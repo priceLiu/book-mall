@@ -36,6 +36,7 @@ export async function runGatewayV1ChatCompletions(opts: {
   auth: ResolvedGatewayApiKeyAuth;
   body: Record<string, unknown>;
   logMeta?: GatewayV1LogMeta;
+  signal?: AbortSignal;
 }): Promise<{ text: string; status: number; logId: string }> {
   const model = typeof opts.body.model === "string" ? opts.body.model : "";
   if (!model) {
@@ -88,6 +89,7 @@ export async function runGatewayV1ChatCompletions(opts: {
       credentialId,
       providerKind: route.providerKind,
       body: opts.body,
+      signal: opts.signal,
     });
     let parsed: unknown = null;
     try {
@@ -106,13 +108,14 @@ export async function runGatewayV1ChatCompletions(opts: {
     });
     return { text: result.text, status: result.status, logId: log.id };
   } catch (e) {
+    const aborted = opts.signal?.aborted === true;
     const msg = e instanceof Error ? e.message : String(e);
     await finalizeRequestLog(log.id, {
-      status: "FAILED",
-      durationMs: 0,
-      failMessage: msg.slice(0, 500),
+      status: aborted ? "CANCELLED" : "FAILED",
+      durationMs: Math.max(0, Date.now() - log.submittedAt.getTime()),
+      failMessage: aborted ? "请求已取消" : msg.slice(0, 500),
       model,
     });
-    throw new GatewayV1ChatError(502, msg);
+    throw new GatewayV1ChatError(aborted ? 499 : 502, aborted ? "请求已取消" : msg);
   }
 }

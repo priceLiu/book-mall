@@ -3,6 +3,7 @@
 import { EcomUnauthorizedError } from "@/lib/ecom-auth";
 import { ecomBookFetch } from "@/lib/ecom-book-fetch";
 import type { FilmPullProject } from "@/lib/film-pull-types";
+import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 
 const BASE = "api/sso/tools/ecom/film-pull";
@@ -38,17 +39,14 @@ export async function getFilmPullProject(id: string): Promise<FilmPullProject> {
   return data.project as FilmPullProject;
 }
 
-export async function listFilmPullProjectSummaries(): Promise<
-  Array<{ id: string; title: string | null; status: string; updatedAt: string; hasMedia: boolean }>
-> {
+export async function listFilmPullProjectSummaries(): Promise<EcomProjectListItem[]> {
   const data = await ecomBookFetch(`${BASE}/projects`);
   const items = (data.items as FilmPullProject[]) ?? [];
   return items.map((p) => ({
     id: p.id,
-    title: p.title,
-    status: p.status,
+    title: p.title?.trim() || "专业拉片",
     updatedAt: p.updatedAt,
-    hasMedia: Boolean(p.media?.ossUrl),
+    subtitle: p.status,
   }));
 }
 
@@ -127,14 +125,56 @@ export async function uploadFilmPullCharacterRef(
   return data.project as FilmPullProject;
 }
 
+export async function streamFilmPullAnalyze(
+  projectId: string,
+  opts?: { prompt?: string; modelKey?: string },
+  onChunk?: (text: string) => void,
+): Promise<string> {
+  const res = await fetch(`/api/book-mall/${BASE}/projects/${projectId}/analyze`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(opts ?? {}),
+  });
+  if (res.status === 401) throw new EcomUnauthorizedError();
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      project?: FilmPullProject;
+    };
+    throw new Error(data.error ?? `拉片失败 (${res.status})`);
+  }
+  if (!res.body) throw new Error("无响应体");
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let full = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const piece = decoder.decode(value, { stream: true });
+    full += piece;
+    onChunk?.(full);
+  }
+  return full.trim();
+}
+
+/** @deprecated 请使用 streamFilmPullAnalyze；保留供轮询 job 降级 */
 export async function analyzeFilmPull(
   projectId: string,
   opts?: { prompt?: string; modelKey?: string },
 ): Promise<FilmPullProject> {
-  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/analyze`, {
+  await streamFilmPullAnalyze(projectId, opts);
+  const project = await getFilmPullProject(projectId);
+  if (!project) throw new Error("拉片失败");
+  return project;
+}
+
+export async function cancelFilmPullAnalyze(projectId: string): Promise<FilmPullProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/analyze/cancel`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(opts ?? {}),
+    body: JSON.stringify({}),
   });
   return data.project as FilmPullProject;
 }

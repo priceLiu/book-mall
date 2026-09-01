@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { ExternalLink, FolderOpen, Plus, Trash2 } from "lucide-react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { EcomHomeAssistant } from "@/components/layout/ecom-home-assistant";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import {
   ECOM_LIBRARY_MEDIA_GRID_CLASS,
@@ -154,9 +153,9 @@ export default function WorkflowDraftsPage() {
   }
 
   return (
-    <EcomWorkspaceLayout
-      assistantHeader={
-        <>
+    <EcomWorkspaceLayout fullWidth>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <header className="shrink-0 border-b border-[#e8e8ed] bg-white px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-[11px] font-medium uppercase tracking-wide text-[#86868b]">
@@ -222,11 +221,9 @@ export default function WorkflowDraftsPage() {
               我的资产 →
             </Link>
           </div>
-        </>
-      }
-      assistant={<EcomHomeAssistant variant="library" />}
-    >
-      <div className="min-h-0 flex-1 overflow-y-auto bg-white p-4 sm:p-6">
+        </header>
+
+        <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto bg-white p-4 sm:p-6">
         {loading ? (
           <EcomMediaSkeletonGrid count={6} gridClass={ECOM_LIBRARY_MEDIA_GRID_CLASS} />
         ) : filtered.length === 0 ? (
@@ -320,6 +317,7 @@ export default function WorkflowDraftsPage() {
             ))}
           </div>
         )}
+        </div>
       </div>
     </EcomWorkspaceLayout>
   );

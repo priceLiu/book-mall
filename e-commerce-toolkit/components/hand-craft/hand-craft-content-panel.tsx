@@ -37,6 +37,11 @@ import {
   stepState,
 } from "@/lib/hand-craft-workflow";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import { defaultImageSizeForModel } from "@/lib/storyboard-gen-params";
+import {
+  filterImageSizeOptionsByEcomRatio,
+  imageSizeOptionsForModel,
+} from "@/lib/storyboard-image-size-options";
 import { cn } from "@/lib/utils";
 
 export function handCraftStepAnchorId(stepId: HandCraftStepId): string {
@@ -71,6 +76,14 @@ type Props = {
   focusStepId?: HandCraftStepId | null;
 };
 
+function defaultHandCraftImageSize(modelKey: string, ratio: string): string {
+  const opts = filterImageSizeOptionsByEcomRatio(
+    imageSizeOptionsForModel(modelKey),
+    ratio,
+  );
+  return opts[0]?.value ?? defaultImageSizeForModel(modelKey, "9:16");
+}
+
 export function HandCraftContentPanel({
   project,
   currentStepId,
@@ -102,6 +115,9 @@ export function HandCraftContentPanel({
   const scrollRootRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [draftModelKey, setDraftModelKey] = useState(imageModelKey);
+  const [imageSize, setImageSize] = useState(() =>
+    defaultHandCraftImageSize(imageModelKey, handCraftStep(currentStepId).ratio),
+  );
   const [pendingGen, setPendingGen] = useState<{
     stepId: HandCraftStepId;
     indexes: number[];
@@ -124,6 +140,11 @@ export function HandCraftContentPanel({
   const genPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => setDraftModelKey(imageModelKey), [imageModelKey]);
+  useEffect(() => {
+    if (!pendingGen) return;
+    const ratio = handCraftStep(pendingGen.stepId).ratio;
+    setImageSize(defaultHandCraftImageSize(draftModelKey || imageModelKey, ratio));
+  }, [draftModelKey, imageModelKey, pendingGen]);
 
   useEffect(
     () => () => {
@@ -184,7 +205,12 @@ export function HandCraftContentPanel({
   }, [generating, project, project.id, startGenPoll]);
 
   const runGenerate = useCallback(
-    async (stepId: HandCraftStepId, indexes: number[], modelKey: string) => {
+    async (
+      stepId: HandCraftStepId,
+      indexes: number[],
+      modelKey: string,
+      sizeOverride?: string,
+    ) => {
       const meta = handCraftStep(stepId);
       setGenerating({ stepId, indexes });
       setBusy(
@@ -202,6 +228,7 @@ export function HandCraftContentPanel({
           stepId,
           indexes,
           modelKey,
+          imageSize: sizeOverride ?? imageSize,
           concurrency: Math.max(1, Math.min(5, imageGenConcurrencyLimit)),
         });
         generated = result.generated;
@@ -234,6 +261,7 @@ export function HandCraftContentPanel({
     [
       alert,
       imageGenConcurrencyLimit,
+      imageSize,
       onProjectChange,
       project.id,
       startGenPoll,
@@ -568,6 +596,8 @@ export function HandCraftContentPanel({
         onRetryLoadModels={onRefreshModels}
         value={draftModelKey}
         onChange={setDraftModelKey}
+        imageSize={imageSize}
+        onImageSizeChange={setImageSize}
         lockedImageSizeLabel={
           pendingGen
             ? `${handCraftStep(pendingGen.stepId).ratio}（由本步版式决定）`
@@ -579,7 +609,7 @@ export function HandCraftContentPanel({
           if (!req) return;
           setPendingGen(null);
           onImageModelChange(modelKey);
-          void runGenerate(req.stepId, req.indexes, modelKey);
+          void runGenerate(req.stepId, req.indexes, modelKey, imageSize);
         }}
       />
 

@@ -30,9 +30,10 @@ function loadTableMd(): string {
 const FILM_PULL_FENCE_CONTRACT = `
 ## 【强制】机器可读交付 · \`\`\`film-pull JSON
 
-1. 先写用户可读 Markdown；
+1. 先写用户可读 Markdown（分镜总览表 + meta 摘要 + 整体叙事逻辑 / 镜头卡点要点 / 可复刻拍摄脚本 三块）；
 2. **最末尾**唯一围栏 \`\`\`film-pull；
-3. JSON 禁止注释、尾逗号。
+3. JSON 须含 narrativeLogic、beatPoints、replicableShootingScript（与 Markdown 三块一致）；
+4. JSON 禁止注释、尾逗号。
 
 契约见 table-format.md。
 `;

@@ -32,6 +32,7 @@ import {
   formatLogTimingPhaseCell,
   logProviderFilterOptions,
   resolveLogVendorPhaseEmptyHint,
+  inputSummaryHasVideoUrl,
   LOG_APP_FILTER_OPTIONS,
 } from "@/lib/gateway-log-display";
 import {
@@ -731,6 +732,7 @@ const LogsTableRow = memo(function LogsTableRow({
     isInProgress,
     hasVolcengineTrace: hasVolcengineTimingTrace(l.resultSummary),
     hasDashscopeTrace: hasDashscopeTimingTrace(l.resultSummary),
+    hasVideoInput: inputSummaryHasVideoUrl(l.inputSummary),
   });
   const phaseCellTitle = (
     cell: { value: string; title?: string },

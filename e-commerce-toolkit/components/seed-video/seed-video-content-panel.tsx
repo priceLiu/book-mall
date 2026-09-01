@@ -68,6 +68,10 @@ import {
   type SeedVideoShot,
 } from "@/lib/seed-video-types";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import {
+  type StoryboardVideoResolution,
+} from "@/lib/storyboard-gen-params";
+import { videoModelSupportsGenerateAudio } from "@/lib/storyboard-video-params";
 
 const DIRECT_POLL_MS = 4000;
 const DIRECT_POLL_MAX = 180;
@@ -299,11 +303,23 @@ export function SeedVideoContentPanel({
     () => directPlan?.durationSec ?? projectTargetDurationSec,
   );
   const [pickerPanelDurationSec, setPickerPanelDurationSec] = useState(8);
+  const [pickerVideoResolution, setPickerVideoResolution] =
+    useState<StoryboardVideoResolution>("1080p");
+  const [pickerVideoR2vRatio, setPickerVideoR2vRatio] = useState<string>(
+    () => project.settings.aspectRatio ?? "9:16",
+  );
+  const [pickerVideoSeed, setPickerVideoSeed] = useState("");
+  const [pickerVideoPromptExtend, setPickerVideoPromptExtend] = useState(true);
+  const [pickerVideoGenerateAudio, setPickerVideoGenerateAudio] = useState(true);
   const directPollLock = useRef(false);
   const generatingShotsRef = useRef(generatingShots);
   generatingShotsRef.current = generatingShots;
   const syncShotVideosLockRef = useRef(false);
   const projectChangeTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    setPickerVideoR2vRatio(project.settings.aspectRatio ?? "9:16");
+  }, [project.id, project.settings.aspectRatio]);
 
   useEffect(() => {
     setPickerDurationSec(directPlan?.durationSec ?? projectTargetDurationSec);
@@ -634,6 +650,8 @@ export function SeedVideoContentPanel({
         modelKey,
         durationSec: pickerPanelDurationSec,
         aspectRatio: project.settings.aspectRatio ?? "9:16",
+        resolution: pickerVideoResolution,
+        generateAudio: pickerVideoGenerateAudio,
       });
       setLocalShots((prev) =>
         prev.map((s) =>
@@ -1118,6 +1136,8 @@ export function SeedVideoContentPanel({
         modelKey,
         durationSec: pickerDurationSec,
         aspectRatio: project.settings.aspectRatio ?? "9:16",
+        resolution: pickerVideoResolution,
+        generateAudio: pickerVideoGenerateAudio,
       });
       await onProjectChange();
       await pollDirect();
@@ -1632,12 +1652,27 @@ export function SeedVideoContentPanel({
         panelIndex={pickerPanelIndex}
         models={filteredModels.length ? filteredModels : videoModels}
         value={videoModelKey}
-        onChange={onVideoModelChange}
+        onChange={(key) => {
+          onVideoModelChange(key);
+          if (videoModelSupportsGenerateAudio(key)) {
+            setPickerVideoGenerateAudio(true);
+          }
+        }}
         onConfirm={(modelKey) => void onPickerConfirm(modelKey)}
         durationSec={pickerDurationSec}
         onDurationChange={setPickerDurationSec}
         panelDurationSec={pickerPanelDurationSec}
         onPanelDurationChange={setPickerPanelDurationSec}
+        videoResolution={pickerVideoResolution}
+        onVideoResolutionChange={setPickerVideoResolution}
+        videoR2vRatio={pickerVideoR2vRatio}
+        onVideoR2vRatioChange={setPickerVideoR2vRatio}
+        videoSeed={pickerVideoSeed}
+        onVideoSeedChange={setPickerVideoSeed}
+        videoPromptExtend={pickerVideoPromptExtend}
+        onVideoPromptExtendChange={setPickerVideoPromptExtend}
+        videoGenerateAudio={pickerVideoGenerateAudio}
+        onVideoGenerateAudioChange={setPickerVideoGenerateAudio}
         aspectRatio={project.settings.aspectRatio ?? "9:16"}
       />
 

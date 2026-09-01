@@ -33,6 +33,7 @@ export type StoryboardSettingsValue = {
   videoR2vRatio?: string;
   videoSeed?: string;
   videoPromptExtend?: boolean;
+  videoGenerateAudio?: boolean;
 };
 
 type Props = {

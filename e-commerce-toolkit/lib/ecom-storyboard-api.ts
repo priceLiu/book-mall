@@ -381,6 +381,7 @@ export async function submitStoryboardFullVideo(
     ratio?: string;
     seedStr?: string;
     promptExtend?: boolean;
+    generateAudio?: boolean;
   },
 ): Promise<{
   status: "running";
@@ -448,6 +449,7 @@ export async function generateStoryboardPanelVideo(
     durationSec?: number;
     resolution?: string;
     modelKey?: string;
+    generateAudio?: boolean;
   },
 ): Promise<{ videoUrl: string; panelIndex: number; chargePoints?: number }> {
   const data = await ecomBookFetch(

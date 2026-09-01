@@ -227,7 +227,10 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
     group("营销", Target, marketingChildren),
     group("应用", Boxes, portalLinks),
     link("我的工作流", "/workflows/drafts", FolderKanban),
-    link("我的资产", "/library", Package),
+    group("我的资产", Package, [
+      link("成图与视频", "/library", Package),
+      link("姿势·场景·道具库", "/ecom/shoot-catalog", Sparkles),
+    ]),
     sep(),
     link("计费与账户", bookAccountHref(bookOrigin, "/account/billing"), Settings, {
       external: true,

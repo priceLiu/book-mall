@@ -155,6 +155,7 @@ type Props = {
   onVideoR2vRatioChange?: (v: string) => void;
   onVideoSeedChange?: (v: string) => void;
   onVideoPromptExtendChange?: (v: boolean) => void;
+  onVideoGenerateAudioChange?: (v: boolean) => void;
   onVideoAspectChange?: (v: "16:9" | "9:16" | "1:1") => void;
   videoAspectRatio?: "16:9" | "9:16" | "1:1";
   videoOssUrl?: string | null;
@@ -231,6 +232,7 @@ export function StoryboardContentPanel({
   onVideoR2vRatioChange,
   onVideoSeedChange,
   onVideoPromptExtendChange,
+  onVideoGenerateAudioChange,
   videoAspectRatio = aspectRatio,
   onVideoAspectChange,
   videoOssUrl,
@@ -404,6 +406,7 @@ export function StoryboardContentPanel({
   const videoR2vRatio = settings.videoR2vRatio ?? settings.aspectRatio ?? "9:16";
   const videoSeed = settings.videoSeed ?? "";
   const videoPromptExtend = settings.videoPromptExtend !== false;
+  const videoGenerateAudio = settings.videoGenerateAudio !== false;
 
   async function ensureFashionCharacterModeForGenerate(): Promise<
     FashionCharacterRefChoice | null
@@ -1827,6 +1830,7 @@ export function StoryboardContentPanel({
         aspectRatio: videoAspectRatio,
         resolution: videoResolution,
         modelKey: effectiveModel,
+        generateAudio: videoGenerateAudio,
         ...(isStoryboardBailianR2vModel(effectiveModel)
           ? {
               ratio: videoR2vRatio,
@@ -1894,6 +1898,7 @@ export function StoryboardContentPanel({
         durationSec: panelDurationSec,
         resolution: videoResolution,
         modelKey: effectiveModel,
+        generateAudio: videoGenerateAudio,
       });
       if (!opts?.skipProjectUpdate && project.sheet) {
         const panels = project.sheet.panels.map((p) =>
@@ -2934,6 +2939,8 @@ export function StoryboardContentPanel({
         onVideoSeedChange={onVideoSeedChange}
         videoPromptExtend={videoPromptExtend}
         onVideoPromptExtendChange={onVideoPromptExtendChange}
+        videoGenerateAudio={videoGenerateAudio}
+        onVideoGenerateAudioChange={onVideoGenerateAudioChange}
         onChange={(key) => {
           if (pickerMode === "image") onImageModelChange?.(key);
           else onVideoModelChange?.(key);

@@ -25,6 +25,7 @@ export async function POST(req: Request, ctx: Ctx) {
       ? body.indexes.filter((x): x is number => typeof x === "number")
       : undefined;
     const modelKey = typeof body.modelKey === "string" ? body.modelKey : undefined;
+    const imageSize = typeof body.imageSize === "string" ? body.imageSize : undefined;
     console.info("[model-shot] image/generate", {
       projectId: id,
       userId: auth.userId,
@@ -36,6 +37,7 @@ export async function POST(req: Request, ctx: Ctx) {
       projectId: id,
       indexes,
       modelKey,
+      imageSize,
     });
     console.info("[model-shot] image/generate done", {
       projectId: id,

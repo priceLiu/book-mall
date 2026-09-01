@@ -16,7 +16,7 @@ import {
   resolveStoryboardVideoProvider,
 } from "@/lib/ecom/ecom-storyboard-video-models";
 import { resolveStoryboardPanelVideoRefPlan, getStoryboardVideoInvokeRules } from "@/lib/ecom/ecom-storyboard-video-ref-rules";
-import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
+import { resolveEcomVideoGenerateAudio } from "@/lib/ecom/ecom-storyboard-gen-params";
 import { resolveSeedVideoChatImageUrls } from "@/lib/ecom/ecom-seed-video-mention";
 import {
   ECOM_SEED_VIDEO_MODULE,
@@ -65,16 +65,18 @@ async function pollVolcengineToOss(opts: {
   durationSec: number;
   aspectRatio: "16:9" | "9:16";
   resolution: VideoResolution;
+  generateAudio?: boolean;
   onSubmitted?: (task: { taskId: string; logId: string }) => void | Promise<void>;
 }): Promise<{ ossUrl: string; taskId: string }> {
   const workspaceId = randomUUID().slice(0, 8);
   const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_SEED_VIDEO_TOOL_KEY);
+  const generateAudio = resolveEcomVideoGenerateAudio(opts.modelKey, opts.generateAudio);
   const { body } = buildCanvasVideoVolcengineInput({
     modelKey: opts.modelKey,
     prompt: opts.prompt,
     imageUrl: opts.imageUrl,
     referenceImageUrls: opts.referenceImageUrls,
-    options: { resolution: opts.resolution, duration: opts.durationSec, generateAudio: true },
+    options: { resolution: opts.resolution, duration: opts.durationSec, generateAudio },
     aspectRatio: opts.aspectRatio,
   });
   const { taskId, logId } = await ecomGwCreateVolcengineVideoJob(opts.userId, {
@@ -161,6 +163,7 @@ export async function ecomGenerateSeedVideoShot(opts: {
   resolution?: string;
   modelKey?: string;
   ratio?: string;
+  generateAudio?: boolean;
 }) {
   await assertEcomToolkitGatewayAccess(opts.userId);
   const shot = opts.shots.find((s) => s.index === opts.shotIndex);
@@ -171,6 +174,7 @@ export async function ecomGenerateSeedVideoShot(opts: {
   );
   const provider = resolveStoryboardVideoProvider(modelKey);
   const resolution = resolveVideoResolution(opts.resolution);
+  const generateAudio = resolveEcomVideoGenerateAudio(modelKey, opts.generateAudio);
   const durationCap = 15;
   const durationSec = Math.max(
     3,
@@ -269,7 +273,7 @@ export async function ecomGenerateSeedVideoShot(opts: {
       prompt,
       imageUrl: firstFrame,
       referenceImageUrls: refUrls,
-      options: { resolution, duration: durationSec, generateAudio: true },
+      options: { resolution, duration: durationSec, generateAudio },
       aspectRatio,
     });
     const created = await ecomGwCreateKieJob(opts.userId, {
@@ -379,6 +383,7 @@ export async function ecomGenerateSeedVideoShot(opts: {
       durationSec,
       aspectRatio,
       resolution,
+      generateAudio,
       onSubmitted: (task) =>
         persistGatewayTask({ ...task, pollProvider: "volcengine" }),
     }));

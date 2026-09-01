@@ -17,6 +17,9 @@
     "shotSequenceLogic": "…",
     "cameraLanguageSummary": "…"
   },
+  "narrativeLogic": "整体叙事逻辑拆解（全片结构、各段功能与时长）",
+  "beatPoints": "镜头卡点要点（关键秒点、切点、音效/BGM、剪辑节奏）",
+  "replicableShootingScript": "可直接落地复刻的同款拍摄脚本（准备/场景/流程/文案/姿态运镜）",
   "shots": [{
     "shotNo": 1,
     "startTimeSec": 0,
@@ -74,3 +77,4 @@
 1. 回复末尾唯一 ` ```film-pull ` 围栏
 2. 无对应内容填 `"无"`
 3. `shots` 至少 1 镜
+4. `narrativeLogic` / `beatPoints` / `replicableShootingScript` **必填** string（可与 Markdown 三块段落一致，长文用 `\n` 换行）

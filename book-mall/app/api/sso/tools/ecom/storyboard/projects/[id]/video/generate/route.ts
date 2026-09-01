@@ -61,6 +61,8 @@ export async function POST(req: Request, ctx: Ctx) {
     typeof body.seedStr === "string" ? body.seedStr : undefined;
   const promptExtend =
     typeof body.promptExtend === "boolean" ? body.promptExtend : undefined;
+  const generateAudio =
+    typeof body.generateAudio === "boolean" ? body.generateAudio : undefined;
 
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
@@ -78,6 +80,7 @@ export async function POST(req: Request, ctx: Ctx) {
       ratio,
       seedStr,
       promptExtend,
+      generateAudio,
       brief: {
         productHighlight:
           typeof project.brief?.productHighlight === "string"

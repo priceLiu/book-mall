@@ -46,6 +46,9 @@ export const filmPullAnalyzePatchSchema = z.object({
   schemaVersion: z.literal(1),
   action: z.literal("analyze_complete"),
   meta: metaSchema,
+  narrativeLogic: z.string().min(1),
+  beatPoints: z.string().min(1),
+  replicableShootingScript: z.string().min(1),
   shots: z.array(filmPullShotSchema).min(1),
 });
 
@@ -152,6 +155,20 @@ export function formatFilmPullAnalyzeMarkdown(patch: FilmPullAnalyzePatch): stri
       `| ${row.shotNo} | ${row.startTimeSec}-${row.endTimeSec} | ${escCell(row.shotScale)} | ${escCell(row.cameraMovement)} | ${escCell(row.cameraAngle)} | ${escCell(row.narrativeFunction)} | ${escCell(row.aiVisualPrompt.slice(0, 80))}… |`,
     );
   }
+  lines.push(
+    "",
+    "## 整体叙事逻辑拆解",
+    "",
+    patch.narrativeLogic,
+    "",
+    "## 镜头卡点要点",
+    "",
+    patch.beatPoints,
+    "",
+    "## 可复刻拍摄脚本",
+    "",
+    patch.replicableShootingScript,
+  );
   return lines.join("\n").trim();
 }
 

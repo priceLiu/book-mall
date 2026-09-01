@@ -265,9 +265,10 @@ export async function generateProductDesignImages(
   opts: {
     target: "main" | "detail";
     indexes?: number[];
-    modelKey?: string;
-    ratio?: EcomImageRatio;
-    concurrency?: number;
+  modelKey?: string;
+  ratio?: EcomImageRatio;
+  imageSize?: string;
+  concurrency?: number;
   },
 ): Promise<{
   project: ProductDesignProject;

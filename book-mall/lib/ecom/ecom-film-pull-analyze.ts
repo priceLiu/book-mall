@@ -1,7 +1,9 @@
+import { randomUUID } from "crypto";
+
 import type { CanvasChatContentPart } from "@/lib/canvas/providers/types";
 import {
   assertStoryLlmVideoUnderstandingModel,
-  isStoryLlmVisionModel,
+  isStoryLlmVideoUnderstandingModel,
 } from "@/lib/canvas/story-llm-vision-models";
 import {
   extractFilmPullAnalyzePatch,
@@ -37,11 +39,41 @@ import {
   getEcomFilmPullProject,
   saveFilmPullAnalyzeResult,
   saveFilmPullRenderScriptResult,
+  claimFilmPullAnalyzeSlot,
   updateEcomFilmPullProject,
   buildRenderPlanFromScript,
 } from "@/lib/ecom/ecom-film-pull-service";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
-import { ecomGwChatStream } from "@/lib/gateway/ecom-tool-gateway-client";
+import { collectEcomGwChatStreamText } from "@/lib/gateway/ecom-gw-chat-stream-collect";
+import {
+  isFilmPullAnalyzeRunAborted,
+  registerFilmPullAnalyzeRun,
+  releaseFilmPullAnalyzeRun,
+} from "@/lib/ecom/ecom-film-pull-analyze-run";
+
+export class FilmPullAnalyzeCanceledError extends Error {
+  constructor() {
+    super("拉片已中止");
+    this.name = "FilmPullAnalyzeCanceledError";
+  }
+}
+
+async function assertAnalyzeNotCanceled(
+  userId: string,
+  projectId: string,
+  runId: string,
+): Promise<void> {
+  const project = await getEcomFilmPullProject(userId, projectId);
+  const meta = project?.meta;
+  if (
+    meta?.analyzeCancelRunId &&
+    meta.analyzeRunId &&
+    meta.analyzeCancelRunId === meta.analyzeRunId &&
+    meta.analyzeRunId === runId
+  ) {
+    throw new FilmPullAnalyzeCanceledError();
+  }
+}
 
 function buildVideoUserContent(
   prompt: string,
@@ -59,44 +91,26 @@ async function collectGwChatText(
     modelKey: string;
     messages: Array<{ role: "system" | "user"; content: string | CanvasChatContentPart[] }>;
     clientPage: string;
+    signal?: AbortSignal;
   },
 ): Promise<string> {
-  const gw = await ecomGwChatStream(userId, {
-    modelKey: opts.modelKey,
-    messages: opts.messages,
-    clientPage: opts.clientPage,
-  });
-  const decoder = new TextDecoder();
-  let fullText = "";
-  const reader = gw.body.getReader();
-  let sseBuffer = "";
   try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      sseBuffer += decoder.decode(value, { stream: true });
-      const lines = sseBuffer.split("\n");
-      sseBuffer = lines.pop() ?? "";
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith("data:")) continue;
-        const payload = trimmed.slice(5).trim();
-        if (!payload || payload === "[DONE]") continue;
-        try {
-          const chunk = JSON.parse(payload) as {
-            choices?: { delta?: { content?: string | null } }[];
-          };
-          const piece = chunk.choices?.[0]?.delta?.content ?? "";
-          if (piece) fullText += piece;
-        } catch {
-          /* ignore */
-        }
-      }
+    return await collectEcomGwChatStreamText(userId, {
+      modelKey: opts.modelKey,
+      messages: opts.messages,
+      clientPage: opts.clientPage,
+      signal: opts.signal,
+    });
+  } catch (e) {
+    if (
+      isFilmPullAnalyzeRunAborted(opts.signal) ||
+      (e instanceof Error &&
+        (e.name === "AbortError" || e.message.includes("请求已取消")))
+    ) {
+      throw new FilmPullAnalyzeCanceledError();
     }
-  } finally {
-    reader.releaseLock();
+    throw e;
   }
-  return fullText.trim();
 }
 
 function normalizeAnalyzePatch(patch: FilmPullAnalyzePatch): FilmPullAnalyzePatch {
@@ -113,55 +127,112 @@ function normalizeAnalyzePatch(patch: FilmPullAnalyzePatch): FilmPullAnalyzePatc
   };
 }
 
-export async function runFilmPullAnalyze(opts: {
+export type FilmPullAnalyzeRunContext = {
+  userId: string;
+  projectId: string;
+  runId: string;
+  abortSignal: AbortSignal;
+  modelKey: string;
+  userPrompt: string;
+  clientPage: string;
+  systemPrompt: string;
+  media: FilmPullMediaReference;
+};
+
+export async function beginFilmPullAnalyzeRun(opts: {
   userId: string;
   projectId: string;
   prompt?: string;
   modelKey?: string;
-}): Promise<FilmPullStructuredResult<FilmPullAnalyzePatch>> {
+}): Promise<FilmPullAnalyzeRunContext> {
   const project = await getEcomFilmPullProject(opts.userId, opts.projectId);
   if (!project?.media?.ossUrl) throw new Error("请先上传视频");
 
-  let modelKey = opts.modelKey?.trim() || project.settings.chatModelKey?.trim() || ECOM_FILM_PULL_DEFAULT_CHAT_MODEL;
-  if (!isStoryLlmVisionModel(modelKey)) modelKey = ECOM_FILM_PULL_DEFAULT_CHAT_MODEL;
+  let modelKey =
+    opts.modelKey?.trim() ||
+    project.settings.chatModelKey?.trim() ||
+    ECOM_FILM_PULL_DEFAULT_CHAT_MODEL;
+  if (!isStoryLlmVideoUnderstandingModel(modelKey)) {
+    modelKey = ECOM_FILM_PULL_DEFAULT_CHAT_MODEL;
+  }
   assertStoryLlmVideoUnderstandingModel(modelKey, "专业拉片");
 
   const userPrompt = opts.prompt?.trim() || FILM_PULL_DEFAULT_ANALYZE_USER_PROMPT;
-  await updateEcomFilmPullProject(opts.userId, opts.projectId, {
-    status: "analyzing",
-    settings: { ...project.settings, chatModelKey: modelKey, lastAnalyzePrompt: userPrompt },
-  });
+  const runId = randomUUID();
+  const startedAt = new Date().toISOString();
 
-  const clientPage = ecomClientPage(opts.userId, opts.projectId, ECOM_FILM_PULL_TOOL_KEY);
-  const systemPrompt = buildFilmPullAnalyzeSystemPrompt();
+  let abortSignal: AbortSignal;
+  try {
+    abortSignal = registerFilmPullAnalyzeRun(opts.userId, opts.projectId, runId);
+  } catch (e) {
+    throw e instanceof Error ? e : new Error("拉片进行中，请等待完成或先中止");
+  }
 
-  let fullText = await collectGwChatText(opts.userId, {
+  try {
+    await claimFilmPullAnalyzeSlot(opts.userId, opts.projectId, {
+      runId,
+      startedAt,
+      chatModelKey: modelKey,
+      lastAnalyzePrompt: userPrompt,
+      settings: project.settings,
+      meta: project.meta,
+    });
+  } catch (e) {
+    releaseFilmPullAnalyzeRun(opts.userId, opts.projectId, runId);
+    throw e;
+  }
+
+  return {
+    userId: opts.userId,
+    projectId: opts.projectId,
+    runId,
+    abortSignal,
     modelKey,
-    clientPage,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: buildVideoUserContent(userPrompt, project.media) },
-    ],
-  });
+    userPrompt,
+    clientPage: ecomClientPage(opts.userId, opts.projectId, ECOM_FILM_PULL_TOOL_KEY),
+    systemPrompt: buildFilmPullAnalyzeSystemPrompt(),
+    media: project.media,
+  };
+}
+
+export async function finalizeFilmPullAnalyzeFromText(opts: {
+  ctx: FilmPullAnalyzeRunContext;
+  fullText: string;
+  retryOnParseError?: boolean;
+}): Promise<FilmPullStructuredResult<FilmPullAnalyzePatch>> {
+  const { ctx } = opts;
+  let fullText = opts.fullText;
 
   let structured = extractFilmPullAnalyzePatch(fullText);
   let parseError = structured ? null : resolveFilmPullParseError(fullText, "analyze");
 
-  if (!structured && parseError) {
-    fullText = await collectGwChatText(opts.userId, {
-      modelKey,
-      clientPage,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: buildVideoUserContent(userPrompt, project.media) },
-        { role: "user", content: `上次输出校验失败：${parseError}。请仅重输出完整 \`\`\`film-pull JSON。` },
-      ],
-    });
-    structured = extractFilmPullAnalyzePatch(fullText);
-    parseError = structured ? null : resolveFilmPullParseError(fullText, "analyze");
+  if (!structured && parseError && opts.retryOnParseError !== false) {
+    try {
+      await assertAnalyzeNotCanceled(ctx.userId, ctx.projectId, ctx.runId);
+      fullText = await collectGwChatText(ctx.userId, {
+        modelKey: ctx.modelKey,
+        clientPage: ctx.clientPage,
+        signal: ctx.abortSignal,
+        messages: [
+          { role: "system", content: ctx.systemPrompt },
+          { role: "user", content: buildVideoUserContent(ctx.userPrompt, ctx.media) },
+          {
+            role: "user",
+            content: `上次输出校验失败：${parseError}。请仅重输出完整 \`\`\`film-pull JSON。`,
+          },
+        ],
+      });
+      structured = extractFilmPullAnalyzePatch(fullText);
+      parseError = structured ? null : resolveFilmPullParseError(fullText, "analyze");
+    } catch (e) {
+      if (e instanceof FilmPullAnalyzeCanceledError) throw e;
+      parseError = e instanceof Error ? e.message : "拉片模型重试失败";
+    }
   }
 
   if (structured) structured = normalizeAnalyzePatch(structured);
+
+  await assertAnalyzeNotCanceled(ctx.userId, ctx.projectId, ctx.runId);
 
   const result: FilmPullStructuredResult<FilmPullAnalyzePatch> = {
     rawText: fullText,
@@ -170,8 +241,65 @@ export async function runFilmPullAnalyze(opts: {
     completedAt: new Date().toISOString(),
   };
 
-  await saveFilmPullAnalyzeResult(opts.userId, opts.projectId, result);
+  await saveFilmPullAnalyzeResult(ctx.userId, ctx.projectId, result);
   return result;
+}
+
+export function endFilmPullAnalyzeRun(ctx: Pick<FilmPullAnalyzeRunContext, "userId" | "projectId" | "runId">): void {
+  releaseFilmPullAnalyzeRun(ctx.userId, ctx.projectId, ctx.runId);
+}
+
+export async function runFilmPullAnalyze(opts: {
+  userId: string;
+  projectId: string;
+  prompt?: string;
+  modelKey?: string;
+}): Promise<FilmPullStructuredResult<FilmPullAnalyzePatch>> {
+  const ctx = await beginFilmPullAnalyzeRun(opts);
+
+  try {
+    let fullText = "";
+    let gatewayError: string | null = null;
+    try {
+      await assertAnalyzeNotCanceled(ctx.userId, ctx.projectId, ctx.runId);
+      fullText = await collectGwChatText(ctx.userId, {
+        modelKey: ctx.modelKey,
+        clientPage: ctx.clientPage,
+        signal: ctx.abortSignal,
+        messages: [
+          { role: "system", content: ctx.systemPrompt },
+          { role: "user", content: buildVideoUserContent(ctx.userPrompt, ctx.media) },
+        ],
+      });
+    } catch (e) {
+      if (e instanceof FilmPullAnalyzeCanceledError) throw e;
+      gatewayError = e instanceof Error ? e.message : "拉片模型调用失败";
+    }
+
+    if (gatewayError) {
+      const result: FilmPullStructuredResult<FilmPullAnalyzePatch> = {
+        rawText: "",
+        structured: null,
+        parseError: gatewayError,
+        completedAt: new Date().toISOString(),
+      };
+      await saveFilmPullAnalyzeResult(ctx.userId, ctx.projectId, result);
+      return result;
+    }
+
+    return await finalizeFilmPullAnalyzeFromText({ ctx, fullText });
+  } catch (e) {
+    if (e instanceof FilmPullAnalyzeCanceledError) {
+      const latest = await getEcomFilmPullProject(ctx.userId, ctx.projectId);
+      if (latest?.analyzeResult?.completedAt) {
+        return latest.analyzeResult;
+      }
+      throw e;
+    }
+    throw e;
+  } finally {
+    endFilmPullAnalyzeRun(ctx);
+  }
 }
 
 export async function runFilmPullRenderScript(opts: {
@@ -188,7 +316,9 @@ export async function runFilmPullRenderScript(opts: {
   }
 
   let modelKey = opts.modelKey?.trim() || project.settings.chatModelKey?.trim() || ECOM_FILM_PULL_DEFAULT_CHAT_MODEL;
-  if (!isStoryLlmVisionModel(modelKey)) modelKey = ECOM_FILM_PULL_DEFAULT_CHAT_MODEL;
+  if (!isStoryLlmVideoUnderstandingModel(modelKey)) {
+    modelKey = ECOM_FILM_PULL_DEFAULT_CHAT_MODEL;
+  }
 
   await updateEcomFilmPullProject(opts.userId, opts.projectId, { status: "render_scripting" });
 
@@ -204,17 +334,23 @@ export async function runFilmPullRenderScript(opts: {
     contentParts.push({ type: "image_url", image_url: { url: ref.ossUrl } });
   }
 
-  const fullText = await collectGwChatText(opts.userId, {
-    modelKey,
-    clientPage,
-    messages: [
-      { role: "system", content: buildFilmPullRenderScriptSystemPrompt() },
-      { role: "user", content: contentParts },
-    ],
-  });
+  let fullText = "";
+  let gatewayError: string | null = null;
+  try {
+    fullText = await collectGwChatText(opts.userId, {
+      modelKey,
+      clientPage,
+      messages: [
+        { role: "system", content: buildFilmPullRenderScriptSystemPrompt() },
+        { role: "user", content: contentParts },
+      ],
+    });
+  } catch (e) {
+    gatewayError = e instanceof Error ? e.message : "渲染脚本模型调用失败";
+  }
 
-  let structured = extractFilmPullRenderScriptPatch(fullText);
-  let parseError = structured ? null : resolveFilmPullParseError(fullText, "render_script");
+  let structured = gatewayError ? null : extractFilmPullRenderScriptPatch(fullText);
+  let parseError = gatewayError ?? (structured ? null : resolveFilmPullParseError(fullText, "render_script"));
 
   if (structured) {
     structured = {

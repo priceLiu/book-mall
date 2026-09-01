@@ -27,6 +27,7 @@ type BackgroundGenerationContextValue = {
   minimizeTask: (id: string) => void;
   minimizeAll: () => void;
   dismissTask: (id: string) => void;
+  failTask: (id: string, error: string) => void;
   expandDock: () => void;
   /** 是否存在前台 running 且未最小化的任务（用于 inline busy） */
   hasForegroundRunning: boolean;
@@ -63,7 +64,7 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
       const next: BackgroundGenerationTask = {
         ...input,
         status: input.status ?? "running",
-        minimized: input.minimized ?? false,
+        minimized: input.minimized ?? true,
       };
       const idx = prev.findIndex((t) => t.id === input.id);
       if (idx >= 0) {
@@ -75,28 +76,43 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
           minimized: input.minimized ?? existing.minimized,
           status: input.status ?? existing.status,
           poll: input.poll,
+          onCancel: input.onCancel ?? existing.onCancel,
+          cancelLabel: input.cancelLabel ?? existing.cancelLabel,
+          onSucceeded: input.onSucceeded ?? existing.onSucceeded,
+          onFailed: input.onFailed ?? existing.onFailed,
         };
         return copy;
       }
       return [...prev, next];
     });
-    setDockExpanded(true);
+    // 新任务默认仅显示右下角胶囊，不自动展开面板
   }, []);
 
   const minimizeTask = useCallback((id: string) => {
     setTasks((prev) =>
       prev.map((t) => (t.id === id ? { ...t, minimized: true } : t)),
     );
-    setDockExpanded(true);
+    setDockExpanded(false);
   }, []);
 
   const minimizeAll = useCallback(() => {
     setTasks((prev) => prev.map((t) => ({ ...t, minimized: true })));
-    setDockExpanded(true);
+    setDockExpanded(false);
   }, []);
 
   const dismissTask = useCallback((id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const failTask = useCallback((id: string, error: string) => {
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? { ...t, status: "failed" as const, error, minimized: true }
+          : t,
+      ),
+    );
+    setDockExpanded(true);
   }, []);
 
   const expandDock = useCallback(() => setDockExpanded(true), []);
@@ -116,7 +132,7 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
           }
           return t;
         });
-        if (changed) setDockExpanded(true);
+        if (changed) setDockExpanded(false);
         return changed ? next : prev;
       });
     }, 5000);
@@ -195,6 +211,7 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
       minimizeTask,
       minimizeAll,
       dismissTask,
+      failTask,
       expandDock,
       hasForegroundRunning,
       isTaskMinimized,
@@ -205,22 +222,19 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
       minimizeTask,
       minimizeAll,
       dismissTask,
+      failTask,
       expandDock,
       hasForegroundRunning,
       isTaskMinimized,
     ],
   );
 
-  const showDock =
-    tasks.length > 0 &&
-    (dockExpanded || tasks.some((t) => t.minimized || t.status !== "running"));
-
   return (
     <BackgroundGenerationContext.Provider value={value}>
       {children}
       <BackgroundGenerationDock
         tasks={tasks}
-        expanded={dockExpanded && showDock}
+        expanded={dockExpanded}
         onExpandedChange={setDockExpanded}
         onDismiss={dismissTask}
       />

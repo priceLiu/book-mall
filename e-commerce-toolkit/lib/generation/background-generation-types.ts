@@ -19,6 +19,9 @@ export type BackgroundGenerationTask = {
   poll: () => Promise<BackgroundGenerationPollResult>;
   onSucceeded?: () => void | Promise<void>;
   onFailed?: () => void | Promise<void>;
+  /** 运行中可取消（如拉片中止） */
+  onCancel?: () => void | Promise<void>;
+  cancelLabel?: string;
   /** 完成后在 Dock 展示「打开作品 / 查看结果」 */
   openLabel?: string;
   onOpen?: () => void | Promise<void>;

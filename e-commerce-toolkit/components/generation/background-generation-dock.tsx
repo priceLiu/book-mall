@@ -256,6 +256,20 @@ export function BackgroundGenerationDock({
                   ) : null}
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
+                  {task.status === "running" && task.onCancel ? (
+                    <button
+                      type="button"
+                      className={cn(
+                        "text-[10px] font-medium",
+                        variant === "light"
+                          ? "text-[#ff3b30] hover:text-[#d70015]"
+                          : "text-red-400 hover:text-red-300",
+                      )}
+                      onClick={() => void task.onCancel?.()}
+                    >
+                      {task.cancelLabel ?? "中止"}
+                    </button>
+                  ) : null}
                   {task.status === "succeeded" && task.onOpen ? (
                     <button
                       type="button"
@@ -282,6 +296,19 @@ export function BackgroundGenerationDock({
                       onClick={() => onDismiss(task.id)}
                     >
                       清除
+                    </button>
+                  ) : task.onCancel ? (
+                    <button
+                      type="button"
+                      className={cn(
+                        "text-[10px]",
+                        variant === "light"
+                          ? "text-[#86868b] hover:text-[#1d1d1f]"
+                          : "text-zinc-500 hover:text-zinc-300",
+                      )}
+                      onClick={() => onExpandedChange(false)}
+                    >
+                      收起
                     </button>
                   ) : null}
                 </div>

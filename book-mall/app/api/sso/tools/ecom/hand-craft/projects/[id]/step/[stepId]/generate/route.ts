@@ -19,7 +19,12 @@ export async function POST(req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "未知步骤" }, { status: 400 });
   }
 
-  let body: { indexes?: unknown; modelKey?: unknown; concurrency?: unknown } = {};
+  let body: {
+    indexes?: unknown;
+    modelKey?: unknown;
+    concurrency?: unknown;
+    imageSize?: unknown;
+  } = {};
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -41,6 +46,8 @@ export async function POST(req: Request, ctx: Ctx) {
       modelKey: typeof body.modelKey === "string" ? body.modelKey : undefined,
       concurrency:
         typeof body.concurrency === "number" ? body.concurrency : undefined,
+      imageSize:
+        typeof body.imageSize === "string" ? body.imageSize : undefined,
     });
     const project = await getEcomHandCraftProject(auth.userId, id);
     return NextResponse.json({ ...result, project });

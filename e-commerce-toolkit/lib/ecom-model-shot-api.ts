@@ -192,6 +192,7 @@ export async function generateModelShotImages(opts: {
   projectId: string;
   indexes?: number[];
   modelKey?: string;
+  imageSize?: string;
 }): Promise<{
   generated: number;
   failures: string[];
@@ -203,6 +204,7 @@ export async function generateModelShotImages(opts: {
     body: JSON.stringify({
       indexes: opts.indexes,
       modelKey: opts.modelKey,
+      imageSize: opts.imageSize,
     }),
   });
   return {

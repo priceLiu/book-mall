@@ -6,74 +6,303 @@ type Props = {
   shots: FilmPullShot[];
   editable?: boolean;
   onChange?: (shots: FilmPullShot[]) => void;
+  /** 嵌入「拉片结果」卡片内时，与拆图拆视频结果表一致 */
+  embedded?: boolean;
 };
 
-export function FilmPullShotTable({ shots, editable, onChange }: Props) {
-  const update = (index: number, field: keyof FilmPullShot, value: string) => {
-    if (!editable || !onChange) return;
-    const next = shots.map((s, i) => (i === index ? { ...s, [field]: value } : s));
+type ColumnDef = {
+  key: string;
+  label: string;
+  minW: string;
+  multiline?: boolean;
+  get: (row: FilmPullShot) => string;
+  set?: (row: FilmPullShot, value: string) => FilmPullShot;
+};
+
+const COLUMNS: ColumnDef[] = [
+  {
+    key: "shotNo",
+    label: "镜号",
+    minW: "min-w-[44px]",
+    get: (r) => String(r.shotNo),
+  },
+  {
+    key: "startTimeSec",
+    label: "入点(s)",
+    minW: "min-w-[64px]",
+    get: (r) => r.startTimeSec.toFixed(2),
+    set: (r, v) => ({ ...r, startTimeSec: Number(v) || r.startTimeSec }),
+  },
+  {
+    key: "endTimeSec",
+    label: "出点(s)",
+    minW: "min-w-[64px]",
+    get: (r) => r.endTimeSec.toFixed(2),
+    set: (r, v) => ({ ...r, endTimeSec: Number(v) || r.endTimeSec }),
+  },
+  {
+    key: "durationSec",
+    label: "时长(s)",
+    minW: "min-w-[56px]",
+    get: (r) => r.durationSec.toFixed(2),
+    set: (r, v) => ({ ...r, durationSec: Number(v) || r.durationSec }),
+  },
+  {
+    key: "cutTransition",
+    label: "转场",
+    minW: "min-w-[72px]",
+    get: (r) => r.cutTransition,
+    set: (r, v) => ({ ...r, cutTransition: v }),
+  },
+  {
+    key: "shotScale",
+    label: "景别",
+    minW: "min-w-[72px]",
+    get: (r) => r.shotScale,
+    set: (r, v) => ({ ...r, shotScale: v }),
+  },
+  {
+    key: "cameraAngle",
+    label: "机位",
+    minW: "min-w-[72px]",
+    get: (r) => r.cameraAngle,
+    set: (r, v) => ({ ...r, cameraAngle: v }),
+  },
+  {
+    key: "cameraMovement",
+    label: "运镜",
+    minW: "min-w-[88px]",
+    get: (r) => r.cameraMovement,
+    set: (r, v) => ({ ...r, cameraMovement: v }),
+  },
+  {
+    key: "focalLengthPerspective",
+    label: "焦距透视",
+    minW: "min-w-[88px]",
+    get: (r) => r.focalLengthPerspective,
+    set: (r, v) => ({ ...r, focalLengthPerspective: v }),
+  },
+  {
+    key: "composition",
+    label: "构图",
+    minW: "min-w-[100px]",
+    multiline: true,
+    get: (r) => r.composition,
+    set: (r, v) => ({ ...r, composition: v }),
+  },
+  {
+    key: "subjectBlocking",
+    label: "主体调度",
+    minW: "min-w-[140px]",
+    multiline: true,
+    get: (r) => r.subjectBlocking,
+    set: (r, v) => ({ ...r, subjectBlocking: v }),
+  },
+  {
+    key: "sightDirection",
+    label: "视线方向",
+    minW: "min-w-[88px]",
+    get: (r) => r.sightDirection,
+    set: (r, v) => ({ ...r, sightDirection: v }),
+  },
+  {
+    key: "sceneEnvironment",
+    label: "场景环境",
+    minW: "min-w-[120px]",
+    multiline: true,
+    get: (r) => r.sceneEnvironment,
+    set: (r, v) => ({ ...r, sceneEnvironment: v }),
+  },
+  {
+    key: "foreMidBackLayer",
+    label: "前中后景",
+    minW: "min-w-[120px]",
+    multiline: true,
+    get: (r) => r.foreMidBackLayer,
+    set: (r, v) => ({ ...r, foreMidBackLayer: v }),
+  },
+  {
+    key: "dynamicProps",
+    label: "动态道具",
+    minW: "min-w-[88px]",
+    get: (r) => r.dynamicProps,
+    set: (r, v) => ({ ...r, dynamicProps: v }),
+  },
+  {
+    key: "lightingSetup",
+    label: "布光",
+    minW: "min-w-[100px]",
+    multiline: true,
+    get: (r) => r.lightingSetup,
+    set: (r, v) => ({ ...r, lightingSetup: v }),
+  },
+  {
+    key: "toneContrast",
+    label: "影调对比",
+    minW: "min-w-[88px]",
+    get: (r) => r.toneContrast,
+    set: (r, v) => ({ ...r, toneContrast: v }),
+  },
+  {
+    key: "narrativeFunction",
+    label: "叙事功能",
+    minW: "min-w-[100px]",
+    multiline: true,
+    get: (r) => r.narrativeFunction,
+    set: (r, v) => ({ ...r, narrativeFunction: v }),
+  },
+  {
+    key: "scriptSubtitle",
+    label: "台词",
+    minW: "min-w-[100px]",
+    multiline: true,
+    get: (r) => r.audioInfo.scriptSubtitle,
+    set: (r, v) => ({
+      ...r,
+      audioInfo: { ...r.audioInfo, scriptSubtitle: v },
+    }),
+  },
+  {
+    key: "vocalEmotion",
+    label: "人声情绪",
+    minW: "min-w-[88px]",
+    get: (r) => r.audioInfo.vocalEmotion,
+    set: (r, v) => ({
+      ...r,
+      audioInfo: { ...r.audioInfo, vocalEmotion: v },
+    }),
+  },
+  {
+    key: "ambientSound",
+    label: "环境声",
+    minW: "min-w-[88px]",
+    get: (r) => r.audioInfo.ambientSound,
+    set: (r, v) => ({
+      ...r,
+      audioInfo: { ...r.audioInfo, ambientSound: v },
+    }),
+  },
+  {
+    key: "fxAndBgm",
+    label: "音效/BGM",
+    minW: "min-w-[88px]",
+    get: (r) => r.audioInfo.fxAndBgm,
+    set: (r, v) => ({
+      ...r,
+      audioInfo: { ...r.audioInfo, fxAndBgm: v },
+    }),
+  },
+  {
+    key: "rhythmWeight",
+    label: "节奏权重",
+    minW: "min-w-[72px]",
+    get: (r) => r.rhythmWeight,
+    set: (r, v) => ({ ...r, rhythmWeight: v }),
+  },
+  {
+    key: "visualMetaphor",
+    label: "视觉隐喻",
+    minW: "min-w-[100px]",
+    multiline: true,
+    get: (r) => r.visualMetaphor,
+    set: (r, v) => ({ ...r, visualMetaphor: v }),
+  },
+  {
+    key: "aiVisualPrompt",
+    label: "aiVisualPrompt",
+    minW: "min-w-[200px]",
+    multiline: true,
+    get: (r) => r.aiVisualPrompt,
+    set: (r, v) => ({ ...r, aiVisualPrompt: v }),
+  },
+];
+
+function CellEditor({
+  value,
+  multiline,
+  editable,
+  onChange,
+}: {
+  value: string;
+  multiline?: boolean;
+  editable: boolean;
+  onChange: (v: string) => void;
+}) {
+  if (!editable) {
+    return <span className="block whitespace-pre-wrap break-words">{value || "--"}</span>;
+  }
+  const className =
+    "w-full rounded border border-[#d2d2d7] px-1.5 py-1 text-xs outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3]/20";
+  if (multiline) {
+    return (
+      <textarea
+        className={className}
+        rows={2}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  }
+  return <input className={className} value={value} onChange={(e) => onChange(e.target.value)} />;
+}
+
+export function FilmPullShotTable({ shots, editable, onChange, embedded }: Props) {
+  const updateCell = (rowIndex: number, col: ColumnDef, value: string) => {
+    if (!editable || !onChange || !col.set) return;
+    const next = shots.map((s, i) => (i === rowIndex ? col.set!(s, value) : s));
     onChange(next);
   };
 
   return (
-    <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-auto rounded-xl border border-[#e8e8ed] bg-white">
-      <table className="min-w-[1200px] w-full border-collapse text-left text-xs">
-        <thead className="sticky top-0 z-10 bg-[#1d1d1f] text-white">
+    <div
+      className={
+        embedded
+          ? "overflow-x-auto rounded-lg border border-[#e8e8ed]"
+          : "ecom-scrollbar-thin min-h-0 flex-1 overflow-auto rounded-xl border border-[#e8e8ed] bg-white"
+      }
+    >
+      <table
+        className={
+          embedded
+            ? "min-w-[3200px] w-full border-collapse text-left text-xs"
+            : "min-w-[3200px] w-full border-collapse text-left text-xs"
+        }
+      >
+        <thead
+          className={
+            embedded
+              ? "bg-[#f5f5f7] text-[#6e6e73]"
+              : "sticky top-0 z-10 bg-[#1d1d1f] text-white"
+          }
+        >
           <tr>
-            {[
-              "镜号",
-              "时段",
-              "景别",
-              "运镜",
-              "机位",
-              "主体调度",
-              "场景",
-              "布光",
-              "台词",
-              "aiVisualPrompt",
-            ].map((h) => (
-              <th key={h} className="border-b border-[#333] px-2 py-2 align-top font-medium">
-                {h}
+            {COLUMNS.map((col) => (
+              <th
+                key={col.key}
+                className={`border-b border-[#e8e8ed] px-2 py-2 align-top font-medium whitespace-nowrap ${col.minW}`}
+              >
+                {col.label}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {shots.map((row, i) => (
-            <tr key={row.shotNo} className="border-b border-[#e8e8ed] align-top">
-              <td className="px-2 py-2">{row.shotNo}</td>
-              <td className="px-2 py-2 whitespace-nowrap">
-                {row.startTimeSec.toFixed(2)}–{row.endTimeSec.toFixed(2)}s
-              </td>
-              <td className="px-2 py-2">
-                {editable ? (
-                  <input
-                    className="w-full rounded border border-[#d2d2d7] px-1 py-0.5"
-                    value={row.shotScale}
-                    onChange={(e) => update(i, "shotScale", e.target.value)}
-                  />
-                ) : (
-                  row.shotScale
-                )}
-              </td>
-              <td className="px-2 py-2">{row.cameraMovement}</td>
-              <td className="px-2 py-2">{row.cameraAngle}</td>
-              <td className="max-w-[160px] px-2 py-2">
-                {editable ? (
-                  <textarea
-                    className="w-full rounded border border-[#d2d2d7] px-1 py-0.5"
-                    rows={2}
-                    value={row.subjectBlocking}
-                    onChange={(e) => update(i, "subjectBlocking", e.target.value)}
-                  />
-                ) : (
-                  row.subjectBlocking
-                )}
-              </td>
-              <td className="max-w-[140px] px-2 py-2">{row.sceneEnvironment}</td>
-              <td className="max-w-[120px] px-2 py-2">{row.lightingSetup}</td>
-              <td className="max-w-[100px] px-2 py-2">{row.audioInfo.scriptSubtitle}</td>
-              <td className="max-w-[220px] px-2 py-2 text-[#6e6e73]">{row.aiVisualPrompt}</td>
+          {shots.map((row, rowIndex) => (
+            <tr key={`${row.shotNo}-${rowIndex}`} className="border-b border-[#e8e8ed] align-top">
+              {COLUMNS.map((col) => {
+                const value = col.get(row);
+                const canEdit = Boolean(editable && col.set && col.key !== "shotNo");
+                return (
+                  <td key={col.key} className={`px-2 py-2 ${col.minW}`}>
+                    <CellEditor
+                      value={value}
+                      multiline={col.multiline}
+                      editable={canEdit}
+                      onChange={(v) => updateCell(rowIndex, col, v)}
+                    />
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>

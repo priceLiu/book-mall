@@ -19,7 +19,7 @@ type Options = {
   listenPaste?: boolean;
   /** 同时接受拖放 / 粘贴的视频文件（拆图拆视频） */
   allowVideo?: boolean;
-  onFiles: (files: File[]) => void | Promise<void>;
+  onFiles: (files: File[], via?: "paste" | "drop") => void | Promise<void>;
   onError?: (title: string, message: string) => void;
 };
 
@@ -44,7 +44,7 @@ export function useImageDropPaste({
   const [focused, setFocused] = useState(false);
 
   const ingestFiles = useCallback(
-    async (raw: File[]) => {
+    async (raw: File[], via?: "paste" | "drop") => {
       if (!enabled || raw.length === 0) return;
       const accepted: File[] = [];
       const validate: (file: File) => ImageUploadError | null = allowVideo
@@ -61,7 +61,7 @@ export function useImageDropPaste({
         accepted.push(candidate);
         if (!multiple) break;
       }
-      if (accepted.length > 0) await onFilesRef.current(accepted);
+      if (accepted.length > 0) await onFilesRef.current(accepted, via);
     },
     [allowVideo, enabled, multiple, onError],
   );
@@ -91,7 +91,7 @@ export function useImageDropPaste({
       if (batch.length === 0) return;
 
       e.preventDefault();
-      void ingestFiles(multiple ? batch : batch.slice(0, 1));
+      void ingestFiles(multiple ? batch : batch.slice(0, 1), "paste");
     }
 
     document.addEventListener("paste", onPaste);
@@ -121,7 +121,7 @@ export function useImageDropPaste({
       e.preventDefault();
       e.stopPropagation();
       setDragOver(false);
-      void ingestFiles(extractMediaFilesFromDataTransfer(e.dataTransfer, { allowVideo }));
+      void ingestFiles(extractMediaFilesFromDataTransfer(e.dataTransfer, { allowVideo }), "drop");
     },
     [allowVideo, enabled, ingestFiles],
   );

@@ -34,12 +34,23 @@ function mergeUpstreamAbortSignal(
   init: RequestInit,
   timeoutMs: number,
 ): RequestInit {
-  if (init.signal) return init;
+  let timeoutSignal: AbortSignal | undefined;
   try {
-    return { ...init, signal: AbortSignal.timeout(timeoutMs) };
+    timeoutSignal = AbortSignal.timeout(timeoutMs);
   } catch {
-    return init;
+    /* Node < 17.3 */
   }
+  const userSignal = init.signal;
+  if (userSignal && timeoutSignal) {
+    try {
+      return { ...init, signal: AbortSignal.any([userSignal, timeoutSignal]) };
+    } catch {
+      return { ...init, signal: userSignal };
+    }
+  }
+  if (userSignal) return init;
+  if (timeoutSignal) return { ...init, signal: timeoutSignal };
+  return init;
 }
 
 /** 供单测与 Canvas 诊断：按 URL + body 解析 upstream fetch 超时。 */
@@ -64,7 +75,38 @@ export function resolveUpstreamChatTimeoutMs(
   ) {
     return UPSTREAM_STORY_CHAT_TIMEOUT_MS;
   }
+  if (chatBodyHasVideoMedia(init.body)) {
+    return UPSTREAM_STORY_CHAT_TIMEOUT_MS;
+  }
   return UPSTREAM_CHAT_TIMEOUT_MS;
+}
+
+/** 供单测与日志 UI：Chat body 是否含 video_url 多模态输入（拉片 / 视频理解） */
+export function chatBodyHasVideoMedia(
+  body: BodyInit | null | undefined,
+): boolean {
+  if (typeof body !== "string" || !body.trim()) return false;
+  try {
+    const parsed = JSON.parse(body) as { messages?: unknown };
+    if (!Array.isArray(parsed.messages)) return false;
+    for (const msg of parsed.messages) {
+      if (!msg || typeof msg !== "object") continue;
+      const content = (msg as { content?: unknown }).content;
+      if (!Array.isArray(content)) continue;
+      for (const part of content) {
+        if (
+          part &&
+          typeof part === "object" &&
+          (part as { type?: string }).type === "video_url"
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 function readChatMaxTokensFromBody(body: BodyInit | null | undefined): number | undefined {
@@ -90,7 +132,9 @@ function formatUpstreamTimeoutMessage(provider: string): string {
         ? "KIE"
         : provider === "BAILIAN"
           ? "百炼"
-          : provider === "DEEPSEEK"
+          : provider === "DASHSCOPE"
+            ? "百炼/DashScope"
+            : provider === "DEEPSEEK"
             ? "DeepSeek"
             : provider === "MOONSHOT"
               ? "Kimi"

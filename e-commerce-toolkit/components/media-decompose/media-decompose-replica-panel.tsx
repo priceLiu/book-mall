@@ -5,24 +5,23 @@ import { Clapperboard, Loader2 } from "lucide-react";
 
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { SeedVideoRefUploader } from "@/components/seed-video/seed-video-ref-uploader";
 import { SeedVideoRenderProgressPanel } from "@/components/seed-video/seed-video-render-progress-panel";
 import { SeedVideoShotTable } from "@/components/seed-video/seed-video-shot-table";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
+import {
+  type StoryboardVideoResolution,
+} from "@/lib/storyboard-gen-params";
+import { videoModelSupportsGenerateAudio } from "@/lib/storyboard-video-params";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
-  attachSeedVideoRefsFromAssets,
   generateSeedVideoShot,
   generateSeedVideoTts,
   getSeedVideoProject,
   pollSeedVideoMediaRenderJob,
-  removeSeedVideoRef,
   renderSeedVideo,
   updateSeedVideoProject,
-  uploadSeedVideoRef,
 } from "@/lib/ecom-seed-video-api";
 import { buildSeedVideoMentionRefs } from "@/lib/seed-video-mention-refs";
-import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
 import {
   appendSeedVideoRenderStepLog,
   resolveSeedVideoRenderPhase,
@@ -30,6 +29,11 @@ import {
 } from "@/lib/seed-video-render-progress";
 import { isShotVideoPending, listPendingShotVideoIndices } from "@/lib/seed-video-pending-shots";
 import { mergeSeedVideoShotsForPersist } from "@/lib/seed-video-shot-merge";
+import {
+  appendSeedVideoShot,
+  canDeleteSeedVideoShot,
+  removeSeedVideoShotAt,
+} from "@/lib/seed-video-shot-rows";
 import {
   filterVideoModelsForMode,
   resolveSeedVideoVideoModelKey,
@@ -90,7 +94,7 @@ export function MediaDecomposeReplicaPanel({
   onPreviewVideo,
   onAlert,
 }: Props) {
-  const { doubleConfirm, toast } = useDialogs();
+  const { toast } = useDialogs();
   const shots = seedVideo.plan?.shots ?? [];
   const [localShots, setLocalShots] = useState<SeedVideoShot[]>(shots);
   const [selectedShotIndices, setSelectedShotIndices] = useState<Set<number>>(() => new Set());
@@ -99,12 +103,19 @@ export function MediaDecomposeReplicaPanel({
   );
   const generatingShotsRef = useRef(generatingShots);
   generatingShotsRef.current = generatingShots;
-  const [projectRefBusy, setProjectRefBusy] = useState(false);
   const [ttsBusy, setTtsBusy] = useState(false);
   const [renderBusy, setRenderBusy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSelected, setPickerSelected] = useState<number[]>([]);
   const [pickerPanelDurationSec, setPickerPanelDurationSec] = useState(8);
+  const [pickerVideoResolution, setPickerVideoResolution] =
+    useState<StoryboardVideoResolution>("1080p");
+  const [pickerVideoR2vRatio, setPickerVideoR2vRatio] = useState<string>(
+    () => seedVideo.settings.aspectRatio ?? "9:16",
+  );
+  const [pickerVideoSeed, setPickerVideoSeed] = useState("");
+  const [pickerVideoPromptExtend, setPickerVideoPromptExtend] = useState(true);
+  const [pickerVideoGenerateAudio, setPickerVideoGenerateAudio] = useState(true);
   const [pickerConfirming, setPickerConfirming] = useState(false);
   const [renderProgress, setRenderProgress] = useState<SeedVideoRenderProgressState | null>(null);
   const [localFinalUrl, setLocalFinalUrl] = useState<string | null>(
@@ -175,11 +186,12 @@ export function MediaDecomposeReplicaPanel({
     return set;
   }, [generatingShots, pendingShotIndices]);
 
-  const hasVoiceover = localShots.some((s) => s.voiceover.trim());
-  const isMultiShot = localShots.length > 1;
-  const showCompose = isMultiShot || hasVoiceover;
-  const pipelineBusy = ttsBusy || renderBusy;
-  const refLocked = pipelineBusy || projectRefBusy;
+
+  const batchProductionBusy = ttsBusy || renderBusy;
+  const singleShotBusy = activeGeneratingIndices.size > 0;
+  const pipelineBusy = batchProductionBusy || singleShotBusy;
+  const planSynced = localShots.length >= 1;
+  const scriptReady = planSynced;
   const anyGenerating = activeGeneratingIndices.size > 0;
   const generatingStatusLabel = useMemo(() => {
     const nums = [...activeGeneratingIndices].sort((a, b) => a - b);
@@ -196,9 +208,12 @@ export function MediaDecomposeReplicaPanel({
 
   const composedUrl =
     localFinalUrl?.trim() || seedVideo.plan?.render?.finalVideoUrl?.trim() || seedVideo.videoOssUrl?.trim() || null;
-  const finalUrl = composedUrl || (!showCompose
-    ? localShots.find((s) => s.videoUrl?.trim())?.videoUrl?.trim() || null
-    : null);
+  const finalUrl = composedUrl;
+
+  async function handleSaveShots() {
+    await persistShots(localShots);
+    await onSeedVideoChange();
+  }
 
   const persistShots = useCallback(
     async (next: SeedVideoShot[]) => {
@@ -229,6 +244,28 @@ export function MediaDecomposeReplicaPanel({
     }, 900);
     return () => window.clearTimeout(timer);
   }, [localShots, persistShots]);
+
+  async function handleAddRow() {
+    const next = appendSeedVideoShot(localShots);
+    setLocalShots(next);
+    await persistShots(next);
+  }
+
+  async function handleDeleteRow(index: number) {
+    const shot = localShots.find((s) => s.index === index);
+    if (!shot || !canDeleteSeedVideoShot(shot, activeGeneratingIndices)) return;
+    const next = removeSeedVideoShotAt(localShots, index);
+    setLocalShots(next);
+    setSelectedShotIndices((prev) => {
+      const nextSel = new Set<number>();
+      for (const i of prev) {
+        if (i < index) nextSel.add(i);
+        else if (i > index) nextSel.add(i - 1);
+      }
+      return nextSel;
+    });
+    await persistShots(next);
+  }
 
   const applyRemoteShotVideo = useCallback((panelIndex: number, remote: SeedVideoShot | undefined) => {
     if (!remote?.videoUrl?.trim()) return false;
@@ -310,63 +347,6 @@ export function MediaDecomposeReplicaPanel({
     syncRemoteShotVideos,
   ]);
 
-  async function handleUploadRef(file: File) {
-    setProjectRefBusy(true);
-    try {
-      await uploadSeedVideoRef(seedVideo.id, file);
-      await onSeedVideoChange();
-    } catch (e) {
-      await onAlert({
-        title: "上传失败",
-        message: e instanceof Error ? e.message : "请稍后重试",
-        variant: "error",
-      });
-    } finally {
-      setProjectRefBusy(false);
-    }
-  }
-
-  async function handleAttachRefs(assetIds: string[]) {
-    if (assetIds.length === 0) return;
-    setProjectRefBusy(true);
-    try {
-      await attachSeedVideoRefsFromAssets(seedVideo.id, assetIds);
-      await onSeedVideoChange();
-    } catch (e) {
-      await onAlert({
-        title: "添加失败",
-        message: e instanceof Error ? e.message : "无法从资产添加参考图",
-        variant: "error",
-      });
-    } finally {
-      setProjectRefBusy(false);
-    }
-  }
-
-  async function handleRemoveRef(refId: string) {
-    const ok = await doubleConfirm({
-      title: "删除参考图",
-      message: "确定从本项目移除这张参考图？",
-      secondTitle: "不可恢复",
-      secondMessage: "已引用该图的镜头将失去参考，是否继续？",
-      confirmLabel: "删除",
-    });
-    if (!ok) return;
-    setProjectRefBusy(true);
-    try {
-      await removeSeedVideoRef(seedVideo.id, refId);
-      await onSeedVideoChange();
-    } catch (e) {
-      await onAlert({
-        title: "删除失败",
-        message: e instanceof Error ? e.message : "无法删除参考图",
-        variant: "error",
-      });
-    } finally {
-      setProjectRefBusy(false);
-    }
-  }
-
   async function runPanelGenerate(
     modelKey: string,
     panelIndex: number,
@@ -384,6 +364,8 @@ export function MediaDecomposeReplicaPanel({
         modelKey,
         durationSec: durationSec ?? pickerPanelDurationRef.current,
         aspectRatio: seedVideo.settings.aspectRatio ?? "9:16",
+        resolution: pickerVideoResolution,
+        generateAudio: pickerVideoGenerateAudio,
       });
       setLocalShots((prev) =>
         prev.map((s) => (s.index === panelIndex ? { ...s, videoUrl: result.videoUrl } : s)),
@@ -556,16 +538,16 @@ export function MediaDecomposeReplicaPanel({
         setRenderProgress(null);
         await onAlert({
           title: "暂不能合成",
-          message: "请先为各镜生成镜头视频。",
+          message: "请先为各镜生成镜头视频（状态「视频 OK」或「就绪」）。",
           variant: "error",
         });
         return;
       }
-      if (hasVoiceover && merged.some((s) => s.voiceover.trim() && !s.ttsUrl?.trim())) {
+      if (merged.some((s) => s.videoUrl?.trim() && !s.ttsUrl?.trim())) {
         setRenderProgress(null);
         await onAlert({
           title: "暂不能合成",
-          message: "请先点击「批量 TTS」，待口播就绪后再合成。",
+          message: "请先点击「批量 TTS」，待各镜状态为「就绪」后再点「合成成片」。",
           variant: "error",
         });
         return;
@@ -613,59 +595,47 @@ export function MediaDecomposeReplicaPanel({
 
   return (
     <>
-      <section className="space-y-3 rounded-xl border border-[#e8e8ed] bg-white p-4">
+      <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-sm font-semibold text-[#1d1d1f]">一键复刻</h2>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-[#6e6e73]">
-              {showCompose
-                ? "上传参考图后勾选镜号逐镜生成；各镜在视频 Prompt 用 @图片1 … 指定参考图。支持 TTS 与合成成片。"
-                : "上传参考图并在各镜视频 Prompt 中用 @图片1 … 引用，生成后可在表格内预览。"}
-            </p>
-          </div>
+          <h2 className="text-sm font-semibold text-[#1d1d1f]">方案② · 精细成片</h2>
           <div className="flex flex-wrap gap-2">
             <EcomButtonSecondary
               type="button"
               size="sm"
-              disabled={pipelineBusy || idleGeneratableIndices.length === 0}
+              disabled={batchProductionBusy || !scriptReady}
+              onClick={() => void handleSaveShots()}
+            >
+              保存编辑
+            </EcomButtonSecondary>
+            <EcomButtonSecondary
+              type="button"
+              size="sm"
+              disabled={batchProductionBusy || singleShotBusy || !scriptReady}
               onClick={() => openGeneratePicker(idleGeneratableIndices)}
             >
               逐镜生成视频
             </EcomButtonSecondary>
-            {showCompose ? (
-              <>
-                <EcomButtonSecondary
-                  type="button"
-                  size="sm"
-                  disabled={pipelineBusy || anyGenerating || !hasVoiceover}
-                  onClick={() => void runTts()}
-                >
-                  {ttsBusy ? "TTS…" : "批量 TTS"}
-                </EcomButtonSecondary>
-                <EcomButtonPrimary
-                  type="button"
-                  size="sm"
-                  disabled={pipelineBusy || anyGenerating}
-                  onClick={() => void runRender()}
-                >
-                  {renderBusy ? "合成中…" : "合成成片"}
-                </EcomButtonPrimary>
-              </>
-            ) : null}
+            <EcomButtonSecondary
+              type="button"
+              size="sm"
+              disabled={batchProductionBusy || singleShotBusy || !scriptReady || ttsBusy}
+              onClick={() => void runTts()}
+            >
+              {ttsBusy ? "TTS…" : "批量 TTS"}
+            </EcomButtonSecondary>
+            <EcomButtonPrimary
+              type="button"
+              size="sm"
+              disabled={batchProductionBusy || singleShotBusy || !scriptReady || renderBusy}
+              onClick={() => void runRender()}
+            >
+              {renderBusy ? "合成中…" : "合成成片"}
+            </EcomButtonPrimary>
           </div>
         </div>
-
-        <SeedVideoRefUploader
-          references={syncedReferences}
-          onUpload={handleUploadRef}
-          onRemove={(id) => void handleRemoveRef(id)}
-          onAttachAssets={handleAttachRefs}
-          busy={refLocked}
-          sectionLabel="参考图"
-          requiredMark={false}
-          emptyHint={`上传 1～9 张参考图；下方表格会展示全部 @图片N，在各镜视频 Prompt 中引用即可。${IMAGE_UPLOAD_DROP_HINT}`}
-          className="rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-3"
-        />
+        <p className="text-[11px] leading-relaxed text-[#6e6e73]">
+          推荐顺序：① 勾选镜头后点表底「生成」→ ②「批量 TTS」→ ③ 状态均为「就绪」后点「合成成片」。可多次勾选、多次生成。
+        </p>
 
         {anyGenerating ? (
           <div
@@ -687,13 +657,11 @@ export function MediaDecomposeReplicaPanel({
           shots={localShots}
           references={syncedReferences}
           onChange={setLocalShots}
-          disabled={pipelineBusy}
+          disabled={batchProductionBusy || !planSynced}
           generatingIndices={activeGeneratingIndices}
           onPreviewVideo={onPreviewVideo}
           showGenerateActions
-          selectDisabled={pipelineBusy}
-          hideRefColumn
-          showRefsGallery
+          selectDisabled={!planSynced}
           videoPromptMentionRefs={mentionRefs}
           selectedShotIndices={selectedShotIndices}
           selectedCount={selectedShotIndices.size}
@@ -706,19 +674,31 @@ export function MediaDecomposeReplicaPanel({
             });
           }}
           onGenerateSelected={() => {
-            if (selectedGeneratableIndices.length === 0) return;
+            if (selectedShotIndices.size === 0) return;
             openGeneratePicker([...selectedGeneratableIndices].sort((a, b) => a - b));
           }}
-          generateSelectedDisabled={selectedGeneratableIndices.length === 0 || pipelineBusy}
+          generateSelectedDisabled={
+            selectedShotIndices.size === 0 ||
+            !planSynced ||
+            ttsBusy ||
+            renderBusy
+          }
+          showRowActions
+          onAddRow={() => void handleAddRow()}
+          onDeleteRow={(index) => void handleDeleteRow(index)}
+          canDeleteShot={(shot) => canDeleteSeedVideoShot(shot, activeGeneratingIndices)}
         />
 
         {finalUrl ? (
           <div className="space-y-2 border-t border-[#e8e8ed] pt-4">
             <h3 className="text-sm font-semibold text-[#1d1d1f]">成片视频</h3>
+            <p className="text-[11px] text-[#6e6e73]">
+              逐镜合成已完成，可预览或保存到「我的资产」。
+            </p>
             <EcomVideoSlot
               src={finalUrl}
               layout="gallery-workspace"
-              onPreview={() => onPreviewVideo(finalUrl, "一键复刻")}
+              onPreview={() => onPreviewVideo(finalUrl, "精细成片")}
               playSize="lg"
             />
           </div>
@@ -732,7 +712,12 @@ export function MediaDecomposeReplicaPanel({
         videoTarget="panel"
         models={filteredModels.length ? filteredModels : videoModels}
         value={videoModelKey}
-        onChange={onVideoModelChange}
+        onChange={(key) => {
+          onVideoModelChange(key);
+          if (videoModelSupportsGenerateAudio(key)) {
+            setPickerVideoGenerateAudio(true);
+          }
+        }}
         onConfirm={(key) => void onPickerConfirm(key)}
         confirming={pickerConfirming}
         aspectRatio={seedVideo.settings.aspectRatio ?? "9:16"}
@@ -741,6 +726,16 @@ export function MediaDecomposeReplicaPanel({
           pickerPanelDurationRef.current = value;
           setPickerPanelDurationSec(value);
         }}
+        videoResolution={pickerVideoResolution}
+        onVideoResolutionChange={setPickerVideoResolution}
+        videoR2vRatio={pickerVideoR2vRatio}
+        onVideoR2vRatioChange={setPickerVideoR2vRatio}
+        videoSeed={pickerVideoSeed}
+        onVideoSeedChange={setPickerVideoSeed}
+        videoPromptExtend={pickerVideoPromptExtend}
+        onVideoPromptExtendChange={setPickerVideoPromptExtend}
+        videoGenerateAudio={pickerVideoGenerateAudio}
+        onVideoGenerateAudioChange={setPickerVideoGenerateAudio}
       />
 
       <SeedVideoRenderProgressPanel

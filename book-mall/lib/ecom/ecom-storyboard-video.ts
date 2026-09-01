@@ -58,6 +58,7 @@ import { composeStoryboardPanelGridPng } from "@/lib/ecom/ecom-storyboard-panel-
 import { normalizeImageForVolcengineVideo } from "@/lib/ecom/ecom-storyboard-video-image";
 import {
   bailianResolutionFromEcom,
+  resolveEcomVideoGenerateAudio,
   resolveVideoResolution,
   videoSrFromResolution,
   type EcomStoryboardVideoResolution,
@@ -301,6 +302,7 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
   ratio?: string;
   seedStr?: string;
   promptExtend?: boolean;
+  generateAudio?: boolean;
 }) {
   await assertEcomToolkitGatewayAccess(opts.userId);
   requireStoryboardProductRef(opts.references);
@@ -374,6 +376,7 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
   );
   const resolution = resolveVideoResolution(opts.resolution);
   const videoSr = videoSrFromResolution(resolution);
+  const generateAudio = resolveEcomVideoGenerateAudio(modelKey, opts.generateAudio);
   const taskKey = `ecom-sb-vid:${opts.projectId}:${workspaceId}`;
   const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
 
@@ -431,7 +434,7 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
       prompt,
       imageUrl: videoImageUrl,
       referenceImageUrls: normalizedReferenceImageUrls,
-      options: { resolution, duration: durationSec, generateAudio: true },
+      options: { resolution, duration: durationSec, generateAudio },
       aspectRatio: videoAspect,
     });
     const created = await ecomGwCreateKieJob(opts.userId, {
@@ -562,7 +565,7 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
       prompt,
       imageUrl: videoImageUrl,
       referenceImageUrls: normalizedReferenceImageUrls,
-      options: { resolution, duration: durationSec, generateAudio: true },
+      options: { resolution, duration: durationSec, generateAudio },
       aspectRatio: videoAspect,
     });
     const created = await ecomGwCreateVolcengineVideoJob(opts.userId, {
@@ -736,19 +739,21 @@ async function runVolcengineVideoJob(opts: {
   durationSec: number;
   aspectRatio: "16:9" | "9:16";
   resolution?: EcomStoryboardVideoResolution;
+  generateAudio?: boolean;
   meta: Record<string, unknown>;
 }): Promise<{ ossUrl: string; taskId: string; logId: string; chargePoints: number | null }> {
   const resolution = opts.resolution ?? "1080p";
   const videoSr = videoSrFromResolution(resolution);
   const taskKey = `ecom-sb-vid:${opts.projectId}:${randomUUID().slice(0, 8)}`;
   const clientPage = ecomClientPage(opts.userId, opts.projectId, ECOM_STORYBOARD_TOOL_KEY);
+  const generateAudio = resolveEcomVideoGenerateAudio(opts.modelKey, opts.generateAudio);
 
   const { body } = buildCanvasVideoVolcengineInput({
     modelKey: opts.modelKey,
     prompt: opts.prompt,
     imageUrl: opts.imageUrl,
     referenceImageUrls: opts.referenceImageUrls,
-    options: { resolution, duration: opts.durationSec, generateAudio: true },
+    options: { resolution, duration: opts.durationSec, generateAudio },
     aspectRatio: opts.aspectRatio,
   });
 
@@ -862,6 +867,7 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
   resolution?: string;
   modelKey?: string;
   brief?: { productHighlight?: string; style?: string };
+  generateAudio?: boolean;
 }) {
   await assertEcomToolkitGatewayAccess(opts.userId);
   requireStoryboardProductRef(opts.references);
@@ -878,6 +884,7 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
   );
   const provider = resolveStoryboardVideoProvider(modelKey);
   const resolution = resolveVideoResolution(opts.resolution);
+  const generateAudio = resolveEcomVideoGenerateAudio(modelKey, opts.generateAudio);
   const panelDurationCap = isStoryboardWan30VideoModel(modelKey)
     ? 30
     : 8;
@@ -966,6 +973,7 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
       durationSec,
       aspectRatio: opts.aspectRatio ?? "9:16",
       resolution,
+      generateAudio,
       meta: {
         projectId: opts.projectId,
         panelIndex: panel.index,

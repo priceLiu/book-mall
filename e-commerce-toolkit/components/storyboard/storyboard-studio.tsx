@@ -102,6 +102,7 @@ export function StoryboardStudio() {
     videoR2vRatio: "9:16",
     videoSeed: "",
     videoPromptExtend: true,
+    videoGenerateAudio: true,
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [needLogin, setNeedLogin] = useState(false);
@@ -175,6 +176,10 @@ export function StoryboardStudio() {
         typeof p.settings?.videoPromptExtend === "boolean"
           ? p.settings.videoPromptExtend
           : prev.videoPromptExtend,
+      videoGenerateAudio:
+        typeof p.settings?.videoGenerateAudio === "boolean"
+          ? p.settings.videoGenerateAudio
+          : prev.videoGenerateAudio,
     }));
     if (p.videoOssUrl) {
       setVideoAsset({
@@ -663,6 +668,12 @@ export function StoryboardStudio() {
             setSettings((s) => ({ ...s, videoPromptExtend }));
             updateStoryboardProject(project.id, {
               settings: { ...project.settings, videoPromptExtend },
+            }).catch(() => undefined);
+          }}
+          onVideoGenerateAudioChange={(videoGenerateAudio) => {
+            setSettings((s) => ({ ...s, videoGenerateAudio }));
+            updateStoryboardProject(project.id, {
+              settings: { ...project.settings, videoGenerateAudio },
             }).catch(() => undefined);
           }}
           videoAspectRatio={videoAspectRatio}

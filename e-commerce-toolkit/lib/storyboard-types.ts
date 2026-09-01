@@ -250,4 +250,6 @@ export type StoryboardGatewayModel = {
   /** 用户可见来源（模型运营中心 sourceLabel） */
   sourceLabel?: string;
   sortOrder?: number;
+  /** 专业拉片 models 路由 · 是否支持 video_url 理解 */
+  supportsVideo?: boolean;
 };

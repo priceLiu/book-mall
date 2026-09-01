@@ -614,6 +614,7 @@ export async function forwardChatCompletions(opts: {
   providerKind: GatewayProviderKind;
   body: Record<string, unknown>;
   baseUrlOverride?: string | null;
+  signal?: AbortSignal;
 }): Promise<{ status: number; text: string; durationMs: number }> {
   const cred = await getDecryptedCredentialApiKey(opts.credentialId);
   if (!cred) throw new Error("凭证不可用");
@@ -635,13 +636,14 @@ export async function forwardChatCompletions(opts: {
       : cred.apiKey;
 
   const started = Date.now();
-  const fetchOpts = {
+  const fetchOpts: RequestInit = {
     method: "POST" as const,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${bearerKey}`,
     },
     body: JSON.stringify(requestBody),
+    ...(opts.signal ? { signal: opts.signal } : {}),
   };
   const hopCtx = {
     hop: "upstream" as const,

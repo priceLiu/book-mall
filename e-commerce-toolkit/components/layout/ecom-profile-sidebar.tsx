@@ -19,6 +19,7 @@ import {
 } from "@/lib/ecom-sidebar-nav";
 import { EcomCreditsBalanceChip } from "@/components/layout/ecom-credits-balance-chip";
 import { ecomPrimaryLinkClass } from "@/components/ui/ecom-button";
+import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
 import { cn } from "@/lib/utils";
 
 const NAV_ACTIVE_SECTION_KEY = "ecom-nav-active-section";
@@ -57,6 +58,7 @@ function navigateSidebarHref(
 ) {
   if (shouldUseNativeNav(event)) return;
   event.preventDefault();
+  unlockEcomDocumentInteraction();
   window.location.assign(href);
 }
 
@@ -346,6 +348,7 @@ export function EcomProfileSidebar({
       if (entry.link.external) {
         window.open(entry.link.href, "_blank", "noopener,noreferrer");
       } else {
+        unlockEcomDocumentInteraction();
         window.location.assign(entry.link.href);
       }
       return;
@@ -361,6 +364,8 @@ export function EcomProfileSidebar({
       if (entry.link.external) {
         window.open(entry.link.href, "_blank", "noopener,noreferrer");
       } else {
+        expandDetail();
+        unlockEcomDocumentInteraction();
         window.location.assign(entry.link.href);
       }
       return;
@@ -411,11 +416,12 @@ export function EcomProfileSidebar({
     <RailTipContext.Provider value={railTipApi}>
       <aside
       className={cn(
-        "pointer-events-auto relative isolate z-[200] flex h-full max-h-full shrink-0 flex-row overflow-visible rounded-xl border border-zinc-800/80 bg-[#141416] text-zinc-100 shadow-lg transition-[width] duration-200 ease-out",
+        "pointer-events-auto relative isolate z-[250] flex h-full max-h-full shrink-0 flex-row overflow-visible rounded-xl border border-zinc-800/80 bg-[#141416] text-zinc-100 shadow-lg transition-[width] duration-200 ease-out",
         collapsed ? "w-16" : "w-[21rem]",
         className,
       )}
       aria-label="电商工具箱导航"
+      onPointerDown={() => unlockEcomDocumentInteraction()}
     >
       {/* 左侧图标轨 */}
       <div className="flex w-16 shrink-0 flex-col items-center gap-2 overflow-visible border-r border-[var(--ecom-chrome-border-subtle)] py-3">

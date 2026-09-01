@@ -6,6 +6,7 @@ export {
   defaultImageSizeForModel,
   aspectRatioForImageSize,
   imageSizeToEcomRatio,
+  filterImageSizeOptionsByEcomRatio,
 } from "@/lib/storyboard-image-size-options";
 
 import {

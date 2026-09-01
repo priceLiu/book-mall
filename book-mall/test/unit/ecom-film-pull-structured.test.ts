@@ -48,6 +48,9 @@ const analyzeBody = {
     shotSequenceLogic: "递进",
     cameraLanguageSummary: "固定为主",
   },
+  narrativeLogic: "五段式：钩子→价值→CTA→教程→结果",
+  beatPoints: "0s 硬切开场；3s BGM 起；6s 转场",
+  replicableShootingScript: "机位固定三脚架；柔光主灯 45°；按镜序逐条拍摄",
   shots: [sampleShot],
 };
 
@@ -57,6 +60,7 @@ describe("extractFilmPullAnalyzePatch", () => {
     const patch = extractFilmPullAnalyzePatch(text);
     expect(patch?.shots).toHaveLength(1);
     expect(patch?.meta.narrativeMainLine).toBe("测试叙事");
+    expect(patch?.narrativeLogic).toContain("五段式");
   });
 
   it("returns null for invalid payload", () => {

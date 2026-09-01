@@ -248,6 +248,8 @@ export async function generateProductDesignImages(opts: {
   modelKey?: string;
   /** 覆盖平台默认比例 */
   ratio?: EcomImageRatio;
+  /** 像素尺寸或 KIE 2K/4K */
+  imageSize?: string;
   /** 覆盖批量出图并发（1–5） */
   concurrency?: number;
 }): Promise<GenerateProductDesignImagesResult> {
@@ -435,6 +437,7 @@ export async function generateProductDesignImages(opts: {
           modelKey,
           prompt,
           ratio,
+          imageSize: opts.imageSize,
           refImageUrls: refs,
           toolKey: isMain
             ? `${ECOM_MAIN_IMAGE_TOOL_KEY}__${ECOM_MAIN_IMAGE_ACTION}`

@@ -221,6 +221,7 @@ export async function generateSeedVideoShot(opts: {
   durationSec?: number;
   aspectRatio?: "9:16" | "16:9";
   resolution?: string;
+  generateAudio?: boolean;
 }): Promise<{ videoUrl: string; shotIndex: number }> {
   const data = await ecomBookFetch(
     `${BASE}/projects/${opts.projectId}/video/panel/generate`,
@@ -239,6 +240,7 @@ export async function generateSeedVideoDirect(opts: {
   durationSec?: number;
   aspectRatio?: string;
   resolution?: string;
+  generateAudio?: boolean;
 }): Promise<{ taskId: string; logId: string; startedAt: string }> {
   const data = await ecomBookFetch(
     `${BASE}/projects/${opts.projectId}/video/direct/generate`,

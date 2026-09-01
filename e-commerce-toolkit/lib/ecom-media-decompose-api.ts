@@ -8,17 +8,20 @@ import type {
   MediaDecomposeSettings,
 } from "@/lib/media-decompose-types";
 import type { SeedVideoProject } from "@/lib/seed-video-types";
+import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 
 const BASE = "api/sso/tools/ecom/media-decompose";
 
 export async function fetchMediaDecomposeModels(): Promise<{
   chatModels: MediaDecomposeChatModel[];
-  defaults?: { chat?: string };
+  imageModels?: StoryboardGatewayModel[];
+  defaults?: { chat?: string; image?: string };
 }> {
   const data = await ecomBookFetch(`${BASE}/models`);
   return {
     chatModels: (data.chatModels as MediaDecomposeChatModel[]) ?? [],
-    defaults: data.defaults as { chat?: string } | undefined,
+    imageModels: (data.imageModels as StoryboardGatewayModel[]) ?? [],
+    defaults: data.defaults as { chat?: string; image?: string } | undefined,
   };
 }
 
@@ -57,7 +60,11 @@ export async function deleteMediaDecomposeProject(id: string): Promise<void> {
 
 export async function updateMediaDecomposeProject(
   id: string,
-  patch: Partial<{ title: string; settings: MediaDecomposeSettings }>,
+  patch: Partial<{
+    title: string;
+    settings: MediaDecomposeSettings;
+    meta: Record<string, unknown> | null;
+  }>,
 ): Promise<MediaDecomposeProject> {
   const data = await ecomBookFetch(`${BASE}/projects/${id}`, {
     method: "PATCH",
@@ -147,6 +154,19 @@ export async function streamMediaDecompose(
   return full.trim();
 }
 
+/** Dev only · Mock 拆解（不调 Gateway，写入 fixture 结果） */
+export async function mockMediaDecompose(
+  projectId: string,
+  args?: { prompt?: string },
+): Promise<MediaDecomposeProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/decompose/mock`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(args ?? {}),
+  });
+  return data.project as MediaDecomposeProject;
+}
+
 export async function startMediaDecomposeReplica(projectId: string): Promise<{
   project: MediaDecomposeProject;
   seedVideo: SeedVideoProject;
@@ -170,6 +190,139 @@ export async function getMediaDecomposeReplica(projectId: string): Promise<{
   return {
     project: data.project as MediaDecomposeProject,
     seedVideo: (data.seedVideo as SeedVideoProject | null) ?? null,
+  };
+}
+
+export async function uploadMediaDecomposeReplicaRef(
+  projectId: string,
+  role: "model" | "product",
+  file: File,
+): Promise<{
+  project: MediaDecomposeProject;
+  seedVideo: SeedVideoProject;
+}> {
+  const form = new FormData();
+  form.set("role", role);
+  form.set("file", file);
+  const res = await fetch(`/api/book-mall/${BASE}/projects/${projectId}/replica/refs`, {
+    method: "POST",
+    body: form,
+  });
+  if (res.status === 401) throw new EcomUnauthorizedError();
+  const data = (await res.json()) as {
+    project?: MediaDecomposeProject;
+    seedVideo?: SeedVideoProject;
+    error?: string;
+  };
+  if (!res.ok) throw new Error(data.error ?? "上传失败");
+  return { project: data.project!, seedVideo: data.seedVideo! };
+}
+
+export async function removeMediaDecomposeReplicaRef(
+  projectId: string,
+  refId: string,
+): Promise<{
+  project: MediaDecomposeProject;
+  seedVideo: SeedVideoProject;
+}> {
+  const data = await ecomBookFetch(
+    `${BASE}/projects/${projectId}/replica/refs/${encodeURIComponent(refId)}`,
+    { method: "DELETE" },
+  );
+  return {
+    project: data.project as MediaDecomposeProject,
+    seedVideo: data.seedVideo as SeedVideoProject,
+  };
+}
+
+export async function recognizeMediaDecomposeReplicaProduct(
+  projectId: string,
+  modelKey?: string,
+): Promise<{
+  project: MediaDecomposeProject;
+  seedVideo: SeedVideoProject;
+  productBrief: string;
+}> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/replica/recognize-product`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(modelKey ? { modelKey } : {}),
+  });
+  return {
+    project: data.project as MediaDecomposeProject,
+    seedVideo: data.seedVideo as SeedVideoProject,
+    productBrief: String(data.productBrief ?? ""),
+  };
+}
+
+/** Dev only · Mock 识产品 */
+export async function mockMediaDecomposeReplicaRecognizeProduct(
+  projectId: string,
+): Promise<{
+  project: MediaDecomposeProject;
+  seedVideo: SeedVideoProject;
+  productBrief: string;
+}> {
+  const data = await ecomBookFetch(
+    `${BASE}/projects/${projectId}/replica/recognize-product/mock`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    },
+  );
+  return {
+    project: data.project as MediaDecomposeProject,
+    seedVideo: data.seedVideo as SeedVideoProject,
+    productBrief: String(data.productBrief ?? ""),
+  };
+}
+
+export async function generateMediaDecomposeReplicaScript(
+  projectId: string,
+  opts?: { productBrief?: string; modelKey?: string },
+): Promise<{
+  project: MediaDecomposeProject;
+  seedVideo: SeedVideoProject;
+}> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/replica/generate-script`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts ?? {}),
+  });
+  return {
+    project: data.project as MediaDecomposeProject,
+    seedVideo: data.seedVideo as SeedVideoProject,
+  };
+}
+
+export async function generateMediaDecomposeReplicaModelPrompt(
+  projectId: string,
+  modelKey?: string,
+): Promise<{ prompt: string }> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/replica/model-prompt`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(modelKey ? { modelKey } : {}),
+  });
+  return { prompt: String(data.prompt ?? "") };
+}
+
+export async function generateMediaDecomposeReplicaModelImage(
+  projectId: string,
+  opts: { prompt: string; modelKey: string; imageSize?: string },
+): Promise<{
+  project: MediaDecomposeProject;
+  seedVideo: SeedVideoProject;
+}> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/replica/model/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts),
+  });
+  return {
+    project: data.project as MediaDecomposeProject,
+    seedVideo: data.seedVideo as SeedVideoProject,
   };
 }
 

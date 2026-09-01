@@ -61,6 +61,8 @@ export async function POST(req: Request, ctx: Ctx) {
       resolution: typeof body.resolution === "string" ? body.resolution : undefined,
       modelKey,
       ratio: typeof body.ratio === "string" ? body.ratio : undefined,
+      generateAudio:
+        typeof body.generateAudio === "boolean" ? body.generateAudio : undefined,
     });
     return NextResponse.json(result);
   } catch (e) {

@@ -69,6 +69,8 @@ export async function POST(req: Request, ctx: Ctx) {
       durationSec,
       resolution,
       modelKey,
+      generateAudio:
+        typeof body.generateAudio === "boolean" ? body.generateAudio : undefined,
       brief: {
         productHighlight:
           typeof project.brief?.productHighlight === "string"

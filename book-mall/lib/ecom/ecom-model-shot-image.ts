@@ -37,6 +37,7 @@ export async function generateModelShotImages(opts: {
   projectId: string;
   indexes?: number[];
   modelKey?: string;
+  imageSize?: string;
 }): Promise<{ generated: number; failures: string[]; project: NonNullable<Awaited<ReturnType<typeof getEcomModelShotProject>>> }> {
   await assertEcomToolkitGatewayAccess(opts.userId);
   const project = await getEcomModelShotProject(opts.userId, opts.projectId);
@@ -96,6 +97,7 @@ export async function generateModelShotImages(opts: {
           modelKey,
           prompt,
           ratio: "3:4",
+          imageSize: opts.imageSize,
           refImageUrls: refs,
           toolKey: `${ECOM_MODEL_SHOT_TOOL_KEY}__${ECOM_MODEL_SHOT_TRYON_ACTION}`,
         });

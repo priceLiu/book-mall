@@ -21,8 +21,12 @@ import {
   type FilmPullRenderPlan,
   type FilmPullSettings,
   type FilmPullStructuredResult,
+  isEcomFilmPullAnalyzeActive,
 } from "@/lib/ecom/ecom-film-pull-types";
 import { prisma } from "@/lib/prisma";
+import {
+  abortFilmPullAnalyzeRun,
+} from "@/lib/ecom/ecom-film-pull-analyze-run";
 
 function assertFilmPullPrismaDelegate(): void {
   const delegate = (
@@ -75,6 +79,37 @@ async function getOwnedRow(userId: string, projectId: string) {
   return prisma.ecomFilmPullProject.findFirst({
     where: { userId, id: projectId, module: ECOM_FILM_PULL_MODULE },
   });
+}
+
+/** 修正 analyzing/render_scripting 与 completedAt 不一致的脏状态 */
+function reconcileFilmPullProjectStatus(
+  dto: FilmPullProjectDto,
+): { dto: FilmPullProjectDto; statusPatch?: string } {
+  if (
+    dto.status === "analyzing" &&
+    dto.analyzeResult?.completedAt
+  ) {
+    const nextStatus = dto.analyzeResult.structured ? "analyzed" : "failed";
+    if (nextStatus !== dto.status) {
+      return { dto: { ...dto, status: nextStatus }, statusPatch: nextStatus };
+    }
+  }
+  if (
+    dto.status === "render_scripting" &&
+    dto.renderScript?.completedAt
+  ) {
+    const nextStatus = dto.renderScript.structured ? "render_ready" : "failed";
+    if (nextStatus !== dto.status) {
+      return { dto: { ...dto, status: nextStatus }, statusPatch: nextStatus };
+    }
+  }
+  return { dto };
+}
+
+function assertFilmPullMediaMutable(status: string): void {
+  if (status === "analyzing" || status === "render_scripting") {
+    throw new Error("拉片进行中，暂不可更换或删除源视频");
+  }
 }
 
 export async function listEcomFilmPullProjects(userId: string): Promise<FilmPullProjectDto[]> {
@@ -132,7 +167,16 @@ export async function getEcomFilmPullProject(
   projectId: string,
 ): Promise<FilmPullProjectDto | null> {
   const row = await getOwnedRow(userId, projectId);
-  return row ? rowToDto(row) : null;
+  if (!row) return null;
+  const dto = rowToDto(row);
+  const { dto: reconciled, statusPatch } = reconcileFilmPullProjectStatus(dto);
+  if (statusPatch) {
+    await prisma.ecomFilmPullProject.update({
+      where: { id: projectId },
+      data: { status: statusPatch },
+    });
+  }
+  return reconciled;
 }
 
 export async function updateEcomFilmPullProject(
@@ -199,10 +243,101 @@ export async function updateEcomFilmPullProject(
   return rowToDto(row);
 }
 
+/** 原子占用拉片槽位：DB 条件更新 + 拒绝并发重复提交 */
+export async function claimFilmPullAnalyzeSlot(
+  userId: string,
+  projectId: string,
+  patch: {
+    runId: string;
+    startedAt: string;
+    chatModelKey: string;
+    lastAnalyzePrompt: string;
+    settings: FilmPullSettings;
+    meta: FilmPullProjectDto["meta"];
+  },
+): Promise<FilmPullProjectDto> {
+  const existing = await getOwnedRow(userId, projectId);
+  if (!existing) throw new Error("项目不存在");
+  if (!sanitizeFilmPullMedia(existing.references)?.ossUrl) {
+    throw new Error("请先上传视频");
+  }
+
+  const updated = await prisma.ecomFilmPullProject.updateMany({
+    where: {
+      userId,
+      id: projectId,
+      module: ECOM_FILM_PULL_MODULE,
+      status: { not: "analyzing" },
+    },
+    data: {
+      status: "analyzing",
+      analyzeResult: Prisma.DbNull,
+      renderScript: Prisma.DbNull,
+      renderPlan: Prisma.DbNull,
+      settings: {
+        ...patch.settings,
+        chatModelKey: patch.chatModelKey,
+        lastAnalyzePrompt: patch.lastAnalyzePrompt,
+      } as Prisma.InputJsonValue,
+      meta: {
+        ...(patch.meta ?? {}),
+        analyzeRunId: patch.runId,
+        analyzeCancelRunId: null,
+        analyzeStartedAt: patch.startedAt,
+      } as Prisma.InputJsonValue,
+    },
+  });
+
+  if (updated.count === 0) {
+    const dto = rowToDto(existing);
+    const { dto: reconciled } = reconcileFilmPullProjectStatus(dto);
+    if (isEcomFilmPullAnalyzeActive(reconciled)) {
+      throw new Error("拉片进行中，请等待完成或先中止");
+    }
+    throw new Error("无法开始拉片，请刷新后重试");
+  }
+
+  const row = await getOwnedRow(userId, projectId);
+  if (!row) throw new Error("项目不存在");
+  return rowToDto(row);
+}
+
 export async function deleteEcomFilmPullProject(userId: string, projectId: string): Promise<void> {
   const existing = await getOwnedRow(userId, projectId);
   if (!existing) throw new Error("项目不存在");
   await prisma.ecomFilmPullProject.delete({ where: { id: projectId } });
+}
+
+export async function cancelEcomFilmPullAnalyze(
+  userId: string,
+  projectId: string,
+): Promise<FilmPullProjectDto> {
+  const existing = await getOwnedRow(userId, projectId);
+  if (!existing) throw new Error("项目不存在");
+  const project = reconcileFilmPullProjectStatus(rowToDto(existing)).dto;
+  const runId = project.meta?.analyzeRunId ?? "forced";
+
+  if (!isEcomFilmPullAnalyzeActive(project) && project.status !== "analyzing") {
+    return project;
+  }
+
+  abortFilmPullAnalyzeRun(userId, projectId);
+
+  const canceledResult: FilmPullStructuredResult<FilmPullAnalyzePatch> = {
+    rawText: project.analyzeResult?.rawText ?? "",
+    structured: null,
+    parseError: "拉片已中止",
+    completedAt: new Date().toISOString(),
+  };
+
+  return updateEcomFilmPullProject(userId, projectId, {
+    status: "failed",
+    analyzeResult: canceledResult,
+    meta: {
+      analyzeCancelRunId: runId,
+      analyzeStartedAt: null,
+    },
+  });
 }
 
 async function setProjectMedia(
@@ -212,6 +347,9 @@ async function setProjectMedia(
 ): Promise<FilmPullProjectDto> {
   const existing = await getOwnedRow(userId, projectId);
   if (!existing) throw new Error("项目不存在");
+  const current = rowToDto(existing);
+  const { dto: reconciled } = reconcileFilmPullProjectStatus(current);
+  assertFilmPullMediaMutable(reconciled.status);
 
   const row = await prisma.ecomFilmPullProject.update({
     where: { id: projectId },
@@ -240,6 +378,10 @@ export async function clearFilmPullMedia(
 ): Promise<FilmPullProjectDto> {
   const existing = await getOwnedRow(userId, projectId);
   if (!existing) throw new Error("项目不存在");
+  const current = rowToDto(existing);
+  const { dto: reconciled } = reconcileFilmPullProjectStatus(current);
+  assertFilmPullMediaMutable(reconciled.status);
+
   const row = await prisma.ecomFilmPullProject.update({
     where: { id: projectId },
     data: {

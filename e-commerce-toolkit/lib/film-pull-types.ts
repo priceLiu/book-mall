@@ -40,6 +40,9 @@ export type FilmPullAnalyzePatch = {
     shotSequenceLogic: string;
     cameraLanguageSummary: string;
   };
+  narrativeLogic: string;
+  beatPoints: string;
+  replicableShootingScript: string;
   shots: FilmPullShot[];
 };
 
@@ -84,16 +87,20 @@ export type FilmPullProject = {
   settings: {
     chatModelKey?: string;
     videoModelKey?: string;
+    lastAnalyzePrompt?: string;
     aspectRatio?: "16:9" | "9:16";
   };
   media: FilmPullMediaReference | null;
   analyzeResult: {
+    rawText?: string;
     structured?: FilmPullAnalyzePatch | null;
     parseError?: string | null;
+    completedAt?: string | null;
   } | null;
   renderScript: {
     structured?: FilmPullRenderScriptPatch | null;
     parseError?: string | null;
+    completedAt?: string | null;
   } | null;
   characterRefs: FilmPullCharacterRef[];
   renderPlan: {
@@ -102,12 +109,71 @@ export type FilmPullProject = {
   } | null;
   meta: {
     finalVideoUrl?: string;
+    analyzeStartedAt?: string;
+    analyzeRunId?: string;
+    analyzeCancelRunId?: string | null;
   } | null;
   createdAt: string;
   updatedAt: string;
 };
 
 export type FilmPullPhase = "analyze" | "review" | "replace" | "output";
+
+/** 与 book-mall EcomFilmPullProject.status 对齐 */
+export const FILM_PULL_PROJECT_STATUS = {
+  DRAFT: "draft",
+  ANALYZING: "analyzing",
+  ANALYZED: "analyzed",
+  RENDER_SCRIPTING: "render_scripting",
+  RENDER_READY: "render_ready",
+  FAILED: "failed",
+} as const;
+
+export type FilmPullProjectStatus =
+  (typeof FILM_PULL_PROJECT_STATUS)[keyof typeof FILM_PULL_PROJECT_STATUS];
+
+export function isFilmPullAnalyzeRunning(project: FilmPullProject | null): boolean {
+  return isFilmPullAnalyzeActive(project);
+}
+
+/** 服务端 analyzing 且尚无终态结果 → 真正进行中 */
+export function isFilmPullAnalyzeActive(project: FilmPullProject | null): boolean {
+  if (!project) return false;
+  if (project.status === FILM_PULL_PROJECT_STATUS.FAILED) return false;
+  if (project.status !== FILM_PULL_PROJECT_STATUS.ANALYZING) return false;
+  if (project.analyzeResult?.completedAt) return false;
+  const meta = project.meta;
+  if (
+    meta?.analyzeCancelRunId &&
+    meta.analyzeRunId &&
+    meta.analyzeCancelRunId === meta.analyzeRunId
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export function isFilmPullRenderScriptRunning(project: FilmPullProject | null): boolean {
+  return isFilmPullRenderScriptActive(project);
+}
+
+export function isFilmPullRenderScriptActive(project: FilmPullProject | null): boolean {
+  if (!project) return false;
+  if (project.status === FILM_PULL_PROJECT_STATUS.FAILED) return false;
+  if (project.status !== FILM_PULL_PROJECT_STATUS.RENDER_SCRIPTING) return false;
+  if (project.renderScript?.completedAt) return false;
+  return true;
+}
+
+export function isFilmPullAnalyzeFailed(project: FilmPullProject | null): boolean {
+  if (!project) return false;
+  if (project.status === FILM_PULL_PROJECT_STATUS.FAILED) return true;
+  return Boolean(
+    project.analyzeResult?.completedAt &&
+      !project.analyzeResult.structured &&
+      project.analyzeResult.parseError,
+  );
+}
 
 export function resolveFilmPullPhase(project: FilmPullProject | null): FilmPullPhase {
   if (!project?.analyzeResult?.structured) return "analyze";

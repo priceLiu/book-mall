@@ -22,8 +22,21 @@ function isReplayableBody(body: BodyInit | null | undefined): boolean {
   return true;
 }
 
+export function formatEcomTransportError(e: unknown): string {
+  const raw = e instanceof Error ? e.message : String(e);
+  if (/terminated|ECONNRESET|aborted|socket hang up|UND_ERR|fetch failed|upstream_fetch_failed/i.test(raw)) {
+    return "与服务器连接中断，请确认 book-mall / Gateway 已启动后重试";
+  }
+  return raw || "请稍后重试";
+}
+
 export async function ecomBookFetch(path: string, init?: RequestInit) {
-  let res = await rawEcomBookFetch(path, init);
+  let res: Response;
+  try {
+    res = await rawEcomBookFetch(path, init);
+  } catch (e) {
+    throw new Error(formatEcomTransportError(e));
+  }
 
   // 令牌过期 → 服务端 refresh 后重试一次
   if (res.status === 401 && isReplayableBody(init?.body)) {
@@ -48,7 +61,8 @@ export async function ecomBookFetch(path: string, init?: RequestInit) {
       typeof data.detail === "string" && data.detail.trim()
         ? `: ${data.detail.trim()}`
         : "";
-    throw new Error(`${err}${detail}`);
+    const combined = `${err}${detail}`;
+    throw new Error(formatEcomTransportError(new Error(combined)));
   }
   return data;
 }

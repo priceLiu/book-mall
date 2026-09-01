@@ -71,6 +71,11 @@ import { getMaxRefsForRoleAtInvokeClient, hasProductRef, PRODUCT_DESIGN_STYLE_RE
 import { ProductDesignGalleryPreviewDialog, type ProductDesignGalleryPreviewItem } from "@/components/product-design/product-design-gallery-preview-dialog";
 import { ProductDesignSaveDialog } from "@/components/product-design/product-design-save-dialog";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import { defaultImageSizeForModel } from "@/lib/storyboard-gen-params";
+import {
+  filterImageSizeOptionsByEcomRatio,
+  imageSizeOptionsForModel,
+} from "@/lib/storyboard-image-size-options";
 import { cn } from "@/lib/utils";
 import {
   productDesignCssAspectRatio,
@@ -356,6 +361,9 @@ export function ProductDesignContentPanel({
 
   const [draftVisionKey, setDraftVisionKey] = useState(visionModelKey);
   const [draftModelKey, setDraftModelKey] = useState(imageModelKey);
+  const [imageSize, setImageSize] = useState(() =>
+    defaultImageSizeForModel(imageModelKey, "9:16"),
+  );
   const [mainGenBatchCount, setMainGenBatchCount] = useState(() =>
     resolveMainImageBatchCount(project.settings.mainImageCount),
   );
@@ -370,6 +378,31 @@ export function ProductDesignContentPanel({
 
   useEffect(() => setDraftVisionKey(visionModelKey), [visionModelKey]);
   useEffect(() => setDraftModelKey(imageModelKey), [imageModelKey]);
+  useEffect(() => {
+    setImageSize((prev) => {
+      const ratio =
+        genPipeline?.target === "detail"
+          ? project.resolved.detailPageRatio
+          : project.resolved.mainImageRatio;
+      const opts = filterImageSizeOptionsByEcomRatio(
+        imageSizeOptionsForModel(draftModelKey || imageModelKey),
+        ratio,
+      );
+      const next =
+        opts[0]?.value ??
+        defaultImageSizeForModel(
+          draftModelKey || imageModelKey,
+          ratio === "16:9" ? "16:9" : "9:16",
+        );
+      return prev === next ? prev : next;
+    });
+  }, [
+    draftModelKey,
+    imageModelKey,
+    genPipeline?.target,
+    project.resolved.detailPageRatio,
+    project.resolved.mainImageRatio,
+  ]);
   useEffect(() => {
     setMainGenBatchCount(resolveMainImageBatchCount(project.settings.mainImageCount));
   }, [project.id, project.settings.mainImageCount]);
@@ -659,7 +692,12 @@ export function ProductDesignContentPanel({
   );
 
   const runGenerate = useCallback(
-    async (target: "main" | "detail", indexes?: number[], modelKey?: string) => {
+    async (
+      target: "main" | "detail",
+      indexes?: number[],
+      modelKey?: string,
+      sizeOverride?: string,
+    ) => {
       const label = target === "main" ? "主图" : "详情屏";
       const items = target === "main" ? design?.mainImages : design?.detailPages;
       if (!items?.length) return;
@@ -675,6 +713,7 @@ export function ProductDesignContentPanel({
         target === "main"
           ? project.resolved.mainImageRatio
           : project.resolved.detailPageRatio;
+      const effectiveImageSize = sizeOverride ?? imageSize;
 
       const countBefore = items.filter((i) =>
         wantedIndexes.includes(i.index) ? Boolean(i.imageUrl) : false,
@@ -696,6 +735,7 @@ export function ProductDesignContentPanel({
           indexes: wantedIndexes,
           modelKey: mk,
           ratio,
+          imageSize: effectiveImageSize,
         });
         generated = result.generated;
         failures.push(...result.failures);
@@ -754,6 +794,7 @@ export function ProductDesignContentPanel({
       project.id,
       project.resolved,
       imageModelKey,
+      imageSize,
       onProjectChange,
       alert,
       startGenPoll,
@@ -983,16 +1024,9 @@ export function ProductDesignContentPanel({
   const requestMainGenerate = useCallback(
     async (indexes: number[]) => {
       if (!design || indexes.length <= 0) return;
-
-      const ok = await confirm({
-        title: `生成 ${indexes.length} 张主图`,
-        message: `将出图 ${indexes.length} 张主图，预计需要几分钟。是否继续？`,
-      });
-      if (!ok) return;
-
       void startGeneratePipeline("main", indexes);
     },
-    [design, confirm, startGeneratePipeline],
+    [design, startGeneratePipeline],
   );
 
   const requestDetailGenerate = useCallback(
@@ -1006,14 +1040,9 @@ export function ProductDesignContentPanel({
         });
         return;
       }
-      const ok = await confirm({
-        title: `生成 ${indexes.length} 张详情屏`,
-        message: `将出图 ${indexes.length} 张详情屏，预计需要几分钟。是否继续？`,
-      });
-      if (!ok) return;
       void startGeneratePipeline("detail", indexes);
     },
-    [design?.detailPages, alert, confirm, startGeneratePipeline],
+    [design?.detailPages, alert, startGeneratePipeline],
   );
 
   // 助手侧点「生成全部主图 / 详情屏」时通过递增 token 触发
@@ -2203,6 +2232,8 @@ export function ProductDesignContentPanel({
         onRetryLoadModels={onRefreshModels}
         value={draftModelKey}
         onChange={setDraftModelKey}
+        imageSize={imageSize}
+        onImageSizeChange={setImageSize}
         lockedImageSizeLabel={
           genPipeline?.target === "detail"
             ? `${project.resolved.detailPageRatio}（由 ${spec?.label ?? "平台"} 规则决定）`
@@ -2215,7 +2246,7 @@ export function ProductDesignContentPanel({
           setImagePickerSubmitting(true);
           setGenPipeline(null);
           onImageModelChange(modelKey);
-          void runGenerate(req.target, req.indexes, modelKey).finally(() => {
+          void runGenerate(req.target, req.indexes, modelKey, imageSize).finally(() => {
             setImagePickerSubmitting(false);
           });
         }}

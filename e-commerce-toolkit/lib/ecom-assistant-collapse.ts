@@ -47,8 +47,11 @@ export function useEcomAssistantCollapseHandlers(opts: {
 }
 
 /** Studio 级：中栏空白折叠 + assistantCollapsed 状态 */
-export function useEcomStudioAssistantCollapse(assistantStreaming: boolean) {
-  const [assistantCollapsed, setAssistantCollapsed] = useState(false);
+export function useEcomStudioAssistantCollapse(
+  assistantStreaming: boolean,
+  initialCollapsed = false,
+) {
+  const [assistantCollapsed, setAssistantCollapsed] = useState(initialCollapsed);
 
   const handleMainBlankPointerDown = useCallback(
     (e: PointerEvent<HTMLElement>) => {

@@ -46,6 +46,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
     if (body.settings && typeof body.settings === "object") {
       patch.settings = body.settings as MediaDecomposeSettings;
     }
+    if (body.meta && typeof body.meta === "object" && !Array.isArray(body.meta)) {
+      patch.meta = body.meta as Record<string, unknown>;
+    }
     const project = await updateEcomMediaDecomposeProject(auth.userId, id, patch);
     return NextResponse.json({ project });
   } catch (e) {

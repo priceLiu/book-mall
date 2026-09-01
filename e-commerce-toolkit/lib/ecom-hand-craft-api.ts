@@ -200,6 +200,7 @@ export async function generateHandCraftStep(opts: {
   indexes?: number[];
   modelKey?: string;
   concurrency?: number;
+  imageSize?: string;
 }): Promise<{
   generated: number;
   failures: Array<{ index: number; message: string }>;
@@ -215,6 +216,7 @@ export async function generateHandCraftStep(opts: {
         indexes: opts.indexes,
         modelKey: opts.modelKey,
         concurrency: opts.concurrency,
+        imageSize: opts.imageSize,
       }),
     },
   );

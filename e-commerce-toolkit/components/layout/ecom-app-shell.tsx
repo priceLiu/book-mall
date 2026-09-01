@@ -12,6 +12,7 @@ import {
   clearEcomSsoReenterAttempts,
   ensureEcomSessionFresh,
 } from "@/lib/ecom-silent-sso";
+import { isEcomNavPersistentPath } from "@/lib/ecom-browse-hub-paths";
 import { isEcomPublicBrowsePath } from "@/lib/ecom-public-paths";
 import { setEcomRuntimeBookOrigin } from "@/lib/ecom-runtime-config";
 import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
@@ -35,6 +36,7 @@ export function EcomAppShell({
 }) {
   const pathname = usePathname();
   const isPublicBrowse = isEcomPublicBrowsePath(pathname);
+  const isBrowseHub = isEcomNavPersistentPath(pathname);
   const [navCollapsed, setNavCollapsed] = React.useState(false);
 
   React.useEffect(() => {
@@ -146,7 +148,7 @@ export function EcomAppShell({
         />
         <div
           className="relative z-0 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl bg-white shadow-inner"
-          onPointerDown={collapseNavOnWorkspaceClick}
+          onPointerDown={isBrowseHub ? undefined : collapseNavOnWorkspaceClick}
         >
           <EcomMobileBar bookOrigin={bookOrigin} />
           <EcomAuthBanner />

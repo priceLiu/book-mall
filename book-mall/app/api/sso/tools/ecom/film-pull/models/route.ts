@@ -52,7 +52,11 @@ export async function GET(req: Request) {
   );
 
   const defaultChat =
-    chatRows.find((m) => m.modelKey === ECOM_FILM_PULL_DEFAULT_CHAT_MODEL)?.modelKey ??
+    chatRows.find(
+      (m) => m.modelKey === ECOM_FILM_PULL_DEFAULT_CHAT_MODEL && m.supportsVideo,
+    )?.modelKey ??
+    chatRows.find((m) => m.supportsVideo && m.credentialBound)?.modelKey ??
+    chatRows.find((m) => m.supportsVideo)?.modelKey ??
     chatRows.find((m) => m.credentialBound)?.modelKey ??
     chatRows[0]?.modelKey ??
     ECOM_FILM_PULL_DEFAULT_CHAT_MODEL;

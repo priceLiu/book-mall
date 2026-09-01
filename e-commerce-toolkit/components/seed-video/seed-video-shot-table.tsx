@@ -1,5 +1,6 @@
 "use client";
 
+import { Plus, Trash2 } from "lucide-react";
 import { ProductDesignPromptMentionTextarea } from "@/components/product-design/product-design-prompt-mention-textarea";
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
 import { SeedVideoRefsGalleryStrip } from "@/components/seed-video/seed-video-refs-gallery-strip";
@@ -40,6 +41,11 @@ type Props = {
   videoPromptMentionRefs?: EcomPromptImageRef[];
   onUploadShotRef?: (shotIndex: number, file: File) => void | Promise<void>;
   onUnassignShotRef?: (shotIndex: number) => void;
+  /** 增删镜头（删行：生成中/已出片禁止） */
+  showRowActions?: boolean;
+  onAddRow?: () => void;
+  onDeleteRow?: (index: number) => void;
+  canDeleteShot?: (shot: SeedVideoShot) => boolean;
 };
 
 export function SeedVideoShotTable({
@@ -67,6 +73,10 @@ export function SeedVideoShotTable({
   videoPromptMentionRefs,
   onUploadShotRef,
   onUnassignShotRef,
+  showRowActions = false,
+  onAddRow,
+  onDeleteRow,
+  canDeleteShot,
 }: Props) {
   function patchShot(index: number, patch: Partial<SeedVideoShot>) {
     onChange(shots.map((s) => (s.index === index ? { ...s, ...patch } : s)));
@@ -102,7 +112,8 @@ export function SeedVideoShotTable({
     5 +
     (showRefColumn ? 1 : 0) +
     (hideVideoColumn ? 0 : 1) +
-    (hideStatusColumn ? 0 : 1);
+    (hideStatusColumn ? 0 : 1) +
+    (showRowActions ? 1 : 0);
 
   const generateLabel =
     selectedCount > 0 ? `生成 (${selectedCount})` : "生成";
@@ -132,6 +143,9 @@ export function SeedVideoShotTable({
             <th className="px-3 py-2 font-medium min-w-[180px]">视频 Prompt</th>
             <th className="px-3 py-2 font-medium min-w-[140px]">口播</th>
             {!hideStatusColumn ? <th className="px-3 py-2 font-medium">状态</th> : null}
+            {showRowActions ? (
+              <th className="px-3 py-2 font-medium w-[4rem]">操作</th>
+            ) : null}
           </tr>
         </thead>
         <tbody>
@@ -140,6 +154,7 @@ export function SeedVideoShotTable({
             const status = shotStatus(shot);
             const isGenerating = isShotGenerating(shot.index);
             const isSelected = selectedShotIndices?.has(shot.index) ?? false;
+            const deletable = canDeleteShot ? canDeleteShot(shot) : !isGenerating && !shot.videoUrl?.trim();
             return (
               <tr key={shot.index} className="border-t border-[#e8e8ed] align-top">
                 <td className="px-3 py-2 whitespace-nowrap">
@@ -247,23 +262,58 @@ export function SeedVideoShotTable({
                 {!hideStatusColumn ? (
                   <td className={`px-3 py-2 ${status.className}`}>{status.label}</td>
                 ) : null}
+                {showRowActions ? (
+                  <td className="px-3 py-2">
+                    <button
+                      type="button"
+                      className="flex size-8 items-center justify-center rounded-lg text-[#86868b] transition hover:bg-[#fff5f5] hover:text-[#ff3b30] disabled:cursor-not-allowed disabled:opacity-30"
+                      disabled={disabled || !deletable || shots.length <= 1}
+                      title={
+                        !deletable
+                          ? isGenerating
+                            ? "生成中不可删除"
+                            : "已出片不可删除"
+                          : "删除本镜"
+                      }
+                      aria-label={`删除镜 ${shot.index}`}
+                      onClick={() => onDeleteRow?.(shot.index)}
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </td>
+                ) : null}
               </tr>
             );
           })}
         </tbody>
-        {showGenerateActions ? (
+        {showGenerateActions || showRowActions ? (
           <tfoot>
             <tr className="border-t border-[#e8e8ed] bg-[#fafafa]">
               <td colSpan={columnCount} className="px-3 py-2.5">
-                <EcomButtonSecondary
-                  type="button"
-                  size="sm"
-                  className="min-w-[9rem] px-6"
-                  disabled={generateSelectedDisabled}
-                  onClick={() => onGenerateSelected?.()}
-                >
-                  {generateLabel}
-                </EcomButtonSecondary>
+                <div className="flex flex-wrap items-center gap-2">
+                  {showGenerateActions ? (
+                    <EcomButtonSecondary
+                      type="button"
+                      size="sm"
+                      className="min-w-[9rem] px-6"
+                      disabled={generateSelectedDisabled}
+                      onClick={() => onGenerateSelected?.()}
+                    >
+                      {generateLabel}
+                    </EcomButtonSecondary>
+                  ) : null}
+                  {showRowActions ? (
+                    <EcomButtonSecondary
+                      type="button"
+                      size="sm"
+                      disabled={disabled}
+                      onClick={() => onAddRow?.()}
+                    >
+                      <Plus className="mr-1 inline size-3.5" />
+                      增加镜头
+                    </EcomButtonSecondary>
+                  ) : null}
+                </div>
               </td>
             </tr>
           </tfoot>

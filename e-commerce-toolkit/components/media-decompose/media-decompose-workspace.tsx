@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Clapperboard, Cpu, Download, Images, Loader2, Save, Sparkles } from "lucide-react";
+import { Clapperboard, ChevronDown, Cpu, Download, Images, Loader2, Save, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { MediaDecomposeMediaInput } from "@/components/media-decompose/media-decompose-media-input";
@@ -10,6 +10,11 @@ import {
   MediaDecomposeReplicaLaunch,
   MediaDecomposeReplicaPanel,
 } from "@/components/media-decompose/media-decompose-replica-panel";
+import { MediaDecomposeReplicaSetupPanel } from "@/components/media-decompose/media-decompose-replica-setup-panel";
+import {
+  MediaDecomposeReplicaIdleComposer,
+  MediaDecomposeReplicaIdleThread,
+} from "@/components/media-decompose/media-decompose-replica-idle-dock";
 import { MediaDecomposeResultPanel } from "@/components/media-decompose/media-decompose-result-panel";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-markdown-block";
@@ -18,6 +23,7 @@ import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-st
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { defaultPromptForKind } from "@/lib/media-decompose-default-prompts";
+import { isMediaDecomposeMockDevUiEnabled } from "@/lib/media-decompose-mock-dev";
 import {
   downloadMediaDecomposeExportZip,
   saveMediaDecomposeDeliverableSnapshot,
@@ -30,8 +36,13 @@ import {
 import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 import type { MediaDecomposeChatModel, MediaDecomposeProject } from "@/lib/media-decompose-types";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
+import {
+  isReplicaScriptReady,
+  readReplicaPhase,
+} from "@/lib/media-decompose-replica-workflow";
 import type { SeedVideoProject } from "@/lib/seed-video-types";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import { cn } from "@/lib/utils";
 
 type Props = {
   project: MediaDecomposeProject;
@@ -47,6 +58,7 @@ type Props = {
   onAttachAsset: (assetId: string) => Promise<void>;
   onClearMedia: () => Promise<void>;
   onDecompose: (prompt: string, modelKey: string) => Promise<void>;
+  onMockDecompose?: (prompt: string) => Promise<void>;
   onRefreshModels?: () => void;
   onNewProject?: () => void | Promise<void>;
   loadProjectList?: () => Promise<EcomProjectListItem[]>;
@@ -58,6 +70,10 @@ type Props = {
   onVideoModelChange?: (key: string) => void;
   onStartReplica?: () => void | Promise<void>;
   onReplicaProjectChange?: () => void | Promise<void>;
+  onReplicaSeedVideoUpdated?: (seedVideo: SeedVideoProject) => void;
+  imageModels?: StoryboardGatewayModel[];
+  imageModelKey?: string;
+  onImageModelChange?: (key: string) => void;
   onPreviewVideo?: (src: string, title?: string) => void;
   onAlert?: (opts: { title: string; message: string; variant?: "error" }) => Promise<void>;
   onProjectUpdated?: (project: MediaDecomposeProject) => void;
@@ -77,6 +93,7 @@ export function MediaDecomposeWorkspace({
   onAttachAsset,
   onClearMedia,
   onDecompose,
+  onMockDecompose,
   onRefreshModels,
   onNewProject,
   loadProjectList,
@@ -88,6 +105,10 @@ export function MediaDecomposeWorkspace({
   onVideoModelChange,
   onStartReplica,
   onReplicaProjectChange,
+  onReplicaSeedVideoUpdated,
+  imageModels = [],
+  imageModelKey = "",
+  onImageModelChange,
   onPreviewVideo,
   onAlert,
   onProjectUpdated,
@@ -99,6 +120,7 @@ export function MediaDecomposeWorkspace({
   );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [draftModelKey, setDraftModelKey] = useState(chatModelKey);
+  const [promptExpanded, setPromptExpanded] = useState(false);
 
   useEffect(() => {
     setPrompt((prev) => {
@@ -128,8 +150,18 @@ export function MediaDecomposeWorkspace({
   const canSave =
     Boolean(project.media) && hasResult && !decomposing && !mediaBusy;
   const canStartReplica = Boolean(onStartReplica) && hasResult && !decomposing;
+  const replicaScriptReady = useMemo(() => {
+    if (!replicaSeedVideo) return false;
+    const phase = readReplicaPhase(replicaSeedVideo);
+    return isReplicaScriptReady(replicaSeedVideo, phase);
+  }, [replicaSeedVideo]);
   const showReplicaPanel = Boolean(
-    replicaSeedVideo && onVideoModelChange && onReplicaProjectChange && onPreviewVideo && onAlert,
+    replicaSeedVideo &&
+      replicaScriptReady &&
+      onVideoModelChange &&
+      onReplicaProjectChange &&
+      onPreviewVideo &&
+      onAlert,
   );
 
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -198,9 +230,22 @@ export function MediaDecomposeWorkspace({
     project.title?.trim() ||
     (project.media?.kind === "video" ? "视频拆解" : project.media ? "图片拆解" : "拆图拆视频");
 
-  return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white">
-      <div className="ecom-scrollbar-overlay h-full min-h-0 w-full overflow-x-hidden overflow-y-auto overscroll-y-contain [overflow-anchor:none]">
+  const showReplicaSetup = Boolean(
+    replicaSeedVideo &&
+      !replicaScriptReady &&
+      onReplicaSeedVideoUpdated &&
+      onAlert &&
+      onImageModelChange,
+  );
+  const showBottomDock = !replicaScriptReady;
+  const bottomDockMode: "idle" | "ready" | "replica-setup" = showReplicaSetup
+    ? "replica-setup"
+    : canStartReplica
+      ? "ready"
+      : "idle";
+
+  const mainScroll = (
+    <>
       <header className="sticky top-0 z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
@@ -275,46 +320,85 @@ export function MediaDecomposeWorkspace({
       />
 
       <div className="space-y-2 rounded-xl border border-[#e8e8ed] bg-white p-4">
-        <label className="text-sm font-semibold text-[#1d1d1f]" htmlFor="decompose-prompt">
-          拆解指令
-        </label>
-        <textarea
-          id="decompose-prompt"
-          value={prompt}
-          disabled={decomposing}
-          rows={10}
-          className="w-full resize-y rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm leading-relaxed outline-none focus:border-[#0071e3] focus:ring-2 focus:ring-[#0071e3]/20"
-          onChange={(e) => setPrompt(e.target.value)}
-        />
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <EcomButtonSecondary
-            size="sm"
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <button
             type="button"
-            disabled={decomposing}
-            onClick={() => setPickerOpen(true)}
+            className="inline-flex min-w-0 items-center gap-1.5 text-left"
+            aria-expanded={promptExpanded}
+            onClick={() => setPromptExpanded((v) => !v)}
           >
-            <Cpu className="mr-1 h-3.5 w-3.5" />
-            {selectedModelLabel}
-          </EcomButtonSecondary>
-          <EcomButtonPrimary
-            size="sm"
-            type="button"
-            disabled={!project.media || !prompt.trim() || decomposing || mediaBusy}
-            onClick={() => void onDecompose(prompt.trim(), chatModelKey)}
-          >
-            {decomposing ? (
-              <>
-                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                拆解中…
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-1 h-3.5 w-3.5" />
-                拆解
-              </>
-            )}
-          </EcomButtonPrimary>
+            <span className="text-sm font-semibold text-[#1d1d1f]">拆解指令</span>
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 shrink-0 text-[#6e6e73] transition-transform",
+                promptExpanded && "rotate-180",
+              )}
+              aria-hidden
+            />
+          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <EcomButtonSecondary
+              size="sm"
+              type="button"
+              disabled={decomposing}
+              onClick={() => setPickerOpen(true)}
+            >
+              <Cpu className="mr-1 h-3.5 w-3.5" />
+              {selectedModelLabel}
+            </EcomButtonSecondary>
+            <EcomButtonPrimary
+              size="sm"
+              type="button"
+              disabled={!project.media || !prompt.trim() || decomposing || mediaBusy}
+              onClick={() => void onDecompose(prompt.trim(), chatModelKey)}
+            >
+              {decomposing ? (
+                <>
+                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                  拆解中…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-1 h-3.5 w-3.5" />
+                  拆解
+                </>
+              )}
+            </EcomButtonPrimary>
+            {isMediaDecomposeMockDevUiEnabled() && onMockDecompose ? (
+              <EcomButtonSecondary
+                size="sm"
+                type="button"
+                disabled={!project.media || decomposing || mediaBusy}
+                title="开发：跳过 Gateway，写入 mock 拆解结果"
+                onClick={() => void onMockDecompose(prompt.trim())}
+              >
+                {decomposing ? "Mock…" : "Mock 拆解"}
+              </EcomButtonSecondary>
+            ) : null}
+          </div>
         </div>
+
+        {!promptExpanded && prompt.trim() ? (
+          <button
+            type="button"
+            className="w-full truncate rounded-lg bg-[#f5f5f7] px-3 py-2 text-left text-xs leading-relaxed text-[#6e6e73] hover:bg-[#ececee]"
+            onClick={() => setPromptExpanded(true)}
+          >
+            {prompt.trim().replace(/\s+/g, " ").slice(0, 120)}
+            {prompt.trim().length > 120 ? "…" : ""}
+          </button>
+        ) : null}
+
+        {promptExpanded ? (
+          <textarea
+            id="decompose-prompt"
+            value={prompt}
+            disabled={decomposing}
+            rows={10}
+            className="w-full resize-y rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm leading-relaxed outline-none focus:border-[#0071e3] focus:ring-2 focus:ring-[#0071e3]/20"
+            onChange={(e) => setPrompt(e.target.value)}
+          />
+        ) : null}
       </div>
 
       <StoryboardTaskStatus
@@ -328,7 +412,7 @@ export function MediaDecomposeWorkspace({
         <div className="space-y-4 rounded-xl border border-[#e8e8ed] bg-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-[#1d1d1f]">拆解结果</h2>
-            {canStartReplica && !showReplicaPanel ? (
+            {canStartReplica && !showReplicaSetup && !replicaScriptReady ? (
               <EcomButtonPrimary
                 type="button"
                 size="sm"
@@ -362,6 +446,26 @@ export function MediaDecomposeWorkspace({
         </div>
       )}
 
+      {showReplicaSetup ? (
+        <MediaDecomposeReplicaSetupPanel
+          project={project}
+          seedVideo={replicaSeedVideo!}
+          chatModelKey={chatModelKey}
+          imageModels={imageModels}
+          imageModelKey={imageModelKey}
+          onImageModelChange={onImageModelChange!}
+          modelsLoading={modelsLoading}
+          onRefreshModels={onRefreshModels}
+          busy={replicaBusy || mediaBusy || decomposing}
+          onProjectUpdated={(p) => onProjectUpdated?.(p)}
+          onSeedVideoUpdated={(sv) => {
+            onReplicaSeedVideoUpdated?.(sv);
+            void onReplicaProjectChange?.();
+          }}
+          onAlert={onAlert!}
+        />
+      ) : null}
+
       {showReplicaPanel ? (
         <MediaDecomposeReplicaPanel
           seedVideo={replicaSeedVideo!}
@@ -372,14 +476,16 @@ export function MediaDecomposeWorkspace({
           onPreviewVideo={onPreviewVideo!}
           onAlert={onAlert!}
         />
-      ) : canStartReplica ? (
-        <div className="sticky bottom-4 z-[20] shrink-0">
+      ) : canStartReplica && !showReplicaSetup && !replicaSeedVideo ? (
+        <div className="shrink-0" data-ecom-no-assistant-collapse>
           <MediaDecomposeReplicaLaunch
             busy={replicaBusy || mediaBusy}
             onStart={() => void onStartReplica?.()}
           />
         </div>
       ) : null}
+
+      {showBottomDock ? <MediaDecomposeReplicaIdleThread mode={bottomDockMode} /> : null}
 
       <StoryboardModelPickerDialog
         open={pickerOpen}
@@ -405,7 +511,23 @@ export function MediaDecomposeWorkspace({
         }}
       />
       </div>
+    </>
+  );
+
+  return (
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white">
+      <div className="ecom-scrollbar-overlay min-h-0 w-full flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain [overflow-anchor:none]">
+        {mainScroll}
       </div>
+      {showBottomDock ? (
+        <MediaDecomposeReplicaIdleComposer
+          mode={bottomDockMode}
+          busy={replicaBusy || mediaBusy}
+          onStartReplica={
+            canStartReplica && !replicaSeedVideo ? () => void onStartReplica?.() : undefined
+          }
+        />
+      ) : null}
 
       <MediaDecomposeSaveDialog
         open={saveDialogOpen}

@@ -25,6 +25,9 @@ const renderScript: FilmPullRenderScriptPatch = {
     fps: "24fps",
     globalVisualTone: "高饱和",
   },
+  narrativeLogic: "主线递进",
+  beatPoints: "3s 切点",
+  replicableShootingScript: "手持跟拍",
   shots: [
     {
       shotNo: 1,

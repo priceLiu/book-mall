@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { ECOM_DEFAULT_ASSISTANT_CHAT_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
+import { STORY_LLM_DEFAULT_VISION_MODEL } from "@/lib/canvas/story-llm-vision-models";
 
 import type {
   FilmPullAnalyzePatch,
@@ -9,7 +9,8 @@ import type {
 
 export const ECOM_FILM_PULL_TOOL_KEY = "ecom-toolkit__film-pull";
 export const ECOM_FILM_PULL_MODULE = "film-pull";
-export const ECOM_FILM_PULL_DEFAULT_CHAT_MODEL = ECOM_DEFAULT_ASSISTANT_CHAT_MODEL;
+/** 须支持 video_url 理解（百炼 Qwen 系） */
+export const ECOM_FILM_PULL_DEFAULT_CHAT_MODEL = STORY_LLM_DEFAULT_VISION_MODEL;
 export const ECOM_FILM_PULL_DEFAULT_VIDEO_MODEL = "wan2.7-r2v";
 
 export const FILM_PULL_V1_MAX_SEC = 60;
@@ -81,6 +82,10 @@ export type FilmPullMeta = {
   mediaRenderJobId?: string;
   sourceApp?: "ecom" | "canvas";
   canvasProjectId?: string;
+  analyzeStartedAt?: string;
+  /** 当前拉片任务 ID，用于中止 */
+  analyzeRunId?: string;
+  analyzeCancelRunId?: string | null;
 };
 
 export type FilmPullProjectDto = {
@@ -227,6 +232,22 @@ export function sanitizeFilmPullChatHistory(raw: unknown): FilmPullChatMessage[]
       ((m as FilmPullChatMessage).role === "user" ||
         (m as FilmPullChatMessage).role === "assistant"),
   );
+}
+
+export function isEcomFilmPullAnalyzeActive(
+  project: Pick<FilmPullProjectDto, "status" | "analyzeResult" | "meta"> | null,
+): boolean {
+  if (!project || project.status !== "analyzing") return false;
+  if (project.analyzeResult?.completedAt) return false;
+  const meta = project.meta;
+  if (
+    meta?.analyzeCancelRunId &&
+    meta.analyzeRunId &&
+    meta.analyzeCancelRunId === meta.analyzeRunId
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export type { FilmPullAnalyzePatch, FilmPullRenderScriptPatch };

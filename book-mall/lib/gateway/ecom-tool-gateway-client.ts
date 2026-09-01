@@ -10,7 +10,11 @@ import {
 import { pickCredentialForKind } from "@/lib/gateway/proxy-common";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 import { resolveEcomAssistantChatParams } from "@/lib/gateway/ecom-storyboard-chat-models";
-import { wrapChatStreamWithLogFinalize } from "@/lib/gateway/gateway-chat-stream-finalize";
+import {
+  GatewayV1ChatError,
+  runGatewayV1ChatCompletions,
+} from "@/lib/gateway/gateway-v1-chat-service";
+import { parseOpenAiUsage } from "@/lib/gateway/proxy-common";
 import {
   gatewayV1ChatCompletionsStream,
   gatewayV1ClientMeta,
@@ -221,6 +225,75 @@ export async function ecomGwPollDashscope(
   return { status };
 }
 
+/** 电商 · 非流式 Chat（进程内 Gateway，避免 dev 自调用 HTTP 中断；适合视频拉片等长推理） */
+export async function ecomGwChatComplete(
+  bookUserId: string,
+  opts: {
+    modelKey: string;
+    messages: CanvasChatMessage[];
+    params?: Record<string, unknown>;
+    clientPage?: string;
+    signal?: AbortSignal;
+  },
+): Promise<{ text: string; logId: string }> {
+  const auth = await requireEcomGatewayAuth(bookUserId);
+  const model = opts.modelKey.trim();
+  const route = routeGatewayModel(model);
+  const credentialId = pickCredentialForKind(auth.credentials, route.providerKind);
+  if (!credentialId) {
+    throw new GatewayRequiredError(
+      `Gateway Key 未绑定 ${route.providerKind} 凭证`,
+    );
+  }
+
+  const chatParams = { ...(opts.params ?? {}) };
+  delete chatParams.model;
+
+  const body: Record<string, unknown> = {
+    model,
+    messages: opts.messages,
+    stream: false,
+    ...resolveEcomAssistantChatParams(model),
+    ...chatParams,
+  };
+
+  try {
+    const result = await runGatewayV1ChatCompletions({
+      auth,
+      body,
+      signal: opts.signal,
+      logMeta: gatewayV1ClientMeta("E_COMMERCE", {
+        clientPage: opts.clientPage,
+        bookUserId,
+      }),
+    });
+    if (result.status >= 300) {
+      throw new GatewayRequiredError(
+        summarizeUpstreamFailMessage(result.text, result.status),
+      );
+    }
+    let parsed: unknown = null;
+    try {
+      parsed = result.text ? JSON.parse(result.text) : null;
+    } catch {
+      parsed = null;
+    }
+    void parseOpenAiUsage(parsed);
+    const choice = (parsed as { choices?: { message?: { content?: string } }[] })
+      ?.choices?.[0];
+    const text =
+      typeof choice?.message?.content === "string"
+        ? choice.message.content
+        : result.text;
+    return { text: text.trim(), logId: result.logId };
+  } catch (e) {
+    if (e instanceof GatewayV1ChatError) {
+      throw new GatewayRequiredError(e.message);
+    }
+    throw e;
+  }
+}
+
 /** 电商故事版 · Gateway 流式 Chat */
 export async function ecomGwChatStream(
   bookUserId: string,
@@ -271,11 +344,7 @@ export async function ecomGwChatStream(
   return {
     logId,
     status: result.status,
-    body: wrapChatStreamWithLogFinalize(bodyStream, {
-      logId,
-      model,
-      startedAtMs: Date.now(),
-    }),
+    body: bodyStream,
   };
 }
 

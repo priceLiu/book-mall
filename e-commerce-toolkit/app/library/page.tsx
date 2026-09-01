@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, Copy, ExternalLink, Layers, Link2, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, ExternalLink, Layers, Link2, RotateCcw, Sparkles } from "lucide-react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { EcomHomeAssistant } from "@/components/layout/ecom-home-assistant";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import {
   EcomImagePreviewHost,
@@ -707,26 +706,51 @@ export default function LibraryPage() {
 
   return (
     <>
-      <EcomWorkspaceLayout
-        assistantHeader={
-          <>
-            <h1 className="text-lg font-semibold text-[#1d1d1f]">我的资产</h1>
-            <div className="mt-2">
-              <EcomPublishDialog
-                content="从电商工具箱发起的示例发布：请在资产详情中选择具体文案后使用。"
-                triggerLabel="一键发布（示例）"
-              />
+      <EcomWorkspaceLayout fullWidth>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <header className="shrink-0 border-b border-[#e8e8ed] bg-white px-4 py-4 sm:px-6 sm:py-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h1 className="text-lg font-semibold text-[#1d1d1f]">我的资产</h1>
+                <p className="mt-1 text-xs text-[#6e6e73]">
+                  {loading
+                    ? "加载中…"
+                    : `共 ${totalAssets} 条媒体 · ${totalBundles} 套工作流/交付包`}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <EcomPublishDialog
+                  content="从电商工具箱发起的示例发布：请在资产详情中选择具体文案后使用。"
+                  triggerLabel="一键发布（示例）"
+                />
+                <Link
+                  href="/workflows/drafts"
+                  className="text-xs text-[#0071e3] hover:underline"
+                >
+                  我的工作流 →
+                </Link>
+              </div>
             </div>
-            <p className="text-xs text-[#6e6e73]">
-              {loading
-                ? "加载中…"
-                : `共 ${totalAssets} 条媒体 · ${totalBundles} 套工作流/交付包`}
-            </p>
-          </>
-        }
-        assistant={<EcomHomeAssistant variant="library" />}
-      >
-        <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
+            <Link
+              href="/ecom/shoot-catalog"
+              className="mt-4 flex items-center gap-3 rounded-xl border border-[#e8e8ed] bg-[#fafafa] px-4 py-3 transition hover:border-[#0071e3]/30 hover:bg-[#f0f6ff]"
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#0071e3] shadow-sm">
+                <Sparkles className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-[#1d1d1f]">
+                  姿势 · 场景 · 道具库
+                </span>
+                <span className="mt-0.5 block text-xs text-[#6e6e73]">
+                  管理服装模特图用的姿势、场景与道具；系统推荐只读，可自建「我的」条目
+                </span>
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-[#86868b]" />
+            </Link>
+          </header>
+
+          <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
           {!loading ? (
             <LibraryTabBar active={activeTab} onChange={setActiveTab} counts={tabCounts} />
           ) : null}
@@ -816,6 +840,7 @@ export default function LibraryPage() {
               ))}
             </div>
           )}
+          </div>
         </div>
       </EcomWorkspaceLayout>
 

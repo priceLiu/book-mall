@@ -26,6 +26,11 @@ import {
 import type { ModelShotProject, ModelShotReferenceRole } from "@/lib/model-shot-types";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import { defaultImageSizeForModel } from "@/lib/storyboard-gen-params";
+import {
+  filterImageSizeOptionsByEcomRatio,
+  imageSizeOptionsForModel,
+} from "@/lib/storyboard-image-size-options";
 
 const PROJECT_STORAGE_KEY = "ecom-model-shot-active-project";
 const ENTRY_PATH = "/ecom/model-shot";
@@ -42,6 +47,13 @@ export function ModelShotStudio() {
   const [imageModels, setImageModels] = useState<StoryboardGatewayModel[]>([]);
   const [chatModelKey, setChatModelKey] = useState(ECOM_DEFAULT_CHAT_MODEL_KEY);
   const [imageModelKey, setImageModelKey] = useState("wan2.7-image");
+  const [imageSize, setImageSize] = useState(() => {
+    const opts = filterImageSizeOptionsByEcomRatio(
+      imageSizeOptionsForModel("wan2.7-image"),
+      "3:4",
+    );
+    return opts[0]?.value ?? defaultImageSizeForModel("wan2.7-image", "3:4", { lockedRatio: true });
+  });
   const [modelsLoading, setModelsLoading] = useState(true);
   const [modelsLoadError, setModelsLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,7 +65,9 @@ export function ModelShotStudio() {
   const [generateToken, setGenerateToken] = useState(0);
   const [refGenBusyRole, setRefGenBusyRole] = useState<ModelShotReferenceRole | null>(null);
   const [imagePicker, setImagePicker] = useState<ImagePickerRequest | null>(null);
-  const imageGenerateRef = useRef<(modelKey: string, indexes: number[]) => void>(() => {});
+  const imageGenerateRef = useRef<
+    (modelKey: string, indexes: number[], imageSize?: string) => void
+  >(() => {});
   const chatModelsRef = useRef<StoryboardGatewayModel[]>([]);
   chatModelsRef.current = chatModels;
 
@@ -403,7 +417,6 @@ export function ModelShotStudio() {
       {imagePicker && project ? (
         <StoryboardModelPickerDialog
           open
-          nativeOverlay
           onOpenChange={(open) => {
             if (!open) setImagePicker(null);
           }}
@@ -411,13 +424,16 @@ export function ModelShotStudio() {
           panelIndex={imagePicker.poseIndex}
           dialogTitle={imagePickerDialogTitle}
           dialogDescription="仅列出支持参考图的 IMAGE 模型；参考顺序：服装 → 模特 → 场景。"
-          footerHint="确认后开始出图，长耗时任务可在右下角 Dock 查看。"
+          footerHint="选好模型与参数后开始生成；长耗时任务可在右下角 Dock 查看。"
           models={imageModels}
           modelsLoading={modelsLoading}
           modelsEmptyHint={modelsLoadError ?? undefined}
           onRetryLoadModels={loadModels}
           value={imageModelKey}
           onChange={handleImageModelChange}
+          imageSize={imageSize}
+          onImageSizeChange={setImageSize}
+          lockedImageSizeLabel="3:4（服装模特图标准竖版）"
           onConfirm={(modelKey) => {
             const indexes =
               imagePicker.batchIndexes && imagePicker.batchIndexes.length > 0
@@ -427,7 +443,7 @@ export function ModelShotStudio() {
                   : project.plan.items.map((i) => i.index);
             setImagePicker(null);
             handleImageModelChange(modelKey);
-            imageGenerateRef.current(modelKey, indexes);
+            imageGenerateRef.current(modelKey, indexes, imageSize);
           }}
         />
       ) : null}

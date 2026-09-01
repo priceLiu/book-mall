@@ -8,6 +8,12 @@ export const ECOM_MEDIA_DECOMPOSE_TOOL_KEY = "ecom-toolkit__media-decompose";
 export const ECOM_MEDIA_DECOMPOSE_MODULE = "media-decompose";
 export const ECOM_MEDIA_DECOMPOSE_DEFAULT_CHAT_MODEL = ECOM_DEFAULT_ASSISTANT_CHAT_MODEL;
 
+/** Gateway clientPage action 后缀（写 GatewayRequestLog） */
+export const ECOM_MEDIA_DECOMPOSE_REPLICA_MODEL_PROMPT_ACTION = "replica-model-prompt";
+export const ECOM_MEDIA_DECOMPOSE_REPLICA_MODEL_GENERATE_ACTION = "replica-model-generate";
+export const ECOM_MEDIA_DECOMPOSE_REPLICA_RECOGNIZE_PRODUCT_ACTION = "replica-recognize-product";
+export const ECOM_MEDIA_DECOMPOSE_REPLICA_SCRIPT_ACTION = "replica-generate-script";
+
 export type MediaDecomposeKind = "image" | "video";
 export type MediaDecomposeSource = "upload" | "url" | "asset";
 

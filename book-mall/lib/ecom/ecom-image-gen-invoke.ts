@@ -2,11 +2,12 @@ import { randomUUID } from "crypto";
 
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
 import { buildKieImageCreateArgs } from "@/lib/canvas/providers/kie";
+import type { EcomImageRatio } from "@/lib/ecom/ecom-platform-spec";
 import {
-  ecomRatioToImageSize,
-  type EcomImageRatio,
-} from "@/lib/ecom/ecom-platform-spec";
-import { resolveKlingV3Resolution, resolveStoryboardWan27JobSize } from "@/lib/ecom/ecom-storyboard-gen-params";
+  resolveEcomGeneratePixelSize,
+  resolveKlingV3Resolution,
+  resolveStoryboardWan27JobSize,
+} from "@/lib/ecom/ecom-storyboard-gen-params";
 import { isDashscopeMultimodalImageGenModel, isQwenImageEditModel, isZImageTurboModel } from "@/lib/gateway/qwen-image-edit-proxy";
 import {
   assertEcomStoryboardImageEditRefs,
@@ -121,6 +122,7 @@ async function generateMultimodalSyncImage(opts: {
   modelKey: string;
   prompt: string;
   ratio: EcomImageRatio;
+  imageSize?: string;
   refImageUrls: string[];
   toolKey: string;
 }): Promise<string> {
@@ -138,12 +140,17 @@ async function generateMultimodalSyncImage(opts: {
     refs.length > 0
       ? [...refs.map((url) => ({ image: url })), { text: opts.prompt }]
       : [{ text: opts.prompt }];
+  const pixelSize = resolveEcomGeneratePixelSize({
+    modelKey: opts.modelKey,
+    ratio: opts.ratio,
+    imageSize: opts.imageSize,
+  });
   const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
     kind: "multimodal-image-sync",
     model: opts.modelKey,
     content,
     parameters: {
-      size: ecomRatioToImageSize(opts.ratio),
+      size: pixelSize,
       n: 1,
       prompt_extend: isQwenImageEditModel(opts.modelKey)
         ? true
@@ -161,6 +168,8 @@ export async function generateEcomImage(opts: {
   modelKey: string;
   prompt: string;
   ratio: EcomImageRatio;
+  /** 像素 size（如 1080*1440）或 KIE 档位 2K/4K */
+  imageSize?: string;
   refImageUrls: string[];
   /** Gateway clientPage 里的计费 toolKey（含 action 后缀） */
   toolKey: string;
@@ -178,13 +187,19 @@ export async function generateEcomImage(opts: {
   }
 
   if (isStoryboardKieImageModel(opts.modelKey)) {
+    const kieResolution =
+      opts.imageSize?.trim() === "4K"
+        ? "4K"
+        : opts.imageSize?.trim() === "2K"
+          ? "2K"
+          : "2K";
     const { model, input } = buildKieImageCreateArgs({
       modelKey: resolveStoryboardKieModel(opts.modelKey),
       prompt,
       imageUrls: opts.refImageUrls.slice(0, 8),
       params: {
         aspect_ratio: opts.ratio,
-        resolution: "2K",
+        resolution: kieResolution,
         output_format: "png",
       },
     });
@@ -207,7 +222,7 @@ export async function generateEcomImage(opts: {
       model: resolveStoryboardKlingModel(opts.modelKey),
       content: [...refs.map((url) => ({ image: url })), { text: prompt }],
       aspectRatio: toKlingAspect(opts.ratio),
-      resolution: resolveKlingV3Resolution(),
+      resolution: resolveKlingV3Resolution({ imageSize: opts.imageSize }),
       n: 1,
       clientPage,
     });
@@ -216,7 +231,11 @@ export async function generateEcomImage(opts: {
   }
 
   const apiModel = resolveStoryboardDashscopeModel(opts.modelKey);
-  const size = ecomRatioToImageSize(opts.ratio);
+  const size = resolveEcomGeneratePixelSize({
+    modelKey: opts.modelKey,
+    ratio: opts.ratio,
+    imageSize: opts.imageSize,
+  });
 
   if (opts.refImageUrls.length === 0) {
     if (isStoryboardDashscopeImageModel(opts.modelKey)) {

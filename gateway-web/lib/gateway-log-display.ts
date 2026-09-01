@@ -203,6 +203,29 @@ const POLL_DELAY_LIMIT_MS = 10_000;
 const POLL_INFLIGHT_WARN_MS = 120_000;
 
 /** 厂商分列全为 — 时的悬停说明（非 bug：非支持厂商 / 未 poll 到 trace） */
+export function inputSummaryHasVideoUrl(inputSummary: unknown): boolean {
+  if (!inputSummary || typeof inputSummary !== "object") return false;
+  const input = (inputSummary as { input?: unknown }).input;
+  if (!input || typeof input !== "object") return false;
+  const messages = (input as { messages?: unknown }).messages;
+  if (!Array.isArray(messages)) return false;
+  for (const msg of messages) {
+    if (!msg || typeof msg !== "object") continue;
+    const content = (msg as { content?: unknown }).content;
+    if (!Array.isArray(content)) continue;
+    for (const part of content) {
+      if (
+        part &&
+        typeof part === "object" &&
+        (part as { type?: string }).type === "video_url"
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export function resolveLogVendorPhaseEmptyHint(input: {
   providerKind: string | null;
   requestKind: string;
@@ -210,6 +233,7 @@ export function resolveLogVendorPhaseEmptyHint(input: {
   isInProgress: boolean;
   hasVolcengineTrace: boolean;
   hasDashscopeTrace?: boolean;
+  hasVideoInput?: boolean;
 }): string | undefined {
   const hasTrace =
     input.hasVolcengineTrace || input.hasDashscopeTrace === true;
@@ -221,6 +245,11 @@ export function resolveLogVendorPhaseEmptyHint(input: {
     input.requestKind !== "CHAT";
 
   if (!isVolcVideo && !isDashscopeAsync) {
+    if (input.requestKind === "CHAT" && input.hasVideoInput) {
+      return input.isInProgress
+        ? "同步 Chat 视频理解：厂商等待时间计入「网关段」墙钟，无厂商分列；进行中请耐心等待（最长约 10 分钟）"
+        : "同步 Chat 视频理解：厂商等待时间计入「网关段」，无厂商分列";
+    }
     return "厂商分阶段（排队 / 生成 / 后处理）仅统计火山异步视频与百炼/DashScope 异步任务；同步 Chat 等无此拆分";
   }
   if (!hasTrace) {

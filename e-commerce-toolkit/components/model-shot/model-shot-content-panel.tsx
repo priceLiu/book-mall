@@ -71,7 +71,7 @@ type Props = {
     batchIndexes?: number[];
   }) => void;
   onRegisterImageGenerate?: (
-    handler: (modelKey: string, indexes: number[]) => void,
+    handler: (modelKey: string, indexes: number[], imageSize?: string) => void,
   ) => void;
 };
 
@@ -493,7 +493,7 @@ export function ModelShotContentPanel({
   }, []);
 
   const startBackgroundGenerate = useCallback(
-    async (modelKey: string, indexes?: number[]) => {
+    async (modelKey: string, indexes?: number[], imageSize?: string) => {
       const targetIndexes =
         indexes?.length && indexes.length > 0
           ? indexes
@@ -558,6 +558,7 @@ export function ModelShotContentPanel({
         projectId: project.id,
         modelKey,
         indexes: targetIndexes,
+        imageSize,
       })
         .then((r) => {
           result = r;
@@ -627,8 +628,8 @@ export function ModelShotContentPanel({
   );
 
   useEffect(() => {
-    onRegisterImageGenerate?.((modelKey, indexes) => {
-      void startBackgroundGenerate(modelKey, indexes);
+    onRegisterImageGenerate?.((modelKey, indexes, imageSize) => {
+      void startBackgroundGenerate(modelKey, indexes, imageSize);
     });
   }, [onRegisterImageGenerate, startBackgroundGenerate]);
 

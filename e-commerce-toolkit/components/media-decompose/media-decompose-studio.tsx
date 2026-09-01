@@ -17,6 +17,7 @@ import {
   listMediaDecomposeProjectSummaries,
   setMediaDecomposeFromUrl,
   startMediaDecomposeReplica,
+  mockMediaDecompose,
   streamMediaDecompose,
   updateMediaDecomposeProject,
   uploadMediaDecomposeFile,
@@ -46,6 +47,8 @@ export function MediaDecomposeStudio() {
   const [replicaBusy, setReplicaBusy] = useState(false);
   const [videoModels, setVideoModels] = useState<StoryboardGatewayModel[]>([]);
   const [videoModelKey, setVideoModelKey] = useState("wan2.7-r2v");
+  const [imageModels, setImageModels] = useState<StoryboardGatewayModel[]>([]);
+  const [imageModelKey, setImageModelKey] = useState("");
   const [previewVideo, setPreviewVideo] = useState<{ src: string; title?: string } | null>(null);
 
   const applyProject = useCallback((p: MediaDecomposeProject) => {
@@ -72,6 +75,17 @@ export function MediaDecomposeStudio() {
           def && models.chatModels.some((m) => m.modelKey === def) ? def : prev,
         ),
       );
+      if (models.imageModels?.length) {
+        setImageModels(models.imageModels);
+        setImageModelKey((prev) =>
+          pickBoundStoryboardModelKey(
+            models.imageModels!,
+            models.defaults?.image && models.imageModels!.some((m) => m.modelKey === models.defaults?.image)
+              ? models.defaults.image
+              : prev,
+          ),
+        );
+      }
       if (seedModels?.videoModels?.length) {
         setVideoModels(seedModels.videoModels);
         setVideoModelKey((prev) =>
@@ -141,7 +155,11 @@ export function MediaDecomposeStudio() {
       typeof project?.meta?.replicaSeedVideoProjectId === "string"
         ? project.meta.replicaSeedVideoProjectId.trim()
         : "";
-    if (!project || !replicaId) {
+    const hasDecomposeResult = Boolean(
+      project?.result?.structured ||
+        (typeof project?.result?.rawText === "string" && project.result.rawText.trim()),
+    );
+    if (!project || !replicaId || !hasDecomposeResult) {
       setReplicaSeedVideo(null);
       return;
     }
@@ -156,7 +174,7 @@ export function MediaDecomposeStudio() {
     return () => {
       cancelled = true;
     };
-  }, [project?.id, project?.meta?.replicaSeedVideoProjectId]);
+  }, [project?.id, project?.meta?.replicaSeedVideoProjectId, project?.result]);
 
   async function wrapMedia(fn: () => Promise<MediaDecomposeProject>) {
     setMediaBusy(true);
@@ -303,6 +321,10 @@ export function MediaDecomposeStudio() {
           /* ignore */
         }
       }}
+      onReplicaSeedVideoUpdated={setReplicaSeedVideo}
+      imageModels={imageModels}
+      imageModelKey={imageModelKey}
+      onImageModelChange={setImageModelKey}
       onPreviewVideo={(src, title) => setPreviewVideo({ src, title })}
       onAlert={alert}
       onProjectUpdated={applyProject}
@@ -332,12 +354,37 @@ export function MediaDecomposeStudio() {
         setStreamText("");
         setReplicaSeedVideo(null);
         try {
+          await updateMediaDecomposeProject(project.id, {
+            meta: {
+              ...(project.meta ?? {}),
+              replicaSeedVideoProjectId: null,
+              replicaResultAt: null,
+            },
+          }).then(applyProject);
           await streamMediaDecompose(project.id, { prompt, modelKey }, setStreamText);
           const fresh = await getMediaDecomposeProject(project.id);
           applyProject(fresh);
         } catch (e) {
           await alert({
             title: "拆解失败",
+            message: e instanceof Error ? e.message : "请重试",
+            variant: "error",
+          });
+        } finally {
+          setDecomposing(false);
+        }
+      }}
+      onMockDecompose={async (prompt) => {
+        setDecomposing(true);
+        setStreamText("");
+        setReplicaSeedVideo(null);
+        try {
+          const fresh = await mockMediaDecompose(project.id, { prompt });
+          applyProject(fresh);
+          setStreamText(fresh.result?.rawText ?? "");
+        } catch (e) {
+          await alert({
+            title: "Mock 拆解失败",
             message: e instanceof Error ? e.message : "请重试",
             variant: "error",
           });

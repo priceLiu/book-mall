@@ -164,6 +164,10 @@ export type SeedVideoProject = {
         startedAt: string;
       }
     >;
+    /** 拆图拆视频 · 一键复刻采集 */
+    replicaCollectPhase?: string;
+    replicaProductBrief?: string | null;
+    replicaModelPrompt?: string;
   } | null;
   createdAt: string;
   updatedAt: string;

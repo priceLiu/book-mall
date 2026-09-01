@@ -27,6 +27,8 @@ import {
   imageSizeOptionsForModel,
   defaultImageSizeForModel,
   aspectRatioForImageSize,
+  filterImageSizeOptionsByEcomRatio,
+  isStoryboardKlingImageModel,
 } from "@/lib/storyboard-image-size-options";
 import {
   STORYBOARD_R2V_RATIO_OPTIONS,
@@ -152,8 +154,12 @@ function countAdjustableParams(
   mode: "image" | "video",
   modelKey: string,
   videoTarget: "panel" | "fullSheet",
+  lockedRatio?: boolean,
 ): number {
-  if (mode === "image") return 1;
+  if (mode === "image") {
+    if (lockedRatio) return 1;
+    return imagePickerUsesAspectRatioOnly(modelKey) ? 1 : 2;
+  }
   let n = 2; // 视频分辨率 + 时长
   const isBailianR2v = isStoryboardBailianR2vModel(modelKey);
   if (isStoryboardWan30VideoModel(modelKey)) {
@@ -166,6 +172,7 @@ function countAdjustableParams(
   } else {
     n += 1; // 画面比例
   }
+  if (videoModelSupportsGenerateAudio(modelKey)) n += 1;
   // panel / fullSheet 都各有一个时长控件，已计入
   void videoTarget;
   return n;
@@ -360,6 +367,8 @@ export function StoryboardModelPickerDialog({
   onVideoSeedChange,
   videoPromptExtend = true,
   onVideoPromptExtendChange,
+  videoGenerateAudio = true,
+  onVideoGenerateAudioChange,
 }: Props) {
   const action = confirmLabel ?? (mode === "image" ? "开始生图" : "开始生成");
   const subtitle =
@@ -409,6 +418,66 @@ export function StoryboardModelPickerDialog({
   const selectedModel = models.find((m) => m.modelKey === draftKey) ?? null;
   const isBailianR2v = mode === "video" && isStoryboardBailianR2vModel(draftKey);
   const isKling30 = mode === "video" && isStoryboardKling30KieVideoModel(draftKey);
+  const lockedRatioHint = lockedImageSizeLabel?.split("（")[0]?.trim();
+  const hasLockedRatio = Boolean(lockedRatioHint);
+  const klingImageAspectOnly =
+    mode === "image" && imagePickerUsesAspectRatioOnly(draftKey, { lockedRatio: hasLockedRatio });
+  const currentImageSizeOptions = useMemo(
+    () =>
+      filterImageSizeOptionsByEcomRatio(
+        imageSizeOptionsForModel(draftKey, { lockedRatio: hasLockedRatio }),
+        lockedRatioHint,
+      ),
+    [draftKey, lockedRatioHint, hasLockedRatio],
+  );
+  const currentVideoResolutionOptions = useMemo(
+    () => videoResolutionOptionsForModel(draftKey),
+    [draftKey],
+  );
+  const showGenerateAudio =
+    mode === "video" && videoModelSupportsGenerateAudio(draftKey);
+  useEffect(() => {
+    if (mode !== "image" || !onImageSizeChange) return;
+    if (klingImageAspectOnly) return;
+    const opts = currentImageSizeOptions;
+    if (!opts.some((o) => o.value === imageSize)) {
+      onImageSizeChange(
+        defaultImageSizeForModel(
+          draftKey,
+          (lockedRatioHint === "16:9" ||
+          lockedRatioHint === "9:16" ||
+          lockedRatioHint === "3:4" ||
+          lockedRatioHint === "4:5" ||
+          lockedRatioHint === "1:1"
+            ? lockedRatioHint
+            : aspectRatio === "16:9"
+              ? "16:9"
+              : "9:16") as "16:9" | "9:16" | "3:4" | "4:5" | "1:1",
+          { lockedRatio: hasLockedRatio },
+        ),
+      );
+    }
+  }, [
+    mode,
+    draftKey,
+    currentImageSizeOptions,
+    imageSize,
+    onImageSizeChange,
+    klingImageAspectOnly,
+    aspectRatio,
+    lockedRatioHint,
+    hasLockedRatio,
+  ]);
+
+  useEffect(() => {
+    if (mode !== "video" || !onVideoResolutionChange) return;
+    if (!currentVideoResolutionOptions.some((o) => o.value === videoResolution)) {
+      onVideoResolutionChange(
+        (currentVideoResolutionOptions[0]?.value ?? "1080p") as StoryboardVideoResolution,
+      );
+    }
+  }, [mode, draftKey, currentVideoResolutionOptions, videoResolution, onVideoResolutionChange]);
+
   const showAspect = mode === "video" && !isBailianR2v;
   const showR2vRatio = mode === "video" && isBailianR2v;
   const showWanR2vExtras = mode === "video" && isStoryboardWanR2vModel(draftKey);
@@ -604,7 +673,12 @@ export function StoryboardModelPickerDialog({
                         model={m}
                         mode={mode}
                         selected={m.modelKey === draftKey}
-                        paramCount={countAdjustableParams(mode, m.modelKey, videoTarget)}
+                        paramCount={countAdjustableParams(
+                          mode,
+                          m.modelKey,
+                          videoTarget,
+                          Boolean(lockedImageSizeLabel),
+                        )}
                         durationLabel={modelVideoDurationLabel(mode, m.modelKey, videoTarget)}
                         onSelect={() => setDraftKey(m.modelKey)}
                       />
@@ -641,27 +715,59 @@ export function StoryboardModelPickerDialog({
                   <p className="rounded-lg border border-[#e8e8ed] bg-white px-3 py-2 text-sm text-[#1d1d1f]">
                     {lockedImageSizeLabel}
                   </p>
+                  <p className="text-[10px] text-[#86868b]">
+                    比例由平台/步骤规则锁定；下方可选同比例下的 720P / 1080P / 2K 等具体像素尺寸。
+                  </p>
                 </div>
               ) : null}
 
-              {showImageSize && !lockedImageSizeLabel ? (
+              {showImageSize && klingImageAspectOnly ? (
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-medium text-[#6e6e73]">输出分辨率（尺寸）</span>
+                  <span className="text-xs font-medium text-[#6e6e73]">画面比例</span>
+                  <select
+                    className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
+                    value={aspectRatio}
+                    onChange={(e) =>
+                      onAspectRatioChange?.(e.target.value as StoryboardVideoAspectRatio)
+                    }
+                  >
+                    <option value="9:16">9:16 竖屏</option>
+                    <option value="16:9">16:9 横屏</option>
+                    <option value="1:1">1:1</option>
+                  </select>
+                </label>
+              ) : null}
+
+              {showImageSize && !klingImageAspectOnly ? (
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium text-[#6e6e73]">
+                    {isStoryboardKlingImageModel(draftKey) && hasLockedRatio
+                      ? "输出分辨率"
+                      : "输出分辨率（尺寸）"}
+                  </span>
                   <select
                     className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
                     value={imageSize}
                     onChange={(e) => {
-                      const next = e.target.value as StoryboardWanxSize;
+                      const next = e.target.value;
                       onImageSizeChange?.(next);
-                      onAspectRatioChange?.(aspectRatioForWanxSize(next));
+                      const ar = aspectRatioForImageSize(next);
+                      if (ar === "16:9" || ar === "9:16" || ar === "1:1") {
+                        onAspectRatioChange?.(ar);
+                      }
                     }}
                   >
-                    {STORYBOARD_WANX_SIZE_OPTIONS.map((opt) => (
+                    {currentImageSizeOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}
                       </option>
                     ))}
                   </select>
+                  {isStoryboardKlingImageModel(draftKey) && hasLockedRatio ? (
+                    <p className="text-[10px] leading-relaxed text-[#86868b]">
+                      可灵 API 不支持 3:4，服务端将映射为最接近比例出图；分辨率可选 1K / 2K。
+                    </p>
+                  ) : null}
                 </label>
               ) : null}
 
@@ -709,7 +815,7 @@ export function StoryboardModelPickerDialog({
                       onVideoResolutionChange?.(e.target.value as StoryboardVideoResolution)
                     }
                   >
-                    {STORYBOARD_VIDEO_RESOLUTION_OPTIONS.map((opt) => (
+                    {currentVideoResolutionOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}
                       </option>
@@ -774,6 +880,18 @@ export function StoryboardModelPickerDialog({
                     value={videoSeed}
                     onChange={(e) => onVideoSeedChange?.(e.target.value)}
                   />
+                </label>
+              ) : null}
+
+              {showGenerateAudio ? (
+                <label className="flex items-center gap-2 text-sm text-[#1d1d1f]">
+                  <input
+                    type="checkbox"
+                    checked={videoGenerateAudio}
+                    onChange={(e) => onVideoGenerateAudioChange?.(e.target.checked)}
+                    className="accent-[var(--ecom-primary)]"
+                  />
+                  <span>生成配音 / 音效</span>
                 </label>
               ) : null}
 

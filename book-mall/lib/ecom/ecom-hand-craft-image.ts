@@ -70,6 +70,7 @@ export async function generateHandCraftStepImages(opts: {
   indexes?: number[];
   modelKey?: string;
   concurrency?: number;
+  imageSize?: string;
 }): Promise<GenerateHandCraftStepResult> {
   await assertEcomToolkitGatewayAccess(opts.userId);
 
@@ -156,6 +157,7 @@ export async function generateHandCraftStepImages(opts: {
           modelKey,
           prompt,
           ratio: step.ratio,
+          imageSize: opts.imageSize,
           refImageUrls,
           toolKey: `${ECOM_HAND_CRAFT_TOOL_KEY}__${ECOM_HAND_CRAFT_GENERATE_ACTION}`,
         });
