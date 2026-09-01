@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveReplicaVisionChatModel } from "@/lib/ecom/ecom-media-decompose-replica";
+import {
+  resolveRecognizeProductModel,
+  resolveReplicaVisionChatModel,
+} from "@/lib/ecom/ecom-media-decompose-replica";
+import { ECOM_RECOGNIZE_PRODUCT_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
 import { formatProductBriefFromRecognition } from "@/lib/ecom/ecom-media-decompose-replica-script";
 
 describe("resolveReplicaVisionChatModel", () => {
@@ -14,6 +18,13 @@ describe("resolveReplicaVisionChatModel", () => {
 
   it("falls back to default vision when both are non-vision", () => {
     expect(resolveReplicaVisionChatModel("deepseek-v4-pro", "deepseek-v4-pro")).toBe("qwen3.8-max");
+  });
+});
+
+describe("resolveRecognizeProductModel", () => {
+  it("always uses qwen3-vl-flash for AI 识产品", () => {
+    expect(resolveRecognizeProductModel()).toBe(ECOM_RECOGNIZE_PRODUCT_MODEL);
+    expect(resolveRecognizeProductModel()).toBe("qwen3-vl-flash");
   });
 });
 

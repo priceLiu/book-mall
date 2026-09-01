@@ -26,6 +26,8 @@ export async function buildFilmPullExportZip(
       analyze,
       renderScript: project.renderScript?.structured ?? null,
       renderPlan: project.renderPlan,
+      refMatch: project.refMatch,
+      productionPlan: project.productionPlan,
     },
     null,
     2,
@@ -46,6 +48,8 @@ export function buildFilmPullExportJson(userId: string, projectId: string) {
       analyze: project.analyzeResult?.structured ?? null,
       renderScript: project.renderScript?.structured ?? null,
       renderPlan: project.renderPlan,
+      refMatch: project.refMatch,
+      productionPlan: project.productionPlan,
       meta: project.meta,
     };
   });

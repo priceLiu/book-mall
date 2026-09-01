@@ -2,9 +2,9 @@
 
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { FilmPullPhase } from "@/lib/film-pull-types";
+import type { FilmPullLegacyPhase } from "@/lib/film-pull-types";
 
-const STEPS: { id: FilmPullPhase; label: string }[] = [
+const STEPS: { id: FilmPullLegacyPhase; label: string }[] = [
   { id: "analyze", label: "拉片" },
   { id: "review", label: "审校" },
   { id: "replace", label: "换角" },
@@ -12,9 +12,9 @@ const STEPS: { id: FilmPullPhase; label: string }[] = [
 ];
 
 type Props = {
-  phase: FilmPullPhase;
+  phase: FilmPullLegacyPhase;
   /** 服务端任务进行中时高亮对应步骤（如 analyzing → 拉片） */
-  pendingStep?: FilmPullPhase;
+  pendingStep?: FilmPullLegacyPhase;
   className?: string;
 };
 

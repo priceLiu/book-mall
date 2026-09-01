@@ -25,6 +25,8 @@ type Props = {
   busy?: boolean;
   /** 0–100 上传进度；null 表示不确定进度 */
   uploadProgress?: number | null;
+  /** 进度条下方文案；默认「正在上传…」 */
+  uploadProgressLabel?: string;
   /** AI 生图进行中（槽位扫光） */
   generating?: boolean;
   generatingLabel?: string;
@@ -120,6 +122,7 @@ export function EcomRefUploadCard({
   emptyHint,
   busy,
   uploadProgress = null,
+  uploadProgressLabel,
   generating = false,
   generatingLabel = "AI 生成中…",
   suggested = false,
@@ -246,7 +249,9 @@ export function EcomRefUploadCard({
             />
           </div>
           <p className="text-[10px] text-[#0071e3]">
-            {uploadProgress >= 100 ? "上传完成" : "正在上传…"}
+            {uploadProgress >= 100
+              ? "完成"
+              : (uploadProgressLabel?.trim() || "正在上传…")}
           </p>
         </div>
       ) : null}

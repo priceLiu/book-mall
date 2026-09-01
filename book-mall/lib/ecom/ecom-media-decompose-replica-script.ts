@@ -29,8 +29,10 @@ ${mentionBlock}
 规则：
 1. 输出唯一围栏 \`\`\`${FENCE}\` ... \`\`\`，JSON 根对象含 shots 数组；
 2. 每镜字段：index、timeSlice、sceneDescription、videoPrompt、voiceover、durationSec（3–15 整数）；
-3. videoPrompt 须引用相关 @图片N（至少包含 1 张模特与 1 张产品编号）；
-4. 口播替换产品名与卖点，保留原节奏与句式结构；
+3. videoPrompt 与 voiceover 严格分离：
+   - videoPrompt：镜头视觉与制作语言。须合并原片拆解中的景别、运镜、镜头角度、构图、画面内容、人物动作、表情、音效、BGM、转场、剪辑节奏（替换为新模特/新产品后）；须引用相关 @图片N（至少包含 1 张模特与 1 张产品编号）；禁止写入字幕文案、配音台词或任何口播原文。
+   - voiceover：仅写替换产品名与卖点后的口播/字幕（供 TTS）；保留原节奏与句式结构；禁止写入 videoPrompt。
+4. 机械映射草稿的 videoPrompt 已含上述非口播字段；改写时须保留信息密度，不得删音效、BGM、转场、剪辑节奏；
 5. sceneDescription 用中文描述换模特换产品后的画面；
 6. 镜数与拆解表一致，除非原表为空则输出 1 镜。`;
 }
@@ -121,11 +123,15 @@ export function buildDraftShotsFromDecompose(structured: MediaDecomposePatch): S
   return buildReplicaShotsFromDecompose(structured, placeholder);
 }
 
-export function buildReplicaProductRecognizePrompt(imageCount = 1): string {
+export function buildReplicaProductRecognizePrompt(imageCount = 1, userDraft?: string): string {
   const multi = imageCount > 1 ? `共 ${imageCount} 张产品图，请综合识别。` : "";
+  const draft = userDraft?.trim();
+  const draftBlock = draft
+    ? `\n\n用户已填写的产品描述草稿（请结合产品图核对、补全、润色；保留正确信息，修正与图片不符之处）：\n${draft}`
+    : "";
   return `你是电商产品识别助手。${multi}根据产品图输出简洁 JSON（不要 markdown 围栏）：
 {"productName":"","category":"","sellingPoints":"","materialOrCraft":"","displayTips":""}
-字段用中文，sellingPoints 为 1–3 条逗号分隔。`;
+字段用中文，sellingPoints 为 1–3 条逗号分隔。${draftBlock}`;
 }
 
 export function buildReplicaModelImagePromptSystem(): string {

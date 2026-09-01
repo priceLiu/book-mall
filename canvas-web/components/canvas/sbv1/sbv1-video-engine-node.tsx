@@ -48,7 +48,11 @@ import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types"
 import type { CanvasNodeRuntime } from "@/lib/canvas/types";
 import { resolveLibtvVideoPosterUrl } from "@/lib/canvas/libtv-video-poster";
 import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
-import { sbv1VideoPatchFromTask, isSameSbv1MediaDataPatch } from "@/lib/canvas/sbv1-image-task-apply";
+import {
+  sbv1VideoPatchFromTask,
+  isSameSbv1MediaDataPatch,
+  shouldRestoreSbv1VideoRuntimeToDone,
+} from "@/lib/canvas/sbv1-image-task-apply";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { useVideoGeneratingWait } from "@/lib/canvas/use-video-generating-wait";
 import { cn } from "@/lib/utils";
@@ -243,7 +247,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     failMessage: d.runtime?.failMessage,
     dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
     modelKey: videoModelKey,
-    hasMedia: hasVideo,
+    hasMedia: Boolean(hasVideo && d.runtime?.status !== "error"),
   });
 
   useLibtvRuntimeErrorAlert({
@@ -254,7 +258,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     failMessage: d.runtime?.failMessage,
     dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
     modelKey: videoModelKey,
-    enabled: !hasVideo && !isMislabeledVendorSuccessError(d.runtime?.failCode, d.runtime?.failMessage),
+    enabled: !isMislabeledVendorSuccessError(d.runtime?.failCode, d.runtime?.failMessage),
     onAlert: ({ message, failCode }) => {
       void alert({
         title: libtvRuntimeErrorAlertTitle(failCode, message, "video"),
@@ -410,20 +414,32 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     updateNodeData(id, patch);
   }, [d.uploading, d.runtime?.status, id, updateNodeData]);
 
-  /** 已有成片但 runtime 仍标 error / pending / running · 自动恢复为 done（排除重新生成中） */
+  /** 本轮已产出成片但 runtime 仍停在 pending/running · 对齐为 done（不抹本轮失败） */
   useEffect(() => {
-    const st = d.runtime?.status;
+    const boundId = d.runtime?.taskId?.trim();
+    const boundSucceeded = Boolean(
+      boundId &&
+        taskHistory.some(
+          (t) => t.id === boundId && t.status === "SUCCEEDED",
+        ),
+    );
+    const currentMediaUrl =
+      d.runtime?.ossUrl?.trim() || d.runtime?.ephemeralUrl?.trim() || "";
     if (
-      !hasVideo ||
-      (st !== "error" && st !== "pending" && st !== "running")
+      !shouldRestoreSbv1VideoRuntimeToDone({
+        status: d.runtime?.status,
+        hasInflightTask: Boolean(inflightTask),
+        uploading: d.uploading,
+        runSessionActive: isCanvasNodeRunSessionActive(id),
+        currentMediaUrl,
+        boundTaskSucceeded: boundSucceeded,
+      })
     ) {
       return;
     }
-    if (inflightTask) return;
-    if (d.uploading) return;
-    if (isCanvasNodeRunSessionActive(id)) return;
     const url =
-      videoUrl ??
+      currentMediaUrl ||
+      videoUrl ||
       pro2VideoBoardRowMediaUrl({ runtime: rowRuntime, task: rowDisplayTask });
     if (!url?.trim()) return;
     updateNodeData(id, {
@@ -437,7 +453,6 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
       },
     });
   }, [
-    hasVideo,
     d.runtime,
     d.uploading,
     id,
@@ -446,6 +461,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     rowRuntime,
     videoUrl,
     inflightTask,
+    taskHistory,
   ]);
 
   const hasToolbarContent = Boolean(

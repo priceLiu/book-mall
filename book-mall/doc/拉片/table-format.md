@@ -72,9 +72,65 @@
 }
 ```
 
+## ref_match（项目 JSON · 非 LLM 围栏）
+
+存于 `EcomFilmPullProject.refMatch`：
+
+```json
+{
+  "shots": [{
+    "shotNo": 1,
+    "modelRefIds": ["ref-film-pull-model-1"],
+    "productRefIds": ["ref-film-pull-product-1"]
+  }]
+}
+```
+
+## production_plan（项目 JSON · 制作脚本表）
+
+存于 `EcomFilmPullProject.productionPlan`：
+
+```json
+{
+  "globalConfig": {
+    "characterUnifiedStyle": "…",
+    "globalLighting": "…",
+    "resolution": "1920×1080",
+    "fps": "24fps",
+    "globalVisualTone": "…"
+  },
+  "shots": [{
+    "shotNo": 1,
+    "startTimeSec": 0,
+    "endTimeSec": 3,
+    "durationSec": 3,
+    "modelRefIds": ["ref-film-pull-model-1"],
+    "productRefIds": ["ref-film-pull-product-1"],
+    "canvasDescription": "场景+主体+构图（换角后）",
+    "lightingStructure": "主光+对比",
+    "cameraMotion": "中景·平视·固定·50mm",
+    "cutTransition": "硬切",
+    "narrativeFunction": "钩子",
+    "rhythmWeight": "铺垫",
+    "voiceover": "口播字幕",
+    "vocalEmotion": "自然",
+    "imagePrompt": "@图片1 @图片2 … 生图用",
+    "videoPrompt": "… 生视频用（含运镜时长）",
+    "imageUrl": null,
+    "videoUrl": null,
+    "ttsUrl": null,
+    "status": "pending_video"
+  }],
+  "render": { "jobId": null, "finalVideoUrl": null }
+}
+```
+
+`status` 枚举：`pending_script` | `pending_image` | `pending_video` | `ready`
+
 ## 规则
 
 1. 回复末尾唯一 ` ```film-pull ` 围栏
 2. 无对应内容填 `"无"`
 3. `shots` 至少 1 镜
 4. `narrativeLogic` / `beatPoints` / `replicableShootingScript` **必填** string（可与 Markdown 三块段落一致，长文用 `\n` 换行）
+5. 制作阶段 **镜号、startTimeSec、endTimeSec、durationSec 不可改**（继承 analyze）

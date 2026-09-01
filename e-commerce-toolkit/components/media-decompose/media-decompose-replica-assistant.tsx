@@ -404,7 +404,9 @@ export function MediaDecomposeReplicaAssistantProvider({
     setRecognizeBusy(true);
     try {
       const { project: nextProject, seedVideo: nextSeed, productBrief: brief } =
-        await recognizeMediaDecomposeReplicaProduct(project.id, chatModelKey);
+        await recognizeMediaDecomposeReplicaProduct(project.id, {
+          userDraft: productBriefDraft,
+        });
       productBriefDirtyRef.current = false;
       setProductBriefDraft(brief);
       onProjectUpdated(nextProject);
@@ -699,6 +701,7 @@ export function MediaDecomposeReplicaAssistantProvider({
           setProductBriefDraft(value);
         }}
         onSaveProductBrief={handleSaveProductBrief}
+        onRecognizeProduct={handleRecognizeProduct}
         briefSaveBusy={briefSaveBusy}
         productBriefDirty={productBriefDirty}
         imageModels={imageModels}
@@ -742,6 +745,7 @@ const ReplicaThreadContext = createContext<{
   productBriefDraft: string;
   onProductBriefDraftChange: (value: string) => void;
   onSaveProductBrief: () => void | Promise<void>;
+  onRecognizeProduct: () => void | Promise<void>;
   briefSaveBusy: boolean;
   productBriefDirty: boolean;
 } | null>(null);
@@ -773,6 +777,7 @@ type RuntimeProps = {
   productBriefDraft: string;
   onProductBriefDraftChange: (value: string) => void;
   onSaveProductBrief: () => void | Promise<void>;
+  onRecognizeProduct: () => void | Promise<void>;
   briefSaveBusy: boolean;
   productBriefDirty: boolean;
   imageModels: StoryboardGatewayModel[];
@@ -811,6 +816,7 @@ function ReplicaAssistantRuntime({
   productBriefDraft,
   onProductBriefDraftChange,
   onSaveProductBrief,
+  onRecognizeProduct,
   briefSaveBusy,
   productBriefDirty,
   imageModels,
@@ -849,6 +855,7 @@ function ReplicaAssistantRuntime({
       productBriefDraft,
       onProductBriefDraftChange,
       onSaveProductBrief,
+      onRecognizeProduct,
       briefSaveBusy,
       productBriefDirty,
     }),
@@ -873,6 +880,7 @@ function ReplicaAssistantRuntime({
       productBriefDraft,
       onProductBriefDraftChange,
       onSaveProductBrief,
+      onRecognizeProduct,
       briefSaveBusy,
       productBriefDirty,
     ],
@@ -936,6 +944,7 @@ export function MediaDecomposeReplicaAssistantThread() {
     productBriefDraft,
     onProductBriefDraftChange,
     onSaveProductBrief,
+    onRecognizeProduct,
     briefSaveBusy,
     productBriefDirty,
   } = useReplicaThread();
@@ -974,6 +983,8 @@ export function MediaDecomposeReplicaAssistantThread() {
             value={productBriefDraft}
             onChange={onProductBriefDraftChange}
             onSave={onSaveProductBrief}
+            onRecognize={onRecognizeProduct}
+            recognizeDisabled={!productReady}
             saving={briefSaveBusy}
             recognizing={recognizeBusy}
             disabled={actionLocked && !recognizeBusy}

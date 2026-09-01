@@ -9,6 +9,7 @@ describe("assistant greeting", () => {
     expect(g.content).not.toContain("价格与计费");
     expect(g.content).not.toContain("报价体系");
     expect(g.appLinks.length).toBeGreaterThanOrEqual(8);
+    expect(g.appLinks.at(-1)?.title).toBe("个人中心");
   });
 
   it("picks jokes from pool", () => {

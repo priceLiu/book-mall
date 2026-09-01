@@ -204,6 +204,8 @@ function isContentSafetyRejection(blob: string): boolean {
     blob.includes("datainspectionfailed") ||
     blob.includes("green net") ||
     blob.includes("moderation") ||
+    blob.includes("ip infringement") ||
+    blob.includes("ipinfringementsuspect") ||
     blob.includes("安全") ||
     blob.includes("违规")
   );
@@ -212,6 +214,9 @@ function isContentSafetyRejection(blob: string): boolean {
 /** 百炼 DashScope 绿网 · 区分输入审核 vs 成片输出审核 */
 function dashscopeGreenNetMessage(raw: string): string | null {
   const blob = raw.toLowerCase();
+  if (blob.includes("ip infringement") || blob.includes("ipinfringementsuspect")) {
+    return "生成的视频未通过百炼版权审核（疑似涉及 IP）。请调整提示词、参考图或镜头/动作描述后重试。";
+  }
   if (
     !blob.includes("green net") &&
     !blob.includes("datainspectionfailed") &&

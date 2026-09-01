@@ -218,6 +218,45 @@ export async function uploadMediaDecomposeReplicaRef(
   return { project: data.project!, seedVideo: data.seedVideo! };
 }
 
+export async function attachMediaDecomposeReplicaModelFromLibrary(
+  projectId: string,
+  entry: { id: string; name: string; ossUrl: string },
+): Promise<{
+  project: MediaDecomposeProject;
+  seedVideo: SeedVideoProject;
+}> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/replica/refs/attach`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ modelEntry: entry }),
+  });
+  return {
+    project: data.project as MediaDecomposeProject,
+    seedVideo: data.seedVideo as SeedVideoProject,
+  };
+}
+
+export async function attachMediaDecomposeReplicaRefsFromAssets(
+  projectId: string,
+  role: "model" | "product",
+  assetIds: string[],
+): Promise<{
+  project: MediaDecomposeProject;
+  seedVideo: SeedVideoProject;
+  addedCount: number;
+}> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/replica/refs/attach`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role, assetIds }),
+  });
+  return {
+    project: data.project as MediaDecomposeProject,
+    seedVideo: data.seedVideo as SeedVideoProject,
+    addedCount: Number(data.addedCount ?? 0),
+  };
+}
+
 export async function removeMediaDecomposeReplicaRef(
   projectId: string,
   refId: string,
@@ -237,16 +276,18 @@ export async function removeMediaDecomposeReplicaRef(
 
 export async function recognizeMediaDecomposeReplicaProduct(
   projectId: string,
-  modelKey?: string,
+  opts?: { userDraft?: string },
 ): Promise<{
   project: MediaDecomposeProject;
   seedVideo: SeedVideoProject;
   productBrief: string;
 }> {
+  const body: { userDraft?: string } = {};
+  if (opts?.userDraft?.trim()) body.userDraft = opts.userDraft.trim();
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/replica/recognize-product`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(modelKey ? { modelKey } : {}),
+    body: JSON.stringify(body),
   });
   return {
     project: data.project as MediaDecomposeProject,

@@ -210,7 +210,7 @@ type ClientReadCache = {
 
 let readCache: ClientReadCache | null = null;
 
-/** 客户端 GET：今日 READY → 昨日 READY（stale）。 */
+/** 客户端 GET：今日 READY → 昨日 READY → 库内最近一条 READY（stale）。 */
 export async function getLatestAiNewsForClient(now = new Date()): Promise<{
   content: string;
   dateKey: string;
@@ -236,6 +236,19 @@ export async function getLatestAiNewsForClient(now = new Date()): Promise<{
       dateKey: yesterday.dateKey,
       stale: true,
       generatedAt: yesterday.generatedAt.toISOString(),
+    };
+  }
+
+  const latest = await prisma.platformAssistantAiNewsDaily.findFirst({
+    where: { status: "READY", NOT: { content: "" } },
+    orderBy: { dateKey: "desc" },
+  });
+  if (latest?.content.trim()) {
+    return {
+      content: latest.content.trim(),
+      dateKey: latest.dateKey,
+      stale: true,
+      generatedAt: latest.generatedAt.toISOString(),
     };
   }
 

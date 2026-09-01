@@ -178,6 +178,27 @@ export function sbv1VideoPatchFromTask(
   return null;
 }
 
+/**
+ * 仅当「本轮」已产出成片时，才把 pending/running 对齐为 done。
+ * 历史成功任务不能用来抹掉本轮失败，否则节点不报错、旧成片继续播。
+ */
+export function shouldRestoreSbv1VideoRuntimeToDone(input: {
+  status?: string | null;
+  hasInflightTask: boolean;
+  uploading?: boolean;
+  runSessionActive: boolean;
+  currentMediaUrl?: string | null;
+  boundTaskSucceeded: boolean;
+}): boolean {
+  if (input.hasInflightTask || input.uploading || input.runSessionActive) {
+    return false;
+  }
+  if (input.status !== "pending" && input.status !== "running") {
+    return false;
+  }
+  return Boolean(input.currentMediaUrl?.trim() || input.boundTaskSucceeded);
+}
+
 /** 运行失败 / 中止 · 清除 uploading 并写入 runtime.error（节点 UI 可读） */
 export function sbv1ImageFailurePatch(
   failCode: string,

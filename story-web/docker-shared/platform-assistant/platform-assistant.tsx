@@ -108,6 +108,50 @@ function lineStartsWithEmoji(s: string): boolean {
   );
 }
 
+/** 默认展示的热闻条数；其余由用户点击展开。 */
+const AI_NEWS_PREVIEW_COUNT = 3;
+
+function countAiNewsItems(text: string): number {
+  return text.split("\n").filter((line) => /^\s*\d+\.\s/.test(line)).length;
+}
+
+function truncateAiNewsMarkdown(text: string, maxItems: number): string {
+  const lines = text.split("\n");
+  const itemStarts: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\s*\d+\.\s/.test(lines[i])) itemStarts.push(i);
+  }
+  if (itemStarts.length <= maxItems) return text;
+  const preview = lines.slice(0, itemStarts[maxItems]);
+  while (preview.length > 0 && !preview[preview.length - 1]?.trim()) {
+    preview.pop();
+  }
+  return preview.join("\n");
+}
+
+function AssistantAiNewsBlock({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const totalItems = countAiNewsItems(text);
+  const hasMore = totalItems > AI_NEWS_PREVIEW_COUNT;
+  const displayText =
+    expanded || !hasMore ? text : truncateAiNewsMarkdown(text, AI_NEWS_PREVIEW_COUNT);
+
+  return (
+    <>
+      <AssistantRichText text={displayText} />
+      {hasMore ? (
+        <button
+          type="button"
+          className="pa-news-expand-btn"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? "收起" : `展开全部（共 ${totalItems} 条）`}
+        </button>
+      ) : null}
+    </>
+  );
+}
+
 function AssistantRichText({ text }: { text: string }) {
   const lines = text.split("\n");
   return (
@@ -469,23 +513,23 @@ function useInjectStyles(accent: string) {
 .pa-app-links {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
   margin-top: 10px;
 }
 .pa-app-links .pa-card {
   margin-top: 0;
-  aspect-ratio: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 8px 6px;
-  border-radius: 10px;
+  padding: 6px 4px;
+  min-height: 32px;
+  border-radius: 8px;
 }
 .pa-app-links .pa-card-title {
   font-size: 11px;
-  line-height: 1.35;
+  font-weight: 500;
+  line-height: 1.3;
   color: #c7d2fe;
 }
 .pa-app-links .pa-card-desc {
@@ -543,6 +587,24 @@ function useInjectStyles(accent: string) {
 .pa-news-loading {
   font-size: 12px;
   color: rgba(255,255,255,.55);
+}
+.pa-news-expand-btn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: #c7d2fe;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.pa-news-expand-btn:hover {
+  background: rgba(255,255,255,.1);
+  border-color: rgba(255,255,255,.2);
 }
 .pa-input-bar {
   flex-shrink: 0;
@@ -1081,9 +1143,16 @@ export function PlatformAssistant({
                       {!isUser && m.newsContent ? (
                         <div className="pa-news-block">
                           <div className="pa-news-block-title">
-                            📰 {m.newsStale ? "AI 热闻（昨日）" : "今日 AI 热闻"}
+                            📰 {m.newsStale ? "AI 热闻（最近一期）" : "今日 AI 热闻"}
                           </div>
-                          <AssistantRichText text={m.newsContent} />
+                          <AssistantAiNewsBlock text={m.newsContent} />
+                        </div>
+                      ) : !isUser && !m.newsLoading && (m.appLinks?.length ?? 0) > 0 ? (
+                        <div className="pa-news-block">
+                          <div className="pa-news-block-title">📰 今日 AI 热闻</div>
+                          <div className="pa-news-loading">
+                            热闻正在准备中，稍后再开即可看到。
+                          </div>
                         </div>
                       ) : null}
                       {m.redirect && (

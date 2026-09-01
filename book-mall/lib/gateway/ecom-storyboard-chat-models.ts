@@ -46,6 +46,8 @@ export function resolveEcomAssistantChatParams(
 }
 
 export const ECOM_DEFAULT_VISION_MODEL = "qwen3.8-max";
+/** 电商 · AI 识产品（百炼 VL Flash · 低成本图片理解） */
+export const ECOM_RECOGNIZE_PRODUCT_MODEL = "qwen3-vl-flash";
 export const ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL = "wan2.7-image";
 export const ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL = "doubao-seedance-2.0";
 

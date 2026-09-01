@@ -377,7 +377,8 @@ export function pickPreferredCanvasTask(
     }
     return undefined;
   }
-  if (localTaskId && localInflight) {
+  const localError = opts?.localRuntime?.status === "error";
+  if (localTaskId && (localInflight || localError)) {
     const bound = tasks.find((t) => t.id === localTaskId);
     if (bound) {
       if (bound.status === "SUCCEEDED" && taskHasDisplayableResult(bound)) {
@@ -390,7 +391,7 @@ export function pickPreferredCanvasTask(
       ) {
         return bound;
       }
-      // 本轮 batch 已失败/取消：须写回终态，勿被更早 SUCCEEDED 挡住（否则行级 pending 永不消失）
+      // 本轮已失败/取消：须写回终态，勿被更早 SUCCEEDED 盖掉（否则节点不报错）
       if (bound.status === "FAILED" || bound.status === "CANCELLED") {
         return bound;
       }
@@ -477,7 +478,8 @@ export function pickStoryRowApplyTask(
   if (
     bound &&
     localRuntime &&
-    isInflightRuntimeStatus(localRuntime.status) &&
+    (isInflightRuntimeStatus(localRuntime.status) ||
+      localRuntime.status === "error") &&
     (bound.status === "FAILED" || bound.status === "CANCELLED")
   ) {
     return bound;

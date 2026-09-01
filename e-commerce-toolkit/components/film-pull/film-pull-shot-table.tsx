@@ -1,16 +1,27 @@
 "use client";
 
+import {
+  ecomDataTableBodyRowClass,
+  ecomDataTableClass,
+  ecomDataTableHeadRowClass,
+  ecomDataTableTdClass,
+  ecomDataTableThClass,
+  ecomDataTableWrapClass,
+} from "@/components/ui/ecom-data-table";
 import type { FilmPullShot } from "@/lib/film-pull-types";
+import { cn } from "@/lib/utils";
 
 type Props = {
   shots: FilmPullShot[];
   editable?: boolean;
   onChange?: (shots: FilmPullShot[]) => void;
-  /** 嵌入「拉片结果」卡片内时，与拆图拆视频结果表一致 */
+  /** 嵌入结果卡片内（只读 · 与拆图拆视频数据表一致） */
   embedded?: boolean;
+  /** 不可编辑列（默认仅镜号） */
+  readOnlyKeys?: string[];
 };
 
-type ColumnDef = {
+export type FilmPullShotColumnDef = {
   key: string;
   label: string;
   minW: string;
@@ -19,13 +30,8 @@ type ColumnDef = {
   set?: (row: FilmPullShot, value: string) => FilmPullShot;
 };
 
-const COLUMNS: ColumnDef[] = [
-  {
-    key: "shotNo",
-    label: "镜号",
-    minW: "min-w-[44px]",
-    get: (r) => String(r.shotNo),
-  },
+export const FILM_PULL_SHOT_TABLE_COLUMNS: FilmPullShotColumnDef[] = [
+  { key: "shotNo", label: "镜号", minW: "min-w-[44px]", get: (r) => String(r.shotNo) },
   {
     key: "startTimeSec",
     label: "入点(s)",
@@ -157,40 +163,28 @@ const COLUMNS: ColumnDef[] = [
     minW: "min-w-[100px]",
     multiline: true,
     get: (r) => r.audioInfo.scriptSubtitle,
-    set: (r, v) => ({
-      ...r,
-      audioInfo: { ...r.audioInfo, scriptSubtitle: v },
-    }),
+    set: (r, v) => ({ ...r, audioInfo: { ...r.audioInfo, scriptSubtitle: v } }),
   },
   {
     key: "vocalEmotion",
     label: "人声情绪",
     minW: "min-w-[88px]",
     get: (r) => r.audioInfo.vocalEmotion,
-    set: (r, v) => ({
-      ...r,
-      audioInfo: { ...r.audioInfo, vocalEmotion: v },
-    }),
+    set: (r, v) => ({ ...r, audioInfo: { ...r.audioInfo, vocalEmotion: v } }),
   },
   {
     key: "ambientSound",
     label: "环境声",
     minW: "min-w-[88px]",
     get: (r) => r.audioInfo.ambientSound,
-    set: (r, v) => ({
-      ...r,
-      audioInfo: { ...r.audioInfo, ambientSound: v },
-    }),
+    set: (r, v) => ({ ...r, audioInfo: { ...r.audioInfo, ambientSound: v } }),
   },
   {
     key: "fxAndBgm",
     label: "音效/BGM",
     minW: "min-w-[88px]",
     get: (r) => r.audioInfo.fxAndBgm,
-    set: (r, v) => ({
-      ...r,
-      audioInfo: { ...r.audioInfo, fxAndBgm: v },
-    }),
+    set: (r, v) => ({ ...r, audioInfo: { ...r.audioInfo, fxAndBgm: v } }),
   },
   {
     key: "rhythmWeight",
@@ -229,58 +223,53 @@ function CellEditor({
   onChange: (v: string) => void;
 }) {
   if (!editable) {
-    return <span className="block whitespace-pre-wrap break-words">{value || "--"}</span>;
+    const text = value?.trim() ? value : "--";
+    return <span className="block whitespace-pre-wrap break-words">{text}</span>;
   }
   const className =
     "w-full rounded border border-[#d2d2d7] px-1.5 py-1 text-xs outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3]/20";
   if (multiline) {
     return (
-      <textarea
-        className={className}
-        rows={2}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      <textarea className={className} rows={2} value={value} onChange={(e) => onChange(e.target.value)} />
     );
   }
   return <input className={className} value={value} onChange={(e) => onChange(e.target.value)} />;
 }
 
-export function FilmPullShotTable({ shots, editable, onChange, embedded }: Props) {
-  const updateCell = (rowIndex: number, col: ColumnDef, value: string) => {
+export function FilmPullShotTable({
+  shots,
+  editable,
+  onChange,
+  embedded,
+  readOnlyKeys = ["shotNo"],
+}: Props) {
+  const readOnly = !editable;
+  const readOnlySet = new Set(readOnlyKeys);
+  const updateCell = (rowIndex: number, col: FilmPullShotColumnDef, value: string) => {
     if (!editable || !onChange || !col.set) return;
     const next = shots.map((s, i) => (i === rowIndex ? col.set!(s, value) : s));
     onChange(next);
   };
 
+  const wrapClass = embedded && readOnly ? ecomDataTableWrapClass : "overflow-x-auto rounded-lg border border-[#e8e8ed]";
+  const tableClass = cn("min-w-[3200px] w-full", embedded && readOnly ? ecomDataTableClass : "border-collapse text-left text-xs");
+  const headRowClass =
+    embedded && readOnly
+      ? ecomDataTableHeadRowClass
+      : embedded
+        ? "bg-[#f5f5f7] text-[#6e6e73]"
+        : "sticky top-0 z-10 bg-[#1d1d1f] text-white";
+  const thClass = embedded && readOnly ? cn("whitespace-nowrap", ecomDataTableThClass) : "border-b border-[#e8e8ed] px-2 py-2 align-top font-medium whitespace-nowrap";
+  const bodyRowClass = embedded && readOnly ? ecomDataTableBodyRowClass : "border-b border-[#e8e8ed] align-top";
+  const tdClass = embedded && readOnly ? ecomDataTableTdClass : "px-2 py-2 align-top";
+
   return (
-    <div
-      className={
-        embedded
-          ? "overflow-x-auto rounded-lg border border-[#e8e8ed]"
-          : "ecom-scrollbar-thin min-h-0 flex-1 overflow-auto rounded-xl border border-[#e8e8ed] bg-white"
-      }
-    >
-      <table
-        className={
-          embedded
-            ? "min-w-[3200px] w-full border-collapse text-left text-xs"
-            : "min-w-[3200px] w-full border-collapse text-left text-xs"
-        }
-      >
-        <thead
-          className={
-            embedded
-              ? "bg-[#f5f5f7] text-[#6e6e73]"
-              : "sticky top-0 z-10 bg-[#1d1d1f] text-white"
-          }
-        >
-          <tr>
-            {COLUMNS.map((col) => (
-              <th
-                key={col.key}
-                className={`border-b border-[#e8e8ed] px-2 py-2 align-top font-medium whitespace-nowrap ${col.minW}`}
-              >
+    <div className={wrapClass}>
+      <table className={tableClass}>
+        <thead>
+          <tr className={headRowClass}>
+            {FILM_PULL_SHOT_TABLE_COLUMNS.map((col) => (
+              <th key={col.key} className={cn(thClass, col.minW)}>
                 {col.label}
               </th>
             ))}
@@ -288,12 +277,15 @@ export function FilmPullShotTable({ shots, editable, onChange, embedded }: Props
         </thead>
         <tbody>
           {shots.map((row, rowIndex) => (
-            <tr key={`${row.shotNo}-${rowIndex}`} className="border-b border-[#e8e8ed] align-top">
-              {COLUMNS.map((col) => {
+            <tr key={`${row.shotNo}-${rowIndex}`} className={bodyRowClass}>
+              {FILM_PULL_SHOT_TABLE_COLUMNS.map((col) => {
                 const value = col.get(row);
-                const canEdit = Boolean(editable && col.set && col.key !== "shotNo");
+                const canEdit = Boolean(editable && col.set && !readOnlySet.has(col.key));
                 return (
-                  <td key={col.key} className={`px-2 py-2 ${col.minW}`}>
+                  <td
+                    key={col.key}
+                    className={cn(tdClass, col.minW, col.key === "shotNo" && readOnly && "font-medium")}
+                  >
                     <CellEditor
                       value={value}
                       multiline={col.multiline}

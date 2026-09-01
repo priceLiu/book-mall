@@ -1,6 +1,6 @@
 "use client";
 
-import { ImageIcon, Loader2, Save } from "lucide-react";
+import { ImageIcon, Loader2, Save, Sparkles } from "lucide-react";
 
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
@@ -107,9 +107,11 @@ type ProductBriefCardProps = {
   value: string;
   onChange: (value: string) => void;
   onSave: () => void | Promise<void>;
+  onRecognize?: () => void | Promise<void>;
   saving?: boolean;
   recognizing?: boolean;
   disabled?: boolean;
+  recognizeDisabled?: boolean;
   dirty?: boolean;
 };
 
@@ -118,9 +120,11 @@ export function ReplicaProductBriefCard({
   value,
   onChange,
   onSave,
+  onRecognize,
   saving,
   recognizing,
   disabled,
+  recognizeDisabled,
   dirty,
 }: ProductBriefCardProps) {
   return (
@@ -135,28 +139,41 @@ export function ReplicaProductBriefCard({
         <div>
           <p className="text-xs font-semibold text-[#1d1d1f]">产品描述</p>
           <p className="text-[11px] text-[#6e6e73]">
-            AI 识产品结果会写入此处，确认后可保存并用于生成复刻脚本。
+            根据产品图 AI 识别，或结合已填文字润色补全；确认后保存并用于生成复刻脚本。
           </p>
         </div>
-        <EcomButtonSecondary
-          size="sm"
-          type="button"
-          dark
-          disabled={disabled || saving || recognizing || !dirty}
-          onClick={() => void onSave()}
-        >
-          {saving ? (
-            <>
-              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-              保存中…
-            </>
-          ) : (
-            <>
-              <Save className="mr-1 h-3.5 w-3.5" />
-              保存
-            </>
-          )}
-        </EcomButtonSecondary>
+        <div className="flex shrink-0 flex-wrap gap-1.5">
+          {onRecognize ? (
+            <EcomButtonSecondary
+              size="sm"
+              type="button"
+              disabled={disabled || saving || recognizing || recognizeDisabled}
+              className="h-7 px-2 text-[10px]"
+              onClick={() => void onRecognize()}
+            >
+              {recognizing ? (
+                <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+              ) : (
+                <Sparkles className="h-3 w-3 shrink-0" />
+              )}
+              AI 识别
+            </EcomButtonSecondary>
+          ) : null}
+          <EcomButtonSecondary
+            size="sm"
+            type="button"
+            disabled={disabled || saving || recognizing || !dirty}
+            className="h-7 px-2 text-[10px]"
+            onClick={() => void onSave()}
+          >
+            {saving ? (
+              <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+            ) : (
+              <Save className="h-3 w-3 shrink-0" />
+            )}
+            保存
+          </EcomButtonSecondary>
+        </div>
       </div>
       <div className="relative">
         <textarea

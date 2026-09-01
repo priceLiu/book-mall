@@ -71,6 +71,64 @@ export type FilmPullCharacterRef = {
   label?: string;
 };
 
+export type FilmPullProductionShotStatus =
+  | "pending_script"
+  | "pending_image"
+  | "pending_video"
+  | "ready";
+
+export type FilmPullRefMatchShot = {
+  shotNo: number;
+  modelRefIds: string[];
+  productRefIds: string[];
+};
+
+export type FilmPullRefMatch = {
+  shots: FilmPullRefMatchShot[];
+};
+
+export type FilmPullProductionGlobalConfig = {
+  characterUnifiedStyle?: string;
+  globalLighting?: string;
+  resolution?: string;
+  fps?: string;
+  globalVisualTone?: string;
+};
+
+export type FilmPullProductInteraction =
+  | "none"
+  | "hold"
+  | "wear"
+  | "use"
+  | "apply"
+  | "display"
+  | "unbox";
+
+export type FilmPullProductionShot = FilmPullShot & {
+  modelRefIds: string[];
+  productRefIds: string[];
+  imagePrompt: string;
+  videoPrompt: string;
+  /** 故事版式确认表 · 产品交互 */
+  productInteraction?: FilmPullProductInteraction;
+  /** 故事版式确认表 · 镜级卖点 */
+  sellpointNote?: string;
+  imageUrl?: string | null;
+  videoUrl?: string | null;
+  videoTaskId?: string;
+  ttsUrl?: string | null;
+  status: FilmPullProductionShotStatus;
+};
+
+export type FilmPullProductionPlan = {
+  globalConfig?: FilmPullProductionGlobalConfig;
+  shots: FilmPullProductionShot[];
+  render?: {
+    jobId?: string;
+    finalVideoUrl?: string;
+  };
+};
+
 export type FilmPullRenderShot = {
   shotNo: number;
   videoPrompt: string;
@@ -107,17 +165,35 @@ export type FilmPullProject = {
     shots: FilmPullRenderShot[];
     render?: { jobId?: string; finalVideoUrl?: string };
   } | null;
+  refMatch: FilmPullRefMatch | null;
+  productionPlan: FilmPullProductionPlan | null;
   meta: {
     finalVideoUrl?: string;
     analyzeStartedAt?: string;
     analyzeRunId?: string;
     analyzeCancelRunId?: string | null;
+    productBrief?: string;
+    refMatchConfirmedAt?: string | null;
+    productionScriptConfirmedAt?: string | null;
+    /** @deprecated V2 不再使用 seed-video */
+    replicaSeedVideoProjectId?: string | null;
+    replicaResultAt?: string | null;
+    replicaProductBrief?: string | null;
   } | null;
   createdAt: string;
   updatedAt: string;
 };
 
-export type FilmPullPhase = "analyze" | "review" | "replace" | "output";
+export type FilmPullPhase =
+  | "analyze"
+  | "replica"
+  | "ref_match"
+  | "production_script"
+  | "production"
+  | "compose";
+
+/** @deprecated 旧审校/换角阶段 */
+export type FilmPullLegacyPhase = "analyze" | "review" | "replace" | "output";
 
 /** 与 book-mall EcomFilmPullProject.status 对齐 */
 export const FILM_PULL_PROJECT_STATUS = {
@@ -175,7 +251,7 @@ export function isFilmPullAnalyzeFailed(project: FilmPullProject | null): boolea
   );
 }
 
-export function resolveFilmPullPhase(project: FilmPullProject | null): FilmPullPhase {
+export function resolveFilmPullPhase(project: FilmPullProject | null): FilmPullLegacyPhase {
   if (!project?.analyzeResult?.structured) return "analyze";
   if (!project.renderScript?.structured) return "review";
   if (!project.renderPlan?.render?.finalVideoUrl) {

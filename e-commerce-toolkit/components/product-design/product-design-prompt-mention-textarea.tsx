@@ -70,6 +70,10 @@ type Props = {
   onBlur?: () => void;
   className?: string;
   minHeightClass?: string;
+  /** 全屏弹层等场景提高层级，避免被遮罩挡住 */
+  pickerZIndex?: number;
+  /** 表格密排时隐藏格内快捷插入钮（顶部已有参考图条） */
+  hideQuickInsert?: boolean;
 };
 
 export function ProductDesignPromptMentionTextarea({
@@ -80,6 +84,8 @@ export function ProductDesignPromptMentionTextarea({
   onBlur,
   className,
   minHeightClass = "min-h-[7rem]",
+  pickerZIndex = PICKER_Z,
+  hideQuickInsert = false,
 }: Props) {
   const pathname = usePathname();
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -333,7 +339,7 @@ export function ProductDesignPromptMentionTextarea({
         left: pickerPos?.left ?? -9999,
         top: pickerPos?.top ?? -9999,
         width: pickerPos?.width,
-        zIndex: PICKER_Z,
+        zIndex: pickerZIndex,
         visibility: pickerPos ? "visible" : "hidden",
       }}
       role="listbox"
@@ -384,7 +390,7 @@ export function ProductDesignPromptMentionTextarea({
 
   return (
     <div ref={wrapperRef} className="relative">
-      {referenceImages.length > 0 ? (
+      {!hideQuickInsert && referenceImages.length > 0 ? (
         <div className="mb-2 flex flex-wrap gap-1.5">
           {referenceImages.map((item) => (
             <button

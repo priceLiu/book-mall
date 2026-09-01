@@ -18,6 +18,7 @@ import {
   listReplicaProductRefs,
   primaryReplicaModelRef,
   removeReplicaReference,
+  REPLICA_REF_MAX_PER_ROLE,
   resolveReplicaCollectPhase,
   replicaMentionSummary,
 } from "@/lib/ecom/ecom-media-decompose-replica-refs";
@@ -52,6 +53,7 @@ import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
 import {
   ECOM_DEFAULT_VISION_MODEL,
+  ECOM_RECOGNIZE_PRODUCT_MODEL,
   ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL,
 } from "@/lib/gateway/ecom-storyboard-chat-models";
 import { ecomGwChatComplete } from "@/lib/gateway/ecom-tool-gateway-client";
@@ -60,6 +62,7 @@ import {
   type SeedVideoReference,
   type SeedVideoShot,
 } from "@/lib/ecom/ecom-seed-video-types";
+import { prisma } from "@/lib/prisma";
 
 const SHOT_DURATION_MIN = 3;
 const SHOT_DURATION_MAX = 15;
@@ -75,6 +78,12 @@ export function resolveReplicaVisionChatModel(
   }
   assertStoryLlmVisionModel(ECOM_DEFAULT_VISION_MODEL, context);
   return ECOM_DEFAULT_VISION_MODEL;
+}
+
+/** AI 识产品：统一低成本 VL Flash，不跟项目 chat 模型走 */
+export function resolveRecognizeProductModel(): string {
+  assertStoryLlmVisionModel(ECOM_RECOGNIZE_PRODUCT_MODEL, "AI 识产品");
+  return ECOM_RECOGNIZE_PRODUCT_MODEL;
 }
 
 function clampDuration(n: number, fallback = 5): number {
@@ -141,6 +150,10 @@ export function buildReplicaShotsFromDecompose(
       row.visualContent,
       row.characterAction,
       row.expression,
+      row.sfx,
+      row.bgm,
+      row.transition,
+      row.editRhythm,
     ]);
     return {
       index,
@@ -278,6 +291,87 @@ export async function upsertReplicaReference(
   });
 }
 
+/** 从平台模特库追加模特参考图（OSS URL 直引，不上传副本） */
+export async function attachReplicaModelFromLibrary(
+  userId: string,
+  decomposeProjectId: string,
+  entry: { id: string; name?: string; ossUrl: string },
+): Promise<{
+  project: MediaDecomposeProjectDto;
+  seedVideo: EcomSeedVideoProjectDto;
+  reference: SeedVideoReference;
+}> {
+  const ossUrl = entry.ossUrl?.trim();
+  if (!entry.id?.trim() || !ossUrl || !/^https?:\/\//i.test(ossUrl)) {
+    throw new Error("无效的模特库条目");
+  }
+  await ensureReplicaSeedProject(userId, decomposeProjectId);
+  return upsertReplicaReferenceUrl(userId, decomposeProjectId, "model", ossUrl);
+}
+
+/** 从「我的资产」追加模特/产品参考图（不重新上传 OSS） */
+export async function attachReplicaRefsFromAssets(
+  userId: string,
+  decomposeProjectId: string,
+  role: "model" | "product",
+  assetIds: string[],
+): Promise<{
+  project: MediaDecomposeProjectDto;
+  seedVideo: EcomSeedVideoProjectDto;
+  addedCount: number;
+}> {
+  await ensureReplicaSeedProject(userId, decomposeProjectId);
+  const { decompose, seedVideo } = await requireReplicaPair(userId, decomposeProjectId);
+  const existing =
+    role === "model"
+      ? listReplicaModelRefs(seedVideo.references)
+      : listReplicaProductRefs(seedVideo.references);
+  const remaining = REPLICA_REF_MAX_PER_ROLE - existing.length;
+  if (remaining <= 0) {
+    throw new Error(
+      role === "model"
+        ? `模特图最多 ${REPLICA_REF_MAX_PER_ROLE} 张`
+        : `产品图最多 ${REPLICA_REF_MAX_PER_ROLE} 张`,
+    );
+  }
+
+  const ids = [...new Set(assetIds.map((id) => id.trim()).filter(Boolean))].slice(0, remaining);
+  if (ids.length === 0) throw new Error("请至少选择一张资产图");
+
+  const assets = await prisma.ecomAsset.findMany({
+    where: { userId, id: { in: ids }, kind: "image" },
+    select: { id: true, ossUrl: true },
+  });
+  if (assets.length === 0) throw new Error("找不到所选资产");
+
+  let currentDecompose = decompose;
+  let currentSeed = seedVideo;
+  let addedCount = 0;
+
+  for (const asset of assets) {
+    const url = asset.ossUrl?.trim();
+    if (!url || !/^https?:\/\//i.test(url)) continue;
+    const currentExisting =
+      role === "model"
+        ? listReplicaModelRefs(currentSeed.references)
+        : listReplicaProductRefs(currentSeed.references);
+    if (currentExisting.length >= REPLICA_REF_MAX_PER_ROLE) break;
+    const result = await upsertReplicaReferenceUrl(
+      userId,
+      decomposeProjectId,
+      role,
+      url,
+      { decompose: currentDecompose, seedVideo: currentSeed },
+    );
+    currentDecompose = result.project;
+    currentSeed = result.seedVideo;
+    addedCount += 1;
+  }
+
+  if (addedCount === 0) throw new Error("所选资产不可用");
+  return { project: currentDecompose, seedVideo: currentSeed, addedCount };
+}
+
 async function upsertReplicaReferenceUrl(
   userId: string,
   decomposeProjectId: string,
@@ -413,7 +507,7 @@ export async function generateReplicaModelImage(
 export async function recognizeReplicaProduct(
   userId: string,
   decomposeProjectId: string,
-  modelKey?: string,
+  opts?: { userDraft?: string },
 ): Promise<{
   project: MediaDecomposeProjectDto;
   seedVideo: EcomSeedVideoProjectDto;
@@ -423,18 +517,18 @@ export async function recognizeReplicaProduct(
   const productRefs = listReplicaProductRefs(seedVideo.references);
   if (productRefs.length === 0) throw new Error("请先上传产品图");
 
-  const chatModel = resolveReplicaVisionChatModel(
-    modelKey,
-    decompose.settings.chatModelKey,
-    "AI 识产品",
-  );
+  const chatModel = resolveRecognizeProductModel();
 
+  const userDraft = opts?.userDraft?.trim() ?? "";
   const parts: CanvasChatContentPart[] = [
     ...productRefs.map(
       (ref) =>
         ({ type: "image_url", image_url: { url: ref.ossUrl } }) satisfies CanvasChatContentPart,
     ),
-    { type: "text", text: buildReplicaProductRecognizePrompt(productRefs.length) },
+    {
+      type: "text",
+      text: buildReplicaProductRecognizePrompt(productRefs.length, userDraft || undefined),
+    },
   ];
 
   const { text } = await ecomGwChatComplete(userId, {

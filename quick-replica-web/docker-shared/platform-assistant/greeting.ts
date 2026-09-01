@@ -84,7 +84,7 @@ export function buildAssistantGreeting(
   const content = [
     `${salutation}${joke}`,
     "",
-    "我是 AI 小智。先看今日 AI 热闻，下面是平台主要应用，点击可在新标签页打开：",
+    "我是 AI 小智。下方默认展示 3 条今日 AI 热闻，可点击展开查看全部；再下面是平台主要应用，点击可在新标签页打开：",
   ].join("\n");
   return {
     content,

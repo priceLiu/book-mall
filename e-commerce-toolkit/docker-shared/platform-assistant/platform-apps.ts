@@ -71,7 +71,7 @@ const APP_DEFS: AppDef[] = [
   },
   {
     key: "book",
-    title: "主站 · 课程与个人中心",
+    title: "个人中心",
     description: "课程学习、账号与个人中心，全站统一登录入口。",
     fallback: "https://book.ai-code8.com",
   },

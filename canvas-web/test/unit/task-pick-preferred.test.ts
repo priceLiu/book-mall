@@ -11,6 +11,7 @@ import {
   pickStoryRowApplyTask,
   shouldSkipStoryRowTaskApply,
 } from "@/lib/canvas/task-pick";
+import { shouldRestoreSbv1VideoRuntimeToDone } from "@/lib/canvas/sbv1-image-task-apply";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 
 const now = Date.now();
@@ -123,6 +124,29 @@ describe("pickPreferredCanvasTask", () => {
     expect(pick).toBeUndefined();
   });
 
+  it("prefers bound FAILED over older SUCCEEDED when local runtime is error", () => {
+    const pick = pickPreferredCanvasTask(
+      [
+        task({
+          id: "old-ok",
+          status: "SUCCEEDED",
+          updatedAt: minsAgo(10),
+          ossUrl: "https://cdn.example/ok.mp4",
+        }),
+        task({
+          id: "new-fail",
+          status: "FAILED",
+          updatedAt: minsAgo(1),
+          failCode: "FAILED",
+          failMessage:
+            "Output data is suspected of being involved in IP infringement",
+        }),
+      ],
+      { localRuntime: { status: "error", taskId: "new-fail" } },
+    );
+    expect(pick?.id).toBe("new-fail");
+  });
+
   it("prefers bound FAILED over older SUCCEEDED when local row still pending", () => {
     const pick = pickPreferredCanvasTaskForScope(
       [
@@ -190,6 +214,31 @@ describe("pickStoryRowApplyTask", () => {
       { status: "running", taskId: "stale-sub" },
     );
     expect(pick?.id).toBe("done");
+  });
+
+  it("prefers bound FAILED over older SUCCEEDED when local runtime is error", () => {
+    const pick = pickStoryRowApplyTask(
+      [
+        task({
+          id: "old-ok",
+          status: "SUCCEEDED",
+          updatedAt: minsAgo(10),
+          ossUrl: "https://cdn.example/ok.mp4",
+          storyScope: { rowKey: "shot-1", mediaKind: "video" },
+        }),
+        task({
+          id: "new-fail",
+          status: "FAILED",
+          updatedAt: minsAgo(1),
+          failMessage:
+            "Output data is suspected of being involved in IP infringement",
+          storyScope: { rowKey: "shot-1", mediaKind: "video" },
+        }),
+      ],
+      { rowKey: "shot-1", mediaKind: "video" },
+      { status: "error", taskId: "new-fail" },
+    );
+    expect(pick?.id).toBe("new-fail");
   });
 });
 
@@ -367,5 +416,46 @@ describe("script hub task pick", () => {
     ];
     expect(hubHasServerInflightLlmTask("hub-1", tasks)).toBe(true);
     expect(hubHasServerInflightLlmTask("hub-2", tasks)).toBe(false);
+  });
+});
+
+describe("shouldRestoreSbv1VideoRuntimeToDone", () => {
+  it("does not restore error just because an older video exists", () => {
+    expect(
+      shouldRestoreSbv1VideoRuntimeToDone({
+        status: "error",
+        hasInflightTask: false,
+        uploading: false,
+        runSessionActive: false,
+        currentMediaUrl: "",
+        boundTaskSucceeded: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not restore pending when only historical video exists", () => {
+    expect(
+      shouldRestoreSbv1VideoRuntimeToDone({
+        status: "pending",
+        hasInflightTask: false,
+        uploading: false,
+        runSessionActive: false,
+        currentMediaUrl: "",
+        boundTaskSucceeded: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("restores pending when this generation already succeeded", () => {
+    expect(
+      shouldRestoreSbv1VideoRuntimeToDone({
+        status: "pending",
+        hasInflightTask: false,
+        uploading: false,
+        runSessionActive: false,
+        currentMediaUrl: "",
+        boundTaskSucceeded: true,
+      }),
+    ).toBe(true);
   });
 });

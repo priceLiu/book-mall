@@ -848,6 +848,10 @@ model EcomFilmPullProject {
   characterRefs Json?
   /// { shots: FilmPullRenderShot[] }
   renderPlan    Json?
+  /// { shots: [{ shotNo, modelRefIds, productRefIds }] }
+  refMatch      Json?
+  /// { globalConfig?, shots: FilmPullProductionShot[], render? }
+  productionPlan Json?
   chatHistory   Json?
   meta          Json?
 

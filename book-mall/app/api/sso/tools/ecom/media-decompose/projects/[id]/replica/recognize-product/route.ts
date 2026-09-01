@@ -31,18 +31,18 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
-  let body: { modelKey?: unknown } = {};
+  let body: { userDraft?: unknown } = {};
   try {
     body = (await req.json()) as typeof body;
   } catch {
     /* empty body ok */
   }
 
-  const modelKey = typeof body.modelKey === "string" ? body.modelKey : undefined;
+  const userDraft = typeof body.userDraft === "string" ? body.userDraft : undefined;
 
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
-    const result = await recognizeReplicaProduct(auth.userId, id, modelKey);
+    const result = await recognizeReplicaProduct(auth.userId, id, { userDraft });
     return NextResponse.json(result);
   } catch (e) {
     const { message, status } = mapReplicaRouteError(e, "识产品失败");

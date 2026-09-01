@@ -10,7 +10,7 @@ import {
   MediaDecomposeReplicaLaunch,
   MediaDecomposeReplicaPanel,
 } from "@/components/media-decompose/media-decompose-replica-panel";
-import { MediaDecomposeReplicaSetupPanel } from "@/components/media-decompose/media-decompose-replica-setup-panel";
+import { ReplicaSetupPanel } from "@/components/replica/replica-setup-panel";
 import {
   MediaDecomposeReplicaIdleComposer,
   MediaDecomposeReplicaIdleThread,
@@ -42,6 +42,10 @@ import {
 } from "@/lib/media-decompose-replica-workflow";
 import type { SeedVideoProject } from "@/lib/seed-video-types";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import {
+  createMediaDecomposeReplicaSetupApi,
+  MEDIA_DECOMPOSE_REPLICA_SETUP_COPY,
+} from "@/lib/replica-setup-api";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -237,6 +241,25 @@ export function MediaDecomposeWorkspace({
       onAlert &&
       onImageModelChange,
   );
+  const replicaSetupApi = useMemo(() => {
+    if (!replicaSeedVideo || !onProjectUpdated || !onReplicaSeedVideoUpdated) return null;
+    return createMediaDecomposeReplicaSetupApi({
+      projectId: project.id,
+      getProject: () => project,
+      getSeedVideo: () => replicaSeedVideo,
+      onProjectUpdated: (p) => onProjectUpdated(p),
+      onSeedVideoUpdated: (sv) => {
+        onReplicaSeedVideoUpdated(sv);
+        void onReplicaProjectChange?.();
+      },
+    });
+  }, [
+    onProjectUpdated,
+    onReplicaProjectChange,
+    onReplicaSeedVideoUpdated,
+    project,
+    replicaSeedVideo,
+  ]);
   const showBottomDock = !replicaScriptReady;
   const bottomDockMode: "idle" | "ready" | "replica-setup" = showReplicaSetup
     ? "replica-setup"
@@ -446,10 +469,10 @@ export function MediaDecomposeWorkspace({
         </div>
       )}
 
-      {showReplicaSetup ? (
-        <MediaDecomposeReplicaSetupPanel
-          project={project}
-          seedVideo={replicaSeedVideo!}
+      {showReplicaSetup && replicaSetupApi ? (
+        <ReplicaSetupPanel
+          api={replicaSetupApi}
+          copy={MEDIA_DECOMPOSE_REPLICA_SETUP_COPY}
           chatModelKey={chatModelKey}
           imageModels={imageModels}
           imageModelKey={imageModelKey}
@@ -457,11 +480,6 @@ export function MediaDecomposeWorkspace({
           modelsLoading={modelsLoading}
           onRefreshModels={onRefreshModels}
           busy={replicaBusy || mediaBusy || decomposing}
-          onProjectUpdated={(p) => onProjectUpdated?.(p)}
-          onSeedVideoUpdated={(sv) => {
-            onReplicaSeedVideoUpdated?.(sv);
-            void onReplicaProjectChange?.();
-          }}
           onAlert={onAlert!}
         />
       ) : null}

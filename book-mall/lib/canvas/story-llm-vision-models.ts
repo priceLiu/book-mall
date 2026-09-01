@@ -16,6 +16,7 @@ export const STORY_LLM_VIDEO_UNDERSTANDING_MODEL_KEYS = [
 
 export const STORY_LLM_VISION_MODEL_KEYS = [
   ...STORY_LLM_VIDEO_UNDERSTANDING_MODEL_KEYS,
+  "qwen3-vl-flash",
   "doubao-seed-2.1-pro",
   "doubao-seed-2.0",
   "google/gemini-3-flash-preview",
@@ -44,7 +45,7 @@ export function assertStoryLlmVisionModel(
   if (isStoryLlmVisionModel(modelKey)) return;
   const prefix = context ? `${context}：` : "";
   throw new Error(
-    `${prefix}模型「${modelKey}」不支持图片/视频理解，请换用 Qwen3.8 Max、Qwen3-VL、Qwen3.7 Plus、Gemini 3 Flash 或 GPT-5.5`,
+    `${prefix}模型「${modelKey}」不支持图片/视频理解，请换用 Qwen3-VL Flash、Qwen3.8 Max、Qwen3-VL Plus 或 Gemini 3 Flash`,
   );
 }
 

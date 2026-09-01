@@ -56,6 +56,19 @@ export async function PATCH(req: Request, ctx: Ctx) {
     if (body.settings && typeof body.settings === "object") {
       patch.settings = body.settings as FilmPullSettings;
     }
+    if (body.meta && typeof body.meta === "object") {
+      patch.meta = body.meta as Record<string, unknown>;
+    }
+    if (body.refMatch === null || (body.refMatch && typeof body.refMatch === "object")) {
+      patch.refMatch = body.refMatch as import("@/lib/ecom/ecom-film-pull-types").FilmPullRefMatch | null;
+    }
+    if (
+      body.productionPlan === null ||
+      (body.productionPlan && typeof body.productionPlan === "object")
+    ) {
+      patch.productionPlan =
+        body.productionPlan as import("@/lib/ecom/ecom-film-pull-types").FilmPullProductionPlan | null;
+    }
     const project = await updateEcomFilmPullProject(auth.userId, id, patch);
     return NextResponse.json({ project });
   } catch (e) {

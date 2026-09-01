@@ -7,10 +7,10 @@ import { FilmPullMediaInput } from "@/components/film-pull/film-pull-media-input
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { IMAGE_UPLOAD_ACCEPT, IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
-import type { FilmPullCharacterRef, FilmPullMediaReference, FilmPullPhase } from "@/lib/film-pull-types";
+import type { FilmPullCharacterRef, FilmPullLegacyPhase, FilmPullMediaReference } from "@/lib/film-pull-types";
 
 type Props = {
-  phase: FilmPullPhase;
+  phase: FilmPullLegacyPhase;
   media: FilmPullMediaReference | null;
   characterRefs: FilmPullCharacterRef[];
   mediaBusy?: boolean;

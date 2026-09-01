@@ -36,6 +36,16 @@ describe("formatCanvasTaskError", () => {
     ).toContain("生成的视频未通过百炼内容安全审核");
   });
 
+  it("maps HappyHorse output IP infringement to copyright hint", () => {
+    expect(
+      formatCanvasTaskError(
+        "FAILED",
+        "Output data is suspected of being involved in IP infringement",
+        "happyhorse-1.1-r2v",
+      ),
+    ).toContain("百炼版权审核");
+  });
+
   it("maps Bailian green net input rejection", () => {
     expect(
       formatCanvasTaskError(
