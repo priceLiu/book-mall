@@ -2,6 +2,14 @@
 
 import type { ReactNode } from "react";
 
+import {
+  ecomDataTableBodyRowClass,
+  ecomDataTableClass,
+  ecomDataTableHeadRowClass,
+  ecomDataTableTdClass,
+  ecomDataTableThClass,
+  ecomDataTableWrapClass,
+} from "@/components/ui/ecom-data-table";
 import type { MediaDecomposePatch } from "@/lib/media-decompose-types";
 
 type Props = {
@@ -12,10 +20,10 @@ export function MediaDecomposeResultPanel({ structured }: Props) {
   if (structured.mediaType === "video") {
     return (
       <div className="space-y-4">
-        <div className="overflow-x-auto rounded-lg border border-[#e8e8ed]">
-          <table className="min-w-full border-collapse text-left text-xs">
-            <thead className="bg-[#f5f5f7] text-[#6e6e73]">
-              <tr>
+        <div className={ecomDataTableWrapClass}>
+          <table className={`min-w-full ${ecomDataTableClass}`}>
+            <thead>
+              <tr className={ecomDataTableHeadRowClass}>
                 {[
                   "镜号",
                   "时长",
@@ -33,7 +41,7 @@ export function MediaDecomposeResultPanel({ structured }: Props) {
                   "转场",
                   "剪辑节奏",
                 ].map((h) => (
-                  <th key={h} className="whitespace-nowrap border-b border-[#e8e8ed] px-2 py-2 font-medium">
+                  <th key={h} className={`whitespace-nowrap ${ecomDataTableThClass}`}>
                     {h}
                   </th>
                 ))}
@@ -41,22 +49,22 @@ export function MediaDecomposeResultPanel({ structured }: Props) {
             </thead>
             <tbody>
               {structured.storyboardTable.map((row) => (
-                <tr key={row.shotNo} className="border-b border-[#f0f0f2] align-top">
-                  <td className="px-2 py-2">{row.shotNo}</td>
-                  <td className="px-2 py-2">{row.duration}</td>
-                  <td className="px-2 py-2">{row.shotSize}</td>
-                  <td className="px-2 py-2">{row.cameraMove}</td>
-                  <td className="px-2 py-2">{row.cameraAngle}</td>
-                  <td className="px-2 py-2">{row.composition}</td>
-                  <td className="px-2 py-2">{row.visualContent}</td>
-                  <td className="px-2 py-2">{row.characterAction}</td>
-                  <td className="px-2 py-2">{row.expression}</td>
-                  <td className="px-2 py-2">{row.subtitle}</td>
-                  <td className="px-2 py-2">{row.voiceover}</td>
-                  <td className="px-2 py-2">{row.sfx}</td>
-                  <td className="px-2 py-2">{row.bgm}</td>
-                  <td className="px-2 py-2">{row.transition}</td>
-                  <td className="px-2 py-2">{row.editRhythm}</td>
+                <tr key={row.shotNo} className={ecomDataTableBodyRowClass}>
+                  <td className={ecomDataTableTdClass}>{row.shotNo}</td>
+                  <td className={ecomDataTableTdClass}>{row.duration}</td>
+                  <td className={ecomDataTableTdClass}>{row.shotSize}</td>
+                  <td className={ecomDataTableTdClass}>{row.cameraMove}</td>
+                  <td className={ecomDataTableTdClass}>{row.cameraAngle}</td>
+                  <td className={ecomDataTableTdClass}>{row.composition}</td>
+                  <td className={ecomDataTableTdClass}>{row.visualContent}</td>
+                  <td className={ecomDataTableTdClass}>{row.characterAction}</td>
+                  <td className={ecomDataTableTdClass}>{row.expression}</td>
+                  <td className={ecomDataTableTdClass}>{row.subtitle}</td>
+                  <td className={ecomDataTableTdClass}>{row.voiceover}</td>
+                  <td className={ecomDataTableTdClass}>{row.sfx}</td>
+                  <td className={ecomDataTableTdClass}>{row.bgm}</td>
+                  <td className={ecomDataTableTdClass}>{row.transition}</td>
+                  <td className={ecomDataTableTdClass}>{row.editRhythm}</td>
                 </tr>
               ))}
             </tbody>

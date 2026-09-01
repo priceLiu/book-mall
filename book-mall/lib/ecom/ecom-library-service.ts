@@ -12,6 +12,9 @@ import {
   type StoryboardWorkflowSnapshot,
 } from "@/lib/ecom/ecom-storyboard-workflow-snapshot";
 import type { MediaDecomposeDeliverableSnapshot } from "@/lib/ecom/ecom-media-decompose-snapshot";
+import { collectModelShotSnapshotsFromMeta } from "@/lib/ecom/ecom-model-shot-snapshot";
+import type { ModelShotDeliverableSnapshot } from "@/lib/ecom/ecom-model-shot-snapshot";
+import { ECOM_MODEL_SHOT_MODULE } from "@/lib/ecom/ecom-model-shot-types";
 import { ECOM_MEDIA_DECOMPOSE_MODULE } from "@/lib/ecom/ecom-media-decompose-types";
 import type { SeedVideoDeliverableSnapshot } from "@/lib/ecom/ecom-seed-video-snapshot";
 import { ECOM_SEED_VIDEO_MODULE } from "@/lib/ecom/ecom-seed-video-types";
@@ -110,6 +113,17 @@ export type EcomLibraryMediaDecomposeBundle = {
   snapshot: MediaDecomposeDeliverableSnapshot;
 };
 
+export type EcomLibraryModelShotBundle = {
+  projectId: string;
+  savedAt: string;
+  title: string;
+  poseCount: number;
+  imageCount: number;
+  planConfirmed: boolean;
+  thumbnailUrl: string | null;
+  snapshot: ModelShotDeliverableSnapshot;
+};
+
 export type EcomLibrarySection = {
   moduleId: string;
   title: string;
@@ -122,6 +136,7 @@ export type EcomLibrarySection = {
   seedVideoBundles: EcomLibrarySeedVideoBundle[];
   handCraftBundles: EcomLibraryHandCraftBundle[];
   mediaDecomposeBundles: EcomLibraryMediaDecomposeBundle[];
+  modelShotBundles: EcomLibraryModelShotBundle[];
 };
 
 const IMAGE_MODULE_IDS = ["main-image", "detail-page", "hand-craft", "model-shot"] as const;
@@ -402,6 +417,29 @@ function snapshotToSeedVideoBundle(
   };
 }
 
+function snapshotToModelShotBundle(
+  projectId: string,
+  snap: ModelShotDeliverableSnapshot,
+): EcomLibraryModelShotBundle {
+  const poseCount = snap.plan.items.length;
+  const imageCount = snap.plan.items.filter((item) => item.imageUrl?.trim()).length;
+  const thumb =
+    snap.thumbnailUrl?.trim() ||
+    snap.plan.items.find((item) => item.imageUrl?.trim())?.imageUrl?.trim() ||
+    snap.references.find((ref) => ref.role === "garment")?.ossUrl?.trim() ||
+    null;
+  return {
+    projectId,
+    savedAt: snap.savedAt,
+    title: snap.title || "服装模特图",
+    poseCount,
+    imageCount,
+    planConfirmed: snap.plan.status === "confirmed",
+    thumbnailUrl: thumb,
+    snapshot: snap,
+  };
+}
+
 function snapshotToMediaDecomposeBundle(
   projectId: string,
   snap: MediaDecomposeDeliverableSnapshot,
@@ -524,7 +562,7 @@ async function enrichStoryboardRowSnapshots(
 export async function listEcomLibrarySections(userId: string): Promise<EcomLibrarySection[]> {
   await backfillEcomAssetProjectNamesForUser(userId);
 
-  const [assets, storyboardRows, productDesignRows, seedVideoRows, handCraftRows, mediaDecomposeRows] =
+  const [assets, storyboardRows, productDesignRows, seedVideoRows, handCraftRows, mediaDecomposeRows, modelShotRows] =
     await Promise.all([
     prisma.ecomAsset.findMany({
       where: { userId },
@@ -562,6 +600,12 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
     }),
     prisma.ecomMediaDecomposeProject.findMany({
       where: { userId, module: ECOM_MEDIA_DECOMPOSE_MODULE },
+      orderBy: { updatedAt: "desc" },
+      take: 50,
+      select: { id: true, meta: true, title: true },
+    }),
+    prisma.ecomModelShotProject.findMany({
+      where: { userId, module: ECOM_MODEL_SHOT_MODULE },
       orderBy: { updatedAt: "desc" },
       take: 50,
       select: { id: true, meta: true, title: true },
@@ -682,6 +726,15 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
   }
   mediaDecomposeBundles.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
 
+  const modelShotBundles: EcomLibraryModelShotBundle[] = [];
+  for (const row of modelShotRows) {
+    const meta = (row.meta as Record<string, unknown> | null) ?? null;
+    for (const snap of collectModelShotSnapshotsFromMeta(meta)) {
+      modelShotBundles.push(snapshotToModelShotBundle(row.id, snap));
+    }
+  }
+  modelShotBundles.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+
   const orderedIds = [
     ...IMAGE_MODULE_IDS,
     ...VIDEO_MODULE_IDS,
@@ -699,6 +752,7 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
     const sectionSeedVideoBundles = moduleId === "seed-video" ? seedVideoBundles : [];
     const sectionMediaDecomposeBundles =
       moduleId === "media-decompose" ? mediaDecomposeBundles : [];
+    const sectionModelShotBundles = moduleId === "model-shot" ? modelShotBundles : [];
     const sectionProductDesignBundles = productDesignBundlesByModule.get(moduleId) ?? [];
     const sectionHandCraftBundles = moduleId === "hand-craft" ? handCraftBundles : [];
     if (
@@ -706,6 +760,7 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
       sectionBundles.length === 0 &&
       sectionSeedVideoBundles.length === 0 &&
       sectionMediaDecomposeBundles.length === 0 &&
+      sectionModelShotBundles.length === 0 &&
       sectionProductDesignBundles.length === 0 &&
       sectionHandCraftBundles.length === 0
     ) {
@@ -723,6 +778,7 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
       seedVideoBundles: sectionSeedVideoBundles,
       handCraftBundles: sectionHandCraftBundles,
       mediaDecomposeBundles: sectionMediaDecomposeBundles,
+      modelShotBundles: sectionModelShotBundles,
     });
   }
 

@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { ECOM_HAND_CRAFT_MODULE } from "@/lib/ecom/ecom-hand-craft-types";
 import { ECOM_MEDIA_DECOMPOSE_MODULE } from "@/lib/ecom/ecom-media-decompose-types";
+import { ECOM_MODEL_SHOT_MODULE } from "@/lib/ecom/ecom-model-shot-types";
+import { parseModelShotPlan } from "@/lib/ecom/ecom-model-shot-types";
 import {
   ECOM_PROJECT_MODULE_DETAIL,
   ECOM_PROJECT_MODULE_MAIN,
@@ -19,7 +21,8 @@ export type EcomWorkflowDraftKind =
   | "product-design-detail"
   | "hand-craft"
   | "seed-video"
-  | "media-decompose";
+  | "media-decompose"
+  | "model-shot";
 
 export type EcomWorkflowDraftItem = {
   kind: EcomWorkflowDraftKind;
@@ -289,16 +292,59 @@ async function listMediaDecomposeDrafts(userId: string): Promise<EcomWorkflowDra
   });
 }
 
+async function listModelShotDrafts(userId: string): Promise<EcomWorkflowDraftItem[]> {
+  const rows = await prisma.ecomModelShotProject.findMany({
+    where: { userId, module: ECOM_MODEL_SHOT_MODULE },
+    orderBy: { updatedAt: "desc" },
+    take: 50,
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      references: true,
+      plan: true,
+      meta: true,
+      updatedAt: true,
+    },
+  });
+  return rows.map((row) => {
+    const plan = parseModelShotPlan(row.plan);
+    const imageCount = plan.items.filter((item) => item.imageUrl?.trim()).length;
+    const phase =
+      (row.meta as { phase?: string; workflow?: { phase?: string } } | null)?.workflow?.phase ??
+      (row.meta as { phase?: string } | null)?.phase ??
+      row.status?.trim() ??
+      "garment";
+    return {
+      kind: "model-shot",
+      projectId: row.id,
+      title: row.title?.trim() || "服装模特图",
+      featureLabel: "服装模特图",
+      domainLabel: "电商",
+      phaseLabel: phase,
+      summary:
+        plan.items.length > 0
+          ? `${plan.items.length} 个姿势${imageCount > 0 ? ` · ${imageCount} 张成图` : ""}`
+          : "进行中",
+      thumbnailUrl:
+        plan.items.find((item) => item.imageUrl?.trim())?.imageUrl?.trim() ??
+        firstRefUrl(row.references),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  });
+}
+
 export async function listEcomWorkflowDrafts(
   userId: string,
 ): Promise<EcomWorkflowDraftItem[]> {
-  const [storyboard, productDesign, handCraft, seedVideo, mediaDecompose] =
+  const [storyboard, productDesign, handCraft, seedVideo, mediaDecompose, modelShot] =
     await Promise.all([
       listStoryboardDrafts(userId),
       listProductDesignDrafts(userId),
       listHandCraftDrafts(userId),
       listSeedVideoDrafts(userId),
       listMediaDecomposeDrafts(userId),
+      listModelShotDrafts(userId),
     ]);
   return [
     ...storyboard,
@@ -306,5 +352,6 @@ export async function listEcomWorkflowDrafts(
     ...handCraft,
     ...seedVideo,
     ...mediaDecompose,
+    ...modelShot,
   ].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }

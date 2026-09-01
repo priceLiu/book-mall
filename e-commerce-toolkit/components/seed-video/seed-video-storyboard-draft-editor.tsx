@@ -20,8 +20,8 @@ export function SeedVideoStoryboardDraftEditor({ rows, onChange, disabled }: Pro
   return (
     <div className="overflow-x-auto rounded-xl border border-[#e8e8ed]">
       <table className="min-w-full text-left text-xs">
-        <thead className="bg-[#f5f5f7] text-[#6e6e73]">
-          <tr>
+        <thead>
+          <tr className="bg-[#1d1d1f] text-white">
             {SEED_VIDEO_FORMAL_SCRIPT_TABLE_HEADERS.map((label) => (
               <th
                 key={label}

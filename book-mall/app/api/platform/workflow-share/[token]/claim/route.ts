@@ -31,7 +31,11 @@ export async function POST(
     return NextResponse.json({
       ok: true,
       ...result,
-      redirectPath: workflowShareRedirectPath(result.app, result.clonedResourceId),
+      redirectPath: workflowShareRedirectPath(
+        result.app,
+        result.clonedResourceId,
+        result.resourceType,
+      ),
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "领取失败";

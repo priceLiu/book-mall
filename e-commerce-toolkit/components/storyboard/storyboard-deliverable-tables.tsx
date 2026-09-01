@@ -3,6 +3,7 @@
 import { Pencil } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { EcomDataTable } from "@/components/ui/ecom-data-table";
 import {
   formatPanelCellText,
   formatProductInteractionLabel,
@@ -12,41 +13,6 @@ import {
   type DeliverableSellingPointsProps,
   type SchemePanelsTableProps,
 } from "@/lib/storyboard-deliverable-labels";
-
-function DataTable({
-  headers,
-  rows,
-}: {
-  headers: string[];
-  rows: string[][];
-}) {
-  return (
-    <div className="overflow-x-auto rounded-lg border border-[#e8e8ed]">
-      <table className="w-full min-w-[480px] border-collapse text-left text-xs">
-        <thead>
-          <tr className="bg-[#1d1d1f] text-white">
-            {headers.map((h) => (
-              <th key={h} className="px-3 py-2 font-medium">
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={`row-${i}`} className="border-t border-[#e8e8ed] align-top">
-              {row.map((cell, j) => (
-                <td key={`cell-${i}-${j}`} className="px-3 py-2 text-[#1d1d1f]">
-                  {cell || "—"}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 export function StoryboardCreativeBrief({ brief }: CreativeBriefProps) {
   return (
@@ -94,21 +60,21 @@ export function StoryboardAnalysisTables({ analysis }: AnalysisTablesProps) {
     <div className="space-y-5">
       <div>
         <h3 className="mb-2 text-sm font-semibold text-[#6e6e73]">表1 · 人群画像</h3>
-        <DataTable
+        <EcomDataTable
           headers={["人群类型", "画像描述"]}
           rows={analysis.audience.map((r) => [r.segment, r.description])}
         />
       </div>
       <div>
         <h3 className="mb-2 text-sm font-semibold text-[#6e6e73]">表2 · 三层痛点</h3>
-        <DataTable
+        <EcomDataTable
           headers={["痛点层级", "具体描述"]}
           rows={analysis.painPoints.map((r) => [r.level, r.description])}
         />
       </div>
       <div>
         <h3 className="mb-2 text-sm font-semibold text-[#6e6e73]">表3 · 爆款策略</h3>
-        <DataTable
+        <EcomDataTable
           headers={["策略", "3秒钩子", "中段承接", "结尾话术"]}
           rows={analysis.strategies.map((r) => [
             r.name,

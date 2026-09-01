@@ -4,6 +4,9 @@ import { generateEcomImage } from "@/lib/ecom/ecom-image-gen-invoke";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { rebuildModelShotItemPrompt } from "@/lib/ecom/model-shot/prompt-assembler";
 import {
+  appendModelShotPoseImage,
+} from "@/lib/ecom/model-shot/pose-image-history";
+import {
   ECOM_MODEL_SHOT_MODULE,
   ECOM_MODEL_SHOT_TRYON_ACTION,
   ECOM_MODEL_SHOT_TOOL_KEY,
@@ -115,9 +118,12 @@ export async function generateModelShotImages(opts: {
           },
         });
 
+        const current = project.plan.items.find((i) => i.index === index);
+        const merged = current
+          ? appendModelShotPoseImage(current, { url: ossUrl, assetId: asset.id })
+          : null;
         await patchPoseItem(opts.userId, opts.projectId, index, {
-          imageUrl: ossUrl,
-          assetId: asset.id,
+          ...(merged ?? { imageUrl: ossUrl, assetId: asset.id }),
           status: "ready",
           prompt,
         });

@@ -34,6 +34,7 @@ const NEW_DRAFT_OPTIONS: Array<{ kind: EcomWorkflowDraftKind; label: string }> =
   { kind: "hand-craft", label: "手伴创作" },
   { kind: "seed-video", label: "种草视频" },
   { kind: "media-decompose", label: "拆图拆视频" },
+  { kind: "model-shot", label: "服装模特图" },
 ];
 
 function groupDraftsByFeature(

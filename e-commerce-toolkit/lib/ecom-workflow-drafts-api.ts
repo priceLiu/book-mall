@@ -8,7 +8,8 @@ export type EcomWorkflowDraftKind =
   | "product-design-detail"
   | "hand-craft"
   | "seed-video"
-  | "media-decompose";
+  | "media-decompose"
+  | "model-shot";
 
 export type EcomWorkflowDraftItem = {
   kind: EcomWorkflowDraftKind;

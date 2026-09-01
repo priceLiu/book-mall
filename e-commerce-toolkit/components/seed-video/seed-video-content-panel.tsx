@@ -1444,8 +1444,8 @@ export function SeedVideoContentPanel({
           ) : effectiveDirectPlan?.shotSequence && effectiveDirectPlan.shotSequence.length > 0 ? (
             <div className="overflow-x-auto rounded-xl border border-[#e8e8ed]">
               <table className="min-w-full text-left text-xs">
-                <thead className="bg-[#f5f5f7] text-[#6e6e73]">
-                  <tr>
+                <thead>
+                  <tr className="bg-[#1d1d1f] text-white">
                     <th className="px-3 py-2">镜号</th>
                     <th className="px-3 py-2">时间</th>
                     <th className="px-3 py-2">参考素材</th>

@@ -260,7 +260,7 @@ Dialog 内表单：与上表一致，底栏 `DialogFooter` 右对齐取消 + 主
 
 - `EcomToolbarButton` — §5.3 工具条按钮
 - `EcomChoiceChip` — §5.4（与助手 choices 合并）
-- `EcomDataTable` — §7 模式 A
+- `EcomDataTable` — §7 模式 A（`components/ui/ecom-data-table.tsx`）
 - `EcomStepSection` — 右侧步骤区块外壳
 
 在新代码中 **先复制 class 字符串**，抽取组件时以本文档为准迁移。

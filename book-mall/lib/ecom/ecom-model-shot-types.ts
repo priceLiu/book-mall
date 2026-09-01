@@ -47,6 +47,12 @@ export type ModelShotBrief = {
   poseCount?: number;
 };
 
+export type ModelShotPoseImageVersion = {
+  url: string;
+  assetId?: string;
+  createdAt: string;
+};
+
 export type ModelShotPoseItem = {
   index: number;
   poseId?: string;
@@ -65,6 +71,8 @@ export type ModelShotPoseItem = {
   prompt: string;
   imageUrl?: string;
   assetId?: string;
+  imageHistory?: ModelShotPoseImageVersion[];
+  activeImageIndex?: number;
   promptEdited?: boolean;
   status?: "pending" | "generating" | "ready" | "failed";
 };
@@ -114,6 +122,12 @@ export type ModelShotProject = {
   updatedAt: string;
 };
 
+const poseImageVersionSchema = z.object({
+  url: z.string().min(1),
+  assetId: z.string().optional(),
+  createdAt: z.string().min(1),
+});
+
 const poseItemSchema = z.object({
   index: z.number().int().positive(),
   poseId: z.string().optional(),
@@ -127,6 +141,8 @@ const poseItemSchema = z.object({
   prompt: z.string().default(""),
   imageUrl: z.string().optional(),
   assetId: z.string().optional(),
+  imageHistory: z.array(poseImageVersionSchema).optional(),
+  activeImageIndex: z.number().int().nonnegative().optional(),
   promptEdited: z.boolean().optional(),
   status: z.enum(["pending", "generating", "ready", "failed"]).optional(),
 });

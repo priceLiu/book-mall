@@ -32,11 +32,13 @@ import {
 import { reuseProductDesignProject } from "@/lib/ecom-product-design-api";
 import { reuseHandCraftProject } from "@/lib/ecom-hand-craft-api";
 import { reuseMediaDecomposeProject } from "@/lib/ecom-media-decompose-api";
+import { reuseModelShotProject } from "@/lib/ecom-model-shot-api";
 import {
   listLibrarySections,
   type EcomLibraryAssetGroup,
   type EcomLibraryHandCraftBundle,
   type EcomLibraryMediaDecomposeBundle,
+  type EcomLibraryModelShotBundle,
   type EcomLibraryProductDesignBundle,
   type EcomLibrarySection,
   type EcomLibrarySeedVideoBundle,
@@ -58,6 +60,7 @@ import type { StoryboardDeliverableSnapshot } from "@/lib/storyboard-types";
 const STORYBOARD_STORAGE_KEY = "ecom-storyboard-active-project";
 const SEED_VIDEO_STORAGE_KEY = "ecom-seed-video-active-project";
 const MEDIA_DECOMPOSE_STORAGE_KEY = "ecom-media-decompose-active-project";
+const MODEL_SHOT_STORAGE_KEY = "ecom-model-shot-active-project";
 const HAND_CRAFT_STORAGE_KEY = "ecom-hand-craft-active-project";
 
 const DOMAIN_ORDER = ["电商", "视频", "品牌"] as const;
@@ -609,6 +612,26 @@ export default function LibraryPage() {
     }
   }
 
+  async function onReuseModelShotBundle(bundle: EcomLibraryModelShotBundle) {
+    const key = `ms:${bundle.projectId}:${bundle.savedAt}`;
+    setReuseBusy(key);
+    try {
+      const project = await reuseModelShotProject(bundle.projectId, bundle.savedAt);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(MODEL_SHOT_STORAGE_KEY, project.id);
+      }
+      router.push("/ecom/model-shot");
+    } catch (e) {
+      await alert({
+        title: "复用失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    } finally {
+      setReuseBusy(null);
+    }
+  }
+
   async function onReviewStoryboardBundle(bundle: EcomLibraryStoryboardBundle) {
     try {
       const snapshot = await fetchStoryboardLibraryDeliverable(bundle.projectId, {
@@ -795,6 +818,7 @@ export default function LibraryPage() {
                       onReuseSeedVideoBundle={onReuseSeedVideoBundle}
                       onReuseHandCraftBundle={onReuseHandCraftBundle}
                       onReuseMediaDecomposeBundle={onReuseMediaDecomposeBundle}
+                      onReuseModelShotBundle={onReuseModelShotBundle}
                       onOpenSeedVideoProject={onOpenSeedVideoProject}
                     />
                   ))}
@@ -832,6 +856,7 @@ export default function LibraryPage() {
                         onReuseSeedVideoBundle={onReuseSeedVideoBundle}
                         onReuseHandCraftBundle={onReuseHandCraftBundle}
                         onReuseMediaDecomposeBundle={onReuseMediaDecomposeBundle}
+                      onReuseModelShotBundle={onReuseModelShotBundle}
                         onOpenSeedVideoProject={onOpenSeedVideoProject}
                       />
                     );
@@ -901,6 +926,7 @@ function LibrarySectionBlock({
   onReuseSeedVideoBundle,
   onReuseHandCraftBundle,
   onReuseMediaDecomposeBundle,
+  onReuseModelShotBundle,
   onOpenSeedVideoProject,
 }: {
   section: EcomLibrarySection;
@@ -919,6 +945,7 @@ function LibrarySectionBlock({
   onReuseSeedVideoBundle: (bundle: EcomLibrarySeedVideoBundle) => void;
   onReuseHandCraftBundle: (bundle: EcomLibraryHandCraftBundle) => void;
   onReuseMediaDecomposeBundle: (bundle: EcomLibraryMediaDecomposeBundle) => void;
+  onReuseModelShotBundle: (bundle: EcomLibraryModelShotBundle) => void;
   onOpenSeedVideoProject: (projectId: string) => void;
 }) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
@@ -952,6 +979,7 @@ function LibrarySectionBlock({
             onReuseSeedVideoBundle={onReuseSeedVideoBundle}
             onReuseHandCraftBundle={onReuseHandCraftBundle}
             onReuseMediaDecomposeBundle={onReuseMediaDecomposeBundle}
+            onReuseModelShotBundle={onReuseModelShotBundle}
             onOpenSeedVideoProject={onOpenSeedVideoProject}
           />
         ))}
@@ -979,6 +1007,7 @@ function LibraryProjectListItem({
   onReuseSeedVideoBundle,
   onReuseHandCraftBundle,
   onReuseMediaDecomposeBundle,
+  onReuseModelShotBundle,
   onOpenSeedVideoProject,
 }: {
   entry: LibraryProjectEntry | LibraryWorkflowEntry;
@@ -999,6 +1028,7 @@ function LibraryProjectListItem({
   onReuseSeedVideoBundle: (bundle: EcomLibrarySeedVideoBundle) => void;
   onReuseHandCraftBundle: (bundle: EcomLibraryHandCraftBundle) => void;
   onReuseMediaDecomposeBundle: (bundle: EcomLibraryMediaDecomposeBundle) => void;
+  onReuseModelShotBundle: (bundle: EcomLibraryModelShotBundle) => void;
   onOpenSeedVideoProject: (projectId: string) => void;
 }) {
   const isVideoThumb = libraryThumbIsVideo(
@@ -1092,6 +1122,7 @@ function LibraryProjectListItem({
             onReuseSeedVideoBundle={onReuseSeedVideoBundle}
             onReuseHandCraftBundle={onReuseHandCraftBundle}
             onReuseMediaDecomposeBundle={onReuseMediaDecomposeBundle}
+            onReuseModelShotBundle={onReuseModelShotBundle}
             onOpenSeedVideoProject={onOpenSeedVideoProject}
           />
         </div>
@@ -1117,6 +1148,7 @@ function LibraryProjectExpandedContent({
   onReuseSeedVideoBundle,
   onReuseHandCraftBundle,
   onReuseMediaDecomposeBundle,
+  onReuseModelShotBundle,
   onOpenSeedVideoProject,
 }: {
   entry: LibraryProjectEntry | LibraryWorkflowEntry;
@@ -1135,6 +1167,7 @@ function LibraryProjectExpandedContent({
   onReuseSeedVideoBundle: (bundle: EcomLibrarySeedVideoBundle) => void;
   onReuseHandCraftBundle: (bundle: EcomLibraryHandCraftBundle) => void;
   onReuseMediaDecomposeBundle: (bundle: EcomLibraryMediaDecomposeBundle) => void;
+  onReuseModelShotBundle: (bundle: EcomLibraryModelShotBundle) => void;
   onOpenSeedVideoProject: (projectId: string) => void;
 }) {
   if (entry.kind === "assets") {
@@ -1418,6 +1451,41 @@ function LibraryProjectExpandedContent({
         disabled={busy}
         onClick={() => onReuseMediaDecomposeBundle(mdBundle)}
       >
+          <RotateCcw className="h-3.5 w-3.5" />
+          {busy ? "复用中…" : "一键复用"}
+        </button>
+      </div>
+    );
+  }
+
+  if (entry.kind === "model-shot") {
+    const msBundle = entry.bundle;
+    const busy = reuseBusy === `ms:${msBundle.projectId}:${msBundle.savedAt}`;
+    const previewSrc = thumb;
+    return (
+      <div className="space-y-3">
+        {previewSrc ? (
+          <div className="max-w-[140px]">
+            <EcomMediaLibraryTile
+              kind="image"
+              src={previewSrc}
+              alt={title}
+              onPreview={() => onPreviewImage(buildEcomOssThumbUrl(previewSrc), title)}
+              onDownload={() =>
+                void downloadMediaUrl(
+                  previewSrc,
+                  mediaDownloadFilename(title, "image", previewSrc),
+                )
+              }
+            />
+          </div>
+        ) : null}
+        <button
+          type="button"
+          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#1d1d1f] bg-[#1d1d1f] px-3 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
+          disabled={busy}
+          onClick={() => onReuseModelShotBundle(msBundle)}
+        >
           <RotateCcw className="h-3.5 w-3.5" />
           {busy ? "复用中…" : "一键复用"}
         </button>

@@ -53,7 +53,11 @@ export default function EcomWorkflowSharePage({
         const url = new URL(data.redirectPath, window.location.origin);
         const projectId = url.searchParams.get("projectId")?.trim();
         if (projectId) {
-          sessionStorage.setItem("ecom-storyboard-active-project", projectId);
+          if (url.pathname.includes("/model-shot")) {
+            sessionStorage.setItem("ecom-model-shot-active-project", projectId);
+          } else {
+            sessionStorage.setItem("ecom-storyboard-active-project", projectId);
+          }
         }
       } catch {
         /* ignore malformed redirect */

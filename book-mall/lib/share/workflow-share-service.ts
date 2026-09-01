@@ -21,6 +21,7 @@ import {
   createCanvasProjectForUser,
 } from "@/lib/canvas/canvas-project-service";
 import { createEcomStoryboardProject } from "@/lib/ecom/ecom-storyboard-service";
+import { duplicateModelShotForShareClaim } from "@/lib/ecom/ecom-model-shot-reuse";
 import { prisma } from "@/lib/prisma";
 import {
   assertCanShareQrTemplate,
@@ -201,6 +202,7 @@ async function duplicateQrForShareClaim(
 
 async function cloneResourceForShare(input: {
   app: WorkflowShareApp;
+  resourceType: string;
   resourceId: string;
   sharerUserId: string;
   claimerUserId: string;
@@ -213,6 +215,13 @@ async function cloneResourceForShare(input: {
         input.sharerUserId,
       );
     case "ECOM":
+      if (input.resourceType === "ecom_model_shot_project") {
+        return duplicateModelShotForShareClaim(
+          input.claimerUserId,
+          input.resourceId,
+          input.sharerUserId,
+        );
+      }
       return duplicateEcomForShareClaim(
         input.claimerUserId,
         input.resourceId,
@@ -233,6 +242,7 @@ export type WorkflowShareClaimResult = {
   claimId: string;
   clonedResourceId: string;
   app: WorkflowShareApp;
+  resourceType: string;
 };
 
 export async function claimWorkflowShare(input: {
@@ -266,11 +276,13 @@ export async function claimWorkflowShare(input: {
       claimId: existing.id,
       clonedResourceId: existing.clonedResourceId,
       app: link.app,
+      resourceType: link.resourceType,
     };
   }
 
   const clonedResourceId = await cloneResourceForShare({
     app: link.app,
+    resourceType: link.resourceType,
     resourceId: link.resourceId,
     sharerUserId: link.sharerUserId,
     claimerUserId: input.claimerUserId,
@@ -311,17 +323,22 @@ export async function claimWorkflowShare(input: {
     claimId: claim.id,
     clonedResourceId,
     app: link.app,
+    resourceType: link.resourceType,
   };
 }
 
 export function workflowShareRedirectPath(
   app: WorkflowShareApp,
   clonedResourceId: string,
+  resourceType?: string,
 ): string {
   switch (app) {
     case "CANVAS":
       return `/canvas/${clonedResourceId}`;
     case "ECOM":
+      if (resourceType === "ecom_model_shot_project") {
+        return `/ecom/model-shot?projectId=${encodeURIComponent(clonedResourceId)}`;
+      }
       return `/ecom/storyboard/micro-drama?projectId=${encodeURIComponent(clonedResourceId)}`;
     case "QUICK_REPLICA":
       return `/?templateId=${encodeURIComponent(clonedResourceId)}`;
@@ -346,9 +363,10 @@ export function workflowShareAppOrigin(app: WorkflowShareApp): string {
 export function workflowShareAbsoluteRedirectUrl(
   app: WorkflowShareApp,
   clonedResourceId: string,
+  resourceType?: string,
 ): string {
   return buildAppWebUrl(
     workflowShareAppOrigin(app),
-    workflowShareRedirectPath(app, clonedResourceId),
+    workflowShareRedirectPath(app, clonedResourceId, resourceType),
   );
 }

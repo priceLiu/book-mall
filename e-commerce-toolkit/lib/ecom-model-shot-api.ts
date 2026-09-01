@@ -146,6 +146,7 @@ export async function patchModelShotPoseItem(
     propCatalogId?: string | null;
     applySceneToAll?: boolean;
     applyPropToAll?: boolean;
+    activeImageIndex?: number;
   },
 ): Promise<ModelShotProject> {
   const res = await fetch(`/api/book-mall/${BASE}/projects/${projectId}/refs/upload`, {
@@ -277,4 +278,28 @@ export async function streamModelShotChat(opts: {
     opts.onChunk(chunk);
   }
   return full;
+}
+
+export async function saveModelShotDeliverableSnapshot(
+  projectId: string,
+  workName: string,
+): Promise<{ project: ModelShotProject }> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/deliverable/snapshot`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workName }),
+  });
+  return { project: data.project as ModelShotProject };
+}
+
+export async function reuseModelShotProject(
+  projectId: string,
+  savedAt?: string,
+): Promise<ModelShotProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/reuse`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(savedAt ? { savedAt } : {}),
+  });
+  return data.project as ModelShotProject;
 }

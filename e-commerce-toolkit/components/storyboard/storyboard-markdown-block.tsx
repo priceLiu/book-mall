@@ -2,6 +2,15 @@
 
 import type React from "react";
 
+import {
+  ecomDataTableBodyRowClass,
+  ecomDataTableClass,
+  ecomDataTableHeadRowClass,
+  ecomDataTableTdClass,
+  ecomDataTableThClass,
+  ecomDataTableWrapClass,
+} from "@/components/ui/ecom-data-table";
+
 function decodeInlineHtml(text: string): string {
   return text
     .replace(/<br\s*\/?>/gi, "\n")
@@ -182,8 +191,8 @@ export function StoryboardMarkdownBlock({ markdown }: { markdown: string }) {
         {titleRow ? (
           <p className="mb-2 text-sm font-semibold text-[#1d1d1f]">{titleRow}</p>
         ) : null}
-        <div className="overflow-x-auto rounded-lg border border-[#e8e8ed]">
-          <table className="w-full min-w-[480px] table-fixed border-collapse text-left text-xs">
+        <div className={ecomDataTableWrapClass}>
+          <table className={`w-full min-w-[480px] table-fixed ${ecomDataTableClass}`}>
             <colgroup>
               {Array.from({ length: displayColCount }, (_, i) => (
                 <col key={i} style={{ width: `${100 / displayColCount}%` }} />
@@ -191,9 +200,9 @@ export function StoryboardMarkdownBlock({ markdown }: { markdown: string }) {
             </colgroup>
             {head ? (
               <thead>
-                <tr className="bg-[#1d1d1f] text-white">
+                <tr className={ecomDataTableHeadRowClass}>
                   {head.map((c, i) => (
-                    <th key={i} className="px-3 py-2 font-medium">
+                    <th key={i} className={ecomDataTableThClass}>
                       {renderInlineText(c, `th-${key}-${i}`)}
                     </th>
                   ))}
@@ -202,9 +211,9 @@ export function StoryboardMarkdownBlock({ markdown }: { markdown: string }) {
             ) : null}
             <tbody>
               {body.map((row, ri) => (
-                <tr key={ri} className="border-t border-[#e8e8ed]">
+                <tr key={ri} className={ecomDataTableBodyRowClass}>
                   {padRow(row).map((c, ci) => (
-                    <td key={ci} className="px-3 py-2 align-top text-[#1d1d1f]">
+                    <td key={ci} className={ecomDataTableTdClass}>
                       {renderInlineText(c, `td-${key}-${ri}-${ci}`)}
                     </td>
                   ))}

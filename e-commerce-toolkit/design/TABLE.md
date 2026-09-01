@@ -8,6 +8,16 @@
 
 ### 外壳
 
+优先使用 `components/ui/ecom-data-table.tsx` 的 `EcomDataTable`；复杂自定义列时可复用导出的 class 常量（`ecomDataTableWrapClass`、`ecomDataTableHeadRowClass` 等）。
+
+```tsx
+import { EcomDataTable } from "@/components/ui/ecom-data-table";
+
+<EcomDataTable headers={["列 A", "列 B"]} rows={[["a1", "b1"]]} minWidth={480} />
+```
+
+等价手写外壳：
+
 ```tsx
 <div className="overflow-x-auto rounded-lg border border-[#e8e8ed]">
   <table className="w-full min-w-[720px] border-collapse text-left text-xs">
@@ -70,7 +80,7 @@
 
 ### 嵌套 Markdown 表
 
-助手交付的 Markdown 表格走 `StoryboardMarkdownBlock`；若需与模式 A 一致，在 block 内复用深色表头 token（后续统一）。
+助手交付的 Markdown 表格走 `StoryboardMarkdownBlock`（已统一深色表头 token）；简单键值表优先 `EcomDataTable`。
 
 ## 模式 C · 印刷/导出表（例外）
 

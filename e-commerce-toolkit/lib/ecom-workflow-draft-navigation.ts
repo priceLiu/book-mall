@@ -4,6 +4,7 @@ import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.
 
 import { createHandCraftProject } from "@/lib/ecom-hand-craft-api";
 import { createMediaDecomposeProject } from "@/lib/ecom-media-decompose-api";
+import { createModelShotProject } from "@/lib/ecom-model-shot-api";
 import { createProductDesignProject } from "@/lib/ecom-product-design-api";
 import type { EcomProjectModule } from "@/lib/product-design-types";
 import { createSeedVideoProject } from "@/lib/ecom-seed-video-api";
@@ -19,6 +20,8 @@ export function productDesignDraftStorageKey(module: EcomProjectModule): string 
   return `ecom-product-design-active-project:${module === "detail-page" ? "detail-page" : "main-image"}`;
 }
 
+export const MODEL_SHOT_DRAFT_STORAGE_KEY = "ecom-model-shot-active-project";
+
 export function workflowDraftStudioPath(kind: EcomWorkflowDraftKind): string {
   switch (kind) {
     case "storyboard":
@@ -33,6 +36,8 @@ export function workflowDraftStudioPath(kind: EcomWorkflowDraftKind): string {
       return "/ecom/seed-video";
     case "media-decompose":
       return "/ecom/media-decompose";
+    case "model-shot":
+      return "/ecom/model-shot";
   }
 }
 
@@ -50,6 +55,8 @@ export function workflowDraftStorageKey(kind: EcomWorkflowDraftKind): string {
       return SEED_VIDEO_DRAFT_STORAGE_KEY;
     case "media-decompose":
       return MEDIA_DECOMPOSE_DRAFT_STORAGE_KEY;
+    case "model-shot":
+      return MODEL_SHOT_DRAFT_STORAGE_KEY;
   }
 }
 
@@ -101,6 +108,10 @@ export async function createWorkflowDraft(
       const project = await createMediaDecomposeProject();
       return { projectId: project.id };
     }
+    case "model-shot": {
+      const project = await createModelShotProject({ title: "服装模特图" });
+      return { projectId: project.id };
+    }
   }
 }
 
@@ -141,6 +152,11 @@ export async function deleteWorkflowDraft(
     case "media-decompose":
       await import("@/lib/ecom-media-decompose-api").then((m) =>
         m.deleteMediaDecomposeProject(projectId),
+      );
+      return;
+    case "model-shot":
+      await import("@/lib/ecom-model-shot-api").then((m) =>
+        m.deleteModelShotProject(projectId),
       );
       return;
   }

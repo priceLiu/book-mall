@@ -5,8 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EcomAssistantCollapsibleLayout } from "@/components/layout/ecom-assistant-collapsible-layout";
 import { EcomAssistantPanelHeader } from "@/components/layout/ecom-assistant-panel-header";
 import { EcomAssistantSendButton } from "@/components/layout/ecom-assistant-send-button";
-import { STORYBOARD_ASSISTANT_CHOICE_CLASS } from "@/components/storyboard/storyboard-assistant-choices";
-import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-markdown-block";
+import { ModelShotAssistantMessageBody } from "@/components/model-shot/model-shot-assistant-message-body";
+import { SeedVideoAssistantChoiceCards } from "@/components/seed-video/seed-video-assistant-choice-cards";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import {
   ECOM_ASSISTANT_BUBBLE_CLASS,
@@ -25,19 +25,18 @@ import {
 import type { ModelShotBrief, ModelShotChatMessage, ModelShotMeta, ModelShotProject } from "@/lib/model-shot-types";
 import {
   MODEL_SHOT_MODEL_MODE_PREFIX,
-  MODEL_SHOT_PROP_DEFER_ASSISTANT_REPLY,
   MODEL_SHOT_PROP_MODE_PREFIX,
   MODEL_SHOT_SCENE_MODE_PREFIX,
   parseModelArchetypeChoice,
 } from "@/lib/model-shot-prompt-presets";
 import {
   choicePrompt,
-  inferAssistantChoices,
   inferModelShotPhase,
   metaAssistantReplyAfterChoice,
   modelArchetypeAssistantReply,
   modelModeAssistantReply,
   MODEL_SHOT_POSE_PLAN_READY_REPLY,
+  MODEL_SHOT_PROP_DEFER_ASSISTANT_REPLY,
   MODEL_SHOT_SKIP_PROP_ASSISTANT_REPLY,
   MODEL_SHOT_SKIP_SCENE_ASSISTANT_REPLY,
   parseMetaCountChoice,
@@ -49,6 +48,13 @@ import {
   scenePickAssistantReply,
   MODEL_SHOT_META_COUNT_REPLY,
 } from "@/lib/model-shot-workflow";
+import {
+  buildModelShotHistoricalChoiceBlock,
+  inferModelShotAssistantChoiceCards,
+  resolveModelShotAssistantChoiceStep,
+  resolveModelShotAssistantHeaderSubtitle,
+  resolveModelShotAssistantSelectedMessage,
+} from "@/lib/model-shot-assistant-choice-ui";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import { hasGarmentReference, type ModelShotReferenceRole } from "@/lib/model-shot-types";
 import { cn } from "@/lib/utils";
@@ -108,6 +114,8 @@ export function ModelShotAssistantPanel({
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
+  const [optimisticSelected, setOptimisticSelected] = useState<string | null>(null);
+  const [choiceBusy, setChoiceBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
 
@@ -284,6 +292,9 @@ export function ModelShotAssistantPanel({
 
   const handleChoice = useCallback(
     async (choice: string) => {
+      setOptimisticSelected(choice);
+      setChoiceBusy(true);
+      try {
       const poseGenLabel = posePlanGenerateChoiceLabel(project.brief?.poseCount ?? 6);
       if (
         choice === "生成姿势方案" ||
@@ -497,6 +508,9 @@ export function ModelShotAssistantPanel({
       }
 
       await sendText(choicePrompt(choice));
+      } finally {
+        setChoiceBusy(false);
+      }
     },
     [
       messages,
@@ -523,10 +537,27 @@ export function ModelShotAssistantPanel({
       ]
     : messages;
 
-  const choices = useMemo(() => inferAssistantChoices(project), [project]);
-  const showChoices = !streaming && choices.length > 0;
-  const modelName =
-    chatModels.find((m) => m.modelKey === chatModelKey)?.displayName ?? "助手模型";
+  const choiceCards = useMemo(
+    () => inferModelShotAssistantChoiceCards(project),
+    [project],
+  );
+  const choiceStep = useMemo(
+    () => resolveModelShotAssistantChoiceStep(project),
+    [project],
+  );
+  const selectedChoiceMessage = useMemo(
+    () => optimisticSelected ?? resolveModelShotAssistantSelectedMessage(project, messages),
+    [optimisticSelected, project, messages],
+  );
+  const showChoices = !streaming && choiceCards.length > 0;
+  const headerSubtitle = useMemo(
+    () => resolveModelShotAssistantHeaderSubtitle(project),
+    [project],
+  );
+
+  useEffect(() => {
+    setOptimisticSelected(null);
+  }, [choiceStep?.title, project.id]);
 
   const tryCollapse = useCallback(() => {
     if (streaming) return;
@@ -551,7 +582,7 @@ export function ModelShotAssistantPanel({
           placeholder={
             hasGarmentReference(project.references)
               ? phase === "model"
-                ? "描述模特偏好，或点上方快捷选项…"
+                ? "描述模特偏好，或点上方选项卡片…"
                 : "补充平台、风格或姿势偏好…"
               : "请先在中栏上传服装参考图…"
           }
@@ -588,7 +619,7 @@ export function ModelShotAssistantPanel({
     >
       <EcomAssistantPanelHeader
         title="服装模特图助手"
-        subtitle={`${phase} · ${modelName}`}
+        subtitle={headerSubtitle}
         composerWide={composerWide}
         onComposerWideChange={onComposerWideChange}
         onCollapse={onCollapsedChange ? tryCollapse : undefined}
@@ -600,45 +631,77 @@ export function ModelShotAssistantPanel({
         className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-3"
       >
         <div className="space-y-3">
-          {displayMessages.map((m) => (
-            <div
-              key={m.id}
-              className={cn(
-                "flex w-full flex-col",
-                m.role === "user" ? "items-end" : "items-start",
-              )}
-            >
+          {displayMessages.map((m) => {
+            const historical =
+              m.role === "user"
+                ? buildModelShotHistoricalChoiceBlock(m.content, project)
+                : null;
+            return (
+            <div key={m.id} className="space-y-2">
               <div
                 className={cn(
-                  ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
-                  m.role === "user"
-                    ? ECOM_ASSISTANT_USER_BUBBLE_CLASS
-                    : ECOM_ASSISTANT_BUBBLE_CLASS,
+                  "flex w-full flex-col",
+                  m.role === "user" ? "items-end" : "items-start",
                 )}
               >
-                {m.role === "assistant" ? (
-                  <StoryboardMarkdownBlock markdown={m.content} />
-                ) : (
-                  <p className="whitespace-pre-wrap">{m.content}</p>
-                )}
+                <div
+                  className={cn(
+                    ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
+                    m.role === "user"
+                      ? ECOM_ASSISTANT_USER_BUBBLE_CLASS
+                      : ECOM_ASSISTANT_BUBBLE_CLASS,
+                  )}
+                >
+                  {m.role === "assistant" ? (
+                    <ModelShotAssistantMessageBody content={m.content} project={project} />
+                  ) : (
+                    <p className="whitespace-pre-wrap">{m.content}</p>
+                  )}
+                </div>
               </div>
+              {historical ? (
+                <div className="flex w-full flex-col items-start">
+                  <div className={cn(ECOM_ASSISTANT_CHOICE_SHELL_CLASS, "w-full max-w-[95%]")}>
+                    <SeedVideoAssistantChoiceCards
+                      title={historical.title}
+                      subtitle="本次点选记录（只读）"
+                      choices={historical.cards}
+                      selectedMessage={historical.selectedMessage}
+                    />
+                  </div>
+                </div>
+              ) : null}
             </div>
-          ))}
-          {showChoices ? (
+            );
+          })}
+          {showChoices && choiceStep ? (
             <div className="flex flex-col items-start">
               <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
-                <div className="flex flex-wrap gap-2">
-                  {choices.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      disabled={streaming}
-                      className={STORYBOARD_ASSISTANT_CHOICE_CLASS}
-                      onClick={() => void handleChoice(c)}
-                    >
-                      {c}
-                    </button>
-                  ))}
+                <div className="rounded-2xl border border-[#0071e3]/25 bg-[#f0f6ff] p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-[#1d1d1f]">{choiceStep.title}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-[#6e6e73]">
+                        {choiceStep.subtitle}
+                      </p>
+                      <p className="mt-2 text-[11px] text-[#86868b]">
+                        请选择（无需输入）：点选后将写入会话并同步中栏。
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-white px-2.5 py-0.5 text-[10px] font-medium text-[#0071e3]">
+                      {choiceStep.progress}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <SeedVideoAssistantChoiceCards
+                    title="可选方案"
+                    subtitle="选中项会高亮显示；确认后进入下一步"
+                    choices={choiceCards}
+                    selectedMessage={selectedChoiceMessage}
+                    disabled={streaming || choiceBusy}
+                    onSelect={(message) => void handleChoice(message)}
+                  />
                 </div>
               </div>
             </div>

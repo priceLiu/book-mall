@@ -6,6 +6,9 @@ import {
   uploadModelShotReference,
 } from "@/lib/ecom/ecom-model-shot-service";
 import { rebuildModelShotItemPrompt } from "@/lib/ecom/model-shot/prompt-assembler";
+import {
+  withModelShotActiveImageIndex,
+} from "@/lib/ecom/model-shot/pose-image-history";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
@@ -69,6 +72,17 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const target = project.plan.items.find((item) => item.index === index);
   if (!target) {
     return NextResponse.json({ error: "姿势条目不存在" }, { status: 404 });
+  }
+
+  if (typeof body.activeImageIndex === "number") {
+    const nextItem = withModelShotActiveImageIndex(target, body.activeImageIndex);
+    const items = project.plan.items.map((item) =>
+      item.index === index ? nextItem : item,
+    );
+    const updated = await updateEcomModelShotProject(auth.userId, id, {
+      plan: { ...project.plan, items },
+    });
+    return NextResponse.json({ project: updated });
   }
 
   const hasStructuredPatch =

@@ -35,6 +35,12 @@ export type ModelShotBrief = {
   poseCount?: number;
 };
 
+export type ModelShotPoseImageVersion = {
+  url: string;
+  assetId?: string;
+  createdAt: string;
+};
+
 export type ModelShotPoseItem = {
   index: number;
   poseId?: string;
@@ -46,8 +52,13 @@ export type ModelShotPoseItem = {
   propText?: string;
   propCatalogId?: string;
   prompt: string;
+  /** 当前选中版本的 URL（与 imageHistory[activeImageIndex] 同步） */
   imageUrl?: string;
   assetId?: string;
+  /** 同姿势多次生成的历史；最早在前，最新在后 */
+  imageHistory?: ModelShotPoseImageVersion[];
+  /** 格内正在查看的版本下标，默认最新 */
+  activeImageIndex?: number;
   promptEdited?: boolean;
   status?: "pending" | "generating" | "ready" | "failed";
 };

@@ -1,6 +1,7 @@
 import type {
   EcomLibraryHandCraftBundle,
   EcomLibraryMediaDecomposeBundle,
+  EcomLibraryModelShotBundle,
   EcomLibraryProductDesignBundle,
   EcomLibrarySection,
   EcomLibrarySeedVideoBundle,
@@ -62,6 +63,15 @@ export type LibraryWorkflowEntry =
       meta: string;
       sortKey: string;
       bundle: EcomLibraryMediaDecomposeBundle;
+    }
+  | {
+      kind: "model-shot";
+      key: string;
+      projectName: string;
+      thumbnailUrl: string | null;
+      meta: string;
+      sortKey: string;
+      bundle: EcomLibraryModelShotBundle;
     };
 
 function bundleEntriesFromSection(section: EcomLibrarySection): LibraryWorkflowEntry[] {
@@ -118,6 +128,17 @@ function bundleEntriesFromSection(section: EcomLibrarySection): LibraryWorkflowE
       projectName: bundle.title,
       thumbnailUrl: bundle.thumbnailUrl,
       meta: `${bundle.mediaKind === "video" ? "视频拆解" : bundle.mediaKind === "image" ? "图片拆解" : "拆图拆视频"} · ${bundle.hasReplica ? `${bundle.shotCount} 镜 · ` : ""}${bundle.hasVideo ? "含成片" : "拆解结果"}`,
+      sortKey: bundle.savedAt,
+      bundle,
+    });
+  }
+  for (const bundle of section.modelShotBundles) {
+    entries.push({
+      kind: "model-shot",
+      key: `ms:${bundle.projectId}:${bundle.savedAt}`,
+      projectName: bundle.title,
+      thumbnailUrl: bundle.thumbnailUrl,
+      meta: `${bundle.poseCount} 个姿势 · ${bundle.imageCount > 0 ? `${bundle.imageCount} 张成图` : "仅方案"} · 已保存工作流`,
       sortKey: bundle.savedAt,
       bundle,
     });

@@ -120,6 +120,36 @@ function stableSceneChoiceLabels(projectId: string, count = 5): string[] {
     .map((s) => `${MODEL_SHOT_SCENE_CHOICE_PREFIX}${s.name}`);
 }
 
+/** 助手历史卡片：重建某次场景词库点选时的选项列表 */
+export function listModelShotScenePickChoiceMessages(projectId: string): string[] {
+  return stableSceneChoiceLabels(projectId);
+}
+
+export function listModelShotModelModeChoiceMessages(): string[] {
+  return [
+    `${MODEL_SHOT_MODEL_MODE_PREFIX}上传参考图`,
+    `${MODEL_SHOT_MODEL_MODE_PREFIX}AI推荐虚拟模特`,
+    `${MODEL_SHOT_MODEL_MODE_PREFIX}手写描述`,
+    `${MODEL_SHOT_MODEL_MODE_PREFIX}从模特库选择`,
+  ];
+}
+
+export function listModelShotSceneModeChoiceMessages(): string[] {
+  return [
+    `${MODEL_SHOT_SCENE_MODE_PREFIX}上传参考图`,
+    `${MODEL_SHOT_SCENE_MODE_PREFIX}词库推荐`,
+    `${MODEL_SHOT_SCENE_MODE_PREFIX}跳过场景`,
+    `${MODEL_SHOT_SCENE_MODE_PREFIX}AI生成（中栏）`,
+  ];
+}
+
+export function listModelShotPropModeChoiceMessages(): string[] {
+  return [
+    `${MODEL_SHOT_PROP_MODE_PREFIX}不需要道具`,
+    `${MODEL_SHOT_PROP_MODE_PREFIX}稍后在姿势表填写`,
+  ];
+}
+
 function stablePropChoiceLabels(projectId: string, count = 5): string[] {
   const all = listModelShotPropPresets();
   if (!all.length) return [];
@@ -175,6 +205,24 @@ function formatModelRecommendList(): string {
 }
 
 export function buildModelShotCollectionSummary(project: ModelShotProject): string {
+  const rows = buildModelShotCollectionSummaryRows(project);
+  const n = project.brief?.poseCount ?? 6;
+  const table = buildModelShotCollectionSummaryTableMarkdown(rows);
+  return `明白。信息采集已完成，汇总如下：
+
+${table}
+
+接下来将为您编排 **${n} 个**差异化全身姿势（涵盖站姿、行走、侧身等多种类型），并同步到中栏。请确认后开始生成。`;
+}
+
+export type ModelShotCollectionSummaryRow = {
+  label: string;
+  value: string;
+};
+
+export function buildModelShotCollectionSummaryRows(
+  project: ModelShotProject,
+): ModelShotCollectionSummaryRow[] {
   const model = refByRole(project.references, "model");
   const scene = refByRole(project.references, "scene");
   const prop = refByRole(project.references, "prop");
@@ -188,16 +236,65 @@ export function buildModelShotCollectionSummary(project: ModelShotProject): stri
     prop?.source === "none" ? "不需要" : (prop?.name ?? prop?.description?.slice(0, 32) ?? "未指定");
   const styles = brief.styles?.join("、") ?? "—";
   const n = brief.poseCount ?? 6;
-  return `明白。信息采集已完成，汇总如下：
+  return [
+    { label: "模特", value: modelLine },
+    { label: "场景", value: sceneLine },
+    { label: "道具", value: propLine },
+    { label: "风格", value: styles },
+    { label: "平台/用途", value: brief.platform ?? "—" },
+    { label: "姿势张数", value: `${n} 张` },
+  ];
+}
 
-- **模特**：${modelLine}
-- **场景**：${sceneLine}
-- **道具**：${propLine}
-- **风格**：${styles}
-- **平台/用途**：${brief.platform ?? "—"}
-- **姿势张数**：${n} 张
+export function buildModelShotCollectionSummaryTableMarkdown(
+  rows: ModelShotCollectionSummaryRow[],
+): string {
+  const escapeCell = (text: string) => text.replace(/\|/g, "\\|");
+  return [
+    "| 项目 | 已选配置 |",
+    "| --- | --- |",
+    ...rows.map((row) => `| ${escapeCell(row.label)} | ${escapeCell(row.value)} |`),
+  ].join("\n");
+}
 
-接下来将为您编排 **${n} 个**差异化全身姿势（涵盖站姿、行走、侧身等多种类型），并同步到中栏。请确认后开始生成。`;
+export const MODEL_SHOT_COLLECTION_SUMMARY_INTRO = "明白。信息采集已完成，汇总如下：";
+
+export function isModelShotCollectionSummaryMessage(content: string): boolean {
+  return content.includes("信息采集已完成，汇总如下");
+}
+
+/** 从助手消息解析采集汇总（支持表格 / 旧版 bullet 列表） */
+export function parseModelShotCollectionSummaryMessage(content: string): {
+  intro: string;
+  outro: string | null;
+  rows: ModelShotCollectionSummaryRow[];
+} | null {
+  if (!isModelShotCollectionSummaryMessage(content)) return null;
+
+  const outroIdx = content.indexOf("接下来将为您编排");
+  const outro = outroIdx >= 0 ? content.slice(outroIdx).trim() : null;
+
+  const rows: ModelShotCollectionSummaryRow[] = [];
+  for (const line of content.split("\n")) {
+    const tableMatch = line.match(/^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|$/);
+    if (tableMatch) {
+      const label = tableMatch[1]!.trim();
+      const value = tableMatch[2]!.trim();
+      if (label === "项目" || /^:?-+:?$/.test(label)) continue;
+      rows.push({ label, value });
+      continue;
+    }
+    const bulletMatch = line.match(/^- \*\*(.+?)\*\*[：:]\s*(.+)$/);
+    if (bulletMatch) {
+      rows.push({ label: bulletMatch[1]!.trim(), value: bulletMatch[2]!.trim() });
+    }
+  }
+
+  return {
+    intro: MODEL_SHOT_COLLECTION_SUMMARY_INTRO,
+    outro,
+    rows,
+  };
 }
 
 export function posePlanGenerateChoiceLabel(poseCount: number): string {

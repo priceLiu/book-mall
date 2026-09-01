@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
       redirectUrl: workflowShareAbsoluteRedirectUrl(
         result.app,
         result.clonedResourceId,
+        result.resourceType,
       ),
     });
   } catch (e) {

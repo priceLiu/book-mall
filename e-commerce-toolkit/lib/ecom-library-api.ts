@@ -81,6 +81,20 @@ export type EcomLibraryMediaDecomposeBundle = {
   };
 };
 
+export type EcomLibraryModelShotBundle = {
+  projectId: string;
+  savedAt: string;
+  title: string;
+  poseCount: number;
+  imageCount: number;
+  planConfirmed: boolean;
+  thumbnailUrl: string | null;
+  snapshot: {
+    savedAt: string;
+    title: string;
+  };
+};
+
 export type EcomLibraryAssetGroup = {
   projectId: string | null;
   projectName: string;
@@ -99,6 +113,7 @@ export type EcomLibrarySection = {
   seedVideoBundles: EcomLibrarySeedVideoBundle[];
   handCraftBundles: EcomLibraryHandCraftBundle[];
   mediaDecomposeBundles: EcomLibraryMediaDecomposeBundle[];
+  modelShotBundles: EcomLibraryModelShotBundle[];
 };
 
 export async function listLibrarySections(): Promise<{
@@ -117,6 +132,7 @@ export async function listLibrarySections(): Promise<{
       seedVideoBundles: s.seedVideoBundles ?? [],
       handCraftBundles: s.handCraftBundles ?? [],
       mediaDecomposeBundles: s.mediaDecomposeBundles ?? [],
+      modelShotBundles: s.modelShotBundles ?? [],
     })),
     totalAssets: typeof data.totalAssets === "number" ? data.totalAssets : 0,
     totalBundles: typeof data.totalBundles === "number" ? data.totalBundles : 0,

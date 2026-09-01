@@ -328,8 +328,8 @@ export function ShootCatalogPanel() {
           <CatalogSection title="系统推荐（只读）">
             <div className="overflow-x-auto rounded-xl border border-[#e5e5ea]">
               <table className="min-w-[640px] w-full text-left text-xs">
-                <thead className="bg-[#f5f5f7] text-[#86868b]">
-                  <tr>
+                <thead>
+                  <tr className="bg-[#1d1d1f] text-white">
                     <th className="px-3 py-2">名称</th>
                     <th className="px-3 py-2">类型</th>
                     <th className="px-3 py-2">visualPrompt</th>
@@ -366,8 +366,8 @@ export function ShootCatalogPanel() {
             ) : (
               <div className="overflow-x-auto rounded-xl border border-[#e5e5ea]">
                 <table className="min-w-[640px] w-full text-left text-xs">
-                  <thead className="bg-[#f5f5f7] text-[#86868b]">
-                    <tr>
+                  <thead>
+                    <tr className="bg-[#1d1d1f] text-white">
                       <th className="px-3 py-2">名称</th>
                       <th className="px-3 py-2">类型</th>
                       <th className="px-3 py-2">visualPrompt</th>
@@ -428,8 +428,8 @@ export function ShootCatalogPanel() {
           <CatalogSection title="系统推荐（只读）">
             <div className="overflow-x-auto rounded-xl border border-[#e5e5ea]">
               <table className="min-w-[640px] w-full text-left text-xs">
-                <thead className="bg-[#f5f5f7] text-[#86868b]">
-                  <tr>
+                <thead>
+                  <tr className="bg-[#1d1d1f] text-white">
                     <th className="px-3 py-2">名称</th>
                     <th className="px-3 py-2">描述</th>
                     <th className="px-3 py-2">冲突标签</th>
@@ -464,8 +464,8 @@ export function ShootCatalogPanel() {
             ) : (
               <div className="overflow-x-auto rounded-xl border border-[#e5e5ea]">
                 <table className="min-w-[640px] w-full text-left text-xs">
-                  <thead className="bg-[#f5f5f7] text-[#86868b]">
-                    <tr>
+                  <thead>
+                    <tr className="bg-[#1d1d1f] text-white">
                       <th className="px-3 py-2">名称</th>
                       <th className="px-3 py-2">描述</th>
                       <th className="px-3 py-2">操作</th>
@@ -521,8 +521,8 @@ export function ShootCatalogPanel() {
           <CatalogSection title="系统推荐（只读）">
             <div className="overflow-x-auto rounded-xl border border-[#e5e5ea]">
               <table className="min-w-[640px] w-full text-left text-xs">
-                <thead className="bg-[#f5f5f7] text-[#86868b]">
-                  <tr>
+                <thead>
+                  <tr className="bg-[#1d1d1f] text-white">
                     <th className="px-3 py-2">类</th>
                     <th className="px-3 py-2">标题</th>
                     <th className="px-3 py-2">baseDescription</th>
@@ -557,8 +557,8 @@ export function ShootCatalogPanel() {
             ) : (
               <div className="overflow-x-auto rounded-xl border border-[#e5e5ea]">
                 <table className="min-w-[640px] w-full text-left text-xs">
-                  <thead className="bg-[#f5f5f7] text-[#86868b]">
-                    <tr>
+                  <thead>
+                    <tr className="bg-[#1d1d1f] text-white">
                       <th className="px-3 py-2">类</th>
                       <th className="px-3 py-2">标题</th>
                       <th className="px-3 py-2">描述</th>

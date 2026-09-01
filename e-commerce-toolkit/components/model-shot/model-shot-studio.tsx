@@ -11,6 +11,7 @@ import { ModelShotProgressRail } from "@/components/model-shot/model-shot-progre
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { ProductCreationStudioSkeleton } from "@/components/product-design/product-creation-studio-skeleton";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
+import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-link-dialog";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { isEcomMainBlankPointerTarget } from "@/lib/ecom-assistant-collapse";
 import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
@@ -65,6 +66,7 @@ export function ModelShotStudio() {
   const [generateToken, setGenerateToken] = useState(0);
   const [refGenBusyRole, setRefGenBusyRole] = useState<ModelShotReferenceRole | null>(null);
   const [imagePicker, setImagePicker] = useState<ImagePickerRequest | null>(null);
+  const [workflowShareOpen, setWorkflowShareOpen] = useState(false);
   const imageGenerateRef = useRef<
     (modelKey: string, indexes: number[], imageSize?: string) => void
   >(() => {});
@@ -159,10 +161,22 @@ export function ModelShotStudio() {
       try {
         const savedId =
           typeof window !== "undefined" ? sessionStorage.getItem(PROJECT_STORAGE_KEY) : null;
+        const urlProjectId =
+          typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search).get("projectId")?.trim() || null
+            : null;
         let initial: ModelShotProject | undefined;
         let projectId: string | null = null;
 
-        if (savedId) {
+        if (urlProjectId) {
+          try {
+            initial = await getModelShotProject(urlProjectId);
+            projectId = initial.id;
+          } catch {
+            /* invalid share / stale link */
+          }
+        }
+        if (!projectId && savedId) {
           try {
             initial = await getModelShotProject(savedId);
             projectId = initial.id;
@@ -411,8 +425,18 @@ export function ModelShotStudio() {
           imagePickerOpen={imagePicker != null}
           onRequestImagePicker={requestImagePicker}
           onRegisterImageGenerate={registerImageGenerate}
+          onShareWorkflow={() => setWorkflowShareOpen(true)}
         />
       </EcomWorkspaceLayout>
+
+      <WorkflowShareLinkDialog
+        projectId={project.id}
+        projectTitle={project.title?.trim() || "服装模特图"}
+        open={workflowShareOpen}
+        onClose={() => setWorkflowShareOpen(false)}
+        resourceType="ecom_model_shot_project"
+        description="分享 10 位码或主站链接；好友领取副本后可继续编辑参考图与姿势方案并生成模特图。"
+      />
 
       {imagePicker && project ? (
         <StoryboardModelPickerDialog

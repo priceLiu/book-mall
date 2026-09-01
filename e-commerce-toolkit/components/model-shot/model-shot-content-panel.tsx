@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FolderOpen, Images, Link2, Save } from "lucide-react";
 import { createPortal } from "react-dom";
 
 import { useBackgroundGeneration } from "@/components/generation";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { ModelShotPoseMediaStrip } from "@/components/model-shot/model-shot-pose-media-strip";
+import { ModelShotSaveDialog } from "@/components/model-shot/model-shot-save-dialog";
 import {
   ModelShotPosePlanTable,
   type PoseItemPatch,
@@ -29,6 +31,7 @@ import {
   generateModelShotReference,
   getModelShotProject,
   patchModelShotPoseItem,
+  saveModelShotDeliverableSnapshot,
   updateModelShotProject,
   uploadModelShotReference,
 } from "@/lib/ecom-model-shot-api";
@@ -73,6 +76,7 @@ type Props = {
   onRegisterImageGenerate?: (
     handler: (modelKey: string, indexes: number[], imageSize?: string) => void,
   ) => void;
+  onShareWorkflow?: () => void;
 };
 
 export function ModelShotContentPanel({
@@ -94,6 +98,7 @@ export function ModelShotContentPanel({
   imagePickerOpen = false,
   onRequestImagePicker,
   onRegisterImageGenerate,
+  onShareWorkflow,
 }: Props) {
   const { alert, doubleConfirm, toast } = useDialogs();
   const backgroundGen = useBackgroundGeneration();
@@ -118,6 +123,8 @@ export function ModelShotContentPanel({
     title: string;
     prompt: string;
   } | null>(null);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
   const imageGenInFlightCountRef = useRef(0);
   const imageGenWatchRef = useRef<number[]>([]);
   const imageGenPollLockRef = useRef(false);
@@ -125,6 +132,11 @@ export function ModelShotContentPanel({
   const pendingPoseIndices = useMemo(
     () => listModelShotPendingPoseIndices(project.meta),
     [project.meta],
+  );
+
+  const canSave = useMemo(
+    () => hasGarmentReference(project.references) && project.plan.items.length > 0,
+    [project.plan.items.length, project.references],
   );
 
   const reconcilePoseImageGenBusy = useCallback((source: ModelShotProject) => {
@@ -554,6 +566,16 @@ export function ModelShotContentPanel({
 
       beginPoseImageGenWatch(targetIndexes);
 
+      setSelectedPoseIndexes((prev) => {
+        if (prev.size === 0) return prev;
+        const next = new Set(prev);
+        let changed = false;
+        for (const idx of targetIndexes) {
+          if (next.delete(idx)) changed = true;
+        }
+        return changed ? next : prev;
+      });
+
       void generateModelShotImages({
         projectId: project.id,
         modelKey,
@@ -672,6 +694,31 @@ export function ModelShotContentPanel({
     return sceneRef.name?.trim() || "已设场景";
   }, [project.references]);
 
+  const handleSaveWorkflow = useCallback(
+    async (workName: string) => {
+      setSaveBusy(true);
+      try {
+        const { project: refreshed } = await saveModelShotDeliverableSnapshot(project.id, workName);
+        await onProjectChange(refreshed);
+        setSaveDialogOpen(false);
+        toast({
+          title: "已保存到资产库",
+          message: "可在「我的资产 → 服装模特图 → 工作流」一键复用。",
+          variant: "success",
+        });
+      } catch (e) {
+        await alert({
+          title: "保存失败",
+          message: e instanceof Error ? e.message : "请稍后重试",
+          variant: "error",
+        });
+      } finally {
+        setSaveBusy(false);
+      }
+    },
+    [alert, onProjectChange, project.id, toast],
+  );
+
   const handlePatchItem = useCallback(
     async (index: number, patch: PoseItemPatch) => {
       setBusy(true);
@@ -723,6 +770,33 @@ export function ModelShotContentPanel({
               <p className="text-[11px] text-[#6e6e73]">阶段：{phase}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <Link href="/workflows/drafts">
+                <EcomButtonSecondary type="button" size="sm" disabled={busy}>
+                  <FolderOpen className="h-3.5 w-3.5 shrink-0" />
+                  暂存
+                </EcomButtonSecondary>
+              </Link>
+              <Link href="/library">
+                <EcomButtonSecondary type="button" size="sm" disabled={busy}>
+                  <Images className="h-3.5 w-3.5 shrink-0" />
+                  我的资产
+                </EcomButtonSecondary>
+              </Link>
+              <EcomButtonSecondary
+                type="button"
+                size="sm"
+                disabled={!canSave || saveBusy || busy}
+                onClick={() => setSaveDialogOpen(true)}
+              >
+                <Save className="h-3.5 w-3.5 shrink-0" />
+                保存
+              </EcomButtonSecondary>
+              {onShareWorkflow ? (
+                <EcomButtonSecondary type="button" size="sm" disabled={busy} onClick={onShareWorkflow}>
+                  <Link2 className="h-3.5 w-3.5 shrink-0" />
+                  分享工作流
+                </EcomButtonSecondary>
+              ) : null}
               {loadProjectList && onOpenProject ? (
                 <EcomProjectListButton
                   currentProjectId={project.id}
@@ -791,14 +865,15 @@ export function ModelShotContentPanel({
           ) : null}
 
           {planConfirmed && project.plan.items.length > 0 ? (
-            <div id="model-shot-pose-media-strip">
             <ModelShotPoseMediaStrip
+              projectId={project.id}
               items={project.plan.items}
               selectedIndexes={selectedPoseIndexes}
               onToggleSelect={togglePoseSelect}
               activeGenIndexes={activeGenPoseIndexes}
               onGenerateAll={(indexes) => requestPoseImageGenerate(undefined, indexes)}
               onGenerateOne={(index) => requestPoseImageGenerate(index)}
+              onProjectChange={() => onProjectChange()}
               onGenerateAllBlocked={() => {
                 toast({
                   title: "暂无可提交的姿势",
@@ -815,7 +890,6 @@ export function ModelShotContentPanel({
                 });
               }}
             />
-            </div>
           ) : null}
 
           {(busy || activeGenPoseIndexes.size > 0 || backgroundGen.hasForegroundRunning) &&
@@ -871,6 +945,14 @@ export function ModelShotContentPanel({
             document.body,
           )
         : null}
+
+      <ModelShotSaveDialog
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        defaultWorkName={project.title?.trim() || "服装模特图"}
+        busy={saveBusy}
+        onConfirm={handleSaveWorkflow}
+      />
 
       <EcomImagePreviewHost
         preview={preview}

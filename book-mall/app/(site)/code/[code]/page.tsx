@@ -57,7 +57,11 @@ export default async function ShareCodeRedeemPage({
       claimerUserId: session.user.id,
     });
     redirect(
-      workflowShareAbsoluteRedirectUrl(result.app, result.clonedResourceId),
+      workflowShareAbsoluteRedirectUrl(
+        result.app,
+        result.clonedResourceId,
+        result.resourceType,
+      ),
     );
   } catch {
     return (

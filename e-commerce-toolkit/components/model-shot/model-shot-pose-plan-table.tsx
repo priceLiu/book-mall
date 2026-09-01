@@ -250,8 +250,8 @@ export function ModelShotPosePlanTable({
       </div>
       <div className="overflow-x-auto rounded-2xl border border-[#e5e5ea]">
         <table className="min-w-[880px] w-full text-left text-xs">
-          <thead className="bg-[#f5f5f7] text-[#86868b]">
-            <tr>
+          <thead>
+            <tr className="bg-[#1d1d1f] text-white">
               <th className="w-10 px-3 py-2 font-medium">#</th>
               <th className="w-12 px-3 py-2 font-medium">分类</th>
               <th className="min-w-[88px] px-3 py-2 font-medium">标题</th>

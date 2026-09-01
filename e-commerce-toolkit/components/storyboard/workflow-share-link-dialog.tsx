@@ -18,11 +18,15 @@ export function WorkflowShareLinkDialog({
   projectTitle,
   open,
   onClose,
+  resourceType = "ecom_storyboard_project",
+  description,
 }: {
   projectId: string;
   projectTitle: string;
   open: boolean;
   onClose: () => void;
+  resourceType?: string;
+  description?: string;
 }) {
   const [shortCode, setShortCode] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
@@ -42,7 +46,7 @@ export function WorkflowShareLinkDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           app: "ECOM",
-          resourceType: "ecom_storyboard_project",
+          resourceType,
           resourceId: projectId,
           title: projectTitle,
         }),
@@ -91,9 +95,10 @@ export function WorkflowShareLinkDialog({
           {teamMemberShare ? "邀请成员体验" : "分享工作流"}
         </h2>
         <p className="mt-2 text-xs text-[#6e6e73]">
-          {teamMemberShare
-            ? "分享 10 位码或主站链接；好友领取副本后将加入你的团队（不发分享积分）。"
-            : "分享 10 位码或主站链接；好友扫码后在主站领取分镜副本。首次成功生成并首笔付费后，你将获得积分奖励。"}
+          {description ??
+            (teamMemberShare
+              ? "分享 10 位码或主站链接；好友领取副本后将加入你的团队（不发分享积分）。"
+              : "分享 10 位码或主站链接；好友扫码后在主站领取分镜副本。首次成功生成并首笔付费后，你将获得积分奖励。")}
         </p>
         {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
         {shortCode && shareUrl ? (
