@@ -146,8 +146,8 @@ export function FilmPullWorkspace({
 
   const displaySource = streamText ?? project.analyzeResult?.rawText ?? "";
   const structured =
-    extractFilmPullAnalyzePatch(displaySource) ??
     project.analyzeResult?.structured ??
+    extractFilmPullAnalyzePatch(displaySource) ??
     null;
   const parseError = project.analyzeResult?.parseError;
   const markdown = toFilmPullDisplayMarkdown(displaySource, analyzing);

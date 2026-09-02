@@ -16,7 +16,7 @@ export function FilmPullAnalyzeSummarySections({ structured }: Props) {
     { title: "整体叙事逻辑", text: structured.narrativeLogic },
     { title: "镜头卡点要点", text: structured.beatPoints },
     { title: "可复刻拍摄脚本", text: structured.replicableShootingScript },
-  ].filter((b) => b.text.trim().length > 0);
+  ].filter((b) => typeof b.text === "string" && b.text.trim().length > 0);
 
   if (blocks.length === 0) return null;
 
