@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useStore } from "@xyflow/react";
 import {
   AudioLines,
+  BookmarkPlus,
   ChevronDown,
   Copy,
   Crop,
@@ -35,6 +36,7 @@ const ICON_BTN = PRO2_IMAGE_NODE_TOOLBAR_ICON_BTN_CLASS;
 export function LibtvVideoNodeToolbar({
   previewUrl,
   onExpandPreview,
+  onSaveAsAsset,
   onDuplicateNode,
   className,
   style,
@@ -42,6 +44,7 @@ export function LibtvVideoNodeToolbar({
 }: {
   previewUrl?: string;
   onExpandPreview?: () => void;
+  onSaveAsAsset?: () => void;
   onDuplicateNode?: () => void;
   className?: string;
   style?: React.CSSProperties;
@@ -129,6 +132,17 @@ export function LibtvVideoNodeToolbar({
 
       <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
 
+      {onSaveAsAsset ? (
+        <button
+          type="button"
+          className={ICON_BTN}
+          title="保存为资产"
+          disabled={!previewUrl}
+          onClick={onSaveAsAsset}
+        >
+          <BookmarkPlus className="size-5" />
+        </button>
+      ) : null}
       <button
         type="button"
         className={ICON_BTN}

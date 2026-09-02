@@ -30,7 +30,8 @@ type UsageSummary = {
 };
 
 type Props = {
-  totalCredits: number;
+  creditBalance: number;
+  creditReserved: number;
   billingPersona: BillingPersona | null;
   membershipPlanName: string | null;
   membershipPeriodEnd: Date | null;
@@ -66,7 +67,8 @@ function StatusDot({ ok }: { ok: boolean }) {
 }
 
 export function AccountOverviewCards({
-  totalCredits,
+  creditBalance,
+  creditReserved,
   billingPersona,
   membershipPlanName,
   membershipPeriodEnd,
@@ -84,6 +86,8 @@ export function AccountOverviewCards({
   const textLink = accountBodyTextLinkClass();
   const financeUsageUrl = getFinanceFeesRedirectUrl("/fees/usage") ?? "/account/usage";
   const financeLedgerUrl = getFinanceFeesRedirectUrl("/fees/billing/ledger") ?? "/account/fees/ledger";
+  const availableCredits = Math.max(0, creditBalance - creditReserved);
+  const fmt = (n: number) => n.toLocaleString("zh-CN");
 
   return (
     <section className="grid items-stretch gap-4 md:grid-cols-2">
@@ -236,18 +240,48 @@ export function AccountOverviewCards({
           </div>
           <CardDescription className="text-xs">
             {isTeamSharedPool
-              ? "团队共享积分池"
-              : "套餐月积分 + 轻量包"}
+              ? "团队共享积分池 · 发起生成以「可用」为准"
+              : "套餐月积分 + 轻量包 · 发起生成以「可用」为准"}
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-1 flex-col">
+        <CardContent className="flex flex-1 flex-col gap-3">
           <div className={accountOverviewCardBodyClass()}>
-            <div>
-              <p className="text-3xl font-semibold tabular-nums tracking-tight">
-                {totalCredits.toLocaleString("zh-CN")}
-                <span className="text-base font-medium text-muted-foreground"> 积分</span>
-              </p>
-            </div>
+            <p className="text-lg font-semibold leading-relaxed tabular-nums tracking-tight">
+              可用{" "}
+              <span
+                className={cn(
+                  "text-2xl",
+                  availableCredits <= 0 && creditReserved > 0
+                    ? "text-amber-600 dark:text-amber-400"
+                    : "text-foreground",
+                )}
+              >
+                {fmt(availableCredits)}
+              </span>
+              <span className="text-base font-medium text-muted-foreground"> / </span>
+              余额{" "}
+              <span className="text-2xl text-foreground">{fmt(creditBalance)}</span>
+              <span className="text-base font-medium text-muted-foreground">
+                （冻结 {fmt(creditReserved)}）
+              </span>
+            </p>
+          </div>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            可用积分 = 余额 − 冻结。视频等任务发起时会先预扣（冻结）积分，完成后结算实扣；失败或取消会释放冻结。
+            {creditReserved > 0 ? (
+              <>
+                {" "}
+                当前有 {fmt(creditReserved)} 积分冻结在途，暂不可用于新任务。
+              </>
+            ) : null}
+          </p>
+          <div className={accountOverviewCardFooterClass()}>
+            <Link href="/account/billing" className={accountInlineLinkClass()}>
+              轻量包购买
+            </Link>
+            <a href={financeLedgerUrl} target="_blank" rel="noopener noreferrer" className={textLink}>
+              积分流水
+            </a>
           </div>
         </CardContent>
       </Card>

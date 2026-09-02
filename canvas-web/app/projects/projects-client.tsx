@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Loader2, Copy, Plus, Trash2, X, Star, Clapperboard, Send } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
@@ -1059,6 +1059,39 @@ function Inner() {
   );
 }
 
+function ProjectCardActionButton({
+  label,
+  title,
+  className,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  title: string;
+  className?: string;
+  disabled?: boolean;
+  onClick?: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center gap-1 rounded-md border px-1.5 py-1 text-[11px] @[22rem]:px-2",
+        className,
+      )}
+    >
+      {children}
+      <span className="hidden @[22rem]:inline">{label}</span>
+    </button>
+  );
+}
+
 function ProjectsSection({
   title,
   edition,
@@ -1133,7 +1166,7 @@ function ProjectsSection({
           {projects.map((p) => (
             <li
               key={p.id}
-              className="group relative rounded-2xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-4 transition hover:border-[var(--canvas-accent)]/40"
+              className="@container group relative rounded-2xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-4 transition hover:border-[var(--canvas-accent)]/40"
               onMouseEnter={() => onPrefetchProject(p.id)}
             >
               <CanvasProjectOpenLink
@@ -1156,23 +1189,10 @@ function ProjectsSection({
                   更新于 {formatProjectUpdatedAt(p.updatedAt)}
                 </p>
               </CanvasProjectOpenLink>
-              <div className="mt-3 flex items-center justify-end gap-2">
+              <div className="mt-3 flex flex-wrap items-center justify-end gap-1.5 @[22rem]:gap-2">
                 {isAdmin && onTogglePortalCase ? (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void onTogglePortalCase(p.id, !portalCaseIds?.has(p.id))
-                    }
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px]",
-                      portalCaseIds?.has(p.id)
-                        ? edition === "sbv1"
-                          ? "border-cyan-400/40 text-cyan-200 hover:border-cyan-400/60"
-                          : "border-violet-400/40 text-violet-200 hover:border-violet-400/60"
-                        : edition === "sbv1"
-                          ? "border-white/10 text-[var(--canvas-muted)] hover:border-cyan-400/35 hover:text-cyan-200/90"
-                          : "border-white/10 text-[var(--canvas-muted)] hover:border-violet-400/35 hover:text-violet-200/90",
-                    )}
+                  <ProjectCardActionButton
+                    label={edition === "sbv1" ? "视频作品" : "案例"}
                     title={
                       portalCaseIds?.has(p.id)
                         ? edition === "sbv1"
@@ -1182,82 +1202,88 @@ function ProjectsSection({
                           ? "设为视频作品"
                           : "设为首页案例"
                     }
+                    onClick={() =>
+                      void onTogglePortalCase(p.id, !portalCaseIds?.has(p.id))
+                    }
+                    className={
+                      portalCaseIds?.has(p.id)
+                        ? edition === "sbv1"
+                          ? "border-cyan-400/40 text-cyan-200 hover:border-cyan-400/60"
+                          : "border-violet-400/40 text-violet-200 hover:border-violet-400/60"
+                        : edition === "sbv1"
+                          ? "border-white/10 text-[var(--canvas-muted)] hover:border-cyan-400/35 hover:text-cyan-200/90"
+                          : "border-white/10 text-[var(--canvas-muted)] hover:border-violet-400/35 hover:text-violet-200/90"
+                    }
                   >
-                    <Clapperboard className="size-3" />
-                    {edition === "sbv1" ? "视频作品" : "案例"}
-                  </button>
+                    <Clapperboard className="size-3.5 shrink-0 @[22rem]:size-3" />
+                  </ProjectCardActionButton>
                 ) : null}
                 {isAdmin && onTogglePortalFeatured ? (
-                  <button
-                    type="button"
+                  <ProjectCardActionButton
+                    label="首页"
+                    title={
+                      portalFeaturedIds?.has(p.id)
+                        ? "取消首页示例"
+                        : "设为首页精选示例"
+                    }
                     onClick={() =>
                       void onTogglePortalFeatured(
                         p.id,
                         !portalFeaturedIds?.has(p.id),
                       )
                     }
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px]",
+                    className={
                       portalFeaturedIds?.has(p.id)
                         ? "border-amber-400/40 text-amber-200 hover:border-amber-400/60"
-                        : "border-white/10 text-[var(--canvas-muted)] hover:border-amber-400/35 hover:text-amber-200/90",
-                    )}
-                    title={
-                      portalFeaturedIds?.has(p.id)
-                        ? "取消首页示例"
-                        : "设为首页精选示例"
+                        : "border-white/10 text-[var(--canvas-muted)] hover:border-amber-400/35 hover:text-amber-200/90"
                     }
                   >
                     <Star
                       className={cn(
-                        "size-3",
+                        "size-3.5 shrink-0 @[22rem]:size-3",
                         portalFeaturedIds?.has(p.id) && "fill-current",
                       )}
                     />
-                    首页
-                  </button>
+                  </ProjectCardActionButton>
                 ) : null}
                 {onOpenSubmit ? (
-                  <button
-                    type="button"
-                    onClick={() => onOpenSubmit(p.id, p.name)}
-                    className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-[var(--canvas-muted)] hover:border-sky-400/40 hover:text-sky-200"
+                  <ProjectCardActionButton
+                    label="投稿"
                     title="提交作品给管理员审核"
+                    onClick={() => onOpenSubmit(p.id, p.name)}
+                    className="border-white/10 text-[var(--canvas-muted)] hover:border-sky-400/40 hover:text-sky-200"
                   >
-                    <Send className="size-3" />
-                    投稿
-                  </button>
+                    <Send className="size-3.5 shrink-0 @[22rem]:size-3" />
+                  </ProjectCardActionButton>
                 ) : null}
-                <button
-                  type="button"
+                <ProjectCardActionButton
+                  label="复制"
+                  title="复制画布"
                   disabled={duplicatingId === p.id}
                   onClick={() => void onDuplicate(p.id, p.name)}
-                  className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-[var(--canvas-muted)] hover:border-cyan-400/40 hover:text-cyan-200 disabled:opacity-50"
-                  title="复制画布"
+                  className="border-white/10 text-[var(--canvas-muted)] hover:border-cyan-400/40 hover:text-cyan-200 disabled:opacity-50"
                 >
                   {duplicatingId === p.id ? (
-                    <Loader2 className="size-3 animate-spin" />
+                    <Loader2 className="size-3.5 shrink-0 animate-spin @[22rem]:size-3" />
                   ) : (
-                    <Copy className="size-3" />
+                    <Copy className="size-3.5 shrink-0 @[22rem]:size-3" />
                   )}
-                  复制
-                </button>
-                <button
-                  type="button"
-                  disabled={p.collaborationLocked}
-                  onClick={() =>
-                    void onDelete(p.id, p.name, p.collaborationLocked)
-                  }
-                  className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-[var(--canvas-muted)] hover:border-red-400/40 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-white/10 disabled:hover:text-[var(--canvas-muted)]"
+                </ProjectCardActionButton>
+                <ProjectCardActionButton
+                  label="删除"
                   title={
                     p.collaborationLocked
                       ? "协同画布已绑定脚本包，不能删除"
                       : "删除画布"
                   }
+                  disabled={p.collaborationLocked}
+                  onClick={() =>
+                    void onDelete(p.id, p.name, p.collaborationLocked)
+                  }
+                  className="border-white/10 text-[var(--canvas-muted)] hover:border-red-400/40 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-white/10 disabled:hover:text-[var(--canvas-muted)]"
                 >
-                  <Trash2 className="size-3" />
-                  删除
-                </button>
+                  <Trash2 className="size-3.5 shrink-0 @[22rem]:size-3" />
+                </ProjectCardActionButton>
               </div>
             </li>
           ))}

@@ -59,10 +59,7 @@ export function LibtvEditableNodeTitle({
 
   return (
     <div
-      className={cn(
-        "nodrag flex min-w-0 flex-1 items-center gap-1.5",
-        className,
-      )}
+      className={cn("flex min-w-0 flex-1 items-center gap-1.5", className)}
     >
       {children}
       {editing ? (
@@ -97,14 +94,13 @@ export function LibtvEditableNodeTitle({
       ) : (
         <span
           className={cn(
-            "nodrag min-w-0 flex-1 truncate",
-            selected ? "cursor-text" : "cursor-default",
+            "min-w-0 flex-1 truncate cursor-grab active:cursor-grabbing",
             textClassName ?? "text-[11px] text-white",
           )}
           title={
             selected
-              ? `${displayLabel} · 点击编辑标题`
-              : `${displayLabel} · 双击编辑标题`
+              ? `${displayLabel} · 按住拖动 · 点击编辑标题`
+              : `${displayLabel} · 按住拖动 · 双击编辑标题`
           }
           onClick={(e) => {
             if (!selected) return;

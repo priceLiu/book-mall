@@ -201,6 +201,70 @@ export type MetaListCover = {
   coverPosterUrl?: string;
 };
 
+export type ResolvedListCover = MetaListCover & {
+  thumbnailUrl?: string;
+};
+
+/**
+ * 列表行封面：优先 meta.listCover；旧项目无 embed 时从 nodes 回退解析成片。
+ * thumbnailUrl 字段亦作兜底（历史仅存视频 URL 的项目）。
+ */
+export function resolveProjectListCoverForListRow(args: {
+  meta: unknown;
+  nodes?: unknown;
+  storedThumbnailUrl?: string;
+}): ResolvedListCover {
+  const fromMeta = readListCoverFromMeta(args.meta);
+  const stored = args.storedThumbnailUrl?.trim() ?? "";
+
+  if (fromMeta?.coverVideoUrl?.trim()) {
+    return {
+      thumbnailUrl: fromMeta.thumbnailUrl ?? stored,
+      coverMediaKind: fromMeta.coverMediaKind ?? "video",
+      coverVideoUrl: fromMeta.coverVideoUrl,
+      coverPosterUrl: fromMeta.coverPosterUrl,
+    };
+  }
+
+  if (args.nodes) {
+    const fromNodes = projectListCoverSummaryFields({ nodes: args.nodes });
+    if (fromNodes.coverVideoUrl?.trim()) {
+      return {
+        thumbnailUrl: fromNodes.thumbnailUrl ?? fromMeta?.thumbnailUrl ?? stored,
+        coverMediaKind: "video",
+        coverVideoUrl: fromNodes.coverVideoUrl,
+        coverPosterUrl: fromNodes.coverPosterUrl ?? fromMeta?.coverPosterUrl,
+      };
+    }
+    if (fromNodes.coverMediaKind === "image" && fromNodes.thumbnailUrl) {
+      return {
+        thumbnailUrl: fromNodes.thumbnailUrl,
+        coverMediaKind: "image",
+      };
+    }
+  }
+
+  if (fromMeta?.thumbnailUrl || fromMeta?.coverMediaKind) {
+    return {
+      thumbnailUrl: fromMeta.thumbnailUrl ?? stored,
+      coverMediaKind: fromMeta.coverMediaKind,
+      coverVideoUrl: fromMeta.coverVideoUrl,
+      coverPosterUrl: fromMeta.coverPosterUrl,
+    };
+  }
+
+  if (stored) {
+    const asVideo = isProjectThumbnailVideoUrl(stored);
+    return {
+      thumbnailUrl: stored,
+      coverMediaKind: asVideo ? "video" : "image",
+      coverVideoUrl: asVideo ? stored : undefined,
+    };
+  }
+
+  return {};
+}
+
 export function readListCoverFromMeta(meta: unknown): MetaListCover | null {
   if (!meta || typeof meta !== "object") return null;
   const raw = (meta as { listCover?: unknown }).listCover;

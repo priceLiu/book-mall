@@ -78,6 +78,7 @@ import { Pro2CrewTaskStatusBadge } from "../pro2/pro2-crew-task-status-badge";
 import { crewNodeShowsParticipatingBadge } from "../libtv-node-header-bar";
 import { LibtvNodeErrorBanner } from "../libtv-node-error-banner";
 import { useLibtvRuntimeErrorBanner } from "@/lib/canvas/use-libtv-runtime-error-banner";
+import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import {
   useLibtvRuntimeErrorAlert,
   libtvRuntimeErrorAlertTitle,
@@ -108,6 +109,7 @@ const VIDEO_TRY_ACTIONS: VideoTryAction[] = [
 
 export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const { alert } = useDialogs();
+  const saveAsAsset = useSaveNodeAsAsset();
   const rfNodes = useNodes();
   const { setNodes: rfSetNodes } = useReactFlow();
   const nodes = useCanvasStore((s) => s.nodes);
@@ -692,6 +694,16 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
               passNodeDrag
               previewUrl={videoUrl}
               onExpandPreview={() => setPreviewOpen(true)}
+              onSaveAsAsset={
+                hasVideo
+                  ? () =>
+                      saveAsAsset(
+                        id,
+                        "sbv1-video-engine",
+                        d as unknown as Record<string, unknown>,
+                      )
+                  : undefined
+              }
               onDuplicateNode={onDuplicateNode}
             />
           </LibtvNodeToolbarPortal>
@@ -709,7 +721,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
             edition: nodeEdition,
           })}
         >
-            <div className="nodrag relative flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+            <div className="relative flex shrink-0 cursor-grab items-center justify-between gap-2 border-b border-white/10 px-3 py-2 active:cursor-grabbing">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <Video className="size-3.5 shrink-0 text-white/70" />
               <LibtvEditableNodeTitle

@@ -982,7 +982,7 @@ export function LibtvImageNode({
           })}
         >
           {edition === "sbv1" ? (
-            <div className="nodrag relative flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+            <div className="relative flex shrink-0 cursor-grab items-center justify-between gap-2 border-b border-white/10 px-3 py-2 active:cursor-grabbing">
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 <button
                   type="button"

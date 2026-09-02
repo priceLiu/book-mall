@@ -1,4 +1,5 @@
 import type { CanvasProjectSummary } from "@/lib/canvas-api";
+import { isProjectThumbnailVideoUrl } from "@/lib/canvas/project-thumbnail";
 
 type CoverProps = {
   url?: string | null;
@@ -18,13 +19,21 @@ export function canvasListCoverPropsFromProject(
     | "coverPosterUrl"
   >,
 ): CoverProps {
-  if (!p.coverMediaKind) {
+  const coverVideoUrl = p.coverVideoUrl?.trim() || "";
+  const thumbnailUrl = p.thumbnailUrl?.trim() || "";
+  const inferredVideo =
+    coverVideoUrl ||
+    (isProjectThumbnailVideoUrl(thumbnailUrl) ? thumbnailUrl : "");
+  const coverMediaKind =
+    p.coverMediaKind ?? (inferredVideo ? "video" : thumbnailUrl ? "image" : undefined);
+
+  if (!coverMediaKind) {
     return { url: p.thumbnailUrl };
   }
   return {
     url: p.thumbnailUrl,
-    coverMediaKind: p.coverMediaKind,
-    coverVideoUrl: p.coverVideoUrl,
+    coverMediaKind,
+    coverVideoUrl: coverVideoUrl || inferredVideo || undefined,
     coverPosterUrl: p.coverPosterUrl,
     showMediaKindBadge: true,
   };

@@ -80,7 +80,8 @@ export function AccountOverviewSection() {
   return (
     <>
       <AccountOverviewCards
-        totalCredits={data.creditBalances.balance}
+        creditBalance={data.creditBalances.balance}
+        creditReserved={data.creditBalances.reserved}
         billingPersona={data.billingPersona}
         membershipPlanName={data.memberAccess.planName}
         membershipPeriodEnd={membershipPeriodEnd}

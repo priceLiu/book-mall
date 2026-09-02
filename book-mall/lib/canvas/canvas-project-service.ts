@@ -1,7 +1,7 @@
 /**
  * canvas-web 画布项目 CRUD 服务。
  */
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   assertAccessibleCanvasProject,
@@ -31,6 +31,7 @@ import {
   embedListCoverInCanvas,
   projectListCoverSummaryFields,
   readListCoverFromMeta,
+  resolveProjectListCoverForListRow,
 } from "@/lib/canvas/canvas-project-list-cover";
 import {
   applyCanvasDelta,
@@ -223,22 +224,50 @@ function decodeListCursor(raw: string | null | undefined): {
   }
 }
 
-function listRowToSummary(row: CanvasProjectListRow): CanvasProjectSummary {
-  const listCover = readListCoverFromMeta(row.meta);
+function listRowToSummary(
+  row: CanvasProjectListRow,
+  nodesFallback?: unknown,
+): CanvasProjectSummary {
   const storedThumb = row.thumbnailUrl?.trim() ?? "";
+  const listCover = resolveProjectListCoverForListRow({
+    meta: row.meta,
+    nodes: nodesFallback,
+    storedThumbnailUrl: storedThumb,
+  });
   return {
     id: row.id,
     name: row.name,
     description: row.description,
-    thumbnailUrl: listCover?.thumbnailUrl ?? storedThumb,
+    thumbnailUrl: listCover.thumbnailUrl ?? storedThumb,
     edition: canvasProjectEditionFromMeta(row.meta),
-    coverMediaKind: listCover?.coverMediaKind,
-    coverVideoUrl: listCover?.coverVideoUrl,
-    coverPosterUrl: listCover?.coverPosterUrl,
+    coverMediaKind: listCover.coverMediaKind,
+    coverVideoUrl: listCover.coverVideoUrl,
+    coverPosterUrl: listCover.coverPosterUrl,
     collaborationLocked: canvasProjectHasCollaboration(row.meta),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+function rowNeedsNodesCoverFallback(row: CanvasProjectListRow): boolean {
+  const metaCover = readListCoverFromMeta(row.meta);
+  if (metaCover?.coverVideoUrl?.trim()) return false;
+  return true;
+}
+
+async function fetchCanvasNodesByProjectIds(
+  userId: string,
+  ids: string[],
+): Promise<Map<string, unknown>> {
+  if (ids.length === 0) return new Map();
+  const rows = await prisma.$queryRaw<Array<{ id: string; nodes: unknown }>>`
+    SELECT cp.id, cp.canvas->'nodes' AS nodes
+    FROM "CanvasProject" cp
+    WHERE cp."userId" = ${userId}
+      AND cp."deletedAt" IS NULL
+      AND cp.id IN (${Prisma.join(ids)})
+  `;
+  return new Map(rows.map((r) => [r.id, r.nodes]));
 }
 
 function isVisibleListRow(row: CanvasProjectListRow): boolean {
@@ -291,7 +320,17 @@ export async function listCanvasProjectsForUser(
 
   const hasMore = rows.length > limit;
   const pageRows = hasMore ? rows.slice(0, limit) : rows;
-  const projects = pageRows.filter(isVisibleListRow).map(listRowToSummary);
+  const visibleRows = pageRows.filter(isVisibleListRow);
+  const nodesFallbackIds = visibleRows
+    .filter(rowNeedsNodesCoverFallback)
+    .map((r) => r.id);
+  const nodesByProjectId = await fetchCanvasNodesByProjectIds(
+    userId,
+    nodesFallbackIds,
+  );
+  const projects = visibleRows.map((row) =>
+    listRowToSummary(row, nodesByProjectId.get(row.id)),
+  );
   const last = pageRows.at(-1);
   const nextCursor =
     hasMore && last ? encodeListCursor(last.updatedAt, last.id) : null;
