@@ -109,6 +109,7 @@ export function TemplatePreviewDialog({
               name={name}
               graph={graph}
               className="w-full border-0"
+              disableEnlargePreview
             />
           )}
         </div>

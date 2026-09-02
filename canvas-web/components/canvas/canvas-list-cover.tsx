@@ -36,6 +36,8 @@ type Props = {
   coverPosterUrl?: string | null;
   /** 左上角展示「成片 / 分镜图」角标 */
   showMediaKindBadge?: boolean;
+  /** 弹层 / 嵌套预览内禁用居中放大 */
+  disableEnlargePreview?: boolean;
 };
 
 /**
@@ -51,6 +53,7 @@ export function CanvasListCover({
   coverVideoUrl,
   coverPosterUrl,
   showMediaKindBadge = false,
+  disableEnlargePreview = false,
 }: Props) {
   const coverUrl = url?.trim() || "";
   const hoverVideo =
@@ -73,6 +76,7 @@ export function CanvasListCover({
             kind="video"
             posterUrl={poster || (coverUrl !== hoverVideo ? coverUrl : undefined)}
             placeholderLetter={name}
+            disableEnlargePreview={disableEnlargePreview}
           />
         ) : coverUrl ? (
           <ProjectCoverMedia

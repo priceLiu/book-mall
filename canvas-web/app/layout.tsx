@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { BookMallBaseUrlProvider } from "@/components/book-mall-base-url-provider";
 import { CanvasAuthGate } from "@/components/auth/canvas-auth-gate";
 import { CanvasShell } from "@/components/layout/canvas-shell";
+import { CanvasSiteNavGuard } from "@/components/layout/canvas-site-nav-guard";
 import { DialogProvider } from "@/components/dialogs/dialog-provider";
+import { HoverVideoEnlargeProvider } from "@/components/home/hover-video-enlarge-preview";
 import { getBookMallBaseUrlServer } from "@/lib/book-mall-base-url.server";
 import { getBookMallOrigin } from "@/lib/site-config";
 import { getMainSiteOrigin } from "@/lib/site-origin";
@@ -33,10 +35,13 @@ export default function RootLayout({
     <html lang="zh-CN" suppressHydrationWarning>
       <body className="canvas-sans" suppressHydrationWarning>
         <BookMallBaseUrlProvider baseUrl={bookMallBaseUrl}>
+          <CanvasSiteNavGuard />
           <DialogProvider>
-            <CanvasAuthGate>
-              <CanvasShell bookOrigin={bookOrigin}>{children}</CanvasShell>
-            </CanvasAuthGate>
+            <HoverVideoEnlargeProvider>
+              <CanvasAuthGate>
+                <CanvasShell bookOrigin={bookOrigin}>{children}</CanvasShell>
+              </CanvasAuthGate>
+            </HoverVideoEnlargeProvider>
           </DialogProvider>
         </BookMallBaseUrlProvider>
         <PlatformAssistant title="AI 小智" />

@@ -9,7 +9,7 @@ import {
 } from "@/components/auth/canvas-tools-session-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { handleCanvasWheel } from "@/lib/canvas/canvas-form-wheel";
-import { installCanvasEditorPageNavGuards } from "@/lib/canvas/canvas-block-browser-nav";
+import { installCanvasEditorPageScrollLock } from "@/lib/canvas/canvas-block-browser-nav";
 import { defaultCanvasProjectName } from "@/lib/canvas/default-project-name";
 import { registerCanvasNotifier } from "@/lib/canvas/canvas-notify";
 import {
@@ -379,7 +379,7 @@ function Inner({ projectId }: { projectId: string }) {
       document.removeEventListener("wheel", onWheel, { capture: true });
   }, []);
 
-  useEffect(() => installCanvasEditorPageNavGuards(), []);
+  useEffect(() => installCanvasEditorPageScrollLock(), []);
 
   useEffect(() => {
     const open = () => {
