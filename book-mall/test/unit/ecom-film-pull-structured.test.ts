@@ -66,6 +66,64 @@ describe("extractFilmPullAnalyzePatch", () => {
   it("returns null for invalid payload", () => {
     expect(extractFilmPullAnalyzePatch('{"schemaVersion":1}')).toBeNull();
   });
+
+  it("coerces empty strings, numeric strings, and missing audioInfo", () => {
+    const loose = {
+      schemaVersion: "1",
+      action: "analyze_complete",
+      meta: {
+        totalDurationSec: "68",
+        narrativeMainLine: "",
+        editRhythmCurve: "平稳",
+        artStyle: "写实",
+        audioDesignLogic: "",
+        shotSequenceLogic: "",
+        cameraLanguageSummary: "",
+      },
+      narrativeLogic: "",
+      beatPoints: "0s 开场",
+      replicableShootingScript: "",
+      shots: [
+        {
+          shotNo: "1",
+          startTimeSec: "0",
+          endTimeSec: "3.5",
+          durationSec: "3.5",
+          cutTransition: "",
+          shotScale: "中景",
+          cameraAngle: "",
+          cameraMovement: "",
+          focalLengthPerspective: "",
+          composition: "",
+          subjectBlocking: "",
+          sightDirection: "",
+          sceneEnvironment: "室内",
+          foreMidBackLayer: "",
+          dynamicProps: "",
+          lightingSetup: "",
+          toneContrast: "",
+          narrativeFunction: "",
+          voiceover: "口播字幕",
+          rhythmWeight: "",
+          visualMetaphor: "",
+          aiVisualPrompt: "A woman holding a product",
+        },
+      ],
+    };
+    const text = `\`\`\`film-pull\n${JSON.stringify(loose)}\n\`\`\``;
+    const patch = extractFilmPullAnalyzePatch(text);
+    expect(patch?.meta.totalDurationSec).toBe(68);
+    expect(patch?.shots[0]?.audioInfo.scriptSubtitle).toBe("口播字幕");
+    expect(patch?.shots[0]?.cameraAngle).toBe("平视");
+  });
+
+  it("repairs trailing commas in fenced JSON", () => {
+    const text = `\`\`\`film-pull\n${JSON.stringify(analyzeBody).replace(
+      '"cameraLanguageSummary": "固定为主"',
+      '"cameraLanguageSummary": "固定为主",',
+    )}\n\`\`\``;
+    expect(extractFilmPullAnalyzePatch(text)?.shots).toHaveLength(1);
+  });
 });
 
 describe("extractFilmPullRenderScriptPatch", () => {

@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { Clapperboard, Loader2, Upload } from "lucide-react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { showCanvasSuccessToast } from "@/components/canvas/canvas-credits-toast-host";
 import {
   Pro2DockHeader,
   Pro2InputDockShell,
@@ -72,7 +73,7 @@ export function FilmPullVideoDock({
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const { alert, toast } = useDialogs();
+  const { alert } = useDialogs();
   const [busy, setBusy] = useState(false);
   const [shotCount, setShotCount] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -120,19 +121,19 @@ export function FilmPullVideoDock({
     void run(async () => {
       const pid = await ensureProject();
       await attachCanvasFilmPullVideoFromUrl(base!, pid, videoUrl.trim());
-      await toast({ variant: "success", title: "已关联节点视频" });
+      showCanvasSuccessToast("已关联节点视频");
     });
-  }, [videoUrl, run, ensureProject, base, toast, alert]);
+  }, [videoUrl, run, ensureProject, base, alert]);
 
   const onUpload = useCallback(
     (file: File) => {
       void run(async () => {
         const pid = await ensureProject();
         await uploadCanvasFilmPullVideo(base!, pid, file);
-        await toast({ variant: "success", title: "视频已上传" });
+        showCanvasSuccessToast("视频已上传");
       });
     },
-    [run, ensureProject, base, toast],
+    [run, ensureProject, base],
   );
 
   const onAnalyze = useCallback(() => {
@@ -145,9 +146,9 @@ export function FilmPullVideoDock({
         throw new Error(project.analyzeResult.parseError);
       }
       if (count < 1) throw new Error("拉片未产出分镜，请重试");
-      await toast({ variant: "success", title: "拉片完成", message: `共 ${count} 镜` });
+      showCanvasSuccessToast(`拉片完成 · 共 ${count} 镜`);
     });
-  }, [run, ensureProject, base, toast]);
+  }, [run, ensureProject, base]);
 
   const onImportHub = useCallback(() => {
     void run(async () => {
@@ -170,11 +171,7 @@ export function FilmPullVideoDock({
       );
       updateNodeData(hubId, hubPatch);
       onPatch({ filmPullScriptHubId: hubId });
-      await toast({
-        variant: "success",
-        title: "已导入制作包",
-        message: "分镜已写入 Script Hub，可在 Hub 内继续编辑与出片。",
-      });
+      showCanvasSuccessToast("已导入制作包 · 分镜已写入 Script Hub");
     });
   }, [
     run,
@@ -186,7 +183,6 @@ export function FilmPullVideoDock({
     base,
     updateNodeData,
     onPatch,
-    toast,
   ]);
 
   return (

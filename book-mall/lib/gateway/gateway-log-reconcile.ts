@@ -84,6 +84,87 @@ export async function ensureGatewayChatLogSucceededAfterStream(input: {
   });
 }
 
+const CANVAS_VIDEO_RECONCILE_LIMIT = 48;
+const CANVAS_VIDEO_RECONCILE_MIN_AGE_MS = 60 * 1000;
+
+function isVideoResultUrl(url: string): boolean {
+  const u = url.trim();
+  if (!u.startsWith("http")) return false;
+  if (/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(u)) return true;
+  return /\/node-video\//i.test(u);
+}
+
+/**
+ * 画布：CanvasGenerationTask 已成功且已有成片，但 Gateway 仍 RUNNING → 强制收口。
+ */
+export async function reconcileStaleCanvasVideoGatewayLogs(
+  nowMs: number,
+): Promise<number> {
+  const cutoff = new Date(nowMs - CANVAS_VIDEO_RECONCILE_MIN_AGE_MS);
+  const rows = await prisma.gatewayRequestLog.findMany({
+    where: {
+      status: "RUNNING",
+      storyTaskId: { not: null },
+      submittedAt: { lt: cutoff },
+      OR: [
+        { clientSource: "CANVAS" },
+        { clientPage: { startsWith: "canvas/" } },
+      ],
+    },
+    orderBy: { submittedAt: "asc" },
+    take: CANVAS_VIDEO_RECONCILE_LIMIT,
+    select: { id: true, storyTaskId: true, externalTaskId: true },
+  });
+  if (rows.length === 0) return 0;
+
+  let closed = 0;
+  for (const row of rows) {
+    const canvasTaskId = row.storyTaskId?.trim();
+    if (!canvasTaskId) continue;
+
+    const task = await prisma.canvasGenerationTask.findUnique({
+      where: { id: canvasTaskId },
+      select: {
+        status: true,
+        ossUrl: true,
+        ephemeralUrl: true,
+        kieTaskId: true,
+        completedAt: true,
+      },
+    });
+    if (task?.status !== "SUCCEEDED") continue;
+
+    const videoUrl =
+      task.ossUrl?.trim() || task.ephemeralUrl?.trim() || "";
+    if (!videoUrl || !isVideoResultUrl(videoUrl)) continue;
+
+    const vendorTaskId =
+      task.kieTaskId?.trim() || row.externalTaskId?.trim() || canvasTaskId;
+
+    try {
+      await ensureGatewayLogSucceededAfterVendorUrl({
+        logId: row.id,
+        taskId: vendorTaskId,
+        videoUrl,
+      });
+      const after = await prisma.gatewayRequestLog.findUnique({
+        where: { id: row.id },
+        select: { status: true },
+      });
+      if (after && isGatewayLogTerminalStatus(after.status)) {
+        closed += 1;
+      }
+    } catch (e) {
+      console.warn(
+        "[gateway-poll] reconcileStaleCanvasVideoGatewayLogs failed",
+        row.id,
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+  }
+  return closed;
+}
+
 export function parseEcomClientPage(clientPage: string | null | undefined): {
   userId: string;
   workspaceId: string;

@@ -17,7 +17,8 @@ export const ECOM_FILM_PULL_REPLICA_SCRIPT_ACTION = "replica-generate-script";
 export const ECOM_FILM_PULL_DEFAULT_CHAT_MODEL = STORY_LLM_DEFAULT_VISION_MODEL;
 export const ECOM_FILM_PULL_DEFAULT_VIDEO_MODEL = "wan2.7-r2v";
 
-export const FILM_PULL_V1_MAX_SEC = 60;
+/** V1 单次拉片上限（>90s 须等分段模式；常见口播/广告片多在 60–90s） */
+export const FILM_PULL_V1_MAX_SEC = 90;
 export const FILM_PULL_SEGMENT_ENABLED = false;
 export const FILM_PULL_MAX_VIDEO_BYTES = 150 * 1024 * 1024;
 

@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
+  FILM_PULL_V1_MAX_SEC,
   newFilmPullMediaId,
-  resolveFilmPullFromUrl,
   resolveFilmPullUpload,
 } from "@/lib/ecom/ecom-film-pull-media";
 import { uploadFilmPullMedia } from "@/lib/ecom/ecom-film-pull-service";
@@ -54,7 +54,8 @@ export async function POST(req: Request, ctx: Ctx) {
     return NextResponse.json({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "上传失败";
-    const status = message.includes("60s") || message.includes("60s") ? 400 : 500;
+    const status =
+      message.includes(`${FILM_PULL_V1_MAX_SEC}s`) || message.includes("长片分段") ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

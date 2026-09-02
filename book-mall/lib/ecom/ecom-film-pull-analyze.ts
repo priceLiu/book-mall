@@ -18,6 +18,7 @@ import {
   normalizeShotScale,
 } from "@/lib/ecom/ecom-film-pull-enums";
 import {
+  buildFilmPullAnalyzeRetryUserPrompt,
   buildFilmPullAnalyzeSystemPrompt,
   buildFilmPullRenderScriptSystemPrompt,
   buildFilmPullRenderScriptUserPrompt,
@@ -218,7 +219,7 @@ export async function finalizeFilmPullAnalyzeFromText(opts: {
           { role: "user", content: buildVideoUserContent(ctx.userPrompt, ctx.media) },
           {
             role: "user",
-            content: `上次输出校验失败：${parseError}。请仅重输出完整 \`\`\`film-pull JSON。`,
+            content: buildFilmPullAnalyzeRetryUserPrompt(parseError),
           },
         ],
       });

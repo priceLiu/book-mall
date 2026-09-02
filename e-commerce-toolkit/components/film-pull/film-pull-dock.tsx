@@ -7,6 +7,7 @@ import { FilmPullMediaInput } from "@/components/film-pull/film-pull-media-input
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { IMAGE_UPLOAD_ACCEPT, IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
+import { filmPullMaxVideoSecLabel } from "@/lib/film-pull-limits";
 import type { FilmPullCharacterRef, FilmPullLegacyPhase, FilmPullMediaReference } from "@/lib/film-pull-types";
 
 type Props = {
@@ -76,7 +77,7 @@ export function FilmPullDock({
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
           源视频
-          <span className="ml-1 font-normal normal-case text-[#ff3b30]">（≤60s · 必传）</span>
+          <span className="ml-1 font-normal normal-case text-[#ff3b30]">（{filmPullMaxVideoSecLabel()} · 必传）</span>
         </span>
         <span className="shrink-0 text-[10px] text-[#86868b]">{videoCount}/1</span>
       </div>

@@ -13,7 +13,7 @@ import {
 } from "@/lib/gateway/volcengine-stall-recover";
 import { syncKieGatewayLogFromVendorPoll } from "@/lib/gateway/kie-gateway-log-sync";
 import { gatewayV1RecordInfo } from "@/lib/gateway/gateway-v1-http-client";
-import { reconcileStaleEcomVideoGatewayLogs, reconcileStaleEcomChatGatewayLogs } from "@/lib/gateway/gateway-log-reconcile";
+import { reconcileStaleEcomVideoGatewayLogs, reconcileStaleEcomChatGatewayLogs, reconcileStaleCanvasVideoGatewayLogs } from "@/lib/gateway/gateway-log-reconcile";
 import { runGatewaySubmitWithRetry } from "@/lib/gateway/gateway-submit-error-policy";
 import {
   createKieTaskWithKey,
@@ -223,6 +223,16 @@ export async function expireStaleGatewayLogs(): Promise<number> {
   } catch (e) {
     console.warn(
       "[gateway-poll] reconcileStaleEcomChatGatewayLogs skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
+  let r3e = 0;
+  try {
+    r3e = await reconcileStaleCanvasVideoGatewayLogs(now);
+  } catch (e) {
+    console.warn(
+      "[gateway-poll] reconcileStaleCanvasVideoGatewayLogs skipped",
       e instanceof Error ? e.message : String(e),
     );
   }

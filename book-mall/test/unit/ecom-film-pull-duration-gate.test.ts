@@ -9,8 +9,10 @@ describe("assertFilmPullDurationAllowed", () => {
     expect(() => assertFilmPullDurationAllowed(undefined)).not.toThrow();
   });
 
-  it("rejects videos over 60s when segmented mode disabled", () => {
-    expect(() => assertFilmPullDurationAllowed(FILM_PULL_V1_MAX_SEC + 1)).toThrow(/60/);
+  it("rejects videos over V1 limit when segmented mode disabled", () => {
+    expect(() => assertFilmPullDurationAllowed(FILM_PULL_V1_MAX_SEC + 1)).toThrow(
+      new RegExp(String(FILM_PULL_V1_MAX_SEC)),
+    );
     expect(() => assertFilmPullDurationAllowed(120)).toThrow(/分段/);
   });
 });

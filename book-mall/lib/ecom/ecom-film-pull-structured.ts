@@ -69,17 +69,183 @@ export type FilmPullShot = z.infer<typeof filmPullShotSchema>;
 export type FilmPullAnalyzePatch = z.infer<typeof filmPullAnalyzePatchSchema>;
 export type FilmPullRenderScriptPatch = z.infer<typeof filmPullRenderScriptPatchSchema>;
 
+const FILM_PULL_TEXT_FALLBACK = "无";
+
+function repairJsonText(body: string): string {
+  return body
+    .replace(/\uFEFF/g, "")
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/,\s*([}\]])/g, "$1");
+}
+
 function tryParseJson(body: string): unknown | null {
-  try {
-    return JSON.parse(body) as unknown;
-  } catch {
-    return null;
+  const trimmed = body.trim();
+  if (!trimmed) return null;
+  for (const candidate of [trimmed, repairJsonText(trimmed)]) {
+    try {
+      return JSON.parse(candidate) as unknown;
+    } catch {
+      // try repaired variant
+    }
   }
+  return null;
+}
+
+function coerceTextField(value: unknown, fallback = FILM_PULL_TEXT_FALLBACK): string {
+  if (typeof value === "string") {
+    const t = value.trim();
+    return t || fallback;
+  }
+  if (value == null || value === false) return fallback;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "boolean") return value ? "是" : "否";
+  return String(value).trim() || fallback;
+}
+
+function coerceFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const t = value.trim();
+    if (!t) return null;
+    const n = Number.parseFloat(t.replace(/[^\d.+-]/g, ""));
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function coerceAudioInfo(raw: unknown, shot: Record<string, unknown>) {
+  const base =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+  return {
+    scriptSubtitle: coerceTextField(
+      base.scriptSubtitle ?? shot.scriptSubtitle ?? shot.voiceover ?? shot.subtitle,
+    ),
+    vocalEmotion: coerceTextField(base.vocalEmotion ?? shot.vocalEmotion),
+    ambientSound: coerceTextField(base.ambientSound ?? shot.ambientSound),
+    fxAndBgm: coerceTextField(base.fxAndBgm ?? shot.fxAndBgm ?? shot.bgm),
+  };
+}
+
+function coerceShot(raw: unknown, index: number): Record<string, unknown> | null {
+  if (!raw || typeof raw !== "object") return null;
+  const s = raw as Record<string, unknown>;
+  const start = coerceFiniteNumber(s.startTimeSec) ?? 0;
+  let end = coerceFiniteNumber(s.endTimeSec);
+  let duration = coerceFiniteNumber(s.durationSec);
+  if (end == null && duration != null) end = start + duration;
+  if (duration == null && end != null) duration = Math.max(0.01, end - start);
+  if (end == null) end = start + (duration ?? 1);
+  if (duration == null || duration <= 0) duration = Math.max(0.01, end - start);
+  if (end <= start) end = start + duration;
+
+  return {
+    shotNo: Math.max(1, Math.trunc(coerceFiniteNumber(s.shotNo) ?? index + 1)),
+    startTimeSec: Math.max(0, start),
+    endTimeSec: end,
+    durationSec: duration,
+    cutTransition: coerceTextField(s.cutTransition, "硬切"),
+    shotScale: coerceTextField(s.shotScale, "中景"),
+    cameraAngle: coerceTextField(s.cameraAngle, "平视"),
+    cameraMovement: coerceTextField(s.cameraMovement, "固定机位"),
+    focalLengthPerspective: coerceTextField(s.focalLengthPerspective, "标准"),
+    composition: coerceTextField(s.composition),
+    subjectBlocking: coerceTextField(s.subjectBlocking),
+    sightDirection: coerceTextField(s.sightDirection),
+    sceneEnvironment: coerceTextField(s.sceneEnvironment),
+    foreMidBackLayer: coerceTextField(s.foreMidBackLayer),
+    dynamicProps: coerceTextField(s.dynamicProps),
+    lightingSetup: coerceTextField(s.lightingSetup),
+    toneContrast: coerceTextField(s.toneContrast),
+    narrativeFunction: coerceTextField(s.narrativeFunction),
+    audioInfo: coerceAudioInfo(s.audioInfo, s),
+    rhythmWeight: coerceTextField(s.rhythmWeight, "中"),
+    visualMetaphor: coerceTextField(s.visualMetaphor),
+    aiVisualPrompt: coerceTextField(s.aiVisualPrompt),
+  };
+}
+
+export function coerceFilmPullPayload(raw: unknown): unknown | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const action =
+    o.action === "render_script_complete"
+      ? "render_script_complete"
+      : "analyze_complete";
+
+  const shotsRaw = Array.isArray(o.shots) ? o.shots : [];
+  const shots = shotsRaw
+    .map((s, i) => coerceShot(s, i))
+    .filter((s): s is Record<string, unknown> => s !== null);
+  if (shots.length === 0) return null;
+
+  const metaRaw =
+    o.meta && typeof o.meta === "object" && !Array.isArray(o.meta)
+      ? (o.meta as Record<string, unknown>)
+      : {};
+  const lastShot = shots[shots.length - 1]!;
+  const totalDurationSec =
+    coerceFiniteNumber(metaRaw.totalDurationSec) ??
+    coerceFiniteNumber(lastShot.endTimeSec) ??
+    1;
+
+  const base = {
+    schemaVersion: 1 as const,
+    action,
+    meta: {
+      totalDurationSec: Math.max(0.01, totalDurationSec),
+      narrativeMainLine: coerceTextField(metaRaw.narrativeMainLine),
+      editRhythmCurve: coerceTextField(metaRaw.editRhythmCurve),
+      artStyle: coerceTextField(metaRaw.artStyle),
+      audioDesignLogic: coerceTextField(metaRaw.audioDesignLogic),
+      shotSequenceLogic: coerceTextField(metaRaw.shotSequenceLogic),
+      cameraLanguageSummary: coerceTextField(metaRaw.cameraLanguageSummary),
+    },
+    narrativeLogic: coerceTextField(o.narrativeLogic),
+    beatPoints: coerceTextField(o.beatPoints),
+    replicableShootingScript: coerceTextField(o.replicableShootingScript),
+    shots,
+  };
+
+  if (action === "render_script_complete") {
+    const cfgRaw =
+      o.renderGlobalConfig && typeof o.renderGlobalConfig === "object"
+        ? (o.renderGlobalConfig as Record<string, unknown>)
+        : {};
+    return {
+      ...base,
+      renderGlobalConfig: {
+        characterUnifiedStyle: coerceTextField(cfgRaw.characterUnifiedStyle),
+        globalLighting: coerceTextField(cfgRaw.globalLighting),
+        resolution: coerceTextField(cfgRaw.resolution, "1080p"),
+        fps: coerceTextField(cfgRaw.fps, "24fps"),
+        globalVisualTone: coerceTextField(cfgRaw.globalVisualTone),
+      },
+    };
+  }
+
+  return base;
+}
+
+function formatZodIssueSummary(error: z.ZodError): string {
+  return error.issues
+    .slice(0, 4)
+    .map((issue) => {
+      const path = issue.path.length > 0 ? issue.path.join(".") : "root";
+      return `${path}: ${issue.message}`;
+    })
+    .join("; ");
 }
 
 function extractFenceBody(text: string): string | null {
   const closed = text.match(/```film-pull\s*([\s\S]*?)```/i);
   if (closed?.[1]?.trim()) return closed[1].trim();
+  for (const match of text.matchAll(/```json\s*([\s\S]*?)```/gi)) {
+    const body = match[1]?.trim();
+    if (body && body.includes('"schemaVersion"')) return body;
+  }
   const open = text.match(/```film-pull\s*([\s\S]*)$/i);
   if (open?.[1]?.trim()) return open[1].trim();
   return null;
@@ -98,18 +264,29 @@ function extractJsonObject(text: string): unknown | null {
   return tryParseJson(text.slice(start, end + 1));
 }
 
-export function extractFilmPullAnalyzePatch(text: string): FilmPullAnalyzePatch | null {
+function parseFilmPullPatch<T>(
+  text: string,
+  schema: z.ZodType<T>,
+): { patch: T | null; validationHint: string | null } {
   const parsed = extractJsonObject(text);
-  if (!parsed) return null;
-  const safe = filmPullAnalyzePatchSchema.safeParse(parsed);
-  return safe.success ? safe.data : null;
+  if (!parsed) {
+    return { patch: null, validationHint: "JSON 语法错误或围栏为空" };
+  }
+  const coerced = coerceFilmPullPayload(parsed);
+  if (!coerced) {
+    return { patch: null, validationHint: "缺少 shots 或镜字段不可解析" };
+  }
+  const safe = schema.safeParse(coerced);
+  if (safe.success) return { patch: safe.data, validationHint: null };
+  return { patch: null, validationHint: formatZodIssueSummary(safe.error) };
+}
+
+export function extractFilmPullAnalyzePatch(text: string): FilmPullAnalyzePatch | null {
+  return parseFilmPullPatch(text, filmPullAnalyzePatchSchema).patch;
 }
 
 export function extractFilmPullRenderScriptPatch(text: string): FilmPullRenderScriptPatch | null {
-  const parsed = extractJsonObject(text);
-  if (!parsed) return null;
-  const safe = filmPullRenderScriptPatchSchema.safeParse(parsed);
-  return safe.success ? safe.data : null;
+  return parseFilmPullPatch(text, filmPullRenderScriptPatchSchema).patch;
 }
 
 export function resolveFilmPullParseError(
@@ -117,13 +294,13 @@ export function resolveFilmPullParseError(
   kind: "analyze" | "render_script",
 ): string | null {
   const fenceComplete = /```film-pull[\s\S]*?```/i.test(fullText);
-  const patch =
-    kind === "analyze"
-      ? extractFilmPullAnalyzePatch(fullText)
-      : extractFilmPullRenderScriptPatch(fullText);
+  const schema =
+    kind === "analyze" ? filmPullAnalyzePatchSchema : filmPullRenderScriptPatchSchema;
+  const { patch, validationHint } = parseFilmPullPatch(fullText, schema);
   if (patch) return null;
   if (fenceComplete) {
-    return "结构化 JSON 解析失败或未通过校验，请按 table-format.md 重新输出 ```film-pull 围栏。";
+    const hint = validationHint ? `（${validationHint}）` : "";
+    return `结构化 JSON 解析失败或未通过校验${hint}，请按 table-format.md 重新输出 \`\`\`film-pull 围栏。`;
   }
   return "回复末尾缺少 ```film-pull JSON 围栏。";
 }

@@ -129,8 +129,20 @@
 
 ## 规则
 
-1. 回复末尾唯一 ` ```film-pull ` 围栏
-2. 无对应内容填 `"无"`
+1. 回复末尾唯一 ` ```film-pull ` 围栏（禁止 ` ```json `）
+2. 无对应内容填 `"无"`（**禁止空字符串**）
 3. `shots` 至少 1 镜
 4. `narrativeLogic` / `beatPoints` / `replicableShootingScript` **必填** string（可与 Markdown 三块段落一致，长文用 `\n` 换行）
 5. 制作阶段 **镜号、startTimeSec、endTimeSec、durationSec 不可改**（继承 analyze）
+
+## 严格校验（机器 parse · 违反即失败）
+
+| 检查项 | 要求 |
+|--------|------|
+| schemaVersion | number `1`，非 `"1"` |
+| meta.totalDurationSec | number，与末镜 endTimeSec 一致 |
+| 时间字段 | shotNo / startTimeSec / endTimeSec / durationSec 均为 number |
+| durationSec | = endTimeSec − startTimeSec（误差 ≤0.02s） |
+| string 字段 | meta 6 项 + 每镜 25 维 + audioInfo 4 项：**全部非空** |
+| audioInfo | 每镜必须有完整 object，不可省略或摊平到镜级 voiceover |
+| JSON 语法 | 标准 JSON；无注释、无尾逗号、无单引号 |

@@ -11,6 +11,7 @@ import {
   IMAGE_OR_VIDEO_UPLOAD_ACCEPT,
   IMAGE_UPLOAD_DROP_HINT,
 } from "@/lib/image-upload-utils";
+import { filmPullMaxVideoSecLabel } from "@/lib/film-pull-limits";
 import type { FilmPullMediaReference } from "@/lib/film-pull-types";
 
 type Props = {
@@ -67,12 +68,14 @@ export function FilmPullMediaInput({
 
   const inputDisabled = busy || locked;
 
+  const maxLabel = filmPullMaxVideoSecLabel();
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
           素材输入
-          <span className="ml-1 font-normal normal-case text-[#ff3b30]">（必传 · ≤60s 视频）</span>
+          <span className="ml-1 font-normal normal-case text-[#ff3b30]">（必传 · {maxLabel} 视频）</span>
         </span>
         <span className="text-[10px] text-[#86868b]">
           {items.length}/1 · {IMAGE_UPLOAD_DROP_HINT}
@@ -82,7 +85,7 @@ export function FilmPullMediaInput({
       <EcomRefUploadCard
         title="视频"
         items={items}
-        emptyHint={`上传 1 段视频（≤60s）；也可粘贴 HTTPS 链接。${IMAGE_UPLOAD_DROP_HINT}`}
+        emptyHint={`上传 1 段视频（${maxLabel}）；也可粘贴 HTTPS 链接。${IMAGE_UPLOAD_DROP_HINT}`}
         removeLabel={locked ? "拉片中不可删除" : "删除素材"}
         busy={inputDisabled}
         accept={IMAGE_OR_VIDEO_UPLOAD_ACCEPT}

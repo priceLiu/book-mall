@@ -117,6 +117,7 @@ import {
   runCanvasDisplayReconcileWorker,
 } from "@/lib/canvas/canvas-video-display-recover";
 import { recoverCanvasKieImageFromGateway } from "@/lib/canvas/canvas-kie-image-recover";
+import { syncCanvasGatewayLogAfterVideoSuccess } from "@/lib/canvas/canvas-gateway-log-sync";
 import {
   scheduleCanvasKieImageOssBackfill,
   scheduleCanvasVideoOssBackfill,
@@ -660,6 +661,9 @@ export async function applyCanvasBailianR2vPollResult(
       polled.raw,
     );
   }
+  await syncCanvasGatewayLogAfterVideoSuccess(taskId, ephemeralUrl).catch(
+    () => undefined,
+  );
 }
 
 export async function applyCanvasDashscopeImagePollResult(
@@ -775,6 +779,10 @@ export async function applyCanvasVolcengineVideoResult(
       ) {
         await patchCanvasProjectNodeMediaFromTask(task);
       }
+      await syncCanvasGatewayLogAfterVideoSuccess(
+        taskId,
+        task.ossUrl?.trim() || task.ephemeralUrl!.trim(),
+      ).catch(() => undefined);
     }
     return;
   }
@@ -823,6 +831,9 @@ export async function applyCanvasVolcengineVideoResult(
     await patchCanvasProjectNodeRuntimeFromTask(updated);
     scheduleCanvasVideoOssBackfill(taskId, ephemeralUrl, updated.projectId);
   }
+  await syncCanvasGatewayLogAfterVideoSuccess(taskId, ephemeralUrl).catch(
+    () => undefined,
+  );
   await persistCanvasE2eForTask(taskId).catch(() => undefined);
 }
 
