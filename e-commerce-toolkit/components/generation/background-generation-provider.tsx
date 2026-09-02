@@ -13,8 +13,10 @@ import {
 
 import { BackgroundGenerationDock } from "@/components/generation/background-generation-dock";
 import {
+  BACKGROUND_DOCK_EXIT_ANIM_MS,
   BACKGROUND_DOCK_FOREGROUND_MS,
   BACKGROUND_DOCK_FOREGROUND_POLL_MS,
+  BACKGROUND_DOCK_SUCCESS_FLASH_MS,
 } from "@/lib/generation/background-generation-policy";
 import type {
   BackgroundGenerationTask,
@@ -58,6 +60,43 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
   const tasksRef = useRef(tasks);
   tasksRef.current = tasks;
   const pollLockRef = useRef(false);
+  const successDismissTimersRef = useRef<Map<string, number>>(new Map());
+
+  const clearSuccessDismissTimer = useCallback((taskId: string) => {
+    const timerId = successDismissTimersRef.current.get(taskId);
+    if (timerId != null) {
+      window.clearTimeout(timerId);
+      successDismissTimersRef.current.delete(taskId);
+    }
+  }, []);
+
+  const dismissTask = useCallback((id: string) => {
+    clearSuccessDismissTimer(id);
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+  }, [clearSuccessDismissTimer]);
+
+  const scheduleSuccessDismiss = useCallback(
+    (taskId: string) => {
+      clearSuccessDismissTimer(taskId);
+      setDockExpanded(true);
+      const hideTimer = window.setTimeout(() => {
+        dismissTask(taskId);
+        successDismissTimersRef.current.delete(taskId);
+      }, BACKGROUND_DOCK_SUCCESS_FLASH_MS);
+      successDismissTimersRef.current.set(taskId, hideTimer);
+    },
+    [clearSuccessDismissTimer, dismissTask],
+  );
+
+  useEffect(
+    () => () => {
+      for (const timerId of successDismissTimersRef.current.values()) {
+        window.clearTimeout(timerId);
+      }
+      successDismissTimersRef.current.clear();
+    },
+    [],
+  );
 
   const registerTask = useCallback((input: RegisterBackgroundGenerationTaskInput) => {
     setTasks((prev) => {
@@ -85,7 +124,6 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
       }
       return [...prev, next];
     });
-    // 新任务默认仅显示右下角胶囊，不自动展开面板
   }, []);
 
   const minimizeTask = useCallback((id: string) => {
@@ -100,10 +138,6 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
     setDockExpanded(false);
   }, []);
 
-  const dismissTask = useCallback((id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
-  }, []);
-
   const failTask = useCallback((id: string, error: string) => {
     setTasks((prev) =>
       prev.map((t) =>
@@ -112,12 +146,12 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
           : t,
       ),
     );
-    setDockExpanded(true);
+    setDockExpanded(false);
   }, []);
 
   const expandDock = useCallback(() => setDockExpanded(true), []);
 
-  // 前台 busy 超时 → 自动最小化
+  // 前台 busy 超时 → 自动最小化（Dock 本身在短任务运行中仍隐藏）
   useEffect(() => {
     const timer = window.setInterval(() => {
       const now = Date.now();
@@ -132,14 +166,13 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
           }
           return t;
         });
-        if (changed) setDockExpanded(false);
         return changed ? next : prev;
       });
     }, 5000);
     return () => window.clearInterval(timer);
   }, []);
 
-  // Dock 轮询（4s，与前台 busy 超时策略配套）
+  // Dock 轮询
   useEffect(() => {
     const tick = async () => {
       if (pollLockRef.current) return;
@@ -160,7 +193,7 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
                     : t,
                 ),
               );
-              setDockExpanded(true);
+              scheduleSuccessDismiss(task.id);
             } else {
               await task.onFailed?.();
               setTasks((prev) =>
@@ -175,7 +208,7 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
                     : t,
                 ),
               );
-              setDockExpanded(true);
+              setDockExpanded(false);
             }
           } catch (e) {
             /* 单次 poll 失败保留 running */
@@ -192,7 +225,7 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
       BACKGROUND_DOCK_FOREGROUND_POLL_MS,
     );
     return () => window.clearInterval(id);
-  }, []);
+  }, [scheduleSuccessDismiss]);
 
   const hasForegroundRunning = useMemo(
     () => tasks.some((t) => t.status === "running" && !t.minimized),

@@ -15,6 +15,15 @@ export const BACKGROUND_DOCK_POLL_MS = 15_000;
 /** 前台轮询间隔（电商故事版整图成片） */
 export const BACKGROUND_DOCK_FOREGROUND_POLL_MS = 4_000;
 
+/** 运行中任务在 Dock 露出的最小时长（此前完全隐藏） */
+export const BACKGROUND_DOCK_LONG_TASK_MS = 10 * 60 * 1000;
+
+/** 成功完成后面板展示时长，随后自动收起并清除 */
+export const BACKGROUND_DOCK_SUCCESS_FLASH_MS = 2_000;
+
+/** 收起/消失过渡时长（与 Dock CSS transition 一致） */
+export const BACKGROUND_DOCK_EXIT_ANIM_MS = 320;
+
 export const BACKGROUND_DOCK_LABEL_RUNNING = "生成中…";
 export const BACKGROUND_DOCK_LABEL_PERSISTENT = "持续后台生成中…";
 export const BACKGROUND_DOCK_LABEL_SUCCEEDED = "已完成";

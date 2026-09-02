@@ -6,6 +6,7 @@ import {
   claimWorkflowShare,
   workflowShareRedirectPath,
 } from "@/lib/share/workflow-share-service";
+import { resolveEcomWorkflowShareRedirectPath } from "@/lib/ecom/ecom-workflow-share-duplicate";
 
 export const dynamic = "force-dynamic";
 
@@ -28,14 +29,21 @@ export async function POST(
       token,
       claimerUserId: user.id,
     });
+    const redirectPath =
+      result.app === "ECOM"
+        ? await resolveEcomWorkflowShareRedirectPath(
+            result.resourceType,
+            result.clonedResourceId,
+          )
+        : workflowShareRedirectPath(
+            result.app,
+            result.clonedResourceId,
+            result.resourceType,
+          );
     return NextResponse.json({
       ok: true,
       ...result,
-      redirectPath: workflowShareRedirectPath(
-        result.app,
-        result.clonedResourceId,
-        result.resourceType,
-      ),
+      redirectPath,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "领取失败";

@@ -20,8 +20,10 @@ import { pickProjectThumbnailUrl } from "@/lib/canvas/pick-project-thumbnail";
 import {
   createCanvasProjectForUser,
 } from "@/lib/canvas/canvas-project-service";
-import { createEcomStoryboardProject } from "@/lib/ecom/ecom-storyboard-service";
-import { duplicateModelShotForShareClaim } from "@/lib/ecom/ecom-model-shot-reuse";
+import {
+  duplicateEcomWorkflowForShareClaim,
+  ecomWorkflowShareRedirectPath,
+} from "@/lib/ecom/ecom-workflow-share-duplicate";
 import { prisma } from "@/lib/prisma";
 import {
   assertCanShareQrTemplate,
@@ -169,27 +171,14 @@ async function duplicateEcomForShareClaim(
   claimerUserId: string,
   sourceProjectId: string,
   sharerUserId: string,
+  resourceType: string,
 ): Promise<string> {
-  const source = await prisma.ecomStoryboardProject.findFirst({
-    where: { id: sourceProjectId, userId: sharerUserId },
+  return duplicateEcomWorkflowForShareClaim({
+    resourceType,
+    sourceProjectId,
+    sharerUserId,
+    claimerUserId,
   });
-  if (!source) throw new Error("分镜项目不存在或无权分享");
-
-  const created = await createEcomStoryboardProject(claimerUserId, {
-    title: `${source.title}（分享副本）`.slice(0, 120),
-    brief: (source.brief ?? {}) as Record<string, unknown>,
-  });
-  await prisma.ecomStoryboardProject.update({
-    where: { id: created.id },
-    data: {
-      references: source.references ?? [],
-      chatHistory: source.chatHistory ?? [],
-      settings: source.settings ?? {},
-      sheet: source.sheet ?? Prisma.JsonNull,
-      meta: source.meta ?? Prisma.JsonNull,
-    },
-  });
-  return created.id;
 }
 
 async function duplicateQrForShareClaim(
@@ -215,17 +204,11 @@ async function cloneResourceForShare(input: {
         input.sharerUserId,
       );
     case "ECOM":
-      if (input.resourceType === "ecom_model_shot_project") {
-        return duplicateModelShotForShareClaim(
-          input.claimerUserId,
-          input.resourceId,
-          input.sharerUserId,
-        );
-      }
       return duplicateEcomForShareClaim(
         input.claimerUserId,
         input.resourceId,
         input.sharerUserId,
+        input.resourceType,
       );
     case "QUICK_REPLICA":
       return duplicateQrForShareClaim(
@@ -336,10 +319,7 @@ export function workflowShareRedirectPath(
     case "CANVAS":
       return `/canvas/${clonedResourceId}`;
     case "ECOM":
-      if (resourceType === "ecom_model_shot_project") {
-        return `/ecom/model-shot?projectId=${encodeURIComponent(clonedResourceId)}`;
-      }
-      return `/ecom/storyboard/micro-drama?projectId=${encodeURIComponent(clonedResourceId)}`;
+      return ecomWorkflowShareRedirectPath(resourceType ?? "", clonedResourceId);
     case "QUICK_REPLICA":
       return `/?templateId=${encodeURIComponent(clonedResourceId)}`;
     default:

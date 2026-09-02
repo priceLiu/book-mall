@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Images, Save, Download } from "lucide-react";
+import { Download, Images, Plus, Save } from "lucide-react";
 
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
@@ -15,6 +15,8 @@ import type { SeedVideoProductionStrategy } from "@/components/seed-video/seed-v
 import { SeedVideoRefUploader } from "@/components/seed-video/seed-video-ref-uploader";
 import { SeedVideoShotTable } from "@/components/seed-video/seed-video-shot-table";
 import { SeedVideoStoryboardDraftEditor } from "@/components/seed-video/seed-video-storyboard-draft-editor";
+import { EcomIconButton, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
@@ -129,6 +131,7 @@ type Props = {
   onSaveStoryboardDraft?: (rows: SeedVideoStoryboardDraftRow[]) => void | Promise<void>;
   onProceedFromStoryboardEdit?: (rows: SeedVideoStoryboardDraftRow[]) => void;
   openProductionAfterSyncToken?: number;
+  onShareWorkflow?: () => void;
 };
 
 export function SeedVideoContentPanel({
@@ -156,6 +159,7 @@ export function SeedVideoContentPanel({
   onSaveStoryboardDraft,
   onProceedFromStoryboardEdit,
   openProductionAfterSyncToken = 0,
+  onShareWorkflow,
 }: Props) {
   const router = useRouter();
   const { toast } = useDialogs();
@@ -1238,58 +1242,59 @@ export function SeedVideoContentPanel({
               </h2>
               <p className="text-[11px] text-[#6e6e73]">{displaySkillLabel} · 素材策划与成片</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {onNewProject ? (
-                <EcomButtonSecondary
-                  size="sm"
-                  type="button"
-                  dark
-                  disabled={Boolean(refBusy) || streaming}
-                  onClick={() => void onNewProject()}
-                >
-                  新建
-                </EcomButtonSecondary>
-              ) : null}
-              {loadProjectList && onOpenProject ? (
-                <EcomProjectListButton
-                  disabled={Boolean(refBusy) || streaming}
-                  currentProjectId={project.id}
-                  loadProjects={loadProjectList}
-                  onSelectProject={onOpenProject}
-                  title="种草视频 · 项目列表"
-                  emptyHint="还没有保存过的种草视频项目。"
+            <EcomIconToolbar>
+              <EcomIconToolbarGroup label="项目">
+                {onNewProject ? (
+                  <EcomIconButton
+                    label="新建项目"
+                    icon={Plus}
+                    disabled={Boolean(refBusy) || streaming}
+                    onClick={() => void onNewProject()}
+                  />
+                ) : null}
+                {loadProjectList && onOpenProject ? (
+                  <EcomProjectListButton
+                    disabled={Boolean(refBusy) || streaming}
+                    currentProjectId={project.id}
+                    loadProjects={loadProjectList}
+                    onSelectProject={onOpenProject}
+                    title="种草视频 · 项目列表"
+                    emptyHint="还没有保存过的种草视频项目。"
+                  />
+                ) : null}
+              </EcomIconToolbarGroup>
+              <EcomIconToolbarGroup label="工作流">
+                <EcomIconButton
+                  label="保存工作流"
+                  icon={Save}
+                  busy={saveBusy}
+                  disabled={!canSave || saveBusy}
+                  onClick={() => setSaveDialogOpen(true)}
                 />
+              </EcomIconToolbarGroup>
+              <EcomIconToolbarGroup label="资产与交付">
+                <EcomIconButton
+                  label="我的资产"
+                  icon={Images}
+                  onClick={() => router.push("/library")}
+                />
+                <EcomIconButton
+                  label={exportBusy ? "打包中…" : "导出交付包"}
+                  icon={Download}
+                  busy={exportBusy}
+                  disabled={!canSave || exportBusy || streaming || productionBusy}
+                  onClick={() => void handleExportZip()}
+                />
+              </EcomIconToolbarGroup>
+              {onShareWorkflow ? (
+                <EcomIconToolbarGroup label="分享">
+                  <EcomShareIconButton
+                    disabled={streaming || productionBusy}
+                    onClick={onShareWorkflow}
+                  />
+                </EcomIconToolbarGroup>
               ) : null}
-              <EcomButtonSecondary
-                size="sm"
-                type="button"
-                dark
-                onClick={() => router.push("/library")}
-              >
-                <Images className="h-3.5 w-3.5 shrink-0" />
-                我的资产
-              </EcomButtonSecondary>
-              <EcomButtonSecondary
-                size="sm"
-                type="button"
-                dark
-                disabled={!canSave || saveBusy}
-                onClick={() => setSaveDialogOpen(true)}
-              >
-                <Save className="h-3.5 w-3.5 shrink-0" />
-                保存
-              </EcomButtonSecondary>
-              <EcomButtonSecondary
-                size="sm"
-                type="button"
-                dark
-                disabled={!canSave || exportBusy || streaming || productionBusy}
-                onClick={() => void handleExportZip()}
-              >
-                <Download className="h-3.5 w-3.5 shrink-0" />
-                {exportBusy ? "打包中…" : "导出交付包"}
-              </EcomButtonSecondary>
-            </div>
+            </EcomIconToolbar>
           </div>
         </header>
 

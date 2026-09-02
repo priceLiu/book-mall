@@ -1,6 +1,7 @@
 "use client";
 
-import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomButtonPrimary } from "@/components/ui/ecom-button";
+import { EcomDialogCloseButton } from "@/components/ui/dialog";
 
 export type SeedVideoProductionStrategy = "panel" | "auto";
 
@@ -24,7 +25,8 @@ export function SeedVideoProductionStrategyDialog({
       aria-modal
       aria-labelledby="seed-video-strategy-title"
     >
-      <div className="w-full max-w-md rounded-2xl border border-[#e8e8ed] bg-white p-5 shadow-xl">
+      <div className="relative w-full max-w-md rounded-2xl border border-[#e8e8ed] bg-white p-5 pr-12 shadow-xl">
+        <EcomDialogCloseButton onClick={() => onOpenChange(false)} />
         <h2 id="seed-video-strategy-title" className="text-base font-semibold text-[#1d1d1f]">
           选择出片方式
         </h2>
@@ -58,11 +60,6 @@ export function SeedVideoProductionStrategyDialog({
               自动生成全部镜头 → 批量 TTS → 合成成片（适合一键出片）。
             </p>
           </button>
-        </div>
-        <div className="mt-4 flex justify-end">
-          <EcomButtonSecondary type="button" size="sm" onClick={() => onOpenChange(false)}>
-            取消
-          </EcomButtonSecondary>
         </div>
       </div>
     </div>

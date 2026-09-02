@@ -2,6 +2,12 @@ import type { ModelShotPoseImageVersion, ModelShotPoseItem } from "@/lib/model-s
 
 export type { ModelShotPoseImageVersion };
 
+export function modelShotPoseHasGeneratedImage(
+  item: Pick<ModelShotPoseItem, "imageUrl" | "assetId" | "imageHistory">,
+): boolean {
+  return resolveModelShotPoseImageHistory(item).length > 0;
+}
+
 export function resolveModelShotPoseImageHistory(
   item: Pick<ModelShotPoseItem, "imageUrl" | "assetId" | "imageHistory">,
 ): ModelShotPoseImageVersion[] {

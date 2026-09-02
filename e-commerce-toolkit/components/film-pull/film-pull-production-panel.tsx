@@ -307,6 +307,7 @@ export function FilmPullProductionPanel({
         onOpenChange={(open) => {
           if (!open) setPicker({ kind: "idle" });
         }}
+        nativeOverlay
         mode={pickerMode}
         dialogTitle={picker.kind === "image" ? "选择生图模型" : "选择生视频模型"}
         dialogDescription="确认后将开始生成。"

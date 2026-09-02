@@ -109,8 +109,54 @@ export function StoryboardPanelMediaStrip({
     [sheet.panels],
   );
 
+  const panelImageCount = useMemo(
+    () => sheet.panels.filter((p) => Boolean(p.imageUrl?.trim())).length,
+    [sheet.panels],
+  );
+  const anyPanelHasImage = panelImageCount > 0;
+
+  /** 勾选后批量再次生图：仅含已有分镜图的镜头 */
+  const imageRegenTargets = useMemo(
+    () =>
+      selectedImageList.filter((index) => {
+        const p = panelByIndex.get(index);
+        return Boolean(p?.imageUrl?.trim());
+      }),
+    [selectedImageList, panelByIndex],
+  );
+
   const imageStripBusy = imgBusy || activeImageGenPanels.size > 0;
   const generateVideoDisabled = videoActionTargets.length === 0;
+
+  const imageBatchDisabled =
+    imageStripBusy ||
+    (anyPanelHasImage && selectedImageList.length > 0 && imageRegenTargets.length === 0);
+
+  const imageBatchLabel = (() => {
+    if (!anyPanelHasImage) return "生成全部分镜图";
+    if (imageRegenTargets.length > 0) {
+      return `再次生成选中镜（${imageRegenTargets.length}）`;
+    }
+    if (selectedImageList.length > 0) {
+      return "再次生成选中镜";
+    }
+    return `再次生成全部分镜图（${panelImageCount}）`;
+  })();
+
+  const handleImageBatchClick = () => {
+    if (!anyPanelHasImage) {
+      onGenerateAllImages(undefined);
+      return;
+    }
+    if (imageRegenTargets.length > 0) {
+      onGenerateAllImages(imageRegenTargets);
+      return;
+    }
+    if (selectedImageList.length > 0) return;
+    onGenerateAllImages(
+      sheet.panels.filter((p) => Boolean(p.imageUrl?.trim())).map((p) => p.index),
+    );
+  };
   const hasMergedVideo = Boolean(mergedVideoUrl?.trim());
   const mergedExpiresLabel =
     mergedVideoExpiresAt &&
@@ -132,16 +178,10 @@ export function StoryboardPanelMediaStrip({
             <EcomButtonSecondary
               size="sm"
               type="button"
-              disabled={imageStripBusy}
-              onClick={() =>
-                onGenerateAllImages(
-                  selectedImageList.length > 0 ? selectedImageList : undefined,
-                )
-              }
+              disabled={imageBatchDisabled}
+              onClick={handleImageBatchClick}
             >
-              {selectedImageList.length > 0
-                ? `生成分镜图（${selectedImageList.length}）`
-                : "生成全部分镜图"}
+              {imageBatchLabel}
             </EcomButtonSecondary>
             <EcomButtonSecondary
               size="sm"
@@ -161,7 +201,9 @@ export function StoryboardPanelMediaStrip({
           </div>
         </div>
         <p className="mb-3 text-[11px] leading-relaxed text-[#86868b]">
-          勾选有分镜图的镜头后可批量生成视频；合并请在下方「单镜视频」区操作。
+          {anyPanelHasImage
+            ? "已有分镜图的镜头可勾选后「再次生成」；勾选有分镜图的镜头后可批量生成视频。合并请在下方「单镜视频」区操作。"
+            : "首次生成：请点各镜头卡片「待生成」，或点上方「生成全部分镜图」。专业版故事版一键成片请在上方「故事版 · 成片工作区」勾选后生成。"}
         </p>
         <div className="flex flex-wrap gap-4">
           {sheet.panels.map((panel, i) => (
@@ -170,10 +212,13 @@ export function StoryboardPanelMediaStrip({
               panel={panel}
               aspectRatio={aspectRatio}
               imageUrl={panel.imageUrl}
-              selectable
+              selectable={anyPanelHasImage && Boolean(panel.imageUrl?.trim())}
               selected={selectedImagePanels.has(panel.index)}
               onToggleSelect={() => onToggleImagePanelSelect(panel.index)}
               busy={activeImageGenPanels.has(panel.index)}
+              generateImageTitle={
+                anyPanelHasImage ? "再次生成此镜头分镜图" : "生成此镜头分镜图"
+              }
               onRegenerateImage={() => onGeneratePanelImage(panel.index)}
               onPreviewImage={
                 panel.imageUrl && onPreviewImage

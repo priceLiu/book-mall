@@ -1,9 +1,11 @@
 "use client";
 
-import { Check, Copy, Link2 } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
-import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomButtonPrimary } from "@/components/ui/ecom-button";
+import { EcomDialogCloseButton } from "@/components/ui/dialog";
+import { EcomWechatShareIcon } from "@/components/ui/ecom-wechat-share-icon";
 
 function bookMallOriginFromShareUrl(shareUrl: string): string | null {
   try {
@@ -89,9 +91,10 @@ export function WorkflowShareLinkDialog({
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-xl border border-[#e8e8ed] bg-white p-5 shadow-xl">
+      <div className="relative w-full max-w-md rounded-xl border border-[#e8e8ed] bg-white p-5 pr-12 shadow-xl">
+        <EcomDialogCloseButton onClick={onClose} />
         <h2 className="flex items-center gap-2 text-base font-semibold text-[#1d1d1f]">
-          <Link2 className="size-4" />
+          <EcomWechatShareIcon className="size-4" />
           {teamMemberShare ? "邀请成员体验" : "分享工作流"}
         </h2>
         <p className="mt-2 text-xs text-[#6e6e73]">
@@ -144,9 +147,6 @@ export function WorkflowShareLinkDialog({
             {loading ? "生成中…" : "生成分享码"}
           </EcomButtonPrimary>
         )}
-        <EcomButtonSecondary type="button" className="mt-4 w-full" onClick={onClose}>
-          关闭
-        </EcomButtonSecondary>
       </div>
     </div>
   );

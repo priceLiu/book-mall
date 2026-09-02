@@ -53,36 +53,73 @@ export function installEcomBrowserNavBlock(): () => void {
   };
 }
 
-export function installEcomHistoryPopstateTrap(): () => void {
+export type EcomWorkspaceNavGuardOptions = {
+  /** popstate 触发后同步 SPA 路由（Next.js App Router） */
+  onNavBlocked?: (lockedHref: string) => void;
+};
+
+let lockedWorkspaceHref = "";
+let navBlockedHandler: EcomWorkspaceNavGuardOptions["onNavBlocked"];
+
+function pushEcomWorkspaceHistoryTrap(href: string): void {
+  if (typeof window === "undefined") return;
+  if (!isEcomWorkspaceNavBlockActive()) return;
+  lockedWorkspaceHref = href;
+  try {
+    window.history.pushState({ __ecomWorkspaceNavTrap: true }, "", href);
+  } catch {
+    /* quota / sandbox */
+  }
+}
+
+/** 路由切换后刷新锁定 URL（仍禁止浏览器后退离开当前页）。 */
+export function syncEcomWorkspaceNavTrapUrl(href?: string): void {
+  if (typeof window === "undefined") return;
+  pushEcomWorkspaceHistoryTrap(href ?? window.location.href);
+}
+
+export function installEcomHistoryPopstateTrap(
+  opts?: EcomWorkspaceNavGuardOptions,
+): () => void {
   if (typeof window === "undefined") return () => undefined;
 
-  const pushTrap = () => {
-    if (!isEcomWorkspaceNavBlockActive()) return;
-    try {
-      window.history.pushState({ __ecomWorkspaceNavTrap: true }, "", window.location.href);
-    } catch {
-      /* quota / sandbox */
-    }
-  };
-
-  pushTrap();
+  navBlockedHandler = opts?.onNavBlocked;
+  pushEcomWorkspaceHistoryTrap(window.location.href);
 
   const onPopState = () => {
     if (!isEcomWorkspaceNavBlockActive()) return;
-    pushTrap();
+    if (!lockedWorkspaceHref) {
+      lockedWorkspaceHref = window.location.href;
+    }
+    try {
+      window.history.pushState(
+        { __ecomWorkspaceNavTrap: true },
+        "",
+        lockedWorkspaceHref,
+      );
+    } catch {
+      /* quota / sandbox */
+    }
+    navBlockedHandler?.(lockedWorkspaceHref);
   };
 
   window.addEventListener("popstate", onPopState);
-  return () => window.removeEventListener("popstate", onPopState);
+  return () => {
+    window.removeEventListener("popstate", onPopState);
+    navBlockedHandler = undefined;
+    lockedWorkspaceHref = "";
+  };
 }
 
 /** 电商工作台页：拦截浏览器 history.back/forward；返回卸载函数。 */
-export function installEcomWorkspaceNavGuards(): () => void {
+export function installEcomWorkspaceNavGuards(
+  opts?: EcomWorkspaceNavGuardOptions,
+): () => void {
   if (typeof document !== "undefined") {
     document.documentElement.setAttribute(ECOM_WORKSPACE_PAGE_HTML_ATTR, "");
   }
   const uninstallBlock = installEcomBrowserNavBlock();
-  const uninstallHistoryTrap = installEcomHistoryPopstateTrap();
+  const uninstallHistoryTrap = installEcomHistoryPopstateTrap(opts);
   return () => {
     uninstallHistoryTrap();
     uninstallBlock();
@@ -91,3 +128,6 @@ export function installEcomWorkspaceNavGuards(): () => void {
     }
   };
 }
+
+/** @alias installEcomWorkspaceNavGuards */
+export const installEcomSiteNavGuards = installEcomWorkspaceNavGuards;

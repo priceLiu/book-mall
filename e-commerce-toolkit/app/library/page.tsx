@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, Copy, ExternalLink, Layers, Link2, RotateCcw, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, ExternalLink, Layers, RotateCcw, Sparkles } from "lucide-react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
@@ -22,6 +22,7 @@ import { EcomVideoThumb } from "@/components/media/ecom-video-player";
 import { StoryboardDeliverableReviewDialog } from "@/components/storyboard/storyboard-deliverable-review-dialog";
 import { StoryboardLibraryDeliverablePanel } from "@/components/storyboard/storyboard-library-deliverable-panel";
 import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-link-dialog";
+import { EcomWechatShareIcon } from "@/components/ui/ecom-wechat-share-icon";
 import { EcomPublishDialog } from "@/components/publish/ecom-publish-dialog";
 import {
   deleteAsset,
@@ -1369,7 +1370,7 @@ function LibraryProjectExpandedContent({
             className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#e8e8ed] bg-white px-3 text-xs font-medium text-[#1d1d1f] hover:bg-[#f5f5f7]"
             onClick={() => onShareStoryboardProject(sbBundle.projectId, title)}
           >
-            <Link2 className="h-3.5 w-3.5" />
+            <EcomWechatShareIcon className="h-3.5 w-3.5" />
             分享工作流
           </button>
         </div>

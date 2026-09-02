@@ -3,13 +3,12 @@ import { Prisma } from "@prisma/client";
 import { generateEcomImage } from "@/lib/ecom/ecom-image-gen-invoke";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { rebuildModelShotItemPrompt } from "@/lib/ecom/model-shot/prompt-assembler";
-import {
-  appendModelShotPoseImage,
-} from "@/lib/ecom/model-shot/pose-image-history";
+import { appendModelShotPoseImage } from "@/lib/ecom/model-shot/pose-image-history";
 import {
   ECOM_MODEL_SHOT_MODULE,
   ECOM_MODEL_SHOT_TRYON_ACTION,
   ECOM_MODEL_SHOT_TOOL_KEY,
+  parseModelShotPlan,
   type ModelShotPoseItem,
 } from "@/lib/ecom/ecom-model-shot-types";
 import { touchCatalogLockOnProjectUse } from "@/lib/ecom/ecom-catalog-lock";
@@ -81,7 +80,8 @@ export async function generateModelShotImages(opts: {
   await mapWithConcurrency(
     claimed,
     async (index) => {
-      const item = project.plan.items.find((i) => i.index === index);
+      const live = await getEcomModelShotProject(opts.userId, opts.projectId);
+      const item = live?.plan.items.find((i) => i.index === index);
       if (!item?.prompt?.trim()) {
         failures.push(`第 ${index} 张：缺少 Prompt`);
         await clearModelShotPoseImagesPending(opts.projectId, [index]);
@@ -90,8 +90,8 @@ export async function generateModelShotImages(opts: {
       }
       const prompt = rebuildModelShotItemPrompt({
         item,
-        brief: project.brief,
-        references: project.references,
+        brief: live!.brief,
+        references: live!.references,
       });
 
       try {
@@ -118,14 +118,12 @@ export async function generateModelShotImages(opts: {
           },
         });
 
-        const current = project.plan.items.find((i) => i.index === index);
-        const merged = current
-          ? appendModelShotPoseImage(current, { url: ossUrl, assetId: asset.id })
-          : null;
-        await patchPoseItem(opts.userId, opts.projectId, index, {
-          ...(merged ?? { imageUrl: ossUrl, assetId: asset.id }),
-          status: "ready",
-          prompt,
+        await patchPoseItem(opts.userId, opts.projectId, index, (current) => {
+          const merged = appendModelShotPoseImage(current, {
+            url: ossUrl,
+            assetId: asset.id,
+          });
+          return { ...merged, status: "ready", prompt };
         });
         await clearModelShotPoseImagesPending(opts.projectId, [index]);
         generated += 1;
@@ -169,14 +167,29 @@ async function patchPoseItem(
   userId: string,
   projectId: string,
   index: number,
-  patch: Partial<ModelShotPoseItem>,
+  patch:
+    | Partial<ModelShotPoseItem>
+    | ((item: ModelShotPoseItem) => Partial<ModelShotPoseItem>),
 ) {
-  const project = await getEcomModelShotProject(userId, projectId);
-  if (!project) return;
-  const items = project.plan.items.map((item) =>
-    item.index === index ? { ...item, ...patch } : item,
-  );
-  await updateEcomModelShotProject(userId, projectId, {
-    plan: { ...project.plan, items },
-  });
+  const maxAttempts = 5;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const row = await prisma.ecomModelShotProject.findFirst({
+      where: { id: projectId, userId, module: ECOM_MODEL_SHOT_MODULE },
+      select: { plan: true, updatedAt: true },
+    });
+    if (!row) return;
+    const plan = parseModelShotPlan(row.plan);
+    const item = plan.items.find((i) => i.index === index);
+    if (!item) return;
+    const patchData = typeof patch === "function" ? patch(item) : patch;
+    const items = plan.items.map((i) =>
+      i.index === index ? { ...i, ...patchData } : i,
+    );
+    const updated = await prisma.ecomModelShotProject.updateMany({
+      where: { id: projectId, updatedAt: row.updatedAt },
+      data: { plan: { ...plan, items } as Prisma.InputJsonValue },
+    });
+    if (updated.count === 1) return;
+  }
+  throw new Error(`姿势 ${index} 数据更新冲突，请刷新后重试`);
 }

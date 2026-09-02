@@ -38,7 +38,7 @@
 
 ### 分镜行 `storyboardTable[]`
 
-Markdown 表列名须对齐：**镜号｜时长｜景别｜运镜｜镜头角度｜构图方式｜画面内容｜人物动作｜表情｜字幕文案｜配音台词｜音效｜BGM｜转场｜剪辑节奏**
+Markdown 表列名须对齐：**镜号｜时长｜景别｜运镜｜镜头角度｜构图方式｜画面内容｜人物动作｜表情｜字幕文案｜口播文案｜音效｜BGM｜转场｜剪辑节奏**
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -51,8 +51,8 @@ Markdown 表列名须对齐：**镜号｜时长｜景别｜运镜｜镜头角度
 | `visualContent` | string | 画面内容 |
 | `characterAction` | string | 人物动作 |
 | `expression` | string | 表情 |
-| `subtitle` | string | 字幕文案 |
-| `voiceover` | string | 配音台词 |
+| `subtitle` | string | 字幕文案（画面内字幕；可与口播相同） |
+| `voiceover` | string | **口播文案**（配音/旁白；有口播时必须填写；若与字幕相同可写同样内容） |
 | `sfx` | string | 音效 |
 | `bgm` | string | BGM |
 | `transition` | string | 转场 |

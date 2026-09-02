@@ -1,12 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronUp, Loader2, Sparkles, Video, X } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  Sparkles,
+  Video,
+  X,
+} from "lucide-react";
 
 import {
+  BACKGROUND_DOCK_EXIT_ANIM_MS,
   estimateBackgroundGenerationProgress,
   formatBackgroundGenerationAge,
+  isBackgroundDockTaskVisible,
   resolveBackgroundGenerationLabel,
 } from "@/lib/generation/background-generation-policy";
 import type { BackgroundGenerationTask } from "@/lib/generation/background-generation-types";
@@ -37,6 +48,8 @@ export function BackgroundGenerationDock({
 }: Props) {
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [entered, setEntered] = useState(false);
+  const [renderTasks, setRenderTasks] = useState<BackgroundGenerationTask[]>([]);
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {
@@ -44,10 +57,36 @@ export function BackgroundGenerationDock({
     return () => window.clearInterval(id);
   }, []);
 
-  if (!mounted || tasks.length === 0) return null;
+  const visibleTasks = useMemo(
+    () => tasks.filter((task) => isBackgroundDockTaskVisible(task, now)),
+    [now, tasks],
+  );
 
-  const runningCount = tasks.filter((t) => t.status === "running").length;
-  const collapsed = !expanded;
+  useEffect(() => {
+    if (visibleTasks.length > 0) {
+      setRenderTasks(visibleTasks);
+      const frame = window.requestAnimationFrame(() => setEntered(true));
+      return () => window.cancelAnimationFrame(frame);
+    }
+    setEntered(false);
+  }, [visibleTasks]);
+
+  useEffect(() => {
+    if (visibleTasks.length > 0 || renderTasks.length === 0) return;
+    const timer = window.setTimeout(() => setRenderTasks([]), BACKGROUND_DOCK_EXIT_ANIM_MS);
+    return () => window.clearTimeout(timer);
+  }, [renderTasks.length, visibleTasks.length]);
+
+  const displayTasks = visibleTasks.length > 0 ? visibleTasks : renderTasks;
+  const hasSuccessFlash = displayTasks.some((t) => t.status === "succeeded");
+  const hasFailed = displayTasks.some((t) => t.status === "failed");
+  const runningCount = displayTasks.filter((t) => t.status === "running").length;
+  const exitingSuccess =
+    visibleTasks.length === 0 && renderTasks.some((t) => t.status === "succeeded");
+  const effectiveExpanded = expanded || hasSuccessFlash || exitingSuccess;
+  const collapsed = !effectiveExpanded;
+
+  if (!mounted || displayTasks.length === 0) return null;
 
   const shellLight =
     "border-[#e8e8ed] bg-white shadow-lg ring-1 ring-black/[0.04]";
@@ -59,14 +98,20 @@ export function BackgroundGenerationDock({
       type="button"
       className={cn(
         "pointer-events-auto flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium shadow-lg transition hover:shadow-xl",
-        variant === "light"
-          ? "border-[#d2d2d7] bg-white text-[#1d1d1f] hover:bg-[#f5f5f7]"
-          : "border-orange-400/40 bg-[#141418]/95 text-orange-100",
+        hasFailed
+          ? variant === "light"
+            ? "border-[#ff3b30]/35 bg-[#fff5f5] text-[#ff3b30] hover:bg-[#ffecec]"
+            : "border-red-400/45 bg-red-950/90 text-red-200"
+          : variant === "light"
+            ? "border-[#d2d2d7] bg-white text-[#1d1d1f] hover:bg-[#f5f5f7]"
+            : "border-orange-400/40 bg-[#141418]/95 text-orange-100",
       )}
       onClick={() => onExpandedChange(true)}
-      aria-label="展开后台生成任务"
+      aria-label={hasFailed ? "展开失败任务" : "展开后台生成任务"}
     >
-      {runningCount > 0 ? (
+      {hasFailed ? (
+        <AlertCircle className="size-4 shrink-0" />
+      ) : runningCount > 0 ? (
         <Loader2
           className={cn(
             "size-4 shrink-0 animate-spin",
@@ -82,8 +127,10 @@ export function BackgroundGenerationDock({
         />
       )}
       <span>
-        后台生成
-        {tasks.length > 0 ? ` · ${runningCount > 0 ? runningCount : tasks.length}` : ""}
+        {hasFailed ? "生成失败" : "后台生成"}
+        {visibleTasks.length > 0
+          ? ` · ${runningCount > 0 ? runningCount : displayTasks.length}`
+          : ""}
       </span>
       <ChevronUp className="size-3.5 opacity-50" />
     </button>
@@ -92,77 +139,98 @@ export function BackgroundGenerationDock({
   const panel = (
     <div
       className={cn(
-        "pointer-events-auto fixed bottom-4 right-4 z-[200] w-[min(100vw-2rem,22rem)] overflow-hidden rounded-xl",
+        "pointer-events-auto w-[min(100vw-2rem,22rem)] overflow-hidden rounded-xl",
         shell,
+        hasFailed && !hasSuccessFlash && variant === "light" && "ring-1 ring-[#ff3b30]/20",
+        hasFailed && !hasSuccessFlash && variant === "dark" && "ring-1 ring-red-400/25",
       )}
     >
       <div
         className={cn(
           "flex items-center justify-between gap-2 border-b px-3 py-2",
           variant === "light" ? "border-[#e8e8ed]" : "border-white/10",
+          hasFailed && !hasSuccessFlash && variant === "light" && "bg-[#fffafa]",
+          hasFailed && !hasSuccessFlash && variant === "dark" && "bg-red-950/40",
         )}
       >
         <span
           className={cn(
             "flex min-w-0 items-center gap-2 text-sm font-medium",
-            variant === "light" ? "text-[#1d1d1f]" : "text-orange-100",
+            hasFailed && !hasSuccessFlash
+              ? variant === "light"
+                ? "text-[#ff3b30]"
+                : "text-red-200"
+              : variant === "light"
+                ? "text-[#1d1d1f]"
+                : "text-orange-100",
           )}
         >
-          <Loader2
-            className={cn(
-              "size-4 shrink-0 animate-spin",
-              runningCount > 0
-                ? variant === "light"
-                  ? "text-[#0071e3]"
-                  : "text-orange-300"
-                : "opacity-0",
-            )}
-          />
-          {!runningCount ? (
+          {hasSuccessFlash ? (
+            <CheckCircle2
+              className={cn(
+                "size-4 shrink-0",
+                variant === "light" ? "text-[#34c759]" : "text-emerald-400",
+              )}
+            />
+          ) : hasFailed ? (
+            <AlertCircle className="size-4 shrink-0" />
+          ) : runningCount > 0 ? (
+            <Loader2
+              className={cn(
+                "size-4 shrink-0 animate-spin",
+                variant === "light" ? "text-[#0071e3]" : "text-orange-300",
+              )}
+            />
+          ) : (
             <Sparkles
               className={cn(
                 "size-4 shrink-0",
                 variant === "light" ? "text-[#0071e3]" : "text-orange-300",
               )}
             />
-          ) : null}
+          )}
           <span className="truncate">
-            后台生成
-            {runningCount > 0 ? ` · ${runningCount} 进行中` : ""}
+            {hasSuccessFlash
+              ? "生成完成"
+              : hasFailed
+                ? "生成失败"
+                : `后台生成${runningCount > 0 ? ` · ${runningCount} 进行中` : ""}`}
           </span>
         </span>
-        <div className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            className={cn(
-              "rounded-md p-1",
-              variant === "light"
-                ? "text-[#86868b] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"
-                : "text-zinc-500 hover:text-zinc-300",
-            )}
-            aria-label="最小化"
-            onClick={() => onExpandedChange(false)}
-          >
-            <ChevronDown className="size-4" />
-          </button>
-          <button
-            type="button"
-            className={cn(
-              "rounded-md p-1",
-              variant === "light"
-                ? "text-[#86868b] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"
-                : "text-zinc-500 hover:text-zinc-300",
-            )}
-            aria-label="关闭面板"
-            onClick={() => onExpandedChange(false)}
-          >
-            <X className="size-4" />
-          </button>
-        </div>
+        {!hasSuccessFlash ? (
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              className={cn(
+                "rounded-md p-1",
+                variant === "light"
+                  ? "text-[#86868b] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"
+                  : "text-zinc-500 hover:text-zinc-300",
+              )}
+              aria-label="最小化"
+              onClick={() => onExpandedChange(false)}
+            >
+              <ChevronDown className="size-4" />
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "rounded-md p-1",
+                variant === "light"
+                  ? "text-[#86868b] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"
+                  : "text-zinc-500 hover:text-zinc-300",
+              )}
+              aria-label="关闭面板"
+              onClick={() => onExpandedChange(false)}
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <ul className="max-h-64 overflow-y-auto p-2 ecom-scrollbar-thin">
-        {tasks.map((task) => {
+        {displayTasks.map((task) => {
           const startedMs = new Date(task.startedAt).getTime();
           const ageSec = Math.max(0, Math.round((now - startedMs) / 1000));
           const statusLabel =
@@ -182,29 +250,46 @@ export function BackgroundGenerationDock({
                 ? 1
                 : 0;
           const Icon = taskIcon(task);
+          const failed = task.status === "failed";
 
           return (
             <li
               key={task.id}
               className={cn(
                 "mb-2 rounded-lg border px-3 py-2 last:mb-0",
-                variant === "light"
-                  ? "border-[#e8e8ed] bg-[#fafafa]"
-                  : "border-white/10 bg-black/30",
+                failed
+                  ? variant === "light"
+                    ? "border-[#ff3b30]/25 bg-[#fff5f5]"
+                    : "border-red-400/30 bg-red-950/30"
+                  : variant === "light"
+                    ? "border-[#e8e8ed] bg-[#fafafa]"
+                    : "border-white/10 bg-black/30",
               )}
             >
               <div className="flex items-start gap-2">
                 <Icon
                   className={cn(
                     "mt-0.5 size-3.5 shrink-0",
-                    variant === "light" ? "text-[#0071e3]" : "text-orange-300",
+                    failed
+                      ? variant === "light"
+                        ? "text-[#ff3b30]"
+                        : "text-red-300"
+                      : variant === "light"
+                        ? "text-[#0071e3]"
+                        : "text-orange-300",
                   )}
                 />
                 <div className="min-w-0 flex-1">
                   <div
                     className={cn(
                       "truncate text-sm font-medium",
-                      variant === "light" ? "text-[#1d1d1f]" : "text-zinc-100",
+                      failed
+                        ? variant === "light"
+                          ? "text-[#ff3b30]"
+                          : "text-red-200"
+                        : variant === "light"
+                          ? "text-[#1d1d1f]"
+                          : "text-zinc-100",
                     )}
                   >
                     {task.label}
@@ -227,7 +312,7 @@ export function BackgroundGenerationDock({
                   >
                     已等待 {formatBackgroundGenerationAge(ageSec)} · {statusLabel}
                   </div>
-                  {task.status === "failed" && task.error ? (
+                  {failed && task.error ? (
                     <div
                       className={cn(
                         "mt-1 line-clamp-3 text-[10px] leading-snug",
@@ -284,7 +369,7 @@ export function BackgroundGenerationDock({
                       {task.openLabel ?? "打开作品"}
                     </button>
                   ) : null}
-                  {task.status !== "running" ? (
+                  {task.status !== "running" && !hasSuccessFlash ? (
                     <button
                       type="button"
                       className={cn(
@@ -297,7 +382,7 @@ export function BackgroundGenerationDock({
                     >
                       清除
                     </button>
-                  ) : task.onCancel ? (
+                  ) : task.status === "running" && task.onCancel ? (
                     <button
                       type="button"
                       className={cn(
@@ -323,11 +408,19 @@ export function BackgroundGenerationDock({
   return createPortal(
     <div className="pointer-events-none fixed inset-0 z-[200]">
       <div className="pointer-events-none fixed bottom-4 right-4 flex flex-col items-end gap-2">
-        {collapsed ? (
-          <div className="pointer-events-auto">{collapsedBtn}</div>
-        ) : (
-          panel
-        )}
+        <div
+          className={cn(
+            "transition-all ease-out",
+            entered ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0",
+          )}
+          style={{ transitionDuration: `${BACKGROUND_DOCK_EXIT_ANIM_MS}ms` }}
+        >
+          {collapsed ? (
+            <div className="pointer-events-auto">{collapsedBtn}</div>
+          ) : (
+            panel
+          )}
+        </div>
       </div>
     </div>,
     document.body,

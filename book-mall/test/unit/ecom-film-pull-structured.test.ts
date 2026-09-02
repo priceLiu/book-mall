@@ -4,6 +4,7 @@ import {
   extractFilmPullAnalyzePatch,
   extractFilmPullRenderScriptPatch,
   resolveFilmPullParseError,
+  validateFilmPullAnalyzeQuality,
 } from "@/lib/ecom/ecom-film-pull-structured";
 
 const sampleShot = {
@@ -12,6 +13,7 @@ const sampleShot = {
   endTimeSec: 3,
   durationSec: 3,
   cutTransition: "硬切",
+  cutDetail: "开场硬切",
   shotScale: "中景",
   cameraAngle: "平视",
   cameraMovement: "固定机位",
@@ -47,6 +49,12 @@ const analyzeBody = {
     audioDesignLogic: "环境音",
     shotSequenceLogic: "递进",
     cameraLanguageSummary: "固定为主",
+  },
+  shootingPrep: {
+    venue: "室内棚拍",
+    costume: "日常装",
+    props: "无",
+    equipment: "三脚架",
   },
   narrativeLogic: "五段式：钩子→价值→CTA→教程→结果",
   beatPoints: "0s 硬切开场；3s BGM 起；6s 转场",
@@ -153,5 +161,23 @@ describe("resolveFilmPullParseError", () => {
   it("returns null when parse succeeds", () => {
     const text = `\`\`\`film-pull\n${JSON.stringify(analyzeBody)}\n\`\`\``;
     expect(resolveFilmPullParseError(text, "analyze")).toBeNull();
+  });
+});
+
+describe("validateFilmPullAnalyzeQuality", () => {
+  it("passes a well-filled analyze patch", () => {
+    const text = `\`\`\`film-pull\n${JSON.stringify(analyzeBody)}\n\`\`\``;
+    const patch = extractFilmPullAnalyzePatch(text);
+    expect(patch).not.toBeNull();
+    expect(validateFilmPullAnalyzeQuality(patch!)).toBeNull();
+  });
+
+  it("rejects when venue is placeholder", () => {
+    const text = `\`\`\`film-pull\n${JSON.stringify({
+      ...analyzeBody,
+      shootingPrep: { ...analyzeBody.shootingPrep, venue: "无" },
+    })}\n\`\`\``;
+    const patch = extractFilmPullAnalyzePatch(text);
+    expect(validateFilmPullAnalyzeQuality(patch!)).toMatch(/venue/);
   });
 });

@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
 import { ShootCatalogPanel } from "@/components/model-shot/shoot-catalog-panel";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
-import { EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomIconButtonLink } from "@/components/ui/ecom-icon-button";
+import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 
 export default function ShootCatalogPage() {
   return (
@@ -17,9 +19,15 @@ export default function ShootCatalogPage() {
               系统推荐条目只读；可在「我的」区自建场景、道具与姿势，供服装模特图姿势表点选。确认计划或出图成功后，被引用的自建条目将锁定。
             </p>
           </div>
-          <Link href="/ecom/model-shot">
-            <EcomButtonSecondary type="button">返回服装模特图</EcomButtonSecondary>
-          </Link>
+          <EcomIconToolbar>
+            <EcomIconToolbarGroup label="导航">
+              <EcomIconButtonLink
+                label="返回服装模特图"
+                icon={ArrowLeft}
+                href="/ecom/model-shot"
+              />
+            </EcomIconToolbarGroup>
+          </EcomIconToolbar>
         </header>
         <ShootCatalogPanel />
       </div>

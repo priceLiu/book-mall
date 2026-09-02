@@ -926,17 +926,9 @@ export function StoryboardModelPickerDialog({
   );
 
   const footer = (
-    <div className="flex shrink-0 items-center justify-between border-t border-[#f0f0f2] px-5 py-3">
+      <div className="flex shrink-0 items-center justify-between border-t border-[#f0f0f2] px-5 py-3">
       <span className="text-[11px] text-[#86868b]">{footerLeftHint}</span>
       <div className="flex items-center gap-2">
-        <EcomButtonSecondary
-          type="button"
-          size="sm"
-          onClick={() => onOpenChange(false)}
-          disabled={running}
-        >
-          {confirming ? "关闭" : "取消"}
-        </EcomButtonSecondary>
         {!running ? (
           <EcomButtonPrimary
             type="button"
@@ -1005,14 +997,6 @@ export function StoryboardModelPickerDialog({
         <DialogFooter className="shrink-0 items-center justify-between border-t border-[#f0f0f2] px-5 py-3 sm:justify-between">
           <span className="text-[11px] text-[#86868b]">{footerLeftHint}</span>
           <div className="flex items-center gap-2">
-            <EcomButtonSecondary
-              type="button"
-              size="sm"
-              onClick={() => onOpenChange(false)}
-              disabled={running}
-            >
-              {confirming ? "关闭" : "取消"}
-            </EcomButtonSecondary>
             {!running ? (
               <EcomButtonPrimary type="button" size="sm" onClick={handleConfirm} disabled={confirming || !canConfirm}>
                 {confirming ? "生成中…" : action}

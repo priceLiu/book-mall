@@ -2,6 +2,10 @@
 
 import { Plus, Trash2 } from "lucide-react";
 
+import {
+  FilmPullRefReadOnlyCell,
+  FilmPullRefToggleCell,
+} from "@/components/film-pull/film-pull-ref-cells";
 import { ProductDesignPromptMentionTextarea } from "@/components/product-design/product-design-prompt-mention-textarea";
 import {
   ecomDataTableBodyRowClass,
@@ -21,8 +25,12 @@ import {
   addProductionShotRow,
   deleteProductionShotRow,
 } from "@/lib/film-pull-production-script-utils";
-import type { FilmPullCharacterRef, FilmPullProductionShot } from "@/lib/film-pull-types";
-import { listFilmPullModelRefs, listFilmPullProductRefs } from "@/lib/film-pull-refs";
+import type { FilmPullCharacterRef, FilmPullProductionShot, FilmPullRefMatch } from "@/lib/film-pull-types";
+import {
+  listFilmPullModelRefs,
+  listFilmPullProductRefs,
+  resolveFilmPullShotDisplayRefIds,
+} from "@/lib/film-pull-refs";
 import { cn } from "@/lib/utils";
 
 export type FilmPullProductionScriptTableMode = "preview" | "edit";
@@ -30,6 +38,7 @@ export type FilmPullProductionScriptTableMode = "preview" | "edit";
 type Props = {
   shots: FilmPullProductionShot[];
   characterRefs: FilmPullCharacterRef[];
+  refMatch?: FilmPullRefMatch | null;
   /** preview：只读；edit：可编辑（配合 onChangeShots） */
   mode?: FilmPullProductionScriptTableMode;
   disabled?: boolean;
@@ -46,73 +55,6 @@ type Props = {
   showRowActions?: boolean;
   className?: string;
 };
-
-function RefThumb({ url, label }: { url: string; label?: string }) {
-  return (
-    <div className="flex flex-col items-center gap-0.5">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt={label ?? ""} className="h-9 w-9 rounded object-cover ring-1 ring-[#e8e8ed]" />
-      {label ? <span className="max-w-[3rem] truncate text-[9px] text-[#6e6e73]">{label}</span> : null}
-    </div>
-  );
-}
-
-function RefToggleGroup({
-  refs,
-  selectedIds,
-  disabled,
-  onChange,
-}: {
-  refs: Array<{ id: string; ossUrl: string; label?: string }>;
-  selectedIds: string[];
-  disabled?: boolean;
-  onChange: (ids: string[]) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-1">
-      {refs.map((ref) => {
-        const active = selectedIds.includes(ref.id);
-        return (
-          <button
-            key={ref.id}
-            type="button"
-            disabled={disabled}
-            title={ref.label ?? ref.id}
-            className={`rounded-lg p-0.5 ring-2 transition ${active ? "ring-[#0071e3]" : "ring-transparent opacity-60 hover:opacity-100"}`}
-            onClick={() => {
-              const next = active
-                ? selectedIds.filter((id) => id !== ref.id)
-                : [...selectedIds, ref.id];
-              onChange(next);
-            }}
-          >
-            <RefThumb url={ref.ossUrl} label={ref.label} />
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function RefReadOnlyGroup({
-  refs,
-  selectedIds,
-}: {
-  refs: Array<{ id: string; ossUrl: string; label?: string }>;
-  selectedIds: string[];
-}) {
-  const selected = refs.filter((r) => selectedIds.includes(r.id));
-  if (selected.length === 0) {
-    return <span className="text-[#86868b]">--</span>;
-  }
-  return (
-    <div className="flex flex-wrap gap-1">
-      {selected.map((ref) => (
-        <RefThumb key={ref.id} url={ref.ossUrl} label={ref.label} />
-      ))}
-    </div>
-  );
-}
 
 const TIME_FIELD_KEYS = new Set(["shotNo", "startTimeSec", "endTimeSec", "durationSec"]);
 
@@ -201,6 +143,7 @@ function ScriptTextField({
 export function FilmPullProductionScriptTable({
   shots,
   characterRefs,
+  refMatch,
   mode = "preview",
   disabled = false,
   onChangeShots,
@@ -309,7 +252,12 @@ export function FilmPullProductionScriptTable({
           </tr>
         </thead>
         <tbody>
-          {shots.map((shot) => (
+          {shots.map((shot) => {
+            const displayRefs = resolveFilmPullShotDisplayRefIds(shot, {
+              characterRefs,
+              refMatch,
+            });
+            return (
             <tr key={shot.shotNo} className={ecomDataTableBodyRowClass}>
               {FILM_PULL_SHOT_TABLE_COLUMNS.map((col) => {
                 const value = col.get(shot);
@@ -328,26 +276,32 @@ export function FilmPullProductionScriptTable({
               })}
               <td className={ecomDataTableTdClass}>
                 {isEdit ? (
-                  <RefToggleGroup
+                  <FilmPullRefToggleCell
                     refs={modelRefs}
                     selectedIds={shot.modelRefIds}
                     disabled={disabled}
                     onChange={(ids) => patchShotLocal(shot.shotNo, { modelRefIds: ids })}
                   />
                 ) : (
-                  <RefReadOnlyGroup refs={modelRefs} selectedIds={shot.modelRefIds} />
+                  <FilmPullRefReadOnlyCell
+                    refs={modelRefs}
+                    selectedIds={displayRefs.modelRefIds}
+                  />
                 )}
               </td>
               <td className={ecomDataTableTdClass}>
                 {isEdit ? (
-                  <RefToggleGroup
+                  <FilmPullRefToggleCell
                     refs={productRefs}
                     selectedIds={shot.productRefIds}
                     disabled={disabled}
                     onChange={(ids) => patchShotLocal(shot.shotNo, { productRefIds: ids })}
                   />
                 ) : (
-                  <RefReadOnlyGroup refs={productRefs} selectedIds={shot.productRefIds} />
+                  <FilmPullRefReadOnlyCell
+                    refs={productRefs}
+                    selectedIds={displayRefs.productRefIds}
+                  />
                 )}
               </td>
               <td className={ecomDataTableTdClass}>
@@ -400,7 +354,8 @@ export function FilmPullProductionScriptTable({
                 </td>
               ) : null}
             </tr>
-          ))}
+            );
+          })}
         </tbody>
         {showRowActions && isEdit ? (
           <tfoot>

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
 import { StoryboardPanelImageHoverActions } from "@/components/storyboard/storyboard-panel-image-hover-actions";
-import { storyboardPreviewAspectClass } from "@/lib/storyboard-aspect";
+import { storyboardPanelCardWidth, storyboardPreviewAspectClass } from "@/lib/storyboard-aspect";
 import type { StoryboardPanel } from "@/lib/storyboard-types";
 import {
   clampModelShotActiveImageIndex,
@@ -64,6 +64,7 @@ export function ModelShotPoseCard({
 
   const displayUrl = activeImage?.url ?? null;
   const hasMultiple = history.length > 1;
+  const cardWidth = storyboardPanelCardWidth(aspectRatio);
 
   const shiftActive = useCallback(
     (delta: number) => {
@@ -79,9 +80,10 @@ export function ModelShotPoseCard({
   return (
     <article
       className={cn(
-        "group relative flex w-full min-w-0 flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition",
+        "group relative isolate flex shrink-0 flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition",
         selected ? "border-[var(--ecom-primary)] ring-2 ring-[#0071e3]/25" : "border-[#e8e8ed]",
       )}
+      style={{ width: cardWidth }}
       onClick={
         selectable && onToggleSelect
           ? (e) => {
@@ -92,21 +94,6 @@ export function ModelShotPoseCard({
           : undefined
       }
     >
-      {selectable && onToggleSelect ? (
-        <label
-          className="absolute left-2 top-2 z-20 flex cursor-pointer items-center gap-1 rounded-md bg-white/90 px-1.5 py-0.5 shadow-sm"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={onToggleSelect}
-            aria-label={`选择${indexLabel} ${panel.index}`}
-            className="h-3.5 w-3.5 accent-[var(--ecom-primary)]"
-          />
-        </label>
-      ) : null}
-
       <div
         className={cn(
           "relative w-full bg-[#f5f5f7]",
@@ -114,6 +101,21 @@ export function ModelShotPoseCard({
           displayUrl && !busy && "group/image",
         )}
       >
+        {selectable && onToggleSelect ? (
+          <label
+            className="absolute left-2 top-2 z-20 flex cursor-pointer items-center gap-1 rounded-md bg-white/90 px-1.5 py-0.5 shadow-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={onToggleSelect}
+              aria-label={`选择${indexLabel} ${panel.index}`}
+              className="h-3.5 w-3.5 accent-[var(--ecom-primary)]"
+            />
+          </label>
+        ) : null}
+
         {displayUrl ? (
           <>
             {history.length > 1 ? (

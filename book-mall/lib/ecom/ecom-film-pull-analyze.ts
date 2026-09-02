@@ -11,6 +11,7 @@ import {
   normalizeFilmPullShotsForDisplay,
   resolveFilmPullParseError,
   assertRenderScriptInvariants,
+  validateFilmPullAnalyzeQuality,
 } from "@/lib/ecom/ecom-film-pull-structured";
 import {
   normalizeCameraMovement,
@@ -206,8 +207,13 @@ export async function finalizeFilmPullAnalyzeFromText(opts: {
 
   let structured = extractFilmPullAnalyzePatch(fullText);
   let parseError = structured ? null : resolveFilmPullParseError(fullText, "analyze");
+  let qualityError = structured ? validateFilmPullAnalyzeQuality(structured) : null;
 
-  if (!structured && parseError && opts.retryOnParseError !== false) {
+  const shouldRetry =
+    opts.retryOnParseError !== false && (parseError || qualityError);
+
+  if (shouldRetry) {
+    const retryReason = qualityError ?? parseError ?? "未知校验错误";
     try {
       await assertAnalyzeNotCanceled(ctx.userId, ctx.projectId, ctx.runId);
       fullText = await collectGwChatText(ctx.userId, {
@@ -219,16 +225,22 @@ export async function finalizeFilmPullAnalyzeFromText(opts: {
           { role: "user", content: buildVideoUserContent(ctx.userPrompt, ctx.media) },
           {
             role: "user",
-            content: buildFilmPullAnalyzeRetryUserPrompt(parseError),
+            content: buildFilmPullAnalyzeRetryUserPrompt(retryReason),
           },
         ],
       });
       structured = extractFilmPullAnalyzePatch(fullText);
       parseError = structured ? null : resolveFilmPullParseError(fullText, "analyze");
+      qualityError = structured ? validateFilmPullAnalyzeQuality(structured) : null;
     } catch (e) {
       if (e instanceof FilmPullAnalyzeCanceledError) throw e;
       parseError = e instanceof Error ? e.message : "拉片模型重试失败";
     }
+  }
+
+  if (structured && qualityError && !parseError) {
+    parseError = `结构化质量校验失败：${qualityError}`;
+    structured = null;
   }
 
   if (structured) structured = normalizeAnalyzePatch(structured);

@@ -238,6 +238,7 @@ export function FilmPullProductionScriptPanel({
           mode="preview"
           shots={plan!.shots}
           characterRefs={project.characterRefs}
+          refMatch={project.refMatch}
         />
       ) : null}
 
@@ -247,6 +248,7 @@ export function FilmPullProductionScriptPanel({
           onOpenChange={setEditOpen}
           shots={plan!.shots}
           characterRefs={project.characterRefs}
+          refMatch={project.refMatch}
           saving={actionBusy}
           onSave={handleSaveScript}
         />

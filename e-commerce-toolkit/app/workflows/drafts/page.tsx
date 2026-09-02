@@ -12,7 +12,8 @@ import {
   ECOM_LIBRARY_MEDIA_GRID_CLASS,
 } from "@/components/media/ecom-media-library-tile";
 import { EcomMediaSkeletonGrid } from "@/components/media/ecom-media-skeleton";
-import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import {
   deleteWorkflowDraft,
   formatWorkflowDraftUpdatedAt,
@@ -168,14 +169,16 @@ export default function WorkflowDraftsPage() {
               </p>
             </div>
             <div className="relative">
-              <EcomButtonPrimary
-                type="button"
-                size="sm"
-                onClick={() => setNewMenuOpen((v) => !v)}
-              >
-                <Plus className="mr-1 inline h-3.5 w-3.5" />
-                新建工作流
-              </EcomButtonPrimary>
+              <EcomIconToolbar>
+                <EcomIconToolbarGroup label="新建">
+                  <EcomIconButton
+                    label="新建工作流"
+                    icon={Plus}
+                    variant="accent"
+                    onClick={() => setNewMenuOpen((v) => !v)}
+                  />
+                </EcomIconToolbarGroup>
+              </EcomIconToolbar>
               {newMenuOpen ? (
                 <div className="absolute right-0 z-20 mt-2 w-56 rounded-xl border border-[#e8e8ed] bg-white p-1 shadow-lg">
                   {NEW_DRAFT_OPTIONS.map((opt) => (
@@ -288,26 +291,27 @@ export default function WorkflowDraftsPage() {
                               更新于 {formatWorkflowDraftUpdatedAt(item.updatedAt)}
                             </p>
                           </div>
-                          <div className="mt-auto flex flex-wrap gap-2">
-                            <EcomButtonPrimary
-                              type="button"
-                              size="sm"
-                              className="flex-1"
-                              disabled={openBusy || deleteBusy}
-                              onClick={() => void handleOpen(item)}
-                            >
-                              <ExternalLink className="mr-1 inline h-3.5 w-3.5" />
-                              {openBusy ? "打开中…" : "继续编辑"}
-                            </EcomButtonPrimary>
-                            <EcomButtonSecondary
-                              type="button"
-                              size="sm"
-                              disabled={openBusy || deleteBusy}
-                              onClick={() => void handleDelete(item)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              {deleteBusy ? "…" : null}
-                            </EcomButtonSecondary>
+                          <div className="mt-auto">
+                          <EcomIconToolbar>
+                            <EcomIconToolbarGroup label="操作">
+                              <EcomIconButton
+                                label={openBusy ? "打开中…" : "继续编辑"}
+                                icon={ExternalLink}
+                                variant="accent"
+                                busy={openBusy}
+                                disabled={openBusy || deleteBusy}
+                                onClick={() => void handleOpen(item)}
+                              />
+                              <EcomIconButton
+                                label={deleteBusy ? "删除中…" : "删除暂存"}
+                                icon={Trash2}
+                                variant="destructive"
+                                busy={deleteBusy}
+                                disabled={openBusy || deleteBusy}
+                                onClick={() => void handleDelete(item)}
+                              />
+                            </EcomIconToolbarGroup>
+                          </EcomIconToolbar>
                           </div>
                         </div>
                       </article>

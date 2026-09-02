@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
-import { ReplicaProductBriefCard } from "@/components/media-decompose/media-decompose-replica-thread-blocks";
+import { ReplicaProductBriefCard, ReplicaSellingPointsCard, ReplicaVoiceoverDraftCard } from "@/components/media-decompose/media-decompose-replica-thread-blocks";
 import { EcomModelLibraryPickerDialog } from "@/components/model-shot/ecom-model-library-picker-dialog";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
@@ -86,6 +86,8 @@ type Props = {
   modelsLoading?: boolean;
   onRefreshModels?: () => void;
   busy?: boolean;
+  /** full：素材采集 + 识产品 + 生成脚本；refs-only：仅保留参考图上传/更换 */
+  variant?: "full" | "refs-only";
   onAlert: (opts: { title: string; message: string; variant?: "error" }) => Promise<void>;
 };
 
@@ -99,9 +101,10 @@ export function ReplicaSetupPanel({
   modelsLoading,
   onRefreshModels,
   busy,
+  variant = "full",
   onAlert,
 }: Props) {
-  const { doubleConfirm } = useDialogs();
+  const { doubleConfirm, toast } = useDialogs();
   const inputRefs = useRef<Record<ReplicaSetupRole, HTMLInputElement | null>>({
     model: null,
     product: null,
@@ -112,9 +115,16 @@ export function ReplicaSetupPanel({
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const progressTickRef = useRef<number | null>(null);
   const [productBriefDraft, setProductBriefDraft] = useState(() => api.readProductBrief());
+  const [sellingPointsDraft, setSellingPointsDraft] = useState(
+    () => api.readSellingPoints?.() ?? "",
+  );
   const briefDirtyRef = useRef(false);
+  const sellingPointsDirtyRef = useRef(false);
   const [briefSaveBusy, setBriefSaveBusy] = useState(false);
+  const [sellingPointsSaveBusy, setSellingPointsSaveBusy] = useState(false);
   const [recognizeBusy, setRecognizeBusy] = useState(false);
+  const [sellingPointsGenBusy, setSellingPointsGenBusy] = useState(false);
+  const [voiceoverGenBusy, setVoiceoverGenBusy] = useState(false);
   const [scriptBusy, setScriptBusy] = useState(false);
   const [modelPromptBusy, setModelPromptBusy] = useState(false);
   const [modelGenBusy, setModelGenBusy] = useState(false);
@@ -128,12 +138,18 @@ export function ReplicaSetupPanel({
   const modelRefs = allRefs.filter((r) => api.isModelRefId(r.id));
   const productRefs = allRefs.filter((r) => api.isProductRefId(r.id));
   const savedProductBrief = api.readProductBrief();
+  const savedSellingPoints = api.readSellingPoints?.() ?? "";
+  const voiceoverDraft = api.readVoiceoverDraft?.() ?? null;
   const productBriefDirty = productBriefDraft.trim() !== savedProductBrief.trim();
+  const sellingPointsDirty = sellingPointsDraft.trim() !== savedSellingPoints.trim();
   const actionLocked =
     busy ||
     Boolean(importState) ||
     briefSaveBusy ||
+    sellingPointsSaveBusy ||
     recognizeBusy ||
+    sellingPointsGenBusy ||
+    voiceoverGenBusy ||
     scriptBusy ||
     modelPromptBusy ||
     modelGenBusy;
@@ -176,12 +192,17 @@ export function ReplicaSetupPanel({
   const supportsAssets = Boolean(api.attachRefsFromAssets);
   const supportsModelLibrary = Boolean(api.attachModelFromLibrary);
   const supportsModelAi = Boolean(api.generateModelPrompt && api.generateModelImage);
-  const supportsScript = Boolean(api.generateScript);
+  const supportsScript = Boolean(api.generateScript) && variant === "full";
 
   useEffect(() => {
     if (briefDirtyRef.current) return;
     setProductBriefDraft(api.readProductBrief());
   }, [api, savedProductBrief]);
+
+  useEffect(() => {
+    if (sellingPointsDirtyRef.current) return;
+    setSellingPointsDraft(api.readSellingPoints?.() ?? "");
+  }, [api, savedSellingPoints]);
 
   const refsForRole = useCallback(
     (role: ReplicaSetupRole) => (role === "model" ? modelRefs : productRefs),
@@ -261,16 +282,26 @@ export function ReplicaSetupPanel({
     }
   }
 
-  async function handleSaveProductBrief() {
+  async function handleSaveCopyFields(opts?: { briefOnly?: boolean; sellingOnly?: boolean }) {
     const brief = productBriefDraft.trim();
-    if (!brief) {
+    const sellingPoints = sellingPointsDraft.trim();
+    if (!opts?.sellingOnly && !brief) {
       await onAlert({ title: "内容为空", message: "请先填写产品描述。", variant: "error" });
       return;
     }
-    setBriefSaveBusy(true);
+    if (!api.saveCopyFields) {
+      if (!opts?.sellingOnly) await api.saveProductBrief(brief);
+      return;
+    }
+    setBriefSaveBusy(!opts?.sellingOnly);
+    setSellingPointsSaveBusy(!opts?.briefOnly);
     try {
-      await api.saveProductBrief(brief);
+      await api.saveCopyFields({
+        ...(opts?.sellingOnly ? {} : { productBrief: brief }),
+        ...(opts?.briefOnly ? {} : { sellingPoints }),
+      });
       briefDirtyRef.current = false;
+      sellingPointsDirtyRef.current = false;
     } catch (e) {
       await onAlert({
         title: "保存失败",
@@ -279,6 +310,24 @@ export function ReplicaSetupPanel({
       });
     } finally {
       setBriefSaveBusy(false);
+      setSellingPointsSaveBusy(false);
+    }
+  }
+
+  async function handleSaveSellingPoints() {
+    if (!api.saveCopyFields) return;
+    setSellingPointsSaveBusy(true);
+    try {
+      await api.saveCopyFields({ sellingPoints: sellingPointsDraft.trim() });
+      sellingPointsDirtyRef.current = false;
+    } catch (e) {
+      await onAlert({
+        title: "保存失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    } finally {
+      setSellingPointsSaveBusy(false);
     }
   }
 
@@ -291,6 +340,10 @@ export function ReplicaSetupPanel({
       });
       briefDirtyRef.current = false;
       setProductBriefDraft(result.productBrief);
+      if (api.readSellingPoints) {
+        sellingPointsDirtyRef.current = false;
+        setSellingPointsDraft(api.readSellingPoints());
+      }
     } catch (e) {
       await onAlert({
         title: mock ? "Mock 识产品失败" : "识产品失败",
@@ -302,9 +355,60 @@ export function ReplicaSetupPanel({
     }
   }
 
+  async function handleGenerateSellingPoints() {
+    if (!api.generateSellingPoints) return;
+    if (!productRefs.length) {
+      await onAlert({ title: "缺少产品图", message: "请至少上传 1 张产品图。", variant: "error" });
+      return;
+    }
+    setSellingPointsGenBusy(true);
+    try {
+      const draft = sellingPointsDraft.trim();
+      const result = await api.generateSellingPoints({
+        userDraft: draft || undefined,
+        productBrief: productBriefDraft.trim() || undefined,
+      });
+      sellingPointsDirtyRef.current = false;
+      setSellingPointsDraft(result.sellingPoints);
+    } catch (e) {
+      await onAlert({
+        title: "卖点生成失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    } finally {
+      setSellingPointsGenBusy(false);
+    }
+  }
+
+  async function handleGenerateVoiceover() {
+    if (!api.generateVoiceover) return;
+    setVoiceoverGenBusy(true);
+    try {
+      await api.generateVoiceover({
+        productBrief: productBriefDraft.trim() || undefined,
+        sellingPoints: sellingPointsDraft.trim() || undefined,
+        modelKey: chatModelKey,
+      });
+      toast({
+        title: "口播草稿已生成",
+        description: "已显示在卖点下方；生成脚本后可在分镜表点击「应用新口播」。",
+      });
+    } catch (e) {
+      await onAlert({
+        title: "口播生成失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    } finally {
+      setVoiceoverGenBusy(false);
+    }
+  }
+
   async function handleGenerateScript() {
     if (!api.generateScript) return;
     const brief = productBriefDraft.trim();
+    const sellingPoints = sellingPointsDraft.trim();
     if (!modelRefs.length) {
       await onAlert({ title: "缺少模特图", message: "请至少上传 1 张模特图。", variant: "error" });
       return;
@@ -313,17 +417,25 @@ export function ReplicaSetupPanel({
       await onAlert({ title: "缺少产品图", message: "请至少上传 1 张产品图。", variant: "error" });
       return;
     }
-    if (!brief) {
+    if (!brief && !sellingPoints) {
       await onAlert({
-        title: "缺少产品描述",
-        message: "请先填写或 AI 识别产品描述。",
+        title: "缺少文案素材",
+        message: "请先填写产品描述或卖点，或使用 AI 识产品 / AI 卖点。",
         variant: "error",
       });
       return;
     }
     setScriptBusy(true);
     try {
-      await api.generateScript({ productBrief: brief, modelKey: chatModelKey });
+      if (api.saveCopyFields && (productBriefDirty || sellingPointsDirty)) {
+        await api.saveCopyFields({
+          productBrief: brief,
+          sellingPoints,
+        });
+        briefDirtyRef.current = false;
+        sellingPointsDirtyRef.current = false;
+      }
+      await api.generateScript({ productBrief: brief, sellingPoints, modelKey: chatModelKey });
     } catch (e) {
       await onAlert({
         title: "脚本生成失败",
@@ -454,8 +566,14 @@ export function ReplicaSetupPanel({
   return (
     <div className="space-y-4 rounded-xl border border-[#e8e8ed] bg-white p-4">
       <div>
-        <h3 className="text-sm font-semibold text-[#1d1d1f]">{copy.panelTitle}</h3>
-        <p className="mt-1 text-[11px] leading-relaxed text-[#6e6e73]">{copy.panelDescription}</p>
+        <h3 className="text-sm font-semibold text-[#1d1d1f]">
+          {variant === "refs-only" ? copy.refSectionLabel : copy.panelTitle}
+        </h3>
+        <p className="mt-1 text-[11px] leading-relaxed text-[#6e6e73]">
+          {variant === "refs-only"
+            ? "可随时更换模特/产品参考图；更换后下方分镜表中的 @图片N 引用将自动同步。"
+            : copy.panelDescription}
+        </p>
       </div>
 
       <div
@@ -563,7 +681,7 @@ export function ReplicaSetupPanel({
           briefDirtyRef.current = true;
           setProductBriefDraft(value);
         }}
-        onSave={handleSaveProductBrief}
+        onSave={() => void handleSaveCopyFields({ briefOnly: true, sellingOnly: false })}
         onRecognize={() => handleRecognizeProduct(false)}
         recognizeDisabled={!productRefs.length}
         saving={briefSaveBusy}
@@ -571,6 +689,38 @@ export function ReplicaSetupPanel({
         disabled={actionLocked && !recognizeBusy}
         dirty={productBriefDirty}
       />
+
+      {api.readSellingPoints || api.generateSellingPoints ? (
+        <ReplicaSellingPointsCard
+          value={sellingPointsDraft}
+          onChange={(value) => {
+            sellingPointsDirtyRef.current = true;
+            setSellingPointsDraft(value);
+          }}
+          onSave={api.saveCopyFields ? () => void handleSaveSellingPoints() : undefined}
+          onGenerate={api.generateSellingPoints ? () => void handleGenerateSellingPoints() : undefined}
+          onGenerateVoiceover={
+            api.generateVoiceover ? () => void handleGenerateVoiceover() : undefined
+          }
+          showVoiceover={Boolean(api.generateVoiceover)}
+          generateDisabled={!productRefs.length}
+          voiceoverDisabled={!productRefs.length}
+          saving={sellingPointsSaveBusy}
+          generating={sellingPointsGenBusy}
+          voiceoverGenerating={voiceoverGenBusy}
+          disabled={actionLocked && !sellingPointsGenBusy && !voiceoverGenBusy}
+          dirty={sellingPointsDirty}
+        />
+      ) : null}
+
+      {voiceoverGenBusy ? (
+        <div className="flex items-center gap-2 rounded-xl border border-[#e8e8ed] bg-white px-4 py-3 text-sm text-[#6e6e73]">
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#0071e3]" />
+          AI 口播生成中…
+        </div>
+      ) : voiceoverDraft ? (
+        <ReplicaVoiceoverDraftCard draft={voiceoverDraft} />
+      ) : null}
 
       {(api.mockDevEnabled?.() || supportsScript) && (
         <div className="flex flex-wrap items-center gap-2 pt-1">

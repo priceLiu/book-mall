@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { modelShotPoseHasGeneratedImage } from "@/lib/ecom/model-shot/pose-image-history";
 import { prisma } from "@/lib/prisma";
 
 /** 与 background-generation-dock-policy BACKGROUND_DOCK_PERSISTENT_MS 一致 */
@@ -165,7 +166,12 @@ export async function clearModelShotPoseImagesPending(
 export async function reconcileModelShotPendingOnRead(opts: {
   projectId: string;
   meta: unknown;
-  planItems: Array<{ index: number; imageUrl?: string }>;
+  planItems: Array<{
+    index: number;
+    imageUrl?: string;
+    assetId?: string;
+    imageHistory?: Array<{ url: string }>;
+  }>;
 }): Promise<number[]> {
   const pending = readModelShotPendingPoseImages(opts.meta);
   const toClear: number[] = [];
@@ -173,9 +179,8 @@ export async function reconcileModelShotPendingOnRead(opts: {
   for (const [key, entry] of Object.entries(pending)) {
     const index = Number.parseInt(key, 10);
     if (!Number.isFinite(index) || index <= 0) continue;
-    const hasImage = opts.planItems.some(
-      (item) => item.index === index && Boolean(item.imageUrl?.trim()),
-    );
+    const item = opts.planItems.find((row) => row.index === index);
+    const hasImage = item ? modelShotPoseHasGeneratedImage(item) : false;
     if (hasImage || isPendingEntryStale(entry)) {
       toClear.push(index);
     }

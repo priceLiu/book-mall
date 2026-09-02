@@ -11,6 +11,7 @@ import { SeedVideoAssistantPanel } from "@/components/seed-video/seed-video-assi
 import { SeedVideoContentPanel } from "@/components/seed-video/seed-video-content-panel";
 import { SeedVideoProgressRail } from "@/components/seed-video/seed-video-progress-rail";
 import { SeedVideoSkillPickerDialog } from "@/components/seed-video/seed-video-skill-picker-dialog";
+import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-link-dialog";
 import { EcomButtonPrimary } from "@/components/ui/ecom-button";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import {
@@ -44,6 +45,10 @@ import {
   type SeedVideoSkillKey,
 } from "@/lib/seed-video-skills";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import {
+  ECOM_WORKFLOW_SHARE_DESCRIPTION,
+  ECOM_WORKFLOW_SHARE_RESOURCE,
+} from "@/lib/ecom-workflow-share";
 
 const PROJECT_STORAGE_KEY = "ecom-seed-video-active-project";
 
@@ -69,6 +74,7 @@ export function SeedVideoStudio() {
     null,
   );
   const [skillPickerOpen, setSkillPickerOpen] = useState(false);
+  const [workflowShareOpen, setWorkflowShareOpen] = useState(false);
   const planningPromptRef = useRef("");
   const planningLaunchRef = useRef(false);
   const loadGenerationRef = useRef(0);
@@ -603,8 +609,18 @@ export function SeedVideoStudio() {
           onSaveStoryboardDraft={handleSaveStoryboardDraft}
           onProceedFromStoryboardEdit={handleProceedFromStoryboardEdit}
           openProductionAfterSyncToken={openProductionAfterSyncToken}
+          onShareWorkflow={() => setWorkflowShareOpen(true)}
         />
       </EcomWorkspaceLayout>
+
+      <WorkflowShareLinkDialog
+        projectId={project.id}
+        projectTitle={project.title?.trim() || skillLabel}
+        open={workflowShareOpen}
+        onClose={() => setWorkflowShareOpen(false)}
+        resourceType={ECOM_WORKFLOW_SHARE_RESOURCE.seedVideo}
+        description={ECOM_WORKFLOW_SHARE_DESCRIPTION[ECOM_WORKFLOW_SHARE_RESOURCE.seedVideo]}
+      />
 
       {previewVideo ? (
         <EcomVideoPreviewDialog

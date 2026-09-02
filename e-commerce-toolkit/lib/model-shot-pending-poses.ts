@@ -1,5 +1,7 @@
 import type { ModelShotMeta, ModelShotPoseItem, ModelShotProject } from "@/lib/model-shot-types";
 
+import { modelShotPoseHasGeneratedImage } from "@/lib/model-shot-pose-images";
+
 export type ModelShotPendingPoseImageEntry = {
   startedAt: string;
   modelKey?: string;
@@ -54,12 +56,15 @@ export function resolveActiveModelShotPoseBusyIndexes(opts: {
   items: readonly ModelShotPoseItem[];
 }): number[] {
   const set = new Set<number>([...opts.pendingIndices, ...opts.localWatchIndices]);
+  for (const item of opts.items) {
+    if (item.status === "generating") set.add(item.index);
+  }
   for (const idx of [...set]) {
-    const hasImage = opts.items.some(
-      (item) => item.index === idx && Boolean(item.imageUrl?.trim()),
-    );
+    const item = opts.items.find((row) => row.index === idx);
+    const hasImage = item ? modelShotPoseHasGeneratedImage(item) : false;
     const serverPending = opts.pendingIndices.includes(idx);
-    if (hasImage && !serverPending && !opts.localWatchIndices.includes(idx)) {
+    // 服务端已落图且不再 pending → 立即解除 busy（批量 API 未返回时也同步）
+    if (hasImage && !serverPending) {
       set.delete(idx);
     }
   }
@@ -69,7 +74,7 @@ export function resolveActiveModelShotPoseBusyIndexes(opts: {
 export function listOrphanModelShotPendingPoseIndices(
   meta: ModelShotMeta | null | undefined,
   items: readonly ModelShotPoseItem[],
-  opts: { localInFlight: boolean; localWatchIndices: readonly number[] },
+  _opts: { localInFlight: boolean; localWatchIndices: readonly number[] },
 ): number[] {
   const map = readModelShotPendingPoseImages(meta);
   const orphans: number[] = [];
@@ -78,9 +83,8 @@ export function listOrphanModelShotPendingPoseIndices(
   for (const [key, entry] of Object.entries(map)) {
     const index = Number.parseInt(key, 10);
     if (!Number.isFinite(index) || index <= 0) continue;
-    const hasImage = items.some(
-      (item) => item.index === index && Boolean(item.imageUrl?.trim()),
-    );
+    const item = items.find((row) => row.index === index);
+    const hasImage = item ? modelShotPoseHasGeneratedImage(item) : false;
     if (hasImage) {
       orphans.push(index);
       continue;
@@ -90,10 +94,7 @@ export function listOrphanModelShotPendingPoseIndices(
       Number.isNaN(started) || now - started > MODEL_SHOT_POSE_PENDING_STALE_MS;
     if (stale) {
       orphans.push(index);
-      continue;
     }
-    if (opts.localInFlight || opts.localWatchIndices.includes(index)) continue;
-    orphans.push(index);
   }
   return orphans.sort((a, b) => a - b);
 }
@@ -137,4 +138,30 @@ export function buildModelShotPendingMetaPatch(
 /** 模特图生成 Dock 任务唯一 id（同项目勿重复登记） */
 export function modelShotImageDockTaskId(projectId: string): string {
   return `model-shot-image:${projectId}`;
+}
+
+export function modelShotTargetIndexesHaveImages(
+  items: readonly ModelShotPoseItem[],
+  indexes: readonly number[],
+): boolean {
+  return indexes.every((idx) => {
+    const item = items.find((row) => row.index === idx);
+    return item ? modelShotPoseHasGeneratedImage(item) : false;
+  });
+}
+
+export function modelShotTargetIndexesGainedImages(
+  beforeItems: readonly ModelShotPoseItem[],
+  afterItems: readonly ModelShotPoseItem[],
+  indexes: readonly number[],
+): boolean {
+  return indexes.some((idx) => {
+    const before = beforeItems.find((row) => row.index === idx);
+    const after = afterItems.find((row) => row.index === idx);
+    if (!after || !modelShotPoseHasGeneratedImage(after)) return false;
+    if (!before || !modelShotPoseHasGeneratedImage(before)) return true;
+    const beforeUrl = before.imageUrl?.trim();
+    const afterUrl = after.imageUrl?.trim();
+    return Boolean(afterUrl && afterUrl !== beforeUrl);
+  });
 }

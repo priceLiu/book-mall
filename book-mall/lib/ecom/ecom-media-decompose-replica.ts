@@ -1,5 +1,5 @@
+import type { CanvasChatContentPart, CanvasChatMessage } from "@/lib/canvas/providers/types";
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
-import type { CanvasChatContentPart } from "@/lib/canvas/providers/types";
 import {
   assertStoryLlmVisionModel,
   isStoryLlmVisionModel,
@@ -28,11 +28,18 @@ import {
   buildReplicaModelImagePromptUserMessage,
   buildReplicaProductRecognizePrompt,
   buildReplicaScriptSystemPrompt,
-  buildReplicaScriptUserPrompt,
+  buildReplicaScriptUserContent,
+  buildReplicaScriptRetryUserPrompt,
+  buildReplicaSellingPointsPrompt,
+  buildReplicaVoiceoverSystemPrompt,
+  buildReplicaVoiceoverUserPrompt,
   extractReplicaScriptPatch,
+  extractReplicaVoiceoverPatch,
   formatProductBriefFromRecognition,
   mapReplicaScriptToShots,
   normalizeReplicaModelImagePrompt,
+  normalizeSellingPointsText,
+  parseProductRecognitionResult,
 } from "@/lib/ecom/ecom-media-decompose-replica-script";
 import {
   createEcomSeedVideoProject,
@@ -47,6 +54,8 @@ import {
   ECOM_MEDIA_DECOMPOSE_REPLICA_MODEL_PROMPT_ACTION,
   ECOM_MEDIA_DECOMPOSE_REPLICA_RECOGNIZE_PRODUCT_ACTION,
   ECOM_MEDIA_DECOMPOSE_REPLICA_SCRIPT_ACTION,
+  ECOM_MEDIA_DECOMPOSE_REPLICA_SELLING_POINTS_ACTION,
+  ECOM_MEDIA_DECOMPOSE_REPLICA_VOICEOVER_ACTION,
   ECOM_MEDIA_DECOMPOSE_TOOL_KEY,
 } from "@/lib/ecom/ecom-media-decompose-types";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
@@ -86,6 +95,17 @@ export function resolveRecognizeProductModel(): string {
   return ECOM_RECOGNIZE_PRODUCT_MODEL;
 }
 
+/** 纯文本 LLM（口播/卖点文案等）：不走 3.8 等 Vision 模型，默认 DeepSeek */
+export function resolveReplicaTextChatModel(
+  explicitModelKey?: string,
+  projectChatModelKey?: string,
+): string {
+  for (const candidate of [explicitModelKey?.trim(), projectChatModelKey?.trim()]) {
+    if (candidate && !isStoryLlmVisionModel(candidate)) return candidate;
+  }
+  return ECOM_MEDIA_DECOMPOSE_DEFAULT_CHAT_MODEL;
+}
+
 function clampDuration(n: number, fallback = 5): number {
   if (!Number.isFinite(n) || n <= 0) return fallback;
   return Math.max(SHOT_DURATION_MIN, Math.min(SHOT_DURATION_MAX, Math.round(n)));
@@ -111,6 +131,71 @@ function joinPromptParts(parts: string[]): string {
     .map((p) => p.trim())
     .filter(Boolean)
     .join("，");
+}
+
+export function readReplicaSellingPoints(
+  decompose: MediaDecomposeProjectDto,
+  seedVideo: EcomSeedVideoProjectDto,
+): string {
+  const fromProject =
+    typeof decompose.meta?.replicaSellingPoints === "string"
+      ? decompose.meta.replicaSellingPoints.trim()
+      : "";
+  if (fromProject) return fromProject;
+  const fromSeed =
+    typeof seedVideo.meta?.replicaSellingPoints === "string"
+      ? String(seedVideo.meta.replicaSellingPoints).trim()
+      : "";
+  return fromSeed;
+}
+
+export type ReplicaVoiceoverDraftDto = {
+  shots: Array<{ index: number; voiceover: string }>;
+  generatedAt?: string;
+};
+
+export function readReplicaVoiceoverDraft(
+  seedVideo: EcomSeedVideoProjectDto,
+): ReplicaVoiceoverDraftDto | null {
+  const raw = seedVideo.meta?.replicaVoiceoverDraft;
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (!Array.isArray(o.shots)) return null;
+  const shots = o.shots
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const r = row as Record<string, unknown>;
+      const index = Number(r.index);
+      if (!Number.isFinite(index) || index < 1) return null;
+      return {
+        index: Math.round(index),
+        voiceover: typeof r.voiceover === "string" ? r.voiceover : "",
+      };
+    })
+    .filter((s): s is { index: number; voiceover: string } => s != null);
+  if (shots.length === 0) return null;
+  return {
+    shots,
+    generatedAt: typeof o.generatedAt === "string" ? o.generatedAt : undefined,
+  };
+}
+
+function mergeReplicaCopyMeta(
+  decompose: MediaDecomposeProjectDto,
+  seedVideo: EcomSeedVideoProjectDto,
+  patch: { productBrief?: string; sellingPoints?: string },
+): { projectMeta: Record<string, unknown>; seedMeta: Record<string, unknown> } {
+  const projectMeta = { ...(decompose.meta ?? {}) };
+  const seedMeta = { ...(seedVideo.meta ?? {}) };
+  if (patch.productBrief !== undefined) {
+    projectMeta.replicaProductBrief = patch.productBrief;
+    seedMeta.replicaProductBrief = patch.productBrief;
+  }
+  if (patch.sellingPoints !== undefined) {
+    projectMeta.replicaSellingPoints = patch.sellingPoints;
+    seedMeta.replicaSellingPoints = patch.sellingPoints;
+  }
+  return { projectMeta, seedMeta };
 }
 
 export function buildReplicaShotsFromDecompose(
@@ -542,24 +627,28 @@ export async function recognizeReplicaProduct(
   });
 
   const productBrief = formatProductBriefFromRecognition(text);
+  const parsed = parseProductRecognitionResult(text);
+  const { projectMeta, seedMeta } = mergeReplicaCopyMeta(decompose, seedVideo, {
+    productBrief: parsed.productBrief || productBrief,
+    sellingPoints: parsed.sellingPoints,
+  });
   const project = await updateEcomMediaDecomposeProject(userId, decomposeProjectId, {
-    meta: { replicaProductBrief: productBrief },
+    meta: projectMeta,
   });
   const updatedSeed = await updateEcomSeedVideoProject(userId, seedVideo.id, {
     meta: {
-      ...(seedVideo.meta ?? {}),
+      ...seedMeta,
       replicaCollectPhase: "ready",
-      replicaProductBrief: productBrief,
     },
   });
 
-  return { project, seedVideo: updatedSeed, productBrief };
+  return { project, seedVideo: updatedSeed, productBrief: parsed.productBrief || productBrief };
 }
 
 export async function generateReplicaScript(
   userId: string,
   decomposeProjectId: string,
-  opts?: { productBrief?: string; modelKey?: string },
+  opts?: { productBrief?: string; sellingPoints?: string; modelKey?: string },
 ): Promise<{
   project: MediaDecomposeProjectDto;
   seedVideo: EcomSeedVideoProjectDto;
@@ -586,38 +675,64 @@ export async function generateReplicaScript(
       ? String(seedVideo.meta.replicaProductBrief).trim()
       : "");
 
-  if (!productBrief) {
-    throw new Error("请先 AI 识产品或填写产品描述");
+  const sellingPoints =
+    (typeof opts?.sellingPoints === "string" ? opts.sellingPoints.trim() : "") ||
+    readReplicaSellingPoints(decompose, seedVideo);
+
+  if (!productBrief && !sellingPoints) {
+    throw new Error("请先 AI 识产品或填写产品描述/卖点");
   }
 
   const draftShots = buildDraftShotsFromDecompose(structured);
-  const chatModel =
-    opts?.modelKey?.trim() ||
-    decompose.settings.chatModelKey?.trim() ||
-    ECOM_MEDIA_DECOMPOSE_DEFAULT_CHAT_MODEL;
+  if (draftShots.length === 0) {
+    throw new Error("拆解结果中没有可用分镜，请重新拆解后再生成复刻脚本");
+  }
 
-  const { text } = await ecomGwChatComplete(userId, {
-    modelKey: chatModel,
-    messages: [
-      { role: "system", content: buildReplicaScriptSystemPrompt(mentionCatalog) },
-      {
-        role: "user",
-        content: buildReplicaScriptUserPrompt({
-          structured,
-          productBrief,
-          draftShots,
-          mentionSummary: replicaMentionSummary(mentionCatalog),
-        }),
-      },
-    ],
-    clientPage: ecomClientPage(
-      userId,
-      decomposeProjectId,
-      `${ECOM_MEDIA_DECOMPOSE_TOOL_KEY}__${ECOM_MEDIA_DECOMPOSE_REPLICA_SCRIPT_ACTION}`,
-    ),
-  });
+  const chatModel = resolveReplicaVisionChatModel(
+    opts?.modelKey,
+    decompose.settings.chatModelKey,
+    "复刻脚本",
+  );
+  const mentionSummary = replicaMentionSummary(mentionCatalog);
+  const clientPage = ecomClientPage(
+    userId,
+    decomposeProjectId,
+    `${ECOM_MEDIA_DECOMPOSE_TOOL_KEY}__${ECOM_MEDIA_DECOMPOSE_REPLICA_SCRIPT_ACTION}`,
+  );
+  const baseMessages: CanvasChatMessage[] = [
+    { role: "system", content: buildReplicaScriptSystemPrompt(mentionCatalog) },
+    {
+      role: "user",
+      content: buildReplicaScriptUserContent({
+        structured,
+        productBrief,
+        sellingPoints,
+        draftShots,
+        mentionSummary,
+        mentionCatalog,
+      }),
+    },
+  ];
 
-  const patch = extractReplicaScriptPatch(text);
+  async function callReplicaScriptModel(messages: CanvasChatMessage[]): Promise<string> {
+    const { text } = await ecomGwChatComplete(userId, {
+      modelKey: chatModel,
+      messages,
+      clientPage,
+    });
+    return text;
+  }
+
+  let text = await callReplicaScriptModel(baseMessages);
+  let patch = extractReplicaScriptPatch(text);
+  if (!patch) {
+    text = await callReplicaScriptModel([
+      ...baseMessages,
+      { role: "assistant", content: text },
+      { role: "user", content: buildReplicaScriptRetryUserPrompt(draftShots.length) },
+    ]);
+    patch = extractReplicaScriptPatch(text);
+  }
   if (!patch) {
     throw new Error("脚本生成失败：模型未返回有效的 replica-script JSON");
   }
@@ -641,11 +756,15 @@ export async function generateReplicaScript(
 
   const references = normalizeReplicaReferences(seedVideo.references);
 
+  const { projectMeta, seedMeta } = mergeReplicaCopyMeta(decompose, seedVideo, {
+    productBrief,
+    sellingPoints,
+  });
   const updatedSeed = await updateEcomSeedVideoProject(userId, seedVideo.id, {
     references,
     plan: { shots },
     meta: {
-      ...(seedVideo.meta ?? {}),
+      ...seedMeta,
       workflow: {
         ...(typeof seedVideo.meta?.workflow === "object" && seedVideo.meta?.workflow
           ? seedVideo.meta.workflow
@@ -655,16 +774,196 @@ export async function generateReplicaScript(
         planSynced: true,
       },
       replicaCollectPhase: "script-done",
-      replicaProductBrief: productBrief,
       replicaScriptGeneratedAt: new Date().toISOString(),
     },
   });
 
   const project = await updateEcomMediaDecomposeProject(userId, decomposeProjectId, {
-    meta: { replicaProductBrief: productBrief },
+    meta: projectMeta,
   });
 
   return { project, seedVideo: updatedSeed };
+}
+
+export async function saveReplicaCopyFields(
+  userId: string,
+  decomposeProjectId: string,
+  patch: { productBrief?: string; sellingPoints?: string },
+): Promise<{
+  project: MediaDecomposeProjectDto;
+  seedVideo: EcomSeedVideoProjectDto;
+}> {
+  const { decompose, seedVideo } = await requireReplicaPair(userId, decomposeProjectId);
+  const { projectMeta, seedMeta } = mergeReplicaCopyMeta(decompose, seedVideo, patch);
+  const project = await updateEcomMediaDecomposeProject(userId, decomposeProjectId, {
+    meta: projectMeta,
+  });
+  const updatedSeed = await updateEcomSeedVideoProject(userId, seedVideo.id, {
+    meta: {
+      ...seedMeta,
+      replicaCollectPhase: "ready",
+    },
+  });
+  return { project, seedVideo: updatedSeed };
+}
+
+export async function generateReplicaSellingPoints(
+  userId: string,
+  decomposeProjectId: string,
+  opts?: { userDraft?: string; productBrief?: string; modelKey?: string },
+): Promise<{
+  project: MediaDecomposeProjectDto;
+  seedVideo: EcomSeedVideoProjectDto;
+  sellingPoints: string;
+}> {
+  const { decompose, seedVideo } = await requireReplicaPair(userId, decomposeProjectId);
+  const productRefs = listReplicaProductRefs(seedVideo.references);
+  if (productRefs.length === 0) throw new Error("请先上传产品图");
+
+  const productBrief =
+    opts?.productBrief?.trim() ||
+    (typeof decompose.meta?.replicaProductBrief === "string"
+      ? decompose.meta.replicaProductBrief.trim()
+      : "") ||
+    (typeof seedVideo.meta?.replicaProductBrief === "string"
+      ? String(seedVideo.meta.replicaProductBrief).trim()
+      : "");
+
+  const userDraft = opts?.userDraft?.trim() || undefined;
+
+  const chatModel = resolveRecognizeProductModel();
+  const parts: CanvasChatContentPart[] = [
+    ...productRefs.map(
+      (ref) =>
+        ({ type: "image_url", image_url: { url: ref.ossUrl } }) satisfies CanvasChatContentPart,
+    ),
+    {
+      type: "text",
+      text: buildReplicaSellingPointsPrompt({
+        imageCount: productRefs.length,
+        productBrief: productBrief || undefined,
+        userDraft: userDraft || undefined,
+      }),
+    },
+  ];
+
+  const { text } = await ecomGwChatComplete(userId, {
+    modelKey: chatModel,
+    messages: [{ role: "user", content: parts }],
+    clientPage: ecomClientPage(
+      userId,
+      decomposeProjectId,
+      `${ECOM_MEDIA_DECOMPOSE_TOOL_KEY}__${ECOM_MEDIA_DECOMPOSE_REPLICA_SELLING_POINTS_ACTION}`,
+    ),
+  });
+
+  const sellingPoints = normalizeSellingPointsText(text);
+  const { projectMeta, seedMeta } = mergeReplicaCopyMeta(decompose, seedVideo, {
+    sellingPoints,
+  });
+  const project = await updateEcomMediaDecomposeProject(userId, decomposeProjectId, {
+    meta: projectMeta,
+  });
+  const updatedSeed = await updateEcomSeedVideoProject(userId, seedVideo.id, {
+    meta: seedMeta,
+  });
+
+  return { project, seedVideo: updatedSeed, sellingPoints };
+}
+
+export async function generateReplicaVoiceoverDraft(
+  userId: string,
+  decomposeProjectId: string,
+  opts?: { productBrief?: string; sellingPoints?: string; modelKey?: string },
+): Promise<{
+  project: MediaDecomposeProjectDto;
+  seedVideo: EcomSeedVideoProjectDto;
+  voiceoverDraft: ReplicaVoiceoverDraftDto;
+}> {
+  const { decompose, seedVideo, structured } = await requireReplicaPair(
+    userId,
+    decomposeProjectId,
+  );
+
+  if (structured.mediaType !== "video") {
+    throw new Error("AI 口播文案仅支持视频拆解项目");
+  }
+
+  const productBrief =
+    opts?.productBrief?.trim() ||
+    (typeof decompose.meta?.replicaProductBrief === "string"
+      ? decompose.meta.replicaProductBrief.trim()
+      : "") ||
+    (typeof seedVideo.meta?.replicaProductBrief === "string"
+      ? String(seedVideo.meta.replicaProductBrief).trim()
+      : "");
+
+  const sellingPoints =
+    (typeof opts?.sellingPoints === "string" ? opts.sellingPoints.trim() : "") ||
+    readReplicaSellingPoints(decompose, seedVideo);
+
+  const planShots = seedVideo.plan?.shots ?? [];
+  const draftShots = planShots.length > 0 ? planShots : buildDraftShotsFromDecompose(structured);
+  if (draftShots.length === 0) {
+    throw new Error("缺少分镜表，请先完成视频拆解或生成复刻脚本");
+  }
+
+  const chatModel = resolveReplicaTextChatModel(
+    opts?.modelKey,
+    decompose.settings.chatModelKey,
+  );
+
+  const shotInputs = draftShots.map((s) => ({
+    index: s.index,
+    timeSlice: s.timeSlice,
+    durationSec: s.durationSec,
+    sceneDescription: s.sceneDescription,
+    voiceover: s.voiceover,
+  }));
+
+  const { text } = await ecomGwChatComplete(userId, {
+    modelKey: chatModel,
+    messages: [
+      { role: "system", content: buildReplicaVoiceoverSystemPrompt() },
+      {
+        role: "user",
+        content: buildReplicaVoiceoverUserPrompt({
+          structured,
+          productBrief,
+          sellingPoints,
+          shots: shotInputs,
+        }),
+      },
+    ],
+    clientPage: ecomClientPage(
+      userId,
+      decomposeProjectId,
+      `${ECOM_MEDIA_DECOMPOSE_TOOL_KEY}__${ECOM_MEDIA_DECOMPOSE_REPLICA_VOICEOVER_ACTION}`,
+    ),
+  });
+
+  const patch = extractReplicaVoiceoverPatch(text);
+  if (!patch) {
+    throw new Error("口播生成失败：模型未返回有效的 replica-voiceover JSON");
+  }
+
+  const byIndex = new Map(patch.shots.map((s) => [s.index, s.voiceover.trim()]));
+  const voiceoverDraft: ReplicaVoiceoverDraftDto = {
+    shots: draftShots.map((s) => ({
+      index: s.index,
+      voiceover: byIndex.get(s.index) ?? "",
+    })),
+    generatedAt: new Date().toISOString(),
+  };
+
+  const updatedSeed = await updateEcomSeedVideoProject(userId, seedVideo.id, {
+    meta: {
+      ...(seedVideo.meta ?? {}),
+      replicaVoiceoverDraft: voiceoverDraft,
+    },
+  });
+
+  return { project: decompose, seedVideo: updatedSeed, voiceoverDraft };
 }
 
 /** @deprecated 别名：开始复刻 = 创建空复刻项目 */

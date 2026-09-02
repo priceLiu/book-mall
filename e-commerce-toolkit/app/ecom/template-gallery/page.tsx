@@ -19,7 +19,8 @@ import {
   EcomTemplateImportProvider,
   useEcomTemplateImport,
 } from "@/components/template-gallery/ecom-template-import-provider";
-import { EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { cn } from "@/lib/utils";
 import { useEcomScrollPagination } from "@/lib/use-ecom-scroll-pagination";
 import {
@@ -375,14 +376,16 @@ function TemplateGalleryPageInner() {
                   </p>
                 </div>
                 {canImport ? (
-                  <EcomButtonSecondary
-                    type="button"
-                    className="max-w-none shrink-0 border-[#0071e3] text-[#0071e3]"
-                    onClick={() => setImportOpen(true)}
-                  >
-                    <Upload className="mr-1.5 h-3.5 w-3.5" />
-                    导入 HTML
-                  </EcomButtonSecondary>
+                  <EcomIconToolbar>
+                    <EcomIconToolbarGroup label="管理">
+                      <EcomIconButton
+                        label="导入 HTML"
+                        icon={Upload}
+                        variant="accent"
+                        onClick={() => setImportOpen(true)}
+                      />
+                    </EcomIconToolbarGroup>
+                  </EcomIconToolbar>
                 ) : importAccessLoading ? (
                   <span className="text-xs text-[#86868b]">…</span>
                 ) : null}

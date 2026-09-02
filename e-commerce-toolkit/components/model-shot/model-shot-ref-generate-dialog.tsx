@@ -299,10 +299,7 @@ export function ModelShotRefGenerateDialog({
                 onChange={(e) => setDraft(e.target.value)}
               />
             </div>
-            <div className="flex justify-end gap-2 border-t border-[#e5e5ea] px-5 py-4">
-              <EcomButtonSecondary type="button" disabled={busy} onClick={onClose}>
-                取消
-              </EcomButtonSecondary>
+            <div className="flex justify-end border-t border-[#e5e5ea] px-5 py-4">
               <EcomButtonPrimary
                 type="button"
                 disabled={busy || !draft.trim() || !draftModelKey.trim()}

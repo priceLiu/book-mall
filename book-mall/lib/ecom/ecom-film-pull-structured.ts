@@ -7,12 +7,21 @@ const audioInfoSchema = z.object({
   fxAndBgm: z.string().default("无"),
 });
 
+export const filmPullShootingPrepSchema = z.object({
+  venue: z.string().min(1),
+  costume: z.string().min(1),
+  props: z.string().min(1),
+  equipment: z.string().min(1),
+});
+
 export const filmPullShotSchema = z.object({
   shotNo: z.number().int().positive(),
   startTimeSec: z.number().nonnegative(),
   endTimeSec: z.number().positive(),
   durationSec: z.number().positive(),
   cutTransition: z.string().min(1),
+  /** 入出点切法说明（动作切点、与下一镜衔接）；类型见 cutTransition */
+  cutDetail: z.string().min(1),
   shotScale: z.string().min(1),
   cameraAngle: z.string().min(1),
   cameraMovement: z.string().min(1),
@@ -46,6 +55,8 @@ export const filmPullAnalyzePatchSchema = z.object({
   schemaVersion: z.literal(1),
   action: z.literal("analyze_complete"),
   meta: metaSchema,
+  /** 全片拍摄准备（与 replicableShootingScript【准备】一致，结构化真源） */
+  shootingPrep: filmPullShootingPrepSchema,
   narrativeLogic: z.string().min(1),
   beatPoints: z.string().min(1),
   replicableShootingScript: z.string().min(1),
@@ -66,10 +77,17 @@ export const filmPullRenderScriptPatchSchema = filmPullAnalyzePatchSchema.extend
 });
 
 export type FilmPullShot = z.infer<typeof filmPullShotSchema>;
+export type FilmPullShootingPrep = z.infer<typeof filmPullShootingPrepSchema>;
 export type FilmPullAnalyzePatch = z.infer<typeof filmPullAnalyzePatchSchema>;
 export type FilmPullRenderScriptPatch = z.infer<typeof filmPullRenderScriptPatchSchema>;
 
 const FILM_PULL_TEXT_FALLBACK = "无";
+
+export function isFilmPullPlaceholderText(value: string | undefined | null): boolean {
+  if (typeof value !== "string") return true;
+  const t = value.trim();
+  return !t || t === FILM_PULL_TEXT_FALLBACK;
+}
 
 function repairJsonText(body: string): string {
   return body
@@ -147,6 +165,7 @@ function coerceShot(raw: unknown, index: number): Record<string, unknown> | null
     endTimeSec: end,
     durationSec: duration,
     cutTransition: coerceTextField(s.cutTransition, "硬切"),
+    cutDetail: coerceTextField(s.cutDetail),
     shotScale: coerceTextField(s.shotScale, "中景"),
     cameraAngle: coerceTextField(s.cameraAngle, "平视"),
     cameraMovement: coerceTextField(s.cameraMovement, "固定机位"),
@@ -191,9 +210,20 @@ export function coerceFilmPullPayload(raw: unknown): unknown | null {
     coerceFiniteNumber(lastShot.endTimeSec) ??
     1;
 
+  const prepRaw =
+    o.shootingPrep && typeof o.shootingPrep === "object" && !Array.isArray(o.shootingPrep)
+      ? (o.shootingPrep as Record<string, unknown>)
+      : {};
+
   const base = {
     schemaVersion: 1 as const,
     action,
+    shootingPrep: {
+      venue: coerceTextField(prepRaw.venue),
+      costume: coerceTextField(prepRaw.costume),
+      props: coerceTextField(prepRaw.props),
+      equipment: coerceTextField(prepRaw.equipment),
+    },
     meta: {
       totalDurationSec: Math.max(0.01, totalDurationSec),
       narrativeMainLine: coerceTextField(metaRaw.narrativeMainLine),
@@ -334,6 +364,13 @@ export function formatFilmPullAnalyzeMarkdown(patch: FilmPullAnalyzePatch): stri
   }
   lines.push(
     "",
+    "## 拍摄准备（shootingPrep）",
+    "",
+    `- **场地**：${patch.shootingPrep.venue}`,
+    `- **服装**：${patch.shootingPrep.costume}`,
+    `- **道具**：${patch.shootingPrep.props}`,
+    `- **设备**：${patch.shootingPrep.equipment}`,
+    "",
     "## 整体叙事逻辑拆解",
     "",
     patch.narrativeLogic,
@@ -379,4 +416,55 @@ export function assertRenderScriptInvariants(
       throw new Error(`镜 ${a.shotNo} 结束时间不可变更`);
     }
   }
+}
+
+/** 拉片结构化质量校验（语法通过后）；失败信息供模型重试 */
+export function validateFilmPullAnalyzeQuality(patch: FilmPullAnalyzePatch): string | null {
+  const { shots, shootingPrep } = patch;
+  if (shots.length === 0) return "shots 为空";
+
+  if (isFilmPullPlaceholderText(shootingPrep.venue)) {
+    return "shootingPrep.venue（拍摄场地）必填，须写可观测场地描述，禁止「无」";
+  }
+
+  const sceneEmpty = shots.filter((s) => isFilmPullPlaceholderText(s.sceneEnvironment)).length;
+  if (sceneEmpty > shots.length / 2) {
+    return "超过半数镜头的 sceneEnvironment（场景环境）仍为「无」；须按每镜可见环境填写，并与 shootingPrep.venue 一致";
+  }
+
+  const coreVisualEmpty = shots.filter(
+    (s) =>
+      isFilmPullPlaceholderText(s.subjectBlocking) &&
+      isFilmPullPlaceholderText(s.lightingSetup) &&
+      isFilmPullPlaceholderText(s.foreMidBackLayer),
+  ).length;
+  if (coreVisualEmpty === shots.length) {
+    return "所有镜头的主体调度/布光/前中后景均为「无」；须从视频中填写可观测内容";
+  }
+
+  if (
+    !isFilmPullPlaceholderText(shootingPrep.props) &&
+    shots.every((s) => isFilmPullPlaceholderText(s.dynamicProps))
+  ) {
+    return "shootingPrep.props 已填写道具清单，但全部镜头的 dynamicProps 仍为「无」；须在出现道具的镜头填写";
+  }
+
+  if (shots.length > 1) {
+    const lastIdx = shots.length - 1;
+    const missingCutDetail = shots.filter(
+      (s, i) => i < lastIdx && isFilmPullPlaceholderText(s.cutDetail),
+    ).length;
+    if (missingCutDetail > Math.floor((shots.length - 1) / 2)) {
+      return "多数非末镜缺少 cutDetail（入出点/动作切点说明）；卡点细节须写入 cutDetail，不能只写在 beatPoints 长文";
+    }
+  }
+
+  if (
+    isFilmPullPlaceholderText(patch.meta.editRhythmCurve) &&
+    !isFilmPullPlaceholderText(patch.beatPoints)
+  ) {
+    return "beatPoints 已写剪辑卡点，但 meta.editRhythmCurve 仍为「无」；全片节奏曲线须写入 meta";
+  }
+
+  return null;
 }

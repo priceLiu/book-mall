@@ -7,8 +7,8 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { BackgroundGenerationProvider, useBackgroundGeneration } from "@/components/generation";
 import { FilmPullWorkspace } from "@/components/film-pull/film-pull-workspace";
 import { EcomVideoPreviewDialog } from "@/components/media/ecom-video-preview-dialog";
+import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-link-dialog";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
-import { installEcomWorkspaceNavGuards } from "@/lib/ecom-block-browser-nav";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
 import {
@@ -35,6 +35,10 @@ import {
 } from "@/lib/film-pull-types";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import {
+  ECOM_WORKFLOW_SHARE_DESCRIPTION,
+  ECOM_WORKFLOW_SHARE_RESOURCE,
+} from "@/lib/ecom-workflow-share";
 
 const PROJECT_STORAGE_KEY = "ecom-film-pull-active-project";
 const FILM_PULL_DEFAULT_CHAT_MODEL = "qwen3.8-max";
@@ -72,6 +76,7 @@ function FilmPullStudioInner() {
   const [imageModels, setImageModels] = useState<StoryboardGatewayModel[]>([]);
   const [imageModelKey, setImageModelKey] = useState("");
   const [previewVideo, setPreviewVideo] = useState<{ src: string; title?: string } | null>(null);
+  const [workflowShareOpen, setWorkflowShareOpen] = useState(false);
 
   const filmPullChatModels = useMemo(
     () => chatModels.filter((m) => m.supportsVideo === true),
@@ -169,8 +174,6 @@ function FilmPullStudioInner() {
     if (filmPullChatModels.length === 0) return;
     setChatModelKey((prev) => pickBoundStoryboardModelKey(filmPullChatModels, prev));
   }, [filmPullChatModels]);
-
-  useEffect(() => installEcomWorkspaceNavGuards(), []);
 
   const loadProjectList = useCallback(async () => listFilmPullProjectSummaries(), []);
 
@@ -602,8 +605,17 @@ function FilmPullStudioInner() {
         onSaveProject={() => void handleSaveProject()}
         onProjectUpdated={applyProject}
         onAlert={alert}
+        onShareWorkflow={() => setWorkflowShareOpen(true)}
       />
       </EcomWorkspaceLayout>
+      <WorkflowShareLinkDialog
+        projectId={project.id}
+        projectTitle={project.title?.trim() || "专业拉片"}
+        open={workflowShareOpen}
+        onClose={() => setWorkflowShareOpen(false)}
+        resourceType={ECOM_WORKFLOW_SHARE_RESOURCE.filmPull}
+        description={ECOM_WORKFLOW_SHARE_DESCRIPTION[ECOM_WORKFLOW_SHARE_RESOURCE.filmPull]}
+      />
       {previewVideo ? (
         <EcomVideoPreviewDialog
           open

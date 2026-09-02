@@ -7,6 +7,28 @@ export const BACKGROUND_DOCK_PERSISTENT_MS = 15 * 60 * 1000;
 export const BACKGROUND_DOCK_POLL_MS = 15_000;
 export const BACKGROUND_DOCK_FOREGROUND_POLL_MS = 4_000;
 
+/** 运行中任务在 Dock 露出的最小时长（此前完全隐藏） */
+export const BACKGROUND_DOCK_LONG_TASK_MS = 10 * 60 * 1000;
+
+/** 成功完成后面板展示时长，随后自动收起并清除 */
+export const BACKGROUND_DOCK_SUCCESS_FLASH_MS = 2_000;
+
+/** 收起/消失过渡时长（与 Dock CSS transition 一致） */
+export const BACKGROUND_DOCK_EXIT_ANIM_MS = 320;
+
+export function isBackgroundDockTaskVisible(
+  task: { status: "running" | "succeeded" | "failed"; startedAt: string },
+  nowMs: number = Date.now(),
+): boolean {
+  if (task.status === "succeeded" || task.status === "failed") return true;
+  if (task.status === "running") {
+    const started = new Date(task.startedAt).getTime();
+    if (Number.isNaN(started)) return false;
+    return nowMs - started >= BACKGROUND_DOCK_LONG_TASK_MS;
+  }
+  return false;
+}
+
 export const BACKGROUND_DOCK_LABEL_RUNNING = "生成中…";
 export const BACKGROUND_DOCK_LABEL_PERSISTENT = "持续后台生成中…";
 export const BACKGROUND_DOCK_LABEL_SUCCEEDED = "已完成";

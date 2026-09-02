@@ -8,6 +8,8 @@ import {
   type PublisherPlatform,
 } from "@private/publisher-client";
 
+import { EcomDialogCloseButton } from "@/components/ui/dialog";
+
 async function ecomPublisherFetch(path: string, init?: RequestInit) {
   const res = await fetch(`/api/book-mall/${path}`, {
     ...init,
@@ -88,7 +90,8 @@ export function EcomPublishDialog({
 
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+      <div className="relative w-full max-w-md rounded-2xl bg-white p-5 pr-12 shadow-xl">
+        <EcomDialogCloseButton onClick={() => setOpen(false)} />
         <h3 className="mb-3 text-base font-semibold text-[var(--ecom-ink)]">一键发布到社交平台</h3>
         <input
           className="mb-2 w-full rounded-xl border px-3 py-2 text-sm"
@@ -114,10 +117,7 @@ export function EcomPublishDialog({
           ))}
         </div>
         {status ? <p className="mb-2 text-xs text-[var(--ecom-muted)]">{status}</p> : null}
-        <div className="flex justify-end gap-2">
-          <button type="button" className="rounded-lg px-3 py-1.5 text-sm" onClick={() => setOpen(false)}>
-            关闭
-          </button>
+        <div className="flex justify-end">
           <button
             type="button"
             disabled={loading || platforms.length === 0}

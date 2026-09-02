@@ -11,6 +11,45 @@ function getBookMallBase(): string {
   );
 }
 
+function persistClaimedProjectId(redirectPath: string, projectId: string) {
+  try {
+    const url = new URL(redirectPath, window.location.origin);
+    if (url.pathname.includes("/model-shot")) {
+      sessionStorage.setItem("ecom-model-shot-active-project", projectId);
+      return;
+    }
+    if (url.pathname.includes("/hand-craft")) {
+      sessionStorage.setItem("ecom-hand-craft-active-project", projectId);
+      return;
+    }
+    if (url.pathname.includes("/seed-video")) {
+      sessionStorage.setItem("ecom-seed-video-active-project", projectId);
+      return;
+    }
+    if (url.pathname.includes("/media-decompose")) {
+      sessionStorage.setItem("ecom-media-decompose-active-project", projectId);
+      return;
+    }
+    if (url.pathname.includes("/film-pull")) {
+      sessionStorage.setItem("ecom-film-pull-active-project", projectId);
+      return;
+    }
+    if (url.pathname.includes("/detail-page-creation")) {
+      sessionStorage.setItem("ecom-product-design-active-project:detail-page", projectId);
+      return;
+    }
+    if (url.pathname.includes("/product-creation")) {
+      sessionStorage.setItem("ecom-product-design-active-project:main-image", projectId);
+      return;
+    }
+    if (url.pathname.includes("/storyboard/")) {
+      sessionStorage.setItem("ecom-storyboard-active-project", projectId);
+    }
+  } catch {
+    /* ignore malformed redirect */
+  }
+}
+
 export default function EcomWorkflowSharePage({
   params,
 }: {
@@ -52,13 +91,7 @@ export default function EcomWorkflowSharePage({
       try {
         const url = new URL(data.redirectPath, window.location.origin);
         const projectId = url.searchParams.get("projectId")?.trim();
-        if (projectId) {
-          if (url.pathname.includes("/model-shot")) {
-            sessionStorage.setItem("ecom-model-shot-active-project", projectId);
-          } else {
-            sessionStorage.setItem("ecom-storyboard-active-project", projectId);
-          }
-        }
+        if (projectId) persistClaimedProjectId(data.redirectPath, projectId);
       } catch {
         /* ignore malformed redirect */
       }
@@ -77,7 +110,7 @@ export default function EcomWorkflowSharePage({
           className="mt-4 rounded bg-blue-600 px-4 py-2 text-sm text-white"
           onClick={() => void claim()}
         >
-          复制到我的分镜项目
+          复制到我的项目
         </button>
       ) : (
         <p className="mt-4 text-sm text-amber-700">链接已失效</p>

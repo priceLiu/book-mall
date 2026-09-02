@@ -332,6 +332,7 @@ export function FilmPullProductionMediaStrip({
         onOpenChange={(open) => {
           if (!open) setPicker({ kind: "idle" });
         }}
+        nativeOverlay
         mode={pickerMode}
         dialogTitle={
           picker.kind === "batch-image" || picker.kind === "image"

@@ -7,11 +7,9 @@ import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
   formatEcomProjectUpdatedAt,
   type EcomProjectListItem,
@@ -153,12 +151,6 @@ export function EcomProjectListDialog({
             </div>
           )}
         </div>
-
-        <DialogFooter className="border-t border-[#f0f0f2] px-5 py-3">
-          <EcomButtonSecondary size="sm" type="button" onClick={() => onOpenChange(false)}>
-            关闭
-          </EcomButtonSecondary>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

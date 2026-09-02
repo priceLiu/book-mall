@@ -1,4 +1,7 @@
-import { MOCK_REPLICA_PRODUCT_BRIEF } from "@/lib/ecom/ecom-media-decompose-mock-fixtures";
+import {
+  MOCK_REPLICA_PRODUCT_BRIEF,
+  MOCK_REPLICA_SELLING_POINTS,
+} from "@/lib/ecom/ecom-media-decompose-mock-fixtures";
 import {
   mockMediaDecomposePatchForKind,
 } from "@/lib/ecom/ecom-media-decompose-mock-fixtures";
@@ -98,13 +101,17 @@ export async function applyMockReplicaProductRecognition(
 
   const productBrief = MOCK_REPLICA_PRODUCT_BRIEF;
   const project = await updateEcomMediaDecomposeProject(userId, decomposeProjectId, {
-    meta: { replicaProductBrief: productBrief },
+    meta: {
+      replicaProductBrief: productBrief,
+      replicaSellingPoints: MOCK_REPLICA_SELLING_POINTS,
+    },
   });
   const updatedSeed = await updateEcomSeedVideoProject(userId, seedVideo.id, {
     meta: {
       ...(seedVideo.meta ?? {}),
       replicaCollectPhase: "ready",
       replicaProductBrief: productBrief,
+      replicaSellingPoints: MOCK_REPLICA_SELLING_POINTS,
     },
   });
 

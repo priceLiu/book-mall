@@ -1,5 +1,11 @@
 import type { ModelShotPoseImageVersion, ModelShotPoseItem } from "@/lib/ecom/ecom-model-shot-types";
 
+export function modelShotPoseHasGeneratedImage(
+  item: Pick<ModelShotPoseItem, "imageUrl" | "assetId" | "imageHistory">,
+): boolean {
+  return resolveModelShotPoseImageHistory(item).length > 0;
+}
+
 export function resolveModelShotPoseImageHistory(
   item: Pick<ModelShotPoseItem, "imageUrl" | "assetId" | "imageHistory">,
 ): ModelShotPoseImageVersion[] {

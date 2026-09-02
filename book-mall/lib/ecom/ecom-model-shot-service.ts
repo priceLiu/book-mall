@@ -26,6 +26,10 @@ import {
   type ModelShotSettings,
 } from "@/lib/ecom/ecom-model-shot-types";
 import { reconcileModelShotPendingOnRead } from "@/lib/ecom/ecom-model-shot-pending-images";
+import {
+  persistRecoveredModelShotPlan,
+  recoverModelShotPoseImagesFromAssets,
+} from "@/lib/ecom/model-shot/recover-pose-images-from-assets";
 import { prisma } from "@/lib/prisma";
 
 export type EcomModelShotProjectDto = ModelShotProject;
@@ -118,7 +122,25 @@ export async function getEcomModelShotProject(
     where: { id, userId, module: ECOM_MODEL_SHOT_MODULE },
   });
   if (!row) return null;
-  const dto = rowToDto(row);
+  let dto = rowToDto(row);
+
+  const recoveredPlan = await recoverModelShotPoseImagesFromAssets({
+    userId,
+    projectId: id,
+    plan: dto.plan,
+  });
+  if (recoveredPlan) {
+    const persisted = await persistRecoveredModelShotPlan(id, recoveredPlan, row.updatedAt);
+    if (persisted) {
+      const fresh = await prisma.ecomModelShotProject.findFirst({
+        where: { id, userId, module: ECOM_MODEL_SHOT_MODULE },
+      });
+      if (fresh) dto = rowToDto(fresh);
+    } else {
+      dto = { ...dto, plan: recoveredPlan };
+    }
+  }
+
   const cleared = await reconcileModelShotPendingOnRead({
     projectId: id,
     meta: dto.meta,

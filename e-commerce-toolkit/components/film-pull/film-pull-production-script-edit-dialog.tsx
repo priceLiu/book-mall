@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { FilmPullConfirmScriptTable } from "@/components/film-pull/film-pull-confirm-script-table";
 import { FilmPullRefsGalleryStrip } from "@/components/film-pull/film-pull-refs-gallery-strip";
-import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomButtonPrimary } from "@/components/ui/ecom-button";
 import { EcomFullScreenOverlay } from "@/components/ui/ecom-full-screen-overlay";
 import { buildFilmPullMentionRefs } from "@/lib/film-pull-mention-refs";
 import {
@@ -14,7 +14,7 @@ import {
   productionShotsSnapshotEqual,
   renumberProductionShots,
 } from "@/lib/film-pull-production-script-utils";
-import type { FilmPullCharacterRef, FilmPullProductionShot } from "@/lib/film-pull-types";
+import type { FilmPullCharacterRef, FilmPullProductionShot, FilmPullProject } from "@/lib/film-pull-types";
 
 type Props = {
   open: boolean;
@@ -23,6 +23,7 @@ type Props = {
   description?: string;
   shots: FilmPullProductionShot[];
   characterRefs: FilmPullCharacterRef[];
+  refMatch?: FilmPullProject["refMatch"];
   saving?: boolean;
   onSave: (shots: FilmPullProductionShot[]) => void | Promise<void>;
 };
@@ -37,6 +38,7 @@ export function FilmPullProductionScriptEditDialog({
   description = "修改确认脚本各列、参考图与生图/生视频 Prompt；支持 @图片N 引用。保存后更新工作台。",
   shots,
   characterRefs,
+  refMatch,
   saving = false,
   onSave,
 }: Props) {
@@ -93,9 +95,6 @@ export function FilmPullProductionScriptEditDialog({
       description={description}
       footer={
         <div className="flex flex-wrap justify-end gap-2">
-          <EcomButtonSecondary type="button" disabled={saving} onClick={() => void requestClose()}>
-            关闭
-          </EcomButtonSecondary>
           <EcomButtonPrimary type="button" disabled={saving || !dirty} onClick={() => void handleSave()}>
             {saving ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
             保存
@@ -114,6 +113,7 @@ export function FilmPullProductionScriptEditDialog({
             mode="edit"
             shots={draftShots}
             characterRefs={characterRefs}
+            refMatch={refMatch}
             disabled={saving}
             mentionRefs={mentionRefs}
             mentionPickerZIndex={7000}

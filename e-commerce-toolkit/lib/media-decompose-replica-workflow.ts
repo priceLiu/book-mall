@@ -61,6 +61,53 @@ export function readProductBrief(
   return fromSeed;
 }
 
+export function readSellingPoints(
+  project: MediaDecomposeProject,
+  seedVideo: SeedVideoProject,
+): string {
+  const projectMeta = project.meta as Record<string, unknown> | null | undefined;
+  const seedMeta = seedVideo.meta as Record<string, unknown> | undefined;
+  const fromProject =
+    typeof projectMeta?.replicaSellingPoints === "string"
+      ? projectMeta.replicaSellingPoints.trim()
+      : "";
+  if (fromProject) return fromProject;
+  const fromSeed =
+    typeof seedMeta?.replicaSellingPoints === "string"
+      ? String(seedMeta.replicaSellingPoints).trim()
+      : "";
+  return fromSeed;
+}
+
+export type ReplicaVoiceoverDraft = {
+  shots: Array<{ index: number; voiceover: string }>;
+  generatedAt?: string;
+};
+
+export function readVoiceoverDraft(seedVideo: SeedVideoProject): ReplicaVoiceoverDraft | null {
+  const raw = seedVideo.meta?.replicaVoiceoverDraft;
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (!Array.isArray(o.shots)) return null;
+  const shots = o.shots
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const r = row as Record<string, unknown>;
+      const index = Number(r.index);
+      if (!Number.isFinite(index) || index < 1) return null;
+      return {
+        index: Math.round(index),
+        voiceover: typeof r.voiceover === "string" ? r.voiceover : "",
+      };
+    })
+    .filter((s): s is { index: number; voiceover: string } => s != null);
+  if (shots.length === 0) return null;
+  return {
+    shots,
+    generatedAt: typeof o.generatedAt === "string" ? o.generatedAt : undefined,
+  };
+}
+
 export function isReplicaScriptReady(
   seedVideo: SeedVideoProject,
   phase: ReplicaCollectPhase,

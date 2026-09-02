@@ -1,8 +1,8 @@
 "use client";
 
-import { Clapperboard, ChevronDown, Cpu, Download, Images, Loader2, Save, Sparkles } from "lucide-react";
+import { ChevronDown, Clapperboard, Cpu, Download, Images, Loader2, Plus, Save, Sparkles, Square } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   FilmPullReplicaIdleComposer,
@@ -17,12 +17,20 @@ import { EcomProjectListButton } from "@/components/layout/ecom-project-list-but
 import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-markdown-block";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
+import { EcomIconButton, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
   autoFilmPullRefMatch,
   assembleFilmPullProductionScript,
   confirmFilmPullProductionScript,
+  saveFilmPullProductionPlan,
 } from "@/lib/ecom-film-pull-api";
+import {
+  buildMentionCatalogFromFilmPullRefs,
+  mentionCatalogSignature,
+  syncFilmPullProductionShotsAfterRefChange,
+} from "@/lib/ecom-mention-catalog-sync";
 import { defaultFilmPullAnalyzePrompt } from "@/lib/film-pull-default-prompts";
 import { isFilmPullMockDevUiEnabled } from "@/lib/film-pull-mock-dev";
 import {
@@ -34,6 +42,10 @@ import {
   resolveFilmPullV2Phase,
   FILM_PULL_SCRIPT_PREP_STEP_LABELS,
 } from "@/lib/film-pull-production-workflow";
+import {
+  buildProductionPlanPatch,
+  syncRefMatchWithProductionShots,
+} from "@/lib/film-pull-production-script-utils";
 import { listFilmPullModelRefs, listFilmPullProductRefs } from "@/lib/film-pull-refs";
 import {
   extractFilmPullAnalyzePatch,
@@ -83,6 +95,7 @@ type Props = {
   onPreviewVideo?: (src: string, title?: string) => void;
   saveBusy?: boolean;
   exportBusy?: boolean;
+  onShareWorkflow?: () => void;
 };
 
 export function FilmPullWorkspace({
@@ -120,6 +133,7 @@ export function FilmPullWorkspace({
   onPreviewVideo,
   saveBusy,
   exportBusy,
+  onShareWorkflow,
 }: Props) {
   const router = useRouter();
   const [prompt, setPrompt] = useState(
@@ -173,11 +187,65 @@ export function FilmPullWorkspace({
     replicaStarted &&
     refsReadyForMatch &&
     Boolean(onProjectUpdated && onAlert && onVideoModelChange && onImageModelChange && onPreviewVideo);
-  const showRefSetup =
-    replicaStarted && !refsReadyForMatch && onAlert && onProjectUpdated;
+
+  const refSetupApi = useMemo(() => {
+    if (!onProjectUpdated) return null;
+    return createFilmPullRefSetupApi({
+      projectId: project.id,
+      getProject: () => project,
+      onProjectUpdated: (p) => onProjectUpdated(p),
+    });
+  }, [onProjectUpdated, project]);
+
+  const showRefPanel =
+    replicaStarted && Boolean(refSetupApi) && onAlert && onProjectUpdated;
+
+  const prevRefCatalogRef = useRef<ReturnType<typeof buildMentionCatalogFromFilmPullRefs> | null>(
+    null,
+  );
+  const refSyncBusyRef = useRef(false);
+
+  useEffect(() => {
+    prevRefCatalogRef.current = buildMentionCatalogFromFilmPullRefs(project.characterRefs);
+  }, [project.id]);
+
+  useEffect(() => {
+    if (!onProjectUpdated || !project.productionPlan?.shots.length) {
+      prevRefCatalogRef.current = buildMentionCatalogFromFilmPullRefs(project.characterRefs);
+      return;
+    }
+    const newCatalog = buildMentionCatalogFromFilmPullRefs(project.characterRefs);
+    const oldCatalog = prevRefCatalogRef.current;
+    prevRefCatalogRef.current = newCatalog;
+    if (!oldCatalog || refSyncBusyRef.current) return;
+    if (mentionCatalogSignature(oldCatalog) === mentionCatalogSignature(newCatalog)) return;
+
+    const syncedShots = syncFilmPullProductionShotsAfterRefChange(
+      project.productionPlan.shots,
+      oldCatalog,
+      newCatalog,
+    );
+    if (JSON.stringify(syncedShots) === JSON.stringify(project.productionPlan.shots)) return;
+
+    refSyncBusyRef.current = true;
+    const productionPlan = buildProductionPlanPatch(project.productionPlan, syncedShots);
+    const refMatch = syncRefMatchWithProductionShots(project.refMatch, syncedShots);
+    void saveFilmPullProductionPlan(project.id, productionPlan, { refMatch })
+      .then((updated) => onProjectUpdated(updated))
+      .finally(() => {
+        refSyncBusyRef.current = false;
+      });
+  }, [
+    onProjectUpdated,
+    project.characterRefs,
+    project.id,
+    project.productionPlan,
+    project.refMatch,
+  ]);
 
   const runScriptPrep = useCallback(async () => {
     if (!onProjectUpdated || !onAlert) return;
+    if (analyzing || !hasAnalyze) return;
     setScriptPrepBusy(true);
     setScriptPrepError(null);
     setScriptPrepStep(1);
@@ -213,7 +281,7 @@ export function FilmPullWorkspace({
     } finally {
       setScriptPrepBusy(false);
     }
-  }, [onAlert, onProjectUpdated, project]);
+  }, [analyzing, hasAnalyze, onAlert, onProjectUpdated, project]);
 
   useEffect(() => {
     setScriptPrepError(null);
@@ -221,9 +289,12 @@ export function FilmPullWorkspace({
 
   useEffect(() => {
     if (!onProjectUpdated || !onAlert || !replicaStarted || !refsReadyForMatch) return;
+    if (analyzing || !hasAnalyze) return;
     if (scriptPrepBusy || scriptPrepError || hasProductionPlan) return;
     void runScriptPrep();
   }, [
+    analyzing,
+    hasAnalyze,
     hasProductionPlan,
     onAlert,
     onProjectUpdated,
@@ -233,15 +304,6 @@ export function FilmPullWorkspace({
     scriptPrepBusy,
     scriptPrepError,
   ]);
-
-  const refSetupApi = useMemo(() => {
-    if (!onProjectUpdated) return null;
-    return createFilmPullRefSetupApi({
-      projectId: project.id,
-      getProject: () => project,
-      onProjectUpdated: (p) => onProjectUpdated(p),
-    });
-  }, [onProjectUpdated, project]);
 
   const showBottomDock = !showProductionWorkspace;
 
@@ -253,39 +315,56 @@ export function FilmPullWorkspace({
             <h2 className="text-sm font-semibold text-[#1d1d1f]">专业拉片</h2>
             <p className="text-[11px] text-[#6e6e73]">上传视频 → 拉片 → 一键复刻 → 制作成片</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {onNewProject ? (
-              <EcomButtonSecondary size="sm" type="button" dark disabled={jobBusy} onClick={() => void onNewProject()}>
-                新建
-              </EcomButtonSecondary>
+          <EcomIconToolbar>
+            <EcomIconToolbarGroup label="项目">
+              {onNewProject ? (
+                <EcomIconButton
+                  label="新建项目"
+                  icon={Plus}
+                  disabled={jobBusy}
+                  onClick={() => void onNewProject()}
+                />
+              ) : null}
+              {loadProjectList && onOpenProject ? (
+                <EcomProjectListButton
+                  disabled={jobBusy}
+                  currentProjectId={project.id}
+                  loadProjects={loadProjectList}
+                  onSelectProject={onOpenProject}
+                  title="专业拉片 · 项目列表"
+                  emptyHint="还没有保存过的拉片项目。"
+                />
+              ) : null}
+            </EcomIconToolbarGroup>
+            <EcomIconToolbarGroup label="工作流">
+              {onSaveProject ? (
+                <EcomIconButton
+                  label="保存工作流"
+                  icon={Save}
+                  busy={saveBusy}
+                  disabled={!canSave || saveBusy}
+                  onClick={() => void onSaveProject()}
+                />
+              ) : null}
+            </EcomIconToolbarGroup>
+            <EcomIconToolbarGroup label="资产与交付">
+              <EcomIconButton label="我的资产" icon={Images} onClick={() => router.push("/library")} />
+              {onExportZip ? (
+                <EcomIconButton
+                  label={exportBusy ? "打包中…" : "导出交付包"}
+                  icon={Download}
+                  busy={exportBusy}
+                  disabled={!canSave || exportBusy || analyzing}
+                  onClick={() => void onExportZip()}
+                />
+              ) : null}
+            </EcomIconToolbarGroup>
+            {onShareWorkflow ? (
+              <EcomIconToolbarGroup label="分享">
+                <EcomShareIconButton disabled={analyzing} onClick={onShareWorkflow} />
+              </EcomIconToolbarGroup>
             ) : null}
-            {loadProjectList && onOpenProject ? (
-              <EcomProjectListButton
-                disabled={jobBusy}
-                currentProjectId={project.id}
-                loadProjects={loadProjectList}
-                onSelectProject={onOpenProject}
-                title="专业拉片 · 项目列表"
-                emptyHint="还没有保存过的拉片项目。"
-              />
-            ) : null}
-            <EcomButtonSecondary size="sm" type="button" dark onClick={() => router.push("/library")}>
-              <Images className="h-3.5 w-3.5 shrink-0" />
-              我的资产
-            </EcomButtonSecondary>
-            {onSaveProject ? (
-              <EcomButtonSecondary size="sm" type="button" dark disabled={!canSave || saveBusy} onClick={() => void onSaveProject()}>
-                <Save className="h-3.5 w-3.5 shrink-0" />
-                保存
-              </EcomButtonSecondary>
-            ) : null}
-            {onExportZip ? (
-              <EcomButtonSecondary size="sm" type="button" dark disabled={!canSave || exportBusy || analyzing} onClick={() => void onExportZip()}>
-                <Download className="h-3.5 w-3.5 shrink-0" />
-                {exportBusy ? "打包中…" : "导出交付包"}
-              </EcomButtonSecondary>
-            ) : null}
-          </div>
+          </EcomIconToolbar>
         </div>
       </header>
 
@@ -312,15 +391,15 @@ export function FilmPullWorkspace({
               <ChevronDown className={cn("h-4 w-4 shrink-0 text-[#6e6e73] transition-transform", promptExpanded && "rotate-180")} />
             </button>
             <div className="flex flex-wrap items-center gap-2">
-              <EcomButtonSecondary size="sm" type="button" disabled={analyzing} onClick={() => setPickerOpen(true)}>
+              <EcomButtonSecondary
+                size="sm"
+                type="button"
+                disabled={analyzing}
+                onClick={() => setPickerOpen(true)}
+              >
                 <Cpu className="mr-1 h-3.5 w-3.5" />
                 {selectedModelLabel}
               </EcomButtonSecondary>
-              {analyzing && onAbortAnalyze ? (
-                <EcomButtonSecondary size="sm" type="button" onClick={() => void onAbortAnalyze()}>
-                  中止
-                </EcomButtonSecondary>
-              ) : null}
               <EcomButtonPrimary
                 size="sm"
                 type="button"
@@ -339,14 +418,21 @@ export function FilmPullWorkspace({
                   </>
                 )}
               </EcomButtonPrimary>
+              {analyzing && onAbortAnalyze ? (
+                <EcomButtonSecondary size="sm" type="button" onClick={() => void onAbortAnalyze()}>
+                  <Square className="mr-1 h-3.5 w-3.5" />
+                  中止
+                </EcomButtonSecondary>
+              ) : null}
               {isFilmPullMockDevUiEnabled() && onMockAnalyze ? (
                 <EcomButtonSecondary
                   size="sm"
                   type="button"
                   disabled={!project.media?.ossUrl || analyzing || mediaBusy}
+                  title="开发：跳过 Gateway，写入 mock 拉片结果"
                   onClick={() => void onMockAnalyze(prompt.trim())}
                 >
-                  Mock 拉片
+                  {analyzing ? "Mock…" : "Mock 拉片"}
                 </EcomButtonSecondary>
               ) : null}
             </div>
@@ -370,14 +456,14 @@ export function FilmPullWorkspace({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-[#1d1d1f]">拉片结果</h2>
               {canStartReplica && phase === "replica_idle" ? (
-                <EcomButtonPrimary type="button" size="sm" disabled={replicaBusy || mediaBusy} onClick={() => void onStartReplica?.()}>
-                  {replicaBusy ? (
-                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Clapperboard className="mr-1 h-3.5 w-3.5" />
-                  )}
-                  一键复刻
-                </EcomButtonPrimary>
+                <EcomIconButton
+                  label={replicaBusy ? "复刻中…" : "一键复刻"}
+                  icon={Clapperboard}
+                  variant="accent"
+                  busy={replicaBusy}
+                  disabled={replicaBusy || mediaBusy}
+                  onClick={() => void onStartReplica?.()}
+                />
               ) : null}
             </div>
             {parseError && !analyzing ? (
@@ -387,12 +473,13 @@ export function FilmPullWorkspace({
           </div>
         )}
 
-        {showRefSetup && refSetupApi ? (
+        {showRefPanel && refSetupApi ? (
           <ReplicaSetupPanel
             api={refSetupApi}
             copy={FILM_PULL_REF_SETUP_COPY}
             chatModelKey={chatModelKey}
             busy={replicaBusy || mediaBusy || scriptPrepBusy}
+            variant={showProductionWorkspace ? "refs-only" : "full"}
             onAlert={onAlert!}
           />
         ) : null}
@@ -428,6 +515,7 @@ export function FilmPullWorkspace({
         <StoryboardModelPickerDialog
           open={pickerOpen}
           onOpenChange={setPickerOpen}
+          nativeOverlay
           mode="image"
           dialogTitle="选择视觉理解模型"
           dialogDescription="拉片须支持视频理解的模型。"

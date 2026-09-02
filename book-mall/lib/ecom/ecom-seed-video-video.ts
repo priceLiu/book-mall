@@ -5,6 +5,7 @@ import { buildCanvasVideoKieInput } from "@/lib/canvas/canvas-video-kie";
 import { buildCanvasVideoVolcengineInput } from "@/lib/canvas/canvas-video-volcengine";
 import { buildEcomStoryboardKling30DashscopeVideoJob } from "@/lib/canvas/dashscope-kling-v3-video";
 import { bailianResolutionFromEcom } from "@/lib/ecom/ecom-storyboard-gen-params";
+import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
   ensureStoryboardBailianR2vRefImage,
   ensureStoryboardVideoRefImage,

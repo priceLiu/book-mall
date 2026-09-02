@@ -61,6 +61,14 @@ export const FILM_PULL_SHOT_TABLE_COLUMNS: FilmPullShotColumnDef[] = [
     set: (r, v) => ({ ...r, cutTransition: v }),
   },
   {
+    key: "cutDetail",
+    label: "切点说明",
+    minW: "min-w-[120px]",
+    multiline: true,
+    get: (r) => r.cutDetail,
+    set: (r, v) => ({ ...r, cutDetail: v }),
+  },
+  {
     key: "shotScale",
     label: "景别",
     minW: "min-w-[72px]",

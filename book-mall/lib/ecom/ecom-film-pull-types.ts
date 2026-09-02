@@ -391,6 +391,7 @@ export function sanitizeFilmPullProductionPlan(raw: unknown): FilmPullProduction
         endTimeSec: Number(row.endTimeSec) || 0,
         durationSec: Number.isFinite(durationSec) && durationSec > 0 ? durationSec : 5,
         cutTransition: productionStringField(row, "cutTransition", "硬切"),
+        cutDetail: productionStringField(row, "cutDetail"),
         shotScale: productionStringField(row, "shotScale", legacyMotion.split("·")[0]?.trim() || "中景"),
         cameraAngle: productionStringField(row, "cameraAngle"),
         cameraMovement: productionStringField(row, "cameraMovement", legacyMotion.split("·")[2]?.trim() || "固定机位"),

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Clapperboard, Eye, Film, RefreshCw } from "lucide-react";
+import { ChevronDown, Clapperboard, Eye, Film, ImagePlus, RefreshCw, Save } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -8,7 +8,8 @@ import {
   type SubtitleBurnInStyle,
 } from "@private/media-render-subtitle-style";
 
-import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { StoryboardFullSheetCard } from "@/components/storyboard/storyboard-full-sheet-card";
 import { StoryboardResultCard } from "@/components/storyboard/storyboard-result-card";
 import { isStoryboardVideoUrl } from "@/lib/storyboard-media";
@@ -100,40 +101,39 @@ export function StoryboardDeliverableSection({
             ? `一键成片 ${durationSec}s · 故事版宫格与分镜脚本一并提交视频模型`
             : `整图成片 ${durationSec}s · 已生成 ${panelVideoCount} 镜单镜视频${canMergePanels ? " · 可合并" : ""}`}
         </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <EcomButtonSecondary size="sm" type="button" onClick={onReloadProject} title="从服务器重新加载项目">
-            <RefreshCw className="h-3.5 w-3.5 shrink-0" />
-            刷新
-          </EcomButtonSecondary>
-          {hasDeliverableSnapshot ? (
-            <EcomButtonSecondary size="sm" type="button" onClick={onOpenDeliverableReview}>
-              <Eye className="h-3.5 w-3.5 shrink-0" />
-              交付查阅
-            </EcomButtonSecondary>
-          ) : null}
-          <EcomButtonSecondary
-            size="sm"
-            type="button"
-            disabled={snapshotBusy || !sheet}
-            onClick={onSaveSnapshot}
-          >
-            {snapshotBusy ? "保存中…" : "保存交付快照"}
-          </EcomButtonSecondary>
-          {!fullSheetOnly ? (
-            <EcomButtonSecondary size="sm" type="button" disabled={!hasSheetImages} onClick={onOpenImagePicker}>
-              重新生图
-            </EcomButtonSecondary>
-          ) : null}
-          <EcomButtonPrimary
-            size="sm"
-            type="button"
-            disabled={!hasSheetImages || vidBusy}
-            onClick={onGenerateFullVideo}
-          >
-            <Film className="h-3.5 w-3.5 shrink-0" />
-            {vidBusy ? "生成中…" : fullSheetOnly ? "一键成片" : "生成完整视频"}
-          </EcomButtonPrimary>
-        </div>
+        <EcomIconToolbar>
+          <EcomIconToolbarGroup label="同步">
+            <EcomIconButton label="刷新项目" icon={RefreshCw} onClick={onReloadProject} />
+          </EcomIconToolbarGroup>
+          <EcomIconToolbarGroup label="交付">
+            {hasDeliverableSnapshot ? (
+              <EcomIconButton label="交付查阅" icon={Eye} onClick={onOpenDeliverableReview} />
+            ) : null}
+            <EcomIconButton
+              label={snapshotBusy ? "保存中…" : "保存交付快照"}
+              icon={Save}
+              busy={snapshotBusy}
+              disabled={snapshotBusy || !sheet}
+              onClick={onSaveSnapshot}
+            />
+            {!fullSheetOnly ? (
+              <EcomIconButton
+                label="重新生图"
+                icon={ImagePlus}
+                disabled={!hasSheetImages}
+                onClick={onOpenImagePicker}
+              />
+            ) : null}
+            <EcomIconButton
+              label={vidBusy ? "生成中…" : fullSheetOnly ? "一键成片" : "生成完整视频"}
+              icon={Film}
+              variant="accent"
+              busy={vidBusy}
+              disabled={!hasSheetImages || vidBusy}
+              onClick={onGenerateFullVideo}
+            />
+          </EcomIconToolbarGroup>
+        </EcomIconToolbar>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -235,9 +235,13 @@ export function StoryboardDeliverableSection({
                   />
                 </button>
               ) : null}
-              <EcomButtonSecondary size="sm" type="button" disabled={mergeBusy} onClick={onMergePanelVideos}>
-                {mergeBusy ? "合并中…" : "合并分镜视频"}
-              </EcomButtonSecondary>
+              <EcomIconButton
+                label={mergeBusy ? "合并中…" : "合并分镜视频"}
+                icon={Clapperboard}
+                busy={mergeBusy}
+                disabled={mergeBusy}
+                onClick={onMergePanelVideos}
+              />
             </div>
           </div>
           {mergeSettingsOpen &&

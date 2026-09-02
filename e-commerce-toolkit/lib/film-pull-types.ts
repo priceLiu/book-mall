@@ -4,6 +4,7 @@ export type FilmPullShot = {
   endTimeSec: number;
   durationSec: number;
   cutTransition: string;
+  cutDetail: string;
   shotScale: string;
   cameraAngle: string;
   cameraMovement: string;
@@ -28,6 +29,13 @@ export type FilmPullShot = {
   aiVisualPrompt: string;
 };
 
+export type FilmPullShootingPrep = {
+  venue: string;
+  costume: string;
+  props: string;
+  equipment: string;
+};
+
 export type FilmPullAnalyzePatch = {
   schemaVersion: 1;
   action: "analyze_complete";
@@ -40,6 +48,7 @@ export type FilmPullAnalyzePatch = {
     shotSequenceLogic: string;
     cameraLanguageSummary: string;
   };
+  shootingPrep: FilmPullShootingPrep;
   narrativeLogic: string;
   beatPoints: string;
   replicableShootingScript: string;

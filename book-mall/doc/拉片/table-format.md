@@ -9,140 +9,73 @@
   "schemaVersion": 1,
   "action": "analyze_complete",
   "meta": {
-    "totalDurationSec": 32.47,
-    "narrativeMainLine": "…",
-    "editRhythmCurve": "…",
-    "artStyle": "…",
-    "audioDesignLogic": "…",
-    "shotSequenceLogic": "…",
-    "cameraLanguageSummary": "…"
+    "totalDurationSec": 15,
+    "narrativeMainLine": "夏季海滩俱乐部多巴胺带货短片，七镜硬切节奏",
+    "editRhythmCurve": "平均镜长约2.1s；稳-稳-_burst-慢-收；全硬切",
+    "artStyle": "高饱和多巴胺配色；红蓝奶油白锚点",
+    "audioDesignLogic": "电子 BGM 卡点；环境海浪底",
+    "shotSequenceLogic": "中景→中近→特写→全景→中景→特写收束",
+    "cameraLanguageSummary": "镜1横移；镜3/7推近；其余固定微手持"
   },
-  "narrativeLogic": "整体叙事逻辑拆解（全片结构、各段功能与时长）",
-  "beatPoints": "镜头卡点要点（关键秒点、切点、音效/BGM、剪辑节奏）",
-  "replicableShootingScript": "可直接落地复刻的同款拍摄脚本（准备/场景/流程/文案/姿态运镜）",
+  "shootingPrep": {
+    "venue": "海滨沙滩俱乐部/海滩咖啡，红白条纹伞+豆袋沙发区",
+    "costume": "蓝棒球帽+橙框墨镜+红色美式印花T+蓝波点阔腿裤+黄腰带",
+    "props": "可乐罐、黄色网球拍、西瓜切块",
+    "equipment": "手机或微单+稳定器"
+  },
+  "narrativeLogic": "（总结性长文：须与 meta + 各镜 narrativeFunction 一致，可分段写镜1–7功能）",
+  "beatPoints": "（总结性长文：须与 meta 节奏字段 + 各镜 cutDetail 一致）",
+  "replicableShootingScript": "（总结性长文：须含【准备】= shootingPrep、【拍摄清单】= shots 逐镜流程）",
   "shots": [{
     "shotNo": 1,
     "startTimeSec": 0,
-    "endTimeSec": 2.13,
-    "durationSec": 2.13,
+    "endTimeSec": 2,
+    "durationSec": 2,
     "cutTransition": "硬切",
+    "cutDetail": "镜1→镜2：碰罐动作与喝对口型 match cut",
     "shotScale": "中景",
-    "cameraAngle": "平视",
-    "cameraMovement": "固定机位",
+    "cameraAngle": "侧平视",
+    "cameraMovement": "横移跟拍",
     "focalLengthPerspective": "标准50mm",
-    "composition": "三分线构图",
-    "subjectBlocking": "…",
-    "sightDirection": "…",
-    "sceneEnvironment": "…",
-    "foreMidBackLayer": "…",
-    "dynamicProps": "无",
-    "lightingSetup": "…",
-    "toneContrast": "…",
-    "narrativeFunction": "…",
+    "composition": "伞群对角引导线",
+    "subjectBlocking": "持可乐罐走向豆袋区",
+    "sightDirection": "侧视前方",
+    "sceneEnvironment": "海滩咖啡区，红白条纹伞背景",
+    "foreMidBackLayer": "前景伞沿；中景人物；后景海平线",
+    "dynamicProps": "可乐罐",
+    "lightingSetup": "侧顺光，高饱和",
+    "toneContrast": "红蓝高对比",
+    "narrativeFunction": "入场建场与人物亮相",
     "audioInfo": {
       "scriptSubtitle": "无",
       "vocalEmotion": "无",
-      "ambientSound": "无",
-      "fxAndBgm": "无"
+      "ambientSound": "海浪、环境人声",
+      "fxAndBgm": "电子BGM入场"
     },
     "rhythmWeight": "铺垫",
     "visualMetaphor": "无",
-    "aiVisualPrompt": "…"
+    "aiVisualPrompt": "Medium shot, beach club, woman with cola can, saturated colors…"
   }]
 }
 ```
 
 ## render_script_complete
 
-在 analyze 结构基础上增加 `renderGlobalConfig`，shots 内 `aiVisualPrompt` / `subjectBlocking` / `sightDirection` 已换角；**镜数、durationSec、start/end 不变**。
-
-```json
-{
-  "schemaVersion": 1,
-  "action": "render_script_complete",
-  "renderGlobalConfig": {
-    "characterUnifiedStyle": "…",
-    "globalLighting": "…",
-    "resolution": "1920×1080",
-    "fps": "24fps",
-    "globalVisualTone": "…"
-  },
-  "meta": { "…": "同 analyze" },
-  "shots": [{ "…": "同 analyze，人物相关字段已换角" }]
-}
-```
-
-## ref_match（项目 JSON · 非 LLM 围栏）
-
-存于 `EcomFilmPullProject.refMatch`：
-
-```json
-{
-  "shots": [{
-    "shotNo": 1,
-    "modelRefIds": ["ref-film-pull-model-1"],
-    "productRefIds": ["ref-film-pull-product-1"]
-  }]
-}
-```
-
-## production_plan（项目 JSON · 制作脚本表）
-
-存于 `EcomFilmPullProject.productionPlan`：
-
-```json
-{
-  "globalConfig": {
-    "characterUnifiedStyle": "…",
-    "globalLighting": "…",
-    "resolution": "1920×1080",
-    "fps": "24fps",
-    "globalVisualTone": "…"
-  },
-  "shots": [{
-    "shotNo": 1,
-    "startTimeSec": 0,
-    "endTimeSec": 3,
-    "durationSec": 3,
-    "modelRefIds": ["ref-film-pull-model-1"],
-    "productRefIds": ["ref-film-pull-product-1"],
-    "canvasDescription": "场景+主体+构图（换角后）",
-    "lightingStructure": "主光+对比",
-    "cameraMotion": "中景·平视·固定·50mm",
-    "cutTransition": "硬切",
-    "narrativeFunction": "钩子",
-    "rhythmWeight": "铺垫",
-    "voiceover": "口播字幕",
-    "vocalEmotion": "自然",
-    "imagePrompt": "@图片1 @图片2 … 生图用",
-    "videoPrompt": "… 生视频用（含运镜时长）",
-    "imageUrl": null,
-    "videoUrl": null,
-    "ttsUrl": null,
-    "status": "pending_video"
-  }],
-  "render": { "jobId": null, "finalVideoUrl": null }
-}
-```
-
-`status` 枚举：`pending_script` | `pending_image` | `pending_video` | `ready`
+在 analyze 结构基础上增加 `renderGlobalConfig`；继承 `shootingPrep` 与场景/光影/音频；**只换人物**相关字段。
 
 ## 规则
 
-1. 回复末尾唯一 ` ```film-pull ` 围栏（禁止 ` ```json `）
-2. 无对应内容填 `"无"`（**禁止空字符串**）
-3. `shots` 至少 1 镜
-4. `narrativeLogic` / `beatPoints` / `replicableShootingScript` **必填** string（可与 Markdown 三块段落一致，长文用 `\n` 换行）
-5. 制作阶段 **镜号、startTimeSec、endTimeSec、durationSec 不可改**（继承 analyze）
+1. 回复末尾唯一 ` ```film-pull ` 围栏
+2. `shootingPrep` 四字段 + `shots` 每镜 **25 维 + cutDetail + audioInfo** 为结构化真源
+3. `narrativeLogic` / `beatPoints` / `replicableShootingScript` **必填**总结长文，**不得**包含 JSON 中不存在的信息
+4. 无真实内容时少数列可填 `"无"`（见 skill.md）；`shootingPrep.venue`、多数镜 `sceneEnvironment`、非末镜 `cutDetail` **禁止**全片「无」
 
-## 严格校验（机器 parse · 违反即失败）
+## 严格校验
 
 | 检查项 | 要求 |
 |--------|------|
-| schemaVersion | number `1`，非 `"1"` |
-| meta.totalDurationSec | number，与末镜 endTimeSec 一致 |
-| 时间字段 | shotNo / startTimeSec / endTimeSec / durationSec 均为 number |
-| durationSec | = endTimeSec − startTimeSec（误差 ≤0.02s） |
-| string 字段 | meta 6 项 + 每镜 25 维 + audioInfo 4 项：**全部非空** |
-| audioInfo | 每镜必须有完整 object，不可省略或摊平到镜级 voiceover |
-| JSON 语法 | 标准 JSON；无注释、无尾逗号、无单引号 |
+| 语法 | schemaVersion、时间 number、audioInfo、无尾逗号 |
+| shootingPrep.venue | 非「无」 |
+| sceneEnvironment | 超过半数镜不得为「无」 |
+| cutDetail | 多镜时多数非末镜不得为「无」 |
+| meta vs beatPoints | beatPoints 非空时 editRhythmCurve 不得为「无」 |

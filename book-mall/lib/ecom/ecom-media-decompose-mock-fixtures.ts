@@ -72,10 +72,11 @@ export const MOCK_MEDIA_DECOMPOSE_VIDEO_PATCH: MediaDecomposePatch = {
 export const MOCK_REPLICA_PRODUCT_BRIEF = [
   "产品：【Mock】休闲针织开衫",
   "品类：女装 / 针织外套",
-  "卖点：轻薄透气、莫兰迪配色、通勤百搭",
   "材质/工艺：棉混纺针织，哑光质地",
   "展示建议：半身或全身 lookbook，突出面料垂感",
 ].join("\n");
+
+export const MOCK_REPLICA_SELLING_POINTS = "轻薄透气、莫兰迪配色、通勤百搭";
 
 export const MOCK_MEDIA_DECOMPOSE_IMAGE_PATCH: MediaDecomposePatch = {
   mediaType: "image",

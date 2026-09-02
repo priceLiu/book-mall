@@ -10,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
   EcomDialogPrimaryButton,
-  EcomDialogCancelButton,
 } from "@/components/ui/dialog";
 
 function sanitizeSaveName(name: string): string {
@@ -87,9 +86,6 @@ export function ProductDesignSaveDialog({
           </span>
         </p>
         <DialogFooter>
-          <EcomDialogCancelButton disabled={busy} onClick={() => onOpenChange(false)}>
-            取消
-          </EcomDialogCancelButton>
           <EcomDialogPrimaryButton
             disabled={busy || !name.trim()}
             onClick={() => void onConfirm(name.trim())}

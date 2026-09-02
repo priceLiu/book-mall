@@ -1,8 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FolderOpen, Images, Link2, Save } from "lucide-react";
+import {
+  Archive,
+  Download,
+  Images,
+  LayoutGrid,
+  Plus,
+  Save,
+  Trash2,
+} from "lucide-react";
 import { createPortal } from "react-dom";
 
 import { useBackgroundGeneration } from "@/components/generation";
@@ -21,7 +28,8 @@ import {
   buildModelShotPosePreviewItems,
 } from "@/components/media";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
-import { EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomIconButton, EcomIconButtonLink, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { EcomDialogCloseButton } from "@/components/ui/dialog";
 import {
   attachModelShotReference,
@@ -30,6 +38,7 @@ import {
   generateModelShotPosePlan,
   generateModelShotReference,
   getModelShotProject,
+  downloadModelShotExportZip,
   patchModelShotPoseItem,
   saveModelShotDeliverableSnapshot,
   updateModelShotProject,
@@ -45,9 +54,12 @@ import {
   listModelShotPendingPoseIndices,
   listOrphanModelShotPendingPoseIndices,
   modelShotImageDockTaskId,
+  modelShotTargetIndexesGainedImages,
+  modelShotTargetIndexesHaveImages,
   readModelShotPendingPoseImages,
   resolveActiveModelShotPoseBusyIndexes,
 } from "@/lib/model-shot-pending-poses";
+import { modelShotPoseHasGeneratedImage, resolveModelShotActiveImage } from "@/lib/model-shot-pose-images";
 import { inferModelShotPhase } from "@/lib/model-shot-workflow";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import { cn } from "@/lib/utils";
@@ -125,6 +137,7 @@ export function ModelShotContentPanel({
   } | null>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
   const imageGenInFlightCountRef = useRef(0);
   const imageGenWatchRef = useRef<number[]>([]);
   const imageGenPollLockRef = useRef(false);
@@ -141,6 +154,11 @@ export function ModelShotContentPanel({
 
   const reconcilePoseImageGenBusy = useCallback((source: ModelShotProject) => {
     const pending = listModelShotPendingPoseIndices(source.meta);
+    imageGenWatchRef.current = imageGenWatchRef.current.filter((idx) => {
+      if (pending.includes(idx)) return true;
+      const item = source.plan.items.find((row) => row.index === idx);
+      return item ? !modelShotPoseHasGeneratedImage(item) : true;
+    });
     const active = resolveActiveModelShotPoseBusyIndexes({
       pendingIndices: pending,
       localWatchIndices: imageGenWatchRef.current,
@@ -279,12 +297,12 @@ export function ModelShotContentPanel({
         const fresh = await getModelShotProject(project.id);
         const still = listModelShotPendingPoseIndices(fresh.meta);
         if (still.length > 0) return { status: "running" as const };
-        const hadNewImages = pendingPoseIndices.some((idx) => {
-          const before = project.plan.items.find((i) => i.index === idx)?.imageUrl?.trim();
-          const after = fresh.plan.items.find((i) => i.index === idx)?.imageUrl?.trim();
-          return Boolean(after && after !== before);
-        });
-        if (!hadNewImages) {
+        const hadNewImages = modelShotTargetIndexesGainedImages(
+          project.plan.items,
+          fresh.plan.items,
+          pendingPoseIndices,
+        );
+        if (!hadNewImages && !modelShotTargetIndexesHaveImages(fresh.plan.items, pendingPoseIndices)) {
           return {
             status: "failed" as const,
             error: "生成未产出新图片，请重试",
@@ -525,13 +543,18 @@ export function ModelShotContentPanel({
         }
         const failures = result.failures ?? [];
         const generated = result.generated ?? 0;
-        const hasImages = targetIndexes.some((idx) =>
-          Boolean(
-            result!.project.plan.items.find((i) => i.index === idx)?.imageUrl?.trim(),
-          ),
+        const hasImages = modelShotTargetIndexesHaveImages(
+          result.project.plan.items,
+          targetIndexes,
         );
-        if (generated > 0 || hasImages) {
+        if (hasImages) {
           return { status: "succeeded" };
+        }
+        if (generated > 0) {
+          return {
+            status: "failed",
+            error: "部分姿势图未写入方案，请刷新页面；若仍缺失请重试对应姿势",
+          };
         }
         if (failures.length > 0) {
           return { status: "failed", error: failures.join("；") };
@@ -547,16 +570,16 @@ export function ModelShotContentPanel({
         document
           .getElementById("model-shot-pose-media-strip")
           ?.scrollIntoView({ behavior: "smooth", block: "start" });
-        const readyIndexes = targetIndexes.filter((idx) =>
-          Boolean(
-            result!.project.plan.items.find((i) => i.index === idx)?.imageUrl?.trim(),
-          ),
-        );
+        const readyIndexes = targetIndexes.filter((idx) => {
+          const item = result!.project.plan.items.find((i) => i.index === idx);
+          return item ? modelShotPoseHasGeneratedImage(item) : false;
+        });
         const focusIndex = readyIndexes[0] ?? targetIndexes[0];
         if (focusIndex == null) return;
         const item = result.project.plan.items.find((i) => i.index === focusIndex);
-        if (item?.imageUrl?.trim()) {
-          openPoseImagePreview(item.imageUrl, item.title ?? `姿势 ${focusIndex}`);
+        const active = item ? resolveModelShotActiveImage(item) : null;
+        if (active?.url?.trim()) {
+          openPoseImagePreview(active.url, item!.title ?? `姿势 ${focusIndex}`);
         }
       };
 
@@ -616,16 +639,25 @@ export function ModelShotContentPanel({
           return resolvePoll();
         },
         onSucceeded: async () => {
-          if (result?.project) {
-            await onProjectChange(result.project);
+          let freshProject: ModelShotProject | undefined;
+          try {
+            freshProject = await getModelShotProject(project.id);
+          } catch {
+            freshProject = result?.project;
+          }
+          if (freshProject) {
+            await onProjectChange(freshProject);
+            reconcilePoseImageGenBusy(freshProject);
           } else {
             await onProjectChange();
           }
-          const outcome = resolvePoll();
-          if (outcome.status === "failed") return;
+          const ready =
+            freshProject != null &&
+            modelShotTargetIndexesHaveImages(freshProject.plan.items, targetIndexes);
+          if (!ready) return;
           toast({
             title: "模特图已生成",
-            message: `成功 ${result?.generated ?? 0} 张，已保存至「我的资产」。`,
+            message: `成功 ${result?.generated ?? targetIndexes.length} 张，已保存至「我的资产」。`,
             variant: "success",
           });
         },
@@ -693,6 +725,26 @@ export function ModelShotContentPanel({
     if (sceneRef.source === "none") return "跳过场景";
     return sceneRef.name?.trim() || "已设场景";
   }, [project.references]);
+
+  const handleExportZip = useCallback(async () => {
+    setExportBusy(true);
+    try {
+      await downloadModelShotExportZip(project.id);
+      toast({
+        title: "导出完成",
+        message: "交付包已下载到本地。",
+        variant: "success",
+      });
+    } catch (e) {
+      await alert({
+        title: "导出失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    } finally {
+      setExportBusy(false);
+    }
+  }, [alert, project.id, toast]);
 
   const handleSaveWorkflow = useCallback(
     async (workName: string) => {
@@ -769,60 +821,70 @@ export function ModelShotContentPanel({
               </h2>
               <p className="text-[11px] text-[#6e6e73]">阶段：{phase}</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Link href="/workflows/drafts">
-                <EcomButtonSecondary type="button" size="sm" disabled={busy}>
-                  <FolderOpen className="h-3.5 w-3.5 shrink-0" />
-                  暂存
-                </EcomButtonSecondary>
-              </Link>
-              <Link href="/library">
-                <EcomButtonSecondary type="button" size="sm" disabled={busy}>
-                  <Images className="h-3.5 w-3.5 shrink-0" />
-                  我的资产
-                </EcomButtonSecondary>
-              </Link>
-              <EcomButtonSecondary
-                type="button"
-                size="sm"
-                disabled={!canSave || saveBusy || busy}
-                onClick={() => setSaveDialogOpen(true)}
-              >
-                <Save className="h-3.5 w-3.5 shrink-0" />
-                保存
-              </EcomButtonSecondary>
-              {onShareWorkflow ? (
-                <EcomButtonSecondary type="button" size="sm" disabled={busy} onClick={onShareWorkflow}>
-                  <Link2 className="h-3.5 w-3.5 shrink-0" />
-                  分享工作流
-                </EcomButtonSecondary>
-              ) : null}
-              {loadProjectList && onOpenProject ? (
-                <EcomProjectListButton
-                  currentProjectId={project.id}
-                  loadProjects={loadProjectList}
-                  onSelectProject={onOpenProject}
-                  title="服装模特图 · 项目列表"
-                  emptyHint="还没有保存过的服装模特图项目。"
-                  disabled={streaming || refBusy || busy}
+            <EcomIconToolbar>
+              <EcomIconToolbarGroup label="项目">
+                {onNewProject ? (
+                  <EcomIconButton
+                    label="新建项目"
+                    icon={Plus}
+                    disabled={busy}
+                    onClick={() => void onNewProject()}
+                  />
+                ) : null}
+                {loadProjectList && onOpenProject ? (
+                  <EcomProjectListButton
+                    currentProjectId={project.id}
+                    loadProjects={loadProjectList}
+                    onSelectProject={onOpenProject}
+                    title="服装模特图 · 项目列表"
+                    emptyHint="还没有保存过的服装模特图项目。"
+                    disabled={streaming || refBusy || busy}
+                  />
+                ) : null}
+                {onDeleteProject ? (
+                  <EcomIconButton
+                    label="删除项目"
+                    icon={Trash2}
+                    variant="destructive"
+                    disabled={busy}
+                    onClick={() => void onDeleteProject()}
+                  />
+                ) : null}
+              </EcomIconToolbarGroup>
+              <EcomIconToolbarGroup label="工作流">
+                <EcomIconButtonLink label="暂存工作流" icon={Archive} href="/workflows/drafts" disabled={busy} />
+                <EcomIconButton
+                  label="保存工作流"
+                  icon={Save}
+                  busy={saveBusy}
+                  disabled={!canSave || saveBusy || busy}
+                  onClick={() => setSaveDialogOpen(true)}
                 />
+              </EcomIconToolbarGroup>
+              <EcomIconToolbarGroup label="资产与库">
+                <EcomIconButtonLink label="我的资产" icon={Images} href="/library" disabled={busy} />
+                <EcomIconButtonLink
+                  label="姿势 · 场景 · 道具库"
+                  icon={LayoutGrid}
+                  href="/ecom/shoot-catalog"
+                  disabled={busy}
+                />
+              </EcomIconToolbarGroup>
+              <EcomIconToolbarGroup label="交付">
+                <EcomIconButton
+                  label={exportBusy ? "打包中…" : "导出交付包"}
+                  icon={Download}
+                  busy={exportBusy}
+                  disabled={!canSave || exportBusy || busy}
+                  onClick={() => void handleExportZip()}
+                />
+              </EcomIconToolbarGroup>
+              {onShareWorkflow ? (
+                <EcomIconToolbarGroup label="分享">
+                  <EcomShareIconButton disabled={busy} onClick={onShareWorkflow} />
+                </EcomIconToolbarGroup>
               ) : null}
-              <Link href="/ecom/shoot-catalog">
-                <EcomButtonSecondary type="button" disabled={busy}>
-                  姿势场景道具库
-                </EcomButtonSecondary>
-              </Link>
-              {onNewProject ? (
-                <EcomButtonSecondary type="button" disabled={busy} onClick={() => void onNewProject()}>
-                  新建
-                </EcomButtonSecondary>
-              ) : null}
-              {onDeleteProject ? (
-                <EcomButtonSecondary type="button" disabled={busy} onClick={() => void onDeleteProject()}>
-                  删除项目
-                </EcomButtonSecondary>
-              ) : null}
-            </div>
+            </EcomIconToolbar>
           </div>
         </header>
 

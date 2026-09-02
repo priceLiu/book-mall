@@ -2,6 +2,11 @@
 
 import { Plus, Trash2 } from "lucide-react";
 
+import {
+  FilmPullRefReadOnlyCell,
+  FilmPullRefToggleCell,
+} from "@/components/film-pull/film-pull-ref-cells";
+import { FilmPullRefsGalleryStrip } from "@/components/film-pull/film-pull-refs-gallery-strip";
 import { ProductDesignPromptMentionTextarea } from "@/components/product-design/product-design-prompt-mention-textarea";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import type { EcomPromptImageRef } from "@/lib/ecom-prompt-mention";
@@ -20,8 +25,13 @@ import type {
   FilmPullCharacterRef,
   FilmPullProductInteraction,
   FilmPullProductionShot,
+  FilmPullRefMatch,
 } from "@/lib/film-pull-types";
-import { listFilmPullModelRefs, listFilmPullProductRefs } from "@/lib/film-pull-refs";
+import {
+  listFilmPullModelRefs,
+  listFilmPullProductRefs,
+  resolveFilmPullShotDisplayRefIds,
+} from "@/lib/film-pull-refs";
 import { cn } from "@/lib/utils";
 
 export type FilmPullConfirmScriptTableMode = "preview" | "edit";
@@ -29,79 +39,17 @@ export type FilmPullConfirmScriptTableMode = "preview" | "edit";
 type Props = {
   shots: FilmPullProductionShot[];
   characterRefs: FilmPullCharacterRef[];
+  refMatch?: FilmPullRefMatch | null;
   mode?: FilmPullConfirmScriptTableMode;
   disabled?: boolean;
   onChangeShots?: (shots: FilmPullProductionShot[]) => void;
   mentionRefs?: EcomPromptImageRef[];
   mentionPickerZIndex?: number;
+  /** 表头下方展示全部参考图及 @图片N */
+  showRefsGallery?: boolean;
   showRowActions?: boolean;
   className?: string;
 };
-
-function RefThumb({ url, label }: { url: string; label?: string }) {
-  return (
-    <div className="flex flex-col items-center gap-0.5">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt={label ?? ""} className="h-9 w-9 rounded object-cover ring-1 ring-[#e8e8ed]" />
-      {label ? <span className="max-w-[3rem] truncate text-[9px] text-[#6e6e73]">{label}</span> : null}
-    </div>
-  );
-}
-
-function RefToggleGroup({
-  refs,
-  selectedIds,
-  disabled,
-  onChange,
-}: {
-  refs: Array<{ id: string; ossUrl: string; label?: string }>;
-  selectedIds: string[];
-  disabled?: boolean;
-  onChange: (ids: string[]) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-1">
-      {refs.map((ref) => {
-        const active = selectedIds.includes(ref.id);
-        return (
-          <button
-            key={ref.id}
-            type="button"
-            disabled={disabled}
-            title={ref.label ?? ref.id}
-            className={`rounded-lg p-0.5 ring-2 transition ${active ? "ring-[#0071e3]" : "ring-transparent opacity-60 hover:opacity-100"}`}
-            onClick={() => {
-              const next = active
-                ? selectedIds.filter((id) => id !== ref.id)
-                : [...selectedIds, ref.id];
-              onChange(next);
-            }}
-          >
-            <RefThumb url={ref.ossUrl} label={ref.label} />
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function RefReadOnlyGroup({
-  refs,
-  selectedIds,
-}: {
-  refs: Array<{ id: string; ossUrl: string; label?: string }>;
-  selectedIds: string[];
-}) {
-  const selected = refs.filter((r) => selectedIds.includes(r.id));
-  if (selected.length === 0) return <span className="text-[#86868b]">—</span>;
-  return (
-    <div className="flex flex-wrap gap-1">
-      {selected.map((ref) => (
-        <RefThumb key={ref.id} url={ref.ossUrl} label={ref.label} />
-      ))}
-    </div>
-  );
-}
 
 function MentionOrTextarea({
   value,
@@ -121,6 +69,19 @@ function MentionOrTextarea({
   onChange: (next: string) => void;
 }) {
   if (!edit) {
+    if (mentionRefs && mentionRefs.length > 0 && /@图片\d+/.test(value)) {
+      return (
+        <ProductDesignPromptMentionTextarea
+          value={value}
+          referenceImages={mentionRefs}
+          disabled
+          hideQuickInsert
+          minHeightClass="min-h-[2rem]"
+          className="max-w-[12rem] rounded border border-transparent bg-transparent px-0 py-0 text-xs leading-relaxed"
+          onChange={() => {}}
+        />
+      );
+    }
     return (
       <span className="block max-w-[12rem] whitespace-pre-wrap break-words">
         {formatFilmPullConfirmCell(value)}
@@ -154,11 +115,13 @@ function MentionOrTextarea({
 export function FilmPullConfirmScriptTable({
   shots,
   characterRefs,
+  refMatch,
   mode = "preview",
   disabled = false,
   onChangeShots,
   mentionRefs,
   mentionPickerZIndex = 6000,
+  showRefsGallery = false,
   showRowActions = false,
   className,
 }: Props) {
@@ -186,6 +149,14 @@ export function FilmPullConfirmScriptTable({
 
   return (
     <div className={cn("overflow-x-auto rounded-lg border border-[#e8e8ed]", className)}>
+      {showRefsGallery ? (
+        <div className="border-b border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5">
+          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[#6e6e73]">
+            参考图 · 在 Prompt 中用 @图片1 … 引用
+          </p>
+          <FilmPullRefsGalleryStrip characterRefs={characterRefs} />
+        </div>
+      ) : null}
       <table className="w-full min-w-[1600px] border-collapse text-left text-xs">
         <thead>
           <tr className="bg-[#1d1d1f] text-white">
@@ -210,7 +181,12 @@ export function FilmPullConfirmScriptTable({
           </tr>
         </thead>
         <tbody>
-          {shots.map((shot) => (
+          {shots.map((shot) => {
+            const displayRefs = resolveFilmPullShotDisplayRefIds(shot, {
+              characterRefs,
+              refMatch,
+            });
+            return (
             <tr key={shot.shotNo} className="border-t border-[#e8e8ed] align-top">
               <td className="px-3 py-2 font-medium">{shot.shotNo}</td>
               <td className="px-3 py-2 text-[#6e6e73]">{formatFilmPullShotTimeline(shot)}</td>
@@ -332,26 +308,32 @@ export function FilmPullConfirmScriptTable({
               </td>
               <td className="px-3 py-2">
                 {isEdit ? (
-                  <RefToggleGroup
+                  <FilmPullRefToggleCell
                     refs={modelRefs}
                     selectedIds={shot.modelRefIds}
                     disabled={disabled}
                     onChange={(ids) => patchShot(shot.shotNo, { modelRefIds: ids })}
                   />
                 ) : (
-                  <RefReadOnlyGroup refs={modelRefs} selectedIds={shot.modelRefIds} />
+                  <FilmPullRefReadOnlyCell
+                    refs={modelRefs}
+                    selectedIds={displayRefs.modelRefIds}
+                  />
                 )}
               </td>
               <td className="px-3 py-2">
                 {isEdit ? (
-                  <RefToggleGroup
+                  <FilmPullRefToggleCell
                     refs={productRefs}
                     selectedIds={shot.productRefIds}
                     disabled={disabled}
                     onChange={(ids) => patchShot(shot.shotNo, { productRefIds: ids })}
                   />
                 ) : (
-                  <RefReadOnlyGroup refs={productRefs} selectedIds={shot.productRefIds} />
+                  <FilmPullRefReadOnlyCell
+                    refs={productRefs}
+                    selectedIds={displayRefs.productRefIds}
+                  />
                 )}
               </td>
               <td className="px-3 py-2">
@@ -393,7 +375,8 @@ export function FilmPullConfirmScriptTable({
                 </td>
               ) : null}
             </tr>
-          ))}
+            );
+          })}
         </tbody>
         {showRowActions && isEdit ? (
           <tfoot>

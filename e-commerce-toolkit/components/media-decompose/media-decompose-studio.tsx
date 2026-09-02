@@ -6,6 +6,7 @@ import { EcomLoginPrompt } from "@/components/auth/ecom-login-prompt";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { MediaDecomposeWorkspace } from "@/components/media-decompose/media-decompose-workspace";
 import { EcomVideoPreviewDialog } from "@/components/media/ecom-video-preview-dialog";
+import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-link-dialog";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import {
@@ -29,6 +30,10 @@ import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import { resolveSeedVideoVideoModelKey } from "@/lib/seed-video-workflow";
 import type { SeedVideoProject } from "@/lib/seed-video-types";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import {
+  ECOM_WORKFLOW_SHARE_DESCRIPTION,
+  ECOM_WORKFLOW_SHARE_RESOURCE,
+} from "@/lib/ecom-workflow-share";
 
 const PROJECT_STORAGE_KEY = "ecom-media-decompose-active-project";
 
@@ -50,6 +55,7 @@ export function MediaDecomposeStudio() {
   const [imageModels, setImageModels] = useState<StoryboardGatewayModel[]>([]);
   const [imageModelKey, setImageModelKey] = useState("");
   const [previewVideo, setPreviewVideo] = useState<{ src: string; title?: string } | null>(null);
+  const [workflowShareOpen, setWorkflowShareOpen] = useState(false);
 
   const applyProject = useCallback((p: MediaDecomposeProject) => {
     setProject(p);
@@ -392,8 +398,17 @@ export function MediaDecomposeStudio() {
           setDecomposing(false);
         }
       }}
+      onShareWorkflow={() => setWorkflowShareOpen(true)}
     />
     </EcomWorkspaceLayout>
+    <WorkflowShareLinkDialog
+      projectId={project.id}
+      projectTitle={project.title?.trim() || "拆图拆视频"}
+      open={workflowShareOpen}
+      onClose={() => setWorkflowShareOpen(false)}
+      resourceType={ECOM_WORKFLOW_SHARE_RESOURCE.mediaDecompose}
+      description={ECOM_WORKFLOW_SHARE_DESCRIPTION[ECOM_WORKFLOW_SHARE_RESOURCE.mediaDecompose]}
+    />
     {previewVideo ? (
       <EcomVideoPreviewDialog
         open

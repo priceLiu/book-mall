@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Images, Settings2, Download, Link2, Save } from "lucide-react";
+import { Download, Images, Loader2, Plus, RefreshCw, Save, Settings2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -21,7 +21,8 @@ import {
   buildStoryboardPanelPreviewItems,
 } from "@/components/media";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
-import { EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomIconButton, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import {
   Dialog,
   DialogContent,
@@ -496,7 +497,8 @@ export function StoryboardContentPanel({
 
     const modelKey = modelKeyOverride?.trim() || imageModel?.trim() || "";
     if (!modelKey) {
-      openImagePicker(panelIndex, batchIndexes, "generate");
+      // 角色弹层关闭后下一帧再开模型选择，避免 Radix Presence 嵌套循环
+      queueMicrotask(() => openImagePicker(panelIndex, batchIndexes, "generate"));
       return;
     }
 
@@ -2592,14 +2594,13 @@ export function StoryboardContentPanel({
         <p className="text-sm text-[#86868b]">
           正在将定稿分镜同步为故事版整页版式…若长时间无内容，请点下方按钮重试。
         </p>
-        <EcomButtonSecondary
-          type="button"
-          size="sm"
+        <EcomIconButton
+          label={fashionSheetSyncing ? "同步中…" : "重新同步故事版"}
+          icon={RefreshCw}
+          busy={fashionSheetSyncing}
           disabled={fashionSheetSyncing}
           onClick={() => void handleRetryFashionSheetSync()}
-        >
-          {fashionSheetSyncing ? "同步中…" : "重新同步故事版"}
-        </EcomButtonSecondary>
+        />
       </div>
     ) : undefined;
 
@@ -2620,75 +2621,67 @@ export function StoryboardContentPanel({
                 {" · 成图自动入库「我的资产 · 微剧故事版」"}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {onNewProject ? (
-                <EcomButtonSecondary
-                  size="sm"
-                  type="button"
-                  dark
-                  disabled={refBusy || Boolean(streaming)}
-                  onClick={() => void onNewProject()}
-                >
-                  新建
-                </EcomButtonSecondary>
-              ) : null}
-              {loadProjectList && onOpenProject ? (
-                <EcomProjectListButton
-                  disabled={refBusy || Boolean(streaming)}
-                  currentProjectId={project.id}
-                  loadProjects={loadProjectList}
-                  onSelectProject={onOpenProject}
-                  title="微剧故事版 · 项目列表"
-                  emptyHint="还没有保存过的微剧故事版项目。"
+            <EcomIconToolbar>
+              <EcomIconToolbarGroup label="项目">
+                {onNewProject ? (
+                  <EcomIconButton
+                    label="新建项目"
+                    icon={Plus}
+                    disabled={refBusy || Boolean(streaming)}
+                    onClick={() => void onNewProject()}
+                  />
+                ) : null}
+                {loadProjectList && onOpenProject ? (
+                  <EcomProjectListButton
+                    disabled={refBusy || Boolean(streaming)}
+                    currentProjectId={project.id}
+                    loadProjects={loadProjectList}
+                    onSelectProject={onOpenProject}
+                    title="微剧故事版 · 项目列表"
+                    emptyHint="还没有保存过的微剧故事版项目。"
+                  />
+                ) : null}
+              </EcomIconToolbarGroup>
+              <EcomIconToolbarGroup label="工作流">
+                <EcomIconButton
+                  label="保存工作流"
+                  icon={Save}
+                  busy={saveWorkflowBusy}
+                  disabled={!canSaveWorkflow || saveWorkflowBusy || Boolean(streaming)}
+                  onClick={() => setSaveDialogOpen(true)}
                 />
-              ) : null}
-              <EcomButtonSecondary
-                size="sm"
-                type="button"
-                dark
-                onClick={() => router.push("/library")}
-              >
-                <Images className="h-3.5 w-3.5 shrink-0" />
-                我的资产
-              </EcomButtonSecondary>
-              <EcomButtonSecondary
-                size="sm"
-                type="button"
-                dark
-                disabled={!canSaveWorkflow || saveWorkflowBusy || Boolean(streaming)}
-                onClick={() => setSaveDialogOpen(true)}
-              >
-                <Save className="h-3.5 w-3.5 shrink-0" />
-                {saveWorkflowBusy ? "保存中…" : "保存工作流"}
-              </EcomButtonSecondary>
-              {onShareWorkflow ? (
-                <EcomButtonSecondary size="sm" type="button" dark onClick={onShareWorkflow}>
-                  <Link2 className="h-3.5 w-3.5 shrink-0" />
-                  分享工作流
-                </EcomButtonSecondary>
-              ) : null}
+              </EcomIconToolbarGroup>
+              <EcomIconToolbarGroup label="资产">
+                <EcomIconButton
+                  label="我的资产"
+                  icon={Images}
+                  onClick={() => router.push("/library")}
+                />
+              </EcomIconToolbarGroup>
               {onOpenSettings ? (
-                <EcomButtonSecondary
-                  size="sm"
-                  type="button"
-                  dark
-                  onClick={() => onOpenSettings()}
-                >
-                  <Settings2 className="h-3.5 w-3.5 shrink-0" />
-                  影片参数
-                </EcomButtonSecondary>
+                <EcomIconToolbarGroup label="设置">
+                  <EcomIconButton
+                    label="影片参数"
+                    icon={Settings2}
+                    onClick={() => onOpenSettings()}
+                  />
+                </EcomIconToolbarGroup>
               ) : null}
-              <EcomButtonSecondary
-                size="sm"
-                type="button"
-                dark
-                disabled={!canExport || exportBusy || Boolean(streaming)}
-                onClick={() => void handleExportZip()}
-              >
-                <Download className="h-3.5 w-3.5 shrink-0" />
-                {exportBusy ? "打包中…" : "导出交付包"}
-              </EcomButtonSecondary>
-            </div>
+              <EcomIconToolbarGroup label="交付">
+                <EcomIconButton
+                  label={exportBusy ? "打包中…" : "导出交付包"}
+                  icon={Download}
+                  busy={exportBusy}
+                  disabled={!canExport || exportBusy || Boolean(streaming)}
+                  onClick={() => void handleExportZip()}
+                />
+              </EcomIconToolbarGroup>
+              {onShareWorkflow ? (
+                <EcomIconToolbarGroup label="分享">
+                  <EcomShareIconButton onClick={onShareWorkflow} />
+                </EcomIconToolbarGroup>
+              ) : null}
+            </EcomIconToolbar>
           </div>
         </header>
 
@@ -2911,6 +2904,7 @@ export function StoryboardContentPanel({
       <StoryboardModelPickerDialog
         open={pickerOpen}
         onOpenChange={setPickerOpen}
+        nativeOverlay
         mode={pickerMode}
         models={pickerMode === "image" ? imageModels : videoModels}
         value={pickerMode === "image" ? imageModel : videoModel}

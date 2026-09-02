@@ -12,6 +12,7 @@ function mockShot(
 ): FilmPullShot {
   return {
     cutTransition: "硬切",
+    cutDetail: "入点硬切开场",
     shotScale: "中景",
     cameraAngle: "平视",
     cameraMovement: "固定机位",
@@ -52,6 +53,12 @@ export const MOCK_FILM_PULL_ANALYZE_PATCH: FilmPullAnalyzePatch = {
     shotSequenceLogic: "建立 → 细节 → 效果展示",
     cameraLanguageSummary: "主机位固定 + 镜 2 慢推特写",
   },
+  shootingPrep: {
+    venue: "简约室内浅灰背景棚",
+    costume: "休闲女装+产品手持",
+    props: "手持产品",
+    equipment: "三脚架+柔光主灯",
+  },
   narrativeLogic:
     "【Mock】0–3s 钩子展示产品 → 3–8s 卖点讲解 → 8–12s 穿搭效果与 CTA。",
   beatPoints: "【Mock】0s 硬切开场；3s BGM 起；8s 转场至全身展示。",
@@ -63,6 +70,7 @@ export const MOCK_FILM_PULL_ANALYZE_PATCH: FilmPullAnalyzePatch = {
       startTimeSec: 0,
       endTimeSec: 3,
       durationSec: 3,
+      cutDetail: "镜1→镜2：钩子切至产品特写",
       shotScale: "中景",
       narrativeFunction: "钩子建立",
       aiVisualPrompt:
@@ -73,6 +81,7 @@ export const MOCK_FILM_PULL_ANALYZE_PATCH: FilmPullAnalyzePatch = {
       startTimeSec: 3,
       endTimeSec: 8,
       durationSec: 5,
+      cutDetail: "镜2→镜3：材质展示切至全身",
       shotScale: "特写",
       cameraMovement: "慢推",
       cameraAngle: "俯拍",

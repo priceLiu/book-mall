@@ -12,6 +12,7 @@ import { ProductDesignContentPanel } from "@/components/product-design/product-d
 import { ProductDesignProgressRail } from "@/components/product-design/product-design-progress-rail";
 import { ProductDesignSourceProjectDialog } from "@/components/product-design/product-design-source-project-dialog";
 import { ProductCreationStudioSkeleton } from "@/components/product-design/product-creation-studio-skeleton";
+import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-link-dialog";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import {
@@ -44,6 +45,10 @@ import {
 import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import {
+  ECOM_WORKFLOW_SHARE_DESCRIPTION,
+  ECOM_WORKFLOW_SHARE_RESOURCE,
+} from "@/lib/ecom-workflow-share";
 
 /** 两个入口各自记住自己的活跃项目，避免互相抢占 */
 function projectStorageKey(module: EcomProjectModule): string {
@@ -107,6 +112,7 @@ export function ProductCreationStudio({ module }: StudioProps) {
   const { assistantCollapsed, setAssistantCollapsed, handleMainBlankPointerDown } =
     useEcomStudioAssistantCollapse(assistantStreaming);
   const [importPickerOpen, setImportPickerOpen] = useState(false);
+  const [workflowShareOpen, setWorkflowShareOpen] = useState(false);
 
   useEffect(() => {
     if (!focusStepId) return;
@@ -567,6 +573,7 @@ export function ProductCreationStudio({ module }: StudioProps) {
   const spec = specs.find((s) => s.code === project.platform) ?? null;
 
   return (
+    <>
     <EcomWorkspaceLayout
       assistantWide={assistantWide}
       assistantCollapsed={assistantCollapsed}
@@ -654,8 +661,18 @@ export function ProductCreationStudio({ module }: StudioProps) {
         modelsLoading={modelsLoading}
         modelsLoadError={modelsLoadError}
         onRefreshModels={() => loadModels({ force: true })}
+        onShareWorkflow={() => setWorkflowShareOpen(true)}
       />
       {importDialog}
     </EcomWorkspaceLayout>
+    <WorkflowShareLinkDialog
+      projectId={project.id}
+      projectTitle={project.title?.trim() || entry.title}
+      open={workflowShareOpen}
+      onClose={() => setWorkflowShareOpen(false)}
+      resourceType={ECOM_WORKFLOW_SHARE_RESOURCE.productDesign}
+      description={ECOM_WORKFLOW_SHARE_DESCRIPTION[ECOM_WORKFLOW_SHARE_RESOURCE.productDesign]}
+    />
+    </>
   );
 }

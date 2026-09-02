@@ -4,6 +4,7 @@ import { ImageIcon, Loader2, Save, Sparkles } from "lucide-react";
 
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
+import type { ReplicaVoiceoverDraft } from "@/lib/media-decompose-replica-workflow";
 import { cn } from "@/lib/utils";
 
 type RefSlotProps = {
@@ -180,7 +181,7 @@ export function ReplicaProductBriefCard({
           value={value}
           disabled={disabled || saving || recognizing}
           rows={6}
-          placeholder="例如：产品：驼色无袖收腰大摆长款连衣裙&#10;品类：女装/连衣裙&#10;卖点：…"
+          placeholder="例如：产品：驼色无袖收腰大摆长款连衣裙&#10;品类：女装/连衣裙&#10;材质/工艺：…"
           className="w-full resize-y rounded-lg border border-[#d2d2d7] bg-[#fafafa] px-3 py-2.5 text-sm leading-relaxed text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[#0071e3] focus:bg-white focus:ring-2 focus:ring-[#0071e3]/20 disabled:opacity-60"
           onChange={(e) => onChange(e.target.value)}
         />
@@ -193,6 +194,148 @@ export function ReplicaProductBriefCard({
           </div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+type SellingPointsCardProps = {
+  value: string;
+  onChange: (value: string) => void;
+  onSave?: () => void | Promise<void>;
+  onGenerate?: () => void | Promise<void>;
+  onGenerateVoiceover?: () => void | Promise<void>;
+  saving?: boolean;
+  generating?: boolean;
+  voiceoverGenerating?: boolean;
+  disabled?: boolean;
+  generateDisabled?: boolean;
+  voiceoverDisabled?: boolean;
+  dirty?: boolean;
+  showVoiceover?: boolean;
+};
+
+/** 内容区 · 卖点（可选单行/短段） */
+export function ReplicaSellingPointsCard({
+  value,
+  onChange,
+  onSave,
+  onGenerate,
+  onGenerateVoiceover,
+  saving,
+  generating,
+  voiceoverGenerating,
+  disabled,
+  generateDisabled,
+  voiceoverDisabled,
+  dirty,
+  showVoiceover = false,
+}: SellingPointsCardProps) {
+  const generateLabel = value.trim() ? "AI 润色卖点" : "AI 生成卖点";
+  return (
+    <div
+      className={cn(
+        "rounded-xl border border-[#e8e8ed] bg-white p-4",
+        generating && "ecom-media-generating-sweep",
+      )}
+      aria-busy={generating || voiceoverGenerating || undefined}
+    >
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold text-[#1d1d1f]">卖点</p>
+          <p className="text-[11px] text-[#6e6e73]">可选；用于脚本与口播生成。不填也可继续，AI 可后续补全。</p>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-1.5">
+          {onGenerate ? (
+            <EcomButtonSecondary
+              size="sm"
+              type="button"
+              disabled={disabled || saving || generating || voiceoverGenerating || generateDisabled}
+              className="h-7 px-2 text-[10px]"
+              onClick={() => void onGenerate()}
+            >
+              {generating ? (
+                <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+              ) : (
+                <Sparkles className="h-3 w-3 shrink-0" />
+              )}
+              {generateLabel}
+            </EcomButtonSecondary>
+          ) : null}
+          {showVoiceover && onGenerateVoiceover ? (
+            <EcomButtonSecondary
+              size="sm"
+              type="button"
+              disabled={
+                disabled || saving || generating || voiceoverGenerating || voiceoverDisabled
+              }
+              className="h-7 px-2 text-[10px]"
+              onClick={() => void onGenerateVoiceover()}
+            >
+              {voiceoverGenerating ? (
+                <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+              ) : (
+                <Sparkles className="h-3 w-3 shrink-0" />
+              )}
+              AI 口播文案
+            </EcomButtonSecondary>
+          ) : null}
+          {onSave ? (
+            <EcomButtonSecondary
+              size="sm"
+              type="button"
+              disabled={disabled || saving || generating || voiceoverGenerating || !dirty}
+              className="h-7 px-2 text-[10px]"
+              onClick={() => void onSave()}
+            >
+              {saving ? (
+                <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+              ) : (
+                <Save className="h-3 w-3 shrink-0" />
+              )}
+              保存
+            </EcomButtonSecondary>
+          ) : null}
+        </div>
+      </div>
+      <input
+        type="text"
+        value={value}
+        disabled={disabled || saving || generating || voiceoverGenerating}
+        placeholder="例如：轻薄透气、莫兰迪配色、通勤百搭（可不填）"
+        className="w-full rounded-lg border border-[#d2d2d7] bg-[#fafafa] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[#0071e3] focus:bg-white focus:ring-2 focus:ring-[#0071e3]/20 disabled:opacity-60"
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+}
+
+/** 内容区 · AI 口播草稿（按镜，显示在卖点块下方） */
+export function ReplicaVoiceoverDraftCard({
+  draft,
+}: {
+  draft: ReplicaVoiceoverDraft;
+}) {
+  return (
+    <div className="rounded-xl border border-[#e8e8ed] bg-white p-4">
+      <div className="mb-3">
+        <p className="text-xs font-semibold text-[#1d1d1f]">AI 口播草稿</p>
+        <p className="text-[11px] text-[#6e6e73]">
+          共 {draft.shots.length} 镜；生成复刻脚本后，可在分镜表各镜口播列点击「应用新口播」。
+        </p>
+      </div>
+      <ul className="space-y-2">
+        {draft.shots.map((row) => (
+          <li
+            key={row.index}
+            className="rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5"
+          >
+            <p className="text-[11px] font-medium text-[#6e6e73]">镜 {row.index}</p>
+            <p className="mt-1 text-sm leading-relaxed text-[#1d1d1f]">
+              {row.voiceover.trim() || "（本镜无口播）"}
+            </p>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

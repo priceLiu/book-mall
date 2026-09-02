@@ -10,6 +10,7 @@ import { HandCraftProgressRail } from "@/components/hand-craft/hand-craft-progre
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { useEcomStudioAssistantCollapse } from "@/lib/ecom-assistant-collapse";
 import { ProductCreationStudioSkeleton } from "@/components/product-design/product-creation-studio-skeleton";
+import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-link-dialog";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import {
@@ -29,6 +30,10 @@ import { inferCurrentStepId } from "@/lib/hand-craft-workflow";
 import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import {
+  ECOM_WORKFLOW_SHARE_DESCRIPTION,
+  ECOM_WORKFLOW_SHARE_RESOURCE,
+} from "@/lib/ecom-workflow-share";
 
 const PROJECT_STORAGE_KEY = "ecom-hand-craft-active-project";
 const ENTRY_PATH = "/ecom/hand-craft";
@@ -46,6 +51,7 @@ export function HandCraftStudio() {
   const [loading, setLoading] = useState(true);
   const [empty, setEmpty] = useState(false);
   const [needLogin, setNeedLogin] = useState(false);
+  const [workflowShareOpen, setWorkflowShareOpen] = useState(false);
   const [refBusy, setRefBusy] = useState(false);
   const [sketchGenBusy, setSketchGenBusy] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -427,6 +433,7 @@ export function HandCraftStudio() {
   }
 
   return (
+    <>
     <EcomWorkspaceLayout
       assistantWide={assistantWide}
       assistantCollapsed={assistantCollapsed}
@@ -496,7 +503,17 @@ export function HandCraftStudio() {
         streaming={assistantStreaming}
         generateRequest={generateRequest}
         focusStepId={focusStepId}
+        onShareWorkflow={() => setWorkflowShareOpen(true)}
       />
     </EcomWorkspaceLayout>
+    <WorkflowShareLinkDialog
+      projectId={project.id}
+      projectTitle={project.title?.trim() || "手伴创作"}
+      open={workflowShareOpen}
+      onClose={() => setWorkflowShareOpen(false)}
+      resourceType={ECOM_WORKFLOW_SHARE_RESOURCE.handCraft}
+      description={ECOM_WORKFLOW_SHARE_DESCRIPTION[ECOM_WORKFLOW_SHARE_RESOURCE.handCraft]}
+    />
+    </>
   );
 }

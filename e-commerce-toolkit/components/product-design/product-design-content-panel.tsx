@@ -2,13 +2,15 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Download, Eye, FileText, Film, ImageIcon, RefreshCw, Save } from "lucide-react";
+import { Download, Eye, FileText, Film, ImageIcon, Import, Plus, RefreshCw, Save } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
+import { EcomIconButton, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
   analyzeProductDesignReferences,
@@ -184,6 +186,7 @@ type Props = {
   onChooseDetailWorkflow?: (mode: DetailWorkflowPath) => void;
   onRegenerateMarketingPlans?: () => void;
   focusStepId?: ProductDesignStepId | null;
+  onShareWorkflow?: () => void;
   /** 模型列表仍在拉取（打开选模弹层前预加载） */
   modelsLoading?: boolean;
   /** 模型拉取失败时的说明 */
@@ -245,6 +248,7 @@ export function ProductDesignContentPanel({
   onChooseDetailWorkflow,
   onRegenerateMarketingPlans,
   focusStepId = null,
+  onShareWorkflow,
   modelsLoading = false,
   modelsLoadError = null,
   onRefreshModels,
@@ -1420,86 +1424,75 @@ export function ProductDesignContentPanel({
             ) : null}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {onNewProject ? (
-            <EcomButtonSecondary
-              size="sm"
-              type="button"
-              dark
-              disabled={Boolean(busy) || Boolean(refBusy) || streaming}
-              onClick={() => void onNewProject()}
-            >
-              新建
-            </EcomButtonSecondary>
-          ) : null}
-          {loadProjectList && onOpenProject ? (
-            <EcomProjectListButton
-              disabled={Boolean(busy) || Boolean(refBusy) || streaming}
-              currentProjectId={project.id}
-              loadProjects={loadProjectList}
-              onSelectProject={onOpenProject}
-              title={
-                activeTrack === "detail" ? "详情页 · 项目列表" : "主图 · 项目列表"
-              }
-              emptyHint={
-                activeTrack === "detail"
-                  ? "还没有保存过的详情页项目。"
-                  : "还没有保存过的主图项目。"
-              }
+        <EcomIconToolbar>
+          <EcomIconToolbarGroup label="项目">
+            {onNewProject ? (
+              <EcomIconButton
+                label="新建项目"
+                icon={Plus}
+                disabled={Boolean(busy) || Boolean(refBusy) || streaming}
+                onClick={() => void onNewProject()}
+              />
+            ) : null}
+            {loadProjectList && onOpenProject ? (
+              <EcomProjectListButton
+                disabled={Boolean(busy) || Boolean(refBusy) || streaming}
+                currentProjectId={project.id}
+                loadProjects={loadProjectList}
+                onSelectProject={onOpenProject}
+                title={
+                  activeTrack === "detail" ? "详情页 · 项目列表" : "主图 · 项目列表"
+                }
+                emptyHint={
+                  activeTrack === "detail"
+                    ? "还没有保存过的详情页项目。"
+                    : "还没有保存过的主图项目。"
+                }
+              />
+            ) : null}
+            {onImportFromMainProject ? (
+              <EcomIconButton
+                label="从主图项目导入"
+                icon={Import}
+                disabled={Boolean(busy) || Boolean(refBusy) || streaming}
+                onClick={() => onImportFromMainProject()}
+              />
+            ) : null}
+          </EcomIconToolbarGroup>
+          <EcomIconToolbarGroup label="编辑">
+            <EcomIconButton
+              label="重新解析"
+              icon={RefreshCw}
+              disabled={streaming || (Boolean(busy) && !generatingTarget)}
+              onClick={() => void handleResync()}
             />
+            <EcomIconButton
+              label="保存工作流"
+              icon={Save}
+              disabled={!design || Boolean(busy)}
+              onClick={() => setSaveDialogOpen(true)}
+            />
+          </EcomIconToolbarGroup>
+          <EcomIconToolbarGroup label="交付">
+            <EcomIconButton
+              label="导出交付包"
+              icon={Download}
+              disabled={!design || Boolean(busy)}
+              onClick={() => void handleExportZip()}
+            />
+            <EcomIconButton
+              label="去做视频"
+              icon={Film}
+              disabled={Boolean(busy) || allAssetIds.length === 0}
+              onClick={() => void handleGoToVideo(allAssetIds, project.title ?? "产品视频")}
+            />
+          </EcomIconToolbarGroup>
+          {onShareWorkflow ? (
+            <EcomIconToolbarGroup label="分享">
+              <EcomShareIconButton disabled={Boolean(busy)} onClick={onShareWorkflow} />
+            </EcomIconToolbarGroup>
           ) : null}
-          {onImportFromMainProject ? (
-            <EcomButtonSecondary
-              size="sm"
-              type="button"
-              dark
-              disabled={Boolean(busy) || Boolean(refBusy) || streaming}
-              onClick={() => onImportFromMainProject()}
-            >
-              从主图项目导入
-            </EcomButtonSecondary>
-          ) : null}
-          <EcomButtonSecondary
-            size="sm"
-            type="button"
-            dark
-            disabled={streaming || (Boolean(busy) && !generatingTarget)}
-            onClick={() => void handleResync()}
-          >
-            <RefreshCw className="h-3.5 w-3.5 shrink-0" />
-            重新解析
-          </EcomButtonSecondary>
-          <EcomButtonSecondary
-            size="sm"
-            type="button"
-            dark
-            disabled={!design || Boolean(busy)}
-            onClick={() => setSaveDialogOpen(true)}
-          >
-            <Save className="h-3.5 w-3.5 shrink-0" />
-            保存
-          </EcomButtonSecondary>
-          <EcomButtonSecondary
-            size="sm"
-            type="button"
-            dark
-            disabled={!design || Boolean(busy)}
-            onClick={() => void handleExportZip()}
-          >
-            <Download className="h-3.5 w-3.5 shrink-0" />
-            导出交付包
-          </EcomButtonSecondary>
-          <EcomButtonSecondary
-            size="sm"
-            type="button"
-            dark
-            disabled={Boolean(busy) || allAssetIds.length === 0}
-            onClick={() => void handleGoToVideo(allAssetIds, project.title ?? "产品视频")}
-          >
-            <Film className="h-3.5 w-3.5 shrink-0" />
-            去做视频
-          </EcomButtonSecondary>
-        </div>
+        </EcomIconToolbar>
         </div>
       </header>
 

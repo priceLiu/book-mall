@@ -21,7 +21,16 @@ import {
   renderSeedVideo,
   updateSeedVideoProject,
 } from "@/lib/ecom-seed-video-api";
-import { buildSeedVideoMentionRefs } from "@/lib/seed-video-mention-refs";
+import { buildReplicaMentionRefs } from "@/lib/media-decompose-replica-refs";
+import {
+  readVoiceoverDraft,
+  type ReplicaVoiceoverDraft,
+} from "@/lib/media-decompose-replica-workflow";
+import {
+  buildReplicaMentionCatalogEntries,
+  mentionCatalogSignature,
+  syncSeedVideoShotsAfterRefChange,
+} from "@/lib/ecom-mention-catalog-sync";
 import {
   appendSeedVideoRenderStepLog,
   resolveSeedVideoRenderPhase,
@@ -44,6 +53,27 @@ import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 const RENDER_POLL_MS = 3000;
 const RENDER_POLL_MAX = 120;
 const SHOT_POLL_MS = 4000;
+
+function voiceoverDraftAfterApply(
+  draft: ReplicaVoiceoverDraft,
+  appliedIndices: number[],
+): ReplicaVoiceoverDraft | null {
+  const applied = new Set(appliedIndices);
+  const remaining = draft.shots.filter((s) => !applied.has(s.index));
+  if (remaining.length === 0) return null;
+  return { ...draft, shots: remaining };
+}
+
+function buildVoiceoverDraftMap(
+  draft: ReplicaVoiceoverDraft | null,
+): Map<number, string> {
+  const map = new Map<number, string>();
+  if (!draft) return map;
+  for (const row of draft.shots) {
+    map.set(row.index, row.voiceover);
+  }
+  return map;
+}
 
 function addGeneratingShot(prev: Set<number>, index: number): Set<number> {
   if (prev.has(index)) return prev;
@@ -128,6 +158,10 @@ export function MediaDecomposeReplicaPanel({
   const [syncedReferences, setSyncedReferences] = useState(seedVideo.references);
 
   const syncLockRef = useRef(false);
+  const prevRefCatalogRef = useRef<ReturnType<typeof buildReplicaMentionCatalogEntries> | null>(
+    null,
+  );
+  const refSyncBusyRef = useRef(false);
   const onSeedVideoChangeRef = useRef(onSeedVideoChange);
   onSeedVideoChangeRef.current = onSeedVideoChange;
   const pickerSelectedRef = useRef<number[]>([]);
@@ -171,8 +205,18 @@ export function MediaDecomposeReplicaPanel({
   }, [videoModels]);
 
   const mentionRefs = useMemo(
-    () => buildSeedVideoMentionRefs(syncedReferences),
+    () => buildReplicaMentionRefs(syncedReferences),
     [syncedReferences],
+  );
+
+  const voiceoverDraft = useMemo(
+    () => readVoiceoverDraft(seedVideo),
+    [seedVideo.meta?.replicaVoiceoverDraft, seedVideo.id],
+  );
+
+  const voiceoverDraftByIndex = useMemo(
+    () => buildVoiceoverDraftMap(voiceoverDraft),
+    [voiceoverDraft],
   );
 
   const pendingShotIndices = useMemo(
@@ -226,6 +270,31 @@ export function MediaDecomposeReplicaPanel({
     [seedVideo.id, seedVideo.plan],
   );
 
+  useEffect(() => {
+    prevRefCatalogRef.current = buildReplicaMentionCatalogEntries(seedVideo.references);
+  }, [seedVideo.id]);
+
+  useEffect(() => {
+    const newCatalog = buildReplicaMentionCatalogEntries(syncedReferences);
+    const oldCatalog = prevRefCatalogRef.current;
+    prevRefCatalogRef.current = newCatalog;
+    if (!oldCatalog || refSyncBusyRef.current) return;
+    if (mentionCatalogSignature(oldCatalog) === mentionCatalogSignature(newCatalog)) return;
+
+    setLocalShots((prev) => {
+      if (prev.length === 0) return prev;
+      const synced = syncSeedVideoShotsAfterRefChange(prev, oldCatalog, newCatalog);
+      if (JSON.stringify(synced) === JSON.stringify(prev)) return prev;
+      refSyncBusyRef.current = true;
+      void persistShots(synced)
+        .then(() => onSeedVideoChangeRef.current())
+        .finally(() => {
+          refSyncBusyRef.current = false;
+        });
+      return synced;
+    });
+  }, [persistShots, syncedReferences]);
+
   const shotsAutosaveSkipRef = useRef(true);
   useEffect(() => {
     shotsAutosaveSkipRef.current = true;
@@ -266,6 +335,38 @@ export function MediaDecomposeReplicaPanel({
     });
     await persistShots(next);
   }
+
+  const applyVoiceoverDraftIndices = useCallback(
+    async (indices: number[]) => {
+      const draft = readVoiceoverDraft(seedVideo);
+      if (!draft || indices.length === 0) return;
+      const byIndex = buildVoiceoverDraftMap(draft);
+      const applicable = indices.filter((index) => byIndex.has(index));
+      if (applicable.length === 0) return;
+
+      const nextShots = localShots.map((s) => {
+        if (!applicable.includes(s.index)) return s;
+        return { ...s, voiceover: byIndex.get(s.index) ?? "" };
+      });
+      setLocalShots(nextShots);
+
+      const merged = mergeSeedVideoShotsForPersist(nextShots, seedVideo.plan?.shots ?? []);
+      const nextDraft = voiceoverDraftAfterApply(draft, applicable);
+      await updateSeedVideoProject(seedVideo.id, {
+        plan: { ...(seedVideo.plan ?? {}), shots: merged },
+        meta: {
+          ...(seedVideo.meta ?? {}),
+          replicaVoiceoverDraft: nextDraft,
+        },
+      });
+      await onSeedVideoChange();
+      toast({
+        title: applicable.length > 1 ? "已应用全部新口播" : "已应用新口播",
+        description: "可在口播列继续编辑或清空；若已有 TTS 请重新批量 TTS。",
+      });
+    },
+    [localShots, onSeedVideoChange, seedVideo, toast],
+  );
 
   const applyRemoteShotVideo = useCallback((panelIndex: number, remote: SeedVideoShot | undefined) => {
     if (!remote?.videoUrl?.trim()) return false;
@@ -662,6 +763,7 @@ export function MediaDecomposeReplicaPanel({
           onPreviewVideo={onPreviewVideo}
           showGenerateActions
           selectDisabled={!planSynced}
+          hideRefColumn
           videoPromptMentionRefs={mentionRefs}
           selectedShotIndices={selectedShotIndices}
           selectedCount={selectedShotIndices.size}
@@ -687,6 +789,11 @@ export function MediaDecomposeReplicaPanel({
           onAddRow={() => void handleAddRow()}
           onDeleteRow={(index) => void handleDeleteRow(index)}
           canDeleteShot={(shot) => canDeleteSeedVideoShot(shot, activeGeneratingIndices)}
+          voiceoverDraftByIndex={voiceoverDraftByIndex}
+          onApplyVoiceoverDraft={(index) => void applyVoiceoverDraftIndices([index])}
+          onApplyAllVoiceoverDrafts={() =>
+            void applyVoiceoverDraftIndices([...voiceoverDraftByIndex.keys()])
+          }
         />
 
         {finalUrl ? (

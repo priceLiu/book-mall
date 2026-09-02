@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DialogProvider } from "@/components/dialogs/dialog-provider";
 import { EcomShell } from "@/components/layout/ecom-shell";
+import { EcomSiteNavGuard } from "@/components/layout/ecom-site-nav-guard";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export default function RootLayout({
     <html lang="zh-CN">
       <body className="bg-[#0c0c0e] font-sans antialiased">
         <DialogProvider>
+          <EcomSiteNavGuard />
           <EcomShell>{children}</EcomShell>
         </DialogProvider>
       </body>

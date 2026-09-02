@@ -9,7 +9,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  EcomDialogCancelButton,
   EcomDialogPrimaryButton,
 } from "@/components/ui/dialog";
 
@@ -86,9 +85,6 @@ export function ModelShotSaveDialog({
           实际时间戳以点击保存时的服务器时间为准
         </p>
         <DialogFooter className="gap-2 sm:gap-2">
-          <EcomDialogCancelButton disabled={busy} onClick={() => onOpenChange(false)}>
-            取消
-          </EcomDialogCancelButton>
           <EcomDialogPrimaryButton
             disabled={!name.trim() || busy}
             onClick={() => void onConfirm(name.trim())}

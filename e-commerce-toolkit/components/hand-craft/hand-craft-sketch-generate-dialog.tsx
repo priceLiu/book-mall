@@ -9,7 +9,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  EcomDialogCancelButton,
   EcomDialogPrimaryButton,
 } from "@/components/ui/dialog";
 import { HAND_CRAFT_SKETCH_GEN_DEFAULT_PROMPT } from "@/lib/hand-craft-types";
@@ -59,9 +58,6 @@ export function HandCraftSketchGenerateDialog({
           onChange={(e) => setDraft(e.target.value)}
         />
         <DialogFooter>
-          <EcomDialogCancelButton disabled={busy} onClick={() => onOpenChange(false)}>
-            取消
-          </EcomDialogCancelButton>
           <EcomDialogPrimaryButton
             disabled={busy || !draft.trim()}
             onClick={() => void onConfirm(draft.trim())}

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   listOrphanModelShotPendingPoseIndices,
+  modelShotTargetIndexesGainedImages,
+  modelShotTargetIndexesHaveImages,
   resolveActiveModelShotPoseBusyIndexes,
 } from "@/lib/model-shot-pending-poses";
 
@@ -12,12 +14,25 @@ describe("resolveActiveModelShotPoseBusyIndexes", () => {
     { index: 3, imageUrl: undefined, prompt: "p3" },
   ];
 
+  it("clears busy for completed pose even when local watch still tracks batch", () => {
+    expect(
+      resolveActiveModelShotPoseBusyIndexes({
+        pendingIndices: [3],
+        localWatchIndices: [1, 2, 3],
+        items: [
+          { index: 1, imageUrl: "https://a/1.png", prompt: "", status: "ready" as const },
+          { index: 2, imageUrl: "https://a/2.png", prompt: "", status: "ready" as const },
+          { index: 3, prompt: "p3", status: "generating" as const },
+        ],
+      }),
+    ).toEqual([3]);
+  });
+
   it("keeps server pending busy after refresh when watch restored from pending", () => {
     expect(
       resolveActiveModelShotPoseBusyIndexes({
         pendingIndices: [2, 3],
         localWatchIndices: [2, 3],
-        imageGenInFlight: false,
         items,
       }),
     ).toEqual([2, 3]);
@@ -28,31 +43,30 @@ describe("resolveActiveModelShotPoseBusyIndexes", () => {
       resolveActiveModelShotPoseBusyIndexes({
         pendingIndices: [],
         localWatchIndices: [],
-        imageGenInFlight: false,
         items,
       }),
     ).toEqual([2]);
   });
 
-  it("selective batch in flight ignores stale pending outside watch", () => {
+  it("clears busy when image exists in history without imageUrl", () => {
     expect(
       resolveActiveModelShotPoseBusyIndexes({
-        pendingIndices: [1, 2, 3, 4],
-        localWatchIndices: [2, 3],
-        imageGenInFlight: true,
+        pendingIndices: [],
+        localWatchIndices: [],
         items: [
-          { index: 1, prompt: "" },
-          { index: 2, prompt: "" },
-          { index: 3, prompt: "" },
-          { index: 4, prompt: "" },
+          {
+            index: 3,
+            prompt: "p3",
+            imageHistory: [{ url: "https://a/3.png", createdAt: "2026-01-01T00:00:00.000Z" }],
+          },
         ],
       }),
-    ).toEqual([2, 3]);
+    ).toEqual([]);
   });
 });
 
 describe("listOrphanModelShotPendingPoseIndices", () => {
-  it("does not clear pending covered by restored watch", () => {
+  it("does not clear active non-stale pending without local watch", () => {
     const orphans = listOrphanModelShotPendingPoseIndices(
       {
         workflow: {
@@ -62,7 +76,7 @@ describe("listOrphanModelShotPendingPoseIndices", () => {
         },
       },
       [{ index: 2, prompt: "" }],
-      { imageGenInFlight: false, localWatchIndices: [2] },
+      { localInFlight: false, localWatchIndices: [] },
     );
     expect(orphans).toEqual([]);
   });
@@ -77,8 +91,60 @@ describe("listOrphanModelShotPendingPoseIndices", () => {
         },
       },
       [{ index: 1, prompt: "" }],
-      { imageGenInFlight: false, localWatchIndices: [] },
+      { localInFlight: false, localWatchIndices: [] },
     );
     expect(orphans).toEqual([1]);
+  });
+
+  it("clears pending when pose already has imageHistory", () => {
+    const orphans = listOrphanModelShotPendingPoseIndices(
+      {
+        workflow: {
+          pendingPoseImages: {
+            "3": { startedAt: new Date().toISOString() },
+          },
+        },
+      },
+      [
+        {
+          index: 3,
+          prompt: "",
+          imageHistory: [{ url: "https://a/3.png", createdAt: "2026-01-01T00:00:00.000Z" }],
+        },
+      ],
+      { localInFlight: false, localWatchIndices: [] },
+    );
+    expect(orphans).toEqual([3]);
+  });
+});
+
+describe("modelShotTargetIndexesHaveImages", () => {
+  it("detects images from imageHistory", () => {
+    expect(
+      modelShotTargetIndexesHaveImages(
+        [
+          {
+            index: 3,
+            prompt: "",
+            imageHistory: [{ url: "https://a/3.png", createdAt: "2026-01-01T00:00:00.000Z" }],
+          },
+        ],
+        [3],
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("modelShotTargetIndexesGainedImages", () => {
+  it("detects newly added history version", () => {
+    const before = [{ index: 3, prompt: "" }];
+    const after = [
+      {
+        index: 3,
+        prompt: "",
+        imageHistory: [{ url: "https://a/3.png", createdAt: "2026-01-01T00:00:00.000Z" }],
+      },
+    ];
+    expect(modelShotTargetIndexesGainedImages(before, after, [3])).toBe(true);
   });
 });

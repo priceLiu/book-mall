@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Download, Images, Save, Trash2 } from "lucide-react";
+import { Download, Images, Plus, Save, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -20,7 +20,8 @@ import {
 } from "@/components/product-design/product-design-gallery-preview-dialog";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
-import { EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomIconButton, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import {
   downloadHandCraftExportZip,
   generateHandCraftStep,
@@ -74,6 +75,7 @@ type Props = {
   /** 助手点「确认生成第 N 步」时递增，携带目标步骤 */
   generateRequest?: { stepId: HandCraftStepId; token: number } | null;
   focusStepId?: HandCraftStepId | null;
+  onShareWorkflow?: () => void;
 };
 
 function defaultHandCraftImageSize(modelKey: string, ratio: string): string {
@@ -109,6 +111,7 @@ export function HandCraftContentPanel({
   streaming,
   generateRequest = null,
   focusStepId = null,
+  onShareWorkflow,
 }: Props) {
   const router = useRouter();
   const { alert, confirm, toast } = useDialogs();
@@ -423,71 +426,67 @@ export function HandCraftContentPanel({
                 {" · 成图自动入库「我的资产 · 手伴创作」"}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {onNewProject ? (
-                <EcomButtonSecondary
-                  size="sm"
-                  type="button"
-                  dark
-                  disabled={Boolean(busy) || Boolean(refBusy) || disabledAll}
-                  onClick={() => void onNewProject()}
-                >
-                  新建
-                </EcomButtonSecondary>
-              ) : null}
-              {loadProjectList && onOpenProject ? (
-                <EcomProjectListButton
-                  disabled={Boolean(busy) || Boolean(refBusy) || disabledAll || Boolean(streaming)}
-                  currentProjectId={project.id}
-                  loadProjects={loadProjectList}
-                  onSelectProject={onOpenProject}
-                  title="手伴创作 · 项目列表"
-                  emptyHint="还没有保存过的手伴创作项目。"
+            <EcomIconToolbar>
+              <EcomIconToolbarGroup label="项目">
+                {onNewProject ? (
+                  <EcomIconButton
+                    label="新建项目"
+                    icon={Plus}
+                    disabled={Boolean(busy) || Boolean(refBusy) || disabledAll}
+                    onClick={() => void onNewProject()}
+                  />
+                ) : null}
+                {loadProjectList && onOpenProject ? (
+                  <EcomProjectListButton
+                    disabled={Boolean(busy) || Boolean(refBusy) || disabledAll || Boolean(streaming)}
+                    currentProjectId={project.id}
+                    loadProjects={loadProjectList}
+                    onSelectProject={onOpenProject}
+                    title="手伴创作 · 项目列表"
+                    emptyHint="还没有保存过的手伴创作项目。"
+                  />
+                ) : null}
+                {onDeleteProject ? (
+                  <EcomIconButton
+                    label="删除项目"
+                    icon={Trash2}
+                    variant="destructive"
+                    disabled={Boolean(busy) || disabledAll}
+                    onClick={() => void onDeleteProject()}
+                  />
+                ) : null}
+              </EcomIconToolbarGroup>
+              <EcomIconToolbarGroup label="工作流">
+                <EcomIconButton
+                  label="保存工作流"
+                  icon={Save}
+                  disabled={Boolean(busy) || !canSave || disabledAll}
+                  onClick={() => setSaveDialogOpen(true)}
                 />
+              </EcomIconToolbarGroup>
+              <EcomIconToolbarGroup label="资产与交付">
+                <EcomIconButton
+                  label="我的资产"
+                  icon={Images}
+                  disabled={Boolean(busy)}
+                  onClick={() => router.push("/library")}
+                />
+                <EcomIconButton
+                  label="导出交付包"
+                  icon={Download}
+                  disabled={Boolean(busy) || progress === 0}
+                  onClick={() => void handleExportZip()}
+                />
+              </EcomIconToolbarGroup>
+              {onShareWorkflow ? (
+                <EcomIconToolbarGroup label="分享">
+                  <EcomShareIconButton
+                    disabled={Boolean(busy) || disabledAll}
+                    onClick={onShareWorkflow}
+                  />
+                </EcomIconToolbarGroup>
               ) : null}
-              <EcomButtonSecondary
-                size="sm"
-                type="button"
-                dark
-                disabled={Boolean(busy)}
-                onClick={() => router.push("/library")}
-              >
-                <Images className="h-3.5 w-3.5 shrink-0" />
-                我的资产
-              </EcomButtonSecondary>
-              <EcomButtonSecondary
-                size="sm"
-                type="button"
-                dark
-                disabled={Boolean(busy) || !canSave || disabledAll}
-                onClick={() => setSaveDialogOpen(true)}
-              >
-                <Save className="h-3.5 w-3.5 shrink-0" />
-                保存
-              </EcomButtonSecondary>
-              <EcomButtonSecondary
-                size="sm"
-                type="button"
-                dark
-                disabled={Boolean(busy) || progress === 0}
-                onClick={() => void handleExportZip()}
-              >
-                <Download className="h-3.5 w-3.5 shrink-0" />
-                导出交付包
-              </EcomButtonSecondary>
-              {onDeleteProject ? (
-                <EcomButtonSecondary
-                  size="sm"
-                  type="button"
-                  dark
-                  disabled={Boolean(busy) || disabledAll}
-                  onClick={() => void onDeleteProject()}
-                >
-                  <Trash2 className="h-3.5 w-3.5 shrink-0" />
-                  删除项目
-                </EcomButtonSecondary>
-              ) : null}
-            </div>
+            </EcomIconToolbar>
           </div>
         </header>
 

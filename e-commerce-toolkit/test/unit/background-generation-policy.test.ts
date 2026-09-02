@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BACKGROUND_DOCK_LONG_TASK_MS,
   BACKGROUND_DOCK_PERSISTENT_MS,
   estimateBackgroundGenerationProgress,
   formatBackgroundGenerationAge,
+  isBackgroundDockTaskVisible,
   resolveBackgroundGenerationLabel,
 } from "@/lib/generation/background-generation-policy";
 
@@ -24,5 +26,28 @@ describe("background-generation-policy", () => {
     expect(
       estimateBackgroundGenerationProgress(start, 30_000, Date.now()),
     ).toBeLessThanOrEqual(0.95);
+  });
+
+  it("hides running tasks until long-task threshold", () => {
+    const startedAt = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    expect(
+      isBackgroundDockTaskVisible({ status: "running", startedAt }),
+    ).toBe(false);
+    const longStartedAt = new Date(
+      Date.now() - BACKGROUND_DOCK_LONG_TASK_MS - 1000,
+    ).toISOString();
+    expect(
+      isBackgroundDockTaskVisible({ status: "running", startedAt: longStartedAt }),
+    ).toBe(true);
+  });
+
+  it("always shows succeeded and failed tasks", () => {
+    const startedAt = new Date().toISOString();
+    expect(
+      isBackgroundDockTaskVisible({ status: "succeeded", startedAt }),
+    ).toBe(true);
+    expect(
+      isBackgroundDockTaskVisible({ status: "failed", startedAt }),
+    ).toBe(true);
   });
 });

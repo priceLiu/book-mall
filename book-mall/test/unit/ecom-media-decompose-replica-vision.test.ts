@@ -2,10 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   resolveRecognizeProductModel,
+  resolveReplicaTextChatModel,
   resolveReplicaVisionChatModel,
 } from "@/lib/ecom/ecom-media-decompose-replica";
 import { ECOM_RECOGNIZE_PRODUCT_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
-import { formatProductBriefFromRecognition } from "@/lib/ecom/ecom-media-decompose-replica-script";
+import {
+  formatProductBriefFromRecognition,
+  parseProductRecognitionResult,
+} from "@/lib/ecom/ecom-media-decompose-replica-script";
 
 describe("resolveReplicaVisionChatModel", () => {
   it("uses explicit vision model when valid", () => {
@@ -28,12 +32,33 @@ describe("resolveRecognizeProductModel", () => {
   });
 });
 
+describe("resolveReplicaTextChatModel", () => {
+  it("skips vision models and defaults to deepseek for voiceover text", () => {
+    expect(resolveReplicaTextChatModel("qwen3.8-max", "qwen3.8-max")).toBe("deepseek-v4-pro");
+  });
+
+  it("uses explicit text model when provided", () => {
+    expect(resolveReplicaTextChatModel("deepseek-v4-pro", "qwen3.8-max")).toBe("deepseek-v4-pro");
+  });
+});
+
+describe("parseProductRecognitionResult", () => {
+  it("parses fenced JSON and separates selling points from product brief", () => {
+    const { productBrief, sellingPoints } = parseProductRecognitionResult(
+      '说明\n```json\n{"productName":"开衫","category":"女装","sellingPoints":"轻薄","materialOrCraft":"针织","displayTips":"lookbook"}\n```',
+    );
+    expect(productBrief).toContain("产品：开衫");
+    expect(productBrief).not.toContain("卖点：");
+    expect(sellingPoints).toBe("轻薄");
+  });
+});
+
 describe("formatProductBriefFromRecognition", () => {
-  it("parses fenced JSON", () => {
+  it("returns product brief without selling points line", () => {
     const brief = formatProductBriefFromRecognition(
       '说明\n```json\n{"productName":"开衫","category":"女装","sellingPoints":"轻薄","materialOrCraft":"针织","displayTips":"lookbook"}\n```',
     );
     expect(brief).toContain("产品：开衫");
-    expect(brief).toContain("卖点：轻薄");
+    expect(brief).not.toContain("卖点：");
   });
 });

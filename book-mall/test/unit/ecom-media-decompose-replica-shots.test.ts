@@ -94,10 +94,15 @@ describe("buildReplicaShotsFromDecompose", () => {
 describe("buildReplicaScriptSystemPrompt", () => {
   it("requires sfx/bgm in videoPrompt and keeps voiceover separate", () => {
     const prompt = buildReplicaScriptSystemPrompt([]);
-    expect(prompt).toMatch(/videoPrompt 与 voiceover 严格分离/);
-    expect(prompt).toMatch(/音效、BGM、转场、剪辑节奏/);
-    expect(prompt).toMatch(/禁止写入字幕文案、配音台词/);
-    expect(prompt).toMatch(/禁止写入 videoPrompt/);
+    expect(prompt).toMatch(/videoPrompt 与 voiceover \*\*严格分离\*\*/);
+    expect(prompt).toMatch(/音效\/BGM\/转场\/剪辑/);
+    expect(prompt).toMatch(/禁止.*videoPrompt/);
+  });
+
+  it("forbids json fence alias in machine contract", () => {
+    const prompt = buildReplicaScriptSystemPrompt([]);
+    expect(prompt).toMatch(/禁止.*json/);
+    expect(prompt).toMatch(/最末尾.*replica-script/);
   });
 });
 

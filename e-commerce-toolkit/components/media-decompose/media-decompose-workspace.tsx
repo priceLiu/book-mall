@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Clapperboard, ChevronDown, Cpu, Download, Images, Loader2, Save, Sparkles } from "lucide-react";
+import { Clapperboard, ChevronDown, Cpu, Download, Images, Loader2, Plus, Save, Sparkles, Square } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { MediaDecomposeMediaInput } from "@/components/media-decompose/media-decompose-media-input";
@@ -20,6 +20,8 @@ import { EcomProjectListButton } from "@/components/layout/ecom-project-list-but
 import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-markdown-block";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
+import { EcomIconButton, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { defaultPromptForKind } from "@/lib/media-decompose-default-prompts";
@@ -81,6 +83,7 @@ type Props = {
   onPreviewVideo?: (src: string, title?: string) => void;
   onAlert?: (opts: { title: string; message: string; variant?: "error" }) => Promise<void>;
   onProjectUpdated?: (project: MediaDecomposeProject) => void;
+  onShareWorkflow?: () => void;
 };
 
 export function MediaDecomposeWorkspace({
@@ -116,6 +119,7 @@ export function MediaDecomposeWorkspace({
   onPreviewVideo,
   onAlert,
   onProjectUpdated,
+  onShareWorkflow,
 }: Props) {
   const router = useRouter();
   const { toast } = useDialogs();
@@ -234,13 +238,6 @@ export function MediaDecomposeWorkspace({
     project.title?.trim() ||
     (project.media?.kind === "video" ? "视频拆解" : project.media ? "图片拆解" : "拆图拆视频");
 
-  const showReplicaSetup = Boolean(
-    replicaSeedVideo &&
-      !replicaScriptReady &&
-      onReplicaSeedVideoUpdated &&
-      onAlert &&
-      onImageModelChange,
-  );
   const replicaSetupApi = useMemo(() => {
     if (!replicaSeedVideo || !onProjectUpdated || !onReplicaSeedVideoUpdated) return null;
     return createMediaDecomposeReplicaSetupApi({
@@ -260,6 +257,20 @@ export function MediaDecomposeWorkspace({
     project,
     replicaSeedVideo,
   ]);
+  const showReplicaSetup = Boolean(
+    replicaSeedVideo &&
+      !replicaScriptReady &&
+      onReplicaSeedVideoUpdated &&
+      onAlert &&
+      onImageModelChange,
+  );
+  const showReplicaRefPanel = Boolean(
+    replicaSeedVideo &&
+      replicaSetupApi &&
+      onReplicaSeedVideoUpdated &&
+      onAlert &&
+      onImageModelChange,
+  );
   const showBottomDock = !replicaScriptReady;
   const bottomDockMode: "idle" | "ready" | "replica-setup" = showReplicaSetup
     ? "replica-setup"
@@ -277,58 +288,56 @@ export function MediaDecomposeWorkspace({
             上传图片或视频，反推分镜拆解或静态画面要素与生图 Prompt。
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {onNewProject ? (
-            <EcomButtonSecondary
-              size="sm"
-              type="button"
-              dark
-              disabled={mediaBusy || decomposing}
-              onClick={() => void onNewProject()}
-            >
-              新建
-            </EcomButtonSecondary>
-          ) : null}
-          {loadProjectList && onOpenProject ? (
-            <EcomProjectListButton
-              disabled={mediaBusy || decomposing}
-              currentProjectId={project.id}
-              loadProjects={loadProjectList}
-              onSelectProject={onOpenProject}
-              title="拆图拆视频 · 项目列表"
-              emptyHint="还没有保存过的拆解项目。"
+        <EcomIconToolbar>
+          <EcomIconToolbarGroup label="项目">
+            {onNewProject ? (
+              <EcomIconButton
+                label="新建项目"
+                icon={Plus}
+                disabled={mediaBusy || decomposing}
+                onClick={() => void onNewProject()}
+              />
+            ) : null}
+            {loadProjectList && onOpenProject ? (
+              <EcomProjectListButton
+                disabled={mediaBusy || decomposing}
+                currentProjectId={project.id}
+                loadProjects={loadProjectList}
+                onSelectProject={onOpenProject}
+                title="拆图拆视频 · 项目列表"
+                emptyHint="还没有保存过的拆解项目。"
+              />
+            ) : null}
+          </EcomIconToolbarGroup>
+          <EcomIconToolbarGroup label="工作流">
+            <EcomIconButton
+              label="保存工作流"
+              icon={Save}
+              busy={saveBusy}
+              disabled={!canSave || saveBusy}
+              onClick={() => setSaveDialogOpen(true)}
             />
+          </EcomIconToolbarGroup>
+          <EcomIconToolbarGroup label="资产与交付">
+            <EcomIconButton
+              label="我的资产"
+              icon={Images}
+              onClick={() => router.push("/library")}
+            />
+            <EcomIconButton
+              label={exportBusy ? "打包中…" : "导出交付包"}
+              icon={Download}
+              busy={exportBusy}
+              disabled={!canSave || exportBusy || decomposing}
+              onClick={() => void handleExportZip()}
+            />
+          </EcomIconToolbarGroup>
+          {onShareWorkflow ? (
+            <EcomIconToolbarGroup label="分享">
+              <EcomShareIconButton disabled={decomposing} onClick={onShareWorkflow} />
+            </EcomIconToolbarGroup>
           ) : null}
-          <EcomButtonSecondary
-            size="sm"
-            type="button"
-            dark
-            onClick={() => router.push("/library")}
-          >
-            <Images className="h-3.5 w-3.5 shrink-0" />
-            我的资产
-          </EcomButtonSecondary>
-          <EcomButtonSecondary
-            size="sm"
-            type="button"
-            dark
-            disabled={!canSave || saveBusy}
-            onClick={() => setSaveDialogOpen(true)}
-          >
-            <Save className="h-3.5 w-3.5 shrink-0" />
-            保存
-          </EcomButtonSecondary>
-          <EcomButtonSecondary
-            size="sm"
-            type="button"
-            dark
-            disabled={!canSave || exportBusy || decomposing}
-            onClick={() => void handleExportZip()}
-          >
-            <Download className="h-3.5 w-3.5 shrink-0" />
-            {exportBusy ? "打包中…" : "导出交付包"}
-          </EcomButtonSecondary>
-        </div>
+        </EcomIconToolbar>
         </div>
       </header>
 
@@ -469,7 +478,7 @@ export function MediaDecomposeWorkspace({
         </div>
       )}
 
-      {showReplicaSetup && replicaSetupApi ? (
+      {showReplicaRefPanel && replicaSetupApi ? (
         <ReplicaSetupPanel
           api={replicaSetupApi}
           copy={MEDIA_DECOMPOSE_REPLICA_SETUP_COPY}
@@ -480,6 +489,7 @@ export function MediaDecomposeWorkspace({
           modelsLoading={modelsLoading}
           onRefreshModels={onRefreshModels}
           busy={replicaBusy || mediaBusy || decomposing}
+          variant={replicaScriptReady ? "refs-only" : "full"}
           onAlert={onAlert!}
         />
       ) : null}

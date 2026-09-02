@@ -28,11 +28,21 @@ function buildImagePrompt(
   characterRefs: FilmPullCharacterRef[],
   matchShot: FilmPullRefMatchShot,
   productBrief?: string,
+  shootingPrep?: FilmPullAnalyzePatch["shootingPrep"],
 ): string {
   const prefix = tokensForRefs(characterRefs, matchShot.modelRefIds, matchShot.productRefIds);
+  const prepBits = shootingPrep
+    ? [
+        shootingPrep.venue !== "无" ? `场地：${shootingPrep.venue}` : "",
+        shootingPrep.costume !== "无" ? `造型：${shootingPrep.costume}` : "",
+        shootingPrep.props !== "无" ? `道具：${shootingPrep.props}` : "",
+      ].filter(Boolean)
+    : [];
   const body = [
+    ...prepBits,
     shot.sceneEnvironment !== "无" ? shot.sceneEnvironment : "",
     shot.subjectBlocking !== "无" ? shot.subjectBlocking : "",
+    shot.dynamicProps !== "无" ? shot.dynamicProps : "",
     shot.composition !== "无" ? shot.composition : "",
     shot.lightingSetup !== "无" ? shot.lightingSetup : "",
     shot.toneContrast !== "无" ? shot.toneContrast : "",
@@ -48,6 +58,7 @@ function buildVideoPrompt(
   characterRefs: FilmPullCharacterRef[],
   matchShot: FilmPullRefMatchShot,
   productBrief?: string,
+  shootingPrep?: FilmPullAnalyzePatch["shootingPrep"],
 ): string {
   const prefix = tokensForRefs(characterRefs, matchShot.modelRefIds, matchShot.productRefIds);
   const motion = [
@@ -58,8 +69,16 @@ function buildVideoPrompt(
   ]
     .filter((v) => v && v !== "无")
     .join("·");
+  const prepBits = shootingPrep
+    ? [
+        shootingPrep.venue !== "无" ? `场地：${shootingPrep.venue}` : "",
+        shootingPrep.props !== "无" ? `道具：${shootingPrep.props}` : "",
+      ].filter(Boolean)
+    : [];
   const body = [
+    ...prepBits,
     shot.aiVisualPrompt !== "无" ? shot.aiVisualPrompt : "",
+    shot.cutDetail !== "无" ? `切点：${shot.cutDetail}` : "",
     motion ? `运镜：${motion}` : "",
     `时长约 ${shot.durationSec.toFixed(1)} 秒`,
     productBrief?.trim() ? `产品：${productBrief.trim()}` : "",
@@ -95,8 +114,20 @@ export function assembleFilmPullProductionPlan(opts: {
       ...shot,
       modelRefIds: [...matchShot.modelRefIds],
       productRefIds: [...matchShot.productRefIds],
-      imagePrompt: buildImagePrompt(shot, characterRefs, matchShot, productBrief),
-      videoPrompt: buildVideoPrompt(shot, characterRefs, matchShot, productBrief),
+      imagePrompt: buildImagePrompt(
+        shot,
+        characterRefs,
+        matchShot,
+        productBrief,
+        analyze.shootingPrep,
+      ),
+      videoPrompt: buildVideoPrompt(
+        shot,
+        characterRefs,
+        matchShot,
+        productBrief,
+        analyze.shootingPrep,
+      ),
       productInteraction: "none",
       sellpointNote: productBrief?.trim() ? productBrief.trim() : "",
       imageUrl: null,

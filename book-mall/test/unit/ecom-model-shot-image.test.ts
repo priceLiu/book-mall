@@ -8,6 +8,8 @@ const updateEcomModelShotProject = vi.fn();
 const assertEcomToolkitGatewayAccess = vi.fn();
 const claimModelShotPoseImageGeneration = vi.fn();
 const clearModelShotPoseImagesPending = vi.fn();
+const findFirst = vi.fn();
+const updateMany = vi.fn();
 
 vi.mock("@/lib/ecom/ecom-model-shot-pending-images", () => ({
   claimModelShotPoseImageGeneration: (...args: unknown[]) =>
@@ -31,10 +33,18 @@ vi.mock("@/lib/ecom/ecom-model-shot-service", () => ({
     updateEcomModelShotProject(...args),
 }));
 
+vi.mock("@/lib/ecom/ecom-catalog-lock", () => ({
+  touchCatalogLockOnProjectUse: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     ecomAsset: {
       create: vi.fn().mockResolvedValue({ id: "asset-1" }),
+    },
+    ecomModelShotProject: {
+      findFirst: (...args: unknown[]) => findFirst(...args),
+      updateMany: (...args: unknown[]) => updateMany(...args),
     },
   },
 }));
@@ -87,6 +97,7 @@ describe("generateModelShotImages", () => {
       async (_projectId: string, indexes: number[]) => indexes,
     );
     clearModelShotPoseImagesPending.mockResolvedValue(undefined);
+    updateMany.mockResolvedValue({ count: 1 });
     updateEcomModelShotProject.mockImplementation(
       async (_userId: string, _id: string, patch: Partial<ModelShotProject>) => {
         const base = confirmedProject();
@@ -95,9 +106,32 @@ describe("generateModelShotImages", () => {
     );
   });
 
-  it("invokes generateEcomImage for each target index (mapWithConcurrency arg order)", async () => {
-    const project = confirmedProject();
-    getEcomModelShotProject.mockResolvedValue(project);
+  it("invokes generateEcomImage and writes imageUrl via optimistic patch", async () => {
+    let project = confirmedProject();
+    getEcomModelShotProject.mockImplementation(async () => project);
+    findFirst.mockImplementation(async () => ({
+      plan: project.plan,
+      updatedAt: new Date(project.updatedAt),
+    }));
+    updateMany.mockImplementation(async (_args: unknown) => {
+      project = {
+        ...project,
+        plan: {
+          ...project.plan,
+          items: project.plan.items.map((item) =>
+            item.index === 1
+              ? {
+                  ...item,
+                  imageUrl: "https://example.com/out.png",
+                  assetId: "asset-1",
+                  status: "ready",
+                }
+              : item,
+          ),
+        },
+      };
+      return { count: 1 };
+    });
     generateEcomImage.mockResolvedValue("https://example.com/out.png");
 
     const { generateModelShotImages } = await import("@/lib/ecom/ecom-model-shot-image");
@@ -110,14 +144,8 @@ describe("generateModelShotImages", () => {
     });
 
     expect(generateEcomImage).toHaveBeenCalledTimes(1);
-    expect(generateEcomImage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: "user-1",
-        modelKey: "nano-banana-pro",
-        toolKey: "ecom-toolkit__model-shot__tryon",
-      }),
-    );
+    expect(updateMany).toHaveBeenCalled();
     expect(result.generated).toBe(1);
-    expect(result.failures).toEqual([]);
+    expect(result.project.plan.items[0]?.imageUrl).toBe("https://example.com/out.png");
   });
 });

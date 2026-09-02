@@ -1,13 +1,14 @@
 "use client";
 
-import { Check, Loader2, Pencil, Save, Sparkles } from "lucide-react";
-import { useCallback, useState } from "react";
+import { Check, Loader2, Pencil, RefreshCw, Save, Sparkles } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 
 import { FilmPullConfirmScriptTable } from "@/components/film-pull/film-pull-confirm-script-table";
 import { FilmPullProductionMediaStrip } from "@/components/film-pull/film-pull-production-media-strip";
 import { FilmPullProductionScriptEditDialog } from "@/components/film-pull/film-pull-production-script-edit-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
-import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import {
   assembleFilmPullProductionScript,
   confirmFilmPullProductionScript,
@@ -19,6 +20,7 @@ import {
   syncRefMatchWithProductionShots,
 } from "@/lib/film-pull-production-script-utils";
 import { FILM_PULL_SCRIPT_PREP_STEP_LABELS } from "@/lib/film-pull-production-workflow";
+import { buildFilmPullMentionRefs } from "@/lib/film-pull-mention-refs";
 import type { FilmPullProductionShot, FilmPullProject } from "@/lib/film-pull-types";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import { cn } from "@/lib/utils";
@@ -106,6 +108,10 @@ export function FilmPullProductionWorkspace({
   const activePrepStep = showLocalPrepProgress ? localPrepStep : prepStep;
   const showEmpty = !plan?.shots.length;
   const aspectRatio = project.settings.aspectRatio ?? "9:16";
+  const mentionRefs = useMemo(
+    () => buildFilmPullMentionRefs(project.characterRefs),
+    [project.characterRefs],
+  );
 
   const handleSaveScript = useCallback(
     async (shots: FilmPullProductionShot[], opts?: { confirm?: boolean }) => {
@@ -167,49 +173,38 @@ export function FilmPullProductionWorkspace({
           </p>
         </div>
         {!showEmpty ? (
-          <div className="flex flex-wrap gap-2">
-            <EcomButtonSecondary
-              size="sm"
-              type="button"
-              disabled={locked}
-              onClick={() => setEditOpen(true)}
-            >
-              <Pencil className="mr-1 h-3.5 w-3.5" />
-              编辑
-            </EcomButtonSecondary>
-            <EcomButtonSecondary
-              size="sm"
-              type="button"
-              disabled={locked}
-              onClick={() => void handleAssemble(false)}
-            >
-              {actionBusy && !editOpen ? (
-                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Sparkles className="mr-1 h-3.5 w-3.5" />
-              )}
-              重新组装
-            </EcomButtonSecondary>
-            {isFilmPullMockDevUiEnabled() ? (
-              <EcomButtonSecondary
-                size="sm"
-                type="button"
+          <EcomIconToolbar>
+            <EcomIconToolbarGroup label="脚本">
+              <EcomIconButton
+                label="编辑脚本"
+                icon={Pencil}
                 disabled={locked}
-                onClick={() => void handleAssemble(true)}
-              >
-                Mock 组装
-              </EcomButtonSecondary>
-            ) : null}
-            <EcomButtonPrimary
-              size="sm"
-              type="button"
-              disabled={locked}
-              onClick={() => void handleSaveScript(plan!.shots)}
-            >
-              <Save className="mr-1 h-3.5 w-3.5" />
-              保存脚本
-            </EcomButtonPrimary>
-          </div>
+                onClick={() => setEditOpen(true)}
+              />
+              <EcomIconButton
+                label={actionBusy && !editOpen ? "组装中…" : "重新组装"}
+                icon={Sparkles}
+                busy={actionBusy && !editOpen}
+                disabled={locked}
+                onClick={() => void handleAssemble(false)}
+              />
+              {isFilmPullMockDevUiEnabled() ? (
+                <EcomIconButton
+                  label="Mock 组装"
+                  icon={Sparkles}
+                  disabled={locked}
+                  onClick={() => void handleAssemble(true)}
+                />
+              ) : null}
+              <EcomIconButton
+                label="保存脚本"
+                icon={Save}
+                variant="accent"
+                disabled={locked}
+                onClick={() => void handleSaveScript(plan!.shots)}
+              />
+            </EcomIconToolbarGroup>
+          </EcomIconToolbar>
         ) : null}
       </div>
 
@@ -232,9 +227,12 @@ export function FilmPullProductionWorkspace({
           <p className="text-sm text-[#c0392b]">生成失败：{prepError}</p>
           {onRetryPrep ? (
             <div className="mt-2">
-              <EcomButtonSecondary type="button" size="sm" disabled={busy} onClick={() => void onRetryPrep()}>
-                重试
-              </EcomButtonSecondary>
+              <EcomIconButton
+                label="重试"
+                icon={RefreshCw}
+                disabled={busy}
+                onClick={() => void onRetryPrep()}
+              />
             </div>
           ) : null}
         </div>
@@ -250,6 +248,8 @@ export function FilmPullProductionWorkspace({
             mode="preview"
             shots={plan!.shots}
             characterRefs={project.characterRefs}
+            refMatch={project.refMatch}
+            mentionRefs={mentionRefs}
           />
 
           <FilmPullProductionMediaStrip
@@ -278,6 +278,7 @@ export function FilmPullProductionWorkspace({
             description="修改分镜字段、参考图与生图/生视频 Prompt；支持 @图片N 引用。保存后更新工作台。"
             shots={plan!.shots}
             characterRefs={project.characterRefs}
+            refMatch={project.refMatch}
             saving={actionBusy}
             onSave={(shots) => handleSaveScript(shots)}
           />

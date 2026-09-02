@@ -34,7 +34,7 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
-  let body: { productBrief?: unknown; modelKey?: unknown } = {};
+  let body: { productBrief?: unknown; sellingPoints?: unknown; modelKey?: unknown } = {};
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -43,12 +43,14 @@ export async function POST(req: Request, ctx: Ctx) {
 
   const productBrief =
     typeof body.productBrief === "string" ? body.productBrief.trim() : undefined;
+  const sellingPoints = typeof body.sellingPoints === "string" ? body.sellingPoints : undefined;
   const modelKey = typeof body.modelKey === "string" ? body.modelKey : undefined;
 
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const result = await generateReplicaScript(auth.userId, id, {
       productBrief,
+      sellingPoints,
       modelKey,
     });
     return NextResponse.json(result);

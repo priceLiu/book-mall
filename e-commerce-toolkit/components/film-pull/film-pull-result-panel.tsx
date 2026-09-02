@@ -2,6 +2,7 @@
 
 import { FilmPullAnalyzeSummarySections } from "@/components/film-pull/film-pull-analyze-summary-sections";
 import { FilmPullMetaSummary } from "@/components/film-pull/film-pull-meta-summary";
+import { FilmPullShootingPrepSummary } from "@/components/film-pull/film-pull-shooting-prep-summary";
 import { FilmPullShotTable } from "@/components/film-pull/film-pull-shot-table";
 import type { FilmPullAnalyzePatch } from "@/lib/film-pull-types";
 
@@ -14,6 +15,9 @@ export function FilmPullResultPanel({ structured }: Props) {
   return (
     <div className="space-y-4">
       <FilmPullMetaSummary meta={structured.meta} />
+      {structured.shootingPrep ? (
+        <FilmPullShootingPrepSummary shootingPrep={structured.shootingPrep} />
+      ) : null}
       <FilmPullShotTable shots={structured.shots} embedded />
       <FilmPullAnalyzeSummarySections structured={structured} />
     </div>

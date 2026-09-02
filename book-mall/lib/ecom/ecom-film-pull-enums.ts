@@ -43,7 +43,7 @@ export function normalizeCutTransition(raw: string): string {
 
 export function normalizeCameraMovement(raw: string): string {
   const t = raw.trim();
-  if (!t || t === "无" || t.includes("固定")) return "固定机位";
+  if (!t || t === "无") return "固定机位";
   return t;
 }
 

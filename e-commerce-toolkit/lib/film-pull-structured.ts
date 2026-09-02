@@ -20,6 +20,12 @@ function normalizeAnalyzePatchForDisplay(raw: FilmPullAnalyzePatch): FilmPullAna
 
   return {
     ...raw,
+    shootingPrep: {
+      venue: coerceDisplayText(raw.shootingPrep?.venue),
+      costume: coerceDisplayText(raw.shootingPrep?.costume),
+      props: coerceDisplayText(raw.shootingPrep?.props),
+      equipment: coerceDisplayText(raw.shootingPrep?.equipment),
+    },
     narrativeLogic: coerceDisplayText(raw.narrativeLogic),
     beatPoints: coerceDisplayText(raw.beatPoints),
     replicableShootingScript: coerceDisplayText(raw.replicableShootingScript),

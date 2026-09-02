@@ -4,7 +4,7 @@ import { FolderOpen } from "lucide-react";
 import { useState } from "react";
 
 import { EcomProjectListDialog } from "@/components/layout/ecom-project-list-dialog";
-import { EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomIconButton } from "@/components/ui/ecom-icon-button";
 import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 
 type Props = {
@@ -30,16 +30,12 @@ export function EcomProjectListButton({
 
   return (
     <>
-      <EcomButtonSecondary
-        size="sm"
-        type="button"
-        dark
+      <EcomIconButton
+        label="项目列表"
+        icon={FolderOpen}
         disabled={disabled}
         onClick={() => setOpen(true)}
-      >
-        <FolderOpen className="h-3.5 w-3.5 shrink-0" />
-        项目列表
-      </EcomButtonSecondary>
+      />
       <EcomProjectListDialog
         open={open}
         onOpenChange={setOpen}

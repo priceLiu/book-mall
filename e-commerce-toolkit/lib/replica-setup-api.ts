@@ -4,10 +4,12 @@ import {
   generateMediaDecomposeReplicaModelImage,
   generateMediaDecomposeReplicaModelPrompt,
   generateMediaDecomposeReplicaScript,
+  generateMediaDecomposeReplicaSellingPoints,
+  generateMediaDecomposeReplicaVoiceover,
   mockMediaDecomposeReplicaRecognizeProduct,
   recognizeMediaDecomposeReplicaProduct,
   removeMediaDecomposeReplicaRef,
-  updateMediaDecomposeProject,
+  saveMediaDecomposeReplicaCopyFields,
   uploadMediaDecomposeReplicaRef,
 } from "@/lib/ecom-media-decompose-api";
 import {
@@ -19,7 +21,6 @@ import {
   updateFilmPullProject,
   uploadFilmPullRef,
 } from "@/lib/ecom-film-pull-api";
-import { updateSeedVideoProject } from "@/lib/ecom-seed-video-api";
 import {
   FILM_PULL_REF_MAX_PER_ROLE,
   isFilmPullModelRefId,
@@ -33,7 +34,7 @@ import {
   isReplicaProductRefId,
   REPLICA_REF_MAX_PER_ROLE,
 } from "@/lib/media-decompose-replica-refs";
-import { readProductBrief } from "@/lib/media-decompose-replica-workflow";
+import { readProductBrief, readSellingPoints, readVoiceoverDraft, type ReplicaVoiceoverDraft } from "@/lib/media-decompose-replica-workflow";
 import type { FilmPullProject } from "@/lib/film-pull-types";
 import type { MediaDecomposeProject } from "@/lib/media-decompose-types";
 import type { SeedVideoProject } from "@/lib/seed-video-types";
@@ -62,16 +63,32 @@ export type ReplicaSetupApi = {
   isModelRefId: (id: string) => boolean;
   isProductRefId: (id: string) => boolean;
   readProductBrief: () => string;
+  readSellingPoints?: () => string;
+  readVoiceoverDraft?: () => ReplicaVoiceoverDraft | null;
   uploadRef: (role: ReplicaSetupRole, file: File) => Promise<void>;
   removeRef: (refId: string) => Promise<void>;
   saveProductBrief: (brief: string) => Promise<void>;
+  saveCopyFields?: (patch: { productBrief?: string; sellingPoints?: string }) => Promise<void>;
   recognizeProduct: (opts: {
     mock?: boolean;
     userDraft?: string;
   }) => Promise<{ productBrief: string }>;
+  generateSellingPoints?: (opts: {
+    userDraft?: string;
+    productBrief?: string;
+  }) => Promise<{ sellingPoints: string }>;
+  generateVoiceover?: (opts: {
+    productBrief?: string;
+    sellingPoints?: string;
+    modelKey?: string;
+  }) => Promise<void>;
   attachModelFromLibrary?: (entry: { id: string; name: string; ossUrl: string }) => Promise<void>;
   attachRefsFromAssets?: (role: ReplicaSetupRole, assetIds: string[]) => Promise<void>;
-  generateScript?: (opts: { productBrief: string; modelKey: string }) => Promise<void>;
+  generateScript?: (opts: {
+    productBrief: string;
+    sellingPoints?: string;
+    modelKey: string;
+  }) => Promise<void>;
   generateModelPrompt?: (modelKey: string) => Promise<string>;
   generateModelImage?: (opts: {
     prompt: string;
@@ -122,6 +139,8 @@ export function createMediaDecomposeReplicaSetupApi(opts: {
     isModelRefId: isReplicaModelRefId,
     isProductRefId: isReplicaProductRefId,
     readProductBrief: () => readProductBrief(getProject(), getSeedVideo()),
+    readSellingPoints: () => readSellingPoints(getProject(), getSeedVideo()),
+    readVoiceoverDraft: () => readVoiceoverDraft(getSeedVideo()),
     uploadRef: async (role, file) => {
       const { project, seedVideo } = await uploadMediaDecomposeReplicaRef(projectId, role, file);
       onProjectUpdated(project);
@@ -133,20 +152,18 @@ export function createMediaDecomposeReplicaSetupApi(opts: {
       onSeedVideoUpdated(seedVideo);
     },
     saveProductBrief: async (brief) => {
-      const project = getProject();
-      const seedVideo = getSeedVideo();
-      const nextProject = await updateMediaDecomposeProject(projectId, {
-        meta: { ...(project.meta ?? {}), replicaProductBrief: brief },
+      const sellingPoints = readSellingPoints(getProject(), getSeedVideo());
+      const { project, seedVideo } = await saveMediaDecomposeReplicaCopyFields(projectId, {
+        productBrief: brief,
+        sellingPoints,
       });
-      const nextSeed = await updateSeedVideoProject(seedVideo.id, {
-        meta: {
-          ...(seedVideo.meta ?? {}),
-          replicaProductBrief: brief,
-          replicaCollectPhase: "ready",
-        },
-      });
-      onProjectUpdated(nextProject);
-      onSeedVideoUpdated(nextSeed);
+      onProjectUpdated(project);
+      onSeedVideoUpdated(seedVideo);
+    },
+    saveCopyFields: async (patch) => {
+      const { project, seedVideo } = await saveMediaDecomposeReplicaCopyFields(projectId, patch);
+      onProjectUpdated(project);
+      onSeedVideoUpdated(seedVideo);
     },
     recognizeProduct: async ({ mock, userDraft }) => {
       const result = mock
@@ -173,9 +190,28 @@ export function createMediaDecomposeReplicaSetupApi(opts: {
       onProjectUpdated(project);
       onSeedVideoUpdated(seedVideo);
     },
-    generateScript: async ({ productBrief, modelKey }) => {
+    generateSellingPoints: async ({ userDraft, productBrief }) => {
+      const result = await generateMediaDecomposeReplicaSellingPoints(projectId, {
+        userDraft,
+        productBrief,
+      });
+      onProjectUpdated(result.project);
+      onSeedVideoUpdated(result.seedVideo);
+      return { sellingPoints: result.sellingPoints };
+    },
+    generateVoiceover: async ({ productBrief, sellingPoints, modelKey }) => {
+      const result = await generateMediaDecomposeReplicaVoiceover(projectId, {
+        productBrief,
+        sellingPoints,
+        modelKey,
+      });
+      onProjectUpdated(result.project);
+      onSeedVideoUpdated(result.seedVideo);
+    },
+    generateScript: async ({ productBrief, sellingPoints, modelKey }) => {
       const { project, seedVideo } = await generateMediaDecomposeReplicaScript(projectId, {
         productBrief,
+        sellingPoints,
         modelKey,
       });
       onProjectUpdated(project);

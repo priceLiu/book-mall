@@ -46,6 +46,10 @@ type Props = {
   onAddRow?: () => void;
   onDeleteRow?: (index: number) => void;
   canDeleteShot?: (shot: SeedVideoShot) => boolean;
+  /** AI 口播草稿（按镜号）；有值时展示「应用新口播」 */
+  voiceoverDraftByIndex?: ReadonlyMap<number, string>;
+  onApplyVoiceoverDraft?: (shotIndex: number) => void | Promise<void>;
+  onApplyAllVoiceoverDrafts?: () => void | Promise<void>;
 };
 
 export function SeedVideoShotTable({
@@ -77,6 +81,9 @@ export function SeedVideoShotTable({
   onAddRow,
   onDeleteRow,
   canDeleteShot,
+  voiceoverDraftByIndex,
+  onApplyVoiceoverDraft,
+  onApplyAllVoiceoverDrafts,
 }: Props) {
   function patchShot(index: number, patch: Partial<SeedVideoShot>) {
     onChange(shots.map((s) => (s.index === index ? { ...s, ...patch } : s)));
@@ -118,6 +125,9 @@ export function SeedVideoShotTable({
   const generateLabel =
     selectedCount > 0 ? `生成 (${selectedCount})` : "生成";
 
+  const voiceoverDraftCount = voiceoverDraftByIndex?.size ?? 0;
+  const showVoiceoverDraftActions = voiceoverDraftCount > 0 && Boolean(onApplyVoiceoverDraft);
+
   return (
     <div className="overflow-x-auto rounded-xl border border-[#e8e8ed]">
       {showRefsGallery ? (
@@ -125,7 +135,29 @@ export function SeedVideoShotTable({
           <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[#6e6e73]">
             参考图 · 在视频 Prompt 中用 @图片1 … 引用
           </p>
-          <SeedVideoRefsGalleryStrip references={references} />
+          {videoPromptMentionRefs && videoPromptMentionRefs.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {videoPromptMentionRefs.map((ref) => (
+                <div
+                  key={ref.token}
+                  className="flex items-center gap-1.5 rounded-lg border border-[#e8e8ed] bg-white px-1.5 py-1"
+                  title={ref.label}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={ref.url}
+                    alt={ref.label}
+                    className="h-10 w-10 shrink-0 rounded-md border border-[#e8e8ed] object-cover"
+                  />
+                  <span className="pr-1 font-mono text-[10px] font-medium text-[#0071e3]">
+                    {ref.token}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <SeedVideoRefsGalleryStrip references={references} />
+          )}
         </div>
       ) : null}
       <table className="min-w-full text-left text-xs">
@@ -252,12 +284,27 @@ export function SeedVideoShotTable({
                   )}
                 </td>
                 <td className="px-3 py-2">
-                  <textarea
-                    className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none disabled:opacity-50"
-                    value={shot.voiceover}
-                    disabled={disabled || isGenerating}
-                    onChange={(e) => patchShot(shot.index, { voiceover: e.target.value })}
-                  />
+                  <div className="space-y-1.5">
+                    {showVoiceoverDraftActions &&
+                    voiceoverDraftByIndex?.has(shot.index) ? (
+                      <EcomButtonSecondary
+                        type="button"
+                        size="sm"
+                        className="h-6 px-2 text-[10px]"
+                        disabled={disabled || isGenerating}
+                        onClick={() => void onApplyVoiceoverDraft?.(shot.index)}
+                      >
+                        应用新口播
+                      </EcomButtonSecondary>
+                    ) : null}
+                    <textarea
+                      className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none disabled:opacity-50"
+                      value={shot.voiceover ?? ""}
+                      placeholder="可留空"
+                      disabled={disabled || isGenerating}
+                      onChange={(e) => patchShot(shot.index, { voiceover: e.target.value })}
+                    />
+                  </div>
                 </td>
                 {!hideStatusColumn ? (
                   <td className={`px-3 py-2 ${status.className}`}>{status.label}</td>
@@ -286,7 +333,7 @@ export function SeedVideoShotTable({
             );
           })}
         </tbody>
-        {showGenerateActions || showRowActions ? (
+        {showGenerateActions || showRowActions || showVoiceoverDraftActions ? (
           <tfoot>
             <tr className="border-t border-[#e8e8ed] bg-[#fafafa]">
               <td colSpan={columnCount} className="px-3 py-2.5">
@@ -300,6 +347,16 @@ export function SeedVideoShotTable({
                       onClick={() => onGenerateSelected?.()}
                     >
                       {generateLabel}
+                    </EcomButtonSecondary>
+                  ) : null}
+                  {showVoiceoverDraftActions && onApplyAllVoiceoverDrafts ? (
+                    <EcomButtonSecondary
+                      type="button"
+                      size="sm"
+                      disabled={disabled}
+                      onClick={() => void onApplyAllVoiceoverDrafts()}
+                    >
+                      全部应用新口播 ({voiceoverDraftCount})
                     </EcomButtonSecondary>
                   ) : null}
                   {showRowActions ? (

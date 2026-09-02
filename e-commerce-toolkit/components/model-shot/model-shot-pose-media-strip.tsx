@@ -121,7 +121,7 @@ export function ModelShotPoseMediaStrip({
 
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
-          <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,max(8.75rem,calc((100%-3*1rem)/4))),1fr))]">
+          <div className="flex flex-wrap gap-4">
             {items.map((item) => {
               const panel = poseItemToPanel(item);
               const title = item.title ?? `姿势 ${item.index}`;

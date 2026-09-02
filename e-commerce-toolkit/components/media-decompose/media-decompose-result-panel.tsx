@@ -35,7 +35,7 @@ export function MediaDecomposeResultPanel({ structured }: Props) {
                   "人物动作",
                   "表情",
                   "字幕",
-                  "配音",
+                  "口播",
                   "音效",
                   "BGM",
                   "转场",
@@ -60,7 +60,9 @@ export function MediaDecomposeResultPanel({ structured }: Props) {
                   <td className={ecomDataTableTdClass}>{row.characterAction}</td>
                   <td className={ecomDataTableTdClass}>{row.expression}</td>
                   <td className={ecomDataTableTdClass}>{row.subtitle}</td>
-                  <td className={ecomDataTableTdClass}>{row.voiceover}</td>
+                  <td className={ecomDataTableTdClass}>
+                    {row.voiceover.trim() || row.subtitle.trim() || "—"}
+                  </td>
                   <td className={ecomDataTableTdClass}>{row.sfx}</td>
                   <td className={ecomDataTableTdClass}>{row.bgm}</td>
                   <td className={ecomDataTableTdClass}>{row.transition}</td>

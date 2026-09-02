@@ -321,7 +321,7 @@ export async function mockMediaDecomposeReplicaRecognizeProduct(
 
 export async function generateMediaDecomposeReplicaScript(
   projectId: string,
-  opts?: { productBrief?: string; modelKey?: string },
+  opts?: { productBrief?: string; sellingPoints?: string; modelKey?: string },
 ): Promise<{
   project: MediaDecomposeProject;
   seedVideo: SeedVideoProject;
@@ -334,6 +334,73 @@ export async function generateMediaDecomposeReplicaScript(
   return {
     project: data.project as MediaDecomposeProject,
     seedVideo: data.seedVideo as SeedVideoProject,
+  };
+}
+
+export async function saveMediaDecomposeReplicaCopyFields(
+  projectId: string,
+  patch: { productBrief?: string; sellingPoints?: string },
+): Promise<{
+  project: MediaDecomposeProject;
+  seedVideo: SeedVideoProject;
+}> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/replica/copy-fields`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  return {
+    project: data.project as MediaDecomposeProject,
+    seedVideo: data.seedVideo as SeedVideoProject,
+  };
+}
+
+export async function generateMediaDecomposeReplicaSellingPoints(
+  projectId: string,
+  opts?: { userDraft?: string; productBrief?: string; modelKey?: string },
+): Promise<{
+  project: MediaDecomposeProject;
+  seedVideo: SeedVideoProject;
+  sellingPoints: string;
+}> {
+  const data = await ecomBookFetch(
+    `${BASE}/projects/${projectId}/replica/selling-points/generate`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(opts ?? {}),
+    },
+  );
+  return {
+    project: data.project as MediaDecomposeProject,
+    seedVideo: data.seedVideo as SeedVideoProject,
+    sellingPoints: String(data.sellingPoints ?? ""),
+  };
+}
+
+export async function generateMediaDecomposeReplicaVoiceover(
+  projectId: string,
+  opts?: { productBrief?: string; sellingPoints?: string; modelKey?: string },
+): Promise<{
+  project: MediaDecomposeProject;
+  seedVideo: SeedVideoProject;
+  voiceoverDraft: {
+    shots: Array<{ index: number; voiceover: string }>;
+    generatedAt?: string;
+  };
+}> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/replica/voiceover/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts ?? {}),
+  });
+  return {
+    project: data.project as MediaDecomposeProject,
+    seedVideo: data.seedVideo as SeedVideoProject,
+    voiceoverDraft: data.voiceoverDraft as {
+      shots: Array<{ index: number; voiceover: string }>;
+      generatedAt?: string;
+    },
   };
 }
 

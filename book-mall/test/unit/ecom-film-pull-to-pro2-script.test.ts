@@ -28,6 +28,12 @@ const renderScript: FilmPullRenderScriptPatch = {
   narrativeLogic: "主线递进",
   beatPoints: "3s 切点",
   replicableShootingScript: "手持跟拍",
+  shootingPrep: {
+    venue: "霓虹街道",
+    costume: "赛博朋克外套",
+    props: "伞",
+    equipment: "手持稳定器",
+  },
   shots: [
     {
       shotNo: 1,
@@ -35,6 +41,7 @@ const renderScript: FilmPullRenderScriptPatch = {
       endTimeSec: 3,
       durationSec: 3,
       cutTransition: "硬切",
+      cutDetail: "镜1→镜2：雨景切至特写",
       shotScale: "特写",
       cameraAngle: "仰拍",
       cameraMovement: "推镜",
