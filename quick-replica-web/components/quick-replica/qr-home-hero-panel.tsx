@@ -121,21 +121,24 @@ export function QrHomeHeroPanel({
     >
       <div
         className={clsx(
-          "mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center gap-20 px-4 sm:px-6",
-          isLanding ? "pt-10 pb-[22vh] sm:pt-12" : "pt-8 pb-[20vh] sm:pt-10",
+          "mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center gap-10 px-4 sm:gap-14 sm:px-6 lg:gap-20",
+          isLanding ? "pt-8 pb-[18vh] sm:pt-10 sm:pb-[22vh]" : "pt-6 pb-[16vh] sm:pt-10 sm:pb-[20vh]",
         )}
       >
-        <section className="flex flex-col items-center gap-20 text-center">
+        <section className="flex flex-col items-center gap-6 text-center sm:gap-10 lg:gap-16">
           <h1
             className={clsx(
-              "whitespace-nowrap font-bold leading-tight tracking-tight",
-              isLanding ? "text-8xl sm:text-9xl" : "text-7xl sm:text-8xl",
+              "max-w-full font-bold leading-[1.15] tracking-tight text-balance",
+              /* 随视口流体缩放，避免固定 text-8xl/9xl 在窄屏溢出 */
+              isLanding
+                ? "text-[clamp(1.75rem,0.9rem+5.2vw,5.75rem)]"
+                : "text-[clamp(1.5rem,0.85rem+4.6vw,4.75rem)]",
             )}
           >
             <span style={{ color: "var(--qr-brand)" }}>一键复刻</span>
             喜欢的同款作品
           </h1>
-          <p className="w-full max-w-4xl truncate px-1 text-lg text-[var(--qr-text-muted)] sm:text-xl">
+          <p className="w-full max-w-4xl px-1 text-sm text-[var(--qr-text-muted)] sm:text-lg lg:text-xl">
             选择喜欢的作品, 点击复制, 选择模型, 即可复刻.
           </p>
         </section>

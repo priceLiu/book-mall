@@ -428,7 +428,13 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "TOPAZ", requestKind: "VIDEO" };
   }
 
-  if (m.includes("qwen") || m.includes("bailian") || (m.includes("minimax") && !m.includes("speech") && !m.includes("music"))) {
+  if (
+    m.startsWith("zhipu/") ||
+    m.includes("glm-5") ||
+    m.includes("qwen") ||
+    m.includes("bailian") ||
+    (m.includes("minimax") && !m.includes("speech") && !m.includes("music"))
+  ) {
     return { providerKind: "BAILIAN", requestKind: "CHAT" };
   }
 

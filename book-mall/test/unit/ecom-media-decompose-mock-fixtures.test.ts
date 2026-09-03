@@ -13,6 +13,12 @@ describe("media-decompose mock fixtures", () => {
     const patch = extractMediaDecomposePatch(text);
     expect(patch?.mediaType).toBe("video");
     expect(patch && "storyboardTable" in patch && patch.storyboardTable.length).toBe(3);
+    if (patch?.mediaType === "video") {
+      expect(patch.openingHook.first3sLines).toContain("太好穿了");
+      expect(patch.fullTranscript).toContain("通勤出游都能搭");
+      expect(patch.talentAnalysis.appearance).toContain("长直发");
+      expect(patch.wardrobeAnalysis.garments).toContain("针织开衫");
+    }
   });
 
   it("image fixture parses from fence", () => {
@@ -58,6 +64,10 @@ describe("media-decompose mock fixtures", () => {
     expect(patch?.mediaType).toBe("video");
     if (patch?.mediaType === "video") {
       expect(patch.storyboardTable[0]?.voiceover).toBe("夏季必备针织开衫");
+      expect(patch.openingHook.firstFrame).toBe("");
+      expect(patch.fullTranscript).toBe("");
+      expect(patch.talentAnalysis.appearance).toBe("");
+      expect(patch.wardrobeAnalysis.garments).toBe("");
     }
   });
 

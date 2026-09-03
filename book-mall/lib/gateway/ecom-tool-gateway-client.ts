@@ -25,6 +25,10 @@ import {
   gatewayV1RecordInfo,
   gatewayV1VolcengineImageGenerations,
 } from "@/lib/gateway/gateway-v1-http-client";
+import {
+  GatewayV1AsrError,
+  runGatewayV1AsrTranscribe,
+} from "@/lib/gateway/gateway-v1-asr-service";
 import type { QwenImageEditParams } from "@/lib/gateway/qwen-image-edit-proxy";
 import {
   isBailianR2vFailed,
@@ -289,6 +293,30 @@ export async function ecomGwChatComplete(
   } catch (e) {
     if (e instanceof GatewayV1ChatError) {
       throw new GatewayRequiredError(e.message);
+    }
+    throw e;
+  }
+}
+
+/** 电商拆图拆视频 · Gateway ASR（进程内，避免 mall 自调用 HTTP 卡死无日志） */
+export async function ecomGwAsrTranscribe(
+  bookUserId: string,
+  opts: { fileUrl: string; modelKey?: string; clientPage?: string },
+): Promise<{ segments: Array<{ startMs: number; endMs: number; text: string }>; logId: string }> {
+  const auth = await requireEcomGatewayAuth(bookUserId);
+  try {
+    return await runGatewayV1AsrTranscribe({
+      auth,
+      fileUrl: opts.fileUrl,
+      model: opts.modelKey,
+      logMeta: gatewayV1ClientMeta("E_COMMERCE", {
+        clientPage: opts.clientPage,
+        bookUserId,
+      }),
+    });
+  } catch (e) {
+    if (e instanceof GatewayV1AsrError) {
+      throw new Error(e.message);
     }
     throw e;
   }

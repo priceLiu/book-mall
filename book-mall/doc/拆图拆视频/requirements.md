@@ -42,7 +42,7 @@
 
 见 [`skill.md`](./skill.md)：
 
-- **视频**：JSON `storyboardTable`（17 列）+ 叙事逻辑 / 卡点要点 / 可复刻拍摄脚本
+- **视频**：JSON `storyboardTable`（17 列）+ 开场 0–3 秒 / 完整台词 / 全片模特 / 全片服装 + 叙事逻辑 / 卡点要点 / 可复刻拍摄脚本
 - **图片**：JSON `elements` + 正向/负向生图 Prompt + 实拍复刻方案
 
 ## 6. 模型约束
@@ -54,7 +54,7 @@
 
 默认 chat 模型：`qwen3.8-max`。
 
-Gateway 输入：图片 `image_url`；视频 `video_url`。
+Gateway 输入：图片 `image_url`；视频 `video_url`。视频拆解先（或并行）走 Gateway ASR `qwen3-asr-flash-filetrans`，再把时间轴注入 VL；`fullTranscript` / 前三秒台词 / 各镜 `voiceover` 以 ASR 为准回填。
 
 ## 7. 失败策略
 

@@ -74,6 +74,10 @@ export type ComicProjectListItem = {
   coverImageUrl: string;
   /** 风格预设的封面占位（cover 未就绪时使用） */
   styleFallbackUrl: string;
+  /** 门户精选卡片悬停预览（可选） */
+  previewVideoUrl?: string;
+  /** 是否为当前用户自己的项目（登录态首页分区用） */
+  isMine?: boolean;
   createdAt: string;
   updatedAt: string;
 };

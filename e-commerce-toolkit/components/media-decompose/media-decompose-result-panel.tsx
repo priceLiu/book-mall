@@ -45,6 +45,32 @@ export function MediaDecomposeResultPanel({ structured }: Props) {
             </ul>
           </Section>
         )}
+        <Section title="开场 0–3 秒信息">
+          <ul className="list-inside list-disc space-y-1 text-sm text-[#424245]">
+            <li>
+              首帧画面描述：{structured.openingHook?.firstFrame.trim() || "—"}
+            </li>
+            <li>
+              前三秒完整台词：{structured.openingHook?.first3sLines.trim() || "—"}
+            </li>
+          </ul>
+        </Section>
+        <CopyBlock title="完整台词全文" text={structured.fullTranscript?.trim() || "—"} />
+        <Section title="模特分析">
+          <ul className="list-inside list-disc space-y-1 text-sm text-[#424245]">
+            <li>人数：{structured.talentAnalysis?.count.trim() || "—"}</li>
+            <li>形象：{structured.talentAnalysis?.appearance.trim() || "—"}</li>
+            <li>表情风格：{structured.talentAnalysis?.expressionStyle.trim() || "—"}</li>
+            <li>走位：{structured.talentAnalysis?.blocking.trim() || "—"}</li>
+          </ul>
+        </Section>
+        <Section title="模特服装">
+          <ul className="list-inside list-disc space-y-1 text-sm text-[#424245]">
+            <li>穿着：{structured.wardrobeAnalysis?.garments.trim() || "—"}</li>
+            <li>换装：{structured.wardrobeAnalysis?.changes.trim() || "—"}</li>
+            <li>造型要点：{structured.wardrobeAnalysis?.stylingNotes.trim() || "—"}</li>
+          </ul>
+        </Section>
         <div className={ecomDataTableWrapClass}>
           <table className={`min-w-full ${ecomDataTableClass}`}>
             <thead>

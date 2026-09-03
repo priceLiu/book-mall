@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { fetchToolsSession } from "@/lib/tools-introspect";
 import { storyRegisterHref } from "@/lib/portal-auth-links";
+import { getMainSiteOrigin } from "@/lib/site-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -24,5 +25,5 @@ export default async function RegisterPage({
   const token = cookies().get("tools_token")?.value;
   const session = await fetchToolsSession(token);
   if (session.active) redirect(target);
-  redirect(storyRegisterHref(target));
+  redirect(storyRegisterHref(target, getMainSiteOrigin()));
 }

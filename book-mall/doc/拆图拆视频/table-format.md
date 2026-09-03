@@ -34,10 +34,14 @@
 | `globalColorTone` | string | 全片色调基调 |
 | `cameraLanguageSummary` | string | 全片运镜总述 |
 | `scenePrep` | object | 场地与固定道具；见下 |
+| `openingHook` | object | **开场 0–3 秒**独立章节；见下。禁止写入分镜行 |
+| `fullTranscript` | string | **完整台词全文**；无人口声填「【无任何人声】」 |
+| `talentAnalysis` | object | **全片**模特分析（不是前 3 秒）；见下 |
+| `wardrobeAnalysis` | object | **全片**模特服装；见下 |
 | `storyboardTable` | array | **至少 1 镜** |
-| `narrativeLogic` | string | 整体叙事逻辑拆解 |
-| `beatPoints` | string | 镜头卡点要点 |
-| `replicableShootingScript` | string | 可直接落地复刻的同款拍摄脚本 |
+| `narrativeLogic` | string | 全片叙事弧线：按时间/镜序写卖点推进与情绪转折，详实不写一句带过 |
+| `beatPoints` | string | 带秒数/时间码的卡点；每条含画面事件 + 运镜 + 转场/切换类型 |
+| `replicableShootingScript` | string | 可落地复刻脚本：机位、运镜轨迹、切换节奏、布光、走位、BGM、口播时段 |
 
 ### `scenePrep`
 
@@ -45,6 +49,30 @@
 |------|------|
 | `venue` | 主要拍摄场地/环境 |
 | `fixedProps` | 固定道具（不含随换产品/服装） |
+
+### `openingHook`（开场 0–3 秒，独立章节）
+
+| 字段 | 说明 |
+|------|------|
+| `firstFrame` | 第 0 秒画面、人物表情、大字花字、视觉元素 |
+| `first3sLines` | 0–3 秒全部人声原文；无则「【无任何人声】」 |
+
+### `talentAnalysis`（全片模特，不是前 3 秒）
+
+| 字段 | 说明 |
+|------|------|
+| `count` | 几位、是否同一人；无出镜写「【无出镜模特】」 |
+| `appearance` | 性别年龄气质脸型发色妆容体态 |
+| `expressionStyle` | 全片表情与镜头关系 |
+| `blocking` | 站位、走位、面对镜头/侧身 |
+
+### `wardrobeAnalysis`（全片服装）
+
+| 字段 | 说明 |
+|------|------|
+| `garments` | 上装下装鞋包配饰，颜色面料版型 |
+| `changes` | 换装按时码；未换写「全片同一套」 |
+| `stylingNotes` | 层次、露出、复刻要点 |
 
 ### 分镜行 `storyboardTable[]`
 

@@ -150,8 +150,9 @@ export function MediaDecomposeWorkspace({
   }, [chatModelKey, eligibleModels, onChatModelChange, project.media?.kind]);
 
   const displaySource = streamText ?? project.result?.rawText ?? "";
-  const structured =
-    extractMediaDecomposePatch(displaySource) ?? project.result?.structured ?? null;
+  const structured = decomposing
+    ? extractMediaDecomposePatch(displaySource) ?? project.result?.structured ?? null
+    : project.result?.structured ?? extractMediaDecomposePatch(displaySource);
   const parseError = project.result?.parseError;
   const markdown = toMediaDecomposeDisplayMarkdown(displaySource, decomposing);
 

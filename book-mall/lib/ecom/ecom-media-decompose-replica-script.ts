@@ -340,6 +340,7 @@ export function buildReplicaModelImagePromptUserMessage(structured: MediaDecompo
   return [
     "原片（视频）拆解结果如下。请推断原片模特类型（性别、年龄感、风格），并写一条**不同面孔**的新模特文生图 Prompt。",
     "须继承全片 visualStyle / globalColorTone 与各镜 lightingSetup / toneContrast 所描述的光影与色调。",
+    "优先参考根字段 talentAnalysis（全片模特）与 wardrobeAnalysis（全片服装），不要只看开场 3 秒。",
     "",
     tableJson,
   ].join("\n");
@@ -442,7 +443,12 @@ export function buildReplicaVoiceoverUserPrompt(opts: {
       ? JSON.stringify(opts.structured.storyboardTable, null, 2)
       : JSON.stringify(opts.structured, null, 2);
   const shotsJson = JSON.stringify(opts.shots, null, 2);
+  const transcript =
+    opts.structured.mediaType === "video" ? opts.structured.fullTranscript.trim() : "";
   return [
+    "## 原片完整台词全文",
+    transcript || "（无）",
+    "",
     "## 原片拆解分镜表",
     tableJson,
     "",

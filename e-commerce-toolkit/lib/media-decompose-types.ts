@@ -44,6 +44,24 @@ export type MediaDecomposeScenePrep = {
   fixedProps: string;
 };
 
+export type MediaDecomposeOpeningHook = {
+  firstFrame: string;
+  first3sLines: string;
+};
+
+export type MediaDecomposeTalentAnalysis = {
+  count: string;
+  appearance: string;
+  expressionStyle: string;
+  blocking: string;
+};
+
+export type MediaDecomposeWardrobeAnalysis = {
+  garments: string;
+  changes: string;
+  stylingNotes: string;
+};
+
 export type MediaDecomposePatch =
   | {
       mediaType: "video";
@@ -52,6 +70,10 @@ export type MediaDecomposePatch =
       globalColorTone: string;
       cameraLanguageSummary: string;
       scenePrep: MediaDecomposeScenePrep;
+      openingHook: MediaDecomposeOpeningHook;
+      fullTranscript: string;
+      talentAnalysis: MediaDecomposeTalentAnalysis;
+      wardrobeAnalysis: MediaDecomposeWardrobeAnalysis;
       storyboardTable: MediaDecomposeStoryboardRow[];
       narrativeLogic: string;
       beatPoints: string;

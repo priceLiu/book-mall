@@ -59,6 +59,60 @@ function coerceScenePrep(raw: unknown): { venue: string; fixedProps: string } {
   };
 }
 
+function coerceOpeningHook(raw: unknown): { firstFrame: string; first3sLines: string } {
+  if (typeof raw === "string" && raw.trim()) {
+    return { firstFrame: raw.trim(), first3sLines: "" };
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { firstFrame: "", first3sLines: "" };
+  }
+  const o = raw as Record<string, unknown>;
+  return {
+    firstFrame: pickString(o, ["firstFrame", "首帧画面描述", "首帧"]),
+    first3sLines: pickString(o, ["first3sLines", "前三秒完整台词", "前三秒台词"]),
+  };
+}
+
+function coerceTalentAnalysis(raw: unknown): {
+  count: string;
+  appearance: string;
+  expressionStyle: string;
+  blocking: string;
+} {
+  if (typeof raw === "string" && raw.trim()) {
+    return { count: "", appearance: raw.trim(), expressionStyle: "", blocking: "" };
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { count: "", appearance: "", expressionStyle: "", blocking: "" };
+  }
+  const o = raw as Record<string, unknown>;
+  return {
+    count: pickString(o, ["count", "人数", "模特人数"]),
+    appearance: pickString(o, ["appearance", "外貌", "形象", "模特分析"]),
+    expressionStyle: pickString(o, ["expressionStyle", "表情风格", "镜头表情"]),
+    blocking: pickString(o, ["blocking", "走位", "站位", "调度"]),
+  };
+}
+
+function coerceWardrobeAnalysis(raw: unknown): {
+  garments: string;
+  changes: string;
+  stylingNotes: string;
+} {
+  if (typeof raw === "string" && raw.trim()) {
+    return { garments: raw.trim(), changes: "", stylingNotes: "" };
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { garments: "", changes: "", stylingNotes: "" };
+  }
+  const o = raw as Record<string, unknown>;
+  return {
+    garments: pickString(o, ["garments", "服装", "穿着", "模特服装"]),
+    changes: pickString(o, ["changes", "换装", "换装记录"]),
+    stylingNotes: pickString(o, ["stylingNotes", "造型要点", "复刻要点"]),
+  };
+}
+
 function mergeAudioFields(row: Record<string, unknown>): {
   subtitle: string;
   voiceover: string;
@@ -195,6 +249,12 @@ function coerceMediaDecomposePayload(raw: unknown): unknown | null {
       "cameraLanguage",
     ]),
     scenePrep: coerceScenePrep(o.scenePrep ?? o.场地准备 ?? o.shootingPrep),
+    openingHook: coerceOpeningHook(o.openingHook ?? o.开场信息),
+    fullTranscript: pickString(o, ["fullTranscript", "完整台词全文", "完整台词", "transcript"]),
+    talentAnalysis: coerceTalentAnalysis(o.talentAnalysis ?? o.模特分析 ?? o.talent),
+    wardrobeAnalysis: coerceWardrobeAnalysis(
+      o.wardrobeAnalysis ?? o.模特服装 ?? o.服装分析 ?? o.wardrobe,
+    ),
     storyboardTable,
     narrativeLogic: pickString(o, ["narrativeLogic", "整体叙事逻辑", "narrative"]),
     beatPoints: pickString(o, ["beatPoints", "镜头卡点要点", "beat"]),
@@ -221,6 +281,22 @@ function normalizeMediaDecomposePatch(patch: MediaDecomposePatch): MediaDecompos
   return {
     ...patch,
     scenePrep: patch.scenePrep ?? { venue: "", fixedProps: "" },
+    openingHook: {
+      firstFrame: patch.openingHook?.firstFrame ?? "",
+      first3sLines: patch.openingHook?.first3sLines ?? "",
+    },
+    fullTranscript: patch.fullTranscript ?? "",
+    talentAnalysis: {
+      count: patch.talentAnalysis?.count ?? "",
+      appearance: patch.talentAnalysis?.appearance ?? "",
+      expressionStyle: patch.talentAnalysis?.expressionStyle ?? "",
+      blocking: patch.talentAnalysis?.blocking ?? "",
+    },
+    wardrobeAnalysis: {
+      garments: patch.wardrobeAnalysis?.garments ?? "",
+      changes: patch.wardrobeAnalysis?.changes ?? "",
+      stylingNotes: patch.wardrobeAnalysis?.stylingNotes ?? "",
+    },
     storyboardTable: patch.storyboardTable.map((row) => ({
       lightingSetup: row.lightingSetup ?? "",
       toneContrast: row.toneContrast ?? "",

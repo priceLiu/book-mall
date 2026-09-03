@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { bookMallReEnterHref } from "@/lib/platform-sso-links";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { storyLoginHref } from "@/lib/portal-auth-links";
 import { isSsoReenterSuppressedClient } from "@/lib/tools-logout-next-url";
 import {
@@ -12,19 +12,19 @@ import {
   readSsoReenterAttempts,
 } from "@/lib/sso-reenter-attempts";
 
-/** 未认证：跳转 Book 登录（经 re-enter 回子应用）。 */
-function bookLoginHref(): string {
-  const path =
-    typeof window !== "undefined"
-      ? window.location.pathname + window.location.search
-      : "/";
-  return storyLoginHref(path || "/");
-}
-
 export function RequireAuth({ children }: { children: React.ReactNode }) {
+  const bookOrigin = useBookMallBaseUrl();
   const [ready, setReady] = useState(false);
   const [needsLogin, setNeedsLogin] = useState(false);
   const [exhausted, setExhausted] = useState(false);
+
+  const authEntryHref = () => {
+    const path =
+      typeof window !== "undefined"
+        ? window.location.pathname + window.location.search
+        : "/";
+    return storyLoginHref(path || "/", bookOrigin);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -41,10 +41,6 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
           setReady(true);
           return;
         }
-        if (!j?.hasCookie) {
-          setNeedsLogin(true);
-          return;
-        }
         if (isSsoReenterSuppressedClient()) {
           setNeedsLogin(true);
           return;
@@ -54,14 +50,14 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
           setNeedsLogin(true);
           return;
         }
-        const path = typeof window !== "undefined" ? window.location.pathname : "/";
-        const reEnter = bookMallReEnterHref(path, "story");
-        if (reEnter) {
-          bumpSsoReenterAttempts();
-          window.location.href = reEnter;
+        // 无 tools_token 或已失效：统一走 Book re-enter（未登录会落到主站登录页）
+        const entry = authEntryHref();
+        if (entry.startsWith("/sso-error")) {
+          setNeedsLogin(true);
           return;
         }
-        window.location.href = bookLoginHref();
+        bumpSsoReenterAttempts();
+        window.location.href = entry;
       } catch {
         if (!cancelled) setNeedsLogin(true);
       }
@@ -69,7 +65,9 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+    // bookOrigin 来自 layout Provider，首屏即有值
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookOrigin]);
 
   if (ready) return <>{children}</>;
 
@@ -86,7 +84,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
           className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm text-white"
           onClick={() => {
             clearSsoReenterAttempts();
-            window.location.href = bookLoginHref();
+            window.location.href = authEntryHref();
           }}
         >
           登录 / 注册

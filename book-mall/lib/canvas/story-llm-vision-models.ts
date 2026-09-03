@@ -8,6 +8,9 @@ export const STORY_LLM_DEFAULT_VISION_MODEL = "qwen3.8-max";
 /** Pro2 文本节点 · 视频反推（百炼 Qwen 视频理解） */
 export const STORY_LLM_VIDEO_UNDERSTANDING_MODEL_KEYS = [
   STORY_LLM_DEFAULT_VISION_MODEL,
+  "qwen3-omni-flash",
+  "qwen2.5-vl-72b-instruct",
+  "glm-5.3-flash",
   "qwen3-vl-plus",
   "qwen3.7-plus",
   "qwen3.6-plus",

@@ -15,6 +15,22 @@ export const MOCK_MEDIA_DECOMPOSE_VIDEO_PATCH: MediaDecomposePatch = {
     venue: "简约室内摄影棚",
     fixedProps: "展示台、绿植",
   },
+  openingHook: {
+    firstFrame: "中景：模特面向镜头举产品，左上角大字「夏季必备」",
+    first3sLines: "这件真的太好穿了",
+  },
+  fullTranscript: "这件真的太好穿了面料轻薄透气，上身无负担通勤出游都能搭",
+  talentAnalysis: {
+    count: "1 位女性模特，全片同一人",
+    appearance: "约 25 岁，长直发，自然淡妆，偏瘦高",
+    expressionStyle: "对镜微笑，讲解时眼神看镜头",
+    blocking: "棚内站姿展示，中段转身走两步",
+  },
+  wardrobeAnalysis: {
+    garments: "米白针织开衫 + 浅色阔腿裤，无配饰",
+    changes: "全片同一套",
+    stylingNotes: "突出面料垂感与领口层次，适合 lookbook 复刻",
+  },
   narrativeLogic:
     "【Mock】五段式：0–3s 钩子展示产品 → 3–8s 卖点讲解 → 8–12s 使用演示 → 12–15s 社会证明 → 15–18s CTA。",
   beatPoints: "【Mock】0s 硬切开场；3s BGM 起；8s 特写产品；12s 转场至用户评价；15s 口播 CTA。",

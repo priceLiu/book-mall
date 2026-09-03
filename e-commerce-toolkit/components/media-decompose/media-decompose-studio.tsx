@@ -382,6 +382,7 @@ export function MediaDecomposeStudio() {
           await streamMediaDecompose(project.id, { prompt, modelKey }, setStreamText);
           const fresh = await getMediaDecomposeProject(project.id);
           applyProject(fresh);
+          setStreamText(fresh.result?.rawText ?? "");
         } catch (e) {
           await alert({
             title: "拆解失败",

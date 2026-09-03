@@ -1,20 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Clapperboard, Loader2 } from "lucide-react";
 import { STORY_NAV_ITEMS } from "@/lib/site-config";
 import { PortalNav } from "@/components/portal-nav";
 import { StoryCreditBalanceChip } from "@/components/platform-credit-balance-chip";
+import { useStorySession } from "@/components/auth/story-session-provider";
 import { getBookAccountUrl } from "@/lib/site-origin";
 import { cn } from "@/lib/utils";
-import {
-  fetchStoryViewerUser,
-  type StoryViewerUser,
-} from "@/lib/story-viewer-session";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-
 import { storyLoginHref, storyRegisterHref } from "@/lib/portal-auth-links";
 
 function shellReturnPath(): string {
@@ -24,27 +19,10 @@ function shellReturnPath(): string {
 
 function ShellAuthSlot() {
   const base = useBookMallBaseUrl();
+  const { loading, active, displayName } = useStorySession();
   const bookAccountUrl = getBookAccountUrl();
-  const [user, setUser] = useState<StoryViewerUser | null | undefined>(undefined);
 
-  useEffect(() => {
-    if (!base) {
-      setUser(null);
-      return;
-    }
-    const ac = new AbortController();
-    const timer = window.setTimeout(() => ac.abort(), 12_000);
-    void fetchStoryViewerUser(base, ac.signal)
-      .then(setUser)
-      .catch(() => setUser(null))
-      .finally(() => window.clearTimeout(timer));
-    return () => {
-      ac.abort();
-      window.clearTimeout(timer);
-    };
-  }, [base]);
-
-  if (user === undefined) {
+  if (loading) {
     return (
       <span className="inline-flex items-center gap-1 text-[11px] text-[var(--story-muted)]">
         <Loader2 className="size-3 animate-spin" aria-hidden />
@@ -53,13 +31,19 @@ function ShellAuthSlot() {
     );
   }
 
-  if (!user) {
+  if (!active) {
     return (
       <div className="flex shrink-0 items-center gap-2">
-        <a href={storyLoginHref(shellReturnPath())} className="twenty-btn-ghost !px-3 !py-1.5 !text-xs">
+        <a
+          href={storyLoginHref(shellReturnPath(), base)}
+          className="twenty-btn-ghost !px-3 !py-1.5 !text-xs"
+        >
           登录
         </a>
-        <a href={storyRegisterHref(shellReturnPath())} className="twenty-btn-accent !px-3 !py-1.5 !text-xs">
+        <a
+          href={storyRegisterHref(shellReturnPath(), base)}
+          className="twenty-btn-accent !px-3 !py-1.5 !text-xs"
+        >
           注册
         </a>
       </div>
@@ -69,7 +53,7 @@ function ShellAuthSlot() {
   return (
     <div className="flex shrink-0 items-center gap-2">
       <span className="hidden max-w-[100px] truncate text-[11px] text-[var(--story-muted)] md:inline xl:max-w-[160px]">
-        {user.name ?? user.phone ?? user.email ?? user.id}
+        {displayName ?? "已登录"}
       </span>
       {bookAccountUrl ? (
         <a href={bookAccountUrl} className="twenty-btn-accent !px-3 !py-1.5 !text-xs">

@@ -9,12 +9,21 @@ import {
 } from "@/lib/canvas/story-llm-vision-models";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
+  applyMediaDecomposeAsrOverlay,
+  formatMediaDecomposeAsrPromptBlock,
+  MEDIA_DECOMPOSE_NO_SPEECH,
+  transcribeMediaDecomposeVideo,
+  type MediaDecomposeAsrBundle,
+} from "@/lib/ecom/ecom-media-decompose-asr";
+import {
+  appendMediaDecomposeAsrTranscriptBlock,
   appendMediaDecomposeJsonDeliveryFooter,
   buildMediaDecomposeSystemPrompt,
 } from "@/lib/ecom/ecom-media-decompose-prompts";
 import {
   extractMediaDecomposePatch,
   resolveMediaDecomposeParseError,
+  toMediaDecomposeFence,
 } from "@/lib/ecom/ecom-media-decompose-structured";
 import {
   getEcomMediaDecomposeProject,
@@ -65,7 +74,6 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!prompt) {
     return NextResponse.json({ error: "请填写拆解指令" }, { status: 400 });
   }
-  const gatewayUserPrompt = appendMediaDecomposeJsonDeliveryFooter(prompt);
 
   const project = await getEcomMediaDecomposeProject(auth.userId, projectId);
   if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
@@ -95,62 +103,97 @@ export async function POST(req: Request, ctx: Ctx) {
       assertStoryLlmVisionModel(modelKey, "拆图拆视频");
     }
 
+    const clientPage = ecomClientPage(auth.userId, projectId, ECOM_MEDIA_DECOMPOSE_TOOL_KEY);
+
     await updateEcomMediaDecomposeProject(auth.userId, projectId, {
       settings: { ...project.settings, chatModelKey: modelKey, lastPrompt: prompt },
     });
 
-    const gw = await ecomGwChatStream(auth.userId, {
-      modelKey,
-      messages: [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: buildMediaGwUserContent(gatewayUserPrompt, media),
-        },
-      ],
-      clientPage: ecomClientPage(auth.userId, projectId, ECOM_MEDIA_DECOMPOSE_TOOL_KEY),
-    });
-
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
-    let fullText = "";
 
     const readable = new ReadableStream({
       async start(controller) {
-        const reader = gw.body.getReader();
-        let sseBuffer = "";
+        let asrBundle: MediaDecomposeAsrBundle | null = null;
+        let fullText = "";
         try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            sseBuffer += decoder.decode(value, { stream: true });
-            const lines = sseBuffer.split("\n");
-            sseBuffer = lines.pop() ?? "";
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed.startsWith("data:")) continue;
-              const payload = trimmed.slice(5).trim();
-              if (!payload || payload === "[DONE]") continue;
-              try {
-                const chunk = JSON.parse(payload) as {
-                  choices?: { delta?: { content?: string | null } }[];
-                };
-                const piece = chunk.choices?.[0]?.delta?.content ?? "";
-                if (piece) {
-                  fullText += piece;
-                  controller.enqueue(encoder.encode(piece));
-                }
-              } catch {
-                /* ignore */
-              }
-            }
+          if (media.kind === "video") {
+            controller.enqueue(encoder.encode("正在识别口播（ASR）…\n"));
+            asrBundle = await transcribeMediaDecomposeVideo({
+              userId: auth.userId,
+              fileUrl: media.ossUrl,
+              clientPage,
+            });
+            const asrNote = asrBundle.failed
+              ? `口播识别未完成（${asrBundle.failMessage ?? "未知错误"}），继续画面拆解。\n\n`
+              : asrBundle.fullTranscript === MEDIA_DECOMPOSE_NO_SPEECH
+                ? "未检出人声，继续画面拆解。\n\n"
+                : "口播识别完成，开始画面拆解…\n\n";
+            controller.enqueue(encoder.encode(asrNote));
           }
 
-          const structured = extractMediaDecomposePatch(fullText);
+          const gatewayUserPrompt = appendMediaDecomposeJsonDeliveryFooter(
+            asrBundle
+              ? appendMediaDecomposeAsrTranscriptBlock(
+                  prompt,
+                  formatMediaDecomposeAsrPromptBlock(asrBundle),
+                )
+              : prompt,
+          );
+
+          const gw = await ecomGwChatStream(auth.userId, {
+            modelKey,
+            messages: [
+              { role: "system", content: systemPrompt },
+              {
+                role: "user",
+                content: buildMediaGwUserContent(gatewayUserPrompt, media),
+              },
+            ],
+            clientPage,
+          });
+
+          const reader = gw.body.getReader();
+          let sseBuffer = "";
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              sseBuffer += decoder.decode(value, { stream: true });
+              const lines = sseBuffer.split("\n");
+              sseBuffer = lines.pop() ?? "";
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed.startsWith("data:")) continue;
+                const payload = trimmed.slice(5).trim();
+                if (!payload || payload === "[DONE]") continue;
+                try {
+                  const chunk = JSON.parse(payload) as {
+                    choices?: { delta?: { content?: string | null } }[];
+                  };
+                  const piece = chunk.choices?.[0]?.delta?.content ?? "";
+                  if (piece) {
+                    fullText += piece;
+                    controller.enqueue(encoder.encode(piece));
+                  }
+                } catch {
+                  /* ignore */
+                }
+              }
+            }
+          } finally {
+            reader.releaseLock();
+          }
+
+          const extracted = extractMediaDecomposePatch(fullText);
+          const structured =
+            extracted && asrBundle
+              ? applyMediaDecomposeAsrOverlay(extracted, asrBundle)
+              : extracted;
           const parseError = structured ? null : resolveMediaDecomposeParseError(fullText);
           try {
             await saveMediaDecomposeResult(auth.userId, projectId, {
-              rawText: fullText.trim(),
+              rawText: structured ? toMediaDecomposeFence(structured) : fullText.trim(),
               structured: structured ?? null,
               parseError,
               completedAt: new Date().toISOString(),
@@ -164,9 +207,16 @@ export async function POST(req: Request, ctx: Ctx) {
           console.error("[media-decompose decompose]", projectId, e);
           if (fullText.trim()) {
             try {
+              const extractedOnAbort = extractMediaDecomposePatch(fullText);
+              const structuredOnAbort =
+                extractedOnAbort && asrBundle
+                  ? applyMediaDecomposeAsrOverlay(extractedOnAbort, asrBundle)
+                  : extractedOnAbort ?? null;
               await saveMediaDecomposeResult(auth.userId, projectId, {
-                rawText: fullText.trim(),
-                structured: extractMediaDecomposePatch(fullText) ?? null,
+                rawText: structuredOnAbort
+                  ? toMediaDecomposeFence(structuredOnAbort)
+                  : fullText.trim(),
+                structured: structuredOnAbort,
                 parseError: resolveMediaDecomposeParseError(fullText),
                 completedAt: new Date().toISOString(),
               });
@@ -180,8 +230,6 @@ export async function POST(req: Request, ctx: Ctx) {
             return;
           }
           controller.error(e instanceof Error ? e : new Error(errMsg));
-        } finally {
-          reader.releaseLock();
         }
       },
     });
