@@ -130,7 +130,7 @@ export function extractBailianR2vVideoUrlFromGatewaySummary(
   const root = summary as Record<string, unknown>;
 
   const fromObj = (obj: Record<string, unknown>): string | null => {
-    const url = obj.video_url;
+    const url = obj.video_url ?? obj.videoUrl;
     return typeof url === "string" && url.trim() ? url.trim() : null;
   };
 

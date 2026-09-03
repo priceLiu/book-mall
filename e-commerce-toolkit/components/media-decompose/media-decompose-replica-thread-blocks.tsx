@@ -1,6 +1,7 @@
 "use client";
 
-import { ImageIcon, Loader2, Save, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronUp, ImageIcon, Loader2, Save, Sparkles } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
@@ -157,7 +158,7 @@ export function ReplicaProductBriefCard({
               ) : (
                 <Sparkles className="h-3 w-3 shrink-0" />
               )}
-              AI 识别
+              AI 识别产品
             </EcomButtonSecondary>
           ) : null}
           <EcomButtonSecondary
@@ -276,7 +277,7 @@ export function ReplicaSellingPointsCard({
               ) : (
                 <Sparkles className="h-3 w-3 shrink-0" />
               )}
-              AI 口播文案
+              AI 口播方案
             </EcomButtonSecondary>
           ) : null}
           {onSave ? (
@@ -309,33 +310,71 @@ export function ReplicaSellingPointsCard({
   );
 }
 
-/** 内容区 · AI 口播草稿（按镜，显示在卖点块下方） */
+/** 内容区 · AI 口播方案（默认折叠，展开为紧凑列表） */
 export function ReplicaVoiceoverDraftCard({
   draft,
 }: {
   draft: ReplicaVoiceoverDraft;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const filledCount = useMemo(
+    () => draft.shots.filter((s) => s.voiceover.trim()).length,
+    [draft.shots],
+  );
+  const preview = useMemo(() => {
+    const first = draft.shots.find((s) => s.voiceover.trim());
+    return first?.voiceover.trim() ?? "";
+  }, [draft.shots]);
+
   return (
-    <div className="rounded-xl border border-[#e8e8ed] bg-white p-4">
-      <div className="mb-3">
-        <p className="text-xs font-semibold text-[#1d1d1f]">AI 口播草稿</p>
-        <p className="text-[11px] text-[#6e6e73]">
-          共 {draft.shots.length} 镜；生成复刻脚本后，可在分镜表各镜口播列点击「应用新口播」。
-        </p>
-      </div>
-      <ul className="space-y-2">
-        {draft.shots.map((row) => (
-          <li
-            key={row.index}
-            className="rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5"
-          >
-            <p className="text-[11px] font-medium text-[#6e6e73]">镜 {row.index}</p>
-            <p className="mt-1 text-sm leading-relaxed text-[#1d1d1f]">
-              {row.voiceover.trim() || "（本镜无口播）"}
-            </p>
-          </li>
-        ))}
-      </ul>
+    <div className="rounded-xl border border-[#e8e8ed] bg-white px-3 py-2.5">
+      <button
+        type="button"
+        className="flex w-full items-start gap-2 text-left"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <p className="text-xs font-semibold text-[#1d1d1f]">AI 口播方案</p>
+            <span className="text-[10px] text-[#86868b]">
+              {filledCount}/{draft.shots.length} 段
+            </span>
+          </div>
+          {!expanded && preview ? (
+            <p className="mt-0.5 truncate text-[11px] leading-snug text-[#6e6e73]">{preview}</p>
+          ) : !expanded ? (
+            <p className="mt-0.5 text-[10px] text-[#86868b]">点击展开各段口播</p>
+          ) : null}
+        </div>
+        {expanded ? (
+          <ChevronUp className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#86868b]" aria-hidden />
+        ) : (
+          <ChevronDown className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#86868b]" aria-hidden />
+        )}
+      </button>
+      {expanded ? (
+        <div
+          className={cn(
+            "mt-2 max-h-36 overflow-y-auto rounded-lg border border-[#e8e8ed] bg-[#fafafa]",
+            "divide-y divide-[#ececef]",
+          )}
+        >
+          {draft.shots.map((row) => (
+            <div key={row.index} className="flex gap-2 px-2 py-1.5 text-[11px] leading-snug">
+              <span className="w-7 shrink-0 font-medium tabular-nums text-[#86868b]">
+                段{row.index}
+              </span>
+              <span className="min-w-0 flex-1 text-[#1d1d1f]">
+                {row.voiceover.trim() || "—"}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <p className="mt-1.5 text-[10px] leading-snug text-[#aeaeb2]">
+        生成复刻脚本后，可在分镜表口播列「应用新口播」。
+      </p>
     </div>
   );
 }

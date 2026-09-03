@@ -186,7 +186,7 @@ function AssistantRichText({ text }: { text: string }) {
 
 const STYLE_ID = "platform-assistant-styles";
 const POSITION_KEY = "platform-assistant-ball-pos";
-const BALL_SIZE = 56;
+const BALL_SIZE = 44;
 const EDGE_GAP = 12;
 /** 判定为「拖拽」而非「点击」的最小位移（px） */
 const DRAG_THRESHOLD = 4;

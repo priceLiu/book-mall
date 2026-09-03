@@ -18,7 +18,6 @@ import {
   listMediaDecomposeProjectSummaries,
   setMediaDecomposeFromUrl,
   startMediaDecomposeReplica,
-  mockMediaDecompose,
   streamMediaDecompose,
   updateMediaDecomposeProject,
   uploadMediaDecomposeFile,
@@ -52,6 +51,7 @@ export function MediaDecomposeStudio() {
   const [decomposing, setDecomposing] = useState(false);
   const [streamText, setStreamText] = useState("");
   const [replicaSeedVideo, setReplicaSeedVideo] = useState<SeedVideoProject | null>(null);
+  const [replicaLoadError, setReplicaLoadError] = useState<string | null>(null);
   const [replicaBusy, setReplicaBusy] = useState(false);
   const [videoModels, setVideoModels] = useState<StoryboardGatewayModel[]>([]);
   const [videoModelKey, setVideoModelKey] = useState("wan2.7-r2v");
@@ -179,15 +179,25 @@ export function MediaDecomposeStudio() {
     );
     if (!project || !replicaId || !hasDecomposeResult) {
       setReplicaSeedVideo(null);
+      setReplicaLoadError(null);
       return;
     }
     let cancelled = false;
+    setReplicaLoadError(null);
     void getSeedVideoProject(replicaId)
       .then((sv) => {
-        if (!cancelled) setReplicaSeedVideo(sv);
+        if (!cancelled) {
+          setReplicaSeedVideo(sv);
+          setReplicaLoadError(null);
+        }
       })
-      .catch(() => {
-        if (!cancelled) setReplicaSeedVideo(null);
+      .catch((e) => {
+        if (!cancelled) {
+          setReplicaSeedVideo(null);
+          setReplicaLoadError(
+            e instanceof Error ? e.message : "复刻子项目加载失败，请刷新页面重试",
+          );
+        }
       });
     return () => {
       cancelled = true;
@@ -301,6 +311,7 @@ export function MediaDecomposeStudio() {
       loadProjectList={loadProjectList}
       onOpenProject={(id) => void handleOpenProject(id)}
       replicaSeedVideo={replicaSeedVideo}
+      replicaLoadError={replicaLoadError}
       replicaBusy={replicaBusy}
       videoModels={videoModels}
       videoModelKey={videoModelKey}
@@ -332,11 +343,14 @@ export function MediaDecomposeStudio() {
             ? project.meta.replicaSeedVideoProjectId.trim()
             : replicaSeedVideo?.id;
         if (!replicaId) return;
+        setReplicaLoadError(null);
         try {
           const sv = await getSeedVideoProject(replicaId);
           setReplicaSeedVideo(sv);
-        } catch {
-          /* ignore */
+        } catch (e) {
+          setReplicaLoadError(
+            e instanceof Error ? e.message : "复刻子项目加载失败，请刷新页面重试",
+          );
         }
       }}
       onReplicaSeedVideoUpdated={setReplicaSeedVideo}
@@ -386,24 +400,6 @@ export function MediaDecomposeStudio() {
         } catch (e) {
           await alert({
             title: "拆解失败",
-            message: e instanceof Error ? e.message : "请重试",
-            variant: "error",
-          });
-        } finally {
-          setDecomposing(false);
-        }
-      }}
-      onMockDecompose={async (prompt) => {
-        setDecomposing(true);
-        setStreamText("");
-        setReplicaSeedVideo(null);
-        try {
-          const fresh = await mockMediaDecompose(project.id, { prompt });
-          applyProject(fresh);
-          setStreamText(fresh.result?.rawText ?? "");
-        } catch (e) {
-          await alert({
-            title: "Mock 拆解失败",
             message: e instanceof Error ? e.message : "请重试",
             variant: "error",
           });

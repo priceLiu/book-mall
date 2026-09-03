@@ -29,6 +29,11 @@ export async function POST(req: Request, ctx: Ctx) {
       projectId,
       shotIndex:
         typeof body.shotIndex === "number" ? Math.trunc(body.shotIndex) : undefined,
+      shotIndices: Array.isArray(body.shotIndices)
+        ? body.shotIndices
+            .filter((n): n is number => typeof n === "number" && Number.isFinite(n))
+            .map((n) => Math.trunc(n))
+        : undefined,
       voicePreset:
         body.voicePreset === "sweet-xhs" || body.voicePreset === "sharp-douyin"
           ? (body.voicePreset as SeedVideoStylePreset)

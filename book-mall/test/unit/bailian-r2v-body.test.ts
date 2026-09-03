@@ -6,19 +6,19 @@ import {
 } from "@/lib/canvas/bailian-r2v-body";
 
 describe("buildBailianR2vMediaItems", () => {
-  it("uses first_frame for single HappyHorse ref (分镜静帧)", () => {
+  it("uses reference_image for single HappyHorse ref (分镜静帧)", () => {
     const media = buildBailianR2vMediaItems("happyhorse-1.1-r2v", [
       "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/frame.png",
     ]);
     expect(media).toEqual([
       {
-        type: "first_frame",
+        type: "reference_image",
         url: "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/frame.png",
       },
     ]);
   });
 
-  it("uses first_frame + reference_image for frame + @ 资产", () => {
+  it("uses reference_image for frame + @ 资产", () => {
     const frame =
       "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/canvas/node-image/frame.png";
     const char =
@@ -28,7 +28,7 @@ describe("buildBailianR2vMediaItems", () => {
       char,
     ]);
     expect(media).toEqual([
-      { type: "first_frame", url: frame },
+      { type: "reference_image", url: frame },
       { type: "reference_image", url: char },
     ]);
   });
@@ -51,7 +51,7 @@ describe("buildBailianR2vRequestBody", () => {
       duration: 8,
     });
     expect(body.input.media).toEqual([
-      { type: "first_frame", url: frame },
+      { type: "reference_image", url: frame },
       {
         type: "reference_image",
         url: refs[1],

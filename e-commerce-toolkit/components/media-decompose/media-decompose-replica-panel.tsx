@@ -5,6 +5,7 @@ import { Clapperboard, Loader2 } from "lucide-react";
 
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { SeedVideoComposeDialog } from "@/components/seed-video/seed-video-compose-dialog";
 import { SeedVideoRenderProgressPanel } from "@/components/seed-video/seed-video-render-progress-panel";
 import { SeedVideoShotTable } from "@/components/seed-video/seed-video-shot-table";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
@@ -17,6 +18,7 @@ import {
   generateSeedVideoShot,
   generateSeedVideoTts,
   getSeedVideoProject,
+  resumeSeedVideoPendingShots,
   pollSeedVideoMediaRenderJob,
   renderSeedVideo,
   updateSeedVideoProject,
@@ -36,8 +38,23 @@ import {
   resolveSeedVideoRenderPhase,
   type SeedVideoRenderProgressState,
 } from "@/lib/seed-video-render-progress";
-import { isShotVideoPending, listPendingShotVideoIndices } from "@/lib/seed-video-pending-shots";
+import { isShotVideoPending } from "@/lib/seed-video-pending-shots";
+import {
+  mergeOptimisticGeneratingShots,
+  seedVideoShotsHaveVoiceover,
+  buildActiveGeneratingIndices,
+  listEffectivePendingShotIndices,
+  clearGeneratingShotsWithVideo,
+} from "@/lib/seed-video-generating-shots";
+import {
+  batchComposeButtonLabel,
+  batchTtsButtonLabel,
+  listSelectedComposeShotIndices,
+  listSelectedTtsShotIndices,
+} from "@/lib/seed-video-tts-selection";
+import { buildSeedVideoComposeProfile } from "@/lib/seed-video-render-profile";
 import { mergeSeedVideoShotsForPersist } from "@/lib/seed-video-shot-merge";
+import { DEFAULT_SUBTITLE_STYLE, type SubtitleBurnInStyle } from "@private/media-render-subtitle-style";
 import {
   appendSeedVideoShot,
   canDeleteSeedVideoShot,
@@ -82,26 +99,10 @@ function addGeneratingShot(prev: Set<number>, index: number): Set<number> {
   return next;
 }
 
-function addGeneratingShots(prev: Set<number>, indices: Iterable<number>): Set<number> {
-  let next = prev;
-  for (const index of indices) {
-    next = addGeneratingShot(next, index);
-  }
-  return next;
-}
-
 function removeGeneratingShot(prev: Set<number>, index: number): Set<number> {
   if (!prev.has(index)) return prev;
   const next = new Set(prev);
   next.delete(index);
-  return next;
-}
-
-function removeGeneratingShots(prev: Set<number>, indices: Iterable<number>): Set<number> {
-  let next = prev;
-  for (const index of indices) {
-    next = removeGeneratingShot(next, index);
-  }
   return next;
 }
 
@@ -129,25 +130,46 @@ export function MediaDecomposeReplicaPanel({
   const [localShots, setLocalShots] = useState<SeedVideoShot[]>(shots);
   const [selectedShotIndices, setSelectedShotIndices] = useState<Set<number>>(() => new Set());
   const [generatingShots, setGeneratingShots] = useState<Set<number>>(
-    () => new Set(listPendingShotVideoIndices(seedVideo.meta)),
+    () =>
+      new Set(listEffectivePendingShotIndices(seedVideo.meta, seedVideo.plan?.shots)),
   );
   const generatingShotsRef = useRef(generatingShots);
   generatingShotsRef.current = generatingShots;
+  /** 各镜号乐观 generating 的起始时间，用于过期清理从未到达服务端的标记 */
+  const generatingSinceRef = useRef<Map<number, number> | null>(null);
+  if (generatingSinceRef.current === null) {
+    generatingSinceRef.current = new Map([...generatingShots].map((i) => [i, Date.now()]));
+  }
   const [ttsBusy, setTtsBusy] = useState(false);
   const [renderBusy, setRenderBusy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSelected, setPickerSelected] = useState<number[]>([]);
-  const [pickerPanelDurationSec, setPickerPanelDurationSec] = useState(8);
+  const [pickerPanelDurationSec, setPickerPanelDurationSec] = useState(() => {
+    const saved = seedVideo.settings.videoPanelDurationSec;
+    return typeof saved === "number" && saved > 0 ? saved : 8;
+  });
   const [pickerVideoResolution, setPickerVideoResolution] =
-    useState<StoryboardVideoResolution>("1080p");
+    useState<StoryboardVideoResolution>(() => {
+      const saved = seedVideo.settings.videoResolution?.trim().toLowerCase();
+      return saved === "720p" ? "720p" : "1080p";
+    });
   const [pickerVideoR2vRatio, setPickerVideoR2vRatio] = useState<string>(
-    () => seedVideo.settings.aspectRatio ?? "9:16",
+    () =>
+      seedVideo.settings.videoR2vRatio?.trim() ||
+      seedVideo.settings.aspectRatio ||
+      "9:16",
   );
   const [pickerVideoSeed, setPickerVideoSeed] = useState("");
   const [pickerVideoPromptExtend, setPickerVideoPromptExtend] = useState(true);
-  const [pickerVideoGenerateAudio, setPickerVideoGenerateAudio] = useState(true);
+  const [pickerVideoGenerateAudio, setPickerVideoGenerateAudio] = useState(
+    () => seedVideo.settings.videoGenerateAudio ?? true,
+  );
   const [pickerConfirming, setPickerConfirming] = useState(false);
   const [renderProgress, setRenderProgress] = useState<SeedVideoRenderProgressState | null>(null);
+  const [composeDialogOpen, setComposeDialogOpen] = useState(false);
+  const [pendingComposeIndices, setPendingComposeIndices] = useState<number[] | null>(null);
+  const [composeSubtitleStyle, setComposeSubtitleStyle] =
+    useState<SubtitleBurnInStyle>(DEFAULT_SUBTITLE_STYLE);
   const [localFinalUrl, setLocalFinalUrl] = useState<string | null>(
     seedVideo.plan?.render?.finalVideoUrl?.trim() || seedVideo.videoOssUrl?.trim() || null,
   );
@@ -158,6 +180,7 @@ export function MediaDecomposeReplicaPanel({
   const [syncedReferences, setSyncedReferences] = useState(seedVideo.references);
 
   const syncLockRef = useRef(false);
+  const submitInFlightRef = useRef(false);
   const prevRefCatalogRef = useRef<ReturnType<typeof buildReplicaMentionCatalogEntries> | null>(
     null,
   );
@@ -165,7 +188,23 @@ export function MediaDecomposeReplicaPanel({
   const onSeedVideoChangeRef = useRef(onSeedVideoChange);
   onSeedVideoChangeRef.current = onSeedVideoChange;
   const pickerSelectedRef = useRef<number[]>([]);
-  const pickerPanelDurationRef = useRef(8);
+  const pickerPanelDurationRef = useRef(
+    typeof seedVideo.settings.videoPanelDurationSec === "number" &&
+      seedVideo.settings.videoPanelDurationSec > 0
+      ? seedVideo.settings.videoPanelDurationSec
+      : 8,
+  );
+
+  const persistVideoGenSettings = useCallback(
+    (patch: Partial<SeedVideoProject["settings"]>) => {
+      void updateSeedVideoProject(seedVideo.id, {
+        settings: { ...seedVideo.settings, ...patch },
+      }).catch(() => {
+        /* 本地仍用于本次生成 */
+      });
+    },
+    [seedVideo.id, seedVideo.settings],
+  );
 
   useEffect(() => {
     setLocalShots((prev) => mergeSeedVideoShotsForPersist(prev, shots));
@@ -184,17 +223,20 @@ export function MediaDecomposeReplicaPanel({
   useEffect(() => {
     setSyncedProjectMeta(seedVideo.meta);
     setSyncedReferences(seedVideo.references);
-  }, [seedVideo.id, seedVideo.meta, seedVideo.references]);
-
-  useEffect(() => {
-    setGeneratingShots(new Set(listPendingShotVideoIndices(seedVideo.meta)));
   }, [seedVideo.id]);
 
   useEffect(() => {
-    const pending = listPendingShotVideoIndices(seedVideo.meta);
-    if (pending.length === 0) return;
-    setGeneratingShots((prev) => addGeneratingShots(prev, pending));
-  }, [seedVideo.meta]);
+    const initial = new Set(listEffectivePendingShotIndices(seedVideo.meta, seedVideo.plan?.shots));
+    generatingSinceRef.current = new Map([...initial].map((i) => [i, Date.now()]));
+    setGeneratingShots(initial);
+  }, [seedVideo.id]);
+
+  useEffect(() => {
+    const shots = seedVideo.plan?.shots;
+    if (!shots?.length) return;
+    setLocalShots((prev) => mergeSeedVideoShotsForPersist(prev, shots));
+    setGeneratingShots((prev) => clearGeneratingShotsWithVideo(prev, shots));
+  }, [seedVideo.plan?.shots, seedVideo.updatedAt, seedVideo.id]);
 
   const filteredModels = useMemo(() => {
     const keys = filterVideoModelsForMode(
@@ -203,6 +245,31 @@ export function MediaDecomposeReplicaPanel({
     );
     return videoModels.filter((m) => keys.includes(m.modelKey));
   }, [videoModels]);
+
+  useEffect(() => {
+    const s = seedVideo.settings;
+    if (typeof s.videoPanelDurationSec === "number" && s.videoPanelDurationSec > 0) {
+      pickerPanelDurationRef.current = s.videoPanelDurationSec;
+      setPickerPanelDurationSec(s.videoPanelDurationSec);
+    }
+    if (s.videoResolution?.trim()) {
+      const v = s.videoResolution.trim().toLowerCase();
+      if (v === "720p" || v === "1080p") {
+        setPickerVideoResolution(v);
+      }
+    }
+    if (typeof s.videoGenerateAudio === "boolean") {
+      setPickerVideoGenerateAudio(s.videoGenerateAudio);
+    }
+    if (s.videoR2vRatio?.trim()) {
+      setPickerVideoR2vRatio(s.videoR2vRatio.trim());
+    }
+    const savedModel = s.videoModelKey?.trim();
+    if (savedModel) {
+      const next = resolveSeedVideoVideoModelKey(filteredModels, savedModel, false);
+      if (next !== videoModelKey) onVideoModelChange(next);
+    }
+  }, [seedVideo.id, seedVideo.settings, filteredModels, videoModelKey, onVideoModelChange]);
 
   const mentionRefs = useMemo(
     () => buildReplicaMentionRefs(syncedReferences),
@@ -220,15 +287,24 @@ export function MediaDecomposeReplicaPanel({
   );
 
   const pendingShotIndices = useMemo(
-    () => listPendingShotVideoIndices(syncedProjectMeta),
-    [syncedProjectMeta],
+    () => listEffectivePendingShotIndices(syncedProjectMeta, localShots),
+    [syncedProjectMeta, localShots],
   );
 
-  const activeGeneratingIndices = useMemo(() => {
-    const set = new Set(generatingShots);
-    for (const idx of pendingShotIndices) set.add(idx);
-    return set;
-  }, [generatingShots, pendingShotIndices]);
+  const activeGeneratingIndices = useMemo(
+    () =>
+      buildActiveGeneratingIndices({
+        generatingShots,
+        pendingIndices: pendingShotIndices,
+        shots: localShots,
+      }),
+    [generatingShots, pendingShotIndices, localShots],
+  );
+
+  const generatingSelectionKey = useMemo(
+    () => [...activeGeneratingIndices].sort((a, b) => a - b).join(","),
+    [activeGeneratingIndices],
+  );
 
 
   const batchProductionBusy = ttsBusy || renderBusy;
@@ -249,6 +325,56 @@ export function MediaDecomposeReplicaPanel({
   const selectedGeneratableIndices = [...selectedShotIndices].filter(
     (index) => !activeGeneratingIndices.has(index),
   );
+  const selectedGeneratableCount = selectedGeneratableIndices.length;
+
+  const selectedTtsIndices = useMemo(
+    () => listSelectedTtsShotIndices(localShots, selectedGeneratableIndices),
+    [localShots, selectedGeneratableIndices],
+  );
+  const selectedTtsCount = selectedTtsIndices.length;
+  const batchTtsLabel = batchTtsButtonLabel({ busy: ttsBusy, selectedCount: selectedTtsCount });
+
+  const selectedComposeIndices = useMemo(
+    () => listSelectedComposeShotIndices(localShots, selectedGeneratableIndices),
+    [localShots, selectedGeneratableIndices],
+  );
+  const selectedComposeCount = selectedComposeIndices.length;
+  const batchComposeLabel = batchComposeButtonLabel({
+    busy: renderBusy,
+    selectedCount: selectedComposeCount,
+  });
+
+  const pickerPanelHasVoiceover = useMemo(() => {
+    if (!pickerOpen) return false;
+    const indices =
+      pickerSelected.length > 0
+        ? pickerSelected
+        : pickerSelectedRef.current.length > 0
+          ? pickerSelectedRef.current
+          : selectedGeneratableCount > 0
+            ? selectedGeneratableIndices
+            : idleGeneratableIndices;
+    return seedVideoShotsHaveVoiceover(localShots, indices);
+  }, [
+    pickerOpen,
+    pickerSelected,
+    localShots,
+    selectedGeneratableCount,
+    selectedGeneratableIndices,
+    idleGeneratableIndices,
+  ]);
+
+  useEffect(() => {
+    setSelectedShotIndices((prev) => {
+      let changed = false;
+      const next = new Set<number>();
+      for (const i of prev) {
+        if (activeGeneratingIndices.has(i)) changed = true;
+        else next.add(i);
+      }
+      return changed ? next : prev;
+    });
+  }, [generatingSelectionKey, activeGeneratingIndices]);
 
   const composedUrl =
     localFinalUrl?.trim() || seedVideo.plan?.render?.finalVideoUrl?.trim() || seedVideo.videoOssUrl?.trim() || null;
@@ -382,15 +508,12 @@ export function MediaDecomposeReplicaPanel({
     return changed;
   }, []);
 
-  const syncRemoteShotVideos = useCallback(async () => {
-    if (syncLockRef.current) return;
-    syncLockRef.current = true;
-    try {
-      const fresh = await getSeedVideoProject(seedVideo.id);
+  const applyFreshShotProject = useCallback(
+    (fresh: SeedVideoProject) => {
       setSyncedProjectMeta(fresh.meta);
       setSyncedReferences(fresh.references);
 
-      const serverPending = listPendingShotVideoIndices(fresh.meta);
+      const serverPending = listEffectivePendingShotIndices(fresh.meta, fresh.plan?.shots);
       const watch = new Set<number>(generatingShotsRef.current);
       for (const idx of serverPending) watch.add(idx);
 
@@ -400,28 +523,41 @@ export function MediaDecomposeReplicaPanel({
         );
       }
 
-      if (watch.size === 0) {
-        await onSeedVideoChangeRef.current();
-        return;
-      }
+      setGeneratingShots((prev) => {
+        const merged = clearGeneratingShotsWithVideo(
+          mergeOptimisticGeneratingShots({
+            previous: prev,
+            serverPending,
+            shots: fresh.plan?.shots,
+            previousStartedAt: generatingSinceRef.current ?? undefined,
+          }),
+          fresh.plan?.shots,
+        );
+        const since = generatingSinceRef.current;
+        if (since) for (const key of [...since.keys()]) if (!merged.has(key)) since.delete(key);
+        return merged;
+      });
 
-      const completed: number[] = [];
       for (const idx of watch) {
         const remote = fresh.plan?.shots?.find((s) => s.index === idx);
         if (!remote?.videoUrl?.trim()) continue;
-        if (applyRemoteShotVideo(idx, remote)) completed.push(idx);
+        applyRemoteShotVideo(idx, remote);
       }
+    },
+    [applyRemoteShotVideo],
+  );
 
-      if (completed.length > 0) {
-        setGeneratingShots((prev) => {
-          let next = prev;
-          for (const idx of completed) next = removeGeneratingShot(next, idx);
-          return next;
-        });
-      }
+  const syncRemoteShotVideos = useCallback(async () => {
+    if (syncLockRef.current || submitInFlightRef.current) return;
+    syncLockRef.current = true;
+    try {
+      let fresh = await getSeedVideoProject(seedVideo.id, { resumePending: false });
+      applyFreshShotProject(fresh);
 
-      if (serverPending.length > 0) {
-        setGeneratingShots((prev) => addGeneratingShots(prev, serverPending));
+      const serverPending = listEffectivePendingShotIndices(fresh.meta, fresh.plan?.shots);
+      if (serverPending.length > 0 && !submitInFlightRef.current) {
+        fresh = await resumeSeedVideoPendingShots(seedVideo.id);
+        applyFreshShotProject(fresh);
       }
 
       await onSeedVideoChangeRef.current();
@@ -430,7 +566,7 @@ export function MediaDecomposeReplicaPanel({
     } finally {
       syncLockRef.current = false;
     }
-  }, [applyRemoteShotVideo, seedVideo.id]);
+  }, [applyFreshShotProject, seedVideo.id]);
 
   useEffect(() => {
     void syncRemoteShotVideos();
@@ -454,11 +590,13 @@ export function MediaDecomposeReplicaPanel({
     durationSec?: number,
     opts?: { skipPersist?: boolean },
   ) {
-    setGeneratingShots((prev) => addGeneratingShot(prev, panelIndex));
+    submitInFlightRef.current = true;
     try {
       if (!opts?.skipPersist) {
         await persistShots(localShots);
       }
+      setGeneratingShots((prev) => addGeneratingShot(prev, panelIndex));
+      generatingSinceRef.current?.set(panelIndex, Date.now());
       const result = await generateSeedVideoShot({
         projectId: seedVideo.id,
         shotIndex: panelIndex,
@@ -468,13 +606,20 @@ export function MediaDecomposeReplicaPanel({
         resolution: pickerVideoResolution,
         generateAudio: pickerVideoGenerateAudio,
       });
+      if ("status" in result) {
+        void syncRemoteShotVideos();
+        await onSeedVideoChange();
+        return;
+      }
       setLocalShots((prev) =>
         prev.map((s) => (s.index === panelIndex ? { ...s, videoUrl: result.videoUrl } : s)),
       );
       setGeneratingShots((prev) => removeGeneratingShot(prev, panelIndex));
       await onSeedVideoChange();
     } catch (e) {
-      const fresh = await getSeedVideoProject(seedVideo.id).catch(() => null);
+      const fresh = await getSeedVideoProject(seedVideo.id, { resumePending: false }).catch(
+        () => null,
+      );
       const remote = fresh?.plan?.shots?.find((s) => s.index === panelIndex);
       if (remote?.videoUrl?.trim()) {
         applyRemoteShotVideo(panelIndex, remote);
@@ -493,6 +638,8 @@ export function MediaDecomposeReplicaPanel({
         message: e instanceof Error ? e.message : "请稍后重试",
         variant: "error",
       });
+    } finally {
+      submitInFlightRef.current = false;
     }
   }
 
@@ -521,11 +668,10 @@ export function MediaDecomposeReplicaPanel({
     pickerPanelDurationRef.current = durationSec;
     const saved = await persistShots(localShots);
     setLocalShots(saved);
-    const fresh = await getSeedVideoProject(seedVideo.id);
-    setLocalShots((prev) => mergeSeedVideoShotsForPersist(prev, fresh.plan?.shots ?? prev));
-    setGeneratingShots((prev) => addGeneratingShots(prev, unique));
+    const pending = unique.filter((index) => !generatingShotsRef.current.has(index));
+    if (pending.length === 0) return;
     await Promise.all(
-      unique.map((index) =>
+      pending.map((index) =>
         runPanelGenerate(modelKey, index, durationSec, { skipPersist: true }),
       ),
     );
@@ -555,19 +701,34 @@ export function MediaDecomposeReplicaPanel({
       return;
     }
 
-    setGeneratingShots((prev) => addGeneratingShots(prev, indices));
+    setSelectedShotIndices((prev) => {
+      const submitting = new Set(indices);
+      const next = new Set<number>();
+      for (const i of prev) {
+        if (!submitting.has(i)) next.add(i);
+      }
+      return next;
+    });
+
     setPickerConfirming(true);
     setPickerOpen(false);
     onVideoModelChange(modelKey);
-    void updateSeedVideoProject(seedVideo.id, {
-      settings: { ...seedVideo.settings, videoModelKey: modelKey },
-    }).catch(() => {
-      /* 模型选择仍用于本次生成 */
+    persistVideoGenSettings({
+      videoModelKey: modelKey,
+      videoPanelDurationSec: durationSec,
+      videoResolution: pickerVideoResolution,
+      videoGenerateAudio: pickerVideoGenerateAudio,
+      videoR2vRatio: pickerVideoR2vRatio,
     });
 
     try {
       await runSelectedShotsParallel(modelKey, indices, durationSec);
     } catch (e) {
+      setGeneratingShots((prev) => {
+        let next = prev;
+        for (const index of indices) next = removeGeneratingShot(next, index);
+        return next;
+      });
       await onAlert({
         title: "提交生成失败",
         message: e instanceof Error ? e.message : "请稍后重试",
@@ -578,11 +739,19 @@ export function MediaDecomposeReplicaPanel({
     }
   }
 
-  async function runTts() {
+  async function runTts(shotIndices: number[]) {
+    if (shotIndices.length === 0) {
+      await onAlert({
+        title: "请先勾选镜头",
+        message: "勾选含口播文案的镜头后再点「批量 TTS」；口播列为空的不计入。",
+        variant: "error",
+      });
+      return;
+    }
     setTtsBusy(true);
     try {
       await persistShots(localShots);
-      await generateSeedVideoTts({ projectId: seedVideo.id });
+      await generateSeedVideoTts({ projectId: seedVideo.id, shotIndices });
       await onSeedVideoChange();
     } catch (e) {
       await onAlert({
@@ -620,7 +789,48 @@ export function MediaDecomposeReplicaPanel({
     throw new Error("合成超时");
   }
 
-  async function runRender() {
+  function requestCompose(shotIndices: number[]) {
+    if (shotIndices.length === 0) {
+      void onAlert({
+        title: "请先勾选镜头",
+        message:
+          "勾选状态为「就绪」或「视频 OK」（无口播）的镜头后再合成；缺视频或未 TTS 的不计入。",
+        variant: "error",
+      });
+      return;
+    }
+    const merged = mergeSeedVideoShotsForPersist(localShots, seedVideo.plan?.shots ?? []);
+    const selectedSet = new Set(shotIndices);
+    const targets = merged.filter((s) => selectedSet.has(s.index));
+    if (targets.some((s) => !s.videoUrl?.trim())) {
+      void onAlert({
+        title: "暂不能合成",
+        message: "所选镜头须已有镜头视频（状态「视频 OK」或「就绪」）。",
+        variant: "error",
+      });
+      return;
+    }
+    if (
+      targets.some(
+        (s) => s.videoUrl?.trim() && s.voiceover?.trim() && !s.ttsUrl?.trim(),
+      )
+    ) {
+      void onAlert({
+        title: "暂不能合成",
+        message: "所选镜头中有口播尚未 TTS，请先对勾选镜头批量 TTS。",
+        variant: "error",
+      });
+      return;
+    }
+    setPendingComposeIndices(shotIndices);
+    setComposeDialogOpen(true);
+  }
+
+  async function runRender(shotIndices: number[], subtitleStyle: SubtitleBurnInStyle) {
+    if (shotIndices.length === 0) return;
+    setComposeSubtitleStyle(subtitleStyle);
+    setComposeDialogOpen(false);
+    setPendingComposeIndices(null);
     setRenderBusy(true);
     const startedAt = Date.now();
     setRenderProgress({
@@ -635,26 +845,35 @@ export function MediaDecomposeReplicaPanel({
     });
     try {
       const merged = mergeSeedVideoShotsForPersist(localShots, seedVideo.plan?.shots ?? []);
-      if (merged.some((s) => !s.videoUrl?.trim())) {
+      const selectedSet = new Set(shotIndices);
+      const targets = merged.filter((s) => selectedSet.has(s.index));
+      if (targets.some((s) => !s.videoUrl?.trim())) {
         setRenderProgress(null);
         await onAlert({
           title: "暂不能合成",
-          message: "请先为各镜生成镜头视频（状态「视频 OK」或「就绪」）。",
+          message: "所选镜头须已有镜头视频（状态「视频 OK」或「就绪」）。",
           variant: "error",
         });
         return;
       }
-      if (merged.some((s) => s.videoUrl?.trim() && !s.ttsUrl?.trim())) {
+      if (
+        targets.some(
+          (s) => s.videoUrl?.trim() && s.voiceover?.trim() && !s.ttsUrl?.trim(),
+        )
+      ) {
         setRenderProgress(null);
         await onAlert({
           title: "暂不能合成",
-          message: "请先点击「批量 TTS」，待各镜状态为「就绪」后再点「合成成片」。",
+          message: "所选镜头中有口播尚未 TTS，请先对勾选镜头批量 TTS。",
           variant: "error",
         });
         return;
       }
       await persistShots(merged);
-      const { jobId } = await renderSeedVideo(seedVideo.id);
+      const { jobId } = await renderSeedVideo(seedVideo.id, {
+        shotIndices,
+        profile: buildSeedVideoComposeProfile(subtitleStyle),
+      });
       setRenderProgress((prev) =>
         prev
           ? {
@@ -703,6 +922,27 @@ export function MediaDecomposeReplicaPanel({
             <EcomButtonSecondary
               type="button"
               size="sm"
+              disabled={
+                batchProductionBusy ||
+                singleShotBusy ||
+                !scriptReady ||
+                (selectedGeneratableCount === 0 && idleGeneratableIndices.length === 0)
+              }
+              onClick={() =>
+                openGeneratePicker(
+                  selectedGeneratableCount > 0
+                    ? selectedGeneratableIndices
+                    : idleGeneratableIndices,
+                )
+              }
+            >
+              {selectedGeneratableCount > 0
+                ? `生成 (${selectedGeneratableCount})`
+                : "生成"}
+            </EcomButtonSecondary>
+            <EcomButtonSecondary
+              type="button"
+              size="sm"
               disabled={batchProductionBusy || !scriptReady}
               onClick={() => void handleSaveShots()}
             >
@@ -719,23 +959,35 @@ export function MediaDecomposeReplicaPanel({
             <EcomButtonSecondary
               type="button"
               size="sm"
-              disabled={batchProductionBusy || singleShotBusy || !scriptReady || ttsBusy}
-              onClick={() => void runTts()}
+              disabled={
+                batchProductionBusy ||
+                singleShotBusy ||
+                !scriptReady ||
+                ttsBusy ||
+                selectedTtsCount === 0
+              }
+              onClick={() => void runTts(selectedTtsIndices)}
             >
-              {ttsBusy ? "TTS…" : "批量 TTS"}
+              {batchTtsLabel}
             </EcomButtonSecondary>
             <EcomButtonPrimary
               type="button"
               size="sm"
-              disabled={batchProductionBusy || singleShotBusy || !scriptReady || renderBusy}
-              onClick={() => void runRender()}
+              disabled={
+                batchProductionBusy ||
+                singleShotBusy ||
+                !scriptReady ||
+                renderBusy ||
+                selectedComposeCount === 0
+              }
+              onClick={() => requestCompose(selectedComposeIndices)}
             >
-              {renderBusy ? "合成中…" : "合成成片"}
+              {batchComposeLabel}
             </EcomButtonPrimary>
           </div>
         </div>
         <p className="text-[11px] leading-relaxed text-[#6e6e73]">
-          推荐顺序：① 勾选镜头后点表底「生成」→ ②「批量 TTS」→ ③ 状态均为「就绪」后点「合成成片」。可多次勾选、多次生成。
+          推荐顺序：① 勾选后「生成 (N)」→ ② 含口播「批量 TTS (N)」→ ③ 就绪镜头「合成成片 (N)」。
         </p>
 
         {anyGenerating ? (
@@ -766,8 +1018,9 @@ export function MediaDecomposeReplicaPanel({
           hideRefColumn
           videoPromptMentionRefs={mentionRefs}
           selectedShotIndices={selectedShotIndices}
-          selectedCount={selectedShotIndices.size}
+          selectedCount={selectedGeneratableCount}
           onToggleShotSelected={(index, checked) => {
+            if (activeGeneratingIndices.has(index)) return;
             setSelectedShotIndices((prev) => {
               const next = new Set(prev);
               if (checked) next.add(index);
@@ -776,15 +1029,31 @@ export function MediaDecomposeReplicaPanel({
             });
           }}
           onGenerateSelected={() => {
-            if (selectedShotIndices.size === 0) return;
+            if (selectedGeneratableCount === 0) return;
             openGeneratePicker([...selectedGeneratableIndices].sort((a, b) => a - b));
           }}
           generateSelectedDisabled={
-            selectedShotIndices.size === 0 ||
+            selectedGeneratableCount === 0 ||
             !planSynced ||
             ttsBusy ||
             renderBusy
           }
+          onBatchTtsSelected={() => void runTts(selectedTtsIndices)}
+          batchTtsDisabled={
+            selectedTtsCount === 0 ||
+            !planSynced ||
+            batchProductionBusy ||
+            singleShotBusy
+          }
+          batchTtsLabel={batchTtsLabel}
+          onBatchComposeSelected={() => requestCompose(selectedComposeIndices)}
+          batchComposeDisabled={
+            selectedComposeCount === 0 ||
+            !planSynced ||
+            batchProductionBusy ||
+            singleShotBusy
+          }
+          batchComposeLabel={batchComposeLabel}
           showRowActions
           onAddRow={() => void handleAddRow()}
           onDeleteRow={(index) => void handleDeleteRow(index)}
@@ -821,6 +1090,7 @@ export function MediaDecomposeReplicaPanel({
         value={videoModelKey}
         onChange={(key) => {
           onVideoModelChange(key);
+          persistVideoGenSettings({ videoModelKey: key });
           if (videoModelSupportsGenerateAudio(key)) {
             setPickerVideoGenerateAudio(true);
           }
@@ -832,17 +1102,45 @@ export function MediaDecomposeReplicaPanel({
         onPanelDurationChange={(value) => {
           pickerPanelDurationRef.current = value;
           setPickerPanelDurationSec(value);
+          persistVideoGenSettings({ videoPanelDurationSec: value });
         }}
         videoResolution={pickerVideoResolution}
-        onVideoResolutionChange={setPickerVideoResolution}
+        onVideoResolutionChange={(value) => {
+          setPickerVideoResolution(value);
+          persistVideoGenSettings({ videoResolution: value });
+        }}
         videoR2vRatio={pickerVideoR2vRatio}
-        onVideoR2vRatioChange={setPickerVideoR2vRatio}
+        onVideoR2vRatioChange={(value) => {
+          setPickerVideoR2vRatio(value);
+          persistVideoGenSettings({ videoR2vRatio: value });
+        }}
         videoSeed={pickerVideoSeed}
         onVideoSeedChange={setPickerVideoSeed}
         videoPromptExtend={pickerVideoPromptExtend}
         onVideoPromptExtendChange={setPickerVideoPromptExtend}
         videoGenerateAudio={pickerVideoGenerateAudio}
-        onVideoGenerateAudioChange={setPickerVideoGenerateAudio}
+        onVideoGenerateAudioChange={(value) => {
+          setPickerVideoGenerateAudio(value);
+          persistVideoGenSettings({ videoGenerateAudio: value });
+        }}
+        panelHasVoiceover={pickerPanelHasVoiceover}
+      />
+
+      <SeedVideoComposeDialog
+        open={composeDialogOpen}
+        shotCount={pendingComposeIndices?.length ?? 0}
+        busy={renderBusy}
+        initialStyle={composeSubtitleStyle}
+        onOpenChange={(open) => {
+          if (!open && !renderBusy) {
+            setComposeDialogOpen(false);
+            setPendingComposeIndices(null);
+          }
+        }}
+        onConfirm={(style) => {
+          if (!pendingComposeIndices?.length) return;
+          void runRender(pendingComposeIndices, style);
+        }}
       />
 
       <SeedVideoRenderProgressPanel
@@ -853,6 +1151,7 @@ export function MediaDecomposeReplicaPanel({
         onCollapsedChange={(collapsed) =>
           setRenderProgress((prev) => (prev ? { ...prev, collapsed } : prev))
         }
+        onDismiss={() => setRenderProgress(null)}
       />
     </>
   );

@@ -1,11 +1,12 @@
 "use client";
 
+import { Fragment } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { ProductDesignPromptMentionTextarea } from "@/components/product-design/product-design-prompt-mention-textarea";
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
 import { SeedVideoRefsGalleryStrip } from "@/components/seed-video/seed-video-refs-gallery-strip";
 import { SeedVideoShotRefCell } from "@/components/seed-video/seed-video-shot-ref-cell";
-import { EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import type { EcomPromptImageRef } from "@/lib/ecom-prompt-mention";
 import type { SeedVideoReference, SeedVideoShot } from "@/lib/seed-video-types";
 
@@ -28,6 +29,12 @@ type Props = {
   onGenerateSelected?: () => void;
   generateSelectedDisabled?: boolean;
   selectedCount?: number;
+  onBatchTtsSelected?: () => void;
+  batchTtsDisabled?: boolean;
+  batchTtsLabel?: string;
+  onBatchComposeSelected?: () => void;
+  batchComposeDisabled?: boolean;
+  batchComposeLabel?: string;
   /** 逐镜指定参考图（legacy）；拆图复刻等场景请用 hideRefColumn + showRefsGallery */
   editableRefs?: boolean;
   /** 隐藏「参考图」列（参考图在表头展示或上方上传区统一管理） */
@@ -69,6 +76,12 @@ export function SeedVideoShotTable({
   onGenerateSelected,
   generateSelectedDisabled = false,
   selectedCount = 0,
+  onBatchTtsSelected,
+  batchTtsDisabled = false,
+  batchTtsLabel = "批量 TTS",
+  onBatchComposeSelected,
+  batchComposeDisabled = false,
+  batchComposeLabel = "合成成片",
   editableRefs = false,
   hideRefColumn = false,
   showRefsGallery = false,
@@ -93,13 +106,14 @@ export function SeedVideoShotTable({
     return references.find((r) => r.id === refImageId)?.ossUrl;
   }
 
-  function isShotGenerating(index: number): boolean {
+  function isShotGenerating(index: number, shot?: SeedVideoShot): boolean {
+    if (shot?.videoUrl?.trim()) return false;
     if (generatingIndices?.has(index)) return true;
     return generatingIndex === index;
   }
 
   function shotStatus(shot: SeedVideoShot): { label: string; className: string } {
-    if (isShotGenerating(shot.index)) {
+    if (isShotGenerating(shot.index, shot)) {
       return { label: "生成中", className: "text-[#0071e3]" };
     }
     if (shot.videoUrl && shot.ttsUrl) {
@@ -184,11 +198,13 @@ export function SeedVideoShotTable({
           {shots.map((shot) => {
             const thumb = refUrl(shot.refImageId);
             const status = shotStatus(shot);
-            const isGenerating = isShotGenerating(shot.index);
-            const isSelected = selectedShotIndices?.has(shot.index) ?? false;
+            const isGenerating = isShotGenerating(shot.index, shot);
+            const isSelected =
+              (selectedShotIndices?.has(shot.index) ?? false) && !isGenerating;
             const deletable = canDeleteShot ? canDeleteShot(shot) : !isGenerating && !shot.videoUrl?.trim();
             return (
-              <tr key={shot.index} className="border-t border-[#e8e8ed] align-top">
+              <Fragment key={shot.index}>
+              <tr className="border-t border-[#e8e8ed] align-top">
                 <td className="px-3 py-2 whitespace-nowrap">
                   <div className="flex items-center gap-2">
                     {showGenerateActions ? (
@@ -330,10 +346,26 @@ export function SeedVideoShotTable({
                   </td>
                 ) : null}
               </tr>
+              {isGenerating ? (
+                <tr aria-hidden="true" className="pointer-events-none border-0">
+                  <td colSpan={columnCount} className="border-0 px-3 py-0">
+                    <div className="flex justify-center pb-2 pt-0.5">
+                      <div
+                        className="ecom-upload-progress ecom-upload-progress-indeterminate h-0.5 w-40 overflow-hidden rounded-full bg-[#e8e8ed]"
+                        role="progressbar"
+                        aria-label={`镜 ${shot.index} 生成中`}
+                      >
+                        <span />
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : null}
+              </Fragment>
             );
           })}
         </tbody>
-        {showGenerateActions || showRowActions || showVoiceoverDraftActions ? (
+        {showGenerateActions || showRowActions || showVoiceoverDraftActions || onBatchTtsSelected || onBatchComposeSelected ? (
           <tfoot>
             <tr className="border-t border-[#e8e8ed] bg-[#fafafa]">
               <td colSpan={columnCount} className="px-3 py-2.5">
@@ -348,6 +380,28 @@ export function SeedVideoShotTable({
                     >
                       {generateLabel}
                     </EcomButtonSecondary>
+                  ) : null}
+                  {onBatchTtsSelected ? (
+                    <EcomButtonSecondary
+                      type="button"
+                      size="sm"
+                      className="min-w-[9rem] px-6"
+                      disabled={batchTtsDisabled}
+                      onClick={() => onBatchTtsSelected()}
+                    >
+                      {batchTtsLabel}
+                    </EcomButtonSecondary>
+                  ) : null}
+                  {onBatchComposeSelected ? (
+                    <EcomButtonPrimary
+                      type="button"
+                      size="sm"
+                      className="min-w-[9rem] px-6"
+                      disabled={batchComposeDisabled}
+                      onClick={() => onBatchComposeSelected()}
+                    >
+                      {batchComposeLabel}
+                    </EcomButtonPrimary>
                   ) : null}
                   {showVoiceoverDraftActions && onApplyAllVoiceoverDrafts ? (
                     <EcomButtonSecondary

@@ -686,6 +686,19 @@ export function resolveCanvasE2eDisplayMs(input: {
   }
 
   if (input.e2eMs != null && input.e2eMs > 0) return input.e2eMs;
+
+  if (
+    !input.isInProgress &&
+    !input.canvasStartedAt &&
+    input.submittedAt &&
+    input.completedAt
+  ) {
+    const ms =
+      new Date(input.completedAt).getTime() -
+      new Date(input.submittedAt).getTime();
+    if (ms >= 0) return ms;
+  }
+
   return null;
 }
 
@@ -696,6 +709,8 @@ export function resolvePreGatewayDisplayMs(input: {
   submittedAt: string;
   isInProgress: boolean;
   nowMs: number | null;
+  /** 无画布、直连 Gateway 终态：出队前记 0 */
+  gatewayDirectSubmit?: boolean;
 }): number | null {
   if (input.preGatewayMs != null && input.preGatewayMs >= 0) {
     return input.preGatewayMs;
@@ -717,6 +732,9 @@ export function resolvePreGatewayDisplayMs(input: {
       new Date(input.submittedAt).getTime() -
       new Date(input.canvasStartedAt).getTime();
     return ms >= 0 ? ms : null;
+  }
+  if (input.gatewayDirectSubmit && !input.isInProgress) {
+    return 0;
   }
   return null;
 }

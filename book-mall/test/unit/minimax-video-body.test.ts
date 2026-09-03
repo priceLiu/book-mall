@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyMinimaxVideoGenerateAudioToPrompt,
   buildCanvasVideoMinimaxInput,
   buildMinimaxVideoSubmitBody,
   minimaxResolutionFromEcom,
+  resolveMinimaxVideoGenerateAudio,
 } from "@/lib/gateway/minimax-video-body";
 import { minimaxH3BillingCanonicalFromInput } from "@/lib/gateway/minimax-video-models";
 
@@ -90,5 +92,30 @@ describe("buildCanvasVideoMinimaxInput", () => {
     expect(input.ratio).toBe("9:16");
     expect(input.duration).toBe(8);
     expect(input.resolution).toBe("2K");
+    expect(input.generate_audio).toBe(true);
+  });
+
+  it("appends silent Sound clause when generate_audio is false", () => {
+    const body = buildMinimaxVideoSubmitBody({
+      modelKey: "MiniMax/MiniMax-H3-t2v",
+      input: {
+        prompt: "一只猫在草地上",
+        generate_audio: false,
+        resolution: "2K",
+        duration: 5,
+      },
+    });
+    const content = body.content as Array<{ type: string; text?: string }>;
+    expect(content[0]?.text).toContain("Sound: silent");
+  });
+
+  it("resolveMinimaxVideoGenerateAudio respects generateAudio alias", () => {
+    expect(resolveMinimaxVideoGenerateAudio({ generateAudio: false })).toBe(false);
+    expect(resolveMinimaxVideoGenerateAudio({ generate_audio: true })).toBe(true);
+  });
+
+  it("applyMinimaxVideoGenerateAudioToPrompt is idempotent for silent prompts", () => {
+    const prompt = "test\n\nSound: silent";
+    expect(applyMinimaxVideoGenerateAudioToPrompt(prompt, false)).toBe(prompt);
   });
 });

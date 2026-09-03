@@ -1,5 +1,6 @@
 /** 万相文生图尺寸（与 DashScope parameters.size 一致） */
 import { ecomRatioToImageSize, type EcomImageRatio } from "@/lib/ecom/ecom-platform-spec";
+import { isStoryboardMinimaxVideoModel } from "@/lib/ecom/ecom-storyboard-video-models";
 
 export const ECOM_STORYBOARD_WANX_SIZES = [
   "720*1280",
@@ -124,6 +125,7 @@ export function resolveEcomVideoGenerateAudio(
   const k = modelKey.trim().toLowerCase();
   if (k.includes("bytedance/seedance") || /doubao-seedance/i.test(k)) return true;
   if (/kling.*3\.0/i.test(k) || /seedance-1\.5/i.test(k)) return true;
+  if (isStoryboardMinimaxVideoModel(k)) return true;
   return false;
 }
 

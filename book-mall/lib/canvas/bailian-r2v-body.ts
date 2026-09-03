@@ -71,8 +71,8 @@ export type BailianR2vMediaItem = {
 
 /**
  * HappyHorse / 万相 2.7 R2V · media 类型映射。
- * 约定：urls[0] 为分镜静帧（主图），须 first_frame；其余 @ 资产为 reference_image。
- * 与 Gateway 登记「首尾帧取连线前 2 张入 media」一致，避免分镜图被当作普通参考图弱化。
+ * 百炼 API 仅接受 type=reference_image（传 first_frame 会 422）。
+ * 顺序仍约定：urls[0] 为分镜静帧/主图，其余 @ 资产为附加参考。
  */
 export function buildBailianR2vMediaItems(
   model: string,
@@ -81,19 +81,6 @@ export function buildBailianR2vMediaItems(
   const max = bailianR2vMaxRefs(model);
   const slice = urls.map((s) => s.trim()).filter(Boolean).slice(0, max);
   if (!slice.length) return [];
-
-  if (isHappyhorseBailianR2vModel(model) || isWan27BailianR2vModel(model)) {
-    if (slice.length === 1) {
-      return [{ type: "first_frame", url: slice[0]! }];
-    }
-    return [
-      { type: "first_frame", url: slice[0]! },
-      ...slice.slice(1).map(
-        (url) => ({ type: "reference_image" as const, url }),
-      ),
-    ];
-  }
-
   return slice.map((url) => ({ type: "reference_image" as const, url }));
 }
 
@@ -105,7 +92,9 @@ export function enrichBailianR2vInputForLog(
   const media = Array.isArray(built.input.media)
     ? (built.input.media as BailianR2vMediaItem[])
     : [];
-  const frameFromMedia = media.find((m) => m.type === "first_frame")?.url?.trim();
+  const frameFromMedia =
+    media.find((m) => m.type === "first_frame")?.url?.trim() ??
+    media[0]?.url?.trim();
   const frameFromUrls = referenceImageUrls
     .map((u) => u.trim())
     .find((u) => u.length > 0 && /\/canvas\/node-image\//.test(u));

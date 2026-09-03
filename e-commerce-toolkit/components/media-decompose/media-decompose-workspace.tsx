@@ -25,7 +25,6 @@ import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { defaultPromptForKind } from "@/lib/media-decompose-default-prompts";
-import { isMediaDecomposeMockDevUiEnabled } from "@/lib/media-decompose-mock-dev";
 import {
   downloadMediaDecomposeExportZip,
   saveMediaDecomposeDeliverableSnapshot,
@@ -64,12 +63,12 @@ type Props = {
   onAttachAsset: (assetId: string) => Promise<void>;
   onClearMedia: () => Promise<void>;
   onDecompose: (prompt: string, modelKey: string) => Promise<void>;
-  onMockDecompose?: (prompt: string) => Promise<void>;
   onRefreshModels?: () => void;
   onNewProject?: () => void | Promise<void>;
   loadProjectList?: () => Promise<EcomProjectListItem[]>;
   onOpenProject?: (id: string) => void | Promise<void>;
   replicaSeedVideo?: SeedVideoProject | null;
+  replicaLoadError?: string | null;
   replicaBusy?: boolean;
   videoModels?: StoryboardGatewayModel[];
   videoModelKey?: string;
@@ -100,12 +99,12 @@ export function MediaDecomposeWorkspace({
   onAttachAsset,
   onClearMedia,
   onDecompose,
-  onMockDecompose,
   onRefreshModels,
   onNewProject,
   loadProjectList,
   onOpenProject,
   replicaSeedVideo,
+  replicaLoadError,
   replicaBusy,
   videoModels = [],
   videoModelKey = "",
@@ -252,7 +251,6 @@ export function MediaDecomposeWorkspace({
       onProjectUpdated: (p) => onProjectUpdated(p),
       onSeedVideoUpdated: (sv) => {
         onReplicaSeedVideoUpdated(sv);
-        void onReplicaProjectChange?.();
       },
     });
   }, [
@@ -401,17 +399,6 @@ export function MediaDecomposeWorkspace({
                 </>
               )}
             </EcomButtonPrimary>
-            {isMediaDecomposeMockDevUiEnabled() && onMockDecompose ? (
-              <EcomButtonSecondary
-                size="sm"
-                type="button"
-                disabled={!project.media || decomposing || mediaBusy}
-                title="开发：跳过 Gateway，写入 mock 拆解结果"
-                onClick={() => void onMockDecompose(prompt.trim())}
-              >
-                {decomposing ? "Mock…" : "Mock 拆解"}
-              </EcomButtonSecondary>
-            ) : null}
           </div>
         </div>
 
@@ -482,6 +469,25 @@ export function MediaDecomposeWorkspace({
           ) : null}
         </div>
       )}
+
+      {replicaLoadError && !replicaSeedVideo ? (
+        <div className="rounded-xl border border-[#ffd6d1] bg-[#fff5f3] px-4 py-3 text-sm text-[#c0392b]">
+          <p className="font-medium">复刻进度加载失败</p>
+          <p className="mt-1 text-[13px] leading-relaxed">{replicaLoadError}</p>
+          <p className="mt-2 text-[12px] text-[#6e6e73]">
+            若 book-mall 刚更新过代码，请重启 dev 服务后刷新本页；你的分镜数据仍在服务端。
+          </p>
+          {onReplicaProjectChange ? (
+            <button
+              type="button"
+              className="mt-3 text-[13px] font-medium text-[#0071e3] hover:underline"
+              onClick={() => void onReplicaProjectChange()}
+            >
+              重试加载
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {showReplicaRefPanel && replicaSetupApi ? (
         <ReplicaSetupPanel

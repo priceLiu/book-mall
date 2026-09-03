@@ -46,8 +46,18 @@ export function fromEcomStoryboardSheet(
 }
 
 /** 种草视频逐镜 → Timeline v1 */
-export function fromEcomSeedVideoPlan(shots: SeedVideoShot[]): MediaTimelineV1 {
-  const sorted = shots.slice().sort((a, b) => a.index - b.index);
+export function fromEcomSeedVideoPlan(
+  shots: SeedVideoShot[],
+  opts?: { shotIndexes?: number[] },
+): MediaTimelineV1 {
+  const indexFilter =
+    opts?.shotIndexes && opts.shotIndexes.length > 0
+      ? new Set(opts.shotIndexes)
+      : null;
+  const sorted = shots
+    .slice()
+    .sort((a, b) => a.index - b.index)
+    .filter((s) => !indexFilter || indexFilter.has(s.index));
   const clips = sorted
     .filter((s) => Boolean(s.videoUrl?.trim() && /^https?:\/\//.test(s.videoUrl!.trim())))
     .map((s, i) => ({

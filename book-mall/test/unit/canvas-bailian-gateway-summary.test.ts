@@ -22,4 +22,13 @@ describe("extractBailianR2vVideoUrlFromGatewaySummary", () => {
       }),
     ).toBe("https://cdn.example/flat.mp4");
   });
+
+  it("reads flat videoUrl on slim summary", () => {
+    expect(
+      extractBailianR2vVideoUrlFromGatewaySummary({
+        status: "succeeded",
+        videoUrl: "https://cdn.example/slim.mp4",
+      }),
+    ).toBe("https://cdn.example/slim.mp4");
+  });
 });

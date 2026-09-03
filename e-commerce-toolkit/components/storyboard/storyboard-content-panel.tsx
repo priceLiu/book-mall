@@ -1893,8 +1893,9 @@ export function StoryboardContentPanel({
         prev.includes(panelIndex) ? prev : [...prev, panelIndex],
       );
     }
+    let keepBusyAfterSubmit = false;
     try {
-      const { videoUrl } = await generateStoryboardPanelVideo(project.id, {
+      const result = await generateStoryboardPanelVideo(project.id, {
         panelIndex,
         aspectRatio,
         durationSec: panelDurationSec,
@@ -1902,6 +1903,24 @@ export function StoryboardContentPanel({
         modelKey: effectiveModel,
         generateAudio: videoGenerateAudio,
       });
+      if ("status" in result && result.status === "submitted") {
+        keepBusyAfterSubmit = true;
+        try {
+          const refreshed = await getStoryboardProject(project.id);
+          onProjectChange(refreshed);
+        } catch {
+          /* ignore transient reload errors */
+        }
+        if (!opts?.quietSuccess) {
+          toast({
+            title: "已提交生成",
+            message: `镜头 ${panelIndex} 视频任务已提交，完成后会自动更新。`,
+            variant: "success",
+          });
+        }
+        return { ok: true };
+      }
+      const videoUrl = result.videoUrl;
       if (!opts?.skipProjectUpdate && project.sheet) {
         const panels = project.sheet.panels.map((p) =>
           p.index === panelIndex ? { ...p, videoUrl } : p,
@@ -1968,12 +1987,14 @@ export function StoryboardContentPanel({
       }
       return { ok: false, error: message };
     } finally {
-      if (!opts?.deferBusy) {
+      if (!opts?.deferBusy && !keepBusyAfterSubmit) {
         syncPanelVideoFlight(
           panelVideoWatchRef.current.filter((i) => i !== panelIndex),
           false,
         );
         setPanelVidBusyPanels((prev) => prev.filter((i) => i !== panelIndex));
+        await syncGeneratingPanelVideos();
+      } else if (keepBusyAfterSubmit) {
         await syncGeneratingPanelVideos();
       }
     }
@@ -2029,8 +2050,16 @@ export function StoryboardContentPanel({
         /* 单镜已成功时仍尽量保留本地 sheet 更新 */
       }
     } finally {
-      syncPanelVideoFlight([], false);
-      setPanelVidBusyPanels([]);
+      try {
+        const refreshed = await getStoryboardProject(project.id);
+        onProjectChange(refreshed);
+        const pending = listStoryboardPendingPanelVideoIndices(refreshed.meta);
+        syncPanelVideoFlight(pending, pending.length > 0);
+        setPanelVidBusyPanels(pending);
+      } catch {
+        syncPanelVideoFlight([], false);
+        setPanelVidBusyPanels([]);
+      }
       await syncGeneratingPanelVideos();
     }
     const reconciledFailures = filterStoryboardBatchFailuresByPanelMedia(
@@ -2992,8 +3021,16 @@ export function StoryboardContentPanel({
                 );
               }
             } else if (batchVideo && batchVideo.length > 0) {
+              syncPanelVideoFlight(batchVideo, true);
+              setPanelVidBusyPanels((prev) =>
+                [...new Set([...prev, ...batchVideo])].sort((a, b) => a - b),
+              );
               await handleGeneratePanelVideosBatch(batchVideo, modelKey);
             } else if (panelIdx != null) {
+              syncPanelVideoFlight([panelIdx], true);
+              setPanelVidBusyPanels((prev) =>
+                prev.includes(panelIdx) ? prev : [...prev, panelIdx],
+              );
               await handleGeneratePanelVideo(panelIdx, { modelKeyOverride: modelKey });
             } else {
               await handleGenerateFullVideo(modelKey);

@@ -7,7 +7,7 @@ import { ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL } from "@/lib/gateway/ecom-storyboa
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 120;
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -25,7 +25,9 @@ export async function POST(req: Request, ctx: Ctx) {
     /* */
   }
 
-  const project = await getEcomStoryboardProject(auth.userId, projectId);
+  const project = await getEcomStoryboardProject(auth.userId, projectId, {
+    resumePendingVideos: false,
+  });
   if (!project?.sheet) {
     return NextResponse.json({ error: "请先生成分镜脚本" }, { status: 400 });
   }

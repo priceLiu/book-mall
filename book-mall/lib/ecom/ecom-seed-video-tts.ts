@@ -27,6 +27,7 @@ export async function ecomGenerateSeedVideoTts(opts: {
   userId: string;
   projectId: string;
   shotIndex?: number;
+  shotIndices?: number[];
   voicePreset?: SeedVideoStylePreset;
   modelKey?: string;
 }) {
@@ -40,12 +41,27 @@ export async function ecomGenerateSeedVideoTts(opts: {
   const voice = mapVoiceToQwen(resolveSeedVideoVoice(stylePreset));
 
   const shots = project.plan.shots ?? [];
-  const targets =
-    typeof opts.shotIndex === "number"
-      ? shots.filter((s) => s.index === opts.shotIndex)
-      : shots.filter((s) => s.voiceover?.trim());
+  const indexFilter = (() => {
+    if (opts.shotIndices?.length) {
+      return new Set(opts.shotIndices);
+    }
+    if (typeof opts.shotIndex === "number") {
+      return new Set([opts.shotIndex]);
+    }
+    return null;
+  })();
 
-  if (targets.length === 0) throw new Error("没有可合成的口播文案");
+  const targets = indexFilter
+    ? shots.filter((s) => indexFilter.has(s.index) && s.voiceover?.trim())
+    : shots.filter((s) => s.voiceover?.trim());
+
+  if (targets.length === 0) {
+    throw new Error(
+      indexFilter
+        ? "所选镜头没有可合成的口播文案"
+        : "没有可合成的口播文案",
+    );
+  }
 
   const auth = await resolveEcomGatewayAuthForUser(opts.userId);
   if (!auth) throw new Error("Gateway 未关联");

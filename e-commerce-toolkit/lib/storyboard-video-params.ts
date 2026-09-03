@@ -77,6 +77,11 @@ export function isStoryboardWan27BailianR2vModel(modelKey: string): boolean {
   return modelKey.trim() === "wan2.7-r2v";
 }
 
+export function isStoryboardMinimaxH3VideoModel(modelKey: string): boolean {
+  const k = modelKey.trim().toLowerCase();
+  return k.includes("minimax-h3") || k.includes("minimax/minimax-h3");
+}
+
 /** 百炼 R2V · 单条 API 时长上限（与 bailian-r2v-body / Gateway schema 一致） */
 export function resolveStoryboardBailianR2vMaxDurationSec(modelKey: string): number {
   const k = modelKey.trim();
@@ -146,6 +151,9 @@ export function resolveStoryboardVideoPanelDurationRange(
   if (/happyhorse.*-(t2v|i2v)/i.test(k)) {
     return { min: 3, max: 15, label: "3–15s" };
   }
+  if (isStoryboardMinimaxH3VideoModel(k)) {
+    return { min: 4, max: 15, label: "4–15s" };
+  }
   return { min: 2, max: 8, label: "2–8s" };
 }
 
@@ -164,12 +172,23 @@ export function isStoryboardSeedanceKieVideoModel(modelKey: string): boolean {
 /** 弹层可调「生成配音/音效」的视频模型 */
 export function videoModelSupportsGenerateAudio(modelKey: string): boolean {
   const k = modelKey.trim().toLowerCase();
+  if (isStoryboardMinimaxH3VideoModel(k)) {
+    return !k.includes("regeneration") && !k.includes("context-ir");
+  }
   if (isStoryboardSeedanceKieVideoModel(k)) return true;
   if (/doubao-seedance/i.test(k)) return true;
   if (isStoryboardKling30KieVideoModel(k)) return true;
   if (/kling.*3\.0/i.test(k)) return true;
   if (/seedance-1\.5/i.test(k)) return true;
   return false;
+}
+
+/** 弹层「生成音轨」控件文案 */
+export function videoGenerateAudioControlLabel(modelKey: string): string {
+  if (isStoryboardMinimaxH3VideoModel(modelKey)) {
+    return "生成原生音轨（对白/音效/环境声）";
+  }
+  return "生成配音 / 音效";
 }
 
 export function videoResolutionOptionsForModel(

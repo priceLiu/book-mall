@@ -60,8 +60,23 @@ export async function createSeedVideoProject(opts?: {
   return data.project as SeedVideoProject;
 }
 
-export async function getSeedVideoProject(id: string): Promise<SeedVideoProject> {
-  const data = await ecomBookFetch(`${BASE}/projects/${id}`);
+export async function getSeedVideoProject(
+  id: string,
+  opts?: { resumePending?: boolean },
+): Promise<SeedVideoProject> {
+  const q = opts?.resumePending === false ? "?resumePending=0" : "";
+  const data = await ecomBookFetch(`${BASE}/projects/${id}${q}`);
+  return data.project as SeedVideoProject;
+}
+
+/** 续查 pending 镜头 Gateway 任务（独立 POST，不阻塞 panel/generate） */
+export async function resumeSeedVideoPendingShots(
+  projectId: string,
+): Promise<SeedVideoProject> {
+  const data = await ecomBookFetch(
+    `${BASE}/projects/${projectId}/video/resume-pending`,
+    { method: "POST" },
+  );
   return data.project as SeedVideoProject;
 }
 
@@ -222,7 +237,10 @@ export async function generateSeedVideoShot(opts: {
   aspectRatio?: "9:16" | "16:9";
   resolution?: string;
   generateAudio?: boolean;
-}): Promise<{ videoUrl: string; shotIndex: number }> {
+}): Promise<
+  | { status: "submitted"; shotIndex: number; taskId: string; logId: string }
+  | { videoUrl: string; shotIndex: number }
+> {
   const data = await ecomBookFetch(
     `${BASE}/projects/${opts.projectId}/video/panel/generate`,
     {
@@ -231,6 +249,14 @@ export async function generateSeedVideoShot(opts: {
       body: JSON.stringify(opts),
     },
   );
+  if (data.status === "submitted") {
+    return {
+      status: "submitted",
+      shotIndex: data.shotIndex as number,
+      taskId: data.taskId as string,
+      logId: data.logId as string,
+    };
+  }
   return data as { videoUrl: string; shotIndex: number };
 }
 
@@ -285,23 +311,33 @@ export async function pollSeedVideoDirect(projectId: string): Promise<{
 export async function generateSeedVideoTts(opts: {
   projectId: string;
   shotIndex?: number;
+  shotIndices?: number[];
 }): Promise<{ shots: unknown[] }> {
   const data = await ecomBookFetch(`${BASE}/projects/${opts.projectId}/tts/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(opts),
+    body: JSON.stringify({
+      ...(typeof opts.shotIndex === "number" ? { shotIndex: opts.shotIndex } : {}),
+      ...(opts.shotIndices?.length ? { shotIndices: opts.shotIndices } : {}),
+    }),
   });
   return data as { shots: unknown[] };
 }
 
 export async function renderSeedVideo(
   projectId: string,
-  opts?: { profile?: import("@/lib/ecom-storyboard-api").EcomMediaRenderProfileInput },
+  opts?: {
+    profile?: import("@/lib/ecom-storyboard-api").EcomMediaRenderProfileInput;
+    shotIndices?: number[];
+  },
 ): Promise<{ jobId: string }> {
+  const body: Record<string, unknown> = {};
+  if (opts?.profile) body.profile = opts.profile;
+  if (opts?.shotIndices?.length) body.shotIndices = opts.shotIndices;
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/video/render`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(opts?.profile ? { profile: opts.profile } : {}),
+    body: JSON.stringify(body),
   });
   return data as { jobId: string };
 }

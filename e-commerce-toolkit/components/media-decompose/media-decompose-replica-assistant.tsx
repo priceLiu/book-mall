@@ -31,7 +31,6 @@ import {
   generateMediaDecomposeReplicaModelPrompt,
   generateMediaDecomposeReplicaScript,
   recognizeMediaDecomposeReplicaProduct,
-  mockMediaDecomposeReplicaRecognizeProduct,
   updateMediaDecomposeProject,
   uploadMediaDecomposeReplicaRef,
 } from "@/lib/ecom-media-decompose-api";
@@ -53,7 +52,6 @@ import {
   readReplicaPhase,
   REPLICA_CHOICE_AI_MODEL,
   REPLICA_CHOICE_AI_RECOGNIZE_PRODUCT,
-  REPLICA_CHOICE_MOCK_RECOGNIZE_PRODUCT,
   REPLICA_CHOICE_AI_WRITE_MODEL_PROMPT,
   REPLICA_CHOICE_GENERATE_SCRIPT,
   REPLICA_CHOICE_PASTE_IMAGE,
@@ -68,7 +66,6 @@ import {
 import type { MediaDecomposeProject } from "@/lib/media-decompose-types";
 import type { SeedVideoProject } from "@/lib/seed-video-types";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
-import { isMediaDecomposeMockDevUiEnabled } from "@/lib/media-decompose-mock-dev";
 import { cn } from "@/lib/utils";
 
 const WELCOME_ID = "welcome";
@@ -379,27 +376,6 @@ export function MediaDecomposeReplicaAssistantProvider({
     }
   }
 
-  async function handleMockRecognizeProduct() {
-    setRecognizeBusy(true);
-    try {
-      const { project: nextProject, seedVideo: nextSeed, productBrief: brief } =
-        await mockMediaDecomposeReplicaRecognizeProduct(project.id);
-      productBriefDirtyRef.current = false;
-      setProductBriefDraft(brief);
-      onProjectUpdated(nextProject);
-      onSeedVideoUpdated(nextSeed);
-      appendAssistant("【Mock】产品描述已写入上方卡片。确认无误后保存，再点「生成复刻脚本」。");
-    } catch (e) {
-      await onAlert({
-        title: "Mock 识产品失败",
-        message: e instanceof Error ? e.message : "请稍后重试",
-        variant: "error",
-      });
-    } finally {
-      setRecognizeBusy(false);
-    }
-  }
-
   async function handleRecognizeProduct() {
     setRecognizeBusy(true);
     try {
@@ -532,11 +508,6 @@ export function MediaDecomposeReplicaAssistantProvider({
       await handleRecognizeProduct();
       return;
     }
-    if (choice === REPLICA_CHOICE_MOCK_RECOGNIZE_PRODUCT) {
-      appendUser(choice);
-      await handleMockRecognizeProduct();
-      return;
-    }
     if (choice === REPLICA_CHOICE_GENERATE_SCRIPT) {
       appendUser(choice);
       await handleGenerateScript();
@@ -572,27 +543,19 @@ export function MediaDecomposeReplicaAssistantProvider({
     }
   }
 
-  const choices = useMemo(() => {
-    const base = inferReplicaAssistantChoices({
-      phase,
-      modelReady,
-      productReady,
-      scriptReady,
-      modelGenDraft,
-      productBrief: productBriefDraft,
-      modelPromptDraft: modelPromptDraft || input,
-    });
-    if (
-      isMediaDecomposeMockDevUiEnabled() &&
-      modelReady &&
-      productReady &&
-      !productBriefDraft.trim() &&
-      !scriptReady
-    ) {
-      return [REPLICA_CHOICE_MOCK_RECOGNIZE_PRODUCT, ...base];
-    }
-    return base;
-  }, [phase, modelReady, productReady, scriptReady, modelGenDraft, productBriefDraft, modelPromptDraft, input]);
+  const choices = useMemo(
+    () =>
+      inferReplicaAssistantChoices({
+        phase,
+        modelReady,
+        productReady,
+        scriptReady,
+        modelGenDraft,
+        productBrief: productBriefDraft,
+        modelPromptDraft: modelPromptDraft || input,
+      }),
+    [phase, modelReady, productReady, scriptReady, modelGenDraft, productBriefDraft, modelPromptDraft, input],
+  );
 
   const renderMessageAttachments = (attachments: ReplicaAssistantAttachment[]) => (
     <div className="mt-2 flex flex-wrap gap-2">

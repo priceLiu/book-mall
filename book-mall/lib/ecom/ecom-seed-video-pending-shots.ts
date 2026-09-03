@@ -2,6 +2,8 @@ import type { SeedVideoPlan } from "@/lib/ecom/ecom-seed-video-types";
 
 /** 单镜 I2V 服务端最长约 10min；超时视为 stale pending */
 export const SEED_VIDEO_PENDING_SHOT_TTL_MS = 25 * 60 * 1000;
+/** 已 mark pending 但尚未写入 Gateway taskId 的宽限期（正常应在数秒内提交） */
+export const SEED_VIDEO_PENDING_SHOT_SUBMIT_GRACE_MS = 3 * 60 * 1000;
 
 export type SeedVideoPendingShotEntry = {
   modelKey?: string;
@@ -11,7 +13,7 @@ export type SeedVideoPendingShotEntry = {
   /** Gateway 任务 ID；刷新页面后续查 */
   taskId?: string;
   logId?: string;
-  pollProvider?: "kie" | "bailian" | "volcengine" | "dashscope";
+  pollProvider?: "kie" | "bailian" | "volcengine" | "dashscope" | "minimax";
 };
 
 export type SeedVideoPendingShotsMap = Record<string, SeedVideoPendingShotEntry>;
@@ -147,9 +149,18 @@ export function reconcileSeedVideoPendingShotMeta(opts: {
     }
 
     const startedAt = entry.startedAt ? Date.parse(entry.startedAt) : NaN;
-    if (Number.isFinite(startedAt) && Date.now() - startedAt > SEED_VIDEO_PENDING_SHOT_TTL_MS) {
-      delete nextMap[key];
-      changed = true;
+    if (Number.isFinite(startedAt)) {
+      const ageMs = Date.now() - startedAt;
+      if (ageMs > SEED_VIDEO_PENDING_SHOT_TTL_MS) {
+        delete nextMap[key];
+        changed = true;
+        continue;
+      }
+      if (!entry.taskId?.trim() && ageMs > SEED_VIDEO_PENDING_SHOT_SUBMIT_GRACE_MS) {
+        delete nextMap[key];
+        changed = true;
+        continue;
+      }
     }
   }
 

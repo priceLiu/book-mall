@@ -6,7 +6,6 @@ import {
   generateMediaDecomposeReplicaScript,
   generateMediaDecomposeReplicaSellingPoints,
   generateMediaDecomposeReplicaVoiceover,
-  mockMediaDecomposeReplicaRecognizeProduct,
   recognizeMediaDecomposeReplicaProduct,
   removeMediaDecomposeReplicaRef,
   saveMediaDecomposeReplicaCopyFields,
@@ -28,7 +27,6 @@ import {
   readFilmPullProductBrief,
 } from "@/lib/film-pull-refs";
 import { isFilmPullMockDevUiEnabled } from "@/lib/film-pull-mock-dev";
-import { isMediaDecomposeMockDevUiEnabled } from "@/lib/media-decompose-mock-dev";
 import {
   isReplicaModelRefId,
   isReplicaProductRefId,
@@ -81,7 +79,7 @@ export type ReplicaSetupApi = {
     productBrief?: string;
     sellingPoints?: string;
     modelKey?: string;
-  }) => Promise<void>;
+  }) => Promise<{ voiceoverDraft: ReplicaVoiceoverDraft }>;
   attachModelFromLibrary?: (entry: { id: string; name: string; ossUrl: string }) => Promise<void>;
   attachRefsFromAssets?: (role: ReplicaSetupRole, assetIds: string[]) => Promise<void>;
   generateScript?: (opts: {
@@ -165,10 +163,8 @@ export function createMediaDecomposeReplicaSetupApi(opts: {
       onProjectUpdated(project);
       onSeedVideoUpdated(seedVideo);
     },
-    recognizeProduct: async ({ mock, userDraft }) => {
-      const result = mock
-        ? await mockMediaDecomposeReplicaRecognizeProduct(projectId)
-        : await recognizeMediaDecomposeReplicaProduct(projectId, { userDraft });
+    recognizeProduct: async ({ userDraft }) => {
+      const result = await recognizeMediaDecomposeReplicaProduct(projectId, { userDraft });
       onProjectUpdated(result.project);
       onSeedVideoUpdated(result.seedVideo);
       return { productBrief: result.productBrief };
@@ -207,6 +203,7 @@ export function createMediaDecomposeReplicaSetupApi(opts: {
       });
       onProjectUpdated(result.project);
       onSeedVideoUpdated(result.seedVideo);
+      return { voiceoverDraft: result.voiceoverDraft };
     },
     generateScript: async ({ productBrief, sellingPoints, modelKey }) => {
       const { project, seedVideo } = await generateMediaDecomposeReplicaScript(projectId, {
@@ -230,7 +227,6 @@ export function createMediaDecomposeReplicaSetupApi(opts: {
       onProjectUpdated(project);
       onSeedVideoUpdated(seedVideo);
     },
-    mockDevEnabled: isMediaDecomposeMockDevUiEnabled,
   };
 }
 

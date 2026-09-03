@@ -1,4 +1,5 @@
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
+import { readGatewayLogVideoOutputUrl, extractVideoUrlFromGatewayLogSummary } from "@/lib/ecom/ecom-gateway-log-video-url";
 import {
   clearPendingShotVideo,
   readPendingShotVideos,
@@ -13,11 +14,17 @@ import {
   ecomGwPollBailianR2v,
   ecomGwPollDashscope,
   ecomGwPollKie,
+  ecomGwPollMinimax,
   ecomGwPollVolcengine,
 } from "@/lib/gateway/ecom-tool-gateway-client";
 import { prisma } from "@/lib/prisma";
 
-export type SeedVideoPanelPollProvider = "kie" | "bailian" | "volcengine" | "dashscope";
+export type SeedVideoPanelPollProvider =
+  | "kie"
+  | "bailian"
+  | "volcengine"
+  | "dashscope"
+  | "minimax";
 
 type PollResult =
   | { status: "running" }
@@ -33,6 +40,41 @@ async function pollPendingPanelJobOnce(
   const provider = entry.pollProvider;
   if (!taskId || !logId || !provider) return { status: "running" };
 
+  const log = await prisma.gatewayRequestLog.findUnique({
+    where: { id: logId },
+    select: {
+      status: true,
+      failMessage: true,
+      resultSummary: true,
+      providerKind: true,
+    },
+  });
+
+  if (log?.status === "FAILED") {
+    return {
+      status: "failed",
+      message: log.failMessage?.trim() || "视频任务失败",
+    };
+  }
+
+  if (log?.status === "SUCCEEDED") {
+    const fromLog = extractVideoUrlFromGatewayLogSummary(log.resultSummary, {
+      pollProvider: provider,
+      providerKind: log.providerKind,
+    });
+    if (fromLog) {
+      return { status: "succeeded", outputUrl: fromLog, taskId };
+    }
+  }
+
+  const fromLog = await readGatewayLogVideoOutputUrl({
+    logId,
+    pollProvider: provider,
+  });
+  if (fromLog) {
+    return { status: "succeeded", outputUrl: fromLog, taskId };
+  }
+
   const polled =
     provider === "kie"
       ? await ecomGwPollKie(userId, { taskId, gatewayLogId: logId })
@@ -40,7 +82,9 @@ async function pollPendingPanelJobOnce(
         ? await ecomGwPollBailianR2v(userId, { taskId, gatewayLogId: logId })
         : provider === "dashscope"
           ? await ecomGwPollDashscope(userId, { taskId, gatewayLogId: logId })
-          : await ecomGwPollVolcengine(userId, { taskId, gatewayLogId: logId });
+          : provider === "minimax"
+            ? await ecomGwPollMinimax(userId, { taskId, gatewayLogId: logId })
+            : await ecomGwPollVolcengine(userId, { taskId, gatewayLogId: logId });
 
   if (polled.status === "FAILED") {
     return { status: "failed", message: polled.failMessage ?? "视频任务失败" };
@@ -48,6 +92,15 @@ async function pollPendingPanelJobOnce(
   if (polled.status === "SUCCEEDED" && polled.outputUrl?.trim()) {
     return { status: "succeeded", outputUrl: polled.outputUrl.trim(), taskId };
   }
+
+  const fromLogAfterPoll = await readGatewayLogVideoOutputUrl({
+    logId,
+    pollProvider: provider,
+  });
+  if (fromLogAfterPoll) {
+    return { status: "succeeded", outputUrl: fromLogAfterPoll, taskId };
+  }
+
   return { status: "running" };
 }
 
@@ -117,31 +170,45 @@ export async function resumePendingSeedVideoPanelShots(opts: {
     const entry = map[key];
     if (!Number.isFinite(shotIndex) || !entry?.taskId?.trim()) continue;
 
-    const shot = plan?.shots?.find((s) => s.index === shotIndex);
-    const polled = await pollPendingPanelJobOnce(opts.userId, entry);
+    try {
+      const shot = plan?.shots?.find((s) => s.index === shotIndex);
+      if (shot?.videoUrl?.trim()) {
+        meta = clearPendingShotVideo(meta, shotIndex);
+        changed = true;
+        continue;
+      }
 
-    if (polled.status === "running") continue;
+      const polled = await pollPendingPanelJobOnce(opts.userId, entry);
 
-    if (polled.status === "failed") {
+      if (polled.status === "running") continue;
+
+      if (polled.status === "failed") {
+        meta = clearPendingShotVideo(meta, shotIndex);
+        changed = true;
+        continue;
+      }
+
+      const prompt = shot?.videoPrompt?.trim() ?? "";
+      const result = await persistPanelShotVideo({
+        userId: opts.userId,
+        projectId: opts.projectId,
+        shotIndex,
+        prompt,
+        modelKey: entry.modelKey,
+        taskId: polled.taskId,
+        outputUrl: polled.outputUrl,
+        shots: plan?.shots ?? [],
+      });
+      plan = { ...(plan ?? {}), shots: result.plan.shots };
       meta = clearPendingShotVideo(meta, shotIndex);
       changed = true;
-      continue;
+    } catch (e) {
+      console.warn(
+        "[ecom-seed-video-panel-resume] shot",
+        shotIndex,
+        e instanceof Error ? e.message : String(e),
+      );
     }
-
-    const prompt = shot?.videoPrompt?.trim() ?? "";
-    const result = await persistPanelShotVideo({
-      userId: opts.userId,
-      projectId: opts.projectId,
-      shotIndex,
-      prompt,
-      modelKey: entry.modelKey,
-      taskId: polled.taskId,
-      outputUrl: polled.outputUrl,
-      shots: plan?.shots ?? [],
-    });
-    plan = { ...(plan ?? {}), shots: result.plan.shots };
-    meta = clearPendingShotVideo(meta, shotIndex);
-    changed = true;
   }
 
   return { meta, plan, changed };

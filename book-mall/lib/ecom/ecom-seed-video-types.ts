@@ -159,6 +159,11 @@ export type SeedVideoSettings = {
   targetDurationSec?: number;
   /** 创建时选定，不可切换 */
   skillKey?: SeedVideoSkillKey;
+  /** 方案②逐镜生成 · 上次模型弹层参数 */
+  videoPanelDurationSec?: number;
+  videoResolution?: string;
+  videoGenerateAudio?: boolean;
+  videoR2vRatio?: string;
 };
 
 export type SeedVideoMeta = {

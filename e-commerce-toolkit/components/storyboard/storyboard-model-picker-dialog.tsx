@@ -42,6 +42,7 @@ import {
   storyboardFullSheetDurationMismatchMessage,
   storyboardPanelDurationMismatchMessage,
   videoModelSupportsGenerateAudio,
+  videoGenerateAudioControlLabel,
   videoResolutionOptionsForModel,
   type StoryboardVideoAspectRatio,
   type StoryboardVideoDurationRange,
@@ -120,6 +121,8 @@ type Props = {
   onVideoPromptExtendChange?: (v: boolean) => void;
   videoGenerateAudio?: boolean;
   onVideoGenerateAudioChange?: (v: boolean) => void;
+  /** 单镜成片且待生成镜头含口播文案 */
+  panelHasVoiceover?: boolean;
 };
 
 /** providerKind → 中文分组名（弹层标题用） */
@@ -370,6 +373,7 @@ export function StoryboardModelPickerDialog({
   onVideoPromptExtendChange,
   videoGenerateAudio = true,
   onVideoGenerateAudioChange,
+  panelHasVoiceover = false,
 }: Props) {
   const action = confirmLabel ?? (mode === "image" ? "开始生图" : "开始生成");
   const subtitle =
@@ -440,6 +444,9 @@ export function StoryboardModelPickerDialog({
   );
   const showGenerateAudio =
     mode === "video" && videoModelSupportsGenerateAudio(draftKey);
+  const generateAudioLabel = videoGenerateAudioControlLabel(draftKey);
+  const showPanelVoiceoverAudio =
+    mode === "video" && videoTarget === "panel" && panelHasVoiceover;
   useEffect(() => {
     if (mode !== "image" || !onImageSizeChange) return;
     if (klingImageAspectOnly) return;
@@ -889,7 +896,32 @@ export function StoryboardModelPickerDialog({
                 </label>
               ) : null}
 
-              {showGenerateAudio ? (
+              {showPanelVoiceoverAudio ? (
+                <div className="space-y-2 rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5">
+                  <p className="text-xs font-medium text-[#1d1d1f]">口播与音频</p>
+                  <p className="text-[11px] leading-relaxed text-[#6e6e73]">
+                    口播文案不会自动朗读进视频。推荐先生成无声视频，再在工作区点「批量
+                    TTS」对口播单独配音，最后「合成成片」。
+                  </p>
+                  {showGenerateAudio ? (
+                    <label className="flex items-start gap-2 text-sm text-[#1d1d1f]">
+                      <input
+                        type="checkbox"
+                        checked={videoGenerateAudio}
+                        onChange={(e) => onVideoGenerateAudioChange?.(e.target.checked)}
+                        className="mt-0.5 accent-[var(--ecom-primary)]"
+                      />
+                      <span className="text-[11px] leading-relaxed">
+                        同时生成视频内环境音 / 音效（不含口播朗读）
+                      </span>
+                    </label>
+                  ) : (
+                    <p className="text-[11px] leading-relaxed text-[#86868b]">
+                      当前模型不生成视频内音效；口播请用「批量 TTS」。
+                    </p>
+                  )}
+                </div>
+              ) : showGenerateAudio ? (
                 <label className="flex items-center gap-2 text-sm text-[#1d1d1f]">
                   <input
                     type="checkbox"
@@ -897,7 +929,7 @@ export function StoryboardModelPickerDialog({
                     onChange={(e) => onVideoGenerateAudioChange?.(e.target.checked)}
                     className="accent-[var(--ecom-primary)]"
                   />
-                  <span>生成配音 / 音效</span>
+                  <span>{generateAudioLabel}</span>
                 </label>
               ) : null}
 

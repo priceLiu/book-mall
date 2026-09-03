@@ -233,38 +233,49 @@ export function resolveLogVendorPhaseEmptyHint(input: {
   isInProgress: boolean;
   hasVolcengineTrace: boolean;
   hasDashscopeTrace?: boolean;
+  hasMinimaxTrace?: boolean;
   hasVideoInput?: boolean;
 }): string | undefined {
   const hasTrace =
-    input.hasVolcengineTrace || input.hasDashscopeTrace === true;
+    input.hasVolcengineTrace ||
+    input.hasDashscopeTrace === true ||
+    input.hasMinimaxTrace === true;
   const isVolcVideo =
     input.providerKind === "VOLCENGINE" && input.requestKind === "VIDEO";
   const isDashscopeAsync =
     (input.providerKind === "DASHSCOPE" ||
       input.providerKind === "BAILIAN") &&
     input.requestKind !== "CHAT";
+  const isMinimaxVideo =
+    input.providerKind === "MINIMAX" && input.requestKind === "VIDEO";
 
-  if (!isVolcVideo && !isDashscopeAsync) {
+  if (!isVolcVideo && !isDashscopeAsync && !isMinimaxVideo) {
     if (input.requestKind === "CHAT" && input.hasVideoInput) {
       return input.isInProgress
         ? "同步 Chat 视频理解：厂商等待时间计入「网关段」墙钟，无厂商分列；进行中请耐心等待（最长约 10 分钟）"
         : "同步 Chat 视频理解：厂商等待时间计入「网关段」，无厂商分列";
     }
-    return "厂商分阶段（排队 / 生成 / 后处理）仅统计火山异步视频与百炼/DashScope 异步任务；同步 Chat 等无此拆分";
+    return "厂商分阶段（排队 / 生成 / 后处理）仅统计火山异步视频、百炼/DashScope 异步与 MiniMax H3 视频；同步 Chat 等无此拆分";
   }
   if (!hasTrace) {
     if (!input.externalTaskId?.trim()) {
       return input.isInProgress
         ? "尚无厂商 taskId：可能卡在 Gateway 提交，或 poll worker 未运行（3 分钟后会 STALE_ORPHAN 收口）"
-        : isDashscopeAsync
+        : isMinimaxVideo
+          ? "无厂商 taskId，未产生 minimaxTiming"
+          : isDashscopeAsync
           ? "无厂商 taskId，未产生 dashscopeTiming"
           : "无厂商 taskId，未产生 volcengineTiming";
     }
     return input.isInProgress
-      ? isDashscopeAsync
+      ? isMinimaxVideo
+        ? "已有 taskId 但尚未 poll 到 minimaxTiming（需厂商回包 created_at / updated_at）"
+        : isDashscopeAsync
         ? "已有 taskId 但尚未 poll 到 dashscopeTiming（需厂商回包 submit_time / scheduled_time）"
         : "已有 taskId 但尚未 poll 到 volcengineTiming，请检查 canvas poll SCF / book-mall poll worker"
-      : isDashscopeAsync
+      : isMinimaxVideo
+        ? "终态无 minimaxTiming trace（可刷新；若 resultSummary 含 task.created_at 会自动反推）"
+        : isDashscopeAsync
         ? "终态无 dashscopeTiming trace"
         : "终态无 volcengineTiming trace";
   }

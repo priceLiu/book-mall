@@ -451,7 +451,16 @@ export async function generateStoryboardPanelVideo(
     modelKey?: string;
     generateAudio?: boolean;
   },
-): Promise<{ videoUrl: string; panelIndex: number; chargePoints?: number }> {
+): Promise<
+  | {
+      status: "submitted";
+      panelIndex: number;
+      taskId: string;
+      logId: string;
+      chargePoints?: number;
+    }
+  | { videoUrl: string; panelIndex: number; chargePoints?: number }
+> {
   const data = await ecomBookFetch(
     `api/sso/tools/ecom/storyboard/projects/${projectId}/video/panel/generate`,
     {
@@ -460,6 +469,16 @@ export async function generateStoryboardPanelVideo(
       body: JSON.stringify(opts),
     },
   );
+  if (data.status === "submitted") {
+    return {
+      status: "submitted",
+      panelIndex: data.panelIndex as number,
+      taskId: data.taskId as string,
+      logId: data.logId as string,
+      chargePoints:
+        typeof data.chargePoints === "number" ? data.chargePoints : undefined,
+    };
+  }
   return {
     videoUrl: data.videoUrl as string,
     panelIndex: data.panelIndex as number,

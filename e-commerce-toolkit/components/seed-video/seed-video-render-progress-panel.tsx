@@ -15,17 +15,39 @@ type Props = {
   state: SeedVideoRenderProgressState | null;
   onPanelOpenChange: (open: boolean) => void;
   onCollapsedChange: (collapsed: boolean) => void;
+  /** 成功态自动收起后清空父级 state */
+  onDismiss?: () => void;
 };
+
+const SUCCESS_HOLD_MS = 2000;
+const SUCCESS_FADE_MS = 1400;
 
 export function SeedVideoRenderProgressPanel({
   state,
   onPanelOpenChange,
   onCollapsedChange,
+  onDismiss,
 }: Props) {
   const [mounted, setMounted] = useState(false);
   const [, tick] = useState(0);
+  const [dismissing, setDismissing] = useState(false);
 
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (state?.phase !== "done") {
+      setDismissing(false);
+      return;
+    }
+    const hold = window.setTimeout(() => setDismissing(true), SUCCESS_HOLD_MS);
+    return () => window.clearTimeout(hold);
+  }, [state?.phase, state?.jobId]);
+
+  useEffect(() => {
+    if (!dismissing) return;
+    const fade = window.setTimeout(() => onDismiss?.(), SUCCESS_FADE_MS);
+    return () => window.clearTimeout(fade);
+  }, [dismissing, onDismiss]);
 
   useEffect(() => {
     if (!state || state.phase === "done" || state.phase === "failed") return;
@@ -43,7 +65,11 @@ export function SeedVideoRenderProgressPanel({
     return createPortal(
       <button
         type="button"
-        className="fixed bottom-4 right-4 z-[90] flex max-w-[min(100vw-2rem,320px)] items-center gap-2 rounded-full border border-[#e8e8ed] bg-white px-4 py-2 text-xs font-medium text-[#1d1d1f] shadow-lg"
+        className={cn(
+          "fixed bottom-4 right-4 z-[90] flex max-w-[min(100vw-2rem,320px)] items-center gap-2 rounded-full border border-[#e8e8ed] bg-white px-4 py-2 text-xs font-medium text-[#1d1d1f] shadow-lg transition-all ease-in-out",
+          dismissing &&
+            "pointer-events-none translate-y-6 opacity-0 duration-[1400ms]",
+        )}
         onClick={() => onPanelOpenChange(true)}
       >
         <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[#0071e3]" />
@@ -59,7 +85,12 @@ export function SeedVideoRenderProgressPanel({
   const currentStep = state.stepLog[state.stepLog.length - 1] ?? state.progressLabel;
 
   return createPortal(
-    <div className="fixed bottom-4 right-4 z-[90] w-[min(100vw-2rem,380px)] overflow-hidden rounded-xl border border-[#e8e8ed] bg-white shadow-lg">
+    <div
+      className={cn(
+        "fixed bottom-4 right-4 z-[90] w-[min(100vw-2rem,380px)] overflow-hidden rounded-xl border border-[#e8e8ed] bg-white shadow-lg transition-all ease-in-out",
+        dismissing && "pointer-events-none translate-y-8 opacity-0 duration-[1400ms]",
+      )}
+    >
       <div className="flex items-center justify-between border-b border-[#e8e8ed] bg-[#f5f5f7] px-3 py-2">
         <div className="min-w-0 flex-1 pr-2">
           <p className="text-xs font-semibold text-[#1d1d1f]">

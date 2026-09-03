@@ -15,7 +15,6 @@ export const REPLICA_CHOICE_AI_WRITE_MODEL_PROMPT = "AI 写模特提示词";
 export const REPLICA_CHOICE_PICK_MODEL_AND_GENERATE = "选择模型并生成";
 export const REPLICA_CHOICE_UPLOAD_PRODUCT = "上传产品图";
 export const REPLICA_CHOICE_AI_RECOGNIZE_PRODUCT = "AI 识产品";
-export const REPLICA_CHOICE_MOCK_RECOGNIZE_PRODUCT = "Mock 识产品";
 export const REPLICA_CHOICE_GENERATE_SCRIPT = "生成复刻脚本";
 
 export type ReplicaAssistantAttachment = {

@@ -81,18 +81,23 @@ export async function mapGatewayRequestLogsToResponseRows(
         l.actorBookUserId != null
           ? (actorMap.get(l.actorBookUserId) ?? null)
           : null;
+      const inProgress =
+        l.status === "RUNNING" || l.status === "PENDING";
+      const nowMs = inProgress ? Date.now() : undefined;
       const timing = resolveGatewayLogPhaseTiming({
         providerKind: l.providerKind,
         requestKind: l.requestKind,
         submittedAt: l.submittedAt,
         completedAt: l.completedAt,
         resultSummary: l.resultSummary,
+        nowMs,
       });
       const vendorNative = resolveGatewayVendorNativeTimingForLogRow({
         providerKind: l.providerKind,
         requestKind: l.requestKind,
         vendorDurationMs: l.vendorDurationMs,
         resultSummary: l.resultSummary,
+        nowMs,
       });
       let estimatedVendorCostYuan = l.estimatedVendorCostYuan?.toString() ?? null;
       if (

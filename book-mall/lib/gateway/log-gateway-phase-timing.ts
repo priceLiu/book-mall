@@ -3,6 +3,10 @@ import {
   resolveDashscopeVendorNativeTimingForLogRow,
 } from "@/lib/gateway/log-dashscope-timing";
 import {
+  resolveMinimaxLogTiming,
+  resolveMinimaxVendorNativeTimingForLogRow,
+} from "@/lib/gateway/log-minimax-timing";
+import {
   resolveVolcengineLogTiming,
   resolveVendorNativeTimingForLogRow,
   type VolcengineTimingBreakdown,
@@ -18,7 +22,9 @@ export function resolveGatewayLogPhaseTiming(input: {
   nowMs?: number;
 }): VolcengineTimingBreakdown | null {
   return (
-    resolveVolcengineLogTiming(input) ?? resolveDashscopeLogTiming(input)
+    resolveVolcengineLogTiming(input) ??
+    resolveDashscopeLogTiming(input) ??
+    resolveMinimaxLogTiming(input)
   );
 }
 
@@ -39,5 +45,12 @@ export function resolveGatewayVendorNativeTimingForLogRow(input: {
   ) {
     return volc;
   }
-  return resolveDashscopeVendorNativeTimingForLogRow(input);
+  const dash = resolveDashscopeVendorNativeTimingForLogRow(input);
+  if (
+    dash.vendorNativeDurationMs != null ||
+    dash.vendorNativeGenerateMs != null
+  ) {
+    return dash;
+  }
+  return resolveMinimaxVendorNativeTimingForLogRow(input);
 }

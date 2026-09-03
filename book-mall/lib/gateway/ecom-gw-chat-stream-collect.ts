@@ -4,6 +4,7 @@
  */
 import type { CanvasChatMessage } from "@/lib/canvas/providers/types";
 import { ecomGwChatStream } from "@/lib/gateway/ecom-tool-gateway-client";
+import { readEcomGwChatSseStream } from "@/lib/gateway/ecom-gw-chat-sse-read";
 
 function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) {
@@ -22,6 +23,7 @@ export async function collectEcomGwChatStreamText(
     params?: Record<string, unknown>;
     signal?: AbortSignal;
     onChunk?: (accumulated: string) => void;
+    onThinkingProgress?: () => void;
   },
 ): Promise<string> {
   throwIfAborted(opts.signal);
@@ -33,42 +35,15 @@ export async function collectEcomGwChatStreamText(
     params: opts.params,
   });
 
-  const decoder = new TextDecoder();
-  const reader = gw.body.getReader();
-  let sseBuffer = "";
-  let fullText = "";
-
-  try {
-    while (true) {
-      throwIfAborted(opts.signal);
-      const { done, value } = await reader.read();
-      if (done) break;
-      sseBuffer += decoder.decode(value, { stream: true });
-      const lines = sseBuffer.split("\n");
-      sseBuffer = lines.pop() ?? "";
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith("data:")) continue;
-        const payload = trimmed.slice(5).trim();
-        if (!payload || payload === "[DONE]") continue;
-        try {
-          const chunk = JSON.parse(payload) as {
-            choices?: { delta?: { content?: string | null } }[];
-          };
-          const piece = chunk.choices?.[0]?.delta?.content ?? "";
-          if (piece) {
-            fullText += piece;
-            opts.onChunk?.(fullText);
-          }
-        } catch {
-          /* ignore malformed SSE chunk */
-        }
-      }
-    }
-    return fullText.trim();
-  } finally {
-    reader.releaseLock();
-  }
+  return readEcomGwChatSseStream(gw.body, {
+    signal: opts.signal,
+    handlers: {
+      onContent: (_piece, accumulated) => {
+        opts.onChunk?.(accumulated);
+      },
+      onThinkingProgress: opts.onThinkingProgress,
+    },
+  });
 }
 
 /** 将 Gateway SSE 字节流转发为 text/plain，同时可选收集全文 */
@@ -81,43 +56,27 @@ export function pipeGatewaySseChatToTextPlain(
   },
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
-  let sseBuffer = "";
-  let fullText = "";
 
   return new ReadableStream({
     async start(controller) {
-      const reader = gwBody.getReader();
+      let thinkingSent = false;
+      let fullText = "";
       try {
-        while (true) {
-          if (opts?.signal?.aborted) {
-            throw new Error("请求已取消");
-          }
-          const { done, value } = await reader.read();
-          if (done) break;
-          sseBuffer += decoder.decode(value, { stream: true });
-          const lines = sseBuffer.split("\n");
-          sseBuffer = lines.pop() ?? "";
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith("data:")) continue;
-            const payload = trimmed.slice(5).trim();
-            if (!payload || payload === "[DONE]") continue;
-            try {
-              const chunk = JSON.parse(payload) as {
-                choices?: { delta?: { content?: string | null } }[];
-              };
-              const piece = chunk.choices?.[0]?.delta?.content ?? "";
-              if (piece) {
-                fullText += piece;
-                controller.enqueue(encoder.encode(piece));
-              }
-            } catch {
-              /* ignore */
-            }
-          }
-        }
-        await opts?.onFullText?.(fullText.trim());
+        const text = await readEcomGwChatSseStream(gwBody, {
+          signal: opts?.signal,
+          handlers: {
+            onThinkingProgress: () => {
+              if (thinkingSent) return;
+              thinkingSent = true;
+              controller.enqueue(encoder.encode("（模型思考中…）\n"));
+            },
+            onContent: (piece) => {
+              fullText += piece;
+              controller.enqueue(encoder.encode(piece));
+            },
+          },
+        });
+        await opts?.onFullText?.(text);
         controller.close();
       } catch (e) {
         const errMsg = e instanceof Error ? e.message : "流式输出失败";
@@ -135,7 +94,6 @@ export function pipeGatewaySseChatToTextPlain(
         }
         controller.error(e instanceof Error ? e : new Error(errMsg));
       } finally {
-        reader.releaseLock();
         opts?.onFinally?.();
       }
     },

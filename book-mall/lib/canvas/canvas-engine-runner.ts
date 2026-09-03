@@ -2061,6 +2061,8 @@ export async function runVideoEngineNode(
         duration: Number(params.duration ?? 5),
         ratio: String(params.ratio ?? params.aspect_ratio ?? "16:9"),
         aigc_watermark: params.aigc_watermark === true,
+        generateAudio:
+          params.generate_audio !== false && params.generateAudio !== false,
       },
     });
     model = built.modelKey;

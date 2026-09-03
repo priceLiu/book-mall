@@ -36,6 +36,7 @@ import {
 } from "@/lib/ecom/ecom-media-decompose-types";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
 import { ecomGwChatStream } from "@/lib/gateway/ecom-tool-gateway-client";
+import { readEcomGwChatSseStream } from "@/lib/gateway/ecom-gw-chat-sse-read";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const runtime = "nodejs";
@@ -110,7 +111,6 @@ export async function POST(req: Request, ctx: Ctx) {
     });
 
     const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
 
     const readable = new ReadableStream({
       async start(controller) {
@@ -153,37 +153,19 @@ export async function POST(req: Request, ctx: Ctx) {
             clientPage,
           });
 
-          const reader = gw.body.getReader();
-          let sseBuffer = "";
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              sseBuffer += decoder.decode(value, { stream: true });
-              const lines = sseBuffer.split("\n");
-              sseBuffer = lines.pop() ?? "";
-              for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed.startsWith("data:")) continue;
-                const payload = trimmed.slice(5).trim();
-                if (!payload || payload === "[DONE]") continue;
-                try {
-                  const chunk = JSON.parse(payload) as {
-                    choices?: { delta?: { content?: string | null } }[];
-                  };
-                  const piece = chunk.choices?.[0]?.delta?.content ?? "";
-                  if (piece) {
-                    fullText += piece;
-                    controller.enqueue(encoder.encode(piece));
-                  }
-                } catch {
-                  /* ignore */
-                }
-              }
-            }
-          } finally {
-            reader.releaseLock();
-          }
+          let thinkingSent = false;
+          fullText = await readEcomGwChatSseStream(gw.body, {
+            handlers: {
+              onThinkingProgress: () => {
+                if (thinkingSent) return;
+                thinkingSent = true;
+                controller.enqueue(encoder.encode("（模型思考中…）\n"));
+              },
+              onContent: (piece) => {
+                controller.enqueue(encoder.encode(piece));
+              },
+            },
+          });
 
           const extracted = extractMediaDecomposePatch(fullText);
           const structured =

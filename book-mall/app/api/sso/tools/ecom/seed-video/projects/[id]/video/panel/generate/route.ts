@@ -7,7 +7,7 @@ import { ECOM_SEED_VIDEO_DEFAULT_VIDEO_MODEL } from "@/lib/ecom/ecom-seed-video-
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 600;
+export const maxDuration = 120;
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -23,7 +23,9 @@ export async function POST(req: Request, ctx: Ctx) {
     /* */
   }
 
-  const project = await getEcomSeedVideoProject(auth.userId, projectId);
+  const project = await getEcomSeedVideoProject(auth.userId, projectId, {
+    resumePending: false,
+  });
   const shots = project?.plan?.shots ?? [];
   if (shots.length === 0) {
     return NextResponse.json({ error: "请先完成镜头表策划" }, { status: 400 });
@@ -63,6 +65,7 @@ export async function POST(req: Request, ctx: Ctx) {
       ratio: typeof body.ratio === "string" ? body.ratio : undefined,
       generateAudio:
         typeof body.generateAudio === "boolean" ? body.generateAudio : undefined,
+      skipGatewayAccessCheck: true,
     });
     return NextResponse.json(result);
   } catch (e) {

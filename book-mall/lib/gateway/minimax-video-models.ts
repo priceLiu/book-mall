@@ -68,6 +68,12 @@ const H3_VIDEO_PARAM_SCHEMA = [
     defaultValue: "16:9",
   },
   {
+    key: "generate_audio",
+    label: "生成音轨",
+    type: "boolean",
+    defaultValue: true,
+  },
+  {
     key: "aigc_watermark",
     label: "AIGC 水印",
     type: "boolean",
@@ -119,7 +125,7 @@ export const MINIMAX_VIDEO_KNOWN_MODELS: MinimaxVideoKnownModel[] = [
     taskKind: "generation",
     capabilities: ["text-to-video"],
     paramsSchema: H3_VIDEO_PARAM_SCHEMA,
-    defaultParams: { resolution: "2K", duration: 5, ratio: "16:9", aigc_watermark: false },
+    defaultParams: { resolution: "2K", duration: 5, ratio: "16:9", aigc_watermark: false, generate_audio: true },
   },
   {
     modelKey: "MiniMax/MiniMax-H3-i2v",
@@ -131,7 +137,7 @@ export const MINIMAX_VIDEO_KNOWN_MODELS: MinimaxVideoKnownModel[] = [
     paramsSchema: H3_VIDEO_PARAM_SCHEMA.map((p) =>
       p.key === "ratio" ? { ...p, defaultValue: "adaptive" } : p,
     ) as CanvasParamSchema,
-    defaultParams: { resolution: "2K", duration: 5, ratio: "adaptive", aigc_watermark: false },
+    defaultParams: { resolution: "2K", duration: 5, ratio: "adaptive", aigc_watermark: false, generate_audio: true },
   },
   {
     modelKey: "MiniMax/MiniMax-H3-fl2v",
@@ -143,7 +149,7 @@ export const MINIMAX_VIDEO_KNOWN_MODELS: MinimaxVideoKnownModel[] = [
     paramsSchema: H3_VIDEO_PARAM_SCHEMA.map((p) =>
       p.key === "ratio" ? { ...p, defaultValue: "adaptive" } : p,
     ) as CanvasParamSchema,
-    defaultParams: { resolution: "2K", duration: 5, ratio: "adaptive", aigc_watermark: false },
+    defaultParams: { resolution: "2K", duration: 5, ratio: "adaptive", aigc_watermark: false, generate_audio: true },
   },
   {
     modelKey: "MiniMax/MiniMax-H3-r2v",
@@ -155,7 +161,7 @@ export const MINIMAX_VIDEO_KNOWN_MODELS: MinimaxVideoKnownModel[] = [
     paramsSchema: H3_VIDEO_PARAM_SCHEMA.map((p) =>
       p.key === "ratio" ? { ...p, defaultValue: "adaptive" } : p,
     ) as CanvasParamSchema,
-    defaultParams: { resolution: "2K", duration: 5, ratio: "adaptive", aigc_watermark: false },
+    defaultParams: { resolution: "2K", duration: 5, ratio: "adaptive", aigc_watermark: false, generate_audio: true },
   },
   {
     modelKey: "MiniMax/MiniMax-H3-s2v",
@@ -167,7 +173,7 @@ export const MINIMAX_VIDEO_KNOWN_MODELS: MinimaxVideoKnownModel[] = [
     paramsSchema: H3_VIDEO_PARAM_SCHEMA.map((p) =>
       p.key === "ratio" ? { ...p, defaultValue: "adaptive" } : p,
     ) as CanvasParamSchema,
-    defaultParams: { resolution: "2K", duration: 5, ratio: "adaptive", aigc_watermark: false },
+    defaultParams: { resolution: "2K", duration: 5, ratio: "adaptive", aigc_watermark: false, generate_audio: true },
   },
   {
     modelKey: "MiniMax/MiniMax-H3-regeneration",

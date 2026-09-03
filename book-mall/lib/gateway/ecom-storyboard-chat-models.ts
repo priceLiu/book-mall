@@ -45,6 +45,30 @@ export function resolveEcomAssistantChatParams(
   return {};
 }
 
+/** 拆图拆视频 / 拉片 · 视频理解模型上游参数（GLM 须低开销思考，避免长时间只有 reasoning_content） */
+export function resolveEcomVisionChatParams(
+  modelKey: string,
+): Record<string, unknown> {
+  const m = modelKey.trim().toLowerCase();
+  const visionJsonMaxTokens = { max_tokens: 24_000 };
+  if (m === "glm-5.3-flash" || m.startsWith("zhipu/glm")) {
+    return {
+      ...visionJsonMaxTokens,
+      enable_thinking: true,
+      reasoning_effort: "low",
+    };
+  }
+  if (
+    m.includes("omni") ||
+    m.includes("vl") ||
+    m === "qwen3.8-max" ||
+    m.startsWith("qwen3.")
+  ) {
+    return { ...visionJsonMaxTokens };
+  }
+  return {};
+}
+
 export const ECOM_DEFAULT_VISION_MODEL = "qwen3.8-max";
 /** 电商 · AI 识产品（百炼 VL Flash · 低成本图片理解） */
 export const ECOM_RECOGNIZE_PRODUCT_MODEL = "qwen3-vl-flash";

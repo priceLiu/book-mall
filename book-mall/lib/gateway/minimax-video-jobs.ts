@@ -4,6 +4,14 @@ import {
   runGatewaySubmitWithRetry,
 } from "@/lib/gateway/gateway-submit-error-policy";
 import { buildGatewayTaskResultSummary } from "@/lib/gateway/log-result-summary";
+import {
+  finalizeMinimaxVideoRequestLog,
+  persistMinimaxTimingOnPoll,
+} from "@/lib/gateway/log-minimax-timing-persist";
+import {
+  mergeMinimaxTimingTrace,
+  readMinimaxTimingTrace,
+} from "@/lib/gateway/log-minimax-timing";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 import { buildMinimaxVideoSubmitBody } from "@/lib/gateway/minimax-video-body";
 import {
@@ -114,6 +122,9 @@ export async function pollMinimaxVideoTaskForLog(opts: {
       submittedAt: true,
       status: true,
       model: true,
+      completedAt: true,
+      lastPolledAt: true,
+      resultSummary: true,
     },
   });
   if (!log) return "done";
@@ -128,12 +139,15 @@ export async function pollMinimaxVideoTaskForLog(opts: {
       task_type: row.task_type,
       usage: row.usage,
     });
-    await finalizeRequestLog(opts.logId, {
+    const trace = mergeMinimaxTimingTrace(
+      readMinimaxTimingTrace(log.resultSummary),
+      { status: vendorStatus, task: row, polledAtMs: Date.now() },
+    );
+    await finalizeMinimaxVideoRequestLog(opts.logId, {
+      submittedAt: log.submittedAt,
       status: "SUCCEEDED",
-      durationMs: log.submittedAt
-        ? Date.now() - log.submittedAt.getTime()
-        : 0,
-      resultSummary: baseSummary,
+      trace,
+      resultSummaryBase: baseSummary,
       externalTaskId: opts.taskId,
       model: log.model,
       usage: row.usage
@@ -148,29 +162,32 @@ export async function pollMinimaxVideoTaskForLog(opts: {
   }
 
   if (isMinimaxVideoTaskFailed(row)) {
-    await finalizeRequestLog(opts.logId, {
+    const failSummary = buildGatewayTaskResultSummary(polled.raw, {
+      status: row.status,
+      error: row.error,
+    });
+    const trace = mergeMinimaxTimingTrace(
+      readMinimaxTimingTrace(log.resultSummary),
+      { status: vendorStatus, task: row, polledAtMs: Date.now() },
+    );
+    await finalizeMinimaxVideoRequestLog(opts.logId, {
+      submittedAt: log.submittedAt,
       status: "FAILED",
-      durationMs: log.submittedAt
-        ? Date.now() - log.submittedAt.getTime()
-        : 0,
+      trace,
+      resultSummaryBase: failSummary,
       failMessage: minimaxVideoTaskFailMessage(row),
       failCode: "MINIMAX_VIDEO_TASK_FAILED",
       externalTaskId: opts.taskId,
       model: log.model,
-      resultSummary: buildGatewayTaskResultSummary(polled.raw, {
-        status: row.status,
-        error: row.error,
-      }),
     });
     return "done";
   }
 
-  await prisma.gatewayRequestLog.update({
-    where: { id: opts.logId },
-    data: {
-      lastPolledAt: new Date(),
-      pollCount: { increment: 1 },
-    },
+  await persistMinimaxTimingOnPoll({
+    log,
+    vendorStatus,
+    task: row,
+    raw: polled.raw,
   });
 
   return "pending";

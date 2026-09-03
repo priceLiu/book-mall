@@ -120,6 +120,11 @@ export type SeedVideoSettings = {
   aspectRatio?: "9:16" | "16:9";
   targetDurationSec?: number;
   skillKey?: SeedVideoSkillKey;
+  /** 方案②逐镜生成 · 上次模型弹层参数 */
+  videoPanelDurationSec?: number;
+  videoResolution?: string;
+  videoGenerateAudio?: boolean;
+  videoR2vRatio?: string;
 };
 
 export type SeedVideoProject = {

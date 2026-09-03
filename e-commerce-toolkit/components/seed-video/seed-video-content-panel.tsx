@@ -7,6 +7,7 @@ import { Download, Images, Plus, Save } from "lucide-react";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
 import { ProductDesignPromptMentionTextarea } from "@/components/product-design/product-design-prompt-mention-textarea";
+import { SeedVideoComposeDialog } from "@/components/seed-video/seed-video-compose-dialog";
 import { SeedVideoRenderProgressPanel } from "@/components/seed-video/seed-video-render-progress-panel";
 import { SeedVideoSaveDialog } from "@/components/seed-video/seed-video-save-dialog";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
@@ -24,6 +25,7 @@ import {
   generateSeedVideoShot,
   generateSeedVideoTts,
   getSeedVideoProject,
+  resumeSeedVideoPendingShots,
   pollSeedVideoDirect,
   pollSeedVideoMediaRenderJob,
   renderSeedVideo,
@@ -47,10 +49,26 @@ import {
   resolveSeedVideoRenderPhase,
   type SeedVideoRenderProgressState,
 } from "@/lib/seed-video-render-progress";
+import { buildSeedVideoComposeProfile } from "@/lib/seed-video-render-profile";
+import { DEFAULT_SUBTITLE_STYLE, type SubtitleBurnInStyle } from "@private/media-render-subtitle-style";
 import {
   isShotVideoPending,
-  listPendingShotVideoIndices,
 } from "@/lib/seed-video-pending-shots";
+import {
+  mergeOptimisticGeneratingShots,
+  buildActiveGeneratingIndices,
+  seedVideoShotsHaveVoiceover,
+  addGeneratingShot,
+  removeGeneratingShot,
+  listEffectivePendingShotIndices,
+  clearGeneratingShotsWithVideo,
+} from "@/lib/seed-video-generating-shots";
+import {
+  batchComposeButtonLabel,
+  batchTtsButtonLabel,
+  listSelectedComposeShotIndices,
+  listSelectedTtsShotIndices,
+} from "@/lib/seed-video-tts-selection";
 import {
   filterVideoModelsForMode,
   hasSeedVideoDirectPlanReady,
@@ -80,20 +98,6 @@ const DIRECT_POLL_MAX = 180;
 const RENDER_POLL_MS = 3000;
 const RENDER_POLL_MAX = 120;
 const SHOT_POLL_MS = 4000;
-
-function addGeneratingShot(prev: Set<number>, index: number): Set<number> {
-  if (prev.has(index)) return prev;
-  const next = new Set(prev);
-  next.add(index);
-  return next;
-}
-
-function removeGeneratingShot(prev: Set<number>, index: number): Set<number> {
-  if (!prev.has(index)) return prev;
-  const next = new Set(prev);
-  next.delete(index);
-  return next;
-}
 
 type PendingDirectVideoMeta = {
   taskId?: string;
@@ -293,7 +297,11 @@ export function SeedVideoContentPanel({
   const [pickerSelectedShotIndices, setPickerSelectedShotIndices] = useState<number[]>([]);
   const [selectedShotIndices, setSelectedShotIndices] = useState<Set<number>>(() => new Set());
   const [generatingShots, setGeneratingShots] = useState<Set<number>>(
-    () => new Set(listPendingShotVideoIndices(project.meta)),
+    () =>
+      new Set(listEffectivePendingShotIndices(project.meta, project.plan?.shots)),
+  );
+  const [syncedProjectMeta, setSyncedProjectMeta] = useState<SeedVideoProject["meta"]>(
+    project.meta,
   );
   const [batchShotBusy, setBatchShotBusy] = useState(false);
   const [ttsBusy, setTtsBusy] = useState(false);
@@ -301,6 +309,10 @@ export function SeedVideoContentPanel({
   const [renderProgress, setRenderProgress] = useState<SeedVideoRenderProgressState | null>(
     null,
   );
+  const [composeDialogOpen, setComposeDialogOpen] = useState(false);
+  const [pendingComposeIndices, setPendingComposeIndices] = useState<number[] | null>(null);
+  const [composeSubtitleStyle, setComposeSubtitleStyle] =
+    useState<SubtitleBurnInStyle>(DEFAULT_SUBTITLE_STYLE);
   const renderResumeLockRef = useRef(false);
   const [directBusy, setDirectBusy] = useState(false);
   const [pickerDurationSec, setPickerDurationSec] = useState(
@@ -318,7 +330,13 @@ export function SeedVideoContentPanel({
   const directPollLock = useRef(false);
   const generatingShotsRef = useRef(generatingShots);
   generatingShotsRef.current = generatingShots;
+  /** 各镜号乐观 generating 的起始时间，用于过期清理从未到达服务端的标记 */
+  const generatingSinceRef = useRef<Map<number, number> | null>(null);
+  if (generatingSinceRef.current === null) {
+    generatingSinceRef.current = new Map([...generatingShots].map((i) => [i, Date.now()]));
+  }
   const syncShotVideosLockRef = useRef(false);
+  const submitInFlightRef = useRef(false);
   const projectChangeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -334,29 +352,97 @@ export function SeedVideoContentPanel({
   }, [project.id]);
 
   useEffect(() => {
-    setGeneratingShots(new Set(listPendingShotVideoIndices(project.meta)));
+    setSyncedProjectMeta(project.meta);
   }, [project.id]);
 
   useEffect(() => {
-    const pending = listPendingShotVideoIndices(project.meta);
-    if (pending.length === 0) return;
-    setGeneratingShots((prev) => {
-      let next = prev;
-      for (const index of pending) next = addGeneratingShot(next, index);
-      return next;
-    });
-  }, [project.meta]);
+    const initial = new Set(listEffectivePendingShotIndices(project.meta, project.plan?.shots));
+    generatingSinceRef.current = new Map([...initial].map((i) => [i, Date.now()]));
+    setGeneratingShots(initial);
+  }, [project.id]);
+
+  useEffect(() => {
+    const shots = project.plan?.shots;
+    if (!shots?.length) return;
+    setLocalShots((prev) => mergeSeedVideoShots(prev, shots));
+    setGeneratingShots((prev) => clearGeneratingShotsWithVideo(prev, shots));
+  }, [project.plan?.shots, project.updatedAt, project.id]);
 
   const pendingShotIndices = useMemo(
-    () => listPendingShotVideoIndices(project.meta),
-    [project.meta],
+    () => listEffectivePendingShotIndices(syncedProjectMeta, localShots),
+    [syncedProjectMeta, localShots],
   );
 
-  const activeGeneratingIndices = useMemo(() => {
-    const set = new Set(generatingShots);
-    for (const idx of pendingShotIndices) set.add(idx);
-    return set;
-  }, [generatingShots, pendingShotIndices]);
+  const activeGeneratingIndices = useMemo(
+    () =>
+      buildActiveGeneratingIndices({
+        generatingShots,
+        pendingIndices: pendingShotIndices,
+        shots: localShots,
+      }),
+    [generatingShots, pendingShotIndices, localShots],
+  );
+
+  const selectedGeneratableIndices = useMemo(
+    () => [...selectedShotIndices].filter((index) => !activeGeneratingIndices.has(index)),
+    [selectedShotIndices, activeGeneratingIndices],
+  );
+  const generatingSelectionKey = useMemo(
+    () => [...activeGeneratingIndices].sort((a, b) => a - b).join(","),
+    [activeGeneratingIndices],
+  );
+  const selectedGeneratableCount = selectedGeneratableIndices.length;
+
+  const selectedTtsIndices = useMemo(
+    () => listSelectedTtsShotIndices(localShots, selectedGeneratableIndices),
+    [localShots, selectedGeneratableIndices],
+  );
+  const selectedTtsCount = selectedTtsIndices.length;
+  const batchTtsLabel = batchTtsButtonLabel({ busy: ttsBusy, selectedCount: selectedTtsCount });
+
+  const selectedComposeIndices = useMemo(
+    () => listSelectedComposeShotIndices(localShots, selectedGeneratableIndices),
+    [localShots, selectedGeneratableIndices],
+  );
+  const selectedComposeCount = selectedComposeIndices.length;
+  const batchComposeLabel = batchComposeButtonLabel({
+    busy: renderBusy,
+    selectedCount: selectedComposeCount,
+  });
+
+  const pickerPanelHasVoiceover = useMemo(() => {
+    if (!pickerOpen || direct) return false;
+    if (pickerPanelIndex != null) {
+      return seedVideoShotsHaveVoiceover(localShots, [pickerPanelIndex]);
+    }
+    if (pickerSelectedShotIndices.length > 0) {
+      return seedVideoShotsHaveVoiceover(localShots, pickerSelectedShotIndices);
+    }
+    if (selectedGeneratableCount > 0) {
+      return seedVideoShotsHaveVoiceover(localShots, selectedGeneratableIndices);
+    }
+    return seedVideoShotsHaveVoiceover(localShots);
+  }, [
+    pickerOpen,
+    direct,
+    pickerPanelIndex,
+    pickerSelectedShotIndices,
+    localShots,
+    selectedGeneratableCount,
+    selectedGeneratableIndices,
+  ]);
+
+  useEffect(() => {
+    setSelectedShotIndices((prev) => {
+      let changed = false;
+      const next = new Set<number>();
+      for (const i of prev) {
+        if (activeGeneratingIndices.has(i)) changed = true;
+        else next.add(i);
+      }
+      return changed ? next : prev;
+    });
+  }, [generatingSelectionKey, activeGeneratingIndices]);
 
   const pendingDirectVideo = readPendingDirectVideo(project.meta);
   const isDirectGenerating = directBusy || Boolean(pendingDirectVideo?.taskId);
@@ -482,36 +568,66 @@ export function SeedVideoContentPanel({
   );
 
   const syncGeneratingShotVideos = useCallback(async () => {
-    if (syncShotVideosLockRef.current) return;
+    if (syncShotVideosLockRef.current || submitInFlightRef.current) return;
     syncShotVideosLockRef.current = true;
     try {
-      const fresh = await getSeedVideoProject(project.id);
+      let fresh = await getSeedVideoProject(project.id, { resumePending: false });
+      setSyncedProjectMeta(fresh.meta);
+
+      const serverPending = listEffectivePendingShotIndices(fresh.meta, fresh.plan?.shots);
       const watch = new Set<number>(generatingShotsRef.current);
-      for (const idx of listPendingShotVideoIndices(fresh.meta)) {
-        watch.add(idx);
+      for (const idx of serverPending) watch.add(idx);
+
+      if (fresh.plan?.shots?.length) {
+        setLocalShots((prev) => mergeSeedVideoShots(prev, fresh.plan?.shots ?? prev));
       }
-      if (watch.size === 0) return;
+
+      setGeneratingShots((prev) => {
+        const merged = clearGeneratingShotsWithVideo(
+          mergeOptimisticGeneratingShots({
+            previous: prev,
+            serverPending,
+            shots: fresh.plan?.shots,
+            previousStartedAt: generatingSinceRef.current ?? undefined,
+          }),
+          fresh.plan?.shots,
+        );
+        const since = generatingSinceRef.current;
+        if (since) for (const key of [...since.keys()]) if (!merged.has(key)) since.delete(key);
+        return merged;
+      });
+
+      if (serverPending.length > 0 && !submitInFlightRef.current) {
+        fresh = await resumeSeedVideoPendingShots(project.id);
+        setSyncedProjectMeta(fresh.meta);
+        if (fresh.plan?.shots?.length) {
+          setLocalShots((prev) => mergeSeedVideoShots(prev, fresh.plan?.shots ?? prev));
+        }
+        setGeneratingShots((prev) => {
+          const merged = clearGeneratingShotsWithVideo(
+            mergeOptimisticGeneratingShots({
+              previous: prev,
+              serverPending: listEffectivePendingShotIndices(fresh.meta, fresh.plan?.shots),
+              shots: fresh.plan?.shots,
+              previousStartedAt: generatingSinceRef.current ?? undefined,
+            }),
+            fresh.plan?.shots,
+          );
+          const since = generatingSinceRef.current;
+          if (since) for (const key of [...since.keys()]) if (!merged.has(key)) since.delete(key);
+          return merged;
+        });
+      }
 
       let videoChanged = false;
-      const completed: number[] = [];
       for (const idx of watch) {
         const remote = fresh.plan?.shots?.find((s) => s.index === idx);
         if (!remote?.videoUrl?.trim()) continue;
         if (applyRemoteShotVideo(idx, remote)) {
           videoChanged = true;
-          completed.push(idx);
         }
       }
 
-      if (completed.length > 0) {
-        setGeneratingShots((prev) => {
-          let next = prev;
-          for (const idx of completed) {
-            next = removeGeneratingShot(next, idx);
-          }
-          return next;
-        });
-      }
       if (videoChanged) scheduleProjectChange();
     } catch {
       /* ignore */
@@ -519,6 +635,10 @@ export function SeedVideoContentPanel({
       syncShotVideosLockRef.current = false;
     }
   }, [applyRemoteShotVideo, project.id, scheduleProjectChange]);
+
+  useEffect(() => {
+    void syncGeneratingShotVideos();
+  }, [project.id, syncGeneratingShotVideos]);
 
   useEffect(() => {
     if (generatingShots.size === 0 && pendingShotIndices.length === 0) return;
@@ -642,12 +762,13 @@ export function SeedVideoContentPanel({
   }
 
   async function runPanelGenerate(modelKey: string, panelIndex: number) {
-    setGeneratingShots((prev) => addGeneratingShot(prev, panelIndex));
-    void syncGeneratingShotVideos();
+    submitInFlightRef.current = true;
     try {
       await persistPlanShotsQuiet(
         mergeSeedVideoShots(localShots, project.plan?.shots ?? []),
       );
+      setGeneratingShots((prev) => addGeneratingShot(prev, panelIndex));
+      generatingSinceRef.current?.set(panelIndex, Date.now());
       const result = await generateSeedVideoShot({
         projectId: project.id,
         shotIndex: panelIndex,
@@ -657,6 +778,11 @@ export function SeedVideoContentPanel({
         resolution: pickerVideoResolution,
         generateAudio: pickerVideoGenerateAudio,
       });
+      if ("status" in result) {
+        void syncGeneratingShotVideos();
+        scheduleProjectChange();
+        return;
+      }
       setLocalShots((prev) =>
         prev.map((s) =>
           s.index === panelIndex ? { ...s, videoUrl: result.videoUrl } : s,
@@ -671,7 +797,7 @@ export function SeedVideoContentPanel({
         scheduleProjectChange();
         return;
       }
-      const fresh = await getSeedVideoProject(project.id);
+      const fresh = await getSeedVideoProject(project.id, { resumePending: false });
       const remote = fresh.plan?.shots?.find((s) => s.index === panelIndex);
       if (remote?.videoUrl?.trim()) {
         applyRemoteShotVideo(panelIndex, remote);
@@ -694,6 +820,8 @@ export function SeedVideoContentPanel({
         message: msg,
         variant: "error",
       });
+    } finally {
+      submitInFlightRef.current = false;
     }
   }
 
@@ -718,9 +846,6 @@ export function SeedVideoContentPanel({
     await persistPlanShotsQuiet(
       mergeSeedVideoShots(localShots, project.plan?.shots ?? []),
     );
-    const fresh = await getSeedVideoProject(project.id);
-    const current = mergeSeedVideoShots(localShots, fresh.plan?.shots ?? localShots);
-    setLocalShots(current);
     const pending = unique.filter((index) => !generatingShotsRef.current.has(index));
     if (pending.length === 0) return;
     void Promise.all(pending.map((index) => runPanelGenerate(modelKey, index)));
@@ -787,7 +912,9 @@ export function SeedVideoContentPanel({
         phase: "queued",
       });
       try {
-        const { jobId } = await renderSeedVideo(project.id);
+        const { jobId } = await renderSeedVideo(project.id, {
+          profile: buildSeedVideoComposeProfile(composeSubtitleStyle),
+        });
         const videoUrl = await waitForRenderJob(jobId, startedAt);
         await persistRenderFinalVideo(jobId, videoUrl);
         await onProjectChange();
@@ -977,13 +1104,21 @@ export function SeedVideoContentPanel({
     waitForRenderJob,
   ]);
 
-  async function runTts() {
+  async function runTts(shotIndices: number[]) {
+    if (shotIndices.length === 0) {
+      await onAlert({
+        title: "请先勾选镜头",
+        message: "勾选含口播文案的镜头后再点「批量 TTS」；口播列为空的不计入。",
+        variant: "error",
+      });
+      return;
+    }
     setTtsBusy(true);
     try {
       await savePlan({
         shots: mergeSeedVideoShots(localShots, project.plan?.shots ?? []),
       });
-      await generateSeedVideoTts({ projectId: project.id });
+      await generateSeedVideoTts({ projectId: project.id, shotIndices });
       await onProjectChange();
     } catch (e) {
       await onAlert({
@@ -996,7 +1131,48 @@ export function SeedVideoContentPanel({
     }
   }
 
-  async function runRender() {
+  function requestCompose(shotIndices: number[]) {
+    if (shotIndices.length === 0) {
+      void onAlert({
+        title: "请先勾选镜头",
+        message:
+          "勾选状态为「就绪」或「视频 OK」（无口播）的镜头后再合成；缺视频或未 TTS 的不计入。",
+        variant: "error",
+      });
+      return;
+    }
+    const merged = mergeSeedVideoShots(localShots, project.plan?.shots ?? []);
+    const selectedSet = new Set(shotIndices);
+    const targets = merged.filter((s) => selectedSet.has(s.index));
+    if (targets.some((s) => !s.videoUrl?.trim())) {
+      void onAlert({
+        title: "暂不能合成",
+        message: "所选镜头须已有镜头视频（状态「视频 OK」或「就绪」）。",
+        variant: "error",
+      });
+      return;
+    }
+    if (
+      targets.some(
+        (s) => s.videoUrl?.trim() && s.voiceover?.trim() && !s.ttsUrl?.trim(),
+      )
+    ) {
+      void onAlert({
+        title: "暂不能合成",
+        message: "所选镜头中有口播尚未 TTS，请先对勾选镜头批量 TTS。",
+        variant: "error",
+      });
+      return;
+    }
+    setPendingComposeIndices(shotIndices);
+    setComposeDialogOpen(true);
+  }
+
+  async function runRender(shotIndices: number[], subtitleStyle: SubtitleBurnInStyle) {
+    if (shotIndices.length === 0) return;
+    setComposeSubtitleStyle(subtitleStyle);
+    setComposeDialogOpen(false);
+    setPendingComposeIndices(null);
     setRenderBusy(true);
     const startedAt = Date.now();
     setRenderProgress({
@@ -1011,22 +1187,26 @@ export function SeedVideoContentPanel({
     });
     try {
       const merged = mergeSeedVideoShots(localShots, project.plan?.shots ?? []);
-      const missingVideo = merged.some((s) => !s.videoUrl?.trim());
-      if (missingVideo) {
+      const selectedSet = new Set(shotIndices);
+      const targets = merged.filter((s) => selectedSet.has(s.index));
+      if (targets.some((s) => !s.videoUrl?.trim())) {
         setRenderProgress(null);
         await onAlert({
           title: "暂不能合成",
-          message: "请先为各镜生成镜头视频（状态「视频 OK」或「就绪」）。",
+          message: "所选镜头须已有镜头视频（状态「视频 OK」或「就绪」）。",
           variant: "error",
         });
         return;
       }
-      const missingTts = merged.some((s) => s.videoUrl?.trim() && !s.ttsUrl?.trim());
-      if (missingTts) {
+      if (
+        targets.some(
+          (s) => s.videoUrl?.trim() && s.voiceover?.trim() && !s.ttsUrl?.trim(),
+        )
+      ) {
         setRenderProgress(null);
         await onAlert({
           title: "暂不能合成",
-          message: "请先点击「批量 TTS」，待各镜状态为「就绪」后再点「合成成片」。",
+          message: "所选镜头中有口播尚未 TTS，请先对勾选镜头批量 TTS。",
           variant: "error",
         });
         return;
@@ -1050,7 +1230,10 @@ export function SeedVideoContentPanel({
             }
           : prev,
       );
-      const { jobId } = await renderSeedVideo(project.id);
+      const { jobId } = await renderSeedVideo(project.id, {
+        shotIndices,
+        profile: buildSeedVideoComposeProfile(subtitleStyle),
+      });
       setRenderProgress((prev) =>
         prev
           ? {
@@ -1163,6 +1346,12 @@ export function SeedVideoContentPanel({
       return;
     }
     if (pickerPanelIndex != null) {
+      setSelectedShotIndices((prev) => {
+        if (!prev.has(pickerPanelIndex)) return prev;
+        const next = new Set(prev);
+        next.delete(pickerPanelIndex);
+        return next;
+      });
       void runPanelGenerate(modelKey, pickerPanelIndex);
       return;
     }
@@ -1174,6 +1363,14 @@ export function SeedVideoContentPanel({
     if (pickerSelectedShotIndices.length > 0) {
       const indices = pickerSelectedShotIndices;
       setPickerSelectedShotIndices([]);
+      setSelectedShotIndices((prev) => {
+        const submitting = new Set(indices);
+        const next = new Set<number>();
+        for (const i of prev) {
+          if (!submitting.has(i)) next.add(i);
+        }
+        return next;
+      });
       void runSelectedShotsParallel(modelKey, indices);
       return;
     }
@@ -1567,17 +1764,29 @@ export function SeedVideoContentPanel({
               </EcomButtonSecondary>
               <EcomButtonSecondary
                 type="button"
-                disabled={batchProductionBusy || singleShotBusy || !finePlanSynced || ttsBusy}
-                onClick={() => void runTts()}
+                disabled={
+                  batchProductionBusy ||
+                  singleShotBusy ||
+                  !finePlanSynced ||
+                  ttsBusy ||
+                  selectedTtsCount === 0
+                }
+                onClick={() => void runTts(selectedTtsIndices)}
               >
-                {ttsBusy ? "TTS…" : "批量 TTS"}
+                {batchTtsLabel}
               </EcomButtonSecondary>
               <EcomButtonPrimary
                 type="button"
-                disabled={batchProductionBusy || singleShotBusy || !finePlanSynced || renderBusy}
-                onClick={() => void runRender()}
+                disabled={
+                  batchProductionBusy ||
+                  singleShotBusy ||
+                  !finePlanSynced ||
+                  renderBusy ||
+                  selectedComposeCount === 0
+                }
+                onClick={() => requestCompose(selectedComposeIndices)}
               >
-                {renderBusy ? "合成中…" : "合成成片"}
+                {batchComposeLabel}
               </EcomButtonPrimary>
             </div>
           </div>
@@ -1587,7 +1796,7 @@ export function SeedVideoContentPanel({
             </p>
           ) : (
             <p className="text-[11px] leading-relaxed text-[#6e6e73]">
-              推荐顺序：① 勾选镜头后点表底「生成」→ ②「批量 TTS」→ ③ 状态均为「就绪」后点「合成成片」。可多次勾选、多次生成。
+              推荐顺序：① 勾选后「生成 (N)」→ ② 含口播「批量 TTS (N)」→ ③ 就绪镜头「合成成片 (N)」。
             </p>
           )}
           <SeedVideoShotTable
@@ -1600,8 +1809,9 @@ export function SeedVideoContentPanel({
             showGenerateActions
             selectDisabled={!finePlanSynced}
             selectedShotIndices={selectedShotIndices}
-            selectedCount={selectedShotIndices.size}
+            selectedCount={selectedGeneratableCount}
             onToggleShotSelected={(index, checked) => {
+              if (activeGeneratingIndices.has(index)) return;
               setSelectedShotIndices((prev) => {
                 const next = new Set(prev);
                 if (checked) next.add(index);
@@ -1610,18 +1820,34 @@ export function SeedVideoContentPanel({
               });
             }}
             onGenerateSelected={() => {
-              if (selectedShotIndices.size === 0) return;
+              if (selectedGeneratableCount === 0) return;
               openVideoPicker({
                 generateSelected: true,
-                selectedShotIndices: [...selectedShotIndices].sort((a, b) => a - b),
+                selectedShotIndices: [...selectedGeneratableIndices].sort((a, b) => a - b),
               });
             }}
             generateSelectedDisabled={
-              selectedShotIndices.size === 0 ||
+              selectedGeneratableCount === 0 ||
               !finePlanSynced ||
               ttsBusy ||
               renderBusy
             }
+            onBatchTtsSelected={() => void runTts(selectedTtsIndices)}
+            batchTtsDisabled={
+              selectedTtsCount === 0 ||
+              !finePlanSynced ||
+              batchProductionBusy ||
+              singleShotBusy
+            }
+            batchTtsLabel={batchTtsLabel}
+            onBatchComposeSelected={() => requestCompose(selectedComposeIndices)}
+            batchComposeDisabled={
+              selectedComposeCount === 0 ||
+              !finePlanSynced ||
+              batchProductionBusy ||
+              singleShotBusy
+            }
+            batchComposeLabel={batchComposeLabel}
           />
           {finalUrl ? (
             <div className="space-y-2 border-t border-[#e8e8ed] pt-4">
@@ -1678,6 +1904,7 @@ export function SeedVideoContentPanel({
         onVideoPromptExtendChange={setPickerVideoPromptExtend}
         videoGenerateAudio={pickerVideoGenerateAudio}
         onVideoGenerateAudioChange={setPickerVideoGenerateAudio}
+        panelHasVoiceover={pickerPanelHasVoiceover}
         aspectRatio={project.settings.aspectRatio ?? "9:16"}
       />
 
@@ -1692,6 +1919,22 @@ export function SeedVideoContentPanel({
         )}
       </div>
     </div>
+    <SeedVideoComposeDialog
+      open={composeDialogOpen}
+      shotCount={pendingComposeIndices?.length ?? 0}
+      busy={renderBusy}
+      initialStyle={composeSubtitleStyle}
+      onOpenChange={(open) => {
+        if (!open && !renderBusy) {
+          setComposeDialogOpen(false);
+          setPendingComposeIndices(null);
+        }
+      }}
+      onConfirm={(style) => {
+        if (!pendingComposeIndices?.length) return;
+        void runRender(pendingComposeIndices, style);
+      }}
+    />
     <SeedVideoRenderProgressPanel
       state={renderProgress}
       onPanelOpenChange={(open) =>
@@ -1700,6 +1943,7 @@ export function SeedVideoContentPanel({
       onCollapsedChange={(collapsed) =>
         setRenderProgress((prev) => (prev ? { ...prev, collapsed } : prev))
       }
+      onDismiss={() => setRenderProgress(null)}
     />
     </>
   );

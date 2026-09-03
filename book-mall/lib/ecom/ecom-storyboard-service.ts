@@ -9,6 +9,7 @@ import {
 } from "@/lib/ecom/ecom-storyboard-deliverable";
 import { parseStoryboardSchemesFromMarkdown } from "@/lib/ecom/ecom-storyboard-markdown-parse";
 import { applyStoryboardSheetReconcile } from "@/lib/ecom/ecom-storyboard-sheet-reconcile";
+import { reconcileStoryboardPendingPanelVideoMeta } from "@/lib/ecom/ecom-storyboard-pending-videos";
 import { resolveStoryboardMergedVideoUrl } from "@/lib/ecom/ecom-storyboard-merged-video";
 import {
   ECOM_STORYBOARD_MODULE,
@@ -249,7 +250,7 @@ async function loadVideoOssUrlMap(
 export async function getEcomStoryboardProject(
   userId: string,
   projectId: string,
-  opts?: { stripSnapshotHistory?: boolean },
+  opts?: { stripSnapshotHistory?: boolean; resumePendingVideos?: boolean },
 ): Promise<EcomStoryboardProjectDto | null> {
   let row = await prisma.ecomStoryboardProject.findFirst({
     where: { id: projectId, userId },
@@ -260,6 +261,38 @@ export async function getEcomStoryboardProject(
   let sheet: StoryboardSheet | null = null;
   const parsed = storyboardSheetSchema.safeParse(row.sheet);
   if (parsed.success) sheet = parseStoryboardSheet(parsed.data);
+
+  const pendingReconcile = reconcileStoryboardPendingPanelVideoMeta({
+    meta: row.meta,
+    sheet,
+  });
+  if (pendingReconcile.changed) {
+    const updated = await prisma.ecomStoryboardProject.update({
+      where: { id: projectId },
+      data: { meta: pendingReconcile.meta as Prisma.InputJsonValue },
+    });
+    row = updated;
+    meta = pendingReconcile.meta as EcomStoryboardProjectDto["meta"];
+  }
+
+  if (opts?.resumePendingVideos !== false) {
+    const { resumeStoryboardPendingPanelVideos } = await import(
+      "@/lib/ecom/ecom-storyboard-panel-video-resume"
+    );
+    const resumed = await resumeStoryboardPendingPanelVideos(userId, projectId);
+    if (resumed) {
+      row =
+        (await prisma.ecomStoryboardProject.findFirst({
+          where: { id: projectId, userId },
+        })) ?? row;
+    }
+  }
+
+  if (!meta) meta = (row.meta as EcomStoryboardProjectDto["meta"]) ?? null;
+  if (!sheet) {
+    const reparsed = storyboardSheetSchema.safeParse(row.sheet);
+    if (reparsed.success) sheet = parseStoryboardSheet(reparsed.data);
+  }
 
   const repaired = repairStoryboardMetaAndSheet(meta, sheet);
   if (repaired.dirty) {

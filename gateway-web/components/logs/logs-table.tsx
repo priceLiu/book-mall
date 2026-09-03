@@ -38,6 +38,7 @@ import {
 import {
   hasVolcengineTimingTrace,
   hasDashscopeTimingTrace,
+  hasMinimaxTimingTrace,
   liveVolcengineVideoTiming,
   resolveLiveLogPhaseTiming,
   resolveVendorNativeTimingLive,
@@ -677,7 +678,10 @@ const LogsTableRow = memo(function LogsTableRow({
         submittedAt: l.submittedAt,
         isInProgress,
         nowMs: liveTick ?? null,
+        gatewayDirectSubmit:
+          !l.canvasStartedAt && !isInProgress && !pendingRow,
       });
+  const gatewayDirectE2e = !l.canvasStartedAt && !pendingRow;
   const vendorNative = resolveVendorNativeTimingLive({
     providerKind: l.providerKind,
     requestKind: l.requestKind,
@@ -732,6 +736,7 @@ const LogsTableRow = memo(function LogsTableRow({
     isInProgress,
     hasVolcengineTrace: hasVolcengineTimingTrace(l.resultSummary),
     hasDashscopeTrace: hasDashscopeTimingTrace(l.resultSummary),
+    hasMinimaxTrace: hasMinimaxTimingTrace(l.resultSummary),
     hasVideoInput: inputSummaryHasVideoUrl(l.inputSummary),
   });
   const phaseCellTitle = (
@@ -843,9 +848,13 @@ const LogsTableRow = memo(function LogsTableRow({
         title={
           e2eMs != null
             ? [
-                `系统总耗时：画布点击 → 任务完成`,
+                gatewayDirectE2e
+                  ? "系统总耗时：Gateway 提交 → 任务完成（直连，无画布出队）"
+                  : "系统总耗时：画布点击 → 任务完成",
                 preGatewayMs != null
-                  ? `出队前 ${Math.round(preGatewayMs / 1000)}s`
+                  ? gatewayDirectE2e && preGatewayMs === 0
+                    ? "出队前 0s（直连 Gateway）"
+                    : `出队前 ${Math.round(preGatewayMs / 1000)}s`
                   : null,
                 l.gatewaySegmentMs != null
                   ? `网关段 ${Math.round(l.gatewaySegmentMs / 1000)}s`
@@ -853,7 +862,9 @@ const LogsTableRow = memo(function LogsTableRow({
                 l.postGatewayMs != null
                   ? `OSS/回写 ${Math.round(l.postGatewayMs / 1000)}s`
                   : null,
-                `≈ 出队前 + 网关段 + OSS/回写（秒级四舍五入）`,
+                gatewayDirectE2e
+                  ? "≈ 网关段（电商/工具直提，无画布 OSS 分段）"
+                  : "≈ 出队前 + 网关段 + OSS/回写（秒级四舍五入）",
               ]
                 .filter(Boolean)
                 .join(" · ")
@@ -864,7 +875,11 @@ const LogsTableRow = memo(function LogsTableRow({
       </td>
       <td
         className="align-middle font-mono text-sm text-amber-200/90"
-        title="我们：点击 → Gateway 有 log（交通控流 QUEUED/DISPATCHING/dispatch/createTask）。超 120s 多为出队卡死。"
+        title={
+          gatewayDirectE2e && preGatewayMs === 0
+            ? "直连 Gateway 提交，无画布交通控流出队"
+            : "我们：点击 → Gateway 有 log（交通控流 QUEUED/DISPATCHING/dispatch/createTask）。超 120s 多为出队卡死。"
+        }
       >
         {preGatewayDuration}
       </td>

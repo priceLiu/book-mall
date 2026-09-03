@@ -22,9 +22,10 @@ export async function GET(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
+  const resumePending = new URL(req.url).searchParams.get("resumePending") !== "0";
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
-    const project = await getEcomSeedVideoProject(auth.userId, id);
+    const project = await getEcomSeedVideoProject(auth.userId, id, { resumePending });
     if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
     return NextResponse.json({ project });
   } catch (e) {

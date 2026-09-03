@@ -46,6 +46,35 @@ function pickText(input: Record<string, unknown>): string {
   ).trim();
 }
 
+/** MiniMax H3 无独立 generate_audio 字段；关闭时在 prompt 末尾追加 Sound 指令 */
+export const MINIMAX_VIDEO_SILENT_SOUND_SUFFIX =
+  "\n\nSound: silent. No dialogue, music, sound effects, or ambient audio.";
+
+export function resolveMinimaxVideoGenerateAudio(
+  input: Record<string, unknown>,
+): boolean {
+  if (input.generate_audio === false || input.generateAudio === false) {
+    return false;
+  }
+  return true;
+}
+
+export function applyMinimaxVideoGenerateAudioToPrompt(
+  prompt: string,
+  generateAudio: boolean,
+): string {
+  const text = prompt.trim();
+  if (generateAudio || !text) return text;
+  if (
+    /\bSound:\s*silent\b/i.test(text) ||
+    /无声/.test(text) ||
+    /不要.*(对白|音乐|音效|环境声)/.test(text)
+  ) {
+    return text;
+  }
+  return `${text}${MINIMAX_VIDEO_SILENT_SOUND_SUFFIX}`;
+}
+
 function pickUrls(input: Record<string, unknown>, key: string): string[] {
   const raw = input[key];
   if (Array.isArray(raw)) {
@@ -74,7 +103,11 @@ export function buildMinimaxVideoSubmitBody(opts: {
   }
 
   const mode = spec.mode as MinimaxVideoMode;
-  const text = pickText(opts.input);
+  const generateAudio = resolveMinimaxVideoGenerateAudio(opts.input);
+  const text = applyMinimaxVideoGenerateAudioToPrompt(
+    pickText(opts.input),
+    generateAudio,
+  );
   if (!text) {
     throw new Error("MiniMax H3 视频生成需要非空 text/prompt");
   }
@@ -241,7 +274,10 @@ function buildContextIrBody(input: Record<string, unknown>): Record<string, unkn
     };
   }
 
-  const text = pickText(input);
+  const text = applyMinimaxVideoGenerateAudioToPrompt(
+    pickText(input),
+    resolveMinimaxVideoGenerateAudio(input),
+  );
   if (!text) throw new Error("H3-Context-IR 需要非空 prompt/text");
 
   const content: MinimaxVideoContentItem[] = [{ type: "text", text }];
@@ -303,8 +339,12 @@ export function buildCanvasVideoMinimaxInput(args: {
     duration?: number;
     ratio?: string;
     aigc_watermark?: boolean;
+    generate_audio?: boolean;
+    generateAudio?: boolean;
   };
 }): { modelKey: string; input: Record<string, unknown> } {
+  const generateAudio =
+    args.options?.generate_audio ?? args.options?.generateAudio ?? true;
   return {
     modelKey: args.modelKey,
     input: {
@@ -318,6 +358,7 @@ export function buildCanvasVideoMinimaxInput(args: {
       duration: args.options?.duration ?? 5,
       ratio: args.options?.ratio,
       aigc_watermark: args.options?.aigc_watermark ?? false,
+      generate_audio: generateAudio,
     },
   };
 }

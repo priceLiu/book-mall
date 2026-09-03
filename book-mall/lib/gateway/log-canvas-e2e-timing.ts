@@ -128,6 +128,46 @@ export function buildCanvasE2eTiming(input: {
   return record;
 }
 
+/** 无画布关联（电商/工具直提 Gateway）：用 submitted → completed 墙钟回填系统列 */
+function resolveGatewayOnlyE2eForLogRow(input: {
+  log: Pick<
+    GatewayRequestLog,
+    "submittedAt" | "completedAt" | "durationMs" | "status"
+  >;
+  nowMs: number;
+}): {
+  canvasStartedAt: string | null;
+  canvasCompletedAt: string | null;
+  e2eMs: number | null;
+  preGatewayMs: number | null;
+  postGatewayMs: number | null;
+  gatewayMs: number | null;
+  e2eFrozen: boolean;
+} | null {
+  const terminal = isGatewayLogTerminalStatus(input.log.status);
+  const submittedMs = input.log.submittedAt.getTime();
+
+  let gatewayMs: number | null = null;
+  if (input.log.durationMs != null && input.log.durationMs > 0) {
+    gatewayMs = input.log.durationMs;
+  } else if (input.log.completedAt) {
+    gatewayMs = Math.max(0, input.log.completedAt.getTime() - submittedMs);
+  } else if (!terminal) {
+    gatewayMs = Math.max(0, input.nowMs - submittedMs);
+  }
+  if (gatewayMs == null) return null;
+
+  return {
+    canvasStartedAt: null,
+    canvasCompletedAt: null,
+    e2eMs: gatewayMs,
+    preGatewayMs: 0,
+    postGatewayMs: null,
+    gatewayMs,
+    e2eFrozen: terminal,
+  };
+}
+
 /** 画布任务终态：冻结 E2E 分段并写入 Gateway resultSummary（幂等）。 */
 export async function persistCanvasE2eTimingToGatewayLog(
   gatewayLogId: string,
@@ -192,15 +232,20 @@ export function resolveCanvasE2eForLogRow(input: {
   }
 
   if (!input.canvasTask) {
-    return {
-      canvasStartedAt: null,
-      canvasCompletedAt: null,
-      e2eMs: null,
-      preGatewayMs: null,
-      postGatewayMs: null,
-      gatewayMs: null,
-      e2eFrozen: false,
-    };
+    return (
+      resolveGatewayOnlyE2eForLogRow({
+        log: input.log,
+        nowMs,
+      }) ?? {
+        canvasStartedAt: null,
+        canvasCompletedAt: null,
+        e2eMs: null,
+        preGatewayMs: null,
+        postGatewayMs: null,
+        gatewayMs: null,
+        e2eFrozen: false,
+      }
+    );
   }
 
   const terminal =

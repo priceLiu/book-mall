@@ -9,55 +9,47 @@ import {
 } from "@/lib/gateway/book-gateway-link";
 import { pickCredentialForKind } from "@/lib/gateway/proxy-common";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
-import { resolveEcomAssistantChatParams } from "@/lib/gateway/ecom-storyboard-chat-models";
+import { resolveEcomAssistantChatParams, resolveEcomVisionChatParams } from "@/lib/gateway/ecom-storyboard-chat-models";
 import {
   GatewayV1ChatError,
   runGatewayV1ChatCompletions,
+  runGatewayV1ChatCompletionsStream,
 } from "@/lib/gateway/gateway-v1-chat-service";
 import { parseOpenAiUsage } from "@/lib/gateway/proxy-common";
 import {
-  gatewayV1ChatCompletionsStream,
   gatewayV1ClientMeta,
   gatewayV1CreateTask,
   gatewayV1Image2ImageAsync,
   gatewayV1ImageOutPainting,
   gatewayV1QwenImageEdit,
-  gatewayV1RecordInfo,
   gatewayV1VolcengineImageGenerations,
 } from "@/lib/gateway/gateway-v1-http-client";
 import {
   GatewayV1AsrError,
   runGatewayV1AsrTranscribe,
 } from "@/lib/gateway/gateway-v1-asr-service";
+import {
+  GatewayV1EcomAsyncJobError,
+  prepareGatewayV1EcomAsyncJobLog,
+  runGatewayV1EcomAsyncJobCreateTask,
+  submitGatewayV1EcomAsyncJobWithLog,
+  type GatewayV1EcomCreateTaskBody,
+  type PreparedGatewayV1EcomAsyncJob,
+} from "@/lib/gateway/gateway-v1-ecom-async-job-service";
 import type { QwenImageEditParams } from "@/lib/gateway/qwen-image-edit-proxy";
-import {
-  isBailianR2vFailed,
-  isBailianR2vSucceeded,
-} from "@/lib/canvas/canvas-gateway-client";
-import type { BailianR2vTaskOutput } from "@/lib/canvas/canvas-video-bailian-r2v";
-import {
-  extractKieResultUrl,
-  isKieRecordFail,
-  isKieRecordSuccess,
-} from "@/lib/story/kie-client";
 import {
   dashscopeExtractTaskImageUrl,
   dashscopeExtractTaskVideoUrl,
-  isDashscopeTaskFailed,
-  isDashscopeTaskSuccess,
   type DashscopeTaskOutput,
 } from "@/lib/gateway/dashscope-client";
 import { resolveEcomGatewayAuthForUser } from "@/lib/ecom/ecom-gateway-auth";
 import {
-  isVolcengineVideoTaskFailed,
-  isVolcengineVideoTaskSuccess,
-} from "@/lib/gateway/volcengine-client";
-import {
-  isMinimaxVideoTaskFailed,
-  isMinimaxVideoTaskSuccess,
-  minimaxVideoTaskResultUrl,
-  type MinimaxVideoTaskRow,
-} from "@/lib/gateway/minimax-video-client";
+  ecomPollBailianR2vInProcess,
+  ecomPollDashscopeVideoInProcess,
+  ecomPollKieInProcess,
+  ecomPollMinimaxInProcess,
+  ecomPollVolcengineInProcess,
+} from "@/lib/gateway/gateway-v1-ecom-poll-service";
 import type { CanvasChatMessage } from "@/lib/canvas/providers/types";
 
 const CLIENT_SOURCE: GatewayClientSource = "E_COMMERCE";
@@ -71,6 +63,71 @@ async function requireEcomGatewayAuth(bookUserId: string) {
     throw new GatewayRequiredError("Gateway API Key 未绑定厂商凭证");
   }
   return auth;
+}
+
+/** 电商异步任务 · 进程内 createTask（避免 dev HTTP 自调用卡死） */
+async function ecomGwCreateTaskInProcess(
+  bookUserId: string,
+  body: GatewayV1EcomCreateTaskBody,
+  clientPage?: string,
+): Promise<{ taskId: string; logId: string }> {
+  const auth = await requireEcomGatewayAuth(bookUserId);
+  try {
+    const created = await runGatewayV1EcomAsyncJobCreateTask({
+      auth,
+      body,
+      logMeta: gatewayV1ClientMeta("E_COMMERCE", { clientPage, bookUserId }),
+    });
+    return { taskId: created.taskId, logId: created.logId };
+  } catch (e) {
+    if (e instanceof GatewayV1EcomAsyncJobError) {
+      throw new GatewayRequiredError(e.message);
+    }
+    throw e;
+  }
+}
+
+/** 参考图预处理前先写 GatewayRequestLog，便于控制台立刻看到 RUNNING */
+export async function ecomGwPrepareVideoJobLog(
+  bookUserId: string,
+  body: GatewayV1EcomCreateTaskBody,
+  clientPage?: string,
+): Promise<{ logId: string; prepared: PreparedGatewayV1EcomAsyncJob }> {
+  const auth = await requireEcomGatewayAuth(bookUserId);
+  try {
+    const prepared = await prepareGatewayV1EcomAsyncJobLog({
+      auth,
+      body,
+      logMeta: gatewayV1ClientMeta("E_COMMERCE", { clientPage, bookUserId }),
+    });
+    return { logId: prepared.logId, prepared };
+  } catch (e) {
+    if (e instanceof GatewayV1EcomAsyncJobError) {
+      throw new GatewayRequiredError(e.message);
+    }
+    throw e;
+  }
+}
+
+export async function ecomGwSubmitPreparedVideoJob(
+  bookUserId: string,
+  prepared: PreparedGatewayV1EcomAsyncJob,
+  body: GatewayV1EcomCreateTaskBody,
+): Promise<{ taskId: string; logId: string }> {
+  const auth = await requireEcomGatewayAuth(bookUserId);
+  try {
+    const created = await submitGatewayV1EcomAsyncJobWithLog({
+      auth,
+      prepared,
+      body,
+    });
+    return { taskId: created.taskId, logId: created.logId };
+  } catch (e) {
+    if (e instanceof GatewayV1EcomAsyncJobError) {
+      throw new GatewayRequiredError(e.message);
+    }
+    throw e;
+  }
 }
 
 export async function ecomGwCreateDashscopeJob(
@@ -183,12 +240,15 @@ export async function ecomGwCreateDashscopeJob(
               },
             };
 
+  if (opts.kind === "video") {
+    return ecomGwCreateTaskInProcess(bookUserId, body, opts.clientPage);
+  }
+
   const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
     body,
-    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage, bookUserId: bookUserId }),
+    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage, bookUserId }),
   });
-
   return { taskId: created.taskId, logId: created.logId };
 }
 
@@ -204,29 +264,7 @@ export async function ecomGwPollDashscope(
   opts: { taskId: string; gatewayLogId: string },
 ): Promise<{ status: string; outputUrl?: string; failMessage?: string }> {
   const auth = await requireEcomGatewayAuth(bookUserId);
-  const credentialId = pickCredentialForKind(auth.credentials, "DASHSCOPE");
-  if (!credentialId) {
-    throw new GatewayRequiredError("Gateway Key 未绑定百炼 / DashScope（阿里云）凭证");
-  }
-
-  const polled = await gatewayV1RecordInfo({
-    apiKeyId: auth.id,
-    taskId: opts.taskId,
-    logId: opts.gatewayLogId,
-    meta: gatewayV1ClientMeta("E_COMMERCE", { bookUserId: bookUserId }),
-  });
-  const output = polled.data as DashscopeTaskOutput;
-
-  const status = output.task_status ?? "UNKNOWN";
-  if (isDashscopeTaskSuccess(status)) {
-    const outputUrl = ecomExtractMediaUrl(output);
-    return { status: "SUCCEEDED", outputUrl: outputUrl ?? undefined };
-  }
-  if (isDashscopeTaskFailed(status)) {
-    const failMessage = output.message ?? output.code ?? "failed";
-    return { status: "FAILED", failMessage };
-  }
-  return { status };
+  return ecomPollDashscopeVideoInProcess(auth, opts);
 }
 
 /** 电商 · 非流式 Chat（进程内 Gateway，避免 dev 自调用 HTTP 中断；适合视频拉片等长推理） */
@@ -322,7 +360,7 @@ export async function ecomGwAsrTranscribe(
   }
 }
 
-/** 电商故事版 · Gateway 流式 Chat */
+/** 电商故事版 · Gateway 流式 Chat（进程内，避免 dev HTTP 自调用卡死 + 漏收口） */
 export async function ecomGwChatStream(
   bookUserId: string,
   opts: {
@@ -348,32 +386,30 @@ export async function ecomGwChatStream(
     stream: true,
     stream_options: { include_usage: true },
     ...resolveEcomAssistantChatParams(model),
+    ...resolveEcomVisionChatParams(model),
     ...(opts.params ?? {}),
   };
 
-  const result = await gatewayV1ChatCompletionsStream({
-    apiKeyId: auth.id,
-    body,
-    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage, bookUserId: bookUserId }),
-  });
-
-  const logId = result.headers.get("x-gateway-log-id") ?? "";
-  const bodyStream = result.body;
-
-  if (!bodyStream || result.status >= 300) {
-    const errText = bodyStream
-      ? await new Response(bodyStream).text()
-      : `HTTP ${result.status}`;
-    throw new GatewayRequiredError(
-      summarizeUpstreamFailMessage(errText, result.status),
-    );
+  try {
+    const result = await runGatewayV1ChatCompletionsStream({
+      auth,
+      body,
+      logMeta: gatewayV1ClientMeta("E_COMMERCE", {
+        clientPage: opts.clientPage,
+        bookUserId,
+      }),
+    });
+    return {
+      logId: result.logId,
+      status: result.status,
+      body: result.body,
+    };
+  } catch (e) {
+    if (e instanceof GatewayV1ChatError) {
+      throw new GatewayRequiredError(e.message);
+    }
+    throw e;
   }
-
-  return {
-    logId,
-    status: result.status,
-    body: bodyStream,
-  };
 }
 
 export async function ecomGwCreateVolcengineVideoJob(
@@ -395,13 +431,11 @@ export async function ecomGwCreateVolcengineVideoJob(
   }
 
   const model = opts.model.trim();
-  const created = await gatewayV1CreateTask({
-    apiKeyId: auth.id,
-    body: { model, input: opts.body },
-    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage, bookUserId: bookUserId }),
-  });
-
-  return { taskId: created.taskId, logId: created.logId };
+  return ecomGwCreateTaskInProcess(
+    bookUserId,
+    { model, input: opts.body },
+    opts.clientPage,
+  );
 }
 
 export async function ecomGwCreateMinimaxVideoJob(
@@ -423,13 +457,11 @@ export async function ecomGwCreateMinimaxVideoJob(
   }
 
   const model = opts.model.trim();
-  const created = await gatewayV1CreateTask({
-    apiKeyId: auth.id,
-    body: { model, input: opts.input },
-    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage, bookUserId: bookUserId }),
-  });
-
-  return { taskId: created.taskId, logId: created.logId };
+  return ecomGwCreateTaskInProcess(
+    bookUserId,
+    { model, input: opts.input },
+    opts.clientPage,
+  );
 }
 
 export async function ecomGwPollMinimax(
@@ -437,30 +469,7 @@ export async function ecomGwPollMinimax(
   opts: { taskId: string; gatewayLogId: string },
 ): Promise<{ status: string; outputUrl?: string; failMessage?: string }> {
   const auth = await requireEcomGatewayAuth(bookUserId);
-  const credentialId = pickCredentialForKind(auth.credentials, "MINIMAX");
-  if (!credentialId) {
-    throw new GatewayRequiredError("Gateway Key 未绑定 MiniMax 凭证");
-  }
-
-  const polled = await gatewayV1RecordInfo({
-    apiKeyId: auth.id,
-    taskId: opts.taskId,
-    logId: opts.gatewayLogId,
-    meta: gatewayV1ClientMeta("E_COMMERCE", { bookUserId: bookUserId }),
-  });
-  const row = polled.data as MinimaxVideoTaskRow;
-
-  if (isMinimaxVideoTaskSuccess(row)) {
-    return { status: "SUCCEEDED", outputUrl: minimaxVideoTaskResultUrl(row) ?? undefined };
-  }
-  if (isMinimaxVideoTaskFailed(row)) {
-    const failMessage =
-      typeof row.error === "object" && row.error?.message
-        ? String(row.error.message)
-        : `status=${row.status}`;
-    return { status: "FAILED", failMessage };
-  }
-  return { status: row.status ?? "PENDING" };
+  return ecomPollMinimaxInProcess(auth, opts);
 }
 
 export async function ecomGwPollVolcengine(
@@ -468,33 +477,7 @@ export async function ecomGwPollVolcengine(
   opts: { taskId: string; gatewayLogId: string },
 ): Promise<{ status: string; outputUrl?: string; failMessage?: string }> {
   const auth = await requireEcomGatewayAuth(bookUserId);
-  const credentialId = pickCredentialForKind(auth.credentials, "VOLCENGINE");
-  if (!credentialId) {
-    throw new GatewayRequiredError("Gateway Key 未绑定火山方舟凭证");
-  }
-
-  const polled = await gatewayV1RecordInfo({
-    apiKeyId: auth.id,
-    taskId: opts.taskId,
-    logId: opts.gatewayLogId,
-    meta: gatewayV1ClientMeta("E_COMMERCE", { bookUserId: bookUserId }),
-  });
-  const row = polled.data as import("@/lib/gateway/volcengine-client").VolcengineVideoTaskResult;
-
-  if (isVolcengineVideoTaskSuccess(row)) {
-    const outputUrl = row.content?.video_url?.trim();
-    return { status: "SUCCEEDED", outputUrl: outputUrl ?? undefined };
-  }
-
-  if (isVolcengineVideoTaskFailed(row)) {
-    const failMessage =
-      typeof row.error === "string"
-        ? row.error
-        : (row.error?.message ?? `status=${row.status}`);
-    return { status: "FAILED", failMessage };
-  }
-
-  return { status: row.status ?? "PENDING" };
+  return ecomPollVolcengineInProcess(auth, opts);
 }
 
 export async function ecomGwCreateKieJob(
@@ -513,13 +496,11 @@ export async function ecomGwCreateKieJob(
   }
 
   const model = opts.model.trim();
-  const created = await gatewayV1CreateTask({
-    apiKeyId: auth.id,
-    body: { model, input: opts.input, callBackUrl: null },
-    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage, bookUserId: bookUserId }),
-  });
-
-  return { taskId: created.taskId, logId: created.logId };
+  return ecomGwCreateTaskInProcess(
+    bookUserId,
+    { model, input: opts.input, callBackUrl: null },
+    opts.clientPage,
+  );
 }
 
 export async function ecomGwPollKie(
@@ -527,29 +508,7 @@ export async function ecomGwPollKie(
   opts: { taskId: string; gatewayLogId: string },
 ): Promise<{ status: string; outputUrl?: string; failMessage?: string }> {
   const auth = await requireEcomGatewayAuth(bookUserId);
-  const credentialId = pickCredentialForKind(auth.credentials, "KIE");
-  if (!credentialId) {
-    throw new GatewayRequiredError("Gateway Key 未绑定 KIE 凭证");
-  }
-
-  const polled = await gatewayV1RecordInfo({
-    apiKeyId: auth.id,
-    taskId: opts.taskId,
-    logId: opts.gatewayLogId,
-    meta: gatewayV1ClientMeta("E_COMMERCE", { bookUserId: bookUserId }),
-  });
-  const record = polled.data as import("@/lib/story/kie-client").KieRecordResponse;
-
-  const state = record.state ?? "UNKNOWN";
-  if (isKieRecordSuccess(state)) {
-    const outputUrl = extractKieResultUrl(record) ?? undefined;
-    return { status: "SUCCEEDED", outputUrl };
-  }
-  if (isKieRecordFail(state)) {
-    const failMessage = record.failMsg ?? record.failCode ?? "failed";
-    return { status: "FAILED", failMessage };
-  }
-  return { status: state };
+  return ecomPollKieInProcess(auth, opts);
 }
 
 export async function ecomGwCreateBailianR2vJob(
@@ -573,9 +532,9 @@ export async function ecomGwCreateBailianR2vJob(
   }
 
   const model = opts.model.trim();
-  const created = await gatewayV1CreateTask({
-    apiKeyId: auth.id,
-    body: {
+  return ecomGwCreateTaskInProcess(
+    bookUserId,
+    {
       model,
       bailian: {
         prompt: opts.prompt,
@@ -587,10 +546,8 @@ export async function ecomGwCreateBailianR2vJob(
         parameterExtras: opts.parameterExtras,
       },
     },
-    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage, bookUserId: bookUserId }),
-  });
-
-  return { taskId: created.taskId, logId: created.logId };
+    opts.clientPage,
+  );
 }
 
 export async function ecomGwPollBailianR2v(
@@ -598,31 +555,7 @@ export async function ecomGwPollBailianR2v(
   opts: { taskId: string; gatewayLogId: string },
 ): Promise<{ status: string; outputUrl?: string; failMessage?: string }> {
   const auth = await requireEcomGatewayAuth(bookUserId);
-  const credentialId = pickCredentialForKind(auth.credentials, "BAILIAN");
-  if (!credentialId) {
-    throw new GatewayRequiredError("Gateway Key 未绑定百炼 / DashScope（阿里云）凭证");
-  }
-
-  const polled = await gatewayV1RecordInfo({
-    apiKeyId: auth.id,
-    taskId: opts.taskId,
-    logId: opts.gatewayLogId,
-    meta: gatewayV1ClientMeta("E_COMMERCE", { bookUserId: bookUserId }),
-  });
-  const output = polled.data as BailianR2vTaskOutput;
-
-  if (isBailianR2vSucceeded(output)) {
-    const outputUrl = output.video_url?.trim() ?? undefined;
-    return { status: "SUCCEEDED", outputUrl };
-  }
-
-  if (isBailianR2vFailed(output)) {
-    const failMessage =
-      output.message ?? output.code ?? `status=${output.task_status ?? "FAILED"}`;
-    return { status: "FAILED", failMessage };
-  }
-
-  return { status: output.task_status ?? "PENDING" };
+  return ecomPollBailianR2vInProcess(auth, opts);
 }
 
 export async function ecomGwQwenImageEdit(

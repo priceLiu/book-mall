@@ -12,16 +12,31 @@ import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { useImageDropPaste } from "@/hooks/use-image-drop-paste";
+import { useStagedTaskDetail } from "@/hooks/use-staged-task-detail";
 import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
 import type {
   ReplicaSetupApi,
   ReplicaSetupCopy,
   ReplicaSetupRole,
 } from "@/lib/replica-setup-api";
+import type { ReplicaVoiceoverDraft } from "@/lib/media-decompose-replica-workflow";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import { cn } from "@/lib/utils";
 
 const REF_TOOLBAR_BTN_CLASS = "h-7 px-2 text-[10px]";
+
+const VOICEOVER_TASK_STEPS = [
+  "整理分镜时段与卖点…",
+  "调用 DeepSeek 生成各段口播…",
+  "校验 JSON 并写入口播方案…",
+] as const;
+
+const SCRIPT_TASK_STEPS = [
+  "校验模特/产品参考图与文案…",
+  "匹配 @图片 引用与分镜草稿…",
+  "调用视觉模型生成复刻脚本…",
+  "解析 JSON 并写入方案②分镜表…",
+] as const;
 
 type ImportVia = "upload" | "paste" | "drop" | "asset" | "library";
 
@@ -139,7 +154,11 @@ export function ReplicaSetupPanel({
   const productRefs = allRefs.filter((r) => api.isProductRefId(r.id));
   const savedProductBrief = api.readProductBrief();
   const savedSellingPoints = api.readSellingPoints?.() ?? "";
-  const voiceoverDraft = api.readVoiceoverDraft?.() ?? null;
+  const savedVoiceoverDraft = api.readVoiceoverDraft?.() ?? null;
+  const [voiceoverDraftLocal, setVoiceoverDraftLocal] = useState<ReplicaVoiceoverDraft | null>(
+    () => savedVoiceoverDraft,
+  );
+  const voiceoverDraft = voiceoverDraftLocal ?? savedVoiceoverDraft;
   const productBriefDirty = productBriefDraft.trim() !== savedProductBrief.trim();
   const sellingPointsDirty = sellingPointsDraft.trim() !== savedSellingPoints.trim();
   const actionLocked =
@@ -153,6 +172,9 @@ export function ReplicaSetupPanel({
     scriptBusy ||
     modelPromptBusy ||
     modelGenBusy;
+
+  const voiceoverTaskDetail = useStagedTaskDetail(VOICEOVER_TASK_STEPS, voiceoverGenBusy);
+  const scriptTaskDetail = useStagedTaskDetail(SCRIPT_TASK_STEPS, scriptBusy);
 
   useEffect(() => {
     return () => {
@@ -203,6 +225,10 @@ export function ReplicaSetupPanel({
     if (sellingPointsDirtyRef.current) return;
     setSellingPointsDraft(api.readSellingPoints?.() ?? "");
   }, [api, savedSellingPoints]);
+
+  useEffect(() => {
+    setVoiceoverDraftLocal(api.readVoiceoverDraft?.() ?? null);
+  }, [api, savedVoiceoverDraft?.generatedAt, savedVoiceoverDraft?.shots.length]);
 
   const refsForRole = useCallback(
     (role: ReplicaSetupRole) => (role === "model" ? modelRefs : productRefs),
@@ -385,13 +411,14 @@ export function ReplicaSetupPanel({
     if (!api.generateVoiceover) return;
     setVoiceoverGenBusy(true);
     try {
-      await api.generateVoiceover({
+      const { voiceoverDraft: draft } = await api.generateVoiceover({
         productBrief: productBriefDraft.trim() || undefined,
         sellingPoints: sellingPointsDraft.trim() || undefined,
         modelKey: chatModelKey,
       });
+      setVoiceoverDraftLocal(draft);
       toast({
-        title: "口播草稿已生成",
+        title: "口播方案已生成",
         description: "已显示在卖点下方；生成脚本后可在分镜表点击「应用新口播」。",
       });
     } catch (e) {
@@ -714,10 +741,13 @@ export function ReplicaSetupPanel({
       ) : null}
 
       {voiceoverGenBusy ? (
-        <div className="flex items-center gap-2 rounded-xl border border-[#e8e8ed] bg-white px-4 py-3 text-sm text-[#6e6e73]">
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#0071e3]" />
-          AI 口播生成中…
-        </div>
+        <StoryboardTaskStatus
+          active
+          sweep
+          surface="content"
+          title="AI 口播方案生成中"
+          detail={voiceoverTaskDetail || VOICEOVER_TASK_STEPS[0]}
+        />
       ) : voiceoverDraft ? (
         <ReplicaVoiceoverDraftCard draft={voiceoverDraft} />
       ) : null}
@@ -782,8 +812,8 @@ export function ReplicaSetupPanel({
           active
           sweep
           surface="content"
-          title="脚本生成中"
-          detail={copy.scriptGeneratingDetail ?? "正在生成复刻脚本…"}
+          title="复刻脚本生成中"
+          detail={scriptTaskDetail || SCRIPT_TASK_STEPS[0]}
         />
       ) : null}
 
