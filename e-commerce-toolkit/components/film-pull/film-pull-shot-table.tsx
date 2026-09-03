@@ -8,7 +8,7 @@ import {
   ecomDataTableThClass,
   ecomDataTableWrapClass,
 } from "@/components/ui/ecom-data-table";
-import type { FilmPullShot } from "@/lib/film-pull-types";
+import type { FilmPullProductionShot, FilmPullShot } from "@/lib/film-pull-types";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -29,6 +29,26 @@ export type FilmPullShotColumnDef = {
   get: (row: FilmPullShot) => string;
   set?: (row: FilmPullShot, value: string) => FilmPullShot;
 };
+
+/** 制作脚本表 · 含 imagePrompt / videoPrompt 等扩展列 */
+export type FilmPullProductionShotColumnDef = {
+  key: string;
+  label: string;
+  minW: string;
+  multiline?: boolean;
+  get: (row: FilmPullProductionShot) => string;
+  set?: (row: FilmPullProductionShot, value: string) => FilmPullProductionShot;
+};
+
+export function asFilmPullProductionShotColumn(
+  col: FilmPullShotColumnDef,
+): FilmPullProductionShotColumnDef {
+  return {
+    ...col,
+    get: (r) => col.get(r),
+    set: col.set ? (r, v) => col.set!(r, v) as FilmPullProductionShot : undefined,
+  };
+}
 
 export const FILM_PULL_SHOT_TABLE_COLUMNS: FilmPullShotColumnDef[] = [
   { key: "shotNo", label: "镜号", minW: "min-w-[44px]", get: (r) => String(r.shotNo) },

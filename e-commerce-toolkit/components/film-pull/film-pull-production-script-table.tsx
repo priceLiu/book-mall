@@ -18,7 +18,8 @@ import {
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
   FILM_PULL_SHOT_TABLE_COLUMNS,
-  type FilmPullShotColumnDef,
+  asFilmPullProductionShotColumn,
+  type FilmPullProductionShotColumnDef,
 } from "@/components/film-pull/film-pull-shot-table";
 import type { EcomPromptImageRef } from "@/lib/ecom-prompt-mention";
 import {
@@ -179,12 +180,12 @@ export function FilmPullProductionScriptTable({
 
   function patchField(
     shot: FilmPullProductionShot,
-    col: FilmPullShotColumnDef,
+    col: FilmPullProductionShotColumnDef,
     value: string,
   ) {
     if (!col.set || disabled) return;
     if (TIME_FIELD_KEYS.has(col.key) && !editableTimeFields) return;
-    const next = col.set(shot, value) as FilmPullProductionShot;
+    const next = col.set(shot, value);
     if (isEdit && onChangeShots) {
       replaceShotRow(shot.shotNo, next);
     } else if (onPatchShot) {
@@ -194,7 +195,7 @@ export function FilmPullProductionScriptTable({
 
   function renderEditableField(
     shot: FilmPullProductionShot,
-    col: FilmPullShotColumnDef,
+    col: FilmPullProductionShotColumnDef,
     value: string,
     opts?: { multiline?: boolean; minHeightClass?: string },
   ) {
@@ -265,7 +266,7 @@ export function FilmPullProductionScriptTable({
                 return (
                   <td key={col.key} className={cn(ecomDataTableTdClass, col.minW)}>
                     {canEdit ? (
-                      renderEditableField(shot, col, value)
+                      renderEditableField(shot, asFilmPullProductionShotColumn(col), value)
                     ) : (
                       <span className="block whitespace-pre-wrap break-words">
                         {value?.trim() ? value : "--"}
