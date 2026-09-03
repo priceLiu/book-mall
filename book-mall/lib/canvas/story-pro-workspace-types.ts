@@ -20,6 +20,10 @@ export type StoryProScriptHubNodeData = {
   scriptCategoryDocTitle?: string;
   scriptCategoryLabel?: string;
   scriptPromptViewId?: "category-doc" | "upstream-outline";
+  /** 制作包 prompt 版本 · ≥13 为 JSON-only（与 canvas-web 同步） */
+  storyPro2PackPromptVersion?: number;
+  /** 大纲段 system/user prompt 摘要 · 可含 json-only-v13 标记 */
+  promptOutline?: string;
   dockInput?: string;
   dockRefImages?: StoryRefImage[];
   productionScript?: Pro2ProductionScript;
