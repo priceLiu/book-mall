@@ -14,7 +14,7 @@ import { pickVolcengineCredentialForGatewayJob } from "@/lib/gateway/volcengine-
 import { pickAiSpaceS2vCredentialId } from "@/lib/ai-space/ai-space-gateway-auth";
 import { isDashscopeWan30VideoModelKey } from "@/lib/gateway/dashscope-client";
 import { buildGatewayInputSummary, buildDashscopeCreateTaskInputForLog } from "@/lib/gateway/log-input-summary";
-import { buildBailianR2vRequestBody } from "@/lib/canvas/bailian-r2v-body";
+import { buildBailianR2vRequestBody, enrichBailianR2vInputForLog } from "@/lib/canvas/bailian-r2v-body";
 import {
   routeGatewayModel,
   UnknownGatewayModelError,
@@ -245,11 +245,7 @@ export async function POST(request: NextRequest) {
           seedStr: typeof b.seedStr === "string" ? b.seedStr : undefined,
           parameterExtras: b.parameterExtras,
         });
-        return {
-          ...built.input,
-          parameters: built.parameters,
-          referenceImageUrls,
-        };
+        return enrichBailianR2vInputForLog(built, referenceImageUrls);
       })()
     : dsForLog && typeof dsForLog === "object"
       ? buildDashscopeCreateTaskInputForLog(

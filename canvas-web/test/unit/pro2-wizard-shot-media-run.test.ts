@@ -6,6 +6,7 @@ import {
   parseWizardShotRunnerNodeId,
   pickWizardShotInflightTask,
   pickWizardShotTaskPreviewUrl,
+  resolveWizardShotVideoModelKey,
   wizardShotRunnerNodeId,
   WIZARD_SHOT_STALE_INFLIGHT_MS,
   type WizardShotTaskRecord,
@@ -233,5 +234,39 @@ describe("buildWizardShotVideoRunPayload", () => {
       "https://cdn.example/frame.png",
       "https://cdn.example/char.png",
     ]);
+  });
+});
+
+describe("resolveWizardShotVideoModelKey", () => {
+  const frameUrl =
+    "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/canvas/node-image/frame.png";
+
+  it("upgrades HappyHorse T2V → I2V when only frame ref", () => {
+    expect(
+      resolveWizardShotVideoModelKey({
+        modelKey: "happyhorse-1.1-t2v",
+        framePreviewUrl: frameUrl,
+        prompt: "镜 1 特写",
+        refImages: [],
+      }),
+    ).toBe("happyhorse-1.1-i2v");
+  });
+
+  it("upgrades HappyHorse T2V → R2V when frame + @ 资产", () => {
+    expect(
+      resolveWizardShotVideoModelKey({
+        modelKey: "happyhorse-1.1-t2v",
+        framePreviewUrl: frameUrl,
+        prompt: "视频 @<wiz-char-c1>",
+        refImages: [],
+        assetDrafts: {
+          "character:c1": {
+            kind: "character",
+            assetId: "c1",
+            previewUrl: "https://cdn.example/char.png",
+          },
+        },
+      }),
+    ).toBe("happyhorse-1.1-r2v");
   });
 });

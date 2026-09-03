@@ -1,7 +1,7 @@
 /**
  * 画布排队合成日志行 · 从 task.inputPayload 推导 Gateway Params（与 createTask inputSummary 对齐）
  */
-import { buildBailianR2vRequestBody } from "@/lib/canvas/bailian-r2v-body";
+import { buildBailianR2vRequestBody, enrichBailianR2vInputForLog } from "@/lib/canvas/bailian-r2v-body";
 import { isCanvasLlmEngineKind } from "@/lib/canvas/canvas-traffic-kind";
 import {
   buildDashscopeCreateTaskInputForLog,
@@ -62,11 +62,10 @@ export function buildCanvasPendingInputSummary(
           ? { prompt_extend: params.prompt_extend !== false }
           : undefined,
     });
-    return buildGatewayInputSummary(modelKey, {
-      ...built.input,
-      parameters: built.parameters,
-      referenceImageUrls,
-    });
+    return buildGatewayInputSummary(
+      modelKey,
+      enrichBailianR2vInputForLog(built, referenceImageUrls),
+    );
   }
 
   if (payload.providerKind === "VOLCENGINE") {

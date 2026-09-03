@@ -111,7 +111,9 @@ import {
   buildDashscopeHappyhorseI2vVideoBody,
   buildDashscopeSbv1T2vVideoBody,
   buildDashscopeWan30Media,
+  dashscopeSbv1T2vModelToR2v,
   isDashscopeHappyhorseImageToVideoModel,
+  isDashscopeHappyhorseTextToVideoModel,
   isDashscopeSbv1TextToVideoModel,
   isDashscopeWan30VideoModel,
   resolveDashscopeT2vRefMismatchMessage,
@@ -1740,6 +1742,17 @@ export async function runVideoEngineNode(
       )
     : imageInputs.slice(1);
   const lastFrameImageUrl = String(data.lastFrameImageUrl ?? "").trim();
+
+  /** 分镜视频 · 有静帧时 HappyHorse T2V 须升 I2V（仅静帧）或 R2V（静帧+@资产） */
+  if (isDashscopeHappyhorseTextToVideoModel(modelKey) && mainFrameImageUrl) {
+    const extraRefs = referenceImageUrls.filter((u) => u !== mainFrameImageUrl);
+    if (extraRefs.length === 0) {
+      modelKey = modelKey.replace(/-t2v$/, "-i2v");
+    } else {
+      modelKey = dashscopeSbv1T2vModelToR2v(modelKey) ?? modelKey;
+    }
+  }
+
   const t2vRefMismatch = resolveDashscopeT2vRefMismatchMessage(modelKey, [
     mainFrameImageUrl,
     ...(lastFrameImageUrl ? [lastFrameImageUrl] : []),

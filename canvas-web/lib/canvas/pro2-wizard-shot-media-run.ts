@@ -35,6 +35,42 @@ import type { CanvasNodeRuntime } from "@/lib/canvas/types";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { readProductionWizardAssetDraftsFromHub } from "@/lib/canvas/pro2-wizard-mention-ref-urls";
+import { resolveDashscopeVideoModelForRefLinks } from "@/lib/canvas/sbv1-video-model-reference";
+
+const DASHSCOPE_T2V_TO_I2V: Record<string, string> = {
+  "happyhorse-1.0-t2v": "happyhorse-1.0-i2v",
+  "happyhorse-1.1-t2v": "happyhorse-1.1-i2v",
+};
+
+/** 向导分镜视频 · 按静帧 + @ 参考图解析应使用的 Gateway 模型 */
+export function resolveWizardShotVideoModelKey(args: {
+  modelKey: string;
+  framePreviewUrl: string;
+  prompt: string;
+  refImages: StoryRefImage[];
+  assetDrafts?: Record<string, Pro2ProductionWizardAssetDraft>;
+}): string {
+  const frameUrl = args.framePreviewUrl.trim();
+  if (!/^https?:\/\//.test(frameUrl)) return args.modelKey.trim();
+
+  const catalog = buildWizardMentionRefCatalog(args.assetDrafts, args.refImages);
+  const mentionRefUrls = wizardMentionRefUrlsForPrompt(
+    args.prompt,
+    catalog,
+    args.refImages,
+  );
+  const extraRefs = mentionRefUrls.filter((u) => u !== frameUrl);
+  const modelKey = args.modelKey.trim();
+
+  if (extraRefs.length > 0) {
+    return (
+      resolveDashscopeVideoModelForRefLinks(modelKey, 1 + extraRefs.length) ??
+      modelKey
+    );
+  }
+
+  return DASHSCOPE_T2V_TO_I2V[modelKey] ?? modelKey;
+}
 
 export type WizardShotTaskRecord = CanvasTaskRecord & {
   previewUrl?: string | null;
@@ -400,13 +436,20 @@ export async function submitPro2WizardShotRun(
       valid.assetDrafts,
     );
   } else {
+    const resolvedModelKey = resolveWizardShotVideoModelKey({
+      modelKey: args.videoEngine!.modelKey,
+      framePreviewUrl: args.framePreviewUrl!,
+      prompt: args.prompt,
+      refImages: args.refImages,
+      assetDrafts: valid.assetDrafts,
+    });
     payload = buildWizardShotVideoRunPayload({
       shotIndex: args.shotIndex,
       prompt: args.prompt,
       refImages: args.refImages,
       framePreviewUrl: args.framePreviewUrl!,
       providerId: args.videoEngine!.providerId,
-      modelKey: args.videoEngine!.modelKey,
+      modelKey: resolvedModelKey,
       params: args.videoEngine!.params ?? {},
       dialogue: args.dialogue,
       script: args.script,
