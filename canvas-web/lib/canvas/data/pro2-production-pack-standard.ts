@@ -74,10 +74,19 @@ export const STORY_PRO2_CAMERA_MOVE_COLUMN_RULES = `- 每镜运镜描述 **≥12
 - 须同时包含：**机位状态**（固定/手持/摇移/跟拍）+ **运动方向**（推/拉/摇/移/升/降）+ **速度**（缓慢/快速）+ **视觉目的**（强调情绪/揭示信息/衔接动作等）`;
 
 /** 分镜表「对白」列撰写规范 · docs/大模型剧本提示词.md §五 */
-export const STORY_PRO2_DIALOGUE_COLUMN_RULES = `- 格式：**角色名（情绪/语气）："台词"**
-- 内心独白：**角色名（内心OS，情绪）："台词"**
-- 多人对白：**角色群（齐声/低语/议论）："台词语"**
-- 无对白写「—」；**禁止**只写台词而不标注说话角色；**禁止**只写在「画面描述」里`;
+export const STORY_PRO2_DIALOGUE_COLUMN_RULES = `- **唯一合法格式**：角色名（情绪/语气）："台词"
+  - 正例：沈昭昭（疲惫）："又要加班……"
+  - 正例（内心OS）：沈昭昭（内心OS，疲惫）："又要加班……"
+  - 正例（无情绪括号也可）：沈昭昭："又要加班……"
+  - 正例（多句连写）：萧景珩（温和）："姑娘小心。"沈知意（羞赧）："谢公子。"
+  - 正例（群杂）：百姓甲（议论）："她要退婚？"
+- **引号硬性**：台词必须用 ASCII 直引号 \`"..."\` 或直角引号 \`「...»\` 包住；**禁止**弯引号 “…” / ‘…’ / 『…』
+- **禁止**：
+  - 无引号：\`沈昭昭（疲惫）：又要加班\`
+  - 缺少角色名：\`"又要加班"\`
+  - 多加「说/道」：\`沈昭昭说："又要加班"\`
+  - 只写叙述或把对白写进 sceneDescription
+- 无对白写「—」`;
 
 /** 系统解析契约 · JSON-only v13（程序只解析 pro2-production-script 围栏） */
 export const STORY_PRO2_PACK_PARSE_CONTRACT = `【系统解析契约 · JSON-only v13 · 硬性】
@@ -94,18 +103,23 @@ export const STORY_PRO2_JSON_FIELD_RULES = `【JSON patch 字段名 · 硬性 ·
   - 禁止 photographyStyle / architectureStyle / colorBlock（colorBlock 仅用于 scenes[] / shots[]）
 - coreConflict[]：{ dimension, content }
 - scenes[]：{ id, name, environmentTimeMood, imagePrompt, negativePrompt?, colorBlock?, description?, foreground?, atmosphere?, compositionSpec?, visualStyleTag? }
+  - **imagePrompt 硬性**：字符串内必须同时含字面量「构图规范」与「[视觉风格：…]」；禁止只写名称/描述；场景用 2×2 四视角构图规范全文
   - colorBlock 须为对象 { primary, secondary?, highlight?, shadow?, notes? }，禁止字符串；无色块则省略
   - 禁止 environment / keywords / prompt 等 alias
 - characters[]：{ id, name, role, appearance, personality?, imagePrompt, description?, clothing?, traits?, compositionSpec?, visualStyleTag? }
   - appearance 须为 ①外貌 / ②服装 / ③特征 三段（或分别写 description · clothing · traits）
   - traits 强制 ≥3 项固定面部/体态细节；**禁止** 在 appearance 写「标志性动作」
+  - **imagePrompt 硬性**：须含字面量「构图规范」（四视图）与「[视觉风格：…]」
   - 禁止 identity / aiImagePrompt 等 alias
 - props[]（v2 Pass1 必填 · 与分镜道具列对应）：{ id, name, description?, traits?, compositionSpec?, visualStyleTag?, imagePrompt? }
+  - **imagePrompt 硬性（每条必填）**：须含字面量「构图规范」（六视图）与「[视觉风格：…]」；禁止省略 imagePrompt
 - shots[] v2 Pass1（storyboard step · schemaVersion 2）：
   { index, shotSize, lighting, cameraMove, sceneDescription, propIds?, dialogue, durationSec, sfxNote, audioNote, sceneId?, characterIds? }
   - **禁止** Pass1 写 imagePrompt / videoPrompt / frameImagePrompt（Pass2 shot_prompts 才写）
   - cameraMove 须 ≥12 字中文运镜描述；须含机位状态+运动方向+速度+视觉目的；禁止单/双字如「固定」「推」
   - **sceneId 每镜必填**；须引用 scenes[].id；scenes[]≥2 时 **禁止全片同一 sceneId**；每镜 lighting 须与同镜 sceneId 绑定（多场景时 lighting **须含 scenes[].name** canonical name）
+  - **dialogue 硬性**：非「—」时须 \`角色名（情绪）："台词"\`；台词须 ASCII \`"..."\` 或 \`「...»\`；禁止无引号、弯引号、\`角色说：\`
+  - **characterIds 硬性**：dialogue 非「—」时 characterIds 必须为非空数组，且每项为 characters[].id；禁止有对白却缺/空 characterIds
   - 禁止 description / aiImagePrompt / duration 等 alias
 - shots[] v1 legacy：{ index, shotSize, cameraMove, sceneDescription, dialogue, durationSec, imagePrompt, videoPrompt, audioNote, sceneId?, characterIds? }
 - handoff[]：{ index, item, owner, note } 对象数组，禁止字符串数组`;
@@ -159,6 +173,17 @@ export const STORY_PRO2_JSON_SCHEMA_EXAMPLE = `{
         "appearance": "① 外貌：女，28岁…\\n② 服装：…\\n③ 特征：…",
         "personality": "压抑、疲惫",
         "imagePrompt": "名称：现代沈昭昭，现代职场女性\\n描述：…\\n服装：…\\n特征：…\\n构图规范：（四视图规范全文）\\n[视觉风格：…]"
+      },
+      {
+        "id": "char-prince",
+        "name": "萧景珩",
+        "role": "盛唐皇子",
+        "description": "男，26岁，身形挺拔，眉目清朗",
+        "clothing": "明黄团龙纹常服，玉冠束发",
+        "traits": "①眉骨略高 ②下颌线清晰 ③左颊浅疤",
+        "appearance": "① 外貌：男，26岁…\\n② 服装：…\\n③ 特征：…",
+        "personality": "温和克制",
+        "imagePrompt": "名称：萧景珩，盛唐皇子\\n描述：…\\n服装：…\\n特征：…\\n构图规范：（四视图规范全文）\\n[视觉风格：…]"
       }
     ],
     "props": [
@@ -198,6 +223,20 @@ export const STORY_PRO2_JSON_SCHEMA_EXAMPLE = `{
         "audioNote": "—",
         "sceneId": "scene-palace",
         "characterIds": []
+      },
+      {
+        "index": 3,
+        "shotSize": "中景",
+        "lighting": "盛唐金銮殿，白日暖金朱红高饱和，威严恢宏",
+        "cameraMove": "固定机位缓慢推近，强调人物与殿内纵深关系",
+        "sceneDescription": "【起始】萧景珩自柱廊侧入画停步。【结束】抬手示意殿内安静",
+        "propIds": [],
+        "dialogue": "萧景珩（温和）：\\"殿内肃静。\\"",
+        "durationSec": 12,
+        "sfxNote": "衣袂轻响，殿内回声",
+        "audioNote": "—",
+        "sceneId": "scene-palace",
+        "characterIds": ["char-prince"]
       }
     ],
     "handoff": [
@@ -213,7 +252,11 @@ ${STORY_PRO2_JSON_SCHEMA_EXAMPLE}
 \`\`\`
 2. **step** 取值：full_pack · outline · character · scene · storyboard · shot_prompts（与当前任务段一致）；**tier 须为 pro**；**schemaVersion 须为 3**（兼容 2）；meta.packProfile 须为 director|industrial。
 3. full_pack 须含非空：meta · visualStyle · coreConflict · scenes · characters · **props[]**（≥1）· shots · handoff（≥6 行）。
-4. creative Pass1（非 film_pull）**硬性**：shots[] 必须 **完整 12–18 镜**（推荐 15 镜），各镜 durationSec **10–15 整数**，合计 **175–185 秒**（推荐 15×12=180）。**禁止**照抄上方示例只交 2 镜样例；示例仅示意字段形状。shots[] 禁止 imagePrompt / videoPrompt / frameImagePrompt。
+4. creative Pass1（非 film_pull）**硬性**：shots[] 必须 **完整 12–18 镜**（推荐 15 镜），各镜 durationSec **10–15 整数**，合计 **175–185 秒**（推荐 15×12=180）。**禁止**照抄上方示例只交 2～3 镜样例；示例仅示意字段形状与 **对白⇔characterIds 成对**写法。shots[] 禁止 imagePrompt / videoPrompt / frameImagePrompt。
+4a. **首轮最易失败三项（缺任一项即校验失败）**：
+   - **对白镜必写 characterIds**：dialogue 非「—」⇒ 同镜 \`characterIds: ["characters[].id"]\` 非空（对白角色名须能在 characters[] 找到 id）
+   - **资产 imagePrompt 双字面量**：scenes[] / characters[] / props[] **每条** imagePrompt 须同时含「构图规范」与「[视觉风格：…]」
+   - **完整镜数**：须输出 12–18 镜全集，勿只交示例镜数
 5. Pass1 字段金标准见 docs/画布提示词.md（运镜/光影/画面描述/音效/角色/场景/道具块结构）。
 ${STORY_PRO2_JSON_FIELD_RULES}
 6. 无有效 JSON 围栏或校验失败 → 任务失败；程序由 JSON 渲染人读 Markdown，**禁止**输出 GFM。`;
@@ -225,6 +268,8 @@ export const STORY_PRO2_PACK_PROFILE_DIRECTOR_RULES = `【制作档 · 简版 di
 - **禁止**输出 shots[].analysis（整块省略）。
 - Pass1 禁止 imagePrompt / videoPrompt / frameImagePrompt。
 - **时长硬性（creative）**：必须输出完整 **12–18 镜**（推荐 15），每镜 durationSec **10–15**，合计 **175–185**（推荐 180）。禁止只输出 1～2 镜示例即停。
+- **对白⇔characterIds（逐镜成对）**：dialogue 非「—」时 **必须** 同镜写 \`characterIds: ["…"]\`（characters[].id）；无对白镜可 \`characterIds: []\` 或省略。
+- **资产 imagePrompt**：scenes[] / characters[] / props[] 每条 imagePrompt **必须** 含字面量「构图规范」与「[视觉风格：…]」（见 patch 示例镜 1 / 场景辞典 / 道具辞典）。
 - scenes[].colorBlock / shots[].colorBlock 若有则须为对象 { primary, … }，禁止字符串。`;
 
 /** 专业版 · 导演表 + analysis */
@@ -444,16 +489,45 @@ export const STORY_PRO2_PACK_OUTPUT_RULES = `【制作包硬性约束 · JSON-on
 2. 须 **完整保留** 上传剧本中已有场景、人物与对白，只做结构化整理，不得压缩成梗概。
 3. full_pack patch 须含：meta · visualStyle · coreConflict · scenes · characters · props[]（≥1）· shots · handoff（≥6 行）。
 4. **分镜 Pass1** 须 **12–18 镜**（总时长 175–185 秒）；每镜 **10–15 秒**整数；shots[] **禁止** imagePrompt / videoPrompt / frameImagePrompt。
-5. 每镜必填：shotSize · lighting(≥8字) · cameraMove(≥12字) · sceneDescription（【起始】…【结束】≥30字）· **sceneId**（须引用 scenes[].id）· **characterIds**（有对白角色时必填）· **propIds**（画面出现可交互道具时必填，须引用 props[].id）· dialogue · durationSec · sfxNote · audioNote；sceneDescription 中出现角色/场景/道具时须使用资产辞典 **canonical name**（与 sceneId/characterIds/propIds 一致）。
+5. 每镜必填：shotSize · lighting(≥8字) · cameraMove(≥12字) · sceneDescription（【起始】…【结束】≥30字）· **sceneId**（须引用 scenes[].id）· **characterIds**（dialogue 非「—」时必须非空，且为 characters[].id）· **propIds**（画面出现可交互道具时必填，须引用 props[].id）· dialogue · durationSec · sfxNote · audioNote；sceneDescription 中出现角色/场景/道具时须使用资产辞典 **canonical name**（与 sceneId/characterIds/propIds 一致）。
 5a. **场景绑定**：每镜 **sceneId 唯一对应当镜主场景**；剧本有多场景时 **禁止** 全片共用同一 sceneId。lighting 首句须含该镜 scenes[].**name** 或 environmentTimeMood 中的 **时代+时段** 关键词（如「深夜」「白日」「黄昏」），且与同镜 sceneId 一致；场景切换后 sceneId 必须变更。
+5b. **imagePrompt 字面量硬性（scenes / characters / props 每条）**：imagePrompt 字符串内必须同时出现「构图规范」与「[视觉风格：…]」两段字面量；缺任一即失败。场景=四视角规范，角色=四视图规范，道具=六视图规范；禁止只写名称/氛围省略这两段。
+5c. **对白⇔characterIds 成对（逐镜 · 高频失败项）**：凡 dialogue 非「—」，**同一镜** 必须写 \`"characterIds": ["char-xxx"]\`（xxx 为对白说话人在 characters[] 中的 id）；写台词却缺/空 characterIds 即失败。无对白镜：dialogue 写「—」，characterIds 可 []。
 6. characters[] 须 description · clothing · traits（≥3 项）；imagePrompt 须含四视图构图规范 + [视觉风格：…]（见 docs/画布提示词.md）。
-7. scenes[] / props[] 的 imagePrompt 须含对应构图规范 + [视觉风格：…]。
+7. scenes[] / props[] 的 imagePrompt 须含对应构图规范 + [视觉风格：…]（props[].imagePrompt 不得省略）。
 8. 「对白」撰写规范：
 ${STORY_PRO2_DIALOGUE_COLUMN_RULES}
 9. 「运镜」撰写规范：
 ${STORY_PRO2_CAMERA_MOVE_COLUMN_RULES}
 10. Pass1 字段范例（运镜/光影/画面描述/音效）见 PRO2_CANVAS_PASS1_SHOT_FIELD_GUIDE。
 11. ${STORY_PRO2_PACK_LANGUAGE_RULES.replace(/^# .+\n\n/, "").trim()}`;
+
+/** 首轮 LLM 输出前自检 · 降低 PRO2_SCRIPT_JSON_INVALID 首轮失败率 */
+export const STORY_PRO2_PARSE_SELF_CHECK_RULES = `【提交前自检 · 输出 JSON 前逐条核对】
+1. **characterIds（逐镜）**：扫描 shots[]——凡 dialogue 非「—」，同镜 characterIds 必须非空且为 characters[].id
+   ✗ dialogue 有台词但缺 characterIds / characterIds 为 []
+   ✓ "dialogue": "沈昭昭（疲惫）：\\"…\\"", "characterIds": ["char-heroine"]
+2. **imagePrompt 字面量（逐条资产）**：scenes[] / characters[] / props[] 每条 imagePrompt 须同时含「构图规范」与「[视觉风格：」
+   ✗ 只有名称/描述/氛围，无上述两字面量
+   ✓ …构图规范：（四视图/四视角/六视图规范全文）。[视觉风格：…]
+3. **propIds**：画面描述出现道具 canonical name ⇒ propIds 须引用 props[].id
+4. **镜数时长**：creative 须完整 **12–18 镜**，各镜 durationSec **10–15**，合计 **175–185** 秒
+5. **sceneId**：每镜必填；多场景剧本禁止全片同一 sceneId`;
+
+/** 首轮最后读到的硬性三门 · 放在 prompt 最末尾（recency） */
+export const STORY_PRO2_FIRST_ATTEMPT_HARD_GATES = `【首轮硬性三门 · 缺任一条即 PRO2_SCRIPT_JSON_INVALID · 输出前最后核对】
+① **对白 ⇔ characterIds 成对**（逐镜）
+   - dialogue 含角色台词 ⇒ 同镜必须写 characterIds: ["characters[].id"]
+   - 从对白「角色名（情绪）："台词"」反查 characters[].name → id
+   ✗ 镜 10 有对白但 characterIds 缺失/为空
+   ✓ 见 JSON 示例镜 1（沈昭昭 + char-heroine）与镜 3（萧景珩 + char-prince）
+② **资产 imagePrompt 双字面量**（scenes / characters / props 每条）
+   - 必须同时含 substring「构图规范」与「[视觉风格：」
+   ✗ 场景/道具只写「名称+描述+氛围」无上述字面量
+   ✓ 见 JSON 示例 scenes[].imagePrompt / props[].imagePrompt 写法
+③ **完整 12–18 镜**（creative）
+   - 示例仅 3 镜示意字段；实际须输出完整 12–18 镜，合计 175–185 秒
+   ✗ 只交 2～3 镜样例即停`;
 
 /** Pass1 导演表字段金标准 · 源：docs/画布提示词.md · docs/大模型剧本提示词.md §五 */
 export const PRO2_CANVAS_PASS1_SHOT_FIELD_GUIDE = `# Pass1 导演表字段（v2 · 每镜必填 · ${STORY_PRO2_PACK_V8_MARKER}）

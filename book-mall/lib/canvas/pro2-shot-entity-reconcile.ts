@@ -130,7 +130,8 @@ export function hydrateWizardMentionsInText(
   return out;
 }
 
-const DIALOGUE_SPEAKER_RE = /^([^（(：:\n]+)[（(]/u;
+const DIALOGUE_SPEAKER_RE =
+  /^([^（(：:\n]+)(?:内心OS)?(?:[（(][^）)]*[）)])?\s*[：:]/u;
 
 function parseReferencedIds(value: string): string[] {
   const seen: Record<string, boolean> = {};

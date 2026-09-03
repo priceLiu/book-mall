@@ -95,8 +95,8 @@ type Props = {
   modelsEmptyHint?: string;
   /** 无模型时点击重试 */
   onRetryLoadModels?: () => void | Promise<void>;
-  /** 覆盖 DialogContent 容器 class */
-  contentClassName?: string;
+  /** 隐藏文生图/图生视频类型筛选（视觉理解 LLM 等纯选型场景） */
+  hideTypeFilter?: boolean;
   /**
    * 使用 createPortal + 自定义 overlay，不经 Radix Dialog。
    * 素材区粘贴热区与 Radix 焦点陷阱冲突时启用（如服装模特图）。
@@ -350,6 +350,7 @@ export function StoryboardModelPickerDialog({
   modelsLoading = false,
   modelsEmptyHint,
   onRetryLoadModels,
+  hideTypeFilter = false,
   contentClassName,
   nativeOverlay = false,
   running = false,
@@ -403,8 +404,11 @@ export function StoryboardModelPickerDialog({
   }, [open, value, nativeOverlay]);
 
   const visibleModels = useMemo(
-    () => models.filter((m) => storyboardModelMatchesMediaFilter(m, mode, mediaFilter)),
-    [models, mode, mediaFilter],
+    () =>
+      hideTypeFilter
+        ? models
+        : models.filter((m) => storyboardModelMatchesMediaFilter(m, mode, mediaFilter)),
+    [hideTypeFilter, models, mode, mediaFilter],
   );
 
   useEffect(() => {
@@ -648,12 +652,14 @@ export function StoryboardModelPickerDialog({
       ) : (
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] lg:items-start">
           <div className="space-y-4">
-            <ModelMediaFilterBar
-              mode={mode}
-              models={models}
-              value={mediaFilter}
-              onChange={setMediaFilter}
-            />
+            {!hideTypeFilter ? (
+              <ModelMediaFilterBar
+                mode={mode}
+                models={models}
+                value={mediaFilter}
+                onChange={setMediaFilter}
+              />
+            ) : null}
             {filterEmpty ? (
               <p className="rounded-xl border border-dashed border-[#e8e8ed] px-4 py-10 text-center text-sm text-[#86868b]">
                 当前筛选下暂无模型，请切换类型或选择「全部」。

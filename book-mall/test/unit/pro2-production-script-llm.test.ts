@@ -48,7 +48,14 @@ const FULL_PACK_FIXTURE = {
         imagePrompt: `名称：小明\n描述：女，28岁\n服装：白T恤\n特征：①杏眼 ②短发 ③偏瘦\n${COMP}\n${VIS}`,
       },
     ],
-    props: [{ id: "p1", name: "道具A", description: "测试道具" }],
+    props: [
+      {
+        id: "p1",
+        name: "道具A",
+        description: "测试道具",
+        imagePrompt: `名称：道具A\n描述：测试道具\n${COMP}\n${VIS}`,
+      },
+    ],
     shots: Array.from({ length: 12 }, (_, i) => {
       const index = i + 1;
       return {

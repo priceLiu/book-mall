@@ -392,6 +392,18 @@ describe("hubShowsGeneratingUi · stale hubGenerateIntent", () => {
     clearCanvasNodeRunSession("hub-1");
   });
 
+  it("stripStaleHubGenerateIntent keeps intent when done but no displayable script", () => {
+    const nodes = stripStaleHubGenerateIntent([
+      hubNode({
+        hubGenerateIntent: true,
+        outlineRuntime: { status: "done", taskId: "t1" },
+      }),
+    ]);
+    expect(
+      (nodes[0]!.data as { hubGenerateIntent?: boolean }).hubGenerateIntent,
+    ).toBe(true);
+  });
+
   it("stripStaleHubGenerateIntent clears intent when no section running", () => {
     const nodes = stripStaleHubGenerateIntent([
       hubNode({

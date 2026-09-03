@@ -89,7 +89,7 @@ export function formatStoryboardImageModelTypeLabel(
   modelKey: string,
   role?: string,
 ): string {
-  void role;
+  if (role === "LLM") return "视觉理解";
   const labels = getStoryboardImageModelTypeLabels(modelKey);
   return labels.length ? labels.join(" · ") : "生图";
 }

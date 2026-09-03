@@ -60,7 +60,8 @@
       {
         "id": "prop-scroll",
         "name": "诗卷",
-        "description": "宣纸诗卷，边缘泛黄"
+        "description": "宣纸诗卷，边缘泛黄",
+        "imagePrompt": "名称：诗卷\n描述：宣纸诗卷，边缘泛黄\n构图规范：2×3网格六视图道具设定\n[视觉风格：电影级写实古装]"
       }
     ],
     "shots": [

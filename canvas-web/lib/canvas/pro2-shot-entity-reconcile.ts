@@ -29,7 +29,8 @@ const WIZ_PROP_PREFIX = "wiz-prop-";
 
 const STORE_TOKEN_RE = /@<([^>\s]+)>/g;
 
-const DIALOGUE_SPEAKER_RE = /^([^（(：:\n]+)[（(]/u;
+const DIALOGUE_SPEAKER_RE =
+  /^([^（(：:\n]+)(?:内心OS)?(?:[（(][^）)]*[）)])?\s*[：:]/u;
 
 type TextRange = { start: number; end: number };
 

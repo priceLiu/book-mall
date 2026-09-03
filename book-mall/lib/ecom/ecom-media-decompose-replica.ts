@@ -49,7 +49,7 @@ import {
 } from "@/lib/ecom/ecom-seed-video-service";
 import { generateEcomImage } from "@/lib/ecom/ecom-image-gen-invoke";
 import {
-  ECOM_MEDIA_DECOMPOSE_DEFAULT_CHAT_MODEL,
+  ECOM_MEDIA_DECOMPOSE_DEFAULT_TEXT_MODEL,
   ECOM_MEDIA_DECOMPOSE_REPLICA_MODEL_GENERATE_ACTION,
   ECOM_MEDIA_DECOMPOSE_REPLICA_MODEL_PROMPT_ACTION,
   ECOM_MEDIA_DECOMPOSE_REPLICA_RECOGNIZE_PRODUCT_ACTION,
@@ -103,7 +103,7 @@ export function resolveReplicaTextChatModel(
   for (const candidate of [explicitModelKey?.trim(), projectChatModelKey?.trim()]) {
     if (candidate && !isStoryLlmVisionModel(candidate)) return candidate;
   }
-  return ECOM_MEDIA_DECOMPOSE_DEFAULT_CHAT_MODEL;
+  return ECOM_MEDIA_DECOMPOSE_DEFAULT_TEXT_MODEL;
 }
 
 function clampDuration(n: number, fallback = 5): number {
@@ -538,10 +538,10 @@ export async function generateReplicaModelPrompt(
   await assertEcomToolkitGatewayAccess(userId);
   const { decompose, structured } = await requireReplicaPair(userId, decomposeProjectId);
 
-  const chatModel =
-    modelKey?.trim() ||
-    decompose.settings.chatModelKey?.trim() ||
-    ECOM_MEDIA_DECOMPOSE_DEFAULT_CHAT_MODEL;
+  const chatModel = resolveReplicaTextChatModel(
+    modelKey,
+    decompose.settings.chatModelKey,
+  );
 
   const { text } = await ecomGwChatComplete(userId, {
     modelKey: chatModel,

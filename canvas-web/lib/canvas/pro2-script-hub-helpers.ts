@@ -175,6 +175,9 @@ export function pro2HubHasOutlineContent(d: StoryProScriptHubNodeData): boolean 
   return Boolean(resolveHubOutlineMd(d).trim());
 }
 
+/** @deprecated 别名 · 使用 hubHasDisplayableScriptContent */
+export { hubHasDisplayableScriptContent as pro2HubHasDisplayableScriptContent } from "./story-hub-runtime";
+
 export type Pro2HubSceneResolveContext = {
   nodes?: CanvasFlowNode[];
   edges?: CanvasFlowEdge[];

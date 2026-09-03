@@ -284,6 +284,9 @@ export function buildPro2CharacterImagePromptFromStructuredFields(
 /** LLM JSON alias / 缺字段 · apply 前补全 */
 export function enrichPro2CharacterRecordForParse(
   raw: Record<string, unknown>,
+  options?: {
+    visualStylePack?: import("./pro2-production-pack-prompt").Pro2CharacterDockVisualStyleInput | null;
+  },
 ): Record<string, unknown> {
   const out: Record<string, unknown> = { ...raw };
 
@@ -314,12 +317,17 @@ export function enrichPro2CharacterRecordForParse(
 
   out.appearance = formatPro2CharacterAppearanceCell(fields);
 
-  const built = buildPro2CharacterImagePromptFromStructuredFields(fields, null, {
-    finalizeDock: true,
-  });
+  const built = buildPro2CharacterImagePromptFromStructuredFields(
+    fields,
+    options?.visualStylePack ?? null,
+    { finalizeDock: true },
+  );
   if (built) out.imagePrompt = built;
   else if (String(out.imagePrompt ?? "").trim()) {
-    out.imagePrompt = finalizePro2CharacterImageDockPrompt(String(out.imagePrompt));
+    out.imagePrompt = finalizePro2CharacterImageDockPrompt(String(out.imagePrompt), {
+      visualStylePack: options?.visualStylePack,
+      visualStyleTag: fields.visualStyleTag,
+    });
   }
 
   const merged = mergeCharacterStructuredFields({

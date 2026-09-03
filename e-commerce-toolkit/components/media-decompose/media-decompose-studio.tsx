@@ -24,8 +24,11 @@ import {
   uploadMediaDecomposeFile,
 } from "@/lib/ecom-media-decompose-api";
 import { fetchSeedVideoModels, getSeedVideoProject } from "@/lib/ecom-seed-video-api";
+import {
+  ECOM_MEDIA_DECOMPOSE_DEFAULT_VISION_MODEL,
+  pickMediaDecomposeChatModelKey,
+} from "@/lib/media-decompose-model-pick";
 import type { MediaDecomposeChatModel, MediaDecomposeProject } from "@/lib/media-decompose-types";
-import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import { resolveSeedVideoVideoModelKey } from "@/lib/seed-video-workflow";
 import type { SeedVideoProject } from "@/lib/seed-video-types";
@@ -41,7 +44,7 @@ export function MediaDecomposeStudio() {
   const { alert, doubleConfirm } = useDialogs();
   const [project, setProject] = useState<MediaDecomposeProject | null>(null);
   const [chatModels, setChatModels] = useState<MediaDecomposeChatModel[]>([]);
-  const [chatModelKey, setChatModelKey] = useState(ECOM_DEFAULT_CHAT_MODEL_KEY);
+  const [chatModelKey, setChatModelKey] = useState(ECOM_MEDIA_DECOMPOSE_DEFAULT_VISION_MODEL);
   const [modelsLoading, setModelsLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [needLogin, setNeedLogin] = useState(false);
@@ -62,7 +65,6 @@ export function MediaDecomposeStudio() {
     if (typeof window !== "undefined") {
       sessionStorage.setItem(PROJECT_STORAGE_KEY, p.id);
     }
-    if (p.settings.chatModelKey) setChatModelKey(p.settings.chatModelKey);
     setStreamText(p.result?.rawText ?? "");
   }, []);
 
@@ -76,9 +78,10 @@ export function MediaDecomposeStudio() {
       setChatModels(models.chatModels);
       const def = models.defaults?.chat;
       setChatModelKey((prev) =>
-        pickBoundStoryboardModelKey(
+        pickMediaDecomposeChatModelKey(
           models.chatModels,
           def && models.chatModels.some((m) => m.modelKey === def) ? def : prev,
+          null,
         ),
       );
       if (models.imageModels?.length) {
@@ -153,8 +156,17 @@ export function MediaDecomposeStudio() {
 
   useEffect(() => {
     if (chatModels.length === 0) return;
-    setChatModelKey((prev) => pickBoundStoryboardModelKey(chatModels, prev));
-  }, [chatModels]);
+    const kind = project?.media?.kind ?? null;
+    setChatModelKey((prev) => {
+      const preferred =
+        project?.settings.chatModelKey &&
+        pickMediaDecomposeChatModelKey(chatModels, project.settings.chatModelKey, kind) ===
+          project.settings.chatModelKey
+          ? project.settings.chatModelKey
+          : prev;
+      return pickMediaDecomposeChatModelKey(chatModels, preferred, kind);
+    });
+  }, [chatModels, project?.id, project?.media?.kind, project?.settings.chatModelKey]);
 
   useEffect(() => {
     const replicaId =

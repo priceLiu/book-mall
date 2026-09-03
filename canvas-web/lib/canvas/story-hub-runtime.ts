@@ -676,6 +676,38 @@ export function hubAggregateStatus(
   return "idle";
 }
 
+/** Hub 是否已有可展示剧本（含 runtime 内待 repair 的 JSON 围栏） */
+export function hubHasDisplayableScriptContent(
+  d: StoryProScriptHubNodeData,
+): boolean {
+  if ((d.productionScript?.shots?.length ?? 0) > 0) return true;
+  if ((d.productionScript?.characters?.length ?? 0) > 0) return true;
+  if (d.productionScript?.visualStyle?.worldBackground?.trim()) return true;
+  if (parseStoryboardRows(resolveHubStoryboardMd(d)).length > 0) return true;
+  const raw = d.outlineMd ?? "";
+  if (
+    hasHumanReadableProductionPackSections(
+      stripTrailingPro2ProductionScriptJson(raw),
+    )
+  ) {
+    return true;
+  }
+  if (isUnparsedPro2ProductionJsonBlob(raw)) return true;
+  if (Boolean(resolveHubOutlineMd(d).trim())) return true;
+  const pending = d.outlineRuntime?.textOutput?.trim();
+  if (
+    pending &&
+    (isUnparsedPro2ProductionJsonBlob(pending) ||
+      /```pro2-production-script/i.test(pending))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** @deprecated 别名 · 使用 hubHasDisplayableScriptContent */
+export const pro2HubHasDisplayableScriptContent = hubHasDisplayableScriptContent;
+
 /** 剧本 Hub 是否展示生成中 UI（扫光）；intent 在任务终态前一律保持扫光 */
 export function hubShowsGeneratingUi(
   node: CanvasFlowNode,
@@ -709,6 +741,8 @@ export function stripStaleHubGenerateIntent(
     const sections = ["outline", "character", "scene", "storyboard"] as const;
     if (sections.some((s) => hubSectionIsRunning(node, s))) return node;
     if (isCanvasNodeRunSessionActive(node.id)) return node;
+    const hubData = node.data as unknown as StoryProScriptHubNodeData;
+    if (!hubHasDisplayableScriptContent(hubData)) return node;
     return {
       ...node,
       data: { ...node.data, hubGenerateIntent: undefined },

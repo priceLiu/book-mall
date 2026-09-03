@@ -1,6 +1,9 @@
 import { z } from "zod";
 
-import { ECOM_DEFAULT_ASSISTANT_CHAT_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
+import {
+  ECOM_DEFAULT_ASSISTANT_CHAT_MODEL,
+  ECOM_DEFAULT_VISION_MODEL,
+} from "@/lib/gateway/ecom-storyboard-chat-models";
 
 import type { MediaDecomposePatch } from "@/lib/ecom/ecom-media-decompose-structured";
 import {
@@ -10,7 +13,11 @@ import {
 
 export const ECOM_MEDIA_DECOMPOSE_TOOL_KEY = "ecom-toolkit__media-decompose";
 export const ECOM_MEDIA_DECOMPOSE_MODULE = "media-decompose";
-export const ECOM_MEDIA_DECOMPOSE_DEFAULT_CHAT_MODEL = ECOM_DEFAULT_ASSISTANT_CHAT_MODEL;
+/** 拆解（图片/视频反推）：须 Vision / 视频理解模型，默认 Qwen3.8 Max */
+export const ECOM_MEDIA_DECOMPOSE_DEFAULT_CHAT_MODEL = ECOM_DEFAULT_VISION_MODEL;
+
+/** 复刻口播/卖点等纯文本任务默认 LLM（非拆解用） */
+export const ECOM_MEDIA_DECOMPOSE_DEFAULT_TEXT_MODEL = ECOM_DEFAULT_ASSISTANT_CHAT_MODEL;
 
 /** Gateway clientPage action 后缀（写 GatewayRequestLog） */
 export const ECOM_MEDIA_DECOMPOSE_REPLICA_MODEL_PROMPT_ACTION = "replica-model-prompt";

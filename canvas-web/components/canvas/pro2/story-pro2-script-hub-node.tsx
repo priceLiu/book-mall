@@ -205,7 +205,8 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
   const hasCharacter = pro2HubHasCharacterTable(d);
   const hasScene = pro2HubHasSceneTable(d, sceneCtx);
   const hasOutline = pro2HubHasOutlineContent(d);
-  const hasPreviewContent = hasTable || hasCharacter || hasScene || hasOutline;
+  const hasPreviewContent =
+    hasTable || hasCharacter || hasScene || hasOutline;
   const [previewTab, setPreviewTab] = useState<Pro2ScriptHubViewTab>("script");
 
   useEffect(() => {
@@ -249,6 +250,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
     hasGeneratedContent: hasPreviewContent,
     isGenerating,
     isLinked,
+    hubGenerateIntent: d.hubGenerateIntent,
   });
   const linkedMessage = pro2ScriptHubLinkedMessage({
     edges,

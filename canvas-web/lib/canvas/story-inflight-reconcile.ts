@@ -53,6 +53,7 @@ import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 import {
   clearCanvasNodeRunSession,
   isCanvasNodeRunSessionActive,
+  PRO2_SCRIPT_HUB_ORPHAN_RECONCILE_GRACE_MS,
   shouldDeferLibtvOrphanReconcile,
 } from "./canvas-run-session";
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
@@ -132,7 +133,15 @@ function shouldDeferHubSectionOrphanClear(
   node: CanvasFlowNode,
   tasks: CanvasTaskRecord[],
 ): boolean {
-  if (shouldDeferLibtvOrphanReconcile(node.id)) return true;
+  const extendedGrace =
+    node.type === "story-pro2-script-hub" ||
+    node.type === "story-pro-script-hub" ||
+    node.type === "story-script-hub"
+      ? PRO2_SCRIPT_HUB_ORPHAN_RECONCILE_GRACE_MS
+      : undefined;
+  if (shouldDeferLibtvOrphanReconcile(node.id, { extendedGraceMs: extendedGrace })) {
+    return true;
+  }
   if (isCanvasNodeRunSessionActive(node.id)) return true;
   if (hasServerInflightForNode(tasks, node.id)) return true;
   const d = node.data as { hubGenerateIntent?: boolean };

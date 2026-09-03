@@ -7,6 +7,8 @@ import {
   STORY_PRO2_JSON_OUTPUT_CONTRACT,
   STORY_PRO2_PACK_LANGUAGE_RULES,
   STORY_PRO2_PACK_PARSE_CONTRACT,
+  STORY_PRO2_PARSE_SELF_CHECK_RULES,
+  STORY_PRO2_FIRST_ATTEMPT_HARD_GATES,
 } from "./data/pro2-production-pack-standard";
 import type { Pro2ScriptCategoryId } from "./pro2-script-category-presets";
 import { defaultPro2ScriptCategoryDocBody } from "./pro2-script-category-doc";
@@ -35,6 +37,8 @@ export function appendPro2ParseContract(
   parts.push(
     `【交接清单结构参考 · 禁止照抄剧名 · 须依大纲改写】\n${PRO2_HANDOFF_EXAMPLE_ROWS}`,
   );
+  parts.push(STORY_PRO2_PARSE_SELF_CHECK_RULES.trim());
+  parts.push(STORY_PRO2_FIRST_ATTEMPT_HARD_GATES.trim());
   return parts.join("\n\n");
 }
 

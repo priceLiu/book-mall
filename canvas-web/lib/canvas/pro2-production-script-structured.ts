@@ -3,6 +3,7 @@
  * book-mall/lib/canvas/pro2-production-script-structured.ts 须保持同步（runner 校验）
  */
 import {
+  coercePro2DialogueForParse,
   normalizePro2CreativeShotDurations,
   pro2ProductionScriptPatchSchema,
   PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION,
@@ -11,7 +12,7 @@ import {
   type Pro2ProductionScriptStep,
 } from "./data/pro2-production-script-schema";
 import { normalizePro2ProductionScriptPatchChinese, pro2PlaceholderSlug } from "./pro2-chinese-prompt-normalize";
-import { enrichPro2CharacterRecordForParse } from "./pro2-character-script-fields";
+import { enrichPro2ProductionScriptPatchForParse } from "./pro2-production-script-parse-enrich";
 import type { StoryLlmSection } from "./story-workspace-types";
 
 const FENCE_TAG = "pro2-production-script";
@@ -84,7 +85,11 @@ function coerceShotRecordForV2Parse(
   if (typeof dur !== "number" || !Number.isFinite(dur) || dur <= 0) {
     out.durationSec = 10;
   }
-  if (!String(out.dialogue ?? "").trim()) out.dialogue = "—";
+  if (!String(out.dialogue ?? "").trim()) {
+    out.dialogue = "—";
+  } else {
+    out.dialogue = coercePro2DialogueForParse(out.dialogue);
+  }
   if (!Array.isArray(out.propIds) && Array.isArray(out.props)) {
     out.propIds = out.props;
     delete out.props;
@@ -128,13 +133,7 @@ export function coercePro2ProductionScriptEnvelopeForParse(
     );
     o.schemaVersion = schemaVersion >= 2 ? schemaVersion : PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION;
   }
-  if (Array.isArray(patch.characters) && patch.characters.length > 0) {
-    patch.characters = patch.characters.map((c) =>
-      c && typeof c === "object" && !Array.isArray(c)
-        ? enrichPro2CharacterRecordForParse(c as Record<string, unknown>)
-        : c,
-    );
-  }
+  enrichPro2ProductionScriptPatchForParse(patch);
   o.patch = patch;
   return o;
 }

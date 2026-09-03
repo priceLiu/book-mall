@@ -132,6 +132,7 @@ export function shouldSkipStoryRowTaskApply(
   pick: CanvasTaskRecord,
   nodeId?: string,
 ): boolean {
+  if (pick.failCode === "SUPERSEDED") return true;
   const localTaskId = localRuntime?.taskId?.trim();
   // 已绑定任务进入终态：必须写回（Gateway 已成功但 UI 仍扫光）
   if (localTaskId && pick.id === localTaskId) {

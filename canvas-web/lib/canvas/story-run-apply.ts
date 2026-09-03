@@ -16,8 +16,10 @@ import { syncProductionScaffoldDataToHubFromStore } from "./hydrate-production-s
 import {
   hubSectionIsRunning,
   hubSectionRuntime,
+  hubHasDisplayableScriptContent,
   shouldSkipHubSectionInflightTaskApply,
 } from "./story-hub-runtime";
+import { isCanvasInflightStatus } from "./story-column-runtime";
 import type {
   StoryLlmSection,
   StoryRunContext,
@@ -91,6 +93,54 @@ function hubSectionPatchChanged(
   const nextMd = patch[mdKey as keyof StoryScriptHubNodeData];
   if (JSON.stringify(prevRt) !== JSON.stringify(nextRt)) return true;
   if (typeof nextMd === "string" && nextMd !== prevMd) return true;
+
+  const prevPro2 = prev as StoryProScriptHubNodeData;
+  const nextPro2 = patch as Partial<StoryProScriptHubNodeData>;
+  if (
+    nextPro2.productionScript != null &&
+    JSON.stringify(prevPro2.productionScript) !==
+      JSON.stringify(nextPro2.productionScript)
+  ) {
+    return true;
+  }
+  if (
+    typeof nextPro2.outlineMd === "string" &&
+    nextPro2.outlineMd !== (prev.outlineMd ?? "")
+  ) {
+    return true;
+  }
+  if (
+    typeof nextPro2.characterMd === "string" &&
+    nextPro2.characterMd !== (prev.characterMd ?? "")
+  ) {
+    return true;
+  }
+  if (
+    typeof nextPro2.sceneMd === "string" &&
+    nextPro2.sceneMd !== (prev.sceneMd ?? "")
+  ) {
+    return true;
+  }
+  if (
+    typeof nextPro2.storyboardMd === "string" &&
+    nextPro2.storyboardMd !== (prev.storyboardMd ?? "")
+  ) {
+    return true;
+  }
+  if (
+    nextPro2.scriptStudioFrameRows != null &&
+    JSON.stringify(prevPro2.scriptStudioFrameRows ?? []) !==
+      JSON.stringify(nextPro2.scriptStudioFrameRows)
+  ) {
+    return true;
+  }
+  if (
+    nextPro2.scriptStudioCharacterRows != null &&
+    JSON.stringify(prevPro2.scriptStudioCharacterRows ?? []) !==
+      JSON.stringify(nextPro2.scriptStudioCharacterRows)
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -596,6 +646,27 @@ export function storyApplyTaskResult(
       return;
     }
     const prevRt = hubSectionRuntime(node, hubLlmSection);
+    // 同节点新任务在跑时，勿把 SUPERSEDED / 旧 FAILED 写回 Hub（否则扫光消失、回到空态）
+    if (
+      task.status === "FAILED" ||
+      task.status === "CANCELLED"
+    ) {
+      if (task.failCode === "SUPERSEDED") return;
+      if (
+        isCanvasNodeRunSessionActive(node.id) &&
+        isCanvasInflightStatus(prevRt?.status) &&
+        prevRt?.taskId !== task.id
+      ) {
+        return;
+      }
+      if (
+        isCanvasNodeRunSessionActive(node.id) &&
+        isCanvasInflightStatus(prevRt?.status) &&
+        !prevRt?.taskId?.trim()
+      ) {
+        return;
+      }
+    }
     if (shouldSkipStoryRowTaskApply(prevRt, task, node.id)) return;
     const prev = node.data as unknown as StoryScriptHubNodeData;
     const patch = applyHubSectionFromTask(
@@ -620,11 +691,25 @@ export function storyApplyTaskResult(
       );
       hubPatch = { ...hubPatch, ...originPatch };
     }
+    const mergedHubData = {
+      ...(prev as StoryProScriptHubNodeData),
+      ...hubPatch,
+    };
     const terminalHubTask =
       task.status === "SUCCEEDED" ||
       task.status === "FAILED" ||
       task.status === "CANCELLED";
-    const hubPatchWithIntentClear = terminalHubTask
+    // SUCCEEDED：须等剧本内容落库后再清 intent / 会话，避免「已链接」空态闪一下
+    const clearHubGenerateIntent =
+      task.status === "SUCCEEDED"
+        ? hubHasDisplayableScriptContent(mergedHubData)
+        : task.status === "CANCELLED" && task.failCode !== "SUPERSEDED"
+          ? true
+          : task.status === "FAILED" &&
+              task.failCode !== "SUPERSEDED" &&
+              (!isCanvasNodeRunSessionActive(node.id) ||
+                Boolean(prevRt?.taskId?.trim() && prevRt.taskId === task.id));
+    const hubPatchWithIntentClear = clearHubGenerateIntent
       ? ({ ...hubPatch, hubGenerateIntent: undefined } as typeof hubPatch)
       : hubPatch;
     updateNodeData(node.id, hubPatchWithIntentClear);
@@ -643,7 +728,13 @@ export function storyApplyTaskResult(
       const stillRunning = (
         ["outline", "character", "scene", "storyboard"] as const
       ).some((s) => hubSectionIsRunning(mergedNode, s));
-      if (!stillRunning) clearCanvasNodeRunSession(node.id);
+      const hubReady =
+        task.status === "SUCCEEDED"
+          ? hubHasDisplayableScriptContent({
+              ...(mergedNode.data as StoryProScriptHubNodeData),
+            })
+          : true;
+      if (!stillRunning && hubReady) clearCanvasNodeRunSession(node.id);
     }
     const starter = findStarterByHubId(allNodes, node.id);
     const ws = (

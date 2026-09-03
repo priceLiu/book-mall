@@ -20,6 +20,9 @@ export function markCanvasNodeRunSession(nodeId: string): void {
   sessionStartedAtMs.set(nodeId, Date.now());
 }
 
+/** Pro2 剧本 Hub · 单次 LLM 含多轮校验重试，宽限须覆盖整段异步执行 */
+export const PRO2_SCRIPT_HUB_ORPHAN_RECONCILE_GRACE_MS = 8 * 60 * 1000;
+
 export function clearCanvasNodeRunSession(nodeId: string): void {
   sessionStartedNodeIds.delete(nodeId);
   sessionStartedAtMs.delete(nodeId);
@@ -36,11 +39,15 @@ export function canvasNodeRunSessionStartedAtMs(nodeId: string): number {
 /** 本地 pending 尚无 taskId 时 · 勿被 reconcile 误清（runOne / Gateway 提交窗口） */
 const LIBTV_ORPHAN_RECONCILE_GRACE_MS = 60_000;
 
-export function shouldDeferLibtvOrphanReconcile(nodeId: string): boolean {
+export function shouldDeferLibtvOrphanReconcile(
+  nodeId: string,
+  opts?: { extendedGraceMs?: number },
+): boolean {
   if (!nodeId || !sessionStartedNodeIds.has(nodeId)) return false;
   const startedAt = sessionStartedAtMs.get(nodeId) ?? 0;
+  const graceMs = opts?.extendedGraceMs ?? LIBTV_ORPHAN_RECONCILE_GRACE_MS;
   if (!startedAt) return true;
-  return Date.now() - startedAt < LIBTV_ORPHAN_RECONCILE_GRACE_MS;
+  return Date.now() - startedAt < graceMs;
 }
 
 function isTerminalTaskStatus(status: string): boolean {

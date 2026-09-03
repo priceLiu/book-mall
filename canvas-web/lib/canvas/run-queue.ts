@@ -2643,7 +2643,21 @@ export function useCanvasRunner(
         pick: CanvasTaskRecord,
         job: CanvasStoryRunJob,
         localRuntime: CanvasNodeRuntime | undefined,
+        nodeTasks?: CanvasTaskRecord[],
       ) => {
+        // Hub：同节点仍有在途任务时，勿把旧 FAILED 写回（校验重试窗口会闪回空态）
+        if (
+          (pick.status === "FAILED" || pick.status === "CANCELLED") &&
+          nodeTasks?.some(
+            (t) =>
+              t.id !== pick.id &&
+              isServerInflightTaskStatus(t.status) &&
+              !isStaleServerInflightTask(t, nodeTasks) &&
+              !isAbandonedCanvasInflightTask(t),
+          )
+        ) {
+          return;
+        }
         if (shouldSkipStoryRowTaskApply(localRuntime, pick, node.id)) return;
         storyApplyTaskResult(node, pick, job, updateNodeData, nodes);
         if (pick.status === "SUCCEEDED" || pick.status === "FAILED") {
@@ -2669,7 +2683,7 @@ export function useCanvasRunner(
             const job: CanvasStoryRunJob =
               jobByTaskRef.current.get(pick.id) ??
               storyRunContextFromScope(node.id, scope);
-            applyRowPick(node, pick, job, localRt);
+            applyRowPick(node, pick, job, localRt, nodeTasks);
           }
           continue;
         }
@@ -2797,6 +2811,7 @@ export function useCanvasRunner(
       t: CanvasTaskRecord,
       nodeId: string,
       nodes: CanvasFlowNode[],
+      allTasks?: CanvasTaskRecord[],
     ) => {
       const node = nodes.find((n) => n.id === nodeId);
       const job = jobByTaskRef.current.get(t.id);
@@ -2812,6 +2827,23 @@ export function useCanvasRunner(
           shouldSkipHubSectionInflightTaskApply(node, ctx.llmSection, t)
         ) {
           return;
+        }
+        if (
+          (t.status === "FAILED" || t.status === "CANCELLED") &&
+          isAnyStoryScriptHubType(node.type ?? "")
+        ) {
+          const nodeTasks = (allTasks ?? []).filter((x) => x.nodeId === nodeId);
+          if (
+            nodeTasks.some(
+              (x) =>
+                x.id !== t.id &&
+                isServerInflightTaskStatus(x.status) &&
+                !isStaleServerInflightTask(x, nodeTasks) &&
+                !isAbandonedCanvasInflightTask(x),
+            )
+          ) {
+            return;
+          }
         }
         storyApplyTaskResult(node, t, ctx, updateNodeData, nodes);
         if (
@@ -3078,7 +3110,7 @@ export function useCanvasRunner(
         latestByNode.forEach((t, nodeId) => {
           if (isServerInflightStatus(t.status)) serverInflight++;
           if (!columnIds.has(nodeId)) {
-            applyTaskUpdate(t, nodeId, useCanvasStore.getState().nodes);
+            applyTaskUpdate(t, nodeId, useCanvasStore.getState().nodes, tasks);
           }
         });
         for (const t of tasks) {

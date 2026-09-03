@@ -25,6 +25,15 @@ function sceneImagePrompt(name: string): string {
   ].join("\n");
 }
 
+function propImagePrompt(name: string): string {
+  return [
+    `名称：${name}`,
+    "描述：道具特写，材质清晰",
+    "构图规范：2×3网格六视图道具设定",
+    VIS_STYLE,
+  ].join("\n");
+}
+
 /** 精简 fixture · v2 Pass1 导演表结构 · JSON-only v13 语义校验通过 */
 export const PRO2_FIXTURE_FULL_PACK: Pro2ProductionScriptPatch = {
   schemaVersion: 2,
@@ -72,6 +81,7 @@ export const PRO2_FIXTURE_FULL_PACK: Pro2ProductionScriptPatch = {
         id: "prop-book",
         name: "明黄婚书",
         description: "明黄绢面婚书，边缘金线滚边",
+        imagePrompt: propImagePrompt("明黄婚书"),
       },
     ],
     shots: [

@@ -4,6 +4,7 @@ import type { CanvasChatContentPart } from "@/lib/canvas/providers/types";
 import {
   assertStoryLlmVideoUnderstandingModel,
   assertStoryLlmVisionModel,
+  isStoryLlmVideoUnderstandingModel,
   isStoryLlmVisionModel,
 } from "@/lib/canvas/story-llm-vision-models";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
@@ -79,6 +80,9 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
     if (!isStoryLlmVisionModel(modelKey)) {
+      modelKey = ECOM_MEDIA_DECOMPOSE_DEFAULT_CHAT_MODEL;
+    }
+    if (media.kind === "video" && !isStoryLlmVideoUnderstandingModel(modelKey)) {
       modelKey = ECOM_MEDIA_DECOMPOSE_DEFAULT_CHAT_MODEL;
     }
     if (media.kind === "video") {

@@ -37,7 +37,7 @@ import {
 } from "@/lib/media-decompose-structured";
 import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 import type { MediaDecomposeChatModel, MediaDecomposeProject } from "@/lib/media-decompose-types";
-import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
+import { pickMediaDecomposeChatModelKey, listEligibleMediaDecomposeChatModels } from "@/lib/media-decompose-model-pick";
 import {
   isReplicaScriptReady,
   readReplicaPhase,
@@ -138,12 +138,16 @@ export function MediaDecomposeWorkspace({
     });
   }, [project.media?.id, project.media?.kind, project.settings.lastPrompt]);
 
-  const eligibleModels = useMemo(() => {
-    if (project.media?.kind === "video") {
-      return chatModels.filter((m) => m.supportsVideo);
-    }
-    return chatModels;
-  }, [chatModels, project.media?.kind]);
+  const eligibleModels = useMemo(
+    () => listEligibleMediaDecomposeChatModels(chatModels, project.media?.kind),
+    [chatModels, project.media?.kind],
+  );
+
+  useEffect(() => {
+    if (eligibleModels.length === 0) return;
+    if (eligibleModels.some((m) => m.modelKey === chatModelKey)) return;
+    onChatModelChange(pickMediaDecomposeChatModelKey(eligibleModels, chatModelKey, project.media?.kind));
+  }, [chatModelKey, eligibleModels, onChatModelChange, project.media?.kind]);
 
   const displaySource = streamText ?? project.result?.rawText ?? "";
   const structured =
@@ -529,7 +533,8 @@ export function MediaDecomposeWorkspace({
         confirmLabel="使用该模型"
         models={eligibleModels}
         modelsLoading={modelsLoading}
-        modelsEmptyHint="暂无可用视觉模型，请检查 Gateway 凭证。"
+        modelsEmptyHint="暂无可用视觉理解模型，请检查 Gateway 凭证。"
+        hideTypeFilter
         onRetryLoadModels={onRefreshModels}
         value={draftModelKey}
         onChange={setDraftModelKey}

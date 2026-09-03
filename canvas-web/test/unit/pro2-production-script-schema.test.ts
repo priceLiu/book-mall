@@ -3,9 +3,11 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   coercePro2ColorBlockInput,
+  coercePro2DialogueForParse,
   listPro2CreativeDurationIssues,
   listPro2IndustrialAnalysisIssues,
   listPro2SemanticPatchIssues,
+  listPro2ShotDialogueIssues,
   normalizePro2CreativeShotDurations,
   pro2ProductionScriptPatchSchema,
   pro2ProductionScriptSchema,
@@ -74,6 +76,28 @@ describe("pro2-production-script-schema", () => {
       "storyboard",
     );
     expect(issues.some((i) => i.includes("缺少 analysis"))).toBe(true);
+  });
+
+  it("accepts dialogue without emotion parentheses", () => {
+    const raw = '萧景珩："姑娘，下次翻墙，记得看路。"';
+    expect(listPro2ShotDialogueIssues([{ index: 10, dialogue: raw }])).toHaveLength(
+      0,
+    );
+    expect(coercePro2DialogueForParse(raw)).toBe(raw);
+  });
+
+  it("normalizes curly quotes and strips 说 before colon", () => {
+    const curly = "萧景珩（温和）：“姑娘小心。”";
+    expect(coercePro2DialogueForParse(curly)).toBe('萧景珩（温和）："姑娘小心。"');
+    expect(
+      listPro2ShotDialogueIssues([{ index: 1, dialogue: curly }]),
+    ).toHaveLength(0);
+
+    const withShuo = '沈昭昭说："又要加班……"';
+    expect(coercePro2DialogueForParse(withShuo)).toBe('沈昭昭："又要加班……"');
+    expect(
+      listPro2ShotDialogueIssues([{ index: 2, dialogue: withShuo }]),
+    ).toHaveLength(0);
   });
 
   it("director creative enforces 12–18 shots and 175–185s", () => {

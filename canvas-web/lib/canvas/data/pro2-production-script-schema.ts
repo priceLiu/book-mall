@@ -681,8 +681,61 @@ export function listPro2IndustrialAnalysisIssues(
   return issues;
 }
 
-const PRO2_DIALOGUE_FORMAT_RE =
-  /^[^（(：:\n]+[（(][^）)]+[）)]\s*[：:]\s*[""「].+[""」]$/u;
+/** 开引号：ASCII " · 弯引号 “ · 直角 「 · 双直角 『 */
+const PRO2_DIALOGUE_OPEN_Q = `["“「『]`;
+/** 闭引号：ASCII " · 弯引号 ” · 直角 」 · 双直角 』 */
+const PRO2_DIALOGUE_CLOSE_Q = `["”」』]`;
+
+const PRO2_DIALOGUE_FORMAT_LENIENT_RE = new RegExp(
+  `^(?:[^（(：:\\n]+(?:[（(][^）)]+[）)])?\\s*[：:]\\s*${PRO2_DIALOGUE_OPEN_Q}[^"“”「」『』]+${PRO2_DIALOGUE_CLOSE_Q}\\s*)+$`,
+  "u",
+);
+
+/** 兼容校验 · 须含角色名 + 引号台词；情绪括号可省略（coerce 后补） */
+const PRO2_DIALOGUE_FORMAT_RE = PRO2_DIALOGUE_FORMAT_LENIENT_RE;
+
+/** 仅字形归一：弯引号 → ASCII；不改台词正文 */
+function normalizePro2DialogueQuotes(text: string): string {
+  return text
+    .replace(/[\u201C\u201D\u300E\u300F]/g, '"') // “ ” 『 』
+    .replace(/\u2018|\u2019/g, "'");
+}
+
+function coerceSinglePro2DialogueSegment(segment: string): string {
+  const t = normalizePro2DialogueQuotes(segment.trim());
+  if (!t || t === "—" || t === "-") return "—";
+  if (/[（(][^）)]+[）)]\s*[：:]/.test(t)) return t;
+  const m = t.match(
+    /^([\u4e00-\u9fa5A-Za-z0-9·]+(?:内心OS)?)\s*[：:]\s*(["「].+[」"])$/u,
+  );
+  if (m) return `${m[1]!}（—）：${m[2]!}`;
+  return t;
+}
+
+/** LLM 常写弯引号 /「角色："台词"」/ 多句连写；解析前只做格式收拢，不编造台词 */
+export function coercePro2DialogueForParse(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  let t = normalizePro2DialogueQuotes(value.trim());
+  if (!t || t === "—" || t === "-") return "—";
+  // 「角色说：」→「角色：」
+  t = t.replace(
+    /([\u4e00-\u9fa5A-Za-z0-9·]+)(内心OS)?(说|道|讲)\s*[：:]/gu,
+    "$1$2：",
+  );
+  if (PRO2_DIALOGUE_FORMAT_LENIENT_RE.test(t)) return t;
+
+  const segments = t
+    .split(/(?=[\u4e00-\u9fa5A-Za-z0-9·]+(?:内心OS)?\s*[：:])/u)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (segments.length > 1) {
+    const joined = segments.map(coerceSinglePro2DialogueSegment).join("");
+    if (PRO2_DIALOGUE_FORMAT_LENIENT_RE.test(joined)) return joined;
+  }
+  const single = coerceSinglePro2DialogueSegment(t);
+  if (PRO2_DIALOGUE_FORMAT_LENIENT_RE.test(single)) return single;
+  return t;
+}
 
 function countPro2TraitItems(traits?: string): number {
   const t = traits?.trim() ?? "";
@@ -743,9 +796,10 @@ export function listPro2ShotDialogueIssues(
   const issues: string[] = [];
   if (!shots?.length) return issues;
   for (const s of shots) {
-    const d = (s.dialogue ?? "").trim();
-    if (!d || d === "—" || d === "-") continue;
-    if (!PRO2_DIALOGUE_FORMAT_RE.test(d)) {
+    const d = coercePro2DialogueForParse(s.dialogue);
+    const dialogue = typeof d === "string" ? d : (s.dialogue ?? "").trim();
+    if (!dialogue || dialogue === "—" || dialogue === "-") continue;
+    if (!PRO2_DIALOGUE_FORMAT_LENIENT_RE.test(dialogue)) {
       issues.push(
         `镜 ${s.index} 对白须为 角色名（情绪/语气）："台词" 格式，无对白写「—」`,
       );
@@ -764,7 +818,8 @@ function listPro2AssetImagePromptIssues(
     }
   }
   for (const p of patch.props ?? []) {
-    if (p.imagePrompt && !imagePromptHasRequiredBlocks(p.imagePrompt)) {
+    // 与 scenes 一致：props 必须带完整 imagePrompt（不得省略）
+    if (!imagePromptHasRequiredBlocks(p.imagePrompt)) {
       issues.push(`道具 ${p.name} imagePrompt 须含「构图规范」与 [视觉风格：…]`);
     }
   }

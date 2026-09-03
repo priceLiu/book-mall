@@ -43,8 +43,16 @@ export function resolveLibtvThinNodeDisplayState(input: {
   hasGeneratedContent: boolean;
   isGenerating: boolean;
   isLinked: boolean;
+  /** 结果落库窗口内保持「已生成」态，避免闪回 initial/connected */
+  hubGenerateIntent?: boolean;
 }): LibtvThinNodeDisplayState {
-  if (input.isGenerating || input.hasGeneratedContent) return "generated";
+  if (
+    input.isGenerating ||
+    input.hasGeneratedContent ||
+    input.hubGenerateIntent
+  ) {
+    return "generated";
+  }
   if (input.isLinked) return "connected";
   return "initial";
 }
