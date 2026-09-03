@@ -410,7 +410,7 @@ export function ModelShotContentPanel({
   );
 
   const handleAttachAssets = useCallback(
-    async (role: ModelShotReferenceRole, assetIds: string[]) => {
+    async (assetIds: string[], role: ModelShotReferenceRole) => {
       setRefBusy(true);
       try {
         await attachModelShotReference(project.id, { role, assetIds });

@@ -86,6 +86,8 @@ type Props = {
   dialogTitle?: string;
   /** 覆盖弹层副标题 */
   dialogDescription?: string;
+  /** 覆盖弹层容器 className（默认 STORYBOARD_MODEL_PICKER_DIALOG_CLASS） */
+  contentClassName?: string;
   /** 覆盖确认按钮文案 */
   confirmLabel?: string;
   /** 覆盖底部左侧提示 */

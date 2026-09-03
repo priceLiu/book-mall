@@ -419,7 +419,7 @@ export function ReplicaSetupPanel({
       setVoiceoverDraftLocal(draft);
       toast({
         title: "口播方案已生成",
-        description: "已显示在卖点下方；生成脚本后可在分镜表点击「应用新口播」。",
+        message: "已显示在卖点下方；生成脚本后可在分镜表点击「应用新口播」。",
       });
     } catch (e) {
       await onAlert({

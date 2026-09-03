@@ -39,6 +39,7 @@ export function createProductionShotRow(
     endTimeSec: startTimeSec + durationSec,
     durationSec,
     cutTransition: previous?.cutTransition ?? "硬切",
+    cutDetail: previous?.cutDetail ?? "无",
     shotScale: previous?.shotScale ?? "中景",
     cameraAngle: previous?.cameraAngle ?? "无",
     cameraMovement: previous?.cameraMovement ?? "固定机位",

@@ -1920,6 +1920,9 @@ export function StoryboardContentPanel({
         }
         return { ok: true };
       }
+      if (!("videoUrl" in result) || !result.videoUrl.trim()) {
+        return { ok: false };
+      }
       const videoUrl = result.videoUrl;
       if (!opts?.skipProjectUpdate && project.sheet) {
         const panels = project.sheet.panels.map((p) =>

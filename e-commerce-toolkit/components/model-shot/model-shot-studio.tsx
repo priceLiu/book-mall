@@ -142,13 +142,12 @@ export function ModelShotStudio() {
 
   /** 模型清单晚于项目到达时，补同步助手模型 */
   useEffect(() => {
-    if (chatModels.length === 0 || !project?.settings.chatModelKey) return;
+    const savedKey = project?.settings.chatModelKey;
+    if (chatModels.length === 0 || !savedKey) return;
     setChatModelKey((prev) =>
       pickBoundStoryboardModelKey(
         chatModels,
-        chatModels.some((m) => m.modelKey === project.settings.chatModelKey)
-          ? project.settings.chatModelKey
-          : prev,
+        chatModels.some((m) => m.modelKey === savedKey) ? savedKey : prev,
       ),
     );
   }, [chatModels, project?.id, project?.settings.chatModelKey]);

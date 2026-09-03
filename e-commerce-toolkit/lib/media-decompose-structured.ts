@@ -298,9 +298,9 @@ function normalizeMediaDecomposePatch(patch: MediaDecomposePatch): MediaDecompos
       stylingNotes: patch.wardrobeAnalysis?.stylingNotes ?? "",
     },
     storyboardTable: patch.storyboardTable.map((row) => ({
+      ...row,
       lightingSetup: row.lightingSetup ?? "",
       toneContrast: row.toneContrast ?? "",
-      ...row,
       voiceover: effectiveDecomposeVoiceover(row),
     })),
   };

@@ -235,8 +235,8 @@ export function ShootCatalogPanel() {
     if (entry.lockedAt) return;
     if (
       !(await doubleConfirm({
-        firstTitle: "删除场景条目",
-        firstMessage: `确定删除「${entry.name}」？`,
+        title: "删除场景条目",
+        message: `确定删除「${entry.name}」？`,
         secondTitle: "不可恢复",
         secondMessage: "删除后无法恢复；若曾被项目引用，相关计划仍保留当时文案。",
       }))
@@ -259,8 +259,8 @@ export function ShootCatalogPanel() {
     if (entry.lockedAt) return;
     if (
       !(await doubleConfirm({
-        firstTitle: "删除道具条目",
-        firstMessage: `确定删除「${entry.name}」？`,
+        title: "删除道具条目",
+        message: `确定删除「${entry.name}」？`,
         secondTitle: "不可恢复",
         secondMessage: "删除后无法恢复。",
       }))
@@ -283,8 +283,8 @@ export function ShootCatalogPanel() {
     if (entry.lockedAt) return;
     if (
       !(await doubleConfirm({
-        firstTitle: "删除姿势条目",
-        firstMessage: `确定删除「${entry.title}」？`,
+        title: "删除姿势条目",
+        message: `确定删除「${entry.title}」？`,
         secondTitle: "不可恢复",
         secondMessage: "删除后无法恢复。",
       }))

@@ -334,7 +334,7 @@ export function ModelShotRefUploader({
                       ? "不需要道具，出图时不带入道具参考。"
                       : "已跳过场景，出图时由模型自由发挥背景。"
                     : aiDesc
-                      ? undefined
+                      ? ""
                       : emptyHint
                 }
                 busy={disabled || pasteSuspended}
