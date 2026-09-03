@@ -9,6 +9,7 @@ import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { buildWizardAssetMentionables } from "@/lib/canvas/pro2-production-wizard-assets";
 import { useWizardJobProgressStatus } from "@/lib/canvas/pro2-wizard-asset-progress";
+import { wizardAssetDraftsShallowEqual } from "@/lib/canvas/pro2-wizard-asset-draft-patch";
 import { enqueueWizardShotGenerate } from "@/lib/canvas/pro2-wizard-shot-generate-queue";
 import { patchProductionWizardShotDraft } from "@/lib/canvas/pro2-wizard-shot-draft-patch";
 import type { Pro2ProductionWizardShotDraft } from "@/lib/canvas/pro2-production-wizard-shot-drafts";
@@ -78,9 +79,11 @@ export const Pro2ProductionWizardShotMediaCard = memo(
     const refImages = draft?.refImages ?? [];
     const assetDrafts = useCanvasStore((s) => {
       const hub = s.nodes.find((n) => n.id === scriptHubId);
-      return (hub?.data as StoryProScriptHubNodeData | undefined)
-        ?.productionWizardAssetDrafts;
-    });
+      return (
+        (hub?.data as StoryProScriptHubNodeData | undefined)
+          ?.productionWizardAssetDrafts ?? {}
+      );
+    }, wizardAssetDraftsShallowEqual);
     const mentionables = useMemo(
       () => buildWizardAssetMentionables(script, refImages, undefined, assetDrafts),
       [script, refImages, assetDrafts],

@@ -49,6 +49,7 @@ import {
 import { listFilmPullModelRefs, listFilmPullProductRefs } from "@/lib/film-pull-refs";
 import {
   extractFilmPullAnalyzePatch,
+  resolveFilmPullAnalyzePatchForDisplay,
   toFilmPullDisplayMarkdown,
 } from "@/lib/film-pull-structured";
 import type { FilmPullProject } from "@/lib/film-pull-types";
@@ -160,7 +161,7 @@ export function FilmPullWorkspace({
 
   const displaySource = streamText ?? project.analyzeResult?.rawText ?? "";
   const structured =
-    project.analyzeResult?.structured ??
+    resolveFilmPullAnalyzePatchForDisplay(project.analyzeResult?.structured) ??
     extractFilmPullAnalyzePatch(displaySource) ??
     null;
   const parseError = project.analyzeResult?.parseError;

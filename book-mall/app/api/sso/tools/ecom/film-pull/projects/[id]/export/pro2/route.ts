@@ -4,6 +4,7 @@ import {
   filmPullAnalyzeToPro2ProductionScript,
   filmPullRenderScriptToPro2ProductionScript,
 } from "@/lib/ecom/adapters/ecom-film-pull-to-pro2-script";
+import { isPro2FilmPullProductionScript } from "@/lib/canvas/pro2-shot-analysis-view";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { getEcomFilmPullProject } from "@/lib/ecom/ecom-film-pull-service";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
@@ -34,10 +35,29 @@ export async function POST(req: Request, ctx: Ctx) {
     const analyze = project.analyzeResult?.structured;
 
     let productionScript;
-    if (preferRender && render) {
+    if (preferRender && render && isPro2FilmPullProductionScript(render)) {
+      productionScript = {
+        ...render,
+        meta: {
+          ...render.meta,
+          title: title?.trim() || render.meta?.title || "视频拉片导入",
+        },
+      };
+    } else if (analyze && isPro2FilmPullProductionScript(analyze)) {
+      productionScript = {
+        ...analyze,
+        meta: {
+          ...analyze.meta,
+          title: title?.trim() || analyze.meta?.title || "视频拉片导入",
+        },
+      };
+    } else if (preferRender && render) {
       productionScript = filmPullRenderScriptToPro2ProductionScript(render, { title });
     } else if (analyze) {
-      productionScript = filmPullAnalyzeToPro2ProductionScript(analyze, { title });
+      productionScript = filmPullAnalyzeToPro2ProductionScript(
+        analyze as Parameters<typeof filmPullAnalyzeToPro2ProductionScript>[0],
+        { title },
+      );
     } else {
       return NextResponse.json({ error: "请先完成拉片" }, { status: 400 });
     }

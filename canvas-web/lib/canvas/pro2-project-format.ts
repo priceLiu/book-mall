@@ -31,6 +31,26 @@ export function isActivePro2ScriptFormatV13(meta: unknown): boolean {
   return readPro2ScriptFormat(meta) === PRO2_SCRIPT_FORMAT_JSON_ONLY_V13;
 }
 
+/** Hub 节点是否 JSON-only v13（prompt 版本或 promptOutline 标记） */
+export function isPro2JsonOnlyHubData(
+  data: {
+    storyPro2PackPromptVersion?: number;
+    promptOutline?: string;
+  } | null | undefined,
+): boolean {
+  if (!data) return false;
+  if (
+    typeof data.storyPro2PackPromptVersion === "number" &&
+    data.storyPro2PackPromptVersion >= 13
+  ) {
+    return true;
+  }
+  const outline = String(data.promptOutline ?? "");
+  return (
+    outline.includes("json-only-v13") || outline.includes("JSON-only")
+  );
+}
+
 /** 是否曾接入 Pro2 剧本链路（脚本 Hub 或关联剧本包）· 纯 starter/生图项目不算 */
 export function pro2ProjectHasScriptUsageFromListHints(
   meta: unknown,

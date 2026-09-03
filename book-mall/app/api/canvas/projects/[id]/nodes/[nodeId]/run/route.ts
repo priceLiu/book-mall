@@ -101,6 +101,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     | "tts"
     | "sceneRef"
     | "themeOutline"
+    | "scriptStudioBatch"
     | "generalText"
     | "music"
     | undefined;
@@ -221,7 +222,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     if (
       (runnerType === "story-pro-starter" ||
         runnerType === "story-pro-script-hub") &&
-      mediaKind === "themeOutline"
+      (mediaKind === "themeOutline" || mediaKind === "scriptStudioBatch")
     ) {
       result = await runStoryProStarterThemeOutline({ ...baseArgs, forceFresh });
     } else if (

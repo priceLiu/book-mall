@@ -36,15 +36,10 @@ import {
 } from "./pro2-production-script-structured";
 import { convertPro2HumanTabMarkdownToGfm, promotePro2HumanGfmToHubFields } from "./parse-md-tables";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
-import { STORY_PRO2_JSON_ONLY_MARKER } from "./data/pro2-production-pack-standard";
+import { isPro2JsonOnlyHubData } from "./pro2-project-format";
 
 function isPro2JsonOnlyHub(data: StoryScriptHubNodeData): boolean {
-  const d = data as StoryProScriptHubNodeData;
-  if (typeof d.storyPro2PackPromptVersion === "number") {
-    return d.storyPro2PackPromptVersion >= 13;
-  }
-  const outline = String(d.promptOutline ?? "");
-  return outline.includes(STORY_PRO2_JSON_ONLY_MARKER) || outline.includes("JSON-only");
+  return isPro2JsonOnlyHubData(data as StoryProScriptHubNodeData);
 }
 
 function pro2SectionFailedRuntime(

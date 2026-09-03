@@ -19,6 +19,7 @@ export type StoryRunContext = {
     | "tts"
     | "sceneRef"
     | "themeOutline"
+    | "scriptStudioBatch"
     | "generalText"
     | "music";
 };

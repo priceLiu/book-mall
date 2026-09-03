@@ -96,7 +96,11 @@ import { spawnStoryProScriptHub } from "@/lib/canvas/spawn-story-pro-workspace";
 import { spawnStoryPro2ScriptHub } from "@/lib/canvas/spawn-story-pro2-workspace";
 import { reflowStoryProWorkspace } from "@/lib/canvas/story-pro-workspace-layout";
 import { reflowStoryPro2Workspace } from "@/lib/canvas/story-pro2-workspace-layout";
-import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
+import { tryApplyAssistantPackImportToHub } from "@/lib/canvas/pro2-production-script-apply";
+import type {
+  StoryProScriptHubNodeData,
+  StoryProStarterNodeData,
+} from "@/lib/canvas/story-pro-workspace-types";
 import { pickPersistableProjectThumbnailUrl } from "@/lib/canvas/project-thumbnail";
 import { markRecentProjectsStale } from "@/lib/canvas/recent-projects-invalidate";
 import {
@@ -228,6 +232,17 @@ function Inner({ projectId }: { projectId: string }) {
           STORY_PRO_THEME_SYSTEM_PROMPT_DEFAULT,
       };
 
+      const applyPro2JsonToHub = (hubId: string) => {
+        const live = useCanvasStore.getState();
+        const hub = live.nodes.find((n) => n.id === hubId);
+        if (!hub) return false;
+        const hubData = hub.data as StoryProScriptHubNodeData;
+        const patch = tryApplyAssistantPackImportToHub(hubData, md, hubId);
+        if (!patch) return false;
+        updateNodeData(hubId, patch);
+        return true;
+      };
+
       if (plan.spawnNew) {
         const starterId = addNode(starterType, plan.position, {
           starterMode: "upload",
@@ -261,10 +276,11 @@ function Inner({ projectId }: { projectId: string }) {
           setEdges,
           updateNodeData,
         };
-        if (isPro2) {
-          spawnStoryPro2ScriptHub(spawnArgs);
-        } else {
-          spawnStoryProScriptHub(spawnArgs);
+        const spawned = isPro2
+          ? spawnStoryPro2ScriptHub(spawnArgs)
+          : spawnStoryProScriptHub(spawnArgs);
+        if (isPro2 && spawned?.scriptHubId) {
+          applyPro2JsonToHub(spawned.scriptHubId);
         }
         const laid = useCanvasStore.getState();
         setNodes(() =>
@@ -279,6 +295,9 @@ function Inner({ projectId }: { projectId: string }) {
         uploadedScriptMd: md,
         starterMode: "upload",
       });
+      if (isPro2 && plan.scriptHubId) {
+        applyPro2JsonToHub(plan.scriptHubId);
+      }
     },
     [addNode, dialogs, setEdges, setNodes, updateNodeData],
   );

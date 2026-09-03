@@ -69,3 +69,31 @@ export function buildStoryboardPanelPreviewItems(
       title: `镜头 ${p.index}`,
     }));
 }
+
+/** 模特姿势各姿势已生成图（含历史版本） */
+export function buildModelShotPosePreviewItems(
+  items: readonly {
+    index: number;
+    imageUrl?: string | null;
+    title?: string | null;
+    imageHistory?: readonly { url: string }[] | null;
+  }[],
+): EcomImagePreviewItem[] {
+  const out: EcomImagePreviewItem[] = [];
+  for (const p of items) {
+    const titleBase = p.title?.trim() || `姿势 ${p.index}`;
+    const history =
+      Array.isArray(p.imageHistory) && p.imageHistory.length > 0
+        ? p.imageHistory.map((v) => v.url?.trim()).filter(Boolean)
+        : p.imageUrl?.trim()
+          ? [p.imageUrl.trim()]
+          : [];
+    history.forEach((src, i) => {
+      out.push({
+        src: src!,
+        title: history.length > 1 ? `${titleBase} · v${i + 1}` : titleBase,
+      });
+    });
+  }
+  return out;
+}

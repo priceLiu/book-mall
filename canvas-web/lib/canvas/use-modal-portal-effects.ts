@@ -76,7 +76,8 @@ export function useCanvasToolbarPopoverOpen(): boolean {
  * 仅依赖 `active`，避免父组件每帧传入新 `onClose` 导致 overflow 反复切换 → 整页闪烁/抖动。
  */
 export function useModalBodyScrollLock(active = true): void {
-  useEffect(() => {
+  // layout 阶段锁定，避免首帧仍滚动 / overflow 切换落在 paint 之后整页闪一下
+  useLayoutEffect(() => {
     if (!active) return;
     applyModalScrollLock();
     return releaseModalScrollLock;

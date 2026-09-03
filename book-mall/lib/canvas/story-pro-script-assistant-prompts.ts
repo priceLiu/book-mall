@@ -1,7 +1,16 @@
 import {
-  STORY_PRO_PACK_MARKDOWN_STRUCTURE,
-  STORY_PRO_PACK_OUTPUT_RULES,
-} from "@/lib/canvas/story-pro-script-pack";
+  PRO2_CANVAS_PASS1_SHOT_FIELD_GUIDE,
+  PRO2_CHARACTER_APPEARANCE_COLUMN_RULES,
+  PRO2_CHARACTER_IMAGE_PROMPT_GOLDEN_RULES,
+  PRO2_PROP_IMAGE_PROMPT_GOLDEN_RULES,
+  PRO2_SCENE_IMAGE_PROMPT_GOLDEN_RULES,
+  STORY_PRO2_CORE_CONFLICT_TABLE_RULES,
+  STORY_PRO2_HANDOFF_TABLE_RULES,
+  STORY_PRO2_JSON_OUTPUT_CONTRACT,
+  STORY_PRO2_PACK_OUTPUT_RULES,
+  STORY_PRO2_PACK_PARSE_CONTRACT,
+  STORY_PRO2_VISUAL_STYLE_TABLE_RULES_V6,
+} from "@/lib/canvas/data/pro2-production-pack-standard";
 
 export type ScriptAssistantOutputMode = "chat" | "pack";
 
@@ -29,13 +38,31 @@ export function buildScriptAssistantSystemPrompt(
 
   return `${base}
 
-【当前模式：创作并导入故事剧本 · 完整制作包】
-用户将把结果导入影视专业版「故事启动」节点，并参与 Hub 定稿拆分。你必须输出 **完整** Markdown 制作包（单次回复即全文，勿只给摘要）：
+【当前模式：创作并导入故事剧本 · 完整制作包 · JSON-only v13】
+用户将把结果导入影视专业版 2.0 Hub。你必须 **只输出** 一个 \`\`\`pro2-production-script\` JSON 围栏（step=full_pack · tier=pro），单次回复即全文，勿只给摘要。
 
-${STORY_PRO_PACK_OUTPUT_RULES}
+${STORY_PRO2_PACK_PARSE_CONTRACT}
 
-${STORY_PRO_PACK_MARKDOWN_STRUCTURE}
+${STORY_PRO2_PACK_OUTPUT_RULES}
 
-- 每个镜头的 **AI视频提示词(英文)** 须独立可用。
-- 有对白的镜头须在 **口型/配音备注** 标明口型同步或后期配音。`;
+${STORY_PRO2_VISUAL_STYLE_TABLE_RULES_V6}
+
+${PRO2_SCENE_IMAGE_PROMPT_GOLDEN_RULES}
+
+${STORY_PRO2_CORE_CONFLICT_TABLE_RULES}
+
+${PRO2_CHARACTER_IMAGE_PROMPT_GOLDEN_RULES}
+
+${PRO2_CHARACTER_APPEARANCE_COLUMN_RULES}
+
+${PRO2_PROP_IMAGE_PROMPT_GOLDEN_RULES}
+
+${STORY_PRO2_HANDOFF_TABLE_RULES}
+
+${PRO2_CANVAS_PASS1_SHOT_FIELD_GUIDE}
+
+${STORY_PRO2_JSON_OUTPUT_CONTRACT}
+
+- **禁止** Markdown 章节、GFM 表、围栏外说明文字。
+- Pass2 frameImagePrompt / videoPrompt 由 Hub「生成提示词」完成；Pass1 shots[] 禁止 imagePrompt / videoPrompt。`;
 }

@@ -29,6 +29,10 @@ import {
   buildScriptStudioFirstRoundPrompt,
   scriptStudioBatchRange,
 } from "./script-studio-prompts";
+import {
+  buildScriptStudioContinuationContext,
+  parseScriptStudioCanonicalJson,
+} from "./script-studio-continuation-context";
 import { isPro2GeneralTextNode, isPro2StoryOutlineTextNode } from "./pro2-text-purpose";
 import { composeStoryProGeneralTextUserPrompt } from "./pro2-general-text-prompt";
 import { assertStoryLlmVisionModel } from "./story-llm-vision-models";
@@ -123,19 +127,24 @@ export async function runStoryProStarterThemeOutline(
       });
     } else {
       const { start, end } = scriptStudioBatchRange(batchIndex, totalEpisodes);
-      const frozen = String(data.scriptStudioFrozenBiblesMd ?? "").trim();
-      const completed = String(data.scriptStudioCompletedBatchesMd ?? "").trim();
-      const continuation = buildScriptStudioContinuationPrompt({
+      const completedJson = parseScriptStudioCanonicalJson(
+        data.scriptStudioCanonicalJson,
+      );
+      const continuationContext = buildScriptStudioContinuationContext({
+        frozenBiblesMd: String(data.scriptStudioFrozenBiblesMd ?? "").trim(),
+        completedCanonicalJson: completedJson.length ? completedJson : null,
+      });
+      prompt = buildScriptStudioContinuationPrompt({
         system: systemKind,
         totalEpisodes,
         batchStart: start,
         batchEnd: end,
         rawScript,
+        continuationContext,
       });
-      prompt = [frozen, completed, continuation].filter(Boolean).join("\n\n");
     }
     system =
-      "你是资深工业影视总编剧，严格执行用户消息中的工业化剧本生产规范；输出 Markdown，不要 JSON。";
+      "你是资深工业影视总编剧，严格执行用户消息中的工业化剧本生产规范；只输出 ```script-studio-batch``` JSON 围栏，禁止 Markdown/GFM/说明文字。";
   } else {
     system =
       (typeof data.themeOutlineSystemPrompt === "string"
@@ -157,7 +166,7 @@ export async function runStoryProStarterThemeOutline(
   return runStoryLlmEngineNode({
     ...args,
     clientPage: proClientPage(args.projectId),
-    storyScope: args.storyScope ?? { mediaKind: "themeOutline" },
+    storyScope: args.storyScope ?? { mediaKind: "scriptStudioBatch" },
     node,
     engineKind: "story-outline-engine",
     executeAsync: args.executeAsync ?? true,

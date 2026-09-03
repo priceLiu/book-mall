@@ -41,6 +41,14 @@ import {
   validatePro2ProductionScriptLlmOutput,
 } from "./pro2-production-script-llm";
 import {
+  buildScriptStudioStructuredRetryUserMessage,
+  ensureScriptStudioBatchFence,
+  isScriptStudioStructuredLlmScope,
+  mergeScriptStudioStructuredLlmParams,
+  SCRIPT_STUDIO_STRUCTURED_LLM_MAX_ATTEMPTS,
+  validateScriptStudioBatchLlmOutput,
+} from "./script-studio-llm";
+import {
   voidGatewayLogForPro2ValidationFailure,
   PRO2_GATEWAY_VALIDATION_FAIL_CODE,
 } from "./pro2-gateway-validation-void";
@@ -1219,9 +1227,12 @@ async function executeStoryLlmEngineTask(
       },
     ];
     const structuredPro2 = isPro2StructuredLlmScope(storyScope);
+    const structuredScriptStudio = isScriptStudioStructuredLlmScope(storyScope);
     const llmParams = structuredPro2
       ? mergePro2StructuredLlmParams(params)
-      : params;
+      : structuredScriptStudio
+        ? mergeScriptStudioStructuredLlmParams(params)
+        : params;
 
     let resp = await canvasGwChatWithOverloadRetry(userId, {
       modelKey,
@@ -1236,8 +1247,13 @@ async function executeStoryLlmEngineTask(
     let pro2Validation: ReturnType<
       typeof validatePro2ProductionScriptLlmOutput
     > | null = null;
+    let scriptStudioValidation: ReturnType<
+      typeof validateScriptStudioBatchLlmOutput
+    > | null = null;
     let pro2AttemptCount = 0;
+    let scriptStudioAttemptCount = 0;
     const pro2GatewayLogIds: string[] = [];
+    const scriptStudioGatewayLogIds: string[] = [];
 
     if (structuredPro2) {
       let chatMessages = messages;
@@ -1323,6 +1339,90 @@ async function executeStoryLlmEngineTask(
       }
     }
 
+    if (structuredScriptStudio) {
+      let chatMessages = messages;
+      let lastError = "结构化 JSON 校验失败";
+
+      for (
+        let attempt = 1;
+        attempt <= SCRIPT_STUDIO_STRUCTURED_LLM_MAX_ATTEMPTS;
+        attempt++
+      ) {
+        scriptStudioAttemptCount = attempt;
+        if (attempt > 1) {
+          resp = await canvasGwChatWithOverloadRetry(userId, {
+            modelKey,
+            messages: chatMessages,
+            params: llmParams,
+            clientPage: gwClientPage,
+            projectId,
+            canvasTaskId: taskId,
+          });
+        }
+        if (resp.logId) scriptStudioGatewayLogIds.push(resp.logId);
+
+        outputText = (resp.text ?? "").trim();
+        if (!outputText) {
+          lastError = "模型返回空内容";
+          if (resp.logId) {
+            await voidGatewayLogForPro2ValidationFailure(resp.logId, {
+              error: lastError,
+              attempt,
+              maxAttempts: SCRIPT_STUDIO_STRUCTURED_LLM_MAX_ATTEMPTS,
+              canvasTaskId: taskId,
+            });
+          }
+          if (attempt >= SCRIPT_STUDIO_STRUCTURED_LLM_MAX_ATTEMPTS) {
+            scriptStudioValidation = { ok: false, error: lastError };
+            break;
+          }
+          chatMessages = [
+            ...chatMessages,
+            {
+              role: "user" as const,
+              content:
+                "上一回复为空。请只输出 ```script-studio-batch``` JSON 围栏，禁止说明文字。",
+            },
+          ];
+          continue;
+        }
+
+        scriptStudioValidation = validateScriptStudioBatchLlmOutput(outputText);
+        if (scriptStudioValidation.ok) {
+          outputText = ensureScriptStudioBatchFence(outputText);
+          break;
+        }
+
+        lastError = scriptStudioValidation.error ?? "校验失败";
+        if (resp.logId) {
+          await voidGatewayLogForPro2ValidationFailure(resp.logId, {
+            error: lastError,
+            attempt,
+            maxAttempts: SCRIPT_STUDIO_STRUCTURED_LLM_MAX_ATTEMPTS,
+            canvasTaskId: taskId,
+          });
+        }
+
+        if (attempt >= SCRIPT_STUDIO_STRUCTURED_LLM_MAX_ATTEMPTS) break;
+
+        chatMessages = [
+          ...chatMessages,
+          { role: "assistant" as const, content: outputText },
+          {
+            role: "user" as const,
+            content: buildScriptStudioStructuredRetryUserMessage(
+              lastError,
+              attempt,
+            ),
+          },
+        ];
+      }
+
+      if (scriptStudioValidation && !scriptStudioValidation.ok && outputText) {
+        outputText = ensureScriptStudioBatchFence(outputText);
+      }
+    }
+
     if (structuredPro2 && pro2Validation && !pro2Validation.ok) {
       const failed = await prisma.canvasGenerationTask.update({
         where: { id: taskId },
@@ -1347,6 +1447,34 @@ async function executeStoryLlmEngineTask(
       return { reused: false, task: failed };
     }
 
+    if (
+      structuredScriptStudio &&
+      scriptStudioValidation &&
+      !scriptStudioValidation.ok
+    ) {
+      const failed = await prisma.canvasGenerationTask.update({
+        where: { id: taskId },
+        data: {
+          status: "FAILED",
+          failCode: PRO2_GATEWAY_VALIDATION_FAIL_CODE,
+          failMessage:
+            scriptStudioValidation.error?.slice(0, 500) ??
+            `Script Studio JSON 校验失败（已尝试 ${scriptStudioAttemptCount} 次）`,
+          completedAt: new Date(),
+          resultPayload: {
+            scriptStudioValidation: {
+              ok: false,
+              error: scriptStudioValidation.error,
+              attempts: scriptStudioAttemptCount,
+              maxAttempts: SCRIPT_STUDIO_STRUCTURED_LLM_MAX_ATTEMPTS,
+              gatewayLogIds: scriptStudioGatewayLogIds,
+            },
+          } as Prisma.InputJsonValue,
+        },
+      });
+      return { reused: false, task: failed };
+    }
+
     // 模型返回空内容
     // 否则前端会从「生成中」直接翻到 done 且无正文，表现为「转圈一会就消失但没生成」。
     if (!outputText) {
@@ -1363,9 +1491,11 @@ async function executeStoryLlmEngineTask(
       return { reused: false, task: failed };
     }
     const scriptStudioMirror =
-      data.scriptStudioMode === true
-        ? scriptStudioMirrorPayload(outputText)
-        : null;
+      structuredScriptStudio && scriptStudioValidation?.ok
+        ? scriptStudioMirrorPayload(outputText, scriptStudioValidation.batch)
+        : data.scriptStudioMode === true
+          ? scriptStudioMirrorPayload(outputText)
+          : null;
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: taskId },
       data: {
@@ -1384,6 +1514,17 @@ async function executeStoryLlmEngineTask(
                   attempts: pro2AttemptCount,
                   maxAttempts: PRO2_STRUCTURED_LLM_MAX_ATTEMPTS,
                   gatewayLogIds: pro2GatewayLogIds,
+                },
+              }
+            : {}),
+          ...(structuredScriptStudio
+            ? {
+                scriptStudioValidation: {
+                  ok: scriptStudioValidation?.ok ?? false,
+                  error: scriptStudioValidation?.error,
+                  attempts: scriptStudioAttemptCount,
+                  maxAttempts: SCRIPT_STUDIO_STRUCTURED_LLM_MAX_ATTEMPTS,
+                  gatewayLogIds: scriptStudioGatewayLogIds,
                 },
               }
             : {}),

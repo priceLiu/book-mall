@@ -276,10 +276,23 @@ export function reconcileStaleInflightRuntimes(
       ).themeOutlineRuntime;
       if (isInflightStatus(rt?.status)) {
         const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
-        const scopes = [
-          { mediaKind: "themeOutline" as const },
-          { mediaKind: "generalText" as const },
-        ];
+        const isScriptStudio =
+          (node.type === "story-pro2-script-hub" &&
+            (node.data as { scriptStudioMode?: boolean }).scriptStudioMode ===
+              true) ||
+          ((node.type === "story-pro2-starter" ||
+            node.type === "story-pro-starter") &&
+            (node.data as { scriptStudioMode?: boolean }).scriptStudioMode ===
+              true);
+        const scopes = isScriptStudio
+          ? [
+              { mediaKind: "scriptStudioBatch" as const },
+              { mediaKind: "themeOutline" as const },
+            ]
+          : [
+              { mediaKind: "themeOutline" as const },
+              { mediaKind: "generalText" as const },
+            ];
         const serverInflight = scopes.some((scope) =>
           hasServerInflightForScope(tasks, node.id, scope),
         );

@@ -13,6 +13,7 @@ import { mergeFrameRowCharacterRefsFromIds } from "./story-column-sync";
 import type {
   StoryProCharacterRow,
   StoryProFrameRow,
+  StoryProPropRow,
   StoryProSceneRow,
   StoryProVideoRow,
 } from "./story-pro-workspace-types";
@@ -53,6 +54,7 @@ export function finalizePro2FrameRowsForCanvasMount(args: {
   frameRows: StoryProFrameRow[];
   characterRows: StoryProCharacterRow[];
   sceneRows: StoryProSceneRow[];
+  propRows?: StoryProPropRow[];
   script?: Pro2ProductionScript;
   scriptHubId: string;
 }): StoryProFrameRow[] {
@@ -60,11 +62,6 @@ export function finalizePro2FrameRowsForCanvasMount(args: {
   if (!indices.length) return args.frameRows;
 
   let rows = applyPro2FrameMediaPromptsForIndices(args.frameRows, indices);
-  rows = syncPro2FrameRowsUpstreamRefs(
-    rows,
-    args.characterRows,
-    args.sceneRows,
-  );
 
   if (args.script) {
     rows = rows.map((row) => {
@@ -77,6 +74,13 @@ export function finalizePro2FrameRowsForCanvasMount(args: {
       ) as StoryProFrameRow;
     });
   }
+
+  rows = syncPro2FrameRowsUpstreamRefs(
+    rows,
+    args.characterRows,
+    args.sceneRows,
+    args.propRows ?? [],
+  );
 
   if (!args.script) return rows;
 

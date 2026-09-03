@@ -39,6 +39,7 @@ import {
   stripPro2AnchorPlaceholders,
 } from "./pro2-chinese-prompt-normalize";
 import { reconcileProductionScriptEntityLinks } from "./pro2-shot-entity-reconcile";
+import { isPro2JsonOnlyHubData } from "./pro2-project-format";
 import {
   characterAppearanceNeedsStructuredCoerce,
   enrichPro2CharacterRecordForParse,
@@ -852,9 +853,11 @@ export function resolveHubProductionScript(
     if (!envelope) continue;
     return finish(mergeProductionScriptPatch(stored, envelope));
   }
-  const fromMd = buildProductionScriptPatchFromHubMarkdown(data);
-  if (fromMd) {
-    return finish(mergeProductionScriptPatch(stored, fromMd));
+  if (!isPro2JsonOnlyHubData(data)) {
+    const fromMd = buildProductionScriptPatchFromHubMarkdown(data);
+    if (fromMd) {
+      return finish(mergeProductionScriptPatch(stored, fromMd));
+    }
   }
   if (storedStrictUsable) return finish(stored!);
   if (storedLenientUsable) return finish(stored!);

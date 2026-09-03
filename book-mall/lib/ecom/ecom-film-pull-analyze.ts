@@ -1,6 +1,8 @@
 import { randomUUID } from "crypto";
 
 import type { CanvasChatContentPart } from "@/lib/canvas/providers/types";
+import type { Pro2ProductionScript } from "@/lib/canvas/data/pro2-production-script-schema";
+import type { FilmPullStoredAnalyze } from "@/lib/ecom/ecom-film-pull-types";
 import {
   assertStoryLlmVideoUnderstandingModel,
   isStoryLlmVideoUnderstandingModel,
@@ -12,7 +14,10 @@ import {
   resolveFilmPullParseError,
   assertRenderScriptInvariants,
   validateFilmPullAnalyzeQuality,
+  type FilmPullAnalyzePatch,
+  type FilmPullRenderScriptPatch,
 } from "@/lib/ecom/ecom-film-pull-structured";
+import { extractFilmPullPro2Analyze } from "@/lib/ecom/ecom-film-pull-v3";
 import {
   normalizeCameraMovement,
   normalizeCutTransition,
@@ -34,10 +39,6 @@ import {
   type FilmPullRenderPlan,
   type FilmPullStructuredResult,
 } from "@/lib/ecom/ecom-film-pull-types";
-import type {
-  FilmPullAnalyzePatch,
-  FilmPullRenderScriptPatch,
-} from "@/lib/ecom/ecom-film-pull-structured";
 import {
   getEcomFilmPullProject,
   saveFilmPullAnalyzeResult,
@@ -203,13 +204,26 @@ export async function finalizeFilmPullAnalyzeFromText(opts: {
   ctx: FilmPullAnalyzeRunContext;
   fullText: string;
   retryOnParseError?: boolean;
-}): Promise<FilmPullStructuredResult<FilmPullAnalyzePatch>> {
+}): Promise<FilmPullStructuredResult<FilmPullStoredAnalyze>> {
   const { ctx } = opts;
   let fullText = opts.fullText;
 
-  let structured = extractFilmPullAnalyzePatch(fullText);
-  let parseError = structured ? null : resolveFilmPullParseError(fullText, "analyze");
-  let qualityError = structured ? validateFilmPullAnalyzeQuality(structured) : null;
+  let structured: FilmPullStoredAnalyze | null = null;
+  const v3 = extractFilmPullPro2Analyze(fullText);
+  if (v3.ok) {
+    structured = v3.script;
+  } else {
+    structured = extractFilmPullAnalyzePatch(fullText);
+  }
+  let parseError = structured
+    ? null
+    : v3.ok
+      ? null
+      : v3.error || resolveFilmPullParseError(fullText, "analyze");
+  let qualityError =
+    structured && !isPro2FilmPullStored(structured)
+      ? validateFilmPullAnalyzeQuality(structured as FilmPullAnalyzePatch)
+      : null;
 
   const shouldRetry =
     opts.retryOnParseError !== false && (parseError || qualityError);
@@ -231,9 +245,21 @@ export async function finalizeFilmPullAnalyzeFromText(opts: {
           },
         ],
       });
-      structured = extractFilmPullAnalyzePatch(fullText);
-      parseError = structured ? null : resolveFilmPullParseError(fullText, "analyze");
-      qualityError = structured ? validateFilmPullAnalyzeQuality(structured) : null;
+      const retryV3 = extractFilmPullPro2Analyze(fullText);
+      if (retryV3.ok) {
+        structured = retryV3.script;
+        parseError = null;
+        qualityError = null;
+      } else {
+        structured = extractFilmPullAnalyzePatch(fullText);
+        parseError = structured
+          ? null
+          : retryV3.error || resolveFilmPullParseError(fullText, "analyze");
+        qualityError =
+          structured && !isPro2FilmPullStored(structured)
+            ? validateFilmPullAnalyzeQuality(structured as FilmPullAnalyzePatch)
+            : null;
+      }
     } catch (e) {
       if (e instanceof FilmPullAnalyzeCanceledError) throw e;
       parseError = e instanceof Error ? e.message : "拉片模型重试失败";
@@ -245,11 +271,13 @@ export async function finalizeFilmPullAnalyzeFromText(opts: {
     structured = null;
   }
 
-  if (structured) structured = normalizeAnalyzePatch(structured);
+  if (structured && !isPro2FilmPullStored(structured)) {
+    structured = normalizeAnalyzePatch(structured as FilmPullAnalyzePatch);
+  }
 
   await assertAnalyzeNotCanceled(ctx.userId, ctx.projectId, ctx.runId);
 
-  const result: FilmPullStructuredResult<FilmPullAnalyzePatch> = {
+  const result: FilmPullStructuredResult<FilmPullStoredAnalyze> = {
     rawText: fullText,
     structured: structured ?? null,
     parseError,
@@ -258,6 +286,17 @@ export async function finalizeFilmPullAnalyzeFromText(opts: {
 
   await saveFilmPullAnalyzeResult(ctx.userId, ctx.projectId, result);
   return result;
+}
+
+function isPro2FilmPullStored(
+  structured: FilmPullStoredAnalyze,
+): structured is Pro2ProductionScript {
+  return (
+    typeof structured === "object" &&
+    structured !== null &&
+    "schemaVersion" in structured &&
+    (structured as Pro2ProductionScript).schemaVersion === 3
+  );
 }
 
 export function endFilmPullAnalyzeRun(ctx: Pick<FilmPullAnalyzeRunContext, "userId" | "projectId" | "runId">): void {
@@ -269,7 +308,7 @@ export async function runFilmPullAnalyze(opts: {
   projectId: string;
   prompt?: string;
   modelKey?: string;
-}): Promise<FilmPullStructuredResult<FilmPullAnalyzePatch>> {
+}): Promise<FilmPullStructuredResult<FilmPullStoredAnalyze>> {
   const ctx = await beginFilmPullAnalyzeRun(opts);
 
   try {

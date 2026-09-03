@@ -14,6 +14,7 @@ import {
 import { patchProductionWizardShotDraft } from "@/lib/canvas/pro2-wizard-shot-draft-patch";
 import {
   finishWizardAssetProgressItem,
+  markWizardShotVideoBackgroundWait,
   upsertWizardAssetProgressItem,
 } from "@/lib/canvas/pro2-wizard-asset-progress";
 import { pickRecoverableWizardShotTask } from "@/lib/canvas/pro2-wizard-shot-recover";
@@ -199,14 +200,17 @@ async function runWizardShotJob(args: EnqueueWizardShotGenerateArgs) {
     kind: args.mediaKind,
     status: "running",
     startedAt: Date.now(),
+    minimized: true,
   });
   patchDraft(args, {
     generateStatus: "running",
     failMessage: undefined,
   });
 
+  let lastTaskId = args.resumeTaskId?.trim() ?? "";
+
   try {
-    let taskId = args.resumeTaskId?.trim() ?? "";
+    let taskId = lastTaskId;
     let cancelBeforeSubmit = "";
 
     if (taskId) {
@@ -254,10 +258,12 @@ async function runWizardShotJob(args: EnqueueWizardShotGenerateArgs) {
         return;
       }
       taskId = submitted.task.id;
+      lastTaskId = taskId;
       /** 与画布 task 一致：taskId 落库，刷新后靠 /tasks + recover 续轮询 */
       patchDraft(args, { taskId, generateStatus: "running" });
     }
 
+    lastTaskId = taskId;
     const task = await waitPro2WizardShotTask(
       args.base,
       args.projectId,
@@ -279,6 +285,18 @@ async function runWizardShotJob(args: EnqueueWizardShotGenerateArgs) {
     applyWizardShotSuccess(args, result, jobId);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    const isVideoTimeout =
+      args.mediaKind === "video" &&
+      (msg.includes("生成超时") || msg.includes("长时间未推进"));
+    if (isVideoTimeout) {
+      markWizardShotVideoBackgroundWait({ jobId, label });
+      patchDraft(args, {
+        generateStatus: "running",
+        failMessage: undefined,
+        ...(lastTaskId ? { taskId: lastTaskId } : {}),
+      });
+      return;
+    }
     patchDraft(args, {
       generateStatus: "failed",
       failMessage: msg || "生成失败",

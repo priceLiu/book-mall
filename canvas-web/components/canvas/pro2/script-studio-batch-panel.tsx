@@ -70,7 +70,7 @@ export function ScriptStudioBatchPanel() {
     if (!starter || running || !hasMore) return;
     busEnqueueStoryRun({
       nodeId: starter.id,
-      mediaKind: "themeOutline",
+      mediaKind: "scriptStudioBatch",
     });
   }, [starter, running, hasMore]);
 

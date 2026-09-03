@@ -3,6 +3,8 @@ import {
   convertWizardMentionTokensToDockRefs,
   finalizePro2FrameRowsForCanvasMount,
 } from "@/lib/canvas/pro2-production-wizard-frame-mount";
+import { syncPro2FrameRowUpstreamRefs } from "@/lib/canvas/pro2-wire-frame-board-refs";
+import { mergeFrameRowCharacterRefsFromIds } from "@/lib/canvas/story-column-sync";
 import type { Pro2ProductionScript } from "@/lib/canvas/data/pro2-production-script-schema";
 import type {
   StoryProCharacterRow,
@@ -27,6 +29,38 @@ describe("pro2-production-wizard-frame-mount", () => {
     );
     expect(out).toContain("@<ref-char-c1>");
     expect(out).toContain("@<ref-scene-hub-1::办公室>");
+  });
+
+  it("mergeFrameRowCharacterRefsFromIds + sync keeps ref-char in refImages", () => {
+    const characterRows: StoryProCharacterRow[] = [
+      {
+        key: "c1",
+        name: "沈昭昭",
+        runtime: { status: "done", ossUrl: "https://cdn.example/c1.png" },
+      },
+    ];
+    const merged = mergeFrameRowCharacterRefsFromIds(
+      {
+        frameIndex: 1,
+        key: "1",
+        scene: "办公室",
+        description: "伏案",
+        dialogue: "—",
+        shotSize: "特写",
+        prompt: "镜头描述：伏案",
+      },
+      characterRows,
+      ["c1"],
+    );
+    expect(merged.referencedNodeIds).toContain("ref-char-c1");
+    const synced = syncPro2FrameRowUpstreamRefs(
+      merged,
+      characterRows,
+      [{ key: "hub-1::办公室", name: "办公室" }],
+      [],
+    );
+    expect(synced.prompt).toMatch(/@<ref-char-c1>/);
+    expect(synced.refImages?.some((r) => r.id === "ref-char-c1")).toBe(true);
   });
 
   it("finalizePro2FrameRowsForCanvasMount fills Pass1 prompt and refs", () => {

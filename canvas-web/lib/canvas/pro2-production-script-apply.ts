@@ -40,6 +40,7 @@ import {
   stripPro2AnchorPlaceholders,
 } from "./pro2-chinese-prompt-normalize";
 import { reconcileProductionScriptEntityLinks } from "./pro2-shot-entity-reconcile";
+import { isPro2JsonOnlyHubData } from "./pro2-project-format";
 import {
   characterAppearanceNeedsStructuredCoerce,
   enrichPro2CharacterRecordForParse,
@@ -888,13 +889,32 @@ export function resolveHubProductionScript(
     if (!envelope) continue;
     return finish(mergeProductionScriptPatch(stored, envelope));
   }
-  const fromMd = buildProductionScriptPatchFromHubMarkdown(data);
-  if (fromMd) {
-    return finish(mergeProductionScriptPatch(stored, fromMd));
+  if (!isPro2JsonOnlyHubData(data)) {
+    const fromMd = buildProductionScriptPatchFromHubMarkdown(data);
+    if (fromMd) {
+      return finish(mergeProductionScriptPatch(stored, fromMd));
+    }
   }
   if (storedStrictUsable) return finish(stored!);
   if (storedLenientUsable) return finish(stored!);
   return finish(stored ?? null);
+}
+
+/** 剧本创作助手 · pack 模式 JSON 导入 Hub（v13 json-only） */
+export function tryApplyAssistantPackImportToHub(
+  data: StoryProScriptHubNodeData,
+  textOutput: string,
+  scriptHubId?: string,
+): Partial<StoryProScriptHubNodeData> | null {
+  const envelope = extractPro2ProductionScriptPatch(textOutput);
+  if (!envelope) return null;
+  if (envelope.step !== "full_pack" && envelope.step !== "outline") return null;
+  return applyProductionScriptPatchToHub(
+    data,
+    envelope,
+    scriptHubId,
+    textOutput,
+  );
 }
 
 export function hubHasStructuredProductionScript(

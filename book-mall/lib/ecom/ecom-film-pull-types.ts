@@ -1,11 +1,15 @@
 import { z } from "zod";
 
+import type { Pro2ProductionScript } from "@/lib/canvas/data/pro2-production-script-schema";
 import { STORY_LLM_DEFAULT_VISION_MODEL } from "@/lib/canvas/story-llm-vision-models";
 
 import type {
   FilmPullAnalyzePatch,
   FilmPullRenderScriptPatch,
 } from "@/lib/ecom/ecom-film-pull-structured";
+
+/** 拉片 analyze 存库：v3 Pro2 真源或 legacy v1 film-pull */
+export type FilmPullStoredAnalyze = FilmPullAnalyzePatch | Pro2ProductionScript;
 
 export const ECOM_FILM_PULL_TOOL_KEY = "ecom-toolkit__film-pull";
 export const ECOM_FILM_PULL_MODULE = "film-pull";
@@ -181,7 +185,7 @@ export type FilmPullProjectDto = {
   status: string;
   settings: FilmPullSettings;
   media: FilmPullMediaReference | null;
-  analyzeResult: FilmPullStructuredResult<FilmPullAnalyzePatch> | null;
+  analyzeResult: FilmPullStructuredResult<FilmPullStoredAnalyze> | null;
   renderScript: FilmPullStructuredResult<FilmPullRenderScriptPatch> | null;
   characterRefs: FilmPullCharacterRef[];
   renderPlan: FilmPullRenderPlan | null;
@@ -247,14 +251,14 @@ export function sanitizeFilmPullSettings(raw: unknown): FilmPullSettings {
 
 export function sanitizeFilmPullAnalyzeResult(
   raw: unknown,
-): FilmPullStructuredResult<FilmPullAnalyzePatch> | null {
+): FilmPullStructuredResult<FilmPullStoredAnalyze> | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
   return {
     rawText: typeof o.rawText === "string" ? o.rawText : undefined,
     structured:
       o.structured && typeof o.structured === "object"
-        ? (o.structured as FilmPullAnalyzePatch)
+        ? (o.structured as FilmPullStoredAnalyze)
         : o.structured === null
           ? null
           : undefined,

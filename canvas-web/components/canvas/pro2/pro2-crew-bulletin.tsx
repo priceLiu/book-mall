@@ -534,7 +534,7 @@ function AuthoringPanel({
 
   const onNextBatch = useCallback(() => {
     if (running || !hasMore) return;
-    busEnqueueStoryRun({ nodeId: hubId, mediaKind: "themeOutline" });
+    busEnqueueStoryRun({ nodeId: hubId, mediaKind: "scriptStudioBatch" });
   }, [hubId, running, hasMore]);
 
   return (

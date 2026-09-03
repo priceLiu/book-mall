@@ -1121,6 +1121,7 @@ export async function runCanvasNode(
       | "tts"
       | "sceneRef"
       | "themeOutline"
+      | "scriptStudioBatch"
       | "generalText"
       | "music";
     /** 影视专业版 · 风格定稿门禁 */

@@ -519,7 +519,11 @@ const STORY_PRO2_PIPELINE: CanvasGraph = {
  */
 const STORY_PRO2_SCRIPT_STUDIO: CanvasGraph = {
   schemaVersion: CANVAS_SCHEMA_VERSION_PRO2,
-  meta: { edition: "pro2", pro2ScriptFormat: PRO2_SCRIPT_FORMAT_JSON_ONLY_V13 },
+  meta: {
+    edition: "pro2",
+    pro2ScriptFormat: PRO2_SCRIPT_FORMAT_JSON_ONLY_V13,
+    scriptStudioFormat: "json-v1",
+  },
   viewport: { x: 0, y: 0, zoom: 0.85 },
   nodes: [
     {
@@ -538,6 +542,7 @@ const STORY_PRO2_SCRIPT_STUDIO: CanvasGraph = {
         sceneMd: "",
         storyboardMd: "",
         scriptStudioMode: true,
+        scriptStudioFormat: "json-v1",
         scriptStudioInputMode: "generate",
         scriptStudioThemeInput: "",
         scriptStudioSystem: "original",

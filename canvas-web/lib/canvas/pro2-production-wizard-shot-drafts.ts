@@ -51,6 +51,22 @@ function dialogueLine(dialogue?: string): string {
   return `对白：${d}`;
 }
 
+function buildWizardVideoFallbackPrompt(shot: Pro2ProductionScriptShot): string {
+  const parts = [
+    `镜 ${shot.index}`,
+    shot.shotSize?.trim() ? `景别：${shot.shotSize.trim()}` : "",
+    shot.lighting?.trim() ? `光影：${shot.lighting.trim()}` : "",
+    shot.cameraMove?.trim() ? `运镜：${shot.cameraMove.trim()}` : "",
+    shot.sceneDescription?.trim()
+      ? `画面：${shot.sceneDescription.trim()}`
+      : "",
+    dialogueLine(shot.dialogue),
+    shot.sfxNote?.trim() ? `音效：${shot.sfxNote.trim()}` : "",
+    shot.lipSyncNote?.trim() ? `口型：${shot.lipSyncNote.trim()}` : "",
+  ].filter(Boolean);
+  return parts.join("\n");
+}
+
 /** Step3 默认提示词：优先 Pass2，否则从 Pass1 字段拼装 */
 export function defaultWizardShotPrompt(
   mediaKind: Pro2WizardShotMediaKind,
@@ -71,7 +87,9 @@ export function defaultWizardShotPrompt(
     ].filter(Boolean);
     return parts.join("\n");
   }
-  return shot.videoPrompt?.trim() || "";
+  const pass2 = shot.videoPrompt?.trim() || "";
+  if (pass2) return pass2;
+  return buildWizardVideoFallbackPrompt(shot);
 }
 
 export function resolveWizardShotFromScript(

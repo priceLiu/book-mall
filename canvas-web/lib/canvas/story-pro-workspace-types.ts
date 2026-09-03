@@ -20,6 +20,7 @@ export type StoryProRunContext = {
     | "video"
     | "tts"
     | "themeOutline"
+    | "scriptStudioBatch"
     | "generalText"
     | "music";
 };
@@ -178,6 +179,9 @@ export type StoryProScriptHubNodeData = {
   feasibility?: StoryProFeasibilityAssessment;
   /** 剧本创作 · 工业化分批（与 starter 同步） */
   scriptStudioMode?: boolean;
+  /** json-v1 = LLM JSON 批次真源；缺省 = 旧 MD 只读 */
+  scriptStudioFormat?: string;
+  scriptStudioCanonicalJson?: unknown;
   /** 生产向导 v2 · 全屏两步向导（见 docs/剧本可视化功能.md） */
   productionWizardMode?: boolean;
   /** 生产向导 · 资产卡草稿（prompt / 参考图 / 模型 / 出图占位） */
@@ -464,6 +468,9 @@ export type StoryProStarterNodeData = {
   themeOutlineSystemPrompt?: string;
   /** 剧本创作画布 · 工业化标准化分批生成 */
   scriptStudioMode?: boolean;
+  /** json-v1 = LLM JSON 批次真源；缺省 = 旧 MD 只读 */
+  scriptStudioFormat?: string;
+  scriptStudioCanonicalJson?: unknown;
   /** 小白生剧 / 上传剧本 */
   scriptStudioInputMode?: StoryProStarterMode;
   /** 剧本创作 · 主题或描述（迁移前 starter 入口） */

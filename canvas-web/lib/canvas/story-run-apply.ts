@@ -545,20 +545,25 @@ export function storyApplyTaskResult(
     isPro2StoryOutlineTextNode((node.data ?? {}) as Record<string, unknown>);
   // 轮询偶发缺 storyScope.mediaKind：按节点用途推断，避免 Gateway 已成功但 UI 一直生成中
   const starterMediaKind =
-    ctx?.mediaKind === "themeOutline" || ctx?.mediaKind === "generalText"
+    ctx?.mediaKind === "themeOutline" ||
+    ctx?.mediaKind === "scriptStudioBatch" ||
+    ctx?.mediaKind === "generalText"
       ? ctx.mediaKind
       : isGeneralLlmTextNode ||
           (node.type === "story-pro2-script-hub" &&
             (node.data as { scriptStudioMode?: boolean }).scriptStudioMode ===
               true)
         ? isOutlineTextNode
-          ? ("themeOutline" as const)
-          : ("generalText" as const)
+          ? (node.data as { scriptStudioMode?: boolean }).scriptStudioMode
+            ? "scriptStudioBatch"
+            : "themeOutline"
+          : "generalText"
         : undefined;
 
   if (
     (isStarterTextNode || node.type === "story-pro2-script-hub") &&
-    starterMediaKind === "themeOutline"
+    (starterMediaKind === "themeOutline" ||
+      starterMediaKind === "scriptStudioBatch")
   ) {
     const hubStudio =
       node.type === "story-pro2-script-hub" &&
@@ -594,7 +599,7 @@ export function storyApplyTaskResult(
     if (
       task.status === "SUCCEEDED" &&
       task.textOutput?.trim() &&
-      isOutlineTextNode
+      (isOutlineTextNode || hubStudio)
     ) {
       applyScriptStudioThemeOutlineResult(
         node,

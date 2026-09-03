@@ -874,10 +874,12 @@ export function kickoffPro2StoryboardFromHub(
         : row.refImages,
   }));
 
+  const propRows = hubData.scriptStudioPropRows ?? [];
   const frameRows = syncPro2FrameRowsUpstreamRefs(
     frameRowsWithPrompts,
     upstream.characterRows,
     upstream.sceneRows,
+    propRows,
   );
 
   store.updateNodeData(frameColumnId, { rows: frameRows, hubNodeId: hubId });

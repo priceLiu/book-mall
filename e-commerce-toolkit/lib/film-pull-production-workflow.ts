@@ -1,4 +1,5 @@
 import type { FilmPullAnalyzePatch, FilmPullProject } from "@/lib/film-pull-types";
+import { resolveFilmPullAnalyzePatchForDisplay } from "@/lib/film-pull-v3-display";
 import { listFilmPullModelRefs, listFilmPullProductRefs } from "@/lib/film-pull-refs";
 
 export type FilmPullV2Phase =
@@ -48,7 +49,10 @@ export const FILM_PULL_SCRIPT_PREP_STEP_LABELS = [
 ] as const;
 
 export function filmPullAnalyzeShots(project: FilmPullProject): FilmPullAnalyzePatch["shots"] {
-  return project.analyzeResult?.structured?.shots ?? [];
+  return (
+    resolveFilmPullAnalyzePatchForDisplay(project.analyzeResult?.structured)
+      ?.shots ?? []
+  );
 }
 
 export type FilmPullBottomDockMode =

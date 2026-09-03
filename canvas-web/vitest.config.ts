@@ -74,6 +74,7 @@ export default defineConfig({
       "test/unit/hydrate-production-scaffold.test.ts",
       "test/unit/pro2-production-wizard-canvas-mount.test.ts",
       "test/unit/pro2-production-wizard-frame-mount.test.ts",
+      "test/unit/pro2-frame-shot-ref-prep.test.ts",
       "test/unit/pro2-media-row-spawn.test.ts",
       "test/unit/story-column-display-video-rows.test.ts",
       "test/unit/pro2-production-wizard-assets.test.ts",

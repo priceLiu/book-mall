@@ -268,6 +268,7 @@ export function mountProductionVisualGroupsFromStore(scriptHubId: string): void 
     frameRows,
     characterRows,
     sceneRows,
+    propRows: hubData.scriptStudioPropRows ?? [],
     script: hubData.productionScript,
     scriptHubId,
   });

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -12,7 +13,6 @@ import {
 import { createPortal } from "react-dom";
 import { Eye, Play, Upload, X } from "lucide-react";
 import {
-  useClientPortalMounted,
   CANVAS_MEDIA_PREVIEW_LIGHTBOX_SHELL_CLASS,
   useModalBodyScrollLock,
   useModalCompareArrowKeys,
@@ -146,7 +146,7 @@ export function MediaHoverBox({
   const mediaReady = mediaActive || alreadyLoaded;
 
   useEffect(() => {
-    if (previewChrome !== "ecom" || hidePreviewOverlay) return;
+    if (previewChrome !== "ecom" || hidePreviewOverlay || previewOpen) return;
     const el = lazyRef.current;
     if (!el) return;
     const sync = () => setStageShortSide(readElementShortSide(el));
@@ -154,7 +154,7 @@ export function MediaHoverBox({
     const ro = new ResizeObserver(sync);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [previewChrome, hidePreviewOverlay, lazyRef, src]);
+  }, [previewChrome, hidePreviewOverlay, lazyRef, previewOpen, src]);
 
   const markLoaded = useCallback(
     (e?: SyntheticEvent<HTMLImageElement>) => {
@@ -196,6 +196,8 @@ export function MediaHoverBox({
     },
     [canPreview],
   );
+
+  const closePreview = useCallback(() => setPreviewOpen(false), []);
 
   const triggerUpload = useCallback(
     (e: React.MouseEvent) => {
@@ -302,7 +304,7 @@ export function MediaHoverBox({
                 <Upload className={overlayIconClass} strokeWidth={1.75} />
               </button>
             ) : null}
-            {canPreview && !hidePreviewOverlay ? (
+            {canPreview && !hidePreviewOverlay && !previewOpen ? (
               previewChrome === "ecom" ? (
                 <button
                   type="button"
@@ -374,7 +376,7 @@ export function MediaHoverBox({
           prompt={prompt}
           promptMentionables={promptMentionables}
           initialView={initialView}
-          onClose={() => setPreviewOpen(false)}
+          onClose={closePreview}
         />
       ) : null}
     </>
@@ -382,7 +384,49 @@ export function MediaHoverBox({
 }
 
 /** 全屏预览 / 对比一体弹层 */
-export function MediaPreviewLightbox({
+function mentionablesPreviewEqual(
+  a?: MentionableItem[],
+  b?: MentionableItem[],
+): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every(
+    (item, i) =>
+      item.id === b[i]?.id &&
+      item.label === b[i]?.label &&
+      item.previewUrl === b[i]?.previewUrl &&
+      item.kind === b[i]?.kind,
+  );
+}
+
+function mediaPreviewLightboxPropsEqual(
+  prev: Readonly<{
+    src: string;
+    kind: "image" | "video";
+    alt: string;
+    posterUrl?: string;
+    compareContext?: MediaCompareContext;
+    prompt?: string;
+    promptMentionables?: MentionableItem[];
+    initialView?: "single" | "compare";
+    onClose: () => void;
+  }>,
+  next: typeof prev,
+): boolean {
+  return (
+    prev.src === next.src &&
+    prev.kind === next.kind &&
+    prev.alt === next.alt &&
+    prev.posterUrl === next.posterUrl &&
+    prev.compareContext === next.compareContext &&
+    prev.prompt === next.prompt &&
+    prev.initialView === next.initialView &&
+    prev.onClose === next.onClose &&
+    mentionablesPreviewEqual(prev.promptMentionables, next.promptMentionables)
+  );
+}
+
+export const MediaPreviewLightbox = memo(function MediaPreviewLightbox({
   src,
   kind,
   alt,
@@ -404,7 +448,6 @@ export function MediaPreviewLightbox({
   initialView?: "single" | "compare";
   onClose: () => void;
 }) {
-  const mounted = useClientPortalMounted();
   const showCompare = compareContext ? canShowCompare(compareContext) : false;
   const splitPrompt = Boolean(prompt?.trim()) && kind === "image";
   const [view, setView] = useState<"single" | "compare">(
@@ -445,7 +488,8 @@ export function MediaPreviewLightbox({
   /** 对比视图有自己的交互，只在单图预览挂缩放 */
   const zoomable = kind === "image" && view === "single";
 
-  if (!mounted) return null;
+  // 用户点击触发，仅客户端挂载 — 跳过 portal defer，避免首帧 null → 弹层闪一下
+  if (typeof document === "undefined") return null;
 
   return createPortal(
     <div
@@ -605,6 +649,6 @@ export function MediaPreviewLightbox({
     </div>,
     document.body,
   );
-}
+}, mediaPreviewLightboxPropsEqual);
 
 export type { MediaCompareContext } from "./compare-utils";

@@ -29,7 +29,10 @@ function resolveStarterCancelScope(
     (node.type === "story-pro2-starter" || node.type === "story-pro-starter") &&
     isPro2StoryOutlineTextNode((node.data ?? {}) as Record<string, unknown>)
   ) {
-    return { mediaKind: "themeOutline" };
+    const d = node.data as { scriptStudioMode?: boolean };
+    return {
+      mediaKind: d.scriptStudioMode ? "scriptStudioBatch" : "themeOutline",
+    };
   }
   if (node.type === "story-pro2-starter" || node.type === "story-pro-starter") {
     return { mediaKind: "generalText" };

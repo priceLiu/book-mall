@@ -669,6 +669,8 @@ export type CanvasGraph = {
     requireScriptLink?: boolean;
     /** Pro2 JSON-only 剧本格式标记 · json-only-v13 */
     pro2ScriptFormat?: string;
+    /** Script Studio JSON 批次格式 · json-v1 */
+    scriptStudioFormat?: string;
     /** 关联的 SCRIPT_PACKAGE 资产 id */
     linkedScriptPackageAssetId?: string;
     /** 协作画布 · 无节点时公告栏数据锚点 */

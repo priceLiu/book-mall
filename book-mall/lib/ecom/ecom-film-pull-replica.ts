@@ -4,6 +4,7 @@ import {
   extractFilmPullAnalyzePatch,
   type FilmPullAnalyzePatch,
 } from "@/lib/ecom/ecom-film-pull-structured";
+import { resolveFilmPullAnalyzePatchForDisplay } from "@/lib/canvas/pro2-shot-analysis-view";
 import {
   getEcomFilmPullProject,
   updateEcomFilmPullProject,
@@ -66,10 +67,13 @@ export function readFilmPullReplicaSeedVideoProjectId(
 }
 
 function readFilmPullStructured(project: FilmPullProjectDto): FilmPullAnalyzePatch | null {
-  return (
-    project.analyzeResult?.structured ??
-    (project.analyzeResult?.rawText ? extractFilmPullAnalyzePatch(project.analyzeResult.rawText) : null)
+  const fromStored = resolveFilmPullAnalyzePatchForDisplay(
+    project.analyzeResult?.structured,
   );
+  if (fromStored) return fromStored;
+  return project.analyzeResult?.rawText
+    ? extractFilmPullAnalyzePatch(project.analyzeResult.rawText)
+    : null;
 }
 
 function normalizeReplicaReferences(existing: SeedVideoReference[]): SeedVideoReference[] {

@@ -1,6 +1,9 @@
 /** 客户端围栏解析（与 book-mall ecom-film-pull-structured 一致；展示用宽松兜底） */
 
 import type { FilmPullAnalyzePatch } from "@/lib/film-pull-types";
+import { resolveFilmPullAnalyzePatchForDisplay } from "@/lib/film-pull-v3-display";
+
+export { resolveFilmPullAnalyzePatchForDisplay };
 
 function coerceDisplayText(value: unknown, fallback = "无"): string {
   if (typeof value === "string") {
@@ -50,6 +53,32 @@ export function stripFilmPullFence(text: string): string {
 }
 
 export function extractFilmPullAnalyzePatch(text: string): FilmPullAnalyzePatch | null {
+  const pro2Closed = text.match(/```pro2-production-script\s*([\s\S]*?)```/i);
+  const pro2Body = pro2Closed?.[1]?.trim();
+  if (pro2Body) {
+    try {
+      const envelope = JSON.parse(pro2Body) as {
+        patch?: unknown;
+        schemaVersion?: number;
+      };
+      const patch = envelope.patch ?? envelope;
+      if (patch && typeof patch === "object") {
+        const wrapped = {
+          schemaVersion: 3 as const,
+          ...(patch as Record<string, unknown>),
+          meta: {
+            ...((patch as { meta?: Record<string, unknown> }).meta ?? {}),
+            source: "film_pull",
+          },
+        };
+        const display = resolveFilmPullAnalyzePatchForDisplay(wrapped);
+        if (display) return display;
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
   const closed = text.match(/```film-pull\s*([\s\S]*?)```/i);
   const body = closed?.[1]?.trim();
   if (!body) return null;

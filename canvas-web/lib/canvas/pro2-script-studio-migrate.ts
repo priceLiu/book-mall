@@ -7,11 +7,11 @@ import { buildCrewBulletinFromHub } from "./crew-bulletin-build";
 import { crewBulletinFromScriptPackagePayload } from "./crew-bulletin-script-package";
 import { findScriptStudioHub } from "./script-studio-run-apply";
 import {
-  STORY_PRO_HUB_LLM_SYSTEM,
   STORY_PRO_LLM_PARAMS_DEFAULT,
 } from "./story-pro-prompts";
 import {
   STORY_PRO2_CHARACTER_PROMPT,
+  STORY_PRO2_HUB_LLM_SYSTEM,
   STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
   STORY_PRO2_SCENE_PROMPT,
   STORY_PRO2_STORYBOARD_PROMPT,
@@ -107,7 +107,7 @@ function hubDataFromStarter(
     ...(existing?.params ?? {}),
   };
   base.outlineSystemPrompt =
-    existing?.outlineSystemPrompt ?? STORY_PRO_HUB_LLM_SYSTEM;
+    existing?.outlineSystemPrompt ?? STORY_PRO2_HUB_LLM_SYSTEM;
   base.promptOutline =
     existing?.promptOutline ?? STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT;
   base.promptCharacter =

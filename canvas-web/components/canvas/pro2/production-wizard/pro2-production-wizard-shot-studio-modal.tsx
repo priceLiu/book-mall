@@ -17,11 +17,16 @@ import {
   type Pro2WizardShotMediaKind,
 } from "@/lib/canvas/pro2-production-wizard-shot-drafts";
 import { buildWizardAssetMentionables } from "@/lib/canvas/pro2-production-wizard-assets";
+import { prepareWizardShotEditorState } from "@/lib/canvas/pro2-frame-shot-ref-prep";
+import { resolveWizardShotFromScript } from "@/lib/canvas/pro2-production-wizard-shot-drafts";
 import type { StoryRefImage } from "@/lib/canvas/story-ref-image";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
+  buildWizardMentionRefCatalog,
+  isWizardAssetMentionId,
   listMissingWizardAssetMentions,
+  mergeWizardMentionRefImages,
   missingWizardAssetMentionsConfirmCopy,
 } from "@/lib/canvas/pro2-wizard-mention-ref-urls";
 import { PRO2_FRAME_IMAGE_MODEL_KEYS } from "@/lib/canvas/pro2-frame-batch-image";
@@ -139,6 +144,12 @@ export function Pro2ProductionWizardShotStudioModal({
   const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
   const initRef = useRef(false);
 
+  const assetDrafts = useCanvasStore((s) => {
+    const hub = s.nodes.find((n) => n.id === scriptHubId);
+    return (hub?.data as StoryProScriptHubNodeData | undefined)
+      ?.productionWizardAssetDrafts;
+  });
+
   useEffect(() => {
     if (!open) {
       initRef.current = false;
@@ -146,8 +157,33 @@ export function Pro2ProductionWizardShotStudioModal({
     }
     if (initRef.current) return;
     initRef.current = true;
-    setPrompt(initialPrompt);
-    setRefImages(initialRefImages);
+
+    const shot = resolveWizardShotFromScript(script, shotIndex);
+    if (shot && script) {
+      const prepared = prepareWizardShotEditorState({
+        prompt: initialPrompt,
+        mediaKind,
+        script,
+        shot,
+        assetDrafts,
+      });
+      const manualRefs = initialRefImages.filter(
+        (r) => !isWizardAssetMentionId(r.id),
+      );
+      const catalog = buildWizardMentionRefCatalog(assetDrafts, prepared.refImages);
+      setPrompt(prepared.prompt);
+      setRefImages(
+        mergeWizardMentionRefImages(
+          prepared.prompt,
+          catalog,
+          [...prepared.refImages, ...manualRefs],
+        ),
+      );
+    } else {
+      setPrompt(initialPrompt);
+      setRefImages(initialRefImages);
+    }
+
     if (mediaKind === "frame") {
       setFrameSettings(coerceFrameSettings({ providerId, modelKey, params }));
     } else {
@@ -169,19 +205,28 @@ export function Pro2ProductionWizardShotStudioModal({
     modelKey,
     params,
     mediaKind,
+    script,
+    shotIndex,
+    assetDrafts,
   ]);
 
   useModalEscapeClose(onClose, { active: open });
 
-  const assetDrafts = useCanvasStore((s) => {
-    const hub = s.nodes.find((n) => n.id === scriptHubId);
-    return (hub?.data as StoryProScriptHubNodeData | undefined)
-      ?.productionWizardAssetDrafts;
-  });
-
   const mentionables = useMemo(
     () => buildWizardAssetMentionables(script, refImages, undefined, assetDrafts),
     [script, refImages, assetDrafts],
+  );
+
+  const handlePromptChange = useCallback(
+    (value: string) => {
+      setPrompt(value);
+      if (!script) return;
+      setRefImages((prev) => {
+        const catalog = buildWizardMentionRefCatalog(assetDrafts, prev);
+        return mergeWizardMentionRefImages(value, catalog, prev);
+      });
+    },
+    [script, assetDrafts],
   );
 
   const batchImage = useMemo(
@@ -411,9 +456,11 @@ export function Pro2ProductionWizardShotStudioModal({
               "min-h-[88px] w-full",
             )}
             value={prompt}
-            onChange={setPrompt}
+            onChange={handlePromptChange}
             mentionables={mentionables}
             mentionEdition="wizard"
+            mentionInlineThumb
+            mentionInlineThumbHoverOnText
             placeholder="输入提示词，输入 @ 引用资产"
           />
 

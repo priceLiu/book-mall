@@ -301,7 +301,9 @@ function shouldReleaseStoryRunInflight(
       (node.type === "story-pro2-script-hub" &&
         (node.data as { scriptStudioMode?: boolean }).scriptStudioMode ===
           true)) &&
-    (job.mediaKind === "themeOutline" || job.mediaKind === "generalText")
+    (job.mediaKind === "themeOutline" ||
+      job.mediaKind === "scriptStudioBatch" ||
+      job.mediaKind === "generalText")
   ) {
     const st = (
       node.data as { themeOutlineRuntime?: { status?: string } }

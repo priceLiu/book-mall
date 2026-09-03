@@ -181,7 +181,7 @@ type Pro2ShotAnalysisV3 = {
 题材 pack（古风 / 默认 / 自定义）**叠加**制作档规则。  
 Pass2 在 industrial 时必须吃 `analysis`，禁止整段复制 `analysisDraftPrompt`。
 
-电商 analyze 仍可输出 `film-pull` 围栏供 25 列表；**导入 / Hub 真源只认 v3**。
+电商 analyze **直出** `pro2-production-script` v3（`meta.source=film_pull`）；25 列 UI 为 `shots[].analysis` 投影；legacy v1 `film-pull` 只读兼容。导入 / Hub 真源只认 v3。
 
 ---
 

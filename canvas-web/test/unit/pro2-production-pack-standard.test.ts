@@ -45,8 +45,8 @@ describe("pro2 production pack standard v8", () => {
     expect(d.promptStoryboard).toContain("Pass1 禁止");
     expect(g.promptStoryboard).toContain("Pass1 禁止");
     expect(d.promptStoryboard).not.toContain("AI生图提示词(英文)（每镜必填）");
-    expect(d.promptStoryboard).toContain("禁止照抄示例剧名");
-    expect(g.promptStoryboard).toContain("禁止照抄示例剧名");
+    expect(d.promptStoryboard).toContain("禁止照抄剧情");
+    expect(g.promptStoryboard).toContain("禁止照抄剧情");
     expect(d.promptOutline).toContain("道具视觉辞典");
     expect(d.promptOutline).toContain("12–18 镜");
     expect(g.promptOutline).toContain("高密度糖点");
