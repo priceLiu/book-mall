@@ -1,5 +1,15 @@
-import type { FilmPullProductionPlan, FilmPullRenderPlan } from "@/lib/ecom/ecom-film-pull-types";
+import type {
+  FilmPullProductionPlan,
+  FilmPullProductionShot,
+  FilmPullRenderPlan,
+} from "@/lib/ecom/ecom-film-pull-types";
 import type { MediaTimelineV1 } from "@/lib/media/timeline-types";
+
+function filmPullProductionShotSubtitle(shot: FilmPullProductionShot): string | undefined {
+  const text = shot.audioInfo?.scriptSubtitle?.trim();
+  if (!text || text === "无") return undefined;
+  return text;
+}
 
 export function fromEcomFilmPullPlan(plan: FilmPullRenderPlan): MediaTimelineV1 {
   const sorted = plan.shots.slice().sort((a, b) => a.shotNo - b.shotNo);
@@ -21,7 +31,8 @@ export function fromEcomFilmPullProductionPlan(plan: FilmPullProductionPlan): Me
     .map((s, i) => ({
       order: i,
       videoUrl: s.videoUrl!.trim(),
-      subtitle: s.voiceover?.trim() || undefined,
+      audioUrl: s.ttsUrl?.trim() || undefined,
+      subtitle: filmPullProductionShotSubtitle(s),
       durationSec: s.durationSec > 0 ? s.durationSec : undefined,
     }));
   return { version: 1, clips };
