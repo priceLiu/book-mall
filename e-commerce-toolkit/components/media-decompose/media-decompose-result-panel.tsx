@@ -11,6 +11,7 @@ import {
   ecomDataTableWrapClass,
 } from "@/components/ui/ecom-data-table";
 import type { MediaDecomposePatch } from "@/lib/media-decompose-types";
+import { effectiveDecomposeVoiceover } from "@/lib/media-decompose-structured";
 
 type Props = {
   structured: MediaDecomposePatch;
@@ -89,7 +90,7 @@ export function MediaDecomposeResultPanel({ structured }: Props) {
                   <td className={ecomDataTableTdClass}>{row.expression}</td>
                   <td className={ecomDataTableTdClass}>{row.subtitle}</td>
                   <td className={ecomDataTableTdClass}>
-                    {row.voiceover.trim() || row.subtitle.trim() || "—"}
+                    {effectiveDecomposeVoiceover(row) || "—"}
                   </td>
                   <td className={ecomDataTableTdClass}>{row.sfx}</td>
                   <td className={ecomDataTableTdClass}>{row.bgm}</td>

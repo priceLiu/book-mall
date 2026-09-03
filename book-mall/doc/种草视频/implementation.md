@@ -53,7 +53,7 @@
 ## 3. 调用大模型步骤与提示词（总表）
 
 > **说明**：下表「System 提示词」指每次请求共享的 System 骨架（§2.1）；**差异**在 `workflowContext` 的「下一步」与 **User 最后一条消息**。  
-> 「期望输出」须含用户可读 Markdown + 末尾 ` ```seed-video ` JSON 围栏（见 [table-format.md](./table-format.md)）。
+> 「期望输出」须为整段 ` ```seed-video ` JSON 围栏（见 [table-format.md](./table-format.md)）；禁止 Markdown 交付。
 
 | # | 触发动作 | User 最后一条消息（示例） | workflowContext「下一步」要点 | Vision | 期望 LLM 输出 |
 |---|----------|---------------------------|------------------------------|--------|---------------|

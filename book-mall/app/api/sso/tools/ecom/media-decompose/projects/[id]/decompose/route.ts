@@ -8,7 +8,10 @@ import {
   isStoryLlmVisionModel,
 } from "@/lib/canvas/story-llm-vision-models";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
-import { buildMediaDecomposeSystemPrompt } from "@/lib/ecom/ecom-media-decompose-prompts";
+import {
+  appendMediaDecomposeJsonDeliveryFooter,
+  buildMediaDecomposeSystemPrompt,
+} from "@/lib/ecom/ecom-media-decompose-prompts";
 import {
   extractMediaDecomposePatch,
   resolveMediaDecomposeParseError,
@@ -62,6 +65,7 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!prompt) {
     return NextResponse.json({ error: "请填写拆解指令" }, { status: 400 });
   }
+  const gatewayUserPrompt = appendMediaDecomposeJsonDeliveryFooter(prompt);
 
   const project = await getEcomMediaDecomposeProject(auth.userId, projectId);
   if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
@@ -101,7 +105,7 @@ export async function POST(req: Request, ctx: Ctx) {
         { role: "system", content: systemPrompt },
         {
           role: "user",
-          content: buildMediaGwUserContent(prompt, media),
+          content: buildMediaGwUserContent(gatewayUserPrompt, media),
         },
       ],
       clientPage: ecomClientPage(auth.userId, projectId, ECOM_MEDIA_DECOMPOSE_TOOL_KEY),

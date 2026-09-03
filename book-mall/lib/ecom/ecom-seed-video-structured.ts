@@ -368,18 +368,134 @@ export function formatScriptsStepMarkdown(patch: SeedVideoStructuredPatch): stri
   return parts.join("\n").trim();
 }
 
-/** 助手气泡：隐藏围栏；有 JSON 时优先由 JSON 渲染 Markdown */
+function formatConfigTableMarkdown(
+  cfg: z.infer<typeof configTableSchema> | undefined,
+): string {
+  if (!cfg) return "";
+  return [
+    "## 成片参数",
+    "",
+    "| 配置项 | 内容 |",
+    "|--------|------|",
+    `| 全局 AI 提示词 | ${escCell(cfg.globalPrompt || "—")} |`,
+    `| 完整口播 | ${escCell(cfg.fullVoiceover || "—")} |`,
+    `| 配音音色 | ${escCell(cfg.voiceTone || "—")} |`,
+    `| 背景音乐 | ${escCell(cfg.bgmPreset || "—")} |`,
+    `| 时长(秒) | ${cfg.durationSec ?? "—"} |`,
+    `| 画幅 | ${escCell(cfg.aspectRatio || "—")} |`,
+    `| 素材运用 | ${escCell(cfg.materialUsage || "—")} |`,
+  ].join("\n");
+}
+
+function formatShotSequenceMarkdown(
+  rows: Array<{
+    index: number;
+    timeSlice: string;
+    refImageLabel: string;
+    sceneDescription?: string;
+    voiceover?: string;
+    videoPrompt?: string;
+    durationSec?: number;
+  }>,
+  opts?: { includeVideoPrompt?: boolean; title?: string; footer?: string },
+): string {
+  const includeVp = Boolean(opts?.includeVideoPrompt);
+  const header = includeVp
+    ? "| 镜号 | 时间 | 参考素材 | 画面设计 | AI视频生成提示词 | 口播文案 |"
+    : "| 镜号 | 时间 | 参考素材 | 画面设计 | 口播文案 |";
+  const sep = includeVp
+    ? "| --- | --- | --- | --- | --- | --- |"
+    : "| --- | --- | --- | --- | --- |";
+  const lines = [opts?.title ?? "## 镜头序列", "", header, sep];
+  for (const row of rows) {
+    if (includeVp) {
+      lines.push(
+        `| ${row.index} | ${escCell(row.timeSlice)} | ${escCell(row.refImageLabel)} | ${escCell(row.sceneDescription ?? "")} | ${escCell(row.videoPrompt ?? "")} | ${escCell(row.voiceover ?? "")} |`,
+      );
+    } else {
+      lines.push(
+        `| ${row.index} | ${escCell(row.timeSlice)} | ${escCell(row.refImageLabel)} | ${escCell(row.sceneDescription ?? "")} | ${escCell(row.voiceover ?? "")} |`,
+      );
+    }
+  }
+  if (opts?.footer) lines.push("", opts.footer);
+  return lines.join("\n").trim();
+}
+
+/** 由 JSON patch 生成助手气泡可读内容（模型可不写 Markdown） */
+export function formatSeedVideoPatchMarkdown(patch: SeedVideoStructuredPatch): string | null {
+  if (patch.scripts?.length === 3) {
+    return formatScriptsStepMarkdown(patch);
+  }
+  if (patch.materialAnalysis && patch.step === "scripts") {
+    return formatMaterialAnalysisMarkdown(patch.materialAnalysis);
+  }
+  if (patch.modeOptions?.length) {
+    const lines = ["## 视频制作模式", ""];
+    for (const opt of patch.modeOptions) {
+      lines.push(`- **${opt.label}**${opt.description ? `：${opt.description}` : ""}`);
+    }
+    lines.push("", "请选择视频制作模式：");
+    return lines.join("\n");
+  }
+  if (patch.styleOptions?.length) {
+    const lines = ["## 成片风格", ""];
+    for (const opt of patch.styleOptions) {
+      const extras = [opt.voiceLabel, opt.bgmLabel, opt.copyTone].filter(Boolean).join(" · ");
+      lines.push(`- **${opt.label}**${extras ? `（${extras}）` : ""}`);
+    }
+    lines.push("", "请选择成片风格：");
+    return lines.join("\n");
+  }
+  if (patch.directPlan?.shotSequence?.length || patch.directPlan?.configTable) {
+    const parts: string[] = ["## 直接连贯成片参数", ""];
+    if (patch.directPlan.shotSequence?.length) {
+      parts.push(
+        formatShotSequenceMarkdown(patch.directPlan.shotSequence, {
+          title: "### 镜头序列",
+        }),
+      );
+      parts.push("");
+    }
+    const cfgMd = formatConfigTableMarkdown(patch.directPlan.configTable);
+    if (cfgMd) parts.push(cfgMd);
+    parts.push("", "请确认成片参数：");
+    return parts.join("\n").trim();
+  }
+  if (patch.shotSequence?.length && patch.step === "storyboard") {
+    return formatShotSequenceMarkdown(patch.shotSequence, {
+      title: "## 分镜执行表",
+      footer: "请确认分镜执行表：",
+    });
+  }
+  if (patch.shots?.length) {
+    const parts: string[] = [
+      formatShotSequenceMarkdown(patch.shots, {
+        includeVideoPrompt: true,
+        title: "## 正式脚本（逐镜）",
+      }),
+    ];
+    const cfgMd = formatConfigTableMarkdown(patch.configTable);
+    if (cfgMd) {
+      parts.push("");
+      parts.push(cfgMd);
+    }
+    parts.push("", "请确认逐镜参数表：");
+    return parts.join("\n").trim();
+  }
+  return null;
+}
+
+/** 助手气泡：隐藏围栏；有 JSON 时由 JSON 渲染可读内容 */
 export function toSeedVideoAssistantChatContent(
   fullText: string,
   options?: { streaming?: boolean },
 ): string {
   const streaming = options?.streaming ?? false;
   const patch = extractSeedVideoStructuredPatch(fullText);
-  if (patch?.scripts?.length === 3) {
-    return formatScriptsStepMarkdown(patch);
-  }
-  if (patch?.materialAnalysis && patch.step === "scripts") {
-    return formatMaterialAnalysisMarkdown(patch.materialAnalysis);
+  if (patch) {
+    const rendered = formatSeedVideoPatchMarkdown(patch);
+    if (rendered) return rendered;
   }
 
   const stripped = stripSeedVideoFence(fullText);
@@ -387,7 +503,7 @@ export function toSeedVideoAssistantChatContent(
   const fenceComplete = isSeedVideoFenceComplete(fullText);
 
   if (fenceStarted && (!fenceComplete || streaming)) {
-    return stripped || fullText.trim();
+    return stripped.trim() ? stripped : "正在生成结构化 JSON…";
   }
 
   if (fenceComplete && !patch) {

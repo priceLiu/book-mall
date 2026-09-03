@@ -30,7 +30,7 @@ function assembleGuFengStoryboardSystemPrompt(outlineMd: string): string {
 }
 
 describe("gu-feng prompt parity vs DeepSeek console", () => {
-  it("category doc mirrors docs/古风田宠短剧.md core rules", () => {
+  it("category doc mirrors docs/古风田宠短剧.md core rules (JSON-only v13)", () => {
     const doc = defaultPro2ScriptCategoryDocBody("gu-feng-tian-chong") ?? "";
     expect(doc).toContain("创作死锁铁律");
     expect(doc).toContain("反差");
@@ -38,11 +38,14 @@ describe("gu-feng prompt parity vs DeepSeek console", () => {
     expect(doc).toContain("糖点密度");
     expect(doc).toContain("视觉死锁");
     expect(doc).toContain("固定形象描述");
-    expect(doc).toContain("10–14 镜");
-    expect(doc).toContain("3 分钟");
+    expect(doc).toContain("12–18 镜");
+    expect(doc).toContain("175–185 秒");
     expect(doc).toContain("黑色发丝，高髻云鬓");
     expect(doc).toContain("深墨蓝暗青色广袖长袍");
     expect(doc).toContain("固定反向提示词");
+    expect(doc).toContain("JSON-only");
+    expect(doc).not.toContain("禁止 JSON");
+    expect(doc).not.toContain("GFM 表头");
     expect(doc).not.toContain("[Negative:");
   });
 
@@ -69,12 +72,13 @@ describe("gu-feng prompt parity vs DeepSeek console", () => {
     ).toBe(false);
   });
 
-  it("scopes category doc for scene segment (no 2-shot table / full pack footer)", () => {
+  it("scopes category doc for scene segment (no shots[] sample / full pack footer)", () => {
     const doc = defaultPro2ScriptCategoryDocBody("gu-feng-tian-chong") ?? "";
     const scoped = scopePro2CategoryDocForSection(doc, "scene");
-    expect(scoped).toContain("仅输出 ## 场景视觉提示词");
-    expect(scoped).not.toContain("| 2 | 俯拍");
-    expect(scoped).not.toContain("章节齐全；分镜 **10–14 镜**");
+    expect(scoped).toContain("step=scene");
+    expect(scoped).toContain("scenes[]");
+    expect(scoped).not.toContain('"index": 1');
+    expect(scoped).not.toContain("禁止只输出 1–2 镜即停");
   });
 });
 

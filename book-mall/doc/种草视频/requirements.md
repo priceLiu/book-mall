@@ -39,7 +39,7 @@
 
 ```
 上传素材 + 填写策划 Prompt
-    → 助手 Step2：素材解析 + 三套脚本（Markdown + ```seed-video JSON）
+    → 助手 Step2：仅 ```seed-video JSON（materialAnalysis + scripts×3；系统渲染）
     → 点选脚本
     → 点选制作模式（direct / fine）
     → [fine] 点选成片风格（sweet-xhs / sharp-douyin）

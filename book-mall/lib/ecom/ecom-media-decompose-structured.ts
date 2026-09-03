@@ -132,6 +132,28 @@ function pickString(obj: Record<string, unknown>, keys: string[]): string {
   return "";
 }
 
+function pickNonEmptyAudioText(...candidates: (string | undefined)[]): string {
+  for (const candidate of candidates) {
+    const text = (candidate ?? "").trim();
+    if (text && !isVisualPlaceholderText(text)) return text;
+  }
+  return "";
+}
+
+function pickVoiceoverByKeyPattern(obj: Record<string, unknown>): string {
+  for (const [key, value] of Object.entries(obj)) {
+    if (typeof value !== "string") continue;
+    const text = value.trim();
+    if (!text || isVisualPlaceholderText(text)) continue;
+    const lowerKey = key.toLowerCase();
+    if (lowerKey.includes("字幕") && !lowerKey.includes("口播")) continue;
+    if (/口播|配音|旁白|解说|台词|voiceover|narration|dubbing|spoken|audioscript/i.test(key)) {
+      return text;
+    }
+  }
+  return "";
+}
+
 function coerceFiniteNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
@@ -143,81 +165,6 @@ function coerceFiniteNumber(value: unknown): number | null {
   return null;
 }
 
-function splitMarkdownTableRow(line: string): string[] {
-  const parts = line.split("|").map((cell) => cell.trim());
-  if (parts[0] === "") parts.shift();
-  if (parts.length > 0 && parts[parts.length - 1] === "") parts.pop();
-  return parts;
-}
-
-function isMarkdownSeparatorRow(cells: string[]): boolean {
-  return cells.length > 0 && cells.every((cell) => /^:?-{2,}:?$/.test(cell));
-}
-
-function headerMatchesVoiceover(header: string): boolean {
-  const h = header.trim().toLowerCase();
-  return (
-    h.includes("口播") ||
-    h.includes("配音") ||
-    h === "voiceover" ||
-    h === "narration" ||
-    h === "dubbing"
-  );
-}
-
-function headerMatchesSubtitle(header: string): boolean {
-  const h = header.trim().toLowerCase();
-  return h.includes("字幕") || h === "subtitle";
-}
-
-function headerMatchesShotNo(header: string): boolean {
-  const h = header.trim().toLowerCase();
-  return h.includes("镜号") || h.includes("序号") || h === "shotno" || h === "index";
-}
-
-/** 从用户可读 Markdown 表格回填口播/字幕（模型常在 Markdown 里写全、JSON 里留空或用错字段名） */
-export function parseMarkdownDecomposeVoiceoverMap(
-  text: string,
-): Map<number, { subtitle: string; voiceover: string }> {
-  const map = new Map<number, { subtitle: string; voiceover: string }>();
-  const lines = stripMediaDecomposeFence(text).split("\n");
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!.trim();
-    if (!line.startsWith("|")) continue;
-
-    const headers = splitMarkdownTableRow(line);
-    const shotIdx = headers.findIndex((h) => headerMatchesShotNo(h));
-    const voiceoverIdx = headers.findIndex((h) => headerMatchesVoiceover(h));
-    const subtitleIdx = headers.findIndex((h) => headerMatchesSubtitle(h));
-    if (shotIdx < 0 || (voiceoverIdx < 0 && subtitleIdx < 0)) continue;
-
-    i += 1;
-    if (i < lines.length) {
-      const maybeSep = splitMarkdownTableRow(lines[i]!.trim());
-      if (isMarkdownSeparatorRow(maybeSep)) i += 1;
-    }
-
-    while (i < lines.length && lines[i]!.trim().startsWith("|")) {
-      const cells = splitMarkdownTableRow(lines[i]!.trim());
-      if (isMarkdownSeparatorRow(cells)) {
-        i += 1;
-        continue;
-      }
-      const shotNo = Math.round(coerceFiniteNumber(cells[shotIdx]) ?? NaN);
-      if (Number.isFinite(shotNo) && shotNo > 0) {
-        map.set(shotNo, {
-          subtitle: subtitleIdx >= 0 ? (cells[subtitleIdx] ?? "").trim() : "",
-          voiceover: voiceoverIdx >= 0 ? (cells[voiceoverIdx] ?? "").trim() : "",
-        });
-      }
-      i += 1;
-    }
-  }
-
-  return map;
-}
-
 function mergeAudioFields(row: Record<string, unknown>): {
   subtitle: string;
   voiceover: string;
@@ -226,17 +173,23 @@ function mergeAudioFields(row: Record<string, unknown>): {
   let voiceover = pickString(row, [
     "voiceover",
     "配音台词",
+    "配音文案",
     "配音",
     "口播文案",
     "口播",
+    "旁白",
+    "旁白文案",
+    "解说词",
+    "解说",
+    "台词",
+    "对白",
     "narration",
     "dubbing",
     "spokenText",
     "audioScript",
-    "scriptSubtitle",
   ]);
 
-  for (const nestedKey of ["audioInfo", "audio", "音频"]) {
+  for (const nestedKey of ["audioInfo", "audio", "音频", "audioTrack", "sound"]) {
     const nested = row[nestedKey];
     if (!nested || typeof nested !== "object" || Array.isArray(nested)) continue;
     const audio = nested as Record<string, unknown>;
@@ -248,14 +201,21 @@ function mergeAudioFields(row: Record<string, unknown>): {
       pickString(audio, [
         "voiceover",
         "配音台词",
+        "配音文案",
         "配音",
         "口播文案",
         "口播",
+        "旁白",
+        "旁白文案",
+        "解说词",
+        "解说",
+        "台词",
         "narration",
-        "scriptSubtitle",
         "spokenText",
       ]);
   }
+
+  voiceover = voiceover || pickVoiceoverByKeyPattern(row);
 
   return { subtitle, voiceover };
 }
@@ -358,25 +318,10 @@ export function effectiveDecomposeVoiceover(row: {
   subtitle?: string;
   voiceover?: string;
 }): string {
-  return (row.voiceover ?? "").trim() || (row.subtitle ?? "").trim();
-}
-
-function enrichPatchFromMarkdown(text: string, patch: MediaDecomposePatch): MediaDecomposePatch {
-  if (patch.mediaType !== "video") return patch;
-  const mdMap = parseMarkdownDecomposeVoiceoverMap(text);
-  if (mdMap.size === 0) return patch;
-
-  return {
-    ...patch,
-    storyboardTable: patch.storyboardTable.map((row) => {
-      const md = mdMap.get(row.shotNo);
-      if (!md) return row;
-      const subtitle = row.subtitle.trim() || md.subtitle;
-      const voiceover =
-        effectiveDecomposeVoiceover({ ...row, subtitle }) || md.voiceover || md.subtitle;
-      return { ...row, subtitle, voiceover };
-    }),
-  };
+  return (
+    pickNonEmptyAudioText(row.voiceover) ||
+    pickNonEmptyAudioText(row.subtitle)
+  );
 }
 
 export function normalizeMediaDecomposePatch(patch: MediaDecomposePatch): MediaDecomposePatch {
@@ -390,11 +335,8 @@ export function normalizeMediaDecomposePatch(patch: MediaDecomposePatch): MediaD
   };
 }
 
-function finalizeMediaDecomposePatch(
-  text: string,
-  patch: MediaDecomposePatch,
-): MediaDecomposePatch {
-  return enrichPatchFromMarkdown(text, normalizeMediaDecomposePatch(patch));
+function finalizeMediaDecomposePatch(patch: MediaDecomposePatch): MediaDecomposePatch {
+  return normalizeMediaDecomposePatch(patch);
 }
 
 function tryParseJson(body: string): unknown | null {
@@ -424,13 +366,13 @@ function extractFenceBody(text: string): string | null {
   return null;
 }
 
-function parseMediaDecomposePatchFromParsed(parsed: unknown, text: string): MediaDecomposePatch | null {
+function parseMediaDecomposePatchFromParsed(parsed: unknown): MediaDecomposePatch | null {
   const coerced = coerceMediaDecomposePayload(parsed) ?? parsed;
   const safe = mediaDecomposePatchSchema.safeParse(coerced);
   if (!safe.success) return null;
   const qualityError = validateMediaDecomposeVisualQuality(safe.data);
   if (qualityError) return null;
-  return finalizeMediaDecomposePatch(text, safe.data);
+  return finalizeMediaDecomposePatch(safe.data);
 }
 
 export function extractMediaDecomposePatch(text: string): MediaDecomposePatch | null {
@@ -438,7 +380,7 @@ export function extractMediaDecomposePatch(text: string): MediaDecomposePatch | 
   if (body) {
     const parsed = tryParseJson(body);
     if (parsed) {
-      const patch = parseMediaDecomposePatchFromParsed(parsed, text);
+      const patch = parseMediaDecomposePatchFromParsed(parsed);
       if (patch) return patch;
     }
   }
@@ -449,7 +391,7 @@ export function extractMediaDecomposePatch(text: string): MediaDecomposePatch | 
     if (end > start) {
       const parsed = tryParseJson(text.slice(start, end + 1));
       if (parsed) {
-        const patch = parseMediaDecomposePatchFromParsed(parsed, text);
+        const patch = parseMediaDecomposePatchFromParsed(parsed);
         if (patch) return patch;
       }
     }

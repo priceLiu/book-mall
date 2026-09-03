@@ -1,4 +1,7 @@
 import {
+  STORY_PRO2_HUB_LLM_SYSTEM,
+} from "./story-pro2-theme-outline-prompt";
+import {
   PRO2_GU_FENG_DEEPSEEK_STORY_INPUT_PREFIX,
   PRO2_GU_FENG_DEEPSEEK_SYSTEM_PROMPT,
 } from "./data/pro2-gu-feng-deepseek-full-pack-prompt";
@@ -23,11 +26,11 @@ export function isPro2GuFengFullPackRun(
 
 export function resolvePro2FullPackSystemPrompt(
   scriptCategoryId?: Pro2ScriptCategoryId,
-): string | undefined {
+): string {
   if (scriptCategoryId === "gu-feng-tian-chong") {
     return PRO2_GU_FENG_DEEPSEEK_SYSTEM_PROMPT;
   }
-  return undefined;
+  return STORY_PRO2_HUB_LLM_SYSTEM;
 }
 
 /** @deprecated */

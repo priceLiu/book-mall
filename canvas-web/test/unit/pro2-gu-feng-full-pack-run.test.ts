@@ -8,8 +8,14 @@ import {
   buildPro2GuFengFullPackUserPrompt,
   formatPro2GuFengFullPackStoryInput,
   isPro2GuFengFullPackRun,
+  resolvePro2FullPackSystemPrompt,
   resolvePro2GuFengOutlinePromptForRun,
 } from "@/lib/canvas/pro2-gu-feng-full-pack-run";
+import { STORY_PRO2_HUB_LLM_SYSTEM } from "@/lib/canvas/story-pro2-theme-outline-prompt";
+import {
+  PRO2_GU_FENG_JSON_OUTPUT_RULES,
+  PRO2_GU_FENG_TEXT_SYSTEM,
+} from "@/lib/canvas/data/pro2-gu-feng-tian-chong-rules";
 import { resolvePro2HubScriptGenerationSections } from "@/lib/canvas/pro2-script-generation-sections";
 
 describe("pro2 gu-feng DeepSeek full pack", () => {
@@ -56,5 +62,23 @@ describe("pro2 gu-feng DeepSeek full pack", () => {
     expect(resolved).toContain("JSON-only v13");
     expect(isPro2GuFengFullPackRun("gu-feng-tian-chong", "3分钟")).toBe(true);
     expect(isPro2GuFengFullPackRun("gu-feng-tian-chong", "")).toBe(false);
+  });
+
+  it("resolvePro2FullPackSystemPrompt returns JSON-only for all categories", () => {
+    expect(resolvePro2FullPackSystemPrompt("gu-feng-tian-chong")).toContain(
+      "pro2-production-script",
+    );
+    expect(resolvePro2FullPackSystemPrompt("default-master")).toBe(
+      STORY_PRO2_HUB_LLM_SYSTEM,
+    );
+    expect(STORY_PRO2_HUB_LLM_SYSTEM).toContain("json-only-v13");
+    expect(STORY_PRO2_HUB_LLM_SYSTEM).not.toContain("GFM Markdown");
+  });
+
+  it("gu-feng text system and json rules forbid GFM output", () => {
+    expect(PRO2_GU_FENG_TEXT_SYSTEM).toContain("step=outline");
+    expect(PRO2_GU_FENG_TEXT_SYSTEM).not.toContain("Markdown 制作包");
+    expect(PRO2_GU_FENG_JSON_OUTPUT_RULES).toContain("json-only-v13");
+    expect(PRO2_GU_FENG_JSON_OUTPUT_RULES).not.toContain("## 分镜脚本");
   });
 });

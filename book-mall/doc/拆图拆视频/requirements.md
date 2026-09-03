@@ -7,7 +7,7 @@
 
 电商工具箱内的 **图片/视频反推拆解** 单页工具：用户上传或粘贴素材 URL，经 Vision LLM 输出可落地的 **分镜拆解表**（视频）或 **画面要素 + 生图/实拍方案**（静态图）。
 
-与「种草视频」对齐的是 **交付机制**（Markdown + `media-decompose` 围栏 JSON + Zod 校验），**不是**种草的业务字段（脚本/模式/成片）。
+与「种草视频」对齐的是 **交付机制**（仅 `media-decompose` 围栏 JSON + Zod 校验；界面由 JSON 渲染），**不是**种草的业务字段（脚本/模式/成片）。
 
 ## 2. 入口与菜单
 
@@ -34,16 +34,16 @@
     → Prompt 区切换对应默认指令（用户可编辑）
     → 选择 Vision 模型（视频须 video-understanding 模型）
     → 点击「拆解」
-    → 流式展示 Markdown
-    → 解析 ```media-decompose JSON → 结构化表格/卡片
+    → 流式接收 ```media-decompose JSON
+    → 解析 JSON → 结构化表格/卡片（系统渲染）
 ```
 
 ## 5. 默认 Prompt
 
 见 [`skill.md`](./skill.md)：
 
-- **视频**：15 列分镜表 + 叙事逻辑 / 卡点要点 / 可复刻拍摄脚本
-- **图片**：画面要素 + 正向/负向生图 Prompt + 实拍复刻方案
+- **视频**：JSON `storyboardTable`（17 列）+ 叙事逻辑 / 卡点要点 / 可复刻拍摄脚本
+- **图片**：JSON `elements` + 正向/负向生图 Prompt + 实拍复刻方案
 
 ## 6. 模型约束
 

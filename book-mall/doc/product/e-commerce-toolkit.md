@@ -22,7 +22,7 @@
 
 - 入口：`/ecom/media-decompose`；**电商**侧栏；单页工作区（上传 + Prompt + 模型 + 拆解结果）
 - 输入：本地图片/视频文件、**公网 HTTPS 链接**、我的资产（单素材）
-- 输出：Markdown + ` ```media-decompose ` JSON（Zod 校验）；视频 **17 列**分镜表（含布光/影调）+ 全片视觉风格/色调/运镜总述 + 叙事/卡点/拍摄脚本；一键复刻继承光影/色调/运镜；静态图要素 + 正/负向 Prompt + 实拍方案
+- 输出：仅 ` ```media-decompose ` JSON（Zod 校验，界面由 JSON 渲染）；视频 **17 列**分镜表（含布光/影调）+ 全片视觉风格/色调/运镜总述 + 叙事/卡点/拍摄脚本；一键复刻继承光影/色调/运镜；静态图要素 + 正/负向 Prompt + 实拍方案
 - 模型：Vision LLM（拆视频须 video-understanding）；Gateway `image_url` / `video_url`
 - toolKey：`ecom-toolkit__media-decompose`（`decompose`）；数据表 `EcomMediaDecomposeProject`
 

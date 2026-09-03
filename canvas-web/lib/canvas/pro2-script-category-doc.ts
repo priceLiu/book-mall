@@ -28,20 +28,20 @@ export function scopePro2CategoryDocForSection(
   if (!raw || !section || section === "outline") return raw;
 
   let scoped = raw.replace(
-    /###\s*分镜脚本[\s\S]*?(?=\n---|\n##\s|$)/i,
+    /###\s*shots\[\][\s\S]*?(?=\n---|\n##\s|$)/i,
     section === "storyboard"
-      ? "### 分镜脚本\n\n（正式须 10–14 镜；单镜结构见 system prompt 样例，**禁止只输出 1–2 镜**）\n"
+      ? "### shots[]\n\n（正式须 **12–18 镜**；单镜结构见 system prompt 样例，**禁止只输出 1–2 镜**）\n"
       : "",
   );
 
   const footers: Record<StoryLlmSection, string> = {
     outline: "",
     character:
-      "请根据用户提供的 **故事大纲**，**仅输出 ## 角色视觉辞典 + 一张 5 列 GFM 表**；不要输出分镜/场景/视觉风格等其他章节。",
+      "请根据用户提供的 **故事大纲**，**仅输出** step=character 的 JSON patch（characters[]）；不要输出 shots/scenes/visualStyle 等其他块。",
     scene:
-      "请根据用户提供的 **故事大纲**，**仅输出 ## 场景视觉提示词 + 一张 6 列 GFM 表**；不要输出分镜/角色/视觉风格等其他章节。",
+      "请根据用户提供的 **故事大纲**，**仅输出** step=scene 的 JSON patch（scenes[] · 补全 imagePrompt / negativePrompt）；不要输出 shots/characters 等其他块。",
     storyboard:
-      "请根据用户提供的 **故事大纲、角色设定、场景提示词**，**仅输出 ## 分镜脚本 + 一张 10 列 GFM 表**（12–18 镜，总时长 175–185 秒，每镜 10–15 秒，含光影/道具/音效与【起始】…【结束】）；Pass1 禁止 AI 列；不要输出其他章节或镜数规划小表。",
+      "请根据用户提供的 **故事大纲、角色设定、场景提示词**，**仅输出** step=storyboard 的 JSON patch（shots[] Pass1 导演表 · 12–18 镜，总时长 175–185 秒，每镜 10–15 秒，含光影/道具/音效与【起始】…【结束】）；Pass1 禁止 imagePrompt / videoPrompt；不要输出其他块。",
     shot_prompts:
       "请根据已定稿分镜，**仅输出** step=shot_prompts 的 JSON patch（每镜 frameImagePrompt / videoPrompt）；不要改写 Pass1 镜号与对白。",
   };
@@ -244,7 +244,7 @@ export function mergePro2ScriptGenerationPrompt(
   if (isPro2CustomPromptCategory(categoryId)) {
     if (extra) {
       parts.push(
-        `## 用户自编剧本提示词（优先遵循；缺省章节由系统按 GFM 制作包自动补全输出）\n${extra}`,
+        `## 用户自编剧本提示词（优先遵循；缺省字段由系统按 JSON-only 制作包自动补全输出）\n${extra}`,
       );
     }
   } else {

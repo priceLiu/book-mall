@@ -32,8 +32,9 @@ describe("pro2ScriptCategoryPreset", () => {
     expect(preset?.starterPatch.label).toBe("故事大纲");
     const doc = defaultPro2ScriptCategoryDocBody("gu-feng-tian-chong") ?? "";
     expect(doc).toContain("【起始】");
-    expect(doc).toContain("10–14 镜");
-    expect(doc).toContain("| 场景名 | 环境 | 时间 | 气氛 | 生图关键词 |");
+    expect(doc).toContain("12–18 镜");
+    expect(doc).toContain("scenes[]");
+    expect(doc).toContain('"imagePrompt"');
     const pack = storyPro2GuFengHubPromptPack();
     expect(pack.promptStoryboard).toContain("高密度糖点");
     expect(pack.promptStoryboard).toContain("json-only-v13");

@@ -1,23 +1,22 @@
 # 拆图拆视频 · 结构化交付契约（权威）
 
-> **系统只解析 ` ```media-decompose ` JSON 围栏。** Markdown 仅供用户阅读，须与 JSON 一致；缺围栏或校验失败则无法渲染结构化结果。
+> **系统只解析回复中唯一 ` ```media-decompose ` 围栏内的 JSON。** 禁止用 Markdown 表格/列表交付结构化数据。
 
 ## 硬性规则
 
-1. 回复**最末尾**必须有且仅有一个 ` ```media-decompose ` 围栏，内含**合法 JSON**（无注释、无尾逗号）。
+1. 回复**整段**应为唯一 ` ```media-decompose ` 围栏，内含**合法 JSON**（无注释、无尾逗号）。允许围栏外零字符；**禁止** Markdown 分镜表与闲聊前言。
 2. JSON 根对象必须含 **`mediaType`**（`image` | `video`）与 **`action`**（固定 `decompose_complete`）。
-3. 凡结构化数据**只写在 JSON**；禁止仅靠 Markdown 表格让系统猜结构。
-4. 固定字段名**禁止改名、禁止缺项**（见下表）。
+3. **所有结构化数据只写在 JSON 内**。
+4. 固定字段名**禁止改名**；必填项**禁止缺项**（见下表）。
 5. 按 `mediaType` **只输出对应分支**字段；另一分支键不要写。
 6. JSON 内禁止注释；长文用 `\n` 换行。
+7. 围栏语言标记必须是 **`media-decompose`**，禁止 `json` / `seed-video` 等代替。
 
-## 回复结构（固定顺序）
+## 回复结构
 
 ```
-[用户可读 Markdown — 表格/段落]
-
 ```media-decompose
-{ ... }
+{ ... 完整 JSON ... }
 ```
 ```
 
@@ -31,10 +30,10 @@
 |------|------|------|
 | `mediaType` | string | 固定 `"video"` |
 | `action` | string | 固定 `"decompose_complete"` |
-| `visualStyle` | string | 全片视觉风格/美术（如高饱和多巴胺、低饱和莫兰迪、纪实 handheld） |
-| `globalColorTone` | string | 全片色调基调（如暖金侧光、冷青电影感、红蓝高对比） |
-| `cameraLanguageSummary` | string | 全片运镜总述（如「镜1横移；镜3慢推；其余固定微手持」） |
-| `scenePrep` | object | 场地与固定道具（不含旧服装）；见下 |
+| `visualStyle` | string | 全片视觉风格/美术 |
+| `globalColorTone` | string | 全片色调基调 |
+| `cameraLanguageSummary` | string | 全片运镜总述 |
+| `scenePrep` | object | 场地与固定道具；见下 |
 | `storyboardTable` | array | **至少 1 镜** |
 | `narrativeLogic` | string | 整体叙事逻辑拆解 |
 | `beatPoints` | string | 镜头卡点要点 |
@@ -49,23 +48,21 @@
 
 ### 分镜行 `storyboardTable[]`
 
-Markdown 表列名须对齐：**镜号｜时长｜景别｜运镜｜镜头角度｜构图方式｜布光｜影调｜画面内容｜人物动作｜表情｜字幕文案｜口播文案｜音效｜BGM｜转场｜剪辑节奏**
-
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `shotNo` | number | 从 1 递增 |
 | `duration` | string | 如 `3s` |
 | `shotSize` | string | 景别 |
-| `cameraMove` | string | 运镜/相机运动（固定/慢推/横移跟拍/手持微晃等可执行术语；禁止「有运镜」等空话） |
+| `cameraMove` | string | 运镜（可执行术语；禁止空话） |
 | `cameraAngle` | string | 镜头角度 |
 | `composition` | string | 构图方式 |
-| `lightingSetup` | string | 本镜布光（方向/软硬/主辅关系）；可见光影时禁止「无」 |
-| `toneContrast` | string | 本镜影调/对比/色彩倾向；可见时禁止「无」 |
-| `visualContent` | string | 画面内容（主体与场景；光影/影调写入专用列，勿重复堆砌） |
+| `lightingSetup` | string | 本镜布光；可见光影时禁止「无」 |
+| `toneContrast` | string | 本镜影调；可见时禁止「无」 |
+| `visualContent` | string | 画面内容 |
 | `characterAction` | string | 人物动作 |
 | `expression` | string | 表情 |
-| `subtitle` | string | 字幕文案（画面内字幕；可与口播相同） |
-| `voiceover` | string | **口播文案**（配音/旁白；有口播时必须填写；若与字幕相同可写同样内容） |
+| `subtitle` | string | 字幕文案 |
+| `voiceover` | string | **口播/旁白**；有口播时**必填** |
 | `sfx` | string | 音效 |
 | `bgm` | string | BGM |
 | `transition` | string | 转场 |
@@ -82,7 +79,7 @@ Markdown 表列名须对齐：**镜号｜时长｜景别｜运镜｜镜头角度
 | `mediaType` | string | 固定 `"image"` |
 | `action` | string | 固定 `"decompose_complete"` |
 | `elements` | object | 画面底层要素 |
-| `positivePrompt` | string | 正向生图 Prompt（**必须**体现 elements.lighting + colorSystem + atmosphere） |
+| `positivePrompt` | string | 正向生图 Prompt |
 | `negativePrompt` | string | 反向负面 Prompt |
 | `liveActionReplication` | object | 实拍复刻方案 |
 

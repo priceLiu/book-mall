@@ -543,12 +543,8 @@ export function enqueuePro2ScriptGeneration(
       Object.assign(optimisticPatch, hubSectionPendingPatch(firstSection));
     }
   }
-  const fullPackSystem = hubData
-    ? resolvePro2FullPackSystemPrompt(hubData.scriptCategoryId)
-    : undefined;
-  if (fullPackSystem) {
-    optimisticPatch.outlineSystemPrompt = fullPackSystem;
-  }
+  const fullPackSystem = resolvePro2FullPackSystemPrompt(hubData?.scriptCategoryId);
+  optimisticPatch.outlineSystemPrompt = fullPackSystem;
   updateNodeData(hubId, optimisticPatch);
 
   const schedulePromptMergeAndRun = () => {

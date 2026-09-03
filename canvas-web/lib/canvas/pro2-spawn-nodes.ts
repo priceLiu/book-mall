@@ -4,10 +4,10 @@ import { connectScriptHubEdge } from "./pro2-script-hub-connect";
 import { patchPro2StarterOnScriptHubLink } from "./pro2-text-hub-link-sync";
 export { connectScriptHubEdge } from "./pro2-script-hub-connect";
 import {
-  STORY_PRO_HUB_LLM_SYSTEM,
   STORY_PRO_LLM_PARAMS_DEFAULT,
 } from "./story-pro-prompts";
 import {
+  STORY_PRO2_HUB_LLM_SYSTEM,
   STORY_PRO2_CHARACTER_PROMPT,
   STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
   STORY_PRO2_PACK_PROMPT_VERSION,
@@ -54,7 +54,7 @@ export function buildPro2ScriptHubNodeData(
     providerId: "",
     modelKey: "",
     params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
-    outlineSystemPrompt: STORY_PRO_HUB_LLM_SYSTEM,
+    outlineSystemPrompt: STORY_PRO2_HUB_LLM_SYSTEM,
     promptOutline: STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
     promptCharacter: STORY_PRO2_CHARACTER_PROMPT,
     promptScene: STORY_PRO2_SCENE_PROMPT,

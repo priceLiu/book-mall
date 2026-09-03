@@ -65,7 +65,7 @@ const SCRIPT_FILM_PULL_PLACEHOLDER =
   "输入拉片，或补充要求后发送：将按上游视频逐镜还原（专业版）";
 
 const CUSTOM_PROMPT_DOCK_PLACEHOLDER =
-  "在此编写你的完整剧本提示词（创意、风格、角色、分镜要求等）；发送后系统将按 GFM 制作包自动补全结构化输出";
+  "在此编写你的完整剧本提示词（创意、风格、角色、分镜要求等）；发送后系统将按 JSON-only 制作包自动补全结构化输出";
 
 /** 2.0 脚本节点 · 底部输入坞（与文本节点统一外壳） */
 export function Pro2ScriptInputDock() {

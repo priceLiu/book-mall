@@ -27,19 +27,44 @@ function loadTableFormatMd(): string {
   return cachedTableFormat;
 }
 
+/** 每条拆解 user 消息末尾追加（服务端强制），即使用户自定义 Prompt 也须遵守 */
+export const MEDIA_DECOMPOSE_JSON_DELIVERY_FOOTER = `
+---
+【交付格式 · 强制 · 最高优先级】
+1. 回复**整段**仅为唯一围栏 \`\`\`media-decompose ，内含**完整合法 JSON**（无注释、无尾逗号）。
+2. **禁止** Markdown 分镜表、列表、前言或闲聊；所有字段（含 \`voiceover\`）必须写在 JSON 内。
+3. 有旁白/配音时，每镜 JSON 字段 \`voiceover\` **不可留空**（与字幕相同可重复填写）。
+4. 围栏语言标记必须是 \`media-decompose\`，**禁止** \`json\` / \`seed-video\` 等代替。`.trim();
+
+export function appendMediaDecomposeJsonDeliveryFooter(userPrompt: string): string {
+  const base = userPrompt.trim();
+  if (!base) return MEDIA_DECOMPOSE_JSON_DELIVERY_FOOTER;
+  if (base.includes("【交付格式 · 强制")) return base;
+  return `${base}\n\n${MEDIA_DECOMPOSE_JSON_DELIVERY_FOOTER}`;
+}
+
 const MEDIA_DECOMPOSE_JSON_CONTRACT = `
-## 【强制】机器可读交付 · \`\`\`media-decompose JSON
+## 【最高优先级】机器可读交付 · 仅 \`\`\`media-decompose JSON
 
-**系统只解析 JSON，不解析 Markdown 表格结构。** 每条回复必须：
+**系统只解析 \`\`\`media-decompose 围栏内的 JSON。** 禁止 Markdown 表格、列表或前言。
 
-1. 先写用户可读 Markdown（与 JSON 一致）；
-2. **最末尾**追加唯一围栏 \`\`\`media-decompose（语言标记必须是 media-decompose，禁止用 json/seed-video 代替）；
-3. JSON 根对象必须含 **mediaType**（image 或 video）与 **action**（固定 decompose_complete）；
-4. 只写当前 mediaType 对应分支字段；JSON 禁止注释。
+### 必须
 
-缺围栏、JSON 非法、必填字段缺失 → 视为失败输出。
+1. 回复**整段**仅为唯一围栏 \`\`\`media-decompose（语言标记必须是 media-decompose）；
+2. 围栏内为**单一合法 JSON 对象**，根字段含 **mediaType**（image | video）与 **action**（固定 decompose_complete）；
+3. 视频分镜写在 **storyboardTable** 数组；每镜使用**英文字段名**（见 table-format.md）；
+4. 有口播/旁白时，每镜 **voiceover** 字符串**不可留空**；
+5. 只写当前 mediaType 对应分支；JSON 禁止注释与尾逗号。
 
-### 视频示例（mediaType: video）
+### 禁止
+
+- 禁止 Markdown 分镜表 / 列表 / 闲聊前言；
+- 禁止口播只写在 Markdown 而不写 JSON \`voiceover\`；
+- 禁止 \`\`\`json\`、\`\`\`seed-video\` 等围栏代替 \`\`\`media-decompose\`。
+
+缺围栏、JSON 非法、必填字段缺失 → **失败输出**。
+
+### 视频 JSON 示例（mediaType: video）
 
 \`\`\`media-decompose
 {
@@ -59,15 +84,15 @@ const MEDIA_DECOMPOSE_JSON_CONTRACT = `
       "composition": "三分法",
       "lightingSetup": "柔光主灯 45° 侧顺光",
       "toneContrast": "低对比自然光",
-      "visualContent": "…",
-      "characterAction": "…",
-      "expression": "…",
-      "subtitle": "…",
-      "voiceover": "…",
-      "sfx": "…",
-      "bgm": "…",
+      "visualContent": "模特手持产品面向镜头",
+      "characterAction": "单手举起产品",
+      "expression": "自然微笑",
+      "subtitle": "夏季必备",
+      "voiceover": "这件真的太好穿了",
+      "sfx": "环境音",
+      "bgm": "轻快 BGM",
       "transition": "切",
-      "editRhythm": "…"
+      "editRhythm": "快节奏"
     }
   ],
   "narrativeLogic": "…",
@@ -76,7 +101,7 @@ const MEDIA_DECOMPOSE_JSON_CONTRACT = `
 }
 \`\`\`
 
-### 图片示例（mediaType: image）
+### 图片 JSON 示例（mediaType: image）
 
 \`\`\`media-decompose
 {
@@ -121,48 +146,58 @@ export function buildMediaDecomposeSystemPrompt(opts: {
 }): string {
   const skill = loadSkillMd();
   const tableFormat = loadTableFormatMd();
-  return `${skill}
-
----
-
-## 结构化契约（table-format.md 摘要）
-
-${tableFormat}
+  return `${MEDIA_DECOMPOSE_JSON_CONTRACT}
 
 ---
 
 ## 运行时上下文
 
 - 当前素材类型：**${opts.mediaKind === "video" ? "视频" : "静态图片"}**
-- 你必须输出 mediaType=${opts.mediaKind} 对应 JSON 分支。
+- 你必须输出 **mediaType=${opts.mediaKind}** 对应 JSON 分支，并在 \`\`\`media-decompose 围栏内交付。
 
-${MEDIA_DECOMPOSE_JSON_CONTRACT}`;
+---
+
+## 结构化字段契约（table-format.md）
+
+${tableFormat}
+
+---
+
+## 领域指令（skill.md）
+
+${skill}`;
 }
 
-export const DEFAULT_VIDEO_DECOMPOSE_USER_PROMPT = `你作为资深影视分镜&镜头语言分析师，接下来我会给到一段视频素材，对该视频做完整主体反推分镜拆解，严格按照下面要求输出：
+export const DEFAULT_VIDEO_DECOMPOSE_USER_PROMPT = `你作为资深影视分镜&镜头语言分析师，接下来我会给到一段视频素材，请做完整反推分镜拆解。
 
-1. **全片视觉（Markdown + JSON 根字段）**：输出 visualStyle（全片视觉风格）、globalColorTone（全片色调基调）、cameraLanguageSummary（全片运镜总述）、scenePrep（venue 场地、fixedProps 固定道具）。
-2. 输出标准结构化分镜表格，表格固定字段：镜号、时长、景别、运镜、镜头角度、构图方式、**布光**、**影调**、画面内容、人物动作、表情、字幕文案、**口播文案**、音效、BGM、转场、剪辑节奏。**JSON 中每镜必须用英文字段 voiceover 填写口播/旁白原文**（有口播时不可留空；与字幕相同时 subtitle 与 voiceover 可写同样内容）。
-3. **运镜（cameraMove）**：用可执行术语（固定机位/慢推/横移跟拍/手持微晃等），禁止「有运镜」等空话；本镜明显在动时禁止填「无」。
-4. **布光/影调**：每镜填写 lightingSetup、toneContrast；可见光影时禁止「无」；勿在画面内容重复堆砌布光术语。
-5. 表格之后额外输出：整体叙事逻辑拆解、镜头卡点要点、可直接落地复刻的同款拍摄脚本。
-6. 整体格式简洁，只输出可直接落地执行的内容，不要多余闲聊废话。`;
+**整段回复仅为 \`\`\`media-decompose JSON**（见 System 契约），要求：
 
-export const DEFAULT_IMAGE_DECOMPOSE_USER_PROMPT = `你作为资深视觉画面解析师，接下来我会上传一张静态画面（产品图/宣传图/氛围感图均可），对图片进行完整反推拆解，严格按以下要求输出：
+1. **JSON 根字段**：visualStyle、globalColorTone、cameraLanguageSummary、scenePrep（venue、fixedProps）、storyboardTable、narrativeLogic、beatPoints、replicableShootingScript。
+2. **storyboardTable 每镜英文字段**：shotNo、duration、shotSize、cameraMove、cameraAngle、composition、lightingSetup、toneContrast、visualContent、characterAction、expression、subtitle、**voiceover**、sfx、bgm、transition、editRhythm。
+3. **口播**：有旁白/配音时，每镜 **voiceover 必须填写原文**（与字幕相同时 subtitle 与 voiceover 可写同样内容）。
+4. **运镜 cameraMove**：固定机位/慢推/横移跟拍/手持微晃等可执行术语；禁止空话；本镜在动时禁止填「无」。
+5. **布光/影调**：lightingSetup、toneContrast 每镜必填；可见光影时禁止「无」。
+6. 禁止 Markdown 表格/前言/闲聊。`;
 
-1. 先拆解画面底层要素：画面主体、主体姿态、场景环境、空间透视、构图方式、镜头参数等效焦距、拍摄角度、布光方案（主光/辅光/轮廓光/环境光，光源方向、软硬、色温）、材质质感、色彩体系、画面氛围、画面细节瑕疵/修饰点。
-2. 基于拆解内容生成两套提示词：正向生成提示词（**必须**体现布光+色彩体系+画面氛围，可直接投喂 AI 绘图）、反向负面提示词；同时附带实拍复刻方案：机位摆放、灯光布置、道具搭配、相机参数参考。
-3. 格式条理清晰，全部内容直接落地可用，不要多余闲聊废话。`;
+export const DEFAULT_IMAGE_DECOMPOSE_USER_PROMPT = `你作为资深视觉画面解析师，接下来我会上传一张静态画面，请做完整反推拆解。
+
+**整段回复仅为 \`\`\`media-decompose JSON**（见 System 契约），要求：
+
+1. **elements** 对象：主体、姿态、场景、透视、构图、等效焦距、拍摄角度、lighting 子对象（主/辅/轮廓/环境光、方向、软硬、色温）、材质、色彩体系、氛围、细节。
+2. **positivePrompt**：须体现布光 + 色彩体系 + 画面氛围，可直接用于 AI 绘图。
+3. **negativePrompt**：反向负面提示词。
+4. **liveActionReplication**：机位、灯光、道具、相机参数。
+5. 禁止 Markdown 表格/前言/闲聊。`;
 
 /** 拆解输出未通过 Zod/光影质量校验时的重试 user 提示 */
 export function buildMediaDecomposeDecomposeRetryUserPrompt(reason: string): string {
-  return `上次输出未通过校验：${reason}
+  return appendMediaDecomposeJsonDeliveryFooter(`上次输出未通过校验：${reason}
 
-请**仅**重输出完整 \`\`\`media-decompose 围栏（可省略 Markdown 前言），并严格遵守：
+请**仅**重输出完整 \`\`\`media-decompose 围栏（无 Markdown），并严格遵守：
 1. 视频根字段须含 visualStyle、globalColorTone、cameraLanguageSummary、scenePrep；
-2. 分镜表 17 列须含 lightingSetup（布光）、toneContrast（影调）；可见光影时禁止「无」；
+2. storyboardTable 每镜须含 lightingSetup、toneContrast；可见光影时禁止「无」；
 3. cameraMove 用可执行运镜术语，禁止空话；
 4. visualContent 写画面主体与动作，光影写入专用列；
-5. 有口播时 voiceover 不可留空；
-6. 围栏语言标记必须是 media-decompose，禁止 json；禁止尾逗号与 JSON 注释。`;
+5. 有口播时 JSON 字段 voiceover 不可留空；
+6. 围栏语言标记必须是 media-decompose；禁止 json；禁止尾逗号与 JSON 注释。`);
 }

@@ -7,6 +7,7 @@ import {
 } from "@/lib/canvas/data/pro2-production-pack-standard";
 import { parseStoryboardRows } from "@/lib/canvas/parse-md-tables";
 import { migrateStoryPromptPackNode } from "@/lib/canvas/story-prompt-pack-migrate";
+import { STORY_PRO_HUB_LLM_SYSTEM } from "@/lib/canvas/story-pro-prompts";
 import {
   STORY_PRO2_PACK_PROMPT_VERSION,
   storyPro2GuFengHubPromptPack,
@@ -67,10 +68,31 @@ describe("pro2 production pack standard v8", () => {
     const data = migrated.data as {
       storyPro2PackPromptVersion?: number;
       promptStoryboard?: string;
+      outlineSystemPrompt?: string;
     };
     expect(data.storyPro2PackPromptVersion).toBe(STORY_PRO2_PACK_PROMPT_VERSION);
     expect(data.promptStoryboard).toContain("12–18 镜");
     expect(data.promptStoryboard).toContain("Pass1 禁止");
+  });
+
+  it("migrate replaces legacy GFM hybrid hub system with JSON-only", () => {
+    const migrated = migrateStoryPromptPackNode({
+      id: "hub-2",
+      type: "story-pro2-script-hub",
+      position: { x: 0, y: 0 },
+      data: {
+        storyPro2PackPromptVersion: STORY_PRO2_PACK_PROMPT_VERSION,
+        outlineSystemPrompt: STORY_PRO_HUB_LLM_SYSTEM,
+        promptOutline: storyPro2HubDefaultPromptPack().promptOutline,
+        promptStoryboard: storyPro2HubDefaultPromptPack().promptStoryboard,
+      },
+    });
+    const sys = String(
+      (migrated.data as { outlineSystemPrompt?: string }).outlineSystemPrompt ??
+        "",
+    );
+    expect(sys).toContain("json-only-v13");
+    expect(sys).not.toContain("GFM Markdown 制作包");
   });
 
   it("pack profile rules stack industrial + film_pull", () => {

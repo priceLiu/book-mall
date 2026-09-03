@@ -9,8 +9,11 @@ import {
   updateEcomMediaDecomposeProject,
 } from "@/lib/ecom/ecom-media-decompose-service";
 import type { MediaDecomposeProjectDto } from "@/lib/ecom/ecom-media-decompose-types";
-import type { MediaDecomposePatch } from "@/lib/ecom/ecom-media-decompose-structured";
-import { extractMediaDecomposePatch } from "@/lib/ecom/ecom-media-decompose-structured";
+import {
+  effectiveDecomposeVoiceover,
+  extractMediaDecomposePatch,
+  type MediaDecomposePatch,
+} from "@/lib/ecom/ecom-media-decompose-structured";
 import {
   appendReplicaReference,
   buildReplicaMentionCatalog,
@@ -260,7 +263,7 @@ export function buildReplicaShotsFromDecompose(
       refImageLabel: ref.label,
       sceneDescription: row.visualContent.trim() || row.characterAction.trim() || `镜头 ${index}`,
       videoPrompt: videoPrompt || row.visualContent.trim() || `镜头 ${index}`,
-      voiceover: row.voiceover.trim() || row.subtitle.trim(),
+      voiceover: effectiveDecomposeVoiceover(row),
       durationSec,
     };
   });

@@ -898,6 +898,9 @@ function parseTableModeChoices(text: string): SeedVideoAssistantChoice[] {
 
 function isAwaitingModeChoice(text: string): boolean {
   if (/请选择视频制作模式|请点选.*制作模式|确认制作模式/.test(text)) return true;
+  const patch = extractSeedVideoStructuredPatch(text);
+  if (patch?.step === "mode" || (patch?.modeOptions?.length ?? 0) >= 2) return true;
+  if (/```seed-video/.test(text) && /await_mode_choice|"step"\s*:\s*"mode"/.test(text)) return true;
   if (parseTableModeChoices(text).length >= 2) return true;
   if (parseTableCircledChoices(text, "mode").length >= 2) return true;
   return (
@@ -910,6 +913,9 @@ function isAwaitingModeChoice(text: string): boolean {
 
 function isAwaitingStyleChoice(text: string): boolean {
   if (/请选择成片风格/.test(text)) return true;
+  const patch = extractSeedVideoStructuredPatch(text);
+  if (patch?.step === "style" || (patch?.styleOptions?.length ?? 0) >= 2) return true;
+  if (/```seed-video/.test(text) && /await_style_choice|"step"\s*:\s*"style"/.test(text)) return true;
   if (/资深广告导演|请你挑选最终执行|套不同风格/.test(text) && /A方案|B方案|成片风格/.test(text)) {
     return true;
   }

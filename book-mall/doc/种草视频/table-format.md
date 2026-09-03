@@ -1,22 +1,20 @@
 # 种草视频 · 结构化交付契约（权威）
 
-> **系统只解析 ` ```seed-video ` JSON 围栏。** Markdown 仅供用户阅读，须与 JSON 一致；缺围栏或校验失败则无法点选、无法同步。  
+> **系统只解析 ` ```seed-video ` JSON 围栏。** **禁止** Markdown 分镜表/前言交付；展示由系统根据 JSON 渲染。缺围栏或校验失败则无法点选、无法同步。  
 > **所有 Skill 共用本契约**（`seed-grass`、`fashion-hit`、`digital-product`、`home-clothes-lounge-wear` 及后续扩展）：不因 Skill 改字段名、step 或枚举 id。
 
 ## 硬性规则（每条助手回复必须遵守）
 
-1. 回复**最末尾**必须有且仅有一个 ` ```seed-video ` 围栏，内含**合法 JSON**（无注释、无尾逗号）。
+1. 回复**整段**必须为且仅有一个 ` ```seed-video ` 围栏，内含**合法 JSON**（无注释、无尾逗号）。
 2. JSON 必须含 **`step`** 与 **`action`**，对应当前 workflow 步骤。
 3. 凡结构化数据（脚本、成片参数、逐镜表）**只写在 JSON**；禁止仅靠 Markdown 表格让系统猜结构。
 4. 固定枚举字段**禁止改名、禁止缺项**（见下表）。
 5. 每步**只输出当前步**字段；未涉及的键不要写。
-6. 用户界面隐藏围栏；**勿向用户解释 JSON**。
+6. 用户界面隐藏围栏并由 JSON 渲染可读内容；**勿向用户解释 JSON**。
 
-## 回复结构（固定顺序）
+## 回复结构
 
 ```
-[用户可读 Markdown — 标题/表格/结尾等待语]
-
 ```seed-video
 { ... }
 ```
@@ -42,7 +40,7 @@
 | `scripts[n].summary` | 点选卡片说明（建议首句口播） |
 | `scripts[n].rows[]` | 至少 1 行；见下 |
 
-### 分镜行 `scripts[].rows[]`（Step2 Markdown 列：分镜｜时长｜画面素材｜口播文案）
+### 分镜行 `scripts[].rows[]`（Step2）
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -66,7 +64,7 @@
 
 ## 表 A / 表 B（方案① / 方案② · JSON 字段）
 
-Markdown 列名固定；**同步时以 JSON 为准**。
+同步与展示**均以 JSON 为准**（系统渲染表格）。
 
 ### 表 A 镜头序列 `shotSequence[]`
 
@@ -99,13 +97,13 @@ Markdown 列名固定；**同步时以 JSON 为准**。
 
 ## 各步骤 JSON 必填摘要
 
-| 步骤 | step | action | 必填 JSON 字段 | Markdown 结尾 |
-|------|------|--------|----------------|---------------|
+| 步骤 | step | action | 必填 JSON 字段 | 系统渲染结尾语 |
+|------|------|--------|----------------|----------------|
 | 素材+三套脚本 | `scripts` | `await_script_choice` | `materialAnalysis` + `scripts`(×3) | 请选择脚本： |
 | 制作模式 | `mode` | `await_mode_choice` | `modeOptions`(×2) | 请选择视频制作模式： |
 | 成片风格 | `style` | `await_style_choice` | `styleOptions`(×2) | 请选择成片风格： |
 | 方案①成片参数 | `directPlan` | `await_direct_plan_confirm` | `directPlan.shotSequence` + `directPlan.configTable` | 请确认成片参数： |
-| 方案②分镜执行表 | `storyboard` | `await_storyboard_review` | `shotSequence`（无 videoPrompt 列亦可） | 分镜执行表确认语 |
+| 方案②分镜执行表 | `storyboard` | `await_storyboard_review` | `shotSequence` | 请确认分镜执行表： |
 | 方案②正式脚本 | `formalShots` | `await_formal_shots_confirm` | `shots`(×N) + `configTable` | 请确认逐镜参数表： |
 
 ### modeOptions（固定 2 项）

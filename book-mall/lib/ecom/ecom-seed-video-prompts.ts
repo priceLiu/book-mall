@@ -9,14 +9,15 @@ import {
 function buildSeedVideoJsonContract(skillKey: SeedVideoSkillKey): string {
   const styleExample = buildSeedVideoStyleChoiceJsonExample(skillKey);
   return `
-## 【强制】机器可读交付 · \`\`\`seed-video JSON
+## 【最高优先级】机器可读交付 · 仅 \`\`\`seed-video JSON
 
-**系统只解析 JSON，不解析 Markdown 表格结构。** 每条回复必须：
+**系统只解析 \`\`\`seed-video 围栏内的 JSON。** 禁止 Markdown 分镜表 / 前言 / 闲聊；用户可读内容由系统根据 JSON 渲染。
 
-1. 先写用户可读 Markdown（与 JSON 一致）；
-2. **最末尾**追加唯一围栏 \`\`\`seed-video（语言标记必须是 seed-video，禁止用 json/product-design 代替）；
-3. JSON 根对象必须含 **\`step\`** 与 **\`action\`**；
-4. 只写当前步骤字段；JSON 禁止注释。
+### 必须
+
+1. 回复**整段**仅为唯一围栏 \`\`\`seed-video（语言标记必须是 seed-video，禁止用 json/product-design 代替）；
+2. JSON 根对象必须含 **\`step\`** 与 **\`action\`**；
+3. 只写当前步骤字段；JSON 禁止注释与尾逗号。
 
 缺围栏、JSON 非法、必填字段缺失 → 用户无法点选、无法同步（视为失败输出）。
 
@@ -104,8 +105,6 @@ function buildSeedVideoJsonContract(skillKey: SeedVideoSkillKey): string {
 }
 \`\`\`
 
-Markdown 须对齐：素材解析表 + \`## 脚本一：{title}\` 等三标题 + 分镜表（列名固定：分镜｜时长｜画面素材｜口播文案）+ 结尾「请选择脚本：」。
-
 ### Step3 mode 示例
 
 \`\`\`seed-video
@@ -181,6 +180,21 @@ ${styleExample}
 `.trim();
 }
 
+/** 每条助手请求末尾追加（服务端强制） */
+export const SEED_VIDEO_JSON_DELIVERY_FOOTER = `
+---
+【交付格式 · 强制 · 最高优先级】
+1. 回复**整段**仅为唯一围栏 \`\`\`seed-video ，内含**完整合法 JSON**（含 step + action；无注释、无尾逗号）。
+2. **禁止** Markdown 分镜表、列表、前言或闲聊；展示由系统根据 JSON 渲染。
+3. 围栏语言标记必须是 \`seed-video\`，**禁止** \`json\` / \`media-decompose\` 等代替。`.trim();
+
+export function appendSeedVideoJsonDeliveryFooter(userText: string): string {
+  const base = userText.trim();
+  if (!base) return SEED_VIDEO_JSON_DELIVERY_FOOTER;
+  if (base.includes("【交付格式 · 强制")) return base;
+  return `${base}\n\n${SEED_VIDEO_JSON_DELIVERY_FOOTER}`;
+}
+
 export function buildSeedVideoSystemPrompt(opts: {
   skillKey?: SeedVideoSkillKey | string;
   targetDurationSec: number;
@@ -207,9 +221,9 @@ ${workflowBlock}
 ## 界面交互规则（摘要）
 
 - 用户**只能**点选卡片；禁止「请回复编号/请勾选」。
-- Step2 Markdown 分镜表列名**固定**：分镜｜时长｜画面素材｜口播文案（禁止别名）。
-- 方案①/②后续表 A：镜号｜时间｜参考素材｜画面设计｜口播文案（正式脚本加 AI视频生成提示词 列）。
-- 表 B 配置 7 行键名见 JSON configTable。
+- **整段回复仅为 \`\`\`seed-video JSON**；禁止 Markdown 分镜表/前言；展示由系统渲染。
+- Step2 \`scripts\` 每套 \`rows\` 字段：beatIndex / duration / refImageLabel / sceneDescription / voiceover。
+- 方案①/②：shotSequence 或 shots + configTable 七键。
 - 每步只输出当前步；禁止跳步、禁止重复已完成的「请选择脚本/制作模式」。
 - 用户点选「确认逐镜参数表，同步到中间工作区」后由系统本地同步；禁止再输出「同步成功」等二次确认。
 - 「导出提示词包 / 结束创作」等**仅**在成片渲染完成后出现。

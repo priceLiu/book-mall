@@ -65,14 +65,13 @@ export function extractFilmPullAnalyzePatch(text: string): FilmPullAnalyzePatch 
 
 export function toFilmPullDisplayMarkdown(fullText: string, streaming?: boolean): string {
   const patch = extractFilmPullAnalyzePatch(fullText);
-  if (patch) {
-    return stripFilmPullFence(fullText) || fullText.trim();
-  }
+  // 结构化结果由 FilmPullResultPanel 渲染；此处仅作流式/失败兜底
+  if (patch) return "";
   const stripped = stripFilmPullFence(fullText);
   const fenceStarted = /```film-pull/i.test(fullText);
   const fenceComplete = /```film-pull[\s\S]*?```/i.test(fullText);
   if (fenceStarted && (!fenceComplete || streaming)) {
-    return stripped || fullText.trim();
+    return stripped.trim() ? stripped : "正在生成结构化 JSON…";
   }
   return stripped || fullText.trim();
 }

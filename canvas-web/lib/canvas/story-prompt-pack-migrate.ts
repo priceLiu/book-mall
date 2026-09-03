@@ -2,9 +2,11 @@ import type { Pro2ScriptCategoryId } from "./pro2-script-category-presets";
 import { resolvePro2HubPromptPack } from "./pro2-script-category-presets";
 import type { CanvasFlowNode } from "./types";
 import {
+  isLegacyPro2HubOutlineSystemPrompt,
   isLegacyStoryPro2HubOutlinePrompt,
   isLegacyStoryPro2ScenePrompt,
   isLegacyStoryPro2StoryboardPrompt,
+  STORY_PRO2_HUB_LLM_SYSTEM,
   STORY_PRO2_PACK_PROMPT_VERSION,
 } from "./story-pro2-theme-outline-prompt";
 import {
@@ -14,12 +16,12 @@ import {
 } from "./story-pro-script-pack";
 import {
   isLegacyStoryProPlannerSystemPrompt,
-  STORY_PRO_HUB_LLM_SYSTEM,
   STORY_PRO_LEGACY_LLM_MAX_TOKENS,
   STORY_PRO_LLM_PARAMS_DEFAULT,
   storyProThemeSystemPromptForTemplate,
   type StoryProThemeSystemPromptTemplateId,
 } from "./story-pro-theme-templates";
+import { resolvePro2FullPackSystemPrompt } from "./pro2-gu-feng-full-pack-run";
 import {
   STORY_LEGACY_OUTLINE_USER_MARK,
   STORY_PACK_PROMPT_VERSION,
@@ -195,16 +197,12 @@ function patchPro2HubOutlineSystemPrompt(
   data: Record<string, unknown>,
 ): Record<string, unknown> | null {
   const sys = String(data.outlineSystemPrompt ?? "").trim();
-  if (
-    sys.includes("pro2-production-script") &&
-    sys.includes("tier 须为 pro")
-  ) {
-    return null;
-  }
-  if (!isLegacyStoryProPlannerSystemPrompt(sys) && sys.length > 120) {
-    return null;
-  }
-  return { ...data, outlineSystemPrompt: STORY_PRO_HUB_LLM_SYSTEM };
+  if (!isLegacyPro2HubOutlineSystemPrompt(sys)) return null;
+  const categoryId = data.scriptCategoryId as Pro2ScriptCategoryId | undefined;
+  return {
+    ...data,
+    outlineSystemPrompt: resolvePro2FullPackSystemPrompt(categoryId),
+  };
 }
 
 function patchPro2LlmPlannerMeta(

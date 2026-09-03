@@ -19,6 +19,7 @@ import {
   normalizeShotScale,
 } from "@/lib/ecom/ecom-film-pull-enums";
 import {
+  appendFilmPullJsonDeliveryFooter,
   buildFilmPullAnalyzeRetryUserPrompt,
   buildFilmPullAnalyzeSystemPrompt,
   buildFilmPullRenderScriptSystemPrompt,
@@ -159,7 +160,8 @@ export async function beginFilmPullAnalyzeRun(opts: {
   }
   assertStoryLlmVideoUnderstandingModel(modelKey, "专业拉片");
 
-  const userPrompt = opts.prompt?.trim() || FILM_PULL_DEFAULT_ANALYZE_USER_PROMPT;
+  const rawPrompt = opts.prompt?.trim() || FILM_PULL_DEFAULT_ANALYZE_USER_PROMPT;
+  const userPrompt = appendFilmPullJsonDeliveryFooter(rawPrompt);
   const runId = randomUUID();
   const startedAt = new Date().toISOString();
 
@@ -175,7 +177,7 @@ export async function beginFilmPullAnalyzeRun(opts: {
       runId,
       startedAt,
       chatModelKey: modelKey,
-      lastAnalyzePrompt: userPrompt,
+      lastAnalyzePrompt: rawPrompt,
       settings: project.settings,
       meta: project.meta,
     });

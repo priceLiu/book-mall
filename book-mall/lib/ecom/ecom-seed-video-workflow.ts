@@ -342,11 +342,11 @@ export function buildSeedVideoWorkflowContext(opts: {
 
   if (!scriptDone) {
     lines.push(
-      "下一步：输出素材解析 Markdown + 三套脚本 Markdown（## 脚本一/二/三：{title} + 分镜表），结尾「请选择脚本：」；**必须**在回复最末尾追加 ```seed-video JSON（step=scripts, action=await_script_choice, materialAnalysis + scripts 恰好 3 项）**；禁止输出制作模式。",
+      "下一步：仅输出 ```seed-video JSON（step=scripts, action=await_script_choice, materialAnalysis + scripts 恰好 3 项）**；禁止 Markdown；禁止输出制作模式。",
     );
   } else if (!modeDone) {
     lines.push(
-      "下一步：Markdown 结尾「请选择视频制作模式：」+ ```seed-video JSON（step=mode, action=await_mode_choice, modeOptions 恰好 2 项：direct/fine）**；禁止再次输出脚本。",
+      "下一步：仅输出 ```seed-video JSON（step=mode, action=await_mode_choice, modeOptions 恰好 2 项：direct/fine）**；禁止 Markdown；禁止再次输出脚本。",
     );
   } else if (workflow.productionMode === "fine" && !styleDone) {
     const scriptLabel = formatSeedVideoSelectedScriptLabel(
@@ -359,19 +359,19 @@ export function buildSeedVideoWorkflowContext(opts: {
       ? `styleOptions label 须为本 Skill：A「${stylePresets[0].label}」、B「${stylePresets[1].label}」（id 仍为 sweet-xhs / sharp-douyin）`
       : "styleOptions 恰好 2 项";
     lines.push(
-      `下一步（Step4）：资深广告导演口吻 + A/B 成片风格；Markdown 结尾「请选择成片风格：」+ \`\`\`seed-video JSON（step=style, action=await_style_choice, ${styleHint}）**；基于${scriptLabel}；禁止跳步。`,
+      `下一步（Step4）：资深广告导演口吻 + A/B 成片风格；仅输出 \`\`\`seed-video JSON（step=style, action=await_style_choice, ${styleHint}）**；基于${scriptLabel}；禁止 Markdown；禁止跳步。`,
     );
   } else if (workflow.productionMode === "direct") {
     lines.push(
-      "下一步：Markdown「直接连贯成片参数」+ ```seed-video JSON（step=directPlan, action=await_direct_plan_confirm, directPlan.shotSequence + directPlan.configTable 七键）**；结尾「请确认成片参数：」。",
+      "下一步：仅输出 ```seed-video JSON（step=directPlan, action=await_direct_plan_confirm, directPlan.shotSequence + directPlan.configTable 七键）**；禁止 Markdown。",
     );
   } else {
     lines.push(
-      "下一步：Markdown「正式脚本」+ ```seed-video JSON（step=formalShots, action=await_formal_shots_confirm, shots + configTable）**；结尾「请确认逐镜参数表：」。",
+      "下一步：仅输出 ```seed-video JSON（step=formalShots, action=await_formal_shots_confirm, shots + configTable）**；禁止 Markdown。",
     );
   }
 
-  lines.push("- **硬性**：每条回复末尾必须有 ```seed-video 围栏 JSON；系统只解析 JSON，不解析 Markdown 表格结构。");
+  lines.push("- **硬性**：每条回复整段仅为 ```seed-video 围栏 JSON；系统只解析 JSON，禁止 Markdown 交付。");
 
   if (modeDone) {
     lines.push("- **硬性**：用户已选制作模式，禁止再次输出「请选择视频制作模式」。");

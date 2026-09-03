@@ -65,9 +65,9 @@
 
 ## 规则
 
-1. 回复末尾唯一 ` ```film-pull ` 围栏
+1. 回复**整段**仅为唯一 ` ```film-pull ` 围栏（**禁止** Markdown 分镜表/前言）
 2. `shootingPrep` 四字段 + `shots` 每镜 **25 维 + cutDetail + audioInfo** 为结构化真源
-3. `narrativeLogic` / `beatPoints` / `replicableShootingScript` **必填**总结长文，**不得**包含 JSON 中不存在的信息
+3. `narrativeLogic` / `beatPoints` / `replicableShootingScript` 为 JSON **字符串字段**，**必填**总结长文，**不得**包含 JSON 中不存在的信息
 4. 无真实内容时少数列可填 `"无"`（见 skill.md）；`shootingPrep.venue`、多数镜 `sceneEnvironment`、非末镜 `cutDetail` **禁止**全片「无」
 
 ## 严格校验

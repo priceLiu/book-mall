@@ -6,7 +6,7 @@ import {
   isStoryLlmVisionModel,
 } from "@/lib/canvas/story-llm-vision-models";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
-import { buildSeedVideoSystemPrompt } from "@/lib/ecom/ecom-seed-video-prompts";
+import { buildSeedVideoSystemPrompt, appendSeedVideoJsonDeliveryFooter } from "@/lib/ecom/ecom-seed-video-prompts";
 import {
   collectSeedVideoPlanningTexts,
   parseSeedVideoTargetDurationFromText,
@@ -48,10 +48,10 @@ function buildGwTurns(
   imageUrls: string[],
 ): Array<{ role: "user" | "assistant" | "system"; content: string | CanvasChatContentPart[] }> {
   return turns.map((m, index) => {
-    const isLastUser =
-      m.role === "user" && index === turns.length - 1 && imageUrls.length > 0;
-    if (!isLastUser) {
-      return { role: m.role as "user" | "assistant", content: m.content };
+    const isLastUser = m.role === "user" && index === turns.length - 1;
+    const text = isLastUser ? appendSeedVideoJsonDeliveryFooter(m.content) : m.content;
+    if (!(isLastUser && imageUrls.length > 0)) {
+      return { role: m.role as "user" | "assistant", content: text };
     }
     const parts: CanvasChatContentPart[] = [
       ...imageUrls.map(
@@ -60,7 +60,7 @@ function buildGwTurns(
           image_url: { url },
         }),
       ),
-      { type: "text", text: m.content },
+      { type: "text", text },
     ];
     return { role: "user" as const, content: parts };
   });

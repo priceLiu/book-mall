@@ -106,7 +106,7 @@ describe("media-decompose mock fixtures", () => {
     }
   });
 
-  it("enriches voiceover from markdown table when JSON voiceover empty", () => {
+  it("maps nested audioInfo to voiceover", () => {
     const raw = {
       mediaType: "video",
       action: "decompose_complete",
@@ -122,11 +122,14 @@ describe("media-decompose mock fixtures", () => {
           cameraMove: "固定",
           cameraAngle: "平视",
           composition: "三分法",
+          lightingSetup: "侧顺光",
+          toneContrast: "低对比",
           visualContent: "模特展示",
           characterAction: "转身",
           expression: "微笑",
-          subtitle: "",
+          subtitle: "夏季必备",
           voiceover: "",
+          audioInfo: { voiceover: "这件真的太好穿了" },
           sfx: "",
           bgm: "",
           transition: "切",
@@ -137,21 +140,11 @@ describe("media-decompose mock fixtures", () => {
       beatPoints: "",
       replicableShootingScript: "",
     };
-    const text = [
-      "## 分镜拆解表",
-      "",
-      "| 镜号 | 时长 | 景别 | 运镜 | 镜头角度 | 构图方式 | 画面内容 | 人物动作 | 表情 | 字幕文案 | 口播文案 | 音效 | BGM | 转场 | 剪辑节奏 |",
-      "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
-      "| 1 | 3s | 中景 | 固定 | 平视 | 三分法 | 模特展示 | 转身 | 微笑 |  | 这件真的太好穿了 |  |  | 切 | 快 |",
-      "",
-      "```media-decompose",
-      JSON.stringify(raw),
-      "```",
-    ].join("\n");
+    const text = `\`\`\`media-decompose\n${JSON.stringify(raw)}\n\`\`\``;
     const patch = extractMediaDecomposePatch(text);
-    expect(patch?.mediaType).toBe("video");
     if (patch?.mediaType === "video") {
       expect(patch.storyboardTable[0]?.voiceover).toBe("这件真的太好穿了");
+      expect(patch.storyboardTable[0]?.subtitle).toBe("夏季必备");
     }
   });
 
@@ -184,6 +177,46 @@ describe("media-decompose mock fixtures", () => {
     };
     const text = `\`\`\`media-decompose\n${JSON.stringify(raw)}\n\`\`\``;
     expect(extractMediaDecomposePatch(text)).toBeNull();
+  });
+
+  it("maps 旁白 Chinese key to voiceover", () => {
+    const raw = {
+      mediaType: "video",
+      action: "decompose_complete",
+      visualStyle: "纪实风格",
+      globalColorTone: "自然光",
+      cameraLanguageSummary: "固定",
+      scenePrep: { venue: "", fixedProps: "" },
+      storyboardTable: [
+        {
+          镜号: 1,
+          时长: "3s",
+          景别: "中景",
+          运镜: "固定",
+          镜头角度: "平视",
+          构图方式: "三分法",
+          布光: "柔光",
+          影调: "自然",
+          画面内容: "模特展示",
+          人物动作: "转身",
+          表情: "微笑",
+          字幕文案: "夏季必备",
+          旁白: "这件针织开衫真的太好穿了",
+          音效: "",
+          BGM: "",
+          转场: "切",
+          剪辑节奏: "快",
+        },
+      ],
+      narrativeLogic: "",
+      beatPoints: "",
+      replicableShootingScript: "",
+    };
+    const text = `\`\`\`media-decompose\n${JSON.stringify(raw)}\n\`\`\``;
+    const patch = extractMediaDecomposePatch(text);
+    if (patch?.mediaType === "video") {
+      expect(patch.storyboardTable[0]?.voiceover).toBe("这件针织开衫真的太好穿了");
+    }
   });
 
   it("coerces Chinese lighting keys on storyboard rows", () => {

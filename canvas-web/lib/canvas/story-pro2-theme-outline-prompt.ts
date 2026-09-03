@@ -89,6 +89,22 @@ ${STORY_PRO2_PACK_PARSE_CONTRACT}
 
 ${STORY_PRO2_PACK_OUTPUT_RULES}`;
 
+/** Pro2 脚本 Hub · Gateway system（JSON-only v13 · 非古风默认） */
+export const STORY_PRO2_HUB_LLM_SYSTEM = `${STORY_PRO_PLANNER_SYSTEM_PREFIX}
+
+输出：只输出 \`\`\`pro2-production-script\` JSON 围栏（${STORY_PRO2_JSON_ONLY_MARKER}）；禁止 Markdown/GFM/说明文字；默认全部中文（占位符/HEX/技术缩写除外）。`;
+
+export function isLegacyPro2HubOutlineSystemPrompt(prompt: string): boolean {
+  const t = prompt.trim();
+  if (!t) return true;
+  if (t.includes("GFM Markdown 制作包")) return true;
+  if (t.includes("正文须为 GFM")) return true;
+  if (t.includes("tier 须为 pro") && !t.includes(STORY_PRO2_JSON_ONLY_MARKER)) {
+    return true;
+  }
+  return !t.includes(STORY_PRO2_JSON_ONLY_MARKER);
+}
+
 export const STORY_PRO2_THEME_OUTLINE_SYSTEM = `${STORY_PRO_PLANNER_SYSTEM_PREFIX}
 
 ${JSON_ONLY_TASK_HEADER}
