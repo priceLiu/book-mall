@@ -1,7 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
 import { Plus, Trash2 } from "lucide-react";
+
+import type { Pro2ShotAnalysis } from "@/lib/canvas/data/pro2-production-script-schema";
+import {
+  formatPro2ShotTimingLabel,
+  Pro2ShotAnalysisFold,
+  shotHasPro2Analysis,
+} from "@/components/canvas/pro2/pro2-shot-analysis-fold";
 
 import {
   formatStoryboardTableMarkdown,
@@ -40,6 +47,9 @@ type StoryStoryboardTableEditorProps = {
   onChange: (md: string) => void;
   /** Pro2 默认 v2 导演表；auto 按表头识别 v1/v2 */
   variant?: "v1" | "v2" | "auto";
+  /** 专业版 / 拉片：按镜号展示时段与折叠详情 */
+  shotAnalysisByIndex?: Record<number, Pro2ShotAnalysis | undefined>;
+  showIndustrialExtras?: boolean;
 };
 
 /** 专业版分镜编辑表（v2 导演表 10 列 · v1 兼容 9 列） */
@@ -47,6 +57,8 @@ export function StoryStoryboardTableEditor({
   value,
   onChange,
   variant = "auto",
+  shotAnalysisByIndex,
+  showIndustrialExtras = false,
 }: StoryStoryboardTableEditorProps) {
   const rows = useMemo(() => storyboardRowsFromMd(value), [value]);
   const useV2 = useMemo(() => {
@@ -58,6 +70,13 @@ export function StoryStoryboardTableEditor({
   const TABLE = storyMdTableWrapperClass(tableVariant);
   const TH = storyMdThClass(tableVariant);
   const TD = `${storyMdTdClass(tableVariant)} p-0`;
+  const showTiming =
+    showIndustrialExtras ||
+    Boolean(
+      shotAnalysisByIndex &&
+        Object.values(shotAnalysisByIndex).some((a) => shotHasPro2Analysis(a)),
+    );
+  const v2ColSpan = showTiming ? 12 : 11;
 
   const commit = (next: StoryboardTableRow[]) => {
     onChange(
@@ -156,6 +175,7 @@ export function StoryStoryboardTableEditor({
               <col className="min-w-[100px]" />
               <col className="min-w-[140px]" />
               <col className="w-[64px]" />
+              {showTiming ? <col className="min-w-[88px]" /> : null}
               <col className="min-w-[88px]" />
               <col className="min-w-[120px]" />
               <col className="w-9" />
@@ -170,6 +190,7 @@ export function StoryStoryboardTableEditor({
                 <th className={TH}>道具</th>
                 <th className={TH}>对白</th>
                 <th className={TH}>时长(秒)</th>
+                {showTiming ? <th className={TH}>时段</th> : null}
                 <th className={TH}>音效</th>
                 <th className={TH}>口型/配音备注</th>
                 <th className={`${TH} w-9 px-0`} aria-hidden />
@@ -177,7 +198,8 @@ export function StoryStoryboardTableEditor({
             </thead>
             <tbody>
               {rows.map((row, index) => (
-                <tr key={`${row.frameIndex}-${index}`}>
+                <Fragment key={`${row.frameIndex}-${index}`}>
+                <tr>
                   <td className={TD}>
                     <input
                       className={`${FIELD} px-2 py-2 text-center text-[15px] text-neutral-800`}
@@ -264,6 +286,15 @@ export function StoryStoryboardTableEditor({
                       }
                     />
                   </td>
+                  {showTiming ? (
+                    <td className={TD}>
+                      <p className="px-2 py-2 text-center text-[13px] text-neutral-500">
+                        {formatPro2ShotTimingLabel(
+                          shotAnalysisByIndex?.[row.frameIndex],
+                        ) || "—"}
+                      </p>
+                    </td>
+                  ) : null}
                   <td className={TD}>
                     <textarea
                       className={`${FIELD} px-3 py-2 text-[14px] leading-relaxed`}
@@ -295,6 +326,17 @@ export function StoryStoryboardTableEditor({
                     </button>
                   </td>
                 </tr>
+                {showTiming &&
+                shotHasPro2Analysis(shotAnalysisByIndex?.[row.frameIndex]) ? (
+                  <tr>
+                    <td colSpan={v2ColSpan} className={`${TD} px-3 py-1.5`}>
+                      <Pro2ShotAnalysisFold
+                        analysis={shotAnalysisByIndex?.[row.frameIndex]}
+                      />
+                    </td>
+                  </tr>
+                ) : null}
+                </Fragment>
               ))}
             </tbody>
           </table>

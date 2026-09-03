@@ -12,7 +12,12 @@ export function pro2DockRefImageCatalog(
   const seen = new Set<string>();
 
   for (const link of upstreamLinks) {
-    if (link.kind !== "image" || !link.previewUrl) continue;
+    if (
+      (link.kind !== "image" && link.kind !== "video") ||
+      !link.previewUrl
+    ) {
+      continue;
+    }
     if (seen.has(link.id)) continue;
     seen.add(link.id);
     out.push({ id: link.id, label: link.label, url: link.previewUrl });

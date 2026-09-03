@@ -3,8 +3,10 @@
  * book-mall/lib/canvas/pro2-production-script-structured.ts 须保持同步（runner 校验）
  */
 import {
+  normalizePro2CreativeShotDurations,
   pro2ProductionScriptPatchSchema,
   PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION,
+  resolvePro2ScriptSource,
   type Pro2ProductionScriptPatch,
   type Pro2ProductionScriptStep,
 } from "./data/pro2-production-script-schema";
@@ -114,6 +116,15 @@ export function coercePro2ProductionScriptEnvelopeForParse(
       shot && typeof shot === "object" && !Array.isArray(shot)
         ? coerceShotRecordForV2Parse(shot as Record<string, unknown>)
         : shot,
+    );
+    const source = resolvePro2ScriptSource(
+      patch.meta && typeof patch.meta === "object" && !Array.isArray(patch.meta)
+        ? (patch.meta as { source?: string; packProfile?: string })
+        : undefined,
+    );
+    patch.shots = normalizePro2CreativeShotDurations(
+      patch.shots as { durationSec?: number }[],
+      source,
     );
     o.schemaVersion = schemaVersion >= 2 ? schemaVersion : PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION;
   }

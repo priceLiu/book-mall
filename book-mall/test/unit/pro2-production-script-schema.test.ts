@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  listPro2IndustrialAnalysisIssues,
+  listPro2SemanticPatchIssues,
   listPro2ShotEntityLinkIssues,
   listShotPromptsPass2Issues,
   pro2ProductionScriptPatchSchema,
@@ -126,6 +128,54 @@ describe("book-mall pro2-production-script-schema mirror", () => {
       ],
     });
     expect(issues.some((i) => i.includes("lighting 须含场景 canonical name"))).toBe(true);
+  });
+
+  it("industrial storyboard fails without analysis", () => {
+    const issues = listPro2SemanticPatchIssues(
+      {
+        meta: { packProfile: "industrial", source: "creative" },
+        shots: [
+          {
+            index: 1,
+            shotSize: "特写",
+            lighting: "冷光压抑氛围测试用例",
+            cameraMove: "固定机位缓慢推近主体面部",
+            sceneDescription: "【起始】伏案。【结束】抬头",
+            dialogue: "—",
+            durationSec: 12,
+          },
+        ],
+      },
+      "storyboard",
+    );
+    expect(issues.some((i) => i.includes("缺少 analysis"))).toBe(true);
+  });
+
+  it("film_pull industrial rejects placeholder cut and missing camera", () => {
+    const issues = listPro2IndustrialAnalysisIssues(
+      [
+        {
+          index: 1,
+          dialogue: "—",
+          analysis: { cut: { detail: "无" } },
+        },
+        {
+          index: 2,
+          dialogue: "—",
+          analysis: {
+            cinematography: { cameraAngle: "平视", focalLength: "35mm" },
+            blocking: {
+              subjectBlocking: "角色居中",
+              foreMidBackLayer: "前中后",
+            },
+            cut: { detail: "硬切至特写" },
+          },
+        },
+      ],
+      "film_pull",
+    );
+    expect(issues.some((i) => i.includes("cameraAngle"))).toBe(true);
+    expect(issues.some((i) => i.includes("禁止「无」"))).toBe(true);
   });
 
   it("shot_prompts frame mode accepts patch without sceneDescription or videoPrompt", () => {

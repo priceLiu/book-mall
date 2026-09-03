@@ -648,7 +648,6 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
           <LibtvMediaGeneratingState
             variant="violet"
             className="z-10"
-            label="生成中…"
             cancelNodeId={id}
           />
         ) : null}

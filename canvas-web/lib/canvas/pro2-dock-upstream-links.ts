@@ -202,6 +202,19 @@ function linkFromSource(
     };
   }
 
+  if (source.type === "sbv1-video-engine" || source.type === "video-engine") {
+    const videoUrl = imageUrlFromNode(source);
+    if (videoUrl) {
+      return {
+        id: `up-video-${source.id}`,
+        kind: "video",
+        label: (source.data as { label?: string }).label?.trim() || "视频",
+        previewUrl: videoUrl,
+        sourceNodeId: source.id,
+      };
+    }
+  }
+
   const url = imageUrlFromNode(source);
   if (url) {
     const label =

@@ -4,11 +4,18 @@
  */
 import { z } from "zod";
 
-export const PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION = 2 as const;
+export const PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION = 3 as const;
+export const PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION_V2 = 2 as const;
 export const PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION_LEGACY = 1 as const;
-export const PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSIONS = [1, 2] as const;
+export const PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSIONS = [1, 2, 3] as const;
 export type Pro2ProductionScriptSchemaVersion =
   (typeof PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSIONS)[number];
+
+export const PRO2_PACK_PROFILES = ["director", "industrial"] as const;
+export type Pro2PackProfile = (typeof PRO2_PACK_PROFILES)[number];
+
+export const PRO2_SCRIPT_SOURCES = ["creative", "film_pull"] as const;
+export type Pro2ScriptSource = (typeof PRO2_SCRIPT_SOURCES)[number];
 
 export const PRO2_PRODUCTION_SCRIPT_TIERS = ["standard", "pro", "fine"] as const;
 export type Pro2ProductionScriptTier = (typeof PRO2_PRODUCTION_SCRIPT_TIERS)[number];
@@ -23,7 +30,7 @@ export const PRO2_PRODUCTION_SCRIPT_STEPS = [
 ] as const;
 export type Pro2ProductionScriptStep = (typeof PRO2_PRODUCTION_SCRIPT_STEPS)[number];
 
-const colorBlockSchema = z.object({
+const colorBlockObjectSchema = z.object({
   primary: z.string().min(1),
   secondary: z.string().optional(),
   highlight: z.string().optional(),
@@ -31,15 +38,49 @@ const colorBlockSchema = z.object({
   notes: z.string().optional(),
 });
 
+/** LLM 常把 colorBlock 写成「暖金侧逆光」字符串；收成 { primary }，空/占位则省略 */
+export function coercePro2ColorBlockInput(value: unknown): unknown {
+  if (value == null) return undefined;
+  if (typeof value === "string") {
+    const t = value.trim();
+    if (!t || t === "—" || t === "-" || t === "无") return undefined;
+    return { primary: t };
+  }
+  return value;
+}
+
+const colorBlockSchema = z.preprocess(
+  coercePro2ColorBlockInput,
+  colorBlockObjectSchema.optional(),
+);
+
 const paletteSchema = z.object({
   primary: z.string().optional(),
   highlight: z.string().optional(),
   shadow: z.string().optional(),
 });
 
+const shootingPrepSchema = z.object({
+  venue: z.string().min(1),
+  costume: z.string().min(1),
+  props: z.string().min(1),
+  equipment: z.string().min(1),
+});
+
 const metaSchema = z.object({
   title: z.string().optional(),
   synopsis: z.string().optional(),
+  packProfile: z.enum(PRO2_PACK_PROFILES).optional(),
+  source: z.enum(PRO2_SCRIPT_SOURCES).optional(),
+  totalDurationSec: z.number().positive().optional(),
+  editRhythmCurve: z.string().optional(),
+  shotSequenceLogic: z.string().optional(),
+  cameraLanguageSummary: z.string().optional(),
+  audioDesignLogic: z.string().optional(),
+  narrativeLogic: z.string().optional(),
+  beatPoints: z.string().optional(),
+  replicableShootingScript: z.string().optional(),
+  shootingPrep: shootingPrepSchema.optional(),
 });
 
 const visualStyleSchema = z.object({
@@ -67,7 +108,7 @@ const sceneSchema = z.object({
   environmentTimeMood: z.string().min(1),
   imagePrompt: z.string().min(1),
   negativePrompt: z.string().default(""),
-  colorBlock: colorBlockSchema.optional(),
+  colorBlock: colorBlockSchema,
   description: z.string().optional(),
   foreground: z.string().optional(),
   atmosphere: z.string().optional(),
@@ -91,6 +132,59 @@ const characterSchema = z.object({
   voiceRefNote: z.string().optional(),
 });
 
+const shotAnalysisSchema = z.object({
+  timing: z
+    .object({
+      startTimeSec: z.number().nonnegative(),
+      endTimeSec: z.number().positive(),
+    })
+    .optional(),
+  cut: z
+    .object({
+      transition: z.string().optional(),
+      detail: z.string().optional(),
+    })
+    .optional(),
+  cinematography: z
+    .object({
+      cameraAngle: z.string().optional(),
+      focalLength: z.string().optional(),
+      composition: z.string().optional(),
+    })
+    .optional(),
+  blocking: z
+    .object({
+      subjectBlocking: z.string().optional(),
+      sightDirection: z.string().optional(),
+      foreMidBackLayer: z.string().optional(),
+      sceneEnvironment: z.string().optional(),
+      dynamicProps: z.string().optional(),
+    })
+    .optional(),
+  look: z
+    .object({
+      lightingSetup: z.string().optional(),
+      toneContrast: z.string().optional(),
+    })
+    .optional(),
+  narrative: z
+    .object({
+      function: z.string().optional(),
+      rhythmWeight: z.string().optional(),
+      visualMetaphor: z.string().optional(),
+    })
+    .optional(),
+  audioInfo: z
+    .object({
+      scriptSubtitle: z.string().optional(),
+      vocalEmotion: z.string().optional(),
+      ambientSound: z.string().optional(),
+      fxAndBgm: z.string().optional(),
+    })
+    .optional(),
+  analysisDraftPrompt: z.string().optional(),
+});
+
 const shotSchema = z.object({
   index: z.number().int().positive(),
   shotSize: z.string().optional(),
@@ -109,8 +203,9 @@ const shotSchema = z.object({
   propIds: z.array(z.string()).optional(),
   sceneId: z.string().optional(),
   characterIds: z.array(z.string()).optional(),
-  colorBlock: colorBlockSchema.optional(),
+  colorBlock: colorBlockSchema,
   lighting: z.string().optional(),
+  analysis: shotAnalysisSchema.optional(),
 });
 
 const handoffSchema = z.object({
@@ -145,6 +240,7 @@ const audioSchema = z.object({
 
 const schemaVersionLiteral = z.union([
   z.literal(PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION_LEGACY),
+  z.literal(PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION_V2),
   z.literal(PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION),
 ]);
 
@@ -163,6 +259,7 @@ export const pro2ProductionScriptSchema = z.object({
 });
 
 export type Pro2ProductionScript = z.infer<typeof pro2ProductionScriptSchema>;
+export type Pro2ShotAnalysis = z.infer<typeof shotAnalysisSchema>;
 
 export const pro2ProductionScriptPatchBodySchema = z.object({
   meta: metaSchema.optional(),
@@ -184,7 +281,27 @@ export type Pro2ProductionScriptPatchBody = z.infer<
 export function isPro2ProductionScriptV2(
   schemaVersion: number | undefined,
 ): boolean {
-  return schemaVersion === PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION;
+  return (
+    schemaVersion === PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION_V2 ||
+    schemaVersion === PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION
+  );
+}
+
+export function resolvePro2PackProfile(
+  meta?: { packProfile?: string } | null,
+): Pro2PackProfile {
+  return meta?.packProfile === "industrial" ? "industrial" : "director";
+}
+
+export function resolvePro2ScriptSource(
+  meta?: { source?: string } | null,
+): Pro2ScriptSource {
+  return meta?.source === "film_pull" ? "film_pull" : "creative";
+}
+
+function isPro2AnalysisPlaceholder(value: string | undefined | null): boolean {
+  const t = value?.trim() ?? "";
+  return !t || t === "无" || t === "—" || t === "-";
 }
 
 /** Hub 展示/渲染 · 旧节点缺 schemaVersion 时按 v2 字段推断 */
@@ -402,19 +519,163 @@ function validateFullPackBlocks(
 export function listPro2FullPackPatchIssues(
   patch: Pro2ProductionScriptPatchBody,
 ): string[] {
-  const required: Array<keyof Pro2ProductionScriptPatchBody> = [
-    "visualStyle",
-    "coreConflict",
-    "scenes",
-    "characters",
-    "shots",
-    "handoff",
-  ];
+  const source = resolvePro2ScriptSource(patch.meta);
+  const required: Array<keyof Pro2ProductionScriptPatchBody> =
+    source === "film_pull"
+      ? ["shots"]
+      : [
+          "visualStyle",
+          "coreConflict",
+          "scenes",
+          "characters",
+          "shots",
+          "handoff",
+        ];
   const issues: string[] = [];
   for (const key of required) {
     const val = patch[key];
     if (val == null || (Array.isArray(val) && val.length === 0)) {
       issues.push(`full_pack 须含非空 ${key}`);
+    }
+  }
+  return issues;
+}
+
+export function listPro2CreativeDurationIssues(
+  shots: Pro2ProductionScriptPatchBody["shots"] | undefined,
+  source: Pro2ScriptSource = "creative",
+  _packProfile: Pro2PackProfile = "director",
+): string[] {
+  // 简版 / 专业版 creative 均强制；仅 film_pull 跟片时长豁免
+  if (source === "film_pull") return [];
+  if (!shots?.length) return [];
+  const issues: string[] = [];
+  if (shots.length < 12 || shots.length > 18) {
+    issues.push(`creative 须 12–18 镜，当前 ${shots.length} 镜`);
+  }
+  for (const s of shots) {
+    const d = s.durationSec ?? 0;
+    if (d < 10 || d > 15 || !Number.isInteger(d)) {
+      issues.push(
+        `分镜 ${s.index} durationSec 须为 10–15 整数，当前 ${s.durationSec}`,
+      );
+      break;
+    }
+  }
+  const total = shots.reduce((sum, s) => sum + (s.durationSec ?? 0), 0);
+  if (total < 175 || total > 185) {
+    issues.push(`creative 总时长须 175–185 秒，当前 ${total}`);
+  }
+  return issues;
+}
+
+/**
+ * creative · 镜数已在 12–18 时，把各镜 durationSec 钳到 10–15 并微调合计至 175–185。
+ * 镜数不对则原样返回（仍走校验失败 → 提示词重试）。
+ */
+export function normalizePro2CreativeShotDurations<
+  T extends { durationSec?: number },
+>(shots: T[], source: Pro2ScriptSource = "creative"): T[] {
+  if (source === "film_pull") return shots;
+  if (shots.length < 12 || shots.length > 18) return shots;
+
+  const next = shots.map((s) => {
+    let d = Number(s.durationSec);
+    if (!Number.isFinite(d) || d <= 0) d = 12;
+    d = Math.round(d);
+    if (d < 10) d = 10;
+    if (d > 15) d = 15;
+    return { ...s, durationSec: d };
+  });
+
+  let total = next.reduce((sum, s) => sum + (s.durationSec ?? 0), 0);
+  let guard = 0;
+  while ((total < 175 || total > 185) && guard < 500) {
+    guard += 1;
+    if (total < 175) {
+      const i = next.findIndex((s) => (s.durationSec ?? 0) < 15);
+      if (i < 0) break;
+      const cur = next[i]!;
+      next[i] = { ...cur, durationSec: (cur.durationSec ?? 0) + 1 };
+      total += 1;
+    } else {
+      const i = next.findIndex((s) => (s.durationSec ?? 0) > 10);
+      if (i < 0) break;
+      const cur = next[i]!;
+      next[i] = { ...cur, durationSec: (cur.durationSec ?? 0) - 1 };
+      total -= 1;
+    }
+  }
+  return next;
+}
+
+export function listPro2IndustrialAnalysisIssues(
+  shots: Pro2ProductionScriptPatchBody["shots"] | undefined,
+  source: Pro2ScriptSource = "creative",
+  totalDurationSec?: number,
+): string[] {
+  if (!shots?.length) return ["industrial 须含 shots"];
+  const issues: string[] = [];
+  let sceneEmpty = 0;
+  for (const [i, shot] of shots.entries()) {
+    const label = `分镜 ${shot.index}`;
+    const a = shot.analysis;
+    if (!a) {
+      issues.push(`${label} 缺少 analysis`);
+      continue;
+    }
+    if (isPro2AnalysisPlaceholder(a.cinematography?.cameraAngle)) {
+      issues.push(`${label} analysis.cinematography.cameraAngle 必填`);
+    }
+    if (isPro2AnalysisPlaceholder(a.cinematography?.focalLength)) {
+      issues.push(`${label} analysis.cinematography.focalLength 必填`);
+    }
+    if (isPro2AnalysisPlaceholder(a.blocking?.subjectBlocking)) {
+      issues.push(`${label} analysis.blocking.subjectBlocking 必填`);
+    }
+    if (isPro2AnalysisPlaceholder(a.blocking?.foreMidBackLayer)) {
+      issues.push(`${label} analysis.blocking.foreMidBackLayer 必填`);
+    }
+    if (isPro2AnalysisPlaceholder(a.blocking?.sceneEnvironment)) {
+      sceneEmpty += 1;
+    }
+    const isLast = i === shots.length - 1;
+    if (
+      !isLast &&
+      isPro2AnalysisPlaceholder(a.cut?.detail) &&
+      (source === "film_pull" || shots.length > 1)
+    ) {
+      issues.push(`${label} analysis.cut.detail 禁止「无」`);
+    }
+    if (shot.frameImagePrompt?.trim() || shot.videoPrompt?.trim()) {
+      issues.push(`${label} Pass1 禁止 frameImagePrompt / videoPrompt`);
+    }
+  }
+  if (source === "film_pull") {
+    if (sceneEmpty > shots.length / 2) {
+      issues.push("超过半数镜头的 sceneEnvironment 仍为「无」");
+    }
+    const timed = shots.filter((s) => s.analysis?.timing);
+    if (timed.length === shots.length) {
+      for (let i = 1; i < shots.length; i++) {
+        const prev = shots[i - 1]!.analysis!.timing!;
+        const cur = shots[i]!.analysis!.timing!;
+        if (cur.startTimeSec + 0.05 < prev.endTimeSec) {
+          issues.push(
+            `分镜 ${shots[i]!.index} 入点早于上一镜出点（时间轴须连续）`,
+          );
+        }
+      }
+    }
+    const sumDur = shots.reduce((sum, s) => sum + (s.durationSec ?? 0), 0);
+    if (
+      typeof totalDurationSec === "number" &&
+      Number.isFinite(totalDurationSec) &&
+      Math.abs(sumDur - totalDurationSec) > 0.5
+    ) {
+      issues.push(
+        `film_pull 各镜时长之和 ${sumDur} 须约等于 meta.totalDurationSec ${totalDurationSec}`,
+      );
     }
   }
   return issues;
@@ -648,14 +909,38 @@ export function listPro2SemanticPatchIssues(
   step: Pro2ProductionScriptStep,
 ): string[] {
   const issues: string[] = [];
-  if (step === "full_pack" || step === "character" || step === "outline") {
+  const source = resolvePro2ScriptSource(patch.meta);
+  const profile = resolvePro2PackProfile(patch.meta);
+  if (
+    source !== "film_pull" &&
+    (step === "full_pack" || step === "character" || step === "outline")
+  ) {
     issues.push(...listPro2CharacterPatchIssues(patch.characters));
   }
   if (step === "full_pack" || step === "storyboard") {
     issues.push(...listPro2ShotDialogueIssues(patch.shots));
-    issues.push(...listPro2ShotEntityLinkIssues(patch));
+    if (source !== "film_pull") {
+      issues.push(...listPro2ShotEntityLinkIssues(patch));
+    }
+    if (step === "full_pack" || step === "storyboard") {
+      issues.push(
+        ...listPro2CreativeDurationIssues(patch.shots, source, profile),
+      );
+    }
+    if (profile === "industrial") {
+      issues.push(
+        ...listPro2IndustrialAnalysisIssues(
+          patch.shots,
+          source,
+          patch.meta?.totalDurationSec,
+        ),
+      );
+    }
   }
-  if (step === "full_pack" || step === "scene") {
+  if (
+    source !== "film_pull" &&
+    (step === "full_pack" || step === "scene")
+  ) {
     issues.push(...listPro2AssetImagePromptIssues(patch));
   }
   return issues;

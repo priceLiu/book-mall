@@ -32,6 +32,11 @@ const liveActionReplicationSchema = z.object({
   cameraParams: z.string().default(""),
 });
 
+const scenePrepSchema = z.object({
+  venue: z.string().default(""),
+  fixedProps: z.string().default(""),
+});
+
 const storyboardRowSchema = z.object({
   shotNo: z.number().int().positive(),
   duration: z.string().default(""),
@@ -39,6 +44,8 @@ const storyboardRowSchema = z.object({
   cameraMove: z.string().default(""),
   cameraAngle: z.string().default(""),
   composition: z.string().default(""),
+  lightingSetup: z.string().default(""),
+  toneContrast: z.string().default(""),
   visualContent: z.string().default(""),
   characterAction: z.string().default(""),
   expression: z.string().default(""),
@@ -53,6 +60,10 @@ const storyboardRowSchema = z.object({
 const videoPatchSchema = z.object({
   mediaType: z.literal("video"),
   action: z.literal("decompose_complete"),
+  visualStyle: z.string().default(""),
+  globalColorTone: z.string().default(""),
+  cameraLanguageSummary: z.string().default(""),
+  scenePrep: scenePrepSchema.default({ venue: "", fixedProps: "" }),
   storyboardTable: z.array(storyboardRowSchema).min(1),
   narrativeLogic: z.string().default(""),
   beatPoints: z.string().default(""),
@@ -74,6 +85,44 @@ export const mediaDecomposePatchSchema = z.discriminatedUnion("mediaType", [
 ]);
 
 export type MediaDecomposePatch = z.infer<typeof mediaDecomposePatchSchema>;
+
+function isVisualPlaceholderText(value: string): boolean {
+  const t = value.trim();
+  return !t || t === "无" || t === "—" || t === "-";
+}
+
+function coerceScenePrep(raw: unknown): { venue: string; fixedProps: string } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { venue: "", fixedProps: "" };
+  }
+  const o = raw as Record<string, unknown>;
+  return {
+    venue: pickString(o, ["venue", "场地", "场景", "拍摄场地"]),
+    fixedProps: pickString(o, ["fixedProps", "固定道具", "props", "道具"]),
+  };
+}
+
+/** 视频拆解光影/色调质量校验；失败返回人类可读原因 */
+export function validateMediaDecomposeVisualQuality(patch: MediaDecomposePatch): string | null {
+  if (patch.mediaType !== "video") return null;
+
+  const styleEmpty = isVisualPlaceholderText(patch.visualStyle);
+  const toneEmpty = isVisualPlaceholderText(patch.globalColorTone);
+  if (styleEmpty && toneEmpty) {
+    return "缺少全片 visualStyle 与 globalColorTone（至少填写一项全片视觉风格或色调基调）";
+  }
+
+  if (patch.storyboardTable.length >= 2) {
+    const weakLighting = patch.storyboardTable.filter((row) =>
+      isVisualPlaceholderText(row.lightingSetup),
+    ).length;
+    if (weakLighting > patch.storyboardTable.length / 2) {
+      return "超过半数镜头的 lightingSetup（布光）为空或为「无」；可见光影时须填写可观测布光描述";
+    }
+  }
+
+  return null;
+}
 
 function pickString(obj: Record<string, unknown>, keys: string[]): string {
   for (const key of keys) {
@@ -227,6 +276,22 @@ function coerceStoryboardRow(raw: unknown, index: number): Record<string, unknow
     cameraMove: pickString(row, ["cameraMove", "运镜", "camera_move", "镜头运动"]),
     cameraAngle: pickString(row, ["cameraAngle", "镜头角度", "camera_angle"]),
     composition: pickString(row, ["composition", "构图方式", "构图"]),
+    lightingSetup: pickString(row, [
+      "lightingSetup",
+      "布光",
+      "光影",
+      "灯光",
+      "lighting",
+      "lighting_setup",
+    ]),
+    toneContrast: pickString(row, [
+      "toneContrast",
+      "影调",
+      "色调对比",
+      "色调",
+      "tone_contrast",
+      "colorTone",
+    ]),
     visualContent: pickString(row, ["visualContent", "画面内容", "visual_content", "画面"]),
     characterAction: pickString(row, ["characterAction", "人物动作", "character_action", "动作"]),
     expression: pickString(row, ["expression", "表情"]),
@@ -262,6 +327,21 @@ export function coerceMediaDecomposePayload(raw: unknown): unknown | null {
   return {
     mediaType: "video",
     action: "decompose_complete",
+    visualStyle: pickString(o, ["visualStyle", "全片视觉风格", "视觉风格", "artStyle", "风格"]),
+    globalColorTone: pickString(o, [
+      "globalColorTone",
+      "全片色调",
+      "色调基调",
+      "globalColor",
+      "colorTone",
+    ]),
+    cameraLanguageSummary: pickString(o, [
+      "cameraLanguageSummary",
+      "运镜总述",
+      "全片运镜",
+      "cameraLanguage",
+    ]),
+    scenePrep: coerceScenePrep(o.scenePrep ?? o.场地准备 ?? o.shootingPrep),
     storyboardTable,
     narrativeLogic: pickString(o, ["narrativeLogic", "整体叙事逻辑", "narrative"]),
     beatPoints: pickString(o, ["beatPoints", "镜头卡点要点", "beat"]),
@@ -344,14 +424,22 @@ function extractFenceBody(text: string): string | null {
   return null;
 }
 
+function parseMediaDecomposePatchFromParsed(parsed: unknown, text: string): MediaDecomposePatch | null {
+  const coerced = coerceMediaDecomposePayload(parsed) ?? parsed;
+  const safe = mediaDecomposePatchSchema.safeParse(coerced);
+  if (!safe.success) return null;
+  const qualityError = validateMediaDecomposeVisualQuality(safe.data);
+  if (qualityError) return null;
+  return finalizeMediaDecomposePatch(text, safe.data);
+}
+
 export function extractMediaDecomposePatch(text: string): MediaDecomposePatch | null {
   const body = extractFenceBody(text);
   if (body) {
     const parsed = tryParseJson(body);
     if (parsed) {
-      const coerced = coerceMediaDecomposePayload(parsed) ?? parsed;
-      const safe = mediaDecomposePatchSchema.safeParse(coerced);
-      if (safe.success) return finalizeMediaDecomposePatch(text, safe.data);
+      const patch = parseMediaDecomposePatchFromParsed(parsed, text);
+      if (patch) return patch;
     }
   }
 
@@ -361,13 +449,23 @@ export function extractMediaDecomposePatch(text: string): MediaDecomposePatch | 
     if (end > start) {
       const parsed = tryParseJson(text.slice(start, end + 1));
       if (parsed) {
-        const coerced = coerceMediaDecomposePayload(parsed) ?? parsed;
-        const safe = mediaDecomposePatchSchema.safeParse(coerced);
-        if (safe.success) return finalizeMediaDecomposePatch(text, safe.data);
+        const patch = parseMediaDecomposePatchFromParsed(parsed, text);
+        if (patch) return patch;
       }
     }
   }
   return null;
+}
+
+function resolveVisualQualityParseError(text: string): string | null {
+  const body = extractFenceBody(text);
+  if (!body) return null;
+  const parsed = tryParseJson(body);
+  if (!parsed) return null;
+  const coerced = coerceMediaDecomposePayload(parsed) ?? parsed;
+  const safe = mediaDecomposePatchSchema.safeParse(coerced);
+  if (!safe.success) return null;
+  return validateMediaDecomposeVisualQuality(safe.data);
 }
 
 export function resolveMediaDecomposeParseError(fullText: string): string | null {
@@ -378,6 +476,10 @@ export function resolveMediaDecomposeParseError(fullText: string): string | null
   if (patch) return null;
   if (fenceStarted && !fenceComplete) return null;
   if (fenceComplete) {
+    const visualError = resolveVisualQualityParseError(fullText);
+    if (visualError) {
+      return `结构化 JSON 光影/色调质量未达标：${visualError}。请按 table-format.md 重新输出 \`\`\`media-decompose 围栏。`;
+    }
     return "结构化 JSON 解析失败或未通过校验，请按 table-format.md 重新输出 ```media-decompose 围栏。";
   }
   return "回复末尾缺少 ```media-decompose JSON 围栏。";
@@ -414,14 +516,20 @@ function escCell(s: string): string {
 }
 
 function formatVideoDecomposeMarkdown(patch: Extract<MediaDecomposePatch, { mediaType: "video" }>): string {
-  const lines: string[] = ["## 分镜拆解表", ""];
+  const lines: string[] = ["## 全片视觉", ""];
+  if (patch.visualStyle.trim()) lines.push(`- **视觉风格**：${patch.visualStyle}`);
+  if (patch.globalColorTone.trim()) lines.push(`- **色调基调**：${patch.globalColorTone}`);
+  if (patch.cameraLanguageSummary.trim()) lines.push(`- **运镜总述**：${patch.cameraLanguageSummary}`);
+  if (patch.scenePrep.venue.trim()) lines.push(`- **场地**：${patch.scenePrep.venue}`);
+  if (patch.scenePrep.fixedProps.trim()) lines.push(`- **固定道具**：${patch.scenePrep.fixedProps}`);
+  lines.push("", "## 分镜拆解表", "");
   lines.push(
-    "| 镜号 | 时长 | 景别 | 运镜 | 镜头角度 | 构图方式 | 画面内容 | 人物动作 | 表情 | 字幕文案 | 口播文案 | 音效 | BGM | 转场 | 剪辑节奏 |",
+    "| 镜号 | 时长 | 景别 | 运镜 | 镜头角度 | 构图方式 | 布光 | 影调 | 画面内容 | 人物动作 | 表情 | 字幕文案 | 口播文案 | 音效 | BGM | 转场 | 剪辑节奏 |",
   );
-  lines.push("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
+  lines.push("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const row of patch.storyboardTable) {
     lines.push(
-      `| ${row.shotNo} | ${escCell(row.duration)} | ${escCell(row.shotSize)} | ${escCell(row.cameraMove)} | ${escCell(row.cameraAngle)} | ${escCell(row.composition)} | ${escCell(row.visualContent)} | ${escCell(row.characterAction)} | ${escCell(row.expression)} | ${escCell(row.subtitle)} | ${escCell(row.voiceover)} | ${escCell(row.sfx)} | ${escCell(row.bgm)} | ${escCell(row.transition)} | ${escCell(row.editRhythm)} |`,
+      `| ${row.shotNo} | ${escCell(row.duration)} | ${escCell(row.shotSize)} | ${escCell(row.cameraMove)} | ${escCell(row.cameraAngle)} | ${escCell(row.composition)} | ${escCell(row.lightingSetup)} | ${escCell(row.toneContrast)} | ${escCell(row.visualContent)} | ${escCell(row.characterAction)} | ${escCell(row.expression)} | ${escCell(row.subtitle)} | ${escCell(row.voiceover)} | ${escCell(row.sfx)} | ${escCell(row.bgm)} | ${escCell(row.transition)} | ${escCell(row.editRhythm)} |`,
     );
   }
   lines.push("", "## 整体叙事逻辑拆解", "", patch.narrativeLogic, "", "## 镜头卡点要点", "", patch.beatPoints, "", "## 可复刻拍摄脚本", "", patch.replicableShootingScript);

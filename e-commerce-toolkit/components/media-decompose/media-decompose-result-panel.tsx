@@ -18,8 +18,32 @@ type Props = {
 
 export function MediaDecomposeResultPanel({ structured }: Props) {
   if (structured.mediaType === "video") {
+    const scenePrep = structured.scenePrep ?? { venue: "", fixedProps: "" };
     return (
       <div className="space-y-4">
+        {(structured.visualStyle?.trim() ||
+          structured.globalColorTone?.trim() ||
+          structured.cameraLanguageSummary?.trim() ||
+          scenePrep.venue.trim() ||
+          scenePrep.fixedProps.trim()) && (
+          <Section title="全片视觉">
+            <ul className="list-inside list-disc space-y-1 text-sm text-[#424245]">
+              {structured.visualStyle?.trim() ? (
+                <li>视觉风格：{structured.visualStyle}</li>
+              ) : null}
+              {structured.globalColorTone?.trim() ? (
+                <li>色调基调：{structured.globalColorTone}</li>
+              ) : null}
+              {structured.cameraLanguageSummary?.trim() ? (
+                <li>运镜总述：{structured.cameraLanguageSummary}</li>
+              ) : null}
+              {scenePrep.venue.trim() ? <li>场地：{scenePrep.venue}</li> : null}
+              {scenePrep.fixedProps.trim() ? (
+                <li>固定道具：{scenePrep.fixedProps}</li>
+              ) : null}
+            </ul>
+          </Section>
+        )}
         <div className={ecomDataTableWrapClass}>
           <table className={`min-w-full ${ecomDataTableClass}`}>
             <thead>
@@ -28,9 +52,11 @@ export function MediaDecomposeResultPanel({ structured }: Props) {
                   "镜号",
                   "时长",
                   "景别",
-                  "运镜",
+                  "运镜/相机运动",
                   "镜头角度",
                   "构图",
+                  "布光",
+                  "影调",
                   "画面内容",
                   "人物动作",
                   "表情",
@@ -56,6 +82,8 @@ export function MediaDecomposeResultPanel({ structured }: Props) {
                   <td className={ecomDataTableTdClass}>{row.cameraMove}</td>
                   <td className={ecomDataTableTdClass}>{row.cameraAngle}</td>
                   <td className={ecomDataTableTdClass}>{row.composition}</td>
+                  <td className={ecomDataTableTdClass}>{row.lightingSetup || "—"}</td>
+                  <td className={ecomDataTableTdClass}>{row.toneContrast || "—"}</td>
                   <td className={ecomDataTableTdClass}>{row.visualContent}</td>
                   <td className={ecomDataTableTdClass}>{row.characterAction}</td>
                   <td className={ecomDataTableTdClass}>{row.expression}</td>

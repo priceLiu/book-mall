@@ -912,6 +912,111 @@ const SEED_ITEMS: {
     sortOrder: 687,
     listKind: "PENDING",
   },
+  // —— 剧本制作档 × 专业拉片统一（见 docs/Pro2拉片整合-schema-v3.md）——
+  {
+    title: "SP-200 制作档统一 · 总规格",
+    description:
+      "同一份 pro2-production-script：简版 director / 专业版 industrial；Hub 原生拉片。题材芯片与制作档正交。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 700,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-201 schema v3 packProfile/source/analysis",
+    description:
+      "schemaVersion=3；meta.packProfile、meta.source、shots[].analysis；canvas-web 与 book-mall 镜像同步。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 701,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-202 校验分档 + LLM 重试",
+    description:
+      "director/industrial × creative/film_pull 语义校验；无围栏/残缺 JSON 失败；最多 5 次重试；禁止 coerce「无」当成功。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 702,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-203 简版/专业版 Pass1 提示词 pack",
+    description:
+      "DIRECTOR / INDUSTRIAL / FILM_PULL 规则常量叠加题材 pack；禁止组件内硬编码提示词。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 703,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-204 Pass2 吃 analysis",
+    description:
+      "专业版 Pass2 注入 analysis；禁止整段复制 analysisDraftPrompt 为最终 Prompt。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 704,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-205 Dock 制作档选择",
+    description:
+      "题材芯片旁新增简版/专业版；写入 hub.packProfile；默认简版。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 705,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-206 Hub 发送专业版拉片",
+    description:
+      "专业版 + 上游视频 + Dock「拉片」走 Hub LLM video_url；简版拉片意图拦截。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 706,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-207 Hub 左侧 + 视频接线",
+    description:
+      "确认 spawn/连线/上传粘贴拖入；视频节点只作媒体源。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 707,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-208 Hub 弹表时段列与拉片详情",
+    description:
+      "导演表保持 12 列；industrial 或 analysis 非空时时段列 + 折叠详情。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 708,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-209 adapter 完整映射",
+    description:
+      "film-pull→v3 保留切点/时间码/机位焦段；aiVisualPrompt 只进 analysisDraftPrompt。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 709,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-210 退役视频节点拉片 Dock 主控制面",
+    description:
+      "FilmPullVideoDock 不再作为拉片控制台，引导至剧本 Dock 专业版发送。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 710,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-211 拉片文档 90s 与中文示例",
+    description:
+      "requirements/solution/table-format 与 FILM_PULL_V1_MAX_SEC=90 对齐；aiVisualPrompt 中文示例。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 711,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-212 单测 schema/校验/adapter/意图",
+    description:
+      "industrial 缺 analysis 失败；简版拉片拦截；adapter 字段不丢失。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 712,
+    listKind: "PENDING",
+  },
 ];
 
 async function main() {

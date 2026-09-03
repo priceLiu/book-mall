@@ -184,6 +184,18 @@ export function Pro2ProductionScriptHtmlPreview({
         s.imagePrompt,
         s.negativePrompt || "—",
       ]) ?? [];
+    const showShotTiming =
+      normalized.meta?.packProfile === "industrial" ||
+      normalized.meta?.source === "film_pull" ||
+      (normalized.shots ?? []).some((s) => s.analysis?.timing);
+    const formatTiming = (
+      s: NonNullable<Pro2ProductionScript["shots"]>[number],
+    ) => {
+      const t = s.analysis?.timing;
+      if (!t) return "—";
+      const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+      return `${fmt(t.startTimeSec)}–${fmt(t.endTimeSec)}s`;
+    };
     const shotRows =
       normalized.shots?.map((s) => [
         String(s.index),
@@ -192,6 +204,7 @@ export function Pro2ProductionScriptHtmlPreview({
         s.sceneDescription ?? "—",
         s.dialogue || "—",
         s.durationSec != null ? `${s.durationSec}s` : "—",
+        ...(showShotTiming ? [formatTiming(s)] : []),
       ]) ?? [];
     const handoffRows =
       normalized.handoff?.map((h) => [
@@ -256,7 +269,15 @@ export function Pro2ProductionScriptHtmlPreview({
         {shotRows.length ? (
           <Section title="分镜脚本" variant={variant}>
             <Table
-              headers={["镜号", "景别", "运镜", "画面描述", "对白", "时长"]}
+              headers={[
+                "镜号",
+                "景别",
+                "运镜",
+                "画面描述",
+                "对白",
+                "时长",
+                ...(showShotTiming ? ["时段"] : []),
+              ]}
               rows={shotRows}
               compact={compact}
             />
@@ -310,6 +331,18 @@ export function Pro2ProductionScriptHtmlPreview({
     );
   }
 
+  const showShotTiming =
+    normalized.meta?.packProfile === "industrial" ||
+    normalized.meta?.source === "film_pull" ||
+    (normalized.shots ?? []).some((s) => s.analysis?.timing);
+  const formatTiming = (
+    s: NonNullable<Pro2ProductionScript["shots"]>[number],
+  ) => {
+    const t = s.analysis?.timing;
+    if (!t) return "—";
+    const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+    return `${fmt(t.startTimeSec)}–${fmt(t.endTimeSec)}s`;
+  };
   const rows =
     normalized.shots?.map((s) => {
       if (isPro2ProductionScriptV2(normalized.schemaVersion)) {
@@ -322,6 +355,7 @@ export function Pro2ProductionScriptHtmlPreview({
           resolveShotPropNames(s, normalized),
           s.dialogue || "—",
           s.durationSec != null ? String(s.durationSec) : "—",
+          ...(showShotTiming ? [formatTiming(s)] : []),
           s.sfxNote ?? "—",
           s.audioNote || "—",
         ];
@@ -333,6 +367,7 @@ export function Pro2ProductionScriptHtmlPreview({
         s.sceneDescription ?? "—",
         s.dialogue || "—",
         s.durationSec != null ? String(s.durationSec) : "—",
+        ...(showShotTiming ? [formatTiming(s)] : []),
         s.imagePrompt ?? "—",
         s.videoPrompt ?? "—",
         s.audioNote || "—",
@@ -351,6 +386,7 @@ export function Pro2ProductionScriptHtmlPreview({
               "道具",
               "对白",
               "时长",
+              ...(showShotTiming ? ["时段"] : []),
               "音效",
               "口型/配音",
             ]
@@ -361,6 +397,7 @@ export function Pro2ProductionScriptHtmlPreview({
               "画面描述",
               "对白",
               "时长",
+              ...(showShotTiming ? ["时段"] : []),
               "AI生图",
               "AI视频",
               "口型/配音",

@@ -209,6 +209,8 @@ export function buildReplicaShotsFromDecompose(
       e.subjectPose,
       e.sceneEnvironment,
       e.composition,
+      e.colorSystem,
+      e.atmosphere,
     ]);
     return [
       {
@@ -224,14 +226,25 @@ export function buildReplicaShotsFromDecompose(
     ];
   }
 
+  const globalPrefix = joinPromptParts([
+    structured.visualStyle,
+    structured.globalColorTone,
+    structured.cameraLanguageSummary,
+    structured.scenePrep.venue,
+    structured.scenePrep.fixedProps,
+  ]);
+
   return structured.storyboardTable.map((row, i) => {
     const index = Number.isFinite(row.shotNo) && row.shotNo > 0 ? row.shotNo : i + 1;
     const durationSec = parseMediaDecomposeShotDurationSec(row.duration, 5);
     const videoPrompt = joinPromptParts([
+      globalPrefix,
       row.shotSize,
       row.cameraMove,
       row.cameraAngle,
       row.composition,
+      row.lightingSetup,
+      row.toneContrast,
       row.visualContent,
       row.characterAction,
       row.expression,

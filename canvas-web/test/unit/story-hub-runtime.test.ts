@@ -361,7 +361,7 @@ describe("shouldSkipHubSectionInflightTaskApply", () => {
 });
 
 describe("hubShowsGeneratingUi · stale hubGenerateIntent", () => {
-  it("does not sweep when all sections done but intent persisted", () => {
+  it("keeps sweep while hubGenerateIntent is set even if sections look done", () => {
     const node = hubNode({
       hubGenerateIntent: true,
       outlineRuntime: { status: "done", taskId: "t1" },
@@ -372,7 +372,8 @@ describe("hubShowsGeneratingUi · stale hubGenerateIntent", () => {
 |------|------|------|---------------------------|------|----------|---------------------|---------------------|---------------|
 | 1 | 中景 | 固定 | 【起始】…【结束】… | 台词 | 10 | img | vid | — |`,
     });
-    expect(hubShowsGeneratingUi(node, true)).toBe(false);
+    // 终态清 intent 前保持扫光，避免校验重试窗口闪回空态
+    expect(hubShowsGeneratingUi(node, true)).toBe(true);
   });
 
   it("shows generating when intent persisted during active run session", () => {
@@ -391,7 +392,7 @@ describe("hubShowsGeneratingUi · stale hubGenerateIntent", () => {
     clearCanvasNodeRunSession("hub-1");
   });
 
-  it("stripStaleHubGenerateIntent clears intent when aggregate is done", () => {
+  it("stripStaleHubGenerateIntent clears intent when no section running", () => {
     const nodes = stripStaleHubGenerateIntent([
       hubNode({
         hubGenerateIntent: true,
@@ -407,6 +408,18 @@ describe("hubShowsGeneratingUi · stale hubGenerateIntent", () => {
     expect(
       (nodes[0]!.data as { hubGenerateIntent?: boolean }).hubGenerateIntent,
     ).toBeUndefined();
+  });
+
+  it("stripStaleHubGenerateIntent keeps intent while section pending", () => {
+    const nodes = stripStaleHubGenerateIntent([
+      hubNode({
+        hubGenerateIntent: true,
+        outlineRuntime: { status: "pending" },
+      }),
+    ]);
+    expect(
+      (nodes[0]!.data as { hubGenerateIntent?: boolean }).hubGenerateIntent,
+    ).toBe(true);
   });
 
   it("shows generating when forceFresh keeps old MD and outlineRuntime is pending", () => {

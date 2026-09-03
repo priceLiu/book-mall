@@ -24,6 +24,7 @@ import {
   pro2HubCanSendScriptPhase,
   pro2HubIsGenerating,
   pro2HubScriptPhaseLabel,
+  resolvePro2HubEffectiveOutline,
 } from "@/lib/canvas/pro2-script-hub-helpers";
 import {
   pro2ScriptRefImageBadgeOffset,
@@ -50,9 +51,18 @@ import { Pro2DockUpstreamChips } from "./pro2-dock-upstream-chips";
 import { Pro2DockPasteZone } from "./pro2-dock-paste-zone";
 import { Pro2DockRefImages } from "./pro2-dock-ref-images";
 import { Pro2ScriptCategoryDocChip } from "./pro2-script-category-doc-chip";
+import { Pro2ScriptPackProfileChip } from "./pro2-script-pack-profile-chip";
+import {
+  listPro2UpstreamVideoUrls,
+  PRO2_FILM_PULL_NEED_INDUSTRIAL_MESSAGE,
+  resolvePro2HubFilmPullIntent,
+} from "@/lib/canvas/pro2-film-pull-intent";
 
 const SCRIPT_PLACEHOLDER =
   "一句话生成剧本：描述剧情或添加角色/场景参考，为你生成分镜脚本；上传剧本生成分镜脚本：在节点内点击上传按钮";
+
+const SCRIPT_FILM_PULL_PLACEHOLDER =
+  "输入拉片，或补充要求后发送：将按上游视频逐镜还原（专业版）";
 
 const CUSTOM_PROMPT_DOCK_PLACEHOLDER =
   "在此编写你的完整剧本提示词（创意、风格、角色、分镜要求等）；发送后系统将按 GFM 制作包自动补全结构化输出";
@@ -166,11 +176,14 @@ export function Pro2ScriptInputDock() {
     ? pro2HubCanSendScriptPhase(hubRfNode as never, d, { nodes, edges, hubTasks })
     : false;
   const isCustomPrompt = d.scriptCategoryId === "custom-prompt";
+  const hasUpstreamVideo = listPro2UpstreamVideoUrls(upstreamLinks).length > 0;
+  const canSendFilmPull =
+    d.packProfile === "industrial" && hasUpstreamVideo;
   const canSend = isCustomPrompt
     ? Boolean(dockInput.trim()) &&
       Boolean(d.providerId?.trim() && d.modelKey?.trim()) &&
       !isGenerating
-    : (canSendScript || Boolean(dockInput.trim())) &&
+    : (canSendScript || Boolean(dockInput.trim()) || canSendFilmPull) &&
       Boolean(d.providerId?.trim() && d.modelKey?.trim()) &&
       !isGenerating;
 
@@ -249,10 +262,18 @@ export function Pro2ScriptInputDock() {
       return;
     }
 
+    const freshUpstream = resolvePro2DockUpstreamLinks(
+      nodeId,
+      "story-pro2-script-hub",
+      freshNodes,
+      freshEdges,
+    );
+    const videoUrls = listPro2UpstreamVideoUrls(freshUpstream);
     const isCustomPrompt = fd.scriptCategoryId === "custom-prompt";
     const canRun = isCustomPrompt
       ? Boolean(freshInput.trim())
       : Boolean(freshInput.trim()) ||
+        (fd.packProfile === "industrial" && videoUrls.length > 0) ||
         pro2HubCanSendScriptPhase(freshRfNode as never, fd, {
           nodes: freshNodes,
           edges: freshEdges,
@@ -263,6 +284,31 @@ export function Pro2ScriptInputDock() {
         title: "请先提供创意输入",
         message:
           "连接上游文本节点、在 Dock 输入主题，或确保已有故事大纲后再发送。",
+        variant: "warning",
+      });
+      return;
+    }
+
+    const pullIntent = resolvePro2HubFilmPullIntent({
+      packProfile: fd.packProfile,
+      dockInput: freshInput,
+      hasUpstreamVideo: videoUrls.length > 0,
+      hasOutline: Boolean(
+        resolvePro2HubEffectiveOutline(freshNodes, freshEdges, nodeId, fd),
+      ),
+    });
+    if (pullIntent === "blocked_need_industrial") {
+      await alert({
+        title: "请改用专业版",
+        message: PRO2_FILM_PULL_NEED_INDUSTRIAL_MESSAGE,
+        variant: "warning",
+      });
+      return;
+    }
+    if (pullIntent === "film_pull" && videoUrls.length < 1) {
+      await alert({
+        title: "请先连接源视频",
+        message: "在剧本节点左侧 + 拉出视频节点，上传 / 粘贴 / 拖入视频后再发送拉片。",
         variant: "warning",
       });
       return;
@@ -287,7 +333,9 @@ export function Pro2ScriptInputDock() {
   const placeholder =
     d.scriptCategoryId === "custom-prompt"
       ? CUSTOM_PROMPT_DOCK_PLACEHOLDER
-      : SCRIPT_PLACEHOLDER;
+      : d.packProfile === "industrial" && hasUpstreamVideo
+        ? SCRIPT_FILM_PULL_PLACEHOLDER
+        : SCRIPT_PLACEHOLDER;
   const llmParams = d.params ?? { ...STORY_PRO_LLM_PARAMS_DEFAULT };
 
   return (
@@ -331,22 +379,31 @@ export function Pro2ScriptInputDock() {
             </>
           }
           trailingRow={
-            <Pro2ScriptCategoryDocChip
-              hubData={d}
-              upstreamLinks={upstreamLinks}
-              disabled={isGenerating}
-              onSaveBody={(body) =>
-                updateNodeData(
-                  storeNode.id,
-                  { scriptCategoryDocBody: body },
-                  { commit: true },
-                )
-              }
-              onSaveCustomPrompt={(body) =>
-                updateNodeData(storeNode.id, { dockInput: body }, { commit: true })
-              }
-              onCategoryApply={onCategoryApply}
-            />
+            <div className="flex items-center gap-1.5">
+              <Pro2ScriptPackProfileChip
+                value={d.packProfile}
+                disabled={isGenerating}
+                onChange={(next) =>
+                  updateNodeData(storeNode.id, { packProfile: next }, { commit: true })
+                }
+              />
+              <Pro2ScriptCategoryDocChip
+                hubData={d}
+                upstreamLinks={upstreamLinks}
+                disabled={isGenerating}
+                onSaveBody={(body) =>
+                  updateNodeData(
+                    storeNode.id,
+                    { scriptCategoryDocBody: body },
+                    { commit: true },
+                  )
+                }
+                onSaveCustomPrompt={(body) =>
+                  updateNodeData(storeNode.id, { dockInput: body }, { commit: true })
+                }
+                onCategoryApply={onCategoryApply}
+              />
+            </div>
           }
         />
       }

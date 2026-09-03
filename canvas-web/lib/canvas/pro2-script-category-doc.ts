@@ -1,4 +1,5 @@
 import { PRO2_GU_FENG_CATEGORY_DOC_SOURCE_MD } from "./data/pro2-gu-feng-category-doc-source";
+import { resolvePro2PackProfilePromptRules } from "./data/pro2-production-pack-standard";
 import type { Pro2DockUpstreamLink } from "./pro2-dock-upstream-links";
 import type { Pro2ScriptCategoryId } from "./pro2-script-category-presets";
 import { buildPro2StoryboardShotBudgetPromptBlock } from "./pro2-storyboard-shot-budget";
@@ -208,9 +209,16 @@ export function mergePro2ScriptGenerationPrompt(
     outlineMd?: string;
     themeInput?: string;
     llmSection?: StoryLlmSection;
+    packProfile?: string;
+    source?: string;
   },
 ): string {
   const parts = [base.trim()];
+  const profileRules = resolvePro2PackProfilePromptRules({
+    packProfile: options?.packProfile,
+    source: options?.source,
+  });
+  if (profileRules) parts.push(profileRules);
   const extra = dockInput.trim();
   const categoryId = options?.scriptCategoryId;
   const includeCategoryDoc = options?.includeCategoryDoc !== false;

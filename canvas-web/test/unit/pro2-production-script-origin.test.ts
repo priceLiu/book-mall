@@ -27,7 +27,7 @@ describe("pro2 production script origin", () => {
     );
     expect(patch.productionScriptOrigin?.rawTextOutput).toBe(raw);
     expect(patch.productionScriptOrigin?.taskId).toBe("t1");
-    expect(patch.productionScriptOrigin?.productionScript?.shots?.length).toBe(2);
+    expect(patch.productionScriptOrigin?.productionScript?.shots?.length).toBe(12);
     expect(patch.productionScriptOriginHistory).toBeUndefined();
   });
 

@@ -11,7 +11,10 @@ import {
   renderProductionScriptMarkdown,
   renderProductionScriptStoryboardMd,
 } from "@/lib/canvas/pro2-production-script-render-md";
-import { ensurePro2ProductionScriptSchemaVersion } from "@/lib/canvas/data/pro2-production-script-schema";
+import {
+  ensurePro2ProductionScriptSchemaVersion,
+  isPro2ProductionScriptV2,
+} from "@/lib/canvas/data/pro2-production-script-schema";
 import { PRO2_FIXTURE_FULL_PACK } from "../fixtures/pro2-production-script-fixture";
 
 describe("pro2-production-script-render-md", () => {
@@ -20,7 +23,7 @@ describe("pro2-production-script-render-md", () => {
   it("renders storyboard table header aligned with pack standard", () => {
     const md = renderProductionScriptStoryboardMd(script);
     expect(md).toContain(STORY_PRO2_STORYBOARD_TABLE_HEADER.split("\n")[0]!);
-    expect(md).toContain("| 1 | 全景 | 正午暖金侧逆光");
+    expect(md).toContain("| 1 | 全景 | 长安主街·日，正午暖金侧逆光");
     expect(md).toContain("明黄婚书");
     expect(md).not.toContain("AI生图提示词(英文)");
   });
@@ -52,7 +55,7 @@ describe("pro2-production-script-render-md", () => {
       schemaVersion: undefined as unknown as 2,
     };
     const normalized = ensurePro2ProductionScriptSchemaVersion(legacy);
-    expect(normalized.schemaVersion).toBe(2);
+    expect(isPro2ProductionScriptV2(normalized.schemaVersion)).toBe(true);
     const md = renderProductionScriptStoryboardMd(normalized);
     expect(md).toContain("| 道具 |");
     expect(md).toContain("明黄婚书");

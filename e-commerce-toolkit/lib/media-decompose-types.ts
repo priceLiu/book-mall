@@ -26,6 +26,8 @@ export type MediaDecomposeStoryboardRow = {
   cameraMove: string;
   cameraAngle: string;
   composition: string;
+  lightingSetup: string;
+  toneContrast: string;
   visualContent: string;
   characterAction: string;
   expression: string;
@@ -37,10 +39,19 @@ export type MediaDecomposeStoryboardRow = {
   editRhythm: string;
 };
 
+export type MediaDecomposeScenePrep = {
+  venue: string;
+  fixedProps: string;
+};
+
 export type MediaDecomposePatch =
   | {
       mediaType: "video";
       action: "decompose_complete";
+      visualStyle: string;
+      globalColorTone: string;
+      cameraLanguageSummary: string;
+      scenePrep: MediaDecomposeScenePrep;
       storyboardTable: MediaDecomposeStoryboardRow[];
       narrativeLogic: string;
       beatPoints: string;

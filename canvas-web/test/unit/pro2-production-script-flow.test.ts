@@ -39,7 +39,7 @@ describe("pro2-production-script flow", () => {
 
     const merged = { ...hub, ...patch } as StoryProScriptHubNodeData;
     expect(merged.productionScript?.characters?.[0]?.name).toBe("沈知意");
-    expect(merged.scriptStudioFrameRows?.length).toBe(2);
+    expect(merged.scriptStudioFrameRows?.length).toBe(12);
 
     const bulletin = buildCrewBulletinFromHub("hub-flow", merged, {
       scriptTitle: "测试剧",
@@ -97,12 +97,12 @@ describe("pro2-production-script flow", () => {
       productionScript: PRO2_FIXTURE_FULL_PACK.patch,
     };
     const rows = resolvePro2HubStoryboardPickerRows(hub);
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(12);
     expect(rows[0]?.frameIndex).toBe(1);
     expect(rows[0]?.shotSize).toBe("全景");
     expect(rows[0]?.cameraMove).toBe("缓慢摇移推进，前景旗幡遮挡增加层次");
     expect(rows[0]?.description).toContain("朱雀大街");
-    expect(rows[0]?.duration).toBe("10");
+    expect(rows[0]?.duration).toBe("15");
     expect(rows[0]?.scene).toBe("长安主街·日");
   });
 
@@ -212,9 +212,9 @@ describe("pro2-production-script flow", () => {
         textOutput: rawJson,
       },
     };
-    expect(resolveHubProductionScript(hub)?.shots?.length).toBe(2);
+    expect(resolveHubProductionScript(hub)?.shots?.length).toBe(12);
     const patch = trySyncResolvedProductionScriptToHub(hub);
-    expect(patch?.productionScript?.shots?.length).toBe(2);
+    expect(patch?.productionScript?.shots?.length).toBe(12);
     expect(patch?.productionScript?.shots?.[0]?.propIds).toEqual(["prop-book"]);
   });
 

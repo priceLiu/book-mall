@@ -7,6 +7,10 @@ import type {
 } from "@/lib/canvas/data/pro2-production-script-schema";
 import { PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION } from "@/lib/canvas/data/pro2-production-script-schema";
 import { Pro2ColorBlockPicker, type Pro2ColorBlockValue } from "./pro2-color-block-picker";
+import {
+  formatPro2ShotTimingLabel,
+  Pro2ShotAnalysisFold,
+} from "./pro2-shot-analysis-fold";
 
 const INPUT =
   "nodrag w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-[12px] text-neutral-800";
@@ -284,6 +288,11 @@ export function Pro2ProductionScriptEditor({
           >
             <p className="mb-2 text-[11px] font-semibold text-neutral-700">
               镜 {shot.index}
+              {formatPro2ShotTimingLabel(shot.analysis) ? (
+                <span className="ml-2 font-normal text-neutral-400">
+                  {formatPro2ShotTimingLabel(shot.analysis)}
+                </span>
+              ) : null}
             </p>
             <div className="grid gap-2 sm:grid-cols-4">
               <input
@@ -349,6 +358,7 @@ export function Pro2ProductionScriptEditor({
                 }}
               />
             </div>
+            <Pro2ShotAnalysisFold analysis={shot.analysis} />
           </div>
         ))}
       </Section>

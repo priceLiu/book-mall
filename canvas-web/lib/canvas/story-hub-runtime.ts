@@ -676,7 +676,7 @@ export function hubAggregateStatus(
   return "idle";
 }
 
-/** 剧本 Hub 是否展示生成中 UI（扫光）；intent 仅入队首帧占位 */
+/** 剧本 Hub 是否展示生成中 UI（扫光）；intent 在任务终态前一律保持扫光 */
 export function hubShowsGeneratingUi(
   node: CanvasFlowNode,
   hubGenerateIntent?: boolean,
@@ -686,18 +686,9 @@ export function hubShowsGeneratingUi(
   if (sections.some((s) => hubSectionIsRunning(node, s))) return true;
   if (serverHubInflight) return true;
   if (isCanvasNodeRunSessionActive(node.id)) return true;
-  if (!hubGenerateIntent) return false;
-
-  const statuses = sections.map((s) => hubSectionRuntime(node, s)?.status);
-  const anyError = statuses.some((st) => st === "error");
-  const allIdleOrTerminal = statuses.every(
-    (st) => !st || st === "idle" || st === "done" || st === "error",
-  );
-  // 换模型重试：上一轮 error 但尚无新的 pending/running
-  if (anyError && allIdleOrTerminal) return true;
-
-  const anySectionTouched = statuses.some((st) => st != null && st !== "idle");
-  return !anySectionTouched;
+  // 入队后 / 校验重试整段期间：intent 未清则持续扫光（勿因已有 outlineMd 误判空闲）
+  if (hubGenerateIntent) return true;
+  return false;
 }
 
 /** hydrate：清掉不应再扫光却仍落库的 hubGenerateIntent */
@@ -714,7 +705,10 @@ export function stripStaleHubGenerateIntent(
     }
     const d = node.data as { hubGenerateIntent?: boolean };
     if (!d.hubGenerateIntent) return node;
-    if (hubShowsGeneratingUi(node, true)) return node;
+    // 仍有段在跑 / 本轮会话 / 服务端在途 → 保留；否则视为过期 intent
+    const sections = ["outline", "character", "scene", "storyboard"] as const;
+    if (sections.some((s) => hubSectionIsRunning(node, s))) return node;
+    if (isCanvasNodeRunSessionActive(node.id)) return node;
     return {
       ...node,
       data: { ...node.data, hubGenerateIntent: undefined },

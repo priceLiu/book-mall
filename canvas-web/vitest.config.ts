@@ -67,6 +67,7 @@ export default defineConfig({
       "test/unit/pro2-production-pack-standard.test.ts",
       "test/unit/pro2-pack-parse-contract.test.ts",
       "test/unit/pro2-production-script-schema.test.ts",
+      "test/unit/pro2-film-pull-intent.test.ts",
       "test/unit/pro2-production-script-structured.test.ts",
       "test/unit/pro2-production-script-render-md.test.ts",
       "test/unit/pro2-production-script-apply.test.ts",

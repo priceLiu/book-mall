@@ -2,14 +2,14 @@
 
 - **真源**：`book-mall/lib/ecom/ecom-film-pull-*`
 - **API**：`/api/sso/tools/ecom/film-pull/*`
-- **壳**：`e-commerce-toolkit` FilmPullStudio；`canvas-web` 预设 + 导入 Hub
+- **壳**：`e-commerce-toolkit` FilmPullStudio；`canvas-web` 剧本 Hub 专业版原生拉片（`pro2-production-script` v3）
 - **V2 变更**：制作链路 **不再** 绑定 seed-video / `replicaSeedVideoProjectId`；使用项目内 `refMatch` + `productionPlan`
 
 ## 常量
 
 | 常量 | 值 |
 |------|-----|
-| `FILM_PULL_V1_MAX_SEC` | 60 |
+| `FILM_PULL_V1_MAX_SEC` | 90 |
 | `FILM_PULL_SEGMENT_ENABLED` | false |
 | `FILM_PULL_DEFAULT_VIDEO_MODEL` | wan2.7-r2v |
 

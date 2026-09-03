@@ -141,6 +141,8 @@ export type StoryProScriptHubNodeData = {
   dockInput?: string;
   /** 2.0 输入坞 · 粘贴的角色/场景等参考图 */
   dockRefImages?: StoryRefImage[];
+  /** 制作档：简版 director / 专业版 industrial */
+  packProfile?: "director" | "industrial";
   /** 剧本类别 preset（古风甜宠 / 默认剧本大师） */
   scriptCategoryId?: Pro2ScriptCategoryId;
   scriptCategoryLabel?: string;

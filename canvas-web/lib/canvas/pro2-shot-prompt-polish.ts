@@ -72,6 +72,8 @@ const PRO2_SHOT_PROMPT_POLISH_SYSTEM_BASE = `你是影视专业版 2.0 的分镜
 
 ## 禁止
 - 改编 Pass 1 导演事实（景别/运镜/对白/时长）
+- 改编 analysis 中的摄影事实（切点/机位/焦段/调度/时间码）
+- 整段复制 analysis.analysisDraftPrompt 作为最终 Prompt（仅可作参考）
 - 输出 markdown 说明或 GFM 表
 - 英文提示词或 [Negative: …] 英文反向
 
@@ -246,6 +248,58 @@ function buildDictionarySection(script: Pro2ProductionScript): string {
   return parts.filter(Boolean).join("\n\n");
 }
 
+function formatShotAnalysisLines(
+  shot: NonNullable<Pro2ProductionScript["shots"]>[number],
+): string[] {
+  const a = shot.analysis;
+  if (!a) return [];
+  const lines: string[] = ["## analysis（须遵守，禁止改编摄影事实）"];
+  if (a.timing) {
+    lines.push(
+      `时段：${a.timing.startTimeSec}–${a.timing.endTimeSec}s`,
+    );
+  }
+  if (a.cut?.transition || a.cut?.detail) {
+    lines.push(
+      `切点：${[a.cut.transition, a.cut.detail].filter(Boolean).join(" · ")}`,
+    );
+  }
+  if (a.cinematography) {
+    lines.push(
+      `摄影：${[
+        a.cinematography.cameraAngle,
+        a.cinematography.focalLength,
+        a.cinematography.composition,
+      ]
+        .filter(Boolean)
+        .join(" · ")}`,
+    );
+  }
+  if (a.blocking) {
+    lines.push(
+      `调度：${[
+        a.blocking.subjectBlocking,
+        a.blocking.sightDirection,
+        a.blocking.foreMidBackLayer,
+        a.blocking.sceneEnvironment,
+      ]
+        .filter(Boolean)
+        .join(" · ")}`,
+    );
+  }
+  if (a.look) {
+    lines.push(
+      `布光/影调：${[a.look.lightingSetup, a.look.toneContrast].filter(Boolean).join(" · ")}`,
+    );
+  }
+  if (a.analysisDraftPrompt?.trim()) {
+    lines.push(
+      `分析草稿 Prompt（仅参考，禁止整段复制）：${a.analysisDraftPrompt.trim()}`,
+    );
+  }
+  return lines.length > 1 ? lines : [];
+}
+
 function formatPass1ShotBlock(
   shot: NonNullable<Pro2ProductionScript["shots"]>[number],
   script: Pro2ProductionScript,
@@ -285,6 +339,7 @@ function formatPass1ShotBlock(
     videoDraft
       ? `已有视频提示词（可覆盖）：${expandWizardMentionsForPrompt(videoDraft, script)}`
       : "",
+    ...formatShotAnalysisLines(shot),
   ]
     .filter(Boolean)
     .join("\n");

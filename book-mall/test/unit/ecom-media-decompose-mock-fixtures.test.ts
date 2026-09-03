@@ -26,6 +26,10 @@ describe("media-decompose mock fixtures", () => {
     const raw = {
       mediaType: "video",
       action: "decompose_complete",
+      visualStyle: "带货 lookbook",
+      globalColorTone: "暖调",
+      cameraLanguageSummary: "固定",
+      scenePrep: { venue: "", fixedProps: "" },
       storyboardTable: [
         {
           shotNo: 1,
@@ -66,6 +70,10 @@ describe("media-decompose mock fixtures", () => {
     const raw = {
       mediaType: "video",
       action: "decompose_complete",
+      visualStyle: "纪实风格",
+      globalColorTone: "自然光",
+      cameraLanguageSummary: "固定",
+      scenePrep: { venue: "", fixedProps: "" },
       storyboardTable: [
         {
           镜号: 1,
@@ -102,6 +110,10 @@ describe("media-decompose mock fixtures", () => {
     const raw = {
       mediaType: "video",
       action: "decompose_complete",
+      visualStyle: "lookbook",
+      globalColorTone: "暖金",
+      cameraLanguageSummary: "固定",
+      scenePrep: { venue: "", fixedProps: "" },
       storyboardTable: [
         {
           shotNo: 1,
@@ -140,6 +152,98 @@ describe("media-decompose mock fixtures", () => {
     expect(patch?.mediaType).toBe("video");
     if (patch?.mediaType === "video") {
       expect(patch.storyboardTable[0]?.voiceover).toBe("这件真的太好穿了");
+    }
+  });
+
+  it("rejects video patch when global visual fields missing", () => {
+    const raw = {
+      mediaType: "video",
+      action: "decompose_complete",
+      storyboardTable: [
+        {
+          shotNo: 1,
+          duration: "3s",
+          shotSize: "中景",
+          cameraMove: "固定",
+          cameraAngle: "平视",
+          composition: "三分法",
+          visualContent: "模特",
+          characterAction: "",
+          expression: "",
+          subtitle: "",
+          voiceover: "",
+          sfx: "",
+          bgm: "",
+          transition: "",
+          editRhythm: "",
+        },
+      ],
+      narrativeLogic: "",
+      beatPoints: "",
+      replicableShootingScript: "",
+    };
+    const text = `\`\`\`media-decompose\n${JSON.stringify(raw)}\n\`\`\``;
+    expect(extractMediaDecomposePatch(text)).toBeNull();
+  });
+
+  it("coerces Chinese lighting keys on storyboard rows", () => {
+    const raw = {
+      mediaType: "video",
+      action: "decompose_complete",
+      visualStyle: "商业短片",
+      globalColorTone: "高饱和",
+      cameraLanguageSummary: "横移",
+      scenePrep: { venue: "海滩", fixedProps: "伞" },
+      storyboardTable: [
+        {
+          镜号: 1,
+          时长: "3s",
+          景别: "中景",
+          运镜: "横移跟拍",
+          镜头角度: "平视",
+          构图方式: "三分法",
+          布光: "侧顺光",
+          影调: "高对比",
+          画面内容: "模特",
+          人物动作: "",
+          表情: "",
+          字幕文案: "",
+          口播: "",
+          音效: "",
+          BGM: "",
+          转场: "",
+          剪辑节奏: "",
+        },
+        {
+          镜号: 2,
+          时长: "3s",
+          景别: "特写",
+          运镜: "固定",
+          镜头角度: "俯拍",
+          构图方式: "居中",
+          布光: "柔光",
+          影调: "低饱和",
+          画面内容: "产品",
+          人物动作: "",
+          表情: "",
+          字幕文案: "",
+          口播: "",
+          音效: "",
+          BGM: "",
+          转场: "",
+          剪辑节奏: "",
+        },
+      ],
+      narrativeLogic: "",
+      beatPoints: "",
+      replicableShootingScript: "",
+    };
+    const text = `\`\`\`media-decompose\n${JSON.stringify(raw)}\n\`\`\``;
+    const patch = extractMediaDecomposePatch(text);
+    expect(patch?.mediaType).toBe("video");
+    if (patch?.mediaType === "video") {
+      expect(patch.storyboardTable[0]?.lightingSetup).toBe("侧顺光");
+      expect(patch.storyboardTable[0]?.toneContrast).toBe("高对比");
     }
   });
 });

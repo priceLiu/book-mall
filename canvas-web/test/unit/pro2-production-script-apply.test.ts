@@ -22,7 +22,7 @@ describe("pro2-production-script-apply", () => {
       "hub-test",
     );
 
-    expect(patch.productionScript?.shots?.length).toBe(2);
+    expect(patch.productionScript?.shots?.length).toBe(12);
     expect(patch.outlineMd).toContain("视觉风格总纲");
     expect(patch.outlineMd).toContain("故事背景");
     expect(patch.characterMd).toContain("沈知意");
@@ -30,11 +30,11 @@ describe("pro2-production-script-apply", () => {
     expect(patch.visualStylePack?.worldBackground).toContain("晚唐");
 
     expect(patch.scriptStudioCharacterRows?.length).toBe(1);
-    expect(patch.scriptStudioFrameRows?.length).toBe(2);
+    expect(patch.scriptStudioFrameRows?.length).toBe(12);
     const frame = patch.scriptStudioFrameRows?.[0];
     expect(frame?.shotSize).toBe("全景");
     expect(frame?.cameraMove).toContain("缓慢摇移");
-    expect(frame?.durationSec).toBe(10);
+    expect(frame?.durationSec).toBe(15);
     expect(frame?.lighting).toContain("暖金");
     expect(frame?.sfxNote).toContain("旗幡");
     expect(frame?.aiImagePrompt).toBeFalsy();

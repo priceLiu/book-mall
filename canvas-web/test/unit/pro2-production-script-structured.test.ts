@@ -19,7 +19,7 @@ describe("pro2-production-script-structured", () => {
     const text = fixtureWithFence(PRO2_FIXTURE_FULL_PACK);
     const patch = extractPro2ProductionScriptPatch(text);
     expect(patch?.step).toBe("full_pack");
-    expect(patch?.patch.shots?.length).toBe(2);
+    expect(patch?.patch.shots?.length).toBe(12);
     expect(patch?.patch.characters?.length).toBe(1);
   });
 
@@ -62,6 +62,31 @@ describe("pro2-production-script-structured", () => {
     expect(patch?.patch.visualStyle?.worldBackground).toBe("穿越");
   });
 
+  it("coerces scene colorBlock string into { primary }", () => {
+    const raw = JSON.stringify({
+      schemaVersion: 3,
+      tier: "pro",
+      step: "scene",
+      patch: {
+        scenes: [
+          {
+            id: "s1",
+            name: "现代深夜办公室",
+            environmentTimeMood: "深夜压抑",
+            imagePrompt:
+              "名称：现代深夜办公室\n构图规范：2×2网格四视角\n[视觉风格：电影级写实]",
+            colorBlock: "冷蓝低饱和",
+          },
+        ],
+      },
+    });
+    const patch = extractPro2ProductionScriptPatch(raw);
+    expect(patch).not.toBeNull();
+    expect(patch?.patch.scenes?.[0]?.colorBlock).toEqual({
+      primary: "冷蓝低饱和",
+    });
+  });
+
   it("coerces LLM alias fields (identity / aiImagePrompt) into canonical schema", () => {
     const raw = JSON.stringify({
       schemaVersion: 2,
@@ -101,7 +126,7 @@ describe("pro2-production-script-structured", () => {
     const patch = extractPro2ProductionScriptPatch(raw);
     expect(patch?.patch.meta?.title).toBe("我在盛唐写天下");
     expect(patch?.patch.characters?.length).toBe(2);
-    expect(patch?.patch.shots?.length).toBe(2);
+    expect(patch?.patch.shots?.length).toBe(12);
     expect(patch?.patch.handoff?.length).toBe(6);
   });
 
@@ -114,7 +139,7 @@ describe("pro2-production-script-structured", () => {
     const patch = extractPro2ProductionScriptPatch(text);
     expect(patch?.step).toBe("full_pack");
     expect(patch?.patch.meta?.title).toBe("我在盛唐写天下");
-    expect(patch?.patch.shots?.length).toBe(2);
+    expect(patch?.patch.shots?.length).toBe(12);
   });
 
   it("does not flag rendered markdown outline as JSON blob", () => {
@@ -138,6 +163,6 @@ describe("pro2-production-script-structured", () => {
     expect(patch?.step).toBe("full_pack");
     expect(patch?.patch.meta?.title).toBe("测试剧");
     expect(patch?.patch.characters?.length).toBe(1);
-    expect(patch?.patch.shots?.length).toBe(2);
+    expect(patch?.patch.shots?.length).toBe(12);
   });
 });

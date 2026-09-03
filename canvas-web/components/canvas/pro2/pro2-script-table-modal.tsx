@@ -539,6 +539,16 @@ export function Pro2ScriptHubEditorModal({
                 value={tableDraft}
                 onChange={setTableDraft}
                 variant="v2"
+                showIndustrialExtras={
+                  draftStructured.meta?.packProfile === "industrial" ||
+                  draftStructured.meta?.source === "film_pull" ||
+                  (draftStructured.shots ?? []).some((s) => s.analysis)
+                }
+                shotAnalysisByIndex={Object.fromEntries(
+                  (draftStructured.shots ?? [])
+                    .filter((s) => s.analysis)
+                    .map((s) => [s.index, s.analysis] as const),
+                )}
               />
             ) : tab === "scene" ? (
               <StorySceneDictionaryTableEditor

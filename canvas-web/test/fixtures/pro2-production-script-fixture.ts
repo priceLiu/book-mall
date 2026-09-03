@@ -83,7 +83,7 @@ export const PRO2_FIXTURE_FULL_PACK: Pro2ProductionScriptPatch = {
         sceneDescription: "【起始】朱雀大街人声鼎沸。【结束】女主举婚书立于外廊。",
         propIds: ["prop-book"],
         dialogue: '百姓甲（议论）："她要退婚？"',
-        durationSec: 10,
+        durationSec: 15,
         sfxNote: "人群议论声、旗幡猎猎",
         audioNote: "群杂收音",
         sceneId: "scene-a",
@@ -96,11 +96,27 @@ export const PRO2_FIXTURE_FULL_PACK: Pro2ProductionScriptPatch = {
         cameraMove: "固定机位平拍，缓慢推近，人物入画",
         sceneDescription: "【起始】承接上镜举书姿势。【结束】男主现身楼下。",
         dialogue: "—",
-        durationSec: 8,
+        durationSec: 15,
         sfxNote: "远处马蹄声",
         audioNote: "男主台词同期",
         sceneId: "scene-a",
       },
+      ...Array.from({ length: 10 }, (_, i) => {
+        const index = i + 3;
+        return {
+          index,
+          shotSize: index % 2 === 0 ? "近景" : "中景",
+          lighting: "长安主街·日，暖金侧光打亮人物轮廓",
+          cameraMove: "固定机位缓慢推近主体，强调情绪递进",
+          sceneDescription: `【起始】镜${index}承接上镜站位。【结束】镜${index}收束至下一拍。`,
+          dialogue: "—" as const,
+          durationSec: 15,
+          sfxNote: "环境底噪",
+          audioNote: "—",
+          sceneId: "scene-a",
+          characterIds: ["char-heroine"],
+        };
+      }),
     ],
     handoff: [
       { index: 1, item: "角色三视图", owner: "美术", note: "按角色表生成" },

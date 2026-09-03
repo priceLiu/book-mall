@@ -69,16 +69,28 @@ const renderScript: FilmPullRenderScriptPatch = {
 };
 
 describe("ecom-film-pull-to-pro2-script", () => {
-  it("maps render script to Pro2 storyboard step", () => {
+  it("maps render script to industrial v3 without final prompts", () => {
     const script = filmPullRenderScriptToPro2ProductionScript(renderScript, {
       title: "拉片测试",
     });
-    expect(script.step).toBe("storyboard");
-    expect(script.meta.title).toBe("拉片测试");
-    expect(script.meta.synopsis).toBe("主线");
-    expect(script.shots[0]?.index).toBe(1);
-    expect(script.shots[0]?.videoPrompt).toContain("cyberpunk");
-    expect(script.shots[0]?.dialogue).toBe("台词一");
+    expect(script.schemaVersion).toBe(3);
+    expect(script.meta?.packProfile).toBe("industrial");
+    expect(script.meta?.source).toBe("film_pull");
+    expect(script.meta?.title).toBe("拉片测试");
+    expect(script.meta?.synopsis).toBe("主线");
+    expect(script.meta?.shootingPrep?.venue).toBe("霓虹街道");
+    expect(script.shots?.[0]?.index).toBe(1);
+    expect(script.shots?.[0]?.dialogue).toBe("台词一");
+    expect(script.shots?.[0]?.videoPrompt).toBeUndefined();
+    expect(script.shots?.[0]?.frameImagePrompt).toBeUndefined();
+    expect(script.shots?.[0]?.analysis?.cut?.detail).toContain("雨景切至特写");
+    expect(script.shots?.[0]?.analysis?.cut?.transition).toBe("硬切");
+    expect(script.shots?.[0]?.analysis?.timing?.startTimeSec).toBe(0);
+    expect(script.shots?.[0]?.analysis?.timing?.endTimeSec).toBe(3);
+    expect(script.shots?.[0]?.analysis?.cinematography?.cameraAngle).toBe("仰拍");
+    expect(script.shots?.[0]?.analysis?.cinematography?.focalLength).toBe("广角");
+    expect(script.shots?.[0]?.analysis?.blocking?.subjectBlocking).toBe("角色 A");
+    expect(script.shots?.[0]?.analysis?.analysisDraftPrompt).toContain("cyberpunk");
   });
 
   it("falls back analyze to pseudo render script", () => {
@@ -90,5 +102,6 @@ describe("ecom-film-pull-to-pro2-script", () => {
     const script = filmPullAnalyzeToPro2ProductionScript(analyze, { title: "仅拉片" });
     expect(script.shots).toHaveLength(1);
     expect(script.visualStyle?.pictureStyle).toBe("赛博");
+    expect(script.shots?.[0]?.analysis?.cut?.transition).toBe("硬切");
   });
 });

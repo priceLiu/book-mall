@@ -54,7 +54,7 @@
     },
     "rhythmWeight": "铺垫",
     "visualMetaphor": "无",
-    "aiVisualPrompt": "Medium shot, beach club, woman with cola can, saturated colors…"
+    "aiVisualPrompt": "中景。海滨沙滩俱乐部，高饱和多巴胺配色。画面中一位戴蓝棒球帽的女性手持可乐罐走向豆袋沙发。侧顺光，红蓝奶油白锚点。"
   }]
 }
 ```

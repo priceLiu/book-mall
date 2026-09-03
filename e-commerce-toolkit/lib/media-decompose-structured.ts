@@ -21,6 +21,22 @@ function coerceFiniteNumber(value: unknown): number | null {
   return null;
 }
 
+function isVisualPlaceholderText(value: string): boolean {
+  const t = value.trim();
+  return !t || t === "无" || t === "—" || t === "-";
+}
+
+function coerceScenePrep(raw: unknown): { venue: string; fixedProps: string } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { venue: "", fixedProps: "" };
+  }
+  const o = raw as Record<string, unknown>;
+  return {
+    venue: pickString(o, ["venue", "场地", "场景", "拍摄场地"]),
+    fixedProps: pickString(o, ["fixedProps", "固定道具", "props", "道具"]),
+  };
+}
+
 function splitMarkdownTableRow(line: string): string[] {
   const parts = line.split("|").map((cell) => cell.trim());
   if (parts[0] === "") parts.shift();
@@ -153,6 +169,21 @@ function coerceStoryboardRow(raw: unknown, index: number): Record<string, unknow
     cameraMove: pickString(row, ["cameraMove", "运镜", "camera_move", "镜头运动"]),
     cameraAngle: pickString(row, ["cameraAngle", "镜头角度", "camera_angle"]),
     composition: pickString(row, ["composition", "构图方式", "构图"]),
+    lightingSetup: pickString(row, [
+      "lightingSetup",
+      "布光",
+      "光影",
+      "灯光",
+      "lighting",
+      "lighting_setup",
+    ]),
+    toneContrast: pickString(row, [
+      "toneContrast",
+      "影调",
+      "色调对比",
+      "tone_contrast",
+      "colorTone",
+    ]),
     visualContent: pickString(row, ["visualContent", "画面内容", "visual_content", "画面"]),
     characterAction: pickString(row, ["characterAction", "人物动作", "character_action", "动作"]),
     expression: pickString(row, ["expression", "表情"]),
@@ -188,6 +219,21 @@ function coerceMediaDecomposePayload(raw: unknown): unknown | null {
   return {
     mediaType: "video",
     action: "decompose_complete",
+    visualStyle: pickString(o, ["visualStyle", "全片视觉风格", "视觉风格", "artStyle", "风格"]),
+    globalColorTone: pickString(o, [
+      "globalColorTone",
+      "全片色调",
+      "色调基调",
+      "globalColor",
+      "colorTone",
+    ]),
+    cameraLanguageSummary: pickString(o, [
+      "cameraLanguageSummary",
+      "运镜总述",
+      "全片运镜",
+      "cameraLanguage",
+    ]),
+    scenePrep: coerceScenePrep(o.scenePrep ?? o.场地准备 ?? o.shootingPrep),
     storyboardTable,
     narrativeLogic: pickString(o, ["narrativeLogic", "整体叙事逻辑", "narrative"]),
     beatPoints: pickString(o, ["beatPoints", "镜头卡点要点", "beat"]),
@@ -225,11 +271,28 @@ function normalizeMediaDecomposePatch(patch: MediaDecomposePatch): MediaDecompos
   if (patch.mediaType !== "video") return patch;
   return {
     ...patch,
+    scenePrep: patch.scenePrep ?? { venue: "", fixedProps: "" },
     storyboardTable: patch.storyboardTable.map((row) => ({
+      lightingSetup: row.lightingSetup ?? "",
+      toneContrast: row.toneContrast ?? "",
       ...row,
       voiceover: effectiveDecomposeVoiceover(row),
     })),
   };
+}
+
+function validateMediaDecomposeVisualQuality(patch: MediaDecomposePatch): boolean {
+  if (patch.mediaType !== "video") return true;
+  if (isVisualPlaceholderText(patch.visualStyle) && isVisualPlaceholderText(patch.globalColorTone)) {
+    return false;
+  }
+  if (patch.storyboardTable.length >= 2) {
+    const weakLighting = patch.storyboardTable.filter((row) =>
+      isVisualPlaceholderText(row.lightingSetup ?? ""),
+    ).length;
+    if (weakLighting > patch.storyboardTable.length / 2) return false;
+  }
+  return true;
 }
 
 function finalizeMediaDecomposePatch(text: string, patch: MediaDecomposePatch): MediaDecomposePatch {
@@ -253,6 +316,7 @@ export function extractMediaDecomposePatch(text: string): MediaDecomposePatch | 
     const coerced = coerceMediaDecomposePayload(parsed) ?? parsed;
     const payload = coerced as MediaDecomposePatch;
     if (payload.mediaType === "video" && Array.isArray(payload.storyboardTable)) {
+      if (!validateMediaDecomposeVisualQuality(payload)) return null;
       return finalizeMediaDecomposePatch(text, payload);
     }
     if (payload.mediaType === "image" && "positivePrompt" in payload && payload.positivePrompt) {

@@ -28,7 +28,7 @@ const REPLICA_SCRIPT_FENCE_CONTRACT = `
 | index | number | 从 1 递增，与草稿镜号一致 |
 | timeSlice | string | 如 \`0-3s\` |
 | sceneDescription | string | 换模特/产品后的画面描述，非空 |
-| videoPrompt | string | 景别/运镜/构图/动作/音效/BGM/转场/剪辑；须含 @图片N；**禁止**口播原文 |
+| videoPrompt | string | 景别/运镜/构图/布光/影调/全片色调/动作/音效/BGM/转场/剪辑；须含 @图片N；**禁止**口播原文 |
 | voiceover | string | 仅口播/字幕（可空字符串）；**禁止**写入 videoPrompt |
 | durationSec | number | 3–15 整数 |
 
@@ -40,7 +40,7 @@ const REPLICA_SCRIPT_FENCE_CONTRACT = `
       "index": 1,
       "timeSlice": "0-3s",
       "sceneDescription": "新模特 @图片1 手持 @图片2 产品面向镜头",
-      "videoPrompt": "@图片1 @图片2，中景，固定机位，三分法，快门声，轻快 BGM，硬切",
+      "videoPrompt": "@图片1 @图片2，中景，固定机位，三分法，柔光侧顺光，低对比自然光，暖金色调，快门声，轻快 BGM，硬切",
       "voiceover": "这件针织开衫真的太好穿了",
       "durationSec": 3
     },
@@ -48,7 +48,7 @@ const REPLICA_SCRIPT_FENCE_CONTRACT = `
       "index": 2,
       "timeSlice": "3-8s",
       "sceneDescription": "产品面料特写，手指划过 @图片2",
-      "videoPrompt": "@图片2，特写，慢推，俯拍，居中，摩擦音，BGM 延续，叠化",
+      "videoPrompt": "@图片2，特写，慢推，俯拍，居中，侧光轮廓，低饱和，摩擦音，BGM 延续，叠化",
       "voiceover": "轻薄透气，上身无负担",
       "durationSec": 5
     }
@@ -73,7 +73,7 @@ export function buildReplicaScriptSystemPrompt(catalog: ReplicaMentionEntry[]): 
   const mentionLines = catalog.map((e) => `${e.token}：${e.ref.label}（${e.role === "model" ? "模特" : "产品"}）`);
   const mentionBlock = mentionLines.length ? mentionLines.join("\n") : "@图片1：模特；@图片2：产品";
   return `你是电商短视频复刻编剧。用户已从原视频/图拆解出分镜，并提供了新的模特图与产品图（可各多张）及产品说明。
-你的任务：在保留原片镜头语言、节奏、景别与运镜的前提下，将画面与口播中的旧模特、旧产品替换为新模特与新商品。
+你的任务：在保留原片镜头语言、节奏、景别、运镜、**布光、影调、全片色调与视觉风格**的前提下，将画面与口播中的旧模特、旧产品替换为新模特与新商品。
 
 参考图编号（须在 videoPrompt 中按需引用）：
 ${mentionBlock}
@@ -82,9 +82,11 @@ ${REPLICA_SCRIPT_FENCE_CONTRACT}
 
 ### 业务规则（与 JSON 一并满足）
 1. videoPrompt 与 voiceover **严格分离**（见上表）；
-2. 机械映射草稿的 videoPrompt 已含景别/运镜/音效/BGM/转场/剪辑；改写时须保留信息密度，不得删减；
-3. sceneDescription 用中文描述换模特换产品后的画面；
-4. 镜数与拆解表一致，除非原表为空则输出 1 镜。`;
+2. 机械映射草稿的 videoPrompt 已含景别/运镜/布光/影调/音效/BGM/转场/剪辑；改写时须保留信息密度，**不得删减**光影、影调、色调与运镜描述；
+3. **继承**原片场景、道具感、BGM/音效气质、转场与剪辑节奏；**只替换**模特（@图片N）、产品、与旧 SKU 绑定的动作描述；
+4. cameraMove 不得弱化（慢推不可改固定，横移不可省略）；
+5. sceneDescription 用中文描述换模特换产品后的画面；
+6. 镜数与拆解表一致，除非原表为空则输出 1 镜。`;
 }
 
 export function buildReplicaScriptUserPrompt(opts: {
@@ -173,7 +175,8 @@ export function buildReplicaScriptRetryUserPrompt(expectedShotCount: number): st
 3. 每镜含 index、timeSlice、sceneDescription、videoPrompt、voiceover、durationSec（3–15 整数）；
 4. videoPrompt 须引用 @图片N（至少 1 张模特 + 1 张产品），禁止写入口播原文；
 5. voiceover 仅写口播/字幕，禁止写入 videoPrompt；
-6. 禁止尾逗号与 JSON 注释。`;
+6. videoPrompt 须保留原片布光/影调/色调/运镜，禁止删除或弱化；
+7. 禁止尾逗号与 JSON 注释。`;
 }
 
 function normalizeReplicaScriptPatch(raw: unknown): ReplicaScriptPatch | null {
@@ -313,15 +316,30 @@ export function buildReplicaModelImagePromptSystem(): string {
 要求：
 - 全身或半身 lookbook 构图，适合后续带货短视频；
 - 描述年龄段、气质、发型、妆容、服装风格（不含具体品牌与产品）；
-- 中性简洁摄影棚或 lifestyle 背景，柔和均匀光；
+- **继承原片布光方案、色彩体系/影调与画面氛围**；只换面孔与体型气质，不换光影逻辑与色调倾向；
 - 中文或中英混合均可，一段连贯描述，80–200 字；
 - 只输出 Prompt 正文，不要 markdown、不要 JSON、不要解释。`;
 }
 
 export function buildReplicaModelImagePromptUserMessage(structured: MediaDecomposePatch): string {
+  if (structured.mediaType === "image") {
+    const e = structured.elements;
+    const l = e.lighting;
+    return [
+      "原片（静态图）拆解结果如下。请推断原片模特类型，并写一条**不同面孔**的新模特文生图 Prompt。",
+      "",
+      `布光参考：主 ${l.keyLight}；辅 ${l.fillLight}；方向 ${l.direction}；${l.hardSoft}；色温 ${l.colorTemperature}`,
+      `色彩体系：${e.colorSystem}`,
+      `画面氛围：${e.atmosphere}`,
+      "",
+      JSON.stringify(structured, null, 2),
+    ].join("\n");
+  }
+
   const tableJson = JSON.stringify(structured, null, 2);
   return [
-    "原片拆解结果如下。请推断原片模特类型（性别、年龄感、风格），并写一条**不同面孔**的新模特文生图 Prompt，用于替换原模特：",
+    "原片（视频）拆解结果如下。请推断原片模特类型（性别、年龄感、风格），并写一条**不同面孔**的新模特文生图 Prompt。",
+    "须继承全片 visualStyle / globalColorTone 与各镜 lightingSetup / toneContrast 所描述的光影与色调。",
     "",
     tableJson,
   ].join("\n");

@@ -49,20 +49,21 @@ const FULL_PACK_FIXTURE = {
       },
     ],
     props: [{ id: "p1", name: "道具A", description: "测试道具" }],
-    shots: [
-      {
-        index: 1,
-        shotSize: "中景",
-        sceneDescription: "【起始】开场【结束】结束",
+    shots: Array.from({ length: 12 }, (_, i) => {
+      const index = i + 1;
+      return {
+        index,
+        shotSize: index === 1 ? "中景" : index % 3 === 0 ? "特写" : "近景",
+        sceneDescription: `【起始】镜${index}开场站位【结束】镜${index}收束`,
         dialogue: "—",
-        durationSec: 10,
+        durationSec: 15,
         lighting: "场景A，自然光，日内氛围与画面描述一致",
         cameraMove: "固定机位，镜头平稳推进，画面稳定",
         sfxNote: "—",
         audioNote: "—",
         sceneId: "s1",
-      },
-    ],
+      };
+    }),
     handoff: [
       { index: 1, item: "三视图", owner: "美术", note: "—" },
       { index: 2, item: "场景", owner: "美术", note: "—" },
@@ -91,6 +92,48 @@ describe("pro2-production-script-llm", () => {
     });
     expect(merged.response_format).toBeUndefined();
     expect(merged.temperature).toBe(0.7);
+  });
+
+  it("validate accepts scene colorBlock written as a string", () => {
+    const patch = {
+      schemaVersion: 3,
+      tier: "pro",
+      step: "scene",
+      patch: {
+        scenes: [
+          {
+            id: "s1",
+            name: "现代深夜办公室",
+            environmentTimeMood: "深夜压抑",
+            imagePrompt:
+              "名称：现代深夜办公室\n构图规范：2×2网格四视角\n[视觉风格：电影级写实]",
+            colorBlock: "冷蓝低饱和",
+          },
+        ],
+      },
+    };
+    const text = `\`\`\`pro2-production-script\n${JSON.stringify(patch)}\n\`\`\``;
+    const v = validatePro2ProductionScriptLlmOutput(text, {
+      llmSection: "scene",
+    });
+    expect(v.ok, v.error).toBe(true);
+    expect(v.patch?.patch.scenes?.[0]?.colorBlock).toEqual({
+      primary: "冷蓝低饱和",
+    });
+  });
+
+  it("validate rejects unfenced or truncated JSON", () => {
+    expect(
+      validatePro2ProductionScriptLlmOutput("模型只回了说明文字", {
+        llmSection: "outline",
+      }).ok,
+    ).toBe(false);
+    expect(
+      validatePro2ProductionScriptLlmOutput(
+        "```pro2-production-script\n{\"schemaVersion\":3,\"step\":\"full_pack\"\n",
+        { llmSection: "outline" },
+      ).ok,
+    ).toBe(false);
   });
 
   it("validatePro2ProductionScriptLlmOutput accepts fenced JSON", () => {
@@ -192,6 +235,8 @@ describe("pro2-production-script-llm", () => {
     const msg = buildPro2StructuredRetryUserMessage("缺少 shots");
     expect(msg).toContain("缺少 shots");
     expect(msg).toContain("重试");
+    expect(msg).toContain("schemaVersion: 3");
+    expect(msg).toContain("12–18");
   });
 
   it("buildPro2StructuredRetryUserMessage includes attempt budget", () => {

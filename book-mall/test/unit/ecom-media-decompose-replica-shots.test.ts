@@ -15,11 +15,22 @@ const ref: SeedVideoReference = {
   ossUrl: "",
 };
 
+const baseVideoPatch = {
+  visualStyle: "低饱和莫兰迪 lookbook",
+  globalColorTone: "暖金侧光",
+  cameraLanguageSummary: "镜1推镜；镜2固定",
+  scenePrep: { venue: "室内棚", fixedProps: "展示台" },
+  narrativeLogic: "",
+  beatPoints: "",
+  replicableShootingScript: "",
+} as const;
+
 describe("buildReplicaShotsFromDecompose", () => {
   it("maps non-voiceover storyboard fields into videoPrompt", () => {
     const structured: MediaDecomposePatch = {
       mediaType: "video",
       action: "decompose_complete",
+      ...baseVideoPatch,
       storyboardTable: [
         {
           shotNo: 1,
@@ -28,6 +39,8 @@ describe("buildReplicaShotsFromDecompose", () => {
           cameraMove: "推镜",
           cameraAngle: "平视",
           composition: "三分法",
+          lightingSetup: "柔光侧顺光",
+          toneContrast: "低对比自然光",
           visualContent: "模特展示包包",
           characterAction: "转身",
           expression: "微笑",
@@ -39,15 +52,16 @@ describe("buildReplicaShotsFromDecompose", () => {
           editRhythm: "卡点",
         },
       ],
-      narrativeLogic: "",
-      beatPoints: "",
-      replicableShootingScript: "",
     };
 
     const [shot] = buildReplicaShotsFromDecompose(structured, ref);
 
+    expect(shot.videoPrompt).toContain("低饱和莫兰迪 lookbook");
+    expect(shot.videoPrompt).toContain("暖金侧光");
     expect(shot.videoPrompt).toContain("中景");
     expect(shot.videoPrompt).toContain("推镜");
+    expect(shot.videoPrompt).toContain("柔光侧顺光");
+    expect(shot.videoPrompt).toContain("低对比自然光");
     expect(shot.videoPrompt).toContain("快门声");
     expect(shot.videoPrompt).toContain("轻快电子");
     expect(shot.videoPrompt).toContain("硬切");
@@ -61,6 +75,7 @@ describe("buildReplicaShotsFromDecompose", () => {
     const structured: MediaDecomposePatch = {
       mediaType: "video",
       action: "decompose_complete",
+      ...baseVideoPatch,
       storyboardTable: [
         {
           shotNo: 1,
@@ -69,6 +84,8 @@ describe("buildReplicaShotsFromDecompose", () => {
           cameraMove: "固定",
           cameraAngle: "俯拍",
           composition: "居中",
+          lightingSetup: "顶光",
+          toneContrast: "高对比",
           visualContent: "产品细节",
           characterAction: "",
           expression: "",
@@ -80,9 +97,6 @@ describe("buildReplicaShotsFromDecompose", () => {
           editRhythm: "",
         },
       ],
-      narrativeLogic: "",
-      beatPoints: "",
-      replicableShootingScript: "",
     };
 
     const [shot] = buildReplicaShotsFromDecompose(structured, ref);
@@ -97,6 +111,13 @@ describe("buildReplicaScriptSystemPrompt", () => {
     expect(prompt).toMatch(/videoPrompt 与 voiceover \*\*严格分离\*\*/);
     expect(prompt).toMatch(/音效\/BGM\/转场\/剪辑/);
     expect(prompt).toMatch(/禁止.*videoPrompt/);
+  });
+
+  it("requires inheriting lighting tone and camera language", () => {
+    const prompt = buildReplicaScriptSystemPrompt([]);
+    expect(prompt).toMatch(/布光、影调、全片色调与视觉风格/);
+    expect(prompt).toMatch(/不得删减.*光影/);
+    expect(prompt).toMatch(/cameraMove 不得弱化/);
   });
 
   it("forbids json fence alias in machine contract", () => {

@@ -94,6 +94,7 @@ export const STORY_PRO2_JSON_FIELD_RULES = `【JSON patch 字段名 · 硬性 ·
   - 禁止 photographyStyle / architectureStyle / colorBlock（colorBlock 仅用于 scenes[] / shots[]）
 - coreConflict[]：{ dimension, content }
 - scenes[]：{ id, name, environmentTimeMood, imagePrompt, negativePrompt?, colorBlock?, description?, foreground?, atmosphere?, compositionSpec?, visualStyleTag? }
+  - colorBlock 须为对象 { primary, secondary?, highlight?, shadow?, notes? }，禁止字符串；无色块则省略
   - 禁止 environment / keywords / prompt 等 alias
 - characters[]：{ id, name, role, appearance, personality?, imagePrompt, description?, clothing?, traits?, compositionSpec?, visualStyleTag? }
   - appearance 须为 ①外貌 / ②服装 / ③特征 三段（或分别写 description · clothing · traits）
@@ -110,11 +111,11 @@ export const STORY_PRO2_JSON_FIELD_RULES = `【JSON patch 字段名 · 硬性 ·
 - handoff[]：{ index, item, owner, note } 对象数组，禁止字符串数组`;
 
 export const STORY_PRO2_JSON_SCHEMA_EXAMPLE = `{
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "tier": "pro",
   "step": "full_pack",
   "patch": {
-    "meta": { "title": "示例剧名", "synopsis": "一句话梗概" },
+    "meta": { "title": "示例剧名", "synopsis": "一句话梗概", "packProfile": "director", "source": "creative" },
     "visualStyle": {
       "worldBackground": "现代都市职场",
       "era": "当代",
@@ -210,12 +211,61 @@ export const STORY_PRO2_JSON_OUTPUT_CONTRACT = `【JSON 结构化输出契约 ·
 \`\`\`pro2-production-script
 ${STORY_PRO2_JSON_SCHEMA_EXAMPLE}
 \`\`\`
-2. **step** 取值：full_pack · outline · character · scene · storyboard · shot_prompts（与当前任务段一致）；**tier 须为 pro**；**schemaVersion 须为 2**。
+2. **step** 取值：full_pack · outline · character · scene · storyboard · shot_prompts（与当前任务段一致）；**tier 须为 pro**；**schemaVersion 须为 3**（兼容 2）；meta.packProfile 须为 director|industrial。
 3. full_pack 须含非空：meta · visualStyle · coreConflict · scenes · characters · **props[]**（≥1）· shots · handoff（≥6 行）。
-4. v2 Pass1 须 **12–18 镜**，各镜 durationSec 之和 **175–185 秒**，每镜 **10–15 秒**整数；shots[] 禁止 imagePrompt / videoPrompt / frameImagePrompt。
+4. creative Pass1（非 film_pull）**硬性**：shots[] 必须 **完整 12–18 镜**（推荐 15 镜），各镜 durationSec **10–15 整数**，合计 **175–185 秒**（推荐 15×12=180）。**禁止**照抄上方示例只交 2 镜样例；示例仅示意字段形状。shots[] 禁止 imagePrompt / videoPrompt / frameImagePrompt。
 5. Pass1 字段金标准见 docs/画布提示词.md（运镜/光影/画面描述/音效/角色/场景/道具块结构）。
 ${STORY_PRO2_JSON_FIELD_RULES}
 6. 无有效 JSON 围栏或校验失败 → 任务失败；程序由 JSON 渲染人读 Markdown，**禁止**输出 GFM。`;
+
+/** 简版 · 现网导演表（packProfile=director） */
+export const STORY_PRO2_PACK_PROFILE_DIRECTOR_RULES = `【制作档 · 简版 director】
+- meta.packProfile 必须为 \`director\`；meta.source 默认 \`creative\`；schemaVersion=3。
+- 只填导演表：shotSize / lighting / cameraMove / sceneDescription / dialogue / durationSec / sfxNote / audioNote / sceneId / characterIds / propIds。
+- **禁止**输出 shots[].analysis（整块省略）。
+- Pass1 禁止 imagePrompt / videoPrompt / frameImagePrompt。
+- **时长硬性（creative）**：必须输出完整 **12–18 镜**（推荐 15），每镜 durationSec **10–15**，合计 **175–185**（推荐 180）。禁止只输出 1～2 镜示例即停。
+- scenes[].colorBlock / shots[].colorBlock 若有则须为对象 { primary, … }，禁止字符串。`;
+
+/** 专业版 · 导演表 + analysis */
+export const STORY_PRO2_PACK_PROFILE_INDUSTRIAL_RULES = `【制作档 · 专业版 industrial】
+- meta.packProfile 必须为 \`industrial\`。
+- 导演表字段与简版相同，且每镜必须含 \`analysis\`：
+  - analysis.cut.transition / cut.detail
+  - analysis.cinematography.cameraAngle / focalLength / composition
+  - analysis.blocking.subjectBlocking / sightDirection / foreMidBackLayer / sceneEnvironment / dynamicProps
+  - analysis.look.lightingSetup / toneContrast
+  - analysis.narrative.function / rhythmWeight
+- 非末镜 cut.detail 禁止「无」。
+- Pass1 禁止 frameImagePrompt / videoPrompt；视觉草稿只写 analysis.analysisDraftPrompt。
+- source=creative 时仍须完整 **12–18 镜**、合计 **175–185** 秒（禁止照抄示例只交 2 镜）。`;
+
+/** 专业版 + 上游视频拉片 */
+export const STORY_PRO2_FILM_PULL_INPUT_RULES = `【输入模式 · 视频拉片 film_pull】
+- meta.source 必须为 \`film_pull\`；meta.packProfile 必须为 \`industrial\`；schemaVersion=3。
+- 客观写实：每次硬切 = 一镜；禁止发明原片没有的镜头或剧情。
+- 须填 meta.totalDurationSec、shootingPrep（venue/costume/props/equipment）、三块长文（narrativeLogic / beatPoints / replicableShootingScript），长文不得超集 JSON。
+- 每镜 analysis.timing.startTimeSec / endTimeSec 连续；时长跟原片，**不要**套 12–18 镜或 175–185 秒。
+- 半数以上镜 sceneEnvironment 须有可观测内容；venue 禁止「无」。
+- characters / scenes / props 可空（可从画面升格，勿编造完整四视图若视频不足以支撑）。
+- 用户 Dock 附加要求须遵守，但不得违背跟片客观性。`;
+
+export function resolvePro2PackProfilePromptRules(opts: {
+  packProfile?: string | null;
+  source?: string | null;
+}): string {
+  const industrial = opts.packProfile === "industrial";
+  const filmPull = opts.source === "film_pull";
+  const parts = [
+    industrial
+      ? STORY_PRO2_PACK_PROFILE_INDUSTRIAL_RULES
+      : STORY_PRO2_PACK_PROFILE_DIRECTOR_RULES,
+  ];
+  if (filmPull && industrial) {
+    parts.push(STORY_PRO2_FILM_PULL_INPUT_RULES);
+  }
+  return parts.join("\n\n");
+}
 
 /** 摄影级视觉风格总纲 GFM 维度 */
 export const STORY_PRO2_VISUAL_STYLE_TABLE_RULES_V6 = `- **视觉风格总纲**须用 GFM 表输出（表头 \`维度 | 内容\`），须 **具体可执行**：

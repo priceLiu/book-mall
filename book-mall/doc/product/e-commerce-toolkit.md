@@ -22,7 +22,7 @@
 
 - 入口：`/ecom/media-decompose`；**电商**侧栏；单页工作区（上传 + Prompt + 模型 + 拆解结果）
 - 输入：本地图片/视频文件、**公网 HTTPS 链接**、我的资产（单素材）
-- 输出：Markdown + ` ```media-decompose ` JSON（Zod 校验）；视频 15 列分镜表 + 叙事/卡点/拍摄脚本；静态图要素 + 正/负向 Prompt + 实拍方案
+- 输出：Markdown + ` ```media-decompose ` JSON（Zod 校验）；视频 **17 列**分镜表（含布光/影调）+ 全片视觉风格/色调/运镜总述 + 叙事/卡点/拍摄脚本；一键复刻继承光影/色调/运镜；静态图要素 + 正/负向 Prompt + 实拍方案
 - 模型：Vision LLM（拆视频须 video-understanding）；Gateway `image_url` / `video_url`
 - toolKey：`ecom-toolkit__media-decompose`（`decompose`）；数据表 `EcomMediaDecomposeProject`
 
@@ -31,7 +31,7 @@
 > 需求与 JSON 契约：[`doc/拉片/`](../拉片/requirements.md)（`ecom-film-pull-prompts.ts` 运行时读取 `skill.md`）
 
 - 入口：`/ecom/film-pull`；**电商**侧栏（紧挨拆图拆视频）；**全屏上下分屏 Studio**（上：阶段条 + 分镜表/成片；下：Dock 上传 + 操作）
-- V1：**≤60s** 单次拉片；>60s 分段仅 schema/`analyzeMode` 预留
+- V1：**≤90s** 单次拉片；>90s 分段仅 schema/`analyzeMode` 预留；与画布专业版制作包统一见 `docs/Pro2拉片整合-schema-v3.md`
 - M1：上传 → Vision 拉片 JSON → 分镜表审校 → 导出 JSON/ZIP
 - M2：角色 ref → 渲染脚本 → 逐镜 R2V → MediaRender 合成成片
 - Canvas：Pro2 底栏预设「视频拉片」→ 拉片 → `POST export/pro2` 导入 Script Hub 制作包

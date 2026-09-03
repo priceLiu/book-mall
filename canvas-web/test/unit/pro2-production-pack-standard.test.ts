@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   PRO2_DEFAULT_SHOT_GFM_EXAMPLE,
+  resolvePro2PackProfilePromptRules,
   STORY_PRO2_STORYBOARD_TABLE_HEADER,
 } from "@/lib/canvas/data/pro2-production-pack-standard";
 import { parseStoryboardRows } from "@/lib/canvas/parse-md-tables";
@@ -70,5 +71,24 @@ describe("pro2 production pack standard v8", () => {
     expect(data.storyPro2PackPromptVersion).toBe(STORY_PRO2_PACK_PROMPT_VERSION);
     expect(data.promptStoryboard).toContain("12–18 镜");
     expect(data.promptStoryboard).toContain("Pass1 禁止");
+  });
+
+  it("pack profile rules stack industrial + film_pull", () => {
+    const director = resolvePro2PackProfilePromptRules({ packProfile: "director" });
+    expect(director).toContain("简版");
+    expect(director).not.toContain("film_pull");
+    const industrial = resolvePro2PackProfilePromptRules({
+      packProfile: "industrial",
+      source: "creative",
+    });
+    expect(industrial).toContain("analysis");
+    expect(industrial).not.toContain("film_pull");
+    const pull = resolvePro2PackProfilePromptRules({
+      packProfile: "industrial",
+      source: "film_pull",
+    });
+    expect(pull).toContain("analysis");
+    expect(pull).toContain("film_pull");
+    expect(pull).toContain("硬切");
   });
 });

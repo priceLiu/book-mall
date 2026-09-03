@@ -12,6 +12,10 @@ import {
 import {
   resolvePro2HubPromptPack,
 } from "./pro2-script-category-presets";
+import {
+  listPro2UpstreamVideoUrls,
+  resolvePro2HubFilmPullIntent,
+} from "./pro2-film-pull-intent";
 import { parseCharacterRows, parseSceneVisualDictionaryRows, parseStoryboardRows, resolveSceneDictionaryMarkdown, extractCharacterSectionFromOutline } from "./parse-md-tables";
 import {
   renderProductionScriptCharacterMd,
@@ -567,6 +571,15 @@ export function enqueuePro2ScriptGeneration(
     const promptPack = resolvePro2HubPromptPack(hubData);
     const categoryDoc = resolvePro2ScriptCategoryDocBody(hubData);
     const categoryId = hubData?.scriptCategoryId;
+    const filmPullSource =
+      resolvePro2HubFilmPullIntent({
+        packProfile: hubData?.packProfile,
+        dockInput,
+        hasUpstreamVideo: listPro2UpstreamVideoUrls(upstreamLinks).length > 0,
+        hasOutline: Boolean(effectiveOutline),
+      }) === "film_pull"
+        ? "film_pull"
+        : "creative";
     const mergeCtx = {
       categoryDoc,
       scriptCategoryId: categoryId,
@@ -591,6 +604,8 @@ export function enqueuePro2ScriptGeneration(
         outlineMd: includeOutlineInPrompt ? mergeCtx.outlineMd : undefined,
         themeInput: includeOutlineInPrompt ? "" : mergeCtx.themeInput,
         llmSection: section,
+        packProfile: hubData?.packProfile,
+        source: filmPullSource,
       });
     };
 
