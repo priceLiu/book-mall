@@ -60,9 +60,9 @@ function groupByAspect(projects: ComicProjectListItem[]): Record<AspectRatio, In
     "16:9": [],
     "9:16": [],
   };
-  for (const [i, p] of projects.entries()) {
+  projects.forEach((p, i) => {
     map[p.aspectRatio].push({ project: p, listIndex: i });
-  }
+  });
   return map;
 }
 
@@ -261,7 +261,7 @@ export function ProjectsPageClient() {
     } finally {
       setLoadingMore(false);
     }
-  }, [base, discoverOffset, hasMoreDiscover, loadingMore, myProjects]);
+  }, [base, discoverOffset, discoverProjects, hasMoreDiscover, loadingMore, myProjects]);
 
   useEffect(() => {
     if (sessionActive === null) return;

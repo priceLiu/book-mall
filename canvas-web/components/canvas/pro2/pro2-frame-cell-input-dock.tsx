@@ -236,7 +236,7 @@ export function Pro2FrameCellInputDock() {
   );
 
   const onPromptChange = useCallback(
-    (value: string, meta?: { commit?: boolean }) => {
+    (value: string, _refs?: string[], meta?: { commit?: boolean }) => {
       const nextRefs = refreshStoryRefImagesFromCatalog(
         storyRefImagesFromPrompt(value, refCatalog),
         refCatalog,
@@ -285,7 +285,7 @@ export function Pro2FrameCellInputDock() {
             refs={refImages}
             onChange={onRefImagesChange}
             promptValue={prompt}
-            onPromptChange={(next) => onPromptChange(next, { commit: true })}
+            onPromptChange={(next) => onPromptChange(next, [], { commit: true })}
             disabled={running}
             pasteActive={false}
             activeIds={activeRefIds}

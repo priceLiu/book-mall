@@ -139,12 +139,10 @@ export function PoseLibraryAdmin() {
 
   async function remove(row: PoseRow) {
     if (
-      !(await confirmDestructiveTwice({
-        firstTitle: "删除姿势条目",
-        firstMessage: `确定删除「${row.title}」？`,
-        secondTitle: "不可恢复",
-        secondMessage: CONFIRM_DELETE_LIBRARY_OSS_SECOND_ZH,
-      }))
+      !confirmDestructiveTwice(
+        `确定删除「${row.title}」？`,
+        CONFIRM_DELETE_LIBRARY_OSS_SECOND_ZH,
+      )
     ) {
       return;
     }

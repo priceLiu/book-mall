@@ -654,6 +654,7 @@ export function resolveCanvasE2eDisplayMs(input: {
   canvasCompletedAt?: string | null | undefined;
   preGatewayMs?: number | null;
   submittedAt?: string;
+  completedAt?: string | null | undefined;
   e2eFrozen?: boolean;
   isInProgress: boolean;
   nowMs: number | null;

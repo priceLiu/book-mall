@@ -34,7 +34,10 @@ import {
 import { applyScriptStudioThemeOutlineResult } from "./script-studio-run-apply";
 import { pickTaskResultMediaUrl } from "./task-media-url";
 import { shouldSkipStoryRowTaskApply } from "./task-pick";
-import { clearCanvasNodeRunSession } from "./canvas-run-session";
+import {
+  clearCanvasNodeRunSession,
+  isCanvasNodeRunSessionActive,
+} from "./canvas-run-session";
 import { buildStoryProStyleDraftApplyPatch } from "./story-pro-style-draft";
 import {
   syncPro2CharacterImagesFromRows,

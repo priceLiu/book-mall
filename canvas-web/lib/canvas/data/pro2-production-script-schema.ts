@@ -259,6 +259,9 @@ export const pro2ProductionScriptSchema = z.object({
 });
 
 export type Pro2ProductionScript = z.infer<typeof pro2ProductionScriptSchema>;
+export type Pro2ProductionScriptShot = NonNullable<
+  Pro2ProductionScript["shots"]
+>[number];
 export type Pro2ShotAnalysis = z.infer<typeof shotAnalysisSchema>;
 
 export const pro2ProductionScriptPatchBodySchema = z.object({

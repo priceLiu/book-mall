@@ -119,7 +119,7 @@ export function syncPro2FrameRowUpstreamRefs(
   }));
 
   let prompt = hydrateCanvasFramePromptMentions(
-    next.prompt ?? next.frameImagePrompt ?? "",
+    next.prompt ?? frame.frameImagePrompt ?? "",
     hydrateEntities,
   );
 
@@ -165,9 +165,9 @@ export function syncPro2FrameRowUpstreamRefs(
   return {
     ...next,
     characterRefIds: frame.characterRefIds ?? next.characterRefIds,
-    propRefIds: frame.propRefIds ?? next.propRefIds,
+    propRefIds: frame.propRefIds,
     prompt,
-    frameImagePrompt: next.frameImagePrompt ?? prompt,
+    frameImagePrompt: frame.frameImagePrompt ?? prompt,
     refImages,
     refImageUrls,
     referencedNodeIds: storyRefIdsFromPrompt(prompt),

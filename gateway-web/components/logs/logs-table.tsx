@@ -666,6 +666,7 @@ const LogsTableRow = memo(function LogsTableRow({
     canvasCompletedAt: l.canvasCompletedAt,
     preGatewayMs: l.preGatewayMs,
     submittedAt: l.submittedAt,
+    completedAt: l.completedAt,
     e2eFrozen: l.e2eFrozen,
     isInProgress,
     nowMs: liveTick ?? null,

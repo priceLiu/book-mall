@@ -62,7 +62,7 @@ function buildWizardVideoFallbackPrompt(shot: Pro2ProductionScriptShot): string 
       : "",
     dialogueLine(shot.dialogue),
     shot.sfxNote?.trim() ? `音效：${shot.sfxNote.trim()}` : "",
-    shot.lipSyncNote?.trim() ? `口型：${shot.lipSyncNote.trim()}` : "",
+    shot.audioNote?.trim() ? `口型：${shot.audioNote.trim()}` : "",
   ].filter(Boolean);
   return parts.join("\n");
 }
