@@ -16,6 +16,18 @@ import {
 } from "@/lib/gateway/minimax-speech-models";
 import { HAPPYHORSE_R2V_MODEL_KEY } from "@/lib/quick-replica/qr-motion-sync-models";
 
+/** 电商 · 拆图拆视频 / 拉片 · 视频理解 Chat 白名单 */
+export const ECOM_VIDEO_UNDERSTANDING_CHAT_MODEL_KEYS = [
+  "qwen3.8-max",
+  "qwen3-omni-flash",
+  "qwen2.5-vl-72b-instruct",
+  "glm-5.3-flash",
+  "qwen3-vl-plus",
+  "qwen3.7-plus",
+  "qwen3.6-plus",
+  "qwen3.5-plus",
+] as const;
+
 /** Canvas Pro2 / sbv1 · 改造前 EnginePicker 白名单 */
 export const CANVAS_SCENE_MODEL_KEYS = {
   "pro2-llm": [
@@ -29,6 +41,9 @@ export const CANVAS_SCENE_MODEL_KEYS = {
     "deepseek-v4-pro",
     "deepseek-chat",
     "qwen3.8-max",
+    "qwen3-omni-flash",
+    "qwen2.5-vl-72b-instruct",
+    "glm-5.3-flash",
     "qwen3.7-plus",
     "qwen3.6-plus",
     "qwen3.5-plus",
@@ -179,6 +194,9 @@ export const ECOM_SCENE_MODEL_KEYS = {
   ],
   "ecom-storyboard-chat": [
     "qwen3.8-max",
+    "qwen3-omni-flash",
+    "qwen2.5-vl-72b-instruct",
+    "glm-5.3-flash",
     "qwen3.7-plus",
     "qwen3.6-plus",
     "qwen3.5-plus",
@@ -205,6 +223,9 @@ export const ECOM_SCENE_MODEL_KEYS = {
   ],
   "ecom-model-shot-chat": [
     "qwen3.8-max",
+    "qwen3-omni-flash",
+    "qwen2.5-vl-72b-instruct",
+    "glm-5.3-flash",
     "qwen3.7-plus",
     "qwen3.6-plus",
     "qwen3.5-plus",
@@ -222,6 +243,8 @@ export const ECOM_SCENE_MODEL_KEYS = {
     "kling-3.0-image",
     "nano-banana-pro",
   ],
+  "ecom-media-decompose-chat": [...ECOM_VIDEO_UNDERSTANDING_CHAT_MODEL_KEYS],
+  "ecom-film-pull-chat": [...ECOM_VIDEO_UNDERSTANDING_CHAT_MODEL_KEYS],
 } as const;
 
 export const SCENE_SHELF_SPECS: SceneShelfSpec[] = [

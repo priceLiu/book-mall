@@ -124,6 +124,7 @@
     "gateway:seed-model-ops": "dotenv -e .env.local -- tsx scripts/seed-model-operations-center.ts --confirm",
     "gateway:seed-model-ops:preview": "dotenv -e .env.local -- tsx scripts/seed-model-operations-center.ts",
     "gateway:seed-model-ops:force": "dotenv -e .env.local -- tsx scripts/seed-model-operations-center.ts --confirm --force-labels",
+    "gateway:publish-video-understanding": "dotenv -e .env.local -- tsx scripts/publish-video-understanding-models.ts",
     "gateway:verify-ai-space": "dotenv -e .env.local -- tsx scripts/verify-ai-space-gateway.ts",
     "gateway:smoke-ai-space": "dotenv -e .env.local -- tsx scripts/smoke-ai-space-compose.ts",
     "gateway:ai-space-worker": "dotenv -e .env.local -- tsx scripts/ai-space-compose-worker.ts",

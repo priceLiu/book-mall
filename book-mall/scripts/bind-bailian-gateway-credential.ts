@@ -73,6 +73,9 @@ async function main() {
 
     for (const modelKey of [
       "qwen3.8-max",
+      "qwen3-omni-flash",
+      "qwen2.5-vl-72b-instruct",
+      "glm-5.3-flash",
       "qwen3.7-plus",
       "qwen3.6-plus",
       "qwen3.5-plus",

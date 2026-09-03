@@ -45,6 +45,9 @@ export const MISSING_MODEL_COST_SEEDS: ModelCostSeedRow[] = [
   { canonicalModelKey: "qwen3.5-27b", vendor: "aliyun", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(0.6), discountRate: ALI },
   { canonicalModelKey: "qwen3.6-plus", vendor: "aliyun", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(2), discountRate: ALI },
   { canonicalModelKey: "qwen3.8-max", vendor: "aliyun", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(12), discountRate: ALI, note: "输入 12/M · 输出 36/M" },
+  { canonicalModelKey: "qwen3-omni-flash", vendor: "aliyun", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(1.8), discountRate: ALI, note: "输入 1.8/M · 输出 15.8/M" },
+  { canonicalModelKey: "qwen2.5-vl-72b-instruct", vendor: "aliyun", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(16), discountRate: ALI, note: "输入 16/M · 输出 48/M" },
+  { canonicalModelKey: "glm-5.3-flash", vendor: "aliyun", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(0.8), discountRate: ALI, note: "智谱 GLM-5.3 Flash · 输入 0.8/M · 输出 2.8/M" },
   { canonicalModelKey: "qwen3.6-flash", vendor: "aliyun", unit: "PER_KTOKEN", listCostYuan: ktokenFromMillion(1.2), discountRate: ALI },
 
   // —— LEGACY · TEXT_LLM（KIE Chat）——

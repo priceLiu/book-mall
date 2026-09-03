@@ -652,6 +652,7 @@ export function resolveBailianChatModelKey(modelKey: string): string {
     "kimi-k2.5": "kimi/kimi-k2.5",
     "kimi-k2.7-code": "kimi/kimi-k2.7-code",
     "kimi-k2.7-code-highspeed": "kimi/kimi-k2.7-code-highspeed",
+    "glm-5.3-flash": "ZHIPU/GLM-5.3-Flash",
   };
   return aliases[raw] ?? raw;
 }

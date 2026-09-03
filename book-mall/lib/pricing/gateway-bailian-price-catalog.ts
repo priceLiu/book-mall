@@ -40,6 +40,10 @@ export const GATEWAY_ALI_PRICE_BY_MODEL_KEY: Record<string, GatewayAliPriceSpec>
   "qwen3.5-27b": { kind: "token", inputYuanPerMillion: 0.6, outputYuanPerMillion: 2, section: "千问Plus" },
   "qwen3.6-plus": { kind: "token", inputYuanPerMillion: 2, outputYuanPerMillion: 8, section: "千问Plus" },
   "qwen3.8-max": { kind: "token", inputYuanPerMillion: 12, outputYuanPerMillion: 36, section: "千问Max" },
+  "qwen3-omni-flash": { kind: "token", inputYuanPerMillion: 1.8, outputYuanPerMillion: 15.8, section: "千问Omni" },
+  "qwen2.5-vl-72b-instruct": { kind: "token", inputYuanPerMillion: 16, outputYuanPerMillion: 48, section: "千问VL" },
+  "ZHIPU/GLM-5.3-Flash": { kind: "token", inputYuanPerMillion: 0.8, outputYuanPerMillion: 2.8, section: "智谱GLM" },
+  "glm-5.3-flash": { kind: "token", inputYuanPerMillion: 0.8, outputYuanPerMillion: 2.8, section: "智谱GLM" },
   "qwen3.6-flash": { kind: "token", inputYuanPerMillion: 1.2, outputYuanPerMillion: 3.6, section: "千问Flash" },
   // Kimi · 百炼 Kimi-月之暗面
   "kimi/kimi-k3": { kind: "token", inputYuanPerMillion: 20, outputYuanPerMillion: 100, section: "Kimi-月之暗面" },

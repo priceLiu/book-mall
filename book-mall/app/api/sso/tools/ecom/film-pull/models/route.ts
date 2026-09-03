@@ -35,7 +35,13 @@ export async function GET(req: Request) {
   const billingPersona = persona === "PLATFORM_CREDIT" ? "PLATFORM_CREDIT" : "BYOK";
 
   const [chatModels, videoModels] = await Promise.all([
-    listModelsForApp({ appTag: "ecom", role: "LLM", persona: billingPersona, boundKinds }),
+    listModelsForApp({
+      appTag: "ecom",
+      sceneKey: "ecom-film-pull-chat",
+      role: "LLM",
+      persona: billingPersona,
+      boundKinds,
+    }),
     listModelsForApp({ appTag: "ecom", role: "VIDEO", persona: billingPersona, boundKinds }),
   ]);
 

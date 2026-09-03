@@ -59,6 +59,6 @@ export function assertStoryLlmVideoUnderstandingModel(
   if (isStoryLlmVideoUnderstandingModel(modelKey)) return;
   const prefix = context ? `${context}：` : "";
   throw new Error(
-    `${prefix}模型「${modelKey}」不支持视频理解，请换用 Qwen3.8 Max、Qwen3-VL 或 Qwen3.7/3.6/3.5 Plus`,
+    `${prefix}模型「${modelKey}」不支持视频理解，请换用 Qwen3.8 Max、Qwen3-Omni Flash、GLM-5.3 Flash、Qwen2.5-VL 72B 或 Qwen3-VL/Plus 系列`,
   );
 }

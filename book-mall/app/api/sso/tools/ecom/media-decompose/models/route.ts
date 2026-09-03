@@ -44,6 +44,7 @@ export async function GET(req: Request) {
   const [chatModels, imageModels] = await Promise.all([
     listModelsForApp({
       appTag: "ecom",
+      sceneKey: "ecom-media-decompose-chat",
       role: "LLM",
       persona: billingPersona,
       boundKinds,

@@ -22,6 +22,12 @@ export function getGatewayModelTypeLabels(args: {
     if (k === "qwen3.8-max") {
       return ["文本模型", "图片反推", "视频理解"];
     }
+    if (k === "glm-5.3-flash") {
+      return ["文本模型", "图片反推", "视频理解", "文件理解"];
+    }
+    if (k === "qwen3-omni-flash") {
+      return ["全模态", "图片反推", "视频理解"];
+    }
     return ["视频理解", "图片反推"];
   }
   if (isStoryLlmVisionModel(key)) {
