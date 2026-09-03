@@ -488,7 +488,8 @@ export function MediaDecomposeReplicaPanel({
       await onSeedVideoChange();
       toast({
         title: applicable.length > 1 ? "已应用全部新口播" : "已应用新口播",
-        description: "可在口播列继续编辑或清空；若已有 TTS 请重新批量 TTS。",
+        message: "可在口播列继续编辑或清空；若已有 TTS 请重新批量 TTS。",
+        variant: "success",
       });
     },
     [localShots, onSeedVideoChange, seedVideo, toast],

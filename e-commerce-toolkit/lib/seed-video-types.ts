@@ -172,7 +172,12 @@ export type SeedVideoProject = {
     /** 拆图拆视频 · 一键复刻采集 */
     replicaCollectPhase?: string;
     replicaProductBrief?: string | null;
+    replicaSellingPoints?: string | null;
     replicaModelPrompt?: string;
+    replicaVoiceoverDraft?: {
+      shots: Array<{ index: number; voiceover: string }>;
+      generatedAt?: string;
+    } | null;
   } | null;
   createdAt: string;
   updatedAt: string;
