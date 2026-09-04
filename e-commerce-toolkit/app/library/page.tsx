@@ -42,6 +42,7 @@ import {
   type EcomLibraryModelShotBundle,
   type EcomLibraryProductDesignBundle,
   type EcomLibrarySection,
+  type EcomLibraryOutfitVideoBundle,
   type EcomLibrarySeedVideoBundle,
   type EcomLibraryStoryboardBundle,
 } from "@/lib/ecom-library-api";
@@ -57,6 +58,8 @@ import {
 import { reuseStoryboardProject, fetchStoryboardLibraryDeliverable } from "@/lib/ecom-storyboard-api";
 import type { EcomProjectModule } from "@/lib/product-design-types";
 import type { StoryboardDeliverableSnapshot } from "@/lib/storyboard-types";
+
+const OUTFIT_VIDEO_STORAGE_KEY = "ecom-outfit-video-active-project";
 
 const STORYBOARD_STORAGE_KEY = "ecom-storyboard-active-project";
 const SEED_VIDEO_STORAGE_KEY = "ecom-seed-video-active-project";
@@ -227,6 +230,15 @@ type LibraryProjectEntry =
       meta: string;
       sortKey: string;
       bundle: EcomLibraryMediaDecomposeBundle;
+    }
+  | {
+      kind: "outfit-video";
+      key: string;
+      projectName: string;
+      thumbnailUrl: string | null;
+      meta: string;
+      sortKey: string;
+      bundle: EcomLibraryOutfitVideoBundle;
     };
 
 function thumbnailFromAssetGroup(group: EcomLibraryAssetGroup): string | null {
@@ -327,6 +339,17 @@ function buildSectionProjectEntries(section: EcomLibrarySection): LibraryProject
       projectName: bundle.title,
       thumbnailUrl: bundle.thumbnailUrl,
       meta: `${bundle.mediaKind === "video" ? "视频拆解" : bundle.mediaKind === "image" ? "图片拆解" : "拆图拆视频"} · ${bundle.hasReplica ? `${bundle.shotCount} 镜 · ` : ""}${bundle.hasVideo ? "含成片" : "拆解结果"}`,
+      sortKey: bundle.savedAt,
+      bundle,
+    });
+  }
+  for (const bundle of section.outfitVideoBundles ?? []) {
+    entries.push({
+      kind: "outfit-video",
+      key: `ov:${bundle.projectId}:${bundle.savedAt}`,
+      projectName: bundle.title,
+      thumbnailUrl: bundle.thumbnailUrl,
+      meta: `${bundle.shotCount > 0 ? `${bundle.shotCount} 镜 · ` : ""}${bundle.hasVideo ? "含成片" : "工作流快照"}`,
       sortKey: bundle.savedAt,
       bundle,
     });
@@ -548,7 +571,8 @@ export default function LibraryPage() {
               s.productDesignBundles.length > 0 ||
               s.seedVideoBundles.length > 0 ||
               s.handCraftBundles.length > 0 ||
-              s.mediaDecomposeBundles.length > 0,
+              s.mediaDecomposeBundles.length > 0 ||
+              (s.outfitVideoBundles?.length ?? 0) > 0,
           ),
       );
       setTotalAssets((n) => Math.max(0, n - 1));

@@ -38,6 +38,8 @@ type Props = {
   showMediaKindBadge?: boolean;
   /** 弹层 / 嵌套预览内禁用居中放大 */
   disableEnlargePreview?: boolean;
+  /** 导航中 / 弹层打开：禁用悬停播放 */
+  calm?: boolean;
 };
 
 /**
@@ -54,6 +56,7 @@ export function CanvasListCover({
   coverPosterUrl,
   showMediaKindBadge = false,
   disableEnlargePreview = false,
+  calm = false,
 }: Props) {
   const coverUrl = url?.trim() || "";
   const hoverVideo =
@@ -77,6 +80,7 @@ export function CanvasListCover({
             posterUrl={poster || (coverUrl !== hoverVideo ? coverUrl : undefined)}
             placeholderLetter={name}
             disableEnlargePreview={disableEnlargePreview}
+            calm={calm}
           />
         ) : coverUrl ? (
           <ProjectCoverMedia

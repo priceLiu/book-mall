@@ -1,0 +1,34 @@
+---
+description: 电商短视频工作流 · JSON 模板与 LLM 结构化交付（强制）
+globs: book-mall/lib/ecom/**,e-commerce-toolkit/**,docs/**,book-mall/doc/ecom/**
+alwaysApply: false
+---
+
+# 电商短视频工作流 · JSON 模板（强制）
+
+权威文档：
+
+- **模板契约**：`book-mall/doc/ecom/video-workflow-template-spec.md`
+- **LLM 总则**：`book-mall/doc/ecom/llm-json-structured-delivery.md`
+- **代码 SSOT**：`book-mall/lib/ecom/video-workflow/`
+
+## 必须
+
+1. **新/改** 电商短视频动作类工作流（穿搭、卡点换装、运镜迁移等）须注册 **`templateId`** + 解析引擎（`registry.ts`），JSON 使用信封 **`ecom-video-workflow/v1`**。
+2. **LLM 产出结构化数据**时：唯一围栏 `` ```ecom-video-workflow `` 或 API 直返同形信封；**zod 校验**后落库。
+3. **1 模板 = 1 引擎**：`schema` + `parser` + `ui-config` + `generation`；客户端镜像 `e-commerce-toolkit/lib/video-workflow/`。
+4. **穿搭 `outfit-v1`**：拆镜走 **物理/API JSON**，禁止 LLM 脑补分镜；逐镜 Prompt **服务端固定**，用户不可编辑动作 Prompt。
+5. 新增 Gateway 模型须完成 `23-new-model-onboarding-mandatory.md` 清单。
+
+## 禁止
+
+- 用 Markdown 分镜表/列表交付结构化真源
+- 用 `` ```json `` / 复用 `media-decompose` / `seed-video` 围栏代替 `ecom-video-workflow` 新模板
+- 未注册 `templateId` 即新增独立 JSON 根结构
+- 前端硬编码模型列表（走 Gateway / 运营中心）
+
+## Code Review
+
+- PR 新增短视频工作流但未更新 `video-workflow-template-spec.md` → **驳回**
+- PR LLM 回复含 Markdown 结构化表且无 JSON 围栏 → **驳回**
+- PR 未含 parser 单测 → **驳回**

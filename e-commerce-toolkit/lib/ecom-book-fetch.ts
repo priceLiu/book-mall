@@ -24,7 +24,7 @@ function isReplayableBody(body: BodyInit | null | undefined): boolean {
 
 export function formatEcomTransportError(e: unknown): string {
   const raw = e instanceof Error ? e.message : String(e);
-  if (/terminated|ECONNRESET|aborted|socket hang up|UND_ERR|fetch failed|upstream_fetch_failed/i.test(raw)) {
+  if (/terminated|ECONNRESET|aborted|socket hang up|UND_ERR|fetch failed|upstream_fetch_failed|failed to fetch/i.test(raw)) {
     return "与服务器连接中断，请确认 book-mall / Gateway 已启动后重试";
   }
   return raw || "请稍后重试";

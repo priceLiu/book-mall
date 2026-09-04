@@ -1,14 +1,18 @@
 {
   "scenes": [
     { "id": "scene-01", "name": "都市霓虹夜街", "visualPrompt": "湿漉漉柏油路反射霓虹光，现代玻璃幕墙，夜晚城市街道，电影感，冷蓝与暖橙对比", "tags": { "archetype": "street" }, "sortOrder": 1 },
-    { "id": "scene-02", "name": "极简高调影棚", "visualPrompt": "纯白无缝背景纸，均匀柔和顶光侧光，干净无杂物，专业商业摄影棚质感", "tags": { "archetype": "studio" }, "sortOrder": 2 },
-    { "id": "scene-03", "name": "法式慵懒阳台", "visualPrompt": "暖白百叶窗，盆栽绿植，午后阳光透窗洒落斑驳光影，优雅生活气息", "tags": { "archetype": "indoor_lifestyle" }, "sortOrder": 3 },
+    { "id": "scene-02", "name": "高级白棚摄影棚", "visualPrompt": "无缝纯白摄影棚背景，浅灰色哑光地面，柔和大面积柔光布光，干净通透，商业服装广告质感，无多余杂物", "tags": { "archetype": "studio", "outfitFusion": true }, "sortOrder": 2 },
+    { "id": "scene-03", "name": "午后阳台自然光", "visualPrompt": "住宅阳台，午后柔和侧方自然光，绿植点缀，通透柔光，浅景深，日常松弛穿搭，阳光氛围感", "tags": { "archetype": "indoor_lifestyle", "outfitFusion": true }, "sortOrder": 3 },
     { "id": "scene-04", "name": "旷野自然草地", "visualPrompt": "一望无际绿色山坡，蓝天白云，自然日光，清新通透，氧气感", "tags": { "archetype": "outdoor" }, "sortOrder": 4 },
-    { "id": "scene-05", "name": "工业复古咖啡馆", "visualPrompt": "裸露红砖墙，黑色金属框架，暖黄吊灯，深色木质长桌，文艺复古光影层次", "tags": { "archetype": "indoor_lifestyle" }, "sortOrder": 5 },
+    { "id": "scene-05", "name": "咖啡店休闲氛围感", "visualPrompt": "ins风咖啡店内部，柔和暖光，木质家具，大玻璃窗，环境虚化，休闲通勤穿搭场景，氛围感柔和", "tags": { "archetype": "indoor_lifestyle", "outfitFusion": true }, "sortOrder": 5 },
     { "id": "scene-06", "name": "海滨日落沙滩", "visualPrompt": "金色细沙，渐变色海面，暖橙粉紫交织日落天空，轻松浪漫度假感", "tags": { "archetype": "outdoor" }, "sortOrder": 6 },
     { "id": "scene-07", "name": "新中式禅意空间", "visualPrompt": "素白墙面，原木格栅，竹帘枯枝插花，水墨画，柔和自然顶光，东方美学", "tags": { "archetype": "indoor_lifestyle" }, "sortOrder": 7 },
     { "id": "scene-08", "name": "都市雪景街拍", "visualPrompt": "飘雪街道，暖黄路灯，冬日氛围，行人的呼吸在冷空气中凝成白雾", "tags": { "archetype": "street" }, "sortOrder": 8 },
     { "id": "scene-09", "name": "奢华酒店宴会厅", "visualPrompt": "水晶吊灯，香槟塔，丝绒椅套，落地窗映照城市天际线，璀璨华丽", "tags": { "archetype": "commercial" }, "sortOrder": 9 },
-    { "id": "scene-10", "name": "日落沙滩剪影", "visualPrompt": "逆光夕阳，海面波光粼粼，暖橘色天空，人物呈剪影或半剪影，浪漫氛围", "tags": { "archetype": "outdoor" }, "sortOrder": 10 }
+    { "id": "scene-10", "name": "日落沙滩剪影", "visualPrompt": "逆光夕阳，海面波光粼粼，暖橘色天空，人物呈剪影或半剪影，浪漫氛围", "tags": { "archetype": "outdoor" }, "sortOrder": 10 },
+    { "id": "scene-11", "name": "米色简约室内空间", "visualPrompt": "浅米色墙面，简约现代家居，少量柔和软装，暖调漫反射自然光，干净高级，浅木色地板，背景轻微虚化", "tags": { "archetype": "indoor_lifestyle", "outfitFusion": true }, "sortOrder": 11 },
+    { "id": "scene-12", "name": "城市街拍外景", "visualPrompt": "城市街道街拍环境，浅色建筑外立面，街边玻璃橱窗，白天柔和日光，浅景深，背景行人虚化，真实生活氛围感", "tags": { "archetype": "street", "outfitFusion": true }, "sortOrder": 12 },
+    { "id": "scene-13", "name": "温柔卧室居家风", "visualPrompt": "温柔奶油风卧室，柔软床品，浅色系软装，薄纱窗帘透入柔和自然光，居家松弛穿搭氛围，画面温暖柔和", "tags": { "archetype": "indoor_lifestyle", "outfitFusion": true }, "sortOrder": 13 },
+    { "id": "scene-14", "name": "极简水泥灰工业风", "visualPrompt": "极简工业风空间，水泥灰墙面地面，简约空旷，硬质感柔和侧光，高级冷调时装拍摄环境，无多余摆件", "tags": { "archetype": "studio", "outfitFusion": true }, "sortOrder": 14 }
   ]
 }

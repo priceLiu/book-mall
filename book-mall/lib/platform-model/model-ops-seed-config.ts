@@ -245,6 +245,17 @@ export const ECOM_SCENE_MODEL_KEYS = {
   ],
   "ecom-media-decompose-chat": [...ECOM_VIDEO_UNDERSTANDING_CHAT_MODEL_KEYS],
   "ecom-film-pull-chat": [...ECOM_VIDEO_UNDERSTANDING_CHAT_MODEL_KEYS],
+  /** 穿搭视频 · 逐镜动作迁移（Kling 动作控制 + 百炼 R2V 备选） */
+  "ecom-outfit-video": [
+    "kling-3.0/motion-control",
+    "kling-2.6/motion-control",
+    "wan/2-6-video-to-video",
+    "wan2.7-r2v",
+    "wan2.6-r2v",
+    "wan2.6-r2v-flash",
+    "happyhorse-1.1-r2v",
+    "happyhorse-1.0-r2v",
+  ],
 } as const;
 
 export const SCENE_SHELF_SPECS: SceneShelfSpec[] = [

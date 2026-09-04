@@ -1175,7 +1175,11 @@ function ProjectsSection({
                 onOpeningProject={onOpeningProject}
                 onPrefetchProject={onPrefetchProject}
               >
-                <CanvasListCover name={p.name} {...canvasListCoverPropsFromProject(p)} />
+                <CanvasListCover
+                  name={p.name}
+                  calm={Boolean(openingProjectId)}
+                  {...canvasListCoverPropsFromProject(p)}
+                />
                 <ProjectNameEditor
                   name={p.name}
                   onSave={(next) => void onRename(p.id, next)}

@@ -81,6 +81,12 @@ describe("wan3.0-video Gateway All-in-One", () => {
     }
   });
 
+  it("wan2.7-r2v and kling motion-control are on ecom-outfit-video shelf", () => {
+    expect(ECOM_SCENE_MODEL_KEYS["ecom-outfit-video"]).toContain("wan2.7-r2v");
+    expect(ECOM_SCENE_MODEL_KEYS["ecom-outfit-video"]).toContain("happyhorse-1.1-r2v");
+    expect(ECOM_SCENE_MODEL_KEYS["ecom-outfit-video"]).toContain("kling-3.0/motion-control");
+  });
+
   it("is selectable in ecom storyboard and QuickReplica catalogs", () => {
     for (const key of ["wan3.0-video", "wan3.0-video-prime"] as const) {
       expect(STORYBOARD_VIDEO_MODELS).toContain(key);

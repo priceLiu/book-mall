@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { useEffect } from "react";
 import { flushSync } from "react-dom";
 
+import { useHoverVideoEnlarge } from "@/components/home/hover-video-enlarge-preview";
 import { cn } from "@/lib/utils";
 
 type CanvasProjectOpenLinkProps = {
@@ -70,11 +72,18 @@ export function CanvasProjectOpeningOverlay({
   visible: boolean;
   label?: string;
 }) {
+  const enlarge = useHoverVideoEnlarge();
+
+  useEffect(() => {
+    if (!visible) return;
+    enlarge?.requestHide();
+  }, [enlarge, visible]);
+
   if (!visible) return null;
 
   return (
     <div
-      className="pointer-events-none fixed inset-0 z-[300] flex flex-col items-center justify-center gap-3 bg-[var(--canvas-bg,#0a0a0f)]"
+      className="fixed inset-0 z-[300] flex cursor-wait flex-col items-center justify-center gap-3 bg-[var(--canvas-bg,#0a0a0f)]"
       role="status"
       aria-live="polite"
       aria-busy="true"

@@ -18,6 +18,8 @@ import { ECOM_MODEL_SHOT_MODULE } from "@/lib/ecom/ecom-model-shot-types";
 import { ECOM_MEDIA_DECOMPOSE_MODULE } from "@/lib/ecom/ecom-media-decompose-types";
 import type { SeedVideoDeliverableSnapshot } from "@/lib/ecom/ecom-seed-video-snapshot";
 import { ECOM_SEED_VIDEO_MODULE } from "@/lib/ecom/ecom-seed-video-types";
+import type { OutfitVideoDeliverableSnapshot } from "@/lib/ecom/ecom-outfit-video-snapshot";
+import { ECOM_OUTFIT_VIDEO_MODULE } from "@/lib/ecom/ecom-outfit-video-types";
 import type { ProductDesignWorkflowSnapshot } from "@/lib/ecom/ecom-product-design-snapshot";
 import type { HandCraftWorkflowSnapshot } from "@/lib/ecom/ecom-hand-craft-snapshot";
 import { countHandCraftGeneratedImages } from "@/lib/ecom/ecom-hand-craft-snapshot";
@@ -113,6 +115,16 @@ export type EcomLibraryMediaDecomposeBundle = {
   snapshot: MediaDecomposeDeliverableSnapshot;
 };
 
+export type EcomLibraryOutfitVideoBundle = {
+  projectId: string;
+  savedAt: string;
+  title: string;
+  shotCount: number;
+  hasVideo: boolean;
+  thumbnailUrl: string | null;
+  snapshot: OutfitVideoDeliverableSnapshot;
+};
+
 export type EcomLibraryModelShotBundle = {
   projectId: string;
   savedAt: string;
@@ -136,6 +148,7 @@ export type EcomLibrarySection = {
   seedVideoBundles: EcomLibrarySeedVideoBundle[];
   handCraftBundles: EcomLibraryHandCraftBundle[];
   mediaDecomposeBundles: EcomLibraryMediaDecomposeBundle[];
+  outfitVideoBundles: EcomLibraryOutfitVideoBundle[];
   modelShotBundles: EcomLibraryModelShotBundle[];
 };
 
@@ -304,6 +317,24 @@ function collectMediaDecomposeSnapshotsFromMeta(
   return out;
 }
 
+function collectOutfitVideoSnapshotsFromMeta(
+  meta: Record<string, unknown> | null | undefined,
+): OutfitVideoDeliverableSnapshot[] {
+  const out: OutfitVideoDeliverableSnapshot[] = [];
+  const latest = meta?.deliverableSnapshot as OutfitVideoDeliverableSnapshot | undefined;
+  const history = Array.isArray(meta?.deliverableSnapshotHistory)
+    ? (meta!.deliverableSnapshotHistory as OutfitVideoDeliverableSnapshot[])
+    : [];
+  const seen = new Set<string>();
+  for (const snap of [latest, ...history]) {
+    if (!snap?.savedAt) continue;
+    if (seen.has(snap.savedAt)) continue;
+    seen.add(snap.savedAt);
+    out.push(snap);
+  }
+  return out;
+}
+
 function collectHandCraftSnapshotsFromMeta(
   meta: Record<string, unknown> | null | undefined,
 ): HandCraftWorkflowSnapshot[] {
@@ -412,6 +443,28 @@ function snapshotToSeedVideoBundle(
     productionMode,
     hasScript,
     hasVideo: Boolean(snap.finalVideoUrl?.trim()),
+    thumbnailUrl: thumb,
+    snapshot: snap,
+  };
+}
+
+function snapshotToOutfitVideoBundle(
+  projectId: string,
+  snap: OutfitVideoDeliverableSnapshot,
+): EcomLibraryOutfitVideoBundle {
+  const shotCount = snap.sceneList?.length ?? 0;
+  const thumb =
+    snap.composeResult?.coverUrl?.trim() ||
+    snap.references?.model?.ossUrl?.trim() ||
+    snap.references?.clothing?.ossUrl?.trim() ||
+    snap.sceneList?.find((s) => s.previewImageUrl?.trim())?.previewImageUrl?.trim() ||
+    null;
+  return {
+    projectId,
+    savedAt: snap.savedAt,
+    title: snap.title || "穿搭视频",
+    shotCount,
+    hasVideo: Boolean(snap.composeResult?.videoUrl?.trim()),
     thumbnailUrl: thumb,
     snapshot: snap,
   };
@@ -562,7 +615,7 @@ async function enrichStoryboardRowSnapshots(
 export async function listEcomLibrarySections(userId: string): Promise<EcomLibrarySection[]> {
   await backfillEcomAssetProjectNamesForUser(userId);
 
-  const [assets, storyboardRows, productDesignRows, seedVideoRows, handCraftRows, mediaDecomposeRows, modelShotRows] =
+  const [assets, storyboardRows, productDesignRows, seedVideoRows, handCraftRows, mediaDecomposeRows, outfitVideoRows, modelShotRows] =
     await Promise.all([
     prisma.ecomAsset.findMany({
       where: { userId },
@@ -600,6 +653,12 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
     }),
     prisma.ecomMediaDecomposeProject.findMany({
       where: { userId, module: ECOM_MEDIA_DECOMPOSE_MODULE },
+      orderBy: { updatedAt: "desc" },
+      take: 50,
+      select: { id: true, meta: true, title: true },
+    }),
+    prisma.ecomVideoWorkflowProject.findMany({
+      where: { userId, module: ECOM_OUTFIT_VIDEO_MODULE },
       orderBy: { updatedAt: "desc" },
       take: 50,
       select: { id: true, meta: true, title: true },
@@ -726,6 +785,15 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
   }
   mediaDecomposeBundles.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
 
+  const outfitVideoBundles: EcomLibraryOutfitVideoBundle[] = [];
+  for (const row of outfitVideoRows) {
+    const meta = (row.meta as Record<string, unknown> | null) ?? null;
+    for (const snap of collectOutfitVideoSnapshotsFromMeta(meta)) {
+      outfitVideoBundles.push(snapshotToOutfitVideoBundle(row.id, snap));
+    }
+  }
+  outfitVideoBundles.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+
   const modelShotBundles: EcomLibraryModelShotBundle[] = [];
   for (const row of modelShotRows) {
     const meta = (row.meta as Record<string, unknown> | null) ?? null;
@@ -752,6 +820,8 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
     const sectionSeedVideoBundles = moduleId === "seed-video" ? seedVideoBundles : [];
     const sectionMediaDecomposeBundles =
       moduleId === "media-decompose" ? mediaDecomposeBundles : [];
+    const sectionOutfitVideoBundles =
+      moduleId === "video-outfit" ? outfitVideoBundles : [];
     const sectionModelShotBundles = moduleId === "model-shot" ? modelShotBundles : [];
     const sectionProductDesignBundles = productDesignBundlesByModule.get(moduleId) ?? [];
     const sectionHandCraftBundles = moduleId === "hand-craft" ? handCraftBundles : [];
@@ -760,6 +830,7 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
       sectionBundles.length === 0 &&
       sectionSeedVideoBundles.length === 0 &&
       sectionMediaDecomposeBundles.length === 0 &&
+      sectionOutfitVideoBundles.length === 0 &&
       sectionModelShotBundles.length === 0 &&
       sectionProductDesignBundles.length === 0 &&
       sectionHandCraftBundles.length === 0
@@ -778,6 +849,7 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
       seedVideoBundles: sectionSeedVideoBundles,
       handCraftBundles: sectionHandCraftBundles,
       mediaDecomposeBundles: sectionMediaDecomposeBundles,
+      outfitVideoBundles: sectionOutfitVideoBundles,
       modelShotBundles: sectionModelShotBundles,
     });
   }

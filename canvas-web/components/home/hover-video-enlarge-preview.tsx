@@ -168,7 +168,7 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
             />
             <div
               className={cn(
-                "relative w-[min(90vw,640px)] transition duration-200",
+                "relative inline-block max-w-[min(90vw,640px)] transition duration-200",
                 touchMode ? "pointer-events-auto" : "pointer-events-none",
                 open ? "scale-100 opacity-100" : "scale-[0.97] opacity-0",
               )}
@@ -188,7 +188,7 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
                   key={open.url}
                   src={open.url}
                   poster={open.posterUrl || undefined}
-                  className="aspect-video w-full object-cover"
+                  className="block h-auto max-h-[80vh] w-auto max-w-[min(90vw,640px)] object-contain"
                   muted
                   playsInline
                   loop

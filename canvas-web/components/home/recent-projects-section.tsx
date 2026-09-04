@@ -134,7 +134,11 @@ export function RecentProjectsSection() {
                   onOpeningProject={setOpeningProjectId}
                   onPrefetchProject={prefetchProject}
                 >
-                  <CanvasListCover name={p.name} {...canvasListCoverPropsFromProject(p)} />
+                  <CanvasListCover
+                    name={p.name}
+                    calm={Boolean(openingProjectId)}
+                    {...canvasListCoverPropsFromProject(p)}
+                  />
                   <p className="mt-3 truncate text-sm font-medium text-white">{p.name}</p>
                   <p className="mt-3 text-[11px] text-[var(--canvas-muted)]/80">
                     更新于 {formatDate(p.updatedAt)}

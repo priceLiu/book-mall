@@ -65,7 +65,30 @@ export function fromEcomSeedVideoPlan(
       videoUrl: s.videoUrl!.trim(),
       audioUrl: s.ttsUrl?.trim() || undefined,
       subtitle: s.voiceover?.trim() || undefined,
-      durationSec: s.durationSec > 0 ? s.durationSec : undefined,
+    }));
+  return { version: 1, clips };
+}
+
+/** 穿搭视频分镜 → Timeline v1（无口播/TTS） */
+export function fromOutfitVideoScenes(
+  scenes: Array<{ index: number; videoUrl?: string; durationSec?: number }>,
+  opts?: { sceneIndexes?: number[] },
+): MediaTimelineV1 {
+  const indexFilter =
+    opts?.sceneIndexes && opts.sceneIndexes.length > 0
+      ? new Set(opts.sceneIndexes)
+      : null;
+  const sorted = scenes
+    .slice()
+    .sort((a, b) => a.index - b.index)
+    .filter((s) => !indexFilter || indexFilter.has(s.index));
+  const clips = sorted
+    .filter((s) => Boolean(s.videoUrl?.trim() && /^https?:\/\//.test(s.videoUrl!.trim())))
+    .map((s, i) => ({
+      order: i,
+      videoUrl: s.videoUrl!.trim(),
+      durationSec:
+        typeof s.durationSec === "number" && s.durationSec > 0 ? s.durationSec : undefined,
     }));
   return { version: 1, clips };
 }

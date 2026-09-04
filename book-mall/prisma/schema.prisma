@@ -128,6 +128,7 @@ model User {
   ecomHandCraftProjects            EcomHandCraftProject[]
   ecomModelShotProjects            EcomModelShotProject[]
   ecomMediaDecomposeProjects       EcomMediaDecomposeProject[]
+  ecomVideoWorkflowProjects        EcomVideoWorkflowProject[]
   ecomFilmPullProjects             EcomFilmPullProject[]
   mediaRenderJobs                  MediaRenderJob[]
   mediaStorageGrants               UserMediaStorageGrant[]
@@ -827,6 +828,39 @@ model EcomMediaDecomposeProject {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, module, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
+}
+
+/// 电商工具箱 · 短视频工作流（穿搭视频等模板化动作迁移）
+model EcomVideoWorkflowProject {
+  id          String  @id @default(cuid())
+  userId      String
+  title       String?
+  module      String  @default("video-outfit")
+  templateId  String  @default("outfit-v1")
+  status      String  @default("draft")
+  phase       String  @default("upload")
+  settings    Json?
+  /// 参考视频 + 模特 + 服装 { referenceVideo?, model?, clothing? }
+  references  Json?
+  /// 最新 envelope 快照 { [action]: WorkflowEnvelope }
+  structured  Json?
+  /// normalize 后分镜 UI 真源 SceneShot[]
+  sceneList   Json?
+  composeResult Json?
+  meta        Json?
+
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, updatedAt])
+  @@index([userId, templateId, updatedAt])
   @@index([tenantId, visibility, updatedAt])
 }
 

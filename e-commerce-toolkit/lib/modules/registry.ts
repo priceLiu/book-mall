@@ -111,7 +111,7 @@ export const ECOM_MODULES: EcomModuleDef[] = [
     id: `video-${p.slug}`,
     title: p.title,
     tagline: "短视频带货模板",
-    href: `/ecom/video/${p.slug}`,
+    href: p.slug === "outfit" ? "/ecom/outfit-video" : `/ecom/video/${p.slug}`,
     kind: "video" as const,
     toolKey: "ecom-toolkit__video",
     action: p.action,

@@ -36,6 +36,12 @@ pnpm dev:all                        # 同时启动 3000–3011（含 e-commerce-
 | common-tools（常用工具） | 3010 | http://localhost:3010 |
 | publisher-web（一键发布） | 3011 | http://localhost:3011 |
 
+### 电商工具箱 · 穿搭视频 Studio
+
+- 路由：**http://localhost:3007/ecom/outfit-video**（旧 `/ecom/video/outfit` 301 重定向）
+- Platform API：`book-mall/app/api/sso/tools/ecom/outfit-video/*`
+- 技术契约：`book-mall/doc/ecom/video-workflow-template-spec.md`（`ecom-video-workflow/v1` · 模板 `outfit-v1`）
+
 ## 漫剧：带上 KIE 轮询
 
 本地没有公网回调时，生成任务靠 poll worker 拉结果。在 `dev:all` 基础上多加一条 poll-loop：

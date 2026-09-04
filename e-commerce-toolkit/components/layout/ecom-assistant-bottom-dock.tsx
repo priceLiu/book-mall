@@ -10,10 +10,17 @@ type Props = {
   className?: string;
   /** 底栏外层（居中宽度） */
   dockClassName?: string;
+  /** 扫光（生成/拆解进行中 · 对齐拆图拆视频底栏） */
+  composerSweep?: boolean;
 };
 
 /** 助手底栏：仅 Composer 输入条（Cursor 式，无会话标题/消息区）。 */
-export function EcomAssistantBottomDock({ composer, className, dockClassName }: Props) {
+export function EcomAssistantBottomDock({
+  composer,
+  className,
+  dockClassName,
+  composerSweep,
+}: Props) {
   return (
     <div
       className={cn(
@@ -28,6 +35,7 @@ export function EcomAssistantBottomDock({ composer, className, dockClassName }: 
             className={cn(
               ECOM_ASSISTANT_FLOATING_COMPOSER_SHELL_CLASS,
               "rounded-[1.75rem] px-3 py-2",
+              composerSweep && "ecom-media-generating-sweep",
             )}
           >
             <div className="min-w-0 flex-1">{composer}</div>

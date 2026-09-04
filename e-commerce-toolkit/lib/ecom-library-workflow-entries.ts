@@ -2,6 +2,7 @@ import type {
   EcomLibraryHandCraftBundle,
   EcomLibraryMediaDecomposeBundle,
   EcomLibraryModelShotBundle,
+  EcomLibraryOutfitVideoBundle,
   EcomLibraryProductDesignBundle,
   EcomLibrarySection,
   EcomLibrarySeedVideoBundle,
@@ -63,6 +64,15 @@ export type LibraryWorkflowEntry =
       meta: string;
       sortKey: string;
       bundle: EcomLibraryMediaDecomposeBundle;
+    }
+  | {
+      kind: "outfit-video";
+      key: string;
+      projectName: string;
+      thumbnailUrl: string | null;
+      meta: string;
+      sortKey: string;
+      bundle: EcomLibraryOutfitVideoBundle;
     }
   | {
       kind: "model-shot";
@@ -128,6 +138,17 @@ function bundleEntriesFromSection(section: EcomLibrarySection): LibraryWorkflowE
       projectName: bundle.title,
       thumbnailUrl: bundle.thumbnailUrl,
       meta: `${bundle.mediaKind === "video" ? "视频拆解" : bundle.mediaKind === "image" ? "图片拆解" : "拆图拆视频"} · ${bundle.hasReplica ? `${bundle.shotCount} 镜 · ` : ""}${bundle.hasVideo ? "含成片" : "拆解结果"}`,
+      sortKey: bundle.savedAt,
+      bundle,
+    });
+  }
+  for (const bundle of section.outfitVideoBundles ?? []) {
+    entries.push({
+      kind: "outfit-video",
+      key: `ov:${bundle.projectId}:${bundle.savedAt}`,
+      projectName: bundle.title,
+      thumbnailUrl: bundle.thumbnailUrl,
+      meta: `${bundle.shotCount > 0 ? `${bundle.shotCount} 镜 · ` : ""}${bundle.hasVideo ? "含成片" : "工作流快照"}`,
       sortKey: bundle.savedAt,
       bundle,
     });

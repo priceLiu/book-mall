@@ -12,15 +12,17 @@ export function storyboardProviderLabel(kind: string): string {
   return PROVIDER_LABELS[kind] ?? kind;
 }
 
-/** 在列表中优先选用已绑定凭证的模型；preferred 不在列表时回退到首个可用项 */
+/** 在列表中优先选用已绑定凭证的模型；preferred 未绑定时有其它可用项则回退 */
 export function pickBoundStoryboardModelKey(
   models: StoryboardGatewayModel[],
   preferred: string,
 ): string {
   if (models.length === 0) return preferred;
   const preferredModel = models.find((m) => m.modelKey === preferred);
-  if (preferredModel?.credentialBound) return preferred;
-  const bound = models.find((m) => m.credentialBound);
+  if (preferredModel?.credentialBound || preferredModel?.platformOffering) {
+    return preferred;
+  }
+  const bound = models.find((m) => m.credentialBound || m.platformOffering);
   if (bound) return bound.modelKey;
   if (preferredModel) return preferred;
   return models[0]!.modelKey;
