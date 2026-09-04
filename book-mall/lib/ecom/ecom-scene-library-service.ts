@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { randomUUID } from "crypto";
@@ -136,7 +137,7 @@ export async function upsertSceneLibraryEntry(
   const data = {
     name: entry.name,
     visualPrompt: entry.visualPrompt,
-    tags: entry.tags ?? undefined,
+    tags: entry.tags ? (entry.tags as Prisma.InputJsonValue) : undefined,
     scope: entry.scope ?? "platform",
     userId: entry.userId ?? null,
     enabled: entry.enabled ?? true,

@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { randomUUID } from "crypto";
@@ -142,7 +143,7 @@ export async function upsertPoseLibraryEntry(
     category: entry.category,
     title: entry.title,
     baseDescription: entry.baseDescription,
-    tags: entry.tags ?? undefined,
+    tags: entry.tags ? (entry.tags as Prisma.InputJsonValue) : undefined,
     scope: entry.scope ?? "platform",
     userId: entry.userId ?? null,
     enabled: entry.enabled ?? true,

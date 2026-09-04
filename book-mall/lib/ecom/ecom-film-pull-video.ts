@@ -403,8 +403,8 @@ export async function ecomRenderFilmPullFinalVideo(opts: {
   for (let i = 0; i < 120; i++) {
     await new Promise((r) => setTimeout(r, 3000));
     const row = await getMediaRenderJobForUser(opts.userId, job.id);
-    if (row?.status === "SUCCEEDED" && row.resultOssUrl?.trim()) {
-      const finalVideoUrl = row.resultOssUrl.trim();
+    if (row?.status === "SUCCEEDED" && row.downloadUrl?.trim()) {
+      const finalVideoUrl = row.downloadUrl.trim();
       const renderMeta = { jobId: job.id, finalVideoUrl };
       if (productionPlan) {
         await updateEcomFilmPullProject(opts.userId, opts.projectId, {

@@ -9,6 +9,7 @@ import { listFilmPullProductRefs } from "@/lib/ecom/ecom-film-pull-refs";
 import { formatFilmPullAnalyzeMarkdown } from "@/lib/ecom/ecom-film-pull-structured";
 import type { FilmPullRenderScriptPatch } from "@/lib/ecom/ecom-film-pull-structured";
 import type { FilmPullProjectDto } from "@/lib/ecom/ecom-film-pull-types";
+import { isLegacyFilmPullAnalyzePatch } from "@/lib/ecom/ecom-film-pull-types";
 import {
   buildRenderPlanFromScript,
   getEcomFilmPullProject,
@@ -101,6 +102,9 @@ export async function applyMockFilmPullRenderScript(
   if (!project) throw new Error("项目不存在");
   const analyze = project.analyzeResult?.structured;
   if (!analyze) throw new Error("请先完成拉片");
+  if (!isLegacyFilmPullAnalyzePatch(analyze)) {
+    throw new Error("Pro2 拉片结果暂不支持 mock 渲染脚本");
+  }
 
   const structured = buildMockFilmPullRenderScript(analyze);
   const rawText = buildMockRenderScriptRawText(structured);

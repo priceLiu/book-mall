@@ -14,11 +14,12 @@ import {
   type ModelShotReferenceRole,
 } from "@/lib/ecom/ecom-model-shot-types";
 import { ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
+import type { EcomImageRatio } from "@/lib/ecom/ecom-platform-spec";
 
-const ROLE_RATIO: Record<ModelShotReferenceRole, "3:4" | "1:1" | "4:3"> = {
+const ROLE_RATIO: Record<ModelShotReferenceRole, EcomImageRatio> = {
   garment: "3:4",
   model: "3:4",
-  scene: "4:3",
+  scene: "16:9",
   prop: "1:1",
 };
 

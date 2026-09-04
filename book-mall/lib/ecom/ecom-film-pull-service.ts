@@ -25,7 +25,9 @@ import {
   type FilmPullRefMatch,
   type FilmPullRenderPlan,
   type FilmPullSettings,
+  type FilmPullStoredAnalyze,
   type FilmPullStructuredResult,
+  isLegacyFilmPullAnalyzePatch,
   isEcomFilmPullAnalyzeActive,
 } from "@/lib/ecom/ecom-film-pull-types";
 import { prisma } from "@/lib/prisma";
@@ -154,18 +156,14 @@ function reconcileFilmPullProjectStatus(
     dto.analyzeResult?.completedAt
   ) {
     const nextStatus = dto.analyzeResult.structured ? "analyzed" : "failed";
-    if (nextStatus !== dto.status) {
-      return { dto: { ...dto, status: nextStatus }, statusPatch: nextStatus };
-    }
+    return { dto: { ...dto, status: nextStatus }, statusPatch: nextStatus };
   }
   if (
     dto.status === "render_scripting" &&
     dto.renderScript?.completedAt
   ) {
     const nextStatus = dto.renderScript.structured ? "render_ready" : "failed";
-    if (nextStatus !== dto.status) {
-      return { dto: { ...dto, status: nextStatus }, statusPatch: nextStatus };
-    }
+    return { dto: { ...dto, status: nextStatus }, statusPatch: nextStatus };
   }
   return { dto };
 }
@@ -250,7 +248,7 @@ export async function updateEcomFilmPullProject(
     title: string;
     status: string;
     settings: FilmPullSettings;
-    analyzeResult: FilmPullStructuredResult<FilmPullAnalyzePatch> | null;
+    analyzeResult: FilmPullStructuredResult<FilmPullStoredAnalyze> | null;
     renderScript: FilmPullStructuredResult<FilmPullRenderScriptPatch> | null;
     characterRefs: FilmPullCharacterRef[];
     renderPlan: FilmPullRenderPlan | null;
@@ -406,7 +404,7 @@ export async function cancelEcomFilmPullAnalyze(
 
   abortFilmPullAnalyzeRun(userId, projectId);
 
-  const canceledResult: FilmPullStructuredResult<FilmPullAnalyzePatch> = {
+  const canceledResult: FilmPullStructuredResult<FilmPullStoredAnalyze> = {
     rawText: project.analyzeResult?.rawText ?? "",
     structured: null,
     parseError: "拉片已中止",
@@ -605,7 +603,7 @@ export async function attachFilmPullRefsFromAssets(
 export async function saveFilmPullAnalyzeResult(
   userId: string,
   projectId: string,
-  result: FilmPullStructuredResult<FilmPullAnalyzePatch>,
+  result: FilmPullStructuredResult<FilmPullStoredAnalyze>,
 ): Promise<FilmPullProjectDto> {
   return updateEcomFilmPullProject(userId, projectId, {
     analyzeResult: result,
@@ -632,7 +630,10 @@ export async function patchFilmPullAnalyzeShots(
   const project = await getEcomFilmPullProject(userId, projectId);
   const structured = project?.analyzeResult?.structured;
   if (!structured) throw new Error("暂无拉片结果");
-  const next = { ...structured, shots };
+  if (!isLegacyFilmPullAnalyzePatch(structured)) {
+    throw new Error("当前拉片结果为 Pro2 格式，不支持此编辑接口");
+  }
+  const next: FilmPullAnalyzePatch = { ...structured, shots };
   return updateEcomFilmPullProject(userId, projectId, {
     analyzeResult: {
       ...project.analyzeResult!,

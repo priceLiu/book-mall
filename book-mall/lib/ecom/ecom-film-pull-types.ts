@@ -11,6 +11,17 @@ import type {
 /** 拉片 analyze 存库：v3 Pro2 真源或 legacy v1 film-pull */
 export type FilmPullStoredAnalyze = FilmPullAnalyzePatch | Pro2ProductionScript;
 
+export function isLegacyFilmPullAnalyzePatch(
+  structured: FilmPullStoredAnalyze,
+): structured is FilmPullAnalyzePatch {
+  return (
+    typeof structured === "object" &&
+    structured !== null &&
+    "action" in structured &&
+    structured.action === "analyze_complete"
+  );
+}
+
 export const ECOM_FILM_PULL_TOOL_KEY = "ecom-toolkit__film-pull";
 export const ECOM_FILM_PULL_MODULE = "film-pull";
 export const ECOM_FILM_PULL_REPLICA_MODEL_PROMPT_ACTION = "replica-model-prompt";

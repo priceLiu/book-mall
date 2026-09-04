@@ -2,6 +2,7 @@ import { createZipArchive, formatExportTimestamp } from "@/lib/zip/create-zip-ar
 
 import { getEcomFilmPullProject } from "@/lib/ecom/ecom-film-pull-service";
 import { formatFilmPullAnalyzeMarkdown } from "@/lib/ecom/ecom-film-pull-structured";
+import { isLegacyFilmPullAnalyzePatch } from "@/lib/ecom/ecom-film-pull-types";
 
 function sanitizeZipSegment(name: string): string {
   return name.replace(/[^\w\u4e00-\u9fff.-]+/g, "_").slice(0, 80) || "专业拉片";
@@ -20,7 +21,9 @@ export async function buildFilmPullExportZip(
   const base = sanitizeZipSegment(project.title ?? "专业拉片");
   const fileName = `${base}-${ts}.zip`;
 
-  const markdown = formatFilmPullAnalyzeMarkdown(analyze);
+  const markdown = isLegacyFilmPullAnalyzePatch(analyze)
+    ? formatFilmPullAnalyzeMarkdown(analyze)
+    : `# Pro2 拉片结果\n\n\`\`\`json\n${JSON.stringify(analyze, null, 2)}\n\`\`\``;
   const json = JSON.stringify(
     {
       analyze,
@@ -33,10 +36,23 @@ export async function buildFilmPullExportZip(
     2,
   );
 
-  const buf = await createZipArchive([
-    { path: "拉片结果.md", content: Buffer.from(markdown, "utf8") },
-    { path: "film-pull.json", content: Buffer.from(json, "utf8") },
-  ]);
+  const buf = await new Promise<Buffer>((resolve, reject) => {
+    void (async () => {
+      try {
+        const archive = await createZipArchive();
+        const chunks: Buffer[] = [];
+        archive.on("data", (c: Buffer) => chunks.push(c));
+        archive.on("error", reject);
+        archive.on("end", () => resolve(Buffer.concat(chunks)));
+
+        archive.append(Buffer.from(markdown, "utf8"), { name: "拉片结果.md" });
+        archive.append(Buffer.from(json, "utf8"), { name: "film-pull.json" });
+        void archive.finalize();
+      } catch (e) {
+        reject(e);
+      }
+    })();
+  });
 
   return { buf, fileName };
 }

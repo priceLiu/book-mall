@@ -3,10 +3,11 @@ import {
   listFilmPullModelRefs,
   listFilmPullProductRefs,
 } from "@/lib/ecom/ecom-film-pull-refs";
-import type {
-  FilmPullCharacterRef,
-  FilmPullRefMatch,
-  FilmPullRefMatchShot,
+import {
+  isLegacyFilmPullAnalyzePatch,
+  type FilmPullCharacterRef,
+  type FilmPullRefMatch,
+  type FilmPullRefMatchShot,
 } from "@/lib/ecom/ecom-film-pull-types";
 
 function isProductCloseUpShot(shot: FilmPullAnalyzePatch["shots"][number]): boolean {
@@ -91,6 +92,9 @@ export async function applyFilmPullRefMatchAuto(
   if (!project) throw new Error("项目不存在");
   const analyze = project.analyzeResult?.structured;
   if (!analyze) throw new Error("请先完成拉片分析");
+  if (!isLegacyFilmPullAnalyzePatch(analyze)) {
+    throw new Error("Pro2 拉片结果暂不支持自动参考图匹配");
+  }
   const refMatch = buildFilmPullRefMatchRule(analyze, project.characterRefs);
   await saveFilmPullRefMatch(userId, projectId, refMatch);
   return refMatch;

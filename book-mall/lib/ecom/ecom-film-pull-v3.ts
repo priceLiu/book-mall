@@ -32,7 +32,7 @@ export function extractFilmPullPro2Analyze(text: string): FilmPullPro2ExtractRes
   if (envelope.patch.meta?.packProfile !== "industrial") {
     return { ok: false, error: "meta.packProfile 须为 industrial" };
   }
-  const script = mergeProductionScriptPatch(null, envelope);
+  const script = mergeProductionScriptPatch(undefined, envelope);
   if (!isPro2FilmPullProductionScript(script)) {
     return { ok: false, error: "拉片 JSON 缺少 shots[] 或 analysis" };
   }

@@ -17,6 +17,7 @@ import type { StoryboardSheet } from "@/lib/ecom/ecom-storyboard-types";
 import { ECOM_STORYBOARD_MODULE } from "@/lib/ecom/ecom-storyboard-types";
 import { resolveEcomGatewayAuthForUser } from "@/lib/ecom/ecom-gateway-auth";
 import {
+  ecomGwPollDashscope,
   ecomGwPollKie,
   ecomGwPollMinimax,
   ecomGwPollVolcengine,

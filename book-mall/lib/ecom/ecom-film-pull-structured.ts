@@ -1,10 +1,10 @@
 import { z } from "zod";
 
 const audioInfoSchema = z.object({
-  scriptSubtitle: z.string().default("无"),
-  vocalEmotion: z.string().default("无"),
-  ambientSound: z.string().default("无"),
-  fxAndBgm: z.string().default("无"),
+  scriptSubtitle: z.string().min(1),
+  vocalEmotion: z.string().min(1),
+  ambientSound: z.string().min(1),
+  fxAndBgm: z.string().min(1),
 });
 
 export const filmPullShootingPrepSchema = z.object({
@@ -294,10 +294,10 @@ function extractJsonObject(text: string): unknown | null {
   return tryParseJson(text.slice(start, end + 1));
 }
 
-function parseFilmPullPatch<T>(
+function parseFilmPullPatch(
   text: string,
-  schema: z.ZodType<T>,
-): { patch: T | null; validationHint: string | null } {
+  schema: z.ZodTypeAny,
+): { patch: unknown | null; validationHint: string | null } {
   const parsed = extractJsonObject(text);
   if (!parsed) {
     return { patch: null, validationHint: "JSON 语法错误或围栏为空" };
@@ -312,11 +312,13 @@ function parseFilmPullPatch<T>(
 }
 
 export function extractFilmPullAnalyzePatch(text: string): FilmPullAnalyzePatch | null {
-  return parseFilmPullPatch(text, filmPullAnalyzePatchSchema).patch;
+  return parseFilmPullPatch(text, filmPullAnalyzePatchSchema).patch as FilmPullAnalyzePatch | null;
 }
 
 export function extractFilmPullRenderScriptPatch(text: string): FilmPullRenderScriptPatch | null {
-  return parseFilmPullPatch(text, filmPullRenderScriptPatchSchema).patch;
+  return parseFilmPullPatch(text, filmPullRenderScriptPatchSchema).patch as
+    | FilmPullRenderScriptPatch
+    | null;
 }
 
 export function resolveFilmPullParseError(

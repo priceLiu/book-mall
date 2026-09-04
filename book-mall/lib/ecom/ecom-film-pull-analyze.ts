@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import type { CanvasChatContentPart } from "@/lib/canvas/providers/types";
 import type { Pro2ProductionScript } from "@/lib/canvas/data/pro2-production-script-schema";
 import type { FilmPullStoredAnalyze } from "@/lib/ecom/ecom-film-pull-types";
+import { isLegacyFilmPullAnalyzePatch } from "@/lib/ecom/ecom-film-pull-types";
 import {
   assertStoryLlmVideoUnderstandingModel,
   isStoryLlmVideoUnderstandingModel,
@@ -412,7 +413,9 @@ export async function runFilmPullRenderScript(opts: {
       shots: normalizeFilmPullShotsForDisplay(structured.shots),
     };
     try {
-      assertRenderScriptInvariants(analyze, structured);
+      if (isLegacyFilmPullAnalyzePatch(analyze)) {
+        assertRenderScriptInvariants(analyze, structured);
+      }
     } catch (e) {
       parseError = e instanceof Error ? e.message : "渲染脚本不变量校验失败";
       structured = null;

@@ -2,6 +2,7 @@
  * 电商逐镜/成片 · Gateway createTask 进程内实现。
  * 避免 dev 下 book-mall 长请求（panel/generate）HTTP 自调 /api/gw/v1/jobs/createTask 卡死、日志写不进去。
  */
+import type { GatewayProviderKind } from "@prisma/client";
 import type { ResolvedGatewayApiKeyAuth } from "@/lib/gateway/api-key-service";
 import { buildBailianR2vRequestBody, enrichBailianR2vInputForLog } from "@/lib/canvas/bailian-r2v-body";
 import { pickAiSpaceS2vCredentialId } from "@/lib/ai-space/ai-space-gateway-auth";
@@ -142,7 +143,10 @@ async function resolveEcomAsyncJobCredential(opts: {
           clientPage: opts.logMeta?.clientPage,
           input: (opts.body.input ?? null) as Record<string, unknown> | null,
         })
-      : pickCredentialForKind(opts.auth.credentials, opts.effectiveRoute.providerKind);
+      : pickCredentialForKind(
+          opts.auth.credentials,
+          opts.effectiveRoute.providerKind as GatewayProviderKind,
+        );
   if (isDashscopeWan30VideoModelKey(opts.model)) {
     credentialId = (await pickAiSpaceS2vCredentialId(opts.auth)) ?? credentialId;
   }

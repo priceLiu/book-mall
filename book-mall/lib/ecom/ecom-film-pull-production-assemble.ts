@@ -4,12 +4,13 @@ import {
   listFilmPullModelRefs,
   listFilmPullProductRefs,
 } from "@/lib/ecom/ecom-film-pull-refs";
-import type {
-  FilmPullCharacterRef,
-  FilmPullProductionPlan,
-  FilmPullProductionShot,
-  FilmPullRefMatch,
-  FilmPullRefMatchShot,
+import {
+  isLegacyFilmPullAnalyzePatch,
+  type FilmPullCharacterRef,
+  type FilmPullProductionPlan,
+  type FilmPullProductionShot,
+  type FilmPullRefMatch,
+  type FilmPullRefMatchShot,
 } from "@/lib/ecom/ecom-film-pull-types";
 
 function tokensForRefs(
@@ -160,6 +161,9 @@ export async function applyFilmPullProductionAssemble(
   if (!project) throw new Error("项目不存在");
   const analyze = project.analyzeResult?.structured;
   if (!analyze) throw new Error("请先完成拉片分析");
+  if (!isLegacyFilmPullAnalyzePatch(analyze)) {
+    throw new Error("Pro2 拉片结果暂不支持制作脚本拼装");
+  }
   const refMatch = project.refMatch;
   if (!refMatch?.shots.length) throw new Error("请先完成参考图匹配");
 

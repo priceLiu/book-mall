@@ -309,7 +309,7 @@ export async function createRequestLog(opts: {
 export async function finalizeRequestLog(
   logId: string,
   patch: {
-    status: "SUCCEEDED" | "FAILED";
+    status: "SUCCEEDED" | "FAILED" | "CANCELLED";
     durationMs: number;
     usage?: UsageFromResponse;
     vendorDurationMs?: number;

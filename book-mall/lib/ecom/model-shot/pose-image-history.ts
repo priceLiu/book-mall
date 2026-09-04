@@ -1,16 +1,28 @@
 import type { ModelShotPoseImageVersion, ModelShotPoseItem } from "@/lib/ecom/ecom-model-shot-types";
 
+type ModelShotPoseImageLike = {
+  imageUrl?: string;
+  assetId?: string;
+  imageHistory?: Array<Partial<ModelShotPoseImageVersion> & { url: string }>;
+};
+
 export function modelShotPoseHasGeneratedImage(
-  item: Pick<ModelShotPoseItem, "imageUrl" | "assetId" | "imageHistory">,
+  item: Pick<ModelShotPoseItem, "imageUrl" | "assetId" | "imageHistory"> | ModelShotPoseImageLike,
 ): boolean {
   return resolveModelShotPoseImageHistory(item).length > 0;
 }
 
 export function resolveModelShotPoseImageHistory(
-  item: Pick<ModelShotPoseItem, "imageUrl" | "assetId" | "imageHistory">,
+  item: Pick<ModelShotPoseItem, "imageUrl" | "assetId" | "imageHistory"> | ModelShotPoseImageLike,
 ): ModelShotPoseImageVersion[] {
   if (Array.isArray(item.imageHistory) && item.imageHistory.length > 0) {
-    return item.imageHistory.filter((v) => v.url?.trim());
+    return item.imageHistory
+      .filter((v) => v.url?.trim())
+      .map((v) => ({
+        url: v.url.trim(),
+        assetId: v.assetId,
+        createdAt: v.createdAt ?? new Date(0).toISOString(),
+      }));
   }
   const url = item.imageUrl?.trim();
   if (!url) return [];
