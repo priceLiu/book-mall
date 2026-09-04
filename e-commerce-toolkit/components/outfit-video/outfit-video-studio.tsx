@@ -464,8 +464,8 @@ function OutfitVideoStudioInner() {
           } catch (e) {
             await alert({
               title: "拆解完成",
-              message: formatEcomTransportError(e),
-              variant: "success",
+              message: `拆解已完成，但刷新项目失败：${formatEcomTransportError(e)}`,
+              variant: "error",
             });
           }
         },
