@@ -1018,7 +1018,7 @@ export async function renderEcomOutfitVideo(
     profile: {
       ...profile,
       audio: { ...profile.audio, mixTts: false },
-      subtitle: { ...profile.subtitle, mode: "off", burnIn: false },
+      subtitle: { ...profile.subtitle, mode: "none", burnIn: false },
     },
   });
   enqueueMediaRenderJob(job.id);
