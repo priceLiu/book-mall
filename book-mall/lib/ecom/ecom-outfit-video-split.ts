@@ -17,6 +17,7 @@ import {
   buildOutfitSplitSystemPrompt,
   buildOutfitSplitBatchEnrichUserContent,
   buildOutfitSplitRetryEnrichUserContent,
+  DEFAULT_OUTFIT_SPLIT_USER_PROMPT,
   listOutfitSplitEnrichRetrySceneIds,
   mergeOutfitSplitEnrichMaps,
   parseOutfitSplitBatchEnrichFromLlm,
@@ -304,8 +305,8 @@ function buildKeypointsPayload(args: {
     frameCount,
     referenceClipUrl: args.referenceClipUrl,
     motionSource: "reference_clip",
-    cameraType: analysis?.cameraType ?? "from_reference",
-    motionType: analysis?.motionType ?? "from_reference",
+    cameraType: "from_reference",
+    motionType: "from_reference",
     shotAnalysis: analysis
       ? {
           characterAction: analysis.characterAction,
@@ -550,7 +551,7 @@ export async function splitOutfitReferenceVideoPhysical(opts: {
         projectId: opts.projectId,
         splitModelKey: opts.splitModelKey.trim(),
         systemPrompt: opts.splitSystemPrompt ?? buildOutfitSplitSystemPrompt(),
-        userPromptBase: opts.splitUserPrompt,
+        userPromptBase: opts.splitUserPrompt?.trim() || DEFAULT_OUTFIT_SPLIT_USER_PROMPT,
         segments: segmentMeta,
         onStreamChunk: opts.onStreamChunk,
       });
