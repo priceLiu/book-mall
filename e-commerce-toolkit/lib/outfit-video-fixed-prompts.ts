@@ -1,7 +1,7 @@
 import {
-  OUTFIT_V1_GENERATE_BASE_PROMPT_ZH,
   OUTFIT_V1_LLM_JSON_PREFIX,
-  OUTFIT_V1_NEGATIVE_PROMPT_ZH,
+  OUTFIT_V1_NEGATIVE_PROMPT,
+  OUTFIT_V1_POSITIVE_PROMPT,
 } from "@/lib/video-workflow/templates/outfit-v1/constants";
 import {
   getOutfitSplitEnrichPromptUi,
@@ -16,15 +16,15 @@ export function getOutfitFixedPromptSections() {
   return {
     split: getOutfitSplitEnrichPromptUi(),
     generate: {
-      basePositive: OUTFIT_V1_GENERATE_BASE_PROMPT_ZH,
-      negative: OUTFIT_V1_NEGATIVE_PROMPT_ZH,
+      basePositive: OUTFIT_V1_POSITIVE_PROMPT,
+      negative: OUTFIT_V1_NEGATIVE_PROMPT,
       jsonPrefix: OUTFIT_V1_LLM_JSON_PREFIX,
     },
   };
 }
 
 export {
-  OUTFIT_V1_GENERATE_BASE_PROMPT_ZH,
+  OUTFIT_V1_POSITIVE_PROMPT,
   OUTFIT_V1_LLM_JSON_PREFIX,
-  OUTFIT_V1_NEGATIVE_PROMPT_ZH,
+  OUTFIT_V1_NEGATIVE_PROMPT,
 };
