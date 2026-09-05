@@ -49,6 +49,7 @@ export function defaultKindForNodeType(nodeType: string): ProjectAssetKind {
     "story-pro-scene": "SCENE",
     "story-pro-frame": "STORYBOARD_IMAGE",
     "story-pro-video": "STORYBOARD_VIDEO",
+    "story-pro2-audio": "AUDIO",
     group: "GROUP_BUNDLE",
   };
   return map[nodeType] ?? "STORYBOARD_IMAGE";

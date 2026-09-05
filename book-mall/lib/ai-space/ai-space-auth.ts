@@ -30,6 +30,35 @@ export type AiSpaceActorResult =
   | { ok: false; res: NextResponse };
 
 /**
+ * 仅校验登录身份（Bearer / NextAuth），不查租户表。
+ * 适用于 MiniMax 系统音色 manifest 等静态目录，避免 DB 抖动导致 500。
+ */
+export async function resolveAiSpaceIdentity(
+  req: Request,
+): Promise<
+  | { ok: true; userId: string; via: "session" | "bearer" }
+  | { ok: false; res: NextResponse }
+> {
+  const hasBearer = (req.headers.get("authorization") ?? "").startsWith("Bearer ");
+
+  if (hasBearer) {
+    const v = verifyToolsBearer(req);
+    if (!v.ok) return { ok: false, res: v.res };
+    return { ok: true, userId: v.userId, via: "bearer" };
+  }
+
+  const session = await getServerSession(authOptions);
+  const userId = session?.user?.id;
+  if (!userId) {
+    return {
+      ok: false,
+      res: NextResponse.json({ error: "未登录" }, { status: 401 }),
+    };
+  }
+  return { ok: true, userId, via: "session" };
+}
+
+/**
  * 解析调用者。有 Authorization 头时走 Bearer，否则回落 NextAuth session。
  */
 export async function resolveAiSpaceActor(

@@ -78,6 +78,12 @@ export function useLibtvMinimaxVoiceCatalog(active: boolean) {
         );
         setPage(nextPage);
         setHasMore(data.hasMore);
+      } catch (e) {
+        console.warn("[libtv voice catalog] load system page failed", e);
+        if (nextPage === 1) {
+          setSystem([]);
+          setHasMore(false);
+        }
       } finally {
         setLoading(false);
       }

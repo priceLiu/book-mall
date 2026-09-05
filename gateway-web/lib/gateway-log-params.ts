@@ -409,6 +409,12 @@ export function extractLogResultUrls(resultSummary: unknown): string[] {
 
   if (resultSummary && typeof resultSummary === "object") {
     const obj = resultSummary as Record<string, unknown>;
+    for (const key of ["audio_url", "url", "dataUrl"]) {
+      const v = obj[key];
+      if (typeof v === "string" && (isHttpUrl(v) || v.startsWith("data:audio/"))) {
+        urls.push(v.trim());
+      }
+    }
     if (Array.isArray(obj.imageUrls)) {
       for (const u of obj.imageUrls) {
         if (typeof u === "string" && /^https?:\/\//.test(u)) urls.push(u);
@@ -436,10 +442,20 @@ export function extractLogResultUrls(resultSummary: unknown): string[] {
   }
 
   collectUrls(resultSummary, urls);
-  return [...new Set(urls.filter((u) => /^https?:\/\//.test(u)))];
+  return [...new Set(urls.filter((u) => isHttpUrl(u) || u.startsWith("data:audio/")))];
+}
+
+export function pickLogAudioPreviewUrl(resultSummary: unknown): string | null {
+  const urls = extractLogResultUrls(resultSummary);
+  for (const u of urls) {
+    if (isAudioResultUrl(u)) return u;
+  }
+  return null;
 }
 
 export function pickLogPreviewUrl(resultSummary: unknown): string | null {
+  const audio = pickLogAudioPreviewUrl(resultSummary);
+  if (audio) return audio;
   const urls = extractLogResultUrls(resultSummary);
   if (urls[0]) return urls[0];
   return null;
@@ -540,6 +556,15 @@ export function formatCreditsDisplay(
 
 export function isImageResultUrl(url: string): boolean {
   return /\.(png|jpe?g|webp|gif|bmp|svg)(\?|$)/i.test(url);
+}
+
+export function isAudioResultUrl(url: string): boolean {
+  const t = url.trim();
+  if (t.startsWith("data:audio/")) return true;
+  return (
+    /\.(mp3|wav|ogg|m4a|aac|flac|opus|pcm)(\?|$)/i.test(t) ||
+    /\/audio\//i.test(t)
+  );
 }
 
 export function isVideoResultUrl(url: string): boolean {

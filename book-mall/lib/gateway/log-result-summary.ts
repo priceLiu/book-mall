@@ -80,6 +80,46 @@ export function buildGatewayChatResultSummary(
   return null;
 }
 
+const TTS_LOG_EMBED_MAX_BYTES = 512_000;
+
+/** TTS 终态：Gateway Result 列可播放 audio_url / data URL */
+export function buildGatewayTtsResultSummary(opts: {
+  audioUrl?: string | null;
+  buffer?: Buffer | null;
+  contentType?: string;
+  vendorJson?: unknown;
+}): Record<string, unknown> {
+  const contentType = opts.contentType?.trim() || "audio/mpeg";
+  const httpUrl =
+    typeof opts.audioUrl === "string" && /^https?:\/\//.test(opts.audioUrl.trim())
+      ? opts.audioUrl.trim()
+      : null;
+  if (httpUrl) {
+    return { kind: "tts", audio_url: httpUrl, url: httpUrl, contentType };
+  }
+
+  const buf = opts.buffer;
+  if (buf && buf.length > 0 && buf.length <= TTS_LOG_EMBED_MAX_BYTES) {
+    const dataUrl = `data:${contentType};base64,${buf.toString("base64")}`;
+    return {
+      kind: "tts",
+      audio_url: dataUrl,
+      url: dataUrl,
+      contentType,
+      byteLength: buf.length,
+    };
+  }
+
+  const slim = buildGatewayTaskResultSummary(opts.vendorJson, {
+    contentType,
+    byteLength: buf?.length ?? 0,
+  });
+  if (slim && typeof slim === "object" && !Array.isArray(slim)) {
+    return { kind: "tts", ...(slim as Record<string, unknown>) };
+  }
+  return { kind: "tts", contentType, byteLength: buf?.length ?? 0 };
+}
+
 /** 流式 Chat 终态：写入厂商 usage 供读时补算 */
 export function buildGatewayStreamChatResultSummary(
   usage: UsageFromResponse,

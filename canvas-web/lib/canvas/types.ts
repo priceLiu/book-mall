@@ -677,6 +677,8 @@ export type CanvasGraph = {
     linkedScriptPackageAssetId?: string;
     /** 协作画布 · 无节点时公告栏数据锚点 */
     crewBulletinAnchor?: import("./crew-bulletin-graph-anchor").CrewBulletinGraphAnchor;
+    /** TTS 调参试听成功后的参考音色预设（本画布所有音频节点共用） */
+    ttsAuditionPresets?: import("./libtv-tts-audition-presets").CanvasTtsAuditionPreset[];
   };
 };
 

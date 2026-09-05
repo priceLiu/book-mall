@@ -201,7 +201,41 @@ export function mapProjectAssetToCanvasInsert(
       );
     }
 
-    case "AUDIO":
+    case "AUDIO": {
+      if (
+        payload.assetSubtype === "tts_voice_preset" &&
+        edition === "pro2"
+      ) {
+        const engine =
+          payload.engine && typeof payload.engine === "object"
+            ? (payload.engine as Record<string, unknown>)
+            : {
+                providerId: String(payload.providerId ?? ""),
+                modelKey: String(payload.modelKey ?? ""),
+                params: payload.params ?? {},
+              };
+        return mergeAssetNodeSnapshot(
+          asset,
+          "story-pro2-audio",
+          {
+            label: asset.displayName,
+            dockInput: String(payload.sampleText ?? ""),
+            engine,
+          },
+          undefined,
+        );
+      }
+      if (edition === "pro2") {
+        return mergeAssetNodeSnapshot(asset, "story-pro2-audio", {
+          label: asset.displayName,
+          dockInput: String(payload.sampleText ?? payload.prompt ?? ""),
+        });
+      }
+      return mergeAssetNodeSnapshot(asset, "story-pro-scene", {
+        label: asset.displayName,
+      });
+    }
+
     case "SCENE":
     case "PROP":
     default:
@@ -230,6 +264,7 @@ export function defaultKindForNodeType(nodeType: string): ProjectAssetKind {
     "story-pro-scene": "SCENE",
     "story-pro-frame": "STORYBOARD_IMAGE",
     "story-pro-video": "STORYBOARD_VIDEO",
+    "story-pro2-audio": "AUDIO",
     group: "GROUP_BUNDLE",
   };
   return map[nodeType] ?? "STORYBOARD_IMAGE";

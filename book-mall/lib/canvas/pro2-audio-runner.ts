@@ -27,6 +27,7 @@ import {
   buildPro2AudioTtsInputHash,
   resolveCanvasMinimaxTtsVoiceInput,
 } from "./canvas-tts-run-params";
+import { buildGatewayTtsResultSummary } from "@/lib/gateway/log-result-summary";
 import { scheduleCanvasBufferOssBackfill } from "./canvas-oss-backfill";
 import { createStoryScopedCanvasTask } from "./canvas-story-scope";
 import {
@@ -187,6 +188,12 @@ async function runCanvasMinimaxTtsNode(
     status: "SUCCEEDED",
     durationMs: result.durationMs,
     model: modelKey,
+    resultSummary: buildGatewayTtsResultSummary({
+      audioUrl: result.audioUrl,
+      buffer: result.buffer,
+      contentType: result.contentType ?? "audio/mpeg",
+      vendorJson: result.vendorJson,
+    }),
   });
 
   const ephemeralUrl = `data:${result.contentType ?? "audio/mpeg"};base64,${result.buffer.toString("base64")}`;

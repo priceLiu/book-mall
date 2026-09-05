@@ -52,6 +52,51 @@ describe("project-asset-insert-map", () => {
     expect(defaultKindForNodeType("story-pro2-starter")).toBe("OUTLINE");
   });
 
+  it("maps tts voice preset to story-pro2-audio with engine", () => {
+    const asset: ProjectAssetRecord = {
+      id: "a3",
+      tenantId: null,
+      ownerUserId: "u1",
+      visibility: "PRIVATE",
+      kind: "AUDIO",
+      displayName: "女声 · 1.1x",
+      description: "",
+      thumbnailUrl: "",
+      sourceProjectId: null,
+      sourceNodeId: null,
+      sourceEdition: "pro2",
+      locked: false,
+      editLockUserId: null,
+      editLockExpiresAt: null,
+      version: 1,
+      payload: {
+        assetSubtype: "tts_voice_preset",
+        sampleText: "你好，这是试听。",
+        engine: {
+          providerId: "gw",
+          modelKey: "speech-2.6-hd",
+          params: { voice_id: "abc", speed: 1.1 },
+        },
+      },
+      refs: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const insert = mapProjectAssetToCanvasInsert(asset, { edition: "pro2" });
+    expect(insert).toMatchObject({
+      nodeType: "story-pro2-audio",
+      data: {
+        label: "女声 · 1.1x",
+        dockInput: "你好，这是试听。",
+        engine: {
+          providerId: "gw",
+          modelKey: "speech-2.6-hd",
+          params: { voice_id: "abc", speed: 1.1 },
+        },
+      },
+    });
+  });
+
   it("merges nodeSnapshot ossUrl and dockInput for pro2 three-view", () => {
     const asset: ProjectAssetRecord = {
       id: "a2",

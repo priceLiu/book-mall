@@ -17,6 +17,8 @@ import {
   type LibtvTtsPreviewContext,
   type LibtvTtsRowPreviewSpec,
 } from "@/lib/canvas/libtv-tts-preview-client";
+import type { CanvasTtsAuditionPreset } from "@/lib/canvas/libtv-tts-audition-presets";
+import { useCanvasTtsAuditionPresets } from "@/lib/canvas/use-canvas-tts-audition-presets";
 import {
   libtvTtsVoiceTriggerLabel,
   useLibtvMinimaxVoiceCatalog,
@@ -27,19 +29,17 @@ import {
 } from "@/lib/canvas/qwen3-tts-voice-catalog";
 import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
-import {
-  upsertLibtvTtsAuditionHistory,
-  type LibtvTtsAuditionHistoryItem,
-} from "@/lib/canvas/libtv-tts-audition-history";
 import { cn } from "@/lib/utils";
-import { LIBTV_DOCK_PARAMS_POPOVER_CLASS } from "./libtv-dock-picker-chrome";
+import { libtvDockSegmentButtonClass, LIBTV_DOCK_PARAMS_POPOVER_CLASS } from "./libtv-dock-picker-chrome";
 import { LibtvMinimaxVoiceCatalogList } from "./libtv-minimax-voice-catalog-list";
+import { LibtvTtsAuditionPresetList } from "./libtv-tts-audition-preset-list";
 import {
   Sbv1ToolbarDropdown,
   useSbv1ToolbarAnchor,
 } from "./sbv1/sbv1-toolbar-anchor-popover";
-import { LibtvVoicePreviewButton } from "./libtv-voice-preview-button";
 import { LibtvVoiceSelectList } from "./libtv-voice-select-list";
+
+type VoiceParamsTab = "catalog" | "auditioned";
 
 export function libtvTtsVoiceParamsTriggerLabel(
   voiceLabel: string,
@@ -61,12 +61,14 @@ export function LibtvTtsDockVoiceParamsPicker({
   modelKey,
   params,
   previewContext,
+  sourceNodeId,
   externalProviders,
   disabled,
   open: controlledOpen,
   onOpenChange,
   onSelectVoice,
   onChangeParams,
+  onApplyAuditionPreset,
 }: {
   variant: "minimax" | "qwen";
   voiceId: string;
@@ -75,12 +77,15 @@ export function LibtvTtsDockVoiceParamsPicker({
   modelKey: string;
   params: Record<string, unknown>;
   previewContext?: LibtvTtsPreviewContext;
+  sourceNodeId?: string;
   externalProviders?: CanvasProviderDto[];
   disabled?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onSelectVoice: (voiceId: string, label: string) => void;
   onChangeParams: (params: Record<string, unknown>) => void;
+  /** 已试听 Tab · 套用整包 engine（含 model） */
+  onApplyAuditionPreset?: (preset: CanvasTtsAuditionPreset) => void;
 }) {
   const { anchorRef, open: internalOpen, setOpen: setInternalOpen, rect } =
     useSbv1ToolbarAnchor(controlledOpen);
@@ -91,6 +96,7 @@ export function LibtvTtsDockVoiceParamsPicker({
   const { merged } = useLibtvMinimaxVoiceCatalog(
     open && variant === "minimax",
   );
+  const { presets, upsertFromSynth } = useCanvasTtsAuditionPresets(variant);
 
   const resolvedVoiceId = String(
     voiceId ?? params.voice_id ?? params.voice ?? "",
@@ -126,9 +132,7 @@ export function LibtvTtsDockVoiceParamsPicker({
   const [billingPreviewEnabled, setBillingPreviewEnabled] = useState(() =>
     isLibtvTtsParamPreviewBillingEnabled(params),
   );
-  const [auditionHistory, setAuditionHistory] = useState<
-    LibtvTtsAuditionHistoryItem[]
-  >([]);
+  const [voiceTab, setVoiceTab] = useState<VoiceParamsTab>("catalog");
 
   useEffect(() => {
     if (open) {
@@ -174,21 +178,63 @@ export function LibtvTtsDockVoiceParamsPicker({
         variant === "qwen"
           ? qwenVoiceOptions.find((v) => v.value === id)
           : undefined;
-      setAuditionHistory((prev) =>
-        upsertLibtvTtsAuditionHistory(prev, {
-          voiceId: id,
-          label:
-            catalogHit?.label?.trim() ||
-            qwenHit?.label?.trim() ||
-            id,
-          subtitle: catalogHit?.subtitle ?? catalogHit?.language,
-          sampleText: catalogHit?.sampleText,
-          language: catalogHit?.language,
-          dataUrl: info.dataUrl,
-        }),
-      );
+      const voiceLabel =
+        catalogHit?.label?.trim() ||
+        qwenHit?.label?.trim() ||
+        savedLabel?.trim() ||
+        id;
+      const dockParams = rowPreviewSpec?.dockParams ?? params;
+      const resolvedModelKey =
+        rowPreviewSpec?.modelKey ?? previewContext?.modelKey ?? modelKey;
+
+      upsertFromSynth({
+        variant,
+        providerId,
+        modelKey: resolvedModelKey,
+        voiceId: id,
+        voiceLabel,
+        params: dockParams,
+        previewUrl: info.dataUrl,
+        sampleText: catalogHit?.sampleText,
+        language: catalogHit?.language,
+        subtitle: catalogHit?.subtitle ?? catalogHit?.language,
+        sourceNodeId,
+      });
+      setVoiceTab("auditioned");
     },
-    [merged, qwenVoiceOptions, variant],
+    [
+      merged,
+      modelKey,
+      params,
+      previewContext?.modelKey,
+      providerId,
+      qwenVoiceOptions,
+      rowPreviewSpec,
+      savedLabel,
+      sourceNodeId,
+      upsertFromSynth,
+      variant,
+    ],
+  );
+
+  const handleApplyPreset = useCallback(
+    (preset: CanvasTtsAuditionPreset) => {
+      if (onApplyAuditionPreset) {
+        onApplyAuditionPreset(preset);
+        return;
+      }
+      onSelectVoice(preset.voiceId, preset.voiceLabel);
+      onChangeParams({
+        ...preset.params,
+        ...(variant === "qwen"
+          ? { voice: preset.voiceId }
+          : {
+              voice_id: preset.voiceId,
+              voice_label: preset.voiceLabel,
+            }),
+      });
+    },
+    [onApplyAuditionPreset, onChangeParams, onSelectVoice, variant],
   );
 
   return (
@@ -227,37 +273,79 @@ export function LibtvTtsDockVoiceParamsPicker({
         )}
       >
         <div className="nodrag nowheel flex min-h-0 flex-1 flex-col">
-          <p className="shrink-0 px-2 pb-0.5 pt-0.5 text-[10px] text-white/40">
-            音色
-          </p>
+          <div className="shrink-0 px-2 pb-1 pt-0.5">
+            <div className="grid grid-cols-2 gap-1" role="tablist" aria-label="音色来源">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={voiceTab === "catalog"}
+                className={libtvDockSegmentButtonClass(voiceTab === "catalog", {
+                  compact: true,
+                })}
+                onClick={() => setVoiceTab("catalog")}
+              >
+                音色
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={voiceTab === "auditioned"}
+                className={libtvDockSegmentButtonClass(voiceTab === "auditioned", {
+                  compact: true,
+                })}
+                onClick={() => setVoiceTab("auditioned")}
+              >
+                已试听{presets.length > 0 ? ` (${presets.length})` : ""}
+              </button>
+            </div>
+          </div>
+
           <div className="min-h-[7.5rem] flex-1 overflow-hidden">
-            {variant === "minimax" ? (
-              <LibtvMinimaxVoiceCatalogList
-                active={open}
-                voiceId={resolvedVoiceId}
-                disabled={disabled}
-                listKey="unified-minimax-voice"
-                className="h-full"
-                maxHeightClass="min-h-0 flex-1"
-                rowPreviewSpec={rowPreviewSpec}
-                onSelectVoice={onSelectVoice}
-                onSynthPlayed={handleSynthPlayed}
-              />
+            {voiceTab === "catalog" ? (
+              variant === "minimax" ? (
+                <LibtvMinimaxVoiceCatalogList
+                  active={open}
+                  voiceId={resolvedVoiceId}
+                  disabled={disabled}
+                  listKey="unified-minimax-voice"
+                  className="h-full"
+                  maxHeightClass="min-h-0 flex-1"
+                  rowPreviewSpec={rowPreviewSpec}
+                  onSelectVoice={onSelectVoice}
+                  onSynthPlayed={handleSynthPlayed}
+                />
+              ) : (
+                <LibtvVoiceSelectList
+                  key="unified-qwen-voice"
+                  options={qwenVoiceOptions}
+                  value={resolvedVoiceId || "Cherry"}
+                  pageSize={10}
+                  maxHeightClass="h-full min-h-0"
+                  minimaxOssFallback={false}
+                  rowPreviewSpec={rowPreviewSpec}
+                  fallbackPreviewContext={previewContext}
+                  onSynthPlayed={handleSynthPlayed}
+                  onSelect={(nextVoiceId) => {
+                    const hit = qwenVoiceOptions.find(
+                      (o) => o.value === nextVoiceId,
+                    );
+                    onSelectVoice(
+                      nextVoiceId,
+                      hit?.label?.trim() || nextVoiceId,
+                    );
+                  }}
+                />
+              )
             ) : (
-              <LibtvVoiceSelectList
-                key="unified-qwen-voice"
-                options={qwenVoiceOptions}
-                value={resolvedVoiceId || "Cherry"}
-                pageSize={10}
-                maxHeightClass="h-full min-h-0"
-                minimaxOssFallback={false}
-                rowPreviewSpec={rowPreviewSpec}
-                fallbackPreviewContext={previewContext}
-                onSynthPlayed={handleSynthPlayed}
-                onSelect={(nextVoiceId) => {
-                  const hit = qwenVoiceOptions.find((o) => o.value === nextVoiceId);
-                  onSelectVoice(nextVoiceId, hit?.label?.trim() || nextVoiceId);
-                }}
+              <LibtvTtsAuditionPresetList
+                presets={presets}
+                variant={variant}
+                providerId={providerId}
+                modelKey={modelKey}
+                voiceId={resolvedVoiceId}
+                params={params}
+                disabled={disabled}
+                onApplyPreset={handleApplyPreset}
               />
             )}
           </div>
@@ -271,52 +359,6 @@ export function LibtvTtsDockVoiceParamsPicker({
               onChange={handleParamsChange}
               onBillingPreviewChange={setBillingPreviewEnabled}
             />
-            {auditionHistory.length > 0 ? (
-              <div className="border-t border-white/10 px-0.5 pb-1 pt-1">
-                <p className="px-2 pb-0.5 text-[10px] text-white/40">已试听</p>
-                <div className="max-h-[7.5rem] overflow-y-auto overscroll-contain">
-                  {auditionHistory.map((item) => (
-                    <div
-                      key={item.voiceId}
-                      className={cn(
-                        "flex items-center gap-1 rounded-md pr-1 transition",
-                        resolvedVoiceId === item.voiceId
-                          ? "bg-white/[0.12]"
-                          : "hover:bg-white/[0.06]",
-                      )}
-                    >
-                      <button
-                        type="button"
-                        className={cn(
-                          "flex min-w-0 flex-1 flex-col px-2 py-1 text-left leading-tight",
-                          resolvedVoiceId === item.voiceId
-                            ? "text-white"
-                            : "text-white/75",
-                        )}
-                        onClick={() => onSelectVoice(item.voiceId, item.label)}
-                      >
-                        <span className="truncate text-[12px] font-medium">
-                          {item.label}
-                        </span>
-                        {item.subtitle ? (
-                          <span className="truncate text-[10px] text-white/40">
-                            {item.subtitle}
-                          </span>
-                        ) : null}
-                      </button>
-                      <LibtvVoicePreviewButton
-                        previewUrl={item.dataUrl}
-                        voiceId={item.voiceId}
-                        voiceLanguage={item.language}
-                        sampleText={item.sampleText}
-                        minimaxOssFallback={false}
-                        mode="oss"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
           </div>
         </div>
       </Sbv1ToolbarDropdown>

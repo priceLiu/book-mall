@@ -13,7 +13,9 @@ import {
   pickCredentialForKind,
   mapGatewayPreCreateLogError,
 } from "@/lib/gateway/proxy-common";
-import { buildGatewayTaskResultSummary } from "@/lib/gateway/log-result-summary";
+import {
+  buildGatewayTtsResultSummary,
+} from "@/lib/gateway/log-result-summary";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 import { parseGatewayClientSource } from "@/lib/gateway/poll-service";
@@ -103,9 +105,11 @@ export async function POST(request: NextRequest) {
       durationMs: result.durationMs,
       usage,
       resultSummary: ok
-        ? buildGatewayTaskResultSummary(result.vendorJson, {
+        ? buildGatewayTtsResultSummary({
+            audioUrl: (result as { audioUrl?: string }).audioUrl,
+            buffer: result.buffer,
             contentType: result.contentType ?? "audio/mpeg",
-            byteLength: result.buffer.length,
+            vendorJson: result.vendorJson,
           })
         : undefined,
       failMessage: ok

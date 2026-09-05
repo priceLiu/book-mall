@@ -16,6 +16,7 @@ import {
   finalizeRequestLog,
   pickCredentialForKind,
 } from "@/lib/gateway/proxy-common";
+import { buildGatewayTtsResultSummary } from "@/lib/gateway/log-result-summary";
 import { prisma } from "@/lib/prisma";
 
 export const CANVAS_TTS_PREVIEW_TEXT_ZH = "你好，这是 MiniMax 语音试听。";
@@ -133,6 +134,14 @@ async function previewMinimaxTts(args: {
         : result.buffer.toString("utf8").slice(0, 500) ||
           `MiniMax 试听失败（HTTP ${result.status}）`,
       model: args.modelKey,
+      resultSummary: ok
+        ? buildGatewayTtsResultSummary({
+            audioUrl: result.audioUrl,
+            buffer: result.buffer,
+            contentType: result.contentType?.trim() || "audio/mpeg",
+            vendorJson: result.vendorJson,
+          })
+        : undefined,
     });
     if (ok) {
       creditsCharged = await readGatewayLogCreditsCharged(logId);

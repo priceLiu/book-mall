@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveLogDisplayDurationMs, extractLogInputImages } from "@/lib/gateway-log-params";
+import { resolveLogDisplayDurationMs, extractLogInputImages, pickLogPreviewUrl, isAudioResultUrl } from "@/lib/gateway-log-params";
 
 describe("resolveLogDisplayDurationMs", () => {
   it("in-progress uses phase sum (not gateway wall clock)", () => {
@@ -121,5 +121,23 @@ describe("extractLogInputImages", () => {
     expect(images[0]?.label).toBe("分镜图");
     expect(images[0]?.url).toBe(frame);
     expect(images).toHaveLength(2);
+  });
+});
+
+describe("pickLogPreviewUrl · audio", () => {
+  it("reads audio_url from TTS resultSummary", () => {
+    const url = "https://cdn.example/preview.mp3";
+    expect(
+      pickLogPreviewUrl({ kind: "tts", audio_url: url, url }),
+    ).toBe(url);
+    expect(isAudioResultUrl(url)).toBe(true);
+  });
+
+  it("reads data audio URLs", () => {
+    const dataUrl = "data:audio/mpeg;base64,AAA";
+    expect(
+      pickLogPreviewUrl({ kind: "tts", audio_url: dataUrl, url: dataUrl }),
+    ).toBe(dataUrl);
+    expect(isAudioResultUrl(dataUrl)).toBe(true);
   });
 });

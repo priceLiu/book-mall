@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import {
   copyTextToClipboard,
   formatLogResultText,
+  isAudioResultUrl,
   isImageResultUrl,
   isVideoResultUrl,
   pickLogPreviewUrl,
@@ -76,6 +77,7 @@ export function LogResultCell({
 
   const previewIsImage = previewUrl ? isImageResultUrl(previewUrl) : false;
   const previewIsVideo = previewUrl ? isVideoResultUrl(previewUrl) : false;
+  const previewIsAudio = previewUrl ? isAudioResultUrl(previewUrl) : false;
 
   const hover = bindAnchor(() => btnRef.current?.getBoundingClientRect() ?? null);
   const tipHover = bindTip();
@@ -163,6 +165,12 @@ export function LogResultCell({
                 controls
                 muted
                 className="max-h-[520px] w-full rounded-md bg-black/40"
+              />
+            ) : previewIsAudio && previewUrl ? (
+              <audio
+                src={previewUrl}
+                controls
+                className="w-full rounded-md bg-black/20"
               />
             ) : previewText ? (
               <pre className="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-[var(--gw-ink)]">

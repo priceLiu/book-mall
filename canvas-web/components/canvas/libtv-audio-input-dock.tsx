@@ -32,6 +32,7 @@ import {
   DEFAULT_LIBTV_MINIMAX_VOICE_ID,
 } from "@/lib/canvas/kie-audio-models";
 import type { LibtvAudioNodeData } from "@/lib/canvas/libtv-audio-task-apply";
+import { paramsFromTtsAuditionPreset } from "@/lib/canvas/libtv-tts-audition-presets";
 import {
   Pro2DockToolbar,
   Pro2InputDockShell,
@@ -425,11 +426,21 @@ export function LibtvAudioInputDock() {
                 modelKey={engine.modelKey ?? ""}
                 params={engine.params ?? ENGINE_PICKER_EMPTY_PARAMS}
                 previewContext={voicePreviewContext}
+                sourceNodeId={storeNode.id}
                 externalProviders={providers}
                 disabled={isRunning}
                 open={dockMenu === "voiceParams"}
                 onOpenChange={(next) => setDockMenu(next ? "voiceParams" : null)}
                 onSelectVoice={onSelectTtsVoice}
+                onApplyAuditionPreset={(preset) => {
+                  updateNodeData(storeNode.id, {
+                    engine: {
+                      providerId: preset.providerId,
+                      modelKey: preset.modelKey,
+                      params: paramsFromTtsAuditionPreset(preset),
+                    },
+                  });
+                }}
                 onChangeParams={(nextParams) => {
                   updateNodeData(storeNode.id, {
                     engine: {
@@ -449,11 +460,21 @@ export function LibtvAudioInputDock() {
                 modelKey={engine.modelKey ?? ""}
                 params={engine.params ?? ENGINE_PICKER_EMPTY_PARAMS}
                 previewContext={voicePreviewContext}
+                sourceNodeId={storeNode.id}
                 externalProviders={providers}
                 disabled={isRunning}
                 open={dockMenu === "voiceParams"}
                 onOpenChange={(next) => setDockMenu(next ? "voiceParams" : null)}
                 onSelectVoice={onSelectTtsVoice}
+                onApplyAuditionPreset={(preset) => {
+                  updateNodeData(storeNode.id, {
+                    engine: {
+                      providerId: preset.providerId,
+                      modelKey: preset.modelKey,
+                      params: paramsFromTtsAuditionPreset(preset),
+                    },
+                  });
+                }}
                 onChangeParams={(nextParams) => {
                   updateNodeData(storeNode.id, {
                     engine: {

@@ -45,7 +45,20 @@ export async function fetchLibtvVoicePage(
     ...init,
     credentials: init.credentials ?? "include",
   });
-  if (!res.ok) throw new Error(`加载音色失败（${res.status}）`);
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const err = (await res.json()) as { error?: string; message?: string };
+      detail = err.error ?? err.message ?? "";
+    } catch {
+      /* ignore */
+    }
+    throw new Error(
+      detail
+        ? `加载音色失败：${detail}（${res.status}）`
+        : `加载音色失败（${res.status}）`,
+    );
+  }
   const data = (await res.json()) as {
     items: LibtvVoiceCatalogItem[];
     hasMore: boolean;

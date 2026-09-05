@@ -132,7 +132,7 @@ export default defineConfig({
       "test/unit/media-render-inflight-persist.test.ts",
       "test/unit/media-render-sync-audio.test.ts",
       "test/unit/libtv-tts-voice-preference.test.ts",
-      "test/unit/libtv-tts-audition-history.test.ts",
+      "test/unit/libtv-tts-audition-presets.test.ts",
       "test/unit/libtv-tts-preview-client.test.ts",
       "test/unit/libtv-minimax-voice-catalog.test.ts",
       "test/unit/libtv-tts-voice-controls-schema.test.ts",

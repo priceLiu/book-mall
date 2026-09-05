@@ -149,6 +149,13 @@ export function normalizeProjectAssetInsertData(
     next.characterKey = data.characterKey;
   }
 
+  if (nodeType === "story-pro2-audio") {
+    const engine = data.engine;
+    if (engine && typeof engine === "object" && !Array.isArray(engine)) {
+      next.engine = engine;
+    }
+  }
+
   if (
     nodeType === "story-pro2-three-view" &&
     !str(next.characterKey) &&

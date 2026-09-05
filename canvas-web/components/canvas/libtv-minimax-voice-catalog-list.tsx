@@ -49,6 +49,10 @@ export function LibtvMinimaxVoiceCatalogList({
           <Loader2 className="size-3.5 animate-spin" />
           加载音色…
         </div>
+      ) : options.length === 0 && !loading ? (
+        <p className="px-3 py-6 text-center text-[11px] leading-relaxed text-white/40">
+          音色目录暂时不可用，请稍后重试或刷新页面。
+        </p>
       ) : (
         <LibtvVoiceSelectList
           key={listKey ?? (active ? "voice-catalog-open" : "voice-catalog-closed")}
