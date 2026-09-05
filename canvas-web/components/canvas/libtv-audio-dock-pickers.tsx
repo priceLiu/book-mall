@@ -22,6 +22,7 @@ import {
 import {
   isLibtvTtsParamPreviewBillingEnabled,
   LIBTV_TTS_PARAM_PREVIEW_BILLING_KEY,
+  type LibtvTtsPreviewContext,
 } from "@/lib/canvas/libtv-tts-preview-client";
 import type { CanvasParamSchema, CanvasProviderDto } from "@/lib/canvas-providers-api";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
