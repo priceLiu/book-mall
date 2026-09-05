@@ -13,6 +13,8 @@ export type QrVoiceCloneCatalogEntry = {
   label: string;
   previewUrl?: string;
   clonedAt: string;
+  /** 克隆时的原文 · 调参试听用各音色自己的样音文案 */
+  sampleText?: string;
 };
 
 export type QrVoiceCloneUploadRow = {
@@ -284,6 +286,7 @@ export async function listQrVoiceCloneCatalogEntries(
       label,
       previewUrl,
       clonedAt,
+      sampleText: prompt || undefined,
     });
 
     if (row.gatewayRequestLogId) templateLogIds.add(row.gatewayRequestLogId);
@@ -309,6 +312,7 @@ export async function listQrVoiceCloneCatalogEntries(
         aiSpacePreviewByLogId,
       ),
       clonedAt: row.submittedAt.toISOString(),
+      sampleText: draft?.prompt || undefined,
     });
   }
 

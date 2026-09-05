@@ -83,8 +83,9 @@ export function LibtvAudioNode({
         blobUrl: d.blobUrl,
         uploading: d.uploading,
         preferBlob: preferBlobPreview,
+        runtime: d.runtime,
       }),
-    [d.ossUrl, d.blobUrl, d.uploading, preferBlobPreview],
+    [d.ossUrl, d.blobUrl, d.uploading, preferBlobPreview, d.runtime],
   );
 
   const onPreviewLoadError = useCallback(() => {

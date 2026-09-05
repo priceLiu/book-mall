@@ -53,7 +53,7 @@ export function libtvAudioPatchFromTask(
     return {
       ossUrl: httpsExportUrl,
       blobUrl: isLocalOnly ? localPreviewUrl : undefined,
-      uploading: !httpsExportUrl,
+      uploading: false,
       uploadError: undefined,
       runtime: {
         status: "done",

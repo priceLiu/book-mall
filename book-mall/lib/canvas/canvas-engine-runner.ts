@@ -28,6 +28,7 @@ import {
   getCanvasUserInflightMax,
 } from "./canvas-constants";
 import { CanvasProjectError } from "./canvas-project-service";
+import { resolveCanvasGatewayTtsExtras } from "./canvas-tts-run-params";
 import { assertStoryLlmVisionModel } from "./story-llm-vision-models";
 import { isLikelyVideoUrl } from "./media-url-kind";
 import { scriptStudioMirrorPayload } from "./script-studio-parse-mirror";
@@ -2644,13 +2645,7 @@ export async function runTtsEngineNode(
     typeof params.language_type === "string"
       ? params.language_type
       : undefined;
-  const extras: Record<string, unknown> = {};
-  if (typeof params.speed === "number") extras.speed = params.speed;
-  if (typeof params.pitch === "number") extras.pitch = params.pitch;
-  if (typeof params.vol === "number") extras.volume = params.vol;
-  if (typeof params.instruction === "string" && params.instruction.trim()) {
-    extras.instruction = params.instruction.trim();
-  }
+  const extras = resolveCanvasGatewayTtsExtras(params);
 
   try {
     const ttsOut = await canvasGwTts(userId, {

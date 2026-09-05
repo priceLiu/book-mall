@@ -2,6 +2,7 @@ import type { CanvasEnginePick } from "./types";
 import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
 import { STORY_TTS_MODEL_KEYS } from "./story-prompts";
 import { isMinimaxSpeechModelKey } from "./libtv-qr-audio-models";
+import { applyLibtvTtsVoicePreferenceToParams } from "./libtv-tts-voice-preference";
 
 export const KIE_SUNO_API_MODEL_KEY = "suno/generate" as const;
 
@@ -88,13 +89,14 @@ export function pickDefaultPro2TtsEngine(
     for (const p of providers) {
       for (const m of p.models ?? []) {
         if (m.modelKey.toLowerCase() === key.toLowerCase() && isPro2TtsModelKey(m.modelKey)) {
-          const params = { ...(m.defaultParams ?? {}) };
+          let params = { ...(m.defaultParams ?? {}) };
           if (
             isMinimaxSpeechModelKey(m.modelKey) &&
             !String(params.voice_id ?? "").trim()
           ) {
             params.voice_id = DEFAULT_LIBTV_MINIMAX_VOICE_ID;
           }
+          params = applyLibtvTtsVoicePreferenceToParams(m.modelKey, params);
           return {
             providerId: p.id,
             modelKey: m.modelKey,

@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
 import { DynamicParamForm } from "@/components/canvas/dynamic-param-form";
 import { resolveLibtvDockEngineModel } from "@/lib/canvas/libtv-dock-engine-models";
-import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
+import type { CanvasParamSchema, CanvasProviderDto } from "@/lib/canvas-providers-api";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import {
@@ -26,6 +26,7 @@ export type LibtvDockGatewayParamsPickerProps = {
   /** 覆盖 Gateway schema（如音色已独立 Popover） */
   schemaOverride?: CanvasParamSchema;
   onChange: (params: Record<string, unknown>) => void;
+  footer?: React.ReactNode;
 };
 
 /** 浮动 Dock · Gateway schema 参数锚点 Popover（即时生效） */
@@ -40,6 +41,7 @@ export function LibtvDockGatewayParamsPicker({
   summaryLabel,
   schemaOverride,
   onChange,
+  footer,
 }: LibtvDockGatewayParamsPickerProps) {
   const { providers: hookProviders } = useUserProviders();
   const providers = externalProviders ?? hookProviders;
@@ -92,6 +94,7 @@ export function LibtvDockGatewayParamsPicker({
               value={params}
               onChange={onChange}
             />
+            {footer}
           </div>
         ) : (
           <p className="px-3 py-2 text-[12px] text-white/45">当前模型无可调参数</p>

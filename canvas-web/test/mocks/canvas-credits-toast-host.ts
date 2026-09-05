@@ -6,3 +6,5 @@ export function CanvasCreditsToastHost(): null {
 export function showCanvasCreditsToast(_message: string): void {}
 
 export function showCanvasSuccessToast(_message: string): void {}
+
+export function showCanvasErrorToast(_message: string): void {}

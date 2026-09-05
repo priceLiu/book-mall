@@ -23,7 +23,7 @@ export function libtvDockSegmentButtonClass(
 ): string {
   return cn(
     "rounded-lg border font-medium transition",
-    opts?.compact ? "px-3 py-1.5 text-[12px]" : "px-4 py-2 text-[13px]",
+    opts?.compact ? "px-2 py-1 text-[11px]" : "px-4 py-2 text-[13px]",
     active
       ? "border-transparent bg-white/[0.10] text-white"
       : "border-transparent bg-white/[0.04] text-white/65 hover:bg-white/[0.07] hover:text-white/85",

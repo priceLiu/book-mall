@@ -14,6 +14,8 @@ export type AiSpaceClonedVoiceItem = {
   tags: string[];
   avatarLetter: string;
   clonedAt?: string;
+  /** 克隆原文 · 调参试听按各音色自己的样音合成 */
+  sampleText?: string;
   /** 是否可用作 TTS 音色（已解析到 MiniMax voice_id） */
   selectable: boolean;
 };
@@ -43,12 +45,14 @@ export async function listAiSpaceClonedVoices(
         catalogId: entry.catalogId,
         voiceId: entry.voiceId,
         label,
-        subtitle: selectable ? "快速复制 · 声音克隆" : "快速复制 · 缺少 voice_id",
-        language: `克隆于 ${formatCloneDate(entry.clonedAt)}`,
+        subtitle: selectable
+          ? `克隆于 ${formatCloneDate(entry.clonedAt)}`
+          : "快速复制 · 缺少 voice_id",
         previewUrl: entry.previewUrl,
         tags: ["cloned"],
         avatarLetter: label.charAt(0) || "我",
         clonedAt: entry.clonedAt,
+        sampleText: entry.sampleText,
         selectable,
       };
     });

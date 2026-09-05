@@ -41,13 +41,27 @@ describe("resolveLibtvMediaGeneratingState", () => {
     ).toBe(true);
   });
 
-  it("done runtime with stale uploading still generating until patch clears uploading", () => {
+  it("done runtime with leftover uploading is idle once media exists", () => {
     expect(
       resolveLibtvMediaGeneratingState({
         uploading: true,
         runtime: { status: "done", ossUrl: "https://cdn/x.png" },
       }).isGenerating,
-    ).toBe(true);
+    ).toBe(false);
+  });
+
+  it("done TTS with local data preview is not generating while OSS backfills", () => {
+    expect(
+      resolveLibtvMediaGeneratingState({
+        uploading: true,
+        blobUrl: "data:audio/mpeg;base64,AAA",
+        runtime: {
+          status: "done",
+          taskId: "t-audio",
+          ephemeralUrl: "data:audio/mpeg;base64,AAA",
+        },
+      }).isGenerating,
+    ).toBe(false);
   });
 });
 

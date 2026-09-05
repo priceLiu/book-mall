@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type CanvasToastKind = "credits" | "success";
+export type CanvasToastKind = "credits" | "success" | "error";
 
 type ToastItem = {
   id: number;
@@ -29,6 +29,10 @@ export function showCanvasCreditsToast(message: string): void {
 /** 非阻塞操作成功提示（3s 自动消失） */
 export function showCanvasSuccessToast(message: string): void {
   emitCanvasToast(message, "success");
+}
+
+export function showCanvasErrorToast(message: string): void {
+  emitCanvasToast(message, "error");
 }
 
 export function CanvasCreditsToastHost() {
@@ -58,7 +62,9 @@ export function CanvasCreditsToastHost() {
             "flex items-center gap-2 rounded-xl border bg-[#1a1a1a]/97 px-3 py-2 text-sm shadow-lg",
             t.kind === "success"
               ? "border-violet-400/35 text-violet-50"
-              : "border-yellow-400/30 text-yellow-300",
+              : t.kind === "error"
+                ? "border-red-400/35 text-red-200"
+                : "border-yellow-400/30 text-yellow-300",
           )}
         >
           {t.kind === "success" ? (

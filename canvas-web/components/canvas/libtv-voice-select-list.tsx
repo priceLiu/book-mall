@@ -4,6 +4,11 @@ import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
+import {
+  buildLibtvTtsRowPreviewContextFromSpec,
+  type LibtvTtsPreviewContext,
+  type LibtvTtsRowPreviewSpec,
+} from "@/lib/canvas/libtv-tts-preview-client";
 import { LibtvVoicePreviewButton } from "./libtv-voice-preview-button";
 
 export type LibtvVoiceSelectOption = {
@@ -11,6 +16,8 @@ export type LibtvVoiceSelectOption = {
   label: string;
   subtitle?: string;
   previewUrl?: string;
+  language?: string;
+  sampleText?: string;
   disabled?: boolean;
   /** 列表项唯一 key；默认同 value */
   rowKey?: string;
@@ -28,7 +35,10 @@ export function LibtvVoiceSelectList({
   hasMore = false,
   onLoadMore,
   maxHeightClass = "max-h-[240px]",
-  minimaxOssPreviewFallback = false,
+  minimaxOssFallback = false,
+  rowPreviewSpec,
+  fallbackPreviewContext,
+  onSynthPlayed,
 }: {
   options: LibtvVoiceSelectOption[];
   value: string;
@@ -39,8 +49,20 @@ export function LibtvVoiceSelectList({
   onLoadMore?: () => void;
   maxHeightClass?: string;
   /** MiniMax 音色列表为 true；Qwen 等无 OSS 试听须 false */
-  minimaxOssPreviewFallback?: boolean;
+  minimaxOssFallback?: boolean;
+  /** 勾选调参试听 · 各行 voiceId + dockParams 实时合成 */
+  rowPreviewSpec?: LibtvTtsRowPreviewSpec;
+  fallbackPreviewContext?: LibtvTtsPreviewContext;
+  onSynthPlayed?: (info: { voiceId: string; dataUrl: string }) => void;
 }) {
+  const synthPreviewContext = useMemo(
+    () =>
+      rowPreviewSpec
+        ? buildLibtvTtsRowPreviewContextFromSpec(rowPreviewSpec)
+        : undefined,
+    [rowPreviewSpec],
+  );
+
   const selectedIdx = useMemo(
     () => options.findIndex((o) => o.value === value),
     [options, value],
@@ -107,6 +129,8 @@ export function LibtvVoiceSelectList({
     );
   }
 
+  const rowSynth = Boolean(synthPreviewContext);
+
   return (
     <div
       ref={scrollRef}
@@ -118,39 +142,41 @@ export function LibtvVoiceSelectList({
       onWheel={(e) => e.stopPropagation()}
       onScroll={onScroll}
     >
-      {visibleItems.map((voice) => {
-        const active = value === voice.value;
-        return (
-          <div
-            key={voice.rowKey ?? voice.value}
+      {visibleItems.map((voice) => (
+        <div
+          key={voice.rowKey ?? voice.value}
+          className={cn(
+            "flex items-center gap-1 rounded-md pr-1 transition",
+            value === voice.value ? "bg-white/[0.12]" : "hover:bg-white/[0.06]",
+          )}
+        >
+          <button
+            type="button"
+            disabled={voice.disabled}
             className={cn(
-              "flex items-center gap-1 rounded-md pr-1 transition",
-              active ? "bg-white/[0.12]" : "hover:bg-white/[0.06]",
+              "flex min-w-0 flex-1 flex-col px-2 py-1 text-left leading-tight",
+              value === voice.value ? "text-white" : "text-white/75",
+              voice.disabled && "cursor-not-allowed opacity-50",
             )}
+            onClick={() => onSelect(voice.value)}
           >
-            <button
-              type="button"
-              disabled={voice.disabled}
-              className={cn(
-                "flex min-w-0 flex-1 flex-col px-2.5 py-2 text-left",
-                active ? "text-white" : "text-white/75",
-                voice.disabled && "cursor-not-allowed opacity-50",
-              )}
-              onClick={() => onSelect(voice.value)}
-            >
-              <span className="truncate text-[13px] font-medium">{voice.label}</span>
-              {voice.subtitle ? (
-                <span className="truncate text-[11px] text-white/45">{voice.subtitle}</span>
-              ) : null}
-            </button>
-            <LibtvVoicePreviewButton
-              previewUrl={voice.previewUrl}
-              voiceId={voice.value}
-              minimaxOssFallback={minimaxOssPreviewFallback}
-            />
-          </div>
-        );
-      })}
+            <span className="truncate text-[12px] font-medium">{voice.label}</span>
+            {voice.subtitle ? (
+              <span className="truncate text-[10px] text-white/40">{voice.subtitle}</span>
+            ) : null}
+          </button>
+          <LibtvVoicePreviewButton
+            previewUrl={rowSynth ? undefined : voice.previewUrl}
+            voiceId={voice.value}
+            voiceLanguage={voice.language}
+            sampleText={voice.sampleText}
+            minimaxOssFallback={minimaxOssFallback}
+            mode={rowSynth ? "synth" : "oss"}
+            previewContext={synthPreviewContext ?? fallbackPreviewContext}
+            onSynthPlayed={onSynthPlayed}
+          />
+        </div>
+      ))}
       {loading && options.length > 0 ? (
         <p className="pb-1 text-center text-[11px] text-white/40">加载更多音色…</p>
       ) : null}

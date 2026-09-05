@@ -9,6 +9,10 @@ import {
   qwen3TtsVoiceLabel,
 } from "@/lib/canvas/qwen3-tts-voice-catalog";
 import {
+  LIBTV_DOCK_VOICE_TRIGGER_MAX_WIDTH_CLASS,
+  resolveLibtvDockVoiceFullLabel,
+} from "@/lib/canvas/libtv-tts-voice-preference";
+import {
   Sbv1ToolbarDropdown,
   useSbv1ToolbarAnchor,
 } from "./sbv1/sbv1-toolbar-anchor-popover";
@@ -18,16 +22,18 @@ import { LibtvVoiceSelectList } from "./libtv-voice-select-list";
 /** Qwen3 TTS · 全量系统音色（百炼 49 种） */
 export function LibtvQwenTtsDockVoicePicker({
   voiceId,
+  savedLabel,
   disabled,
   open: controlledOpen,
   onOpenChange,
   onSelectVoice,
 }: {
   voiceId: string;
+  savedLabel?: string;
   disabled?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
-  onSelectVoice: (voiceId: string) => void;
+  onSelectVoice: (voiceId: string, label: string) => void;
 }) {
   const { anchorRef, open: internalOpen, setOpen: setInternalOpen, rect } =
     useSbv1ToolbarAnchor(controlledOpen);
@@ -43,7 +49,11 @@ export function LibtvQwenTtsDockVoicePicker({
       })),
     [],
   );
-  const selectedLabel = qwen3TtsVoiceLabel(voiceId);
+  const selectedLabel = resolveLibtvDockVoiceFullLabel({
+    voiceId,
+    savedLabel,
+    catalogLabel: qwen3TtsVoiceLabel(voiceId),
+  });
 
   return (
     <>
@@ -52,11 +62,15 @@ export function LibtvQwenTtsDockVoicePicker({
         type="button"
         disabled={disabled}
         title={selectedLabel}
-        className="nodrag flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-2 text-white hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
+        className="nodrag flex max-w-[11rem] shrink-0 items-center gap-1.5 rounded-md px-2.5 py-2 text-white hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
         style={{ fontSize: fontPx, minHeight: minHeightPx }}
         onClick={() => setOpen(!open)}
       >
-        <span className="max-w-[8rem] truncate whitespace-nowrap">{selectedLabel}</span>
+        <span
+          className={`min-w-0 truncate whitespace-nowrap ${LIBTV_DOCK_VOICE_TRIGGER_MAX_WIDTH_CLASS}`}
+        >
+          {selectedLabel}
+        </span>
         <ChevronDown
           className="shrink-0 opacity-45"
           style={{ width: chevronPx, height: chevronPx }}
@@ -80,7 +94,8 @@ export function LibtvQwenTtsDockVoicePicker({
             pageSize={10}
             maxHeightClass="max-h-[260px]"
             onSelect={(nextVoiceId) => {
-              onSelectVoice(nextVoiceId);
+              const hit = options.find((o) => o.value === nextVoiceId);
+              onSelectVoice(nextVoiceId, hit?.label?.trim() || nextVoiceId);
               setOpen(false);
             }}
           />

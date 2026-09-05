@@ -92,6 +92,8 @@ export function Sbv1ToolbarDropdown({
   estimatedHeight = 320,
   /** 子组件自管滚动（如音色列表）时关闭面板外层滚动，避免双滚动抢 wheel */
   containScroll = false,
+  /** 与 maxHeight 同高，供内部 flex 列表占满剩余空间 */
+  fillHeight = false,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
@@ -103,6 +105,7 @@ export function Sbv1ToolbarDropdown({
   /** auto 时用于判断向上/向下展开 */
   estimatedHeight?: number;
   containScroll?: boolean;
+  fillHeight?: boolean;
 }) {
   const baseZ = useContext(ToolbarDropdownZContext);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -176,7 +179,10 @@ export function Sbv1ToolbarDropdown({
         transform,
         zIndex: baseZ + 1,
         maxHeight: panelMaxHeight,
+        height: fillHeight ? panelMaxHeight : undefined,
         overflowY: containScroll ? "hidden" : "auto",
+        display: fillHeight ? "flex" : undefined,
+        flexDirection: fillHeight ? "column" : undefined,
       }}
     >
       {children}

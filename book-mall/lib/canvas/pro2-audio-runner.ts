@@ -1,8 +1,6 @@
 /**
  * Pro2 / LibTV 音频节点 runner（Gateway 同步 TTS · MiniMax · KIE ElevenLabs · Suno）
  */
-import { createHash } from "node:crypto";
-
 import type { Prisma } from "@prisma/client";
 
 import { forwardMinimaxT2a } from "@/lib/gateway/minimax-speech-proxy";
@@ -25,6 +23,10 @@ import {
   type RunEngineNodeArgs,
   type RunEngineNodeResult,
 } from "./canvas-engine-runner";
+import {
+  buildPro2AudioTtsInputHash,
+  resolveCanvasMinimaxTtsVoiceInput,
+} from "./canvas-tts-run-params";
 import { scheduleCanvasBufferOssBackfill } from "./canvas-oss-backfill";
 import { createStoryScopedCanvasTask } from "./canvas-story-scope";
 import {
@@ -105,9 +107,12 @@ async function runCanvasMinimaxTtsNode(
   await ensureProjectInflightCapacity(projectId);
   await ensureUserInflightCapacity(userId);
 
-  const inputHash = createHash("sha256")
-    .update(JSON.stringify({ modelKey, voiceId, text: mergedPrompt }))
-    .digest("hex");
+  const inputHash = buildPro2AudioTtsInputHash({
+    modelKey,
+    voiceId,
+    text: mergedPrompt,
+    params,
+  });
 
   const gwClientPage = args.clientPage ?? `canvas/${projectId}/sbv1`;
   const log = await createRequestLog({
@@ -151,30 +156,7 @@ async function runCanvasMinimaxTtsNode(
     input: {
       modelKey,
       text: mergedPrompt,
-      voice_id: voiceId,
-      speed:
-        typeof params.speed === "number"
-          ? params.speed
-          : typeof params.voice_speed === "number"
-            ? params.voice_speed
-            : undefined,
-      vol:
-        typeof params.vol === "number"
-          ? params.vol
-          : typeof params.volume === "number"
-            ? params.volume
-            : typeof params.voice_volume === "number"
-              ? params.voice_volume
-              : undefined,
-      pitch:
-        typeof params.pitch === "number"
-          ? params.pitch
-          : typeof params.voice_pitch === "number"
-            ? params.voice_pitch
-            : undefined,
-      ...(typeof params.emotion === "string" && params.emotion.trim()
-        ? { emotion: params.emotion.trim() }
-        : {}),
+      ...resolveCanvasMinimaxTtsVoiceInput(params, voiceId, modelKey),
     },
   });
 

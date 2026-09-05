@@ -1,15 +1,12 @@
-/** MiniMax T2A emotion · 与快速复制 / Gateway 一致 */
-export const AI_SPACE_TTS_EMOTION_OPTIONS = [
-  { id: "", label: "默认（跟随音色）" },
-  { id: "happy", label: "开心" },
-  { id: "sad", label: "悲伤" },
-  { id: "angry", label: "愤怒" },
-  { id: "fearful", label: "恐惧" },
-  { id: "disgusted", label: "厌恶" },
-  { id: "surprised", label: "惊讶" },
-  { id: "calm", label: "平静" },
-  { id: "neutral", label: "中性" },
-] as const;
+import { MINIMAX_TTS_EMOTION_OPTIONS } from "@/lib/gateway/minimax-tts-emotion-options";
+
+/** MiniMax T2A emotion · 与画布 Dock / Gateway 一致 */
+export const AI_SPACE_TTS_EMOTION_OPTIONS = MINIMAX_TTS_EMOTION_OPTIONS.map(
+  (o) => ({
+    id: o.value,
+    label: o.value === "" ? "默认（跟随音色）" : o.label,
+  }),
+) as ReadonlyArray<{ id: string; label: string }>;
 
 export type AiSpaceTtsVoiceControls = {
   emotion: string | null;

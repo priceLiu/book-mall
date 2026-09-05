@@ -53,9 +53,11 @@ export function resolveLibtvMediaGeneratingState(
   const rt = data.runtime;
   const hasPersistedMedia = rowRuntimeHasPersistedMedia(rt);
 
-  // 终态优先：避免 uploading 残留导致 Gateway 已成功仍扫光
+  // 终态优先：已有可预览媒体时结束扫光（TTS 常先 data:/blob，OSS 后台补）
   if (s === "done" || s === "error" || s === "idle") {
-    if (s === "done" && data.uploading) {
+    const hasPreview =
+      hasPersistedMedia || Boolean(String(data.blobUrl ?? "").trim());
+    if (s === "done" && data.uploading && !hasPreview) {
       return {
         isGenerating: true,
         reason: "uploading",

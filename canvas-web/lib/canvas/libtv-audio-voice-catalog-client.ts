@@ -10,6 +10,8 @@ export type LibtvVoiceCatalogItem = {
   tags?: string[];
   avatarLetter: string;
   selectable?: boolean;
+  /** 该音色自己的样音文案（克隆 prompt / 系统目录脚本） */
+  sampleText?: string;
 };
 
 const CLONED_PATH = "/api/platform/v1/ai-space/voices/cloned";

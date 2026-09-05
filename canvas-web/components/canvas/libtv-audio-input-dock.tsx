@@ -38,9 +38,9 @@ import {
 } from "./pro2/pro2-input-dock-shell";
 import {
   LibtvTtsDockModelPicker,
-  LibtvTtsDockParamsPicker,
 } from "./libtv-audio-dock-pickers";
 import { LibtvTtsDockVoicePicker } from "./libtv-tts-voice-picker";
+import { LibtvTtsDockVoiceParamsPicker } from "./libtv-tts-dock-voice-params-picker";
 import { LibtvQrAudioDockModelPicker } from "./libtv-qr-audio-dock-model-picker";
 import {
   fetchLibtvQrAudioCatalog,
@@ -51,11 +51,18 @@ import {
 } from "@/lib/canvas/libtv-qr-audio-models";
 import { isQwen3TtsModelKey } from "@/lib/canvas/qwen3-tts-voice-catalog";
 import { LIBTV_TTS_VOICE_CONTROL_DEFAULTS } from "@/lib/canvas/libtv-tts-voice-controls-schema";
-import { LibtvQwenTtsDockVoicePicker } from "./libtv-qwen-tts-voice-picker";
+import {
+  applyLibtvTtsVoicePreferenceToParams,
+  buildLibtvTtsVoiceParamsPatch,
+  readLibtvTtsVoicePreference,
+  resolveLibtvTtsVoiceKind,
+  libtvTtsVoiceParamKey,
+} from "@/lib/canvas/libtv-tts-voice-preference";
 import {
   mergeLibtvAudioRunText,
   resolveLibtvAudioPredecessorTexts,
 } from "@/lib/canvas/libtv-audio-run-text";
+import type { LibtvTtsPreviewContext } from "@/lib/canvas/libtv-tts-preview-client";
 
 /** Pro2 音频节点 · 底部浮动输入坞（ElevenLabs TTS） */
 export function LibtvAudioInputDock() {
@@ -64,10 +71,11 @@ export function LibtvAudioInputDock() {
   const { providers } = useUserProviders();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
+  const projectId = useCanvasStore((s) => s.projectId);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
 
-  const [dockMenu, setDockMenu] = useState<"model" | "params" | "voice" | null>(null);
+  const [dockMenu, setDockMenu] = useState<"model" | "voiceParams" | "voice" | null>(null);
 
   const dockNodeId = useLibtvSoleSelectedNodeId("story-pro2-audio");
   const suppressDock = useLibtvShouldSuppressFloatingDock();
@@ -93,8 +101,46 @@ export function LibtvAudioInputDock() {
   const isMinimaxEngine = isMinimaxSpeechModelKey(engine.modelKey ?? "");
   const isQwenEngine = isQwen3TtsModelKey(engine.modelKey ?? "");
   const voiceId = String(engine.params?.voice_id ?? engine.params?.voice ?? "");
+  const voiceLabel = String(engine.params?.voice_label ?? "");
   const dockInput = String(d.dockInput ?? "");
   const isRunning = isLibtvMediaGenerating(d);
+
+  const voicePreviewContext = useMemo((): LibtvTtsPreviewContext | undefined => {
+    const modelKey = engine.modelKey?.trim();
+    if (!modelKey || isQrVoicePreset) return undefined;
+    return {
+      modelKey,
+      params: engine.params ?? {},
+      projectId: projectId ?? undefined,
+    };
+  }, [engine.modelKey, engine.params, projectId, isQrVoicePreset]);
+
+  useEffect(() => {
+    if (!storeNode || isRunning) return;
+    const modelKey = engine.modelKey?.trim() ?? "";
+    if (!modelKey) return;
+    const kind = resolveLibtvTtsVoiceKind(modelKey);
+    if (!kind) return;
+    const paramKey = libtvTtsVoiceParamKey(kind);
+    if (String(engine.params?.[paramKey] ?? "").trim()) return;
+    const pref = readLibtvTtsVoicePreference(kind);
+    if (!pref) return;
+    updateNodeData(storeNode.id, {
+      engine: {
+        providerId: engine.providerId ?? "",
+        modelKey,
+        params: applyLibtvTtsVoicePreferenceToParams(modelKey, engine.params ?? {}),
+      },
+    });
+  }, [
+    storeNode?.id,
+    isRunning,
+    engine.modelKey,
+    engine.providerId,
+    engine.params?.voice_id,
+    engine.params?.voice,
+    updateNodeData,
+  ]);
 
   const upstreamLinks = useMemo(() => {
     if (!storeNode) return [];
@@ -134,6 +180,31 @@ export function LibtvAudioInputDock() {
       updateNodeData(storeNode.id, { dockInput: value });
     },
     [storeNode, updateNodeData],
+  );
+
+  const onSelectTtsVoice = useCallback(
+    (nextVoiceId: string, nextLabel: string) => {
+      if (!storeNode) return;
+      updateNodeData(storeNode.id, {
+        engine: {
+          providerId: engine.providerId ?? "",
+          modelKey: engine.modelKey ?? "",
+          params: buildLibtvTtsVoiceParamsPatch({
+            modelKey: engine.modelKey ?? "",
+            voiceId: nextVoiceId,
+            label: nextLabel,
+            prevParams: engine.params ?? {},
+          }),
+        },
+      });
+    },
+    [
+      storeNode,
+      updateNodeData,
+      engine.providerId,
+      engine.modelKey,
+      engine.params,
+    ],
   );
 
   const onRun = useCallback(async () => {
@@ -307,8 +378,10 @@ export function LibtvAudioInputDock() {
                     isMinimaxSpeechModelKey(nextKey) &&
                     !isMinimaxSpeechModelKey(prevKey)
                   ) {
+                    const pref = readLibtvTtsVoicePreference("minimax");
                     params = {
-                      voice_id: DEFAULT_LIBTV_MINIMAX_VOICE_ID,
+                      voice_id: pref?.voiceId ?? DEFAULT_LIBTV_MINIMAX_VOICE_ID,
+                      voice_label: pref?.label,
                       speed: LIBTV_TTS_VOICE_CONTROL_DEFAULTS.speed,
                       vol: LIBTV_TTS_VOICE_CONTROL_DEFAULTS.vol,
                       pitch: LIBTV_TTS_VOICE_CONTROL_DEFAULTS.pitch,
@@ -317,8 +390,10 @@ export function LibtvAudioInputDock() {
                     isQwen3TtsModelKey(nextKey) &&
                     !isQwen3TtsModelKey(prevKey)
                   ) {
+                    const pref = readLibtvTtsVoicePreference("qwen");
                     params = {
-                      voice: "Cherry",
+                      voice: pref?.voiceId ?? "Cherry",
+                      voice_label: pref?.label,
                       language_type: "Chinese",
                     };
                   }
@@ -332,75 +407,54 @@ export function LibtvAudioInputDock() {
                 }}
               />
             ) : null}
-            {isMinimaxEngine ? (
+            {isMinimaxEngine && isQrVoicePreset ? (
               <LibtvTtsDockVoicePicker
                 voiceId={voiceId}
+                savedLabel={voiceLabel}
                 disabled={isRunning}
                 open={dockMenu === "voice"}
                 onOpenChange={(next) => setDockMenu(next ? "voice" : null)}
-                onSelectVoice={(nextVoiceId) => {
+                onSelectVoice={onSelectTtsVoice}
+              />
+            ) : isMinimaxEngine ? (
+              <LibtvTtsDockVoiceParamsPicker
+                variant="minimax"
+                voiceId={voiceId}
+                savedLabel={voiceLabel}
+                providerId={engine.providerId ?? ""}
+                modelKey={engine.modelKey ?? ""}
+                params={engine.params ?? ENGINE_PICKER_EMPTY_PARAMS}
+                previewContext={voicePreviewContext}
+                externalProviders={providers}
+                disabled={isRunning}
+                open={dockMenu === "voiceParams"}
+                onOpenChange={(next) => setDockMenu(next ? "voiceParams" : null)}
+                onSelectVoice={onSelectTtsVoice}
+                onChangeParams={(nextParams) => {
                   updateNodeData(storeNode.id, {
                     engine: {
                       providerId: engine.providerId ?? "",
                       modelKey: engine.modelKey ?? "",
-                      params: {
-                        ...(engine.params ?? {}),
-                        voice_id: nextVoiceId,
-                      },
+                      params: nextParams,
                     },
                   });
                 }}
               />
             ) : isQwenEngine ? (
-              <>
-                <LibtvQwenTtsDockVoicePicker
-                  voiceId={String(engine.params?.voice ?? voiceId)}
-                  disabled={isRunning}
-                  open={dockMenu === "voice"}
-                  onOpenChange={(next) => setDockMenu(next ? "voice" : null)}
-                  onSelectVoice={(nextVoiceId) => {
-                    updateNodeData(storeNode.id, {
-                      engine: {
-                        providerId: engine.providerId ?? "",
-                        modelKey: engine.modelKey ?? "",
-                        params: {
-                          ...(engine.params ?? {}),
-                          voice: nextVoiceId,
-                        },
-                      },
-                    });
-                  }}
-                />
-                <LibtvTtsDockParamsPicker
-                  providerId={engine.providerId ?? ""}
-                  modelKey={engine.modelKey ?? ""}
-                  params={engine.params ?? ENGINE_PICKER_EMPTY_PARAMS}
-                  externalProviders={providers}
-                  disabled={isRunning}
-                  open={dockMenu === "params"}
-                  onOpenChange={(next) => setDockMenu(next ? "params" : null)}
-                  onChange={(nextParams) => {
-                    updateNodeData(storeNode.id, {
-                      engine: {
-                        providerId: engine.providerId ?? "",
-                        modelKey: engine.modelKey ?? "",
-                        params: nextParams,
-                      },
-                    });
-                  }}
-                />
-              </>
-            ) : null}
-            {isMinimaxEngine && !isQrVoicePreset ? (
-              <LibtvTtsDockParamsPicker
+              <LibtvTtsDockVoiceParamsPicker
+                variant="qwen"
+                voiceId={String(engine.params?.voice ?? voiceId)}
+                savedLabel={voiceLabel}
                 providerId={engine.providerId ?? ""}
                 modelKey={engine.modelKey ?? ""}
                 params={engine.params ?? ENGINE_PICKER_EMPTY_PARAMS}
+                previewContext={voicePreviewContext}
                 externalProviders={providers}
                 disabled={isRunning}
-                open={dockMenu === "params"}
-                onOpenChange={(next) => setDockMenu(next ? "params" : null)}
-                onChange={(nextParams) => {
+                open={dockMenu === "voiceParams"}
+                onOpenChange={(next) => setDockMenu(next ? "voiceParams" : null)}
+                onSelectVoice={onSelectTtsVoice}
+                onChangeParams={(nextParams) => {
                   updateNodeData(storeNode.id, {
                     engine: {
                       providerId: engine.providerId ?? "",

@@ -47,7 +47,7 @@ export function resolveLibtvMediaPreviewUrl(data: {
   if (data.uploading && blob) return blob;
   if (ossHttp) return ossHttp;
   if (oss.startsWith("blob:")) return oss;
-  return blob || ephemeralHttp || oss;
+  return blob || ephemeralHttp || runtimePreview || oss;
 }
 
 export function libtvMediaPreviewCanFallbackToBlob(data: {
