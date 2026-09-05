@@ -116,7 +116,7 @@ export function useEcomToolsAdmin(): boolean {
     let cancelled = false;
     void fetchEcomToolsSessionFull()
       .then((s) => {
-        if (!cancelled) setIsAdmin(isEcomToolsAdminSession(s));
+        if (!cancelled) setIsAdmin(isEcomToolsAdminSession(s as ToolsSessionShape));
       })
       .catch(() => {
         if (!cancelled) setIsAdmin(false);

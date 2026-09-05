@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
+  EcomImagePreviewHost,
+  useEcomImagePreview,
+} from "@/components/media";
+import {
   EcomMediaLibraryTile,
   ECOM_LIBRARY_MEDIA_GRID_CLASS,
 } from "@/components/media/ecom-media-library-tile";
@@ -34,6 +38,7 @@ import {
 } from "@/lib/ecom-scene-library-api";
 import type { EcomSceneLibraryEntry } from "@/lib/ecom-scene-library/types";
 import { cn } from "@/lib/utils";
+import { mapPreviewItemsFromEntries } from "@/lib/media/ecom-image-preview";
 
 type Tab = "scene" | "prop" | "pose";
 
@@ -71,18 +76,27 @@ function PoseCatalogCard({
   readonly,
   onEdit,
   onRemove,
+  onPreviewImage,
 }: {
   entry: EcomPoseLibraryEntry;
   readonly?: boolean;
   onEdit?: () => void;
   onRemove?: () => void;
+  onPreviewImage?: (src: string, title: string) => void;
 }) {
   const imageUrl = entry.thumbUrl || entry.ossUrl || undefined;
   return (
     <li className="flex flex-col overflow-hidden rounded-xl border border-[#e5e5ea] bg-white">
       <div className="relative aspect-[3/4] w-full bg-[#f5f5f7]">
         {imageUrl ? (
-          <EcomMediaLibraryTile kind="image" src={imageUrl} alt={entry.title} className="h-full w-full rounded-none" />
+          <EcomMediaLibraryTile
+            kind="image"
+            src={imageUrl}
+            alt={entry.title}
+            aspectClass="aspect-[3/4]"
+            className="h-full w-full rounded-none"
+            onPreview={() => onPreviewImage?.(imageUrl, entry.title)}
+          />
         ) : (
           <div className="flex h-full items-center justify-center px-2 text-center text-[10px] text-[#86868b]">
             暂无参考图
@@ -135,6 +149,7 @@ function PoseCatalogCard({
 
 export function ShootCatalogPanel() {
   const { alert, doubleConfirm } = useDialogs();
+  const { preview, openPreview, closePreview } = useEcomImagePreview();
   const [tab, setTab] = useState<Tab>("scene");
   const [loading, setLoading] = useState(true);
   const [scenes, setScenes] = useState<{ platform: EcomSceneLibraryEntry[]; user: EcomSceneLibraryEntry[] }>({
@@ -203,6 +218,26 @@ export function ShootCatalogPanel() {
         pose: "姿势",
       }) as const,
     [],
+  );
+
+  const posePreviewItems = useMemo(
+    () =>
+      mapPreviewItemsFromEntries(
+        [...poses.platform, ...poses.user]
+          .map((p) => ({
+            url: p.thumbUrl || p.ossUrl || "",
+            title: p.title?.trim() || "姿势参考图",
+          }))
+          .filter((row) => row.url.trim()),
+      ),
+    [poses.platform, poses.user],
+  );
+
+  const openPoseImagePreview = useCallback(
+    (src: string, title: string) => {
+      openPreview(src, title, posePreviewItems);
+    },
+    [openPreview, posePreviewItems],
   );
 
   async function saveScene() {
@@ -595,7 +630,12 @@ export function ShootCatalogPanel() {
             ) : (
               <ul className={ECOM_LIBRARY_MEDIA_GRID_CLASS}>
                 {poses.platform.map((p) => (
-                  <PoseCatalogCard key={p.id} entry={p} readonly />
+                  <PoseCatalogCard
+                    key={p.id}
+                    entry={p}
+                    readonly
+                    onPreviewImage={openPoseImagePreview}
+                  />
                 ))}
               </ul>
             )}
@@ -620,6 +660,7 @@ export function ShootCatalogPanel() {
                   <PoseCatalogCard
                     key={p.id}
                     entry={p}
+                    onPreviewImage={openPoseImagePreview}
                     onEdit={() =>
                       setPoseForm({
                         id: p.id,
@@ -751,6 +792,12 @@ export function ShootCatalogPanel() {
           </div>
         </FormModal>
       ) : null}
+
+      <EcomImagePreviewHost
+        preview={preview}
+        galleryItems={posePreviewItems}
+        onClose={closePreview}
+      />
     </div>
   );
 }
