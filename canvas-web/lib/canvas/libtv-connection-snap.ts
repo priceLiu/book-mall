@@ -22,13 +22,13 @@ export const DEFAULT_HANDLE_BY_TYPE: Record<
   "sbv1-image": { target: "in_image", source: "image" },
   "sbv1-video-engine": { target: "in_ref", source: "out_video" },
   "jianying-export-pro2": { target: "in_video" },
-  "jianying-auto-render-pro2": { target: "in_video" },
+  "jianying-auto-render-pro2": { target: "in_video", source: undefined },
   "story-pro2-image": { target: "in_image", source: "image" },
   "story-pro2-three-view": { target: "in_image", source: "image" },
   "story-pro2-style-asset": { target: "in_image", source: "style" },
   "story-pro2-prop": { target: "in_image", source: "image" },
   "story-pro2-mood": { target: "in_image", source: "image" },
-  "story-pro2-audio": { target: "in_image", source: "image" },
+  "story-pro2-audio": { target: "in_audio", source: "audio" },
   "story-pro2-starter": { target: "in_text", source: "text" },
   "story-pro2-script-hub": { target: "in_text", source: "text" },
   "story-pro2-frame": { target: "in_text" },
@@ -272,6 +272,14 @@ export function resolveSnapConnectionOnNodeHit(
       (state.fromHandleId === "out_video" || state.fromHandleId === "plus_left")
     ) {
       targetHandle = "in_video";
+    } else if (
+      (targetNode.type === "jianying-export-pro2" ||
+        targetNode.type === "jianying-auto-render-pro2") &&
+      !state.toHandleId &&
+      fromNode?.type === "story-pro2-audio" &&
+      (state.fromHandleId === "audio" || state.fromHandleId === "plus_left")
+    ) {
+      targetHandle = "in_audio";
     }
     if (!targetHandle) return null;
     return {

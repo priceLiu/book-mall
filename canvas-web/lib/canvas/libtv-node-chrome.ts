@@ -83,21 +83,21 @@ export const LIBTV_SQUARE_IMAGE_NODE_MIN_WIDTH = 220;
 export const LIBTV_SQUARE_IMAGE_NODE_MIN_HEIGHT = 220;
 
 /**
- * LibTV 音频轨节点（Pro2 · 横条 · 波形图）
- * 宽 460 × 高 104（标题 44 + 波形区 60）
+ * LibTV 音频轨节点（Pro2 · 迷你播放器横条 + 标题栏）
+ * 宽 460 × 高 102（标题 ~28 + 播放器 74）
  */
 export const LIBTV_AUDIO_TRACK_NODE_WIDTH = 460;
-export const LIBTV_AUDIO_TRACK_WAVEFORM_HEIGHT = 60;
-export const LIBTV_AUDIO_TRACK_NODE_HEIGHT =
-  LIBTV_IMAGE_NODE_HEADER_HEIGHT + LIBTV_AUDIO_TRACK_WAVEFORM_HEIGHT;
+export const LIBTV_AUDIO_MINI_PLAYER_HEIGHT = 74;
+/** @deprecated 旧波形区高度；新 UI 使用 LIBTV_AUDIO_MINI_PLAYER_HEIGHT */
+export const LIBTV_AUDIO_TRACK_WAVEFORM_HEIGHT = LIBTV_AUDIO_MINI_PLAYER_HEIGHT;
+export const LIBTV_AUDIO_TRACK_NODE_HEIGHT = 102;
 export const LIBTV_AUDIO_TRACK_NODE_MIN_WIDTH = 220;
-export const LIBTV_AUDIO_TRACK_NODE_MIN_HEIGHT = 84;
+export const LIBTV_AUDIO_TRACK_NODE_MIN_HEIGHT = 102;
 /** 音轨 UI 版本 · hydrate 时强制迁移外框 */
-export const LIBTV_AUDIO_TRACK_LAYOUT_VERSION = 7;
+export const LIBTV_AUDIO_TRACK_LAYOUT_VERSION = 9;
 
-/** 空态/预览 · 波形装饰图（public/libtv） */
-export const LIBTV_AUDIO_WAVEFORM_RIBBON_SRC =
-  "/libtv/audio-waveform-grid.png";
+/** 迷你播放器左侧图标 */
+export const LIBTV_AUDIO_MINI_ICON_SRC = "/libtv/mini-audio-large.svg";
 
 /** 音频节点强调色 · 与画布磁吸 Dock「上传」图标同色（emerald-400） */
 export const LIBTV_AUDIO_ACCENT_COLOR = "#34d399";

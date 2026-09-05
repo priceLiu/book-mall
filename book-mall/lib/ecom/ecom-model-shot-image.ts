@@ -3,11 +3,14 @@ import { Prisma } from "@prisma/client";
 import { generateEcomImage } from "@/lib/ecom/ecom-image-gen-invoke";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { rebuildModelShotItemPrompt } from "@/lib/ecom/model-shot/prompt-assembler";
+import { buildModelShotRefImageUrls } from "@/lib/ecom/model-shot/pose-ref";
+import { resolvePoseRefUrl } from "@/lib/ecom/ecom-pose-library-import";
 import { appendModelShotPoseImage } from "@/lib/ecom/model-shot/pose-image-history";
 import {
   ECOM_MODEL_SHOT_MODULE,
   ECOM_MODEL_SHOT_TRYON_ACTION,
   ECOM_MODEL_SHOT_TOOL_KEY,
+  hasGarmentReference,
   parseModelShotPlan,
   type ModelShotPoseItem,
 } from "@/lib/ecom/ecom-model-shot-types";
@@ -24,14 +27,20 @@ import { ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL } from "@/lib/gateway/ecom-storyboa
 import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
 import { prisma } from "@/lib/prisma";
 
-function refUrls(project: Awaited<ReturnType<typeof getEcomModelShotProject>>): string[] {
+function refUrls(
+  project: Awaited<ReturnType<typeof getEcomModelShotProject>>,
+  item?: { poseRefUrl?: string; poseId?: string },
+  modelKey?: string,
+): string[] {
   if (!project) return [];
-  const urls: string[] = [];
-  for (const role of ["garment", "model", "scene"] as const) {
-    const ref = project.references.find((r) => r.role === role);
-    if (ref?.ossUrl) urls.push(ref.ossUrl);
-  }
-  return urls;
+  const poseRef =
+    item?.poseRefUrl?.trim() ||
+    undefined;
+  return buildModelShotRefImageUrls({
+    references: project.references,
+    poseRefUrl: poseRef,
+    modelKey,
+  });
 }
 
 export async function generateModelShotImages(opts: {
@@ -49,8 +58,9 @@ export async function generateModelShotImages(opts: {
   }
 
   const modelKey = opts.modelKey?.trim() || project.settings.imageModelKey || ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL;
-  const refs = refUrls(project);
-  if (refs.length === 0) throw new Error("请先上传服装参考图");
+  if (!hasGarmentReference(project.references)) {
+    throw new Error("请先上传服装参考图");
+  }
 
   const targetIndexes =
     opts.indexes?.length && opts.indexes.length > 0
@@ -88,8 +98,16 @@ export async function generateModelShotImages(opts: {
         await patchPoseItem(opts.userId, opts.projectId, index, { status: "failed" });
         return;
       }
+
+      let poseRefUrl = item.poseRefUrl?.trim();
+      if (!poseRefUrl && item.poseId) {
+        poseRefUrl = (await resolvePoseRefUrl(item.poseId)) ?? undefined;
+      }
+
+      const refs = refUrls(live!, { poseRefUrl, poseId: item.poseId }, modelKey);
+
       const prompt = rebuildModelShotItemPrompt({
-        item,
+        item: { ...item, poseRefUrl },
         brief: live!.brief,
         references: live!.references,
       });

@@ -413,6 +413,15 @@
 - **产品文档**：`doc/拉片/requirements.md`、`doc/plans/2026-08-ecom-film-pull-module.md`
 - **应用**：`pnpm db:apply-pending` + `pnpm db:generate`
 
+## 2026-09-04 — 姿势库 V2 · 参考图与去重
+
+- **迁移目录**：`prisma/migrations/20260904200000_ecom_pose_library_v2/`
+- **字段扩展**：`EcomPoseLibraryEntry` 新增 `ossUrl`、`thumbUrl`、`sourceImageKey`
+- **产品文档**：`doc/模特姿势/pose-library-v2-requirements.md`
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`
+
+---
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

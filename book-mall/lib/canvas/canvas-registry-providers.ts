@@ -16,6 +16,7 @@ import { VOLCENGINE_ALL_KNOWN_MODELS, VOLCENGINE_VIDEO_KNOWN_MODELS } from "@/li
 import { listHunyuanKnownModels } from "./providers/hunyuan-3d";
 import { TOPAZ_KNOWN_MODELS } from "./providers/topaz";
 import { MINIMAX_VIDEO_KNOWN_MODELS_CANVAS } from "./providers/minimax-video";
+import { MINIMAX_SPEECH_KNOWN_MODELS_CANVAS } from "./providers/minimax-speech";
 import { getUserBillingPersona } from "@/lib/billing/billing-persona";
 import { getGatewayLinkStatusForUser } from "@/lib/gateway/book-gateway-link";
 import { isGatewayProviderBound } from "@/lib/gateway/gateway-credential-match";
@@ -56,6 +57,14 @@ const KNOWN: KnownMeta[] = [
   ...listHunyuanKnownModels(),
   ...TOPAZ_KNOWN_MODELS,
   ...MINIMAX_VIDEO_KNOWN_MODELS_CANVAS.map((m) => ({
+    modelKey: m.modelKey,
+    displayName: m.displayName,
+    role: m.role,
+    description: m.description ?? null,
+    paramsSchema: m.paramsSchema ?? null,
+    defaultParams: m.defaultParams ?? null,
+  })),
+  ...MINIMAX_SPEECH_KNOWN_MODELS_CANVAS.map((m) => ({
     modelKey: m.modelKey,
     displayName: m.displayName,
     role: m.role,
@@ -230,6 +239,70 @@ export function mergeKnownBailianImageModelsForCanvas(
   return out;
 }
 
+function knownMinimaxSpeechToModelDto(
+  providerId: string,
+  meta: (typeof MINIMAX_SPEECH_KNOWN_MODELS_CANVAS)[number],
+  sortOrder: number,
+): CanvasProviderDto["models"][0] {
+  return {
+    id: `${providerId}::${meta.modelKey}`,
+    modelKey: meta.modelKey,
+    displayName: meta.displayName,
+    role: meta.role,
+    description: meta.description ?? null,
+    paramsSchema: meta.paramsSchema ?? null,
+    defaultParams: meta.defaultParams ?? null,
+    enabled: true,
+    sortOrder,
+  };
+}
+
+/** 注册表漏项时兜底 MiniMax Speech（Canvas 音频节点 / AI 空间同款） */
+export function mergeKnownMinimaxSpeechModelsForCanvas(
+  providers: CanvasProviderDto[],
+  opts: { role?: CanvasModelRole },
+): CanvasProviderDto[] {
+  if (opts.role && opts.role !== "TTS" && opts.role !== "LLM") return providers;
+
+  const presentKeys = new Set<string>();
+  for (const p of providers) {
+    for (const m of p.models) presentKeys.add(m.modelKey);
+  }
+
+  const missing = MINIMAX_SPEECH_KNOWN_MODELS_CANVAS.filter(
+    (m) => !presentKeys.has(m.modelKey),
+  );
+  if (missing.length === 0) return providers;
+
+  const now = new Date().toISOString();
+  const out = providers.map((p) =>
+    p.id === GATEWAY_MINIMAX_VIDEO_PROVIDER_ID
+      ? { ...p, models: [...p.models] }
+      : p,
+  );
+  let minimax = out.find((p) => p.id === GATEWAY_MINIMAX_VIDEO_PROVIDER_ID);
+  if (!minimax) {
+    minimax = {
+      ...buildProviderShell(GATEWAY_MINIMAX_VIDEO_PROVIDER_ID, now),
+      models: [],
+    };
+    out.push(minimax);
+  }
+
+  const baseSort = minimax.models.length;
+  for (let i = 0; i < missing.length; i++) {
+    minimax.models.push(
+      knownMinimaxSpeechToModelDto(
+        GATEWAY_MINIMAX_VIDEO_PROVIDER_ID,
+        missing[i]!,
+        baseSort + i,
+      ),
+    );
+  }
+  minimax.models.sort((a, b) => a.sortOrder - b.sortOrder);
+  return out;
+}
+
 /** 由统一注册表构建 Canvas 虚拟 Provider 列表。 */
 export async function buildCanvasProvidersFromRegistry(
   userId: string,
@@ -273,6 +346,16 @@ export async function buildCanvasProvidersFromRegistry(
 
   if (canUseDashscopeImage) {
     providers = mergeKnownBailianImageModelsForCanvas(providers, {
+      role: opts?.role,
+    });
+  }
+
+  const canUseMinimaxTts =
+    persona === "PLATFORM_CREDIT" ||
+    isGatewayProviderBound(boundKinds, "MINIMAX");
+
+  if (canUseMinimaxTts) {
+    providers = mergeKnownMinimaxSpeechModelsForCanvas(providers, {
       role: opts?.role,
     });
   }

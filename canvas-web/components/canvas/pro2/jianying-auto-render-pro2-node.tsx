@@ -76,8 +76,19 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
 
   const onLeftPick = useCallback(
     (itemId: string, nodeType?: string) => {
-      if (itemId !== "video" && nodeType !== "sbv1-video-engine") return;
       const s = useCanvasStore.getState();
+      if (itemId === "audio" || nodeType === "story-pro2-audio") {
+        spawnSbv1NeighborFromNode(id, "left", "story-pro2-audio", {
+          nodes: s.nodes,
+          edges: s.edges,
+          addNode: s.addNode,
+          addNodeInGroup: s.addNodeInGroup,
+          setNodes: s.setNodes,
+          setEdges: s.setEdges,
+        });
+        return;
+      }
+      if (itemId !== "video" && nodeType !== "sbv1-video-engine") return;
       spawnSbv1NeighborFromNode(id, "left", "sbv1-video-engine", {
         nodes: s.nodes,
         edges: s.edges,
@@ -121,7 +132,23 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
                 ? "opacity-100"
                 : "pointer-events-none opacity-0",
           )}
+          style={{ top: "38%" }}
           title="各镜视频"
+        />
+        <Handle
+          id="in_audio"
+          type="target"
+          position={Position.Left}
+          className={cn(
+            SBV1_NODE_HANDLE_CLASS,
+            showSidePlus
+              ? "pointer-events-none opacity-0"
+              : selected
+                ? "opacity-100"
+                : "pointer-events-none opacity-0",
+          )}
+          style={{ top: "62%" }}
+          title="各镜配音"
         />
         <Pro2NodeSidePlus
           side="left"
@@ -209,7 +236,7 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
               </div>
             ) : (
               <div className="flex h-full min-h-[400px] items-center justify-center px-4 text-center text-[12px] text-white/40">
-                接入视频后，选中节点并在下方 Dock 点击「自动剪辑成片」
+                接入视频与音频后，选中节点并在下方 Dock 点击「自动剪辑成片」
               </div>
             )}
           </div>

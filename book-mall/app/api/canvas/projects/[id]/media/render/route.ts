@@ -12,6 +12,7 @@ import {
 } from "@/lib/canvas/api-helpers";
 import type { JianyingFrameInput } from "@/lib/canvas/canvas-jianying-export";
 import { CanvasProjectError, getCanvasProjectForUser } from "@/lib/canvas/canvas-project-service";
+import { hydrateJianyingRenderFrameAudioUrls } from "@/lib/canvas/hydrate-jianying-render-frames";
 import { mapBillingFailureForGatewayLog } from "@/lib/billing/billing-failure-map";
 import { InsufficientCreditsError } from "@/lib/billing/credit-account-service";
 import { fromCanvasJianyingFrames } from "@/lib/media/timeline-adapters";
@@ -50,9 +51,38 @@ export async function POST(request: NextRequest, ctx: Ctx) {
   }
 
   try {
-    await getCanvasProjectForUser(guard.user.id, projectId);
-    const timeline = fromCanvasJianyingFrames(frames);
+    const project = await getCanvasProjectForUser(guard.user.id, projectId);
+    const canvasNodes =
+      (
+        project.canvas as {
+          nodes?: Array<{ id: string; type?: string; data?: Record<string, unknown> }>;
+        }
+      ).nodes ?? [];
+    const hydratedFrames = await hydrateJianyingRenderFrameAudioUrls({
+      userId: guard.user.id,
+      projectId,
+      frames: frames as JianyingFrameInput[],
+      canvasNodes,
+    });
     const profile = parseRenderProfile(body.body.profile);
+    if (profile.audio?.mixTts) {
+      const videoFramesWithAudio = hydratedFrames.filter(
+        (f) => f.audioSourceNodeId?.trim() && f.videoUrl?.trim(),
+      );
+      const missingAudio = videoFramesWithAudio.filter(
+        (f) => !f.audioUrl?.trim(),
+      );
+      if (missingAudio.length > 0) {
+        return NextResponse.json(
+          {
+            error: "AUDIO_HYDRATE_FAILED",
+            message: `已勾选「烧录对白」，但有 ${missingAudio.length} 镜配音未能同步到云端。请确认 TTS 已生成完成，稍候重试；若仍失败请重新生成配音后再提交。`,
+          },
+          { status: 400, headers: jsonHeaders(request) },
+        );
+      }
+    }
+    const timeline = fromCanvasJianyingFrames(hydratedFrames);
     const replaceInFlight = body.body.replaceInFlight === true;
     const job = await createMediaRenderJob({
       userId: guard.user.id,

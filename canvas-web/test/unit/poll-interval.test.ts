@@ -23,7 +23,7 @@ describe("nextPollIntervalMs 自适应轮询间隔", () => {
   });
 
   it("1 条在飞 → 2.5s", () => {
-    expect(nextPollIntervalMs(1, false)).toBe(2_500);
+    expect(nextPollIntervalMs(1, false)).toBe(1_500);
   });
 
   it("2~3 条在飞 → 6s", () => {

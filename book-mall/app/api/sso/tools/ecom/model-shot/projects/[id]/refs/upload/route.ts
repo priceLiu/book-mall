@@ -6,6 +6,7 @@ import {
   uploadModelShotReference,
 } from "@/lib/ecom/ecom-model-shot-service";
 import { rebuildModelShotItemPrompt } from "@/lib/ecom/model-shot/prompt-assembler";
+import { getPoseLibraryEntry } from "@/lib/ecom/ecom-pose-library-service";
 import {
   withModelShotActiveImageIndex,
 } from "@/lib/ecom/model-shot/pose-image-history";
@@ -93,6 +94,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
     body.sceneCatalogId === null ||
     typeof body.propCatalogId === "string" ||
     body.propCatalogId === null ||
+    typeof body.poseId === "string" ||
+    typeof body.poseRefUrl === "string" ||
+    typeof body.title === "string" ||
+    typeof body.category === "string" ||
     body.applySceneToAll === true ||
     body.applyPropToAll === true;
 
@@ -123,7 +128,15 @@ export async function PATCH(req: Request, ctx: Ctx) {
         ? undefined
         : undefined;
 
-  const patchOne = (item: typeof target) => {
+  const patchOne = async (item: typeof target) => {
+    let poseRefUrl =
+      typeof body.poseRefUrl === "string" ? body.poseRefUrl.trim() : item.poseRefUrl;
+    let poseId = typeof body.poseId === "string" ? body.poseId : item.poseId;
+    if (typeof body.poseId === "string" && !poseRefUrl) {
+      const catalogEntry = await getPoseLibraryEntry(body.poseId);
+      poseRefUrl = catalogEntry?.ossUrl?.trim() || poseRefUrl;
+    }
+
     const nextItem = {
       ...item,
       ...(typeof body.poseDescription === "string"
@@ -133,6 +146,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
       ...(typeof body.propText === "string" ? { propText: body.propText } : {}),
       ...(body.sceneCatalogId !== undefined ? { sceneCatalogId: sceneCatalogId ?? undefined } : {}),
       ...(body.propCatalogId !== undefined ? { propCatalogId: propCatalogId ?? undefined } : {}),
+      ...(typeof body.poseId === "string" ? { poseId } : {}),
+      ...(typeof body.title === "string" ? { title: body.title } : {}),
+      ...(typeof body.category === "string" ? { category: body.category } : {}),
+      ...(poseRefUrl !== undefined ? { poseRefUrl: poseRefUrl || undefined } : {}),
       promptEdited: true,
     };
     nextItem.prompt = rebuildModelShotItemPrompt({
@@ -145,19 +162,27 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
   const applySceneAll = body.applySceneToAll === true;
   const applyPropAll = body.applyPropToAll === true;
-  const items = project.plan.items.map((item) => {
+  const items: typeof project.plan.items = [];
+  for (const item of project.plan.items) {
     if (applySceneAll || applyPropAll) {
       const shouldPatch =
         (applySceneAll &&
           (typeof body.sceneText === "string" || body.sceneCatalogId !== undefined)) ||
         (applyPropAll &&
           (typeof body.propText === "string" || body.propCatalogId !== undefined));
-      if (!shouldPatch) return item;
-      return patchOne(item);
+      if (!shouldPatch) {
+        items.push(item);
+        continue;
+      }
+      items.push(await patchOne(item));
+      continue;
     }
-    if (item.index !== index) return item;
-    return patchOne(item);
-  });
+    if (item.index !== index) {
+      items.push(item);
+      continue;
+    }
+    items.push(await patchOne(item));
+  }
 
   const updated = await updateEcomModelShotProject(auth.userId, id, {
     plan: { ...project.plan, items },

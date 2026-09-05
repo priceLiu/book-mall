@@ -4,6 +4,10 @@ import type { CanvasParamSchema } from "@/lib/canvas-providers-api";
 import { onCanvasFormWheel } from "@/lib/canvas/canvas-form-wheel";
 import { RF_FORM_CONTROL, RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import { libtvDockSegmentButtonClass } from "@/components/canvas/libtv-dock-picker-chrome";
+import {
+  LibtvVoiceSelectList,
+  type LibtvVoiceSelectOption,
+} from "@/components/canvas/libtv-voice-select-list";
 import { cn } from "@/lib/utils";
 
 export type DynamicParamFormProps = {
@@ -113,6 +117,27 @@ function PanelField({
 }) {
   if (item.type === "select") {
     const val = String(cur ?? item.defaultValue ?? item.options[0]?.value ?? "");
+    const useVoiceList =
+      dock && (item.key === "voice" || item.key === "voice_id" || item.label === "音色");
+
+    if (useVoiceList) {
+      const voiceOptions: LibtvVoiceSelectOption[] = item.options.map((o) => ({
+        value: o.value,
+        label: o.label,
+      }));
+      return (
+        <div>
+          <p className="mb-1.5 text-[12px] text-white/50">{item.label}</p>
+          <LibtvVoiceSelectList
+            options={voiceOptions}
+            value={val}
+            pageSize={10}
+            onSelect={(next) => onPatch(next)}
+          />
+        </div>
+      );
+    }
+
     return (
       <div>
         <p

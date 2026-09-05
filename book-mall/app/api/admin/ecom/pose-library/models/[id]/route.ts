@@ -31,6 +31,8 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     title: typeof body.title === "string" ? body.title : existing.title,
     baseDescription:
       typeof body.baseDescription === "string" ? body.baseDescription : existing.baseDescription,
+    ossUrl: typeof body.ossUrl === "string" ? body.ossUrl : existing.ossUrl,
+    thumbUrl: typeof body.thumbUrl === "string" ? body.thumbUrl : existing.thumbUrl,
     enabled: typeof body.enabled === "boolean" ? body.enabled : existing.enabled,
     sortOrder: typeof body.sortOrder === "number" ? body.sortOrder : existing.sortOrder,
   });

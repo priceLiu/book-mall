@@ -215,10 +215,14 @@ export async function ecomPollKieInProcess(
 ): Promise<EcomPollResult> {
   const synced = await syncKieGatewayLogFromVendorPoll(opts.gatewayLogId);
   if (synced.status === "SUCCEEDED") {
-    return {
-      status: "SUCCEEDED",
-      outputUrl: extractKieResultUrl(synced.record) ?? undefined,
-    };
+    const outputUrl =
+      extractKieResultUrl(synced.record) ??
+      (await readGatewayLogVideoOutputUrl({
+        logId: opts.gatewayLogId,
+        pollProvider: "kie",
+      })) ??
+      undefined;
+    return { status: "SUCCEEDED", outputUrl };
   }
   if (synced.status === "FAILED") {
     return {

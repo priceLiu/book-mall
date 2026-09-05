@@ -851,6 +851,8 @@ export async function canvasGwTts(
     clientPage?: string;
     projectId?: string;
     canvasTaskId?: string;
+    /** 百炼 Qwen 等扩展参数：speed / pitch / volume / instruction */
+    extras?: Record<string, unknown>;
   },
 ): Promise<{ buffer: Buffer; logId: string; contentType: string; ext: string }> {
   const auth = await requireGatewayAuth(userId);
@@ -875,6 +877,7 @@ export async function canvasGwTts(
       ...(opts.languageType?.trim()
         ? { language_type: opts.languageType.trim() }
         : {}),
+      ...(opts.extras ?? {}),
     },
     meta: await canvasGwMeta(userId, {
       clientPage: opts.clientPage,

@@ -225,6 +225,19 @@ export function buildEcomModelLibraryOssKey(id: string, ext: string): string {
   return `ecom/model-library/${safeId}.${safeExt}`;
 }
 
+/** 电商工具箱 · 姿势库参考图（固定 key） */
+export function buildEcomPoseLibraryOssKey(id: string, ext: string): string {
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeExt = ext.replace(/^\./, "").toLowerCase() || "webp";
+  return `ecom/pose-library/${safeId}.${safeExt}`;
+}
+
+/** 电商工具箱 · 姿势库列表缩略图 */
+export function buildEcomPoseLibraryThumbOssKey(id: string): string {
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `ecom/pose-library/${safeId}-thumb.webp`;
+}
+
 /** 电商工具箱 · 模板区案例图（固定 key，按 category 分子目录） */
 export function buildEcomTemplateGalleryOssKey(
   category: string,

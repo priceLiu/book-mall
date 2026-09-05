@@ -231,24 +231,30 @@ export async function generateModelShotPosePlan(
   const items: ModelShotPoseItem[] = picked.map((pose, i) => {
     const poseDescription = descriptions[i]!;
     const propText = "";
-    return {
+    const poseRefUrl = pose.ossUrl?.trim() || undefined;
+    const itemBase = {
       index: i + 1,
       poseId: pose.id,
       category: pose.category,
       title: pose.title,
       poseDescription,
+      poseRefUrl,
       sceneText,
       sceneCatalogId,
       propText,
-      propCatalogId: undefined,
+      propCatalogId: undefined as string | undefined,
+      status: "pending" as const,
+    };
+    return {
+      ...itemBase,
       prompt: assembleModelShotPrompt({
         poseDescription,
         brief: project.brief,
         references: project.references,
         sceneText,
         propText,
+        hasPoseRef: Boolean(poseRefUrl),
       }),
-      status: "pending",
     };
   });
 

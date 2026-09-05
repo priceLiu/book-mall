@@ -1389,6 +1389,27 @@ export function useCanvasRunner(
             mergedTextInputs = [...extraText, ...mergedTextInputs];
           }
         }
+        if (node.type === "story-pro2-audio") {
+          const links = resolvePro2DockUpstreamLinks(
+            nodeId,
+            node.type ?? "",
+            state.nodes,
+            state.edges,
+          );
+          const dockPrompt = String(
+            (runData as { dockInput?: string }).dockInput ?? "",
+          );
+          const { prompt: cleanedPrompt, extraText } = resolveDockRunPrompt(
+            dockPrompt,
+            links,
+          );
+          if (cleanedPrompt !== dockPrompt) {
+            runData = { ...runData, dockInput: cleanedPrompt };
+          }
+          if (extraText.length) {
+            mergedTextInputs = [...extraText, ...mergedTextInputs];
+          }
+        }
         if (
           node.type === "sbv1-image" ||
           node.type === "story-pro2-image" ||

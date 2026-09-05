@@ -3,6 +3,7 @@ import { SBV1_VIDEO_COMPOSE_LABEL } from "./sbv1-node-chrome";
 import {
   Clapperboard,
   Image as ImageIcon,
+  Music,
   ScanLine,
   Sparkles,
   Type,
@@ -97,10 +98,10 @@ export const JIANYING_EXPORT_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
   },
 ];
 
-/** 自动成片节点左侧 + · 接入视频 */
+/** 自动成片节点左侧 + · 接入视频 / 音频 */
 export const JIANYING_AUTO_RENDER_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
   {
-    title: "接入视频",
+    title: "接入素材",
     items: [
       {
         id: "video",
@@ -108,6 +109,13 @@ export const JIANYING_AUTO_RENDER_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
         icon: Video,
         enabled: true,
         nodeType: "sbv1-video-engine",
+      },
+      {
+        id: "audio",
+        label: "音频",
+        icon: Music,
+        enabled: true,
+        nodeType: "story-pro2-audio",
       },
     ],
   },

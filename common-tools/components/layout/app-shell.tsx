@@ -12,6 +12,7 @@ import {
   isCommonToolsPublicBrowsePath,
 } from "@/lib/silent-sso";
 import { PortalNav } from "@/components/portal-nav";
+import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 import { setRuntimeBookOrigin } from "@/lib/auth";
 import { buildLoginUrl } from "@/lib/portal-auth-links";
 import type { ShellUser } from "@/lib/session.server";
@@ -74,7 +75,6 @@ export function AppShell({
   }, [loggedIn, bookOrigin]);
 
   const accountUrl = `${bookOrigin.replace(/\/$/, "")}/account`;
-  const pricingUrl = `${bookOrigin.replace(/\/$/, "")}/pricing`;
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f5f5f7]">
@@ -85,12 +85,10 @@ export function AppShell({
               常用工具
             </Link>
             <div className="flex items-center gap-3 text-sm sm:hidden">
-              <a
-                href={pricingUrl}
+              <PlatformTopupNavLink
+                bookOrigin={bookOrigin}
                 className="text-[#0071e3] hover:underline"
-              >
-                充值
-              </a>
+              />
               {user ? (
                 <button
                   type="button"
@@ -104,12 +102,10 @@ export function AppShell({
           </div>
           <PortalNav current="common-tools" />
           <div className="hidden items-center gap-3 text-sm sm:flex">
-            <a
-              href={pricingUrl}
+            <PlatformTopupNavLink
+              bookOrigin={bookOrigin}
               className="text-[#0071e3] hover:underline"
-            >
-              会员与充值
-            </a>
+            />
             {user ? (
               <>
                 <a href={accountUrl} className="text-[#1d1d1f] hover:text-[#0071e3]">

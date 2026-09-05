@@ -96,6 +96,34 @@ describe("pickModelShotPoses", () => {
     expect(picked.some((p) => p.category === "B" || p.category === "H")).toBe(true);
     expect(picked.some((p) => p.category === "J")).toBe(false);
   });
+
+  it("prefers poses with ossUrl within the same category", () => {
+    const poolWithImages = [
+      { id: "p-a-text", category: "A", title: "A text", baseDescription: "stand", enabled: true, sortOrder: 0 },
+      {
+        id: "p-a-img",
+        category: "A",
+        title: "A img",
+        baseDescription: "stand with ref",
+        ossUrl: "https://cdn.example.com/pose-a.webp",
+        enabled: true,
+        sortOrder: 1,
+      },
+      { id: "p-c1", category: "C", title: "C1", baseDescription: "cool", enabled: true, sortOrder: 0 },
+      { id: "p-j1", category: "J", title: "J1", baseDescription: "lean", enabled: true, sortOrder: 0 },
+      { id: "p-k1", category: "K", title: "K1", baseDescription: "walk", enabled: true, sortOrder: 0 },
+      { id: "p-b1", category: "B", title: "B1", baseDescription: "wave", enabled: true, sortOrder: 0 },
+      { id: "p-i1", category: "I", title: "I1", baseDescription: "sit", enabled: true, sortOrder: 0 },
+    ];
+    const picked = pickModelShotPoses({
+      pool: poolWithImages,
+      styles: ["酷冷"],
+      count: 6,
+      prop: null,
+    });
+    const categoryA = picked.find((p) => p.category === "A");
+    expect(categoryA?.id).toBe("p-a-img");
+  });
 });
 
 describe("assembleModelShotPrompt", () => {

@@ -45,6 +45,7 @@ export function assembleModelShotPrompt(opts: {
   garmentDescription?: string;
   sceneText?: string;
   propText?: string;
+  hasPoseRef?: boolean;
 }): string {
   const garment = refByRole(opts.references, "garment");
   const model = refByRole(opts.references, "model");
@@ -88,6 +89,9 @@ export function assembleModelShotPrompt(opts: {
     opts.poseDescription,
     scenePart,
     propPart,
+    opts.hasPoseRef
+      ? "严格参考姿势参考图的身体姿态与构图，不改变服装款式与模特身份"
+      : "",
     `${platformHint}，高清，自然光，无水印`,
   ].filter(Boolean);
 
@@ -99,7 +103,7 @@ export function assembleModelShotPrompt(opts: {
 export function rebuildModelShotItemPrompt(opts: {
   item: Pick<
     ModelShotPoseItem,
-    "poseDescription" | "sceneText" | "propText" | "prompt" | "promptEdited"
+    "poseDescription" | "sceneText" | "propText" | "prompt" | "promptEdited" | "poseRefUrl"
   >;
   brief: ModelShotBrief | null;
   references: ModelShotReference[];
@@ -116,6 +120,7 @@ export function rebuildModelShotItemPrompt(opts: {
       references: opts.references,
       sceneText: opts.item.sceneText,
       propText: opts.item.propText,
+      hasPoseRef: Boolean(opts.item.poseRefUrl?.trim()),
     });
   }
 

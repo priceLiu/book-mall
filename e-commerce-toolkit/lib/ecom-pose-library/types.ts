@@ -3,6 +3,9 @@ export type EcomPoseLibraryEntry = {
   category: string;
   title: string;
   baseDescription: string;
+  ossUrl?: string | null;
+  thumbUrl?: string | null;
+  sourceImageKey?: string | null;
   tags?: Record<string, unknown>;
   scope?: "platform" | "user";
   userId?: string | null;

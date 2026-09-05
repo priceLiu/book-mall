@@ -23,6 +23,8 @@ export type LibtvDockGatewayParamsPickerProps = {
   onOpenChange?: (open: boolean) => void;
   /** 底栏摘要文案；未选模型时显示「参数」 */
   summaryLabel: string;
+  /** 覆盖 Gateway schema（如音色已独立 Popover） */
+  schemaOverride?: CanvasParamSchema;
   onChange: (params: Record<string, unknown>) => void;
 };
 
@@ -36,6 +38,7 @@ export function LibtvDockGatewayParamsPicker({
   open: controlledOpen,
   onOpenChange,
   summaryLabel,
+  schemaOverride,
   onChange,
 }: LibtvDockGatewayParamsPickerProps) {
   const { providers: hookProviders } = useUserProviders();
@@ -52,7 +55,7 @@ export function LibtvDockGatewayParamsPicker({
     [providers, providerId, modelKey],
   );
 
-  const schema = resolvedModel?.paramsSchema ?? [];
+  const schema = schemaOverride ?? resolvedModel?.paramsSchema ?? [];
   const hasParams = schema.length > 0;
 
   return (

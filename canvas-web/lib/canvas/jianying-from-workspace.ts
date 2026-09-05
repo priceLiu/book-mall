@@ -1,4 +1,5 @@
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
+import { resolveLibtvAudioHttpsExportUrlFromNode, resolveLibtvAudioMixReadiness, resolveLibtvAudioLocalPreviewUrl } from "./libtv-audio-export-url";
 import { resolveLibtvVideoPosterUrl } from "./libtv-video-poster";
 import { parseStoryboardRows } from "./parse-md-tables";
 import { resolveSbv1UpstreamTextLinks } from "./sbv1-upstream-text-links";
@@ -18,6 +19,8 @@ const LIBTV_VIDEO_SOURCE_TYPES = new Set([
   "video-engine",
   "ai-video-engine",
 ]);
+
+const LIBTV_AUDIO_SOURCE_TYPES = new Set(["story-pro2-audio"]);
 
 const SCRIPT_HUB_NODE_TYPES = new Set([
   "story-pro2-script-hub",
@@ -62,6 +65,31 @@ function videoUrlFromConnectedNode(node: CanvasFlowNode): string | undefined {
     d.runtime?.ephemeralUrl?.trim() ||
     undefined
   );
+}
+
+function audioUrlFromConnectedNode(node: CanvasFlowNode): string | undefined {
+  return resolveLibtvAudioHttpsExportUrlFromNode(node);
+}
+
+function dialogueFromAudioNode(node: CanvasFlowNode): string | undefined {
+  const d = node.data as { dockInput?: string; label?: string };
+  const fromDock = normalizeSubtitleBurnInText(d.dockInput);
+  if (fromDock) return fromDock;
+  return normalizeSubtitleBurnInText(d.label);
+}
+function clipLabelFromAudioNode(node: CanvasFlowNode): string {
+  const d = node.data as {
+    label?: string;
+    crewTaskLabel?: string;
+    dockInput?: string;
+  };
+  const dialogue = String(d.dockInput ?? "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (dialogue) {
+    return dialogue.length > 48 ? `${dialogue.slice(0, 47)}…` : dialogue;
+  }
+  return d.label?.trim() || d.crewTaskLabel?.trim() || "音频";
 }
 
 function dialogueFromConnectedVideoNode(
@@ -242,6 +270,8 @@ export type JianyingFrameExport = {
   dialogue?: string;
   /** 连线源节点 id · 用于剪辑顺序持久化 */
   sourceNodeId?: string;
+  /** 配对配音节点 id · 提交时服务端自动落 OSS */
+  audioSourceNodeId?: string;
 };
 
 export type JianyingLibtvClipSlot = {
@@ -254,6 +284,19 @@ export type JianyingLibtvClipSlot = {
   posterUrl?: string;
   dialogue?: string;
   hasVideo: boolean;
+};
+
+export type JianyingLibtvAudioClipSlot = {
+  sourceNodeId: string;
+  sequence: number;
+  label: string;
+  audioUrl?: string;
+  /** HTTPS · 云端可混入 */
+  hasAudio: boolean;
+  /** 含 data:/blob: · 节点已生成但 OSS 可能仍在同步 */
+  hasLocalPreview: boolean;
+  /** 顺序条试听（含本地预览） */
+  previewUrl?: string;
 };
 
 /** 从分镜脚本行 + 视频列行收集可打包的镜位（至少含视频或配音） */
@@ -320,6 +363,47 @@ function incomingLibtvVideoNodes(
       (n): n is CanvasFlowNode =>
         !!n && LIBTV_VIDEO_SOURCE_TYPES.has(n.type ?? ""),
     );
+}
+
+function incomingLibtvAudioNodes(
+  exportNodeId: string,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): CanvasFlowNode[] {
+  const incoming = edges.filter((e) => {
+    if (e.target !== exportNodeId) return false;
+    const src = nodes.find((n) => n.id === e.source);
+    const isAudio =
+      !!src && LIBTV_AUDIO_SOURCE_TYPES.has(src.type ?? "");
+    if (isAudio) {
+      // 误连到 in_video（上侧入点）时仍识别为配音
+      return (
+        !e.targetHandle ||
+        e.targetHandle === "in_audio" ||
+        e.targetHandle === "in_video"
+      );
+    }
+    return e.targetHandle === "in_audio";
+  });
+  return incoming
+    .map((e) => nodes.find((n) => n.id === e.source))
+    .filter(
+      (n): n is CanvasFlowNode =>
+        !!n && LIBTV_AUDIO_SOURCE_TYPES.has(n.type ?? ""),
+    );
+}
+
+/** 按视频剪辑顺序对齐第 N 镜配音（与 frames[i].audioUrl 规则一致） */
+export function pairAudioSlotsToVideoOrder(
+  videoOrderNodeIds: readonly string[],
+  audioOrderNodeIds: readonly string[],
+  audioClipSlots: readonly JianyingLibtvAudioClipSlot[],
+): (JianyingLibtvAudioClipSlot | undefined)[] {
+  const audioById = new Map(audioClipSlots.map((s) => [s.sourceNodeId, s]));
+  return videoOrderNodeIds.map((_, index) => {
+    const audioId = audioOrderNodeIds[index];
+    return audioId ? audioById.get(audioId) : undefined;
+  });
 }
 
 /** 默认顺序：优先 out_video 串联链，其次画布 Y→X */
@@ -402,15 +486,43 @@ export function moveClipOrderNodeIds(
   return next;
 }
 
+export function mergeLibtvAudioOrderNodeIds(
+  savedOrder: string[] | undefined,
+  audioNodes: CanvasFlowNode[],
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): string[] {
+  const currentIds = audioNodes.map((n) => n.id);
+  const currentSet = new Set(currentIds);
+  let order = (savedOrder ?? []).filter((id) => currentSet.has(id));
+  const missing = currentIds.filter((id) => !order.includes(id));
+  if (missing.length) {
+    const missingNodes = audioNodes.filter((n) => missing.includes(n.id));
+    order = [
+      ...order,
+      ...sortLibtvVideoNodesDefault(missingNodes, nodes, edges).map((n) => n.id),
+    ];
+  }
+  if (!order.length) {
+    order = sortLibtvVideoNodesDefault(audioNodes, nodes, edges).map((n) => n.id);
+  }
+  return order;
+}
+
 export type JianyingLibtvConnectionSnapshot = {
   /** in_video 入边 · 视频类源节点总数（含未生成） */
   connectedCount: number;
   /** 其中已有 oss / ephemeral 视频 URL 的数量 */
   renderedCount: number;
+  /** in_audio 入边 · 音频源节点总数 */
+  audioConnectedCount: number;
+  audioRenderedCount: number;
   /** 全部入边镜头（含顺序 · 含未成片） */
   clipSlots: JianyingLibtvClipSlot[];
+  audioClipSlots: JianyingLibtvAudioClipSlot[];
   /** 当前顺序（源节点 id 列表） */
   orderNodeIds: string[];
+  audioOrderNodeIds: string[];
   /** 仅含成片的导出帧（ZIP / 自动剪辑用 · 已按 clipSlots 顺序） */
   frames: JianyingFrameExport[];
 };
@@ -421,15 +533,24 @@ export function collectJianyingLibtvConnectionSnapshot(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
   savedClipOrderNodeIds?: string[],
+  savedAudioOrderNodeIds?: string[],
 ): JianyingLibtvConnectionSnapshot {
   const videoNodes = incomingLibtvVideoNodes(exportNodeId, nodes, edges);
+  const audioNodes = incomingLibtvAudioNodes(exportNodeId, nodes, edges);
   const orderNodeIds = mergeLibtvClipOrderNodeIds(
     savedClipOrderNodeIds,
     videoNodes,
     nodes,
     edges,
   );
+  const audioOrderNodeIds = mergeLibtvAudioOrderNodeIds(
+    savedAudioOrderNodeIds,
+    audioNodes,
+    nodes,
+    edges,
+  );
   const nodeById = new Map(videoNodes.map((n) => [n.id, n]));
+  const audioById = new Map(audioNodes.map((n) => [n.id, n]));
 
   const clipSlots: JianyingLibtvClipSlot[] = [];
   orderNodeIds.forEach((id, i) => {
@@ -454,20 +575,63 @@ export function collectJianyingLibtvConnectionSnapshot(
     });
   });
 
+  const audioClipSlots: JianyingLibtvAudioClipSlot[] = [];
+  audioOrderNodeIds.forEach((id, i) => {
+    const node = audioById.get(id);
+    if (!node) return;
+    const audioUrl = audioUrlFromConnectedNode(node);
+    const mix = resolveLibtvAudioMixReadiness(
+      (node.data ?? {}) as {
+        ossUrl?: string;
+        blobUrl?: string;
+        runtime?: { ossUrl?: string; ephemeralUrl?: string };
+      },
+    );
+    audioClipSlots.push({
+      sourceNodeId: id,
+      sequence: i + 1,
+      label: clipLabelFromAudioNode(node),
+      audioUrl,
+      previewUrl: resolveLibtvAudioLocalPreviewUrl(
+        (node.data ?? {}) as {
+          ossUrl?: string;
+          blobUrl?: string;
+          runtime?: { ossUrl?: string; ephemeralUrl?: string };
+        },
+      ),
+      hasAudio: mix.exportReady,
+      hasLocalPreview: mix.localPreview,
+    });
+  });
+
   const frames: JianyingFrameExport[] = clipSlots
     .filter((s) => s.hasVideo)
-    .map((s, i) => ({
-      frameIndex: i + 1,
-      sourceNodeId: s.sourceNodeId,
-      videoUrl: s.videoUrl,
-      dialogue: s.dialogue,
-    }));
+    .map((s, i) => {
+      const pairedAudioId = audioOrderNodeIds[i];
+      const pairedAudioNode = pairedAudioId
+        ? audioById.get(pairedAudioId)
+        : undefined;
+      return {
+        frameIndex: i + 1,
+        sourceNodeId: s.sourceNodeId,
+        audioSourceNodeId: pairedAudioId,
+        videoUrl: s.videoUrl,
+        audioUrl: audioClipSlots[i]?.hasAudio ? audioClipSlots[i]?.audioUrl : undefined,
+        dialogue:
+          s.dialogue ??
+          (pairedAudioNode ? dialogueFromAudioNode(pairedAudioNode) : undefined),
+      };
+    });
 
   return {
     connectedCount: clipSlots.length,
     renderedCount: frames.length,
+    audioConnectedCount: audioClipSlots.length,
+    audioRenderedCount: audioClipSlots.filter((s) => s.hasAudio).length,
     clipSlots,
+    audioClipSlots,
     orderNodeIds,
+    audioOrderNodeIds,
     frames,
   };
 }
@@ -478,12 +642,14 @@ export function collectJianyingFramesFromLibtvVideos(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
   savedClipOrderNodeIds?: string[],
+  savedAudioOrderNodeIds?: string[],
 ): JianyingFrameExport[] {
   return collectJianyingLibtvConnectionSnapshot(
     exportNodeId,
     nodes,
     edges,
     savedClipOrderNodeIds,
+    savedAudioOrderNodeIds,
   ).frames;
 }
 
@@ -494,12 +660,14 @@ export function collectJianyingFramesForExportNode(
   edges: CanvasFlowEdge[],
   ws?: Pick<StoryWorkspaceIds, "frameColumnId" | "videoColumnId"> | null,
   savedClipOrderNodeIds?: string[],
+  savedAudioOrderNodeIds?: string[],
 ): JianyingFrameExport[] {
   const libtv = collectJianyingFramesFromLibtvVideos(
     exportNodeId,
     nodes,
     edges,
     savedClipOrderNodeIds,
+    savedAudioOrderNodeIds,
   );
   if (libtv.length) return libtv;
   if (ws) return collectJianyingFramesFromWorkspace(nodes, ws);

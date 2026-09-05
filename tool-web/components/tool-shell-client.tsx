@@ -44,6 +44,7 @@ import {
   SESSION_KICKED_MESSAGE,
 } from "@/lib/session-revoked";
 import { ToolCreditBalanceChip } from "@/components/platform-credit-balance-chip";
+import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 
 const SESSION_POLL_MS = 60_000;
 
@@ -646,6 +647,13 @@ export function ToolShellClient({
             </button>
 
             <div className="tool-topbar-fill" />
+
+            {mainOrigin ? (
+              <PlatformTopupNavLink
+                bookOrigin={mainOrigin}
+                className="tool-topup-link hidden shrink-0 sm:inline-flex"
+              />
+            ) : null}
 
             <ToolCreditBalanceChip />
 

@@ -161,15 +161,20 @@ async function runCanvasMinimaxTtsNode(
       vol:
         typeof params.vol === "number"
           ? params.vol
-          : typeof params.voice_volume === "number"
-            ? params.voice_volume
-            : undefined,
+          : typeof params.volume === "number"
+            ? params.volume
+            : typeof params.voice_volume === "number"
+              ? params.voice_volume
+              : undefined,
       pitch:
         typeof params.pitch === "number"
           ? params.pitch
           : typeof params.voice_pitch === "number"
             ? params.voice_pitch
             : undefined,
+      ...(typeof params.emotion === "string" && params.emotion.trim()
+        ? { emotion: params.emotion.trim() }
+        : {}),
     },
   });
 

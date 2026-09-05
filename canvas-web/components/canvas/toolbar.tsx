@@ -37,6 +37,8 @@ import {
   useCanvasNetworkStatus,
 } from "@/lib/canvas/use-canvas-network-status";
 import { useCanvasCreditBalance } from "@/lib/canvas/use-canvas-credit-balance";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 import {
   CanvasToolbarDropdownItem,
   CanvasToolbarDropdownMenu,
@@ -136,6 +138,7 @@ export function CanvasToolbar({
   const networkConnectionLabel = formatCanvasNetworkConnectionLabel(network);
   const networkSpeedLabel = formatCanvasNetworkSpeedLabel(network);
   const creditPools = useCanvasCreditBalance();
+  const bookMallBase = useBookMallBaseUrl();
   const mineMenu = useCanvasToolbarDropdown();
 
   const formatCreditBalance = (n: number | null) =>
@@ -406,6 +409,16 @@ export function CanvasToolbar({
             {formatCreditBalance(creditPools.total)}
           </span>
         </span>
+
+        {bookMallBase ? (
+          <PlatformTopupNavLink
+            bookOrigin={bookMallBase}
+            className={cn(
+              CANVAS_TOOLBAR_META_CHIP_CLASS,
+              "hidden shrink-0 text-white/75 transition hover:border-white/20 hover:bg-white/10 hover:text-white lg:inline-flex",
+            )}
+          />
+        ) : null}
 
         <CanvasToolbarIconButton
           label="保存"

@@ -42,7 +42,7 @@ flowchart LR
 
 | 表 | 字段 |
 |----|------|
-| EcomPoseLibraryEntry | category, baseDescription, tags |
+| EcomPoseLibraryEntry | category, baseDescription, tags, ossUrl?, thumbUrl?, sourceImageKey? |
 | EcomPropLibraryEntry | name, visualDescription, conflictTags, ossUrl? |
 | EcomSceneLibraryEntry | name, visualPrompt, tags.archetype |
 
@@ -58,7 +58,7 @@ flowchart LR
 
 ## 5. 出图
 
-- ref 顺序 garment → model → scene
+- ref 顺序 garment → model → scene → poseRef（catalog 有 ossUrl 时，V2）
 - 仅 `plan.status === confirmed` 可出图
 - 确认/成图成功后 `touchCatalogLockOnProjectUse`
 

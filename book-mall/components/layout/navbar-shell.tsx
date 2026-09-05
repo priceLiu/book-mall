@@ -231,6 +231,14 @@ export function NavbarShell({
             <SheetFooter className="flex-col justify-start items-stretch sm:flex-col">
               <Separator className="mb-2" />
               <div className="flex flex-wrap items-center gap-2">
+                <a
+                  href="/account/recharge"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-medium text-primary hover:underline"
+                >
+                  积分充值
+                </a>
                 {children}
                 <ToggleTheme iconOnly className="shrink-0" />
               </div>
@@ -248,6 +256,14 @@ export function NavbarShell({
       </div>
 
       <div className="hidden h-9 shrink-0 items-center gap-2 lg:flex">
+        <a
+          href="/account/recharge"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 text-sm font-medium text-primary hover:underline"
+        >
+          积分充值
+        </a>
         {children}
         <ToggleTheme iconOnly className="shrink-0" />
       </div>

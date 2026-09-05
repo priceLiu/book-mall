@@ -5,6 +5,7 @@ import { randomUUID } from "crypto";
 
 import type { EcomCatalogScope } from "@/lib/ecom/ecom-catalog-scope";
 import { assertUserCatalogEditable } from "@/lib/ecom/ecom-catalog-lock";
+import { normalizePoseSourceImageUrl } from "@/lib/ecom/ecom-pose-library-import-helpers";
 import { prisma } from "@/lib/prisma";
 
 export type EcomPoseLibraryEntry = {
@@ -12,6 +13,9 @@ export type EcomPoseLibraryEntry = {
   category: string;
   title: string;
   baseDescription: string;
+  ossUrl?: string | null;
+  thumbUrl?: string | null;
+  sourceImageKey?: string | null;
   tags?: Record<string, unknown>;
   scope?: EcomCatalogScope;
   userId?: string | null;
@@ -53,6 +57,9 @@ function rowToEntry(row: {
   category: string;
   title: string;
   baseDescription: string;
+  ossUrl: string | null;
+  thumbUrl: string | null;
+  sourceImageKey: string | null;
   tags: unknown;
   scope: string;
   userId: string | null;
@@ -65,6 +72,9 @@ function rowToEntry(row: {
     category: row.category,
     title: row.title,
     baseDescription: row.baseDescription,
+    ossUrl: row.ossUrl,
+    thumbUrl: row.thumbUrl,
+    sourceImageKey: row.sourceImageKey,
     tags:
       row.tags && typeof row.tags === "object" && !Array.isArray(row.tags)
         ? (row.tags as Record<string, unknown>)
@@ -136,6 +146,35 @@ export async function readPoseLibraryCatalogLive(): Promise<EcomPoseLibraryCatal
   return readPoseLibraryCatalogJson();
 }
 
+export async function findPoseEntryBySourceImageKey(
+  key: string,
+): Promise<EcomPoseLibraryEntry | null> {
+  const row = await prisma.ecomPoseLibraryEntry.findFirst({
+    where: { deletedAt: null, sourceImageKey: key.trim() },
+  });
+  return row ? rowToEntry(row) : null;
+}
+
+export async function findPoseEntryByNormalizedSourceUrl(
+  url: string,
+): Promise<EcomPoseLibraryEntry | null> {
+  const normalized = normalizePoseSourceImageUrl(url);
+  if (!normalized) return null;
+  const rows = await prisma.ecomPoseLibraryEntry.findMany({
+    where: { deletedAt: null, scope: "platform" },
+    take: 2000,
+    orderBy: { updatedAt: "desc" },
+  });
+  for (const row of rows) {
+    const tags =
+      row.tags && typeof row.tags === "object" && !Array.isArray(row.tags)
+        ? (row.tags as Record<string, unknown>)
+        : undefined;
+    if (tags?.sourceImageUrl === normalized) return rowToEntry(row);
+  }
+  return null;
+}
+
 export async function upsertPoseLibraryEntry(
   entry: EcomPoseLibraryEntry,
 ): Promise<EcomPoseLibraryEntry> {
@@ -143,6 +182,9 @@ export async function upsertPoseLibraryEntry(
     category: entry.category,
     title: entry.title,
     baseDescription: entry.baseDescription,
+    ossUrl: entry.ossUrl ?? null,
+    thumbUrl: entry.thumbUrl ?? null,
+    sourceImageKey: entry.sourceImageKey ?? null,
     tags: entry.tags ? (entry.tags as Prisma.InputJsonValue) : undefined,
     scope: entry.scope ?? "platform",
     userId: entry.userId ?? null,

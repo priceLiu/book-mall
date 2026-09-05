@@ -27,9 +27,12 @@ export const CANVAS_VIDEO_MEDIA_NODE_TYPES = new Set([
   "ai-video-engine",
 ]);
 
+export const CANVAS_AUDIO_MEDIA_NODE_TYPES = new Set(["story-pro2-audio"]);
+
 export const CANVAS_MEDIA_NODE_TYPES = new Set([
   ...CANVAS_IMAGE_MEDIA_NODE_TYPES,
   ...CANVAS_VIDEO_MEDIA_NODE_TYPES,
+  ...CANVAS_AUDIO_MEDIA_NODE_TYPES,
 ]);
 
 export function canvasNodeShowsPersistedMedia(
@@ -70,7 +73,12 @@ export function patchCanvasJsonNodeMedia(
   runtime: CanvasNodeRuntimePatch,
 ): unknown {
   let next = patchCanvasJsonNodeRuntime(canvas, nodeId, runtime);
-  if (!CANVAS_IMAGE_MEDIA_NODE_TYPES.has(nodeType ?? "")) return next;
+  if (
+    !CANVAS_IMAGE_MEDIA_NODE_TYPES.has(nodeType ?? "") &&
+    !CANVAS_AUDIO_MEDIA_NODE_TYPES.has(nodeType ?? "")
+  ) {
+    return next;
+  }
   if (!next || typeof next !== "object") return next;
   const dataOssUrl = isCanvasManagedOssUrl(mediaUrl) ? mediaUrl : undefined;
   const c = next as {

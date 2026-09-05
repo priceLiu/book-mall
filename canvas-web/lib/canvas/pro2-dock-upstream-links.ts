@@ -240,6 +240,9 @@ function targetInputHandle(nodeType: string): string {
   ) {
     return "in_image";
   }
+  if (nodeType === "story-pro2-audio") {
+    return "in_audio";
+  }
   return "in_text";
 }
 
@@ -273,6 +276,17 @@ function edgeMatchesDockInput(
   if (edge.target !== nodeId) return false;
   const inHandle = targetInputHandle(nodeType);
   if (!edge.targetHandle || edge.targetHandle === inHandle) return true;
+  // 音频节点历史连线可能用 in_text / default
+  if (inHandle === "in_audio") {
+    const source = nodes.find((n) => n.id === edge.source);
+    if (source?.type && TEXT_UPSTREAM_SOURCE_TYPES.has(source.type)) {
+      return (
+        edge.targetHandle === "in_text" ||
+        edge.targetHandle === "default" ||
+        !edge.targetHandle
+      );
+    }
+  }
   // 历史连线可能误用 in_text / default，仍应展示图片上游缩略图
   if (inHandle === "in_image") {
     const source = nodes.find((n) => n.id === edge.source);

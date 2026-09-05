@@ -11,9 +11,15 @@ export const metadata = {
   title: "轻量包购买 — 个人中心",
 };
 
-export default async function AccountBillingPage() {
+export default async function AccountBillingPage({
+  searchParams,
+}: {
+  searchParams?: { returnTo?: string };
+}) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/login");
+
+  const returnTo = searchParams?.returnTo?.trim() || undefined;
 
   const [config, teamTenants] = await Promise.all([
     loadPricingConfig(),
@@ -38,6 +44,7 @@ export default async function AccountBillingPage() {
         isLoggedIn
         showAdminPacks={canManagePricing(session.user.role)}
         userPhone={session.user.phone}
+        returnTo={returnTo}
       />
     </>
   );

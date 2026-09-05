@@ -82,3 +82,7 @@
 - AI 试衣 `aitryon-refiner` 精修
 - 与主图创作姿势方案互通导入
 - 独立第四张「提示词片段库」表
+
+## 8. 姿势库 V2（图 + 文）
+
+姿势参考图、管理员成图入库、姿势图生成工作室、有图优先作 ref — 见 **[pose-library-v2-requirements.md](./pose-library-v2-requirements.md)**。

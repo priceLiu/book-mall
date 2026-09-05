@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Palette } from "lucide-react";
 import { PortalNav } from "@/components/portal-nav";
 import { CanvasShellAuthSlot } from "@/components/layout/canvas-shell-auth-slot";
+import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 import { useCanvasAdmin } from "@/components/home/use-canvas-admin";
 import { CANVAS_NAV_ITEMS, CANVAS_SITE_BRAND_NAME } from "@/lib/site-config";
 import { cn } from "@/lib/utils";
@@ -81,6 +82,13 @@ export function CanvasShell({
           </nav>
 
           <div className="min-w-0 flex-1" aria-hidden />
+
+          {bookOrigin ? (
+            <PlatformTopupNavLink
+              bookOrigin={bookOrigin}
+              className="canvas-sans hidden shrink-0 rounded-full border border-white/15 px-2.5 py-1.5 text-xs font-semibold text-white/80 transition hover:border-white/25 hover:bg-white/10 hover:text-white sm:inline-flex"
+            />
+          ) : null}
 
           <PortalNav current="canvas" bookOrigin={bookOrigin} />
 

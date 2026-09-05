@@ -32,7 +32,7 @@ export const SIDE_PLUS_BY_TYPE: Record<
   "story-pro2-style-asset": { left: "plus_left", right: "style" },
   "story-pro2-prop": { left: "plus_left", right: "image" },
   "story-pro2-mood": { left: "plus_left", right: "image" },
-  "story-pro2-audio": { left: "plus_left", right: "image" },
+  "story-pro2-audio": { left: "plus_left", right: "audio" },
 };
 
 export function sideConnectSideFromHandle(handleId: string): "left" | "right" {

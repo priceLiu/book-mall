@@ -31,7 +31,7 @@ describe("resolveLibtvSoleSelectedNodeId", () => {
     ).toBe("a");
   });
 
-  it("falls back to store pin when RF selection is empty", () => {
+  it("does not use pin when RF selection is empty", () => {
     const nodes = rf([
       { id: "img1", type: "sbv1-image", selected: false },
       { id: "img2", type: "story-pro2-image", selected: false },
@@ -42,7 +42,7 @@ describe("resolveLibtvSoleSelectedNodeId", () => {
         nodeId: "img1",
         nodeType: "sbv1-image",
       }),
-    ).toBe("img1");
+    ).toBeNull();
   });
 
   it("does not use pin when RF has a different sole selection", () => {

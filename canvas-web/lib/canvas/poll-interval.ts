@@ -28,7 +28,7 @@ export function nextPollIntervalMs(
   if (stale) return CANVAS_POLL_STALE_BACKOFF_MS;
   if (inflightCount <= 0) return 0;
   // 略拉长间隔：connection_limit 过小时 1.5s 空轮询会与保存/剪辑抢池
-  if (inflightCount === 1) return 2_500;
+  if (inflightCount === 1) return 1_500;
   if (inflightCount <= 3) return 6_000;
   return 10_000;
 }

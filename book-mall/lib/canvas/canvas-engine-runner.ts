@@ -2644,6 +2644,13 @@ export async function runTtsEngineNode(
     typeof params.language_type === "string"
       ? params.language_type
       : undefined;
+  const extras: Record<string, unknown> = {};
+  if (typeof params.speed === "number") extras.speed = params.speed;
+  if (typeof params.pitch === "number") extras.pitch = params.pitch;
+  if (typeof params.vol === "number") extras.volume = params.vol;
+  if (typeof params.instruction === "string" && params.instruction.trim()) {
+    extras.instruction = params.instruction.trim();
+  }
 
   try {
     const ttsOut = await canvasGwTts(userId, {
@@ -2651,6 +2658,7 @@ export async function runTtsEngineNode(
       text,
       voice,
       languageType,
+      extras: Object.keys(extras).length ? extras : undefined,
       clientPage: gwClientPage,
       projectId,
     });

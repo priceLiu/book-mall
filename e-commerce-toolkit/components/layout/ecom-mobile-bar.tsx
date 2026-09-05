@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { buildPortalNavItems } from "@/components/portal-nav";
+import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 
 /** 窄屏：跨门户入口（原顶栏 Federated 菜单） */
 export function EcomMobileBar({ bookOrigin }: { bookOrigin: string }) {
@@ -16,6 +17,12 @@ export function EcomMobileBar({ bookOrigin }: { bookOrigin: string }) {
           电商工具箱
         </Link>
         <div className="flex items-center gap-3">
+          {bookOrigin ? (
+            <PlatformTopupNavLink
+              bookOrigin={bookOrigin}
+              className="text-xs font-medium text-[#0071e3] hover:underline"
+            />
+          ) : null}
           <Link href="/workflows/drafts" className="text-xs text-[#6e6e73] hover:text-[#1d1d1f]">
             我的工作流
           </Link>

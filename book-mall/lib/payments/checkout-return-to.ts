@@ -83,6 +83,15 @@ export function buildBookMembershipHref(input: {
   });
 }
 
+/** 顶栏充值入口：服务端按会员状态分流至 /account/billing 或 /pricing */
+export function buildBookRechargeEntryHref(returnTo?: string | null): string {
+  const params = new URLSearchParams();
+  const safe = resolveCheckoutReturnTo(returnTo);
+  if (safe) params.set("returnTo", safe);
+  const q = params.toString();
+  return `/account/recharge${q ? `?${q}` : ""}`;
+}
+
 export function checkoutSuccessRedirect(
   returnTo: string | null | undefined,
   fallback: string,

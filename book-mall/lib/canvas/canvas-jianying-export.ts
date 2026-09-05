@@ -16,6 +16,8 @@ export type JianyingFrameInput = {
   dialogue: string;
   videoUrl?: string | null;
   audioUrl?: string | null;
+  /** 配对配音节点 · 提交时服务端可自动落 OSS */
+  audioSourceNodeId?: string | null;
   /** 秒；缺省 3 */
   durationSec?: number;
 };

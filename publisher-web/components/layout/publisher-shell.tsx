@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PortalNav } from "@/components/portal-nav";
+import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 import { publisherLoginHref } from "@/lib/portal-auth-links";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
@@ -58,6 +59,12 @@ export function PublisherShell({ children }: { children: React.ReactNode }) {
             <PortalNav current="publisher" />
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-2 text-sm">
+            {bookOrigin ? (
+              <PlatformTopupNavLink
+                bookOrigin={bookOrigin}
+                className="rounded-full border border-black/10 px-3 py-1.5 text-[var(--pub-muted)] hover:bg-[#f5f5f7]"
+              />
+            ) : null}
             {bookOrigin ? (
               <a
                 href={`${bookOrigin}/publisher-open?client=extension&path=/login`}

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, X } from "lucide-react";
 import { libtvMediaLooksGenerating } from "@/lib/canvas/canvas-task-generating-state";
 import {
   LIBTV_MEDIA_GENERATING_CYAN_CLASS,
@@ -42,6 +42,7 @@ export function LibtvMediaGeneratingState({
   cancelNodeId,
   cancelScope,
   onCancel,
+  passNodeDrag = false,
 }: {
   /** 留空则仅显示扫光 + 旋转图标，不渲染文字（避免「排队中…」等影响心情的提示） */
   label?: string;
@@ -52,10 +53,12 @@ export function LibtvMediaGeneratingState({
   className?: string;
   /** 可选：上传中半透明底图等 */
   children?: ReactNode;
-  /** 传入则显示「中止」按钮（须 confirm 扣费提示） */
+  /** 传入则显示右上角中止钮（无文案，避免挤偏中央加载态） */
   cancelNodeId?: string;
   cancelScope?: LibtvMediaGeneratingCancelScope;
   onCancel?: () => void;
+  /** 画布节点：遮罩不挡整卡拖动，仅中止钮可点 */
+  passNodeDrag?: boolean;
 }) {
   const { requestCancel } = useCanvasGenerationCancel(
     cancelNodeId ?? "",
@@ -93,33 +96,47 @@ export function LibtvMediaGeneratingState({
       */}
       <div className={cn("relative size-full overflow-hidden", shimmerClass)}>
         {children}
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/45 px-6 py-10 text-center">
-          <span
-            className={cn(
-              "flex size-[4.5rem] items-center justify-center rounded-full border shadow-lg backdrop-blur-sm",
-              spinRingClass,
-            )}
-          >
-            <RefreshCw className={spinClass} />
-          </span>
-          {label?.trim() ? <span className={labelClass}>{label}</span> : null}
+        <div
+          className={cn(
+            "absolute inset-0 z-10 bg-black/45",
+            passNodeDrag && "pointer-events-none",
+          )}
+        >
+          <div className="flex size-full items-center justify-center">
+            <span
+              className={cn(
+                "flex size-[4.5rem] items-center justify-center rounded-full border shadow-lg backdrop-blur-sm",
+                spinRingClass,
+              )}
+            >
+              <RefreshCw className={spinClass} />
+            </span>
+            {label?.trim() ? (
+              <span className={cn("absolute bottom-3 left-0 right-0 px-4", labelClass)}>
+                {label}
+              </span>
+            ) : null}
+          </div>
           {showCancel ? (
             <button
               type="button"
               className={cn(
-                "nodrag mt-1 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition",
+                "nodrag absolute right-2 top-2 flex size-7 items-center justify-center rounded-md border transition",
+                passNodeDrag && "pointer-events-auto",
                 variant === "violet"
-                  ? "border-violet-400/35 bg-violet-950/40 text-violet-100 hover:bg-violet-900/50"
-                  : "border-cyan-400/35 bg-cyan-950/40 text-cyan-100 hover:bg-cyan-900/50",
+                  ? "border-violet-400/35 bg-violet-950/55 text-violet-100 hover:bg-violet-900/60"
+                  : "border-cyan-400/35 bg-cyan-950/55 text-cyan-100 hover:bg-cyan-900/60",
                 tone === "background" && "opacity-90",
               )}
+              aria-label="中止生成"
+              title="中止生成"
               onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 handleCancel();
               }}
             >
-              中止
+              <X className="size-3.5" aria-hidden />
             </button>
           ) : null}
         </div>

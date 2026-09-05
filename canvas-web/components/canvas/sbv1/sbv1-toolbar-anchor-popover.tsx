@@ -90,6 +90,8 @@ export function Sbv1ToolbarDropdown({
   align = "start",
   placement = "auto",
   estimatedHeight = 320,
+  /** 子组件自管滚动（如音色列表）时关闭面板外层滚动，避免双滚动抢 wheel */
+  containScroll = false,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
@@ -100,6 +102,7 @@ export function Sbv1ToolbarDropdown({
   placement?: Sbv1ToolbarDropdownPlacement;
   /** auto 时用于判断向上/向下展开 */
   estimatedHeight?: number;
+  containScroll?: boolean;
 }) {
   const baseZ = useContext(ToolbarDropdownZContext);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -173,7 +176,7 @@ export function Sbv1ToolbarDropdown({
         transform,
         zIndex: baseZ + 1,
         maxHeight: panelMaxHeight,
-        overflowY: "auto",
+        overflowY: containScroll ? "hidden" : "auto",
       }}
     >
       {children}

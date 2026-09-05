@@ -9,6 +9,7 @@ import {
   moveClipOrderNodeIds,
   sortLibtvVideoNodesDefault,
 } from "@/lib/canvas/jianying-from-workspace";
+import { resolveLibtvAudioMixReadiness } from "@/lib/canvas/libtv-audio-export-url";
 import {
   buildBatchConnectEdges,
   classifyBatchConnectMode,
@@ -254,6 +255,105 @@ describe("collectJianyingFramesFromLibtvVideos", () => {
     expect(snap.orderNodeIds).toEqual(["v-b", "v-a"]);
     expect(snap.frames[0]?.videoUrl).toBe("https://oss/b.mp4");
     expect(snap.frames[1]?.videoUrl).toBe("https://oss/a.mp4");
+  });
+
+  it("distinguishes local TTS preview from https export readiness", () => {
+    expect(
+      resolveLibtvAudioMixReadiness({
+        ossUrl: "data:audio/mpeg;base64,abc",
+        runtime: { ephemeralUrl: "data:audio/mpeg;base64,abc" },
+      }),
+    ).toEqual({ exportReady: false, localPreview: true });
+  });
+
+  it("uses runtime https oss when data ossUrl is local preview only", () => {
+    const exportId = "export-1";
+    const nodes: CanvasFlowNode[] = [
+      videoNode("v-a", 100, "https://oss/a.mp4"),
+      {
+        id: "a-a",
+        type: "story-pro2-audio",
+        position: { x: 100, y: 120 },
+        data: {
+          ossUrl: "data:audio/mpeg;base64,abc",
+          dockInput: "第一句对白",
+          runtime: {
+            status: "done",
+            ossUrl: "https://oss/a.mp3",
+            ephemeralUrl: "data:audio/mpeg;base64,abc",
+          },
+        },
+      },
+      { id: exportId, type: "jianying-auto-render-pro2", position: { x: 400, y: 0 }, data: {} },
+    ];
+    const edges: CanvasFlowEdge[] = [
+      { id: "ev1", source: "v-a", target: exportId, targetHandle: "in_video" },
+      { id: "ea1", source: "a-a", target: exportId, targetHandle: "in_audio" },
+    ];
+    const snap = collectJianyingLibtvConnectionSnapshot(exportId, nodes, edges);
+    expect(snap.audioRenderedCount).toBe(1);
+    expect(snap.audioClipSlots[0]?.hasLocalPreview).toBe(true);
+    expect(snap.frames[0]?.audioUrl).toBe("https://oss/a.mp3");
+    expect(snap.frames[0]?.dialogue).toBe("第一句对白");
+  });
+
+  it("pairs audio clips with video frames by sequence index", () => {
+    const exportId = "export-1";
+    const nodes: CanvasFlowNode[] = [
+      videoNode("v-a", 100, "https://oss/a.mp4"),
+      {
+        id: "a-a",
+        type: "story-pro2-audio",
+        position: { x: 100, y: 120 },
+        data: { ossUrl: "https://oss/a.mp3", label: "配音A" },
+      },
+      videoNode("v-b", 200, "https://oss/b.mp4"),
+      {
+        id: "a-b",
+        type: "story-pro2-audio",
+        position: { x: 200, y: 120 },
+        data: {
+          runtime: { status: "done", ossUrl: "https://oss/b.mp3" },
+        },
+      },
+      { id: exportId, type: "jianying-auto-render-pro2", position: { x: 400, y: 0 }, data: {} },
+    ];
+    const edges: CanvasFlowEdge[] = [
+      { id: "ev1", source: "v-a", target: exportId, targetHandle: "in_video" },
+      { id: "ev2", source: "v-b", target: exportId, targetHandle: "in_video" },
+      { id: "ea1", source: "a-a", target: exportId, targetHandle: "in_audio" },
+      { id: "ea2", source: "a-b", target: exportId, targetHandle: "in_audio" },
+    ];
+
+    const snap = collectJianyingLibtvConnectionSnapshot(exportId, nodes, edges);
+    expect(snap.audioConnectedCount).toBe(2);
+    expect(snap.audioRenderedCount).toBe(2);
+    expect(snap.frames).toHaveLength(2);
+    expect(snap.frames[0]?.audioUrl).toBe("https://oss/a.mp3");
+    expect(snap.frames[1]?.audioUrl).toBe("https://oss/b.mp3");
+  });
+
+  it("counts audio misconnected to in_video as配音", () => {
+    const exportId = "export-1";
+    const nodes: CanvasFlowNode[] = [
+      videoNode("v-a", 100, "https://oss/a.mp4"),
+      {
+        id: "a-a",
+        type: "story-pro2-audio",
+        position: { x: 100, y: 120 },
+        data: { ossUrl: "https://oss/a.mp3", dockInput: "第一句对白" },
+      },
+      { id: exportId, type: "jianying-auto-render-pro2", position: { x: 400, y: 0 }, data: {} },
+    ];
+    const edges: CanvasFlowEdge[] = [
+      { id: "ev1", source: "v-a", target: exportId, targetHandle: "in_video" },
+      { id: "ea1", source: "a-a", target: exportId, targetHandle: "in_video" },
+    ];
+
+    const snap = collectJianyingLibtvConnectionSnapshot(exportId, nodes, edges);
+    expect(snap.audioConnectedCount).toBe(1);
+    expect(snap.audioClipSlots[0]?.label).toBe("第一句对白");
+    expect(snap.frames[0]?.audioUrl).toBe("https://oss/a.mp3");
   });
 
   it("sorts by Y then X when no chain exists", () => {

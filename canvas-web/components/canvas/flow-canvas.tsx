@@ -1632,8 +1632,10 @@ function FlowCanvasInner({
       if (count >= 2) {
         store.setLibtvFloatingDockSelection(null, null);
         store.setPro2FrameDockFocus(null);
+      } else if (count === 0) {
+        store.setLibtvFloatingDockSelection(null, null);
+        store.setPro2FrameDockFocus(null);
       }
-      // count === 0 时勿清 pin：RF sync/zoom 可能瞬时空选，Dock 靠 store pin 兜底；空白点击由 onPaneClick 清 pin
     },
     [],
   );
@@ -2283,6 +2285,12 @@ function FlowCanvasInner({
                 closePaneMenu();
                 if (ignoreNextPaneClickRef.current) {
                   ignoreNextPaneClickRef.current = false;
+                  flushCanvasTextDrafts();
+                  useCanvasStore.getState().setLibtvInputDockFocused(false);
+                  const activeIgnored = document.activeElement;
+                  if (activeIgnored instanceof HTMLElement) {
+                    activeIgnored.blur();
+                  }
                   return;
                 }
                 closePaneAddMenu();
@@ -2291,6 +2299,7 @@ function FlowCanvasInner({
                 if (active instanceof HTMLElement) {
                   active.blur();
                 }
+                useCanvasStore.getState().setLibtvInputDockFocused(false);
                 useCanvasStore
                   .getState()
                   .setLibtvFloatingDockSelection(null, null);
@@ -2318,7 +2327,6 @@ function FlowCanvasInner({
         onNodeClick={
           pro2FloatingInspector || sbv1Canvas
             ? (e, node) => {
-                ignoreNextPaneClickRef.current = true;
                 if (node.type === "group") {
                   const all = useCanvasStore.getState().nodes as CanvasFlowNode[];
                   const hit = all.find((n) => n.id === node.id);

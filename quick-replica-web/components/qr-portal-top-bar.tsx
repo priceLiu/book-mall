@@ -2,6 +2,7 @@
 
 import { Sparkles } from "lucide-react";
 import { PortalNav } from "@/components/portal-nav";
+import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 import { qrLoginHref, qrRegisterHref } from "@/lib/portal-auth-links";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
@@ -41,6 +42,12 @@ export function QrPortalTopBar({ authed = false }: Props) {
         </div>
 
         <div className="ml-auto flex shrink-0 items-center justify-end gap-2 md:ml-0 md:min-w-[9.5rem]">
+          {bookOrigin ? (
+            <PlatformTopupNavLink
+              bookOrigin={bookOrigin}
+              className="qr-btn-secondary !px-3 !py-1.5 !text-xs"
+            />
+          ) : null}
           {!authed ? (
             <>
               <a href={qrLoginHref("/")} className="qr-btn-secondary !px-3 !py-1.5 !text-xs">

@@ -37,23 +37,12 @@ export function resolveLibtvSoleSelectedNodeId(
 ): string | null {
   if (opts?.marqueeSelecting) return null;
   if (countLibtvSelectedNonGroupNodes(rfNodes) >= 2) return null;
+  if (countLibtvSelectedNonGroupNodes(rfNodes) === 0) return null;
 
   const rfGlobal = resolveLibtvFloatingDockSelection(rfNodes);
   if (rfGlobal?.nodeType === nodeType) {
     const id = rfGlobal.nodeId;
     if (id && !libtvDetailEditorOpenForNode(id)) return id;
-  }
-
-  const pinId = pinned.nodeId?.trim() ?? "";
-  const pinType = pinned.nodeType ?? "";
-  if (
-    pinId &&
-    pinType === nodeType &&
-    rfNodes.some((n) => n.id === pinId) &&
-    !libtvDetailEditorOpenForNode(pinId) &&
-    countLibtvSelectedNonGroupNodes(rfNodes) <= 1
-  ) {
-    return pinId;
   }
 
   return null;
@@ -106,14 +95,13 @@ export function useLibtvShouldSuppressFloatingDock(): boolean {
   );
 }
 
-/** 节点是否为当前唯一选中（框选进行中恒为 false；RF 选中闪断时读 store pin） */
+/** 节点是否为当前唯一选中（框选进行中恒为 false） */
 export function useLibtvIsNodeSoleSelected(
   nodeId: string,
   selected: boolean,
 ): boolean {
   const rfNodes = useNodes();
   const marqueeSelecting = useCanvasMarqueeSelecting();
-  const pinnedId = useCanvasStore((s) => s.libtvFloatingDockNodeId);
 
   return useMemo(() => {
     if (marqueeSelecting) return false;
@@ -130,13 +118,6 @@ export function useLibtvIsNodeSoleSelected(
       if (count === 1 && match) return true;
     }
 
-    if (
-      pinnedId === nodeId &&
-      countLibtvSelectedNonGroupNodes(rfNodes) <= 1
-    ) {
-      return true;
-    }
-
     return false;
-  }, [marqueeSelecting, selected, nodeId, rfNodes, pinnedId]);
+  }, [marqueeSelecting, selected, nodeId, rfNodes]);
 }

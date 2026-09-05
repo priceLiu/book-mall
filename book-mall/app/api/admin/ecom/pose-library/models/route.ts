@@ -45,6 +45,10 @@ export async function POST(request: Request) {
     category,
     title,
     baseDescription,
+    ossUrl: typeof body.ossUrl === "string" ? body.ossUrl.trim() : undefined,
+    thumbUrl: typeof body.thumbUrl === "string" ? body.thumbUrl.trim() : undefined,
+    sourceImageKey:
+      typeof body.sourceImageKey === "string" ? body.sourceImageKey.trim() : undefined,
     tags: body.tags && typeof body.tags === "object" ? (body.tags as Record<string, unknown>) : undefined,
     enabled: body.enabled !== false,
     sortOrder: typeof body.sortOrder === "number" ? body.sortOrder : 0,

@@ -5,6 +5,7 @@ import { PortalNav } from "@/components/portal-nav";
 import { buildEcomLoginUrl, buildEcomRegisterUrl } from "@/lib/portal-auth-links";
 import { getBookAccountUrl } from "@/lib/site-origin";
 import { EcomButtonSecondaryLink } from "@/components/ui/ecom-button";
+import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 
 type Props = {
   authed?: boolean;
@@ -47,6 +48,12 @@ export function EcomPortalTopBar({ authed = true, bookOrigin = null }: Props) {
                 免费注册
               </a>
             </>
+          ) : null}
+          {authed && bookOrigin ? (
+            <PlatformTopupNavLink
+              bookOrigin={bookOrigin}
+              className="rounded-full border border-white/20 px-3 py-1.5 text-xs font-medium text-white/90 transition hover:bg-white/10"
+            />
           ) : null}
           {authed && bookAccountUrl ? (
             <EcomButtonSecondaryLink

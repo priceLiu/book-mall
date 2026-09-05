@@ -48,7 +48,8 @@ import {
 } from "@/lib/run-qr-generate-job";
 import { fetchQrPlatform, formatQrPlatformError } from "@/lib/qr-platform-fetch";
 import { PortalNav } from "@/components/portal-nav";
-import { getBookAccountUrl } from "@/lib/site-origin";
+import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
+import { getBookAccountUrl, getMainSiteOrigin } from "@/lib/site-origin";
 import {
   buildHomeCategoryCards,
   type QrHomeCategoryCard,
@@ -128,6 +129,7 @@ export function QrAppClient({
     navMode === "category" && category === "world" && middleMode === "browse";
 
   const bookAccountUrl = getBookAccountUrl();
+  const bookOrigin = getMainSiteOrigin();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -838,6 +840,12 @@ export function QrAppClient({
         </div>
 
         <div className="ml-auto flex min-w-0 items-center gap-2 overflow-x-auto sm:gap-3">
+          {bookOrigin ? (
+            <PlatformTopupNavLink
+              bookOrigin={bookOrigin}
+              className="hidden shrink-0 rounded-full border border-[var(--qr-border)] px-2.5 py-1.5 text-xs transition hover:bg-white/5 sm:inline-flex"
+            />
+          ) : null}
           {bookAccountUrl ? (
             <a
               href={bookAccountUrl}

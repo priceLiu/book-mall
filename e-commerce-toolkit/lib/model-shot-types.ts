@@ -51,6 +51,7 @@ export type ModelShotPoseItem = {
   sceneCatalogId?: string;
   propText?: string;
   propCatalogId?: string;
+  poseRefUrl?: string;
   prompt: string;
   /** 当前选中版本的 URL（与 imageHistory[activeImageIndex] 同步） */
   imageUrl?: string;

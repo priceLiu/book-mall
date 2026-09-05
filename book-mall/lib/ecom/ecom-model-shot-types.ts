@@ -68,6 +68,8 @@ export type ModelShotPoseItem = {
   propText?: string;
   /** 道具库 catalogId */
   propCatalogId?: string;
+  /** 姿势库参考图（V2） */
+  poseRefUrl?: string;
   prompt: string;
   imageUrl?: string;
   assetId?: string;
@@ -138,6 +140,7 @@ const poseItemSchema = z.object({
   sceneCatalogId: z.string().optional(),
   propText: z.string().optional(),
   propCatalogId: z.string().optional(),
+  poseRefUrl: z.string().optional(),
   prompt: z.string().default(""),
   imageUrl: z.string().optional(),
   assetId: z.string().optional(),

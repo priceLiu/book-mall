@@ -1,4 +1,5 @@
 import type { EcomPoseLibraryEntry } from "@/lib/ecom/ecom-pose-library-service";
+import { sortPoseEntriesWithImageFirst } from "@/lib/ecom/ecom-pose-library-sort";
 import type { EcomPropLibraryEntry } from "@/lib/ecom/ecom-prop-library-service";
 import type { EcomSceneLibraryEntry } from "@/lib/ecom/ecom-scene-library-service";
 
@@ -128,14 +129,15 @@ export function pickModelShotPoses(opts: {
 
   for (const cat of priorityCats) {
     if (picked.length >= count) break;
-    const match = candidates.find((p) => p.category === cat && !usedIds.has(p.id));
+    const matches = candidates.filter((p) => p.category === cat && !usedIds.has(p.id));
+    const match = matches.find((p) => p.ossUrl?.trim()) ?? matches[0];
     if (match) {
       picked.push(match);
       usedIds.add(match.id);
     }
   }
 
-  for (const p of candidates) {
+  for (const p of sortPoseEntriesWithImageFirst(candidates)) {
     if (picked.length >= count) break;
     if (usedIds.has(p.id)) continue;
     picked.push(p);

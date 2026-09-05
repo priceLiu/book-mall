@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useEdges, useNodes, type NodeProps } from "@xyflow/react";
 import { Download, ImageIcon, Split } from "lucide-react";
+import { CanvasSaveToPoseLibraryButton } from "@/components/admin/canvas-save-to-pose-library-button";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { directPredecessors } from "@/lib/canvas/topo";
 import type {
@@ -207,6 +208,14 @@ export function OutputNode({ id, data, selected }: NodeProps) {
                           >
                             与上一张对比
                           </button>
+                        ) : null}
+                        {t.ossUrl ? (
+                          <CanvasSaveToPoseLibraryButton
+                            imageUrl={t.ossUrl}
+                            sourceModule="canvas-output-node"
+                            sourceAssetId={t.id}
+                            className="text-[11px] text-white/75"
+                          />
                         ) : null}
                         <a
                           href={t.ossUrl!}

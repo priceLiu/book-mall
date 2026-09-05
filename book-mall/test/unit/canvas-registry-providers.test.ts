@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { CanvasProviderDto } from "@/lib/canvas/canvas-provider-service";
-import { GATEWAY_BAILIAN_PROVIDER_ID } from "@/lib/canvas/canvas-gateway-providers";
-import { mergeKnownBailianImageModelsForCanvas } from "@/lib/canvas/canvas-registry-providers";
+import {
+  GATEWAY_BAILIAN_PROVIDER_ID,
+  GATEWAY_MINIMAX_VIDEO_PROVIDER_ID,
+} from "@/lib/canvas/canvas-gateway-providers";
+import {
+  mergeKnownBailianImageModelsForCanvas,
+  mergeKnownMinimaxSpeechModelsForCanvas,
+} from "@/lib/canvas/canvas-registry-providers";
 
 function shell(id: string): Omit<CanvasProviderDto, "models"> {
   const now = new Date().toISOString();
@@ -61,6 +67,40 @@ describe("mergeKnownBailianImageModelsForCanvas", () => {
 
   it("skips merge for non-IMAGE role filter", () => {
     const merged = mergeKnownBailianImageModelsForCanvas([], { role: "VIDEO" });
+    expect(merged).toEqual([]);
+  });
+});
+
+describe("mergeKnownMinimaxSpeechModelsForCanvas", () => {
+  it("appends MiniMax Speech when registry list omitted it", () => {
+    const providers: CanvasProviderDto[] = [
+      {
+        ...shell(GATEWAY_MINIMAX_VIDEO_PROVIDER_ID),
+        models: [],
+      },
+    ];
+
+    const merged = mergeKnownMinimaxSpeechModelsForCanvas(providers, {
+      role: "TTS",
+    });
+    const minimax = merged.find((p) => p.id === GATEWAY_MINIMAX_VIDEO_PROVIDER_ID);
+    expect(minimax?.models.some((m) => m.modelKey === "MiniMax/speech-2.8-hd")).toBe(
+      true,
+    );
+    expect(
+      minimax?.models.find((m) => m.modelKey === "MiniMax/speech-2.8-hd")?.defaultParams,
+    ).toMatchObject({ voice_id: "male-qn-qingse" });
+  });
+
+  it("creates minimax provider when list was empty", () => {
+    const merged = mergeKnownMinimaxSpeechModelsForCanvas([], { role: "LLM" });
+    const minimax = merged.find((p) => p.id === GATEWAY_MINIMAX_VIDEO_PROVIDER_ID);
+    expect(minimax?.active).toBe(true);
+    expect(minimax?.models.length).toBeGreaterThan(0);
+  });
+
+  it("skips merge for unrelated role filter", () => {
+    const merged = mergeKnownMinimaxSpeechModelsForCanvas([], { role: "VIDEO" });
     expect(merged).toEqual([]);
   });
 });

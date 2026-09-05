@@ -8,6 +8,8 @@ import {
   type CatalogPickerEntry,
 } from "@/components/model-shot/ecom-catalog-picker-dialog";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { fetchEcomPoseLibraryCatalog } from "@/lib/ecom-pose-library-api";
+import type { EcomPoseLibraryEntry } from "@/lib/ecom-pose-library/types";
 import { fetchEcomPropLibraryCatalog } from "@/lib/ecom-prop-library-api";
 import type { EcomPropLibraryEntry } from "@/lib/ecom-prop-library/types";
 import { fetchEcomSceneLibraryCatalog } from "@/lib/ecom-scene-library-api";
@@ -20,6 +22,10 @@ export type PoseItemPatch = {
   propText: string;
   sceneCatalogId?: string | null;
   propCatalogId?: string | null;
+  poseId?: string | null;
+  poseRefUrl?: string | null;
+  title?: string;
+  category?: string;
   applySceneToAll?: boolean;
   applyPropToAll?: boolean;
 };
@@ -35,7 +41,7 @@ type Props = {
   confirmed?: boolean;
 };
 
-type PickerKind = "scene" | "prop" | null;
+type PickerKind = "scene" | "prop" | "pose" | null;
 
 function displayPoseDescription(item: ModelShotPoseItem): string {
   if (item.poseDescription?.trim()) return item.poseDescription.trim();
@@ -59,6 +65,30 @@ function toDraft(item: ModelShotPoseItem): PoseItemPatch {
     propText: item.propText ?? "",
     sceneCatalogId: item.sceneCatalogId ?? null,
     propCatalogId: item.propCatalogId ?? null,
+    poseId: item.poseId ?? null,
+    poseRefUrl: item.poseRefUrl ?? null,
+    title: item.title,
+    category: item.category,
+  };
+}
+
+function sortPosesWithImageFirst(entries: EcomPoseLibraryEntry[]): EcomPoseLibraryEntry[] {
+  return [...entries].sort((a, b) => {
+    const aHas = Boolean(a.ossUrl?.trim() || a.thumbUrl?.trim());
+    const bHas = Boolean(b.ossUrl?.trim() || b.thumbUrl?.trim());
+    if (aHas !== bHas) return aHas ? -1 : 1;
+    return (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.title.localeCompare(b.title, "zh-CN");
+  });
+}
+
+function poseToPickerEntry(entry: EcomPoseLibraryEntry): CatalogPickerEntry {
+  return {
+    id: entry.id,
+    name: entry.title,
+    subtitle: entry.baseDescription?.trim() || "—",
+    imageUrl: entry.thumbUrl || entry.ossUrl,
+    scope: entry.scope,
+    lockedAt: entry.lockedAt,
   };
 }
 
@@ -104,16 +134,18 @@ export function ModelShotPosePlanTable({
   const [applyToAll, setApplyToAll] = useState(false);
   const [sceneCatalog, setSceneCatalog] = useState<EcomSceneLibraryEntry[]>([]);
   const [propCatalog, setPropCatalog] = useState<EcomPropLibraryEntry[]>([]);
+  const [poseCatalog, setPoseCatalog] = useState<EcomPoseLibraryEntry[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
 
   const pickerEntries = useMemo((): CatalogPickerEntry[] => {
     if (pickerKind === "scene") return sceneCatalog.map(sceneToPickerEntry);
     if (pickerKind === "prop") return propCatalog.map(propToPickerEntry);
+    if (pickerKind === "pose") return sortPosesWithImageFirst(poseCatalog).map(poseToPickerEntry);
     return [];
-  }, [pickerKind, sceneCatalog, propCatalog]);
+  }, [pickerKind, sceneCatalog, propCatalog, poseCatalog]);
 
   const openPicker = useCallback(
-    async (kind: "scene" | "prop", index: number, all = false) => {
+    async (kind: "scene" | "prop" | "pose", index: number, all = false) => {
       setPickerKind(kind);
       setPickerTargetIndex(index);
       setApplyToAll(all);
@@ -126,12 +158,18 @@ export function ModelShotPosePlanTable({
             ? catalog.scenes
             : [...(catalog.platform ?? []), ...(catalog.user ?? [])];
           setSceneCatalog(list);
-        } else {
+        } else if (kind === "prop") {
           const catalog = await fetchEcomPropLibraryCatalog();
           const list = catalog.props.length
             ? catalog.props
             : [...(catalog.platform ?? []), ...(catalog.user ?? [])];
           setPropCatalog(list);
+        } else {
+          const catalog = await fetchEcomPoseLibraryCatalog();
+          const list = catalog.poses.length
+            ? catalog.poses
+            : [...(catalog.platform ?? []), ...(catalog.user ?? [])];
+          setPoseCatalog(list);
         }
       } finally {
         setCatalogLoading(false);
@@ -164,7 +202,7 @@ export function ModelShotPosePlanTable({
           sceneCatalogId: entry.id,
           applySceneToAll: applyToAll,
         });
-      } else {
+      } else if (pickerKind === "prop") {
         const prop = propCatalog.find((p) => p.id === entry.id);
         const propText = prop?.visualDescription ?? entry.subtitle;
         if (editIndex === index) {
@@ -181,9 +219,26 @@ export function ModelShotPosePlanTable({
           propCatalogId: entry.id,
           applyPropToAll: applyToAll,
         });
+      } else {
+        const pose = poseCatalog.find((p) => p.id === entry.id);
+        const poseDescription = pose?.baseDescription?.trim() || entry.subtitle;
+        const poseRefUrl = pose?.ossUrl?.trim() || pose?.thumbUrl?.trim() || null;
+        const patch: PoseItemPatch = {
+          ...toDraft(item),
+          poseDescription,
+          poseId: entry.id,
+          poseRefUrl,
+          title: pose?.title ?? entry.name,
+          category: pose?.category,
+        };
+        if (editIndex === index) {
+          setDraft(patch);
+          return;
+        }
+        await onPatchItem(index, patch);
       }
     },
-    [applyToAll, editIndex, onPatchItem, pickerKind, pickerTargetIndex, plan.items, propCatalog, sceneCatalog],
+    [applyToAll, editIndex, onPatchItem, pickerKind, pickerTargetIndex, plan.items, poseCatalog, propCatalog, sceneCatalog],
   );
 
   if (plan.items.length === 0) {
@@ -281,6 +336,15 @@ export function ModelShotPosePlanTable({
                               setDraft((prev) => ({ ...prev, poseDescription: e.target.value }))
                             }
                           />
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 text-[10px] text-[#0071e3]"
+                            disabled={busy}
+                            onClick={() => void openPicker("pose", item.index, false)}
+                          >
+                            <BookOpen className="h-3 w-3" />
+                            从姿势库选择
+                          </button>
                         </label>
                         <label className="block space-y-1">
                           <span className="text-[10px] font-medium text-[#86868b]">场景</span>
@@ -354,6 +418,15 @@ export function ModelShotPosePlanTable({
                       <p className="line-clamp-4 whitespace-pre-wrap text-[#424245]">
                         {displayPoseDescription(item)}
                       </p>
+                      <button
+                        type="button"
+                        className="mt-1 inline-flex items-center gap-1 text-[10px] text-[#0071e3]"
+                        disabled={busy}
+                        onClick={() => void openPicker("pose", item.index, false)}
+                      >
+                        <BookOpen className="h-3 w-3" />
+                        姿势库
+                      </button>
                     </td>
                     <td className="px-3 py-3 align-top">
                       <p className="line-clamp-4 whitespace-pre-wrap text-[#424245]">
@@ -414,9 +487,11 @@ export function ModelShotPosePlanTable({
               ? applyToAll
                 ? "选择场景 · 应用到全部"
                 : "选择场景"
-              : applyToAll
-                ? "选择道具 · 应用到全部"
-                : "选择道具"
+              : pickerKind === "prop"
+                ? applyToAll
+                  ? "选择道具 · 应用到全部"
+                  : "选择道具"
+                : "从姿势库选择"
         }
         entries={catalogLoading ? [] : pickerEntries}
         onOpenChange={setPickerOpen}

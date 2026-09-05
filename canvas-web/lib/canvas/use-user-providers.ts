@@ -21,7 +21,7 @@ const CACHE: {
 };
 /** 会话内缓存：打开模型选择器时不重复阻塞 UI；后台静默刷新 */
 /** bump 后强制刷新（Provider 映射变更时递增） */
-const PROVIDERS_CACHE_VERSION = 9;
+const PROVIDERS_CACHE_VERSION = 10;
 const TTL_MS = 30 * 60 * 1000;
 let prefetchInflight: Promise<void> | null = null;
 

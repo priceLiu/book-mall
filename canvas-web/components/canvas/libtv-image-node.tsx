@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { usePointerImagePasteHost } from "@/lib/canvas/image-upload-handlers";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position, useNodes, useReactFlow } from "@xyflow/react";
 import { AlertTriangle, GripVertical, ImageIcon } from "lucide-react";
+import { CanvasSaveToPoseLibraryButton } from "@/components/admin/canvas-save-to-pose-library-button";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { confirmOpenTopupCheckout } from "@/lib/platform-billing/open-topup-checkout";
@@ -31,6 +32,7 @@ import {
   shouldApplyCanvasTaskRuntimePatch,
   shouldSkipStoryRowTaskApply,
 } from "@/lib/canvas/task-pick";
+import { pickTaskImagePreviewUrl } from "@/lib/canvas/task-media-url";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import type { CanvasEnginePick, CanvasNodeRuntime } from "@/lib/canvas/types";
 import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
@@ -196,12 +198,33 @@ export function LibtvImageNode({
     setPreferEphemeralPreview(false);
   }, [d.ossUrl, d.blobUrl, d.uploading, d.runtime?.ephemeralUrl]);
 
+  const { history: taskHistory } = useNodeTaskHistory(id);
+  const inflightTask = useMemo(
+    () =>
+      pickActiveServerInflightTask(
+        taskHistory,
+        d.runtime?.taskId,
+        d.runtime,
+      ),
+    [taskHistory, d.runtime],
+  );
+
+  const boundTerminalPreviewUrl = useMemo(() => {
+    const boundId = d.runtime?.taskId?.trim();
+    if (!boundId) return "";
+    const terminal = taskHistory.find(
+      (t) => t.id === boundId && t.status === "SUCCEEDED",
+    );
+    if (!terminal) return "";
+    return pickTaskImagePreviewUrl(terminal) ?? "";
+  }, [taskHistory, d.runtime?.taskId]);
+
   const previewUrl = useMemo(() => {
     const gridSource = String(
       (d as { gridSplitSourceUrl?: string }).gridSplitSourceUrl ?? "",
     ).trim();
     if (d.gridSplitCrop && gridSource) return gridSource;
-    return resolveLibtvMediaPreviewUrl({
+    const fromNode = resolveLibtvMediaPreviewUrl({
       ossUrl: d.ossUrl,
       blobUrl: d.blobUrl,
       ephemeralUrl: d.runtime?.ephemeralUrl,
@@ -210,6 +233,8 @@ export function LibtvImageNode({
       preferBlob: preferBlobPreview,
       preferEphemeral: preferEphemeralPreview,
     });
+    if (fromNode) return fromNode;
+    return boundTerminalPreviewUrl;
   }, [
     d.gridSplitCrop,
     (d as { gridSplitSourceUrl?: string }).gridSplitSourceUrl,
@@ -219,6 +244,7 @@ export function LibtvImageNode({
     d.uploading,
     preferBlobPreview,
     preferEphemeralPreview,
+    boundTerminalPreviewUrl,
   ]);
   const onPreviewLoadError = useCallback(() => {
     if (
@@ -258,21 +284,11 @@ export function LibtvImageNode({
     hasImage &&
     Boolean(d.uploading) &&
     !d.runtime?.taskId;
-  const { history: taskHistory } = useNodeTaskHistory(id);
-  const inflightTask = useMemo(
-    () =>
-      pickActiveServerInflightTask(
-        taskHistory,
-        d.runtime?.taskId,
-        d.runtime,
-      ),
-    [taskHistory, d.runtime],
-  );
   const isGenerating = isDirectorDeskShotLocalPreview
     ? false
     : Boolean(inflightTask) || isLibtvMediaGenerating(d);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (inflightTask) return;
     const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
     const localRt = (node?.data as LibtvImageNodeData | undefined)?.runtime;
@@ -1017,6 +1033,14 @@ export function LibtvImageNode({
                 <Pro2CrewTaskStatusBadge nodeId={id} />
               ) : null}
               <div className="relative z-[1] flex shrink-0 items-center gap-2">
+                {!isGenerating && d.ossUrl?.trim() ? (
+                  <CanvasSaveToPoseLibraryButton
+                    imageUrl={d.ossUrl.trim()}
+                    prompt={d.dockInput}
+                    sourceModule={`canvas-${edition}-image`}
+                    sourceAssetId={id}
+                  />
+                ) : null}
                 {!isGenerating ? (
                   <LibtvNodeHeaderActions
                     portraitActive={portraitActive}

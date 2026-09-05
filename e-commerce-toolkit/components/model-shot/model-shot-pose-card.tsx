@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, ImageIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
+import { EcomSaveToPoseLibraryButton } from "@/components/admin/ecom-save-to-pose-library-button";
 import { StoryboardPanelImageHoverActions } from "@/components/storyboard/storyboard-panel-image-hover-actions";
 import { storyboardPanelCardWidth, storyboardPreviewAspectClass } from "@/lib/storyboard-aspect";
 import type { StoryboardPanel } from "@/lib/storyboard-types";
@@ -211,11 +212,21 @@ export function ModelShotPoseCard({
             <span className="ml-1 font-normal text-[#86868b]">{panel.timeline}</span>
           ) : null}
         </p>
-        {resolveModelShotActiveImage(item) ? (
-          <span className="text-[10px] text-[#86868b]">
-            {history.length > 1 ? `${history.length} 版` : "已生成"}
-          </span>
-        ) : null}
+        <div className="flex flex-col items-end gap-0.5">
+          {resolveModelShotActiveImage(item) ? (
+            <span className="text-[10px] text-[#86868b]">
+              {history.length > 1 ? `${history.length} 版` : "已生成"}
+            </span>
+          ) : null}
+          {displayUrl ? (
+            <EcomSaveToPoseLibraryButton
+              imageUrl={displayUrl}
+              prompt={item.prompt ?? item.poseDescription}
+              sourceModule="ecom-model-shot"
+              sourceAssetId={`${item.index}`}
+            />
+          ) : null}
+        </div>
       </div>
     </article>
   );

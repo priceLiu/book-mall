@@ -55,7 +55,7 @@ export const BATCH_OUT_HANDLE_BY_TYPE: Record<string, string> = {
   "story-pro2-style-asset": "style",
   "story-pro2-prop": "image",
   "story-pro2-mood": "image",
-  "story-pro2-audio": "image",
+  "story-pro2-audio": "audio",
   "story-pro2-starter": "text",
   "story-pro2-script-hub": "text",
 };
@@ -75,7 +75,12 @@ export function nodesEligibleForBatchOut(
 ): CanvasFlowNode[] {
   return ids
     .map((id) => nodes.find((n) => n.id === id))
-    .filter((n): n is CanvasFlowNode => !!n && !!nodeBatchOutHandle(n));
+    .filter((n): n is CanvasFlowNode => {
+      if (!n) return false;
+      if (nodeBatchOutHandle(n)) return true;
+      if (n.type === "story-pro2-audio") return true;
+      return false;
+    });
 }
 
 /** 框选 ≥2 个可批量节点时返回模式，否则 null */
@@ -84,6 +89,14 @@ export function classifyBatchConnectMode(
 ): BatchConnectMode | null {
   if (sources.length < 2) return null;
   if (sources.every((s) => s.type === "sbv1-video-engine")) {
+    return "video-export";
+  }
+  if (
+    sources.every(
+      (s) => s.type === "sbv1-video-engine" || s.type === "story-pro2-audio",
+    ) &&
+    sources.some((s) => s.type === "sbv1-video-engine")
+  ) {
     return "video-export";
   }
   if (sources.every((s) => isBatchMediaPipelineSource(s))) {
@@ -165,6 +178,7 @@ export function batchConnectTargetHandleForSnap(
     (target.type === "jianying-export-pro2" ||
       target.type === "jianying-auto-render-pro2")
   ) {
+    if (source.type === "story-pro2-audio") return "in_audio";
     return "in_video";
   }
   const sourceHandle = nodeBatchOutHandle(source);
@@ -185,6 +199,14 @@ export function pickBatchTargetHandle(
     sourceHandle === "out_video"
   ) {
     return "in_video";
+  }
+  if (
+    (targetNode.type === "jianying-export-pro2" ||
+      targetNode.type === "jianying-auto-render-pro2") &&
+    sourceNode.type === "story-pro2-audio" &&
+    sourceHandle === "audio"
+  ) {
+    return "in_audio";
   }
   if (
     targetNode.type === "sbv1-video-engine" &&

@@ -10,6 +10,7 @@ export type CatalogPickerEntry = {
   id: string;
   name: string;
   subtitle: string;
+  imageUrl?: string | null;
   scope?: "platform" | "user";
   lockedAt?: string | null;
 };
@@ -121,12 +122,26 @@ function CatalogPickerRow({
       disabled={busy}
       onClick={() => void onPick()}
       className={cn(
-        "w-full rounded-xl border border-[#e5e5ea] px-3 py-2 text-left transition hover:border-[#0071e3] hover:bg-[#f0f6ff]",
+        "flex w-full gap-3 rounded-xl border border-[#e5e5ea] px-3 py-2 text-left transition hover:border-[#0071e3] hover:bg-[#f0f6ff]",
         busy && "opacity-60",
       )}
     >
-      <div className="text-sm font-medium text-[#1d1d1f]">{entry.name}</div>
-      <div className="mt-0.5 line-clamp-2 text-xs text-[#86868b]">{entry.subtitle}</div>
+      {entry.imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={entry.imageUrl}
+          alt=""
+          className="size-14 shrink-0 rounded-lg object-cover"
+        />
+      ) : (
+        <div className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-[#f5f5f7] text-[10px] text-[#86868b]">
+          无图
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium text-[#1d1d1f]">{entry.name}</div>
+        <div className="mt-0.5 line-clamp-2 text-xs text-[#86868b]">{entry.subtitle}</div>
+      </div>
     </button>
   );
 }

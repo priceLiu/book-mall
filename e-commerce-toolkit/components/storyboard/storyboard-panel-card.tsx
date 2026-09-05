@@ -4,6 +4,7 @@ import Image from "next/image";
 import { ImageIcon } from "lucide-react";
 
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
+import { EcomSaveToPoseLibraryButton } from "@/components/admin/ecom-save-to-pose-library-button";
 import { StoryboardPanelImageHoverActions } from "@/components/storyboard/storyboard-panel-image-hover-actions";
 import { storyboardPanelCardWidth, storyboardPreviewAspectClass } from "@/lib/storyboard-aspect";
 import type { StoryboardPanel } from "@/lib/storyboard-types";
@@ -130,6 +131,13 @@ export function StoryboardPanelCard({
           >
             有视频
           </button>
+        ) : imageUrl ? (
+          <EcomSaveToPoseLibraryButton
+            imageUrl={imageUrl}
+            prompt={panel.imagePrompt}
+            sourceModule="ecom-storyboard"
+            sourceAssetId={`panel-${panel.index}`}
+          />
         ) : null}
       </div>
     </article>

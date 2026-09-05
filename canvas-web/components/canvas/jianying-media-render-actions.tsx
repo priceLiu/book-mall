@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_SUBTITLE_STYLE,
-  SubtitleBurnInFields,
   type SubtitleBurnInStyle,
 } from "@private/media-render-subtitle-style";
 import { Clapperboard, Download } from "lucide-react";
@@ -39,7 +38,9 @@ import {
   type JianyingMediaRenderInFlight,
   type JianyingMediaRenderTransitionKind,
 } from "@/lib/canvas/media-render-in-flight";
-import type { JianyingLibtvClipSlot } from "@/lib/canvas/jianying-from-workspace";
+import { syncMediaRenderFrameAudios } from "@/lib/canvas/media-render-sync-audio";
+import type { JianyingLibtvAudioClipSlot, JianyingLibtvClipSlot } from "@/lib/canvas/jianying-from-workspace";
+import { pairAudioSlotsToVideoOrder } from "@/lib/canvas/jianying-from-workspace";
 import {
   preserveAutoRenderNodeMediaFitPatch,
   scheduleAutoRenderParentGroupRelayout,
@@ -54,6 +55,11 @@ import { computeMediaRenderCreditsPreview } from "@/lib/canvas/media-render-cred
 import { dispatchPlatformCreditsBalanceRefresh } from "@/lib/canvas/canvas-credits-balance-events";
 import { LibtvDockCreditsLabel } from "./libtv-dock-credits-label";
 import { JianyingClipOrderStrip } from "./jianying-clip-order-strip";
+import { JianyingAudioClipOrderStrip } from "./jianying-audio-clip-order-strip";
+import {
+  JianyingAutoRenderOutputFields,
+  type JianyingAutoRenderSubtitleMode,
+} from "./jianying-auto-render-output-fields";
 
 type Props = {
   nodeId: string;
@@ -63,6 +69,9 @@ type Props = {
   clipSlots?: JianyingLibtvClipSlot[];
   clipOrderNodeIds?: string[];
   onClipOrderChange?: (orderNodeIds: string[]) => void;
+  audioClipSlots?: JianyingLibtvAudioClipSlot[];
+  audioOrderNodeIds?: string[];
+  onAudioOrderChange?: (orderNodeIds: string[]) => void;
   persisted?: JianyingMediaRenderResult | null;
   inFlight?: JianyingMediaRenderInFlight | null;
   /** false = 成片留在当前节点，不另 spawn video-preview */
@@ -70,6 +79,7 @@ type Props = {
   layout?: "default" | "dock";
   connectedCount?: number;
   renderedCount?: number;
+  audioConnectedCount?: number;
 };
 
 const SCALE_OPTIONS: { value: MediaRenderScaleMode; label: string }[] = [
@@ -103,12 +113,16 @@ export function JianyingMediaRenderActions({
   clipSlots = [],
   clipOrderNodeIds = [],
   onClipOrderChange,
+  audioClipSlots = [],
+  audioOrderNodeIds = [],
+  onAudioOrderChange,
   persisted,
   inFlight,
   spawnPreview = true,
   layout = "default",
   connectedCount = 0,
   renderedCount = 0,
+  audioConnectedCount = 0,
 }: Props) {
   const dialogs = useDialogs();
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -134,9 +148,18 @@ export function JianyingMediaRenderActions({
   const [scaleMode, setScaleMode] = useState<MediaRenderScaleMode>(
     inFlight?.scaleMode ?? "fit1080p",
   );
-  const [burnIn, setBurnIn] = useState(inFlight?.burnIn ?? false);
-  const [subtitleMode, setSubtitleMode] = useState<"script" | "asr">(
-    inFlight?.subtitleMode ?? "script",
+  const [mixDialogue, setMixDialogue] = useState(
+    () =>
+      inFlight?.mixDialogue ??
+      (audioConnectedCount > 0),
+  );
+  const [burnInSubtitles, setBurnInSubtitles] = useState(
+    () => inFlight?.burnInSubtitles ?? inFlight?.burnIn ?? false,
+  );
+  const [subtitleMode, setSubtitleMode] = useState<JianyingAutoRenderSubtitleMode>(
+    () =>
+      inFlight?.subtitleMode ??
+      (audioConnectedCount > 0 ? "tts" : "script"),
   );
   const [subtitleStyle, setSubtitleStyle] = useState<SubtitleBurnInStyle>(
     inFlight?.subtitleStyle ?? DEFAULT_SUBTITLE_STYLE,
@@ -167,7 +190,8 @@ export function JianyingMediaRenderActions({
     transitionKind,
     transitionSec,
     scaleMode,
-    burnIn,
+    mixDialogue,
+    burnInSubtitles,
     subtitleMode,
     subtitleStyle,
   });
@@ -184,7 +208,8 @@ export function JianyingMediaRenderActions({
     transitionKind,
     transitionSec,
     scaleMode,
-    burnIn,
+    mixDialogue,
+    burnInSubtitles,
     subtitleMode,
     subtitleStyle,
   };
@@ -194,21 +219,34 @@ export function JianyingMediaRenderActions({
   const videoFrames = frames.filter((f) => f.videoUrl);
   const canRender = Boolean(base && projectId && videoFrames.length >= 1);
   const isDock = layout === "dock";
+  const pairedAudioForVideos = useMemo(
+    () =>
+      pairAudioSlotsToVideoOrder(
+        clipOrderNodeIds,
+        audioOrderNodeIds,
+        audioClipSlots,
+      ),
+    [clipOrderNodeIds, audioOrderNodeIds, audioClipSlots],
+  );
 
   const renderCreditsEstimate = useMemo(
-    () => computeMediaRenderCreditsPreview({ burnIn, subtitleMode }),
-    [burnIn, subtitleMode],
+    () =>
+      computeMediaRenderCreditsPreview({
+        burnInSubtitles,
+        subtitleMode,
+      }),
+    [burnInSubtitles, subtitleMode],
   );
 
   const renderCreditsTitle = useMemo(() => {
-    if (burnIn && subtitleMode === "asr") {
+    if (burnInSubtitles && subtitleMode === "asr") {
       return "自动成片 20 积分 + ASR 识别 10 积分";
     }
-    if (burnIn && subtitleMode === "script") {
-      return "自动成片 20 积分（脚本字幕不另收费）";
+    if (burnInSubtitles) {
+      return "自动成片 20 积分（字幕不另收费）";
     }
     return "自动成片 20 积分";
-  }, [burnIn, subtitleMode]);
+  }, [burnInSubtitles, subtitleMode]);
 
   const patchInFlight = useCallback(
     (patch: JianyingMediaRenderInFlight | null) => {
@@ -254,7 +292,14 @@ export function JianyingMediaRenderActions({
         setTransitionSec(inFlight.transitionSec);
       }
       if (inFlight?.scaleMode) setScaleMode(inFlight.scaleMode);
-      if (typeof inFlight?.burnIn === "boolean") setBurnIn(inFlight.burnIn);
+      if (typeof inFlight?.mixDialogue === "boolean") {
+        setMixDialogue(inFlight.mixDialogue);
+      }
+      if (typeof inFlight?.burnInSubtitles === "boolean") {
+        setBurnInSubtitles(inFlight.burnInSubtitles);
+      } else if (typeof inFlight?.burnIn === "boolean") {
+        setBurnInSubtitles(inFlight.burnIn);
+      }
       if (inFlight?.subtitleMode) setSubtitleMode(inFlight.subtitleMode);
       if (inFlight?.subtitleStyle) setSubtitleStyle(inFlight.subtitleStyle);
       return;
@@ -455,7 +500,8 @@ export function JianyingMediaRenderActions({
           transitionKind: settings.transitionKind,
           transitionSec: settings.transitionSec,
           scaleMode: settings.scaleMode,
-          burnIn: settings.burnIn,
+          mixDialogue: settings.mixDialogue,
+          burnInSubtitles: settings.burnInSubtitles,
           subtitleMode: settings.subtitleMode,
           subtitleStyle: settings.subtitleStyle,
         });
@@ -687,7 +733,16 @@ export function JianyingMediaRenderActions({
       });
       return;
     }
-    if (burnIn && subtitleMode === "asr" && gatewayBlocked) {
+    if (mixDialogue && audioConnectedCount < 1) {
+      await dialogs.alert({
+        title: "无法烧录对白",
+        message:
+          "已勾选「烧录对白」，但未连接配音节点。请将音效设计节点连到自动成片下方配音入点，或取消勾选。",
+        variant: "warning",
+      });
+      return;
+    }
+    if (burnInSubtitles && subtitleMode === "asr" && gatewayBlocked) {
       await dialogs.alert({
         title: "无法提交",
         message: gatewayAccountUrl
@@ -697,21 +752,28 @@ export function JianyingMediaRenderActions({
       });
       return;
     }
-    if (burnIn && subtitleMode === "script") {
+    if (burnInSubtitles && (subtitleMode === "script" || subtitleMode === "tts")) {
       const hasDialogue = videoFrames.some((f) => f.dialogue?.trim());
       if (!hasDialogue) {
         await dialogs.alert({
           title: "无法烧录字幕",
           message:
-            "当前各镜未解析到分镜对白。请确认：\n" +
-            "1. 脚本表「对白」列已填写；或\n" +
-            "2. 视频节点已连线文本/脚本节点；或\n" +
-            "3. 改用「从视频音频识别 (ASR)」模式。",
+            subtitleMode === "tts"
+              ? "当前各镜未解析到 TTS 台词。请确认音频节点已填写台词并连线到自动成片。"
+              : "当前各镜未解析到分镜对白。请确认脚本表「对白」列已填写，或视频已连线文本/脚本节点，或改用「已连接 TTS 配音」。",
           variant: "warning",
         });
         return;
       }
     }
+
+    const framesPayload = mixDialogue
+      ? videoFrames
+      : videoFrames.map((f) => ({
+          ...f,
+          audioUrl: null,
+          audioSourceNodeId: null,
+        }));
 
     submittingRef.current = true;
     setSubmitting(true);
@@ -724,7 +786,7 @@ export function JianyingMediaRenderActions({
     setDoneUrl(null);
     setExpiresAt(null);
     setProgress(0);
-    setStepLabel("提交任务…");
+    setStepLabel(mixDialogue ? "准备同步配音…" : "准备提交…");
     // 新任务开始前清掉复制画布带来的旧成片 URL，避免播放仍指向源项目 OSS
     updateNodeData(nodeId, {
       videoUrl: undefined,
@@ -740,11 +802,12 @@ export function JianyingMediaRenderActions({
           jobId: "pending",
           status: "PENDING",
           progress: 0,
-          progressLabel: "提交任务…",
+          progressLabel: mixDialogue ? "准备同步配音…" : "提交任务…",
           transitionKind,
           transitionSec,
           scaleMode,
-          burnIn,
+          mixDialogue,
+          burnInSubtitles,
           subtitleMode,
           subtitleStyle,
         },
@@ -760,14 +823,60 @@ export function JianyingMediaRenderActions({
         transitionKind === "xfade"
           ? ({ type: "xfade" as const, durationSec: transitionSec })
           : ({ type: "none" as const });
+      const subtitleApiMode =
+        !burnInSubtitles ? "none" : subtitleMode === "asr" ? "asr" : "script";
+
+      let framesToSubmit = framesPayload;
+      if (mixDialogue) {
+        framesToSubmit = await syncMediaRenderFrameAudios({
+          base,
+          projectId,
+          frames: framesPayload,
+          onProgress: ({ label, progressPct }) => {
+            setStepLabel(label);
+            setProgress(progressPct);
+            patchInFlight({
+              jobId: "pending",
+              status: "PENDING",
+              progress: progressPct,
+              progressLabel: label,
+              transitionKind,
+              transitionSec,
+              scaleMode,
+              mixDialogue,
+              burnInSubtitles,
+              subtitleMode,
+              subtitleStyle,
+            });
+          },
+        });
+      }
+
+      setStepLabel("提交剪辑任务…");
+      setProgress((prev) => Math.max(prev ?? 0, 12));
+      patchInFlight({
+        jobId: "pending",
+        status: "PENDING",
+        progress: 12,
+        progressLabel: "提交剪辑任务…",
+        transitionKind,
+        transitionSec,
+        scaleMode,
+        mixDialogue,
+        burnInSubtitles,
+        subtitleMode,
+        subtitleStyle,
+      });
+
       const job = await submitMediaRender(base, projectId, {
-        frames: videoFrames,
+        frames: framesToSubmit,
         profile: {
           transition,
+          audio: { mixTts: mixDialogue },
           subtitle: {
-            mode: burnIn ? subtitleMode : "none",
-            burnIn,
-            ...(burnIn ? { style: subtitleStyle } : {}),
+            mode: subtitleApiMode,
+            burnIn: burnInSubtitles,
+            ...(burnInSubtitles ? { style: subtitleStyle } : {}),
           },
           video: { scaleMode },
         },
@@ -1067,53 +1176,78 @@ export function JianyingMediaRenderActions({
     </a>
   ) : null;
 
-  const burnInControls = (
-    <div
-      className={cn(
-        "nodrag shrink-0",
-        isDock
-          ? "border-t border-white/[0.06] pt-2"
-          : "border-t border-white/10 pt-2",
-      )}
-    >
-      <SubtitleBurnInFields
-        variant="canvas-dark"
-        density="compact"
-        burnIn={burnIn}
-        onBurnInChange={setBurnIn}
-        style={subtitleStyle}
-        onStyleChange={setSubtitleStyle}
-        disabled={settingsLocked}
-        subtitleMode={subtitleMode}
-        onSubtitleModeChange={setSubtitleMode}
-        showSubtitleMode
-      />
-    </div>
+  const outputControls = (
+    <JianyingAutoRenderOutputFields
+      mixDialogue={mixDialogue}
+      onMixDialogueChange={setMixDialogue}
+      burnSubtitles={burnInSubtitles}
+      onBurnSubtitlesChange={setBurnInSubtitles}
+      subtitleMode={subtitleMode}
+      onSubtitleModeChange={setSubtitleMode}
+      style={subtitleStyle}
+      onStyleChange={setSubtitleStyle}
+      disabled={settingsLocked}
+      showMixDialogue={audioConnectedCount > 0}
+      className={isDock ? undefined : "border-white/10"}
+    />
   );
 
   if (isDock) {
     return (
       <div className="flex h-full min-h-0 flex-col text-[13px] text-white/80">
-        <div className="nodrag flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden px-4 py-2">
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/[0.06] pb-1.5">
-            <p className="text-[13px] text-white/70">
-              已连接 <strong className="text-white">{connectedCount}</strong>
-              {" · "}
-              可剪辑 <strong className="text-white">{renderedCount}</strong>
-            </p>
-            <p className="text-[13px] font-medium text-white/90">云端自动剪辑成片</p>
+        <div className="nodrag min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-2 [-ms-overflow-style:none] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20"
+          data-canvas-wheel-scroll
+        >
+          <div className="flex shrink-0 flex-col gap-1 border-b border-white/[0.06] pb-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[13px] text-white/70">
+                视频 <strong className="text-white">{connectedCount}</strong>
+                {" · "}
+                可剪辑 <strong className="text-white">{renderedCount}</strong>
+                {audioConnectedCount > 0 ? (
+                  <>
+                    {" · "}
+                    音频 <strong className="text-white">{audioConnectedCount}</strong>
+                  </>
+                ) : null}
+              </p>
+              <p className="text-[13px] font-medium text-white/90">云端自动剪辑成片</p>
+            </div>
+            {audioConnectedCount > 0 ? (
+              <p className="text-[11px] leading-snug text-white/40">
+                第 N 段音频对应第 N 镜视频；在下方两行分别用 ↑↓ 对齐。提交时自动上传并混入 TTS。
+              </p>
+            ) : connectedCount > 0 ? (
+              <p className="text-[11px] leading-snug text-white/40">
+                将音效设计节点从右侧 <strong className="text-white/55">audio</strong> 口连到自动成片左侧
+                <strong className="text-white/55"> 下方配音入点</strong>，即可混入 TTS 对白。
+              </p>
+            ) : null}
           </div>
 
           {clipSlots.length > 0 && onClipOrderChange ? (
             <JianyingClipOrderStrip
               slots={clipSlots}
               orderNodeIds={clipOrderNodeIds}
+              pairedAudioByVideoIndex={pairedAudioForVideos}
               disabled={settingsLocked}
               onOrderChange={onClipOrderChange}
-              className="shrink-0 border-b border-white/[0.06] pb-2"
+              className="mt-1.5 shrink-0 border-b border-white/[0.06] pb-1.5"
             />
           ) : null}
 
+          {audioClipSlots.length > 0 && onAudioOrderChange ? (
+            <JianyingAudioClipOrderStrip
+              slots={audioClipSlots}
+              orderNodeIds={audioOrderNodeIds}
+              disabled={settingsLocked}
+              onOrderChange={onAudioOrderChange}
+              className="mt-1.5 shrink-0 border-b border-white/[0.06] pb-1.5"
+            />
+          ) : null}
+        </div>
+
+        <div className="nodrag shrink-0 border-t border-white/[0.06] bg-[#16161a] px-4 py-2">
           <div className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2">
             <label className="flex items-center gap-2 text-[13px] text-white/70">
               <span className="shrink-0">转场时长</span>
@@ -1163,7 +1297,7 @@ export function JianyingMediaRenderActions({
             </label>
           </div>
 
-          {burnInControls}
+          {outputControls}
         </div>
 
         <div className="nodrag flex shrink-0 flex-col gap-2 border-t border-white/[0.06] bg-[#1a1a1f] px-4 py-2.5">
@@ -1234,7 +1368,7 @@ export function JianyingMediaRenderActions({
           ))}
         </select>
       </label>
-      {burnInControls}
+      {outputControls}
       {renderBtnRow}
       {progressBlock}
       {expiryHint}

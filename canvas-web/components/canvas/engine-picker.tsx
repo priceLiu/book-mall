@@ -31,6 +31,10 @@ import {
   ENGINE_PICKER_UNSELECTED_BORDER,
   type GatewayModelRole,
 } from "@/lib/canvas/gateway-model-role";
+import {
+  isAllowedDockModelKey,
+  modelMatchesDockGatewayRole,
+} from "@/lib/canvas/libtv-dock-engine-models";
 
 export type EnginePickerProps = {
   /** 过滤模型 role：LLM / IMAGE / VIDEO / MUSIC / TTS */
@@ -151,9 +155,9 @@ export function EnginePicker({
           models: p.models.filter(
             (m) =>
               m.enabled &&
-              m.role === role &&
+              modelMatchesDockGatewayRole(m, role, allowedSet) &&
               (role !== "IMAGE" || isImageGenerationModelKey(m.modelKey)) &&
-              (!allowedSet || allowedSet.has(m.modelKey)) &&
+              isAllowedDockModelKey(m.modelKey, allowedSet) &&
               (!stableReqCaps?.length ||
                 modelHasStoryCapabilities(m.modelKey, stableReqCaps)),
           ),

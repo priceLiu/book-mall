@@ -580,6 +580,8 @@ export type JianyingAutoRenderNodeData = {
   mediaRenderInFlight?: import("./media-render-in-flight").JianyingMediaRenderInFlight | null;
   /** 入边视频源节点 id · 剪辑顺序（持久化用户调整） */
   clipOrderNodeIds?: string[];
+  /** 入边音频源节点 id · 与视频按序号配对 */
+  audioOrderNodeIds?: string[];
   mediaFit?: boolean;
   mediaFitKey?: string;
 };

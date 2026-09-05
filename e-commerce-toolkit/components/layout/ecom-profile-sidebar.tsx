@@ -18,6 +18,7 @@ import {
   type EcomSidebarNavLink,
 } from "@/lib/ecom-sidebar-nav";
 import { EcomCreditsBalanceChip } from "@/components/layout/ecom-credits-balance-chip";
+import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 import { ecomPrimaryLinkClass } from "@/components/ui/ecom-button";
 import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
 import { cn } from "@/lib/utils";
@@ -511,8 +512,12 @@ export function EcomProfileSidebar({
           </div>
 
           {user ? (
-            <div className="mb-3">
+            <div className="mb-3 space-y-2">
               <EcomCreditsBalanceChip />
+              <PlatformTopupNavLink
+                bookOrigin={bookOrigin}
+                className="inline-flex w-full items-center justify-center rounded-lg border border-[var(--ecom-chrome-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ecom-chrome-text)] transition-colors hover:bg-[var(--ecom-chrome-hover)]"
+              />
             </div>
           ) : null}
 

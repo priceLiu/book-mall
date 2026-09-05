@@ -17,8 +17,11 @@ export type JianyingMediaRenderInFlight = {
   transitionKind?: JianyingMediaRenderTransitionKind;
   transitionSec?: number;
   scaleMode?: MediaRenderScaleMode;
+  /** @deprecated 用 burnInSubtitles */
   burnIn?: boolean;
-  subtitleMode?: "script" | "asr";
+  mixDialogue?: boolean;
+  burnInSubtitles?: boolean;
+  subtitleMode?: "script" | "asr" | "tts";
   subtitleStyle?: SubtitleBurnInStyle;
 };
 

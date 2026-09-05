@@ -6,6 +6,7 @@ import { Clapperboard, Loader2 } from "lucide-react";
 import { STORY_NAV_ITEMS } from "@/lib/site-config";
 import { PortalNav } from "@/components/portal-nav";
 import { StoryCreditBalanceChip } from "@/components/platform-credit-balance-chip";
+import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 import { useStorySession } from "@/components/auth/story-session-provider";
 import { getBookAccountUrl } from "@/lib/site-origin";
 import { cn } from "@/lib/utils";
@@ -70,6 +71,7 @@ function ShellAuthSlot() {
 export function StoryShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
   const isProjectWorkspace = pathname.startsWith("/project/");
+  const base = useBookMallBaseUrl();
 
   if (isProjectWorkspace) {
     return <>{children}</>;
@@ -123,6 +125,13 @@ export function StoryShell({ children }: { children: React.ReactNode }) {
           <div className="hidden md:block">
             <PortalNav current="story" />
           </div>
+
+          {base ? (
+            <PlatformTopupNavLink
+              bookOrigin={base}
+              className="story-sans hidden shrink-0 rounded-full border border-white/15 px-2.5 py-1.5 text-xs font-semibold text-white/80 transition hover:border-white/25 hover:bg-white/10 hover:text-white sm:inline-flex"
+            />
+          ) : null}
 
           <StoryCreditBalanceChip />
 

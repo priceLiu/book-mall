@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { AdminPoseLibraryGenerateStudio } from "@/components/admin/admin-pose-library-generate-studio";
 import {
   confirmDestructiveTwice,
   CONFIRM_DELETE_LIBRARY_OSS_SECOND_ZH,
@@ -12,6 +13,8 @@ type PoseRow = {
   category: string;
   title: string;
   baseDescription: string;
+  ossUrl?: string | null;
+  thumbUrl?: string | null;
   enabled?: boolean;
   sortOrder?: number;
 };
@@ -88,6 +91,7 @@ export function PoseLibraryAdmin() {
   const [form, setForm] = useState<PoseRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [generateOpen, setGenerateOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -161,6 +165,15 @@ export function PoseLibraryAdmin() {
         setForm({ id: "", category: "A", title: "", baseDescription: "", sortOrder: 0, enabled: true })
       }
     >
+      <div className="mb-2 flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="rounded border border-[#0969da] px-2 py-1 text-xs text-[#0969da]"
+          onClick={() => setGenerateOpen(true)}
+        >
+          生成姿势参考图
+        </button>
+      </div>
       <div className="flex flex-wrap gap-2">
         {["all", "A", "B", "C", "D", "E", "H", "I", "J", "K", "L", "M"].map((c) => (
           <button
@@ -177,6 +190,7 @@ export function PoseLibraryAdmin() {
         <table className="min-w-[720px] w-full text-left text-xs">
           <thead className="bg-[#1d1d1f] text-white">
             <tr>
+              <th className="px-2 py-2 align-top">预览</th>
               <th className="px-2 py-2 align-top">ID</th>
               <th className="px-2 py-2 align-top">类</th>
               <th className="px-2 py-2 align-top">标题</th>
@@ -187,6 +201,18 @@ export function PoseLibraryAdmin() {
           <tbody>
             {filtered.map((r) => (
               <tr key={r.id} className="border-t align-top">
+                <td className="px-2 py-2">
+                  {r.thumbUrl || r.ossUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={r.thumbUrl || r.ossUrl || ""}
+                      alt=""
+                      className="size-14 rounded object-cover"
+                    />
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
                 <td className="px-2 py-2">{r.id}</td>
                 <td className="px-2 py-2">{r.category}</td>
                 <td className="px-2 py-2">{r.title}</td>
@@ -221,6 +247,12 @@ export function PoseLibraryAdmin() {
           </div>
         </div>
       ) : null}
+      <AdminPoseLibraryGenerateStudio
+        open={generateOpen}
+        poses={rows}
+        onClose={() => setGenerateOpen(false)}
+        onDone={() => void load()}
+      />
     </CatalogListShell>
   );
 }

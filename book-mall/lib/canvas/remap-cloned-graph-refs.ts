@@ -38,6 +38,7 @@ const NODE_ID_FIELD_KEYS = new Set([
 
 const NODE_ID_ARRAY_FIELD_KEYS = new Set([
   "clipOrderNodeIds",
+  "audioOrderNodeIds",
   "referencedNodeIds",
   "videoReferencedNodeIds",
 ]);

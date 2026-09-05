@@ -4197,6 +4197,9 @@ model EcomPoseLibraryEntry {
   category        String
   title           String
   baseDescription String    @db.Text
+  ossUrl          String?
+  thumbUrl        String?
+  sourceImageKey  String?
   tags            Json?
   scope           String    @default("platform")
   userId          String?
@@ -4209,6 +4212,7 @@ model EcomPoseLibraryEntry {
 
   @@index([category, deletedAt])
   @@index([scope, userId, deletedAt])
+  @@index([sourceImageKey, deletedAt])
 }
 
 model EcomPropLibraryEntry {

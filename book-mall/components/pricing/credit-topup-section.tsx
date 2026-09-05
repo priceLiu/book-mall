@@ -86,6 +86,7 @@ export function CreditTopupSection({
   isLoggedIn,
   showAdminPacks = false,
   userPhone,
+  returnTo,
 }: {
   anchorYuan: number;
   isTeam: boolean;
@@ -93,6 +94,7 @@ export function CreditTopupSection({
   isLoggedIn: boolean;
   showAdminPacks?: boolean;
   userPhone?: string | null;
+  returnTo?: string | null;
 }) {
   const router = useRouter();
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -115,6 +117,8 @@ export function CreditTopupSection({
       params.set("target", "team");
       params.set("tenantId", activeTeam.id);
     }
+    const safeReturnTo = returnTo?.trim();
+    if (safeReturnTo) params.set("returnTo", safeReturnTo);
     router.push(`/checkout/topup?${params.toString()}`);
   }
 

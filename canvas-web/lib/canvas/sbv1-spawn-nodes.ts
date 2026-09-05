@@ -18,6 +18,7 @@ import {
 } from "./sbv1-workspace-types";
 import { buildSbv1HdVideoEngineNodeData } from "./sbv1-hd-video-models";
 import {
+  buildPro2AudioNodeData,
   buildPro2GeneralTextNodeData,
 } from "./pro2-spawn-nodes";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
@@ -403,7 +404,11 @@ export function spawnSbv1NeighborFromNode(
           targetHandle: "in_motion_video",
         },
       ]);
-    } else if (self.type === "jianying-export-pro2" && side === "left") {
+    } else if (
+      (self.type === "jianying-export-pro2" ||
+        self.type === "jianying-auto-render-pro2") &&
+      side === "left"
+    ) {
       setEdges((prev) => [
         ...prev,
         {
@@ -454,6 +459,33 @@ export function spawnSbv1NeighborFromNode(
       if (edge) setEdges((prev) => [...prev, edge]);
     }
     selectSbv1NodeAfterSpawn(setNodes, newId);
+    return newId;
+  }
+
+  if (nodeType === "story-pro2-audio") {
+    const newId = addNode(
+      "story-pro2-audio",
+      { x, y },
+      buildPro2AudioNodeData(),
+    );
+    if (!newId) return "";
+    if (
+      (self.type === "jianying-export-pro2" ||
+        self.type === "jianying-auto-render-pro2") &&
+      side === "left"
+    ) {
+      setEdges((prev) => [
+        ...prev,
+        {
+          id: `e-${newId}-${anchorId}-audio`,
+          source: newId,
+          target: anchorId,
+          sourceHandle: "audio",
+          targetHandle: "in_audio",
+        },
+      ]);
+    }
+    selectPro2NodeAfterSpawn(setNodes, newId);
     return newId;
   }
 

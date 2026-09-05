@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import {
+  EcomMediaLibraryTile,
+  ECOM_LIBRARY_MEDIA_GRID_CLASS,
+} from "@/components/media/ecom-media-library-tile";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
   createEcomPoseLibraryEntry,
@@ -33,8 +37,6 @@ import { cn } from "@/lib/utils";
 
 type Tab = "scene" | "prop" | "pose";
 
-const POSE_CATEGORIES = ["A", "B", "C", "D", "E", "H", "I", "J", "K", "L", "M"];
-
 function LockedBadge({ lockedAt }: { lockedAt?: string | null }) {
   if (!lockedAt) return null;
   return (
@@ -59,6 +61,75 @@ function CatalogSection({
       <h4 className="text-xs font-semibold text-[#86868b]">{title}</h4>
       {children}
     </section>
+  );
+}
+
+const POSE_CATEGORIES = ["A", "B", "C", "D", "E", "H", "I", "J", "K", "L", "M"];
+
+function PoseCatalogCard({
+  entry,
+  readonly,
+  onEdit,
+  onRemove,
+}: {
+  entry: EcomPoseLibraryEntry;
+  readonly?: boolean;
+  onEdit?: () => void;
+  onRemove?: () => void;
+}) {
+  const imageUrl = entry.thumbUrl || entry.ossUrl || undefined;
+  return (
+    <li className="flex flex-col overflow-hidden rounded-xl border border-[#e5e5ea] bg-white">
+      <div className="relative aspect-[3/4] w-full bg-[#f5f5f7]">
+        {imageUrl ? (
+          <EcomMediaLibraryTile kind="image" src={imageUrl} alt={entry.title} className="h-full w-full rounded-none" />
+        ) : (
+          <div className="flex h-full items-center justify-center px-2 text-center text-[10px] text-[#86868b]">
+            暂无参考图
+          </div>
+        )}
+        <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
+          {entry.category}
+        </span>
+      </div>
+      <div className="flex flex-1 flex-col gap-1 p-2">
+        <p className="line-clamp-1 text-xs font-medium text-[#1d1d1f]">
+          {entry.title}
+          {!readonly ? <LockedBadge lockedAt={entry.lockedAt} /> : null}
+        </p>
+        {entry.baseDescription?.trim() ? (
+          <p className="line-clamp-2 text-[10px] leading-relaxed text-[#6e6e73]">
+            {entry.baseDescription}
+          </p>
+        ) : (
+          <p className="text-[10px] text-[#c7c7cc]">—</p>
+        )}
+        {!readonly && (onEdit || onRemove) ? (
+          <div className="mt-auto flex gap-2 pt-1">
+            {onEdit ? (
+              <button
+                type="button"
+                className="text-[10px] text-[#0071e3] disabled:opacity-40"
+                disabled={!!entry.lockedAt}
+                onClick={onEdit}
+              >
+                编辑
+              </button>
+            ) : null}
+            {onRemove ? (
+              <button
+                type="button"
+                className="text-[10px] text-red-600 disabled:opacity-40"
+                disabled={!!entry.lockedAt}
+                onClick={onRemove}
+              >
+                删除
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </li>
   );
 }
 
@@ -519,26 +590,15 @@ export function ShootCatalogPanel() {
             系统姿势参与助手自动编排；自建姿势仅供姿势表内手动替换，不会进入自动抽取池。
           </p>
           <CatalogSection title="系统推荐（只读）">
-            <div className="overflow-x-auto rounded-xl border border-[#e5e5ea]">
-              <table className="min-w-[640px] w-full text-left text-xs">
-                <thead>
-                  <tr className="bg-[#1d1d1f] text-white">
-                    <th className="px-3 py-2">类</th>
-                    <th className="px-3 py-2">标题</th>
-                    <th className="px-3 py-2">baseDescription</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {poses.platform.map((p) => (
-                    <tr key={p.id} className="border-t border-[#e5e5ea]">
-                      <td className="px-3 py-2">{p.category}</td>
-                      <td className="px-3 py-2">{p.title}</td>
-                      <td className="max-w-md px-3 py-2 text-[#6e6e73]">{p.baseDescription}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {poses.platform.length === 0 ? (
+              <p className="text-xs text-[#86868b]">暂无系统姿势。</p>
+            ) : (
+              <ul className={ECOM_LIBRARY_MEDIA_GRID_CLASS}>
+                {poses.platform.map((p) => (
+                  <PoseCatalogCard key={p.id} entry={p} readonly />
+                ))}
+              </ul>
+            )}
           </CatalogSection>
 
           <CatalogSection title="我的姿势">
@@ -555,55 +615,23 @@ export function ShootCatalogPanel() {
             {poses.user.length === 0 ? (
               <p className="text-xs text-[#86868b]">暂无自建姿势。</p>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-[#e5e5ea]">
-                <table className="min-w-[640px] w-full text-left text-xs">
-                  <thead>
-                    <tr className="bg-[#1d1d1f] text-white">
-                      <th className="px-3 py-2">类</th>
-                      <th className="px-3 py-2">标题</th>
-                      <th className="px-3 py-2">描述</th>
-                      <th className="px-3 py-2">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {poses.user.map((p) => (
-                      <tr key={p.id} className="border-t border-[#e5e5ea]">
-                        <td className="px-3 py-2">{p.category}</td>
-                        <td className="px-3 py-2">
-                          {p.title}
-                          <LockedBadge lockedAt={p.lockedAt} />
-                        </td>
-                        <td className="max-w-md px-3 py-2 text-[#6e6e73]">{p.baseDescription}</td>
-                        <td className="px-3 py-2">
-                          <button
-                            type="button"
-                            className="mr-2 text-[#0071e3] disabled:opacity-40"
-                            disabled={!!p.lockedAt}
-                            onClick={() =>
-                              setPoseForm({
-                                id: p.id,
-                                category: p.category,
-                                title: p.title,
-                                baseDescription: p.baseDescription,
-                              })
-                            }
-                          >
-                            编辑
-                          </button>
-                          <button
-                            type="button"
-                            className="text-red-600 disabled:opacity-40"
-                            disabled={!!p.lockedAt}
-                            onClick={() => void removeUserPose(p)}
-                          >
-                            删除
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ul className={ECOM_LIBRARY_MEDIA_GRID_CLASS}>
+                {poses.user.map((p) => (
+                  <PoseCatalogCard
+                    key={p.id}
+                    entry={p}
+                    onEdit={() =>
+                      setPoseForm({
+                        id: p.id,
+                        category: p.category,
+                        title: p.title,
+                        baseDescription: p.baseDescription,
+                      })
+                    }
+                    onRemove={() => void removeUserPose(p)}
+                  />
+                ))}
+              </ul>
             )}
           </CatalogSection>
         </div>

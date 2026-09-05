@@ -1960,6 +1960,7 @@ export type JianyingExportFrame = {
   dialogue: string;
   videoUrl?: string | null;
   audioUrl?: string | null;
+  audioSourceNodeId?: string | null;
   durationSec?: number;
 };
 
@@ -2035,6 +2036,9 @@ export type MediaRenderProfile = {
     burnIn?: boolean;
     asrModelKey?: string;
     style?: SubtitleBurnInStyle;
+  };
+  audio?: {
+    mixTts?: boolean;
   };
   video?: { scaleMode?: MediaRenderScaleMode };
 };
@@ -2115,6 +2119,35 @@ async function fetchMediaRenderApi(
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error("fetch failed");
+}
+
+/** 自动成片提交前 · 同步单镜 TTS 配音到 OSS */
+export async function syncMediaRenderAudio(
+  base: string,
+  projectId: string,
+  audioSourceNodeId: string,
+): Promise<string> {
+  const { url, init } = resolveBookMallBrowserRequest(
+    base,
+    `/api/canvas/projects/${encodeURIComponent(projectId)}/media/render/sync-audio`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ audioSourceNodeId }),
+    },
+  );
+  const r = await fetchMediaRenderApi(url, init);
+  const data = (await r.json().catch(() => ({}))) as {
+    audioUrl?: string;
+    message?: string;
+    error?: string;
+  };
+  if (!r.ok) {
+    throw new Error(parseMediaRenderApiError(data, r.status));
+  }
+  const audioUrl = data.audioUrl?.trim();
+  if (!audioUrl) throw new Error("invalid sync-audio response");
+  return audioUrl;
 }
 
 export async function submitMediaRender(

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { resolveLibtvAudioDisplayTitle, isOpaqueGeneratedAudioFilename } from "@/lib/canvas/libtv-audio-display-title";
 import { computeLibtvMediaAspectPresetSize } from "@/lib/canvas/libtv-media-aspect-preset";
 import {
   reconcileLibtvMediaNodeBoxSizes,
@@ -96,7 +97,7 @@ describe("reconcileLibtvMediaNodeBoxSizes", () => {
     expect(render.height).toBe(expected.height);
   });
 
-  it("migrates legacy story-pro2-audio track to v7 layout size", () => {
+  it("migrates legacy story-pro2-audio track to mini player layout size", () => {
     const before: CanvasFlowNode[] = [
       {
         id: "a1",
@@ -111,7 +112,7 @@ describe("reconcileLibtvMediaNodeBoxSizes", () => {
     const after = reconcileLibtvMediaNodeBoxSizes(before);
     const audio = after[0]!;
     expect(audio.width).toBe(LIBTV_AUDIO_TRACK_NODE_WIDTH);
-    expect(audio.height).toBe(LIBTV_AUDIO_TRACK_NODE_HEIGHT);
+    expect(audio.height).toBe(102);
     expect(
       (audio.data as { audioTrackLayoutVersion?: number }).audioTrackLayoutVersion,
     ).toBe(LIBTV_AUDIO_TRACK_LAYOUT_VERSION);
@@ -119,5 +120,52 @@ describe("reconcileLibtvMediaNodeBoxSizes", () => {
       width: LIBTV_AUDIO_TRACK_NODE_WIDTH,
       height: LIBTV_AUDIO_TRACK_NODE_HEIGHT,
     });
+  });
+});
+
+describe("resolveLibtvAudioDisplayTitle", () => {
+  it("shows happy music before generation", () => {
+    expect(
+      resolveLibtvAudioDisplayTitle({ hasAudio: false, label: "音效设计" }),
+    ).toBe("happy music");
+  });
+
+  it("prefers dock dialogue over opaque oss filename", () => {
+    expect(
+      resolveLibtvAudioDisplayTitle({
+        hasAudio: true,
+        dockInput: "数字化时代，数据驱动企业决策。",
+        ossUrl:
+          "https://cdn.example.com/uYxAADwAABpAAAACAAADSAAAAETEFNRTMu.mp3",
+      }),
+    ).toBe("数字化时代，数据驱动企业决策。");
+  });
+
+  it("uses oss filename when human readable", () => {
+    expect(
+      resolveLibtvAudioDisplayTitle({
+        hasAudio: true,
+        ossUrl: "https://cdn.example.com/Standalone_scifi_escape_bgm_audio%23e0fe7f.mp3",
+      }),
+    ).toBe("Standalone_scifi_escape_bgm_audio#e0fe7f");
+  });
+
+  it("skips opaque generated filenames without dialogue", () => {
+    expect(
+      resolveLibtvAudioDisplayTitle({
+        hasAudio: true,
+        ossUrl:
+          "https://cdn.example.com/uYxAADwAABpAAAACAAADSAAAAETEFNRTMu.mp3",
+      }),
+    ).toBe("happy music");
+  });
+});
+
+describe("isOpaqueGeneratedAudioFilename", () => {
+  it("detects base64-like task filenames", () => {
+    expect(isOpaqueGeneratedAudioFilename("uYxAADwAABpAAAACAAADSAAAAETEFNRTMu")).toBe(
+      true,
+    );
+    expect(isOpaqueGeneratedAudioFilename("Standalone_scifi_bgm")).toBe(false);
   });
 });

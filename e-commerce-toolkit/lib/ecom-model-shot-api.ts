@@ -144,6 +144,10 @@ export async function patchModelShotPoseItem(
     propText?: string;
     sceneCatalogId?: string | null;
     propCatalogId?: string | null;
+    poseId?: string | null;
+    poseRefUrl?: string | null;
+    title?: string;
+    category?: string;
     applySceneToAll?: boolean;
     applyPropToAll?: boolean;
     activeImageIndex?: number;

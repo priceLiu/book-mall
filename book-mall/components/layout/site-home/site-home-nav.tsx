@@ -165,6 +165,18 @@ export function SiteHomeNav({
 
   const authAndMobile = (
     <>
+      <a
+        href="/account/recharge"
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cn(
+          "hidden shrink-0 text-sm font-medium text-primary hover:underline sm:inline",
+          isAccount && "site-app-topnav-text-link",
+        )}
+      >
+        积分充值
+      </a>
+
       <ToggleTheme
         iconOnly
         className={cn(

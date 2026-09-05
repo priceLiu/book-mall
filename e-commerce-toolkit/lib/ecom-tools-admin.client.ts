@@ -107,3 +107,24 @@ export function useEcomTemplateImportAccess(): {
 
   return { canImport, loading };
 }
+
+/** 平台管理员（introspect tools_role / tier） */
+export function useEcomToolsAdmin(): boolean {
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchEcomToolsSessionFull()
+      .then((s) => {
+        if (!cancelled) setIsAdmin(isEcomToolsAdminSession(s));
+      })
+      .catch(() => {
+        if (!cancelled) setIsAdmin(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return isAdmin;
+}

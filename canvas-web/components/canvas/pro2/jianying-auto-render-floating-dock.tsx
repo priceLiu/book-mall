@@ -82,8 +82,9 @@ const JianyingAutoRenderFloatingDockBody = memo(function JianyingAutoRenderFloat
         nodes,
         edges,
         data?.clipOrderNodeIds,
+        data?.audioOrderNodeIds,
       ),
-    [nodeId, nodes, edges, data?.clipOrderNodeIds],
+    [nodeId, nodes, edges, data?.clipOrderNodeIds, data?.audioOrderNodeIds],
   );
 
   const exportFrames = useMemo(
@@ -98,6 +99,13 @@ const JianyingAutoRenderFloatingDockBody = memo(function JianyingAutoRenderFloat
   const onClipOrderChange = useCallback(
     (orderNodeIds: string[]) => {
       updateNodeData(nodeId, { clipOrderNodeIds: orderNodeIds });
+    },
+    [nodeId, updateNodeData],
+  );
+
+  const onAudioOrderChange = useCallback(
+    (orderNodeIds: string[]) => {
+      updateNodeData(nodeId, { audioOrderNodeIds: orderNodeIds });
     },
     [nodeId, updateNodeData],
   );
@@ -123,12 +131,16 @@ const JianyingAutoRenderFloatingDockBody = memo(function JianyingAutoRenderFloat
         clipSlots={snapshot.clipSlots}
         clipOrderNodeIds={snapshot.orderNodeIds}
         onClipOrderChange={onClipOrderChange}
+        audioClipSlots={snapshot.audioClipSlots}
+        audioOrderNodeIds={snapshot.audioOrderNodeIds}
+        onAudioOrderChange={onAudioOrderChange}
         persisted={data?.mediaRenderResult}
         inFlight={data?.mediaRenderInFlight}
         spawnPreview={false}
         layout="dock"
         connectedCount={snapshot.connectedCount}
         renderedCount={snapshot.renderedCount}
+        audioConnectedCount={snapshot.audioConnectedCount}
       />
     </Pro2InputDockShell>
   );

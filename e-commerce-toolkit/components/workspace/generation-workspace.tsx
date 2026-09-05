@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { EcomSaveToPoseLibraryButton } from "@/components/admin/ecom-save-to-pose-library-button";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import {
   EcomImagePreviewHost,
@@ -237,7 +238,7 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
               {assets.map((a) => {
                 const isVideo = a.kind === "video";
                 return (
-                  <li key={a.id}>
+                  <li key={a.id} className="flex flex-col gap-1">
                     <EcomMediaLibraryTile
                       kind={isVideo ? "video" : "image"}
                       src={a.ossUrl}
@@ -258,6 +259,15 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
                       onPinToAiSpace={() => void handlePin(a)}
                       pinnedToAiSpace={pinnedAssetIds.has(a.id)}
                     />
+                    {!isVideo ? (
+                      <EcomSaveToPoseLibraryButton
+                        imageUrl={a.ossUrl}
+                        prompt={a.prompt}
+                        sourceModule={`ecom-${module.id}`}
+                        sourceAssetId={a.id}
+                        className="self-start px-0.5"
+                      />
+                    ) : null}
                   </li>
                 );
               })}
