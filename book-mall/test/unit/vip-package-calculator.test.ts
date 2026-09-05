@@ -6,13 +6,15 @@ import {
   computeVipPackageQuote,
   computeVipSeatAllocation,
   validateVipManualAllocation,
-  VIP_DEFAULT_COST_GENERAL_YUAN,
-  VIP_DEFAULT_COST_VIDEO_YUAN,
+  VIP_COST_WORST_PER_CREDIT,
+  VIP_DEFAULT_COST_LIGHT_YUAN,
   VIP_MIN_AMOUNT_YUAN,
+  VIP_MIN_MARGIN_GUARD,
+  VIP_SEEDANCE_CHARGE_CREDITS,
 } from "@/lib/finance/vip-package-calculator";
 
-describe("computeVipCreditScheme — 毛利恒定", () => {
-  it("按目标毛利分配后实际毛利 ≈ 目标（容差 0.5pct）", () => {
+describe("computeVipCreditScheme v2 — 单池 + 毛利护栏", () => {
+  it("按目标毛利分配；锚定护栏满足时实际毛利 ≈ 目标", () => {
     for (const margin of [0.4, 0.5, 0.6]) {
       for (const f of [0.15, 0.4]) {
         const s = computeVipCreditScheme({
@@ -20,32 +22,58 @@ describe("computeVipCreditScheme — 毛利恒定", () => {
           targetMargin: margin,
           videoFraction: f,
         });
-        expect(Math.abs(s.actualMargin - margin)).toBeLessThan(0.005);
-        // 通用 + 视频 = 总积分
-        expect(s.generalCredits + s.videoCredits).toBe(s.totalCredits);
-        // 视频占比大致等于 f
-        expect(Math.abs(s.videoCredits / s.totalCredits - f)).toBeLessThan(0.01);
+        expect(s.anchorMarginOk).toBe(true);
+        expect(s.anchorMarginRate).toBeGreaterThanOrEqual(VIP_MIN_MARGIN_GUARD - 0.002);
+        // 护栏收紧积分时，按预期用量的实际毛利可能高于目标（仍 ≥ 目标）
+        expect(s.actualMargin).toBeGreaterThanOrEqual(margin - 0.02);
+        if (s.actualMargin < margin + 0.02) {
+          expect(Math.abs(s.actualMargin - margin)).toBeLessThan(0.02);
+        }
+        expect(s.totalCredits).toBeGreaterThan(0);
       }
     }
   });
 
-  it("视频占比越高、同毛利下总积分越少", () => {
-    const general = computeVipCreditScheme({ amountYuan: 200_000, targetMargin: 0.5, videoFraction: 0.15 });
-    const video = computeVipCreditScheme({ amountYuan: 200_000, targetMargin: 0.5, videoFraction: 0.4 });
-    expect(general.totalCredits).toBeGreaterThan(video.totalCredits);
+  it("锚定 Seedance 15s 毛利 ≥ 护栏（默认 22%）", () => {
+    const q = computeVipPackageQuote({ amountYuan: 200_000, targetMargin: 0.5 });
+    expect(q.schemeGeneralHeavy.anchorMarginOk).toBe(true);
+    expect(q.schemeVideoHeavy.anchorMarginOk).toBe(true);
+    expect(q.schemeGeneralHeavy.anchorMarginRate).toBeGreaterThanOrEqual(
+      VIP_MIN_MARGIN_GUARD - 0.002,
+    );
+    expect(q.schemeVideoHeavy.anchorMarginRate).toBeGreaterThanOrEqual(
+      VIP_MIN_MARGIN_GUARD - 0.002,
+    );
   });
 
-  it("成本口径：视频单位成本 > 通用单位成本（保守）", () => {
-    expect(VIP_DEFAULT_COST_VIDEO_YUAN).toBeGreaterThan(VIP_DEFAULT_COST_GENERAL_YUAN);
+  it("视频用量画像越高、同毛利下总积分越少", () => {
+    const balanced = computeVipCreditScheme({
+      amountYuan: 200_000,
+      targetMargin: 0.5,
+      videoFraction: 0.15,
+    });
+    const videoHeavy = computeVipCreditScheme({
+      amountYuan: 200_000,
+      targetMargin: 0.5,
+      videoFraction: 0.4,
+    });
+    expect(balanced.totalCredits).toBeGreaterThan(videoHeavy.totalCredits);
+  });
+
+  it("最坏单位成本 > 轻量单位成本", () => {
+    expect(VIP_COST_WORST_PER_CREDIT).toBeGreaterThan(VIP_DEFAULT_COST_LIGHT_YUAN);
+    expect(VIP_COST_WORST_PER_CREDIT * VIP_SEEDANCE_CHARGE_CREDITS).toBe(15);
   });
 });
 
 describe("computeVipPackageQuote — 双方案 + 起订", () => {
-  it("¥200,000 @ 50% 两方案毛利同为 50%、总积分不同", () => {
+  it("¥200,000 @ 50% 两方案锚定毛利过护栏、总积分不同", () => {
     const q = computeVipPackageQuote({ amountYuan: 200_000, targetMargin: 0.5 });
     expect(q.meetsMinimum).toBe(true);
-    expect(Math.abs(q.schemeGeneralHeavy.actualMargin - 0.5)).toBeLessThan(0.005);
-    expect(Math.abs(q.schemeVideoHeavy.actualMargin - 0.5)).toBeLessThan(0.005);
+    expect(q.schemeGeneralHeavy.anchorMarginOk).toBe(true);
+    expect(q.schemeVideoHeavy.anchorMarginOk).toBe(true);
+    expect(q.schemeGeneralHeavy.actualMargin).toBeGreaterThanOrEqual(0.48);
+    expect(q.schemeVideoHeavy.actualMargin).toBeGreaterThanOrEqual(0.48);
     expect(q.schemeGeneralHeavy.totalCredits).toBeGreaterThan(q.schemeVideoHeavy.totalCredits);
   });
 
@@ -58,42 +86,33 @@ describe("computeVipPackageQuote — 双方案 + 起订", () => {
 describe("席位分配守恒", () => {
   it("自动平均分配 + 余数归首席，合计守恒", () => {
     const alloc = computeVipSeatAllocation({
-      totalGeneralCredits: 1_000_003,
-      totalVideoCredits: 500_002,
+      totalCredits: 1_500_005,
       seats: 3,
     });
-    expect(alloc.perSeatGeneral * 3 + alloc.remainderGeneral).toBe(1_000_003);
-    expect(alloc.perSeatVideo * 3 + alloc.remainderVideo).toBe(500_002);
+    expect(alloc.perSeatCredits * 3 + alloc.remainderCredits).toBe(1_500_005);
   });
 
   it("buildAutoSeatPlans 与 computeVipSeatAllocation 一致", () => {
     const plans = buildAutoSeatPlans({
-      totalGeneralCredits: 100,
-      totalVideoCredits: 50,
+      totalCredits: 150,
       seats: 3,
       ownerPhone: "13800138000",
     });
     expect(plans).toHaveLength(3);
     expect(plans[0].phone).toBe("13800138000");
-    expect(plans[0].generalCredits + plans[1].generalCredits + plans[2].generalCredits).toBe(100);
-    expect(plans[0].videoCredits + plans[1].videoCredits + plans[2].videoCredits).toBe(50);
+    expect(plans.reduce((s, p) => s + p.credits, 0)).toBe(150);
   });
 
-  it("手动分配合计不等于池总数则拒绝", () => {
+  it("手动分配合计不等于总数则拒绝", () => {
     const ok = validateVipManualAllocation({
-      totalGeneralCredits: 100,
-      totalVideoCredits: 50,
-      perSeat: [
-        { generalCredits: 60, videoCredits: 30 },
-        { generalCredits: 40, videoCredits: 20 },
-      ],
+      totalCredits: 150,
+      perSeat: [{ credits: 80 }, { credits: 70 }],
     });
     expect(ok.ok).toBe(true);
 
     const bad = validateVipManualAllocation({
-      totalGeneralCredits: 100,
-      totalVideoCredits: 50,
-      perSeat: [{ generalCredits: 60, videoCredits: 30 }],
+      totalCredits: 150,
+      perSeat: [{ credits: 80 }],
     });
     expect(bad.ok).toBe(false);
   });

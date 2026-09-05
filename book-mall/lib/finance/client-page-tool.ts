@@ -18,5 +18,16 @@ export function clientPageToToolKey(clientPage: string | null | undefined): stri
 export function clientPageToToolLabel(clientPage: string | null | undefined): string {
   const p = clientPage?.trim();
   if (!p) return "—";
+  if (p.startsWith("platform-assistant/")) {
+    const tail = p.slice("platform-assistant/".length);
+    const tailLabels: Record<string, string> = {
+      chat: "对话",
+      "ai-news-generate": "每日资讯生成",
+      embed: "向量入库",
+      retrieve: "检索向量",
+      completion: "非流式对话",
+    };
+    return `AI 小智 · ${tailLabels[tail] ?? tail}`;
+  }
   return toolKeyToLabel(p.replace(/\//g, "__"));
 }

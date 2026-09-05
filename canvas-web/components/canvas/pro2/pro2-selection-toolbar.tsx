@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useReactFlow } from "@xyflow/react";
+import { useClientPortalMounted } from "@/lib/canvas/use-modal-portal-effects";
 import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import { ChevronDown, Copy, FolderPlus, LayoutGrid, Loader2, BookmarkPlus } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -15,6 +17,7 @@ import {
   computePro2MultiSelectionBbox,
   pro2SelectedNonGroupIds,
 } from "@/lib/canvas/pro2-selection-bbox";
+import { batchConnectSelectionScreenBox } from "@/lib/canvas/batch-connect-preview-anchors";
 import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import { GROUP_COLOR_PRESETS } from "@/lib/canvas/types";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
@@ -54,6 +57,7 @@ export function Pro2SelectionToolbar({
 }: {
   rfNodes: CanvasFlowNode[];
 }) {
+  const mounted = useClientPortalMounted();
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
   const { flowToScreenPosition, getInternalNode, setNodes: rfSetNodes } =
@@ -67,8 +71,20 @@ export function Pro2SelectionToolbar({
   const storeNodes = useCanvasStore((s) => s.nodes);
   const [saving, setSaving] = useState(false);
   const [groupOpen, setGroupOpen] = useState(false);
-  const [groupName, setGroupName] = useState("未命名分组");
+  const [groupName, setGroupName] = useState("");
   const [groupColor, setGroupColor] = useState<string>(GROUP_COLOR_PRESETS[2]);
+
+  useEffect(() => {
+    if (!groupOpen) {
+      delete document.documentElement.dataset.canvasToolbarPopoverOpen;
+      return;
+    }
+    document.documentElement.dataset.canvasToolbarPopoverOpen = "true";
+    setGroupName(`未命名分组 ${new Date().toLocaleTimeString().slice(0, 5)}`);
+    return () => {
+      delete document.documentElement.dataset.canvasToolbarPopoverOpen;
+    };
+  }, [groupOpen]);
 
   const selectedIds = useMemo(
     () => pro2SelectedNonGroupIds(rfNodes),
@@ -118,7 +134,40 @@ export function Pro2SelectionToolbar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIds, getInternalNode, rfNodes, storeNodes, viewport]);
 
+  const screenBox = useMemo(() => {
+    void viewport;
+    const pool = (rfNodes.length ? rfNodes : storeNodes) as CanvasFlowNode[];
+    return batchConnectSelectionScreenBox(
+      selectedIds,
+      pool,
+      flowToScreenPosition,
+      getInternalNode,
+    );
+  }, [
+    selectedIds,
+    viewport,
+    rfNodes,
+    storeNodes,
+    flowToScreenPosition,
+    getInternalNode,
+  ]);
+
   const placement = useMemo(() => {
+    if (screenBox) {
+      const midX = (screenBox.left + screenBox.right) / 2;
+      if (screenBox.top - TOOLBAR_HEIGHT - GAP < HEADER_RESERVED) {
+        return {
+          x: midX,
+          y: screenBox.bottom + GAP,
+          place: "below" as const,
+        };
+      }
+      return {
+        x: midX,
+        y: screenBox.top - GAP,
+        place: "above" as const,
+      };
+    }
     if (!bbox) return null;
     const cx = (bbox.x + bbox.x2) / 2;
     const top = flowToScreenPosition({ x: cx, y: bbox.y });
@@ -127,11 +176,13 @@ export function Pro2SelectionToolbar({
       return { x: bottom.x, y: bottom.y + GAP, place: "below" as const };
     }
     return { x: top.x, y: top.y - GAP, place: "above" as const };
-  }, [bbox, flowToScreenPosition, viewport]);
+  }, [bbox, screenBox, flowToScreenPosition, viewport]);
 
   if (marqueeSelecting || viewportMoving || !placement || selectedIds.length < 2) {
     return null;
   }
+
+  if (!mounted) return null;
 
   const onSaveToAssets = async () => {
     if (!saveableThreeViews.length) {
@@ -177,7 +228,7 @@ export function Pro2SelectionToolbar({
           description: draft.description,
           thumbnailUrl: draft.thumbnailUrl,
           visibility: "PRIVATE",
-          sourceProjectId: projectId ?? null,
+          sourceProjectId: null,
           sourceNodeId: live.id,
           sourceEdition: edition,
           payload: draft.payload,
@@ -231,11 +282,12 @@ export function Pro2SelectionToolbar({
       pro2Styled: true,
     });
     setGroupOpen(false);
+    setGroupName("");
   };
 
-  return (
+  return createPortal(
     <div
-      className="pointer-events-auto fixed z-[1600]"
+      className="pointer-events-auto fixed z-[2050]"
       style={{
         left: placement.x,
         top: placement.y,
@@ -292,8 +344,9 @@ export function Pro2SelectionToolbar({
           </button>
           {groupOpen ? (
             <div
+              data-pro2-selection-toolbar-popover
               className={cn(
-                "absolute right-0 top-[calc(100%+8px)] z-[1] w-[240px]",
+                "absolute right-0 top-[calc(100%+8px)] z-[9999] w-[240px]",
                 PRO2_IMAGE_NODE_TOOLBAR_POPOVER_CLASS,
               )}
               onMouseDown={(e) => e.stopPropagation()}
@@ -353,6 +406,7 @@ export function Pro2SelectionToolbar({
           ) : null}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

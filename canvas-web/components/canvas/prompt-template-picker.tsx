@@ -5,6 +5,11 @@ import { createPortal } from "react-dom";
 import { ChevronDown, FilePlus2, X } from "lucide-react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import {
+  CANVAS_MODAL_BACKDROP_CLASS,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import type { CanvasPromptEngineKind } from "@/lib/canvas-prompt-templates-api";
 import type { AppliedPromptTemplate } from "@/lib/canvas-prompt-templates-api";
 import { usePromptTemplates } from "@/lib/canvas/use-prompt-templates";
@@ -99,21 +104,12 @@ function PromptTemplateModal({
 }) {
   const [mounted, setMounted] = useState(false);
 
+  useModalBodyScrollLock(true);
+  useModalEscapeClose(onClose);
+
   useEffect(() => {
     setMounted(true);
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [onClose]);
+  }, []);
 
   if (!mounted) return null;
 
@@ -121,7 +117,7 @@ function PromptTemplateModal({
 
   const node = (
     <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/65 backdrop-blur-sm p-4"
+      className={`${CANVAS_MODAL_BACKDROP_CLASS} z-[1000]`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

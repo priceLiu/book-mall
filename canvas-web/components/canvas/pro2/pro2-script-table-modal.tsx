@@ -1,13 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import {
+  CANVAS_MODAL_BACKDROP_CLASS,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import { createPortal } from "react-dom";
-import { Megaphone, X } from "lucide-react";
+import { Megaphone, RefreshCw, X } from "lucide-react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { confirmAndPublishPro2ScriptHub } from "@/lib/canvas/pro2-publish-script-hub";
-import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
+import { runPro2ScriptPublishFlow } from "@/lib/canvas/pro2-script-publish-flow";
+import { useCrewCollaborationAccess } from "@/lib/canvas/use-crew-collaboration-access";
+import type { StoryProScriptHubNodeData, StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 
 import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import {
@@ -24,13 +32,25 @@ import {
   canEditStoryboardAsTable,
 } from "../story-storyboard-table-editor";
 import {
-  StoryGenericMdTableEditor,
-  canEditGenericMdTable,
-} from "../story-generic-md-table-editor";
+  StorySceneDictionaryTableEditor,
+  canEditSceneDictionaryAsTable,
+} from "../story-scene-dictionary-table-editor";
 import { StoryOutlineDocumentEditor } from "../story-outline-document-editor";
 import { StoryHubReadonlyPane } from "../story-hub-readonly-pane";
 import { cn } from "@/lib/utils";
 import { Pro2ScriptHubViewTabs } from "./pro2-script-hub-view-tabs";
+import { Pro2ProductionScriptHtmlPreview } from "./pro2-production-script-html-preview";
+import {
+  resolveHubProductionScript,
+  productionScriptHasDisplayContent,
+} from "@/lib/canvas/pro2-production-script-apply";
+import { pro2HubIsGenerating } from "@/lib/canvas/pro2-script-hub-helpers";
+import { isUnparsedPro2ProductionJsonBlob } from "@/lib/canvas/pro2-production-script-structured";
+import {
+  Pro2ProductionScriptEditor,
+  normalizeHubProductionScript,
+} from "./pro2-production-script-editor";
+import type { Pro2ProductionScript } from "@/lib/canvas/data/pro2-production-script-schema";
 
 const DOC_PAD = "px-10 py-12 sm:px-14 sm:py-16";
 const AUTOSAVE_MS = 600;
@@ -49,6 +69,8 @@ export type Pro2ScriptHubEditorModalProps = {
   onAutoSaveScene: (md: string) => void;
   onAutoSaveCharacter: (md: string) => void;
   onAutoSaveStoryboard: (md: string) => void;
+  onAutoSaveStructured?: (script: Pro2ProductionScript) => void;
+  productionScript?: Pro2ProductionScript;
   /** 脚本 hub id · 用于发布剧本 */
   hubId?: string;
   hubData?: StoryProScriptHubNodeData;
@@ -71,16 +93,43 @@ export function Pro2ScriptHubEditorModal({
   onAutoSaveScene,
   onAutoSaveCharacter,
   onAutoSaveStoryboard,
+  onAutoSaveStructured,
+  productionScript,
   hubId,
   hubData,
   readOnly = false,
 }: Pro2ScriptHubEditorModalProps) {
   const { alert, confirm } = useDialogs();
+  const collaboration = useCrewCollaborationAccess();
+  const base = useBookMallBaseUrl();
+  const projectId = useCanvasStore((s) => s.projectId) ?? "";
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const liveHubNode = useCanvasStore((s) =>
+    hubId ? s.nodes.find((n) => n.id === hubId) : undefined,
+  );
+  const { history: hubTasks } = useNodeTaskHistory(hubId);
+  const hubIsGenerating = useMemo(() => {
+    if (!hubId || readOnly) return false;
+    const data =
+      (liveHubNode?.data as StoryProScriptHubNodeData | undefined) ?? hubData;
+    if (!data) return false;
+    return pro2HubIsGenerating(
+      {
+        id: hubId,
+        type: "story-pro2-script-hub",
+        data,
+        position: liveHubNode?.position ?? { x: 0, y: 0 },
+      } as never,
+      hubTasks,
+    );
+  }, [hubId, hubData, hubTasks, liveHubNode, readOnly]);
   const [draftOutline, setDraftOutline] = useState(outlineMd);
   const [draftScene, setDraftScene] = useState(sceneMd);
   const [draftCharacter, setDraftCharacter] = useState(characterMd);
   const [draftStoryboard, setDraftStoryboard] = useState(storyboardMd);
+  const [draftStructured, setDraftStructured] = useState(() =>
+    normalizeHubProductionScript(productionScript),
+  );
   const [savedHint, setSavedHint] = useState(false);
   const skipNextSaveRef = useRef(true);
   const wasOpenRef = useRef(false);
@@ -89,32 +138,58 @@ export function Pro2ScriptHubEditorModal({
   const onAutoSaveSceneRef = useRef(onAutoSaveScene);
   const onAutoSaveCharacterRef = useRef(onAutoSaveCharacter);
   const onAutoSaveStoryboardRef = useRef(onAutoSaveStoryboard);
+  const onAutoSaveStructuredRef = useRef(onAutoSaveStructured);
   onAutoSaveOutlineRef.current = onAutoSaveOutline;
   onAutoSaveSceneRef.current = onAutoSaveScene;
   onAutoSaveCharacterRef.current = onAutoSaveCharacter;
   onAutoSaveStoryboardRef.current = onAutoSaveStoryboard;
+  onAutoSaveStructuredRef.current = onAutoSaveStructured;
 
   const onPublishScript = useCallback(async () => {
     if (!hubId || !hubData) return;
     const live = useCanvasStore.getState().nodes.find((n) => n.id === hubId);
     const liveData = (live?.data ?? hubData) as StoryProScriptHubNodeData;
-    const pub = await confirmAndPublishPro2ScriptHub(hubId, liveData, {
-      alert,
-      confirm,
-    }, {
-      requireBatch: liveData.scriptStudioMode === true,
-      batchIndex: liveData.scriptStudioBatchIndex,
+    await runPro2ScriptPublishFlow({
+      hubId,
+      hubData: liveData,
+      projectId,
+      base,
+      dialogs: { alert, confirm },
+      collaboration,
+      updateNodeData,
+      findStarter: () => {
+        const starter = useCanvasStore
+          .getState()
+          .nodes.find(
+            (n) =>
+              n.type === "story-pro2-starter" &&
+              (n.data as StoryProStarterNodeData).workspaceIds?.scriptHubId ===
+                hubId,
+          );
+        return starter
+          ? {
+              id: starter.id,
+              data: starter.data as StoryProStarterNodeData,
+            }
+          : undefined;
+      },
     });
-    if (pub) updateNodeData(hubId, pub);
-  }, [hubId, hubData, alert, confirm, updateNodeData]);
+  }, [
+    hubId,
+    hubData,
+    alert,
+    confirm,
+    updateNodeData,
+    projectId,
+    base,
+    collaboration,
+  ]);
 
   useEffect(() => {
     if (!open) {
       wasOpenRef.current = false;
-      document.body.style.overflow = "";
       return;
     }
-    document.body.style.overflow = "hidden";
     if (!wasOpenRef.current) {
       wasOpenRef.current = true;
       skipNextSaveRef.current = true;
@@ -122,6 +197,12 @@ export function Pro2ScriptHubEditorModal({
       setDraftScene(sceneMd);
       setDraftCharacter(characterMd);
       setDraftStoryboard(storyboardMd);
+      setDraftStructured(
+        normalizeHubProductionScript(
+          productionScript ??
+            (hubData ? resolveHubProductionScript(hubData) : undefined),
+        ),
+      );
       setSavedHint(false);
     }
     const onKey = (e: KeyboardEvent) => {
@@ -130,7 +211,6 @@ export function Pro2ScriptHubEditorModal({
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
     };
     // 仅随 open 开关初始化 draft；勿依赖 md props（store 轮询/自动保存会触发整页闪屏）
     // eslint-disable-next-line react-hooks/exhaustive-deps -- outlineMd/sceneMd/characterMd/storyboardMd intentionally omitted
@@ -150,6 +230,8 @@ export function Pro2ScriptHubEditorModal({
         onAutoSaveSceneRef.current(draftScene);
       } else if (tab === "character") {
         onAutoSaveCharacterRef.current(draftCharacter);
+      } else if (tab === "structured") {
+        onAutoSaveStructuredRef.current?.(draftStructured);
       } else {
         onAutoSaveStoryboardRef.current(draftStoryboard);
       }
@@ -159,8 +241,38 @@ export function Pro2ScriptHubEditorModal({
     return () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     };
-  }, [draftOutline, draftScene, draftCharacter, draftStoryboard, open, readOnly, tab]);
+  }, [draftOutline, draftScene, draftCharacter, draftStoryboard, draftStructured, open, readOnly, tab]);
 
+  const scriptForPreview = useMemo(
+    () =>
+      normalizeHubProductionScript(
+        productionScript ??
+          (hubData ? resolveHubProductionScript(hubData) : undefined),
+      ),
+    [productionScript, hubData],
+  );
+  const resolvedStructuredFingerprint = useMemo(() => {
+    const s = scriptForPreview;
+    return [
+      s.visualStyle?.worldBackground ?? "",
+      s.scenes?.length ?? 0,
+      s.characters?.length ?? 0,
+      s.shots?.length ?? 0,
+    ].join("|");
+  }, [scriptForPreview]);
+  const hasStructuredPreview = productionScriptHasDisplayContent(scriptForPreview);
+
+  useEffect(() => {
+    if (!open || !hasStructuredPreview) return;
+    setDraftStructured((prev) => {
+      if (productionScriptHasDisplayContent(prev)) return prev;
+      skipNextSaveRef.current = true;
+      return scriptForPreview;
+    });
+  }, [open, hasStructuredPreview, resolvedStructuredFingerprint, scriptForPreview]);
+
+  useModalBodyScrollLock(open);
+  useModalEscapeClose(onClose, { active: open });
   if (!open) return null;
 
   const subtitle =
@@ -170,7 +282,9 @@ export function Pro2ScriptHubEditorModal({
         ? "场景视图 · 双击单元格编辑"
         : tab === "character"
           ? "角色视图 · 双击单元格编辑"
-          : "脚本视图 · 双击单元格编辑";
+          : tab === "structured"
+            ? "结构化 JSON · 表单 + 色块编辑（自动同步 Markdown）"
+            : "脚本视图 · 双击单元格编辑";
 
   const tableDraft =
     tab === "scene"
@@ -187,16 +301,49 @@ export function Pro2ScriptHubEditorModal({
 
   const canTable =
     tab === "scene"
-      ? canEditGenericMdTable(tableDraft)
+      ? canEditSceneDictionaryAsTable(tableDraft)
       : tab === "character"
         ? canEditCharacterAsTable(tableDraft)
         : tab === "script"
           ? canEditStoryboardAsTable(tableDraft)
           : false;
 
+  const outlineShowsJsonBlob =
+    !hasStructuredPreview &&
+    (isUnparsedPro2ProductionJsonBlob(hubData?.outlineMd ?? "") ||
+      isUnparsedPro2ProductionJsonBlob(draftOutline));
+  const storyboardShowsJsonBlob =
+    isUnparsedPro2ProductionJsonBlob(tableDraft) ||
+    isUnparsedPro2ProductionJsonBlob(hubData?.storyboardMd ?? "");
+  const scriptTabUsesStructuredPreview =
+    tab === "script" &&
+    hasStructuredPreview &&
+    ((scriptForPreview.shots?.length ?? 0) > 0 ||
+      storyboardShowsJsonBlob ||
+      !canTable);
+  const characterUsesStructuredPreview =
+    tab === "character" &&
+    hasStructuredPreview &&
+    (scriptForPreview.characters?.length ?? 0) > 0;
+  const sceneUsesStructuredPreview =
+    tab === "scene" &&
+    hasStructuredPreview &&
+    (scriptForPreview.scenes?.length ?? 0) > 0;
+  const outlineUsesStructuredPreview =
+    tab === "outline" && hasStructuredPreview && !outlineShowsJsonBlob;
+
+  const structuredPreviewHint = (
+    <div className="mx-auto mb-6 max-w-2xl rounded-xl border border-violet-200 bg-violet-50/80 px-4 py-3 text-center">
+      <p className="text-[12px] font-medium text-violet-900">JSON 结构化预览</p>
+      <p className="mt-1 text-[11px] leading-relaxed text-violet-800/80">
+        请使用「结构化」Tab 编辑剧本；Markdown 由 productionScript 自动渲染，勿在此直接改表。
+      </p>
+    </div>
+  );
+
   return createPortal(
     <div
-      className="fixed inset-0 z-[1100] flex h-[100dvh] w-screen flex-col bg-[#0c0a14]/92 backdrop-blur-sm"
+      className={`${CANVAS_MODAL_BACKDROP_CLASS} z-[1100] flex flex-col items-stretch justify-start p-0`}
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -209,6 +356,11 @@ export function Pro2ScriptHubEditorModal({
             </p>
             {savedHint ? (
               <p className="text-[11px] text-violet-300/70">已自动保存</p>
+            ) : hubIsGenerating ? (
+              <p className="flex items-center gap-1 text-[11px] text-violet-300/80">
+                <RefreshCw className="size-3 animate-spin" />
+                剧本生成中…
+              </p>
             ) : (
               <p className="text-[11px] text-white/40">{subtitle}</p>
             )}
@@ -220,11 +372,11 @@ export function Pro2ScriptHubEditorModal({
           />
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {hubId && hubData ? (
+          {hubId && hubData && collaboration.canPublishScript ? (
             <button
               type="button"
               className="nodrag inline-flex items-center gap-1.5 rounded-lg border border-violet-400/35 bg-violet-500/15 px-3 py-1.5 text-[11px] font-medium text-violet-100 transition hover:bg-violet-500/25"
-              title="发布剧本 · 保存后可发布至剧组公告条"
+              title="发布剧本 · 同步剧本包并更新公告栏"
               onClick={() => void onPublishScript()}
             >
               <Megaphone className="size-3.5" />
@@ -246,12 +398,44 @@ export function Pro2ScriptHubEditorModal({
           <div
             className={`${RF_NODE_SCROLL} min-h-0 flex-1 overflow-y-auto bg-[#f8f7f4] ${DOC_PAD}`}
           >
-            <StoryHubReadonlyPane md={draftOutline} />
+            {hasStructuredPreview ? (
+              <Pro2ProductionScriptHtmlPreview
+                script={scriptForPreview}
+                tab="outline"
+                variant="document"
+              />
+            ) : (
+              <StoryHubReadonlyPane md={draftOutline} />
+            )}
           </div>
+        ) : outlineShowsJsonBlob ? (
+          <div
+            className={`${RF_NODE_SCROLL} min-h-0 flex-1 overflow-y-auto bg-[#f8f7f4] ${DOC_PAD}`}
+          >
+            <div className="mx-auto max-w-lg rounded-xl border border-amber-200 bg-white p-6 text-center">
+              <p className="text-[13px] font-medium text-neutral-800">
+                JSON 未能解析为制作包
+              </p>
+              <p className="mt-2 text-[11px] leading-relaxed text-neutral-500">
+                请切换到「结构化」Tab 检查，或重新生成。若 Gateway 日志有返回体，请联系支持附带完整 output。
+              </p>
+            </div>
+          </div>
+        ) : outlineUsesStructuredPreview ? (
+        <div
+          className={`${RF_NODE_SCROLL} min-h-0 flex-1 overflow-y-auto bg-[#f8f7f4] ${DOC_PAD}`}
+        >
+          {structuredPreviewHint}
+          <Pro2ProductionScriptHtmlPreview
+            script={scriptForPreview}
+            tab="outline"
+            variant="document"
+          />
+        </div>
         ) : (
         <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2">
           <div
-            className={`nodrag ${RF_NODE_SCROLL} flex min-h-0 flex-col overflow-y-auto border-r border-violet-400/10 bg-white`}
+            className={`nodrag ${RF_NODE_SCROLL} flex min-h-0 min-w-0 flex-col overflow-y-auto border-r border-violet-400/10 bg-white`}
           >
             <div className="sticky top-0 z-10 shrink-0 border-b border-neutral-200 bg-neutral-50/95 px-4 py-2.5">
               <p className="text-xs font-medium text-neutral-700">编辑区</p>
@@ -266,7 +450,7 @@ export function Pro2ScriptHubEditorModal({
               />
             </div>
           </div>
-          <div className="flex min-h-0 flex-col overflow-hidden bg-neutral-50/80">
+          <div className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-neutral-50/80">
             <div className="sticky top-0 z-10 shrink-0 border-b border-neutral-200 bg-neutral-100/90 px-4 py-2.5">
               <p className="text-xs font-medium text-neutral-600">渲染预览</p>
               <p className="text-[10px] text-neutral-500">
@@ -276,11 +460,44 @@ export function Pro2ScriptHubEditorModal({
             <div
               className={`${RF_NODE_SCROLL} min-h-0 flex-1 overflow-y-auto ${DOC_PAD}`}
             >
-              <StoryHubReadonlyPane md={draftOutline} />
+              {hasStructuredPreview ? (
+                <Pro2ProductionScriptHtmlPreview
+                  script={scriptForPreview}
+                  tab="outline"
+                  variant="document"
+                />
+              ) : (
+                <StoryHubReadonlyPane md={draftOutline} />
+              )}
             </div>
           </div>
         </div>
         )
+      ) : tab === "structured" ? (
+        <div
+          className={cn(
+            RF_NODE_SCROLL,
+            "min-h-0 flex-1 overflow-auto bg-[#f8f7f4] px-4 py-6 sm:px-8",
+          )}
+        >
+          {hasStructuredPreview ? (
+            <Pro2ProductionScriptEditor
+              value={draftStructured}
+              onChange={setDraftStructured}
+              readOnly={readOnly}
+            />
+          ) : (
+            <div className="mx-auto max-w-lg rounded-xl border border-violet-200 bg-white p-6 text-center">
+              <p className="text-[13px] font-medium text-neutral-800">
+                暂无结构化剧本数据
+              </p>
+              <p className="mt-2 text-[11px] leading-relaxed text-neutral-500">
+                请先在输入坞生成制作包（LLM 须返回 pro2-production-script JSON）。
+                生成成功后可在本页编辑视觉风格、场景色块与分镜字段；保存会自动同步 Markdown 与公告栏行。
+              </p>
+            </div>
+          )}
+        </div>
       ) : (
         <div
           className={cn(
@@ -288,8 +505,29 @@ export function Pro2ScriptHubEditorModal({
             "min-h-0 flex-1 overflow-auto bg-[#f8f7f4] px-4 py-6 sm:px-8",
           )}
         >
-          {readOnly ? (
+          {readOnly && hasStructuredPreview ? (
+            <Pro2ProductionScriptHtmlPreview
+              script={scriptForPreview}
+              tab={tab === "scene" || tab === "character" ? tab : "script"}
+              variant="document"
+            />
+          ) : readOnly ? (
             <StoryHubReadonlyPane md={tableDraft} />
+          ) : characterUsesStructuredPreview || sceneUsesStructuredPreview ? (
+            <>
+              {structuredPreviewHint}
+              <Pro2ProductionScriptHtmlPreview
+                script={scriptForPreview}
+                tab={tab === "scene" ? "scene" : "character"}
+                variant="document"
+              />
+            </>
+          ) : scriptTabUsesStructuredPreview ? (
+            <Pro2ProductionScriptHtmlPreview
+              script={scriptForPreview}
+              tab="script"
+              variant="document"
+            />
           ) : canTable ? (
             tab === "character" ? (
               <StoryCharacterTableEditor
@@ -300,13 +538,35 @@ export function Pro2ScriptHubEditorModal({
               <StoryStoryboardTableEditor
                 value={tableDraft}
                 onChange={setTableDraft}
+                variant="v2"
+                showIndustrialExtras={
+                  draftStructured.meta?.packProfile === "industrial" ||
+                  draftStructured.meta?.source === "film_pull" ||
+                  (draftStructured.shots ?? []).some((s) => s.analysis)
+                }
+                shotAnalysisByIndex={Object.fromEntries(
+                  (draftStructured.shots ?? [])
+                    .filter((s) => s.analysis)
+                    .map((s) => [s.index, s.analysis] as const),
+                )}
               />
-            ) : (
-              <StoryGenericMdTableEditor
+            ) : tab === "scene" ? (
+              <StorySceneDictionaryTableEditor
                 value={tableDraft}
                 onChange={setTableDraft}
               />
-            )
+            ) : null
+          ) : tab === "script" && hasStructuredPreview ? (
+            <div className="mx-auto max-w-lg rounded-xl border border-amber-200 bg-white p-6 text-center">
+              <p className="text-[13px] font-medium text-neutral-800">
+                暂无分镜数据
+              </p>
+              <p className="mt-2 text-[11px] leading-relaxed text-neutral-500">
+                当前 productionScript 缺少 shots[]（多为模型返回了 step=outline
+                且未含分镜表）。请点顶部「重新生成」；服务端现已强制要求
+                step=full_pack 且含分镜 JSON。
+              </p>
+            </div>
           ) : (
             <textarea
               className="nodrag min-h-[60vh] w-full resize-y rounded-lg border border-neutral-200 bg-white p-4 font-mono text-[13px] text-neutral-800"

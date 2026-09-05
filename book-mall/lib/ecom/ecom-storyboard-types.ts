@@ -19,6 +19,17 @@ export type StoryboardReference = {
   ossUrl: string;
 };
 
+/** 单镜视频生成时模型选择器确认的参数（写入 sheet + ecomAsset，供合并/重生成） */
+export const storyboardPanelVideoGenSchema = z.object({
+  modelKey: z.string().min(1),
+  durationSec: z.number().positive(),
+  resolution: z.string().optional(),
+  aspectRatio: z.enum(["16:9", "9:16"]).optional(),
+  generatedAt: z.string().optional(),
+});
+
+export type StoryboardPanelVideoGen = z.infer<typeof storyboardPanelVideoGenSchema>;
+
 export const storyboardSheetSchema = z.object({
   overview: z.object({
     title: z.string().min(1),
@@ -43,6 +54,8 @@ export const storyboardSheetSchema = z.object({
         timeline: z.string().optional(),
         shotType: z.string().min(1),
         scene: z.string().min(1),
+        /** 生图/生视频共用的场景描述 prompt（无场景参考图时为主约束） */
+        scenePrompt: z.string().optional(),
         action: z.string().min(1),
         dialogue: z.string().optional(),
         camera: z.string().optional(),
@@ -51,6 +64,16 @@ export const storyboardSheetSchema = z.object({
         videoPromptEn: z.string().optional(),
         imageUrl: z.string().optional(),
         videoUrl: z.string().optional(),
+        /** 最近一次单镜视频生成参数（模型选择器确认值） */
+        videoGen: storyboardPanelVideoGenSchema.optional(),
+        productInteraction: z
+          .enum(["none", "hold", "wear", "use", "apply", "display", "unbox"])
+          .optional(),
+        productVisibility: z.enum(["off", "hint", "partial", "hero"]).optional(),
+        sellpointTags: z.array(z.string()).optional(),
+        imagePrompt: z.string().optional(),
+        protagonistBeat: z.string().optional(),
+        productBeat: z.string().optional(),
       }),
     )
     .min(1),

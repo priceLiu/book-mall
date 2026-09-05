@@ -1,5 +1,14 @@
 /** 解析 GFM 表格为行对象（首行作表头）。 */
 
+import {
+  STORY_PRO2_CHARACTER_TABLE_HEADER,
+  STORY_PRO2_SCENE_TABLE_HEADER,
+  STORY_PRO2_STORYBOARD_TABLE_HEADER,
+  STORY_PRO2_STORYBOARD_TABLE_HEADER_V1,
+  STORY_PRO2_HANDOFF_TABLE_HEADER,
+} from "./data/pro2-production-pack-standard";
+import { stripPro2AnchorPlaceholders } from "./pro2-chinese-prompt-normalize";
+
 export type MdTableRow = Record<string, string>;
 
 function normHeader(h: string): string {
@@ -8,9 +17,19 @@ function normHeader(h: string): string {
 
 function pickColumn(row: MdTableRow, aliases: string[]): string {
   for (const alias of aliases) {
+    const na = normHeader(alias);
+    for (const [key, val] of Object.entries(row)) {
+      if (normHeader(key) === na) {
+        return stripInlineMarkdownCell(val);
+      }
+    }
+  }
+  for (const alias of aliases) {
+    if (/^[a-z]{1,4}$/i.test(alias)) continue;
+    const na = normHeader(alias);
     for (const [key, val] of Object.entries(row)) {
       const nk = normHeader(key);
-      if (nk === alias || nk.includes(alias)) {
+      if (nk.includes(na)) {
         return stripInlineMarkdownCell(val);
       }
     }
@@ -33,11 +52,24 @@ function stripInlineMarkdownCell(text: string): string {
   return s.trim();
 }
 
-function parseGfmTableRowCells(line: string): string[] | null {
+function parseGfmTableRowCells(line: string, unescape = false): string[] | null {
   const t = normalizeMdTableLine(line);
   if (!t.startsWith("|")) return null;
   const inner = t.replace(/^\|/, "").replace(/\|$/, "");
-  return inner.split("|").map((c) => c.trim());
+  return inner.split("|").map((c) => {
+    const cell = c.trim();
+    return unescape ? unescapeGfmTableCell(cell) : cell;
+  });
+}
+
+function unescapeGfmTableCell(cell: string): string {
+  let s = cell;
+  for (let i = 0; i < 4; i++) {
+    const next = s.replace(/\\([\\*_|[\]])/g, "$1");
+    if (next === s) break;
+    s = next;
+  }
+  return s;
 }
 
 function isGfmTableSeparatorLine(line: string): boolean {
@@ -144,14 +176,18 @@ function formatGfmTableRow(cells: string[]): string {
   return `| ${cells.map(escapeGfmTableCell).join(" | ")} |`;
 }
 
-function parseMdTableLines(normalized: string): { headers: string[]; rows: MdTableRow[] } {
+function parseMdTableLines(
+  normalized: string,
+  opts?: { unescapeCells?: boolean },
+): { headers: string[]; rows: MdTableRow[] } {
+  const unescape = opts?.unescapeCells ?? false;
   const lines = normalized.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const headerIdx = lines.findIndex(
     (l) => l.startsWith("|") && !/^[\|\s\-:]+$/.test(l),
   );
   if (headerIdx < 0) return { headers: [], rows: [] };
 
-  const headerCells = parseGfmTableRowCells(lines[headerIdx]!);
+  const headerCells = parseGfmTableRowCells(lines[headerIdx]!, unescape);
   if (!headerCells?.length) return { headers: [], rows: [] };
   const headers = headerCells;
 
@@ -160,7 +196,7 @@ function parseMdTableLines(normalized: string): { headers: string[]; rows: MdTab
     const line = lines[i]!;
     if (!line.startsWith("|")) break;
     if (/^[\|\s\-:]+$/.test(line)) continue;
-    const cells = parseGfmTableRowCells(line);
+    const cells = parseGfmTableRowCells(line, unescape);
     if (!cells) break;
     const row: MdTableRow = {};
     headers.forEach((h, j) => {
@@ -177,7 +213,7 @@ export function parseMdTable(md: string): { headers: string[]; rows: MdTableRow[
 
 /** 预览表格解析（不转义单元格，供 HTML 表格渲染） */
 export function parseMdTableDisplay(md: string): { headers: string[]; rows: MdTableRow[] } {
-  return parseMdTableLines(prepareMarkdownForPreview(md));
+  return parseMdTableLines(prepareMarkdownForPreview(md), { unescapeCells: true });
 }
 
 /** 从段落正文解析角色（GFM 表 · 列表 · 「角色名 · …」行） */
@@ -185,11 +221,17 @@ export function parseCharacterListFromSection(body: string): Array<{
   name: string;
   role: string;
   appearance: string;
+  personality: string;
 }> {
   const fromTable = parseCharacterRows(body);
   if (fromTable.length) return fromTable;
 
-  const out: Array<{ name: string; role: string; appearance: string }> = [];
+  const out: Array<{
+    name: string;
+    role: string;
+    appearance: string;
+    personality: string;
+  }> = [];
   for (const raw of body.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line) continue;
@@ -204,6 +246,7 @@ export function parseCharacterListFromSection(body: string): Array<{
       name,
       role: parts[1] ?? "",
       appearance: parts.slice(2).join(" · ") || parts[1] || "（待补充外观）",
+      personality: "",
     });
   }
   return out;
@@ -227,6 +270,7 @@ export function parseCharacterRows(md: string): Array<{
   role: string;
   appearance: string;
   personality: string;
+  aiImagePrompt: string;
 }> {
   const { rows } = parseMdTable(md);
   return rows
@@ -270,7 +314,19 @@ export function parseCharacterRows(md: string): Array<{
         "性格特点",
         "个性",
       ]);
-      return { name, role, appearance, personality };
+      const aiImagePrompt = pickColumn(r, [
+        "ai生图提示词(英文)",
+        "ai生图提示词",
+        "ai image prompt",
+        "image prompt",
+      ]);
+      return {
+        name: stripPro2AnchorPlaceholders(name),
+        role: stripPro2AnchorPlaceholders(role),
+        appearance: stripPro2AnchorPlaceholders(appearance),
+        personality: stripPro2AnchorPlaceholders(personality),
+        aiImagePrompt,
+      };
     })
     .map((c) => ({
       ...c,
@@ -369,15 +425,17 @@ export function formatCharacterTableMarkdown(
     role: string;
     appearance: string;
     personality?: string;
+    aiImagePrompt?: string;
   }>,
 ): string {
   if (!rows.length) return "";
+  const headerLines = STORY_PRO2_CHARACTER_TABLE_HEADER.split("\n");
   return [
-    "| 姓名 | 身份 | 外貌关键词 | 性格 |",
-    "|------|------|------------|------|",
+    headerLines[0] ?? "",
+    headerLines[1] ?? "",
     ...rows.map(
       (r) =>
-        `| ${escapeMdTableCell(r.name)} | ${escapeMdTableCell(r.role)} | ${escapeMdTableCell(r.appearance)} | ${escapeMdTableCell(r.personality ?? "")} |`,
+        `| ${escapeMdTableCell(r.name)} | ${escapeMdTableCell(r.role)} | ${escapeMdTableCell(r.appearance)} | ${escapeMdTableCell(r.personality ?? "")} | ${escapeMdTableCell(r.aiImagePrompt ?? "")} |`,
     ),
   ].join("\n");
 }
@@ -615,18 +673,7 @@ function splitMergedGfmTableHeaderSeparator(md: string): string {
 
 /** 预览用：合并换行 / 紧凑表格 / 标题与表格间补空行（不转义，交给 remark-gfm 渲染） */
 export function prepareMarkdownForPreview(md: string): string {
-  let s = md.replace(/\uFF5C/g, "|").trim();
-  s = unescapeOverEscapedMarkdown(s);
-  s = splitHeadingEmbeddedTableHeaders(s);
-  s = splitMergedGfmTableHeaderSeparator(s);
-  s = joinMultilineGfmTableRows(s);
-  s = compactGfmTables(s);
-  s = repairGfmTablesForPreview(s);
-  if (!s) return "";
-  s = s.replace(/<br\s*\/?>/gi, "  \n");
-  s = ensureMarkdownBlockSpacing(s);
-  s = s.replace(/(^|\n)(#{1,6}[^\n]+)\n(?!\n)(\|)/gm, "$1$2\n\n$3");
-  return s.replace(/\n{3,}/g, "\n\n").trim();
+  return prepareMarkdownTableStructure(md, { convertBrToNewline: true });
 }
 
 function unescapeOverEscapedMarkdown(md: string): string {
@@ -639,9 +686,32 @@ function unescapeOverEscapedMarkdown(md: string): string {
   return s;
 }
 
+function prepareMarkdownTableStructure(
+  md: string,
+  opts: { convertBrToNewline: boolean },
+): string {
+  let s = md.replace(/\uFF5C/g, "|").trim();
+  s = unescapeOverEscapedMarkdown(s);
+  s = splitHeadingEmbeddedTableHeaders(s);
+  s = splitMergedGfmTableHeaderSeparator(s);
+  s = joinMultilineGfmTableRows(s);
+  s = compactGfmTables(s);
+  s = repairGfmTablesForPreview(s);
+  if (!s) return "";
+  if (opts.convertBrToNewline) {
+    s = s.replace(/<br\s*\/?>/gi, "  \n");
+  }
+  s = ensureMarkdownBlockSpacing(s);
+  s = s.replace(/(^|\n)(#{1,6}[^\n]+)\n(?!\n)(\|)/gm, "$1$2\n\n$3");
+  return s.replace(/\n{3,}/g, "\n\n").trim();
+}
+
 /** 解析 GFM 表格行对象用（含转义修复，勿用于 Markdown 预览） */
 export function prepareMarkdownForTableParse(md: string): string {
-  return repairGfmTablesForPreview(prepareMarkdownForPreview(md));
+  // 解析路径禁止把 <br> 换成物理换行，否则单元格内断行会被当成新表格行/截断，多镜表塌成一行
+  return repairGfmTablesForPreview(
+    prepareMarkdownTableStructure(md, { convertBrToNewline: false }),
+  );
 }
 
 function extractMarkdownSectionByHeader(
@@ -652,7 +722,7 @@ function extractMarkdownSectionByHeader(
 }
 
 /** 按标题层级（## / ### / #）提取 Markdown 段落 */
-function extractMarkdownSectionByHeaderLevels(
+export function extractMarkdownSectionByHeaderLevels(
   md: string,
   titlePattern: RegExp,
   levels: number[],
@@ -675,6 +745,197 @@ function extractMarkdownSectionByHeaderLevels(
     const body = md.slice(bodyStart, bodyEnd).trim();
     if (body) return body;
   }
+  return extractPlainTextSectionByHeader(md, titlePattern);
+}
+
+const PRO2_HUMAN_SECTION_TITLE =
+  /^(?:视觉风格总纲|场景视觉辞典|核心冲突与结构摘要|角色视觉辞典|分镜脚本|下一步交接清单)$/;
+
+function isPro2HumanSectionTitleLine(line: string): boolean {
+  const t = line.trim();
+  return PRO2_HUMAN_SECTION_TITLE.test(t) && !t.includes("\t");
+}
+
+function parseTabTableBlockAt(
+  lines: string[],
+  startIdx: number,
+): { table: string; nextIdx: number } | null {
+  const headerLine = lines[startIdx]?.trim() ?? "";
+  if (!headerLine.includes("\t")) return null;
+  const headers = headerLine.split("\t").map((s) => s.trim());
+  if (headers.length < 2) return null;
+  const colCount = headers.length;
+  const dataRows: string[][] = [];
+  let i = startIdx + 1;
+
+  while (i < lines.length) {
+    const raw = lines[i] ?? "";
+    const trimmed = raw.trim();
+
+    if (!trimmed) {
+      const next = lines[i + 1]?.trim() ?? "";
+      if (
+        next &&
+        (isPro2HumanSectionTitleLine(next) ||
+          (next.startsWith("##") && !next.includes("\t")) ||
+          next.startsWith("{"))
+      ) {
+        break;
+      }
+      i++;
+      continue;
+    }
+
+    if (
+      (isPro2HumanSectionTitleLine(trimmed) ||
+        (trimmed.startsWith("##") && !trimmed.includes("\t"))) &&
+      !trimmed.includes("\t")
+    ) {
+      break;
+    }
+    if (trimmed.startsWith("{")) break;
+
+    if (trimmed.includes("\t")) {
+      const cells = trimmed.split("\t").map((s) => s.trim());
+      const row = [...cells];
+      while (row.length < colCount) row.push("");
+      dataRows.push(row.slice(0, colCount));
+      i++;
+      continue;
+    }
+
+    if (!dataRows.length) break;
+    const last = dataRows[dataRows.length - 1]!;
+    let targetCol = colCount - 1;
+    for (let c = colCount - 1; c >= 0; c--) {
+      if (last[c]?.trim()) {
+        targetCol = c;
+        break;
+      }
+    }
+    last[targetCol] = `${last[targetCol] ?? ""}\n${raw}`.trim();
+    i++;
+  }
+
+  if (!dataRows.length) return null;
+  const rows: MdTableRow[] = dataRows.map((cells) => {
+    const row: MdTableRow = {};
+    headers.forEach((h, idx) => {
+      row[h] = cells[idx] ?? "";
+    });
+    return row;
+  });
+  return {
+    table: formatGenericGfmTableMarkdown(headers, rows),
+    nextIdx: i,
+  };
+}
+
+/** LLM 人读段（Tab 分隔表 · 支持单元格内换行）→ GFM */
+export function convertPro2HumanTabMarkdownToGfm(md: string): string {
+  const raw = md.trim();
+  if (!raw) return raw;
+
+  const lines = raw.split(/\r?\n/);
+  const out: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i]!;
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      out.push("");
+      i++;
+      continue;
+    }
+
+    const parsed = parseTabTableBlockAt(lines, i);
+    if (parsed) {
+      out.push(parsed.table);
+      i = parsed.nextIdx;
+      continue;
+    }
+
+    if (isPro2HumanSectionTitleLine(trimmed) && !trimmed.startsWith("##")) {
+      out.push(`## ${trimmed}`);
+      i++;
+      continue;
+    }
+
+    out.push(line);
+    i++;
+  }
+
+  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/** 人读 GFM · 大纲 Tab 展示（保留视觉/冲突/角色/场景/交接 · 去掉分镜） */
+export function extractPro2OutlineDisplayMdFromHumanGfm(gfm: string): string {
+  const lines = gfm.split(/\r?\n/);
+  const out: string[] = [];
+  let skipStoryboard = false;
+  for (const line of lines) {
+    const t = line.trim();
+    if (/^##\s*分镜脚本/i.test(t)) {
+      skipStoryboard = true;
+      continue;
+    }
+    if (skipStoryboard) {
+      if (/^##\s+/.test(t)) skipStoryboard = false;
+      else continue;
+    }
+    out.push(line);
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/** 人读 GFM → Hub 各 Tab Markdown（对齐 docs/画布大模型代码解析.md · 保留原表） */
+export function promotePro2HumanGfmToHubFields(gfm: string): {
+  outlineMd: string;
+  characterMd: string;
+  sceneMd: string;
+  storyboardMd: string;
+} {
+  return {
+    outlineMd: extractPro2OutlineDisplayMdFromHumanGfm(gfm),
+    characterMd: extractCharacterSectionFromOutline(gfm),
+    sceneMd: resolveSceneDictionaryMarkdown(gfm, ""),
+    storyboardMd: extractPro2HumanStoryboardMd(gfm),
+  };
+}
+
+const PLAIN_SECTION_TITLE =
+  /^(?:视觉风格总纲|场景视觉辞典|核心冲突与结构摘要|角色视觉辞典|分镜脚本|下一步交接清单)/;
+
+/** result.md 风格：无 ## 的纯文本章节标题 */
+function extractPlainTextSectionByHeader(
+  md: string,
+  titlePattern: RegExp,
+): string {
+  const lines = md.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const title = lines[i]?.trim() ?? "";
+    if (!title || title.startsWith("#") || title.startsWith("|")) continue;
+    if (!titlePattern.test(title)) continue;
+    const bodyLines: string[] = [];
+    for (let j = i + 1; j < lines.length; j++) {
+      const raw = lines[j] ?? "";
+      const nt = raw.trim();
+      if (nt.startsWith("##")) break;
+      if (
+        nt &&
+        !nt.startsWith("|") &&
+        PLAIN_SECTION_TITLE.test(nt) &&
+        !titlePattern.test(nt)
+      ) {
+        break;
+      }
+      bodyLines.push(raw);
+    }
+    const body = bodyLines.join("\n").trim();
+    if (body) return body;
+  }
   return "";
 }
 
@@ -688,12 +949,18 @@ function sceneDictionaryHeadersMatch(headers: string[]): boolean {
       h === "scene" ||
       h === "location",
   );
+  const hasCanonicalMerged = norms.some((h) =>
+    h.includes("环境/时间/气氛"),
+  );
   const hasSceneMeta = norms.some((h) =>
     ["环境", "时间", "气氛", "氛围", "environment", "time", "mood", "atmosphere"].some(
       (alias) => h === alias || h.includes(alias),
     ),
   );
-  return hasSceneName && hasSceneMeta;
+  const hasImageKw = norms.some((h) =>
+    h.includes("生图关键词") || h.includes("image"),
+  );
+  return hasSceneName && (hasCanonicalMerged || hasSceneMeta || hasImageKw);
 }
 
 /** 无 ## 场景视觉辞典 标题时，按表头扫描全文 GFM 场景辞典表 */
@@ -734,11 +1001,77 @@ export function stripOutlineEmbeddedPackSections(md: string): string {
 
 export type SceneVisualDictionaryRow = {
   name: string;
+  /** canonical · 环境/时间/气氛 合并列 */
+  envTimeMood?: string;
   environment: string;
   time: string;
   mood: string;
   imageKeywords: string;
+  negativePrompt?: string;
 };
+
+function sceneEnvTimeMoodDisplay(row: SceneVisualDictionaryRow): string {
+  const merged = row.envTimeMood?.trim();
+  if (merged) return merged;
+  return [row.environment, row.time, row.mood].filter(Boolean).join(" · ");
+}
+
+function parseSceneDictionaryRowFromMd(r: MdTableRow): SceneVisualDictionaryRow | null {
+  const name =
+    pickColumn(r, ["场景名", "场景", "scene name", "scene", "location", "name"]) ||
+    "";
+  if (!name.trim()) return null;
+  const envTimeMood = pickColumn(r, [
+    "环境/时间/气氛",
+    "环境时间气氛",
+  ]);
+  const environment =
+    pickColumn(r, ["环境", "environment", "env"]) || envTimeMood;
+  const time = pickColumn(r, ["时间", "time", "timeofday"]);
+  const mood = pickColumn(r, ["气氛", "氛围", "mood", "atmosphere"]);
+  const sceneDesc = pickColumn(r, ["场景描述", "描述", "description"]);
+  const imageKeywords = pickColumn(r, [
+    "生图关键词(英文)",
+    "生图关键词",
+    "生成图片关键词",
+    "关键词",
+    "ai生图提示词(英文)",
+    "ai生图提示词",
+    "image prompt",
+    "image keywords",
+    "prompt",
+  ]) || sceneDesc;
+  const negativePrompt = pickColumn(r, [
+    "固定反向提示词",
+    "反向提示词",
+    "negative prompt",
+    "negative",
+  ]);
+  return {
+    name: name.trim(),
+    envTimeMood: envTimeMood || undefined,
+    environment,
+    time,
+    mood,
+    imageKeywords,
+    negativePrompt: negativePrompt || undefined,
+  };
+}
+
+export function formatSceneDictionaryTableMarkdown(
+  rows: SceneVisualDictionaryRow[],
+): string {
+  if (!rows.length) return "";
+  const headerLines = STORY_PRO2_SCENE_TABLE_HEADER.split("\n");
+  return [
+    headerLines[0] ?? "",
+    headerLines[1] ?? "",
+    ...rows.map(
+      (r) =>
+        `| ${escapeMdTableCell(r.name)} | ${escapeMdTableCell(sceneEnvTimeMoodDisplay(r))} | ${escapeMdTableCell(r.imageKeywords)} | ${escapeMdTableCell(r.negativePrompt ?? "")} |`,
+    ),
+  ].join("\n");
+}
 
 /** 从大纲或场景段正文中提取场景 GFM 表 */
 export function extractSceneSectionMd(md: string): string {
@@ -751,18 +1084,116 @@ export function extractSceneSectionMd(md: string): string {
   return extractSceneVisualDictionaryFromOutline(md);
 }
 
+function sceneDictRowScore(row: SceneVisualDictionaryRow): number {
+  let score = 0;
+  if (row.envTimeMood?.trim()) score += 2;
+  if (row.environment?.trim()) score += 1;
+  if (row.time?.trim()) score += 1;
+  if (row.mood?.trim()) score += 1;
+  if (row.imageKeywords?.trim()) score += 4;
+  if (row.negativePrompt?.trim()) score += 2;
+  return score;
+}
+
+/** 按场景名合并大纲辞典与场景段扩写表，优先保留非空生图关键词 */
+export function mergeSceneVisualDictionaryRows(
+  primary: SceneVisualDictionaryRow[],
+  secondary: SceneVisualDictionaryRow[],
+): SceneVisualDictionaryRow[] {
+  const byName = new Map<string, SceneVisualDictionaryRow>();
+  const mergePair = (
+    a: SceneVisualDictionaryRow,
+    b: SceneVisualDictionaryRow,
+  ): SceneVisualDictionaryRow => ({
+    name: a.name || b.name,
+    envTimeMood: a.envTimeMood?.trim() || b.envTimeMood?.trim() || undefined,
+    environment: a.environment?.trim() || b.environment?.trim() || "",
+    time: a.time?.trim() || b.time?.trim() || "",
+    mood: a.mood?.trim() || b.mood?.trim() || "",
+    imageKeywords:
+      a.imageKeywords?.trim() || b.imageKeywords?.trim() || "",
+    negativePrompt:
+      a.negativePrompt?.trim() || b.negativePrompt?.trim() || undefined,
+  });
+  for (const row of primary) {
+    if (!row.name.trim()) continue;
+    byName.set(row.name.trim(), row);
+  }
+  for (const row of secondary) {
+    if (!row.name.trim()) continue;
+    const prev = byName.get(row.name.trim());
+    if (!prev) {
+      byName.set(row.name.trim(), row);
+      continue;
+    }
+    const merged = mergePair(prev, row);
+    byName.set(
+      row.name.trim(),
+      sceneDictRowScore(row) > sceneDictRowScore(prev) ? merged : mergePair(row, prev),
+    );
+  }
+  return Array.from(byName.values());
+}
+
+/** 解析 LLM「场景视觉提示词」段（sceneMd） */
+export function parseScenePromptSectionRows(md: string): SceneVisualDictionaryRow[] {
+  const section = extractMarkdownSectionByHeaderLevels(
+    md ?? "",
+    /场景视觉提示词/,
+    [2, 3, 1],
+  );
+  if (!section.trim()) return [];
+  const { rows } = parseMdTable(compactGfmTables(section));
+  const out: SceneVisualDictionaryRow[] = [];
+  for (const r of rows) {
+    const parsed = parseSceneDictionaryRowFromMd(r);
+    if (parsed) out.push(parsed);
+  }
+  return out;
+}
+
+/** 合并大纲场景辞典 + sceneMd 扩写段，供预览 / 生成场景图弹层使用 */
+export function resolveMergedSceneVisualDictionaryRows(
+  outlineMd: string,
+  sceneMd = "",
+): SceneVisualDictionaryRow[] {
+  const outlineSection =
+    extractSceneVisualDictionaryFromOutline(outlineMd ?? "") ||
+    extractSceneSectionMd(outlineMd ?? "");
+  const fromOutline = outlineSection.trim()
+    ? parseSceneVisualDictionaryRows(outlineSection)
+    : parseSceneVisualDictionaryRows(outlineMd ?? "");
+  const fromSceneMd = parseScenePromptSectionRows(sceneMd);
+  if (!fromOutline.length && !fromSceneMd.length) return [];
+  if (!fromOutline.length) return fromSceneMd;
+  if (!fromSceneMd.length) return fromOutline;
+  return mergeSceneVisualDictionaryRows(fromOutline, fromSceneMd);
+}
+
 /** 优先可解析的 sceneMd，否则从大纲拆出场景辞典 */
 export function resolveSceneDictionaryMarkdown(
   outlineMd: string,
   sceneMd = "",
 ): string {
-  const dedicated = sceneMd.trim();
-  if (dedicated && parseSceneVisualDictionaryRows(dedicated).length > 0) {
+  const merged = resolveMergedSceneVisualDictionaryRows(outlineMd, sceneMd);
+  if (!merged.length) {
+    const dedicated = sceneMd.trim();
+    if (dedicated && parseSceneVisualDictionaryRows(dedicated).length > 0) {
+      return dedicated;
+    }
+    const fromOutline = extractSceneSectionMd(outlineMd);
+    if (fromOutline.trim()) return fromOutline;
     return dedicated;
   }
-  const fromOutline = extractSceneSectionMd(outlineMd);
-  if (fromOutline.trim()) return fromOutline;
-  return dedicated;
+  const header =
+    STORY_PRO2_SCENE_TABLE_HEADER;
+  const body = merged
+    .map(
+      (r) =>
+        `| ${r.name} | ${sceneEnvTimeMoodDisplay(r)} | ${r.imageKeywords} | ${r.negativePrompt ?? ""} |`,
+    )
+    .join("\n");
+  return `${header}${body}`;
 }
 
 /** 解析「场景视觉辞典」GFM 表 */
@@ -772,26 +1203,8 @@ export function parseSceneVisualDictionaryRows(md: string): SceneVisualDictionar
   const { rows } = parseMdTable(compactGfmTables(section));
   const out: SceneVisualDictionaryRow[] = [];
   for (const r of rows) {
-    const name =
-      pickColumn(r, ["场景名", "场景", "scene name", "scene", "location", "name"]) ||
-      "";
-    if (!name.trim()) continue;
-    out.push({
-      name: name.trim(),
-      environment: pickColumn(r, ["环境", "environment", "env"]),
-      time: pickColumn(r, ["时间", "time", "timeofday"]),
-      mood: pickColumn(r, ["气氛", "氛围", "mood", "atmosphere"]),
-      imageKeywords: pickColumn(r, [
-        "生图关键词",
-        "生成图片关键词",
-        "关键词",
-        "AI生图提示词(英文)",
-        "AI生图提示词",
-        "image prompt",
-        "image keywords",
-        "prompt",
-      ]),
-    });
+    const parsed = parseSceneDictionaryRowFromMd(r);
+    if (parsed) out.push(parsed);
   }
   return out;
 }
@@ -822,23 +1235,117 @@ export function extractCharacterSectionFromOutline(md: string): string {
   return body;
 }
 
-/** 从大纲正文中提取「分镜脚本」段 */
+/** 去掉段内 JSON / 围栏，避免误落库到 storyboardMd */
+function stripEmbeddedJsonFromMarkdownSection(text: string): string {
+  let t = text.trim();
+  if (!t) return t;
+  t = t
+    .replace(/```pro2-production-script[\s\S]*?```/gi, "")
+    .replace(/```pro2-production-script[\s\S]*$/gi, "");
+  const lines = t.split(/\r?\n/);
+  const kept = lines.filter((line) => {
+    const tr = line.trim();
+    if (!tr) return true;
+    if (tr.startsWith("|")) return true;
+    if (/^#{1,6}\s/.test(tr)) return true;
+    if (/^[\{\[]/.test(tr)) return false;
+    if (/^"?(patch|schemaVersion|meta|visualStyle|shots|characters|props)"?\s*:/.test(tr)) {
+      return false;
+    }
+    if (/^[\}\]],?$/.test(tr)) return false;
+    return !/^"[^"]+"\s*:\s*[\{\[\"]/.test(tr);
+  });
+  return compactGfmTables(kept.join("\n").trim());
+}
+
+/** 从大纲正文中提取「分镜脚本」段（仅 GFM 表 · 不含 JSON 块） */
 export function extractStoryboardSectionFromOutline(md: string): string {
-  const body = extractMarkdownSectionByHeader(
+  const body = extractMarkdownSectionByHeaderLevels(
     md,
-    /分镜脚本|分镜表|镜头序列|分镜设计|镜头规划|镜头设计|分镜|storyboard/i,
+    /分镜脚本|分镜表|镜头序列|分镜设计|镜头规划|镜头设计|storyboard/i,
+    [2, 3, 1],
   );
   if (!body) return "";
-  return compactGfmTables(body);
+  return stripEmbeddedJsonFromMarkdownSection(body);
+}
+
+export type Pro2HandoffRow = {
+  index: number;
+  item: string;
+  owner: string;
+  note: string;
+};
+
+/** 解析「下一步交接清单」GFM 表（4 列 canonical · 兼容 legacy 3 列） */
+export function parseHandoffRows(md: string): Pro2HandoffRow[] {
+  const section = extractHandoffSectionFromOutline(md);
+  if (!section.trim()) return [];
+  const { rows } = parseMdTable(compactGfmTables(section));
+  const out: Pro2HandoffRow[] = [];
+  for (const r of rows) {
+    const indexRaw = pickColumn(r, ["序号", "index", "no", "#"]);
+    const item =
+      pickColumn(r, ["交接项", "环节", "item", "task"]) || "";
+    const owner =
+      pickColumn(r, ["负责方", "owner", "role", "team"]) || "";
+    const note =
+      pickColumn(r, [
+        "备注",
+        "说明",
+        "建议工具/步骤",
+        "note",
+        "notes",
+        "detail",
+      ]) || "";
+    if (!item.trim() && !note.trim()) continue;
+    const parsedIdx = parseInt(String(indexRaw).replace(/\D/g, ""), 10);
+    out.push({
+      index: Number.isFinite(parsedIdx) && parsedIdx > 0 ? parsedIdx : out.length + 1,
+      item: item.trim(),
+      owner: owner.trim(),
+      note: note.trim(),
+    });
+  }
+  return out;
+}
+
+export function extractHandoffSectionFromOutline(md: string): string {
+  return extractMarkdownSectionByHeaderLevels(
+    md,
+    /下一步交接清单|交接清单|handoff/i,
+    [2, 3, 1],
+  );
+}
+
+export function formatHandoffTableMarkdown(rows: Pro2HandoffRow[]): string {
+  if (!rows.length) return "";
+  const headerLines = STORY_PRO2_HANDOFF_TABLE_HEADER.split("\n");
+  return [
+    headerLines[0] ?? "",
+    headerLines[1] ?? "",
+    ...rows.map(
+      (r) =>
+        `| ${r.index} | ${escapeMdTableCell(r.item)} | ${escapeMdTableCell(r.owner)} | ${escapeMdTableCell(r.note)} |`,
+    ),
+  ].join("\n");
 }
 
 /** 主题模板分镜表 → 标准 hub 分镜 GFM 表 */
 export function normalizeStoryboardSectionFromOutline(md: string): string {
   const section = extractStoryboardSectionFromOutline(md);
   if (!section) return "";
-  const rows = parseStoryboardRows(section);
-  if (!rows.length) return section;
-  return formatStoryboardTableMarkdown(rows);
+  const wrapped = /##\s*分镜脚本/i.test(section)
+    ? section
+    : `## 分镜脚本\n\n${section}`;
+  return normalizeStoryboardSectionMd(wrapped);
+}
+
+/** 人读分镜段 · 提取并保留原表（对齐 docs/画布大模型代码解析.md · 不做 normalize 重排） */
+export function extractPro2HumanStoryboardMd(gfm: string): string {
+  const section = extractStoryboardSectionFromOutline(gfm);
+  if (!section.trim()) return "";
+  if (/##\s*分镜脚本/i.test(section)) return section.trim();
+  return `## 分镜脚本\n\n${section.trim()}`;
 }
 
 /** 故事大纲里的「人物表（简要）」— 仅角色名与定位 */
@@ -912,16 +1419,26 @@ function normalizeDialogueCell(raw: string, description: string): string {
   return inferDialogueFromDescription(description);
 }
 
-/** 专业版分镜表行（8 列真源 · 兼容旧 5 列简表） */
+/** 专业版分镜表行（v2 导演表 + Pass2 提示词列） */
 export type StoryboardTableRow = {
   frameIndex: number;
   /** 旧版简表「场景」列；专业版分镜表无此列 */
   scene: string;
   shotSize: string;
+  /** v2 Pass1 */
+  lighting: string;
   cameraMove: string;
   description: string;
   dialogue: string;
   duration: string;
+  /** v2 Pass1 */
+  sfxNote: string;
+  /** v2 Pass1 · 道具列 */
+  propNames: string;
+  /** v2 Pass2 · 分镜图 */
+  frameImagePrompt: string;
+  /** v1 / 兼容 · AI生图提示词 */
+  aiImagePrompt: string;
   aiVideoPrompt: string;
   lipSyncNote: string;
   /** 与 aiVideoPrompt 同步，供列同步 / 批量任务沿用 */
@@ -1011,13 +1528,49 @@ export function enrichStoryboardRowsAiVideoPrompts(
   });
 }
 
-/** 补全空 AI 视频提示词并规范为 8 列 GFM 表 */
+/** 空 AI 生图列时从画面描述 + 景别合成中文兜底 */
+export function enrichStoryboardRowsAiImagePrompts(
+  rows: StoryboardTableRow[],
+): StoryboardTableRow[] {
+  return rows.map((row) => {
+    if (!isEmptyStoryboardCell(row.aiImagePrompt)) return row;
+    const desc = row.description?.trim();
+    if (!desc) return row;
+    const shot = (row.shotSize ?? "").trim();
+    const fallback = [
+      "电影级分镜静帧",
+      shot && !isEmptyStoryboardCell(shot) ? shot : "",
+      desc,
+    ]
+      .filter(Boolean)
+      .join("，");
+    return { ...row, aiImagePrompt: fallback };
+  });
+}
+
+export function enrichStoryboardRowsForPack(rows: StoryboardTableRow[]): StoryboardTableRow[] {
+  return enrichStoryboardRowsAiImagePrompts(enrichStoryboardRowsAiVideoPrompts(rows));
+}
+
+/** 分镜表解析源：优先 ## 分镜脚本 段，避免误读段首「镜数规划」等小表 */
+export function resolveStoryboardMarkdownForParse(md: string): string {
+  const raw = (md ?? "").trim();
+  if (!raw) return raw;
+  const section = extractStoryboardSectionFromOutline(raw);
+  return section || raw;
+}
+
+/** 补全空 AI 视频提示词并规范为 9 列 GFM 表 */
+export function storyboardMdHasParseableRows(md: string): boolean {
+  return parseStoryboardRows(md).length > 0;
+}
+
 export function normalizeStoryboardSectionMd(md: string): string {
   const raw = md.trim();
   if (!raw) return raw;
   const rows = parseStoryboardRows(raw);
-  if (!rows.length) return raw;
-  const enriched = enrichStoryboardRowsAiVideoPrompts(rows);
+  if (!rows.length) return "";
+  const enriched = enrichStoryboardRowsForPack(rows);
   const table = formatStoryboardTableMarkdown(enriched);
   if (/##\s*分镜脚本/i.test(raw)) {
     return raw.replace(/##\s*分镜脚本[\s\S]*/i, `## 分镜脚本\n\n${table}`);
@@ -1034,9 +1587,19 @@ export function ensureStoryboardAiVideoPromptsMd(md: string): string {
   return normalizeStoryboardSectionMd(raw);
 }
 
+function parseStoryboardAiImagePrompt(r: Record<string, string>): string {
+  const raw = pickColumn(r, [
+    "ai生图提示词(英文)",
+    "ai生图提示词",
+    "ai image prompt",
+    "image prompt",
+  ]);
+  return isEmptyStoryboardCell(raw) ? "" : raw;
+}
+
 /** 分镜表 → 按镜号排序的行 */
 export function parseStoryboardRows(md: string): StoryboardTableRow[] {
-  const { rows } = parseMdTable(md);
+  const { rows } = parseMdTable(resolveStoryboardMarkdownForParse(md));
   return rows
     .map((r, i) => {
       const rawIdx =
@@ -1063,7 +1626,13 @@ export function parseStoryboardRows(md: string): StoryboardTableRow[] {
       ]);
       const scene =
         pickColumn(r, ["场景", "scene", "location"]) || r["场景"] || "";
-      const duration = pickColumn(r, ["时长(秒)", "时长", "duration"]);
+      const duration = pickColumn(r, [
+        "时长(秒)",
+        "时长（秒）",
+        "时长",
+        "duration",
+      ]);
+      const aiImagePrompt = parseStoryboardAiImagePrompt(r);
       const description =
         pickColumn(r, ["画面描述", "description", "visual", "画面"]) ||
         r["画面描述"] ||
@@ -1077,7 +1646,6 @@ export function parseStoryboardRows(md: string): StoryboardTableRow[] {
           "scenetext",
           "scene text",
           "旁白",
-          "音效",
         ]) ||
         r["台词"] ||
         r["对白/音效"] ||
@@ -1090,14 +1658,29 @@ export function parseStoryboardRows(md: string): StoryboardTableRow[] {
         "lip sync",
         "lipsync",
       ]);
+      const lighting = pickColumn(r, ["光影", "lighting", "光线", "光影氛围"]);
+      const sfxNote = pickColumn(r, ["音效", "sfx", "sound"]);
+      const propNamesRaw = pickColumn(r, ["道具", "props", "prop"]);
+      const propNames = stripPro2AnchorPlaceholders(propNamesRaw) || propNamesRaw.trim();
+      const frameImagePrompt =
+        pickColumn(r, [
+          "分镜图提示词",
+          "frame image prompt",
+          "frameimageprompt",
+        ]) || aiImagePrompt;
       return {
         frameIndex,
-        scene,
+        scene: stripPro2AnchorPlaceholders(scene),
         shotSize,
+        lighting,
         cameraMove,
         description,
         dialogue: normalizeDialogueCell(dialogueRaw, description),
         duration,
+        sfxNote,
+        propNames,
+        frameImagePrompt,
+        aiImagePrompt: frameImagePrompt || aiImagePrompt,
         aiVideoPrompt,
         lipSyncNote,
         videoPrompt: aiVideoPrompt,
@@ -1106,7 +1689,6 @@ export function parseStoryboardRows(md: string): StoryboardTableRow[] {
     .sort((a, b) => a.frameIndex - b.frameIndex);
 }
 
-/** 是否为专业版 8 列分镜表头 */
 export function isProStoryboardTableMd(md: string): boolean {
   const t = md.trim();
   if (!t) return true;
@@ -1122,10 +1704,28 @@ export function isProStoryboardTableMd(md: string): boolean {
   const nk = normHeader(header);
   return (
     nk.includes("运镜") ||
+    nk.includes("光影") ||
     nk.includes("aivideoprompt") ||
     nk.includes("口型") ||
     nk.includes("时长")
   );
+}
+
+/** v2 导演表（含光影/道具/音效 · 无 AI 提示词列） */
+export function isV2StoryboardTableMd(md: string): boolean {
+  const t = md.trim();
+  if (!t) return true;
+  const header = t
+    .split(/\r?\n/)
+    .find(
+      (l) =>
+        l.trim().startsWith("|") &&
+        l.trim().endsWith("|") &&
+        !/^[\|\s\-:]+$/.test(l.trim()),
+    );
+  if (!header) return true;
+  const nk = normHeader(header);
+  return nk.includes("光影") && !nk.includes("ai生图");
 }
 
 /** 更新分镜表中某一镜的对白列，写回 GFM 表 Markdown */
@@ -1191,26 +1791,43 @@ export function formatStoryboardTableMarkdown(
     frameIndex: number;
     scene?: string;
     shotSize?: string;
+    lighting?: string;
     cameraMove?: string;
     description: string;
     dialogue: string;
     duration?: string;
+    propNames?: string;
+    sfxNote?: string;
+    aiImagePrompt?: string;
     aiVideoPrompt?: string;
     lipSyncNote?: string;
     videoPrompt?: string;
   }>,
-  options?: { format?: "pro" | "legacy" },
+  options?: { format?: "pro" | "pro-v1" | "legacy" },
 ): string {
   if (!rows.length) return "";
-  const usePro = options?.format !== "legacy";
-  if (usePro) {
+  const useLegacy = options?.format === "legacy";
+  const useV1 = options?.format === "pro-v1";
+  if (!useLegacy && !useV1) {
+    const headerLines = STORY_PRO2_STORYBOARD_TABLE_HEADER.split("\n");
     return [
-      "| 镜号 | 景别 | 运镜 | 画面描述 | 对白 | 时长(秒) | AI视频提示词(英文) | 口型/配音备注 |",
-      "|------|------|------|----------|------|----------|---------------------|---------------|",
+      headerLines[0] ?? "",
+      headerLines[1] ?? "",
       ...rows.map((r) => {
-        const ai =
+        return `| ${r.frameIndex} | ${escapeMdTableCell(r.shotSize ?? "")} | ${escapeMdTableCell(r.lighting ?? "")} | ${escapeMdTableCell(r.cameraMove ?? "")} | ${escapeMdTableCell(r.description)} | ${escapeMdTableCell(r.propNames ?? "—")} | ${escapeMdTableCell(r.dialogue)} | ${escapeMdTableCell(r.duration ?? "")} | ${escapeMdTableCell(r.sfxNote ?? "")} | ${escapeMdTableCell(r.lipSyncNote ?? "")} |`;
+      }),
+    ].join("\n");
+  }
+  if (useV1) {
+    const headerLines = STORY_PRO2_STORYBOARD_TABLE_HEADER_V1.split("\n");
+    return [
+      headerLines[0] ?? "",
+      headerLines[1] ?? "",
+      ...rows.map((r) => {
+        const aiImage = r.aiImagePrompt?.trim() ?? "";
+        const aiVideo =
           r.aiVideoPrompt?.trim() || r.videoPrompt?.trim() || "";
-        return `| ${r.frameIndex} | ${escapeMdTableCell(r.shotSize ?? "")} | ${escapeMdTableCell(r.cameraMove ?? "")} | ${escapeMdTableCell(r.description)} | ${escapeMdTableCell(r.dialogue)} | ${escapeMdTableCell(r.duration ?? "")} | ${escapeMdTableCell(ai)} | ${escapeMdTableCell(r.lipSyncNote ?? "")} |`;
+        return `| ${r.frameIndex} | ${escapeMdTableCell(r.shotSize ?? "")} | ${escapeMdTableCell(r.cameraMove ?? "")} | ${escapeMdTableCell(r.description)} | ${escapeMdTableCell(r.dialogue)} | ${escapeMdTableCell(r.duration ?? "")} | ${escapeMdTableCell(aiImage)} | ${escapeMdTableCell(aiVideo)} | ${escapeMdTableCell(r.lipSyncNote ?? "")} |`;
       }),
     ].join("\n");
   }

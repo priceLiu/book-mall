@@ -1,15 +1,15 @@
-import { Loader2 } from "lucide-react";
+import { AccountOverviewSkeleton } from "@/components/account/account-overview-skeleton";
+import { AccountSectionHeader } from "@/components/account/account-section-header";
 
+/** 个人中心子路由切换 · 概览骨架（壳层 layout 已即时渲染）。 */
 export default function AccountLoading() {
   return (
-    <div
-      className="flex min-h-[min(24rem,50vh)] flex-col items-center justify-center gap-3 py-12 text-[#656d76]"
-      role="status"
-      aria-live="polite"
-      aria-label="个人中心加载中"
-    >
-      <Loader2 className="size-8 animate-spin text-[#8c959f]" aria-hidden />
-      <p className="text-sm">正在加载个人中心…</p>
-    </div>
+    <>
+      <AccountSectionHeader
+        title="概览"
+        description="积分、计费身份与套餐状态一览；其它模块请用左侧菜单切换。"
+      />
+      <AccountOverviewSkeleton />
+    </>
   );
 }

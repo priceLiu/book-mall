@@ -5,9 +5,10 @@ applyBookMallProductionOriginDefaults();
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { verifyCredentialsLogin } from "@/lib/auth/verify-credentials";
+import { verifyLoginWithThrottle } from "@/lib/auth/login-with-throttle";
+import { clientIpFromHeaders } from "@/lib/site-traffic/client-ip";
 import {
   bumpSessionVersion,
   isSingleSessionEnforced,
@@ -81,15 +82,24 @@ export const authOptions: NextAuthOptions = {
         autoLoginToken: { label: "自动登录票据", type: "text" },
       },
       async authorize(credentials) {
-        // 统一凭证校验（唯一真源，门户无头登录端点亦复用之）。
-        const verified = await verifyCredentialsLogin(credentials);
-        if (!verified) return null;
+        if (!credentials) return null;
+        const ip = clientIpFromHeaders(headers());
+        const result = await verifyLoginWithThrottle({
+          credentials,
+          ip,
+        });
+        if (!result.ok) {
+          if (result.status === 429) {
+            throw new Error(result.error);
+          }
+          return null;
+        }
         return {
-          id: verified.id,
-          email: verified.email,
-          name: verified.name,
-          image: verified.image,
-          role: verified.role,
+          id: result.user.id,
+          email: result.user.email,
+          name: result.user.name,
+          image: result.user.image,
+          role: result.user.role,
         };
       },
     }),

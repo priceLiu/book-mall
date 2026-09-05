@@ -23,17 +23,27 @@ import {
   defaultSbv1DockInputModeForModel,
   dockInputModeToPatch,
   getSbv1VideoModelRefCaps,
+  isSbv1Wan30VideoModel,
+  resolveSbv1VideoModelRefLinkBlock,
 } from "@/lib/canvas/sbv1-video-model-reference";
 import { getSbv1VideoModelTypeLabels } from "@/lib/canvas/story-model-capabilities";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import { cn } from "@/lib/utils";
 import {
-  LIBTV_DOCK_POPOVER_CLASS,
+  LIBTV_DOCK_MODEL_POPOVER_CLASS,
   LIBTV_DOCK_PARAMS_POPOVER_CLASS,
-  LibtvDockParamGrid,
   LIBTV_DOCK_PICKER_CHECK_CLASS,
   libtvDockModelItemClassName,
 } from "../libtv-dock-picker-chrome";
+import { LibtvDockVideoParamsPanel } from "../libtv-dock-video-params-panel";
+import {
+  aspectOptionsFromVideoSchema,
+  aspectValueFromParams,
+  durationBoundsFromVideoSchema,
+  filterDockVideoParamsSchema,
+  resolutionOptionsFromVideoSchema,
+  resolutionSegmentValue,
+} from "@/lib/canvas/sbv1-video-dock-params-schema";
 import {
   Sbv1ToolbarDropdown,
   useSbv1ToolbarAnchor,
@@ -50,8 +60,8 @@ import {
 } from "@/lib/canvas/sbv1-video-ui-sync";
 
 const RESOLUTION_OPTIONS = [
-  { id: "720p", label: "720p" },
-  { id: "1080p", label: "1080p" },
+  { id: "720p", label: "720P" },
+  { id: "1080p", label: "1080P" },
 ] as const;
 
 function resolveVideoModelDisplayName(
@@ -98,13 +108,14 @@ function useSbv1VideoSettingsDerived(data: Sbv1VideoEngineNodeData) {
   );
   const effectiveDurationSec = useMemo(() => {
     if (smartMulti) return 0;
+    const maxDur = isSbv1Wan30VideoModel(modelKey) ? 30 : 15;
     const fromParams = Number(engineParams.duration);
-    if (Number.isFinite(fromParams) && fromParams >= 4 && fromParams <= 15) {
+    if (Number.isFinite(fromParams) && fromParams >= 3 && fromParams <= maxDur) {
       return fromParams;
     }
-    if (data.durationSec >= 4 && data.durationSec <= 15) return data.durationSec;
-    return 15;
-  }, [smartMulti, engineParams.duration, data.durationSec]);
+    if (data.durationSec >= 3 && data.durationSec <= maxDur) return data.durationSec;
+    return Math.min(15, maxDur);
+  }, [smartMulti, engineParams.duration, data.durationSec, modelKey]);
   const generateAudio = engineParams.generate_audio !== false;
   const watermark = Boolean(engineParams.watermark);
   return {
@@ -178,13 +189,14 @@ function patchVideoSettings(
   if (smartMulti) {
     effectiveDurationSec = 0;
   } else {
+    const maxDur = isSbv1Wan30VideoModel(modelKey) ? 30 : 15;
     const fromParams = Number(engineParams.duration);
-    if (Number.isFinite(fromParams) && fromParams >= 4 && fromParams <= 15) {
+    if (Number.isFinite(fromParams) && fromParams >= 3 && fromParams <= maxDur) {
       effectiveDurationSec = fromParams;
-    } else if (durationSec >= 4 && durationSec <= 15) {
+    } else if (durationSec >= 3 && durationSec <= maxDur) {
       effectiveDurationSec = durationSec;
     } else {
-      effectiveDurationSec = 15;
+      effectiveDurationSec = Math.min(15, maxDur);
     }
   }
   onPatch(
@@ -213,12 +225,15 @@ export function Sbv1VideoDockModelPicker({
   onPatch,
   open: controlledOpen,
   onOpenChange,
+  refLinkCount = 0,
 }: {
   data: Sbv1VideoEngineNodeData;
   disabled?: boolean;
   onPatch: (patch: Partial<Sbv1VideoEngineNodeData>) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** 已连接参考图数量 · 有图时禁用百炼 T2V */
+  refLinkCount?: number;
 }) {
   const { providers } = useUserProviders();
   const { anchorRef, open: internalOpen, setOpen: setInternalOpen, rect } =
@@ -308,7 +323,7 @@ export function Sbv1VideoDockModelPicker({
         rect={rect}
         placement="auto"
         estimatedHeight={280}
-        className={LIBTV_DOCK_POPOVER_CLASS}
+        className={LIBTV_DOCK_MODEL_POPOVER_CLASS}
       >
         <p className="px-3 pb-1.5 pt-0.5 text-[13px] font-medium text-white/75">
           选择模型
@@ -322,12 +337,21 @@ export function Sbv1VideoDockModelPicker({
               model.displayName || model.modelKey,
             );
             const typeLabels = getSbv1VideoModelTypeLabels(model.modelKey);
+            const refBlock = resolveSbv1VideoModelRefLinkBlock({
+              modelKey: model.modelKey,
+              refLinkCount,
+            });
             return (
               <button
                 key={`${providerId}:${model.modelKey}`}
                 type="button"
-                className={libtvDockModelItemClassName(selected)}
-                onClick={() => onSelect(providerId, model)}
+                disabled={refBlock.blocked}
+                title={refBlock.reason}
+                className={libtvDockModelItemClassName(selected, refBlock.blocked)}
+                onClick={() => {
+                  if (refBlock.blocked) return;
+                  onSelect(providerId, model);
+                }}
               >
                 <span className="grid size-7 shrink-0 place-items-center rounded-md bg-white/[0.06] text-[10px] font-semibold text-white/70">
                   {displayName.slice(0, 1)}
@@ -423,132 +447,223 @@ export function Sbv1VideoDockParamsPicker({
         estimatedHeight={520}
         className={LIBTV_DOCK_PARAMS_POPOVER_CLASS}
       >
-        <div className="space-y-2.5 px-1 pb-1">
-          {derived.isVolcDockModel ? (
-            <>
-              <LibtvDockParamGrid
-                label="比例"
-                options={SBV1_ASPECT_RATIOS.map((r) => ({
-                  id: r,
-                  label: sbv1AspectRatioLabel(r),
-                }))}
-                value={data.aspectRatio}
-                onChange={(id) =>
+        {derived.isMotionControl ? (
+          <div className="space-y-2.5 px-3 pb-3 pt-2">
+            <p className="text-[12px] leading-snug text-white/50">
+              动作控制需连接参考图与驱动动作视频；其余参数随模型见下方。
+            </p>
+            {resolvedModel?.paramsSchema &&
+            resolvedModel.paramsSchema.length > 0 ? (
+              <DynamicParamForm
+                variant="dock"
+                schema={filterDockVideoParamsSchema(resolvedModel.paramsSchema)}
+                value={derived.engineParams}
+                onChange={(next) => {
+                  let referenceMode = data.referenceMode;
+                  if (
+                    derived.refCaps.multiShotsBlocksFirstLast &&
+                    next.multi_shots === true
+                  ) {
+                    referenceMode = "omni";
+                  }
+                  patchVideoSettings(data, onPatch, {
+                    engineParams: next,
+                    referenceMode,
+                  });
+                }}
+              />
+            ) : null}
+          </div>
+        ) : derived.isVolcDockModel ? (
+          <LibtvDockVideoParamsPanel
+            aspectOptions={SBV1_ASPECT_RATIOS.map((r) => ({
+              id: r,
+              label: sbv1AspectRatioLabel(r),
+            }))}
+            aspectValue={data.aspectRatio}
+            onAspectChange={(id) =>
+              patchVideoSettings(data, onPatch, {
+                aspectRatio: id as Sbv1AspectRatio,
+              })
+            }
+            resolutionOptions={RESOLUTION_OPTIONS.map((r) => ({
+              id: r.id,
+              label: r.label,
+            }))}
+            resolutionValue={data.resolution}
+            onResolutionChange={(id) =>
+              patchVideoSettings(data, onPatch, {
+                resolution: id as "720p" | "1080p",
+                engineParams: {
+                  ...derived.engineParams,
+                  resolution: id,
+                },
+              })
+            }
+            referenceModeOptions={SBV1_REFERENCE_MODES.map((m) => ({
+              id: m.id,
+              label: m.label,
+            }))}
+            referenceModeValue={data.referenceMode}
+            onReferenceModeChange={(id) => {
+              const mode = id as Sbv1ReferenceMode;
+              const nextDuration =
+                mode === "smart_multi"
+                  ? 0
+                  : data.durationSec < 4 || data.durationSec > 15
+                    ? 15
+                    : data.durationSec;
+              patchVideoSettings(data, onPatch, {
+                referenceMode: mode,
+                durationSec: nextDuration,
+              });
+            }}
+            durationMin={4}
+            durationMax={15}
+            durationValue={derived.effectiveDurationSec}
+            showDuration={!derived.smartMulti}
+            onDurationChange={(next) =>
+              patchVideoSettings(data, onPatch, {
+                durationSec: next,
+                engineParams: {
+                  ...derived.engineParams,
+                  duration: next,
+                },
+              })
+            }
+            generateAudio={derived.generateAudio}
+            onGenerateAudioChange={(v) =>
+              patchVideoSettings(data, onPatch, {
+                generateAudio: v,
+                engineParams: {
+                  ...derived.engineParams,
+                  generate_audio: v,
+                  generateAudio: v,
+                  sound: v,
+                },
+              })
+            }
+            showWatermark
+            watermark={derived.watermark}
+            onWatermarkChange={(v) =>
+              patchVideoSettings(data, onPatch, {
+                watermark: v,
+                engineParams: {
+                  ...derived.engineParams,
+                  watermark: v,
+                },
+              })
+            }
+          />
+        ) : (
+          (() => {
+            const schema = resolvedModel?.paramsSchema ?? null;
+            const aspectOptions = aspectOptionsFromVideoSchema(schema);
+            const resolutionOptions = resolutionOptionsFromVideoSchema(schema);
+            const durationBounds = durationBoundsFromVideoSchema(schema);
+            const extraSchema = filterDockVideoParamsSchema(schema);
+            const aspectValue = aspectValueFromParams(
+              derived.engineParams,
+              data.aspectRatio,
+            );
+            const resolutionValue = resolutionSegmentValue(
+              derived.engineParams.resolution ?? data.resolution,
+              resolutionOptions,
+              data.resolution,
+            );
+            return (
+              <LibtvDockVideoParamsPanel
+                aspectOptions={aspectOptions}
+                aspectValue={aspectValue}
+                onAspectChange={(id) =>
                   patchVideoSettings(data, onPatch, {
                     aspectRatio: id as Sbv1AspectRatio,
+                    engineParams: {
+                      ...derived.engineParams,
+                      ratio: id,
+                      aspect_ratio: id,
+                    },
                   })
                 }
-              />
-              <LibtvDockParamGrid
-                label="分辨率"
-                options={RESOLUTION_OPTIONS.map((r) => ({
-                  id: r.id,
-                  label: r.label,
-                }))}
-                value={data.resolution}
-                onChange={(id) =>
+                resolutionOptions={resolutionOptions}
+                resolutionValue={resolutionValue}
+                onResolutionChange={(id) =>
                   patchVideoSettings(data, onPatch, {
-                    resolution: id as "720p" | "1080p",
+                    resolution:
+                      id.toLowerCase() === "1080p" ||
+                      id.toUpperCase() === "1080P"
+                        ? "1080p"
+                        : "720p",
                     engineParams: {
                       ...derived.engineParams,
                       resolution: id,
                     },
                   })
                 }
-              />
-              <LibtvDockParamGrid
-                label="参考模式"
-                options={SBV1_REFERENCE_MODES.map((m) => ({
-                  id: m.id,
-                  label: m.label,
-                }))}
-                value={data.referenceMode}
-                onChange={(id) => {
-                  const mode = id as Sbv1ReferenceMode;
-                  const nextDuration =
-                    mode === "smart_multi"
-                      ? 0
-                      : data.durationSec < 4 || data.durationSec > 15
-                        ? 15
-                        : data.durationSec;
+                referenceModeOptions={
+                  showGatewayReferenceMode
+                    ? referenceModeOptions.map((m) => ({
+                        id: m.id,
+                        label: m.label,
+                      }))
+                    : undefined
+                }
+                referenceModeValue={
+                  showGatewayReferenceMode ? data.referenceMode : undefined
+                }
+                onReferenceModeChange={
+                  showGatewayReferenceMode
+                    ? (id) =>
+                        patchVideoSettings(data, onPatch, {
+                          referenceMode: id as Sbv1ReferenceMode,
+                        })
+                    : undefined
+                }
+                durationMin={durationBounds.min}
+                durationMax={durationBounds.max}
+                durationStep={durationBounds.step}
+                durationLabel={durationBounds.label}
+                durationValue={derived.effectiveDurationSec}
+                onDurationChange={(next) =>
                   patchVideoSettings(data, onPatch, {
-                    referenceMode: mode,
-                    durationSec: nextDuration,
+                    durationSec: next,
+                    engineParams: {
+                      ...derived.engineParams,
+                      duration: next,
+                    },
+                  })
+                }
+                generateAudio={derived.generateAudio}
+                onGenerateAudioChange={(v) =>
+                  patchVideoSettings(data, onPatch, {
+                    generateAudio: v,
+                    engineParams: {
+                      ...derived.engineParams,
+                      generate_audio: v,
+                      generateAudio: v,
+                      sound: v,
+                    },
+                  })
+                }
+                extraSchema={extraSchema}
+                extraParams={derived.engineParams}
+                onExtraParamsChange={(next) => {
+                  let referenceMode = data.referenceMode;
+                  if (
+                    derived.refCaps.multiShotsBlocksFirstLast &&
+                    next.multi_shots === true
+                  ) {
+                    referenceMode = "omni";
+                  }
+                  patchVideoSettings(data, onPatch, {
+                    engineParams: next,
+                    referenceMode,
                   });
                 }}
               />
-              {!derived.smartMulti ? (
-                <div className="px-3">
-                  <div className="mb-1.5 flex items-center justify-between text-[12px] text-white/50">
-                    <span>时长</span>
-                    <span className="tabular-nums text-white/75">
-                      {derived.effectiveDurationSec}s
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={4}
-                    max={15}
-                    step={1}
-                    value={derived.effectiveDurationSec}
-                    className="nodrag h-1.5 w-full cursor-pointer accent-white"
-                    onChange={(e) => {
-                      const next = Number(e.target.value);
-                      patchVideoSettings(data, onPatch, {
-                        durationSec: next,
-                        engineParams: {
-                          ...derived.engineParams,
-                          duration: next,
-                        },
-                      });
-                    }}
-                  />
-                </div>
-              ) : null}
-            </>
-          ) : (
-            <>
-              {showGatewayReferenceMode ? (
-                <LibtvDockParamGrid
-                  label="参考模式"
-                  options={referenceModeOptions.map((m) => ({
-                    id: m.id,
-                    label: m.label,
-                  }))}
-                  value={data.referenceMode}
-                  onChange={(id) =>
-                    patchVideoSettings(data, onPatch, {
-                      referenceMode: id as Sbv1ReferenceMode,
-                    })
-                  }
-                />
-              ) : null}
-              {resolvedModel?.paramsSchema &&
-              resolvedModel.paramsSchema.length > 0 ? (
-                <div className="px-2">
-                  <DynamicParamForm
-                    variant="dock"
-                    schema={resolvedModel.paramsSchema}
-                    value={derived.engineParams}
-                    onChange={(next) => {
-                      let referenceMode = data.referenceMode;
-                      if (
-                        derived.refCaps.multiShotsBlocksFirstLast &&
-                        next.multi_shots === true
-                      ) {
-                        referenceMode = "omni";
-                      }
-                      patchVideoSettings(data, onPatch, {
-                        engineParams: next,
-                        referenceMode,
-                      });
-                    }}
-                  />
-                </div>
-              ) : null}
-            </>
-          )}
-        </div>
+            );
+          })()
+        )}
       </Sbv1ToolbarDropdown>
     </>
   );

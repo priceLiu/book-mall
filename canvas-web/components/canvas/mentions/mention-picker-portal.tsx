@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import Image from "next/image";
 import { GripVertical, X } from "lucide-react";
 import { RF_NO_DRAG } from "@/lib/canvas/react-flow-classes";
+import { mentionPreviewShouldUseVideo } from "@/lib/canvas/mention-preview-media";
 import { cn } from "@/lib/utils";
 import type { MentionableItem } from "./MentionsTextarea";
 
@@ -89,6 +89,50 @@ function resolveDockShellPickerPosition(
     top: Math.min(belowTop, window.innerHeight - pickerH - 12),
     flip: false,
   };
+}
+
+function MentionPickerPreviewThumb({
+  item,
+  height,
+}: {
+  item: MentionableItem;
+  height: number;
+}) {
+  const url = item.previewUrl?.trim();
+  if (!url) {
+    return (
+      <span
+        className="w-full rounded-md border border-dashed border-white/15 bg-white/5"
+        style={{ height }}
+      />
+    );
+  }
+  const frameClass =
+    "relative w-full overflow-hidden rounded-md border border-white/15 bg-black/40";
+  if (mentionPreviewShouldUseVideo(item)) {
+    return (
+      <span className={frameClass} style={{ height }}>
+        <video
+          src={url}
+          muted
+          playsInline
+          preload="metadata"
+          className="size-full object-contain"
+        />
+      </span>
+    );
+  }
+  return (
+    <span className={frameClass} style={{ height }}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- OSS / blob 预览 */}
+      <img
+        src={url}
+        alt=""
+        className="size-full object-contain"
+        referrerPolicy="no-referrer"
+      />
+    </span>
+  );
 }
 
 export function MentionPickerPortal({
@@ -260,25 +304,7 @@ export function MentionPickerPortal({
                 }}
                 onMouseEnter={() => onHoverIndex(i)}
               >
-                {m.previewUrl ? (
-                  <span
-                    className="relative w-full overflow-hidden rounded-md border border-white/15 bg-black/40"
-                    style={{ height: thumbH }}
-                  >
-                    <Image
-                      src={m.previewUrl}
-                      alt=""
-                      fill
-                      className="object-contain"
-                      unoptimized
-                    />
-                  </span>
-                ) : (
-                  <span
-                    className="w-full rounded-md border border-dashed border-white/15 bg-white/5"
-                    style={{ height: thumbH }}
-                  />
-                )}
+                <MentionPickerPreviewThumb item={m} height={thumbH} />
                 <span
                   className={cn(
                     "line-clamp-2 leading-snug",

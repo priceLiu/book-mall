@@ -23,10 +23,16 @@ import {
 } from "lucide-react";
 import { AnalysisReplyMarkdown } from "@/components/visual-lab/analysis-reply-markdown";
 import {
+  ImageZoomControls,
+  IMAGE_ZOOM_BUTTON_STEP,
+} from "@/components/media/image-zoom-controls";
+import { useImageZoomPan } from "@/lib/media/use-image-zoom-pan";
+import {
   formatPointsPrimaryYuanSecondary,
   formatRequiredPointsShortfall,
   readRequiredPointsFromSettleJson,
 } from "@/lib/format-points-ui";
+import { VISUAL_LAB_DEMO_VIDEO } from "@/lib/visual-lab-demo-assets";
 import {
   type VisualLabGalleryItem,
   type VisualLabSnapshotStats,
@@ -88,8 +94,8 @@ const ANALYSIS_TEMPLATES: AnalysisTemplate[] = [
     title: "视频理解",
     description:
       "根据这个视频，在一个 HTML 中，复刻视频中的网站，需要尽量和视频中一致，不丢失细节",
-    videoSrc: "/videos/qwen36-flash-ex2.mp4",
-    fileName: "qwen36-flash-ex2.mp4",
+    videoSrc: VISUAL_LAB_DEMO_VIDEO.url,
+    fileName: VISUAL_LAB_DEMO_VIDEO.fileName,
     prompt: TEMPLATE_PROMPT_VIDEO_REPLICATE,
   },
   {
@@ -508,6 +514,7 @@ export function VisualLabAnalysisClient({
   const [analysisReasoning, setAnalysisReasoning] = useState("");
   const [userTurnDisplay, setUserTurnDisplay] = useState<UserTurnDisplay | null>(null);
   const [mediaLightbox, setMediaLightbox] = useState<MediaLightbox>(null);
+  const lightboxZoom = useImageZoomPan(mediaLightbox?.src ?? "");
   const [analysisStopped, setAnalysisStopped] = useState(false);
   const [outcomeQuotaModalKind, setOutcomeQuotaModalKind] = useState<"image" | "video" | null>(
     null,
@@ -1731,8 +1738,15 @@ export function VisualLabAnalysisClient({
               <X className="h-5 w-5" strokeWidth={2} />
             </button>
             {mediaLightbox.kind === "image" ? (
-              // eslint-disable-next-line @next/next/no-img-element -- data URL / dynamic blob URLs
-              <img src={mediaLightbox.src} alt="" className="vl-media-lightbox-img" />
+              <div {...lightboxZoom.stageProps}>
+                {/* eslint-disable-next-line @next/next/no-img-element -- data URL / dynamic blob URLs */}
+                <img
+                  src={mediaLightbox.src}
+                  alt=""
+                  draggable={false}
+                  className="vl-media-lightbox-img"
+                />
+              </div>
             ) : (
               <video
                 src={mediaLightbox.src}
@@ -1743,6 +1757,17 @@ export function VisualLabAnalysisClient({
               />
             )}
           </div>
+          {mediaLightbox.kind === "image" ? (
+            // 根节点 onClick 会关闭预览，控件须拦住冒泡
+            <div onClick={(e) => e.stopPropagation()}>
+              <ImageZoomControls
+                zoom={lightboxZoom.zoom}
+                onZoomIn={() => lightboxZoom.zoomBy(IMAGE_ZOOM_BUTTON_STEP)}
+                onZoomOut={() => lightboxZoom.zoomBy(-IMAGE_ZOOM_BUTTON_STEP)}
+                onReset={lightboxZoom.reset}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

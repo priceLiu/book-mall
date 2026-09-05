@@ -1,0 +1,34 @@
+---
+description: 新模型接入强制规范（Gateway 注册 · 运营中心上架 · 成本积分 · 禁止直连）
+globs: book-mall/lib/gateway/**/*,book-mall/lib/canvas/**/*,book-mall/lib/platform-model/**/*,book-mall/lib/pricing/**/*,book-mall/lib/quick-replica/**/*,book-mall/app/api/gw/**/*,canvas-web/**/*,quick-replica-web/**/*,e-commerce-toolkit/**/*,finance-web/components/admin/**/*
+alwaysApply: false
+---
+
+# 新模型接入 · 强制规范
+
+权威文档：**`book-mall/doc/product/23-new-model-onboarding-mandatory.md`**
+
+凡 **平台代付 / API 会员** 场景下新接入、新上架、新暴露给用户选模的模型，**必须**完成该文档 §3 清单，**禁止**合并未勾选项的 PR。
+
+## 必须
+
+1. **Gateway 唯一路径**：`modelKey` → `*-gateway-client` → `/api/gw/v1/*` → `createRequestLog` → `assertModelRegistered` → `finalizeRequestLog`。
+2. **L1 注册**：`canonical-registry.ts` + `GatewayModelRoute` + `pnpm gateway:seed-registry -- --confirm`。
+3. **L2 凭证**：平台代付在 Gateway `:3005/dashboard/models` 绑定厂商凭证（**禁止**向 `.env.local` 写厂商 Key 绕过）。
+4. **L3 定价**：`ModelCostProfile` + `ModelCreditPrice` 发布；按 `unified-credit-formula` 验算毛利护栏。
+5. **L5 运营中心**：`AppModelShelf`（`appTag` + `sceneKey`）或更新 `model-ops-seed-config.ts` 后 `pnpm gateway:seed-model-ops`。
+6. **选模数据源**：`listModelsForApp` / registry API；**禁止**前端硬编码新模型卡片列表。
+7. **用户可见扣分**：生成前预估积分 + 生成后实际扣分（不单改友好提示掩盖计费/路由问题）。
+8. **API 文档**：PR 内补充 §4.3 模板（`modelKey`、Gateway 路径、计费单位、U₀）。
+
+## 禁止
+
+- 业务层 `fetch` 厂商 API 或 `model-router` 失败时直连 fallback。
+- 未录入成本、未发布积分价即 `gatewayPublished` 对用户开放。
+- 只改 `friendly-task-error` / toast 而不修 Gateway 注册、传参或定价根因。
+
+## Code Review
+
+- PR 新增 `modelKey` / 厂商集成 → 检查是否附带 §3 勾选清单与成本测算表。
+- 出现新硬编码模型列表 → 驳回，改走运营中心 + registry。
+- 出现 `VENDOR_*_API_KEY` 业务 env → 驳回，改 Gateway 凭证池。

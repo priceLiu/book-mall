@@ -7,6 +7,14 @@ import {
 } from "@/lib/gateway/env";
 import { signGatewayAccessToken } from "@/lib/gateway/gateway-sso-token";
 import { findGatewayUserByEmail } from "@/lib/gateway/sync-user";
+import {
+  AuthThrottleError,
+  LOGIN_FAIL_IP,
+  assertNotThrottled,
+  recordThrottleHit,
+  clearThrottle,
+} from "@/lib/auth/auth-throttle";
+import { clientIpFromRequest } from "@/lib/site-traffic/client-ip";
 
 export const dynamic = "force-dynamic";
 
@@ -27,15 +35,34 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "参数无效" }, { status: 400 });
   }
 
+  const email = parsed.data.email.trim().toLowerCase();
+  const ip = clientIpFromRequest(request);
+  try {
+    if (ip) assertNotThrottled(`login:ip:${ip}`, LOGIN_FAIL_IP);
+    assertNotThrottled(`login:email:${email}`, LOGIN_FAIL_IP);
+  } catch (e) {
+    if (e instanceof AuthThrottleError) {
+      return NextResponse.json({ error: e.message }, { status: 429 });
+    }
+    throw e;
+  }
+
   const user = await findGatewayUserByEmail(parsed.data.email);
   if (!user?.passwordHash) {
+    if (ip) recordThrottleHit(`login:ip:${ip}`, LOGIN_FAIL_IP);
+    recordThrottleHit(`login:email:${email}`, LOGIN_FAIL_IP);
     return NextResponse.json({ error: "邮箱或密码错误" }, { status: 401 });
   }
 
   const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
   if (!ok) {
+    if (ip) recordThrottleHit(`login:ip:${ip}`, LOGIN_FAIL_IP);
+    recordThrottleHit(`login:email:${email}`, LOGIN_FAIL_IP);
     return NextResponse.json({ error: "邮箱或密码错误" }, { status: 401 });
   }
+
+  if (ip) clearThrottle(`login:ip:${ip}`);
+  clearThrottle(`login:email:${email}`);
 
   const secret = requireGatewayJwtSecret();
   const expiresIn = getGatewayJwtTtlSec();

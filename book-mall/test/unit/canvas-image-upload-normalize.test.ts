@@ -84,7 +84,7 @@ describe("canvas-image-upload-normalize", () => {
     expect(out.ext).toBe("jpg");
   });
 
-  it("re-encodes jpeg buffer", async () => {
+  it("passes through jpeg without re-encode when no resize needed", async () => {
     const jpeg = await sharp({
       create: {
         width: 8,
@@ -98,6 +98,7 @@ describe("canvas-image-upload-normalize", () => {
     const out = await normalizeCanvasUploadImageBuffer(jpeg);
     expect(out.contentType).toBe("image/jpeg");
     expect(out.ext).toBe("jpg");
+    expect(out.buf.equals(jpeg)).toBe(true);
   });
 
   it("converts webp to jpeg", async () => {

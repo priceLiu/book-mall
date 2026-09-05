@@ -18,19 +18,24 @@ import {
 import { useMemo, useState } from "react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { showCanvasSuccessToast } from "@/components/canvas/canvas-credits-toast-host";
 import { extractGroupSubgraph } from "@/lib/canvas/extract-group-subgraph";
 import { shareWorkflowAsTemplate } from "@/lib/canvas/share-workflow";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { CANVAS_PRIMARY_BTN_SM_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import { useSaveGroupAsAsset } from "@/lib/canvas/use-save-node-as-asset";
-import { batchRunStoryRows } from "@/lib/canvas/batch-run-nodes";
+import { batchRunPro2FrameRows, batchRunPro2ThreeViewRows, batchRunStoryRows } from "@/lib/canvas/batch-run-nodes";
 import { kickoffPro2VideoBoardFromFrameGroup } from "@/lib/canvas/pro2-script-hub-helpers";
 import { resolvePro2VideoBatchVideoForHub } from "@/lib/canvas/pro2-video-batch-video";
 import {
   batchRunPro2SceneImageNodes,
   readPro2SceneRowsForHub,
 } from "@/lib/canvas/pro2-spawn-scene-image-group";
-import { formatCharacterRowThreeViewPrompt } from "@/lib/canvas/three-view-prompt-rules";
+import { syncPro2CharacterColumnAndThreeViewDocksFromHub } from "@/lib/canvas/pro2-spawn-character-image-group";
+import {
+  applyPro2CharacterMediaPromptsForKeys,
+} from "@/lib/canvas/pro2-lazy-media-prompts";
+import { readHubVisualStylePack } from "@/lib/canvas/story-pro-visual-style-pack";
 import type {
   StoryProCharacterRow,
   StoryProFrameRow,
@@ -219,13 +224,11 @@ export function Pro2MediaGroupToolbarPanel({
         sourceLabel: defaultName,
         visibility: sharePublic ? "public" : "private",
       });
-      await alert({
-        title: sharePublic ? "已公开分享" : "已保存模板",
-        message: sharePublic
-          ? "工作流已出现在首页社区模板区。"
-          : "可在「我的模板」中复用。",
-        variant: "success",
-      });
+      showCanvasSuccessToast(
+        sharePublic
+          ? "已公开分享 · 工作流已出现在首页社区模板区"
+          : "已保存模板 · 可在「我的模板」中复用",
+      );
     } catch (e) {
       await alert({
         title: "分享失败",
@@ -373,39 +376,69 @@ export function Pro2MediaGroupToolbarPanel({
     Boolean(kind && controller && rowCount) &&
     (kind !== "video-board" || videoBoardHasMedia);
   const canCopyGroup = childrenIds.length > 0;
+  const hubNodeId = (group?.data as { pro2HubNodeId?: string }).pro2HubNodeId;
 
   const onRegenerateAll = () => {
     if (!controller) return;
     if (kind === "character-board") {
+      if (!hubNodeId) return;
       const rows = readRows<StoryProCharacterRow>(controller);
       if (!rows.length) return;
-      const refreshedRows = rows.map((row) => ({
-        ...row,
-        prompt: formatCharacterRowThreeViewPrompt({
-          name: row.name,
-          role: row.role,
-          appearance: row.appearance,
-        }),
-      }));
-      updateNodeData(controller.id, { rows: refreshedRows });
-      batchRunStoryRows(
-        controller.id,
-        refreshedRows.map((r) => r.key),
-        "threeView",
-        { forceFresh: true },
+      const rowKeys = nodes
+        .filter(
+          (n) =>
+            n.parentId === groupId &&
+            (n.type === "story-pro2-three-view" ||
+              (n.type === "story-pro2-image" &&
+                (n.data as { pro2MediaRole?: string }).pro2MediaRole ===
+                  "character-three-view")),
+        )
+        .map((n) => (n.data as { pro2RowKey?: string }).pro2RowKey)
+        .filter((k): k is string => Boolean(k?.trim()));
+      const keys =
+        rowKeys.length > 0 ? rowKeys : rows.map((r) => r.key);
+      updateNodeData(controller.id, { pro2PendingSyncGroupId: groupId });
+      syncPro2CharacterColumnAndThreeViewDocksFromHub(
+        nodes,
+        hubNodeId,
+        updateNodeData,
       );
+      const nodesAfter = useCanvasStore.getState().nodes;
+      const colAfter = nodesAfter.find((n) => n.id === controller.id);
+      const rowsAfter =
+        (colAfter?.data as { rows?: StoryProCharacterRow[] }).rows ?? rows;
+      const visualPack = readHubVisualStylePack(hubNodeId, nodesAfter);
+      const refreshedRows = applyPro2CharacterMediaPromptsForKeys(
+        rowsAfter,
+        keys,
+        visualPack,
+      );
+      updateNodeData(controller.id, { rows: refreshedRows });
+      batchRunPro2ThreeViewRows(controller.id, keys, { forceFresh: true });
       return;
     }
     if (kind === "scene-board") {
       if (controller?.type === "story-pro2-script-hub") {
         const rows = readPro2SceneRowsForHub(controller.id, nodes);
         if (!rows.length) return;
+        const rowKeys = nodes
+          .filter(
+            (n) =>
+              n.parentId === groupId &&
+              n.type === "story-pro2-image" &&
+              (n.data as { pro2MediaRole?: string }).pro2MediaRole === "scene",
+          )
+          .map((n) => (n.data as { pro2RowKey?: string }).pro2RowKey)
+          .filter((k): k is string => Boolean(k?.trim()));
+        const keys =
+          rowKeys.length > 0 ? rowKeys : rows.map((r) => r.key);
+        updateNodeData(controller.id, { pro2PendingSyncSceneGroupId: groupId });
         batchRunPro2SceneImageNodes(
           nodes,
           controller.id,
           rows,
-          rows.map((r) => r.key),
-          { forceFresh: true },
+          keys,
+          { forceFresh: true, groupId },
         );
         return;
       }
@@ -433,17 +466,25 @@ export function Pro2MediaGroupToolbarPanel({
     if (kind === "frame-board") {
       const rows = readRows<StoryProFrameRow>(controller);
       if (!rows.length) return;
-      batchRunStoryRows(
-        controller.id,
-        rows.map((r) => r.key),
-        "frameImage",
-        { forceFresh: true },
-      );
+      const rowKeys = nodes
+        .filter(
+          (n) =>
+            n.parentId === groupId &&
+            n.type === "story-pro2-image" &&
+            (n.data as { pro2MediaRole?: string }).pro2MediaRole === "frame",
+        )
+        .map((n) => (n.data as { pro2RowKey?: string }).pro2RowKey)
+        .filter((k): k is string => Boolean(k?.trim()));
+      const keys =
+        rowKeys.length > 0 ? rowKeys : rows.map((r) => r.key);
+      updateNodeData(controller.id, { pro2PendingSyncGroupId: groupId });
+      batchRunPro2FrameRows(controller.id, keys, {
+        forceFresh: true,
+      });
       return;
     }
   };
 
-  const hubNodeId = (group?.data as { pro2HubNodeId?: string }).pro2HubNodeId;
   const frameRowsForVideo = useMemo(() => {
     if (kind !== "frame-board" || !controller) return [];
     return readRows<StoryProFrameRow>(controller);

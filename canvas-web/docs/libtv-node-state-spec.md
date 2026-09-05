@@ -25,20 +25,20 @@
 - 初始态 **不**在节点内重复底部 Dock 的快捷工具（图片反推 / 视频反推 / 文生视频 → 见画布底部 `Pro2CanvasToolbar`）。
 - 连线判定：`pro2ThinNodeIsLinked`（有边即 connected，不要求内容已同步）。
 
-## 脚本生成器 · `story-pro2-script-hub`
+## 故事脚本生成 · `story-pro2-script-hub`
 
-用户可见名：**脚本生成器**（`PRO2_SCRIPT_HUB_NODE_LABEL`）。勿与列节点 `story-pro2-frame`（分镜脚本列）混淆。
+用户可见名：**故事脚本生成**（`PRO2_SCRIPT_HUB_NODE_LABEL`）。勿与列节点 `story-pro2-frame`（分镜脚本列）混淆。
 
 | 态 | 节点标题 | 节点内 Stage | 底部 Dock |
 | --- | --- | --- | --- |
-| **initial** | **脚本生成器** | Logo +「尝试：」三条能力说明（剧本/视频参考/角色 → 分镜脚本）+ 底部引导文案 | `Pro2ScriptInputDock` · 模型 + 剧情输入 + 发送 |
-| **connected** | **脚本生成器** | Logo + 连线说明（如「已链接文本节点 · 在下方 Dock 输入后发送」） | 上游 Chip + 输入 + 发送 |
+| **initial** | **故事脚本生成** | Logo +「尝试：」左栏能力快捷 + 右栏 **剧本类别**（古风甜宠 / 默认剧本大师） | `Pro2ScriptInputDock` · 模型 + 剧情输入 + 发送 |
+| **connected** | **故事脚本生成** | Logo + 连线说明（如「已链接文本节点 · 在下方 Dock 输入后发送」） | 上游 Chip + 输入 + 发送 |
 | **generated** | **大纲主题**（来自 `resolvePro2HubTableTitle`） | **大纲 / 角色 / 脚本** Tab（`Pro2ScriptHubViewTabs`）+ GFM 预览；生成中 Loader | 输入 + 发送；选中且已有分镜表时显示 `Pro2ScriptHubToolbar` |
-| **error** | 脚本生成器 或 主题标题 | 由 section runtime 写入（见 script-hub helpers） | Dock 可重试 |
+| **error** | 故事脚本生成 或 主题标题 | 由 section runtime 写入（见 script-hub helpers） | Dock 可重试 |
 
 - 初始/连线态 **不**展示空表格壳；仅 **generated** 使用 `Pro2ScriptHubContentPreview`。
 - 连线判定：`pro2ThinNodeIsLinked`（有边即 connected；`outlineMd` 未同步也算 connected）。
-- **生成逻辑（蓝色箭头 · Dock 发送）**：`enqueuePro2ScriptGeneration` 始终按序 LLM：`outline` → `character` → `storyboard`（完整脚本）。
+- **生成逻辑（蓝色箭头 · Dock 发送）**：`enqueuePro2ScriptGeneration` 单次 LLM（`outline` 段 · `step=full_pack` JSON）；角色/场景/分镜 Tab 由 apply 拆分。单段重生成仍走 `runStoryHubSection`。
 - **工具栏按钮功能**：
   - 「重新生成」→ 重新生成完整脚本（同上）
   - 「生成分镜」→ 根据已有脚本表生成分镜 **图片**（`kickoffPro2FrameBoardFromHub`）

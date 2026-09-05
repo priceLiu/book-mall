@@ -15,6 +15,8 @@ import {
 } from "@/lib/auth/sms-bypass";
 import { prisma } from "@/lib/prisma";
 import { sendSmsMessage } from "@/lib/sms/send-sms";
+import { smsProvider } from "@/lib/sms/sms-config";
+import { consumeRateLimit, SMS_BURST_IP } from "@/lib/auth/auth-throttle";
 
 const CODE_TTL_MS = 5 * 60 * 1000;
 /** 团队邀请链接内验证码与 TenantInvite 同 TTL（7 天） */
@@ -99,9 +101,13 @@ export async function issueSmsCode(input: {
     if (ipDayCount >= MAX_DAILY_PER_IP) {
       throw new SmsRateLimitError("请求过于频繁，请稍后再试");
     }
+    if (consumeRateLimit(`sms:ip:${input.sendIp}`, SMS_BURST_IP)) {
+      throw new SmsRateLimitError("请求过于频繁，请稍后再试");
+    }
   }
 
-  const code = isMockSmsPhone(phone) ? MOCK_SMS_CODE : generateCode();
+  const isMock = smsProvider() === "mock" || isMockSmsPhone(phone);
+  const code = isMock ? MOCK_SMS_CODE : generateCode();
   const codeHash = await bcrypt.hash(code, 10);
   const expiresAt = new Date(now.getTime() + codeTtlMs(input.purpose));
 
@@ -124,7 +130,7 @@ export async function issueSmsCode(input: {
   });
 
   const result: { code: string; mockCode?: string } = { code };
-  if (isMockSmsPhone(phone) && process.env.NODE_ENV !== "production") {
+  if (isMock && process.env.NODE_ENV !== "production") {
     result.mockCode = code;
   }
   return result;
@@ -222,7 +228,35 @@ export async function verifySmsCode(input: {
     orderBy: { createdAt: "desc" },
   });
 
-  if (!row) throw new SmsVerificationError("验证码无效或已过期");
+  if (!row) {
+    // 区分两种情况：消费过 vs 确实没有
+    const consumed = await prisma.smsVerification.findFirst({
+      where: {
+        phone,
+        purpose: input.purpose,
+        consumedAt: { not: null },
+        ...(input.inviteToken ? { inviteToken: input.inviteToken.trim() } : { inviteToken: null }),
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    if (consumed) {
+      throw new SmsVerificationError("验证码已使用，请重新获取");
+    }
+    const expired = await prisma.smsVerification.findFirst({
+      where: {
+        phone,
+        purpose: input.purpose,
+        consumedAt: null,
+        expiresAt: { lte: new Date() },
+        ...(input.inviteToken ? { inviteToken: input.inviteToken.trim() } : { inviteToken: null }),
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    if (expired) {
+      throw new SmsVerificationError("验证码已过期（5分钟有效），请重新获取");
+    }
+    throw new SmsVerificationError("验证码无效，请重新获取");
+  }
 
   if (row.attemptCount >= MAX_VERIFY_ATTEMPTS) {
     throw new SmsVerificationError("验证码错误次数过多，请重新获取");

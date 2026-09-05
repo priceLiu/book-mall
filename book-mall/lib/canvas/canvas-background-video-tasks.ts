@@ -3,9 +3,12 @@
  */
 import type { CanvasGenerationTask } from "@prisma/client";
 
-import { isCanvasVolcengineVideoTaskPayload } from "@/lib/canvas/canvas-constants";
 import {
-  isRecoverableVolcengineStallFailCode,
+  isCanvasAsyncVideoEngineTaskPayload,
+} from "@/lib/canvas/canvas-constants";
+import { canvasNodeShowsPersistedMedia } from "@/lib/canvas/canvas-media-patch";
+import {
+  isRecoverableVideoBackgroundStallFailCode,
   isVideoBackgroundGenerationAge,
   readVideoBackgroundGeneration,
   VIDEO_BACKGROUND_GENERATION_LABEL,
@@ -15,6 +18,9 @@ import {
 import { VIDEO_BACKGROUND_UI_MS } from "@/lib/gateway/video-task-wait-policy";
 import { canvasTaskTerminalCutoffDate } from "@/lib/canvas/canvas-task-hot-window";
 import { prisma } from "@/lib/prisma";
+
+export const VIDEO_BACKGROUND_READY_HINT =
+  "成片已就绪，请点击「加载到节点」写入画布。";
 
 export type CanvasBackgroundVideoTaskRow = {
   taskId: string;
@@ -110,7 +116,7 @@ export async function listCanvasProjectBackgroundVideoTasks(input: {
 
   for (const task of tasks) {
     const payload = taskPayload(task);
-    if (!payload || !isCanvasVolcengineVideoTaskPayload(payload)) continue;
+    if (!payload || !isCanvasAsyncVideoEngineTaskPayload(payload)) continue;
 
     const gatewayLogId =
       typeof payload.gatewayLogId === "string"
@@ -164,15 +170,28 @@ export async function listCanvasProjectBackgroundVideoTasks(input: {
       gatewayStatus === "RUNNING" ||
       gatewayStatus === "PENDING";
 
-    if (hasMedia && task.status === "SUCCEEDED" && !inflight) {
+    if (
+      hasMedia &&
+      task.status === "SUCCEEDED" &&
+      !inflight &&
+      canvas != null &&
+      canvasNodeShowsPersistedMedia(canvas, task.nodeId, task.id)
+    ) {
       continue;
     }
 
     const recoverableStall =
       (task.status === "FAILED" &&
-        isRecoverableVolcengineStallFailCode(task.failCode)) ||
+        isRecoverableVideoBackgroundStallFailCode(task.failCode)) ||
       (gatewayStatus === "FAILED" &&
-        isRecoverableVolcengineStallFailCode(gatewayFailCode));
+        isRecoverableVideoBackgroundStallFailCode(gatewayFailCode));
+
+    const readyToLoad =
+      hasMedia &&
+      task.status === "SUCCEEDED" &&
+      !inflight &&
+      canvas != null &&
+      !canvasNodeShowsPersistedMedia(canvas, task.nodeId, task.id);
 
     const backgroundGenerating =
       inflight &&
@@ -184,11 +203,13 @@ export async function listCanvasProjectBackgroundVideoTasks(input: {
           VIDEO_BACKGROUND_UI_MS,
         ));
 
-    if (!backgroundGenerating && !recoverableStall) continue;
+    if (!backgroundGenerating && !recoverableStall && !readyToLoad) continue;
 
-    const kind: CanvasBackgroundVideoTaskRow["kind"] = recoverableStall
-      ? "recoverable_stall"
-      : "background_generating";
+    const kind: CanvasBackgroundVideoTaskRow["kind"] = readyToLoad
+      ? "ready_to_load"
+      : recoverableStall
+        ? "recoverable_stall"
+        : "background_generating";
 
     out.push({
       taskId: task.id,
@@ -202,10 +223,12 @@ export async function listCanvasProjectBackgroundVideoTasks(input: {
       ageSec,
       kind,
       label: nodeLabelFromCanvas(canvas, task.nodeId),
-      hint: recoverableStall
-        ? VIDEO_BACKGROUND_RECOVER_HINT
-        : VIDEO_BACKGROUND_WAIT_HINT,
-      canRecover: recoverableStall || kind === "background_generating",
+      hint: readyToLoad
+        ? VIDEO_BACKGROUND_READY_HINT
+        : recoverableStall
+          ? VIDEO_BACKGROUND_RECOVER_HINT
+          : VIDEO_BACKGROUND_WAIT_HINT,
+      canRecover: recoverableStall || kind === "background_generating" || readyToLoad,
     });
   }
 

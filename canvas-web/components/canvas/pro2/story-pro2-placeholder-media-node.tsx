@@ -16,6 +16,7 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import { selectPro2NodeAfterSpawn } from "@/lib/canvas/pro2-spawn-select";
 import type { Pro2ImageMediaRole } from "@/lib/canvas/story-pro2-workspace-types";
 import { LibtvImageNode } from "../libtv-image-node";
+import { StoryPro2AudioNode } from "./story-pro2-audio-node";
 
 const PLACEHOLDER_LABELS: Record<string, string> = {
   "story-pro2-prop": "道具",
@@ -65,20 +66,12 @@ export function StoryPro2PlaceholderMediaNode(props: NodeProps) {
 
   if (nodeType === "story-pro2-audio") {
     return (
-      <LibtvImageNode
+      <StoryPro2AudioNode
         {...props}
         data={{
           ...(props.data as Record<string, unknown>),
           label: (props.data as { label?: string }).label ?? defaultLabel,
         }}
-        edition="pro2"
-        rfNodeType="story-pro2-image"
-        saveAsAssetKind="story-pro2-image"
-        leftMenuSections={PRO2_IMAGE_LEFT_ADD_MENU}
-        rightMenuSections={PRO2_RIGHT_ADD_MENU}
-        onSidePickLeft={onSidePick("left")}
-        onSidePickRight={onSidePick("right")}
-        onSelectAfterDuplicate={(newId) => selectPro2NodeAfterSpawn(setNodes, newId)}
       />
     );
   }

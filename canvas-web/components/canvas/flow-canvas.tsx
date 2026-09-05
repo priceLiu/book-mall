@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutTemplate } from "lucide-react";
 import {
-  Background,
-  BackgroundVariant,
   PanOnScrollMode,
   ReactFlow,
   ReactFlowProvider,
@@ -21,19 +19,31 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { hasLibtvMediaCanvasNodes } from "@/lib/canvas/libtv-canvas-detect";
+import {
+  libtvCanvasReflowFitViewOptions,
+} from "@/lib/canvas/libtv-canvas-viewport-reflow";
+import {
+  CANVAS_VIEWPORT_MAX_ZOOM,
+  CANVAS_VIEWPORT_MIN_ZOOM,
+} from "@/lib/canvas/canvas-viewport-zoom";
+import { flushCanvasTextDrafts } from "@/lib/canvas/flush-text-drafts";
+import { CANVAS_COMMIT_NODE_POSITIONS_EVENT } from "@/lib/canvas/canvas-commit-node-positions";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   augmentStoreChangesWithResizePositions,
   applyLibtvGroupResizeFrame,
   buildGroupResizeFrozenAbs,
   buildGeometryPatchesFromRf,
+  extractNodeRemoveChanges,
   extractResizeCommitIds,
   findGroupResizeSessionId,
+  hasNodeRemoveChanges,
   isGroupResizeCommitFrame,
   isCanvasInteractiveGeometryInProgress,
   isCanvasPositionCommitOnly,
   isCanvasDimensionCommitOnly,
   isResizeRelatedChange,
+  extractSelectNodeChanges,
   filterStoreBoundNodeChanges,
   readGroupResizeGeometry,
   type GroupResizeFrozenAbs,
@@ -48,6 +58,7 @@ import {
   resolveLibtvFloatingDockSelection,
 } from "@/lib/canvas/libtv-floating-dock-selection";
 import { cloneCanvasNodeData } from "@/lib/canvas/clone-node-data";
+import { remapClonedNodeData } from "@/lib/canvas/remap-cloned-graph-refs";
 import { isSbv1MediaGroup } from "@/lib/canvas/sbv1-media-group-meta";
 import {
   isPro2StyledGroup,
@@ -58,10 +69,18 @@ import type {
   CanvasFlowNode,
   CanvasNodeType,
 } from "@/lib/canvas/types";
+import { isGroupNode } from "@/lib/canvas/types";
+import { pro2NodeAbsolutePosition } from "@/lib/canvas/pro2-selection-bbox";
 import { buildTextNodeDataFromPreset } from "@/lib/canvas/text-templates";
 import { buildImageEngineDataFromPreset } from "@/lib/canvas/image-engine-presets";
-import { uploadCanvasImage } from "@/lib/canvas-api";
-import { normalizeCanvasImageFile } from "@/lib/canvas/normalize-canvas-image-file";
+import { scheduleCanvasImageUpload } from "@/lib/canvas/canvas-image-preview-upload";
+import { scheduleCanvasVideoUpload, canvasVideoPreviewLabel } from "@/lib/canvas/canvas-video-preview-upload";
+import {
+  fitGenericImageNodeNaturalSize,
+  fitLibtvUploadedImageNaturalSize,
+  fitLibtvUploadedVideoNaturalSize,
+} from "@/lib/canvas/libtv-media-aspect-preset-apply";
+import { buildSbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-spawn-nodes";
 import {
   registerCanvasViewportPlacement,
   unregisterCanvasViewportPlacement,
@@ -73,8 +92,20 @@ import {
 import { ensureNodeDragHandles } from "@/lib/canvas/normalize-graph-nodes";
 import {
   CANVAS_RF_SELECT_NODE_EVENT,
+  CANVAS_RF_VIEWPORT_READY_EVENT,
   mergeStoreNodesIntoRf,
 } from "@/lib/canvas/canvas-rf-sync";
+import { commitLibtvRfNodeSelection } from "@/lib/canvas/select-libtv-node";
+import { useLibtvCanvasOverlayClickThrough } from "@/lib/canvas/use-libtv-canvas-overlay-click-through";
+import { filterSpuriousRfEdgeRemoves } from "@/lib/canvas/canvas-edge-change-guard";
+import {
+  CANVAS_EDGE_STROKE_WIDTH,
+  CANVAS_EDGE_STROKE_WIDTH_ACTIVE,
+  CANVAS_EDGE_STROKE_WIDTH_CONNECTING,
+  CANVAS_EDGE_Z_NODE_GAP,
+  canvasEdgeLayerClassName,
+  resolveLibtvCanvasEdgeZIndex,
+} from "@/lib/canvas/canvas-edge-layer-z";
 import { CANVAS_GRAPH_UNDO_REDO_EVENT } from "@/lib/canvas/canvas-graph-undo-redo";
 import { resolveSnapConnectionOnNodeHit, findNearestSidePlusHandle } from "@/lib/canvas/libtv-connection-snap";
 import {
@@ -86,6 +117,7 @@ import {
   buildDragSnapCandidates,
   canvasDragSnapThreshold,
   computeDragSnap,
+  filterNearbySnapCandidates,
   flowViewportRect,
   nodeSnapBox,
   snapGuideKey,
@@ -98,6 +130,7 @@ import { canvasNotify } from "@/lib/canvas/canvas-notify";
 import { validateStoryPipelineDeletion } from "@/lib/canvas/story-pipeline-delete-guard";
 import {
   allImageFilesFromDataTransfer,
+  allVideoFilesFromDataTransfer,
   resolveClipboardImageFiles,
   isEditablePasteTarget,
   getLastPointerClient,
@@ -116,6 +149,7 @@ import { Pro2SelectionToolbar } from "./pro2/pro2-selection-toolbar";
 import { Pro2SelectionBatchConnectLayer } from "./pro2/pro2-selection-batch-connect";
 import { LibtvSideConnectLayer } from "./pro2/libtv-side-connect-layer";
 import { Pro2StarterInputDock } from "./pro2/pro2-starter-input-dock";
+import { Pro2PromptInputDock } from "./pro2/pro2-prompt-input-dock";
 import { Pro2ScriptInputDock } from "./pro2/pro2-script-input-dock";
 import { LibtvImageInputDock } from "./libtv-image-input-dock";
 import { LibtvAudioInputDock } from "./libtv-audio-input-dock";
@@ -124,6 +158,7 @@ import { JianyingAutoRenderFloatingDock } from "./pro2/jianying-auto-render-floa
 import { Pro2ThreeViewInputDock } from "./pro2/pro2-three-view-input-dock";
 import { Pro2TextNodeOutlineEditorHost } from "./pro2/pro2-text-node-outline-editor-host";
 import { Pro2ScriptTableEditorHost } from "./pro2/pro2-script-table-editor-host";
+import { Director3dDeskEditorHost } from "./pro2/director-3d-desk-editor-host";
 import type {
   StoryProScriptHubNodeData,
   StoryProStarterNodeData,
@@ -172,9 +207,12 @@ const edgeTypes = {
   default: DeletableEdge,
 } as const;
 
-/** 连线 zIndex：高于组框(5)、低于媒体子节点(22) · 须配合 zIndexMode="manual" */
+/** 连线 zIndex：组内 24 · 跨组 4 · 画布外 12 · 须配合 zIndexMode="manual" */
 const CANVAS_EDGE_Z_INDEX = 12;
-const CANVAS_DEFAULT_EDGE_OPTIONS = { zIndex: CANVAS_EDGE_Z_INDEX } as const;
+const CANVAS_DEFAULT_EDGE_OPTIONS = {
+  zIndex: CANVAS_EDGE_Z_INDEX,
+  style: { strokeWidth: CANVAS_EDGE_STROKE_WIDTH },
+} as const;
 
 export const canvasFlowNodeTypes = memoizedNodeTypes;
 export const canvasFlowEdgeTypes = edgeTypes;
@@ -234,6 +272,8 @@ function FlowCanvasInner({
   const groupResizeSnapshotRef = useRef<GroupResizeSnapshot | null>(null);
   const groupResizeIdRef = useRef<string | null>(null);
   const groupResizeDetachedRef = useRef(false);
+  /** 组内子节点拖动时暂解除 extent，松手后恢复或 reparent */
+  const groupChildDragLiftRef = useRef<Set<string>>(new Set());
   /** 用户真实拖过组框角/边（resizing:true）· pointerup 仅此时落库 */
   const groupResizeUserActiveRef = useRef(false);
   /** store→RF 推送期间忽略 RF 回写的选中/测量/坐标 echo，避免打组后 Maximum update depth */
@@ -266,6 +306,15 @@ function FlowCanvasInner({
       syncingGraphFromStoreRef.current = false;
       syncingGraphFromStoreTimerRef.current = null;
     }, 300);
+  }, []);
+
+  const clearDragSnapGuides = useCallback(() => {
+    if (dragSnapRafRef.current !== null) {
+      cancelAnimationFrame(dragSnapRafRef.current);
+      dragSnapRafRef.current = null;
+    }
+    lastSnapGuideKeyRef.current = "";
+    setSnapGuides([]);
   }, []);
 
   const storeOnNodesChange = useCanvasStore((s) => s.onNodesChange);
@@ -328,16 +377,26 @@ function FlowCanvasInner({
     const finishInitialFit = () => {
       initialFitDoneRef.current = true;
     };
-    // Pro2 打开时统一 fitView，忽略 DB 里各项目不一致的旧 viewport
-    if (isLibtv && pro2FloatingInspector) {
-      void fitView({ padding: 0.12, duration: 0 }).then(() => {
+    const clearMediaReflowPending = () => {
+      useCanvasStore.getState().clearLibtvMediaViewportReflowPending();
+    };
+    const mediaReflowFit = () =>
+      fitView(libtvCanvasReflowFitViewOptions()).then(() => {
         syncVp();
-        requestAnimationFrame(() => {
-          void fitView({ padding: 0.12, duration: 0 }).then(() => {
-            syncVp();
-            finishInitialFit();
-          });
-        });
+        clearMediaReflowPending();
+      });
+
+    // 媒体外框迁移（如顶边统一算法）后须 fitView；否则旧 pan/zoom 下节点 2× 会溢出屏幕
+    if (isLibtv && state.libtvMediaViewportReflowPending) {
+      void mediaReflowFit().then(finishInitialFit);
+      return;
+    }
+
+    // Pro2 打开保持已保存视口，勿 fitView（单节点新建时 fitView 会放大节点）
+    if (isLibtv && pro2FloatingInspector) {
+      void rfSetViewport(state.viewport, { duration: 0 }).then(() => {
+        syncVp();
+        finishInitialFit();
       });
       return;
     }
@@ -367,6 +426,7 @@ function FlowCanvasInner({
     hasLibtvMediaCanvasNodes(rfNodes);
   const enablePaneContextMenu = libtvCanvas;
   const enableDragSnapGuides = libtvCanvas;
+  useLibtvCanvasOverlayClickThrough(libtvCanvas);
 
   const resolveGuideViewport = useCallback((): FlowViewportRect | undefined => {
     const el = wrapRef.current;
@@ -537,7 +597,7 @@ function FlowCanvasInner({
     setCanvasDraggingNodeId,
   ]);
 
-  /** LibTV 打开时勿用 graph 里旧 viewport 作为 RF 初值，等 fitView 完成 */
+  /** LibTV 打开时勿用 graph 里旧 viewport 作为 RF 初值；Pro2 保持 100% */
   const flowDefaultViewport = useMemo(() => {
     const isLibtv =
       pro2FloatingInspector ||
@@ -553,7 +613,10 @@ function FlowCanvasInner({
   useEffect(() => {
     const unsub = useCanvasStore.subscribe((state, prev) => {
       if (state.nodes !== prev.nodes) {
-        if (deferStoreGraphSyncRef.current) {
+        if (
+          deferStoreGraphSyncRef.current ||
+          state.canvasGeometryDragging
+        ) {
           // 拖动/组缩放中：禁止 store→RF 盖布局（避免子节点被旧相对坐标重绘乱动）
           // 仅结构变化（增删/换父）时强制对齐
           const structural =
@@ -569,6 +632,7 @@ function FlowCanvasInner({
         setRfNodes((rf) =>
           mergeStoreNodesIntoRf(rf, state.nodes, {
             preserveRfSelection: true,
+            preserveRfPositions: useCanvasStore.getState().canvasGeometryDragging,
           }),
         );
       }
@@ -591,6 +655,7 @@ function FlowCanvasInner({
       setRfNodes((rf) =>
         mergeStoreNodesIntoRf(rf, s.nodes, {
           preserveRfSelection: false,
+          preserveRfPositions: useCanvasStore.getState().canvasGeometryDragging,
         }),
       );
       setRfEdges(s.edges);
@@ -606,9 +671,10 @@ function FlowCanvasInner({
       const nodeId = (event as CustomEvent<{ nodeId?: string }>).detail
         ?.nodeId;
       if (!nodeId) return;
-      setRfNodes((prev) =>
-        prev.map((n) => ({ ...n, selected: n.id === nodeId })),
-      );
+      const nodeType =
+        useCanvasStore.getState().nodes.find((n) => n.id === nodeId)?.type ??
+        null;
+      commitLibtvRfNodeSelection(setRfNodes, nodeId, nodeType);
     };
     window.addEventListener(CANVAS_RF_SELECT_NODE_EVENT, onRfSelect);
     return () =>
@@ -629,35 +695,35 @@ function FlowCanvasInner({
   ]);
 
   /** 勿用受控 viewport：节点轮询会频繁重渲染，store 里的旧视口会把滚轮缩放拉回 */
-  const onMoveEnd = useCallback(
-    (_event: MouseEvent | TouchEvent | null, vp: Viewport) => {
-      setCanvasViewportMoving(false);
-      if (!isNodeDraggingRef.current) {
-        setCanvasGeometryDragging(false);
-        setCanvasDraggingNodeId(null);
-      }
-      if (viewportTimerRef.current !== null) {
-        window.clearTimeout(viewportTimerRef.current);
-      }
-      viewportTimerRef.current = window.setTimeout(() => {
-        setViewport(vp);
-        viewportTimerRef.current = null;
-      }, 350);
-    },
-    [
-      setViewport,
-      setCanvasViewportMoving,
-      setCanvasGeometryDragging,
-      setCanvasDraggingNodeId,
-    ],
-  );
-
   const flushAutosaveAfterDrag = useCallback(() => {
     if (typeof window === "undefined") return;
     window.dispatchEvent(
       new CustomEvent("canvas:flush-autosave", { detail: { immediate: true } }),
     );
   }, []);
+
+  const onMoveEnd = useCallback(
+    (_event: MouseEvent | TouchEvent | null, vp: Viewport) => {
+      setCanvasViewportMoving(false);
+      if (!isNodeDraggingRef.current) {
+        setCanvasGeometryDragging(false);
+        setCanvasDraggingNodeId(null);
+        flushAutosaveAfterDrag();
+      }
+      if (viewportTimerRef.current !== null) {
+        window.clearTimeout(viewportTimerRef.current);
+        viewportTimerRef.current = null;
+      }
+      setViewport(vp);
+    },
+    [
+      setViewport,
+      flushAutosaveAfterDrag,
+      setCanvasViewportMoving,
+      setCanvasGeometryDragging,
+      setCanvasDraggingNodeId,
+    ],
+  );
 
   const clearGroupResizeSession = useCallback(() => {
     groupResizeFrozenRef.current = null;
@@ -850,6 +916,15 @@ function FlowCanvasInner({
           rfChanges,
           rfBeforeChange,
         ) as CanvasFlowNode[];
+      } else {
+        const selectChanges = extractSelectNodeChanges(rfChanges);
+        if (selectChanges.length > 0) {
+          onRfNodesChange(selectChanges);
+          rfAfterChange = applyNodeChanges(
+            selectChanges,
+            rfAfterChange,
+          ) as CanvasFlowNode[];
+        }
       }
 
       if (
@@ -891,13 +966,6 @@ function FlowCanvasInner({
         return;
       }
 
-      // store→RF 推送期间：RF 会批量回写选中/测量/相对坐标，一律不落库
-      if (syncingGraphFromStoreRef.current) {
-        setCanvasGeometryDragging(false);
-        setCanvasDraggingNodeId(null);
-        return;
-      }
-
       const storeChanges = filterStoreBoundNodeChanges(rfChanges);
       const syncLibtvFloatingDockPinFromRf = () => {
         const sel = resolveLibtvFloatingDockSelection(
@@ -909,6 +977,27 @@ function FlowCanvasInner({
         );
       };
 
+      // store→RF 推送期间：选中/测量/相对坐标回写不落库；删除须立即落库，否则 RF 已删而 store 仍留节点会被 merge 还原
+      if (syncingGraphFromStoreRef.current) {
+        setCanvasGeometryDragging(false);
+        setCanvasDraggingNodeId(null);
+        const selectChanges = extractSelectNodeChanges(rfChanges);
+        if (selectChanges.length > 0) {
+          onRfNodesChange(selectChanges);
+          if (libtvCanvas) {
+            syncLibtvFloatingDockPinFromRf();
+          }
+        }
+        if (hasNodeRemoveChanges(storeChanges)) {
+          deferStoreGraphSyncRef.current = false;
+          storeOnNodesChange(extractNodeRemoveChanges(storeChanges));
+          if (libtvCanvas) {
+            syncLibtvFloatingDockPinFromRf();
+          }
+        }
+        return;
+      }
+
       // 拖动 session 内 pause 了 undo；松手帧若此时写 store 会被 zundo 吞掉 → 延后到 onNodeDragStop
       if (dragUndoPausedRef.current && storeChanges.length > 0) {
         const resizeCommitIdsForDefer = extractResizeCommitIds(rfChanges);
@@ -917,9 +1006,8 @@ function FlowCanvasInner({
           isCanvasPositionCommitOnly(storeChanges) ||
           isCanvasDimensionCommitOnly(storeChanges, manualIdsForDefer)
         ) {
-          deferStoreGraphSyncRef.current = false;
-          setCanvasGeometryDragging(false);
-          setCanvasDraggingNodeId(null);
+          // 坐标提交延后到 onNodeDragStop；须保持 dragging + defer 直至 RF 坐标落库
+          deferStoreGraphSyncRef.current = true;
           if (libtvCanvas && rfChanges.some((c) => c.type === "select")) {
             syncLibtvFloatingDockPinFromRf();
           }
@@ -1021,8 +1109,18 @@ function FlowCanvasInner({
 
   const handleEdgesChange = useCallback(
     (changes: Parameters<typeof storeOnEdgesChange>[0]) => {
-      onRfEdgesChange(changes);
-      storeOnEdgesChange(changes);
+      if (syncingGraphFromStoreRef.current) {
+        return;
+      }
+      const { edges, nodes } = useCanvasStore.getState();
+      const { changes: safeChanges } = filterSpuriousRfEdgeRemoves(
+        changes,
+        edges,
+        nodes,
+      );
+      if (!safeChanges.length) return;
+      onRfEdgesChange(safeChanges);
+      storeOnEdgesChange(safeChanges);
     },
     [onRfEdgesChange, storeOnEdgesChange],
   );
@@ -1051,9 +1149,10 @@ function FlowCanvasInner({
     rfReadyRef.current = true;
     initialFitDoneRef.current = false;
     applyInitialViewport();
+    window.dispatchEvent(new Event(CANVAS_RF_VIEWPORT_READY_EVENT));
   }, [applyInitialViewport]);
 
-  /** hydrate 后节点才到位 · onInit 时可能仍为空，此处补一次 LibTV fitView */
+  /** hydrate 后节点才到位 · onInit 时可能仍为空，此处补一次 LibTV 初视口 */
   useEffect(() => {
     if (!rfReadyRef.current || initialFitDoneRef.current) return;
     if (storeNodes.length === 0) return;
@@ -1083,9 +1182,18 @@ function FlowCanvasInner({
   useEffect(() => {
     if (fitViewNonce <= 0) return;
     const syncVp = () => setViewport(getViewport());
+    const clearMediaReflowPending = () => {
+      useCanvasStore.getState().clearLibtvMediaViewportReflowPending();
+    };
+    const pendingMediaReflow =
+      useCanvasStore.getState().libtvMediaViewportReflowPending;
     const runFit = () =>
-      fitView({ padding: 0.12, duration: 0 }).then(() => {
+      fitView({
+        ...libtvCanvasReflowFitViewOptions(),
+        ...(pendingMediaReflow ? {} : { minZoom: CANVAS_VIEWPORT_MIN_ZOOM }),
+      }).then(() => {
         syncVp();
+        if (pendingMediaReflow) clearMediaReflowPending();
       });
     const t = window.requestAnimationFrame(() => {
       void runFit().then(() => {
@@ -1112,28 +1220,12 @@ function FlowCanvasInner({
 
   /** 上传一个图片 File，并在指定位置创建 image 节点。返回新节点 id。 */
   const ingestImageFile = useCallback(
-    async (
+    (
       file: File,
       position: { x: number; y: number },
       labelOverride?: string,
     ) => {
-      let normalized = file;
-      try {
-        normalized = await normalizeCanvasImageFile(file);
-      } catch (e) {
-        const imageType: CanvasNodeType = sbv1Canvas
-          ? "sbv1-image"
-          : pro2FloatingInspector
-            ? "story-pro2-image"
-            : "image";
-        const id = addNode(imageType, position, {
-          uploading: false,
-          uploadError: e instanceof Error ? e.message : String(e),
-          label: labelOverride ?? file.name ?? "粘贴的图片",
-        });
-        return id;
-      }
-      const blobUrl = URL.createObjectURL(normalized);
+      const blobUrl = URL.createObjectURL(file);
       const imageType: CanvasNodeType = sbv1Canvas
         ? "sbv1-image"
         : pro2FloatingInspector
@@ -1142,28 +1234,106 @@ function FlowCanvasInner({
       const id = addNode(imageType, position, {
         blobUrl,
         uploading: true,
-        label: labelOverride ?? normalized.name ?? "粘贴的图片",
+        label: labelOverride ?? file.name ?? "粘贴的图片",
+        ...(sbv1Canvas ? { imageMode: "upload" as const } : {}),
       });
-      if (!base) {
-        updateNodeData(id, {
-          uploading: false,
-          uploadError: "画布未就绪，请刷新后重试",
-        });
-        return id;
-      }
-      try {
-        const ossUrl = await uploadCanvasImage(base, normalized);
-        updateNodeData(id, { ossUrl, uploading: false });
-      } catch (e) {
-        updateNodeData(id, {
-          uploading: false,
-          uploadError: e instanceof Error ? e.message : String(e),
-        });
+      scheduleCanvasImageUpload({
+        nodeId: id,
+        file,
+        base,
+        updateNodeData,
+        previewBlobUrl: blobUrl,
+      });
+      if (imageType === "image") {
+        queueMicrotask(() => fitGenericImageNodeNaturalSize(id, blobUrl));
+      } else {
+        queueMicrotask(() => fitLibtvUploadedImageNaturalSize(id, blobUrl));
       }
       return id;
     },
     [addNode, base, updateNodeData, pro2FloatingInspector, sbv1Canvas],
   );
+
+  /** 上传本地视频并在指定位置创建 sbv1-video-engine 节点（LibTV 画布）。 */
+  const ingestVideoFile = useCallback(
+    (
+      file: File,
+      position: { x: number; y: number },
+      labelOverride?: string,
+    ) => {
+      if (!libtvCanvas) {
+        canvasNotify({
+          title: "无法添加视频",
+          message: "本地视频拖入仅支持分镜视频 / 影视专业版画布",
+          variant: "info",
+        });
+        return null;
+      }
+      const blobUrl = URL.createObjectURL(file);
+      const id = addNode(
+        "sbv1-video-engine",
+        position,
+        buildSbv1VideoEngineNodeData({
+          label: labelOverride ?? canvasVideoPreviewLabel(file),
+          aspectRatio: "auto",
+          uploading: true,
+          runtime: { ephemeralUrl: blobUrl },
+        }),
+      );
+      scheduleCanvasVideoUpload({
+        nodeId: id,
+        file,
+        base,
+        updateNodeData,
+        previewBlobUrl: blobUrl,
+        onUploadError: (message) => {
+          canvasNotify({
+            title: "视频上传失败",
+            message,
+            variant: "error",
+          });
+        },
+      });
+      queueMicrotask(() => fitLibtvUploadedVideoNaturalSize(id, blobUrl));
+      return id;
+    },
+    [addNode, base, libtvCanvas, updateNodeData],
+  );
+
+  const liftGroupChildrenExtent = useCallback(
+    (draggedNodeId: string) => {
+      setRfNodes((prev) => {
+        const dragged = prev.find((n) => n.id === draggedNodeId);
+        if (!dragged?.parentId) return prev;
+
+        const selectedInGroup = prev.filter((n) => n.selected && n.parentId);
+        const liftIds =
+          selectedInGroup.length > 1 &&
+          selectedInGroup.some((n) => n.id === draggedNodeId)
+            ? new Set(selectedInGroup.map((n) => n.id))
+            : new Set([draggedNodeId]);
+
+        groupChildDragLiftRef.current = liftIds;
+        return prev.map((n) =>
+          liftIds.has(n.id) && n.parentId ? { ...n, extent: undefined } : n,
+        );
+      });
+    },
+    [setRfNodes],
+  );
+
+  const restoreLiftedGroupChildrenExtent = useCallback(() => {
+    const lifted = groupChildDragLiftRef.current;
+    if (!lifted.size) return;
+    groupChildDragLiftRef.current = new Set();
+    setRfNodes((prev) =>
+      prev.map((n) =>
+        lifted.has(n.id) && n.parentId
+          ? { ...n, extent: "parent" as const }
+          : n,
+      ),
+    );
+  }, [setRfNodes]);
 
   // ── 拖入分组归属：识别"鼠标当前是否在某个 group bbox 内"
   const findGroupAtPoint = useCallback(
@@ -1196,7 +1366,7 @@ function FlowCanvasInner({
   const onNodeDragStart = useCallback(
     (_event: React.MouseEvent, node: { id: string; type?: string }) => {
       isNodeDraggingRef.current = true;
-      setIsNodeDragging(true);
+      deferStoreGraphSyncRef.current = true;
       setCanvasGeometryDragging(true);
       setCanvasDraggingNodeId(node.id);
       if (libtvCanvas) {
@@ -1209,22 +1379,34 @@ function FlowCanvasInner({
       } else {
         libtvMultiNodeDragRef.current = false;
       }
-      setSnapGuides([]);
-      lastSnapGuideKeyRef.current = "";
-      if (enableDragSnapGuides) {
-        const all = getNodes() as CanvasFlowNode[];
-        const dragging = all.find((n) => n.id === node.id);
-        snapOthersRef.current = dragging
-          ? buildDragSnapCandidates(dragging, all)
-          : [];
-      } else {
-        snapOthersRef.current = [];
+      if (node.type !== "group") {
+        liftGroupChildrenExtent(node.id);
       }
-      if (dragUndoPausedRef.current) return;
-      useCanvasStore.temporal.getState().pause();
-      dragUndoPausedRef.current = true;
+
+      // 非关键路径延后一帧，避免拖动手感「鼠标先走、节点后追」
+      requestAnimationFrame(() => {
+        setIsNodeDragging(true);
+        setSnapGuides([]);
+        lastSnapGuideKeyRef.current = "";
+        if (dragSnapRafRef.current !== null) {
+          cancelAnimationFrame(dragSnapRafRef.current);
+          dragSnapRafRef.current = null;
+        }
+        if (enableDragSnapGuides) {
+          const all = getNodes() as CanvasFlowNode[];
+          const dragging = all.find((n) => n.id === node.id);
+          snapOthersRef.current = dragging
+            ? buildDragSnapCandidates(dragging, all)
+            : [];
+        } else {
+          snapOthersRef.current = [];
+        }
+        if (dragUndoPausedRef.current) return;
+        useCanvasStore.temporal.getState().pause();
+        dragUndoPausedRef.current = true;
+      });
     },
-    [enableDragSnapGuides, getNodes, setCanvasGeometryDragging, setCanvasDraggingNodeId, libtvCanvas],
+    [enableDragSnapGuides, getNodes, liftGroupChildrenExtent, setCanvasGeometryDragging, setCanvasDraggingNodeId, libtvCanvas],
   );
 
   const onNodeDrag = useCallback(
@@ -1253,17 +1435,23 @@ function FlowCanvasInner({
       if (dragSnapRafRef.current !== null) return;
       dragSnapRafRef.current = window.requestAnimationFrame(() => {
         dragSnapRafRef.current = null;
+        if (!isNodeDraggingRef.current) return;
         const all = getNodes() as CanvasFlowNode[];
         const dragging = all.find((n) => n.id === node.id);
         if (!dragging) return;
         const dragBox = nodeSnapBox(dragging, all);
+        const nearby = filterNearbySnapCandidates(
+          dragBox,
+          snapOthersRef.current,
+        );
         const guideViewport = resolveGuideViewport();
         const { guides } = computeDragSnap(
           dragBox,
-          snapOthersRef.current,
+          nearby,
           canvasDragSnapThreshold(getZoom()),
           guideViewport,
         );
+        if (!isNodeDraggingRef.current) return;
         const key = snapGuideKey(guides);
         if (key === lastSnapGuideKeyRef.current) return;
         lastSnapGuideKeyRef.current = key;
@@ -1297,17 +1485,37 @@ function FlowCanvasInner({
     return true;
   }, [getNodes]);
 
+  useEffect(() => {
+    const onCommitPositions = () => {
+      commitFlowPositionsFromRf();
+    };
+    window.addEventListener(
+      CANVAS_COMMIT_NODE_POSITIONS_EVENT,
+      onCommitPositions,
+    );
+    return () =>
+      window.removeEventListener(
+        CANVAS_COMMIT_NODE_POSITIONS_EVENT,
+        onCommitPositions,
+      );
+  }, [commitFlowPositionsFromRf]);
+
   const onNodeDragStop = useCallback(
     (event: React.MouseEvent, node: { id: string; type?: string; parentId?: string }) => {
       isNodeDraggingRef.current = false;
       setIsNodeDragging(false);
-      setCanvasGeometryDragging(false);
-      setCanvasDraggingNodeId(null);
-      setSnapGuides([]);
+      clearDragSnapGuides();
       if (dragUndoPausedRef.current) {
         useCanvasStore.temporal.getState().resume();
         dragUndoPausedRef.current = false;
       }
+      const finishDragSession = () => {
+        deferStoreGraphSyncRef.current = false;
+        setCanvasGeometryDragging(false);
+        setCanvasDraggingNodeId(null);
+        flushAutosaveAfterDrag();
+        snapOthersRef.current = [];
+      };
       if (node.type === "group") {
         if (enableDragSnapGuides) {
           const all = getNodes() as CanvasFlowNode[];
@@ -1330,9 +1538,8 @@ function FlowCanvasInner({
           }
         }
         commitFlowPositionsFromRf();
-        deferStoreGraphSyncRef.current = false;
         setDragHoverGroup(null);
-        flushAutosaveAfterDrag();
+        finishDragSession();
         return;
       }
       if (enableDragSnapGuides) {
@@ -1359,8 +1566,15 @@ function FlowCanvasInner({
       const gid = findGroupAtPoint(event.clientX, event.clientY);
       const willReparent = gid !== (node.parentId ?? null);
       if (willReparent) {
-        // 进 / 出 / 换组
-        reparentNode(node.id, gid);
+        const rfAll = getNodes() as CanvasFlowNode[];
+        const rfNode = rfAll.find((n) => n.id === node.id);
+        const dropAbs = rfNode
+          ? pro2NodeAbsolutePosition(rfNode, rfAll)
+          : undefined;
+        reparentNode(node.id, gid, dropAbs);
+        groupChildDragLiftRef.current = new Set();
+      } else {
+        restoreLiftedGroupChildrenExtent();
       }
       setDragHoverGroup(null);
       if (libtvCanvas && node.type && node.type !== "group") {
@@ -1369,21 +1583,19 @@ function FlowCanvasInner({
           useCanvasStore.getState().setLibtvFloatingDockSelection(null, null);
           useCanvasStore.getState().setCanvasSelectionDragging(false);
         } else {
-          setRfNodes((prev) =>
-            prev.map((n) => ({ ...n, selected: n.id === node.id })),
-          );
-          useCanvasStore.getState().setLibtvFloatingDockSelection(
+          const dragged = getNodes().find((n) => n.id === node.id);
+          commitLibtvRfNodeSelection(
+            setRfNodes,
             node.id,
-            node.type,
+            dragged?.type ?? node.type ?? null,
           );
         }
         libtvMultiNodeDragRef.current = false;
       }
-      deferStoreGraphSyncRef.current = false;
-      // 坐标可能在 handleNodesChange(dragging:false) 已写入 store；松手一律立即 flush
-      flushAutosaveAfterDrag();
+      finishDragSession();
     },
     [
+      clearDragSnapGuides,
       commitFlowPositionsFromRf,
       enableDragSnapGuides,
       findGroupAtPoint,
@@ -1392,6 +1604,7 @@ function FlowCanvasInner({
       getZoom,
       libtvCanvas,
       reparentNode,
+      restoreLiftedGroupChildrenExtent,
       setDragHoverGroup,
       setRfNodes,
       setCanvasGeometryDragging,
@@ -1399,10 +1612,32 @@ function FlowCanvasInner({
   );
 
   const onConnectStart = useCallback(
-    (_evt: unknown, params: { nodeId?: string | null }) => {
-      setConnectingFrom(params.nodeId ?? null);
+    (
+      _evt: unknown,
+      params: { nodeId?: string | null; handleId?: string | null },
+    ) => {
+      setConnectingFrom(params.nodeId ?? null, params.handleId ?? null);
     },
     [setConnectingFrom],
+  );
+
+  /** ≥2 非 group 节点被选中时改由选区批量 + 承接连线，各节点侧栏 + 收起 */
+  const onSelectionChange = useCallback(
+    ({ nodes: selectedNodes }: { nodes: { type?: string }[] }) => {
+      const count = selectedNodes.filter(
+        (n) => n.type && !isGroupNode(n.type),
+      ).length;
+      const store = useCanvasStore.getState();
+      store.setCanvasMultiSelectActive(count >= 2);
+      if (count >= 2) {
+        store.setLibtvFloatingDockSelection(null, null);
+        store.setPro2FrameDockFocus(null);
+      } else if (count === 0) {
+        store.setLibtvFloatingDockSelection(null, null);
+        store.setPro2FrameDockFocus(null);
+      }
+    },
+    [],
   );
   const onConnectEnd = useCallback<OnConnectEnd>(
     (event, connectionState) => {
@@ -1548,24 +1783,31 @@ function FlowCanvasInner({
 
   const edgesWithLayerZ = useMemo(
     () =>
-      rfEdges.map((e) => ({
-        ...e,
-        zIndex: Math.max(
-          typeof e.zIndex === "number" ? e.zIndex : 0,
-          CANVAS_EDGE_Z_INDEX,
-        ),
-      })),
-    [rfEdges],
+      rfEdges.map((e) => {
+        const z = libtvCanvas
+          ? resolveLibtvCanvasEdgeZIndex(e, storeNodes, focusEdgeIds)
+          : CANVAS_EDGE_Z_INDEX;
+        const layerClass = libtvCanvas ? canvasEdgeLayerClassName(z) : undefined;
+        const className = layerClass
+          ? `${e.className ?? ""} ${layerClass}`.trim()
+          : e.className;
+        return {
+          ...e,
+          className,
+          zIndex: Math.max(typeof e.zIndex === "number" ? e.zIndex : 0, z),
+        };
+      }),
+    [rfEdges, libtvCanvas, storeNodes, focusEdgeIds],
   );
 
   const decoratedEdges = useMemo(() => {
     if (!focusEdgeIds) return edgesWithLayerZ;
     let changed = false;
-    const next = rfEdges.map((e) => {
+    const next = edgesWithLayerZ.map((e) => {
       if (focusEdgeIds.has(e.target)) {
         const className = `${e.className ?? ""} pro2-edge-active pro2-edge-up`.trim();
         if (
-          e.zIndex === CANVAS_EDGE_Z_INDEX &&
+          e.zIndex === CANVAS_EDGE_Z_NODE_GAP &&
           className === e.className &&
           e.style?.stroke === "#60a5fa"
         ) {
@@ -1574,16 +1816,16 @@ function FlowCanvasInner({
         changed = true;
         return {
           ...e,
-          zIndex: CANVAS_EDGE_Z_INDEX,
+          zIndex: CANVAS_EDGE_Z_NODE_GAP,
           className,
-          style: { ...(e.style ?? {}), stroke: "#60a5fa", strokeWidth: 1.5 },
+          style: { ...(e.style ?? {}), stroke: "#60a5fa", strokeWidth: CANVAS_EDGE_STROKE_WIDTH_ACTIVE },
         };
       }
       if (focusEdgeIds.has(e.source)) {
         const className =
           `${e.className ?? ""} pro2-edge-active pro2-edge-down`.trim();
         if (
-          e.zIndex === CANVAS_EDGE_Z_INDEX &&
+          e.zIndex === CANVAS_EDGE_Z_NODE_GAP &&
           className === e.className &&
           e.style?.stroke === "#238636"
         ) {
@@ -1592,21 +1834,16 @@ function FlowCanvasInner({
         changed = true;
         return {
           ...e,
-          zIndex: CANVAS_EDGE_Z_INDEX,
+          zIndex: CANVAS_EDGE_Z_NODE_GAP,
           className,
-          style: { ...(e.style ?? {}), stroke: "#238636", strokeWidth: 1.5 },
+          style: { ...(e.style ?? {}), stroke: "#238636", strokeWidth: CANVAS_EDGE_STROKE_WIDTH_ACTIVE },
         };
       }
-      const opacity = (e.style as { opacity?: number } | undefined)?.opacity;
-      if (opacity === 0.18) return e;
-      changed = true;
-      return {
-        ...e,
-        style: { ...(e.style ?? {}), opacity: 0.18 },
-      };
+      // 勿批量压低非关联连线 opacity — 单选时全图 SVG 重绘导致明显屏闪
+      return e;
     });
     return changed ? next : edgesWithLayerZ;
-  }, [edgesWithLayerZ, focusEdgeIds]);
+  }, [edgesWithLayerZ, focusEdgeIds, rfEdges]);
 
   const onlyRenderVisible =
     forceOnlyRenderVisible || libtvCanvas || rfNodes.length >= 8;
@@ -1633,22 +1870,36 @@ function FlowCanvasInner({
       }
 
       const palette = event.dataTransfer.getData("application/canvas-node-type");
+      const droppedVideos = allVideoFilesFromDataTransfer(event.dataTransfer);
       const droppedImages = allImageFilesFromDataTransfer(event.dataTransfer);
-      if (!palette && droppedImages.length > 0) {
+      if (!palette && (droppedImages.length > 0 || droppedVideos.length > 0)) {
         event.preventDefault();
         const position = screenToFlowPosition({
           x: event.clientX,
           y: event.clientY,
         });
-        await Promise.all(
-          droppedImages.map((f, i) =>
-            ingestImageFile(
-              f,
-              { x: position.x + i * 28, y: position.y + i * 28 },
-              droppedImages.length === 1 ? "拖入的图片" : `拖入 ${i + 1}`,
-            ),
-          ),
-        );
+        let offset = 0;
+        droppedVideos.forEach((f) => {
+          ingestVideoFile(
+            f,
+            {
+              x: position.x + offset * 28,
+              y: position.y + offset * 28,
+            },
+            droppedVideos.length === 1 ? "拖入的视频" : `拖入视频 ${offset + 1}`,
+          );
+          offset += 1;
+        });
+        droppedImages.forEach((f, i) => {
+          ingestImageFile(
+            f,
+            {
+              x: position.x + (offset + i) * 28,
+              y: position.y + (offset + i) * 28,
+            },
+            droppedImages.length === 1 ? "拖入的图片" : `拖入 ${i + 1}`,
+          );
+        });
         return;
       }
       event.preventDefault();
@@ -1677,17 +1928,25 @@ function FlowCanvasInner({
       }
 
       const files = allImageFilesFromDataTransfer(event.dataTransfer);
-      await Promise.all(
-        files.map((f, i) =>
-          ingestImageFile(
-            f,
-            { x: position.x + i * 28, y: position.y + i * 28 },
-            files.length === 1 ? "拖入的图片" : `拖入 ${i + 1}`,
-          ),
-        ),
-      );
+      const videos = allVideoFilesFromDataTransfer(event.dataTransfer);
+      let offset = 0;
+      videos.forEach((f) => {
+        ingestVideoFile(
+          f,
+          { x: position.x + offset * 28, y: position.y + offset * 28 },
+          videos.length === 1 ? "拖入的视频" : `拖入视频 ${offset + 1}`,
+        );
+        offset += 1;
+      });
+      files.forEach((f, i) => {
+        ingestImageFile(
+          f,
+          { x: position.x + (offset + i) * 28, y: position.y + (offset + i) * 28 },
+          files.length === 1 ? "拖入的图片" : `拖入 ${i + 1}`,
+        );
+      });
     },
-    [addNode, ingestImageFile, screenToFlowPosition],
+    [addNode, ingestImageFile, ingestVideoFile, screenToFlowPosition],
   );
 
   // ── 复制 / 剪切 / 粘贴：节点 + 图片
@@ -1762,6 +2021,7 @@ function FlowCanvasInner({
 
       const idMap = new Map<string, string>();
       let lastNewId = "";
+      const pasted: { oldId: string; newId: string }[] = [];
       for (const n of payload.nodes) {
         const newId = addNode(
           (n.type ?? "text") as CanvasNodeType,
@@ -1772,7 +2032,20 @@ function FlowCanvasInner({
           { ...cloneCanvasNodeData(n.data as Record<string, unknown>) },
         );
         idMap.set(n.id, newId);
+        pasted.push({ oldId: n.id, newId });
         lastNewId = newId;
+      }
+      const updateNodeData = useCanvasStore.getState().updateNodeData;
+      for (const { oldId, newId } of pasted) {
+        const raw = payload.nodes.find((n) => n.id === oldId)?.data as
+          | Record<string, unknown>
+          | undefined;
+        if (!raw) continue;
+        const remapped = remapClonedNodeData(
+          cloneCanvasNodeData(raw),
+          idMap,
+        );
+        updateNodeData(newId, remapped, { commit: true });
       }
       if (lastNewId) {
         queueMicrotask(() => {
@@ -1809,12 +2082,48 @@ function FlowCanvasInner({
       // 服务端 sharp 统一处理）。提前 canvas 重编码会丢色彩配置导致变暗、并多一次有损往返。
       // 预览用的规范化由 ingestImageFile / onFile 各自完成。
       let imageFiles = allImageFilesFromDataTransfer(dt);
+      const videoFiles = allVideoFilesFromDataTransfer(dt);
       if (!imageFiles.length) {
         imageFiles = await resolveClipboardImageFiles(dt);
       }
 
       // 文本输入中（含 Dock 粘贴区 contenteditable）不抢图片粘贴，避免粘贴文案时误生图节点
       if (isEditablePasteTarget(event.target)) {
+        return;
+      }
+
+      if (videoFiles.length > 0 && libtvCanvas) {
+        event.preventDefault();
+        const ptr = getLastPointerClient();
+        const wrap = wrapRef.current;
+        const rect = wrap?.getBoundingClientRect?.();
+        const pointerInWrap = Boolean(
+          rect &&
+            ptr.x >= rect.left &&
+            ptr.x <= rect.right &&
+            ptr.y >= rect.top &&
+            ptr.y <= rect.bottom,
+        );
+        const clientX = pointerInWrap
+          ? ptr.x
+          : rect
+            ? rect.left + rect.width / 2
+            : 0;
+        const clientY = pointerInWrap
+          ? ptr.y
+          : rect
+            ? rect.top + rect.height / 2
+            : 0;
+        const center = rect
+          ? screenToFlowPosition({ x: clientX, y: clientY })
+          : { x: 240, y: 160 };
+        videoFiles.forEach((f, i) => {
+          ingestVideoFile(
+            f,
+            { x: center.x + i * 28, y: center.y + i * 28 },
+            videoFiles.length === 1 ? "粘贴的视频" : `粘贴视频 ${i + 1}`,
+          );
+        });
         return;
       }
 
@@ -1853,15 +2162,13 @@ function FlowCanvasInner({
         const center = rect
           ? screenToFlowPosition({ x: clientX, y: clientY })
           : { x: 240, y: 160 };
-        await Promise.all(
-          imageFiles.map((f, i) =>
-            ingestImageFile(
-              f,
-              { x: center.x + i * 28, y: center.y + i * 28 },
-              imageFiles.length === 1 ? "粘贴的图片" : `粘贴 ${i + 1}`,
-            ),
-          ),
-        );
+        imageFiles.forEach((f, i) => {
+          ingestImageFile(
+            f,
+            { x: center.x + i * 28, y: center.y + i * 28 },
+            imageFiles.length === 1 ? "粘贴的图片" : `粘贴 ${i + 1}`,
+          );
+        });
         return;
       }
 
@@ -1879,7 +2186,7 @@ function FlowCanvasInner({
     };
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [ingestImageFile, pasteFromClipboard, screenToFlowPosition]);
+  }, [ingestImageFile, ingestVideoFile, libtvCanvas, pasteFromClipboard, screenToFlowPosition]);
 
   /** Cmd+C / Cmd+X：选中节点入剪贴板。 */
   useEffect(() => {
@@ -1935,11 +2242,26 @@ function FlowCanvasInner({
         onMoveStart={onMoveStart}
         onMoveEnd={onMoveEnd}
         onInit={onInit}
+        onSelectionChange={onSelectionChange}
         onSelectionStart={() => {
-          useCanvasStore.getState().setCanvasMarqueeSelecting(true);
+          const store = useCanvasStore.getState();
+          store.setCanvasMarqueeSelecting(true);
+          store.setLibtvFloatingDockSelection(null, null);
+          store.setPro2FrameDockFocus(null);
         }}
         onSelectionDragStart={() => {
           useCanvasStore.getState().setCanvasSelectionDragging(true);
+          setRfNodes((prev) => {
+            const selectedInGroup = prev.filter(
+              (n) => n.selected && n.parentId && n.type !== "group",
+            );
+            if (!selectedInGroup.length) return prev;
+            const liftIds = new Set(selectedInGroup.map((n) => n.id));
+            groupChildDragLiftRef.current = liftIds;
+            return prev.map((n) =>
+              liftIds.has(n.id) ? { ...n, extent: undefined } : n,
+            );
+          });
         }}
         onSelectionDragStop={() => {
           useCanvasStore.getState().setCanvasSelectionDragging(false);
@@ -1957,17 +2279,27 @@ function FlowCanvasInner({
         }
         onPaneClick={
           pro2FloatingInspector || sbv1Canvas
-            ? () => {
+            ? (event) => {
+                const target = event.target as HTMLElement | null;
+                if (target?.closest?.(".react-flow__node")) return;
                 closePaneMenu();
                 if (ignoreNextPaneClickRef.current) {
                   ignoreNextPaneClickRef.current = false;
+                  flushCanvasTextDrafts();
+                  useCanvasStore.getState().setLibtvInputDockFocused(false);
+                  const activeIgnored = document.activeElement;
+                  if (activeIgnored instanceof HTMLElement) {
+                    activeIgnored.blur();
+                  }
                   return;
                 }
                 closePaneAddMenu();
+                flushCanvasTextDrafts();
                 const active = document.activeElement;
                 if (active instanceof HTMLElement) {
                   active.blur();
                 }
+                useCanvasStore.getState().setLibtvInputDockFocused(false);
                 useCanvasStore
                   .getState()
                   .setLibtvFloatingDockSelection(null, null);
@@ -1976,9 +2308,12 @@ function FlowCanvasInner({
                 if (pro2FloatingInspector) {
                   useCanvasStore.getState().setPro2FrameDockFocus(null);
                 }
-                setRfNodes((prev) =>
-                  prev.map((n) => (n.selected ? { ...n, selected: false } : n)),
-                );
+                setRfNodes((prev) => {
+                  if (!prev.some((n) => n.selected)) return prev;
+                  return prev.map((n) =>
+                    n.selected ? { ...n, selected: false } : n,
+                  );
+                });
                 window.dispatchEvent(new CustomEvent("canvas:pro2-pane-click"));
               }
             : undefined
@@ -1991,7 +2326,7 @@ function FlowCanvasInner({
         zoomOnDoubleClick={enablePaneContextMenu ? false : undefined}
         onNodeClick={
           pro2FloatingInspector || sbv1Canvas
-            ? (_e, node) => {
+            ? (e, node) => {
                 if (node.type === "group") {
                   const all = useCanvasStore.getState().nodes as CanvasFlowNode[];
                   const hit = all.find((n) => n.id === node.id);
@@ -2002,18 +2337,28 @@ function FlowCanvasInner({
                   ) {
                     return;
                   }
-                  setRfNodes((prev) =>
-                    prev.map((n) => ({ ...n, selected: n.id === node.id })),
+                  commitLibtvRfNodeSelection(
+                    setRfNodes,
+                    node.id,
+                    node.type ?? null,
                   );
                   return;
                 }
-                setRfNodes((prev) =>
-                  prev.map((n) => ({ ...n, selected: n.id === node.id })),
-                );
-                useCanvasStore.getState().setLibtvFloatingDockSelection(
-                  node.id,
-                  node.type ?? null,
-                );
+                useCanvasStore.getState().setLibtvInputDockFocused(false);
+                const additive =
+                  e.metaKey || e.ctrlKey || e.shiftKey || e.altKey;
+                if (!additive) {
+                  commitLibtvRfNodeSelection(
+                    setRfNodes,
+                    node.id,
+                    node.type ?? null,
+                  );
+                } else {
+                  useCanvasStore.getState().setLibtvFloatingDockSelection(
+                    node.id,
+                    node.type ?? null,
+                  );
+                }
               }
             : undefined
         }
@@ -2073,26 +2418,15 @@ function FlowCanvasInner({
         zoomActivationKeyCode="Control"
         noWheelClassName="nowheel"
         noDragClassName="nodrag"
-        minZoom={0.02}
-        maxZoom={32}
+        minZoom={CANVAS_VIEWPORT_MIN_ZOOM}
+        maxZoom={CANVAS_VIEWPORT_MAX_ZOOM}
         connectionRadius={160}
         connectOnClick={false}
-        connectionLineStyle={{ strokeWidth: 1, stroke: "#60a5fa" }}
+        connectionLineStyle={{
+          strokeWidth: CANVAS_EDGE_STROKE_WIDTH_CONNECTING,
+          stroke: "#60a5fa",
+        }}
       >
-        {/* 淡淡的网格线（大格）+ 细点阵（小格），叠出层次但不抢眼 */}
-        <Background
-          id="canvas-grid-lines"
-          variant={BackgroundVariant.Lines}
-          gap={120}
-          lineWidth={1}
-          color="rgba(255,255,255,0.04)"
-        />
-        <Background
-          id="canvas-grid-dots"
-          gap={24}
-          size={1}
-          color="rgba(255,255,255,0.06)"
-        />
         <CanvasViewportToolbar
           pro2Canvas={pro2FloatingInspector}
           sbv1Canvas={sbv1Canvas}
@@ -2116,6 +2450,7 @@ function FlowCanvasInner({
       {pro2FloatingInspector ? (
         <>
           <Pro2StarterInputDock />
+          <Pro2PromptInputDock />
           <Pro2ScriptInputDock />
           <Pro2FrameCellInputDock />
           <Pro2ThreeViewInputDock />
@@ -2145,6 +2480,7 @@ function FlowCanvasInner({
         onClose={closePaneAddMenu}
         onPick={onPaneAddPick}
       />
+      <Director3dDeskEditorHost />
     </div>
   );
 }

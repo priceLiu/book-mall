@@ -77,6 +77,11 @@ export default function AdminBillingUsersIndexPage() {
       <h1 className="text-lg font-medium text-[#262626]">有 Gateway 调用或账单的用户</h1>
       <p className="text-sm text-[#8c8c8c]">
         含成功与失败调用；仅注册、从未调用 Gateway 的用户不在此列表。团队扣费请同时看「团队驾驶舱」。
+        <span className="text-[#595959]">
+          {" "}
+          「AI 小智」为平台导览助手专用虚拟用户（<code className="rounded bg-[#f5f5f5] px-1">platform-assistant</code>
+          ），与用户个人 Canvas/工具用量分开对帐。
+        </span>
         {periodKey ? ` Gateway 用量列统计账期 ${periodKey}（张/秒/千Token）。` : null}
       </p>
 
@@ -117,7 +122,14 @@ export default function AdminBillingUsersIndexPage() {
             </thead>
             <tbody className="text-[#262626]">
               {users.map((u) => (
-                <tr key={u.id} className="hover:bg-[#fafafa]">
+                <tr
+                  key={u.id}
+                  className={
+                    u.id === "platform-assistant"
+                      ? "bg-[#f0f6ff] hover:bg-[#e6f0ff]"
+                      : "hover:bg-[#fafafa]"
+                  }
+                >
                   <td className="border border-[#e8e8e8] px-3 py-2 font-medium">
                     {u.name ?? <span className="text-[#bfbfbf]">—</span>}
                   </td>

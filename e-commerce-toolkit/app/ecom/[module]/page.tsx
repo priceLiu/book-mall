@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { GenerationWorkspace } from "@/components/workspace/generation-workspace";
 import { ECOM_MODULES } from "@/lib/modules/registry";
 
@@ -7,6 +7,19 @@ export default function EcomModulePage({
 }: {
   params: { module: string };
 }) {
+  if (params.module === "seed-video") {
+    redirect("/ecom/seed-video");
+  }
+  if (params.module === "media-decompose") {
+    redirect("/ecom/media-decompose");
+  }
+  if (params.module === "film-pull") {
+    redirect("/ecom/film-pull");
+  }
+  if (params.module === "model-shot") {
+    redirect("/ecom/model-shot");
+  }
+
   const mod = ECOM_MODULES.find(
     (m) => m.href === `/ecom/${params.module}` && m.kind !== "video",
   );

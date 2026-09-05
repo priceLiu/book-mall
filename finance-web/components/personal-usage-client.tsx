@@ -8,11 +8,7 @@ import { financeApiFetch } from "@/lib/finance-viewer";
 
 type UsageData = {
   balance: number;
-  pools: {
-    general: { balance: number; reserved: number };
-    video: { balance: number; reserved: number };
-    pricePerCreditYuan: number | null;
-  };
+  reserved: number;
   teamContext?: {
     tenantId: string;
     tenantName: string;
@@ -55,7 +51,7 @@ const STATUS: Record<string, string> = {
 
 const PERSONA_LABEL: Record<string, string> = {
   PLATFORM_CREDIT: "平台代付",
-  BYOK: "自带 Key",
+  BYOK: "平台代付",
 };
 
 export function PersonalUsageClient() {
@@ -79,7 +75,7 @@ export function PersonalUsageClient() {
         <div>
           <h1 className="text-lg font-medium text-[#262626]">积分用量中心</h1>
           <p className="mt-1 text-sm text-[#8c8c8c]">
-            财务 2.0 · 总次数、双池余额、按工具/模型消耗与近期生成记录。
+            财务 2.0 · 总次数、积分余额、按工具/模型消耗与近期生成记录。
           </p>
         </div>
         <Link
@@ -109,14 +105,13 @@ export function PersonalUsageClient() {
         </section>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="成功调用总次数" value={data.totalCalls} />
         <StatCard
-          label={data.teamContext ? "个人池余额" : "通用池余额"}
+          label={data.teamContext ? "个人池余额" : "总积分余额"}
           value={data.balance}
         />
-        <StatCard label="视频池余额" value={data.pools.video.balance} />
-        <StatCard label="视频冻结中" value={data.pools.video.reserved} />
+        <StatCard label="冻结中" value={data.reserved} />
         <StatCard label="累计消耗积分" value={data.totalConsumed} />
       </div>
 

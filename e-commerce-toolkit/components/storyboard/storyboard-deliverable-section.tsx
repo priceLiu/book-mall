@@ -1,8 +1,15 @@
 "use client";
 
-import { Clapperboard, Eye, Film, RefreshCw } from "lucide-react";
+import { ChevronDown, Clapperboard, Eye, Film, ImagePlus, RefreshCw, Save } from "lucide-react";
+import { useState } from "react";
 
-import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import {
+  SubtitleBurnInFields,
+  type SubtitleBurnInStyle,
+} from "@private/media-render-subtitle-style";
+
+import { EcomIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { StoryboardFullSheetCard } from "@/components/storyboard/storyboard-full-sheet-card";
 import { StoryboardResultCard } from "@/components/storyboard/storyboard-result-card";
 import { isStoryboardVideoUrl } from "@/lib/storyboard-media";
@@ -23,9 +30,15 @@ type Props = {
   hasSheetImages: boolean;
   canMergePanels: boolean;
   vidBusy: boolean;
+  /** 成片预览区扫光；默认跟 vidBusy，可单独稳定（避免轮询抖动） */
+  videoOverlayBusy?: boolean;
   imageGenBusy: boolean;
   sheetPngBusy: boolean;
   mergeBusy: boolean;
+  mergeBurnIn?: boolean;
+  mergeSubtitleStyle?: SubtitleBurnInStyle;
+  onMergeBurnInChange?: (value: boolean) => void;
+  onMergeSubtitleStyleChange?: (style: SubtitleBurnInStyle) => void;
   snapshotBusy: boolean;
   hasDeliverableSnapshot: boolean;
   onGenerateFullVideo: () => void;
@@ -36,6 +49,8 @@ type Props = {
   onReloadProject: () => void;
   onMergePanelVideos: () => void;
   onPreviewVideo: (src: string, title?: string) => void;
+  /** 路径 B：故事版工作区已负责生图，此处仅整页预览 + 一键成片 */
+  fullSheetOnly?: boolean;
 };
 
 /** 成片区：工具条 + 分镜图/成片双栏（左只读预览，右视频播放器） */
@@ -54,9 +69,14 @@ export function StoryboardDeliverableSection({
   hasSheetImages,
   canMergePanels,
   vidBusy,
+  videoOverlayBusy,
   imageGenBusy,
   sheetPngBusy,
   mergeBusy,
+  mergeBurnIn = false,
+  mergeSubtitleStyle,
+  onMergeBurnInChange,
+  onMergeSubtitleStyleChange,
   snapshotBusy,
   hasDeliverableSnapshot,
   onGenerateFullVideo,
@@ -67,48 +87,53 @@ export function StoryboardDeliverableSection({
   onReloadProject,
   onMergePanelVideos,
   onPreviewVideo,
+  fullSheetOnly = false,
 }: Props) {
   const resolvedVideo = isStoryboardVideoUrl(videoUrl) ? videoUrl!.trim() : null;
+  const [mergeSettingsOpen, setMergeSettingsOpen] = useState(false);
+  const showVideoGenerating = videoOverlayBusy ?? vidBusy;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#e8e8ed] bg-[#fafafa] px-4 py-3">
         <p className="text-xs text-[#6e6e73]">
-          整图成片 {durationSec}s · 已生成 {panelVideoCount} 镜单镜视频
-          {canMergePanels ? " · 可合并" : ""}
+          {fullSheetOnly
+            ? `一键成片 ${durationSec}s · 故事版宫格与分镜脚本一并提交视频模型`
+            : `整图成片 ${durationSec}s · 已生成 ${panelVideoCount} 镜单镜视频${canMergePanels ? " · 可合并" : ""}`}
         </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <EcomButtonSecondary size="sm" type="button" onClick={onReloadProject} title="从服务器重新加载项目">
-            <RefreshCw className="h-3.5 w-3.5 shrink-0" />
-            刷新
-          </EcomButtonSecondary>
-          {hasDeliverableSnapshot ? (
-            <EcomButtonSecondary size="sm" type="button" onClick={onOpenDeliverableReview}>
-              <Eye className="h-3.5 w-3.5 shrink-0" />
-              交付查阅
-            </EcomButtonSecondary>
-          ) : null}
-          <EcomButtonSecondary
-            size="sm"
-            type="button"
-            disabled={snapshotBusy || !sheet}
-            onClick={onSaveSnapshot}
-          >
-            {snapshotBusy ? "保存中…" : "保存交付快照"}
-          </EcomButtonSecondary>
-          <EcomButtonSecondary size="sm" type="button" disabled={!hasSheetImages} onClick={onOpenImagePicker}>
-            重新生图
-          </EcomButtonSecondary>
-          <EcomButtonPrimary
-            size="sm"
-            type="button"
-            disabled={!hasSheetImages || vidBusy}
-            onClick={onGenerateFullVideo}
-          >
-            <Film className="h-3.5 w-3.5 shrink-0" />
-            {vidBusy ? "生成中…" : "生成完整视频"}
-          </EcomButtonPrimary>
-        </div>
+        <EcomIconToolbar>
+          <EcomIconToolbarGroup label="同步">
+            <EcomIconButton label="刷新项目" icon={RefreshCw} onClick={onReloadProject} />
+          </EcomIconToolbarGroup>
+          <EcomIconToolbarGroup label="交付">
+            {hasDeliverableSnapshot ? (
+              <EcomIconButton label="交付查阅" icon={Eye} onClick={onOpenDeliverableReview} />
+            ) : null}
+            <EcomIconButton
+              label={snapshotBusy ? "保存中…" : "保存交付快照"}
+              icon={Save}
+              busy={snapshotBusy}
+              disabled={snapshotBusy || !sheet}
+              onClick={onSaveSnapshot}
+            />
+            {!fullSheetOnly ? (
+              <EcomIconButton
+                label="重新生图"
+                icon={ImagePlus}
+                disabled={!hasSheetImages}
+                onClick={onOpenImagePicker}
+              />
+            ) : null}
+            <EcomIconButton
+              label={vidBusy ? "生成中…" : fullSheetOnly ? "一键成片" : "生成完整视频"}
+              icon={Film}
+              variant="accent"
+              busy={vidBusy}
+              disabled={!hasSheetImages || vidBusy}
+              onClick={onGenerateFullVideo}
+            />
+          </EcomIconToolbarGroup>
+        </EcomIconToolbar>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -125,10 +150,18 @@ export function StoryboardDeliverableSection({
             panelAspectRatio={panelAspectRatio}
             imageGenBusy={imageGenBusy}
             sheetPngBusy={sheetPngBusy}
-            emptyHint="请先生成分镜图"
+            emptyHint={fullSheetOnly ? "请先在故事版工作区生成各镜分镜图" : "请先生成分镜图"}
             onPreview={sheet ? onOpenSheetPreview : undefined}
-            onRegenerateImage={hasSheetImages ? onOpenImagePicker : undefined}
-            onGenerateVideo={hasSheetImages && !vidBusy ? onGenerateFullVideo : undefined}
+            onRegenerateImage={
+              fullSheetOnly ? undefined : hasSheetImages ? onOpenImagePicker : undefined
+            }
+            onGenerateVideo={
+              fullSheetOnly
+                ? undefined
+                : hasSheetImages && !vidBusy
+                  ? onGenerateFullVideo
+                  : undefined
+            }
             onDownloadPng={
               sheetPngUrl?.trim()
                 ? () => {
@@ -141,8 +174,12 @@ export function StoryboardDeliverableSection({
                   }
                 : undefined
             }
-            primaryActionLabel={!hasSheetImages ? "生成分镜图" : undefined}
-            onPrimaryAction={!hasSheetImages ? onOpenImagePicker : undefined}
+            primaryActionLabel={
+              fullSheetOnly || hasSheetImages ? undefined : "生成分镜图"
+            }
+            onPrimaryAction={
+              fullSheetOnly || hasSheetImages ? undefined : onOpenImagePicker
+            }
           />
         </div>
 
@@ -151,10 +188,20 @@ export function StoryboardDeliverableSection({
             label="完整视频"
             aspectRatio={videoAspectRatio}
             videoSrc={resolvedVideo}
-            emptyHint="整图成片或合并分镜视频"
-            busy={vidBusy}
+            emptyHint={
+              fullSheetOnly
+                ? "故事版 6 镜图就绪后，一键提交 Gateway 视频模型"
+                : "整图成片或合并分镜视频"
+            }
+            busy={showVideoGenerating}
             disabled={!hasSheetImages && !canMergePanels}
-            primaryActionLabel={hasSheetImages && !resolvedVideo ? "整图成片" : undefined}
+            primaryActionLabel={
+              hasSheetImages && !resolvedVideo
+                ? fullSheetOnly
+                  ? "一键成片"
+                  : "整图成片"
+                : undefined
+            }
             onPrimaryAction={hasSheetImages && !resolvedVideo ? onGenerateFullVideo : undefined}
             secondaryActionLabel={canMergePanels ? "合并分镜视频" : undefined}
             onSecondaryAction={canMergePanels ? onMergePanelVideos : undefined}
@@ -169,14 +216,48 @@ export function StoryboardDeliverableSection({
       </div>
 
       {canMergePanels ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-[#e8e8ed] bg-white px-4 py-2.5">
-          <span className="text-xs text-[#6e6e73]">
-            <Clapperboard className="mr-1 inline h-3.5 w-3.5" />
-            已有 {panelVideoCount} 个镜头视频可拼接
-          </span>
-          <EcomButtonSecondary size="sm" type="button" disabled={mergeBusy} onClick={onMergePanelVideos}>
-            {mergeBusy ? "合并中…" : "合并分镜视频"}
-          </EcomButtonSecondary>
+        <div className="space-y-2 rounded-lg border border-[#e8e8ed] bg-white px-4 py-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs text-[#6e6e73]">
+              <Clapperboard className="mr-1 inline h-3.5 w-3.5" />
+              已有 {panelVideoCount} 个镜头视频可拼接
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              {onMergeBurnInChange && onMergeSubtitleStyleChange && mergeSubtitleStyle ? (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-xs text-[#0071e3] hover:underline"
+                  onClick={() => setMergeSettingsOpen((v) => !v)}
+                >
+                  合并设置
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 transition ${mergeSettingsOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+              ) : null}
+              <EcomIconButton
+                label={mergeBusy ? "合并中…" : "合并分镜视频"}
+                icon={Clapperboard}
+                busy={mergeBusy}
+                disabled={mergeBusy}
+                onClick={onMergePanelVideos}
+              />
+            </div>
+          </div>
+          {mergeSettingsOpen &&
+          onMergeBurnInChange &&
+          onMergeSubtitleStyleChange &&
+          mergeSubtitleStyle ? (
+            <SubtitleBurnInFields
+              variant="ecom-light"
+              burnIn={mergeBurnIn}
+              onBurnInChange={onMergeBurnInChange}
+              style={mergeSubtitleStyle}
+              onStyleChange={onMergeSubtitleStyleChange}
+              disabled={mergeBusy}
+              burnInLabel="合并时烧录台词字幕"
+            />
+          ) : null}
         </div>
       ) : null}
     </div>

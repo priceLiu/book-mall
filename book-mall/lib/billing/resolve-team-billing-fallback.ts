@@ -1,7 +1,7 @@
 /**
  * 团队成员在个人池无余额时，回落到有效团队共享池（PLATFORM_CREDIT）。
  */
-import { getCreditBalance, getPoolBalances } from "@/lib/billing/credit-account-service";
+import { getAccountCreditBalances, getCreditBalance } from "@/lib/billing/credit-account-service";
 import { prisma } from "@/lib/prisma";
 
 /** 返回可用于扣费的团队 tenantId；无则 null。 */
@@ -30,12 +30,12 @@ export async function resolveTeamBillingFallbackTenantId(
   });
 
   for (const m of memberships) {
-    const pools = await getPoolBalances({
+    const balances = await getAccountCreditBalances({
       ownerType: "TENANT",
       ownerId: m.tenantId,
     }).catch(() => null);
-    if (!pools) continue;
-    const available = pools.general.balance + pools.video.balance;
+    if (!balances) continue;
+    const available = balances.balance - balances.reserved;
     if (available > 0) return m.tenantId;
   }
   return null;

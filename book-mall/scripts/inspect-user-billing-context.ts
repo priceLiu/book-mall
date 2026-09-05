@@ -1,7 +1,7 @@
 /** cd book-mall && pnpm exec dotenv -e .env.local -- tsx scripts/inspect-user-billing-context.ts 13042023589 */
 import { prisma } from "@/lib/prisma";
 import { resolveTenantContextForUser } from "@/lib/tenant/context";
-import { getPoolBalances } from "@/lib/billing/credit-account-service";
+import { getAccountCreditBalances } from "@/lib/billing/credit-account-service";
 
 const phone = process.argv[2]?.trim() ?? "13042023589";
 
@@ -44,10 +44,10 @@ async function main() {
   const ctxTeam = team
     ? await resolveTenantContextForUser(user.id, team.tenant.id)
     : null;
-  const poolsDefault = ctxDefault
-    ? await getPoolBalances(ctxDefault.billingOwnerRef)
+  const balancesDefault = ctxDefault
+    ? await getAccountCreditBalances(ctxDefault.billingOwnerRef)
     : null;
-  const poolsTeam = ctxTeam ? await getPoolBalances(ctxTeam.billingOwnerRef) : null;
+  const balancesTeam = ctxTeam ? await getAccountCreditBalances(ctxTeam.billingOwnerRef) : null;
 
   console.log({
     user,
@@ -60,19 +60,19 @@ async function main() {
     personalAcc: personalAcc
       ? {
           balance: personalAcc.balanceCredits,
-          video: personalAcc.videoBalanceCredits,
+          reserved: personalAcc.reservedCredits,
         }
       : null,
     teamAcc: teamAcc
       ? {
           balance: teamAcc.balanceCredits,
-          video: teamAcc.videoBalanceCredits,
+          reserved: teamAcc.reservedCredits,
         }
       : null,
     ctxDefault,
     ctxTeam,
-    poolsDefault,
-    poolsTeam,
+    balancesDefault,
+    balancesTeam,
   });
 }
 

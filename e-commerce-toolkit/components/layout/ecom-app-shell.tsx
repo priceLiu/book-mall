@@ -1,19 +1,29 @@
 "use client";
 
 import * as React from "react";
-
+import { usePathname } from "next/navigation";
+import { PlatformAssistant } from "@private/platform-assistant";
+import { dispatchEcomCreditsBalanceRefresh } from "@/lib/ecom-credits-balance-events";
 import { EcomAuthBanner } from "@/components/auth/ecom-auth-banner";
 import { EcomMobileBar } from "@/components/layout/ecom-mobile-bar";
-import { EcomPortalTopBar } from "@/components/layout/ecom-portal-top-bar";
 import { EcomProfileSidebar } from "@/components/layout/ecom-profile-sidebar";
-import { ensureEcomSessionFresh } from "@/lib/ecom-silent-sso";
+import {
+  attemptEcomColdStartSso,
+  clearEcomSsoReenterAttempts,
+  ensureEcomSessionFresh,
+} from "@/lib/ecom-silent-sso";
+import { isEcomNavPersistentPath } from "@/lib/ecom-browse-hub-paths";
+import { isEcomPublicBrowsePath } from "@/lib/ecom-public-paths";
+import { setEcomRuntimeBookOrigin } from "@/lib/ecom-runtime-config";
+import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
 import type { EcomShellUser } from "@/lib/ecom-session.server";
+import { cn } from "@/lib/utils";
 
 const NAV_COLLAPSED_KEY = "ecom-nav-collapsed";
 /** 心跳间隔：令牌默认 10 分钟，60s 检查可在过期前静默续期 */
 const SESSION_HEARTBEAT_MS = 60_000;
 /** 令牌剩余不足该秒数时静默续期 */
-const SESSION_REFRESH_THRESHOLD_SEC = 180;
+const SESSION_REFRESH_THRESHOLD_SEC = 240;
 
 export function EcomAppShell({
   user,
@@ -24,7 +34,14 @@ export function EcomAppShell({
   bookOrigin: string;
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  const isPublicBrowse = isEcomPublicBrowsePath(pathname);
+  const isBrowseHub = isEcomNavPersistentPath(pathname);
   const [navCollapsed, setNavCollapsed] = React.useState(false);
+
+  React.useEffect(() => {
+    setEcomRuntimeBookOrigin(bookOrigin);
+  }, [bookOrigin]);
 
   React.useEffect(() => {
     try {
@@ -44,14 +61,43 @@ export function EcomAppShell({
     }
   }, []);
 
-  // 已登录时定时静默续期工具站令牌，避免长时间编辑过程中会话过期掉登录
+  const coldStartAttemptedRef = React.useRef(false);
+
+  // 冷启动 / 硬刷新：续签过期 token 或整页 re-enter（与 tool-web 一致，不用 iframe）
+  React.useEffect(() => {
+    if (user) {
+      clearEcomSsoReenterAttempts();
+      coldStartAttemptedRef.current = false;
+      return;
+    }
+    if (isPublicBrowse) return;
+    if (coldStartAttemptedRef.current) return;
+    coldStartAttemptedRef.current = true;
+    attemptEcomColdStartSso({ bookOrigin, pathname });
+  }, [user, bookOrigin, pathname, isPublicBrowse]);
+
+  React.useEffect(() => {
+    const onRefreshed = () => {
+      clearEcomSsoReenterAttempts();
+      dispatchEcomCreditsBalanceRefresh();
+    };
+    window.addEventListener("ecom:tools-session-refreshed", onRefreshed);
+    return () =>
+      window.removeEventListener("ecom:tools-session-refreshed", onRefreshed);
+  }, []);
+
+  // 已登录时定时静默续期；失败时不踢到登录页，下一轮心跳再试
   const loggedIn = Boolean(user);
   React.useEffect(() => {
     if (!loggedIn) return;
     const tick = () => {
       if (document.visibilityState !== "visible") return;
-      void ensureEcomSessionFresh(SESSION_REFRESH_THRESHOLD_SEC).catch(() => {});
+      void ensureEcomSessionFresh(SESSION_REFRESH_THRESHOLD_SEC, {
+        bookOrigin,
+        redirectOnFailure: false,
+      }).catch(() => {});
     };
+    tick();
     const id = window.setInterval(tick, SESSION_HEARTBEAT_MS);
     const onVisible = () => {
       if (document.visibilityState === "visible") tick();
@@ -61,23 +107,55 @@ export function EcomAppShell({
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [loggedIn]);
+  }, [loggedIn, bookOrigin]);
+
+  React.useEffect(() => {
+    unlockEcomDocumentInteraction();
+  }, [pathname]);
+
+  React.useEffect(() => {
+    return () => {
+      unlockEcomDocumentInteraction();
+    };
+  }, []);
+
+  const sidebarInset = navCollapsed
+    ? "md:grid-cols-[4rem_minmax(0,1fr)]"
+    : "md:grid-cols-[21rem_minmax(0,1fr)]";
+
+  const collapseNavOnWorkspaceClick = React.useCallback(() => {
+    if (!navCollapsed) setCollapsed(true);
+  }, [navCollapsed, setCollapsed]);
+
+  if (!user && isPublicBrowse) {
+    return <>{children}</>;
+  }
 
   return (
-    <div className="flex h-dvh gap-3 overflow-hidden bg-[#0c0c0e] p-3 md:gap-4 md:p-5">
-      <EcomProfileSidebar
-        user={user}
-        bookOrigin={bookOrigin}
-        collapsed={navCollapsed}
-        onCollapsedChange={setCollapsed}
-        className="hidden h-full md:flex"
-      />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-[var(--ecom-parchment)] shadow-inner">
-        <EcomPortalTopBar authed={loggedIn} />
-        <EcomMobileBar />
-        <EcomAuthBanner />
-        <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+    <div className="relative h-dvh overflow-hidden bg-[#0c0c0e] p-3 md:p-5">
+      <div
+        className={cn(
+          "grid h-full min-h-0 grid-cols-1 gap-3 overflow-visible md:gap-4",
+          sidebarInset,
+        )}
+      >
+        <EcomProfileSidebar
+          user={user}
+          bookOrigin={bookOrigin}
+          collapsed={navCollapsed}
+          onCollapsedChange={setCollapsed}
+          className="relative z-[200] hidden h-full max-h-full md:flex"
+        />
+        <div
+          className="relative z-0 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl bg-white shadow-inner"
+          onPointerDown={isBrowseHub ? undefined : collapseNavOnWorkspaceClick}
+        >
+          <EcomMobileBar bookOrigin={bookOrigin} />
+          <EcomAuthBanner />
+          <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+        </div>
       </div>
+      <PlatformAssistant title="AI 小智" />
     </div>
   );
 }

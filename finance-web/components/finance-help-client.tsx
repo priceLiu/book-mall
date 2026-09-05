@@ -20,8 +20,9 @@ export function FinanceHelpClient() {
       <section className={sectionCls}>
         <h2 className={h2}>一、登录与角色</h2>
         <p className={p}>
-          请先在主站 <code className="rounded bg-[#fafafa] px-1">book-mall</code> 登录，再打开本财务控制台（
-          <code className="rounded bg-[#fafafa] px-1">:3002</code>）。侧栏按角色过滤菜单：
+          财务控制台<strong>无独立门户</strong>，须先在主站{" "}
+          <code className="rounded bg-[#fafafa] px-1">book-mall</code> 登录，再从<strong>管理后台</strong>
+          或<strong>个人中心</strong>进入对应模块。侧栏按角色过滤菜单：
         </p>
         <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-[#595959]">
           <li>
@@ -91,8 +92,8 @@ export function FinanceHelpClient() {
         <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-[#595959]">
           <li>单条最长 15 秒，按秒计费，超过 15 秒仍按 15 秒计</li>
           <li>视频系数分档：贵视频 M=1.0（贴成本）、普通 M=1.5；护栏 ≥ -0.02</li>
-          <li>先冻结视频池积分 → 渲染成功结算；厂商全失败才全额退还</li>
-          <li>通用积分池与视频专用池隔离（账户配置了 videoMonthlyGrant 时启用双池）</li>
+          <li>先冻结积分 → 渲染成功结算；厂商全失败才全额退还</li>
+          <li>统一积分池：充值、月赠、模型扣费共用同一余额</li>
           <li>并发 2 / 队列 10 / 批量 ≤5 集 / 5 分钟 ≥10 条触发 15 分钟冷却</li>
         </ul>
       </section>
@@ -114,7 +115,8 @@ export function FinanceHelpClient() {
               ["/admin/model-cost", "模型成本", "厂商挂牌价与渠道折扣（仅财务）"],
               ["/admin/credit-pricing", "积分报价", "发布各模型对外积分价"],
               ["/admin/membership-plans", "会员套餐", "五档套餐与席位带"],
-              ["/admin/reconciliation", "云账单对账", "上传阿里云 CSV 对账与补扣"],
+              ["/admin/reconciliation", "对账总账", "平台底表 + 厂商 CSV/Excel 对账"],
+              ["/admin/reconciliation/payments", "用户支付明细", "微信 Checkout 与积分流水"],
               ["/admin/billing/users", "用户明细", "31 列费用明细（含成本/M）"],
             ].map(([href, title, desc]) => (
               <tr key={href} className="border-t">

@@ -93,7 +93,7 @@ export function getDevHubServices(): DevHubService[] {
     {
       id: "quick-replica",
       label: "quick-replica-web",
-      description: "快速复制 · 模板浏览 + 运动同步",
+      description: "快速复刻 · 模板浏览 + 运动同步",
       url: trimOrigin(
         process.env.NEXT_PUBLIC_QUICK_REPLICA_ORIGIN ??
           process.env.QUICK_REPLICA_PUBLIC_ORIGIN,
@@ -124,6 +124,42 @@ export function getDevHubServices(): DevHubService[] {
         "http://localhost:3007",
       ),
       port: 3007,
+      openable: true,
+    },
+    {
+      id: "director",
+      label: "director-web",
+      description: "3D导演台 · 机位规划 / 场景摆位 / 截图导出（画布节点内嵌）",
+      url: trimOrigin(
+        process.env.NEXT_PUBLIC_DIRECTOR_WEB_ORIGIN ??
+          process.env.DIRECTOR_WEB_PUBLIC_ORIGIN,
+        "http://localhost:3009",
+      ),
+      port: 3009,
+      openable: true,
+    },
+    {
+      id: "common",
+      label: "common-tools",
+      description: "常用工具 · AI 图像小工具菜单（修图 / 表情包 / 海报等）",
+      url: trimOrigin(
+        process.env.NEXT_PUBLIC_COMMON_TOOLS_ORIGIN ??
+          process.env.COMMON_TOOLS_PUBLIC_ORIGIN,
+        "http://localhost:3010",
+      ),
+      port: 3010,
+      openable: true,
+    },
+    {
+      id: "publisher",
+      label: "publisher-web",
+      description: "一键发布 · 小红书/抖音/微博/B站/公众号多平台分发",
+      url: trimOrigin(
+        process.env.NEXT_PUBLIC_PUBLISHER_WEB_ORIGIN ??
+          process.env.PUBLISHER_WEB_PUBLIC_ORIGIN,
+        "http://localhost:3011",
+      ),
+      port: 3011,
       openable: true,
     },
   ];

@@ -180,12 +180,24 @@ export function resolveGatewayTokenMetrics(opts: {
   inputSummary?: unknown;
   resultSummary?: unknown;
   requestKind?: GatewayRequestKind | string;
+  /** false：无厂商 usage 时不做 PLATFORM 粗算（如 STALE_CHAT_ORPHAN 强制关闭） */
+  allowPlatformEstimate?: boolean;
 }): ResolvedTokenMetrics {
   const fromPatch = normalizeUsage(opts.usage);
   if (fromPatch?.hasTokenUsage) return fromPatch;
 
   const fromResult = normalizeUsage(parseUsageFromUnknown(opts.resultSummary));
   if (fromResult?.hasTokenUsage) return fromResult;
+
+  if (opts.allowPlatformEstimate === false) {
+    return {
+      promptTokens: null,
+      completionTokens: null,
+      totalTokens: null,
+      metricsSource: "PLATFORM",
+      hasTokenUsage: false,
+    };
+  }
 
   const promptTexts = extractPromptTextsFromInputSummary(opts.inputSummary);
   const completionTexts =

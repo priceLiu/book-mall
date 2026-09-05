@@ -1,20 +1,19 @@
 /**
- * VIP 大额套餐 · 积分测算器（纯函数，无 prisma / 无副作用）
+ * VIP 大额套餐 · 积分测算器 v2（单积分池 · 统一扣分 U₀）
  *
- * 面向大额预充客户（如 ¥20 万对等积分）。管理员/财务在后台输入充值金额、
- * 目标毛利、视频占比，输出「通用多 / 视频多」两套积分方案供客户选择；毛利由
- * 「调总积分」恒定保证（视频越多、总积分越少）。
+ * 面向大额预充（起订 ¥100,000）。管理员输入充值金额、目标毛利、用量画像，
+ * 输出「均衡 / 视频偏重」两套 **总积分** 方案（单池发放）；人人扣分相同，价差仅在 ppc。
  *
- * 口径（保守满额消耗）：
- *   通用积分单位成本 costGeneral = 锚定 ÷ M(2.5) = ¥0.016/积分
- *   视频积分单位成本 costVideo   = 锚定 ÷ M(1.5) = ¥0.0267/积分（保守，比 DB 视频 M 更低毛利）
+ * 毛利护栏（锚定 Seedance 2.0 15s）：
+ *   U₀ = 525 积分，净成本 C = ¥15 → 最坏单位成本 c_worst = 15/525
+ *   若客户全部用于该模型：毛利 g = 1 − c_worst / ppc，ppc = A / T
  *
- * 公式：
- *   c(f) = (1−f)·costGeneral + f·costVideo         // 按视频占比 f 的混合单位成本
- *   p    = c(f) ÷ (1−m)                             // 达到目标毛利 m 的每积分售价
- *   T    = A ÷ p = A·(1−m) ÷ c(f)                   // 总积分
- *   通用 = (1−f)·T ; 视频 = f·T
+ * 用量画像 f（预期视频算力占比，非双池拆分）：
+ *   c_blend(f) = (1−f)·c_light + f·c_worst
+ *   T = A·(1−m) / c_blend(f)  → 目标毛利 m（按预期用量）
+ *   再按 c_worst 验算锚定毛利，不足 22% 护栏时下调 T。
  */
+import { DEFAULT_VIDEO_MIN_MARGIN_GUARD } from "@/lib/pricing/credit-pricing-formulas";
 
 /** VIP 起订金额（元）。 */
 export const VIP_MIN_AMOUNT_YUAN = 100_000;
@@ -22,13 +21,26 @@ export const VIP_MIN_AMOUNT_YUAN = 100_000;
 /** 企业大额预充积分有效期（年）。公示见 docs/大额vip.md */
 export const VIP_CREDIT_VALIDITY_YEARS = 5;
 
-/** 保守单位成本（元/积分）。 */
-export const VIP_DEFAULT_COST_GENERAL_YUAN = 0.016; // 锚定 0.04 ÷ M 2.5
-export const VIP_DEFAULT_COST_VIDEO_YUAN = 0.04 / 1.5; // ≈ 0.026667，锚定 0.04 ÷ M 1.5
+/** 锚定 Seedance 15s（与 unified-credit-formula v2 一致）。 */
+export const VIP_SEEDANCE_CHARGE_CREDITS = 525;
+export const VIP_SEEDANCE_NET_COST_YUAN = 15;
+export const VIP_COST_WORST_PER_CREDIT =
+  VIP_SEEDANCE_NET_COST_YUAN / VIP_SEEDANCE_CHARGE_CREDITS;
 
-/** 两方案默认视频占比。 */
+/** 图文 / 文本等轻量用量保守单位成本（锚定 ÷ M2.5）。 */
+export const VIP_DEFAULT_COST_LIGHT_YUAN = 0.016;
+
+/** @deprecated 别名，兼容旧引用 */
+export const VIP_DEFAULT_COST_GENERAL_YUAN = VIP_DEFAULT_COST_LIGHT_YUAN;
+/** @deprecated 最坏视频单位成本 */
+export const VIP_DEFAULT_COST_VIDEO_YUAN = VIP_COST_WORST_PER_CREDIT;
+
+/** 两方案默认「视频算力消耗占比」（用量画像，非池拆分）。 */
 export const VIP_GENERAL_HEAVY_VIDEO_FRACTION = 0.15;
 export const VIP_VIDEO_HEAVY_VIDEO_FRACTION = 0.4;
+
+/** 锚定毛利护栏（与全站 videoMinMarginGuard 默认一致）。 */
+export const VIP_MIN_MARGIN_GUARD = DEFAULT_VIDEO_MIN_MARGIN_GUARD;
 
 /** 默认目标毛利。 */
 export const VIP_DEFAULT_TARGET_MARGIN = 0.5;
@@ -40,24 +52,25 @@ export interface VipCreditSchemeInput {
   amountYuan: number;
   /** 目标毛利，0~1（如 0.5 = 50%）。 */
   targetMargin: number;
-  /** 视频占比，0~1（占总积分比例）。 */
+  /** 预期视频算力消耗占比，0~1（用量画像）。 */
   videoFraction: number;
-  costGeneralYuan?: number;
-  costVideoYuan?: number;
+  costLightYuan?: number;
+  costWorstPerCredit?: number;
   anchorYuan?: number;
+  minMarginGuard?: number;
 }
 
 export interface VipCreditScheme {
+  /** 用量画像（视频算力占比） */
   videoFraction: number;
   pricePerCreditYuan: number;
   totalCredits: number;
-  generalCredits: number;
-  videoCredits: number;
-  /** 取整回算的实际毛利（应 ≈ targetMargin）。 */
+  /** 按预期用量回算的实际毛利 */
   actualMargin: number;
-  /** 锚定面值（积分 × anchor），用于对客户展示"相当于原价"。 */
+  /** 锚定 Seedance 15s 单笔毛利（满额最坏消耗） */
+  anchorMarginRate: number;
+  anchorMarginOk: boolean;
   faceValueYuan: number;
-  /** 平台成本（元）。 */
   costYuan: number;
 }
 
@@ -69,32 +82,55 @@ function round(n: number): number {
   return Math.round(n);
 }
 
-/** 单方案测算：给定金额、目标毛利、视频占比 → 通用/视频积分分配。 */
+function blendedUnitCost(
+  f: number,
+  costLight: number,
+  costWorst: number,
+): number {
+  return (1 - f) * costLight + f * costWorst;
+}
+
+function anchorMarginFromPpc(ppc: number, costWorst: number): number {
+  if (ppc <= 0) return 0;
+  return 1 - costWorst / ppc;
+}
+
+/** 单方案测算：给定金额、目标毛利、用量画像 → 总积分（单池）。 */
 export function computeVipCreditScheme(input: VipCreditSchemeInput): VipCreditScheme {
   const amount = Math.max(0, input.amountYuan || 0);
   const margin = Math.min(0.99, clamp01(input.targetMargin));
   const f = clamp01(input.videoFraction);
-  const costGeneral = input.costGeneralYuan ?? VIP_DEFAULT_COST_GENERAL_YUAN;
-  const costVideo = input.costVideoYuan ?? VIP_DEFAULT_COST_VIDEO_YUAN;
+  const costLight = input.costLightYuan ?? VIP_DEFAULT_COST_LIGHT_YUAN;
+  const costWorst = input.costWorstPerCredit ?? VIP_COST_WORST_PER_CREDIT;
   const anchor = input.anchorYuan ?? VIP_ANCHOR_YUAN;
+  const minGuard = input.minMarginGuard ?? VIP_MIN_MARGIN_GUARD;
 
-  const blendedCost = (1 - f) * costGeneral + f * costVideo;
-  const pricePerCredit = blendedCost / (1 - margin);
-  const totalCredits = pricePerCredit > 0 ? round(amount / pricePerCredit) : 0;
-  const videoCredits = round(f * totalCredits);
-  const generalCredits = Math.max(0, totalCredits - videoCredits);
+  const blendedCost = blendedUnitCost(f, costLight, costWorst);
+  const pricePerCreditTarget = blendedCost / (1 - margin);
+  let totalCredits =
+    pricePerCreditTarget > 0 ? round(amount / pricePerCreditTarget) : 0;
 
-  const costYuan = generalCredits * costGeneral + videoCredits * costVideo;
+  let ppc = totalCredits > 0 ? amount / totalCredits : 0;
+  let anchorMargin = anchorMarginFromPpc(ppc, costWorst);
+
+  if (amount > 0 && anchorMargin < minGuard - 0.0005) {
+    const maxPpc = costWorst / (1 - minGuard);
+    totalCredits = maxPpc > 0 ? Math.floor(amount / maxPpc) : 0;
+    ppc = totalCredits > 0 ? amount / totalCredits : 0;
+    anchorMargin = anchorMarginFromPpc(ppc, costWorst);
+  }
+
+  const costYuan = totalCredits * blendedCost;
   const actualMargin = amount > 0 ? 1 - costYuan / amount : 0;
-  const faceValueYuan = (generalCredits + videoCredits) * anchor;
+  const faceValueYuan = totalCredits * anchor;
 
   return {
     videoFraction: f,
-    pricePerCreditYuan: Math.round(pricePerCredit * 1e6) / 1e6,
-    totalCredits: generalCredits + videoCredits,
-    generalCredits,
-    videoCredits,
+    pricePerCreditYuan: Math.round(ppc * 1e6) / 1e6,
+    totalCredits,
     actualMargin: Math.round(actualMargin * 10000) / 10000,
+    anchorMarginRate: Math.round(anchorMargin * 10000) / 10000,
+    anchorMarginOk: anchorMargin >= minGuard - 0.0005,
     faceValueYuan: Math.round(faceValueYuan * 100) / 100,
     costYuan: Math.round(costYuan * 100) / 100,
   };
@@ -105,9 +141,10 @@ export interface VipPackageQuoteInput {
   targetMargin?: number;
   generalHeavyVideoFraction?: number;
   videoHeavyVideoFraction?: number;
-  costGeneralYuan?: number;
-  costVideoYuan?: number;
+  costLightYuan?: number;
+  costWorstPerCredit?: number;
   anchorYuan?: number;
+  minMarginGuard?: number;
 }
 
 export interface VipPackageQuote {
@@ -118,16 +155,17 @@ export interface VipPackageQuote {
   schemeVideoHeavy: VipCreditScheme;
 }
 
-/** 双方案报价：通用多 / 视频多，供客户二选一。 */
+/** 双方案报价：均衡 / 视频偏重（单池总积分）。 */
 export function computeVipPackageQuote(input: VipPackageQuoteInput): VipPackageQuote {
   const amount = Math.max(0, input.amountYuan || 0);
   const targetMargin = input.targetMargin ?? VIP_DEFAULT_TARGET_MARGIN;
   const shared = {
     amountYuan: amount,
     targetMargin,
-    costGeneralYuan: input.costGeneralYuan,
-    costVideoYuan: input.costVideoYuan,
+    costLightYuan: input.costLightYuan,
+    costWorstPerCredit: input.costWorstPerCredit,
     anchorYuan: input.anchorYuan,
+    minMarginGuard: input.minMarginGuard,
   };
   return {
     amountYuan: amount,
@@ -146,17 +184,13 @@ export function computeVipPackageQuote(input: VipPackageQuoteInput): VipPackageQ
 }
 
 export interface VipSeatAllocationInput {
-  totalGeneralCredits: number;
-  totalVideoCredits: number;
+  totalCredits: number;
   seats: number;
 }
 
 export interface VipSeatAllocation {
-  perSeatGeneral: number;
-  perSeatVideo: number;
-  /** 平均分配后余数归第 1 席（保证合计守恒）。 */
-  remainderGeneral: number;
-  remainderVideo: number;
+  perSeatCredits: number;
+  remainderCredits: number;
 }
 
 /** 自动平均分配到席位（余数归首席，保证总数不变）。 */
@@ -164,13 +198,12 @@ export function computeVipSeatAllocation(
   input: VipSeatAllocationInput,
 ): VipSeatAllocation {
   const seats = Math.max(1, Math.round(input.seats || 1));
-  const perSeatGeneral = Math.floor(input.totalGeneralCredits / seats);
-  const perSeatVideo = Math.floor(input.totalVideoCredits / seats);
+  const total = Math.max(0, Math.round(input.totalCredits));
+  const perSeatCredits = Math.floor(total / seats);
+  const remainderCredits = total - perSeatCredits * seats;
   return {
-    perSeatGeneral,
-    perSeatVideo,
-    remainderGeneral: input.totalGeneralCredits - perSeatGeneral * seats,
-    remainderVideo: input.totalVideoCredits - perSeatVideo * seats,
+    perSeatCredits,
+    remainderCredits,
   };
 }
 
@@ -182,63 +215,51 @@ export interface VipSeatPlan {
   label: string;
   phone?: string;
   role: "OWNER" | "MEMBER";
-  generalCredits: number;
-  videoCredits: number;
+  credits: number;
   isChief?: boolean;
 }
 
 /** 自动平均分配到各席位（首席席含余数）。 */
 export function buildAutoSeatPlans(input: {
-  totalGeneralCredits: number;
-  totalVideoCredits: number;
+  totalCredits: number;
   seats: number;
   ownerPhone?: string;
 }): VipSeatPlan[] {
   const seats = Math.max(1, Math.round(input.seats || 1));
-  const alloc = computeVipSeatAllocation({
-    totalGeneralCredits: input.totalGeneralCredits,
-    totalVideoCredits: input.totalVideoCredits,
-    seats,
-  });
+  const total = Math.max(0, Math.round(input.totalCredits));
+  const alloc = computeVipSeatAllocation({ totalCredits: total, seats });
   return Array.from({ length: seats }, (_, i) => {
     const isChief = i === 0;
+    const credits = alloc.perSeatCredits + (isChief ? alloc.remainderCredits : 0);
     return {
       seatIndex: i + 1,
       label: isChief ? "首席席（含余数）" : `席位 ${i + 1}`,
       phone: isChief ? input.ownerPhone?.trim() || undefined : undefined,
       role: isChief ? "OWNER" : "MEMBER",
-      generalCredits: alloc.perSeatGeneral + (isChief ? alloc.remainderGeneral : 0),
-      videoCredits: alloc.perSeatVideo + (isChief ? alloc.remainderVideo : 0),
+      credits,
       isChief,
     };
   });
 }
 
-/** 手动席位分配合计与池总数校验。 */
+/** 手动席位分配合计与总数校验。 */
 export function validateVipManualAllocation(input: {
-  totalGeneralCredits: number;
-  totalVideoCredits: number;
-  perSeat: { generalCredits: number; videoCredits: number }[];
-}): { ok: boolean; reason?: string; sumGeneral?: number; sumVideo?: number } {
-  const sumGeneral = input.perSeat.reduce((s, x) => s + Math.max(0, Math.round(x.generalCredits)), 0);
-  const sumVideo = input.perSeat.reduce((s, x) => s + Math.max(0, Math.round(x.videoCredits)), 0);
-  if (sumGeneral !== input.totalGeneralCredits) {
+  totalCredits: number;
+  perSeat: { credits: number }[];
+}): { ok: boolean; reason?: string; sumCredits?: number } {
+  const target = Math.max(0, Math.round(input.totalCredits));
+  const sumCredits = input.perSeat.reduce(
+    (s, x) => s + Math.max(0, Math.round(x.credits)),
+    0,
+  );
+  if (sumCredits !== target) {
     return {
       ok: false,
-      reason: `通用积分分配合计 ${sumGeneral.toLocaleString()} ≠ 池总数 ${input.totalGeneralCredits.toLocaleString()}`,
-      sumGeneral,
-      sumVideo,
+      reason: `积分分配合计 ${sumCredits.toLocaleString()} ≠ 套餐总数 ${target.toLocaleString()}`,
+      sumCredits,
     };
   }
-  if (sumVideo !== input.totalVideoCredits) {
-    return {
-      ok: false,
-      reason: `视频积分分配合计 ${sumVideo.toLocaleString()} ≠ 池总数 ${input.totalVideoCredits.toLocaleString()}`,
-      sumGeneral,
-      sumVideo,
-    };
-  }
-  return { ok: true, sumGeneral, sumVideo };
+  return { ok: true, sumCredits };
 }
 
 /** 算力市场价参考（合规展示，非现金面值）。 */

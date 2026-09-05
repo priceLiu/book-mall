@@ -4,15 +4,23 @@ import { resolveGenerationSlowWarnMs } from "@/lib/generation/slow-warn-config";
 import { maybeRunSlowWarnAutoHandler } from "@/lib/generation/slow-warn-auto-handler";
 import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
 import {
-  promoteVolcengineTasksToBackgroundGeneration,
-} from "@/lib/gateway/volcengine-background-promote";
+  promoteVideoTasksToBackgroundGeneration,
+} from "@/lib/gateway/video-background-promote";
 import {
   autoRecoverPollStalledVolcengineGatewayLogs,
   recoverMisclassifiedVolcengineStallLogs,
   recoverVolcengineGatewayLogFromVendor,
 } from "@/lib/gateway/volcengine-stall-recover";
+import { syncKieGatewayLogFromVendorPoll } from "@/lib/gateway/kie-gateway-log-sync";
 import { gatewayV1RecordInfo } from "@/lib/gateway/gateway-v1-http-client";
-import { createKieTaskWithKey, getKieTaskWithKey } from "@/lib/story/kie-client";
+import { reconcileStaleEcomVideoGatewayLogs, reconcileStaleEcomChatGatewayLogs, reconcileStaleCanvasVideoGatewayLogs } from "@/lib/gateway/gateway-log-reconcile";
+import { runGatewaySubmitWithRetry } from "@/lib/gateway/gateway-submit-error-policy";
+import {
+  createKieTaskWithKey,
+  getKieTaskWithKey,
+  type KieRecordResponse,
+  type KieRecordState,
+} from "@/lib/story/kie-client";
 import {
   createKieSunoTaskWithKey,
   getKieSunoTaskWithKey,
@@ -32,11 +40,21 @@ import {
   dashscopeGetTask,
   isDashscopeTaskFailed,
   isDashscopeTaskSuccess,
+  resolveDashscopeVideoTaskPollBaseUrl,
 } from "./dashscope-client";
 import { pollHunyuanTaskForLog, submitHunyuanJobForLog } from "./hunyuan-jobs";
 import { getDecryptedCredentialApiKey } from "./credential-service";
+import { finalizeRequestLog } from "./proxy-common";
+import { finalizeDashscopeSyncWallClockRequestLog } from "./log-dashscope-timing-persist";
+import {
+  qwenImageEditGenerate,
+  type QwenImageEditContentItem,
+  type QwenImageEditParams,
+  validateDashscopeMultimodalImageContent,
+} from "./qwen-image-edit-proxy";
 
 import { SUBMIT_ORPHAN_FAIL } from "@/lib/gateway/gateway-submit-error-policy";
+import { staleChatStreamMs } from "@/lib/gateway/gateway-health-policy";
 import {
   auditGatewayPollStallAfterBatch,
   countSlowRunningGatewayLogs,
@@ -103,12 +121,31 @@ export async function expireStaleGatewayLogs(): Promise<number> {
     where: {
       status: "RUNNING",
       externalTaskId: null,
+      requestKind: { not: "CHAT" },
       submittedAt: { lt: noTaskCutoff },
     },
     data: {
       status: "FAILED",
       failCode: "STALE_ORPHAN",
       failMessage: "请求未成功提交厂商任务（无 taskId），已自动关闭",
+      completedAt: new Date(),
+    },
+  });
+
+  // 流式 CHAT 无 externalTaskId（同步 SSE）。3min orphan 会误杀剧本长流，
+  // 但必须有独立超时，否则进程重启后日志永远 RUNNING。
+  const chatCutoff = new Date(now - staleChatStreamMs());
+  const r1c = await prisma.gatewayRequestLog.updateMany({
+    where: {
+      status: "RUNNING",
+      requestKind: "CHAT",
+      externalTaskId: null,
+      submittedAt: { lt: chatCutoff },
+    },
+    data: {
+      status: "FAILED",
+      failCode: "STALE_CHAT_ORPHAN",
+      failMessage: "流式 Chat 长时间未收口（超过 15 分钟），已自动关闭",
       completedAt: new Date(),
     },
   });
@@ -170,6 +207,36 @@ export async function expireStaleGatewayLogs(): Promise<number> {
 
   const r3 = await reconcileStaleVolcengineVideoLogs(now);
 
+  let r3c = 0;
+  try {
+    r3c = await reconcileStaleEcomVideoGatewayLogs(now);
+  } catch (e) {
+    console.warn(
+      "[gateway-poll] reconcileStaleEcomVideoGatewayLogs skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
+  let r3d = 0;
+  try {
+    r3d = await reconcileStaleEcomChatGatewayLogs(now);
+  } catch (e) {
+    console.warn(
+      "[gateway-poll] reconcileStaleEcomChatGatewayLogs skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
+  let r3e = 0;
+  try {
+    r3e = await reconcileStaleCanvasVideoGatewayLogs(now);
+  } catch (e) {
+    console.warn(
+      "[gateway-poll] reconcileStaleCanvasVideoGatewayLogs skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
   const asyncVideoCutoff = new Date(now - STALE_ASYNC_VIDEO_MS);
   const r3b = await prisma.gatewayRequestLog.updateMany({
     where: {
@@ -177,7 +244,7 @@ export async function expireStaleGatewayLogs(): Promise<number> {
       requestKind: "VIDEO",
       externalTaskId: { not: null },
       submittedAt: { lt: asyncVideoCutoff },
-      providerKind: { in: ["BAILIAN", "KIE", "DASHSCOPE"] },
+      providerKind: { in: ["BAILIAN", "KIE", "DASHSCOPE", "MINIMAX"] },
     },
     data: {
       status: "FAILED",
@@ -190,16 +257,26 @@ export async function expireStaleGatewayLogs(): Promise<number> {
 
   let r4 = 0;
   try {
-    r4 = await promoteVolcengineTasksToBackgroundGeneration(now);
+    r4 = await promoteVideoTasksToBackgroundGeneration(now);
   } catch (e) {
     console.warn(
-      "[gateway-poll] promoteVolcengineTasksToBackgroundGeneration skipped",
+      "[gateway-poll] promoteVideoTasksToBackgroundGeneration skipped",
       e instanceof Error ? e.message : String(e),
     );
   }
 
   return (
-    r0.count + r1.count + r2.count + r2b.count + r3a.count + r3 + r3b.count + r4
+    r0.count +
+    r1.count +
+    r1c.count +
+    r2.count +
+    r2b.count +
+    r3a.count +
+    r3 +
+    r3c +
+    r3d +
+    r3b.count +
+    r4
   );
 }
 
@@ -309,7 +386,7 @@ const GATEWAY_POLL_PROVIDER_KINDS = [
  * - 其它异步轮询（BAILIAN / DASHSCOPE / HUNYUAN）：中等预算，同样按公平调度。
  */
 const CALLBACK_POLL_PROVIDER_KINDS = ["KIE"] as const;
-const OTHER_POLL_PROVIDER_KINDS = ["BAILIAN", "DASHSCOPE", "HUNYUAN"] as const;
+const OTHER_POLL_PROVIDER_KINDS = ["BAILIAN", "DASHSCOPE", "HUNYUAN", "MINIMAX"] as const;
 
 const ESCALATION_POLL_TIMEOUT_MS = 20_000;
 
@@ -355,6 +432,8 @@ const POLL_ROW_SELECT = {
   status: true,
   apiKeyId: true,
   externalTaskId: true,
+  providerKind: true,
+  credentialId: true,
 } as const;
 
 /** 公平调度：最久未 poll 的先 poll（null 即从未 poll，最优先），杜绝按 submittedAt 的尾部饿死。 */
@@ -368,20 +447,68 @@ type PollableGatewayRow = {
   status: string;
   apiKeyId: string | null;
   externalTaskId: string | null;
+  providerKind: string | null;
+  credentialId: string | null;
 };
 
 async function pollGatewayLogWithTimeout(
   row: PollableGatewayRow,
   timeoutMs: number,
 ): Promise<"updated" | "pending" | "skipped"> {
-  if (!row.externalTaskId || !row.apiKeyId) return "skipped";
+  if (!row.externalTaskId) return "skipped";
   const beforeStatus = row.status;
   let resultSummary: unknown = null;
+
+  if (row.providerKind === "KIE" && row.credentialId) {
+    try {
+      await syncKieGatewayLogFromVendorPoll(row.id);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const logRow = await prisma.gatewayRequestLog.findUnique({
+        where: { id: row.id },
+        select: { resultSummary: true },
+      });
+      resultSummary = logRow?.resultSummary ?? null;
+      await recordGatewayPollLastAttempt({
+        logId: row.id,
+        resultSummary,
+        ok: false,
+        kind: /connection pool|timed out fetching/i.test(msg) ? "db" : "vendor",
+        error: msg,
+      }).catch(() => undefined);
+    }
+    try {
+      await prisma.gatewayRequestLog.update({
+        where: { id: row.id },
+        data: { lastPolledAt: new Date(), pollCount: { increment: 1 } },
+      });
+    } catch (dbErr) {
+      const dbMsg = dbErr instanceof Error ? dbErr.message : String(dbErr);
+      await recordGatewayPollLastAttempt({
+        logId: row.id,
+        resultSummary,
+        ok: false,
+        kind: "db",
+        error: dbMsg,
+      }).catch(() => undefined);
+    }
+    const after = await prisma.gatewayRequestLog.findUnique({
+      where: { id: row.id },
+      select: { status: true },
+    });
+    if (beforeStatus === "RUNNING" && after?.status !== "RUNNING") {
+      return "updated";
+    }
+    return "pending";
+  }
+
+  if (!row.apiKeyId) return "skipped";
   try {
     await Promise.race([
       gatewayV1RecordInfo({
         apiKeyId: row.apiKeyId,
         taskId: row.externalTaskId,
+        logId: row.id,
       }),
       new Promise<never>((_, reject) =>
         setTimeout(
@@ -654,6 +781,21 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
   }
 
   try {
+    const { runGatewayKieWatchdog } = await import(
+      "@/lib/gateway/gateway-kie-watchdog"
+    );
+    const kie = await runGatewayKieWatchdog({ source: "gateway-poll-worker" });
+    if (kie.ran && ((kie.recovered ?? 0) > 0 || (kie.failed ?? 0) > 0)) {
+      console.info("[gateway-kie-watchdog] poll-worker tick", kie);
+    }
+  } catch (e) {
+    console.warn(
+      "[gateway-poll] gateway kie watchdog skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
+  try {
     const audit = await auditGatewayPollStallAfterBatch(batchSnapshot);
     if (audit.audited > 0) {
       console.warn("[gateway-poll] stall audit", audit);
@@ -708,14 +850,16 @@ export async function submitKieJobForLog(opts: {
     return taskId;
   }
 
-  const { taskId } = await createKieTaskWithKey(
-    cred.apiKey,
-    {
-      model: opts.model,
-      input: opts.input as never,
-      callBackUrl: opts.callBackUrl ?? null,
-    },
-    baseUrl,
+  const { taskId } = await runGatewaySubmitWithRetry(() =>
+    createKieTaskWithKey(
+      cred.apiKey,
+      {
+        model: opts.model,
+        input: opts.input as never,
+        callBackUrl: opts.callBackUrl ?? null,
+      },
+      baseUrl,
+    ),
   );
   await prisma.gatewayRequestLog.update({
     where: { id: opts.logId },
@@ -752,7 +896,11 @@ export async function submitBailianR2vJobForLog(opts: {
   if (!created.ok) throw new Error(created.error);
   await prisma.gatewayRequestLog.update({
     where: { id: opts.logId },
-    data: { externalTaskId: created.taskId, status: "RUNNING" },
+    data: {
+      externalTaskId: created.taskId,
+      status: "RUNNING",
+      ...(created.requestId ? { vendorRequestId: created.requestId } : {}),
+    },
   });
   return created.taskId;
 }
@@ -762,7 +910,7 @@ export async function pollKieTaskForLog(opts: {
   credentialId: string;
   taskId: string;
   model?: string;
-}) {
+}): Promise<KieRecordResponse> {
   const cred = await getDecryptedCredentialApiKey(opts.credentialId);
   if (!cred) throw new Error("凭证不可用");
   const { resolveKieApiRoot } = await import("@/lib/gateway/model-router");
@@ -770,7 +918,7 @@ export async function pollKieTaskForLog(opts: {
   if (opts.model && isKieSunoModelKey(opts.model)) {
     const suno = await getKieSunoTaskWithKey(cred.apiKey, opts.taskId, baseUrl);
     const st = (suno.status ?? "").trim().toLowerCase();
-    const state =
+    const state: KieRecordState =
       st === "success" || st === "succeeded"
         ? "success"
         : st === "fail" || st === "failed"
@@ -885,6 +1033,64 @@ export async function submitDashscopeKlingV3ImageJobForLog(opts: {
   return created.taskId;
 }
 
+/** 百炼 multimodal-generation · 同步出图（qwen-image-3.0-pro / z-image-turbo） */
+export async function submitDashscopeMultimodalImageSyncForLog(opts: {
+  logId: string;
+  credentialId: string;
+  model: string;
+  content: QwenImageEditContentItem[];
+  parameters?: QwenImageEditParams;
+}) {
+  const contentErr = validateDashscopeMultimodalImageContent(
+    opts.model,
+    opts.content,
+  );
+  if (contentErr) throw new Error(contentErr);
+
+  const cred = await getDecryptedCredentialApiKey(opts.credentialId);
+  if (!cred) throw new Error("凭证不可用");
+  const started = Date.now();
+  const result = await qwenImageEditGenerate({
+    apiKey: cred.apiKey,
+    baseUrl: cred.baseUrl ?? undefined,
+    model: opts.model,
+    content: opts.content,
+    parameters: opts.parameters,
+  });
+  if (!result.ok) throw new Error(result.error);
+
+  const output = {
+    task_status: "SUCCEEDED",
+    choices: result.imageUrls.map((image) => ({
+      finish_reason: "stop",
+      message: {
+        role: "assistant",
+        content: [{ image }],
+      },
+    })),
+  };
+
+  const ended = Date.now();
+  await prisma.gatewayRequestLog.update({
+    where: { id: opts.logId },
+    data: { externalTaskId: opts.logId, status: "RUNNING" },
+  });
+  await finalizeDashscopeSyncWallClockRequestLog(opts.logId, {
+    vendorCallStartedAtMs: started,
+    vendorCallEndedAtMs: ended,
+    status: "SUCCEEDED",
+    resultSummaryBase: {
+      sync: true,
+      output,
+      imageUrls: result.imageUrls,
+      imageCount: result.imageUrls.length,
+    },
+    externalTaskId: opts.logId,
+    model: opts.model,
+  });
+  return opts.logId;
+}
+
 export async function submitDashscopeWanxJobForLog(opts: {
   logId: string;
   credentialId: string;
@@ -930,11 +1136,16 @@ export async function submitDashscopeVideoJobForLog(opts: {
     apiKey: cred.apiKey,
     model: opts.model,
     body: opts.body,
+    baseUrl: cred.baseUrl,
   });
   if (!created.ok) throw new Error(created.error);
   await prisma.gatewayRequestLog.update({
     where: { id: opts.logId },
-    data: { externalTaskId: created.taskId, status: "RUNNING" },
+    data: {
+      externalTaskId: created.taskId,
+      status: "RUNNING",
+      ...(created.requestId ? { vendorRequestId: created.requestId } : {}),
+    },
   });
   return created.taskId;
 }
@@ -942,12 +1153,19 @@ export async function submitDashscopeVideoJobForLog(opts: {
 export async function pollDashscopeTaskForLog(opts: {
   credentialId: string;
   taskId: string;
+  baseUrl?: string | null;
+  model?: string | null;
 }) {
   const cred = await getDecryptedCredentialApiKey(opts.credentialId);
   if (!cred) throw new Error("凭证不可用");
   const polled = await dashscopeGetTask({
     apiKey: cred.apiKey,
     taskId: opts.taskId,
+    baseUrl: resolveDashscopeVideoTaskPollBaseUrl({
+      model: opts.model,
+      apiKey: cred.apiKey,
+      storedBaseUrl: opts.baseUrl ?? cred.baseUrl,
+    }),
   });
   if (!polled.ok) throw new Error(polled.error);
   return { output: polled.output, raw: polled.raw };

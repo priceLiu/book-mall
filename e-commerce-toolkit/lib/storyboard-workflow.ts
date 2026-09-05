@@ -12,6 +12,7 @@ import {
   isParamCollecting,
   PARAM_STEPS,
   QUICK_GENERATE_CHOICE,
+  REGENERATE_PLAN_CHOICE,
   resetParamCollectPatch,
   startCustomParamCollectPatch,
 } from "@/lib/storyboard-param-collect";
@@ -19,12 +20,61 @@ import {
   buildCustomSceneLlmUserMessage,
   buildScenePresetLlmUserMessage,
   CUSTOM_SCENE_INPUT_CHOICE,
+  formatSceneCustomDisplay,
   getScenePresetChoiceLabels,
+  isSceneAdjustLlmTrigger,
+  isScenePresetChoice,
+  resolveScenePresetByKey,
   resolveScenePresetByLabel,
+  SCENE_APPLY_AI_CHOICE,
+  SCENE_APPLY_CUSTOM_CHOICE,
 } from "@/lib/storyboard-scene-presets";
-import type { StoryboardProject, StoryboardReference } from "@/lib/storyboard-types";
+import type { StoryboardDeliverable, StoryboardProject, StoryboardReference } from "@/lib/storyboard-types";
+import { extractStoryboardDeliverableFromText, asStoryboardDeliverable } from "@/lib/storyboard-deliverable-parse";
+import { isFashionDeliverable } from "@/lib/fashion-types";
 
 export type StoryboardUploadRole = "product" | "character" | "scene";
+
+export type StoryboardSchemePickChoice = {
+  id: string;
+  label: string;
+  title: string;
+  description?: string;
+  message: string;
+  recommended?: boolean;
+};
+
+/** meta 未同步时，从聊天记录 / deliverableMarkdown 解析 deliverable */
+export function resolveStoryboardDeliverable(
+  project: StoryboardProject,
+): StoryboardDeliverable | null {
+  const fromMeta = asStoryboardDeliverable(project.meta?.deliverable);
+  if (fromMeta?.schemes?.length || fromMeta?.analysis) return fromMeta ?? null;
+
+  for (let i = project.chatHistory.length - 1; i >= 0; i--) {
+    const msg = project.chatHistory[i];
+    if (msg?.role !== "assistant") continue;
+    const parsed = extractStoryboardDeliverableFromText(msg.content);
+    if (parsed?.schemes?.length || parsed?.analysis) return parsed;
+  }
+
+  const cachedMd = project.meta?.deliverableMarkdown?.trim();
+  if (cachedMd) {
+    const parsed = extractStoryboardDeliverableFromText(cachedMd);
+    if (parsed?.schemes?.length || parsed?.analysis) return parsed;
+  }
+
+  return fromMeta ?? null;
+}
+
+/** 方案已产出（或已选定），进入角色/场景参考与定稿阶段 */
+export function isInPostPlanRefWorkflow(project: StoryboardProject): boolean {
+  if (project.sheet) return false;
+  if (!hasStoryboardProductRef(project)) return false;
+  if (!hasStoryboardPlanningContent(project)) return false;
+  if (isAwaitingSchemePick(project)) return false;
+  return userPickedScheme(project);
+}
 
 function userSaid(project: StoryboardProject, texts: string[]): boolean {
   return project.chatHistory.some(
@@ -53,12 +103,145 @@ export function planModeChosen(project: StoryboardProject): boolean {
   return false;
 }
 
-function hasPlanningDeliverable(project: StoryboardProject): boolean {
-  return Boolean(
-    project.meta?.deliverable?.analysis ||
-      project.meta?.deliverable?.schemes?.length ||
-      project.sheet,
+export function hasPlanningDeliverable(project: StoryboardProject): boolean {
+  const deliverable = resolveStoryboardDeliverable(project);
+  return Boolean(deliverable?.analysis || deliverable?.schemes?.length || project.sheet);
+}
+
+export function hasStoryboardPlanningContent(project: StoryboardProject): boolean {
+  const deliverable = resolveStoryboardDeliverable(project);
+  return Boolean(deliverable?.analysis || deliverable?.schemes?.length);
+}
+
+/** 已选生成方式但策划 JSON 未入库（LLM 失败或未输出 deliverable） */
+export function isAwaitingPlanDeliverable(project: StoryboardProject): boolean {
+  if (project.sheet) return false;
+  if (isParamCollecting(project)) return false;
+  if (isAwaitingPlanMode(project)) return false;
+  if (project.meta?.workflow?.replanning) return false;
+  if (!planModeChosen(project)) return false;
+  return !hasStoryboardPlanningContent(project);
+}
+
+/** meta 或聊天记录中已选定方案（避免父级 project 刷新滞后） */
+export function userPickedScheme(project: StoryboardProject): boolean {
+  const schemes = resolveStoryboardDeliverable(project)?.schemes ?? [];
+  if (schemes.length <= 1) return schemes.length === 1;
+
+  if (project.meta?.workflow?.schemePicked === true) return true;
+
+  for (let i = project.chatHistory.length - 1; i >= 0; i--) {
+    const msg = project.chatHistory[i];
+    if (msg?.role === "user" && parseSchemePickChoice(project, msg.content) != null) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function resolveSelectedSchemeIndex(project: StoryboardProject): number {
+  if (typeof project.meta?.selectedSchemeIndex === "number") {
+    return project.meta.selectedSchemeIndex;
+  }
+  for (let i = project.chatHistory.length - 1; i >= 0; i--) {
+    const msg = project.chatHistory[i];
+    if (msg?.role === "user") {
+      const idx = parseSchemePickChoice(project, msg.content);
+      if (idx != null) return idx;
+    }
+  }
+  return 0;
+}
+
+/** 多套方案已生成，等待用户选定（未定稿、无 sheet） */
+export function isAwaitingSchemePick(project: StoryboardProject): boolean {
+  if (project.sheet) return false;
+  const schemes = resolveStoryboardDeliverable(project)?.schemes ?? [];
+  if (schemes.length <= 1) return false;
+  return !userPickedScheme(project);
+}
+
+/** 历史误标 schemePicked（未点选、仍处 planning）时可自动修复 */
+export function needsStaleSchemePickReset(project: StoryboardProject): boolean {
+  const schemes = resolveStoryboardDeliverable(project)?.schemes ?? [];
+  if (schemes.length <= 1 || project.sheet) return false;
+  const wf = project.meta?.workflow ?? {};
+  if (wf.schemePicked !== true || wf.phase !== "planning") return false;
+  return !project.chatHistory.some(
+    (m) => m.role === "user" && parseSchemePickChoice(project, m.content) != null,
   );
+}
+
+export function schemePickPromptBlock(): { title: string; subtitle: string } {
+  return {
+    title: "请选择你喜欢的分镜方案，确认后继续上传参考图",
+    subtitle: "选择方案（单选）",
+  };
+}
+
+export function buildSchemePickChoiceCards(
+  project: StoryboardProject,
+): StoryboardSchemePickChoice[] {
+  return buildSchemePickChoicesFromSchemes(
+    resolveStoryboardDeliverable(project)?.schemes ?? [],
+  );
+}
+
+export function buildSchemePickChoicesFromSchemes(
+  schemes: Array<{ id?: string; title?: string; summary?: string; strategy?: string }>,
+): StoryboardSchemePickChoice[] {
+  return schemes.map((scheme, index) => ({
+    id: scheme.id || `scheme-${index}`,
+    label: scheme.title?.trim() || `方案${index + 1}`,
+    title: scheme.title?.trim() || `方案${index + 1}`,
+    description: scheme.summary?.trim() || scheme.strategy?.trim() || undefined,
+    message: schemePickChoiceLabel(scheme, index),
+    recommended: index === 0,
+  }));
+}
+
+export function schemePickChoiceLabel(
+  scheme: { title?: string },
+  index: number,
+): string {
+  const title = scheme.title?.trim() || `方案${index + 1}`;
+  return title.startsWith("采用") ? title : `采用${title}`;
+}
+
+export function getSchemePickChoices(project: StoryboardProject): string[] {
+  return buildSchemePickChoiceCards(project).map((c) => c.message);
+}
+
+export function parseSchemePickChoice(
+  project: StoryboardProject,
+  text: string,
+): number | null {
+  const schemes = resolveStoryboardDeliverable(project)?.schemes ?? [];
+  const t = text.trim();
+  if (!t) return null;
+
+  for (let i = 0; i < schemes.length; i++) {
+    const label = schemePickChoiceLabel(schemes[i]!, i);
+    if (t === label || t === schemes[i]!.title?.trim()) return i;
+  }
+
+  const cnMap: Record<string, number> = { 一: 0, 二: 1, 三: 2 };
+  const numMap: Record<string, number> = { "1": 0, "2": 1, "3": 2 };
+  const cn = t.match(/方案([一二三])/);
+  if (cn?.[1] && cnMap[cn[1]!] != null && cnMap[cn[1]!]! < schemes.length) {
+    return cnMap[cn[1]!]!;
+  }
+  const num = t.match(/方案\s*([123])/);
+  if (num?.[1] && numMap[num[1]!] != null && numMap[num[1]!]! < schemes.length) {
+    return numMap[num[1]!]!;
+  }
+  return null;
+}
+
+export function selectedSchemeForProject(project: StoryboardProject) {
+  const schemes = resolveStoryboardDeliverable(project)?.schemes ?? [];
+  const idx = resolveSelectedSchemeIndex(project);
+  return schemes[idx] ?? schemes[0] ?? null;
 }
 
 export function isAwaitingPlanMode(project: StoryboardProject): boolean {
@@ -73,6 +256,19 @@ export function productRefStepDone(project: StoryboardProject): boolean {
   return hasStoryboardProductRef(project);
 }
 
+/** 开场：须先上传产品图（策划交付前） */
+export function isAwaitingInitialProductRef(project: StoryboardProject): boolean {
+  if (hasPlanningDeliverable(project)) return false;
+  return !hasStoryboardProductRef(project);
+}
+
+/** 产品图已上传，等待输入产品名 */
+export function isAwaitingProductNameInput(project: StoryboardProject): boolean {
+  if (hasPlanningDeliverable(project)) return false;
+  if (!hasStoryboardProductRef(project)) return false;
+  return !hasProductName(project);
+}
+
 export function characterRefStepDone(project: StoryboardProject): boolean {
   const wf = project.meta?.workflow ?? {};
   return (
@@ -83,12 +279,38 @@ export function characterRefStepDone(project: StoryboardProject): boolean {
   );
 }
 
+export function hasStoryboardCharacterRef(project: StoryboardProject): boolean {
+  return project.references.some(
+    (r) => r.role === "character" && /^https?:\/\//.test(r.ossUrl?.trim() ?? ""),
+  );
+}
+
+/** 本次生图是否会先自动生成角色参考图（尚无 character ref 时） */
+export function willStoryboardAutoGenCharacter(
+  project: StoryboardProject,
+  fashionCharMode?: "ai" | "upload",
+): boolean {
+  const wf = project.meta?.workflow ?? {};
+  if (wf.skippedCharacter) return false;
+  if (hasStoryboardCharacterRef(project)) return false;
+  return (
+    Boolean(wf.autoGenCharacter) ||
+    Boolean(wf.characterPresetKey) ||
+    fashionCharMode === "ai" ||
+    wf.fashionCharacterMode === "ai"
+  );
+}
+
+export const STORYBOARD_CHARACTER_REF_REQUIRED_MESSAGE =
+  "各镜头人物一致须绑定角色参考图。请在左侧上传角色图，或在流程中完成「角色图」步骤（选择自动生成），再重新生成分镜图与视频。";
+
 export function hasSceneReference(project: StoryboardProject): boolean {
   return project.references.some((r) => r.role === "scene" || r.role === "other");
 }
 
 export function sceneRefStepDone(project: StoryboardProject): boolean {
   const wf = project.meta?.workflow ?? {};
+  if (wf.awaitingSceneApplyMode) return false;
   return (
     userSaid(project, ["已上传场景图", "已上传参考图"]) ||
     Boolean(wf.scenePreset) ||
@@ -97,8 +319,79 @@ export function sceneRefStepDone(project: StoryboardProject): boolean {
   );
 }
 
+export function isAwaitingSceneApplyMode(project: StoryboardProject): boolean {
+  if (project.meta?.workflow?.awaitingSceneApplyMode) return true;
+  const hist = project.chatHistory;
+  for (let i = hist.length - 1; i >= 0; i--) {
+    const m = hist[i];
+    if (m?.role !== "assistant") continue;
+    if (!m.content.includes("请选择应用方式")) continue;
+    const after = hist.slice(i + 1);
+    const picked = after.some(
+      (x) =>
+        x.role === "user" &&
+        (x.content.trim() === SCENE_APPLY_CUSTOM_CHOICE ||
+          x.content.trim() === SCENE_APPLY_AI_CHOICE),
+    );
+    return !picked;
+  }
+  return false;
+}
+
+const SCENE_STEP_RESERVED_USER_TEXT = new Set([
+  "定稿",
+  "无需微调",
+  "跳过",
+  "已上传场景图",
+  "已上传参考图",
+  CUSTOM_SCENE_INPUT_CHOICE,
+  SCENE_APPLY_CUSTOM_CHOICE,
+  SCENE_APPLY_AI_CHOICE,
+]);
+
 export function isAwaitingCustomSceneInput(project: StoryboardProject): boolean {
-  return Boolean(project.meta?.workflow?.awaitingCustomSceneInput);
+  if (project.meta?.workflow?.awaitingCustomSceneInput) return true;
+  const hist = project.chatHistory;
+  for (let i = hist.length - 1; i >= 0; i--) {
+    const m = hist[i];
+    if (m?.role !== "assistant") continue;
+    if (!m.content.includes("请描述拍摄场景")) continue;
+    const after = hist.slice(i + 1);
+    const answered = after.some(
+      (x) =>
+        x.role === "user" &&
+        !SCENE_STEP_RESERVED_USER_TEXT.has(x.content.trim()) &&
+        !isScenePresetChoice(x.content.trim()) &&
+        !isSceneAdjustLlmTrigger(x.content),
+    );
+    return !answered;
+  }
+  return false;
+}
+
+/** 场景步骤：用户输入应写入 scenePreset，不得走通用 LLM */
+export function shouldCaptureSceneDescription(
+  project: StoryboardProject,
+  text: string,
+): boolean {
+  const t = text.trim();
+  if (!t || t.length > 120) return false;
+  if (isSceneAdjustLlmTrigger(t)) return false;
+  if (SCENE_STEP_RESERVED_USER_TEXT.has(t)) return false;
+  if (isScenePresetChoice(t)) return false;
+  if (isAwaitingSceneApplyMode(project)) return false;
+
+  if (isAwaitingCustomSceneInput(project)) return true;
+
+  if (
+    isInPostPlanRefWorkflow(project) &&
+    characterRefStepDone(project) &&
+    !sceneRefStepDone(project)
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 export function getSceneRefStepChoices(project: StoryboardProject): string[] {
@@ -130,34 +423,96 @@ export function completeCustomSceneInput(
 ): {
   workflowPatch: Record<string, unknown>;
   assistantReply: string;
-  llmUserMessage: string;
 } | null {
   const text = description.trim();
   if (!text) return null;
-  const productName = inferProductNameFromChat(project);
+  if (text.startsWith("场景参考已确认") || text.includes("storyboard-deliverable")) {
+    return null;
+  }
+  if (text.length > 120) return null;
+
+  const preset = resolveScenePresetByLabel(text);
+  if (preset) {
+    return {
+      workflowPatch: {
+        scenePreset: preset.key,
+        scenePresetCustom: undefined,
+        awaitingCustomSceneInput: false,
+        awaitingSceneApplyMode: true,
+        skippedRefs: false,
+      },
+      assistantReply: `已记录场景：${preset.label}。请选择应用方式：`,
+    };
+  }
+
   return {
     workflowPatch: {
       scenePreset: "custom",
       scenePresetCustom: text,
       awaitingCustomSceneInput: false,
+      awaitingSceneApplyMode: true,
       skippedRefs: false,
     },
-    assistantReply: `已记录自定义场景：${text}。正在根据该环境微调各镜头画面背景…`,
-    llmUserMessage: buildCustomSceneLlmUserMessage(text, productName),
+    assistantReply: `已记录场景：${text}。请选择应用方式：`,
   };
 }
 
 export function completeScenePresetChoice(
   project: StoryboardProject,
   label: string,
-): { workflowPatch: Record<string, unknown>; assistantReply: string; llmUserMessage: string } | null {
+): { workflowPatch: Record<string, unknown>; assistantReply: string } | null {
   const preset = resolveScenePresetByLabel(label);
   if (!preset) return null;
-  const productName = inferProductNameFromChat(project);
   return {
-    workflowPatch: { scenePreset: preset.key, skippedRefs: false },
-    assistantReply: `已选预设场景：${preset.label}。正在根据该环境微调各镜头画面背景…`,
-    llmUserMessage: buildScenePresetLlmUserMessage(preset, productName),
+    workflowPatch: {
+      scenePreset: preset.key,
+      scenePresetCustom: undefined,
+      awaitingSceneApplyMode: true,
+      skippedRefs: false,
+    },
+    assistantReply: `已记录场景：${preset.label}。请选择应用方式：`,
+  };
+}
+
+export function resolveSceneApplyLlmMessage(project: StoryboardProject): string | null {
+  const wf = project.meta?.workflow ?? {};
+  const productName = inferProductNameFromChat(project);
+  if (wf.scenePreset === "custom" && wf.scenePresetCustom?.trim()) {
+    return buildCustomSceneLlmUserMessage(wf.scenePresetCustom, productName);
+  }
+  const preset = resolveScenePresetByKey(wf.scenePreset);
+  if (preset) {
+    return buildScenePresetLlmUserMessage(preset, productName);
+  }
+  return null;
+}
+
+export function completeSceneApplyCustom(project: StoryboardProject): {
+  workflowPatch: Record<string, unknown>;
+  assistantReply: string;
+} {
+  const label = sceneApplyModePromptLabel(project);
+  return {
+    workflowPatch: { awaitingSceneApplyMode: false },
+    assistantReply: `已按自定义方式记录场景「${label}」，分镜脚本保持原稿。确认无误可回复「定稿」。`,
+  };
+}
+
+export function sceneApplyModePromptLabel(project: StoryboardProject): string {
+  const wf = project.meta?.workflow ?? {};
+  if (wf.scenePreset === "custom" && wf.scenePresetCustom) {
+    return formatSceneCustomDisplay(wf.scenePresetCustom);
+  }
+  return resolveScenePresetByKey(wf.scenePreset)?.label ?? "当前场景";
+}
+
+export function completeSceneApplyAi(): {
+  workflowPatch: Record<string, unknown>;
+  assistantReply: string;
+} {
+  return {
+    workflowPatch: { awaitingSceneApplyMode: false },
+    assistantReply: "正在根据所选场景微调各镜头画面背景…",
   };
 }
 
@@ -168,6 +523,14 @@ export function otherRefStepDone(project: StoryboardProject): boolean {
 
 /** 当前应收参考图的类型（用户点「已上传」前可连续上传多张） */
 export function inferCollectUploadRole(project: StoryboardProject): StoryboardUploadRole {
+  if (isAwaitingInitialProductRef(project) || isAwaitingProductNameInput(project)) {
+    return "product";
+  }
+  if (isInPostPlanRefWorkflow(project)) {
+    if (!characterRefStepDone(project)) return "character";
+    if (!sceneRefStepDone(project)) return "scene";
+    return "scene";
+  }
   if (!productRefStepDone(project)) return "product";
   if (!characterRefStepDone(project)) return "character";
   if (!sceneRefStepDone(project)) return "scene";
@@ -196,17 +559,87 @@ export function panelVideoCount(project: StoryboardProject): number {
   return project.sheet?.panels.filter((p) => Boolean(p.videoUrl)).length ?? 0;
 }
 
+export function resolveAssistantComposerPlaceholder(project: StoryboardProject): string {
+  const wf = project.meta?.workflow ?? {};
+  if (wf.awaitingCustomSceneInput) {
+    return "请描述拍摄场景（环境、光线、道具等）…";
+  }
+  if (wf.awaitingSceneApplyMode) {
+    return "请点击上方按钮选择「自定义」或「AI 生成」…";
+  }
+  if (wf.paramAwaitingSellpoint) {
+    return "请输入产品卖点（品牌、价格、核心卖点等）…";
+  }
+  if (isParamCollecting(project)) {
+    return "请点击上方按钮选择参数…";
+  }
+  if (isAwaitingInitialProductRef(project)) {
+    return "请先在参考图区上传产品图（必填），完成后点击「已上传产品图」…";
+  }
+  if (isAwaitingProductNameInput(project)) {
+    return "请输入产品名（如「蓝牙耳机」「保湿面霜」）…";
+  }
+  if (isAwaitingCategory(project)) {
+    return "请选择产品品类，或点击上方按钮…";
+  }
+  if (isAwaitingPlanMode(project)) {
+    return "请点击上方按钮选择「快速生成」或「自定义参数」…";
+  }
+
+  if (isAwaitingSchemePick(project)) {
+    return "点选上方方案卡片继续；也可输入补充说明…";
+  }
+
+  if (isInPostPlanRefWorkflow(project)) {
+    if (!characterRefStepDone(project)) {
+      return "请上传角色图、选择预设，或点击「跳过」…";
+    }
+    if (!sceneRefStepDone(project)) {
+      return "请选择场景预设、上传场景图，或点击「跳过」…";
+    }
+    return "确认方案无误可回复「定稿」；需修改请说明调整点…";
+  }
+
+  const hasPlanning = hasStoryboardPlanningContent(project);
+  const hasSheet = Boolean(project.sheet);
+
+  if (hasPlanning && !hasSheet) {
+    if (!characterRefStepDone(project)) {
+      return "请上传角色图、选择预设，或点击「跳过」…";
+    }
+    if (!sceneRefStepDone(project)) {
+      return "请选择场景预设、上传场景图，或点击「跳过」…";
+    }
+    return "确认方案无误可回复「定稿」；需修改请说明调整点…";
+  }
+
+  if (hasSheet && !hasSheetImagesReady(project)) {
+    return "方案已定稿：可点击「生成全部分镜图」，或输入微调说明…";
+  }
+  if (hasSheetImagesReady(project)) {
+    return "分镜图已就绪：可生成整图成片或合并分镜视频…";
+  }
+
+  if (isAwaitingPlanDeliverable(project)) {
+    return "策划方案未完整生成，请点击「重新生成策划」重试…";
+  }
+
+  return "点击上方按钮继续，或输入补充说明…";
+}
+
 export function inferAssistantChoices(project: StoryboardProject): string[] {
   if (project.meta?.workflow?.replanning) return [];
   if (isAwaitingCustomSceneInput(project)) return [];
+  if (isAwaitingSceneApplyMode(project)) {
+    return [SCENE_APPLY_CUSTOM_CHOICE, SCENE_APPLY_AI_CHOICE];
+  }
 
   if (isParamCollecting(project)) {
     return getChoicesForStep(project);
   }
 
   const hasSheet = Boolean(project.sheet);
-  const hasAnalysis = Boolean(project.meta?.deliverable?.analysis);
-  const hasSchemes = Boolean(project.meta?.deliverable?.schemes?.length);
+  const hasPlanning = hasStoryboardPlanningContent(project);
   const imagesReady = hasSheetImagesReady(project);
   const hasVideo = Boolean(project.videoAssetId);
 
@@ -214,13 +647,29 @@ export function inferAssistantChoices(project: StoryboardProject): string[] {
     return getCategoryChoiceLabels();
   }
 
+  if (isAwaitingInitialProductRef(project)) {
+    return hasStoryboardProductRef(project) ? ["已上传产品图"] : [];
+  }
+
+  if (isAwaitingProductNameInput(project)) {
+    return [];
+  }
+
   if (isAwaitingPlanMode(project)) {
     return [QUICK_GENERATE_CHOICE, CUSTOM_PARAMS_CHOICE];
   }
 
-  // 策划交付物生成完成后再进入参考图 / 定稿步骤；生成中不展示选项，避免气泡高度抖动
-  if ((hasAnalysis || hasSchemes) && !hasSheet) {
-    if (!productRefStepDone(project)) return ["已上传产品图"];
+  if (isAwaitingPlanDeliverable(project)) {
+    return [REGENERATE_PLAN_CHOICE];
+  }
+
+  // 多套方案：由助手区卡片点选，不在气泡内重复展示胶囊按钮
+  if (isAwaitingSchemePick(project)) {
+    return [];
+  }
+
+  // 策划交付后：角色 / 场景 / 定稿（产品图仅开场上传，此处不再检测）
+  if (isInPostPlanRefWorkflow(project)) {
     if (!characterRefStepDone(project)) {
       return [
         "已上传角色图",
@@ -269,7 +718,6 @@ export function workflowPatchForChoice(
   text: string,
 ): Record<string, unknown> | null {
   if (text === "跳过") {
-    if (!productRefStepDone(project)) return null;
     if (!characterRefStepDone(project)) return { skippedCharacter: true };
     if (!sceneRefStepDone(project)) {
       return { skippedRefs: true, scenePreset: undefined, scenePresetCustom: undefined };
@@ -294,6 +742,27 @@ export function workflowPatchForChoice(
   if (text === "wan2.7-image" || text === "通义万相 2.7") return { imageModelKey: "wan2.7-image" };
   if (text === "wan2.7-image-pro" || text === "通义万相 2.7 Pro")
     return { imageModelKey: "wan2.7-image-pro" };
+  if (
+    text === "qwen-image-3.0-pro" ||
+    text === "千问 Image 3.0 Pro" ||
+    text === "千问 image 3.0 pro"
+  ) {
+    return { imageModelKey: "qwen-image-3.0-pro" };
+  }
+  if (
+    text === "qwen-image-edit" ||
+    text === "千问图像编辑" ||
+    text === "千问 · 图像编辑"
+  ) {
+    return { imageModelKey: "qwen-image-edit" };
+  }
+  if (
+    text === "qwen-image-edit-max" ||
+    text === "千问图像编辑 Max" ||
+    text === "千问 · 图像编辑 Max"
+  ) {
+    return { imageModelKey: "qwen-image-edit-max" };
+  }
   if (
     text === "wan2.6-image" ||
     text === "wan2.6-t2i" ||
@@ -352,6 +821,15 @@ export function workflowPatchForChoice(
     text === "万相 2.6 Flash"
   ) {
     return { videoModelKey: "wan2.6-r2v-flash" };
+  }
+  if (
+    text === "wan3.0-video" ||
+    text === "wan3.0-video-prime" ||
+    text === "万相 3.0" ||
+    text === "Wan 3.0" ||
+    text === "万相3.0"
+  ) {
+    return { videoModelKey: "wan3.0-video" };
   }
   return null;
 }

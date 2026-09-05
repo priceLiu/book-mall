@@ -1,15 +1,20 @@
 import {
+  LIBTV_AUDIO_TRACK_NODE_HEIGHT,
+  LIBTV_AUDIO_TRACK_NODE_WIDTH,
   LIBTV_SQUARE_IMAGE_NODE_WIDTH,
   LIBTV_SQUARE_IMAGE_NODE_HEIGHT,
 } from "./libtv-node-chrome";
 import {
   buildPro2ImageNodeData,
+  buildPro2ScriptHubNodeData,
   buildPro2StarterNodeData,
   buildPro2GeneralTextNodeData,
 } from "./pro2-spawn-nodes";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
 import {
   PRO2_IMAGE_NODE_HEIGHT,
+  PRO2_SCRIPT_NODE_HEIGHT,
+  PRO2_SCRIPT_NODE_WIDTH,
   PRO2_TEXT_NODE_HEIGHT,
   PRO2_TEXT_NODE_MIN_WIDTH,
   PRO2_TEXT_NODE_WIDTH,
@@ -17,18 +22,63 @@ import {
 import { SBV1_VIDEO_ENGINE_HEIGHT, SBV1_VIDEO_ENGINE_WIDTH } from "./sbv1-node-chrome";
 import { buildSbv1VideoEngineNodeData } from "./sbv1-spawn-nodes";
 import { buildPro2AudioNodeData } from "./pro2-spawn-nodes";
+import {
+  GATEWAY_MINIMAX_VIDEO_PROVIDER_ID,
+  GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
+} from "./system-providers";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { flowPositionAtViewportCenter } from "./viewport-placement";
 
 export type Pro2ShortcutPresetId =
   | "image-to-prompt"
   | "video-to-prompt"
+  | "video-film-pull"
   | "text-to-video"
   | "text-to-music";
+
+/** 视频节点空态 · 左侧添加上游快捷预设 */
+export type Pro2VideoShortcutPresetId =
+  | "image-ref-to-video"
+  | "text-to-video-from-video"
+  | "video-to-video"
+  | "lip-sync-broadcast"
+  | "reference-audio-to-video";
+
+const VIDEO_PRESET_LABEL: Record<Pro2VideoShortcutPresetId, string> = {
+  "image-ref-to-video": "预设 - 图(参考)生视频",
+  "text-to-video-from-video": "预设 - 文生视频",
+  "video-to-video": "预设 - 视频生视频",
+  "lip-sync-broadcast": "预设 - 对口型口播",
+  "reference-audio-to-video": "预设 - 参考音生视频",
+};
+
+const LIP_SYNC_AUDIO_ENGINE = {
+  providerId: GATEWAY_MINIMAX_VIDEO_PROVIDER_ID,
+  modelKey: "MiniMax/speech-2.8-hd",
+  params: { voice_id: "" },
+} as const;
+
+const REF_AUDIO_AUDIO_ENGINE = {
+  providerId: GATEWAY_MINIMAX_VIDEO_PROVIDER_ID,
+  modelKey: "MiniMax/speech-2.8-hd",
+  params: { voice_id: "male-qn-qingse" },
+} as const;
+
+const REF_AUDIO_VIDEO_ENGINE = {
+  providerId: GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
+  modelKey: "doubao-seedance-2.0",
+  params: {
+    resolution: "720p",
+    generate_audio: false,
+    ratio: "16:9",
+    duration: 15,
+  },
+} as const;
 
 const PRESET_LABEL: Record<Pro2ShortcutPresetId, string> = {
   "image-to-prompt": "预设 - 图片反推提示词",
   "video-to-prompt": "预设 - 视频反推提示词",
+  "video-film-pull": "预设 - 视频拉片",
   "text-to-video": "预设 - 文生视频",
   "text-to-music": "预设 - 文字生音乐",
 };
@@ -181,6 +231,56 @@ export function spawnPro2ShortcutPreset(
     return { groupId, focusNodeId: textId };
   }
 
+  if (preset === "video-film-pull") {
+    const hubW = PRO2_SCRIPT_NODE_WIDTH;
+    const totalW = videoW + gap + hubW;
+    const maxH = Math.max(SBV1_VIDEO_ENGINE_HEIGHT, PRO2_SCRIPT_NODE_HEIGHT);
+    const y = center.y - maxH / 2;
+    const videoId = store.addNode(
+      "sbv1-video-engine",
+      { x: center.x - totalW / 2, y },
+      buildSbv1VideoEngineNodeData({
+        label: "源视频",
+        pro2PresetKind: preset,
+      }),
+    );
+    const hubId = store.addNode(
+      "story-pro2-script-hub",
+      { x: center.x - totalW / 2 + videoW + gap, y },
+      buildPro2ScriptHubNodeData({ label: "拉片制作包" }),
+    );
+    if (!videoId || !hubId) {
+      return { groupId: null, focusNodeId: videoId || hubId };
+    }
+    const groupId = store.createGroupContaining([videoId, hubId], {
+      label: PRESET_LABEL[preset],
+      ...SHORTCUT_GROUP_OPTS,
+    });
+    queueMicrotask(() => {
+      store.setNodes((prev) =>
+        prev.map((n) =>
+          n.id === videoId
+            ? {
+                ...n,
+                data: { ...(n.data as Record<string, unknown>), filmPullScriptHubId: hubId },
+              }
+            : n,
+        ) as typeof prev,
+      );
+      relayoutShortcutPresetGroup(
+        store.setNodes,
+        groupId,
+        [
+          { id: videoId, width: videoW, height: SBV1_VIDEO_ENGINE_HEIGHT },
+          { id: hubId, width: hubW, height: PRO2_SCRIPT_NODE_HEIGHT },
+        ],
+        gap,
+      );
+      selectPro2NodeAfterSpawn(store.setNodes, videoId);
+    });
+    return { groupId, focusNodeId: videoId };
+  }
+
   if (preset === "video-to-prompt") {
     const totalW = videoW + gap + textW;
     const y = center.y - SBV1_VIDEO_ENGINE_HEIGHT / 2;
@@ -233,8 +333,8 @@ export function spawnPro2ShortcutPreset(
   const maxH = Math.max(PRO2_TEXT_NODE_HEIGHT, SBV1_VIDEO_ENGINE_HEIGHT);
   const y = center.y - maxH / 2;
   if (preset === "text-to-music") {
-    const audioW = LIBTV_SQUARE_IMAGE_NODE_WIDTH;
-    const audioH = 220;
+    const audioW = LIBTV_AUDIO_TRACK_NODE_WIDTH;
+    const audioH = LIBTV_AUDIO_TRACK_NODE_HEIGHT;
     const totalMusicW = textW + gap + audioW;
     const musicY = center.y - Math.max(PRO2_TEXT_NODE_HEIGHT, audioH) / 2;
     const textId = store.addNode(
@@ -457,4 +557,199 @@ function attachTextToMusicPreset(
     },
   ]);
   selectPro2NodeAfterSpawn(store.setNodes, starterId);
+}
+
+/** 在已有空视频节点左侧挂载快捷预设（上游在左、视频锚点在右） */
+export function attachPro2VideoShortcutPreset(
+  videoId: string,
+  preset: Pro2VideoShortcutPresetId,
+  nodes: CanvasFlowNode[],
+  store: AttachStarterStore,
+): void {
+  const video = nodes.find((n) => n.id === videoId);
+  if (!video || video.type !== "sbv1-video-engine") return;
+
+  const gap = 56;
+  const vx = video.position.x;
+  const vy = video.position.y;
+  const videoW = video.width ?? SBV1_VIDEO_ENGINE_WIDTH;
+  const videoH = video.height ?? SBV1_VIDEO_ENGINE_HEIGHT;
+  const textW = PRO2_TEXT_NODE_WIDTH;
+  const imageW = LIBTV_SQUARE_IMAGE_NODE_WIDTH;
+  const imageH = LIBTV_SQUARE_IMAGE_NODE_HEIGHT;
+  const audioW = LIBTV_AUDIO_TRACK_NODE_WIDTH;
+  const audioH = LIBTV_AUDIO_TRACK_NODE_HEIGHT;
+
+  store.updateNodeData(videoId, { pro2PresetKind: preset });
+
+  if (preset === "image-ref-to-video") {
+    const imageId = store.addNode(
+      "story-pro2-image",
+      {
+        x: vx - imageW - gap,
+        y: vy + Math.max(0, (videoH - imageH) / 2),
+      },
+      buildPro2ImageNodeData({
+        label: "图片",
+        pro2PresetKind: preset,
+      }),
+    );
+    if (!imageId) return;
+    store.setEdges((prev) => [
+      ...prev,
+      {
+        id: `e-${imageId}-${videoId}`,
+        source: imageId,
+        target: videoId,
+        sourceHandle: "image",
+        targetHandle: "in_ref",
+      },
+    ]);
+    selectPro2NodeAfterSpawn(store.setNodes, videoId);
+    return;
+  }
+
+  if (preset === "text-to-video-from-video") {
+    const textId = store.addNode(
+      "story-pro2-starter",
+      {
+        x: vx - textW - gap,
+        y: vy + Math.max(0, (videoH - PRO2_TEXT_NODE_HEIGHT) / 2),
+      },
+      buildPro2GeneralTextNodeData({ pro2PresetKind: preset }),
+    );
+    if (!textId) return;
+    store.setEdges((prev) => [
+      ...prev,
+      {
+        id: `e-${textId}-${videoId}`,
+        source: textId,
+        target: videoId,
+        sourceHandle: "text",
+        targetHandle: "in_text",
+      },
+    ]);
+    selectPro2NodeAfterSpawn(store.setNodes, videoId);
+    return;
+  }
+
+  if (preset === "video-to-video") {
+    const upstreamVideoId = store.addNode(
+      "sbv1-video-engine",
+      {
+        x: vx - videoW - gap,
+        y: vy,
+      },
+      buildSbv1VideoEngineNodeData({
+        label: "视频",
+        pro2PresetKind: preset,
+      }),
+    );
+    if (!upstreamVideoId) return;
+    store.setEdges((prev) => [
+      ...prev,
+      {
+        id: `e-${upstreamVideoId}-${videoId}`,
+        source: upstreamVideoId,
+        target: videoId,
+        sourceHandle: "out_video",
+        targetHandle: "in_motion_video",
+      },
+    ]);
+    selectPro2NodeAfterSpawn(store.setNodes, videoId);
+    return;
+  }
+
+  if (
+    preset === "lip-sync-broadcast" ||
+    preset === "reference-audio-to-video"
+  ) {
+    attachImageAudioVideoPreset(videoId, preset, vx, vy, videoH, gap, store, {
+      imageW,
+      imageH,
+      audioW,
+      audioH,
+    });
+    return;
+  }
+
+  selectPro2NodeAfterSpawn(store.setNodes, videoId);
+}
+
+function attachImageAudioVideoPreset(
+  videoId: string,
+  preset: "lip-sync-broadcast" | "reference-audio-to-video",
+  vx: number,
+  vy: number,
+  videoH: number,
+  gap: number,
+  store: AttachStarterStore,
+  dims: {
+    imageW: number;
+    imageH: number;
+    audioW: number;
+    audioH: number;
+  },
+): void {
+  const stackLeft = vx - Math.max(dims.imageW, dims.audioW) - gap;
+  const stackTop =
+    vy + Math.max(0, (videoH - dims.imageH - dims.audioH - 24) / 2);
+  const imageId = store.addNode(
+    "story-pro2-image",
+    { x: stackLeft, y: stackTop },
+    buildPro2ImageNodeData({
+      label: "图片",
+      pro2PresetKind: preset,
+    }),
+  );
+  const audioOverrides =
+    preset === "lip-sync-broadcast"
+      ? {
+          pro2PresetKind: preset,
+          engine: { ...LIP_SYNC_AUDIO_ENGINE },
+        }
+      : {
+          pro2PresetKind: preset,
+          engine: { ...REF_AUDIO_AUDIO_ENGINE },
+        };
+  const audioId = store.addNode(
+    "story-pro2-audio",
+    { x: stackLeft, y: stackTop + dims.imageH + 24 },
+    buildPro2AudioNodeData({
+      label: "音频",
+      ...audioOverrides,
+    }),
+  );
+  const videoOverrides =
+    preset === "reference-audio-to-video"
+      ? {
+          pro2PresetKind: preset,
+          referenceMode: "omni" as const,
+          dockInputMode: "omni" as const,
+          engine: { ...REF_AUDIO_VIDEO_ENGINE },
+        }
+      : {
+          pro2PresetKind: preset,
+          resolution: "720p" as const,
+        };
+  store.updateNodeData(videoId, videoOverrides);
+  if (!imageId || !audioId) return;
+  store.setEdges((prev) => [
+    ...prev,
+    {
+      id: `e-${imageId}-${videoId}`,
+      source: imageId,
+      target: videoId,
+      sourceHandle: "image",
+      targetHandle: "in_ref",
+    },
+    {
+      id: `e-${audioId}-${videoId}`,
+      source: audioId,
+      target: videoId,
+      sourceHandle: "audio",
+      targetHandle: "in_ref",
+    },
+  ]);
+  selectPro2NodeAfterSpawn(store.setNodes, videoId);
 }

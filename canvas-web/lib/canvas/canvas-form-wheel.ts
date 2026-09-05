@@ -22,10 +22,28 @@ export const CANVAS_NATIVE_SCROLL_SELECTOR = "[data-canvas-wheel-scroll]";
 /** LibTV 浮动 / 内嵌输入坞（prompt · @ 引用等） */
 export const LIBTV_INPUT_DOCK_SELECTOR = "[data-libtv-input-dock]";
 
+/** 脚本 Dock · 提示词模板悬停层（portal 到 body） */
+export const PRO2_SCRIPT_DOCK_POPOVER_SELECTOR = "[data-pro2-script-dock-popover]";
+
+/** 指针在输入坞或 Dock 悬停层上时，节点侧栏 + 停止磁吸跟随 */
+export function pointerBlocksSidePlusMagnet(
+  clientX: number,
+  clientY: number,
+): boolean {
+  if (typeof document === "undefined") return false;
+  const el = document.elementFromPoint(clientX, clientY);
+  if (!el) return false;
+  return Boolean(
+    el.closest(LIBTV_INPUT_DOCK_SELECTOR) ||
+    el.closest(PRO2_SCRIPT_DOCK_POPOVER_SELECTOR),
+  );
+}
+
 /** Dock 正文滚动区（textarea 自动增高，滚动条在此容器） */
 export const LIBTV_DOCK_SCROLL_SELECTOR = ".pro2-dock-scroll";
 
 function isHorizontalDominantWheel(nativeEvent: WheelEvent): boolean {
+  if (nativeEvent.shiftKey && Math.abs(nativeEvent.deltaY) > 0.5) return true;
   return Math.abs(nativeEvent.deltaX) > Math.abs(nativeEvent.deltaY);
 }
 
@@ -61,6 +79,11 @@ export function isLibtvInputDockWheelTarget(target: EventTarget | null): boolean
 export function isCanvasWheelScrollBlockTarget(target: EventTarget | null): boolean {
   if (isLibtvInputDockWheelTarget(target)) return false;
   if (isCanvasNodeScrollWheelTarget(target)) return false;
+  // 全屏编辑弹层 / 显式原生滚动区：允许 textarea 内滚轮
+  if (target instanceof Element) {
+    if (target.closest(CANVAS_NATIVE_SCROLL_SELECTOR)) return false;
+    if (target.closest('[role="dialog"][aria-modal="true"]')) return false;
+  }
   return isCanvasFormWheelTarget(target);
 }
 
@@ -82,7 +105,6 @@ export function isCanvasViewportWheelTarget(target: EventTarget | null): boolean
 export function shouldBlockCanvasViewportWheel(nativeEvent: WheelEvent): boolean {
   const { target } = nativeEvent;
   if (!(target instanceof Element)) return false;
-  if (nativeEvent.ctrlKey || nativeEvent.metaKey) return false;
   if (target.closest(CANVAS_NATIVE_SCROLL_SELECTOR)) return false;
   if (target.closest(LIBTV_INPUT_DOCK_SELECTOR)) return false;
 
@@ -90,8 +112,11 @@ export function shouldBlockCanvasViewportWheel(nativeEvent: WheelEvent): boolean
   const inEditor = isCanvasEditorWheelTarget(target);
   const inViewport = !!target.closest(CANVAS_VIEWPORT_WHEEL_ROOT);
 
-  // 编辑页内任意横向滑动手势：禁止触发浏览器历史导航
+  // 编辑页内任意横向滑动手势：禁止触发浏览器历史导航（含 Ctrl+滚轮 / pinch 缩放时）
   if (horizontal && inEditor) return true;
+
+  // 缩放滚轮（Ctrl/Meta）仅放行纵向；横向已在上方拦截
+  if (nativeEvent.ctrlKey || nativeEvent.metaKey) return false;
 
   if (!inViewport) return false;
   if (target.closest(".nowheel") && !horizontal) return false;

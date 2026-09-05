@@ -75,8 +75,8 @@ export default function SmartSupportImplementationPage() {
         <ToolImplementationSection heading="2. 关键事项">
           <ul>
             <li>
-              <code>DEEPSEEK_API_KEY</code> 仅服务端（<code>lib/deepseek-env.ts</code>
-              ）；勿提交仓库。
+              DeepSeek / 百炼等 LLM 经 Book Gateway（<code>/api/smart-support/chat</code> → SSO
+              Gateway BFF）；厂商凭证在 Gateway 控制台绑定，勿在 tool-web 配置直连 Key。
             </li>
             <li>
               <code>NEXT_PUBLIC_*</code> 会进入前端 bundle；Dify 嵌入 token 面向公开嵌入场景，仍勿与控制台 Admin Key 混用。

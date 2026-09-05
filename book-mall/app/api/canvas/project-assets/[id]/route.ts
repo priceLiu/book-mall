@@ -40,12 +40,15 @@ export async function PATCH(request: NextRequest, ctx: RouteCtx) {
     const parsed = await readJsonBody(request);
     if (!parsed.ok) return parsed.response;
     const body = parsed.body;
+    const sourceProjectId: null | undefined =
+      body.sourceProjectId === null ? null : undefined;
     const asset = await patchProjectAsset(guard.user.id, ctx.params.id, {
       displayName: body.displayName as string | undefined,
       description: body.description as string | undefined,
       visibility: body.visibility as AssetVisibility | undefined,
       locked: body.locked as boolean | undefined,
       payload: body.payload as Record<string, unknown> | undefined,
+      sourceProjectId,
     });
     return NextResponse.json({ asset }, { headers: jsonHeaders(request) });
   } catch (err) {

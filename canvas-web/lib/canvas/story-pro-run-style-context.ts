@@ -1,5 +1,12 @@
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { findProStyleForHub } from "./story-workspace-resolver";
+import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
+import {
+  buildVisualStyleAnchorEn,
+  buildVisualStyleAnchorZh,
+  parseVisualStylePackFromOutline,
+  type StoryProVisualStylePack,
+} from "./story-pro-visual-style-pack";
 
 export type StoryProRunStylePayload = {
   styleFinalized?: boolean;
@@ -66,21 +73,50 @@ export function resolveStoryProRunStylePayload(
   if (!hubId) return {};
 
   const styleNode = findProStyleForHub(nodes, edges, hubId);
-  if (!styleNode) return {};
+  if (styleNode) {
+    const d = styleNode.data as {
+      styleFinalized?: boolean;
+      styleAnchorZh?: string;
+      styleAnchorEn?: string;
+      negativePrompt?: string;
+    };
+    if (
+      d.styleAnchorZh?.trim() ||
+      d.styleAnchorEn?.trim() ||
+      d.styleFinalized
+    ) {
+      return {
+        styleFinalized: d.styleFinalized === true,
+        styleAnchor: {
+          styleAnchorZh: d.styleAnchorZh,
+          styleAnchorEn: d.styleAnchorEn,
+          negativePrompt: d.negativePrompt,
+        },
+      };
+    }
+  }
 
-  const d = styleNode.data as {
-    styleFinalized?: boolean;
-    styleAnchorZh?: string;
-    styleAnchorEn?: string;
-    negativePrompt?: string;
-  };
+  const pack = resolveHubVisualStylePack(hubId, nodes);
+  if (!pack) return {};
 
   return {
-    styleFinalized: d.styleFinalized === true,
     styleAnchor: {
-      styleAnchorZh: d.styleAnchorZh,
-      styleAnchorEn: d.styleAnchorEn,
-      negativePrompt: d.negativePrompt,
+      styleAnchorZh: buildVisualStyleAnchorZh(pack),
+      styleAnchorEn: pack.styleAnchorEn?.trim() || buildVisualStyleAnchorEn(pack),
+      negativePrompt: pack.negativePrompt,
     },
   };
+}
+
+function resolveHubVisualStylePack(
+  hubId: string,
+  nodes: CanvasFlowNode[],
+): StoryProVisualStylePack | null {
+  const hub = nodes.find((n) => n.id === hubId);
+  const d = (hub?.data ?? {}) as StoryProScriptHubNodeData;
+  if (d.visualStylePack) return d.visualStylePack;
+  if (d.outlineMd?.trim()) {
+    return parseVisualStylePackFromOutline(d.outlineMd) ?? null;
+  }
+  return null;
 }

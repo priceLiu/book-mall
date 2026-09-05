@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Play, RefreshCw, X } from "lucide-react";
 
+import {
+  CANVAS_MODAL_BACKDROP_CLASS,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import {
   STORY_LLM_MODEL_KEYS,
@@ -234,25 +239,15 @@ export function StoryEngineActionsModal({
   const allBatchKeys = batchSelectItems?.map((i) => i.key) ?? [];
   const checkedKeys = allBatchKeys.filter((k) => selectedKeys.has(k));
 
-  useEffect(() => {
-    if (!open) return;
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
+  useModalBodyScrollLock(open);
+  useModalEscapeClose(onClose, { active: open });
 
   if (!mounted || !open) return null;
 
   return createPortal(
     <>
       <div
-        className="fixed inset-0 z-[1090] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+        className={`${CANVAS_MODAL_BACKDROP_CLASS} z-[1090]`}
         role="dialog"
         aria-modal="true"
         aria-label={`${title} · 操作`}

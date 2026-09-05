@@ -12,6 +12,8 @@ import {
   storyMdThClass,
   type StoryMdTableVariant,
 } from "@/lib/canvas/story-md-table-chrome";
+import { splitTagMarkdownInlineStyles } from "@/lib/canvas/libtv-markdown-inline-style";
+import { cn } from "@/lib/utils";
 
 function MarkdownProse({
   content,
@@ -23,6 +25,7 @@ function MarkdownProse({
   isDarkPreview,
   isLightDoc,
   inheritFontSize = false,
+  inlineFlow = false,
 }: {
   content: string;
   className: string;
@@ -33,9 +36,14 @@ function MarkdownProse({
   isDarkPreview: boolean;
   isLightDoc: boolean;
   inheritFontSize?: boolean;
+  /** 标签节点：段内 markdown 与彩色 span 同行混排 */
+  inlineFlow?: boolean;
 }) {
   const tablePad = isLightDoc ? "px-4 py-2.5" : "px-2 py-1";
   const darkInherit = isDarkPreview && inheritFontSize;
+  const inlinePara = inlineFlow
+    ? "inline [overflow-wrap:anywhere]"
+    : undefined;
 
   return (
     <div className={`w-full min-w-0 max-w-full overflow-x-hidden ${className}`}>
@@ -45,7 +53,9 @@ function MarkdownProse({
           h1: ({ children }) => (
             <h1
               className={
-                isDoc
+                inlineFlow
+                  ? "mb-2 mt-3 block border-b border-white/15 pb-1 text-[1.45em] font-bold leading-snug text-white first:mt-0"
+                  : isDoc
                   ? "mb-6 border-b border-neutral-200 pb-3 text-[28px] font-bold leading-tight text-neutral-900"
                   : isDarkPreview
                     ? darkInherit
@@ -94,7 +104,9 @@ function MarkdownProse({
           p: ({ children }) => (
             <p
               className={
-                isDoc
+                inlinePara
+                  ? inlinePara + (isDarkPreview ? " text-white/90" : "")
+                  : isDoc
                   ? "mb-4 break-words text-[17px] leading-[1.85] text-neutral-800 [overflow-wrap:anywhere]"
                   : isNodePreview
                     ? "mb-3 break-words text-[13px] leading-[1.75] text-neutral-700 [overflow-wrap:anywhere]"
@@ -111,7 +123,9 @@ function MarkdownProse({
           li: ({ children }) => (
             <li
               className={
-                isDoc
+                inlineFlow
+                  ? "leading-[1.7] text-white/90"
+                  : isDoc
                   ? "text-[17px] leading-[1.75]"
                   : isNodePreview
                     ? "text-[13px] leading-[1.7]"
@@ -176,6 +190,8 @@ export function MarkdownView({
   variant = "inline",
   /** 为 true 时不写死 text-[13px]，继承父级字号（标签节点等） */
   inheritFontSize = false,
+  /** 标签节点：渲染 `{{14px|#fff}}局部样式{{/}}` */
+  inlineStyles = false,
   /** 已由调用方 prepare 过时设为 true，避免重复处理 */
   prepared = false,
 }: {
@@ -184,6 +200,7 @@ export function MarkdownView({
   /** inline=暗色节点；nodePreview=节点内白纸预览；document=全屏 Word 式阅读；darkPreview=黑底白字节点预览 */
   variant?: "inline" | "document" | "nodePreview" | "darkPreview";
   inheritFontSize?: boolean;
+  inlineStyles?: boolean;
   prepared?: boolean;
 }) {
   if (!content.trim()) {
@@ -215,6 +232,46 @@ export function MarkdownView({
     variant === "document" || variant === "nodePreview" || variant === "darkPreview";
   const md =
     useRichPreview && !prepared ? prepareMarkdownForPreview(content) : content;
+
+  if (inlineStyles) {
+    const segments = splitTagMarkdownInlineStyles(md);
+    return (
+      <div className={cn(proseClass, "inline-flow-tag-preview")}>
+        {segments.map((seg, i) => {
+          if (seg.kind === "styled") {
+            const style: React.CSSProperties = {};
+            if (seg.style.fontSizePx) style.fontSize = `${seg.style.fontSizePx}px`;
+            if (seg.style.color) style.color = seg.style.color;
+            return (
+              <span
+                key={`styled-${i}`}
+                style={style}
+                className="inline [overflow-wrap:anywhere]"
+              >
+                {seg.text}
+              </span>
+            );
+          }
+          if (!seg.text) return null;
+          return (
+            <MarkdownProse
+              key={`md-${i}`}
+              content={seg.text}
+              className="inline"
+              variant={variant}
+              tableVariant={tableVariant}
+              isDoc={isDoc}
+              isNodePreview={isNodePreview}
+              isDarkPreview={isDarkPreview}
+              isLightDoc={isLightDoc}
+              inheritFontSize={inheritFontSize}
+              inlineFlow
+            />
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <MarkdownProse

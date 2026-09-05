@@ -17,9 +17,9 @@ alwaysApply: false
 3. **工具条按钮**：卡片/表内用 `rounded-lg` 灰描边（SYSTEM §5.3），**不要**滥用主胶囊。
 4. **助手聊天**：气泡样式与 Choice Chip 见 `CHAT.md`；快捷按钮统一 `STORYBOARD_ASSISTANT_CHOICE_CLASS`，禁止深色策划按钮。
 5. **表格**：数据表深色表头 `#1d1d1f` + `align-top`（`TABLE.md`）。
-6. **图片**：缩略 `object-cover`/`object-contain` 分明；预览 `EcomImagePreviewDialog`；上传 `Plus` + 分类块（`MEDIA.md`）。
-7. **弹窗**：`useDialogs()`；禁止 `window.alert/confirm`。
-8. **视频**：`EcomVideoPlayer`（`VIDEO.md`）。
+6. **图片 / 视频**：展示、预览、上传、资产选取 **必须** 走 `MEDIA.md` §0 / `VIDEO.md` §0 组件映射；禁止自写缩略图或弹层。预览 `EcomImagePreviewDialog`（含缩放）；视频 `EcomVideoPreviewDialog`；上传 `EcomRefUploadCard` + `EcomAssetPickerDialog`；懒加载见 `ecom-media-lazy-load.mdc`。
+7. **弹窗**：`useDialogs()`；禁止 `window.alert/confirm`。成功/完成用 **toast**（`DIALOG.md` · `ecom-success-toast.mdc`），错误才 `alert`。
+8. **长耗时生成**：≥3min 须移交右下角 `BackgroundGenerationDock`（见 `docs/generation-background-dock.md`）。
 9. **生图/生视频模型选择**：唯一弹层 `StoryboardModelPickerDialog`（见 `ecom-model-picker.mdc`），禁止另写选择器。
 
 ## Code Review
@@ -28,3 +28,7 @@ alwaysApply: false
 - 助手气泡内第二套 choice 栏 → 删
 - 表头品牌蓝或单元格未顶对齐 → 改
 - 裸 `<video controls>` / 手写 fixed 弹层 → 改
+- 图片/视频列表未走 `EcomMediaLibraryTile` → 改
+- 参考上传未走 `EcomRefUploadCard` 或「我的资产」未接 `EcomAssetPickerDialog` → 改
+- 单图预览未走 `EcomImagePreviewDialog` → 改
+- 图片/视频长列表无懒加载 skeleton 或滚动加载态 → 改（见 `ecom-media-lazy-load.mdc`）

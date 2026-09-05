@@ -1,17 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchQrPlatform } from "@/lib/qr-platform-fetch";
+import { canShareQrTemplate } from "@/lib/qr-workflow-share-eligibility";
 import { Menu, Sparkles, Video, ImageIcon, Smile, Globe, Volume2, Home } from "lucide-react";
 
+import {
+  QrGenerateDock,
+  newQrGenerateSessionId,
+  type QrGenerateSession,
+} from "@/components/quick-replica/qr-generate-dock";
 import {
   QrGeneratePreviewModal,
   type QrGenerateModalPhase,
 } from "@/components/quick-replica/qr-generate-preview-modal";
 import { QrGenerateHistoryPanel } from "@/components/quick-replica/qr-generate-history-panel";
-import { QrAdminPanel } from "@/components/quick-replica/qr-admin-panel";
 import { QrMyWorksPreviewPanel } from "@/components/quick-replica/qr-my-works-preview-panel";
-import { QrHomeWorksPanel } from "@/components/quick-replica/qr-home-works-panel";
+import { QrWorkflowShareDialog } from "@/components/quick-replica/qr-workflow-share-dialog";
+import { QrHomeHeroPanel } from "@/components/quick-replica/qr-home-hero-panel";
 import { QrSidebar, type QrNavMode } from "@/components/quick-replica/qr-sidebar";
 import { QrKindBrowsePanel } from "@/components/quick-replica/qr-kind-browse-panel";
 import { QrTemplateGallery } from "@/components/quick-replica/qr-template-gallery";
@@ -36,13 +41,19 @@ import {
   type QrWorkspaceDraft,
   templateToWorkspaceDraft,
 } from "@/lib/qr-template-types";
-import { runQrGenerateJob, deleteQrUserTemplate } from "@/lib/run-qr-generate-job";
-import { formatQrPlatformError } from "@/lib/qr-platform-fetch";
-import { PortalNav } from "@/components/portal-nav";
-import { getBookAccountUrl } from "@/lib/site-origin";
 import {
-  QR_HOME_FEED_CACHE_KEY,
-  buildHomeFeedTemplates,
+  deleteQrUserTemplate,
+  runQrGenerateJob,
+  watchQrGenerateJob,
+} from "@/lib/run-qr-generate-job";
+import { fetchQrPlatform, formatQrPlatformError } from "@/lib/qr-platform-fetch";
+import { PortalNav } from "@/components/portal-nav";
+import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
+import { getBookAccountUrl, getMainSiteOrigin } from "@/lib/site-origin";
+import {
+  buildHomeCategoryCards,
+  type QrHomeCategoryCard,
+  QR_HOME_CARD_CATEGORIES,
 } from "@/lib/qr-home-feed";
 
 type SessionInfo = {
@@ -81,17 +92,14 @@ export function QrAppClient({
   const [kindItems, setKindItems] = useState<QrKindBrowseItem[]>([]);
   const [previewTemplate, setPreviewTemplate] = useState<QrTemplate | null>(null);
   const [copyToast, setCopyToast] = useState<string | null>(null);
-  const [generateResult, setGenerateResult] = useState<QrGenerateJobResult | null>(null);
-  const [generatePhase, setGeneratePhase] = useState<QrGenerateModalPhase>("generating");
-  const [generateModalOpen, setGenerateModalOpen] = useState(false);
-  const [generateLogId, setGenerateLogId] = useState<string | null>(null);
-  const [generatePreviewImage, setGeneratePreviewImage] = useState<string | undefined>();
-  const [generateDraftSnapshot, setGenerateDraftSnapshot] = useState<QrWorkspaceDraft | null>(
-    null,
-  );
-  const [generating, setGenerating] = useState(false);
+  const [generateSessions, setGenerateSessions] = useState<QrGenerateSession[]>([]);
+  const [focusedGenerateId, setFocusedGenerateId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [homeCategoryCards, setHomeCategoryCards] = useState<QrHomeCategoryCard[]>(() =>
+    buildHomeCategoryCards({}),
+  );
+  const homeCardsCacheRef = useRef<QrHomeCategoryCard[] | null>(null);
   const [kindsLoading, setKindsLoading] = useState(false);
   const kindsCacheRef = useRef<Map<QrCategory, QrKindBrowseItem[]>>(new Map());
   const templatesCacheRef = useRef<Map<string, QrTemplate[]>>(new Map());
@@ -103,8 +111,16 @@ export function QrAppClient({
   const [voiceGalleryFocus, setVoiceGalleryFocus] = useState(false);
   const [myWorksCategory, setMyWorksCategory] = useState<QrCategory>("audio");
   const [myWorksPreview, setMyWorksPreview] = useState<QrTemplate | null>(null);
+  const [shareTemplate, setShareTemplate] = useState<QrTemplate | null>(null);
   const audioRightPanelRef = useRef<HTMLElement>(null);
   const voiceGalleryFocusTimerRef = useRef<number | null>(null);
+  const focusedGenerate = generateSessions.find((s) => s.id === focusedGenerateId);
+  const focusedGenerating =
+    Boolean(focusedGenerate) &&
+    !focusedGenerate?.minimized &&
+    focusedGenerate?.phase === "generating";
+  const dockSessions = generateSessions.filter((s) => s.minimized);
+  const showGenerateModal = Boolean(focusedGenerate && !focusedGenerate.minimized);
 
   const templateScope =
     navMode === "my-works" || navMode === "generate-history" ? "my" : "all";
@@ -113,6 +129,34 @@ export function QrAppClient({
     navMode === "category" && category === "world" && middleMode === "browse";
 
   const bookAccountUrl = getBookAccountUrl();
+  const bookOrigin = getMainSiteOrigin();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const templateId = new URLSearchParams(window.location.search)
+      .get("templateId")
+      ?.trim();
+    if (!templateId) return;
+
+    void (async () => {
+      try {
+        const res = await fetchQrPlatform(
+          `/api/book-mall/api/platform/v1/quick-replica/templates/${encodeURIComponent(templateId)}`,
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as QrTemplate | { template?: QrTemplate };
+        const template = "template" in data && data.template ? data.template : (data as QrTemplate);
+        if (!template?.reference?.prompt) return;
+        setDraft(templateToWorkspaceDraft(template));
+        setCategory(template.category);
+        setSelectedKind(template.kind);
+        setMiddleMode("workspace");
+        setNavMode("category");
+      } catch {
+        /* ignore deep-link load errors */
+      }
+    })();
+  }, []);
 
   const browseKey = useMemo(() => {
     if (navMode === "home") return "";
@@ -133,24 +177,21 @@ export function QrAppClient({
   const navModeRef = useRef(navMode);
   navModeRef.current = navMode;
 
-  const loadHomeFeed = useCallback(async (force = false) => {
-    if (!force) {
-      const cached = templatesCacheRef.current.get(QR_HOME_FEED_CACHE_KEY);
-      if (cached) {
-        setTemplates(cached);
-        setTemplatesLoading(false);
-        return;
-      }
-    } else {
-      templatesCacheRef.current.delete(QR_HOME_FEED_CACHE_KEY);
+  const loadHomeFeed = useCallback(async (force = false, silent = false) => {
+    if (!force && homeCardsCacheRef.current) {
+      setHomeCategoryCards(homeCardsCacheRef.current);
+      if (!silent) setTemplatesLoading(false);
+      return;
+    }
+    if (force) {
+      homeCardsCacheRef.current = null;
     }
 
-    setTemplatesLoading(true);
+    if (!silent) setTemplatesLoading(true);
     const requestNav = "home";
     try {
-      const categories = QR_CATEGORIES.map((c) => c.id);
       const results = await Promise.all(
-        categories.map(async (cat) => {
+        QR_HOME_CARD_CATEGORIES.map(async (cat) => {
           const res = await fetchQrPlatform(
             `/api/book-mall/api/platform/v1/quick-replica/templates?scope=all&category=${encodeURIComponent(cat)}`,
           );
@@ -160,9 +201,12 @@ export function QrAppClient({
         }),
       );
       if (navModeRef.current !== requestNav) return;
-      const feed = buildHomeFeedTemplates(results.flat());
-      templatesCacheRef.current.set(QR_HOME_FEED_CACHE_KEY, feed);
-      setTemplates(feed);
+      const byCategory = Object.fromEntries(
+        QR_HOME_CARD_CATEGORIES.map((cat, index) => [cat, results[index] ?? []]),
+      ) as Partial<Record<QrCategory, QrTemplate[]>>;
+      const cards = buildHomeCategoryCards(byCategory);
+      homeCardsCacheRef.current = cards;
+      setHomeCategoryCards(cards);
     } finally {
       if (navModeRef.current === requestNav) {
         setTemplatesLoading(false);
@@ -170,20 +214,23 @@ export function QrAppClient({
     }
   }, []);
 
-  const loadTemplates = useCallback(async () => {
+  const loadTemplates = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     if (navMode === "home") {
-      await loadHomeFeed();
+      await loadHomeFeed(false, silent);
       return;
     }
 
     const requestKey = browseKeyRef.current;
     const cached = templatesCacheRef.current.get(requestKey);
-    if (cached) {
-      setTemplates(cached);
-    } else {
-      setTemplates([]);
+    if (!silent) {
+      if (cached) {
+        setTemplates(cached);
+      } else {
+        setTemplates([]);
+        setTemplatesLoading(true);
+      }
     }
-    setTemplatesLoading(true);
 
     const qs = new URLSearchParams({ scope: templateScope });
     if (navMode === "my-works") {
@@ -213,7 +260,8 @@ export function QrAppClient({
     }
   }, [navMode, category, selectedKind, pinnedToolKey, templateScope, myWorksCategory, loadHomeFeed]);
 
-  const loadKinds = useCallback(async () => {
+  const loadKinds = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     if (navMode === "my-works" || navMode === "home" || navMode === "pinned-tool" || navMode === "generate-history") {
       setKindItems([]);
       setKindsLoading(false);
@@ -222,12 +270,14 @@ export function QrAppClient({
 
     const requestCategory = category;
     const cached = kindsCacheRef.current.get(requestCategory);
-    if (cached) {
-      setKindItems(cached);
-    } else {
-      setKindItems([]);
+    if (!silent) {
+      if (cached) {
+        setKindItems(cached);
+      } else {
+        setKindItems([]);
+        setKindsLoading(true);
+      }
     }
-    setKindsLoading(true);
     try {
       const res = await fetchQrPlatform(
         `/api/book-mall/api/platform/v1/quick-replica/kinds?category=${encodeURIComponent(requestCategory)}`,
@@ -252,6 +302,21 @@ export function QrAppClient({
   useEffect(() => {
     void loadKinds();
   }, [loadKinds]);
+
+  useEffect(() => {
+    const refreshFromServer = () => {
+      if (document.visibilityState === "hidden") return;
+      void loadTemplates({ silent: true });
+      void loadKinds({ silent: true });
+    };
+    const onFocus = () => refreshFromServer();
+    document.addEventListener("visibilitychange", refreshFromServer);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", refreshFromServer);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [loadTemplates, loadKinds]);
 
   useEffect(() => {
     if (navMode !== "category") return;
@@ -286,7 +351,7 @@ export function QrAppClient({
   );
 
   useEffect(() => {
-    if (navMode !== "category" && navMode !== "my-works" && navMode !== "admin") return;
+    if (navMode !== "category" && navMode !== "my-works") return;
     for (const cat of QR_CATEGORIES) {
       prefetchTemplateList(qrTemplateCacheKey("all", cat.id), { category: cat.id });
     }
@@ -310,10 +375,6 @@ export function QrAppClient({
   }, [navMode, category, prefetchTemplateList]);
 
   const galleryTitleSuffix = useMemo(() => {
-    if (navMode === "admin") {
-      if (selectedKind === "motion-sync") return "运动同步";
-      return "推荐模板";
-    }
     if (navMode === "my-works") return "我的作品";
     if (navMode === "generate-history") return "我的作品";
     if (selectedKind) return getKindDef(selectedKind)?.label ?? selectedKind;
@@ -327,59 +388,10 @@ export function QrAppClient({
     setSelectedKind(null);
     setPinnedToolKey(null);
     setWorldOmniboxExpanded(false);
-    const cached = templatesCacheRef.current.get(QR_HOME_FEED_CACHE_KEY);
-    setTemplates(cached ?? []);
+    const cached = homeCardsCacheRef.current;
+    setHomeCategoryCards(cached ?? buildHomeCategoryCards({}));
     setTemplatesLoading(!cached);
   };
-
-  const openCategoryWithKind = useCallback(
-    (cat: QrCategory, kind: string, toolKey?: string | null) => {
-      setNavMode("category");
-      setCategory(cat);
-      setPinnedToolKey(toolKey ?? getKindDef(kind)?.toolKey ?? null);
-      setSelectedKind(kind);
-
-      if (cat === "audio") {
-        setMiddleMode("workspace");
-        setDraft(defaultWorkspaceDraft({ category: cat, kind, toolKey: toolKey ?? undefined }));
-      } else if (cat === "world") {
-        setMiddleMode("browse");
-        setWorldOmniboxExpanded(false);
-        setDraft(defaultWorkspaceDraft({ category: cat, kind }));
-      } else {
-        setMiddleMode("browse");
-      }
-
-      const cachedKinds = kindsCacheRef.current.get(cat);
-      setKindItems(cachedKinds ?? []);
-      setKindsLoading(!cachedKinds);
-
-      const cacheKey = qrTemplateCacheKey("all", cat, kind);
-      let cachedTemplates = templatesCacheRef.current.get(cacheKey);
-      if (!cachedTemplates && cat === "video" && kind === "text-to-video") {
-        cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", cat));
-      }
-      if (!cachedTemplates && cat === "image" && kind === "create-image") {
-        cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", cat));
-      }
-      if (!cachedTemplates && cat === "character" && kind === "create-character") {
-        cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", cat));
-      }
-      if (!cachedTemplates && cat === "audio" && kind === "create-voiceover") {
-        cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", cat));
-      }
-      setTemplates(cachedTemplates ?? []);
-      setTemplatesLoading(true);
-    },
-    [],
-  );
-
-  const onSelectHomeWork = useCallback(
-    (t: QrTemplate) => {
-      openCategoryWithKind(t.category, t.kind, t.toolKey ?? getKindDef(t.kind)?.toolKey ?? null);
-    },
-    [openCategoryWithKind],
-  );
 
   const refreshHomeFeed = useCallback(() => {
     if (navModeRef.current !== "home") return;
@@ -410,7 +422,7 @@ export function QrAppClient({
       qrTemplateCacheKey("all", cat),
     );
     setTemplates(cachedTemplates ?? []);
-    setTemplatesLoading(true);
+    setTemplatesLoading(!cachedTemplates);
   };
 
   const onMyWorks = () => {
@@ -429,39 +441,6 @@ export function QrAppClient({
     setPinnedToolKey(null);
   };
 
-  const onAdmin = () => {
-    setNavMode("admin");
-    setMiddleMode("browse");
-    setSelectedKind(null);
-    setPinnedToolKey(null);
-    setCategory("video");
-    const cacheKey = qrTemplateCacheKey("all", "video");
-    setTemplates(templatesCacheRef.current.get(cacheKey) ?? []);
-    setTemplatesLoading(true);
-  };
-
-  const refreshTemplateCaches = useCallback(() => {
-    templatesCacheRef.current.clear();
-    kindsCacheRef.current.clear();
-    void loadTemplates();
-    void loadKinds();
-  }, [loadKinds, loadTemplates]);
-
-  const handleAdminScopeChange = useCallback(
-    (scope: { category: QrCategory; kind: string | null }) => {
-      setCategory(scope.category);
-      setSelectedKind(scope.kind);
-      const cacheKey = qrTemplateCacheKey(
-        "all",
-        scope.category,
-        scope.kind ?? undefined,
-      );
-      setTemplates(templatesCacheRef.current.get(cacheKey) ?? []);
-      setTemplatesLoading(true);
-    },
-    [],
-  );
-
   const onPinnedTool = (toolKey: string, cat: QrCategory, kind: string) => {
     setNavMode("pinned-tool");
     setCategory(cat);
@@ -478,11 +457,15 @@ export function QrAppClient({
       const cacheKey = qrTemplateCacheKey("all", category);
       const cachedTemplates = templatesCacheRef.current.get(cacheKey);
       setTemplates(cachedTemplates ?? []);
-      setTemplatesLoading(true);
+      setTemplatesLoading(!cachedTemplates);
       return;
     }
 
     setSelectedKind(kind);
+    const featured = kindItems.find((item) => item.kind === kind)?.featuredTemplate;
+    if (featured) {
+      setDraft(templateToWorkspaceDraft(featured));
+    }
     const def = getKindDef(kind);
     setPinnedToolKey(def?.toolKey ?? null);
     const cacheKey = qrTemplateCacheKey("all", category, kind);
@@ -516,7 +499,7 @@ export function QrAppClient({
       cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", category));
     }
     setTemplates(cachedTemplates ?? []);
-    setTemplatesLoading(true);
+    setTemplatesLoading(!cachedTemplates);
   };
 
   const dismissCopyToast = useCallback(() => setCopyToast(null), []);
@@ -553,7 +536,7 @@ export function QrAppClient({
     setMiddleMode("workspace");
     if (t.category) setCategory(t.category);
     setSelectedKind(t.kind);
-    if (navMode === "home" || navMode === "admin") {
+    if (navMode === "home") {
       setNavMode("category");
     }
     setCopyToast(
@@ -563,38 +546,78 @@ export function QrAppClient({
     );
   };
 
+  const patchGenerateSession = useCallback(
+    (id: string, patch: Partial<QrGenerateSession>) => {
+      setGenerateSessions((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+      );
+    },
+    [],
+  );
+
   const handleGenerate = useCallback(async (draftToRun: QrWorkspaceDraft) => {
-    setGenerating(true);
-    setGenerateModalOpen(true);
-    setGeneratePhase("generating");
-    setGenerateResult(null);
-    setGenerateLogId(null);
-    setGenerateDraftSnapshot(draftToRun);
-    setGeneratePreviewImage(
+    const id = newQrGenerateSessionId();
+    const previewImageUrl =
       draftToRun.targetImageUrl.trim() ||
-        draftToRun.sceneImageUrls.find((u) => u.trim()) ||
-        undefined,
-    );
+      draftToRun.sceneImageUrls.find((u) => u.trim()) ||
+      undefined;
+    const session: QrGenerateSession = {
+      id,
+      logId: null,
+      phase: "generating",
+      result: null,
+      draft: draftToRun,
+      previewImageUrl,
+      alreadySaved: false,
+      minimized: false,
+      startedAt: Date.now(),
+    };
+    setGenerateSessions((prev) => [
+      ...prev.map((s) =>
+        s.phase === "generating" && !s.minimized ? { ...s, minimized: true } : s,
+      ),
+      session,
+    ]);
+    setFocusedGenerateId(id);
 
     try {
       const job = await runQrGenerateJob(draftToRun);
-      setGenerateLogId(job.logId ?? null);
-      setGenerateResult(job);
-      setGeneratePhase(
-        job.status === "SUCCEEDED" && job.outputUrl ? "success" : "failed",
-      );
+      const phase: QrGenerateModalPhase =
+        job.status === "SUCCEEDED" && job.outputUrl ? "success" : "failed";
+      setGenerateSessions((prev) => {
+        const othersBusy = prev.some(
+          (s) => s.id !== id && !s.minimized && s.phase === "generating",
+        );
+        return prev.map((s) =>
+          s.id === id
+            ? {
+                ...s,
+                logId: job.logId ?? s.logId,
+                result: job,
+                phase,
+                minimized: othersBusy ? s.minimized : false,
+              }
+            : s,
+        );
+      });
+      setFocusedGenerateId((current) => {
+        if (current && current !== id) return current;
+        return id;
+      });
       if (job.status === "FAILED" && job.error) {
         setCopyToast(formatQrPlatformError(job.error));
       }
     } catch (e) {
       const message = e instanceof Error ? e.message : "生成请求失败";
-      setGenerateResult({ status: "FAILED", error: message });
-      setGeneratePhase("failed");
+      patchGenerateSession(id, {
+        result: { status: "FAILED", error: message },
+        phase: "failed",
+        minimized: false,
+      });
+      setFocusedGenerateId(id);
       setCopyToast(formatQrPlatformError(message));
-    } finally {
-      setGenerating(false);
     }
-  }, []);
+  }, [patchGenerateSession]);
 
   const onGenerateSaved = (template: QrTemplate) => {
     setTemplates((prev) => [template, ...prev.filter((x) => x.id !== template.id)]);
@@ -628,12 +651,43 @@ export function QrAppClient({
       phase: QrGenerateModalPhase;
       result: QrGenerateJobResult;
       previewImageUrl?: string;
+      alreadySaved?: boolean;
+      generateDraft?: QrWorkspaceDraft;
     }) => {
-      setGenerateLogId(args.logId);
-      setGenerateResult(args.result);
-      setGeneratePhase(args.phase);
-      setGeneratePreviewImage(args.previewImageUrl);
-      setGenerateModalOpen(true);
+      let sessionId = "";
+      setGenerateSessions((prev) => {
+        const existing = prev.find((s) => s.logId === args.logId);
+        sessionId = existing?.id ?? newQrGenerateSessionId();
+        const next: QrGenerateSession = {
+          id: sessionId,
+          logId: args.logId,
+          phase: args.phase,
+          result: args.result,
+          draft:
+            args.generateDraft ??
+            existing?.draft ??
+            defaultWorkspaceDraft({ category: "video", kind: "text-to-video" }),
+          previewImageUrl: args.previewImageUrl,
+          alreadySaved: Boolean(args.alreadySaved),
+          minimized: false,
+          startedAt: existing?.startedAt ?? Date.now(),
+        };
+        return [...prev.filter((s) => s.id !== sessionId && s.logId !== args.logId), next];
+      });
+      setFocusedGenerateId(sessionId);
+      if (args.phase !== "generating") return;
+      void watchQrGenerateJob(args.logId).then((job) => {
+        const phase: QrGenerateModalPhase =
+          job.status === "SUCCEEDED" && job.outputUrl ? "success" : "failed";
+        setGenerateSessions((prev) =>
+          prev.map((s) =>
+            s.logId === args.logId || s.id === sessionId
+              ? { ...s, logId: job.logId ?? args.logId, result: job, phase, minimized: false }
+              : s,
+          ),
+        );
+        setFocusedGenerateId((current) => current ?? sessionId);
+      });
     },
     [],
   );
@@ -662,15 +716,6 @@ export function QrAppClient({
   }, []);
 
   const middlePanel = (() => {
-    if (navMode === "admin") {
-      return (
-        <QrAdminPanel
-          bookMallAdminUrl={bookMallAdminUrl}
-          onTemplatesChanged={refreshTemplateCaches}
-          onScopeChange={handleAdminScopeChange}
-        />
-      );
-    }
     if (middleMode === "welcome") {
       return (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center">
@@ -686,7 +731,7 @@ export function QrAppClient({
         <QrWorkspacePanel
           draft={draft}
           onDraftChange={setDraft}
-          generating={generating}
+          generating={focusedGenerating}
           onGenerate={(d) => void handleGenerate(d)}
           onBackToBrowse={
             navMode === "category" || navMode === "my-works"
@@ -733,6 +778,11 @@ export function QrAppClient({
             template={myWorksPreview}
             onSelectTemplate={setMyWorksPreview}
             onCopy={onCopyTemplate}
+            onShare={
+              myWorksPreview && canShareQrTemplate(myWorksPreview, canManageFeatured)
+                ? (t) => setShareTemplate(t)
+                : undefined
+            }
             onDelete={(t) => void handleDeleteTemplate(t)}
           />
         </div>
@@ -757,34 +807,45 @@ export function QrAppClient({
   return (
     <div className="flex h-dvh flex-col overflow-hidden" style={{ background: "var(--qr-bg-page)" }}>
       <header
-        className="flex shrink-0 items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3"
+        className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:px-4 sm:py-3"
         style={{
           borderBottom: "1px solid var(--qr-border)",
-          background: "var(--qr-bg-surface)",
+          background:
+            navMode === "home"
+              ? "var(--qr-bg-page)"
+              : "var(--qr-bg-surface)",
         }}
       >
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          <button
-            type="button"
-            className="rounded-lg border p-2 lg:hidden"
-            style={{ borderColor: "var(--qr-border)" }}
-            onClick={() => setSidebarOpen(true)}
-            aria-label="打开菜单"
-          >
-            <Menu className="h-4 w-4" />
-          </button>
-          <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          {navMode !== "home" ? (
+            <button
+              type="button"
+              className="rounded-lg border p-2 lg:hidden"
+              style={{ borderColor: "var(--qr-border)" }}
+              onClick={() => setSidebarOpen(true)}
+              aria-label="打开菜单"
+            >
+              <Menu className="h-4 w-4" />
+            </button>
+          ) : null}
+          <div className="flex min-w-0 items-center gap-2">
             <Sparkles className="h-5 w-5 shrink-0" style={{ color: "var(--qr-brand)" }} />
-            <span className="font-semibold">QuickReplica</span>
-            <span className="hidden text-xs qr-panel-muted sm:inline">快速复制</span>
+            <span className="truncate font-semibold">QuickReplica</span>
+            <span className="hidden text-xs qr-panel-muted sm:inline">快速复刻</span>
           </div>
         </div>
 
-        <div className="min-w-0 flex-1" aria-hidden />
-
-        <div className="flex shrink-0 items-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-3 [&::-webkit-scrollbar]:hidden">
+        <div className="order-3 flex w-full min-w-0 justify-center overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] md:order-none md:w-auto md:flex-1 [&::-webkit-scrollbar]:hidden">
           <PortalNav current="quick-replica" />
-          <span className="hidden h-4 w-px shrink-0 bg-white/15 sm:block" aria-hidden />
+        </div>
+
+        <div className="ml-auto flex min-w-0 items-center gap-2 overflow-x-auto sm:gap-3">
+          {bookOrigin ? (
+            <PlatformTopupNavLink
+              bookOrigin={bookOrigin}
+              className="hidden shrink-0 rounded-full border border-[var(--qr-border)] px-2.5 py-1.5 text-xs transition hover:bg-white/5 sm:inline-flex"
+            />
+          ) : null}
           {bookAccountUrl ? (
             <a
               href={bookAccountUrl}
@@ -814,28 +875,30 @@ export function QrAppClient({
       </header>
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <QrSidebar
-          compact={isWorldBrowse}
-          navMode={navMode}
-          category={category}
-          pinnedToolKey={pinnedToolKey}
-          sidebarOpen={sidebarOpen}
-          canManageFeatured={canManageFeatured}
-          onCloseSidebar={() => setSidebarOpen(false)}
-          onHome={onHome}
-          onCategory={onCategory}
-          onMyWorks={onMyWorks}
-          onGenerateHistory={onGenerateHistory}
-          onPinnedTool={onPinnedTool}
-          onAdmin={canManageFeatured ? onAdmin : undefined}
-        />
+        {navMode !== "home" ? (
+          <QrSidebar
+            compact={isWorldBrowse}
+            navMode={navMode}
+            category={category}
+            pinnedToolKey={pinnedToolKey}
+            sidebarOpen={sidebarOpen}
+            canManageFeatured={canManageFeatured}
+            onCloseSidebar={() => setSidebarOpen(false)}
+            onHome={onHome}
+            onCategory={onCategory}
+            onMyWorks={onMyWorks}
+            onGenerateHistory={onGenerateHistory}
+            onPinnedTool={onPinnedTool}
+            bookMallAdminUrl={bookMallAdminUrl}
+          />
+        ) : null}
 
         {navMode === "home" ? (
           <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            <QrHomeWorksPanel
-              templates={templates}
+            <QrHomeHeroPanel
+              cards={homeCategoryCards}
               loading={templatesLoading}
-              onSelectWork={onSelectHomeWork}
+              onCategoryClick={onCategory}
               onRefresh={refreshHomeFeed}
             />
           </main>
@@ -850,7 +913,7 @@ export function QrAppClient({
               onOmniboxExpandedChange={setWorldOmniboxExpanded}
               onApplyTemplate={applyWorldTemplate}
               onGenerate={(d) => void handleGenerate(d)}
-              generating={generating}
+              generating={focusedGenerating}
               onToast={setCopyToast}
             />
           </main>
@@ -910,6 +973,7 @@ export function QrAppClient({
         )}
       </div>
 
+      {navMode !== "home" ? (
       <nav
         className="flex shrink-0 justify-around px-2 py-2 lg:hidden"
         style={{
@@ -920,9 +984,7 @@ export function QrAppClient({
         <button
           type="button"
           onClick={onHome}
-          className={`flex flex-col items-center gap-1 rounded-full px-3 py-1 text-[10px] ${
-            navMode === "home" ? "qr-nav-category-active" : "text-[var(--qr-text-muted)]"
-          }`}
+          className="flex flex-col items-center gap-1 rounded-full px-3 py-1 text-[10px] text-[var(--qr-text-muted)]"
         >
           <Home className="h-4 w-4" />
           首页
@@ -947,42 +1009,73 @@ export function QrAppClient({
           );
         })}
       </nav>
+      ) : null}
 
       <QrTemplatePreviewModal
         template={previewTemplate}
         open={previewTemplate !== null}
-        canManageFeatured={canManageFeatured}
         onClose={() => setPreviewTemplate(null)}
         onCopy={onCopyTemplate}
+        onShare={
+          previewTemplate && canShareQrTemplate(previewTemplate, canManageFeatured)
+            ? (t) => {
+                setShareTemplate(t);
+                setPreviewTemplate(null);
+              }
+            : undefined
+        }
         allowDelete={navMode === "my-works" || navMode === "generate-history"}
         onDelete={
           navMode === "my-works" || navMode === "generate-history"
             ? (t) => void handleDeleteTemplate(t)
             : undefined
         }
-        onFeaturedUpdated={() => {
-          kindsCacheRef.current.delete(category);
-          invalidateQrTemplateCacheForCategory(templatesCacheRef.current, category);
-          void loadKinds();
-          void loadTemplates();
-        }}
       />
 
       <QrGeneratePreviewModal
-        open={generateModalOpen}
-        phase={generatePhase}
-        result={generateResult}
-        logId={generateLogId}
-        previewImageUrl={generatePreviewImage}
-        generateDraft={generateDraftSnapshot}
-        onClose={() => {
-          if (generating) return;
-          setGenerateModalOpen(false);
-          setGenerateResult(null);
-          setGenerateLogId(null);
-          setGenerateDraftSnapshot(null);
+        open={showGenerateModal}
+        phase={focusedGenerate?.phase ?? "generating"}
+        result={focusedGenerate?.result ?? null}
+        logId={focusedGenerate?.logId}
+        previewImageUrl={focusedGenerate?.previewImageUrl}
+        generateDraft={focusedGenerate?.draft ?? null}
+        alreadySaved={focusedGenerate?.alreadySaved ?? false}
+        onMinimize={() => {
+          if (!focusedGenerateId) return;
+          patchGenerateSession(focusedGenerateId, { minimized: true });
+          setFocusedGenerateId(null);
         }}
-        onSaved={onGenerateSaved}
+        onClose={() => {
+          if (!focusedGenerateId) return;
+          const id = focusedGenerateId;
+          setFocusedGenerateId(null);
+          setGenerateSessions((prev) => prev.filter((s) => s.id !== id));
+        }}
+        onSaved={(template) => {
+          if (focusedGenerateId) {
+            patchGenerateSession(focusedGenerateId, { alreadySaved: true });
+          }
+          onGenerateSaved(template);
+        }}
+      />
+
+      <QrGenerateDock
+        sessions={dockSessions}
+        onExpand={(id) => {
+          patchGenerateSession(id, { minimized: false });
+          setFocusedGenerateId(id);
+        }}
+        onDismiss={(id) => {
+          setGenerateSessions((prev) => prev.filter((s) => s.id !== id));
+          setFocusedGenerateId((current) => (current === id ? null : current));
+        }}
+      />
+
+      <QrWorkflowShareDialog
+        templateId={shareTemplate?.id ?? ""}
+        templateTitle={shareTemplate?.title ?? "我的作品"}
+        open={Boolean(shareTemplate)}
+        onClose={() => setShareTemplate(null)}
       />
 
       <QrToast message={copyToast} onDismiss={dismissCopyToast} />

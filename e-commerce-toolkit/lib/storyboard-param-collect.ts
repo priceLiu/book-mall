@@ -1,3 +1,4 @@
+import { asStoryboardDeliverable } from "@/lib/storyboard-deliverable-parse";
 import type { StoryboardProject } from "@/lib/storyboard-types";
 import { inferProductCategoryFromName } from "@/lib/storyboard-category-infer";
 import {
@@ -7,6 +8,8 @@ import {
 import {
   CUSTOM_SCENE_INPUT_CHOICE,
   getScenePresetChoiceLabels,
+  SCENE_APPLY_AI_CHOICE,
+  SCENE_APPLY_CUSTOM_CHOICE,
 } from "@/lib/storyboard-scene-presets";
 
 export type ProductCategoryKey =
@@ -30,6 +33,13 @@ export const PRODUCT_CATEGORIES: Array<{
 ];
 
 export const QUICK_GENERATE_CHOICE = "快速生成";
+
+/** 策划 LLM 触发语落库后不在聊天气泡展示 */
+export function isStoryboardPlanLlmTrigger(text: string): boolean {
+  return text.trim().startsWith("参数已确认 |");
+}
+
+export const REGENERATE_PLAN_CHOICE = "重新生成策划";
 export const CUSTOM_PARAMS_CHOICE = "自定义参数";
 export const AUTO_MATCH_CATEGORY_CHOICE = "自动匹配";
 
@@ -144,10 +154,14 @@ const SYSTEM_USER_TEXT_FILTERS = [
   "参数已确认",
   "按默认方案A",
   "场景参考已确认",
+  SCENE_APPLY_CUSTOM_CHOICE,
+  SCENE_APPLY_AI_CHOICE,
+  REGENERATE_PLAN_CHOICE,
   ...PRODUCT_CATEGORIES.map((c) => c.label),
   ...getScenePresetChoiceLabels(),
   "已上传场景图",
   "已上传角色图",
+  "已上传产品图",
   CHARACTER_PRESET_FEMALE_CHOICE,
   CHARACTER_PRESET_MALE_CHOICE,
   "是，自动生成角色",
@@ -195,14 +209,16 @@ function resolveDurationSec(
 }
 
 export function inferProductNameFromChat(project: StoryboardProject): string {
-  const firstUser = project.chatHistory.find(
-    (m) =>
-      m.role === "user" &&
-      m.content.trim() &&
-      !SYSTEM_USER_TEXT_FILTERS.some((x) => m.content.includes(x)) &&
-      !m.content.startsWith("参数已确认"),
-  );
-  return firstUser?.content.trim().slice(0, 120) ?? "";
+  if (!project.references.some((r) => r.role === "product")) return "";
+  for (const m of project.chatHistory) {
+    if (m.role !== "user") continue;
+    const text = m.content.trim();
+    if (!text) continue;
+    if (SYSTEM_USER_TEXT_FILTERS.some((x) => text.includes(x) || text === x)) continue;
+    if (text.startsWith("采用") || /^方案[一二三123]/.test(text)) continue;
+    return text.slice(0, 120);
+  }
+  return "";
 }
 
 export function hasProductName(project: StoryboardProject): boolean {
@@ -230,12 +246,13 @@ export function isAwaitingCategory(project: StoryboardProject): boolean {
   if (isParamCollecting(project)) return false;
   if (project.meta?.workflow?.productCategory) return false;
   if (
-    project.meta?.deliverable?.analysis ||
-    project.meta?.deliverable?.schemes?.length ||
+    asStoryboardDeliverable(project.meta?.deliverable)?.analysis ||
+    asStoryboardDeliverable(project.meta?.deliverable)?.schemes?.length ||
     project.sheet
   ) {
     return false;
   }
+  if (!project.references.some((r) => r.role === "product")) return false;
   return hasProductName(project);
 }
 
@@ -258,19 +275,21 @@ export function buildStoryboardLlmUserMessage(
   return [
     `参数已确认 | 产品名：${productName || "（见对话上文）"} | 品类分支：${category} | 时长：${spec.totalSec}秒 | 风格偏好：${stylePref} | 产品露出强度：${exposure}`,
     "",
-    "请一次性生成完整策划交付（表1–3 + 三套分镜 + storyboard-deliverable JSON），勿再追问参数。",
+    "请一次性生成完整策划交付：brief 摘要 + storyboard-deliverable JSON（禁止 Markdown 表格），勿再追问参数。",
     "",
     "【硬性生成约束】",
-    `1. 表1–3 与三套分镜必须严格匹配品类分支 ${category} 的专属情景池、痛点侧重、钩子类型、口播语气与视觉风格，禁止跨品类复用模板`,
-    `2. 分镜总时长 ${spec.totalSec} 秒、共 ${spec.panelCount} 镜，时间轴须连续覆盖全片，不得随意改镜头数与总时长`,
-    "3. 每镜「画面内容」须可实拍：写清具体场景（如卧室衣柜前/羽毛球馆）+ 人物动作 + 产品介入方式，禁止仅写抽象情绪词",
-    "4. storyboard-deliverable 中 productName 必须是用户产品名，禁止使用方案标题（如「方案一：痛点救场型」）",
-    "5. 画面内容须来自本品类的情景池，不得出现其他品类的典型场景或动作",
+    `1. 在品类分支 ${category} 的创意方向域内扩展情景与爆款结构，禁止跨品类复用模板`,
+    `2. 分镜总时长 ${spec.totalSec} 秒、共 ${spec.panelCount} 镜，时间轴须连续覆盖全片`,
+    "3. 每镜须写清 scene、scenePrompt、action、productInteraction、imagePrompt、videoPromptEn（五要素+场景/视频 prompt），禁止抽象概括",
+    "4. productName 必须是用户产品名，禁止用方案标题",
+    "5. productSellingPoints 必填：用户有卖点则用 user，否则 inferred 推导 2–4 条",
+    "6. analysis 使用结构化 audience / painPoints / strategies 数组，禁止 audienceMarkdown",
     "",
-    "【JSON 字段】",
-    "必须使用：index, timeline, shotType, camera, scene, action, emotion, dialogue, durationHintSec, totalDurationHintSec",
-    "analysis 须含 audienceMarkdown、painPointsMarkdown、strategiesMarkdown（三张表的 Markdown 原文）",
-    "禁止使用：shotId, visualDescription, voiceover, timeStartSec, schemeId",
+    "【JSON 必填字段】",
+    "productName, productSellingPoints, creativeBrief, cast, analysis, schemes（3套）",
+    "每镜：index, timeline, shotType, camera, scene, action, emotion, dialogue, durationHintSec,",
+    "productInteraction, productVisibility, sellpointTags, scenePrompt, imagePrompt, videoPromptEn",
+    "禁止使用：shotId, visualDescription, voiceover, *Markdown 字段",
     "",
     "【完整参数】",
     paramLine || "（快速生成默认参数）",

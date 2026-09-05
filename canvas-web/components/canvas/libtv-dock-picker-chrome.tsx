@@ -3,9 +3,14 @@
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** 浮动 Dock 底栏 · 模型/参数锚点 Popover 容器（z ≥ 1600 · 高于节点顶栏 z-1500） */
-export const LIBTV_DOCK_POPOVER_CLASS =
-  "nodrag nowheel max-h-[min(420px,70vh)] w-[min(22rem,calc(100vw-24px))] overflow-y-auto rounded-xl border border-white/10 bg-[#1a1a1c] py-2 shadow-[0_8px_32px_rgba(0,0,0,0.45)] ring-0 outline-none";
+const LIBTV_DOCK_POPOVER_SHELL =
+  "nodrag nowheel max-h-[min(420px,70vh)] overflow-y-auto rounded-xl border border-white/10 bg-[#1a1a1c] py-2 shadow-[0_8px_32px_rgba(0,0,0,0.45)] ring-0 outline-none";
+
+/** 浮动 Dock 底栏 · 模型选择 Popover（较宽，容纳 displayName + modelKey + 类型标签） */
+export const LIBTV_DOCK_MODEL_POPOVER_CLASS = `${LIBTV_DOCK_POPOVER_SHELL} w-[min(28rem,calc(100vw-24px))] min-w-[20rem]`;
+
+/** 浮动 Dock 底栏 · 通用锚点 Popover（参数段、高清视频等） */
+export const LIBTV_DOCK_POPOVER_CLASS = `${LIBTV_DOCK_POPOVER_SHELL} w-[min(22rem,calc(100vw-24px))]`;
 
 /** 参数 Popover · 更宽更高，容纳 Gateway schema + 参考模式，尽量避免滚动条 */
 export const LIBTV_DOCK_PARAMS_POPOVER_CLASS =
@@ -18,7 +23,7 @@ export function libtvDockSegmentButtonClass(
 ): string {
   return cn(
     "rounded-lg border font-medium transition",
-    opts?.compact ? "px-3 py-1.5 text-[12px]" : "px-4 py-2 text-[13px]",
+    opts?.compact ? "px-2 py-1 text-[11px]" : "px-4 py-2 text-[13px]",
     active
       ? "border-transparent bg-white/[0.10] text-white"
       : "border-transparent bg-white/[0.04] text-white/65 hover:bg-white/[0.07] hover:text-white/85",
@@ -26,12 +31,17 @@ export function libtvDockSegmentButtonClass(
 }
 
 /** Pro2 / LibTV Dock · 模型列表项（无彩色边框 / hover） */
-export function libtvDockModelItemClassName(selected: boolean): string {
+export function libtvDockModelItemClassName(
+  selected: boolean,
+  disabled = false,
+): string {
   return cn(
     "flex w-full items-center gap-2 rounded-lg border px-2.5 py-2.5 text-left transition",
-    selected
-      ? "border-transparent bg-white/[0.10] text-white"
-      : "border-transparent text-white/80 hover:bg-white/[0.04]",
+    disabled
+      ? "cursor-not-allowed border-transparent text-white/35 opacity-50"
+      : selected
+        ? "border-transparent bg-white/[0.10] text-white"
+        : "border-transparent text-white/80 hover:bg-white/[0.04]",
   );
 }
 

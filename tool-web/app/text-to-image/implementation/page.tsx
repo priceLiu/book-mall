@@ -27,8 +27,10 @@ export default function TextToImageImplementationPage() {
             <code>/api/text-to-image/persist-library</code> 与主站库存 API。
           </p>
           <p>
-            Key 仅服务端读取（<code>lib/qwen-env.ts</code> / <code>lib/tool-config.ts</code>
-            ），勿下发给客户端组件。
+            厂商凭证与出站 HTTP 均在主站 <strong>Gateway</strong>（
+            <code>forward-gateway-dashscope-server</code> →{" "}
+            <code>/api/sso/tools/gateway/dashscope</code>）；工具站进程<strong>不</strong>配置{" "}
+            <code>DASHSCOPE_API_KEY</code>。
           </p>
         </ToolImplementationSection>
 
@@ -49,55 +51,34 @@ export default function TextToImageImplementationPage() {
 
         <ToolImplementationSection heading="3. 核心代码摘录">
           <ToolImplementationCode
-            caption="创建任务：校验 Cookie、读取 Key、调用 DashScope 异步创建（app/api/text-to-image/start/route.ts）"
-            code={`export async function POST(req: Request) {
-  const token = cookies().get("tools_token")?.value?.trim();
-  if (!token) {
-    return NextResponse.json({ error: "请先登录工具站" }, { status: 401 });
-  }
+            caption="创建任务：校验 Cookie，经 Gateway 代理创建 DashScope 异步任务（app/api/text-to-image/start/route.ts）"
+            code={`const created = await createDashscopeJobFromServer({
+  kind: "wanx",
+  model: WANX_TEXT2IMAGE_PLUS_MODEL,
+  prompt,
+  negativePrompt,
+  n,
+  clientPage: "text-to-image",
+});
 
-  const apiKey = getQwenApiKey();
-  // ...
-  const created = await wanxCreateTextToImageTask({
-    apiKey,
-    prompt,
-    negativePrompt,
-    n,
-  });
-  // ...
-  return NextResponse.json({ taskId: created.taskId });
-}`}
+if (!created.ok) {
+  return NextResponse.json({ error: created.error ?? "Gateway 调用失败" }, { status: 502 });
+}
+
+return NextResponse.json({
+  taskId: created.taskId,
+  gatewayLogId: created.logId,
+});`}
           />
 
           <ToolImplementationCode
             caption="结算：Gateway poll 成功时 finalizeRequestLog 自动扣积分/BYOK 超额（settle 路由仅校验任务状态）"
-            code={`/** 文生图单次生成扣费 … 幂等键 meta.taskId = DashScope task_id */
-export async function POST(req: Request) {
-  // … 校验 tools_token、拉取任务状态 …
-  if (status !== "SUCCEEDED") {
-    return NextResponse.json({ error: \`任务未完成…\`, taskStatus: status }, { status: 409 });
-  }
-
-  // settle 仅校验 SUCCEEDED；扣分在 Gateway poll finalize
-  return NextResponse.json({ ok: true, creditBilling: true });
-}`}
-          />
-
-          <ToolImplementationCode
-            caption="DashScope HTTP：异步头 + 模型名（lib/text-to-image-dashscope.ts）"
-            code={`const res = await fetch(CREATE_URL, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    Authorization: \`Bearer \${opts.apiKey}\`,
-    "X-DashScope-Async": "enable",
-  },
-  body: JSON.stringify({
-    model: WANX_TEXT2IMAGE_PLUS_MODEL,
-    input: { prompt, /* … */ },
-    parameters: { size: "1024*1024", n, prompt_extend: true, watermark: false },
-  }),
-});`}
+            code={`const polled = await pollDashscopeJobFromServer({ taskId, gatewayLogId });
+const status = (polled.output as WanxTaskPollOutput).task_status ?? "";
+if (status !== "SUCCEEDED") {
+  return NextResponse.json({ error: \`任务未完成…\`, taskStatus: status }, { status: 409 });
+}
+return NextResponse.json({ ok: true, creditBilling: true });`}
           />
         </ToolImplementationSection>
       </ToolImplementationDoc>

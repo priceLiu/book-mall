@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { getBookMallBaseUrlServer } from "@/lib/book-mall-base-url.server";
 import { fetchToolsSessionUncachedWithDiag } from "@/lib/tools-introspect";
+import { shouldRefreshToolsJwt } from "@/lib/tools-jwt-exp";
 
 export const dynamic = "force-dynamic";
 
@@ -29,9 +30,14 @@ function decodeJwtSub(token: string): string | null {
 async function refreshFromBookMall(
   request: NextRequest,
   existingToken: string | null,
-): Promise<{ token: string; expiresIn: number } | null> {
+): Promise<
+  | { token: string; expiresIn: number }
+  | { error: string; code?: string; status: number }
+> {
   const base = getBookMallBaseUrlServer();
-  if (!base) return null;
+  if (!base) {
+    return { error: "book_mall_url_missing", status: 503 };
+  }
 
   const headers = new Headers();
   const cookie = request.headers.get("cookie");
@@ -63,24 +69,38 @@ async function refreshFromBookMall(
         };
       }
     }
+    // server-secret 换票失败（如 DB 瞬时不可用）时 fall through，用 JWT/cookie 续签
   }
 
+  const bearerHeaders = new Headers();
+  if (cookie) bearerHeaders.set("cookie", cookie);
   if (existingToken) {
-    headers.set("Authorization", `Bearer ${existingToken}`);
+    bearerHeaders.set("Authorization", `Bearer ${existingToken}`);
   }
-  headers.delete("Content-Type");
 
   const r = await fetch(`${base.replace(/\/$/, "")}/api/sso/tools/refresh-token`, {
     method: "POST",
-    headers,
+    headers: bearerHeaders,
     cache: "no-store",
   });
-  if (!r.ok) return null;
+  if (!r.ok) {
+    const err = (await r.json().catch(() => null)) as {
+      error?: string;
+      code?: string;
+    } | null;
+    return {
+      error: err?.error ?? "refresh_failed",
+      code: err?.code,
+      status: r.status,
+    };
+  }
   const data = (await r.json().catch(() => null)) as {
     access_token?: string;
     expires_in?: number;
   } | null;
-  if (typeof data?.access_token !== "string" || !data.access_token) return null;
+  if (typeof data?.access_token !== "string" || !data.access_token) {
+    return { error: "refresh_failed", status: 502 };
+  }
   return {
     token: data.access_token,
     expiresIn:
@@ -93,22 +113,31 @@ async function refreshFromBookMall(
 /** POST：静默续签 tools_token 并写 Cookie */
 export async function POST(request: NextRequest) {
   const existing = cookies().get("tools_token")?.value?.trim() ?? null;
-  const { session } = await fetchToolsSessionUncachedWithDiag(existing ?? undefined);
-  if (session.active && existing) {
-    return NextResponse.json({ active: true, refreshed: false });
+
+  // 令牌仍有效且距过期尚早：仅 introspect 确认会话，避免每 90s 都打 refresh-token
+  if (existing && !shouldRefreshToolsJwt(existing)) {
+    const { session } = await fetchToolsSessionUncachedWithDiag(existing);
+    if (session.active) {
+      return NextResponse.json({ active: true, refreshed: false });
+    }
   }
 
   const refreshed = await refreshFromBookMall(request, existing);
-  if (!refreshed) {
+  if ("error" in refreshed) {
     return NextResponse.json(
-      { active: false, refreshed: false, error: "refresh_failed" },
-      { status: 401 },
+      {
+        active: false,
+        refreshed: false,
+        error: refreshed.error,
+        ...(refreshed.code ? { code: refreshed.code } : {}),
+      },
+      { status: refreshed.status >= 400 ? refreshed.status : 401 },
     );
   }
 
-  const verify = await fetchToolsSessionUncachedWithDiag(refreshed.token);
+  // 刚换票成功即视为 active；勿因 introspect 慢/超时把续签误判为失败（会误弹「令牌过期」）
   const res = NextResponse.json({
-    active: verify.session.active,
+    active: true,
     refreshed: true,
     hasCookie: true,
   });

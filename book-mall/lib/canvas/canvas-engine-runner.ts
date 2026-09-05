@@ -28,10 +28,31 @@ import {
   getCanvasUserInflightMax,
 } from "./canvas-constants";
 import { CanvasProjectError } from "./canvas-project-service";
+import { resolveCanvasGatewayTtsExtras } from "./canvas-tts-run-params";
 import { assertStoryLlmVisionModel } from "./story-llm-vision-models";
 import { isLikelyVideoUrl } from "./media-url-kind";
 import { scriptStudioMirrorPayload } from "./script-studio-parse-mirror";
 import type { CanvasTaskStoryScope } from "./canvas-story-scope";
+import {
+  buildPro2StructuredRetryUserMessage,
+  ensurePro2ProductionScriptFence,
+  isPro2StructuredLlmScope,
+  mergePro2StructuredLlmParams,
+  PRO2_STRUCTURED_LLM_MAX_ATTEMPTS,
+  validatePro2ProductionScriptLlmOutput,
+} from "./pro2-production-script-llm";
+import {
+  buildScriptStudioStructuredRetryUserMessage,
+  ensureScriptStudioBatchFence,
+  isScriptStudioStructuredLlmScope,
+  mergeScriptStudioStructuredLlmParams,
+  SCRIPT_STUDIO_STRUCTURED_LLM_MAX_ATTEMPTS,
+  validateScriptStudioBatchLlmOutput,
+} from "./script-studio-llm";
+import {
+  voidGatewayLogForPro2ValidationFailure,
+  PRO2_GATEWAY_VALIDATION_FAIL_CODE,
+} from "./pro2-gateway-validation-void";
 import {
   assertNoProjectInflightByInputHash,
   claimCanvasTaskKieSubmit,
@@ -39,25 +60,39 @@ import {
 import {
   createStoryScopedCanvasTask,
   extractStoryScopeFromInputPayload,
+  shouldSkipInflightScopeConflictForRun,
   storyScopesConflict,
 } from "./canvas-story-scope";
 import {
-  canvasGwChat,
+  canvasGwChatWithOverloadRetry,
   canvasGwCreateBailianR2vJob,
   canvasGwCreateDashscopeKlingImageJob,
+  canvasGwCreateDashscopeMultimodalImageSyncJob,
   canvasGwCreateDashscopeVideoJob,
+  canvasGwCreateDashscopeWan27ImageJob,
   canvasGwCreateHunyuanJob,
   canvasGwCreateKieJob,
+  canvasGwCreateMinimaxVideoJob,
   canvasGwCreateTopazVideoJob,
   canvasGwCreateVolcengineVideoJob,
   canvasGwTts,
+  canvasGwVolcengineImageGenerations,
 } from "./canvas-gateway-client";
-import { GATEWAY_VOLCENGINE_PROVIDER_ID } from "./canvas-gateway-providers";
+import { engineOverloadedUserHintZh, isEngineOverloadedMessage } from "@/lib/gateway/gateway-submit-error-policy";
 import {
   assertCanvasProviderMatchesModelRoute,
   shouldCanvasUseGateway,
 } from "./canvas-gateway-run";
-import { persistCanvasBufferToOss } from "./canvas-oss";
+import { GATEWAY_VOLCENGINE_PROVIDER_ID } from "./canvas-gateway-providers";
+import {
+  scheduleCanvasBufferOssBackfill,
+  scheduleCanvasKieImageOssBackfill,
+} from "./canvas-oss-backfill";
+import {
+  buildVolcengineSeedreamImageCall,
+  isVolcengineSeedreamImageModelKey,
+} from "@/lib/gateway/volcengine-chat-models";
+import { ensureCanvasVendorImageUrls } from "@/lib/canvas/ensure-vendor-image-url";
 import type { CanvasRunNodeInput } from "./canvas-task-service";
 import {
   buildCanvasRefVideoKieInput,
@@ -69,15 +104,26 @@ import {
   isVolcengineStoryVideoModelKey,
   VOLCENGINE_VIDEO_MULTI_REF_MODEL,
 } from "./canvas-video-volcengine";
+import { buildCanvasVideoMinimaxInput } from "@/lib/gateway/minimax-video-body";
+import { isMinimaxCanvasVideoModelKey } from "./providers/minimax-video";
 import { normalizePortraitAssetRefs } from "./canvas-portrait-import-service";
 import { isTopazCanvasVideoModelKey } from "./providers/topaz";
 import {
   buildDashscopeHappyhorseI2vVideoBody,
   buildDashscopeSbv1T2vVideoBody,
+  buildDashscopeWan30Media,
+  dashscopeSbv1T2vModelToR2v,
   isDashscopeHappyhorseImageToVideoModel,
+  isDashscopeHappyhorseTextToVideoModel,
   isDashscopeSbv1TextToVideoModel,
-  upgradeDashscopeT2vModelWhenRefsPresent,
+  isDashscopeWan30VideoModel,
+  resolveDashscopeT2vRefMismatchMessage,
 } from "./dashscope-sbv1-t2v";
+import {
+  buildDashscopeKlingV3VideoBody,
+  isDashscopeKlingV3VideoGatewayModel,
+  resolveDashscopeKlingV3UpstreamModel,
+} from "./dashscope-kling-v3-video";
 import {
   parseTopazFrameInterpolation,
   parseTopazSlowmoFactor,
@@ -100,13 +146,22 @@ import {
 } from "@/lib/generation/traffic-control/constants";
 import { computeCanvasQueueDispatchAfter } from "@/lib/generation/traffic-control/queue-dispatch-after";
 import { fireCanvasDispatchForProject } from "@/lib/generation/traffic-control/fire-canvas-dispatch";
+import { buildGridSplitPrepareFromNodeData } from "@/lib/generation/traffic-control/dispatch-canvas-image";
 import { assertVideoCreditsBeforeTrafficQueue } from "@/lib/generation/traffic-control/video-queue-precheck";
 import { resolveCanvasProjectTrafficScope } from "@/lib/generation/traffic-control/scope-key";
 import {
+  isStoryboardDashscopeImageModel,
   isStoryboardKlingImageModel,
+  isWan26ImageModel,
+  resolveStoryboardDashscopeModel,
   resolveStoryboardKlingModel,
 } from "@/lib/ecom/ecom-storyboard-image-models";
-import { resolveKlingV3Resolution } from "@/lib/ecom/ecom-storyboard-gen-params";
+import { resolveKlingV3Resolution, resolveWan27ImageSize } from "@/lib/ecom/ecom-storyboard-gen-params";
+import { ensureStoryboardRefImagesForWan27 } from "@/lib/ecom/ecom-storyboard-ref-image";
+import {
+  isDashscopeMultimodalImageGenModel,
+  isZImageTurboModel,
+} from "@/lib/gateway/qwen-image-edit-proxy";
 
 const MAX_PROMPT_LEN = 16000;
 /** Story LLM（故事大纲等）允许更长上游参考包，避免截断创意描述 */
@@ -360,7 +415,7 @@ export async function runAiEngineNode(
     projectId,
     nodeId,
     storyScope: args.storyScope,
-    skipInflightScopeConflict: args.forceFresh === true,
+    skipInflightScopeConflict: shouldSkipInflightScopeConflictForRun(args),
     initialStatus: "SUBMITTED",
     data: {
       kind: "TEXT",
@@ -409,7 +464,7 @@ export async function runAiEngineNode(
           : userContent,
     });
 
-    const resp = await canvasGwChat(userId, {
+    const resp = await canvasGwChatWithOverloadRetry(userId, {
       modelKey,
       messages,
       params,
@@ -502,8 +557,11 @@ export async function runImageEngineNode(
     }
   }
 
-  // 上游 textInputs（含 ai-engine 输出）+ 节点 prompt 拼接
-  const upstreamText = (node.textInputs ?? []).filter((s) => s && s.trim());
+  // 三视图 row.prompt 已在 Pro2 Dock 组装完毕，禁止再拼 hub 大纲/分镜 markdown
+  const upstreamText =
+    engineKind === "three-view-engine"
+      ? []
+      : (node.textInputs ?? []).filter((s) => s && s.trim());
   const expandedPrompt = expandMentionsText(
     [promptRaw.trim(), ...upstreamText].filter(Boolean).join("\n\n"),
     node,
@@ -512,13 +570,20 @@ export async function runImageEngineNode(
     throw new CanvasProjectError("EMPTY_PROMPT", `${engineKind} prompt 为空`);
   }
 
-  const imageUrls = (node.imageInputs ?? [])
+  const imageUrlsRaw = (node.imageInputs ?? [])
     .filter((u): u is string => typeof u === "string" && /^https?:\/\//.test(u))
     .slice(0, 8);
+
+  const gridSplitPrepare = buildGridSplitPrepareFromNodeData(data);
+  /** 宫格高清待裁切：参考图由 dispatch PREPARING 写入，不入队 imageUrls */
+  const imageUrls = gridSplitPrepare ? [] : imageUrlsRaw;
 
   const isHunyuan =
     modelKey === "hunyuan-3d-pro" || modelKey === "hunyuan-3d-express";
   const isKlingImage = isStoryboardKlingImageModel(modelKey);
+  const isDashscopeWanImage = isStoryboardDashscopeImageModel(modelKey);
+  const isMultimodalSyncImage = isDashscopeMultimodalImageGenModel(modelKey);
+  const isVolcengineSeedream = isVolcengineSeedreamImageModelKey(modelKey);
   await shouldCanvasUseGateway(userId, providerId, modelKey);
 
   const inputHash = computeInputHash({
@@ -551,6 +616,9 @@ export async function runImageEngineNode(
       ? (data.sbv1Billing as Record<string, unknown>)
       : undefined;
 
+  const gridSplitPrepareForPayload = buildGridSplitPrepareFromNodeData(data);
+  const trafficQueued = isTrafficControlEnabled();
+
   const imageInputPayload = {
     kind: engineKind,
     prompt: clipPrompt(expandedPrompt),
@@ -561,6 +629,7 @@ export async function runImageEngineNode(
     clientPage: gwClientPage,
     /** run API 同步提交 Gateway；poll worker 勿在短时内二次 createTask */
     syncGatewaySubmit: true,
+    ...(gridSplitPrepareForPayload ? { gridSplitPrepare: gridSplitPrepareForPayload } : {}),
     ...(sbv1Billing ? { sbv1Billing } : {}),
     ...(args.storyScope ? { storyScope: args.storyScope } : {}),
   } as Prisma.InputJsonValue;
@@ -569,6 +638,9 @@ export async function runImageEngineNode(
     projectId,
     nodeId,
     storyScope: args.storyScope,
+    actorUserId: userId,
+    skipInflightScopeConflict: shouldSkipInflightScopeConflictForRun(args),
+    initialStatus: trafficQueued ? "QUEUED" : undefined,
     data: {
       kind: "IMAGE",
       model: modelKey,
@@ -577,6 +649,11 @@ export async function runImageEngineNode(
       inputPayload: imageInputPayload,
     },
   });
+
+  if (created.status === "QUEUED") {
+    fireCanvasDispatchForProject(projectId, "runImageEngineNode");
+    return { reused: false, task: created };
+  }
 
   const callBackUrl = buildCanvasAiKieCallbackUrl("image", created.id);
 
@@ -659,6 +736,230 @@ export async function runImageEngineNode(
         return { reused: false, task: updated };
       }
 
+      if (isMultimodalSyncImage) {
+        const promptText = clipPrompt(expandedPrompt);
+        const resolution = String(params.resolution ?? "2K");
+        const size =
+          resolution === "4K"
+            ? "2048*2048"
+            : resolution === "1K"
+              ? "1024*1024"
+              : "1536*1536";
+        const n = Math.min(
+          isZImageTurboModel(modelKey) ? 1 : 6,
+          Math.max(1, Number(params.n ?? 1) || 1),
+        );
+        const refs =
+          !isZImageTurboModel(modelKey) && imageUrls.length > 0
+            ? await ensureStoryboardRefImagesForWan27({
+                userId,
+                urls: imageUrls.slice(0, 3),
+              })
+            : [];
+        const content: Array<{ text: string } | { image: string }> =
+          refs.length > 0
+            ? [...refs.map((url) => ({ image: url })), { text: promptText }]
+            : [{ text: promptText }];
+        const job = await canvasGwCreateDashscopeMultimodalImageSyncJob(userId, {
+          model: modelKey,
+          content,
+          parameters: {
+            size,
+            n,
+            prompt_extend: isZImageTurboModel(modelKey) ? false : true,
+            watermark: false,
+          },
+          clientPage: gwClientPage,
+          projectId,
+          canvasTaskId: created.id,
+        });
+        const updated = await prisma.canvasGenerationTask.update({
+          where: { id: created.id },
+          data: {
+            status: "SUBMITTED",
+            kieTaskId: job.taskId,
+            submittedAt: new Date(),
+            inputPayload: {
+              kind: engineKind,
+              prompt: promptText,
+              params,
+              providerId,
+              modelKey,
+              imageUrls,
+              clientPage: gwClientPage,
+              syncGatewaySubmit: true,
+              gatewayLogId: job.logId,
+              providerKind: "DASHSCOPE",
+              dashscopeJobKind: "multimodal-image-sync",
+              ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+            } as Prisma.InputJsonValue,
+          },
+        });
+        const { recoverCanvasDashscopeSyncImageFromGateway } = await import(
+          "@/lib/canvas/canvas-dashscope-sync-image-recover"
+        );
+        await recoverCanvasDashscopeSyncImageFromGateway(updated.id).catch(() => undefined);
+        return { reused: false, task: updated };
+      }
+
+      if (isDashscopeWanImage) {
+        const apiModel = resolveStoryboardDashscopeModel(modelKey);
+        const promptText = clipPrompt(expandedPrompt);
+        const wan26 =
+          isWan26ImageModel(apiModel) || isWan26ImageModel(modelKey);
+        const resolution = String(params.resolution ?? "2K");
+        const aspectRaw = String(params.aspect_ratio ?? "1:1");
+        const wanAspect: "16:9" | "9:16" =
+          aspectRaw === "9:16" ||
+          aspectRaw === "3:4" ||
+          aspectRaw === "2:3" ||
+          aspectRaw === "4:5" ||
+          aspectRaw === "9:21"
+            ? "9:16"
+            : "16:9";
+        const wan27Size =
+          !wan26 && imageUrls.length === 0
+            ? resolveWan27ImageSize({
+                aspectRatio: wanAspect,
+                imageSize:
+                  resolution === "4K"
+                    ? "4K"
+                    : resolution === "1K"
+                      ? "1K"
+                      : "2K",
+              })
+            : undefined;
+        const refs =
+          imageUrls.length > 0
+            ? await ensureStoryboardRefImagesForWan27({
+                userId,
+                urls: imageUrls,
+              })
+            : [];
+        const content: Array<{ text: string } | { image: string }> =
+          refs.length > 0
+            ? wan26
+              ? [{ text: promptText }, ...refs.map((url) => ({ image: url }))]
+              : [
+                  ...refs.map((url) => ({ image: url })),
+                  { text: promptText },
+                ]
+            : [{ text: promptText }];
+        const job = await canvasGwCreateDashscopeWan27ImageJob(userId, {
+          model: apiModel,
+          content,
+          size: wan27Size,
+          n: Math.min(4, Math.max(1, Number(params.n ?? 1) || 1)),
+          contentOrder: wan26 ? "text-first" : "images-first",
+          clientPage: gwClientPage,
+          projectId,
+          canvasTaskId: created.id,
+        });
+        const updated = await prisma.canvasGenerationTask.update({
+          where: { id: created.id },
+          data: {
+            status: "SUBMITTED",
+            kieTaskId: job.taskId,
+            submittedAt: new Date(),
+            inputPayload: {
+              kind: engineKind,
+              prompt: promptText,
+              params,
+              providerId,
+              modelKey,
+              imageUrls,
+              clientPage: gwClientPage,
+              syncGatewaySubmit: true,
+              gatewayLogId: job.logId,
+              providerKind: "DASHSCOPE",
+              dashscopeJobKind: "wan27-image",
+              ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+            } as Prisma.InputJsonValue,
+          },
+        });
+        return { reused: false, task: updated };
+      }
+
+      if (isVolcengineSeedream) {
+        const promptText = clipPrompt(expandedPrompt);
+        const vendorImageUrls =
+          imageUrls.length > 0
+            ? await ensureCanvasVendorImageUrls(userId, imageUrls)
+            : [];
+        const call = buildVolcengineSeedreamImageCall({
+          prompt: promptText,
+          imageUrls: vendorImageUrls,
+          params,
+        });
+        const { images, logId } = await canvasGwVolcengineImageGenerations(
+          userId,
+          {
+            model: modelKey,
+            prompt: call.prompt,
+            image: call.image,
+            parameters: call.parameters,
+            clientPage: gwClientPage,
+            projectId,
+            canvasTaskId: created.id,
+          },
+        );
+        const first = images[0];
+        const url = first?.url?.trim() ?? "";
+        const b64 = first?.b64?.trim() ?? "";
+        if (!url && !b64) {
+          throw new Error("火山方舟 Seedream 未返回可用图像");
+        }
+        const ephemeralUrl = url || `data:image/png;base64,${b64}`;
+        const resultImageUrls = images
+          .map((i) => i.url?.trim())
+          .filter((u): u is string => Boolean(u));
+        const updated = await prisma.canvasGenerationTask.update({
+          where: { id: created.id },
+          data: {
+            status: "SUCCEEDED",
+            ephemeralUrl,
+            submittedAt: new Date(),
+            completedAt: new Date(),
+            inputPayload: {
+              kind: engineKind,
+              prompt: promptText,
+              params,
+              providerId,
+              modelKey,
+              imageUrls: vendorImageUrls.length > 0 ? vendorImageUrls : imageUrls,
+              clientPage: gwClientPage,
+              syncGatewaySubmit: true,
+              gatewayLogId: logId,
+              providerKind: "VOLCENGINE",
+              ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+            } as Prisma.InputJsonValue,
+            resultPayload: {
+              imageCount: images.length,
+              ...(resultImageUrls.length ? { imageUrls: resultImageUrls } : {}),
+            } as Prisma.InputJsonValue,
+          },
+        });
+        if (url) {
+          scheduleCanvasKieImageOssBackfill(
+            created.id,
+            url,
+            projectId,
+            "node-image",
+          );
+        } else {
+          scheduleCanvasBufferOssBackfill({
+            taskId: created.id,
+            buf: Buffer.from(b64, "base64"),
+            contentType: "image/png",
+            kind: "node-image",
+            projectId,
+            userId,
+            ext: "png",
+          });
+        }
+        return { reused: false, task: updated };
+      }
+
       const { model, input } = buildKieImageCreateArgs({
         modelKey,
         prompt: clipPrompt(expandedPrompt),
@@ -684,6 +985,7 @@ export async function runImageEngineNode(
       }
 
       const job = await canvasGwCreateKieJob(userId, {
+        gatewayModelKey: modelKey,
         model,
         input: input as Record<string, unknown>,
         callBackUrl,
@@ -927,17 +1229,258 @@ async function executeStoryLlmEngineTask(
             : userContent,
       },
     ];
-    const resp = await canvasGwChat(userId, {
+    const structuredPro2 = isPro2StructuredLlmScope(storyScope);
+    const structuredScriptStudio = isScriptStudioStructuredLlmScope(storyScope);
+    const llmParams = structuredPro2
+      ? mergePro2StructuredLlmParams(params)
+      : structuredScriptStudio
+        ? mergeScriptStudioStructuredLlmParams(params)
+        : params;
+
+    let resp = await canvasGwChatWithOverloadRetry(userId, {
       modelKey,
       messages,
-      params,
+      params: llmParams,
       clientPage: gwClientPage,
       projectId,
       canvasTaskId: taskId,
     });
-    // 模型返回空内容（推理预算耗尽 / 上游异常 / 解析失败）时，勿当作成功落库：
+
+    let outputText = (resp.text ?? "").trim();
+    let pro2Validation: ReturnType<
+      typeof validatePro2ProductionScriptLlmOutput
+    > | null = null;
+    let scriptStudioValidation: ReturnType<
+      typeof validateScriptStudioBatchLlmOutput
+    > | null = null;
+    let pro2AttemptCount = 0;
+    let scriptStudioAttemptCount = 0;
+    const pro2GatewayLogIds: string[] = [];
+    const scriptStudioGatewayLogIds: string[] = [];
+
+    if (structuredPro2) {
+      let chatMessages = messages;
+      let lastError = "结构化 JSON 校验失败";
+
+      for (
+        let attempt = 1;
+        attempt <= PRO2_STRUCTURED_LLM_MAX_ATTEMPTS;
+        attempt++
+      ) {
+        pro2AttemptCount = attempt;
+        if (attempt > 1) {
+          resp = await canvasGwChatWithOverloadRetry(userId, {
+            modelKey,
+            messages: chatMessages,
+            params: llmParams,
+            clientPage: gwClientPage,
+            projectId,
+            canvasTaskId: taskId,
+          });
+        }
+        if (resp.logId) pro2GatewayLogIds.push(resp.logId);
+
+        outputText = (resp.text ?? "").trim();
+        if (!outputText) {
+          lastError = "模型返回空内容";
+          if (resp.logId) {
+            await voidGatewayLogForPro2ValidationFailure(resp.logId, {
+              error: lastError,
+              attempt,
+              maxAttempts: PRO2_STRUCTURED_LLM_MAX_ATTEMPTS,
+              canvasTaskId: taskId,
+            });
+          }
+          if (attempt >= PRO2_STRUCTURED_LLM_MAX_ATTEMPTS) {
+            pro2Validation = { ok: false, error: lastError };
+            break;
+          }
+          chatMessages = [
+            ...chatMessages,
+            {
+              role: "user" as const,
+              content:
+                "上一回复为空。请只输出 ```pro2-production-script``` JSON 围栏，禁止说明文字。",
+            },
+          ];
+          continue;
+        }
+
+        pro2Validation = validatePro2ProductionScriptLlmOutput(
+          outputText,
+          storyScope,
+        );
+        if (pro2Validation.ok) {
+          outputText = ensurePro2ProductionScriptFence(outputText);
+          break;
+        }
+
+        lastError = pro2Validation.error ?? "校验失败";
+        if (resp.logId) {
+          await voidGatewayLogForPro2ValidationFailure(resp.logId, {
+            error: lastError,
+            attempt,
+            maxAttempts: PRO2_STRUCTURED_LLM_MAX_ATTEMPTS,
+            canvasTaskId: taskId,
+          });
+        }
+
+        if (attempt >= PRO2_STRUCTURED_LLM_MAX_ATTEMPTS) break;
+
+        chatMessages = [
+          ...chatMessages,
+          { role: "assistant" as const, content: outputText },
+          {
+            role: "user" as const,
+            content: buildPro2StructuredRetryUserMessage(lastError, attempt),
+          },
+        ];
+      }
+
+      if (pro2Validation && !pro2Validation.ok && outputText) {
+        outputText = ensurePro2ProductionScriptFence(outputText);
+      }
+    }
+
+    if (structuredScriptStudio) {
+      let chatMessages = messages;
+      let lastError = "结构化 JSON 校验失败";
+
+      for (
+        let attempt = 1;
+        attempt <= SCRIPT_STUDIO_STRUCTURED_LLM_MAX_ATTEMPTS;
+        attempt++
+      ) {
+        scriptStudioAttemptCount = attempt;
+        if (attempt > 1) {
+          resp = await canvasGwChatWithOverloadRetry(userId, {
+            modelKey,
+            messages: chatMessages,
+            params: llmParams,
+            clientPage: gwClientPage,
+            projectId,
+            canvasTaskId: taskId,
+          });
+        }
+        if (resp.logId) scriptStudioGatewayLogIds.push(resp.logId);
+
+        outputText = (resp.text ?? "").trim();
+        if (!outputText) {
+          lastError = "模型返回空内容";
+          if (resp.logId) {
+            await voidGatewayLogForPro2ValidationFailure(resp.logId, {
+              error: lastError,
+              attempt,
+              maxAttempts: SCRIPT_STUDIO_STRUCTURED_LLM_MAX_ATTEMPTS,
+              canvasTaskId: taskId,
+            });
+          }
+          if (attempt >= SCRIPT_STUDIO_STRUCTURED_LLM_MAX_ATTEMPTS) {
+            scriptStudioValidation = { ok: false, error: lastError };
+            break;
+          }
+          chatMessages = [
+            ...chatMessages,
+            {
+              role: "user" as const,
+              content:
+                "上一回复为空。请只输出 ```script-studio-batch``` JSON 围栏，禁止说明文字。",
+            },
+          ];
+          continue;
+        }
+
+        scriptStudioValidation = validateScriptStudioBatchLlmOutput(outputText);
+        if (scriptStudioValidation.ok) {
+          outputText = ensureScriptStudioBatchFence(outputText);
+          break;
+        }
+
+        lastError = scriptStudioValidation.error ?? "校验失败";
+        if (resp.logId) {
+          await voidGatewayLogForPro2ValidationFailure(resp.logId, {
+            error: lastError,
+            attempt,
+            maxAttempts: SCRIPT_STUDIO_STRUCTURED_LLM_MAX_ATTEMPTS,
+            canvasTaskId: taskId,
+          });
+        }
+
+        if (attempt >= SCRIPT_STUDIO_STRUCTURED_LLM_MAX_ATTEMPTS) break;
+
+        chatMessages = [
+          ...chatMessages,
+          { role: "assistant" as const, content: outputText },
+          {
+            role: "user" as const,
+            content: buildScriptStudioStructuredRetryUserMessage(
+              lastError,
+              attempt,
+            ),
+          },
+        ];
+      }
+
+      if (scriptStudioValidation && !scriptStudioValidation.ok && outputText) {
+        outputText = ensureScriptStudioBatchFence(outputText);
+      }
+    }
+
+    if (structuredPro2 && pro2Validation && !pro2Validation.ok) {
+      const failed = await prisma.canvasGenerationTask.update({
+        where: { id: taskId },
+        data: {
+          status: "FAILED",
+          failCode: PRO2_GATEWAY_VALIDATION_FAIL_CODE,
+          failMessage:
+            pro2Validation.error?.slice(0, 500) ??
+            `结构化 JSON 校验失败（已尝试 ${pro2AttemptCount} 次）`,
+          completedAt: new Date(),
+          resultPayload: {
+            pro2ScriptValidation: {
+              ok: false,
+              error: pro2Validation.error,
+              attempts: pro2AttemptCount,
+              maxAttempts: PRO2_STRUCTURED_LLM_MAX_ATTEMPTS,
+              gatewayLogIds: pro2GatewayLogIds,
+            },
+          } as Prisma.InputJsonValue,
+        },
+      });
+      return { reused: false, task: failed };
+    }
+
+    if (
+      structuredScriptStudio &&
+      scriptStudioValidation &&
+      !scriptStudioValidation.ok
+    ) {
+      const failed = await prisma.canvasGenerationTask.update({
+        where: { id: taskId },
+        data: {
+          status: "FAILED",
+          failCode: PRO2_GATEWAY_VALIDATION_FAIL_CODE,
+          failMessage:
+            scriptStudioValidation.error?.slice(0, 500) ??
+            `Script Studio JSON 校验失败（已尝试 ${scriptStudioAttemptCount} 次）`,
+          completedAt: new Date(),
+          resultPayload: {
+            scriptStudioValidation: {
+              ok: false,
+              error: scriptStudioValidation.error,
+              attempts: scriptStudioAttemptCount,
+              maxAttempts: SCRIPT_STUDIO_STRUCTURED_LLM_MAX_ATTEMPTS,
+              gatewayLogIds: scriptStudioGatewayLogIds,
+            },
+          } as Prisma.InputJsonValue,
+        },
+      });
+      return { reused: false, task: failed };
+    }
+
+    // 模型返回空内容
     // 否则前端会从「生成中」直接翻到 done 且无正文，表现为「转圈一会就消失但没生成」。
-    if (!(resp.text ?? "").trim()) {
+    if (!outputText) {
       const failed = await prisma.canvasGenerationTask.update({
         where: { id: taskId },
         data: {
@@ -951,24 +1494,48 @@ async function executeStoryLlmEngineTask(
       return { reused: false, task: failed };
     }
     const scriptStudioMirror =
-      data.scriptStudioMode === true
-        ? scriptStudioMirrorPayload(resp.text)
-        : null;
+      structuredScriptStudio && scriptStudioValidation?.ok
+        ? scriptStudioMirrorPayload(outputText, scriptStudioValidation.batch)
+        : data.scriptStudioMode === true
+          ? scriptStudioMirrorPayload(outputText)
+          : null;
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: taskId },
       data: {
         status: "SUCCEEDED",
-        textOutput: resp.text,
+        textOutput: outputText,
         resultPayload: {
           ...(typeof resp.rawPayload === "object" && resp.rawPayload
             ? (resp.rawPayload as Record<string, unknown>)
             : {}),
           ...(scriptStudioMirror ?? {}),
+          ...(structuredPro2
+            ? {
+                pro2ScriptValidation: {
+                  ok: pro2Validation?.ok ?? false,
+                  error: pro2Validation?.error,
+                  attempts: pro2AttemptCount,
+                  maxAttempts: PRO2_STRUCTURED_LLM_MAX_ATTEMPTS,
+                  gatewayLogIds: pro2GatewayLogIds,
+                },
+              }
+            : {}),
+          ...(structuredScriptStudio
+            ? {
+                scriptStudioValidation: {
+                  ok: scriptStudioValidation?.ok ?? false,
+                  error: scriptStudioValidation?.error,
+                  attempts: scriptStudioAttemptCount,
+                  maxAttempts: SCRIPT_STUDIO_STRUCTURED_LLM_MAX_ATTEMPTS,
+                  gatewayLogIds: scriptStudioGatewayLogIds,
+                },
+              }
+            : {}),
         } as Prisma.InputJsonValue,
         inputPayload: {
           kind: engineKind,
           prompt: clipPrompt(userText, STORY_LLM_MAX_PROMPT_LEN),
-          params,
+          params: llmParams,
           providerId,
           modelKey,
           textInputs: node.textInputs ?? [],
@@ -988,12 +1555,23 @@ async function executeStoryLlmEngineTask(
       data: {
         status: "FAILED",
         failCode: code,
-        failMessage: msg.slice(0, 500),
+        failMessage: storyLlmUserFailMessage(msg),
         completedAt: new Date(),
       },
     });
     return { reused: false, task: updated };
   }
+}
+
+function storyLlmUserFailMessage(raw: string): string {
+  const msg = raw.trim();
+  if (isEngineOverloadedMessage(msg)) {
+    return engineOverloadedUserHintZh();
+  }
+  if (/aborted due to timeout|timed out|timeout/i.test(msg)) {
+    return "文本模型生成超时（长剧本/大输出较慢，约需数分钟）。请直接重试；若仍失败可缩短上游剧本或暂时换更快模型。";
+  }
+  return msg.slice(0, 500);
 }
 
 /** Story LLM 引擎 —— 同步 Markdown 文本，不注入海报 system prompt。 */
@@ -1077,7 +1655,7 @@ export async function runStoryLlmEngineNode(
     projectId,
     nodeId,
     storyScope: args.storyScope,
-    skipInflightScopeConflict: args.forceFresh === true,
+    skipInflightScopeConflict: shouldSkipInflightScopeConflictForRun(args),
     initialStatus: "SUBMITTED",
     data: {
       kind: "TEXT",
@@ -1165,11 +1743,25 @@ export async function runVideoEngineNode(
       )
     : imageInputs.slice(1);
   const lastFrameImageUrl = String(data.lastFrameImageUrl ?? "").trim();
-  modelKey = upgradeDashscopeT2vModelWhenRefsPresent(modelKey, [
+
+  /** 分镜视频 · 有静帧时 HappyHorse T2V 须升 I2V（仅静帧）或 R2V（静帧+@资产） */
+  if (isDashscopeHappyhorseTextToVideoModel(modelKey) && mainFrameImageUrl) {
+    const extraRefs = referenceImageUrls.filter((u) => u !== mainFrameImageUrl);
+    if (extraRefs.length === 0) {
+      modelKey = modelKey.replace(/-t2v$/, "-i2v");
+    } else {
+      modelKey = dashscopeSbv1T2vModelToR2v(modelKey) ?? modelKey;
+    }
+  }
+
+  const t2vRefMismatch = resolveDashscopeT2vRefMismatchMessage(modelKey, [
     mainFrameImageUrl,
     ...(lastFrameImageUrl ? [lastFrameImageUrl] : []),
     ...referenceImageUrls,
   ]);
+  if (t2vRefMismatch) {
+    throw new CanvasProjectError("INVALID_INPUT", t2vRefMismatch);
+  }
   const forceReferenceMode = data.forceReferenceMode === true;
   const portraitAssetRefs = normalizePortraitAssetRefs(
     node.portraitAssetRefs ?? data.portraitAssetRefs,
@@ -1190,7 +1782,14 @@ export async function runVideoEngineNode(
   const isKlingT2v =
     modelKey === "kling-3.0/video" &&
     (dockInputModeRaw === "t2v" || !dockInputModeRaw);
-  const isTextToVideoOnly = isDashscopeT2v || isKlingT2v;
+  const isVolcengineT2v =
+    isVolcengineStoryVideoModelKey(modelKey) && dockInputModeRaw === "t2v";
+  const isMinimaxT2v =
+    isMinimaxCanvasVideoModelKey(modelKey) &&
+    (modelKey.toLowerCase().includes("-t2v") ||
+      modelKey.toLowerCase().includes("context-ir"));
+  const isTextToVideoOnly =
+    isDashscopeT2v || isKlingT2v || isVolcengineT2v || isMinimaxT2v;
   const motionVideoUrls = isMotionControl || isVideoOnlyV2v
     ? (Array.isArray(params.reference_video_urls)
         ? (params.reference_video_urls as unknown[])
@@ -1299,6 +1898,7 @@ export async function runVideoEngineNode(
   if (!(STORY_VIDEO_MODEL_IDS as readonly string[]).includes(effectiveModelKey)) {
     if (
       !isVolcengineStoryVideoModelKey(effectiveModelKey) &&
+      !isMinimaxCanvasVideoModelKey(effectiveModelKey) &&
       !isMotionControl &&
       !isVideoOnlyV2v &&
       !isDashscopeT2v
@@ -1313,6 +1913,7 @@ export async function runVideoEngineNode(
   await shouldCanvasUseGateway(userId, providerId, effectiveModelKey);
 
   const isVolcengineVideo = isVolcengineStoryVideoModelKey(effectiveModelKey);
+  const isMinimaxVideo = isMinimaxCanvasVideoModelKey(effectiveModelKey);
 
   const inputHash = computeInputHash({
     modelKey: effectiveModelKey,
@@ -1369,8 +1970,8 @@ export async function runVideoEngineNode(
   let model: string;
   let input: Record<string, unknown>;
   let dashscopeVideoBody: Record<string, unknown> | undefined;
-  let videoProviderKind: "VOLCENGINE" | "KIE" | "TOPAZ" | "DASHSCOPE" =
-    isVolcengineVideo ? "VOLCENGINE" : "KIE";
+  let videoProviderKind: "VOLCENGINE" | "KIE" | "TOPAZ" | "DASHSCOPE" | "MINIMAX" =
+    isVolcengineVideo ? "VOLCENGINE" : isMinimaxVideo ? "MINIMAX" : "KIE";
 
   if (isTopazDirectV2v) {
     model = effectiveModelKey;
@@ -1437,6 +2038,37 @@ export async function runVideoEngineNode(
     });
     model = built.model;
     input = built.body as Record<string, unknown>;
+  } else if (isMinimaxVideo) {
+    const refVideos = Array.isArray(params.reference_video_urls)
+      ? params.reference_video_urls.filter(
+          (u): u is string => typeof u === "string",
+        )
+      : undefined;
+    const refAudios = Array.isArray(params.reference_audio_urls)
+      ? params.reference_audio_urls.filter(
+          (u): u is string => typeof u === "string",
+        )
+      : undefined;
+    const built = buildCanvasVideoMinimaxInput({
+      modelKey: effectiveModelKey,
+      prompt: expandedPrompt,
+      imageUrl: mainFrameImageUrl,
+      lastFrameUrl: lastFrameImageUrl,
+      referenceImageUrls,
+      referenceVideoUrls: refVideos,
+      referenceAudioUrls: refAudios,
+      options: {
+        resolution: String(params.resolution ?? "2K"),
+        duration: Number(params.duration ?? 5),
+        ratio: String(params.ratio ?? params.aspect_ratio ?? "16:9"),
+        aigc_watermark: params.aigc_watermark === true,
+        generateAudio:
+          params.generate_audio !== false && params.generateAudio !== false,
+      },
+    });
+    model = built.modelKey;
+    input = built.input;
+    videoProviderKind = "MINIMAX";
   } else if (isDashscopeT2v) {
     try {
       const aspectRatio = String(
@@ -1446,6 +2078,25 @@ export async function runVideoEngineNode(
         params.resolution ?? data.resolution ?? "720p",
       );
       const durationSec = Number(params.duration ?? data.durationSec ?? 5);
+      const dockMode = String(data.dockInputMode ?? "").trim();
+      const wan30Media = isDashscopeWan30VideoModel(effectiveModelKey)
+        ? dockMode === "first_last" || Boolean(kieLastFrame)
+          ? buildDashscopeWan30Media({
+              firstFrameUrl: kieMainFrame,
+              lastFrameUrl: kieLastFrame,
+              referenceImageUrls: kieReferenceImageUrls,
+            })
+          : dockMode === "i2v"
+            ? buildDashscopeWan30Media({
+                firstFrameUrl: kieMainFrame,
+              })
+            : buildDashscopeWan30Media({
+                firstFrameUrl: "",
+                referenceImageUrls: [kieMainFrame, ...kieReferenceImageUrls].filter(
+                  Boolean,
+                ),
+              })
+        : undefined;
       dashscopeVideoBody = buildDashscopeSbv1T2vVideoBody({
         prompt: expandedPrompt,
         aspectRatio,
@@ -1454,6 +2105,7 @@ export async function runVideoEngineNode(
         promptExtend: params.prompt_extend !== false,
         modelKey: effectiveModelKey,
         watermark: params.watermark === true,
+        media: wan30Media,
       });
       model = effectiveModelKey;
       input = dashscopeVideoBody;
@@ -1482,6 +2134,55 @@ export async function runVideoEngineNode(
         watermark: params.watermark === true,
       });
       model = effectiveModelKey;
+      input = dashscopeVideoBody;
+      videoProviderKind = "DASHSCOPE";
+    } catch (e) {
+      throw new CanvasProjectError(
+        "INVALID_INPUT",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+  } else if (isDashscopeKlingV3VideoGatewayModel(effectiveModelKey)) {
+    try {
+      const aspectRaw = String(
+        params.ratio ?? params.aspect_ratio ?? data.aspectRatio ?? "16:9",
+      );
+      const aspectRatio =
+        aspectRaw === "9:16"
+          ? "9:16"
+          : aspectRaw === "1:1"
+            ? "1:1"
+            : "16:9";
+      const durationSec = Number(params.duration ?? data.durationSec ?? 5);
+      const modeRaw = String(params.mode ?? "pro");
+      const mode =
+        modeRaw === "std" || modeRaw === "pro" || modeRaw === "4k"
+          ? modeRaw
+          : "pro";
+      const multiShot = params.multi_shots === true;
+      const audio =
+        params.sound !== false &&
+        params.generate_audio !== false &&
+        params.generateAudio !== false;
+      const upstreamModel = resolveDashscopeKlingV3UpstreamModel({
+        firstFrameUrl: isKlingT2v ? null : kieMainFrame,
+        lastFrameUrl: kieLastFrame,
+        referImageUrls: kieReferenceImageUrls,
+        multiShot,
+      });
+      dashscopeVideoBody = buildDashscopeKlingV3VideoBody({
+        prompt: expandedPrompt,
+        firstFrameUrl: isKlingT2v ? null : kieMainFrame,
+        lastFrameUrl: kieLastFrame,
+        referImageUrls: kieReferenceImageUrls,
+        aspectRatio,
+        durationSec,
+        mode,
+        audio,
+        watermark: params.watermark === true,
+        multiShot,
+      });
+      model = upstreamModel;
       input = dashscopeVideoBody;
       videoProviderKind = "DASHSCOPE";
     } catch (e) {
@@ -1552,7 +2253,7 @@ export async function runVideoEngineNode(
     nodeId,
     storyScope: args.storyScope,
     actorUserId: userId,
-    skipInflightScopeConflict: args.forceFresh === true,
+    skipInflightScopeConflict: shouldSkipInflightScopeConflictForRun(args),
     initialStatus: isTrafficControlEnabled() ? "QUEUED" : "PENDING",
     data: {
       kind: "IMAGE",
@@ -1572,6 +2273,8 @@ export async function runVideoEngineNode(
         providerKind: videoProviderKind,
         ...(videoProviderKind === "VOLCENGINE"
           ? { volcengineModel: model, volcengineBody: input }
+          : videoProviderKind === "MINIMAX"
+            ? { minimaxModel: model, minimaxInput: input }
           : videoProviderKind === "TOPAZ"
             ? { topazModel: model, topazInput: input }
             : videoProviderKind === "DASHSCOPE"
@@ -1612,6 +2315,8 @@ export async function runVideoEngineNode(
     providerKind: videoProviderKind,
     ...(videoProviderKind === "VOLCENGINE"
       ? { volcengineModel: model, volcengineBody: input }
+      : videoProviderKind === "MINIMAX"
+        ? { minimaxModel: model, minimaxInput: input }
       : videoProviderKind === "TOPAZ"
         ? { topazModel: model, topazInput: input }
         : videoProviderKind === "DASHSCOPE"
@@ -1676,6 +2381,14 @@ export async function runVideoEngineNode(
               ? (data.sbv1Billing as Record<string, unknown>)
               : undefined,
         })
+      : videoProviderKind === "MINIMAX"
+        ? await canvasGwCreateMinimaxVideoJob(userId, {
+            model,
+            input: input as Record<string, unknown>,
+            clientPage: gwClientPage,
+            projectId,
+            canvasTaskId: claimedTask.id,
+          })
       : videoProviderKind === "DASHSCOPE"
         ? await canvasGwCreateDashscopeVideoJob(userId, {
             model,
@@ -1685,6 +2398,7 @@ export async function runVideoEngineNode(
             canvasTaskId: claimedTask.id,
           })
       : await canvasGwCreateKieJob(userId, {
+          gatewayModelKey: effectiveModelKey,
           model,
           input: input as Record<string, unknown>,
           callBackUrl,
@@ -1791,7 +2505,7 @@ export async function runKieAudioEngineNode(
     projectId,
     nodeId,
     storyScope: args.storyScope,
-    skipInflightScopeConflict: args.forceFresh === true,
+    skipInflightScopeConflict: shouldSkipInflightScopeConflictForRun(args),
     initialStatus: "PENDING",
     data: {
       kind: "IMAGE",
@@ -1816,6 +2530,7 @@ export async function runKieAudioEngineNode(
 
   try {
     const job = await canvasGwCreateKieJob(userId, {
+      gatewayModelKey: modelKey,
       model: modelKey,
       input: kieInput,
       callBackUrl,
@@ -1930,6 +2645,7 @@ export async function runTtsEngineNode(
     typeof params.language_type === "string"
       ? params.language_type
       : undefined;
+  const extras = resolveCanvasGatewayTtsExtras(params);
 
   try {
     const ttsOut = await canvasGwTts(userId, {
@@ -1937,25 +2653,28 @@ export async function runTtsEngineNode(
       text,
       voice,
       languageType,
+      extras: Object.keys(extras).length ? extras : undefined,
       clientPage: gwClientPage,
       projectId,
     });
-    const ossUrl = await persistCanvasBufferToOss({
+    const ephemeralUrl = `data:${ttsOut.contentType};base64,${ttsOut.buffer.toString("base64")}`;
+    const updated = await prisma.canvasGenerationTask.update({
+      where: { id: created.id },
+      data: {
+        status: "SUCCEEDED",
+        ephemeralUrl,
+        textOutput: text.slice(0, 500),
+        completedAt: new Date(),
+      },
+    });
+    scheduleCanvasBufferOssBackfill({
+      taskId: created.id,
       buf: ttsOut.buffer,
       contentType: ttsOut.contentType,
       kind: "node-audio",
       projectId,
       userId,
       ext: ttsOut.ext,
-    });
-    const updated = await prisma.canvasGenerationTask.update({
-      where: { id: created.id },
-      data: {
-        status: "SUCCEEDED",
-        ossUrl,
-        textOutput: text.slice(0, 500),
-        completedAt: new Date(),
-      },
     });
     return { reused: false, task: updated };
   } catch (e) {
@@ -2278,6 +2997,7 @@ export async function runRefVideoEngineNode(
     }
 
     const job = await canvasGwCreateKieJob(userId, {
+      gatewayModelKey: modelKey,
       model,
       input: input as Record<string, unknown>,
       callBackUrl,

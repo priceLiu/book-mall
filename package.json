@@ -1,16 +1,22 @@
 {
   "name": "private-website",
   "private": true,
-  "description": "Monorepo dev orchestration (book-mall, tool-web, finance-web, story-web, canvas-web, gateway-web, prompt-optimizer-platform, e-commerce-toolkit)",
+  "description": "Monorepo dev orchestration (book-mall, tool-web, finance-web, story-web, canvas-web, gateway-web, prompt-optimizer-platform, e-commerce-toolkit, common-tools)",
   "scripts": {
     "dev:preflight": "node scripts/dev-preflight.mjs",
     "dev:preflight:kill": "node scripts/dev-preflight.mjs --kill",
-    "dev:all": "pnpm dev:preflight && node scripts/dev-all.mjs",
+    "dev:all": "CI=true pnpm install --prefer-offline && node scripts/ensure-platform-assistant.mjs && pnpm dev:preflight && node scripts/dev-all.mjs",
     "dev:all:clean": "pnpm dev:preflight:kill && pnpm dev:all",
+    "ensure:platform-assistant": "node scripts/ensure-platform-assistant.mjs",
     "build:prompt-vendor": "pnpm --dir prompt-optimizer-platform build:vendor",
     "build:prompt-vendor:copy": "node prompt-optimizer-platform/scripts/copy-vendor-dist.mjs --copy-only",
     "dev:all:story": "pnpm dev:all",
-    "dev:all:nopoll": "pnpm dev:preflight && node scripts/dev-all.mjs --no-poll"
+    "dev:all:nopoll": "CI=true pnpm install --prefer-offline && node scripts/ensure-platform-assistant.mjs && pnpm dev:preflight && node scripts/dev-all.mjs --no-poll",
+    "sync:pro2-gu-feng-doc": "node scripts/sync-pro2-gu-feng-category-doc.mjs",
+    "sync:docker-shared": "node scripts/sync-docker-shared.mjs",
+    "sync:docker-shared:check": "node scripts/sync-docker-shared.mjs --check",
+    "build:publisher-artifacts": "node scripts/build-publisher-download-artifacts.mjs",
+    "arch:diagram": "node scripts/render-architecture-diagram.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

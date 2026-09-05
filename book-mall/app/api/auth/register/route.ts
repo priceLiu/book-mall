@@ -15,6 +15,8 @@ import { getInviteByToken } from "@/lib/tenant/tenant-invite-service";
 import { resolveReferrerByCode } from "@/lib/referral/referral-service";
 import { grantWelcomeGift } from "@/lib/billing/welcome-gift";
 import { issueAutoLoginToken } from "@/lib/auth/auto-login-token";
+import { lockReferralAttribution } from "@/lib/share/share-reward-service";
+import { tryApiDbUnavailableResponse } from "@/lib/http/api-db-error";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +26,7 @@ const registerSchema = z.object({
   // 分享链接免密注册时可省略密码（后续可用短信 OTP 登录或在设置中补设密码）。
   password: z.string().min(8, "密码至少 8 位").optional(),
   name: z.string().max(64).optional(),
-  billingPersona: z.enum(["PLATFORM_CREDIT", "BYOK"]).optional(),
+  billingPersona: z.enum(["PLATFORM_CREDIT"]).optional(),
   inviteToken: z.string().min(1).optional(),
   /// 分享码（来自 /r/{code} 链接），用于注册归因
   referralCode: z.string().min(1).max(32).optional(),
@@ -48,6 +50,15 @@ export async function POST(request: Request) {
     const phone = normalizePhone(parsed.data.phone);
     if (!phone) {
       return NextResponse.json({ error: "手机号格式无效" }, { status: 400 });
+    }
+
+    // 先检查是否已注册，避免浪费短信验证码
+    const existingUser = await prisma.user.findUnique({ where: { phone } });
+    if (existingUser?.phoneVerifiedAt) {
+      return NextResponse.json({
+        error: "该手机号已注册，请直接登录",
+        hint: "如果您忘记了密码，请点击「忘记密码」找回",
+      }, { status: 409 });
     }
 
     const inviteToken = parsed.data.inviteToken?.trim() || undefined;
@@ -77,16 +88,12 @@ export async function POST(request: Request) {
     // 分享链接注册默认平台代付；普通注册保留用户所选 persona。
     const billingPersona = (parsed.data.billingPersona ??
       "PLATFORM_CREDIT") as BillingPersona;
-    const existing = await prisma.user.findUnique({ where: { phone } });
-    if (existing?.phoneVerifiedAt) {
-      return NextResponse.json({ error: "该手机号已注册" }, { status: 409 });
-    }
 
     // 解析分享归因：仅在分享码有效且非自荐时记录 referredByUserId（仅新建用户写入）。
     let referredByUserId: string | null = null;
     if (referralCode) {
       const referrer = await resolveReferrerByCode(referralCode);
-      if (referrer && referrer.referrerUserId !== existing?.id) {
+      if (referrer && referrer.referrerUserId !== existingUser?.id) {
         referredByUserId = referrer.referrerUserId;
       }
     }
@@ -98,20 +105,20 @@ export async function POST(request: Request) {
     const verifiedAt = new Date();
 
     const createdUserId = await prisma.$transaction(async (tx) => {
-      if (existing) {
+      if (existingUser) {
         const user = await tx.user.update({
-          where: { id: existing.id },
+          where: { id: existingUser.id },
           data: {
             phone,
             phoneVerifiedAt: verifiedAt,
             // 仅在用户设置了密码时更新密码，避免清空历史密码
             ...(passwordHash ? { passwordHash } : {}),
-            name: parsed.data.name?.trim() || existing.name,
+            name: parsed.data.name?.trim() || existingUser.name,
             billingPersona,
             billingPersonaLockedAt: lockedAt,
             ecomBillingMode: deriveEcomBillingMode(billingPersona),
             // 仅在尚未归因时写入分享上线
-            ...(referredByUserId && !existing.referredByUserId
+            ...(referredByUserId && !existingUser.referredByUserId
               ? { referredByUserId }
               : {}),
           },
@@ -148,6 +155,18 @@ export async function POST(request: Request) {
       console.warn("[register] grantWelcomeGift failed", giftErr);
     }
 
+    if (referredByUserId) {
+      try {
+        await lockReferralAttribution({
+          inviteeUserId: createdUserId,
+          referrerUserId: referredByUserId,
+          referralCode,
+        });
+      } catch (refErr) {
+        console.warn("[register] lockReferralAttribution failed", refErr);
+      }
+    }
+
     // 免密注册场景：返回一次性自动登录票据，客户端据此建立会话（无需二次短信）。
     const autoLoginToken = issueAutoLoginToken(createdUserId);
 
@@ -162,6 +181,8 @@ export async function POST(request: Request) {
     if (e instanceof SmsVerificationError) {
       return NextResponse.json({ error: e.message }, { status: 400 });
     }
+    const dbResp = tryApiDbUnavailableResponse(e);
+    if (dbResp) return dbResp;
     console.error("[register]", e);
 
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {

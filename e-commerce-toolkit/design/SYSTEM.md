@@ -153,16 +153,18 @@ CSS 变量定义：`app/globals.css`。语义表：`COLORS.md`、token 全集：
 
 ## 8. 图片与媒体
 
-详见 `MEDIA.md`、`VIDEO.md`。
+详见 **`MEDIA.md`**（图片）、**`VIDEO.md`**（视频）。**展示、弹出层、上传、从资产库选取须用文档 §0 组件映射，禁止各模块自写。**
 
 | 场景 | 规范 |
 |------|------|
-| 列表缩略 | `relative overflow-hidden rounded-lg border border-[#e8e8ed] bg-[#f5f5f7]` + `Image fill object-cover` |
-| 结果预览 | `object-contain`；完整分镜图可 live thumb |
-| 点击放大 | `EcomImagePreviewDialog`（灰底 `bg-[#f5f5f7]`、`max-h-[80vh]`） |
-| 视频 | `EcomVideoPlayer` / `EcomVideoThumb` + `EcomVideoPreviewDialog` |
-| 上传区 | 分类边框块 + `Plus` 上传 + hover 粘贴高亮 `border-[#0071e3] bg-[#0071e3]/5` |
-| 产品阴影 | 仅产品摄影可用 `.ecom-product-shadow` |
+| 列表 / 网格缩略 | `EcomMediaLibraryTile` + `ECOM_LIBRARY_MEDIA_GRID_CLASS` |
+| 单张图片放大 | `EcomImagePreviewDialog` / `useEcomImagePreview`（全屏暗底 + 缩放平移 + 可选右侧缩略条） |
+| 同页多图切换 | `@/components/media` · `items` + `EcomImagePreviewHost` · `MEDIA.md` |
+| 视频缩略 / 预览 | `EcomMediaLibraryTile kind="video"` → `EcomVideoPreviewDialog` |
+| 参考图上传 | **`EcomRefUploadCard`**（我的资产 + 上传 + 拖放粘贴） |
+| 从资产库选取 | **`EcomAssetPickerDialog`** |
+| 上传区缩略 | `EcomRefImageThumb` 56px |
+| 产品阴影 | 仅产品摄影 `.ecom-product-shadow` |
 
 ---
 
@@ -218,15 +220,19 @@ Dialog 内表单：与上表一致，底栏 `DialogFooter` 右对齐取消 + 主
 |---------|-------------|
 | 主操作 | `EcomButtonPrimary` · `BUTTON.md` |
 | 次操作 | `EcomButtonSecondary` · `BUTTON.md` |
-| 确认/提示 | `useDialogs()` · `DIALOG.md` |
+| 确认/提示 | `useDialogs()` · `DIALOG.md`（成功/完成 → **toast**；错误 → alert） |
 | 助手聊天 | `StoryboardAssistantPanel` 模式 · `CHAT.md` |
 | 助手快捷 | `StoryboardAssistantChoices` / `STORYBOARD_ASSISTANT_CHOICE_CLASS` |
 | 工作台布局 | `EcomWorkspaceLayout` · `LAYOUT.md` |
 | 数据表 | `TABLE.md` 模式 A |
-| 图片预览 | `EcomImagePreviewDialog` · `MEDIA.md` |
-| 视频 | `EcomVideoPlayer` · `VIDEO.md` |
-| 参考上传 | `StoryboardRefUploader` · `MEDIA.md` |
+| 图片网格 / 缩略 | `EcomMediaLibraryTile` · `MEDIA.md` §0 |
+| 单张 / 多图预览 | `EcomImagePreviewDialog` · `useEcomImagePreview` · `MEDIA.md` |
+| 成图槽位画廊（兼容） | `ProductDesignGalleryPreviewDialog`（内部委托统一预览） |
+| 视频列表 / 预览 | `EcomMediaLibraryTile` + `EcomVideoPreviewDialog` · `VIDEO.md` |
+| 参考上传 | `EcomRefUploadCard` → 模块薄封装 · `MEDIA.md` |
+| 从资产库选取 | `EcomAssetPickerDialog` · `MEDIA.md` |
 | 任务状态 | `StoryboardTaskStatus` |
+| 后台长任务 Dock | `BackgroundGenerationProvider` + `BackgroundGenerationDock` · [全站规范](../../docs/generation-background-dock.md) |
 | 导出分镜版式 | `StoryboardProSheetView`（印刷风格，内联样式例外） |
 
 ---
@@ -239,11 +245,12 @@ Dialog 内表单：与上表一致，底栏 `DialogFooter` 右对齐取消 + 主
 | [DESIGN.md](./DESIGN.md) | Apple token 全集 |
 | [BUTTON.md](./BUTTON.md) | 胶囊主/次按钮 |
 | [DIALOG.md](./DIALOG.md) | 弹出层 |
-| [VIDEO.md](./VIDEO.md) | 视频播放 |
 | [LAYOUT.md](./LAYOUT.md) | 壳层与双栏 |
 | [CHAT.md](./CHAT.md) | 创作助手聊天 |
 | [TABLE.md](./TABLE.md) | 表格与字段行 |
-| [MEDIA.md](./MEDIA.md) | 图片上传与预览 |
+| [MEDIA.md](./MEDIA.md) | 图片展示、上传、预览、资产选取 |
+| [VIDEO.md](./VIDEO.md) | 视频展示与预览 |
+| [../../docs/generation-background-dock.md](../../docs/generation-background-dock.md) | 后台生成 Dock（全站） |
 
 ---
 
@@ -253,7 +260,7 @@ Dialog 内表单：与上表一致，底栏 `DialogFooter` 右对齐取消 + 主
 
 - `EcomToolbarButton` — §5.3 工具条按钮
 - `EcomChoiceChip` — §5.4（与助手 choices 合并）
-- `EcomDataTable` — §7 模式 A
+- `EcomDataTable` — §7 模式 A（`components/ui/ecom-data-table.tsx`）
 - `EcomStepSection` — 右侧步骤区块外壳
 
 在新代码中 **先复制 class 字符串**，抽取组件时以本文档为准迁移。

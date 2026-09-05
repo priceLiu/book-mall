@@ -89,6 +89,10 @@ export async function normalizeCanvasUploadImageBuffer(
   };
 
   if (meta.format === "jpeg") {
+    const orientation = meta.orientation ?? 1;
+    if (!needResize && orientation === 1) {
+      return { buf, contentType: "image/jpeg", ext: "jpg" };
+    }
     const out = await buildResized().jpeg({ quality: 92, mozjpeg: true }).toBuffer();
     return { buf: Buffer.from(out), contentType: "image/jpeg", ext: "jpg" };
   }

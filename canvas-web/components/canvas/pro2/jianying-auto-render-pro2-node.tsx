@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState, type MouseEvent } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
-import { Clapperboard, Maximize2, Play, RefreshCw } from "lucide-react";
+import { Clapperboard, Maximize2, Play } from "lucide-react";
 
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import {
@@ -23,13 +23,14 @@ import {
   SBV1_NODE_OUTER_CLASS,
 } from "@/lib/canvas/sbv1-node-chrome";
 import { isMediaRenderJobInflight } from "@/lib/canvas/media-render-in-flight";
+import { isMediaRenderSessionLocalUrl } from "@/lib/canvas/media-render-session-url";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { JianyingAutoRenderNodeData } from "@/lib/canvas/types";
 import { RF_NO_DRAG } from "@/lib/canvas/react-flow-classes";
-import { CANVAS_SEMANTIC_STATUS_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import { cn } from "@/lib/utils";
 import { LazyViewportImage, LazyViewportVideo } from "../lazy-viewport-media";
 import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
+import { useMediaRenderCancel } from "@/lib/canvas/use-media-render-cancel";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 
@@ -39,21 +40,28 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  const nodes = useCanvasStore((s) => s.nodes);
-  const edges = useCanvasStore((s) => s.edges);
-  const addNode = useCanvasStore((s) => s.addNode);
-  const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
-  const setNodes = useCanvasStore((s) => s.setNodes);
-  const setEdges = useCanvasStore((s) => s.setEdges);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
 
-  const videoUrl =
-    d.mediaRenderResult?.downloadUrl?.trim() || d.videoUrl?.trim() || "";
-  const posterUrl =
-    d.mediaRenderResult?.posterUrl?.trim() || d.posterUrl?.trim() || undefined;
-  const hasVideo = Boolean(videoUrl);
   const renderInFlight = isMediaRenderJobInflight(d.mediaRenderInFlight);
+  const sessionVideoUrl = d.videoUrl?.trim() || "";
+  const persistedOssUrl = d.mediaRenderResult?.downloadUrl?.trim() || "";
+  // 会话本地成片优先；否则用最新 OSS（复制工作流后旧 videoUrl 可能仍是源项目 URL）
+  const videoUrl =
+    (sessionVideoUrl && isMediaRenderSessionLocalUrl(sessionVideoUrl)
+      ? sessionVideoUrl
+      : null) ?? (persistedOssUrl || sessionVideoUrl || "");
+  const posterUrl =
+    d.posterUrl?.trim() || d.mediaRenderResult?.posterUrl?.trim() || undefined;
+  const hasVideo = Boolean(videoUrl);
+  /**
+   * 扫光：剪辑进行中且尚未拿到本地成片（progressLabel 非空）。
+   * 本地成片就绪后 Dock 仍可显示「云端同步中」，节点结束扫光并刷新预览。
+   */
+  const ffmpegPhase =
+    renderInFlight &&
+    (Boolean(d.mediaRenderInFlight?.progressLabel?.trim()) || !hasVideo);
   const title = d.label?.trim() || "自动成片";
+  const { requestCancel: requestMediaRenderCancel } = useMediaRenderCancel(id);
   const showSidePlus = Boolean(hovered || selected || connectingFromNodeId);
   const stageVideoFitClass = "object-contain";
 
@@ -63,21 +71,40 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
     posterUrl,
     kind: "video",
     profile: "sbv1-video",
-    disabled: renderInFlight || !hasVideo,
+    disabled: ffmpegPhase || !hasVideo,
   });
-
-  const spawnStore = useMemo(
-    () => ({ nodes, edges, addNode, addNodeInGroup, setNodes, setEdges }),
-    [nodes, edges, addNode, addNodeInGroup, setNodes, setEdges],
-  );
 
   const onLeftPick = useCallback(
     (itemId: string, nodeType?: string) => {
+      const s = useCanvasStore.getState();
+      if (itemId === "audio" || nodeType === "story-pro2-audio") {
+        spawnSbv1NeighborFromNode(id, "left", "story-pro2-audio", {
+          nodes: s.nodes,
+          edges: s.edges,
+          addNode: s.addNode,
+          addNodeInGroup: s.addNodeInGroup,
+          setNodes: s.setNodes,
+          setEdges: s.setEdges,
+        });
+        return;
+      }
       if (itemId !== "video" && nodeType !== "sbv1-video-engine") return;
-      spawnSbv1NeighborFromNode(id, "left", "sbv1-video-engine", spawnStore);
+      spawnSbv1NeighborFromNode(id, "left", "sbv1-video-engine", {
+        nodes: s.nodes,
+        edges: s.edges,
+        addNode: s.addNode,
+        addNodeInGroup: s.addNodeInGroup,
+        setNodes: s.setNodes,
+        setEdges: s.setEdges,
+      });
     },
-    [id, spawnStore],
+    [id],
   );
+
+  const openPreview = useCallback((e: MouseEvent) => {
+    e.stopPropagation();
+    setPreviewOpen(true);
+  }, []);
 
   const borderStyle = libtvNodeBorderStyle({
     selected: !!selected,
@@ -88,7 +115,7 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
   return (
     <>
       <div
-        className={cn(SBV1_NODE_OUTER_CLASS, SBV1_CARD_DRAG_CLASS)}
+        className={SBV1_NODE_OUTER_CLASS}
         data-sbv1-dock-anchor={id}
         onPointerEnter={onPointerEnter}
         onPointerLeave={onPointerLeave}
@@ -105,16 +132,24 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
                 ? "opacity-100"
                 : "pointer-events-none opacity-0",
           )}
+          style={{ top: "38%" }}
           title="各镜视频"
         />
         <Handle
-          id="plus_left"
-          type="source"
+          id="in_audio"
+          type="target"
           position={Position.Left}
-          className={cn(SBV1_NODE_HANDLE_CLASS, "pointer-events-none opacity-0")}
-          title="接入视频"
+          className={cn(
+            SBV1_NODE_HANDLE_CLASS,
+            showSidePlus
+              ? "pointer-events-none opacity-0"
+              : selected
+                ? "opacity-100"
+                : "pointer-events-none opacity-0",
+          )}
+          style={{ top: "62%" }}
+          title="各镜配音"
         />
-
         <Pro2NodeSidePlus
           side="left"
           handleId="plus_left"
@@ -138,24 +173,14 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
             <p className="min-w-0 flex-1 truncate text-xs font-medium text-white">
               {title}
             </p>
-            {renderInFlight ? (
-              <>
-                <RefreshCw
-                  className={cn("size-3.5 shrink-0 animate-spin", CANVAS_SEMANTIC_STATUS_CLASS)}
-                />
-                <span className="shrink-0 rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] tabular-nums text-emerald-200">
-                  剪辑中 {d.mediaRenderInFlight?.progress ?? 0}%
-                </span>
-              </>
-            ) : null}
             {hasVideo ? (
               <button
                 type="button"
                 className={cn(
                   RF_NO_DRAG,
-                  "flex size-7 shrink-0 items-center justify-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white/80",
+                  "flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white/80",
                 )}
-                onClick={() => setPreviewOpen(true)}
+                onClick={openPreview}
                 title="全屏预览"
               >
                 <Maximize2 className="size-3.5" />
@@ -167,33 +192,11 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
             className={cn(SBV1_MEDIA_STAGE_CLASS, "group/stage relative")}
             style={{ backgroundColor: LIBTV_INPUT_DOCK_BG }}
           >
-            {renderInFlight ? (
+            {ffmpegPhase ? (
               <LibtvMediaGeneratingState
                 variant="cyan"
-                label={d.mediaRenderInFlight?.progressLabel?.trim() || undefined}
-              >
-                {hasVideo ? (
-                  posterUrl ? (
-                    <LazyViewportImage
-                      src={posterUrl}
-                      alt=""
-                      eager
-                      className="absolute inset-0"
-                      imgClassName={cn("pointer-events-none opacity-60", stageVideoFitClass)}
-                      rootMargin="280px"
-                    />
-                  ) : (
-                    <LazyViewportVideo
-                      src={videoUrl}
-                      poster={posterUrl}
-                      eager
-                      className="absolute inset-0"
-                      videoClassName={cn("pointer-events-none opacity-60", stageVideoFitClass)}
-                      rootMargin="280px"
-                    />
-                  )
-                ) : null}
-              </LibtvMediaGeneratingState>
+                onCancel={() => void requestMediaRenderCancel()}
+              />
             ) : hasVideo ? (
               <div className="group/video absolute inset-0">
                 {posterUrl ? (
@@ -221,11 +224,11 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
                     type="button"
                     aria-label="播放成片"
                     title="播放成片"
-                    className="nodrag pointer-events-auto flex size-20 items-center justify-center rounded-full border border-white/25 bg-black/60 shadow-lg transition-transform group-hover/video:scale-105"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPreviewOpen(true);
-                    }}
+                    className={cn(
+                      RF_NO_DRAG,
+                      "pointer-events-auto flex size-20 cursor-pointer items-center justify-center rounded-full border border-white/25 bg-black/60 shadow-lg transition-transform group-hover/video:scale-105",
+                    )}
+                    onClick={openPreview}
                   >
                     <Play className="ml-1 size-10 fill-white text-white" />
                   </button>
@@ -233,7 +236,7 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
               </div>
             ) : (
               <div className="flex h-full min-h-[400px] items-center justify-center px-4 text-center text-[12px] text-white/40">
-                接入视频后，选中节点并在下方 Dock 点击「自动剪辑成片」
+                接入视频与音频后，选中节点并在下方 Dock 点击「自动剪辑成片」
               </div>
             )}
           </div>

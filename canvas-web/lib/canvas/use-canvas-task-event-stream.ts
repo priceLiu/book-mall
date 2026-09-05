@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 
 import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
 import {
+  emitCanvasTasksChanged,
   notifyCanvasTaskPanelSync,
   type CanvasTaskPanelSyncDetail,
 } from "@/lib/canvas/canvas-panel-sync-events";
@@ -99,6 +100,7 @@ export function useCanvasTaskEventStream(
             terminal: (data.inflightCount ?? 0) === 0,
           };
           notifyCanvasTaskPanelSync(detail);
+          emitCanvasTasksChanged(projectId);
         }
       } catch {
         nextDelayMs = ERROR_BACKOFF_MS;

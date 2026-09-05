@@ -21,6 +21,7 @@ import {
   isKieCodexChatModel,
   kieCodexResponseToChatCompletions,
 } from "@/lib/gateway/kie-codex-chat";
+import { prepareKieChatMessages } from "@/lib/gateway/kie-chat-media";
 import { buildKieGrokTextToImageCreateArgs } from "@/lib/canvas/kie-grok-builders";
 import { KIE_AUDIO_GATEWAY_MODELS } from "@/lib/gateway/kie-audio-models";
 
@@ -277,7 +278,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "gemini-3-flash",
-    displayName: "Gemini 3 Flash (KIE · 多模态)",
+    displayName: "Gemini 3 Flash (KIE)",
     role: "LLM",
     description:
       "多模态视觉理解 + 文本生成。上游连接产品图 / 风格图 / 参数即可直接出设计方案。",
@@ -347,7 +348,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "flux-2-pro",
-    displayName: "Flux-2 Pro (KIE · 文生图)",
+    displayName: "Flux-2 Pro (KIE)",
     role: "IMAGE",
     description: "Black Forest Labs Flux-2 Pro · 高质量写实；有参考图时走图生图。",
     paramsSchema: [
@@ -367,7 +368,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "seedream-5-lite",
-    displayName: "Seedream 5.0 Lite (KIE · 文生图)",
+    displayName: "Seedream 5.0 Lite (KIE)",
     role: "IMAGE",
     description: "字节 Seedream 5 Lite · 写实文生图；有参考图时自动走图生图。",
     paramsSchema: SEEDREAM_ASPECT_SCHEMA,
@@ -375,7 +376,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "seedream-4.5",
-    displayName: "Seedream 4.5 (KIE · 文生图)",
+    displayName: "Seedream 4.5 (KIE)",
     role: "IMAGE",
     description: "Seedream 4.5 · 高质量写实；有参考图时走 Edit。",
     paramsSchema: SEEDREAM_ASPECT_SCHEMA,
@@ -428,7 +429,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "gpt-image-2",
-    displayName: "GPT Image 2 (KIE · 文生图)",
+    displayName: "GPT Image 2 (KIE)",
     role: "IMAGE",
     description: "OpenAI GPT Image 2 · 海报 / 排版；有参考图时走图生图。",
     paramsSchema: [
@@ -450,7 +451,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "gpt-image-1",
-    displayName: "GPT Image 1.5 (KIE · 文生图)",
+    displayName: "GPT Image 1.5 (KIE)",
     role: "IMAGE",
     description: "GPT Image 1.5 · 排版 / 平面海报；有参考图时走图生图。",
     paramsSchema: [
@@ -470,7 +471,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "qwen-text-to-image",
-    displayName: "Qwen (KIE · 文生图)",
+    displayName: "Qwen (KIE)",
     role: "IMAGE",
     description: "通义 Qwen 写实文生图；有参考图时走图生图。",
     paramsSchema: [
@@ -863,7 +864,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "bytedance/seedance-2",
-    displayName: "Seedance 2 (KIE · 图生视频)",
+    displayName: "Seedance 2 (KIE)",
     role: "VIDEO",
     description: "字节豆包 · 分镜图驱动视频。",
     paramsSchema: [
@@ -916,7 +917,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "bytedance/seedance-2-mini",
-    displayName: "Seedance 2.0 Mini (KIE · 图/视频生视频)",
+    displayName: "Seedance 2.0 Mini (KIE)",
     role: "VIDEO",
     description: "字节 Seedance 2 Mini · 轻量图/视频参考生视频。",
     paramsSchema: [
@@ -1167,6 +1168,68 @@ function normalizeKieAudioParamsSchema(
   });
 }
 
+function isKieGptImageModelKey(modelKey: string): boolean {
+  const k = modelKey.trim().toLowerCase();
+  return k === "4o-image" || k.startsWith("gpt-image");
+}
+
+function isKieNanoBananaModelKey(modelKey: string): boolean {
+  return modelKey.trim().toLowerCase().includes("nano-banana");
+}
+
+/**
+ * KIE GPT Image 暂不支持 4:5 / 5:4（createTask 422）。
+ * 竖版就近 3:4，横版就近 4:3。
+ */
+export function resolveKieGptImageAspectRatio(raw: string | undefined): string {
+  const r = String(raw ?? "1:1").trim() || "1:1";
+  if (r === "4:5") return "3:4";
+  if (r === "5:4") return "4:3";
+  return r;
+}
+
+/** Nano Banana Pro 等仅支持 1:1 / 16:9 / 9:16（createTask 500）。 */
+export function resolveKieNanoBananaAspectRatio(
+  raw: string | undefined,
+): "1:1" | "16:9" | "9:16" {
+  const r = String(raw ?? "1:1").trim() || "1:1";
+  if (r === "1:1" || r === "16:9" || r === "9:16") {
+    return r as "1:1" | "16:9" | "9:16";
+  }
+  if (
+    r === "3:4" ||
+    r === "2:3" ||
+    r === "4:5" ||
+    r === "9:21" ||
+    r === "1:2"
+  ) {
+    return "9:16";
+  }
+  if (
+    r === "4:3" ||
+    r === "3:2" ||
+    r === "5:4" ||
+    r === "21:9" ||
+    r === "2:1"
+  ) {
+    return "16:9";
+  }
+  return "1:1";
+}
+
+function resolveKieImageAspectForModel(
+  modelKey: string,
+  aspectRaw: string,
+): string {
+  if (isKieGptImageModelKey(modelKey)) {
+    return resolveKieGptImageAspectRatio(aspectRaw);
+  }
+  if (isKieNanoBananaModelKey(modelKey)) {
+    return resolveKieNanoBananaAspectRatio(aspectRaw);
+  }
+  return aspectRaw;
+}
+
 /** 画布 modelKey → KIE createTask 的 model + input（含 gpt-image-1 映射） */
 export function buildKieImageCreateArgs(args: {
   modelKey: string;
@@ -1175,7 +1238,11 @@ export function buildKieImageCreateArgs(args: {
   params?: Record<string, unknown>;
 }): { model: string; input: Record<string, unknown> } {
   const params = args.params ?? {};
-  const aspect = (params.aspect_ratio as KieAspectRatio | undefined) ?? "1:1";
+  const aspectRaw = String(params.aspect_ratio ?? "1:1").trim() || "1:1";
+  const aspect = resolveKieImageAspectForModel(
+    args.modelKey,
+    aspectRaw,
+  ) as KieAspectRatio;
   const imageUrls = (args.imageUrls ?? []).filter(
     (u): u is string => typeof u === "string" && /^https?:\/\//.test(u),
   );
@@ -1410,11 +1477,14 @@ export class KieGateway implements CanvasProviderGateway {
   }
 
   async chat(req: CanvasGatewayChatRequest): Promise<CanvasGatewayChatResponse> {
+    // KIE 侧拉取国内 OSS 常失败（Failed to get the file information）；图片内联为 data URL
+    const messages = await prepareKieChatMessages(req.messages);
+
     if (isKieCodexChatModel(req.modelKey)) {
       const url = `${this.baseUrl}/codex/v1/responses`;
       const body = buildKieCodexResponsesBody({
         model: req.modelKey,
-        messages: req.messages,
+        messages,
         reasoning_effort: req.params?.reasoning_effort,
         temperature: req.params?.temperature,
       });
@@ -1477,7 +1547,7 @@ export class KieGateway implements CanvasProviderGateway {
       usage?: CanvasGatewayChatResponse["usage"];
     }> => {
       const body: Record<string, unknown> = {
-        messages: req.messages,
+        messages,
         stream: false,
         include_thoughts: includeThoughts,
       };

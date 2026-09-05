@@ -1,5 +1,9 @@
 import type { GatewayProviderKind } from "@prisma/client";
 
+import {
+  syncQuickReplicaAudioToAiSpace,
+  type AiSpaceAudioSourceType,
+} from "@/lib/ai-space/ai-space-audio-service";
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
 import {
   GatewayRequiredError,
@@ -82,18 +86,50 @@ async function requireMinimaxAuth(userId: string) {
   return { auth, credentialId };
 }
 
+/**
+ * 音频产物统一出口：上传 OSS 后同步登记到平台音频库（我的 AI 空间 · Book 真源）。
+ * 所有 QR 音频类型（TTS / 克隆 / 变声 / 音效 / 音乐）都汇入此处，一处插桩全覆盖。
+ */
 async function uploadAudioOutput(args: {
   userId: string;
   buffer: Buffer;
   ext: string;
+  aiSpace: {
+    sourceType: AiSpaceAudioSourceType;
+    name: string;
+    textScript?: string | null;
+    originRef?: string | null;
+    meta?: Record<string, unknown> | null;
+  };
 }): Promise<string> {
-  return uploadCanvasUserBuffer({
+  const audioUrl = await uploadCanvasUserBuffer({
     userId: args.userId,
     buf: args.buffer,
     contentType: args.ext === "wav" ? "audio/wav" : "audio/mpeg",
     ext: args.ext,
     preferBucketUrl: true,
   });
+
+  await syncQuickReplicaAudioToAiSpace({
+    userId: args.userId,
+    audioUrl,
+    buffer: args.buffer,
+    ext: args.ext,
+    sourceType: args.aiSpace.sourceType,
+    name: args.aiSpace.name,
+    textScript: args.aiSpace.textScript ?? null,
+    originRef: args.aiSpace.originRef ?? null,
+    meta: args.aiSpace.meta ?? null,
+  });
+
+  return audioUrl;
+}
+
+/** 音频库条目名：优先台词/提示词摘要 */
+function audioAssetName(fallback: string, text?: string | null): string {
+  const t = text?.trim();
+  if (!t) return fallback;
+  return t.length > 40 ? `${t.slice(0, 40)}…` : t;
 }
 
 export async function qrCreateMinimaxTtsJob(
@@ -155,6 +191,12 @@ export async function qrCreateMinimaxTtsJob(
     userId,
     buffer: result.buffer,
     ext: result.ext,
+    aiSpace: {
+      sourceType: "tts",
+      name: audioAssetName("文本转语音", draft.prompt),
+      textScript: draft.prompt,
+      originRef: log.id,
+    },
   });
 
   await finalizeRequestLog(log.id, {
@@ -223,6 +265,11 @@ export async function qrCreateMinimaxVoiceConvertJob(
     userId,
     buffer: result.buffer,
     ext: result.ext,
+    aiSpace: {
+      sourceType: "voice_changer",
+      name: "变声音频",
+      originRef: log.id,
+    },
   });
 
   await finalizeRequestLog(log.id, {
@@ -311,6 +358,11 @@ export async function qrCreateElevenLabsStsJob(
     userId,
     buffer: result.buffer,
     ext: result.ext,
+    aiSpace: {
+      sourceType: "voice_changer",
+      name: "变声音频",
+      originRef: log.id,
+    },
   });
 
   await finalizeRequestLog(log.id, {
@@ -374,6 +426,12 @@ export async function qrCreateElevenLabsSfxJob(
     userId,
     buffer: result.buffer,
     ext: result.ext,
+    aiSpace: {
+      sourceType: "sound_effect",
+      name: audioAssetName("音效", draft.prompt),
+      textScript: draft.prompt,
+      originRef: log.id,
+    },
   });
 
   await finalizeRequestLog(log.id, {
@@ -460,6 +518,12 @@ export async function qrCreateElevenLabsMusicJob(
     userId,
     buffer: result.buffer,
     ext: result.ext,
+    aiSpace: {
+      sourceType: "music",
+      name: audioAssetName("音乐", draft.prompt),
+      textScript: draft.prompt,
+      originRef: log.id,
+    },
   });
 
   await finalizeRequestLog(log.id, {
@@ -603,6 +667,13 @@ export async function qrCreateMinimaxVoiceCloneJob(
         userId,
         buffer: t2a.buffer,
         ext: t2a.ext,
+        aiSpace: {
+          sourceType: "voice_clone",
+          name: audioAssetName("声音克隆", draft.prompt),
+          textScript: draft.prompt,
+          originRef: log.id,
+          meta: { voiceId: cloneVoiceId },
+        },
       });
     }
   } else {
@@ -611,6 +682,13 @@ export async function qrCreateMinimaxVoiceCloneJob(
       userId,
       buffer: demoBuf,
       ext: "mp3",
+      aiSpace: {
+        sourceType: "voice_clone",
+        name: audioAssetName("声音克隆", draft.prompt),
+        textScript: draft.prompt,
+        originRef: log.id,
+        meta: { voiceId: cloneVoiceId },
+      },
     });
   }
 

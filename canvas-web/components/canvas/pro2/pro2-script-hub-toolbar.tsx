@@ -1,14 +1,13 @@
 "use client";
 
 import { useMemo, useState, useCallback } from "react";
-import { Download, LayoutGrid, MapPin, Megaphone, Package, RotateCw, Users, BookmarkPlus, Copy } from "lucide-react";
-import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { Clapperboard, Download, LayoutGrid, MapPin, Megaphone, RotateCw, Users, BookmarkPlus, Copy } from "lucide-react";
+import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { parseStoryboardRows } from "@/lib/canvas/parse-md-tables";
-import { resolveHubStoryboardMd } from "@/lib/canvas/story-hub-runtime";
-import { confirmAndPublishPro2ScriptHub } from "@/lib/canvas/pro2-publish-script-hub";
-import { syncScriptPackageAssetOnPublish } from "@/lib/canvas/sync-script-package-on-publish";
+import { runPro2ScriptPublishFlow } from "@/lib/canvas/pro2-script-publish-flow";
+import { useCrewCollaborationAccess } from "@/lib/canvas/use-crew-collaboration-access";
 import {
   downloadPro2ScriptMarkdown,
   generatePro2CharacterThreeViewFromHub,
@@ -24,8 +23,12 @@ import {
   pro2HubIsGenerating,
   pro2HubIsLinkedOutline,
   resolvePro2HubCharacterMd,
+  resolvePro2HubCharacterPickerRows,
   resolvePro2HubSceneMd,
   resolvePro2HubSceneRows,
+  resolvePro2HubStoryboardPickerRows,
+  enqueuePro2ShotPromptPolish,
+  persistPro2StoryboardTableEditsToHub,
 } from "@/lib/canvas/pro2-script-hub-helpers";
 import {
   resolvePro2ThreeViewBatchImageForHub,
@@ -35,8 +38,6 @@ import {
 } from "@/lib/canvas/pro2-scene-batch-image";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
-import { exportScriptPackageDraft } from "@/lib/canvas/export-script-package";
-import { openSaveProjectAssetDialog } from "@/components/canvas/save-project-asset-dialog";
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import type { StoryRefImage } from "@/lib/canvas/story-ref-image";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
@@ -50,19 +51,20 @@ import {
 import {
   resolvePro2FrameBatchImageForHub,
 } from "@/lib/canvas/pro2-frame-batch-image";
-import { hubHasPro2FrameBoardGroup } from "@/lib/canvas/pro2-resolve-frame-board-group";
 import {
   Pro2CharacterThreeViewPicker,
   type Pro2CharacterThreeViewResult,
 } from "./pro2-character-three-view-picker";
 import {
   Pro2FrameGeneratePicker,
-  type Pro2FrameGenerateResult,
+  type Pro2StoryboardSpawnResult,
 } from "./pro2-frame-generate-picker";
 import {
   Pro2SceneImagePicker,
   type Pro2SceneImageResult,
 } from "./pro2-scene-image-picker";
+import { isPro2ProductionWizardHub } from "@/lib/canvas/pro2-production-wizard";
+import { Pro2ProductionWizardShell } from "./production-wizard/pro2-production-wizard-shell";
 
 /** 与图片节点顶部工具条统一样式（字号 / 尺寸 / 外壳） */
 const TOOL_BTN = PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS;
@@ -82,27 +84,9 @@ function pro2HubBatchStore() {
   return {
     nodes: state.nodes,
     edges: state.edges,
-    addNode: (
-      type:
-        | "story-pro2-character"
-        | "story-pro2-scene"
-        | "story-pro2-frame"
-        | "story-pro2-image"
-        | "story-pro2-three-view"
-        | "group",
-      position: { x: number; y: number },
-      data: Record<string, unknown>,
-    ) => state.addNode(type, position, data),
-    addNodeInGroup: (
-      type: "story-pro2-image" | "story-pro2-three-view",
-      groupId: string,
-      relativePosition: { x: number; y: number },
-      data: Record<string, unknown>,
-    ) => state.addNodeInGroup(type, groupId, relativePosition, data),
-    createGroupContaining: (
-      childIds: string[],
-      opts: { label: string; color: string },
-    ) => state.createGroupContaining(childIds, opts),
+    addNode: state.addNode,
+    addNodeInGroup: state.addNodeInGroup,
+    createGroupContaining: state.createGroupContaining,
     setEdges: state.setEdges,
     updateNodeData: state.updateNodeData,
     setNodes: state.setNodes,
@@ -118,37 +102,48 @@ export function Pro2ScriptHubToolbar({
   onDuplicateNode,
 }: Pro2ScriptHubToolbarProps) {
   const { alert, confirm } = useDialogs();
+  const collaboration = useCrewCollaborationAccess();
   const base = useBookMallBaseUrl();
   const { providers } = useUserProviders();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const liveHubNode = nodes.find((n) => n.id === hubId);
+  const liveHubData =
+    (liveHubNode?.data as StoryProScriptHubNodeData | undefined) ?? hubData;
+  const useProductionWizard = isPro2ProductionWizardHub(liveHubData);
+  const hideLegacyMediaToolbar = useProductionWizard;
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [framePickerOpen, setFramePickerOpen] = useState(false);
-  const [framePickerMode, setFramePickerMode] = useState<
-    "first" | "regenerate" | "spawnNew"
-  >("first");
+  const [shotPromptPolishBusy, setShotPromptPolishBusy] = useState(false);
   const [tvPickerOpen, setTvPickerOpen] = useState(false);
   const [scenePickerOpen, setScenePickerOpen] = useState(false);
   const projectId = useCanvasStore((s) => s.projectId) ?? "";
 
   const saveAsAsset = useSaveNodeAsAsset();
-  const dockInput = hubData.dockInput ?? "";
-  const dockRefImages = (hubData.dockRefImages ?? []) as StoryRefImage[];
-  const hasTable = pro2HubHasScriptTable(hubData);
-  const hasCharacterTable = pro2HubHasCharacterTable(hubData);
-  const hasSceneTable = pro2HubHasSceneTable(hubData, { nodes, edges, hubId });
-  const linked = pro2HubIsLinkedOutline(nodes, edges, hubId, hubData);
-  const isGenerating = pro2HubIsGenerating({
-    id: hubId,
-    data: hubData,
-    type: "story-pro2-script-hub",
-    position: { x: 0, y: 0 },
-  } as never);
+  const dockInput = liveHubData.dockInput ?? "";
+  const dockRefImages = (liveHubData.dockRefImages ?? []) as StoryRefImage[];
+  const hasTable = pro2HubHasScriptTable(liveHubData);
+  const hasCharacterTable = pro2HubHasCharacterTable(liveHubData);
+  const hasSceneTable = pro2HubHasSceneTable(liveHubData, { nodes, edges, hubId });
+  const linked = pro2HubIsLinkedOutline(nodes, edges, hubId, liveHubData);
+  const { history: hubTasks } = useNodeTaskHistory(hubId);
+  const isGenerating = pro2HubIsGenerating(
+    {
+      id: hubId,
+      data: liveHubData,
+      type: "story-pro2-script-hub",
+      position: { x: 0, y: 0 },
+    } as never,
+    hubTasks,
+  );
 
   const storyboardRows = useMemo(() => {
-    if (!hasTable) return [];
-    return parseStoryboardRows(resolveHubStoryboardMd(hubData));
-  }, [hasTable, hubData]);
+    if (!hasTable && !(liveHubData.productionScript?.shots?.length ?? 0)) {
+      return [];
+    }
+    return resolvePro2HubStoryboardPickerRows(liveHubData);
+  }, [hasTable, liveHubData]);
 
   const initialFrameBatchImage = useMemo(
     () => resolvePro2FrameBatchImageForHub(hubId, nodes, edges),
@@ -165,30 +160,44 @@ export function Pro2ScriptHubToolbar({
     [hubId, nodes, edges],
   );
 
-  const hasFrameBoardGroup = useMemo(
-    () => hubHasPro2FrameBoardGroup(hubId, nodes),
-    [hubId, nodes],
-  );
-
-  const runFrameGenerate = (result: Pro2FrameGenerateResult) => {
-    const kickoffOptions =
-      framePickerMode === "spawnNew"
-        ? { spawnNewGroup: true as const }
-        : framePickerMode === "regenerate"
-          ? { forceFresh: true as const }
-          : undefined;
+  const runFrameGenerate = (result: Pro2StoryboardSpawnResult) => {
+    const hubPatch = persistPro2StoryboardTableEditsToHub(
+      hubData,
+      result.rows,
+      hubId,
+    );
+    updateNodeData(hubId, hubPatch);
+    const mergedHub = { ...hubData, ...hubPatch };
     generatePro2FrameBoardFromHub(
       hubId,
-      hubData,
+      mergedHub,
       dockInput,
       dockRefImages,
       providers,
       pro2HubBatchStore,
       result.frameIndices,
-      result.batchImage,
-      kickoffOptions,
+      result.batchImage ?? undefined,
+      { spawnNewGroup: true },
     );
-    setFramePickerMode("first");
+  };
+
+  const runShotPromptPolish = (frameIndices: number[]) => {
+    if (!liveHubData.providerId?.trim() || !liveHubData.modelKey?.trim()) {
+      void alert({
+        title: "请选择模型",
+        message: "在底部输入坞选择 LLM 模型后再生成提示词。",
+        variant: "warning",
+      });
+      return;
+    }
+    setShotPromptPolishBusy(true);
+    enqueuePro2ShotPromptPolish(
+      hubId,
+      frameIndices,
+      liveHubData,
+      updateNodeData,
+    );
+    window.setTimeout(() => setShotPromptPolishBusy(false), 1200);
   };
 
   const runThreeViewGenerate = (result: Pro2CharacterThreeViewResult) => {
@@ -223,7 +232,7 @@ export function Pro2ScriptHubToolbar({
       });
       return;
     }
-    if (!hubData.providerId?.trim() || !hubData.modelKey?.trim()) {
+    if (!liveHubData.providerId?.trim() || !liveHubData.modelKey?.trim()) {
       await alert({
         title: "请选择模型",
         message: "在底部输入坞选择 LLM 模型后再重新生成。",
@@ -233,7 +242,7 @@ export function Pro2ScriptHubToolbar({
     }
     regeneratePro2ScriptHub(
       hubId,
-      hubData,
+      liveHubData,
       nodes,
       edges,
       dockInput,
@@ -242,18 +251,17 @@ export function Pro2ScriptHubToolbar({
     );
   };
 
-  const onGenerateFrames = async (mode: "first" | "regenerate" | "spawnNew") => {
+  const onGenerateFrames = async () => {
     if (isGenerating) return;
     if (!hasTable) {
       await alert({
         title: "请先生成分镜脚本",
         message:
-          "在底部输入坞发送生成专业版分镜脚本后，再点击「生成分镜组」。",
+          "在底部输入坞发送生成专业版分镜脚本后，再点击「生成分镜」。",
         variant: "warning",
       });
       return;
     }
-    setFramePickerMode(mode);
     setFramePickerOpen(true);
   };
 
@@ -285,41 +293,6 @@ export function Pro2ScriptHubToolbar({
     setScenePickerOpen(true);
   };
 
-  const onExportScriptPackage = async () => {
-    if (!projectId) {
-      await alert({
-        title: "无法导出",
-        message: "请先保存画布项目后再导出剧本包。",
-        variant: "warning",
-      });
-      return;
-    }
-    const starter = nodes.find(
-      (n) =>
-        n.type === "story-pro2-starter" &&
-        (n.data as StoryProStarterNodeData).workspaceIds?.scriptHubId === hubId,
-    );
-    const starterData = (starter?.data ?? {}) as StoryProStarterNodeData;
-    const draft = exportScriptPackageDraft({
-      projectId,
-      edition: "pro2",
-      starterId: starter?.id ?? hubId,
-      starterData,
-      hubId,
-      hubData,
-    });
-    if (!String(draft.payload.markdown ?? "").trim()) {
-      await alert({
-        title: "暂无剧本内容",
-        message: "请先生成至少一批工业化剧本后再导出。",
-        variant: "warning",
-      });
-      return;
-    }
-    updateNodeData(hubId, { scriptFinalized: true });
-    openSaveProjectAssetDialog(draft, { showTeamShare: true });
-  };
-
   const onDownload = () => {
     const md = pro2ScriptHubExportMarkdown(hubData);
     if (!md.trim()) return;
@@ -330,16 +303,15 @@ export function Pro2ScriptHubToolbar({
     if (isGenerating) return;
     const live = useCanvasStore.getState().nodes.find((n) => n.id === hubId);
     const liveData = (live?.data ?? hubData) as StoryProScriptHubNodeData;
-    const pub = await confirmAndPublishPro2ScriptHub(hubId, liveData, {
-      alert,
-      confirm,
-    }, {
-      requireBatch: liveData.scriptStudioMode === true,
-      batchIndex: liveData.scriptStudioBatchIndex,
-    });
-    if (pub) {
-      updateNodeData(hubId, pub);
-      if (base?.trim() && projectId) {
+    await runPro2ScriptPublishFlow({
+      hubId,
+      hubData: liveData,
+      projectId,
+      base,
+      dialogs: { alert, confirm },
+      collaboration,
+      updateNodeData,
+      findStarter: () => {
         const starter = useCanvasStore
           .getState()
           .nodes.find(
@@ -348,20 +320,30 @@ export function Pro2ScriptHubToolbar({
               (n.data as StoryProStarterNodeData).workspaceIds?.scriptHubId ===
                 hubId,
           );
-        const assetId = await syncScriptPackageAssetOnPublish({
-          base,
-          projectId,
-          hubId,
-          hubData: { ...liveData, ...pub } as StoryProScriptHubNodeData,
-          starterId: starter?.id,
-          starterData: (starter?.data ?? {}) as StoryProStarterNodeData,
-        });
-        if (assetId) {
-          updateNodeData(hubId, { linkedScriptPackageAssetId: assetId });
-        }
-      }
-    }
-  }, [hubId, hubData, isGenerating, alert, confirm, updateNodeData, base, projectId]);
+        return starter
+          ? {
+              id: starter.id,
+              data: starter.data as StoryProStarterNodeData,
+            }
+          : undefined;
+      },
+    });
+  }, [
+    hubId,
+    hubData,
+    isGenerating,
+    alert,
+    confirm,
+    updateNodeData,
+    base,
+    projectId,
+    collaboration,
+  ]);
+
+  const hubSceneRows = useMemo(
+    () => resolvePro2HubSceneRows(hubId, hubData, nodes, edges),
+    [hubId, hubData, nodes, edges],
+  );
 
   return (
     <>
@@ -378,88 +360,83 @@ export function Pro2ScriptHubToolbar({
           type="button"
           className={TOOL_BTN}
           disabled={isGenerating}
-          title="重新生成分镜脚本"
+          title="重新生成角色、场景与分镜脚本（已链接大纲时不重复跑大纲 LLM）"
           onClick={() => void onRegenerate()}
         >
           <RotateCw className="size-3.5" />
           <span>重新生成</span>
         </button>
-        <button
-          type="button"
-          className={TOOL_BTN}
-          disabled={isGenerating}
-          title={
-            hasCharacterTable
-              ? "选择角色并生成正/侧/背三视图"
-              : "请先生成含角色设定的分镜脚本"
-          }
-          onClick={() => void onGenerateThreeView()}
-        >
-          <Users className="size-3.5" />
-          <span>生成角色三视图</span>
-        </button>
-        <button
-          type="button"
-          className={TOOL_BTN}
-          disabled={isGenerating}
-          title={
-            hasSceneTable
-              ? "选择场景并生成场景参考图"
-              : "请先生成含场景设定的分镜脚本"
-          }
-          onClick={() => void onGenerateScene()}
-        >
-          <MapPin className="size-3.5" />
-          <span>生成场景图</span>
-        </button>
-        {hasFrameBoardGroup ? (
-          <button
-            type="button"
-            className={TOOL_BTN}
-            disabled={isGenerating || !hasTable}
-            title="选择镜号并重新生成当前分镜组（覆盖已有分镜图）"
-            onClick={() => void onGenerateFrames("regenerate")}
-          >
-            <RotateCw className="size-3.5" />
-            <span>重新生成分镜组</span>
-          </button>
+        {!hideLegacyMediaToolbar ? (
+          <>
+            <button
+              type="button"
+              className={TOOL_BTN}
+              disabled={isGenerating}
+              title={
+                hasCharacterTable
+                  ? "选择角色并新建一组三视图（保留已有组，可多次抽卡）"
+                  : "请先生成含角色设定的分镜脚本"
+              }
+              onClick={() => void onGenerateThreeView()}
+            >
+              <Users className="size-3.5" />
+              <span>生成角色三视图</span>
+            </button>
+            <button
+              type="button"
+              className={TOOL_BTN}
+              disabled={isGenerating}
+              title={
+                hasSceneTable
+                  ? "选择场景并新建一组场景图（保留已有组，可多次抽卡）"
+                  : "请先生成含场景设定的分镜脚本"
+              }
+              onClick={() => void onGenerateScene()}
+            >
+              <MapPin className="size-3.5" />
+              <span>生成场景图</span>
+            </button>
+            <button
+              type="button"
+              className={TOOL_BTN}
+              disabled={isGenerating || !hasTable}
+              title="编辑分镜表并创建分镜图组 + 分镜视频组（不自动生图/生视频）"
+              onClick={() => void onGenerateFrames()}
+            >
+              <LayoutGrid className="size-3.5" />
+              <span>生成分镜</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
+            <button
+              type="button"
+              className={TOOL_BTN}
+              disabled={isGenerating}
+              title="全屏两步向导：资产出图 → 分镜与音画同步"
+              onClick={() => setWizardOpen(true)}
+            >
+              <Clapperboard className="size-3.5" />
+              <span>剧本制作</span>
+            </button>
+          </>
+        )}
+        {collaboration.canPublishScript ? (
+          <>
+            <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
+            <button
+              type="button"
+              className={TOOL_BTN}
+              disabled={isGenerating}
+              title="发布剧本 · 同步剧本包并更新公告栏（可选团队共享）"
+              onClick={() => void onPublishScript()}
+            >
+              <Megaphone className="size-3.5" />
+              <span>发布剧本</span>
+            </button>
+          </>
         ) : null}
-        <button
-          type="button"
-          className={TOOL_BTN}
-          disabled={isGenerating || !hasTable}
-          title={
-            hasFrameBoardGroup
-              ? "选择镜号并新增一个分镜组（保留已有分镜组）"
-              : "选择镜号并生成分镜图（自动关联角色三视图与场景图）"
-          }
-          onClick={() =>
-            void onGenerateFrames(hasFrameBoardGroup ? "spawnNew" : "first")
-          }
-        >
-          <LayoutGrid className="size-3.5" />
-          <span>生成分镜组</span>
-        </button>
-        <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
-        <button
-          type="button"
-          className={TOOL_BTN}
-          disabled={isGenerating}
-          title="发布剧本 · 剧组可在公告条参与制作（发布者也可参与）"
-          onClick={() => void onPublishScript()}
-        >
-          <Megaphone className="size-3.5" />
-          <span>发布剧本</span>
-        </button>
-        <button
-          type="button"
-          className={TOOL_BTN}
-          title="导出定稿剧本包（SCRIPT_PACKAGE）"
-          onClick={() => void onExportScriptPackage()}
-        >
-          <Package className="size-3.5" />
-          <span>导出剧本包</span>
-        </button>
         <button
           type="button"
           className={TOOL_BTN}
@@ -501,16 +478,17 @@ export function Pro2ScriptHubToolbar({
         open={framePickerOpen}
         rows={storyboardRows}
         initialBatchImage={initialFrameBatchImage}
+        generatingPrompts={shotPromptPolishBusy}
         onClose={() => {
           setFramePickerOpen(false);
-          setFramePickerMode("first");
         }}
         onConfirm={runFrameGenerate}
+        onGeneratePrompts={runShotPromptPolish}
       />
 
       <Pro2CharacterThreeViewPicker
         open={tvPickerOpen}
-        characterMd={resolvePro2HubCharacterMd(hubData)}
+        characterRows={resolvePro2HubCharacterPickerRows(hubData)}
         initialBatchImage={initialThreeViewBatchImage}
         onClose={() => setTvPickerOpen(false)}
         onConfirm={runThreeViewGenerate}
@@ -519,12 +497,18 @@ export function Pro2ScriptHubToolbar({
       <Pro2SceneImagePicker
         open={scenePickerOpen}
         sceneMd={resolvePro2HubSceneMd(hubData, { nodes, edges, hubId })}
-        sceneRowKeys={resolvePro2HubSceneRows(hubId, hubData, nodes, edges).map(
-          (r) => ({ name: r.name, key: r.key }),
-        )}
+        sceneRows={hubSceneRows}
+        sceneRowKeys={hubSceneRows.map((r) => ({ name: r.name, key: r.key }))}
         initialBatchImage={initialSceneBatchImage}
         onClose={() => setScenePickerOpen(false)}
         onConfirm={runSceneGenerate}
+      />
+
+      <Pro2ProductionWizardShell
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        scriptHubId={hubId}
+        hubData={liveHubData}
       />
     </>
   );

@@ -1,20 +1,17 @@
 import { NextResponse } from "next/server";
 import { toolsExchangeAuthorized } from "@/lib/sso-tools-env";
-import { verifyCredentialsLogin } from "@/lib/auth/verify-credentials";
+import { verifyLoginWithThrottle } from "@/lib/auth/login-with-throttle";
 import { issueAutoLoginToken } from "@/lib/auth/auto-login-token";
+import { withApiDbGuard } from "@/lib/http/api-db-error";
+import { portalClientIpFromRequest } from "@/lib/site-traffic/client-ip";
 
 export const dynamic = "force-dynamic";
 
 /**
  * 门户无头登录：子应用 BFF（服务端）用 TOOLS_SSO_SERVER_SECRET 调用。
  * 校验手机号 + (密码 | 短信验证码)，成功后签发一次性自动登录票据（autoLoginToken）。
- *
- * 门户前端拿到 token 后整页跳 Book `/portal-signin` 建立 Book 会话，再走既有
- * `re-enter → exchange → callback` 落子应用 tools_token。
- *
- * 注意：本端点 **不做工具准入判定**（登录 != 开通）。准入在生成/网关路径复查。
  */
-export async function POST(req: Request) {
+export const POST = withApiDbGuard(async (req) => {
   if (!toolsExchangeAuthorized(req)) {
     return NextResponse.json({ error: "未授权" }, { status: 401 });
   }
@@ -38,26 +35,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "不支持的登录方式" }, { status: 400 });
   }
 
-  const verified = await verifyCredentialsLogin({
-    phone: body?.phone,
-    password: body?.password,
-    code: body?.code,
-    loginMode,
+  const verified = await verifyLoginWithThrottle({
+    credentials: {
+      phone: body?.phone,
+      password: body?.password,
+      code: body?.code,
+      loginMode,
+    },
+    ip: portalClientIpFromRequest(req),
   });
 
-  if (!verified) {
-    return NextResponse.json(
-      {
-        error:
-          loginMode === "password" ? "手机号或密码错误" : "手机号或验证码错误",
-      },
-      { status: 401 },
-    );
+  if (!verified.ok) {
+    return NextResponse.json({ error: verified.error }, { status: verified.status });
   }
 
   let autoLoginToken: string;
   try {
-    autoLoginToken = issueAutoLoginToken(verified.id);
+    autoLoginToken = issueAutoLoginToken(verified.user.id);
   } catch (e) {
     console.error("[portal/verify] issueAutoLoginToken", e);
     return NextResponse.json(
@@ -69,6 +63,6 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     autoLoginToken,
-    userId: verified.id,
+    userId: verified.user.id,
   });
-}
+});

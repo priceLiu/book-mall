@@ -1,0 +1,50 @@
+---
+description: 电商工具箱图片/视频列表懒加载与加载态（硬性）
+globs: e-commerce-toolkit/**/*
+alwaysApply: false
+---
+
+# 电商工具箱 · 媒体懒加载与加载态
+
+权威文档：**`e-commerce-toolkit/design/MEDIA.md`** §懒加载与加载态
+
+交互参考 **QuickReplica**（`quick-replica-web/components/quick-replica/qr-world-browse-panel.tsx` · `qr-skeleton` · indeterminate 进度条）；电商为 **浅色** 变体。
+
+## 硬性要求
+
+### 缩略图
+
+- **必须** 使用 `EcomMediaLibraryTile`（或 `EcomTemplateGalleryTile` 等基于它的封装）
+- 视口外不加载；加载完成前显示 `ecom-skeleton`
+- **OSS 网格须** 有 `thumbUrl` 时直接用；否则 `buildEcomOssThumbUrl`（模特库）
+- **模板区导入须** sharp 生成 `-thumb.webp`（见 MEDIA.md §模板区 · 预生成缩略图）
+- **禁止** 列表内裸 `<Image>` / `<video>` 无占位或直接拉原图
+
+### 滚动分页（模特库、模板区、长画廊）
+
+- **必须** `useEcomScrollPagination` + `EcomScrollLoadFooter`
+- 加载中：**骨架行** + **`ecom-upload-progress-indeterminate`** + 「加载中…」
+- 禁止一次性 render 全部条目（> 一屏时）
+- 滚动容器须 `overflow-y-auto` + `min-h-0`，sentinel 在列表底部
+
+### 首屏 / 接口等待
+
+- **必须** `EcomMediaSkeletonGrid`（网格与正式列表一致）
+- **禁止** 仅 `<p>加载中…</p>`
+
+## 唯一组件 / Hook
+
+| 用途 | 路径 |
+|------|------|
+| 缩略图 | `components/media/ecom-media-library-tile.tsx` |
+| 模板区卡片 | `components/media/ecom-template-gallery-tile.tsx` |
+| 骨架 | `components/media/ecom-media-skeleton.tsx` |
+| 滚动加载底栏 | `components/media/ecom-scroll-load-footer.tsx` |
+| 分页 Hook | `lib/use-ecom-scroll-pagination.ts` |
+| 视口检测 | `lib/use-intersection-visible.ts` |
+
+## Code Review
+
+- 新图片/视频网格未走上述组件 → **驳回**
+- 滚动加载仅文字、无 skeleton/进度条 → **驳回**
+- 复制 IntersectionObserver 到业务页而不复用 Hook → 改

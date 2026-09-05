@@ -28,6 +28,9 @@ parentBaseline: tool-web/doc/price_0518.md
 | ecom-toolkit__poster | generate | flux-2-pro | 0.20 | 40 |
 | ecom-toolkit__ip | character | gpt-image-2 | 0.35 | 70 |
 | ecom-toolkit__vi | emoji-pack | seedream-4.5 | 2.00 (8张×0.25) | 400 |
+| ecom-toolkit__hand-craft | generate | seedream-4.5 | 0.25 | 50 |
+
+> 手伴创作 `compose`（第 8–10 步拼版）不调厂商模型，由浏览器 html2canvas 出 PNG，**无按次成本**。
 
 ## 视频（VIDEO_MODEL_SPEC，元/秒，1080P 档）
 
@@ -60,5 +63,9 @@ parentBaseline: tool-web/doc/price_0518.md
 ## 维护流程
 
 1. 更新本文件（B）。
-2. `book-mall` 执行 seed / 管理后台维护 `ToolBillablePrice`（D）。
+2. `book-mall` 执行 seed / 管理后台维护按次价目（D）。
 3. `pnpm pricing:inspect-billable-vs-md`（扩展后）确认对齐。
+
+> **注**：`ToolBillablePrice`（旧 D 表）已在 `20260709120000_drop_tool_billable_price` 删除，按次真值迁至
+> `ModelCreditPrice` + `ModelCostProfile`。新增模块（如 `ecom-toolkit__hand-craft`）**不需要** 新的按次价目迁移：
+> 套件月费按 navKey `e-commerce-toolkit` 收取，厂商成本经 Gateway 按模型结算。本表继续作为挂牌价参考基线。

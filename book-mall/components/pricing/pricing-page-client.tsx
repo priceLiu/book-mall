@@ -9,7 +9,6 @@ import {
   X,
   Sparkles,
   Users,
-  KeyRound,
   Calculator,
   Minus,
   Plus,
@@ -30,16 +29,23 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
-import { deriveVideoMonthlyCredits } from "@/lib/billing/video-model-seeds";
 import {
   computeTeamSeatQuote,
   computeTierGenerations,
+  computeUnifiedChargeCredits,
+  DEFAULT_VIDEO_SEC,
   unitLabel,
   type SeatBand,
 } from "@/lib/pricing/credit-pricing-formulas";
+import {
+  computePricingHighlightEstimate,
+  resolveMembershipPeriodCredits,
+} from "@/lib/pricing/pricing-highlight-estimate";
 import { CreditTopupSection } from "@/components/pricing/credit-topup-section";
+import { ShareRewardsPromo } from "@/components/pricing/share-rewards-promo";
 import { CreditExpiryPolicySection } from "@/components/pricing/credit-expiry-policy";
-import { ByokMembershipCta } from "@/components/pricing/byok-subscribe-buttons";
+import { PricingModeTabs } from "@/components/pricing/pricing-mode-tabs";
+import { PricingPlanCreditsBlock } from "@/components/pricing/pricing-plan-credits-block";
 import {
   buildLoginRedirectForCheckout,
   buildMembershipCheckoutPath,
@@ -62,7 +68,6 @@ interface Plan {
   originalYuan: number | null;
   promoLabel: string | null;
   monthlyCredits: number;
-  videoMonthlyCredits: number;
   includedSeats: number;
   seatTiers: SeatTier[];
 }
@@ -117,61 +122,14 @@ interface Highlight {
   nowrap?: boolean;
 }
 
-function resolvePerSeatPools(monthlyCredits: number, videoMonthlyCredits?: number) {
-  const perSeatVideo =
-    videoMonthlyCredits != null && videoMonthlyCredits > 0
-      ? videoMonthlyCredits
-      : deriveVideoMonthlyCredits(monthlyCredits);
-  const perSeatGeneral = Math.max(0, monthlyCredits - perSeatVideo);
-  return { perSeatGeneral, perSeatVideo };
-}
-
-/** 构造卡片「套餐亮点」清单（含 ✓/✗ 差异化）。 */
-function buildHighlights(args: {
-  isTeam: boolean;
-  index: number;
-  periodLabel: string;
-  monthlyCredits: number;
-  videoMonthlyCredits: number;
-  teamSeats?: number;
-  maxImages: number;
-  maxVideoSecFromVideoPool: number;
-}): Highlight[] {
-  const {
-    isTeam,
-    index,
-    periodLabel,
-    monthlyCredits,
-    videoMonthlyCredits,
-    teamSeats = 1,
-    maxImages,
-    maxVideoSecFromVideoPool,
-  } = args;
-  const { perSeatGeneral, perSeatVideo } = resolvePerSeatPools(monthlyCredits, videoMonthlyCredits);
-  const poolGeneral = isTeam ? perSeatGeneral * teamSeats : perSeatGeneral;
-  const poolVideo = isTeam ? perSeatVideo * teamSeats : perSeatVideo;
+function buildHighlights(args: { isTeam: boolean; index: number }): Highlight[] {
+  const { isTeam, index } = args;
 
   if (isTeam) {
     return [
       {
-        text: `团队 ${poolGeneral.toLocaleString()} 通用 + ${poolVideo.toLocaleString()} 视频积分/${periodLabel}（${teamSeats} 席）`,
+        text: "人人同一扣分；高级会员积分单价更低，可生成更多次",
         included: true,
-        nowrap: true,
-      },
-      {
-        text: `每席 ${perSeatGeneral.toLocaleString()} 通用 + ${perSeatVideo.toLocaleString()} 视频（视频仅扣视频池）`,
-        included: true,
-        nowrap: true,
-      },
-      {
-        text: `最多约 ${maxImages.toLocaleString()} 张图/${periodLabel}（每席·通用池）`,
-        included: true,
-        nowrap: true,
-      },
-      {
-        text: `最多约 ${maxVideoSecFromVideoPool.toLocaleString()} 秒视频/${periodLabel}（每席·视频池）`,
-        included: true,
-        nowrap: true,
       },
       { text: "团队共享资产库 · 多人画布协作", included: true },
       { text: "席位 / 权限 / 用量管控", included: true },
@@ -183,15 +141,7 @@ function buildHighlights(args: {
 
   return [
     {
-      text: `每月 ${poolGeneral.toLocaleString()} 通用 + ${poolVideo.toLocaleString()} 视频积分`,
-      included: true,
-    },
-    {
-      text: "视频仅扣视频池，图文扣通用池，两池不互通",
-      included: true,
-    },
-    {
-      text: `最多约 ${maxImages.toLocaleString()} 张图（通用池）/ ${maxVideoSecFromVideoPool.toLocaleString()} 秒视频（视频池）`,
+      text: "人人同一扣分；高级会员积分单价更低，可生成更多次",
       included: true,
     },
     { text: "全站应用通用：工具站 / Canvas / Story / 电商 / 提示词", included: true },
@@ -208,7 +158,6 @@ export function PricingPageClient({
   plans,
   models,
   byokQuotas = [],
-  rates,
   teamTenants = [],
   isLoggedIn,
   billingPersona = null,
@@ -218,11 +167,11 @@ export function PricingPageClient({
   plans: Plan[];
   models: ModelPrice[];
   byokQuotas?: ByokQuota[];
-  rates: ResourceRate[];
+  rates?: ResourceRate[];
   teamTenants?: { id: string; name: string }[];
   isLoggedIn: boolean;
   billingPersona?: BillingPersona | null;
-  welcomeGift?: { generalCredits: number; videoCredits: number } | null;
+  welcomeGift?: { generalCredits: number } | null;
 }) {
   const [family, setFamily] = useState<"PERSONAL" | "TEAM">("PERSONAL");
   const [interval, setInterval] = useState<"MONTH" | "YEAR">("MONTH");
@@ -230,15 +179,13 @@ export function PricingPageClient({
   const checkoutError = searchParams.get("error");
 
   const checkoutErrorMessage =
-    checkoutError === "byok-persona"
-      ? "当前账号为自带 Key（BYOK）身份，无法购买平台代付会员套餐。积分清零不影响此限制——计费身份在注册时已锁定。请使用 BYOK 入口，或由财务后台为您续充。"
-      : checkoutError === "persona"
-        ? "请先完成计费身份选择后再开通会员。"
-        : checkoutError === "no-plan"
-          ? "未选择有效套餐，请从下方卡片重新点击「立即开通」。"
-          : checkoutError === "invalid-plan"
-            ? "所选套餐已下架或不存在，请刷新页面后重试。"
-            : null;
+    checkoutError === "persona"
+      ? "请先完成计费身份选择后再开通会员。"
+      : checkoutError === "no-plan"
+        ? "未选择有效套餐，请从下方卡片重新点击「立即开通」。"
+        : checkoutError === "invalid-plan"
+          ? "所选套餐已下架或不存在，请刷新页面后重试。"
+          : null;
 
   useEffect(() => {
     if (!checkoutError) return;
@@ -261,10 +208,6 @@ export function PricingPageClient({
   const imageModels = models.filter((m) => m.unit === "PER_IMAGE");
   const otherModels = models.filter((m) => m.unit !== "PER_SEC" && m.unit !== "PER_IMAGE");
 
-  // 各档「最便宜」单价，用于「最多生成约 …」估算
-  const minImageCpu = imageModels.length > 0 ? Math.min(...imageModels.map((m) => m.creditsPerUnit)) : 0;
-  const minVideoCpu = videoModels.length > 0 ? Math.min(...videoModels.map((m) => m.creditsPerUnit)) : 0;
-
   // 同档年付价（用于「买年卡立省 X%」）
   const yearPriceByTier = useMemo(() => {
     const map = new Map<string, number>();
@@ -277,60 +220,8 @@ export function PricingPageClient({
   return (
     <div className="site-pricing-page">
       <div className="site-pricing-hero">
-        <h1 className="site-pricing-title">专业 AI 工具 · 积分会员</h1>
-        <p className="site-pricing-subtitle">
-          透明积分体系：按月订阅发放积分，全站 AI 应用通用；自带 Key 用户厂商费用自理，超额从轻量包扣点。
-        </p>
-
-        {welcomeGift &&
-        (welcomeGift.generalCredits > 0 || welcomeGift.videoCredits > 0) ? (
-          <div className="mx-auto mt-5 inline-flex flex-wrap items-center justify-center gap-2 rounded-full border border-[#8957e5]/30 bg-[#8957e5]/10 px-4 py-2 text-sm text-[#5a32a3]">
-            <Gift className="h-4 w-4" />
-            <span>
-              新用户注册即送 {welcomeGift.generalCredits.toLocaleString()} 通用积分
-              {welcomeGift.videoCredits > 0
-                ? ` + ${welcomeGift.videoCredits.toLocaleString()} 视频积分`
-                : ""}
-              ，30 天内有效
-            </span>
-          </div>
-        ) : null}
-
-        {checkoutErrorMessage ? (
-          <div
-            id="checkout-error-banner"
-            className="mx-auto mt-5 max-w-2xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-          >
-            {checkoutErrorMessage}
-            {checkoutError === "persona" ? (
-              <>
-                {" "}
-                <Link href="/onboarding/billing-persona" className="font-medium underline">
-                  去选择计费身份
-                </Link>
-              </>
-            ) : null}
-            {checkoutError === "byok-persona" ? (
-              <>
-                {" "}
-                <Link href="/account/billing" className="font-medium underline">
-                  查看账户计费
-                </Link>
-              </>
-            ) : null}
-          </div>
-        ) : null}
-
-        {isLoggedIn && billingPersona === "BYOK" && !checkoutErrorMessage ? (
-          <div className="mx-auto mt-5 max-w-2xl rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-            您当前为 <strong>自带 Key（BYOK）</strong> 身份，报价页「立即开通」仅适用于
-            <strong>平台代付</strong> 会员。积分清零不会解除此限制。如需续充 VIP 大额预充，请联系商务或在
-            <Link href="/account/team" className="font-medium underline">
-              团队中心
-            </Link>
-            查看现有团队。
-          </div>
-        ) : null}
+        <h1 className="sr-only">订阅价格</h1>
+        <PricingModeTabs />
 
         <div className="site-pricing-toggles">
           <div className="site-pricing-toggle-group">
@@ -353,26 +244,58 @@ export function PricingPageClient({
             </ToggleBtn>
           </div>
         </div>
+
+        {welcomeGift && welcomeGift.generalCredits > 0 ? (
+          <div className="flex w-full max-w-2xl flex-wrap items-center justify-center gap-2 rounded-full border border-[#8957e5]/30 bg-[#8957e5]/10 px-4 py-2 text-sm text-[#5a32a3]">
+            <Gift className="h-4 w-4 shrink-0" />
+            <span>
+              新用户注册即送 {welcomeGift.generalCredits.toLocaleString()} 积分，30 天内有效
+            </span>
+          </div>
+        ) : null}
+
+        <ShareRewardsPromo isLoggedIn={isLoggedIn} />
+
+        {checkoutErrorMessage ? (
+          <div
+            id="checkout-error-banner"
+            className="mx-auto max-w-2xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          >
+            {checkoutErrorMessage}
+            {checkoutError === "persona" ? (
+              <>
+                {" "}
+                <Link href="/onboarding/billing-persona" className="font-medium underline">
+                  去选择计费身份
+                </Link>
+              </>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
-      <div className="site-pricing-disclosure">
-        <p>
-          下方{visible.length}档为平台代付（积分套餐）：月发积分拆为通用池（图文 / 文本等）与视频池（仅视频生成），两池不互通、按模型扣积分。
-          {isTeam
-            ? " 团队套餐 3 席起订，大卡价格为套餐合计（非单席价），下方标注每席单价。"
-            : null}
-        </p>
-        <p>
-          若注册时选择自带 Key（BYOK），请见本页下方说明——不含月度积分，含任务次数额度；超额与工具月费从轻量包余额扣。
-        </p>
+      <div className="site-pricing-body">
+        <section className="site-pricing-section-head">
+          <h2 className="site-pricing-section-title">订阅套餐</h2>
+          <p className="site-pricing-section-hint">自动续订，包月可随时取消</p>
+          <p className="site-pricing-section-hint">
+            会员积分每 31 天发放一期，当期未使用积分不结转至下期（年付按{periodLabel}计费，积分仍按 31 天周期刷新）
+          </p>
+        </section>
       </div>
 
       <div
         className={cn(
-          "site-pricing-plans-grid mt-8",
+          "site-pricing-plans-band",
           isTeam ? "site-pricing-plans-grid--team" : "site-pricing-plans-grid--personal",
         )}
       >
+        <div
+          className={cn(
+            "site-pricing-plans-grid",
+            isTeam ? "site-pricing-plans-grid--team" : "site-pricing-plans-grid--personal",
+          )}
+        >
           {visible.map((p, i) => {
             const yearPrice = yearPriceByTier.get(p.tier);
             const annualSavingPct =
@@ -391,8 +314,7 @@ export function PricingPageClient({
                 periodLabel={periodLabel}
                 anchorYuan={anchorYuan}
                 featured={isTeam ? i === 1 : i === Math.min(2, visible.length - 1)}
-                minImageCpu={minImageCpu}
-                minVideoCpu={minVideoCpu}
+                models={models}
                 annualSavingPct={annualSavingPct}
               />
             );
@@ -402,6 +324,7 @@ export function PricingPageClient({
               该组合套餐即将上线
             </div>
           ) : null}
+        </div>
       </div>
 
       <div className="site-pricing-body">
@@ -417,6 +340,13 @@ export function PricingPageClient({
           </div>
         ) : null}
 
+        <CreditTopupSection
+          anchorYuan={anchorYuan}
+          isTeam={isTeam}
+          teamTenants={teamTenants}
+          isLoggedIn={isLoggedIn}
+        />
+
         {/* 全档「可生成数量」矩阵 */}
         {models.length > 0 && visible.length > 0 ? (
           <section className="mt-16">
@@ -425,7 +355,7 @@ export function PricingPageClient({
                 每月可生成数量{isTeam ? " / 每席位" : ""}
               </h2>
               <p className="site-pricing-footnote">
-                *数字为「只用该模型」的估算上限；通用池与视频池互不挪用，混用各自扣到 0 为止。
+                *数字为「只用该模型」的估算上限；混用各模型时按各自扣分从同一积分池扣减。
               </p>
             </div>
             <div className={cn("mt-4 overflow-x-auto", PANEL_CLASS)}>
@@ -434,20 +364,16 @@ export function PricingPageClient({
                   <TableRow className="border-border bg-muted/30 hover:bg-muted/30">
                     <TableHead className="min-w-[160px] text-foreground">模型</TableHead>
                     <TableHead className="whitespace-nowrap text-right text-foreground">每次消耗</TableHead>
-                    {visible.map((p) => {
-                      const { perSeatGeneral, perSeatVideo } = resolvePerSeatPools(
-                        p.monthlyCredits,
-                        p.videoMonthlyCredits,
-                      );
-                      return (
-                        <TableHead key={p.id} className="min-w-[7.5rem] text-right text-foreground">
-                          {p.tier}
-                          <span className="mt-0.5 block text-[10px] font-normal leading-tight text-muted-foreground">
-                            通用 {perSeatGeneral.toLocaleString()} / 视频 {perSeatVideo.toLocaleString()}
-                          </span>
-                        </TableHead>
-                      );
-                    })}
+                    {visible.map((p) => (
+                      <TableHead key={p.id} className="min-w-[7.5rem] text-right text-foreground">
+                        {p.tier}
+                        <span className="mt-0.5 block text-[10px] font-normal leading-tight text-muted-foreground">
+                          {resolveMembershipPeriodCredits(p.monthlyCredits, p.interval).toLocaleString()}{" "}
+                          积分/31天
+                          {isTeam ? "（每席）" : ""}
+                        </span>
+                      </TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -471,18 +397,11 @@ export function PricingPageClient({
               </Table>
             </div>
             <p className="mt-2 site-pricing-footnote">
-              生成次数为单一模型的估算值（实际因参数而异）。视频行按视频池、图片行按通用池。
+              生成次数为单一模型的估算值（视频按 15 秒/条；实际因参数而异）。扣分人人相同，会员档越高可生成次数越多。
               {isTeam ? " 团队为「每席位」口径，团队池 = 每席 × 席数。" : ""}
             </p>
           </section>
         ) : null}
-
-        <CreditTopupSection
-          anchorYuan={anchorYuan}
-          isTeam={isTeam}
-          teamTenants={teamTenants}
-          isLoggedIn={isLoggedIn}
-        />
 
         {/* 规则说明 + 用完处理 */}
         <section className="mt-16 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -491,12 +410,12 @@ export function PricingPageClient({
               <Info className="h-5 w-5 text-muted-foreground" /> 计费规则（一看就懂）
             </div>
             <ul className="mt-3 space-y-2 site-pricing-body-text">
+              <li>一种积分：图文、视频、文本模型均从同一积分池扣减。</li>
+              <li>人人同一扣分（U₀×单位数）；高级会员积分单价更低，可生成更多次。</li>
+              <li>每次生成按该模型「积分/单位」扣减；不是每个模型各有独立配额。</li>
               <li>
-                双积分池：通用池（图文 / 文本等）与视频池（仅视频）分开发放、分开扣减，不可互借。
+                上表视频按 <strong className="text-foreground">15 秒/条</strong> 估算；「X 张 / X 条」是只用该模型的上限，同池内互斥。
               </li>
-              <li>视频池约占每席月积分的 20%（财务 2.0 默认）；通用池为其余部分。</li>
-              <li>每次生成按该模型「积分/次」从对应池扣；不是每个模型各有配额。</li>
-              <li>上表「X 张 / X 秒」是只用该模型的上限，同池内互斥——做图就少了做视频的额度。</li>
               <li>失败 / 取消全额返还积分。</li>
               <li>
                 会员服务：月付自购买起 <strong className="text-foreground">31 天</strong>、年付{" "}
@@ -536,61 +455,6 @@ export function PricingPageClient({
                 </li>
               </ul>
             </div>
-
-            <div className={cn(PANEL_CLASS, "p-6")}>
-              <div className="site-pricing-panel-title flex items-center gap-2">
-                <KeyRound className="h-5 w-5 text-muted-foreground" /> 自带 Key（BYOK）
-              </div>
-              <p className="mt-2 site-pricing-body-text">
-                已有厂商 API Key？绑定后模型费用由你与厂商直接结算，平台不扣推理积分。须先开通会员订阅获得工具准入；套餐内含月度任务次数，超出后购买轻量包按次扣积分。
-              </p>
-              <div className="mt-3 rounded-lg border border-border bg-muted/30 px-3 py-2 site-pricing-body-text-sm">
-                <p className="site-pricing-panel-title">BYOK 怎么扣费？</p>
-                <ul className="mt-1 list-inside list-disc space-y-0.5">
-                  <li>会员订阅：工具准入（与平台代付共用套餐体系）</li>
-                  <li>套餐内：文生图（含试衣）、图生视频、视频生视频、视频理解、TTS 按次数免费</li>
-                  <li>超额：从轻量包通用积分池按次扣分</li>
-                  <li>厂商费：走你的 Gateway Key，Book 不代收</li>
-                </ul>
-              </div>
-              {byokQuotas.length > 0 ? (
-                <ul className="mt-3 space-y-1 site-pricing-footnote">
-                  {byokQuotas
-                    .filter((q) => q.scopeKey === "personal")
-                    .map((q) => (
-                      <li key={q.taskKind}>
-                        {q.label}：含 {q.monthlyIncluded} 次/月，超额 {q.overageCredits} 积分/次
-                      </li>
-                    ))}
-                </ul>
-              ) : null}
-              <ByokMembershipCta isLoggedIn={isLoggedIn} />
-              {byokQuotas.some((q) => q.scopeKey === "team-seat") ? (
-                <div className="mt-3 border-t border-border pt-3">
-                  <p className="site-pricing-panel-title">团队 BYOK</p>
-                  <ul className="mt-1 space-y-0.5 site-pricing-footnote">
-                    {byokQuotas
-                      .filter((q) => q.scopeKey === "team-seat")
-                      .map((q) => (
-                        <li key={q.taskKind}>
-                          {q.label}：含 {q.monthlyIncluded} 次/月/席，超额 {q.overageCredits} 积分/次
-                        </li>
-                      ))}
-                  </ul>
-                  <ByokMembershipCta isLoggedIn={isLoggedIn} isTeamScope />
-                </div>
-              ) : null}
-              {rates.length > 0 ? (
-                <div className="mt-3 border-t border-border pt-3 site-pricing-footnote">
-                  资源使用费：
-                  {rates.map((r) => (
-                    <span key={r.resourceType} className="mr-2">
-                      {RESOURCE_LABEL[r.resourceType] ?? r.resourceType} ¥{r.coefficientYuan}/{r.unitLabel}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </div>
           </div>
         </section>
 
@@ -620,8 +484,7 @@ function PlanCard({
   periodLabel,
   anchorYuan,
   featured,
-  minImageCpu,
-  minVideoCpu,
+  models,
   annualSavingPct,
 }: {
   plan: Plan;
@@ -633,8 +496,7 @@ function PlanCard({
   periodLabel: string;
   anchorYuan: number;
   featured: boolean;
-  minImageCpu: number;
-  minVideoCpu: number;
+  models: ModelPrice[];
   annualSavingPct: number | null;
 }) {
   const router = useRouter();
@@ -663,35 +525,18 @@ function PlanCard({
     isTeam && plan.originalYuan
       ? Math.round((plan.originalYuan / minSeats) * quote.seats)
       : plan.originalYuan;
-  // 用于「最多生成约 …」与「1积分≈¥X」的积分口径（团队按每席）
-  const basisCredits = isTeam ? quote.perSeatCredits : plan.monthlyCredits;
+  const rawCredits = isTeam ? quote.perSeatCredits : plan.monthlyCredits;
+  const perPeriodCredits = resolveMembershipPeriodCredits(rawCredits, interval);
+  const poolCreditsPerPeriod = isTeam ? perPeriodCredits * quote.seats : perPeriodCredits;
+  const ppcPriceYuan = isTeam ? quote.perSeatPriceYuan : headlinePrice;
   const yuanPerCredit =
-    basisCredits > 0 ? Math.round((headlinePrice / basisCredits) * 1000) / 1000 : anchorYuan;
-  const { perSeatGeneral, perSeatVideo } = resolvePerSeatPools(
-    plan.monthlyCredits,
-    plan.videoMonthlyCredits,
-  );
-  const maxImages = minImageCpu > 0 ? Math.floor(perSeatGeneral / minImageCpu) : 0;
-  const maxVideoSecFromVideoPool =
-    minVideoCpu > 0 ? Math.floor(perSeatVideo / minVideoCpu) : 0;
+    perPeriodCredits > 0 ? Math.round((ppcPriceYuan / perPeriodCredits) * 1000) / 1000 : anchorYuan;
+  const creditEstimate = computePricingHighlightEstimate(perPeriodCredits, models);
 
   const desc = (isTeam ? TEAM_DESC : PERSONAL_DESC)[index] ?? "";
-  const highlights = buildHighlights({
-    isTeam,
-    index,
-    periodLabel,
-    monthlyCredits: plan.monthlyCredits,
-    videoMonthlyCredits: plan.videoMonthlyCredits,
-    teamSeats: isTeam ? quote.seats : undefined,
-    maxImages,
-    maxVideoSecFromVideoPool,
-  });
+  const highlights = buildHighlights({ isTeam, index });
 
   function goCheckout() {
-    if (isLoggedIn && billingPersona === "BYOK") {
-      window.location.assign("/pricing?error=byok-persona");
-      return;
-    }
     const checkoutPath = buildMembershipCheckoutPath({
       planId: plan.id,
       seats: isTeam ? quote.seats : undefined,
@@ -710,7 +555,7 @@ function PlanCard({
       transition={{ delay: index * 0.04 }}
       className={cn(
         "site-pricing-plan-card relative flex w-full min-w-0 flex-col overflow-visible rounded-2xl border border-border bg-white transition-colors duration-300",
-        featured && "z-10 ring-1 ring-black/5",
+        featured && "site-pricing-plan-card--featured z-10 ring-1 ring-black/5",
       )}
     >
       {/* 顶部药丸徽标：骑在顶边线上，文字中线对齐边框（见图 2） */}
@@ -756,6 +601,17 @@ function PlanCard({
           ) : null}
         </div>
         <p className="mt-4 site-pricing-plan-desc">{desc}</p>
+
+        <PricingPlanCreditsBlock
+          perPeriodCredits={perPeriodCredits}
+          poolCreditsPerPeriod={poolCreditsPerPeriod}
+          maxImages={creditEstimate.maxImages}
+          maxVideos15s={creditEstimate.maxVideos15s}
+          imageAnchorLabel={creditEstimate.imageAnchorLabel}
+          videoAnchorLabel={creditEstimate.videoAnchorLabel}
+          isTeam={isTeam}
+          featured={featured}
+        />
 
         {/* 团队席位计数器 */}
         {isTeam ? (
@@ -821,13 +677,8 @@ function PlanCard({
           variant={featured ? "default" : "outline"}
           className="h-11 w-full rounded-full text-sm font-medium"
           onClick={goCheckout}
-          disabled={isLoggedIn && billingPersona === "BYOK"}
         >
-          {isLoggedIn && billingPersona === "BYOK"
-            ? "BYOK 账号不可购"
-            : isTeam
-              ? "开通团队会员"
-              : "立即开通"}
+          {isTeam ? "开通团队会员" : "立即开通"}
         </Button>
       </div>
     </motion.div>
@@ -850,23 +701,29 @@ function GroupRow({ icon, label, span }: { icon: React.ReactNode; label: string;
 }
 
 function ModelMatrixRow({ model, tiers }: { model: ModelPrice; tiers: Plan[] }) {
-  const isVideo = model.unit === "PER_SEC";
+  const isVideoSec = model.unit === "PER_SEC";
+  const chargePerUnit = isVideoSec
+    ? computeUnifiedChargeCredits({
+        creditsPerUnit: model.creditsPerUnit,
+        units: DEFAULT_VIDEO_SEC,
+      })
+    : model.creditsPerUnit;
+  const unitSuffix = isVideoSec ? "条15秒" : unitLabel(model.unit);
+
   return (
     <TableRow className="border-border">
       <TableCell className="font-medium text-foreground">{model.displayName}</TableCell>
       <TableCell className="whitespace-nowrap text-right text-muted-foreground">
-        {model.creditsPerUnit} 积分 / {unitLabel(model.unit)}
+        {chargePerUnit} 积分 / {unitSuffix}
       </TableCell>
       {tiers.map((p) => {
-        const { perSeatGeneral, perSeatVideo } = resolvePerSeatPools(
-          p.monthlyCredits,
-          p.videoMonthlyCredits,
-        );
-        const poolCredits = isVideo ? perSeatVideo : perSeatGeneral;
+        const periodCredits = resolveMembershipPeriodCredits(p.monthlyCredits, p.interval);
         return (
           <TableCell key={p.id} className="whitespace-nowrap text-right text-foreground">
-            {computeTierGenerations(poolCredits, model.creditsPerUnit).toLocaleString()}
-            <span className="ml-0.5 text-xs font-normal text-muted-foreground">{unitLabel(model.unit)}</span>
+            {computeTierGenerations(periodCredits, chargePerUnit).toLocaleString()}
+            <span className="ml-0.5 text-xs font-normal text-muted-foreground">
+              {unitSuffix}
+            </span>
           </TableCell>
         );
       })}
@@ -893,8 +750,8 @@ function ToggleBtn({
         "site-pricing-toggle inline-flex items-center rounded-full transition",
         small ? "px-4 py-1.5" : "px-5 py-2",
         active
-          ? "bg-primary text-primary-foreground shadow-sm"
-          : "text-muted-foreground hover:text-foreground",
+          ? "site-pricing-toggle-active bg-primary text-primary-foreground shadow-sm"
+          : "text-muted-foreground",
       )}
     >
       {children}

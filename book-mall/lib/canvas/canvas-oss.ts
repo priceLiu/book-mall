@@ -4,6 +4,7 @@
  */
 import {
   createOssClientFrom,
+  ossHeadObject,
   ossUploadBuffer,
   readOssEnv,
   type OssEnvConfig,
@@ -14,6 +15,12 @@ import {
   buildQuickReplicaBuiltinSplatOssKey,
   buildMinimaxVoicePreviewOssKey,
   buildStyleLibraryOssKey,
+  buildEcomModelLibraryOssKey,
+  buildEcomPoseLibraryOssKey,
+  buildEcomTemplateGalleryOssKey,
+  buildEcomTemplateGallerySlotOssKey,
+  buildEcomTemplateGalleryThumbOssKey,
+  type EcomTemplateGalleryUploadSlot,
   type CanvasOssKind,
 } from "./canvas-constants";
 import {
@@ -79,6 +86,8 @@ async function downloadToBuffer(
 }
 
 const MULTIPART_UPLOAD_THRESHOLD_BYTES = 5 * 1024 * 1024;
+/** multipart 失败后改用单次 put 的上限（过大 put 易超时） */
+const PUT_FALLBACK_MAX_BYTES = 20 * 1024 * 1024;
 const LARGE_UPLOAD_TIMEOUT_MS = 600_000;
 
 /** OSS PUT 可重试的瞬时网络错误（TLS 握手断开 / 连接重置 / 超时等） */
@@ -93,26 +102,35 @@ async function uploadBufferToOss(args: {
   /** 百炼等阿里云服务拉取：用 bucket 直链，避免自定义 CDN 域返回异常 */
   preferBucketUrl?: boolean;
 }): Promise<string> {
-  const useMultipart = args.buf.byteLength >= MULTIPART_UPLOAD_THRESHOLD_BYTES;
-  const timeoutMs = useMultipart ? LARGE_UPLOAD_TIMEOUT_MS : 60_000;
+  const preferMultipart = args.buf.byteLength >= MULTIPART_UPLOAD_THRESHOLD_BYTES;
+  const timeoutMs = preferMultipart ? LARGE_UPLOAD_TIMEOUT_MS : 60_000;
   const ct = args.contentType.split(";")[0].trim() || "application/octet-stream";
 
-  // 瞬时网络抖动（如 TLS 握手前 socket 断开）重试；每次重建客户端用全新连接
-  const sleeps = [0, 600, 1800];
+  // 瞬时网络抖动重试；multipart 用 parallel=1 降低并发 TLS 断连；末次可改 put。
+  const sleeps = [0, 600, 1800, 4000];
   let result: { url?: string } | null = null;
   let lastError: unknown = null;
   for (let attempt = 0; attempt < sleeps.length; attempt++) {
     if (sleeps[attempt] > 0) {
       await new Promise((r) => setTimeout(r, sleeps[attempt]));
     }
-    const client = await createOssClientFrom(args.cfg, { timeoutMs });
+    const useMultipart =
+      preferMultipart &&
+      !(
+        attempt === sleeps.length - 1 &&
+        args.buf.byteLength <= PUT_FALLBACK_MAX_BYTES
+      );
+    const client = await createOssClientFrom(args.cfg, {
+      timeoutMs: useMultipart ? timeoutMs : Math.max(timeoutMs, 120_000),
+    });
     try {
       result = await ossUploadBuffer(client, {
         key: args.key,
         buf: args.buf,
         contentType: ct,
         useMultipart,
-        timeoutMs,
+        timeoutMs: useMultipart ? timeoutMs : Math.max(timeoutMs, 120_000),
+        multipartParallel: 1,
       });
       break;
     } catch (e) {
@@ -126,6 +144,14 @@ async function uploadBufferToOss(args: {
       }
       lastError = e;
       if (attempt < sleeps.length - 1 && TRANSIENT_OSS_ERROR.test(raw)) {
+        continue;
+      }
+      if (
+        attempt < sleeps.length - 1 &&
+        preferMultipart &&
+        args.buf.byteLength <= PUT_FALLBACK_MAX_BYTES
+      ) {
+        // multipart 非瞬时错误时仍允许末次 put 兜底
         continue;
       }
       throw e;
@@ -308,6 +334,202 @@ export async function uploadStyleLibraryPreview(args: {
     buf: args.buf,
     contentType: args.contentType,
   });
+}
+
+/** 电商工具箱 · 平台模特库（固定 OSS key）。 */
+export async function uploadEcomModelLibraryPreview(args: {
+  id: string;
+  buf: Buffer;
+  contentType: string;
+  ext: string;
+}): Promise<string> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const key = buildEcomModelLibraryOssKey(args.id, args.ext);
+  return uploadBufferToOss({
+    cfg: cfgRaw,
+    key,
+    buf: args.buf,
+    contentType: args.contentType,
+  });
+}
+
+/** 电商工具箱 · 姿势库参考图（固定 OSS key）。 */
+export async function uploadEcomPoseLibraryPreview(args: {
+  id: string;
+  buf: Buffer;
+  contentType: string;
+  ext: string;
+}): Promise<string> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const key = buildEcomPoseLibraryOssKey(args.id, args.ext);
+  return uploadBufferToOss({
+    cfg: cfgRaw,
+    key,
+    buf: args.buf,
+    contentType: args.contentType,
+  });
+}
+
+function isOssNotFoundError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /NoSuchKey|404|not exist|Not Found/i.test(msg);
+}
+
+/** 检查 OSS 对象是否已存在（用于导入同名跳过）。 */
+/** head 探测与 PUT 一样会遇到 TLS 握手重置；不重试会把整条导入打成 500 */
+const OSS_HEAD_RETRY_SLEEPS = [0, 500, 1500, 3500];
+
+export async function ossObjectExists(key: string): Promise<boolean> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < OSS_HEAD_RETRY_SLEEPS.length; attempt++) {
+    if (OSS_HEAD_RETRY_SLEEPS[attempt] > 0) {
+      await new Promise((r) => setTimeout(r, OSS_HEAD_RETRY_SLEEPS[attempt]));
+    }
+    try {
+      const client = await createOssClientFrom(cfgRaw);
+      await ossHeadObject(client, key);
+      return true;
+    } catch (e) {
+      if (isOssNotFoundError(e)) return false;
+      lastError = e;
+      const raw = e instanceof Error ? e.message : String(e);
+      if (!TRANSIENT_OSS_ERROR.test(raw)) throw e;
+    }
+  }
+  throw lastError;
+}
+
+/** 由 OSS key 推导公网 URL（catalog 跳过上传时补 URL）。 */
+export function ossPublicUrlForKeyFromEnv(key: string): string {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const base = process.env.OSS_PUBLIC_URL_BASE?.trim().replace(/\/$/, "");
+  if (base) return `${base}/${key}`;
+  return `https://${cfgRaw.bucket}.${cfgRaw.region}.aliyuncs.com/${key}`;
+}
+
+/** 电商工具箱 · 模板区案例图（固定 OSS key）。 */
+export async function uploadEcomTemplateGalleryPreview(args: {
+  category: string;
+  id: string;
+  buf: Buffer;
+  contentType: string;
+  ext: string;
+}): Promise<string> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const key = buildEcomTemplateGalleryOssKey(args.category, args.id, args.ext);
+  return uploadBufferToOss({
+    cfg: cfgRaw,
+    key,
+    buf: args.buf,
+    contentType: args.contentType,
+  });
+}
+
+/** 电商工具箱 · 模板区预生成缩略图（{id}-thumb.webp）。 */
+export async function uploadEcomTemplateGalleryThumb(args: {
+  category: string;
+  id: string;
+  buf: Buffer;
+}): Promise<string> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const key = buildEcomTemplateGalleryThumbOssKey(args.category, args.id);
+  return uploadBufferToOss({
+    cfg: cfgRaw,
+    key,
+    buf: args.buf,
+    contentType: "image/webp",
+  });
+}
+
+export type EcomTemplateGallerySlotUploadResult = {
+  url: string;
+  thumbUrl?: string;
+  coverUrl?: string;
+};
+
+/** 管理后台 · 按槽位上传（cover / main / ref 与 preview 分离） */
+export async function uploadEcomTemplateGallerySlot(args: {
+  category: string;
+  id: string;
+  slot: EcomTemplateGalleryUploadSlot;
+  buf: Buffer;
+  contentType: string;
+  ext: string;
+  refKey?: string;
+  /** preview / main 图片：顺带生成 thumb；preview / main 且尚无 cover 时写入 cover 槽 */
+  autoCover?: boolean;
+}): Promise<EcomTemplateGallerySlotUploadResult> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const key = buildEcomTemplateGallerySlotOssKey(
+    args.category,
+    args.id,
+    args.slot,
+    args.ext,
+    args.refKey,
+  );
+  const url = await uploadBufferToOss({
+    cfg: cfgRaw,
+    key,
+    buf: args.buf,
+    contentType: args.contentType,
+  });
+
+  const isImage = args.contentType.startsWith("image/");
+  let thumbUrl: string | undefined;
+  let coverUrl: string | undefined;
+
+  if (
+    isImage &&
+    (args.slot === "preview" || args.slot === "main")
+  ) {
+    const { buildEcomGalleryThumbWebp } = await import("@/lib/ecom/ecom-gallery-thumb");
+    const thumbBuf = await buildEcomGalleryThumbWebp(args.buf);
+    thumbUrl = await uploadEcomTemplateGalleryThumb({
+      category: args.category,
+      id: args.id,
+      buf: thumbBuf,
+    });
+  }
+
+  if (isImage && args.autoCover && args.slot !== "cover" && args.slot !== "ref") {
+    const coverKey = buildEcomTemplateGallerySlotOssKey(
+      args.category,
+      args.id,
+      "cover",
+      args.ext,
+    );
+    coverUrl = await uploadBufferToOss({
+      cfg: cfgRaw,
+      key: coverKey,
+      buf: args.buf,
+      contentType: args.contentType,
+    });
+  }
+
+  return { url, thumbUrl, coverUrl };
 }
 
 /** QuickReplica 内置模板预览图（固定 OSS key）。 */

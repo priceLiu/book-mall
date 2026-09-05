@@ -1,10 +1,13 @@
 import type { Prisma } from "@prisma/client";
 
+import { cascadeDeletePinsBySource } from "@/lib/ai-space/ai-space-pin-service";
+import { canViewFinanceCost } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/prisma";
 import {
   getBuiltinQrTemplateById,
   listBuiltinQrTemplates,
 } from "@/lib/quick-replica/builtin-templates";
+import { ADMIN_TEMPLATE_PAGE_SIZE } from "@/lib/admin/admin-template-page";
 import { filterTemplatesForGallery } from "@/lib/quick-replica/qr-template-catalog";
 import type { QrCategory, QrTemplateJson, QrTemplateListFilters } from "@/lib/quick-replica/qr-types";
 
@@ -212,6 +215,78 @@ export async function listQrTemplates(
   );
 }
 
+/** 工作流分享：按 resourceId 解析模板（DB / 内置 / 运营 override），不校验归属 */
+export async function resolveQrTemplateForWorkflowShare(
+  resourceId: string,
+): Promise<QrTemplateJson | null> {
+  const builtin = getBuiltinQrTemplateById(resourceId);
+  if (builtin) {
+    const overrideRow = await prisma.qrTemplate.findFirst({
+      where: { catalogBuiltinId: resourceId, deletedAt: null },
+    });
+    if (overrideRow) {
+      return mergeBuiltinWithOverride(builtin, rowToJson(overrideRow));
+    }
+    return builtin;
+  }
+
+  const row = await prisma.qrTemplate.findFirst({
+    where: { id: resourceId, deletedAt: null },
+  });
+  if (row) return rowToJson(row);
+
+  return null;
+}
+
+/** 创建 QR 工作流分享链接前：普通用户仅自己的作品；管理员任意模板 */
+export async function assertCanShareQrTemplate(
+  userId: string,
+  resourceId: string,
+): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  if (canViewFinanceCost(user?.role)) {
+    const t = await resolveQrTemplateForWorkflowShare(resourceId);
+    if (!t) throw new Error("模板不存在");
+    return;
+  }
+
+  const owned = await prisma.qrTemplate.findFirst({
+    where: { id: resourceId, ownerUserId: userId, deletedAt: null },
+  });
+  if (!owned) throw new Error("模板不存在或无权分享");
+}
+
+/** claim 时克隆 QR 模板为领取人私有副本 */
+export async function cloneQrTemplateForShareClaim(
+  claimerUserId: string,
+  resourceId: string,
+): Promise<string> {
+  const snapshot = await resolveQrTemplateForWorkflowShare(resourceId);
+  if (!snapshot) throw new Error("模板不存在或已删除");
+
+  const row = await prisma.qrTemplate.create({
+    data: {
+      ownerUserId: claimerUserId,
+      category: snapshot.category,
+      kind: snapshot.kind,
+      toolKey: snapshot.toolKey ?? null,
+      title: `${snapshot.title}（分享副本）`.slice(0, 120),
+      thumbnailUrl: snapshot.thumbnailUrl,
+      badges: snapshot.badges ?? [],
+      visibility: "private",
+      reference: snapshot.reference as Prisma.InputJsonValue,
+      output: snapshot.output
+        ? (snapshot.output as Prisma.InputJsonValue)
+        : undefined,
+      sortOrder: 0,
+    },
+  });
+  return rowToJson(row).id;
+}
+
 export async function getQrTemplateById(
   userId: string,
   id: string,
@@ -369,6 +444,8 @@ export async function deleteUserQrTemplate(
     where: { id },
     data: { deletedAt: new Date() },
   });
+  // AI 空间侧清理：Pin 删除，画布块保留并渲染「素材已删除」占位
+  await cascadeDeletePinsBySource("qr_template", id);
   return true;
 }
 
@@ -386,6 +463,7 @@ export async function deleteAdminUserQrTemplate(id: string): Promise<boolean> {
     where: { id },
     data: { deletedAt: new Date() },
   });
+  await cascadeDeletePinsBySource("qr_template", id);
   return true;
 }
 
@@ -393,7 +471,8 @@ export async function listAdminUserQrTemplates(filters: {
   category?: QrCategory | null;
   kind?: string | null;
   limit?: number;
-}): Promise<QrTemplateJson[]> {
+  offset?: number;
+}): Promise<{ templates: QrTemplateJson[]; total: number }> {
   const where: Prisma.QrTemplateWhereInput = {
     ownerUserId: { not: null },
     catalogBuiltinId: null,
@@ -401,12 +480,21 @@ export async function listAdminUserQrTemplates(filters: {
   };
   if (filters.category) where.category = filters.category;
   if (filters.kind) where.kind = filters.kind;
-  const rows = await prisma.qrTemplate.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    take: Math.min(200, Math.max(1, filters.limit ?? 100)),
-  });
-  return rows.map(rowToJson);
+  const offset = Math.max(0, filters.offset ?? 0);
+  const limit = Math.min(
+    100,
+    Math.max(1, filters.limit ?? ADMIN_TEMPLATE_PAGE_SIZE),
+  );
+  const [rows, total] = await prisma.$transaction([
+    prisma.qrTemplate.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: offset,
+      take: limit,
+    }),
+    prisma.qrTemplate.count({ where }),
+  ]);
+  return { templates: rows.map(rowToJson), total };
 }
 
 export function templateToWorkspaceDraft(

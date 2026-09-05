@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
-import { ArrowUp, Languages, Loader2, Zap } from "lucide-react";
+import { useCallback, useMemo, useRef } from "react";
+import { ArrowUp, Languages, Loader2 } from "lucide-react";
 import {
   VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
 } from "@/lib/canvas/libtv-dock-scale";
@@ -10,8 +10,12 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useLibtvFloatingDock, useLibtvSoleSelectedNodeId } from "@/lib/canvas/use-libtv-floating-dock";
+import type { LibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
+import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-dock-selection";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
+import type { MentionsTextareaCommitHandle } from "@/components/canvas/mentions/MentionsTextarea";
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
+import { LIBTV_INPUT_DOCK_SEND_BTN_CLASS } from "@/lib/canvas/libtv-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
@@ -24,6 +28,7 @@ import {
 import { isPro2StarterTextGenerating } from "@/lib/canvas/pro2-thin-node-display-state";
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
+import { isPro2SunoModelKey } from "@/lib/canvas/kie-audio-models";
 import {
   useLibtvRuntimeErrorAlert,
 } from "@/lib/canvas/libtv-runtime-error-alert";
@@ -46,10 +51,36 @@ import {
   pro2TextNodeLlmNeedsVision,
 } from "@/lib/canvas/pro2-text-node-engine-roles";
 import { isStoryLlmVisionModel } from "@/lib/canvas/story-llm-vision-models";
-import { isPro2SunoModelKey } from "@/lib/canvas/kie-audio-models";
+import { Pro2LlmDockCreditsBadge } from "./pro2-llm-dock-credits-badge";
 
 /** 2.0 文本节点 · 底部输入坞 */
 export function Pro2StarterInputDock() {
+  const dockNodeId = useLibtvSoleSelectedNodeId("story-pro2-starter");
+  const suppressDock = useLibtvShouldSuppressFloatingDock();
+  const { placement, hidden: dockHidden, active: dockActive } =
+    useLibtvFloatingDock(dockNodeId);
+
+  if (suppressDock || !dockNodeId || !dockActive || !placement) return null;
+
+  return (
+    <Pro2StarterInputDockBody
+      key={dockNodeId}
+      dockNodeId={dockNodeId}
+      placement={placement}
+      dockHidden={dockHidden}
+    />
+  );
+}
+
+function Pro2StarterInputDockBody({
+  dockNodeId,
+  placement,
+  dockHidden,
+}: {
+  dockNodeId: string;
+  placement: LibtvDockFlowPlacement;
+  dockHidden: boolean;
+}) {
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
   const { providers } = useUserProviders();
@@ -57,18 +88,15 @@ export function Pro2StarterInputDock() {
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
-  const dockNodeId = useLibtvSoleSelectedNodeId("story-pro2-starter");
   const storeNode = useMemo(() => {
-    if (!dockNodeId) return null;
     return nodes.find((n) => n.id === dockNodeId) ?? null;
   }, [dockNodeId, nodes]);
-
-  const { placement, hidden: dockHidden, active: dockActive } =
-    useLibtvFloatingDock(dockNodeId);
 
   const dockTextFontPx = VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100;
   const sendBtnPx = 44;
   const sendIconPx = 18;
+
+  const promptCommitRef = useRef<MentionsTextareaCommitHandle | null>(null);
 
   const d = (storeNode?.data ?? {}) as StoryProStarterNodeData;
   const textPurpose = useMemo(
@@ -111,10 +139,20 @@ export function Pro2StarterInputDock() {
     },
   });
 
+  const readLiveThemeInput = useCallback((nodeId: string): string => {
+    promptCommitRef.current?.flushDraft();
+    const live = useCanvasStore
+      .getState()
+      .nodes.find((n) => n.id === nodeId);
+    return String(
+      (live?.data as StoryProStarterNodeData | undefined)?.themeInput ?? "",
+    ).trim();
+  }, []);
+
   const onSendGeneralText = useCallback(async () => {
     if (!storeNode) return;
     if (isPro2StarterTextGenerating(d)) return;
-    const text = themeInput.trim();
+    const text = readLiveThemeInput(storeNode.id);
     const isMusicPreset = String(d.pro2PresetKind ?? "") === "text-to-music";
     const canSend = pro2StarterCanSendGeneralText({
       themeInput: text,
@@ -222,12 +260,12 @@ export function Pro2StarterInputDock() {
         variant: "warning",
       });
     }
-  }, [storeNode, themeInput, d.pro2PresetKind, nodes, edges, base, alert, updateNodeData]);
+  }, [storeNode, d.pro2PresetKind, nodes, edges, base, alert, updateNodeData, readLiveThemeInput]);
 
   const onSendOutline = useCallback(async () => {
     if (!storeNode) return;
     if (isPro2StarterTextGenerating(d)) return;
-    const theme = themeInput.trim();
+    const theme = readLiveThemeInput(storeNode.id);
     if (!theme) {
       await alert({
         title: "请先填写故事",
@@ -291,7 +329,7 @@ export function Pro2StarterInputDock() {
         },
       });
     }
-  }, [storeNode, themeInput, base, alert, updateNodeData, nodes, edges]);
+  }, [storeNode, base, alert, updateNodeData, nodes, edges, readLiveThemeInput]);
 
   const onSend = isStoryOutlineMode ? onSendOutline : onSendGeneralText;
   const sendTitle = isStoryOutlineMode ? "生成故事大纲" : "生成";
@@ -361,13 +399,15 @@ export function Pro2StarterInputDock() {
     updateNodeData,
   });
 
-  if (!storeNode || !dockActive || !placement) return null;
+  if (!storeNode) return null;
 
   return (
     <Pro2InputDockShell
+      key={storeNode.id}
       flowAnchor={placement}
       dockClassName="pro2-starter-dock"
       hidden={dockHidden}
+      anchorNodeId={storeNode.id}
       header={
         <Pro2DockHeader
           refRow={
@@ -413,34 +453,26 @@ export function Pro2StarterInputDock() {
               style={{ fontSize: dockTextFontPx }}
             >
               {isStoryOutlineMode ? (
-                <>
-                  <button
-                    type="button"
-                    className="nodrag rounded-md p-1.5 text-white/35 hover:bg-white/6 hover:text-white/60"
-                    title="翻译（预留）"
-                    disabled
-                  >
-                    <Languages style={{ width: sendIconPx, height: sendIconPx }} />
-                  </button>
-                  <button
-                    type="button"
-                    className="nodrag flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white/35"
-                    style={{ fontSize: dockTextFontPx }}
-                    title="消耗（预留）"
-                    disabled
-                  >
-                    <Zap style={{ width: sendIconPx, height: sendIconPx }} />
-                    <span>1</span>
-                  </button>
-                </>
+                <button
+                  type="button"
+                  className="nodrag rounded-md p-1.5 text-white/35 hover:bg-white/6 hover:text-white/60"
+                  title="翻译（预留）"
+                  disabled
+                >
+                  <Languages style={{ width: sendIconPx, height: sendIconPx }} />
+                </button>
               ) : null}
+              <Pro2LlmDockCreditsBadge
+                modelKey={d.modelKey}
+                fontPx={dockTextFontPx}
+              />
               <button
                 type="button"
                 disabled={
                   isGenerating ||
                   (isStoryOutlineMode ? !themeInput.trim() : !canSendGeneral)
                 }
-                className="nodrag flex items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
+                className={cn(LIBTV_INPUT_DOCK_SEND_BTN_CLASS)}
                 style={{ width: sendBtnPx, height: sendBtnPx }}
                 title={sendTitle}
                 onClick={() => void onSend()}
@@ -466,6 +498,8 @@ export function Pro2StarterInputDock() {
         maxImages={12}
       >
         <MentionsEditable
+          key={storeNode.id}
+          sourceId={storeNode.id}
           className={cn(
             PRO2_DOCK_TEXTAREA_CLASS,
             RF_FORM_CONTROL,
@@ -479,6 +513,7 @@ export function Pro2StarterInputDock() {
           rows={3}
           mentionInlineThumb
           mentionEdition="pro2"
+          commitHandleRef={promptCommitRef}
           onChange={(value, _refs, meta) =>
             updateNodeData(storeNode.id, { themeInput: value }, {
               commit: meta?.commit ?? true,

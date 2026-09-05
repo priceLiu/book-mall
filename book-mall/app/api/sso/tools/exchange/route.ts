@@ -13,15 +13,31 @@ import {
   intersectNavKeysWithSsoClient,
   loadActiveSsoClient,
 } from "@/lib/sso-client-scope";
+import { withApiDbGuard } from "@/lib/http/api-db-error";
+import { isSsoAuthorizationCodeReplayAllowed } from "@/lib/sso-authorization-code";
 
 export const dynamic = "force-dynamic";
 
+async function exchangeTokenResponse(userId: string) {
+  const issued = await issueToolsAccessTokenForUser(userId);
+  if (!issued.ok) {
+    return NextResponse.json(
+      { error: issued.error, ...(issued.code ? { code: issued.code } : {}) },
+      { status: issued.status },
+    );
+  }
+  return NextResponse.json({
+    access_token: issued.accessToken,
+    expires_in: issued.expiresIn,
+    token_type: "Bearer",
+    token_subtype: issued.tokenSubtype,
+  });
+}
+
 /**
  * 工具站服务端调用：用一次性 code 换短时 access token（JWT）。
- * 准入：管理员直通；普通用户须至少一个有效工具技术服务费周期。JWT `tier` 分别为 `gold` / `admin`（legacy 字段名），载荷含 `tools_nav_keys` 与 `tool_service_periods`。
- * 须在服务端发起；Bearer 为 TOOLS_SSO_SERVER_SECRET。
  */
-export async function POST(req: Request) {
+export const POST = withApiDbGuard(async (req) => {
   if (!toolsExchangeAuthorized(req)) {
     return NextResponse.json({ error: "未授权" }, { status: 401 });
   }
@@ -41,7 +57,14 @@ export async function POST(req: Request) {
     where: { code },
   });
   const now = new Date();
-  if (!row || row.consumedAt || row.expiresAt < now) {
+  if (!row || row.expiresAt < now) {
+    return NextResponse.json({ error: "无效或已过期的授权码" }, { status: 400 });
+  }
+
+  if (row.consumedAt) {
+    if (isSsoAuthorizationCodeReplayAllowed(row, now)) {
+      return exchangeTokenResponse(row.userId);
+    }
     return NextResponse.json({ error: "无效或已过期的授权码" }, { status: 400 });
   }
 
@@ -109,11 +132,6 @@ export async function POST(req: Request) {
     );
   }
 
-  await prisma.ssoAuthorizationCode.update({
-    where: { id: row.id },
-    data: { consumedAt: now },
-  });
-
   const issued = await issueToolsAccessTokenForUser(row.userId);
   if (!issued.ok) {
     return NextResponse.json(
@@ -122,10 +140,15 @@ export async function POST(req: Request) {
     );
   }
 
+  await prisma.ssoAuthorizationCode.update({
+    where: { id: row.id },
+    data: { consumedAt: now },
+  });
+
   return NextResponse.json({
     access_token: issued.accessToken,
     expires_in: issued.expiresIn,
     token_type: "Bearer",
     token_subtype: issued.tokenSubtype,
   });
-}
+});

@@ -22,6 +22,7 @@ export async function POST(req: Request) {
   const result = await forwardToBook("/api/sso/portal/verify", {
     method: "POST",
     withServerSecret: true,
+    clientRequest: req,
     body: {
       phone: body?.phone,
       password: body?.password,

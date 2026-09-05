@@ -10,12 +10,15 @@ import type { CreditCostUnit, GatewayProviderKind } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { libNanoProCanonicalFromModelKey } from "@/lib/billing/lib-nano-pro-canonical";
+import { resolveKnownGatewayModelRegistration } from "@/lib/gateway/model-registry";
 import { resolveSbv1BillingCanonicalFromInputSummary } from "@/lib/gateway/log-pricing-hints";
+import { minimaxH3BillingCanonicalFromInput, isMinimaxVideoModelKey } from "@/lib/gateway/minimax-video-models";
 import { canonicalKeyForAlias } from "@/lib/model-catalog/resolve";
 import {
   computeBaseMarginRate,
   DEFAULT_CREDIT_ANCHOR_YUAN,
 } from "@/lib/pricing/credit-pricing-formulas";
+import { refreshCreditPriceIfStale } from "@/lib/pricing/credit-pricing-engine";
 
 /** providerKind → 财务口径 vendor（与 ModelCatalog.vendor / ModelCostProfile.vendor 对齐） */
 export function vendorForProviderKind(kind: GatewayProviderKind): string {
@@ -33,6 +36,8 @@ export function vendorForProviderKind(kind: GatewayProviderKind): string {
       return "deepseek";
     case "MOONSHOT":
       return "moonshot";
+    case "MINIMAX":
+      return "minimax";
     default:
       return String(kind).toLowerCase();
   }
@@ -65,8 +70,42 @@ export async function resolveCanonicalModelKey(modelKey: string): Promise<string
   return null;
 }
 
+function resolutionFromInputSummary(inputSummary: unknown): string | null {
+  if (!inputSummary || typeof inputSummary !== "object" || Array.isArray(inputSummary)) {
+    return null;
+  }
+  const o = inputSummary as Record<string, unknown>;
+  const direct = o.resolution ?? o.imageResolution ?? o.outputResolution;
+  return typeof direct === "string" ? direct : null;
+}
+
+function finalizeBillingCanonical(
+  canonicalModelKey: string,
+  modelKey: string,
+  inputSummary?: unknown,
+): string {
+  if (canonicalModelKey === "lib-nano-pro") {
+    return (
+      libNanoProCanonicalFromModelKey(
+        modelKey,
+        resolutionFromInputSummary(inputSummary),
+      ) ?? "lib-nano-pro-2k"
+    );
+  }
+  if (
+    canonicalModelKey.startsWith("minimax-h3") ||
+    isMinimaxVideoModelKey(modelKey)
+  ) {
+    return minimaxH3BillingCanonicalFromInput({
+      modelKey,
+      resolution: resolutionFromInputSummary(inputSummary),
+    });
+  }
+  return canonicalModelKey;
+}
+
 /**
- * 计费归口：sbv1 分档 variant → tier canonical；否则 modelKey 别名。
+ * 计费归口：sbv1 分档 variant → tier canonical；否则 modelKey 别名 / Gateway 注册表。
  */
 export async function resolveBillingCanonicalKey(input: {
   modelKey: string;
@@ -78,13 +117,23 @@ export async function resolveBillingCanonicalKey(input: {
   );
   if (fromSbv1) return fromSbv1;
 
+  const fromNano = libNanoProCanonicalFromModelKey(
+    input.modelKey,
+    resolutionFromInputSummary(input.inputSummary),
+  );
+  if (fromNano) return fromNano;
+
   const canonical = await resolveCanonicalModelKey(input.modelKey);
-  if (canonical === "lib-nano-pro") {
-    return (
-      libNanoProCanonicalFromModelKey(input.modelKey, null) ?? "lib-nano-pro-2k"
-    );
+  if (canonical) {
+    return finalizeBillingCanonical(canonical, input.modelKey, input.inputSummary);
   }
-  return canonical;
+
+  const reg = resolveKnownGatewayModelRegistration(input.modelKey);
+  if (reg) {
+    return finalizeBillingCanonical(reg.canonicalModelKey, input.modelKey, input.inputSummary);
+  }
+
+  return null;
 }
 
 export interface CostSnapshot {
@@ -94,6 +143,10 @@ export interface CostSnapshot {
   creditsPerUnit: number | null;
   /** 单位挂牌价（元/秒、元/张、元/千token），逐档积分换算用 */
   listPriceYuan: number | null;
+  inputCreditsPerKToken?: number | null;
+  outputCreditsPerKToken?: number | null;
+  inputListPriceYuan?: number | null;
+  outputListPriceYuan?: number | null;
   unit: CreditCostUnit | null;
   vendor: string;
 }
@@ -103,6 +156,13 @@ export interface CostSnapshot {
  * 找不到成本档返回 null（由调用方决定是否阻断）。
  */
 export async function resolveCostSnapshot(canonicalModelKey: string): Promise<CostSnapshot | null> {
+  await refreshCreditPriceIfStale({
+    canonicalModelKey,
+    publishedBy: "resolveCostSnapshot",
+  }).catch(() => {
+    /* 无成本档或毛利护栏失败时沿用旧报价 */
+  });
+
   const now = new Date();
   const profiles = await prisma.modelCostProfile.findMany({
     where: {
@@ -135,6 +195,10 @@ export async function resolveCostSnapshot(canonicalModelKey: string): Promise<Co
     marginRate,
     creditsPerUnit,
     listPriceYuan: price?.listPriceYuan != null ? num(price.listPriceYuan) : null,
+    inputCreditsPerKToken: price?.inputCreditsPerKToken ?? null,
+    outputCreditsPerKToken: price?.outputCreditsPerKToken ?? null,
+    inputListPriceYuan: price?.inputListPriceYuan != null ? num(price.inputListPriceYuan) : null,
+    outputListPriceYuan: price?.outputListPriceYuan != null ? num(price.outputListPriceYuan) : null,
     unit: price?.unit ?? chosen.unit ?? null,
     vendor: chosen.vendor,
   };
@@ -169,7 +233,7 @@ export async function checkCredentialModelBinding(input: {
   enforceCostProfile?: boolean; // 平台 Key 模式传 true
 }): Promise<BindingCheckResult> {
   const vendor = vendorForProviderKind(input.providerKind);
-  const canonical = await resolveCanonicalModelKey(input.modelKey);
+  const canonical = await resolveBillingCanonicalKey({ modelKey: input.modelKey });
 
   if (!canonical) {
     return {

@@ -16,7 +16,7 @@
 - **工作台**：默认首页，说明导航与重连方式。
 - **试衣间** (`/fitting-room`)：套装列表与详情弹层；**试穿**跳转 **AI 试衣**并预填服装（详见 [fitting-room-and-ai-fit.md](./fitting-room-and-ai-fit.md)）。
 - **AI 试衣** (`/fitting-room/ai-fit`)：模特与服装配置、异步试衣与结果展示；支持从试衣间带 `id` 预填。
-- **文生图** (`/text-to-image`)：通义文生图异步任务与结算；推理 Key 仅服务端读取（`lib/qwen-env.ts` / `lib/tool-config.ts`）。
+- **文生图** (`/text-to-image`)：通义文生图异步任务与结算；经主站 Gateway（`forward-gateway-dashscope-server`），不在 tool-web 配置百炼 Key。
 - **图生视频** (`/image-to-video` 及 `/lab`、`/library`)：百炼视频合成（首帧 / 参考 / 文生）；任务成功后主站计费、成片可入库 OSS；上游 HTTP 备忘见 [pic-video.md](../pic-video.md) 及实现页 `/image-to-video/implementation`。
 - **智能客服** (`/smart-support`)：首页 Hero；**我的智能客服**（`/smart-support/chat`）左栏 DeepSeek 流式 API、右栏 Dify iframe；`/smart-support/sessions` 仅占位路由（侧栏不展示）。
 - **实现逻辑**（摘录页）：各工具对应 `…/implementation` 路由，说明流程、计费要点与代码摘录；与使用页双向链接，交付要求见 [tools-delivery-checklist.md](./tools-delivery-checklist.md) §5。

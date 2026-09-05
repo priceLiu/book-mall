@@ -15,7 +15,6 @@ type Plan = {
   originalYuan: number | null;
   promoLabel: string | null;
   monthlyCredits: number;
-  videoMonthlyCredits: number;
   includedSeats: number;
   active: boolean;
   seatTiers: Array<{
@@ -43,7 +42,6 @@ const EMPTY = {
   originalYuan: "",
   promoLabel: "",
   monthlyCredits: 0,
-  videoMonthlyCredits: 0,
   includedSeats: 1,
   active: true,
 };
@@ -82,7 +80,6 @@ export function MembershipPlansClient() {
       sortOrder: draft.sortOrder,
       priceYuan: draft.priceYuan,
       monthlyCredits: draft.monthlyCredits,
-      videoMonthlyCredits: draft.videoMonthlyCredits,
       includedSeats: draft.includedSeats,
       active: draft.active,
     };
@@ -141,10 +138,6 @@ export function MembershipPlansClient() {
             <input type="number" className={inputCls} value={draft.monthlyCredits} onChange={(e) => setDraft({ ...draft, monthlyCredits: Number(e.target.value) })} />
           </label>
           <label className="text-sm">
-            <span className="text-[#8c8c8c]">视频池积分</span>
-            <input type="number" className={inputCls} value={draft.videoMonthlyCredits} onChange={(e) => setDraft({ ...draft, videoMonthlyCredits: Number(e.target.value) })} />
-          </label>
-          <label className="text-sm">
             <span className="text-[#8c8c8c]">含席位数</span>
             <input type="number" className={inputCls} value={draft.includedSeats} onChange={(e) => setDraft({ ...draft, includedSeats: Number(e.target.value) })} />
           </label>
@@ -161,7 +154,6 @@ export function MembershipPlansClient() {
               <th className="px-3 py-2 text-left">套餐</th>
               <th className="px-3 py-2 text-right">价格</th>
               <th className="px-3 py-2 text-right">月积分</th>
-              <th className="px-3 py-2 text-right">视频池</th>
               <th className="px-3 py-2 text-right">席位</th>
               <th className="px-3 py-2">状态</th>
               <th className="px-3 py-2 text-right">操作</th>
@@ -178,7 +170,6 @@ export function MembershipPlansClient() {
                 </td>
                 <td className="px-3 py-2 text-right">¥{p.priceYuan.toFixed(2)}</td>
                 <td className="px-3 py-2 text-right">{p.monthlyCredits}</td>
-                <td className="px-3 py-2 text-right">{p.videoMonthlyCredits}</td>
                 <td className="px-3 py-2 text-right">{p.includedSeats}</td>
                 <td className="px-3 py-2">{p.active ? "生效" : "停用"}</td>
                 <td className="px-3 py-2 text-right">
@@ -196,7 +187,6 @@ export function MembershipPlansClient() {
                         originalYuan: p.originalYuan != null ? String(p.originalYuan) : "",
                         promoLabel: p.promoLabel ?? "",
                         monthlyCredits: p.monthlyCredits,
-                        videoMonthlyCredits: p.videoMonthlyCredits,
                         includedSeats: p.includedSeats,
                         active: p.active,
                       });

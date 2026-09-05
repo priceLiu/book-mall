@@ -16,6 +16,73 @@ describe("isGatewayImageModelKey", () => {
 });
 
 describe("formatCanvasTaskError", () => {
+  it("maps vendor unsafe image rejection to Chinese hint", () => {
+    expect(
+      formatCanvasTaskError(
+        "IMAGE_ENGINE_FAILED",
+        "The generated images appear to be unsafe. Try modifying the prompts.",
+        "nano-banana-pro",
+      ),
+    ).toBe("内容被安全策略拦截，请修改提示词或参考图后重试。");
+  });
+
+  it("maps Bailian green net output rejection for R2V video", () => {
+    expect(
+      formatCanvasTaskError(
+        "FAILED",
+        "Green net check failed for image (output): Output data may contain inappropriate content.",
+        "happyhorse-1.1-r2v",
+      ),
+    ).toContain("生成的视频未通过百炼内容安全审核");
+  });
+
+  it("maps HappyHorse output IP infringement to copyright hint", () => {
+    expect(
+      formatCanvasTaskError(
+        "FAILED",
+        "Output data is suspected of being involved in IP infringement",
+        "happyhorse-1.1-r2v",
+      ),
+    ).toContain("百炼版权审核");
+  });
+
+  it("maps Bailian green net input rejection", () => {
+    expect(
+      formatCanvasTaskError(
+        "DataInspectionFailed",
+        "Green net check failed for image input",
+        "happyhorse-1.1-r2v",
+      ),
+    ).toContain("参考图或提示词未通过百炼内容安全审核");
+  });
+
+  it("maps auth failures to re-login hint", () => {
+    expect(
+      formatCanvasTaskError(
+        "REQUEST_FAILED",
+        "401 UNAUTHORIZED",
+        "happyhorse-1.1-t2v",
+      ),
+    ).toBe("登录状态已过期，请刷新页面或重新连接主站账号后再生成。");
+  });
+
+  it("maps db/proxy overload to system busy (not model unavailable)", () => {
+    expect(
+      formatCanvasTaskError(
+        "SYSTEM_BUSY",
+        "503 服务繁忙，请稍后再试",
+        "happyhorse-1.1-t2v",
+      ),
+    ).toContain("系统繁忙或主站连接异常");
+    expect(
+      formatCanvasTaskError(
+        "REQUEST_FAILED",
+        "503 DATABASE_UNAVAILABLE",
+        "happyhorse-1.1-t2v",
+      ),
+    ).toContain("系统繁忙或主站连接异常");
+  });
+
   it("short image timeout message without Gemini hint", () => {
     expect(
       formatCanvasTaskError(
@@ -26,14 +93,24 @@ describe("formatCanvasTaskError", () => {
     ).toBe("生图服务暂时不可用，请稍后重试。");
   });
 
-  it("dev database unreachable mentions VPN", () => {
+  it("OSS upload failure is not labeled as image service down", () => {
+    expect(
+      formatCanvasTaskError(
+        "OSS_UPLOAD_FAILED",
+        "socket disconnected before secure TLS connection was established",
+        "nano-banana-pro",
+      ),
+    ).toContain("保存到云存储失败");
+  });
+
+  it("dev database unreachable mentions db:ping", () => {
     expect(
       formatCanvasTaskError(
         "FAILED",
         "Can't reach database server at cdb-xxx.tencentcdb.com:24155",
         "nano-banana-pro",
       ),
-    ).toContain("VPN");
+    ).toContain("db:ping");
   });
 
   it("short LLM timeout message", () => {
@@ -46,14 +123,88 @@ describe("formatCanvasTaskError", () => {
     ).toBe("文本模型服务暂时不可用，请稍后重试。");
   });
 
-  it("short KIE video timeout message", () => {
+  it("maps DeepSeek TLS handshake drop to DeepSeek unavailable", () => {
+    expect(
+      formatCanvasTaskError(
+        "FAILED",
+        "DEEPSEEK API 请求失败: Client network socket disconnected before secure TLS connection was established",
+        "deepseek-v4-flash",
+      ),
+    ).toBe("DeepSeek 服务暂时不可用，请稍后重试。");
+  });
+
+  it("Kling video timeout uses generic service message (DashScope route)", () => {
     expect(
       formatCanvasTaskError(
         "VIDEO_ENGINE_FAILED",
         "KIE API 连接超时，请稍后重试。",
         "kling-3.0/video",
       ),
-    ).toBe("KIE 视频服务暂时不可用，请稍后重试。");
+    ).toBe("模型服务暂时不可用，请稍后重试。");
+  });
+
+  it("KIE quota on image model shows balance hint", () => {
+    expect(
+      formatCanvasTaskError(
+        "PROVIDER_QUOTA_EXCEEDED",
+        "KIE 余额不足，请充值后重试",
+        "nano-banana-pro",
+      ),
+    ).toBe("KIE 生图账户余额不足，请充值 Gateway 绑定的 KIE 凭证后重试。");
+  });
+
+  it("INSUFFICIENT_CREDITS without prisma noise", () => {
+    expect(
+      formatCanvasTaskError(
+        "INSUFFICIENT_CREDITS",
+        "reserve failed",
+        "nano-banana-pro",
+      ),
+    ).toContain("平台积分不足");
+  });
+
+  it("Kling image product-not-activated points to Bailian not KIE", () => {
+    expect(
+      formatCanvasTaskError(
+        "REQUEST_FAILED",
+        "createTask code=422 msg=The product is not activated",
+        "kling-3.0-image",
+      ),
+    ).toContain("阿里云百炼");
+    expect(
+      formatCanvasTaskError(
+        "REQUEST_FAILED",
+        "createTask code=422 msg=The product is not activated",
+        "kling-3.0-image",
+      ),
+    ).not.toContain("KIE 控制台");
+  });
+
+  it("Kling video product-not-activated points to Bailian", () => {
+    expect(
+      formatCanvasTaskError(
+        "VIDEO_ENGINE_FAILED",
+        "The product is not activated",
+        "kling-3.0/video",
+      ),
+    ).toContain("阿里云百炼");
+    expect(
+      formatCanvasTaskError(
+        "VIDEO_ENGINE_FAILED",
+        "The product is not activated",
+        "kling-3.0/video",
+      ),
+    ).not.toContain("KIE 控制台");
+  });
+
+  it("Kling motion-control product-not-activated still points to KIE", () => {
+    expect(
+      formatCanvasTaskError(
+        "VIDEO_ENGINE_FAILED",
+        "The product is not activated",
+        "kling-3.0/motion-control",
+      ),
+    ).toContain("KIE 控制台");
   });
 
   it("strips long gateway technical messages", () => {
@@ -64,5 +215,15 @@ describe("formatCanvasTaskError", () => {
         "nano-banana-pro",
       ),
     ).toBe("生图服务暂时不可用，请稍后重试。");
+  });
+
+  it("maps Kimi EngineOverloadedError to retry hint", () => {
+    expect(
+      formatCanvasTaskError(
+        "FAILED",
+        '{"error":{"message":"The engine is currently overloaded, please try again later","type":"EngineOverloadedError","code":"EngineOverloadedError"}}',
+        "kimi-k3",
+      ),
+    ).toContain("引擎繁忙");
   });
 });

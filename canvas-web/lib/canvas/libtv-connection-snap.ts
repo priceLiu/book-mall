@@ -6,8 +6,13 @@ import { libtvSidePlusInHandleId } from "./libtv-side-plus-in-handle";
 import {
   LIBTV_SIDE_PLUS_LG_RADIUS_FLOW,
   LIBTV_SIDE_PLUS_SNAP_PADDING_FLOW,
+  libtvSidePlusFollowVerticalBounds,
 } from "./libtv-node-chrome";
 import type { CanvasFlowNode } from "./types";
+import {
+  isBatchConnectSnapTarget,
+  type BatchConnectMode,
+} from "./pro2-batch-connect";
 
 /** 拖线松手时 · 节点 type → 默认 target / source handle */
 export const DEFAULT_HANDLE_BY_TYPE: Record<
@@ -17,9 +22,13 @@ export const DEFAULT_HANDLE_BY_TYPE: Record<
   "sbv1-image": { target: "in_image", source: "image" },
   "sbv1-video-engine": { target: "in_ref", source: "out_video" },
   "jianying-export-pro2": { target: "in_video" },
-  "jianying-auto-render-pro2": { target: "in_video" },
+  "jianying-auto-render-pro2": { target: "in_video", source: undefined },
   "story-pro2-image": { target: "in_image", source: "image" },
   "story-pro2-three-view": { target: "in_image", source: "image" },
+  "story-pro2-style-asset": { target: "in_image", source: "style" },
+  "story-pro2-prop": { target: "in_image", source: "image" },
+  "story-pro2-mood": { target: "in_image", source: "image" },
+  "story-pro2-audio": { target: "in_audio", source: "audio" },
   "story-pro2-starter": { target: "in_text", source: "text" },
   "story-pro2-script-hub": { target: "in_text", source: "text" },
   "story-pro2-frame": { target: "in_text" },
@@ -84,10 +93,7 @@ type SidePlusSnapHit = {
   dist: number;
 };
 
-/** 与 pro2-node-side-plus · MAGNET_VERTICAL_INSET_PX 对齐 */
-const SIDE_PLUS_VERTICAL_INSET_FLOW = 24;
-
-/** 点到侧 + 吸附带的最短距离（+ 可沿节点竖边磁吸移动） */
+/** 与 pro2-node-side-plus · libtvSidePlusFollowVerticalBounds 对齐 */
 function distancePointToSidePlusZone(
   point: { x: number; y: number },
   node: CanvasFlowNode,
@@ -99,12 +105,12 @@ function distancePointToSidePlusZone(
   const handleId = side === "left" ? map.left : map.right;
   if (!handleId) return null;
   const box = nodeSnapBox(node, nodes);
-  const cx =
-    side === "left"
-      ? box.left - LIBTV_SIDE_PLUS_LG_RADIUS_FLOW
-      : box.right + LIBTV_SIDE_PLUS_LG_RADIUS_FLOW;
-  const minY = box.top + SIDE_PLUS_VERTICAL_INSET_FLOW;
-  const maxY = box.bottom - SIDE_PLUS_VERTICAL_INSET_FLOW;
+  /** + 圆心钉在节点左/右边框中线上（见 globals.css · pro2-node-side-plus-handle） */
+  const cx = side === "left" ? box.left : box.right;
+  const boxHeight = box.bottom - box.top;
+  const { insetFromEdge } = libtvSidePlusFollowVerticalBounds(boxHeight);
+  const minY = box.top + insetFromEdge;
+  const maxY = box.bottom - insetFromEdge;
   if (maxY <= minY) return null;
   const clampedY = Math.max(minY, Math.min(maxY, point.y));
   return Math.hypot(point.x - cx, point.y - clampedY);
@@ -185,22 +191,14 @@ export function findBatchConnectSnapTarget(
   nodes: CanvasFlowNode[],
   flowPoint: { x: number; y: number },
   excludeIds: string[],
-  mode: "video-export" | "image-pipeline" = "video-export",
+  mode: BatchConnectMode = "video-export",
 ): CanvasFlowNode | null {
   const exclude = new Set(excludeIds);
   let nearest: { node: CanvasFlowNode; dist: number } | null = null;
 
   for (const n of nodes) {
     if (exclude.has(n.id)) continue;
-    const matches =
-      mode === "video-export"
-        ? n.type === "jianying-export-pro2" ||
-          n.type === "jianying-auto-render-pro2"
-        : n.type === "sbv1-video-engine" ||
-          n.type === "sbv1-image" ||
-          n.type === "story-pro2-image" ||
-          n.type === "story-pro2-three-view";
-    if (!matches) continue;
+    if (!isBatchConnectSnapTarget(n, mode)) continue;
     const box = nodeSnapBox(n, nodes);
     const dist = distancePointToRect(flowPoint, box);
     if (
@@ -274,6 +272,14 @@ export function resolveSnapConnectionOnNodeHit(
       (state.fromHandleId === "out_video" || state.fromHandleId === "plus_left")
     ) {
       targetHandle = "in_video";
+    } else if (
+      (targetNode.type === "jianying-export-pro2" ||
+        targetNode.type === "jianying-auto-render-pro2") &&
+      !state.toHandleId &&
+      fromNode?.type === "story-pro2-audio" &&
+      (state.fromHandleId === "audio" || state.fromHandleId === "plus_left")
+    ) {
+      targetHandle = "in_audio";
     }
     if (!targetHandle) return null;
     return {

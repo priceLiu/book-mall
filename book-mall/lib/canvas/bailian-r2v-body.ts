@@ -28,6 +28,12 @@ export function bailianR2vMaxRefs(model: string): number {
   return BAILIAN_R2V_HAPPYHORSE_MAX_REFS;
 }
 
+/** 百炼 R2V 单条成片 API 时长上限（秒） */
+export function bailianR2vMaxDurationSec(model: string): number {
+  if (isWan26BailianR2vModel(model.trim())) return 10;
+  return 30;
+}
+
 export function wan26R2vSizeFromAspect(
   aspectRatio: string,
   resolution: "720P" | "1080P",
@@ -58,6 +64,49 @@ function parseSeed(raw: string | undefined): number | undefined {
   return n;
 }
 
+export type BailianR2vMediaItem = {
+  type: "first_frame" | "last_frame" | "reference_image";
+  url: string;
+};
+
+/**
+ * HappyHorse / 万相 2.7 R2V · media 类型映射。
+ * 百炼 API 仅接受 type=reference_image（传 first_frame 会 422）。
+ * 顺序仍约定：urls[0] 为分镜静帧/主图，其余 @ 资产为附加参考。
+ */
+export function buildBailianR2vMediaItems(
+  model: string,
+  urls: readonly string[],
+): BailianR2vMediaItem[] {
+  const max = bailianR2vMaxRefs(model);
+  const slice = urls.map((s) => s.trim()).filter(Boolean).slice(0, max);
+  if (!slice.length) return [];
+  return slice.map((url) => ({ type: "reference_image" as const, url }));
+}
+
+/** Gateway inputSummary · 显式写入 mainFrameImageUrl，日志 UI 可单独展示分镜图 */
+export function enrichBailianR2vInputForLog(
+  built: BailianR2vRequestBody,
+  referenceImageUrls: readonly string[],
+): Record<string, unknown> {
+  const media = Array.isArray(built.input.media)
+    ? (built.input.media as BailianR2vMediaItem[])
+    : [];
+  const frameFromMedia =
+    media.find((m) => m.type === "first_frame")?.url?.trim() ??
+    media[0]?.url?.trim();
+  const frameFromUrls = referenceImageUrls
+    .map((u) => u.trim())
+    .find((u) => u.length > 0 && /\/canvas\/node-image\//.test(u));
+  const mainFrameImageUrl = frameFromMedia || frameFromUrls;
+  return {
+    ...built.input,
+    parameters: built.parameters,
+    referenceImageUrls: [...referenceImageUrls],
+    ...(mainFrameImageUrl ? { mainFrameImageUrl } : {}),
+  };
+}
+
 /** 百炼 R2V：wan2.6 用 reference_urls；wan2.7 / happyhorse 用 media */
 export function buildBailianR2vRequestBody(opts: {
   model: string;
@@ -71,7 +120,10 @@ export function buildBailianR2vRequestBody(opts: {
 }): BailianR2vRequestBody {
   const model = opts.model.trim();
   const urls = opts.referenceImageUrls.map((s) => s.trim()).filter(Boolean);
-  const duration = Math.min(15, Math.max(3, Math.floor(opts.duration)));
+  const duration = Math.min(
+    bailianR2vMaxDurationSec(model),
+    Math.max(3, Math.floor(opts.duration)),
+  );
   const seed = parseSeed(opts.seedStr);
   const ratio = opts.ratio.trim() || "16:9";
 
@@ -109,10 +161,7 @@ export function buildBailianR2vRequestBody(opts: {
       model,
       input: {
         prompt: opts.prompt.trim(),
-        media: urls.slice(0, BAILIAN_R2V_WAN27_MAX_REFS).map((url) => ({
-          type: "reference_image",
-          url,
-        })),
+        media: buildBailianR2vMediaItems(model, urls),
       },
       parameters,
     };
@@ -122,10 +171,7 @@ export function buildBailianR2vRequestBody(opts: {
     model,
     input: {
       prompt: opts.prompt.trim(),
-      media: urls.slice(0, BAILIAN_R2V_HAPPYHORSE_MAX_REFS).map((url) => ({
-        type: "reference_image",
-        url,
-      })),
+      media: buildBailianR2vMediaItems(model, urls),
     },
     parameters,
   };

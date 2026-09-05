@@ -8,6 +8,7 @@ import {
   patchCanvasJsonNodeRuntime,
   type CanvasNodeRuntimePatch,
 } from "@/lib/canvas/canvas-volcengine-recover";
+import { isCanvasManagedOssUrl } from "@/lib/canvas/canvas-managed-oss-url";
 import { prisma } from "@/lib/prisma";
 
 export const CANVAS_IMAGE_MEDIA_NODE_TYPES = new Set([
@@ -26,9 +27,12 @@ export const CANVAS_VIDEO_MEDIA_NODE_TYPES = new Set([
   "ai-video-engine",
 ]);
 
+export const CANVAS_AUDIO_MEDIA_NODE_TYPES = new Set(["story-pro2-audio"]);
+
 export const CANVAS_MEDIA_NODE_TYPES = new Set([
   ...CANVAS_IMAGE_MEDIA_NODE_TYPES,
   ...CANVAS_VIDEO_MEDIA_NODE_TYPES,
+  ...CANVAS_AUDIO_MEDIA_NODE_TYPES,
 ]);
 
 export function canvasNodeShowsPersistedMedia(
@@ -69,8 +73,14 @@ export function patchCanvasJsonNodeMedia(
   runtime: CanvasNodeRuntimePatch,
 ): unknown {
   let next = patchCanvasJsonNodeRuntime(canvas, nodeId, runtime);
-  if (!CANVAS_IMAGE_MEDIA_NODE_TYPES.has(nodeType ?? "")) return next;
+  if (
+    !CANVAS_IMAGE_MEDIA_NODE_TYPES.has(nodeType ?? "") &&
+    !CANVAS_AUDIO_MEDIA_NODE_TYPES.has(nodeType ?? "")
+  ) {
+    return next;
+  }
   if (!next || typeof next !== "object") return next;
+  const dataOssUrl = isCanvasManagedOssUrl(mediaUrl) ? mediaUrl : undefined;
   const c = next as {
     nodes?: Array<{ id: string; data?: Record<string, unknown> }>;
   };
@@ -83,10 +93,17 @@ export function patchCanvasJsonNodeMedia(
             ...n,
             data: {
               ...(n.data ?? {}),
-              ossUrl: mediaUrl,
-              blobUrl: undefined,
-              uploading: false,
-              uploadError: undefined,
+              ...(dataOssUrl
+                ? {
+                    ossUrl: dataOssUrl,
+                    blobUrl: undefined,
+                    uploading: false,
+                    uploadError: undefined,
+                  }
+                : {
+                    uploading: false,
+                    uploadError: undefined,
+                  }),
             },
           }
         : n,
@@ -148,6 +165,26 @@ export async function patchCanvasProjectNodeMediaFromTask(
   if (!node) return false;
 
   const nodeType = opts?.nodeType ?? node.type;
+  const nodeData = node.data as {
+    ossUrl?: string;
+    uploading?: boolean;
+    runtime?: { taskId?: string; status?: string; ossUrl?: string };
+  };
+  const managedTaskOss = isCanvasManagedOssUrl(task.ossUrl);
+  const needsManagedOssUpgrade =
+    managedTaskOss &&
+    (!isCanvasManagedOssUrl(nodeData?.ossUrl) ||
+      Boolean(nodeData?.uploading) ||
+      nodeData?.runtime?.status === "pending" ||
+      nodeData?.runtime?.status === "running" ||
+      nodeData?.runtime?.status === "queued");
+  // 节点已展示本任务成片 → 跳过整图写回，避免无谓 bump updatedAt 与增量 autosave 抢写
+  if (
+    canvasNodeShowsPersistedMedia(canvas, task.nodeId, task.id) &&
+    !needsManagedOssUpgrade
+  ) {
+    return false;
+  }
   const existingTaskId = node.data?.runtime?.taskId?.trim();
   const existingStatus = node.data?.runtime?.status;
   if (

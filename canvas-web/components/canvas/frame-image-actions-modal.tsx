@@ -18,9 +18,15 @@ import {
   isFrameMediaInflight,
 } from "@/lib/canvas/story-batch-spawn";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import {
+  CANVAS_MODAL_BACKDROP_CLASS,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import { busEnqueueNode } from "@/lib/canvas/canvas-run-bus";
 import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import { EnginePicker } from "./engine-picker";
+import { STORY_PRO_FRAME_IMAGE_MODEL_KEYS } from "@/lib/canvas/story-prompts";
 import {
   MentionsTextarea,
   type MentionableItem,
@@ -365,24 +371,14 @@ export function FrameImageActionsModal({
     setTab(t);
   }, [open, initialTab]);
 
-  useEffect(() => {
-    if (!open) return;
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
+  useModalBodyScrollLock(open);
+  useModalEscapeClose(onClose, { active: open });
 
   if (!mounted || !open) return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1090] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className={`${CANVAS_MODAL_BACKDROP_CLASS} z-[1090]`}
       role="dialog"
       aria-modal="true"
       aria-label={`${title} · 操作`}
@@ -455,6 +451,7 @@ export function FrameImageActionsModal({
                   providerId={providerId}
                   modelKey={modelKey}
                   params={params}
+                  allowedModelKeys={[...STORY_PRO_FRAME_IMAGE_MODEL_KEYS]}
                   onChange={onPickEngine}
                 />
               </div>

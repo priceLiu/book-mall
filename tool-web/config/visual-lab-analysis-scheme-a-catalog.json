@@ -5,6 +5,12 @@
   "schemeNote": "成本字段由主站 PricingSourceLine 经 pnpm pricing:emit-catalogs 同步； retailMultiplier 与等价用量仍以本文件为准；人工请勿手改 input/output 元价。",
   "models": [
     {
+      "id": "qwen3.8-max",
+      "inputYuanPerMillion": 12,
+      "outputYuanPerMillion": 36,
+      "tierNote": "0<Token≤1M · 中国内地"
+    },
+    {
       "id": "qwen3.6-plus",
       "inputYuanPerMillion": 2,
       "outputYuanPerMillion": 12,

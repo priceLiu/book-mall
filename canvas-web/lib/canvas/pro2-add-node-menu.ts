@@ -15,6 +15,7 @@ import {
   Sparkles,
   Tag,
   Type,
+  MessageSquareText,
   User,
   Video,
   Wind,
@@ -47,6 +48,13 @@ const NODE_ITEMS: Pro2AddMenuItem[] = [
     nodeType: "story-pro2-starter",
   },
   {
+    id: "prompt",
+    label: "提示词",
+    icon: MessageSquareText,
+    enabled: true,
+    nodeType: "story-pro2-prompt",
+  },
+  {
     id: "tag",
     label: "标签",
     icon: Tag,
@@ -68,6 +76,14 @@ const NODE_ITEMS: Pro2AddMenuItem[] = [
     nodeType: "story-pro2-three-view",
   },
   {
+    id: "3d-desk",
+    label: "3D导演台",
+    icon: Box,
+    enabled: true,
+    badge: "NEW",
+    nodeType: "story-pro2-3d-desk",
+  },
+  {
     id: "hd-video",
     label: "高清视频",
     icon: ScanLine,
@@ -84,7 +100,7 @@ const NODE_ITEMS: Pro2AddMenuItem[] = [
   { id: "audio", label: "音频", icon: Music, enabled: true, nodeType: "story-pro2-audio" },
   {
     id: "script",
-    label: "脚本",
+    label: "故事剧本",
     icon: FileText,
     enabled: true,
     badge: "Beta",
@@ -150,7 +166,7 @@ export const PRO2_IMAGE_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
       { id: "video", label: "视频", icon: Video, enabled: false },
       {
         id: "script",
-        label: "脚本",
+        label: "故事剧本",
         icon: FileText,
         enabled: false,
         badge: "Beta",
@@ -185,10 +201,16 @@ export const PRO2_STARTER_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
         enabled: true,
         nodeType: "sbv1-video-engine",
       },
-      { id: "audio", label: "音频", icon: Music, enabled: false },
+      {
+        id: "audio",
+        label: "音频",
+        icon: Music,
+        enabled: true,
+        nodeType: "story-pro2-audio",
+      },
       {
         id: "script",
-        label: "脚本",
+        label: "故事剧本",
         icon: FileText,
         enabled: false,
         badge: "NEW",
@@ -230,7 +252,7 @@ export const PRO2_STYLE_ASSET_RIGHT_MENU: Pro2AddMenuSection[] = [
       { id: "audio", label: "音频", icon: Music, enabled: false },
       {
         id: "script",
-        label: "脚本",
+        label: "故事剧本",
         icon: FileText,
         enabled: false,
         badge: "NEW",

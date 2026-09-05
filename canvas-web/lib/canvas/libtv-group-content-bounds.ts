@@ -11,9 +11,9 @@ function nodeMeasuredSize(n: CanvasFlowNode): { w: number; h: number } {
 }
 
 /** 与 pro2-media-group-layout.ts 保持一致 · 避免单测拉入 use client 模块 */
-const LIBTV_GROUP_PAD = 64;
+const LIBTV_GROUP_PAD = 96;
 const LIBTV_GROUP_HEADER = 48;
-const LIBTV_GROUP_EXTRA = 56;
+const LIBTV_GROUP_EXTRA = 84;
 
 export const LIBTV_GROUP_ABSOLUTE_MIN_WIDTH = 220;
 export const LIBTV_GROUP_ABSOLUTE_MIN_HEIGHT = 140;
@@ -154,3 +154,47 @@ export function clampGroupBoxToBounds(
 }
 
 export type GroupResizeSnapshot = GroupResizeGeometry;
+
+/**
+ * 仅撑大组框以包住子节点，不改动子节点 position / 不宫格重排。
+ * 供自动成片等「只改自身尺寸」场景使用。
+ */
+export function expandLibtvGroupToFitChildren(
+  nodes: CanvasFlowNode[],
+  groupId: string,
+): CanvasFlowNode[] {
+  const group = nodes.find((n) => n.id === groupId && n.type === "group");
+  if (!group) return nodes;
+  if (Boolean((group.data as { manualSize?: boolean } | undefined)?.manualSize)) {
+    return nodes;
+  }
+
+  const { minWidth, minHeight } = computeLibtvGroupContentMinSize(groupId, nodes);
+  const style = group.style as { width?: number; height?: number } | undefined;
+  const curW =
+    (typeof group.width === "number" ? group.width : undefined) ??
+    style?.width ??
+    0;
+  const curH =
+    (typeof group.height === "number" ? group.height : undefined) ??
+    style?.height ??
+    0;
+  const nextW = Math.max(curW, minWidth);
+  const nextH = Math.max(curH, minHeight);
+  if (nextW <= curW && nextH <= curH) return nodes;
+
+  return nodes.map((n) =>
+    n.id === groupId
+      ? {
+          ...n,
+          width: nextW,
+          height: nextH,
+          style: {
+            ...(typeof n.style === "object" && n.style ? n.style : {}),
+            width: nextW,
+            height: nextH,
+          },
+        }
+      : n,
+  );
+}

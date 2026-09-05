@@ -1,18 +1,33 @@
 FROM node:22-bookworm-slim AS base
 WORKDIR /app
 
-FROM base AS deps
+# CloudBase 目标目录是 e-commerce-toolkit/，构建上下文进不去仓库根的 shared/。
+# package.json 的 file:../shared/* 在镜像里解析为 /shared/*，故把快照拷到该路径。
+# 刷新快照（改 shared/ 后、发版前）：
+#   cp -R ../shared/federated-portal-logout ../shared/federated-portal-nav ../shared/platform-assistant ../shared/publisher-client docker-shared/
+FROM base AS with-shared
+COPY docker-shared/federated-portal-logout /shared/federated-portal-logout
+COPY docker-shared/federated-portal-nav /shared/federated-portal-nav
+COPY docker-shared/media-render-subtitle-style /shared/media-render-subtitle-style
+COPY docker-shared/platform-assistant /shared/platform-assistant
+COPY docker-shared/publisher-client /shared/publisher-client
+
+FROM with-shared AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN corepack enable && corepack prepare pnpm@11.1.3 --activate \
   && CI=true pnpm install --frozen-lockfile
 
-FROM base AS builder
+FROM with-shared AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/package.json ./package.json
 COPY --from=deps /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY . .
 RUN mkdir -p public
+ARG NEXT_PUBLIC_BOOK_MALL_URL=https://book.ai-code8.com
+ARG NEXT_PUBLIC_ECOMMERCE_WEB_ORIGIN=https://ecom.ai-code8.com
+ENV NEXT_PUBLIC_BOOK_MALL_URL=${NEXT_PUBLIC_BOOK_MALL_URL}
+ENV NEXT_PUBLIC_ECOMMERCE_WEB_ORIGIN=${NEXT_PUBLIC_ECOMMERCE_WEB_ORIGIN}
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN corepack enable && corepack prepare pnpm@11.1.3 --activate \
   && pnpm run build:docker

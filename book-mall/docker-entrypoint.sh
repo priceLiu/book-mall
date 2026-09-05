@@ -31,6 +31,8 @@ if [ "$NODE_ENV" = "production" ] && [ "${ALLOW_CLOUDBASE_DEFAULT_ORIGINS:-}" !=
   patch_origin_env CANVAS_WEB_ORIGINS "https://canvas.ai-code8.com"
   patch_origin_env NEXT_PUBLIC_PROMPT_OPTIMIZER_ORIGIN "https://prompt.ai-code8.com"
   patch_origin_env PROMPT_OPTIMIZER_PUBLIC_ORIGIN "https://prompt.ai-code8.com"
+  patch_origin_env NEXT_PUBLIC_QUICK_REPLICA_ORIGIN "https://cp.ai-code8.com"
+  patch_origin_env QUICK_REPLICA_PUBLIC_ORIGIN "https://cp.ai-code8.com"
   case "${NEXTAUTH_COOKIE_DOMAIN:-}" in
     "")
       export NEXTAUTH_COOKIE_DOMAIN=".ai-code8.com"
@@ -38,6 +40,41 @@ if [ "$NODE_ENV" = "production" ] && [ "${ALLOW_CLOUDBASE_DEFAULT_ORIGINS:-}" !=
       ;;
   esac
 fi
+
+# 企业微信支付：从环境变量 materialize 私钥/公钥到 certs/（CloudBase 无法挂文件时使用）
+bootstrap_wechat_pay_certs() {
+  key_path="${WECHAT_PAY_KEY_PATH:-certs/apiclient_key.pem}"
+  pub_path="${WECHAT_PAY_PUB_KEY_PATH:-certs/wechat_pay_pub_key.pem}"
+  case "$key_path" in /*) ;; *) key_path="/app/$key_path" ;; esac
+  case "$pub_path" in /*) ;; *) pub_path="/app/$pub_path" ;; esac
+
+  mkdir -p "$(dirname "$key_path")" "$(dirname "$pub_path")"
+
+  if [ ! -f "$key_path" ]; then
+    if [ -n "${WECHAT_PAY_PRIVATE_KEY_B64:-}" ]; then
+      printf '%s' "$WECHAT_PAY_PRIVATE_KEY_B64" | base64 -d > "$key_path" 2>/dev/null || true
+    elif [ -n "${WECHAT_PAY_PRIVATE_KEY:-}" ]; then
+      printf '%b' "$(printf '%s' "$WECHAT_PAY_PRIVATE_KEY" | sed 's/\\n/\n/g')" > "$key_path"
+    fi
+    if [ -f "$key_path" ]; then
+      chmod 600 "$key_path"
+      echo "[book-mall] WeChat Pay private key materialized -> $key_path"
+    fi
+  fi
+
+  if [ ! -f "$pub_path" ] && [ -n "${WECHAT_PAY_PUBLIC_KEY_B64:-}${WECHAT_PAY_PUBLIC_KEY:-}" ]; then
+    if [ -n "${WECHAT_PAY_PUBLIC_KEY_B64:-}" ]; then
+      printf '%s' "$WECHAT_PAY_PUBLIC_KEY_B64" | base64 -d > "$pub_path" 2>/dev/null || true
+    elif [ -n "${WECHAT_PAY_PUBLIC_KEY:-}" ]; then
+      printf '%b' "$(printf '%s' "$WECHAT_PAY_PUBLIC_KEY" | sed 's/\\n/\n/g')" > "$pub_path"
+    fi
+    if [ -f "$pub_path" ]; then
+      chmod 644 "$pub_path"
+      echo "[book-mall] WeChat Pay public key materialized -> $pub_path"
+    fi
+  fi
+}
+bootstrap_wechat_pay_certs
 
 if [ -z "$DATABASE_URL" ]; then
   echo "[book-mall] ERROR: DATABASE_URL 未设置，无法执行 prisma migrate deploy"

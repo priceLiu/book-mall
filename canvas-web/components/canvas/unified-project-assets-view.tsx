@@ -208,6 +208,36 @@ export function UnifiedProjectAssetsView({
     }
   };
 
+  const onPromoteToUserSpace = async (asset: ProjectAssetRecord) => {
+    if (asset.id.startsWith("legacy:") || !asset.sourceProjectId) return;
+    if (
+      !(await confirm({
+        title: "全画布可用",
+        message: `将「${asset.displayName}」设为「我的空间可用」？之后本人所有画布均可插入。`,
+      }))
+    ) {
+      return;
+    }
+    setBusyId(asset.id);
+    try {
+      await patchProjectAsset(base, asset.id, { sourceProjectId: null });
+      await refresh();
+      await alert({
+        title: "已更新",
+        message: "该资产已在所有画布的项目资产面板中可见。",
+        variant: "success",
+      });
+    } catch (e) {
+      await alert({
+        title: "更新失败",
+        message: formatCanvasApiError(e instanceof Error ? e.message : String(e)),
+        variant: "error",
+      });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <>
       <div className={compact ? "space-y-3" : "space-y-4"}>
@@ -277,6 +307,7 @@ export function UnifiedProjectAssetsView({
                   onHoverPreviewClear={() => setHoverPreview(null)}
                   onToggleLock={() => void onToggleLock(asset)}
                   onToggleShare={() => void onToggleShare(asset)}
+                  onPromoteToUserSpace={() => void onPromoteToUserSpace(asset)}
                   onDelete={() => void onDelete(asset)}
                 />
               ))}
@@ -324,6 +355,7 @@ function ProjectAssetGridItem({
   onHoverPreviewClear,
   onToggleLock,
   onToggleShare,
+  onPromoteToUserSpace,
   onDelete,
 }: {
   asset: ProjectAssetRecord;
@@ -340,6 +372,7 @@ function ProjectAssetGridItem({
   onHoverPreviewClear: () => void;
   onToggleLock: () => void;
   onToggleShare: () => void;
+  onPromoteToUserSpace: () => void;
   onDelete: () => void;
 }) {
   const snapshots = projectAssetRefSnapshots(asset);
@@ -387,6 +420,21 @@ function ProjectAssetGridItem({
         footerMeta={
           <>
             <div className="mb-1 flex min-h-[14px] flex-wrap gap-1">
+              {asset.sourceProjectId && asset.visibility === "PRIVATE" ? (
+                <span className="rounded bg-slate-500/25 px-1 py-0.5 text-[8px] text-slate-200">
+                  本项目
+                </span>
+              ) : null}
+              {!asset.sourceProjectId && asset.visibility === "PRIVATE" ? (
+                <span className="rounded bg-violet-500/20 px-1 py-0.5 text-[8px] text-violet-200">
+                  我的空间
+                </span>
+              ) : null}
+              {!asset.sourceProjectId && asset.visibility === "TEAM_PUBLIC" ? (
+                <span className="rounded bg-cyan-500/20 px-1 py-0.5 text-[8px] text-cyan-200">
+                  租户库
+                </span>
+              ) : null}
               {asset.visibility === "TEAM_PUBLIC" ? (
                 <span className="rounded bg-emerald-500/20 px-1 py-0.5 text-[8px] text-emerald-200">
                   团队
@@ -413,6 +461,16 @@ function ProjectAssetGridItem({
                 >
                   {asset.locked ? "解锁" : "锁定"}
                 </button>
+                {asset.sourceProjectId ? (
+                  <button
+                    type="button"
+                    className="text-[9px] text-violet-300/80 hover:text-violet-200"
+                    disabled={busyId === asset.id}
+                    onClick={onPromoteToUserSpace}
+                  >
+                    全画布
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="text-[9px] text-white/50 hover:text-white/80"

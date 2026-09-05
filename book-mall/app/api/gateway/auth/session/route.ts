@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveGatewayBookRole } from "@/lib/gateway/book-role";
+import { canAccessGatewayModelManager } from "@/lib/gateway/gateway-model-manager-access";
 import { resolveGatewayCredentialScope } from "@/lib/gateway/platform-credential-delegate";
 import {
   gatewayDatabaseUnavailableResponse,
@@ -21,16 +22,24 @@ export async function GET(request: NextRequest) {
     const credentialScope = await resolveGatewayCredentialScope(user);
     let billingPersona: string | null = null;
     let phone: string | null = phoneFromGatewayEmail(user.email);
+    let bookRoleRaw: string | null = null;
     if (user.bookUserId) {
       const bookUser = await prisma.user.findUnique({
         where: { id: user.bookUserId },
-        select: { billingPersona: true, billingPersonaLockedAt: true, phone: true },
+        select: { billingPersona: true, billingPersonaLockedAt: true, phone: true, role: true },
       });
       if (bookUser?.billingPersonaLockedAt) {
         billingPersona = bookUser.billingPersona;
       }
       phone = bookUser?.phone ?? phone;
+      bookRoleRaw = bookUser?.role ?? null;
     }
+    const canManageGatewayModels = canAccessGatewayModelManager({
+      email: user.email,
+      billingPersona,
+      bookRole: bookRoleRaw,
+      isPlatformPoolDelegate: credentialScope.isPlatformPoolDelegate,
+    });
     return NextResponse.json({
       user: {
         id: user.id,
@@ -41,6 +50,7 @@ export async function GET(request: NextRequest) {
         bookUserId: user.bookUserId,
         bookRole,
         billingPersona,
+        canManageGatewayModels,
         platformPoolDelegate: credentialScope.isPlatformPoolDelegate
           ? { canonicalOwnerEmail: credentialScope.canonicalOwnerEmail }
           : null,

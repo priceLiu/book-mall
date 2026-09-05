@@ -51,6 +51,12 @@ export function isCanvasSelectionOnlyChange(changes: NodeChange[]): boolean {
   return changes.length > 0 && changes.every((c) => c.type === "select");
 }
 
+export function extractSelectNodeChanges(
+  changes: NodeChange<CanvasFlowNode>[],
+): NodeChange<CanvasFlowNode>[] {
+  return changes.filter((c) => c.type === "select");
+}
+
 /** RF 回写选中 / zIndex 与 store 一致时跳过 set，避免 store↔RF 无限循环 */
 export function canvasNodesSelectionAndZEqual(
   prev: CanvasFlowNode[],
@@ -81,6 +87,22 @@ export function filterStoreBoundNodeChanges(
   changes: NodeChange[],
 ): NodeChange[] {
   return changes.filter((c) => !isRfLocalNodeChange(c));
+}
+
+/** 批次是否含节点删除（须落库，不可因 store→RF 同步 guard 跳过） */
+export function hasNodeRemoveChanges(changes: NodeChange[]): boolean {
+  return changes.some(
+    (c) => c.type === "remove" && "id" in c && typeof c.id === "string",
+  );
+}
+
+export function extractNodeRemoveChanges(
+  changes: NodeChange[],
+): Array<NodeChange & { type: "remove"; id: string }> {
+  return changes.filter(
+    (c): c is NodeChange & { type: "remove"; id: string } =>
+      c.type === "remove" && "id" in c && typeof c.id === "string",
+  );
 }
 
 /** 批次是否全部为 RF 本地变更（选中 + 纯测量），无需写 store */

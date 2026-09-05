@@ -1,14 +1,22 @@
 /**
  * 画布 KIE 媒体（IMAGE / video-engine）· Gateway 已成功但 canvas 任务仍 SUBMITTED 时的写回。
  */
+import type { Prisma } from "@prisma/client";
+
 import { isCanvasKieVideoTaskPayload } from "@/lib/canvas/canvas-constants";
+import { patchCanvasProjectNodeMediaFromTask } from "@/lib/canvas/canvas-media-patch";
+import { scheduleCanvasKieImageOssBackfill } from "@/lib/canvas/canvas-oss-backfill";
 import { applyCanvasKieTaskResult } from "@/lib/canvas/canvas-task-service";
+import { GENERATION_INFLIGHT_STATUSES } from "@/lib/generation/traffic-control/constants";
 import { prisma } from "@/lib/prisma";
 import {
+  extractKieResultUrl,
   isKieRecordFail,
   isKieRecordSuccess,
   type KieRecordResponse,
 } from "@/lib/story/kie-client";
+
+export { scheduleCanvasKieImageOssBackfill } from "@/lib/canvas/canvas-oss-backfill";
 
 function normalizeKieRecordState(
   raw: string | undefined,
@@ -108,27 +116,23 @@ export type CanvasKieImageRecoverResult =
   | "pending"
   | "noop";
 
-/** 按 gatewayLogId / storyTaskId 从 Gateway KIE 日志恢复 IMAGE / video-engine 结果。 */
-export async function recoverCanvasKieImageFromGateway(
-  taskId: string,
-): Promise<CanvasKieImageRecoverResult> {
-  const task = await prisma.canvasGenerationTask.findUnique({
-    where: { id: taskId },
-    select: {
-      id: true,
-      status: true,
-      kind: true,
-      model: true,
-      kieTaskId: true,
-      inputPayload: true,
-    },
-  });
-  if (!task || !isRecoverableCanvasKieMediaTask(task)) return "noop";
-  if (task.status !== "SUBMITTED" && task.status !== "PENDING") return "noop";
+type KieGatewayLogRow = {
+  id: string;
+  status: string;
+  failCode: string | null;
+  failMessage: string | null;
+  resultSummary: unknown;
+  providerKind: string | null;
+};
 
+async function loadKieGatewayLogForTask(
+  taskId: string,
+  inputPayload: unknown,
+  kieTaskId: string | null,
+): Promise<KieGatewayLogRow | null> {
   const payload =
-    task.inputPayload && typeof task.inputPayload === "object"
-      ? (task.inputPayload as Record<string, unknown>)
+    inputPayload && typeof inputPayload === "object"
+      ? (inputPayload as Record<string, unknown>)
       : {};
   const payloadLogId =
     typeof payload.gatewayLogId === "string" ? payload.gatewayLogId.trim() : "";
@@ -158,8 +162,135 @@ export async function recoverCanvasKieImageFromGateway(
         },
       });
 
+  if (!log) return null;
+  if (log.providerKind && log.providerKind !== "KIE") return null;
+  void kieTaskId;
+  return log;
+}
+
+/** 读路径快速写回：Gateway 已成功时先写 ephemeralUrl + SUCCEEDED 并 patch 节点，OSS 后台补。 */
+export async function recoverCanvasKieImageFromGatewayForRead(
+  taskId: string,
+): Promise<CanvasKieImageRecoverResult> {
+  const task = await prisma.canvasGenerationTask.findUnique({
+    where: { id: taskId },
+    select: {
+      id: true,
+      status: true,
+      kind: true,
+      model: true,
+      kieTaskId: true,
+      inputPayload: true,
+      ossUrl: true,
+      ephemeralUrl: true,
+      projectId: true,
+    },
+  });
+  if (!task || !isRecoverableCanvasKieMediaTask(task)) return "noop";
+  if (
+    task.status === "SUCCEEDED" &&
+    (task.ossUrl?.trim() || task.ephemeralUrl?.trim())
+  ) {
+    return "succeeded";
+  }
+  if (task.status !== "SUBMITTED" && task.status !== "PENDING") return "noop";
+
+  const log = await loadKieGatewayLogForTask(
+    taskId,
+    task.inputPayload,
+    task.kieTaskId,
+  );
   if (!log) return "noop";
-  if (log.providerKind && log.providerKind !== "KIE") return "noop";
+
+  if (log.status === "SUCCEEDED") {
+    const record = kieRecordFromGatewaySummary(
+      log.resultSummary,
+      task.kieTaskId ?? "",
+      task.model,
+    );
+    if (!record || !isKieRecordSuccess(record.state)) return "pending";
+    const ephemeralUrl = extractKieResultUrl(record);
+    if (!ephemeralUrl) return "pending";
+
+    const applied = await prisma.canvasGenerationTask.updateMany({
+      where: {
+        id: taskId,
+        status: { in: [...GENERATION_INFLIGHT_STATUSES] },
+      },
+      data: {
+        status: "SUCCEEDED",
+        ephemeralUrl,
+        resultPayload: record as unknown as Prisma.InputJsonValue,
+        completedAt: new Date(),
+      },
+    });
+    if (applied.count === 0) return "noop";
+
+    const updated = await prisma.canvasGenerationTask.findUnique({
+      where: { id: taskId },
+      select: {
+        id: true,
+        projectId: true,
+        nodeId: true,
+        ossUrl: true,
+        ephemeralUrl: true,
+        completedAt: true,
+        resultPayload: true,
+      },
+    });
+    if (updated) {
+      await patchCanvasProjectNodeMediaFromTask(updated);
+      if (!updated.ossUrl?.trim()) {
+        scheduleCanvasKieImageOssBackfill(taskId, ephemeralUrl, updated.projectId);
+      }
+    }
+    return "succeeded";
+  }
+
+  if (log.status === "FAILED") {
+    return recoverCanvasKieImageFromGateway(taskId);
+  }
+
+  return "pending";
+}
+
+/** 读路径快速写回：Gateway 已成功但 canvas IMAGE 仍 SUBMITTED（限条数，避免拖慢 /tasks）。 */
+export async function recoverProjectInflightKieImageTasksForRead(
+  taskIds: string[],
+  limit = 5,
+): Promise<number> {
+  let recovered = 0;
+  for (const taskId of taskIds.slice(0, limit)) {
+    const outcome = await recoverCanvasKieImageFromGatewayForRead(taskId);
+    if (outcome === "succeeded" || outcome === "failed") recovered += 1;
+  }
+  return recovered;
+}
+
+/** 按 gatewayLogId / storyTaskId 从 Gateway KIE 日志恢复 IMAGE / video-engine 结果。 */
+export async function recoverCanvasKieImageFromGateway(
+  taskId: string,
+): Promise<CanvasKieImageRecoverResult> {
+  const task = await prisma.canvasGenerationTask.findUnique({
+    where: { id: taskId },
+    select: {
+      id: true,
+      status: true,
+      kind: true,
+      model: true,
+      kieTaskId: true,
+      inputPayload: true,
+    },
+  });
+  if (!task || !isRecoverableCanvasKieMediaTask(task)) return "noop";
+  if (task.status !== "SUBMITTED" && task.status !== "PENDING") return "noop";
+
+  const log = await loadKieGatewayLogForTask(
+    taskId,
+    task.inputPayload,
+    task.kieTaskId,
+  );
+  if (!log) return "noop";
 
   if (log.status === "SUCCEEDED") {
     const record = kieRecordFromGatewaySummary(

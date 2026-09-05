@@ -1,62 +1,49 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { buildBookPortalNavItems, BOOK_PORTAL_EXTERNAL_LINK_PROPS } from "@/lib/portal-nav";
 import { cn } from "@/lib/utils";
-
-export const SITE_HOME_PRODUCT_OPTIONS = [
-  {
-    value: "ai-apps",
-    label: "AI 应用",
-    description: "工具型产品与在线应用",
-    href: "/products/ai-apps",
-  },
-  {
-    value: "ai-courses",
-    label: "AI 课程（导购）",
-    description: "商品化的课程产品介绍",
-    href: "/products/ai-courses",
-  },
-  {
-    value: "courses",
-    label: "AI 学堂",
-    description: "课程学习与订阅权益",
-    href: "/courses",
-  },
-] as const;
-
-function resolveProductValue(pathname: string) {
-  if (pathname.startsWith("/products/ai-courses")) return "ai-courses";
-  if (pathname === "/courses" || pathname.startsWith("/courses/")) return "courses";
-  return "ai-apps";
-}
 
 const splitBtnClass =
   "rounded-none shadow-none first:rounded-s-lg last:rounded-e-lg focus-visible:z-10 h-9 px-4 pointer-events-none";
 
-/** 顶栏「产品」：分割按钮或文字链样式（YouMind 居中导航） */
-export function SiteHomeProductNav({ variant = "button" }: { variant?: "button" | "link" }) {
-  const pathname = usePathname();
-  const router = useRouter();
+/** 顶栏「产品」：与各子站 federated 门户菜单一致 */
+export function SiteHomeProductNav({
+  isLoggedIn = false,
+  variant = "button",
+  linkClassName = "site-home-nav-link",
+  linkActiveClassName = "site-home-nav-link-active",
+}: {
+  isLoggedIn?: boolean;
+  variant?: "button" | "link";
+  linkClassName?: string;
+  linkActiveClassName?: string;
+}) {
   const [open, setOpen] = useState(false);
-  const selected = resolveProductValue(pathname);
-  const active =
-    SITE_HOME_PRODUCT_OPTIONS.find((o) => o.value === selected) ?? SITE_HOME_PRODUCT_OPTIONS[0];
-  const onProductSection =
-    pathname.startsWith("/products/") ||
-    pathname === "/courses" ||
-    pathname.startsWith("/courses/");
+  const items = buildBookPortalNavItems(undefined, isLoggedIn);
 
-  const mainLabel = onProductSection ? active.label : "产品";
+  const menuLinks = (
+    <div className="flex flex-col gap-0.5 p-1">
+      {items.map((item) => (
+        <a
+          key={item.key}
+          href={item.href}
+          {...BOOK_PORTAL_EXTERNAL_LINK_PROPS}
+          className="site-home-nav-sheet-item rounded-md px-3 py-2.5 hover:bg-muted"
+          onClick={() => setOpen(false)}
+        >
+          {item.label}
+        </a>
+      ))}
+    </div>
+  );
 
   if (variant === "link") {
     return (
@@ -64,42 +51,21 @@ export function SiteHomeProductNav({ variant = "button" }: { variant?: "button" 
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className={cn("site-home-nav-link", onProductSection && "site-home-nav-link-active")}
+            className={cn(linkClassName, open && linkActiveClassName)}
             aria-haspopup="menu"
             aria-expanded={open}
           >
-            <span>{mainLabel}</span>
+            <span>产品</span>
             <ChevronDown className="size-3.5 opacity-60" aria-hidden />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
-          className="max-w-64 md:max-w-xs"
+          className="min-w-44"
           side="bottom"
           sideOffset={8}
           align="center"
         >
-          <DropdownMenuRadioGroup
-            value={selected}
-            onValueChange={(value) => {
-              const option = SITE_HOME_PRODUCT_OPTIONS.find((o) => o.value === value);
-              if (!option) return;
-              setOpen(false);
-              router.push(option.href);
-            }}
-          >
-            {SITE_HOME_PRODUCT_OPTIONS.map((option) => (
-              <DropdownMenuRadioItem
-                key={option.value}
-                value={option.value}
-                className="items-start [&>span]:pt-1.5"
-              >
-                <div className="flex flex-col gap-1">
-                  <span className="site-home-nav-sheet-item">{option.label}</span>
-                  <span className="text-xs font-normal text-muted-foreground">{option.description}</span>
-                </div>
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
+          {menuLinks}
         </DropdownMenuContent>
       </DropdownMenu>
     );
@@ -117,7 +83,7 @@ export function SiteHomeProductNav({ variant = "button" }: { variant?: "button" 
           className="inline-flex -space-x-px divide-x divide-primary-foreground/30 rounded-lg shadow-sm shadow-black/5 rtl:space-x-reverse cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
         >
           <Button variant="default" type="button" className={splitBtnClass} tabIndex={-1}>
-            {mainLabel}
+            产品
           </Button>
           <Button variant="default" type="button" size="icon" className={`${splitBtnClass} w-9`} tabIndex={-1}>
             <ChevronDown size={16} strokeWidth={2} aria-hidden="true" />
@@ -125,33 +91,12 @@ export function SiteHomeProductNav({ variant = "button" }: { variant?: "button" 
         </div>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        className="max-w-64 md:max-w-xs"
+        className="min-w-44"
         side="bottom"
         sideOffset={4}
         align="end"
       >
-        <DropdownMenuRadioGroup
-          value={selected}
-          onValueChange={(value) => {
-            const option = SITE_HOME_PRODUCT_OPTIONS.find((o) => o.value === value);
-            if (!option) return;
-            setOpen(false);
-            router.push(option.href);
-          }}
-        >
-          {SITE_HOME_PRODUCT_OPTIONS.map((option) => (
-            <DropdownMenuRadioItem
-              key={option.value}
-              value={option.value}
-              className="items-start [&>span]:pt-1.5"
-            >
-                <div className="flex flex-col gap-1">
-                  <span className="site-home-nav-sheet-item">{option.label}</span>
-                  <span className="text-xs font-normal text-muted-foreground">{option.description}</span>
-                </div>
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
+        {menuLinks}
       </DropdownMenuContent>
     </DropdownMenu>
   );

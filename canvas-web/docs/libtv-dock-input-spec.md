@@ -15,6 +15,16 @@ Pro2InputDockShell
 
 **禁止** footer 上方单独 pill 行展示 @ 缩略图；内联图必须在 **textarea 正文流** 内。
 
+## 1.1 按节点隔离（强制）
+
+浮动 Dock 是画布级单例。切换同类型节点时 **必须** 拆开输入实例，否则 contenteditable / debounce 会把 A 的草稿写进 B：
+
+- 外壳：`key={dockNodeId}`（视频 `Sbv1VideoEngineFloatingDockBody`、图片 `LibtvImageInputDockBody`）
+- 编辑器：`MentionsEditable` · `key={nodeId}` · `sourceId={nodeId}`
+- debounce：`useDeferredTextCommit(..., sourceKey)` 钉在 schedule 时的 handler 上
+
+**禁止** 两个图片 / 文本 / 三视图 / 音频节点共用同一块未 keyed 的 Dock 正文。
+
 ## 2. 内联 @ 缩略图（占位符方案 · 固定实现）
 
 | 项 | 规范 |

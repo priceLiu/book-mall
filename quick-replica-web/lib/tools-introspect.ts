@@ -4,7 +4,7 @@ import type {
   ToolsSessionFetchDiag,
   ToolsSessionNoBearerDiag,
 } from "@/lib/tools-diagnostics";
-import { verifyToolsJwt } from "@/lib/tools-jwt";
+import { verifyToolsJwt, type VerifiedToolsJwt } from "@/lib/tools-jwt";
 
 export type ToolsIntrospectPayload = Record<string, unknown> | null;
 
@@ -27,9 +27,44 @@ function normalizeBearer(token: string | undefined): string | undefined {
   return t.length > 0 ? t : undefined;
 }
 
+function jwtIntrospectFallbackEnabled(): boolean {
+  const raw = process.env.TOOLS_INTROSPECT_JWT_FALLBACK?.trim();
+  if (raw === "1" || raw === "true") return true;
+  if (raw === "0" || raw === "false") return false;
+  return process.env.NODE_ENV === "development";
+}
+
+function sessionFromVerifiedJwt(
+  verified: VerifiedToolsJwt,
+  originConfigured: boolean,
+): FetchToolsSessionResult {
+  return {
+    hasCookie: true,
+    originConfigured,
+    introspectStatus: 200,
+    introspect: {
+      active: true,
+      session_source: "jwt_fallback",
+      sub: verified.sub,
+      tier: verified.tier,
+      ...(verified.email ? { email: verified.email } : {}),
+      ...(verified.phone ? { phone: verified.phone } : {}),
+      ...(verified.name ? { name: verified.name } : {}),
+      ...(verified.image ? { image: verified.image } : {}),
+      ...(verified.toolsNavKeys ? { tools_nav_keys: verified.toolsNavKeys } : {}),
+      note: "主站 introspect 超时或不可达，已用本地 JWT 兜底（开发环境）",
+    },
+    active: true,
+  };
+}
+
 function jwtSecretReady(): string | null {
   const s = process.env.TOOLS_SSO_JWT_SECRET?.trim();
   return s && s.length >= 16 ? s : null;
+}
+
+function shouldJwtFallbackAfterHttpStatus(status: number): boolean {
+  return status === 503 || status === 504 || status >= 500;
 }
 
 /**
@@ -45,12 +80,14 @@ async function fetchToolsSessionCore(bearer: string): Promise<{
 
   const secret = jwtSecretReady();
   let msJwtAttempt: number | undefined;
+  let verifiedJwt: VerifiedToolsJwt | null = null;
 
   if (secret) {
     const tJwtStart = performance.now();
-    verifyToolsJwt(bearer, secret);
+    verifiedJwt = verifyToolsJwt(bearer, secret);
     msJwtAttempt = performance.now() - tJwtStart;
     // 不在本地短路 active：须主站 introspect 才能感知 logout / sessionVersion 失效。
+    // 主站超时/DB 拥堵时 dev 可回落 JWT（见 introspect catch 与 jwtIntrospectFallbackEnabled）。
   }
 
   if (!origin) {
@@ -75,7 +112,9 @@ async function fetchToolsSessionCore(bearer: string): Promise<{
   const timeoutMs =
     timeoutMsRaw && /^\d+$/.test(timeoutMsRaw)
       ? Math.min(Math.max(Number(timeoutMsRaw), 3000), 60000)
-      : 12000;
+      : process.env.NODE_ENV === "development"
+        ? 5_000
+        : 12_000;
 
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
@@ -93,6 +132,21 @@ async function fetchToolsSessionCore(bearer: string): Promise<{
     const aborted =
       e instanceof Error &&
       (e.name === "AbortError" || e.message.includes("aborted"));
+    if (
+      verifiedJwt &&
+      jwtIntrospectFallbackEnabled() &&
+      (aborted || e instanceof TypeError)
+    ) {
+      return {
+        session: sessionFromVerifiedJwt(verifiedJwt, originConfigured),
+        diag: {
+          path: aborted ? "jwt_fallback_after_abort" : "jwt_fallback_network",
+          msJwtAttempt,
+          msIntrospectFetch,
+          msTotal: performance.now() - t0,
+        },
+      };
+    }
     return {
       session: {
         hasCookie: true,
@@ -119,6 +173,24 @@ async function fetchToolsSessionCore(bearer: string): Promise<{
 
   const msIntrospectFetch = performance.now() - tFetchStart;
   const introspectStatus = r.status;
+
+  if (
+    verifiedJwt &&
+    jwtIntrospectFallbackEnabled() &&
+    shouldJwtFallbackAfterHttpStatus(introspectStatus)
+  ) {
+    return {
+      session: sessionFromVerifiedJwt(verifiedJwt, originConfigured),
+      diag: {
+        path: "jwt_fallback_http",
+        msJwtAttempt,
+        msIntrospectFetch,
+        introspectHttpStatus: introspectStatus,
+        msTotal: performance.now() - t0,
+      },
+    };
+  }
+
   const raw = (await r.json().catch(() => null)) as ToolsIntrospectPayload;
 
   let introspect = raw;
@@ -157,8 +229,8 @@ async function fetchToolsSessionCached(bearerKey: string): Promise<FetchToolsSes
 }
 
 /**
- * 统一会话拉取：① 配置 `TOOLS_SSO_JWT_SECRET` 且 JWT 有效 → **零 HTTP**（不经主站 DB）；② 否则走主站 introspect。
- * 同一请求内多处调用会去重（React cache；键为 trim 后的 token）。
+ * 统一会话拉取：配置 `TOOLS_SSO_JWT_SECRET` 且 JWT 有效时，主站 introspect 超时/503 可在 dev 回落 JWT；
+ * 否则走主站 introspect。同一请求内多处调用会去重（React cache；键为 trim 后的 token）。
  */
 export async function fetchToolsSession(
   token: string | undefined,

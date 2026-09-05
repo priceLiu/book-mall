@@ -11,6 +11,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@private/federated-portal-nav": "file:../shared/federated-portal-nav",
+    "@private/platform-assistant": "file:../shared/platform-assistant",
     "@sparkjsdev/spark": "^2.1.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",

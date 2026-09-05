@@ -18,6 +18,7 @@ import {
 } from "./sbv1-workspace-types";
 import { buildSbv1HdVideoEngineNodeData } from "./sbv1-hd-video-models";
 import {
+  buildPro2AudioNodeData,
   buildPro2GeneralTextNodeData,
 } from "./pro2-spawn-nodes";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
@@ -25,11 +26,14 @@ import { useCanvasStore } from "./store";
 import { cloneCanvasNodeData } from "./clone-node-data";
 import { PRO2_TEXT_NODE_MIN_WIDTH } from "./story-pro2-node-chrome";
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
+import {
+  resolveJianyingAutoRenderNodeSize,
+  withFlowNodeDimensions,
+} from "./jianying-auto-render-node-size";
 import { flowPositionAtScreenPoint } from "./viewport-placement";
 
 const GAP = 48;
 const JIANYING_EXPORT_PRO2_WIDTH = 400;
-const JIANYING_AUTO_RENDER_PRO2_WIDTH = 720;
 
 export function buildSbv1ImageNodeData(
   overrides?: Record<string, unknown>,
@@ -151,7 +155,7 @@ export function spawnSbv1NeighborFromNode(
     atScreen?: { x: number; y: number };
   },
 ): string {
-  const { nodes, addNode, setNodes, setEdges } = store;
+  const { nodes, edges, addNode, setNodes, setEdges } = store;
   const self = nodes.find((n) => n.id === anchorId);
   if (!self) return "";
 
@@ -175,11 +179,19 @@ export function spawnSbv1NeighborFromNode(
     }
   }
 
+  const autoRenderSize =
+    nodeType === "jianying-auto-render-pro2"
+      ? resolveJianyingAutoRenderNodeSize({
+          anchorNode: self,
+          nodes,
+          edges,
+        })
+      : null;
   const newNodeW =
     nodeType === "jianying-export-pro2"
       ? JIANYING_EXPORT_PRO2_WIDTH
       : nodeType === "jianying-auto-render-pro2"
-        ? JIANYING_AUTO_RENDER_PRO2_WIDTH
+        ? autoRenderSize!.width
         : nodeType === "sbv1-video-engine"
           ? SBV1_VIDEO_ENGINE_WIDTH
           : nodeType === "story-pro2-starter"
@@ -295,11 +307,30 @@ export function spawnSbv1NeighborFromNode(
   }
 
   if (nodeType === "jianying-auto-render-pro2") {
-    const newId = addNode(
-      "jianying-auto-render-pro2",
-      { x, y },
-      { label: "自动成片" },
-    );
+    const { addNodeInGroup } = store;
+    const parentGroup = self.parentId
+      ? nodes.find((n) => n.id === self.parentId && n.type === "group")
+      : undefined;
+    let newId = "";
+    if (parentGroup && !options?.atScreen) {
+      // 锚点在组内：成片节点必须带 parentId，否则拖组时一起移动
+      const rel = {
+        x: Math.max(48, (self.position?.x ?? 0) + (self.width ?? 320) + GAP),
+        y: self.position?.y ?? 48,
+      };
+      newId = addNodeInGroup(
+        "jianying-auto-render-pro2",
+        parentGroup.id,
+        rel,
+        { label: "自动成片" },
+      );
+    } else {
+      newId = addNode(
+        "jianying-auto-render-pro2",
+        { x, y },
+        { label: "自动成片" },
+      );
+    }
     if (!newId) return "";
     if (self.type === "sbv1-video-engine" && side === "right") {
       setEdges((prev) => [
@@ -313,7 +344,31 @@ export function spawnSbv1NeighborFromNode(
         },
       ]);
     }
-    selectSbv1NodeAfterSpawn(setNodes, newId);
+    const size =
+      autoRenderSize ??
+      resolveJianyingAutoRenderNodeSize({
+        anchorNode: self,
+        nodes,
+        edges,
+      });
+    setNodes((prev) =>
+      ensureNodeDragHandles(
+        sortNodesForReactFlow(
+          prev.map((n) =>
+            n.id === newId
+              ? withFlowNodeDimensions(
+                  { ...n, selected: true },
+                  size.width,
+                  size.height,
+                )
+              : { ...n, selected: false },
+          ),
+        ),
+      ),
+    );
+    queueMicrotask(() => {
+      useCanvasStore.getState().focusCanvasNode(newId);
+    });
     return newId;
   }
 
@@ -349,7 +404,11 @@ export function spawnSbv1NeighborFromNode(
           targetHandle: "in_motion_video",
         },
       ]);
-    } else if (self.type === "jianying-export-pro2" && side === "left") {
+    } else if (
+      (self.type === "jianying-export-pro2" ||
+        self.type === "jianying-auto-render-pro2") &&
+      side === "left"
+    ) {
       setEdges((prev) => [
         ...prev,
         {
@@ -375,6 +434,17 @@ export function spawnSbv1NeighborFromNode(
           targetHandle: "in_text",
         },
       ]);
+    } else if (self.type === "sbv1-video-engine" && side === "right") {
+      setEdges((prev) => [
+        ...prev,
+        {
+          id: `e-${anchorId}-${newId}`,
+          source: anchorId,
+          target: newId,
+          sourceHandle: "out_video",
+          targetHandle: "in_motion_video",
+        },
+      ]);
     } else {
       const edge =
         self.type === "sbv1-image"
@@ -389,6 +459,33 @@ export function spawnSbv1NeighborFromNode(
       if (edge) setEdges((prev) => [...prev, edge]);
     }
     selectSbv1NodeAfterSpawn(setNodes, newId);
+    return newId;
+  }
+
+  if (nodeType === "story-pro2-audio") {
+    const newId = addNode(
+      "story-pro2-audio",
+      { x, y },
+      buildPro2AudioNodeData(),
+    );
+    if (!newId) return "";
+    if (
+      (self.type === "jianying-export-pro2" ||
+        self.type === "jianying-auto-render-pro2") &&
+      side === "left"
+    ) {
+      setEdges((prev) => [
+        ...prev,
+        {
+          id: `e-${newId}-${anchorId}-audio`,
+          source: newId,
+          target: anchorId,
+          sourceHandle: "audio",
+          targetHandle: "in_audio",
+        },
+      ]);
+    }
+    selectPro2NodeAfterSpawn(setNodes, newId);
     return newId;
   }
 

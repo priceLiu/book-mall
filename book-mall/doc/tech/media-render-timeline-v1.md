@@ -36,14 +36,15 @@
 ```json
 {
   "transition": { "type": "xfade", "durationSec": 0.6 },
-  "subtitle": { "mode": "script", "burnIn": false },
+  "subtitle": { "mode": "script", "burnIn": false, "style": { "fontKey": "heiti", "sizeKey": "large" } },
   "video": { "scaleMode": "fit1080p" }
 }
 ```
 
 - `transition.type`: `xfade`（默认 0.6s 交叉淡化）或 `none`（concat，兼容旧合并）
 - `subtitle.mode`: `script` 使用 clips 台词；`none` 不生成字幕
-- `subtitle.burnIn`: `true` 时 ffmpeg 烧录字幕（P1.5+）
+- `subtitle.burnIn`: `true` 时 ffmpeg 烧录字幕（P1.5+）。须显式指定 CJK 字体（`subtitle-ffmpeg-style.ts`）；libass 默认 Arial 无中文 glyph，会烧成空心方框。生产镜像装 `fonts-wqy-microhei`，macOS 用系统黑体/冬青黑体。
+- `subtitle.style`（可选，`burnIn: true` 时生效）：`fontKey`（`heiti` \| `songti` \| `noto`，默认 `heiti`）+ `sizeKey`（`large` \| `medium` \| `small`，默认 `large`）。字号映射见 `docs/自动成片升级方案.md` 与 `shared/media-render-subtitle-style/subtitle-style-options.ts`。
 - `video.scaleMode`: `fit1080p` 统一 1080p 信箱；`source` 保持源分辨率（需规格一致）
 
 ## Adapters

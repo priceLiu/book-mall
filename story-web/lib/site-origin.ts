@@ -16,8 +16,10 @@ function normalizeHttpOriginUrl(raw: string): URL | null {
 export function getMainSiteOrigin(): string | null {
   const raw =
     process.env.MAIN_SITE_ORIGIN?.trim() ||
+    process.env.NEXT_PUBLIC_MAIN_SITE_ORIGIN?.trim() ||
     process.env.NEXT_PUBLIC_BOOK_MALL_URL?.trim() ||
-    process.env.BOOK_MALL_URL?.trim();
+    process.env.BOOK_MALL_URL?.trim() ||
+    process.env.BOOK_MALL_ORIGIN?.trim();
   if (!raw) return null;
   const u = normalizeHttpOriginUrl(raw);
   return u?.origin ?? null;

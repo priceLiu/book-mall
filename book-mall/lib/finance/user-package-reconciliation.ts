@@ -1,7 +1,4 @@
-import { getActiveByokSubscription } from "@/lib/billing/byok-subscription-service";
 import {
-  getAccountByokTaskSummary,
-  getAccountPackageUsageRows,
   getAccountPlatformCategoryUsageRows,
   getAccountUsageSummary,
   type PackageUsageRow,
@@ -14,7 +11,7 @@ export type UserPackageReconciliation = {
   scopeKey: string | null;
   usageSummary: Awaited<ReturnType<typeof getAccountUsageSummary>>;
   packageUsageRows: PackageUsageRow[];
-  byokTaskSummary: Awaited<ReturnType<typeof getAccountByokTaskSummary>>;
+  byokTaskSummary: [];
 };
 
 function currentPeriodKey(d = new Date()): string {
@@ -25,32 +22,23 @@ function currentPeriodKey(d = new Date()): string {
 export async function fetchUserPackageReconciliation(
   bookUserId: string,
 ): Promise<UserPackageReconciliation | null> {
-  const [user, sub] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: bookUserId },
-      select: { billingPersona: true },
-    }),
-    getActiveByokSubscription({ ownerType: "USER", ownerId: bookUserId }),
-  ]);
+  const user = await prisma.user.findUnique({
+    where: { id: bookUserId },
+    select: { billingPersona: true },
+  });
   if (!user) return null;
 
-  const scopeKey = sub?.scopeKey ?? null;
-  const packageRowsPromise: Promise<PackageUsageRow[]> =
-    user.billingPersona === "PLATFORM_CREDIT"
-      ? getAccountPlatformCategoryUsageRows(bookUserId)
-      : getAccountPackageUsageRows(bookUserId, scopeKey);
-  const [usageSummary, packageUsageRows, byokTaskSummary] = await Promise.all([
+  const [usageSummary, packageUsageRows] = await Promise.all([
     getAccountUsageSummary(bookUserId),
-    packageRowsPromise,
-    scopeKey ? getAccountByokTaskSummary(bookUserId, scopeKey) : Promise.resolve([]),
+    getAccountPlatformCategoryUsageRows(bookUserId),
   ]);
 
   return {
     periodKey: currentPeriodKey(),
     billingPersona: user.billingPersona,
-    scopeKey,
+    scopeKey: null,
     usageSummary,
     packageUsageRows,
-    byokTaskSummary,
+    byokTaskSummary: [],
   };
 }

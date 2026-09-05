@@ -28,6 +28,7 @@ type DashboardUser = {
   name: string | null;
   bookRole?: "ADMIN" | "USER";
   billingPersona?: "PLATFORM_CREDIT" | "BYOK" | null;
+  canManageGatewayModels?: boolean;
   platformPoolDelegate?: { canonicalOwnerEmail: string } | null;
 };
 

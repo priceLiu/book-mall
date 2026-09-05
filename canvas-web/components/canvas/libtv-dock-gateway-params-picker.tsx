@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
 import { DynamicParamForm } from "@/components/canvas/dynamic-param-form";
 import { resolveLibtvDockEngineModel } from "@/lib/canvas/libtv-dock-engine-models";
-import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
+import type { CanvasParamSchema, CanvasProviderDto } from "@/lib/canvas-providers-api";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import {
@@ -23,7 +23,10 @@ export type LibtvDockGatewayParamsPickerProps = {
   onOpenChange?: (open: boolean) => void;
   /** 底栏摘要文案；未选模型时显示「参数」 */
   summaryLabel: string;
+  /** 覆盖 Gateway schema（如音色已独立 Popover） */
+  schemaOverride?: CanvasParamSchema;
   onChange: (params: Record<string, unknown>) => void;
+  footer?: React.ReactNode;
 };
 
 /** 浮动 Dock · Gateway schema 参数锚点 Popover（即时生效） */
@@ -36,7 +39,9 @@ export function LibtvDockGatewayParamsPicker({
   open: controlledOpen,
   onOpenChange,
   summaryLabel,
+  schemaOverride,
   onChange,
+  footer,
 }: LibtvDockGatewayParamsPickerProps) {
   const { providers: hookProviders } = useUserProviders();
   const providers = externalProviders ?? hookProviders;
@@ -52,7 +57,7 @@ export function LibtvDockGatewayParamsPicker({
     [providers, providerId, modelKey],
   );
 
-  const schema = resolvedModel?.paramsSchema ?? [];
+  const schema = schemaOverride ?? resolvedModel?.paramsSchema ?? [];
   const hasParams = schema.length > 0;
 
   return (
@@ -89,6 +94,7 @@ export function LibtvDockGatewayParamsPicker({
               value={params}
               onChange={onChange}
             />
+            {footer}
           </div>
         ) : (
           <p className="px-3 py-2 text-[12px] text-white/45">当前模型无可调参数</p>
@@ -98,15 +104,21 @@ export function LibtvDockGatewayParamsPicker({
   );
 }
 
-/** LLM 默认参数摘要（reasoning_effort · max_tokens） */
+/** LLM 默认参数摘要（thinking · reasoning_effort · max_tokens） */
 export function libtvLlmParamsSummaryLabel(
   params: Record<string, unknown>,
 ): string {
   const parts: string[] = [];
+  const thinking = String(params.thinking_mode ?? "").trim();
+  if (thinking === "enabled") parts.push("深度思考");
+  else if (thinking === "disabled") parts.push("快答");
   const effort = String(params.reasoning_effort ?? "").trim();
-  if (effort === "low") parts.push("低推理");
-  else if (effort === "medium") parts.push("中推理");
-  else if (effort === "high") parts.push("高推理");
+  if (thinking === "enabled") {
+    if (effort === "low") parts.push("低推理");
+    else if (effort === "medium") parts.push("中推理");
+    else if (effort === "high") parts.push("高推理");
+    else if (effort === "max") parts.push("最深推理");
+  }
   const maxTokens = Number(params.max_tokens);
   if (Number.isFinite(maxTokens) && maxTokens > 0) {
     parts.push(maxTokens >= 1000 ? `${Math.round(maxTokens / 1000)}k` : String(maxTokens));

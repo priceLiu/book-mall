@@ -1,10 +1,11 @@
 "use client";
 
-import Image from "next/image";
-import { Plus, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
-import { EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
+import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
+import { useImageDropPaste } from "@/hooks/use-image-drop-paste";
+import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
 import type { StoryboardReference } from "@/lib/storyboard-types";
 import type { StoryboardUploadRole } from "@/lib/storyboard-workflow";
 import { cn } from "@/lib/utils";
@@ -13,8 +14,13 @@ type Props = {
   references: StoryboardReference[];
   onUpload: (file: File, opts: { label: string; role: StoryboardReference["role"] }) => Promise<void>;
   onRemove?: (id: string) => void | Promise<void>;
+  onAttachAssets?: (
+    assetIds: string[],
+    role: StoryboardReference["role"],
+  ) => Promise<void>;
   busy?: boolean;
-  /** 助手步骤建议的分类（高亮提示） */
+  uploadingRole?: StoryboardReference["role"] | null;
+  uploadProgress?: number | null;
   activeRole?: StoryboardUploadRole;
   onActiveRoleChange?: (role: StoryboardUploadRole) => void;
 };
@@ -23,17 +29,37 @@ const ROLE_SECTIONS: Array<{
   role: StoryboardUploadRole;
   title: string;
   refRole: StoryboardReference["role"];
+  emptyHint: string;
 }> = [
-  { role: "product", title: "产品图", refRole: "product" },
-  { role: "character", title: "角色图", refRole: "character" },
-  { role: "scene", title: "场景图", refRole: "scene" },
+  {
+    role: "product",
+    title: "产品图",
+    refRole: "product",
+    emptyHint:
+      "上传或粘贴产品图后，助手将自动检测并进入七维参数采集。",
+  },
+  {
+    role: "character",
+    title: "角色图",
+    refRole: "character",
+    emptyHint: "拖放图片到此处，或点击「上传」后 Ctrl+V / ⌘V 粘贴",
+  },
+  {
+    role: "scene",
+    title: "场景图",
+    refRole: "scene",
+    emptyHint: "拖放图片到此处，或点击「上传」后 Ctrl+V / ⌘V 粘贴",
+  },
 ];
 
 export function StoryboardRefUploader({
   references,
   onUpload,
   onRemove,
+  onAttachAssets,
   busy,
+  uploadingRole = null,
+  uploadProgress = null,
   activeRole = "product",
   onActiveRoleChange,
 }: Props) {
@@ -42,7 +68,7 @@ export function StoryboardRefUploader({
     character: null,
     scene: null,
   });
-  const [hoverRole, setHoverRole] = useState<StoryboardUploadRole | null>(null);
+  const [pickerRole, setPickerRole] = useState<StoryboardReference["role"] | null>(null);
 
   const uploadFile = useCallback(
     async (file: File, role: StoryboardReference["role"]) => {
@@ -54,9 +80,9 @@ export function StoryboardRefUploader({
     [busy, onUpload],
   );
 
-  async function handleFiles(files: FileList | null, role: StoryboardReference["role"]) {
-    if (!files?.length || busy) return;
-    for (const file of Array.from(files)) {
+  async function handleFiles(files: File[], role: StoryboardReference["role"]) {
+    if (!files.length || busy) return;
+    for (const file of files) {
       await uploadFile(file, role);
     }
     const section = ROLE_SECTIONS.find((s) => s.refRole === role);
@@ -65,127 +91,99 @@ export function StoryboardRefUploader({
     }
   }
 
-  function openPicker(role: StoryboardUploadRole) {
-    onActiveRoleChange?.(role);
-    inputRefs.current[role]?.click();
-  }
+  const activeRefRole =
+    ROLE_SECTIONS.find((s) => s.role === activeRole)?.refRole ?? "product";
+  const activeRefRoleRef = useRef(activeRefRole);
+  activeRefRoleRef.current = activeRefRole;
 
-  useEffect(() => {
-    function onPaste(e: ClipboardEvent) {
-      if (busy) return;
-      const items = e.clipboardData?.items;
-      if (!items?.length) return;
-
-      const pasteRole = hoverRole ?? activeRole;
-      const section = ROLE_SECTIONS.find((s) => s.role === pasteRole);
-      if (!section) return;
-
-      for (const item of Array.from(items)) {
-        if (!item.type.startsWith("image/")) continue;
-        const file = item.getAsFile();
-        if (!file) continue;
-        e.preventDefault();
-        void uploadFile(file, section.refRole);
-        break;
-      }
-    }
-    window.addEventListener("paste", onPaste);
-    return () => window.removeEventListener("paste", onPaste);
-  }, [hoverRole, activeRole, busy, uploadFile]);
+  const {
+    pasteReady: sectionPasteReady,
+    dropZoneProps: sectionPasteProps,
+    focusZone: focusSectionPaste,
+  } = useImageDropPaste({
+    enabled: !busy,
+    multiple: true,
+    listenPaste: true,
+    onFiles: (files) => void handleFiles(files, activeRefRoleRef.current),
+  });
 
   return (
-    <div className="space-y-3">
+    <div
+      {...sectionPasteProps}
+      className={cn(
+        "space-y-2 rounded-lg outline-none transition-shadow",
+        sectionPasteReady && "ring-2 ring-[#0071e3]/20",
+      )}
+      onMouseEnter={(e) => {
+        sectionPasteProps.onMouseEnter?.();
+        e.currentTarget.focus({ preventScroll: true });
+      }}
+      onMouseLeave={sectionPasteProps.onMouseLeave}
+    >
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
           素材图
         </span>
-        <span className="text-[10px] text-[#86868b]">鼠标移入分类后粘贴</span>
+        <span className="text-[10px] text-[#86868b]">
+          {IMAGE_UPLOAD_DROP_HINT}
+          {sectionPasteReady ? " · 粘贴至当前选中项" : ""}
+        </span>
       </div>
 
-      {ROLE_SECTIONS.map(({ role, title, refRole }) => {
-        const items = references.filter((r) =>
-          refRole === "other" ? r.role === "scene" || r.role === "other" : r.role === refRole,
-        );
-        const isHover = hoverRole === role;
-        const isSuggested = activeRole === role;
+      {ROLE_SECTIONS.map(({ role, title, refRole, emptyHint }) => (
+        <EcomRefUploadCard
+          key={role}
+          title={title}
+          suggested={activeRole === role}
+          listenPaste={false}
+          items={references
+            .filter((r) => r.role === refRole)
+            .map((r) => ({ id: r.id, ossUrl: r.ossUrl, label: r.label }))}
+          emptyHint={emptyHint}
+          busy={busy}
+          uploadProgress={uploadingRole === refRole ? uploadProgress : null}
+          onUploadFiles={(files) => void handleFiles(files, refRole)}
+          onOpenFilePicker={() => {
+            onActiveRoleChange?.(role);
+            inputRefs.current[role]?.click();
+          }}
+          onOpenAssetPicker={
+            onAttachAssets
+              ? () => {
+                  onActiveRoleChange?.(role);
+                  setPickerRole(refRole);
+                }
+              : undefined
+          }
+          onRemove={onRemove}
+          removeLabel={`删除${title}`}
+          onTitleClick={() => onActiveRoleChange?.(role)}
+          onMouseEnterCard={() => {
+            onActiveRoleChange?.(role);
+            focusSectionPaste();
+          }}
+          inputRef={(el) => {
+            inputRefs.current[role] = el;
+          }}
+        />
+      ))}
 
-        return (
-          <div
-            key={role}
-            className={cn(
-              "rounded-lg border px-2.5 py-2 transition-colors",
-              isHover && "border-[#0071e3] bg-[#0071e3]/5 ring-1 ring-[#0071e3]/40",
-              !isHover && isSuggested && "border-[#1d1d1f]/25 bg-white",
-              !isHover && !isSuggested && "border-[#e8e8ed] bg-[#fafafa]",
-            )}
-            onMouseEnter={() => setHoverRole(role)}
-            onMouseLeave={() => setHoverRole((prev) => (prev === role ? null : prev))}
-          >
-            <div className="mb-1.5 flex items-center justify-between gap-2">
-              <button
-                type="button"
-                className="text-xs font-semibold text-[#1d1d1f]"
-                onClick={() => onActiveRoleChange?.(role)}
-              >
-                {title}
-                {isHover ? (
-                  <span className="ml-1.5 text-[10px] font-normal text-[#0071e3]">粘贴至此</span>
-                ) : null}
-              </button>
-              <EcomButtonSecondary
-                size="sm"
-                type="button"
-                disabled={busy}
-                className="h-7 px-2 text-[10px]"
-                onClick={() => openPicker(role)}
-              >
-                <Plus className="h-3 w-3 shrink-0" />
-                上传
-              </EcomButtonSecondary>
-            </div>
-            <input
-              ref={(el) => {
-                inputRefs.current[role] = el;
-              }}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              multiple
-              className="hidden"
-              onChange={(e) => handleFiles(e.target.files, refRole)}
-            />
-            {items.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5">
-                {items.map((r) => (
-                  <div
-                    key={r.id}
-                    className="group relative h-14 w-14 overflow-hidden rounded-md border border-[#d2d2d7] bg-white"
-                  >
-                    <Image
-                      src={r.ossUrl}
-                      alt={r.label}
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
-                    {onRemove ? (
-                      <button
-                        type="button"
-                        className="absolute right-0.5 top-0.5 rounded-full bg-black/65 p-0.5 text-white"
-                        onClick={() => void onRemove(r.id)}
-                        aria-label={`删除${title}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-[10px] text-[#86868b]">--</p>
-            )}
-          </div>
-        );
-      })}
+      {onAttachAssets ? (
+        <EcomAssetPickerDialog
+          open={pickerRole !== null}
+          onOpenChange={(open) => {
+            if (!open) setPickerRole(null);
+          }}
+          onConfirm={async (assets) => {
+            const role = pickerRole ?? "product";
+            setPickerRole(null);
+            await onAttachAssets(
+              assets.map((a) => a.id),
+              role,
+            );
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -10,6 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@private/platform-assistant": "file:../shared/platform-assistant",
     "@swc/helpers": "0.5.5",
     "next": "14.2.3",
     "react": "^18",

@@ -4,9 +4,16 @@ import { canViewFinanceCost } from "@/lib/auth/permissions";
 import {
   batchAggregateUserGatewayTokenUsage,
   EMPTY_GATEWAY_TOKEN_USAGE,
+  fetchPlatformAssistantGatewayTokenUsage,
   gatewayTokenUsageToRecord,
 } from "@/lib/gateway/gateway-token-usage-aggregate";
 import { currentPeriodKey, periodBounds } from "@/lib/finance/team-finance-guard";
+import {
+  buildPlatformAssistantGatewayLogWhere,
+  excludePlatformAssistantClientPageFilter,
+  PLATFORM_ASSISTANT_BILLING_USER_ID,
+  PLATFORM_ASSISTANT_BILLING_USER_LABEL,
+} from "@/lib/platform-assistant/platform-assistant-billing";
 import { prisma } from "@/lib/prisma";
 import {
   financeForbidden,
@@ -15,6 +22,7 @@ import {
   getFinanceSession,
 } from "@/lib/finance/finance-api";
 import { financeCorsHeaders } from "@/lib/finance/cors";
+import { buildFinancePeriodSubmittedAt } from "@/lib/gateway/finance-log-query";
 
 export async function OPTIONS(request: NextRequest) {
   return financeOptions(request);
@@ -38,13 +46,20 @@ export async function GET(request: NextRequest) {
     }),
     prisma.gatewayRequestLog.groupBy({
       by: ["actorBookUserId"],
-      where: { actorBookUserId: { not: null } },
+      where: {
+        actorBookUserId: { not: null },
+        ...excludePlatformAssistantClientPageFilter(),
+      },
       _count: { _all: true },
       _max: { submittedAt: true },
     }),
     prisma.gatewayRequestLog.groupBy({
       by: ["actorBookUserId"],
-      where: { actorBookUserId: { not: null }, status: "SUCCEEDED" },
+      where: {
+        actorBookUserId: { not: null },
+        status: "SUCCEEDED",
+        ...excludePlatformAssistantClientPageFilter(),
+      },
       _count: { _all: true },
     }),
   ]);
@@ -92,7 +107,48 @@ export async function GET(request: NextRequest) {
   }
 
   if (merged.size === 0) {
-    return NextResponse.json({ users: [] }, { headers: cors });
+    const periodKey = currentPeriodKey();
+    const { from, to } = periodBounds(periodKey);
+    const [assistantAgg, assistantSucceeded, assistantTokenUsage] = await Promise.all([
+      prisma.gatewayRequestLog.aggregate({
+        where: buildPlatformAssistantGatewayLogWhere(
+          buildFinancePeriodSubmittedAt(from, to),
+        ),
+        _count: { _all: true },
+        _max: { submittedAt: true },
+      }),
+      prisma.gatewayRequestLog.count({
+        where: buildPlatformAssistantGatewayLogWhere({
+          AND: [buildFinancePeriodSubmittedAt(from, to), { status: "SUCCEEDED" }],
+        }),
+      }),
+      fetchPlatformAssistantGatewayTokenUsage({
+        submittedFrom: from,
+        submittedTo: to,
+      }),
+    ]);
+    if (assistantAgg._count._all === 0) {
+      return NextResponse.json({ users: [], periodKey }, { headers: cors });
+    }
+    return NextResponse.json(
+      {
+        users: [
+          {
+            id: PLATFORM_ASSISTANT_BILLING_USER_ID,
+            name: PLATFORM_ASSISTANT_BILLING_USER_LABEL,
+            email: null,
+            phone: null,
+            lineCount: assistantAgg._count._all,
+            succeededCalls: assistantSucceeded,
+            latestAt: assistantAgg._max.submittedAt?.toISOString() ?? null,
+            periodKey,
+            tokenUsage: gatewayTokenUsageToRecord(assistantTokenUsage),
+          },
+        ],
+        periodKey,
+      },
+      { headers: cors },
+    );
   }
 
   const sorted = Array.from(merged.entries())
@@ -112,11 +168,33 @@ export async function GET(request: NextRequest) {
   const periodKey = currentPeriodKey();
   const { from, to } = periodBounds(periodKey);
   const userIds = sorted.map(([id]) => id);
-  const tokenByUser = await batchAggregateUserGatewayTokenUsage({
-    bookUserIds: userIds,
-    submittedFrom: from,
-    submittedTo: to,
-  });
+  const [tokenByUser, assistantAgg, assistantSucceeded, assistantTokenUsage] =
+    await Promise.all([
+      batchAggregateUserGatewayTokenUsage({
+        bookUserIds: userIds,
+        submittedFrom: from,
+        submittedTo: to,
+      }),
+      prisma.gatewayRequestLog.aggregate({
+        where: buildPlatformAssistantGatewayLogWhere(
+          buildFinancePeriodSubmittedAt(from, to),
+        ),
+        _count: { _all: true },
+        _max: { submittedAt: true },
+      }),
+      prisma.gatewayRequestLog.count({
+        where: buildPlatformAssistantGatewayLogWhere({
+          AND: [
+            buildFinancePeriodSubmittedAt(from, to),
+            { status: "SUCCEEDED" },
+          ],
+        }),
+      }),
+      fetchPlatformAssistantGatewayTokenUsage({
+        submittedFrom: from,
+        submittedTo: to,
+      }),
+    ]);
 
   const out = sorted
     .map(([id, stats]) => {
@@ -137,6 +215,20 @@ export async function GET(request: NextRequest) {
       };
     })
     .filter((u) => u.email || u.name || u.phone);
+
+  if (assistantAgg._count._all > 0) {
+    out.unshift({
+      id: PLATFORM_ASSISTANT_BILLING_USER_ID,
+      name: PLATFORM_ASSISTANT_BILLING_USER_LABEL,
+      email: null,
+      phone: null,
+      lineCount: assistantAgg._count._all,
+      succeededCalls: assistantSucceeded,
+      latestAt: assistantAgg._max.submittedAt?.toISOString() ?? null,
+      periodKey,
+      tokenUsage: gatewayTokenUsageToRecord(assistantTokenUsage),
+    });
+  }
 
   return NextResponse.json({ users: out, periodKey }, { headers: cors });
 }

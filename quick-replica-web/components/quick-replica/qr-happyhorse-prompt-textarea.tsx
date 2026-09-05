@@ -78,6 +78,8 @@ type Props = {
   onChange: (value: string) => void;
   /** 默认 min-h-[180px]；文字转视频中栏可传 min-h-[360px] */
   minHeightClass?: string;
+  placeholder?: string;
+  emptyHint?: string;
 };
 
 export function QrHappyHorsePromptTextarea({
@@ -88,6 +90,8 @@ export function QrHappyHorsePromptTextarea({
   referenceImages,
   onChange,
   minHeightClass = "min-h-[180px]",
+  placeholder = "对所需输出的文本描述… 输入 @ 引用下方图片",
+  emptyHint = "请先在下方上传引用图片，再输入 @ 引用",
 }: Props) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -369,7 +373,7 @@ export function QrHappyHorsePromptTextarea({
     >
       {referenceImages.length === 0 ? (
         <p className="px-4 py-3 text-xs text-[var(--qr-text-muted)]">
-          请先在下方上传引用图片，再输入 @ 引用
+          {emptyHint}
         </p>
       ) : filteredImages.length === 0 ? (
         <p className="px-4 py-3 text-xs text-[var(--qr-text-muted)]">
@@ -444,7 +448,7 @@ export function QrHappyHorsePromptTextarea({
       />
       {isEmpty ? (
         <div className="pointer-events-none absolute left-0 top-0 select-none px-[14px] py-[10px] text-sm text-[var(--qr-text-muted)]">
-          对所需输出的文本描述… 输入 @ 引用下方图片
+          {placeholder}
         </div>
       ) : null}
 

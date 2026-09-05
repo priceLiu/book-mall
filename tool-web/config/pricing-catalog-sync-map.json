@@ -2,6 +2,7 @@
   "visualLabAnalysis": {
     "catalogRelativePath": "config/visual-lab-analysis-scheme-a-catalog.json",
     "models": [
+      { "catalogId": "qwen3.8-max", "modelKey": "qwen3.8-max", "tierRaw": "0<Token≤1M" },
       { "catalogId": "qwen3.6-plus", "modelKey": "qwen3.6-plus", "tierRaw": "0<Token≤256K" },
       { "catalogId": "qwen3.6-flash", "modelKey": "qwen3.6-flash", "tierRaw": "0<Token≤256K" },
       { "catalogId": "qwen3.5-plus", "modelKey": "qwen3.5-plus", "tierRaw": "0<Token≤128K" },

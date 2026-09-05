@@ -1,9 +1,13 @@
+import type { Pro2ScriptCategoryId } from "./pro2-script-category-presets";
+import { resolvePro2HubPromptPack } from "./pro2-script-category-presets";
 import type { CanvasFlowNode } from "./types";
 import {
+  isLegacyPro2HubOutlineSystemPrompt,
   isLegacyStoryPro2HubOutlinePrompt,
   isLegacyStoryPro2ScenePrompt,
+  isLegacyStoryPro2StoryboardPrompt,
+  STORY_PRO2_HUB_LLM_SYSTEM,
   STORY_PRO2_PACK_PROMPT_VERSION,
-  storyPro2HubDefaultPromptPack,
 } from "./story-pro2-theme-outline-prompt";
 import {
   isLegacyStoryProDirectorPrompt,
@@ -11,9 +15,13 @@ import {
   STORY_PRO_PACK_PROMPT_VERSION,
 } from "./story-pro-script-pack";
 import {
+  isLegacyStoryProPlannerSystemPrompt,
+  STORY_PRO_LEGACY_LLM_MAX_TOKENS,
+  STORY_PRO_LLM_PARAMS_DEFAULT,
   storyProThemeSystemPromptForTemplate,
   type StoryProThemeSystemPromptTemplateId,
 } from "./story-pro-theme-templates";
+import { resolvePro2FullPackSystemPrompt } from "./pro2-gu-feng-full-pack-run";
 import {
   STORY_LEGACY_OUTLINE_USER_MARK,
   STORY_PACK_PROMPT_VERSION,
@@ -165,27 +173,88 @@ function pro2PromptPackVersion(data: Record<string, unknown>): number {
   return typeof v === "number" && Number.isFinite(v) ? v : 0;
 }
 
+function patchPro2LlmParams(
+  data: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const params = {
+    ...STORY_PRO_LLM_PARAMS_DEFAULT,
+    ...((data.params as Record<string, unknown> | undefined) ?? {}),
+  };
+  const maxTokens = params.max_tokens;
+  if (
+    maxTokens !== STORY_PRO_LEGACY_LLM_MAX_TOKENS &&
+    maxTokens !== undefined
+  ) {
+    return null;
+  }
+  return {
+    ...data,
+    params: { ...params, max_tokens: STORY_PRO_LLM_PARAMS_DEFAULT.max_tokens },
+  };
+}
+
+function patchPro2HubOutlineSystemPrompt(
+  data: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const sys = String(data.outlineSystemPrompt ?? "").trim();
+  if (!isLegacyPro2HubOutlineSystemPrompt(sys)) return null;
+  const categoryId = data.scriptCategoryId as Pro2ScriptCategoryId | undefined;
+  return {
+    ...data,
+    outlineSystemPrompt: resolvePro2FullPackSystemPrompt(categoryId),
+  };
+}
+
+function patchPro2LlmPlannerMeta(
+  data: Record<string, unknown>,
+  opts?: { refreshSystem?: boolean },
+): Record<string, unknown> | null {
+  let next = data;
+  let changed = false;
+
+  const paramsPatch = patchPro2LlmParams(next);
+  if (paramsPatch) {
+    next = paramsPatch;
+    changed = true;
+  }
+
+  if (opts?.refreshSystem !== false) {
+    const sysPatch = patchPro2HubOutlineSystemPrompt(next);
+    if (sysPatch) {
+      next = sysPatch;
+      changed = true;
+    }
+  }
+
+  return changed ? next : null;
+}
+
 function migrateStoryPro2ScriptHubData(
   data: Record<string, unknown>,
 ): Record<string, unknown> | null {
   const curVer = pro2PromptPackVersion(data);
   const promptOutline = String(data.promptOutline ?? "");
   const promptScene = String(data.promptScene ?? "");
+  const promptStoryboard = String(data.promptStoryboard ?? "");
   const needsHubPrompts =
     curVer < STORY_PRO2_PACK_PROMPT_VERSION ||
     isLegacyStoryPro2HubOutlinePrompt(promptOutline) ||
-    isLegacyStoryPro2ScenePrompt(promptScene);
+    isLegacyStoryPro2ScenePrompt(promptScene) ||
+    isLegacyStoryPro2StoryboardPrompt(promptStoryboard);
 
   if (!needsHubPrompts && curVer >= STORY_PRO2_PACK_PROMPT_VERSION) {
     return null;
   }
 
-  const defaults = storyPro2HubDefaultPromptPack();
-  return {
+  const defaults = resolvePro2HubPromptPack({
+    scriptCategoryId: data.scriptCategoryId as Pro2ScriptCategoryId | undefined,
+  });
+  const merged = {
     ...data,
     ...defaults,
     storyPro2PackPromptVersion: STORY_PRO2_PACK_PROMPT_VERSION,
   };
+  return patchPro2LlmPlannerMeta(merged) ?? merged;
 }
 
 /** 加载画布：刷新内置制作包模板 + hub 段 prompt */
@@ -201,7 +270,10 @@ export function migrateStoryPromptPackNode(n: CanvasFlowNode): CanvasFlowNode {
   } else if (n.type === STORY_PRO_SCRIPT_HUB) {
     patch = migrateStoryProScriptHubData(data);
   } else if (n.type === STORY_PRO2_SCRIPT_HUB) {
-    patch = migrateStoryPro2ScriptHubData(data);
+    const packPatch = migrateStoryPro2ScriptHubData(data);
+    patch = patchPro2LlmPlannerMeta(packPatch ?? data) ?? packPatch;
+  } else if (n.type === "story-pro2-starter") {
+    patch = patchPro2LlmPlannerMeta(data, { refreshSystem: false });
   }
   if (!patch) return n;
   return { ...n, data: patch };
@@ -274,8 +346,18 @@ export function migrateStoryPromptPackAll(
       return { ...n, data: patch };
     }
     if (n.type === STORY_PRO2_SCRIPT_HUB) {
-      const patch = migrateStoryPro2ScriptHubData(
+      const packPatch = migrateStoryPro2ScriptHubData(
         (n.data ?? {}) as Record<string, unknown>,
+      );
+      const patch =
+        patchPro2LlmPlannerMeta(packPatch ?? (n.data ?? {})) ?? packPatch;
+      if (!patch) return n;
+      return { ...n, data: patch };
+    }
+    if (n.type === "story-pro2-starter") {
+      const patch = patchPro2LlmPlannerMeta(
+        (n.data ?? {}) as Record<string, unknown>,
+        { refreshSystem: false },
       );
       if (!patch) return n;
       return { ...n, data: patch };

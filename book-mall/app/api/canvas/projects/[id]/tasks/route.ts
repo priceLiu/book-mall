@@ -9,6 +9,9 @@ import {
   listProjectTasks,
   scheduleOpportunisticCanvasPoll,
 } from "@/lib/canvas/canvas-task-service";
+import { touchCanvasActiveProject } from "@/lib/canvas/canvas-active-project";
+import { recoverProjectInflightKieImageTasksForRead } from "@/lib/canvas/canvas-kie-image-recover";
+import { recoverProjectInflightTextTasksForRead } from "@/lib/canvas/canvas-text-llm-recover";
 import { isPrismaConnectionUnavailable } from "@/lib/db-unavailable";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -51,6 +54,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   const guard = await requireSessionUser(request);
   if (!guard.ok) return guard.response;
   const { id: projectId } = await ctx.params;
+  touchCanvasActiveProject(projectId);
   const url = new URL(request.url);
   const nodeIdsParam = url.searchParams.get("nodeIds");
   const nodeIds = nodeIdsParam
@@ -59,7 +63,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const tasks = await Promise.race([
+    let tasks = await Promise.race([
       listProjectTasks({
         userId: guard.user.id,
         projectId,
@@ -73,6 +77,65 @@ export async function GET(request: NextRequest, ctx: Ctx) {
         );
       }),
     ]);
+
+    const textSubmittedIds = tasks
+      .filter((t) => t.kind === "TEXT" && t.status === "SUBMITTED")
+      .map((t) => t.id);
+    if (textSubmittedIds.length > 0) {
+      const recovered = await recoverProjectInflightTextTasksForRead(
+        textSubmittedIds,
+        Math.min(20, textSubmittedIds.length),
+      );
+      if (recovered > 0) {
+        tasks = await listProjectTasks({
+          userId: guard.user.id,
+          projectId,
+          nodeIds,
+          lightweight: true,
+        });
+      }
+    }
+
+    const imageSubmittedIds = tasks
+      .filter((t) => t.kind === "IMAGE" && t.status === "SUBMITTED")
+      .map((t) => t.id);
+    if (imageSubmittedIds.length > 0) {
+      const recoverLimit = Math.min(50, imageSubmittedIds.length);
+      const recovered = await recoverProjectInflightKieImageTasksForRead(
+        imageSubmittedIds,
+        recoverLimit,
+      );
+      if (recovered > 0) {
+        tasks = await listProjectTasks({
+          userId: guard.user.id,
+          projectId,
+          nodeIds,
+          lightweight: true,
+        });
+      }
+    }
+
+    const pseudoTimeoutIds = tasks.filter(
+      (t) =>
+        t.status === "FAILED" && t.failCode === "SUBMIT_DISPATCH_TIMEOUT",
+    );
+    if (pseudoTimeoutIds.length > 0) {
+      const { recoverProjectSubmitDispatchTimeoutTasksForRead } = await import(
+        "@/lib/generation/traffic-control/canvas-orphan-gateway-log"
+      );
+      const recovered = await recoverProjectSubmitDispatchTimeoutTasksForRead(
+        pseudoTimeoutIds,
+        Math.min(10, pseudoTimeoutIds.length),
+      );
+      if (recovered > 0) {
+        tasks = await listProjectTasks({
+          userId: guard.user.id,
+          projectId,
+          nodeIds,
+          lightweight: true,
+        });
+      }
+    }
 
     // 有进行中任务：后台 DISPATCHING 超时自愈（30s）+ 轮询推进，不阻塞读响应
     const hasInflight = tasks.some((t) => CANVAS_INFLIGHT_STATUS.has(t.status));

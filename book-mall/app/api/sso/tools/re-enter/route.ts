@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { issueToolsSsoRedirect } from "@/lib/issue-tools-sso-redirect";
+import { isPrismaConnectionUnavailable } from "@/lib/db-unavailable";
 import { parsePlatformSsoApp } from "@/lib/platform-app-sso";
 import { getBookMallOrigin } from "@/lib/gateway/env";
 import {
@@ -58,13 +59,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const result = await issueToolsSsoRedirect({
-    userId: session.user.id,
-    redirectPath,
-    app,
-    clientId,
-    redirectUri,
-  });
+  let result;
+  try {
+    result = await issueToolsSsoRedirect({
+      userId: session.user.id,
+      redirectPath,
+      app,
+      clientId,
+      redirectUri,
+    });
+  } catch (e) {
+    if (isPrismaConnectionUnavailable(e)) {
+      const url = new URL("/account", bookOrigin);
+      url.searchParams.set("tools_sso_err", "TOOLS_SSO_UNAVAILABLE");
+      return NextResponse.redirect(url);
+    }
+    throw e;
+  }
 
   if (!result.ok) {
     const url = new URL("/account", bookOrigin);

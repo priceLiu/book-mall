@@ -157,4 +157,19 @@ h</textarea>
     const el = document.querySelector(".pro2-node-scroll")!;
     expect(isCanvasWheelScrollBlockTarget(el)).toBe(false);
   });
+
+  it("blocks horizontal wheel in editor even when ctrlKey (pinch zoom)", () => {
+    document.body.innerHTML = `<div data-canvas-editor><div class="react-flow"></div></div>`;
+    const pane = document.querySelector(".react-flow")!;
+    expect(
+      shouldBlockCanvasViewportWheel({
+        target: pane,
+        deltaX: 12,
+        deltaY: 2,
+        ctrlKey: true,
+        metaKey: false,
+        shiftKey: false,
+      } as unknown as WheelEvent),
+    ).toBe(true);
+  });
 });

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { deleteManagedOssObjectByUrl } from "@/lib/oss-delete-object";
 import { prisma } from "@/lib/prisma";
+import { cascadeDeletePinsBySource } from "@/lib/ai-space/ai-space-pin-service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -80,6 +81,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: oss.error }, { status: 502 });
     }
 
+    await cascadeDeletePinsBySource("i2v_library", row.id);
     await prisma.imageToVideoLibraryItem.delete({ where: { id: row.id } });
     return NextResponse.json({ ok: true, ossDeleted: oss.deleted });
   } catch (e) {

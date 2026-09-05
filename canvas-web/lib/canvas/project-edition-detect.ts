@@ -15,6 +15,7 @@ const STORY_PRO_NODE_TYPES = new Set([
 
 const STORY_PRO2_NODE_TYPES = new Set([
   "story-pro2-starter",
+  "story-pro2-prompt",
   "story-pro2-script-hub",
   "story-pro2-style",
   "story-pro2-style-asset",
@@ -45,28 +46,66 @@ export function isSbv1PipelineNodeType(type: string): boolean {
   return SBV1_NODE_TYPES.has(type);
 }
 
-export function canvasProjectEditionFromGraph(
-  canvas: unknown,
+function readCanvasGraphMetaHint(meta: unknown): {
+  edition?: string;
+  crewBulletinAnchor?: unknown;
+  linkedScriptPackageAssetId?: string;
+} | null {
+  if (!meta || typeof meta !== "object") return null;
+  return meta as {
+    edition?: string;
+    crewBulletinAnchor?: unknown;
+    linkedScriptPackageAssetId?: string;
+  };
+}
+
+export function canvasProjectEditionFromMeta(meta: unknown): CanvasProjectEdition {
+  const m = readCanvasGraphMetaHint(meta);
+  if (!m) return "standard";
+  if (m.edition === "sbv1") return "sbv1";
+  if (m.edition === "pro2") return "pro2";
+  if (m.crewBulletinAnchor || m.linkedScriptPackageAssetId) return "pro2";
+  return "standard";
+}
+
+export function canvasProjectEditionFromNodeTypes(
+  nodeTypes: Iterable<string> | null | undefined,
 ): CanvasProjectEdition {
-  if (!canvas || typeof canvas !== "object") return "standard";
-
-  const meta = (canvas as { meta?: { edition?: string; crewBulletinAnchor?: unknown; linkedScriptPackageAssetId?: string } }).meta;
-  if (meta?.edition === "sbv1") return "sbv1";
-  if (meta?.edition === "pro2") return "pro2";
-  /** 空白协作画布 · 仅 meta 存公告栏锚点 */
-  if (meta?.crewBulletinAnchor || meta?.linkedScriptPackageAssetId) {
-    return "pro2";
-  }
-
-  const nodes = (canvas as { nodes?: unknown }).nodes;
-  if (!Array.isArray(nodes)) return "standard";
-  for (const raw of nodes) {
-    if (!raw || typeof raw !== "object") continue;
-    const type = (raw as { type?: unknown }).type;
+  if (!nodeTypes) return "standard";
+  for (const type of nodeTypes) {
     if (typeof type !== "string") continue;
     if (isSbv1PipelineNodeType(type)) return "sbv1";
     if (isStoryPro2PipelineNodeType(type)) return "pro2";
     if (isStoryProPipelineNodeType(type)) return "pro";
   }
   return "standard";
+}
+
+export function canvasProjectEditionFromListHints(
+  meta: unknown,
+  nodeTypes: Iterable<string> | null | undefined,
+): CanvasProjectEdition {
+  const fromMeta = canvasProjectEditionFromMeta(meta);
+  if (fromMeta !== "standard") return fromMeta;
+  return canvasProjectEditionFromNodeTypes(nodeTypes);
+}
+
+export function canvasProjectEditionFromGraph(
+  canvas: unknown,
+): CanvasProjectEdition {
+  if (!canvas || typeof canvas !== "object") return "standard";
+
+  const meta = (canvas as { meta?: unknown }).meta;
+  const fromMeta = canvasProjectEditionFromMeta(meta);
+  if (fromMeta !== "standard") return fromMeta;
+
+  const nodes = (canvas as { nodes?: unknown }).nodes;
+  if (!Array.isArray(nodes)) return "standard";
+  const types: string[] = [];
+  for (const raw of nodes) {
+    if (!raw || typeof raw !== "object") continue;
+    const type = (raw as { type?: unknown }).type;
+    if (typeof type === "string") types.push(type);
+  }
+  return canvasProjectEditionFromNodeTypes(types);
 }

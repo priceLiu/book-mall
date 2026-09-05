@@ -4,6 +4,7 @@
  *   pnpm --filter book-mall seed:ecom-image-processing-credits
  */
 import { publishModelCreditPrice } from "../lib/pricing/credit-pricing-engine";
+import { importModelCostProfileVersioned } from "../lib/pricing/import-model-cost-profile-versioned";
 import { prisma } from "../lib/prisma";
 
 const ROWS = [
@@ -52,32 +53,18 @@ const ROWS = [
 ] as const;
 
 async function upsertCost(row: (typeof ROWS)[number]) {
-  const netCostYuan = row.listCostYuan * (1 - row.discountRate);
-  const id = `seed_ecom_imgproc_${row.canonicalModelKey}`;
-  await prisma.modelCostProfile.upsert({
-    where: { id },
-    create: {
-      id,
-      canonicalModelKey: row.canonicalModelKey,
-      vendor: row.vendor,
-      channel: "CHANNEL",
-      unit: "PER_IMAGE",
-      tierRaw: null,
-      listCostYuan: row.listCostYuan,
-      discountRate: row.discountRate,
-      netCostYuan,
-      active: true,
-      note: "seed-ecom-image-processing-credit-prices",
-    },
-    update: {
-      listCostYuan: row.listCostYuan,
-      discountRate: row.discountRate,
-      netCostYuan,
-      active: true,
-      note: "seed-ecom-image-processing-credit-prices",
-    },
+  const result = await importModelCostProfileVersioned({
+    canonicalModelKey: row.canonicalModelKey,
+    vendor: row.vendor,
+    unit: "PER_IMAGE",
+    listCostYuan: row.listCostYuan,
+    discountRate: row.discountRate,
+    note: "seed-ecom-image-processing-credit-prices",
+    seedId: `seed_ecom_imgproc_${row.canonicalModelKey}`,
   });
-  console.log(`[cost] ${row.canonicalModelKey} net=${netCostYuan.toFixed(4)}`);
+  console.log(
+    `[${result.action}] ${row.canonicalModelKey} list=${row.listCostYuan}`,
+  );
 }
 
 async function main() {

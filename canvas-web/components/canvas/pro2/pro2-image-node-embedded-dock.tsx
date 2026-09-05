@@ -5,7 +5,9 @@ import { ArrowUp, Loader2, MapPin, Upload } from "lucide-react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
+import { optimisticLibtvMediaRunStart } from "@/lib/canvas/libtv-image-node-run";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
+import { LIBTV_INPUT_DOCK_SEND_BTN_CLASS } from "@/lib/canvas/libtv-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import {
   resolvePro2DockUpstreamLinks,
@@ -35,7 +37,7 @@ import { Pro2DockUpstreamHeader } from "./pro2-dock-upstream-header";
 
 function framePromptPlaceholder(role?: string): string {
   if (role === "frame") {
-    return "编辑本镜画面描述；输入 @ 引用角色三视图或风格参考…";
+    return "编辑本镜 AI 生图提示词；输入 @ 引用角色三视图或风格参考…";
   }
   return "描述你想生成的画面，或输入 @ 引用已链接的图片…";
 }
@@ -59,6 +61,7 @@ export function Pro2ImageNodeEmbeddedDock({
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
   const setPro2StyleLibImageNodeId = useCanvasStore(
     (s) => s.setPro2StyleLibImageNodeId,
   );
@@ -70,6 +73,7 @@ export function Pro2ImageNodeEmbeddedDock({
   const { actionBtnPx, logoIconPx, logoLabelFontPx } = useLibtvDockRefThumbMetrics();
   const d = (storeNode?.data ?? {}) as StoryPro2ImageNodeData;
   const dockInput = d.dockInput ?? "";
+  const dockRefImages = (d.dockRefImages ?? []) as import("@/lib/canvas/story-ref-image").StoryRefImage[];
   const mediaRole = d.pro2MediaRole ?? "generic";
   const isRunning = Boolean(d.uploading);
 
@@ -89,8 +93,8 @@ export function Pro2ImageNodeEmbeddedDock({
   );
 
   const mentionables = useMemo(
-    () => buildPro2DockMentionables(upstreamLinks),
-    [upstreamLinks],
+    () => buildPro2DockMentionables(upstreamLinks, dockRefImages),
+    [upstreamLinks, dockRefImages],
   );
   const activeRefIds = useMemo(
     () => dockActiveRefIdsFromPrompt(dockInput),
@@ -142,10 +146,18 @@ export function Pro2ImageNodeEmbeddedDock({
     const controllerId = d.pro2ControllerNodeId;
     const rowKey = d.pro2RowKey;
     if (!controllerId || !rowKey) return;
+    optimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
     batchRunStoryRowsSequential(controllerId, [rowKey], "frameImage", {
       forceFresh: true,
     });
-  }, [storeNode, mediaRole, d.pro2ControllerNodeId, d.pro2RowKey]);
+  }, [
+    storeNode,
+    mediaRole,
+    d.pro2ControllerNodeId,
+    d.pro2RowKey,
+    updateNodeData,
+    setNodeRuntime,
+  ]);
 
   const onOpenStyleLibrary = useCallback(() => {
     setPro2StyleLibImageNodeId(nodeId);
@@ -227,8 +239,11 @@ export function Pro2ImageNodeEmbeddedDock({
                 </button>
               ) : null}
               <Pro2DockRefImages
-                refs={[]}
-                onChange={() => {}}
+                refs={dockRefImages}
+                onChange={(next) => {
+                  updateNodeData(storeNode.id, { dockRefImages: next });
+                  syncFrameRowPrompt(dockInput);
+                }}
                 disabled={isRunning}
                 pasteActive={false}
                 spawnAnchor={{
@@ -247,7 +262,7 @@ export function Pro2ImageNodeEmbeddedDock({
           <button
             type="button"
             disabled={!canRegenerate || isRunning}
-            className="nodrag flex size-8 items-center justify-center rounded-lg bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
+            className={cn(LIBTV_INPUT_DOCK_SEND_BTN_CLASS, "size-8")}
             title={canRegenerate ? "重新生成" : "发送（即将推出）"}
             onClick={onRegenerate}
           >
@@ -267,6 +282,8 @@ export function Pro2ImageNodeEmbeddedDock({
         maxImages={12}
       >
         <MentionsEditable
+          key={nodeId}
+          sourceId={nodeId}
           className={cn(
             PRO2_DOCK_TEXTAREA_CLASS,
             RF_FORM_CONTROL,

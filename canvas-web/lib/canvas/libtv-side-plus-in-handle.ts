@@ -33,6 +33,7 @@ function inboundTargetForNodeType(
   ) {
     return "in_image";
   }
+  if (targetType === "story-pro2-audio") return "in_audio";
   return "in_text";
 }
 

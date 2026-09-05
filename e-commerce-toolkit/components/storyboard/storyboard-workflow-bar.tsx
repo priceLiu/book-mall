@@ -3,12 +3,14 @@
 import { Film, ImageIcon, Loader2, Sparkles } from "lucide-react";
 import { useState } from "react";
 
+import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
   generateStoryboardSheetImage,
   generateStoryboardVideo,
   syncStoryboardSheet,
 } from "@/lib/ecom-storyboard-api";
+import { asStoryboardDeliverable } from "@/lib/storyboard-deliverable-parse";
 import type { StoryboardGatewayModel, StoryboardProject } from "@/lib/storyboard-types";
 
 type Props = {
@@ -44,7 +46,8 @@ export function StoryboardWorkflowBar({
   onVideoReady,
   onAlert,
 }: Props) {
-  const schemes = project.meta?.deliverable?.schemes ?? [];
+  const { toast } = useDialogs();
+  const schemes = asStoryboardDeliverable(project.meta?.deliverable)?.schemes ?? [];
   const hasSheet = Boolean(project.sheet) || schemes.length > 0;
   const [imageModel, setImageModel] = useState(
     project.meta?.workflow?.imageModelKey ?? "wan2.7-image",
@@ -94,7 +97,11 @@ export function StoryboardWorkflowBar({
         autoGenCharacter: autoGenChar,
       });
       onImageReady();
-      await onAlert({ title: "分镜图已生成", message: "完整分镜图已保存，可在右侧查看。" });
+      toast({
+        title: "分镜图已生成",
+        message: "完整分镜图已保存，可在右侧查看。",
+        variant: "success",
+      });
     } catch (e) {
       await onAlert({
         title: "生成失败",
@@ -119,7 +126,11 @@ export function StoryboardWorkflowBar({
         modelKey: videoModel,
       });
       onVideoReady();
-      await onAlert({ title: "视频已生成", message: "完整成片已保存。" });
+      toast({
+        title: "视频已生成",
+        message: "完整成片已保存。",
+        variant: "success",
+      });
     } catch (e) {
       await onAlert({
         title: "生成失败",

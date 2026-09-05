@@ -1,0 +1,15 @@
+{
+  "name": "@private/media-render-subtitle-style",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./subtitle-style-options": "./subtitle-style-options.ts",
+    "./subtitle-preview": "./subtitle-preview.tsx"
+  },
+  "peerDependencies": {
+    "react": "^18"
+  }
+}

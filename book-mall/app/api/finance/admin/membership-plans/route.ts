@@ -44,7 +44,6 @@ export async function GET(request: NextRequest) {
       originalYuan: p.originalYuan == null ? null : Number(p.originalYuan),
       promoLabel: p.promoLabel,
       monthlyCredits: p.monthlyCredits,
-      videoMonthlyCredits: p.videoMonthlyCredits,
       includedSeats: p.includedSeats,
       active: p.active,
       seatTiers: p.seatTiers.map((t) => ({

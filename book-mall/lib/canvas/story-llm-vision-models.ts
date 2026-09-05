@@ -2,15 +2,24 @@
  * canvas-web/lib/canvas/story-llm-vision-models.ts 须保持同步
  */
 
+/** 全站视觉理解默认模型（百炼 · 平台代付） */
+export const STORY_LLM_DEFAULT_VISION_MODEL = "qwen3.8-max";
+
 /** Pro2 文本节点 · 视频反推（百炼 Qwen 视频理解） */
 export const STORY_LLM_VIDEO_UNDERSTANDING_MODEL_KEYS = [
+  STORY_LLM_DEFAULT_VISION_MODEL,
+  "qwen3-omni-flash",
+  "qwen2.5-vl-72b-instruct",
+  "glm-5.3-flash",
   "qwen3-vl-plus",
   "qwen3.7-plus",
+  "qwen3.6-plus",
   "qwen3.5-plus",
 ] as const;
 
 export const STORY_LLM_VISION_MODEL_KEYS = [
   ...STORY_LLM_VIDEO_UNDERSTANDING_MODEL_KEYS,
+  "qwen3-vl-flash",
   "doubao-seed-2.1-pro",
   "doubao-seed-2.0",
   "google/gemini-3-flash-preview",
@@ -39,6 +48,17 @@ export function assertStoryLlmVisionModel(
   if (isStoryLlmVisionModel(modelKey)) return;
   const prefix = context ? `${context}：` : "";
   throw new Error(
-    `${prefix}模型「${modelKey}」不支持图片/视频理解，请换用 Qwen3-VL、Qwen3.7 Plus、Gemini 3 Flash 或 GPT-5.5`,
+    `${prefix}模型「${modelKey}」不支持图片/视频理解，请换用 Qwen3-VL Flash、Qwen3.8 Max、Qwen3-VL Plus 或 Gemini 3 Flash`,
+  );
+}
+
+export function assertStoryLlmVideoUnderstandingModel(
+  modelKey: string,
+  context?: string,
+): void {
+  if (isStoryLlmVideoUnderstandingModel(modelKey)) return;
+  const prefix = context ? `${context}：` : "";
+  throw new Error(
+    `${prefix}模型「${modelKey}」不支持视频理解，请换用 Qwen3.8 Max、Qwen3-Omni Flash、GLM-5.3 Flash、Qwen2.5-VL 72B 或 Qwen3-VL/Plus 系列`,
   );
 }

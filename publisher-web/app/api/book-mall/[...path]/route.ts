@@ -1,0 +1,69 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getBookMallBaseUrlServer } from "@/lib/book-mall-base-url.server";
+
+export const dynamic = "force-dynamic";
+
+async function proxyToBookMall(request: NextRequest, pathSegments: string[]) {
+  const base = getBookMallBaseUrlServer();
+  const path = pathSegments.join("/");
+  const upstream = `${base}/${path}${request.nextUrl.search}`;
+
+  const headers = new Headers();
+  const cookie = request.headers.get("cookie");
+  if (cookie) headers.set("cookie", cookie);
+  const toolsToken = request.cookies.get("tools_token")?.value?.trim();
+  if (toolsToken) headers.set("authorization", `Bearer ${toolsToken}`);
+  const contentType = request.headers.get("content-type");
+  if (contentType) headers.set("content-type", contentType);
+
+  const body =
+    request.method === "GET" || request.method === "HEAD"
+      ? undefined
+      : await request.arrayBuffer();
+
+  try {
+    const r = await fetch(upstream, {
+      method: request.method,
+      headers,
+      body,
+      cache: "no-store",
+    });
+    const respContentType = r.headers.get("content-type") ?? "application/json";
+    // SSE / 流式接口须透传 body（平台 AI 导览助手 chat 等）
+    if (respContentType.toLowerCase().includes("text/event-stream") && r.body) {
+      return new NextResponse(r.body, {
+        status: r.status,
+        headers: {
+          "Content-Type": respContentType,
+          "Cache-Control": "no-store",
+          "X-Accel-Buffering": "no",
+        },
+      });
+    }
+    const respBuf = await r.arrayBuffer();
+    return new NextResponse(respBuf, {
+      status: r.status,
+      headers: { "Content-Type": respContentType },
+    });
+  } catch (e: unknown) {
+    const detail = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: "upstream_fetch_failed", detail }, { status: 502 });
+  }
+}
+
+type RouteCtx = { params: Promise<{ path: string[] }> };
+
+export async function GET(request: NextRequest, ctx: RouteCtx) {
+  const { path } = await ctx.params;
+  return proxyToBookMall(request, path);
+}
+
+export async function POST(request: NextRequest, ctx: RouteCtx) {
+  const { path } = await ctx.params;
+  return proxyToBookMall(request, path);
+}
+
+export async function DELETE(request: NextRequest, ctx: RouteCtx) {
+  const { path } = await ctx.params;
+  return proxyToBookMall(request, path);
+}

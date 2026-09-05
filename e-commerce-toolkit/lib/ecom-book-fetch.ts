@@ -1,7 +1,7 @@
 "use client";
 
 import { throwIfUnauthorized } from "@/lib/ecom-auth";
-import { silentEcomSessionRefresh } from "@/lib/ecom-silent-sso";
+import { refreshEcomToolsSessionClient } from "@/lib/ecom-tools-session-client";
 
 function rawEcomBookFetch(path: string, init?: RequestInit) {
   return fetch(`/api/book-mall/${path}`, {
@@ -22,12 +22,25 @@ function isReplayableBody(body: BodyInit | null | undefined): boolean {
   return true;
 }
 
-export async function ecomBookFetch(path: string, init?: RequestInit) {
-  let res = await rawEcomBookFetch(path, init);
+export function formatEcomTransportError(e: unknown): string {
+  const raw = e instanceof Error ? e.message : String(e);
+  if (/terminated|ECONNRESET|aborted|socket hang up|UND_ERR|fetch failed|upstream_fetch_failed|failed to fetch/i.test(raw)) {
+    return "与服务器连接中断，请确认 book-mall / Gateway 已启动后重试";
+  }
+  return raw || "请稍后重试";
+}
 
-  // 令牌过期 → 隐藏 iframe 静默换票后重试一次（主站会话仍在时无感）
+export async function ecomBookFetch(path: string, init?: RequestInit) {
+  let res: Response;
+  try {
+    res = await rawEcomBookFetch(path, init);
+  } catch (e) {
+    throw new Error(formatEcomTransportError(e));
+  }
+
+  // 令牌过期 → 服务端 refresh 后重试一次
   if (res.status === 401 && isReplayableBody(init?.body)) {
-    const refreshed = await silentEcomSessionRefresh();
+    const refreshed = await refreshEcomToolsSessionClient();
     if (refreshed) {
       res = await rawEcomBookFetch(path, init);
     }
@@ -44,7 +57,12 @@ export async function ecomBookFetch(path: string, init?: RequestInit) {
   if (!res.ok) {
     const err =
       typeof data.error === "string" ? data.error : `请求失败 (${res.status})`;
-    throw new Error(err);
+    const detail =
+      typeof data.detail === "string" && data.detail.trim()
+        ? `: ${data.detail.trim()}`
+        : "";
+    const combined = `${err}${detail}`;
+    throw new Error(formatEcomTransportError(new Error(combined)));
   }
   return data;
 }

@@ -2,6 +2,7 @@ import {
   assertGatewayApiKeyLinkedForUser,
   resolveGatewayAuthForBookUser,
 } from "@/lib/gateway/book-gateway-link";
+import type { GatewayProviderKind } from "@prisma/client";
 import { assertPlatformGatewayEntitlement } from "@/lib/platform-gateway-entitlement";
 import { ECOM_TOOLKIT_NAV_KEY } from "@/lib/ecom/ecom-access";
 import { getUserBillingPersona } from "@/lib/billing/billing-persona";
@@ -29,4 +30,13 @@ export async function resolveEcomGatewayAuthForUser(userId: string) {
     }
   }
   return resolveGatewayAuthForBookUser(userId);
+}
+
+/** 模型选择器：用 sk-gw 实际绑定的厂商（含 PLATFORM_CREDIT 托管 Key），勿传空 boundKinds */
+export async function resolveEcomGatewayBoundKindsForModelPicker(
+  userId: string,
+): Promise<GatewayProviderKind[]> {
+  const gw = await resolveEcomGatewayAuthForUser(userId);
+  const kinds = gw?.credentials.map((c) => c.providerKind) ?? [];
+  return [...new Set(kinds)];
 }

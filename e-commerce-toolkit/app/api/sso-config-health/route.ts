@@ -6,5 +6,8 @@ export const dynamic = "force-dynamic";
 
 /** 运维：确认 e-commerce-toolkit **运行时** 是否读到 SSO 与主站地址（不返回密钥明文） */
 export async function GET() {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   return NextResponse.json(ssoExchangeEnvStatus());
 }

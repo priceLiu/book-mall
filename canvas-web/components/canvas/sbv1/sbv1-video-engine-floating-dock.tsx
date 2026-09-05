@@ -6,13 +6,14 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { buildSbv1VideoEngineDockMentionables } from "@/lib/canvas/sbv1-dock-mentionables";
 import { resolvePro2VideoBoardCellDockLinks } from "@/lib/canvas/pro2-video-board-dock-links";
 import { resolveSbv1VideoEngineInputs, resolveSbv1VideoEngineEffectivePrompt } from "@/lib/canvas/resolve-sbv1-video-engine-inputs";
-import { resolveSbv1UpstreamRefLinks } from "@/lib/canvas/sbv1-upstream-ref-links";
+import { resolveSbv1UpstreamRefLinks, resolveSbv1UpstreamMotionVideoLinks } from "@/lib/canvas/sbv1-upstream-ref-links";
 import { resolveSbv1UpstreamTextLinks } from "@/lib/canvas/sbv1-upstream-text-links";
 import { sbv1TextLinksToDockUpstream } from "@/lib/canvas/sbv1-upstream-text-links";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import {
   getSbv1VideoDockModeChips,
   resolveSbv1DockInputMode,
+  resolveSbv1VideoModelRefRunWarning,
 } from "@/lib/canvas/sbv1-video-model-reference";
 import { isSbv1HdVideoNode } from "@/lib/canvas/sbv1-hd-video-params";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
@@ -29,11 +30,19 @@ import {
   useLibtvFloatingDock,
   useLibtvSoleSelectedNodeId,
 } from "@/lib/canvas/use-libtv-floating-dock";
+import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-dock-selection";
 import { SBV1_VIDEO_DOCK_PLACEMENT_OPTS } from "@/lib/canvas/sbv1-video-dock-placement";
 import { Sbv1VideoEngineChatInput } from "./sbv1-video-engine-chat-input";
+import { FilmPullVideoDock } from "../pro2/film-pull-video-dock";
+import {
+  focusSbv1UpstreamAudioNode,
+  promptSbv1EmptyUpstreamAudio,
+  sbv1HasEmptyUpstreamAudio,
+} from "@/lib/canvas/sbv1-upstream-audio-empty-prompt";
 
 /** 分镜视频 1.0 · 视频引擎浮动输入坞（选中节点时显示在节点下方） */
 export function Sbv1VideoEngineFloatingDock() {
+  const suppressDock = useLibtvShouldSuppressFloatingDock();
   const dockNodeId = useLibtvSoleSelectedNodeId("sbv1-video-engine");
 
   const nodeExists = useCanvasStore(
@@ -48,7 +57,7 @@ export function Sbv1VideoEngineFloatingDock() {
     SBV1_VIDEO_DOCK_PLACEMENT_OPTS,
   );
 
-  if (!dockNodeId || !nodeExists || !placement) return null;
+  if (suppressDock || !dockNodeId || !nodeExists || !placement) return null;
 
   return (
     <Sbv1VideoEngineFloatingDockBody
@@ -70,7 +79,7 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
   hidden: boolean;
 }) {
   const base = useBookMallBaseUrl();
-  const { alert } = useDialogs();
+  const { alert, confirm } = useDialogs();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -86,7 +95,12 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
   const nodeData = (data ?? {}) as Sbv1VideoEngineNodeData & {
     pro2MediaRole?: string;
     pro2ControllerNodeId?: string;
+    pro2PresetKind?: string;
+    filmPullProjectId?: string;
+    filmPullScriptHubId?: string;
   };
+
+  const isFilmPullPreset = nodeData.pro2PresetKind === "video-film-pull";
 
   const isPro2VideoBoardCell =
     nodeData.pro2MediaRole === "video" &&
@@ -105,6 +119,11 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
     [nodeId, nodes, edges],
   );
 
+  const motionVideoLinks = useMemo(
+    () => resolveSbv1UpstreamMotionVideoLinks(nodeId, nodes, edges),
+    [nodeId, nodes, edges],
+  );
+
   const upstreamTextLinks = useMemo(
     () => resolveSbv1UpstreamTextLinks(nodeId, nodes, edges),
     [nodeId, nodes, edges],
@@ -117,8 +136,16 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
         upstreamTextLinks,
         pro2BoardDockLinks,
         nodes,
+        undefined,
+        motionVideoLinks,
       ),
-    [upstreamLinks, upstreamTextLinks, pro2BoardDockLinks, nodes],
+    [
+      upstreamLinks,
+      upstreamTextLinks,
+      pro2BoardDockLinks,
+      nodes,
+      motionVideoLinks,
+    ],
   );
 
   const dockUpstreamForChips = useMemo(() => {
@@ -216,6 +243,49 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
       });
       return;
     }
+    const pro2PresetKind = String(
+      (latestData as { pro2PresetKind?: string }).pro2PresetKind ?? "",
+    ).trim();
+    if (
+      sbv1HasEmptyUpstreamAudio(
+        nodeId,
+        latestNodes,
+        latestEdges,
+        resolved.audioInputs,
+        pro2PresetKind,
+      )
+    ) {
+      const choice = await promptSbv1EmptyUpstreamAudio({
+        pro2PresetKind,
+        confirm,
+      });
+      if (choice === "generate-audio") {
+        revertPending();
+        focusSbv1UpstreamAudioNode(nodeId, latestNodes, latestEdges);
+        return;
+      }
+      if (choice === "cancel") {
+        revertPending();
+        return;
+      }
+    }
+    const refCount =
+      resolved.imageInputs.length + resolved.portraitAssetRefs.length;
+    const refWarning = resolveSbv1VideoModelRefRunWarning({
+      modelKey,
+      refCount,
+      providerId: latestData.engine?.providerId,
+      multiShots: latestData.engine?.params?.multi_shots === true,
+    });
+    if (refWarning) {
+      revertPending();
+      await alert({
+        title: refWarning.title,
+        message: refWarning.message,
+        variant: "warning",
+      });
+      return;
+    }
     if (
       !isSbv1HdVideoNode(latestData) &&
       latestData.referenceMode === "first_last" &&
@@ -259,7 +329,26 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
         variant: "warning",
       });
     }
-  }, [nodeId, base, alert, updateNodeData, setNodeRuntime]);
+  }, [nodeId, base, alert, confirm, updateNodeData, setNodeRuntime, hasVideo]);
+
+  if (isFilmPullPreset) {
+    const videoUrl =
+      nodeData.runtime?.ossUrl?.trim() ||
+      succeededMediaUrl?.trim() ||
+      undefined;
+    return (
+      <FilmPullVideoDock
+        key={nodeId}
+        nodeId={nodeId}
+        filmPullProjectId={nodeData.filmPullProjectId}
+        filmPullScriptHubId={nodeData.filmPullScriptHubId}
+        videoUrl={videoUrl}
+        placement={placement}
+        hidden={hidden}
+        onPatch={onPatch}
+      />
+    );
+  }
 
   return (
     <Sbv1VideoEngineChatInput

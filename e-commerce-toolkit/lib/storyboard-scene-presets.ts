@@ -77,6 +77,12 @@ export const STORYBOARD_SCENE_PRESETS: ScenePreset[] = [
 
 export const CUSTOM_SCENE_INPUT_CHOICE = "自定义场景";
 
+/** 场景描述确认后：仅记录，不改写分镜 */
+export const SCENE_APPLY_CUSTOM_CHOICE = "自定义";
+
+/** 场景描述确认后：由 AI 微调各镜头背景 */
+export const SCENE_APPLY_AI_CHOICE = "AI 生成";
+
 export function getScenePresetChoiceLabels(): string[] {
   return STORYBOARD_SCENE_PRESETS.map((p) => p.label);
 }
@@ -143,6 +149,24 @@ export function resolveCustomSceneDescription(
   key?: string | null,
   custom?: string | null,
 ): string | undefined {
-  if (key === "custom" && custom?.trim()) return custom.trim();
+  if (key === "custom" && custom?.trim()) return formatSceneCustomDisplay(custom);
   return undefined;
+}
+
+/** 展示用：避免历史脏数据（LLM 触发语被误写入 custom）撑满 UI */
+export function formatSceneCustomDisplay(custom?: string | null): string {
+  if (!custom?.trim()) return "";
+  const t = custom.trim();
+  if (!t.includes("场景参考已确认") && !t.includes("storyboard-deliverable")) {
+    return t.slice(0, 120);
+  }
+  const labelMatch = t.match(/自定义场景：([^|\n]+)/);
+  if (labelMatch?.[1]?.trim()) return labelMatch[1].trim().slice(0, 120);
+  const pipeMatch = t.match(/自定义场景：([^|]+)/);
+  if (pipeMatch?.[1]?.trim()) return pipeMatch[1].trim().slice(0, 120);
+  return t.slice(0, 80);
+}
+
+export function isSceneAdjustLlmTrigger(text: string): boolean {
+  return text.trim().startsWith("场景参考已确认 |");
 }

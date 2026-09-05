@@ -5,10 +5,16 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ToolImplementationCrossLink } from "@/components/tool-implementation-crosslink";
 import { ToolShellCloseButton } from "@/components/ui/tool-shell-close-button";
+import {
+  ImageZoomControls,
+  IMAGE_ZOOM_BUTTON_STEP,
+} from "@/components/media/image-zoom-controls";
+import { useImageZoomPan } from "@/lib/media/use-image-zoom-pan";
 import { MessagesLocaleProvider, useMessagesLocale } from "@/components/messages-locale-context";
 import type { TextToImageLibraryItem } from "@/lib/text-to-image-library-types";
 import styles from "@/app/fitting-room/ai-fit/closet/closet.module.css";
 import { confirmDestructiveTwice } from "@/lib/confirm-destructive-twice";
+import { isPinnedInAiSpace, pinToAiSpace } from "@/lib/ai-space-client";
 
 type ImageLibraryQuota = { max: number; used: number };
 
@@ -73,7 +79,9 @@ function LibraryView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewZoom = useImageZoomPan(previewUrl ?? "");
   const [mounted, setMounted] = useState(false);
   const [promptTip, setPromptTip] = useState<PromptTooltipState | null>(null);
   const [space, setSpace] = useState<"PERSONAL" | "TEAM">("PERSONAL");
@@ -150,8 +158,12 @@ function LibraryView() {
 
   const handleDelete = useCallback(
     async (id: string) => {
+      const pinned = await isPinnedInAiSpace("t2i_library", id);
       if (
-        !confirmDestructiveTwice(t("imageLibraryDeleteConfirm"), t("destructiveDeleteSecondOss"))
+        !confirmDestructiveTwice(
+          t("imageLibraryDeleteConfirm"),
+          t(pinned ? "destructiveDeleteSecondOssPinned" : "destructiveDeleteSecondOss"),
+        )
       )
         return;
       setBusyId(id);
@@ -165,6 +177,12 @@ function LibraryView() {
           return;
         }
         setItems((prev) => prev.filter((x) => x.id !== id));
+        setPinnedIds((prev) => {
+          if (!prev.has(id)) return prev;
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
         setQuota((q) => (q ? { ...q, used: Math.max(0, q.used - 1) } : q));
       } catch {
         setError(t("closetDeleteFailed"));
@@ -174,6 +192,19 @@ function LibraryView() {
     },
     [t],
   );
+
+  const handlePin = useCallback(async (id: string) => {
+    setBusyId(id);
+    setError(null);
+    try {
+      await pinToAiSpace("t2i_library", id);
+      setPinnedIds((prev) => new Set(prev).add(id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "展示到 AI 空间失败");
+    } finally {
+      setBusyId(null);
+    }
+  }, []);
 
   const handleToggleVisibility = useCallback(
     async (item: TextToImageLibraryItem) => {
@@ -243,12 +274,24 @@ function LibraryView() {
             label={t("closetLightboxClose")}
             onClick={() => setPreviewUrl(null)}
           />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={previewUrl}
-            alt=""
-            className={styles.lightboxImg}
-            referrerPolicy="no-referrer"
+          <div {...previewZoom.stageProps}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewUrl}
+              alt=""
+              draggable={false}
+              className={styles.lightboxImg}
+              referrerPolicy="no-referrer"
+            />
+          </div>
+        </div>
+        {/* 根节点 onClick 会关闭预览，控件须拦住冒泡 */}
+        <div onClick={(e) => e.stopPropagation()}>
+          <ImageZoomControls
+            zoom={previewZoom.zoom}
+            onZoomIn={() => previewZoom.zoomBy(IMAGE_ZOOM_BUTTON_STEP)}
+            onZoomOut={() => previewZoom.zoomBy(-IMAGE_ZOOM_BUTTON_STEP)}
+            onReset={previewZoom.reset}
           />
         </div>
       </div>,
@@ -400,6 +443,15 @@ function LibraryView() {
                         {item.visibility === "TEAM_PUBLIC" ? "收回私有" : "设为公共"}
                       </button>
                     ) : null}
+                    <button
+                      type="button"
+                      className={styles.btnPreview}
+                      onClick={() => void handlePin(item.id)}
+                      disabled={busyId === item.id || pinnedIds.has(item.id)}
+                      title="在个人中心「我的 AI 空间」布置展示；空间只保存指向，不复制文件"
+                    >
+                      {pinnedIds.has(item.id) ? "已在 AI 空间" : "展示到 AI 空间"}
+                    </button>
                     <button
                       type="button"
                       className={styles.btnDelete}

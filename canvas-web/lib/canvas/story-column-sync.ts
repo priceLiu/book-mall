@@ -1,6 +1,19 @@
 "use client";
 
-import { formatCharacterRowThreeViewPrompt } from "./three-view-prompt-rules";
+import {
+  isPro2ProductionPackCharacterImagePrompt,
+  isPro2ProductionPackSceneImagePrompt,
+  resolvePro2SceneMediaPromptFromRow,
+  finalizePro2SceneImageDockPrompt,
+  isLegacyWrappedMediaPrompt,
+  buildPro2CharacterVisualStyleTag,
+  hasPro2ProductionPackVisualStyleTag,
+} from "./pro2-production-pack-prompt";
+import { shouldRebuildPro2CharacterRowPrompt } from "./three-view-prompt-rules";
+import {
+  resolveHubVisualStylePackFromHubData,
+  type StoryProVisualStylePack,
+} from "./story-pro-visual-style-pack";
 import { hubDataForColumnSync, resolveHubStoryboardMd } from "./story-hub-runtime";
 import {
   outlineCharacterNamesAlign,
@@ -9,6 +22,7 @@ import {
   parseOutlineBriefCharacters,
   parseStoryboardRows,
   parseSceneVisualDictionaryRows,
+  resolveMergedSceneVisualDictionaryRows,
   resolveSceneDictionaryMarkdown,
   extractCharacterSectionFromOutline,
   type SceneVisualDictionaryRow,
@@ -20,6 +34,12 @@ import {
   type StoryRefImage,
 } from "./story-ref-image";
 import { storyProSceneRowKey } from "./story-pro-scene-asset-catalog";
+import type { Pro2ProductionScript } from "./data/pro2-production-script-schema";
+import { resolvePro2ShotFrameImagePrompt } from "./data/pro2-production-script-schema";
+import {
+  isAnyStoryScriptHubType,
+} from "./story-workspace-resolver";
+import { finalizeStoryPro2SceneImagePrompt } from "./story-pro2-scene-image-prompt";
 import type { StoryProSceneRow } from "./story-pro-workspace-types";
 import type {
   StoryCharacterRow,
@@ -29,17 +49,48 @@ import type {
 } from "./story-workspace-types";
 import type { CanvasFlowNode } from "./types";
 
+function appendHubVisualStyleTagIfMissing(
+  prompt: string,
+  visualStylePack?: StoryProVisualStylePack | null,
+  visualStyleTag?: string | null,
+): string {
+  const t = prompt.trim();
+  if (!t || hasPro2ProductionPackVisualStyleTag(t)) return t;
+  const tag = buildPro2CharacterVisualStyleTag(visualStylePack, visualStyleTag);
+  return tag ? `${t}\n\n${tag}` : t;
+}
+
+function hubVisualStylePackForCharacterRows(
+  d: StoryScriptHubNodeData,
+): StoryProVisualStylePack | null {
+  return resolveHubVisualStylePackFromHubData(d);
+}
+
 function characterRowFromParts(
-  c: { name: string; role: string; appearance: string },
+  c: {
+    name: string;
+    role: string;
+    appearance: string;
+    personality?: string;
+    aiImagePrompt?: string;
+  },
   promptOverride?: string,
+  visualStylePack?: StoryProVisualStylePack | null,
 ): StoryCharacterRow {
+  const aiImagePrompt = c.aiImagePrompt?.trim() || undefined;
+  const initialPrompt =
+    promptOverride?.trim() ||
+    (aiImagePrompt && isPro2ProductionPackCharacterImagePrompt(aiImagePrompt)
+      ? aiImagePrompt
+      : "");
   return {
     key: c.name,
     name: c.name,
     role: c.role,
     appearance: c.appearance,
-    prompt:
-      promptOverride?.trim() || formatCharacterRowThreeViewPrompt(c),
+    personality: c.personality?.trim() || undefined,
+    aiImagePrompt,
+    prompt: initialPrompt,
   };
 }
 
@@ -51,22 +102,45 @@ export function buildCharacterRowsFromMd(md: string): StoryCharacterRow[] {
 export function buildCharacterRowsFromHub(
   d: StoryScriptHubNodeData,
 ): StoryCharacterRow[] {
+  const pro2 = (d as import("./story-pro-workspace-types").StoryProScriptHubNodeData)
+    .productionScript;
+  const visualPack = hubVisualStylePackForCharacterRows(d);
+  if (pro2?.characters?.length) {
+    return pro2.characters.map((c) => ({
+      ...characterRowFromParts(
+        {
+          name: c.name,
+          role: c.role,
+          appearance: c.appearance,
+          personality: c.personality,
+          aiImagePrompt: c.imagePrompt,
+        },
+        undefined,
+        visualPack,
+      ),
+      key: c.id,
+    }));
+  }
   const synced = hubDataForColumnSync(d);
   const characterSource =
     (synced.characterMd ?? "").trim() ||
     extractCharacterSectionFromOutline(d.outlineMd ?? "");
   const fromCharacter = parseCharacterListFromSection(characterSource);
   if (fromCharacter.length > 0) {
-    return fromCharacter.map((c) => characterRowFromParts(c));
+    return fromCharacter.map((c) => characterRowFromParts(c, undefined, visualPack));
   }
   const fromBrief = parseOutlineBriefCharacters(d.outlineMd ?? "");
   if (fromBrief.length > 0) {
     return fromBrief.map((b) =>
-      characterRowFromParts({
-        name: b.name,
-        role: b.role || "",
-        appearance: b.appearance,
-      }),
+      characterRowFromParts(
+        {
+          name: b.name,
+          role: b.role || "",
+          appearance: b.appearance,
+        },
+        undefined,
+        visualPack,
+      ),
     );
   }
   return [];
@@ -211,7 +285,13 @@ export function buildDefaultFrameRowPrompt(frame: {
   description: string;
   dialogue?: string;
   videoPrompt?: string;
+  aiImagePrompt?: string;
 }): string {
+  const fromPack = frame.aiImagePrompt?.trim();
+  const shotLine = frame.shotSize?.trim() ? `景别：${frame.shotSize.trim()}` : "";
+  if (fromPack) {
+    return [shotLine, fromPack].filter(Boolean).join("\n");
+  }
   return buildFrameRowImagePrompt(frame);
 }
 
@@ -237,20 +317,91 @@ export function isShotSizeSceneLabel(name: string): boolean {
 /** 场景设计列：环境参考图 prompt（非分镜脚本） */
 export function buildDefaultSceneRowPrompt(
   row: SceneVisualDictionaryRow & { description?: string },
+  visualStylePack?: StoryProVisualStylePack | null,
 ): string {
+  const asSceneRow: StoryProSceneRow = {
+    key: row.name,
+    name: row.name,
+    environment: row.environment,
+    time: row.time,
+    mood: row.mood,
+    description: row.description ?? row.envTimeMood ?? "",
+    imageKeywords: row.imageKeywords,
+    negativePrompt: row.negativePrompt,
+    prompt: row.imageKeywords?.trim() ?? "",
+  };
+  const passthrough = resolvePro2SceneMediaPromptFromRow(asSceneRow);
+  if (
+    passthrough &&
+    !isLegacyWrappedMediaPrompt(passthrough) &&
+    passthrough.includes("名称：")
+  ) {
+    return finalizePro2SceneImageDockPrompt(passthrough, {
+      visualStylePack: visualStylePack ?? null,
+    });
+  }
+  const envTimeMood =
+    row.envTimeMood?.trim() ||
+    [row.environment, row.time, row.mood].filter(Boolean).join(" · ");
   const parts = [
     row.name.trim() ? `场景：${row.name.trim()}` : "",
-    row.environment?.trim() ? `环境：${row.environment.trim()}` : "",
-    row.time?.trim() ? `时间：${row.time.trim()}` : "",
-    row.mood?.trim() ? `气氛：${row.mood.trim()}` : "",
+    envTimeMood ? `环境/时间/气氛：${envTimeMood}` : "",
     row.imageKeywords?.trim() ? `生图：${row.imageKeywords.trim()}` : "",
-    !row.environment?.trim() &&
+    !envTimeMood &&
     !row.imageKeywords?.trim() &&
     row.description?.trim()
       ? `画面：${row.description.trim()}`
       : "",
   ].filter(Boolean);
-  return parts.join("\n");
+  let prompt = finalizeStoryPro2SceneImagePrompt(parts.join("\n"));
+  prompt = appendHubVisualStyleTagIfMissing(prompt, visualStylePack);
+  const neg = row.negativePrompt?.trim();
+  if (neg) prompt = `${prompt}\n【反向提示词】${neg}`;
+  return prompt;
+}
+
+/** 场景设计列 / 场景图节点 Dock · 制作包透传或 legacy 结构化展示 */
+export function formatSceneRowDockInput(
+  row: StoryProSceneRow,
+  visualStylePack?: StoryProVisualStylePack | null,
+): string {
+  const passthrough = resolvePro2SceneMediaPromptFromRow(row);
+  if (
+    passthrough &&
+    !isLegacyWrappedMediaPrompt(passthrough) &&
+    passthrough.includes("名称：")
+  ) {
+    let prompt = finalizePro2SceneImageDockPrompt(passthrough, {
+      visualStylePack: visualStylePack ?? null,
+      visualStyleTag: row.visualStyleTag,
+    });
+    const neg = row.negativePrompt?.trim();
+    if (neg) prompt = `${prompt}\n【反向提示词】${neg}`;
+    return prompt;
+  }
+  const envTimeMood =
+    [row.environment, row.time, row.mood].filter(Boolean).join(" · ") ||
+    row.description?.trim() ||
+    "";
+  const parts = [
+    row.name.trim() ? `场景：${row.name.trim()}` : "",
+    envTimeMood ? `环境/时间/气氛：${envTimeMood}` : "",
+    (row.imageKeywords ?? "").trim()
+      ? `生图：${row.imageKeywords!.trim()}`
+      : "",
+    !row.imageKeywords?.trim() && row.description?.trim() && !envTimeMood
+      ? `画面：${row.description.trim()}`
+      : "",
+  ].filter(Boolean);
+  let prompt = finalizeStoryPro2SceneImagePrompt(parts.join("\n"));
+  prompt = appendHubVisualStyleTagIfMissing(
+    prompt,
+    visualStylePack,
+    row.visualStyleTag,
+  );
+  const neg = row.negativePrompt?.trim();
+  if (neg) prompt = `${prompt}\n【反向提示词】${neg}`;
+  return prompt;
 }
 
 /** 分镜脚本格式误入场景列时识别并覆盖 */
@@ -265,26 +416,122 @@ export function isFrameScriptPrompt(prompt: string): boolean {
   );
 }
 
+/** 将 scenes[].environmentTimeMood 拆为环境/时间/气氛（展示用） */
+export function splitEnvironmentTimeMood(combined: string): {
+  environment: string;
+  time: string;
+  mood: string;
+} {
+  const text = combined.trim();
+  if (!text) return { environment: "", time: "", mood: "" };
+  const parts = text
+    .split(/\s*[·•/|，,]\s*/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length >= 3) {
+    return {
+      environment: parts[0]!,
+      time: parts[1]!,
+      mood: parts.slice(2).join(" · "),
+    };
+  }
+  if (parts.length === 2) {
+    return { environment: parts[0]!, time: parts[1]!, mood: "" };
+  }
+  return { environment: text, time: "", mood: "" };
+}
+
+/** 从 productionScript.scenes 拆分场景行（JSON 真源） */
+export function buildSceneRowsFromProductionScript(
+  d: StoryScriptHubNodeData,
+  scriptHubId: string,
+): StoryProSceneRow[] {
+  const pro2 = (d as import("./story-pro-workspace-types").StoryProScriptHubNodeData)
+    .productionScript;
+  if (!pro2?.scenes?.length) return [];
+  const hub = scriptHubId.trim();
+  const byKey = new Map<string, StoryProSceneRow>();
+  for (const s of pro2.scenes) {
+    const key = hub ? storyProSceneRowKey(hub, s.name) : s.id;
+    if (byKey.has(key)) continue;
+    const etm = splitEnvironmentTimeMood(s.environmentTimeMood);
+    const imagePrompt = s.imagePrompt?.trim() ?? "";
+    byKey.set(key, {
+      key,
+      name: s.name,
+      environment: etm.environment,
+      time: etm.time,
+      mood: etm.mood,
+      description: s.environmentTimeMood,
+      imageKeywords: imagePrompt,
+      negativePrompt: s.negativePrompt?.trim() || undefined,
+      prompt: isPro2ProductionPackSceneImagePrompt(imagePrompt)
+        ? imagePrompt
+        : "",
+    });
+  }
+  return Array.from(byKey.values());
+}
+
+/** 从 productionScript.shots 拆分分镜行（JSON 真源） */
+export function buildFrameRowsFromProductionScript(
+  script: Pro2ProductionScript,
+  characterRows: StoryCharacterRow[],
+): StoryFrameRow[] {
+  const sceneById = new Map(
+    (script.scenes ?? []).map((s) => [s.id, s.name] as const),
+  );
+  return (script.shots ?? []).map((shot) => {
+    const sceneName = shot.sceneId ? sceneById.get(shot.sceneId) ?? "" : "";
+    const frameImagePrompt = resolvePro2ShotFrameImagePrompt(shot) || undefined;
+    return mergeFrameRowCharacterRefsFromIds(
+      {
+        frameIndex: shot.index,
+        key: String(shot.index),
+        scene: sceneName,
+        shotSize: shot.shotSize,
+        description: shot.sceneDescription ?? "",
+        dialogue: shot.dialogue,
+        videoPrompt: shot.videoPrompt ?? "",
+        prompt: frameImagePrompt ?? "",
+      },
+      characterRows,
+      shot.characterIds,
+    );
+  });
+}
+
 /** 从故事剧本大纲「场景视觉辞典」拆分场景行（定稿真源） */
 export function buildSceneRowsFromHub(
   d: StoryScriptHubNodeData,
   scriptHubId: string,
 ): StoryProSceneRow[] {
+  const fromJson = buildSceneRowsFromProductionScript(d, scriptHubId);
+  if (fromJson.length) return fromJson;
   const synced = hubDataForColumnSync(d);
-  const dictRows = parseSceneVisualDictionaryRows(
-    resolveSceneDictionaryMarkdown(synced.outlineMd ?? "", synced.sceneMd ?? ""),
+  const dictRows = resolveMergedSceneVisualDictionaryRows(
+    synced.outlineMd ?? "",
+    synced.sceneMd ?? "",
   );
   const hub = scriptHubId.trim();
   const byKey = new Map<string, StoryProSceneRow>();
   for (const r of dictRows) {
     const key = hub ? storyProSceneRowKey(hub, r.name) : r.name;
     if (byKey.has(key)) continue;
-    byKey.set(key, {
+    const row: StoryProSceneRow = {
       key,
       name: r.name,
-      description: [r.environment, r.time, r.mood].filter(Boolean).join(" · "),
-      prompt: buildDefaultSceneRowPrompt(r),
-    });
+      environment: r.environment?.trim() || undefined,
+      time: r.time?.trim() || undefined,
+      mood: r.mood?.trim() || undefined,
+      imageKeywords: r.imageKeywords?.trim() || undefined,
+      negativePrompt: r.negativePrompt?.trim() || undefined,
+      description:
+        r.envTimeMood?.trim() ||
+        [r.environment, r.time, r.mood].filter(Boolean).join(" · "),
+      prompt: "",
+    };
+    byKey.set(key, row);
   }
   return Array.from(byKey.values());
 }
@@ -316,12 +563,46 @@ export function syncFrameRowCharacterRefs(
   };
 }
 
+/** 分镜 JSON characterIds → 参考图绑定（不修改 prompt 正文） */
+export function mergeFrameRowCharacterRefsFromIds(
+  frame: StoryFrameRow,
+  characterRows: StoryCharacterRow[],
+  characterIds: string[] | undefined,
+): StoryFrameRow {
+  const synced = syncFrameRowCharacterRefs(frame, characterRows);
+  if (!characterIds?.length) return synced;
+  const idSet = new Set(characterIds);
+  const explicit = characterRows.filter((c) => idSet.has(c.key));
+  if (!explicit.length) return synced;
+  const catalog = buildFrameRefImagesForCharacters(characterRows);
+  const fromIds = explicit.map((c) => ({
+    id: `ref-char-${c.key}`,
+    label: c.name,
+    url: c.runtime?.ossUrl ?? c.runtime?.ephemeralUrl,
+  }));
+  const refImages = refreshStoryRefImagesFromCatalog(
+    [...(synced.refImages ?? []), ...fromIds],
+    catalog,
+  );
+  const referencedNodeIds = [
+    ...new Set([
+      ...(synced.referencedNodeIds ?? []),
+      ...explicit.map((c) => `ref-char-${c.key}`),
+    ]),
+  ];
+  const refImageUrls = refImages
+    .map((ref) => ref.url)
+    .filter((u): u is string => Boolean(u && /^https?:\/\//.test(u)));
+  return { ...synced, refImages, referencedNodeIds, refImageUrls };
+}
+
 export function buildFrameRowsFromMd(
   md: string,
   characterRows: StoryCharacterRow[],
 ): StoryFrameRow[] {
-  return parseStoryboardRows(md).map((r) =>
-    syncFrameRowCharacterRefs(
+  return parseStoryboardRows(md).map((r) => {
+    const aiImagePrompt = r.aiImagePrompt?.trim() || undefined;
+    return syncFrameRowCharacterRefs(
       {
         frameIndex: r.frameIndex,
         key: String(r.frameIndex),
@@ -330,11 +611,11 @@ export function buildFrameRowsFromMd(
         description: r.description,
         dialogue: r.dialogue,
         videoPrompt: r.videoPrompt,
-        prompt: "",
+        prompt: aiImagePrompt ?? "",
       },
       characterRows,
-    ),
-  );
+    );
+  });
 }
 
 export function buildVideoRowsFromFrames(
@@ -395,7 +676,7 @@ export function syncColumnsFromHub(
   };
 } | null {
   const hub = nodes.find((n) => n.id === hubId);
-  if (!hub || hub.type !== "story-script-hub") return null;
+  if (!hub || !isAnyStoryScriptHubType(hub.type ?? "")) return null;
   const d = hubDataForColumnSync(hub.data as unknown as StoryScriptHubNodeData);
   const charRows = buildCharacterRowsFromHub(d);
   const existingChar = (
@@ -410,12 +691,19 @@ export function syncColumnsFromHub(
     if (!prev) return row;
     return {
       ...row,
-      prompt: prev.prompt?.trim() ? prev.prompt : row.prompt,
+      prompt: shouldRebuildPro2CharacterRowPrompt(prev, row)
+        ? ""
+        : prev.prompt?.trim() || "",
       promptHistory: prev.promptHistory,
       runtime: prev.runtime,
     };
   });
-  const frameRows = buildFrameRowsFromMd(resolveHubStoryboardMd(d), mergedChar);
+  const pro2 = (d as import("./story-pro-workspace-types").StoryProScriptHubNodeData)
+    .productionScript;
+  const frameRows =
+    pro2?.shots?.length
+      ? buildFrameRowsFromProductionScript(pro2, mergedChar)
+      : buildFrameRowsFromMd(resolveHubStoryboardMd(d), mergedChar);
   const existingFrame = (
     nodes.find((n) => n.id === frameColumnId)?.data as {
       rows?: StoryFrameRow[];

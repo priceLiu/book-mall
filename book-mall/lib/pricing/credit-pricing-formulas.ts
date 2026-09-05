@@ -16,8 +16,10 @@ export const DEFAULT_MIN_MARGIN_GUARD = 0.3;
 export const DEFAULT_VIDEO_SEC = 15;
 /** 定价 1.5：普通视频默认 M=1.5（≈33% 毛利） */
 export const DEFAULT_VIDEO_MARGIN_M = 1.5;
-/** 贵视频 M=1.0 允许贴成本；护栏略负以容纳取整误差 */
-export const DEFAULT_VIDEO_MIN_MARGIN_GUARD = -0.02;
+/** 单积分 v2：贵视频 SKU 最低毛利护栏（订阅/轻量包/API 购入单价验算） */
+export const DEFAULT_VIDEO_MIN_MARGIN_GUARD = 0.22;
+/** 非视频模型发布护栏 */
+export const DEFAULT_ACQUISITION_MIN_MARGIN = 0.22;
 
 /**
  * 逐档单价派生 + 积分取整会引入约 ±0.2pct 的毛利误差（见验收标准 §1 容差）。
@@ -196,7 +198,7 @@ export function computeCreditPrice(input: {
     creditsPerUnit,
     baseMarginRate,
     formulaSnapshot: {
-      version: 1,
+      version: 2,
       inputs: {
         listCostYuan: input.listCostYuan,
         discountRate: input.discountRate,
@@ -212,11 +214,191 @@ export function computeCreditPrice(input: {
       formulas: {
         netCost: "C = listCost × (1 - discountRate)",
         listPrice: "P = C × M",
-        creditsPerUnit: "U = round(P ÷ anchor)",
-        margin: "g = 1 - C ÷ (U × anchor)",
+        creditsPerUnit: "U₀ = round(P ÷ anchor)",
+        charge: "扣减 = U₀ × units（人人相同）",
+        margin: "g = 1 - C ÷ (U₀ × anchor)",
+        acquisition: "实收 = 扣减 × ppc；ppc = 售价 ÷ 到账积分",
       },
     },
   };
+}
+
+/** LLM 输入/输出分价：分别计算 in/out 积分单价（元/千 token）。 */
+export function computeSplitTokenCreditPrice(input: {
+  inputListCostYuan: number;
+  outputListCostYuan: number;
+  discountRate: number;
+  marginM: number;
+  anchorYuan: number;
+}): {
+  inputCreditsPerKToken: number;
+  outputCreditsPerKToken: number;
+  inputListPriceYuan: number;
+  outputListPriceYuan: number;
+  netCostYuan: number;
+  baseMarginRate: number;
+  formulaSnapshot: Record<string, unknown>;
+} {
+  const inNet = round4(computeNetCost(input.inputListCostYuan, input.discountRate));
+  const outNet = round4(computeNetCost(input.outputListCostYuan, input.discountRate));
+  const inList = round4(computeListPrice(inNet, input.marginM));
+  const outList = round4(computeListPrice(outNet, input.marginM));
+  const inputCreditsPerKToken = computeCreditsPerUnit(inList, input.anchorYuan);
+  const outputCreditsPerKToken = computeCreditsPerUnit(outList, input.anchorYuan);
+  const avgNet = (inNet + outNet) / 2;
+  const avgList = (inList + outList) / 2;
+  const avgCredits = (inputCreditsPerKToken + outputCreditsPerKToken) / 2;
+  const baseMarginRate = computeBaseMarginRate(avgNet, Math.max(1, Math.round(avgCredits)), input.anchorYuan);
+  return {
+    inputCreditsPerKToken,
+    outputCreditsPerKToken,
+    inputListPriceYuan: inList,
+    outputListPriceYuan: outList,
+    netCostYuan: avgNet,
+    baseMarginRate,
+    formulaSnapshot: {
+      version: "1.1",
+      billingMode: "TOKEN_IN_OUT",
+      inputs: {
+        inputListCostYuan: input.inputListCostYuan,
+        outputListCostYuan: input.outputListCostYuan,
+        discountRate: input.discountRate,
+        marginM: input.marginM,
+        anchorYuan: input.anchorYuan,
+      },
+      steps: {
+        inputNetCostYuan: inNet,
+        outputNetCostYuan: outNet,
+        inputListPriceYuan: inList,
+        outputListPriceYuan: outList,
+        inputCreditsPerKToken,
+        outputCreditsPerKToken,
+        baseMarginRate,
+      },
+      formulas: {
+        netCost: "C_in/out = listCost_in/out × (1 - discountRate)",
+        listPrice: "P_in/out = C_in/out × M",
+        creditsPerKToken: "U_in/out = round(P_in/out ÷ anchor)",
+      },
+    },
+  };
+}
+
+/** LLM 分价扣积分：有 in/out 快照时按 prompt/completion 千 token 分别换算。 */
+export function computeLlmSplitChargeCredits(input: {
+  inputCreditsPerKToken?: number | null;
+  outputCreditsPerKToken?: number | null;
+  inputListPriceYuan?: number | null;
+  outputListPriceYuan?: number | null;
+  creditsPerUnit?: number | null;
+  listPriceYuan?: number | null;
+  promptTokens?: number | null;
+  completionTokens?: number | null;
+  totalTokens?: number | null;
+  pricePerCreditYuan: number | null;
+}): number {
+  const hasSplit =
+    (input.inputCreditsPerKToken != null && input.inputCreditsPerKToken > 0) ||
+    (input.outputCreditsPerKToken != null && input.outputCreditsPerKToken > 0);
+  if (!hasSplit) {
+    const units = Math.max(1, Math.ceil((input.totalTokens ?? 0) / 1000));
+    return computeChargeCreditsFromSnapshot({
+      listPriceYuan: input.listPriceYuan ?? null,
+      creditsPerUnit: input.creditsPerUnit ?? null,
+      units,
+      pricePerCreditYuan: input.pricePerCreditYuan,
+    });
+  }
+  const inK = Math.max(0, Math.ceil((input.promptTokens ?? 0) / 1000));
+  const outK = Math.max(0, Math.ceil((input.completionTokens ?? 0) / 1000));
+  if (inK === 0 && outK === 0) {
+    const fallbackK = Math.max(1, Math.ceil((input.totalTokens ?? 0) / 1000));
+    return computeChargeCreditsFromSnapshot({
+      listPriceYuan: input.listPriceYuan ?? null,
+      creditsPerUnit: input.creditsPerUnit ?? null,
+      units: fallbackK,
+      pricePerCreditYuan: input.pricePerCreditYuan,
+    });
+  }
+  let credits = 0;
+  if (inK > 0) {
+    credits += computeChargeCreditsFromSnapshot({
+      listPriceYuan: input.inputListPriceYuan ?? null,
+      creditsPerUnit: input.inputCreditsPerKToken ?? null,
+      units: inK,
+      pricePerCreditYuan: input.pricePerCreditYuan,
+    });
+  }
+  if (outK > 0) {
+    credits += computeChargeCreditsFromSnapshot({
+      listPriceYuan: input.outputListPriceYuan ?? null,
+      creditsPerUnit: input.outputCreditsPerKToken ?? null,
+      units: outK,
+      pricePerCreditYuan: input.pricePerCreditYuan,
+    });
+  }
+  return Math.max(credits, inK + outK > 0 ? 1 : 0);
+}
+
+/**
+ * 单档积分换算（v2 · 人人相同扣分）。
+ * 扣减 = round(U₀ × units)；价差仅在积分购入 ppc，不再按 ppc 重算扣分。
+ */
+export function computeChargeCreditsFromSnapshot(input: {
+  listPriceYuan?: number | null;
+  creditsPerUnit?: number | null;
+  units: number;
+  pricePerCreditYuan?: number | null;
+}): number {
+  const units = Math.max(1, input.units);
+  const cpu = input.creditsPerUnit ?? 0;
+  if (cpu > 0) {
+    return Math.max(1, Math.round(cpu * units));
+  }
+  const list = input.listPriceYuan;
+  const ppc = input.pricePerCreditYuan;
+  if (ppc && ppc > 0 && list && list > 0) {
+    return computeTierCredits(list * units, ppc);
+  }
+  return 0;
+}
+
+/** SKU 购入单价上限：毛利 ≥ minMargin 时 ppc 不得超过此值 */
+export function computeMaxPricePerCreditYuan(input: {
+  netCostYuan: number;
+  chargeCredits: number;
+  minMargin: number;
+}): number {
+  const { netCostYuan, chargeCredits, minMargin } = input;
+  if (!(chargeCredits > 0) || !(netCostYuan > 0)) return 0;
+  const denom = chargeCredits * (1 - minMargin);
+  if (denom <= 0) return 0;
+  return round4(netCostYuan / denom);
+}
+
+/** 单次扣减积分（v2：人人相同，不随 ppc 变化） */
+export function computeUnifiedChargeCredits(input: {
+  creditsPerUnit: number;
+  units: number;
+}): number {
+  return computeChargeCreditsFromSnapshot({
+    creditsPerUnit: input.creditsPerUnit,
+    units: input.units,
+  });
+}
+
+/** 非视频 PER_SEC（ASR 等）：按实际音频秒数，至少 1 秒。 */
+export function audioBillableSeconds(durationSec: number | null | undefined): number {
+  if (durationSec == null || durationSec <= 0) return 1;
+  return Math.max(1, Math.round(durationSec));
+}
+
+/** Wan 3.0：输入+输出视频秒数均计费（ali 原价口径）。 */
+export function wan30BillableSeconds(inputSec: number | null | undefined, outputSec: number | null | undefined): number {
+  const inS = inputSec != null && inputSec > 0 ? Math.round(inputSec) : 0;
+  const outS = outputSec != null && outputSec > 0 ? Math.round(outputSec) : 0;
+  const total = inS + outS;
+  return total > 0 ? total : 15;
 }
 
 export interface ByokResourceUsage {

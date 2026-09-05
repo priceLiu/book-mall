@@ -19,7 +19,7 @@ import {
 import type { CanvasEnginePick } from "./types";
 import { parseCharacterRows, parseStoryboardRows } from "./parse-md-tables";
 import { batchRunNodesSequential } from "./batch-run-nodes";
-import { batchRunStoryRowsSequential } from "./batch-run-nodes";
+import { batchRunPro2ThreeViewRows } from "./batch-run-nodes";
 import { findStoryWorkspaceIds } from "./story-column-display";
 import { findStoryLlmEngines } from "./spawn-story-llm-engines";
 import type { StoryEngineNodeData } from "./types";
@@ -147,7 +147,7 @@ export async function runThreeViewBatchAction(
         params: batchImage.params ?? {},
       },
     });
-    batchRunStoryRowsSequential(ws.characterColumnId, selectedKeys, "threeView", {
+    batchRunPro2ThreeViewRows(ws.characterColumnId, selectedKeys, {
       forceFresh,
     });
     patchStarterPipelineStage(store.updateNodeData, store.getNodes(), "tv_done");

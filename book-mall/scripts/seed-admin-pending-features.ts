@@ -1,0 +1,1138 @@
+/**
+ * 初始化「待做功能」清单（按标题幂等 upsert）。
+ * 用法：cd book-mall && pnpm exec dotenv -e .env.local -- tsx scripts/seed-admin-pending-features.ts
+ */
+import { prisma } from "@/lib/prisma";
+
+const SEED_ITEMS: {
+  title: string;
+  description: string;
+  docPath?: string;
+  sortOrder: number;
+  listKind?: "FEATURE" | "PENDING";
+  completed?: boolean;
+}[] = [
+  {
+    title: "运营中心",
+    description: "统一运营数据看板、活动配置与子站入口聚合。",
+    sortOrder: 10,
+  },
+  {
+    title: "小红书标签",
+    description: "小红书内容标签分析与推荐，辅助选题与发布。",
+    sortOrder: 20,
+  },
+  {
+    title: "标题热词",
+    description: "标题热词挖掘与推荐，提升内容点击率。",
+    sortOrder: 30,
+  },
+  {
+    title: "文章热词",
+    description: "正文热词分析与 SEO/选题辅助。",
+    sortOrder: 40,
+  },
+  {
+    title: "爆款视频拆解",
+    description: "爆款视频结构拆解、分镜与节奏学习工具。",
+    sortOrder: 50,
+  },
+  {
+    title: "拉片",
+    description:
+      "专业拉片 V2（/ecom/film-pull）：拉片 → 一键复刻 → 参考图匹配 → 制作脚本 → 制作成片（非 seed-video 精细成片）。见 doc/拉片/requirements.md",
+    docPath: "book-mall/doc/拉片/requirements.md",
+    sortOrder: 55,
+    completed: true,
+  },
+  {
+    title: "姿势 skill",
+    description: "姿势生成/编辑 Agent Skill，供画布与工具站复用。",
+    sortOrder: 60,
+  },
+  {
+    title: "提示词库",
+    description: "全站提示词模板库，支持分类、版本与共享。",
+    sortOrder: 70,
+  },
+  {
+    title: "一键发布",
+    description: "多平台内容一键发布（Publisher），含扩展与桌面端。",
+    docPath: "docs/一键发布平台.md",
+    sortOrder: 80,
+  },
+  {
+    title: "数字人",
+    description: "数字人形象创建、驱动与视频合成能力。",
+    sortOrder: 90,
+  },
+  {
+    title: "自动剪辑",
+    description: "云端 Media Render 自动剪辑成片（book-mall 服务端 ffmpeg）。",
+    docPath: "docs/自动剪辑.md",
+    sortOrder: 100,
+  },
+  {
+    title: "ep",
+    description: "火山视频 EP 接入池：按凭证配置 ep-* 选路，替换 env 临时方案。",
+    docPath: "docs/ep.md",
+    sortOrder: 105,
+  },
+  {
+    title: "image out painting",
+    description: "阿里云 image-out-painting 图像画面扩展（扩图），适配布局与拓宽视野。",
+    docPath: "docs/image out painting.md",
+    sortOrder: 108,
+  },
+  {
+    title: "wen",
+    description: "千问图像编辑（qwen-image）多图输入输出、文字与物体编辑。",
+    docPath: "docs/wen.md",
+    sortOrder: 112,
+  },
+  {
+    title: "wan 图像局部",
+    description: "万相图像局部重绘（vary-region / wanx-x-painting）。",
+    docPath: "docs/wan 图像局部.md",
+    sortOrder: 114,
+  },
+  {
+    title: "wan 2.0 i2i preview",
+    description: "万相 2.0 通用图像编辑（wan2.5 i2i 预览能力接入）。",
+    docPath: "docs/wan 2.0 i2i preview.md",
+    sortOrder: 116,
+  },
+  {
+    title: "platform-apps-catalog",
+    description: "平台应用总览与 AI 小智导览知识库（对外可讲的应用清单）。",
+    docPath: "docs/platform-apps-catalog.md",
+    sortOrder: 118,
+  },
+  {
+    title: "v2.5",
+    description: "CineCanvas 影视 AI 全流程协同平台 V2.5 柔性工作流方案。",
+    docPath: "docs/v2.5.md",
+    sortOrder: 120,
+  },
+  {
+    title: "Gateway 统一注册登录",
+    description: "Gateway 与 Book 统一账号注册/登录，单点互通，消除独立 Gateway 账号体系。",
+    sortOrder: 122,
+  },
+  {
+    title: "域名静态化管理",
+    description: "多域名静态资源、路由与 CDN 配置统一管理。",
+    docPath: "docs/域名静态化管理方案.md",
+    sortOrder: 110,
+  },
+  {
+    title: "自动成片升级",
+    description: "统一烧录字幕字体/字号、三端 UI、轻量剪辑台前置协议。",
+    docPath: "docs/自动成片升级方案.md",
+    sortOrder: 102,
+    listKind: "PENDING",
+  },
+  {
+    title: "模型与应用管理",
+    description:
+      "模型调用地图：全站应用×页面×功能点的模型清单、用量统计与分级配置（L6 调用点绑定）。",
+    docPath: "docs/模型与应用管理.md",
+    sortOrder: 125,
+  },
+  // —— 对账 Phase 2（待处理 · 见 docs/对账需求.md）——
+  {
+    title: "对账需求 · 总规格",
+    description: "两阶段预算/对账/收益框架、口径对照与验收标准（SSOT）。",
+    docPath: "docs/对账需求.md",
+    sortOrder: 200,
+    listKind: "PENDING",
+  },
+  {
+    title: "AR-106 总表预估净成本列",
+    description: "Gateway 用量 × 净成本（costSnapshot/ModelCostProfile.netCost）汇总列。",
+    docPath: "docs/对账需求.md",
+    sortOrder: 210,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "AR-107 总表用户实收与行级毛利",
+    description: "展示 platformRevenueYuan 与 实收−净成本；与驾驶舱/P&L 一致。",
+    docPath: "docs/对账需求.md",
+    sortOrder: 220,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "AR-108 对账列头口径说明",
+    description: "区分挂牌预算、对账差额、用户实收；消除平台挂牌误读。",
+    docPath: "docs/对账需求.md",
+    sortOrder: 230,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "AR-109 对账总表顶栏 KPI",
+    description: "预算净成本、已对账差额、实收、毛利四象限汇总。",
+    docPath: "docs/对账需求.md",
+    sortOrder: 240,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "AR-103 费用概览按日 P&L",
+    description: "usage-overview 增加按日损益 Tab，与 P&L 同源。",
+    docPath: "docs/对账需求.md",
+    sortOrder: 250,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "AR-104 ASR 历史秒数回填",
+    description: "回填 Gateway 日志 audioDurationSec，收敛 ASR UNDER_PLATFORM。",
+    docPath: "docs/阿里对账.md",
+    sortOrder: 260,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "AR-105 S2V 非 Gateway 缺口排查",
+    description: "wan2.2-s2v 等平台用量与阿里 CSV 59.3s 缺口根因。",
+    docPath: "docs/阿里对账.md",
+    sortOrder: 270,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "AR-110 成本档关旧开新 · 全量脚本",
+    description: "seed/价目导入脚本统一走 upsertModelCostProfileVersioned。",
+    docPath: "docs/对账需求.md",
+    sortOrder: 280,
+    listKind: "PENDING",
+    completed: true,
+  },
+  // —— 分享规则 2.0（见 docs/分享规则.md）——
+  {
+    title: "分享规则 · 总规格",
+    description: "双轨分享 SSOT：邀请 20 分 + 工作流 40 分，全积分、先到先得、首笔订阅/充值。",
+    docPath: "docs/分享规则.md",
+    sortOrder: 300,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SR-101 分享奖励引擎",
+    description: "ShareRewardService + ShareRewardAttribution 归因锁定与发奖。",
+    docPath: "docs/分享规则.md",
+    sortOrder: 310,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SR-102 邀请分享改积分",
+    description: "/r/ 注册+首笔付费 → 20 积分；退役现金返佣新出单。",
+    docPath: "docs/分享规则.md",
+    sortOrder: 320,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SR-103 工作流分享 · 画布",
+    description: "WorkflowShareLink/Claim + canvas /share/w/{token} + clone。",
+    docPath: "docs/分享规则.md",
+    sortOrder: 330,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SR-104 工作流分享 · 电商/快速复刻",
+    description: "e-commerce-toolkit + quick-replica-web duplicate 与分享 UI。",
+    docPath: "docs/分享规则.md",
+    sortOrder: 340,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SR-105 财务后台配置",
+    description: "referralRewardCredits / workflowShareRewardCredits 等 finance-web 配置。",
+    docPath: "docs/分享规则.md",
+    sortOrder: 350,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SR-106 订阅页分享展示",
+    description: "pricing 页分享得积分说明卡片 + CTA。",
+    docPath: "docs/分享规则.md",
+    sortOrder: 360,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SR-107 全应用充值 returnTo",
+    description: "checkout returnTo 深链 + 各应用充值/不足弹层（不重做支付）。",
+    docPath: "docs/分享规则.md",
+    sortOrder: 370,
+    listKind: "PENDING",
+    completed: true,
+  },
+  // —— 分享链接 3.0（见 docs/分享链接.md）——
+  {
+    title: "SC-300 分享链接 · 总规格",
+    description: "码优先 + 统一 /code 兑换 + 微信 QR；前缀注册表 SSOT。",
+    docPath: "docs/分享链接.md",
+    sortOrder: 375,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SC-301 ShareCodePrefix 注册表",
+    description: "schema + seed + admin 前缀映射（仅管理员可见）。",
+    docPath: "docs/分享链接.md",
+    sortOrder: 380,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SC-302 share-code resolve/claim 服务",
+    description: "统一解析邀请/工作流码 + IP 限流 + legacy fallback。",
+    docPath: "docs/分享链接.md",
+    sortOrder: 385,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SC-303 主站 /code 页面",
+    description: "输入页 + /code/[code] 分流 + QR PNG API。",
+    docPath: "docs/分享链接.md",
+    sortOrder: 390,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SC-304 邀请分享 UI",
+    description: "referral-panel 码+链+QR；register 可选邀请码预填。",
+    docPath: "docs/分享链接.md",
+    sortOrder: 395,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SC-305 工作流短码生成",
+    description: "WorkflowShareLink.shortCode + create API 返回 shareUrl。",
+    docPath: "docs/分享链接.md",
+    sortOrder: 400,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SC-306 三应用分享弹层",
+    description: "canvas / ecom / quick-replica 展示 10 位码 + 主站链 + QR。",
+    docPath: "docs/分享链接.md",
+    sortOrder: 405,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SC-307 存量兼容与回填",
+    description: "邀请 legacy 8 位码 fallback；workflow backfill shortCode。",
+    docPath: "docs/分享链接.md",
+    sortOrder: 410,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SC-308 单元测试",
+    description: "resolve 路由、碰撞、legacy fallback、disabled prefix。",
+    docPath: "docs/分享链接.md",
+    sortOrder: 415,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SC-310 团队分享分流",
+    description: "OWNER 工作流 claim 加成员不发奖；sharePersona 文案；概览邀请明细链接。",
+    docPath: "docs/分享链接.md",
+    sortOrder: 425,
+    listKind: "PENDING",
+    completed: true,
+  },
+  // —— 大流量页静态快照（见 docs/静态化.md）——
+  {
+    title: "静态化 · 总规格",
+    description: "主站/画布门户 StaticPageSnapshot：Cron 预生成、ISR/SSR 读快照、ST-* 台账。",
+    docPath: "docs/静态化.md",
+    sortOrder: 380,
+    listKind: "PENDING",
+  },
+  {
+    title: "ST-101 快照模型与迁移",
+    description: "StaticPageSnapshot + StaticSnapshotGenerationRun；db:apply-pending。",
+    docPath: "docs/静态化.md",
+    sortOrder: 390,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "ST-102 site-home 快照与 ISR",
+    description: "主站首页 Hero/平台应用/Gateway 模型；revalidate=86400；CLI/Cron。",
+    docPath: "docs/静态化.md",
+    sortOrder: 400,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "ST-103 canvas-home 快照与 SSR",
+    description: "画布门户精选/模板/案例/视频墙；公开 API + canvas-web SSR。",
+    docPath: "docs/静态化.md",
+    sortOrder: 410,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "ST-104 静态资源管理页",
+    description: "/admin/static-snapshots 双 Tab、生成流水、手动触发生成。",
+    docPath: "docs/静态化.md",
+    sortOrder: 420,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "ST-105 Cron pageKey=all",
+    description: "一次 Cron 生成 site-home + canvas-home；vercel.json + deploy 文档。",
+    docPath: "docs/静态化.md",
+    sortOrder: 430,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "ST-106 移除门户冗余 API 拉数",
+    description: "画布首页不再客户端拉 portal-*；匿名 GET 白名单收紧。",
+    docPath: "docs/静态化.md",
+    sortOrder: 440,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "ST-107 最近项目实时与分享刷新",
+    description: "最近项目不走快照；分享/投稿后 markRecentProjectsStale + bump updatedAt。",
+    docPath: "docs/静态化.md",
+    sortOrder: 450,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "ST-108 清理废弃主站平台卡片组件",
+    description: "删除 site-home-platform-app-card.tsx，统一 rotator。",
+    docPath: "docs/静态化.md",
+    sortOrder: 460,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "ST-201 Phase 2 定价/模型市场快照",
+    description: "pricing、gateway-market、pricing-api 复用 StaticPageSnapshot。",
+    docPath: "docs/静态化.md",
+    sortOrder: 470,
+    listKind: "PENDING",
+  },
+  {
+    title: "ST-202 生产 Cron 与首次验收",
+    description: "CloudBase 05:30 CST 定时 HTTP；管理页确认 READY 与首页/画布目检。",
+    docPath: "docs/静态化.md",
+    sortOrder: 480,
+    listKind: "PENDING",
+  },
+  {
+    title: "ST-203 快照失败告警",
+    description: "连续 FAILED 或当日无 READY 时运维通知（待选型）。",
+    docPath: "docs/静态化.md",
+    sortOrder: 490,
+    listKind: "PENDING",
+  },
+  {
+    title: "ST-204 分享后触发 canvas-home 增量生成",
+    description: "门户发布后立即 regenerate canvas-home（可选，替代仅等 Cron）。",
+    docPath: "docs/静态化.md",
+    sortOrder: 500,
+    listKind: "PENDING",
+  },
+  // —— 剧本可视化 · Pro2 生产向导 v2（见 docs/剧本可视化功能.md）——
+  {
+    title: "PW-100 剧本可视化 · 总规格",
+    description: "两步向导 SSOT：Step1 资产出图、Step2 分镜图→视频→音画同步；数据结构先行。",
+    docPath: "docs/剧本可视化功能.md",
+    sortOrder: 510,
+    listKind: "PENDING",
+  },
+  {
+    title: "PW-101 模板与拓扑预搭建",
+    description: "Pro2 脚本 Hub + hydrateProductionScaffold 幂等 spawn 与 placeholder rows。",
+    docPath: "docs/剧本可视化功能.md",
+    sortOrder: 520,
+    listKind: "PENDING",
+  },
+  {
+    title: "PW-102 向导 Step1 · 资产出图",
+    description: "角色/场景/道具卡片：ref 图 + prompt + EnginePicker + 生成挂位。",
+    docPath: "docs/剧本可视化功能.md",
+    sortOrder: 530,
+    listKind: "PENDING",
+  },
+  {
+    title: "PW-103 向导 Step2 · 分镜图→视频→音画同步",
+    description: "Pass2 prompt、分镜图/视频生成、按镜 TTS 与 audioNote 编辑。",
+    docPath: "docs/剧本可视化功能.md",
+    sortOrder: 540,
+    listKind: "PENDING",
+  },
+  {
+    title: "PW-104 数据结构预留",
+    description: "productionScript/Hub row/productionWizardMode 同步契约与 ttsRuntime 空槽。",
+    docPath: "docs/剧本可视化功能.md",
+    sortOrder: 550,
+    listKind: "PENDING",
+  },
+  {
+    title: "UM-100 用量管理 · 总规格",
+    description: "三层真源（Vendor/Gateway/Platform）、多 Key 策略、日对账方法与排查结论 SSOT。",
+    docPath: "docs/用量管理明细.md",
+    sortOrder: 195,
+    listKind: "PENDING",
+  },
+  {
+    title: "UM-101 日聚合 · Gateway 用量",
+    description: "GatewayRequestLog 按 CST 日 + 应用/Key/模型维度聚合，供用量对账中心。",
+    docPath: "docs/用量管理明细.md",
+    sortOrder: 210,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "UM-102 日对账 · DeepSeek 厂商 vs Gateway",
+    description: "上传 DeepSeek cost+amount CSV，按日 + channel 对比厂商与 Gateway 请求/成本。",
+    docPath: "docs/用量管理明细.md",
+    sortOrder: 220,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "UM-103 Finance 用量对账中心 UI",
+    description: "Finance /admin/usage-management：按应用、按 Key、日对账、差异摘要 Tab。",
+    docPath: "docs/用量管理明细.md",
+    sortOrder: 230,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "UM-104 clientPage 标准化（Canvas story-pro 细分）",
+    description: "Canvas story-pro2/script-hub 等 clientPage 细分，便于平台侧按模块归因。",
+    docPath: "docs/用量管理明细.md",
+    sortOrder: 240,
+    listKind: "PENDING",
+  },
+  {
+    title: "UM-105 Gateway 控制台 · 用量统计页",
+    description: "Gateway :3005 独立用量统计页，复用量对账 API 或同源聚合。",
+    docPath: "docs/用量管理明细.md",
+    sortOrder: 250,
+    listKind: "PENDING",
+  },
+  {
+    title: "UM-106 DeepSeek 多 Key 归口 + 禁用 canvas Key",
+    description: "DeepSeek 控制台创建 gw-* Key 并绑定 Gateway；迁移凭证 channel；禁用历史 canvas Key。",
+    docPath: "docs/用量管理明细.md",
+    sortOrder: 260,
+    listKind: "PENDING",
+  },
+  {
+    title: "UM-107 AI 小智模型 ID 修复（deepseek-chat→v4-flash）",
+    description: "小智 chat 默认链路由 legacy deepseek-chat 归一为 deepseek-v4-flash，消除无效 FAILED。",
+    docPath: "docs/用量管理明细.md",
+    sortOrder: 270,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "UM-108 驾驶舱 · 用量对比（平台审计 vs Gateway）",
+    description: "Book /admin 驾驶舱用量审计 Tab：平台业务表 vs Gateway 按应用对比。",
+    docPath: "docs/用量管理明细.md",
+    sortOrder: 275,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "UM-109 可观测性：env 哨兵 + 实例指纹 + 直连出口审计",
+    description: "LEGACY_VENDOR_ENV boot 落库；context.runtime 实例指纹；VENDOR_DIRECT_EGRESS 出口审计。",
+    docPath: "docs/日志记录.md",
+    sortOrder: 280,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "UM-110 用量对账自动化（常驻每日审计 + CSV 即时告警）",
+    description: "usage-recon-scheduler 每日 CST 01:00 后审计昨日；Finance CSV 上传 USAGE_RECON_MISMATCH 告警。",
+    docPath: "docs/日志记录.md",
+    sortOrder: 285,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "UM-111 单模型日调用上限保险丝（默认 300，可关）",
+    description: "GATEWAY_MODEL_DAILY_LIMIT：单 model CST 日上限 429 熔断 + MODEL_DAILY_LIMIT 告警。",
+    docPath: "docs/日志记录.md",
+    sortOrder: 290,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "PL-100 平台日志记录 · 总规格",
+    description: "PlatformErrorLog 分层、加固机制、环境变量与排查手册 SSOT（canvas Key 3.5k 复盘）。",
+    docPath: "docs/日志记录.md",
+    sortOrder: 300,
+    listKind: "PENDING",
+  },
+  {
+    title: "PL-101 boot env 哨兵（LEGACY_VENDOR_ENV）",
+    description: "启动检出 DEEPSEEK_API_KEY 等废弃直连 env → PlatformErrorLog + key 指纹。",
+    docPath: "docs/日志记录.md",
+    sortOrder: 310,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "PL-102 常驻用量对账（USAGE_RECON_MISMATCH）",
+    description: "每 30min 扫描；CST 01:00 后审计昨日平台任务 vs Gateway，差异落库。",
+    docPath: "docs/日志记录.md",
+    sortOrder: 320,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "PL-103 CSV 对账即时告警",
+    description: "Finance 上传 DeepSeek CSV 后 MISSING_PLATFORM 等差异即时写 PlatformErrorLog。",
+    docPath: "docs/日志记录.md",
+    sortOrder: 330,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "PL-104 业务层直连出口审计（VENDOR_DIRECT_EGRESS）",
+    description: "OpenAiCompatGateway 命中厂商域名即审计；VENDOR_DIRECT_BLOCK_HOSTS 可硬阻断。",
+    docPath: "docs/日志记录.md",
+    sortOrder: 340,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "PL-105 实例指纹（context.runtime）",
+    description: "PlatformErrorLog 统一注入 host/commitSha/APP_INSTANCE_LABEL，多容器定位来源。",
+    docPath: "docs/日志记录.md",
+    sortOrder: 350,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "PL-106 单模型日调用上限保险丝",
+    description: "createRequestLog 预检：单 model CST 日达 GATEWAY_MODEL_DAILY_LIMIT 即 429 + 告警。",
+    docPath: "docs/日志记录.md",
+    sortOrder: 360,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "PL-107 部署后验证：无 LEGACY_VENDOR_ENV",
+    description: "book-mall redeploy 后查 /admin/errors 与 CloudBase 启动日志，确认无废弃 DEEPSEEK_API_KEY。",
+    docPath: "docs/日志记录.md",
+    sortOrder: 370,
+    listKind: "PENDING",
+  },
+  {
+    title: "PL-108 观察 canvas Key 删除后厂商用量归零",
+    description: "8/25 起 DeepSeek 控制台 canvas Key 用量应归零；不归零则仍有进程持有效 key。",
+    docPath: "docs/日志记录.md",
+    sortOrder: 380,
+    listKind: "PENDING",
+  },
+  {
+    title: "PL-109 日志与保险丝配置页（/admin/settings）",
+    description: "管理后台配置单模型日上限 / 覆盖 / 直连阻断名单 / 常驻对账；存 PlatformConfig，30s 生效。",
+    docPath: "docs/日志记录.md",
+    sortOrder: 390,
+    listKind: "PENDING",
+    completed: true,
+  },
+  // —— 短信 / 手机验证码加固（见 docs/短信手机验证码加固.md）——
+  {
+    title: "SEC-100 短信手机验证码加固 · 总规格",
+    description:
+      "公网扫描复盘后：门户 IP 转发、密码登录失败限速、短信 IP 突发限、生产关闭 sso-config-health；扫描 PV 另标。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 560,
+    listKind: "PENDING",
+  },
+  {
+    title: "SEC-101 门户 BFF 转发真实客户端 IP",
+    description: "x-platform-client-ip；Book portal/verify 与 portal/sms/send 信任并用于限速/短信 sendIp。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 570,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SEC-102 密码登录失败限速",
+    description: "IP 15min/20 次、手机号 15min/8 次；NextAuth + portal/verify + client/login + gateway/login。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 580,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SEC-103 短信 IP 突发限速",
+    description: "在 60s 冷却与日限额之上：同一 IP 10 分钟最多 8 次 issueSmsCode。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 590,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SEC-104 生产关闭 sso-config-health",
+    description: "e-commerce-toolkit / story-web 生产 NODE_ENV=production 返回 404，防配置侦察。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 600,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SEC-105 访问统计扫描路径标明",
+    description: "probeViews/probeHitCount；/admin/traffic 类型列正常/扫描/混合；仍计入 PV。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 610,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "SEC-201 部署 book-mall + 数据库迁移",
+    description: "20260825040000_site_traffic_probe_views；db:apply-pending + 重启 book-mall。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 620,
+    listKind: "PENDING",
+  },
+  {
+    title: "SEC-202 部署各门户 BFF（登录/短信）",
+    description: "ecom / canvas / story / quick-replica / common-tools / publisher；否则 IP 限额仍按子站出口。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 630,
+    listKind: "PENDING",
+  },
+  {
+    title: "SEC-203 部署 gateway-web 短信/登录代理",
+    description: "gateway-web 转发 x-platform-client-ip 至 book-mall。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 640,
+    listKind: "PENDING",
+  },
+  {
+    title: "SEC-204 生产验收（短信限速 + 登录锁定 + 统计）",
+    description: "§5 检查清单：429 频控、sendIp 为用户 IP、sso-config-health 404、登录回归。",
+    docPath: "docs/短信手机验证码加固.md",
+    sortOrder: 650,
+    listKind: "PENDING",
+  },
+  // —— 20260830 阿里对账复核 · 见 docs/对帐20260830.md ——
+  {
+    title: "RECON-20260830 ASR 源文件时长 ffprobe 历史回填",
+    description:
+      "202608 ASR：forward 写 sourceAudioDurationSec；aggregator 按 fileUrl 去重；历史可选 backfill-asr --probe-urls。",
+    docPath: "docs/对帐20260830.md",
+    sortOrder: 660,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "RECON-20260830 Embedding 入库 Gateway 日志",
+    description:
+      "text-embedding-v3 MISSING_PLATFORM：platformEmbedTextsInProcess 已改 createRequestLog；下次 assistant:index 可对账。",
+    docPath: "docs/对帐20260830.md",
+    sortOrder: 661,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "RECON-20260830 HappyHorse 1080P +32s 抽样",
+    description:
+      "厂商 204s=32 条；平台 251s=39 条。末批未入 CSV 的 logId 见 docs/对帐20260830.md §5；非平台重复计费。",
+    docPath: "docs/对帐20260830.md",
+    sortOrder: 662,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "RECON-20260830 wan2.2-s2v 非 Gateway 缺口",
+    description:
+      "失败终态写 audio 秒数；aggregator 含 FAILED + 按 audio_url 去重 → 平台 50s vs 厂商 59.3s（余 ~9s 待核）。",
+    docPath: "docs/对帐20260830.md",
+    sortOrder: 663,
+    listKind: "PENDING",
+    completed: true,
+  },
+  {
+    title: "RECON-20260830 对账总表复核（202608 CSV）",
+    description:
+      "已 force 重跑 reconciliation v2 + refreshPlatformMasterBaseline；Finance /admin/reconciliation 可查看 41 行总表。",
+    docPath: "docs/对帐20260830.md",
+    sortOrder: 664,
+    listKind: "PENDING",
+    completed: true,
+  },
+  // —— 专业拉片 V2 · 制作成片 · 见 book-mall/doc/plans/2026-08-film-pull-production-v2.md ——
+  {
+    title: "FP-101 专业拉片 ProductionShot/RefMatch 类型",
+    description: "前后端 FilmPullProductionShot、FilmPullRefMatch、productionPlan JSON 类型定义。",
+    docPath: "book-mall/doc/plans/2026-08-film-pull-production-v2.md",
+    sortOrder: 670,
+    listKind: "PENDING",
+  },
+  {
+    title: "FP-102 专业拉片 productionPlan service",
+    description: "ecom-film-pull-service 读写 refMatch / productionPlan；PATCH 单镜。",
+    docPath: "book-mall/doc/plans/2026-08-film-pull-production-v2.md",
+    sortOrder: 671,
+    listKind: "PENDING",
+  },
+  {
+    title: "FP-103 专业拉片移除 seed-video replica",
+    description: "film-pull 不再使用 MediaDecomposeReplicaPanel / replicaSeedVideoProjectId。",
+    docPath: "book-mall/doc/plans/2026-08-film-pull-production-v2.md",
+    sortOrder: 672,
+    listKind: "PENDING",
+  },
+  {
+    title: "FP-104 专业拉片 ref-match 规则引擎",
+    description: "ecom-film-pull-ref-match.ts 按景别/叙事自动匹配每镜模特产品 ref。",
+    docPath: "book-mall/doc/plans/2026-08-film-pull-production-v2.md",
+    sortOrder: 673,
+    listKind: "PENDING",
+  },
+  {
+    title: "FP-105 专业拉片 ref-match API",
+    description: "POST auto / PATCH / confirm 参考图匹配 API 路由。",
+    docPath: "book-mall/doc/plans/2026-08-film-pull-production-v2.md",
+    sortOrder: 674,
+    listKind: "PENDING",
+  },
+  {
+    title: "FP-106 专业拉片 FilmPullRefMatchPanel",
+    description: "参考图匹配表 UI：每镜模特/产品 ref 多选 + 确认。",
+    docPath: "book-mall/doc/plans/2026-08-film-pull-production-v2.md",
+    sortOrder: 675,
+    listKind: "PENDING",
+  },
+  {
+    title: "FP-107 专业拉片素材采集简化",
+    description: "ReplicaSetup 仅上传/识产品，去掉 seed 复刻脚本生成。",
+    docPath: "book-mall/doc/plans/2026-08-film-pull-production-v2.md",
+    sortOrder: 676,
+    listKind: "PENDING",
+  },
+  {
+    title: "FP-108 专业拉片 production assemble 规则",
+    description: "ecom-film-pull-production-assemble 拼装画布/光影/运镜/双 Prompt。",
+    docPath: "book-mall/doc/plans/2026-08-film-pull-production-v2.md",
+    sortOrder: 677,
+    listKind: "PENDING",
+  },
+  {
+    title: "FP-109 专业拉片 production API",
+    description: "assemble / patch shot / confirm 制作脚本 API。",
+    docPath: "book-mall/doc/plans/2026-08-film-pull-production-v2.md",
+    sortOrder: 678,
+    listKind: "PENDING",
+  },
+  {
+    title: "FP-110 专业拉片 FilmPullProductionScriptPanel",
+    description: "可编辑制作脚本表 + 确认进入制作成片。",
+    docPath: "book-mall/doc/plans/2026-08-film-pull-production-v2.md",
+    sortOrder: 679,
+    listKind: "PENDING",
+  },
+  {
+    title: "FP-111 专业拉片 FilmPullProductionPanel",
+    description: "制作成片主面板（替代精细成片 SeedVideo 表）。",
+    docPath: "book-mall/doc/plans/2026-08-film-pull-production-v2.md",
+    sortOrder: 680,
+    listKind: "PENDING",
+  },
+  {
+    title: "FP-112 专业拉片单镜/批量生图",
+    description: "shots/:shotNo/image/generate + 每镜 refUrls。",
+    docPath: "book-mall/doc/plans/2026-08-film-pull-production-v2.md",
+    sortOrder: 681,
+    listKind: "PENDING",
+  },
+  {
+    title: "FP-113 专业拉片生视频每镜 ref",
+    description: "ecom-film-pull-video 扩展：每镜 refIds；有分镜图 I2V 优先。",
+    docPath: "book-mall/doc/plans/2026-08-film-pull-production-v2.md",
+    sortOrder: 682,
+    listKind: "PENDING",
+  },
+  {
+    title: "FP-114 专业拉片批量生视频轮询",
+    description: "批量出视频 + BackgroundGenerationDock 任务轮询。",
+    docPath: "book-mall/doc/plans/2026-08-film-pull-production-v2.md",
+    sortOrder: 683,
+    listKind: "PENDING",
+  },
+  {
+    title: "FP-115 专业拉片合成成片预览",
+    description: "video/render + 成片预览区。",
+    docPath: "book-mall/doc/plans/2026-08-film-pull-production-v2.md",
+    sortOrder: 684,
+    listKind: "PENDING",
+  },
+  {
+    title: "FP-116 专业拉片 workspace 阶段门控",
+    description: "hasAnalyze → refConfirmed → scriptConfirmed → productionPanel。",
+    docPath: "book-mall/doc/plans/2026-08-film-pull-production-v2.md",
+    sortOrder: 685,
+    listKind: "PENDING",
+  },
+  {
+    title: "FP-117 专业拉片 studio 与底栏",
+    description: "去掉 seedVideo state；底栏阶段文案。",
+    docPath: "book-mall/doc/plans/2026-08-film-pull-production-v2.md",
+    sortOrder: 686,
+    listKind: "PENDING",
+  },
+  {
+    title: "FP-118 专业拉片 Mock 与导出",
+    description: "Mock ref-match/assemble/image；ZIP 含 productionPlan。",
+    docPath: "book-mall/doc/plans/2026-08-film-pull-production-v2.md",
+    sortOrder: 687,
+    listKind: "PENDING",
+  },
+  // —— 剧本制作档 × 专业拉片统一（见 docs/Pro2拉片整合-schema-v3.md）——
+  {
+    title: "SP-200 制作档统一 · 总规格",
+    description:
+      "同一份 pro2-production-script：简版 director / 专业版 industrial；Hub 原生拉片。题材芯片与制作档正交。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 700,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-201 schema v3 packProfile/source/analysis",
+    description:
+      "schemaVersion=3；meta.packProfile、meta.source、shots[].analysis；canvas-web 与 book-mall 镜像同步。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 701,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-202 校验分档 + LLM 重试",
+    description:
+      "director/industrial × creative/film_pull 语义校验；无围栏/残缺 JSON 失败；最多 5 次重试；禁止 coerce「无」当成功。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 702,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-203 简版/专业版 Pass1 提示词 pack",
+    description:
+      "DIRECTOR / INDUSTRIAL / FILM_PULL 规则常量叠加题材 pack；禁止组件内硬编码提示词。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 703,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-204 Pass2 吃 analysis",
+    description:
+      "专业版 Pass2 注入 analysis；禁止整段复制 analysisDraftPrompt 为最终 Prompt。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 704,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-205 Dock 制作档选择",
+    description:
+      "题材芯片旁新增简版/专业版；写入 hub.packProfile；默认简版。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 705,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-206 Hub 发送专业版拉片",
+    description:
+      "专业版 + 上游视频 + Dock「拉片」走 Hub LLM video_url；简版拉片意图拦截。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 706,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-207 Hub 左侧 + 视频接线",
+    description:
+      "确认 spawn/连线/上传粘贴拖入；视频节点只作媒体源。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 707,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-208 Hub 弹表时段列与拉片详情",
+    description:
+      "导演表保持 12 列；industrial 或 analysis 非空时时段列 + 折叠详情。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 708,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-209 adapter 完整映射",
+    description:
+      "film-pull→v3 保留切点/时间码/机位焦段；aiVisualPrompt 只进 analysisDraftPrompt。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 709,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-210 退役视频节点拉片 Dock 主控制面",
+    description:
+      "FilmPullVideoDock 不再作为拉片控制台，引导至剧本 Dock 专业版发送。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 710,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-211 拉片文档 90s 与中文示例",
+    description:
+      "requirements/solution/table-format 与 FILM_PULL_V1_MAX_SEC=90 对齐；aiVisualPrompt 中文示例。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 711,
+    listKind: "PENDING",
+  },
+  {
+    title: "SP-212 单测 schema/校验/adapter/意图",
+    description:
+      "industrial 缺 analysis 失败；简版拉片拦截；adapter 字段不丢失。",
+    docPath: "docs/Pro2拉片整合-schema-v3.md",
+    sortOrder: 712,
+    listKind: "PENDING",
+  },
+  {
+    title: "PL-001 姿势库 V2 · Schema 与类型",
+    description: "EcomPoseLibraryEntry 新增 ossUrl/thumbUrl/sourceImageKey 迁移与类型镜像。",
+    docPath: "book-mall/doc/模特姿势/pose-library-v2-requirements.md",
+    sortOrder: 620,
+    listKind: "PENDING",
+  },
+  {
+    title: "PL-002 姿势库 V2 · 成图入库 API",
+    description: "POST import-from-image：去重、OSS 转存、savePrompt 分支、自动命名。",
+    docPath: "book-mall/doc/模特姿势/pose-library-v2-requirements.md",
+    sortOrder: 621,
+    listKind: "PENDING",
+  },
+  {
+    title: "PL-003 姿势库 V2 · 工具资源库入库 UI",
+    description: "/admin/tool-libraries 图片卡片「保存到姿势库」弹窗。",
+    docPath: "book-mall/doc/模特姿势/pose-library-v2-requirements.md",
+    sortOrder: 622,
+    listKind: "PENDING",
+  },
+  {
+    title: "PL-004 姿势库 V2 · 姿势图生成 API",
+    description: "POST generate-preview：模特+服装+多选批量 Gateway IMAGE。",
+    docPath: "book-mall/doc/模特姿势/pose-library-v2-requirements.md",
+    sortOrder: 623,
+    listKind: "PENDING",
+  },
+  {
+    title: "PL-005 姿势库 V2 · 姿势图生成 UI",
+    description: "admin 姿势库 Tab「生成姿势参考图」工作室 Modal。",
+    docPath: "book-mall/doc/模特姿势/pose-library-v2-requirements.md",
+    sortOrder: 624,
+    listKind: "PENDING",
+  },
+  {
+    title: "PL-006 姿势库 V2 · 图+文 catalog UI",
+    description: "shoot-catalog + admin 姿势库网格展示缩略图与描述。",
+    docPath: "book-mall/doc/模特姿势/pose-library-v2-requirements.md",
+    sortOrder: 625,
+    listKind: "PENDING",
+  },
+  {
+    title: "PL-007 姿势库 V2 · model-shot 姿势 ref",
+    description: "出图 refUrls 追加 poseRef；prompt-assembler 姿态约束。",
+    docPath: "book-mall/doc/模特姿势/pose-library-v2-requirements.md",
+    sortOrder: 626,
+    listKind: "PENDING",
+  },
+  {
+    title: "PL-008 姿势库 V2 · 有图优先排序",
+    description: "pose-picker 有 ossUrl 优先；姿势 picker 图+文选择。",
+    docPath: "book-mall/doc/模特姿势/pose-library-v2-requirements.md",
+    sortOrder: 627,
+    listKind: "PENDING",
+  },
+  {
+    title: "PL-009 姿势库 V2 · 单测与回归",
+    description: "import/dedup/ref 顺序单测。",
+    docPath: "book-mall/doc/模特姿势/pose-library-v2-requirements.md",
+    sortOrder: 628,
+    listKind: "PENDING",
+  },
+  {
+    title: "PL-010 姿势库 V2 · 各应用 admin 保存钮",
+    description: "Canvas/工具箱成图卡片 admin 保存到姿势库（可选收尾）。",
+    docPath: "book-mall/doc/模特姿势/pose-library-v2-requirements.md",
+    sortOrder: 629,
+    listKind: "PENDING",
+  },
+];
+
+async function main() {
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+
+  for (const item of SEED_ITEMS) {
+    const existing = await prisma.adminPendingFeature.findFirst({
+      where: { title: item.title },
+    });
+    if (existing) {
+      if (item.completed === true && !existing.completed) {
+        await prisma.adminPendingFeature.update({
+          where: { id: existing.id },
+          data: { completed: true },
+        });
+        updated += 1;
+        console.log(`[pending-feature] ✓ ${item.title}`);
+      } else {
+        skipped += 1;
+      }
+      continue;
+    }
+    await prisma.adminPendingFeature.create({
+      data: {
+        title: item.title,
+        description: item.description,
+        docPath: item.docPath ?? "",
+        listKind: item.listKind ?? "FEATURE",
+        sortOrder: item.sortOrder,
+        completed: item.completed ?? false,
+      },
+    });
+    created += 1;
+    console.log(`[pending-feature] + ${item.title}`);
+  }
+
+  console.log(
+    `[pending-feature] 完成：新增 ${created}，标记完成 ${updated}，已存在 ${skipped}，合计 ${SEED_ITEMS.length}`,
+  );
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());

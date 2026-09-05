@@ -320,21 +320,36 @@ export function buildMemePrompt(opts: {
   topText?: string;
   bottomText?: string;
   textStyle?: string;
+  /** 为 true 时不把上下文案写进 prompt（由 Sharp 后处理叠字） */
+  omitCaptionText?: boolean;
 }): string {
   const format = MEME_FORMAT_HINTS[opts.memeFormat] ?? MEME_FORMAT_HINTS.classic;
   const typography =
     MEME_TEXT_STYLE_HINTS[opts.textStyle ?? "impact-classic"] ??
     MEME_TEXT_STYLE_HINTS["impact-classic"];
+  const overlayLater = opts.omitCaptionText === true;
   return [
-    "Create a viral internet meme image.",
+    overlayLater
+      ? "Create a viral internet meme scene image WITHOUT any text, letters, numbers, or watermarks in the picture."
+      : "Create a viral internet meme image.",
     format,
-    typography,
+    overlayLater
+      ? "Leave clear empty margin at top and bottom for captions later."
+      : typography,
     `Scene: ${opts.sceneDescription.trim()}.`,
-    opts.topText?.trim() ? `Top caption text: "${opts.topText.trim()}".` : "",
-    opts.bottomText?.trim()
-      ? `Bottom caption text: "${opts.bottomText.trim()}".`
-      : "",
-    "High contrast, readable caption areas, no watermark.",
+    overlayLater
+      ? ""
+      : opts.topText?.trim()
+        ? `Top caption text: "${opts.topText.trim()}".`
+        : "",
+    overlayLater
+      ? ""
+      : opts.bottomText?.trim()
+        ? `Bottom caption text: "${opts.bottomText.trim()}".`
+        : "",
+    overlayLater
+      ? "High contrast, readable empty caption areas, no watermark."
+      : "High contrast, readable caption areas, no watermark.",
   ]
     .filter(Boolean)
     .join(" ");

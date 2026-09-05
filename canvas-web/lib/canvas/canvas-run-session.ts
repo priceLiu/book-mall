@@ -20,6 +20,9 @@ export function markCanvasNodeRunSession(nodeId: string): void {
   sessionStartedAtMs.set(nodeId, Date.now());
 }
 
+/** Pro2 剧本 Hub · 单次 LLM 含多轮校验重试，宽限须覆盖整段异步执行 */
+export const PRO2_SCRIPT_HUB_ORPHAN_RECONCILE_GRACE_MS = 8 * 60 * 1000;
+
 export function clearCanvasNodeRunSession(nodeId: string): void {
   sessionStartedNodeIds.delete(nodeId);
   sessionStartedAtMs.delete(nodeId);
@@ -29,14 +32,22 @@ export function isCanvasNodeRunSessionActive(nodeId: string): boolean {
   return sessionStartedNodeIds.has(nodeId);
 }
 
-/** 本地 pending 尚无 taskId 时 · 勿被 reconcile 误清（runOne / Gateway 提交窗口） */
-const LIBTV_ORPHAN_RECONCILE_GRACE_MS = 120_000;
+export function canvasNodeRunSessionStartedAtMs(nodeId: string): number {
+  return sessionStartedAtMs.get(nodeId) ?? 0;
+}
 
-export function shouldDeferLibtvOrphanReconcile(nodeId: string): boolean {
+/** 本地 pending 尚无 taskId 时 · 勿被 reconcile 误清（runOne / Gateway 提交窗口） */
+const LIBTV_ORPHAN_RECONCILE_GRACE_MS = 60_000;
+
+export function shouldDeferLibtvOrphanReconcile(
+  nodeId: string,
+  opts?: { extendedGraceMs?: number },
+): boolean {
   if (!nodeId || !sessionStartedNodeIds.has(nodeId)) return false;
   const startedAt = sessionStartedAtMs.get(nodeId) ?? 0;
+  const graceMs = opts?.extendedGraceMs ?? LIBTV_ORPHAN_RECONCILE_GRACE_MS;
   if (!startedAt) return true;
-  return Date.now() - startedAt < LIBTV_ORPHAN_RECONCILE_GRACE_MS;
+  return Date.now() - startedAt < graceMs;
 }
 
 function isTerminalTaskStatus(status: string): boolean {
@@ -53,7 +64,9 @@ export function shouldSkipStaleTerminalWhileLocalInflight(
   pick: CanvasTaskRecord,
 ): boolean {
   const localSt = localRuntime?.status;
-  if (localSt !== "pending" && localSt !== "running") return false;
+  if (localSt !== "pending" && localSt !== "running" && localSt !== "queued") {
+    return false;
+  }
   if (
     !isServerInflightTaskStatus(pick.status) &&
     !isTerminalTaskStatus(pick.status)
@@ -67,7 +80,11 @@ export function shouldSkipStaleTerminalWhileLocalInflight(
     return true;
   }
 
-  if (!sessionStartedNodeIds.has(nodeId)) return true;
+  if (!sessionStartedNodeIds.has(nodeId)) {
+    // 刷新后会话丢失：服务端已终态时仍应写回，避免 Gateway 已成功但 UI 一直「生成中」
+    if (isTerminalTaskStatus(pick.status)) return false;
+    return true;
+  }
 
   const startedAt = sessionStartedAtMs.get(nodeId) ?? 0;
   const pickMs = Date.parse(pick.updatedAt || pick.createdAt || "");

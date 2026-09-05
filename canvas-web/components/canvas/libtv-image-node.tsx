@@ -1,15 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { usePointerImagePasteHost } from "@/lib/canvas/image-upload-handlers";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position, useNodes, useReactFlow } from "@xyflow/react";
-import { AlertTriangle, ImageIcon } from "lucide-react";
+import { AlertTriangle, GripVertical, ImageIcon } from "lucide-react";
+import { CanvasSaveToPoseLibraryButton } from "@/components/admin/canvas-save-to-pose-library-button";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { uploadCanvasImage } from "@/lib/canvas-api";
-import { normalizeCanvasImageFile } from "@/lib/canvas/normalize-canvas-image-file";
+import { confirmOpenTopupCheckout } from "@/lib/platform-billing/open-topup-checkout";
+import { scheduleCanvasImageUpload } from "@/lib/canvas/canvas-image-preview-upload";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { CANVAS_SEMANTIC_STATUS_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import {
@@ -22,20 +23,43 @@ import {
   LIBTV_NODE_SIDE_PLUS_SIZE,
   libtvNodeBorderStyle,
 } from "@/lib/canvas/libtv-node-chrome";
+import {
+  isSameSbv1MediaDataPatch,
+  sbv1ImagePatchFromTask,
+} from "@/lib/canvas/sbv1-image-task-apply";
+import {
+  pickActiveServerInflightTask,
+  shouldApplyCanvasTaskRuntimePatch,
+  shouldSkipStoryRowTaskApply,
+} from "@/lib/canvas/task-pick";
+import { pickTaskImagePreviewUrl } from "@/lib/canvas/task-media-url";
+import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import type { CanvasEnginePick, CanvasNodeRuntime } from "@/lib/canvas/types";
+import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import type { Pro2ImageMediaRole } from "@/lib/canvas/story-pro2-workspace-types";
 import type { CanvasPortraitNodeFields } from "@/lib/canvas/portrait-node-data";
 import { isPortraitNodeActive } from "@/lib/canvas/portrait-node-data";
 import { useImportPortraitToLibrary } from "@/lib/canvas/use-import-portrait-to-library";
 import {
   libtvMediaPreviewCanFallbackToBlob,
+  libtvMediaPreviewCanFallbackToEphemeral,
   resolveLibtvMediaPreviewUrl,
 } from "@/lib/canvas/libtv-media-preview-url";
 import { Sbv1PortraitLivenessModal } from "./sbv1/sbv1-portrait-liveness-modal";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { selectLibtvNodeAfterDuplicate } from "@/lib/canvas/select-libtv-node";
 import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
-import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
+import {
+  computeLibtvMediaNodeSize,
+  isLibtvMediaNodeBoxStale,
+  useLibtvMediaNodeAutoFit,
+} from "@/lib/canvas/libtv-media-node-auto-fit";
+import {
+  fitLibtvUploadedImageNaturalSize,
+  useLibtvMediaAspectPresetSync,
+} from "@/lib/canvas/libtv-media-aspect-preset-apply";
+import { LIBTV_MEDIA_FIT_VERSION } from "@/lib/canvas/libtv-node-chrome";
+import { PRO2_TEXT_NODE_TITLE_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { cn } from "@/lib/utils";
 import { MediaHoverBox, MediaPreviewLightbox } from "./media-hover-box";
 import { LibtvNodeHeaderActions } from "./libtv-node-header-preview-button";
@@ -63,16 +87,16 @@ import {
   useLibtvRuntimeErrorAlert,
 } from "@/lib/canvas/libtv-runtime-error-alert";
 import { isMislabeledVendorSuccessError } from "@/lib/canvas/friendly-task-error";
+import { LibtvGridSplitCropSprite } from "@/components/canvas/libtv-grid-split-crop-sprite";
+import type { GridSplitCrop } from "@/lib/canvas/libtv-grid-split-crop";
+import { batchRunNodes } from "@/lib/canvas/batch-run-nodes";
+import type { LibtvGridHdScaleId } from "@/lib/canvas/libtv-grid-split-hd";
 import {
-  gridSplitCropBackgroundStyle,
-  type GridSplitCrop,
-} from "@/lib/canvas/libtv-grid-split-crop";
-import {
-  libtvGridSplitFromPreset,
+  libtvGridSplitFromDimensions,
   spawnExpandImageFromGridSplit,
   spawnFrameGroupFromGridSplit,
+  spawnHdImageFromGridSplit,
   toggleGridSplitCell,
-  type LibtvGridSplitPresetId,
   type LibtvImageGridSplitState,
 } from "@/lib/canvas/libtv-image-grid-split";
 import {
@@ -97,6 +121,8 @@ export type LibtvImageNodeData = CanvasPortraitNodeFields & {
   engine?: CanvasEnginePick;
   imageMode?: string;
   pro2MediaRole?: Pro2ImageMediaRole | string;
+  /** 数据锚点列节点 id（story-pro2-frame / story-pro2-character） */
+  pro2ControllerNodeId?: string;
   gridSplit?: LibtvImageGridSplitState;
   gridSplitCrop?: GridSplitCrop;
 };
@@ -144,7 +170,7 @@ export function LibtvImageNode({
 }: LibtvImageNodeProps) {
   const chrome = EDITION_CHROME[edition];
   const base = useBookMallBaseUrl();
-  const { alert } = useDialogs();
+  const { alert, confirm } = useDialogs();
   const rfNodes = useNodes();
   const { setNodes: rfSetNodes } = useReactFlow();
   const nodes = useCanvasStore((s) => s.nodes);
@@ -163,28 +189,78 @@ export function LibtvImageNode({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [livenessOpen, setLivenessOpen] = useState(false);
   const [preferBlobPreview, setPreferBlobPreview] = useState(false);
+  const [preferEphemeralPreview, setPreferEphemeralPreview] = useState(false);
   const projectId = useCanvasStore((s) => s.projectId) ?? undefined;
 
   const d = data as unknown as LibtvImageNodeData;
   useEffect(() => {
     setPreferBlobPreview(false);
-  }, [d.ossUrl, d.blobUrl, d.uploading]);
+    setPreferEphemeralPreview(false);
+  }, [d.ossUrl, d.blobUrl, d.uploading, d.runtime?.ephemeralUrl]);
 
-  const previewUrl = useMemo(
+  const { history: taskHistory } = useNodeTaskHistory(id);
+  const inflightTask = useMemo(
     () =>
-      resolveLibtvMediaPreviewUrl({
-        ossUrl: d.ossUrl,
-        blobUrl: d.blobUrl,
-        uploading: d.uploading,
-        preferBlob: preferBlobPreview,
-      }),
-    [d.ossUrl, d.blobUrl, d.uploading, preferBlobPreview],
+      pickActiveServerInflightTask(
+        taskHistory,
+        d.runtime?.taskId,
+        d.runtime,
+      ),
+    [taskHistory, d.runtime],
   );
+
+  const boundTerminalPreviewUrl = useMemo(() => {
+    const boundId = d.runtime?.taskId?.trim();
+    if (!boundId) return "";
+    const terminal = taskHistory.find(
+      (t) => t.id === boundId && t.status === "SUCCEEDED",
+    );
+    if (!terminal) return "";
+    return pickTaskImagePreviewUrl(terminal) ?? "";
+  }, [taskHistory, d.runtime?.taskId]);
+
+  const previewUrl = useMemo(() => {
+    const gridSource = String(
+      (d as { gridSplitSourceUrl?: string }).gridSplitSourceUrl ?? "",
+    ).trim();
+    if (d.gridSplitCrop && gridSource) return gridSource;
+    const fromNode = resolveLibtvMediaPreviewUrl({
+      ossUrl: d.ossUrl,
+      blobUrl: d.blobUrl,
+      ephemeralUrl: d.runtime?.ephemeralUrl,
+      uploading: d.uploading,
+      runtime: d.runtime,
+      preferBlob: preferBlobPreview,
+      preferEphemeral: preferEphemeralPreview,
+    });
+    if (fromNode) return fromNode;
+    return boundTerminalPreviewUrl;
+  }, [
+    d.gridSplitCrop,
+    (d as { gridSplitSourceUrl?: string }).gridSplitSourceUrl,
+    d.ossUrl,
+    d.blobUrl,
+    d.runtime,
+    d.uploading,
+    preferBlobPreview,
+    preferEphemeralPreview,
+    boundTerminalPreviewUrl,
+  ]);
   const onPreviewLoadError = useCallback(() => {
+    if (
+      !preferEphemeralPreview &&
+      libtvMediaPreviewCanFallbackToEphemeral({
+        ossUrl: d.ossUrl,
+        ephemeralUrl: d.runtime?.ephemeralUrl,
+      })
+    ) {
+      setPreferEphemeralPreview(true);
+      return;
+    }
     if (libtvMediaPreviewCanFallbackToBlob(d)) {
       setPreferBlobPreview(true);
     }
-  }, [d]);
+  }, [d, preferEphemeralPreview]);
   const saveAsAsset = useSaveNodeAsAsset();
   const self = nodes.find((n) => n.id === id);
   const insideGroup = Boolean(self?.parentId);
@@ -202,13 +278,60 @@ export function LibtvImageNode({
       imageUrl: d.ossUrl,
       onNeedLiveness: () => setLivenessOpen(true),
     });
-  const isGenerating = isLibtvMediaGenerating(d);
+  const isDirectorDeskShot = mediaRole === "director-desk-shot";
+  const isDirectorDeskShotLocalPreview =
+    isDirectorDeskShot &&
+    hasImage &&
+    Boolean(d.uploading) &&
+    !d.runtime?.taskId;
+  const isGenerating = isDirectorDeskShotLocalPreview
+    ? false
+    : Boolean(inflightTask) || isLibtvMediaGenerating(d);
+
+  useLayoutEffect(() => {
+    if (inflightTask) return;
+    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
+    const localRt = (node?.data as LibtvImageNodeData | undefined)?.runtime;
+    const boundId = localRt?.taskId?.trim();
+    if (!boundId) return;
+
+    const localSt = localRt?.status;
+    if (localSt !== "pending" && localSt !== "running") return;
+
+    const terminal = taskHistory.find(
+      (t) =>
+        t.id === boundId &&
+        (t.status === "SUCCEEDED" ||
+          t.status === "FAILED" ||
+          t.status === "CANCELLED"),
+    );
+    if (!terminal) return;
+    if (shouldSkipStoryRowTaskApply(localRt, terminal, id)) return;
+
+    const nodePatch = sbv1ImagePatchFromTask(
+      (node?.data ?? {}) as unknown as Sbv1ImageNodeData,
+      terminal,
+    );
+    if (!nodePatch) return;
+    const rtPatch = nodePatch.runtime as Partial<CanvasNodeRuntime> | undefined;
+    if (!rtPatch) return;
+    if (!shouldApplyCanvasTaskRuntimePatch(localRt, terminal, rtPatch, id)) {
+      return;
+    }
+    if (
+      isSameSbv1MediaDataPatch(node?.data as Record<string, unknown>, nodePatch)
+    ) {
+      return;
+    }
+    updateNodeData(id, nodePatch);
+  }, [taskHistory, id, updateNodeData, inflightTask]);
   const hasRuntimeError = d.runtime?.status === "error";
   const hasUploadError = Boolean(d.uploadError?.trim()) && !isGenerating;
   const hasError = hasRuntimeError || hasUploadError;
   const errorMessage = hasRuntimeError
     ? d.runtime?.failMessage?.trim() || "生成失败"
     : d.uploadError?.trim() || "生成失败";
+  const imageModelKey = d.engine?.modelKey;
   const errorBanner = useLibtvRuntimeErrorBanner({
     nodeId: id,
     status: d.runtime?.status,
@@ -216,6 +339,7 @@ export function LibtvImageNode({
     failCode: d.runtime?.failCode,
     failMessage: d.runtime?.failMessage,
     dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
+    modelKey: imageModelKey,
     hasMedia: Boolean(hasImage && !hasRuntimeError),
   });
   useLibtvRuntimeErrorAlert({
@@ -225,11 +349,24 @@ export function LibtvImageNode({
     failCode: d.runtime?.failCode,
     failMessage: d.runtime?.failMessage,
     dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
+    modelKey: imageModelKey,
     enabled: !isMislabeledVendorSuccessError(
       d.runtime?.failCode,
       d.runtime?.failMessage,
-    ),
+    ) &&
+      !(
+        d.runtime?.failCode === "RUN_STALE" &&
+        Boolean(d.pro2ControllerNodeId?.trim())
+      ),
     onAlert: ({ message, failCode }) => {
+      if (
+        failCode === "INSUFFICIENT_CREDITS" ||
+        message.includes("积分不足") ||
+        message.includes("积分不够")
+      ) {
+        void confirmOpenTopupCheckout(confirm);
+        return;
+      }
       void alert({
         title: libtvRuntimeErrorAlertTitle(failCode, message, "image"),
         message,
@@ -251,13 +388,9 @@ export function LibtvImageNode({
     showFloatingToolbar &&
       !isCharacterThreeView &&
       !gridSplitActive &&
-      (hasImage ||
-        Boolean(d.dockInput?.trim()) ||
-        Boolean(d.engine?.modelKey?.trim())),
+      hasImage,
   );
-  const showNormalToolbar = Boolean(
-    showFloatingToolbar && !isCharacterThreeView && !gridSplitActive,
-  );
+  const showNormalToolbar = showImageTools;
   const showGridSplitToolbar = Boolean(
     soleSelected && gridSplitActive && !isGenerating,
   );
@@ -265,23 +398,87 @@ export function LibtvImageNode({
     edition === "pro2" && hasImage && !isCharacterThreeView,
   );
 
-  const stageImageFit: "cover" | "contain" = gridSplitActive ? "contain" : "cover";
+  /** Stage 内图片/视频 · cover 铺满，避免比例未齐时出现深色留边 */
+  const stageImageFit: "cover" | "contain" = "cover";
 
   const gridSplitCropCss = d.gridSplitCrop;
+
+  useLibtvMediaAspectPresetSync(
+    id,
+    (d as { aspectRatio?: string }).aspectRatio,
+    !isCharacterThreeView && !gridSplitCropCss,
+  );
 
   useLibtvMediaNodeAutoFit({
     nodeId: id,
     mediaUrl: previewUrl,
     kind: "image",
-    profile: "square-image",
+    profile: "sbv1-media",
     // 本地上传/粘贴时按 blob 立即自适配（blob 探测必成功），避免只等 ossUrl
     // ——OSS 探测偶发慢/失败会让外框停在默认比例，露出深色舞台「边框/投影」。
     // 仅 AI 生成中（非上传）才暂停自适配，避免贴合占位旧图。
     disabled:
       !hasImage ||
       isCharacterThreeView ||
+      Boolean(d.uploading) ||
       (isGenerating && !d.uploading),
   });
+
+  /** 侧 + 拉出邻居后 graph 变更 · 若外框仍停在默认横条则按 natural 重算 */
+  useEffect(() => {
+    if (!hasImage || isCharacterThreeView || d.uploading) return;
+    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
+    if (!node || !isLibtvMediaNodeBoxStale(node, "sbv1-media")) return;
+    const url = previewUrl?.trim();
+    if (!url) return;
+    fitLibtvUploadedImageNaturalSize(id, url);
+  }, [edges, id, hasImage, isCharacterThreeView, d.uploading, previewUrl]);
+
+  const applyLibtvMediaFit = useCanvasStore((s) => s.applyLibtvMediaFit);
+  const onStageNaturalSize = useCallback(
+    ({ w, h }: { w: number; h: number }) => {
+      if (isCharacterThreeView || !previewUrl?.trim()) return;
+      const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
+      if (!node) return;
+      if (
+        (node.data as { mediaAspectPreset?: string }).mediaAspectPreset?.trim()
+      ) {
+        return;
+      }
+      const nodeData = node.data as {
+        uploading?: boolean;
+        mediaFit?: boolean;
+        mediaFitKey?: string;
+        mediaNaturalW?: number;
+        mediaNaturalH?: number;
+      };
+      const nextData = {
+        ...((node.data as object) ?? {}),
+        mediaNaturalW: w,
+        mediaNaturalH: h,
+      };
+      const probe = { ...node, data: nextData };
+      const uploading = Boolean(nodeData.uploading);
+      const needsFit =
+        uploading || isLibtvMediaNodeBoxStale(probe, "sbv1-media");
+      if (!needsFit) {
+        if (nodeData.mediaNaturalW !== w || nodeData.mediaNaturalH !== h) {
+          updateNodeData(id, { mediaNaturalW: w, mediaNaturalH: h });
+        }
+        return;
+      }
+      const size = computeLibtvMediaNodeSize(w, h, "sbv1-media");
+      const fitPrefix = uploading ? "upload" : "image";
+      applyLibtvMediaFit(id, size, {
+        mediaFit: true,
+        mediaFitKey: `${fitPrefix}|${previewUrl.trim()}|sbv1-media`,
+        mediaFitVersion: LIBTV_MEDIA_FIT_VERSION,
+        mediaNaturalW: w,
+        mediaNaturalH: h,
+      });
+    },
+    [applyLibtvMediaFit, id, isCharacterThreeView, previewUrl, updateNodeData],
+  );
 
   const defaultNodeLabel = useMemo(() => {
     if (isCharacterThreeView) return "角色";
@@ -298,7 +495,7 @@ export function LibtvImageNode({
   const onPick = useCallback(() => inputRef.current?.click(), []);
 
   const onFile = useCallback(
-    async (file: File) => {
+    (file: File) => {
       if (
         !file ||
         (!file.type.startsWith("image/") &&
@@ -307,44 +504,31 @@ export function LibtvImageNode({
       ) {
         return;
       }
-      let normalized: File;
-      try {
-        normalized = await normalizeCanvasImageFile(file);
-      } catch (e) {
-        await alert({
-          title: "无法读取图片",
-          message: e instanceof Error ? e.message : String(e),
-          variant: "error",
-        });
-        return;
-      }
-      const blobUrl = URL.createObjectURL(normalized);
+      const blobUrl = URL.createObjectURL(file);
       updateNodeData(id, {
         blobUrl,
         ossUrl: undefined,
         uploading: true,
         uploadError: undefined,
-        label: normalized.name.replace(/\.[^.]+$/, "") || "图片",
-        ...(edition === "sbv1" ? { imageMode: "upload" as const } : {}),
+        label: file.name.replace(/\.[^.]+$/, "") || "图片",
+        mediaAspectPreset: "",
+        imageMode: "upload" as const,
       });
-      if (!base) {
-        updateNodeData(id, { uploading: false, uploadError: "画布未就绪" });
-        return;
-      }
-      try {
-        const ossUrl = await uploadCanvasImage(base, normalized);
-        updateNodeData(id, { ossUrl, uploading: false });
-      } catch (e) {
-        updateNodeData(id, {
-          uploading: false,
-          uploadError: e instanceof Error ? e.message : String(e),
-        });
-        await alert({
-          title: "上传失败",
-          message: e instanceof Error ? e.message : String(e),
-          variant: "error",
-        });
-      }
+      scheduleCanvasImageUpload({
+        nodeId: id,
+        file,
+        base,
+        updateNodeData,
+        previewBlobUrl: blobUrl,
+        onUploadError: (message) => {
+          void alert({
+            title: "上传失败",
+            message,
+            variant: "error",
+          });
+        },
+      });
+      fitLibtvUploadedImageNaturalSize(id, blobUrl);
     },
     [id, base, updateNodeData, alert, edition],
   );
@@ -391,9 +575,11 @@ export function LibtvImageNode({
   );
 
   const onGridSplitPick = useCallback(
-    (presetId: LibtvGridSplitPresetId) => {
+    (cols: number, rows: number) => {
       if (edition !== "pro2" || !hasImage) return;
-      updateNodeData(id, { gridSplit: libtvGridSplitFromPreset(presetId) });
+      const split = libtvGridSplitFromDimensions(cols, rows);
+      if (!split) return;
+      updateNodeData(id, { gridSplit: split });
     },
     [edition, hasImage, id, updateNodeData],
   );
@@ -465,6 +651,48 @@ export function LibtvImageNode({
     })();
   }, [gridSplit, id, nodes, addNode, setNodes, setEdges, clearGridSplit, alert]);
 
+  const onGenerateHdFromGridSplit = useCallback(
+    (scaleId: LibtvGridHdScaleId) => {
+      if (!gridSplit?.selected.length) return;
+      if (!base) {
+        void alert({
+          title: "无法生成",
+          message: "画布未就绪，请刷新页面后重试。",
+          variant: "error",
+        });
+        return;
+      }
+      void (() => {
+        const { runnableIds } = spawnHdImageFromGridSplit(
+          id,
+          gridSplit,
+          scaleId,
+          {
+            nodes,
+            getNodes: () => useCanvasStore.getState().nodes,
+            addNode,
+            setNodes,
+            setEdges,
+            base,
+            projectId,
+            updateNodeData,
+          },
+        );
+        if (!runnableIds.length) {
+          void alert({
+            title: "生成失败",
+            message: "无法创建高清图片节点，请确认原图已加载。",
+            variant: "error",
+          });
+          return;
+        }
+        clearGridSplit();
+        batchRunNodes(runnableIds);
+      })();
+    },
+    [gridSplit, id, nodes, addNode, setNodes, setEdges, updateNodeData, clearGridSplit, alert, base, projectId],
+  );
+
   useEffect(() => {
     if (!gridSplitActive) return;
     const onKey = (e: KeyboardEvent) => {
@@ -494,7 +722,7 @@ export function LibtvImageNode({
     if (isCharacterThreeView) {
       if (isGenerating) {
         return (
-          <LibtvMediaGeneratingState variant={chrome.generating} />
+          <LibtvMediaGeneratingState variant={chrome.generating} cancelNodeId={id} />
         );
       }
       if (hasImage) {
@@ -504,7 +732,7 @@ export function LibtvImageNode({
             variant="generated"
             alt={nodeLabel}
             fit="cover"
-            hidePreviewOverlay
+            previewChrome="ecom"
             onImageError={onPreviewLoadError}
             className="absolute inset-0"
           />
@@ -529,18 +757,26 @@ export function LibtvImageNode({
     }
 
     if (isGenerating) {
+      const cropPreview =
+        gridSplitCropCss && previewUrl ? (
+          <LibtvGridSplitCropSprite
+            url={previewUrl}
+            crop={gridSplitCropCss}
+            className="absolute inset-0 opacity-40"
+          />
+        ) : previewUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={previewUrl}
+            alt=""
+            className="absolute inset-0 size-full object-contain opacity-40"
+            draggable={false}
+            onError={onPreviewLoadError}
+          />
+        ) : null;
       return (
-        <LibtvMediaGeneratingState variant={chrome.generating}>
-          {previewUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={previewUrl}
-              alt=""
-              className="absolute inset-0 size-full object-contain opacity-40"
-              draggable={false}
-              onError={onPreviewLoadError}
-            />
-          ) : null}
+        <LibtvMediaGeneratingState variant={chrome.generating} cancelNodeId={id}>
+          {cropPreview}
         </LibtvMediaGeneratingState>
       );
     }
@@ -579,11 +815,10 @@ export function LibtvImageNode({
       }
       if (gridSplitCropCss && previewUrl) {
         return (
-          <div
+          <LibtvGridSplitCropSprite
+            url={previewUrl}
+            crop={gridSplitCropCss}
             className="absolute inset-0"
-            style={gridSplitCropBackgroundStyle(previewUrl, gridSplitCropCss)}
-            aria-label={nodeLabel}
-            role="img"
           />
         );
       }
@@ -593,8 +828,9 @@ export function LibtvImageNode({
           variant="generated"
           alt={nodeLabel}
           fit={stageImageFit}
-          hidePreviewOverlay
+          previewChrome="ecom"
           onImageError={onPreviewLoadError}
+          onNaturalSize={onStageNaturalSize}
           className="absolute inset-0"
         />
       );
@@ -652,7 +888,12 @@ export function LibtvImageNode({
   return (
     <>
       <div
-        className={cn(LIBTV_NODE_OUTER_CLASS, "image-paste-host")}
+        className={cn(
+          LIBTV_NODE_OUTER_CLASS,
+          edition === "pro2" && LIBTV_CARD_DRAG_CLASS,
+          edition === "pro2" && "flex flex-col",
+          "image-paste-host",
+        )}
         data-image-paste-host={id}
         data-pro2-dock-anchor={id}
         onPointerEnter={onPointerEnter}
@@ -665,30 +906,13 @@ export function LibtvImageNode({
             position={Position.Left}
             className={cn(
               LIBTV_NODE_HANDLE_CLASS,
-              showSidePlus
-                ? "pointer-events-none opacity-0"
-                : selected
-                  ? "opacity-100"
-                  : "pointer-events-none opacity-0",
+              "libtv-node-inbound-handle",
+              "pointer-events-none !opacity-0 !border-transparent !bg-transparent",
             )}
             title="上游参考图"
           />
         ) : null}
-        <Handle
-          id="image"
-          type="source"
-          position={Position.Right}
-          className={cn(
-            LIBTV_NODE_HANDLE_CLASS,
-            showSidePlus
-              ? "pointer-events-none opacity-0"
-              : selected
-                ? "opacity-100"
-                : "pointer-events-none opacity-0",
-          )}
-          title="连线到下游"
-        />
-
+        {/* 右侧出边由 Pro2NodeSidePlus handleId=image 提供，勿重复声明 Handle */}
         <Pro2NodeSidePlus
           side="left"
           handleId="plus_left"
@@ -710,34 +934,26 @@ export function LibtvImageNode({
 
         {showNormalToolbar ? (
           <LibtvNodeToolbarPortal nodeId={id} visible={showNormalToolbar}>
-            {showImageTools ? (
-              <Pro2ImageNodeToolbar
-                passNodeDrag
-                previewUrl={previewUrl}
-                pro2ImageTools={pro2ImageToolbarExtras}
-                onEditPick={pro2ImageToolbarExtras ? onEditPick : undefined}
-                onMagicPick={pro2ImageToolbarExtras ? onMagicPick : undefined}
-                onGridSplitPick={
-                  pro2ImageToolbarExtras ? onGridSplitPick : undefined
-                }
-                onExpandPreview={() => setPreviewOpen(true)}
-                onSaveAsAsset={() =>
-                  saveAsAsset(id, saveAsAssetKind, d as unknown as Record<string, unknown>)
-                }
-                onImportPortrait={
-                  d.ossUrl ? () => void importPortrait() : undefined
-                }
-                portraitImporting={portraitImporting}
-                portraitActive={portraitActive}
-                onDuplicateNode={onDuplicateNode}
-              />
-            ) : (
-              <Pro2ImageNodeToolbar
-                passNodeDrag
-                minimal
-                onDuplicateNode={onDuplicateNode}
-              />
-            )}
+            <Pro2ImageNodeToolbar
+              passNodeDrag
+              previewUrl={previewUrl}
+              pro2ImageTools={pro2ImageToolbarExtras}
+              onEditPick={pro2ImageToolbarExtras ? onEditPick : undefined}
+              onMagicPick={pro2ImageToolbarExtras ? onMagicPick : undefined}
+              onGridSplitPick={
+                pro2ImageToolbarExtras ? onGridSplitPick : undefined
+              }
+              onExpandPreview={() => setPreviewOpen(true)}
+              onSaveAsAsset={() =>
+                saveAsAsset(id, saveAsAssetKind, d as unknown as Record<string, unknown>)
+              }
+              onImportPortrait={
+                d.ossUrl ? () => void importPortrait() : undefined
+              }
+              portraitImporting={portraitImporting}
+              portraitActive={portraitActive}
+              onDuplicateNode={onDuplicateNode}
+            />
           </LibtvNodeToolbarPortal>
         ) : null}
 
@@ -749,8 +965,24 @@ export function LibtvImageNode({
               onCancel={clearGridSplit}
               onExpandImage={onExpandFromGridSplit}
               onCreateFrameGroup={onCreateFrameGroupFromSplit}
+              onGenerateHd={onGenerateHdFromGridSplit}
             />
           </LibtvNodeToolbarPortal>
+        ) : null}
+
+        {edition === "pro2" ? (
+          <div className={cn(PRO2_TEXT_NODE_TITLE_CLASS, "relative mb-1.5 shrink-0")}>
+            <GripVertical className="size-3.5 shrink-0 text-white/30" />
+            <ImageIcon className="size-3.5 shrink-0 text-violet-300" />
+            <LibtvEditableNodeTitle
+              nodeId={id}
+              defaultLabel={defaultNodeLabel}
+              textClassName="text-[11px] text-white"
+            />
+            {crewNodeShowsParticipatingBadge(id, nodes, graphMeta) ? (
+              <Pro2CrewTaskStatusBadge nodeId={id} />
+            ) : null}
+          </div>
         ) : null}
 
         <div
@@ -765,51 +997,61 @@ export function LibtvImageNode({
             edition,
           })}
         >
-          <div className="relative flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <button
-                type="button"
-                className={cn(
-                  "nodrag flex shrink-0 items-center rounded-md transition",
-                  !hasImage &&
-                    !isGenerating &&
-                    !isCharacterThreeView &&
-                    "cursor-pointer hover:bg-white/[0.06]",
-                )}
-                title={
-                  !hasImage && !isGenerating && !isCharacterThreeView
-                    ? "双击上传图片"
-                    : undefined
-                }
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  if (!hasImage && !isGenerating && !isCharacterThreeView) {
-                    onPick();
+          {edition === "sbv1" ? (
+            <div className="relative flex shrink-0 cursor-grab items-center justify-between gap-2 border-b border-white/10 px-3 py-2 active:cursor-grabbing">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <button
+                  type="button"
+                  className={cn(
+                    "nodrag flex shrink-0 items-center rounded-md transition",
+                    !hasImage &&
+                      !isGenerating &&
+                      !isCharacterThreeView &&
+                      "cursor-pointer hover:bg-white/[0.06]",
+                  )}
+                  title={
+                    !hasImage && !isGenerating && !isCharacterThreeView
+                      ? "双击上传图片"
+                      : undefined
                   }
-                }}
-              >
-                <ImageIcon className={cn("size-3.5 shrink-0", chrome.icon)} />
-              </button>
-              <LibtvEditableNodeTitle
-                nodeId={id}
-                defaultLabel={defaultNodeLabel}
-                textClassName="text-xs font-medium text-white"
-              />
-            </div>
-            {crewNodeShowsParticipatingBadge(id, nodes, graphMeta) ? (
-              <Pro2CrewTaskStatusBadge nodeId={id} />
-            ) : null}
-            <div className="relative z-[1] flex shrink-0 items-center gap-2">
-              {!isGenerating ? (
-                <LibtvNodeHeaderActions
-                  portraitActive={portraitActive}
-                  portraitImporting={portraitImporting}
-                  showPreview={hasImage}
-                  onPreview={() => setPreviewOpen(true)}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    if (!hasImage && !isGenerating && !isCharacterThreeView) {
+                      onPick();
+                    }
+                  }}
+                >
+                  <ImageIcon className={cn("size-3.5 shrink-0", chrome.icon)} />
+                </button>
+                <LibtvEditableNodeTitle
+                  nodeId={id}
+                  defaultLabel={defaultNodeLabel}
+                  textClassName="text-xs font-medium text-white"
                 />
+              </div>
+              {crewNodeShowsParticipatingBadge(id, nodes, graphMeta) ? (
+                <Pro2CrewTaskStatusBadge nodeId={id} />
               ) : null}
+              <div className="relative z-[1] flex shrink-0 items-center gap-2">
+                {!isGenerating && d.ossUrl?.trim() ? (
+                  <CanvasSaveToPoseLibraryButton
+                    imageUrl={d.ossUrl.trim()}
+                    prompt={d.dockInput}
+                    sourceModule={`canvas-${edition}-image`}
+                    sourceAssetId={id}
+                  />
+                ) : null}
+                {!isGenerating ? (
+                  <LibtvNodeHeaderActions
+                    portraitActive={portraitActive}
+                    portraitImporting={portraitImporting}
+                    showPreview={false}
+                    onPreview={() => setPreviewOpen(true)}
+                  />
+                ) : null}
+              </div>
             </div>
-          </div>
+          ) : null}
 
           <div className={cn(LIBTV_MEDIA_STAGE_CLASS, "relative flex min-h-0 flex-col")}>
             {renderStage()}

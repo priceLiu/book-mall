@@ -4,7 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position, useNodes, useReactFlow } from "@xyflow/react";
-import { Maximize2, Play, RefreshCw, Video } from "lucide-react";
+import {
+  ImageIcon,
+  Maximize2,
+  Mic,
+  Music,
+  Play,
+  RefreshCw,
+  Video,
+} from "lucide-react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { CANVAS_SEMANTIC_STATUS_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
@@ -40,14 +48,26 @@ import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types"
 import type { CanvasNodeRuntime } from "@/lib/canvas/types";
 import { resolveLibtvVideoPosterUrl } from "@/lib/canvas/libtv-video-poster";
 import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
-import { sbv1VideoPatchFromTask, isSameSbv1MediaDataPatch } from "@/lib/canvas/sbv1-image-task-apply";
+import {
+  sbv1VideoPatchFromTask,
+  isSameSbv1MediaDataPatch,
+  shouldRestoreSbv1VideoRuntimeToDone,
+} from "@/lib/canvas/sbv1-image-task-apply";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { useVideoGeneratingWait } from "@/lib/canvas/use-video-generating-wait";
 import { cn } from "@/lib/utils";
 import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
 import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
+import { useLibtvMediaAspectPresetSync } from "@/lib/canvas/libtv-media-aspect-preset-apply";
 import { LazyViewportImage, LazyViewportVideo } from "@/components/canvas/lazy-viewport-media";
 import { Pro2MediaNodeEmptyState } from "../pro2/pro2-media-node-empty";
+import {
+  attachPro2VideoShortcutPreset,
+  type Pro2VideoShortcutPresetId,
+} from "@/lib/canvas/pro2-spawn-shortcut-presets";
+import { LibtvEmptyTryStage } from "../libtv-empty-try-stage";
+import { LibtvNodeLinkedStage } from "../libtv-node-stage-logo";
+import { libtvVideoEngineNodeIsLinked } from "@/lib/canvas/pro2-thin-node-display-state";
 import { LibtvVideoNodeToolbar } from "../libtv-video-node-toolbar";
 import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
 import { LibtvEditableNodeTitle } from "../libtv-editable-node-title";
@@ -58,6 +78,7 @@ import { Pro2CrewTaskStatusBadge } from "../pro2/pro2-crew-task-status-badge";
 import { crewNodeShowsParticipatingBadge } from "../libtv-node-header-bar";
 import { LibtvNodeErrorBanner } from "../libtv-node-error-banner";
 import { useLibtvRuntimeErrorBanner } from "@/lib/canvas/use-libtv-runtime-error-banner";
+import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import {
   useLibtvRuntimeErrorAlert,
   libtvRuntimeErrorAlertTitle,
@@ -72,8 +93,23 @@ import {
 } from "@/lib/canvas/pro2-video-board-cell-task";
 import type { StoryProVideoRow } from "@/lib/canvas/story-pro-workspace-types";
 
+type VideoTryAction = {
+  id: Pro2VideoShortcutPresetId;
+  label: string;
+  icon: typeof ImageIcon | typeof Video | typeof Music | typeof Mic;
+};
+
+const VIDEO_TRY_ACTIONS: VideoTryAction[] = [
+  { id: "image-ref-to-video", label: "图(参考)生视频", icon: ImageIcon },
+  { id: "text-to-video-from-video", label: "文生视频", icon: Video },
+  { id: "video-to-video", label: "视频生视频", icon: Play },
+  { id: "lip-sync-broadcast", label: "对口型口播", icon: Mic },
+  { id: "reference-audio-to-video", label: "参考音生视频", icon: Music },
+];
+
 export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const { alert } = useDialogs();
+  const saveAsAsset = useSaveNodeAsAsset();
   const rfNodes = useNodes();
   const { setNodes: rfSetNodes } = useReactFlow();
   const nodes = useCanvasStore((s) => s.nodes);
@@ -90,6 +126,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     pro2MediaRole?: string;
     pro2ControllerNodeId?: string;
     label?: string;
+    mediaFit?: boolean;
+    mediaFitKey?: string;
   };
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const isPro2VideoBoardCell =
@@ -189,12 +227,20 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     pro2VideoBoardRowMediaUrl({ runtime: rowRuntime, task: rowDisplayTask }) ??
     undefined;
   const hasVideo = Boolean(videoUrl);
+  const isUploadNaturalFit = Boolean(
+    d.mediaFit &&
+      d.mediaFitKey?.startsWith("upload|") &&
+      (d.runtime?.ephemeralUrl?.trim() || d.runtime?.ossUrl?.trim()),
+  );
   const stageVideoFit: "cover" | "contain" = isPro2VideoBoardCell
     ? "cover"
-    : "contain";
+    : isUploadNaturalFit
+      ? "cover"
+      : "contain";
   const stageVideoFitClass =
     stageVideoFit === "cover" ? "object-cover" : "object-contain";
 
+  const videoModelKey = d.engine?.modelKey;
   const errorBanner = useLibtvRuntimeErrorBanner({
     nodeId: id,
     status: d.runtime?.status,
@@ -202,7 +248,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     failCode: d.runtime?.failCode,
     failMessage: d.runtime?.failMessage,
     dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
-    hasMedia: hasVideo,
+    modelKey: videoModelKey,
+    hasMedia: Boolean(hasVideo && d.runtime?.status !== "error"),
   });
 
   useLibtvRuntimeErrorAlert({
@@ -212,7 +259,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     failCode: d.runtime?.failCode,
     failMessage: d.runtime?.failMessage,
     dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
-    enabled: !hasVideo && !isMislabeledVendorSuccessError(d.runtime?.failCode, d.runtime?.failMessage),
+    modelKey: videoModelKey,
+    enabled: !isMislabeledVendorSuccessError(d.runtime?.failCode, d.runtime?.failMessage),
     onAlert: ({ message, failCode }) => {
       void alert({
         title: libtvRuntimeErrorAlertTitle(failCode, message, "video"),
@@ -368,20 +416,32 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     updateNodeData(id, patch);
   }, [d.uploading, d.runtime?.status, id, updateNodeData]);
 
-  /** 已有成片但 runtime 仍标 error / pending / running · 自动恢复为 done（排除重新生成中） */
+  /** 本轮已产出成片但 runtime 仍停在 pending/running · 对齐为 done（不抹本轮失败） */
   useEffect(() => {
-    const st = d.runtime?.status;
+    const boundId = d.runtime?.taskId?.trim();
+    const boundSucceeded = Boolean(
+      boundId &&
+        taskHistory.some(
+          (t) => t.id === boundId && t.status === "SUCCEEDED",
+        ),
+    );
+    const currentMediaUrl =
+      d.runtime?.ossUrl?.trim() || d.runtime?.ephemeralUrl?.trim() || "";
     if (
-      !hasVideo ||
-      (st !== "error" && st !== "pending" && st !== "running")
+      !shouldRestoreSbv1VideoRuntimeToDone({
+        status: d.runtime?.status,
+        hasInflightTask: Boolean(inflightTask),
+        uploading: d.uploading,
+        runSessionActive: isCanvasNodeRunSessionActive(id),
+        currentMediaUrl,
+        boundTaskSucceeded: boundSucceeded,
+      })
     ) {
       return;
     }
-    if (inflightTask) return;
-    if (d.uploading) return;
-    if (isCanvasNodeRunSessionActive(id)) return;
     const url =
-      videoUrl ??
+      currentMediaUrl ||
+      videoUrl ||
       pro2VideoBoardRowMediaUrl({ runtime: rowRuntime, task: rowDisplayTask });
     if (!url?.trim()) return;
     updateNodeData(id, {
@@ -395,7 +455,6 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
       },
     });
   }, [
-    hasVideo,
     d.runtime,
     d.uploading,
     id,
@@ -404,6 +463,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     rowRuntime,
     videoUrl,
     inflightTask,
+    taskHistory,
   ]);
 
   const hasToolbarContent = Boolean(
@@ -417,6 +477,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const showFloatingToolbar = Boolean(soleSelected && !isGenerating);
   const showToolbar = Boolean(showFloatingToolbar && hasToolbarContent);
   const showSidePlus = Boolean((hovered || selected || connectingFromNodeId) && !isGenerating);
+
+  useLibtvMediaAspectPresetSync(id, d.aspectRatio, !isPro2VideoBoardCell);
 
   useLibtvMediaNodeAutoFit({
     nodeId: id,
@@ -524,6 +586,39 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     }
   }, [duplicateNode, id, rfSetNodes]);
 
+  const isLinked = useMemo(
+    () => libtvVideoEngineNodeIsLinked(id, edges),
+    [edges, id],
+  );
+
+  const linkedMessage = useMemo(() => {
+    const hasIncoming = edges.some(
+      (e) =>
+        e.target === id &&
+        (e.targetHandle === "in_text" ||
+          e.targetHandle === "in_ref" ||
+          e.targetHandle === "in_motion_video" ||
+          e.targetHandle == null),
+    );
+    if (hasIncoming) {
+      return "已连接上游节点，选中本节点编辑 prompt 并生成";
+    }
+    return "已连接下游节点，上传或生成视频";
+  }, [edges, id]);
+
+  const onTryVideoPreset = useCallback(
+    (preset: Pro2VideoShortcutPresetId) => {
+      attachPro2VideoShortcutPreset(id, preset, nodes, {
+        addNode: (type, position, nodeData) =>
+          addNode(type as never, position, nodeData),
+        setEdges,
+        setNodes,
+        updateNodeData,
+      });
+    },
+    [id, nodes, addNode, setEdges, setNodes, updateNodeData],
+  );
+
   return (
     <>
       <div
@@ -538,11 +633,12 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           position={Position.Left}
           className={cn(
             SBV1_NODE_HANDLE_CLASS,
+            "libtv-node-inbound-handle",
+            "libtv-node-inbound-text-handle",
             showSidePlus
               ? "pointer-events-none opacity-0"
               : "opacity-100",
           )}
-          style={{ top: "22%" }}
           title="文本 / 提示词输入"
         />
         <Handle
@@ -551,11 +647,11 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           position={Position.Left}
           className={cn(
             SBV1_NODE_HANDLE_CLASS,
+            "libtv-node-inbound-handle",
             showSidePlus
               ? "pointer-events-none opacity-0"
               : "opacity-100",
           )}
-          style={{ top: "35%" }}
           title="参考图输入"
         />
         <Handle
@@ -564,28 +660,14 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           position={Position.Left}
           className={cn(
             SBV1_NODE_HANDLE_CLASS,
+            "libtv-node-inbound-handle",
             showSidePlus
               ? "pointer-events-none opacity-0"
               : "opacity-100",
           )}
-          style={{ top: "68%" }}
           title="动作视频输入（Motion Control）"
         />
-        <Handle
-          id="out_video"
-          type="source"
-          position={Position.Right}
-          className={cn(
-            SBV1_NODE_HANDLE_CLASS,
-            showSidePlus
-              ? "pointer-events-none opacity-0"
-              : selected
-                ? "opacity-100"
-                : "pointer-events-none opacity-0",
-          )}
-          title={`串联下一${SBV1_VIDEO_COMPOSE_LABEL}`}
-        />
-
+        {/* out_video 出边由 Pro2NodeSidePlus 提供 */}
         <Pro2NodeSidePlus
           side="left"
           handleId="plus_left"
@@ -606,21 +688,24 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           onPick={onSidePick("right")}
         />
 
-        {showFloatingToolbar ? (
-          <LibtvNodeToolbarPortal nodeId={id} visible={showFloatingToolbar}>
-            {showToolbar ? (
-              <LibtvVideoNodeToolbar
-                passNodeDrag
-                previewUrl={videoUrl}
-                onExpandPreview={() => setPreviewOpen(true)}
-                onDuplicateNode={onDuplicateNode}
-              />
-            ) : (
-              <LibtvVideoNodeToolbar
-                passNodeDrag
-                onDuplicateNode={onDuplicateNode}
-              />
-            )}
+        {showToolbar ? (
+          <LibtvNodeToolbarPortal nodeId={id} visible={showToolbar}>
+            <LibtvVideoNodeToolbar
+              passNodeDrag
+              previewUrl={videoUrl}
+              onExpandPreview={() => setPreviewOpen(true)}
+              onSaveAsAsset={
+                hasVideo
+                  ? () =>
+                      saveAsAsset(
+                        id,
+                        "sbv1-video-engine",
+                        d as unknown as Record<string, unknown>,
+                      )
+                  : undefined
+              }
+              onDuplicateNode={onDuplicateNode}
+            />
           </LibtvNodeToolbarPortal>
         ) : null}
 
@@ -636,7 +721,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
             edition: nodeEdition,
           })}
         >
-          <div className="relative flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+            <div className="relative flex shrink-0 cursor-grab items-center justify-between gap-2 border-b border-white/10 px-3 py-2 active:cursor-grabbing">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <Video className="size-3.5 shrink-0 text-white/70" />
               <LibtvEditableNodeTitle
@@ -673,6 +758,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
               <LibtvMediaGeneratingState
                 variant={isPro2VideoBoardCell ? "violet" : "cyan"}
                 tone={isBackground ? "background" : "active"}
+                cancelNodeId={id}
               >
                 {hasVideo ? (
                   posterUrl?.trim() ? (
@@ -733,7 +819,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                   </button>
                 </div>
               </div>
-            ) : (
+            ) : isPro2VideoBoardCell ? (
               <div
                 className="absolute inset-0 flex flex-col items-center justify-center px-3 py-4"
                 onDoubleClick={(e) => {
@@ -742,19 +828,41 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
               >
                 <Pro2MediaNodeEmptyState
                   icon={Video}
-                  label={
-                    isPro2VideoBoardCell
-                      ? "添加或生成视频"
-                      : "选中本节点，在下方编辑 prompt 并生成"
-                  }
+                  label="添加或生成视频"
                   className="min-h-0 pb-0"
                   passNodeDrag
                 />
-                {isPro2VideoBoardCell && !selected ? (
+                {!selected ? (
                   <p className="mt-3 text-[10px] text-white/35">
                     选中节点以编辑提示词
                   </p>
                 ) : null}
+              </div>
+            ) : isLinked ? (
+              <div
+                className="absolute inset-0 flex min-h-0 flex-col"
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                <LibtvNodeLinkedStage stageIcon={Video} message={linkedMessage} />
+              </div>
+            ) : (
+              <div
+                className="absolute inset-0 flex min-h-0 flex-col"
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                <LibtvEmptyTryStage
+                  stageIcon={Video}
+                  actions={VIDEO_TRY_ACTIONS.map((action) => ({
+                    id: action.id,
+                    label: action.label,
+                    icon: action.icon,
+                    onClick: () => onTryVideoPreset(action.id),
+                  }))}
+                />
               </div>
             )}
           </div>

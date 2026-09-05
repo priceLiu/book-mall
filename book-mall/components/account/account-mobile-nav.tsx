@@ -15,6 +15,7 @@ const LINKS = [
   { href: "/account/billing", label: "费用" },
   { href: "/account/gateway", label: "Gateway" },
   { href: "/account/security", label: "安全" },
+  { href: "/account/devices", label: "设备" },
   { href: "/account/withdraw", label: "提现" },
 ] as const;
 

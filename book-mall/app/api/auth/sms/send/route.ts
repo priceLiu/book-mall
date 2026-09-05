@@ -3,6 +3,7 @@ import type { SmsVerificationPurpose } from "@prisma/client";
 import { z } from "zod";
 
 import { normalizePhone } from "@/lib/auth/phone";
+import { verifyCaptcha } from "@/lib/auth/captcha";
 import {
   issueSmsCode,
   SmsRateLimitError,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/auth/sms-verification-service";
 import { getInviteByToken } from "@/lib/tenant/tenant-invite-service";
 import { prisma } from "@/lib/prisma";
+import { tryApiDbUnavailableResponse } from "@/lib/http/api-db-error";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,8 @@ const bodySchema = z.object({
   phone: z.string().min(1),
   purpose: z.enum(["REGISTER", "LOGIN", "BIND_PHONE", "TEAM_INVITE", "RESET_PASSWORD"]),
   inviteToken: z.string().optional(),
+  captchaToken: z.string().min(1, "缺少验证码令牌"),
+  captchaAnswer: z.number().int().min(0, "验证码答案无效"),
 });
 
 function clientIp(request: Request): string | null {
@@ -33,7 +37,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "参数无效" }, { status: 400 });
     }
 
-    const { phone, purpose, inviteToken } = parsed.data;
+    const { phone, purpose, inviteToken, captchaToken, captchaAnswer } = parsed.data;
+
+    // 1. 先校验图片验证码
+    if (!verifyCaptcha(captchaToken, captchaAnswer)) {
+      return NextResponse.json({ error: "验证码错误或已过期，请刷新重试" }, { status: 400 });
+    }
 
     const phoneNorm = normalizePhone(phone);
     if (purpose === "REGISTER" && phoneNorm) {
@@ -73,6 +82,8 @@ export async function POST(request: Request) {
     if (e instanceof SmsVerificationError) {
       return NextResponse.json({ error: e.message }, { status: 400 });
     }
+    const dbResp = tryApiDbUnavailableResponse(e);
+    if (dbResp) return dbResp;
     console.error("[sms/send]", e);
     return NextResponse.json({ error: "发送失败，请稍后重试" }, { status: 500 });
   }

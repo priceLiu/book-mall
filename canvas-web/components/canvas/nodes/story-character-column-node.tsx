@@ -34,7 +34,7 @@ import { useStoryProCharacterAudioAssets } from "@/lib/canvas/use-story-pro-audi
 import { useStoryColumnAutoSize } from "@/lib/canvas/use-story-column-auto-size";
 import { storyCharacterColumnSize } from "@/lib/canvas/story-column-layout";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
-import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
+import { batchRunPro2ThreeViewRows } from "@/lib/canvas/batch-run-nodes";
 import { displayCharacterRows } from "@/lib/canvas/story-column-display";
 import { pushStoryRevision } from "@/lib/canvas/story-revision";
 import {
@@ -152,7 +152,7 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
     const keys = displayRows.map((r) => r.key);
     if (!keys.length || !d.batchImage?.providerId) return;
     updateRows(displayRows);
-    batchRunStoryRowsSequential(id, keys, "threeView");
+    batchRunPro2ThreeViewRows(id, keys);
   };
 
   const saveRowPrompt = (key: string, prompt: string) => {

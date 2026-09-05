@@ -56,22 +56,16 @@ describe("computeLibtvPortaledToolbarScale", () => {
     );
   });
 
-  it("stays readable at 17% zoom (not tiny like scale=zoom)", () => {
-    const { width, height, scale } = libtvPortaledToolbarScreenSize(0.17);
-    expect(scale).toBeGreaterThan(1);
-    expect(width).toBeGreaterThan(1200);
-    expect(width).toBeLessThanOrEqual(LIBTV_TOOLBAR_MAX_SCREEN_WIDTH);
-    expect(height).toBeGreaterThan(70);
-    expect(height).toBeLessThanOrEqual(LIBTV_TOOLBAR_MAX_SCREEN_HEIGHT);
+  it("caps portal scale to viewport width at 100% zoom", () => {
+    expect(computeLibtvPortaledToolbarScale(1)).toBeLessThanOrEqual(1);
+    expect(computeLibtvToolbarScreenWidth(1)).toBeLessThanOrEqual(1022);
   });
 
-  it("caps at design max when zoomed out to anchor", () => {
-    expect(computeLibtvToolbarScreenWidth(LIBTV_TOOLBAR_ZOOMOUT_ANCHOR)).toBe(
-      LIBTV_TOOLBAR_MAX_SCREEN_WIDTH,
-    );
-    expect(
-      computeLibtvToolbarScreenHeight(LIBTV_TOOLBAR_ZOOMOUT_ANCHOR),
-    ).toBe(LIBTV_TOOLBAR_MAX_SCREEN_HEIGHT);
+  it("does not enlarge toolbar when canvas is zoomed out", () => {
+    const at17 = libtvPortaledToolbarScreenSize(0.17);
+    const at100 = libtvPortaledToolbarScreenSize(1);
+    expect(at17.scale).toBeLessThanOrEqual(at100.scale);
+    expect(at17.width).toBeLessThanOrEqual(at100.width);
   });
 
   it("does not shrink below design min when zoomed in", () => {

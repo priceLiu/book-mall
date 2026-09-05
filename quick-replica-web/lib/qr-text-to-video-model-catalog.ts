@@ -135,6 +135,27 @@ const CATALOG_OVERRIDES: Record<
     resolutionTag: formatResolutionTag(WAN_T2V_RESOLUTIONS),
     durationTag: formatDurationTag(WAN_T2V_DURATION_MIN, WAN_T2V_DURATION_MAX),
   },
+  "wan3.0-video": {
+    description: "万相 3.0 All-in-One · 文生 / 图生 / 参考生视频",
+    provider: "wan",
+    badges: ["new"],
+    recommended: true,
+    heroGradient: "linear-gradient(135deg, #0c1a1f 0%, #0f766e 50%, #0c1a1f 100%)",
+    iconLetter: "W",
+    iconBg: "#14b8a6",
+    resolutionTag: "480-1080p",
+    durationTag: "2-30s",
+  },
+  "wan3.0-video-prime": {
+    description: "万相 3.0 优速版 · 更快生成 · 文/图/参考生视频",
+    provider: "wan",
+    badges: ["new"],
+    heroGradient: "linear-gradient(135deg, #0c1a1f 0%, #115e59 50%, #0c1a1f 100%)",
+    iconLetter: "W",
+    iconBg: "#0d9488",
+    resolutionTag: "480-1080p",
+    durationTag: "2-30s",
+  },
 };
 
 function resolveCategory(args: {

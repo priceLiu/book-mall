@@ -18,8 +18,17 @@ export async function GET(request: NextRequest) {
   const guard = await requireSessionUser(request);
   if (!guard.ok) return guard.response;
   try {
-    const gatewayProviders = await listCanvasProvidersForUser(guard.user.id);
-    const gatewayLink = await getGatewayLinkStatusForUser(guard.user.id);
+    const url = new URL(request.url);
+    const sceneKey = url.searchParams.get("sceneKey")?.trim() || undefined;
+    const roleParam = url.searchParams.get("role")?.trim().toUpperCase();
+    const role =
+      roleParam === "LLM" || roleParam === "IMAGE" || roleParam === "VIDEO"
+        ? roleParam
+        : undefined;
+    const [gatewayProviders, gatewayLink] = await Promise.all([
+      listCanvasProvidersForUser(guard.user.id, { skipEnsure: true, sceneKey, role }),
+      getGatewayLinkStatusForUser(guard.user.id),
+    ]);
     return NextResponse.json(
       { providers: gatewayProviders, gatewayLink },
       { headers: jsonHeaders(request) },

@@ -3,12 +3,24 @@ import type { CanvasEnginePick } from "./types";
 
 /** sbv1 / Pro2 图片节点 · IMAGE 白名单（Gateway 登记模型） */
 export const SBV1_IMAGE_MODEL_KEYS = [
+  /** 与电商主图 / 分镜默认一致 · 多图参考（图生图） */
+  "qwen-image-3.0-pro",
+  "z-image-turbo",
+  "qwen-image-edit",
+  "qwen-image-edit-max",
+  "wan2.7-image",
+  "wan2.7-image-pro",
+  "wan2.6-image",
   "nano-banana-pro",
   "kling-3.0-image",
   "4o-image",
   "nano-banana-2",
   "gpt-image-2",
   "google/nano-banana",
+  /** 专用图生图 / 编辑 */
+  "google/nano-banana-edit",
+  "doubao-seedream-5-0-pro",
+  "doubao-seedream-5-0-lite",
   "seedream-4.5",
   "seedream-5-lite",
 ] as const;
@@ -82,6 +94,79 @@ export function sbv1ImageQualityLabel(q: Sbv1ImageQuality): string {
   return SBV1_IMAGE_QUALITIES.find((x) => x.value === q)?.label ?? q;
 }
 
+function isKieGptImageModelKey(modelKey: string): boolean {
+  const k = modelKey.trim().toLowerCase();
+  return k === "4o-image" || k.startsWith("gpt-image");
+}
+
+function isKieNanoBananaModelKey(modelKey: string): boolean {
+  return modelKey.trim().toLowerCase().includes("nano-banana");
+}
+
+const KIE_NANO_BANANA_ASPECTS = new Set<Sbv1ImageAspectRatio>([
+  "1:1",
+  "16:9",
+  "9:16",
+]);
+
+/** Nano Banana Pro 等 KIE 模型仅支持 1:1 / 16:9 / 9:16。 */
+export function resolveKieNanoBananaAspectRatio(
+  raw: Sbv1ImageAspectRatio | string | undefined,
+): "1:1" | "16:9" | "9:16" {
+  const r = String(raw ?? "1:1").trim() as Sbv1ImageAspectRatio;
+  if (KIE_NANO_BANANA_ASPECTS.has(r)) return r as "1:1" | "16:9" | "9:16";
+  if (
+    r === "3:4" ||
+    r === "2:3" ||
+    r === "4:5" ||
+    r === "9:21" ||
+    r === "1:2"
+  ) {
+    return "9:16";
+  }
+  if (
+    r === "4:3" ||
+    r === "3:2" ||
+    r === "5:4" ||
+    r === "21:9" ||
+    r === "2:1"
+  ) {
+    return "16:9";
+  }
+  return "1:1";
+}
+
+/** Dock 比例列表：GPT Image 暂不可选 4:5 / 5:4（KIE 422）。 */
+export function sbv1ImageAspectOptionsForModel(modelKey: string): {
+  value: Sbv1ImageAspectRatio;
+  label: string;
+}[] {
+  const all = SBV1_IMAGE_ASPECT_RATIOS.filter((r) => r.value !== "auto");
+  if (isKieGptImageModelKey(modelKey)) {
+    return all.filter((r) => r.value !== "4:5" && r.value !== "5:4");
+  }
+  if (isKieNanoBananaModelKey(modelKey)) {
+    return all.filter((r) => KIE_NANO_BANANA_ASPECTS.has(r.value));
+  }
+  return all;
+}
+
+/** 选 GPT / Nano Banana 时把不可用比例就近映射到厂商白名单。 */
+export function coerceSbv1ImageAspectForModel(
+  modelKey: string,
+  aspect: Sbv1ImageAspectRatio,
+): Sbv1ImageAspectRatio {
+  if (isKieGptImageModelKey(modelKey)) {
+    if (aspect === "4:5") return "3:4";
+    if (aspect === "5:4") return "4:3";
+    return aspect;
+  }
+  if (isKieNanoBananaModelKey(modelKey)) {
+    return resolveKieNanoBananaAspectRatio(aspect);
+  }
+  return aspect;
+}
+
 /** 写入 Gateway / KIE createTask params */
 export function buildSbv1ImageEngineParams(data: {
   aspectRatio?: Sbv1ImageAspectRatio;
@@ -145,4 +230,36 @@ export function pickDefaultSbv1ImageEngine(
     }
   }
   return null;
+}
+
+/** Dock 发送钮 · 补齐仅有 modelKey、缺 providerId 的 engine（默认数据常见） */
+export function resolveDockImageEnginePick(
+  engine: CanvasEnginePick | undefined,
+  providers: CanvasProviderDto[],
+  fallback?: () => CanvasEnginePick | null,
+): CanvasEnginePick | null {
+  const modelKey = engine?.modelKey?.trim();
+  const providerId = engine?.providerId?.trim();
+  if (providerId && modelKey) {
+    return {
+      providerId,
+      modelKey,
+      params: engine?.params ?? {},
+    };
+  }
+  if (modelKey) {
+    for (const provider of providers.filter((p) => p.active)) {
+      const model = provider.models.find(
+        (m) => m.enabled && m.modelKey === modelKey,
+      );
+      if (model) {
+        return {
+          providerId: provider.id,
+          modelKey: model.modelKey,
+          params: engine?.params ?? {},
+        };
+      }
+    }
+  }
+  return fallback?.() ?? null;
 }

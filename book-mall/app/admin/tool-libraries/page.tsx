@@ -5,6 +5,7 @@ import {
   confirmDestructiveTwice,
   CONFIRM_DELETE_LIBRARY_OSS_SECOND_ZH,
 } from "@/lib/confirm-destructive-twice";
+import { AdminPoseLibraryImportDialog } from "@/components/admin/admin-pose-library-import-dialog";
 
 type AdminVideoRow = {
   id: string;
@@ -39,6 +40,7 @@ export default function AdminToolLibrariesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [importTarget, setImportTarget] = useState<AdminImageRow | null>(null);
 
   const loadVideos = useCallback(async () => {
     const r = await fetch("/api/admin/tool-libraries/videos", { cache: "no-store" });
@@ -268,6 +270,13 @@ export default function AdminToolLibrariesPage() {
                     </a>
                     <button
                       type="button"
+                      className="text-[#0969da] underline disabled:opacity-50"
+                      onClick={() => setImportTarget(im)}
+                    >
+                      保存到姿势库
+                    </button>
+                    <button
+                      type="button"
                       className="text-destructive underline disabled:opacity-50"
                       disabled={busyId === im.id}
                       onClick={() => void deleteImage(im.id)}
@@ -288,6 +297,13 @@ export default function AdminToolLibrariesPage() {
           </table>
         </div>
       )}
+      <AdminPoseLibraryImportDialog
+        open={importTarget != null}
+        imageUrl={importTarget?.imageUrl ?? ""}
+        prompt={importTarget?.prompt}
+        sourceAssetId={importTarget?.id}
+        onClose={() => setImportTarget(null)}
+      />
     </div>
   );
 }

@@ -132,8 +132,13 @@ async function call<T>(
 
 export async function listCanvasProviders(
   base: string,
+  opts?: { sceneKey?: string; role?: "LLM" | "IMAGE" | "VIDEO" },
 ): Promise<ListCanvasProvidersResult> {
-  return call<ListCanvasProvidersResult>(base, "/api/canvas/providers");
+  const qs = new URLSearchParams();
+  if (opts?.sceneKey) qs.set("sceneKey", opts.sceneKey);
+  if (opts?.role) qs.set("role", opts.role);
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return call<ListCanvasProvidersResult>(base, `/api/canvas/providers${suffix}`);
 }
 
 export async function fetchGatewayLinkStatus(

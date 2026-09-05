@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { kieRecordFromGatewaySummary } from "@/lib/canvas/canvas-kie-image-recover";
+import {
+  kieRecordFromGatewaySummary,
+  recoverCanvasKieImageFromGatewayForRead,
+} from "@/lib/canvas/canvas-kie-image-recover";
 
 describe("kieRecordFromGatewaySummary", () => {
   it("reads gateway KIE success summary", () => {
@@ -38,5 +41,11 @@ describe("kieRecordFromGatewaySummary", () => {
     );
     expect(record?.state).toBe("success");
     expect(record?.taskId).toBe("vendor-9");
+  });
+});
+
+describe("recoverCanvasKieImageFromGatewayForRead", () => {
+  it("is exported for tasks read-path recovery", () => {
+    expect(typeof recoverCanvasKieImageFromGatewayForRead).toBe("function");
   });
 });

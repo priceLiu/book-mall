@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { getServerSession } from "next-auth";
 
+import { authOptions } from "@/lib/auth";
 import { sanitizeAppRedirectPath } from "@/lib/sanitize-app-redirect-path";
-
+import { resolveBookAppOpenTargetUrl } from "@/lib/platform-portal-entry";
 import { StoryOpenClient } from "./story-open-client";
 
 export const metadata: Metadata = {
@@ -9,13 +11,18 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function StoryOpenPage({
+export default async function StoryOpenPage({
   searchParams,
 }: {
   searchParams: { path?: string };
 }) {
   const path = sanitizeAppRedirectPath(searchParams.path);
-  const reEnterPath = `/api/sso/tools/re-enter?app=story&redirect=${encodeURIComponent(path)}`;
+  const session = await getServerSession(authOptions);
+  const targetUrl = resolveBookAppOpenTargetUrl({
+    app: "story",
+    path,
+    loggedIn: Boolean(session?.user?.id),
+  });
 
-  return <StoryOpenClient reEnterPath={reEnterPath} />;
+  return <StoryOpenClient reEnterPath={targetUrl} />;
 }

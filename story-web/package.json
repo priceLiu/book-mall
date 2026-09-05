@@ -11,6 +11,8 @@
     "upload:landing-videos": "node scripts/upload-landing-videos-to-oss.mjs"
   },
   "dependencies": {
+    "@private/federated-portal-nav": "file:../shared/federated-portal-nav",
+    "@private/platform-assistant": "file:../shared/platform-assistant",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
     "next": "14.2.3",

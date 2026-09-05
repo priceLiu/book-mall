@@ -13,6 +13,9 @@ function hintForReason(reason: string): string {
   if (reason === "exchange_401") {
     return "子站调用主站 exchange 时 Bearer 密钥被拒：请确认 canvas-web 与 book-mall 的 TOOLS_SSO_SERVER_SECRET 完全一致（生产环境在云托管两侧分别配置后重启服务）。";
   }
+  if (reason === "exchange_400") {
+    return "授权码无效、已过期，或 callback 被重复打开。请从主站「打开画布」重新发起 SSO（勿刷新或重复打开 callback 链接）。";
+  }
   return "请从主站「打开画布」重新发起 SSO，并确认主站与子站 TOOLS_SSO_* 密钥一致。";
 }
 

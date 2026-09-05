@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 
 import { computeCreditPrice,
   computeNetCost,
+  computeSplitTokenCreditPrice,
   DEFAULT_CREDIT_ANCHOR_YUAN,
   DEFAULT_MARGIN_M,
   DEFAULT_MIN_MARGIN_GUARD,
@@ -25,6 +26,12 @@ import { resolveModelMarginM } from "./model-margin-policy";
 
 export * from "./credit-pricing-formulas";
 export { resolveModelMarginM, expectedAnchorMarginForM } from "./model-margin-policy";
+export {
+  buildUnifiedFormulaSimulation,
+  UNIFIED_CREDIT_FORMULA_LINES,
+  UNIFIED_CREDIT_FORMULA_VERSION,
+  type UnifiedFormulaSimulation,
+} from "./unified-credit-formula";
 
 function toNum(v: unknown, fallback = 0): number {
   if (v == null) return fallback;
@@ -100,7 +107,7 @@ export async function publishModelCreditPrice(input: {
     if (r !== 0) return r;
     const netA = computeNetCost(toNum(a.listCostYuan), toNum(a.discountRate));
     const netB = computeNetCost(toNum(b.listCostYuan), toNum(b.discountRate));
-    return netB - netA;
+    return netA - netB;
   })[0];
 
   const netCostYuan = computeNetCost(toNum(chosen.listCostYuan), toNum(chosen.discountRate));
@@ -109,6 +116,7 @@ export async function publishModelCreditPrice(input: {
     resolveModelMarginM({
       unit: chosen.unit,
       netCostYuan,
+      listCostYuan: toNum(chosen.listCostYuan),
       defaultMarginM: config.defaultMarginM,
       videoMarginM: config.videoMarginM,
     });
@@ -116,6 +124,74 @@ export async function publishModelCreditPrice(input: {
     minMarginGuard: config.minMarginGuard,
     videoMinMarginGuard: config.videoMinMarginGuard,
   });
+
+  const inList = toNum(chosen.inputListCostYuan);
+  const outList = toNum(chosen.outputListCostYuan);
+  const hasTokenSplit =
+    chosen.unit === "PER_KTOKEN" && inList > 0 && outList > 0;
+
+  if (hasTokenSplit) {
+    const split = computeSplitTokenCreditPrice({
+      inputListCostYuan: inList,
+      outputListCostYuan: outList,
+      discountRate: toNum(chosen.discountRate),
+      marginM,
+      anchorYuan: config.creditAnchorYuan,
+    });
+    if (!marginPassesGuard(split.baseMarginRate, minGuard)) {
+      throw new MarginGuardError(split.baseMarginRate, minGuard, input.canonicalModelKey);
+    }
+    const snapshot = { ...split.formulaSnapshot, publishedAt: new Date().toISOString() };
+    const saved = await prisma.modelCreditPrice.upsert({
+      where: { canonicalModelKey: input.canonicalModelKey },
+      create: {
+        canonicalModelKey: input.canonicalModelKey,
+        displayName: input.displayName,
+        vendor: chosen.vendor,
+        unit: chosen.unit,
+        tierRaw: chosen.tierRaw,
+        netCostYuan: split.netCostYuan,
+        marginM,
+        listPriceYuan: split.inputListPriceYuan,
+        creditsPerUnit: split.inputCreditsPerKToken,
+        inputCreditsPerKToken: split.inputCreditsPerKToken,
+        outputCreditsPerKToken: split.outputCreditsPerKToken,
+        inputListPriceYuan: split.inputListPriceYuan,
+        outputListPriceYuan: split.outputListPriceYuan,
+        baseMarginRate: split.baseMarginRate,
+        formulaSnapshot: snapshot,
+        active: true,
+        publishedBy: input.publishedBy,
+      },
+      update: {
+        displayName: input.displayName,
+        vendor: chosen.vendor,
+        unit: chosen.unit,
+        tierRaw: chosen.tierRaw,
+        netCostYuan: split.netCostYuan,
+        marginM,
+        listPriceYuan: split.inputListPriceYuan,
+        creditsPerUnit: split.inputCreditsPerKToken,
+        inputCreditsPerKToken: split.inputCreditsPerKToken,
+        outputCreditsPerKToken: split.outputCreditsPerKToken,
+        inputListPriceYuan: split.inputListPriceYuan,
+        outputListPriceYuan: split.outputListPriceYuan,
+        baseMarginRate: split.baseMarginRate,
+        formulaSnapshot: snapshot,
+        active: true,
+        publishedAt: new Date(),
+        publishedBy: input.publishedBy,
+      },
+    });
+    return {
+      canonicalModelKey: saved.canonicalModelKey,
+      creditsPerUnit: saved.creditsPerUnit,
+      listPriceYuan: toNum(saved.listPriceYuan),
+      baseMarginRate: toNum(saved.baseMarginRate),
+      netCostYuan: toNum(saved.netCostYuan),
+    };
+  }
+
   const comp = computeCreditPrice({
     listCostYuan: toNum(chosen.listCostYuan),
     discountRate: toNum(chosen.discountRate),
@@ -170,4 +246,47 @@ export async function publishModelCreditPrice(input: {
     baseMarginRate: toNum(saved.baseMarginRate),
     netCostYuan: toNum(saved.netCostYuan),
   };
+}
+
+/** 成本档晚于积分报价发布 → 视为过期，生成前应重发报价 */
+export async function isCreditPriceStale(canonicalModelKey: string): Promise<boolean> {
+  const price = await prisma.modelCreditPrice.findUnique({
+    where: { canonicalModelKey },
+    select: { publishedAt: true },
+  });
+  if (!price) return true;
+
+  const profile = await prisma.modelCostProfile.findFirst({
+    where: { canonicalModelKey, active: true },
+    orderBy: { updatedAt: "desc" },
+    select: { updatedAt: true },
+  });
+  if (!profile) return false;
+  return profile.updatedAt.getTime() > price.publishedAt.getTime();
+}
+
+/** 积分报价过期则按最新成本档重发；返回是否执行了重发 */
+export async function refreshCreditPriceIfStale(input: {
+  canonicalModelKey: string;
+  displayName?: string;
+  publishedBy?: string;
+}): Promise<boolean> {
+  const stale = await isCreditPriceStale(input.canonicalModelKey);
+  if (!stale) return false;
+
+  const existing = await prisma.modelCreditPrice.findUnique({
+    where: { canonicalModelKey: input.canonicalModelKey },
+    select: { displayName: true },
+  });
+  const displayName =
+    input.displayName ??
+    existing?.displayName ??
+    input.canonicalModelKey.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+  await publishModelCreditPrice({
+    canonicalModelKey: input.canonicalModelKey,
+    displayName,
+    publishedBy: input.publishedBy ?? "refreshCreditPriceIfStale",
+  });
+  return true;
 }

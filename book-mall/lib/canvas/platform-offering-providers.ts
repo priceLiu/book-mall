@@ -3,9 +3,12 @@ import type { CanvasModelRole } from "@prisma/client";
 import type { CanvasProviderDto } from "./canvas-provider-service";
 import { KIE_KNOWN_MODELS } from "./providers/kie";
 import { DEEPSEEK_KNOWN_MODELS } from "./providers/deepseek-system";
+import { BAILIAN_CHAT_KNOWN_MODELS } from "@/lib/gateway/bailian-chat-models";
+import { BAILIAN_IMAGE_KNOWN_MODELS } from "./providers/bailian-image";
 import { BAILIAN_R2V_KNOWN_MODELS } from "./providers/bailian-r2v";
 import { VOLCENGINE_ALL_KNOWN_MODELS } from "@/lib/gateway/volcengine-chat-models";
 import { listPlatformModelsForApp } from "@/lib/platform-model/auto-publish-offerings";
+import { MINIMAX_VIDEO_KNOWN_MODELS_CANVAS } from "./providers/minimax-video";
 
 export const PLATFORM_OFFERING_PROVIDER_ID = "platform:offering";
 
@@ -21,8 +24,18 @@ type KnownMeta = {
 const KNOWN: KnownMeta[] = [
   ...KIE_KNOWN_MODELS,
   ...DEEPSEEK_KNOWN_MODELS,
+  ...BAILIAN_CHAT_KNOWN_MODELS,
+  ...BAILIAN_IMAGE_KNOWN_MODELS,
   ...BAILIAN_R2V_KNOWN_MODELS,
   ...VOLCENGINE_ALL_KNOWN_MODELS,
+  ...MINIMAX_VIDEO_KNOWN_MODELS_CANVAS.map((m) => ({
+    modelKey: m.modelKey,
+    displayName: m.displayName,
+    role: m.role,
+    description: m.description ?? null,
+    paramsSchema: m.paramsSchema ?? null,
+    defaultParams: m.defaultParams ?? null,
+  })),
 ];
 
 function metaForModelKey(modelKey: string, fallbackName: string, role: CanvasModelRole): KnownMeta {
@@ -51,7 +64,7 @@ export async function listPlatformOfferingProvidersForUser(
     return {
       id: `${PLATFORM_OFFERING_PROVIDER_ID}::${o.modelKey}`,
       modelKey: o.modelKey,
-      displayName: o.displayName,
+      displayName: meta.displayName || o.displayName,
       role: meta.role,
       description: o.description || meta.description || null,
       paramsSchema: meta.paramsSchema ?? null,

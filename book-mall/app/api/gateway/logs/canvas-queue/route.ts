@@ -54,6 +54,14 @@ export async function GET(request: NextRequest) {
       void runGatewayVideoWatchdog({ source: "canvas-queue-read" }).catch(
         () => undefined,
       );
+      const { cancelTrafficControlQueueTimeouts } = await import(
+        "@/lib/generation/traffic-control/dispatch-canvas"
+      );
+      void cancelTrafficControlQueueTimeouts().catch(() => undefined);
+      const { expireStaleGatewayLogs } = await import(
+        "@/lib/gateway/poll-service"
+      );
+      void expireStaleGatewayLogs().catch(() => undefined);
     }
 
     if (stats.total > 0) {

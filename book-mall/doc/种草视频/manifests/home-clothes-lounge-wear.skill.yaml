@@ -1,0 +1,73 @@
+schemaVersion: "1.0"
+workflow: seed-video
+
+skillKey: home-clothes-lounge-wear
+label: 家居服带货
+description: 软糯质感种草、居家舒适痛点、居家场景穿搭
+defaultTitle: 家居服带货视频
+icon: home
+
+defaultPlanningPrompt: |
+  @图片1 @图片2 帮我用这些家居服素材生成 3 套带货短视频脚本（带口播），时长约 20 秒，给我选择确认。
+
+role:
+  title: 家居服爆款带货短视频策划助理
+  persona: 熟悉家居服面料、软糯体感、居家痛点、慵懒松弛穿搭、宅家生活场景带货
+
+duration:
+  source: user_prompt
+  defaultSec: 20
+
+materialAnalysis:
+  productSummaryHint: 款式、版型、面料、花色、领口袖口设计、套装搭配、宽松度
+  sellingPointsHints:
+    - 软糯亲肤、透气不闷、宽松遮肉、显瘦慵懒
+    - 垂感好、不起球、居家无束缚、可外穿
+  sceneTagsHints:
+    - 宅家休息、睡前放松、居家办公、晨起穿搭、居家遛弯
+  styleToneHint: 慵懒松弛 / 软糯治愈 / 居家实用带货
+
+scripts:
+  - slot: 1
+    title: 质感治愈向
+    angle: 面料软糯质感、视觉松弛氛围感、居家高级感
+    hookStyle: 治愈松弛、颜值观感式开头
+    cardLabel: 脚本一：质感治愈向
+  - slot: 2
+    title: 痛点舒适向
+    angle: 紧绷勒肉、面料粗糙、睡觉拘束、闷热不透气等居家痛点
+    hookStyle: 反问/共鸣式开头
+    cardLabel: 脚本二：痛点舒适向
+  - slot: 3
+    title: 居家场景向
+    angle: 宅家、睡前、晨起、居家办公多场景实穿
+    hookStyle: 生活代入式场景开头
+    cardLabel: 脚本三：居家场景向
+
+productionModes:
+  direct:
+    extraHint: 一条连贯成片，快速展示家居服整体慵懒质感
+  fine:
+    suggestedShotCount: 4
+    extraHint: 逐镜 I2V + TTS + 合成，精细展示面料、上身、动态版型
+
+stylePresets:
+  sweet-xhs:
+    label: A方案：温柔治愈风（小红书）
+    voiceHint: 温柔软糯、治愈松弛
+    bgmHint: 轻柔舒缓居家BGM
+    copyTone: 治愈种草、居家氛围感、真实体感分享
+  sharp-douyin:
+    label: B方案：居家带货风（抖音）
+    voiceHint: 亲切自然、接地气
+    bgmHint: 轻柔舒缓小众卡点BGM
+    copyTone: 共鸣痛点、突出舒适实用、高转化居家带货
+
+contentRules:
+  voiceover:
+    - 句子短、软糯治愈、贴近居家日常
+    - 每套脚本第一句必须是强共鸣钩子
+    - 拒绝生硬硬广、拒绝文艺空洞文案
+  videoPrompt:
+    - 必须引用 @图片N
+    - 优先动作：抬手展示面料、轻微走动、转身垂感、坐姿上身、轻抚面料、居家松弛动态

@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Copy, Trash2, X } from "lucide-react";
+import { Copy, Link2, Trash2, X } from "lucide-react";
 
+import { QrHoverEyeOverlay } from "@/components/quick-replica/qr-hover-eye-overlay";
+import { QrHoverVideo } from "@/components/quick-replica/qr-hover-video";
 import { QrModal } from "@/components/quick-replica/qr-modal";
 import { QrRefImageThumb } from "@/components/quick-replica/qr-ref-image-thumb";
 import { QrToast } from "@/components/quick-replica/qr-toast";
@@ -13,12 +15,11 @@ import { QrAudioGenerateSuccess } from "@/components/quick-replica/qr-audio-gene
 type Props = {
   template: QrTemplate | null;
   open: boolean;
-  canManageFeatured: boolean;
   onClose: () => void;
   onCopy: (template: QrTemplate) => void;
+  onShare?: (template: QrTemplate) => void;
   allowDelete?: boolean;
   onDelete?: (template: QrTemplate) => void;
-  onFeaturedUpdated?: () => void;
 };
 
 function resolveAspectRatioLabel(template: QrTemplate): string {
@@ -57,14 +58,12 @@ function resolvePreviewMedia(template: QrTemplate): {
 export function QrTemplatePreviewModal({
   template,
   open,
-  canManageFeatured,
   onClose,
   onCopy,
+  onShare,
   allowDelete = false,
   onDelete,
-  onFeaturedUpdated,
 }: Props) {
-  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [promptExpanded, setPromptExpanded] = useState(false);
   const [copyToast, setCopyToast] = useState<string | null>(null);
@@ -118,56 +117,6 @@ export function QrTemplatePreviewModal({
     }
   };
 
-  const setFeatured = async (makePublic: boolean) => {
-    setBusy(true);
-    setMessage(null);
-    try {
-      const res = await fetch(
-        `/api/book-mall/api/platform/v1/quick-replica/admin/kinds/${encodeURIComponent(template.kind)}/featured`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            templateId: template.id,
-            templateSource: template.source,
-            makePublic,
-          }),
-        },
-      );
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? "设置失败");
-      }
-      setMessage("已设为分类示例");
-      onFeaturedUpdated?.();
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : "设置失败");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const clearFeatured = async () => {
-    setBusy(true);
-    setMessage(null);
-    try {
-      const res = await fetch(
-        `/api/book-mall/api/platform/v1/quick-replica/admin/kinds/${encodeURIComponent(template.kind)}/featured`,
-        { method: "DELETE" },
-      );
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? "清除失败");
-      }
-      setMessage("已清除分类示例");
-      onFeaturedUpdated?.();
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : "清除失败");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <>
       <QrModal open={open} onClose={onClose} variant="preview" hideHeader>
@@ -186,19 +135,22 @@ export function QrTemplatePreviewModal({
                 />
               </div>
             ) : isVideo ? (
-              <video
+              <QrHoverVideo
                 src={previewUrl}
                 controls
+                resetOnLeave={false}
                 className="h-full w-full max-h-full rounded-xl object-contain"
-                playsInline
               />
             ) : (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={previewUrl}
-                alt={template.title}
-                className="h-full w-full max-h-full rounded-xl object-contain"
-              />
+              <div className="group/media relative flex h-full w-full items-center justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={previewUrl}
+                  alt={template.title}
+                  className="h-full w-full max-h-full rounded-xl object-contain"
+                />
+                <QrHoverEyeOverlay src={previewUrl} title={template.title} size="lg" />
+              </div>
             )
           ) : (
             <div className="flex h-full min-h-[12rem] items-center justify-center">
@@ -287,30 +239,6 @@ export function QrTemplatePreviewModal({
             ) : null}
 
             {message ? <p className="text-xs text-[var(--qr-text-muted)]">{message}</p> : null}
-
-            {canManageFeatured ? (
-              <div className="border-t pt-3" style={{ borderColor: "var(--qr-border)" }}>
-                <div className="mb-2 text-xs text-[var(--qr-text-muted)]">管理员</div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={busy}
-                    className="qr-btn-secondary px-3 py-1.5 text-xs disabled:opacity-50"
-                    onClick={() => void setFeatured(template.source === "user")}
-                  >
-                    设为分类示例
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    className="qr-btn-secondary px-3 py-1.5 text-xs disabled:opacity-50"
-                    onClick={() => void clearFeatured()}
-                  >
-                    清除推荐
-                  </button>
-                </div>
-              </div>
-            ) : null}
           </div>
 
           <div className="shrink-0 space-y-2 p-5" style={{ borderTop: "1px solid var(--qr-border)" }}>
@@ -383,6 +311,16 @@ export function QrTemplatePreviewModal({
             >
               复制
             </button>
+            {onShare ? (
+              <button
+                type="button"
+                className="qr-btn-secondary inline-flex w-full items-center justify-center gap-2"
+                onClick={() => onShare(template)}
+              >
+                <Link2 className="h-4 w-4" />
+                分享工作流
+              </button>
+            ) : null}
           </div>
         </div>
       </div>

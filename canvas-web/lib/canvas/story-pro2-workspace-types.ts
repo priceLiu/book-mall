@@ -30,7 +30,8 @@ export type Pro2ImageMediaRole =
   | "character-three-view"
   | "scene"
   | "prop"
-  | "mood";
+  | "mood"
+  | "director-desk-shot";
 
 /** 2.0 角色三视图节点 data（独立 type · 横向矩形） */
 export type StoryPro2ThreeViewNodeData = ImageNodeData &
@@ -63,6 +64,8 @@ export type StoryPro2ImageNodeData = ImageNodeData &
   dockRefImages?: import("./story-ref-image").StoryRefImage[];
   /** 组内分镜 / 三视图子节点 */
   pro2MediaRole?: Pro2ImageMediaRole;
+  /** 3D 导演台机位图 · 来源导演台节点 id */
+  directorDeskNodeId?: string;
   pro2RowKey?: string;
   pro2HubNodeId?: string;
   /** 数据锚点列节点 id（story-pro2-frame / story-pro2-character） */
@@ -99,10 +102,28 @@ export type StoryPro2StyleAssetNodeData = {
   renderQuality?: import("./story-pro-workspace-types").StoryProRenderQuality;
 };
 
-/** 2.0 标签节点 · 画布注释（Markdown · 无 Dock · 无 Gateway） */
+/** 2.0 标签节点 · 画布注释（TipTap HTML · 无 Dock · 仅展示） */
 export type StoryPro2TagNodeData = {
+  /** 富文本 HTML（TipTap） */
   body: string;
   label?: string;
+};
+
+/** 2.0 提示词节点 · 纯文本 LLM（@ 引用上游 + Dock 输入） */
+export type StoryPro2PromptNodeData = {
+  label?: string;
+  prompt?: string;
+  generatedText?: string;
+  pro2TextPurpose?: "general";
+  providerId?: string;
+  modelKey?: string;
+  params?: Record<string, unknown>;
+  dockRefImages?: import("./story-ref-image").StoryRefImage[];
+  themeOutlineRuntime?: import("./types").CanvasNodeRuntime;
+  generalTextSystemPrompt?: string;
+  pro2PresetKind?: string;
+  imageEngine?: import("./types").CanvasEnginePick;
+  videoEngine?: import("./types").CanvasEnginePick;
 };
 
 /** 检视面板内编辑用（与 pro 字段同构） */

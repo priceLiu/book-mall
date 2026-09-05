@@ -1,8 +1,15 @@
 import { useEffect, useRef, type DragEventHandler } from "react";
 
-import { normalizeCanvasImageFile } from "@/lib/canvas/normalize-canvas-image-file";
-
 const IMAGE_EXT = /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i;
+const VIDEO_EXT = /\.(mp4|webm|mov|mkv|avi)$/i;
+
+const CLIPBOARD_VIDEO_TYPES = new Set([
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/x-msvideo",
+  "video/x-matroska",
+]);
 
 const CLIPBOARD_IMAGE_TYPES = new Set([
   "public.png",
@@ -22,8 +29,22 @@ function isImageClipboardItemType(type: string): boolean {
   return CLIPBOARD_IMAGE_TYPES.has(t);
 }
 
+function isVideoClipboardItemType(type: string): boolean {
+  const t = type.toLowerCase();
+  if (t.startsWith("video/")) return true;
+  return CLIPBOARD_VIDEO_TYPES.has(t);
+}
+
+function isClipboardVideoFile(file: File): boolean {
+  if (file.size <= 0) return false;
+  if (file.type.startsWith("video/")) return true;
+  if (!file.type && VIDEO_EXT.test(file.name)) return true;
+  return false;
+}
+
 function isClipboardImageFile(file: File): boolean {
   if (file.size <= 0) return false;
+  if (isClipboardVideoFile(file)) return false;
   if (file.type.startsWith("image/") && file.type !== "image/svg+xml") {
     return true;
   }
@@ -31,6 +52,36 @@ function isClipboardImageFile(file: File): boolean {
   /** Windows 截图/部分浏览器粘贴：type 为空但仍是有效位图 */
   if (!file.type && file.size > 0) return true;
   return false;
+}
+
+/** 从剪贴板或拖放 DataTransfer 中取全部视频文件 */
+export function allVideoFilesFromDataTransfer(
+  dt: DataTransfer | null | undefined,
+): File[] {
+  if (!dt) return [];
+  const out: File[] = [];
+  const seen = new Set<string>();
+  const push = (f: File | null) => {
+    if (!f || !isClipboardVideoFile(f)) return;
+    const key = `${f.size}:${f.lastModified}:${f.type || "unknown"}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(f);
+  };
+  const fromFiles = Array.from(dt.files).filter(isClipboardVideoFile);
+  if (fromFiles.length > 0) {
+    for (const f of fromFiles) push(f);
+    return out;
+  }
+  if (dt.items) {
+    for (const item of Array.from(dt.items)) {
+      if (item.kind !== "file") continue;
+      const type = item.type ?? "";
+      if (!isVideoClipboardItemType(type) && type !== "") continue;
+      push(item.getAsFile());
+    }
+  }
+  return out;
 }
 
 /** 从剪贴板或拖放 DataTransfer 中取全部图片文件 */
@@ -63,17 +114,14 @@ export function allImageFilesFromDataTransfer(
   return out;
 }
 
-/** 剪贴板图片（含 URL 回落）；规范化后供上传/预览 */
+/** 剪贴板图片（含 URL 回落）；返回原始 bytes，预览/上传各自异步处理 */
 export async function resolveClipboardImageFiles(
   dt: DataTransfer | null | undefined,
 ): Promise<File[]> {
   const direct = allImageFilesFromDataTransfer(dt);
-  if (direct.length) {
-    return Promise.all(direct.map((f) => normalizeCanvasImageFile(f)));
-  }
+  if (direct.length) return direct;
   const urlFile = await imageFileFromClipboardUrl(dt);
-  if (!urlFile) return [];
-  return [await normalizeCanvasImageFile(urlFile)];
+  return urlFile ? [urlFile] : [];
 }
 
 /** 从剪贴板或拖放 DataTransfer 中取第一张图片文件 */
@@ -126,7 +174,7 @@ export function isEditablePasteTarget(target: EventTarget | null): boolean {
 
 /** 输入坞参考图/粘贴区；图片节点走 data-image-paste-host + pickPointerImagePasteHandler */
 const IMAGE_PASTE_SLOT_SELECTOR =
-  ".pro2-dock-ref-zone, .pro2-dock-paste-zone";
+  ".pro2-dock-ref-zone, .pro2-dock-paste-zone, .pro2-wizard-ref-zone";
 
 let lastPointerClient = { x: 0, y: 0 };
 let pointerTrackerInstalled = false;
@@ -306,10 +354,7 @@ export async function routeClipboardImageToActivePasteSlot(
   }
   const files = allImageFilesFromDataTransfer(dt);
   if (files.length) {
-    const normalized = await Promise.all(
-      files.map((f) => normalizeCanvasImageFile(f)),
-    );
-    return deliverFilesToPasteTarget(target, normalized);
+    return deliverFilesToPasteTarget(target, files);
   }
   const file = await resolveClipboardImageFile(dt);
   if (!file) return false;

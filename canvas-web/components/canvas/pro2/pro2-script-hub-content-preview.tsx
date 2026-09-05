@@ -7,9 +7,12 @@ import {
   parseSceneVisualDictionaryRows,
   parseStoryboardRows,
 } from "@/lib/canvas/parse-md-tables";
-import { outlineDisplayMd } from "@/lib/canvas/story-hub-runtime";
+import { resolvePro2StoryboardMdFromPackSource } from "@/lib/canvas/story-hub-runtime";
+import { mergeStoryboardRowsWithProductionScript } from "@/lib/canvas/pro2-production-script-render-md";
 import type { Pro2ScriptHubViewTab } from "@/lib/canvas/pro2-script-hub-view-types";
+import type { Pro2ProductionScript } from "@/lib/canvas/data/pro2-production-script-schema";
 import { PRO2_TEXT_NODE_TITLE_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
+import { Pro2ProductionScriptHtmlPreview } from "./pro2-production-script-html-preview";
 import { LIBTV_NODE_STAGE_DRAG_CLASS } from "@/components/canvas/libtv-thin-node-try-row";
 import { cn } from "@/lib/utils";
 import { MarkdownView } from "../markdown-view";
@@ -19,27 +22,29 @@ import { Pro2NodeScrollArea } from "./pro2-node-scroll-area";
 const STORYBOARD_COLS = [
   { key: "frameIndex", label: "镜号", className: "w-10 text-center" },
   { key: "shotSize", label: "景别", className: "w-14 whitespace-nowrap" },
+  { key: "lighting", label: "光影", className: "min-w-[88px]" },
   { key: "cameraMove", label: "运镜", className: "w-14 whitespace-nowrap" },
   { key: "description", label: "画面描述", className: "min-w-[140px]" },
+  { key: "propNames", label: "道具", className: "w-14 whitespace-nowrap" },
   { key: "dialogue", label: "对白", className: "min-w-[100px]" },
   { key: "duration", label: "时长", className: "w-10 text-center" },
-  { key: "aiVideoPrompt", label: "AI视频提示词", className: "min-w-[120px]" },
+  { key: "sfxNote", label: "音效", className: "min-w-[80px]" },
   { key: "lipSyncNote", label: "口型/配音", className: "min-w-[80px]" },
 ] as const;
 
 const SCENE_COLS = [
   { key: "name", label: "场景名", className: "w-16 whitespace-nowrap" },
-  { key: "environment", label: "环境", className: "min-w-[88px]" },
-  { key: "time", label: "时间", className: "w-14 whitespace-nowrap" },
-  { key: "mood", label: "气氛", className: "min-w-[72px]" },
-  { key: "imageKeywords", label: "AI生图提示词", className: "min-w-[140px]" },
+  { key: "envTimeMood", label: "环境/时间/气氛", className: "min-w-[120px]" },
+  { key: "imageKeywords", label: "生图关键词", className: "min-w-[140px]" },
+  { key: "negativePrompt", label: "反向提示词", className: "min-w-[100px]" },
 ] as const;
 
 const CHARACTER_COLS = [
   { key: "name", label: "姓名", className: "w-16 whitespace-nowrap" },
   { key: "role", label: "身份", className: "min-w-[88px]" },
-  { key: "appearance", label: "外貌关键词", className: "min-w-[120px]" },
+  { key: "appearance", label: "外貌/服装", className: "min-w-[120px]" },
   { key: "personality", label: "性格", className: "min-w-[80px]" },
+  { key: "aiImagePrompt", label: "AI生图", className: "min-w-[100px]" },
 ] as const;
 
 const TABLE =
@@ -55,6 +60,7 @@ export function Pro2ScriptHubContentPreview({
   sceneMd,
   storyboardMd,
   outlineMd,
+  productionScript,
   title,
   tab,
   onTabChange,
@@ -66,6 +72,7 @@ export function Pro2ScriptHubContentPreview({
   sceneMd: string;
   storyboardMd: string;
   outlineMd?: string;
+  productionScript?: Pro2ProductionScript | null;
   title?: string;
   tab: Pro2ScriptHubViewTab;
   onTabChange: (tab: Pro2ScriptHubViewTab) => void;
@@ -82,14 +89,38 @@ export function Pro2ScriptHubContentPreview({
     () => parseSceneVisualDictionaryRows(sceneMd),
     [sceneMd],
   );
-  const storyboardRows = useMemo(
-    () => parseStoryboardRows(storyboardMd),
-    [storyboardMd],
+  const storyboardRows = useMemo(() => {
+    const fromMd = parseStoryboardRows(storyboardMd);
+    const base =
+      fromMd.length > 0
+        ? fromMd
+        : outlineMd?.trim()
+          ? parseStoryboardRows(resolvePro2StoryboardMdFromPackSource(outlineMd))
+          : [];
+    return mergeStoryboardRowsWithProductionScript(base, productionScript);
+  }, [storyboardMd, outlineMd, productionScript]);
+  const outlinePreview = useMemo(() => (outlineMd ?? "").trim(), [outlineMd]);
+  const structuredTab =
+    tab === "script" || tab === "outline" || tab === "scene" || tab === "character"
+      ? tab
+      : "script";
+  const useStructuredPreview = Boolean(
+    productionScript &&
+      (productionScript.visualStyle?.worldBackground?.trim() ||
+        (productionScript.scenes?.length ?? 0) > 0 ||
+        (productionScript.characters?.length ?? 0) > 0 ||
+        (productionScript.shots?.length ?? 0) > 0),
   );
-  const outlinePreview = useMemo(
-    () => outlineDisplayMd(outlineMd ?? ""),
-    [outlineMd],
-  );
+
+  const hasStructuredRows =
+    useStructuredPreview &&
+    (structuredTab === "outline"
+      ? Boolean(productionScript?.visualStyle?.worldBackground?.trim())
+      : structuredTab === "scene"
+        ? (productionScript?.scenes?.length ?? 0) > 0
+        : structuredTab === "character"
+          ? (productionScript?.characters?.length ?? 0) > 0
+          : (productionScript?.shots?.length ?? 0) > 0);
 
   const emptyMessage =
     tab === "outline"
@@ -100,6 +131,7 @@ export function Pro2ScriptHubContentPreview({
           ? "暂无角色设定"
           : "暂无分镜脚本";
   const hasAnyRows =
+    hasStructuredRows ||
     Boolean(outlinePreview.trim()) ||
     sceneRows.length > 0 ||
     characterRows.length > 0 ||
@@ -152,18 +184,85 @@ export function Pro2ScriptHubContentPreview({
     return (
       <div className={cn(LIBTV_NODE_STAGE_DRAG_CLASS, "flex h-full min-h-0 flex-col", className)}>
         {header}
-        <Pro2NodeScrollArea className="py-2 pl-2 pr-1">
+        <Pro2NodeScrollArea className="py-2 pl-2 pr-1" wrapContent>
           {outlinePreview.trim() ? (
             <MarkdownView
               content={outlinePreview}
               variant="darkPreview"
               className="text-[11px]"
             />
+          ) : useStructuredPreview && productionScript ? (
+            <Pro2ProductionScriptHtmlPreview
+              script={productionScript}
+              tab="outline"
+              variant="dark"
+            />
           ) : (
             <p className="py-8 text-center text-[11px] text-white/40">
               {statusMessage ?? emptyMessage}
             </p>
           )}
+        </Pro2NodeScrollArea>
+      </div>
+    );
+  }
+
+  if (tab === "structured") {
+    const structuredReady =
+      productionScript &&
+      (productionScript.visualStyle?.worldBackground?.trim() ||
+        (productionScript.scenes?.length ?? 0) > 0 ||
+        (productionScript.characters?.length ?? 0) > 0 ||
+        (productionScript.shots?.length ?? 0) > 0);
+    const storyboardOnly =
+      !structuredReady &&
+      storyboardRows.length > 0 &&
+      (productionScript?.shots?.length ?? 0) > 0;
+    return (
+      <div className={cn(LIBTV_NODE_STAGE_DRAG_CLASS, "flex h-full min-h-0 flex-col", className)}>
+        {header}
+        <Pro2NodeScrollArea className="py-2 pl-2 pr-1" wrapContent>
+          {structuredReady && productionScript ? (
+            <Pro2ProductionScriptHtmlPreview
+              script={productionScript}
+              tab="outline"
+              variant="dark"
+            />
+          ) : storyboardOnly && productionScript ? (
+            <Pro2ProductionScriptHtmlPreview
+              script={productionScript}
+              tab="script"
+              variant="dark"
+            />
+          ) : storyboardRows.length > 0 ? (
+            <p className="py-4 text-center text-[11px] text-white/45">
+              分镜表已解析（{storyboardRows.length} 镜）· 结构化 JSON 待同步，请双击放大或刷新节点
+            </p>
+          ) : (
+            <p className="py-8 text-center text-[11px] text-white/40">
+              暂无结构化 JSON · 双击放大编辑
+            </p>
+          )}
+        </Pro2NodeScrollArea>
+      </div>
+    );
+  }
+
+  if (
+    tab === "script" &&
+    storyboardRows.length > 0
+  ) {
+    // fall through to table render below
+  } else if (useStructuredPreview && productionScript && hasStructuredRows) {
+    return (
+      <div className={cn(LIBTV_NODE_STAGE_DRAG_CLASS, "flex h-full min-h-0 flex-col", className)}>
+        {header}
+        <Pro2NodeScrollArea className="py-1 pl-2 pr-1">
+          <Pro2ProductionScriptHtmlPreview
+            script={productionScript}
+            tab={structuredTab}
+            variant="dark"
+          />
         </Pro2NodeScrollArea>
       </div>
     );
@@ -214,15 +313,23 @@ export function Pro2ScriptHubContentPreview({
                     <tr key={`${row.name}-${index}`}>
                       {SCENE_COLS.map((col) => {
                         const text =
-                          String(row[col.key as keyof typeof row] ?? "").trim() ||
-                          "—";
+                          col.key === "envTimeMood"
+                            ? (
+                                row.envTimeMood?.trim() ||
+                                [row.environment, row.time, row.mood]
+                                  .filter(Boolean)
+                                  .join(" · ")
+                              ).trim() || "—"
+                            : String(row[col.key as keyof typeof row] ?? "").trim() ||
+                              "—";
                         return (
                           <td key={col.key} className={cn(TD, col.className)}>
                             <p
                               className={cn(
                                 "text-[10px] leading-snug",
                                 col.key === "imageKeywords" ||
-                                  col.key === "environment"
+                                  col.key === "envTimeMood" ||
+                                  col.key === "negativePrompt"
                                   ? "line-clamp-3"
                                   : "",
                               )}
@@ -246,7 +353,9 @@ export function Pro2ScriptHubContentPreview({
                               <p
                                 className={cn(
                                   "text-[10px] leading-snug",
-                                  col.key === "appearance" || col.key === "role"
+                                  col.key === "appearance" ||
+                                    col.key === "role" ||
+                                    col.key === "aiImagePrompt"
                                     ? "line-clamp-3"
                                     : "",
                                 )}
@@ -272,7 +381,8 @@ export function Pro2ScriptHubContentPreview({
                                 className={cn(
                                   "text-[10px] leading-snug",
                                   col.key === "description" ||
-                                    col.key === "aiVideoPrompt" ||
+                                    col.key === "lighting" ||
+                                    col.key === "sfxNote" ||
                                     col.key === "dialogue"
                                     ? "line-clamp-3"
                                     : "",

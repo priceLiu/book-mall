@@ -135,6 +135,11 @@ function extractContentImages(
   for (const block of content) {
     if (!block || typeof block !== "object") continue;
     const b = block as Record<string, unknown>;
+    if (typeof b.image === "string" && isLogImageRef(b.image)) {
+      imgIdx += 1;
+      push(String(b.image), imageLabel(imgIdx, "reference"), "reference");
+      continue;
+    }
     if (b.type !== "image_url") continue;
     const imageUrl = b.image_url;
     const url =
@@ -151,11 +156,99 @@ function extractContentImages(
 }
 
 function imageLabel(index: number, role?: string): string {
+  if (role === "first_frame") return "分镜图";
+  if (role === "last_frame") return "尾帧";
+  if (role === "reference_image") return `参考图 ${index}`;
+  if (role === "reference") return `参考图 ${index}`;
   const base = `Image ${index}`;
-  if (role === "first_frame") return `${base} · first_frame`;
-  if (role === "reference_image") return `${base} · ref`;
   if (role && role !== "reference") return `${base} · ${role}`;
   return base;
+}
+
+/** 画布分镜静帧 OSS 路径 · 用于历史 R2V 日志推断 mainFrame */
+function inferCanvasStoryFrameUrl(urls: readonly string[]): string | null {
+  for (const raw of urls) {
+    const u = raw.trim();
+    if (!isLogImageRef(u)) continue;
+    if (/\/canvas\/node-image\//.test(u)) return u;
+  }
+  return null;
+}
+
+function collectLogImageCandidateUrls(input: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  if (isLogImageRef(input.mainFrameImageUrl)) {
+    out.push(String(input.mainFrameImageUrl).trim());
+  }
+  if (Array.isArray(input.media)) {
+    for (const row of input.media) {
+      if (!row || typeof row !== "object") continue;
+      const url = (row as Record<string, unknown>).url;
+      if (isLogImageRef(url)) out.push(String(url).trim());
+    }
+  }
+  if (Array.isArray(input.referenceImageUrls)) {
+    for (const u of input.referenceImageUrls) {
+      if (isLogImageRef(u)) out.push(u.trim());
+    }
+  }
+  return out;
+}
+
+function pushMediaArray(
+  media: unknown,
+  items: LogInputImageItem[],
+  seen: Set<string>,
+  push: (url: string, label: string, role?: string) => void,
+  inferredFrameUrl: string | null,
+): void {
+  if (!Array.isArray(media)) return;
+  let refIdx = 1;
+  for (const row of media) {
+    if (!row || typeof row !== "object") continue;
+    const url = (row as Record<string, unknown>).url;
+    const type = (row as Record<string, unknown>).type;
+    if (!isLogImageRef(url)) continue;
+    const urlStr = String(url).trim();
+    let role = typeof type === "string" ? type : "media";
+    if (
+      role === "reference_image" &&
+      inferredFrameUrl &&
+      urlStr === inferredFrameUrl
+    ) {
+      role = "first_frame";
+    }
+    if (role === "reference_image") {
+      push(urlStr, imageLabel(refIdx, role), role);
+      refIdx += 1;
+    } else {
+      push(urlStr, imageLabel(items.length + 1, role), role);
+    }
+  }
+}
+
+function pushReferenceImageUrls(
+  urls: unknown,
+  items: LogInputImageItem[],
+  seen: Set<string>,
+  push: (url: string, label: string, role?: string) => void,
+): void {
+  if (!Array.isArray(urls)) return;
+  const list = urls.filter((u): u is string => isLogImageRef(u));
+  const hasFrame = items.some((i) => i.role === "first_frame");
+  let frameUrl: string | null = null;
+  if (!hasFrame) {
+    frameUrl = inferCanvasStoryFrameUrl(list);
+    if (frameUrl) {
+      push(frameUrl, "分镜图", "first_frame");
+    }
+  }
+  let refIdx = 1;
+  for (const u of list) {
+    if (frameUrl && u.trim() === frameUrl) continue;
+    push(u, imageLabel(refIdx, "reference_image"), "reference_image");
+    refIdx += 1;
+  }
 }
 
 /** 从 Params inputSummary 提取请求侧参考图（顺序与 API 数组一致） */
@@ -180,7 +273,14 @@ export function extractLogInputImages(inputSummary: unknown): LogInputImageItem[
     });
   };
 
-  if (isLogImageRef(input.mainFrameImageUrl)) {
+  const inferredFrameUrl =
+    isLogImageRef(input.mainFrameImageUrl)
+      ? String(input.mainFrameImageUrl).trim()
+      : inferCanvasStoryFrameUrl(collectLogImageCandidateUrls(input));
+
+  if (inferredFrameUrl && !isLogImageRef(input.mainFrameImageUrl)) {
+    push(inferredFrameUrl, imageLabel(1, "first_frame"), "first_frame");
+  } else if (isLogImageRef(input.mainFrameImageUrl)) {
     push(String(input.mainFrameImageUrl), imageLabel(1, "first_frame"), "first_frame");
   }
   if (isLogImageRef(input.lastFrameImageUrl)) {
@@ -190,15 +290,10 @@ export function extractLogInputImages(inputSummary: unknown): LogInputImageItem[
     push(String(input.lastFrameUrl), imageLabel(items.length || 1, "last_frame"), "last_frame");
   }
 
-  if (Array.isArray(input.referenceImageUrls)) {
-    let idx = 1;
-    for (const u of input.referenceImageUrls) {
-      if (isLogImageRef(u)) {
-        push(u, imageLabel(idx, "reference"), "reference");
-        idx += 1;
-      }
-    }
-  }
+  /** media 须在 referenceImageUrls 之前：后者常含重复 URL，会先占 seen 导致分镜图类型丢失 */
+  pushMediaArray(input.media, items, seen, push, inferredFrameUrl);
+
+  pushReferenceImageUrls(input.referenceImageUrls, items, seen, push);
 
   if (Array.isArray(input.imageUrls)) {
     let idx = items.length + 1;
@@ -247,15 +342,12 @@ export function extractLogInputImages(inputSummary: unknown): LogInputImageItem[
     }
   }
 
-  if (Array.isArray(input.media)) {
+  /** KIE nano-banana / 部分生图模型 */
+  if (Array.isArray(input.image_input)) {
     let idx = items.length + 1;
-    for (const row of input.media) {
-      if (!row || typeof row !== "object") continue;
-      const url = (row as Record<string, unknown>).url;
-      const type = (row as Record<string, unknown>).type;
-      if (isLogImageRef(url)) {
-        const role = typeof type === "string" ? type : "media";
-        push(String(url), imageLabel(idx, role), role);
+    for (const u of input.image_input) {
+      if (isLogImageRef(u)) {
+        push(u, imageLabel(idx, "reference"), "reference");
         idx += 1;
       }
     }
@@ -479,6 +571,7 @@ export function isLogInProgress(status: string): boolean {
     s === "PENDING" ||
     // 方向 2：画布排队中（待提交）合成行也算「进行中」，让总耗时从点击起 live 递增
     s === "QUEUED" ||
+    s === "PREPARING" ||
     s === "DISPATCHING"
   );
 }
@@ -486,7 +579,7 @@ export function isLogInProgress(status: string): boolean {
 /** 画布排队中（待提交）：尚未提交厂商，仅在出队/派发阶段 */
 export function isLogPendingSubmit(status: string): boolean {
   const s = status.trim().toUpperCase();
-  return s === "QUEUED" || s === "DISPATCHING";
+  return s === "QUEUED" || s === "PREPARING" || s === "DISPATCHING";
 }
 
 /** 优先用 durationMs（>0）；0 视为未写入，回退 completedAt - submittedAt；进行中可回退 now - submittedAt */
@@ -526,6 +619,13 @@ export function resolveLogDisplayDurationMs(input: {
   liveTotalMs?: number | null;
 }): number | null {
   if (input.isInProgress) {
+    if (input.liveTotalMs != null && input.liveTotalMs > 0) {
+      return input.liveTotalMs;
+    }
+    if (input.nowMs != null) {
+      const wall = input.nowMs - new Date(input.submittedAt).getTime();
+      if (wall >= 0) return wall;
+    }
     const phaseSum =
       Math.max(0, input.queueMs ?? 0) +
       Math.max(0, input.generateMs ?? 0) +
@@ -537,13 +637,6 @@ export function resolveLogDisplayDurationMs(input: {
       (input.vendorPostProcessMs ?? 0) > 0 ||
       (input.pollDelayMs ?? 0) > 0;
     if (hasPhaseAnchors) return phaseSum;
-    if (input.nowMs != null) {
-      const wall = input.nowMs - new Date(input.submittedAt).getTime();
-      if (wall >= 0) return wall;
-    }
-    if (input.liveTotalMs != null && input.liveTotalMs > 0) {
-      return input.liveTotalMs;
-    }
     return null;
   }
 
@@ -561,6 +654,7 @@ export function resolveCanvasE2eDisplayMs(input: {
   canvasCompletedAt?: string | null | undefined;
   preGatewayMs?: number | null;
   submittedAt?: string;
+  completedAt?: string | null | undefined;
   e2eFrozen?: boolean;
   isInProgress: boolean;
   nowMs: number | null;
@@ -593,6 +687,19 @@ export function resolveCanvasE2eDisplayMs(input: {
   }
 
   if (input.e2eMs != null && input.e2eMs > 0) return input.e2eMs;
+
+  if (
+    !input.isInProgress &&
+    !input.canvasStartedAt &&
+    input.submittedAt &&
+    input.completedAt
+  ) {
+    const ms =
+      new Date(input.completedAt).getTime() -
+      new Date(input.submittedAt).getTime();
+    if (ms >= 0) return ms;
+  }
+
   return null;
 }
 
@@ -603,6 +710,8 @@ export function resolvePreGatewayDisplayMs(input: {
   submittedAt: string;
   isInProgress: boolean;
   nowMs: number | null;
+  /** 无画布、直连 Gateway 终态：出队前记 0 */
+  gatewayDirectSubmit?: boolean;
 }): number | null {
   if (input.preGatewayMs != null && input.preGatewayMs >= 0) {
     return input.preGatewayMs;
@@ -624,6 +733,9 @@ export function resolvePreGatewayDisplayMs(input: {
       new Date(input.submittedAt).getTime() -
       new Date(input.canvasStartedAt).getTime();
     return ms >= 0 ? ms : null;
+  }
+  if (input.gatewayDirectSubmit && !input.isInProgress) {
+    return 0;
   }
   return null;
 }
@@ -708,7 +820,7 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
       document.body.appendChild(ta);
       ta.select();
       document.execCommand("copy");
-      document.body.removeChild(ta);
+      ta.remove();
       return true;
     } catch {
       return false;

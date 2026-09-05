@@ -56,7 +56,7 @@ export async function GET(req: Request) {
   }
 
   return NextResponse.json({
-    scheme: persona === "BYOK" ? "byok" : "unified_credits",
+    scheme: "unified_credits",
     billingPersona: persona ?? "PLATFORM_CREDIT",
     credits: preview.estimatedCredits,
     creditsPerUnit: preview.creditsPerUnit,

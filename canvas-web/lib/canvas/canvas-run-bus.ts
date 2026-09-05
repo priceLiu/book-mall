@@ -7,6 +7,14 @@ import type { StoryRunContext } from "./story-workspace-types";
 
 export type CanvasRunSequentialOpts = { forceFresh?: boolean };
 
+export type CanvasCancelGenerationJob = {
+  nodeId: string;
+  taskId?: string;
+  rowKey?: string;
+  mediaKind?: StoryRunContext["mediaKind"];
+  llmSection?: StoryRunContext["llmSection"];
+};
+
 export type CanvasStoryRunJob = {
   nodeId: string;
   forceFresh?: boolean;
@@ -23,6 +31,7 @@ type CanvasRunBusHandlers = {
     jobs: CanvasStoryRunJob[],
     opts?: CanvasRunSequentialOpts,
   ) => void;
+  cancelGeneration: (job: CanvasCancelGenerationJob) => boolean;
 };
 
 let handlers: CanvasRunBusHandlers | null = null;
@@ -54,6 +63,10 @@ export function busEnqueueNodesSequential(
   opts?: CanvasRunSequentialOpts,
 ) {
   if (!nodeIds.length) return;
+  if (handlers) {
+    handlers.enqueueNodesSequential(nodeIds, opts);
+    return;
+  }
   busEnqueueStoryRunsSequential(
     nodeIds.map((nodeId) => ({ nodeId, forceFresh: opts?.forceFresh })),
     opts,
@@ -78,4 +91,14 @@ export function busEnqueueStoryRunsSequential(
       detail: { jobs: withForce, forceFresh: opts?.forceFresh },
     }),
   );
+}
+
+export function busCancelCanvasGeneration(job: CanvasCancelGenerationJob): boolean {
+  if (handlers?.cancelGeneration) {
+    return handlers.cancelGeneration(job);
+  }
+  window.dispatchEvent(
+    new CustomEvent("canvas:cancel-generation", { detail: job }),
+  );
+  return true;
 }

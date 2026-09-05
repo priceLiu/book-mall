@@ -4,13 +4,13 @@
  */
 import type { BillingCategory, ByokTaskKind } from "@prisma/client";
 
-import { BYOK_TASK_KIND_LABEL, mapLogToByokTaskKind } from "@/lib/billing/byok-pricing";
+import { BILLING_TASK_KIND_LABEL, mapLogToBillingTaskKind } from "@/lib/billing/gateway-log-classifier";
 
 export type BillingCategoryKey = BillingCategory;
 
 /** 七类展示标签（含 TEXT / OTHER）。 */
 export const BILLING_CATEGORY_LABEL: Record<BillingCategory, string> = {
-  ...BYOK_TASK_KIND_LABEL,
+  ...BILLING_TASK_KIND_LABEL,
   TEXT: "文字",
   OTHER: "其他",
 };
@@ -68,7 +68,7 @@ export type DashboardChartLogInput = {
 
 /** 将 Gateway 日志映射为七类之一（Single Writer）。 */
 export function classifyBillingCategory(log: DashboardChartLogInput): BillingCategory {
-  const byok: ByokTaskKind | null = mapLogToByokTaskKind(log);
+  const byok: ByokTaskKind | null = mapLogToBillingTaskKind(log);
   if (byok) return byok;
   if (log.requestKind === "CHAT") return "TEXT";
   return "OTHER";
@@ -112,7 +112,7 @@ export function resolveDashboardChartCategory(
   if (raw !== "OTHER") return raw;
   if (isPortraitLibraryGatewayLog(log)) return DASHBOARD_PORTRAIT_IMPORT_CATEGORY;
   if (log.requestKind === "VIDEO") {
-    return mapLogToByokTaskKind(log) ?? "IMAGE_TO_VIDEO";
+    return mapLogToBillingTaskKind(log) ?? "IMAGE_TO_VIDEO";
   }
   if (log.requestKind === "IMAGE" || log.requestKind === "TRYON") {
     return "TEXT_TO_IMAGE";

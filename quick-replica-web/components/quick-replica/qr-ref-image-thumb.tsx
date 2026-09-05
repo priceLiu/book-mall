@@ -3,7 +3,7 @@
 import { Download, Eye, X } from "lucide-react";
 import { useCallback, useState } from "react";
 
-import { QrModal } from "@/components/quick-replica/qr-modal";
+import { QrFullscreenImagePreview } from "@/components/quick-replica/qr-fullscreen-image-preview";
 import { downloadImageUrl } from "@/lib/qr-image-upload-paste";
 
 const SIZE_CLASS = {
@@ -89,17 +89,12 @@ export function QrRefImageThumb({
         </div>
       </div>
 
-      <QrModal
-        open={lightboxOpen}
-        onClose={() => setLightboxOpen(false)}
-        variant="square"
-        title="图片预览"
-      >
-        <div className="flex min-h-0 flex-1 items-center justify-center p-4">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt="" className="max-h-full max-w-full object-contain" />
-        </div>
-      </QrModal>
+      {lightboxOpen ? (
+        <QrFullscreenImagePreview
+          src={url}
+          onClose={() => setLightboxOpen(false)}
+        />
+      ) : null}
     </>
   );
 }

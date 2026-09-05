@@ -13,8 +13,12 @@ import {
   mapGatewayPreCreateLogError,
   pickCredentialForKind,
 } from "@/lib/gateway/proxy-common";
+import { finalizeDashscopeSyncWallClockRequestLog } from "@/lib/gateway/log-dashscope-timing-persist";
 import { parseGatewayClientSource } from "@/lib/gateway/poll-service";
 import {
+  isDashscopeMultimodalImageGenModel,
+  isZImageTurboModel,
+  validateDashscopeMultimodalImageContent,
   qwenImageEditGenerate,
   type QwenImageEditContentItem,
   type QwenImageEditParams,
@@ -52,25 +56,17 @@ export async function POST(request: NextRequest) {
   }
 
   const content = Array.isArray(body.content) ? body.content : [];
-  const hasImage = content.some(
-    (c) => typeof c === "object" && c !== null && "image" in c && String(c.image).trim(),
-  );
-  const hasText = content.some(
-    (c) => typeof c === "object" && c !== null && "text" in c && String(c.text).trim(),
-  );
-  if (!hasImage || !hasText) {
-    return NextResponse.json(
-      { error: "content must include at least one image and one text" },
-      { status: 400 },
-    );
+  const contentErr = validateDashscopeMultimodalImageContent(model, content);
+  if (contentErr) {
+    return NextResponse.json({ error: contentErr }, { status: 400 });
   }
 
   routeGatewayModel(model);
 
-  const credentialId = pickCredentialForKind(auth.credentials, "BAILIAN");
+  const credentialId = pickCredentialForKind(auth.credentials, "DASHSCOPE");
   if (!credentialId) {
     return NextResponse.json(
-      { error: "No BAILIAN / DashScope credential" },
+      { error: "No DASHSCOPE credential" },
       { status: 400 },
     );
   }
@@ -125,10 +121,11 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json({ error: result.error, logId: log.id }, { status: 502 });
     }
-    await finalizeRequestLog(log.id, {
+    await finalizeDashscopeSyncWallClockRequestLog(log.id, {
+      vendorCallStartedAtMs: started,
+      vendorCallEndedAtMs: Date.now(),
       status: "SUCCEEDED",
-      durationMs: Date.now() - started,
-      resultSummary: { imageCount: result.imageUrls.length },
+      resultSummaryBase: { imageCount: result.imageUrls.length },
       model,
     });
     return NextResponse.json({

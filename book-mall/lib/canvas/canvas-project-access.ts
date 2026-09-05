@@ -100,6 +100,29 @@ export async function assertAccessibleCanvasProject(
   return { id: project.id };
 }
 
+/** 单次查询加载画布并校验访问权（避免 GET 项目时再查一遍全量行）。 */
+export async function loadAccessibleCanvasProjectRow<
+  T extends Prisma.CanvasProjectFindFirstArgs,
+>(userId: string, projectId: string, query: T) {
+  const p = await prisma.canvasProject.findFirst({
+    ...query,
+    where: { id: projectId, deletedAt: null },
+  });
+  if (!p) {
+    throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
+  }
+  const access = {
+    id: p.id,
+    userId: p.userId,
+    tenantId: p.tenantId,
+    visibility: p.visibility,
+  };
+  if (!(await userCanAccessCanvasProjectRow(userId, access))) {
+    throw new CanvasProjectError("FORBIDDEN", "无权访问此画布项目", 403);
+  }
+  return p;
+}
+
 /** listProjectTasks / poll worker 等项目级 where（含团队共享项目）。 */
 export async function canvasProjectAccessWhere(
   userId: string,

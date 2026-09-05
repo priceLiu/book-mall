@@ -4,7 +4,6 @@
  * 幂等：全部 upsert。可重复执行。
  *  - PlatformPricingConfig（锚定 0.04 / M=2.5 / 护栏 0.30 / 视频 5s）
  *  - MembershipPlan + TeamSeatTier（个人/团队 × 月/年 × 五档；算法2 g=60%）
- *  - ByokServiceConfig + ResourceMeterRate（BYOK 技术服务费 + 资源系数）
  *  - ModelCostProfile（示例成本档）→ publishModelCreditPrice 生成首版报价快照
  *
  * 套餐金额为首版占位（与图1–4 一致的结构：个人/团队、月/年、五档、席位带），
@@ -13,6 +12,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { importModelCostProfileVersioned } from "@/lib/pricing/import-model-cost-profile-versioned";
 import {
   DEFAULT_CREDIT_ANCHOR_YUAN,
   DEFAULT_MARGIN_M,
@@ -22,8 +22,6 @@ import {
   DEFAULT_VIDEO_SEC,
   publishModelCreditPrice,
 } from "@/lib/pricing/credit-pricing-engine";
-import { deriveVideoMonthlyCredits } from "@/lib/billing/video-model-seeds";
-import { seedByokSimplifiedPricing } from "@/lib/billing/byok-pricing";
 import {
   RETIRED_TEAM_TIERS,
   TEAM_MIN_INCLUDED_SEATS,
@@ -121,7 +119,6 @@ async function seedPlans(
 ) {
   for (const s of seeds) {
     const pricePerCreditYuan = derivePricePerCredit(s.priceYuan, s.monthlyCredits, s.includedSeats);
-    const videoMonthlyCredits = deriveVideoMonthlyCredits(s.monthlyCredits);
     const plan = await prisma.membershipPlan.upsert({
       where: { family_interval_tier: { family, interval, tier: s.tier } },
       create: {
@@ -133,7 +130,6 @@ async function seedPlans(
         originalYuan: s.originalYuan ?? null,
         promoLabel: s.promoLabel ?? null,
         monthlyCredits: s.monthlyCredits,
-        videoMonthlyCredits,
         pricePerCreditYuan,
         includedSeats: s.includedSeats,
         active: true,
@@ -144,7 +140,6 @@ async function seedPlans(
         originalYuan: s.originalYuan ?? null,
         promoLabel: s.promoLabel ?? null,
         monthlyCredits: s.monthlyCredits,
-        videoMonthlyCredits,
         pricePerCreditYuan,
         includedSeats: s.includedSeats,
         active: true,
@@ -212,40 +207,19 @@ export async function seedUnifiedCreditBilling(publishedBy = "seed"): Promise<Se
   });
   const plansCount = PERSONAL_MONTH.length * 2 + TEAM_MONTH.length * 2;
 
-  // 3) BYOK 任务额度 + 资源系数（技术服务费已退役）
-  await seedByokSimplifiedPricing();
-
-  const resourceRates: { type: "OSS_GB_MONTH" | "EGRESS_GB" | "TASK_COUNT"; coef: number; unit: string }[] = [
-    { type: "OSS_GB_MONTH", coef: 0.12, unit: "GB·月" },
-    { type: "EGRESS_GB", coef: 0.5, unit: "GB" },
-    { type: "TASK_COUNT", coef: 0, unit: "次" },
-  ];
-  for (const r of resourceRates) {
-    await prisma.resourceMeterRate.upsert({
-      where: { resourceType: r.type },
-      create: { resourceType: r.type, coefficientYuan: r.coef, unitLabel: r.unit, active: true },
-      update: { coefficientYuan: r.coef, unitLabel: r.unit, active: true },
-    });
-  }
-
   // 4) 模型成本档（确定性 id 便于幂等）+ 发布报价
   for (const c of COST_SEEDS) {
-    const netCost = c.listCostYuan * (1 - c.discountRate);
     const id = `seed-${c.canonicalModelKey}-CHANNEL`;
-    const data: Prisma.ModelCostProfileUncheckedCreateInput = {
-      id,
-      vendor: c.vendor,
+    await importModelCostProfileVersioned({
       canonicalModelKey: c.canonicalModelKey,
-      channel: "CHANNEL",
+      vendor: c.vendor,
       unit: c.unit,
       tierRaw: c.tierRaw ?? null,
       listCostYuan: c.listCostYuan,
       discountRate: c.discountRate,
-      netCostYuan: netCost,
-      active: true,
       note: "seed 占位成本档",
-    };
-    await prisma.modelCostProfile.upsert({ where: { id }, create: data, update: data });
+      seedId: id,
+    });
   }
 
   const published: SeedSummary["published"] = [];

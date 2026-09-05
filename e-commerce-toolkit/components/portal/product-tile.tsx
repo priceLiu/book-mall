@@ -5,7 +5,7 @@ import type { EcomModuleDef } from "@/lib/modules/registry";
 
 const tileBg: Record<EcomModuleDef["tile"], string> = {
   light: "bg-white text-[var(--ecom-ink)]",
-  parchment: "bg-[var(--ecom-parchment)] text-[var(--ecom-ink)]",
+  parchment: "bg-white text-[var(--ecom-ink)]",
   dark: "bg-[var(--ecom-tile)] text-white",
 };
 

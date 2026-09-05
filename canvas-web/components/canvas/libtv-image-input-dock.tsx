@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Zap } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { MentionsTextareaCommitHandle } from "@/components/canvas/mentions/MentionsTextarea";
+import { LibtvDockCreditsLabel } from "./libtv-dock-credits-label";
 import { useNodes } from "@xyflow/react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -13,6 +14,7 @@ import {
   useLibtvFloatingDock,
   useLibtvSoleSelectedNodeId,
 } from "@/lib/canvas/use-libtv-floating-dock";
+import type { LibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import {
@@ -24,23 +26,36 @@ import {
 import { pro2DockRefImageCatalog } from "@/lib/canvas/pro2-dock-ref-catalog";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
-import { pickDefaultSbv1ImageEngine } from "@/lib/canvas/sbv1-image-models";
+import { pickDefaultSbv1ImageEngine, resolveDockImageEnginePick } from "@/lib/canvas/sbv1-image-models";
+import {
+  canvasImageEditModelLabel,
+  canvasImageEditRequiresRefs,
+} from "@/lib/canvas/canvas-image-edit-models";
 import {
   pickDefaultPro2FrameImageEngine,
   PRO2_FRAME_IMAGE_MODEL_KEYS,
 } from "@/lib/canvas/pro2-frame-batch-image";
+import { pro2BatchImageToImageNodePatch } from "@/lib/canvas/pro2-three-view-engine";
 import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import {
   isLibtvFreestandingImageNode,
   isLibtvPipelineImageCell,
+  isOrphanLibtvMediaInflight,
   optimisticLibtvMediaRunStart,
   revertOptimisticLibtvMediaRunStart,
 } from "@/lib/canvas/libtv-image-node-run";
-import { resolveLibtvFloatingDockSelection } from "@/lib/canvas/libtv-floating-dock-selection";
-import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
-import { isLibtvPro2ImageDockNodeType } from "@/lib/canvas/libtv-pro2-image-dock-types";
+import { clearCanvasNodeRunSession } from "@/lib/canvas/canvas-run-session";
+import {
+  resolveLibtvSoleSelectedNodeId,
+  useLibtvShouldSuppressFloatingDock,
+} from "@/lib/canvas/libtv-floating-dock-selection";
+import {
+  isLibtvPro2ImageDockNodeType,
+  LIBTV_PRO2_IMAGE_DOCK_NODE_TYPES,
+} from "@/lib/canvas/libtv-pro2-image-dock-types";
 import type { StoryProFrameRow } from "@/lib/canvas/story-pro-workspace-types";
 import type { StoryPro2ImageNodeData } from "@/lib/canvas/story-pro2-workspace-types";
+import type { CanvasFlowNode } from "@/lib/canvas/types";
 import { isLibtvMediaGenerating } from "@/components/canvas/libtv-media-generating-state";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import {
@@ -57,6 +72,8 @@ import { Pro2DockRefImages } from "./pro2/pro2-dock-ref-images";
 import { Pro2DockStyleButton } from "./pro2/pro2-dock-style-button";
 import { Pro2DockUpstreamChips } from "./pro2/pro2-dock-upstream-chips";
 import { Pro2DockUpstreamHeader } from "./pro2/pro2-dock-upstream-header";
+import { Pro2VisualStylePackBar } from "./pro2/pro2-visual-style-pack-bar";
+import { promptHasEmbeddedVisualStyleBlock } from "@/lib/canvas/story-pro-visual-style-pack";
 import {
   Pro2DockToolbar,
   Pro2InputDockShell,
@@ -79,9 +96,32 @@ function placeholderDockLabel(type: string | undefined): string | undefined {
   return undefined;
 }
 
+function resolveSceneEngineFromHub(
+  hubNodeId: string | undefined,
+  nodes: CanvasFlowNode[],
+): { providerId: string; modelKey: string; params?: Record<string, unknown> } | null {
+  if (!hubNodeId?.trim()) return null;
+  const hub = nodes.find((n) => n.id === hubNodeId);
+  const batch = (
+    hub?.data as {
+      sceneBatchImage?: {
+        providerId?: string;
+        modelKey?: string;
+        params?: Record<string, unknown>;
+      };
+    }
+  )?.sceneBatchImage;
+  if (!batch?.providerId?.trim() || !batch.modelKey?.trim()) return null;
+  return {
+    providerId: batch.providerId,
+    modelKey: batch.modelKey,
+    params: batch.params ?? {},
+  };
+}
+
 function framePromptPlaceholder(role?: string): string {
   if (role === "frame") {
-    return "编辑本镜画面描述；输入 @ 引用角色三视图或风格参考…";
+    return "编辑本镜 AI 生图提示词；输入 @ 引用角色三视图或风格参考…";
   }
   if (role === "scene") {
     return "编辑场景生图关键词；输入 @ 引用风格或上游图片…";
@@ -97,10 +137,63 @@ function framePromptPlaceholder(role?: string): string {
 
 /** LibTV 统一图片节点 · 底部浮动输入坞（分镜 1.0 · 影视专业 2.0） */
 export function LibtvImageInputDock() {
+  const rfNodes = useNodes();
+  const suppressDock = useLibtvShouldSuppressFloatingDock();
+  const pinnedId = useCanvasStore((s) => s.libtvFloatingDockNodeId);
+  const pinnedType = useCanvasStore((s) => s.libtvFloatingDockNodeType);
+  const pinned = useMemo(
+    () => ({ nodeId: pinnedId, nodeType: pinnedType }),
+    [pinnedId, pinnedType],
+  );
+
+  const sbv1DockNodeId = useLibtvSoleSelectedNodeId("sbv1-image");
+  const pro2DockNodeId = useMemo(() => {
+    if (suppressDock) return null;
+    for (const nodeType of LIBTV_PRO2_IMAGE_DOCK_NODE_TYPES) {
+      const id = resolveLibtvSoleSelectedNodeId(rfNodes, nodeType, pinned);
+      if (!id) continue;
+      if (nodeType === "story-pro2-image") {
+        const rf = rfNodes.find((n) => n.id === id);
+        if (
+          (rf?.data as { pro2MediaRole?: string })?.pro2MediaRole ===
+          "character-three-view"
+        ) {
+          continue;
+        }
+      }
+      return id;
+    }
+    return null;
+  }, [rfNodes, suppressDock, pinned]);
+
+  const dockNodeId = sbv1DockNodeId ?? pro2DockNodeId;
+  const { placement, hidden: dockHidden, active: dockActive } =
+    useLibtvFloatingDock(dockNodeId);
+
+  if (suppressDock || !dockNodeId || !dockActive || !placement) return null;
+
+  return (
+    <LibtvImageInputDockBody
+      key={dockNodeId}
+      dockNodeId={dockNodeId}
+      placement={placement}
+      dockHidden={dockHidden}
+    />
+  );
+}
+
+function LibtvImageInputDockBody({
+  dockNodeId,
+  placement,
+  dockHidden,
+}: {
+  dockNodeId: string;
+  placement: LibtvDockFlowPlacement;
+  dockHidden: boolean;
+}) {
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
   const { providers } = useUserProviders();
-  const rfNodes = useNodes();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -110,32 +203,11 @@ export function LibtvImageInputDock() {
   );
 
   const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
-
-  const sbv1DockNodeId = useLibtvSoleSelectedNodeId("sbv1-image");
-  const marqueeSelecting = useCanvasMarqueeSelecting();
-  const pro2DockNodeId = useMemo(() => {
-    if (marqueeSelecting) return null;
-    const sel = resolveLibtvFloatingDockSelection(rfNodes);
-    if (!sel || !isLibtvPro2ImageDockNodeType(sel.nodeType)) return null;
-    const rf = rfNodes.find((n) => n.id === sel.nodeId);
-    if (
-      sel.nodeType === "story-pro2-image" &&
-      (rf?.data as { pro2MediaRole?: string })?.pro2MediaRole ===
-        "character-three-view"
-    ) {
-      return null;
-    }
-    return sel.nodeId;
-  }, [rfNodes, marqueeSelecting]);
-
-  const dockNodeId = sbv1DockNodeId ?? pro2DockNodeId;
+  const promptCommitRef = useRef<MentionsTextareaCommitHandle | null>(null);
 
   const storeNode = useMemo(() => {
-    if (!dockNodeId) return null;
     return nodes.find((n) => n.id === dockNodeId) ?? null;
   }, [dockNodeId, nodes]);
-  const { placement, hidden: dockHidden, active: dockActive } =
-    useLibtvFloatingDock(dockNodeId);
 
   const nodeType = (storeNode?.type ?? "sbv1-image") as DockImageNodeType;
   const isPro2 = isLibtvPro2ImageDockNodeType(nodeType);
@@ -164,12 +236,24 @@ export function LibtvImageInputDock() {
 
   const settingsData = (storeNode?.data ?? {}) as Sbv1ImageNodeData;
   const dockInput = settingsData.dockInput ?? "";
+  const [livePrompt, setLivePrompt] = useState(dockInput);
+  useEffect(() => {
+    setLivePrompt(dockInput);
+  }, [dockInput, dockNodeId]);
   const dockRefImages = settingsData.dockRefImages ?? [];
   const previewUrl = settingsData.ossUrl ?? settingsData.blobUrl ?? "";
   const hasImage = Boolean(previewUrl);
   const isRunning = isLibtvMediaGenerating(
     (storeNode?.data ?? {}) as { uploading?: boolean; runtime?: { status?: string } },
   );
+  const orphanInflight = Boolean(
+    storeNode &&
+      isOrphanLibtvMediaInflight((storeNode.data ?? {}) as Sbv1ImageNodeData),
+  );
+  const freestandingBlocked = isRunning && !orphanInflight;
+
+  const isFrameFreestanding =
+    pro2Data.pro2MediaRole === "frame" && !isPipelineCell;
 
   const engine = isFramePipelineCell
     ? frameBatchImage?.providerId && frameBatchImage?.modelKey
@@ -181,6 +265,31 @@ export function LibtvImageInputDock() {
       : undefined
     : settingsData.engine;
   const modelKey = normalizeModelKey(engine?.modelKey);
+  const resolvedEngine = useMemo(() => {
+    if (isFramePipelineCell && frameBatchImage?.providerId) {
+      return {
+        providerId: frameBatchImage.providerId,
+        modelKey: frameBatchImage.modelKey ?? "",
+        params: frameBatchImage.params ?? {},
+      };
+    }
+    return resolveDockImageEnginePick(settingsData.engine, providers, () =>
+      isFrameFreestanding || pro2Data.pro2MediaRole === "frame"
+        ? pickDefaultPro2FrameImageEngine(providers)
+        : pickDefaultSbv1ImageEngine(providers),
+    );
+  }, [
+    isFramePipelineCell,
+    frameBatchImage,
+    settingsData.engine,
+    providers,
+    isFrameFreestanding,
+    pro2Data.pro2MediaRole,
+  ]);
+  const hasEngine = Boolean(
+    resolvedEngine?.providerId?.trim() &&
+      normalizeModelKey(resolvedEngine.modelKey),
+  );
   const outputCount = settingsData.outputCount ?? 1;
   const pickerData = useMemo((): Sbv1ImageNodeData => {
     if (!isFramePipelineCell || !frameBatchImage?.providerId) {
@@ -203,8 +312,12 @@ export function LibtvImageInputDock() {
     settingsData.resolution ?? "2K",
   );
 
-  const isFrameFreestanding =
-    pro2Data.pro2MediaRole === "frame" && !isPipelineCell;
+  const showVisualStylePackBar =
+    isPro2 &&
+    Boolean(pro2Data.pro2HubNodeId) &&
+    !isPipelineCell &&
+    pro2Data.pro2MediaRole !== "scene" &&
+    !promptHasEmbeddedVisualStyleBlock(dockInput);
   const imageModelKeys =
     isFrameFreestanding || pro2Data.pro2MediaRole === "frame"
       ? PRO2_FRAME_IMAGE_MODEL_KEYS
@@ -212,10 +325,18 @@ export function LibtvImageInputDock() {
 
   useEffect(() => {
     if (!storeNode || !showModelPicker || engine?.providerId?.trim()) return;
-    const seed =
+    if (pro2Data.pro2MediaRole === "scene") {
+      const fromHub = resolveSceneEngineFromHub(pro2Data.pro2HubNodeId, nodes);
+      if (fromHub) {
+        updateNodeData(storeNode.id, pro2BatchImageToImageNodePatch(fromHub));
+        return;
+      }
+    }
+    const seed = resolveDockImageEnginePick(settingsData.engine, providers, () =>
       isFrameFreestanding || pro2Data.pro2MediaRole === "frame"
         ? pickDefaultPro2FrameImageEngine(providers)
-        : pickDefaultSbv1ImageEngine(providers);
+        : pickDefaultSbv1ImageEngine(providers),
+    );
     if (!seed) return;
     if (isFramePipelineCell && framePipelineController) {
       updateNodeData(framePipelineController.id, { batchImage: seed });
@@ -230,6 +351,8 @@ export function LibtvImageInputDock() {
     updateNodeData,
     isFrameFreestanding,
     pro2Data.pro2MediaRole,
+    pro2Data.pro2HubNodeId,
+    nodes,
     isFramePipelineCell,
     framePipelineController,
   ]);
@@ -301,6 +424,7 @@ export function LibtvImageInputDock() {
   const onPromptChange = useCallback(
     (value: string, _refs?: string[], meta?: { commit?: boolean }) => {
       if (!storeNode) return;
+      setLivePrompt(value);
       updateNodeData(
         storeNode.id,
         { dockInput: value },
@@ -324,27 +448,48 @@ export function LibtvImageInputDock() {
     const controllerId = pro2Data.pro2ControllerNodeId;
     const rowKey = pro2Data.pro2RowKey;
     if (!controllerId || !rowKey || pro2Data.pro2MediaRole !== "frame") return;
+    optimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
     batchRunStoryRows(controllerId, [rowKey], "frameImage", {
       forceFresh: true,
     });
-  }, [storeNode, isPipelineCell, pro2Data]);
+  }, [storeNode, isPipelineCell, pro2Data, updateNodeData, setNodeRuntime]);
 
   const onRunFreestanding = useCallback(async () => {
     if (!storeNode || !isLibtvFreestandingImageNode(storeNode)) return;
-    if (isRunning) return;
 
-    let runEngine = engine;
+    const nodeData = (storeNode.data ?? {}) as Sbv1ImageNodeData;
+    const orphanInflight = isOrphanLibtvMediaInflight(nodeData);
+    if (isRunning && !orphanInflight) return;
+    if (orphanInflight) {
+      clearCanvasNodeRunSession(storeNode.id);
+      revertOptimisticLibtvMediaRunStart(
+        storeNode.id,
+        updateNodeData,
+        setNodeRuntime,
+      );
+    }
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    const { nodes: latestNodes, edges: latestEdges } = useCanvasStore.getState();
+    const latestNode = latestNodes.find((n) => n.id === storeNode.id);
+    const latestData = (latestNode?.data ?? {}) as Sbv1ImageNodeData;
+
+    let runEngine = resolveDockImageEnginePick(latestData.engine, providers, () =>
+      pro2Data.pro2MediaRole === "frame"
+        ? pickDefaultPro2FrameImageEngine(providers)
+        : pickDefaultSbv1ImageEngine(providers),
+    );
     if (!runEngine?.providerId?.trim()) {
-      const seed =
-        pro2Data.pro2MediaRole === "frame"
-          ? pickDefaultPro2FrameImageEngine(providers)
-          : pickDefaultSbv1ImageEngine(providers);
-      if (seed) {
-        runEngine = seed;
-        updateNodeData(storeNode.id, { engine: seed });
+      if (pro2Data.pro2MediaRole === "scene") {
+        const fromHub = resolveSceneEngineFromHub(pro2Data.pro2HubNodeId, latestNodes);
+        if (fromHub) {
+          runEngine = fromHub;
+          updateNodeData(storeNode.id, pro2BatchImageToImageNodePatch(fromHub));
+        }
       }
     }
-    if (!runEngine?.providerId?.trim() || !normalizeModelKey(runEngine?.modelKey)) {
+    if (!runEngine?.providerId?.trim() || !normalizeModelKey(runEngine.modelKey)) {
       await alert({
         title: "请选择模型",
         message:
@@ -353,17 +498,43 @@ export function LibtvImageInputDock() {
       });
       return;
     }
-    const prompt = dockInput.trim();
-    const linkedStyle = resolvePro2DockStyleFromUpstream(upstreamLinks);
+    if (!latestData.engine?.providerId?.trim()) {
+      updateNodeData(storeNode.id, { engine: runEngine });
+    }
+
+    const latestUpstreamLinks = resolvePro2DockUpstreamLinks(
+      storeNode.id,
+      nodeType,
+      latestNodes,
+      latestEdges,
+    );
+    const prompt = String(latestData.dockInput ?? livePrompt).trim();
+    const linkedStyle = resolvePro2DockStyleFromUpstream(latestUpstreamLinks);
+    const latestPreviewUrl =
+      latestData.ossUrl ?? latestData.blobUrl ?? "";
     const hasRefs =
-      hasImage ||
-      upstreamLinks.some((l) => l.previewUrl) ||
-      Boolean(settingsData.dockStyleRef?.imageUrl) ||
+      Boolean(latestPreviewUrl) ||
+      latestUpstreamLinks.some((l) => l.previewUrl) ||
+      Boolean(latestData.dockStyleRef?.imageUrl) ||
       Boolean(linkedStyle);
     if (!prompt && !hasRefs) {
       await alert({
         title: "请输入提示词",
         message: "可直接文字生图，或上传/连接图片后输入编辑指令。",
+        variant: "warning",
+      });
+      return;
+    }
+    const editModelKey = normalizeModelKey(runEngine.modelKey);
+    if (
+      canvasImageEditRequiresRefs(editModelKey, {
+        imageMode: String(latestData.imageMode ?? ""),
+      }) &&
+      !hasRefs
+    ) {
+      await alert({
+        title: "需要参考图",
+        message: `${canvasImageEditModelLabel(editModelKey)} 须连接上游图片或上传参考图后再生成。`,
         variant: "warning",
       });
       return;
@@ -377,10 +548,8 @@ export function LibtvImageInputDock() {
       return;
     }
 
-    optimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
     const queued = busEnqueueStoryRun({ nodeId: storeNode.id, forceFresh: true });
     if (!queued) {
-      revertOptimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
       await alert({
         title: "无法开始生成",
         message: "该节点已有进行中的生成任务，请稍候完成后再试。",
@@ -389,20 +558,24 @@ export function LibtvImageInputDock() {
     }
   }, [
     storeNode,
-    engine,
     providers,
+    pro2Data.pro2MediaRole,
+    pro2Data.pro2HubNodeId,
     updateNodeData,
     setNodeRuntime,
-    dockInput,
-    hasImage,
-    upstreamLinks,
-    settingsData.dockStyleRef,
+    livePrompt,
+    nodeType,
     base,
     alert,
     isRunning,
   ]);
 
-  const onRun = isPipelineCell ? onRunPipeline : () => void onRunFreestanding();
+  const runWithCommittedPrompt = useCallback(() => {
+    promptCommitRef.current?.flushDraft();
+    void onRunFreestanding();
+  }, [onRunFreestanding]);
+
+  const onRun = isPipelineCell ? onRunPipeline : runWithCommittedPrompt;
 
   const onImagePatch = useCallback(
     (patch: Partial<Sbv1ImageNodeData>) => {
@@ -419,6 +592,19 @@ export function LibtvImageInputDock() {
             },
           });
         }
+        if (
+          patch.aspectRatio !== undefined ||
+          patch.resolution !== undefined ||
+          patch.outputCount !== undefined ||
+          patch.imageQuality !== undefined
+        ) {
+          updateNodeData(storeNode.id, {
+            aspectRatio: merged.aspectRatio,
+            resolution: merged.resolution,
+            outputCount: merged.outputCount,
+            imageQuality: merged.imageQuality,
+          });
+        }
         return;
       }
       updateNodeData(storeNode.id, patch);
@@ -432,7 +618,7 @@ export function LibtvImageInputDock() {
     ],
   );
 
-  if (!storeNode || !dockActive || !placement) return null;
+  if (!storeNode) return null;
 
   const usesEmbedded =
     nodeType === "sbv1-image"
@@ -455,14 +641,14 @@ export function LibtvImageInputDock() {
     isPipelineCell &&
     Boolean(pro2Data.pro2ControllerNodeId && pro2Data.pro2RowKey) &&
     !isRunning &&
-    (Boolean(dockInput.trim()) || hasImage) &&
-    (isFramePipelineCell ? Boolean(engine?.providerId && modelKey) : true);
+    (Boolean(livePrompt.trim()) || hasImage) &&
+    (isFramePipelineCell ? hasEngine : true);
 
   const canSendFreestanding =
     showModelPicker &&
-    Boolean(engine?.providerId && modelKey) &&
-    !isRunning &&
-    (Boolean(dockInput.trim()) ||
+    hasEngine &&
+    !freestandingBlocked &&
+    (Boolean(livePrompt.trim()) ||
       hasImage ||
       upstreamLinks.some((l) => l.previewUrl) ||
       Boolean(styleRef?.imageUrl) ||
@@ -483,6 +669,7 @@ export function LibtvImageInputDock() {
         flowAnchor={placement}
         dockClassName={isPro2 ? "pro2-image-dock" : "sbv1-image-dock"}
         hidden={dockHidden}
+        anchorNodeId={storeNode.id}
         header={
           <Pro2DockUpstreamHeader
             refRow={
@@ -546,7 +733,13 @@ export function LibtvImageInputDock() {
           disabled={isRunning}
           maxImages={12}
         >
+          {showVisualStylePackBar ? (
+            <Pro2VisualStylePackBar hubNodeId={pro2Data.pro2HubNodeId} />
+          ) : null}
           <MentionsEditable
+            key={storeNode.id}
+            sourceId={storeNode.id}
+            commitHandleRef={promptCommitRef}
             className={cn(
               PRO2_DOCK_TEXTAREA_CLASS,
               RF_FORM_CONTROL,
@@ -620,19 +813,15 @@ function LibtvImageDockFooter({
         <div className="min-w-0 flex-1" />
       ) : null}
       <div className="flex shrink-0 items-center gap-1.5">
-        {!isPipelineCell && estCredits?.credits != null ? (
-          <span
-            className="flex shrink-0 items-center gap-1 tabular-nums text-amber-200/90"
-            style={{ fontSize: fontPx }}
-            title={`${estCredits.canonicalModelKey} · 挂牌 ${estCredits.creditsPerUnit} 积分/${estCredits.unit === "PER_IMAGE" ? "张" : "次"}`}
-          >
-            <Zap
-              className="fill-amber-300/90 text-amber-300/90"
-              style={{ width: sendIconPx, height: sendIconPx }}
-            />
-            {estCredits.credits}
-          </span>
-        ) : null}
+        <LibtvDockCreditsLabel
+          credits={estCredits?.credits}
+          fontPx={fontPx}
+          title={
+            estCredits?.credits != null
+              ? `${estCredits.canonicalModelKey} · 挂牌 ${estCredits.creditsPerUnit} 积分/${estCredits.unit === "PER_IMAGE" ? "张" : "次"}`
+              : undefined
+          }
+        />
         <LibtvDockSendButton
           disabled={!canSend}
           loading={isRunning}

@@ -1,16 +1,15 @@
 import { BenefitsSection } from "@/components/layout/sections/benefits";
 import { CommunitySection } from "@/components/layout/sections/community";
 import { FeaturesSection } from "@/components/layout/sections/features";
-import { FeaturedProductsSection } from "@/components/layout/sections/featured-products";
 import { SiteHomeGatewayModelsSection } from "@/components/layout/site-home/site-home-gateway-models-section";
+import { SiteHomePlatformNavSection } from "@/components/layout/site-home/site-home-platform-nav-section";
 import { FooterSection } from "@/components/layout/sections/footer";
 import { SiteHomeHeroSection } from "@/components/layout/site-home/site-home-hero";
-import { SiteHomeLogoMarquee } from "@/components/layout/site-home/site-home-logo-marquee";
-import { pickRandomStoryHeroBackground, pickRandomStoryVideoClips } from "@/lib/story-theater-videos";
+import { getSiteHomeSnapshotForRender } from "@/lib/static-snapshots/site-home-snapshot-service";
+import { buildSiteHomePlatformApps } from "@/lib/site-home/platform-apps";
 import { TestimonialSection } from "@/components/layout/sections/testimonial";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 86400;
 
 export const metadata = {
   title: "智选 AI Mall｜找AI上智选",
@@ -43,17 +42,28 @@ export const metadata = {
   },
 };
 
-export default function Home() {
-  const heroClips = pickRandomStoryVideoClips(3);
-  const heroBackground = pickRandomStoryHeroBackground();
+export default async function Home() {
+  const snapshot = await getSiteHomeSnapshotForRender();
+  const liveHrefByKey = new Map<string, string>(
+    buildSiteHomePlatformApps().map((app) => [app.key, app.href]),
+  );
+  const platformApps = snapshot.payload.platformApps.map((app) => ({
+    ...app,
+    href: liveHrefByKey.get(app.key) ?? app.href,
+  }));
 
   return (
     <>
-      <SiteHomeHeroSection clips={heroClips} background={heroBackground} />
-      <SiteHomeLogoMarquee />
+      <SiteHomeHeroSection
+        clips={snapshot.payload.hero.clips}
+        background={snapshot.payload.hero.background}
+      />
+      <SiteHomePlatformNavSection platformApps={platformApps} />
       <div className="site-home-below-hero">
-        <FeaturedProductsSection />
-        <SiteHomeGatewayModelsSection />
+        <SiteHomeGatewayModelsSection
+          models={snapshot.payload.gatewayModels}
+          gatewayOrigin={snapshot.payload.gatewayOrigin}
+        />
         <BenefitsSection />
         <FeaturesSection />
         <TestimonialSection />

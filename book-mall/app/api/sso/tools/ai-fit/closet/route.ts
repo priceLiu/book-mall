@@ -4,6 +4,7 @@ import {
   AI_FIT_TABLES_MISSING_MESSAGE,
   prismaErrorCode,
 } from "@/lib/ai-fit-db-error";
+import { cascadeDeletePinsBySource } from "@/lib/ai-space/ai-space-pin-service";
 import { prisma } from "@/lib/prisma";
 import { requireToolsJwtSecret } from "@/lib/sso-tools-env";
 import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
@@ -220,6 +221,8 @@ export async function DELETE(req: Request) {
     if (r.count === 0) {
       return NextResponse.json({ error: "不存在或无权删除" }, { status: 404 });
     }
+    // AI 空间侧清理：Pin 删除，画布块保留并渲染「素材已删除」占位
+    await cascadeDeletePinsBySource("aifit_closet", id);
     return NextResponse.json({ ok: true });
   } catch (e) {
     const code = prismaErrorCode(e);

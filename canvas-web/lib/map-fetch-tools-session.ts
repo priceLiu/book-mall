@@ -39,7 +39,9 @@ export function mapFetchToolsSessionResultToShell(
     name: introspectStringField(introObj.name),
     image: introspectStringField(introObj.image),
     sub: introspectStringField(introObj.sub),
-    toolsRole: introspectStringField(introObj.tools_role),
+    toolsRole:
+      introspectStringField(introObj.tools_role) ??
+      (introObj.tier === "admin" ? "admin" : null),
     toolsNavKeys: keys,
   };
 }

@@ -1,6 +1,9 @@
 "use client";
 
+import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
+import { StoryboardPanelImageHoverActions } from "@/components/storyboard/storyboard-panel-image-hover-actions";
 import { buildPanelTimelineMap } from "@/lib/storyboard-gen-params";
+import { cn } from "@/lib/utils";
 import type { StoryboardReference, StoryboardSheet } from "@/lib/storyboard-types";
 
 type Props = {
@@ -11,10 +14,20 @@ type Props = {
   projectKeywords?: string;
   producer?: string;
   exportRootId?: string;
+  /** 表头标题，默认「微短剧带货分镜制作」 */
+  sheetHeading?: string;
   /** export：固定 1920 宽供 html2canvas；preview：可滚动放大预览 */
   variant?: "export" | "preview";
   /** preview 模式下点击镜头/参考图放大 */
   onPreviewImage?: (src: string, title: string) => void;
+  /** 成片工作区：镜头位可点击单镜生图 */
+  interactive?: boolean;
+  generatingPanelIndexes?: ReadonlySet<number>;
+  onGeneratePanel?: (panelIndex: number) => void;
+  onRegeneratePanel?: (panelIndex: number) => void;
+  onPreviewPanelPrompt?: (panelIndex: number) => void;
+  selectedPanelIndexes?: ReadonlySet<number>;
+  onTogglePanelSelect?: (panelIndex: number) => void;
 };
 
 function SheetImage({
@@ -83,8 +96,16 @@ export function StoryboardProSheetView({
   projectKeywords,
   producer,
   exportRootId = "storyboard-sheet-export",
+  sheetHeading = "微短剧带货分镜制作",
   variant = "export",
   onPreviewImage,
+  interactive = false,
+  generatingPanelIndexes,
+  onGeneratePanel,
+  onRegeneratePanel,
+  onPreviewPanelPrompt,
+  selectedPanelIndexes,
+  onTogglePanelSelect,
 }: Props) {
   const isPreview = variant === "preview";
   /** 导出 PNG 须满足火山图生视频宽高比 ≤2.50（1920/768≈2.5） */
@@ -149,7 +170,7 @@ export function StoryboardProSheetView({
                 textAlign: "center",
               }}
             >
-              微短剧带货分镜制作
+              {sheetHeading}
             </td>
           </tr>
           <tr>
@@ -223,7 +244,17 @@ export function StoryboardProSheetView({
           overflowX: isPreview ? "auto" : undefined,
         }}
       >
-        {sheet.panels.map((panel, i) => (
+        {sheet.panels.map((panel, i) => {
+          const generating = generatingPanelIndexes?.has(panel.index) ?? false;
+          const selected = selectedPanelIndexes?.has(panel.index) ?? false;
+          const handlePanelAction = () => {
+            if (panel.imageUrl && onRegeneratePanel) {
+              onRegeneratePanel(panel.index);
+            } else if (onGeneratePanel) {
+              onGeneratePanel(panel.index);
+            }
+          };
+          return (
           <div
             key={panel.index}
             style={{
@@ -231,6 +262,9 @@ export function StoryboardProSheetView({
               minWidth: isPreview ? 220 : 0,
               width: isPreview ? 220 : undefined,
               borderRight: i < sheet.panels.length - 1 ? "1px solid #1d1d1f" : undefined,
+              position: "relative",
+              isolation: "isolate",
+              overflow: "hidden",
             }}
           >
             <div
@@ -240,34 +274,96 @@ export function StoryboardProSheetView({
                 textAlign: "center",
                 fontWeight: 700,
                 fontSize: 12,
-                background: "#f5f5f7",
+                background: selected ? "#e8f2ff" : "#f5f5f7",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
               }}
             >
-              Shot {String(panel.index).padStart(2, "0")}
+              {interactive && onTogglePanelSelect ? (
+                <input
+                  type="checkbox"
+                  checked={selected}
+                  onChange={() => onTogglePanelSelect(panel.index)}
+                  aria-label={`选择镜头 ${panel.index}`}
+                  style={{ width: 14, height: 14, cursor: "pointer" }}
+                />
+              ) : null}
+              <span>Shot {String(panel.index).padStart(2, "0")}</span>
             </div>
             <div
+              className={cn(
+                interactive && panel.imageUrl && !generating && "group/image",
+              )}
               style={{
                 height: panelImgHeight,
                 borderBottom: "1px solid #1d1d1f",
-                background: "#e8e8ed",
+                background: generating ? "#000" : "#e8e8ed",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 overflow: "hidden",
+                position: "relative",
               }}
             >
               {panel.imageUrl ? (
-                <SheetImage
-                  src={panel.imageUrl}
-                  alt={`镜头 ${panel.index}`}
-                  useCrossOrigin={useCrossOrigin}
-                  objectFit={isPreview ? "contain" : "cover"}
-                  previewable={isPreview}
-                  onPreview={onPreviewImage}
-                />
-              ) : (
+                <>
+                  <SheetImage
+                    src={panel.imageUrl}
+                    alt={`镜头 ${panel.index}`}
+                    useCrossOrigin={useCrossOrigin}
+                    objectFit={isPreview ? "contain" : "cover"}
+                  />
+                  {interactive && !generating ? (
+                    <StoryboardPanelImageHoverActions
+                      onPreview={
+                        onPreviewImage
+                          ? () =>
+                              onPreviewImage(
+                                panel.imageUrl!,
+                                `镜头 ${panel.index}`,
+                              )
+                          : undefined
+                      }
+                      onRegenerate={
+                        onRegeneratePanel ?? onGeneratePanel
+                          ? handlePanelAction
+                          : undefined
+                      }
+                      onPreviewPrompt={
+                        onPreviewPanelPrompt
+                          ? () => onPreviewPanelPrompt(panel.index)
+                          : undefined
+                      }
+                    />
+                  ) : null}
+                </>
+              ) : interactive && onGeneratePanel && !generating ? (
+                <button
+                  type="button"
+                  onClick={handlePanelAction}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                    fontSize: 11,
+                    color: "#0071e3",
+                  }}
+                >
+                  点击生成分镜图
+                </button>
+              ) : !generating ? (
                 <span style={{ fontSize: 11, color: "#86868b" }}>待生成</span>
-              )}
+              ) : null}
+              {generating ? (
+                <EcomMediaGeneratingBusy
+                  className="z-[1] rounded-none"
+                  background="black"
+                />
+              ) : null}
             </div>
             <table
               style={{
@@ -290,7 +386,8 @@ export function StoryboardProSheetView({
               </tbody>
             </table>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div

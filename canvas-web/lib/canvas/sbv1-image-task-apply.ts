@@ -3,8 +3,13 @@
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 import type { CanvasNodeRuntime } from "./types";
+import {
+  canvasIdleRuntimeAfterUserCancel,
+  isUserCancelledCanvasTask,
+} from "./canvas-generation-cancel-messages";
 import { formatCanvasTaskError } from "./friendly-task-error";
-import { pickTaskResultMediaUrl } from "./task-media-url";
+import { isCanvasManagedOssUrl } from "./canvas-managed-oss-url";
+import { pickTaskImagePreviewUrl, pickTaskResultMediaUrl } from "./task-media-url";
 
 function posterUrlFromTask(task: CanvasTaskRecord): string | undefined {
   const direct = task.posterUrl?.trim();
@@ -12,25 +17,38 @@ function posterUrlFromTask(task: CanvasTaskRecord): string | undefined {
   return undefined;
 }
 
-/** sbv1-image 任务结果写回节点 ossUrl + runtime */
+const IMAGE_INFLIGHT_STATUSES = new Set([
+  "QUEUED",
+  "DISPATCHING",
+  "PENDING",
+  "SUBMITTED",
+]);
+
+/** sbv1-image / story-pro2-image 任务结果写回节点 ossUrl + runtime */
 export function sbv1ImagePatchFromTask(
   prev: Sbv1ImageNodeData,
   task: CanvasTaskRecord,
 ): Record<string, unknown> | null {
-  const mediaUrl = pickTaskResultMediaUrl(task) ?? task.ossUrl ?? undefined;
-
-  if (task.status === "SUCCEEDED" && mediaUrl) {
+  if (task.status === "SUCCEEDED") {
+    const previewUrl = pickTaskImagePreviewUrl(task);
+    if (!previewUrl) return null;
     const hadImage = Boolean(prev.ossUrl?.trim() || prev.blobUrl?.trim());
+    const taskOss = task.ossUrl?.trim();
+    const managedOss = isCanvasManagedOssUrl(taskOss) ? taskOss : undefined;
     return {
-      ossUrl: mediaUrl,
-      blobUrl: undefined,
+      ...(managedOss
+        ? {
+            ossUrl: managedOss,
+            blobUrl: undefined,
+            imageMode: hadImage ? "img2img" : "txt2img",
+          }
+        : {}),
       uploading: false,
       uploadError: undefined,
-      imageMode: hadImage ? "img2img" : "txt2img",
       runtime: {
         status: "done",
         taskId: task.id,
-        ossUrl: mediaUrl,
+        ossUrl: managedOss ?? previewUrl,
         ephemeralUrl: task.ephemeralUrl ?? undefined,
         failCode: undefined,
         failMessage: undefined,
@@ -39,6 +57,13 @@ export function sbv1ImagePatchFromTask(
   }
 
   if (task.status === "FAILED" || task.status === "CANCELLED") {
+    if (isUserCancelledCanvasTask(task)) {
+      return {
+        uploading: false,
+        uploadError: undefined,
+        runtime: canvasIdleRuntimeAfterUserCancel(task.id),
+      };
+    }
     return {
       uploading: false,
       uploadError: undefined,
@@ -55,12 +80,17 @@ export function sbv1ImagePatchFromTask(
     };
   }
 
-  if (task.status === "SUBMITTED" || task.status === "PENDING") {
+  if (IMAGE_INFLIGHT_STATUSES.has(task.status)) {
     return {
       uploading: true,
       uploadError: undefined,
       runtime: {
-        status: task.status === "PENDING" ? "pending" : "running",
+        status:
+          task.status === "QUEUED" ||
+          task.status === "PENDING" ||
+          task.status === "DISPATCHING"
+            ? "pending"
+            : "running",
         taskId: task.id,
         failCode: undefined,
         failMessage: undefined,
@@ -105,6 +135,13 @@ export function sbv1VideoPatchFromTask(
   }
 
   if (task.status === "FAILED" || task.status === "CANCELLED") {
+    if (isUserCancelledCanvasTask(task)) {
+      return {
+        uploading: false,
+        uploadError: undefined,
+        runtime: canvasIdleRuntimeAfterUserCancel(task.id),
+      };
+    }
     return {
       uploading: false,
       uploadError: undefined,
@@ -123,11 +160,12 @@ export function sbv1VideoPatchFromTask(
 
   if (VIDEO_INFLIGHT_STATUSES.has(task.status)) {
     return {
-      uploading: true,
       uploadError: undefined,
       runtime: {
         status:
-          task.status === "QUEUED" || task.status === "PENDING"
+          task.status === "QUEUED" ||
+          task.status === "PENDING" ||
+          task.status === "DISPATCHING"
             ? "pending"
             : "running",
         taskId: task.id,
@@ -140,10 +178,32 @@ export function sbv1VideoPatchFromTask(
   return null;
 }
 
+/**
+ * 仅当「本轮」已产出成片时，才把 pending/running 对齐为 done。
+ * 历史成功任务不能用来抹掉本轮失败，否则节点不报错、旧成片继续播。
+ */
+export function shouldRestoreSbv1VideoRuntimeToDone(input: {
+  status?: string | null;
+  hasInflightTask: boolean;
+  uploading?: boolean;
+  runSessionActive: boolean;
+  currentMediaUrl?: string | null;
+  boundTaskSucceeded: boolean;
+}): boolean {
+  if (input.hasInflightTask || input.uploading || input.runSessionActive) {
+    return false;
+  }
+  if (input.status !== "pending" && input.status !== "running") {
+    return false;
+  }
+  return Boolean(input.currentMediaUrl?.trim() || input.boundTaskSucceeded);
+}
+
 /** 运行失败 / 中止 · 清除 uploading 并写入 runtime.error（节点 UI 可读） */
 export function sbv1ImageFailurePatch(
   failCode: string,
   failMessage: string,
+  modelKey?: string | null,
 ): Record<string, unknown> {
   return {
     uploading: false,
@@ -151,7 +211,7 @@ export function sbv1ImageFailurePatch(
     runtime: {
       status: "error",
       failCode,
-      failMessage: formatCanvasTaskError(failCode, failMessage),
+      failMessage: formatCanvasTaskError(failCode, failMessage, modelKey),
     } satisfies CanvasNodeRuntime,
   };
 }
@@ -169,6 +229,7 @@ export function isSameSbv1MediaDataPatch(
   current: Record<string, unknown> | undefined,
   patch: Record<string, unknown>,
 ): boolean {
+  if (needsForceLibtvMediaPatchApply(current, patch)) return false;
   for (const key of Object.keys(patch)) {
     if (!SBV1_MEDIA_PATCH_KEYS.has(key)) return false;
   }
@@ -200,4 +261,25 @@ export function isSameSbv1MediaDataPatch(
     (prev.ephemeralUrl ?? "") === (nextRt.ephemeralUrl ?? "") &&
     (prev.posterUrl ?? "") === (nextRt.posterUrl ?? "")
   );
+}
+
+/** 本地仍扫光但 patch 已是终态 → 强制写回（避免 isSame 误吞 uploading:false） */
+export function needsForceLibtvMediaPatchApply(
+  current: Record<string, unknown> | undefined,
+  patch: Record<string, unknown>,
+): boolean {
+  const cur = current ?? {};
+  const rt = cur.runtime as CanvasNodeRuntime | undefined;
+  const nextRt = patch.runtime as CanvasNodeRuntime | undefined;
+  const stillGenerating =
+    Boolean(cur.uploading) ||
+    rt?.status === "pending" ||
+    rt?.status === "running" ||
+    rt?.status === "queued";
+  const terminalPatch =
+    patch.uploading === false ||
+    nextRt?.status === "done" ||
+    nextRt?.status === "error" ||
+    nextRt?.status === "idle";
+  return stillGenerating && terminalPatch;
 }

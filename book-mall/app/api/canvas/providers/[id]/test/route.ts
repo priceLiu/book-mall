@@ -1,11 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import {
-  canvasErrorToResponse,
   corsOptionsResponse,
   jsonHeaders,
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
-import { testProviderForUser } from "@/lib/canvas/canvas-provider-service";
 import {
   getGatewayVirtualProviderForUser,
   isGatewayVirtualProviderId,
@@ -13,9 +11,7 @@ import {
 import { getGatewayLinkStatusForUser } from "@/lib/canvas/book-gateway-link";
 import {
   isSystemProviderId,
-  resolveSystemProvider,
 } from "@/lib/canvas/canvas-system-provider";
-import { getGatewayForKind } from "@/lib/canvas/providers";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -47,25 +43,19 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     );
   }
   if (isSystemProviderId(id)) {
-    const sys = resolveSystemProvider(id);
-    if (!sys) {
-      return NextResponse.json(
-        { ok: false, message: "该系统 Provider 未启用（请检查 book-mall .env）" },
-        { headers: jsonHeaders(request) },
-      );
-    }
-    try {
-      const gateway = getGatewayForKind(sys.kind, sys.config);
-      const result = await gateway.testConnection();
-      return NextResponse.json(result, { headers: jsonHeaders(request) });
-    } catch (err) {
-      return canvasErrorToResponse(request, err);
-    }
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "厂商 env-key 直连测试已禁用；请关联 Gateway sk-gw 并在 Gateway 控制台绑定凭证",
+      },
+      { status: 403, headers: jsonHeaders(request) },
+    );
   }
-  try {
-    const result = await testProviderForUser(guard.user.id, id);
-    return NextResponse.json(result, { headers: jsonHeaders(request) });
-  } catch (err) {
-    return canvasErrorToResponse(request, err);
-  }
+  return NextResponse.json(
+    {
+      ok: false,
+      message: "BYOK 直连测试已禁用；请使用 Gateway 虚拟 Provider 或关联 sk-gw",
+    },
+    { status: 403, headers: jsonHeaders(request) },
+  );
 }

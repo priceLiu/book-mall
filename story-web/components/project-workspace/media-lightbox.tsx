@@ -4,6 +4,11 @@ import { useEffect } from "react";
 import Image from "next/image";
 import { X } from "lucide-react";
 import { ModalPortal } from "@/components/common/modal-portal";
+import {
+  ImageZoomControls,
+  IMAGE_ZOOM_BUTTON_STEP,
+} from "@/components/media/image-zoom-controls";
+import { useImageZoomPan } from "@/lib/media/use-image-zoom-pan";
 
 type MediaLightboxProps = {
   open: boolean;
@@ -45,6 +50,8 @@ export function MediaLightbox({
     };
   }, [open, onClose]);
 
+  const { zoom, zoomBy, reset, stageProps } = useImageZoomPan(src ?? "");
+
   if (!open || !src) return null;
 
   return (
@@ -74,6 +81,7 @@ export function MediaLightbox({
       <div
         className="relative flex h-[88vh] w-[88vw] items-center justify-center"
         onClick={(e) => e.stopPropagation()}
+        {...(kind === "image" ? stageProps : {})}
       >
         {kind === "image" ? (
           <Image
@@ -81,6 +89,7 @@ export function MediaLightbox({
             alt={alt ?? ""}
             fill
             sizes="88vw"
+            draggable={false}
             className="select-none object-contain"
             unoptimized
             priority
@@ -96,6 +105,18 @@ export function MediaLightbox({
           />
         )}
       </div>
+
+      {kind === "image" ? (
+        // 根节点 onClick 会关闭预览，控件须拦住冒泡
+        <div onClick={(e) => e.stopPropagation()}>
+          <ImageZoomControls
+            zoom={zoom}
+            onZoomIn={() => zoomBy(IMAGE_ZOOM_BUTTON_STEP)}
+            onZoomOut={() => zoomBy(-IMAGE_ZOOM_BUTTON_STEP)}
+            onReset={reset}
+          />
+        </div>
+      ) : null}
     </div>
     </ModalPortal>
   );

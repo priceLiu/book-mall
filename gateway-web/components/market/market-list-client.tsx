@@ -317,7 +317,7 @@ export function MarketListClient({ initial }: Props) {
           <Chip active={provider === "all"} onClick={() => onProviderChange("all")}>
             All
           </Chip>
-          {data.providers.map((p) => (
+          {(data.providers ?? []).map((p) => (
             <Chip key={p} active={provider === p} onClick={() => onProviderChange(p)}>
               {p}
             </Chip>
@@ -331,7 +331,7 @@ export function MarketListClient({ initial }: Props) {
           <Chip active={task === "all"} onClick={() => onTaskChange("all")}>
             All
           </Chip>
-          {data.tasks.map((t) => (
+          {(data.tasks ?? []).map((t) => (
             <Chip key={t} active={task === t} onClick={() => onTaskChange(t)}>
               {TASK_LABELS[t] ?? t}
             </Chip>
@@ -339,29 +339,29 @@ export function MarketListClient({ initial }: Props) {
         </div>
       </div>
 
-      {data.models.length === 0 ? (
+      {(data.models ?? []).length === 0 ? (
         <div className="gw-card text-center text-sm text-[var(--gw-muted)]">
           没有匹配的模型。平台代付用户仅展示已上架且有定价的模型；BYOK 用户需先绑定对应厂商凭证。
         </div>
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {data.models.map((m) => (
+            {(data.models ?? []).map((m) => (
               <ModelCard key={m.canonicalKey} model={m} />
             ))}
           </div>
 
-          {data.totalPages > 1 ? (
+          {(data.totalPages ?? 1) > 1 ? (
             <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
               <button
                 type="button"
                 className="gw-btn-ghost px-3 py-1.5 text-xs disabled:opacity-40"
-                disabled={data.page <= 1 || loading}
+                disabled={(data.page ?? 1) <= 1 || loading}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
                 上一页
               </button>
-              {Array.from({ length: data.totalPages }, (_, i) => i + 1).map((n) => (
+              {Array.from({ length: data.totalPages ?? 1 }, (_, i) => i + 1).map((n) => (
                 <button
                   key={n}
                   type="button"
@@ -379,8 +379,8 @@ export function MarketListClient({ initial }: Props) {
               <button
                 type="button"
                 className="gw-btn-ghost px-3 py-1.5 text-xs disabled:opacity-40"
-                disabled={data.page >= data.totalPages || loading}
-                onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+                disabled={(data.page ?? 1) >= (data.totalPages ?? 1) || loading}
+                onClick={() => setPage((p) => Math.min(data.totalPages ?? 1, p + 1))}
               >
                 下一页
               </button>

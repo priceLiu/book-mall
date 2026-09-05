@@ -10,6 +10,10 @@ import {
   MINIMAX_SPEECH_MODELS,
 } from "@/lib/gateway/minimax-speech-models";
 import {
+  MINIMAX_VIDEO_KNOWN_MODELS,
+  minimaxH3BillingCanonicalFromInput,
+} from "@/lib/gateway/minimax-video-models";
+import {
   ELEVENLABS_SFX_MODELS,
   ELEVENLABS_STS_MODELS,
   ELEVENLABS_MUSIC_MODELS,
@@ -59,6 +63,89 @@ function dashVideo(modelKey: string, sortOrder: number): CanonicalModelDef {
     unitLabel: "元/秒",
     routes: [{ vendor: "aliyun", modelKey, providerKind: "DASHSCOPE" }],
   };
+}
+
+function buildMinimaxH3CanonicalRegistryDefs(): CanonicalModelDef[] {
+  const grouped = new Map<string, (typeof MINIMAX_VIDEO_KNOWN_MODELS)[number][]>();
+  for (const m of MINIMAX_VIDEO_KNOWN_MODELS) {
+    const ck = minimaxH3BillingCanonicalFromInput({
+      modelKey: m.modelKey,
+      resolution: m.defaultParams.resolution as string | undefined,
+    });
+    const list = grouped.get(ck) ?? [];
+    list.push(m);
+    grouped.set(ck, list);
+  }
+
+  const metaByCanonical: Record<
+    string,
+    {
+      displayName: string;
+      mediaKind: ModelMediaKind;
+      billingKind: "PER_SECOND" | "PER_1K_TOKENS";
+      unitLabel: string;
+      sortOrder: number;
+    }
+  > = {
+    "minimax-h3-2k": {
+      displayName: "MiniMax H3 · 2K",
+      mediaKind: "IMAGE_TO_VIDEO",
+      billingKind: "PER_SECOND",
+      unitLabel: "元/秒",
+      sortOrder: 76.6,
+    },
+    "minimax-h3-768p": {
+      displayName: "MiniMax H3 · 768P",
+      mediaKind: "IMAGE_TO_VIDEO",
+      billingKind: "PER_SECOND",
+      unitLabel: "元/秒",
+      sortOrder: 76.7,
+    },
+    "minimax-h3-regeneration-2k": {
+      displayName: "MiniMax H3 再生成",
+      mediaKind: "VIDEO_TO_VIDEO",
+      billingKind: "PER_SECOND",
+      unitLabel: "元/秒",
+      sortOrder: 76.8,
+    },
+    "minimax-h3-context-ir": {
+      displayName: "MiniMax H3 Context-IR",
+      mediaKind: "TEXT_LLM",
+      billingKind: "PER_1K_TOKENS",
+      unitLabel: "元/百万 tokens",
+      sortOrder: 76.9,
+    },
+  };
+
+  const defs: CanonicalModelDef[] = [];
+  for (const [canonicalModelKey, models] of grouped) {
+    const meta = metaByCanonical[canonicalModelKey] ?? {
+      displayName: canonicalModelKey,
+      mediaKind: "IMAGE_TO_VIDEO" as const,
+      billingKind: "PER_SECOND" as const,
+      unitLabel: "元/秒",
+      sortOrder: 76.6,
+    };
+    defs.push({
+      canonicalModelKey,
+      displayName: meta.displayName,
+      description: models.map((m) => m.displayName).join(" · "),
+      mediaKind: meta.mediaKind,
+      role: "VIDEO",
+      requestKind: "VIDEO",
+      appTags: [...VISUAL],
+      sortOrder: meta.sortOrder,
+      primaryVendor: "minimax",
+      billingKind: meta.billingKind,
+      unitLabel: meta.unitLabel,
+      routes: models.map((m) => ({
+        vendor: "minimax",
+        modelKey: m.modelKey,
+        providerKind: "MINIMAX" as const,
+      })),
+    });
+  }
+  return defs.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 function bailianVideo(modelKey: string, sortOrder: number): CanonicalModelDef {
@@ -231,10 +318,39 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
     mediaKind: "TEXT_LLM",
     role: "LLM",
     requestKind: "TTS",
-    appTags: ["canvas", "story"],
+    appTags: ["canvas", "story", "book"],
     sortOrder: 53,
     primaryVendor: "aliyun",
     routes: [{ vendor: "aliyun", modelKey: "qwen3-tts", providerKind: "BAILIAN" }],
+  },
+  // 我的 AI 空间 · 音频库 TTS（非实时语音合成 SpeechSynthesizer）
+  {
+    canonicalModelKey: "cosyvoice-v3-flash",
+    displayName: "CosyVoice v3 Flash",
+    description: "百炼非实时语音合成，支持系统音色与复刻音色，24 小时音频链接",
+    mediaKind: "TEXT_LLM",
+    role: "LLM",
+    requestKind: "TTS",
+    appTags: ["book", "canvas", "story"],
+    sortOrder: 531,
+    primaryVendor: "aliyun",
+    routes: [
+      { vendor: "aliyun", modelKey: "cosyvoice-v3-flash", providerKind: "BAILIAN" },
+    ],
+  },
+  {
+    canonicalModelKey: "cosyvoice-v3-plus",
+    displayName: "CosyVoice v3 Plus",
+    description: "百炼非实时语音合成 Plus 档，音质更佳",
+    mediaKind: "TEXT_LLM",
+    role: "LLM",
+    requestKind: "TTS",
+    appTags: ["book", "canvas", "story"],
+    sortOrder: 532,
+    primaryVendor: "aliyun",
+    routes: [
+      { vendor: "aliyun", modelKey: "cosyvoice-v3-plus", providerKind: "BAILIAN" },
+    ],
   },
   dashVideo("happyhorse-1.0-i2v", 54),
   dashVideo("happyhorse-1.0-t2v", 55),
@@ -249,6 +365,40 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   dashVideo("wan2.7-i2v-2026-04-25", 61),
   dashVideo("wan2.7-t2v", 62),
   dashVideo("wan2.7-t2v-2026-04-25", 63),
+  dashVideo("wan3.0-video", 631),
+  dashVideo("wan3.0-video-prime", 632),
+  // 数字人对口型（我的 AI 空间 · 合成台）：形象图 + 人声音频 → 口播视频；厂商同时处理中任务数为 1
+  {
+    canonicalModelKey: "wan2.2-s2v",
+    displayName: "万相 2.2 数字人（S2V）",
+    description: "单张形象图 + 20 秒内人声音频，生成口型/表情同步的口播视频",
+    mediaKind: "IMAGE_TO_VIDEO",
+    role: "VIDEO",
+    requestKind: "VIDEO",
+    appTags: ["book", ...VISUAL],
+    sortOrder: 639,
+    primaryVendor: "aliyun",
+    billingKind: "PER_SECOND",
+    unitLabel: "元/秒",
+    routes: [{ vendor: "aliyun", modelKey: "wan2.2-s2v", providerKind: "DASHSCOPE" }],
+  },
+  // 形象图预检：同步接口，提交 S2V 前拦掉不合格人像（S2V 排队常达数十分钟，失败代价高）
+  {
+    canonicalModelKey: "wan2.2-s2v-detect",
+    displayName: "万相 2.2 数字人形象检测",
+    description: "同步检测形象图是否满足 S2V 人像规范（是否为人像、是否合规）",
+    mediaKind: "TEXT_TO_IMAGE",
+    role: "IMAGE",
+    requestKind: "IMAGE",
+    appTags: ["book", ...VISUAL],
+    sortOrder: 640,
+    primaryVendor: "aliyun",
+    billingKind: "PER_IMAGE",
+    unitLabel: "元/张",
+    routes: [
+      { vendor: "aliyun", modelKey: "wan2.2-s2v-detect", providerKind: "DASHSCOPE" },
+    ],
+  },
   dashVideo("wan2.5-i2v-preview", 64),
   dashVideo("wan2.5-t2v-preview", 65),
   dashVideo("pixverse-c1-it2v", 66),
@@ -555,6 +705,7 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
   bailianChat("qwen3.5-plus", 81),
   bailianChat("qwen3.5-27b", 82),
   bailianChat("qwen3.6-plus", 83),
+  bailianChat("qwen3.8-max", 83.2),
   bailianChat("qwen3.6-flash", 84),
   kieMusic(
     "kie-suno-api",
@@ -669,4 +820,5 @@ export const LEGACY_INVOKE_MODEL_REGISTRY: CanonicalModelDef[] = [
     unitLabel: "元/次",
     routes: [{ vendor: "elevenlabs", modelKey: m.modelKey, providerKind: "ELEVENLABS" as const }],
   })),
+  ...buildMinimaxH3CanonicalRegistryDefs(),
 ];

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 import { deleteManagedOssObjectByUrl } from "@/lib/oss-delete-object";
+import { cascadeDeletePinsBySource } from "@/lib/ai-space/ai-space-pin-service";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,26 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
   const url = new URL(req.url);
+  const id = url.searchParams.get("id")?.trim();
+  if (id) {
+    const row = await prisma.ecomAsset.findFirst({
+      where: { id, userId: auth.userId },
+      select: {
+        id: true,
+        module: true,
+        kind: true,
+        title: true,
+        prompt: true,
+        ossUrl: true,
+        thumbnailUrl: true,
+        createdAt: true,
+      },
+    });
+    if (!row) {
+      return NextResponse.json({ error: "未找到" }, { status: 404 });
+    }
+    return NextResponse.json({ item: row });
+  }
   const ecomModule = url.searchParams.get("module")?.trim();
   const items = await prisma.ecomAsset.findMany({
     where: {
@@ -43,6 +64,7 @@ export async function DELETE(req: Request) {
   if (row.thumbnailUrl && row.thumbnailUrl !== row.ossUrl) {
     await deleteManagedOssObjectByUrl(row.thumbnailUrl).catch(() => undefined);
   }
+  await cascadeDeletePinsBySource("ecom_asset", row.id);
   await prisma.ecomAsset.delete({ where: { id: row.id } });
   return NextResponse.json({ ok: true });
 }

@@ -23,12 +23,18 @@ import {
   STORY_PRO2_THEME_OUTLINE_SYSTEM,
   STORY_PRO2_THEME_OUTLINE_USER_PREFIX,
 } from "./story-pro2-theme-outline-prompt";
+import { resolveShotPromptPolishQueuePrompt } from "./pro2-shot-prompt-polish";
 import {
   buildScriptStudioContinuationPrompt,
   buildScriptStudioFirstRoundPrompt,
   scriptStudioBatchRange,
 } from "./script-studio-prompts";
+import {
+  buildScriptStudioContinuationContext,
+  parseScriptStudioCanonicalJson,
+} from "./script-studio-continuation-context";
 import { isPro2GeneralTextNode, isPro2StoryOutlineTextNode } from "./pro2-text-purpose";
+import { composeStoryProGeneralTextUserPrompt } from "./pro2-general-text-prompt";
 import { assertStoryLlmVisionModel } from "./story-llm-vision-models";
 import { isLikelyVideoUrl } from "./media-url-kind";
 
@@ -36,13 +42,19 @@ function proClientPage(projectId: string): string {
   return `canvas/${projectId}/story-pro`;
 }
 
-export type StoryProLlmSection = "outline" | "character" | "scene" | "storyboard";
+export type StoryProLlmSection =
+  | "outline"
+  | "character"
+  | "scene"
+  | "storyboard"
+  | "shot_prompts";
 
 const PROMPT_KEY: Record<StoryProLlmSection, string> = {
   outline: "promptOutline",
   character: "promptCharacter",
   scene: "promptScene",
   storyboard: "promptStoryboard",
+  shot_prompts: "promptShotPrompts",
 };
 
 type StoryRow = Record<string, unknown>;
@@ -57,8 +69,11 @@ function hashSalt(args: {
   rowKey?: string;
   llmSection?: string;
   mediaKind?: string;
+  polishMode?: string;
 }): string {
-  return [args.llmSection, args.rowKey, args.mediaKind].filter(Boolean).join(":");
+  return [args.llmSection, args.rowKey, args.mediaKind, args.polishMode]
+    .filter(Boolean)
+    .join(":");
 }
 
 /** 2.0 文本/脚本节点 · 主题 → 工业化剧本批次（不自动 spawn 下游列） */
@@ -112,19 +127,24 @@ export async function runStoryProStarterThemeOutline(
       });
     } else {
       const { start, end } = scriptStudioBatchRange(batchIndex, totalEpisodes);
-      const frozen = String(data.scriptStudioFrozenBiblesMd ?? "").trim();
-      const completed = String(data.scriptStudioCompletedBatchesMd ?? "").trim();
-      const continuation = buildScriptStudioContinuationPrompt({
+      const completedJson = parseScriptStudioCanonicalJson(
+        data.scriptStudioCanonicalJson,
+      );
+      const continuationContext = buildScriptStudioContinuationContext({
+        frozenBiblesMd: String(data.scriptStudioFrozenBiblesMd ?? "").trim(),
+        completedCanonicalJson: completedJson.length ? completedJson : null,
+      });
+      prompt = buildScriptStudioContinuationPrompt({
         system: systemKind,
         totalEpisodes,
         batchStart: start,
         batchEnd: end,
         rawScript,
+        continuationContext,
       });
-      prompt = [frozen, completed, continuation].filter(Boolean).join("\n\n");
     }
     system =
-      "你是资深工业影视总编剧，严格执行用户消息中的工业化剧本生产规范；输出 Markdown，不要 JSON。";
+      "你是资深工业影视总编剧，严格执行用户消息中的工业化剧本生产规范；只输出 ```script-studio-batch``` JSON 围栏，禁止 Markdown/GFM/说明文字。";
   } else {
     system =
       (typeof data.themeOutlineSystemPrompt === "string"
@@ -146,7 +166,7 @@ export async function runStoryProStarterThemeOutline(
   return runStoryLlmEngineNode({
     ...args,
     clientPage: proClientPage(args.projectId),
-    storyScope: args.storyScope ?? { mediaKind: "themeOutline" },
+    storyScope: args.storyScope ?? { mediaKind: "scriptStudioBatch" },
     node,
     engineKind: "story-outline-engine",
     executeAsync: args.executeAsync ?? true,
@@ -183,9 +203,15 @@ export async function runStoryProStarterGeneralText(
   );
   const videoUrls = mediaUrls.filter((u) => isLikelyVideoUrl(u));
   const imageUrls = mediaUrls.filter((u) => !isLikelyVideoUrl(u));
-  let prompt =
-    (typeof data.themeInput === "string" ? data.themeInput : "").trim() ||
-    (args.node.textInputs ?? []).filter(Boolean).join("\n\n").trim();
+  const themeInput =
+    typeof data.themeInput === "string" ? data.themeInput : "";
+  const upstreamText = (args.node.textInputs ?? []).filter(
+    (s): s is string => typeof s === "string" && Boolean(s.trim()),
+  );
+  let prompt = composeStoryProGeneralTextUserPrompt({
+    themeInput,
+    textInputs: upstreamText,
+  });
   const preset = String(data.pro2PresetKind ?? "").trim();
   if (!prompt && preset === "image-to-prompt" && imageUrls.length > 0) {
     prompt = STORY_PRO2_IMAGE_TO_PROMPT_USER;
@@ -221,6 +247,8 @@ export async function runStoryProStarterGeneralText(
   const node: CanvasRunNodeInput = {
     ...args.node,
     type: "story-outline-engine",
+    // 上游正文已写入 prompt，避免 runStoryLlmEngineNode 再拼一遍 textInputs
+    textInputs: [],
     data: {
       ...data,
       prompt,
@@ -234,6 +262,25 @@ export async function runStoryProStarterGeneralText(
     node,
     engineKind: "story-outline-engine",
     executeAsync: args.executeAsync ?? true,
+  });
+}
+
+/** 2.0 提示词节点 · general LLM（复用 starter 管线，读 prompt 字段） */
+export async function runStoryProPromptGeneralText(
+  args: RunEngineNodeArgs,
+): Promise<RunEngineNodeResult> {
+  const data = args.node.data ?? {};
+  const prompt = typeof data.prompt === "string" ? data.prompt : "";
+  return runStoryProStarterGeneralText({
+    ...args,
+    node: {
+      ...args.node,
+      data: {
+        ...data,
+        themeInput: prompt,
+        pro2TextPurpose: "general",
+      },
+    },
   });
 }
 
@@ -288,8 +335,33 @@ export async function runStoryProScriptHubSection(
   },
 ): Promise<RunEngineNodeResult> {
   const data = args.node.data ?? {};
-  const prompt = String(data[PROMPT_KEY[args.llmSection]] ?? data.prompt ?? "");
-  const salt = hashSalt({ llmSection: args.llmSection });
+  const promptKey = PROMPT_KEY[args.llmSection];
+  let prompt = String(data[promptKey] ?? data.prompt ?? "");
+  if (args.llmSection === "shot_prompts") {
+    const rowKey = args.storyScope?.rowKey?.trim();
+    const queue = data.shotPromptPolishQueue as Record<string, string> | undefined;
+    const queued = rowKey
+      ? resolveShotPromptPolishQueuePrompt(
+          queue,
+          rowKey,
+          args.storyScope?.polishMode,
+        )
+      : undefined;
+    if (queued) {
+      prompt = queued;
+    }
+    const system = String(
+      data.shotPromptPolishSystemPrompt ?? data.outlineSystemPrompt ?? "",
+    ).trim();
+    if (system) {
+      (data as Record<string, unknown>).outlineSystemPrompt = system;
+    }
+  }
+  const salt = hashSalt({
+    llmSection: args.llmSection,
+    rowKey: args.storyScope?.rowKey,
+    polishMode: args.storyScope?.polishMode,
+  });
   const node: CanvasRunNodeInput = {
     ...args.node,
     type: "story-outline-engine",
@@ -354,7 +426,7 @@ export async function runStoryProCharacterRow(
 ): Promise<RunEngineNodeResult> {
   const rows = (args.node.data?.rows as StoryRow[]) ?? [];
   const row = pickRow(rows, args.rowKey);
-  const rawPrompt = String(row.prompt ?? "");
+  const rawPrompt = String(row.prompt ?? "").trim();
   const prompt = prependStoryProStyleAnchor(rawPrompt, args.styleAnchor);
   const assetRefUrls = await resolveCharacterRowAssetRefUrls(
     args.userId,

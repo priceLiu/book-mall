@@ -6,6 +6,7 @@ import type { StoryProThemeSystemPromptTemplateId } from "./story-pro-theme-temp
 import type { StoryTextRevision } from "./story-revision";
 import type { StoryRefImage } from "./story-ref-image";
 import type { StoryLlmSection } from "./story-workspace-types";
+import type { Pro2ScriptCategoryId } from "./pro2-script-category-presets";
 
 export type { StoryLlmSection };
 
@@ -19,6 +20,7 @@ export type StoryProRunContext = {
     | "video"
     | "tts"
     | "themeOutline"
+    | "scriptStudioBatch"
     | "generalText"
     | "music";
 };
@@ -44,6 +46,21 @@ export type StoryProFinalizedScriptSnapshot = {
   outlineMd: string;
   characterMd: string;
   storyboardMd: string;
+};
+
+/** LLM 首次/重生成返回的原始剧本快照（immutable 真源 · 用户编辑改工作副本） */
+export type StoryProProductionScriptOrigin = {
+  savedAt: string;
+  taskId?: string;
+  section: import("./story-workspace-types").StoryLlmSection;
+  step?: string;
+  /** 模型原始输出（人读 MD + JSON 围栏） */
+  rawTextOutput: string;
+  outlineMd?: string;
+  characterMd?: string;
+  sceneMd?: string;
+  storyboardMd?: string;
+  productionScript?: import("./data/pro2-production-script-schema").Pro2ProductionScript;
 };
 
 export type StoryProStyleRefImage = StoryRefImage & {
@@ -104,11 +121,38 @@ export type StoryProScriptHubNodeData = {
     modelKey?: string;
     params?: Record<string, unknown>;
   };
+  /** 2.0 · 从大纲「视觉风格总纲」解析的全片视觉锚定（生图统一风格） */
+  visualStylePack?: import("./story-pro-visual-style-pack").StoryProVisualStylePack;
+  /** 制作包 prompt 版本 · ≥13 为 JSON-only */
+  storyPro2PackPromptVersion?: number;
+  /** 2.0 · LLM 结构化 JSON 胖结构真源（schemaVersion: 1） */
+  productionScript?: import("./data/pro2-production-script-schema").Pro2ProductionScript;
+  /** LLM 返回瞬间的原始版本（autosave 立即落库 · 用户编辑不覆盖） */
+  productionScriptOrigin?: StoryProProductionScriptOrigin;
+  /** full_pack 重生成时归档的旧原始版本（最多 3 条） */
+  productionScriptOriginHistory?: StoryProProductionScriptOrigin[];
+  /** 分镜图/视频生成完成后最后一次增量回写 Hub 的时间 */
+  productionScriptMediaRevisionAt?: string;
+  /** 分镜视频行快照（自视频列增量回写） */
+  scriptStudioVideoRows?: StoryProVideoRow[];
   storyboardMd: string;
+  /** 点击发送后、段级 pending 写入前：保持「生成中」扫光，避免空态闪一下 */
+  hubGenerateIntent?: boolean;
   /** 2.0 输入坞 · 用户提示词 */
   dockInput?: string;
   /** 2.0 输入坞 · 粘贴的角色/场景等参考图 */
   dockRefImages?: StoryRefImage[];
+  /** 制作档：简版 director / 专业版 industrial */
+  packProfile?: "director" | "industrial";
+  /** 剧本类别 preset（古风甜宠 / 默认剧本大师） */
+  scriptCategoryId?: Pro2ScriptCategoryId;
+  scriptCategoryLabel?: string;
+  /** 顶栏类别参考标题（可编辑 · 仅当前节点） */
+  scriptCategoryDocTitle?: string;
+  /** 顶栏类别参考正文（可编辑 · 发送时并入 LLM · 不写回后台 docs） */
+  scriptCategoryDocBody?: string;
+  /** 顶栏「提示词」chip 当前预览/编辑来源（悬停切换） */
+  scriptPromptViewId?: "category-doc" | "upstream-outline";
   outlineRuntime?: CanvasNodeRuntime;
   characterRuntime?: CanvasNodeRuntime;
   sceneRuntime?: CanvasNodeRuntime;
@@ -121,6 +165,9 @@ export type StoryProScriptHubNodeData = {
   promptCharacter: string;
   promptScene?: string;
   promptStoryboard: string;
+  /** Pass 2 · 按镜 user prompt 队列（rowKey → prompt） */
+  shotPromptPolishQueue?: Record<string, string>;
+  shotPromptPolishSystemPrompt?: string;
   outlineHistory?: StoryTextRevision[];
   characterHistory?: StoryTextRevision[];
   sceneHistory?: StoryTextRevision[];
@@ -132,6 +179,23 @@ export type StoryProScriptHubNodeData = {
   feasibility?: StoryProFeasibilityAssessment;
   /** 剧本创作 · 工业化分批（与 starter 同步） */
   scriptStudioMode?: boolean;
+  /** json-v1 = LLM JSON 批次真源；缺省 = 旧 MD 只读 */
+  scriptStudioFormat?: string;
+  scriptStudioCanonicalJson?: unknown;
+  /** 生产向导 v2 · 全屏两步向导（见 docs/剧本可视化功能.md） */
+  productionWizardMode?: boolean;
+  /** 生产向导 · 资产卡草稿（prompt / 参考图 / 模型 / 出图占位） */
+  productionWizardAssetDrafts?: Record<
+    string,
+    import("./pro2-production-wizard-assets").Pro2ProductionWizardAssetDraft
+  >;
+  /** 生产向导 Step3 · 分镜图/视频 draft（key: frame:1 / video:1） */
+  productionWizardShotDrafts?: Record<
+    string,
+    import("./pro2-production-wizard-shot-drafts").Pro2ProductionWizardShotDraft
+  >;
+  /** hub 入口 · 工作区 ID（无 starter 时挂 hub） */
+  workspaceIds?: StoryProWorkspaceIds;
   /** 小白生剧 / 上传剧本 */
   scriptStudioInputMode?: StoryProStarterMode;
   /** 剧本创作 · 主题或描述（hub 入口） */
@@ -179,6 +243,10 @@ export type StoryProCharacterRow = {
   name: string;
   role: string;
   appearance: string;
+  /** 角色表 · 性格 */
+  personality?: string;
+  /** 角色辞典 · AI生图提示词(英文) */
+  aiImagePrompt?: string;
   prompt: string;
   promptHistory?: StoryTextRevision[];
   rowRevisionHistory?: StoryRowFieldRevision[];
@@ -192,6 +260,18 @@ export type StoryProSceneRow = {
   key: string;
   name: string;
   description: string;
+  /** 场景辞典 · 环境 */
+  environment?: string;
+  /** 场景辞典 · 时间 */
+  time?: string;
+  /** 场景辞典 · 气氛 */
+  mood?: string;
+  /** 场景辞典 · 生图关键词（中文或英文） */
+  imageKeywords?: string;
+  /** 场景辞典 · 固定反向提示词 */
+  negativePrompt?: string;
+  /** 制作包 scenes[].visualStyleTag */
+  visualStyleTag?: string;
   prompt: string;
   promptHistory?: StoryTextRevision[];
   rowRevisionHistory?: StoryRowFieldRevision[];
@@ -264,6 +344,13 @@ export type StoryProFrameRow = {
   description: string;
   dialogue: string;
   videoPrompt: string;
+  /** v2 Pass2 · 分镜图提示词（优先于 aiImagePrompt） */
+  frameImagePrompt?: string;
+  lighting?: string;
+  sfxNote?: string;
+  audioNote?: string;
+  /** 分镜表 · AI生图提示词(英文) · v1 legacy */
+  aiImagePrompt?: string;
   prompt: string;
   promptHistory?: StoryTextRevision[];
   rowRevisionHistory?: StoryRowFieldRevision[];
@@ -363,6 +450,8 @@ export type StoryProUploadedScriptMeta = {
 export type StoryProStarterMode = "upload" | "generate";
 
 export type StoryProStarterNodeData = {
+  /** 节点标题（Pro2 文本节点 · Dock 上游 chip 展示） */
+  label?: string;
   /** upload=上传剧本；generate=主题输入生成大纲（2.0 文本节点） */
   starterMode?: StoryProStarterMode;
   /** 2.0 文本节点 · 用户输入的故事主题 */
@@ -379,6 +468,9 @@ export type StoryProStarterNodeData = {
   themeOutlineSystemPrompt?: string;
   /** 剧本创作画布 · 工业化标准化分批生成 */
   scriptStudioMode?: boolean;
+  /** json-v1 = LLM JSON 批次真源；缺省 = 旧 MD 只读 */
+  scriptStudioFormat?: string;
+  scriptStudioCanonicalJson?: unknown;
   /** 小白生剧 / 上传剧本 */
   scriptStudioInputMode?: StoryProStarterMode;
   /** 剧本创作 · 主题或描述（迁移前 starter 入口） */

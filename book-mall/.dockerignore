@@ -1,5 +1,7 @@
 node_modules
 .next
+tmp
+test
 .git
 .gitignore
 *.md

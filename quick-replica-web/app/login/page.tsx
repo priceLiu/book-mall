@@ -1,14 +1,12 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { QrLoginForm } from "@/components/auth/qr-login-form";
+import { qrLoginHref } from "@/lib/portal-auth-links";
 import { fetchToolsSession } from "@/lib/tools-introspect";
-import { getMainSiteOrigin } from "@/lib/site-origin";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "登录",
-  description: "登录快速复制 QuickReplica，按示例快速复制生成视频、图像与场景。",
 };
 
 function safeRedirect(raw: string | string[] | undefined): string {
@@ -26,10 +24,5 @@ export default async function LoginPage({
   const token = cookies().get("tools_token")?.value;
   const session = await fetchToolsSession(token);
   if (session.active) redirect(target);
-
-  return (
-    <main className="flex h-dvh w-full items-center justify-center overflow-y-auto px-4 py-10">
-      <QrLoginForm bookOrigin={getMainSiteOrigin()} redirect={target} />
-    </main>
-  );
+  redirect(qrLoginHref(target));
 }

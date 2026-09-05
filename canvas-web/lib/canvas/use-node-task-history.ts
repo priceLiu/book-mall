@@ -180,8 +180,23 @@ export function useNodeTaskHistory(nodeId: string | null | undefined) {
   const runtimeTaskId = useCanvasStore((s) => {
     if (!nodeId) return undefined;
     const n = s.nodes.find((x) => x.id === nodeId);
-    return (n?.data as { runtime?: { taskId?: string; status?: string } })
-      ?.runtime?.taskId;
+    if (!n) return undefined;
+    const d = n.data as {
+      runtime?: { taskId?: string };
+      outlineRuntime?: { taskId?: string };
+      characterRuntime?: { taskId?: string };
+      sceneRuntime?: { taskId?: string };
+      storyboardRuntime?: { taskId?: string };
+    };
+    // Hub 用段级 *Runtime.taskId；媒体节点用 data.runtime.taskId
+    return (
+      d.runtime?.taskId?.trim() ||
+      d.outlineRuntime?.taskId?.trim() ||
+      d.characterRuntime?.taskId?.trim() ||
+      d.sceneRuntime?.taskId?.trim() ||
+      d.storyboardRuntime?.taskId?.trim() ||
+      undefined
+    );
   });
 
   const subscribe = useCallback(

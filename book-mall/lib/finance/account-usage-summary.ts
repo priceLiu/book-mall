@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import { BYOK_TASK_KIND_LABEL } from "@/lib/billing/byok-pricing";
 import {
   BILLING_CATEGORY_LABEL,
   BILLING_CATEGORY_ORDER,
@@ -7,7 +6,7 @@ import {
   type BillingCategoryKey,
 } from "@/lib/billing/billing-category";
 import type { AccountRef } from "@/lib/billing/credit-account-service";
-import { getPoolBalances } from "@/lib/billing/credit-account-service";
+import { getAccountCreditBalances } from "@/lib/billing/credit-account-service";
 import {
   buildGatewayLogActorWhere,
   buildGatewayLogWhereForTeamTenant,
@@ -119,7 +118,7 @@ export async function getAccountUsageSummary(
 
   const account = await prisma.creditAccount.findUnique({
     where: { ownerType_ownerId: ref },
-    select: { id: true, planId: true, balanceCredits: true, videoBalanceCredits: true },
+    select: { id: true, planId: true, balanceCredits: true },
   });
 
   const user = await prisma.user.findUnique({
@@ -127,8 +126,8 @@ export async function getAccountUsageSummary(
     select: { billingPersona: true },
   });
 
-  const [pools, topupAgg, grantAgg, adjustAgg, consumedAgg, totalCalls] = await Promise.all([
-    getPoolBalances(ref),
+  const [balances, topupAgg, grantAgg, adjustAgg, consumedAgg, totalCalls] = await Promise.all([
+    getAccountCreditBalances(ref),
     account
       ? prisma.creditLedger.aggregate({
           where: { accountId: account.id, createdAt: { gte: since }, type: "TOPUP" },
@@ -176,11 +175,7 @@ export async function getAccountUsageSummary(
   let grantCreditsThisMonth = Math.max(0, grantAgg._sum.credits ?? 0);
   const adjustCreditsThisMonth = Math.max(0, adjustAgg._sum.credits ?? 0);
   const creditsConsumed = Math.abs(consumedAgg._sum.credits ?? 0);
-  const creditsRemaining = pools.general.balance + pools.video.balance;
-
-  if (user?.billingPersona === "BYOK" && !account?.planId) {
-    grantCreditsThisMonth = 0;
-  }
+  const creditsRemaining = balances.balance;
 
   const topupCreditsThisMonth = Math.min(
     topupRaw,
@@ -198,170 +193,26 @@ export async function getAccountUsageSummary(
     adjustCreditsThisMonth,
     creditsConsumed,
     creditsRemaining,
-    generalBalance: pools.general.balance,
-    videoBalance: pools.video.balance,
+    balance: balances.balance,
+    reserved: balances.reserved,
     totalCallsThisMonth: totalCalls,
   };
 }
 
-/** 套餐内任务使用情况（本月 Gateway 成功/失败 + BYOK 额度剩余）。 */
+/** 套餐内任务使用情况（本月 Gateway 成功/失败 + 七类消耗）。 */
 export async function getAccountPackageUsageRows(
   bookUserId: string,
-  scopeKey: string | null,
+  _scopeKey: string | null = null,
 ): Promise<PackageUsageRow[]> {
-  const since = monthStartUtc();
-  const periodKey = currentPeriodKey();
-
-  const [logs, quotas, usage, settlementCounts] = await Promise.all([
-    prisma.gatewayRequestLog.findMany({
-      where: buildGatewayLogActorWhere(bookUserId, {
-        submittedFrom: since,
-        statuses: ["SUCCEEDED", "FAILED"],
-      }),
-      select: { requestKind: true, status: true, inputSummary: true },
-    }),
-    scopeKey
-      ? prisma.byokTaskQuota.findMany({
-          where: { scopeKey, active: true },
-          orderBy: { taskKind: "asc" },
-        })
-      : Promise.resolve([]),
-    scopeKey
-      ? prisma.byokUsageMonthly.findMany({
-          where: { ownerType: "USER", ownerId: bookUserId, periodKey },
-        })
-      : Promise.resolve([]),
-    scopeKey
-      ? prisma.billingSettlementLine.groupBy({
-          by: ["byokTaskKind"],
-          where: {
-            ownerType: "USER",
-            ownerId: bookUserId,
-            periodKey,
-            settlementKind: "BYOK_QUOTA_INCLUDED",
-            byokTaskKind: { not: null },
-          },
-          _count: { _all: true },
-        })
-      : Promise.resolve([]),
-  ]);
-
-  const usageByKind = new Map(usage.map((u) => [u.taskKind, u]));
-  const settlementByKind = new Map(
-    settlementCounts.map((s) => [s.byokTaskKind!, s._count._all]),
-  );
-  const counts = new Map<BillingCategoryKey, { succeeded: number; failed: number }>();
-
-  for (const log of logs) {
-    const cat = classifyBillingCategory(log);
-    const row = counts.get(cat) ?? { succeeded: 0, failed: 0 };
-    if (log.status === "SUCCEEDED") row.succeeded += 1;
-    else row.failed += 1;
-    counts.set(cat, row);
-  }
-
-  const quotaRows: PackageUsageRow[] = await Promise.all(
-    quotas.map(async (q) => {
-      const c = counts.get(q.taskKind) ?? { succeeded: 0, failed: 0 };
-      const usageRow = usageByKind.get(q.taskKind);
-      const settlementUsed = settlementByKind.get(q.taskKind) ?? 0;
-      const used = settlementUsed;
-      if (usageRow && usageRow.includedUsed !== settlementUsed) {
-        await prisma.byokUsageMonthly
-          .update({
-            where: { id: usageRow.id },
-            data: { includedUsed: settlementUsed },
-          })
-          .catch(() => undefined);
-      }
-      return {
-        key: q.taskKind,
-        label: BYOK_TASK_KIND_LABEL[q.taskKind] ?? q.label,
-        total: q.monthlyIncluded,
-        includedUsed: used,
-        succeeded: c.succeeded,
-        failed: c.failed,
-        remaining: Math.max(0, q.monthlyIncluded - used),
-      };
-    }),
-  );
-
-  const textCounts = counts.get("TEXT") ?? { succeeded: 0, failed: 0 };
-  const otherCounts = counts.get("OTHER") ?? { succeeded: 0, failed: 0 };
-  return [
-    ...quotaRows,
-    {
-      key: "TEXT",
-      label: BILLING_CATEGORY_LABEL.TEXT,
-      total: null,
-      includedUsed: null,
-      succeeded: textCounts.succeeded,
-      failed: textCounts.failed,
-      remaining: null,
-    },
-    {
-      key: "OTHER",
-      label: BILLING_CATEGORY_LABEL.OTHER,
-      total: null,
-      includedUsed: null,
-      succeeded: otherCounts.succeeded,
-      failed: otherCounts.failed,
-      remaining: null,
-    },
-  ];
+  return getAccountPlatformCategoryUsageRows(bookUserId);
 }
 
-/** BYOK 本月任务含/已用/剩余（个人中心概览用）。 */
-export async function getAccountByokTaskSummary(bookUserId: string, scopeKey: string) {
-  const periodKey = currentPeriodKey();
-  const [quotas, usage, settlementCounts] = await Promise.all([
-    prisma.byokTaskQuota.findMany({
-      where: { scopeKey, active: true },
-      orderBy: { taskKind: "asc" },
-    }),
-    prisma.byokUsageMonthly.findMany({
-      where: { ownerType: "USER", ownerId: bookUserId, periodKey },
-    }),
-    prisma.billingSettlementLine.groupBy({
-      by: ["byokTaskKind"],
-      where: {
-        ownerType: "USER",
-        ownerId: bookUserId,
-        periodKey,
-        settlementKind: "BYOK_QUOTA_INCLUDED",
-        byokTaskKind: { not: null },
-      },
-      _count: { _all: true },
-    }),
-  ]);
-
-  const usageByKind = new Map(usage.map((u) => [u.taskKind, u]));
-  const settlementByKind = new Map(
-    settlementCounts.map((s) => [s.byokTaskKind!, s._count._all]),
-  );
-  return Promise.all(
-    quotas.map(async (q) => {
-      const row = usageByKind.get(q.taskKind);
-      const includedUsed = settlementByKind.get(q.taskKind) ?? row?.includedUsed ?? 0;
-      if (row && row.includedUsed !== includedUsed) {
-        await prisma.byokUsageMonthly
-          .update({
-            where: { id: row.id },
-            data: { includedUsed },
-          })
-          .catch(() => undefined);
-      }
-      const monthlyIncluded = q.monthlyIncluded;
-      return {
-        taskKind: q.taskKind,
-        label: BYOK_TASK_KIND_LABEL[q.taskKind] ?? q.label,
-        monthlyIncluded,
-        includedUsed,
-        includedRemaining: Math.max(0, monthlyIncluded - includedUsed),
-        overageUsed: row?.overageUsed ?? 0,
-      };
-    }),
-  );
+/** 历史 BYOK 含次摘要（已退役，恒空）。 */
+export async function getAccountByokTaskSummary(
+  _bookUserId: string,
+  _scopeKey: string,
+): Promise<[]> {
+  return [];
 }
 
 /** 按工具聚合 Gateway 成功调用。 */

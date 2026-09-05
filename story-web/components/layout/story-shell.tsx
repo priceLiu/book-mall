@@ -1,51 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Clapperboard, Loader2 } from "lucide-react";
 import { STORY_NAV_ITEMS } from "@/lib/site-config";
 import { PortalNav } from "@/components/portal-nav";
+import { StoryCreditBalanceChip } from "@/components/platform-credit-balance-chip";
+import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
+import { useStorySession } from "@/components/auth/story-session-provider";
 import { getBookAccountUrl } from "@/lib/site-origin";
 import { cn } from "@/lib/utils";
-import {
-  fetchStoryViewerUser,
-  type StoryViewerUser,
-} from "@/lib/story-viewer-session";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { storyLoginHref, storyRegisterHref } from "@/lib/portal-auth-links";
 
-/** 未登录跳本域品牌登录/注册页，保留 redirect 回跳。 */
-function localAuthHref(kind: "login" | "register"): string {
-  const path =
-    typeof window !== "undefined"
-      ? window.location.pathname + window.location.search
-      : "/";
-  return `/${kind}?redirect=${encodeURIComponent(path || "/")}`;
+function shellReturnPath(): string {
+  if (typeof window === "undefined") return "/";
+  return window.location.pathname + window.location.search || "/";
 }
 
 function ShellAuthSlot() {
   const base = useBookMallBaseUrl();
+  const { loading, active, displayName } = useStorySession();
   const bookAccountUrl = getBookAccountUrl();
-  const [user, setUser] = useState<StoryViewerUser | null | undefined>(undefined);
 
-  useEffect(() => {
-    if (!base) {
-      setUser(null);
-      return;
-    }
-    const ac = new AbortController();
-    const timer = window.setTimeout(() => ac.abort(), 12_000);
-    void fetchStoryViewerUser(base, ac.signal)
-      .then(setUser)
-      .catch(() => setUser(null))
-      .finally(() => window.clearTimeout(timer));
-    return () => {
-      ac.abort();
-      window.clearTimeout(timer);
-    };
-  }, [base]);
-
-  if (user === undefined) {
+  if (loading) {
     return (
       <span className="inline-flex items-center gap-1 text-[11px] text-[var(--story-muted)]">
         <Loader2 className="size-3 animate-spin" aria-hidden />
@@ -54,13 +32,19 @@ function ShellAuthSlot() {
     );
   }
 
-  if (!user) {
+  if (!active) {
     return (
       <div className="flex shrink-0 items-center gap-2">
-        <a href={localAuthHref("login")} className="twenty-btn-ghost !px-3 !py-1.5 !text-xs">
+        <a
+          href={storyLoginHref(shellReturnPath(), base)}
+          className="twenty-btn-ghost !px-3 !py-1.5 !text-xs"
+        >
           登录
         </a>
-        <a href={localAuthHref("register")} className="twenty-btn-accent !px-3 !py-1.5 !text-xs">
+        <a
+          href={storyRegisterHref(shellReturnPath(), base)}
+          className="twenty-btn-accent !px-3 !py-1.5 !text-xs"
+        >
           注册
         </a>
       </div>
@@ -70,7 +54,7 @@ function ShellAuthSlot() {
   return (
     <div className="flex shrink-0 items-center gap-2">
       <span className="hidden max-w-[100px] truncate text-[11px] text-[var(--story-muted)] md:inline xl:max-w-[160px]">
-        {user.name ?? user.phone ?? user.email ?? user.id}
+        {displayName ?? "已登录"}
       </span>
       {bookAccountUrl ? (
         <a href={bookAccountUrl} className="twenty-btn-accent !px-3 !py-1.5 !text-xs">
@@ -87,6 +71,7 @@ function ShellAuthSlot() {
 export function StoryShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
   const isProjectWorkspace = pathname.startsWith("/project/");
+  const base = useBookMallBaseUrl();
 
   if (isProjectWorkspace) {
     return <>{children}</>;
@@ -116,10 +101,8 @@ export function StoryShell({ children }: { children: React.ReactNode }) {
             {STORY_NAV_ITEMS.map(({ href, label }) => {
               const active =
                 href === "/"
-                  ? pathname === "/"
-                  : href === "/projects"
-                    ? pathname.startsWith("/projects")
-                    : pathname.startsWith(href);
+                  ? pathname === "/" || pathname.startsWith("/projects")
+                  : pathname.startsWith(href);
               return (
                 <Link
                   key={href}
@@ -142,6 +125,15 @@ export function StoryShell({ children }: { children: React.ReactNode }) {
           <div className="hidden md:block">
             <PortalNav current="story" />
           </div>
+
+          {base ? (
+            <PlatformTopupNavLink
+              bookOrigin={base}
+              className="story-sans hidden shrink-0 rounded-full border border-white/15 px-2.5 py-1.5 text-xs font-semibold text-white/80 transition hover:border-white/25 hover:bg-white/10 hover:text-white sm:inline-flex"
+            />
+          ) : null}
+
+          <StoryCreditBalanceChip />
 
           <ShellAuthSlot />
         </div>

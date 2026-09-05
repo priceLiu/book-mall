@@ -42,24 +42,53 @@ const T2V_PARAMS_SCHEMA = [
   },
 ] satisfies CanvasParamSchema;
 
+const HAPPYHORSE_DURATION_SCHEMA = {
+  key: "duration",
+  label: "时长(秒)",
+  type: "number",
+  min: 3,
+  max: 15,
+  step: 1,
+  defaultValue: 5,
+} as const satisfies CanvasParamSchema[number];
+
+const HAPPYHORSE_BASE_SCHEMA = [
+  T2V_PARAMS_SCHEMA[0],
+  T2V_PARAMS_SCHEMA[1],
+  HAPPYHORSE_DURATION_SCHEMA,
+] satisfies CanvasParamSchema;
+
+const WAN30_PARAMS_SCHEMA = [
+  T2V_PARAMS_SCHEMA[0],
+  {
+    key: "resolution",
+    label: "清晰度",
+    type: "select",
+    options: [
+      { value: "480P", label: "480P" },
+      { value: "720P", label: "720P" },
+      { value: "1080P", label: "1080P" },
+    ],
+    defaultValue: "720P",
+  },
+  {
+    key: "duration",
+    label: "时长(秒)",
+    type: "number",
+    min: 3,
+    max: 30,
+    step: 1,
+    defaultValue: 15,
+  },
+] satisfies CanvasParamSchema;
+
 export const BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   {
     modelKey: "happyhorse-1.0-t2v",
     displayName: "HappyHorse-1.0-T2V",
     role: "VIDEO",
     description: "DashScope happyhorse-1.0-t2v · text-to-video",
-    paramsSchema: [
-      ...T2V_PARAMS_SCHEMA.slice(0, 3),
-      {
-        key: "duration",
-        label: "duration (sec)",
-        type: "number",
-        min: 3,
-        max: 15,
-        step: 1,
-        defaultValue: 5,
-      },
-    ],
+    paramsSchema: HAPPYHORSE_BASE_SCHEMA,
     defaultParams: {
       ratio: "16:9",
       resolution: "720P",
@@ -71,18 +100,7 @@ export const BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     displayName: "HappyHorse-1.1-T2V",
     role: "VIDEO",
     description: "DashScope happyhorse-1.1-t2v · text-to-video",
-    paramsSchema: [
-      ...T2V_PARAMS_SCHEMA.slice(0, 3),
-      {
-        key: "duration",
-        label: "duration (sec)",
-        type: "number",
-        min: 3,
-        max: 15,
-        step: 1,
-        defaultValue: 5,
-      },
-    ],
+    paramsSchema: HAPPYHORSE_BASE_SCHEMA,
     defaultParams: {
       ratio: "16:9",
       resolution: "720P",
@@ -94,18 +112,7 @@ export const BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     displayName: "HappyHorse-1.1-I2V",
     role: "VIDEO",
     description: "DashScope happyhorse-1.1-i2v · image-to-video (first frame)",
-    paramsSchema: [
-      ...T2V_PARAMS_SCHEMA.slice(0, 3),
-      {
-        key: "duration",
-        label: "duration (sec)",
-        type: "number",
-        min: 3,
-        max: 15,
-        step: 1,
-        defaultValue: 5,
-      },
-    ],
+    paramsSchema: HAPPYHORSE_BASE_SCHEMA,
     defaultParams: {
       ratio: "16:9",
       resolution: "720P",
@@ -117,18 +124,7 @@ export const BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     displayName: "HappyHorse-1.0-I2V",
     role: "VIDEO",
     description: "DashScope happyhorse-1.0-i2v · image-to-video (first frame)",
-    paramsSchema: [
-      ...T2V_PARAMS_SCHEMA.slice(0, 3),
-      {
-        key: "duration",
-        label: "duration (sec)",
-        type: "number",
-        min: 3,
-        max: 15,
-        step: 1,
-        defaultValue: 5,
-      },
-    ],
+    paramsSchema: HAPPYHORSE_BASE_SCHEMA,
     defaultParams: {
       ratio: "16:9",
       resolution: "720P",
@@ -159,6 +155,32 @@ export const BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
       resolution: "720P",
       duration: 5,
       prompt_extend: true,
+    },
+  },
+  {
+    modelKey: "wan3.0-video",
+    displayName: "Wan 3.0 Video",
+    role: "VIDEO",
+    description:
+      "DashScope wan3.0-video · 万相 3.0 All-in-One 文生/图生/参考生视频（480P/720P/1080P · 最长 30s）",
+    paramsSchema: WAN30_PARAMS_SCHEMA,
+    defaultParams: {
+      ratio: "16:9",
+      resolution: "720P",
+      duration: 15,
+    },
+  },
+  {
+    modelKey: "wan3.0-video-prime",
+    displayName: "Wan 3.0 Video Prime",
+    role: "VIDEO",
+    description:
+      "DashScope wan3.0-video-prime · 万相 3.0 优速版 文生/图生/参考生视频（480P/720P/1080P · 最长 30s）",
+    paramsSchema: WAN30_PARAMS_SCHEMA,
+    defaultParams: {
+      ratio: "16:9",
+      resolution: "720P",
+      duration: 15,
     },
   },
 ];

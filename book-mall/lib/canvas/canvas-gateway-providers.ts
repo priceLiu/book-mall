@@ -8,6 +8,7 @@ import type { CanvasProviderDto } from "./canvas-provider-service";
 import { KIE_KNOWN_MODELS } from "./providers/kie";
 import { DEEPSEEK_KNOWN_MODELS, DEEPSEEK_SYSTEM_BASE_URL } from "./providers/deepseek-system";
 import { MOONSHOT_KNOWN_MODELS, MOONSHOT_SYSTEM_BASE_URL } from "./providers/moonshot-system";
+import { BAILIAN_CHAT_KNOWN_MODELS } from "@/lib/gateway/bailian-chat-models";
 import { BAILIAN_IMAGE_KNOWN_MODELS } from "./providers/bailian-image";
 import { BAILIAN_R2V_KNOWN_MODELS } from "./providers/bailian-r2v";
 import { BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS } from "./providers/bailian-dashscope-t2v";
@@ -20,6 +21,7 @@ import { listPlatformOfferingProvidersForUser } from "@/lib/canvas/platform-offe
 import { VOLCENGINE_ALL_KNOWN_MODELS, VOLCENGINE_VIDEO_KNOWN_MODELS } from "@/lib/gateway/volcengine-chat-models";
 import { listHunyuanKnownModels } from "./providers/hunyuan-3d";
 import { TOPAZ_KNOWN_MODELS } from "./providers/topaz";
+import { MINIMAX_VIDEO_KNOWN_MODELS_CANVAS } from "./providers/minimax-video";
 
 export const GATEWAY_KIE_PROVIDER_ID = "gateway:kie";
 export const GATEWAY_DEEPSEEK_PROVIDER_ID = "gateway:deepseek";
@@ -31,6 +33,8 @@ export const GATEWAY_VOLCENGINE_PROVIDER_ID = "gateway:volcengine";
 export const GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID = "gateway:sbv1-volcengine";
 /** Topaz Labs · 高清视频增强 */
 export const GATEWAY_TOPAZ_PROVIDER_ID = "gateway:topaz";
+/** MiniMax · H3 视频生成 */
+export const GATEWAY_MINIMAX_VIDEO_PROVIDER_ID = "gateway:minimax-video";
 
 export function isGatewayVirtualProviderId(id: string | null | undefined): boolean {
   return !!id && id.startsWith("gateway:");
@@ -77,7 +81,7 @@ function modelsForKind(kind: GatewayProviderKind): CanvasProviderDto["models"] {
     }));
   }
   if (kind === "BAILIAN") {
-    const r2v = BAILIAN_R2V_KNOWN_MODELS.map((m, idx) => ({
+    const chat = BAILIAN_CHAT_KNOWN_MODELS.map((m, idx) => ({
       id: `${GATEWAY_BAILIAN_PROVIDER_ID}::${m.modelKey}`,
       modelKey: m.modelKey,
       displayName: m.displayName,
@@ -88,6 +92,17 @@ function modelsForKind(kind: GatewayProviderKind): CanvasProviderDto["models"] {
       enabled: true,
       sortOrder: idx,
     }));
+    const r2v = BAILIAN_R2V_KNOWN_MODELS.map((m, idx) => ({
+      id: `${GATEWAY_BAILIAN_PROVIDER_ID}::${m.modelKey}`,
+      modelKey: m.modelKey,
+      displayName: m.displayName,
+      role: m.role,
+      description: m.description ?? null,
+      paramsSchema: m.paramsSchema ?? null,
+      defaultParams: (m.defaultParams as Record<string, unknown> | null) ?? null,
+      enabled: true,
+      sortOrder: chat.length + idx,
+    }));
     const image = BAILIAN_IMAGE_KNOWN_MODELS.map((m, idx) => ({
       id: `${GATEWAY_BAILIAN_PROVIDER_ID}::${m.modelKey}`,
       modelKey: m.modelKey,
@@ -97,7 +112,7 @@ function modelsForKind(kind: GatewayProviderKind): CanvasProviderDto["models"] {
       paramsSchema: m.paramsSchema ?? null,
       defaultParams: (m.defaultParams as Record<string, unknown> | null) ?? null,
       enabled: true,
-      sortOrder: r2v.length + idx,
+      sortOrder: chat.length + r2v.length + idx,
     }));
     const tts = STORY_TTS_GATEWAY_MODELS.map((m, idx) => ({
       id: `${GATEWAY_BAILIAN_PROVIDER_ID}::${m.modelKey}`,
@@ -108,7 +123,7 @@ function modelsForKind(kind: GatewayProviderKind): CanvasProviderDto["models"] {
       paramsSchema: m.paramsSchema ?? null,
       defaultParams: (m.defaultParams as Record<string, unknown> | null) ?? null,
       enabled: true,
-      sortOrder: r2v.length + image.length + idx,
+      sortOrder: chat.length + r2v.length + image.length + idx,
     }));
     const t2v = BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS.map((m, idx) => ({
       id: `${GATEWAY_BAILIAN_PROVIDER_ID}::${m.modelKey}`,
@@ -119,9 +134,9 @@ function modelsForKind(kind: GatewayProviderKind): CanvasProviderDto["models"] {
       paramsSchema: m.paramsSchema ?? null,
       defaultParams: (m.defaultParams as Record<string, unknown> | null) ?? null,
       enabled: true,
-      sortOrder: r2v.length + image.length + tts.length + idx,
+      sortOrder: chat.length + r2v.length + image.length + tts.length + idx,
     }));
-    return [...r2v, ...image, ...tts, ...t2v];
+    return [...chat, ...r2v, ...image, ...tts, ...t2v];
   }
   if (kind === "VOLCENGINE") {
     return VOLCENGINE_ALL_KNOWN_MODELS.map((m, idx) => ({
@@ -333,36 +348,78 @@ export async function listGatewayVirtualProvidersForUser(
     });
   }
 
+  /** MiniMax H3：目录已登记；已关联 Gateway Key 即在画布展示，提交时校验 MINIMAX 凭证 */
+  if (link.linked) {
+    out.push({
+      id: GATEWAY_MINIMAX_VIDEO_PROVIDER_ID,
+      alias: "Gateway · MiniMax H3 视频",
+      kind: "OPENAI_COMPAT",
+      baseUrl: "https://api.minimaxi.com",
+      apiKeyMasked: "gateway",
+      active: true,
+      lastTestedAt: null,
+      lastTestStatus: "gateway",
+      models: MINIMAX_VIDEO_KNOWN_MODELS_CANVAS.map((m, idx) => ({
+        id: `${GATEWAY_MINIMAX_VIDEO_PROVIDER_ID}::${m.modelKey}`,
+        modelKey: m.modelKey,
+        displayName: m.displayName,
+        role: m.role,
+        description: m.description ?? null,
+        paramsSchema: m.paramsSchema ?? null,
+        defaultParams: (m.defaultParams as Record<string, unknown> | null) ?? null,
+        enabled: true,
+        sortOrder: idx,
+      })),
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
   return out;
 }
 
-/** Canvas / Story 模型列表：平台代付 = 上架模型 + Gateway 虚拟 Provider（含 sbv1 火山 VIDEO） */
-export async function listCanvasProvidersForUser(userId: string): Promise<CanvasProviderDto[]> {
-  try {
-    await ensureBookUserGatewayIdentitySynced(userId);
-  } catch (e) {
-    console.warn("[listCanvasProvidersForUser] gateway identity sync failed", e);
+export type ListCanvasProvidersOpts = {
+  /**
+   * 跳过 identity/platform-key ensure（会打多轮 DB）。
+   * 画布打开时的列表请求应设 true，避免连接池紧张时拖到 180s。
+   */
+  skipEnsure?: boolean;
+  /** 应用内场景（模型运营中心 · AppModelShelf） */
+  sceneKey?: string | null;
+  role?: import("@prisma/client").CanvasModelRole;
+};
+
+/** Canvas / Story 模型列表：统一注册表驱动 */
+export async function listCanvasProvidersForUser(
+  userId: string,
+  opts?: ListCanvasProvidersOpts,
+): Promise<CanvasProviderDto[]> {
+  const skipEnsure = opts?.skipEnsure === true;
+  if (!skipEnsure) {
+    try {
+      await ensureBookUserGatewayIdentitySynced(userId);
+    } catch (e) {
+      console.warn("[listCanvasProvidersForUser] gateway identity sync failed", e);
+    }
   }
 
   const persona = await getUserBillingPersona(userId);
 
   if (persona === "PLATFORM_CREDIT") {
-    try {
-      await ensurePlatformManagedKeyForUser(userId);
-    } catch (e) {
-      console.warn("[listCanvasProvidersForUser] platform key ensure failed", e);
+    if (!skipEnsure) {
+      try {
+        await ensurePlatformManagedKeyForUser(userId);
+      } catch (e) {
+        console.warn("[listCanvasProvidersForUser] platform key ensure failed", e);
+      }
     }
-    const [offerings, gateway] = await Promise.all([
-      listPlatformOfferingProvidersForUser(userId),
-      listGatewayVirtualProvidersForUser(userId),
-    ]);
-    const byId = new Map<string, CanvasProviderDto>();
-    for (const p of offerings) byId.set(p.id, p);
-    for (const p of gateway) byId.set(p.id, p);
-    return [...byId.values()];
   }
 
-  return listGatewayVirtualProvidersForUser(userId);
+  const { buildCanvasProvidersFromRegistry } = await import("./canvas-registry-providers");
+  return buildCanvasProvidersFromRegistry(userId, {
+    sceneKey: opts?.sceneKey,
+    role: opts?.role,
+  });
 }
 
 export async function getGatewayVirtualProviderForUser(

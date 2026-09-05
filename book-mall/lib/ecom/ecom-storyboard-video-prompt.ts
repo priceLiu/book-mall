@@ -1,4 +1,8 @@
-import type { StoryboardSheet } from "@/lib/ecom/ecom-storyboard-types";
+import type { StoryboardReference, StoryboardSheet } from "@/lib/ecom/ecom-storyboard-types";
+import {
+  resolvePanelSceneText,
+  type PanelScenePromptContext,
+} from "@/lib/ecom/ecom-storyboard-scene-prompt";
 import {
   bailianR2vMaxRefs,
   isHappyhorseBailianR2vModel,
@@ -94,6 +98,8 @@ function buildBailianStoryboardGridVideoPrompt(
   brief: { productHighlight?: string; style?: string } | undefined,
   slots: StoryboardVideoRefSlot[],
   rules: StoryboardVideoInvokeRules,
+  references: StoryboardReference[] = [],
+  sceneCtx?: PanelScenePromptContext,
 ): string {
   const modelKey = rules.modelKey;
   const refDesc = slots
@@ -114,9 +120,15 @@ function buildBailianStoryboardGridVideoPrompt(
     .map((p, i) => {
       const parts = [`${i + 1}. ${p.shotType}`];
       if (sceneTag) {
-        parts.push(`背景环境须与${sceneTag}一致`);
-      } else if (p.scene?.trim()) {
-        parts.push(p.scene.trim());
+        const local = p.scenePrompt?.trim() || p.scene?.trim();
+        parts.push(
+          local
+            ? `背景须与${sceneTag}一致，${local}`
+            : `背景环境须与${sceneTag}一致`,
+        );
+      } else {
+        const sceneText = resolvePanelSceneText(p, references, sceneCtx);
+        if (sceneText) parts.push(sceneText);
       }
       if (p.action?.trim()) parts.push(p.action.trim());
       if (productTag) {
@@ -152,10 +164,11 @@ function buildBailianStoryboardGridVideoPrompt(
 export function buildEcomStoryboardVideoPrompt(
   sheet: StoryboardSheet,
   brief?: { productHighlight?: string; style?: string },
-  _references?: unknown,
+  references: StoryboardReference[] = [],
   opts?: {
     refSlots?: StoryboardVideoRefSlot[];
     refRules?: StoryboardVideoInvokeRules;
+    sceneCtx?: PanelScenePromptContext;
   },
 ): string {
   if (
@@ -167,6 +180,8 @@ export function buildEcomStoryboardVideoPrompt(
       brief,
       opts.refSlots,
       opts.refRules,
+      references,
+      opts.sceneCtx,
     );
   }
 
@@ -192,9 +207,10 @@ export function buildEcomStoryboardVideoPrompt(
   }
   lines.push("Shots (in order):");
   for (const p of sheet.panels) {
+    const sceneText = resolvePanelSceneText(p, references, opts?.sceneCtx);
     const parts = [
       `#${p.index} ${p.shotType}`,
-      `Scene: ${p.scene}`,
+      `Scene: ${sceneText}`,
       `Action: ${p.action}`,
     ];
     if (p.dialogue?.trim()) parts.push(`Dialogue: ${p.dialogue.trim()}`);
@@ -222,17 +238,21 @@ export function buildEcomStoryboardPanelVideoPrompt(
   opts?: {
     refSlots?: StoryboardVideoRefSlot[];
     refRules?: StoryboardVideoInvokeRules;
+    references?: StoryboardReference[];
+    sceneCtx?: PanelScenePromptContext;
   },
 ): string {
   const highlight =
     sheet.overview.productHighlight?.trim() ||
     brief?.productHighlight?.trim();
+  const refs = opts?.references ?? [];
+  const sceneText = resolvePanelSceneText(panel, refs, opts?.sceneCtx);
   const lines = [
     "Generate a single storyboard shot clip for e-commerce micro-drama product video.",
     `Title: ${sheet.overview.title}`,
     highlight ? `Product highlight: ${highlight}` : "",
     `Shot #${panel.index} | ${panel.shotType}`,
-    `Scene: ${panel.scene}`,
+    `Scene: ${sceneText}`,
     `Action: ${panel.action}`,
     panel.emotion ? `Emotion: ${panel.emotion}` : "",
     panel.camera ? `Camera: ${panel.camera}` : "",
@@ -240,7 +260,10 @@ export function buildEcomStoryboardPanelVideoPrompt(
     panel.durationHintSec
       ? `Target duration: ~${panel.durationHintSec} seconds.`
       : "Target duration: ~3 seconds.",
-    "CRITICAL: Match product packshot and character reference from reference_image inputs. Commercial UGC quality.",
+    panel.videoPromptEn?.trim()
+      ? `Motion prompt: ${panel.videoPromptEn.trim()}`
+      : "",
+    "CRITICAL: Match product packshot, scene reference (if provided), and character reference from reference_image inputs. Commercial UGC quality.",
   ].filter(Boolean);
   if (opts?.refSlots?.length && opts.refRules) {
     lines.push(buildStoryboardVideoRefGuideFromPlan(opts.refSlots, opts.refRules));

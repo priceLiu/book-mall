@@ -10,7 +10,7 @@ import {
   SESSION_KICKED_MESSAGE,
 } from "@/lib/session-revoked";
 import { bookMallReEnterHref } from "@/lib/platform-sso-links";
-import { getMainSiteOrigin } from "@/lib/site-origin";
+import { canvasLoginHref } from "@/lib/portal-auth-links";
 import {
   buildSilentReEnterHref,
   shouldAttemptSilentSso,
@@ -21,6 +21,7 @@ import {
 } from "@/lib/sso-exchange-fresh";
 import {
   parseToolsSessionInactiveReason,
+  shouldClearToolsTokenOnInactive,
   toolsSessionInactiveUserMessage,
   type ToolsSessionInactiveReason,
 } from "@/lib/tools-session-inactive-reason";
@@ -41,8 +42,8 @@ const SESSION_FETCH_TIMEOUT_MS = 22_000;
 const SESSION_FETCH_RETRY_DELAY_MS = 800;
 const SESSION_FETCH_TIMEOUT_RETRIES = 3;
 const SESSION_FETCH_TIMEOUT_RETRY_DELAY_MS = 1_500;
-const SESSION_FETCH_FRESH_EXCHANGE_RETRIES = 4;
-const SESSION_FETCH_FRESH_EXCHANGE_DELAY_MS = 1_200;
+const SESSION_FETCH_FRESH_EXCHANGE_RETRIES = 2;
+const SESSION_FETCH_FRESH_EXCHANGE_DELAY_MS = 450;
 const SESSION_POLL_MS = 60_000;
 const SESSION_BACKGROUND_REVALIDATE_MS = 8_000;
 
@@ -137,7 +138,8 @@ function SessionRevokedPoller({
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const bookMallBase = useBookMallBaseUrl();
-  const mainOrigin = getMainSiteOrigin() || bookMallBase || null;
+  /** 优先用根 layout 服务端注入的主站 origin；客户端读不到运行时 MAIN_SITE_ORIGIN */
+  const mainOrigin = bookMallBase?.trim() || null;
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -160,14 +162,13 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     );
   }, [mainOrigin]);
 
-  // 未认证兜底：跳本域品牌登录页（保留回跳），不再弹主站登录。
   const localLoginHref = useCallback(() => {
     const path =
       typeof window !== "undefined"
         ? window.location.pathname + window.location.search
         : "/projects";
-    return `/login?redirect=${encodeURIComponent(path || "/projects")}`;
-  }, []);
+    return canvasLoginHref(path || "/projects", mainOrigin);
+  }, [mainOrigin]);
 
   const redirectToSso = useCallback(() => {
     const reEnter = reEnterHref();
@@ -225,16 +226,23 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
         const inactive = parseToolsSessionInactiveReason(data);
         if (background && readyRef.current) {
           if (
-            inactive === "introspect_timeout" ||
-            (inactive === "unknown" && data.hasCookie)
+            inactive === "session_revoked" ||
+            inactive === "jwt_invalid" ||
+            inactive === "tools_access_denied"
           ) {
-            window.setTimeout(() => {
-              if (gen === loadGenRef.current) {
-                void loadSession({ background: true });
-              }
-            }, SESSION_BACKGROUND_REVALIDATE_MS);
+            if (shouldClearToolsTokenOnInactive(data)) {
+              clearCachedToolsSession();
+            }
+            setReady(false);
             return;
           }
+          /** 已在编辑器内：主站 introspect 抖动时保持 ready，避免 silent re-enter 把用户踢回列表 */
+          window.setTimeout(() => {
+            if (gen === loadGenRef.current) {
+              void loadSession({ background: true });
+            }
+          }, SESSION_BACKGROUND_REVALIDATE_MS);
+          return;
         }
         clearCachedToolsSession();
         setReady(false);
@@ -292,6 +300,19 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const freshExchange = isSsoExchangeFreshClient();
+    if (
+      freshExchange &&
+      typeof document !== "undefined" &&
+      document.cookie.includes("tools_token=")
+    ) {
+      readyRef.current = true;
+      setHasTokenCookie(true);
+      setSessionActive(true);
+      setReady(true);
+      setLoading(false);
+      void loadSession({ background: true });
+      return;
+    }
     if (!freshExchange) {
       const cached = getCachedToolsSession();
       if (cached?.active) {

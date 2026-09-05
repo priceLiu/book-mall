@@ -77,20 +77,24 @@ export function gatewayModelRoleSectionTitle(role: GatewayModelRole): string {
 
 /**
  * 节点模型选择器中隐藏 "KIE" 厂商名（产品要求：不向用户暴露 KIE 这个上游厂商）。
- * 覆盖 "(KIE)" / "(KIE · 图生视频)" / "Gateway · KIE" / "KIE · xxx" / 残留独立 KIE。
+ * 覆盖 "(KIE)" / "(KIE · 文生图)" / "Gateway · KIE" / "KIE · xxx" / 残留独立 KIE。
+ * `(KIE · 文生图)` 整段去掉：类型由列表副行标签展示，名称不再带括号能力后缀。
  */
 export function hideKieVendorLabel(
   text: string | null | undefined,
 ): string {
   if (!text) return "";
   let s = text;
-  s = s.replace(/\(\s*KIE\s*·\s*/gi, "(");
-  s = s.replace(/\s*\(\s*KIE\s*\)\s*/gi, " ");
+  s = s.replace(/\s*[\(（]\s*KIE(?:\s*·\s*[^)）]*)?\s*[\)）]/gi, "");
   s = s.replace(/\s*·\s*KIE\b/gi, "");
   s = s.replace(/\bKIE\s*·\s*/gi, "");
   s = s.replace(/\bKIE\b/gi, "");
+  s = s.replace(
+    /\s*[\(（][^)）]*?(?:文生图|图生图|文生视频|图生视频|视频生视频|多模态)[^)）]*?[\)）]/g,
+    "",
+  );
   return s
-    .replace(/\(\s*\)/g, "")
+    .replace(/[\(（]\s*[\)）]/g, "")
     .replace(/\s{2,}/g, " ")
     .replace(/\s+·\s*$/g, "")
     .trim();

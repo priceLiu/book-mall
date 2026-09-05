@@ -8,6 +8,7 @@
  * 默认关闭（无需 Redis）：设置 SINGLE_SESSION_ENFORCE=1 开启。
  */
 import { prisma } from "@/lib/prisma";
+import type { ClientDeviceType } from "@prisma/client";
 
 export function isSingleSessionEnforced(): boolean {
   return process.env.SINGLE_SESSION_ENFORCE === "1";
@@ -26,13 +27,25 @@ export async function bumpSessionVersion(userId: string): Promise<number> {
   return u.sessionVersion;
 }
 
-/** 读取当前 sessionVersion。 */
+/** 读取当前 sessionVersion（网页全局）。 */
 export async function getSessionVersion(userId: string): Promise<number> {
   const u = await prisma.user.findUnique({
     where: { id: userId },
     select: { sessionVersion: true },
   });
   return u?.sessionVersion ?? 0;
+}
+
+/** 按设备类型读取 sessionVersion。 */
+export async function getDeviceSessionVersion(
+  userId: string,
+  deviceType: ClientDeviceType,
+): Promise<number> {
+  const row = await prisma.userDeviceSessionVersion.findUnique({
+    where: { userId_deviceType: { userId, deviceType } },
+    select: { sessionVersion: true },
+  });
+  return row?.sessionVersion ?? 0;
 }
 
 /**

@@ -28,7 +28,7 @@
 }
 
 :root {
-  --canvas-bg: #141414;
+  --canvas-bg: #191919;
   --canvas-surface: #13131f;
   --canvas-surface-2: #1a1a2b;
   --canvas-border: rgba(255, 255, 255, 0.1);
@@ -88,6 +88,17 @@ body {
   /** 落地 Hero 垂直居中占满首屏 */
   .canvas-hero-fill {
     @apply canvas-page-fill items-center justify-center py-10 sm:py-12 lg:py-16;
+  }
+
+  /** 门户 main · 隐藏滚动条，保留滚轮/触控滚动 */
+  .canvas-shell-scroll {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .canvas-shell-scroll::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
   }
 
   .canvas-serif {
@@ -206,16 +217,83 @@ body {
 .react-flow__pane,
 .react-flow__viewport,
 .canvas-flow-wrap,
-[data-canvas-editor],
 [data-canvas-block-nav-gesture] {
   overscroll-behavior: none;
   overscroll-behavior-x: none;
+  touch-action: none;
 }
 
-/* 弹层打开时暂停画布指针交互，避免背后 hover / pan 触发重绘导致 backdrop 闪烁 */
+/* 画布编辑器 · 仅锁页面滚动；勿改 react-flow 内部 viewport（会破坏节点渲染） */
+html[data-canvas-editor-open],
+html[data-canvas-editor-open] body {
+  overflow: hidden;
+}
+
+/** 添加节点菜单 · 屏上固定字号（不受画布 zoom / 系统 text-size-adjust 影响） */
+.pro2-add-menu {
+  font-size: 13px;
+  line-height: 1.35;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+[data-canvas-editor] {
+  overflow: hidden;
+  width: 100%;
+  max-width: 100dvw;
+}
+
+/* 顶栏壳层：宽度锁在视口内；纵向 overflow 可见以便悬停提示 */
+[data-canvas-toolbar-shell] {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+  overflow-y: visible;
+}
+
+[data-canvas-toolbar] {
+  overflow: visible !important;
+}
+
+[data-canvas-toolbar-actions] {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+[data-canvas-toolbar-actions] > * {
+  flex-shrink: 0;
+}
+
+/* 框选打组 / 顶栏弹层打开时：隐藏 RF 虚线框，避免盖住组名输入 */
+html[data-canvas-toolbar-popover-open] .react-flow__nodesselection-rect,
+html[data-canvas-toolbar-popover-open] .react-flow__selection {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+html[data-canvas-toolbar-popover-open] [data-pro2-selection-toolbar-popover] {
+  z-index: 9999;
+}
+
+/* 弹层打开时暂停画布指针交互，避免背后 hover / pan 触发重绘导致遮罩闪烁 */
 html[data-canvas-modal-open] .canvas-flow-wrap,
-html[data-canvas-modal-open] .pro2-input-dock {
-  pointer-events: none;
+html[data-canvas-modal-open] .pro2-input-dock,
+html[data-canvas-modal-open] .react-flow__renderer,
+html[data-canvas-modal-open] .react-flow__viewport,
+html[data-canvas-modal-open] .react-flow__pane {
+  pointer-events: none !important;
+}
+
+/* 节点顶栏 portal 到 body（z-1500），弹层打开时收起；visibility 比 display:none 少闪一下 */
+html[data-canvas-modal-open] .libtv-node-toolbar-portal {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* 画布弹层遮罩 · 纯色底（禁止 backdrop-blur，否则 RF 动画时每帧重算模糊会闪屏） */
+.canvas-modal-backdrop {
+  isolation: isolate;
+  contain: layout paint style;
 }
 
 /* 拖动对齐辅助线 · 高于普通节点 (15) 与 dragging (1000) */
@@ -282,6 +360,16 @@ html[data-canvas-modal-open] .pro2-input-dock {
 /* ----------------------------------------
  * 连线 · 宽命中带 + 悬停 1s 剪断（剪刀 portal 在 body）
  * ---------------------------------------- */
+.canvas-flow-wrap {
+  --canvas-edge-stroke-width: 2.5;
+  --canvas-edge-stroke-width-active: 3;
+  --canvas-edge-stroke-width-sweep: 3.5;
+  --canvas-edge-stroke-width-connecting: 2.5;
+  /* 框选 / 多选外框 · 保留 React Flow 点线蓝，仅加粗到 2px */
+  --xy-selection-border: 2px dotted rgba(0, 89, 220, 0.8);
+  --xy-selection-background-color: rgba(0, 89, 220, 0.08);
+}
+
 .react-flow__edge .react-flow__edge-interaction {
   stroke-width: 40 !important;
   pointer-events: stroke !important;
@@ -290,11 +378,18 @@ html[data-canvas-modal-open] .pro2-input-dock {
 
 /*
  * 连线 / 节点容器均勿建 stacking context，否则边的 svg zIndex 无法与节点交错：
- * 组框 z=5 < 连线 z=12 < 媒体子节点 z=22（zIndexMode=manual + defaultEdgeOptions）
+ * 组框 z=5 · 连线 z=12 · 媒体子节点 z=22 · 选中子节点 z=1201
+ * 连线在节点间隙与组底色上可见，但不压住卡片本体
  */
 .canvas-flow-wrap .react-flow__edges,
 .canvas-flow-wrap .react-flow__nodes {
   z-index: auto !important;
+}
+.canvas-flow-wrap .react-flow__edges svg {
+  z-index: 12 !important;
+}
+.canvas-flow-wrap .react-flow__edges svg:has(.canvas-edge-node-gap) {
+  z-index: 12 !important;
 }
 /* 非 group 节点默认在连线之上 */
 .canvas-flow-wrap .react-flow__node:not(.react-flow__node-group) {
@@ -317,7 +412,7 @@ html[data-canvas-modal-open] .pro2-input-dock {
   }
 }
 .react-flow__edge.pro2-edge-active .react-flow__edge-path:not(.pro2-edge-sweep-overlay) {
-  stroke-width: 1.5 !important;
+  stroke-width: var(--canvas-edge-stroke-width-active, 3) !important;
   stroke-dasharray: none;
   animation: none;
   transition:
@@ -331,7 +426,7 @@ html[data-canvas-modal-open] .pro2-input-dock {
   filter: drop-shadow(0 0 3px rgba(167, 139, 250, 0.5));
 }
 .react-flow__edge-path.pro2-edge-sweep-overlay {
-  stroke-width: 2.5;
+  stroke-width: var(--canvas-edge-stroke-width-sweep, 3.5);
   stroke-linecap: round;
   stroke-dasharray: 20 60;
   animation: canvas-edge-sweep 1.35s ease-in-out infinite;
@@ -345,7 +440,7 @@ html[data-canvas-modal-open] .pro2-input-dock {
   filter: drop-shadow(0 0 6px rgba(167, 139, 250, 0.75));
 }
 .react-flow__connection-path {
-  stroke-width: 1 !important;
+  stroke-width: var(--canvas-edge-stroke-width-connecting, 2.5) !important;
   stroke-dasharray: 4 6;
 }
 .react-flow__edge .react-flow__edge-path {
@@ -355,6 +450,7 @@ html[data-canvas-modal-open] .pro2-input-dock {
 /* 静止连线 · 白线（选中高亮 pro2-edge-active 保持原色与流动动效） */
 .canvas-flow-wrap .react-flow__edge:not(.pro2-edge-active) .react-flow__edge-path {
   stroke: #ffffff !important;
+  stroke-width: var(--canvas-edge-stroke-width, 2.5) !important;
 }
 
 /* Pro2 脚本 / 大纲节点 · 横纵滚动条（避开右侧连线 Handle 热区） */
@@ -379,10 +475,14 @@ html[data-canvas-modal-open] .pro2-input-dock {
   border-radius: 999px;
 }
 
-/* LibTV / 画布节点 · 连线吸附：左右 Handle 热区铺满节点高度（排除侧栏 +） */
-.canvas-flow-wrap
+/* LibTV / 画布节点 · 连线吸附：左右 Handle 热区铺满节点高度（排除侧栏 +）
+ * 须透明无描边，避免 !bg-white / border 在热区上露出「左右多一条线」
+ * 非拖线时由下方规则折叠，此处仅拖线 (.canvas-connecting) 生效 */
+.canvas-flow-wrap.canvas-connecting
   .react-flow__node:not(.react-flow__node-group)
-  .react-flow__handle-left:not(.pro2-node-side-plus-handle) {
+  .react-flow__handle-left:not(.pro2-node-side-plus-handle):not(
+    .pro2-node-side-plus-in-handle
+  ):not(.libtv-node-inbound-handle):not(.libtv-node-inbound-text-handle) {
   top: 0 !important;
   left: -6px !important;
   width: 20px !important;
@@ -390,11 +490,35 @@ html[data-canvas-modal-open] .pro2-input-dock {
   transform: none !important;
   border-radius: 0 !important;
   opacity: 0 !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
 }
 
-.canvas-flow-wrap
+/* 文本 / 脚本 / 媒体 · 左侧入边：窄热区，避免 100% 竖条在两侧露出白线 */
+.canvas-flow-wrap.canvas-connecting
   .react-flow__node:not(.react-flow__node-group)
-  .react-flow__handle-right:not(.pro2-node-side-plus-handle) {
+  .react-flow__handle-left.libtv-node-inbound-handle,
+.canvas-flow-wrap.canvas-connecting
+  .react-flow__node:not(.react-flow__node-group)
+  .react-flow__handle-left.libtv-node-inbound-text-handle {
+  top: 28% !important;
+  left: -6px !important;
+  width: 16px !important;
+  height: 44% !important;
+  transform: none !important;
+  border-radius: 0 !important;
+  opacity: 0 !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.canvas-flow-wrap.canvas-connecting
+  .react-flow__node:not(.react-flow__node-group)
+  .react-flow__handle-right:not(.pro2-node-side-plus-handle):not(
+    .pro2-node-side-plus-in-handle
+  ) {
   top: 28% !important;
   right: -6px !important;
   left: auto !important;
@@ -403,9 +527,42 @@ html[data-canvas-modal-open] .pro2-input-dock {
   transform: none !important;
   border-radius: 0 !important;
   opacity: 0 !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
 }
 
-.canvas-flow-wrap
+/* 非拖线：折叠入边/侧栏热区 DOM，仅保留侧栏 + 可见；消除静止态左右白线 */
+.canvas-flow-wrap:not(.canvas-connecting)
+  .react-flow__node:not(.react-flow__node-group)
+  .react-flow__handle:not(.pro2-node-side-plus-handle) {
+  width: 0 !important;
+  height: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* 入边锚点 · 折叠时仍固定在左右边垂直居中，避免连线贴顶/被 + 视觉错位 */
+.canvas-flow-wrap:not(.canvas-connecting)
+  .react-flow__node:not(.react-flow__node-group)
+  .react-flow__handle-left.libtv-node-inbound-handle,
+.canvas-flow-wrap:not(.canvas-connecting)
+  .react-flow__node:not(.react-flow__node-group)
+  .react-flow__handle-left.libtv-node-inbound-text-handle {
+  top: 50% !important;
+  left: 0 !important;
+  transform: translateY(-50%) !important;
+}
+
+.canvas-flow-wrap.canvas-connecting
   .react-flow__node:not(.react-flow__node-group)
   .react-flow__handle-top:not(.pro2-node-side-plus-handle) {
   top: -6px !important;
@@ -417,7 +574,7 @@ html[data-canvas-modal-open] .pro2-input-dock {
   opacity: 0 !important;
 }
 
-.canvas-flow-wrap
+.canvas-flow-wrap.canvas-connecting
   .react-flow__node:not(.react-flow__node-group)
   .react-flow__handle-bottom:not(.pro2-node-side-plus-handle) {
   bottom: -6px !important;
@@ -429,48 +586,47 @@ html[data-canvas-modal-open] .pro2-input-dock {
   opacity: 0 !important;
 }
 
-/* Pro2 / LibTV 侧栏 +：保持圆形可见；仅拖线中显示十字准星 */
-.react-flow__handle.pro2-node-side-plus-handle {
-  cursor: pointer !important;
-  opacity: 1 !important;
+/* Pro2 / LibTV 侧栏 + · source handle 收成 0×0 锚点，钉在节点左/右边框中点。
+ * React Flow 对 Position.Right 取 handle 右边缘、Left 取左边缘做连线锚点；
+ * 若 handle 本身是 70px 圆，锚点会外移一个半径，静止时露出「连线缺一段」。
+ * 可见圆改由子元素 .pro2-node-side-plus-dot 渲染，不参与 handle bounds。 */
+.react-flow__handle.pro2-node-side-plus-handle:not(.pro2-node-side-plus-in-handle) {
+  position: absolute !important;
+  inset: auto !important;
   top: 50% !important;
-  transform: translateY(-50%) !important;
-  border-radius: 9999px !important;
-  pointer-events: auto !important;
-}
-/* default 尺寸（薄卡等） */
-.react-flow__handle.pro2-node-side-plus-handle:not(.pro2-node-side-plus-handle--lg) {
-  width: 44px !important;
-  height: 44px !important;
-  min-width: 44px !important;
-  min-height: 44px !important;
-}
-.react-flow__handle.pro2-node-side-plus-handle:not(.pro2-node-side-plus-handle--lg).react-flow__handle-left {
-  left: -22px !important;
+  left: 0 !important;
   right: auto !important;
-}
-.react-flow__handle.pro2-node-side-plus-handle:not(.pro2-node-side-plus-handle--lg).react-flow__handle-right {
-  right: -22px !important;
-  left: auto !important;
-}
-/* lg 尺寸（媒体 / 视频节点 · 与组件 88px 对齐） */
-.react-flow__handle.pro2-node-side-plus-handle--lg {
-  width: 88px !important;
-  height: 88px !important;
-  min-width: 88px !important;
-  min-height: 88px !important;
-}
-.react-flow__handle.pro2-node-side-plus-handle--lg.react-flow__handle-left {
-  left: -44px !important;
-  right: auto !important;
-}
-.react-flow__handle.pro2-node-side-plus-handle--lg.react-flow__handle-right {
-  right: -44px !important;
-  left: auto !important;
-}
-.canvas-connecting .react-flow__handle.pro2-node-side-plus-handle {
+  bottom: auto !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  transform: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
   opacity: 1 !important;
-  pointer-events: all !important;
+  overflow: visible !important;
+  /* 命中区在 .pro2-node-side-plus-dot 上；事件冒泡到 handle 触发 RF 拖线 */
+  pointer-events: none !important;
+}
+
+/* 可见 + 圆：以 handle 锚点为中心，磁吸时只平移自身（内联 transform 覆盖） */
+.pro2-node-side-plus-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.pro2-node-side-plus-dot--lg {
+  width: 70px;
+  height: 70px;
 }
 .canvas-connecting .react-flow__handle.pro2-node-side-plus-handle.connectingto,
 .canvas-connecting .react-flow__handle.pro2-node-side-plus-handle.connectingfrom,
@@ -478,7 +634,8 @@ html[data-canvas-modal-open] .pro2-input-dock {
   cursor: crosshair !important;
 }
 
-/* 侧栏 + 叠层 target · 拖线时吸附；平时不挡单击菜单 */
+/* 侧栏 + 叠层 target · 仅拖线时挂载（见 Pro2NodeSidePlus）；勿常驻 DOM 以免拖线后残留白线
+ * 纯命中区，不承载持久连线（onConnect 会解析回真实 in_* handle），故可保留圆尺寸 */
 .react-flow__handle.pro2-node-side-plus-in-handle {
   cursor: crosshair !important;
   opacity: 0 !important;
@@ -486,29 +643,26 @@ html[data-canvas-modal-open] .pro2-input-dock {
   border: none !important;
   box-shadow: none !important;
   pointer-events: none !important;
+  position: absolute !important;
+  inset: auto !important;
+  top: 50% !important;
+  left: 0 !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translate(-50%, -50%) !important;
   z-index: 20048 !important;
 }
 .canvas-connecting .react-flow__handle.pro2-node-side-plus-in-handle {
   pointer-events: all !important;
   z-index: 20055 !important;
 }
-/* 叠层 target 与可见 + 同尺寸，拖线时扩大命中区 */
+/* 叠层 target 与可见 + 同尺寸，拖线时扩大命中区（定位继承 .pro2-node-side-plus-handle） */
 .canvas-connecting
   .react-flow__handle.pro2-node-side-plus-in-handle.pro2-node-side-plus-handle--lg {
-  width: 88px !important;
-  height: 88px !important;
-  min-width: 88px !important;
-  min-height: 88px !important;
-}
-.canvas-connecting
-  .react-flow__handle.pro2-node-side-plus-in-handle.pro2-node-side-plus-handle--lg.react-flow__handle-left {
-  left: -44px !important;
-  right: auto !important;
-}
-.canvas-connecting
-  .react-flow__handle.pro2-node-side-plus-in-handle.pro2-node-side-plus-handle--lg.react-flow__handle-right {
-  right: -44px !important;
-  left: auto !important;
+  width: 70px !important;
+  height: 70px !important;
+  min-width: 70px !important;
+  min-height: 70px !important;
 }
 .canvas-connecting
   .react-flow__handle.pro2-node-side-plus-in-handle:not(.pro2-node-side-plus-handle--lg) {
@@ -517,11 +671,9 @@ html[data-canvas-modal-open] .pro2-input-dock {
   min-width: 44px !important;
   min-height: 44px !important;
 }
-/* 拖线时让可见 +（source）不挡住叠层 target 的吸附 */
-.canvas-connecting
-  .react-flow__handle.pro2-node-side-plus-handle:not(.connectingfrom):not(
-    .react-flow__handle-connecting
-  ) {
+/* 拖线时让可见 + 圆不挡住叠层 target 的吸附 */
+.canvas-connecting .pro2-node-side-plus-dot {
+  cursor: crosshair;
   pointer-events: none !important;
 }
 .canvas-connecting .react-flow__handle.pro2-node-side-plus-in-handle.connectingto,
@@ -799,4 +951,13 @@ html[data-canvas-modal-open] .pro2-input-dock {
 
 .canvas-toolbar-side-panel-aside-enter {
   animation: canvas-toolbar-panel-slide-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes portalHeroFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }

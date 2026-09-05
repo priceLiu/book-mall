@@ -86,6 +86,30 @@ const PLATFORM_GATEWAY_MODELS: Array<{
 
 export const PLATFORM_GATEWAY_DEFAULT_MODEL_ID = "deepseek-v4-flash";
 
+let cachedRegistryModels: TextModel[] | null = null;
+
+/** 平台版：从 BFF `/api/gateway/models` 拉取统一注册表（模型运营中心）。 */
+export async function fetchPlatformGatewayModelsFromRegistry(): Promise<TextModel[]> {
+  if (typeof window === "undefined") return [];
+  try {
+    const origin = window.location.origin;
+    const r = await fetch(`${origin}/api/gateway/models`, { credentials: "same-origin" });
+    if (!r.ok) return [];
+    const data = (await r.json()) as {
+      models?: Array<{ modelKey: string; displayName: string; description?: string; sourceLabel?: string }>;
+    };
+    const models = (data.models ?? []).map((m) => ({
+      ...new PlatformGatewayAdapter().buildDefaultModel(m.modelKey),
+      name: m.sourceLabel ? `${m.displayName} · ${m.sourceLabel}` : m.displayName,
+      description: m.description ?? "",
+    }));
+    if (models.length > 0) cachedRegistryModels = models;
+    return models;
+  } catch {
+    return [];
+  }
+}
+
 /**
  * 平台版 LLM Provider：OpenAI SDK 形态，实际请求同域 `/api/gateway/chat` BFF。
  */
@@ -97,7 +121,7 @@ export class PlatformGatewayAdapter extends OpenAICompatibleAdapter {
       description: "平台 Gateway BYOK；凭证与模型启用状态在 gateway-web 管理",
       requiresApiKey: false,
       defaultBaseURL: getPlatformGatewayChatPath(),
-      supportsDynamicModels: false,
+      supportsDynamicModels: true,
       connectionSchema: {
         required: [],
         optional: [],
@@ -107,6 +131,7 @@ export class PlatformGatewayAdapter extends OpenAICompatibleAdapter {
   }
 
   public getModels(): TextModel[] {
+    if (cachedRegistryModels?.length) return cachedRegistryModels;
     return PLATFORM_GATEWAY_MODELS.map((definition) => ({
       ...this.buildDefaultModel(definition.id),
       name: definition.name,

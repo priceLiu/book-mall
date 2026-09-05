@@ -1,8 +1,6 @@
 /**
- * 积分加油包（加量包）— 通用池固定三档 + 视频专项池三档，锚定 ¥0.04/积分。
+ * 积分加油包（加量包）— 三档，锚定 ¥0.04/积分。
  */
-import type { CreditPool } from "@prisma/client";
-
 import { DEFAULT_CREDIT_ANCHOR_YUAN } from "@/lib/pricing/credit-pricing-formulas";
 
 export interface CreditTopupPack {
@@ -10,9 +8,12 @@ export interface CreditTopupPack {
   credits: number;
   priceYuan: number;
   label: string;
-  pool: CreditPool;
   /** 相对锚定价的折扣说明（展示用） */
   promo?: string;
+  /** 仅平台管理员可见/可购 */
+  adminOnly?: boolean;
+  /** 购买前须验证注册手机号 + 短信验证码 */
+  requirePhoneVerify?: boolean;
 }
 
 export const CREDIT_TOPUP_PACKS: CreditTopupPack[] = [
@@ -20,15 +21,13 @@ export const CREDIT_TOPUP_PACKS: CreditTopupPack[] = [
     id: "pack-light",
     credits: 1500,
     priceYuan: 62,
-    label: "轻量包",
-    pool: "GENERAL",
+    label: "轻量积分包",
   },
   {
     id: "pack-standard",
     credits: 4000,
     priceYuan: 160,
     label: "标准包",
-    pool: "GENERAL",
     promo: "省10%",
   },
   {
@@ -36,45 +35,31 @@ export const CREDIT_TOPUP_PACKS: CreditTopupPack[] = [
     credits: 8000,
     priceYuan: 304,
     label: "加量包",
-    pool: "GENERAL",
     promo: "省15%",
   },
 ];
 
-/** 视频专项池独立充值包（不占用套餐月积分）。 */
-export const VIDEO_CREDIT_TOPUP_PACKS: CreditTopupPack[] = [
-  {
-    id: "video-pack-500",
-    credits: 500,
-    priceYuan: 22,
-    label: "视频轻量包",
-    pool: "VIDEO",
-  },
-  {
-    id: "video-pack-1500",
-    credits: 1500,
-    priceYuan: 58,
-    label: "视频标准包",
-    pool: "VIDEO",
-    promo: "省13%",
-  },
-  {
-    id: "video-pack-3000",
-    credits: 3000,
-    priceYuan: 108,
-    label: "视频加量包",
-    pool: "VIDEO",
-    promo: "省10%",
-  },
-];
+/** 管理员专用 · 测试充值（须短信验证 + 企业微信支付）。 */
+export const ADMIN_VIDEO_TOPUP_PACK: CreditTopupPack = {
+  id: "video-pack-admin-5000",
+  credits: 5000,
+  priceYuan: 0.01,
+  label: "管理员专用包",
+  adminOnly: true,
+  requirePhoneVerify: true,
+};
 
 export const ALL_CREDIT_TOPUP_PACKS: CreditTopupPack[] = [
   ...CREDIT_TOPUP_PACKS,
-  ...VIDEO_CREDIT_TOPUP_PACKS,
+  ADMIN_VIDEO_TOPUP_PACK,
 ];
 
 export function packById(id: string): CreditTopupPack | undefined {
   return ALL_CREDIT_TOPUP_PACKS.find((p) => p.id === id);
+}
+
+export function isAdminOnlyTopupPack(pack: CreditTopupPack | undefined): boolean {
+  return pack?.adminOnly === true;
 }
 
 /** 锚定原价（未折扣），用于展示划线价 */

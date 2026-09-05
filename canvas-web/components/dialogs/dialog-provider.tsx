@@ -25,6 +25,12 @@ import {
   type ReactNode,
 } from "react";
 
+import {
+  CANVAS_MODAL_BACKDROP_CLASS,
+  useModalBodyScrollLock,
+} from "@/lib/canvas/use-modal-portal-effects";
+import { CANVAS_DIALOG_MODAL_Z } from "@/lib/canvas/libtv-generate-settings-modal-z";
+
 export type ConfirmOptions = {
   title?: ReactNode;
   message: ReactNode;
@@ -204,6 +210,8 @@ function DialogShell({
   onCancel: () => void;
   children: ReactNode;
 }) {
+  useModalBodyScrollLock();
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -217,7 +225,8 @@ function DialogShell({
 
   return (
     <div
-      className="fixed inset-0 z-[1700] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className={CANVAS_MODAL_BACKDROP_CLASS}
+      style={{ zIndex: CANVAS_DIALOG_MODAL_Z }}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}

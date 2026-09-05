@@ -37,6 +37,7 @@ import {
 } from "./clone-node-data";
 import { migrateGraphV1ToV2 } from "./migrate";
 import { clearOrphanLibtvMediaInflightInNodes } from "./libtv-image-node-run";
+import { clearStaleMediaRenderInFlightInNodes } from "./media-render-in-flight";
 import {
   detachChildrenOfRemovedGroups,
   ensureNodeDragHandles,
@@ -45,6 +46,10 @@ import {
   sortNodesForReactFlow,
   stripPersistedNodeSelection,
 } from "./normalize-graph-nodes";
+import {
+  maybeApplyLibtvMediaAspectPresetForNewNode,
+  maybeApplyLibtvMediaAspectPresetFromPatch,
+} from "./libtv-media-aspect-preset-apply";
 import { reflowStoryComicFlat } from "./story-comic-layout";
 import { reflowStoryComicColumns } from "./story-comic-columns-layout";
 import {
@@ -80,7 +85,7 @@ import {
   shouldUseSbv1ImageVideoColumnLayout,
 } from "./sbv1-media-group-layout";
 import { isPro2VideoBoardChild } from "./pro2-resolve-video-board-group";
-import { reflowSbv1Canvas as computeSbv1CanvasReflow } from "./sbv1-canvas-layout";
+import { reflowSbv1Canvas as computeSbv1CanvasReflow, relayoutStaleSbv1MediaGroups } from "./sbv1-canvas-layout";
 import { reflowPro2CanvasLayout } from "./pro2-canvas-layout";
 import { duplicateMediaGroupInGraph } from "./duplicate-media-group";
 import { hasStoryComicPipeline } from "./story-comic-layout";
@@ -98,7 +103,8 @@ import {
   migratePro2SceneColumnOffCanvas,
 } from "./pro2-spawn-scene-image-group";
 import { reconcileStoryPro2Workspace } from "./spawn-story-pro2-workspace";
-import { repairPro2VideoBoardVisualGroups } from "./pro2-spawn-video-board-group";
+import { stripStaleHubGenerateIntent, repairHubEmbeddedPackSections, repairHubStructuredProductionScriptNodes } from "./story-hub-runtime";
+import { repairPro2VideoBoardVisualGroups, applyPro2VideoBoardGroupRemoval } from "./pro2-spawn-video-board-group";
 import { canvasNotify } from "./canvas-notify";
 import {
   canvasNodesLayoutFieldsEqual,
@@ -113,6 +119,9 @@ import {
 } from "./canvas-node-changes";
 import { dispatchCanvasRfSelectNode } from "./canvas-rf-sync";
 import { preserveLocalInflightOnHydrateLayout } from "./hydrate-inflight-preserve";
+import { libtvMediaNodesNeedViewportReflow } from "./libtv-media-node-size";
+import { libtvCanvasNeedsViewportReflow } from "./libtv-canvas-viewport-reflow";
+import { clampCanvasViewport } from "./canvas-viewport-zoom";
 import { ensureGraphMetaEdition } from "./canvas-layout-mode";
 import { isSameSbv1MediaDataPatch } from "./sbv1-image-task-apply";
 
@@ -128,6 +137,7 @@ const CANVAS_DRAFT_DATA_FIELDS = new Set([
   "prompt",
   "dockInput",
   "themeInput",
+  "body",
 ]);
 
 function isCanvasDraftDataPatch(
@@ -137,6 +147,21 @@ function isCanvasDraftDataPatch(
   if (commit === true) return false;
   const keys = Object.keys(patch);
   return keys.length > 0 && keys.every((k) => CANVAS_DRAFT_DATA_FIELDS.has(k));
+}
+
+/**
+ * hydrate 收尾（延后布局 / 视频组修复）跑在 microtask 里，已在调用方 `clear()` 之后，
+ * 不 pause 会让「打开项目后第一次撤销」回到未定稿布局。
+ */
+function runWithUndoTrackingPaused(fn: () => void): void {
+  const temporal = useCanvasStore.temporal.getState();
+  const wasTracking = temporal.isTracking;
+  temporal.pause();
+  try {
+    fn();
+  } finally {
+    if (wasTracking) temporal.resume();
+  }
 }
 
 function withGraphRevision<T extends Record<string, unknown>>(
@@ -157,32 +182,19 @@ function finalizeHydratedGraph(
   const finalized = finalizeStoryMediaGraph(nextNodes, nextEdges);
   nextNodes = applyStoryColumnHeights(finalized.nodes, finalized.edges);
   nextEdges = finalized.edges;
+  nextNodes = relayoutStaleSbv1MediaGroups(nextNodes, nextEdges);
   return {
     nodes: ensureNodeDragHandles(nextNodes),
     edges: nextEdges,
   };
 }
 
-/** hydrate 布局落定后，Pro2 画布请求 fitView（节点测量完成后再框选） */
-function requestPro2FitViewAfterHydrate(
-  meta: { edition?: "pro2" | "sbv1" } | null | undefined,
-  set: (
-    partial:
-      | Partial<{ fitViewNonce: number }>
-      | ((state: { fitViewNonce: number }) => Partial<{ fitViewNonce: number }>),
-  ) => void,
-) {
-  if (meta?.edition !== "pro2") return;
-  set((s) => ({ fitViewNonce: s.fitViewNonce + 1 }));
-}
-
-/** Pro2 打开时忽略 DB 里各项目不一致的旧 viewport，统一 fitView */
-function pro2NeutralViewportOnOpen(
-  meta: { edition?: "pro2" | "sbv1" } | null | undefined,
+/** 打开项目时恢复已保存视口（pan/zoom 由 autosave 持久化） */
+function hydrateSavedViewport(
+  _meta: { edition?: "pro2" | "sbv1" } | null | undefined,
   saved: { x: number; y: number; zoom: number },
 ): { x: number; y: number; zoom: number } {
-  if (meta?.edition === "pro2") return { x: 0, y: 0, zoom: 1 };
-  return saved;
+  return clampCanvasViewport(saved);
 }
 
 function runPostHydratePro2VideoBoardRepair(
@@ -213,7 +225,7 @@ function runPostHydratePro2VideoBoardRepair(
     updateNodeData: (
       id: string,
       patch: Record<string, unknown>,
-      options?: { commit?: boolean },
+      options?: { commit?: boolean; sessionOnly?: boolean },
     ) => void;
     setNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void;
     setEdges: (fn: (edges: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
@@ -223,6 +235,7 @@ function runPostHydratePro2VideoBoardRepair(
   repairPro2VideoBoardVisualGroups(get);
 }
 import { validateStoryPipelineDeletion } from "./story-pipeline-delete-guard";
+import { filterSpuriousRfEdgeRemoves } from "./canvas-edge-change-guard";
 import { pruneMentionsAfterNodeRemoval } from "./strip-dock-mentions";
 import { reconcileStoryWorkspaceEdges } from "./spawn-story-workspace";
 import { hasStoryComicColumnGroups } from "./story-comic-groups";
@@ -236,6 +249,14 @@ import {
   validateRefVideoConnection,
 } from "./ref-video-edges";
 import { validatePro2StyleAssetConnection } from "./pro2-style-asset-connect";
+import {
+  applyPro2StarterUnlinkAfterEdgeRemoval,
+  collectPro2StarterUnlinkPatches,
+  findPro2StartersLinkedToHub,
+  isPro2StarterScriptHubEdge,
+  patchPro2StarterOnScriptHubLink,
+  patchPro2StarterOnScriptHubUnlink,
+} from "./pro2-text-hub-link-sync";
 import type { HubPreviewSection } from "./story-hub-runtime";
 
 export type PendingSideConnect = {
@@ -252,6 +273,9 @@ type CanvasState = {
   viewport: Viewport;
   /** 递增后触发 React Flow fitView（漫剧重排等） */
   fitViewNonce: number;
+  /** 媒体外框迁移后须 fitView；Pro2 打开时勿恢复旧 pan/zoom */
+  libtvMediaViewportReflowPending: boolean;
+  clearLibtvMediaViewportReflowPending: () => void;
   /** 生成中聚焦某节点（选中 + 平移，不写 undo 栈） */
   runningFocusNodeId: string | null;
   runningFocusNonce: number;
@@ -268,6 +292,8 @@ type CanvasState = {
    * - `dragHoverGroupId`：拖动节点过程中，鼠标当前悬停在哪个 group 容器内
    */
   connectingFromNodeId: string | null;
+  /** 正在拖线的源 handle id · 拖线中仅该侧 + 保持可见 */
+  connectingFromHandleId: string | null;
   /** 侧栏 + 拖线松手空白处 · 待选菜单（与 connectingFrom 并存） */
   pendingSideConnect: PendingSideConnect | null;
   dragHoverGroupId: string | null;
@@ -281,12 +307,16 @@ type CanvasState = {
   canvasMarqueeSelecting: boolean;
   /** 多选选区整体拖动中：隐藏单节点 Dock / 顶栏 */
   canvasSelectionDragging: boolean;
+  /** 已选中 ≥2 个非 group 节点：只保留选区批量 +，隐藏各节点侧栏 + */
+  canvasMultiSelectActive: boolean;
   /** LibTV 浮动 Dock · 最近一次唯一选中节点（zoom 时 RF 选中态可能闪断，Dock 读此字段） */
   libtvFloatingDockNodeId: string | null;
   libtvFloatingDockNodeType: string | null;
+  /** 用户正在操作输入坞：隐藏节点顶栏，避免遮挡 Dock */
+  libtvInputDockFocused: boolean;
   /** 鼠标悬停的 LibTV 媒体组（未选中时也可显示顶栏） */
   hoveredMediaGroupId: string | null;
-  setConnectingFrom: (id: string | null) => void;
+  setConnectingFrom: (id: string | null, handleId?: string | null) => void;
   setPendingSideConnect: (pending: PendingSideConnect | null) => void;
   clearPendingSideConnect: () => void;
   setDragHoverGroup: (id: string | null) => void;
@@ -298,10 +328,12 @@ type CanvasState = {
   setCanvasViewportMoving: (moving: boolean) => void;
   setCanvasMarqueeSelecting: (selecting: boolean) => void;
   setCanvasSelectionDragging: (dragging: boolean) => void;
+  setCanvasMultiSelectActive: (active: boolean) => void;
   setLibtvFloatingDockSelection: (
     nodeId: string | null,
     nodeType: string | null,
   ) => void;
+  setLibtvInputDockFocused: (focused: boolean) => void;
 
   /** 故事大纲审阅弹窗（全局，避免节点重渲染丢失 open 状态） */
   storyHubReview: { hubId: string; section: HubPreviewSection } | null;
@@ -324,6 +356,11 @@ type CanvasState = {
     tab: import("./pro2-script-hub-view-types").Pro2ScriptHubViewTab,
   ) => void;
   closePro2ScriptTableEditor: () => void;
+
+  /** 3D导演台节点 · 全屏 iframe 编辑（双击 / 按钮打开） */
+  director3dDeskEditorNodeId: string | null;
+  openDirector3dDeskEditor: (nodeId: string) => void;
+  closeDirector3dDeskEditor: () => void;
 
   /** 2.0 分镜图板 · 当前聚焦的单格（用于格下输入坞） */
   pro2FrameDockFocus: { nodeId: string; rowKey: string } | null;
@@ -366,11 +403,26 @@ type CanvasState = {
   updateNodeData: (
     id: string,
     patch: Record<string, unknown>,
-    options?: { commit?: boolean },
+    options?: { commit?: boolean; sessionOnly?: boolean },
   ) => void;
   setNodeRuntime: (id: string, runtime: Partial<CanvasNodeRuntime>) => void;
   /** 程序化调整节点尺寸（选中时仍可用 NodeResizer 手动覆盖） */
   resizeNode: (id: string, size: { width: number; height: number }) => void;
+  /** 媒体自适配：尺寸与 mediaFit 元数据原子写入 */
+  applyLibtvMediaFit: (
+    id: string,
+    size: { width: number; height: number },
+    fitMeta: {
+      mediaFit: boolean;
+      mediaFitKey: string;
+      mediaFitVersion: number;
+      mediaNaturalW: number;
+      mediaNaturalH: number;
+      mediaAspectPreset?: string;
+      mediaAspectPresetSizeVersion?: number;
+      manualSize?: boolean;
+    },
+  ) => void;
   /** NodeResizer 松手：从 RF 权威几何一次性写入 store（含左/上缘 position） */
   commitNodesGeometryFromRf: (
     patches: Array<{
@@ -437,8 +489,13 @@ type CanvasState = {
   /**
    * 把指定节点重新挂到 newParentGroupId（或挂到画布根，传 null）。
    * 自动换算 position 使屏幕坐标不变；并设置 / 清除 extent='parent'。
+   * `absolutePosition`：拖动松手时传入 RF 当前视觉绝对坐标，避免用过期的 store 相对坐标。
    */
-  reparentNode: (nodeId: string, newParentGroupId: string | null) => void;
+  reparentNode: (
+    nodeId: string,
+    newParentGroupId: string | null,
+    absolutePosition?: { x: number; y: number },
+  ) => void;
   /** 从 React Flow 本地 nodes 提交坐标（拖动松手兜底；不跑 normalize） */
   commitFlowNodePositions: (
     patches: Array<{ id: string; position: { x: number; y: number } }>,
@@ -486,12 +543,16 @@ export const useCanvasStore = create<CanvasState>()(
       edges: [],
       viewport: { x: 0, y: 0, zoom: 1 },
       fitViewNonce: 0,
+      libtvMediaViewportReflowPending: false,
+      clearLibtvMediaViewportReflowPending: () =>
+        set({ libtvMediaViewportReflowPending: false }),
       runningFocusNodeId: null,
       runningFocusNonce: 0,
       canvasFocusNodeId: null,
       canvasFocusNonce: 0,
       graphRevision: 0,
       connectingFromNodeId: null,
+      connectingFromHandleId: null,
       pendingSideConnect: null,
       dragHoverGroupId: null,
       hoveredMediaGroupId: null,
@@ -500,12 +561,22 @@ export const useCanvasStore = create<CanvasState>()(
       canvasViewportMoving: false,
       canvasMarqueeSelecting: false,
       canvasSelectionDragging: false,
+      canvasMultiSelectActive: false,
       libtvFloatingDockNodeId: null,
       libtvFloatingDockNodeType: null,
-      setConnectingFrom: (id) => set({ connectingFromNodeId: id }),
+      libtvInputDockFocused: false,
+      setConnectingFrom: (id, handleId = null) =>
+        set({
+          connectingFromNodeId: id,
+          connectingFromHandleId: id ? handleId : null,
+        }),
       setPendingSideConnect: (pending) => set({ pendingSideConnect: pending }),
       clearPendingSideConnect: () =>
-        set({ pendingSideConnect: null, connectingFromNodeId: null }),
+        set({
+          pendingSideConnect: null,
+          connectingFromNodeId: null,
+          connectingFromHandleId: null,
+        }),
       setDragHoverGroup: (id) => set({ dragHoverGroupId: id }),
       setHoveredMediaGroupId: (id) => set({ hoveredMediaGroupId: id }),
       clearPortalEditorChrome: () =>
@@ -514,11 +585,13 @@ export const useCanvasStore = create<CanvasState>()(
           dragHoverGroupId: null,
           libtvFloatingDockNodeId: null,
           libtvFloatingDockNodeType: null,
+          libtvInputDockFocused: false,
           canvasGeometryDragging: false,
           canvasDraggingNodeId: null,
           canvasMarqueeSelecting: false,
           canvasSelectionDragging: false,
           connectingFromNodeId: null,
+          connectingFromHandleId: null,
           pendingSideConnect: null,
         }),
       setCanvasGeometryDragging: (dragging) =>
@@ -531,11 +604,17 @@ export const useCanvasStore = create<CanvasState>()(
         set({ canvasMarqueeSelecting: selecting }),
       setCanvasSelectionDragging: (dragging) =>
         set({ canvasSelectionDragging: dragging }),
+      setCanvasMultiSelectActive: (active) => {
+        if (get().canvasMultiSelectActive === active) return;
+        set({ canvasMultiSelectActive: active });
+      },
       setLibtvFloatingDockSelection: (nodeId, nodeType) =>
         set({
           libtvFloatingDockNodeId: nodeId,
           libtvFloatingDockNodeType: nodeType,
         }),
+      setLibtvInputDockFocused: (focused) =>
+        set({ libtvInputDockFocused: focused }),
 
       storyHubReview: null,
       openStoryHubReview: (hubId, section) =>
@@ -563,6 +642,12 @@ export const useCanvasStore = create<CanvasState>()(
           pro2ScriptTableEditorTab: "script",
         }),
 
+      director3dDeskEditorNodeId: null,
+      openDirector3dDeskEditor: (nodeId) =>
+        set({ director3dDeskEditorNodeId: nodeId }),
+      closeDirector3dDeskEditor: () =>
+        set({ director3dDeskEditorNodeId: null }),
+
       pro2FrameDockFocus: null,
       setPro2FrameDockFocus: (focus) => set({ pro2FrameDockFocus: focus }),
       pro2StyleLibImageNodeId: null,
@@ -578,7 +663,9 @@ export const useCanvasStore = create<CanvasState>()(
           Array.isArray(g0.nodes) && g0.nodes.length
             ? {
                 ...g0,
-                nodes: clearOrphanLibtvMediaInflightInNodes(g0.nodes),
+                nodes: clearStaleMediaRenderInFlightInNodes(
+                  clearOrphanLibtvMediaInflightInNodes(g0.nodes),
+                ),
               }
             : g0;
         let edges = g.edges as CanvasFlowEdge[];
@@ -590,16 +677,24 @@ export const useCanvasStore = create<CanvasState>()(
         let normalized = normalizeCanvasNodes(migrated.nodes, edges);
         let nodes = stripPersistedNodeSelection(
           normalized.some((n) => String(n.type ?? "").startsWith("story-pro2-"))
-            ? reconcileStoryPro2Workspace(normalized)
+            ? stripStaleHubGenerateIntent(
+                repairHubStructuredProductionScriptNodes(
+                  repairHubEmbeddedPackSections(reconcileStoryPro2Workspace(normalized)),
+                ),
+              )
             : reconcileStoryProWorkspace(normalized),
         );
+        const needsMediaViewportReflow = libtvCanvasNeedsViewportReflow(
+          migrated.nodes as CanvasFlowNode[],
+          g.viewport ?? { x: 0, y: 0, zoom: 1 },
+        );
         const hydratedMeta = ensureGraphMetaEdition(nodes, g.meta ?? null);
-        const viewport = pro2NeutralViewportOnOpen(
+        const viewport = hydrateSavedViewport(
           hydratedMeta,
           g.viewport ?? { x: 0, y: 0, zoom: 1 },
         );
 
-        const applyDeferredLayout = () => {
+        const applyDeferredLayoutInner = () => {
           const current = get();
           const laid = finalizeHydratedGraph(current.nodes, current.edges);
           const nodesWithInflight = preserveLocalInflightOnHydrateLayout(
@@ -618,9 +713,13 @@ export const useCanvasStore = create<CanvasState>()(
             }),
           );
           queueMicrotask(() => {
-            runPostHydratePro2VideoBoardRepair(get);
-            requestPro2FitViewAfterHydrate(meta, set);
+            runWithUndoTrackingPaused(() => {
+              runPostHydratePro2VideoBoardRepair(get);
+            });
           });
+        };
+        const applyDeferredLayout = () => {
+          runWithUndoTrackingPaused(applyDeferredLayoutInner);
         };
 
         if (nodes.length >= DEFER_HYDRATE_LAYOUT_NODE_COUNT) {
@@ -635,9 +734,14 @@ export const useCanvasStore = create<CanvasState>()(
               storyHubReview: null,
               pro2TextOutlineEditorNodeId: null,
               pro2ScriptTableEditorNodeId: null,
+              director3dDeskEditorNodeId: null,
               libtvFloatingDockNodeId: null,
               libtvFloatingDockNodeType: null,
               graphMeta: hydratedMeta ?? null,
+              libtvMediaViewportReflowPending: needsMediaViewportReflow,
+              fitViewNonce: needsMediaViewportReflow
+                ? state.fitViewNonce + 1
+                : state.fitViewNonce,
             }),
           );
           queueMicrotask(applyDeferredLayout);
@@ -655,14 +759,20 @@ export const useCanvasStore = create<CanvasState>()(
             storyHubReview: null,
             pro2TextOutlineEditorNodeId: null,
             pro2ScriptTableEditorNodeId: null,
+            director3dDeskEditorNodeId: null,
             libtvFloatingDockNodeId: null,
             libtvFloatingDockNodeType: null,
             graphMeta: meta ?? null,
+            libtvMediaViewportReflowPending: needsMediaViewportReflow,
+            fitViewNonce: needsMediaViewportReflow
+              ? state.fitViewNonce + 1
+              : state.fitViewNonce,
           }),
         );
         queueMicrotask(() => {
-          runPostHydratePro2VideoBoardRepair(get);
-          requestPro2FitViewAfterHydrate(meta, set);
+          runWithUndoTrackingPaused(() => {
+            runPostHydratePro2VideoBoardRepair(get);
+          });
         });
       },
 
@@ -693,10 +803,20 @@ export const useCanvasStore = create<CanvasState>()(
           });
         });
       },
-      setEdges: (updater) =>
+      setEdges: (updater) => {
+        const prev = get();
+        const prevEdges = prev.edges;
+        const nextEdges = updater(prevEdges);
+        if (nextEdges === prevEdges) return;
+        const nextNodes = applyPro2StarterUnlinkAfterEdgeRemoval(
+          prev.nodes,
+          prevEdges,
+          nextEdges,
+        );
         set((state) =>
-          withGraphRevision(state, { edges: updater(state.edges) }),
-        ),
+          withGraphRevision(state, { edges: nextEdges, nodes: nextNodes }),
+        );
+      },
       setViewport: (v) => set({ viewport: v }),
 
       focusCanvasNode: (nodeId) => {
@@ -832,6 +952,7 @@ export const useCanvasStore = create<CanvasState>()(
           return;
         }
         next = detachChildrenOfRemovedGroups(prev, next);
+        next = applyPro2VideoBoardGroupRemoval(prev, next);
         const removedNodeIds = prev
           .filter((n) => !next.some((x) => x.id === n.id))
           .map((n) => n.id);
@@ -902,14 +1023,48 @@ export const useCanvasStore = create<CanvasState>()(
           return withGraphRevision(state, patch);
         });
       },
-      onEdgesChange: (changes) =>
+      onEdgesChange: (changes) => {
+        const prev = get();
+        const { changes: safeChanges, blockedRemoves } =
+          filterSpuriousRfEdgeRemoves(changes, prev.edges, prev.nodes);
+        if (blockedRemoves || !safeChanges.length) return;
+
+        const removedStarterHubEdges = safeChanges
+          .filter((c): c is EdgeChange & { type: "remove"; id: string } =>
+            c.type === "remove" && typeof c.id === "string",
+          )
+          .map((c) => prev.edges.find((e) => e.id === c.id))
+          .filter((e): e is CanvasFlowEdge => Boolean(e))
+          .filter((e) => isPro2StarterScriptHubEdge(e, prev.nodes));
+
+        const nextEdges = applyEdgeChanges(safeChanges, prev.edges);
+        let nextNodes = prev.nodes;
+        if (removedStarterHubEdges.length > 0) {
+          const patches = collectPro2StarterUnlinkPatches(
+            removedStarterHubEdges,
+            prev.nodes,
+            nextEdges,
+          );
+          if (patches.size > 0) {
+            nextNodes = prev.nodes.map((n) => {
+              const patch = patches.get(n.id);
+              if (!patch) return n;
+              return {
+                ...n,
+                data: { ...(n.data as Record<string, unknown>), ...patch },
+              };
+            });
+          }
+        }
+
         set((state) =>
-          withGraphRevision(state, {
-            edges: applyEdgeChanges(changes, state.edges),
-          }),
-        ),
+          withGraphRevision(state, { edges: nextEdges, nodes: nextNodes }),
+        );
+      },
       onConnect: (connection) => {
         if (!connection.source || !connection.target) return;
+        // 自连边无业务含义，且会绕到节点背后只露出左右两截白线
+        if (connection.source === connection.target) return;
         const state = get();
         const normalized = normalizePro2PlusLeftConnection(
           normalizeSbv1PlusLeftConnection(
@@ -1004,13 +1159,23 @@ export const useCanvasStore = create<CanvasState>()(
 
         const srcNode = state.nodes.find((n) => n.id === normalized.source);
         const tgtNode = state.nodes.find((n) => n.id === normalized.target);
-        if (
-          srcNode?.type === "story-pro2-starter" &&
-          tgtNode?.type === "story-pro2-script-hub"
-        ) {
-          const sd = srcNode.data as import("./story-pro-workspace-types").StoryProStarterNodeData;
+        const starterNode =
+          srcNode?.type === "story-pro2-starter"
+            ? srcNode
+            : tgtNode?.type === "story-pro2-starter"
+              ? tgtNode
+              : null;
+        const hubNode =
+          srcNode?.type === "story-pro2-script-hub"
+            ? srcNode
+            : tgtNode?.type === "story-pro2-script-hub"
+              ? tgtNode
+              : null;
+        if (starterNode && hubNode) {
+          const sd =
+            starterNode.data as import("./story-pro-workspace-types").StoryProStarterNodeData;
           const hubPatch: Record<string, unknown> = {
-            referencedNodeIds: [srcNode.id],
+            referencedNodeIds: [starterNode.id],
           };
           if (sd.providerId?.trim()) hubPatch.providerId = sd.providerId;
           if (sd.modelKey?.trim()) hubPatch.modelKey = sd.modelKey;
@@ -1018,12 +1183,9 @@ export const useCanvasStore = create<CanvasState>()(
           const outline =
             sd.generatedOutlineMd?.trim() || sd.uploadedScriptMd?.trim();
           if (outline) hubPatch.outlineMd = outline;
-          get().updateNodeData(tgtNode.id, hubPatch);
-          get().updateNodeData(srcNode.id, {
-            workspaceIds: {
-              ...(sd.workspaceIds ?? {}),
-              scriptHubId: tgtNode.id,
-            },
+          get().updateNodeData(hubNode.id, hubPatch);
+          get().updateNodeData(starterNode.id, {
+            ...patchPro2StarterOnScriptHubLink(sd, hubNode.id),
           });
         }
 
@@ -1059,6 +1221,7 @@ export const useCanvasStore = create<CanvasState>()(
             ),
           }),
         );
+        maybeApplyLibtvMediaAspectPresetForNewNode(id, type);
         return id;
       },
 
@@ -1091,6 +1254,7 @@ export const useCanvasStore = create<CanvasState>()(
             nodes: ensureNodeDragHandles(sortNodesForReactFlow([...all, node])),
           }),
         );
+        maybeApplyLibtvMediaAspectPresetForNewNode(id, type);
         return id;
       },
 
@@ -1121,6 +1285,11 @@ export const useCanvasStore = create<CanvasState>()(
             );
           }
         }
+        if (options?.sessionOnly) {
+          set({ nodes });
+          maybeApplyLibtvMediaAspectPresetFromPatch(id, patch);
+          return;
+        }
         if (isCanvasDraftDataPatch(patch, options?.commit)) {
           const temporal = useCanvasStore.temporal.getState();
           temporal.pause();
@@ -1130,9 +1299,11 @@ export const useCanvasStore = create<CanvasState>()(
           } finally {
             temporal.resume();
           }
+          maybeApplyLibtvMediaAspectPresetFromPatch(id, patch);
           return;
         }
         set((state) => withGraphRevision(state, { nodes }));
+        maybeApplyLibtvMediaAspectPresetFromPatch(id, patch);
       },
 
       setNodeRuntime: (id, runtime) => {
@@ -1203,6 +1374,67 @@ export const useCanvasStore = create<CanvasState>()(
                     width,
                     height,
                     style: { ...n.style, width, height },
+                  }
+                : n,
+            ),
+          }),
+        );
+      },
+
+      /** 媒体自适配：尺寸 + mediaFit 元数据同一次写入，避免中间态被 RF 合回矮框 */
+      applyLibtvMediaFit: (
+        id,
+        size,
+        fitMeta,
+      ) => {
+        const prev = get().nodes.find((n) => n.id === id);
+        if (prev) {
+          const style = prev.style as { width?: number; height?: number } | undefined;
+          const prevW = Math.round(
+            (typeof prev.width === "number" ? prev.width : undefined) ??
+              style?.width ??
+              0,
+          );
+          const prevH = Math.round(
+            (typeof prev.height === "number" ? prev.height : undefined) ??
+              style?.height ??
+              0,
+          );
+          const d = prev.data as Record<string, unknown>;
+          const sizeSame = prevW === size.width && prevH === size.height;
+          const metaSame =
+            d.mediaFit === fitMeta.mediaFit &&
+            d.mediaFitKey === fitMeta.mediaFitKey &&
+            d.mediaFitVersion === fitMeta.mediaFitVersion &&
+            d.mediaNaturalW === fitMeta.mediaNaturalW &&
+            d.mediaNaturalH === fitMeta.mediaNaturalH &&
+            (fitMeta.mediaAspectPreset === undefined ||
+              d.mediaAspectPreset === fitMeta.mediaAspectPreset) &&
+            (fitMeta.mediaAspectPresetSizeVersion === undefined ||
+              d.mediaAspectPresetSizeVersion ===
+                fitMeta.mediaAspectPresetSizeVersion) &&
+            (fitMeta.manualSize === undefined ||
+              d.manualSize === fitMeta.manualSize);
+          if (sizeSame && metaSame) return;
+        }
+        set((state) =>
+          withGraphRevision(state, {
+            nodes: state.nodes.map((n) =>
+              n.id === id
+                ? {
+                    ...n,
+                    width: size.width,
+                    height: size.height,
+                    style: {
+                      ...(typeof n.style === "object" && n.style ? n.style : {}),
+                      width: size.width,
+                      height: size.height,
+                    },
+                    data: {
+                      ...n.data,
+                      ...fitMeta,
+                      manualSize: false,
+                    },
                   }
                 : n,
             ),
@@ -1306,20 +1538,68 @@ export const useCanvasStore = create<CanvasState>()(
         if (!validation.allowedIds.includes(id)) {
           return;
         }
-        const edges = get().edges.filter((e) => e.source !== id && e.target !== id);
-        const filtered = get().nodes.filter((n) => n.id !== id);
+        const prevNodes = get().nodes;
+        const prevEdges = get().edges;
+        const removedNode = prevNodes.find((n) => n.id === id);
+        const starterUnlinkPatches = new Map<string, Record<string, unknown>>();
+        if (removedNode?.type === "story-pro2-script-hub") {
+          for (const starterId of findPro2StartersLinkedToHub(
+            id,
+            prevNodes,
+            prevEdges,
+          )) {
+            const starter = prevNodes.find((n) => n.id === starterId);
+            if (!starter || starter.type !== "story-pro2-starter") continue;
+            starterUnlinkPatches.set(
+              starterId,
+              patchPro2StarterOnScriptHubUnlink(
+                starter.data as import("./pro2-text-hub-link-sync").Pro2StarterLinkData,
+              ),
+            );
+          }
+        }
+
+        const edges = prevEdges.filter((e) => e.source !== id && e.target !== id);
+        const filtered = applyPro2VideoBoardGroupRemoval(
+          prevNodes,
+          prevNodes.filter((n) => n.id !== id),
+        );
         const pruned = pruneMentionsAfterNodeRemoval(filtered, id);
-        const nodes = pruned.some((n) =>
+        let nodes = pruned.map((n) => {
+          const patch = starterUnlinkPatches.get(n.id);
+          if (!patch) return n;
+          return {
+            ...n,
+            data: { ...(n.data as Record<string, unknown>), ...patch },
+          };
+        });
+        nodes = nodes.some((n) =>
           String(n.type ?? "").startsWith("story-pro2-"),
         )
-          ? reconcileStoryPro2Workspace(pruned)
-          : reconcileStoryProWorkspace(pruned);
+          ? reconcileStoryPro2Workspace(nodes)
+          : reconcileStoryProWorkspace(nodes);
         const s = get();
         const clearDockPin =
           s.libtvFloatingDockNodeId === id
             ? { libtvFloatingDockNodeId: null, libtvFloatingDockNodeType: null }
             : {};
-        set((state) => withGraphRevision(state, { nodes, edges, ...clearDockPin }));
+        const clearConnectState =
+          s.connectingFromNodeId === id ||
+          s.pendingSideConnect?.fromNodeId === id
+            ? {
+                connectingFromNodeId: null,
+                connectingFromHandleId: null,
+                pendingSideConnect: null,
+              }
+            : {};
+        set((state) =>
+          withGraphRevision(state, {
+            nodes,
+            edges,
+            ...clearDockPin,
+            ...clearConnectState,
+          }),
+        );
       },
 
       duplicateNode: (id, options) => {
@@ -1482,7 +1762,10 @@ export const useCanvasStore = create<CanvasState>()(
           !pro2ShortcutPreset &&
             (pro2Kind || sbv1Styled || (pro2Styled && mediaGridChildrenOnly)),
         );
-        const PADDING = usePro2MediaGrid ? PRO2_MEDIA_GROUP_PAD : 28;
+        const PADDING =
+          usePro2MediaGrid || pro2Styled || sbv1Styled
+            ? PRO2_MEDIA_GROUP_PAD
+            : 84;
         const boxes = children.map((c) => {
           const m = measuredSizes?.[c.id];
           const cell = usePro2MediaGrid
@@ -1835,11 +2118,13 @@ export const useCanvasStore = create<CanvasState>()(
           pro2Kind?: string;
           pro2ShortcutPreset?: boolean;
         };
-        const useMediaRelayout =
-          mode === "auto" &&
+        const sbv1LikeGroup =
           !d.pro2ShortcutPreset &&
           (shouldUseSbv1ImageVideoColumnLayout(group, nodes) ||
-            isSbv1MediaGroup(group, nodes) ||
+            isSbv1MediaGroup(group, nodes));
+        const useMediaRelayout =
+          !d.pro2ShortcutPreset &&
+          (sbv1LikeGroup ||
             isPro2StyledGroup(group, nodes) ||
             Boolean(d.pro2Kind));
 
@@ -1850,6 +2135,7 @@ export const useCanvasStore = create<CanvasState>()(
                 state.nodes,
                 state.edges,
                 groupId,
+                { force: true, mode },
               ),
             }),
           );
@@ -1876,7 +2162,7 @@ export const useCanvasStore = create<CanvasState>()(
         });
       },
 
-      reparentNode: (nodeId, newParentGroupId) => {
+      reparentNode: (nodeId, newParentGroupId, absolutePosition) => {
         const all = get().nodes;
         const node = all.find((n) => n.id === nodeId);
         if (!node) return;
@@ -1903,7 +2189,7 @@ export const useCanvasStore = create<CanvasState>()(
           return { x: pa.x + n.position.x, y: pa.y + n.position.y };
         };
 
-        const abs = absOf(node);
+        const abs = absolutePosition ?? absOf(node);
         let newPosition = abs;
         if (newParentGroupId) {
           const g = all.find((x) => x.id === newParentGroupId);
@@ -1912,16 +2198,25 @@ export const useCanvasStore = create<CanvasState>()(
           newPosition = { x: abs.x - gAbs.x, y: abs.y - gAbs.y };
         }
 
-        const updated = all.map((n) =>
-          n.id === nodeId
-            ? ({
-                ...n,
-                parentId: newParentGroupId ?? undefined,
-                extent: newParentGroupId ? "parent" : undefined,
-                position: newPosition,
-              } as CanvasFlowNode)
-            : n,
-        );
+        const updated = all.map((n) => {
+          if (n.id !== nodeId) return n;
+          const data = { ...(n.data as Record<string, unknown>) };
+          if (newParentGroupId) {
+            const parentGroup = all.find((x) => x.id === newParentGroupId);
+            if (parentGroup && isGroupNode(parentGroup.type)) {
+              data.pro2GroupId = newParentGroupId;
+            }
+          } else {
+            delete data.pro2GroupId;
+          }
+          return {
+            ...n,
+            parentId: newParentGroupId ?? undefined,
+            extent: newParentGroupId ? "parent" : undefined,
+            position: newPosition,
+            data,
+          } as CanvasFlowNode;
+        });
         // React Flow 要求父节点先于子节点出现：重排，把所有 group 放最前
         set((state) =>
           withGraphRevision(state, {
@@ -2010,7 +2305,13 @@ export const useCanvasStore = create<CanvasState>()(
       partialize: (state) => ({
         nodes: state.nodes,
         edges: state.edges,
+        graphRevision: state.graphRevision,
       }),
+      // zundo 默认「任何 set 都记一帧」：视口平移、连线状态、任务轮询运行态等非图更新
+      // 会把 limit 条历史全部填成同一份图，撤销就点不动了。
+      // graphRevision 只在 withGraphRevision 里 bump（与 autosave 的脏判据同源），
+      // 因此它变了才等于「图真的编辑过」。
+      equality: (past, current) => past.graphRevision === current.graphRevision,
       limit: 50,
     },
   ),

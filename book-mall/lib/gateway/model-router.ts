@@ -4,6 +4,7 @@ import {
   isMinimaxMusicModelKey,
   isMinimaxSpeechModelKey,
 } from "@/lib/gateway/minimax-speech-models";
+import { isMinimaxVideoModelKey } from "@/lib/gateway/minimax-video-models";
 import {
   isKieElevenLabsMarketModelKey,
   isKieSunoModelKey,
@@ -32,16 +33,32 @@ const DEEPSEEK_MODELS = new Set([
   "deepseek-coder",
 ]);
 
-const MOONSHOT_MODELS = new Set([
+/** Kimi 全系经百炼代销（平台代付 · DashScope compatible-mode） */
+const KIMI_CHAT_MODELS = new Set([
   "kimi-k3",
   "kimi-k2.6",
   "kimi-k2.5",
   "kimi-k2.7-code",
   "kimi-k2.7-code-highspeed",
+  "kimi/kimi-k3",
+  "kimi/kimi-k2.6",
+  "kimi/kimi-k2.5",
+  "kimi/kimi-k2.7-code",
+  "kimi/kimi-k2.7-code-highspeed",
+]);
+
+const MOONSHOT_LEGACY_MODELS = new Set([
   "moonshot-v1-8k",
   "moonshot-v1-32k",
   "moonshot-v1-128k",
 ]);
+
+export function isKimiChatModelKey(modelKey: string): boolean {
+  const m = modelKey.trim().toLowerCase();
+  if (m.startsWith("kimi/")) return true;
+  if (m.startsWith("kimi-")) return true;
+  return KIMI_CHAT_MODELS.has(m);
+}
 
 const KIE_CHAT_MODELS = new Set([
   "gemini-3-flash",
@@ -85,7 +102,18 @@ export function isBailianR2vGatewayModel(model: string): boolean {
   return BAILIAN_R2V.has(model.trim().toLowerCase());
 }
 
-const TTS_MODELS = new Set(["tts-1", "tts-1-hd", "qwen3-tts"]);
+const TTS_MODELS = new Set([
+  "tts-1",
+  "tts-1-hd",
+  "qwen3-tts",
+  "cosyvoice-v2",
+  "cosyvoice-v3-flash",
+  "cosyvoice-v3-plus",
+  "cosyvoice-v3.5-flash",
+  "cosyvoice-v3.5-plus",
+  "qwen-audio-3.0-tts-flash",
+  "qwen-audio-3.0-tts-plus",
+]);
 
 const TRYON_PREFIXES = ["aitryon"];
 
@@ -96,6 +124,7 @@ const DASHSCOPE_VIDEO_PREFIXES = [
   "happyhorse-1.1-",
   "happyhorse-1-0-",
   "wan2.",
+  "wan3.",
   "pixverse-",
 ];
 
@@ -120,6 +149,11 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "VOLCENGINE", requestKind: "VIDEO" };
   }
 
+  // 文本向量（平台 AI 导览助手 RAG）：百炼 text-embedding-v* 走 OpenAI 兼容 /v1/embeddings
+  if (m.startsWith("text-embedding-v") || m === "text-embedding") {
+    return { providerKind: "BAILIAN", requestKind: "OTHER" };
+  }
+
   if (HUNYUAN_MODELS.has(m) || m.startsWith("hunyuan-3d")) {
     return { providerKind: "HUNYUAN", requestKind: "IMAGE" };
   }
@@ -128,12 +162,28 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "VOLCENGINE", requestKind: "OTHER" };
   }
 
-  if (TTS_MODELS.has(m) || m.startsWith("tts-")) {
+  if (
+    TTS_MODELS.has(m) ||
+    m.startsWith("tts-") ||
+    m.startsWith("cosyvoice-") ||
+    m.startsWith("qwen-audio-3.0-tts")
+  ) {
     return { providerKind: "BAILIAN", requestKind: "TTS" };
   }
 
   if (TRYON_PREFIXES.some((p) => m.startsWith(p))) {
     return { providerKind: "DASHSCOPE", requestKind: "TRYON" };
+  }
+
+  if (
+    m === "qwen-image-edit" ||
+    m === "qwen-image-edit-max" ||
+    m.startsWith("qwen-image-edit") ||
+    m === "qwen-image-3.0-pro" ||
+    m === "qwen-image-3.0" ||
+    m === "z-image-turbo"
+  ) {
+    return { providerKind: "DASHSCOPE", requestKind: "IMAGE" };
   }
 
   if (m.startsWith("wan2.7-image") || m.startsWith("wan2.7_image")) {
@@ -153,6 +203,16 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "DASHSCOPE", requestKind: "IMAGE" };
   }
 
+  if (
+    m === "kling-3.0/video" ||
+    m === "kling-3.0" ||
+    (m.startsWith("kling/kling-v3") &&
+      m.includes("video") &&
+      !m.includes("image"))
+  ) {
+    return { providerKind: "DASHSCOPE", requestKind: "VIDEO" };
+  }
+
   if (m.startsWith("wanx") || m.includes("wanx")) {
     return { providerKind: "DASHSCOPE", requestKind: "IMAGE" };
   }
@@ -167,11 +227,16 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "BAILIAN", requestKind: "VIDEO" };
   }
 
+  /** MiniMax H3 须在 DashScope `-r2v` 启发式之前（`MiniMax/MiniMax-H3-r2v` 含 `-r2v` 且带 `/`） */
+  if (isMinimaxVideoModelKey(raw) || isMinimaxVideoModelKey(m)) {
+    return { providerKind: "MINIMAX", requestKind: "VIDEO" };
+  }
+
   if (
     DASHSCOPE_VIDEO_PREFIXES.some((p) => m.startsWith(p)) ||
     (m.includes("-i2v") && !m.includes("/")) ||
     (m.includes("-t2v") && !m.includes("/")) ||
-    (m.includes("-r2v") && !BAILIAN_R2V.has(m))
+    (m.includes("-r2v") && !m.includes("/") && !BAILIAN_R2V.has(m))
   ) {
     return { providerKind: "DASHSCOPE", requestKind: "VIDEO" };
   }
@@ -180,11 +245,11 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "DEEPSEEK", requestKind: "CHAT" };
   }
 
-  if (
-    MOONSHOT_MODELS.has(m) ||
-    m.startsWith("kimi-") ||
-    m.startsWith("moonshot-")
-  ) {
+  if (isKimiChatModelKey(m)) {
+    return { providerKind: "BAILIAN", requestKind: "CHAT" };
+  }
+
+  if (MOONSHOT_LEGACY_MODELS.has(m) || m.startsWith("moonshot-")) {
     return { providerKind: "MOONSHOT", requestKind: "CHAT" };
   }
 
@@ -216,14 +281,6 @@ export function routeGatewayModel(model: string): RoutedModel {
   }
 
   if (
-    m === "qwen-image-edit" ||
-    m === "qwen-image-edit-max" ||
-    m.startsWith("qwen-image-edit")
-  ) {
-    return { providerKind: "BAILIAN", requestKind: "IMAGE" };
-  }
-
-  if (
     m === "image-out-painting" ||
     m === "wanx-x-painting" ||
     m === "wan2.5-i2i-preview"
@@ -234,7 +291,9 @@ export function routeGatewayModel(model: string): RoutedModel {
   if (
     m === "doubao-seedream-5-0-lite" ||
     m === "doubao-seedream-5-0-260128" ||
-    (m.includes("doubao-seedream-5") && m.includes("lite"))
+    m === "doubao-seedream-5-0-pro" ||
+    m === "doubao-seedream-5-0-pro-260628" ||
+    (m.includes("doubao-seedream-5") && (m.includes("lite") || m.includes("pro")))
   ) {
     return { providerKind: "VOLCENGINE", requestKind: "IMAGE" };
   }
@@ -296,6 +355,13 @@ export function routeGatewayModel(model: string): RoutedModel {
     /^google\/gemini-\d+(\.\d+)?-flash(-preview)?$/i.test(m)
   ) {
     return { providerKind: "KIE", requestKind: "CHAT" };
+  }
+
+  if (
+    m.startsWith("seedream/") ||
+    m.startsWith("gpt-image/")
+  ) {
+    return { providerKind: "KIE", requestKind: "IMAGE" };
   }
 
   if (KIE_JOB_PREFIXES.some((p) => m.includes(p))) {
@@ -362,7 +428,13 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "TOPAZ", requestKind: "VIDEO" };
   }
 
-  if (m.includes("qwen") || m.includes("bailian") || (m.includes("minimax") && !m.includes("speech") && !m.includes("music"))) {
+  if (
+    m.startsWith("zhipu/") ||
+    m.includes("glm-5") ||
+    m.includes("qwen") ||
+    m.includes("bailian") ||
+    (m.includes("minimax") && !m.includes("speech") && !m.includes("music"))
+  ) {
     return { providerKind: "BAILIAN", requestKind: "CHAT" };
   }
 
@@ -455,8 +527,14 @@ export function resolveMoonshotBaseUrl(
   return raw;
 }
 
+function normalizeKimiModelSlug(model: string): string {
+  const m = model.trim().toLowerCase();
+  if (m.startsWith("kimi/kimi-")) return m.slice("kimi/".length);
+  return m;
+}
+
 /** Kimi 模型 temperature / top_p 等为固定值；K2.6 thinking_mode → thinking 对象。 */
-export function resolveMoonshotChatCompletionsBody(
+export function resolveKimiChatCompletionsBody(
   body: Record<string, unknown>,
 ): Record<string, unknown> {
   const out = { ...body };
@@ -467,15 +545,30 @@ export function resolveMoonshotChatCompletionsBody(
   delete out.frequency_penalty;
 
   const model =
-    typeof out.model === "string" ? out.model.trim().toLowerCase() : "";
+    typeof out.model === "string" ? normalizeKimiModelSlug(out.model) : "";
   const thinkingMode = out.thinking_mode;
   if (typeof thinkingMode === "string" && model === "kimi-k2.6") {
     out.thinking = { type: thinkingMode === "disabled" ? "disabled" : "enabled" };
   }
   delete out.thinking_mode;
 
+  // Kimi K3 · reasoning_effort 须为 low / high / max（Story 默认 low 合法）
+  if (model === "kimi-k3") {
+    const effort = out.reasoning_effort;
+    if (
+      effort !== "low" &&
+      effort !== "high" &&
+      effort !== "max"
+    ) {
+      out.reasoning_effort = "max";
+    }
+  }
+
   return out;
 }
+
+/** @deprecated 使用 resolveKimiChatCompletionsBody（Moonshot 直连仅保留 legacy v1） */
+export const resolveMoonshotChatCompletionsBody = resolveKimiChatCompletionsBody;
 
 /**
  * 将用户填写的 DashScope 根域名规范为 compatible-mode/v1，避免请求 /chat/completions 404。
@@ -549,11 +642,17 @@ export {
   resolveKieCodexUpstreamModel,
 } from "@/lib/gateway/kie-codex-chat";
 
-/** 百炼 compatible-mode 上游 model 字段（MiniMax 官方 ID 带 MiniMax/ 前缀） */
+/** 百炼 compatible-mode 上游 model 字段（MiniMax / Kimi 官方 ID 带前缀） */
 export function resolveBailianChatModelKey(modelKey: string): string {
   const raw = modelKey.trim();
   const aliases: Record<string, string> = {
     "MiniMax-M2.7": "MiniMax/MiniMax-M2.7",
+    "kimi-k3": "kimi/kimi-k3",
+    "kimi-k2.6": "kimi/kimi-k2.6",
+    "kimi-k2.5": "kimi/kimi-k2.5",
+    "kimi-k2.7-code": "kimi/kimi-k2.7-code",
+    "kimi-k2.7-code-highspeed": "kimi/kimi-k2.7-code-highspeed",
+    "glm-5.3-flash": "ZHIPU/GLM-5.3-Flash",
   };
   return aliases[raw] ?? raw;
 }
@@ -571,6 +670,42 @@ export function resolveDeepseekChatModelKey(modelKey: string): string {
     return "deepseek-v4-flash";
   }
   return raw;
+}
+
+/** DeepSeek V4 · thinking_mode → thinking 对象；校验 reasoning_effort */
+export function resolveDeepseekChatCompletionsBody(
+  body: Record<string, unknown>,
+): Record<string, unknown> {
+  const out = { ...body };
+  const model = typeof out.model === "string" ? out.model : "";
+  if (model) {
+    out.model = resolveDeepseekChatModelKey(model);
+  }
+
+  const thinkingMode = out.thinking_mode;
+  if (typeof thinkingMode === "string") {
+    out.thinking = {
+      type: thinkingMode.trim().toLowerCase() === "disabled" ? "disabled" : "enabled",
+    };
+  }
+  delete out.thinking_mode;
+
+  const effort = out.reasoning_effort;
+  const thinkingType =
+    out.thinking &&
+    typeof out.thinking === "object" &&
+    !Array.isArray(out.thinking) &&
+    (out.thinking as { type?: string }).type;
+  if (thinkingType === "enabled") {
+    if (effort !== "low" && effort !== "high" && effort !== "max") {
+      out.reasoning_effort = "low";
+    }
+  } else if (effort === "low" || effort === "high" || effort === "max") {
+    // 非思考模式不传 reasoning_effort，避免上游忽略或告警
+    delete out.reasoning_effort;
+  }
+
+  return out;
 }
 
 export {

@@ -92,7 +92,7 @@ function volcengineVendorFailMessage(msg: string, blob: string): string {
 export function formatVideoEngineFailMessage(
   failCode?: string | null,
   failMessage?: string | null,
-  opts?: { providerKind?: "KIE" | "VOLCENGINE" | "BAILIAN" | "DASHSCOPE" | "TOPAZ" },
+  opts?: { providerKind?: "KIE" | "VOLCENGINE" | "BAILIAN" | "DASHSCOPE" | "TOPAZ" | "MINIMAX" },
 ): string {
   const msg = (failMessage ?? "").trim();
   const code = (failCode ?? "").trim();
@@ -321,12 +321,45 @@ export function extractKieResultUrl(record: KieRecordResponse): string | null {
   return null;
 }
 
+function normalizeKieRecordStateToken(
+  state: string | undefined | null,
+): string {
+  return (state ?? "").trim().toLowerCase();
+}
+
 export function isKieRecordSuccess(state: string | undefined | null): boolean {
-  return (state ?? "").trim().toLowerCase() === "success";
+  const s = normalizeKieRecordStateToken(state);
+  return s === "success" || s === "succeeded";
 }
 
 export function isKieRecordFail(state: string | undefined | null): boolean {
-  return (state ?? "").trim().toLowerCase() === "fail";
+  const s = normalizeKieRecordStateToken(state);
+  return s === "fail" || s === "failed";
+}
+
+/** 厂商 state 未收口但已有 completeTime + resultJson 时视为成功（KIE recordInfo 偶发滞后）。 */
+export function isKieRecordComplete(record: {
+  state?: string | null;
+  completeTime?: number | null;
+  resultJson?: string;
+}): boolean {
+  if (isKieRecordSuccess(record.state)) return true;
+  return Boolean(record.completeTime && record.resultJson?.trim());
+}
+
+/** 厂商仍在排队 / 生成（非终态）。 */
+export function isKieRecordInFlight(state: string | undefined | null): boolean {
+  const s = normalizeKieRecordStateToken(state);
+  if (!s) return true;
+  if (isKieRecordSuccess(s) || isKieRecordFail(s)) return false;
+  return (
+    s === "waiting" ||
+    s === "queuing" ||
+    s === "generating" ||
+    s === "running" ||
+    s === "pending" ||
+    s === "processing"
+  );
 }
 
 export function logKieEvent(

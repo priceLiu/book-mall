@@ -14,7 +14,7 @@ import {
 } from "@/lib/gateway/proxy-common";
 import { pickVolcengineCredentialForGatewayJob } from "@/lib/gateway/volcengine-credential-pick";
 import { summarizeUpstreamFailMessage } from "@/lib/gateway/book-gateway-link";
-import { routeGatewayModel } from "@/lib/gateway/model-router";
+import { routeGatewayModel, isKimiChatModelKey } from "@/lib/gateway/model-router";
 import {
   buildGatewayChatResultSummary,
   buildGatewayStreamChatResultSummary,
@@ -23,6 +23,7 @@ import {
   GatewayV1ChatError,
   runGatewayV1ChatCompletions,
 } from "@/lib/gateway/gateway-v1-chat-service";
+import { isEngineOverloadedMessage } from "@/lib/gateway/gateway-submit-error-policy";
 import {
   GatewayV1KieTaskError,
   runGatewayV1KieCreateTask,
@@ -33,6 +34,7 @@ import {
   gatewayV1CreateTask,
   gatewayV1ImageParsing,
   gatewayV1RecordInfo,
+  gatewayV1VolcengineImageGenerations,
 } from "@/lib/gateway/gateway-v1-http-client";
 import { gatewayV1ClientMetaForBookUser } from "@/lib/gateway/gateway-log-meta-for-user";
 import { resolveCanvasProjectTeamTenantId } from "@/lib/gateway/resolve-canvas-project-team-tenant";
@@ -47,6 +49,11 @@ import {
   type DashscopeTaskOutput,
 } from "@/lib/gateway/dashscope-client";
 import type { VolcengineVideoTaskResult } from "@/lib/gateway/volcengine-client";
+import type { MinimaxVideoTaskRow } from "@/lib/gateway/minimax-video-client";
+import {
+  isMinimaxVideoTaskFailed,
+  isMinimaxVideoTaskSuccess,
+} from "@/lib/gateway/minimax-video-client";
 
 const CLIENT_SOURCE = "CANVAS" as const;
 
@@ -128,6 +135,13 @@ export async function canvasGwChat(
   if (route.providerKind === "VOLCENGINE") {
     delete chatParams.reasoning_effort;
   }
+  if (isKimiChatModelKey(model)) {
+    delete chatParams.temperature;
+    delete chatParams.top_p;
+    delete chatParams.n;
+    delete chatParams.presence_penalty;
+    delete chatParams.frequency_penalty;
+  }
 
   const body: Record<string, unknown> = {
     ...chatParams,
@@ -192,6 +206,42 @@ export async function canvasGwChat(
   };
 }
 
+const GW_CHAT_OVERLOAD_RETRY_DELAYS_MS = [0, 3_000, 8_000] as const;
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** LLM chat · 厂商 EngineOverloaded 时有限退避重试 */
+export async function canvasGwChatWithOverloadRetry(
+  userId: string,
+  opts: Parameters<typeof canvasGwChat>[1],
+): Promise<CanvasGwChatResult> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < GW_CHAT_OVERLOAD_RETRY_DELAYS_MS.length; attempt++) {
+    const delay = GW_CHAT_OVERLOAD_RETRY_DELAYS_MS[attempt];
+    if (delay > 0) await sleepMs(delay);
+    try {
+      return await canvasGwChat(userId, opts);
+    } catch (e) {
+      lastError = e;
+      const msg =
+        e instanceof CanvasProjectError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : String(e);
+      if (
+        !isEngineOverloadedMessage(msg) ||
+        attempt >= GW_CHAT_OVERLOAD_RETRY_DELAYS_MS.length - 1
+      ) {
+        throw e;
+      }
+    }
+  }
+  throw lastError;
+}
+
 export type CanvasGwJobResult = {
   taskId: string;
   logId: string;
@@ -201,7 +251,10 @@ export type CanvasGwJobResult = {
 export async function canvasGwCreateKieJob(
   userId: string,
   opts: {
-    model: string;
+    /** Gateway 登记 modelKey（路由 / 计费 / 日志） */
+    gatewayModelKey: string;
+    /** KIE createTask 上游 model；缺省与 gatewayModelKey 相同 */
+    model?: string;
     input: Record<string, unknown>;
     callBackUrl?: string | null;
     clientPage?: string;
@@ -211,7 +264,9 @@ export async function canvasGwCreateKieJob(
   },
 ): Promise<CanvasGwJobResult> {
   const auth = await requireGatewayAuth(userId);
-  const route = routeGatewayModel(opts.model);
+  const gatewayModelKey = opts.gatewayModelKey.trim();
+  const kieUpstreamModel = (opts.model ?? gatewayModelKey).trim();
+  const route = routeGatewayModel(gatewayModelKey);
   const credentialId = pickCredentialForKind(auth.credentials, "KIE");
   if (!credentialId) {
     throw new CanvasProjectError(
@@ -228,7 +283,8 @@ export async function canvasGwCreateKieJob(
   });
 
   const body = {
-    model: opts.model,
+    model: kieUpstreamModel,
+    gatewayModelKey,
     input: {
       ...opts.input,
       ...(opts.sbv1Billing ? { sbv1Billing: opts.sbv1Billing } : {}),
@@ -327,6 +383,54 @@ export async function canvasGwCreateVolcengineVideoJob(
   };
 }
 
+export async function canvasGwCreateMinimaxVideoJob(
+  userId: string,
+  opts: {
+    model: string;
+    input: Record<string, unknown>;
+    clientPage?: string;
+    projectId?: string;
+    canvasTaskId?: string;
+  },
+): Promise<CanvasGwJobResult> {
+  const auth = await requireGatewayAuth(userId);
+  const route = routeGatewayModel(opts.model);
+  if (route.providerKind !== "MINIMAX" || route.requestKind !== "VIDEO") {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      `模型 ${opts.model} 非 MiniMax H3 视频`,
+      400,
+    );
+  }
+  const credentialId = pickCredentialForKind(auth.credentials, "MINIMAX");
+  if (!credentialId) {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      "Gateway Key 未绑定 MiniMax 凭证",
+      503,
+    );
+  }
+
+  const created = await gatewayV1CreateTask({
+    apiKeyId: auth.id,
+    body: {
+      model: opts.model,
+      input: opts.input,
+    },
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
+    }),
+  });
+
+  return {
+    taskId: created.taskId,
+    logId: created.logId,
+    providerKind: "MINIMAX",
+  };
+}
+
 export async function canvasGwCreateBailianR2vJob(
   userId: string,
   opts: {
@@ -390,6 +494,52 @@ function pickDashscopeCredentialForCanvas(
   );
 }
 
+/** Canvas · 火山方舟 Seedream 图像（同步 /images/generations） */
+export async function canvasGwVolcengineImageGenerations(
+  userId: string,
+  opts: {
+    model: string;
+    prompt: string;
+    image?: string | string[];
+    parameters?: Record<string, unknown>;
+    clientPage?: string;
+    projectId?: string;
+    canvasTaskId?: string;
+  },
+): Promise<{ images: Array<{ url?: string; b64?: string }>; logId: string }> {
+  const auth = await requireGatewayAuth(userId);
+  const model = opts.model.trim();
+  const route = routeGatewayModel(model);
+  if (route.providerKind !== "VOLCENGINE" || route.requestKind !== "IMAGE") {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      `模型 ${model} 不是火山方舟图像模型`,
+      400,
+    );
+  }
+  if (!pickCredentialForKind(auth.credentials, "VOLCENGINE")) {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      "Gateway Key 未绑定火山方舟凭证",
+      503,
+    );
+  }
+  return gatewayV1VolcengineImageGenerations({
+    apiKeyId: auth.id,
+    body: {
+      model,
+      prompt: opts.prompt,
+      image: opts.image,
+      parameters: opts.parameters,
+    },
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
+    }),
+  });
+}
+
 /** Canvas · 百炼可灵 3.0 图像（DashScope 异步；展示在 Gateway · 百炼 Provider） */
 export async function canvasGwCreateDashscopeKlingImageJob(
   userId: string,
@@ -439,7 +589,110 @@ export async function canvasGwCreateDashscopeKlingImageJob(
   };
 }
 
-/** Canvas · DashScope 文生视频（wan2.6-t2v / wan2.7-t2v） */
+/** Canvas · 万相 2.6/2.7 多图参考生图（DashScope 异步） */
+export async function canvasGwCreateDashscopeWan27ImageJob(
+  userId: string,
+  opts: {
+    model: string;
+    content: Array<{ text: string } | { image: string }>;
+    size?: string;
+    n?: number;
+    contentOrder?: "text-first" | "images-first";
+    clientPage?: string;
+    projectId?: string;
+    canvasTaskId?: string;
+  },
+): Promise<CanvasGwJobResult> {
+  const auth = await requireGatewayAuth(userId);
+  if (!pickDashscopeCredentialForCanvas(auth.credentials)) {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      "Gateway Key 未绑定 DashScope / 百炼凭证（万相生图需要阿里云 DashScope Key）",
+      503,
+    );
+  }
+
+  const created = await gatewayV1CreateTask({
+    apiKeyId: auth.id,
+    body: {
+      model: opts.model,
+      dashscope: {
+        jobKind: "wan27-image" as const,
+        content: opts.content,
+        size: opts.size,
+        n: opts.n,
+        contentOrder: opts.contentOrder,
+      },
+    },
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
+    }),
+  });
+
+  return {
+    taskId: created.taskId,
+    logId: created.logId,
+    providerKind: "DASHSCOPE",
+  };
+}
+
+/** Canvas · 千问 Image 3.0 Pro / Z-Image Turbo（DashScope 同步 multimodal-generation） */
+export async function canvasGwCreateDashscopeMultimodalImageSyncJob(
+  userId: string,
+  opts: {
+    model: string;
+    content: Array<{ text: string } | { image: string }>;
+    parameters?: {
+      negative_prompt?: string;
+      prompt_extend?: boolean;
+      prompt_extend_mode?: "direct" | "agent";
+      enable_thinking?: boolean;
+      watermark?: boolean;
+      seed?: number;
+      n?: number;
+      size?: string;
+    };
+    clientPage?: string;
+    projectId?: string;
+    canvasTaskId?: string;
+  },
+): Promise<CanvasGwJobResult> {
+  const auth = await requireGatewayAuth(userId);
+  if (!pickDashscopeCredentialForCanvas(auth.credentials)) {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      "Gateway Key 未绑定 DashScope / 百炼凭证（千问/Z-Image 生图需要阿里云 DashScope Key）",
+      503,
+    );
+  }
+
+  const created = await gatewayV1CreateTask({
+    apiKeyId: auth.id,
+    body: {
+      model: opts.model,
+      dashscope: {
+        jobKind: "multimodal-image-sync" as const,
+        content: opts.content,
+        parameters: opts.parameters,
+      },
+    },
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
+    }),
+  });
+
+  return {
+    taskId: created.taskId,
+    logId: created.logId,
+    providerKind: "DASHSCOPE",
+  };
+}
+
+/** Canvas · DashScope 文生视频（wan2.6-t2v / wan2.7-t2v / wan3.0-video） */
 export async function canvasGwCreateDashscopeVideoJob(
   userId: string,
   opts: {
@@ -598,6 +851,8 @@ export async function canvasGwTts(
     clientPage?: string;
     projectId?: string;
     canvasTaskId?: string;
+    /** 百炼 Qwen 等扩展参数：speed / pitch / volume / instruction */
+    extras?: Record<string, unknown>;
   },
 ): Promise<{ buffer: Buffer; logId: string; contentType: string; ext: string }> {
   const auth = await requireGatewayAuth(userId);
@@ -622,6 +877,7 @@ export async function canvasGwTts(
       ...(opts.languageType?.trim()
         ? { language_type: opts.languageType.trim() }
         : {}),
+      ...(opts.extras ?? {}),
     },
     meta: await canvasGwMeta(userId, {
       clientPage: opts.clientPage,
@@ -644,6 +900,7 @@ export type CanvasGwPollResult =
   | { providerKind: "HUNYUAN"; polled: CanvasGatewayPollResult }
   | { providerKind: "DASHSCOPE"; output: DashscopeTaskOutput }
   | { providerKind: "VOLCENGINE"; task: VolcengineVideoTaskResult }
+  | { providerKind: "MINIMAX"; task: MinimaxVideoTaskRow }
   | {
       providerKind: "TOPAZ";
       polled: {
@@ -674,6 +931,7 @@ export async function canvasGwRecordInfo(
   const polled = await gatewayV1RecordInfo({
     apiKeyId: auth.id,
     taskId: opts.taskId,
+    logId: opts.gatewayLogId ?? undefined,
     meta: await canvasGwMeta(userId),
   });
 
@@ -699,6 +957,13 @@ export async function canvasGwRecordInfo(
     return {
       providerKind: "VOLCENGINE",
       task: polled.data as VolcengineVideoTaskResult,
+    };
+  }
+  if (polled.providerKind === "MINIMAX") {
+    const data = polled.data as { task?: MinimaxVideoTaskRow };
+    return {
+      providerKind: "MINIMAX",
+      task: data.task ?? (polled.data as MinimaxVideoTaskRow),
     };
   }
   if (polled.providerKind === "TOPAZ") {

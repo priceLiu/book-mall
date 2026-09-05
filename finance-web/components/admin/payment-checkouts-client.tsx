@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { financeApiFetch } from "@/lib/finance-viewer";
+import { formatLedgerSummary } from "@/lib/ledger-display";
 import { formatUserCellPrimary } from "@/lib/user-contact-display";
 
 type PaymentRow = {
@@ -17,7 +18,7 @@ type PaymentRow = {
   createdAt: string;
   user: { email: string | null; name: string | null; phone: string | null };
   order: { id: string; amountYuan: number | null; type: string; status: string } | null;
-  ledger: { type: string; credits: number; pool: string; createdAt: string } | null;
+  ledger: { type: string; credits: number; description: string | null; createdAt: string } | null;
 };
 
 function fmtYuan(n: number) {
@@ -54,9 +55,9 @@ export function PaymentCheckoutsClient() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">支付明细</h2>
+          <h1 className="text-lg font-semibold">用户支付明细</h1>
           <p className="text-sm text-muted-foreground">
-            微信个人收款 Checkout 与 Order 联查。默认仅显示已支付（PAID）；未支付的 CANCELLED 不影响已开通的 BYOK 权益。
+            微信个人收款 Checkout 与 Order 联查。默认仅显示已支付（PAID）。
           </p>
         </div>
         <select
@@ -105,9 +106,7 @@ export function PaymentCheckoutsClient() {
                     {r.order?.id ? `${r.order.id.slice(0, 10)}…` : "—"}
                   </td>
                   <td className="px-3 py-2 text-xs">
-                    {r.ledger
-                      ? `${r.ledger.type} ${r.ledger.credits > 0 ? "+" : ""}${r.ledger.credits} (${r.ledger.pool})`
-                      : "—"}
+                    {r.ledger ? formatLedgerSummary(r.ledger) : "—"}
                   </td>
                 </tr>
               ))

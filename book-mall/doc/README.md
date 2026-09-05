@@ -22,8 +22,17 @@
 | [**10-multimodal-studio-and-finance-master-plan.md**](./product/10-multimodal-studio-and-finance-master-plan.md) | **全模态工作室 + 财务重构 — 整体方案（通俗版）**：`m.ai-code8.com` 与 `book`/`tool` 分工、用户/后台/核算、落地顺序 |
 | [**12-platform-app-federation.md**](./product/12-platform-app-federation.md) | **平台联邦架构**（独立部署、门户、Book SSO、Gateway、第三方接入） |
 | [**13-tool-service-fee-and-wallet.md**](./product/13-tool-service-fee-and-wallet.md) | **工具技术服务费与钱包**（月费 + Gateway BYOK，退役按次扣点） |
+| [**20-platform-api-member-proposal.md**](./product/20-platform-api-member-proposal.md) | **API 会员方案**（定价 · **订阅价格 / API 价格** 双页 · HTTP Key · 未实施） |
+| [**21-unified-credit-formula-v2.md**](./product/21-unified-credit-formula-v2.md) | **单积分统一计价 v2**（一种积分、人人同 U₀、ppc 价差、毛利护栏） |
+| [**22-quick-replica-credits-preview.md**](./product/22-quick-replica-credits-preview.md) | **快速复制 · 生成前积分预览**（Platform API + 产生钮 hint） |
+| [**23-new-model-onboarding-mandatory.md**](./product/23-new-model-onboarding-mandatory.md) | **新模型接入强制规范**（Gateway 注册 · 运营中心上架 · 成本积分 · API 文档 · 禁止直连） |
+| [**24-prompt-hub-open-library.md**](./product/24-prompt-hub-open-library.md) | **提示词库（Prompt Hub）** · 全平台开放查阅 + 优化器联动（草案） |
+| [**25-canvas-pro2-script-structured-output.md**](./product/25-canvas-pro2-script-structured-output.md) | **画布剧本结构化（Pro2）** · JSON 围栏 + 胖/瘦结构 + Zod + MD 回退 |
+| [**26-platform-traffic-analytics.md**](./product/26-platform-traffic-analytics.md) | **全站访问统计 Phase 1**（按 appKey PV/UV/IP · Book 汇聚 · 管理后台） |
 | [**14-tenant-team-design.md**](./product/14-tenant-team-design.md) | **租户/团队体系完整设计**（租户/席位/RBAC/资源共享/财务对账/使用明细/单会话；待评审） |
 | [**15-team-usage-manual.md**](./product/15-team-usage-manual.md) | **团队/公司版使用手册**（开通/成员席位/公共私有库/账单对账/BYOK/FAQ） |
+| [**我的AI空间.md**](./product/我的AI空间.md) | **我的 AI 空间**（个人中心跨应用 Pin、数字人/音频/视频库、合成创作台） |
+| [**AI 空间功能设计文档.md**](./product/AI%20空间功能设计文档.md) | **AI 空间 · 全局资产库与自由画布**（5 整页模板、5 尺寸档位、12 挂件、公开分享页） |
 | [**prompt-optimizer-platform.md**](./product/prompt-optimizer-platform.md) | **提示词优化器**（上游 Vue 接入、Gateway 断直连、工具月费） |
 
 协作需求草案：[**v1.1**](./v1.1)（独立 AI 工具集成 · 试衣间等）。

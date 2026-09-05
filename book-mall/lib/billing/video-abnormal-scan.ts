@@ -28,27 +28,29 @@ export function detectAbnormalUserSignals(input: {
   return signals;
 }
 
-/** 扫描近 24h 视频结算流水，输出异常用户列表。 */
+/** 扫描近 24h 视频 Gateway 成功调用，输出异常用户列表。 */
 export async function scanAbnormalUsers(limit = 100): Promise<AbnormalUserRow[]> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const rows = await prisma.creditLedger.groupBy({
-    by: ["accountId"],
+  const rows = await prisma.gatewayRequestLog.groupBy({
+    by: ["actorBookUserId"],
     where: {
-      type: "SETTLE",
-      pool: "VIDEO",
-      createdAt: { gte: since },
+      status: "SUCCEEDED",
+      requestKind: "VIDEO",
+      actorBookUserId: { not: null },
+      submittedAt: { gte: since },
     },
     _count: { _all: true },
   });
 
   const out: AbnormalUserRow[] = [];
   for (const r of rows.slice(0, limit)) {
+    const userId = r.actorBookUserId;
+    if (!userId) continue;
     const account = await prisma.creditAccount.findUnique({
-      where: { id: r.accountId },
-      select: { ownerType: true, ownerId: true, planId: true },
+      where: { ownerType_ownerId: { ownerType: "USER", ownerId: userId } },
+      select: { planId: true },
     });
-    if (!account || account.ownerType !== "USER") continue;
-    const plan = account.planId
+    const plan = account?.planId
       ? await prisma.membershipPlan.findUnique({
           where: { id: account.planId },
           select: { tier: true },
@@ -59,7 +61,7 @@ export async function scanAbnormalUsers(limit = 100): Promise<AbnormalUserRow[]>
     const signals = detectAbnormalUserSignals({ tier, videoCount24h });
     if (signals.length === 0) continue;
     out.push({
-      userId: account.ownerId,
+      userId,
       tier,
       signals,
       videoCount24h,

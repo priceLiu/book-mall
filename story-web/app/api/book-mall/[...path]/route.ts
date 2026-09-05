@@ -33,10 +33,22 @@ async function proxyToBookMall(request: NextRequest, pathSegments: string[]) {
       body,
       cache: "no-store",
     });
+    const respContentType = r.headers.get("content-type") ?? "application/json";
+    // SSE / 流式接口须透传 body，不可 buffer（平台 AI 导览助手 chat 等）
+    if (respContentType.toLowerCase().includes("text/event-stream") && r.body) {
+      return new NextResponse(r.body, {
+        status: r.status,
+        headers: {
+          "Content-Type": respContentType,
+          "Cache-Control": "no-store",
+          "X-Accel-Buffering": "no",
+        },
+      });
+    }
     return new NextResponse(await r.text(), {
       status: r.status,
       headers: {
-        "Content-Type": r.headers.get("content-type") ?? "application/json",
+        "Content-Type": respContentType,
       },
     });
   } catch (e: unknown) {

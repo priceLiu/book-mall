@@ -4,12 +4,15 @@ import { useCallback, useEffect, useRef } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
   isCanvasApiAccessDeniedError,
+  cancelCanvasGenerationTask,
   listCanvasProjectTasks,
   markCanvasProjectTasksForbidden,
   runCanvasNode,
   type CanvasTaskRecord,
 } from "@/lib/canvas-api";
 import { useCanvasStore } from "./store";
+import { flushCanvasGraphPersistBounded } from "./canvas-graph-persist-bridge";
+import { isCanvasSaveInFlight } from "./canvas-project-version-sync";
 import { buildCanvasRunSnapshot } from "./canvas-run-snapshot";
 import { refreshSbv1UpstreamPortraitStatuses } from "./refresh-sbv1-upstream-portrait";
 import { resolveSbv1VideoEngineInputs, resolveSbv1VideoEngineEffectivePrompt } from "./resolve-sbv1-video-engine-inputs";
@@ -22,15 +25,18 @@ import {
 import {
   resolvePortraitAssetRefsFromUpstream,
 } from "./resolve-portrait-asset-refs";
+import { materializeImageInputsForRun } from "./materialize-image-inputs-for-run";
+import { resolveHdGridSplitImageInputs } from "./resolve-hd-grid-split-image-inputs";
 import { directPredecessors } from "./topo";
+import { tagRichTextToPlainText } from "./tag-rich-text-migrate";
 import { dockMentionRefUrlsForPrompt } from "./dock-mention-ref-urls";
 import { parseReferencedIds } from "./dock-mention-parse";
 import type { StoryRefImage } from "./story-ref-image";
 import { resolvePro2DockUpstreamLinks } from "./pro2-dock-upstream-links";
 import { findStyleAssetLinkedToImage } from "./pro2-style-asset-connect";
-import { pro2DockMentionRefCatalog, resolveDockRefsForRun } from "./pro2-dock-ref-catalog";
+import { pro2DockMentionRefCatalog, resolveDockImageUrlsForRun } from "./pro2-dock-ref-catalog";
 import { resolveDockRunPrompt, resolveSbv1VideoEngineRunPrompt } from "./resolve-dock-run-prompt";
-import { resolveSbv1UpstreamRefLinks } from "./sbv1-upstream-ref-links";
+import { resolveSbv1UpstreamRefLinks, resolveSbv1UpstreamMotionVideoLinks } from "./sbv1-upstream-ref-links";
 import { resolveSbv1UpstreamTextLinks } from "./sbv1-upstream-text-links";
 import { buildSbv1VideoEngineDockUpstreamLinks } from "./sbv1-dock-mentionables";
 import { resolvePro2VideoBoardCellDockLinks } from "./pro2-video-board-dock-links";
@@ -59,12 +65,15 @@ import { sceneRowKeysEquivalent } from "./story-pro-scene-asset-catalog";
 import { formatCanvasTaskError, resolveLibtvRunFailureCode } from "./friendly-task-error";
 import { maybeNotifyCanvasCreditsSettled, markCanvasNodeGenerationStarted } from "./canvas-credits-notify";
 import { clearCanvasNodeRunSession } from "./canvas-run-session";
+import { canvasIdleRuntimeAfterUserCancel } from "./canvas-generation-cancel-messages";
 import {
   isCanvasTaskTerminalStatus,
   notifyCanvasTaskPanelSync,
+  subscribeCanvasTasksChanged,
 } from "./canvas-panel-sync-events";
 import {
   registerCanvasRunBus,
+  type CanvasCancelGenerationJob,
   type CanvasStoryRunJob,
   unregisterCanvasRunBus,
 } from "./canvas-run-bus";
@@ -77,6 +86,7 @@ import { reconcileStaleInflightRuntimes } from "./story-inflight-reconcile";
 import { resolveStoryHubSectionTextInputs } from "./story-hub-text-inputs";
 import { resolveStoryProStarterScriptInput } from "./story-pro-starter-text";
 import {
+  commitStoryRunCancelLocal,
   commitStoryRunPendingPatch,
   storyApplyTaskResult,
 } from "./story-run-apply";
@@ -94,6 +104,7 @@ import {
 import {
   commitLibtvMediaRunPendingPatch,
   isLibtvFreestandingImageNode,
+  libtvMediaRunPendingRuntimePartial,
   resolveLibtvImageEngineFromNodeData,
 } from "./libtv-image-node-run";
 import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
@@ -106,8 +117,10 @@ import type {
 import { isStoryWorkspaceNodeType } from "./types";
 import {
   hubSectionIsComplete,
+  hubSectionHasTerminalError,
   hubSectionNeedsRun,
   hubSectionRuntime,
+  shouldSkipHubSectionInflightTaskApply,
 } from "./story-hub-runtime";
 import { isCanvasInflightStatus } from "./story-column-runtime";
 import {
@@ -132,6 +145,9 @@ import {
   shouldApplyCanvasTaskRuntimePatch,
   shouldSkipStoryRowTaskApply,
   storyRunContextFromScope,
+  isAbandonedCanvasInflightTask,
+  isStaleServerInflightTask,
+  isServerInflightTaskStatus,
 } from "./task-pick";
 import {
   ingestCanvasProjectTasks,
@@ -139,9 +155,26 @@ import {
 } from "./use-node-task-history";
 import { restoreServerInflightNodeRuntimes } from "./restore-server-inflight-node-runtimes";
 import {
+  characterRowsNeedingThreeViewNodeSync,
+  findPro2CharacterThreeViewNodeForRow,
+  findPro2FrameImageNodeForRow,
+  frameRowsNeedingImageNodeSync,
+  maybeClearHubPendingSceneSyncGroup,
+  reconcilePro2FrameNodesWithColumnRows,
+  reconcilePro2ThreeViewNodesWithColumnRows,
+} from "./pro2-group-row-resolve";
+import { syncPro2CharacterImagesFromRows } from "./pro2-spawn-character-image-group";
+import { syncPro2FrameImagesFromRows } from "./pro2-spawn-frame-image-group";
+import type {
+  StoryProCharacterRow,
+  StoryProFrameRow,
+} from "./story-pro-workspace-types";
+import {
   CANVAS_POLL_IDLE_RECHECK_MS,
+  CANVAS_POLL_MEDIA_RENDER_BACKOFF_MS,
   nextPollIntervalMs,
 } from "./poll-interval";
+import { hasAnyMediaRenderInFlight } from "./media-render-in-flight";
 
 /** 打开画布后尽快全量任务扫描，刷新后恢复服务端在飞任务（原 5s 会导致生成态短暂消失） */
 const INITIAL_FULL_SCAN_DELAY_MS = 300;
@@ -149,6 +182,49 @@ const INITIAL_FULL_SCAN_DELAY_MS = 300;
 const INITIAL_TICK_DELAY_MS = 200;
 /** 每 N 次 tick 做一次全项目任务扫描，避免刷新后 runtime 丢失导致轮询停住 */
 const FULL_SCAN_EVERY_N_TICKS = 3;
+
+function syncPro2CharacterGroupImagesFromColumnRuntimes(
+  nodes: CanvasFlowNode[],
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): void {
+  for (const node of nodes) {
+    if (!isAnyStoryCharacterColumnType(node.type ?? "")) continue;
+    const rows = (node.data as { rows?: StoryProCharacterRow[] }).rows ?? [];
+    if (!rows.length) continue;
+    const rowsToSync = characterRowsNeedingThreeViewNodeSync(rows);
+    if (rowsToSync.length) {
+      syncPro2CharacterImagesFromRows(
+        nodes,
+        node.id,
+        rowsToSync,
+        updateNodeData,
+        { inflightOnly: true },
+      );
+    }
+    reconcilePro2ThreeViewNodesWithColumnRows(nodes, node.id, updateNodeData);
+  }
+}
+
+function syncPro2FrameGroupImagesFromColumnRuntimes(
+  nodes: CanvasFlowNode[],
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): void {
+  for (const node of nodes) {
+    if (!isAnyStoryFrameColumnType(node.type ?? "")) continue;
+    const rows = (node.data as { rows?: StoryProFrameRow[] }).rows ?? [];
+    if (!rows.length) continue;
+    const rowsToSync = frameRowsNeedingImageNodeSync(rows);
+    if (rowsToSync.length) {
+      syncPro2FrameImagesFromRows(
+        nodes,
+        node.id,
+        rowsToSync,
+        updateNodeData,
+      );
+    }
+    reconcilePro2FrameNodesWithColumnRows(nodes, node.id, updateNodeData);
+  }
+}
 
 function canvasStoryRunJobKey(job: CanvasStoryRunJob): string {
   const parts = [job.nodeId];
@@ -166,7 +242,7 @@ function nodeRuntimeStatus(node: CanvasFlowNode): string | undefined {
 }
 
 function isLocalInflightStatus(status?: string): boolean {
-  return status === "pending" || status === "running";
+  return status === "queued" || status === "pending" || status === "running";
 }
 
 function isServerInflightStatus(status?: string): boolean {
@@ -220,11 +296,14 @@ function shouldReleaseStoryRunInflight(
   if (
     node &&
     (node.type === "story-pro2-starter" ||
+      node.type === "story-pro2-prompt" ||
       node.type === "story-pro-starter" ||
       (node.type === "story-pro2-script-hub" &&
         (node.data as { scriptStudioMode?: boolean }).scriptStudioMode ===
           true)) &&
-    (job.mediaKind === "themeOutline" || job.mediaKind === "generalText")
+    (job.mediaKind === "themeOutline" ||
+      job.mediaKind === "scriptStudioBatch" ||
+      job.mediaKind === "generalText")
   ) {
     const st = (
       node.data as { themeOutlineRuntime?: { status?: string } }
@@ -248,8 +327,9 @@ function shouldReleaseStoryRunInflight(
 
 function latestTasksByNode(
   tasks: CanvasTaskRecord[],
+  nodes: CanvasFlowNode[],
 ): Map<string, CanvasTaskRecord> {
-  return preferredTasksByNode(tasks);
+  return preferredTasksByNode(tasks, nodes);
 }
 
 /** 顶部工具栏：进行中的生成任务数（含漫剧行级 / 文案段） */
@@ -263,6 +343,14 @@ function resolveImageInputsRaw(
   edges: CanvasFlowEdge[],
   nodeId: string,
 ): string[] {
+  const self = nodes.find((n) => n.id === nodeId);
+  if (
+    self?.type === "story-pro2-image" &&
+    (self.data as { pro2HdFromGridSplit?: boolean }).pro2HdFromGridSplit
+  ) {
+    return [];
+  }
+
   const out: string[] = [];
   for (const pid of directPredecessors(edges, nodeId)) {
     const p = nodes.find((n) => n.id === pid);
@@ -332,6 +420,9 @@ function promptForDockMentionFilter(
   if (node.type === "story-pro2-starter") {
     return String(d.themeInput ?? "");
   }
+  if (node.type === "story-pro2-prompt") {
+    return String(d.prompt ?? "");
+  }
   if (node.type === "story-pro2-script-hub") {
     return String(d.dockInput ?? "");
   }
@@ -348,13 +439,19 @@ function promptForDockMentionFilter(
     const rows = (d.rows as { key?: string; prompt?: string }[] | undefined) ?? [];
     const row = rows.find((r) => r.key === rowKey);
     if (row?.prompt) return String(row.prompt);
-    const imageNode = nodes.find(
-      (n) =>
-        (n.type === "story-pro2-image" || n.type === "story-pro2-three-view") &&
-        (n.data as { pro2ControllerNodeId?: string; pro2RowKey?: string })
-          .pro2ControllerNodeId === node.id &&
-        (n.data as { pro2RowKey?: string }).pro2RowKey === rowKey,
-    );
+    const imageNode =
+      isAnyStoryCharacterColumnType(node.type ?? "")
+        ? findPro2CharacterThreeViewNodeForRow(nodes, node.id, rowKey)
+        : isAnyStoryFrameColumnType(node.type ?? "")
+          ? findPro2FrameImageNodeForRow(nodes, node.id, rowKey)
+          : nodes.find(
+              (n) =>
+                (n.type === "story-pro2-image" ||
+                  n.type === "story-pro2-three-view") &&
+                (n.data as { pro2ControllerNodeId?: string; pro2RowKey?: string })
+                  .pro2ControllerNodeId === node.id &&
+                (n.data as { pro2RowKey?: string }).pro2RowKey === rowKey,
+            );
     if (imageNode) {
       return String(
         (imageNode.data as { dockInput?: string }).dockInput ?? "",
@@ -391,6 +488,7 @@ function mentionCatalogForNode(
 
   if (
     node.type === "story-pro2-starter" ||
+    node.type === "story-pro2-prompt" ||
     node.type === "story-pro2-script-hub" ||
     node.type === "story-pro2-image" ||
     node.type === "story-pro2-three-view"
@@ -409,13 +507,19 @@ function mentionCatalogForNode(
   }
 
   if (rowKey && isStoryWorkspaceNodeType(node.type ?? "")) {
-    const imageNode = nodes.find(
-      (n) =>
-        (n.type === "story-pro2-image" || n.type === "story-pro2-three-view") &&
-        (n.data as { pro2ControllerNodeId?: string; pro2RowKey?: string })
-          .pro2ControllerNodeId === node.id &&
-        (n.data as { pro2RowKey?: string }).pro2RowKey === rowKey,
-    );
+    const imageNode =
+      isAnyStoryCharacterColumnType(node.type ?? "")
+        ? findPro2CharacterThreeViewNodeForRow(nodes, node.id, rowKey)
+        : isAnyStoryFrameColumnType(node.type ?? "")
+          ? findPro2FrameImageNodeForRow(nodes, node.id, rowKey)
+          : nodes.find(
+              (n) =>
+                (n.type === "story-pro2-image" ||
+                  n.type === "story-pro2-three-view") &&
+                (n.data as { pro2ControllerNodeId?: string; pro2RowKey?: string })
+                  .pro2ControllerNodeId === node.id &&
+                (n.data as { pro2RowKey?: string }).pro2RowKey === rowKey,
+            );
     if (imageNode) {
       const d = imageNode.data as {
         dockRefImages?: StoryRefImage[];
@@ -442,11 +546,35 @@ function resolveImageInputs(
   const node = nodes.find((n) => n.id === nodeId);
   if (!node) return [];
 
+  const nodeType = node.type ?? "";
+    if (
+    nodeType === "story-pro2-image" &&
+    (node.data as { pro2HdFromGridSplit?: boolean }).pro2HdFromGridSplit
+  ) {
+    const d = node.data as {
+      gridSplitCrop?: unknown;
+      ossUrl?: string;
+      blobUrl?: string;
+      dockRefImages?: StoryRefImage[];
+      gridSplitFrameCrop?: boolean;
+    };
+    if (d.gridSplitCrop) return [];
+    const urls: string[] = [];
+    const selfOss = d.ossUrl?.trim();
+    const selfBlob = d.blobUrl?.trim();
+    if (selfOss && /^https?:\/\//.test(selfOss)) urls.push(selfOss);
+    else if (selfBlob) urls.push(selfBlob);
+    for (const ref of d.dockRefImages ?? []) {
+      const u = ref.url?.trim();
+      if (u && !urls.includes(u)) urls.push(u);
+    }
+    return urls;
+  }
+
   const prompt =
     opts?.prompt ??
     promptForDockMentionFilter(node, nodes, edges, opts?.rowKey);
   const raw = resolveImageInputsRaw(nodes, edges, nodeId);
-  const nodeType = node.type ?? "";
   const dockImageTypes = new Set([
     "sbv1-image",
     "story-pro2-image",
@@ -463,18 +591,13 @@ function resolveImageInputs(
   const dockRefImages = (
     (node.data as { dockRefImages?: StoryRefImage[] }).dockRefImages ?? []
   ) as StoryRefImage[];
-  const mentioned = parseReferencedIds(prompt);
-  if (mentioned.length > 0) {
-    const refs = resolveDockRefsForRun(prompt, links, dockRefImages);
-    const urls = refs
-      .map((r) => r.url)
-      .filter((u): u is string => typeof u === "string" && Boolean(u.trim()));
-    return Array.from(new Set(urls));
-  }
-
-  const catalog = pro2DockMentionRefCatalog(links, dockRefImages);
-  if (!catalog.length) return raw;
-  return dockMentionRefUrlsForPrompt(prompt, catalog);
+  const fromDock = resolveDockImageUrlsForRun(links, dockRefImages);
+  const merged = Array.from(new Set([...fromDock, ...raw])).filter(
+    (u) =>
+      typeof u === "string" &&
+      (u.startsWith("blob:") || /^https?:\/\//.test(u.trim())),
+  );
+  return merged.length > 0 ? merged : raw;
 }
 
 function resolveSbv1ImageRunData(
@@ -582,9 +705,21 @@ function applySbv1ImageTaskResult(
   );
   if (!patch) return false;
   if (isSameSbv1MediaDataPatch(node.data as Record<string, unknown>, patch)) {
+    maybeClearHubPendingSceneSyncGroup(
+      useCanvasStore.getState().nodes,
+      node.id,
+      updateNodeData,
+    );
     return true;
   }
   updateNodeData(node.id, patch);
+  maybeClearHubPendingSceneSyncGroup(
+    useCanvasStore.getState().nodes.map((n) =>
+      n.id === node.id ? { ...n, data: { ...n.data, ...patch } } : n,
+    ),
+    node.id,
+    updateNodeData,
+  );
   return true;
 }
 
@@ -603,6 +738,45 @@ function applySbv1VideoTaskResult(
   return true;
 }
 
+function modelKeyFromCanvasNode(
+  node: CanvasFlowNode | undefined,
+): string | undefined {
+  if (!node) return undefined;
+  const d = node.data as {
+    engine?: { modelKey?: string };
+    modelKey?: string;
+  };
+  return d.engine?.modelKey?.trim() || d.modelKey?.trim() || undefined;
+}
+
+/** 独立节点顺序跑（宫格高清等）· 单节点失败不阻断后续 */
+function isIndependentCanvasNodeJob(job: CanvasStoryRunJob): boolean {
+  return !job.rowKey && !job.llmSection && !job.mediaKind;
+}
+
+function shouldAdvanceSequentialAfterHubFailure(
+  node: CanvasFlowNode | undefined,
+  job: CanvasStoryRunJob,
+): boolean {
+  if (!node || !job.llmSection || !isAnyStoryScriptHubType(node.type ?? "")) {
+    return false;
+  }
+  return hubSectionHasTerminalError(node, job.llmSection);
+}
+
+function advanceSequentialAfterNodeError(
+  job: CanvasStoryRunJob,
+  key: string,
+  finishSequentialStep: (completedKey: string) => void,
+  abortSequentialOnError: (completedKey: string) => void,
+): void {
+  if (isIndependentCanvasNodeJob(job)) {
+    finishSequentialStep(key);
+    return;
+  }
+  abortSequentialOnError(key);
+}
+
 function applyLibtvMediaRunFailure(
   node: CanvasFlowNode | undefined,
   updateNodeData: (id: string, patch: Record<string, unknown>) => void,
@@ -611,8 +785,9 @@ function applyLibtvMediaRunFailure(
 ): boolean {
   if (!node) return false;
   clearCanvasNodeRunSession(node.id);
+  const modelKey = modelKeyFromCanvasNode(node);
   if (isLibtvFreestandingImageNode(node) || node.type === "sbv1-video-engine" || node.type === "story-pro2-audio") {
-    updateNodeData(node.id, sbv1ImageFailurePatch(failCode, failMessage));
+    updateNodeData(node.id, sbv1ImageFailurePatch(failCode, failMessage, modelKey));
     return true;
   }
   return false;
@@ -653,6 +828,10 @@ function resolveTextInputs(
       const d = p.data as unknown as StoryComicStarterNodeData;
       const sp = d.systemPrompt?.trim() || d.theme?.trim();
       if (sp) out.push(sp);
+    } else if (p.type === "story-pro2-prompt") {
+      const d = p.data as import("./story-pro2-workspace-types").StoryPro2PromptNodeData;
+      const text = d.generatedText?.trim() || d.prompt?.trim();
+      if (text) out.push(text);
     } else if (p.type === "story-pro2-starter") {
       const d = p.data as import("./story-pro-workspace-types").StoryProStarterNodeData;
       const script = resolveStoryProStarterScriptInput(nodes, edges, pid);
@@ -674,7 +853,7 @@ function resolveTextInputs(
       }
     } else if (p.type === "story-pro2-tag") {
       const d = p.data as { body?: string };
-      if (d.body?.trim()) out.push(d.body.trim());
+      if (d.body?.trim()) out.push(tagRichTextToPlainText(d.body));
     } else if (isAnyStoryScriptHubType(p.type ?? "")) {
       const d = p.data as {
         outlineMd?: string;
@@ -715,6 +894,7 @@ export function useCanvasRunner(
   const deferredForceFreshRef = useRef<Map<string, QueueItem>>(new Map());
   const taskByNodeRef = useRef<Map<string, string>>(new Map());
   const jobByTaskRef = useRef<Map<string, QueueItem>>(new Map());
+  const tasksByIdRef = useRef<Map<string, CanvasTaskRecord>>(new Map());
   const terminalNotifiedRef = useRef<Set<string>>(new Set());
   const sequentialRef = useRef<{
     jobs: QueueItem[];
@@ -745,6 +925,8 @@ export function useCanvasRunner(
         created: opts?.created,
       });
       if (opts?.flushAutosave && task.status === "SUCCEEDED") {
+        // 不在此全量/轻量拉项目：连接池紧张时会刷 Failed to fetch 红屏；
+        // 保存遇 409 时由 autosave 自行轻量对齐 updatedAt。
         window.dispatchEvent(new CustomEvent("canvas:flush-autosave"));
       }
     },
@@ -834,13 +1016,30 @@ export function useCanvasRunner(
               message,
             )
           ) {
+            const modelKey = modelKeyFromCanvasNode(node);
             setNodeRuntime(job.nodeId, {
               status: "error",
               failCode: "RUN_ABORTED",
-              failMessage: formatCanvasTaskError("RUN_ABORTED", message),
+              failMessage: formatCanvasTaskError(
+                "RUN_ABORTED",
+                message,
+                modelKey,
+              ),
             });
           }
         }
+      }
+      if (job && isIndependentCanvasNodeJob(job)) {
+        const seq = sequentialRef.current;
+        if (seq) {
+          const key = runKey(job);
+          if (seq.activeKey === key) {
+            seq.activeKey = null;
+            seq.cursor += 1;
+            pumpSequentialRef.current();
+          }
+        }
+        return;
       }
       sequentialRef.current = null;
     },
@@ -864,6 +1063,12 @@ export function useCanvasRunner(
     const key = runKey(job);
     const node = useCanvasStore.getState().nodes.find((n) => n.id === job.nodeId);
     if (!node) {
+      if (isIndependentCanvasNodeJob(job)) {
+        seq.cursor += 1;
+        seq.activeKey = null;
+        pumpSequential();
+        return;
+      }
       abortSequential(job, "找不到节点，请刷新页面或重新创建工作区");
       return;
     }
@@ -899,12 +1104,7 @@ export function useCanvasRunner(
       !commitStoryRunPendingPatch(node, job, nodesNow, updateNodeData) &&
       !commitLibtvMediaRunPendingPatch(node, updateNodeData)
     ) {
-      setNodeRuntime(job.nodeId, {
-        status: "pending",
-        taskId: undefined,
-        failCode: undefined,
-        failMessage: undefined,
-      });
+      setNodeRuntime(job.nodeId, libtvMediaRunPendingRuntimePartial());
     }
     queueRef.current.push({ ...job, forceFresh: seq.forceFresh });
     drainRef.current();
@@ -914,6 +1114,139 @@ export function useCanvasRunner(
   useEffect(() => {
     pumpSequentialRef.current = pumpSequential;
   }, [pumpSequential]);
+
+  /** createTask 返回 SUBMITTED 后立刻拉 /tasks（含读道 TEXT recover），缩短 Gateway 成功与 UI 对齐延迟 */
+  const syncInflightTaskAfterSubmit = useCallback(
+    (nodeId: string, job: QueueItem) => {
+      pollKickRef.current?.();
+      if (!base || !projectId) return;
+
+      const applyTasks = (tasks: CanvasTaskRecord[] | null) => {
+        if (tasks == null) return;
+        ingestCanvasProjectTasks(projectId, tasks);
+        const nodeTasks = tasks.filter((t) => t.nodeId === nodeId);
+        if (!nodeTasks.length) return;
+        const node = useCanvasStore.getState().nodes.find((x) => x.id === nodeId);
+        if (!node) return;
+        const nodes = useCanvasStore.getState().nodes;
+
+        if (isAnyStoryScriptHubType(node.type ?? "")) {
+          for (const section of [
+            "outline",
+            "character",
+            "scene",
+            "storyboard",
+          ] as const) {
+            const scope = { llmSection: section };
+            const localRt = hubSectionRuntime(node, section);
+            const pick = pickPreferredCanvasTaskForScope(
+              nodeTasks,
+              scope,
+              localRt,
+              nodeId,
+            );
+            if (!pick) continue;
+            const ctx: CanvasStoryRunJob =
+              jobByTaskRef.current.get(pick.id) ??
+              storyRunContextFromScope(nodeId, scope);
+            if (shouldSkipStoryRowTaskApply(localRt, pick, nodeId)) continue;
+            storyApplyTaskResult(node, pick, ctx, updateNodeData, nodes);
+          }
+          return;
+        }
+
+        const scope = {
+          rowKey: job.rowKey,
+          mediaKind: job.mediaKind,
+          llmSection: job.llmSection,
+        };
+        let localRt = (node.data as { runtime?: CanvasNodeRuntime }).runtime;
+        if (job.rowKey) {
+          const rows =
+            (
+              node.data as {
+                rows?: {
+                  key: string;
+                  runtime?: CanvasNodeRuntime;
+                  videoRuntime?: CanvasNodeRuntime;
+                  ttsRuntime?: CanvasNodeRuntime;
+                }[];
+              }
+            ).rows ?? [];
+          const row = rows.find((r) => r.key === job.rowKey);
+          if (row) {
+            localRt =
+              job.mediaKind === "video"
+                ? row.videoRuntime
+                : job.mediaKind === "tts"
+                  ? row.ttsRuntime
+                  : row.runtime;
+          }
+        }
+        const pick =
+          job.rowKey && (job.mediaKind || job.llmSection)
+            ? pickStoryRowApplyTask(nodeTasks, scope, localRt)
+            : job.rowKey || job.mediaKind || job.llmSection
+              ? pickPreferredCanvasTaskForScope(nodeTasks, scope, localRt, nodeId)
+              : pickPreferredCanvasTask(nodeTasks, { localRuntime: localRt, nodeId });
+        if (!pick) return;
+
+        if (isStoryWorkspaceNodeType(node.type ?? "")) {
+          storyApplyTaskResult(node, pick, job, updateNodeData, nodes);
+          return;
+        }
+        if (isLibtvFreestandingImageNode(node)) {
+          if (shouldSkipStoryRowTaskApply(localRt, pick, nodeId)) return;
+          const patch = sbv1ImagePatchFromTask(
+            node.data as unknown as Sbv1ImageNodeData,
+            pick,
+          );
+          if (
+            patch &&
+            !isSameSbv1MediaDataPatch(
+              node.data as Record<string, unknown>,
+              patch,
+            )
+          ) {
+            updateNodeData(nodeId, patch);
+          }
+          return;
+        }
+        if (node.type === "sbv1-video-engine") {
+          if (shouldSkipStoryRowTaskApply(localRt, pick, nodeId)) return;
+          const patch = sbv1VideoPatchFromTask(pick);
+          if (
+            patch &&
+            !isSameSbv1MediaDataPatch(
+              node.data as Record<string, unknown>,
+              patch,
+            )
+          ) {
+            updateNodeData(nodeId, patch);
+          }
+          return;
+        }
+        const patch = runtimePatchFromCanvasTask(pick);
+        if (
+          patch &&
+          shouldApplyCanvasTaskRuntimePatch(localRt, pick, patch, nodeId)
+        ) {
+          setNodeRuntime(nodeId, patch);
+        }
+      };
+
+      void listCanvasProjectTasks(base, projectId, [nodeId])
+        .then(applyTasks)
+        .catch(() => {});
+      window.setTimeout(() => {
+        void listCanvasProjectTasks(base, projectId, [nodeId])
+          .then(applyTasks)
+          .catch(() => {});
+        pollKickRef.current?.();
+      }, 800);
+    },
+    [base, projectId, updateNodeData, setNodeRuntime],
+  );
 
   const runOne = useCallback(
     async (job: QueueItem) => {
@@ -935,6 +1268,7 @@ export function useCanvasRunner(
         let imageInputs = resolveImageInputs(state.nodes, state.edges, nodeId, {
           rowKey: job.rowKey,
         });
+        let audioInputs: string[] = [];
         let portraitAssetRefs: ReturnType<
           typeof resolvePortraitAssetRefsFromUpstream
         > = [];
@@ -999,6 +1333,7 @@ export function useCanvasRunner(
           }
           sbv1VideoResolved = resolved;
           imageInputs = resolved.imageInputs;
+          audioInputs = resolved.audioInputs;
           portraitAssetRefs = resolved.portraitAssetRefs;
         } else {
           portraitAssetRefs = resolvePortraitAssetRefsFromUpstream(
@@ -1013,12 +1348,68 @@ export function useCanvasRunner(
           resolveTextInputs(state.nodes, state.edges, nodeId),
         );
         let mergedTextInputs = textInputs;
+        if (
+          job.rowKey &&
+          (job.mediaKind === "threeView" ||
+            job.mediaKind === "sceneRef" ||
+            job.mediaKind === "frameImage")
+        ) {
+          mergedTextInputs = [];
+        }
 
         const data = node.data as Record<string, unknown>;
         let runData = isLibtvFreestandingImageNode(node)
           ? resolveSbv1ImageRunData(node, state.nodes, state.edges, data)
           : data;
 
+        if (
+          node.type === "story-pro2-starter" ||
+          node.type === "story-pro2-prompt" ||
+          node.type === "story-pro-starter"
+        ) {
+          const links = resolvePro2DockUpstreamLinks(
+            nodeId,
+            node.type ?? "",
+            state.nodes,
+            state.edges,
+          );
+          const promptField =
+            node.type === "story-pro2-prompt" ? "prompt" : "themeInput";
+          const dockPrompt = String(
+            (runData as Record<string, unknown>)[promptField] ?? "",
+          );
+          const { prompt: cleanedPrompt, extraText } = resolveDockRunPrompt(
+            dockPrompt,
+            links,
+          );
+          if (cleanedPrompt !== dockPrompt) {
+            runData = { ...runData, [promptField]: cleanedPrompt };
+          }
+          if (extraText.length) {
+            mergedTextInputs = [...extraText, ...mergedTextInputs];
+          }
+        }
+        if (node.type === "story-pro2-audio") {
+          const links = resolvePro2DockUpstreamLinks(
+            nodeId,
+            node.type ?? "",
+            state.nodes,
+            state.edges,
+          );
+          const dockPrompt = String(
+            (runData as { dockInput?: string }).dockInput ?? "",
+          );
+          const { prompt: cleanedPrompt, extraText } = resolveDockRunPrompt(
+            dockPrompt,
+            links,
+          );
+          if (cleanedPrompt !== dockPrompt) {
+            runData = { ...runData, dockInput: cleanedPrompt };
+          }
+          if (extraText.length) {
+            mergedTextInputs = [...extraText, ...mergedTextInputs];
+          }
+        }
         if (
           node.type === "sbv1-image" ||
           node.type === "story-pro2-image" ||
@@ -1068,15 +1459,25 @@ export function useCanvasRunner(
             resolveSbv1UpstreamRefLinks(nodeId, latestNodes, latestEdges),
             resolveSbv1UpstreamTextLinks(nodeId, latestNodes, latestEdges),
             boardLinks,
+            resolveSbv1UpstreamMotionVideoLinks(
+              nodeId,
+              latestNodes,
+              latestEdges,
+            ),
           );
           const effectivePrompt = resolveSbv1VideoEngineEffectivePrompt(
             nodeId,
             latestNodes,
             latestEdges,
           );
+          const sbv1ModelKeyForPrompt = String(
+            (vdForPrompt as { engine?: { modelKey?: string } }).engine?.modelKey ??
+              "",
+          ).trim();
           const runPrompt = resolveSbv1VideoEngineRunPrompt(
             effectivePrompt,
             upstreamForMention,
+            { modelKey: sbv1ModelKeyForPrompt || undefined },
           );
           if (runPrompt) {
             runData = {
@@ -1184,12 +1585,145 @@ export function useCanvasRunner(
           return;
         }
 
+        const latestForInputs = useCanvasStore.getState();
+        const nodeForInputs =
+          latestForInputs.nodes.find((n) => n.id === nodeId) ?? node;
+        const inputData = nodeForInputs.data as {
+          pro2HdFromGridSplit?: boolean;
+          gridSplitCrop?: import("./libtv-grid-split-crop").GridSplitCrop;
+          gridSplitFrameCrop?: boolean;
+          gridSplitSourceUrl?: string;
+          ossUrl?: string;
+          blobUrl?: string;
+        };
+
+        const precroppedOss = inputData.ossUrl?.trim();
+        const hasPrecroppedHdRef =
+          nodeForInputs.type === "story-pro2-image" &&
+          inputData.pro2HdFromGridSplit &&
+          inputData.gridSplitFrameCrop &&
+          !inputData.gridSplitCrop &&
+          Boolean(precroppedOss && /^https?:\/\//.test(precroppedOss));
+
+        if (hasPrecroppedHdRef) {
+          imageInputs = [precroppedOss!];
+          runData = {
+            ...runData,
+            ossUrl: precroppedOss,
+            blobUrl: undefined,
+            gridSplitCrop: undefined,
+            gridSplitFrameCrop: true,
+          };
+        } else if (
+          nodeForInputs.type === "story-pro2-image" &&
+          inputData.pro2HdFromGridSplit &&
+          inputData.gridSplitCrop &&
+          base &&
+          projectId
+        ) {
+          const sourceUrl = String(inputData.gridSplitSourceUrl ?? "").trim();
+          const serverWillPrepare = /^https?:\/\//.test(sourceUrl);
+          if (serverWillPrepare) {
+            imageInputs = [];
+          } else {
+            try {
+              imageInputs = await resolveHdGridSplitImageInputs(
+                base,
+                projectId,
+                nodeId,
+                inputData,
+                updateNodeData,
+              );
+              const croppedUrl = imageInputs[0]?.trim();
+              if (
+                croppedUrl &&
+                (runData as { pro2HdFromGridSplit?: boolean }).pro2HdFromGridSplit
+              ) {
+                runData = {
+                  ...runData,
+                  ossUrl: croppedUrl,
+                  blobUrl: undefined,
+                  gridSplitCrop: undefined,
+                  gridSplitFrameCrop: true,
+                };
+              }
+            } catch (e) {
+              abortSequential(
+                job,
+                e instanceof Error ? e.message : "宫格裁切参考图失败",
+              );
+              return;
+            }
+          }
+        } else {
+          imageInputs = resolveImageInputs(
+            latestForInputs.nodes,
+            latestForInputs.edges,
+            nodeId,
+            { rowKey: job.rowKey },
+          );
+          if (base && imageInputs.some((u) => u.startsWith("blob:"))) {
+            try {
+              imageInputs = await materializeImageInputsForRun(
+                base,
+                imageInputs,
+              );
+              const ossUrl = imageInputs[0]?.trim();
+              if (
+                ossUrl &&
+                /^https?:\/\//.test(ossUrl) &&
+                (runData as { pro2HdFromGridSplit?: boolean })
+                  .pro2HdFromGridSplit
+              ) {
+                const refId = `hd-ref-${nodeId}`;
+                updateNodeData(nodeId, {
+                  ossUrl,
+                  blobUrl: undefined,
+                  uploading: false,
+                  mediaFitKey: ossUrl,
+                  dockRefImages: [
+                    { id: refId, label: "参考图", url: ossUrl },
+                  ],
+                });
+              }
+            } catch (e) {
+              abortSequential(
+                job,
+                e instanceof Error
+                  ? e.message
+                  : "参考图上传 OSS 失败，无法发起图生图",
+              );
+              return;
+            }
+          }
+        }
+
+        if (
+          node.type === "story-pro2-image" &&
+          (runData as { pro2HdFromGridSplit?: boolean }).pro2HdFromGridSplit &&
+          imageInputs.length === 0 &&
+          !(
+            inputData.gridSplitCrop &&
+            /^https?:\/\//.test(String(inputData.gridSplitSourceUrl ?? ""))
+          )
+        ) {
+          abortSequential(
+            job,
+            "高清参考图未就绪，无法发起图生图，请重新选择宫格并生成。",
+          );
+          return;
+        }
+
+        // 生成前尽量落盘；最多等 8s，避免 PATCH 挂死阻塞「生成」与「保存中」UI
+        await flushCanvasGraphPersistBounded(8_000, true);
+
         const r = await runCanvasNode(base, projectId, nodeId, {
           node: {
             type: node.type ?? "image-engine",
             modelKey,
             data: runData,
             imageInputs,
+            audioInputs,
             textInputs: mergedTextInputs,
             portraitAssetRefs,
           },
@@ -1317,45 +1851,28 @@ export function useCanvasRunner(
               setNodeRuntime(nodeId, errorPatch);
             }
           }
-        } else if (isStoryWorkspaceNodeType(nodeNow.type ?? "")) {
-          storyApplyTaskResult(
-            nodeNow,
-            r.task,
-            job,
-            updateNodeData,
-            nodesNow,
-          );
-        } else if (
-          applySbv1ImageTaskResult(nodeNow, r.task, updateNodeData) ||
-          applySbv1VideoTaskResult(nodeNow, r.task, updateNodeData) ||
-          applyLibtvAudioTaskResult(nodeNow, r.task, updateNodeData)
-        ) {
-          /* pending / running */
         } else {
-          setNodeRuntime(nodeId, {
-            status: "running",
-            taskId: r.task.id,
-          });
-          void listCanvasProjectTasks(base, projectId, [nodeId])
-            .then((tasks) => {
-              if (tasks == null) return;
-              const scope =
-                job.rowKey || job.mediaKind || job.llmSection
-                  ? {
-                      rowKey: job.rowKey,
-                      mediaKind: job.mediaKind,
-                      llmSection: job.llmSection,
-                    }
-                  : undefined;
-              const latest = scope
-                ? pickPreferredCanvasTaskForScope(tasks, scope)
-                : pickPreferredCanvasTask(tasks);
-              if (!latest) return;
-              const n = useCanvasStore.getState().nodes.find((x) => x.id === nodeId);
-              if (!n) return;
-              storyApplyTaskResult(n, latest, job, updateNodeData, useCanvasStore.getState().nodes);
-            })
-            .catch(() => {});
+          if (isStoryWorkspaceNodeType(nodeNow.type ?? "")) {
+            storyApplyTaskResult(
+              nodeNow,
+              r.task,
+              job,
+              updateNodeData,
+              nodesNow,
+            );
+          } else if (
+            applySbv1ImageTaskResult(nodeNow, r.task, updateNodeData) ||
+            applySbv1VideoTaskResult(nodeNow, r.task, updateNodeData) ||
+            applyLibtvAudioTaskResult(nodeNow, r.task, updateNodeData)
+          ) {
+            /* pending / running */
+          } else {
+            setNodeRuntime(nodeId, {
+              status: "running",
+              taskId: r.task.id,
+            });
+          }
+          syncInflightTaskAfterSubmit(nodeId, job);
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -1505,13 +2022,14 @@ export function useCanvasRunner(
           );
         } else {
           const failCode = resolveLibtvRunFailureCode(msg);
+          const modelKey = modelKeyFromCanvasNode(errNode);
           if (
             !applySbv1ImageRunFailure(errNode, updateNodeData, failCode, msg)
           ) {
             setNodeRuntime(nodeId, {
               status: "error",
               failCode,
-              failMessage: formatCanvasTaskError(failCode, msg),
+              failMessage: formatCanvasTaskError(failCode, msg, modelKey),
             });
           }
         }
@@ -1546,11 +2064,27 @@ export function useCanvasRunner(
               storyRowRuntimeStatus(node, job) === "error";
             if (rowErr && job.mediaKind === "sceneRef") {
               finishSequentialStep(key);
-            } else if (rowErr || (node && nodeRuntimeStatus(node) === "error")) {
-              abortSequentialOnError(key);
+            } else if (
+              rowErr ||
+              (node && nodeRuntimeStatus(node) === "error") ||
+              shouldAdvanceSequentialAfterHubFailure(node, job)
+            ) {
+              advanceSequentialAfterNodeError(
+                job,
+                key,
+                finishSequentialStep,
+                abortSequentialOnError,
+              );
             } else {
               finishSequentialStep(key);
             }
+          } else if (shouldAdvanceSequentialAfterHubFailure(node, job)) {
+            advanceSequentialAfterNodeError(
+              job,
+              key,
+              finishSequentialStep,
+              abortSequentialOnError,
+            );
           }
         }
         drainRef.current();
@@ -1565,6 +2099,7 @@ export function useCanvasRunner(
       projectId,
       releaseInflightKey,
       setNodeRuntime,
+      syncInflightTaskAfterSubmit,
       updateNodeData,
     ],
   );
@@ -1599,19 +2134,70 @@ export function useCanvasRunner(
       const boundTaskId =
         taskByNodeRef.current.get(key) ??
         taskByNodeRef.current.get(job.nodeId);
-      if (boundTaskId) return false;
+      if (boundTaskId) {
+        const boundTask = tasksByIdRef.current.get(boundTaskId);
+        if (boundTask) {
+          const nodeTasks = [boundTask];
+          const staleBound =
+            boundTask.status === "FAILED" ||
+            boundTask.status === "CANCELLED" ||
+            boundTask.status === "SUCCEEDED" ||
+            isAbandonedCanvasInflightTask(boundTask) ||
+            isStaleServerInflightTask(boundTask, nodeTasks);
+          if (!staleBound) return false;
+        } else {
+          const node = useCanvasStore
+            .getState()
+            .nodes.find((n) => n.id === job.nodeId);
+          const rt = (node?.data as { runtime?: CanvasNodeRuntime } | undefined)
+            ?.runtime;
+          const rtTaskId = rt?.taskId?.trim();
+          if (rtTaskId && rtTaskId === boundTaskId) return false;
+        }
+        taskByNodeRef.current.delete(key);
+        taskByNodeRef.current.delete(job.nodeId);
+        jobByTaskRef.current.delete(boundTaskId);
+      }
       const node = useCanvasStore
         .getState()
         .nodes.find((n) => n.id === job.nodeId);
       const outlineRt =
-        node?.type === "story-pro2-starter" || node?.type === "story-pro-starter"
+        node?.type === "story-pro2-starter" ||
+        node?.type === "story-pro2-prompt" ||
+        node?.type === "story-pro-starter"
           ? (node.data as { themeOutlineRuntime?: CanvasNodeRuntime })
               .themeOutlineRuntime
           : undefined;
       if (outlineRt?.taskId?.trim()) return false;
+      if (
+        node &&
+        isAnyStoryScriptHubType(node.type ?? "") &&
+        job.llmSection
+      ) {
+        const sectionRt = hubSectionRuntime(node, job.llmSection);
+        if (sectionRt?.taskId?.trim()) return false;
+      }
       const rt = (node?.data as { runtime?: CanvasNodeRuntime } | undefined)
         ?.runtime;
-      if (rt?.taskId?.trim()) return false;
+      const rtTaskId = rt?.taskId?.trim();
+      if (rtTaskId) {
+        const rtTask = tasksByIdRef.current.get(rtTaskId);
+        if (
+          rtTask &&
+          (rtTask.status === "FAILED" ||
+            rtTask.status === "CANCELLED" ||
+            rtTask.status === "SUCCEEDED" ||
+            isAbandonedCanvasInflightTask(rtTask) ||
+            isStaleServerInflightTask(rtTask, [rtTask]))
+        ) {
+          // terminal / stale runtime binding — allow forceFresh retry
+        } else if (
+          !rtTask ||
+          isServerInflightTaskStatus(rtTask.status)
+        ) {
+          return false;
+        }
+      }
       releaseInflightKey(key);
       return true;
     },
@@ -1655,7 +2241,6 @@ export function useCanvasRunner(
         if (inflightRef.current.has(key)) {
           if (job.forceFresh) {
             deferredForceFreshRef.current.set(key, job);
-            return true;
           }
           return false;
         }
@@ -1665,7 +2250,8 @@ export function useCanvasRunner(
       if (
         node &&
         isAnyStoryScriptHubType(node.type ?? "") &&
-        job.llmSection
+        job.llmSection &&
+        !job.forceFresh
       ) {
         const st = hubSectionRuntime(node, job.llmSection)?.status;
         if (isCanvasInflightStatus(st)) return false;
@@ -1685,12 +2271,7 @@ export function useCanvasRunner(
           !commitStoryRunPendingPatch(node, job, nodesNow, updateNodeData) &&
           !commitLibtvMediaRunPendingPatch(node, updateNodeData)
         ) {
-          setNodeRuntime(job.nodeId, {
-            status: "pending",
-            taskId: undefined,
-            failCode: undefined,
-            failMessage: undefined,
-          });
+          setNodeRuntime(job.nodeId, libtvMediaRunPendingRuntimePartial());
         }
       }
       queueRef.current.push(job);
@@ -1719,6 +2300,14 @@ export function useCanvasRunner(
   const enqueueNodesSequential = useCallback(
     (nodeIds: string[], forceFresh?: boolean) => {
       if (!nodeIds.length) return;
+      for (const nodeId of nodeIds) {
+        setNodeRuntime(nodeId, {
+          status: "queued",
+          taskId: undefined,
+          failCode: undefined,
+          failMessage: undefined,
+        });
+      }
       sequentialRef.current = {
         jobs: nodeIds.map((nodeId) => ({ nodeId, forceFresh })),
         cursor: 0,
@@ -1727,7 +2316,7 @@ export function useCanvasRunner(
       };
       pumpSequential();
     },
-    [pumpSequential],
+    [pumpSequential, setNodeRuntime],
   );
 
   const enqueueStoryRunsSequential = useCallback(
@@ -1747,16 +2336,38 @@ export function useCanvasRunner(
         return true;
       });
 
+      const wantsForceFresh = normalized.some((j) => j.forceFresh);
+      if (wantsForceFresh) {
+        for (const job of deduped) {
+          const key = runKey(job);
+          // 新 forceFresh 顺序链：丢弃旧 deferred，避免 releaseInflightKey 回放 + pump 双提交 Gateway
+          deferredForceFreshRef.current.delete(key);
+          releaseStaleInflightLock(job);
+        }
+        if (sequentialRef.current) {
+          sequentialRef.current = null;
+        }
+      }
+
       const runnable = deduped.filter((job) => {
         const key = runKey(job);
-        if (inflightRef.current.has(key)) return false;
+        if (inflightRef.current.has(key)) {
+          if (wantsForceFresh) {
+            deferredForceFreshRef.current.set(key, job);
+          }
+          return false;
+        }
         if (queueRef.current.some((q) => runKey(q) === key)) return false;
         return true;
       });
       if (!runnable.length) return;
 
       const seq = sequentialRef.current;
-      if (seq && (seq.activeKey || seq.cursor < seq.jobs.length)) {
+      if (
+        !wantsForceFresh &&
+        seq &&
+        (seq.activeKey || seq.cursor < seq.jobs.length)
+      ) {
         const existing = new Set([
           ...(seq.activeKey ? [seq.activeKey] : []),
           ...seq.jobs.slice(seq.cursor).map(runKey),
@@ -1775,9 +2386,20 @@ export function useCanvasRunner(
         forceFresh,
         activeKey: null,
       };
+      for (const job of runnable) {
+        markCanvasNodeGenerationStarted(job.nodeId);
+      }
+      for (const job of runnable) {
+        setNodeRuntime(job.nodeId, {
+          status: "queued",
+          taskId: undefined,
+          failCode: undefined,
+          failMessage: undefined,
+        });
+      }
       pumpSequential();
     },
-    [pumpSequential],
+    [pumpSequential, releaseStaleInflightLock, setNodeRuntime],
   );
 
   const enqueueStoryRunRef = useRef(enqueueStoryRun);
@@ -1793,6 +2415,121 @@ export function useCanvasRunner(
     enqueueStoryRunsSequentialRef.current = enqueueStoryRunsSequential;
   }, [enqueueStoryRunsSequential]);
 
+  const resolveCancelTaskId = useCallback(
+    (job: CanvasCancelGenerationJob, node?: CanvasFlowNode): string | undefined => {
+      const explicit = job.taskId?.trim();
+      if (explicit) return explicit;
+      const key = runKey(job);
+      const fromRef =
+        taskByNodeRef.current.get(key) ??
+        taskByNodeRef.current.get(job.nodeId);
+      if (fromRef?.trim()) return fromRef.trim();
+      if (!node) return undefined;
+      if (job.llmSection && isAnyStoryScriptHubType(node.type ?? "")) {
+        return hubSectionRuntime(node, job.llmSection)?.taskId?.trim() || undefined;
+      }
+      if (job.rowKey) {
+        const rows = (
+          node.data as {
+            rows?: {
+              key: string;
+              runtime?: CanvasNodeRuntime;
+              videoRuntime?: CanvasNodeRuntime;
+              ttsRuntime?: CanvasNodeRuntime;
+            }[];
+          }
+        ).rows;
+        const row = rows?.find((r) => r.key === job.rowKey);
+        if (job.mediaKind === "tts") return row?.ttsRuntime?.taskId?.trim();
+        if (job.mediaKind === "video") return row?.videoRuntime?.taskId?.trim();
+        return row?.runtime?.taskId?.trim();
+      }
+      if (
+        node.type === "story-pro2-starter" ||
+        node.type === "story-pro2-prompt" ||
+        node.type === "story-pro-starter"
+      ) {
+        return (
+          node.data as { themeOutlineRuntime?: CanvasNodeRuntime }
+        ).themeOutlineRuntime?.taskId?.trim();
+      }
+      return (node.data as { runtime?: CanvasNodeRuntime }).runtime?.taskId?.trim();
+    },
+    [],
+  );
+
+  const cancelCanvasGeneration = useCallback(
+    (job: CanvasCancelGenerationJob): boolean => {
+      if (!projectId) return false;
+      const nodesNow = useCanvasStore.getState().nodes;
+      const node = nodesNow.find((n) => n.id === job.nodeId);
+      const queueJob = job as QueueItem;
+      const key = runKey(queueJob);
+
+      queueRef.current = queueRef.current.filter((q) => runKey(q) !== key);
+      releaseInflightKey(key);
+      releaseInflightKey(job.nodeId);
+
+      const taskId = resolveCancelTaskId(job, node);
+      if (node) {
+        if (
+          !commitStoryRunCancelLocal(
+            node,
+            queueJob,
+            nodesNow,
+            updateNodeData,
+            taskId,
+          )
+        ) {
+          setNodeRuntime(job.nodeId, canvasIdleRuntimeAfterUserCancel(taskId));
+          if (
+            isLibtvFreestandingImageNode(node) ||
+            node.type === "story-pro2-three-view" ||
+            node.type === "story-pro2-audio"
+          ) {
+            updateNodeData(job.nodeId, {
+              uploading: false,
+              uploadError: undefined,
+            });
+          }
+        }
+      }
+
+      detachNodeTaskRefs(queueJob);
+      clearCanvasNodeRunSession(job.nodeId);
+      abortSequentialOnError(key);
+
+      if (taskId) {
+        void cancelCanvasGenerationTask(base, projectId, taskId)
+          .then(() => {
+            emitTaskPanelSync({ id: taskId, status: "CANCELLED" });
+          })
+          .catch(() => {
+            /* 本地已清态；服务端取消失败不阻塞 UI */
+          });
+      }
+
+      pollKickRef.current?.();
+      return true;
+    },
+    [
+      abortSequentialOnError,
+      base,
+      detachNodeTaskRefs,
+      emitTaskPanelSync,
+      projectId,
+      releaseInflightKey,
+      resolveCancelTaskId,
+      setNodeRuntime,
+      updateNodeData,
+    ],
+  );
+
+  const cancelCanvasGenerationRef = useRef(cancelCanvasGeneration);
+  useEffect(() => {
+    cancelCanvasGenerationRef.current = cancelCanvasGeneration;
+  }, [cancelCanvasGeneration]);
+
   useEffect(() => {
     registerCanvasRunBus({
       enqueueNode: (nodeId, forceFresh) =>
@@ -1802,6 +2539,7 @@ export function useCanvasRunner(
         enqueueNodesSequentialRef.current(nodeIds, opts?.forceFresh),
       enqueueStoryRunsSequential: (jobs, opts) =>
         enqueueStoryRunsSequentialRef.current(jobs, opts?.forceFresh),
+      cancelGeneration: (job) => cancelCanvasGenerationRef.current(job),
     });
     return () => unregisterCanvasRunBus();
   }, []);
@@ -1816,6 +2554,16 @@ export function useCanvasRunner(
     window.addEventListener("canvas:run-node", handler);
     return () => window.removeEventListener("canvas:run-node", handler);
   }, [enqueueStoryRun]);
+
+  useEffect(() => {
+    const handler = (ev: Event) => {
+      const e = ev as CustomEvent<CanvasCancelGenerationJob>;
+      if (!e.detail?.nodeId) return;
+      cancelCanvasGeneration(e.detail);
+    };
+    window.addEventListener("canvas:cancel-generation", handler);
+    return () => window.removeEventListener("canvas:cancel-generation", handler);
+  }, [cancelCanvasGeneration]);
 
   useEffect(() => {
     const handler = (ev: Event) => {
@@ -1850,7 +2598,9 @@ export function useCanvasRunner(
       if (!node) return;
       let done = false;
       if (isAnyStoryScriptHubType(node.type ?? "") && job.llmSection) {
-        done = hubSectionIsComplete(node, job.llmSection);
+        done =
+          hubSectionIsComplete(node, job.llmSection) ||
+          hubSectionHasTerminalError(node, job.llmSection);
       } else if (job.rowKey) {
         done = storyRowRuntimeStatus(node, job) === "done" ||
           storyRowRuntimeStatus(node, job) === "error";
@@ -1871,7 +2621,21 @@ export function useCanvasRunner(
         return;
       }
       if (rowErr || nodeRuntimeStatus(node) === "error") {
-        abortSequentialOnError(key);
+        advanceSequentialAfterNodeError(
+          job,
+          key,
+          finishSequentialStep,
+          abortSequentialOnError,
+        );
+        return;
+      }
+      if (shouldAdvanceSequentialAfterHubFailure(node, job)) {
+        advanceSequentialAfterNodeError(
+          job,
+          key,
+          finishSequentialStep,
+          abortSequentialOnError,
+        );
         return;
       }
       finishSequentialStep(key);
@@ -1885,6 +2649,10 @@ export function useCanvasRunner(
     let pollStopped = false;
     let loopTimer = 0;
     let tickCount = 0;
+    /** 防止 pollKick 叠出并行 loop（否则 tasks 会打满浏览器连接，PATCH 排队超时） */
+    let pollLoopRunning = false;
+    let pollKickPending = false;
+    let pollKickPendingFullScan = false;
     /** 上一次轮询是否读道降级（tasks==null）；用于自适应退避到 15s */
     let lastPollStale = false;
     const serverInflightRef = { current: false };
@@ -1898,7 +2666,21 @@ export function useCanvasRunner(
         pick: CanvasTaskRecord,
         job: CanvasStoryRunJob,
         localRuntime: CanvasNodeRuntime | undefined,
+        nodeTasks?: CanvasTaskRecord[],
       ) => {
+        // Hub：同节点仍有在途任务时，勿把旧 FAILED 写回（校验重试窗口会闪回空态）
+        if (
+          (pick.status === "FAILED" || pick.status === "CANCELLED") &&
+          nodeTasks?.some(
+            (t) =>
+              t.id !== pick.id &&
+              isServerInflightTaskStatus(t.status) &&
+              !isStaleServerInflightTask(t, nodeTasks) &&
+              !isAbandonedCanvasInflightTask(t),
+          )
+        ) {
+          return;
+        }
         if (shouldSkipStoryRowTaskApply(localRuntime, pick, node.id)) return;
         storyApplyTaskResult(node, pick, job, updateNodeData, nodes);
         if (pick.status === "SUCCEEDED" || pick.status === "FAILED") {
@@ -1913,25 +2695,32 @@ export function useCanvasRunner(
         if (isAnyStoryScriptHubType(node.type ?? "")) {
           for (const section of ["outline", "character", "scene", "storyboard"] as const) {
             const scope = { llmSection: section };
-            const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+            const localRt = hubSectionRuntime(node, section);
+            const pick = pickPreferredCanvasTaskForScope(
+              nodeTasks,
+              scope,
+              localRt,
+              node.id,
+            );
             if (!pick) continue;
             const job: CanvasStoryRunJob =
               jobByTaskRef.current.get(pick.id) ??
               storyRunContextFromScope(node.id, scope);
-            storyApplyTaskResult(node, pick, job, updateNodeData, nodes);
-            if (pick.status === "SUCCEEDED" || pick.status === "FAILED") {
-              releaseInflightKey(runKey(job));
-            }
+            applyRowPick(node, pick, job, localRt, nodeTasks);
           }
           continue;
         }
 
         if (isAnyStorySceneColumnType(node.type ?? "")) {
           const rows =
-            (node.data as { rows?: { key: string }[] }).rows ?? [];
+            (node.data as { rows?: { key: string; runtime?: CanvasNodeRuntime }[] }).rows ?? [];
           for (const row of rows) {
             const scope = { rowKey: row.key, mediaKind: "sceneRef" as const };
-            const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+            const pick = pickStoryRowApplyTask(
+              nodeTasks,
+              scope,
+              row.runtime,
+            );
             if (!pick) continue;
             const job: CanvasStoryRunJob =
               jobByTaskRef.current.get(pick.id) ??
@@ -1953,7 +2742,11 @@ export function useCanvasRunner(
               .rows ?? [];
           for (const row of rows) {
             const scope = { rowKey: row.key, mediaKind: "threeView" };
-            const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+            const pick = pickStoryRowApplyTask(
+              nodeTasks,
+              scope,
+              row.runtime,
+            );
             if (!pick) continue;
             const job: CanvasStoryRunJob =
               jobByTaskRef.current.get(pick.id) ??
@@ -1969,7 +2762,11 @@ export function useCanvasRunner(
               .rows ?? [];
           for (const row of rows) {
             const scope = { rowKey: row.key, mediaKind: "frameImage" };
-            const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+            const pick = pickStoryRowApplyTask(
+              nodeTasks,
+              scope,
+              row.runtime,
+            );
             if (!pick) continue;
             const job: CanvasStoryRunJob =
               jobByTaskRef.current.get(pick.id) ??
@@ -2037,34 +2834,50 @@ export function useCanvasRunner(
       t: CanvasTaskRecord,
       nodeId: string,
       nodes: CanvasFlowNode[],
+      allTasks?: CanvasTaskRecord[],
     ) => {
       const node = nodes.find((n) => n.id === nodeId);
       const job = jobByTaskRef.current.get(t.id);
       if (node && isStoryWorkspaceNodeType(node.type ?? "")) {
-        if (job) {
+        const scope = t.storyScope ?? {};
+        const ctx: CanvasStoryRunJob = {
+          ...(job ?? {}),
+          ...storyRunContextFromScope(nodeId, scope),
+          nodeId,
+        };
+        if (
+          ctx.llmSection &&
+          shouldSkipHubSectionInflightTaskApply(node, ctx.llmSection, t)
+        ) {
+          return;
+        }
+        if (
+          (t.status === "FAILED" || t.status === "CANCELLED") &&
+          isAnyStoryScriptHubType(node.type ?? "")
+        ) {
+          const nodeTasks = (allTasks ?? []).filter((x) => x.nodeId === nodeId);
           if (
-            job.llmSection &&
-            (t.status === "SUBMITTED" ||
-              t.status === "DISPATCHING" ||
-              t.status === "PENDING" ||
-              t.status === "QUEUED") &&
-            hubSectionIsComplete(node, job.llmSection) &&
-            !isCanvasInflightStatus(hubSectionRuntime(node, job.llmSection)?.status)
+            nodeTasks.some(
+              (x) =>
+                x.id !== t.id &&
+                isServerInflightTaskStatus(x.status) &&
+                !isStaleServerInflightTask(x, nodeTasks) &&
+                !isAbandonedCanvasInflightTask(x),
+            )
           ) {
             return;
           }
-          storyApplyTaskResult(node, t, job, updateNodeData, nodes);
-        } else {
-          const scope = t.storyScope ?? {};
-          if (scope.llmSection || scope.rowKey || scope.mediaKind) {
-            storyApplyTaskResult(
-              node,
-              t,
-              storyRunContextFromScope(nodeId, scope),
-              updateNodeData,
-              nodes,
-            );
-          }
+        }
+        storyApplyTaskResult(node, t, ctx, updateNodeData, nodes);
+        if (
+          t.status === "SUCCEEDED" ||
+          t.status === "FAILED" ||
+          t.status === "CANCELLED"
+        ) {
+          releaseInflightKey(runKey(ctx));
+          releaseInflightKey(nodeId);
+          if (t.status === "SUCCEEDED") maybeNotifyCanvasCreditsSettled(t);
+          emitTaskPanelSync(t, { flushAutosave: t.status === "SUCCEEDED" });
         }
         return;
       }
@@ -2082,7 +2895,9 @@ export function useCanvasRunner(
       boundTaskId ??= taskByNodeRef.current.get(nodeId);
       const localTaskId = localRt?.taskId?.trim();
       const isTerminal =
-        t.status === "SUCCEEDED" || t.status === "FAILED";
+        t.status === "SUCCEEDED" ||
+        t.status === "FAILED" ||
+        t.status === "CANCELLED";
       const isCurrentTaskTerminal =
         jobByTaskRef.current.has(t.id) ||
         (localTaskId != null && localTaskId === t.id) ||
@@ -2126,11 +2941,55 @@ export function useCanvasRunner(
             updateNodeData(nodeId, sbv1Patch);
           }
           const st = (sbv1Patch.runtime as CanvasNodeRuntime | undefined)?.status;
-          if (st === "done" || st === "error") {
+          if (st === "done" || st === "error" || st === "idle") {
+            maybeClearHubPendingSceneSyncGroup(
+              useCanvasStore.getState().nodes.map((n) =>
+                n.id === nodeId
+                  ? { ...n, data: { ...n.data, ...sbv1Patch } }
+                  : n,
+              ),
+              nodeId,
+              updateNodeData,
+            );
             const job = jobByTaskRef.current.get(t.id);
-            if (job) releaseInflightKey(runKey(job));
+            if (job) {
+              releaseInflightKey(runKey(job));
+              taskByNodeRef.current.delete(runKey(job));
+            }
+            taskByNodeRef.current.delete(nodeId);
             if (st === "done") maybeNotifyCanvasCreditsSettled(t);
             emitTaskPanelSync(t, { flushAutosave: st === "done" });
+          }
+        } else if (
+          patch &&
+          (t.status === "SUCCEEDED" || t.status === "FAILED" || t.status === "CANCELLED")
+        ) {
+          const mediaUrl = pickTaskResultMediaUrl(t) ?? t.ossUrl ?? undefined;
+          const fallbackPatch: Record<string, unknown> = {
+            uploading: false,
+            uploadError: undefined,
+            runtime: patch,
+            ...(mediaUrl && t.status === "SUCCEEDED"
+              ? { ossUrl: mediaUrl, blobUrl: undefined }
+              : {}),
+          };
+          if (
+            !isSameSbv1MediaDataPatch(
+              node.data as Record<string, unknown>,
+              fallbackPatch,
+            )
+          ) {
+            updateNodeData(nodeId, fallbackPatch);
+          }
+          if (patch.status === "done" || patch.status === "error" || patch.status === "idle") {
+            const job = jobByTaskRef.current.get(t.id);
+            if (job) {
+              releaseInflightKey(runKey(job));
+              taskByNodeRef.current.delete(runKey(job));
+            }
+            taskByNodeRef.current.delete(nodeId);
+            if (patch.status === "done") maybeNotifyCanvasCreditsSettled(t);
+            emitTaskPanelSync(t, { flushAutosave: patch.status === "done" });
           }
         }
         return;
@@ -2176,7 +3035,7 @@ export function useCanvasRunner(
             );
           }
         }
-        if (patch.status === "done" || patch.status === "error") {
+        if (patch.status === "done" || patch.status === "error" || patch.status === "idle") {
           const job = jobByTaskRef.current.get(t.id);
           if (job) {
             releaseInflightKey(runKey(job));
@@ -2194,6 +3053,8 @@ export function useCanvasRunner(
 
     const tick = async (forceFullScan = false) => {
       if (cancelled || pollStopped) return;
+      // 保存占连接时跳过本轮 DB 拉取，给 PATCH 让路
+      if (isCanvasSaveInFlight()) return;
       tickCount++;
       const periodicFullScan =
         !forceFullScan && tickCount % FULL_SCAN_EVERY_N_TICKS === 0;
@@ -2226,6 +3087,9 @@ export function useCanvasRunner(
           return;
         }
         lastPollStale = false;
+        for (const t of tasks) {
+          tasksByIdRef.current.set(t.id, t);
+        }
         ingestCanvasProjectTasks(projectId, tasks);
         const nodesNow = useCanvasStore.getState().nodes;
         restoreServerInflightNodeRuntimes(
@@ -2235,6 +3099,14 @@ export function useCanvasRunner(
           setNodeRuntime,
         );
         applyStoryColumnRowTasks(tasks, nodesNow);
+        syncPro2CharacterGroupImagesFromColumnRuntimes(
+          useCanvasStore.getState().nodes,
+          updateNodeData,
+        );
+        syncPro2FrameGroupImagesFromColumnRuntimes(
+          useCanvasStore.getState().nodes,
+          updateNodeData,
+        );
         const skipReconcileNodeIds = new Set<string>();
         for (const key of inflightRef.current) {
           skipReconcileNodeIds.add(key.split(":")[0]!);
@@ -2248,11 +3120,6 @@ export function useCanvasRunner(
         for (const key of taskByNodeRef.current.keys()) {
           skipReconcileNodeIds.add(key.split(":")[0]!);
         }
-        for (const id of collectCanvasInflightNodeIds(
-          useCanvasStore.getState().nodes,
-        )) {
-          skipReconcileNodeIds.add(id);
-        }
         reconcileStaleInflightRuntimes(
           useCanvasStore.getState().nodes,
           tasks,
@@ -2261,12 +3128,12 @@ export function useCanvasRunner(
           { skipNodeIds: skipReconcileNodeIds },
         );
         const columnIds = storyColumnNodeIds();
-        const latestByNode = latestTasksByNode(tasks);
+        const latestByNode = latestTasksByNode(tasks, useCanvasStore.getState().nodes);
         let serverInflight = 0;
         latestByNode.forEach((t, nodeId) => {
           if (isServerInflightStatus(t.status)) serverInflight++;
           if (!columnIds.has(nodeId)) {
-            applyTaskUpdate(t, nodeId, useCanvasStore.getState().nodes);
+            applyTaskUpdate(t, nodeId, useCanvasStore.getState().nodes, tasks);
           }
         });
         for (const t of tasks) {
@@ -2308,22 +3175,79 @@ export function useCanvasRunner(
     // 无在飞时暂停 DB 轮询，只保留廉价的「空转再探」节拍唤醒。
     const scheduleNext = () => {
       if (cancelled || pollStopped) return;
-      const ms = nextPollIntervalMs(currentInflightCount(), lastPollStale);
+      if (pollKickPending) {
+        const full = pollKickPendingFullScan;
+        pollKickPending = false;
+        pollKickPendingFullScan = false;
+        loopTimer = window.setTimeout(() => void loop(full), 0);
+        return;
+      }
+      const mediaRenderActive = hasAnyMediaRenderInFlight(
+        useCanvasStore.getState().nodes,
+      );
+      // 保存进行中：拉长轮询，避免与 PATCH 抢 DB / 浏览器连接
+      if (isCanvasSaveInFlight()) {
+        const delay = CANVAS_POLL_MEDIA_RENDER_BACKOFF_MS;
+        loopTimer = window.setTimeout(() => void loop(), delay);
+        return;
+      }
+      const ms = nextPollIntervalMs(
+        currentInflightCount(),
+        lastPollStale,
+        mediaRenderActive,
+      );
       const delay = ms > 0 ? ms : CANVAS_POLL_IDLE_RECHECK_MS;
       loopTimer = window.setTimeout(() => void loop(), delay);
     };
 
     const loop = async (forceFullScan = false) => {
       if (cancelled || pollStopped) return;
-      await tick(forceFullScan);
+      if (pollLoopRunning) {
+        pollKickPending = true;
+        if (forceFullScan) pollKickPendingFullScan = true;
+        return;
+      }
+      pollLoopRunning = true;
+      try {
+        await tick(forceFullScan);
+      } finally {
+        pollLoopRunning = false;
+      }
+      if (cancelled || pollStopped) return;
       scheduleNext();
     };
 
+    let mediaRenderPollKickEarliest = 0;
     pollKickRef.current = () => {
       if (cancelled || pollStopped) return;
+      // 保存中：只记 pending，不立刻开新 GET
+      if (isCanvasSaveInFlight()) {
+        pollKickPending = true;
+        return;
+      }
+      if (pollLoopRunning) {
+        pollKickPending = true;
+        return;
+      }
+      if (hasAnyMediaRenderInFlight(useCanvasStore.getState().nodes)) {
+        const now = Date.now();
+        if (now < mediaRenderPollKickEarliest) return;
+        mediaRenderPollKickEarliest =
+          now + CANVAS_POLL_MEDIA_RENDER_BACKOFF_MS;
+        if (loopTimer) window.clearTimeout(loopTimer);
+        loopTimer = window.setTimeout(
+          () => void loop(false),
+          CANVAS_POLL_MEDIA_RENDER_BACKOFF_MS,
+        );
+        return;
+      }
       if (loopTimer) window.clearTimeout(loopTimer);
       void loop(false);
     };
+
+    const unsubTasksChanged = subscribeCanvasTasksChanged(projectId, () => {
+      pollKickRef.current?.();
+    });
 
     const initialDelay =
       inflightRef.current.size > 0 ||
@@ -2345,6 +3269,7 @@ export function useCanvasRunner(
     );
     return () => {
       cancelled = true;
+      unsubTasksChanged();
       pollKickRef.current = null;
       if (loopTimer) window.clearTimeout(loopTimer);
       window.clearTimeout(initialTickTimer);

@@ -37,7 +37,6 @@ import {
   listCanvasEngineModels,
   type CanvasEngineModel,
 } from "@/lib/canvas-api";
-import { PromptTemplatesTab } from "./prompt-templates-tab";
 import { useGatewayLinkStatus } from "@/lib/canvas/use-gateway-link-status";
 import { isGatewayProviderId } from "@/lib/canvas/system-providers";
 
@@ -121,7 +120,7 @@ function hunyuanPreset(tier: HunyuanTier): Partial<AddForm> {
   };
 }
 
-type Tab = "providers" | "models" | "system" | "prompts";
+type Tab = "providers" | "models" | "system";
 
 function Inner() {
   const base = useBookMallBaseUrl();
@@ -391,7 +390,6 @@ function Inner() {
         {[
           { k: "providers" as const, label: `Gateway Providers (${providers.length})` },
           { k: "models" as const, label: `我的模型 (${allMyModels.length})` },
-          { k: "prompts" as const, label: "提示词模板" },
           { k: "system" as const, label: `系统模板模型 (${systemModels.length})` },
         ].map(({ k, label }) => (
           <button
@@ -435,8 +433,6 @@ function Inner() {
           providers={providers}
           onToggleModel={handleToggleModel}
         />
-      ) : tab === "prompts" ? (
-        <PromptTemplatesTab />
       ) : (
         <SystemModelsTab models={systemModels} />
       )}

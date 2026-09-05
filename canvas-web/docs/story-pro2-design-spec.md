@@ -242,6 +242,7 @@
 | --- | --- |
 | 职责 | 分镜表 / 角色表 hub；驱动三视图板、分镜图板生成 |
 | 卡片 | 标题 + 内容预览 `Pro2ScriptHubContentPreview`；Tab 视图在检视 / 工具条切换 |
+| 空态 Try | **左栏**：上传剧本 · 文生视频 · 角色（`TRY_ACTIONS`）；**右栏**：「剧本类别」— 古风甜宠短剧剧本 / 默认剧本大师（点击 → 左侧 spawn 文本 + 连线，写入 preset；**不在 Dock 底栏**） |
 | 工具条 | 卡片内 `Pro2ScriptHubToolbar`（生成三视图 / 分镜图 / 打开表编辑器等） |
 | Dock | 唯一选中 → `Pro2ScriptInputDock`；LLM · 表级操作 |
 | 侧 `+` | 同文本节点菜单映射 |
@@ -298,10 +299,12 @@
 | --- | --- |
 | **我的历史** | 顶栏「我的历史」→ 侧栏；每项目 **15** 条；间隔 localStorage 可配 |
 | **写入时机** | 自动保存 / 手动保存 → `PATCH /api/canvas/projects/:id` 带 `historySnapshot`（服务端写库） |
+| **历史封面** | 写历史前 `captureCanvasViewportSnapshotUrl()` 截当前视口 → OSS，作 `historySnapshot.thumbnailUrl`；截图/上传失败回退项目封面或画布内媒体图，**不阻断保存** |
 | **列表刷新** | 保存成功后派发 `canvas:history-updated`；侧栏打开时自动 reload |
 | **恢复** | `doubleConfirm` 二次确认 → `hydrate` 覆盖当前画布 |
-| **自动保存** | `canvas-autosave-settings.ts` · debounce 1.5s · 拖动松手 `canvas:flush-autosave` |
-| **Undo/Redo** | 画布工具栏；拖动时 temporal pause |
+| **自动保存** | `canvas-autosave-settings.ts` · debounce 1.5s 落盘项目 · 拖动松手 `canvas:flush-autosave` |
+| **历史心跳** | 每 30s 检查「距上次写历史 ≥ 用户间隔」+ `graphRevision` 有变才写。**禁止**用 `isCanvasDirty()` 判定（debounce 落盘已清 dirty，会导致历史几乎不写） |
+| **Undo/Redo** | 画布工具栏；拖动 / 选中态 / hydrate 收尾 temporal pause；zundo `equality` 只让 `nodes`/`edges` 变更进栈（默认「任何 set 都记一帧」会把 `limit` 填满同一份图） |
 | **模型选择** | 全站 `EnginePicker`（见 `.cursor/rules/pro2-model-picker.mdc`） |
 
 ---

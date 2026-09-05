@@ -1,19 +1,50 @@
 import type { Connection } from "@xyflow/react";
+import { Clapperboard, Download, Sparkles, Video } from "lucide-react";
+import type { Pro2AddMenuSection } from "./pro2-add-node-menu";
 import { DEFAULT_HANDLE_BY_TYPE } from "./libtv-connection-snap";
-import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
+import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 
-/** 框选批量 · 图片上游（图生图 / 图生视频） */
+/** 框选批量 · 媒体上游（图 / 三视图 / 风格 / 道具 / 氛围 / 音频 / 文本等） */
 export const BATCH_IMAGE_SOURCE_TYPES = new Set([
   "sbv1-image",
   "story-pro2-image",
   "story-pro2-three-view",
+  "story-pro2-style-asset",
+  "story-pro2-prop",
+  "story-pro2-mood",
+  "story-pro2-audio",
 ]);
 
-export type BatchConnectMode = "video-export" | "image-pipeline";
+export const BATCH_TEXT_SOURCE_TYPES = new Set([
+  "story-pro2-starter",
+  "story-pro2-script-hub",
+]);
+
+export type BatchConnectMode = "video-export" | "media-pipeline";
 
 export function isBatchImageSource(node: CanvasFlowNode): boolean {
   return BATCH_IMAGE_SOURCE_TYPES.has(node.type ?? "");
 }
+
+export function isBatchTextSource(node: CanvasFlowNode): boolean {
+  return BATCH_TEXT_SOURCE_TYPES.has(node.type ?? "");
+}
+
+/** 框选批量短菜单 · 图生图 / 图生视频（与单节点完整 + 菜单区分） */
+export const BATCH_MEDIA_SPAWN_MENU_ITEMS = [
+  {
+    id: "img2img",
+    label: "图生图",
+    icon: Sparkles,
+    nodeType: "story-pro2-image",
+  },
+  {
+    id: "img2video",
+    label: "图生视频",
+    icon: Video,
+    nodeType: "sbv1-video-engine",
+  },
+] as const;
 
 /** 框选批量出边 · 节点 type → source handle */
 export const BATCH_OUT_HANDLE_BY_TYPE: Record<string, string> = {
@@ -21,9 +52,17 @@ export const BATCH_OUT_HANDLE_BY_TYPE: Record<string, string> = {
   "sbv1-image": "image",
   "story-pro2-image": "image",
   "story-pro2-three-view": "image",
+  "story-pro2-style-asset": "style",
+  "story-pro2-prop": "image",
+  "story-pro2-mood": "image",
+  "story-pro2-audio": "audio",
   "story-pro2-starter": "text",
   "story-pro2-script-hub": "text",
 };
+
+export function isBatchMediaPipelineSource(node: CanvasFlowNode): boolean {
+  return isBatchImageSource(node) || isBatchTextSource(node);
+}
 
 export function nodeBatchOutHandle(node: CanvasFlowNode): string | null {
   const t = node.type ?? "";
@@ -36,10 +75,15 @@ export function nodesEligibleForBatchOut(
 ): CanvasFlowNode[] {
   return ids
     .map((id) => nodes.find((n) => n.id === id))
-    .filter((n): n is CanvasFlowNode => !!n && !!nodeBatchOutHandle(n));
+    .filter((n): n is CanvasFlowNode => {
+      if (!n) return false;
+      if (nodeBatchOutHandle(n)) return true;
+      if (n.type === "story-pro2-audio") return true;
+      return false;
+    });
 }
 
-/** 框选 ≥2 个同类型可批量节点时返回模式，否则 null（混合选区不出批量 +） */
+/** 框选 ≥2 个可批量节点时返回模式，否则 null */
 export function classifyBatchConnectMode(
   sources: CanvasFlowNode[],
 ): BatchConnectMode | null {
@@ -47,10 +91,56 @@ export function classifyBatchConnectMode(
   if (sources.every((s) => s.type === "sbv1-video-engine")) {
     return "video-export";
   }
-  if (sources.every((s) => isBatchImageSource(s))) {
-    return "image-pipeline";
+  if (
+    sources.every(
+      (s) => s.type === "sbv1-video-engine" || s.type === "story-pro2-audio",
+    ) &&
+    sources.some((s) => s.type === "sbv1-video-engine")
+  ) {
+    return "video-export";
+  }
+  if (sources.every((s) => isBatchMediaPipelineSource(s))) {
+    return "media-pipeline";
   }
   return null;
+}
+
+/** 框选批量 + 菜单（media-pipeline → 图生图/图生视频；video-export → 成片/导出） */
+export function resolveBatchConnectMenu(
+  mode: BatchConnectMode,
+): Pro2AddMenuSection[] {
+  if (mode === "video-export") {
+    return [
+      {
+        title: "工作环节",
+        items: [
+          {
+            id: "auto-render",
+            label: "自动成片",
+            icon: Clapperboard,
+            enabled: true,
+            nodeType: "jianying-auto-render-pro2",
+          },
+          {
+            id: "export",
+            label: "导出剪辑",
+            icon: Download,
+            enabled: true,
+            nodeType: "jianying-export-pro2",
+          },
+        ],
+      },
+    ];
+  }
+  return [
+    {
+      title: "批量连线",
+      items: BATCH_MEDIA_SPAWN_MENU_ITEMS.map((item) => ({
+        ...item,
+        enabled: true,
+      })),
+    },
+  ];
 }
 
 export function batchImageSpawnNodeType(
@@ -74,9 +164,7 @@ export function isBatchConnectSnapTarget(
   }
   return (
     node.type === "sbv1-video-engine" ||
-    isBatchImageSource(node) ||
-    node.type === "story-pro2-image" ||
-    node.type === "story-pro2-three-view"
+    isBatchMediaPipelineSource(node)
   );
 }
 
@@ -90,10 +178,8 @@ export function batchConnectTargetHandleForSnap(
     (target.type === "jianying-export-pro2" ||
       target.type === "jianying-auto-render-pro2")
   ) {
+    if (source.type === "story-pro2-audio") return "in_audio";
     return "in_video";
-  }
-  if (mode === "image-pipeline" && target.type === "sbv1-video-engine") {
-    return "in_ref";
   }
   const sourceHandle = nodeBatchOutHandle(source);
   if (!sourceHandle) return null;
@@ -115,6 +201,14 @@ export function pickBatchTargetHandle(
     return "in_video";
   }
   if (
+    (targetNode.type === "jianying-export-pro2" ||
+      targetNode.type === "jianying-auto-render-pro2") &&
+    sourceNode.type === "story-pro2-audio" &&
+    sourceHandle === "audio"
+  ) {
+    return "in_audio";
+  }
+  if (
     targetNode.type === "sbv1-video-engine" &&
     (sourceNode.type === "story-pro2-starter" ||
       sourceNode.type === "story-pro2-script-hub")
@@ -132,7 +226,11 @@ export function pickBatchTargetHandle(
     targetNode.type === "sbv1-video-engine" &&
     (sourceNode.type === "sbv1-image" ||
       sourceNode.type === "story-pro2-image" ||
-      sourceNode.type === "story-pro2-three-view")
+      sourceNode.type === "story-pro2-three-view" ||
+      sourceNode.type === "story-pro2-prop" ||
+      sourceNode.type === "story-pro2-mood" ||
+      sourceNode.type === "story-pro2-audio" ||
+      sourceNode.type === "story-pro2-style-asset")
   ) {
     return "in_ref";
   }

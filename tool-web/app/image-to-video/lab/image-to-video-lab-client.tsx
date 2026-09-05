@@ -53,6 +53,7 @@ import {
   formatRequiredPointsShortfall,
   readRequiredPointsFromSettleJson,
 } from "@/lib/format-points-ui";
+import { dispatchPlatformCreditsBalanceRefresh } from "@/lib/platform-credits-balance-events";
 import ttiStyles from "../../text-to-image/text-to-image-modal.module.css";
 import { TextToVideoWorkbench } from "./text-to-video-workbench";
 
@@ -963,6 +964,7 @@ export function ImageToVideoLabClient({
           } else if (settleJson.recorded === true) {
             settleHintForJob =
               "已按方案 A（任务返回的时长、分辨率与模型）完成计费，可在费用明细查看。";
+            dispatchPlatformCreditsBalanceRefresh();
           }
 
           const doneAt = new Date().toLocaleString("zh-CN", {

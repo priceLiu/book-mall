@@ -80,11 +80,25 @@ export function sbv1RefLinksToDockUpstream(
   }));
 }
 
-/** 视频 Dock · 合并文本 / 图片 / 分镜脚本上游，供 @ 与 resolveDockRunPrompt */
+/** 视频 → 视频 in_motion_video 上游 · 供 Dock @ 与 resolveDockRunPrompt */
+export function sbv1MotionVideoLinksToDockUpstream(
+  motionVideoLinks: Sbv1UpstreamRefLink[],
+): Pro2DockUpstreamLink[] {
+  return motionVideoLinks.map((l) => ({
+    id: l.id,
+    kind: "video" as const,
+    label: l.label,
+    previewUrl: l.previewUrl,
+    sourceNodeId: l.sourceNodeId,
+  }));
+}
+
+/** 视频 Dock · 合并文本 / 图片 / 上游视频 / 分镜脚本 chip，供 @ 与 resolveDockRunPrompt */
 export function buildSbv1VideoEngineDockUpstreamLinks(
   upstreamRefLinks: Sbv1UpstreamRefLink[],
   upstreamTextLinks: Sbv1UpstreamTextLink[],
   extraLinks: Pro2DockUpstreamLink[] = [],
+  motionVideoLinks: Sbv1UpstreamRefLink[] = [],
 ): Pro2DockUpstreamLink[] {
   const seen = new Set<string>();
   const out: Pro2DockUpstreamLink[] = [];
@@ -95,22 +109,27 @@ export function buildSbv1VideoEngineDockUpstreamLinks(
   };
   for (const link of extraLinks) push(link);
   for (const link of sbv1TextLinksToDockUpstream(upstreamTextLinks)) push(link);
+  for (const link of sbv1MotionVideoLinksToDockUpstream(motionVideoLinks)) {
+    push(link);
+  }
   for (const link of sbv1RefLinksToDockUpstream(upstreamRefLinks)) push(link);
   return out;
 }
 
-/** 视频 Dock @ 列表：文本上游 + 参考图 + 分镜脚本 chip */
+/** 视频 Dock @ 列表：文本上游 + 上游视频 + 参考图 + 分镜脚本 chip */
 export function buildSbv1VideoEngineDockMentionables(
   upstreamRefLinks: Sbv1UpstreamRefLink[],
   upstreamTextLinks: Sbv1UpstreamTextLink[],
   extraLinks: Pro2DockUpstreamLink[] = [],
   nodes?: CanvasFlowNode[],
   prompt?: string,
+  motionVideoLinks: Sbv1UpstreamRefLink[] = [],
 ): MentionableItem[] {
   const upstream = buildSbv1VideoEngineDockUpstreamLinks(
     upstreamRefLinks,
     upstreamTextLinks,
     extraLinks,
+    motionVideoLinks,
   );
   const items = buildPro2DockMentionables(upstream);
   const imageExtras = buildSbv1DockMentionables(upstreamRefLinks, nodes, prompt);

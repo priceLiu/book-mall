@@ -23,15 +23,13 @@ export async function OPTIONS(request: NextRequest) {
 
 const grantSchema = z.object({
   action: z.literal("grant"),
-  generalCredits: z.number().int().min(0).optional(),
-  videoCredits: z.number().int().min(0).optional(),
+  credits: z.number().int().min(0).optional(),
   description: z.string().max(200).optional(),
 });
 
 const adjustSchema = z.object({
   action: z.literal("adjust"),
   credits: z.number().int(),
-  pool: z.enum(["GENERAL", "VIDEO"]).optional(),
   description: z.string().max(200).optional(),
 });
 
@@ -70,8 +68,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     if (parsed.data.action === "grant") {
       detail = await adminGrantVipTestCredits({
         tenantId: params.tenantId,
-        generalCredits: parsed.data.generalCredits,
-        videoCredits: parsed.data.videoCredits,
+        credits: parsed.data.credits,
         description: parsed.data.description,
         adminUserId: user.id,
       });
@@ -79,7 +76,6 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       detail = await adminAdjustVipCredits({
         tenantId: params.tenantId,
         credits: parsed.data.credits,
-        pool: parsed.data.pool,
         description: parsed.data.description,
         adminUserId: user.id,
       });

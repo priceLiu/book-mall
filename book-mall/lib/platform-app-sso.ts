@@ -1,7 +1,10 @@
 import {
   getCanvasWebOrigin,
+  getCommonToolsOrigin,
+  getDirectorWebOrigin,
   getEcommerceWebOrigin,
   getPromptOptimizerOrigin,
+  getPublisherWebOrigin,
   getQuickReplicaOrigin,
   getStoryWebOrigin,
 } from "@/lib/app-web-origins";
@@ -13,7 +16,10 @@ export type PlatformSsoApp =
   | "story"
   | "prompt-optimizer"
   | "quick-replica"
-  | "e-commerce";
+  | "e-commerce"
+  | "director"
+  | "common-tools"
+  | "publisher";
 
 /** 子应用公网 Origin（SSO callback 重定向目标）。 */
 export function getPlatformAppPublicOrigin(app: PlatformSsoApp): string | null {
@@ -30,6 +36,12 @@ export function getPlatformAppPublicOrigin(app: PlatformSsoApp): string | null {
       return getQuickReplicaOrigin().replace(/\/$/, "") || null;
     case "e-commerce":
       return getEcommerceWebOrigin().replace(/\/$/, "") || null;
+    case "director":
+      return getDirectorWebOrigin().replace(/\/$/, "") || null;
+    case "common-tools":
+      return getCommonToolsOrigin().replace(/\/$/, "") || null;
+    case "publisher":
+      return getPublisherWebOrigin().replace(/\/$/, "") || null;
     default:
       return null;
   }
@@ -47,6 +59,15 @@ export function parsePlatformSsoApp(raw: string | null | undefined): PlatformSso
   }
   if (v === "e-commerce" || v === "ecommerce") {
     return "e-commerce";
+  }
+  if (v === "director" || v === "director-desk") {
+    return "director";
+  }
+  if (v === "common-tools" || v === "common_tools") {
+    return "common-tools";
+  }
+  if (v === "publisher" || v === "social-publisher") {
+    return "publisher";
   }
   return "tool";
 }

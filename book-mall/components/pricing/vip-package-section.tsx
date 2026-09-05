@@ -64,15 +64,13 @@ export function VipPackageSection() {
   const seatAlloc = useMemo(
     () =>
       computeVipSeatAllocation({
-        totalGeneralCredits: scheme.generalCredits,
-        totalVideoCredits: scheme.videoCredits,
+        totalCredits: scheme.totalCredits,
         seats,
       }),
-    [scheme.generalCredits, scheme.videoCredits, seats],
+    [scheme.totalCredits, seats],
   );
 
-  const chiefGeneral = seatAlloc.perSeatGeneral + seatAlloc.remainderGeneral;
-  const chiefVideo = seatAlloc.perSeatVideo + seatAlloc.remainderVideo;
+  const chiefCredits = seatAlloc.perSeatCredits + seatAlloc.remainderCredits;
 
   const checkoutHref = `/checkout/vip?amount=${amount}&scheme=${chosen}&seats=${seats}`;
 
@@ -125,25 +123,23 @@ export function VipPackageSection() {
 
         <div className="relative mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <SchemeCard
-            title="方案 A · 通用多"
-            subtitle="适用场景：视频算力消耗约 15%，以文本、图文生成需求为主"
+            title="方案 A · 均衡"
+            subtitle="适用场景：视频算力消耗约 15%，以文本、图文生成为主（单池总积分更多）"
             icon={<ImageIcon className="h-4 w-4" />}
             active={chosen === "general_heavy"}
             onSelect={() => setChosen("general_heavy")}
-            generalCredits={quote.schemeGeneralHeavy.generalCredits}
-            videoCredits={quote.schemeGeneralHeavy.videoCredits}
             totalCredits={quote.schemeGeneralHeavy.totalCredits}
+            anchorMarginRate={quote.schemeGeneralHeavy.anchorMarginRate}
             computePowerRefYuan={quote.schemeGeneralHeavy.faceValueYuan}
           />
           <SchemeCard
-            title="方案 B · 视频多"
-            subtitle="适用场景：视频算力消耗约 40%，适合短视频、数字人视频制作团队"
+            title="方案 B · 视频偏重"
+            subtitle="适用场景：视频算力消耗约 40%，适合短视频、数字人团队（按最坏模型护栏定价）"
             icon={<Film className="h-4 w-4" />}
             active={chosen === "video_heavy"}
             onSelect={() => setChosen("video_heavy")}
-            generalCredits={quote.schemeVideoHeavy.generalCredits}
-            videoCredits={quote.schemeVideoHeavy.videoCredits}
             totalCredits={quote.schemeVideoHeavy.totalCredits}
+            anchorMarginRate={quote.schemeVideoHeavy.anchorMarginRate}
             computePowerRefYuan={quote.schemeVideoHeavy.faceValueYuan}
           />
         </div>
@@ -186,17 +182,10 @@ export function VipPackageSection() {
 
             <ul className="mt-4 space-y-2 text-sm text-foreground">
               <li>
-                · 均分参考（{seats} 席示例）：单席位通用 {credits(seatAlloc.perSeatGeneral)} + 视频{" "}
-                {credits(seatAlloc.perSeatVideo)}
+                · 均分参考（{seats} 席）：每席约 {credits(seatAlloc.perSeatCredits)} 积分
               </li>
-              <li>
-                · 首席账号（含管理员权限）：通用 {credits(chiefGeneral)} + 视频{" "}
-                {credits(chiefVideo)}
-              </li>
-              <li>
-                · 团队共享总池：通用 {credits(scheme.generalCredits)} + 视频{" "}
-                {credits(scheme.videoCredits)}
-              </li>
+              <li>· 首席账号（含余数）：{credits(chiefCredits)} 积分</li>
+              <li>· 团队共享总池：{credits(scheme.totalCredits)} 积分</li>
             </ul>
 
             <p className="mt-3 text-xs text-muted-foreground">{VIP_CONSUMPTION_ORDER_NOTE}</p>
@@ -242,7 +231,7 @@ export function VipPackageSection() {
           </Button>
           <p className="text-xs text-muted-foreground">
             当前示意：¥{amount.toLocaleString("zh-CN")} 充值 · 已选
-            {chosen === "video_heavy" ? "视频多" : "通用多"}方案 · 积分有效期 {VIP_CREDIT_VALIDITY_YEARS} 年
+            {chosen === "video_heavy" ? "视频偏重" : "均衡"}方案 · 积分有效期 {VIP_CREDIT_VALIDITY_YEARS} 年
           </p>
         </div>
 
@@ -265,9 +254,8 @@ function SchemeCard({
   icon,
   active,
   onSelect,
-  generalCredits,
-  videoCredits,
   totalCredits,
+  anchorMarginRate,
   computePowerRefYuan,
 }: {
   title: string;
@@ -275,9 +263,8 @@ function SchemeCard({
   icon: React.ReactNode;
   active: boolean;
   onSelect: () => void;
-  generalCredits: number;
-  videoCredits: number;
   totalCredits: number;
+  anchorMarginRate: number;
   computePowerRefYuan: number;
 }) {
   return (
@@ -318,7 +305,7 @@ function SchemeCard({
         <span className="text-sm text-muted-foreground">总积分</span>
       </div>
       <p className="mt-2 text-sm text-foreground">
-        通用积分：{credits(generalCredits)} ｜ 视频积分：{credits(videoCredits)}
+        锚定 Seedance 15s 毛利：{(anchorMarginRate * 100).toFixed(1)}%
       </p>
       <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
         {formatComputePowerRefYuan(computePowerRefYuan)}

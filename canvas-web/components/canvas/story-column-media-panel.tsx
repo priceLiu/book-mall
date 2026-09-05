@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Clapperboard, Check, Download, Eye, RefreshCw, X } from "lucide-react";
 import {
+  CANVAS_MEDIA_PREVIEW_LIGHTBOX_SHELL_CLASS,
   useClientPortalMounted,
   useModalBodyScrollLock,
   useModalEscapeClose,
@@ -22,6 +23,11 @@ import {
   type StoryEdition,
 } from "@/lib/canvas/story-edition-chrome";
 import { StoryErrorLine } from "@/components/canvas/story-status-line";
+import {
+  ImageZoomControls,
+  IMAGE_ZOOM_BUTTON_STEP,
+} from "@/components/media/image-zoom-controls";
+import { useImageZoomPan } from "@/lib/media/use-image-zoom-pan";
 import { STORY_HINT_GOLD_CLASS } from "@/lib/canvas/story-column-sync";
 import {
   StoryVideoPromptTipPortal,
@@ -380,13 +386,13 @@ export function StoryMediaPreviewModal({
   const mounted = useClientPortalMounted();
   useModalBodyScrollLock();
   useModalEscapeClose(onClose);
+  const { zoom, zoomBy, reset, stageProps } = useImageZoomPan(url);
 
   if (!mounted) return null;
 
   return createPortal(
     <div
-      className="canvas-media-preview-lightbox pointer-events-auto fixed inset-0 z-[2000] flex flex-col bg-black/88 backdrop-blur-md"
-      style={{ backgroundColor: "rgba(0,0,0,0.88)" }}
+      className={CANVAS_MEDIA_PREVIEW_LIGHTBOX_SHELL_CLASS}
       onClick={onClose}
     >
       <div
@@ -428,15 +434,30 @@ export function StoryMediaPreviewModal({
               autoPlay
             />
           ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={url}
-              alt=""
-              className="max-h-[calc(100dvh-88px)] max-w-[min(96vw,960px)] object-contain"
-            />
+            <div {...stageProps} className="inline-block leading-none">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={url}
+                alt=""
+                draggable={false}
+                className="max-h-[calc(100dvh-88px)] max-w-[min(96vw,960px)] object-contain"
+              />
+            </div>
           )}
         </div>
       </div>
+
+      {kind === "image" ? (
+        // 根节点 onClick 会关闭预览，控件须拦住冒泡
+        <div onClick={(e) => e.stopPropagation()}>
+          <ImageZoomControls
+            zoom={zoom}
+            onZoomIn={() => zoomBy(IMAGE_ZOOM_BUTTON_STEP)}
+            onZoomOut={() => zoomBy(-IMAGE_ZOOM_BUTTON_STEP)}
+            onReset={reset}
+          />
+        </div>
+      ) : null}
     </div>,
     document.body,
   );

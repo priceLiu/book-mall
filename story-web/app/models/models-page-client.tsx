@@ -103,7 +103,7 @@ export function ModelsPageClient() {
       <div className="story-shell-page py-16 text-center">
         <p className="text-red-400">{error}</p>
         <p className="mt-2 text-sm text-[var(--story-muted)]">
-          请先在顶部栏登录 book-mall 账号。
+          模型配置需要登录后使用，请从顶部栏重新登录。
         </p>
         <Link href="/" className="twenty-btn-ghost mt-6 inline-flex">
           回到首页

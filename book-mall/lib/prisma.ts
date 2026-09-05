@@ -1,14 +1,21 @@
 import { statSync } from "node:fs";
 import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
-import { isPrismaConnectionUnavailable } from "@/lib/db-unavailable";
+import { isPrismaConnectionUnavailable, toDbUnavailableError } from "@/lib/db-unavailable";
 import {
   resolvePrismaDatasourceUrl,
   resolvePrismaReplicaUrl,
   getPrismaConnectionLimit,
 } from "@/lib/prisma-pool-config";
+import {
+  acquirePrismaDbSlot,
+  PrismaPoolBusyError,
+  recordPrismaPoolTimeout,
+  releasePrismaDbSlot,
+} from "@/lib/prisma-db-gate";
 
 export { getPrismaConnectionLimit };
+export { getPrismaDbGateSnapshot } from "@/lib/prisma-db-gate";
 
 /**
  * 挂在 globalThis，避免 dev 热更新重复 `new PrismaClient()`。
@@ -34,12 +41,18 @@ type PrismaGlobal = {
 const globalForPrisma = globalThis as unknown as PrismaGlobal;
 
 function generatedClientStamp(): string {
-  try {
-    const p = join(process.cwd(), "node_modules/.prisma/client/index.js");
-    return String(statSync(p).mtimeMs);
-  } catch {
-    return "0";
+  const directCandidates = [
+    join(process.cwd(), "node_modules/.prisma/client/index.js"),
+    join(process.cwd(), "node_modules/.prisma/client/default.js"),
+  ];
+  for (const p of directCandidates) {
+    try {
+      return String(statSync(p).mtimeMs);
+    } catch {
+      /* try next */
+    }
   }
+  return "0";
 }
 
 const datasourceUrl = resolvePrismaDatasourceUrl();
@@ -78,24 +91,47 @@ function buildPrismaClient(urlOverride?: string): PrismaClient {
     query: {
       $allModels: {
         async $allOperations({ args, query }) {
-          let lastErr: unknown;
-          const startedAt = Date.now();
-          for (let attempt = 0; attempt <= DB_RETRY_MAX; attempt++) {
-            try {
-              return await query(args);
-            } catch (e) {
-              lastErr = e;
-              if (
-                !isPrismaConnectionUnavailable(e) ||
-                attempt === DB_RETRY_MAX ||
-                Date.now() - startedAt > DB_RETRY_BUDGET_MS
-              ) {
-                throw e;
+          let gateHeld = false;
+          try {
+            await acquirePrismaDbSlot();
+            gateHeld = true;
+          } catch (e) {
+            if (e instanceof PrismaPoolBusyError) {
+              recordPrismaPoolTimeout(e);
+              if (process.env.NODE_ENV === "production") {
+                throw toDbUnavailableError(e);
               }
-              await sleep(DB_RETRY_BASE_DELAY_MS * (attempt + 1));
+              console.warn("[prisma-db-gate] fail-open in dev:", e.message);
+            } else {
+              throw e;
             }
           }
-          throw lastErr;
+          try {
+            let lastErr: unknown;
+            const startedAt = Date.now();
+            for (let attempt = 0; attempt <= DB_RETRY_MAX; attempt++) {
+              try {
+                return await query(args);
+              } catch (e) {
+                lastErr = e;
+                recordPrismaPoolTimeout(e);
+                if (
+                  !isPrismaConnectionUnavailable(e) ||
+                  attempt === DB_RETRY_MAX ||
+                  Date.now() - startedAt > DB_RETRY_BUDGET_MS
+                ) {
+                  if (isPrismaConnectionUnavailable(e)) {
+                    throw toDbUnavailableError(e);
+                  }
+                  throw e;
+                }
+                await sleep(DB_RETRY_BASE_DELAY_MS * (attempt + 1));
+              }
+            }
+            throw lastErr;
+          } finally {
+            if (gateHeld) releasePrismaDbSlot();
+          }
         },
       },
     },
@@ -104,29 +140,96 @@ function buildPrismaClient(urlOverride?: string): PrismaClient {
   return extended as unknown as PrismaClient;
 }
 
-const clientStamp = generatedClientStamp();
-if (
-  globalForPrisma.prisma &&
-  globalForPrisma.prismaClientStamp &&
-  globalForPrisma.prismaClientStamp !== clientStamp
-) {
-  void globalForPrisma.prisma.$disconnect().catch(() => {});
-  globalForPrisma.prisma = undefined;
+/** schema 新增 model 后，dev 热更新可能仍持有旧 Client（缺 delegate） */
+const REQUIRED_PRISMA_DELEGATES = [
+  "aiSpaceFavorite",
+  "ecomMediaDecomposeProject",
+] as const;
+
+function prismaClientHasRequiredDelegates(client: PrismaClient): boolean {
+  const record = client as unknown as Record<string, { findMany?: unknown } | undefined>;
+  return REQUIRED_PRISMA_DELEGATES.every(
+    (key) => typeof record[key]?.findMany === "function",
+  );
 }
 
-export const prisma = globalForPrisma.prisma ?? buildPrismaClient();
+function discardCachedPrismaClients() {
+  const main = globalForPrisma.prisma;
+  const read = globalForPrisma.prismaRead;
+  globalForPrisma.prisma = undefined;
+  globalForPrisma.prismaRead = undefined;
+  globalForPrisma.prismaClientStamp = undefined;
+  if (main) void main.$disconnect().catch(() => {});
+  if (read && read !== main) void read.$disconnect().catch(() => {});
+}
 
-globalForPrisma.prisma = prisma;
-globalForPrisma.prismaClientStamp = clientStamp;
+function ensurePrismaClient(): PrismaClient {
+  const stamp = generatedClientStamp();
+  const cached = globalForPrisma.prisma;
+  if (
+    cached &&
+    globalForPrisma.prismaClientStamp === stamp &&
+    prismaClientHasRequiredDelegates(cached)
+  ) {
+    return cached;
+  }
+  if (cached) discardCachedPrismaClients();
+  const next = buildPrismaClient();
+  globalForPrisma.prisma = next;
+  globalForPrisma.prismaClientStamp = stamp;
+  if (
+    process.env.NODE_ENV === "development" &&
+    !prismaClientHasRequiredDelegates(next)
+  ) {
+    console.error(
+      "[prisma] Client 缺少必要 model delegate（如 aiSpaceFavorite / ecomMediaDecomposeProject）；请在 book-mall 执行 pnpm db:generate 并重启 dev:all。",
+    );
+  }
+  return next;
+}
+
+/**
+ * 始终解析 global 上的最新 Client，避免 dev HMR 后旧模块仍持有已 disconnect 的 prisma 引用
+ * （表现为 `Response from the Engine was empty` / delegate undefined）。
+ */
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    const client = ensurePrismaClient();
+    const value = Reflect.get(client as object, prop, receiver);
+    if (typeof value === "function") {
+      return (value as (...args: unknown[]) => unknown).bind(client);
+    }
+    return value;
+  },
+});
 
 /**
  * 只读副本 Client（Gen-HotCold-R2 Phase 6）。
  * 配置 `DATABASE_REPLICA_URL` 时指向只读副本，用于报表/仪表盘等重读，卸载主库；
  * 未配置则复用主库实例（行为不变）。**严禁**用 prismaRead 写库。
  */
-const replicaUrl = resolvePrismaReplicaUrl();
-export const prismaRead: PrismaClient =
-  globalForPrisma.prismaRead ??
-  (replicaUrl ? buildPrismaClient(replicaUrl) : prisma);
+function ensurePrismaReadClient(): PrismaClient {
+  const replicaUrl = resolvePrismaReplicaUrl();
+  if (!replicaUrl) return ensurePrismaClient();
 
-globalForPrisma.prismaRead = prismaRead;
+  const stamp = generatedClientStamp();
+  const cached = globalForPrisma.prismaRead;
+  if (cached && globalForPrisma.prismaClientStamp === stamp) {
+    return cached;
+  }
+  if (cached) void cached.$disconnect().catch(() => {});
+  const next = buildPrismaClient(replicaUrl);
+  globalForPrisma.prismaRead = next;
+  return next;
+}
+
+export const prismaRead: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    const client = ensurePrismaReadClient();
+    const value = Reflect.get(client as object, prop, receiver);
+    if (typeof value === "function") {
+      return (value as (...args: unknown[]) => unknown).bind(client);
+    }
+    return value;
+  },
+});

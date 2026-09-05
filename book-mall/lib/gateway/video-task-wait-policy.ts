@@ -1,10 +1,10 @@
 /**
- * 视频任务等待策略：Canvas 10min 后台化 UI 与 Gateway 筛选共用阈值。
- * 硬超时（90min STALE_TIMEOUT）见 poll-config / volcengine stale release。
+ * 视频任务等待策略：Canvas 15min 后台化 UI 与 Gateway 筛选共用阈值。
+ * 硬超时（90min STALE_TIMEOUT）见 poll-config / gateway stale release。
  */
 import type { Prisma } from "@prisma/client";
 
-export const VIDEO_BACKGROUND_UI_MS = 10 * 60 * 1000;
+export const VIDEO_BACKGROUND_UI_MS = 15 * 60 * 1000;
 export const VIDEO_BACKGROUND_UI_SEC = VIDEO_BACKGROUND_UI_MS / 1000;
 
 export const VIDEO_BACKGROUND_UI_LABEL = "持续后台生成中…";
@@ -25,7 +25,7 @@ export function isVideoBackgroundWaitAge(
   return nowMs - ts >= thresholdMs;
 }
 
-/** Gateway 日志 · 进行中且已等待 ≥ threshold（默认 10min） */
+/** Gateway 日志 · 进行中且已等待 ≥ threshold（默认 15min） */
 export function buildVideoBackgroundWaitWhere(
   thresholdMs: number = VIDEO_BACKGROUND_UI_MS,
   nowMs: number = Date.now(),

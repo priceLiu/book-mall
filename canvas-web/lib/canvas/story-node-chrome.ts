@@ -2,9 +2,12 @@
  * 漫剧节点 · 统一底栏按钮高度、故事主题/故事大纲固定尺寸。
  */
 
-import { STORY_ORANGE_BTN_CLASS } from "@/components/canvas/story-column-batch-footer";
 import { STORY_THEME_SYSTEM_PROMPT_TEMPLATES } from "./story-prompts";
 import type { CanvasFlowNode } from "./types";
+
+/** 漫剧引擎节点底栏主按钮：亮橙实心，禁用时不变暗（纯常量 · 供 lib 单测 import） */
+export const STORY_ORANGE_BTN_CLASS =
+  "rounded-md bg-[#fb923c] font-medium text-black hover:bg-[#fdba74] disabled:cursor-not-allowed disabled:bg-[#fb923c] disabled:text-black disabled:opacity-100 disabled:hover:bg-[#fb923c]";
 
 /** NodeShell 底栏容器（所有带 footer 的漫剧/引擎节点共用） */
 export const STORY_NODE_SHELL_FOOTER_CLASS =

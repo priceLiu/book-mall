@@ -14,11 +14,14 @@ import {
   pickCredentialForKind,
 } from "@/lib/gateway/proxy-common";
 import { parseGatewayClientSource } from "@/lib/gateway/poll-service";
+import { parseUsageFromUnknown } from "@/lib/gateway/gateway-token-metrics";
 import {
+  buildVolcengineImageLogResultSummary,
   volcengineImageGenerations,
   type VolcengineImageGenerationsParams,
 } from "@/lib/gateway/volcengine-image-generations-proxy";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
+import { resolveVolcengineModelKey } from "@/lib/gateway/volcengine-chat-models";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -34,7 +37,7 @@ export async function POST(request: NextRequest) {
   let body: {
     model?: string;
     prompt?: string;
-    image?: string;
+    image?: string | string[];
     parameters?: VolcengineImageGenerationsParams;
   };
   try {
@@ -43,13 +46,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const model = body.model?.trim() || SEEDREAM_50_LITE;
+  const requested = body.model?.trim() || SEEDREAM_50_LITE;
+  const model = resolveVolcengineModelKey(requested);
   const prompt = body.prompt?.trim() ?? "";
   if (!prompt) {
     return NextResponse.json({ error: "prompt required" }, { status: 400 });
   }
 
-  routeGatewayModel(model);
+  routeGatewayModel(requested);
 
   const credentialId = pickCredentialForKind(auth.credentials, "VOLCENGINE");
   if (!credentialId) {
@@ -59,6 +63,12 @@ export async function POST(request: NextRequest) {
   const clientSource = parseGatewayClientSource(
     logMeta.clientSource ?? request.headers.get("x-gateway-client"),
   );
+
+  const imageUrlsForLog = Array.isArray(body.image)
+    ? body.image.filter((u) => typeof u === "string" && u.trim())
+    : body.image?.trim()
+      ? [body.image.trim()]
+      : [];
 
   let log;
   try {
@@ -73,7 +83,10 @@ export async function POST(request: NextRequest) {
       clientSource,
       inputSummary: buildGatewayInputSummary(model, {
         prompt: prompt.slice(0, 200),
-        imageCount: body.image ? 1 : 0,
+        referenceImageCount: imageUrlsForLog.length,
+        ...(imageUrlsForLog.length ? { imageUrls: imageUrlsForLog } : {}),
+        n: body.parameters?.n ?? 1,
+        size: body.parameters?.size,
       }),
       ...logMetaToRequestLogFields(logMeta),
     });
@@ -108,7 +121,11 @@ export async function POST(request: NextRequest) {
     await finalizeRequestLog(log.id, {
       status: "SUCCEEDED",
       durationMs: Date.now() - started,
-      resultSummary: { imageCount: result.images.length },
+      resultSummary: buildVolcengineImageLogResultSummary(
+        result.raw,
+        result.images,
+      ),
+      usage: parseUsageFromUnknown(result.raw),
       model,
     });
     return NextResponse.json({

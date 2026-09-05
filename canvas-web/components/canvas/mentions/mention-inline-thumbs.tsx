@@ -21,6 +21,10 @@ import {
   stripMentionThumbSlots,
 } from "@/lib/canvas/mention-inline-thumb-placeholder";
 import { LIBTV_INPUT_DOCK_BG } from "@/lib/canvas/libtv-node-chrome";
+import {
+  createMentionPreviewThumbEl,
+  mentionPreviewShouldUseVideo,
+} from "@/lib/canvas/mention-preview-media";
 import { useLibtvInputDockUi } from "@/lib/canvas/libtv-input-dock-ui-context";
 import { getTextareaCaretClientRects } from "@/lib/canvas/textarea-caret-rect";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -169,18 +173,12 @@ function syncBadgeDom(
       badge.style.backgroundColor = LIBTV_INPUT_DOCK_BG;
       badge.style.gap = `${INLINE_MENTION_BADGE_GAP_PX}px`;
 
-      const img = document.createElement("img");
-      img.draggable = false;
-      img.dataset.mentionThumb = "";
-      img.className = "shrink-0 rounded-[4px] object-cover";
-      img.style.width = `${INLINE_MENTION_THUMB_PX}px`;
-      img.style.height = `${INLINE_MENTION_THUMB_PX}px`;
-      img.referrerPolicy = "no-referrer";
-
       const label = document.createElement("span");
       label.className = "mention-inline-label min-w-0 truncate";
 
-      badge.appendChild(img);
+      badge.appendChild(
+        createMentionPreviewThumbEl(p.item, INLINE_MENTION_THUMB_PX),
+      );
       badge.appendChild(label);
       host.appendChild(badge);
       root.appendChild(host);
@@ -193,11 +191,24 @@ function syncBadgeDom(
     if (maskEl) maskEl.style.width = `${p.maskWidth}px`;
 
     const badgeEl = host.querySelector<HTMLElement>("[data-mention-inline-badge]");
-    const imgEl = host.querySelector<HTMLImageElement>("img[data-mention-thumb]");
     const labelEl = host.querySelector<HTMLElement>(".mention-inline-label");
     if (badgeEl) badgeEl.dataset.mentionId = p.item.id;
-    if (imgEl && p.item.previewUrl && imgEl.src !== p.item.previewUrl) {
-      imgEl.src = p.item.previewUrl;
+    if (badgeEl && p.item.previewUrl) {
+      const thumbEl = badgeEl.querySelector("[data-mention-thumb]");
+      const wantVideo = mentionPreviewShouldUseVideo(p.item);
+      const isVideo = thumbEl instanceof HTMLVideoElement;
+      const url = p.item.previewUrl.trim();
+      if (!thumbEl || wantVideo !== isVideo) {
+        thumbEl?.remove();
+        badgeEl.insertBefore(
+          createMentionPreviewThumbEl(p.item, INLINE_MENTION_THUMB_PX),
+          labelEl,
+        );
+      } else if (thumbEl instanceof HTMLImageElement && thumbEl.src !== url) {
+        thumbEl.src = url;
+      } else if (thumbEl instanceof HTMLVideoElement && thumbEl.src !== url) {
+        thumbEl.src = url;
+      }
     }
     if (labelEl) labelEl.textContent = p.label;
   }

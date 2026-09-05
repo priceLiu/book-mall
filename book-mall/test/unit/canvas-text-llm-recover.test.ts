@@ -14,4 +14,20 @@ describe("extractChatTextFromGatewaySummary", () => {
       "world",
     );
   });
+
+  it("reads OpenAI choices payload stored in resultSummary", () => {
+    expect(
+      extractChatTextFromGatewaySummary({
+        choices: [{ message: { content: "outline body" } }],
+      }),
+    ).toBe("outline body");
+  });
+
+  it("reads nested data / choices[].text", () => {
+    expect(
+      extractChatTextFromGatewaySummary({
+        data: { choices: [{ text: "nested text" }] },
+      }),
+    ).toBe("nested text");
+  });
 });

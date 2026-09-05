@@ -96,3 +96,19 @@
 - **团队共享池**：批次挂 `CreditAccount(ownerType=TENANT)`，逻辑一致；per-seat cap 不变。
 - **BYOK / 资源计量**：不走积分池，不受影响。
 - **对账 / 归档**：EXPIRE 沿用既有流水类型，`CreditLedgerArchive` 无需改。
+
+## 10. 积分清零运维台（Credit Expiry Ops）
+
+> 需求全文：[`docs/积分清零控制台.md`](../../../docs/积分清零控制台.md)
+
+生产 CloudBase **必须**配置 Cron（见 `deploy/tencent/README.md` §积分清零）；`vercel.json` 仅作 Vercel 备用。
+
+| 模块 | 位置 |
+|---|---|
+| 工单 + 执行记录 | `CreditOpsWorkItem` / `CreditOpsJobRun`（Prisma） |
+| 生成 / 执行 / 对账 | `lib/billing/credit-ops-service.ts` |
+| 预警 | `lib/billing/credit-ops-alerts.ts` |
+| Cron API | `/api/admin/credits/ops/*` |
+| 财务运维 UI | finance-web `/admin/credit-expiry-ops` |
+
+定时任务经 ops 层执行，逐单回写工单；`expire-sweep` / `monthly-reset` 兼容路由内部转调同一 service。

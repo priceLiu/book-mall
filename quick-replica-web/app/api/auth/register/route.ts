@@ -17,6 +17,7 @@ export async function POST(req: Request) {
 
   const result = await forwardToBook("/api/auth/register", {
     method: "POST",
+    clientRequest: req,
     body: {
       phone: body?.phone,
       code: body?.code,

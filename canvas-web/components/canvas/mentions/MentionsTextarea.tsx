@@ -50,6 +50,8 @@ import { MentionHoverPreviewPortal } from "./mention-hover-preview";
 import { MentionInlineThumbOverlay, type MentionInlineThumbMirrorHandle } from "./mention-inline-thumbs";
 import { MentionPickerPortal } from "./mention-picker-portal";
 
+import type { GridSplitCrop } from "@/lib/canvas/libtv-grid-split-crop";
+
 export type MentionableItem = {
   id: string;
   /** popover / 正文里显示的标签，如 "1.png" */
@@ -57,6 +59,8 @@ export type MentionableItem = {
   kind?: string;
   /** @ 列表缩略图（角色三视图等） */
   previewUrl?: string;
+  /** 宫格参考图 · 悬停预览按单元裁切 */
+  gridSplitCrop?: GridSplitCrop;
 };
 
 export type MentionsTextareaProps = {
@@ -560,6 +564,27 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       ],
     );
 
+    const onMouseDown = (e: MouseEvent<HTMLTextAreaElement>) => {
+      if (disabled || popoverOpen) return;
+      const el = innerRef.current;
+      if (!el) return;
+      const index = getTextareaIndexFromClientPoint(
+        el,
+        e.clientX,
+        e.clientY,
+      );
+      const hit = findMentionRangeAtDisplayIndex(
+        displayValue,
+        index,
+        mentionables,
+      );
+      if (!hit) return;
+      e.preventDefault();
+      el.focus();
+      el.setSelectionRange(hit.start, hit.end);
+      pendingCaretRef.current = hit.end;
+    };
+
     const onMouseMove = useCallback(
       (e: MouseEvent<HTMLTextAreaElement>) => {
         if (!hoverPreviewEnabled) return;
@@ -673,6 +698,7 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
               onBlur?.();
             }}
             onMouseMove={onMouseMove}
+            onMouseDown={onMouseDown}
             onMouseLeave={onMouseLeave}
             autoFocus={autoFocus}
             rows={stretchInParent ? 1 : rows}

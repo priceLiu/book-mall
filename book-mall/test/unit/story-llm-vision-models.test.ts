@@ -20,7 +20,7 @@ describe("story-llm-vision-models", () => {
 
   it("assert throws for non-vision model", () => {
     expect(() => assertStoryLlmVisionModel("deepseek-v4-flash")).toThrow(
-      /不支持图片理解/,
+      /不支持图片\/视频理解/,
     );
   });
 });

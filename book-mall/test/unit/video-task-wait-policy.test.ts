@@ -10,7 +10,7 @@ import {
 describe("video-task-wait-policy", () => {
   const now = Date.parse("2026-06-22T12:00:00.000Z");
 
-  it("isVideoBackgroundWaitAge respects 10min threshold", () => {
+  it("isVideoBackgroundWaitAge respects 15min threshold", () => {
     const submitted = new Date(now - VIDEO_BACKGROUND_UI_MS - 1);
     expect(isVideoBackgroundWaitAge(submitted, submitted, now)).toBe(true);
     expect(

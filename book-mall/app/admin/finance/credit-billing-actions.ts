@@ -13,6 +13,7 @@ import {
   marginPassesGuard,
   publishModelCreditPrice,
 } from "@/lib/pricing/credit-pricing-engine";
+import { upsertModelCostProfileVersioned } from "@/lib/pricing/upsert-model-cost-profile-versioned";
 import { SCENARIO_LAB_USAGE_SECONDS } from "@/lib/billing/scenario-lab";
 import { VIDEO_MODEL_SEEDS } from "@/lib/billing/video-model-seeds";
 import { DEFAULT_VIDEO_MIN_MARGIN_GUARD } from "@/lib/pricing/credit-pricing-formulas";
@@ -60,7 +61,7 @@ export async function savePricingConfigAction(formData: FormData): Promise<Actio
   const minMarginGuard = num(formData.get("minMarginGuard"), 0.3);
   const defaultVideoSec = Math.max(1, Math.round(num(formData.get("defaultVideoSec"), 15)));
   const videoMarginM = num(formData.get("videoMarginM"), 1.5);
-  const videoMinMarginGuard = num(formData.get("videoMinMarginGuard"), -0.02);
+  const videoMinMarginGuard = num(formData.get("videoMinMarginGuard"), 0.22);
   if (creditAnchorYuan <= 0) return { ok: false, error: "锚定单价必须大于 0" };
   await prisma.platformPricingConfig.upsert({
     where: { id: "default" },
@@ -98,9 +99,18 @@ export async function upsertModelCostAction(formData: FormData): Promise<ActionR
 
   if (!vendor || !canonicalModelKey) return { ok: false, error: "厂商与归口模型键必填" };
   if (listCostYuan < 0) return { ok: false, error: "成本不能为负" };
-  const netCostYuan = listCostYuan * (1 - discountRate);
 
-  const data = {
+  if (id && !active) {
+    await prisma.modelCostProfile.update({
+      where: { id },
+      data: { active: false, effectiveTo: new Date() },
+    });
+    revalidatePath("/admin/finance/model-cost");
+    revalidatePath("/admin/finance/credit-pricing");
+    return { ok: true };
+  }
+
+  const result = await upsertModelCostProfileVersioned({
     vendor,
     canonicalModelKey,
     channel: channel || "CHANNEL",
@@ -109,16 +119,17 @@ export async function upsertModelCostAction(formData: FormData): Promise<ActionR
     tierRaw,
     listCostYuan,
     discountRate,
-    netCostYuan,
     note,
-    active,
-  };
+    seedId: id || undefined,
+  });
 
-  if (id) {
-    await prisma.modelCostProfile.update({ where: { id }, data });
-  } else {
-    await prisma.modelCostProfile.create({ data });
+  if (result.action === "unchanged" && id) {
+    await prisma.modelCostProfile.update({
+      where: { id: result.profileId },
+      data: { note, credentialId },
+    });
   }
+
   revalidatePath("/admin/finance/model-cost");
   revalidatePath("/admin/finance/credit-pricing");
   return { ok: true };
@@ -176,8 +187,6 @@ export async function importModelCostsAction(
     const channel = (raw.channel ?? "CHANNEL") as CreditChannel;
     const unit = (raw.unit ?? "PER_IMAGE") as CreditCostUnit;
     const tierRaw = raw.tierRaw?.trim() || null;
-    const netCostYuan = listCostYuan * (1 - discountRate);
-    const active = raw.active !== false;
 
     const existing = await prisma.modelCostProfile.findFirst({
       where: {
@@ -186,10 +195,12 @@ export async function importModelCostsAction(
         channel,
         unit,
         tierRaw,
+        active: true,
+        effectiveTo: null,
       },
     });
 
-    const data = {
+    const result = await upsertModelCostProfileVersioned({
       vendor,
       canonicalModelKey,
       channel,
@@ -198,17 +209,10 @@ export async function importModelCostsAction(
       tierRaw,
       listCostYuan,
       discountRate,
-      netCostYuan,
       note: raw.note?.trim() || null,
-      active,
-    };
-
-    if (existing) {
-      await prisma.modelCostProfile.update({ where: { id: existing.id }, data });
-    } else {
-      await prisma.modelCostProfile.create({ data });
-    }
-    imported++;
+      seedId: existing ? undefined : `import-${vendor}-${canonicalModelKey}-${tierRaw ?? "default"}-${channel}`,
+    });
+    if (result.action !== "unchanged") imported++;
   }
 
   revalidatePath("/admin/finance/model-cost");
@@ -303,17 +307,11 @@ export async function upsertMembershipPlanAction(formData: FormData): Promise<Ac
   const originalYuan = originalRaw ? Number(originalRaw) : null;
   const promoLabel = str(formData.get("promoLabel")) || null;
   const monthlyCredits = Math.round(num(formData.get("monthlyCredits")));
-  const videoMonthlyRaw = formData.get("videoMonthlyCredits");
-  const videoMonthlyCredits =
-    videoMonthlyRaw != null && String(videoMonthlyRaw).trim() !== ""
-      ? Math.max(0, Math.round(num(videoMonthlyRaw)))
-      : Math.round(monthlyCredits * 0.2);
   const includedSeats = Math.max(1, Math.round(num(formData.get("includedSeats"), 1)));
   const active = formData.get("active") === "on" || formData.get("active") === "true";
   const pricePerCreditYuan = derivePricePerCredit(priceYuan, monthlyCredits, includedSeats);
 
   if (!family || !interval || !tier) return { ok: false, error: "类型/周期/档位必填" };
-  if (videoMonthlyCredits > monthlyCredits) return { ok: false, error: "视频池积分不能超过月积分" };
 
   const existingPlans = await prisma.membershipPlan.findMany({
     where: { active: true },
@@ -369,7 +367,6 @@ export async function upsertMembershipPlanAction(formData: FormData): Promise<Ac
     originalYuan,
     promoLabel,
     monthlyCredits,
-    videoMonthlyCredits,
     pricePerCreditYuan,
     includedSeats,
     active,
@@ -430,83 +427,5 @@ export async function deleteSeatTierAction(formData: FormData): Promise<ActionRe
   await prisma.teamSeatTier.delete({ where: { id } });
   revalidatePath("/admin/finance/membership-plans");
   revalidatePath("/pricing");
-  return { ok: true };
-}
-
-// ——————————————————— BYOK 服务费 + 资源系数 ———————————————————
-
-export async function upsertByokConfigAction(formData: FormData): Promise<ActionResult> {
-  const auth = await requireAdmin();
-  if (!auth.ok) return auth;
-  const id = str(formData.get("id"));
-  const scopeKey = str(formData.get("scopeKey"));
-  const label = str(formData.get("label"));
-  const techServiceFeeYuan = num(formData.get("techServiceFeeYuan"));
-  const minSeatsRaw = str(formData.get("minSeats"));
-  const minSeats = minSeatsRaw ? Math.max(1, Math.round(num(formData.get("minSeats")))) : null;
-  const interval = (str(formData.get("interval")) as MembershipInterval) || "MONTH";
-  const note = str(formData.get("note")) || null;
-  const active = formData.get("active") === "on" || formData.get("active") === "true";
-  if (!scopeKey || !label) return { ok: false, error: "规格键与名称必填" };
-  const data = { scopeKey, label, techServiceFeeYuan, minSeats, interval, note, active };
-  if (id) {
-    await prisma.byokServiceConfig.update({ where: { id }, data });
-  } else {
-    await prisma.byokServiceConfig.upsert({ where: { scopeKey }, create: data, update: data });
-  }
-  revalidatePath("/admin/finance/byok");
-  return { ok: true };
-}
-
-export async function deleteByokConfigAction(formData: FormData): Promise<ActionResult> {
-  const auth = await requireAdmin();
-  if (!auth.ok) return auth;
-  const id = str(formData.get("id"));
-  if (!id) return { ok: false, error: "缺少 id" };
-  await prisma.byokServiceConfig.delete({ where: { id } });
-  revalidatePath("/admin/finance/byok");
-  return { ok: true };
-}
-
-export async function saveResourceRateAction(formData: FormData): Promise<ActionResult> {
-  const auth = await requireAdmin();
-  if (!auth.ok) return auth;
-  const resourceType = str(formData.get("resourceType")) as "OSS_GB_MONTH" | "EGRESS_GB" | "TASK_COUNT";
-  const coefficientYuan = num(formData.get("coefficientYuan"));
-  const unitLabel = str(formData.get("unitLabel"));
-  const active = formData.get("active") === "on" || formData.get("active") === "true";
-  if (!resourceType) return { ok: false, error: "缺少资源类型" };
-  await prisma.resourceMeterRate.upsert({
-    where: { resourceType },
-    create: { resourceType, coefficientYuan, unitLabel, active },
-    update: { coefficientYuan, unitLabel, active },
-  });
-  revalidatePath("/admin/finance/byok");
-  return { ok: true };
-}
-
-export async function saveByokQuotaAction(formData: FormData): Promise<ActionResult> {
-  const auth = await requireAdmin();
-  if (!auth.ok) return auth;
-  const id = str(formData.get("id"));
-  const scopeKey = str(formData.get("scopeKey"));
-  const taskKind = str(formData.get("taskKind")) as "TEXT_TO_IMAGE" | "IMAGE_TO_VIDEO" | "VIDEO_TO_VIDEO";
-  const label = str(formData.get("label"));
-  const monthlyIncluded = Math.max(0, Math.round(num(formData.get("monthlyIncluded"))));
-  const overageCredits = Math.max(1, Math.round(num(formData.get("overageCredits"))));
-  const active = formData.get("active") === "on" || formData.get("active") === "true";
-  if (!scopeKey || !taskKind || !label) return { ok: false, error: "规格、任务类型与名称必填" };
-
-  const data = { scopeKey, taskKind, label, monthlyIncluded, overageCredits, active };
-  if (id) {
-    await prisma.byokTaskQuota.update({ where: { id }, data });
-  } else {
-    await prisma.byokTaskQuota.upsert({
-      where: { scopeKey_taskKind: { scopeKey, taskKind } },
-      create: data,
-      update: data,
-    });
-  }
-  revalidatePath("/admin/finance/byok");
   return { ok: true };
 }

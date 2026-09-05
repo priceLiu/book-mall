@@ -2,8 +2,10 @@
 
 import { nanoid } from "nanoid";
 import {
+  buildPro2AudioNodeData,
   buildPro2GeneralTextNodeData,
   buildPro2ImageNodeData,
+  buildPro2PromptNodeData,
   buildPro2StarterNodeData,
   buildPro2ThreeViewNodeData,
   spawnPro2ScriptHubFromSource,
@@ -24,6 +26,7 @@ import {
 } from "./story-pro2-node-chrome";
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
 import { flowPositionAtScreenPoint } from "./viewport-placement";
+import { useCanvasStore } from "./store";
 
 const GAP = 48;
 
@@ -55,7 +58,9 @@ export type LibtvSideSpawnStore = {
 function spawnWidth(nodeType: string, anchor: CanvasFlowNode): number {
   if (nodeType === "sbv1-video-engine") return SBV1_VIDEO_ENGINE_WIDTH;
   if (nodeType === "story-pro2-three-view") return PRO2_CHARACTER_THREE_VIEW_WIDTH;
-  if (nodeType === "story-pro2-starter") return PRO2_TEXT_NODE_MIN_WIDTH;
+  if (nodeType === "story-pro2-starter" || nodeType === "story-pro2-prompt") {
+    return PRO2_TEXT_NODE_MIN_WIDTH;
+  }
   if (nodeType === "story-pro2-script-hub") {
     return anchor.width ?? PRO2_TEXT_NODE_MIN_WIDTH;
   }
@@ -76,6 +81,7 @@ function canRefVideoFromAnchor(anchor: CanvasFlowNode): boolean {
   return (
     anchor.type === "story-pro2-image" ||
     anchor.type === "story-pro2-three-view" ||
+    anchor.type === "story-pro2-3d-desk" ||
     anchor.type === "sbv1-image"
   );
 }
@@ -121,6 +127,31 @@ export function spawnLibtvNeighborFromAnchor(
     if (!newId) return "";
     const targetHandle =
       anchor.type === "story-pro2-starter" ||
+      anchor.type === "story-pro2-prompt" ||
+      anchor.type === "story-pro2-script-hub"
+        ? "in_text"
+        : "in_image";
+    pushEdge(setEdges, {
+      id: `e-${nanoid(6)}`,
+      source: side === "left" ? newId : anchorId,
+      target: side === "left" ? anchorId : newId,
+      sourceHandle: side === "left" ? "text" : anchorSourceHandle(anchor),
+      targetHandle: side === "left" ? targetHandle : "in_text",
+    });
+    selectPro2NodeAfterSpawn(setNodes, newId);
+    return newId;
+  }
+
+  if (nodeType === "story-pro2-prompt") {
+    const newId = addNode(
+      "story-pro2-prompt",
+      { x: position.x, y: position.y },
+      buildPro2PromptNodeData(),
+    );
+    if (!newId) return "";
+    const targetHandle =
+      anchor.type === "story-pro2-starter" ||
+      anchor.type === "story-pro2-prompt" ||
       anchor.type === "story-pro2-script-hub"
         ? "in_text"
         : "in_image";
@@ -140,6 +171,7 @@ export function spawnLibtvNeighborFromAnchor(
     if (!newId) return "";
     const anchorIsText =
       anchor.type === "story-pro2-starter" ||
+      anchor.type === "story-pro2-prompt" ||
       anchor.type === "story-pro2-script-hub";
     pushEdge(setEdges, {
       id: `e-${nanoid(6)}`,
@@ -169,6 +201,10 @@ export function spawnLibtvNeighborFromAnchor(
       buildPro2ThreeViewNodeData(),
     );
     if (!newId) return "";
+    const anchorIsText =
+      anchor.type === "story-pro2-starter" ||
+      anchor.type === "story-pro2-prompt" ||
+      anchor.type === "story-pro2-script-hub";
     if (
       anchor.type === "story-pro2-image" ||
       anchor.type === "story-pro2-three-view"
@@ -179,6 +215,14 @@ export function spawnLibtvNeighborFromAnchor(
         target: side === "left" ? anchorId : newId,
         sourceHandle: "image",
         targetHandle: "in_image",
+      });
+    } else if (anchorIsText) {
+      pushEdge(setEdges, {
+        id: `e-${nanoid(6)}`,
+        source: side === "left" ? newId : anchorId,
+        target: side === "left" ? anchorId : newId,
+        sourceHandle: side === "left" ? "image" : "text",
+        targetHandle: side === "left" ? "in_text" : "in_image",
       });
     }
     setNodes((prev) =>
@@ -197,6 +241,64 @@ export function spawnLibtvNeighborFromAnchor(
       ),
     );
     selectPro2NodeAfterSpawn(setNodes, newId);
+    return newId;
+  }
+
+  if (nodeType === "story-pro2-3d-desk") {
+    const newId = addNode("story-pro2-3d-desk", { x: position.x, y: position.y }, {
+      label: "",
+      sceneInstanceId: "",
+    });
+    if (!newId) return "";
+    useCanvasStore.getState().updateNodeData(newId, { sceneInstanceId: newId });
+    const anchorIsImage =
+      anchor.type === "story-pro2-image" ||
+      anchor.type === "story-pro2-three-view" ||
+      anchor.type === "story-pro2-3d-desk" ||
+      anchor.type === "sbv1-image";
+    const anchorIsText =
+      anchor.type === "story-pro2-starter" ||
+      anchor.type === "story-pro2-prompt" ||
+      anchor.type === "story-pro2-script-hub";
+    if (anchorIsImage) {
+      pushEdge(setEdges, {
+        id: `e-${nanoid(6)}`,
+        source: side === "right" ? anchorId : newId,
+        target: side === "right" ? newId : anchorId,
+        sourceHandle: "image",
+        targetHandle: side === "right" ? "panorama" : "in_image",
+      });
+    } else if (side === "right" && anchor.type === "sbv1-video-engine") {
+      pushEdge(setEdges, {
+        id: `e-${nanoid(6)}`,
+        source: newId,
+        target: anchorId,
+        sourceHandle: "image",
+        targetHandle: "in_ref",
+      });
+    } else if (side === "right" && anchorIsText) {
+      // 故事脚本生成 / 文本 → 导演台（脚本引用进 3D）
+      pushEdge(setEdges, {
+        id: `e-${nanoid(6)}`,
+        source: anchorId,
+        target: newId,
+        sourceHandle: "text",
+        targetHandle: "panorama",
+      });
+    } else if (side === "left" && anchorIsText) {
+      pushEdge(setEdges, {
+        id: `e-${nanoid(6)}`,
+        source: newId,
+        target: anchorId,
+        sourceHandle: "image",
+        targetHandle: "in_text",
+      });
+    }
+    selectPro2NodeAfterSpawn(setNodes, newId);
+    // 等节点写入 store 后再开全屏，避免 host 因找不到节点直接 return null
+    queueMicrotask(() => {
+      useCanvasStore.getState().openDirector3dDeskEditor(newId);
+    });
     return newId;
   }
 
@@ -236,8 +338,40 @@ export function spawnLibtvNeighborFromAnchor(
         sourceHandle: "out_video",
         targetHandle: "in_text",
       });
+    } else if (anchor.type === "sbv1-video-engine" && side === "right") {
+      pushEdge(setEdges, {
+        id: `e-${nanoid(6)}`,
+        source: anchorId,
+        target: newId,
+        sourceHandle: "out_video",
+        targetHandle: "in_motion_video",
+      });
     }
     selectSbv1NodeAfterSpawn(setNodes, newId);
+    return newId;
+  }
+
+  if (nodeType === "story-pro2-audio") {
+    const newId = addNode(
+      "story-pro2-audio",
+      { x: position.x, y: position.y },
+      buildPro2AudioNodeData(),
+    );
+    if (!newId) return "";
+    const anchorIsText =
+      anchor.type === "story-pro2-starter" ||
+      anchor.type === "story-pro2-prompt" ||
+      anchor.type === "story-pro2-script-hub";
+    if (anchorIsText) {
+      pushEdge(setEdges, {
+        id: `e-${nanoid(6)}`,
+        source: side === "left" ? newId : anchorId,
+        target: side === "left" ? anchorId : newId,
+        sourceHandle: side === "left" ? "audio" : "text",
+        targetHandle: side === "left" ? "in_text" : "in_audio",
+      });
+    }
+    selectPro2NodeAfterSpawn(setNodes, newId);
     return newId;
   }
 
@@ -280,10 +414,13 @@ export function spawnLibtvNeighborFromAnchor(
 export function isLibtvSideSpawnNodeType(nodeType?: string): boolean {
   return (
     nodeType === "story-pro2-starter" ||
+    nodeType === "story-pro2-prompt" ||
     nodeType === "story-pro2-image" ||
     nodeType === "story-pro2-three-view" ||
+    nodeType === "story-pro2-3d-desk" ||
     nodeType === "story-pro2-script-hub" ||
     nodeType === "story-pro2-style-asset" ||
+    nodeType === "story-pro2-audio" ||
     nodeType === "sbv1-video-engine"
   );
 }
@@ -294,10 +431,13 @@ export function resolveLibtvSideSpawnNodeType(
 ): string | undefined {
   if (nodeType && isLibtvSideSpawnNodeType(nodeType)) return nodeType;
   if (itemId === "text") return "story-pro2-starter";
+  if (itemId === "prompt") return "story-pro2-prompt";
   if (itemId === "image") return "story-pro2-image";
   if (itemId === "three-view") return "story-pro2-three-view";
+  if (itemId === "3d-desk") return "story-pro2-3d-desk";
   if (itemId === "script") return "story-pro2-script-hub";
   if (itemId === "style-asset") return "story-pro2-style-asset";
+  if (itemId === "audio") return "story-pro2-audio";
   if (
     itemId === "video" ||
     itemId === "video-compose" ||

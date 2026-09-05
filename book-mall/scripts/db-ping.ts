@@ -36,13 +36,13 @@ async function main() {
     if (isPrismaConnectionUnavailable(error)) {
       console.error("");
       console.error("常见原因（本地开发）：");
-      console.error("  1) VPN 未连接 — 腾讯云 CDB 通常在私有网络，需先连 VPN");
-      console.error("  2) DATABASE_URL 主机/端口错误 — 运行时走连接池端口，勿与 DIRECT_DATABASE_URL 混用");
-      console.error("  3) 连接池耗尽 — dev:all 时 URL 追加 connection_limit=30&pool_timeout=30");
+      console.error("  1) DATABASE_URL 主机/端口错误 — 须用运行时连接池公网地址，勿与 DIRECT_DATABASE_URL 混用");
+      console.error("  2) 腾讯云安全组/白名单未放行本机出口 IP");
+      console.error("  3) 连接池耗尽 — dev:all 时 URL 追加 connection_limit；可 pnpm dev:all --no-poll");
       console.error("");
       console.error("处置：");
-      console.error("  · 确认 VPN 后重试：pnpm --dir book-mall db:ping");
-      console.error("  · 迁移用池路径：pnpm --dir book-mall db:apply-pending（勿依赖直连 migrate deploy）");
+      console.error("  · 自检：pnpm --dir book-mall db:ping");
+      console.error("  · 迁移：pnpm --dir book-mall db:apply-pending");
       console.error("  · 详见 docs/dev.md §数据库连接");
     } else if (error instanceof Error) {
       console.error("  ", error.message);

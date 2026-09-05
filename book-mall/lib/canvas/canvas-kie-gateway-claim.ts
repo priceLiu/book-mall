@@ -8,7 +8,10 @@ import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { CANVAS_DB_TX_OPTIONS, runTxWithRetry } from "@/lib/db-tx-retry";
 import { CanvasProjectError } from "./canvas-project-service";
-import { findPromotableCanvasGatewayLog } from "@/lib/generation/traffic-control/canvas-orphan-gateway-log";
+import {
+  findExistingCanvasGatewayLogForTask,
+  findPromotableCanvasGatewayLog,
+} from "@/lib/generation/traffic-control/canvas-orphan-gateway-log";
 import { GENERATION_INFLIGHT_STATUSES } from "@/lib/generation/traffic-control/constants";
 
 function taskInputPayload(
@@ -129,6 +132,17 @@ export async function findSiblingActiveVendorJob(args: {
 export async function claimCanvasTaskKieSubmit(
   taskId: string,
 ): Promise<{ claimed: boolean; task: CanvasGenerationTask }> {
+  const inflightLog = await findExistingCanvasGatewayLogForTask(taskId);
+  if (inflightLog) {
+    const task = await prisma.canvasGenerationTask.findUnique({
+      where: { id: taskId },
+    });
+    if (!task) {
+      throw new CanvasProjectError("NOT_FOUND", `task ${taskId} not found`, 404);
+    }
+    return { claimed: false, task };
+  }
+
   // 同 taskId 由 pg_advisory_xact_lock 串行化即足够互斥；去掉 Serializable，
   // 改默认隔离级 + 瞬时错误重试，避免高并发 dispatch 时 P2034 → VIDEO_DISPATCH_FAILED。
   return runTxWithRetry(

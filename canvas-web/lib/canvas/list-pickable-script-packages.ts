@@ -1,6 +1,6 @@
 import {
   getCanvasProject,
-  listMyCanvasProjects,
+  listAllMyCanvasProjects,
   listProjectAssets,
 } from "@/lib/canvas-api";
 import { exportScriptPackageDraft } from "./export-script-package";
@@ -54,7 +54,7 @@ export async function listPickableScriptPackages(
     });
   }
 
-  const projects = (await listMyCanvasProjects(base))
+  const projects = (await listAllMyCanvasProjects(base, { maxItems: MAX_PROJECT_SCAN * 2 }))
     .filter((p) => p.edition === "pro2")
     .sort(
       (a, b) =>

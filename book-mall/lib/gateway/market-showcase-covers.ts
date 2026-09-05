@@ -30,6 +30,8 @@ const SHOWCASE_COVERS: Record<string, string> = {
   "happyhorse-r2v": `https://picsum.photos/seed/happyhorse-r2v/480/360`,
   "wan2.7-image": `https://picsum.photos/seed/wan2.7-image/480/360`,
   "wan2.7-image-pro": `https://picsum.photos/seed/wan2.7-image-pro/480/360`,
+  "qwen-image-3.0-pro": `https://picsum.photos/seed/qwen-image-3.0-pro/480/360`,
+  "z-image-turbo": `https://picsum.photos/seed/z-image-turbo/480/360`,
   "wan/2-6-video-to-video": `https://picsum.photos/seed/builtin-video-frame-to-video/480/360`,
   "kling-2.6/motion-control": `https://picsum.photos/seed/builtin-video-motion-sync/480/360`,
   "kling-3.0/motion-control": `https://picsum.photos/seed/builtin-character-motion/480/360`,

@@ -27,10 +27,31 @@ type CostRow = {
   unit: string;
   tierRaw: string | null;
   listCostYuan: number;
+  inputListCostYuan?: number | null;
+  outputListCostYuan?: number | null;
+  officialSampleYuan?: number;
   discountRate: number;
   netCostYuan: number;
   note: string | null;
   active: boolean;
+  mediaKind: string | null;
+  mediaKindLabel: string | null;
+  displayName: string | null;
+  marginM: number;
+  creditsPerUnit: number;
+  inputCreditsPerKToken?: number | null;
+  outputCreditsPerKToken?: number | null;
+  samplePlatformCredits?: number;
+  samplePlatformYuan?: number;
+  listPriceYuan: number;
+  marginRate: number;
+  marginOk: boolean;
+};
+
+type RegistryGap = {
+  canonicalModelKey: string;
+  displayName: string;
+  mediaKind: string;
 };
 
 const EMPTY = {
@@ -65,6 +86,12 @@ export function ModelCostClient() {
   const base = useBookMallBaseUrl();
   const [profiles, setProfiles] = useState<CostRow[]>([]);
   const [catalogKeys, setCatalogKeys] = useState<{ key: string; name: string }[]>([]);
+  const [registryMissingCost, setRegistryMissingCost] = useState<RegistryGap[]>([]);
+  const [pricingConfig, setPricingConfig] = useState<{
+    creditAnchorYuan: number;
+    defaultMarginM: number;
+    videoMarginM: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -78,19 +105,24 @@ export function ModelCostClient() {
   const [filterVendor, setFilterVendor] = useState("");
   const [filterModel, setFilterModel] = useState("");
   const [filterChannel, setFilterChannel] = useState("");
+  const [filterMediaKind, setFilterMediaKind] = useState("");
   const [filterActive, setFilterActive] = useState<"all" | "active" | "inactive">("all");
 
   const reload = useCallback(async () => {
     if (!base) return;
     setLoading(true);
     setError(null);
-    const r = await financeApiFetch<{ profiles: CostRow[]; catalogKeys: { key: string; name: string }[] }>(
-      base,
-      "/api/finance/admin/model-cost",
-    );
+    const r = await financeApiFetch<{
+      profiles: CostRow[];
+      catalogKeys: { key: string; name: string }[];
+      registryMissingCost: RegistryGap[];
+      pricingConfig: { creditAnchorYuan: number; defaultMarginM: number; videoMarginM: number };
+    }>(base, "/api/finance/admin/model-cost");
     if (r.ok) {
       setProfiles(r.data.profiles);
       setCatalogKeys(r.data.catalogKeys);
+      setRegistryMissingCost(r.data.registryMissingCost ?? []);
+      setPricingConfig(r.data.pricingConfig ?? null);
     } else {
       setError(r.error);
     }
@@ -106,18 +138,39 @@ export function ModelCostClient() {
     [profiles],
   );
 
+  const mediaKindOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(profiles.map((p) => p.mediaKindLabel).filter(Boolean)),
+      ).sort() as string[],
+    [profiles],
+  );
+
   const filteredProfiles = useMemo(() => {
     const v = filterVendor.trim().toLowerCase();
     const m = filterModel.trim().toLowerCase();
+    const mk = filterMediaKind.trim();
     return profiles.filter((p) => {
       if (v && p.vendor.toLowerCase() !== v) return false;
       if (m && !p.canonicalModelKey.toLowerCase().includes(m)) return false;
+      if (mk && p.mediaKindLabel !== mk) return false;
       if (filterChannel && p.channel !== filterChannel) return false;
       if (filterActive === "active" && !p.active) return false;
       if (filterActive === "inactive" && p.active) return false;
       return true;
     });
-  }, [profiles, filterVendor, filterModel, filterChannel, filterActive]);
+  }, [profiles, filterVendor, filterModel, filterChannel, filterMediaKind, filterActive]);
+
+  const mediaGroups = useMemo(() => {
+    const map = new Map<string, CostRow[]>();
+    for (const row of filteredProfiles) {
+      const key = row.mediaKindLabel ?? row.unit ?? "其它";
+      const list = map.get(key) ?? [];
+      list.push(row);
+      map.set(key, list);
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b, "zh"));
+  }, [filteredProfiles]);
 
   const netPreview = useMemo(
     () => draft.listCostYuan * (1 - Math.min(Math.max(draft.discountRate, 0), 1)),
@@ -230,9 +283,27 @@ export function ModelCostClient() {
       <header className="mb-4">
         <h1 className="text-lg font-medium text-[#262626]">模型成本与渠道折扣</h1>
         <p className="mt-1 text-sm text-[#8c8c8c]">
-          仅财务管理员可见。维护各模型在不同渠道下的挂牌成本与折扣，供积分报价与平台模型自动上架引用。
+          维护各模型在不同渠道下的挂牌成本与折扣。右侧预览按当前「积分报价」全局参数换算积分/单位与毛利护栏。
+          {pricingConfig
+            ? ` 锚定 ¥${pricingConfig.creditAnchorYuan}/积分 · 默认 M=${pricingConfig.defaultMarginM} · 视频 M=${pricingConfig.videoMarginM}。`
+            : null}
         </p>
       </header>
+
+      {registryMissingCost.length > 0 ? (
+        <div className="mb-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-medium">
+            平台注册表中有 {registryMissingCost.length} 个模型尚未维护任何成本档（平台模型页会显示 DRAFT）：
+          </p>
+          <p className="mt-1 text-xs text-amber-800">
+            {registryMissingCost
+              .slice(0, 12)
+              .map((g) => g.canonicalModelKey)
+              .join("、")}
+            {registryMissingCost.length > 12 ? " …" : ""}
+          </p>
+        </div>
+      ) : null}
 
       {msg ? <p className="mb-3 text-sm text-[#1890ff]">{msg}</p> : null}
 
@@ -240,6 +311,21 @@ export function ModelCostClient() {
         <div className="min-w-0 space-y-3">
           <section className="rounded border border-[#e8e8e8] bg-white p-3">
             <div className="flex flex-wrap items-end gap-3">
+              <label className="text-sm">
+                <span className="text-[#8c8c8c]">类别</span>
+                <select
+                  className={`${inputCls} mt-1 min-w-[120px]`}
+                  value={filterMediaKind}
+                  onChange={(e) => setFilterMediaKind(e.target.value)}
+                >
+                  <option value="">全部</option>
+                  {mediaKindOptions.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="text-sm">
                 <span className="text-[#8c8c8c]">厂商</span>
                 <select
@@ -298,6 +384,7 @@ export function ModelCostClient() {
                   setFilterVendor("");
                   setFilterModel("");
                   setFilterChannel("");
+                  setFilterMediaKind("");
                   setFilterActive("all");
                 }}
               >
@@ -316,59 +403,88 @@ export function ModelCostClient() {
             </p>
           </section>
 
-          <section className="overflow-x-auto rounded border border-[#e8e8e8] bg-white">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10 bg-[#fafafa] text-left text-xs text-[#8c8c8c]">
-                <tr>
-                  <th className="px-3 py-2">模型</th>
-                  <th className="px-3 py-2">厂商/渠道</th>
-                  <th className="px-3 py-2">单位</th>
-                  <th className="px-3 py-2 text-right">挂牌</th>
-                  <th className="px-3 py-2 text-right">折扣</th>
-                  <th className="px-3 py-2 text-right">净成本</th>
-                  <th className="px-3 py-2">状态</th>
-                  <th className="px-3 py-2 text-right">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProfiles.map((p) => (
-                  <tr
-                    key={p.id}
-                    className={`border-t hover:bg-[#fafafa] ${editingId === p.id ? "bg-[#e6f7ff]" : ""}`}
-                  >
-                    <td className="px-3 py-2 font-medium">
-                      {p.canonicalModelKey}
-                      {p.tierRaw ? <span className="ml-1 text-xs text-[#8c8c8c]">{p.tierRaw}</span> : null}
-                    </td>
-                    <td className="px-3 py-2">
-                      {p.vendor}{" "}
-                      <span className="rounded bg-[#f0f0f0] px-1 text-xs">{CHANNEL_LABEL[p.channel] ?? p.channel}</span>
-                    </td>
-                    <td className="px-3 py-2">{UNIT_LABEL[p.unit] ?? p.unit}</td>
-                    <td className="px-3 py-2 text-right">¥{p.listCostYuan.toFixed(4)}</td>
-                    <td className="px-3 py-2 text-right">{(p.discountRate * 100).toFixed(0)}%</td>
-                    <td className="px-3 py-2 text-right font-medium">¥{p.netCostYuan.toFixed(4)}</td>
-                    <td className="px-3 py-2">{p.active ? "生效" : "停用"}</td>
-                    <td className="px-3 py-2 text-right">
-                      <button type="button" className="text-[#1890ff] hover:underline" onClick={() => startEdit(p)}>
-                        编辑
-                      </button>
-                      <button type="button" className="ml-2 text-red-600 hover:underline" onClick={() => setDeleteId(p.id)}>
-                        删除
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {filteredProfiles.length === 0 ? (
+          {mediaGroups.map(([groupLabel, list]) => (
+            <section key={groupLabel} className="overflow-x-auto rounded border border-[#e8e8e8] bg-white">
+              <header className="border-b bg-[#fafafa] px-3 py-2 text-sm font-medium">{groupLabel}</header>
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10 bg-[#fafafa] text-left text-xs text-[#8c8c8c]">
                   <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-[#8c8c8c]">
-                      无匹配成本档
-                    </td>
+                    <th className="px-3 py-2">模型</th>
+                    <th className="px-3 py-2">厂商/渠道</th>
+                    <th className="px-3 py-2">单位</th>
+                    <th className="px-3 py-2 text-right">官方价</th>
+                    <th className="px-3 py-2 text-right">官方应扣</th>
+                    <th className="px-3 py-2 text-right">平台积分</th>
+                    <th className="px-3 py-2 text-right">平台换算价</th>
+                    <th className="px-3 py-2 text-right">样例扣积分</th>
+                    <th className="px-3 py-2 text-right">样例扣费</th>
+                    <th className="px-3 py-2 text-right">折扣</th>
+                    <th className="px-3 py-2 text-right">净成本</th>
+                    <th className="px-3 py-2 text-right">毛利</th>
+                    <th className="px-3 py-2">状态</th>
+                    <th className="px-3 py-2 text-right">操作</th>
                   </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </section>
+                </thead>
+                <tbody>
+                  {list.map((p) => (
+                    <tr
+                      key={p.id}
+                      className={`border-t hover:bg-[#fafafa] ${editingId === p.id ? "bg-[#e6f7ff]" : ""}`}
+                    >
+                      <td className="px-3 py-2 font-medium">
+                        {p.canonicalModelKey}
+                        {p.displayName ? (
+                          <div className="text-xs font-normal text-[#8c8c8c]">{p.displayName}</div>
+                        ) : null}
+                        {p.tierRaw ? <span className="ml-1 text-xs text-[#8c8c8c]">{p.tierRaw}</span> : null}
+                      </td>
+                      <td className="px-3 py-2">
+                        {p.vendor}{" "}
+                        <span className="rounded bg-[#f0f0f0] px-1 text-xs">{CHANNEL_LABEL[p.channel] ?? p.channel}</span>
+                      </td>
+                      <td className="px-3 py-2">{UNIT_LABEL[p.unit] ?? p.unit}</td>
+                      <td className="px-3 py-2 text-right">
+                        {p.inputListCostYuan != null && p.outputListCostYuan != null
+                          ? `in ${p.inputListCostYuan.toFixed(4)} / out ${p.outputListCostYuan.toFixed(4)}`
+                          : `¥${p.listCostYuan.toFixed(4)}`}
+                      </td>
+                      <td className="px-3 py-2 text-right">¥{(p.officialSampleYuan ?? p.listCostYuan).toFixed(4)}</td>
+                      <td className="px-3 py-2 text-right font-medium text-[#1890ff]">
+                        {p.inputCreditsPerKToken != null
+                          ? `${p.inputCreditsPerKToken}/${p.outputCreditsPerKToken ?? "-"}`
+                          : p.creditsPerUnit}
+                      </td>
+                      <td className="px-3 py-2 text-right">¥{p.listPriceYuan.toFixed(4)}</td>
+                      <td className="px-3 py-2 text-right">{p.samplePlatformCredits ?? p.creditsPerUnit}</td>
+                      <td className="px-3 py-2 text-right">¥{(p.samplePlatformYuan ?? 0).toFixed(2)}</td>
+                      <td className="px-3 py-2 text-right">{(p.discountRate * 100).toFixed(0)}%</td>
+                      <td className="px-3 py-2 text-right font-medium">¥{p.netCostYuan.toFixed(4)}</td>
+                      <td className="px-3 py-2 text-right">
+                        <span className={p.marginOk ? "text-green-700" : "font-medium text-red-600"}>
+                          {(p.marginRate * 100).toFixed(1)}%
+                        </span>
+                        <div className="text-xs text-[#8c8c8c]">M={p.marginM}</div>
+                      </td>
+                      <td className="px-3 py-2">{p.active ? "生效" : "停用"}</td>
+                      <td className="px-3 py-2 text-right">
+                        <button type="button" className="text-[#1890ff] hover:underline" onClick={() => startEdit(p)}>
+                          编辑
+                        </button>
+                        <button type="button" className="ml-2 text-red-600 hover:underline" onClick={() => setDeleteId(p.id)}>
+                          删除
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          ))}
+          {filteredProfiles.length === 0 ? (
+            <div className="rounded border border-[#e8e8e8] bg-white px-3 py-8 text-center text-[#8c8c8c]">
+              无匹配成本档
+            </div>
+          ) : null}
         </div>
 
         <section className="rounded border border-[#e8e8e8] bg-white p-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:shadow-sm">

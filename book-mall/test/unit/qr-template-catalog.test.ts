@@ -152,8 +152,11 @@ describe("qr-template-catalog", () => {
       kind: "motion-sync",
       scope: "all",
     });
-    expect(out.every(isQrMotionSyncGalleryTemplate)).toBe(true);
-    expect(out).toHaveLength(2);
+    expect(out.map((t) => t.id)).toEqual([
+      "qr-motion-sync-gallery-01",
+      "qr-motion-sync-gallery-02",
+      "builtin-video-motion-sync",
+    ]);
   });
 
   it("motion-sync gallery includes platform catalog templates", () => {
@@ -233,16 +236,40 @@ describe("qr-template-catalog", () => {
     ]);
   });
 
-  it("video lip-sync kind excludes gallery builtins", () => {
+  it("video lip-sync kind includes official kind thumb", () => {
     const items = [
       tpl("qr-video-gallery-01", "text-to-video", "video"),
       tpl("qr-motion-sync-gallery-01", "motion-sync", "video"),
+      tpl("builtin-video-lip-sync-thumb", "lip-sync", "video"),
     ];
     const out = filterTemplatesForGallery(items, {
       category: "video",
       kind: "lip-sync",
       scope: "all",
     });
-    expect(out).toHaveLength(0);
+    expect(out.map((t) => t.id)).toEqual(["builtin-video-lip-sync-thumb"]);
+  });
+
+  it("selected image kind includes official kind thumb so admin prompt edits are visible", () => {
+    const items = [
+      tpl("qr-image-gallery-01", "create-image"),
+      tpl("builtin-image-multi-view-thumb", "multi-view"),
+      tpl("builtin-image-create-image-thumb", "create-image"),
+    ];
+    const out = filterTemplatesForGallery(items, {
+      category: "image",
+      kind: "multi-view",
+      scope: "all",
+    });
+    expect(out.map((t) => t.id)).toEqual(["builtin-image-multi-view-thumb"]);
+  });
+
+  it("image category browse still hides kind thumbs until a kind is selected", () => {
+    const items = [
+      tpl("qr-image-gallery-01", "create-image"),
+      tpl("builtin-image-multi-view-thumb", "multi-view"),
+    ];
+    const out = filterTemplatesForGallery(items, { category: "image", scope: "all" });
+    expect(out.map((t) => t.id)).toEqual(["qr-image-gallery-01"]);
   });
 });

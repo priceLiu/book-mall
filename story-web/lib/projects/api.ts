@@ -33,6 +33,8 @@ export type ProjectListItemDto = {
   storyOutline: string;
   coverImageUrl: string;
   styleFallbackUrl: string;
+  previewVideoUrl?: string;
+  isMine?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -127,6 +129,30 @@ export async function apiListProjects(base: string): Promise<ProjectListItemDto[
     { method: "GET" },
   );
   return data.projects;
+}
+
+/** 未登录门户首页 · 公开作品列表（分页） */
+export async function apiListDiscoverProjects(
+  base: string,
+  opts?: { offset?: number; limit?: number },
+): Promise<{
+  projects: ProjectListItemDto[];
+  total: number;
+  hasMore: boolean;
+  nextOffset: number | null;
+}> {
+  const offset = Math.max(0, opts?.offset ?? 0);
+  const limit = Math.min(24, Math.max(1, opts?.limit ?? 12));
+  const q = new URLSearchParams({
+    offset: String(offset),
+    limit: String(limit),
+  });
+  return callApi<{
+    projects: ProjectListItemDto[];
+    total: number;
+    hasMore: boolean;
+    nextOffset: number | null;
+  }>(base, `/api/story/projects/discover?${q}`, { method: "GET" });
 }
 
 export async function apiCreateProject(

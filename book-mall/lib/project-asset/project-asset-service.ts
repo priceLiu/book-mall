@@ -4,6 +4,7 @@ import type {
   ProjectAssetKind,
 } from "@prisma/client";
 
+import { cascadeDeletePinsBySource } from "@/lib/ai-space/ai-space-pin-service";
 import { prisma } from "@/lib/prisma";
 import { getActiveTenantContext } from "@/lib/tenant/context";
 import { assertTenantPermission } from "@/lib/tenant/permission";
@@ -162,11 +163,9 @@ function buildProjectAssetWhere(
     base.sourceProjectId = projectId;
   } else if (filter.scope === "library") {
     base.sourceProjectId = null;
-  } else if (projectId) {
-    andClauses.push({
-      OR: [{ sourceProjectId: projectId }, { sourceProjectId: null }],
-    });
   }
+  // scope=all（默认）：不按 sourceProjectId 过滤，本人资产在所有画布侧栏均可见；
+  // 「仅本项目」请显式传 scope=project。
 
   const q = filter.search?.trim();
   if (q) {
@@ -417,6 +416,8 @@ export async function patchProjectAsset(
     visibility?: AssetVisibility;
     locked?: boolean;
     payload?: Record<string, unknown>;
+    /** 仅允许设为 null：将「本项目」资产提升为「我的空间可用」 */
+    sourceProjectId?: null;
   },
 ): Promise<ProjectAssetRecord> {
   const ctx = await resolveProjectAssetTenantContext(userId);
@@ -437,7 +438,11 @@ export async function patchProjectAsset(
   }
 
   const isOwner = existing.ownerUserId === ctx.actorUserId;
-  if (patch.visibility !== undefined || patch.locked !== undefined) {
+  if (
+    patch.visibility !== undefined ||
+    patch.locked !== undefined ||
+    patch.sourceProjectId !== undefined
+  ) {
     if (!isOwner && existing.visibility === "TEAM_PUBLIC") {
       assertTenantPermission(ctx, "asset:manage_public");
     } else if (!isOwner) {
@@ -451,6 +456,19 @@ export async function patchProjectAsset(
     throw new ProjectAssetError("INVALID_INPUT", "个人空间无法设为团队共享");
   }
 
+  if (patch.sourceProjectId !== undefined && patch.sourceProjectId !== null) {
+    throw new ProjectAssetError(
+      "INVALID_INPUT",
+      "仅支持将资产提升为「我的空间可用」",
+    );
+  }
+  if (
+    patch.sourceProjectId === null &&
+    existing.sourceProjectId == null
+  ) {
+    throw new ProjectAssetError("INVALID_INPUT", "资产已是全画布可用");
+  }
+
   const row = await prisma.projectAsset.update({
     where: { id: assetId },
     data: {
@@ -458,6 +476,8 @@ export async function patchProjectAsset(
       description: patch.description?.trim(),
       visibility: patch.visibility,
       locked: patch.locked,
+      sourceProjectId:
+        patch.sourceProjectId === null ? null : undefined,
       payload: patch.payload
         ? (patch.payload as Prisma.InputJsonValue)
         : undefined,
@@ -507,6 +527,9 @@ export async function deleteProjectAsset(
     where: { id: assetId },
     data: { deletedAt: new Date() },
   });
+
+  // AI 空间侧清理：Pin 删除，画布块保留并渲染「素材已删除」占位
+  await cascadeDeletePinsBySource("project_asset", assetId);
 
   return { ossUrls };
 }

@@ -17,10 +17,12 @@ import {
 } from "./story-prompts";
 import {
   STORY_PRO2_CHARACTER_PROMPT,
+  STORY_PRO2_HUB_LLM_SYSTEM,
   STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
   STORY_PRO2_SCENE_PROMPT,
   STORY_PRO2_STORYBOARD_PROMPT,
 } from "./story-pro2-theme-outline-prompt";
+import { PRO2_SCRIPT_FORMAT_JSON_ONLY_V13 } from "./pro2-project-format";
 import {
   STORY_PRO_CHARACTER_PROMPT,
   STORY_PRO_OUTLINE_USER_PROMPT,
@@ -482,8 +484,8 @@ const STORY_PRO2_STARTER_ORIGIN = { x: 120, y: 160 };
 
 const STORY_PRO2_PIPELINE: CanvasGraph = {
   schemaVersion: CANVAS_SCHEMA_VERSION_PRO2,
-  meta: { edition: "pro2" },
-  viewport: { x: 0, y: 0, zoom: 0.85 },
+  meta: { edition: "pro2", pro2ScriptFormat: PRO2_SCRIPT_FORMAT_JSON_ONLY_V13 },
+  viewport: { x: 0, y: 0, zoom: 1 },
   nodes: [
     {
       id: "sp2-starter",
@@ -517,7 +519,11 @@ const STORY_PRO2_PIPELINE: CanvasGraph = {
  */
 const STORY_PRO2_SCRIPT_STUDIO: CanvasGraph = {
   schemaVersion: CANVAS_SCHEMA_VERSION_PRO2,
-  meta: { edition: "pro2" },
+  meta: {
+    edition: "pro2",
+    pro2ScriptFormat: PRO2_SCRIPT_FORMAT_JSON_ONLY_V13,
+    scriptStudioFormat: "json-v1",
+  },
   viewport: { x: 0, y: 0, zoom: 0.85 },
   nodes: [
     {
@@ -536,6 +542,7 @@ const STORY_PRO2_SCRIPT_STUDIO: CanvasGraph = {
         sceneMd: "",
         storyboardMd: "",
         scriptStudioMode: true,
+        scriptStudioFormat: "json-v1",
         scriptStudioInputMode: "generate",
         scriptStudioThemeInput: "",
         scriptStudioSystem: "original",
@@ -544,7 +551,7 @@ const STORY_PRO2_SCRIPT_STUDIO: CanvasGraph = {
         providerId: "",
         modelKey: "",
         params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
-        outlineSystemPrompt: STORY_PRO_HUB_LLM_SYSTEM,
+        outlineSystemPrompt: STORY_PRO2_HUB_LLM_SYSTEM,
         promptOutline: STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
         promptCharacter: STORY_PRO_CHARACTER_PROMPT,
         promptScene: STORY_PRO2_SCENE_PROMPT,
@@ -562,6 +569,7 @@ const STORY_PRO2_PRODUCTION: CanvasGraph = {
   schemaVersion: CANVAS_SCHEMA_VERSION_PRO2,
   meta: {
     edition: "pro2",
+    pro2ScriptFormat: PRO2_SCRIPT_FORMAT_JSON_ONLY_V13,
     productionCanvas: true,
     requireScriptLink: true,
   },
@@ -658,7 +666,7 @@ export const BUILTIN_CANVAS_TEMPLATES: BuiltinCanvasTemplate[] = [
     category: "builtin",
     name: "影视专业版 2.0",
     description:
-      "LibTV 架构：文本节点 + 底部输入坞 + 侧栏 + 号连接下游；业务规则与 1.0 对齐。",
+      "文本节点 + 底部输入坞 + 侧栏连接下游；业务规则与 1.0 对齐。",
     canvas: STORY_PRO2_PIPELINE,
   },
   {
@@ -666,7 +674,7 @@ export const BUILTIN_CANVAS_TEMPLATES: BuiltinCanvasTemplate[] = [
     category: "builtin",
     name: "剧本创作（工业化）",
     description:
-      "小白式主题生成 / 上传原稿翻新 · 10 集/批 · 冻结档案 · 脚本生成器产出分镜脚本。",
+      "小白式主题生成 / 上传原稿翻新 · 10 集/批 · 冻结档案 · 故事脚本生成产出分镜脚本。",
     canvas: STORY_PRO2_SCRIPT_STUDIO,
   },
   {

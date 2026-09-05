@@ -1,14 +1,14 @@
 /** 生成记录面板 · 厂商 / 模型展示名（勿暴露 Gateway modelKey 裸值） */
 
 const PROVIDER_LABELS: Record<string, string> = {
-  VOLCENGINE: "火山方舟",
-  KIE: "KIE",
-  BAILIAN: "百炼",
-  BAILIAN_R2V: "百炼",
-  HUNYUAN: "混元",
-  HUNYUAN_3D: "混元",
-  DASHSCOPE: "通义",
-  DEEPSEEK: "DeepSeek",
+  VOLCENGINE: "平台",
+  KIE: "第三方",
+  BAILIAN: "平台",
+  BAILIAN_R2V: "平台",
+  HUNYUAN: "平台",
+  HUNYUAN_3D: "平台",
+  DASHSCOPE: "平台",
+  DEEPSEEK: "平台",
 };
 
 const SBV1_VOLCENGINE_VARIANT_DISPLAY: Record<string, string> = {

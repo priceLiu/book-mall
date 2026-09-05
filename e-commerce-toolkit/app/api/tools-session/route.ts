@@ -1,5 +1,8 @@
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
+
+import { fetchEcomToolsSessionWithIntrospect } from "@/lib/ecom-tools-introspect";
+import { readJwtExpSec, isToolsJwtExpired } from "@/lib/tools-jwt-exp";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 import {
   isToolsFederatedLogoutRequest,
@@ -8,51 +11,53 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function readJwtExp(token: string): number | null {
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-  try {
-    let b = parts[1]!.replace(/-/g, "+").replace(/_/g, "/");
-    while (b.length % 4) b += "=";
-    const payload = JSON.parse(Buffer.from(b, "base64").toString("utf8")) as {
-      exp?: number;
-    };
-    return typeof payload.exp === "number" ? payload.exp : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function GET(request: NextRequest) {
   if (isToolsFederatedLogoutRequest(request)) {
     return respondToolsFederatedLogout(request);
   }
 
   const token = cookies().get("tools_token")?.value?.trim();
-  const origin = getMainSiteOrigin();
-  const tokenExpiresAt = token ? readJwtExp(token) : null;
-  if (!origin || !token) {
+  const tokenExpiresAt = token ? readJwtExpSec(token) : null;
+  const lite = request.nextUrl.searchParams.get("lite") === "1";
+
+  if (!token) {
     return NextResponse.json({
-      hasCookie: Boolean(token),
+      hasCookie: false,
       active: false,
       introspect: null,
       tokenExpiresAt,
     });
   }
-  const res = await fetch(`${origin}/api/sso/tools/introspect`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
-  const introspect = await res.json().catch(() => null);
-  const active = res.ok && Boolean((introspect as { active?: boolean })?.active);
+
+  // 心跳 / 路由切换：只读 JWT 过期，避免每次菜单点击都等 introspect（常 10s+）
+  if (lite) {
+    return NextResponse.json({
+      hasCookie: true,
+      active: !isToolsJwtExpired(token),
+      introspect: null,
+      tokenExpiresAt,
+    });
+  }
+
+  if (!getMainSiteOrigin()) {
+    return NextResponse.json({
+      hasCookie: true,
+      active: !isToolsJwtExpired(token),
+      introspect: null,
+      tokenExpiresAt,
+    });
+  }
+
+  const session = await fetchEcomToolsSessionWithIntrospect(token);
   const out = NextResponse.json({
-    hasCookie: true,
-    active,
-    introspect,
-    introspectStatus: res.status,
-    tokenExpiresAt,
+    hasCookie: session.hasCookie,
+    active: session.active,
+    introspect: session.introspect,
+    introspectStatus: session.introspectStatus,
+    tokenExpiresAt: session.tokenExpiresAt ?? tokenExpiresAt,
   });
-  if (!active) {
+
+  if (!session.active) {
     out.cookies.set("tools_token", "", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -61,5 +66,6 @@ export async function GET(request: NextRequest) {
       maxAge: 0,
     });
   }
+
   return out;
 }

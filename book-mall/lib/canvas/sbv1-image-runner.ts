@@ -2,14 +2,37 @@
  * 分镜视频 1.0 · sbv1-image runner（文生图 / 图生图）
  */
 import { CanvasProjectError } from "./canvas-project-service";
+import { canvasImageEditRequiresRefs } from "./canvas-image-edit-models";
 import {
   runImageEngineNode,
   type RunEngineNodeArgs,
   type RunEngineNodeResult,
 } from "./canvas-engine-runner";
+import { finalizeStoryPro2SceneImagePrompt } from "./story-pro2-scene-image-prompt";
 
 function httpsImageUrls(urls: string[]): string[] {
   return urls.filter((u) => typeof u === "string" && /^https?:\/\//.test(u.trim()));
+}
+
+/** 组装 sbv1 / Pro2 图片节点参考图：显式 dock/上游 refs 优先，勿把节点旧输出与 refs 重复合并。 */
+export function resolveSbv1ImageReferenceUrls(input: {
+  isHdGridSplit: boolean;
+  pendingGridCrop: boolean;
+  precroppedUrl: string;
+  selfUrl: string;
+  upstreamUrls: string[];
+}): string[] {
+  if (input.pendingGridCrop) return [];
+  if (input.precroppedUrl) return [input.precroppedUrl];
+  if (input.isHdGridSplit) return input.upstreamUrls.slice(0, 8);
+
+  const urls =
+    input.upstreamUrls.length > 0
+      ? input.upstreamUrls
+      : input.selfUrl
+        ? [input.selfUrl]
+        : [];
+  return Array.from(new Set(urls.filter(Boolean))).slice(0, 8);
 }
 
 type Sbv1ImageQuality = "low" | "standard" | "high";
@@ -97,28 +120,57 @@ export async function runSbv1ImageNode(
     );
   }
 
+  const isHdGridSplit = Boolean(data.pro2HdFromGridSplit);
+  const pendingGridCrop = Boolean(
+    isHdGridSplit &&
+      data.gridSplitCrop &&
+      typeof data.gridSplitCrop === "object" &&
+      data.gridSplitFrameCrop !== true,
+  );
   const selfUrl =
-    typeof data.ossUrl === "string" && /^https?:\/\//.test(data.ossUrl)
+    !isHdGridSplit &&
+    typeof data.ossUrl === "string" &&
+    /^https?:\/\//.test(data.ossUrl)
       ? data.ossUrl
       : "";
   const upstreamUrls = httpsImageUrls(args.node.imageInputs ?? []);
-  // 风格仅拼进 prompt（stylePrompt）；参考图只认前端 imageInputs / 节点自身 ossUrl，避免风格缩略图多传一张
-  const imageUrls = Array.from(new Set([selfUrl, ...upstreamUrls].filter(Boolean))).slice(
-    0,
-    8,
-  );
+  const precroppedUrl =
+    isHdGridSplit &&
+    data.gridSplitFrameCrop === true &&
+    typeof data.ossUrl === "string" &&
+    /^https?:\/\//.test(data.ossUrl)
+      ? data.ossUrl
+      : "";
+  const imageUrls = resolveSbv1ImageReferenceUrls({
+    isHdGridSplit,
+    pendingGridCrop,
+    precroppedUrl,
+    selfUrl,
+    upstreamUrls,
+  });
 
   const hasRefs = imageUrls.length > 0;
   const stylePrompt = styleRef?.prompt?.trim() ?? "";
   const promptParts = [stylePrompt, promptRaw, ...upstreamText].filter(Boolean);
-  const prompt =
+  let prompt =
     promptParts.join("\n\n") ||
     (hasRefs ? "根据参考图生成或编辑画面" : "");
+
+  if (String(data.pro2MediaRole ?? "") === "scene") {
+    prompt = finalizeStoryPro2SceneImagePrompt(prompt);
+  }
 
   if (!prompt.trim()) {
     throw new CanvasProjectError(
       "INVALID_INPUT",
       "请填写提示词，或上传/连接参考图",
+    );
+  }
+
+  if (canvasImageEditRequiresRefs(modelKey, { imageMode: String(data.imageMode ?? "") }) && !hasRefs) {
+    throw new CanvasProjectError(
+      "INVALID_INPUT",
+      "图像编辑模型须至少一张参考图（连接上游图片或上传）",
     );
   }
 

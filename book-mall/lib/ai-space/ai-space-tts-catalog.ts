@@ -1,0 +1,77 @@
+/**
+ * 我的 AI 空间 · 音频库 TTS 可选模型与音色
+ *
+ * 模型真源仍是 Gateway 注册表（ModelCatalog + GatewayModelRoute）；
+ * 本文件只描述「界面可选项 + 默认音色」，不承担路由职责。
+ */
+
+import {
+  MINIMAX_DEFAULT_SPEECH_MODEL_KEY,
+  MINIMAX_SPEECH_MODELS,
+  isMinimaxSpeechModelKey,
+} from "@/lib/gateway/minimax-speech-models";
+
+import { QWEN3_TTS_FLASH_VOICES } from "./qwen3-tts-voice-catalog";
+
+export type AiSpaceTtsModelDef = {
+  modelKey: string;
+  label: string;
+  description: string;
+  voices: Array<{ id: string; label: string }>;
+};
+
+export const AI_SPACE_TTS_MODELS: AiSpaceTtsModelDef[] = [
+  {
+    modelKey: "cosyvoice-v3-flash",
+    label: "CosyVoice v3 Flash",
+    description: "百炼非实时合成，音色丰富、速度快，适合口播台词",
+    voices: [
+      { id: "longanyang", label: "龙安洋 · 沉稳男声" },
+      { id: "longxiaochun_v2", label: "龙小淳 · 亲和女声" },
+      { id: "longanrou", label: "龙安柔 · 温柔女声" },
+      { id: "longanxuan", label: "龙安宣 · 播报男声" },
+    ],
+  },
+  {
+    modelKey: "qwen3-tts",
+    label: "Qwen3 TTS",
+    description: "通义千问语音合成，49 种系统音色（含方言），中英自适应",
+    voices: QWEN3_TTS_FLASH_VOICES.map((v) => ({ id: v.id, label: v.label })),
+  },
+];
+
+export const AI_SPACE_TTS_DEFAULT_MODEL_KEY = MINIMAX_DEFAULT_SPEECH_MODEL_KEY;
+
+export const AI_SPACE_TTS_MINIMAX_MODELS = MINIMAX_SPEECH_MODELS.map((m) => ({
+  modelKey: m.modelKey,
+  label: m.label,
+  description: m.subtitle,
+}));
+
+export function getAiSpaceTtsModelDef(modelKey: string): AiSpaceTtsModelDef {
+  const key = modelKey.trim();
+  if (isMinimaxSpeechModelKey(key)) {
+    const mm = MINIMAX_SPEECH_MODELS.find((m) => m.modelKey === key);
+    return {
+      modelKey: key,
+      label: mm?.label ?? key,
+      description: mm?.subtitle ?? "MiniMax 语音合成",
+      voices: [],
+    };
+  }
+  return (
+    AI_SPACE_TTS_MODELS.find((m) => m.modelKey === key) ??
+    AI_SPACE_TTS_MODELS[0]
+  );
+}
+
+export function isAiSpaceTtsModelKey(modelKey: unknown): boolean {
+  return (
+    typeof modelKey === "string" &&
+    (isMinimaxSpeechModelKey(modelKey.trim()) ||
+      AI_SPACE_TTS_MODELS.some((m) => m.modelKey === modelKey.trim()))
+  );
+}
+
+/** 音频库 TTS 单次台词上限（字符） */
+export const AI_SPACE_TTS_TEXT_MAX = 2000;

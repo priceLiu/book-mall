@@ -1,0 +1,37 @@
+---
+description: 全站后台生成 Dock（超时缩小右下角 + 进度）；生图/生视频长任务必接
+globs: canvas-web/**/*,e-commerce-toolkit/**/*,story-web/**/*,tool-web/**/*,quick-replica-web/**/*
+alwaysApply: false
+---
+
+# 后台生成 Dock（全站强制）
+
+权威文档：**`docs/generation-background-dock.md`**  
+策略常量：**`book-mall/lib/generation/background-generation-dock-policy.ts`**
+
+## 必须
+
+凡 **预计可超过 3 分钟** 的 AI 生成（生图 batch、整图成片、单镜视频、Pro2 分镜视频等）：
+
+1. **前台**内联 busy（TaskStatus / 媒体扫光）≤ `BACKGROUND_DOCK_FOREGROUND_MS`（默认 3min）
+2. 超时或用户最小化 → **右下角 Dock**（`BackgroundGenerationDock` light · `CanvasBackgroundVideoPanel` dark）
+3. Dock 展示：**标签 + 已等待 + 进度条**；≥15min 文案 **「持续后台生成中…」**
+4. **pending 可恢复**（`meta.workflow.pending*` / Gateway log）；完成后 **toast 通知** + 写回，**禁止** silent fail
+5. **禁止**超时后仅 `alert` 让用户手动刷新而不继续 poll（除非用户 dismiss）
+6. **完成通知**：`useDialogs().toast({ variant: "success" })`；**禁止** `await alert` 成功提示（见 `ecom-success-toast.mdc`）
+
+## 电商工具箱
+
+- Provider：`e-commerce-toolkit/components/generation/background-generation-provider.tsx`
+- Dock：`e-commerce-toolkit/components/generation/background-generation-dock.tsx`
+- 故事版：`StoryboardStudio` 包裹 Provider；`storyboard-content-panel` 注册整图/单镜视频任务
+
+## Canvas
+
+- 已有：`canvas-background-video-panel.tsx`（dark 变体）
+- 新增长视频入口须登记 `background-video-tasks` API，**不得**新建第二套右下角 UI
+
+## Code Review
+
+- PR 新增长耗时生成但无 Dock / pending 恢复 → **驳回**
+- 右下角浮层样式与 `docs/generation-background-dock.md` §3 不一致 → **驳回**

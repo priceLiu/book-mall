@@ -41,6 +41,8 @@ export function exportScriptPackageDraft(args: {
 
   const payload: Record<string, unknown> = {
     markdown,
+    canonicalJson:
+      hub?.scriptStudioCanonicalJson ?? d.scriptStudioCanonicalJson,
     characterMd,
     sceneMd,
     storyboardMd,

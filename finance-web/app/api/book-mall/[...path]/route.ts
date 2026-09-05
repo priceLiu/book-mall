@@ -20,6 +20,8 @@ async function proxyToBookMall(request: NextRequest, pathSegments: string[]) {
   if (cookie) headers.set("cookie", cookie);
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
+  const toolsToken = request.cookies.get("tools_token")?.value?.trim();
+  if (toolsToken) headers.set("authorization", `Bearer ${toolsToken}`);
 
   let body: BodyInit | undefined;
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -35,10 +37,21 @@ async function proxyToBookMall(request: NextRequest, pathSegments: string[]) {
       body,
       cache: "no-store",
     });
+    const respContentType = r.headers.get("content-type") ?? "application/json";
+    if (respContentType.toLowerCase().includes("text/event-stream") && r.body) {
+      return new NextResponse(r.body, {
+        status: r.status,
+        headers: {
+          "Content-Type": respContentType,
+          "Cache-Control": "no-store",
+          "X-Accel-Buffering": "no",
+        },
+      });
+    }
     return new NextResponse(await r.text(), {
       status: r.status,
       headers: {
-        "Content-Type": r.headers.get("content-type") ?? "application/json",
+        "Content-Type": respContentType,
       },
     });
   } catch (e: unknown) {

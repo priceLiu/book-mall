@@ -8,7 +8,7 @@ export function AppTopbar() {
 
   return (
     <header className="po-topbar">
-      <div className="po-topbar-title">QuickReplica · 快速复制</div>
+      <div className="po-topbar-title">QuickReplica · 快速复刻</div>
       <nav className="po-topbar-links">
         {main ? (
           <a href={`${main}/account`} target="_blank" rel="noreferrer">

@@ -140,3 +140,50 @@ export function invalidateCanvasTaskSyncSnapshotCache(projectId?: string): void 
   if (projectId) snapshotCache.delete(projectId);
   else snapshotCache.clear();
 }
+
+type CanvasTaskSseSendFn = (
+  event: string,
+  data: Record<string, unknown>,
+) => void;
+
+const sseClientsByProject = new Map<string, Set<CanvasTaskSseSendFn>>();
+
+/** 注册 SSE 客户端 send 回调；返回 unregister */
+export function registerCanvasTaskSseClient(
+  projectId: string,
+  send: CanvasTaskSseSendFn,
+): () => void {
+  let set = sseClientsByProject.get(projectId);
+  if (!set) {
+    set = new Set();
+    sseClientsByProject.set(projectId, set);
+  }
+  set.add(send);
+  return () => {
+    set!.delete(send);
+    if (set!.size === 0) sseClientsByProject.delete(projectId);
+  };
+}
+
+/**
+ * 任务终态写库后：invalidate 指纹缓存，并向已连接 SSE 客户端推送 tasks-changed。
+ * JSON task-sync 轮询会在下次 tick 读到新指纹。
+ */
+export async function notifyCanvasTaskSnapshotChanged(
+  projectId: string,
+): Promise<void> {
+  invalidateCanvasTaskSyncSnapshotCache(projectId);
+  const clients = sseClientsByProject.get(projectId);
+  if (!clients || clients.size === 0) return;
+  try {
+    const snap = await getCanvasProjectTaskSyncSnapshot(projectId, {
+      bypassCache: true,
+    });
+    const payload = { projectId, ...snap };
+    for (const send of clients) {
+      send("tasks-changed", payload);
+    }
+  } catch {
+    // 推送失败不影响 poll worker；客户端仍靠 task-sync / run-queue 兜底
+  }
+}

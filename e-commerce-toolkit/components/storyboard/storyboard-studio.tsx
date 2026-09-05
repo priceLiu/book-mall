@@ -1,35 +1,44 @@
 "use client";
 
-import html2canvas from "html2canvas";
 import { useCallback, useEffect, useState } from "react";
 
-import { EcomLoginPrompt } from "@/components/auth/ecom-login-prompt";
-import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { EcomLoginPrompt } from "@/components/auth/ecom-login-prompt";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
+import { BackgroundGenerationProvider } from "@/components/generation";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { EcomVideoPreviewDialog } from "@/components/media/ecom-video-preview-dialog";
+import { FashionAssistantPanel } from "@/components/fashion/fashion-assistant-panel";
 import { StoryboardAssistantPanel } from "@/components/storyboard/storyboard-assistant-panel";
 import { StoryboardContentPanel } from "@/components/storyboard/storyboard-content-panel";
 import { StoryboardProSheetView } from "@/components/storyboard/storyboard-pro-sheet-view";
 import { StoryboardProgressRail } from "@/components/storyboard/storyboard-progress-rail";
-import { StoryboardRefUploader } from "@/components/storyboard/storyboard-ref-uploader";
 import {
   StoryboardSettingsDialog,
   type StoryboardSettingsValue,
 } from "@/components/storyboard/storyboard-settings-dialog";
+import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-link-dialog";
 import { listAssets, type EcomAsset } from "@/lib/ecom-api";
 import {
+  attachStoryboardRefsFromAssets,
   createStoryboardProject,
   fetchStoryboardModels,
   getStoryboardProject,
-  listStoryboardProjects,
+  listStoryboardProjectSummaries,
   removeStoryboardRef,
   updateStoryboardProject,
   uploadStoryboardRef,
 } from "@/lib/ecom-storyboard-api";
+import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
+import {
+  resolveStoryboardVideoFullSheetDurationRange,
+  resolveSheetTotalDurationHintSec,
+} from "@/lib/storyboard-video-params";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
+import { isLegacyStoryboardProject } from "@/lib/fashion-workflow";
+import { asStoryboardDeliverable } from "@/lib/storyboard-deliverable-parse";
 import { inferCollectUploadRole, type StoryboardUploadRole } from "@/lib/storyboard-workflow";
+import { isEcomMainBlankPointerTarget } from "@/lib/ecom-assistant-collapse";
 import type { StoryboardReference } from "@/lib/storyboard-types";
 import type {
   StoryboardGatewayModel,
@@ -37,6 +46,27 @@ import type {
 } from "@/lib/storyboard-types";
 
 const PROJECT_STORAGE_KEY = "ecom-storyboard-active-project";
+
+async function resolveFallbackStoryboardProject(): Promise<{
+  id: string;
+  project?: StoryboardProject;
+}> {
+  const summaries = await listStoryboardProjectSummaries();
+  if (summaries.length > 0) {
+    return { id: summaries[0]!.id };
+  }
+  const created = await createStoryboardProject({
+    title: "电商专业版",
+    meta: {
+      workflow: {
+        proMode: true,
+        proPhase: "product_ref",
+        dimensionStep: 0,
+      },
+    },
+  });
+  return { id: created.id, project: created };
+}
 
 export function StoryboardStudio() {
   const { alert, doubleConfirm } = useDialogs();
@@ -55,9 +85,13 @@ export function StoryboardStudio() {
   );
   const [loading, setLoading] = useState(true);
   const [refBusy, setRefBusy] = useState(false);
+  const [uploadingRole, setUploadingRole] = useState<
+    "character" | "product" | "scene" | "other" | null
+  >(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [assistantStreaming, setAssistantStreaming] = useState(false);
   const [settings, setSettings] = useState<StoryboardSettingsValue>({
-    chatModelKey: "qwen3.5-flash",
+    chatModelKey: ECOM_DEFAULT_CHAT_MODEL_KEY,
     imageModelKey: "wan2.7-image",
     videoModelKey: "doubao-seedance-2.0",
     aspectRatio: "9:16",
@@ -68,6 +102,7 @@ export function StoryboardStudio() {
     videoR2vRatio: "9:16",
     videoSeed: "",
     videoPromptExtend: true,
+    videoGenerateAudio: true,
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [needLogin, setNeedLogin] = useState(false);
@@ -76,23 +111,42 @@ export function StoryboardStudio() {
   const [generateAllImagesToken, setGenerateAllImagesToken] = useState(0);
   const [generateFullVideoToken, setGenerateFullVideoToken] = useState(0);
   const [mergePanelVideosToken, setMergePanelVideosToken] = useState(0);
+  const [assistantWide, setAssistantWide] = useState(false);
+  const [assistantCollapsed, setAssistantCollapsed] = useState(false);
+  const [workflowShareOpen, setWorkflowShareOpen] = useState(false);
 
-  const reload = useCallback(async (id: string) => {
-    const p = await getStoryboardProject(id);
+  const handleMainBlankPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLElement>) => {
+      if (assistantCollapsed || assistantStreaming) return;
+      if (!isEcomMainBlankPointerTarget(e.target)) return;
+      setAssistantCollapsed(true);
+    },
+    [assistantCollapsed, assistantStreaming],
+  );
+
+  const applyProject = useCallback((p: StoryboardProject) => {
     setProject(p);
     if (typeof window !== "undefined") {
-      sessionStorage.setItem(PROJECT_STORAGE_KEY, id);
+      sessionStorage.setItem(PROJECT_STORAGE_KEY, p.id);
     }
-    const d =
+    const videoModelKey =
+      (p.meta?.workflow?.videoModelKey as string | undefined) ??
+      (typeof p.settings?.videoModelKey === "string" ? p.settings.videoModelKey : undefined) ??
+      "doubao-seedance-2.0";
+    const fromSettings =
       typeof p.settings?.durationSec === "number" ? p.settings.durationSec : 15;
-    setDurationSec(Math.max(4, Math.min(15, d)));
+    const fromSheet = resolveSheetTotalDurationHintSec(p.sheet);
+    const durationBase = fromSheet ?? fromSettings;
+    const durationMax = resolveStoryboardVideoFullSheetDurationRange(videoModelKey).max;
+    const clampedDuration = Math.max(4, Math.min(durationMax, durationBase));
+    setDurationSec(clampedDuration);
     if (p.settings?.aspectRatio === "16:9" || p.settings?.aspectRatio === "9:16") {
       setAspectRatio(p.settings.aspectRatio);
       setVideoAspectRatio(p.settings.aspectRatio);
     }
     setSettings((prev) => ({
       ...prev,
-      durationSec: Math.max(4, Math.min(15, d)),
+      durationSec: clampedDuration,
       aspectRatio:
         p.settings?.aspectRatio === "16:9" || p.settings?.aspectRatio === "9:16"
           ? p.settings.aspectRatio
@@ -122,6 +176,10 @@ export function StoryboardStudio() {
         typeof p.settings?.videoPromptExtend === "boolean"
           ? p.settings.videoPromptExtend
           : prev.videoPromptExtend,
+      videoGenerateAudio:
+        typeof p.settings?.videoGenerateAudio === "boolean"
+          ? p.settings.videoGenerateAudio
+          : prev.videoGenerateAudio,
     }));
     if (p.videoOssUrl) {
       setVideoAsset({
@@ -134,24 +192,42 @@ export function StoryboardStudio() {
         thumbnailUrl: null,
         createdAt: p.updatedAt,
       });
+    } else if (p.meta?.deliverableSnapshot?.videoUrl?.trim()) {
+      setVideoAsset({
+        id: p.meta.deliverableSnapshot.renderJobId ?? "",
+        module: "storyboard-micro-drama",
+        kind: "video",
+        title: p.sheet?.overview.title ?? null,
+        prompt: null,
+        ossUrl: p.meta.deliverableSnapshot.videoUrl.trim(),
+        thumbnailUrl: null,
+        createdAt: p.updatedAt,
+      });
     } else if (p.videoAssetId) {
-      try {
-        const assets = await listAssets("storyboard-micro-drama");
-        const found = assets.find((a) => a.id === p.videoAssetId);
-        setVideoAsset(found ?? null);
-      } catch {
-        setVideoAsset(null);
-      }
+      void listAssets("storyboard-micro-drama")
+        .then((assets) => {
+          const found = assets.find((a) => a.id === p.videoAssetId);
+          setVideoAsset(found ?? null);
+        })
+        .catch(() => setVideoAsset(null));
     } else {
       setVideoAsset(null);
     }
   }, []);
 
+  const reload = useCallback(
+    async (id: string, initial?: StoryboardProject) => {
+      const p = initial ?? (await getStoryboardProject(id));
+      applyProject(p);
+    },
+    [applyProject],
+  );
+
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const models = await fetchStoryboardModels();
+
+    void fetchStoryboardModels()
+      .then((models) => {
         if (cancelled) return;
         setChatModels(models.chatModels);
         setImageModels(models.imageModels);
@@ -171,35 +247,38 @@ export function StoryboardStudio() {
             prev.videoModelKey,
           ),
         }));
+      })
+      .catch(() => {
+        /* 模型列表后台加载，不阻塞工作室 */
+      });
 
-        const savedId =
+    (async () => {
+      try {
+        const urlProjectId =
           typeof window !== "undefined"
-            ? sessionStorage.getItem(PROJECT_STORAGE_KEY)
+            ? new URLSearchParams(window.location.search).get("projectId")?.trim()
             : null;
-        let projectId: string | null = savedId;
+        const savedId =
+          urlProjectId ||
+          (typeof window !== "undefined"
+            ? sessionStorage.getItem(PROJECT_STORAGE_KEY)
+            : null);
 
-        if (projectId) {
+        let resolved: { id: string; project?: StoryboardProject };
+        if (savedId) {
           try {
-            await getStoryboardProject(projectId);
+            const p = await getStoryboardProject(savedId);
+            resolved = { id: p.id, project: p };
           } catch {
-            projectId = null;
+            resolved = await resolveFallbackStoryboardProject();
           }
-        }
-
-        if (!projectId) {
-          const items = await listStoryboardProjects();
-          if (items.length > 0) {
-            projectId = items[0]!.id;
-          }
-        }
-
-        if (!projectId) {
-          const created = await createStoryboardProject({ title: "微剧故事版" });
-          projectId = created.id;
+        } else {
+          resolved = await resolveFallbackStoryboardProject();
         }
 
         if (cancelled) return;
-        await reload(projectId);
+        await reload(resolved.id, resolved.project);
+        if (!cancelled) setLoading(false);
       } catch (e) {
         if (!cancelled) {
           if (isEcomUnauthorizedError(e)) {
@@ -216,6 +295,7 @@ export function StoryboardStudio() {
         if (!cancelled) setLoading(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
@@ -224,13 +304,7 @@ export function StoryboardStudio() {
   useEffect(() => {
     if (!project) return;
     setUploadRole(inferCollectUploadRole(project));
-  }, [
-    project?.id,
-    project?.chatHistory,
-    project?.sheet,
-    project?.meta?.workflow,
-    project?.meta?.deliverable,
-  ]);
+  }, [project]);
 
   const capturePng = useCallback(async () => {
     await new Promise<void>((r) => {
@@ -255,6 +329,7 @@ export function StoryboardStudio() {
       ),
     );
     await new Promise((r) => setTimeout(r, 300));
+    const { default: html2canvas } = await import("html2canvas");
     const canvas = await html2canvas(el, {
       scale: 2,
       useCORS: true,
@@ -267,14 +342,72 @@ export function StoryboardStudio() {
   }, []);
 
   async function handleNewProject() {
+    if (assistantStreaming) {
+      await alert({
+        title: "请稍候",
+        message: "请等待助手完成当前输出后再新建项目。",
+        variant: "error",
+      });
+      return;
+    }
     setLoading(true);
     try {
-      const created = await createStoryboardProject({ title: "微剧故事版" });
-      await reload(created.id);
+      const created = await createStoryboardProject({
+        title: "电商专业版",
+        meta: {
+          workflow: {
+            proMode: true,
+            proPhase: "product_ref",
+            dimensionStep: 0,
+          },
+        },
+      });
+      setGenerateAllImagesToken(0);
+      setGenerateFullVideoToken(0);
+      setMergePanelVideosToken(0);
+      setExportSheet(null);
+      setAssistantWide(false);
+      setAssistantCollapsed(false);
+      setVideoAsset(null);
+      applyProject(created);
     } catch (e) {
       await alert({
         title: "新建失败",
         message: e instanceof Error ? e.message : "无法创建故事版",
+        variant: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const loadProjectList = useCallback(async () => {
+    const items = await listStoryboardProjectSummaries();
+    return items.map((p) => ({
+      id: p.id,
+      title: p.title?.trim() || "微剧故事版",
+      updatedAt: p.updatedAt,
+    }));
+  }, []);
+
+  async function handleOpenProject(id: string) {
+    if (project?.id === id) return;
+    if (assistantStreaming) {
+      await alert({
+        title: "请稍候",
+        message: "请等待助手完成当前输出后再切换项目。",
+        variant: "error",
+      });
+      return;
+    }
+    setLoading(true);
+    try {
+      await reload(id);
+      setAssistantCollapsed(false);
+    } catch (e) {
+      await alert({
+        title: "打开失败",
+        message: e instanceof Error ? e.message : "无法打开项目",
         variant: "error",
       });
     } finally {
@@ -288,11 +421,55 @@ export function StoryboardStudio() {
   ) {
     if (!project) return;
     setRefBusy(true);
+    setUploadingRole(opts.role);
+    setUploadProgress(10);
+    const tick = window.setInterval(() => {
+      setUploadProgress((p) => (p != null && p < 88 ? p + 7 : p));
+    }, 180);
     try {
       await uploadStoryboardRef(project.id, file, opts);
+      setUploadProgress(100);
       await reload(project.id);
+    } catch (e) {
+      await alert({
+        title: "上传失败",
+        message: e instanceof Error ? e.message : "无法上传参考图",
+        variant: "error",
+      });
     } finally {
+      window.clearInterval(tick);
       setRefBusy(false);
+      setUploadingRole(null);
+      window.setTimeout(() => setUploadProgress(null), 450);
+    }
+  }
+
+  async function handleAttachAssets(
+    assetIds: string[],
+    role: StoryboardReference["role"],
+  ) {
+    if (!project) return;
+    setRefBusy(true);
+    setUploadingRole(role);
+    setUploadProgress(10);
+    const tick = window.setInterval(() => {
+      setUploadProgress((p) => (p != null && p < 88 ? p + 7 : p));
+    }, 180);
+    try {
+      await attachStoryboardRefsFromAssets(project.id, { assetIds, role });
+      setUploadProgress(100);
+      await reload(project.id);
+    } catch (e) {
+      await alert({
+        title: "添加失败",
+        message: e instanceof Error ? e.message : "无法从资产添加参考图",
+        variant: "error",
+      });
+    } finally {
+      window.clearInterval(tick);
+      setRefBusy(false);
+      setUploadingRole(null);
+      window.setTimeout(() => setUploadProgress(null), 450);
     }
   }
 
@@ -345,71 +522,99 @@ export function StoryboardStudio() {
   }
 
   return (
+    <BackgroundGenerationProvider>
     <>
       <EcomWorkspaceLayout
-        assistantHeader={
-          <>
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h1 className="text-lg font-semibold text-[#1d1d1f]">微剧故事版</h1>
-                <p className="text-xs text-[#6e6e73]">厨卫清洁 · 10秒4镜 · Skill 策划</p>
-              </div>
-              <EcomButtonSecondary
-                size="sm"
-                type="button"
-                disabled={loading || refBusy}
-                onClick={() => void handleNewProject()}
-              >
-                新建微剧故事版
-              </EcomButtonSecondary>
-            </div>
-            <div className="mt-3">
-              <StoryboardRefUploader
-                references={project.references}
-                onUpload={handleRefUpload}
-                onRemove={handleRefRemove}
-                busy={refBusy}
-                activeRole={uploadRole}
-                onActiveRoleChange={setUploadRole}
-              />
-            </div>
-          </>
-        }
+        assistantWide={assistantWide}
+        assistantCollapsed={assistantCollapsed}
+        onMainBlankPointerDown={handleMainBlankPointerDown}
         progress={
           <StoryboardProgressRail project={project} hasVideo={Boolean(videoAsset)} />
         }
         assistant={
-          <StoryboardAssistantPanel
-            project={project}
-            chatModels={chatModels}
-            imageModels={imageModels}
-            videoModels={videoModels}
-            settings={settings}
-            onStreamingChange={setAssistantStreaming}
-            onOpenSettings={() => setSettingsOpen(true)}
-            onDeliverableReady={async () => {
-              await reload(project.id);
-            }}
-            onRequestGenerateAllImages={() =>
-              setGenerateAllImagesToken((t) => t + 1)
-            }
-            onRequestGenerateFullVideo={() =>
-              setGenerateFullVideoToken((t) => t + 1)
-            }
-            onRequestMergePanelVideos={() =>
-              setMergePanelVideosToken((t) => t + 1)
-            }
-            onAlert={alert}
-          />
+          isLegacyStoryboardProject(project) ? (
+            <StoryboardAssistantPanel
+              key={project.id}
+              project={project}
+              chatModels={chatModels}
+              imageModels={imageModels}
+              videoModels={videoModels}
+              settings={settings}
+              durationSec={durationSec}
+              composerWide={assistantWide}
+              onComposerWideChange={setAssistantWide}
+              collapsed={assistantCollapsed}
+              onCollapsedChange={setAssistantCollapsed}
+              onStreamingChange={setAssistantStreaming}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onDeliverableReady={async (updated) => {
+                if (updated) applyProject(updated);
+                else await reload(project.id);
+              }}
+              onRequestGenerateAllImages={() =>
+                setGenerateAllImagesToken((t) => t + 1)
+              }
+              onRequestGenerateFullVideo={() =>
+                setGenerateFullVideoToken((t) => t + 1)
+              }
+              onRequestMergePanelVideos={() =>
+                setMergePanelVideosToken((t) => t + 1)
+              }
+              onAlert={alert}
+              legacyReadonly
+            />
+          ) : (
+            <FashionAssistantPanel
+              key={project.id}
+              project={project}
+              chatModels={chatModels}
+              settings={settings}
+              composerWide={assistantWide}
+              onComposerWideChange={setAssistantWide}
+              collapsed={assistantCollapsed}
+              onCollapsedChange={setAssistantCollapsed}
+              onStreamingChange={setAssistantStreaming}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onDeliverableReady={async (updated) => {
+                if (updated) applyProject(updated);
+                else await reload(project.id);
+              }}
+              onRequestGenerateAllImages={() =>
+                setGenerateAllImagesToken((t) => t + 1)
+              }
+              onRequestGenerateFullVideo={() =>
+                setGenerateFullVideoToken((t) => t + 1)
+              }
+              onRequestMergePanelVideos={() =>
+                setMergePanelVideosToken((t) => t + 1)
+              }
+              onAlert={alert}
+            />
+          )
         }
       >
         <StoryboardContentPanel
+          key={project.id}
           project={project}
           references={project.references}
+          durationSec={durationSec}
+          aspectRatio={aspectRatio}
+          onNewProject={() => void handleNewProject()}
+          loadProjectList={loadProjectList}
+          onOpenProject={(id) => void handleOpenProject(id)}
+          onShareWorkflow={() => setWorkflowShareOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          refBusy={refBusy}
+          uploadingRole={uploadingRole}
+          uploadProgress={uploadProgress}
+          uploadRole={uploadRole}
+          onUploadRoleChange={setUploadRole}
+          onRefUpload={handleRefUpload}
+          onRefRemove={handleRefRemove}
+          onAttachAssets={handleAttachAssets}
           imageModels={imageModels}
           videoModels={videoModels}
           settings={settings}
-          onOpenSettings={() => setSettingsOpen(true)}
           onImageModelChange={(key) => {
             setSettings((s) => ({ ...s, imageModelKey: key }));
             updateStoryboardProject(project.id, {
@@ -465,8 +670,12 @@ export function StoryboardStudio() {
               settings: { ...project.settings, videoPromptExtend },
             }).catch(() => undefined);
           }}
-          durationSec={durationSec}
-          aspectRatio={aspectRatio}
+          onVideoGenerateAudioChange={(videoGenerateAudio) => {
+            setSettings((s) => ({ ...s, videoGenerateAudio }));
+            updateStoryboardProject(project.id, {
+              settings: { ...project.settings, videoGenerateAudio },
+            }).catch(() => undefined);
+          }}
           videoAspectRatio={videoAspectRatio}
           onVideoAspectChange={setVideoAspectRatio}
           videoOssUrl={videoAsset?.ossUrl}
@@ -530,6 +739,13 @@ export function StoryboardStudio() {
         onConfirm={() => setSettingsOpen(false)}
       />
 
+      <WorkflowShareLinkDialog
+        projectId={project.id}
+        projectTitle={project.title?.trim() || "微剧故事版"}
+        open={workflowShareOpen}
+        onClose={() => setWorkflowShareOpen(false)}
+      />
+
       <EcomVideoPreviewDialog
         open={!!previewVideo}
         src={previewVideo?.src ?? ""}
@@ -539,21 +755,22 @@ export function StoryboardStudio() {
         }}
       />
 
+
       {(exportSheet ?? project.sheet) ? (
         <div className="pointer-events-none fixed -left-[9999px] top-0 z-0" aria-hidden>
           <StoryboardProSheetView
             sheet={(exportSheet ?? project.sheet)!}
             references={project.references}
-            productName={project.meta?.deliverable?.productName}
+            productName={asStoryboardDeliverable(project.meta?.deliverable)?.productName}
             productHighlight={
               (exportSheet ?? project.sheet)?.overview.productHighlight ??
-              (typeof project.meta?.deliverable?.params?.卖点 === "string"
-                ? project.meta.deliverable.params.卖点
+              (typeof asStoryboardDeliverable(project.meta?.deliverable)?.params?.卖点 === "string"
+                ? asStoryboardDeliverable(project.meta?.deliverable)!.params!.卖点
                 : undefined)
             }
             projectKeywords={
-              (typeof project.meta?.deliverable?.params?.关键词 === "string"
-                ? project.meta.deliverable.params.关键词
+              (typeof asStoryboardDeliverable(project.meta?.deliverable)?.params?.关键词 === "string"
+                ? asStoryboardDeliverable(project.meta?.deliverable)!.params!.关键词
                 : undefined) ??
               project.meta?.deliverable?.productName ??
               undefined
@@ -562,5 +779,6 @@ export function StoryboardStudio() {
         </div>
       ) : null}
     </>
+    </BackgroundGenerationProvider>
   );
 }

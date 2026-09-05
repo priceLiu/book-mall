@@ -51,3 +51,15 @@ export function openQuickReplicaAppInNewTab(redirectPath = "/") {
   const href = `/quick-replica-open?path=${encodeURIComponent(path)}`;
   window.open(href, "_blank", "noopener,noreferrer");
 }
+
+export function openCommonToolsAppInNewTab(redirectPath = "/") {
+  const path = redirectPath.startsWith("/") ? redirectPath : `/${redirectPath}`;
+  const href = `/common-tools-open?path=${encodeURIComponent(path)}`;
+  window.open(href, "_blank", "noopener,noreferrer");
+}
+
+export function openPublisherAppInNewTab(redirectPath = "/") {
+  const path = redirectPath.startsWith("/") ? redirectPath : `/${redirectPath}`;
+  const href = `/publisher-open?path=${encodeURIComponent(path)}`;
+  window.open(href, "_blank", "noopener,noreferrer");
+}

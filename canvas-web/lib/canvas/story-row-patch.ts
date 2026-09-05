@@ -20,9 +20,53 @@ import {
   normalizeOutlineSection,
   normalizeStoryboardSectionMd,
   parseOutlineBriefCharacters,
+  storyboardMdHasParseableRows,
 } from "./parse-md-tables";
 import { pushStoryRevision } from "./story-revision";
-import { promoteEmbeddedPackFromOutline } from "./story-hub-runtime";
+import {
+  outlineTextHasEmbeddedProductionPack,
+  promoteEmbeddedPackFromOutline,
+} from "./story-hub-runtime";
+import { parseVisualStylePackFromOutline } from "./story-pro-visual-style-pack";
+import { tryApplyStructuredProductionScript, trySyncResolvedProductionScriptToHub } from "./pro2-production-script-apply";
+import {
+  extractPro2HumanProductionPackPrefix,
+  hasHumanReadableProductionPackSections,
+  isUnparsedPro2ProductionJsonBlob,
+} from "./pro2-production-script-structured";
+import { convertPro2HumanTabMarkdownToGfm, promotePro2HumanGfmToHubFields } from "./parse-md-tables";
+import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
+import { isPro2JsonOnlyHubData } from "./pro2-project-format";
+
+function isPro2JsonOnlyHub(data: StoryScriptHubNodeData): boolean {
+  return isPro2JsonOnlyHubData(data as StoryProScriptHubNodeData);
+}
+
+function pro2SectionFailedRuntime(
+  section: StoryLlmSection,
+  runtime: CanvasNodeRuntime,
+  textOutput?: string,
+): Partial<StoryScriptHubNodeData> {
+  const failed: CanvasNodeRuntime = {
+    ...runtime,
+    status: "error",
+    failCode: "PRO2_SCRIPT_JSON_INVALID",
+    failMessage:
+      "模型须只返回 pro2-production-script JSON 围栏；解析或语义校验失败，请重试。",
+    textOutput: textOutput?.trim() || undefined,
+  };
+  if (section === "outline") return { outlineRuntime: failed };
+  if (section === "character") return { characterRuntime: failed };
+  if (section === "scene") return { sceneRuntime: failed };
+  if (section === "storyboard" || section === "shot_prompts") {
+    return { storyboardRuntime: failed };
+  }
+  return {};
+}
+
+function isUnparsedPro2JsonBlob(text: string): boolean {
+  return isUnparsedPro2ProductionJsonBlob(text);
+}
 
 export function applyHubSectionFromTask(
   data: StoryScriptHubNodeData,
@@ -34,10 +78,45 @@ export function applyHubSectionFromTask(
   if (section === "outline") {
     patch.outlineRuntime = runtime;
     if (textOutput?.trim()) {
+      const structured = tryApplyStructuredProductionScript(
+        data as StoryProScriptHubNodeData,
+        section,
+        textOutput,
+      );
+      if (structured) {
+        const syncPatch = trySyncResolvedProductionScriptToHub({
+          ...(data as StoryProScriptHubNodeData),
+          ...structured,
+          outlineRuntime: { ...runtime, textOutput },
+        });
+        const withSync = syncPatch
+          ? { ...structured, ...syncPatch }
+          : structured;
+        const sectionRuntime: CanvasNodeRuntime = {
+          ...runtime,
+          textOutput: undefined,
+        };
+        return {
+          ...withSync,
+          outlineRuntime: sectionRuntime,
+          ...(withSync.characterMd != null
+            ? { characterRuntime: sectionRuntime }
+            : {}),
+          ...(withSync.sceneMd != null ? { sceneRuntime: sectionRuntime } : {}),
+          ...(withSync.storyboardMd != null
+            ? { storyboardRuntime: sectionRuntime }
+            : {}),
+        } as Partial<StoryScriptHubNodeData>;
+      }
+      if (isPro2JsonOnlyHub(data)) {
+        return pro2SectionFailedRuntime(section, runtime, textOutput);
+      }
+      const replaceEmbedded = outlineTextHasEmbeddedProductionPack(textOutput);
       const promoted = promoteEmbeddedPackFromOutline(
         textOutput,
-        data.characterMd ?? "",
-        data.storyboardMd ?? "",
+        replaceEmbedded ? "" : (data.characterMd ?? ""),
+        replaceEmbedded ? "" : (data.storyboardMd ?? ""),
+        replaceEmbedded ? "" : (data.sceneMd ?? ""),
       );
       const { outlineMd, characterMd } = normalizeOutlineSection(
         promoted.outlineMd,
@@ -45,16 +124,39 @@ export function applyHubSectionFromTask(
       );
       patch.outlineMd = outlineMd;
       patch.outlineHistory = pushStoryRevision(data.outlineHistory, outlineMd);
-      if (characterMd !== (data.characterMd ?? "")) {
+      const stylePack = parseVisualStylePackFromOutline(outlineMd);
+      if (stylePack) {
+        (patch as Record<string, unknown>).visualStylePack = stylePack;
+      }
+      const storyboardReady = storyboardMdHasParseableRows(promoted.storyboardMd);
+      if (
+        replaceEmbedded
+          ? characterMd.trim()
+          : characterMd !== (data.characterMd ?? "")
+      ) {
         patch.characterMd = characterMd;
         patch.characterHistory = pushStoryRevision(
           data.characterHistory,
           characterMd,
         );
       }
+      if (promoted.sceneMd.trim()) {
+        const sceneChanged =
+          replaceEmbedded || promoted.sceneMd !== (data.sceneMd ?? "");
+        if (sceneChanged) {
+          patch.sceneMd = promoted.sceneMd;
+          patch.sceneHistory = pushStoryRevision(
+            data.sceneHistory,
+            promoted.sceneMd,
+          );
+        }
+      }
       if (
-        promoted.storyboardMd.trim() &&
-        promoted.storyboardMd !== (data.storyboardMd ?? "")
+        storyboardReady &&
+        (replaceEmbedded
+          ? promoted.storyboardMd.trim()
+          : promoted.storyboardMd.trim() &&
+            promoted.storyboardMd !== (data.storyboardMd ?? ""))
       ) {
         patch.storyboardMd = promoted.storyboardMd;
         patch.storyboardHistory = pushStoryRevision(
@@ -62,10 +164,86 @@ export function applyHubSectionFromTask(
           promoted.storyboardMd,
         );
       }
+      const syncPatch = trySyncResolvedProductionScriptToHub({
+        ...(data as StoryProScriptHubNodeData),
+        ...patch,
+        outlineRuntime: { ...runtime, textOutput },
+      });
+      if (syncPatch) Object.assign(patch, syncPatch);
+      const pro2Patch = patch as StoryProScriptHubNodeData;
+      const packComplete =
+        storyboardMdHasParseableRows(pro2Patch.storyboardMd ?? "") ||
+        Boolean(pro2Patch.productionScript);
+      const sectionRuntime: CanvasNodeRuntime | undefined =
+        replaceEmbedded && runtime.status === "done"
+          ? {
+              status: "done",
+              taskId: runtime.taskId,
+              textOutput: packComplete ? undefined : textOutput,
+              failCode: undefined,
+              failMessage: undefined,
+            }
+          : undefined;
+      if (patch.characterMd != null && sectionRuntime) {
+        patch.characterRuntime = sectionRuntime;
+      }
+      if (patch.sceneMd != null && sectionRuntime) {
+        patch.sceneRuntime = sectionRuntime;
+      }
+      if (patch.storyboardMd != null && sectionRuntime) {
+        patch.storyboardRuntime = sectionRuntime;
+      }
+      const pro2After = patch as StoryProScriptHubNodeData;
+      if (
+        isUnparsedPro2JsonBlob(textOutput) &&
+        !pro2After.productionScript &&
+        !(pro2After.outlineMd ?? "").trim() &&
+        !(pro2After.characterMd ?? "").trim()
+      ) {
+        return {
+          outlineRuntime: {
+            ...runtime,
+            status: "error",
+            failCode: "PRO2_SCRIPT_JSON_INVALID",
+            failMessage:
+              "模型返回了未解析的结构化 JSON，未写入大纲预览。请重试生成。",
+          },
+        };
+      }
     }
   } else if (section === "character") {
     patch.characterRuntime = runtime;
     if (textOutput?.trim()) {
+      const structured = tryApplyStructuredProductionScript(
+        data as StoryProScriptHubNodeData,
+        section,
+        textOutput,
+      );
+      if (structured) {
+        return { ...structured, characterRuntime: runtime } as Partial<StoryScriptHubNodeData>;
+      }
+      if (isPro2JsonOnlyHub(data)) {
+        return pro2SectionFailedRuntime(section, runtime, textOutput);
+      }
+      const humanGfm = convertPro2HumanTabMarkdownToGfm(
+        extractPro2HumanProductionPackPrefix(textOutput),
+      );
+      if (hasHumanReadableProductionPackSections(humanGfm)) {
+        const promoted = promotePro2HumanGfmToHubFields(humanGfm);
+        if (promoted.characterMd.trim()) {
+          patch.characterMd = promoted.characterMd;
+          patch.characterHistory = pushStoryRevision(
+            data.characterHistory,
+            promoted.characterMd,
+          );
+          const syncPatch = trySyncResolvedProductionScriptToHub({
+            ...(data as StoryProScriptHubNodeData),
+            ...patch,
+          });
+          if (syncPatch) Object.assign(patch, syncPatch);
+          return { ...patch, characterRuntime: runtime } as Partial<StoryScriptHubNodeData>;
+        }
+      }
       const brief = parseOutlineBriefCharacters(data.outlineMd ?? "");
       const characterMd = normalizeCharacterTableMd(
         brief.length > 0
@@ -77,23 +255,74 @@ export function applyHubSectionFromTask(
         data.characterHistory,
         characterMd,
       );
+      const syncPatch = trySyncResolvedProductionScriptToHub({
+        ...(data as StoryProScriptHubNodeData),
+        ...patch,
+      });
+      if (syncPatch) Object.assign(patch, syncPatch);
     }
   } else if (section === "scene") {
     patch.sceneRuntime = runtime;
     if (textOutput?.trim()) {
+      const structured = tryApplyStructuredProductionScript(
+        data as StoryProScriptHubNodeData,
+        section,
+        textOutput,
+      );
+      if (structured) {
+        return { ...structured, sceneRuntime: runtime } as Partial<StoryScriptHubNodeData>;
+      }
+      if (isPro2JsonOnlyHub(data)) {
+        return pro2SectionFailedRuntime(section, runtime, textOutput);
+      }
       const sceneMd = textOutput.trim();
       patch.sceneMd = sceneMd;
       patch.sceneHistory = pushStoryRevision(data.sceneHistory, sceneMd);
     }
+  } else if (section === "shot_prompts") {
+    patch.storyboardRuntime =
+      runtime.status === "error"
+        ? runtime
+        : { status: "idle", taskId: undefined, failCode: undefined, failMessage: undefined };
+    if (textOutput?.trim()) {
+      const structured = tryApplyStructuredProductionScript(
+        data as StoryProScriptHubNodeData,
+        section,
+        textOutput,
+      );
+      if (structured) {
+        return {
+          ...structured,
+          storyboardRuntime: patch.storyboardRuntime,
+        };
+      }
+      if (isPro2JsonOnlyHub(data)) {
+        return pro2SectionFailedRuntime(section, runtime, textOutput);
+      }
+    }
+    return patch;
   } else {
     patch.storyboardRuntime = runtime;
     if (textOutput?.trim()) {
-      const storyboardMd = normalizeStoryboardSectionMd(textOutput);
-      patch.storyboardMd = storyboardMd;
-      patch.storyboardHistory = pushStoryRevision(
-        data.storyboardHistory,
-        storyboardMd,
+      const structured = tryApplyStructuredProductionScript(
+        data as StoryProScriptHubNodeData,
+        section,
+        textOutput,
       );
+      if (structured) {
+        return { ...structured, storyboardRuntime: runtime } as Partial<StoryScriptHubNodeData>;
+      }
+      if (isPro2JsonOnlyHub(data)) {
+        return pro2SectionFailedRuntime(section, runtime, textOutput);
+      }
+      const storyboardMd = normalizeStoryboardSectionMd(textOutput);
+      if (storyboardMdHasParseableRows(storyboardMd)) {
+        patch.storyboardMd = storyboardMd;
+        patch.storyboardHistory = pushStoryRevision(
+          data.storyboardHistory,
+          storyboardMd,
+        );
+      }
     }
   }
   return patch;

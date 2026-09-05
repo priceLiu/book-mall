@@ -5,7 +5,7 @@ import type { MarketListResponse } from "@/lib/market-types";
 export const dynamic = "force-dynamic";
 
 export default async function MarketPage() {
-  const { data } = await gatewayJson<MarketListResponse>(
+  const { ok, data } = await gatewayJson<MarketListResponse>(
     "/api/gateway/market/models?page=1&pageSize=20",
   );
 
@@ -21,6 +21,10 @@ export default async function MarketPage() {
     totalPages: 1,
   };
 
+  // 未登录等错误体也是 truthy JSON（{ error }），不可用 data ?? empty
+  const initial =
+    ok && data && Array.isArray(data.providers) ? data : empty;
+
   return (
     <div className="space-y-4">
       <div>
@@ -29,7 +33,7 @@ export default async function MarketPage() {
           浏览已上架模型 · 筛选厂商与任务类型 · 点击进入 Playground 试跑（经 Gateway 扣费 / BYOK）
         </p>
       </div>
-      <MarketListClient initial={data ?? empty} />
+      <MarketListClient initial={initial} />
     </div>
   );
 }

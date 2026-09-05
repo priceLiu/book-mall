@@ -4,15 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 
-const ALLOWED_APPS = new Set([
-  "tool",
-  "canvas",
-  "story",
-  "prompt-optimizer",
-  "quick-replica",
-  "e-commerce",
-]);
-
 function safeRedirect(raw: string | null): string {
   if (!raw) return "/";
   const v = raw.trim();
@@ -20,9 +11,19 @@ function safeRedirect(raw: string | null): string {
   return "/";
 }
 
+/** 与 `lib/platform-app-sso.ts` · parsePlatformSsoApp 保持一致（客户端纯函数） */
 function parseApp(raw: string | null): string {
   const v = raw?.trim().toLowerCase() ?? "tool";
-  return ALLOWED_APPS.has(v) ? v : "tool";
+  if (v === "canvas") return "canvas";
+  if (v === "story") return "story";
+  if (v === "prompt-optimizer" || v === "prompt_optimizer") return "prompt-optimizer";
+  if (v === "quick-replica" || v === "quick_replica") return "quick-replica";
+  if (v === "e-commerce" || v === "ecommerce") return "e-commerce";
+  if (v === "director" || v === "director-desk") return "director";
+  if (v === "common-tools" || v === "common_tools") return "common-tools";
+  if (v === "publisher" || v === "social-publisher") return "publisher";
+  if (v === "tool") return "tool";
+  return "tool";
 }
 
 export function PortalSigninClient() {

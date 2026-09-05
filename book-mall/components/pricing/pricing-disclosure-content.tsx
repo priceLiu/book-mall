@@ -15,6 +15,7 @@ import { PricingDisclosureRouteSync } from "@/components/pricing/pricing-disclos
 import { PricingDisclosureMeteredSection } from "@/components/pricing/pricing-disclosure-metered";
 import { BillingPolicySection } from "@/components/layout/sections/billing-policy";
 import { CreditExpiryPolicySection } from "@/components/pricing/credit-expiry-policy";
+import { GenerationSubmitQuotaSection } from "@/components/pricing/generation-submit-quota-section";
 import { SubscriptionPlansTable } from "@/components/pricing/subscription-plans-table";
 import { Button } from "@/components/ui/button";
 
@@ -155,8 +156,10 @@ export async function PricingDisclosureContent({
         showPricingInternals={showPricingInternals}
       />
 
+      <GenerationSubmitQuotaSection embedded={embedded} />
+
       <section className={embedded ? "space-y-4" : "mt-12 space-y-4"}>
-        <h2 className="text-lg font-semibold">三、平台余额线（参考配置）</h2>
+        <h2 className="text-lg font-semibold">四、平台余额线（参考配置）</h2>
         <p className="text-sm text-muted-foreground">
           使用依赖余额的高阶/按量能力前，可用余额通常须不低于
           <strong className="text-foreground">最低余额线</strong>
@@ -185,7 +188,7 @@ export async function PricingDisclosureContent({
       </section>
 
       <section className={embedded ? "space-y-4" : "mt-12 space-y-4"}>
-        <h2 className="text-lg font-semibold">四、典型使用与扣费案例</h2>
+        <h2 className="text-lg font-semibold">五、典型使用与扣费案例</h2>
         <p className="text-sm text-muted-foreground">
           以下为常见路径的示例；如果您的账号已开通对应工具且余额充足，单次成功执行将按下表所示从钱包扣点（失败一般不扣费，以各工具内提示为准）。
         </p>

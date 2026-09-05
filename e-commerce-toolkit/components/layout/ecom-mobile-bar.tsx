@@ -1,22 +1,46 @@
-import Link from "next/link";
+"use client";
 
-/** 窄屏：侧栏隐藏时的顶栏入口 */
-export function EcomMobileBar() {
+import Link from "next/link";
+import { buildPortalNavItems } from "@/components/portal-nav";
+import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
+
+/** 窄屏：跨门户入口（原顶栏 Federated 菜单） */
+export function EcomMobileBar({ bookOrigin }: { bookOrigin: string }) {
+  const portalItems = buildPortalNavItems(bookOrigin).filter(
+    (item) => item.href && item.key !== "e-commerce",
+  );
+
   return (
-    <header className="flex h-11 shrink-0 items-center justify-between border-b border-[var(--ecom-hairline)] bg-white px-4 md:hidden">
-      <Link href="/" className="text-sm font-semibold text-[var(--ecom-ink)]">
-        电商工具箱
-      </Link>
-      <div className="flex items-center gap-3 overflow-x-auto text-xs text-[var(--ecom-muted)] sm:gap-4">
-        <Link href="/library" className="shrink-0 hover:text-[var(--ecom-ink)]">
-          我的资产
+    <header className="flex h-11 shrink-0 flex-col border-b border-[#e8e8ed] bg-white md:hidden">
+      <div className="flex items-center justify-between px-4 py-2">
+        <Link href="/" className="text-sm font-semibold text-[#1d1d1f]">
+          电商工具箱
         </Link>
-        <Link href="/ecom/main-image" className="shrink-0 hover:text-[var(--ecom-ink)]">
-          主图
-        </Link>
-        <Link href="/ecom/image-processing" className="shrink-0 hover:text-[var(--ecom-ink)]">
-          图像处理
-        </Link>
+        <div className="flex items-center gap-3">
+          {bookOrigin ? (
+            <PlatformTopupNavLink
+              bookOrigin={bookOrigin}
+              className="text-xs font-medium text-[#0071e3] hover:underline"
+            />
+          ) : null}
+          <Link href="/workflows/drafts" className="text-xs text-[#6e6e73] hover:text-[#1d1d1f]">
+            我的工作流
+          </Link>
+          <Link href="/library" className="text-xs text-[#6e6e73] hover:text-[#1d1d1f]">
+            我的资产
+          </Link>
+        </div>
+      </div>
+      <div className="ecom-scrollbar-thin flex gap-3 overflow-x-auto border-t border-[#f0f0f2] px-4 py-2 text-xs text-[#6e6e73]">
+        {portalItems.map((item) => (
+          <a
+            key={item.key}
+            href={item.href!}
+            className="shrink-0 whitespace-nowrap hover:text-[#1d1d1f]"
+          >
+            {item.label}
+          </a>
+        ))}
       </div>
     </header>
   );

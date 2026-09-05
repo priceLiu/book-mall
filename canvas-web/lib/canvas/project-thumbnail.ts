@@ -73,6 +73,37 @@ function pickFromNodes(
   return "";
 }
 
+/** 视频节点：优先取成片 URL（非 poster） */
+function persistableVideoUrlFromNodeData(data: unknown): string {
+  if (!data || typeof data !== "object") return "";
+  const d = data as Record<string, unknown>;
+  const runtime = readRuntime(d);
+  const candidates = [
+    runtime?.ossUrl,
+    typeof d.videoUrl === "string" ? d.videoUrl : "",
+    typeof d.ossUrl === "string" ? d.ossUrl : "",
+  ]
+    .map((raw) => (typeof raw === "string" ? raw : "").trim())
+    .filter((url) => url.startsWith("http"));
+
+  return (
+    candidates.find((url) => isProjectThumbnailVideoUrl(url)) ?? candidates[0] ?? ""
+  );
+}
+
+function displayVideoUrlFromNodeData(data: unknown): string {
+  const stable = persistableVideoUrlFromNodeData(data);
+  if (stable) return stable;
+
+  if (!data || typeof data !== "object") return "";
+  const runtime = readRuntime(data as Record<string, unknown>);
+  const ephemeral = runtime?.ephemeralUrl?.trim();
+  if (ephemeral?.startsWith("http") && isProjectThumbnailVideoUrl(ephemeral)) {
+    return ephemeral;
+  }
+  return "";
+}
+
 /**
  * 从画布图里挑最近一条图片或视频作为项目缩略图（按节点顺序，后添加优先）。
  * 含 ephemeral 兜底，供列表即时展示。
@@ -98,6 +129,41 @@ export function pickPersistableProjectThumbnailUrl(graph: CanvasGraph): string {
   );
 }
 
+/** 列表封面：优先最近一条成片，无成片再回退分镜图 */
+export function pickProjectThumbnailUrlPreferVideo(graph: CanvasGraph): string {
+  const nodes = [...(graph.nodes ?? [])].reverse();
+
+  return (
+    pickFromNodes(nodes, VIDEO_THUMBNAIL_NODE_TYPES, displayVideoUrlFromNodeData) ||
+    pickFromNodes(nodes, VIDEO_THUMBNAIL_NODE_TYPES, displayMediaUrlFromNodeData) ||
+    pickFromNodes(nodes, IMAGE_THUMBNAIL_NODE_TYPES, displayMediaUrlFromNodeData)
+  );
+}
+
+export function pickPersistableProjectThumbnailUrlPreferVideo(graph: CanvasGraph): string {
+  const nodes = [...(graph.nodes ?? [])].reverse();
+
+  return (
+    pickFromNodes(nodes, VIDEO_THUMBNAIL_NODE_TYPES, persistableVideoUrlFromNodeData) ||
+    pickFromNodes(nodes, VIDEO_THUMBNAIL_NODE_TYPES, persistableMediaUrlFromNodeData) ||
+    pickFromNodes(nodes, IMAGE_THUMBNAIL_NODE_TYPES, persistableMediaUrlFromNodeData)
+  );
+}
+
 export function isProjectThumbnailVideoUrl(url: string): boolean {
-  return /\.(mp4|webm|mov)(\?|#|$)/i.test(url.trim());
+  const u = url.trim();
+  if (/\.(mp4|webm|mov)(\?|#|$)/i.test(u)) return true;
+  if (/\/node-video\//i.test(u)) return true;
+  return false;
+}
+
+/** 从画布收集全部可用图片 URL（原图 OSS，供门户 Hero 等大图场景） */
+export function collectProjectImageUrls(graph: CanvasGraph): string[] {
+  const urls = new Set<string>();
+  for (const n of graph.nodes ?? []) {
+    if (!n.type || !IMAGE_THUMBNAIL_NODE_TYPES.has(n.type)) continue;
+    const url = displayMediaUrlFromNodeData(n.data);
+    if (url && !isProjectThumbnailVideoUrl(url)) urls.add(url);
+  }
+  return [...urls];
 }

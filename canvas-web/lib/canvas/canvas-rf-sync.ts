@@ -1,8 +1,11 @@
 import type { CanvasFlowNode } from "./types";
 import { ensureNodeDragHandles } from "./normalize-graph-nodes";
+import { pickStoreToRfPosition } from "./canvas-rf-sync-position";
 
 /** 仅更新 RF 本地选中（不写 zustand），供 focusCanvasNode / 打组后选中新组 */
 export const CANVAS_RF_SELECT_NODE_EVENT = "canvas:rf-select-node";
+/** React Flow 已挂载 · 浮动 Dock 可 portal 到 viewport */
+export const CANVAS_RF_VIEWPORT_READY_EVENT = "canvas:rf-viewport-ready";
 
 export function dispatchCanvasRfSelectNode(nodeId: string): void {
   if (typeof window === "undefined") return;
@@ -25,9 +28,10 @@ function applyRfSelectionPreserved(
 export function mergeStoreNodesIntoRf(
   rfNodes: CanvasFlowNode[],
   storeNodes: CanvasFlowNode[],
-  opts?: { preserveRfSelection?: boolean },
+  opts?: { preserveRfSelection?: boolean; preserveRfPositions?: boolean },
 ): CanvasFlowNode[] {
   const preserveRfSelection = opts?.preserveRfSelection ?? false;
+  const preserveRfPositions = opts?.preserveRfPositions ?? false;
   if (rfNodes.length !== storeNodes.length) {
     const next = ensureNodeDragHandles(storeNodes);
     return preserveRfSelection
@@ -68,11 +72,18 @@ export function mergeStoreNodesIntoRf(
       type: sn.type,
       data: sn.data,
       selected,
-      position: sn.position,
+      position: pickStoreToRfPosition({
+        preserveRfPositions,
+        rfParentId: rf.parentId,
+        storeParentId: sn.parentId,
+        rfPosition: rf.position,
+        storePosition: sn.position,
+      }),
       width: sn.width,
       height: sn.height,
       zIndex: sn.zIndex,
       parentId: sn.parentId,
+      extent: sn.extent,
       style: sn.style,
       dragHandle: sn.dragHandle,
     });

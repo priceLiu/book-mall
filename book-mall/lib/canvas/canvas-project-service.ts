@@ -1,23 +1,43 @@
 /**
  * canvas-web 画布项目 CRUD 服务。
  */
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   assertAccessibleCanvasProject,
+  loadAccessibleCanvasProjectRow,
 } from "@/lib/canvas/canvas-project-access";
 import {
   canvasProjectEditionFromGraph,
-  canvasProjectEditionFromListHints,
+  canvasProjectEditionFromMeta,
   canvasProjectHasCollaboration,
   type CanvasProjectEdition,
 } from "@/lib/canvas/canvas-story-edition";
+import {
+  isRetiredLegacyPro2Canvas,
+  isRetiredLegacyPro2FromListHints,
+  withPro2ScriptFormatV13Meta,
+} from "@/lib/canvas/pro2-project-format";
 import { getActiveTenantContext } from "@/lib/tenant/context";
 import {
   pickPersistableProjectThumbnailUrl,
+  pickPersistableProjectThumbnailUrlPreferVideo,
   pickProjectThumbnailUrl,
+  pickProjectThumbnailUrlPreferVideo,
 } from "@/lib/canvas/pick-project-thumbnail";
 import { cloneCanvasGraphForDuplicate } from "@/lib/canvas/clone-canvas-graph";
+import { isPortalFilmShowcaseProject } from "@/lib/canvas/sbv1-film-showcase";
+import {
+  embedListCoverInCanvas,
+  projectListCoverSummaryFields,
+  readListCoverFromMeta,
+  resolveProjectListCoverForListRow,
+} from "@/lib/canvas/canvas-project-list-cover";
+import {
+  applyCanvasDelta,
+  assertCanvasDeltaBaseUpdatedAt,
+  type CanvasDeltaPatch,
+} from "@/lib/canvas/canvas-delta-merge";
 import { mergePersistedMediaIntoCanvasGraph } from "@/lib/canvas/canvas-persist-merge";
 import { extractManagedOssObjectKey } from "@/lib/oss-delete-object";
 import { readOssEnv } from "@/lib/oss-client";
@@ -36,7 +56,8 @@ export class CanvasProjectError extends Error {
       | "PROVIDER_KEYS_REQUIRED"
       | "GATEWAY_KEY_REQUIRED"
       | "INSUFFICIENT_CREDITS"
-      | "UPSTREAM_ERROR",
+      | "UPSTREAM_ERROR"
+      | "CONFLICT",
     message: string,
     public httpStatus = 400,
   ) {
@@ -47,18 +68,18 @@ export class CanvasProjectError extends Error {
 
 const MAX_NAME = 80;
 
-function canvasNodeCount(canvas: unknown): number {
-  if (!canvas || typeof canvas !== "object") return 0;
-  const nodes = (canvas as { nodes?: unknown }).nodes;
-  return Array.isArray(nodes) ? nodes.length : 0;
-}
-
 export type CanvasProjectSummary = {
   id: string;
   name: string;
   description: string;
   thumbnailUrl: string;
   edition: CanvasProjectEdition;
+  /** sbv1 · 列表封面媒体类型（成片 / 分镜图） */
+  coverMediaKind?: "image" | "video";
+  /** sbv1 · 悬停播放的成片 URL */
+  coverVideoUrl?: string;
+  /** sbv1 · 成片静态封面 */
+  coverPosterUrl?: string;
   /** 已绑定脚本包 / 公告栏的协同画布，禁止删除 */
   collaborationLocked: boolean;
   createdAt: string;
@@ -84,21 +105,43 @@ function resolveThumbnailUrl(p: {
   canvas: unknown;
 }): string {
   const stored = p.thumbnailUrl?.trim() ?? "";
-  const persistable = pickPersistableProjectThumbnailUrl(p.canvas);
+  const preferVideo = canvasProjectEditionFromGraph(p.canvas) === "sbv1";
+  const pickPersistable = preferVideo
+    ? pickPersistableProjectThumbnailUrlPreferVideo
+    : pickPersistableProjectThumbnailUrl;
+  const pickDisplay = preferVideo
+    ? pickProjectThumbnailUrlPreferVideo
+    : pickProjectThumbnailUrl;
+  const persistable = pickPersistable(p.canvas);
 
   if (persistable && (!stored || !isTrustworthyStoredThumbnail(stored))) {
     return persistable;
   }
   if (stored) return stored;
-  return pickProjectThumbnailUrl(p.canvas);
+  return pickDisplay(p.canvas);
 }
 
-function duplicateProjectName(sourceName: string): string {
+export function duplicateProjectName(sourceName: string): string {
   const suffix = " 副本";
   const base = sourceName.trim() || defaultCanvasProjectName();
   const next = `${base}${suffix}`;
   if (next.length <= MAX_NAME) return next;
   return `${base.slice(0, MAX_NAME - suffix.length)}${suffix}`;
+}
+
+function enrichSummaryWithListCover(
+  summary: CanvasProjectSummary,
+  canvas: unknown,
+): CanvasProjectSummary {
+  const cover = projectListCoverSummaryFields(canvas);
+  if (!cover.coverMediaKind) return summary;
+  return {
+    ...summary,
+    thumbnailUrl: cover.thumbnailUrl ?? summary.thumbnailUrl,
+    coverMediaKind: cover.coverMediaKind,
+    coverVideoUrl: cover.coverVideoUrl,
+    coverPosterUrl: cover.coverPosterUrl,
+  };
 }
 
 function toSummary(p: {
@@ -114,12 +157,16 @@ function toSummary(p: {
     p.canvas && typeof p.canvas === "object"
       ? (p.canvas as { meta?: unknown })
       : null;
+  const sbv1Cover = projectListCoverSummaryFields(p.canvas);
   return {
     id: p.id,
     name: p.name,
     description: p.description,
-    thumbnailUrl: resolveThumbnailUrl(p),
+    thumbnailUrl: sbv1Cover.thumbnailUrl ?? resolveThumbnailUrl(p),
     edition: canvasProjectEditionFromGraph(p.canvas),
+    coverMediaKind: sbv1Cover.coverMediaKind,
+    coverVideoUrl: sbv1Cover.coverVideoUrl,
+    coverPosterUrl: sbv1Cover.coverPosterUrl,
     collaborationLocked: canvasProjectHasCollaboration(canvas?.meta),
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
@@ -132,59 +179,163 @@ type CanvasProjectListRow = {
   description: string;
   thumbnailUrl: string;
   meta: unknown;
-  nodeTypes: string[] | null;
   createdAt: Date;
   updatedAt: Date;
 };
 
-function parseListNodeTypes(raw: unknown): string[] | null {
-  if (!Array.isArray(raw)) return null;
-  return raw.filter((t): t is string => typeof t === "string");
+export type CanvasProjectListPage = {
+  projects: CanvasProjectSummary[];
+  nextCursor: string | null;
+  hasMore: boolean;
+};
+
+const DEFAULT_LIST_PAGE_SIZE = 20;
+const MAX_LIST_PAGE_SIZE = 50;
+
+function clampListLimit(limit: number | undefined): number {
+  if (!limit || !Number.isFinite(limit)) return DEFAULT_LIST_PAGE_SIZE;
+  return Math.min(Math.max(Math.floor(limit), 1), MAX_LIST_PAGE_SIZE);
 }
 
-function listRowToSummary(row: CanvasProjectListRow): CanvasProjectSummary {
-  const nodeTypes = parseListNodeTypes(row.nodeTypes);
+function encodeListCursor(updatedAt: Date, id: string): string {
+  return Buffer.from(`${updatedAt.toISOString()}|${id}`, "utf8").toString(
+    "base64url",
+  );
+}
+
+function decodeListCursor(raw: string | null | undefined): {
+  updatedAt: Date;
+  id: string;
+} | null {
+  const trimmed = raw?.trim();
+  if (!trimmed) return null;
+  try {
+    const decoded = Buffer.from(trimmed, "base64url").toString("utf8");
+    const sep = decoded.lastIndexOf("|");
+    if (sep <= 0) return null;
+    const iso = decoded.slice(0, sep);
+    const id = decoded.slice(sep + 1);
+    if (!id) return null;
+    const updatedAt = new Date(iso);
+    if (Number.isNaN(updatedAt.getTime())) return null;
+    return { updatedAt, id };
+  } catch {
+    return null;
+  }
+}
+
+function listRowToSummary(
+  row: CanvasProjectListRow,
+  nodesFallback?: unknown,
+): CanvasProjectSummary {
+  const storedThumb = row.thumbnailUrl?.trim() ?? "";
+  const listCover = resolveProjectListCoverForListRow({
+    meta: row.meta,
+    nodes: nodesFallback,
+    storedThumbnailUrl: storedThumb,
+  });
   return {
     id: row.id,
     name: row.name,
     description: row.description,
-    thumbnailUrl: row.thumbnailUrl?.trim() ?? "",
-    edition: canvasProjectEditionFromListHints(row.meta, nodeTypes),
+    thumbnailUrl: listCover.thumbnailUrl ?? storedThumb,
+    edition: canvasProjectEditionFromMeta(row.meta),
+    coverMediaKind: listCover.coverMediaKind,
+    coverVideoUrl: listCover.coverVideoUrl,
+    coverPosterUrl: listCover.coverPosterUrl,
     collaborationLocked: canvasProjectHasCollaboration(row.meta),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
 
-export async function listCanvasProjectsForUser(
+function rowNeedsNodesCoverFallback(row: CanvasProjectListRow): boolean {
+  const metaCover = readListCoverFromMeta(row.meta);
+  if (metaCover?.coverVideoUrl?.trim()) return false;
+  return true;
+}
+
+async function fetchCanvasNodesByProjectIds(
   userId: string,
-): Promise<CanvasProjectSummary[]> {
-  const rows = await prisma.$queryRaw<CanvasProjectListRow[]>`
-    SELECT
-      cp.id,
-      cp.name,
-      cp.description,
-      cp."thumbnailUrl",
-      cp.canvas->'meta' AS meta,
-      (
-        SELECT COALESCE(jsonb_agg(elem->>'type'), '[]'::jsonb)
-        FROM jsonb_array_elements(
-          CASE
-            WHEN jsonb_typeof(cp.canvas->'nodes') = 'array'
-            THEN cp.canvas->'nodes'
-            ELSE '[]'::jsonb
-          END
-        ) AS elem
-      ) AS "nodeTypes",
-      cp."createdAt",
-      cp."updatedAt"
+  ids: string[],
+): Promise<Map<string, unknown>> {
+  if (ids.length === 0) return new Map();
+  const rows = await prisma.$queryRaw<Array<{ id: string; nodes: unknown }>>`
+    SELECT cp.id, cp.canvas->'nodes' AS nodes
     FROM "CanvasProject" cp
     WHERE cp."userId" = ${userId}
       AND cp."deletedAt" IS NULL
-    ORDER BY cp."updatedAt" DESC
-    LIMIT 200
+      AND cp.id IN (${Prisma.join(ids)})
   `;
-  return rows.map(listRowToSummary);
+  return new Map(rows.map((r) => [r.id, r.nodes]));
+}
+
+function isVisibleListRow(row: CanvasProjectListRow): boolean {
+  return !isRetiredLegacyPro2FromListHints(row.meta, null);
+}
+
+/** 列表页 · 分页 + 仅读 meta（不扫 nodes、不二次拉全量 canvas） */
+export async function listCanvasProjectsForUser(
+  userId: string,
+  opts?: { limit?: number; cursor?: string | null },
+): Promise<CanvasProjectListPage> {
+  const limit = clampListLimit(opts?.limit);
+  const cursor = decodeListCursor(opts?.cursor);
+
+  const rows = cursor
+    ? await prisma.$queryRaw<CanvasProjectListRow[]>`
+        SELECT
+          cp.id,
+          cp.name,
+          cp.description,
+          cp."thumbnailUrl",
+          cp.canvas->'meta' AS meta,
+          cp."createdAt",
+          cp."updatedAt"
+        FROM "CanvasProject" cp
+        WHERE cp."userId" = ${userId}
+          AND cp."deletedAt" IS NULL
+          AND (
+            cp."updatedAt" < ${cursor.updatedAt}
+            OR (cp."updatedAt" = ${cursor.updatedAt} AND cp.id < ${cursor.id})
+          )
+        ORDER BY cp."updatedAt" DESC, cp.id DESC
+        LIMIT ${limit + 1}
+      `
+    : await prisma.$queryRaw<CanvasProjectListRow[]>`
+        SELECT
+          cp.id,
+          cp.name,
+          cp.description,
+          cp."thumbnailUrl",
+          cp.canvas->'meta' AS meta,
+          cp."createdAt",
+          cp."updatedAt"
+        FROM "CanvasProject" cp
+        WHERE cp."userId" = ${userId}
+          AND cp."deletedAt" IS NULL
+        ORDER BY cp."updatedAt" DESC, cp.id DESC
+        LIMIT ${limit + 1}
+      `;
+
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
+  const visibleRows = pageRows.filter(isVisibleListRow);
+  const nodesFallbackIds = visibleRows
+    .filter(rowNeedsNodesCoverFallback)
+    .map((r) => r.id);
+  const nodesByProjectId = await fetchCanvasNodesByProjectIds(
+    userId,
+    nodesFallbackIds,
+  );
+  const projects = visibleRows.map((row) =>
+    listRowToSummary(row, nodesByProjectId.get(row.id)),
+  );
+  const last = pageRows.at(-1);
+  const nextCursor =
+    hasMore && last ? encodeListCursor(last.updatedAt, last.id) : null;
+
+  return { projects, nextCursor, hasMore };
 }
 
 function defaultCanvasProjectName(now = new Date()): string {
@@ -210,10 +361,15 @@ export async function createCanvasProjectForUser(
   if (name.length > MAX_NAME)
     throw new CanvasProjectError("INVALID_INPUT", "name too long");
   const description = (args.description ?? "").toString();
-  const canvas =
+  let canvas =
     args.canvas && typeof args.canvas === "object"
-      ? args.canvas
+      ? embedListCoverInCanvas(args.canvas)
       : { schemaVersion: 1, nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  if (canvasProjectEditionFromGraph(canvas) === "pro2") {
+    canvas = withPro2ScriptFormatV13Meta(
+      canvas as { meta?: unknown },
+    );
+  }
 
   const tenantCtx = await getActiveTenantContext(userId);
 
@@ -239,11 +395,10 @@ export async function getCanvasProjectForUser(
   userId: string,
   projectId: string,
 ): Promise<CanvasProjectDetail> {
-  await assertAccessibleCanvasProject(userId, projectId);
-  const p = await prisma.canvasProject.findFirst({
-    where: { id: projectId, deletedAt: null },
-  });
-  if (!p) throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
+  const p = await loadAccessibleCanvasProjectRow(userId, projectId, {});
+  if (isRetiredLegacyPro2Canvas(p.canvas)) {
+    throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
+  }
   return {
     ...toSummary(p),
     canvas: p.canvas,
@@ -253,13 +408,22 @@ export async function getCanvasProjectForUser(
 export async function updateCanvasProjectForUser(
   userId: string,
   projectId: string,
-  patch: { name?: string; description?: string; canvas?: unknown; thumbnailUrl?: string },
+  patch: {
+    name?: string;
+    description?: string;
+    canvas?: unknown;
+    canvasDelta?: CanvasDeltaPatch;
+    thumbnailUrl?: string;
+  },
 ): Promise<CanvasProjectDetail> {
   await assertAccessibleCanvasProject(userId, projectId);
   const p = await prisma.canvasProject.findFirst({
     where: { id: projectId, deletedAt: null },
   });
   if (!p) throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
+  if (isRetiredLegacyPro2Canvas(p.canvas)) {
+    throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
+  }
 
   const data: Prisma.CanvasProjectUpdateInput = {};
   if (typeof patch.name === "string") {
@@ -275,22 +439,27 @@ export async function updateCanvasProjectForUser(
   if (typeof patch.thumbnailUrl === "string") {
     data.thumbnailUrl = patch.thumbnailUrl;
   }
-  if (patch.canvas !== undefined) {
+  if (patch.canvas !== undefined && patch.canvasDelta !== undefined) {
+    throw new CanvasProjectError(
+      "INVALID_INPUT",
+      "canvas and canvasDelta are mutually exclusive",
+    );
+  }
+  if (patch.canvasDelta !== undefined) {
+    assertCanvasDeltaBaseUpdatedAt(patch.canvasDelta.baseUpdatedAt, p.updatedAt);
+    const mergedCanvas = embedListCoverInCanvas(
+      mergePersistedMediaIntoCanvasGraph(
+        applyCanvasDelta(p.canvas, patch.canvasDelta),
+        p.canvas,
+      ),
+    );
+    data.canvas = mergedCanvas as Prisma.InputJsonValue;
+  } else if (patch.canvas !== undefined) {
     if (!patch.canvas || typeof patch.canvas !== "object") {
       throw new CanvasProjectError("INVALID_INPUT", "canvas must be object");
     }
-    const prevNodes = canvasNodeCount(p.canvas);
-    const nextNodes = canvasNodeCount(patch.canvas);
-    if (prevNodes > 0 && nextNodes === 0) {
-      throw new CanvasProjectError(
-        "INVALID_INPUT",
-        "refusing to save empty canvas over existing nodes",
-        409,
-      );
-    }
-    const mergedCanvas = mergePersistedMediaIntoCanvasGraph(
-      patch.canvas,
-      p.canvas,
+    const mergedCanvas = embedListCoverInCanvas(
+      mergePersistedMediaIntoCanvasGraph(patch.canvas, p.canvas),
     );
     data.canvas = mergedCanvas as Prisma.InputJsonValue;
   }
@@ -396,6 +565,7 @@ export async function duplicateCanvasProjectForUser(
 
 export type PortalFeaturedProjectSummary = CanvasProjectSummary & {
   portalFeaturedBlurb: string;
+  owner?: { id: string; name: string | null; email: string | null } | null;
 };
 
 function portalFeaturedBlurbOf(p: {
@@ -415,11 +585,21 @@ export async function listPortalFeaturedCanvasProjects(): Promise<
     where: { portalFeatured: true, deletedAt: null },
     orderBy: [{ portalFeaturedSort: "asc" }, { updatedAt: "desc" }],
     take: 50,
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+    },
   });
-  return rows.map((p) => ({
-    ...toSummary(p),
-    portalFeaturedBlurb: portalFeaturedBlurbOf(p),
-  }));
+  return rows
+    .filter(
+      (p) =>
+        canvasProjectEditionFromGraph(p.canvas) === "pro2" &&
+        !isRetiredLegacyPro2Canvas(p.canvas),
+    )
+    .map((p) => ({
+      ...toSummary(p),
+      portalFeaturedBlurb: portalFeaturedBlurbOf(p),
+      owner: p.user,
+    }));
 }
 
 async function getPortalFeaturedCanvasProjectRow(projectId: string) {
@@ -438,6 +618,89 @@ export async function duplicatePortalFeaturedProjectForUser(
   sourceProjectId: string,
 ): Promise<CanvasProjectDetail> {
   const source = await getPortalFeaturedCanvasProjectRow(sourceProjectId);
+  if (isRetiredLegacyPro2Canvas(source.canvas)) {
+    throw new CanvasProjectError("NOT_FOUND", "portal featured project not found", 404);
+  }
+  const canvas = cloneCanvasGraphForDuplicate(source.canvas);
+  const thumbnailUrl =
+    resolveThumbnailUrl({
+      thumbnailUrl: source.thumbnailUrl,
+      canvas: source.canvas,
+    }) || "";
+  const created = await createCanvasProjectForUser(userId, {
+    name: duplicateProjectName(source.name),
+    description: source.description,
+    canvas,
+  });
+  if (!thumbnailUrl) return created;
+
+  const updated = await prisma.canvasProject.update({
+    where: { id: created.id },
+    data: { thumbnailUrl },
+  });
+  return {
+    ...toSummary(updated),
+    canvas: updated.canvas,
+  };
+}
+
+async function getPortalCaseCanvasProjectRow(projectId: string) {
+  const p = await prisma.canvasProject.findFirst({
+    where: { id: projectId, deletedAt: null, portalCase: true },
+  });
+  if (!p) {
+    throw new CanvasProjectError("NOT_FOUND", "portal case project not found", 404);
+  }
+  return p;
+}
+
+/** 从门户案例复制到当前用户 */
+export async function duplicatePortalCaseProjectForUser(
+  userId: string,
+  sourceProjectId: string,
+): Promise<CanvasProjectDetail> {
+  const source = await getPortalCaseCanvasProjectRow(sourceProjectId);
+  if (isRetiredLegacyPro2Canvas(source.canvas)) {
+    throw new CanvasProjectError("NOT_FOUND", "portal case project not found", 404);
+  }
+  const canvas = cloneCanvasGraphForDuplicate(source.canvas);
+  const thumbnailUrl =
+    resolveThumbnailUrl({
+      thumbnailUrl: source.thumbnailUrl,
+      canvas: source.canvas,
+    }) || "";
+  const created = await createCanvasProjectForUser(userId, {
+    name: duplicateProjectName(source.name),
+    description: source.description,
+    canvas,
+  });
+  if (!thumbnailUrl) return created;
+
+  const updated = await prisma.canvasProject.update({
+    where: { id: created.id },
+    data: { thumbnailUrl },
+  });
+  return {
+    ...toSummary(updated),
+    canvas: updated.canvas,
+  };
+}
+
+/** 从影视案例墙复制 sbv1 项目（portalCase 分镜 1.0） */
+export async function duplicatePortalFilmShowcaseProjectForUser(
+  userId: string,
+  sourceProjectId: string,
+): Promise<CanvasProjectDetail> {
+  const allowed = await isPortalFilmShowcaseProject(sourceProjectId);
+  if (!allowed) {
+    throw new CanvasProjectError("NOT_FOUND", "film showcase project not found", 404);
+  }
+  const source = await prisma.canvasProject.findFirst({
+    where: { id: sourceProjectId, deletedAt: null },
+  });
+  if (!source) {
+    throw new CanvasProjectError("NOT_FOUND", "film showcase project not found", 404);
+  }
   const canvas = cloneCanvasGraphForDuplicate(source.canvas);
   const thumbnailUrl =
     resolveThumbnailUrl({

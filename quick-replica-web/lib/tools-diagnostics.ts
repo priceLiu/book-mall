@@ -2,6 +2,9 @@
 export type ToolsSessionFetchDiag = {
   path:
     | "jwt_local"
+    | "jwt_fallback_after_abort"
+    | "jwt_fallback_network"
+    | "jwt_fallback_http"
     | "missing_main_origin"
     | "introspect_http"
     | "introspect_aborted"

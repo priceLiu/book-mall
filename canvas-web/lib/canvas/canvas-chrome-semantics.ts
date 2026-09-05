@@ -7,6 +7,13 @@ export const CANVAS_SEMANTIC_TITLE_CLASS = "text-white";
 
 export const CANVAS_SEMANTIC_STATUS_CLASS = "text-orange-300/90";
 
+/** 顶栏状态 chip · 统一浅灰字 */
+export const CANVAS_TOOLBAR_META_CHIP_CLASS =
+  "inline-flex shrink-0 items-center gap-1 rounded-md bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-white/55";
+
+/** 顶栏保存 / 状态文案 · 浅灰 */
+export const CANVAS_TOOLBAR_META_TEXT_CLASS = "text-[11px] text-white/55";
+
 export const CANVAS_SEMANTIC_ERROR_CLASS = "text-red-400/90";
 
 export const CANVAS_SEMANTIC_ERROR_SOFT_CLASS = "text-red-300/95";
@@ -39,6 +46,10 @@ export const CANVAS_PRIMARY_BTN_SM_CLASS =
 /** 顶栏工具按钮（白字 · 中性描边，禁止彩色字） */
 export const CANVAS_TOOLBAR_BTN_CLASS =
   "inline-flex shrink-0 items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-white/85 hover:border-white/30 hover:text-white";
+
+/** 顶栏纯图标按钮（悬停 title 展示文案） */
+export const CANVAS_TOOLBAR_ICON_BTN_CLASS =
+  "inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-white/10 text-white/85 hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-50";
 
 /** 侧栏标题行 */
 export const CANVAS_PANEL_HEADER_BORDER_CLASS = "border-white/10";

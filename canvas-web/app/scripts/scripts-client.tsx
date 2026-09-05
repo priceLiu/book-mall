@@ -6,10 +6,13 @@ import { FileText, Loader2, Plus } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { ProjectsSubNav } from "@/components/layout/projects-sub-nav";
 import { listPickableScriptPackages } from "@/lib/canvas/list-pickable-script-packages";
+import { CREW_COLLABORATION_PERSONAL_HINT } from "@/lib/canvas/crew-collaboration-access";
+import { useCrewCollaborationAccess } from "@/lib/canvas/use-crew-collaboration-access";
 import type { NewProjectScriptPackageAsset } from "@/lib/canvas/pro2-new-project-script-package";
 
 export function ScriptsClient() {
   const base = useBookMallBaseUrl();
+  const collaboration = useCrewCollaborationAccess();
   const [scripts, setScripts] = useState<NewProjectScriptPackageAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,8 +31,32 @@ export function ScriptsClient() {
   }, [base]);
 
   useEffect(() => {
+    if (!collaboration.canUseCrewBulletin) {
+      setLoading(false);
+      return;
+    }
     void load();
-  }, [load]);
+  }, [load, collaboration.canUseCrewBulletin]);
+
+  if (!collaboration.canUseCrewBulletin) {
+    return (
+      <div className="canvas-page canvas-page-fill py-6 sm:py-8 lg:py-10">
+        <div className="mb-6 flex justify-center">
+          <ProjectsSubNav />
+        </div>
+        <header className="mb-8">
+          <p className="twenty-eyebrow">canvas-web · scripts</p>
+          <h1 className="canvas-serif mt-2 flex items-center gap-2 text-3xl text-white">
+            <FileText className="size-8 text-[var(--canvas-accent)]" />
+            脚本
+          </h1>
+        </header>
+        <div className="rounded-2xl border border-dashed border-[var(--canvas-border)] p-12 text-center text-sm text-[var(--canvas-muted)]">
+          {CREW_COLLABORATION_PERSONAL_HINT}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="canvas-page canvas-page-fill py-6 sm:py-8 lg:py-10">

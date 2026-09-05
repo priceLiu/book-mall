@@ -40,6 +40,7 @@ import {
   LIBTV_NODE_SIDE_PLUS_LAYER_CLASS,
   LIBTV_NODE_SIDE_PLUS_SIZE,
 } from "@/lib/canvas/libtv-node-chrome";
+import { LibtvEditableNodeTitle } from "../libtv-editable-node-title";
 import { Pro2NodeSidePlus } from "../pro2/pro2-node-side-plus";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { handlePro2GroupSidePick } from "@/lib/canvas/pro2-group-side-spawn";
@@ -142,10 +143,9 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const Pro2GroupIcon = pro2MediaGroupIcon(d.pro2Kind);
   const GroupHeaderIcon =
     isSbv1Group && !isPro2MediaGroup ? LayoutGrid : Pro2GroupIcon;
-  const groupHeaderLabel =
-    isSbv1Group && !isPro2MediaGroup
-      ? d.label?.trim() || "参考图组"
-      : d.label?.trim() || "未命名分组";
+  const groupDefaultLabel =
+    isSbv1Group && !isPro2MediaGroup ? "参考图组" : "未命名分组";
+  const groupHeaderLabel = d.label?.trim() || groupDefaultLabel;
 
   const selectMediaGroup = useCallback(() => {
     rfSetNodes((prev) =>
@@ -237,52 +237,13 @@ export function GroupNode({ id, data, selected }: NodeProps) {
             )}
             style={{ top: "50%" }}
           />
-          <Handle
-            id="out_media"
-            type="source"
-            position={Position.Right}
-            className={cn(
-              PRO2_NODE_HANDLE_CLASS,
-              showSidePlus
-                ? "pointer-events-none opacity-0"
-                : selected
-                  ? "opacity-100"
-                  : "pointer-events-none opacity-0",
-            )}
-            style={{ top: "50%" }}
-          />
+          {/* out_media 出边由 Pro2NodeSidePlus 提供 */}
         </>
       ) : null}
 
       {isSbv1Group && !isPro2MediaGroup ? (
-        <Handle
-          id="out_media"
-          type="source"
-          position={Position.Right}
-          className={cn(
-            SBV1_NODE_HANDLE_CLASS,
-            showSidePlus
-              ? "pointer-events-none opacity-0"
-              : selected
-                ? "opacity-100"
-                : "pointer-events-none opacity-0",
-          )}
-          style={{ top: "50%" }}
-          title={`连线到${SBV1_VIDEO_COMPOSE_LABEL}`}
-        />
-      ) : null}
-
-      {isLibtvMediaGroup ? (
-        <Handle
-          id="plus_left"
-          type="source"
-          position={Position.Left}
-          className={cn(
-            isPro2MediaGroup ? PRO2_NODE_HANDLE_CLASS : SBV1_NODE_HANDLE_CLASS,
-            "pointer-events-none opacity-0",
-          )}
-          style={{ top: "50%" }}
-        />
+        /* sbv1 组 out_media 由 Pro2NodeSidePlus 提供 */
+        null
       ) : null}
 
       {isLibtvMediaGroup ? (
@@ -347,24 +308,16 @@ export function GroupNode({ id, data, selected }: NodeProps) {
               style={{ background: color }}
             />
           )}
-          {isLibtvMediaGroup || readonly ? (
-            <span
-              className={cn(
-                PRO2_MEDIA_NODE_TITLE_CLASS,
-                "mb-0 px-0",
-                isLibtvMediaGroup &&
-                  "cursor-pointer transition hover:text-white/90",
-              )}
-            >
+          {readonly ? (
+            <span className={cn(PRO2_MEDIA_NODE_TITLE_CLASS, "mb-0 px-0")}>
               {groupHeaderLabel}
             </span>
           ) : (
-            <input
-              value={d.label ?? ""}
-              onChange={(e) => updateNodeData(id, { label: e.target.value })}
-              placeholder="未命名分组"
-              className="nodrag min-w-0 flex-1 bg-transparent text-[11px] text-white outline-none placeholder:text-white/35"
-              spellCheck={false}
+            <LibtvEditableNodeTitle
+              nodeId={id}
+              defaultLabel={groupDefaultLabel}
+              className="gap-0"
+              textClassName="text-[11px] text-white transition hover:text-white/90"
             />
           )}
         </div>

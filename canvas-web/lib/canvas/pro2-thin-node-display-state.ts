@@ -1,6 +1,8 @@
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
+import { resolvePro2StarterDockLinkLabel } from "./pro2-dock-upstream-links";
+import type { StoryProStarterNodeData } from "./story-pro-workspace-types";
 
-/** LibTV 薄卡（文本 / 脚本生成器）三种展示态 · 见 docs/libtv-node-state-spec.md */
+/** LibTV 薄卡（文本 / 故事脚本生成）三种展示态 · 见 docs/libtv-node-state-spec.md */
 export type LibtvThinNodeDisplayState = "initial" | "connected" | "generated";
 
 export function pro2ThinNodeIsLinked(
@@ -16,12 +18,41 @@ export function pro2ThinNodeIsLinked(
   );
 }
 
+/** 视频合成节点 · 有入边或出边即视为已连线（含快捷预设生成的上游节点） */
+export function libtvVideoEngineNodeIsLinked(
+  nodeId: string,
+  edges: CanvasFlowEdge[],
+): boolean {
+  return edges.some((e) => {
+    if (e.target === nodeId) {
+      return (
+        e.targetHandle === "in_text" ||
+        e.targetHandle === "in_ref" ||
+        e.targetHandle === "in_motion_video" ||
+        e.targetHandle == null
+      );
+    }
+    if (e.source === nodeId) {
+      return e.sourceHandle === "out_video" || e.sourceHandle == null;
+    }
+    return false;
+  });
+}
+
 export function resolveLibtvThinNodeDisplayState(input: {
   hasGeneratedContent: boolean;
   isGenerating: boolean;
   isLinked: boolean;
+  /** 结果落库窗口内保持「已生成」态，避免闪回 initial/connected */
+  hubGenerateIntent?: boolean;
 }): LibtvThinNodeDisplayState {
-  if (input.isGenerating || input.hasGeneratedContent) return "generated";
+  if (
+    input.isGenerating ||
+    input.hasGeneratedContent ||
+    input.hubGenerateIntent
+  ) {
+    return "generated";
+  }
   if (input.isLinked) return "connected";
   return "initial";
 }
@@ -74,7 +105,7 @@ export function pro2StarterLinkedMessage(
   return "已链接上游 · 在下方 Dock 输入后发送";
 }
 
-/** 脚本生成器连线态说明（有边即 connected，不要求 outlineMd 已同步） */
+/** 故事脚本生成连线态说明（有边即 connected；标题随上游节点 label） */
 export function pro2ScriptHubLinkedMessage(input: {
   edges: CanvasFlowEdge[];
   nodes: CanvasFlowNode[];
@@ -88,13 +119,14 @@ export function pro2ScriptHubLinkedMessage(input: {
     };
   }
   const incoming = input.edges.filter((e) => e.target === input.hubId);
-  const fromStarter = incoming.some((e) => {
-    const src = input.nodes.find((n) => n.id === e.source);
-    return src?.type === "story-pro2-starter";
-  });
-  if (fromStarter) {
+  const starter = incoming
+    .map((e) => input.nodes.find((n) => n.id === e.source))
+    .find((n) => n?.type === "story-pro2-starter");
+  if (starter) {
+    const sd = starter.data as unknown as StoryProStarterNodeData;
+    const label = resolvePro2StarterDockLinkLabel(sd);
     return {
-      title: "已链接文本节点",
+      title: `已链接${label}`,
       hint: "在下方 Dock 输入后发送",
     };
   }

@@ -6,6 +6,7 @@ import {
   publishModelCreditPrice,
   loadPricingConfig,
   computeCreditPrice,
+  refreshCreditPriceIfStale,
   resolveModelMarginM,
 } from "@/lib/pricing/credit-pricing-engine";
 import { prisma } from "@/lib/prisma";
@@ -140,6 +141,11 @@ export async function autoPublishPlatformOfferings(input?: {
     }
 
     try {
+      await refreshCreditPriceIfStale({
+        canonicalModelKey: def.canonicalModelKey,
+        displayName: def.displayName,
+        publishedBy: input?.publishedBy ?? "autoPublishPlatformOfferings",
+      });
       if (def.canonicalModelKey === "lib-nano-pro") {
         await publishModelCreditPrice({
           canonicalModelKey: pricingCanonicalKey,

@@ -1,22 +1,58 @@
 "use client";
 
-import { buildEcomLoginUrl, getBookOriginClient } from "@/lib/ecom-auth";
+import { buildEcomLoginUrl } from "@/lib/portal-auth-links";
+import { getBookOriginClient } from "@/lib/ecom-auth";
+import { isEcomPublicSsoPath } from "@/lib/ecom-public-paths";
+import {
+  bumpEcomSsoReenterAttempts,
+  clearEcomSsoReenterAttempts,
+  MAX_ECOM_SSO_REENTER_ATTEMPTS,
+  readEcomSsoReenterAttempts,
+} from "@/lib/ecom-sso-reenter-attempts";
+import {
+  fetchEcomToolsSessionLite,
+  refreshEcomToolsSessionClient,
+} from "@/lib/ecom-tools-session-client";
 
 const REFRESH_COOLDOWN_MS = 45_000;
 let lastRefreshAt = 0;
 
-/** 静默换票完成后，子页面回传给父页面的消息类型 */
-export const ECOM_SILENT_SSO_MESSAGE = "ecom-sso-refreshed" as const;
-/** 静默换票的回跳着陆页（轻量页，仅 postMessage） */
-const SILENT_DONE_PATH = "/auth/sso/silent-done";
-const SILENT_REFRESH_TIMEOUT_MS = 12_000;
-const SILENT_REFRESH_MIN_GAP_MS = 8_000;
+function resolveBookOrigin(bookOrigin?: string): string {
+  const raw = bookOrigin?.trim() || getBookOriginClient();
+  return raw.replace(/\/$/, "");
+}
 
-let silentRefreshInFlight: Promise<boolean> | null = null;
-let lastSilentRefreshOkAt = 0;
+function buildReEnterUrl(args: {
+  bookOrigin?: string;
+  redirectPath: string;
+}): string {
+  const book = resolveBookOrigin(args.bookOrigin);
+  return `${book}/api/sso/tools/re-enter?app=e-commerce&redirect=${encodeURIComponent(
+    args.redirectPath,
+  )}`;
+}
 
-/** 经主站静默换票后回到当前路径（全页跳转，兜底用） */
-export function redirectEcomSessionRefresh(returnPath?: string): void {
+/** 首页静默换票（与 quick-replica `buildSilentReEnterHref` 一致）。 */
+export function buildEcomSilentReEnterHref(
+  mainOrigin: string | null,
+  redirectPath: string,
+): string | null {
+  if (!mainOrigin?.trim()) return null;
+  return buildReEnterUrl({
+    bookOrigin: mainOrigin,
+    redirectPath: redirectPath.startsWith("/") ? redirectPath : `/${redirectPath}`,
+  });
+}
+
+export { isEcomPublicSsoPath } from "@/lib/ecom-public-paths";
+
+/**
+ * 全页换票：走主站 re-enter（与 tool-web / canvas 一致，避免 iframe 第三方 Cookie 被拦）。
+ */
+export function redirectEcomSessionRefresh(
+  returnPath?: string,
+  bookOrigin?: string,
+): void {
   const path =
     returnPath ??
     (typeof window !== "undefined"
@@ -25,74 +61,58 @@ export function redirectEcomSessionRefresh(returnPath?: string): void {
   const now = Date.now();
   if (now - lastRefreshAt < REFRESH_COOLDOWN_MS) return;
   lastRefreshAt = now;
+
+  const book = resolveBookOrigin(bookOrigin);
+  if (book) {
+    window.location.href = buildReEnterUrl({ bookOrigin: book, redirectPath: path });
+    return;
+  }
   window.location.href = buildEcomLoginUrl(path);
 }
 
-/** 直连主站 re-enter（不经 /ecom-open 过渡页），用于隐藏 iframe 静默换票 */
-function buildSilentReEnterUrl(): string {
-  const book = getBookOriginClient().replace(/\/$/, "");
-  return `${book}/api/sso/tools/re-enter?app=e-commerce&redirect=${encodeURIComponent(
-    SILENT_DONE_PATH,
-  )}`;
+/**
+ * 冷启动 / 硬刷新：先 POST 续签（过期 token），失败则整页 re-enter（主站 Cookie 同页一级）。
+ */
+export function attemptEcomColdStartSso(opts: {
+  bookOrigin?: string;
+  pathname?: string;
+}): void {
+  if (typeof window === "undefined") return;
+  const pathname =
+    opts.pathname ??
+    `${window.location.pathname}${window.location.search}`;
+  if (isEcomPublicSsoPath(window.location.pathname)) return;
+  if (readEcomSsoReenterAttempts() >= MAX_ECOM_SSO_REENTER_ATTEMPTS) return;
+
+  void (async () => {
+    if (await refreshEcomToolsSessionClient()) return;
+
+    // 无 tools_token：允许匿名浏览工作台，生成时再登录。
+    if (
+      typeof document !== "undefined" &&
+      !document.cookie.includes("tools_token=")
+    ) {
+      return;
+    }
+
+    const book = resolveBookOrigin(opts.bookOrigin);
+    if (!book) return;
+
+    bumpEcomSsoReenterAttempts();
+    window.location.href = buildReEnterUrl({
+      bookOrigin: book,
+      redirectPath: pathname.startsWith("/") ? pathname : `/${pathname}`,
+    });
+  })();
 }
 
 /**
- * 隐藏 iframe 静默换票：book 与 ecom 同站（ai-code8.com / localhost），
- * iframe 内 re-enter 可带上主站会话 Cookie；换票链最终落在 ecom 同源着陆页，
- * 由其 postMessage 通知父页面完成。成功返回 true，超时/失败返回 false。
+ * 静默续期：优先 server refresh；不在此处整页跳转（避免 API 401 时打断编辑）。
  */
-export function silentEcomSessionRefresh(): Promise<boolean> {
-  if (typeof window === "undefined") return Promise.resolve(false);
-  if (silentRefreshInFlight) return silentRefreshInFlight;
-  // 刚成功续期过则视为仍新鲜，避免心跳/重试短时间重复换票
-  if (Date.now() - lastSilentRefreshOkAt < SILENT_REFRESH_MIN_GAP_MS) {
-    return Promise.resolve(true);
-  }
-
-  silentRefreshInFlight = new Promise<boolean>((resolve) => {
-    const iframe = document.createElement("iframe");
-    iframe.setAttribute("aria-hidden", "true");
-    iframe.title = "session-refresh";
-    Object.assign(iframe.style, {
-      position: "fixed",
-      left: "-9999px",
-      top: "0",
-      width: "1px",
-      height: "1px",
-      border: "0",
-      visibility: "hidden",
-      pointerEvents: "none",
-    } satisfies Partial<CSSStyleDeclaration>);
-
-    let settled = false;
-    const finish = (ok: boolean) => {
-      if (settled) return;
-      settled = true;
-      window.removeEventListener("message", onMessage);
-      window.clearTimeout(timer);
-      try {
-        iframe.remove();
-      } catch {
-        /* ignore */
-      }
-      if (ok) lastSilentRefreshOkAt = Date.now();
-      silentRefreshInFlight = null;
-      resolve(ok);
-    };
-
-    const onMessage = (e: MessageEvent) => {
-      if (e.origin !== window.location.origin) return;
-      const data = e.data as { type?: string } | null;
-      if (data?.type === ECOM_SILENT_SSO_MESSAGE) finish(true);
-    };
-
-    const timer = window.setTimeout(() => finish(false), SILENT_REFRESH_TIMEOUT_MS);
-    window.addEventListener("message", onMessage);
-    iframe.src = buildSilentReEnterUrl();
-    document.body.appendChild(iframe);
-  });
-
-  return silentRefreshInFlight;
+export async function silentEcomSessionRefresh(
+  _bookOrigin?: string,
+): Promise<boolean> {
+  return refreshEcomToolsSessionClient();
 }
 
 export type EcomToolsSessionInfo = {
@@ -101,27 +121,30 @@ export type EcomToolsSessionInfo = {
   tokenExpiresAt?: number | null;
 };
 
-/** 查询工具站会话；token 将过期时返回 expiresAt（秒级时间戳） */
+/** 查询工具站会话（lite：不阻塞 introspect） */
 export async function fetchEcomToolsSession(): Promise<EcomToolsSessionInfo> {
-  const res = await fetch("/api/tools-session", { credentials: "include", cache: "no-store" });
-  const data = (await res.json().catch(() => ({}))) as {
-    hasCookie?: boolean;
-    active?: boolean;
-    tokenExpiresAt?: number | null;
-  };
+  const data = await fetchEcomToolsSessionLite();
   return {
-    hasCookie: Boolean(data.hasCookie),
-    active: Boolean(data.active),
-    tokenExpiresAt:
-      typeof data.tokenExpiresAt === "number" ? data.tokenExpiresAt : null,
+    hasCookie: data.hasCookie,
+    active: data.active,
+    tokenExpiresAt: data.tokenExpiresAt ?? null,
   };
 }
 
+export type EnsureEcomSessionFreshOptions = {
+  bookOrigin?: string;
+  returnPath?: string;
+  /** 静默续期失败时是否整页跳转换票（后台心跳应 false，生图/提交前应 true） */
+  redirectOnFailure?: boolean;
+};
+
 /**
- * 令牌将在 thresholdSec 内过期时静默换票（隐藏 iframe）。
- * 静默失败（主站会话也失效）才退回全页跳转换票。
+ * 令牌将在 thresholdSec 内过期时静默续签。
  */
-export async function ensureEcomSessionFresh(thresholdSec = 120): Promise<boolean> {
+export async function ensureEcomSessionFresh(
+  thresholdSec = 120,
+  opts: EnsureEcomSessionFreshOptions = {},
+): Promise<boolean> {
   const session = await fetchEcomToolsSession();
   const exp = session.tokenExpiresAt;
   const needsRefresh =
@@ -130,8 +153,12 @@ export async function ensureEcomSessionFresh(thresholdSec = 120): Promise<boolea
     (exp != null && exp * 1000 < Date.now() + thresholdSec * 1000);
   if (!needsRefresh) return true;
 
-  if (await silentEcomSessionRefresh()) return true;
+  if (await refreshEcomToolsSessionClient()) return true;
 
-  redirectEcomSessionRefresh();
+  if (opts.redirectOnFailure) {
+    redirectEcomSessionRefresh(opts.returnPath, opts.bookOrigin);
+  }
   return false;
 }
+
+export { clearEcomSsoReenterAttempts };

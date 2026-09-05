@@ -8,8 +8,16 @@ import {
   Layers,
   ScanFace,
   SlidersHorizontal,
+  Sparkles,
   User,
+  Wand2,
 } from "lucide-react";
+import {
+  buildPro2ImageEditNodeData,
+  CANVAS_IMAGE_EDIT_MODEL_KEYS,
+  isDirectCanvasImageEditMenuId,
+  type CanvasImageEditModelKey,
+} from "./canvas-image-edit-models";
 import {
   buildPro2GeneralTextNodeData,
   buildPro2ImageNodeData,
@@ -26,6 +34,7 @@ import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
 const GAP = 48;
 
 export type LibtvImageEditMenuId =
+  | CanvasImageEditModelKey
   | "character-face-three-view"
   | "character-design"
   | "scene-design"
@@ -38,9 +47,27 @@ export type LibtvImageEditMenuItem = {
   id: LibtvImageEditMenuId;
   label: string;
   icon: LucideIcon;
+  /** Gateway 直连图像编辑（千问 / 万相 2.7 Pro） */
+  directImageEdit?: boolean;
 };
 
-export const LIBTV_IMAGE_EDIT_MENU: LibtvImageEditMenuItem[] = [
+/** 图片节点 ·「编辑」下拉 · Gateway 图像编辑（平台代付） */
+export const LIBTV_IMAGE_DIRECT_EDIT_MENU: LibtvImageEditMenuItem[] = [
+  {
+    id: "qwen-image-edit",
+    label: "千问 · 图像编辑",
+    icon: Sparkles,
+    directImageEdit: true,
+  },
+  {
+    id: "wan2.7-image-pro",
+    label: "万相 2.7 Pro · 编辑",
+    icon: Wand2,
+    directImageEdit: true,
+  },
+];
+
+export const LIBTV_IMAGE_EDIT_WORKFLOW_MENU: LibtvImageEditMenuItem[] = [
   { id: "character-face-three-view", label: "角色脸部三视图", icon: ScanFace },
   { id: "character-design", label: "角色设定图", icon: User },
   { id: "scene-design", label: "场景设定图", icon: Layers },
@@ -49,6 +76,13 @@ export const LIBTV_IMAGE_EDIT_MENU: LibtvImageEditMenuItem[] = [
   { id: "lighting-grade", label: "电影级光影校正", icon: SlidersHorizontal },
   { id: "character-three-view", label: "角色三视图", icon: User },
 ];
+
+export const LIBTV_IMAGE_EDIT_MENU: LibtvImageEditMenuItem[] = [
+  ...LIBTV_IMAGE_DIRECT_EDIT_MENU,
+  ...LIBTV_IMAGE_EDIT_WORKFLOW_MENU,
+];
+
+export { CANVAS_IMAGE_EDIT_MODEL_KEYS };
 
 export type LibtvImageEditSpawnStore = {
   nodes: CanvasFlowNode[];
@@ -79,7 +113,12 @@ function editTargetHandle(nodeType: CanvasNodeType): string {
   return "in_image";
 }
 
-function targetSpec(menuId: LibtvImageEditMenuId): EditTargetSpec {
+type LibtvImageEditWorkflowMenuId = Exclude<
+  LibtvImageEditMenuId,
+  CanvasImageEditModelKey
+>;
+
+function targetSpec(menuId: LibtvImageEditWorkflowMenuId): EditTargetSpec {
   switch (menuId) {
     case "character-face-three-view":
       return {
@@ -151,12 +190,52 @@ function targetSpec(menuId: LibtvImageEditMenuId): EditTargetSpec {
   }
 }
 
+function spawnDirectImageEditTarget(
+  sourceNodeId: string,
+  modelKey: CanvasImageEditModelKey,
+  store: LibtvImageEditSpawnStore,
+): string {
+  const anchor = store.nodes.find((n) => n.id === sourceNodeId);
+  if (!anchor) return "";
+
+  const anchorW = anchor.width ?? PRO2_IMAGE_NODE_WIDTH;
+  const position = {
+    x: anchor.position.x + anchorW + GAP,
+    y: anchor.position.y,
+  };
+
+  const newId = store.addNode(
+    "story-pro2-image",
+    position,
+    buildPro2ImageEditNodeData({ modelKey }),
+  );
+  if (!newId) return "";
+
+  store.setEdges((prev) => [
+    ...prev,
+    {
+      id: `e-${nanoid(6)}`,
+      source: sourceNodeId,
+      target: newId,
+      sourceHandle: "image",
+      targetHandle: "in_image",
+    },
+  ]);
+
+  selectPro2NodeAfterSpawn(store.setNodes, newId);
+  return newId;
+}
+
 /** 图片节点 ·「编辑」菜单 · 右侧生成 Pro2 节点并连线，参考图进入 Dock 上游缩略图 */
 export function spawnLibtvImageEditTarget(
   sourceNodeId: string,
   menuId: LibtvImageEditMenuId,
   store: LibtvImageEditSpawnStore,
 ): string {
+  if (isDirectCanvasImageEditMenuId(menuId)) {
+    return spawnDirectImageEditTarget(sourceNodeId, menuId, store);
+  }
+
   const anchor = store.nodes.find((n) => n.id === sourceNodeId);
   if (!anchor) return "";
 

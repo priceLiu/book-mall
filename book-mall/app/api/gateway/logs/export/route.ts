@@ -12,9 +12,9 @@ import {
 import { resolveGatewayLogAppTaskLinks } from "@/lib/gateway/log-app-task-link";
 import { resolveGatewayLogDisplayModelKey } from "@/lib/gateway/gateway-log-display-model";
 import {
-  resolveVendorNativeTimingForLogRow,
-  resolveVolcengineLogTiming,
-} from "@/lib/gateway/log-volcengine-timing";
+  resolveGatewayLogPhaseTiming,
+  resolveGatewayVendorNativeTimingForLogRow,
+} from "@/lib/gateway/log-gateway-phase-timing";
 import {
   computeLogTotalPages,
   GATEWAY_LOG_PAGE_SIZE_MAX,
@@ -95,14 +95,14 @@ export async function GET(request: NextRequest) {
         l.actorBookUserId != null
           ? (actorMap.get(l.actorBookUserId) ?? null)
           : null;
-      const timing = resolveVolcengineLogTiming({
+      const timing = resolveGatewayLogPhaseTiming({
         providerKind: l.providerKind,
         requestKind: l.requestKind,
         submittedAt: l.submittedAt,
         completedAt: l.completedAt,
         resultSummary: l.resultSummary,
       });
-      const vendorNative = resolveVendorNativeTimingForLogRow({
+      const vendorNative = resolveGatewayVendorNativeTimingForLogRow({
         providerKind: l.providerKind,
         requestKind: l.requestKind,
         vendorDurationMs: l.vendorDurationMs,

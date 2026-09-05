@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { FakeQrPlaceholder } from "@/components/pay/fake-qr-placeholder";
+import { WechatEnterpriseCheckout } from "@/components/pay/wechat-enterprise-checkout";
 import { Button } from "@/components/ui/button";
 
 export type CheckoutSession = {
@@ -34,8 +35,14 @@ export function WechatPersonalCheckout({
   const [checkout, setCheckout] = useState<CheckoutSession | null>(null);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [payeeName, setPayeeName] = useState("");
+  const [channel, setChannel] = useState<string>("WECHAT_PERSONAL");
+  const creatingRef = useRef(false);
+  const createdRef = useRef(false);
+  const payloadKey = JSON.stringify(createPayload);
 
-  const initCheckout = useCallback(async () => {
+  const initCheckout = useCallback(async (force = false) => {
+    if (!force && (createdRef.current || creatingRef.current)) return;
+    creatingRef.current = true;
     setLoading(true);
     setMsg(null);
     try {
@@ -47,7 +54,7 @@ export function WechatPersonalCheckout({
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
         checkout?: CheckoutSession & { productLabel: string };
-        wechat?: { qrUrl: string | null; payeeName: string };
+        wechat?: { channel?: string; qrUrl: string | null; payeeName: string };
         adminInstant?: boolean;
       };
       if (!res.ok) throw new Error(data.error ?? "创建支付单失败");
@@ -62,16 +69,22 @@ export function WechatPersonalCheckout({
       });
       setQrUrl(data.wechat?.qrUrl ?? null);
       setPayeeName(data.wechat?.payeeName ?? "");
+      setChannel(data.wechat?.channel ?? "WECHAT_PERSONAL");
+      createdRef.current = true;
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "创建支付单失败");
+      createdRef.current = false;
     } finally {
       setLoading(false);
+      creatingRef.current = false;
     }
   }, [createPayload]);
 
   useEffect(() => {
+    createdRef.current = false;
+    creatingRef.current = false;
     void initCheckout();
-  }, [initCheckout]);
+  }, [payloadKey, initCheckout]);
 
   async function onUserSubmitted() {
     if (!checkout) return;
@@ -120,7 +133,14 @@ export function WechatPersonalCheckout({
     return (
       <div className="space-y-3">
         <p className="text-sm text-red-500">{msg ?? "无法创建支付单"}</p>
-        <Button variant="outline" onClick={() => void initCheckout()}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            createdRef.current = false;
+            creatingRef.current = false;
+            void initCheckout(true);
+          }}
+        >
           重试
         </Button>
       </div>
@@ -129,6 +149,22 @@ export function WechatPersonalCheckout({
 
   const amountLabel = `¥${checkout.amountYuan.toFixed(2)}`;
   const awaiting = checkout.status === "AWAITING_CONFIRM";
+
+  // 企业微信支付 → 显示扫码组件
+  if (channel === "WECHAT_ENTERPRISE") {
+    return (
+      <div className="space-y-4">
+        <WechatEnterpriseCheckout
+          checkoutId={checkout.id}
+          amountYuan={checkout.amountYuan}
+          description={checkout.productLabel}
+          onPaid={() => {
+            if (successRedirect) window.location.href = successRedirect;
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

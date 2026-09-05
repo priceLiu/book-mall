@@ -16,7 +16,6 @@ import { DEEPSEEK_KNOWN_MODELS } from "./deepseek-system";
 import { Hunyuan3DGateway } from "./hunyuan-3d";
 import { KieGateway } from "./kie";
 import { OpenAiCompatGateway } from "./openai-compat";
-import { SYSTEM_DEEPSEEK_PROVIDER_ID } from "../canvas-system-provider";
 import {
   CanvasGatewayError,
   type CanvasProviderConfig,
@@ -53,10 +52,9 @@ export function getGatewayForKind(
     case "OPENAI_COMPAT":
       return new OpenAiCompatGateway(config, {
         kind: "OPENAI_COMPAT",
-        fallbackModels:
-          config.id === SYSTEM_DEEPSEEK_PROVIDER_ID
-            ? DEEPSEEK_KNOWN_MODELS
-            : undefined,
+        fallbackModels: config.baseUrl?.includes("deepseek.com")
+          ? DEEPSEEK_KNOWN_MODELS
+          : undefined,
       });
     case "HUNYUAN_3D":
       return new Hunyuan3DGateway(config);

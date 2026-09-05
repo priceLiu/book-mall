@@ -7,12 +7,14 @@ const config: Config = {
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./lib/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
+    "../shared/federated-portal-nav/**/*.{js,ts,jsx,tsx}",
+    "./docker-shared/federated-portal-nav/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {
       colors: {
         canvas: {
-          bg: "#141414",
+          bg: "#191919",
           surface: "#13131f",
           border: "rgba(255,255,255,0.08)",
           ink: "#f5f5f7",

@@ -49,19 +49,21 @@ export default function ImageToVideoImplementationPage() {
               <code>lib/image-to-video-models.ts</code> 加载；实验室侧栏切换 <code>apiModel</code>。
             </li>
             <li>
-              <strong>HTTP 与地域</strong>：创建与查询均走华北2「视频合成」异步接口，封装于{" "}
-              <code>lib/image-to-video-dashscope.ts</code>（可与仓库内 <code>doc/pic-video.md</code>、
-              <code>doc/chanaosheng.md</code>、<code>doc/wen-video.md</code> 对照）。
+              <strong>HTTP 与地域</strong>：创建与查询经主站 Gateway 出站；请求体构建见{" "}
+              <code>lib/image-to-video-dashscope.ts</code>（可与{" "}
+              <code>doc/pic-video.md</code>、<code>doc/chanaosheng.md</code>、
+              <code>doc/wen-video.md</code> 对照）。
             </li>
             <li>
               <strong>文生视频参数分叉</strong>：<code>happyhorse-*</code> 文生使用{" "}
               <code>parameters.resolution</code> + <code>ratio</code> + <code>duration</code>（3～15
               秒）等；万相等仍使用像素 <code>size</code> + <code>duration</code>（5 或 10）。分支在{" "}
-              <code>start/route.ts</code> 与 <code>t2vCreateVideoTask</code> 的{" "}
+              <code>start/route.ts</code> 与 <code>buildT2vVideoBody</code> 的{" "}
               <code>parameterStyle</code>。
             </li>
             <li>
-              <strong>密钥</strong>：仅服务端 <code>lib/qwen-env.ts</code> 读取，勿下发到客户端组件。
+              <strong>凭证</strong>：用户须关联 Gateway <code>sk-gw</code>；工具站经{" "}
+              <code>forward-gateway-dashscope-server</code> 换票调用主站，不在 tool-web 配置百炼 Key。
             </li>
           </ul>
         </ToolImplementationSection>
@@ -85,7 +87,7 @@ export default function ImageToVideoImplementationPage() {
         <ToolImplementationSection heading="4. 核心代码摘录">
           <ToolImplementationCode
             caption="创建任务：鉴权、分流 i2v / r2v / t2v（app/api/image-to-video/start/route.ts）"
-            code={`// kind: i2v | ref | t2v → i2vCreateVideoTask / r2vCreateReferenceVideoTask / t2vCreateVideoTask
+            code={`// kind: i2v | ref | t2v → build*VideoBody + createDashscopeJobFromServer
 // t2v：happyhorse-* → resolution + ratio + duration(3–15)；否则 size + duration(5|10)`}
           />
 

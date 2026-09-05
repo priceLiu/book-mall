@@ -4,11 +4,11 @@ import { nanoid } from "nanoid";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { NODE_DEFAULT_SIZE } from "./types";
 import {
-  STORY_PRO_HUB_LLM_SYSTEM,
   STORY_PRO_LLM_PARAMS_DEFAULT,
   STORY_PRO_THEME_SYSTEM_PROMPT_DEFAULT,
 } from "./story-pro-prompts";
 import {
+  STORY_PRO2_HUB_LLM_SYSTEM,
   STORY_PRO2_CHARACTER_PROMPT,
   STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
   STORY_PRO2_PACK_PROMPT_VERSION,
@@ -238,7 +238,7 @@ export function spawnStoryPro2ScriptHub(args: SpawnProHubArgs): {
       characterMd: "",
       sceneMd: "",
       storyboardMd: "",
-      outlineSystemPrompt: STORY_PRO_HUB_LLM_SYSTEM,
+      outlineSystemPrompt: STORY_PRO2_HUB_LLM_SYSTEM,
       promptOutline: STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
       promptCharacter: STORY_PRO2_CHARACTER_PROMPT,
       promptScene: STORY_PRO2_SCENE_PROMPT,

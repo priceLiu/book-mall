@@ -11,10 +11,16 @@ import {
 } from "@/lib/gateway/log-progress";
 import { persistVolcengineTimingOnPoll, finalizeVolcengineVideoRequestLog } from "@/lib/gateway/log-volcengine-timing-persist";
 import { readVolcengineTimingTrace } from "@/lib/gateway/log-volcengine-timing";
+import {
+  persistDashscopeTimingOnPoll,
+  finalizeDashscopeAsyncRequestLog,
+} from "@/lib/gateway/log-dashscope-timing-persist";
+import { readDashscopeTimingTrace } from "@/lib/gateway/log-dashscope-timing";
 import { inferGatewayFailCode } from "@/lib/gateway/log-fail-code";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
-import { prisma } from "@/lib/prisma";
 import {
+  extractKieResultUrl,
+  isKieRecordComplete,
   isKieRecordFail,
   isKieRecordSuccess,
 } from "@/lib/story/kie-client";
@@ -25,6 +31,7 @@ import {
   pollKieTaskForLog,
 } from "@/lib/gateway/poll-service";
 import { pollTopazVideoTaskForLog } from "@/lib/gateway/topaz-jobs";
+import { pollMinimaxVideoTaskStatus } from "@/lib/gateway/minimax-video-jobs";
 import {
   isDashscopeTaskFailed,
   isDashscopeTaskSuccess,
@@ -38,6 +45,16 @@ import {
 } from "@/lib/gateway/volcengine-client";
 import { resolveVolcengineArkApiKey } from "@/lib/gateway/volcengine-gateway-credential";
 import { extractBailianR2vVideoUrlFromGatewaySummary } from "@/lib/canvas/canvas-video-bailian-r2v";
+import type { GatewayRequestLog } from "@prisma/client";
+import type { DashscopeTaskOutput } from "@/lib/gateway/dashscope-client";
+import { readVendorRequestIdFromJson } from "@/lib/gateway/vendor-request-id";
+import { dashscopeVideoFinalizeExtras } from "@/lib/gateway/dashscope-video-finalize-extras";
+import { extractVolcengineVideoUrlFromGatewaySummary } from "@/lib/canvas/canvas-volcengine-recover";
+import {
+  isGatewayLogTerminalStatus,
+  resolveGatewayLogForRecordInfo,
+} from "@/lib/gateway/gateway-log-record-info";
+import { syncDashscopePollToGatewayLog } from "@/lib/gateway/gateway-v1-dashscope-poll-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -53,13 +70,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "taskId required" }, { status: 400 });
   }
 
-  const log = await prisma.gatewayRequestLog.findFirst({
-    where: {
-      userId: auth.userId,
-      externalTaskId: taskId,
-    },
-    orderBy: { submittedAt: "desc" },
+  const logIdParam =
+    request.nextUrl.searchParams.get("logId")?.trim() ??
+    request.nextUrl.searchParams.get("log_id")?.trim();
+
+  const log = await resolveGatewayLogForRecordInfo({
+    authUserId: auth.userId,
+    taskId,
+    logId: logIdParam,
   });
+  if (logIdParam && !log) {
+    return NextResponse.json(
+      { error: "Gateway log not found or taskId mismatch" },
+      { status: 404 },
+    );
+  }
 
   const credentialId =
     log?.credentialId ?? auth.credentials[0]?.id ?? null;
@@ -75,39 +100,31 @@ export async function GET(request: NextRequest) {
 
   try {
     if (providerKind === "DASHSCOPE") {
-      const polled = await pollDashscopeTaskForLog({ credentialId, taskId });
+      if (log?.status === "SUCCEEDED" || log?.status === "FAILED") {
+        const summary = (log.resultSummary ?? {}) as Record<string, unknown>;
+        if (summary.sync === true && summary.output) {
+          return NextResponse.json({
+            code: 200,
+            data: summary.output,
+            providerKind: "DASHSCOPE",
+          });
+        }
+      }
+
+      const polled = await pollDashscopeTaskForLog({
+        credentialId,
+        taskId,
+        model: log?.model,
+      });
       const { output, raw } = polled;
       if (log) {
-        const status = output.task_status;
-        if (isDashscopeTaskSuccess(status)) {
-          await finalizeRequestLog(log.id, {
-            status: "SUCCEEDED",
-            durationMs: log.submittedAt
-              ? Date.now() - log.submittedAt.getTime()
-              : 0,
-            resultSummary: buildGatewayTaskResultSummary(raw, output),
-            externalTaskId: taskId,
-            model: log.model,
-          });
-        } else if (isDashscopeTaskFailed(status)) {
-          await finalizeRequestLog(log.id, {
-            status: "FAILED",
-            durationMs: log.submittedAt
-              ? Date.now() - log.submittedAt.getTime()
-              : 0,
-            failMessage: output.message ?? output.code ?? "failed",
-            externalTaskId: taskId,
-            model: log.model,
-          });
-        } else {
-          await touchGatewayLogProgress(
-            log.id,
-            buildGatewayLogProgressSummary({
-              providerKind: "DASHSCOPE",
-              status: String(status ?? "RUNNING"),
-            }),
-          );
-        }
+        await syncDashscopePollToGatewayLog({
+          log,
+          taskId,
+          output,
+          raw,
+          providerKind: "DASHSCOPE",
+        });
       }
       return NextResponse.json({ code: 200, data: output, providerKind: "DASHSCOPE" });
     }
@@ -219,45 +236,109 @@ export async function GET(request: NextRequest) {
       });
       const { output, raw } = polled;
       if (log) {
-        const status = output.task_status?.toUpperCase() ?? "";
-        if (status === "SUCCEEDED" || status === "SUCCESS") {
+        await syncDashscopePollToGatewayLog({
+          log,
+          taskId,
+          output,
+          raw,
+          providerKind: "BAILIAN",
+        });
+      }
+      return NextResponse.json({ code: 200, data: output, providerKind: "BAILIAN" });
+    }
+
+    if (providerKind === "MINIMAX") {
+      const polled = await pollMinimaxVideoTaskStatus({ credentialId, taskId });
+      if (log) {
+        if (polled.state === "succeeded") {
           await finalizeRequestLog(log.id, {
             status: "SUCCEEDED",
             durationMs: log.submittedAt
               ? Date.now() - log.submittedAt.getTime()
               : 0,
-            resultSummary: buildGatewayTaskResultSummary(raw, output),
+            resultSummary: buildGatewayTaskResultSummary(polled.raw, {
+              ...(polled.videoUrl ? { videoUrl: polled.videoUrl } : {}),
+              ...(polled.enhancedPrompt
+                ? { enhancedPrompt: polled.enhancedPrompt }
+                : {}),
+              status: polled.task.status,
+              usage: polled.task.usage,
+            }),
             externalTaskId: taskId,
             model: log.model,
+            usage: polled.task.usage
+              ? {
+                  totalTokens: polled.task.usage.total_tokens,
+                  promptTokens: polled.task.usage.prompt_tokens,
+                  completionTokens: polled.task.usage.completion_tokens,
+                }
+              : undefined,
           });
-        } else if (
-          status === "FAILED" ||
-          status === "CANCELED" ||
-          status === "UNKNOWN"
-        ) {
+        } else if (polled.state === "failed") {
           await finalizeRequestLog(log.id, {
             status: "FAILED",
             durationMs: log.submittedAt
               ? Date.now() - log.submittedAt.getTime()
               : 0,
-            failMessage: output.message ?? output.code ?? "failed",
+            failMessage: polled.errorMessage ?? "MiniMax video task failed",
+            failCode: "MINIMAX_VIDEO_TASK_FAILED",
             externalTaskId: taskId,
             model: log.model,
+            resultSummary: buildGatewayTaskResultSummary(polled.raw, {
+              status: polled.task.status,
+              error: polled.task.error,
+            }),
           });
         } else {
           await touchGatewayLogProgress(
             log.id,
             buildGatewayLogProgressSummary({
-              providerKind: "BAILIAN",
-              status: status || "RUNNING",
+              providerKind: "MINIMAX",
+              status: polled.state,
             }),
           );
         }
       }
-      return NextResponse.json({ code: 200, data: output, providerKind: "BAILIAN" });
+      return NextResponse.json({
+        code: 200,
+        data: {
+          task: polled.task,
+          video_url: polled.videoUrl,
+          enhanced_prompt: polled.enhancedPrompt,
+        },
+        providerKind: "MINIMAX",
+      });
     }
 
     if (providerKind === "VOLCENGINE") {
+      if (log && isGatewayLogTerminalStatus(log.status)) {
+        if (log.status === "SUCCEEDED") {
+          const cachedUrl = extractVolcengineVideoUrlFromGatewaySummary(
+            log.resultSummary,
+          );
+          if (cachedUrl) {
+            return NextResponse.json({
+              code: 200,
+              data: {
+                status: "succeeded",
+                content: { video_url: cachedUrl },
+              },
+              providerKind: "VOLCENGINE",
+            });
+          }
+        }
+        if (log.status === "FAILED") {
+          return NextResponse.json({
+            code: 200,
+            data: {
+              status: "failed",
+              error: log.failMessage ?? "failed",
+            },
+            providerKind: "VOLCENGINE",
+          });
+        }
+      }
+
       const cred = await getDecryptedCredentialApiKey(credentialId);
       if (!cred) {
         return NextResponse.json({ error: "Credential unavailable" }, { status: 400 });
@@ -382,7 +463,7 @@ export async function GET(request: NextRequest) {
       model: log?.model ?? undefined,
     });
     if (log) {
-      if (isKieRecordSuccess(data.state)) {
+      if (isKieRecordSuccess(data.state) || isKieRecordComplete(data)) {
         await finalizeRequestLog(log.id, {
           status: "SUCCEEDED",
           durationMs: log.submittedAt
@@ -392,7 +473,7 @@ export async function GET(request: NextRequest) {
             "costTime" in data && typeof data.costTime === "number"
               ? Math.round(data.costTime * 1000)
               : undefined,
-          resultSummary: { state: data.state, resultJson: data.resultJson },
+          resultSummary: { state: "success", resultJson: data.resultJson },
           externalTaskId: data.taskId,
           model: data.model || log.model,
         });

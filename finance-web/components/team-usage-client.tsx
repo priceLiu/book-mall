@@ -42,7 +42,7 @@ const STATUS: Record<string, string> = {
 
 const PERSONA_LABEL: Record<string, string> = {
   PLATFORM_CREDIT: "平台代付",
-  BYOK: "自带 Key",
+  BYOK: "平台代付",
 };
 
 type TeamUsageClientProps = {

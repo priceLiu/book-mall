@@ -87,6 +87,8 @@ export const en = {
       "Second confirmation: this cannot be undone. Continue?",
     destructiveDeleteSecondOss:
       "Second confirmation: this cannot be undone. We will also try to delete the matching file from cloud storage (OSS). Continue?",
+    destructiveDeleteSecondOssPinned:
+      "Second confirmation: this cannot be undone. We will also try to delete the matching file from cloud storage (OSS). This item is pinned in “My AI Space” — that display will be removed as well. Continue?",
     imageLibraryDeleteConfirm:
       "Remove this image from your library? We'll remove the list entry and try to delete the matching file from cloud storage (OSS).",
     closetDeleteFailed: "Delete failed. Please try again.",

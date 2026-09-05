@@ -1,7 +1,6 @@
 import type { BillingPersona, EcomBillingMode, UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { getActiveByokSubscription } from "@/lib/billing/byok-subscription-service";
 
 export class BillingPersonaError extends Error {
   constructor(
@@ -23,22 +22,24 @@ export function isStaffRole(role: UserRole | string | null | undefined): boolean
   return STAFF_ROLES.includes(role as UserRole);
 }
 
+/** BYOK 已退役，统一归口为平台代付积分。 */
+export function normalizeBillingPersona(p: BillingPersona): BillingPersona {
+  return p === "BYOK" ? "PLATFORM_CREDIT" : p;
+}
+
 export async function getUserBillingPersona(userId: string): Promise<BillingPersona | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { billingPersona: true, billingPersonaLockedAt: true },
   });
   if (!user?.billingPersonaLockedAt) return null;
-  return user.billingPersona;
+  return normalizeBillingPersona(user.billingPersona);
 }
 
 export async function requireUserBillingPersona(userId: string): Promise<BillingPersona> {
   const persona = await getUserBillingPersona(userId);
   if (!persona) {
-    throw new BillingPersonaError(
-      "请先完成计费身份选择（平台代付或自带 Key）",
-      "PERSONA_REQUIRED",
-    );
+    throw new BillingPersonaError("请先完成计费身份选择（平台代付）", "PERSONA_REQUIRED");
   }
   return persona;
 }
@@ -49,54 +50,40 @@ export async function assertBillingPersona(
 ): Promise<BillingPersona> {
   const persona = await requireUserBillingPersona(userId);
   const allowed = Array.isArray(expected) ? expected : [expected];
-  if (!allowed.includes(persona)) {
-    throw new BillingPersonaError(
-      persona === "BYOK"
-        ? "当前账号为自带 Key 身份，无法开通此平台代付产品"
-        : "当前账号为平台代付身份，无法开通自带 Key 产品",
-      "PERSONA_MISMATCH",
-    );
+  const normalized = allowed.map(normalizeBillingPersona);
+  const personaNorm = normalizeBillingPersona(persona);
+  if (!normalized.includes(personaNorm)) {
+    throw new BillingPersonaError("当前账号计费身份不符合此产品要求", "PERSONA_MISMATCH");
   }
   return persona;
 }
 
-export async function assertNoCrossProduct(userId: string): Promise<void> {
-  const persona = await requireUserBillingPersona(userId);
-  const now = new Date();
-
-  if (persona === "PLATFORM_CREDIT") {
-    const byok = await getActiveByokSubscription({ ownerType: "USER", ownerId: userId });
-    if (byok) {
-      throw new BillingPersonaError(
-        "平台代付账号不可同时拥有有效 BYOK 套餐",
-        "CROSS_PRODUCT",
-      );
-    }
-  }
-  // BYOK（积分换算 1.0）：允许同时拥有会员订阅（准入 + 轻量包积分池）
+export async function assertNoCrossProduct(_userId: string): Promise<void> {
+  // 单一路径：平台代付 + 会员订阅
 }
 
-export function deriveEcomBillingMode(persona: BillingPersona): EcomBillingMode {
-  return persona === "PLATFORM_CREDIT" ? "PLATFORM_METERED" : "BYOK_SERVICE_FEE";
+export function deriveEcomBillingMode(_persona: BillingPersona): EcomBillingMode {
+  return "PLATFORM_METERED";
 }
 
 export async function lockBillingPersona(
   userId: string,
   persona: BillingPersona,
 ): Promise<void> {
+  const lockedPersona = normalizeBillingPersona(persona);
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { billingPersonaLockedAt: true, billingPersona: true },
   });
-  if (user?.billingPersonaLockedAt && user.billingPersona !== persona) {
+  if (user?.billingPersonaLockedAt && user.billingPersona !== lockedPersona) {
     throw new BillingPersonaError("计费身份已锁定，无法更改", "PERSONA_LOCKED");
   }
   await prisma.user.update({
     where: { id: userId },
     data: {
-      billingPersona: persona,
+      billingPersona: lockedPersona,
       billingPersonaLockedAt: user?.billingPersonaLockedAt ?? new Date(),
-      ecomBillingMode: deriveEcomBillingMode(persona),
+      ecomBillingMode: deriveEcomBillingMode(lockedPersona),
     },
   });
 }

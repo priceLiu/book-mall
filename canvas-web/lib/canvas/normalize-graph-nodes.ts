@@ -15,8 +15,14 @@ import {
   syncPro2MediaGroupZIndex,
 } from "./pro2-media-group-meta";
 import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
+import { LIBTV_MEDIA_FIT_VERSION } from "./libtv-node-chrome";
+import {
+  computeLibtvMediaNodeSize,
+  isLibtvMediaNodeBoxStale,
+  reconcileLibtvMediaNodeBoxSizes,
+} from "./libtv-media-node-size";
 
-const GROUP_PADDING = 28;
+const GROUP_PADDING = 84;
 const GROUP_HEADER = 40;
 
 /** 选中态仅会话内有效，持久化/加载时一律清除，避免重开画布自动弹出 Dock */
@@ -908,11 +914,88 @@ function collapsePro2VideoColumnAnchors(
   return changed ? next : nodes;
 }
 
+/** 清除 LibTV 图片节点旧 square-image 自适配，打开画布时触发 sbv1-media 重算 */
+function resetStaleSbv1MediaFit(nodes: CanvasFlowNode[]): CanvasFlowNode[] {
+  let changed = false;
+  const next = nodes.map((n) => {
+    if (n.type !== "sbv1-image" && n.type !== "story-pro2-image") return n;
+    const d = n.data as {
+      mediaFit?: boolean;
+      mediaFitKey?: string;
+      mediaFitVersion?: number;
+      mediaNaturalW?: number;
+      mediaNaturalH?: number;
+      manualSize?: boolean;
+      ossUrl?: string;
+      blobUrl?: string;
+    };
+    const hasMedia = Boolean(d.ossUrl?.trim() || d.blobUrl?.trim());
+    if (!hasMedia) return n;
+    const key = d.mediaFitKey ?? "";
+    const versionStale = d.mediaFitVersion !== LIBTV_MEDIA_FIT_VERSION;
+    const profileStale =
+      key.includes("|square-image") || !key.endsWith("|sbv1-media");
+    const oversized = typeof n.width === "number" && n.width > 700;
+    const boxStale = isLibtvMediaNodeBoxStale(n, "sbv1-media");
+    // 比例错乱时允许覆盖 manualSize（历史误标会永久锁死 635×365）
+    if (d.manualSize && !boxStale && !versionStale && !profileStale) return n;
+
+    if (
+      boxStale &&
+      typeof d.mediaNaturalW === "number" &&
+      typeof d.mediaNaturalH === "number" &&
+      d.mediaNaturalW >= 1 &&
+      d.mediaNaturalH >= 1
+    ) {
+      const size = computeLibtvMediaNodeSize(
+        d.mediaNaturalW,
+        d.mediaNaturalH,
+        "sbv1-media",
+      );
+      changed = true;
+      return {
+        ...n,
+        width: size.width,
+        height: size.height,
+        style: {
+          ...(typeof n.style === "object" && n.style ? n.style : {}),
+          width: size.width,
+          height: size.height,
+        },
+        data: {
+          ...d,
+          mediaFit: true,
+          mediaFitVersion: LIBTV_MEDIA_FIT_VERSION,
+          manualSize: false,
+        },
+      } as CanvasFlowNode;
+    }
+
+    if (!versionStale && !profileStale && !oversized && !boxStale) return n;
+    changed = true;
+    return {
+      ...n,
+      data: {
+        ...d,
+        mediaFit: false,
+        mediaFitKey: undefined,
+        mediaFitVersion: undefined,
+        mediaNaturalW: undefined,
+        mediaNaturalH: undefined,
+        manualSize: false,
+      },
+    } as CanvasFlowNode;
+  });
+  return changed ? next : nodes;
+}
+
 export function normalizeCanvasNodes(
   nodes: CanvasFlowNode[],
   edges?: CanvasFlowEdge[],
 ): CanvasFlowNode[] {
-  const withLlmParams = migrateStoryOutlineLlmParamsAll(nodes);
+  const withUnifiedMediaBox = reconcileLibtvMediaNodeBoxSizes(nodes);
+  const withSbv1Fit = resetStaleSbv1MediaFit(withUnifiedMediaBox);
+  const withLlmParams = migrateStoryOutlineLlmParamsAll(withSbv1Fit);
   const withDimensions = ensureExplicitNodeDimensions(withLlmParams);
   const sized = normalizeStoryControlNodeSizes(
     normalizeStoryMediaColumnSizes(

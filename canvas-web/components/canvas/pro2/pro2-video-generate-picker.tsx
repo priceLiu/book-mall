@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  CANVAS_MODAL_BACKDROP_CLASS,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import { createPortal } from "react-dom";
 import { Video, X } from "lucide-react";
 import type { StoryProFrameRow } from "@/lib/canvas/story-pro-workspace-types";
@@ -85,18 +90,8 @@ export function Pro2VideoGeneratePicker({
     setParams(seed.params ?? {});
   }, [open, initialBatchVideo, providers, providerId]);
 
-  useEffect(() => {
-    if (!open) return;
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
+  useModalBodyScrollLock(open);
+  useModalEscapeClose(onClose, { active: open });
 
   if (!mounted || !open) return null;
 
@@ -116,7 +111,7 @@ export function Pro2VideoGeneratePicker({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
+      className={`${CANVAS_MODAL_BACKDROP_CLASS} z-[1200]`}
       role="dialog"
       aria-modal="true"
       onMouseDown={(e) => {

@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-08-21 — 全站访问统计（SiteTrafficDaily / SiteTrafficIpDaily）
+
+- **迁移目录**：`prisma/migrations/20260821200000_platform_traffic_daily/`
+- **新表**：
+  - `SiteTrafficDaily`——按 CST 日 + appKey 汇总 PV；`@@unique([dateCst, appKey])`。
+  - `SiteTrafficIpDaily`——按 CST 日 + appKey + IP 明细（hitCount、首末访）；UV 由 distinct IP 计数；`userId` 可选关联 `User`。
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`。
+- **逻辑**：详见 `doc/product/26-platform-traffic-analytics.md`。
+
+---
+
 ## 2026-05-16 — 按秒计费（WalletHold）+ 模型校准（ModelCatalog / ModelAlias）
 
 - **迁移目录**：`prisma/migrations/20260516220000_per_second_billing_and_model_calibration/`
@@ -50,6 +61,14 @@
 - **枚举**：`WalletEntryType`、`SubscriptionInterval`、`SubscriptionStatus`、`OrderType`、`OrderStatus`  
 - **回滚**：开发环境可 `DROP SCHEMA public CASCADE` 后重建（**生产禁止**）；生产需逆向迁移或备份后操作。  
 - **本机应用**：`pnpm run db:deploy`（依赖 `.env.local` 中 `DATABASE_URL`），然后 `pnpm run db:seed`。当前团队环境使用 Neon 默认库 **`neondb`** 亦可。
+
+## 2026-08-22 — 首页静态快照 CMS（Phase 1）
+
+- **迁移目录**：`prisma/migrations/20260822233000_static_page_snapshot/`
+- **新表**：`StaticPageSnapshot`（`pageKey` + `dateKey` 唯一；`payload` Json）、`StaticSnapshotGenerationRun`（生成流水）
+- **枚举**：`StaticSnapshotStatus`、`StaticSnapshotTrigger`
+- **逻辑**：Cron/管理后台/CLI 预生成首页快照；ISR 只读；详见 `doc/product/site-home-static-snapshot.md`
+- **应用**：`pnpm db:apply-pending`，`pnpm db:generate`
 
 ## 2026-05-10 — 初始化
 
@@ -229,6 +248,177 @@
 - **部署文件**：`deploy/tencent/pgbouncer/`（`pgbouncer.ini` transaction 模式 + 空闲回收、`docker-compose.yml`、`userlist.txt.example`）。
 - **应用侧抗压**（同批，非 schema）：DB 重试加墙钟预算 `DB_RETRY_BUDGET_MS`（默认 8s，止住池超时叠加到分钟级）；DISPATCHING 活锁修复（按 `queuedAt` 年龄回收无 vendor id 的孤儿任务）；`background-video-tasks` 读端点动静分离（终态查询限近 6h、canvas JSON 懒加载）。
 - **回滚**：移除 `directUrl` 行并删除各 env 的 `DIRECT_DATABASE_URL` 即恢复;迁移历史不受影响（未新增迁移）。
+
+---
+
+## 2026-08-15 — 电商模板区 / 模特库 catalog（Prisma）
+
+- **迁移目录**：`prisma/migrations/20260815010000_ecom_template_and_model_catalog/`
+- **新表**：
+  - `EcomTemplateCatalogEntry`——电商工具箱模板区运营 catalog。保留原 `id/category/mediaKind/title/hot/ossUrl/thumbUrl`，并扩展封面/主图/参考图/prompt/负向词/默认模型与参数/海报/排序；`deletedAt` 软删。
+  - `EcomModelLibraryEntry`——模特库（`name/gender/age/ossUrl/sortOrder` + 软删）。
+- **种子**：`pnpm ecom:seed-catalog` 从 `e-commerce-toolkit` 的 `catalog.json` upsert；JSON / CLI 仅作种子与导入备份，运行时用户 GET 优先读库。
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`。
+- **管理入口**：Book `/admin/templates?tab=ecom`。
+- **回滚**：开发环境可 `DROP TABLE "EcomTemplateCatalogEntry","EcomModelLibraryEntry";`；生产严禁直接回滚。
+
+---
+
+## 2026-08-15 — 我的 AI 空间（已落库）
+
+- **迁移目录**：`prisma/migrations/20260815020000_ai_space/`
+- **产品文档**：[`doc/product/我的AI空间.md`](../product/我的AI空间.md)
+- **新表**：
+  - `AiSpacePin`——作品墙指针。只存 `{ sourceApp, sourceType, sourceId, sortOrder, caption }`，`@@unique([userId, sourceType, sourceId])`；**禁止**缓存 `prompt` / `ossUrl` / `thumbnailUrl`，展示字段读时 resolve 源记录。
+  - `AiSpaceDigitalHuman`——数字人形象库（Book 真源，全应用引用 id）。含 `avatarImageUrl` / `status`（`active` | `inactive` | `detect_failed`）；尺寸与 `wan2.2-s2v-detect` 预检结果存 `meta`（`width` / `height` / `detect.{checkPass,humanoid,message,checkedAt,imageUrl}`），换图后 `imageUrl` 不匹配即视为未检测，**无需迁移**。
+  - `AiSpaceAudioAsset`——统一音频库（Book 真源）。`sourceType` 覆盖 `upload` / `tts` / `voice_clone` / `voice_changer` / `sound_effect` / `music`；`durationSec` 由 ffprobe 探测，合成台 20 秒门禁依赖该字段。
+  - `AiSpaceVideoMaterial`——视频创作库，只存 **用户上传** 与 **合成成片**（`sourceKind = upload | compose_output`）；各应用已发布视频经 `AiSpacePin(kind=video)` 引用展示，不复制。
+  - `AiSpaceComposeTask`——数字人口播合成任务。状态 `pending → generating_human → composing → completed`（失败 `failed`），串联 Gateway `wan2.2-s2v` 与 `MediaRenderJob`。
+- **原则**：Pin 仅指针；数字人/音频为 **Book 真源**，全应用引用 ID；删源 cascade Pin（`cascadeDeletePinsBySource`）；删素材前经 `/api/platform/v1/ai-space/refs/check` 检测跨应用引用。
+- **非 schema 同批变更**：`MediaTimelineV1` 新增可选 `composite`（背景 / 音轨 / overlay / 字幕），走 `render-ffmpeg.runCompositeRender`；`MediaRenderJob.sourceApp` 复用 `api`，未新增枚举值。
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`。
+- **回滚**：开发环境可 `DROP TABLE "AiSpaceComposeTask","AiSpaceVideoMaterial","AiSpaceAudioAsset","AiSpaceDigitalHuman","AiSpacePin";`；生产严禁直接回滚。
+
+---
+
+## 2026-08-16 — 我的 AI 空间 · 口播分镜脚本（已落库）
+
+- **迁移目录**：`prisma/migrations/20260816140000_ai_space_broadcast/`
+- **产品文档**：[`doc/product/ai-space-broadcast-script.md`](../product/ai-space-broadcast-script.md) · [`doc/product/我的AI空间.md`](../product/我的AI空间.md) §4.5
+- **新表**：
+  - `AiSpaceBroadcastProject`——口播项目壳（`sourceKind` / `sourceText` / `brief` / `activeScriptId` / `status`）
+  - `AiSpaceBroadcastScript`——版本化脚本头（`projectId` + `version` 唯一）
+  - `AiSpaceBroadcastShot`——镜级行（台词 / 时间 / `presenter` & `visual` JSON / 素材 id 引用）
+  - `AiSpaceBroadcastRenderJob`——总拼接任务（`finalVideoUrl` / `status`）
+- **非 schema**：合成台 `ComposeProgressStep[]` 分步进度；Tab `?tab=broadcast`
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`
+
+---
+
+## 2026-08-15 — 手伴创作（线稿 → 潮玩盲盒 IP 全案，已落库）
+
+- **迁移目录**：`prisma/migrations/20260815120000_ecom_hand_craft_project/`
+- **产品文档**：[`doc/product/e-commerce-toolkit.md`](../product/e-commerce-toolkit.md) §手伴创作 · [`doc/手伴/skill.md`](../手伴/skill.md)（助手 system prompt 真源）
+- **新表**：
+  - `EcomHandCraftProject`——字段照 `EcomSeedVideoProject`（`userId` / `title` / `module @default("hand-craft")` / `status` / `brief` / `settings` / `references` / `chatHistory` / `plan` / `meta` + 租户三字段），索引 `[userId, module, updatedAt]`、`[tenantId, visibility, updatedAt]`。
+  - `plan.steps` 为 10 步产出：`generate` 步存 `slots[]`（index / title / prompt / imageUrl / assetId），`compose` 步存 `outputs[]`（页序 / 标题 / 拼版 PNG）。结构见 `lib/ecom/ecom-hand-craft-types.ts`，模板表见 `lib/ecom/ecom-hand-craft-steps.ts`。
+  - `meta.workflow.heroLockedUrl`——第 1 步定稿的主形象 OSS URL，是后续 9 步的一致性锚点（每步生图第 1 张参考图恒为它）。换主线稿会重置 `plan` 与该字段。
+- **不新增表**：成图直接落 `EcomAsset(module: "hand-craft")`；第 8–10 步拼版 PNG 由浏览器 html2canvas 抓图后同样落 `EcomAsset`。
+- **计费**：不新增价目行。套件月费仍走 `e-commerce-toolkit` navKey（`ecom-toolkit__` 前缀自动覆盖），厂商成本经 Gateway；`ToolBillablePrice` 已于 `20260709120000_drop_tool_billable_price` 删除，无按次价目表可写。
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`。
+- **回滚**：开发环境可 `DROP TABLE "EcomHandCraftProject";`；生产严禁直接回滚。
+
+---
+
+## 2026-08-16 — 我的 AI 空间 · 作品墙自由画布（已落库）
+
+- **迁移目录**：`prisma/migrations/20260816160000_ai_space_canvas/`
+- **产品文档**：[`doc/product/AI 空间功能设计文档.md`](../product/AI%20空间功能设计文档.md) · [`doc/product/我的AI空间.md`](../product/我的AI空间.md)
+- **新枚举**：
+  - `AiSpacePageTemplate`（`MAGAZINE` | `PORTFOLIO` | `BENTO` | `TIMELINE` | `MINIMAL`）——5 套整页版式
+  - `AiSpacePagePublishStatus`（`DRAFT` | `PUBLISHED`）——形状对齐现网 `StorySpace`
+- **新表**：
+  - `AiSpacePage`——空间页。`userId` **unique**（v1 一人一页）、`slug` unique 供 `/space/{slug}` 公开访问；`title` / `bio` / `templateKey` / `theme`（背景与主色）/ `publishStatus` / `publishedAt`。
+  - `AiSpaceBlock`——画布块 / 挂件。`blockType`（12 种，取值真源 `lib/ai-space/space-blocks/types.ts`）、`sizeTier`（`sm` | `portrait` | `wide` | `lg` | `full`）、`layoutX/Y/W/H/Z` 为 **12 列栅格单位（非像素）**，与 react-grid-layout 的 `x/y/w/h` 一一对应；`mobileOrder` 为窄屏单列顺序；`config` / `content` 由服务端 `parseConfig` / `parseContent` 白名单规范化后落库。冗余 `userId` 便于鉴权过滤。
+  - `AiSpaceBlockRef`——块引用的资产 0..N（单图 1 条、图片墙至多 60 条）。`sourceApp` / `sourceType` / `sourceId` 与 `AiSpacePin` **同一套取值**，读时复用 `lib/ai-space/pin-resolvers.ts` 联邦解析；`slotKey` 承载命名槽位（`before` / `after`、`face` / `full_body` / `outfit` / `extra`）。
+- **`AiSpaceBlockRef` 刻意不加 unique**：同一资产可同时出现在封面块与图片墙里；保留 `@@index([sourceType, sourceId])` 供删源级联。
+- **`AiSpacePin` 零改动**：语义由「已展示在墙上」调整为「已收进空间的素材」（编辑器左侧素材抽屉），5 处子应用写入与 7 处 `cascadeDeletePinsBySource` 调用点均未修改。
+- **删源级联**：`cascadeDeletePinsBySource` 现同步调用 `cascadeDeleteBlockRefsBySource` 清 ref，**块本身保留**并渲染「素材已删除」占位——删一张图不应导致整页布局塌陷。`pins/check` / `refs/check` 及三个素材库的 `?checkRefsFor=` 返回补 `blockRefCount`。
+- **硬上限（服务端校验）**：单页块数 60、单页总 refs 500、单个 `gallery` refs 60、`video_playlist` refs 20。
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`。
+- **回滚**：开发环境可 `DROP TABLE "AiSpaceBlockRef","AiSpaceBlock","AiSpacePage" CASCADE;` + `DROP TYPE "AiSpacePagePublishStatus","AiSpacePageTemplate";`；生产严禁直接回滚。
+
+---
+
+## 2026-08-16 — 我的 AI 空间 · 全局资产库（**无 schema 变更**）
+
+- **迁移**：无。资产源扩展纯代码层，`sourceType` 是 `AiSpacePin` / `AiSpaceBlockRef` 的普通字符串列，新增取值不需要 DDL。
+- **产品文档**：[`doc/product/AI 空间功能设计文档.md`](../product/AI%20空间功能设计文档.md) §11
+- **新增 `sourceType` 取值（8 种，真源 `lib/ai-space/ai-space-pin-types.ts`）**：
+  `story_character`、`story_frame_image`、`story_frame_video`（`StoryCharacter` / `StoryStoryboardFrame`，归属经 `project.userId`）；
+  `project_asset`（`ProjectAsset`，归属 `ownerUserId`，跳过纯文字类 kind）；
+  `canvas_task`（`CanvasGenerationTask`，仅 `SUCCEEDED` 且 `ossUrl` 非空）；
+  `aifit_model`、`aifit_closet`（`AiFitCustomModel` / `AiFitClosetItem`）；
+  `qr_template`（`QrTemplate`，排除 `isPlatformCatalog`）。
+- **读路径**：`pin-resolvers.ts` 由「一源一 resolver」重构为「一源一适配器」（`SOURCE_ADAPTERS`），同一段 `where` 同时服务按 id 解析与按最近列举；新增聚合服务 `ai-space-asset-library.ts`（单源 24 条 / 合并 240 条 / 并发 4）。
+- **删源级联新增接入点**：`deleteProjectAsset`、`deleteUserQrTemplate` / `deleteAdminUserQrTemplate`、AI 试衣衣柜 `DELETE`。`story_*` / `canvas_task` / `aifit_model` 的删除路径在子应用侧，暂未接入；孤儿 Pin 读时静默跳过，画布块渲染「素材已删除」占位。
+- **注意**：`aifit_model` 的媒体是 base64 Data URL，经鉴权代理路由输出，且 `AI_SPACE_PIN_SOURCE_PUBLIC_SAFE=false`——公开页跳过该类引用。
+
+---
+
+## 2026-08-19 — 模型运营中心（sourceLabel + AppModelShelf）
+
+- **迁移目录**：`prisma/migrations/20260819120000_model_operations_center/`
+- **ModelCatalog**：新增可空字段 `sourceLabel`（用户选模时展示的「来源」标签）
+- **新表 `AppModelShelf`**：按 `appTag` + `sceneKey` + `canonicalModelKey` 管理应用/场景级上架与排序；`AppModelShelfStatus`（`ACTIVE` | `HIDDEN` | `DEPRECATED`）
+- **产品文档**：`doc/product/model-operations-center.md`
+- **Seed**：`pnpm gateway:seed-model-ops`（回填 sourceLabel 与全局 AppModelShelf）
+
+---
+
+## 2026-08-21 — 管理后台待做功能（AdminPendingFeature）
+
+- **迁移目录**：`prisma/migrations/20260821210000_admin_pending_feature/`
+- **新表**：`AdminPendingFeature`——title、description、docPath（仓库相对路径）、completed、sortOrder。
+- **页面**：`/admin/pending-features`（Book 运营 → 待做功能）。
+- **种子**：`pnpm exec dotenv -e .env.local -- tsx scripts/seed-admin-pending-features.ts`
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`。
+
+---
+
+## 2026-08-25 — 访问统计扫描标明 + 认证限速
+
+- **迁移目录**：`prisma/migrations/20260825040000_site_traffic_probe_views/`
+- **字段**：`SiteTrafficDaily.probeViews`、`SiteTrafficIpDaily.probeHitCount`（扫描路径仍计入 `pageViews` / `hitCount`，另计以便后台标明）。
+- **登录/短信**：门户 BFF 转发 `x-platform-client-ip`；密码登录失败按 IP/手机号限速；短信增加每 IP 10 分钟突发上限。
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`。
+- **逻辑**：`doc/product/26-platform-traffic-analytics.md`。
+
+---
+
+---
+
+## 2026-08-31 — 服装模特图 + 姿势/道具/场景 Catalog
+
+- **迁移目录**：
+  - `prisma/migrations/20260831120000_ecom_pose_prop_scene_catalog/`
+  - `prisma/migrations/20260831130000_ecom_model_shot_project/`
+- **新表**：
+  - `EcomPoseLibraryEntry` — 姿势库（category A–M、baseDescription、tags）
+  - `EcomPropLibraryEntry` — 道具库（visualDescription、conflictTags、可选 ossUrl）
+  - `EcomSceneLibraryEntry` — 场景库（visualPrompt、tags）
+  - `EcomModelShotProject` — 服装模特图项目（brief/references/plan/chatHistory/meta JSON）
+- **Seed**：`pnpm ecom:seed-catalog`（扩展姿势/道具/场景 JSON）；`pnpm ecom:seed-pose-library` 等
+- **产品文档**：`doc/模特姿势/requirements.md`、`doc/plans/2026-08-ecom-model-shot-module.md`
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`
+
+---
+
+## 2026-08-31 — 服装模特图 V2 · 用户 Catalog + 场景匹配
+
+- **迁移目录**：`prisma/migrations/20260831140000_ecom_catalog_user_scope/`
+- **字段扩展**（三库同构）：
+  - `EcomPoseLibraryEntry` / `EcomPropLibraryEntry` / `EcomSceneLibraryEntry`：`scope`（platform|user，默认 platform）、`userId`、`lockedAt`
+- **plan JSON**（非列）：`ModelShotPoseItem.sceneCatalogId`、`propCatalogId`
+- **产品文档**：`doc/模特姿势/requirements.md` V2、`doc/plans/2026-08-ecom-model-shot-module.md` Phase 2
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`
+
+---
+
+## 2026-08-31 — 专业拉片（EcomFilmPullProject）
+
+- **迁移目录**：`prisma/migrations/20260831140000_ecom_film_pull_project/`
+- **新表**：`EcomFilmPullProject` — 拉片项目（media/settings/analyzeResult/renderScript/characterRefs/renderPlan/meta JSON；status 状态机）
+- **Platform API**：`/api/sso/tools/ecom/film-pull/*`（M1 拉片 + M2 换角成片 + export/pro2）
+- **产品文档**：`doc/拉片/requirements.md`、`doc/plans/2026-08-ecom-film-pull-module.md`
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`
+
+## 2026-09-04 — 姿势库 V2 · 参考图与去重
+
+- **迁移目录**：`prisma/migrations/20260904200000_ecom_pose_library_v2/`
+- **字段扩展**：`EcomPoseLibraryEntry` 新增 `ossUrl`、`thumbUrl`、`sourceImageKey`
+- **产品文档**：`doc/模特姿势/pose-library-v2-requirements.md`
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`
 
 ---
 

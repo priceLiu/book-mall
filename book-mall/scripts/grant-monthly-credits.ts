@@ -1,9 +1,9 @@
 /**
  * 月度积分发放 / 重置（unified-credit-billing · 里程碑 4）
  *
- * 口径（积分清零 1.0）：生产环境的月度重置**已由 API + cron 接管**——
- *   `POST /api/admin/credits/monthly-reset`（每日）+ `POST /api/admin/credits/expire-sweep`（每日），
- *   见 doc/product/19-credit-expiry.md。月度重置**仅**清零并重发「订阅」积分，保留充值/免费批次。
+ * 口径（积分清零 1.0）：生产环境的月度重置**已由 Credit Expiry Ops + CloudBase Cron 接管**——
+ *   `POST /api/admin/credits/ops/generate-work-items` + `run-daily`（或兼容 `expire-sweep` / `monthly-reset`），
+ *   见 docs/积分清零控制台.md · doc/product/19-credit-expiry.md §10。
  *   本脚本为等价的**手动/排障**入口（复用同一 resetMonthlyCredits）；日常无需手动执行。
  *   VIP 一次性预充账户（monthlyGrantCredits=0 / currentPeriodEnd=null）不受影响。
  *
@@ -63,7 +63,6 @@ async function main() {
       ownerId: true,
       balanceCredits: true,
       monthlyGrantCredits: true,
-      videoMonthlyGrant: true,
       perSeatCapCredits: true,
       planId: true,
       currentPeriodEnd: true,
@@ -118,7 +117,6 @@ async function main() {
     const res = await resetMonthlyCredits({
       ref: { ownerType: acc.ownerType, ownerId: acc.ownerId },
       monthlyGrantCredits: acc.monthlyGrantCredits,
-      videoMonthlyGrantCredits: acc.videoMonthlyGrant ?? 0,
       periodKey,
       planId: acc.planId,
       nextPeriodEnd,

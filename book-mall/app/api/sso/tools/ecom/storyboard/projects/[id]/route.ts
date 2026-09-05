@@ -22,7 +22,9 @@ export async function GET(req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
   const { id } = await ctx.params;
-  const project = await getEcomStoryboardProject(auth.userId, id);
+  const project = await getEcomStoryboardProject(auth.userId, id, {
+    stripSnapshotHistory: true,
+  });
   if (!project) {
     return NextResponse.json({ error: "未找到" }, { status: 404 });
   }

@@ -1,83 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Loader2, Palette } from "lucide-react";
+import { Palette } from "lucide-react";
 import { PortalNav } from "@/components/portal-nav";
-import { CANVAS_NAV_ITEMS } from "@/lib/site-config";
-import { getBookAccountUrl } from "@/lib/site-origin";
+import { CanvasShellAuthSlot } from "@/components/layout/canvas-shell-auth-slot";
+import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
+import { useCanvasAdmin } from "@/components/home/use-canvas-admin";
+import { CANVAS_NAV_ITEMS, CANVAS_SITE_BRAND_NAME } from "@/lib/site-config";
 import { cn } from "@/lib/utils";
-import {
-  fetchCanvasViewerUser,
-  type CanvasViewerUser,
-} from "@/lib/canvas-viewer-session";
-import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 
-function ShellAuthSlot() {
-  const base = useBookMallBaseUrl();
-  const bookAccountUrl = getBookAccountUrl();
-  const [user, setUser] = useState<CanvasViewerUser | null | undefined>(undefined);
-
-  useEffect(() => {
-    if (!base) {
-      setUser(null);
-      return;
-    }
-    const ac = new AbortController();
-    const timer = window.setTimeout(() => ac.abort(), 12_000);
-    void fetchCanvasViewerUser(base, ac.signal)
-      .then(setUser)
-      .catch(() => setUser(null))
-      .finally(() => window.clearTimeout(timer));
-    return () => {
-      ac.abort();
-      window.clearTimeout(timer);
-    };
-  }, [base]);
-
-  if (user === undefined) {
-    return (
-      <span className="inline-flex items-center gap-1 text-[11px] text-[var(--canvas-muted)]">
-        <Loader2 className="size-3 animate-spin" aria-hidden />
-        <span className="hidden sm:inline">登录检查</span>
-      </span>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="flex shrink-0 items-center gap-2">
-        <Link href="/login" className="twenty-btn-ghost !px-3 !py-1.5 !text-xs">
-          登录
-        </Link>
-        <Link href="/register" className="twenty-btn-accent !px-3 !py-1.5 !text-xs">
-          注册
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex shrink-0 items-center gap-2">
-      <span className="hidden max-w-[100px] truncate text-[11px] text-[var(--canvas-muted)] md:inline xl:max-w-[160px]">
-        {user.name ?? user.phone ?? user.email ?? user.id}
-      </span>
-      {bookAccountUrl ? (
-        <a href={bookAccountUrl} className="twenty-btn-accent !px-3 !py-1.5 !text-xs">
-          个人中心
-        </a>
-      ) : null}
-      <a href="/api/auth/logout" className="twenty-btn-ghost !px-3 !py-1.5 !text-xs">
-        退出
-      </a>
-    </div>
-  );
-}
-
-export function CanvasShell({ children }: { children: React.ReactNode }) {
+export function CanvasShell({
+  children,
+  bookOrigin,
+}: {
+  children: React.ReactNode;
+  bookOrigin: string | null;
+}) {
   const pathname = usePathname() || "/";
   const isCanvasEditor = pathname.startsWith("/canvas/");
+  const isAdmin = useCanvasAdmin();
 
   if (isCanvasEditor) {
     return <>{children}</>;
@@ -86,7 +28,7 @@ export function CanvasShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-[var(--canvas-bg)]">
       <header
-        className="sticky top-0 z-40 shrink-0 border-b border-white/10 bg-black/45 backdrop-blur-xl backdrop-saturate-150"
+        className="sticky top-0 z-40 shrink-0 border-b border-white/10 bg-[#181818]"
         style={{ height: "var(--canvas-header-h)" }}
       >
         <div className="canvas-page flex h-full items-center gap-2 sm:gap-3">
@@ -97,7 +39,7 @@ export function CanvasShell({ children }: { children: React.ReactNode }) {
             <span className="flex size-8 items-center justify-center rounded-md border border-white/15 bg-gradient-to-br from-[var(--canvas-accent)]/30 to-transparent">
               <Palette className="size-4 text-[var(--canvas-accent)]" strokeWidth={2} />
             </span>
-            <span className="canvas-sans hidden text-sm sm:inline">canvas-web</span>
+            <span className="canvas-sans hidden text-sm sm:inline">{CANVAS_SITE_BRAND_NAME}</span>
           </Link>
 
           <nav
@@ -124,17 +66,37 @@ export function CanvasShell({ children }: { children: React.ReactNode }) {
                 </Link>
               );
             })}
+            {isAdmin ? (
+              <Link
+                href="/admin"
+                className={cn(
+                  "canvas-sans shrink-0 rounded-full px-2.5 py-1.5 text-xs font-semibold tracking-tight transition sm:px-3 sm:text-sm",
+                  pathname.startsWith("/admin")
+                    ? "bg-white/12 text-white ring-1 ring-white/15"
+                    : "text-white/70 hover:bg-white/10 hover:text-white",
+                )}
+              >
+                管理中心
+              </Link>
+            ) : null}
           </nav>
 
           <div className="min-w-0 flex-1" aria-hidden />
 
-          <PortalNav current="canvas" />
+          {bookOrigin ? (
+            <PlatformTopupNavLink
+              bookOrigin={bookOrigin}
+              className="canvas-sans hidden shrink-0 rounded-full border border-white/15 px-2.5 py-1.5 text-xs font-semibold text-white/80 transition hover:border-white/25 hover:bg-white/10 hover:text-white sm:inline-flex"
+            />
+          ) : null}
 
-          <ShellAuthSlot />
+          <PortalNav current="canvas" bookOrigin={bookOrigin} />
+
+          <CanvasShellAuthSlot />
         </div>
       </header>
 
-      <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">{children}</main>
+      <main className="canvas-shell-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden">{children}</main>
     </div>
   );
 }

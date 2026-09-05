@@ -243,3 +243,26 @@ html {
     overflow-x: clip;
   }
 }
+
+@layer components {
+  .site-home-infinite-marquee--fade {
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 8%,
+      black 92%,
+      transparent
+    );
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 8%,
+      black 92%,
+      transparent
+    );
+  }
+
+  .site-home-infinite-marquee__track {
+    will-change: transform;
+  }
+}

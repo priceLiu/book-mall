@@ -3,7 +3,6 @@
 import { useCallback, useMemo } from "react";
 import type { NodeProps } from "@xyflow/react";
 import {
-  AlignLeft,
   FileText,
   GripVertical,
   ImageIcon,
@@ -84,8 +83,9 @@ import { LibtvEditableNodeTitle } from "../libtv-editable-node-title";
 import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
 import {
   LIBTV_NODE_STAGE_DRAG_CLASS,
-  LibtvTryActionRow,
 } from "../libtv-thin-node-try-row";
+import { LibtvEmptyTryStage } from "../libtv-empty-try-stage";
+import { LibtvNodeLinkedStage } from "../libtv-node-stage-logo";
 
 type StarterTryAction =
   | { id: "write"; label: string; icon: typeof PenLine; kind: "write" }
@@ -171,10 +171,11 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
   }, [uploadedMd, hasOutline, outlineMd, d.themeInput]);
 
   const nodeLabel = useMemo(() => {
+    if (isStoryOutlineMode) return "故事大纲";
     const starters = nodes.filter((n) => n.type === "story-pro2-starter");
     const idx = starters.findIndex((n) => n.id === id);
     return `文本节点 ${idx >= 0 ? idx + 1 : ""}`.trim();
-  }, [nodes, id]);
+  }, [nodes, id, isStoryOutlineMode]);
 
   const leftAddMenuSections = PRO2_STARTER_LEFT_ADD_MENU;
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
@@ -182,6 +183,9 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
     (hovered || selected || connectingFromNodeId) && !isGenerating,
   );
   const soleSelected = useLibtvIsNodeSoleSelected(id, Boolean(selected));
+  const showFloatingToolbar = Boolean(
+    soleSelected && hasCardContent && !isGenerating,
+  );
 
   const openEditor = useCallback(() => {
     if (!hasCardContent || isGenerating) return;
@@ -373,15 +377,20 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
         itemId,
         nodeType,
         { alert },
-        () => {
-          const spawnType = resolveLibtvSideSpawnNodeType(itemId, nodeType);
+        (pickId, pickType) => {
+          const spawnType = resolveLibtvSideSpawnNodeType(pickId, pickType);
+          if (!spawnType) return;
           if (
             spawnType === "story-pro2-three-view" ||
-            spawnType === "sbv1-video-engine"
+            spawnType === "sbv1-video-engine" ||
+            spawnType === "story-pro2-3d-desk" ||
+            spawnType === "story-pro2-image" ||
+            spawnType === "story-pro2-starter" ||
+            spawnType === "story-pro2-audio"
           ) {
             spawnLibtvNeighborFromAnchor(id, side, spawnType, {
-              nodes,
-              edges,
+              nodes: useCanvasStore.getState().nodes,
+              edges: useCanvasStore.getState().edges,
               addNode,
               addNodeInGroup,
               setNodes,
@@ -400,16 +409,8 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
             }
             return;
           }
-          if (itemId === "script" || nodeType === "story-pro2-script-hub") {
+          if (pickId === "script" || pickType === "story-pro2-script-hub") {
             spawnNeighbor("right", "story-pro2-script-hub");
-            return;
-          }
-          if (itemId === "text" || nodeType === "story-pro2-starter") {
-            spawnNeighbor(side, "story-pro2-starter");
-            return;
-          }
-          if (itemId === "image" || nodeType === "story-pro2-image") {
-            spawnNeighbor(side, "story-pro2-image");
           }
         },
       );
@@ -437,26 +438,9 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
         position={Position.Left}
         className={cn(
           PRO2_NODE_HANDLE_CLASS,
-          showSidePlus
-            ? "pointer-events-none opacity-0"
-            : selected
-              ? "opacity-100"
-              : "opacity-0 pointer-events-none",
-        )}
-      />
-      <Handle
-        id="plus_left"
-        type="source"
-        position={Position.Left}
-        className={cn(PRO2_NODE_HANDLE_CLASS, "pointer-events-none opacity-0")}
-      />
-      <Handle
-        id="text"
-        type="source"
-        position={Position.Right}
-        className={cn(
-          PRO2_NODE_HANDLE_CLASS,
-          "pointer-events-none opacity-0",
+          "libtv-node-inbound-handle",
+          "libtv-node-inbound-text-handle",
+          "pointer-events-none !opacity-0 !border-transparent !bg-transparent",
         )}
       />
 
@@ -479,8 +463,8 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
         onPick={onSidePick("right")}
       />
 
-      {soleSelected ? (
-        <LibtvNodeToolbarPortal nodeId={id} visible={soleSelected}>
+      {showFloatingToolbar ? (
+        <LibtvNodeToolbarPortal nodeId={id} visible={showFloatingToolbar}>
           <Pro2ThinNodeToolbar
             onSaveAsAsset={() =>
               saveAsAsset(
@@ -527,7 +511,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
           />
         ) : null}
         {isGenerating ? (
-          <LibtvMediaGeneratingState variant="violet" />
+          <LibtvMediaGeneratingState variant="violet" cancelNodeId={id} />
         ) : displayState === "generated" ? (
           <div
             className={cn(
@@ -561,41 +545,20 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
             </Pro2NodeScrollArea>
           </div>
         ) : displayState === "connected" ? (
-          <div
-            className={cn(
-              LIBTV_NODE_STAGE_DRAG_CLASS,
-              "flex flex-col items-center justify-center gap-2 px-4 text-center",
-            )}
-          >
-            <AlignLeft className="size-8 text-white/20" />
-            <p className="text-[11px] text-white/45">{linkedMessage}</p>
-          </div>
+          <LibtvNodeLinkedStage
+            stageIcon={FileText}
+            message={linkedMessage}
+          />
         ) : (
-          <div
-            className={cn(
-              LIBTV_NODE_STAGE_DRAG_CLASS,
-              "flex flex-col px-3 pb-3 pt-2",
-            )}
-          >
-            <div className="mb-3 flex justify-center pt-1">
-              <AlignLeft className="size-8 text-white/20" />
-            </div>
-            <p className="mb-2 text-[11px] text-white/45">尝试：</p>
-            <ul className="space-y-0.5">
-              {STARTER_TRY_ACTIONS.map((action) => (
-                <li key={action.id}>
-                  <LibtvTryActionRow
-                    icon={action.icon}
-                    label={action.label}
-                    onClick={() => onTryAction(action)}
-                  />
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-[10px] leading-relaxed text-white/35">
-              在脚本生成器中创作并发布剧本后，可在公告条参与制作任务；本节点也可用于提示词与下游生图/生视频。
-            </p>
-          </div>
+          <LibtvEmptyTryStage
+            stageIcon={FileText}
+            actions={STARTER_TRY_ACTIONS.map((action) => ({
+              id: action.id,
+              label: action.label,
+              icon: action.icon,
+              onClick: () => onTryAction(action),
+            }))}
+          />
         )}
       </div>
     </div>

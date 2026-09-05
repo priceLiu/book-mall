@@ -15,12 +15,9 @@ import {
   billingCategoryLabel,
   resolveBillingCategory,
 } from "@/lib/billing/billing-category";
-import {
-  BYOK_TASK_KIND_LABEL,
-  normalizeByokFeeDescription,
-  normalizeByokQuotaSettlementSnapshot,
-} from "@/lib/billing/byok-pricing";
-import { resolveBillableImageCountFromLog, resolveBillableVideoSecondsFromLog } from "@/lib/gateway/log-billing-metrics";
+import { BILLING_TASK_KIND_LABEL } from "@/lib/billing/gateway-log-classifier";
+import { resolveBillableUsageForLog } from "@/lib/gateway/gateway-token-usage-aggregate";
+import { estimateGatewayLogNetCostYuan } from "@/lib/finance/gateway-log-line-cost";
 import {
   ALL_DISPLAY_KEYS,
   K_CREDITS_CONSUMED,
@@ -67,6 +64,15 @@ export type GatewayLogBillInput = Pick<
   | "credentialId"
   | "credentialAliasSnapshot"
   | "inputSummary"
+  | "resultSummary"
+  | "totalTokens"
+  | "promptTokens"
+  | "completionTokens"
+  | "hasTokenUsage"
+  | "metricsSource"
+  | "tenantId"
+  | "apiKeyId"
+  | "estimatedVendorCostYuan"
   | "failCode"
   | "failMessage"
 >;
@@ -80,11 +86,11 @@ const STATUS_LABEL: Record<GatewayRequestStatus, string> = {
 };
 
 const SETTLEMENT_KIND_LABEL: Record<BillingSettlementKind, string> = {
-  BYOK_QUOTA_INCLUDED: "BYOK 套餐内扣次",
-  BYOK_QUOTA_OVERAGE: "BYOK 超额扣积分",
+  BYOK_QUOTA_INCLUDED: "历史结算（套餐内）",
+  BYOK_QUOTA_OVERAGE: "历史结算（超额）",
   PLATFORM_CREDIT: "平台代付扣积分",
   PLATFORM_VIDEO: "平台代付视频",
-  METER_ONLY: "BYOK 仅计量",
+  METER_ONLY: "平台计量（不扣积分）",
   NONE: "无扣费/扣次",
 };
 
@@ -124,8 +130,7 @@ function requestKindUnit(kind: GatewayRequestKind, category: BillingCategory): s
 }
 
 function personaLabel(persona: BillingPersona | null | undefined): string {
-  if (persona === "BYOK") return "自带 Key（BYOK）";
-  if (persona === "PLATFORM_CREDIT") return "平台代付";
+  if (persona === "PLATFORM_CREDIT" || persona === "BYOK") return "平台代付";
   return "—";
 }
 
@@ -143,17 +148,11 @@ function feeDescription(
       : `调用失败 · ${catLabel}`;
   }
   if (settlement?.feeDescription) return settlement.feeDescription;
-  const credits = log.creditsCharged ?? 0;
-  if (log.billingPersonaSnap === "BYOK") {
-    return credits > 0 ? `BYOK 超额 · ${catLabel} · 扣积分` : `BYOK 套餐内 · ${catLabel}`;
+  const credits = settlement?.creditsCharged ?? log.creditsCharged ?? 0;
+  if (credits > 0) {
+    return `平台代付 · ${catLabel} · 扣 ${credits} 积分`;
   }
-  if (log.billingPersonaSnap === "PLATFORM_CREDIT") {
-    return credits > 0 ? `平台代付 · ${catLabel} · 扣 ${credits} 积分` : `平台代付 · ${catLabel}（未扣积分）`;
-  }
-  if (log.billingMode === "BYOK") {
-    return credits > 0 ? "BYOK 超额 · 扣积分" : "BYOK 套餐内";
-  }
-  return credits > 0 ? "扣积分" : "成功调用（0 积分）";
+  return `平台代付 · ${catLabel}（未扣积分）`;
 }
 
 function emptyRow(): Record<string, string> {
@@ -191,7 +190,7 @@ export function projectGatewayLogToBillRow(
   const displayName = modelDisplayNames.get(modelKey) ?? modelKey;
   const toolLabel = clientPageToToolLabel(log.clientPage);
   const credits = settlement?.creditsCharged ?? log.creditsCharged ?? 0;
-  const costYuan = log.costSnapshotYuan != null ? Number(log.costSnapshotYuan) : null;
+  const lineNetCost = estimateGatewayLogNetCostYuan(log);
   const margin = log.marginSnapshot != null ? Number(log.marginSnapshot) : null;
   const submitted = log.submittedAt;
   const modelName =
@@ -231,56 +230,25 @@ export function projectGatewayLogToBillRow(
 
   const byokTaskKind = settlement?.byokTaskKind ?? log.byokTaskKind;
   row[K_TASK_KIND] =
-    byokTaskKind && byokTaskKind in BYOK_TASK_KIND_LABEL
-      ? BYOK_TASK_KIND_LABEL[byokTaskKind as keyof typeof BYOK_TASK_KIND_LABEL]
+    byokTaskKind && byokTaskKind in BILLING_TASK_KIND_LABEL
+      ? BILLING_TASK_KIND_LABEL[byokTaskKind as keyof typeof BILLING_TASK_KIND_LABEL]
       : categoryLabel;
-
-  const quotaSnap = settlement
-    ? normalizeByokQuotaSettlementSnapshot({
-        byokTaskKind,
-        ownerType: settlement.ownerType,
-        monthlyIncluded: settlement.monthlyIncluded,
-        includedUsedAfter:
-          quotaSnapshotOverride?.includedUsedAfter ??
-          settlement.includedUsedAfter ??
-          log.includedUsedAfter,
-        includedRemainingAfter:
-          quotaSnapshotOverride?.includedRemainingAfter ??
-          settlement.includedRemainingAfter ??
-          log.includedRemainingAfter,
-      })
-    : quotaSnapshotOverride
-      ? {
-          monthlyIncluded: null,
-          includedUsedAfter: quotaSnapshotOverride.includedUsedAfter,
-          includedRemainingAfter: quotaSnapshotOverride.includedRemainingAfter,
-          corrected: false,
-        }
-      : null;
 
   row[K_QUOTA_DELTA] = fmtNum(settlement?.quotaDelta ?? log.quotaDelta);
   row[K_INCLUDED_USED] = fmtNum(
-    quotaSnap?.includedUsedAfter ?? settlement?.includedUsedAfter ?? log.includedUsedAfter,
+    settlement?.includedUsedAfter ?? log.includedUsedAfter,
   );
   row[K_INCLUDED_REMAINING] = fmtNum(
-    quotaSnap?.includedRemainingAfter ??
-      settlement?.includedRemainingAfter ??
-      log.includedRemainingAfter,
+    settlement?.includedRemainingAfter ?? log.includedRemainingAfter,
   );
 
-  const feeText = feeDescription(log, settlement);
-  row["平台账单/费用说明"] = quotaSnap?.corrected
-    ? normalizeByokFeeDescription(feeText, true, quotaSnap.includedRemainingAfter)
-    : feeText;
+  row["平台账单/费用说明"] = feeDescription(log, settlement);
 
-  const usageUnits =
-    log.requestKind === "VIDEO"
-      ? resolveBillableVideoSecondsFromLog(log)
-      : resolveBillableImageCountFromLog(log);
+  const { amount: usageUnits } = resolveBillableUsageForLog(log);
   row["平台用量/用量"] = String(usageUnits);
   row["平台用量/用量单位"] = requestKindUnit(log.requestKind, billingCategory);
 
-  row["财务核算/净成本(元)"] = costYuan != null ? costYuan.toFixed(6) : "—";
+  row["财务核算/净成本(元)"] = lineNetCost > 0 ? lineNetCost.toFixed(6) : "—";
   row["财务核算/毛利率"] = formatMargin(margin);
 
   return row;

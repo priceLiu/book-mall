@@ -1,3 +1,4 @@
+import { resolveCharacterSyncGroupId } from "./pro2-group-row-resolve";
 import type { CanvasFlowNode } from "./types";
 
 function isThreeViewMediaChild(n: CanvasFlowNode): boolean {
@@ -66,4 +67,37 @@ export function resolvePro2CharacterBoardGroupSelection(
   }
 
   return null;
+}
+
+/** 角色列控制器 → 三视图媒体组 id */
+export function resolvePro2CharacterBoardGroupIdForColumn(
+  characterColumnId: string,
+  allNodes: CanvasFlowNode[],
+): string | null {
+  const charCol = allNodes.find((n) => n.id === characterColumnId);
+  const visualId = (
+    charCol?.data as { pro2VisualGroupId?: string }
+  )?.pro2VisualGroupId?.trim();
+  if (visualId && allNodes.some((n) => n.id === visualId && n.type === "group")) {
+    return visualId;
+  }
+  const byController = allNodes.find(
+    (n) =>
+      n.type === "group" &&
+      (n.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId ===
+        characterColumnId &&
+      isPro2CharacterBoardGroup(n, allNodes),
+  );
+  return byController?.id ?? null;
+}
+
+/** 角色列已有（或正在绑定）媒体组时，画布上隐藏整板卡片，仅保留 1×1 数据锚点 */
+export function isPro2CharacterBoardColumnVisualPlaceholder(
+  characterColumnId: string,
+  allNodes: CanvasFlowNode[],
+): boolean {
+  if (resolveCharacterSyncGroupId(allNodes, characterColumnId)) return true;
+  return Boolean(
+    resolvePro2CharacterBoardGroupIdForColumn(characterColumnId, allNodes),
+  );
 }

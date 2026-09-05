@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useCanvasStore } from "@/lib/canvas/store";
 import { cn } from "@/lib/utils";
 
-/** 节点标题栏 · 双击编辑自定义名称（写入 `data.label`） */
+/** 节点标题栏 · 选中后单击 / 未选中双击编辑（写入 `data.label`） */
 export function LibtvEditableNodeTitle({
   nodeId,
   defaultLabel,
@@ -30,6 +30,12 @@ export function LibtvEditableNodeTitle({
       [nodeId],
     ),
   );
+  const selected = useCanvasStore(
+    useCallback(
+      (s) => Boolean(s.nodes.find((n) => n.id === nodeId)?.selected),
+      [nodeId],
+    ),
+  );
   const displayLabel = storedLabel || defaultLabel;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(displayLabel);
@@ -45,8 +51,16 @@ export function LibtvEditableNodeTitle({
     setEditing(false);
   }, [draft, nodeId, updateNodeData]);
 
+  const beginEdit = useCallback((e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+    setEditing(true);
+    requestAnimationFrame(() => inputRef.current?.select());
+  }, []);
+
   return (
-    <div className={cn("flex min-w-0 flex-1 items-center gap-1.5", className)}>
+    <div
+      className={cn("flex min-w-0 flex-1 items-center gap-1.5", className)}
+    >
       {children}
       {editing ? (
         <input
@@ -80,15 +94,19 @@ export function LibtvEditableNodeTitle({
       ) : (
         <span
           className={cn(
-            "nodrag min-w-0 flex-1 truncate",
+            "min-w-0 flex-1 truncate cursor-grab active:cursor-grabbing",
             textClassName ?? "text-[11px] text-white",
           )}
-          title={`${displayLabel} · 双击编辑标题`}
-          onDoubleClick={(e) => {
-            e.stopPropagation();
-            setEditing(true);
-            requestAnimationFrame(() => inputRef.current?.select());
+          title={
+            selected
+              ? `${displayLabel} · 按住拖动 · 点击编辑标题`
+              : `${displayLabel} · 按住拖动 · 双击编辑标题`
+          }
+          onClick={(e) => {
+            if (!selected) return;
+            beginEdit(e);
           }}
+          onDoubleClick={beginEdit}
         >
           {displayLabel}
         </span>

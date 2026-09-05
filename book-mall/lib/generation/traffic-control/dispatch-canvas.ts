@@ -3,16 +3,23 @@ import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 import {
   buildCanvasAiKieCallbackUrl,
 } from "@/lib/canvas/canvas-constants";
+import { canvasTrafficPayloadWhere } from "@/lib/canvas/canvas-traffic-kind";
 import { canvasVideoPayloadWhere } from "@/lib/canvas/canvas-queue-without-log";
 import { claimCanvasTaskKieSubmit, findSiblingActiveVendorJob } from "@/lib/canvas/canvas-kie-gateway-claim";
 import {
   canvasGwCreateBailianR2vJob,
   canvasGwCreateDashscopeVideoJob,
   canvasGwCreateKieJob,
+  canvasGwCreateMinimaxVideoJob,
   canvasGwCreateTopazVideoJob,
   canvasGwCreateVolcengineVideoJob,
 } from "@/lib/canvas/canvas-gateway-client";
 import { CanvasProjectError } from "@/lib/canvas/canvas-project-service";
+import {
+  parseTopazFrameInterpolation,
+  parseTopazSlowmoFactor,
+  topazUpscaleFromHdResolution,
+} from "@/lib/gateway/topaz-client";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 import { refundFailedGatewayLog } from "@/lib/billing/gateway-credit-settlement";
 import { prisma } from "@/lib/prisma";
@@ -29,7 +36,11 @@ import {
   getQueueTimeoutMin,
   isTrafficControlEnabled,
 } from "./constants";
-import { isCanvasVideoTrafficKind } from "./admit-canvas";
+import {
+  isCanvasImageTrafficKind,
+  isCanvasVideoTrafficKind,
+} from "@/lib/canvas/canvas-traffic-kind";
+import { dispatchCanvasImageQueuedTask } from "./dispatch-canvas-image";
 import {
   acquireTrafficSlotInTx,
   releaseTrafficSlot,
@@ -42,6 +53,7 @@ import { clearDispatchStaleRetryInPayload } from "./pre-submit-retry";
 import {
   findPromotableCanvasGatewayLog,
   promoteCanvasTaskFromGatewayLog,
+  resolveCanvasGatewaySubmitCollision,
 } from "./canvas-orphan-gateway-log";
 
 function taskInputPayload(
@@ -132,15 +144,30 @@ async function submitCanvasVideoToGateway(
   if (providerKind === "TOPAZ") {
     const topazInput =
       (payload.topazInput as Record<string, unknown> | undefined) ?? {};
+    const resolution = String(topazInput.resolution ?? "1080p");
     const job = await canvasGwCreateTopazVideoJob(userId, {
       model: String(payload.topazModel ?? task.model),
       videoUrl: String(topazInput.video_url ?? topazInput.videoUrl ?? ""),
       filterModel: String(topazInput.filter_model ?? topazInput.filterModel ?? "proteus"),
-      upscaleFactor: topazInput.upscale_factor ?? topazInput.upscaleFactor,
-      slowmo: topazInput.slowmo,
-      frameInterpolation:
+      upscaleFactor: topazUpscaleFromHdResolution(
+        topazInput.upscale_factor ?? topazInput.upscaleFactor ?? resolution,
+      ),
+      slowmo: parseTopazSlowmoFactor(topazInput.slowmo),
+      frameInterpolation: parseTopazFrameInterpolation(
         topazInput.frame_interpolation ?? topazInput.frameInterpolation,
-      resolution: String(topazInput.resolution ?? "1080p"),
+      ),
+      resolution,
+      clientPage,
+      projectId: task.projectId,
+      canvasTaskId: task.id,
+    });
+    return { taskId: job.taskId, logId: job.logId };
+  }
+
+  if (providerKind === "MINIMAX") {
+    const job = await canvasGwCreateMinimaxVideoJob(userId, {
+      model: String(payload.minimaxModel ?? task.model),
+      input: (payload.minimaxInput as Record<string, unknown>) ?? {},
       clientPage,
       projectId: task.projectId,
       canvasTaskId: task.id,
@@ -150,6 +177,7 @@ async function submitCanvasVideoToGateway(
 
   const callBackUrl = buildCanvasAiKieCallbackUrl("video", task.id);
   const job = await canvasGwCreateKieJob(userId, {
+    gatewayModelKey: String(payload.modelKey ?? task.model),
     model: String(payload.kieModel ?? task.model),
     input: (payload.kieInput as Record<string, unknown>) ?? {},
     callBackUrl,
@@ -184,7 +212,32 @@ async function cancelQueueTimeouts(projectId?: string): Promise<number> {
       status: "QUEUED",
       queuedAt: { lt: cutoff },
       ...(projectId ? { projectId } : {}),
-      NOT: canvasVideoPayloadWhere(),
+      NOT: canvasTrafficPayloadWhere(),
+    },
+    data: {
+      status: "CANCELLED",
+      failCode: "QUEUE_TIMEOUT",
+      failMessage: `排队超过 ${getQueueTimeoutMin()} 分钟，请重试`,
+      completedAt: new Date(),
+    },
+  });
+  return res.count;
+}
+
+/** 交通控流 IMAGE/VIDEO：QUEUED 超过 QUEUE_TIMEOUT_MIN 则取消（合成 pending 行停止计时） */
+export async function cancelTrafficControlQueueTimeouts(
+  projectId?: string,
+): Promise<number> {
+  const cutoff = new Date(Date.now() - getQueueTimeoutMin() * 60_000);
+  const res = await prisma.canvasGenerationTask.updateMany({
+    where: {
+      status: "QUEUED",
+      ...(projectId ? { projectId } : {}),
+      ...canvasTrafficPayloadWhere(),
+      OR: [
+        { queuedAt: { lt: cutoff } },
+        { queuedAt: null, createdAt: { lt: cutoff } },
+      ],
     },
     data: {
       status: "CANCELLED",
@@ -242,7 +295,9 @@ async function dispatchOneCanvasQueuedTask(
   let scopeKey: string | null = null;
   try {
   const payload = taskInputPayload(task);
-  if (!isCanvasVideoTrafficKind(payload)) return "skipped";
+  const isVideo = isCanvasVideoTrafficKind(payload);
+  const isImage = isCanvasImageTrafficKind(payload);
+  if (!isVideo && !isImage) return "skipped";
 
   const now = new Date();
   if (task.dispatchAfter && task.dispatchAfter.getTime() > now.getTime()) {
@@ -291,6 +346,14 @@ async function dispatchOneCanvasQueuedTask(
 
   if (slotResult.action !== "claimed") return "skipped";
 
+  if (isImage) {
+    return dispatchCanvasImageQueuedTask(task, scope.scopeKey, {
+      releaseTrafficSlot,
+      revertStuckDispatchingTask,
+      releaseGatewayVideoTrafficSlotIfOccupying,
+    });
+  }
+
   // 仅当 createTask 成功返回 logId 后为 true；503 预检失败时仍为 false，可安全退回队列。
   let vendorJob: { taskId: string; logId: string } | null = null;
   let claimedTask: CanvasGenerationTask | null = null;
@@ -323,6 +386,21 @@ async function dispatchOneCanvasQueuedTask(
 
     // 幂等守卫：若上一次提交「超时但其实成功」，已存在带本 task.id 的厂商日志 →
     // 直接 promote 成 SUBMITTED，绝不重复 createTask（避免重复扣费 + 假性失败）。
+    const collision = await resolveCanvasGatewaySubmitCollision({
+      taskId: task.id,
+      payload: taskInputPayload(claimedTask!),
+      scopeKey: scope.scopeKey,
+    });
+    if (collision === "dispatched") return "dispatched";
+    if (collision === "in_flight") {
+      console.warn(
+        "[canvas-dispatch] skip duplicate submit; gateway log in flight",
+        task.id.slice(0, 12),
+      );
+      await releaseTrafficSlot(scope.scopeKey);
+      return "skipped";
+    }
+
     const orphan = await findPromotableCanvasGatewayLog(task.id);
     if (orphan) {
       const promoted = await promoteCanvasTaskFromGatewayLog({
@@ -478,6 +556,16 @@ export async function dispatchQueuedCanvasTasks(opts?: {
     } catch (e) {
       console.warn(
         "[canvas-dispatch] cancelQueueTimeouts failed",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+    try {
+      result.cancelled += await cancelTrafficControlQueueTimeouts(
+        opts?.projectId,
+      );
+    } catch (e) {
+      console.warn(
+        "[canvas-dispatch] cancelTrafficControlQueueTimeouts failed",
         e instanceof Error ? e.message : String(e),
       );
     }

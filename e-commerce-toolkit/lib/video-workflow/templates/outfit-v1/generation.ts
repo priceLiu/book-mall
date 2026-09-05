@@ -1,0 +1,94 @@
+import {
+  OUTFIT_V1_GENERATE_BASE_PROMPT_ZH,
+  OUTFIT_V1_NEGATIVE_PROMPT_ZH,
+  buildOutfitShotPrefilledGeneratePrompt,
+  resolveOutfitShotGeneratePrompt,
+} from "@/lib/ecom-outfit-video-generate-prompts";
+import {
+  OUTFIT_V1_DEFAULT_GENERATE_CONSTRAINT,
+  OUTFIT_V1_DEFAULT_VIDEO_CONFIG,
+  OUTFIT_V1_DEFAULT_VIDEO_MODEL,
+  OUTFIT_V1_LLM_JSON_PREFIX,
+  OUTFIT_V1_TEMPLATE_ID,
+} from "@/lib/video-workflow/templates/outfit-v1/constants";
+import type { SceneShot, WorkflowRefs } from "@/lib/video-workflow/shot-spine";
+
+export {
+  OUTFIT_V1_GENERATE_BASE_PROMPT_ZH,
+  OUTFIT_V1_NEGATIVE_PROMPT_ZH,
+  OUTFIT_V1_DEFAULT_VIDEO_CONFIG,
+  OUTFIT_V1_DEFAULT_GENERATE_CONSTRAINT,
+  OUTFIT_V1_DEFAULT_VIDEO_MODEL,
+  OUTFIT_V1_LLM_JSON_PREFIX,
+  OUTFIT_V1_TEMPLATE_ID,
+  buildOutfitShotPrefilledGeneratePrompt,
+  resolveOutfitShotGeneratePrompt,
+};
+
+export type OutfitShotGenerateContext = {
+  scene: SceneShot;
+  refs: WorkflowRefs;
+  videoModelKey: string;
+  durationSec?: number;
+};
+
+export function buildOutfitShotNegativePrompt(): string {
+  return OUTFIT_V1_NEGATIVE_PROMPT_ZH;
+}
+
+export function resolveOutfitDressedImageUrl(refs: WorkflowRefs): string {
+  const dressed = refs.dressedImage?.ossUrl?.trim();
+  if (dressed) return dressed;
+  throw new Error("请先锁定穿搭参考图");
+}
+
+export function resolveOutfitShotCharacterImageUrl(
+  scene: SceneShot,
+  refs: WorkflowRefs,
+): string {
+  const fused = scene.sceneFusion?.fusedImageUrl?.trim();
+  if (fused) return fused;
+  throw new Error("请先在分镜表生成场景融合图");
+}
+
+export function buildOutfitShotGenerateBody(ctx: OutfitShotGenerateContext): {
+  prompt: string;
+  negativePrompt: string;
+  modelImageUrl: string;
+  clothingImageUrl: string;
+  previewImageUrl?: string;
+  keypointsUrl?: string;
+  referenceClipUrl?: string;
+  aspectRatio: string;
+  durationSec: number;
+  generateConstraint: typeof OUTFIT_V1_DEFAULT_GENERATE_CONSTRAINT;
+  videoConfig: typeof OUTFIT_V1_DEFAULT_VIDEO_CONFIG;
+} {
+  const dressedUrl = resolveOutfitShotCharacterImageUrl(ctx.scene, ctx.refs);
+
+  const durationSec =
+    typeof ctx.durationSec === "number" && ctx.durationSec > 0
+      ? ctx.durationSec
+      : Math.max(2, Math.min(4, Math.round(ctx.scene.durationSec)));
+
+  return {
+    prompt: resolveOutfitShotGeneratePrompt(ctx.scene),
+    negativePrompt: buildOutfitShotNegativePrompt(),
+    modelImageUrl: dressedUrl,
+    clothingImageUrl: dressedUrl,
+    previewImageUrl: ctx.scene.previewImageUrl,
+    keypointsUrl: ctx.scene.keypointsUrl,
+    referenceClipUrl: ctx.scene.referenceClipUrl,
+    aspectRatio: OUTFIT_V1_DEFAULT_VIDEO_CONFIG.aspectRatio,
+    durationSec,
+    generateConstraint: OUTFIT_V1_DEFAULT_GENERATE_CONSTRAINT,
+    videoConfig: OUTFIT_V1_DEFAULT_VIDEO_CONFIG,
+  };
+}
+
+export function withOutfitShotInitialGeneratePrompt(scene: SceneShot): SceneShot {
+  return {
+    ...scene,
+    userGeneratePrompt: buildOutfitShotPrefilledGeneratePrompt(scene),
+  };
+}

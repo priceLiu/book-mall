@@ -65,7 +65,7 @@ export function resolvePro2ProductionGate(
   let message = "";
   if (requireLinkedScript && !linked) {
     message =
-      "建议先关联已发布剧本（在脚本生成器中发布，或在新建画布时选择）。仍可跳过继续工作。";
+      "建议先关联已发布剧本（在故事脚本生成中发布，或在新建画布时选择）。仍可跳过继续工作。";
   } else if (optionalLinkPrompt) {
     message =
       "可选：关联已发布剧本后在公告条参与制作任务；也可跳过，自由添加节点创作。";

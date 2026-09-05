@@ -1,6 +1,7 @@
 /**
  * 漫剧 / 影视专业版 · TTS 配音（Gateway · 百炼 Qwen3-TTS / OpenAI 兼容 tts-1）
  */
+import { QWEN3_TTS_FLASH_VOICES } from "@/lib/ai-space/qwen3-tts-voice-catalog";
 import type { CanvasParamSchema } from "./types";
 
 const QWEN_TTS_VOICE_SCHEMA = [
@@ -8,14 +9,10 @@ const QWEN_TTS_VOICE_SCHEMA = [
     key: "voice",
     label: "音色",
     type: "select",
-    options: [
-      { value: "Cherry", label: "Cherry（女声）" },
-      { value: "Serena", label: "Serena（女声）" },
-      { value: "Ryan", label: "Ryan（男声）" },
-      { value: "Aiden", label: "Aiden（男声）" },
-      { value: "Dylan", label: "Dylan" },
-      { value: "Vivian", label: "Vivian" },
-    ],
+    options: QWEN3_TTS_FLASH_VOICES.map((v) => ({
+      value: v.id,
+      label: v.label,
+    })),
     defaultValue: "Cherry",
   },
   {

@@ -1,12 +1,14 @@
 import {
   buildAppWebUrl,
   getCanvasWebOrigin,
+  getCommonToolsOrigin,
   getEcommerceWebOrigin,
   getPromptOptimizerOrigin,
   getQuickReplicaOrigin,
   getStoryWebOrigin,
 } from "@/lib/app-web-origins";
 import { getBookMallOrigin } from "@/lib/gateway/env";
+import { listPlatformWebOrigins } from "@/lib/platform-web-origins";
 import { getToolsPublicOrigin } from "@/lib/sso-tools-env";
 
 function trimOrigin(raw: string | null | undefined): string | null {
@@ -31,6 +33,7 @@ function listAllFederatedToolsLogoutCandidates(): string[] {
     getPromptOptimizerOrigin(),
     getQuickReplicaOrigin(),
     getEcommerceWebOrigin(),
+    getCommonToolsOrigin(),
   ];
   for (const raw of candidates) {
     const o = trimOrigin(raw);
@@ -90,10 +93,21 @@ export function resolveBookMallCallbackUrl(
   callbackPath: string,
   requestOrigin?: string,
 ): string {
+  const trimmed = callbackPath.trim();
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    try {
+      const u = new URL(trimmed);
+      const allowed = new Set(listPlatformWebOrigins(requestOrigin));
+      if (allowed.has(u.origin.replace(/\/$/, ""))) {
+        return u.toString();
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
   const path =
-    callbackPath.startsWith("/") && !callbackPath.startsWith("//")
-      ? callbackPath
-      : "/";
+    trimmed.startsWith("/") && !trimmed.startsWith("//") ? trimmed : "/";
   const book = trimOrigin(getBookMallOrigin()) ?? trimOrigin(requestOrigin);
   if (book) return buildAppWebUrl(book, path);
   return path;
@@ -117,13 +131,15 @@ export function buildFederatedLogoutStepUrl(
  * CloudBase：Set-Cookie × 外链 Location 同包会 502；子站链路由 `/api/auth/federated-logout` 继续。
  */
 export function buildFederatedLogoutRelativeEntry(
-  callbackPath: string,
+  callback: string,
 ): string | null {
   if (!shouldUseFederatedToolsLogoutChain()) return null;
   if (listFederatedToolsLogoutOrigins().length === 0) return null;
-  const path =
-    callbackPath.startsWith("/") && !callbackPath.startsWith("//")
-      ? callbackPath
-      : "/";
-  return `/api/auth/federated-logout?step=0&final=${encodeURIComponent(path)}`;
+  const final =
+    callback.startsWith("http://") || callback.startsWith("https://")
+      ? callback
+      : callback.startsWith("/") && !callback.startsWith("//")
+        ? callback
+        : "/";
+  return `/api/auth/federated-logout?step=0&final=${encodeURIComponent(final)}`;
 }

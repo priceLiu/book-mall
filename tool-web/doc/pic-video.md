@@ -12,9 +12,9 @@
 |------|------|
 | 产品入口 | `/image-to-video`（首页）、`/image-to-video/lab`（实验室）、`/image-to-video/library`（我的视频库） |
 | 流程说明 | [`app/image-to-video/implementation/page.tsx`](../app/image-to-video/implementation/page.tsx) |
-| 创建 / 查询封装 | [`lib/image-to-video-dashscope.ts`](../lib/image-to-video-dashscope.ts)（`i2vCreateVideoTask`、`i2vGetVideoTask` 等） |
+| 创建 / 查询 | 经主站 Gateway（[`lib/forward-gateway-dashscope-server.ts`](../lib/forward-gateway-dashscope-server.ts)）；请求体见 [`lib/image-to-video-dashscope.ts`](../lib/image-to-video-dashscope.ts)（`buildI2vVideoBody` 等） |
 | 模型列表 | [`config/lab-video-models.json`](../config/lab-video-models.json) → [`lib/image-to-video-models.ts`](../lib/image-to-video-models.ts) |
-| API Key | 服务端 [`lib/qwen-env.ts`](../lib/qwen-env.ts)：优先 `QWEN_API_KEY`，否则 `DASHSCOPE_API_KEY`（参见 [`.env.example`](../.env.example)） |
+| 凭证 | 用户 Gateway `sk-gw` + 主站 DB 厂商凭证；**tool-web 不配置** `DASHSCOPE_API_KEY` |
 
 计费与主站上报、入库 OSS 等 **不** 在本篇展开，见实现逻辑页与 [`learning-pricing-solution.md`](./product/learning-pricing-solution.md)。
 
@@ -45,7 +45,7 @@ HTTP 必须为 **异步**：
 
 ## 4. 图生视频（首帧）请求体要点（i2v）
 
-与实现中 `i2vCreateVideoTask` 一致：
+与实现中 `buildI2vVideoBody` 一致：
 
 - **`model`**：DashScope 侧模型名（如 `happyhorse-1.0-i2v`、`wan2.7-i2v-…`，以 `lab-video-models.json` 为准）。
 - **`input.prompt`**：文本提示词（长度与同系列文档一致，过长会被截断）。

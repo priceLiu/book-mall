@@ -16,6 +16,8 @@ import {
   X,
 } from "lucide-react";
 
+import { QrCreditsHint } from "@/components/quick-replica/qr-credits-hint";
+import { QrHoverEyeOverlay } from "@/components/quick-replica/qr-hover-eye-overlay";
 import { QrImageUploadZone } from "@/components/quick-replica/qr-image-upload-zone";
 import { extractImageFilesFromClipboard } from "@/lib/qr-image-upload-paste";
 import {
@@ -30,6 +32,8 @@ import {
 import type { QrTemplate, QrWorkspaceDraft } from "@/lib/qr-template-types";
 import { uploadQrAsset } from "@/lib/qr-upload-asset";
 import { useLockBodyScroll } from "@/lib/use-lock-body-scroll";
+import { useQrCreditsPreview } from "@/hooks/use-qr-credits-preview";
+import { getQrCreditsInsufficientMessage } from "@/lib/qr-credits-preview";
 
 const MAX_REF_IMAGES = 8;
 
@@ -81,6 +85,16 @@ export function QrWorldPromptOmnibox({
   const refUrls = draft.sceneImageUrls.filter((u) => u.trim());
   const thumbUrl = refUrls[0] ?? (draft.targetImageUrl.trim() || undefined);
   const canGenerate = Boolean(draft.prompt.trim() || refUrls.length > 0);
+  const { preview: creditsPreview, loading: creditsLoading } = useQrCreditsPreview(draft);
+
+  const handleGenerateClick = () => {
+    const creditsMessage = getQrCreditsInsufficientMessage(creditsPreview);
+    if (creditsMessage) {
+      onToast?.(creditsMessage);
+      return;
+    }
+    onGenerate();
+  };
 
   useLockBodyScroll(expanded);
 
@@ -270,9 +284,10 @@ export function QrWorldPromptOmnibox({
           QR_WORLD_REF_VIEWS[i % QR_WORLD_REF_VIEWS.length]!.label;
         return (
           <div key={`${url}-${i}`} className="flex flex-col items-center gap-1">
-            <div className="group relative h-10 w-10 overflow-hidden rounded-md border border-white/10">
+            <div className="group/media group relative h-10 w-10 overflow-hidden rounded-md border border-white/10">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={url} alt="" className="h-full w-full object-cover" />
+              <QrHoverEyeOverlay src={url} size="sm" />
               <button
                 type="button"
                 aria-label="移除参考图"
@@ -456,10 +471,11 @@ export function QrWorldPromptOmnibox({
               </p>
               <div className="flex items-center gap-2">
                 {modelDropdown}
+                <QrCreditsHint preview={creditsPreview} loading={creditsLoading} />
                 <button
                   type="button"
                   disabled={generating || !canGenerate}
-                  onClick={onGenerate}
+                  onClick={handleGenerateClick}
                   className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition disabled:opacity-50"
                   style={{ background: "var(--qr-brand)" }}
                 >

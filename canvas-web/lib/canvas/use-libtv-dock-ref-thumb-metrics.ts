@@ -20,7 +20,7 @@ export function useLibtvDockRefThumbMetrics() {
     const markBtnWidthPx = DOCK_HEADER_MARK_BTN_SCREEN_W;
     const markBtnHeightPx = DOCK_HEADER_MARK_BTN_SCREEN_H;
     /** 顶栏行高以缩略图为准；标记可略高但不撑大行高 */
-    const headerMinHeightPx = thumbSize + 10;
+    const headerMinHeightPx = thumbSize + 24;
     const thumbStyle = {
       width: thumbSize,
       height: thumbSize,

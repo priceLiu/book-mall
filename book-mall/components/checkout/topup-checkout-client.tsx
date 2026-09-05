@@ -21,6 +21,9 @@ export function TopupCheckoutClient({
   priceYuan,
   target = "personal",
   tenantId,
+  verifyToken,
+  forceRealPayment = false,
+  successRedirect = "/account/billing?success=topup",
 }: {
   packId: string;
   packLabel: string;
@@ -28,9 +31,13 @@ export function TopupCheckoutClient({
   priceYuan: number;
   target?: "personal" | "team";
   tenantId?: string;
+  verifyToken?: string;
+  forceRealPayment?: boolean;
+  successRedirect?: string;
 }) {
   const { data: session } = useSession();
-  const adminInstant = canUseAdminInstantCheckout(session?.user?.role);
+  const adminInstant =
+    canUseAdminInstantCheckout(session?.user?.role) && !forceRealPayment;
 
   return (
     <Card className="mx-auto max-w-md">
@@ -42,18 +49,24 @@ export function TopupCheckoutClient({
         <p className="text-lg">
           {credits.toLocaleString()} 积分 · ¥{priceYuan.toFixed(2)}
         </p>
+        {forceRealPayment ? (
+          <p className="text-xs text-muted-foreground">
+            管理员专用包须完成企业微信支付，支付成功后自动充入积分余额。
+          </p>
+        ) : null}
         <WechatPersonalCheckout
           createPayload={{
             productKind: "CREDIT_TOPUP",
             packId,
             target,
             tenantId,
+            ...(verifyToken ? { verifyToken } : {}),
           }}
           adminInstant={adminInstant}
-          successRedirect="/account/billing?success=topup"
+          successRedirect={successRedirect}
         />
         <Button variant="outline" className="w-full" asChild>
-          <Link href="/pricing">返回定价页</Link>
+          <Link href="/account/billing">返回购买页</Link>
         </Button>
       </CardContent>
     </Card>

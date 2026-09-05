@@ -2,6 +2,22 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+/** 画布弹层遮罩：纯色底，不用 backdrop-blur（背后 RF 重绘会闪屏） */
+export const CANVAS_MODAL_BACKDROP_CLASS =
+  "canvas-modal-backdrop fixed inset-0 flex items-center justify-center bg-black/78 p-4";
+
+/** 全屏画布弹层：顶栏固定 + 内容区撑满视口（勿叠加 items-center 居中类） */
+export const CANVAS_MODAL_FULLSCREEN_SHELL_CLASS =
+  "canvas-modal-backdrop pointer-events-auto fixed inset-0 flex h-[100dvh] w-screen flex-col items-stretch justify-start overflow-hidden bg-black/78";
+
+/** 门户首页 · 预览弹层：纯色半透明遮罩（勿加 canvas-modal-backdrop / backdrop-blur） */
+export const PORTAL_PREVIEW_MODAL_BACKDROP_CLASS =
+  "fixed inset-0 z-[1200] flex min-h-[100dvh] w-screen items-center justify-center bg-black/70 p-4 sm:p-6";
+
+/** 全屏媒体预览 · 纯色底 + paint  containment（禁止 backdrop-blur，向导/RF 动画在后会闪屏） */
+export const CANVAS_MEDIA_PREVIEW_LIGHTBOX_SHELL_CLASS =
+  "canvas-media-preview-lightbox canvas-modal-backdrop pointer-events-auto fixed inset-0 z-[2000] flex h-[100dvh] w-screen flex-col bg-[#0a0a0c]";
+
 /** 弹层 scroll lock 引用计数 · 避免多弹层 / effect 重跑时 overflow 来回切换 */
 let modalScrollLockCount = 0;
 let savedBodyOverflow = "";
@@ -18,9 +34,10 @@ function applyModalScrollLock(): void {
 }
 
 function releaseModalScrollLock(): void {
-  if (modalScrollLockCount <= 0) return;
-  modalScrollLockCount -= 1;
-  if (modalScrollLockCount !== 0) return;
+  // 不提前 return：计数被热更新重置时也要保证标记能清掉，
+  // 否则 html[data-canvas-modal-open] 会永久隐藏节点顶栏。
+  modalScrollLockCount = Math.max(0, modalScrollLockCount - 1);
+  if (modalScrollLockCount > 0) return;
   document.body.style.overflow = savedBodyOverflow;
   document.documentElement.style.overflow = savedHtmlOverflow;
   delete document.documentElement.dataset.canvasModalOpen;
@@ -35,12 +52,32 @@ export function useClientPortalMounted(): boolean {
   return mounted;
 }
 
+/** 节点/框选工具条 Popover 打开（`data-canvas-toolbar-popover-open`） */
+export function useCanvasToolbarPopoverOpen(): boolean {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const root = document.documentElement;
+    const sync = () => {
+      setOpen(root.dataset.canvasToolbarPopoverOpen === "true");
+    };
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(root, {
+      attributes: true,
+      attributeFilter: ["data-canvas-toolbar-popover-open"],
+    });
+    return () => observer.disconnect();
+  }, []);
+  return open;
+}
+
 /**
  * 弹层打开期间锁定 body 滚动，并标记 `data-canvas-modal-open` 暂停画布指针事件。
  * 仅依赖 `active`，避免父组件每帧传入新 `onClose` 导致 overflow 反复切换 → 整页闪烁/抖动。
  */
 export function useModalBodyScrollLock(active = true): void {
-  useEffect(() => {
+  // layout 阶段锁定，避免首帧仍滚动 / overflow 切换落在 paint 之后整页闪一下
+  useLayoutEffect(() => {
     if (!active) return;
     applyModalScrollLock();
     return releaseModalScrollLock;

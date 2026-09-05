@@ -80,9 +80,10 @@ export async function gatewayV1CreateTask(
 }
 
 export async function gatewayV1RecordInfo(
-  opts: GatewayV1RequestOpts & { taskId: string },
+  opts: GatewayV1RequestOpts & { taskId: string; logId?: string },
 ): Promise<{ providerKind: string; data: unknown }> {
   const q = new URLSearchParams({ taskId: opts.taskId });
+  if (opts.logId?.trim()) q.set("logId", opts.logId.trim());
   const r = await gatewayV1Fetch(
     opts.apiKeyId,
     `jobs/recordInfo?${q.toString()}`,
@@ -243,7 +244,7 @@ export async function gatewayV1VolcengineImageGenerations(
     body: {
       model: string;
       prompt: string;
-      image?: string;
+      image?: string | string[];
       parameters?: Record<string, unknown>;
     };
   },
@@ -338,6 +339,60 @@ export async function gatewayV1Image2ImageAsync(
     meta: opts.meta,
   });
   return parseGatewayImageUrlsResponse(r, "image2image-async");
+}
+
+export async function gatewayV1AsrTranscribe(
+  opts: GatewayV1RequestOpts & {
+    body: {
+      fileUrl: string;
+      modelKey?: string;
+    };
+  },
+): Promise<{
+  segments: Array<{ startMs: number; endMs: number; text: string }>;
+  logId: string;
+}> {
+  const r = await gatewayV1Fetch(opts.apiKeyId, "dashscope/asr/transcribe", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts.body),
+    meta: opts.meta,
+  });
+  const text = await r.text();
+  if (!r.ok) {
+    throw new Error(
+      summarizeUpstreamFailMessage(text, r.status) ||
+        `Gateway ASR HTTP ${r.status}`,
+    );
+  }
+  let json: {
+    code?: number;
+    data?: { segments?: Array<{ startMs: number; endMs: number; text: string }> };
+    logId?: string;
+    error?: string;
+  };
+  try {
+    json = JSON.parse(text) as typeof json;
+  } catch {
+    throw new Error("Gateway ASR 响应非 JSON");
+  }
+  return { segments: json.data?.segments ?? [], logId: json.logId ?? "" };
+}
+
+/** OpenAI 兼容 /v1/embeddings（平台 AI 导览助手 RAG）。 */
+export async function gatewayV1Embeddings(
+  opts: GatewayV1RequestOpts & { body: Record<string, unknown>; signal?: AbortSignal },
+): Promise<{ status: number; text: string; logId?: string }> {
+  const r = await gatewayV1Fetch(opts.apiKeyId, "embeddings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts.body),
+    meta: opts.meta,
+    signal: opts.signal,
+  });
+  const text = await r.text();
+  const logId = r.headers.get("x-gateway-log-id") ?? undefined;
+  return { text, status: r.status, logId };
 }
 
 export function gatewayV1ClientMeta(

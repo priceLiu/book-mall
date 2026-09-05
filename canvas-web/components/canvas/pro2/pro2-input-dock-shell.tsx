@@ -21,7 +21,9 @@ import {
   LIBTV_INPUT_DOCK_SHELL_CLASS,
 } from "@/lib/canvas/libtv-node-chrome";
 import { useLibtvDockWheelScroll } from "@/lib/canvas/use-libtv-dock-wheel-scroll";
+import { useCanvasStore } from "@/lib/canvas/store";
 import { RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
+import { CANVAS_RF_VIEWPORT_READY_EVENT } from "@/lib/canvas/canvas-rf-sync";
 import { cn } from "@/lib/utils";
 
 export type Pro2InputDockShellProps = {
@@ -44,6 +46,8 @@ export type Pro2InputDockShellProps = {
   hideExpand?: boolean;
   /** 拖动所属节点时隐藏（仍挂载 · 保持锚点与输入状态） */
   hidden?: boolean;
+  /** 所属节点 id · 用于点击穿透切换到被遮挡的其它节点 */
+  anchorNodeId?: string | null;
 };
 
 function useReactFlowViewportEl(): HTMLElement | null {
@@ -53,7 +57,22 @@ function useReactFlowViewportEl(): HTMLElement | null {
       document.querySelector(
         ".canvas-flow-wrap .react-flow__viewport",
       ) as HTMLElement | null;
-    setEl(pick());
+    const found = pick();
+    if (found) {
+      setEl(found);
+      return;
+    }
+    const onReady = () => {
+      const next = pick();
+      if (next) setEl(next);
+    };
+    window.addEventListener(CANVAS_RF_VIEWPORT_READY_EVENT, onReady);
+    const observer = new MutationObserver(onReady);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      window.removeEventListener(CANVAS_RF_VIEWPORT_READY_EVENT, onReady);
+      observer.disconnect();
+    };
   }, []);
   return el;
 }
@@ -70,6 +89,7 @@ export function Pro2InputDockShell({
   screenWidth,
   hideExpand = false,
   hidden = false,
+  anchorNodeId = null,
 }: Pro2InputDockShellProps) {
   const viewportEl = useReactFlowViewportEl();
   const [expanded, setExpanded] = useState(false);
@@ -98,13 +118,20 @@ export function Pro2InputDockShell({
     [expanded, contentZoom, shellScreenScale, zoom],
   );
 
+  const onDockInteractivePointerDownCapture = (
+    e: React.PointerEvent<HTMLElement>,
+  ) => {
+    e.stopPropagation();
+    useCanvasStore.getState().setLibtvInputDockFocused(true);
+  };
+
   if (!viewportEl) return null;
 
   return createPortal(
     <LibtvInputDockUiContext.Provider value={dockUi}>
       <div
         className={cn(
-          "pro2-input-dock pointer-events-auto absolute z-[1000]",
+          "pro2-input-dock pointer-events-none absolute z-[1000]",
           RF_NO_WHEEL,
           dockClassName,
         )}
@@ -117,20 +144,19 @@ export function Pro2InputDockShell({
           transform: `translateX(-50%) scale(${invScale}) translateZ(0)`,
           transition: "transform 180ms ease",
           visibility: hidden ? "hidden" : "visible",
-          pointerEvents: hidden ? "none" : "auto",
+          pointerEvents: hidden ? "none" : undefined,
           backfaceVisibility: "hidden",
         }}
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
       >
         <div
           className={cn(
             LIBTV_INPUT_DOCK_SHELL_CLASS,
             RF_NO_WHEEL,
-            "relative",
+            "pointer-events-none relative",
             className,
           )}
           data-libtv-input-dock=""
+          data-libtv-dock-anchor-node-id={anchorNodeId ?? undefined}
           data-libtv-dock-expanded={expanded ? "true" : "false"}
           style={{
             borderColor: LIBTV_INPUT_DOCK_BORDER,
@@ -146,7 +172,9 @@ export function Pro2InputDockShell({
             <button
               type="button"
               title={expanded ? "收起输入区" : "放大输入区"}
-              className="nodrag absolute right-2 top-2 z-20 grid size-11 place-items-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white/80"
+              className="nodrag pointer-events-auto absolute right-2 top-2 z-20 grid size-11 place-items-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white/80"
+              data-libtv-dock-interactive=""
+              onPointerDownCapture={onDockInteractivePointerDownCapture}
               onClick={() => setExpanded((v) => !v)}
             >
               {expanded ? (
@@ -156,9 +184,19 @@ export function Pro2InputDockShell({
               )}
             </button>
           )}
-          {header}
+          {header ? (
+            <div
+              className="pointer-events-auto shrink-0"
+              data-libtv-dock-interactive=""
+              onPointerDownCapture={onDockInteractivePointerDownCapture}
+            >
+              {header}
+            </div>
+          ) : null}
           <div
-            className="libtv-dock-content-zoom flex min-h-0 flex-1 flex-col overflow-hidden"
+            className="libtv-dock-content-zoom pointer-events-auto flex min-h-0 flex-1 flex-col overflow-hidden"
+            data-libtv-dock-interactive=""
+            onPointerDownCapture={onDockInteractivePointerDownCapture}
             style={{
               ...(contentZoom === 1 ? {} : { zoom: contentZoom }),
               ["--libtv-dock-prompt-font" as string]: `${promptFontFlowPx}px`,
@@ -174,7 +212,15 @@ export function Pro2InputDockShell({
               </div>
             </div>
           </div>
-          {footer ? <div className="shrink-0">{footer}</div> : null}
+          {footer ? (
+            <div
+              className="pointer-events-auto shrink-0"
+              data-libtv-dock-interactive=""
+              onPointerDownCapture={onDockInteractivePointerDownCapture}
+            >
+              {footer}
+            </div>
+          ) : null}
         </div>
       </div>
     </LibtvInputDockUiContext.Provider>,
@@ -200,26 +246,29 @@ export function Pro2DockContextBar({ children }: { children: ReactNode }) {
 export function Pro2DockHeader({
   refRow,
   actionRow,
+  trailingRow,
   compact,
   minHeightPx,
 }: {
   refRow?: ReactNode;
   actionRow?: ReactNode;
+  /** 顶栏最右侧（如提示词模板 chip） */
+  trailingRow?: ReactNode;
   /** 视频 Dock 等 · 更矮顶栏 */
   compact?: boolean;
   minHeightPx?: number;
 }) {
-  if (!refRow && !actionRow) return null;
+  if (!refRow && !actionRow && !trailingRow) return null;
   return (
     <div
       className={cn("nodrag shrink-0 border-b", LIBTV_INPUT_DOCK_DIVIDER)}
     >
       <div
         className={cn(
-          "hide-scroll-bar flex min-w-0 flex-nowrap items-start overflow-x-auto overflow-y-hidden",
+          "hide-scroll-bar flex min-w-0 flex-nowrap items-start overflow-x-auto overflow-y-visible",
           compact
-            ? "gap-1 px-2 py-1"
-            : "min-h-[44px] gap-1.5 px-3 py-1.5",
+            ? "gap-2 px-4 py-3"
+            : "min-h-[44px] gap-2 px-4 py-2.5",
         )}
         style={
           minHeightPx != null
@@ -231,8 +280,13 @@ export function Pro2DockHeader({
               : undefined
         }
       >
-        {refRow}
-        {actionRow}
+        <div className="flex min-w-0 flex-1 flex-nowrap items-start gap-1.5 overflow-x-auto">
+          {refRow}
+          {actionRow}
+        </div>
+        {trailingRow ? (
+          <div className="ml-auto shrink-0 pl-1 pr-12">{trailingRow}</div>
+        ) : null}
       </div>
     </div>
   );
@@ -244,7 +298,7 @@ export function Pro2DockRefRow({ children }: { children: ReactNode }) {
   return (
     <div
       className={cn(
-        "nodrag flex min-h-[44px] shrink-0 flex-wrap items-center gap-1.5 border-b px-3 py-1",
+        "nodrag flex min-h-[44px] shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2.5",
         LIBTV_INPUT_DOCK_DIVIDER,
       )}
     >
@@ -311,6 +365,9 @@ export function Pro2EmbeddedInputDock({
           className,
         )}
         data-libtv-input-dock=""
+        onPointerDownCapture={() => {
+          useCanvasStore.getState().setLibtvInputDockFocused(true);
+        }}
       >
         {header}
         <div

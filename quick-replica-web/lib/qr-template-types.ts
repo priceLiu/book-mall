@@ -516,6 +516,13 @@ export const TEXT_TO_VIDEO_MODELS = [
     maxRefImages: 0,
     paramProfile: "wan_t2v" as const,
   },
+  {
+    modelKey: "wan3.0-video",
+    label: "万相 3.0",
+    subtitle: "文生 / 图生 / 参考生视频",
+    maxRefImages: 10,
+    paramProfile: "wan_t2v" as const,
+  },
 ] as const;
 
 export const TEXT_TO_VIDEO_DEFAULT_MODEL_KEY = "grok-imagine/image-to-video";
@@ -636,6 +643,10 @@ export function validateTextToImageDraft(args: {
   }
   if (refs.length > meta.maxRefImages) {
     return `参考图最多 ${meta.maxRefImages} 张`;
+  }
+  const maxIdx = maxHappyHorsePromptImageIndex(prompt);
+  if (maxIdx > refs.length) {
+    return `提示词引用了 [Image ${maxIdx}]，但只有 ${refs.length} 张参考图`;
   }
   return null;
 }

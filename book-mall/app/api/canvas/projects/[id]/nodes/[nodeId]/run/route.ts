@@ -37,6 +37,7 @@ import {
   runStoryProScriptHubSection,
   runStoryProStarterThemeOutline,
   runStoryProStarterGeneralText,
+  runStoryProPromptGeneralText,
   runStoryProStarterTextToMusic,
   runStoryProStyleDraft,
   runStoryProTtsRow,
@@ -75,6 +76,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
         modelKey?: string;
         data?: Record<string, unknown>;
         imageInputs?: string[];
+        audioInputs?: string[];
         textInputs?: string[];
         portraitAssetRefs?: Array<{
           url: string;
@@ -99,12 +101,18 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     | "tts"
     | "sceneRef"
     | "themeOutline"
+    | "scriptStudioBatch"
     | "generalText"
     | "music"
     | undefined;
+  const polishMode = body.body.polishMode as
+    | "frame"
+    | "video"
+    | "both"
+    | undefined;
   const storyScope =
-    rowKey || mediaKind || llmSection
-      ? { rowKey, mediaKind, llmSection }
+    rowKey || mediaKind || llmSection || polishMode
+      ? { rowKey, mediaKind, llmSection, polishMode }
       : undefined;
   const isPro2 = isStoryPro2PipelineNodeType(node.type);
   const isSbv1 = isSbv1PipelineNodeType(node.type);
@@ -145,6 +153,12 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       >,
       imageInputs: Array.isArray(node.imageInputs)
         ? node.imageInputs.filter((u): u is string => typeof u === "string")
+        : [],
+      audioInputs: Array.isArray(node.audioInputs)
+        ? node.audioInputs.filter(
+            (u): u is string =>
+              typeof u === "string" && /^https?:\/\//.test(u.trim()),
+          )
         : [],
       textInputs: Array.isArray(node.textInputs)
         ? node.textInputs.filter((u): u is string => typeof u === "string")
@@ -208,9 +222,14 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     if (
       (runnerType === "story-pro-starter" ||
         runnerType === "story-pro-script-hub") &&
-      mediaKind === "themeOutline"
+      (mediaKind === "themeOutline" || mediaKind === "scriptStudioBatch")
     ) {
       result = await runStoryProStarterThemeOutline({ ...baseArgs, forceFresh });
+    } else if (
+      node.type === "story-pro2-prompt" &&
+      mediaKind === "generalText"
+    ) {
+      result = await runStoryProPromptGeneralText({ ...baseArgs, forceFresh });
     } else if (
       runnerType === "story-pro-starter" &&
       mediaKind === "generalText"

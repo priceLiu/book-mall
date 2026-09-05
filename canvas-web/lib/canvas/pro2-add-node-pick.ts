@@ -3,6 +3,7 @@
 import { flowPositionAtScreenPoint, flowPositionAtViewportCenter } from "./viewport-placement";
 import {
   buildPro2ImageNodeData,
+  buildPro2PromptNodeData,
   buildPro2StarterNodeData,
   buildPro2TagNodeData,
   buildPro2ThreeViewNodeData,
@@ -39,11 +40,13 @@ export type Pro2AddNodePickStore = {
   addNode: (
     type:
       | "story-pro2-starter"
+      | "story-pro2-prompt"
       | "story-pro2-tag"
       | "story-pro2-image"
       | "story-pro2-script-hub"
       | "story-pro2-style-asset"
       | "story-pro2-three-view"
+      | "story-pro2-3d-desk"
       | "story-pro2-style"
       | "story-pro2-character"
       | "story-pro2-scene"
@@ -200,6 +203,13 @@ export async function handlePro2ToolbarAddNodePick(
     return;
   }
 
+  if (itemId === "prompt" && nodeType === "story-pro2-prompt") {
+    const pos = spawnPosition("story-pro2-prompt", options);
+    const id = addNode("story-pro2-prompt", pos, buildPro2PromptNodeData());
+    if (id) selectPro2NodeAfterSpawn(setNodes, id);
+    return;
+  }
+
   if (itemId === "image" && nodeType === "story-pro2-image") {
     const pos = spawnPosition("story-pro2-image", options);
     const id = addNode("story-pro2-image", pos, buildPro2ImageNodeData());
@@ -231,6 +241,23 @@ export async function handlePro2ToolbarAddNodePick(
         ),
       );
       selectPro2NodeAfterSpawn(setNodes, id);
+    }
+    return;
+  }
+
+  if (itemId === "3d-desk" || nodeType === "story-pro2-3d-desk") {
+    const pos = spawnPosition("story-pro2-3d-desk", options);
+    const id = addNode(
+      "story-pro2-3d-desk",
+      pos,
+      { ...(NODE_DEFAULT_DATA["story-pro2-3d-desk"] as Record<string, unknown>) },
+    );
+    if (id) {
+      useCanvasStore.getState().updateNodeData(id, { sceneInstanceId: id });
+      selectPro2NodeAfterSpawn(setNodes, id);
+      queueMicrotask(() => {
+        useCanvasStore.getState().openDirector3dDeskEditor(id);
+      });
     }
     return;
   }
@@ -369,14 +396,18 @@ export async function handlePro2SideAddNodePick(
     itemId === "text" ||
     itemId === "image" ||
     itemId === "three-view" ||
+    itemId === "3d-desk" ||
     itemId === "style-asset" ||
     itemId === "script" ||
     itemId === "video" ||
     itemId === "video-compose" ||
     nodeType === "story-pro2-starter" ||
+    nodeType === "story-pro2-prompt" ||
     nodeType === "story-pro2-image" ||
     nodeType === "story-pro2-script-hub" ||
     nodeType === "story-pro2-three-view" ||
+    nodeType === "story-pro2-3d-desk" ||
+    nodeType === "story-pro2-audio" ||
     nodeType === "sbv1-video-engine"
   ) {
     onSpawn(itemId, nodeType ?? spawnType);

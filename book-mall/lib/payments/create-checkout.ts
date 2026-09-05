@@ -1,8 +1,13 @@
 import type { Prisma } from "@prisma/client";
-import type { PaymentProductKind } from "@prisma/client";
+import type { PaymentProductKind, PaymentChannel } from "@prisma/client";
 
 import { assertBillingPersona } from "@/lib/billing/billing-persona";
-import { packById } from "@/lib/billing/credit-topup-packs";
+import {
+  isAdminOnlyTopupPack,
+  packById,
+} from "@/lib/billing/credit-topup-packs";
+import { canManagePricing } from "@/lib/auth/permissions";
+import { verifyAdminTopupVerifyToken } from "@/lib/payments/admin-topup-verify-token";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
 import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
 import {
@@ -11,6 +16,7 @@ import {
 } from "@/lib/finance/vip-package-service";
 import { VIP_MIN_AMOUNT_YUAN } from "@/lib/finance/vip-package-calculator";
 import { generateOutTradeNo } from "@/lib/payments/out-trade-no";
+import { resolvePendingCheckoutDedupe } from "@/lib/payments/checkout-create-dedupe";
 import { appendPaymentEvent } from "@/lib/payments/payment-events";
 import { generateUniqueRemarkCode } from "@/lib/payments/remark-code";
 import { checkoutExpiresHours } from "@/lib/payments/wechat-personal-config";
@@ -43,6 +49,7 @@ export type CreateCheckoutInput =
       packId: string;
       target?: "personal" | "team";
       tenantId?: string | null;
+      verifyToken?: string | null;
     }
   | {
       productKind: "VIP_PACKAGE";
@@ -54,18 +61,21 @@ export type CreateCheckoutInput =
 
 export async function createPaymentCheckout(input: {
   userId: string;
+  userRole?: string | null;
   payload: CreateCheckoutInput;
   adminNote?: string | null;
   createdByAdminId?: string | null;
+  channel?: PaymentChannel;
 }) {
   const { userId, payload } = input;
+  const channel = input.channel ?? "WECHAT_PERSONAL";
   let productKind: PaymentProductKind = payload.productKind;
   let amountYuan = 0;
   let productSnapshot: Record<string, unknown> = {};
 
   switch (payload.productKind) {
     case "MEMBERSHIP_PERSONAL": {
-      await assertBillingPersona(userId, "PLATFORM_CREDIT");
+      await assertBillingPersona(userId, ["PLATFORM_CREDIT", "BYOK"]);
       const plan = await prisma.membershipPlan.findUnique({ where: { id: payload.planId } });
       if (!plan || !plan.active) throw new Error("无效的会员套餐");
       amountYuan = Number(plan.priceYuan);
@@ -78,7 +88,7 @@ export async function createPaymentCheckout(input: {
       break;
     }
     case "MEMBERSHIP_TEAM": {
-      await assertBillingPersona(userId, "PLATFORM_CREDIT");
+      await assertBillingPersona(userId, ["PLATFORM_CREDIT", "BYOK"]);
       const plan = await prisma.membershipPlan.findUnique({ where: { id: payload.planId } });
       if (!plan || !plan.active || plan.family !== "TEAM") throw new Error("无效的团队套餐");
       const seats = Math.max(
@@ -103,12 +113,26 @@ export async function createPaymentCheckout(input: {
     case "CREDIT_TOPUP": {
       const pack = packById(payload.packId);
       if (!pack) throw new Error("无效的积分包档位");
+      if (isAdminOnlyTopupPack(pack)) {
+        if (!canManagePricing(input.userRole)) {
+          throw new Error("无权购买该档位");
+        }
+        if (pack.requirePhoneVerify) {
+          if (
+            !verifyAdminTopupVerifyToken(payload.verifyToken, userId, pack.id)
+          ) {
+            throw new Error("请先完成手机号验证");
+          }
+        }
+        if (payload.target === "team") {
+          throw new Error("管理员专用包仅支持个人充值");
+        }
+      }
       amountYuan = pack.priceYuan;
       productSnapshot = {
         packId: pack.id,
         packLabel: pack.label,
         credits: pack.credits,
-        pool: pack.pool,
         target: payload.target ?? "personal",
         tenantId: payload.tenantId ?? null,
       };
@@ -128,7 +152,7 @@ export async function createPaymentCheckout(input: {
       break;
     }
     case "VIP_PACKAGE": {
-      await assertBillingPersona(userId, "PLATFORM_CREDIT");
+      await assertBillingPersona(userId, ["PLATFORM_CREDIT", "BYOK"]);
       const vipAmount = Math.round(payload.amountYuan);
       if (vipAmount < VIP_MIN_AMOUNT_YUAN) {
         throw new Error(`VIP 起订金额为 ¥${VIP_MIN_AMOUNT_YUAN.toLocaleString()}`);
@@ -155,34 +179,15 @@ export async function createPaymentCheckout(input: {
   expiresAt.setHours(expiresAt.getHours() + checkoutExpiresHours());
 
   return prisma.$transaction(async (tx) => {
-    const dedupeWhere: Prisma.PaymentCheckoutWhereInput = {
+    const dedupe = await resolvePendingCheckoutDedupe({
+      tx,
       userId,
       productKind,
-      status: { in: ["PENDING", "AWAITING_CONFIRM"] },
-      expiresAt: { gt: new Date() },
-    };
-    const existingPending = await tx.paymentCheckout.findFirst({
-      where: dedupeWhere,
-      orderBy: { createdAt: "desc" },
+      productSnapshot,
+      amountYuan,
     });
-    if (existingPending) {
-      const snap = existingPending.productSnapshot as Record<string, unknown> | null;
-      const sameProduct =
-        productKind === "CREDIT_TOPUP"
-          ? snap?.packId === productSnapshot.packId && snap?.target === productSnapshot.target
-          : productKind === "VIP_PACKAGE"
-            ? snap?.amountYuan === productSnapshot.amountYuan &&
-              snap?.scheme === productSnapshot.scheme &&
-              snap?.seats === productSnapshot.seats
-            : productKind.startsWith("BYOK_")
-            ? snap?.scopeKey === productSnapshot.scopeKey &&
-              (productKind !== "BYOK_TEAM" || snap?.tenantId === productSnapshot.tenantId)
-            : productKind.startsWith("MEMBERSHIP_")
-              ? snap?.planId === productSnapshot.planId
-              : false;
-      if (sameProduct) {
-        return existingPending;
-      }
+    if (dedupe.action === "reuse") {
+      return dedupe.checkout;
     }
 
     const checkout = await tx.paymentCheckout.create({
@@ -195,6 +200,7 @@ export async function createPaymentCheckout(input: {
         amountYuan,
         expiresAt,
         adminNote: input.adminNote?.trim() || null,
+        channel,
         status: "PENDING",
       },
     });

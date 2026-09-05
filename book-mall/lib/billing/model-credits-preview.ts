@@ -4,9 +4,14 @@
 import type { CreditCostUnit } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { resolveCanonicalModelKey, resolveCostSnapshot } from "@/lib/gateway/credit-billing-guard";
 import {
-  computeTierCredits,
+  resolveBillingCanonicalKey,
+  resolveCostSnapshot,
+} from "@/lib/gateway/credit-billing-guard";
+import {
+  audioBillableSeconds,
+  computeLlmSplitChargeCredits,
+  computeUnifiedChargeCredits,
   videoBillableSeconds,
 } from "@/lib/pricing/credit-pricing-formulas";
 
@@ -30,6 +35,9 @@ export interface CreditsPreviewInput {
   units?: number;
   durationSec?: number | null;
   imageCount?: number | null;
+  /** LLM 预估 token（缺省 4k in + 2k out） */
+  promptTokens?: number | null;
+  completionTokens?: number | null;
   /** KIE nano-banana / sbv1 生图清晰度分档（1K / 2K / 4K） */
   resolution?: string | null;
 }
@@ -64,18 +72,28 @@ async function resolvePricePerCredit(input: CreditsPreviewInput): Promise<number
   return plan?.pricePerCreditYuan != null ? Number(plan.pricePerCreditYuan) : null;
 }
 
+function isAsrCanonical(key: string): boolean {
+  return key === "qwen3-asr-flash-filetrans" || key.startsWith("qwen3-asr");
+}
+
 function billableUnits(
   unit: CreditCostUnit,
   input: CreditsPreviewInput,
+  canonical: string,
 ): number {
   if (unit === "PER_SEC") {
+    if (isAsrCanonical(canonical)) {
+      return audioBillableSeconds(input.durationSec ?? input.units ?? null);
+    }
     return videoBillableSeconds(input.durationSec ?? input.units ?? null);
   }
   if (unit === "PER_IMAGE") {
     return Math.max(1, Math.round(input.imageCount ?? input.units ?? 1));
   }
   if (unit === "PER_KTOKEN") {
-    return Math.max(1, Math.ceil((input.units ?? 1000) / 1000));
+    const pt = input.promptTokens ?? 4000;
+    const ct = input.completionTokens ?? 2000;
+    return Math.max(1, Math.ceil(pt / 1000) + Math.ceil(ct / 1000));
   }
   return Math.max(1, Math.round(input.units ?? 1));
 }
@@ -84,8 +102,14 @@ async function resolvePreviewCanonical(input: CreditsPreviewInput): Promise<stri
   const explicit = input.canonicalModelKey?.trim();
   if (explicit) return explicit;
 
+  const mk = input.modelKey?.trim() ?? "";
   const fromVariant = sbv1VideoCanonicalKey(input.variantId);
-  if (fromVariant) return fromVariant;
+  if (
+    fromVariant &&
+    (mk.includes("seedance") || mk.includes("doubao-seedance"))
+  ) {
+    return fromVariant;
+  }
 
   const fromNano = libNanoProCanonicalFromModelKey(
     input.modelKey,
@@ -93,10 +117,10 @@ async function resolvePreviewCanonical(input: CreditsPreviewInput): Promise<stri
   );
   if (fromNano) return fromNano;
 
-  const fromKey = await resolveCanonicalModelKey(input.modelKey);
-  if (fromKey === "lib-nano-pro") {
-    return libNanoProCanonicalFromModelKey(input.modelKey, input.resolution);
-  }
+  const fromKey = await resolveBillingCanonicalKey({
+    modelKey: input.modelKey,
+    inputSummary: input.resolution ? { resolution: input.resolution } : undefined,
+  });
   if (fromKey) return fromKey;
 
   return sbv1VideoCanonicalFromParams({ modelKey: input.modelKey });
@@ -113,7 +137,14 @@ export async function previewModelCredits(
 
   const price = await prisma.modelCreditPrice.findUnique({
     where: { canonicalModelKey: canonical },
-    select: { creditsPerUnit: true },
+    select: {
+      creditsPerUnit: true,
+      inputCreditsPerKToken: true,
+      outputCreditsPerKToken: true,
+      inputListPriceYuan: true,
+      outputListPriceYuan: true,
+      listPriceYuan: true,
+    },
   });
   const creditsPerUnit = price?.creditsPerUnit ?? snap.creditsPerUnit;
   if (!creditsPerUnit || creditsPerUnit <= 0) return null;
@@ -121,9 +152,29 @@ export async function previewModelCredits(
   const ppc = await resolvePricePerCredit(input);
   if (!ppc || ppc <= 0) return null;
 
-  const units = billableUnits(snap.unit, input);
-  const totalList = snap.listPriceYuan * units;
-  const estimatedCredits = computeTierCredits(totalList, ppc);
+  let estimatedCredits: number;
+  if (snap.unit === "PER_KTOKEN") {
+    const pt = input.promptTokens ?? 4000;
+    const ct = input.completionTokens ?? 2000;
+    estimatedCredits = computeLlmSplitChargeCredits({
+      inputCreditsPerKToken: price?.inputCreditsPerKToken ?? snap.inputCreditsPerKToken,
+      outputCreditsPerKToken: price?.outputCreditsPerKToken ?? snap.outputCreditsPerKToken,
+      inputListPriceYuan: price?.inputListPriceYuan != null ? Number(price.inputListPriceYuan) : snap.inputListPriceYuan,
+      outputListPriceYuan: price?.outputListPriceYuan != null ? Number(price.outputListPriceYuan) : snap.outputListPriceYuan,
+      creditsPerUnit,
+      listPriceYuan: snap.listPriceYuan,
+      promptTokens: pt,
+      completionTokens: ct,
+      totalTokens: pt + ct,
+      pricePerCreditYuan: ppc,
+    });
+  } else {
+    const units = billableUnits(snap.unit, input, canonical);
+    estimatedCredits = computeUnifiedChargeCredits({
+      creditsPerUnit,
+      units,
+    });
+  }
 
   return {
     canonicalModelKey: canonical,

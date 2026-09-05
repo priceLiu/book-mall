@@ -1,21 +1,42 @@
-import { execFile } from "child_process";
+import { createWriteStream } from "fs";
+import { Transform } from "stream";
+import { pipeline } from "stream/promises";
+import { Readable } from "stream";
+
 import { mkdtemp, rm, stat, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { promisify } from "util";
 
 import type { JianyingFrameInput } from "@/lib/canvas/canvas-jianying-export";
 import { buildMergedSrt } from "@/lib/canvas/canvas-jianying-export";
+import {
+  buildAsrSubtitleSrt,
+  transcribeClipViaGateway,
+} from "@/lib/media/asr-subtitle";
+import { QWEN3_ASR_FLASH_FILETRANS_MODEL } from "@/lib/gateway/dashscope-client";
 import { remuxMp4FaststartFromPath } from "@/lib/canvas/video-poster-ffmpeg";
+import { runFfmpeg, runFfprobe } from "@/lib/media/ffmpeg-exec";
 import { persistMediaRenderLocalOutput } from "@/lib/media/media-render-local-output";
 import {
   MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC,
   MEDIA_RENDER_MAX_SOURCE_BYTES_PER_CLIP,
 } from "@/lib/media/render-limits";
 import { FFMPEG_USER_MESSAGE } from "@/lib/media/ffmpeg-preflight";
-import type { MediaTimelineV1, RenderProfile } from "@/lib/media/timeline-types";
+import {
+  buildSubtitlesFilterExpr,
+  buildSubtitleBurnInFilterOverrides,
+  resolveSubtitleFontByKey,
+} from "@/lib/media/subtitle-ffmpeg-style";
+import type {
+  CompositeOverlay,
+  MediaTimelineV1,
+  RenderProfile,
+} from "@/lib/media/timeline-types";
 
-const execFileAsync = promisify(execFile);
+/** 字幕基线与画中画小窗之间的留白 */
+const SUBTITLE_OVERLAY_GAP_PX = 16;
+/** ffmpeg 把 SRT 转 ASS 时的默认脚本画布高度（force_style 的 MarginV 以此为基准） */
+const ASS_DEFAULT_PLAY_RES_Y = 288;
 
 export type ProbedClip = {
   order: number;
@@ -30,17 +51,57 @@ async function fetchToFile(
   dest: string,
   maxBytes: number,
 ): Promise<void> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`下载失败 HTTP ${res.status}: ${url}`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.byteLength > maxBytes) {
-    throw new Error(`源片过大（>${Math.round(maxBytes / 1024 / 1024)}MB）`);
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(180_000),
+      });
+      if (!res.ok) {
+        throw new Error(`下载失败 HTTP ${res.status}: ${url}`);
+      }
+      const contentLength = Number(res.headers.get("content-length") ?? "0");
+      if (contentLength > maxBytes) {
+        throw new Error(`源片过大（>${Math.round(maxBytes / 1024 / 1024)}MB）`);
+      }
+      const body = res.body;
+      if (!body) {
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.byteLength > maxBytes) {
+          throw new Error(`源片过大（>${Math.round(maxBytes / 1024 / 1024)}MB）`);
+        }
+        await writeFile(dest, buf);
+        return;
+      }
+      let received = 0;
+      const limiter = new Transform({
+        transform(chunk: Buffer, _enc, cb) {
+          received += chunk.length;
+          if (received > maxBytes) {
+            cb(new Error(`源片过大（>${Math.round(maxBytes / 1024 / 1024)}MB）`));
+            return;
+          }
+          cb(null, chunk);
+        },
+      });
+      await pipeline(
+        Readable.fromWeb(body as import("stream/web").ReadableStream),
+        limiter,
+        createWriteStream(dest),
+      );
+      return;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < 3) {
+        await new Promise((r) => setTimeout(r, 800 * attempt));
+      }
+    }
   }
-  await writeFile(dest, buf);
+  throw lastErr instanceof Error ? lastErr : new Error("下载源片失败");
 }
 
 export async function ffprobeDurationSec(filePath: string): Promise<number> {
-  const { stdout } = await execFileAsync("ffprobe", [
+  const stdout = await runFfprobe([
     "-v",
     "error",
     "-show_entries",
@@ -56,10 +117,32 @@ export async function ffprobeDurationSec(filePath: string): Promise<number> {
   return sec;
 }
 
+/** 优先音频流时长（ASR 对账）；无音轨时退回容器时长。 */
+export async function ffprobeAudioDurationSec(filePath: string): Promise<number> {
+  try {
+    const stdout = await runFfprobe([
+      "-v",
+      "error",
+      "-select_streams",
+      "a:0",
+      "-show_entries",
+      "stream=duration",
+      "-of",
+      "default=noprint_wrappers=1:nokey=1",
+      filePath,
+    ]);
+    const sec = Number.parseFloat(stdout.trim());
+    if (Number.isFinite(sec) && sec > 0) return sec;
+  } catch {
+    // fall through
+  }
+  return ffprobeDurationSec(filePath);
+}
+
 export async function ffprobeVideoSize(
   filePath: string,
 ): Promise<{ w: number; h: number }> {
-  const { stdout } = await execFileAsync("ffprobe", [
+  const stdout = await runFfprobe([
     "-v",
     "error",
     "-select_streams",
@@ -121,7 +204,7 @@ function scaleFilterToTarget(tw: number, th: number): string {
 
 async function clipHasAudio(filePath: string): Promise<boolean> {
   try {
-    const { stdout } = await execFileAsync("ffprobe", [
+    const stdout = await runFfprobe([
       "-v",
       "error",
       "-select_streams",
@@ -136,6 +219,185 @@ async function clipHasAudio(filePath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** 种草逐镜合成：profile.audio.mixTts 默认 true，须把 clip.audioUrl（TTS）混入成片 */
+export function resolveMixTtsEnabled(profile: RenderProfile): boolean {
+  return profile.audio?.mixTts !== false;
+}
+
+/**
+ * 合并成片以 ffprobe 实测时长为准；脚本 durationHintSec 仅作探测失败时的兜底。
+ * 若误用 hint 短于实际成片，attachSilentAudio 的 -t 会把每镜截断。
+ */
+export function resolveMediaClipDurationSec(
+  probedSec: number,
+  hintSec?: number,
+): number {
+  if (Number.isFinite(probedSec) && probedSec > 0.05) return probedSec;
+  if (hintSec != null && Number.isFinite(hintSec) && hintSec > 0) return hintSec;
+  return 3;
+}
+
+function buildVoiceoverAudioFilter(durationSec: number): string {
+  const dur = durationSec.toFixed(3);
+  return `[1:a]aformat=sample_rates=44100:channel_layouts=stereo,apad=whole_dur=${dur},atrim=0:${dur},asetpts=PTS-STARTPTS[aout]`;
+}
+
+/** 将 TTS 口播对齐到镜头时长并写入标准化镜头（保留视频轨，替换/新增音轨） */
+async function attachVoiceoverToNormalizedClip(args: {
+  videoPath: string;
+  audioUrl: string;
+  outPath: string;
+}): Promise<void> {
+  const durationSec = await ffprobeDurationSec(args.videoPath);
+  const audioPath = join(join(args.videoPath, ".."), `voice-${args.outPath.split("/").pop()}`);
+  await fetchToFile(
+    args.audioUrl,
+    audioPath,
+    MEDIA_RENDER_MAX_SOURCE_BYTES_PER_CLIP,
+  );
+  try {
+    const dur = durationSec.toFixed(3);
+    await runFfmpeg([
+      "-y",
+      "-i",
+      args.videoPath,
+      "-i",
+      audioPath,
+      "-filter_complex",
+      buildVoiceoverAudioFilter(durationSec),
+      "-map",
+      "0:v",
+      "-map",
+      "[aout]",
+      "-c:v",
+      "copy",
+      "-c:a",
+      "aac",
+      "-ar",
+      "44100",
+      "-ac",
+      "2",
+      "-b:a",
+      "128k",
+      "-shortest",
+      args.outPath,
+    ]);
+  } finally {
+    await rm(audioPath, { force: true }).catch(() => undefined);
+  }
+}
+
+/** 无音轨镜头：按视频实际时长补静音轨（不截断视频） */
+async function attachSilentAudioToNormalizedClip(args: {
+  videoPath: string;
+  outPath: string;
+}): Promise<void> {
+  const durationSec = await ffprobeDurationSec(args.videoPath);
+  const dur = durationSec.toFixed(3);
+  await runFfmpeg([
+    "-y",
+    "-i",
+    args.videoPath,
+    "-f",
+    "lavfi",
+    "-i",
+    "anullsrc=r=44100:cl=stereo",
+    "-filter_complex",
+    `[1:a]atrim=0:${dur},asetpts=PTS-STARTPTS[aout]`,
+    "-map",
+    "0:v",
+    "-map",
+    "[aout]",
+    "-c:v",
+    "copy",
+    "-c:a",
+    "aac",
+    "-ar",
+    "44100",
+    "-ac",
+    "2",
+    "-b:a",
+    "128k",
+    "-shortest",
+    args.outPath,
+  ]);
+}
+
+/** 保留厂商原生音轨，统一为 xfade/concat 可混流的 AAC 立体声 */
+async function remuxVideoWithNormalizedAudio(
+  inputPath: string,
+  outPath: string,
+): Promise<void> {
+  await runFfmpeg([
+    "-y",
+    "-i",
+    inputPath,
+    "-c:v",
+    "copy",
+    "-c:a",
+    "aac",
+    "-ar",
+    "44100",
+    "-ac",
+    "2",
+    "-b:a",
+    "128k",
+    outPath,
+  ]);
+}
+
+/** 合并前：每镜必有音轨；有 TTS 用 TTS，否则保留原生，再否则补静音 */
+async function prepareClipsForMerge(args: {
+  normPaths: string[];
+  probed: ProbedClip[];
+  mixTts: boolean;
+  tmp: string;
+  onProgress?: (pct: number, label: string) => void;
+}): Promise<{ paths: string[]; durations: number[] }> {
+  const paths: string[] = [];
+  const durations: number[] = [];
+  for (let i = 0; i < args.normPaths.length; i++) {
+    const normPath = args.normPaths[i]!;
+    const outPath = join(args.tmp, `merge-ready-${i}.mp4`);
+    const audioUrl = args.probed[i]?.audioUrl?.trim();
+    args.onProgress?.(
+      66 + Math.round((i / Math.max(args.normPaths.length, 1)) * 4),
+      audioUrl
+        ? `混入第 ${i + 1}/${args.normPaths.length} 镜口播音轨`
+        : `准备第 ${i + 1}/${args.normPaths.length} 镜音轨`,
+    );
+    if (args.mixTts && audioUrl) {
+      await attachVoiceoverToNormalizedClip({
+        videoPath: normPath,
+        audioUrl,
+        outPath,
+      });
+    } else if (await clipHasAudio(normPath)) {
+      await remuxVideoWithNormalizedAudio(normPath, outPath);
+    } else {
+      await attachSilentAudioToNormalizedClip({
+        videoPath: normPath,
+        outPath,
+      });
+    }
+    paths.push(outPath);
+    durations.push(await ffprobeDurationSec(outPath));
+  }
+  return { paths, durations };
+}
+
+export function estimateMergedDurationSec(
+  durations: number[],
+  transitionSec: number,
+): number {
+  if (durations.length <= 1) return durations[0] ?? 0;
+  if (transitionSec <= 0) return durations.reduce((a, b) => a + b, 0);
+  return (
+    durations.reduce((a, b) => a + b, 0) -
+    transitionSec * Math.max(0, durations.length - 1)
+  );
 }
 
 async function normalizeClip(
@@ -164,7 +426,7 @@ async function normalizeClip(
     args.push("-an");
   }
   args.push(outputPath);
-  await execFileAsync("ffmpeg", args, { maxBuffer: 10 * 1024 * 1024 });
+  await runFfmpeg(args);
 }
 
 function buildXfadeFilterChain(
@@ -223,7 +485,7 @@ async function concatCopy(partPaths: string[], outPath: string): Promise<void> {
     .map((p) => `file '${p.replace(/'/g, "'\\''")}'`)
     .join("\n");
   await writeFile(listPath, listBody);
-  await execFileAsync("ffmpeg", [
+  await runFfmpeg([
     "-y",
     "-f",
     "concat",
@@ -237,24 +499,21 @@ async function concatCopy(partPaths: string[], outPath: string): Promise<void> {
   ]);
 }
 
-function escapeFfmpegSubtitlesPath(srtPath: string): string {
-  return srtPath.replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "'\\''");
-}
-
 /** 对已合并视频烧录 SRT（单镜 concat 与多镜 xfade 共用）。 */
 async function burnSubtitlesIntoVideo(
   inputPath: string,
   srtPath: string,
   outPath: string,
+  profile: RenderProfile,
 ): Promise<void> {
-  const escaped = escapeFfmpegSubtitlesPath(srtPath);
+  const styleOverrides = buildSubtitleBurnInFilterOverrides(profile.subtitle.style);
   const withAudio = await clipHasAudio(inputPath);
   const args = [
     "-y",
     "-i",
     inputPath,
     "-vf",
-    `subtitles='${escaped}'`,
+    buildSubtitlesFilterExpr(srtPath, styleOverrides),
     "-c:v",
     "libx264",
     "-preset",
@@ -268,7 +527,7 @@ async function burnSubtitlesIntoVideo(
     args.push("-an");
   }
   args.push(outPath);
-  await execFileAsync("ffmpeg", args, { maxBuffer: 20 * 1024 * 1024 });
+  await runFfmpeg(args);
 }
 
 async function renderXfade(
@@ -288,7 +547,7 @@ async function renderXfade(
   if (transitionSec <= 0 || normPaths.length === 1) {
     await concatCopy(normPaths, mergedPath);
     if (needBurn) {
-      await burnSubtitlesIntoVideo(mergedPath, srtPath!, outPath);
+      await burnSubtitlesIntoVideo(mergedPath, srtPath!, outPath, profile);
     }
     return;
   }
@@ -296,6 +555,9 @@ async function renderXfade(
   const withAudio = (await Promise.all(normPaths.map((p) => clipHasAudio(p)))).every(
     Boolean,
   );
+  if (!withAudio && normPaths.length > 1) {
+    throw new Error("合并失败：部分镜头缺少音轨，请重试或联系支持");
+  }
   const { filter, videoLabel, audioLabel } = buildXfadeFilterChain(
     durations,
     transitionSec,
@@ -305,8 +567,8 @@ async function renderXfade(
   let complex = filter;
   let mapVideo = videoLabel;
   if (needBurn) {
-    const escaped = escapeFfmpegSubtitlesPath(srtPath!);
-    complex += `;[${videoLabel}]subtitles='${escaped}'[vfinal]`;
+    const styleOverrides = buildSubtitleBurnInFilterOverrides(profile.subtitle.style);
+    complex += `;[${videoLabel}]${buildSubtitlesFilterExpr(srtPath!, styleOverrides)}[vfinal]`;
     mapVideo = "vfinal";
   }
   const args = [
@@ -330,7 +592,7 @@ async function renderXfade(
     outPath,
   );
 
-  await execFileAsync("ffmpeg", args, { maxBuffer: 20 * 1024 * 1024 });
+  await runFfmpeg(args);
 }
 
 export function timelineToSrtFrames(
@@ -350,6 +612,338 @@ export type RenderFfmpegResult = {
   totalDurationSec: number;
   srtContent?: string;
 };
+
+function overlayPositionExpr(
+  position: CompositeOverlay["position"],
+  marginPx: number,
+): string {
+  switch (position) {
+    case "bottom-left":
+      return `${marginPx}:main_h-overlay_h-${marginPx}`;
+    case "top-right":
+      return `main_w-overlay_w-${marginPx}:${marginPx}`;
+    case "top-left":
+      return `${marginPx}:${marginPx}`;
+    case "center":
+      return "(main_w-overlay_w)/2:(main_h-overlay_h)/2";
+    default:
+      return `main_w-overlay_w-${marginPx}:main_h-overlay_h-${marginPx}`;
+  }
+}
+
+function overlayEnableExpr(
+  overlay: CompositeOverlay,
+  durationSec: number,
+): string {
+  const from = overlay.appearFromSec ?? 0;
+  const to =
+    overlay.appearToSec != null && overlay.appearToSec >= 0
+      ? overlay.appearToSec
+      : durationSec;
+  if (from <= 0 && to >= durationSec - 0.05) return "";
+  return `:enable='between(t,${from.toFixed(3)},${to.toFixed(3)})'`;
+}
+
+function srtTimestamp(totalSec: number): string {
+  const ms = Math.max(0, Math.round(totalSec * 1000));
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  const s = Math.floor((ms % 60_000) / 1000);
+  const rest = ms % 1000;
+  const p = (n: number, len = 2) => n.toString().padStart(len, "0");
+  return `${p(h)}:${p(m)}:${p(s)},${p(rest, 3)}`;
+}
+
+/**
+ * 整段台词按时长均分成字幕行（口播视频无逐字时间戳时的近似方案）。
+ * 按中文标点断句，句长权重分配时间。
+ */
+export function buildCompositeSrt(text: string, durationSec: number): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (!clean || durationSec <= 0) return "";
+  const sentences = clean
+    .split(/(?<=[。！？；.!?;])/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const lines = sentences.length > 0 ? sentences : [clean];
+  const totalChars = lines.reduce((sum, l) => sum + l.length, 0) || 1;
+
+  const blocks: string[] = [];
+  let cursor = 0;
+  lines.forEach((line, i) => {
+    const share = (line.length / totalChars) * durationSec;
+    const start = cursor;
+    const end = i === lines.length - 1 ? durationSec : cursor + share;
+    cursor = end;
+    blocks.push(
+      `${i + 1}\n${srtTimestamp(start)} --> ${srtTimestamp(end)}\n${line}\n`,
+    );
+  });
+  return blocks.join("\n");
+}
+
+/**
+ * 底部小窗会压住默认位置的字幕，此时把字幕抬到小窗上沿之上。
+ * 返回 ASS `MarginV`（脚本坐标）；无需抬高时为 undefined。
+ */
+async function subtitleMarginVForOverlay(args: {
+  foregroundPath: string;
+  overlay: CompositeOverlay;
+  targetWidth: number;
+  targetHeight: number;
+  hasBackground: boolean;
+}): Promise<number | undefined> {
+  if (!args.hasBackground) return undefined;
+  if (!args.overlay.position.startsWith("bottom")) return undefined;
+
+  const fgSize = await ffprobeVideoSize(args.foregroundPath).catch(() => null);
+  if (!fgSize || fgSize.w <= 0) return undefined;
+
+  const overlayW = Math.max(2, Math.round(args.targetWidth * args.overlay.scale));
+  const overlayH = Math.round((overlayW * fgSize.h) / fgSize.w);
+  const marginPx = args.overlay.marginPx + overlayH + SUBTITLE_OVERLAY_GAP_PX;
+  // MarginV 用的是 ASS 脚本坐标，需按 SRT→ASS 的默认画布高度换算回去
+  return Math.round((marginPx * ASS_DEFAULT_PLAY_RES_Y) / args.targetHeight);
+}
+
+/**
+ * 画中画合成：背景循环铺底 + 前景口播叠加 + 可替换音轨 + 可选字幕。
+ *
+ * 输出时长以 **前景** 为准（`-shortest` 配合背景 `-stream_loop -1`）。
+ */
+async function runCompositeFfmpeg(args: {
+  foregroundPath: string;
+  backgroundPath: string | null;
+  audioPath: string | null;
+  overlay: CompositeOverlay;
+  targetSize: { w: number; h: number };
+  foregroundDurationSec: number;
+  srtPath: string | null;
+  subtitleStyle?: RenderProfile["subtitle"]["style"];
+  outPath: string;
+}): Promise<void> {
+  const { targetSize, overlay } = args;
+  const inputs: string[] = [];
+  const filters: string[] = [];
+
+  if (args.backgroundPath) {
+    // 背景短于前景时循环铺底；trim 保证不超出前景时长
+    inputs.push("-stream_loop", "-1", "-i", args.backgroundPath);
+    inputs.push("-i", args.foregroundPath);
+    filters.push(
+      [
+        `[0:v]scale=${targetSize.w}:${targetSize.h}:force_original_aspect_ratio=increase`,
+        `crop=${targetSize.w}:${targetSize.h}`,
+        "setsar=1",
+        "fps=30",
+        `trim=duration=${args.foregroundDurationSec.toFixed(3)}`,
+        "setpts=PTS-STARTPTS[bg]",
+      ].join(","),
+    );
+    filters.push(
+      `[1:v]scale=${Math.max(2, Math.round(targetSize.w * overlay.scale))}:-2,setsar=1,fps=30[fg]`,
+    );
+    filters.push(
+      `[bg][fg]overlay=${overlayPositionExpr(overlay.position, overlay.marginPx)}${overlayEnableExpr(overlay, args.foregroundDurationSec)}:shortest=1[vmix]`,
+    );
+  } else {
+    inputs.push("-i", args.foregroundPath);
+    filters.push(
+      [
+        `[0:v]scale=${targetSize.w}:${targetSize.h}:force_original_aspect_ratio=increase`,
+        `crop=${targetSize.w}:${targetSize.h}`,
+        "setsar=1",
+        "fps=30[vmix]",
+      ].join(","),
+    );
+  }
+
+  let videoLabel = "vmix";
+  if (args.srtPath) {
+    const marginV = await subtitleMarginVForOverlay({
+      foregroundPath: args.foregroundPath,
+      overlay,
+      targetWidth: targetSize.w,
+      targetHeight: targetSize.h,
+      hasBackground: Boolean(args.backgroundPath),
+    });
+    filters.push(
+      `[vmix]${buildSubtitlesFilterExpr(args.srtPath, buildSubtitleBurnInFilterOverrides(args.subtitleStyle, { MarginV: marginV }))}[vout]`,
+    );
+    videoLabel = "vout";
+  }
+
+  const fgIndex = args.backgroundPath ? 1 : 0;
+  let audioMap: string | null = null;
+  if (args.audioPath) {
+    inputs.push("-i", args.audioPath);
+    audioMap = `${args.backgroundPath ? 2 : 1}:a`;
+  } else if (await clipHasAudio(args.foregroundPath)) {
+    audioMap = `${fgIndex}:a`;
+  }
+
+  const ffArgs = [
+    "-y",
+    ...inputs,
+    "-filter_complex",
+    filters.join(";"),
+    "-map",
+    `[${videoLabel}]`,
+  ];
+  if (audioMap) {
+    ffArgs.push("-map", audioMap, "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k");
+  } else {
+    ffArgs.push("-an");
+  }
+  ffArgs.push(
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "23",
+    "-pix_fmt",
+    "yuv420p",
+    "-shortest",
+    args.outPath,
+  );
+
+  await runFfmpeg(ffArgs);
+}
+
+/**
+ * composite 渲染入口：`timeline.clips[0]` 为前景口播视频，
+ * `timeline.composite` 描述背景 / 音轨 / 叠加位置 / 字幕。
+ */
+export async function runCompositeRender(args: {
+  jobId: string;
+  timeline: MediaTimelineV1;
+  profile: RenderProfile;
+  onProgress?: (pct: number, label: string) => void;
+}): Promise<RenderFfmpegResult> {
+  const composite = args.timeline.composite;
+  if (!composite) throw new Error("缺少 composite 参数");
+  const foreground = args.timeline.clips[0];
+  if (!foreground) throw new Error("缺少前景视频");
+
+  const tmp = await mkdtemp(join(tmpdir(), "media-composite-"));
+  try {
+    args.onProgress?.(5, "下载口播视频");
+    const fgPath = join(tmp, "foreground.mp4");
+    await fetchToFile(
+      foreground.videoUrl,
+      fgPath,
+      MEDIA_RENDER_MAX_SOURCE_BYTES_PER_CLIP,
+    );
+
+    let bgPath: string | null = null;
+    if (composite.backgroundUrl) {
+      args.onProgress?.(20, "下载背景视频");
+      bgPath = join(tmp, "background.mp4");
+      await fetchToFile(
+        composite.backgroundUrl,
+        bgPath,
+        MEDIA_RENDER_MAX_SOURCE_BYTES_PER_CLIP,
+      );
+    }
+
+    let audioPath: string | null = null;
+    if (composite.audioUrl) {
+      args.onProgress?.(30, "下载口播音轨");
+      audioPath = join(tmp, "voice.mp3");
+      await fetchToFile(
+        composite.audioUrl,
+        audioPath,
+        MEDIA_RENDER_MAX_SOURCE_BYTES_PER_CLIP,
+      );
+    }
+
+    const fgDuration =
+      foreground.durationSec && foreground.durationSec > 0
+        ? foreground.durationSec
+        : await ffprobeDurationSec(fgPath);
+    if (fgDuration > MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC) {
+      throw new Error(
+        `成片时长 ${Math.round(fgDuration)}s 超过上限 ${MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC}s`,
+      );
+    }
+
+    // 有背景时按背景比例定画布（画中画铺底），否则按前景
+    const sizeRef = bgPath
+      ? await ffprobeVideoSize(bgPath)
+      : await ffprobeVideoSize(fgPath);
+    const targetSize = computeRenderTargetSize(
+      [sizeRef],
+      args.profile.video.scaleMode,
+    );
+
+    let srtContent: string | undefined;
+    let srtPath: string | null = null;
+    if (
+      args.profile.subtitle.burnIn &&
+      args.profile.subtitle.mode !== "none" &&
+      composite.subtitleText?.trim()
+    ) {
+      args.onProgress?.(38, "生成字幕文件");
+      srtContent = buildCompositeSrt(composite.subtitleText, fgDuration);
+      if (srtContent.trim()) {
+        srtPath = join(tmp, "subs.srt");
+        await writeFile(srtPath, srtContent, "utf8");
+        const style = args.profile.subtitle.style;
+        const font = resolveSubtitleFontByKey(
+          style?.fontKey ?? "heiti",
+        );
+        console.info(
+          `[media-render] 烧录字幕字体 ${font.fontName} (${style?.fontKey ?? "heiti"}/${style?.sizeKey ?? "large"}) @ ${font.fontFile}`,
+        );
+      }
+    }
+
+    args.onProgress?.(
+      45,
+      bgPath ? "叠加数字人与背景" : "编码口播视频",
+    );
+    const outPath = join(tmp, "composite.mp4");
+    await runCompositeFfmpeg({
+      foregroundPath: fgPath,
+      backgroundPath: bgPath,
+      audioPath,
+      overlay: composite.overlay,
+      targetSize,
+      foregroundDurationSec: fgDuration,
+      srtPath,
+      subtitleStyle: args.profile.subtitle.style,
+      outPath,
+    });
+
+    args.onProgress?.(82, "编码完成，准备保存");
+    const fastPath = join(tmp, "composite-faststart.mp4");
+    const faststarted = await remuxMp4FaststartFromPath(outPath, fastPath);
+    const uploadPath = faststarted ? fastPath : outPath;
+
+    const outStat = await stat(uploadPath);
+    const outMb = Math.max(1, Math.round(outStat.size / 1024 / 1024));
+    args.onProgress?.(88, `保存成片（约 ${outMb}MB）`);
+
+    const persisted = await persistMediaRenderLocalOutput(args.jobId, uploadPath);
+    args.onProgress?.(89, "合成完成，可下载");
+
+    return {
+      localPath: persisted.path,
+      bytesOut: persisted.bytesOut,
+      totalDurationSec: fgDuration,
+      srtContent: srtContent?.trim() || undefined,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("ENOENT") || /ffmpeg|ffprobe/i.test(msg)) {
+      throw new Error(FFMPEG_USER_MESSAGE);
+    }
+    throw e;
+  } finally {
+    await rm(tmp, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
 
 export async function runFfmpegMediaRender(args: {
   userId: string;
@@ -377,10 +971,8 @@ export async function runFfmpegMediaRender(args: {
         rawPath,
         MEDIA_RENDER_MAX_SOURCE_BYTES_PER_CLIP,
       );
-      const durationSec =
-        clip.durationSec && clip.durationSec > 0
-          ? clip.durationSec
-          : await ffprobeDurationSec(rawPath);
+      const probedSec = await ffprobeDurationSec(rawPath);
+      const durationSec = resolveMediaClipDurationSec(probedSec, clip.durationSec);
       const size = await ffprobeVideoSize(rawPath);
       sourceSizes.push(size);
       probed.push({
@@ -397,15 +989,12 @@ export async function runFfmpegMediaRender(args: {
     }
 
     const durations = probed.map((p) => p.durationSec);
-    const totalEstimate =
-      profile.transition.type === "xfade" && probed.length > 1
-        ? durations.reduce((a, b) => a + b, 0) -
-          profile.transition.durationSec * (probed.length - 1)
-        : durations.reduce((a, b) => a + b, 0);
-
-    if (totalEstimate > MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC) {
+    const transitionSec =
+      profile.transition.type === "xfade" ? profile.transition.durationSec : 0;
+    const roughEstimate = estimateMergedDurationSec(durations, transitionSec);
+    if (roughEstimate > MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC * 1.2) {
       throw new Error(
-        `成片时长 ${Math.round(totalEstimate)}s 超过上限 ${MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC}s`,
+        `成片时长 ${Math.round(roughEstimate)}s 超过上限 ${MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC}s`,
       );
     }
 
@@ -430,27 +1019,109 @@ export async function runFfmpegMediaRender(args: {
       );
     }
 
-    const srtFrames = timelineToSrtFrames(timeline, durations);
-    const srtContent =
-      profile.subtitle.mode === "script" ? buildMergedSrt(srtFrames) : undefined;
+    const mixTts = resolveMixTtsEnabled(profile);
+    const { paths: mergePaths, durations: mergeDurations } =
+      await prepareClipsForMerge({
+        normPaths,
+        probed,
+        mixTts,
+        tmp,
+        onProgress: (pct, label) => args.onProgress?.(pct, label),
+      });
+    normPaths.splice(0, normPaths.length, ...mergePaths);
+
+    const totalEstimate = estimateMergedDurationSec(mergeDurations, transitionSec);
+    if (totalEstimate > MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC) {
+      throw new Error(
+        `成片时长 ${Math.round(totalEstimate)}s 超过上限 ${MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC}s`,
+      );
+    }
+
+    const srtFrames = timelineToSrtFrames(timeline, mergeDurations);
+    let srtContent: string | undefined;
+    if (profile.subtitle.mode === "script") {
+      srtContent = buildMergedSrt(srtFrames, {
+        transitionType: profile.transition.type,
+        transitionSec,
+      });
+      if (profile.subtitle.burnIn && !srtContent?.trim()) {
+        throw new Error(
+          "未找到可烧录的分镜对白：请确认脚本表「对白」列已填写，或视频已连线文本/脚本节点后再试",
+        );
+      }
+    } else if (profile.subtitle.mode === "asr" && profile.subtitle.burnIn) {
+      const asrModelKey =
+        profile.subtitle.asrModelKey?.trim() || QWEN3_ASR_FLASH_FILETRANS_MODEL;
+      const clipSegments: Array<
+        Array<{ startMs: number; endMs: number; text: string }>
+      > = [];
+      for (let i = 0; i < timeline.clips.length; i++) {
+        const clip = timeline.clips[i]!;
+        args.onProgress?.(
+          66 + Math.round((i / Math.max(timeline.clips.length, 1)) * 4),
+          `识别第 ${i + 1}/${timeline.clips.length} 镜台词…`,
+        );
+        let segments: Array<{ startMs: number; endMs: number; text: string }> =
+          [];
+        try {
+          segments = await transcribeClipViaGateway({
+            userId: args.userId,
+            fileUrl: clip.videoUrl,
+            modelKey: asrModelKey,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (/Gateway API Key|未关联 Gateway/i.test(msg)) {
+            throw e;
+          }
+          segments = [];
+        }
+        if (segments.length === 0 && clip.subtitle?.trim()) {
+          const durMs = Math.max(
+            500,
+            Math.round((mergeDurations[i] ?? 3) * 1000),
+          );
+          segments = [
+            {
+              startMs: 0,
+              endMs: durMs,
+              text: clip.subtitle.trim(),
+            },
+          ];
+        }
+        clipSegments.push(segments);
+      }
+      srtContent = buildAsrSubtitleSrt(clipSegments, mergeDurations, {
+        transitionType: profile.transition.type,
+        transitionSec,
+      });
+    }
     let srtPath: string | undefined;
     if (srtContent?.trim()) {
       args.onProgress?.(68, "生成字幕文件");
       srtPath = join(tmp, "subs.srt");
       await writeFile(srtPath, srtContent, "utf8");
+      if (profile.subtitle.burnIn) {
+        const style = profile.subtitle.style;
+        const font = resolveSubtitleFontByKey(style?.fontKey ?? "heiti");
+        console.info(
+          `[media-render] 烧录字幕字体 ${font.fontName} (${style?.fontKey ?? "heiti"}/${style?.sizeKey ?? "large"}) @ ${font.fontFile}`,
+        );
+      }
     }
 
     const outPath = join(tmp, "merged.mp4");
+    const willBurnSubs = Boolean(srtPath?.trim() && profile.subtitle.burnIn);
     const xfadeLabel =
       profile.transition.type === "xfade" && normPaths.length > 1
-        ? profile.subtitle.burnIn
+        ? willBurnSubs
           ? "合并转场并烧录字幕"
           : "合并转场"
-        : profile.subtitle.burnIn
+        : willBurnSubs
           ? "拼接镜头并烧录字幕"
           : "拼接镜头";
     args.onProgress?.(72, xfadeLabel);
-    await renderXfade(normPaths, durations, profile, outPath, srtPath);
+    await renderXfade(normPaths, mergeDurations, profile, outPath, srtPath);
     args.onProgress?.(85, "编码完成，准备保存");
 
     const fastPath = join(tmp, "merged-faststart.mp4");

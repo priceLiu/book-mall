@@ -4,7 +4,7 @@ import type { Pro2ThreeViewBatchImagePick } from "./pro2-three-view-batch-image"
 import {
   enqueuePro2ScriptGeneration,
   kickoffPro2CharacterThreeViewFromHub,
-  kickoffPro2FrameBoardFromHub,
+  kickoffPro2StoryboardFromHub,
   kickoffPro2SceneImageFromHub,
   pro2HubHasScriptTable,
   pro2HubIsLinkedOutline,
@@ -14,7 +14,30 @@ import type { Pro2SceneBatchImagePick } from "./pro2-scene-batch-image";
 import { resolveHubStoryboardMd } from "./story-hub-runtime";
 import type { StoryRefImage } from "./story-ref-image";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
-import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
+import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
+
+type KickoffStoreSlice = {
+  nodes: CanvasFlowNode[];
+  edges: CanvasFlowEdge[];
+  addNode: (
+    type: CanvasNodeType,
+    position: { x: number; y: number },
+    data: Record<string, unknown>,
+  ) => string;
+  addNodeInGroup: (
+    type: CanvasNodeType,
+    groupId: string,
+    relativePosition: { x: number; y: number },
+    data: Record<string, unknown>,
+  ) => string;
+  createGroupContaining: (
+    childIds: string[],
+    opts: { label: string; color: string },
+  ) => string | null;
+  setEdges: (fn: (e: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void;
+  setNodes: (fn: (n: CanvasFlowNode[]) => CanvasFlowNode[]) => void;
+};
 
 export function downloadPro2ScriptMarkdown(md: string, title: string): void {
   const safe = (title.trim() || "脚本").replace(/[/\\?%*:|"<>]/g, "_");
@@ -27,7 +50,7 @@ export function downloadPro2ScriptMarkdown(md: string, title: string): void {
   URL.revokeObjectURL(url);
 }
 
-/** 工具栏「重新生成」：重新生成完整脚本（大纲 + 角色 + 脚本表） */
+/** 工具栏「重新生成」：有上游/已落库大纲时只跑角色→场景→分镜；无大纲时含 outline 共四段 */
 export function regeneratePro2ScriptHub(
   hubId: string,
   hubData: StoryProScriptHubNodeData,
@@ -49,7 +72,7 @@ export function regeneratePro2ScriptHub(
     dockInput,
     dockRefImages,
     updateNodeData,
-    { forceFresh: true, nodes, edges, hubData, regenerateAll: true },
+    { forceFresh: true, nodes, edges, hubData },
   );
   return true;
 }
@@ -60,61 +83,40 @@ export function generatePro2FrameBoardFromHub(
   dockInput: string,
   dockRefImages: StoryRefImage[],
   providers: import("@/lib/canvas-providers-api").CanvasProviderDto[],
-  getStore: () => {
-    nodes: CanvasFlowNode[];
-    edges: CanvasFlowEdge[];
-    addNode: (
-      type: "story-pro2-frame" | "story-pro2-image" | "group",
-      position: { x: number; y: number },
-      data: Record<string, unknown>,
-    ) => string;
-    addNodeInGroup: (
-      type: "story-pro2-image" | "story-pro2-three-view",
-      groupId: string,
-      relativePosition: { x: number; y: number },
-      data: Record<string, unknown>,
-    ) => string;
-    createGroupContaining: (
-      childIds: string[],
-      opts: { label: string; color: string },
-    ) => string | null;
-    setEdges: (fn: (e: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
-    updateNodeData: (id: string, patch: Record<string, unknown>) => void;
-    setNodes: (fn: (n: CanvasFlowNode[]) => CanvasFlowNode[]) => void;
-  },
+  getStore: () => KickoffStoreSlice,
   selectedFrameIndices?: number[],
   batchImage?: {
     providerId: string;
     modelKey: string;
     params?: Record<string, unknown>;
-  },
+  } | null,
   kickoffOptions?: Pick<
     KickoffPro2FrameBoardOptions,
     "spawnNewGroup" | "forceFresh"
   >,
 ): boolean {
   if (!pro2HubHasScriptTable(hubData)) return false;
-  const opts: KickoffPro2FrameBoardOptions = {};
+  const opts: KickoffPro2FrameBoardOptions = { spawnNewGroup: true };
   if (selectedFrameIndices?.length) {
     opts.selectedFrameIndices = selectedFrameIndices;
   }
   if (batchImage?.providerId?.trim() && batchImage.modelKey?.trim()) {
     opts.batchImage = batchImage;
   }
-  if (kickoffOptions?.spawnNewGroup) {
-    opts.spawnNewGroup = true;
+  if (kickoffOptions?.spawnNewGroup === false) {
+    opts.spawnNewGroup = false;
   }
   if (kickoffOptions?.forceFresh) {
     opts.forceFresh = true;
   }
-  kickoffPro2FrameBoardFromHub(
+  kickoffPro2StoryboardFromHub(
     getStore,
     hubId,
     hubData,
     dockInput,
     dockRefImages,
     providers,
-    Object.keys(opts).length ? opts : undefined,
+    opts,
   );
   return true;
 }
@@ -123,40 +125,15 @@ export function generatePro2CharacterThreeViewFromHub(
   hubId: string,
   hubData: StoryProScriptHubNodeData,
   providers: import("@/lib/canvas-providers-api").CanvasProviderDto[],
-  getStore: () => {
-    nodes: CanvasFlowNode[];
-    edges: CanvasFlowEdge[];
-    addNode: (
-      type:
-        | "story-pro2-character"
-        | "story-pro2-frame"
-        | "story-pro2-image"
-        | "story-pro2-three-view"
-        | "group",
-      position: { x: number; y: number },
-      data: Record<string, unknown>,
-    ) => string;
-    addNodeInGroup: (
-      type: "story-pro2-image" | "story-pro2-three-view",
-      groupId: string,
-      relativePosition: { x: number; y: number },
-      data: Record<string, unknown>,
-    ) => string;
-    createGroupContaining: (
-      childIds: string[],
-      opts: { label: string; color: string },
-    ) => string | null;
-    setEdges: (fn: (e: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
-    updateNodeData: (id: string, patch: Record<string, unknown>) => void;
-    setNodes: (fn: (n: CanvasFlowNode[]) => CanvasFlowNode[]) => void;
-  },
+  getStore: () => KickoffStoreSlice,
   selectedCharacterKeys?: string[],
   batchImage?: Pro2ThreeViewBatchImagePick,
 ): boolean {
   const opts: {
     characterKeys?: string[];
     batchImage?: Pro2ThreeViewBatchImagePick;
-  } = {};
+    spawnNewGroup: true;
+  } = { spawnNewGroup: true };
   if (selectedCharacterKeys?.length) {
     opts.characterKeys = selectedCharacterKeys;
   }
@@ -169,7 +146,7 @@ export function generatePro2CharacterThreeViewFromHub(
       hubId,
       hubData,
       providers,
-      Object.keys(opts).length ? opts : undefined,
+      opts,
     ) != null
   );
 }
@@ -178,41 +155,15 @@ export function generatePro2SceneImageFromHub(
   hubId: string,
   hubData: StoryProScriptHubNodeData,
   providers: import("@/lib/canvas-providers-api").CanvasProviderDto[],
-  getStore: () => {
-    nodes: CanvasFlowNode[];
-    edges: CanvasFlowEdge[];
-    addNode: (
-      type:
-        | "story-pro2-character"
-        | "story-pro2-scene"
-        | "story-pro2-frame"
-        | "story-pro2-image"
-        | "story-pro2-three-view"
-        | "group",
-      position: { x: number; y: number },
-      data: Record<string, unknown>,
-    ) => string;
-    addNodeInGroup: (
-      type: "story-pro2-image" | "story-pro2-three-view",
-      groupId: string,
-      relativePosition: { x: number; y: number },
-      data: Record<string, unknown>,
-    ) => string;
-    createGroupContaining: (
-      childIds: string[],
-      opts: { label: string; color: string },
-    ) => string | null;
-    setEdges: (fn: (e: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
-    updateNodeData: (id: string, patch: Record<string, unknown>) => void;
-    setNodes: (fn: (n: CanvasFlowNode[]) => CanvasFlowNode[]) => void;
-  },
+  getStore: () => KickoffStoreSlice,
   selectedSceneKeys?: string[],
   batchImage?: Pro2SceneBatchImagePick,
 ): boolean {
   const opts: {
     sceneKeys?: string[];
     batchImage?: Pro2SceneBatchImagePick;
-  } = {};
+    spawnNewGroup: true;
+  } = { spawnNewGroup: true };
   if (selectedSceneKeys?.length) {
     opts.sceneKeys = selectedSceneKeys;
   }
@@ -225,7 +176,7 @@ export function generatePro2SceneImageFromHub(
       hubId,
       hubData,
       providers,
-      Object.keys(opts).length ? opts : undefined,
+      opts,
     ) != null
   );
 }

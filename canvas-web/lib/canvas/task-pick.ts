@@ -4,6 +4,11 @@ import type { CanvasStoryRunJob } from "./canvas-run-bus";
 import type { StoryRunContext } from "./story-workspace-types";
 import { formatCanvasTaskError } from "./friendly-task-error";
 import {
+  canvasIdleRuntimeAfterUserCancel,
+  isUserCancelledCanvasTask,
+} from "./canvas-generation-cancel-messages";
+import {
+  canvasNodeRunSessionStartedAtMs,
   isCanvasNodeRunSessionActive,
   shouldSkipStaleTerminalWhileLocalInflight,
 } from "./canvas-run-session";
@@ -11,11 +16,15 @@ import {
   pickTaskResultMediaUrl,
   taskHasDisplayableResult,
 } from "./task-media-url";
+import { isCanvasInflightStatus } from "./story-column-runtime";
+import type { StoryScriptHubNodeData } from "./story-workspace-types";
+import { isAnyStoryScriptHubType } from "./story-workspace-resolver";
 
 export type CanvasTaskStoryScope = {
   rowKey?: string;
   mediaKind?: string;
   llmSection?: string;
+  polishMode?: "frame" | "video" | "both";
 };
 
 function taskHasSuccessPayload(task: CanvasTaskRecord): boolean {
@@ -70,21 +79,19 @@ export function isStaleServerInflightTask(
 export function pickActiveServerInflightTask(
   nodeTasks: CanvasTaskRecord[],
   boundTaskId?: string | null,
-  runtime?: CanvasNodeRuntime | null,
+  _runtime?: CanvasNodeRuntime | null,
 ): CanvasTaskRecord | undefined {
   const boundId = boundTaskId?.trim();
-  const hasRtMedia = Boolean(
-    runtime?.ossUrl?.trim() || runtime?.ephemeralUrl?.trim(),
-  );
 
   if (boundId) {
     const bound = nodeTasks.find((t) => t.id === boundId);
-    if (bound && isServerInflightTaskStatus(bound.status)) {
-      if (isStaleServerInflightTask(bound, nodeTasks) || hasRtMedia) {
-        // fall through
-      } else {
-        return bound;
-      }
+    if (
+      bound &&
+      isServerInflightTaskStatus(bound.status) &&
+      !isStaleServerInflightTask(bound, nodeTasks) &&
+      !isAbandonedCanvasInflightTask(bound)
+    ) {
+      return bound;
     }
   }
 
@@ -95,7 +102,6 @@ export function pickActiveServerInflightTask(
       !isAbandonedCanvasInflightTask(t),
   );
   if (!inflight.length) return undefined;
-  if (hasRtMedia && !boundId) return undefined;
   return [...inflight].sort(
     (a, b) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -126,17 +132,57 @@ export function shouldSkipStoryRowTaskApply(
   pick: CanvasTaskRecord,
   nodeId?: string,
 ): boolean {
+  if (pick.failCode === "SUPERSEDED") return true;
+  const localTaskId = localRuntime?.taskId?.trim();
+  // 已绑定任务进入终态：必须写回（Gateway 已成功但 UI 仍扫光）
+  if (localTaskId && pick.id === localTaskId) {
+    if (
+      pick.status === "SUCCEEDED" ||
+      pick.status === "FAILED" ||
+      pick.status === "CANCELLED"
+    ) {
+      return false;
+    }
+  }
+  if (pick.status === "SUCCEEDED" && taskHasDisplayableResult(pick)) {
+    const localSt = localRuntime?.status;
+    if (
+      localSt === "pending" ||
+      localSt === "running" ||
+      localSt === "queued"
+    ) {
+      if (!localTaskId) {
+        if (!nodeId || !isCanvasNodeRunSessionActive(nodeId)) return false;
+        const startedAt = canvasNodeRunSessionStartedAtMs(nodeId);
+        const pickMs = Date.parse(
+          pick.completedAt ?? pick.updatedAt ?? pick.createdAt ?? "",
+        );
+        if (Number.isFinite(pickMs) && pickMs >= startedAt - 3000) {
+          return false;
+        }
+      } else if (pick.id === localTaskId) {
+        return false;
+      }
+    }
+  }
+
   if (
     nodeId &&
     isCanvasNodeRunSessionActive(nodeId) &&
-    !localRuntime?.taskId?.trim() &&
+    !localTaskId &&
     localRuntime?.status === "error"
   ) {
     return true;
   }
 
   const localSt = localRuntime?.status;
-  if (localSt !== "pending" && localSt !== "running") return false;
+  if (
+    localSt !== "pending" &&
+    localSt !== "running" &&
+    localSt !== "queued"
+  ) {
+    return false;
+  }
   if (isServerInflightTaskStatus(pick.status)) {
     if (nodeId) {
       return shouldSkipStaleTerminalWhileLocalInflight(nodeId, localRuntime, pick);
@@ -148,19 +194,21 @@ export function shouldSkipStoryRowTaskApply(
   }
   if (localRuntime?.taskId) {
     if (pick.id === localRuntime.taskId) return false;
-  } else {
-    // 无 taskId：历史终态一律跳过，避免刚点生成时闪回旧结果
     return (
       pick.status === "SUCCEEDED" ||
       pick.status === "FAILED" ||
       pick.status === "CANCELLED"
     );
   }
-  return (
+  // 无 taskId + 本地仍扫光：终态必须写回（含 OSS 未就绪、无 preview URL 的 SUCCEEDED）
+  if (
     pick.status === "SUCCEEDED" ||
     pick.status === "FAILED" ||
     pick.status === "CANCELLED"
-  );
+  ) {
+    return false;
+  }
+  return false;
 }
 
 /** 任务终态写回 node.runtime 前 · 用户已关闭的错误勿重复弹出 */
@@ -207,6 +255,9 @@ export function runtimePatchFromCanvasTask(
     };
   }
   if (task.status === "FAILED" || task.status === "CANCELLED") {
+    if (isUserCancelledCanvasTask(task)) {
+      return canvasIdleRuntimeAfterUserCancel(task.id);
+    }
     return {
       status: "error",
       taskId: task.id,
@@ -255,15 +306,18 @@ export function tasksMatchStoryScope(
   if (scope.rowKey && t.rowKey !== scope.rowKey) return false;
   if (scope.mediaKind && t.mediaKind !== scope.mediaKind) return false;
   if (scope.llmSection && t.llmSection !== scope.llmSection) return false;
+  if (scope.polishMode && t.polishMode !== scope.polishMode) return false;
   return true;
 }
 
 export function pickPreferredCanvasTaskForScope(
   tasks: CanvasTaskRecord[],
   scope: CanvasTaskStoryScope,
+  localRuntime?: CanvasNodeRuntime | null,
+  nodeId?: string,
 ): CanvasTaskRecord | undefined {
   const scoped = tasks.filter((t) => tasksMatchStoryScope(t, scope));
-  return pickPreferredCanvasTask(scoped);
+  return pickPreferredCanvasTask(scoped, { localRuntime, nodeId });
 }
 
 export function storyRunContextFromScope(
@@ -284,12 +338,72 @@ export function storyRunContextFromScope(
  */
 export function pickPreferredCanvasTask(
   tasks: CanvasTaskRecord[],
+  opts?: { localRuntime?: CanvasNodeRuntime | null; nodeId?: string },
 ): CanvasTaskRecord | undefined {
   if (!tasks.length) return undefined;
+
+  const localTaskId = opts?.localRuntime?.taskId?.trim();
+  const localInflight = isInflightRuntimeStatus(opts?.localRuntime?.status);
+  // 乐观 pending/running 尚无 taskId：只认服务端在途，勿 pick 上一轮 SUCCEEDED
+  if (localInflight && !localTaskId) {
+    const inflight = tasks.filter(
+      (t) =>
+        isServerInflightTaskStatus(t.status) &&
+        !isStaleServerInflightTask(t, tasks) &&
+        !isAbandonedCanvasInflightTask(t),
+    );
+    if (inflight.length) return newestTaskByUpdatedAt(inflight);
+    // 在途已结束：认本轮会话内最新终态（Gateway 已返回但本地尚未 bind taskId）
+    const nodeId = opts?.nodeId?.trim();
+    if (nodeId && isCanvasNodeRunSessionActive(nodeId)) {
+      const startedAt = canvasNodeRunSessionStartedAtMs(nodeId);
+      const sessionTerminal = tasks.filter((t) => {
+        if (isServerInflightTaskStatus(t.status)) return false;
+        if (t.status === "SUCCEEDED" && !taskHasDisplayableResult(t)) {
+          return false;
+        }
+        if (
+          t.status !== "SUCCEEDED" &&
+          t.status !== "FAILED" &&
+          t.status !== "CANCELLED"
+        ) {
+          return false;
+        }
+        const pickMs = Date.parse(t.updatedAt || t.createdAt || "");
+        return Number.isFinite(pickMs) && pickMs >= startedAt - 3000;
+      });
+      if (sessionTerminal.length) {
+        return newestTaskByUpdatedAt(sessionTerminal);
+      }
+    }
+    return undefined;
+  }
+  const localError = opts?.localRuntime?.status === "error";
+  if (localTaskId && (localInflight || localError)) {
+    const bound = tasks.find((t) => t.id === localTaskId);
+    if (bound) {
+      if (bound.status === "SUCCEEDED" && taskHasDisplayableResult(bound)) {
+        return bound;
+      }
+      if (
+        isServerInflightTaskStatus(bound.status) &&
+        !isStaleServerInflightTask(bound, tasks) &&
+        !isAbandonedCanvasInflightTask(bound)
+      ) {
+        return bound;
+      }
+      // 本轮已失败/取消：须写回终态，勿被更早 SUCCEEDED 盖掉（否则节点不报错）
+      if (bound.status === "FAILED" || bound.status === "CANCELLED") {
+        return bound;
+      }
+    }
+  }
+
   const inflight = tasks.filter(
     (t) =>
       isServerInflightTaskStatus(t.status) &&
-      !isStaleServerInflightTask(t, tasks),
+      !isStaleServerInflightTask(t, tasks) &&
+      !isAbandonedCanvasInflightTask(t),
   );
   if (inflight.length) return newestTaskByUpdatedAt(inflight);
 
@@ -302,7 +416,37 @@ export function pickPreferredCanvasTask(
 }
 
 function isInflightRuntimeStatus(status?: string): boolean {
-  return status === "pending" || status === "running";
+  return status === "queued" || status === "pending" || status === "running";
+}
+
+/** run-queue · preferredTasksByNode 用段级 runtime（Hub 无顶层 runtime 字段） */
+export function hubNodeLocalRuntimeForTaskPick(
+  node: CanvasFlowNode,
+): CanvasNodeRuntime | undefined {
+  const d = node.data as unknown as StoryScriptHubNodeData;
+  for (const rt of [
+    d.outlineRuntime,
+    d.characterRuntime,
+    d.sceneRuntime,
+    d.storyboardRuntime,
+  ]) {
+    if (isCanvasInflightStatus(rt?.status)) return rt;
+  }
+  return d.outlineRuntime;
+}
+
+/** 服务端仍有 LLM 任务在途（刷新后本地 runtime 可能尚未 restore） */
+export function hubHasServerInflightLlmTask(
+  nodeId: string,
+  tasks: CanvasTaskRecord[],
+): boolean {
+  const nodeTasks = tasks.filter((t) => t.nodeId === nodeId);
+  return nodeTasks.some(
+    (t) =>
+      isServerInflightTaskStatus(t.status) &&
+      !isStaleServerInflightTask(t, nodeTasks) &&
+      !isAbandonedCanvasInflightTask(t),
+  );
 }
 
 /** 行级 scope · 最新成功成片（展示 URL，不受后续失败重试覆盖） */
@@ -329,6 +473,19 @@ export function pickStoryRowApplyTask(
   if (!scoped.length) return undefined;
 
   const localTaskId = localRuntime?.taskId?.trim();
+  const bound = localTaskId
+    ? scoped.find((t) => t.id === localTaskId)
+    : undefined;
+  if (
+    bound &&
+    localRuntime &&
+    (isInflightRuntimeStatus(localRuntime.status) ||
+      localRuntime.status === "error") &&
+    (bound.status === "FAILED" || bound.status === "CANCELLED")
+  ) {
+    return bound;
+  }
+
   const localInflight =
     localTaskId && isInflightRuntimeStatus(localRuntime?.status)
       ? scoped.find(
@@ -340,12 +497,14 @@ export function pickStoryRowApplyTask(
   const inflight = scoped.filter(
     (t) =>
       isServerInflightTaskStatus(t.status) &&
-      !isStaleServerInflightTask(t, scoped),
+      !isStaleServerInflightTask(t, scoped) &&
+      !isAbandonedCanvasInflightTask(t),
   );
 
   if (
     localInflight &&
-    !isStaleServerInflightTask(localInflight, scoped)
+    !isStaleServerInflightTask(localInflight, scoped) &&
+    !isAbandonedCanvasInflightTask(localInflight)
   ) {
     return localInflight;
   }
@@ -357,7 +516,7 @@ export function pickStoryRowApplyTask(
       succeeded &&
       pick.status === "SUBMITTED" &&
       pick.id !== succeeded.id &&
-      !localInflight
+      (!localInflight || localInflight.id === pick.id)
     ) {
       return succeeded;
     }
@@ -377,6 +536,7 @@ export function pickStoryRowApplyTask(
 
 export function preferredTasksByNode(
   tasks: CanvasTaskRecord[],
+  nodes?: CanvasFlowNode[],
 ): Map<string, CanvasTaskRecord> {
   const grouped = new Map<string, CanvasTaskRecord[]>();
   for (const t of tasks) {
@@ -386,7 +546,16 @@ export function preferredTasksByNode(
   }
   const out = new Map<string, CanvasTaskRecord>();
   for (const [nodeId, list] of Array.from(grouped.entries())) {
-    const pick = pickPreferredCanvasTask(list);
+    const node = nodes?.find((n) => n.id === nodeId);
+    const localRt = node
+      ? isAnyStoryScriptHubType(node.type ?? "")
+        ? hubNodeLocalRuntimeForTaskPick(node)
+        : (node.data as { runtime?: CanvasNodeRuntime }).runtime
+      : undefined;
+    const pick = pickPreferredCanvasTask(list, {
+      localRuntime: localRt,
+      nodeId,
+    });
     if (pick) out.set(nodeId, pick);
   }
   return out;

@@ -246,7 +246,7 @@ Story-Pro 1.0 列节点：列引擎条 / 槽位面板增加同文案按钮，API
 | 名称 | 默认节点标题 / 角色名 / 组名 |
 | 类型 | 自动预选，可改（下拉 11 类） |
 | 可见性 | personal：固定私有；team：私有 / 团队共享 |
-| 目标 | 「本项目资产库」/「租户复用库」（`sourceProjectId` null） |
+| 目标 | **本项目**（`sourceProjectId=projectId`）/ **我的空间可用**（`null` + `PRIVATE`）/ **租户复用库**（`null` + `TEAM_PUBLIC`，仅 team） |
 | 预览 | 缩略图 + 摘要（prompt 前 80 字 / 表行数） |
 
 确认 → `POST /api/platform/assets`（Platform API，book-mall 单写）。

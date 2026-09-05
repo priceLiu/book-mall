@@ -8,6 +8,9 @@ import {
   type StoryboardDeliverable,
 } from "@/lib/ecom/ecom-storyboard-deliverable";
 import { parseStoryboardSchemesFromMarkdown } from "@/lib/ecom/ecom-storyboard-markdown-parse";
+import { applyStoryboardSheetReconcile } from "@/lib/ecom/ecom-storyboard-sheet-reconcile";
+import { reconcileStoryboardPendingPanelVideoMeta } from "@/lib/ecom/ecom-storyboard-pending-videos";
+import { resolveStoryboardMergedVideoUrl } from "@/lib/ecom/ecom-storyboard-merged-video";
 import {
   ECOM_STORYBOARD_MODULE,
   sanitizeStoryboardChatMessages,
@@ -50,6 +53,21 @@ export type EcomStoryboardProjectDto = {
       planMode?: "quick" | "custom" | "default_a";
       scenePreset?: string;
       scenePresetCustom?: string;
+      vertical?: "fashion_apparel" | "bags";
+      fashionPhase?: string;
+      proMode?: boolean;
+      proPhase?: string;
+      proSellpointsEdited?: boolean;
+      proStoryboardPanelsEdited?: boolean;
+      proProduceSetupPending?: boolean;
+      proImageModelKey?: string;
+      proCharacterMode?: "ai" | "upload";
+      /** 角色参考：AI 生成 / 用户上传（服装电商路径 B） */
+      fashionCharacterMode?: "ai" | "upload";
+      fashionProduceSetupPending?: boolean;
+      fashionImageModelKey?: string;
+      fashionSellpointsEdited?: boolean;
+      fashionStoryboardPanelsEdited?: boolean;
     };
   } | null;
   createdAt: string;
@@ -120,12 +138,17 @@ function rowToDto(
     updatedAt: Date;
   },
   videoOssUrl?: string | null,
+  opts?: { stripSnapshotHistory?: boolean },
 ): EcomStoryboardProjectDto {
   let sheet: StoryboardSheet | null = null;
   const parsed = storyboardSheetSchema.safeParse(row.sheet);
   if (parsed.success) sheet = parseStoryboardSheet(parsed.data);
 
-  const meta = (row.meta as EcomStoryboardProjectDto["meta"]) ?? null;
+  let meta = (row.meta as EcomStoryboardProjectDto["meta"]) ?? null;
+  if (opts?.stripSnapshotHistory && meta && typeof meta === "object") {
+    const { deliverableSnapshotHistory: _history, ...rest } = meta as Record<string, unknown>;
+    meta = rest as EcomStoryboardProjectDto["meta"];
+  }
 
   return {
     id: row.id,
@@ -158,9 +181,36 @@ export async function listEcomStoryboardProjects(
   return rows.map((row) => rowToDto(row));
 }
 
+export type EcomStoryboardProjectSummary = {
+  id: string;
+  title: string | null;
+  updatedAt: string;
+};
+
+/** 轻量列表：初始化工作室时只取 id，避免拉全量 chatHistory */
+export async function listEcomStoryboardProjectSummaries(
+  userId: string,
+): Promise<EcomStoryboardProjectSummary[]> {
+  const rows = await prisma.ecomStoryboardProject.findMany({
+    where: { userId, module: ECOM_STORYBOARD_MODULE },
+    orderBy: { updatedAt: "desc" },
+    take: 50,
+    select: { id: true, title: true, updatedAt: true },
+  });
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    updatedAt: row.updatedAt.toISOString(),
+  }));
+}
+
 export async function createEcomStoryboardProject(
   userId: string,
-  opts?: { title?: string; brief?: Record<string, unknown> },
+  opts?: {
+    title?: string;
+    brief?: Record<string, unknown>;
+    meta?: Record<string, unknown>;
+  },
 ): Promise<EcomStoryboardProjectDto> {
   const row = await prisma.ecomStoryboardProject.create({
     data: {
@@ -173,6 +223,7 @@ export async function createEcomStoryboardProject(
         durationSec: 10,
         aspectRatio: "9:16",
       } as Prisma.InputJsonValue,
+      ...(opts?.meta ? { meta: opts.meta as Prisma.InputJsonValue } : {}),
     },
   });
   return rowToDto(row);
@@ -199,6 +250,7 @@ async function loadVideoOssUrlMap(
 export async function getEcomStoryboardProject(
   userId: string,
   projectId: string,
+  opts?: { stripSnapshotHistory?: boolean; resumePendingVideos?: boolean },
 ): Promise<EcomStoryboardProjectDto | null> {
   let row = await prisma.ecomStoryboardProject.findFirst({
     where: { id: projectId, userId },
@@ -210,20 +262,72 @@ export async function getEcomStoryboardProject(
   const parsed = storyboardSheetSchema.safeParse(row.sheet);
   if (parsed.success) sheet = parseStoryboardSheet(parsed.data);
 
+  const pendingReconcile = reconcileStoryboardPendingPanelVideoMeta({
+    meta: row.meta,
+    sheet,
+  });
+  if (pendingReconcile.changed) {
+    const updated = await prisma.ecomStoryboardProject.update({
+      where: { id: projectId },
+      data: { meta: pendingReconcile.meta as Prisma.InputJsonValue },
+    });
+    row = updated;
+    meta = pendingReconcile.meta as EcomStoryboardProjectDto["meta"];
+  }
+
+  if (opts?.resumePendingVideos !== false) {
+    const { resumeStoryboardPendingPanelVideos } = await import(
+      "@/lib/ecom/ecom-storyboard-panel-video-resume"
+    );
+    const resumed = await resumeStoryboardPendingPanelVideos(userId, projectId);
+    if (resumed) {
+      row =
+        (await prisma.ecomStoryboardProject.findFirst({
+          where: { id: projectId, userId },
+        })) ?? row;
+    }
+  }
+
+  if (!meta) meta = (row.meta as EcomStoryboardProjectDto["meta"]) ?? null;
+  if (!sheet) {
+    const reparsed = storyboardSheetSchema.safeParse(row.sheet);
+    if (reparsed.success) sheet = parseStoryboardSheet(reparsed.data);
+  }
+
   const repaired = repairStoryboardMetaAndSheet(meta, sheet);
   if (repaired.dirty) {
+    meta = repaired.meta;
+    sheet = repaired.sheet;
+  }
+
+  const reconciled = await applyStoryboardSheetReconcile(
+    userId,
+    projectId,
+    sheet,
+    meta,
+  );
+  if (repaired.dirty || reconciled.dirty) {
+    const nextSheet = reconciled.sheet ?? sheet;
+    const nextMeta = reconciled.meta ?? meta;
     const updated = await prisma.ecomStoryboardProject.update({
       where: { id: projectId },
       data: {
-        ...(repaired.sheet ? { sheet: repaired.sheet as Prisma.InputJsonValue } : {}),
-        ...(repaired.meta ? { meta: repaired.meta as Prisma.InputJsonValue } : {}),
+        ...(nextSheet ? { sheet: nextSheet as Prisma.InputJsonValue } : {}),
+        ...(nextMeta ? { meta: nextMeta as Prisma.InputJsonValue } : {}),
       },
     });
     row = updated;
   }
 
   const videoMap = await loadVideoOssUrlMap(userId, [row.videoAssetId]);
-  return rowToDto(row, row.videoAssetId ? videoMap.get(row.videoAssetId) ?? null : null);
+  const assetVideoUrl = row.videoAssetId
+    ? videoMap.get(row.videoAssetId) ?? null
+    : null;
+  const metaForVideo = (row.meta as EcomStoryboardProjectDto["meta"]) ?? null;
+  const mergedVideoUrl =
+    assetVideoUrl ??
+    (await resolveStoryboardMergedVideoUrl(userId, projectId, metaForVideo));
+  return rowToDto(row, mergedVideoUrl, opts);
 }
 
 export async function updateEcomStoryboardProject(
@@ -268,14 +372,25 @@ export async function updateEcomStoryboardProject(
   if (patch.sheetPngUrl !== undefined) data.sheetPngUrl = patch.sheetPngUrl;
   if (patch.meta !== undefined) {
     const prev = (existing.meta as Record<string, unknown> | null) ?? {};
-    data.meta = { ...prev, ...patch.meta } as Prisma.InputJsonValue;
+    const patchMeta = patch.meta as Record<string, unknown>;
+    const prevWorkflow = (prev.workflow as Record<string, unknown> | undefined) ?? {};
+    const patchWorkflow = patchMeta.workflow as Record<string, unknown> | undefined;
+    data.meta = {
+      ...prev,
+      ...patchMeta,
+      ...(patchWorkflow
+        ? { workflow: { ...prevWorkflow, ...patchWorkflow } }
+        : {}),
+    } as Prisma.InputJsonValue;
   }
 
-  const row = await prisma.ecomStoryboardProject.update({
+  await prisma.ecomStoryboardProject.update({
     where: { id: projectId },
     data,
   });
-  return rowToDto(row);
+  const refreshed = await getEcomStoryboardProject(userId, projectId);
+  if (!refreshed) throw new Error("项目不存在");
+  return refreshed;
 }
 
 export async function deleteEcomStoryboardProject(

@@ -1,4 +1,4 @@
-import { getPoolBalances } from "@/lib/billing/credit-account-service";
+import { getAccountCreditBalances } from "@/lib/billing/credit-account-service";
 import { K_CREDITS_CONSUMED } from "@/lib/finance/bill-display-keys";
 import {
   loadModelCatalogBillMaps,
@@ -6,7 +6,6 @@ import {
 } from "@/lib/finance/gateway-bill-projection";
 import { fetchUserPackageReconciliation } from "@/lib/finance/user-package-reconciliation";
 import { loadBillingSettlementsByLogIds } from "@/lib/billing/billing-settlement-service";
-import { computeSequentialByokQuotaSnapshots } from "@/lib/finance/byok-quota-reconcile";
 import {
   loadGatewayLogKeyLabels,
   pickGatewayLogKeyLabels,
@@ -21,10 +20,17 @@ import {
   financePeriodFromKey,
 } from "@/lib/gateway/finance-log-query";
 import {
+  fetchPlatformAssistantGatewayTokenUsage,
   fetchTeamGatewayTokenUsage,
   fetchUserGatewayTokenUsage,
   gatewayTokenUsageToRecord,
 } from "@/lib/gateway/gateway-token-usage-aggregate";
+import {
+  buildPlatformAssistantGatewayLogWhere,
+  isPlatformAssistantClientPage,
+  PLATFORM_ASSISTANT_BILLING_USER_ID,
+  PLATFORM_ASSISTANT_BILLING_USER_LABEL,
+} from "@/lib/platform-assistant/platform-assistant-billing";
 import { currentPeriodKey } from "@/lib/finance/team-finance-guard";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -59,6 +65,14 @@ const GATEWAY_SELECT = {
   credentialId: true,
   credentialAliasSnapshot: true,
   inputSummary: true,
+  resultSummary: true,
+  totalTokens: true,
+  promptTokens: true,
+  completionTokens: true,
+  hasTokenUsage: true,
+  metricsSource: true,
+  tenantId: true,
+  estimatedVendorCostYuan: true,
   failCode: true,
   failMessage: true,
 } as const;
@@ -103,6 +117,8 @@ async function loadSettlementLinesForQuotaSnapshots(opts: {
         settlementKind: true,
         quotaDelta: true,
         monthlyIncluded: true,
+        includedUsedAfter: true,
+        includedRemainingAfter: true,
       },
       orderBy: { submittedAt: "asc" },
     });
@@ -125,6 +141,8 @@ async function loadSettlementLinesForQuotaSnapshots(opts: {
         settlementKind: true,
         quotaDelta: true,
         monthlyIncluded: true,
+        includedUsedAfter: true,
+        includedRemainingAfter: true,
       },
       orderBy: { submittedAt: "asc" },
     });
@@ -159,6 +177,8 @@ async function loadSettlementLinesForQuotaSnapshots(opts: {
       settlementKind: true,
       quotaDelta: true,
       monthlyIncluded: true,
+      includedUsedAfter: true,
+      includedRemainingAfter: true,
     },
     orderBy: { submittedAt: "asc" },
   });
@@ -248,19 +268,18 @@ async function buildGatewayRows(input: {
     tenantId: input.tenantId,
     settlementsInBatch: [...settlements.values()],
   });
-  const sequentialSnapshots = computeSequentialByokQuotaSnapshots(
-    settlementLinesForSnapshots.map((line) => ({
-      logId: line.gatewayLogId,
-      submittedAt: line.submittedAt,
-      ownerType: line.ownerType,
-      ownerId: line.ownerId,
-      periodKey: line.periodKey,
-      byokTaskKind: line.byokTaskKind,
-      settlementKind: line.settlementKind,
-      quotaDelta: line.quotaDelta,
-      monthlyIncluded: line.monthlyIncluded,
-    })),
-  );
+  const sequentialSnapshots = new Map<
+    string,
+    { includedUsedAfter: number; includedRemainingAfter: number }
+  >();
+  for (const line of settlementLinesForSnapshots) {
+    if (line.includedUsedAfter != null || line.includedRemainingAfter != null) {
+      sequentialSnapshots.set(line.gatewayLogId, {
+        includedUsedAfter: line.includedUsedAfter ?? 0,
+        includedRemainingAfter: line.includedRemainingAfter ?? 0,
+      });
+    }
+  }
 
   const keyLabelMap = await loadGatewayLogKeyLabels(
     logs.map((log) => ({
@@ -271,8 +290,13 @@ async function buildGatewayRows(input: {
   );
 
   const rows = logs.map((log) => {
-    const uid = log.actorBookUserId ?? input.userId ?? "";
-    const label = userMap.get(uid) ?? userMap.get(input.userId ?? "") ?? uid;
+    const isAssistant = isPlatformAssistantClientPage(log.clientPage);
+    const uid = isAssistant
+      ? PLATFORM_ASSISTANT_BILLING_USER_ID
+      : (log.actorBookUserId ?? input.userId ?? "");
+    const label = isAssistant
+      ? PLATFORM_ASSISTANT_BILLING_USER_LABEL
+      : (userMap.get(uid) ?? userMap.get(input.userId ?? "") ?? uid);
     return projectGatewayLogToBillRow(
       log,
       uid || (input.userId ?? ""),
@@ -321,16 +345,20 @@ export async function fetchBillingDetailsForUser(input: {
   tab: BillingDetailsTab;
   take?: number;
 }) {
+  if (input.userId === PLATFORM_ASSISTANT_BILLING_USER_ID) {
+    return fetchBillingDetailsForPlatformAssistant(input);
+  }
+
   const take = Math.min(2000, Math.max(1, input.take ?? 500));
   const periodKey = currentPeriodKey();
   const { from, to } = financePeriodFromKey(periodKey);
 
-  const [user, pools, gatewayPart, packageReconciliation, tokenUsageRaw] = await Promise.all([
+  const [user, balances, gatewayPart, packageReconciliation, tokenUsageRaw] = await Promise.all([
     prisma.user.findUnique({
       where: { id: input.userId },
       select: { id: true, name: true, email: true },
     }),
-    getPoolBalances({ ownerType: "USER", ownerId: input.userId }),
+    getAccountCreditBalances({ ownerType: "USER", ownerId: input.userId }),
     buildGatewayRows({ tab: input.tab, userId: input.userId, take, periodKey }),
     fetchUserPackageReconciliation(input.userId),
     fetchUserGatewayTokenUsage({
@@ -342,7 +370,7 @@ export async function fetchBillingDetailsForUser(input: {
 
   if (!user) return null;
 
-  const balanceCredits = pools.general.balance + pools.video.balance;
+  const balanceCredits = balances.balance;
   const totalCredits = sumCredits(gatewayPart.rows);
 
   return {
@@ -350,10 +378,7 @@ export async function fetchBillingDetailsForUser(input: {
     tab: input.tab,
     user: { id: user.id, name: user.name, email: user.email },
     balancePoints: balanceCredits,
-    poolBalances: {
-      general: pools.general.balance,
-      video: pools.video.balance,
-    },
+    balanceCredits,
     totalCalls: gatewayPart.totalCalls,
     succeededCalls: gatewayPart.succeededCalls,
     failedCalls: gatewayPart.failedCalls,
@@ -411,12 +436,12 @@ export async function fetchBillingDetailsForTenant(input: {
   const periodKey = currentPeriodKey();
   const { from, to } = financePeriodFromKey(periodKey);
 
-  const [tenant, pools, gatewayPart, tokenUsageRaw] = await Promise.all([
+  const [tenant, balances, gatewayPart, tokenUsageRaw] = await Promise.all([
     prisma.tenant.findUnique({
       where: { id: input.tenantId },
       select: { id: true, name: true, ownerUserId: true },
     }),
-    getPoolBalances({ ownerType: "TENANT", ownerId: input.tenantId }),
+    getAccountCreditBalances({ ownerType: "TENANT", ownerId: input.tenantId }),
     buildGatewayRows({
       tab: input.tab,
       tenantId: input.tenantId,
@@ -433,7 +458,7 @@ export async function fetchBillingDetailsForTenant(input: {
 
   if (!tenant) return null;
 
-  const balanceCredits = pools.general.balance + pools.video.balance;
+  const balanceCredits = balances.balance;
   const totalCredits = sumCredits(gatewayPart.rows);
 
   return {
@@ -441,10 +466,160 @@ export async function fetchBillingDetailsForTenant(input: {
     tab: input.tab,
     tenant: { id: tenant.id, name: tenant.name },
     balancePoints: balanceCredits,
-    poolBalances: {
-      general: pools.general.balance,
-      video: pools.video.balance,
+    balanceCredits,
+    totalCalls: gatewayPart.totalCalls,
+    succeededCalls: gatewayPart.succeededCalls,
+    failedCalls: gatewayPart.failedCalls,
+    totalPoints: totalCredits,
+    totalCredits,
+    rows: gatewayPart.rows,
+    packageReconciliation: null,
+    returned: gatewayPart.returned,
+    take,
+    truncated: gatewayPart.returned >= take,
+    periodKey,
+    tokenUsage: gatewayTokenUsageToRecord(tokenUsageRaw),
+  };
+}
+
+function mergePlatformAssistantTabFilters(
+  filters: GatewayLogFilterInput,
+): Prisma.GatewayRequestLogWhereInput {
+  const extra: Prisma.GatewayRequestLogWhereInput = {};
+  if (filters.status) extra.status = filters.status;
+  if (filters.statuses?.length) extra.status = { in: filters.statuses };
+  if (filters.submittedFrom || filters.submittedBefore) {
+    extra.submittedAt = {
+      ...(filters.submittedFrom ? { gte: filters.submittedFrom } : {}),
+      ...(filters.submittedBefore ? { lt: filters.submittedBefore } : {}),
+    };
+  }
+  if (filters.creditsChargedGt != null) {
+    extra.creditsCharged = { gt: filters.creditsChargedGt };
+  }
+  return extra;
+}
+
+async function buildPlatformAssistantGatewayRows(input: {
+  tab: BillingDetailsTab;
+  take: number;
+  periodKey?: string;
+}): Promise<{
+  rows: Record<string, string>[];
+  totalCalls: number;
+  succeededCalls: number;
+  failedCalls: number;
+  returned: number;
+}> {
+  const periodKey = input.periodKey ?? currentPeriodKey();
+  const { from, to } = financePeriodFromKey(periodKey);
+  const periodFilters: GatewayLogFilterInput = {
+    submittedFrom: from,
+    submittedBefore: to,
+  };
+
+  const tabFilters: GatewayLogFilterInput =
+    input.tab === "usage"
+      ? { statuses: [...USAGE_TAB_STATUSES], ...periodFilters }
+      : { creditsChargedGt: 0, ...periodFilters };
+
+  const where = buildPlatformAssistantGatewayLogWhere(
+    mergePlatformAssistantTabFilters(tabFilters),
+  );
+
+  const logs = await prisma.gatewayRequestLog.findMany({
+    where,
+    orderBy: { submittedAt: "desc" },
+    take: input.take,
+    select: GATEWAY_SELECT,
+  });
+
+  const modelKeys = logs.map((l) => l.canonicalModelKey ?? l.model ?? "");
+  const [catalogMaps, settlements] = await Promise.all([
+    loadModelCatalogBillMaps(modelKeys, prisma),
+    loadBillingSettlementsByLogIds(logs.map((l) => l.id)),
+  ]);
+
+  const keyLabelMap = await loadGatewayLogKeyLabels(
+    logs.map((log) => ({
+      apiKeyId: log.apiKeyId,
+      credentialId: log.credentialId,
+      credentialAliasSnapshot: log.credentialAliasSnapshot,
+    })),
+  );
+
+  const rows = logs.map((log) =>
+    projectGatewayLogToBillRow(
+      log,
+      PLATFORM_ASSISTANT_BILLING_USER_ID,
+      PLATFORM_ASSISTANT_BILLING_USER_LABEL,
+      catalogMaps.displayNames,
+      settlements.get(log.id) ?? null,
+      catalogMaps.vendors,
+      null,
+      pickGatewayLogKeyLabels(keyLabelMap, {
+        apiKeyId: log.apiKeyId,
+        credentialId: log.credentialId,
+        credentialAliasSnapshot: log.credentialAliasSnapshot,
+      }),
+    ),
+  );
+
+  const [succeededCalls, failedCalls] =
+    input.tab === "usage"
+      ? await Promise.all([
+          prisma.gatewayRequestLog.count({
+            where: buildPlatformAssistantGatewayLogWhere(
+              mergePlatformAssistantTabFilters({
+                status: "SUCCEEDED",
+                ...periodFilters,
+              }),
+            ),
+          }),
+          prisma.gatewayRequestLog.count({
+            where: buildPlatformAssistantGatewayLogWhere(
+              mergePlatformAssistantTabFilters({
+                status: "FAILED",
+                ...periodFilters,
+              }),
+            ),
+          }),
+        ])
+      : [0, 0];
+
+  const totalCalls = input.tab === "usage" ? succeededCalls + failedCalls : logs.length;
+
+  return { rows, totalCalls, succeededCalls, failedCalls, returned: logs.length };
+}
+
+export async function fetchBillingDetailsForPlatformAssistant(input: {
+  tab: BillingDetailsTab;
+  take?: number;
+}) {
+  const take = Math.min(2000, Math.max(1, input.take ?? 500));
+  const periodKey = currentPeriodKey();
+  const { from, to } = financePeriodFromKey(periodKey);
+
+  const [gatewayPart, tokenUsageRaw] = await Promise.all([
+    buildPlatformAssistantGatewayRows({ tab: input.tab, take, periodKey }),
+    fetchPlatformAssistantGatewayTokenUsage({
+      submittedFrom: from,
+      submittedTo: to,
+    }),
+  ]);
+
+  const totalCredits = sumCredits(gatewayPart.rows);
+
+  return {
+    source: "finance-2.0",
+    tab: input.tab,
+    user: {
+      id: PLATFORM_ASSISTANT_BILLING_USER_ID,
+      name: PLATFORM_ASSISTANT_BILLING_USER_LABEL,
+      email: null,
     },
+    balancePoints: 0,
+    balanceCredits: 0,
     totalCalls: gatewayPart.totalCalls,
     succeededCalls: gatewayPart.succeededCalls,
     failedCalls: gatewayPart.failedCalls,

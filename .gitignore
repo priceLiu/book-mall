@@ -6,6 +6,7 @@
 **/.next/
 **/out/
 **/.turbo/
+publisher-desktop/release/
 
 # 工具站本地密钥与环境（勿提交）
 tool-web/.env.local
@@ -15,12 +16,24 @@ tool-web/.env.local
 
 # 根目录杂项
 .DS_Store
+.workbuddy/
 
 # 含腾讯云数据库凭证的迁移/issue 笔记（勿提交）
 /issue.md
 
 # 腾讯云部署本地密钥（从 *.example 复制，勿提交）
 /deploy/tencent/book-mall.env
+/deploy/tencent/wechat-pay-cloudbase.env.patch
 /deploy/tencent/tool-web.env
 /deploy/tencent/pgbouncer/userlist.txt
 /deploy/tencent/pgbouncer/pgbouncer.runtime.ini
+
+# 大体积媒体一律走 OSS 持久化，勿提交进 Git（历史包袱会拖垮云构建 clone）。
+# story-web 首页「发现更多」演示视频清单在 src/shared/landing-videos.manifest.json，
+# 播放走 tool-mall OSS；本地占位放 public/video 即可，不入库。
+story-web/public/video/*.mp4
+**/public/video/*.mp4
+*.mp4
+
+# 本地导入/调试临时文件（HTML 抓取、进度快照等），勿提交
+book-mall/tmp/

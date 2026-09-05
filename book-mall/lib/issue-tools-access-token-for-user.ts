@@ -28,6 +28,13 @@ export type IssueToolsAccessTokenResult =
  */
 export async function issueToolsAccessTokenForUser(
   userId: string,
+  opts?: {
+    deviceContext?: {
+      deviceType: "WEB" | "EXTENSION" | "DESKTOP";
+      deviceId: string;
+      deviceSessionVersion: number;
+    };
+  },
 ): Promise<IssueToolsAccessTokenResult> {
   const elig = await getToolsSsoEligibility(userId);
   const ecomOk = await userCanAccessEcommerceToolkit(userId);
@@ -57,7 +64,9 @@ export async function issueToolsAccessTokenForUser(
   const expiresIn = getToolsJwtTtlSec();
   const ecomBillingMode = await getUserEcomBillingMode(userId);
   const tenantCtx = await resolveTenantContextForUser(userId);
-  const sessionVersion = await getSessionVersion(userId);
+  const sessionVersion = opts?.deviceContext
+    ? opts.deviceContext.deviceSessionVersion
+    : await getSessionVersion(userId);
   const accessToken = signToolsAccessToken({
     userId,
     secret: jwtSecret,
@@ -65,7 +74,8 @@ export async function issueToolsAccessTokenForUser(
     tier,
     toolsNavKeys,
     ecomBillingMode,
-    sessionVersion,
+    sessionVersion: opts?.deviceContext ? undefined : sessionVersion,
+    deviceContext: opts?.deviceContext,
     tenant: tenantCtx
       ? {
           tenantId: tenantCtx.tenantId,

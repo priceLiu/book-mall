@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { resolveHubStoryboardMd } from "@/lib/canvas/story-hub-runtime";
+import { resolveHubStoryboardMd, resolveHubOutlineMd } from "@/lib/canvas/story-hub-runtime";
 import { extractThemeFromStorySystemPrompt } from "@/lib/canvas/story-prompts";
 import { resolveStarterForHub } from "@/lib/canvas/story-workspace-resolver";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
@@ -18,7 +18,15 @@ import {
   resolvePro2HubCharacterMd,
   resolvePro2HubSceneMd,
 } from "@/lib/canvas/pro2-script-hub-helpers";
-import { outlineDisplayMd } from "@/lib/canvas/story-hub-runtime";
+import { syncPro2CharacterColumnAndThreeViewDocksFromHub } from "@/lib/canvas/pro2-spawn-character-image-group";
+import {
+  applyProductionScriptDirectToHub,
+  resolveHubProductionScript,
+  tryRepairHubFromStoredProductionJson,
+  trySyncResolvedProductionScriptToHub,
+} from "@/lib/canvas/pro2-production-script-apply";
+import { syncProductionScaffoldDataToHubFromStore } from "@/lib/canvas/hydrate-production-scaffold";
+import type { Pro2ProductionScript } from "@/lib/canvas/data/pro2-production-script-schema";
 import { Pro2ScriptHubEditorModal } from "./pro2-script-table-modal";
 import {
   CREW_BULLETIN_META_ANCHOR_ID,
@@ -67,6 +75,26 @@ export function Pro2ScriptTableEditorHost() {
 
   const d = ((isMetaAnchor ? metaHubFields : node?.data) ??
     {}) as StoryProScriptHubNodeData;
+  const productionScript = useMemo(() => resolveHubProductionScript(d), [d]);
+
+  useEffect(() => {
+    if (!node || isMetaAnchor) return;
+    const hubData = node.data as StoryProScriptHubNodeData;
+    const repairPatch = tryRepairHubFromStoredProductionJson(hubData, node.id);
+    const syncPatch = trySyncResolvedProductionScriptToHub({
+      ...hubData,
+      ...(repairPatch ?? {}),
+    });
+    const patch = repairPatch || syncPatch
+      ? { ...(repairPatch ?? {}), ...(syncPatch ?? {}) }
+      : null;
+    if (patch) {
+      updateNodeData(node.id, patch);
+      openSnapshotRef.current = null;
+    }
+    // 打开全屏编辑时尝试把 raw JSON 落库为 productionScript
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- editorNodeId only
+  }, [editorNodeId]);
   const storyboardMd = resolveHubStoryboardMd(d);
   const characterMd = resolvePro2HubCharacterMd(d);
   const sceneCtx = useMemo(
@@ -77,12 +105,13 @@ export function Pro2ScriptTableEditorHost() {
     [editorNodeId, isMetaAnchor, nodes, edges],
   );
   const sceneMd = resolvePro2HubSceneMd(d, sceneCtx);
-  const outlineMd = outlineDisplayMd(d.outlineMd ?? "");
+  const outlineMd = resolveHubOutlineMd(d);
   const hasContent =
     pro2HubHasScriptTable(d) ||
     pro2HubHasCharacterTable(d) ||
     pro2HubHasSceneTable(d, sceneCtx) ||
-    pro2HubHasOutlineContent(d);
+    pro2HubHasOutlineContent(d) ||
+    Boolean(d.productionScript);
 
   const liveContent: CachedContent = {
     storyboardMd,
@@ -175,8 +204,36 @@ export function Pro2ScriptTableEditorHost() {
         characterMd: md,
         characterHistory: history,
       });
+      const nodesNow = useCanvasStore.getState().nodes.map((n) =>
+        n.id === node.id
+          ? {
+              ...n,
+              data: { ...n.data, characterMd: md, characterHistory: history },
+            }
+          : n,
+      );
+      syncPro2CharacterColumnAndThreeViewDocksFromHub(
+        nodesNow,
+        node.id,
+        updateNodeData,
+        {
+          ...d,
+          characterMd: md,
+          characterHistory: history,
+        },
+      );
     },
-    [node, d.characterHistory, updateNodeData],
+    [node, d, updateNodeData],
+  );
+
+  const persistStructured = useCallback(
+    (script: Pro2ProductionScript) => {
+      if (!node) return;
+      const patch = applyProductionScriptDirectToHub(d, script, node.id);
+      updateNodeData(node.id, patch);
+      syncProductionScaffoldDataToHubFromStore(node.id);
+    },
+    [node, d, updateNodeData],
   );
 
   if (!editorNodeId) return null;
@@ -229,6 +286,8 @@ export function Pro2ScriptTableEditorHost() {
       onAutoSaveScene={persistScene}
       onAutoSaveCharacter={persistCharacter}
       onAutoSaveStoryboard={persistStoryboard}
+      productionScript={productionScript ?? d.productionScript}
+      onAutoSaveStructured={persistStructured}
       hubId={node.id}
       hubData={d}
     />

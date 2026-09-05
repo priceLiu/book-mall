@@ -35,9 +35,9 @@ export const PLATFORM_MEDIA_KIND_LABEL: Record<ModelMediaKind, string> = {
   TEXT_LLM: "纯文本",
 };
 
-const ALL_APPS = ["canvas", "story", "tool", "ecom", "prompt-optimizer"] as const;
-const CHAT_APPS = ["canvas", "story", "tool", "ecom", "prompt-optimizer"] as const;
-const VISUAL_APPS = ["canvas", "story", "tool", "ecom"] as const;
+const ALL_APPS = ["canvas", "story", "tool", "ecom", "prompt-optimizer", "quick-replica"] as const;
+const CHAT_APPS = ["canvas", "story", "tool", "ecom", "prompt-optimizer", "quick-replica"] as const;
+const VISUAL_APPS = ["canvas", "story", "tool", "ecom", "quick-replica"] as const;
 
 function dedupeRoutes(list: CanonicalRouteDef[]): CanonicalRouteDef[] {
   const seen = new Set<string>();
@@ -47,6 +47,17 @@ function dedupeRoutes(list: CanonicalRouteDef[]): CanonicalRouteDef[] {
     if (seen.has(k)) continue;
     seen.add(k);
     out.push(r);
+  }
+  return out;
+}
+
+function dedupeCanonicals(list: CanonicalModelDef[]): CanonicalModelDef[] {
+  const seen = new Set<string>();
+  const out: CanonicalModelDef[] = [];
+  for (const def of list) {
+    if (seen.has(def.canonicalModelKey)) continue;
+    seen.add(def.canonicalModelKey);
+    out.push(def);
   }
   return out;
 }
@@ -82,11 +93,12 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     requestKind: "CHAT",
     appTags: [...CHAT_APPS],
     sortOrder: 12,
-    primaryVendor: "moonshot",
+    primaryVendor: "aliyun",
     billingKind: "PER_1K_TOKENS",
     unitLabel: "元/百万 tokens",
     routes: dedupeRoutes([
-      { vendor: "moonshot", modelKey: "kimi-k3", providerKind: "MOONSHOT" },
+      { vendor: "aliyun", modelKey: "kimi/kimi-k3", providerKind: "BAILIAN" },
+      { vendor: "aliyun", modelKey: "kimi-k3", providerKind: "BAILIAN" },
     ]),
   },
   {
@@ -98,11 +110,12 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     requestKind: "CHAT",
     appTags: [...CHAT_APPS],
     sortOrder: 13,
-    primaryVendor: "moonshot",
+    primaryVendor: "aliyun",
     billingKind: "PER_1K_TOKENS",
     unitLabel: "元/百万 tokens",
     routes: dedupeRoutes([
-      { vendor: "moonshot", modelKey: "kimi-k2.6", providerKind: "MOONSHOT" },
+      { vendor: "aliyun", modelKey: "kimi/kimi-k2.6", providerKind: "BAILIAN" },
+      { vendor: "aliyun", modelKey: "kimi-k2.6", providerKind: "BAILIAN" },
     ]),
   },
   {
@@ -114,11 +127,84 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     requestKind: "CHAT",
     appTags: [...CHAT_APPS],
     sortOrder: 14,
-    primaryVendor: "moonshot",
+    primaryVendor: "aliyun",
     billingKind: "PER_1K_TOKENS",
     unitLabel: "元/百万 tokens",
     routes: dedupeRoutes([
-      { vendor: "moonshot", modelKey: "kimi-k2.7-code", providerKind: "MOONSHOT" },
+      { vendor: "aliyun", modelKey: "kimi/kimi-k2.7-code", providerKind: "BAILIAN" },
+      { vendor: "aliyun", modelKey: "kimi-k2.7-code", providerKind: "BAILIAN" },
+    ]),
+  },
+  {
+    canonicalModelKey: "qwen3.8-max",
+    displayName: "Qwen3.8 Max",
+    description:
+      "千问 3.8 Max · 文本生成 / 深度思考 / 图片理解 / 长视频理解 · 1M 上下文",
+    mediaKind: "TEXT_LLM",
+    role: "LLM",
+    requestKind: "CHAT",
+    appTags: [...CHAT_APPS],
+    sortOrder: 10.5,
+    primaryVendor: "aliyun",
+    billingKind: "PER_1K_TOKENS",
+    unitLabel: "元/百万 tokens",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "qwen3.8-max", providerKind: "BAILIAN" },
+    ]),
+  },
+  {
+    canonicalModelKey: "qwen3-omni-flash",
+    displayName: "Qwen3-Omni Flash",
+    description:
+      "千问 Omni Flash · 文本/图片/音频/视频理解 · 全模态 · 1M 上下文",
+    mediaKind: "TEXT_LLM",
+    role: "LLM",
+    requestKind: "CHAT",
+    appTags: [...CHAT_APPS],
+    sortOrder: 10.45,
+    primaryVendor: "aliyun",
+    billingKind: "PER_1K_TOKENS",
+    unitLabel: "元/百万 tokens",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "qwen3-omni-flash", providerKind: "BAILIAN" },
+    ]),
+  },
+  {
+    canonicalModelKey: "qwen2.5-vl-72b-instruct",
+    displayName: "Qwen2.5-VL 72B",
+    description: "千问 2.5-VL Max · 图片/视频理解 · 128K 上下文",
+    mediaKind: "TEXT_LLM",
+    role: "LLM",
+    requestKind: "CHAT",
+    appTags: [...CHAT_APPS],
+    sortOrder: 10.42,
+    primaryVendor: "aliyun",
+    billingKind: "PER_1K_TOKENS",
+    unitLabel: "元/百万 tokens",
+    routes: dedupeRoutes([
+      {
+        vendor: "aliyun",
+        modelKey: "qwen2.5-vl-72b-instruct",
+        providerKind: "BAILIAN",
+      },
+    ]),
+  },
+  {
+    canonicalModelKey: "glm-5.3-flash",
+    displayName: "GLM-5.3 Flash",
+    description:
+      "智谱 GLM-5.3 Flash · 百炼直供 · 图片/视频/文件理解 · 1M 上下文 · 深度思考",
+    mediaKind: "TEXT_LLM",
+    role: "LLM",
+    requestKind: "CHAT",
+    appTags: [...CHAT_APPS],
+    sortOrder: 10.41,
+    primaryVendor: "aliyun",
+    billingKind: "PER_1K_TOKENS",
+    unitLabel: "元/百万 tokens",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "ZHIPU/GLM-5.3-Flash", providerKind: "BAILIAN" },
+      { vendor: "aliyun", modelKey: "glm-5.3-flash", providerKind: "BAILIAN" },
     ]),
   },
   {
@@ -222,6 +308,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   {
     canonicalModelKey: "wan2.7-image-pro",
     displayName: "Wan 2.7 Image Pro",
+    description: "通义万相 2.7 Pro · 文生图 / 多图参考 / 图像编辑",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
     requestKind: "IMAGE",
@@ -232,6 +319,54 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     unitLabel: "元/张",
     routes: dedupeRoutes([
       { vendor: "aliyun", modelKey: "wan2.7-image-pro", providerKind: "BAILIAN" },
+    ]),
+  },
+  {
+    canonicalModelKey: "wan2.6-image",
+    displayName: "Wan 2.6 Image Edit",
+    description: "通义万相 2.6 · 多图参考 / 图像编辑（非纯文生图）",
+    mediaKind: "TEXT_TO_IMAGE",
+    role: "IMAGE",
+    requestKind: "IMAGE",
+    appTags: [...VISUAL_APPS],
+    sortOrder: 21.5,
+    primaryVendor: "aliyun",
+    billingKind: "PER_IMAGE",
+    unitLabel: "元/张",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "wan2.6-image", providerKind: "DASHSCOPE" },
+    ]),
+  },
+  {
+    canonicalModelKey: "qwen-image-3.0-pro",
+    displayName: "Qwen Image 3.0 Pro",
+    description: "千问图像 3.0 Pro · 文生图 / 图生图（最多 3 张参考）· 小字与版面",
+    mediaKind: "TEXT_TO_IMAGE",
+    role: "IMAGE",
+    requestKind: "IMAGE",
+    appTags: [...VISUAL_APPS],
+    sortOrder: 19,
+    primaryVendor: "aliyun",
+    billingKind: "PER_IMAGE",
+    unitLabel: "元/张",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "qwen-image-3.0-pro", providerKind: "DASHSCOPE" },
+    ]),
+  },
+  {
+    canonicalModelKey: "z-image-turbo",
+    displayName: "Z-Image Turbo",
+    description: "百炼 Z-Image Turbo · 快速低成本文生图（不支持参考图编辑）",
+    mediaKind: "TEXT_TO_IMAGE",
+    role: "IMAGE",
+    requestKind: "IMAGE",
+    appTags: [...VISUAL_APPS],
+    sortOrder: 18,
+    primaryVendor: "aliyun",
+    billingKind: "PER_IMAGE",
+    unitLabel: "元/张",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "z-image-turbo", providerKind: "DASHSCOPE" },
     ]),
   },
   {
@@ -347,17 +482,19 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   {
     canonicalModelKey: "kling-3.0-video",
     displayName: "Kling 3.0 I2V/T2V",
-    description: "KIE · 可灵 3.0 · 图生/文生视频，多镜头 + 元素引用。",
+    description: "百炼 · 可灵 3.0 · 图生/文生视频，首帧/首尾帧 + 参考图。",
     mediaKind: "IMAGE_TO_VIDEO",
     role: "VIDEO",
     requestKind: "VIDEO",
     appTags: [...VISUAL_APPS],
     sortOrder: 31,
-    primaryVendor: "kie",
+    primaryVendor: "aliyun",
     billingKind: "PER_SECOND",
     unitLabel: "元/秒",
     routes: dedupeRoutes([
-      { vendor: "kie", modelKey: "kling-3.0/video", providerKind: "KIE" },
+      { vendor: "aliyun", modelKey: "kling-3.0/video", providerKind: "DASHSCOPE" },
+      { vendor: "aliyun", modelKey: "kling/kling-v3-video-generation", providerKind: "DASHSCOPE" },
+      { vendor: "aliyun", modelKey: "kling/kling-v3-omni-video-generation", providerKind: "DASHSCOPE" },
     ]),
   },
   {
@@ -457,6 +594,56 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     ]),
   },
   {
+    canonicalModelKey: "wan3.0-video",
+    displayName: "Wan 3.0 Video",
+    description:
+      "万相 3.0 All-in-One · 文生视频 / 图生视频（首帧·首尾帧）/ 参考生视频 · 480P–1080P · 最长 30s",
+    mediaKind: "IMAGE_TO_VIDEO",
+    role: "VIDEO",
+    requestKind: "VIDEO",
+    appTags: [...VISUAL_APPS],
+    sortOrder: 31,
+    primaryVendor: "aliyun",
+    billingKind: "PER_SECOND",
+    unitLabel: "元/秒",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "wan3.0-video", providerKind: "DASHSCOPE" },
+    ]),
+  },
+  {
+    canonicalModelKey: "wan3.0-video-prime",
+    displayName: "Wan 3.0 Video Prime",
+    description:
+      "万相 3.0 优速版 · 能力对齐标准版，生成速度更快 · 文生/图生/参考生视频 · 480P–1080P · 最长 30s",
+    mediaKind: "IMAGE_TO_VIDEO",
+    role: "VIDEO",
+    requestKind: "VIDEO",
+    appTags: [...VISUAL_APPS],
+    sortOrder: 32,
+    primaryVendor: "aliyun",
+    billingKind: "PER_SECOND",
+    unitLabel: "元/秒",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "wan3.0-video-prime", providerKind: "DASHSCOPE" },
+    ]),
+  },
+  {
+    canonicalModelKey: "qwen3-asr-flash-filetrans",
+    displayName: "Qwen3 ASR Flash Filetrans",
+    description: "百炼 · 文件/URL 语音转写",
+    mediaKind: "TEXT_LLM",
+    role: "LLM",
+    requestKind: "OTHER",
+    appTags: [...CHAT_APPS],
+    sortOrder: 18,
+    primaryVendor: "aliyun",
+    billingKind: "PER_SECOND",
+    unitLabel: "元/秒（音频）",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "qwen3-asr-flash-filetrans", providerKind: "DASHSCOPE" },
+    ]),
+  },
+  {
     canonicalModelKey: "wanxiang-video-2.7-i2v",
     displayName: "Wan 2.7 I2V",
     mediaKind: "IMAGE_TO_VIDEO",
@@ -499,7 +686,8 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     billingKind: "PER_SECOND",
     unitLabel: "元/秒",
     routes: dedupeRoutes([
-      { vendor: "aliyun", modelKey: "wan2.6-r2v", providerKind: "DASHSCOPE" },
+      { vendor: "aliyun", modelKey: "wan2.6-r2v", providerKind: "BAILIAN" },
+      { vendor: "aliyun", modelKey: "wan2.6-r2v-flash", providerKind: "BAILIAN" },
     ]),
   },
   {
@@ -514,7 +702,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     billingKind: "PER_SECOND",
     unitLabel: "元/秒",
     routes: dedupeRoutes([
-      { vendor: "aliyun", modelKey: "wan2.7-r2v", providerKind: "DASHSCOPE" },
+      { vendor: "aliyun", modelKey: "wan2.7-r2v", providerKind: "BAILIAN" },
     ]),
   },
   {
@@ -530,7 +718,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     billingKind: "PER_IMAGE",
     unitLabel: "元/张",
     routes: dedupeRoutes([
-      { vendor: "aliyun", modelKey: "qwen-image-edit", providerKind: "BAILIAN" },
+      { vendor: "aliyun", modelKey: "qwen-image-edit", providerKind: "DASHSCOPE" },
     ]),
   },
   {
@@ -546,13 +734,13 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     billingKind: "PER_IMAGE",
     unitLabel: "元/张",
     routes: dedupeRoutes([
-      { vendor: "aliyun", modelKey: "qwen-image-edit-max", providerKind: "BAILIAN" },
+      { vendor: "aliyun", modelKey: "qwen-image-edit-max", providerKind: "DASHSCOPE" },
     ]),
   },
   {
     canonicalModelKey: "doubao-seedream-5-0-lite",
     displayName: "Doubao Seedream 5.0 Lite",
-    description: "火山方舟 · 指令式图像编辑（doubao-seedream-5-0-260128）",
+    description: "火山方舟 · 文生图/图生图（doubao-seedream-5-0-260128）",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
     requestKind: "IMAGE",
@@ -564,7 +752,37 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     routes: dedupeRoutes([
       {
         vendor: "volcengine",
+        modelKey: "doubao-seedream-5-0-lite",
+        providerKind: "VOLCENGINE",
+      },
+      {
+        vendor: "volcengine",
         modelKey: "doubao-seedream-5-0-260128",
+        providerKind: "VOLCENGINE",
+      },
+    ]),
+  },
+  {
+    canonicalModelKey: "doubao-seedream-5-0-pro",
+    displayName: "Doubao Seedream 5.0 Pro",
+    description: "火山方舟 · 旗舰文生图/图生图（doubao-seedream-5-0-pro-260628）",
+    mediaKind: "TEXT_TO_IMAGE",
+    role: "IMAGE",
+    requestKind: "IMAGE",
+    appTags: [...VISUAL_APPS],
+    sortOrder: 36.5,
+    primaryVendor: "volcengine",
+    billingKind: "PER_IMAGE",
+    unitLabel: "元/张",
+    routes: dedupeRoutes([
+      {
+        vendor: "volcengine",
+        modelKey: "doubao-seedream-5-0-pro",
+        providerKind: "VOLCENGINE",
+      },
+      {
+        vendor: "volcengine",
+        modelKey: "doubao-seedream-5-0-pro-260628",
         providerKind: "VOLCENGINE",
       },
     ]),
@@ -651,10 +869,15 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
 ];
 
-export const GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
+/**
+ * 核心表在前：与 legacy 表 canonicalModelKey 撞车时以核心定义为准。
+ * 必须去重——下游按 `count(canonicalKey in keys) >= keys.length` 判断 DB 是否已同步，
+ * 重复项会让该条件永远不成立，导致每次请求都触发全量 upsert。
+ */
+export const GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = dedupeCanonicals([
   ...CORE_GATEWAY_CANONICAL_REGISTRY,
   ...LEGACY_INVOKE_MODEL_REGISTRY,
-];
+]);
 
 /** 四媒介槽默认 canonical（无用户选模时 fallback）。 */
 export const PLATFORM_MEDIA_DEFAULTS: Record<ModelMediaKind, string> = {

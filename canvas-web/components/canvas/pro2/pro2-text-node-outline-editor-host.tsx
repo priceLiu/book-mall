@@ -39,13 +39,18 @@ export function Pro2TextNodeOutlineEditorHost() {
     [node, d, nodes, edges],
   );
   const isGeneral = textPurpose === "general";
+  const uploadedMd = d.uploadedScriptMd?.trim() ?? "";
   const outlineMd =
     d.generatedOutlineMd?.trim() ||
+    uploadedMd ||
     (isGeneral ? d.themeInput?.trim() : "") ||
     "";
 
   const nodeLabel = useMemo(() => {
-    if (!node) return "文本节点";
+    if (!node) return "故事大纲";
+    const d = node.data as { pro2TextPurpose?: string; label?: string };
+    if (d.label?.trim()) return d.label.trim();
+    if (d.pro2TextPurpose === "story-outline") return "故事大纲";
     const starters = nodes.filter((n) => n.type === "story-pro2-starter");
     const idx = starters.findIndex((n) => n.id === node.id);
     return `文本节点 ${idx >= 0 ? idx + 1 : ""}`.trim();
@@ -62,7 +67,8 @@ export function Pro2TextNodeOutlineEditorHost() {
       updateNodeData(node.id, {
         generatedOutlineMd: md,
         generatedOutlineHistory: history,
-        ...(isGeneral ? { themeInput: md.slice(0, 8000) } : {}),
+        ...(d.uploadedScriptMd?.trim() ? { uploadedScriptMd: md } : {}),
+        ...(isGeneral ? { themeInput: md } : {}),
       });
       const hub = findStoryPro2ScriptHubForStarter(
         nodes,

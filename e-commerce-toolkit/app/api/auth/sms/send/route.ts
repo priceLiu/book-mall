@@ -3,7 +3,7 @@ import { forwardToBook } from "@/lib/portal-auth-bff";
 
 export const dynamic = "force-dynamic";
 
-/** 门户短信 BFF：转发 Book /api/auth/sms/send（dev 回传 mockCode）。 */
+/** 门户短信 BFF：经 Book 服务端密钥调用 /api/sso/portal/sms/send（dev 回传 mockCode）。 */
 export async function POST(req: Request) {
   let body: { phone?: string; purpose?: string } | null = null;
   try {
@@ -17,8 +17,10 @@ export async function POST(req: Request) {
       ? body.purpose
       : "LOGIN";
 
-  const result = await forwardToBook("/api/auth/sms/send", {
+  const result = await forwardToBook("/api/sso/portal/sms/send", {
     method: "POST",
+    withServerSecret: true,
+    clientRequest: req,
     body: { phone: body?.phone, purpose },
   });
 

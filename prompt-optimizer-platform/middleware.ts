@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { fireTrafficHitFromRequest } from "@/lib/platform-traffic";
 
 function incomingHost(request: NextRequest): string {
   const xf = request.headers.get("x-forwarded-host");
@@ -30,6 +31,7 @@ function isPublicPath(pathname: string): boolean {
   if (pathname.startsWith("/auth/sso/callback")) return true;
   if (pathname.startsWith("/sso-error")) return true;
   if (pathname.startsWith("/_next/")) return true;
+  if (pathname === "/" || pathname === "/login" || pathname === "/register") return true;
   if (pathname === "/favicon.ico" || pathname === "/robots.txt") return true;
   if (/\.[a-z0-9]+$/i.test(pathname)) return true;
   return false;
@@ -51,6 +53,8 @@ function buildReEnterUrl(request: NextRequest): string | null {
 }
 
 export function middleware(request: NextRequest) {
+  fireTrafficHitFromRequest("prompt-optimizer", request);
+
   if (process.env.NODE_ENV === "production") {
     const canonicalOrigin = getCanonicalOrigin();
     if (canonicalOrigin) {

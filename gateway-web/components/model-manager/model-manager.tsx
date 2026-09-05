@@ -10,6 +10,7 @@ import { formatProviderKindLabel } from "@/lib/gateway-model-display";
 import { ProviderApplyLink } from "@/lib/provider-apply-urls";
 
 const TAB_LABELS: Record<ModelTab, string> = {
+  all: "ALL Models",
   text: "Text Models",
   image: "Image Models",
   video: "Video Models",
@@ -40,7 +41,7 @@ export function ModelManager({
   initialCredentials: CredentialRow[];
   tabGroups: Record<ModelTab, CatalogGroup[]>;
 }) {
-  const [tab, setTab] = useState<ModelTab>("text");
+  const [tab, setTab] = useState<ModelTab>("all");
   const [query, setQuery] = useState("");
   const [credentials, setCredentials] = useState(initialCredentials);
   const [editOpen, setEditOpen] = useState(false);
@@ -51,17 +52,29 @@ export function ModelManager({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const filterGroups = useCallback(
-    (base: CatalogGroup[], q: string) => {
-      const volcFull = initialGroups.find((g) => g.providerKind === "VOLCENGINE");
-      const merged = !volcFull
-        ? base
-        : base.map((g) =>
-            g.providerKind === "VOLCENGINE" ? volcFull : g,
-          );
-      if (!q) return merged;
-      return merged
-        .map((g) => ({
+  const groupsForTab = useCallback(
+    (key: ModelTab) => {
+      if (key === "all") {
+        return tabGroups.all?.length ? tabGroups.all : initialGroups;
+      }
+      return tabGroups[key] ?? [];
+    },
+    [tabGroups, initialGroups],
+  );
+
+  const filterGroups = useCallback((base: CatalogGroup[], q: string) => {
+    if (!q) return base;
+    return base
+      .map((g) => {
+        const vendorHay = [
+          g.providerKind,
+          g.label,
+          formatProviderKindLabel(g.providerKind),
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (vendorHay.includes(q)) return g;
+        return {
           ...g,
           models: g.models.filter((m) => {
             const hay = [
@@ -69,24 +82,21 @@ export function ModelManager({
               m.displayName,
               m.canonicalModelKey ?? "",
               ...(m.capabilities ?? []),
-              g.label,
-              g.providerKind,
             ]
               .join(" ")
               .toLowerCase();
             return hay.includes(q);
           }),
-        }))
-        .filter((g) => g.models.length > 0);
-    },
-    [initialGroups],
-  );
+        };
+      })
+      .filter((g) => g.models.length > 0);
+  }, []);
 
   const tabStats = useMemo(() => {
     const q = query.trim().toLowerCase();
     const stats = {} as Record<ModelTab, { total: number; matched: number }>;
     for (const key of Object.keys(TAB_LABELS) as ModelTab[]) {
-      const base = tabGroups[key] ?? [];
+      const base = groupsForTab(key);
       const total = base.reduce((n, g) => n + g.models.length, 0);
       const matched = q
         ? filterGroups(base, q).reduce((n, g) => n + g.models.length, 0)
@@ -94,17 +104,21 @@ export function ModelManager({
       stats[key] = { total, matched };
     }
     return stats;
-  }, [tabGroups, query, filterGroups]);
+  }, [groupsForTab, query, filterGroups]);
 
   const groups = useMemo(
-    () => filterGroups(tabGroups[tab] ?? [], query.trim().toLowerCase()),
-    [tab, tabGroups, query, filterGroups],
+    () => filterGroups(groupsForTab(tab), query.trim().toLowerCase()),
+    [tab, groupsForTab, query, filterGroups],
   );
 
   useEffect(() => {
     const q = query.trim().toLowerCase();
     if (!q) return;
     if ((tabStats[tab]?.matched ?? 0) > 0) return;
+    if ((tabStats.all?.matched ?? 0) > 0) {
+      setTab("all");
+      return;
+    }
     const next = (Object.keys(TAB_LABELS) as ModelTab[]).find(
       (key) => (tabStats[key]?.matched ?? 0) > 0,
     );
@@ -249,19 +263,19 @@ export function ModelManager({
       <div className="flex flex-wrap items-end gap-3">
         <label className="min-w-[220px] flex-1">
           <span className="mb-1 block text-xs text-[var(--gw-muted)]">
-            搜索 modelKey / 名称 / 能力
+            搜索厂商 / modelKey / 名称 / 能力
           </span>
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="例如 qwen3.7、百炼、Vision"
+            placeholder="例如 kie、百炼、qwen3.7、Vision"
             className="w-full rounded-lg border border-[var(--gw-border)] bg-black/30 px-3 py-2 text-sm text-[var(--gw-ink)] placeholder:text-[var(--gw-muted)]"
           />
         </label>
       </div>
 
-      <div className="flex gap-1 rounded-lg border border-[var(--gw-border)] bg-black/20 p-1">
+      <div className="flex flex-wrap gap-1 rounded-lg border border-[var(--gw-border)] bg-black/20 p-1">
         {(Object.keys(TAB_LABELS) as ModelTab[]).map((key) => {
           const { total, matched } = tabStats[key] ?? { total: 0, matched: 0 };
           const q = query.trim();
@@ -287,7 +301,7 @@ export function ModelManager({
         })}
       </div>
       <p className="text-xs text-[var(--gw-muted)]">
-        当前 Tab 按模型类型筛选。Seedance、Veo、海螺、可灵等视频模型在{" "}
+        ALL Models 显示全部厂商模型。搜索厂商名（如 kie、百炼）可在 ALL Models 看到该厂商全部模型；分类 Tab 仅显示该类型。视频模型在{" "}
         <button
           type="button"
           className="text-[var(--gw-accent)] hover:underline"
@@ -360,7 +374,11 @@ export function ModelManager({
                     <p className="text-xs text-[var(--gw-muted)]">
                       默认凭证：{primary.alias}
                       {primary.channel ? `（${primary.channel}）` : ""} ·{" "}
-                      <CredentialKeyReveal credentialId={primary.id} masked={primary.apiKeyMasked} />
+                      <CredentialKeyReveal
+                        credentialId={primary.id}
+                        masked={primary.apiKeyMasked}
+                        credential={primary}
+                      />
                       {primary.lastTestStatus
                         ? ` · 最近测试 ${primary.lastTestStatus}`
                         : ""}
@@ -458,12 +476,25 @@ export function ModelManager({
                             默认
                           </span>
                         ) : null}
+                        {c.volcengineHasPortraitIam ? (
+                          <span className={`rounded-full border px-2 py-0.5 ${tagClass("cap")}`}>
+                            人像 IAM
+                          </span>
+                        ) : c.providerKind === "VOLCENGINE" ? (
+                          <span className="rounded-full border border-amber-500/30 px-2 py-0.5 text-amber-200/90">
+                            缺人像 IAM
+                          </span>
+                        ) : null}
                         {!c.active ? (
                           <span className="rounded-full border border-[var(--gw-border)] px-2 py-0.5 text-[var(--gw-muted)]">
                             停用
                           </span>
                         ) : null}
-                        <CredentialKeyReveal credentialId={c.id} masked={c.apiKeyMasked} />
+                        <CredentialKeyReveal
+                          credentialId={c.id}
+                          masked={c.apiKeyMasked}
+                          credential={c}
+                        />
                       </div>
                       <div className="flex items-center gap-3">
                         {!c.isDefaultForProvider && c.active ? (
@@ -493,7 +524,11 @@ export function ModelManager({
         })}
 
         {groups.length === 0 ? (
-          <div className="gw-card text-sm text-[var(--gw-muted)]">此分类暂无模型</div>
+          <div className="gw-card text-sm text-[var(--gw-muted)]">
+            {query.trim()
+              ? "没有匹配的模型。试试清空搜索或切换 Tab。"
+              : "此分类暂无模型"}
+          </div>
         ) : null}
       </div>
 

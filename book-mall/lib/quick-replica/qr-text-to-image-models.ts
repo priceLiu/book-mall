@@ -1,3 +1,5 @@
+import { maxHappyHorsePromptImageIndex } from "@/lib/quick-replica/qr-motion-sync-models";
+
 export type QrTextToImageParamProfile =
   | "nano_pro"
   | "grok_t2i"
@@ -5,7 +7,8 @@ export type QrTextToImageParamProfile =
   | "seedream"
   | "gpt_image_2"
   | "gpt_image_1"
-  | "qwen_t2i";
+  | "qwen_t2i"
+  | "qwen_multimodal";
 
 export type QrTextToImageModelDef = {
   modelKey: string;
@@ -76,6 +79,20 @@ export const QR_TEXT_TO_IMAGE_MODELS: QrTextToImageModelDef[] = [
     maxRefImages: 1,
     paramProfile: "qwen_t2i",
   },
+  {
+    modelKey: "qwen-image-3.0-pro",
+    label: "千问 Image 3.0 Pro",
+    subtitle: "文生图 / 多图参考",
+    maxRefImages: 3,
+    paramProfile: "qwen_multimodal",
+  },
+  {
+    modelKey: "z-image-turbo",
+    label: "Z-Image Turbo",
+    subtitle: "快速文生图",
+    maxRefImages: 0,
+    paramProfile: "qwen_multimodal",
+  },
 ];
 
 export const QR_DEFAULT_TEXT_TO_IMAGE_MODEL_KEY = "lib-nano-pro";
@@ -119,6 +136,10 @@ export function validateTextToImageDraft(args: {
   }
   if (refs.length > meta.maxRefImages) {
     return `参考图最多 ${meta.maxRefImages} 张`;
+  }
+  const maxIdx = maxHappyHorsePromptImageIndex(prompt);
+  if (maxIdx > refs.length) {
+    return `提示词引用了 [Image ${maxIdx}]，但只有 ${refs.length} 张参考图`;
   }
   return null;
 }

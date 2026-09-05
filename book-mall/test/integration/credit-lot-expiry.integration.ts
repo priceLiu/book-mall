@@ -21,7 +21,7 @@ import { prisma } from "@/lib/prisma";
 import {
   consumeCredits,
   expireDueLotsForAccount,
-  getPoolBalances,
+  getAccountCreditBalances,
   grantCredits,
   refundCredits,
   releaseReserved,
@@ -50,9 +50,9 @@ async function accId(ownerId: string): Promise<string> {
   return a.id;
 }
 
-async function lots(accountId: string, pool: "GENERAL" | "VIDEO" = "GENERAL") {
+async function lots(accountId: string) {
   return prisma.creditLot.findMany({
-    where: { accountId, pool },
+    where: { accountId },
     orderBy: { grantedAt: "asc" },
     select: { source: true, remainingCredits: true, originalCredits: true, expiresAt: true, periodKey: true },
   });
@@ -62,21 +62,16 @@ async function lots(accountId: string, pool: "GENERAL" | "VIDEO" = "GENERAL") {
 async function assertInvariant(accountId: string, label: string) {
   const acc = await prisma.creditAccount.findUniqueOrThrow({
     where: { id: accountId },
-    select: { balanceCredits: true, reservedCredits: true, videoBalanceCredits: true, videoReservedCredits: true },
+    select: { balanceCredits: true, reservedCredits: true },
   });
   const now = new Date();
-  for (const pool of ["GENERAL", "VIDEO"] as const) {
-    const active = await prisma.creditLot.findMany({
-      where: { accountId, pool, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
-      select: { remainingCredits: true },
-    });
-    const sumLots = active.reduce((s, l) => s + l.remainingCredits, 0);
-    const owned =
-      pool === "VIDEO"
-        ? acc.videoBalanceCredits + acc.videoReservedCredits
-        : acc.balanceCredits + acc.reservedCredits;
-    check(`${label} · 对账 ${pool}：sum(lots)=${sumLots} == balance+reserved=${owned}`, sumLots === owned);
-  }
+  const active = await prisma.creditLot.findMany({
+    where: { accountId, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+    select: { remainingCredits: true },
+  });
+  const sumLots = active.reduce((s, l) => s + l.remainingCredits, 0);
+  const owned = acc.balanceCredits + acc.reservedCredits;
+  check(`${label} · 对账：sum(lots)=${sumLots} == balance+reserved=${owned}`, sumLots === owned);
 }
 
 async function main() {
@@ -119,8 +114,8 @@ async function main() {
       !!top && !!top.expiresAt && Math.abs(top.expiresAt.getTime() - addMonths(new Date(), 12).getTime()) < 2 * 864e5,
       top,
     );
-    const bal0 = await getPoolBalances(ref);
-    check("初始余额 = 500+200+1000 = 1700", bal0.general.balance === 1700, bal0.general);
+    const bal0 = await getAccountCreditBalances(ref);
+    check("初始余额 = 500+200+1000 = 1700", bal0.balance === 1700, bal0);
     await assertInvariant(id, "初始");
 
     // FIFO：消费 550 → 先扣订阅 500，再扣免费 50（订阅到期最近）
@@ -168,9 +163,9 @@ async function main() {
     // refund 30 → 回补最早到期活跃批次（免费最早到期，回补免费）
     await refundCredits({ ref, credits: 30, idempotencyKey: `rf2:${uid}` });
     await assertInvariant(id, "refund 后");
-    const balAfterRefund = await getPoolBalances(ref);
+    const balAfterRefund = await getAccountCreditBalances(ref);
     // 1700 -550 -100(settle) -60 +30 = 1020
-    check("refund 后余额 = 1020", balAfterRefund.general.balance === 1020, balAfterRefund.general);
+    check("refund 后余额 = 1020", balAfterRefund.balance === 1020, balAfterRefund);
 
     // —————————————— TC-sweep（到期清扫）——————————————
     const uid2 = `test-lot-sweep-${randomUUID()}`;
@@ -185,9 +180,9 @@ async function main() {
       data: { expiresAt: addDays(new Date(), -1) },
     });
     const r = await expireDueLotsForAccount(ref2);
-    check("清扫过期免费 300", r.expiredGeneral === 300, r);
-    const balAfterSweep = await getPoolBalances(ref2);
-    check("清扫后余额 = 700（仅剩充值）", balAfterSweep.general.balance === 700, balAfterSweep.general);
+    check("清扫过期免费 300", r.expiredCredits === 300, r);
+    const balAfterSweep = await getAccountCreditBalances(ref2);
+    check("清扫后余额 = 700（仅剩充值）", balAfterSweep.balance === 700, balAfterSweep);
     const expireLedger = await prisma.creditLedger.count({ where: { accountId: id2, type: "EXPIRE" } });
     check("写入 EXPIRE 流水", expireLedger >= 1, expireLedger);
     await assertInvariant(id2, "清扫后");
@@ -216,8 +211,8 @@ async function main() {
     const subLots = l3.filter((l) => l.source === "SUBSCRIPTION" && l.remainingCredits > 0);
     check("月度重置：仅一个有效订阅批次（本周期）", subLots.length === 1 && subLots[0]!.periodKey === "2026-08", subLots);
     check("月度重置：保留充值批次 400", l3.find((l) => l.source === "TOPUP")?.remainingCredits === 400, l3);
-    const bal3 = await getPoolBalances(ref3);
-    check("月度重置后余额 = 500(新订阅)+400(充值) = 900", bal3.general.balance === 900, bal3.general);
+    const bal3 = await getAccountCreditBalances(ref3);
+    check("月度重置后余额 = 500(新订阅)+400(充值) = 900", bal3.balance === 900, bal3);
     await assertInvariant(id3, "月度重置后");
 
     console.log("");

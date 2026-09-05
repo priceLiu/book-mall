@@ -1,9 +1,5 @@
-import { ProjectsPageClient } from "@/components/projects/projects-page-client";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "创作室",
-};
-
-export default function ProjectsPage() {
-  return <ProjectsPageClient />;
+export default function ProjectsRedirectPage() {
+  redirect("/");
 }

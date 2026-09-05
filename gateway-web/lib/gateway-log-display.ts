@@ -1,25 +1,43 @@
 /** Gateway 请求日志 · 展示用文案（与 book-mall GatewayRequestLog 枚举对齐） */
 
+/** 应用 Tab 筛选 key（与 book-mall gateway-log-app-filter 对齐） */
+export type GatewayLogAppKey =
+  | "assistant"
+  | "book"
+  | "tool"
+  | "quick-replica"
+  | "prompt-optimizer"
+  | "canvas"
+  | "story"
+  | "e-commerce"
+  | "gateway-console"
+  | "external";
+
 export type LogClientSource =
   | "CANVAS"
   | "STORY"
   | "TOOL"
+  | "QUICK_REPLICA"
   | "GATEWAY_CONSOLE"
   | "EXTERNAL"
   | string;
 
-/** 日志页 · 按工具应用筛选（value 空 = 全部） */
+/** 日志页 · 按应用 Tab 筛选（value 空 = 全部） */
 export const LOG_APP_FILTER_OPTIONS: {
-  value: "" | LogClientSource;
+  value: "" | GatewayLogAppKey;
   label: string;
 }[] = [
   { value: "", label: "全部" },
-  { value: "CANVAS", label: "画布" },
-  { value: "TOOL", label: "工具站" },
-  { value: "STORY", label: "漫剧" },
-  { value: "E_COMMERCE", label: "电商工具箱" },
-  { value: "GATEWAY_CONSOLE", label: "控制台" },
-  { value: "EXTERNAL", label: "外部 API" },
+  { value: "assistant", label: "AI 小智" },
+  { value: "book", label: "主站 Book" },
+  { value: "tool", label: "日常工具" },
+  { value: "quick-replica", label: "快速复刻" },
+  { value: "prompt-optimizer", label: "提示词" },
+  { value: "canvas", label: "画布" },
+  { value: "story", label: "故事版" },
+  { value: "e-commerce", label: "电商工具箱" },
+  { value: "gateway-console", label: "控制台" },
+  { value: "external", label: "外部 API" },
 ];
 
 export type LogProviderKind =
@@ -41,8 +59,9 @@ export type LogRequestStatus =
 
 const CLIENT_SOURCE_LABEL: Record<string, string> = {
   CANVAS: "Canvas 画布",
-  STORY: "Story 漫剧",
+  STORY: "Story 故事版",
   E_COMMERCE: "电商工具箱",
+  QUICK_REPLICA: "快速复刻",
   GATEWAY_CONSOLE: "控制台调试",
   EXTERNAL: "外部 API",
 };
@@ -50,8 +69,9 @@ const CLIENT_SOURCE_LABEL: Record<string, string> = {
 /** 日志表 Source 列 · 短标签 */
 const CLIENT_SOURCE_SHORT: Record<string, string> = {
   CANVAS: "画布",
-  STORY: "漫剧",
+  STORY: "故事版",
   TOOL: "工具站",
+  QUICK_REPLICA: "快速复刻",
   E_COMMERCE: "电商",
   GATEWAY_CONSOLE: "控制台",
   EXTERNAL: "外部 API",
@@ -182,26 +202,82 @@ export function formatLogAppTaskCell(input: {
 const POLL_DELAY_LIMIT_MS = 10_000;
 const POLL_INFLIGHT_WARN_MS = 120_000;
 
-/** 厂商分列全为 — 时的悬停说明（非 bug：非火山视频 / 未 poll 到 trace） */
+/** 厂商分列全为 — 时的悬停说明（非 bug：非支持厂商 / 未 poll 到 trace） */
+export function inputSummaryHasVideoUrl(inputSummary: unknown): boolean {
+  if (!inputSummary || typeof inputSummary !== "object") return false;
+  const input = (inputSummary as { input?: unknown }).input;
+  if (!input || typeof input !== "object") return false;
+  const messages = (input as { messages?: unknown }).messages;
+  if (!Array.isArray(messages)) return false;
+  for (const msg of messages) {
+    if (!msg || typeof msg !== "object") continue;
+    const content = (msg as { content?: unknown }).content;
+    if (!Array.isArray(content)) continue;
+    for (const part of content) {
+      if (
+        part &&
+        typeof part === "object" &&
+        (part as { type?: string }).type === "video_url"
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export function resolveLogVendorPhaseEmptyHint(input: {
   providerKind: string | null;
   requestKind: string;
   externalTaskId?: string | null;
   isInProgress: boolean;
   hasVolcengineTrace: boolean;
+  hasDashscopeTrace?: boolean;
+  hasMinimaxTrace?: boolean;
+  hasVideoInput?: boolean;
 }): string | undefined {
-  if (input.providerKind !== "VOLCENGINE" || input.requestKind !== "VIDEO") {
-    return "厂商分阶段（排队 / 生成 / 后处理）仅统计火山异步视频；生图 / 同步接口无此拆分";
+  const hasTrace =
+    input.hasVolcengineTrace ||
+    input.hasDashscopeTrace === true ||
+    input.hasMinimaxTrace === true;
+  const isVolcVideo =
+    input.providerKind === "VOLCENGINE" && input.requestKind === "VIDEO";
+  const isDashscopeAsync =
+    (input.providerKind === "DASHSCOPE" ||
+      input.providerKind === "BAILIAN") &&
+    input.requestKind !== "CHAT";
+  const isMinimaxVideo =
+    input.providerKind === "MINIMAX" && input.requestKind === "VIDEO";
+
+  if (!isVolcVideo && !isDashscopeAsync && !isMinimaxVideo) {
+    if (input.requestKind === "CHAT" && input.hasVideoInput) {
+      return input.isInProgress
+        ? "同步 Chat 视频理解：厂商等待时间计入「网关段」墙钟，无厂商分列；进行中请耐心等待（最长约 10 分钟）"
+        : "同步 Chat 视频理解：厂商等待时间计入「网关段」，无厂商分列";
+    }
+    return "厂商分阶段（排队 / 生成 / 后处理）仅统计火山异步视频、百炼/DashScope 异步与 MiniMax H3 视频；同步 Chat 等无此拆分";
   }
-  if (!input.hasVolcengineTrace) {
+  if (!hasTrace) {
     if (!input.externalTaskId?.trim()) {
       return input.isInProgress
         ? "尚无厂商 taskId：可能卡在 Gateway 提交，或 poll worker 未运行（3 分钟后会 STALE_ORPHAN 收口）"
-        : "无厂商 taskId，未产生 volcengineTiming";
+        : isMinimaxVideo
+          ? "无厂商 taskId，未产生 minimaxTiming"
+          : isDashscopeAsync
+          ? "无厂商 taskId，未产生 dashscopeTiming"
+          : "无厂商 taskId，未产生 volcengineTiming";
     }
     return input.isInProgress
-      ? "已有 taskId 但尚未 poll 到 volcengineTiming，请检查 canvas poll SCF / book-mall poll worker"
-      : "终态无 volcengineTiming trace";
+      ? isMinimaxVideo
+        ? "已有 taskId 但尚未 poll 到 minimaxTiming（需厂商回包 created_at / updated_at）"
+        : isDashscopeAsync
+        ? "已有 taskId 但尚未 poll 到 dashscopeTiming（需厂商回包 submit_time / scheduled_time）"
+        : "已有 taskId 但尚未 poll 到 volcengineTiming，请检查 canvas poll SCF / book-mall poll worker"
+      : isMinimaxVideo
+        ? "终态无 minimaxTiming trace（可刷新；若 resultSummary 含 task.created_at 会自动反推）"
+        : isDashscopeAsync
+        ? "终态无 dashscopeTiming trace"
+        : "终态无 volcengineTiming trace";
   }
   return undefined;
 }
@@ -231,9 +307,9 @@ export function formatLogTimingPhaseCell(
   }
   const sec = Math.round(ms / 1000);
   const labels = {
-    queue: "火山排队",
-    generate: "厂商 GPU（updated−created；进行中未跳变显示 …）",
-    postproc: "厂商后处理（仅成功任务；updated_at → succeeded）",
+    queue: "厂商排队",
+    generate: "厂商生成（DashScope scheduled→end；火山 updated−created）",
+    postproc: "厂商后处理（仅火山成功任务；DashScope 一般为 —）",
     poll: "我方轮询 / 收口延迟",
   } as const;
   let title = `${labels[phase]} · ${sec}s`;
@@ -293,6 +369,7 @@ export function logProviderFilterOptions(
 
 const STATUS_LABEL: Record<string, string> = {
   QUEUED: "排队中",
+  PREPARING: "准备中",
   DISPATCHING: "派发中",
   PENDING: "排队",
   RUNNING: "进行中",
@@ -332,13 +409,26 @@ export function formatLogOriginLabel(
   return `${src} · ${vendor}`;
 }
 
-/** 日志表 Source 列 · 含页面 slug，如「工具站 · image-to-video」 */
+/** 日志表 Source 列 · 含页面 slug；AI 小智 / 主站 Book 优先按 clientPage 展示 */
 export function formatLogPageLabel(
   clientSource: LogClientSource,
   clientPage?: string | null,
 ): string {
-  const src = formatClientSourceShortLabel(clientSource);
   const page = clientPage?.trim();
+  if (page?.startsWith("platform-assistant/")) {
+    const tail = page.slice("platform-assistant/".length);
+    return tail ? `AI 小智 · ${tail}` : "AI 小智";
+  }
+  if (page?.startsWith("account/")) {
+    return `主站 Book · ${page}`;
+  }
+  if (page?.startsWith("prompt-optimizer")) {
+    return "提示词";
+  }
+  if (page?.startsWith("quick-replica")) {
+    return `快速复刻 · ${page.replace(/^quick-replica\/?/, "") || "—"}`;
+  }
+  const src = formatClientSourceShortLabel(clientSource);
   if (page) return `${src} · ${page}`;
   return src;
 }
@@ -375,6 +465,8 @@ export function formatRequestStatusShortLabel(status: LogRequestStatus): string 
       return "pending";
     case "QUEUED":
       return "queued";
+    case "PREPARING":
+      return "preparing";
     case "DISPATCHING":
       return "dispatching";
     case "CANCELLED":
@@ -395,6 +487,7 @@ export function statusDotClass(status: LogRequestStatus): string {
     case "PENDING":
       return "bg-[#eab308] shadow-[0_0_6px_rgba(234,179,8,0.55)]";
     case "QUEUED":
+    case "PREPARING":
     case "DISPATCHING":
       return "bg-zinc-400/80 shadow-[0_0_6px_rgba(161,161,170,0.5)]";
     case "CANCELLED":
@@ -419,6 +512,7 @@ export function statusBadgeClass(status: LogRequestStatus): string {
     case "PENDING":
       return "bg-amber-500/15 text-amber-300";
     case "QUEUED":
+    case "PREPARING":
     case "DISPATCHING":
       return "bg-zinc-500/15 text-zinc-300";
     case "CANCELLED":

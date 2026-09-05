@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * dev:all 启动前的端口预检：
- *   - 检查 3000-3007 是否被占
+ *   - 检查 3000-3010 是否被占
  *   - 若 DATABASE_URL 走 127.0.0.1:6432，检查 PgBouncer 是否在监听
  *   - 如果有占用：打印占用 PID + 命令名，并给出处置建议（kill 命令），随后退出 1
  *   - 全空闲：静默通过
@@ -28,6 +28,9 @@ const PORTS = [
   { port: 3006, label: "prompt-optimizer-platform" },
   { port: 3007, label: "e-commerce-toolkit" },
   { port: 3008, label: "quick-replica-web" },
+  { port: 3009, label: "director-web" },
+  { port: 3010, label: "common-tools" },
+  { port: 3011, label: "publisher-web" },
 ];
 
 function listListenersOnPort(port) {
@@ -148,7 +151,7 @@ function checkDatabasePreflight() {
       const RST = "\x1b[0m";
       console.warn(
         `\n${YEL}⚠ 远程数据库 TCP 不可达${RST} — ${YEL}${host}:${port}${RST}\n` +
-          `  本地开发若使用腾讯云 CDB，通常需先连接 VPN；否则生图/登录等会失败或极慢。\n` +
+          `  请检查 DATABASE_URL 是否为公网连接池地址、腾讯云白名单是否放行本机 IP。\n` +
           `  自检：${GRN}pnpm --dir book-mall db:ping${RST}  ·  详见 ${GRN}docs/dev.md${RST} §数据库连接\n`,
       );
     }

@@ -2,8 +2,8 @@ import type { Pro2AddMenuSection } from "./pro2-add-node-menu";
 import { SBV1_VIDEO_COMPOSE_LABEL } from "./sbv1-node-chrome";
 import {
   Clapperboard,
-  Download,
   Image as ImageIcon,
+  Music,
   ScanLine,
   Sparkles,
   Type,
@@ -98,10 +98,10 @@ export const JIANYING_EXPORT_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
   },
 ];
 
-/** 自动成片节点左侧 + · 接入视频 */
+/** 自动成片节点左侧 + · 接入视频 / 音频 */
 export const JIANYING_AUTO_RENDER_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
   {
-    title: "接入视频",
+    title: "接入素材",
     items: [
       {
         id: "video",
@@ -109,6 +109,13 @@ export const JIANYING_AUTO_RENDER_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
         icon: Video,
         enabled: true,
         nodeType: "sbv1-video-engine",
+      },
+      {
+        id: "audio",
+        label: "音频",
+        icon: Music,
+        enabled: true,
+        nodeType: "story-pro2-audio",
       },
     ],
   },
@@ -130,7 +137,7 @@ export const JIANYING_EXPORT_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
   },
 ];
 
-/** 视频节点右侧 + · 串联下一节点 / 导出剪辑 */
+/** 视频节点右侧 + · 串联下一节点（成片/导出请框选 ≥2 个视频后走选区批量 +） */
 export const SBV1_VIDEO_ENGINE_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
   {
     title: "串联生成",
@@ -148,25 +155,6 @@ export const SBV1_VIDEO_ENGINE_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
         icon: Video,
         enabled: true,
         nodeType: "sbv1-video-engine",
-      },
-    ],
-  },
-  {
-    title: "导出成片",
-    items: [
-      {
-        id: "auto-render",
-        label: "自动成片",
-        icon: Clapperboard,
-        enabled: true,
-        nodeType: "jianying-auto-render-pro2",
-      },
-      {
-        id: "export",
-        label: "导出剪辑",
-        icon: Download,
-        enabled: true,
-        nodeType: "jianying-export-pro2",
       },
     ],
   },

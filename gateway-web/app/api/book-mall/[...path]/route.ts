@@ -21,8 +21,15 @@ async function proxyToBookMall(request: NextRequest, pathSegments: string[]) {
   if (cookie) headers.set("cookie", cookie);
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
+  const platformApp = request.headers.get("x-platform-app");
+  if (platformApp) headers.set("x-platform-app", platformApp);
   const auth = request.headers.get("authorization");
-  if (auth) headers.set("authorization", auth);
+  if (auth) {
+    headers.set("authorization", auth);
+  } else {
+    const toolsToken = request.cookies.get("tools_token")?.value?.trim();
+    if (toolsToken) headers.set("authorization", `Bearer ${toolsToken}`);
+  }
 
   const body =
     request.method === "GET" || request.method === "HEAD"
@@ -35,11 +42,22 @@ async function proxyToBookMall(request: NextRequest, pathSegments: string[]) {
       headers,
       body,
     });
+    const respContentType = r.headers.get("content-type") ?? "application/json";
+    if (respContentType.toLowerCase().includes("text/event-stream") && r.body) {
+      return new NextResponse(r.body, {
+        status: r.status,
+        headers: {
+          "Content-Type": respContentType,
+          "Cache-Control": "no-store",
+          "X-Accel-Buffering": "no",
+        },
+      });
+    }
     const respBuf = await r.arrayBuffer();
     return new NextResponse(respBuf, {
       status: r.status,
       headers: {
-        "Content-Type": r.headers.get("content-type") ?? "application/json",
+        "Content-Type": respContentType,
       },
     });
   } catch (e: unknown) {

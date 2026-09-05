@@ -115,6 +115,8 @@ export function reflowStoryPro2Workspace(
       if (!id) return;
       const node = byId.get(id);
       if (!node || node.type !== type) return;
+      // 用户手动打组（parentId）内的控制行节点保持相对位置，禁止自动重排
+      if (node.parentId) return;
       byId.set(id, placeNode(node, x, y));
     };
 

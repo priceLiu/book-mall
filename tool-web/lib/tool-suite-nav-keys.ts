@@ -10,6 +10,7 @@ export const TOOL_SUITE_NAV_KEYS = [
   "ai-poster-canvas",
   "prompt-optimizer",
   "quick-replica",
+  "social-publisher",
   "smart-support",
   "app-history",
 ] as const;

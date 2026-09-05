@@ -16,8 +16,12 @@ export function isEcomUnauthorizedError(err: unknown): boolean {
   );
 }
 
+import { getEcomRuntimeBookOrigin } from "@/lib/ecom-runtime-config";
+
 /** 浏览器侧主站地址（须配置 NEXT_PUBLIC_BOOK_MALL_URL） */
 export function getBookOriginClient(): string {
+  const runtime = getEcomRuntimeBookOrigin();
+  if (runtime) return runtime;
   const raw =
     process.env.NEXT_PUBLIC_BOOK_MALL_URL?.trim() ||
     process.env.MAIN_SITE_ORIGIN?.trim();
@@ -25,14 +29,9 @@ export function getBookOriginClient(): string {
 }
 
 /**
- * 门户独立登录：跳本域品牌登录页（携带回跳），不再直接弹主站。
- * 已有 Book 会话的用户由 `silentEcomSessionRefresh`（隐藏 iframe re-enter）无感续期，
- * 无 Book 会话者在本域品牌页完成登录/注册。
+ * 门户登录：统一跳转 Book 登录（经 re-enter 回子应用）。
  */
-export function buildEcomLoginUrl(returnPath = "/"): string {
-  const path = returnPath.startsWith("/") ? returnPath : `/${returnPath}`;
-  return `/login?redirect=${encodeURIComponent(path)}`;
-}
+export { buildEcomLoginUrl, buildEcomRegisterUrl } from "@/lib/portal-auth-links";
 
 export function throwIfUnauthorized(res: Response, data: Record<string, unknown>): void {
   if (res.status !== 401) return;

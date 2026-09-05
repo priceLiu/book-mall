@@ -13,11 +13,13 @@ import {
   LogOut,
   Menu,
   Receipt,
+  Send,
   Settings,
   ShoppingBag,
   Sparkles,
   User,
   Users,
+  Wand2,
   Zap,
   Activity,
 } from "lucide-react";
@@ -37,7 +39,9 @@ import {
 import { ToggleTheme } from "@/components/layout/toogle-theme";
 import {
   openCanvasAppInNewTab,
+  openCommonToolsAppInNewTab,
   openEcomAppInNewTab,
+  openPublisherAppInNewTab,
   openQuickReplicaAppInNewTab,
   openToolsAppInNewTab,
 } from "@/lib/account-app-launch";
@@ -55,8 +59,8 @@ const NAV_LINKS = [
   { href: "/account/team", label: "团队空间", icon: Users },
   { href: "/account/team/billing", label: "团队账单", icon: Receipt },
   { href: "/account/billing", label: "轻量包购买", icon: Sparkles },
-  { href: "/account/byok", label: "自带 Key（BYOK）", icon: Zap },
-  { href: "/pricing", label: "会员套餐", icon: Receipt },
+  { href: "/pricing", label: "订阅价格", icon: Receipt },
+  { href: "/pricing/api", label: "API 价格", icon: Receipt },
   { href: "/account/courses", label: "AI 学堂", icon: Sparkles },
 ] as const;
 
@@ -77,6 +81,9 @@ export function AccountMenuDropdown({
   ecomOriginConfigured,
   canLaunchQuickReplica,
   quickReplicaOriginConfigured,
+  canLaunchCommonTools,
+  commonToolsOriginConfigured,
+  publisherOriginConfigured,
   billingPersona,
 }: {
   profileLabel: string;
@@ -90,6 +97,9 @@ export function AccountMenuDropdown({
   ecomOriginConfigured: boolean;
   canLaunchQuickReplica: boolean;
   quickReplicaOriginConfigured: boolean;
+  canLaunchCommonTools: boolean;
+  commonToolsOriginConfigured: boolean;
+  publisherOriginConfigured: boolean;
   billingPersona: BillingPersona | null;
 }) {
   const pathname = usePathname();
@@ -106,6 +116,14 @@ export function AccountMenuDropdown({
     billingPersona,
     gatewayLinked,
   });
+  const commonToolsReady = isAccountCanvasLaunchClickable({
+    canLaunchCanvas: canLaunchCommonTools,
+    canvasOriginConfigured: commonToolsOriginConfigured,
+    billingPersona,
+    gatewayLinked,
+  });
+
+  const publisherReady = canLaunchTools && publisherOriginConfigured;
 
   async function handleAppLaunch(actionId: string, launch: () => void | Promise<unknown>) {
     if (isAppLaunchAction(actionId)) {
@@ -116,9 +134,14 @@ export function AccountMenuDropdown({
         canvasOriginConfigured,
         canvasReady,
         ecomReady,
+        canLaunchCommonTools,
+        commonToolsOriginConfigured,
+        commonToolsReady,
         canLaunchQuickReplica,
         quickReplicaOriginConfigured,
         quickReplicaReady,
+        publisherOriginConfigured,
+        publisherReady,
         billingPersona,
         gatewayLinked,
       });
@@ -215,6 +238,17 @@ export function AccountMenuDropdown({
                   <DropdownMenuItem
                     onSelect={(e) => {
                       e.preventDefault();
+                      void handleAppLaunch("launch-common-tools", () =>
+                        openCommonToolsAppInNewTab("/"),
+                      );
+                    }}
+                  >
+                    <Wand2 />
+                    <span>常用工具</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
                       void handleAppLaunch("launch-tools", () =>
                         openToolsAppInNewTab("/fitting-room"),
                       );
@@ -252,7 +286,18 @@ export function AccountMenuDropdown({
                     }}
                   >
                     <Copy />
-                    <span>快速复制</span>
+                    <span>快速复刻</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      void handleAppLaunch("launch-publisher", () =>
+                        openPublisherAppInNewTab("/"),
+                      );
+                    }}
+                  >
+                    <Send />
+                    <span>一键发布</span>
                   </DropdownMenuItem>
                 </DropdownMenuSubContent>
               </DropdownMenuPortal>

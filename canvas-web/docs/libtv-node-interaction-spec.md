@@ -18,7 +18,7 @@
 | Dock 壳层 | `Pro2InputDockShell` · `Pro2DockPasteZone` · `Pro2DockRefImages` · `DockUpstreamRefPreviewCard` · `Pro2DockUpstreamChips` · `Pro2DockStyleButton` | 模型选择须 `EnginePicker`；Dock 输入见 [`libtv-dock-input-spec.md`](./libtv-dock-input-spec.md) |
 | 画布底 Dock | `Sbv1Dock` · `LIBTV_CANVAS_DOCK_BAR_CLASS` | 分镜 1.0 / 2.0 底部磁吸栏共用 |
 | 悬停预览 | `MediaHoverBox` | 仅 Eye 小圆钮 `nodrag` |
-| 空态 / 错误 | `Pro2MediaNodeEmptyState` · `Pro2MediaNodeErrorState` | 空态 **须** `passNodeDrag`（整卡可拖） |
+| 空态 / 错误 | `Pro2MediaNodeEmptyState` · `Pro2MediaNodeErrorState` | 空态 / 错误态 **须** `passNodeDrag`（整卡可拖） |
 | 角标缩放 | `Pro2NodeResizer` | 组内节点隐藏 |
 | 框选工具条 | `Pro2SelectionToolbar`（Pro2）/ `SelectionToolbar`（通用） | 打组 / 保存资产；**Pro2 壳层同组顶栏** |
 | 媒体组顶栏 | `Pro2MediaGroupToolbar` · `Pro2MediaGroupToolbarPanel` | 样式 **同** `Pro2ImageNodeToolbar`（`PRO2_IMAGE_NODE_TOOLBAR_*`） |
@@ -91,7 +91,7 @@ LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 | 比例 | `LIBTV_DOCK_ASPECT_W` : `LIBTV_DOCK_ASPECT_H` | **16 : 6** | 固定宽高比 |
 | 长宽尺度 | `LIBTV_DOCK_SIZE_FACTOR` | **0.9** | flow 长宽同比 −10% |
 | flow 宽 | `LIBTV_DOCK_FLOW_WIDTH` | **1296**（1440×0.9） | flow 坐标基准宽（固定） |
-| flow 高 | `LIBTV_DOCK_FLOW_HEIGHT` | **486** | = 宽 × 6/16 |
+| flow 高 | `LIBTV_DOCK_FLOW_HEIGHT` | **482** | = 宽 × 6/16 × 1.15（输入区加高） |
 | 基准放大 | `LIBTV_DOCK_BASE_SCALE` | **1.4** | 未展开时屏幕 +40% |
 | 展开放大 | `LIBTV_DOCK_EXPAND_FACTOR` | **1.5** | 点击展开仅 **增高 prompt 输入区** +50%（顶栏缩略图 / 字号 / 屏宽不变） |
 | 100% 屏宽 | `LIBTV_DOCK_SCREEN_W_BASE` | **~1512px** | zoom=1 目标屏幕宽 |

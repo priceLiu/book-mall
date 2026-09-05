@@ -3,12 +3,15 @@ import type { NodeChange } from "@xyflow/react";
 import {
   canvasNodesLayoutFieldsEqual,
   canvasNodesSelectionAndZEqual,
+  extractNodeRemoveChanges,
   extractResizeCommitIds,
+  extractSelectNodeChanges,
   filterStoreBoundNodeChanges,
+  findGroupResizeSessionId,
+  hasNodeRemoveChanges,
   isCanvasInternalDimensionsOnlyChange,
   isCanvasRfLocalOnlyChange,
   isGroupResizeCommitFrame,
-  findGroupResizeSessionId,
 } from "@/lib/canvas/canvas-node-changes";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 
@@ -24,6 +27,18 @@ function node(
     ...patch,
   } as CanvasFlowNode;
 }
+
+describe("extractSelectNodeChanges", () => {
+  it("keeps only select changes", () => {
+    const changes: NodeChange[] = [
+      { id: "a", type: "select", selected: true },
+      { id: "b", type: "position", position: { x: 0, y: 0 } },
+    ];
+    expect(extractSelectNodeChanges(changes)).toEqual([
+      { id: "a", type: "select", selected: true },
+    ]);
+  });
+});
 
 describe("canvasNodesSelectionAndZEqual", () => {
   it("returns true when selection and zIndex match", () => {
@@ -178,5 +193,38 @@ describe("isGroupResizeCommitFrame", () => {
     expect(
       isGroupResizeCommitFrame(changes, "g1", extractResizeCommitIds(changes)),
     ).toBe(false);
+  });
+});
+
+describe("hasNodeRemoveChanges", () => {
+  it("detects remove changes", () => {
+    expect(
+      hasNodeRemoveChanges([
+        { type: "select", id: "a", selected: true },
+        { type: "remove", id: "b" },
+      ]),
+    ).toBe(true);
+  });
+
+  it("returns false for geometry-only batches", () => {
+    expect(
+      hasNodeRemoveChanges([
+        { type: "position", id: "a", position: { x: 1, y: 2 }, dragging: false },
+      ]),
+    ).toBe(false);
+  });
+});
+
+describe("extractNodeRemoveChanges", () => {
+  it("filters only remove entries", () => {
+    const changes: NodeChange[] = [
+      { type: "select", id: "a", selected: true },
+      { type: "remove", id: "b" },
+      { type: "remove", id: "c" },
+    ];
+    expect(extractNodeRemoveChanges(changes).map((c) => c.id)).toEqual([
+      "b",
+      "c",
+    ]);
   });
 });

@@ -25,6 +25,7 @@ export async function POST(req: Request) {
   const result = await forwardToBook("/api/sso/portal/verify", {
     method: "POST",
     withServerSecret: true,
+    clientRequest: req,
     body: {
       phone: body?.phone,
       password: body?.password,
@@ -34,10 +35,11 @@ export async function POST(req: Request) {
   });
 
   if (!result.ok) {
-    return NextResponse.json(
-      { error: (result.data.error as string) ?? "登录失败" },
-      { status: result.status },
-    );
+    const err =
+      typeof result.data.error === "string" ? result.data.error : "登录失败";
+    const status =
+      result.status >= 500 ? 503 : result.status >= 400 ? result.status : 401;
+    return NextResponse.json({ error: err }, { status });
   }
 
   return NextResponse.json({

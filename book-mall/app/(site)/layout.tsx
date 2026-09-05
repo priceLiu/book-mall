@@ -12,7 +12,11 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
   const session = await getServerSession(authOptions);
 
   return (
-    <SiteLayoutShell navAuth={<NavbarAuth appearance="site-home" />} isLoggedIn={Boolean(session?.user)}>
+    <SiteLayoutShell
+      navAuth={<NavbarAuth appearance="site-home" />}
+      pricingNavAuth={<NavbarAuth appearance="default" />}
+      isLoggedIn={Boolean(session?.user)}
+    >
       {children}
       <CookieConsentBanner />
     </SiteLayoutShell>

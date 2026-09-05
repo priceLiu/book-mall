@@ -3,6 +3,7 @@ import type {
   CanvasProviderModelDto,
 } from "@/lib/canvas-providers-api";
 import {
+  isImageGenerationModelKey,
   modelHasStoryCapabilities,
   type StoryModelCapability,
 } from "@/lib/canvas/story-model-capabilities";
@@ -14,6 +15,40 @@ export type LibtvDockEngineModelEntry = {
   provider: CanvasProviderDto;
   model: CanvasProviderModelDto;
 };
+
+/** Gateway 白名单匹配（modelKey 大小写不敏感） */
+export function isAllowedDockModelKey(
+  modelKey: string,
+  allowedSet: Set<string> | null | undefined,
+): boolean {
+  if (!allowedSet?.size) return true;
+  const key = modelKey.trim().toLowerCase();
+  for (const allowed of allowedSet) {
+    if (allowed.trim().toLowerCase() === key) return true;
+  }
+  return false;
+}
+
+/**
+ * Dock / EnginePicker 的 Gateway role 与 Provider DTO role 对齐。
+ * Canvas 注册表里 qwen3-tts、ElevenLabs 等 TTS，以及 Suno 音乐模型常为 `LLM`，
+ * 须结合白名单归入 TTS / MUSIC 分组。
+ */
+export function modelMatchesDockGatewayRole(
+  model: Pick<CanvasProviderModelDto, "role" | "modelKey">,
+  dockRole: GatewayModelRole,
+  allowedSet: Set<string> | null | undefined,
+): boolean {
+  if (model.role === dockRole) return true;
+  if (
+    model.role === "LLM" &&
+    (dockRole === "TTS" || dockRole === "MUSIC") &&
+    isAllowedDockModelKey(model.modelKey, allowedSet)
+  ) {
+    return true;
+  }
+  return false;
+}
 
 export function collectLibtvDockEngineModels(
   providers: CanvasProviderDto[],
@@ -38,8 +73,15 @@ export function collectLibtvDockEngineModels(
     if (providerIdSet && !providerIdSet.has(provider.id)) continue;
     for (const model of provider.models) {
       if (!model.enabled) continue;
-      if (allowedSet && !allowedSet.has(model.modelKey)) continue;
-      if (!allowedSet && model.role !== opts.role) continue;
+      if (!modelMatchesDockGatewayRole(model, opts.role, allowedSet)) continue;
+      if (!isAllowedDockModelKey(model.modelKey, allowedSet)) continue;
+      if (
+        opts.role === "IMAGE" &&
+        !allowedSet &&
+        !isImageGenerationModelKey(model.modelKey)
+      ) {
+        continue;
+      }
       if (
         reqCaps?.length &&
         !modelHasStoryCapabilities(model.modelKey, reqCaps)

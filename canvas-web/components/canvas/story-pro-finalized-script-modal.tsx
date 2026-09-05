@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  CANVAS_MODAL_BACKDROP_CLASS,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import { createPortal } from "react-dom";
 import { BookOpen, ChevronLeft, ChevronRight, X } from "lucide-react";
 
@@ -73,31 +78,6 @@ export function StoryProFinalizedScriptModal({
   const active = entries[versionIndex] ?? entries[0];
   const hasMultiple = entries.length > 1;
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const max = Math.max(0, entries.length - 1);
-    setVersionIndex(Math.min(Math.max(0, initialVersionIndex), max));
-  }, [open, initialVersionIndex, entries.length]);
-
-  useEffect(() => {
-    if (!open) {
-      document.body.style.overflow = "";
-      return;
-    }
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
 
   if (!mounted || !open || !active) return null;
 
@@ -107,7 +87,7 @@ export function StoryProFinalizedScriptModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1100] flex h-[100dvh] w-screen flex-col bg-[#0a0f14]/92 backdrop-blur-sm"
+      className={`${CANVAS_MODAL_BACKDROP_CLASS} z-[1100]`}
       role="dialog"
       aria-modal="true"
       aria-label="定稿剧本 · 历史"

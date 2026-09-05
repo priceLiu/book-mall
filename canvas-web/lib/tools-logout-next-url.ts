@@ -1,3 +1,8 @@
+export {
+  isSsoReenterSuppressedClient,
+  markSsoReenterSuppressed,
+} from "@private/federated-portal-logout";
+
 /** 与 book-mall/lib/platform-web-origins.ts LOCAL_PLATFORM_WEB_ORIGINS 保持一致。 */
 const LOCAL_PLATFORM_WEB_ORIGINS = [
   "http://localhost:3000",
@@ -63,9 +68,4 @@ export function appendSsoReenterSuppressCookie(res: {
   const parts = ["sso_reenter_suppress=1", "Path=/", "Max-Age=300", "SameSite=Lax"];
   if (secure) parts.push("Secure");
   res.headers.append("Set-Cookie", parts.join("; "));
-}
-
-export function isSsoReenterSuppressedClient(): boolean {
-  if (typeof document === "undefined") return false;
-  return /(?:^|;\s*)sso_reenter_suppress=1(?:;|$)/.test(document.cookie);
 }

@@ -27,6 +27,7 @@ export type Pro2CharacterBoardCellProps = {
   row: StoryProCharacterRow;
   focused?: boolean;
   onSelect?: () => void;
+  cancelScope?: import("@/lib/canvas/canvas-run-bus").CanvasCancelGenerationJob;
 };
 
 /** 人物设计板单格（与分镜图板图 4 同构） */
@@ -34,6 +35,7 @@ export function Pro2CharacterBoardCell({
   row,
   focused,
   onSelect,
+  cancelScope,
 }: Pro2CharacterBoardCellProps) {
   const url = threeViewUrl(row);
   const st = pro2CharacterCellStatus(row);
@@ -63,8 +65,8 @@ export function Pro2CharacterBoardCell({
       className={cn(
         "nodrag relative flex min-h-[140px] w-full flex-col overflow-hidden rounded-xl border bg-[#141418] text-left transition",
         focused
-          ? "border-white/40 ring-1 ring-white/12"
-          : "border-white/10 hover:border-white/22",
+          ? "border-white shadow-[0_0_0_1.5px_#FFFFFF]"
+          : "border-white/[0.08]",
       )}
     >
       <span className="pointer-events-none absolute left-2 top-2 z-10 max-w-[calc(100%-1rem)] truncate rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white/85">
@@ -91,7 +93,11 @@ export function Pro2CharacterBoardCell({
         </div>
       ) : st === "running" ? (
         <div className="relative min-h-[160px] flex-1">
-          <LibtvMediaGeneratingState variant="violet" />
+          <LibtvMediaGeneratingState
+            variant="violet"
+            cancelNodeId={cancelScope?.nodeId}
+            cancelScope={cancelScope}
+          />
         </div>
       ) : st === "error" ? (
         <div className="flex min-h-[160px] flex-1 flex-col items-center justify-center gap-2 px-4 py-6 text-center">

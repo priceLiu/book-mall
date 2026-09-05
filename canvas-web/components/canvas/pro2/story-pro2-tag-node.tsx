@@ -1,11 +1,17 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
+import type { Editor } from "@tiptap/react";
 import { GripVertical, Tag } from "lucide-react";
 
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { validateStoryPipelineDeletion } from "@/lib/canvas/story-pipeline-delete-guard";
+import { canvasNotify } from "@/lib/canvas/canvas-notify";
+import { selectPro2TagNodeDefaultLabel } from "@/lib/canvas/pro2-tag-node-label";
+import { useTagRichTextCommit } from "@/lib/canvas/use-tag-rich-text-commit";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
   PRO2_CARD_SHELL_CLASS,
   pro2NodeBorderColor,
@@ -18,19 +24,21 @@ import {
   LIBTV_NODE_OUTER_CLASS,
   libtvNodeBorderStyle,
 } from "@/lib/canvas/libtv-node-chrome";
-import { LIBTV_NODE_STAGE_DRAG_CLASS } from "@/components/canvas/libtv-thin-node-try-row";
-import { MarkdownView } from "@/components/canvas/markdown-view";
+import { ensureTagRichTextHtmlDocument, normalizeTagRichTextBody } from "@/lib/canvas/tag-rich-text-migrate";
 import type { StoryPro2TagNodeData } from "@/lib/canvas/story-pro2-workspace-types";
 import { cn } from "@/lib/utils";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
 import { Pro2NodeResizeGrip } from "./pro2-node-resize-grip";
 import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
 import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
-import { LibtvMarkdownFormatToolbar } from "../libtv-markdown-format-toolbar";
 import { StoryPro2TagExpandModal } from "./story-pro2-tag-expand-modal";
 import { useLibtvNodeDuplicate } from "../libtv-node-header-bar";
 import { LibtvEditableNodeTitle } from "../libtv-editable-node-title";
-import { Pro2ThinNodeToolbar } from "./pro2-thin-node-toolbar";
+import {
+  TagRichTextEditor,
+} from "./tag-rich-text-editor.client";
+import { TagRichTextBodyView } from "./tag-rich-text-body-view";
+import { TagRichTextToolbar } from "./tag-rich-text-toolbar";
 
 function TagEmptySkeleton() {
   return (
@@ -45,40 +53,118 @@ function TagEmptySkeleton() {
 
 export function StoryPro2TagNode({ id, data, selected, height }: NodeProps) {
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
-  const nodes = useCanvasStore((s) => s.nodes);
-  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const { doubleConfirm } = useDialogs();
+  const removeNode = useCanvasStore((s) => s.removeNode);
   const onDuplicateNode = useLibtvNodeDuplicate(id, "story-pro2-tag");
 
-  const d = data as unknown as StoryPro2TagNodeData;
-  const body = d.body?.trim() ?? "";
-  const hasBody = Boolean(body);
-  const [editing, setEditing] = useState(false);
-  const [expandOpen, setExpandOpen] = useState(false);
-  const taRef = useRef<HTMLTextAreaElement | null>(null);
-  const soleSelected = useLibtvIsNodeSoleSelected(id, Boolean(selected));
-  const compact = (height ?? 999) <= 80;
-  /** 选中即可拉伸；编辑/非编辑均保留右下角热区 */
-  const resizeCorner = !!selected;
-
-  const nodeLabel = useMemo(() => {
-    const tags = nodes.filter((n) => n.type === "story-pro2-tag");
-    const idx = tags.findIndex((n) => n.id === id);
-    return `标签节点 ${idx >= 0 ? idx + 1 : ""}`.trim();
-  }, [nodes, id]);
-
-  const setBody = useCallback(
-    (next: string) => {
-      updateNodeData(id, { body: next });
-    },
-    [id, updateNodeData],
+  const defaultLabel = useCanvasStore(
+    useCallback((s) => selectPro2TagNodeDefaultLabel(s.nodes, id), [id]),
   );
 
-  const focusEditor = useCallback(() => {
-    setEditing(true);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => taRef.current?.focus());
-    });
+  const d = data as unknown as StoryPro2TagNodeData;
+  const storedBody = d.body ?? "";
+  const { draft, schedule, flush, storedIsHtml } = useTagRichTextCommit(id, storedBody);
+  const editorContent = useMemo(
+    () =>
+      storedIsHtml
+        ? ensureTagRichTextHtmlDocument(draft)
+        : normalizeTagRichTextBody(storedBody),
+    [storedIsHtml, draft, storedBody],
+  );
+  const isEmpty = useMemo(() => {
+    if (storedIsHtml) {
+      return (
+        !editorContent ||
+        editorContent === "<p></p>" ||
+        editorContent === "<p><br></p>"
+      );
+    }
+    return !storedBody.trim();
+  }, [storedIsHtml, editorContent, storedBody]);
+  const [expandOpen, setExpandOpen] = useState(false);
+  const [editor, setEditor] = useState<Editor | null>(null);
+  const editorRef = useRef<Editor | null>(null);
+  const soleSelected = useLibtvIsNodeSoleSelected(id, Boolean(selected));
+  const compact = (height ?? 999) <= 80;
+  const resizeCorner = !!selected;
+  const mountEditor = soleSelected;
+
+  const bindEditor = useCallback((ed: Editor | null) => {
+    editorRef.current = ed;
+    setEditor(ed);
   }, []);
+
+  const onDeleteNode = useCallback(async () => {
+    flush();
+    const { nodes, edges } = useCanvasStore.getState();
+    const validation = validateStoryPipelineDeletion([id], nodes, edges);
+    if (!validation.ok) {
+      canvasNotify({
+        title: "无法删除该节点",
+        message: validation.message,
+        variant: "error",
+      });
+      return;
+    }
+    if (!validation.allowedIds.includes(id)) return;
+
+    const label = d.label?.trim() || defaultLabel;
+    const ok = await doubleConfirm({
+      first: {
+        title: `删除「${label}」？`,
+        message: "将从画布移除此标签节点。",
+        confirmLabel: "继续",
+        danger: true,
+      },
+      second: {
+        title: "再次确认 · 不可恢复",
+        message: "节点删除后无法撤回，是否继续？",
+        confirmLabel: "永久删除",
+        danger: true,
+      },
+    });
+    if (!ok) return;
+    removeNode(id);
+  }, [id, d.label, defaultLabel, doubleConfirm, flush, removeNode]);
+
+  useEffect(() => {
+    if (!soleSelected) flush();
+  }, [soleSelected, flush]);
+
+  useEffect(() => {
+    if (!mountEditor) {
+      editorRef.current = null;
+      setEditor(null);
+    }
+  }, [mountEditor]);
+
+  useEffect(() => {
+    if (!mountEditor) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const ed = editorRef.current;
+      if (!ed || ed.isDestroyed) return;
+      const inEditor = (e.target as HTMLElement | null)?.closest(".ProseMirror");
+      if (!inEditor) return;
+      if (!ed.isEmpty) return;
+      const { nodes, edges } = useCanvasStore.getState();
+      const validation = validateStoryPipelineDeletion([id], nodes, edges);
+      if (!validation.ok || !validation.allowedIds.includes(id)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      flush();
+      removeNode(id);
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [mountEditor, id, flush, removeNode]);
+
+  const selectNode = useCallback(() => {
+    useCanvasStore.getState().setNodes((prev) =>
+      prev.map((n) => ({ ...n, selected: n.id === id })),
+    );
+  }, [id]);
 
   const bodyPadClass = compact ? "px-2 py-1" : "px-3 py-2.5";
 
@@ -89,16 +175,20 @@ export function StoryPro2TagNode({ id, data, selected, height }: NodeProps) {
       onPointerLeave={onPointerLeave}
     >
       {soleSelected ? (
-        <LibtvNodeToolbarPortal nodeId={id} visible={soleSelected}>
-          <div className="flex flex-col items-center gap-2">
-            <LibtvMarkdownFormatToolbar
-              textareaRef={taRef}
-              value={d.body ?? ""}
-              onChange={setBody}
-              onExpand={() => setExpandOpen(true)}
-            />
-            <Pro2ThinNodeToolbar onDuplicateNode={onDuplicateNode} />
-          </div>
+        <LibtvNodeToolbarPortal
+          nodeId={id}
+          visible={soleSelected}
+          toolbarHeightEstimate={100}
+        >
+          <TagRichTextToolbar
+            editor={editor}
+            onExpand={() => {
+              flush();
+              setExpandOpen(true);
+            }}
+            onDelete={() => void onDeleteNode()}
+            onDuplicate={onDuplicateNode}
+          />
         </LibtvNodeToolbarPortal>
       ) : null}
 
@@ -107,7 +197,7 @@ export function StoryPro2TagNode({ id, data, selected, height }: NodeProps) {
         <Tag className="size-3.5 shrink-0 text-violet-300/80" />
         <LibtvEditableNodeTitle
           nodeId={id}
-          defaultLabel={nodeLabel}
+          defaultLabel={defaultLabel}
           textClassName="text-[11px] text-white"
         />
       </div>
@@ -118,7 +208,7 @@ export function StoryPro2TagNode({ id, data, selected, height }: NodeProps) {
           LIBTV_CARD_DRAG_CLASS,
           "relative flex min-h-0 flex-1 flex-col",
           resizeCorner ? "overflow-visible" : "overflow-hidden",
-          !editing && !hasBody && "cursor-text",
+          !mountEditor && isEmpty && "cursor-text",
         )}
         style={
           libtvNodeBorderStyle({
@@ -128,77 +218,34 @@ export function StoryPro2TagNode({ id, data, selected, height }: NodeProps) {
           }) ?? { borderColor: pro2NodeBorderColor(!!selected) }
         }
         onClick={() => {
-          if (!editing) focusEditor();
+          if (!soleSelected) selectNode();
         }}
       >
-        {!hasBody && !editing && !compact ? <TagEmptySkeleton /> : null}
+        {isEmpty && !mountEditor && !compact ? <TagEmptySkeleton /> : null}
 
         <div
           className={cn(
-            "relative min-h-0 flex-1",
-            resizeCorner ? "overflow-visible" : "overflow-hidden",
-            editing && LIBTV_CARD_DRAG_CLASS,
+            "relative min-h-0 flex-1 overflow-y-auto",
+            bodyPadClass,
+            resizeCorner && "pr-6 pb-6",
+            mountEditor && LIBTV_CARD_DRAG_CLASS,
           )}
         >
-          {/* 所见即所得：预览层始终渲染 Markdown */}
-          <div
-            className={cn(
-              "absolute overflow-y-auto text-[11px] leading-relaxed",
-              bodyPadClass,
-              !editing && LIBTV_NODE_STAGE_DRAG_CLASS,
-              editing && "pointer-events-none select-none",
-            )}
-            style={{
-              top: 0,
-              left: 0,
-              right: resizeCorner ? 24 : 0,
-              bottom: resizeCorner ? 24 : 0,
-            }}
-            title={editing ? undefined : "点击编辑"}
-            onDoubleClick={(e) => {
-              if (editing) return;
-              e.stopPropagation();
-              focusEditor();
-            }}
-          >
-            {hasBody || editing ? (
-              hasBody ? (
-                <MarkdownView
-                  content={d.body ?? ""}
-                  variant="darkPreview"
-                  inheritFontSize
-                />
-              ) : (
-                <p className="text-white/30">输入内容…</p>
-              )
-            ) : null}
-          </div>
-
-          {/* 编辑：不可见 textarea 捕获输入，视觉仅 Markdown 预览 */}
-          {(editing || !hasBody) && (
-            <textarea
-              ref={taRef}
-              className={cn(
-                "nodrag absolute z-[1] resize-none border-0 bg-transparent font-sans text-[11px] leading-relaxed",
-                "opacity-0 caret-violet-300/90",
-                compact
-                  ? resizeCorner
-                    ? "left-2 right-6 top-1 bottom-6"
-                    : "left-2 right-2 top-1 bottom-2"
-                  : resizeCorner
-                    ? "left-3 right-6 top-2.5 bottom-6"
-                    : "left-3 right-3 top-2.5 bottom-2.5",
-                !hasBody && !editing && "pointer-events-none",
-              )}
-              rows={compact ? 1 : undefined}
-              value={d.body ?? ""}
-              placeholder=""
-              spellCheck={false}
-              onChange={(e) => setBody(e.target.value)}
-              onFocus={() => setEditing(true)}
-              onBlur={() => setEditing(false)}
+          {mountEditor ? (
+            <TagRichTextEditor
+              content={editorContent}
+              editable
+              placeholder="输入标注内容…"
+              onUpdate={schedule}
+              onBlur={flush}
+              onEditor={bindEditor}
             />
-          )}
+          ) : !isEmpty ? (
+            <TagRichTextBodyView
+              storedBody={storedBody}
+              htmlDraft={draft}
+            />
+          ) : null}
         </div>
 
         {resizeCorner ? (
@@ -218,10 +265,10 @@ export function StoryPro2TagNode({ id, data, selected, height }: NodeProps) {
 
       <StoryPro2TagExpandModal
         open={expandOpen}
-        title={nodeLabel}
-        value={d.body ?? ""}
+        title={d.label?.trim() || defaultLabel}
+        value={editorContent}
         onClose={() => setExpandOpen(false)}
-        onSave={setBody}
+        onSave={(html) => flush(html)}
       />
     </div>
   );

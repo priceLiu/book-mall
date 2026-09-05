@@ -2,7 +2,7 @@
 
 import { ChevronDown, ChevronUp, Film } from "lucide-react";
 
-import type { JianyingLibtvClipSlot } from "@/lib/canvas/jianying-from-workspace";
+import type { JianyingLibtvAudioClipSlot, JianyingLibtvClipSlot } from "@/lib/canvas/jianying-from-workspace";
 import { moveClipOrderNodeIds } from "@/lib/canvas/jianying-from-workspace";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +40,8 @@ function ClipOrderThumbnail({ slot }: { slot: JianyingLibtvClipSlot }) {
 type Props = {
   slots: JianyingLibtvClipSlot[];
   orderNodeIds: string[];
+  /** 与 orderNodeIds 同序 · 第 N 镜对应的配音槽 */
+  pairedAudioByVideoIndex?: (JianyingLibtvAudioClipSlot | undefined)[];
   disabled?: boolean;
   onOrderChange: (orderNodeIds: string[]) => void;
   className?: string;
@@ -48,6 +50,7 @@ type Props = {
 export function JianyingClipOrderStrip({
   slots,
   orderNodeIds,
+  pairedAudioByVideoIndex,
   disabled = false,
   onOrderChange,
   className,
@@ -66,6 +69,7 @@ export function JianyingClipOrderStrip({
         {orderNodeIds.map((id, index) => {
           const slot = slotById.get(id);
           if (!slot) return null;
+          const pairedAudio = pairedAudioByVideoIndex?.[index];
           return (
             <div
               key={id}
@@ -100,6 +104,25 @@ export function JianyingClipOrderStrip({
               >
                 {slot.label}
               </p>
+              {pairedAudio?.hasAudio || pairedAudio?.hasLocalPreview ? (
+                <p
+                  className="line-clamp-2 px-0.5 text-[9px] leading-snug text-violet-200/80"
+                  title={pairedAudio.label}
+                >
+                  配音 · {pairedAudio.label}
+                </p>
+              ) : pairedAudio ? (
+                <p className="px-0.5 text-[9px] text-violet-200/45">配音 · 未生成</p>
+              ) : slot.dialogue?.trim() ? (
+                <p
+                  className="line-clamp-2 px-0.5 text-[9px] leading-snug text-emerald-200/75"
+                  title={slot.dialogue}
+                >
+                  {slot.dialogue}
+                </p>
+              ) : (
+                <p className="px-0.5 text-[9px] text-white/30">无对白</p>
+              )}
               <div className="flex items-center justify-center gap-0.5">
                 <button
                   type="button"

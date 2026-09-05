@@ -149,24 +149,7 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
     >
-      <Handle
-        id="plus_left"
-        type="source"
-        position={Position.Left}
-        className={cn(PRO2_NODE_HANDLE_CLASS, "pointer-events-none opacity-0")}
-      />
-      <Handle
-        id="style"
-        type="source"
-        position={Position.Right}
-        className={cn(
-          PRO2_NODE_HANDLE_CLASS,
-          showSidePlus
-            ? "pointer-events-none opacity-0"
-            : "opacity-0 pointer-events-none",
-        )}
-      />
-
+      {/* plus_left / style 出边由 Pro2NodeSidePlus 提供 */}
       <Pro2NodeSidePlus
         side="left"
         handleId="plus_left"
@@ -186,7 +169,7 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
         onPick={onSidePick("right")}
       />
 
-      {soleSelected ? (
+      {soleSelected && previewUrl ? (
         <Pro2ThinNodeToolbar style={{ top: -60 }} onDuplicateNode={onDuplicateNode} />
       ) : null}
 

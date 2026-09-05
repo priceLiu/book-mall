@@ -20,6 +20,21 @@ export const MEDIA_RENDER_MAX_CONCURRENT_PER_USER = envInt(
   "MEDIA_RENDER_MAX_CONCURRENT_PER_USER",
   2,
 );
+/** 长时间停留在 PENDING（未真正开剪）则回收，默认 2 分钟 */
+export const MEDIA_RENDER_STALE_PENDING_SEC = envInt(
+  "MEDIA_RENDER_STALE_PENDING_SEC",
+  120,
+);
+/** 上传阶段长时间无进展则回收，默认 10 分钟 */
+export const MEDIA_RENDER_UPLOAD_STALE_SEC = envInt(
+  "MEDIA_RENDER_UPLOAD_STALE_SEC",
+  600,
+);
+/** 单次 OSS 上传最长等待（multipart 卡住时强制失败并重试） */
+export const MEDIA_RENDER_UPLOAD_ATTEMPT_TIMEOUT_SEC = envInt(
+  "MEDIA_RENDER_UPLOAD_ATTEMPT_TIMEOUT_SEC",
+  180,
+);
 export const MEDIA_RENDER_JOB_TIMEOUT_SEC = envInt(
   "MEDIA_RENDER_JOB_TIMEOUT_SEC",
   900,
@@ -60,6 +75,22 @@ export function validateTimelineLimits(
       };
     }
   }
+  const composite = timeline.composite;
+  if (composite) {
+    if (composite.backgroundUrl && !/^https:\/\//i.test(composite.backgroundUrl)) {
+      return {
+        code: "INVALID_VIDEO_URL",
+        message: "背景视频须为 HTTPS 地址",
+      };
+    }
+    if (composite.audioUrl && !/^https:\/\//i.test(composite.audioUrl)) {
+      return {
+        code: "INVALID_AUDIO_URL",
+        message: "口播音轨须为 HTTPS 地址",
+      };
+    }
+  }
+
   const estimatedSec = timeline.clips.reduce(
     (sum, c) => sum + (c.durationSec && c.durationSec > 0 ? c.durationSec : 8),
     0,

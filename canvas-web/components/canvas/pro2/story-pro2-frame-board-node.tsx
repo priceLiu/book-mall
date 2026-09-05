@@ -6,6 +6,8 @@ import { Film } from "lucide-react";
 import { Handle, Position } from "@xyflow/react";
 
 import { useCanvasStore } from "@/lib/canvas/store";
+import { isPro2FrameBoardColumnVisualPlaceholder } from "@/lib/canvas/pro2-resolve-frame-board-group";
+import { resolvePro2BoardRowCancelScope } from "@/lib/canvas/use-canvas-generation-cancel-scope";
 import {
   PRO2_CARD_SHELL_CLASS,
   pro2NodeBorderColor,
@@ -26,8 +28,12 @@ export function StoryPro2FrameBoardNode({ id, data, selected }: NodeProps) {
     rows?: StoryProFrameRow[];
     hubNodeId?: string;
     pro2VisualGroupId?: string;
+    pro2PendingSyncGroupId?: string;
   };
-  const isVisualGroupPlaceholder = Boolean(d.pro2VisualGroupId);
+  const isVisualGroupPlaceholder = useMemo(
+    () => isPro2FrameBoardColumnVisualPlaceholder(id, nodes),
+    [id, nodes],
+  );
 
   const label = useMemo(() => {
     const hubs = nodes.filter((n) => n.type === "story-pro2-script-hub");
@@ -93,7 +99,7 @@ export function StoryPro2FrameBoardNode({ id, data, selected }: NodeProps) {
         style={{ borderColor: pro2NodeBorderColor(!!selected) }}
       >
         {anyRunning && !hasAnyImage ? (
-          <LibtvMediaGeneratingState variant="violet" />
+          <LibtvMediaGeneratingState variant="violet" cancelNodeId={id} />
         ) : sortedRows.length ? (
           <div className="nodrag min-h-0 flex-1 overflow-y-auto pr-0.5">
             <div className="grid grid-cols-2 gap-2">
@@ -108,6 +114,12 @@ export function StoryPro2FrameBoardNode({ id, data, selected }: NodeProps) {
                     focus.rowKey === row.key
                   }
                   onSelect={() => selectCell(row.key)}
+                  cancelScope={resolvePro2BoardRowCancelScope(nodes, {
+                    hubNodeId: d.hubNodeId,
+                    rowKey: row.key,
+                    mediaKind: "frameImage",
+                    taskId: row.runtime?.taskId,
+                  })}
                 />
               ))}
             </div>

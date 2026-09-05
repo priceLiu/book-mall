@@ -12,7 +12,14 @@ import {
 import { SBV1_REF_THUMB_BASE_CLASS, SBV1_REF_THUMB_CLASS } from "@/lib/canvas/sbv1-node-chrome";
 import { setMentionDragData } from "@/lib/canvas/mention-drag";
 import type { PortraitImportUiState } from "@/lib/canvas/portrait-node-data";
+import { isLikelyVideoUrl } from "@/lib/canvas/task-media-url";
 import { cn } from "@/lib/utils";
+
+function isDockVideoPreviewUrl(url: string): boolean {
+  const u = url.trim();
+  if (!u) return false;
+  return u.startsWith("blob:") || isLikelyVideoUrl(u);
+}
 
 const THUMB_ICON_SHADOW =
   "drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]";
@@ -101,13 +108,24 @@ export function DockUpstreamRefPreviewCard({
         onMouseLeave={() => setHover(null)}
       >
         {previewUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={previewUrl}
-            alt={label}
-            draggable={false}
-            className="h-full w-full object-cover"
-          />
+          isDockVideoPreviewUrl(previewUrl) ? (
+            <video
+              src={previewUrl}
+              muted
+              playsInline
+              preload="metadata"
+              draggable={false}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={previewUrl}
+              alt={label}
+              draggable={false}
+              className="h-full w-full object-cover"
+            />
+          )
         ) : (
           <div className="flex size-full items-center justify-center text-white/30">
             <ImageIcon className="size-4" />

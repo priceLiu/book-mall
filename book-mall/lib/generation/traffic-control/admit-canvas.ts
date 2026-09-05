@@ -7,11 +7,7 @@ import { computeCanvasQueueDispatchAfter } from "./queue-dispatch-after";
 import { resolveCanvasProjectTrafficScope, type TrafficScope } from "./scope-key";
 import { withTrafficStartedAtPayload } from "./traffic-timing";
 
-export function isCanvasVideoTrafficKind(payload: Record<string, unknown> | null): boolean {
-  if (!payload) return false;
-  const kind = typeof payload.kind === "string" ? payload.kind : "";
-  return kind === "video-engine" || kind === "ai-video-engine";
-}
+export { isCanvasVideoTrafficKind } from "@/lib/canvas/canvas-traffic-kind";
 
 /** 创建 QUEUED 画布视频任务（不 RESERVE、不调厂商） */
 export async function admitCanvasVideoTask(input: {

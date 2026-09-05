@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { bookMallReEnterHref } from "@/lib/platform-sso-links";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { storyLoginHref } from "@/lib/portal-auth-links";
 import { isSsoReenterSuppressedClient } from "@/lib/tools-logout-next-url";
 import {
   bumpSsoReenterAttempts,
@@ -11,26 +12,29 @@ import {
   readSsoReenterAttempts,
 } from "@/lib/sso-reenter-attempts";
 
-/** 未认证跳本域品牌登录页（不再弹主站），保留 redirect 回跳。 */
-function localLoginHref(): string {
-  const path =
-    typeof window !== "undefined"
-      ? window.location.pathname + window.location.search
-      : "/";
-  return `/login?redirect=${encodeURIComponent(path || "/")}`;
-}
-
 export function RequireAuth({ children }: { children: React.ReactNode }) {
+  const bookOrigin = useBookMallBaseUrl();
   const [ready, setReady] = useState(false);
   const [needsLogin, setNeedsLogin] = useState(false);
   const [exhausted, setExhausted] = useState(false);
+
+  const authEntryHref = () => {
+    const path =
+      typeof window !== "undefined"
+        ? window.location.pathname + window.location.search
+        : "/";
+    return storyLoginHref(path || "/", bookOrigin);
+  };
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
         const r = await fetch("/api/tools-session", { cache: "no-store" });
-        const j = (await r.json().catch(() => null)) as { active?: boolean } | null;
+        const j = (await r.json().catch(() => null)) as {
+          active?: boolean;
+          hasCookie?: boolean;
+        } | null;
         if (cancelled) return;
         if (j?.active) {
           clearSsoReenterAttempts();
@@ -41,20 +45,19 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
           setNeedsLogin(true);
           return;
         }
-        // 静默自动换票：连续 MAX 次仍未建立会话才停下并跳本域品牌登录页
         if (readSsoReenterAttempts() >= MAX_SSO_REENTER_ATTEMPTS) {
           setExhausted(true);
           setNeedsLogin(true);
           return;
         }
-        const path = typeof window !== "undefined" ? window.location.pathname : "/";
-        const reEnter = bookMallReEnterHref(path, "story");
-        if (reEnter) {
-          bumpSsoReenterAttempts();
-          window.location.href = reEnter;
+        // 无 tools_token 或已失效：统一走 Book re-enter（未登录会落到主站登录页）
+        const entry = authEntryHref();
+        if (entry.startsWith("/sso-error")) {
+          setNeedsLogin(true);
           return;
         }
-        window.location.href = localLoginHref();
+        bumpSsoReenterAttempts();
+        window.location.href = entry;
       } catch {
         if (!cancelled) setNeedsLogin(true);
       }
@@ -62,7 +65,9 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+    // bookOrigin 来自 layout Provider，首屏即有值
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookOrigin]);
 
   if (ready) return <>{children}</>;
 
@@ -72,14 +77,14 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
         <p className="text-sm">
           {exhausted
             ? "多次自动连接账号均未成功，请重新登录后继续使用。"
-            : "会话已退出，请重新登录。"}
+            : "使用此功能需要登录。"}
         </p>
         <button
           type="button"
           className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm text-white"
           onClick={() => {
             clearSsoReenterAttempts();
-            window.location.href = localLoginHref();
+            window.location.href = authEntryHref();
           }}
         >
           登录 / 注册

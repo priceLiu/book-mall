@@ -21,9 +21,14 @@ export async function GET(req: Request) {
     url.searchParams.get("appTag")?.trim().toLowerCase() ||
     "canvas";
   const appTag =
-    app === "e-commerce-toolkit" || app === "ecom-toolkit" ? "ecom" : app;
+    app === "e-commerce-toolkit" || app === "ecom-toolkit"
+      ? "ecom"
+      : app === "qr" || app === "quick-replica-web"
+        ? "quick-replica"
+        : app;
 
   const roleParam = url.searchParams.get("role")?.trim().toUpperCase();
+  const sceneKey = url.searchParams.get("sceneKey")?.trim() || undefined;
   const role: CanvasModelRole | undefined =
     roleParam === "LLM" || roleParam === "IMAGE" || roleParam === "VIDEO"
       ? roleParam
@@ -37,6 +42,7 @@ export async function GET(req: Request) {
     const models = await listModelsForApp({
       appTag,
       role,
+      sceneKey,
       persona: "PLATFORM_CREDIT",
       boundKinds,
     });
@@ -46,6 +52,7 @@ export async function GET(req: Request) {
   const models = await listModelsForApp({
     appTag,
     role,
+    sceneKey,
     persona: "BYOK",
     boundKinds,
   });

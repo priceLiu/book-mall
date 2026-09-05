@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 
+import { QrHoverEyeOverlay } from "@/components/quick-replica/qr-hover-eye-overlay";
 import { useIntersectionVisible } from "@/lib/use-intersection-visible";
 import type { QrTemplate } from "@/lib/qr-template-types";
 
@@ -21,7 +22,7 @@ export function QrWorldGalleryCard({
   template: QrTemplate;
   onSelect: () => void;
 }) {
-  const { ref, visible } = useIntersectionVisible<HTMLButtonElement>();
+  const { ref, visible } = useIntersectionVisible<HTMLDivElement>();
   const thumbUrl = template.thumbnailUrl?.trim();
   const showTitle = Boolean(template.title?.trim());
   const hint = readThumbHint(template);
@@ -42,13 +43,20 @@ export function QrWorldGalleryCard({
         : undefined;
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       ref={ref}
       onClick={onSelect}
-      className="group block w-full overflow-hidden rounded-xl bg-[#141820] text-left ring-1 ring-white/[0.08] transition hover:ring-white/20"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className="group block w-full cursor-pointer overflow-hidden rounded-xl bg-[#141820] text-left ring-1 ring-white/[0.08] transition hover:ring-white/20"
     >
-      <div className="relative w-full bg-zinc-900 leading-none">
+      <div className="group/media relative w-full bg-zinc-900 leading-none">
         {!visible || !thumbUrl ? (
           <div
             className="qr-skeleton w-full"
@@ -76,12 +84,13 @@ export function QrWorldGalleryCard({
               className="relative z-[1] block w-full max-w-full align-top transition duration-300 group-hover:scale-[1.01]"
               style={{ height: "auto" }}
             />
+            <QrHoverEyeOverlay src={thumbUrl} title={template.title} />
           </>
         )}
       </div>
       {showTitle ? (
         <p className="truncate px-2.5 py-2 text-xs font-medium text-white/90">{template.title}</p>
       ) : null}
-    </button>
+    </div>
   );
 }

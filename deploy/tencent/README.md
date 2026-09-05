@@ -1,6 +1,6 @@
 # 腾讯云部署说明
 
-本仓库已带好 **`book-mall/Dockerfile`**、**`tool-web/Dockerfile`**、**`finance-web/Dockerfile`**、**`story-web/Dockerfile`**、**`canvas-web/Dockerfile`**、**`gateway-web/Dockerfile`**、**`prompt-optimizer-platform/Dockerfile`**、**`e-commerce-toolkit/Dockerfile`**、**`quick-replica-web/Dockerfile`**（Next.js `standalone` 镜像；prompt 含上游 Vue vendor 多阶段构建）。  
+本仓库已带好 **`book-mall/Dockerfile`**、**`tool-web/Dockerfile`**、…、**`common-tools/Dockerfile`**、**`publisher-web/Dockerfile`**（Next.js `standalone` 镜像；prompt 与 director 含上游 vendor 多阶段构建）。  
 在腾讯云 **自动构建、自动部署** 的场景下，你 **不必** 在自己电脑上执行 `docker compose`，也不必 SSH 上服务器敲命令——流水线会在每次推送后构建镜像并发布。
 
 > **第一次开服务 / 重建服务**：直接看 **[`cloudbase-build-guide.md`](./cloudbase-build-guide.md)**（控制台逐步流程、字段对照、环境变量、验收清单、故障排查）。本文档保留为概览。
@@ -48,14 +48,14 @@ priceLiu/book-mall（一个 Git 仓库，推送后云构建可选这一条）
 
 若你用的是腾讯云 **云托管 CloudBase Run**（控制台「新版云托管」），字段名称与官方文档 **[云托管服务设置](https://cloud.tencent.com/document/product/1243/77197)** 一致。同一 Git 仓库请创建 **四个服务**；从 Git 自动构建可参考 **[通过 Git 仓库部署](https://docs.cloudbase.net/run/deploy/deploy/deploying-git)**。
 
-| 控制台配置项 | 主站 | 工具站 | **财务控制台** | **漫剧 story-web** | **canvas-web** | **gateway-web** | **提示词优化器** | **电商工具箱** |
-|-------------|------|--------|----------------|-------------------|----------------|-----------------|------------------|----------------|
-| **Git 仓库** | `priceLiu/book-mall` | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 |
-| **分支** | `main` | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 |
-| **目标目录** | `book-mall` | `tool-web` | `finance-web` | `story-web` | `canvas-web` | `gateway-web` | **`prompt-optimizer-platform`** | **`e-commerce-toolkit`** | **`quick-replica-web`** |
-| **Dockerfile** | 默认 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 |
-| **容器监听端口** | **3000** | **3001** | **3002** | **3003** | **3004** | **3005** | **3006** | **3007** | **3008** |
-| **自定义域（示例）** | `book.ai-code8.com` | `tool.ai-code8.com` | `f.ai-code8.com` | `story.ai-code8.com` | `canvas.ai-code8.com` | `gateway.ai-code8.com` | **`prompt.ai-code8.com`** | **`ecom.ai-code8.com`** | **`replica.ai-code8.com`** |
+| 控制台配置项 | 主站 | 工具站 | **财务控制台** | **漫剧 story-web** | **canvas-web** | **gateway-web** | **提示词优化器** | **电商工具箱** | **快速复制** | **3D导演台** |
+|-------------|------|--------|----------------|-------------------|----------------|-----------------|------------------|----------------|--------------|--------------|
+| **Git 仓库** | `priceLiu/book-mall` | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 |
+| **分支** | `main` | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 |
+| **目标目录** | `book-mall` | `tool-web` | `finance-web` | `story-web` | `canvas-web` | `gateway-web` | **`prompt-optimizer-platform`** | **`e-commerce-toolkit`** | **`quick-replica-web`** | **`director-web`** | **`common-tools`** |
+| **Dockerfile** | 默认 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 |
+| **容器监听端口** | **3000** | **3001** | **3002** | **3003** | **3004** | **3005** | **3006** | **3007** | **3008** | **3009** | **3010** |
+| **自定义域（示例）** | `book.ai-code8.com` | `tool.ai-code8.com` | `f.ai-code8.com` | `story.ai-code8.com` | `canvas.ai-code8.com` | `gateway.ai-code8.com` | **`prompt.ai-code8.com`** | **`ecom.ai-code8.com`** | **`cp.ai-code8.com`** | **`director.ai-code8.com`** | **`com.ai-code8.com`** |
 
 要点：
 
@@ -141,6 +141,14 @@ priceLiu/book-mall（一个 Git 仓库，推送后云构建可选这一条）
 - **`TOOLS_SSO_SERVER_SECRET`、`TOOLS_SSO_JWT_SECRET`（与主站完全一致；缺则 SSO `missing_exchange_secret`）**
 - `NEXT_PUBLIC_STORY_WEB_ORIGIN=https://story.ai-code8.com`
 
+**AI 海报画布 `canvas-web`**（至少）：
+
+- `MAIN_SITE_ORIGIN=https://book.ai-code8.com`
+- `NEXT_PUBLIC_BOOK_MALL_URL=https://book.ai-code8.com`
+- **`TOOLS_SSO_SERVER_SECRET`、`TOOLS_SSO_JWT_SECRET`（与主站完全一致；缺则门户登录 503 / 退出 federated 链异常）**
+- `NEXT_PUBLIC_CANVAS_WEB_ORIGIN=https://canvas.ai-code8.com`
+- `CANVAS_PUBLIC_ORIGIN=https://canvas.ai-code8.com`
+
 **提示词优化器 `prompt-optimizer-platform`**（至少）：
 
 - `MAIN_SITE_ORIGIN=https://book.ai-code8.com`
@@ -148,7 +156,7 @@ priceLiu/book-mall（一个 Git 仓库，推送后云构建可选这一条）
 - `PROMPT_OPTIMIZER_PUBLIC_ORIGIN=https://prompt.ai-code8.com`
 - `NEXT_PUBLIC_GATEWAY_WEB_ORIGIN=https://gateway.ai-code8.com`
 
-对照文件：`deploy/tencent/book-mall.env.example`、`tool-web.env.example`、**`finance-web.env.example`**、**`story-web.env.example`**、**`prompt-optimizer-platform.env.example`**。  
+对照文件：`deploy/tencent/book-mall.env.example`、`tool-web.env.example`、**`finance-web.env.example`**、**`story-web.env.example`**、**`canvas-web.env.example`**、**`prompt-optimizer-platform.env.example`**。  
 更全说明见仓库根目录 [`DEPLOY.md`](../../DEPLOY.md)。
 
 ### 3. SSO / 域名要点
@@ -181,6 +189,7 @@ docker compose up -d --build
 - **story-web** 使用 Node 22，结构与 finance-web 相同。
 - **book-mall** 云端自动剪辑（Media Render）与电商分镜合并依赖容器内 **ffmpeg** / **ffprobe**；镜像须预装（与历史 `ecomMergeStoryboardPanelVideos` 相同）。定时清理过期成片：`pnpm media-render:expire`。
 - **Gateway 模型注册表**：`migrate deploy` 后若出现「模型未在 Gateway 注册」500（如试衣 `aitryon`），在 book-mall 执行一次 `pnpm gateway:seed-registry`（脚本内带 `--confirm`）。日常核查：`pnpm gateway:audit-gaps`、`pnpm gateway:verify-registry`。用户操作见 `docs/自动剪辑.md`。
+- **DeepSeek 凭证归口**：平台代付 DEEPSEEK 仅在 **Gateway 控制台**（`:3005/dashboard/models`）绑定厂商 Key；**勿**在 book-mall `.env` 配置 `DEEPSEEK_API_KEY` 直连。历史 **`canvas`** 命名 Key（`sk-918f…`）**已于 2026-08-24 删除**；现网 DeepSeek 控制台 Key 名为 **`book mall`**（`sk-f9ddd…`，原 bilibili），经 Gateway 绑定。发版前跑 `book-mall/scripts/audit-legacy-deepseek-canvas-key.ts`。
 
 ---
 
@@ -210,3 +219,61 @@ docker compose up -d --build
 | `pnpm --dir book-mall hotcold:archive -- --only=gateway` | **每 15–30 分钟** | R3：终态 Gateway 日志迁入归档（默认热保留 1h） |
 
 详见 `book-mall/doc/product/gen-hotcold-policy.md`。
+
+---
+
+## 七、book-mall 积分清零 Cron（Credit Expiry Ops）
+
+生产 **CloudBase 定时 HTTP**（鉴权 `Authorization: Bearer <CREDITS_CRON_SECRET>`，缺省回退 `CRON_SECRET`）：
+
+| 时间 (CST) | 路径 | 说明 |
+|------------|------|------|
+| 00:05 | `POST /api/admin/credits/ops/generate-work-items?includeOverdue=1` | 生成/更新当日与逾期工单 |
+| 00:15 | `POST /api/admin/credits/ops/run-daily?phase=expire` | 批次到期清扫 + 回写工单 |
+| 00:30 | `POST /api/admin/credits/ops/run-daily?phase=reset` | 订阅 31 天刷新 + 回写工单 |
+
+兼容旧路径（内部转调 ops 层）：`/api/admin/credits/expire-sweep`、`/api/admin/credits/monthly-reset`。
+
+运维监控：finance-web **`/admin/credit-expiry-ops`**（见 `docs/积分清零控制台.md`）。
+
+`vercel.json` 中同名 cron 仅作 Vercel 部署备用，**不以之为 CloudBase 唯一依赖**。
+
+---
+
+## 八、book-mall AI 小智热闻 Cron（全平台共用）
+
+生产 **CloudBase 定时 HTTP**（鉴权 `Authorization: Bearer <CRON_SECRET>`）：
+
+| 时间 (CST) | 路径 | 说明 |
+|------------|------|------|
+| 06:30 | `POST /api/internal/platform-assistant/ai-news/generate` | 预生成当日 AI 热闻（Gateway 百炼） |
+| 12:30 | 同上 | 覆盖刷新当日热闻 |
+| 18:30 | 同上 | 覆盖刷新当日热闻 |
+
+本地手动：`pnpm --dir book-mall platform-assistant:ai-news-generate`，或 **book-mall 管理驾驶舱** →「立即生成今日热闻」（无需额外 Key，走 Gateway 百炼 LLM）。
+
+读路径：`GET /api/platform-assistant/ai-news` **只读 DB**；保留最近 3 天。详见 `book-mall/doc/product/platform-assistant-ai-news-and-canvas-portal.md`。
+
+---
+
+## 九、全站访问统计（Phase 1）
+
+各子应用 middleware 异步 `POST book-mall/api/internal/platform-traffic/hit`。
+
+**零新增 env**：鉴权复用 SSO 部署已有变量 — `Authorization: Bearer <TOOLS_SSO_SERVER_SECRET>` 或 `GATEWAY_SSO_SERVER_SECRET`（Gateway 控制台仅后者；book 侧两者皆可）。上报目标 Book Origin 复用 `MAIN_SITE_ORIGIN` / `NEXT_PUBLIC_BOOK_MALL_URL` / `BOOK_MALL_URL` / `NEXTAUTH_URL` 等已有变量。
+
+管理后台：**book-mall** `/admin/traffic`。IP 明细保留 90 天（`pnpm --dir book-mall tsx scripts/platform-traffic-purge-old.ts`）。详见 `book-mall/doc/product/26-platform-traffic-analytics.md`。
+
+---
+
+## 十、book-mall 首页静态快照 Cron
+
+生产 **CloudBase 定时 HTTP**（鉴权 `Authorization: Bearer <CRON_SECRET>`）：
+
+| 时间 (CST) | 路径 | 说明 |
+|------------|------|------|
+| 05:30 | `POST /api/internal/static-snapshots/generate?pageKey=all` | 预生成当日 **主站首页** + **画布门户首页** 快照 |
+
+本地手动：`pnpm --dir book-mall site-home:snapshot-generate` / `canvas-home:snapshot-generate`，或 **book-mall 管理后台** `/admin/static-snapshots`。
+
+读路径：主站 ISR + 画布门户 SSR 读 `StaticPageSnapshot`；公开 API `GET /api/public/static-snapshots/site-home` · `canvas-home`。详见 `book-mall/doc/product/site-home-static-snapshot.md`。

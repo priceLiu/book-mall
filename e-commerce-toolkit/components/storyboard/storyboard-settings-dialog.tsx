@@ -33,6 +33,7 @@ export type StoryboardSettingsValue = {
   videoR2vRatio?: string;
   videoSeed?: string;
   videoPromptExtend?: boolean;
+  videoGenerateAudio?: boolean;
 };
 
 type Props = {
@@ -152,20 +153,9 @@ export function StoryboardSettingsDialog({
             </div>
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-bold text-[#1d1d1f]">
-              成片时长 {value.durationSec}s
-            </label>
-            <input
-              type="range"
-              min={4}
-              max={15}
-              value={value.durationSec}
-              onChange={(e) => onChange({ durationSec: Number(e.target.value) })}
-              className="w-full"
-            />
-            <p className="mt-1 text-xs text-[#86868b]">整图成片模式使用此时长；分镜合并按各镜头时长拼接。</p>
-          </div>
+          <p className="text-xs leading-relaxed text-[#86868b]">
+            成片时长与视频模型请在点击「整图成片」或单镜「生成视频」时，于模型选择弹层中确认。
+          </p>
         </div>
 
         <DialogFooter>

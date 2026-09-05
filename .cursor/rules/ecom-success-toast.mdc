@@ -1,0 +1,30 @@
+---
+description: 电商工具箱 · 成功/进度类提示须 toast，禁止阻塞 alert
+globs: e-commerce-toolkit/**/*
+alwaysApply: false
+---
+
+# 成功提示 · Toast（电商工具箱强制）
+
+权威文档：**`e-commerce-toolkit/design/DIALOG.md`**
+
+## 必须
+
+| 场景 | 用法 |
+|------|------|
+| 生成/合成/保存 **成功** | `useDialogs().toast({ variant: "success", ... })` |
+| 转入后台、批量完成等 **非阻塞说明** | `toast({ ... })`（默认 variant） |
+| 失败、缺参、须用户阅读多行错误 | `await alert({ variant: "error", ... })` |
+| 确认/删除 | `confirm` / `doubleConfirm` |
+
+**禁止**对「已生成」「完成」「已保存」等成功路径使用 `await alert()`（须点「知道了」）。
+
+## 实现
+
+- 组件：`components/dialogs/ecom-toast.tsx` → `EcomToastHost` 固定右下角 `z-[400]`，默认 **6s** 自动消失
+- 与 `BackgroundGenerationDock`（`z-[200]`）共存；完成通知用 toast，不用 Dock 内二次弹层
+
+## Code Review
+
+- PR 新增 `await alert({ title: "…已生成/完成/已保存" })` → **驳回**，改 toast
+- 后台任务 `onSucceeded` 回调禁止 `await onAlert` 成功提示

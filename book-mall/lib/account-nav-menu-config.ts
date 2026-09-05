@@ -1,13 +1,15 @@
 import type { LucideIcon } from "lucide-react";
 import type { BillingPersona } from "@prisma/client";
 import {
+  Boxes,
   Copy,
   CreditCard,
   GraduationCap,
   Home,
-  Key,
   LayoutGrid,
   LogOut,
+  MonitorSmartphone,
+  Send,
   Settings,
   Shield,
   Sparkles,
@@ -19,7 +21,11 @@ import {
   ScrollText,
   Activity,
   Gift,
+  Wand2,
+  Users,
 } from "lucide-react";
+
+import type { ReferralSharePersona } from "@/lib/referral/referral-share-persona";
 
 export type AccountNavLinkItem = {
   kind: "link";
@@ -78,17 +84,26 @@ function financeNavItem(
 export function buildAccountNavMenuGroups(input: {
   isAdmin: boolean;
   billingPersona: BillingPersona | null;
-  /** 任意有效订阅（个人套餐或团队 OWNER）显示分享返佣入口；团队非 OWNER 成员不显示 */
+  /** 任意有效订阅（个人套餐或团队 OWNER）显示分享入口；团队 ADMIN/MEMBER 不显示 */
   showReferral?: boolean;
+  sharePersona?: ReferralSharePersona;
 }): AccountNavMenuGroup[] {
-  const isByok = input.billingPersona === "BYOK";
   const isPlatform = input.billingPersona === "PLATFORM_CREDIT" || !input.billingPersona;
 
   const appItems: AccountNavMenuItem[] = [
+    {
+      kind: "link",
+      href: "/account/ai-space",
+      label: "我的 AI 空间",
+      icon: Boxes,
+      openInNewTab: true,
+    },
+    { kind: "action", id: "launch-common-tools", label: "常用工具", icon: Wand2 },
     { kind: "action", id: "launch-tools", label: "AI 工具站", icon: Wrench },
     { kind: "action", id: "launch-canvas", label: "AI 画布", icon: LayoutGrid },
     { kind: "action", id: "launch-ecom", label: "电商工具箱", icon: LayoutGrid },
-    { kind: "action", id: "launch-quick-replica", label: "快速复制", icon: Copy },
+    { kind: "action", id: "launch-quick-replica", label: "快速复刻", icon: Copy },
+    { kind: "action", id: "launch-publisher", label: "一键发布", icon: Send },
   ];
 
   const billingItems: AccountNavMenuItem[] = [
@@ -97,14 +112,9 @@ export function buildAccountNavMenuGroups(input: {
     financeNavItem("/fees/billing/details", "/account/fees/details", "费用明细", Receipt),
     financeNavItem("/fees/billing/ledger", "/account/fees/ledger", "积分流水", ScrollText),
   ];
-  if (isByok) {
-    billingItems.push(
-      financeNavItem("/fees/billing/byok", "/account/fees/byok", "BYOK 任务用量", Key),
-    );
-    billingItems.push({ kind: "link", href: "/account/byok", label: "自带 Key 管理", icon: Key });
-  }
   if (isPlatform) {
-    billingItems.push({ kind: "link", href: "/pricing", label: "会员套餐", icon: CreditCard });
+    billingItems.push({ kind: "link", href: "/pricing", label: "订阅价格", icon: CreditCard });
+    billingItems.push({ kind: "link", href: "/pricing/api", label: "API 价格", icon: CreditCard });
   }
   billingItems.push({
     kind: "link",
@@ -113,11 +123,19 @@ export function buildAccountNavMenuGroups(input: {
     icon: Wallet,
   });
   if (input.showReferral) {
+    const shareLabel =
+      input.sharePersona === "team_owner" ? "分享邀请" : "分享得积分";
+    billingItems.push({
+      kind: "action",
+      id: "referral-share",
+      label: shareLabel,
+      icon: Gift,
+    });
     billingItems.push({
       kind: "link",
       href: "/account/referral",
-      label: "分享返佣",
-      icon: Gift,
+      label: "邀请明细",
+      icon: Users,
     });
   }
 
@@ -160,16 +178,8 @@ export function buildAccountNavMenuGroups(input: {
   const accountItems: AccountNavMenuItem[] = [
     { kind: "link", href: "/account", label: "概览", icon: User, exact: true },
     { kind: "link", href: "/account/security", label: "账户与安全", icon: Shield, exact: true },
+    { kind: "link", href: "/account/devices", label: "已登录设备", icon: MonitorSmartphone, exact: true },
   ];
-
-  if (isByok) {
-    accountItems.push({
-      kind: "link",
-      href: "/account/gateway",
-      label: "Gateway API Key",
-      icon: Key,
-    });
-  }
 
   accountItems.push(
     { kind: "link", href: "/", label: "返回商城首页", icon: Home },

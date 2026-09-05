@@ -9,6 +9,8 @@ import {
   PRODUCTION_MAIN_SITE_ORIGIN,
   shouldEnforceProductionHttps,
 } from "@/lib/production-origin";
+import { fireTrafficHitFromRequest } from "@/lib/platform-traffic";
+import { shouldRecordTrafficHit } from "@/lib/platform-traffic/should-record-traffic-hit";
 
 function incomingHost(request: NextRequest): string {
   const xf = request.headers.get("x-forwarded-host");
@@ -82,6 +84,36 @@ function enforceProductionHttpsRedirect(request: NextRequest): NextResponse | nu
 }
 
 export default async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  const recordTraffic = shouldRecordTrafficHit({
+    method: request.method,
+    pathname: path,
+    search: request.nextUrl.search,
+    excludeAdmin: true,
+  });
+
+  const needsAuth =
+    path === "/account" ||
+    path.startsWith("/account/") ||
+    path === "/admin" ||
+    path.startsWith("/admin/");
+
+  let sessionToken: Awaited<ReturnType<typeof getToken>> | null = null;
+  if (recordTraffic || needsAuth) {
+    sessionToken = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
+  }
+
+  if (recordTraffic) {
+    fireTrafficHitFromRequest("book", request, {
+      excludeAdmin: true,
+      userId: sessionToken?.sub ?? null,
+      cookies: request.cookies,
+    });
+  }
+
   const httpsRedirect = enforceProductionHttpsRedirect(request);
   if (httpsRedirect) {
     return withProductionSecurityHeaders(httpsRedirect, request);
@@ -90,7 +122,6 @@ export default async function middleware(request: NextRequest) {
   const early = canonicalBookHostRedirect(request);
   if (early) return withProductionSecurityHeaders(early, request);
 
-  const path = request.nextUrl.pathname;
   if (path.startsWith("/invite/")) {
     const res = NextResponse.next();
     res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
@@ -98,17 +129,8 @@ export default async function middleware(request: NextRequest) {
     return withProductionSecurityHeaders(res, request);
   }
 
-  const needsAuth =
-    path === "/account" ||
-    path.startsWith("/account/") ||
-    path === "/admin" ||
-    path.startsWith("/admin/");
-
   if (needsAuth) {
-    const token = await getToken({
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET,
-    });
+    const token = sessionToken;
 
     if (!token?.sub) {
       const loginUrl = buildBookMallLoginRedirectUrl(

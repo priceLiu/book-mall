@@ -8,7 +8,10 @@ import {
   libtvRuntimeErrorAlertScope,
   markLibtvRuntimeErrorAlertShown,
 } from "./libtv-runtime-error-alert";
-import { isMislabeledVendorSuccessError } from "./friendly-task-error";
+import {
+  formatCanvasTaskError,
+  isMislabeledVendorSuccessError,
+} from "./friendly-task-error";
 
 /** @deprecated 错误条改为仅手动关闭，避免用户错过失败原因 */
 export const LIBTV_RUNTIME_ERROR_AUTO_DISMISS_MS = 0;
@@ -20,6 +23,7 @@ export function useLibtvRuntimeErrorBanner(opts: {
   failCode?: string;
   failMessage?: string;
   dismissedFailTaskId?: string;
+  modelKey?: string;
   autoDismissMs?: number;
   /** 节点已有成片 · 不展示错误条（避免 success 误标失败挡住视频） */
   hasMedia?: boolean;
@@ -70,6 +74,7 @@ export function useLibtvRuntimeErrorBanner(opts: {
       opts.hasMedia ||
       opts.status !== "error" ||
       !msg ||
+      opts.failCode?.trim() === "USER_CANCELLED" ||
       isMislabeledVendorSuccessError(opts.failCode, msg) ||
       msg.includes("视频已生成但未写入节点")
     ) {
@@ -85,7 +90,7 @@ export function useLibtvRuntimeErrorBanner(opts: {
       setVisible(false);
       return;
     }
-    setMessage(msg);
+    setMessage(formatCanvasTaskError(opts.failCode, msg, opts.modelKey));
     setVisible(true);
     const autoDismissMs = opts.autoDismissMs ?? LIBTV_RUNTIME_ERROR_AUTO_DISMISS_MS;
     if (autoDismissMs > 0) {
@@ -100,6 +105,7 @@ export function useLibtvRuntimeErrorBanner(opts: {
     opts.dismissedFailTaskId,
     opts.autoDismissMs,
     opts.hasMedia,
+    opts.modelKey,
   ]);
 
   return { visible, message, dismiss };

@@ -11,8 +11,10 @@ import {
   mapGatewayPreCreateLogError,
 } from "@/lib/gateway/proxy-common";
 import { pickVolcengineCredentialForGatewayJob } from "@/lib/gateway/volcengine-credential-pick";
-import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
-import { buildBailianR2vRequestBody } from "@/lib/canvas/bailian-r2v-body";
+import { pickAiSpaceS2vCredentialId } from "@/lib/ai-space/ai-space-gateway-auth";
+import { isDashscopeWan30VideoModelKey } from "@/lib/gateway/dashscope-client";
+import { buildGatewayInputSummary, buildDashscopeCreateTaskInputForLog } from "@/lib/gateway/log-input-summary";
+import { buildBailianR2vRequestBody, enrichBailianR2vInputForLog } from "@/lib/canvas/bailian-r2v-body";
 import {
   routeGatewayModel,
   UnknownGatewayModelError,
@@ -22,6 +24,7 @@ import {
   parseGatewayClientSource,
   submitBailianR2vJobForLog,
   submitDashscopeKlingV3ImageJobForLog,
+  submitDashscopeMultimodalImageSyncForLog,
   submitDashscopeTryOnJobForLog,
   submitDashscopeVideoJobForLog,
   submitDashscopeWan27ImageJobForLog,
@@ -29,14 +32,18 @@ import {
   submitHunyuanJobForLog,
 } from "@/lib/gateway/poll-service";
 import { submitTopazVideoJobForLog } from "@/lib/gateway/topaz-jobs";
+import { submitMinimaxVideoJobForLog } from "@/lib/gateway/minimax-video-jobs";
 import { runGatewayV1KieCreateTask } from "@/lib/gateway/gateway-v1-kie-task-service";
 import { submitVolcengineVideoJobForLog } from "@/lib/gateway/volcengine-jobs";
 import { VolcengineUpstreamError } from "@/lib/gateway/volcengine-client";
 import { buildSubmitFailureFinalizePayload } from "@/lib/gateway/gateway-submit-error-policy";
 import { prisma } from "@/lib/prisma";
+import { extractVendorRequestIdFromText } from "@/lib/gateway/vendor-request-id";
 import {
-  extractVendorRequestIdFromText,
-} from "@/lib/gateway/vendor-request-id";
+  acquireGatewayStoryTaskCreateLock,
+  dedupeGatewayCreateByStoryTaskId,
+  releaseGatewayStoryTaskCreateLock,
+} from "@/lib/gateway/gateway-v1-story-task-dedup";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +76,7 @@ export async function POST(request: NextRequest) {
 
   let body: {
     model?: string;
+    gatewayModelKey?: string;
     input?: Record<string, unknown>;
     callBackUrl?: string | null;
     bailian?: {
@@ -81,7 +89,7 @@ export async function POST(request: NextRequest) {
       parameterExtras?: Record<string, unknown>;
     };
     dashscope?: {
-      jobKind?: "tryon" | "wanx" | "video" | "wan27-image" | "kling-v3-image";
+      jobKind?: "tryon" | "wanx" | "video" | "wan27-image" | "kling-v3-image" | "multimodal-image-sync";
       personImageUrl?: string;
       topGarmentUrl?: string;
       bottomGarmentUrl?: string;
@@ -97,6 +105,16 @@ export async function POST(request: NextRequest) {
       contentOrder?: "text-first" | "images-first";
       aspectRatio?: "16:9" | "9:16" | "1:1";
       resolution?: "1k" | "2k" | "4k";
+      parameters?: {
+        negative_prompt?: string;
+        prompt_extend?: boolean;
+        prompt_extend_mode?: "direct" | "agent";
+        enable_thinking?: boolean;
+        watermark?: boolean;
+        seed?: number;
+        n?: number;
+        size?: string;
+      };
     };
     hunyuan?: {
       prompt?: string;
@@ -118,14 +136,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const model = body.model?.trim() ?? "";
-  if (!model) {
+  const kieUpstreamModel = body.model?.trim() ?? "";
+  const gatewayModelKey = body.gatewayModelKey?.trim() || kieUpstreamModel;
+  if (!kieUpstreamModel) {
     return NextResponse.json({ error: "model required" }, { status: 400 });
   }
+  /** 路由 / 凭证 / 非 KIE 分支使用的登记 modelKey */
+  const model = gatewayModelKey;
 
   let route;
   try {
-    route = routeGatewayModel(model);
+    route = routeGatewayModel(gatewayModelKey);
   } catch (e) {
     if (e instanceof UnknownGatewayModelError) {
       return NextResponse.json({ error: e.message }, { status: 400 });
@@ -139,7 +160,7 @@ export async function POST(request: NextRequest) {
     ? ({ providerKind: "BAILIAN", requestKind: "VIDEO" } as const)
     : route;
 
-  const credentialId =
+  let credentialId =
     route.providerKind === "VOLCENGINE" &&
     route.requestKind === "VIDEO" &&
     !isBailianR2vModel
@@ -153,6 +174,10 @@ export async function POST(request: NextRequest) {
           auth.credentials,
           effectiveRoute.providerKind,
         );
+  if (isDashscopeWan30VideoModelKey(model)) {
+    credentialId =
+      (await pickAiSpaceS2vCredentialId(auth)) ?? credentialId;
+  }
   if (!credentialId) {
     return NextResponse.json(
       {
@@ -173,7 +198,8 @@ export async function POST(request: NextRequest) {
       const created = await runGatewayV1KieCreateTask({
         auth,
         body: {
-          model,
+          model: kieUpstreamModel,
+          gatewayModelKey,
           input: body.input,
           callBackUrl: body.callBackUrl ?? null,
         },
@@ -199,6 +225,7 @@ export async function POST(request: NextRequest) {
 
   const isBailianR2v = isBailianR2vModel;
   const b = body.bailian ?? {};
+  const dsForLog = body.dashscope as Record<string, unknown> | undefined;
   const inputForLog: Record<string, unknown> = isBailianR2v
     ? (() => {
         const prompt = String(b.prompt ?? body.input?.prompt ?? "").trim();
@@ -218,13 +245,35 @@ export async function POST(request: NextRequest) {
           seedStr: typeof b.seedStr === "string" ? b.seedStr : undefined,
           parameterExtras: b.parameterExtras,
         });
-        return {
-          ...built.input,
-          parameters: built.parameters,
-          referenceImageUrls,
-        };
+        return enrichBailianR2vInputForLog(built, referenceImageUrls);
       })()
-    : (body.input ?? {});
+    : dsForLog && typeof dsForLog === "object"
+      ? buildDashscopeCreateTaskInputForLog(
+          dsForLog,
+          body.input as Record<string, unknown> | undefined,
+        )
+      : (body.input ?? {});
+
+  const storyTaskId = logMeta.storyTaskId?.trim();
+  if (storyTaskId) {
+    await acquireGatewayStoryTaskCreateLock(storyTaskId);
+  }
+  try {
+    if (storyTaskId) {
+      const hit = await dedupeGatewayCreateByStoryTaskId(storyTaskId, {
+        waitMs: 0,
+      });
+      if (hit !== "not_found" && hit !== "in_progress") {
+        return NextResponse.json({
+          code: 200,
+          data: {
+            taskId: hit.taskId,
+            logId: hit.logId,
+            providerKind: effectiveRoute.providerKind,
+          },
+        });
+      }
+    }
 
   let log;
   try {
@@ -432,6 +481,26 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      if (jobKind === "multimodal-image-sync") {
+        const content = Array.isArray(ds.content) ? ds.content : [];
+        const taskId = await submitDashscopeMultimodalImageSyncForLog({
+          logId: log.id,
+          credentialId,
+          model,
+          content,
+          parameters: ds.parameters,
+        });
+        return NextResponse.json({
+          code: 200,
+          data: {
+            taskId,
+            logId: log.id,
+            providerKind: "DASHSCOPE",
+            sync: true,
+          },
+        });
+      }
+
       const prompt = String(ds.prompt ?? body.input?.prompt ?? "").trim();
       if (!prompt) {
         return NextResponse.json({ error: "prompt required" }, { status: 400 });
@@ -470,6 +539,20 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    if (route.providerKind === "MINIMAX" && route.requestKind === "VIDEO") {
+      const minimaxInput = (body.input ?? {}) as Record<string, unknown>;
+      const taskId = await submitMinimaxVideoJobForLog({
+        logId: log.id,
+        credentialId,
+        model,
+        input: minimaxInput,
+      });
+      return NextResponse.json({
+        code: 200,
+        data: { taskId, logId: log.id, providerKind: "MINIMAX" },
+      });
+    }
+
     return NextResponse.json(
       { error: "Unsupported async job provider" },
       { status: 400 },
@@ -487,5 +570,10 @@ export async function POST(request: NextRequest) {
       await finalizeRequestLog(log.id, finalizePayload).catch(() => undefined);
     }
     return NextResponse.json({ error: msg }, { status: 502 });
+  }
+  } finally {
+    if (storyTaskId) {
+      await releaseGatewayStoryTaskCreateLock(storyTaskId);
+    }
   }
 }

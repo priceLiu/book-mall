@@ -5,6 +5,7 @@
  * 这里是不依赖外部 poll-loop 是否存活、也不依赖是否有人打开 Logs 页的「定时巡检」，
  * 每 `GATEWAY_VIDEO_WATCHDOG_RESIDENT_INTERVAL_MS`（默认 30s）跑一次：
  *  1. runGatewayVideoWatchdog —— 火山在途视频按检查点向厂商核对并收口；
+ *  1b. runGatewayKieWatchdog —— KIE 异步（生图/音频/视频）进程内复核 + 通道诊断；
  *  2. runGatewayPollWorker —— 推进所有异步在途任务：轮询火山 / 其它厂商，并对
  *     KIE（回调型）做 backstop 补捞，同时内部已包含 expireStaleGatewayLogs 卡死收口。
  *     这样即便 `gateway:poll-loop` 进程没起（如 `dev:all --no-poll`）、或本地收不到
@@ -66,7 +67,26 @@ export function startResidentGatewayVideoWatchdog(): void {
         await runGatewayVideoWatchdog({ source: "resident-scheduler" });
       } catch (e) {
         console.warn(
-          "[gateway-watchdog] resident tick failed",
+          "[gateway-watchdog] resident video tick failed",
+          e instanceof Error ? e.message : String(e),
+        );
+      }
+      try {
+        const { runGatewayKieWatchdog } = await import(
+          "@/lib/gateway/gateway-kie-watchdog"
+        );
+        const kie = await runGatewayKieWatchdog({ source: "resident-scheduler" });
+        if (
+          kie.ran &&
+          ((kie.recovered ?? 0) > 0 ||
+            (kie.failed ?? 0) > 0 ||
+            (kie.dbRetried ?? 0) > 0)
+        ) {
+          console.info("[gateway-kie-watchdog] resident tick", kie);
+        }
+      } catch (e) {
+        console.warn(
+          "[gateway-kie-watchdog] resident tick failed",
           e instanceof Error ? e.message : String(e),
         );
       }

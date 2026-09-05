@@ -8,8 +8,10 @@ import {
   logMetaToRequestLogFields,
 } from "@/lib/gateway/gateway-v1-log-meta";
 import { parseGatewayClientSource } from "@/lib/gateway/poll-service";
+import { wrapChatStreamWithLogFinalize } from "@/lib/gateway/gateway-chat-stream-finalize";
 import {
   createRequestLog,
+  finalizeRequestLog,
   forwardChatCompletionsStream,
   mapGatewayPreCreateLogError,
   pickCredentialForKind,
@@ -92,18 +94,57 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: mapped.error }, { status: mapped.status });
     }
 
-    const result = await forwardChatCompletionsStream({
-      credentialId,
-      providerKind: route.providerKind,
-      body,
-    });
-    return new NextResponse(result.body, {
-      status: result.status,
-      headers: {
-        "Content-Type": "text/event-stream",
-        "x-gateway-log-id": log.id,
+    const startedAtMs = Date.now();
+    let result: Awaited<ReturnType<typeof forwardChatCompletionsStream>>;
+    try {
+      result = await forwardChatCompletionsStream({
+        credentialId,
+        providerKind: route.providerKind,
+        body,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      await finalizeRequestLog(log.id, {
+        status: "FAILED",
+        durationMs: Date.now() - startedAtMs,
+        failCode: "STREAM_UPSTREAM_ERROR",
+        failMessage: msg.slice(0, 500),
+        model,
+      });
+      return NextResponse.json({ error: msg }, { status: 502 });
+    }
+
+    if (!result.body || result.status >= 300) {
+      const errText = result.body
+        ? await new Response(result.body).text()
+        : `HTTP ${result.status}`;
+      await finalizeRequestLog(log.id, {
+        status: "FAILED",
+        durationMs: result.durationMs,
+        failCode: `UPSTREAM_HTTP_${result.status}`,
+        failMessage: errText.slice(0, 500),
+        model,
+      });
+      return new NextResponse(errText, {
+        status: result.status || 502,
+        headers: { "x-gateway-log-id": log.id },
+      });
+    }
+
+    return new NextResponse(
+      wrapChatStreamWithLogFinalize(result.body, {
+        logId: log.id,
+        model,
+        startedAtMs,
+      }),
+      {
+        status: result.status,
+        headers: {
+          "Content-Type": "text/event-stream",
+          "x-gateway-log-id": log.id,
+        },
       },
-    });
+    );
   }
 
   try {

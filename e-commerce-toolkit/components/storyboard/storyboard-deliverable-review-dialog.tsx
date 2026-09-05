@@ -1,10 +1,14 @@
 "use client";
 
-import Image from "next/image";
 import { Eye } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
-import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
+import {
+  buildStoryboardPanelPreviewItems,
+  EcomImagePreviewHost,
+  mapPreviewItemsFromEntries,
+  useEcomImagePreview,
+} from "@/components/media";
 import { EcomVideoThumb } from "@/components/media/ecom-video-player";
 import {
   Dialog,
@@ -14,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { StoryboardSheetLiveThumb } from "@/components/storyboard/storyboard-sheet-live-thumb";
 import { StoryboardSheetPreviewDialog } from "@/components/storyboard/storyboard-sheet-preview-dialog";
+import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
 import type { StoryboardDeliverableSnapshot } from "@/lib/storyboard-types";
 
 type Props = {
@@ -39,10 +44,32 @@ export function StoryboardDeliverableReviewDialog({
   onPreviewVideo,
 }: Props) {
   const [sheetPreviewOpen, setSheetPreviewOpen] = useState(false);
-  const [imagePreview, setImagePreview] = useState<{ src: string; title: string } | null>(null);
 
   const products = snapshot.references.filter((r) => r.role === "product");
   const characters = snapshot.references.filter((r) => r.role === "character");
+
+  const snapshotImagePreviewItems = useMemo(() => {
+    const refEntries = [...products, ...characters]
+      .filter((r) => r.ossUrl?.trim())
+      .map((r) => ({
+        url: r.ossUrl,
+        title: `${r.role === "product" ? "产品" : "角色"} · ${r.label}`,
+      }));
+    const panelEntries = buildStoryboardPanelPreviewItems(snapshot.sheet.panels).map((p) => ({
+      url: p.src,
+      title: `${p.title} 分镜图`,
+    }));
+    const pngEntry = snapshot.sheetPngUrl?.trim()
+      ? [{ url: snapshot.sheetPngUrl, title: "完整分镜图 PNG" }]
+      : [];
+    return mapPreviewItemsFromEntries([...refEntries, ...panelEntries, ...pngEntry]);
+  }, [snapshot.sheet.panels, snapshot.sheetPngUrl, products, characters]);
+
+  const {
+    preview: deliverableImagePreview,
+    openPreview: openDeliverableImagePreview,
+    closePreview: closeDeliverableImagePreview,
+  } = useEcomImagePreview(snapshotImagePreviewItems);
 
   return (
     <>
@@ -61,18 +88,27 @@ export function StoryboardDeliverableReviewDialog({
           </DialogHeader>
 
           <div className="ecom-scrollbar-thin min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
+            {snapshot.deliverableMarkdown ? (
+              <section>
+                <h3 className="mb-2 text-sm font-semibold text-[#1d1d1f]">剧本 / 策划稿</h3>
+                <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] p-3 text-xs leading-relaxed text-[#1d1d1f]">
+                  {snapshot.deliverableMarkdown}
+                </pre>
+              </section>
+            ) : null}
+
             <section>
               <h3 className="mb-2 text-sm font-semibold text-[#1d1d1f]">场景图</h3>
               <div className="flex flex-wrap gap-4">
                 <RefPreviewCard
                   title="产品图"
                   refs={products}
-                  onPreview={(src, title) => setImagePreview({ src, title })}
+                  onPreview={(src, title) => openDeliverableImagePreview(src, title)}
                 />
                 <RefPreviewCard
                   title="角色图"
                   refs={characters}
-                  onPreview={(src, title) => setImagePreview({ src, title })}
+                  onPreview={(src, title) => openDeliverableImagePreview(src, title)}
                 />
               </div>
             </section>
@@ -108,7 +144,10 @@ export function StoryboardDeliverableReviewDialog({
                   type="button"
                   className="mt-2 text-xs text-[#6e6e73] underline-offset-2 hover:text-[#1d1d1f] hover:underline"
                   onClick={() =>
-                    setImagePreview({ src: snapshot.sheetPngUrl!, title: "完整分镜图 PNG" })
+                    openDeliverableImagePreview(
+                      snapshot.sheetPngUrl!,
+                      "完整分镜图 PNG",
+                    )
                   }
                 >
                   查看合成 PNG
@@ -127,19 +166,18 @@ export function StoryboardDeliverableReviewDialog({
                       className="relative mb-1 h-[72px] w-full overflow-hidden rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] disabled:opacity-50"
                       onClick={() =>
                         panel.imageUrl &&
-                        setImagePreview({
-                          src: panel.imageUrl,
-                          title: `镜头 ${panel.index} 分镜图`,
-                        })
+                        openDeliverableImagePreview(
+                          panel.imageUrl,
+                          `镜头 ${panel.index} 分镜图`,
+                        )
                       }
                     >
                       {panel.imageUrl ? (
-                        <Image
-                          src={panel.imageUrl}
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={buildEcomOssThumbUrl(panel.imageUrl)}
                           alt={`镜头${panel.index}`}
-                          fill
-                          className="object-cover"
-                          unoptimized
+                          className="absolute inset-0 size-full object-cover"
                         />
                       ) : (
                         <span className="text-[10px] text-[#86868b]">无图</span>
@@ -196,16 +234,11 @@ export function StoryboardDeliverableReviewDialog({
         title={`交付快照 · ${snapshot.title}`}
       />
 
-      {imagePreview ? (
-        <EcomImagePreviewDialog
-          src={imagePreview.src}
-          title={imagePreview.title}
-          open
-          onOpenChange={(o) => {
-            if (!o) setImagePreview(null);
-          }}
-        />
-      ) : null}
+      <EcomImagePreviewHost
+        preview={deliverableImagePreview}
+        galleryItems={snapshotImagePreviewItems}
+        onClose={closeDeliverableImagePreview}
+      />
     </>
   );
 }
@@ -229,7 +262,12 @@ function RefPreviewCard({
           className="relative mb-1 h-[88px] w-full overflow-hidden rounded-md border border-[#e8e8ed] bg-[#f5f5f7]"
           onClick={() => onPreview(primary.ossUrl, `${title} · ${primary.label}`)}
         >
-          <Image src={primary.ossUrl} alt={primary.label} fill className="object-cover" unoptimized />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={buildEcomOssThumbUrl(primary.ossUrl)}
+            alt={primary.label}
+            className="absolute inset-0 size-full object-cover"
+          />
         </button>
       ) : (
         <div className="mb-1 flex h-[88px] items-center justify-center rounded-md border border-dashed border-[#d2d2d7] text-[10px] text-[#86868b]">

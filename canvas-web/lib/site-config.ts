@@ -1,5 +1,7 @@
 /** canvas-web 顶部导航 */
 
+export const CANVAS_SITE_BRAND_NAME = "ZH 无限画布";
+
 export type CanvasNavItem = {
   href: string;
   label: string;
@@ -10,12 +12,20 @@ export const CANVAS_NAV_ITEMS: CanvasNavItem[] = [
   { href: "/projects", label: "我的画布" },
 ];
 
+/** 管理中心 · 子导航（仅 /admin/* 页） */
+export const CANVAS_ADMIN_SUB_NAV: CanvasNavItem[] = [
+  { href: "/admin/portal", label: "工作流管理" },
+  { href: "/admin/film", label: "影视作品" },
+  { href: "/admin/templates", label: "模板管理" },
+];
+
 /** 「我的画布」内页居中子导航（原顶栏二级入口） */
 export const CANVAS_PROJECTS_SUB_NAV: CanvasNavItem[] = [
   { href: "/assets", label: "项目资产" },
   { href: "/characters", label: "角色库" },
   { href: "/scripts", label: "脚本" },
   { href: "/storyboards", label: "分镜" },
+  { href: "/style-library", label: "风格库" },
   { href: "/guides/project-assets", label: "资产指南" },
 ];
 
@@ -25,7 +35,10 @@ export function getCanvasWebOrigin(): string {
 }
 
 export function getBookMallOrigin(): string {
-  const raw = process.env.NEXT_PUBLIC_BOOK_MALL_URL ?? "http://localhost:3000";
+  const raw =
+    process.env.NEXT_PUBLIC_BOOK_MALL_URL?.trim() ||
+    process.env.MAIN_SITE_ORIGIN?.trim() ||
+    (process.env.NODE_ENV === "development" ? "http://localhost:3000" : "");
   return raw.replace(/\/$/, "");
 }
 

@@ -11,10 +11,8 @@ import {
   Coins,
   FileSpreadsheet,
   GitPullRequest,
-  HelpCircle,
   KeyRound,
   Layers,
-  LayoutDashboard,
   ClipboardList,
   Crown,
   ListChecks,
@@ -47,14 +45,6 @@ type NavGroup = {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    id: "start",
-    label: "入门",
-    items: [
-      { href: "/admin", label: "概览", icon: LayoutDashboard, exact: true },
-      { href: "/admin/help", label: "使用说明", icon: HelpCircle, prefix: "/admin/help" },
-    ],
-  },
-  {
     id: "finance-console",
     label: "财务控制台",
     items: [
@@ -74,9 +64,23 @@ const NAV_GROUPS: NavGroup[] = [
       },
       {
         href: "/admin/reconciliation",
-        label: "云账单对账",
+        label: "对账总账",
         icon: CloudUpload,
-        prefix: "/admin/reconciliation",
+        exact: true,
+        show: (v) => canViewFinanceCost(v.user.role),
+      },
+      {
+        href: "/admin/reconciliation/payments",
+        label: "用户支付明细",
+        icon: Coins,
+        prefix: "/admin/reconciliation/payments",
+        show: (v) => canViewFinanceCost(v.user.role),
+      },
+      {
+        href: "/admin/credit-expiry-ops",
+        label: "积分清零运维",
+        icon: ListChecks,
+        prefix: "/admin/credit-expiry-ops",
         show: (v) => canViewFinanceCost(v.user.role),
       },
     ],
@@ -107,6 +111,13 @@ const NAV_GROUPS: NavGroup[] = [
         show: (v) => canViewFinanceCost(v.user.role),
       },
       {
+        href: "/admin/usage-management",
+        label: "用量对账中心",
+        icon: ClipboardList,
+        prefix: "/admin/usage-management",
+        show: (v) => canViewFinanceCost(v.user.role),
+      },
+      {
         href: "/admin/pnl-alerts",
         label: "盈亏预警",
         icon: AlertTriangle,
@@ -128,7 +139,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       {
         href: "/admin/platform-models",
-        label: "平台模型",
+        label: "模型运营中心",
         icon: Layers,
         prefix: "/admin/platform-models",
         show: (v) => canViewFinanceCost(v.user.role),
@@ -288,7 +299,7 @@ export function AdminSidebar() {
           </>
         )}
       </div>
-      <nav className="flex-1 space-y-3 overflow-y-auto p-2">
+      <nav className="finance-sidebar-scroll flex-1 space-y-3 overflow-y-auto p-2">
         {NAV_GROUPS.map((group) => {
           const items = viewer
             ? group.items.filter((item) => !item.show || item.show(viewer))

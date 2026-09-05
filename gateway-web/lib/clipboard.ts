@@ -12,7 +12,7 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
       document.body.appendChild(ta);
       ta.select();
       document.execCommand("copy");
-      document.body.removeChild(ta);
+      ta.remove();
       return true;
     } catch {
       return false;

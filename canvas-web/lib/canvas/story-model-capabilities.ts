@@ -12,6 +12,13 @@ export type StoryModelCapability =
   | "video_multi_ref";
 
 const EXPLICIT: Record<string, StoryModelCapability[]> = {
+  "qwen-image-3.0-pro": ["image_t2i", "image_multi_ref"],
+  "z-image-turbo": ["image_t2i"],
+  "qwen-image-edit": ["image_multi_ref"],
+  "qwen-image-edit-max": ["image_multi_ref"],
+  "wan2.7-image": ["image_t2i", "image_multi_ref"],
+  "wan2.7-image-pro": ["image_t2i", "image_multi_ref"],
+  "wan2.6-image": ["image_t2i", "image_multi_ref"],
   "nano-banana-pro": ["image_t2i", "image_multi_ref"],
   "kling-3.0-image": ["image_t2i", "image_multi_ref"],
   "4o-image": ["image_t2i", "image_multi_ref"],
@@ -22,6 +29,8 @@ const EXPLICIT: Record<string, StoryModelCapability[]> = {
   "hunyuan-3d-express": ["image_t2i", "image_multi_ref"],
   "google/nano-banana-pro": ["image_t2i", "image_multi_ref"],
   "flux-2-pro": ["image_t2i", "image_multi_ref"],
+  "doubao-seedream-5-0-pro": ["image_t2i", "image_multi_ref"],
+  "doubao-seedream-5-0-lite": ["image_t2i", "image_multi_ref"],
   "seedream-5-lite": ["image_t2i", "image_multi_ref"],
   "seedream-4.5": ["image_t2i", "image_multi_ref"],
   "gpt-image-2": ["image_t2i", "image_multi_ref"],
@@ -38,13 +47,13 @@ const EXPLICIT: Record<string, StoryModelCapability[]> = {
   "flux-kontext-pro": ["image_t2i", "image_multi_ref"],
   "flux-kontext-max": ["image_t2i", "image_multi_ref"],
   "qwen-text-to-image": ["image_t2i"],
-  /** 与 book-mall/lib/canvas/story-model-capabilities.ts 对齐；勿仅靠 infer（seedance 会被误判为 t2v） */
+  /** 与 book-mall/lib/canvas/story-model-capabilities.ts 对齐；勿仅靠 infer（seedance 会被误判能力组合） */
   "kling-2.6/image-to-video": ["video_i2v"],
   "kling/v3-turbo-image-to-video": ["video_i2v"],
   "kling/v3-turbo-text-to-video": ["video_t2v"],
   "kling-3.0/video": ["video_i2v", "video_t2v"],
-  "bytedance/seedance-2": ["video_i2v", "video_r2v", "video_multi_ref"],
-  "doubao-seedance-2.0": ["video_i2v", "video_r2v", "video_multi_ref"],
+  "bytedance/seedance-2": ["video_t2v", "video_i2v", "video_r2v", "video_multi_ref"],
+  "doubao-seedance-2.0": ["video_t2v", "video_i2v", "video_r2v", "video_multi_ref"],
   "doubao-seedance-1.5-pro": ["video_i2v"],
   "wan/2-7-image-to-video": ["video_i2v"],
   "happyhorse/image-to-video": ["video_i2v"],
@@ -60,6 +69,15 @@ const EXPLICIT: Record<string, StoryModelCapability[]> = {
   "wan2.6-t2v": ["video_t2v"],
   "wan2.7-t2v": ["video_t2v"],
   "wan2.7-t2v-2026-04-25": ["video_t2v"],
+  "wan3.0-video": ["video_t2v", "video_i2v", "video_r2v", "video_multi_ref"],
+  "wan3.0-video-prime": ["video_t2v", "video_i2v", "video_r2v", "video_multi_ref"],
+  "MiniMax/MiniMax-H3-t2v": ["video_t2v"],
+  "MiniMax/MiniMax-H3-i2v": ["video_i2v"],
+  "MiniMax/MiniMax-H3-fl2v": ["video_i2v"],
+  "MiniMax/MiniMax-H3-r2v": ["video_r2v", "video_multi_ref"],
+  "MiniMax/MiniMax-H3-s2v": ["video_r2v", "video_multi_ref"],
+  "MiniMax/MiniMax-H3-regeneration": ["video_v2v"],
+  "MiniMax/MiniMax-H3-context-ir": ["video_t2v"],
 };
 
 const VIDEO_CAPABILITY_LABELS: Record<
@@ -96,10 +114,13 @@ function inferCapabilities(modelKey: string): StoryModelCapability[] {
   const isVideo =
     k.includes("video") ||
     k.includes("seedance") ||
-    k.includes("kling") ||
+    (k.includes("kling") && !k.includes("-image")) ||
     k.includes("veo") ||
-    k.includes("wan2.") ||
-    k.includes("happyhorse");
+    (k.includes("wan2.") && !k.includes("-image")) ||
+    (k.includes("wan3.0") && !k.includes("-image")) ||
+    k.includes("happyhorse") ||
+    k.includes("minimax-h3") ||
+    k.includes("minimax/minimax-h3");
 
   if (isVideo) {
     if (k.includes("-r2v") || k.endsWith("r2v")) {
@@ -153,6 +174,12 @@ export function modelHasStoryCapabilities(
   if (!required.length) return true;
   const have = new Set(getStoryModelCapabilities(modelKey));
   return required.every((c) => have.has(c));
+}
+
+/** 画布 IMAGE 选择器：须具备文生图或多图参考能力，排除纯视频模型 */
+export function isImageGenerationModelKey(modelKey: string): boolean {
+  const caps = getStoryModelCapabilities(modelKey);
+  return caps.includes("image_t2i") || caps.includes("image_multi_ref");
 }
 
 export function filterModelKeysByStoryCapabilities(

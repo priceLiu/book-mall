@@ -1,7 +1,9 @@
 import {
   getCanvasWebOrigin,
+  getCommonToolsOrigin,
   getEcommerceWebOrigin,
   getPromptOptimizerOrigin,
+  getQuickReplicaOrigin,
   getStoryWebOrigin,
 } from "@/lib/app-web-origins";
 import { getBookMallOrigin } from "@/lib/gateway/env";
@@ -20,6 +22,7 @@ export const LOCAL_PLATFORM_WEB_ORIGINS = [
   "http://localhost:3004",
   "http://localhost:3006",
   "http://localhost:3007",
+  "http://localhost:3010",
 ] as const;
 
 /** 全站子应用 Origin（federated logout 链 / tools-logout next 白名单）。 */
@@ -39,7 +42,9 @@ export function listPlatformWebOrigins(selfOrigin?: string): string[] {
     getCanvasWebOrigin(),
     getStoryWebOrigin(),
     getPromptOptimizerOrigin(),
+    getQuickReplicaOrigin(),
     getEcommerceWebOrigin(),
+    getCommonToolsOrigin(),
     selfOrigin,
   ]) {
     push(raw);

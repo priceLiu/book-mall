@@ -21,11 +21,16 @@ describe("resolveKnownGatewayModelRegistration", () => {
     });
   });
 
-  it("resolves Kimi K3 via canonical registry", () => {
+  it("resolves Kimi K3 via canonical registry（百炼代销）", () => {
     expect(resolveKnownGatewayModelRegistration("kimi-k3")).toMatchObject({
       canonicalModelKey: "kimi-k3",
-      providerKind: "MOONSHOT",
-      vendor: "moonshot",
+      providerKind: "BAILIAN",
+      vendor: "aliyun",
+    });
+    expect(resolveKnownGatewayModelRegistration("kimi/kimi-k3")).toMatchObject({
+      canonicalModelKey: "kimi-k3",
+      providerKind: "BAILIAN",
+      vendor: "aliyun",
     });
   });
 
@@ -53,6 +58,24 @@ describe("resolveKnownGatewayModelRegistration", () => {
       canonicalModelKey: "doubao-seed-2.0",
       providerKind: "VOLCENGINE",
       vendor: "volcengine",
+    });
+  });
+
+  it("resolves qwen-image-3.0-pro via canonical registry", () => {
+    expect(
+      resolveKnownGatewayModelRegistration("qwen-image-3.0-pro"),
+    ).toMatchObject({
+      canonicalModelKey: "qwen-image-3.0-pro",
+      providerKind: "DASHSCOPE",
+      vendor: "aliyun",
+    });
+  });
+
+  it("resolves z-image-turbo via canonical registry", () => {
+    expect(resolveKnownGatewayModelRegistration("z-image-turbo")).toMatchObject({
+      canonicalModelKey: "z-image-turbo",
+      providerKind: "DASHSCOPE",
+      vendor: "aliyun",
     });
   });
 });

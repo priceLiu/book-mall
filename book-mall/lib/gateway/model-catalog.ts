@@ -6,8 +6,10 @@ import type { GatewayProviderKind } from "@prisma/client";
 
 import { BAILIAN_R2V_KNOWN_MODELS } from "@/lib/canvas/providers/bailian-r2v";
 import { BAILIAN_CHAT_KNOWN_MODELS } from "@/lib/gateway/bailian-chat-models";
+import { BAILIAN_IMAGE_KNOWN_MODELS } from "@/lib/canvas/providers/bailian-image";
 import {
   VOLCENGINE_CHAT_KNOWN_MODELS,
+  VOLCENGINE_IMAGE_KNOWN_MODELS,
   VOLCENGINE_VIDEO_KNOWN_MODELS,
 } from "@/lib/gateway/volcengine-chat-models";
 import { DEEPSEEK_KNOWN_MODELS } from "@/lib/canvas/providers/deepseek-system";
@@ -20,6 +22,7 @@ import {
   MINIMAX_MUSIC_MODELS,
   MINIMAX_SPEECH_MODELS,
 } from "@/lib/gateway/minimax-speech-models";
+import { MINIMAX_VIDEO_KNOWN_MODELS } from "@/lib/gateway/minimax-video-models";
 import {
   ELEVENLABS_SFX_MODELS,
   ELEVENLABS_STS_MODELS,
@@ -61,8 +64,10 @@ export type GatewayModelCatalog = {
   boundKinds: GatewayProviderKind[];
   /** Model Manager Tab 分组 */
   tabs: {
+    all: GatewayCatalogGroup[];
     text: GatewayCatalogGroup[];
     image: GatewayCatalogGroup[];
+    video: GatewayCatalogGroup[];
     function: GatewayCatalogGroup[];
   };
 };
@@ -372,8 +377,12 @@ function isImageModel(m: GatewayCatalogModel): boolean {
   return m.requestKind === "IMAGE";
 }
 
+function isVideoModel(m: GatewayCatalogModel): boolean {
+  return m.requestKind === "VIDEO";
+}
+
 function isFunctionModel(m: GatewayCatalogModel): boolean {
-  return !isTextModel(m) && !isImageModel(m);
+  return !isTextModel(m) && !isImageModel(m) && !isVideoModel(m);
 }
 
 function sortModels(models: GatewayCatalogModel[]): GatewayCatalogModel[] {
@@ -439,6 +448,9 @@ export function buildGatewayModelCatalog(
       ...BAILIAN_R2V_KNOWN_MODELS.map((m) =>
         fromListed(m, "BAILIAN", ["Canvas"]),
       ),
+      ...BAILIAN_IMAGE_KNOWN_MODELS.map((m) =>
+        fromListed(m, "BAILIAN", ["Canvas", "Story", "电商工具箱"]),
+      ),
     ]),
   );
 
@@ -471,6 +483,9 @@ export function buildGatewayModelCatalog(
       ...VOLCENGINE_VIDEO_KNOWN_MODELS.map((m) =>
         fromListed(m, "VOLCENGINE", ["Canvas", "Story", "工具站"]),
       ),
+      ...VOLCENGINE_IMAGE_KNOWN_MODELS.map((m) =>
+        fromListed(m, "VOLCENGINE", ["Canvas", "Story", "工具站", "电商工具箱"]),
+      ),
     ]),
   );
 
@@ -493,6 +508,15 @@ export function buildGatewayModelCatalog(
         description: m.subtitle,
         products: ["QuickReplica"],
         capabilities: [] as string[],
+      })),
+      ...MINIMAX_VIDEO_KNOWN_MODELS.map((m) => ({
+        modelKey: m.modelKey,
+        displayName: m.displayName,
+        requestKind: "VIDEO" as const,
+        role: "VIDEO" as const,
+        description: m.description,
+        products: ["Canvas", "Story", "工具站", "电商工具箱"],
+        capabilities: m.capabilities,
       })),
     ]),
   );
@@ -555,8 +579,10 @@ export function buildGatewayModelCatalog(
     totalCount,
     boundKinds,
     tabs: {
+      all: groups,
       text: filterGroupModels(groups, isTextModel),
       image: filterGroupModels(groups, isImageModel),
+      video: filterGroupModels(groups, isVideoModel),
       function: filterGroupModels(groups, isFunctionModel),
     },
   };

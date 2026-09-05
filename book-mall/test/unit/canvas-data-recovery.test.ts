@@ -102,22 +102,22 @@ describe("patchCanvasJsonNodeMedia · 任务写回可恢复", () => {
     const runtime = buildMediaRuntimePatchFromTask(
       {
         id: "t1",
-        ossUrl: "https://cdn.example/a.png",
+        ossUrl: "https://bucket.oss-cn-hangzhou.aliyuncs.com/canvas/a.png",
         ephemeralUrl: null,
         resultPayload: null,
       },
-      "https://cdn.example/a.png",
+      "https://bucket.oss-cn-hangzhou.aliyuncs.com/canvas/a.png",
     );
     const next = patchCanvasJsonNodeMedia(
       canvas,
       "img1",
       "sbv1-image",
-      "https://cdn.example/a.png",
+      "https://bucket.oss-cn-hangzhou.aliyuncs.com/canvas/a.png",
       runtime,
     );
     expect(canvasNodeShowsPersistedMedia(next, "img1", "t1")).toBe(true);
     const node = (next as typeof canvas).nodes[0];
-    expect(node.data.ossUrl).toBe("https://cdn.example/a.png");
+    expect(node.data.ossUrl).toBe("https://bucket.oss-cn-hangzhou.aliyuncs.com/canvas/a.png");
   });
 });
 

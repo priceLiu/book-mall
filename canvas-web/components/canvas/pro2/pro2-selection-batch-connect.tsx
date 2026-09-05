@@ -3,23 +3,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useReactFlow } from "@xyflow/react";
-import { Clapperboard, Download, Plus, Sparkles, Video } from "lucide-react";
+import { Plus, Clapperboard, Download } from "lucide-react";
 
-import { useClientPortalMounted } from "@/lib/canvas/use-modal-portal-effects";
+import { useClientPortalMounted, useCanvasToolbarPopoverOpen } from "@/lib/canvas/use-modal-portal-effects";
 import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
+import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import { findBatchConnectSnapTarget } from "@/lib/canvas/libtv-connection-snap";
 import { batchConnectSourceClientPoint } from "@/lib/canvas/batch-connect-preview-anchors";
 import {
   batchConnectTargetHandleForSnap,
   batchImageSpawnNodeType,
+  BATCH_MEDIA_SPAWN_MENU_ITEMS,
   buildBatchConnectEdges,
   classifyBatchConnectMode,
   nodesEligibleForBatchOut,
   type BatchConnectMode,
 } from "@/lib/canvas/pro2-batch-connect";
-import { batchConnectSelectionClientBox } from "@/lib/canvas/batch-connect-preview-anchors";
+import { batchConnectSelectionScreenBox } from "@/lib/canvas/batch-connect-preview-anchors";
 import {
-  computePro2MultiSelectionBbox,
   pro2SelectedNonGroupIds,
 } from "@/lib/canvas/pro2-selection-bbox";
 import { buildPro2ImageNodeData } from "@/lib/canvas/pro2-spawn-nodes";
@@ -29,6 +30,11 @@ import {
   buildSbv1VideoEngineNodeData,
   selectSbv1NodeAfterSpawn,
 } from "@/lib/canvas/sbv1-spawn-nodes";
+import {
+  resolveJianyingAutoRenderNodeSize,
+  withFlowNodeDimensions,
+} from "@/lib/canvas/jianying-auto-render-node-size";
+import { ensureNodeDragHandles, sortNodesForReactFlow } from "@/lib/canvas/normalize-graph-nodes";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { NODE_DEFAULT_SIZE, type CanvasFlowNode } from "@/lib/canvas/types";
 import { cn } from "@/lib/utils";
@@ -41,12 +47,6 @@ import {
 const DRAG_THRESHOLD = 3;
 
 const SPAWN_MENU_OFFSET_X = 12;
-
-/** 松手后忽略画布 pane 清空选区（与框选 onSelectionEnd 同机制） */
-function suppressNextCanvasPaneClick(): void {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent("canvas:suppress-next-pane-click"));
-}
 
 const VIDEO_EXPORT_MENU_ITEMS: BatchConnectSpawnMenuItem[] = [
   {
@@ -63,20 +63,14 @@ const VIDEO_EXPORT_MENU_ITEMS: BatchConnectSpawnMenuItem[] = [
   },
 ];
 
-const IMAGE_PIPELINE_MENU_ITEMS: BatchConnectSpawnMenuItem[] = [
-  {
-    id: "img2img",
-    label: "图生图",
-    icon: Sparkles,
-    nodeType: "story-pro2-image",
-  },
-  {
-    id: "img2video",
-    label: "图生视频",
-    icon: Video,
-    nodeType: "sbv1-video-engine",
-  },
-];
+const MEDIA_PIPELINE_MENU_ITEMS: BatchConnectSpawnMenuItem[] =
+  BATCH_MEDIA_SPAWN_MENU_ITEMS.map((item) => ({ ...item }));
+
+/** 松手后忽略画布 pane 清空选区（与框选 onSelectionEnd 同机制） */
+function suppressNextCanvasPaneClick(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("canvas:suppress-next-pane-click"));
+}
 
 function Pro2SelectionBatchConnectLayerInner({
   rfNodes,
@@ -85,26 +79,27 @@ function Pro2SelectionBatchConnectLayerInner({
 }) {
   const { flowToScreenPosition, screenToFlowPosition, getInternalNode } =
     useReactFlow();
-  const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
+  const marqueeSelecting = useCanvasMarqueeSelecting();
+  const toolbarPopoverOpen = useCanvasToolbarPopoverOpen();
   const storeNodes = useCanvasStore((s) => s.nodes);
   const addNode = useCanvasStore((s) => s.addNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
+  const canvasDraggingNodeId = useCanvasStore((s) => s.canvasDraggingNodeId);
+  const canvasGeometryDragging = useCanvasStore((s) => s.canvasGeometryDragging);
 
   const selectedIds = useMemo(
     () => pro2SelectedNonGroupIds(rfNodes),
     [rfNodes],
   );
 
-  const viewport = useViewportTransformActive(
-    selectedIds.length >= 2 && !viewportMoving,
-  );
+  /** 多选期间始终订阅 viewport，缩小画布时 + 位置跟随 pan/zoom */
+  const viewport = useViewportTransformActive(selectedIds.length >= 2);
 
   const eligibleSources = useMemo(() => {
     const raw = nodesEligibleForBatchOut(storeNodes, selectedIds);
-    const mode = classifyBatchConnectMode(raw);
-    if (!mode) return [];
-    return raw;
+    if (classifyBatchConnectMode(raw)) return raw;
+    return [];
   }, [storeNodes, selectedIds]);
 
   const batchMode = useMemo(
@@ -112,36 +107,41 @@ function Pro2SelectionBatchConnectLayerInner({
     [eligibleSources],
   );
 
-  const bbox = useMemo(() => {
-    const pool = rfNodes.length ? rfNodes : storeNodes;
-    return computePro2MultiSelectionBbox(
+  const spawnMenuItems = useMemo((): BatchConnectSpawnMenuItem[] => {
+    if (batchMode === "video-export") return VIDEO_EXPORT_MENU_ITEMS;
+    if (batchMode === "media-pipeline") return MEDIA_PIPELINE_MENU_ITEMS;
+    return [];
+  }, [batchMode]);
+
+  const spawnMenuTitle = useMemo(() => {
+    if (batchMode === "video-export") return "工作环节";
+    if (batchMode === "media-pipeline") return "批量连线";
+    return "";
+  }, [batchMode]);
+
+  const screenBox = useMemo(() => {
+    void viewport;
+    const pool = (rfNodes.length ? rfNodes : storeNodes) as CanvasFlowNode[];
+    return batchConnectSelectionScreenBox(
       selectedIds,
-      pool as CanvasFlowNode[],
+      pool,
+      flowToScreenPosition,
       getInternalNode,
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIds, getInternalNode, rfNodes, storeNodes, viewport]);
+  }, [
+    selectedIds,
+    viewport,
+    rfNodes,
+    storeNodes,
+    flowToScreenPosition,
+    getInternalNode,
+  ]);
 
-  const clientBox = useMemo(() => {
-    void viewport;
-    return batchConnectSelectionClientBox(selectedIds);
-  }, [selectedIds, viewport]);
+  const pinnedLayoutBoxRef = useRef<ReturnType<typeof batchConnectSelectionScreenBox>>(null);
 
-  const flowScreenBox = useMemo(() => {
-    if (!bbox) return null;
-    const tl = flowToScreenPosition({ x: bbox.x, y: bbox.y });
-    const br = flowToScreenPosition({ x: bbox.x2, y: bbox.y2 });
-    return {
-      left: tl.x,
-      top: tl.y,
-      width: br.x - tl.x,
-      height: br.y - tl.y,
-      right: br.x,
-      midY: (tl.y + br.y) / 2,
-    };
-  }, [bbox, flowToScreenPosition, viewport]);
-
-  const screenBox = clientBox ?? flowScreenBox;
+  useEffect(() => {
+    if (screenBox) pinnedLayoutBoxRef.current = screenBox;
+  }, [screenBox]);
 
   const [dragging, setDragging] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(
@@ -237,6 +237,20 @@ function Pro2SelectionBatchConnectLayerInner({
     gestureRef.current = null;
   }, []);
 
+  useEffect(() => {
+    if (canvasDraggingNodeId || canvasGeometryDragging) {
+      clearPreview();
+    }
+  }, [canvasDraggingNodeId, canvasGeometryDragging, clearPreview]);
+
+  useEffect(() => {
+    if (selectedIds.length < 2) {
+      clearPreview();
+    }
+  }, [selectedIds.length, clearPreview]);
+
+  const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
+
   const spawnAtAnchor = useCallback(
     (
       anchor: { x: number; y: number },
@@ -246,23 +260,60 @@ function Pro2SelectionBatchConnectLayerInner({
         | "story-pro2-image"
         | "sbv1-image"
         | "sbv1-video-engine",
-      targetHandle: string,
+      targetHandle?: string,
       data?: Record<string, unknown>,
     ) => {
       if (eligibleSources.length < 2) return;
       const { height } = NODE_DEFAULT_SIZE[nodeType];
       const flow = screenToFlowPosition({ x: anchor.x, y: anchor.y });
-      const newId = addNode(
-        nodeType,
-        {
-          x: flow.x + SPAWN_MENU_OFFSET_X,
-          y: flow.y - height / 2,
-        },
-        data,
-      );
+      const sharedParentId = eligibleSources.every(
+        (n) => n.parentId && n.parentId === eligibleSources[0]?.parentId,
+      )
+        ? eligibleSources[0]?.parentId
+        : undefined;
+      let newId = "";
+      if (nodeType === "jianying-auto-render-pro2" && sharedParentId) {
+        const absXs = eligibleSources.map((n) => n.position.x + (n.width ?? 320));
+        const absYs = eligibleSources.map((n) => n.position.y);
+        newId = addNodeInGroup(
+          nodeType,
+          sharedParentId,
+          {
+            x: Math.max(...absXs) + 48,
+            y: Math.min(...absYs),
+          },
+          data,
+        );
+      } else {
+        newId = addNode(
+          nodeType,
+          {
+            x: flow.x + SPAWN_MENU_OFFSET_X,
+            y: flow.y - height / 2,
+          },
+          data,
+        );
+      }
       if (!newId) return;
       connectBatchToTarget(newId, targetHandle);
       clearPreview();
+      if (nodeType === "jianying-auto-render-pro2") {
+        const size = resolveJianyingAutoRenderNodeSize({
+          sourceNodes: eligibleSources,
+          nodes: useCanvasStore.getState().nodes,
+        });
+        setNodes((prev) =>
+          ensureNodeDragHandles(
+            sortNodesForReactFlow(
+              prev.map((n) =>
+                n.id === newId
+                  ? withFlowNodeDimensions(n, size.width, size.height)
+                  : n,
+              ),
+            ),
+          ),
+        );
+      }
       if (nodeType === "sbv1-video-engine" || nodeType === "sbv1-image") {
         selectSbv1NodeAfterSpawn(setNodes, newId);
       } else {
@@ -270,9 +321,10 @@ function Pro2SelectionBatchConnectLayerInner({
       }
     },
     [
-      eligibleSources.length,
+      eligibleSources,
       screenToFlowPosition,
       addNode,
+      addNodeInGroup,
       connectBatchToTarget,
       clearPreview,
       setNodes,
@@ -317,7 +369,7 @@ function Pro2SelectionBatchConnectLayerInner({
       spawnAtAnchor(
         anchor,
         "sbv1-video-engine",
-        "in_ref",
+        undefined,
         buildSbv1VideoEngineNodeData(),
       );
     },
@@ -325,12 +377,8 @@ function Pro2SelectionBatchConnectLayerInner({
   );
 
   const closeMenu = useCallback(() => {
-    menuOpenRef.current = false;
-    gestureActiveRef.current = false;
-    frozenScreenBoxRef.current = null;
-    setMenuAnchor(null);
-    setLineTarget(null);
-  }, []);
+    clearPreview();
+  }, [clearPreview]);
 
   const connectSnapTarget = useCallback(
     (target: CanvasFlowNode, mode: BatchConnectMode): boolean => {
@@ -410,10 +458,11 @@ function Pro2SelectionBatchConnectLayerInner({
   } else if (!gestureActive) {
     frozenScreenBoxRef.current = null;
   }
+
   const layoutBox =
     gestureActive && frozenScreenBoxRef.current
       ? frozenScreenBoxRef.current
-      : screenBox;
+      : screenBox ?? pinnedLayoutBoxRef.current;
 
   const onPlusPointerDown = (e: React.PointerEvent) => {
     if (eligibleSources.length < 2 || !batchMode) return;
@@ -486,18 +535,17 @@ function Pro2SelectionBatchConnectLayerInner({
 
   const onMenuPick = useCallback(
     (itemId: string) => {
-      if (!menuAnchor) return;
-      if (batchMode === "video-export" && itemId === "export") {
-        spawnExportAndConnect(menuAnchor);
+      if (!menuAnchor || !batchMode) return;
+      if (batchMode === "video-export") {
+        if (itemId === "export") spawnExportAndConnect(menuAnchor);
+        if (itemId === "auto-render") spawnAutoRenderAndConnect(menuAnchor);
+        closeMenu();
         return;
       }
-      if (batchMode === "video-export" && itemId === "auto-render") {
-        spawnAutoRenderAndConnect(menuAnchor);
-        return;
-      }
-      if (batchMode === "image-pipeline") {
+      if (batchMode === "media-pipeline") {
         if (itemId === "img2img") spawnImg2ImgAndConnect(menuAnchor);
         if (itemId === "img2video") spawnImg2VideoAndConnect(menuAnchor);
+        closeMenu();
       }
     },
     [
@@ -507,11 +555,12 @@ function Pro2SelectionBatchConnectLayerInner({
       spawnAutoRenderAndConnect,
       spawnImg2ImgAndConnect,
       spawnImg2VideoAndConnect,
+      closeMenu,
     ],
   );
 
   if (
-    viewportMoving ||
+    marqueeSelecting ||
     selectedIds.length < 2 ||
     eligibleSources.length < 2 ||
     !batchMode ||
@@ -522,44 +571,33 @@ function Pro2SelectionBatchConnectLayerInner({
 
   const boxLeft = layoutBox.left;
   const boxTop = layoutBox.top;
-  const boxWidth = layoutBox.right - layoutBox.left;
-  const boxHeight =
-    "bottom" in layoutBox
-      ? layoutBox.bottom - layoutBox.top
-      : layoutBox.height;
+  const boxWidth = layoutBox.width;
+  const boxHeight = layoutBox.height;
   const plusLeft = layoutBox.right + 4;
   const plusTop = layoutBox.midY;
 
   const showPreviewLines =
     lineTarget && (dragging || menuAnchor) && previewSourcePoints.length >= 2;
 
-  const menuTitle =
-    batchMode === "image-pipeline"
-      ? `为所选中的 ${eligibleSources.length} 张图片生成`
-      : `为所选中的 ${eligibleSources.length} 个视频生成`;
-
-  const menuItems =
-    batchMode === "image-pipeline"
-      ? IMAGE_PIPELINE_MENU_ITEMS
-      : VIDEO_EXPORT_MENU_ITEMS;
-
   const plusTitle =
-    batchMode === "image-pipeline"
+    batchMode === "media-pipeline"
       ? "批量连线 · 图生图 / 图生视频 / 拖到已有节点"
       : "批量连线 · 导出剪辑 / 拖到已有节点";
 
   return (
     <>
-      <div
-        className="pointer-events-none fixed z-[2090] rounded-sm border border-dashed border-white/40"
-        style={{
-          left: boxLeft,
-          top: boxTop,
-          width: boxWidth,
-          height: boxHeight,
-        }}
-        aria-hidden
-      />
+      {!toolbarPopoverOpen ? (
+        <div
+          className="pointer-events-none fixed z-[1500] rounded-sm border-2 border-dashed border-white/40"
+          style={{
+            left: boxLeft,
+            top: boxTop,
+            width: boxWidth,
+            height: boxHeight,
+          }}
+          aria-hidden
+        />
+      ) : null}
 
       {showPreviewLines ? (
         <BatchConnectPreviewLines
@@ -591,11 +629,11 @@ function Pro2SelectionBatchConnectLayerInner({
         <Plus className="size-6 text-white/90" strokeWidth={2.25} />
       </button>
 
-      {menuAnchor ? (
+      {menuAnchor && spawnMenuItems.length > 0 ? (
         <BatchConnectSpawnMenu
           anchor={menuAnchor}
-          title={menuTitle}
-          items={menuItems}
+          title={spawnMenuTitle}
+          items={spawnMenuItems}
           onPick={onMenuPick}
           onClose={closeMenu}
         />

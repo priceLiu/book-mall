@@ -2,6 +2,10 @@ import type { GatewayProviderKind } from "@prisma/client";
 
 import { buildQrTextToImageCreateArgs } from "@/lib/canvas/qr-image-builders";
 import {
+  isDashscopeMultimodalImageGenModel,
+  isZImageTurboModel,
+} from "@/lib/gateway/qwen-image-edit-proxy";
+import {
   GatewayRequiredError,
   assertGatewayApiKeyLinkedForUser,
   resolveGatewayAuthForBookUser,
@@ -53,6 +57,46 @@ export async function qrCreateTextToImageJob(
     targetImageUrl: draft.targetImageUrl,
   });
 
+  if (isDashscopeMultimodalImageGenModel(gatewayModelKey)) {
+    const refs = !isZImageTurboModel(gatewayModelKey) ? imageUrls.slice(0, 3) : [];
+    const content: Array<{ text: string } | { image: string }> =
+      refs.length > 0
+        ? [...refs.map((url) => ({ image: url })), { text: draft.prompt.trim() }]
+        : [{ text: draft.prompt.trim() }];
+    const resolution = draft.resolution?.trim() || "2K";
+    const size =
+      resolution === "4K"
+        ? "2048*2048"
+        : resolution === "1K"
+          ? "1024*1024"
+          : "1536*1536";
+    const created = await gatewayV1CreateTask({
+      apiKeyId: auth.id,
+      body: {
+        model: gatewayModelKey,
+        dashscope: {
+          jobKind: "multimodal-image-sync" as const,
+          content,
+          parameters: {
+            size,
+            n: 1,
+            prompt_extend: !isZImageTurboModel(gatewayModelKey),
+            watermark: false,
+          },
+        },
+      },
+      meta: gatewayV1ClientMeta(CLIENT_SOURCE, {
+        clientPage: CLIENT_PAGE,
+        bookUserId: userId,
+      }),
+    });
+    return {
+      taskId: created.taskId,
+      logId: created.logId,
+      providerKind: "DASHSCOPE" as GatewayProviderKind,
+    };
+  }
+
   const { model: routedModel, input } = buildQrTextToImageCreateArgs({
     modelKey: draft.modelKey,
     prompt: draft.prompt,
@@ -65,7 +109,11 @@ export async function qrCreateTextToImageJob(
 
   const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
-    body: { model: routedModel, input },
+    body: {
+      model: routedModel,
+      gatewayModelKey,
+      input,
+    },
     meta: gatewayV1ClientMeta(CLIENT_SOURCE, {
       clientPage: CLIENT_PAGE,
       bookUserId: userId,

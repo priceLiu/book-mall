@@ -32,10 +32,13 @@ import {
   formatLogTimingPhaseCell,
   logProviderFilterOptions,
   resolveLogVendorPhaseEmptyHint,
+  inputSummaryHasVideoUrl,
   LOG_APP_FILTER_OPTIONS,
 } from "@/lib/gateway-log-display";
 import {
   hasVolcengineTimingTrace,
+  hasDashscopeTimingTrace,
+  hasMinimaxTimingTrace,
   liveVolcengineVideoTiming,
   resolveLiveLogPhaseTiming,
   resolveVendorNativeTimingLive,
@@ -375,7 +378,7 @@ async function fetchGatewayLogs(params: {
   fromDate: string;
   toDate: string;
   statusFilter: string;
-  sourceFilter: string;
+  appFilter: string;
   providerFilter: string;
   modelFilter: string;
   credentialIdFilter: string;
@@ -398,7 +401,7 @@ async function fetchGatewayLogs(params: {
   if (params.fromDate) qs.set("from", params.fromDate);
   if (params.toDate) qs.set("to", params.toDate);
   if (params.statusFilter) qs.set("status", params.statusFilter);
-  if (params.sourceFilter) qs.set("clientSource", params.sourceFilter);
+  if (params.appFilter) qs.set("appKey", params.appFilter);
   if (params.providerFilter) qs.set("providerKind", params.providerFilter);
   if (params.modelFilter) qs.set("model", params.modelFilter);
   if (params.credentialIdFilter) qs.set("credentialId", params.credentialIdFilter);
@@ -442,7 +445,7 @@ async function fetchGatewayLogFacets(params: {
   fromDate: string;
   toDate: string;
   statusFilter: string;
-  sourceFilter: string;
+  appFilter: string;
   providerFilter: string;
   modelFilter: string;
   credentialIdFilter: string;
@@ -459,7 +462,7 @@ async function fetchGatewayLogFacets(params: {
   if (params.fromDate) qs.set("from", params.fromDate);
   if (params.toDate) qs.set("to", params.toDate);
   if (params.statusFilter) qs.set("status", params.statusFilter);
-  if (params.sourceFilter) qs.set("clientSource", params.sourceFilter);
+  if (params.appFilter) qs.set("appKey", params.appFilter);
   if (params.providerFilter) qs.set("providerKind", params.providerFilter);
   if (params.modelFilter) qs.set("model", params.modelFilter);
   if (params.credentialIdFilter) qs.set("credentialId", params.credentialIdFilter);
@@ -523,7 +526,7 @@ async function fetchGatewayLogsDelta(params: {
   fromDate: string;
   toDate: string;
   statusFilter: string;
-  sourceFilter: string;
+  appFilter: string;
   providerFilter: string;
   modelFilter: string;
   credentialIdFilter: string;
@@ -535,7 +538,7 @@ async function fetchGatewayLogsDelta(params: {
   if (params.fromDate) qs.set("from", params.fromDate);
   if (params.toDate) qs.set("to", params.toDate);
   if (params.statusFilter) qs.set("status", params.statusFilter);
-  if (params.sourceFilter) qs.set("clientSource", params.sourceFilter);
+  if (params.appFilter) qs.set("appKey", params.appFilter);
   if (params.providerFilter) qs.set("providerKind", params.providerFilter);
   if (params.modelFilter) qs.set("model", params.modelFilter);
   if (params.credentialIdFilter) qs.set("credentialId", params.credentialIdFilter);
@@ -663,6 +666,7 @@ const LogsTableRow = memo(function LogsTableRow({
     canvasCompletedAt: l.canvasCompletedAt,
     preGatewayMs: l.preGatewayMs,
     submittedAt: l.submittedAt,
+    completedAt: l.completedAt,
     e2eFrozen: l.e2eFrozen,
     isInProgress,
     nowMs: liveTick ?? null,
@@ -675,7 +679,10 @@ const LogsTableRow = memo(function LogsTableRow({
         submittedAt: l.submittedAt,
         isInProgress,
         nowMs: liveTick ?? null,
+        gatewayDirectSubmit:
+          !l.canvasStartedAt && !isInProgress && !pendingRow,
       });
+  const gatewayDirectE2e = !l.canvasStartedAt && !pendingRow;
   const vendorNative = resolveVendorNativeTimingLive({
     providerKind: l.providerKind,
     requestKind: l.requestKind,
@@ -729,6 +736,9 @@ const LogsTableRow = memo(function LogsTableRow({
     externalTaskId: l.externalTaskId,
     isInProgress,
     hasVolcengineTrace: hasVolcengineTimingTrace(l.resultSummary),
+    hasDashscopeTrace: hasDashscopeTimingTrace(l.resultSummary),
+    hasMinimaxTrace: hasMinimaxTimingTrace(l.resultSummary),
+    hasVideoInput: inputSummaryHasVideoUrl(l.inputSummary),
   });
   const phaseCellTitle = (
     cell: { value: string; title?: string },
@@ -839,9 +849,13 @@ const LogsTableRow = memo(function LogsTableRow({
         title={
           e2eMs != null
             ? [
-                `系统总耗时：画布点击 → 任务完成`,
+                gatewayDirectE2e
+                  ? "系统总耗时：Gateway 提交 → 任务完成（直连，无画布出队）"
+                  : "系统总耗时：画布点击 → 任务完成",
                 preGatewayMs != null
-                  ? `出队前 ${Math.round(preGatewayMs / 1000)}s`
+                  ? gatewayDirectE2e && preGatewayMs === 0
+                    ? "出队前 0s（直连 Gateway）"
+                    : `出队前 ${Math.round(preGatewayMs / 1000)}s`
                   : null,
                 l.gatewaySegmentMs != null
                   ? `网关段 ${Math.round(l.gatewaySegmentMs / 1000)}s`
@@ -849,7 +863,9 @@ const LogsTableRow = memo(function LogsTableRow({
                 l.postGatewayMs != null
                   ? `OSS/回写 ${Math.round(l.postGatewayMs / 1000)}s`
                   : null,
-                `≈ 出队前 + 网关段 + OSS/回写（秒级四舍五入）`,
+                gatewayDirectE2e
+                  ? "≈ 网关段（电商/工具直提，无画布 OSS 分段）"
+                  : "≈ 出队前 + 网关段 + OSS/回写（秒级四舍五入）",
               ]
                 .filter(Boolean)
                 .join(" · ")
@@ -860,7 +876,11 @@ const LogsTableRow = memo(function LogsTableRow({
       </td>
       <td
         className="align-middle font-mono text-sm text-amber-200/90"
-        title="我们：点击 → Gateway 有 log（交通控流 QUEUED/DISPATCHING/dispatch/createTask）。超 120s 多为出队卡死。"
+        title={
+          gatewayDirectE2e && preGatewayMs === 0
+            ? "直连 Gateway 提交，无画布交通控流出队"
+            : "我们：点击 → Gateway 有 log（交通控流 QUEUED/DISPATCHING/dispatch/createTask）。超 120s 多为出队卡死。"
+        }
       >
         {preGatewayDuration}
       </td>
@@ -1052,7 +1072,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   const [facets, setFacets] = useState<GatewayLogFacets>(
     initialData.facets ?? { models: [], providerKinds: [], credentialKeys: [] },
   );
-  const [sourceFilter, setSourceFilter] = useState("");
+  const [appFilter, setAppFilter] = useState("");
   const [providerFilter, setProviderFilter] = useState("");
   const [modelFilter, setModelFilter] = useState("");
   const [credentialIdFilter, setCredentialIdFilter] = useState("");
@@ -1082,6 +1102,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   const hasMoreLogsRef = useRef(true);
   const historyLoadSeqRef = useRef(0);
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
   loadedPagesRef.current = loadedPages;
   hasMoreLogsRef.current = hasMoreLogs;
   const [pageVisible, setPageVisible] = useState(true);
@@ -1125,6 +1146,16 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     setFiltersCollapsed(readFiltersCollapsed());
   }, []);
 
+  useEffect(() => {
+    const el = tableScrollRef.current;
+    if (!el) return;
+    const closeHoverTips = () => {
+      window.dispatchEvent(new Event("gw-log-close-hover-tips"));
+    };
+    el.addEventListener("scroll", closeHoverTips, { passive: true });
+    return () => el.removeEventListener("scroll", closeHoverTips);
+  }, []);
+
   const dateRangeInvalid = isLogDateRangeInvalid(fromDate, toDate);
 
   const skipInitialFetchRef = useRef(true);
@@ -1134,7 +1165,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       fromDate,
       toDate,
       statusFilter,
-      sourceFilter,
+      appFilter,
       providerFilter,
       modelFilter,
       credentialIdFilter,
@@ -1144,7 +1175,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       fromDate,
       toDate,
       statusFilter,
-      sourceFilter,
+      appFilter,
       providerFilter,
       modelFilter,
       credentialIdFilter,
@@ -1153,7 +1184,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   );
 
   const filtersAreDefault =
-    !sourceFilter &&
+    !appFilter &&
     !providerFilter &&
     !modelFilter &&
     !credentialIdFilter &&
@@ -1359,7 +1390,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
           fromDate,
           toDate,
           statusFilter,
-          sourceFilter,
+          appFilter,
           providerFilter,
           modelFilter,
           credentialIdFilter,
@@ -1367,6 +1398,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
         });
         const merged = mergeLogsDelta(logsRef.current, delta);
         setLogs(merged.rows);
+        window.dispatchEvent(new Event("gw-log-close-hover-tips"));
         void fetchCanvasQueueStats().then((s) => {
           applyCanvasQueueFetchResult(
             s,
@@ -1389,7 +1421,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       fromDate,
       toDate,
       statusFilter,
-      sourceFilter,
+      appFilter,
       providerFilter,
       modelFilter,
       credentialIdFilter,
@@ -1610,9 +1642,9 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
 
   const activeFilterLabels = useMemo(() => {
     const labels: string[] = [];
-    if (sourceFilter) {
-      const opt = LOG_APP_FILTER_OPTIONS.find((o) => o.value === sourceFilter);
-      labels.push(`应用: ${opt?.label ?? sourceFilter}`);
+    if (appFilter) {
+      const opt = LOG_APP_FILTER_OPTIONS.find((o) => o.value === appFilter);
+      labels.push(`应用: ${opt?.label ?? appFilter}`);
     }
     if (fromDate || toDate) {
       labels.push(
@@ -1639,7 +1671,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     }
     return labels;
   }, [
-    sourceFilter,
+    appFilter,
     fromDate,
     toDate,
     statusFilter,
@@ -1761,14 +1793,14 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             <span className="mx-1 text-zinc-700">|</span>
             <span className="mr-1 shrink-0 text-xs text-[var(--gw-muted)]">应用</span>
             {LOG_APP_FILTER_OPTIONS.map((opt) => {
-              const active = sourceFilter === opt.value;
+              const active = appFilter === opt.value;
               return (
                 <button
                   key={opt.value || "all"}
                   type="button"
                   className={logFilterChipClass(active)}
                   onClick={() => {
-                    setSourceFilter(opt.value);
+                    setAppFilter(opt.value);
                     resetListScrollOnFilter();
                     clearSelectionOnFilter(setSelected);
                   }}
@@ -2029,6 +2061,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       </div>
 
       <div
+        ref={tableScrollRef}
         className="gw-logs-table-scroll gw-scrollbar-thin relative min-h-0 flex-1 overflow-auto rounded-xl border border-[var(--gw-border)] bg-[#0f0f14]"
         aria-busy={loading}
       >
@@ -2177,31 +2210,31 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               </th>
               <th
                 className="whitespace-nowrap border-l border-white/10 bg-zinc-800/25 px-2"
-                title="仅火山异步视频 · Gateway 提交 → 首次观测到火山 running（或仍在 queued 时的累计排队）"
+                title="百炼/DashScope 异步 · Gateway 提交 → scheduled_time；火山异步视频 · 提交 → 首次 running"
               >
                 排队
               </th>
               <th
                 className="whitespace-nowrap bg-zinc-800/25 px-2"
-                title="仅火山异步视频 · 生成阶段秒表：到厂商起按墙钟实时累计，厂商完成时冻结；厂商 GPU 真值见右侧「厂商生成」列。"
+                title="百炼/DashScope：scheduled_time → end_time；火山：生成阶段墙钟 / GPU 真值"
               >
                 生成
               </th>
               <th
                 className="whitespace-nowrap bg-zinc-800/25 px-2"
-                title="仅火山异步视频 · 成功任务：updated_at 跳变 → 首次 succeeded；失败为 —"
+                title="火山异步视频 · 成功任务 updated_at 跳变 → 首次 succeeded；百炼/DashScope 一般为 —"
               >
                 后处理
               </th>
               <th
                 className="whitespace-nowrap bg-zinc-800/25 px-2 text-[var(--gw-muted)]"
-                title="厂商 · 火山 trace created→updated（仅 GPU 生成跨度，不含排队/后处理/我方轮询）。与「生成」列 GPU 真值一致；进行中 updated 未跳变时为 —。"
+                title="厂商原生跨度：DashScope submit→end；火山 created→updated（GPU，不含排队/轮询）"
               >
                 厂商 GPU
               </th>
               <th
                 className="whitespace-nowrap border-r border-white/10 bg-zinc-800/25 px-2 text-[var(--gw-muted)]"
-                title="仅火山异步视频 · 厂商 GPU 真值（updated−created，只读）；与左侧「生成」墙钟对照。未跳变前不计秒。"
+                title="厂商生成真值：DashScope scheduled→end；火山 updated−created"
               >
                 厂商生成
               </th>

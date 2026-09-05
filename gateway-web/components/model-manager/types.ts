@@ -1,4 +1,4 @@
-export type ModelTab = "text" | "image" | "video" | "function";
+export type ModelTab = "all" | "text" | "image" | "video" | "function";
 
 export type CredentialRow = {
   id: string;
@@ -14,6 +14,9 @@ export type CredentialRow = {
   lastTestStatus: string | null;
   createdAt: string;
   updatedAt: string;
+  /** VOLCENGINE · 是否已配置私域人像 IAM */
+  volcengineHasPortraitIam?: boolean;
+  volcenginePortraitAccessKeyMasked?: string | null;
 };
 
 export type CatalogModel = {

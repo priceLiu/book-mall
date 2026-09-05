@@ -57,6 +57,8 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
   if (!body.ok) return body.response;
   const { id } = await ctx.params;
   try {
+    const hasCanvasPatch =
+      body.body.canvas !== undefined || body.body.canvasDelta !== undefined;
     const project = await updateCanvasProjectForUser(guard.user.id, id, {
       name: typeof body.body.name === "string" ? body.body.name : undefined,
       description:
@@ -64,6 +66,12 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
           ? body.body.description
           : undefined,
       canvas: body.body.canvas,
+      canvasDelta:
+        body.body.canvasDelta &&
+        typeof body.body.canvasDelta === "object" &&
+        !Array.isArray(body.body.canvasDelta)
+          ? (body.body.canvasDelta as import("@/lib/canvas/canvas-delta-merge").CanvasDeltaPatch)
+          : undefined,
       thumbnailUrl:
         typeof body.body.thumbnailUrl === "string"
           ? body.body.thumbnailUrl
@@ -74,16 +82,19 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     let historyItem: Awaited<
       ReturnType<typeof createCanvasProjectHistoryForUser>
     > | null = null;
-    if (
-      hs &&
-      typeof hs === "object" &&
-      body.body.canvas !== undefined
-    ) {
+    if (hs && typeof hs === "object" && hasCanvasPatch) {
       const source =
         (hs as { source?: string }).source === "manual"
           ? ("manual" as const)
           : ("autosave" as const);
       const labelRaw = (hs as { label?: unknown }).label;
+      // 客户端视口截图优先：项目封面/画布内媒体图只能反映「有没有生成过图」，
+      // 不能反映该版本的画布长什么样
+      const shotRaw = (hs as { thumbnailUrl?: unknown }).thumbnailUrl;
+      const viewportShot =
+        typeof shotRaw === "string" && /^https?:\/\//i.test(shotRaw.trim())
+          ? shotRaw.trim()
+          : "";
       try {
         historyItem = await createCanvasProjectHistoryForUser(
           guard.user.id,
@@ -91,6 +102,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
           {
             canvas: project.canvas,
             thumbnailUrl:
+              viewportShot ||
               project.thumbnailUrl?.trim() ||
               pickProjectThumbnailUrl(project.canvas) ||
               undefined,

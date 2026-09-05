@@ -2,10 +2,13 @@
  * 补充 KIE / 火山等 ModelCostProfile，并触发平台模型自动上架。
  *
  *   pnpm exec dotenv -e .env.local -- tsx scripts/seed-platform-model-costs.ts
+ *   pnpm exec dotenv -e .env.local -- tsx scripts/seed-platform-model-costs.ts --no-publish
  *
- * KIE 参考价：https://kie.ai/pricing（2026-06）
+ * KIE 参考价：https://kie.ai/pricing（2026-08）
  */
+import { MISSING_MODEL_COST_SEEDS } from "../lib/finance/missing-model-cost-seeds";
 import { autoPublishPlatformOfferings } from "../lib/platform-model/auto-publish-offerings";
+import { importModelCostProfileVersioned } from "../lib/pricing/import-model-cost-profile-versioned";
 import { prisma } from "../lib/prisma";
 
 type CostSeed = {
@@ -66,26 +69,50 @@ const EXTRA_COSTS: CostSeed[] = [
     listCostYuan: 0.12,
     discountRate: 0.05,
   },
-  // 文生图（Gateway 统一 canonical）
+  // 文生图（百炼华北2 官方价：help.aliyun.com/zh/model-studio/model-pricing）
   {
     canonicalModelKey: "wan2.7-image",
     vendor: "aliyun",
     unit: "PER_IMAGE",
-    listCostYuan: 0.08,
+    listCostYuan: 0.2,
     discountRate: 0.1,
+  },
+  {
+    canonicalModelKey: "wan2.6-image",
+    vendor: "aliyun",
+    unit: "PER_IMAGE",
+    listCostYuan: 0.2,
+    discountRate: 0.1,
+    note: "万相 2.6 图像编辑 · 官方 0.20 元/张",
   },
   {
     canonicalModelKey: "wan2.7-image-pro",
     vendor: "aliyun",
     unit: "PER_IMAGE",
-    listCostYuan: 0.12,
+    listCostYuan: 0.5,
+    discountRate: 0.1,
+  },
+  {
+    canonicalModelKey: "qwen-image-3.0-pro",
+    vendor: "aliyun",
+    unit: "PER_IMAGE",
+    listCostYuan: 0.5,
+    discountRate: 0.1,
+    note: "2K 输出档 · 官方 0.5 元/张",
+  },
+  {
+    canonicalModelKey: "z-image-turbo",
+    vendor: "aliyun",
+    unit: "PER_IMAGE",
+    listCostYuan: 0.1,
     discountRate: 0.1,
   },
   {
     canonicalModelKey: "kling-3.0-image",
     vendor: "aliyun",
     unit: "PER_IMAGE",
-    listCostYuan: 0.1,
+    tierRaw: "1K",
+    listCostYuan: 0.2,
     discountRate: 0.1,
   },
   // 图生视频
@@ -109,7 +136,16 @@ const EXTRA_COSTS: CostSeed[] = [
     canonicalModelKey: "wanxiang-video-2.7-i2v",
     vendor: "aliyun",
     unit: "PER_SEC",
-    listCostYuan: 0.2,
+    tierRaw: "720P",
+    listCostYuan: 0.6,
+    discountRate: 0.1,
+  },
+  {
+    canonicalModelKey: "kling-3.0-video",
+    vendor: "aliyun",
+    unit: "PER_SEC",
+    tierRaw: "720P",
+    listCostYuan: 0.6,
     discountRate: 0.1,
   },
   // KIE 生图 · gpt-image-1.5 / gpt-image-2 / Grok Imagine
@@ -195,8 +231,8 @@ const EXTRA_COSTS: CostSeed[] = [
     canonicalModelKey: "kling-3.0-video",
     vendor: "kie",
     unit: "PER_SEC",
-    tierRaw: "标准",
-    listCostYuan: 0.68,
+    tierRaw: "720P",
+    listCostYuan: 0.49,
     discountRate: 0.05,
   },
   // 百炼 R2V / 万相
@@ -212,14 +248,16 @@ const EXTRA_COSTS: CostSeed[] = [
     canonicalModelKey: "wanxiang-video-2.7",
     vendor: "aliyun",
     unit: "PER_SEC",
-    listCostYuan: 0.25,
+    tierRaw: "720P",
+    listCostYuan: 0.6,
     discountRate: 0.1,
   },
   {
     canonicalModelKey: "wanxiang-video-2.6",
     vendor: "aliyun",
     unit: "PER_SEC",
-    listCostYuan: 0.22,
+    tierRaw: "720P",
+    listCostYuan: 0.6,
     discountRate: 0.1,
   },
   // AI 试衣（文生图 taxonomy）
@@ -267,50 +305,71 @@ const EXTRA_COSTS: CostSeed[] = [
     listCostYuan: 0.008,
     discountRate: 0.1,
   },
+  ...MISSING_MODEL_COST_SEEDS,
 ];
+
+const ALL_COSTS: CostSeed[] = EXTRA_COSTS;
 
 function seedId(row: CostSeed): string {
   const tier = row.tierRaw ? `_${row.tierRaw.replace(/\W/g, "")}` : "";
   return `seed_${row.canonicalModelKey}_${row.vendor}${tier}`;
 }
 
+/** 同 canonical + vendor + tier 关旧开新（不再 in-place 覆盖）。 */
 async function upsertCost(row: CostSeed) {
-  const netCostYuan = row.listCostYuan * (1 - row.discountRate);
-  const id = seedId(row);
-  await prisma.modelCostProfile.upsert({
-    where: { id },
-    create: {
-      id,
-      canonicalModelKey: row.canonicalModelKey,
-      vendor: row.vendor,
-      unit: row.unit,
-      tierRaw: row.tierRaw ?? null,
-      listCostYuan: row.listCostYuan,
-      discountRate: row.discountRate,
-      netCostYuan,
-      active: true,
-      note: "seed-platform-model-costs (kie.ai/pricing)",
-    },
-    update: {
-      listCostYuan: row.listCostYuan,
-      discountRate: row.discountRate,
-      netCostYuan,
-      active: true,
-      note: "seed-platform-model-costs (kie.ai/pricing)",
-    },
+  const result = await importModelCostProfileVersioned({
+    canonicalModelKey: row.canonicalModelKey,
+    vendor: row.vendor,
+    unit: row.unit,
+    tierRaw: row.tierRaw ?? null,
+    listCostYuan: row.listCostYuan,
+    discountRate: row.discountRate,
+    note: "seed-platform-model-costs (kie.ai/pricing)",
+    seedId: seedId(row),
   });
-  console.log(`[ok] ${row.canonicalModelKey} (${row.vendor}${row.tierRaw ? ` · ${row.tierRaw}` : ""})`);
+  console.log(
+    `[${result.action}] ${row.canonicalModelKey} (${row.vendor}${row.tierRaw ? ` · ${row.tierRaw}` : ""})`,
+  );
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
 }
 
 async function main() {
-  for (const row of EXTRA_COSTS) {
+  const skipPublish = process.argv.includes("--no-publish");
+
+  for (const row of ALL_COSTS) {
     await upsertCost(row);
   }
+  console.log(`[ok] upserted ${ALL_COSTS.length} cost profile(s)`);
 
-  const result = await autoPublishPlatformOfferings({ publishedBy: "seed-script" });
-  console.log(`[ok] auto-publish: ${result.published} active, ${result.skipped} skipped`);
-  if (result.warnings.length) {
-    console.warn(result.warnings.join("\n"));
+  if (skipPublish) {
+    console.log("[skip] auto-publish (--no-publish)");
+    return;
+  }
+
+  const seededKeys = [...new Set(ALL_COSTS.map((r) => r.canonicalModelKey))];
+  let published = 0;
+  let skipped = 0;
+  const warnings: string[] = [];
+
+  for (const batch of chunk(seededKeys, 15)) {
+    const result = await autoPublishPlatformOfferings({
+      canonicalKeys: batch,
+      publishedBy: "seed-script",
+    });
+    published += result.published;
+    skipped += result.skipped;
+    warnings.push(...result.warnings);
+  }
+
+  console.log(`[ok] auto-publish: ${published} active, ${skipped} skipped`);
+  if (warnings.length) {
+    console.warn(warnings.slice(0, 20).join("\n"));
+    if (warnings.length > 20) console.warn(`… 另有 ${warnings.length - 20} 条警告`);
   }
 }
 

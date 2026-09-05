@@ -1,11 +1,12 @@
 "use client";
 
-import { Menu } from "lucide-react";
+import { Braces, CreditCard, Layers, LayoutGrid, Menu, MessageSquareText, Monitor } from "lucide-react";
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ProductMegaMenuContent } from "@/components/layout/product-mega-menu";
+import { buildBookPortalNavItems, BOOK_PORTAL_EXTERNAL_LINK_PROPS, marketingHomeSectionUrl } from "@/lib/portal-nav";
 import {
   Sheet,
   SheetContent,
@@ -16,14 +17,17 @@ import {
 } from "../ui/sheet";
 import { Separator } from "../ui/separator";
 import { Button } from "../ui/button";
-import { NotchNav, type NotchNavItem } from "../ui/notch-nav";
+import {
+  TubelightNavBar,
+  type TubelightNavItem,
+} from "../ui/tubelight-navbar";
 import { ToggleTheme } from "./toogle-theme";
 import { siteHeaderWidthClass } from "@/lib/site-layout";
 import { cn } from "@/lib/utils";
 import { PRODUCTION_BRAND_PORTAL_ORIGIN } from "@/lib/production-origin";
 
-/** 与 NotchNav 中「产品」项 value 一致，用于凹槽高亮与路由判断 */
-const NAV_PRODUCT_VALUE = "__nav_products__";
+/** 与 TubelightNav「产品」项 name 一致 */
+const NAV_PRODUCT_LABEL = "产品";
 
 interface RouteProps {
   href: string;
@@ -32,8 +36,10 @@ interface RouteProps {
 
 const routeList: RouteProps[] = [
   { href: "#hero-video", label: "主屏" },
+  { href: "#platform-apps", label: "平台应用" },
   { href: "#testimonials", label: "客户评价" },
-  { href: "/pricing", label: "报价" },
+  { href: "/pricing", label: "订阅价格" },
+  { href: "/pricing/api", label: "API 价格" },
 ];
 
 function BrandLogoLink({ onNavigate }: { onNavigate?: () => void }) {
@@ -56,7 +62,13 @@ function BrandLogoLink({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export function NavbarShell({ children }: { children: React.ReactNode }) {
+export function NavbarShell({
+  children,
+  isLoggedIn = false,
+}: {
+  children: React.ReactNode;
+  isLoggedIn?: boolean;
+}) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [productMenuOpen, setProductMenuOpen] = React.useState(false);
   const pathname = usePathname();
@@ -74,54 +86,72 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
     };
   }, [pathname]);
 
-  const isProductPath =
-    pathname.startsWith("/products/") ||
-    pathname === "/courses" ||
-    pathname.startsWith("/courses/");
+  const activeNavName = React.useMemo(() => {
+    if (productMenuOpen) return NAV_PRODUCT_LABEL;
+    if (pathname === "/pricing/api" || pathname.startsWith("/pricing/api/")) return "API 价格";
+    if (pathname === "/pricing") return "订阅价格";
+    if (pathname === "/") {
+      const hit = routeList.find((r) => r.href === hash);
+      return hit?.label ?? "主屏";
+    }
+    return "主屏";
+  }, [pathname, hash, productMenuOpen]);
 
-  const notchAnchorValue = React.useMemo(() => {
-    if (isProductPath || productMenuOpen) return NAV_PRODUCT_VALUE;
-    if (pathname !== "/") return routeList[0]?.href ?? "";
-    const hit = routeList.find((r) => r.href === hash);
-    return hit?.href ?? routeList[0]?.href ?? "";
-  }, [pathname, hash, isProductPath, productMenuOpen]);
-
-  const notchItems = React.useMemo((): NotchNavItem[] => {
+  const tubelightItems = React.useMemo((): TubelightNavItem[] => {
+    const icons: Record<string, TubelightNavItem["icon"]> = {
+      主屏: Monitor,
+      平台应用: LayoutGrid,
+      客户评价: MessageSquareText,
+      订阅价格: CreditCard,
+      "API 价格": Braces,
+    };
     return [
       {
-        value: NAV_PRODUCT_VALUE,
-        label: "产品",
-        dropdown: <ProductMegaMenuContent />,
+        name: NAV_PRODUCT_LABEL,
+        icon: Layers,
+        dropdown: <ProductMegaMenuContent isLoggedIn={isLoggedIn} />,
         onDropdownOpenChange: setProductMenuOpen,
       },
-      ...routeList.map((r) => ({ value: r.href, label: r.label })),
+      ...routeList.map((r) => ({
+        name: r.label,
+        url: r.href,
+        icon: icons[r.label] ?? Monitor,
+      })),
     ];
-  }, []);
+  }, [isLoggedIn]);
 
-  const navigateNotch = React.useCallback(
-    (href: string) => {
+  const handleTubelightNavigate = React.useCallback(
+    (item: TubelightNavItem) => {
+      if (!item.url) return;
       setProductMenuOpen(false);
-      if (href === NAV_PRODUCT_VALUE) return;
 
-      if (href.startsWith("#")) {
-        setHash(href);
-        const target = `/${href}`;
-        const sectionId = href.slice(1);
+      if (item.url.startsWith("#")) {
+        setHash(item.url);
+        const sectionId = item.url.slice(1);
+
+        if (pathname !== "/") {
+          window.open(
+            marketingHomeSectionUrl(window.location.origin, item.url),
+            "_blank",
+            "noopener,noreferrer",
+          );
+          return;
+        }
 
         if (pathname === "/") {
-          void router.push(target, { scroll: false });
+          void router.push(`/${item.url}`, { scroll: false });
           requestAnimationFrame(() => {
             document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" });
           });
           return;
         }
 
-        void router.push(target);
+        void router.push(`/${item.url}`);
         router.refresh();
         return;
       }
 
-      void router.push(href);
+      void router.push(item.url);
     },
     [pathname, router],
   );
@@ -159,30 +189,19 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
 
               <div className="flex flex-col gap-2">
                 <p className="px-2 text-xs font-medium text-muted-foreground">产品</p>
-                <Button
-                  onClick={() => setIsOpen(false)}
-                  asChild
-                  variant="ghost"
-                  className="justify-start text-base"
-                >
-                  <Link href="/products/ai-apps">AI 应用</Link>
-                </Button>
-                <Button
-                  onClick={() => setIsOpen(false)}
-                  asChild
-                  variant="ghost"
-                  className="justify-start text-base"
-                >
-                  <Link href="/products/ai-courses">AI 课程</Link>
-                </Button>
-                <Button
-                  onClick={() => setIsOpen(false)}
-                  asChild
-                  variant="ghost"
-                  className="justify-start text-base"
-                >
-                  <Link href="/courses">AI 学堂</Link>
-                </Button>
+                {buildBookPortalNavItems(undefined, isLoggedIn).map((item) => (
+                  <Button
+                    key={item.key}
+                    onClick={() => setIsOpen(false)}
+                    asChild
+                    variant="ghost"
+                    className="justify-start text-base"
+                  >
+                    <a href={item.href} {...BOOK_PORTAL_EXTERNAL_LINK_PROPS}>
+                      {item.label}
+                    </a>
+                  </Button>
+                ))}
               </div>
               <Separator className="my-2" />
               <div className="flex flex-col gap-2">
@@ -194,7 +213,16 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
                     variant="ghost"
                     className="justify-start text-base"
                   >
-                    <Link href={href.startsWith("#") ? `/${href}` : href}>{label}</Link>
+                    {href.startsWith("#") && pathname !== "/" ? (
+                      <a
+                        href={marketingHomeSectionUrl(window.location.origin, href)}
+                        {...BOOK_PORTAL_EXTERNAL_LINK_PROPS}
+                      >
+                        {label}
+                      </a>
+                    ) : (
+                      <Link href={href.startsWith("#") ? `/${href}` : href}>{label}</Link>
+                    )}
                   </Button>
                 ))}
               </div>
@@ -203,6 +231,14 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
             <SheetFooter className="flex-col justify-start items-stretch sm:flex-col">
               <Separator className="mb-2" />
               <div className="flex flex-wrap items-center gap-2">
+                <a
+                  href="/account/recharge"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-medium text-primary hover:underline"
+                >
+                  积分充值
+                </a>
                 {children}
                 <ToggleTheme iconOnly className="shrink-0" />
               </div>
@@ -212,17 +248,22 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="hidden min-h-9 min-w-0 flex-1 items-center justify-center overflow-visible lg:flex">
-        <NotchNav
-          key={pathname}
-          items={notchItems}
-          value={notchAnchorValue}
-          onValueChange={navigateNotch}
-          ariaLabel="主导航"
-          className="shrink-0"
+        <TubelightNavBar
+          items={tubelightItems}
+          activeName={activeNavName}
+          onNavigate={handleTubelightNavigate}
         />
       </div>
 
       <div className="hidden h-9 shrink-0 items-center gap-2 lg:flex">
+        <a
+          href="/account/recharge"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 text-sm font-medium text-primary hover:underline"
+        >
+          积分充值
+        </a>
         {children}
         <ToggleTheme iconOnly className="shrink-0" />
       </div>

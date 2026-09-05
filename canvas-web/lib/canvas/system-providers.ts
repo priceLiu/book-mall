@@ -8,6 +8,8 @@ import {
 } from "./ref-video-models";
 import {
   STORY_LLM_MODEL_KEYS,
+  STORY_PRO_VIDEO_BAILIAN_MODEL_KEYS,
+  STORY_PRO_VIDEO_MINIMAX_MODEL_KEYS,
   STORY_PRO_VIDEO_MODEL_KEYS,
   STORY_PRO_VIDEO_VOLCENGINE_MODEL_KEYS,
   STORY_TTS_MODEL_KEYS,
@@ -18,7 +20,6 @@ import {
 
 export const SYSTEM_KIE_PROVIDER_ID = "system:kie";
 export const SYSTEM_DEEPSEEK_PROVIDER_ID = "system:deepseek";
-export const SYSTEM_BAILIAN_R2V_PROVIDER_ID = "system:bailian-r2v";
 export const GATEWAY_KIE_PROVIDER_ID = "gateway:kie";
 export const GATEWAY_DEEPSEEK_PROVIDER_ID = "gateway:deepseek";
 export const GATEWAY_MOONSHOT_PROVIDER_ID = "gateway:moonshot";
@@ -29,6 +30,10 @@ export const GATEWAY_VOLCENGINE_PROVIDER_ID = "gateway:volcengine";
 export const GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID = "gateway:sbv1-volcengine";
 /** Topaz Labs · 高清视频增强 */
 export const GATEWAY_TOPAZ_PROVIDER_ID = "gateway:topaz";
+/** MiniMax H3 视频 · Gateway 直连 */
+export const GATEWAY_MINIMAX_VIDEO_PROVIDER_ID = "gateway:minimax-video";
+/** 平台代付 · 统一 offering 分组（registry 优先映射到 gateway:*，此处作兼容） */
+export const PLATFORM_OFFERING_PROVIDER_ID = "platform:offering";
 /** 与 story-web 初始化大纲一致，走 KIE gemini-3-flash 端点 */
 export const STORY_LLM_PREFERRED_MODEL_KEY = "google/gemini-3-flash-preview";
 
@@ -212,16 +217,38 @@ function findVideoOnProvider(
   return { providerId: provider.id, modelKey: m.modelKey };
 }
 
-/** 漫剧分镜视频 · 默认 Gateway · 火山方舟 Seedance 2.0，其次 KIE */
+/** 漫剧分镜视频 · 默认 Gateway · HappyHorse 1.1 T2V，其次火山 Seedance / KIE */
 export function pickDefaultStoryVideoEngine(
   providers: CanvasProviderDto[],
 ): { providerId: string; modelKey: string } | null {
+  const bailian =
+    findProviderByKind(providers, "ALI_BAILIAN") ??
+    activeCanvasProviders(providers).find(
+      (p) => p.id === GATEWAY_BAILIAN_PROVIDER_ID,
+    );
+  if (bailian) {
+    for (const key of STORY_PRO_VIDEO_BAILIAN_MODEL_KEYS) {
+      const hit = findVideoOnProvider(bailian, key);
+      if (hit) return hit;
+    }
+  }
+
   const volc = activeCanvasProviders(providers).find(
     (p) => p.id === GATEWAY_VOLCENGINE_PROVIDER_ID,
   );
   if (volc) {
     for (const key of STORY_PRO_VIDEO_VOLCENGINE_MODEL_KEYS) {
       const hit = findVideoOnProvider(volc, key);
+      if (hit) return hit;
+    }
+  }
+
+  const minimax = activeCanvasProviders(providers).find(
+    (p) => p.id === GATEWAY_MINIMAX_VIDEO_PROVIDER_ID,
+  );
+  if (minimax) {
+    for (const key of STORY_PRO_VIDEO_MINIMAX_MODEL_KEYS) {
+      const hit = findVideoOnProvider(minimax, key);
       if (hit) return hit;
     }
   }

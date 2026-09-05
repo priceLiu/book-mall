@@ -174,16 +174,9 @@ function ScenarioPanel({ scenario }: { scenario: BusinessScenario }) {
             </>
           ) : (
             <>
-              月付 <strong>{yuan(sub.monthlyPriceYuan)}</strong> · 含 {sub.monthlyCredits.toLocaleString()} 积分 ·
-              视频专用池约 {sub.videoPoolCredits.toLocaleString()} 积分
+              月付 <strong>{yuan(sub.monthlyPriceYuan)}</strong> · 含 {sub.monthlyCredits.toLocaleString()} 积分
             </>
           )}
-          {isTeam ? (
-            <span className="ml-1 text-xs text-[#8c8c8c]">
-              （每席视频池 {sub.videoPoolCredits.toLocaleString()}，团队合计约{" "}
-              {(sub.videoPoolCredits * (sub.seats ?? 1)).toLocaleString()}）
-            </span>
-          ) : null}
         </p>
       </header>
 

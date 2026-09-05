@@ -19,6 +19,8 @@ import { buildTeamGatewayUsageWhere } from "@/lib/gateway/log-query-scope";
 import {
   fetchTeamGatewayTokenUsage,
   gatewayTokenUsageToRecord,
+  GATEWAY_USAGE_LOG_SELECT,
+  resolveBillableUsageForLog,
 } from "@/lib/gateway/gateway-token-usage-aggregate";
 import { getTenantOverview } from "@/lib/tenant/tenant-service";
 
@@ -46,7 +48,7 @@ export interface InternalModelCost {
 
 /**
  * 平台内部口径：某月各 canonicalModelKey 的调用次数与成本合计。
- * 成本取 costSnapshotYuan（净成本快照），缺失回退 estimatedVendorCostYuan。
+ * 成本 = costSnapshotYuan（单位净价）× 计费用量；缺失回退 estimatedVendorCostYuan。
  */
 export async function aggregateInternalCostByModel(periodKey: string): Promise<InternalModelCost[]> {
   const { from, to } = periodBounds(periodKey);
@@ -56,8 +58,7 @@ export async function aggregateInternalCostByModel(periodKey: string): Promise<I
       status: "SUCCEEDED",
     },
     select: {
-      canonicalModelKey: true,
-      model: true,
+      ...GATEWAY_USAGE_LOG_SELECT,
       costSnapshotYuan: true,
       estimatedVendorCostYuan: true,
     },
@@ -66,10 +67,13 @@ export async function aggregateInternalCostByModel(periodKey: string): Promise<I
   const map = new Map<string, InternalModelCost>();
   for (const l of logs) {
     const key = l.canonicalModelKey ?? l.model ?? "(未归口)";
-    const cost = l.costSnapshotYuan != null ? num(l.costSnapshotYuan) : num(l.estimatedVendorCostYuan);
+    const unitNet =
+      l.costSnapshotYuan != null ? num(l.costSnapshotYuan) : num(l.estimatedVendorCostYuan);
+    const { amount: units } = resolveBillableUsageForLog(l);
+    const lineCost = unitNet * units;
     const cur = map.get(key) ?? { canonicalModelKey: key, count: 0, internalCostYuan: 0 };
     cur.count += 1;
-    cur.internalCostYuan += cost;
+    cur.internalCostYuan += lineCost;
     map.set(key, cur);
   }
   return [...map.values()].sort((a, b) => b.internalCostYuan - a.internalCostYuan);

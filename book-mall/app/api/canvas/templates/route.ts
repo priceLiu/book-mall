@@ -9,6 +9,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { resolveListThumbnailUrl } from "@/lib/canvas/resolve-list-thumbnail";
+import { isPublicCanvasTemplatesListScope } from "@/lib/canvas/portal-public-read";
 
 export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request);
@@ -38,23 +39,29 @@ function templateSelect() {
 
 /** GET：scope=featured|public|my|all（默认 all = builtin + 自己的） */
 export async function GET(request: NextRequest) {
-  const guard = await requireSessionUser(request);
-  if (!guard.ok) return guard.response;
-
   const scope = request.nextUrl.searchParams.get("scope")?.trim() || "all";
+  const isPublicScope = isPublicCanvasTemplatesListScope(scope);
+
+  let ownerUserId: string | undefined;
+  if (!isPublicScope) {
+    const guard = await requireSessionUser(request);
+    if (!guard.ok) return guard.response;
+    ownerUserId = guard.user.id;
+  }
 
   let where: Prisma.CanvasTemplateWhereInput;
   if (scope === "featured") {
     where = {
+      edition: "pro2",
       OR: [{ builtin: true, featured: true }, { featured: true, visibility: "public" }],
     };
   } else if (scope === "public") {
-    where = { visibility: "public", builtin: false };
+    where = { visibility: "public", builtin: false, edition: "pro2" };
   } else if (scope === "my") {
-    where = { ownerUserId: guard.user.id };
+    where = { ownerUserId: ownerUserId! };
   } else {
     where = {
-      OR: [{ builtin: true }, { ownerUserId: guard.user.id }],
+      OR: [{ builtin: true }, { ownerUserId: ownerUserId! }],
     };
   }
 

@@ -91,14 +91,23 @@ export function decideWatchdogVendorCheck(input: {
   lastPolledAtMs: number | null;
   lastWatchdogRecoverAtMs: number | null;
   checkpointsSec?: number[];
+  /** 覆盖默认 env（KIE 看门狗等场景用更短阈值） */
+  workerStaleMs?: number;
+  tooLongMs?: number;
+  minRecoverGapMs?: number;
+  intervalAfterLastCheckpointMs?: number;
 }): WatchdogDueDecision {
   const checkpointsSec = input.checkpointsSec ?? parseWatchdogCheckpointSec();
   const checkpointsMs = checkpointsSec.map((s) => s * 1000);
   const ageMs = input.nowMs - input.submittedAtMs;
   const pollLagMs =
     input.nowMs - (input.lastPolledAtMs ?? input.submittedAtMs);
-  const workerStaleMs = watchdogWorkerStaleMs();
-  const tooLongMs = watchdogLegacyTooLongMs();
+  const workerStaleMs = input.workerStaleMs ?? watchdogWorkerStaleMs();
+  const tooLongMs = input.tooLongMs ?? watchdogLegacyTooLongMs();
+  const minGapMs = input.minRecoverGapMs ?? watchdogMinRecoverGapMs();
+  const intervalMs =
+    input.intervalAfterLastCheckpointMs ??
+    watchdogIntervalAfterLastCheckpointMs();
 
   if (
     ageMs >= tooLongMs &&
@@ -107,7 +116,6 @@ export function decideWatchdogVendorCheck(input: {
     return { due: true, reason: "poll_stale" };
   }
 
-  const minGapMs = watchdogMinRecoverGapMs();
   const lastRecover = input.lastWatchdogRecoverAtMs ?? 0;
   if (lastRecover > 0 && input.nowMs - lastRecover < minGapMs) {
     return { due: false, reason: null };
@@ -129,7 +137,7 @@ export function decideWatchdogVendorCheck(input: {
   if (
     lastCpMs != null &&
     ageMs >= lastCpMs &&
-    input.nowMs - lastRecover >= watchdogIntervalAfterLastCheckpointMs()
+    input.nowMs - lastRecover >= intervalMs
   ) {
     return {
       due: true,

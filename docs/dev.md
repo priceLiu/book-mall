@@ -6,7 +6,7 @@
 pnpm install                        # 根目录 concurrently
 pnpm --dir e-commerce-toolkit install   # 首次：电商工具箱依赖（dev:all 会起 :3007）
 pnpm --dir book-mall install            # 主站与其它子站按需在各自目录 install
-pnpm dev:all                        # 同时启动 3000–3008（含 e-commerce-toolkit、quick-replica-web）
+pnpm dev:all                        # 同时启动 3000–3011（含 e-commerce-toolkit、quick-replica-web、director-web、common-tools、publisher-web）
 ```
 
 `dev:all` 进程表见仓库根 `scripts/dev-all.mjs`；终端里电商工具箱日志前缀为 `[ecom]`。
@@ -32,6 +32,15 @@ pnpm dev:all                        # 同时启动 3000–3008（含 e-commerce-
 | prompt-optimizer-platform（提示词优化器） | 3006 | http://localhost:3006 |
 | e-commerce-toolkit（电商工具箱） | 3007 | http://localhost:3007 |
 | quick-replica-web（快速复制） | 3008 | http://localhost:3008 |
+| director-web（3D导演台） | 3009 | http://localhost:3009 |
+| common-tools（常用工具） | 3010 | http://localhost:3010 |
+| publisher-web（一键发布） | 3011 | http://localhost:3011 |
+
+### 电商工具箱 · 穿搭视频 Studio
+
+- 路由：**http://localhost:3007/ecom/outfit-video**（旧 `/ecom/video/outfit` 301 重定向）
+- Platform API：`book-mall/app/api/sso/tools/ecom/outfit-video/*`
+- 技术契约：`book-mall/doc/ecom/video-workflow-template-spec.md`（`ecom-video-workflow/v1` · 模板 `outfit-v1`）
 
 ## 漫剧：带上 KIE 轮询
 
@@ -54,26 +63,32 @@ pnpm dev:all:story
 | `DATABASE_URL` | **运行时**（book-mall / poll-loop / Prisma Client）— 走连接池端口或直连 CDB |
 | `DIRECT_DATABASE_URL` | **仅** Prisma CLI `migrate deploy`；防火墙常拦直连 → 迁移改用 `pnpm db:apply-pending` |
 
-**VPN**：腾讯云 CDB 通常在私有网络。VPN 未连时 TCP 不通，表现为登录慢、生图报「服务暂时不可用」或 Prisma P1001。`pnpm dev:all` 启动时会 TCP 探测远程库并黄色提示；随时可自检：
+**网络（禁止 VPN）**：本地开发 **不得** 通过 VPN 连库或访问 OSS/厂商 API。数据库使用 `DATABASE_URL` **公网连接池**；不可达时查白名单、`db:ping`、连接池预算（见 `.cursor/rules/no-vpn-networking.mdc`）。
+
+`pnpm dev:all` 启动时会 TCP 探测远程库并黄色提示；随时可自检：
 
 ```bash
 pnpm --dir book-mall db:ping
 ```
 
-**推荐**在 `book-mall/.env.local` 的 `DATABASE_URL` query 追加：
+**推荐**在 `book-mall/.env.local` 的 `DATABASE_URL` query 追加（直连 CDB 时可省略 `connection_limit`，代码默认注入 30；经 PgBouncer 建议显式 `15`）：
 
 ```
-connection_limit=10&pool_timeout=30&connect_timeout=15
+pool_timeout=30&connect_timeout=15
 ```
 
 | 场景 | 建议 |
 |------|------|
-| 全量 `pnpm dev:all:story` | `connection_limit=10`，改 URL 后**必须重启** dev:all |
-| 仍频繁 P1001 | `pnpm dev:all:nopoll`，手动单开 poll；或暂时只起 book-mall + canvas |
+| 全量 `pnpm dev:all` | book-mall **不再**硬编码 `PRISMA_CONNECTION_LIMIT=12`；直连默认 30/进程，PgBouncer 默认 15 |
+| 仍频繁 P2024 | `pnpm dev:all:nopoll` 或重启 dev:all；勿在 URL 设过小 `connection_limit`（如 10） |
+| Book 页 `PrismaPoolBusyError` | 连接池闸门默认**关闭**；勿设 `PRISMA_DB_GATE=1` 除非刻意压测。改代码后须 **重启 dev:all**（Prisma Client 缓存在 globalThis） |
+| 连接预算自检 | `GET http://localhost:3000/api/dev/health` → `database.budget`（mall + 3×poll 估算 vs 推荐上限） |
 | 对账排队任务 | `pnpm --dir book-mall canvas:queued-reconcile` |
 | 洗误标 Gateway log | `pnpm --dir book-mall gateway:repair-insufficient-mislabel -- --apply` |
 
-poll-loop 子进程已在 `package.json` 设 `PRISMA_CONNECTION_LIMIT=3`（dev 经 PgBouncer，给单 worker 留 1~2 条连接余量，避免单连接慢/被回收时整 worker 饿死 → P2024 → 任务漏 poll 到 90min 误超时；worker 身份由 `GENERATION_POLL_WORKER=1` 标记，与连接数无关）。生产 PgBouncer / 连接预算见 `deploy/tencent/pgbouncer/README.md`。
+poll-loop 子进程已在 `package.json` 设 `PRISMA_CONNECTION_LIMIT=1`（3 个 worker：story / canvas / gateway）。dev:all 估算总连接 = mall 进程 limit + 3×1；详见 health API `database.budget`。生产 PgBouncer / 连接预算见 `deploy/tencent/pgbouncer/README.md`。
+
+**连接池饱和时的产品行为（2026-08）**：Prisma 重试耗尽 → 统一 `DbUnavailableError`；RSC 有 `app/error.tsx` + account 布局降级；SSO/auth API → 503 `SYSTEM_BUSY`（非 500 红屏）。
 
 Release 全文：`docs/releases/2026-06-db-resilience-r1.md`。
 
@@ -161,6 +176,15 @@ Agent 约束见 `.cursor/rules/prompt-optimizer-platform-build.mdc`。
 | `/canvas/[id]` | 画布编辑（组顶栏/工具栏可分享工作流） |
 
 功能需求详见 `canvas-web/docs/canvas-portal-product-requirements.md`。
+
+### Canvas 任务完成同步（可选 env）
+
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `CANVAS_ACTIVE_OPPORTUNISTIC_POLL_MS` | 3000 | 用户正在看画布时，读路径 opportunistic poll 最短间隔 |
+| `CANVAS_IDLE_OPPORTUNISTIC_POLL_MS` | 8000 | 非活跃项目 opportunistic poll 最短间隔 |
+
+详见 [`canvas-web/docs/canvas-task-completion-sync.md`](../canvas-web/docs/canvas-task-completion-sync.md)。
 
 ## QuickReplica · MiniMax 音色同步
 

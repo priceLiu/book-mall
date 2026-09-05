@@ -1,6 +1,8 @@
 /**
  * 简易 P&L 报表（营收拆分、分业务毛利）。
  */
+import { estimateGatewayLogNetCostYuan } from "@/lib/finance/gateway-log-line-cost";
+import { GATEWAY_USAGE_LOG_SELECT } from "@/lib/gateway/gateway-token-usage-aggregate";
 import { prisma } from "@/lib/prisma";
 
 export interface PnlReportRow {
@@ -24,9 +26,32 @@ export async function buildPnlReport(periodKey: string): Promise<PnlReportRow> {
     select: {
       credits: true,
       costSnapshotYuan: true,
+      refType: true,
+      refId: true,
       account: { select: { pricePerCreditYuan: true } },
     },
   });
+
+  const logIds = [
+    ...new Set(
+      ledgers
+        .filter((l) => l.refType === "gateway_log" && l.refId)
+        .map((l) => l.refId as string),
+    ),
+  ];
+  const gatewayLogs =
+    logIds.length > 0
+      ? await prisma.gatewayRequestLog.findMany({
+          where: { id: { in: logIds } },
+          select: {
+            id: true,
+            ...GATEWAY_USAGE_LOG_SELECT,
+            costSnapshotYuan: true,
+            estimatedVendorCostYuan: true,
+          },
+        })
+      : [];
+  const logCostMap = new Map(gatewayLogs.map((g) => [g.id, estimateGatewayLogNetCostYuan(g)]));
 
   let revenueYuan = 0;
   let costYuan = 0;
@@ -35,7 +60,11 @@ export async function buildPnlReport(periodKey: string): Promise<PnlReportRow> {
     const credits = Math.abs(l.credits);
     const ppc = l.account.pricePerCreditYuan != null ? Number(l.account.pricePerCreditYuan) : 0.04;
     revenueYuan += credits * ppc;
-    costYuan += l.costSnapshotYuan != null ? Number(l.costSnapshotYuan) : 0;
+    if (l.refType === "gateway_log" && l.refId && logCostMap.has(l.refId)) {
+      costYuan += logCostMap.get(l.refId) ?? 0;
+    } else {
+      costYuan += l.costSnapshotYuan != null ? Number(l.costSnapshotYuan) : 0;
+    }
     consumeCredits += credits;
   }
 

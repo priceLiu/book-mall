@@ -14,7 +14,7 @@ import {
   billingCategoryLabel,
   classifyBillingCategory,
 } from "@/lib/billing/billing-category";
-import { extractTryonModelKey, BYOK_TASK_KIND_LABEL } from "@/lib/billing/byok-pricing";
+import { extractTryonModelKey } from "@/lib/billing/gateway-log-classifier";
 import { aiTryonModelLabel } from "@/lib/pricing/ai-tryon-cost";
 import { resolveBillableImageCountFromLog } from "@/lib/gateway/log-billing-metrics";
 import type { AccountRef } from "@/lib/billing/credit-account-service";
@@ -44,10 +44,7 @@ function buildFeeDescription(input: RecordBillingSettlementInput): string {
   const category =
     input.billingCategory ?? classifyBillingCategory(input.log);
   const catLabel = billingCategoryLabel(category);
-  const taskLabel =
-    input.byokTaskKind != null
-      ? BYOK_TASK_KIND_LABEL[input.byokTaskKind]
-      : catLabel;
+  const taskLabel = catLabel;
   const tryonKey =
     input.log.requestKind === "TRYON" ? extractTryonModelKey(input.log) : null;
   const tryonLabel = aiTryonModelLabel(tryonKey);
@@ -58,15 +55,10 @@ function buildFeeDescription(input: RecordBillingSettlementInput): string {
       : null;
   const unitSuffix =
     imageUnits != null && imageUnits > 0 ? ` · ${imageUnits} 张输入` : "";
-  const remaining =
-    input.includedRemainingAfter != null
-      ? `，套餐剩余 ${input.includedRemainingAfter}`
-      : "";
   switch (kind) {
     case "BYOK_QUOTA_INCLUDED":
-      return `BYOK 套餐内 · ${taskLabel}${tryonSuffix}${unitSuffix} · 扣次 ${input.quotaDelta ?? 1}${remaining}`;
     case "BYOK_QUOTA_OVERAGE":
-      return `BYOK 超额 · ${taskLabel}${tryonSuffix}${unitSuffix} 扣 ${input.creditsCharged ?? 0} 积分${remaining}`;
+      return `历史结算 · ${taskLabel}${tryonSuffix}${unitSuffix}`;
     case "PLATFORM_CREDIT":
       return `平台代付 · ${catLabel}${tryonSuffix}${unitSuffix} · 扣 ${input.creditsCharged ?? 0} 积分`;
     case "PLATFORM_VIDEO": {
@@ -75,7 +67,7 @@ function buildFeeDescription(input: RecordBillingSettlementInput): string {
       return `平台代付 · ${catLabel}${secSuffix} · 视频扣 ${input.creditsCharged ?? 0} 积分`;
     }
     case "METER_ONLY":
-      return `BYOK 调用 · ${taskLabel}${tryonSuffix}${unitSuffix}（仅计量）`;
+      return `调用 · ${taskLabel}${tryonSuffix}${unitSuffix}（仅计量）`;
     case "NONE":
     default:
       return category === "OTHER" || category === "TEXT"
@@ -101,7 +93,8 @@ export async function recordBillingSettlement(input: RecordBillingSettlementInpu
   const quotaDelta = input.quotaDelta ?? 0;
   const periodKey = `${log.submittedAt.getUTCFullYear()}-${String(log.submittedAt.getUTCMonth() + 1).padStart(2, "0")}`;
 
-  const line = await prisma.$transaction(async (tx) => {
+  const line = await prisma.$transaction(
+    async (tx) => {
     let created;
     try {
       created = await tx.billingSettlementLine.create({
@@ -156,7 +149,9 @@ export async function recordBillingSettlement(input: RecordBillingSettlementInpu
     });
 
     return created;
-  });
+    },
+    { timeout: 60_000, maxWait: 15_000 },
+  );
 
   return line;
 }

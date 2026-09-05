@@ -12,7 +12,7 @@ export function QuickReplicaOpenClient({
     <AppOpenTransitionShell
       targetUrl={reEnterPath}
       loader={<QuickReplicaOpenLoader />}
-      title="正在打开快速复制"
+      title="正在打开快速复刻"
       subtitle="正在通过 Book SSO 完成登录，请稍候…"
       gradientClassName="bg-[radial-gradient(ellipse_80%_60%_at_50%_40%,rgba(236,72,153,0.12),transparent_70%)]"
     />

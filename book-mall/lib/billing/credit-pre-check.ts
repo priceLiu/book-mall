@@ -3,15 +3,15 @@
  */
 import { prisma } from "@/lib/prisma";
 import {
-  getPoolBalances,
-  resolveVideoPool,
+  getAccountCreditBalances,
   InsufficientCreditsError,
 } from "./credit-account-service";
 import { computeChargeCredits } from "./gateway-credit-settlement";
 import { isUnifiedCreditBillingActive } from "./unified-credit-flag";
 import { resolveBillingCanonicalKey, resolveCostSnapshot } from "@/lib/gateway/credit-billing-guard";
-import { computeTierCredits, videoBillableSeconds } from "@/lib/pricing/credit-pricing-formulas";
+import { computeUnifiedChargeCredits, videoBillableSeconds } from "@/lib/pricing/credit-pricing-formulas";
 import { resolveTeamBillingFallbackTenantId } from "./resolve-team-billing-fallback";
+import { isPlatformOperationalApiKey } from "@/lib/gateway/platform-operational-api-key";
 
 export async function resolveBillingRef(input: {
   tenantId?: string | null;
@@ -56,6 +56,9 @@ export async function assertCreditsBeforeGenerate(input: {
 }): Promise<void> {
   if (!isUnifiedCreditBillingActive()) return;
 
+  // 平台代付（AI 小智、AI 资讯等）走 Platform Admin Key，不扣用户积分
+  if (await isPlatformOperationalApiKey(input.apiKeyId)) return;
+
   // 私域人像库入库走火山 AK/SK · 不计平台积分
   if (input.model.trim().startsWith("portrait:")) return;
 
@@ -68,43 +71,39 @@ export async function assertCreditsBeforeGenerate(input: {
     inputSummary: input.inputSummary,
   }).catch(() => null);
 
-  // 视频：走视频池冻结预检（逐档单价 × 15s 封顶）
-  if (isVideo) {
-    const pools = await getPoolBalances(ref);
-    const pool = await resolveVideoPool(ref);
-    const bucket = pool === "VIDEO" ? pools.video : pools.general;
-    const available = Math.max(0, bucket.balance - bucket.reserved);
-    let minNeeded = 1;
-    if (canonical) {
-      const snap = await resolveCostSnapshot(canonical).catch(() => null);
-      const list = snap?.listPriceYuan ?? null;
-      const units = videoBillableSeconds(null);
-      if (pools.pricePerCreditYuan && pools.pricePerCreditYuan > 0 && list && list > 0) {
-        minNeeded = computeTierCredits(list * units, pools.pricePerCreditYuan);
-      } else if (snap?.creditsPerUnit && snap.creditsPerUnit > 0) {
-        minNeeded = Math.round(snap.creditsPerUnit * units);
-      }
-    }
-    if (available < minNeeded) throw new InsufficientCreditsError(available, minNeeded);
-    return;
-  }
-
-  const pools = await getPoolBalances(ref);
-  const balance = Math.max(
-    0,
-    pools.general.balance - pools.general.reserved,
-  );
+  const accountSnap = await getAccountCreditBalances(ref);
+  const balance = Math.max(0, accountSnap.balance - accountSnap.reserved);
   let minNeeded = 1;
+
   if (canonical) {
-    const snap = await resolveCostSnapshot(canonical).catch(() => null);
-    if (snap) {
-      const units = 1;
-      minNeeded = computeChargeCredits({
-        snapshot: snap,
-        units,
-        pricePerCreditYuan: pools.pricePerCreditYuan,
-      });
-      if (minNeeded < 1) minNeeded = 1;
+    const costSnap = await resolveCostSnapshot(canonical).catch(() => null);
+    if (costSnap) {
+      if (isVideo) {
+        const units = videoBillableSeconds(null);
+        if (costSnap.creditsPerUnit && costSnap.creditsPerUnit > 0) {
+          minNeeded = computeUnifiedChargeCredits({
+            creditsPerUnit: costSnap.creditsPerUnit,
+            units,
+          });
+        } else if (
+          accountSnap.pricePerCreditYuan &&
+          accountSnap.pricePerCreditYuan > 0 &&
+          costSnap.listPriceYuan &&
+          costSnap.listPriceYuan > 0
+        ) {
+          minNeeded = Math.max(
+            1,
+            Math.round((costSnap.listPriceYuan * units) / accountSnap.pricePerCreditYuan),
+          );
+        }
+      } else {
+        minNeeded = computeChargeCredits({
+          snapshot: costSnap,
+          units: 1,
+          pricePerCreditYuan: accountSnap.pricePerCreditYuan,
+        });
+        if (minNeeded < 1) minNeeded = 1;
+      }
     }
   }
 

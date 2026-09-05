@@ -156,6 +156,23 @@ export function isPro2StyledGroup(
   return groupHasPro2MediaChildren(node.id, allNodes);
 }
 
+/** Pro2 媒体组内 · 三视图/场景/分镜格（尺寸由组 relayout 统一，禁止 aspect preset 与 relayout 互抢） */
+export function isPro2PipelineMediaGroupChild(
+  node: Pick<CanvasFlowNode, "type" | "data" | "parentId">,
+  allNodes: CanvasFlowNode[],
+): boolean {
+  if (!node.parentId) return false;
+  const parent = allNodes.find((n) => n.id === node.parentId);
+  if (!parent || !isPro2StyledGroup(parent, allNodes)) return false;
+  if (node.type === "story-pro2-three-view") return true;
+  const role = (node.data as { pro2MediaRole?: string }).pro2MediaRole;
+  return (
+    role === "frame" ||
+    role === "scene" ||
+    role === "character-three-view"
+  );
+}
+
 const PRO2_MEDIA_GROUP_Z_BASE = 5;
 const PRO2_MEDIA_GROUP_Z_SELECTED = 5;
 /** 高于 `.react-flow__edges`（globals.css · 12），连线可见但不压住图片 */

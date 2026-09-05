@@ -51,8 +51,23 @@ export function buildAdminNavGroups(financeWebOrigin: string | null): AdminNavGr
       label: "Book 运营",
       items: [
         { label: "支付核对", href: "/admin/payments" },
+        { label: "访问统计", href: "/admin/traffic" },
+        { label: "静态资源", href: "/admin/static-snapshots" },
         { label: "课程订阅", href: "/admin/billing" },
         { label: "提现审核", href: "/admin/refunds" },
+        { label: "积分清零控制台", href: "/admin/finance/credit-expiry-ops" },
+      ],
+    },
+    {
+      id: "usage",
+      label: "用量管理",
+      items: [
+        { label: "用量审计对比", href: "/admin/usage-audit" },
+        fin(o, "/admin/usage-management", "用量对账中心", "/admin/finance/usage-management"),
+        fin(o, "/admin/usage-overview", "费用多维度概览", "/admin/finance/usage-overview"),
+        fin(o, "/admin/model-credit-ledger", "模型积分流水", "/admin/finance/model-credit-ledger"),
+        fin(o, "/admin/billing/users", "账单明细（按用户）", "/admin/finance/billing-users"),
+        fin(o, "/admin/video-risk", "视频用量风控", "/admin/finance/video-risk"),
       ],
     },
     {
@@ -60,27 +75,27 @@ export function buildAdminNavGroups(financeWebOrigin: string | null): AdminNavGr
       label: "财务控制台",
       items: [
         fin(o, "/admin/vip-ops", "VIP 大额预充", "/admin/finance/vip-ops"),
-        fin(o, "/admin/usage-overview", "费用多维度概览", "/admin/finance/usage-overview"),
-        fin(o, "/admin/reconciliation", "云账单对账", "/admin/finance/reconciliation"),
+        fin(o, "/admin/reconciliation", "对账总账", "/admin/finance/reconciliation"),
+        fin(o, "/admin/reconciliation/payments", "用户支付明细", "/admin/finance/reconciliation"),
         fin(o, "/admin/model-cost", "模型成本与折扣", "/admin/finance/model-cost"),
         fin(o, "/admin/credit-pricing", "积分报价计算器", "/admin/finance/credit-pricing"),
         fin(o, "/admin/membership-plans", "工具会员套餐与席位", "/admin/finance/membership-plans"),
         fin(o, "/admin/plan-change", "调价测算与审批", "/admin/finance/plan-change"),
         fin(o, "/admin/pnl-alerts", "盈亏预警中心", "/admin/finance/pnl-alerts"),
+        fin(o, "/admin/pnl-report", "P&L 报表", "/admin/finance/pnl-report"),
+        fin(o, "/admin/credit-expiry-ops", "积分清零运维台", "/admin/finance/credit-expiry-ops"),
         fin(o, "/admin/pnl-report", "盈亏报表", "/admin/finance/pnl-alerts"),
-        fin(o, "/admin/billing/users", "账单明细（按用户）", "/admin/finance/usage-overview"),
         fin(o, "/admin/teams", "团队与租户", "/admin/finance/usage-overview"),
         fin(o, "/admin/platform-models", "平台模型登记", "/admin/finance/model-cost"),
-        fin(o, "/admin/video-risk", "视频风控", "/admin/finance/usage-overview"),
         fin(o, "/admin/scenario-lab", "场景实验室", "/admin/finance/credit-pricing"),
-        fin(o, "/admin/model-credit-ledger", "模型积分流水", "/admin/finance/usage-overview"),
       ],
     },
     {
       id: "public",
       label: "对外公示",
       items: [
-        { label: "对外报价页（积分）", href: "/pricing", external: true },
+        { label: "订阅价格页", href: "/pricing", external: true },
+        { label: "API 价格页", href: "/pricing/api", external: true },
         { label: "平台价目表（前台）", href: "/pricing-disclosure", external: true },
       ],
     },
@@ -96,24 +111,36 @@ export function buildAdminNavGroups(financeWebOrigin: string | null): AdminNavGr
       id: "tools",
       label: "工具与应用",
       items: [
+        { label: "AI 小智", href: "/admin/platform-assistant" },
         { label: "工具菜单", href: "/admin/tool-apps/tool-menu" },
         { label: "Platform SSO 客户端", href: "/admin/sso-clients" },
         { label: "Gateway 平台凭证池", href: "/admin/gateway/platform" },
+        { label: "Gateway 阻塞预警", href: "/admin/gateway/health" },
         { label: "平台错误日志", href: "/admin/errors" },
+        { label: "日志与保险丝配置", href: "/admin/settings" },
+        { label: "生成频率配额", href: "/admin/generation-quota" },
         { label: "工具管理", href: "/admin/tool-apps/manage" },
         { label: "资源库（图/视频）", href: "/admin/tool-libraries" },
-        { label: "快速复制模板", href: "/admin/quick-replica/templates" },
+        { label: "模板管理", href: "/admin/templates" },
         { label: "工具站跳转测试", href: "/admin/tools-sso-test" },
+        { label: "分享码前缀", href: "/admin/share-code-prefixes" },
       ],
     },
   ];
 }
 
+/** 桌面顶栏：下拉分组之后的单链（如待做功能） */
+export const ADMIN_TRAILING_TOP_LEVEL_LINKS = [
+  { label: "待做功能", href: "/admin/pending-features" },
+] as const;
+
 /** 桌面顶栏：单链 + 下拉分组（不含对外公示，改由概览页链出） */
 export const ADMIN_TOP_LEVEL_LINKS = [
-  { label: "概览", href: "/admin" },
+  { label: "驾驶舱", href: "/admin" },
+  { label: "AI 小智", href: "/admin/platform-assistant" },
   { label: "用户", href: "/admin/users" },
   { label: "账号安全", href: "/admin/security" },
+  { label: "积分清零", href: "/admin/finance/credit-expiry-ops" },
 ] as const;
 
 export function adminNavGroupsForDesktop(financeWebOrigin: string | null): AdminNavGroup[] {

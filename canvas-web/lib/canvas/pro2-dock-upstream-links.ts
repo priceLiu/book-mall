@@ -14,11 +14,27 @@ import type {
   StoryProScriptHubNodeData,
   StoryProStarterNodeData,
 } from "./story-pro-workspace-types";
-import type { StoryPro2TagNodeData } from "./story-pro2-workspace-types";
+import type { StoryPro2PromptNodeData } from "./story-pro2-workspace-types";
+import type { TextNodeData } from "./types";
+import { tagRichTextToPlainText } from "./tag-rich-text-migrate";
+
+/** 上游文本/大纲 chip 与 @ 引用展示名 · 优先节点标题 */
+export function resolvePro2StarterDockLinkLabel(
+  d: Pick<
+    StoryProStarterNodeData,
+    "label" | "pro2TextPurpose" | "generatedOutlineMd" | "uploadedScriptMd"
+  >,
+): string {
+  const custom = d.label?.trim();
+  if (custom) return custom;
+  if (d.pro2TextPurpose === "story-outline") return "故事大纲";
+  if (d.uploadedScriptMd?.trim()) return "已上传剧本";
+  return "文本";
+}
 
 export type Pro2DockUpstreamLink = {
   id: string;
-  kind: "outline" | "image" | "text";
+  kind: "outline" | "image" | "text" | "video";
   label: string;
   previewUrl?: string;
   previewMd?: string;
@@ -86,7 +102,10 @@ function linkFromSource(
       return {
         id: `up-script-${source.id}`,
         kind: "outline",
-        label: d.uploadedScriptMeta?.fileName?.trim() || "已上传剧本",
+        label:
+          d.label?.trim() ||
+          d.uploadedScriptMeta?.fileName?.trim() ||
+          "已上传剧本",
         previewMd: uploaded.slice(0, 800),
         sourceNodeId: source.id,
       };
@@ -95,7 +114,7 @@ function linkFromSource(
       return {
         id: `up-outline-${source.id}`,
         kind: "outline",
-        label: "故事大纲",
+        label: resolvePro2StarterDockLinkLabel(d),
         previewMd: storyThemePromptDisplayMd(outline),
         sourceNodeId: source.id,
       };
@@ -105,7 +124,7 @@ function linkFromSource(
       return {
         id: `up-text-${source.id}`,
         kind: "text",
-        label: "文本",
+        label: resolvePro2StarterDockLinkLabel(d),
         previewMd: theme,
         sourceNodeId: source.id,
       };
@@ -113,7 +132,49 @@ function linkFromSource(
     return null;
   }
 
-  if (targetType === "story-pro2-script-hub") {
+  if (source.type === "story-pro2-prompt") {
+    const d = source.data as unknown as StoryPro2PromptNodeData;
+    const generated = d.generatedText?.trim();
+    const prompt = d.prompt?.trim();
+    const text = generated || prompt;
+    if (!text) return null;
+    return {
+      id: `up-text-${source.id}`,
+      kind: "text",
+      label: d.label?.trim() || "提示词",
+      previewMd: text,
+      sourceNodeId: source.id,
+    };
+  }
+
+  if (source.type === "story-pro2-tag") {
+    const d = source.data as { body?: string; label?: string };
+    const plain = tagRichTextToPlainText(d.body ?? "").trim();
+    if (!plain) return null;
+    return {
+      id: `up-text-${source.id}`,
+      kind: "text",
+      label: d.label?.trim() || "标签",
+      previewMd: plain.slice(0, 800),
+      sourceNodeId: source.id,
+    };
+  }
+
+  if (source.type === "text") {
+    const d = source.data as unknown as TextNodeData;
+    const text =
+      d.runtime?.textOutput?.trim() || d.text?.trim() || "";
+    if (!text) return null;
+    return {
+      id: `up-text-${source.id}`,
+      kind: "text",
+      label: "文本",
+      previewMd: text.slice(0, 800),
+      sourceNodeId: source.id,
+    };
+  }
+
+  if (source.type === "story-pro2-script-hub") {
     const d = source.data as unknown as StoryProScriptHubNodeData;
     const outline = d.outlineMd?.trim();
     if (outline) {
@@ -125,20 +186,7 @@ function linkFromSource(
         sourceNodeId: source.id,
       };
     }
-  }
-
-  if (source.type === "story-pro2-tag") {
-    const d = source.data as unknown as StoryPro2TagNodeData;
-    const body = d.body?.trim();
-    if (!body) return null;
-    const label = d.label?.trim() || "标签";
-    return {
-      id: `up-tag-${source.id}`,
-      kind: "text",
-      label,
-      previewMd: body,
-      sourceNodeId: source.id,
-    };
+    return null;
   }
 
   if (source.type === "story-pro2-style-asset") {
@@ -152,6 +200,19 @@ function linkFromSource(
       previewMd: d.stylePrompt?.trim(),
       sourceNodeId: source.id,
     };
+  }
+
+  if (source.type === "sbv1-video-engine" || source.type === "video-engine") {
+    const videoUrl = imageUrlFromNode(source);
+    if (videoUrl) {
+      return {
+        id: `up-video-${source.id}`,
+        kind: "video",
+        label: (source.data as { label?: string }).label?.trim() || "视频",
+        previewUrl: videoUrl,
+        sourceNodeId: source.id,
+      };
+    }
   }
 
   const url = imageUrlFromNode(source);
@@ -179,6 +240,9 @@ function targetInputHandle(nodeType: string): string {
   ) {
     return "in_image";
   }
+  if (nodeType === "story-pro2-audio") {
+    return "in_audio";
+  }
   return "in_text";
 }
 
@@ -195,7 +259,13 @@ const IMAGE_UPSTREAM_SOURCE_TYPES = new Set([
   "three-view-engine",
 ]);
 
-const TEXT_UPSTREAM_SOURCE_TYPES = new Set(["story-pro2-tag", "story-pro2-starter"]);
+const TEXT_UPSTREAM_SOURCE_TYPES = new Set([
+  "story-pro2-starter",
+  "story-pro2-prompt",
+  "story-pro2-script-hub",
+  "story-pro2-tag",
+  "text",
+]);
 
 function edgeMatchesDockInput(
   edge: CanvasFlowEdge,
@@ -206,6 +276,17 @@ function edgeMatchesDockInput(
   if (edge.target !== nodeId) return false;
   const inHandle = targetInputHandle(nodeType);
   if (!edge.targetHandle || edge.targetHandle === inHandle) return true;
+  // 音频节点历史连线可能用 in_text / default
+  if (inHandle === "in_audio") {
+    const source = nodes.find((n) => n.id === edge.source);
+    if (source?.type && TEXT_UPSTREAM_SOURCE_TYPES.has(source.type)) {
+      return (
+        edge.targetHandle === "in_text" ||
+        edge.targetHandle === "default" ||
+        !edge.targetHandle
+      );
+    }
+  }
   // 历史连线可能误用 in_text / default，仍应展示图片上游缩略图
   if (inHandle === "in_image") {
     const source = nodes.find((n) => n.id === edge.source);
@@ -233,6 +314,14 @@ export function resolvePro2DockUpstreamLinks(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
 ): Pro2DockUpstreamLink[] {
+  const self = nodes.find((n) => n.id === nodeId);
+  if (
+    nodeType === "story-pro2-image" &&
+    (self?.data as { pro2HdFromGridSplit?: boolean }).pro2HdFromGridSplit
+  ) {
+    return [];
+  }
+
   const incoming = edges.filter((e) =>
     edgeMatchesDockInput(e, nodeId, nodeType, nodes),
   );

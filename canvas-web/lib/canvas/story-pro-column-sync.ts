@@ -1,20 +1,30 @@
 "use client";
 
-import { compactGfmTables, parseMdTable, parseStoryboardRows } from "./parse-md-tables";
+import {
+  PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION,
+  resolvePro2ShotFrameImagePrompt,
+  type Pro2ProductionScript,
+} from "./data/pro2-production-script-schema";
 import {
   buildCharacterRowsFromHub,
   buildDefaultFrameRowPrompt,
   buildFrameRowScriptPrompt,
-  buildDefaultSceneRowPrompt,
   buildSceneRowsFromHub,
   buildVideoRowsFromFrames,
   isFrameScriptPrompt,
   isShotSizeSceneLabel,
+  mergeFrameRowCharacterRefsFromIds,
   patchVideoRowsFromFrameRows,
-  sanitizeLegacyFramePrompt,
   syncFrameRowCharacterRefs,
 } from "./story-column-sync";
+import { preservePro2MediaRowPrompt } from "./pro2-media-row-spawn";
+import { buildPro2FrameMediaPrompt } from "./pro2-lazy-media-prompts";
 import { hubDataForColumnSync, resolveHubStoryboardMd } from "./story-hub-runtime";
+import {
+  compactGfmTables,
+  parseMdTable,
+  parseStoryboardRows,
+} from "./parse-md-tables";
 import type {
   StoryProCharacterRow,
   StoryProFrameRow,
@@ -51,6 +61,8 @@ function toProCharacterRows(rows: StoryCharacterRow[]): StoryProCharacterRow[] {
     name: r.name,
     role: r.role,
     appearance: r.appearance,
+    personality: r.personality,
+    aiImagePrompt: r.aiImagePrompt,
     prompt: r.prompt,
     promptHistory: r.promptHistory,
     runtime: r.runtime,
@@ -111,14 +123,7 @@ function buildSceneRowsFromStoryboardFallback(
       key: storyProSceneRowKey(scriptHubId, name),
       name,
       description: f.description?.trim() || "",
-      prompt: buildDefaultSceneRowPrompt({
-        name,
-        environment: "",
-        time: "",
-        mood: "",
-        imageKeywords: "",
-        description: f.description?.trim() || "",
-      }),
+      prompt: "",
     });
   }
   return Array.from(byName.values());
@@ -188,10 +193,16 @@ function mergeProSceneRows(
     return {
       ...row,
       description: prev.description?.trim() ? prev.description : row.description,
-      prompt:
-        prev.prompt?.trim() && !isFrameScriptPrompt(prev.prompt)
-          ? prev.prompt
-          : row.prompt,
+      environment: prev.environment?.trim() ? prev.environment : row.environment,
+      time: prev.time?.trim() ? prev.time : row.time,
+      mood: prev.mood?.trim() ? prev.mood : row.mood,
+      imageKeywords: prev.imageKeywords?.trim()
+        ? prev.imageKeywords
+        : row.imageKeywords,
+      negativePrompt: prev.negativePrompt?.trim()
+        ? prev.negativePrompt
+        : row.negativePrompt,
+      prompt: preservePro2MediaRowPrompt(prev, row, "scene"),
       promptHistory: prev.promptHistory,
       refImages: prev.refImages,
       runtime: prev.runtime,
@@ -207,6 +218,53 @@ function mergeProSceneRows(
       !isStaleSceneRow(r),
   );
   return extras.length ? [...merged, ...extras] : merged;
+}
+
+function buildProFrameRowsFromProductionScript(
+  script: Pro2ProductionScript,
+  characterRows: StoryProCharacterRow[],
+): StoryProFrameRow[] {
+  const charCompat: StoryCharacterRow[] = characterRows;
+  const sceneById = new Map(
+    (script.scenes ?? []).map((s) => [s.id, s.name] as const),
+  );
+  return (script.shots ?? []).map((shot) => {
+    const sceneName = shot.sceneId ? sceneById.get(shot.sceneId) ?? "" : "";
+    const frameImagePrompt =
+      resolvePro2ShotFrameImagePrompt(shot) || undefined;
+    const base: StoryFrameRow = mergeFrameRowCharacterRefsFromIds(
+      {
+        frameIndex: shot.index,
+        key: String(shot.index),
+        scene: sceneName,
+        shotSize: shot.shotSize,
+        description: shot.sceneDescription ?? "",
+        dialogue: shot.dialogue,
+        videoPrompt: shot.videoPrompt ?? "",
+        prompt: frameImagePrompt ?? "",
+      },
+      charCompat,
+      shot.characterIds,
+    );
+    const row: StoryProFrameRow = {
+      ...base,
+      frameImagePrompt,
+      aiImagePrompt: frameImagePrompt,
+      lighting: shot.lighting,
+      sfxNote: shot.sfxNote,
+      audioNote: shot.audioNote,
+      propRefIds: shot.propIds,
+      shotNo: String(shot.index),
+      shotSize: shot.shotSize,
+      cameraMove: shot.cameraMove,
+      durationSec: shot.durationSec,
+      sceneRefId: sceneName || undefined,
+    };
+    return {
+      ...row,
+      prompt: buildPro2FrameMediaPrompt(row),
+    };
+  });
 }
 
 function buildProFrameRowsFromMd(
@@ -226,6 +284,7 @@ function buildProFrameRowsFromMd(
     const difficultyRaw = pickColumn(r, ["ai难度", "难度", "ai difficulty"]);
     const durationSec = durationRaw ? parseInt(durationRaw, 10) : undefined;
     const aiDifficulty = difficultyRaw ? parseInt(difficultyRaw, 10) : undefined;
+    const aiImagePrompt = b.aiImagePrompt?.trim() || undefined;
     const base: StoryFrameRow = syncFrameRowCharacterRefs(
       {
         frameIndex: b.frameIndex,
@@ -241,6 +300,7 @@ function buildProFrameRowsFromMd(
     );
     return {
       ...base,
+      aiImagePrompt,
       shotNo,
       shotSize: shotSize || base.shotSize || undefined,
       cameraMove: cameraMove || undefined,
@@ -263,15 +323,14 @@ function mergeProFrameRows(
     if (!prev) return row;
     return {
       ...row,
-      prompt: prev.prompt?.trim()
-        ? sanitizeLegacyFramePrompt(prev.prompt) ||
-          buildDefaultFrameRowPrompt(row)
-        : row.prompt,
+      prompt: preservePro2MediaRowPrompt(prev, row, "frame"),
       promptHistory: prev.promptHistory,
       runtime: prev.runtime,
-      refImages: prev.refImages,
-      refImageUrls: prev.refImageUrls,
-      referencedNodeIds: prev.referencedNodeIds,
+      refImages: prev.refImages?.length ? prev.refImages : row.refImages,
+      refImageUrls: prev.refImageUrls?.length ? prev.refImageUrls : row.refImageUrls,
+      referencedNodeIds: prev.referencedNodeIds?.length
+        ? prev.referencedNodeIds
+        : row.referencedNodeIds,
       frameApprovedAt: prev.frameApprovedAt,
       frameRejectedReason: prev.frameRejectedReason,
     };
@@ -296,7 +355,7 @@ function mergeProCharacterRows(
     if (!prev) return row;
     return {
       ...row,
-      prompt: prev.prompt?.trim() ? prev.prompt : row.prompt,
+      prompt: preservePro2MediaRowPrompt(prev, row, "character"),
       promptHistory: prev.promptHistory,
       runtime: prev.runtime,
       assetId: prev.assetId,
@@ -348,7 +407,7 @@ export type StoryProColumnSyncExisting = Partial<{
   videoRows: StoryProVideoRow[];
 }>;
 
-/** 从 script hub 文案拆分角色 / 场景 / 分镜 / 视频行（不触发媒体 run） */
+/** 从 script hub 文案拆分角色 / 场景 / 分镜 / 视频行（仅表字段；媒体 prompt 在用户点「生成」时按选中项组装） */
 export function syncStoryProColumnRows(
   hubData: StoryProScriptHubNodeData,
   existing?: StoryProColumnSyncExisting,
@@ -381,10 +440,14 @@ export function syncStoryProColumnRows(
     hubId,
     fromDictionary.length > 0,
   );
-  const frameRows = mergeProFrameRows(
-    buildProFrameRowsFromMd(storyboardMd, characterRows),
-    existing?.frameRows,
-  );
+  const frameBuilt =
+    synced.productionScript?.shots?.length
+      ? buildProFrameRowsFromProductionScript(
+          synced.productionScript,
+          characterRows,
+        )
+      : buildProFrameRowsFromMd(storyboardMd, characterRows);
+  const frameRows = mergeProFrameRows(frameBuilt, existing?.frameRows);
   const videoRows = mergeProVideoRows(
     buildVideoRowsFromFrames(frameRows as StoryFrameRow[]) as StoryProVideoRow[],
     existing?.videoRows,

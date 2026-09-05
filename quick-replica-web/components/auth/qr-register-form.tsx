@@ -122,7 +122,7 @@ export function QrRegisterForm({
       <div>
         <h1 className="text-2xl font-bold">创建账号</h1>
         <p className="mt-1 text-sm text-[var(--qr-text-secondary)]">
-          注册即可开始体验快速复制
+          注册即可开始体验快速复刻
         </p>
       </div>
 

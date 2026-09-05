@@ -19,8 +19,15 @@ export async function GET(request: NextRequest) {
   const guard = await requireSessionUser(request);
   if (!guard.ok) return guard.response;
   try {
-    const projects = await listCanvasProjectsForUser(guard.user.id);
-    return NextResponse.json({ projects }, { headers: jsonHeaders(request) });
+    const { searchParams } = new URL(request.url);
+    const limitRaw = searchParams.get("limit");
+    const limit = limitRaw ? Number(limitRaw) : undefined;
+    const cursor = searchParams.get("cursor");
+    const page = await listCanvasProjectsForUser(guard.user.id, {
+      limit: Number.isFinite(limit) ? limit : undefined,
+      cursor,
+    });
+    return NextResponse.json(page, { headers: jsonHeaders(request) });
   } catch (err) {
     return canvasErrorToResponse(request, err);
   }

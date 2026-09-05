@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useReactFlow } from "@xyflow/react";
 import {
   libtvFloatingDockHidden,
@@ -11,31 +11,52 @@ import {
   pro2NodeAbsolutePosition,
   pro2NodeBoxSize,
 } from "@/lib/canvas/pro2-selection-bbox";
-
 const NODE_TOOLBAR_HEADER_RESERVED = 56;
 const NODE_TOOLBAR_HEIGHT = 44;
 const NODE_TOOLBAR_GAP = 8;
 
-/** 拖动所属节点时隐藏顶栏（与浮动 Dock 同一规则） */
+export type LibtvNodeToolbarScreenPlacement = {
+  x: number;
+  y: number;
+  place: "above" | "below";
+};
+
+/** pan/zoom 时 placement 短暂为 null 时保留上一帧，避免顶栏卸载（与浮动 Dock 同规则） */
+export function useStableLibtvNodeToolbarScreenPlacement(
+  placement: LibtvNodeToolbarScreenPlacement | null,
+): LibtvNodeToolbarScreenPlacement | null {
+  const lastRef = useRef<LibtvNodeToolbarScreenPlacement | null>(null);
+  if (placement) lastRef.current = placement;
+  return placement ?? lastRef.current;
+}
+
+/** 拖动所属节点、全屏详情编辑打开、或用户正在操作输入坞时隐藏顶栏 */
 export function useLibtvNodeToolbarHidden(nodeId: string): boolean {
-  return useCanvasStore((s) =>
+  const dragHidden = useCanvasStore((s) =>
     libtvFloatingDockHidden(s.canvasDraggingNodeId, nodeId),
   );
+  const detailOpen = useCanvasStore(
+    (s) =>
+      s.pro2ScriptTableEditorNodeId === nodeId ||
+      s.pro2TextOutlineEditorNodeId === nodeId,
+  );
+  const dockFocused = useCanvasStore((s) => s.libtvInputDockFocused);
+  return dragHidden || detailOpen || dockFocused;
 }
 
 /** 节点顶栏 · 屏幕坐标（portal 固定定位，避免组内/相邻节点 z 轴夹住工具条） */
 export function useLibtvNodeToolbarScreenPlacement(
   nodeId: string,
   visible: boolean,
-): { x: number; y: number; place: "above" | "below" } | null {
+  toolbarHeightEstimate = NODE_TOOLBAR_HEIGHT,
+): LibtvNodeToolbarScreenPlacement | null {
   const { flowToScreenPosition, getInternalNode } = useReactFlow();
   const flowNode = useCanvasStore((s) => s.nodes.find((n) => n.id === nodeId));
   const allNodes = useCanvasStore((s) => s.nodes);
-  const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
-  const viewport = useViewportTransformActive(visible && !viewportMoving);
+  const viewport = useViewportTransformActive(visible);
 
   return useMemo(() => {
-    if (!visible || viewportMoving || !flowNode) return null;
+    if (!visible || !flowNode) return null;
     const internal = getInternalNode(nodeId) as
       | {
           measured?: { width?: number; height?: number };
@@ -65,7 +86,10 @@ export function useLibtvNodeToolbarScreenPlacement(
     const cx = pos.x + w / 2;
     const top = flowToScreenPosition({ x: cx, y: pos.y });
     const bottom = flowToScreenPosition({ x: cx, y: pos.y + pro2NodeBoxSize(flowNode).h });
-    if (top.y - NODE_TOOLBAR_HEIGHT - NODE_TOOLBAR_GAP < NODE_TOOLBAR_HEADER_RESERVED) {
+    if (
+      top.y - toolbarHeightEstimate - NODE_TOOLBAR_GAP <
+      NODE_TOOLBAR_HEADER_RESERVED
+    ) {
       return { x: bottom.x, y: bottom.y + NODE_TOOLBAR_GAP, place: "below" };
     }
     return { x: top.x, y: top.y - NODE_TOOLBAR_GAP, place: "above" };
@@ -73,11 +97,11 @@ export function useLibtvNodeToolbarScreenPlacement(
   }, [
     nodeId,
     visible,
-    viewportMoving,
     viewport,
     getInternalNode,
     flowToScreenPosition,
     flowNode,
     allNodes,
+    toolbarHeightEstimate,
   ]);
 }

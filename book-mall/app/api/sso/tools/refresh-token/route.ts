@@ -1,7 +1,7 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getSessionVersion } from "@/lib/auth-session-version";
+import { isToolsTokenSessionValid } from "@/lib/tools-token-session-valid";
 import { issueToolsAccessTokenForUser } from "@/lib/issue-tools-access-token-for-user";
 import {
   requireToolsJwtSecret,
@@ -11,6 +11,7 @@ import {
   verifyToolsAccessToken,
   verifyToolsAccessTokenAllowExpired,
 } from "@/lib/tools-sso-token";
+import { withApiDbGuard } from "@/lib/http/api-db-error";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ function tokenResponse(result: Awaited<ReturnType<typeof issueToolsAccessTokenFo
  * 3. Authorization: Bearer {未过期 tools JWT} → 续签
  * 4. Authorization: Bearer {已过期但签名有效 tools JWT} → 校验 sessionVersion 后续签
  */
-export async function POST(req: NextRequest) {
+export const POST = withApiDbGuard(async (req) => {
   if (toolsExchangeAuthorized(req)) {
     let userId = "";
     try {
@@ -82,8 +83,12 @@ export async function POST(req: NextRequest) {
   }
 
   if (typeof expired.sv === "number") {
-    const currentSv = await getSessionVersion(expired.sub);
-    if (currentSv !== expired.sv) {
+    const valid = await isToolsTokenSessionValid({
+      userId: expired.sub,
+      tokenVersion: expired.sv,
+      deviceType: expired.device_type ?? null,
+    });
+    if (!valid) {
       return NextResponse.json(
         { error: "会话已在别处登录，请重新连接主站账号", code: "SESSION_REVOKED" },
         { status: 401 },
@@ -92,4 +97,4 @@ export async function POST(req: NextRequest) {
   }
 
   return tokenResponse(await issueToolsAccessTokenForUser(expired.sub));
-}
+});

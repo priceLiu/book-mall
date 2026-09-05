@@ -3,16 +3,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Edge } from "@xyflow/react";
+import { useViewport } from "@xyflow/react";
 import { Scissors } from "lucide-react";
 import { useCanvasStore } from "@/lib/canvas/store";
+import {
+  LIBTV_NODE_SIDE_PLUS_SIZE,
+  libtvSidePlusScreenDiameter,
+} from "@/lib/canvas/libtv-node-chrome";
 import { cn } from "@/lib/utils";
 
 const HOVER_REVEAL_MS = 1000;
 /** 鼠标沿连线移动超过此距离才重置 1s 计时 */
 const HOVER_RESET_MOVE_PX = 10;
-/** 剪刀圆形按钮直径（px） */
-const CUT_BUTTON_SIZE_PX = 64;
-const CUT_HIT_RADIUS_PX = CUT_BUTTON_SIZE_PX / 2;
+/** lg + 内图标 40px / 外圆 70px */
+const CUT_ICON_TO_DOT_RATIO = 40 / 70;
 
 export type CanvasEdgeCutHover = {
   edgeId: string;
@@ -32,10 +36,9 @@ function pointerInCutZone(
   clientX: number,
   clientY: number,
   cut: CanvasEdgeCutHover,
+  hitRadiusPx: number,
 ): boolean {
-  return (
-    Math.hypot(clientX - cut.x, clientY - cut.y) <= CUT_HIT_RADIUS_PX
-  );
+  return Math.hypot(clientX - cut.x, clientY - cut.y) <= hitRadiusPx;
 }
 
 /**
@@ -43,6 +46,14 @@ function pointerInCutZone(
  * 剪刀层 pointer-events:none，避免挡住连线命中；点击由 document 捕获阶段命中检测。
  */
 export function useCanvasEdgeCutHover() {
+  const { zoom } = useViewport();
+  const cutButtonPx = libtvSidePlusScreenDiameter(
+    zoom,
+    LIBTV_NODE_SIDE_PLUS_SIZE,
+  );
+  const cutHitRadiusPx = cutButtonPx / 2;
+  const cutIconPx = cutButtonPx * CUT_ICON_TO_DOT_RATIO;
+
   const setEdges = useCanvasStore((s) => s.setEdges);
 
   const [cut, setCut] = useState<CanvasEdgeCutHover | null>(null);
@@ -180,13 +191,13 @@ export function useCanvasEdgeCutHover() {
         setCutHot(false);
         return;
       }
-      setCutHot(pointerInCutZone(e.clientX, e.clientY, c));
+      setCutHot(pointerInCutZone(e.clientX, e.clientY, c, cutHitRadiusPx));
     };
 
     const onPointerDown = (e: PointerEvent) => {
       const c = cutRef.current;
       if (!c || e.button !== 0) return;
-      if (!pointerInCutZone(e.clientX, e.clientY, c)) return;
+      if (!pointerInCutZone(e.clientX, e.clientY, c, cutHitRadiusPx)) return;
       e.preventDefault();
       e.stopPropagation();
       onCut();
@@ -198,7 +209,7 @@ export function useCanvasEdgeCutHover() {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerdown", onPointerDown, true);
     };
-  }, [cut, onCut]);
+  }, [cut, onCut, cutHitRadiusPx]);
 
   const portal =
     cut && typeof document !== "undefined"
@@ -218,14 +229,21 @@ export function useCanvasEdgeCutHover() {
               role="button"
               aria-label="剪断连线"
               title="剪断连线"
-              style={{ width: CUT_BUTTON_SIZE_PX, height: CUT_BUTTON_SIZE_PX }}
+              style={{
+                width: cutButtonPx,
+                height: cutButtonPx,
+              }}
               className={cn(
-                "flex items-center justify-center rounded-full border border-white/25 bg-[#1a1a1e] text-white/90 shadow-[0_4px_16px_rgba(0,0,0,0.55)] transition-colors",
+                "flex items-center justify-center rounded-full border border-white/25 bg-[#1a1a1e] text-white/90 shadow-[0_4px_16px_rgba(0,0,0,0.45)] transition-colors",
                 cutHot &&
                   "border-red-400/70 bg-red-500/35 text-red-100",
               )}
             >
-              <Scissors className="size-8" strokeWidth={2} aria-hidden />
+              <Scissors
+                style={{ width: cutIconPx, height: cutIconPx }}
+                strokeWidth={2.25}
+                aria-hidden
+              />
             </div>
           </div>,
           document.body,

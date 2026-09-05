@@ -1,14 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNodes } from "@xyflow/react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { useLibtvFloatingDock } from "@/lib/canvas/use-libtv-floating-dock";
-import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
+import {
+  useLibtvFloatingDock,
+  useLibtvSoleSelectedNodeId,
+} from "@/lib/canvas/use-libtv-floating-dock";
+import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-dock-selection";
+import { batchRunPro2ThreeViewRows } from "@/lib/canvas/batch-run-nodes";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
+import { commitPro2ThreeViewRowPromptFromDock } from "@/lib/canvas/pro2-lazy-media-prompts";
+import { scopePro2CharacterSyncGroupForThreeViewNode } from "@/lib/canvas/pro2-group-row-resolve";
 import {
   optimisticLibtvMediaRunStart,
   revertOptimisticLibtvMediaRunStart,
@@ -36,8 +41,10 @@ import type {
 import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
+import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
 import { cn } from "@/lib/utils";
 import { LibtvDockSendButton } from "../libtv-dock-send-button";
+import { LibtvDockCreditsLabel } from "../libtv-dock-credits-label";
 import {
   Sbv1ImageDockModelPicker,
   Sbv1ImageDockParamsPicker,
@@ -51,10 +58,10 @@ import { Pro2DockMarkButton } from "./pro2-dock-mark-button";
 import { Pro2DockStyleButton } from "./pro2-dock-style-button";
 import { Pro2DockUpstreamChips } from "./pro2-dock-upstream-chips";
 import { pro2ThreeViewNodeUsesEmbeddedDock } from "./pro2-three-view-node-embedded-dock";
+import { isLibtvMediaGenerating } from "../libtv-media-generating-state";
 
 /** 2.0 三视图节点 · 底部输入坞（图标区固定 / 正文可滚动） */
 export function Pro2ThreeViewInputDock() {
-  const rfNodes = useNodes();
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
   const { providers } = useUserProviders();
@@ -68,25 +75,24 @@ export function Pro2ThreeViewInputDock() {
 
   const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
 
-  const selected = useMemo(() => {
-    const picked = rfNodes.filter(
-      (n) => n.selected && n.type === "story-pro2-three-view",
-    );
-    return picked.length === 1 ? picked[0] : null;
-  }, [rfNodes]);
+  /** 框选 / 多选 ≥2 时由 useLibtvSoleSelectedNodeId 返回 null，禁止单节点 Dock */
+  const suppressDock = useLibtvShouldSuppressFloatingDock();
+  const dockNodeId = useLibtvSoleSelectedNodeId("story-pro2-three-view");
+
+  useEffect(() => {
+    setDockMenu(null);
+  }, [dockNodeId]);
 
   const storeNode = useMemo(() => {
-    if (!selected) return null;
-    return nodes.find((n) => n.id === selected.id) ?? null;
-  }, [selected, nodes]);
-
-  const dockNodeId = selected?.id ?? storeNode?.id ?? null;
+    if (!dockNodeId) return null;
+    return nodes.find((n) => n.id === dockNodeId) ?? null;
+  }, [dockNodeId, nodes]);
   const { placement, hidden: dockHidden, active: dockActive } =
     useLibtvFloatingDock(dockNodeId);
 
   const d = (storeNode?.data ?? {}) as StoryPro2ThreeViewNodeData;
   const dockInput = d.dockInput ?? "";
-  const isRunning = Boolean(d.uploading);
+  const isRunning = isLibtvMediaGenerating(d);
   const controllerId = d.pro2ControllerNodeId;
 
   const controller = useMemo(() => {
@@ -220,13 +226,42 @@ export function Pro2ThreeViewInputDock() {
     if (!storeNode || isRunning) return;
 
     if (controllerId && d.pro2RowKey) {
-      const ctrl = nodes.find((n) => n.id === controllerId);
-      if (ctrl) {
-        batchRunStoryRowsSequential(controllerId, [d.pro2RowKey], "threeView", {
-          forceFresh: true,
+      const prompt = dockInput.trim();
+      const linkedStyle = resolvePro2DockStyleFromUpstream(upstreamLinks);
+      const hasRefs =
+        upstreamLinks.some((l) => l.previewUrl) ||
+        Boolean(settingsData.dockStyleRef?.imageUrl) ||
+        Boolean(linkedStyle);
+      if (!prompt && !hasRefs) {
+        await alert({
+          title: "请输入提示词",
+          message: "请填写角色外观描述，或连接风格/参考图后再生成。",
+          variant: "warning",
         });
         return;
       }
+      const nodesNow = useCanvasStore.getState().nodes;
+      commitPro2ThreeViewRowPromptFromDock(
+        controllerId,
+        d.pro2RowKey,
+        prompt,
+        nodesNow,
+        updateNodeData,
+      );
+      scopePro2CharacterSyncGroupForThreeViewNode(
+        controllerId,
+        storeNode.id,
+        nodesNow,
+        updateNodeData,
+      );
+      updateNodeData(storeNode.id, {
+        dockInput: prompt,
+        uploadError: undefined,
+      });
+      batchRunPro2ThreeViewRows(controllerId, [d.pro2RowKey], {
+        forceFresh: true,
+      });
+      return;
     }
 
     let runEngine = settingsData.engine;
@@ -299,15 +334,14 @@ export function Pro2ThreeViewInputDock() {
     isRunning,
     controllerId,
     d.pro2RowKey,
-    nodes,
-    updateNodeData,
-    setNodeRuntime,
-    settingsData,
-    providers,
     dockInput,
     upstreamLinks,
+    settingsData.dockStyleRef,
+    updateNodeData,
     alert,
     base,
+    providers,
+    setNodeRuntime,
   ]);
 
   const onOpenStyleLibrary = useCallback(() => {
@@ -316,7 +350,7 @@ export function Pro2ThreeViewInputDock() {
     window.dispatchEvent(new CustomEvent("canvas:open-pro2-style-library"));
   }, [storeNode, setPro2StyleLibImageNodeId]);
 
-  if (!storeNode || !dockActive || !placement) return null;
+  if (suppressDock || !storeNode || !dockActive || !placement) return null;
   if (
     pro2ThreeViewNodeUsesEmbeddedDock(d, {
       selected: true,
@@ -332,9 +366,11 @@ export function Pro2ThreeViewInputDock() {
   return (
     <>
       <Pro2InputDockShell
+        key={storeNode.id}
         flowAnchor={placement}
         dockClassName="pro2-three-view-dock"
         hidden={dockHidden}
+        anchorNodeId={storeNode.id}
         header={
           <Pro2DockHeader
             refRow={
@@ -374,6 +410,8 @@ export function Pro2ThreeViewInputDock() {
         }
       >
         <MentionsEditable
+          key={storeNode.id}
+          sourceId={storeNode.id}
           className={cn(
             PRO2_DOCK_TEXTAREA_CLASS,
             RF_FORM_CONTROL,
@@ -411,6 +449,10 @@ function Pro2ThreeViewDockFooter({
   onConfirmSettings: (patch: Partial<Sbv1ImageNodeData>) => void;
   onRegenerate: () => void;
 }) {
+  const modelKey = settingsData.engine?.modelKey?.trim() ?? "";
+  const resolution = String(settingsData.resolution ?? "2K");
+  const estCredits = useModelCreditsPreview(modelKey, 0, undefined, 1, resolution);
+
   return (
     <Pro2DockToolbar className="gap-2">
       <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-0.5">
@@ -429,6 +471,8 @@ function Pro2ThreeViewDockFooter({
           onPatch={onConfirmSettings}
         />
       </div>
+      <div className="min-w-0 flex-1" />
+      <LibtvDockCreditsLabel credits={estCredits?.credits} />
       <LibtvDockSendButton
         disabled={!canRegenerate}
         loading={isRunning}

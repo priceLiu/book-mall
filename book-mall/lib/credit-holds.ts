@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import {
-  getPoolBalances,
+  getAccountCreditBalances,
   InsufficientCreditsError,
   releaseReserved,
   reserveCredits,
@@ -50,7 +50,7 @@ function reserveKey(userId: string, taskKey: string): string {
   return `hold:reserve:${userId}:${taskKey}`;
 }
 
-/** 积分预占用：冻结 credits（GENERAL 池），taskKey 幂等。 */
+/** 积分预占用：冻结 credits，taskKey 幂等。 */
 export async function reserveCreditHold(
   input: ReserveCreditHoldInput,
 ): Promise<ReserveCreditHoldResult> {
@@ -66,14 +66,14 @@ export async function reserveCreditHold(
   }
 
   const ref = accountRef(input.userId);
-  const pools = await getPoolBalances(ref);
-  const available = pools.general.balance - pools.general.reserved;
+  const balances = await getAccountCreditBalances(ref);
+  const available = balances.balance - balances.reserved;
   if (available < reserved) {
     return {
       ok: false,
       reason: "insufficient_balance",
-      balanceCredits: pools.general.balance,
-      reservedCredits: pools.general.reserved,
+      balanceCredits: balances.balance,
+      reservedCredits: balances.reserved,
       requiredCredits: reserved,
     };
   }
@@ -98,7 +98,6 @@ export async function reserveCreditHold(
   await reserveCredits({
     ref,
     credits: reserved,
-    pool: "GENERAL",
     idempotencyKey: reserveKey(input.userId, holdId),
     description: `工具预占 · ${input.toolKey}${input.action ? ` · ${input.action}` : ""}`,
   });
@@ -117,7 +116,7 @@ export async function releaseCreditHold(input: {
 }): Promise<void> {
   const ledger = await prisma.creditLedger.findUnique({
     where: { idempotencyKey: reserveKey(input.userId, input.holdId) },
-    select: { credits: true, pool: true },
+    select: { credits: true },
   });
   if (!ledger) return;
   const frozen = Math.abs(ledger.credits);
@@ -125,7 +124,6 @@ export async function releaseCreditHold(input: {
   await releaseReserved({
     ref: accountRef(input.userId),
     credits: frozen,
-    pool: ledger.pool,
     idempotencyKey: `hold:release:${input.userId}:${input.holdId}`,
     description: "工具预占释放",
   });
@@ -143,7 +141,7 @@ export async function settleCreditHold(input: {
 }): Promise<boolean> {
   const ledger = await prisma.creditLedger.findUnique({
     where: { idempotencyKey: reserveKey(input.userId, input.holdId) },
-    select: { credits: true, pool: true },
+    select: { credits: true },
   });
   if (!ledger) return false;
 
@@ -152,12 +150,10 @@ export async function settleCreditHold(input: {
   if (frozen <= 0) return false;
 
   const ref = accountRef(input.userId);
-  const pool = ledger.pool;
 
   await settleReserved({
     ref,
     credits: Math.min(actual, frozen),
-    pool,
     idempotencyKey: input.idempotencyKey ?? `hold:settle:${input.userId}:${input.holdId}`,
     description: "工具预占结算",
   });
@@ -166,7 +162,6 @@ export async function settleCreditHold(input: {
     await releaseReserved({
       ref,
       credits: frozen - actual,
-      pool,
       idempotencyKey: `hold:release:excess:${input.userId}:${input.holdId}`,
       description: "工具预占差额返还",
     });

@@ -87,6 +87,8 @@ export const zh = {
       "【再次确认】删除后无法恢复，确定继续？",
     destructiveDeleteSecondOss:
       "【再次确认】删除后无法恢复。将同时尝试删除云端存储（OSS）中的对应文件，确定继续？",
+    destructiveDeleteSecondOssPinned:
+      "【再次确认】删除后无法恢复。将同时尝试删除云端存储（OSS）中的对应文件；本条已展示在「我的 AI 空间」，个人空间展示将一并移除。确定继续？",
     imageLibraryDeleteConfirm:
       "从「我的图片库」删除本条？将从列表移除并尝试删除云端 OSS 中的对应图片文件。",
     closetDeleteFailed: "删除失败，请稍后重试",

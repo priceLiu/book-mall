@@ -62,6 +62,18 @@ type OssGetClient = {
   ) => Promise<{ content?: Buffer }>;
 };
 
+type OssHeadClient = {
+  head: (name: string, options?: Record<string, unknown>) => Promise<unknown>;
+};
+
+/** ali-oss 运行时支持 head，但 @types 未声明；对象不存在时抛 NoSuchKey */
+export async function ossHeadObject(
+  client: Awaited<ReturnType<typeof createOssClientFrom>>,
+  key: string,
+): Promise<void> {
+  await (client as unknown as OssHeadClient).head(key);
+}
+
 /** ali-oss 运行时支持 multipartUpload，但 @types 未声明 */
 export async function ossUploadBuffer(
   client: Awaited<ReturnType<typeof createOssClientFrom>>,

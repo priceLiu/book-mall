@@ -42,8 +42,8 @@ function main() {
   if (process.platform === "linux") {
     console.log(
       "[ffmpeg] Linux 请由运维在 book-mall 主机或容器内执行：\n" +
-        "  sudo apt-get update && sudo apt-get install -y ffmpeg\n" +
-        "生产环境请使用已内置 ffmpeg 的 book-mall Docker 镜像。",
+        "  sudo apt-get update && sudo apt-get install -y ffmpeg fonts-wqy-microhei\n" +
+        "生产环境请使用已内置 ffmpeg + 中文字体的 book-mall Docker 镜像。",
     );
     process.exit(ffmpegOk && ffprobeOk ? 0 : 1);
   }

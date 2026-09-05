@@ -10,18 +10,22 @@ import {
 import { PRO2_RIGHT_ADD_MENU, PRO2_STARTER_LEFT_ADD_MENU } from "@/lib/canvas/pro2-add-node-menu";
 import type { NodeProps } from "@xyflow/react";
 import {
-  AlignLeft,
+  BookOpen,
   FileText,
   GripVertical,
+  PenLine,
   Play,
+  Sparkles,
   Upload,
   User,
 } from "lucide-react";
 import { Handle, Position } from "@xyflow/react";
 
-import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
+import { LibtvNodeLinkedStage } from "../libtv-node-stage-logo";
 import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
 import { useLibtvNodeDuplicate } from "../libtv-node-header-bar";
 import { Pro2CrewTaskStatusBadge } from "./pro2-crew-task-status-badge";
@@ -48,7 +52,9 @@ import {
   pro2HubHasScriptTable,
   pro2HubIsGenerating,
   pro2HubIsLinkedOutline,
+  pro2ScriptHubHasLinkedOutlineContent,
   resolvePro2HubCharacterMd,
+  resolvePro2HubCharacterPickerRows,
   resolvePro2HubSceneMd,
 } from "@/lib/canvas/pro2-script-hub-helpers";
 import {
@@ -57,7 +63,7 @@ import {
   resolveLibtvThinNodeDisplayState,
 } from "@/lib/canvas/pro2-thin-node-display-state";
 import type { Pro2ScriptHubViewTab } from "@/lib/canvas/pro2-script-hub-view-types";
-import { resolveHubStoryboardMd } from "@/lib/canvas/story-hub-runtime";
+import { resolveHubOutlineMd, resolveHubStoryboardMd, buildHubStoryboardBackfillPatch, hubNodeRepairPatchIfChanged } from "@/lib/canvas/story-hub-runtime";
 import { resolvePro2HubTableTitle } from "@/lib/canvas/pro2-hub-display-title";
 import { resolveStarterForHub } from "@/lib/canvas/story-workspace-resolver";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
@@ -69,6 +75,11 @@ import {
   libtvNodeBorderStyle,
 } from "@/lib/canvas/libtv-node-chrome";
 import { ingestPro2HubScriptFile } from "@/lib/canvas/pro2-hub-script-upload";
+import {
+  resolveHubProductionScript,
+  tryRepairHubFromStoredProductionJson,
+  trySyncResolvedProductionScriptToHub,
+} from "@/lib/canvas/pro2-production-script-apply";
 import { STORY_PRO_UPLOAD_SCRIPT_ACCEPT } from "@/lib/canvas/story-pro-upload-script";
 import { cn } from "@/lib/utils";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
@@ -85,6 +96,15 @@ import { resolvePro2ThreeViewBatchImageForHub } from "@/lib/canvas/pro2-three-vi
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
 import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
+import {
+  PRO2_SCRIPT_CATEGORY_PRESETS,
+  type Pro2ScriptCategoryId,
+} from "@/lib/canvas/pro2-script-category-presets";
+import { applyPro2ScriptCategoryFromHub } from "@/lib/canvas/spawn-pro2-script-category-from-hub";
+import {
+  useObserveNodeInternalsResize,
+  useScheduleUpdateNodeInternals,
+} from "@/lib/canvas/use-schedule-update-node-internals";
 
 type HubTryActionId = "upload-script" | "video-ref" | "character";
 
@@ -98,31 +118,20 @@ const TRY_ACTIONS: Array<{
   { id: "character", label: "角色生成分镜脚本", icon: User },
 ];
 
+const CATEGORY_ICONS: Record<Pro2ScriptCategoryId, typeof BookOpen> = {
+  "gu-feng-tian-chong": BookOpen,
+  "default-master": Sparkles,
+  "custom-prompt": PenLine,
+};
+
 function pro2HubThreeViewStore() {
   const state = useCanvasStore.getState();
   return {
     nodes: state.nodes,
     edges: state.edges,
-    addNode: (
-      type:
-        | "story-pro2-character"
-        | "story-pro2-frame"
-        | "story-pro2-image"
-        | "story-pro2-three-view"
-        | "group",
-      position: { x: number; y: number },
-      data: Record<string, unknown>,
-    ) => state.addNode(type, position, data),
-    addNodeInGroup: (
-      type: "story-pro2-image" | "story-pro2-three-view",
-      groupId: string,
-      relativePosition: { x: number; y: number },
-      data: Record<string, unknown>,
-    ) => state.addNodeInGroup(type, groupId, relativePosition, data),
-    createGroupContaining: (
-      childIds: string[],
-      opts: { label: string; color: string },
-    ) => state.createGroupContaining(childIds, opts),
+    addNode: state.addNode,
+    addNodeInGroup: state.addNodeInGroup,
+    createGroupContaining: state.createGroupContaining,
     setEdges: state.setEdges,
     updateNodeData: state.updateNodeData,
     setNodes: state.setNodes,
@@ -130,6 +139,8 @@ function pro2HubThreeViewStore() {
 }
 
 export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
+  const scheduleUpdateNodeInternals = useScheduleUpdateNodeInternals(id);
+  const outerRef = useRef<HTMLDivElement>(null);
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
   const { providers } = useUserProviders();
@@ -145,7 +156,9 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
   const [uploadBusy, setUploadBusy] = useState(false);
   const scriptUploadRef = useRef<HTMLInputElement>(null);
 
-  const d = data as unknown as StoryProScriptHubNodeData;
+  // 生成态写在 zustand；RF props 经 mergeStoreNodesIntoRf 可能晚一帧，须读 store 才能立刻扫光
+  const liveHubNode = nodes.find((n) => n.id === id);
+  const d = (liveHubNode?.data ?? data) as unknown as StoryProScriptHubNodeData;
   const onDuplicateNode = useLibtvNodeDuplicate(id, "story-pro2-script-hub");
   const storyboardMd = resolveHubStoryboardMd(d);
   const characterMd = resolvePro2HubCharacterMd(d);
@@ -154,12 +167,46 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
     [nodes, edges, id],
   );
   const sceneMd = resolvePro2HubSceneMd(d, sceneCtx);
-  const outlineMd = d.outlineMd ?? "";
+  const outlineMd = resolveHubOutlineMd(d);
+  const productionScript = useMemo(() => resolveHubProductionScript(d), [d]);
+  const { history: hubTasks } = useNodeTaskHistory(id);
+
+  useEffect(() => {
+    const storyboardPatch = buildHubStoryboardBackfillPatch(d);
+    const repairPatch = tryRepairHubFromStoredProductionJson(d, id);
+    const merged = { ...d, ...storyboardPatch, ...(repairPatch ?? {}) };
+    const syncPatch = trySyncResolvedProductionScriptToHub(merged);
+    const patch =
+      storyboardPatch && Object.keys(storyboardPatch).length
+        ? storyboardPatch
+        : null;
+    const finalPatch =
+      repairPatch || syncPatch || patch
+        ? {
+            ...(patch ?? {}),
+            ...(repairPatch ?? {}),
+            ...(syncPatch ?? {}),
+          }
+        : null;
+    const changedPatch = hubNodeRepairPatchIfChanged(
+      d as unknown as Record<string, unknown>,
+      finalPatch as Record<string, unknown> | null,
+    );
+    if (changedPatch) updateNodeData(id, changedPatch);
+  }, [
+    d.outlineMd,
+    d.storyboardMd,
+    d.outlineRuntime?.textOutput,
+    d.storyboardRuntime?.textOutput,
+    id,
+    updateNodeData,
+  ]);
   const hasTable = pro2HubHasScriptTable(d);
   const hasCharacter = pro2HubHasCharacterTable(d);
   const hasScene = pro2HubHasSceneTable(d, sceneCtx);
   const hasOutline = pro2HubHasOutlineContent(d);
-  const hasPreviewContent = hasTable || hasCharacter || hasScene || hasOutline;
+  const hasPreviewContent =
+    hasTable || hasCharacter || hasScene || hasOutline;
   const [previewTab, setPreviewTab] = useState<Pro2ScriptHubViewTab>("script");
 
   useEffect(() => {
@@ -188,24 +235,28 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
     }
   }, [hasTable, hasCharacter, hasScene, hasOutline, previewTab]);
 
-  const isGenerating = pro2HubIsGenerating({
-    id,
-    data: d,
-    type: "story-pro2-script-hub",
-    position: { x: 0, y: 0 },
-  } as never);
+  const isGenerating = pro2HubIsGenerating(
+    {
+      id,
+      data: d,
+      type: "story-pro2-script-hub",
+      position: liveHubNode?.position ?? { x: 0, y: 0 },
+    } as never,
+    hubTasks,
+  );
   const outlineLinked = pro2HubIsLinkedOutline(nodes, edges, id, d);
   const isLinked = pro2ThinNodeIsLinked(id, edges);
   const displayState = resolveLibtvThinNodeDisplayState({
     hasGeneratedContent: hasPreviewContent,
     isGenerating,
     isLinked,
+    hubGenerateIntent: d.hubGenerateIntent,
   });
   const linkedMessage = pro2ScriptHubLinkedMessage({
     edges,
     nodes,
     hubId: id,
-    hasOutlineLink: Boolean(outlineLinked?.outlineMd?.trim()),
+    hasOutlineLink: pro2ScriptHubHasLinkedOutlineContent(nodes, edges, id, d),
   });
   const tableTitle = useMemo(() => {
     const starter = resolveStarterForHub(nodes, edges, id);
@@ -219,7 +270,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
     (s) => s.pro2ScriptTableEditorNodeId === id,
   );
   const showToolbar = Boolean(
-    soleSelected && hasPreviewContent && !isGenerating && !scriptTableEditorOpen,
+    soleSelected && hasPreviewContent && !scriptTableEditorOpen,
   );
   const showThinTitle = displayState !== "generated" || isGenerating;
   const previewTitle =
@@ -230,6 +281,51 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
       (hasPreviewContent || isLinked) &&
       !isGenerating,
   );
+
+  /** 生成中保留底图（预览/连线/空态），扫光叠层，避免 unmount 闪一下 */
+  const hubStageVariant = useMemo((): "preview" | "connected" | "initial" => {
+    if (hasPreviewContent && (displayState === "generated" || isGenerating)) {
+      return "preview";
+    }
+    if (displayState === "connected" || (isGenerating && isLinked)) {
+      return "connected";
+    }
+    return "initial";
+  }, [
+    displayState,
+    hasPreviewContent,
+    isGenerating,
+    isLinked,
+  ]);
+
+  useEffect(() => {
+    scheduleUpdateNodeInternals(
+      [
+        displayState,
+        showToolbar ? 1 : 0,
+        showThinTitle ? 1 : 0,
+        showSidePlus ? 1 : 0,
+        isGenerating ? 1 : 0,
+        selected ? 1 : 0,
+        hasPreviewContent ? 1 : 0,
+        isLinked ? 1 : 0,
+        previewTab,
+      ].join("|"),
+    );
+  }, [
+    scheduleUpdateNodeInternals,
+    displayState,
+    showToolbar,
+    showThinTitle,
+    showSidePlus,
+    isGenerating,
+    selected,
+    hasPreviewContent,
+    isLinked,
+    previewTab,
+  ]);
+
+  useObserveNodeInternalsResize(id, outerRef);
 
   const onGenerateThreeView = useCallback(async () => {
     if (isGenerating) return;
@@ -261,30 +357,32 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
 
   const onSidePick = useCallback(
     (side: "left" | "right") => (itemId: string, nodeType?: string) => {
-      // 右侧 + 「三视图」与顶部工具栏「生成角色三视图」对齐：基于角色表生成三视图
-      if (itemId === "three-view" || nodeType === "story-pro2-three-view") {
-        void onGenerateThreeView();
-        return;
-      }
       void handlePro2SideAddNodePick(
         itemId,
         nodeType,
         { alert },
-        () => {
-          const spawnType = resolveLibtvSideSpawnNodeType(itemId, nodeType);
+        async (pickId, pickType) => {
+          const spawnType = resolveLibtvSideSpawnNodeType(pickId, pickType);
           if (!spawnType) return;
-          spawnLibtvNeighborFromAnchor(id, side, spawnType, {
-            nodes,
-            edges,
+          const newId = spawnLibtvNeighborFromAnchor(id, side, spawnType, {
+            nodes: useCanvasStore.getState().nodes,
+            edges: useCanvasStore.getState().edges,
             addNode,
             addNodeInGroup,
             setNodes,
             setEdges,
           });
+          if (!newId) {
+            await alert({
+              title: "无法添加节点",
+              message: "当前画布未能创建该节点，请刷新后重试或检查工作流版本。",
+              variant: "warning",
+            });
+          }
         },
       );
     },
-    [id, nodes, edges, addNode, addNodeInGroup, setNodes, setEdges, alert, onGenerateThreeView],
+    [id, addNode, addNodeInGroup, setNodes, setEdges, alert],
   );
 
   const openEditor = useCallback(() => {
@@ -336,8 +434,50 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
     [onTryUploadScript, alert],
   );
 
+  const onCategoryPick = useCallback(
+    (categoryId: Pro2ScriptCategoryId) => {
+      if (isGenerating) return;
+      const result = applyPro2ScriptCategoryFromHub(id, categoryId, {
+        nodes,
+        edges,
+        addNode: (type, position, data) =>
+          addNode(type as "story-pro2-starter", position, data),
+        setEdges,
+        setNodes,
+        updateNodeData,
+      });
+      if (!result) {
+        void alert({
+          title: "无法应用剧本类别",
+          message: "请刷新页面后重试。",
+          variant: "warning",
+        });
+        return;
+      }
+      if (!result.spawnedStarter) {
+        void alert({
+          title: "已更新剧本类别",
+          message: "已切换类别配置；上游文本节点已保留。",
+          variant: "info",
+        });
+      }
+    },
+    [
+      id,
+      isGenerating,
+      nodes,
+      edges,
+      addNode,
+      setEdges,
+      setNodes,
+      updateNodeData,
+      alert,
+    ],
+  );
+
   return (
     <div
+      ref={outerRef}
       className={cn(LIBTV_NODE_OUTER_CLASS, LIBTV_CARD_DRAG_CLASS)}
       data-pro2-dock-anchor={id}
       onPointerEnter={onPointerEnter}
@@ -350,32 +490,16 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
       />
       {selected ? <Pro2NodeResizeGrip /> : null}
 
+      {/* 左侧入边吸附；plus_left / text 由 Pro2NodeSidePlus 提供，勿重复声明（会露出左右竖条） */}
       <Handle
         id="in_text"
         type="target"
         position={Position.Left}
         className={cn(
           PRO2_NODE_HANDLE_CLASS,
-          showSidePlus
-            ? "pointer-events-none opacity-0"
-            : selected
-              ? "opacity-100"
-              : "opacity-0 pointer-events-none",
-        )}
-      />
-      <Handle
-        id="plus_left"
-        type="source"
-        position={Position.Left}
-        className={cn(PRO2_NODE_HANDLE_CLASS, "pointer-events-none opacity-0")}
-      />
-      <Handle
-        id="text"
-        type="source"
-        position={Position.Right}
-        className={cn(
-          PRO2_NODE_HANDLE_CLASS,
-          showSidePlus ? "pointer-events-none opacity-0" : selected ? "opacity-100" : "opacity-0 pointer-events-none",
+          "libtv-node-inbound-handle",
+          "libtv-node-inbound-text-handle",
+          "pointer-events-none !opacity-0 !border-transparent !bg-transparent",
         )}
       />
 
@@ -398,10 +522,6 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
         onPick={onSidePick("right")}
       />
 
-      {soleSelected && !showToolbar ? (
-        <Pro2ThinNodeToolbar style={{ top: -60 }} onDuplicateNode={onDuplicateNode} />
-      ) : null}
-
       {showThinTitle ? (
         <div className={cn(PRO2_TEXT_NODE_TITLE_CLASS, "relative mb-1.5 shrink-0")}>
           <GripVertical className="size-3.5 shrink-0 text-white/30" />
@@ -415,23 +535,29 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
         </div>
       ) : null}
 
-      {showToolbar ? (
-        <LibtvNodeToolbarPortal nodeId={id} visible={showToolbar}>
-          <Pro2ScriptHubToolbar
-            hubId={id}
-            hubData={d}
-            tableTitle={tableTitle}
-            onDuplicateNode={onDuplicateNode}
-          />
+      {soleSelected && !scriptTableEditorOpen ? (
+        <LibtvNodeToolbarPortal nodeId={id} visible={soleSelected}>
+          {showToolbar ? (
+            <Pro2ScriptHubToolbar
+              hubId={id}
+              hubData={d}
+              tableTitle={tableTitle}
+              onDuplicateNode={onDuplicateNode}
+            />
+          ) : (
+            <Pro2ThinNodeToolbar onDuplicateNode={onDuplicateNode} />
+          )}
         </LibtvNodeToolbarPortal>
       ) : null}
 
       <div className="relative min-h-0 flex-1 overflow-visible">
       <div
         className={cn(
+          "canvas-node-shell",
           PRO2_CARD_SHELL_CLASS,
           LIBTV_CARD_DRAG_CLASS,
           "relative flex h-full min-h-0 flex-col overflow-hidden",
+          isGenerating && "canvas-node-generating",
         )}
         style={
           libtvNodeBorderStyle({
@@ -441,16 +567,16 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
           }) ?? { borderColor: pro2NodeBorderColor(!!selected) }
         }
       >
-        {isGenerating ? (
-          <LibtvMediaGeneratingState variant="violet" />
-        ) : displayState === "generated" ? (
+        {hubStageVariant === "preview" ? (
           <div
             className={cn(
               LIBTV_NODE_STAGE_DRAG_CLASS,
               "flex h-full min-h-0 flex-col px-2 py-2",
+              isGenerating && "pointer-events-none",
             )}
             title="双击放大编辑"
             onDoubleClick={(e) => {
+              if (isGenerating) return;
               e.preventDefault();
               e.stopPropagation();
               openEditor();
@@ -462,64 +588,77 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
               sceneMd={sceneMd}
               storyboardMd={storyboardMd}
               outlineMd={outlineMd}
+              productionScript={productionScript}
               title={previewTitle}
               tab={previewTab}
               onTabChange={setPreviewTab}
               onExpand={openEditor}
             />
           </div>
-        ) : displayState === "connected" ? (
-          <div
-            className={cn(
-              LIBTV_NODE_STAGE_DRAG_CLASS,
-              "flex flex-col items-center justify-center gap-2 px-4 text-center text-[11px] text-white/45",
-            )}
-          >
-            <AlignLeft className="size-8 text-white/20" />
-            <p>{linkedMessage.title}</p>
-            <p className="text-[10px] text-white/35">{linkedMessage.hint}</p>
-          </div>
+        ) : hubStageVariant === "connected" ? (
+          <LibtvNodeLinkedStage
+            stageIcon={BookOpen}
+            message={linkedMessage.title}
+            className={isGenerating ? "pointer-events-none" : undefined}
+          />
         ) : (
           <div
             className={cn(
               LIBTV_NODE_STAGE_DRAG_CLASS,
               "flex flex-col overflow-y-auto px-3 pb-3 pt-2",
+              isGenerating && "pointer-events-none",
             )}
           >
-            <div className="mb-3 flex justify-center pt-1">
-              <AlignLeft className="size-8 text-white/20" />
-            </div>
             <p className="mb-2 text-[11px] text-white/45">尝试：</p>
-            <ul className="space-y-0.5">
-              {TRY_ACTIONS.map((action) => (
-                <li key={action.id}>
-                  <LibtvTryActionRow
-                    icon={action.icon}
-                    label={action.label}
-                    disabled={
-                      isGenerating ||
-                      (action.id === "upload-script" && uploadBusy)
-                    }
-                    onClick={() => onTryAction(action.id)}
-                  />
-                </li>
-              ))}
-            </ul>
-            <div className="mt-3 space-y-1 text-center text-[10px] leading-relaxed text-white/30">
-              <p>一句话生成剧本：在下方 Dock 输入剧情后发送</p>
-              <p>上传剧本生成分镜脚本：点击上方按钮选择 .md / .txt 文件</p>
-              <p className="pt-1 text-white/25">
-                完成剧本后在节点顶栏发布，即可在公告条参与制作任务
-              </p>
+            <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
+              <div className="min-w-0">
+                <ul className="space-y-0.5">
+                  {TRY_ACTIONS.map((action) => (
+                    <li key={action.id}>
+                      <LibtvTryActionRow
+                        icon={action.icon}
+                        label={action.label}
+                        disabled={
+                          isGenerating ||
+                          (action.id === "upload-script" && uploadBusy)
+                        }
+                        onClick={() => onTryAction(action.id)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="min-w-0 pl-1">
+                <p className="mb-2 text-[11px] text-white/45">提示词模板</p>
+                <ul className="space-y-0.5">
+                  {PRO2_SCRIPT_CATEGORY_PRESETS.map((preset) => (
+                    <li key={preset.id}>
+                      <LibtvTryActionRow
+                        icon={CATEGORY_ICONS[preset.id]}
+                        label={preset.label}
+                        disabled={isGenerating}
+                        onClick={() => onCategoryPick(preset.id)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
         )}
+        {isGenerating ? (
+          <LibtvMediaGeneratingState
+            variant="violet"
+            className="z-10"
+            cancelNodeId={id}
+          />
+        ) : null}
       </div>
       </div>
 
       <Pro2CharacterThreeViewPicker
         open={tvPickerOpen}
-        characterMd={characterMd}
+        characterRows={resolvePro2HubCharacterPickerRows(d)}
         initialBatchImage={resolvePro2ThreeViewBatchImageForHub(id, nodes, edges)}
         onClose={() => setTvPickerOpen(false)}
         onConfirm={runThreeViewGenerate}

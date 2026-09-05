@@ -100,37 +100,54 @@ function selectStoreGeometry(
 export function useLibtvDockFlowPlacement(
   nodeId: string | null,
   opts?: PlacementOpts,
+  /** 拖动所属节点时冻结锚点，避免 Dock portal 每帧重算拖慢 RF */
+  freeze = false,
 ): LibtvDockFlowPlacement | null {
+  const frozenGeometryRef = useRef<NodeFlowGeometry | null>(null);
+  const defaultNodeWidth = opts?.defaultNodeWidth;
+  const defaultNodeHeight = opts?.defaultNodeHeight;
+  const storePlacementOpts = useMemo(
+    (): PlacementOpts | undefined =>
+      defaultNodeWidth != null || defaultNodeHeight != null
+        ? { defaultNodeWidth, defaultNodeHeight }
+        : undefined,
+    [defaultNodeHeight, defaultNodeWidth],
+  );
+
   const geometry = useStore(
     useCallback(
       (state) => {
         if (!nodeId) return null;
+        if (freeze) return frozenGeometryRef.current;
+
         const node = state.nodeLookup.get(nodeId);
         if (!node) return null;
 
         const w =
           node.measured?.width ??
           (typeof node.width === "number" ? node.width : undefined) ??
-          opts?.defaultNodeWidth ??
+          defaultNodeWidth ??
           LIBTV_DOCK_FLOW_WIDTH;
         const h =
           node.measured?.height ??
           (typeof node.height === "number" ? node.height : undefined) ??
-          opts?.defaultNodeHeight ??
+          defaultNodeHeight ??
           280;
         const pos = node.internals?.positionAbsolute ?? node.position;
 
-        return { x: pos.x, y: pos.y, w, h } satisfies NodeFlowGeometry;
+        const next = { x: pos.x, y: pos.y, w, h } satisfies NodeFlowGeometry;
+        frozenGeometryRef.current = next;
+        return next;
       },
-      [nodeId, opts?.defaultNodeWidth, opts?.defaultNodeHeight],
+      [nodeId, defaultNodeWidth, defaultNodeHeight, freeze],
     ),
     geometryEqual,
   );
 
   const storeGeometry = useCanvasStore(
     useCallback(
-      (s) => selectStoreGeometry(s.nodes, nodeId, opts),
-      [nodeId, opts?.defaultNodeWidth, opts?.defaultNodeHeight],
+      (s) => selectStoreGeometry(s.nodes, nodeId, storePlacementOpts),
+      [nodeId, storePlacementOpts],
     ),
     geometryEqual,
   );

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { parseAdminListPage } from "@/lib/admin/admin-template-page";
 import { requireFinanceAdminApi } from "@/lib/admin/require-finance-admin-api";
 import {
-  deleteAdminQrTemplate,
   listAdminQrTemplates,
   upsertAdminQrTemplate,
 } from "@/lib/quick-replica/qr-template-admin-service";
@@ -27,9 +27,19 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const category = parseCategory(url.searchParams.get("category"));
   const kind = url.searchParams.get("kind")?.trim() || null;
+  const { limit, offset } = parseAdminListPage(url.searchParams);
 
-  const templates = await listAdminQrTemplates({ category, kind });
-  return NextResponse.json({ templates });
+  if (!category) {
+    return NextResponse.json({ templates: [], total: 0 });
+  }
+
+  const { templates, total } = await listAdminQrTemplates({
+    category,
+    kind,
+    limit,
+    offset,
+  });
+  return NextResponse.json({ templates, total });
 }
 
 export async function POST(request: Request) {

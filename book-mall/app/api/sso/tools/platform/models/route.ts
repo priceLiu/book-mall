@@ -57,6 +57,8 @@ export async function GET(req: Request) {
         requestKind: r.requestKind,
         creditsPerUnit: r.creditsPerUnit,
         credentialBound: true,
+        sourceLabel: r.sourceLabel,
+        sortOrder: r.sortOrder,
       })),
       platformOffering: true,
     });

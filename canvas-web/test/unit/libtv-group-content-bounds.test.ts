@@ -4,6 +4,7 @@ import {
   clampGroupBoxToBounds,
   computeGroupChildrenAbsBounds,
   computeLibtvGroupContentMinSize,
+  expandLibtvGroupToFitChildren,
   resolveGroupResizeGeometry,
 } from "@/lib/canvas/libtv-group-content-bounds";
 
@@ -27,8 +28,49 @@ describe("computeLibtvGroupContentMinSize", () => {
       },
     ];
     const min = computeLibtvGroupContentMinSize("g1", nodes);
-    expect(min.minWidth).toBeGreaterThanOrEqual(350 + 64 + 64);
-    expect(min.minHeight).toBeGreaterThanOrEqual(350 + 112 + 64);
+    expect(min.minWidth).toBeGreaterThanOrEqual(350 + 96 + 96);
+    expect(min.minHeight).toBeGreaterThanOrEqual(350 + 112 + 96);
+  });
+});
+
+describe("expandLibtvGroupToFitChildren", () => {
+  it("grows group box without moving children", () => {
+    const nodes: CanvasFlowNode[] = [
+      {
+        id: "g1",
+        type: "group",
+        position: { x: 10, y: 20 },
+        width: 400,
+        height: 300,
+        data: { sbv1Styled: true },
+      },
+      {
+        id: "render1",
+        type: "jianying-auto-render-pro2",
+        parentId: "g1",
+        position: { x: 200, y: 100 },
+        width: 635,
+        height: 1100,
+        data: { label: "自动成片" },
+      },
+      {
+        id: "img1",
+        type: "sbv1-image",
+        parentId: "g1",
+        position: { x: 64, y: 112 },
+        width: 350,
+        height: 350,
+        data: {},
+      },
+    ];
+    const next = expandLibtvGroupToFitChildren(nodes, "g1");
+    const group = next.find((n) => n.id === "g1")!;
+    const render = next.find((n) => n.id === "render1")!;
+    const img = next.find((n) => n.id === "img1")!;
+    expect(group.width).toBeGreaterThan(400);
+    expect(group.height).toBeGreaterThan(300);
+    expect(render.position).toEqual({ x: 200, y: 100 });
+    expect(img.position).toEqual({ x: 64, y: 112 });
   });
 });
 
@@ -76,10 +118,10 @@ describe("computeGroupChildrenAbsBounds", () => {
     const frozen = new Map([["img1", { x: 200, y: 200 }]]);
     const bounds = computeGroupChildrenAbsBounds(frozen, nodes);
     expect(bounds).toEqual({
-      left: 200 - 64,
-      top: 200 - 64 - 48,
-      right: 300 + 64,
-      bottom: 300 + 64,
+      left: 200 - 96,
+      top: 200 - 96 - 48,
+      right: 300 + 96,
+      bottom: 300 + 96,
     });
   });
 

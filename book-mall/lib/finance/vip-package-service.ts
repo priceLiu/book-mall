@@ -1,9 +1,8 @@
 /**
  * VIP 大额套餐 · 开通服务（管理员/财务后台 + 线上下单）
  *
- * 依据测算器选定的方案（通用/视频积分），为客户创建 VIP 团队租户并一次性发放
- * 双池积分。VIP 为一次性预充：monthlyGrantCredits = 0、currentPeriodEnd = null，
- * 因此月度重置脚本（若启用）会跳过该账户，积分长期有效、不清零。
+ * 依据测算器选定的方案（均衡 / 视频偏重），为客户创建 VIP 团队租户并一次性发放
+ * 单池总积分。VIP 为一次性预充：monthlyGrantCredits = 0、currentPeriodEnd = null。
  */
 import { grantCredits } from "@/lib/billing/credit-account-service";
 import { addMonths } from "@/lib/billing/credit-lot-logic";
@@ -42,8 +41,7 @@ export type VipAllocationMode = "auto" | "manual";
 export interface ProvisionSeatPlanInput {
   phone?: string | null;
   role?: "OWNER" | "MEMBER";
-  generalCredits: number;
-  videoCredits: number;
+  credits: number;
   label?: string | null;
 }
 
@@ -66,10 +64,8 @@ export type ProvisionVipPackageResult =
   | {
       ok: true;
       tenantId: string;
-      generalCredits: number;
-      videoCredits: number;
-      perSeatGeneral: number;
-      perSeatVideo: number;
+      credits: number;
+      perSeatCredits: number;
       seatPlans: VipSeatPlan[];
       invitesSent: { phone: string; inviteUrl: string | null }[];
     }
@@ -83,18 +79,19 @@ async function resolveSeatPlans(input: {
   ownerPhone?: string | null;
 }): Promise<VipSeatPlan[]> {
   if (input.allocationMode === "manual" && input.seatPlans?.length) {
-    const manual = input.seatPlans.map((p, i) => ({
-      seatIndex: i + 1,
-      label: p.label?.trim() || (i === 0 ? "首席席" : `席位 ${i + 1}`),
-      phone: p.phone?.trim() || undefined,
-      role: (p.role ?? (i === 0 ? "OWNER" : "MEMBER")) as "OWNER" | "MEMBER",
-      generalCredits: Math.max(0, Math.round(p.generalCredits)),
-      videoCredits: Math.max(0, Math.round(p.videoCredits)),
-      isChief: i === 0,
-    }));
+    const manual = input.seatPlans.map((p, i) => {
+      const credits = Math.max(0, Math.round(p.credits ?? 0));
+      return {
+        seatIndex: i + 1,
+        label: p.label?.trim() || (i === 0 ? "首席席" : `席位 ${i + 1}`),
+        phone: p.phone?.trim() || undefined,
+        role: (p.role ?? (i === 0 ? "OWNER" : "MEMBER")) as "OWNER" | "MEMBER",
+        credits,
+        isChief: i === 0,
+      };
+    });
     const check = validateVipManualAllocation({
-      totalGeneralCredits: input.scheme.generalCredits,
-      totalVideoCredits: input.scheme.videoCredits,
+      totalCredits: input.scheme.totalCredits,
       perSeat: manual,
     });
     if (!check.ok) throw new Error(check.reason ?? "手动分配合计不正确");
@@ -102,8 +99,7 @@ async function resolveSeatPlans(input: {
   }
 
   return buildAutoSeatPlans({
-    totalGeneralCredits: input.scheme.generalCredits,
-    totalVideoCredits: input.scheme.videoCredits,
+    totalCredits: input.scheme.totalCredits,
     seats: input.seats,
     ownerPhone: input.ownerPhone ?? undefined,
   });
@@ -116,7 +112,7 @@ async function applyOwnerCap(tenantId: string, ownerUserId: string, plan: VipSea
   if (!member) return;
   await prisma.tenantMember.update({
     where: { id: member.id },
-    data: { monthlyCapCredits: plan.generalCredits > 0 ? plan.generalCredits : null },
+    data: { monthlyCapCredits: plan.credits > 0 ? plan.credits : null },
   });
 }
 
@@ -143,8 +139,7 @@ async function sendSeatInvites(input: {
         phone,
         role: "MEMBER",
         createdById: input.adminUserId,
-        plannedGeneralCredits: plan.generalCredits,
-        plannedVideoCredits: plan.videoCredits,
+        plannedGeneralCredits: plan.credits,
       });
       sent.push({ phone, inviteUrl });
     } catch (e) {
@@ -179,13 +174,11 @@ async function grantVipCredits(input: {
 }) {
   await grantCredits({
     ref: { ownerType: "TENANT", ownerId: input.tenantId },
-    credits: input.scheme.generalCredits,
-    videoCredits: input.scheme.videoCredits,
+    credits: input.scheme.totalCredits,
     monthlyGrantCredits: 0,
-    videoMonthlyGrantCredits: 0,
     pricePerCreditYuan: input.scheme.pricePerCreditYuan,
     currentPeriodEnd: null,
-    perSeatCapCredits: input.alloc.perSeatGeneral > 0 ? input.alloc.perSeatGeneral : null,
+    perSeatCapCredits: input.alloc.perSeatCredits > 0 ? input.alloc.perSeatCredits : null,
     lotSource: "TOPUP",
     lotExpiresAt: vipLotExpiresAt(),
     idempotencyKey: input.idempotencyKey,
@@ -227,10 +220,8 @@ export async function provisionVipPackage(
     return {
       ok: true,
       tenantId: result.tenantId,
-      generalCredits: result.generalCredits,
-      videoCredits: result.videoCredits,
-      perSeatGeneral: result.perSeatGeneral,
-      perSeatVideo: result.perSeatVideo,
+      credits: result.credits,
+      perSeatCredits: result.perSeatCredits,
       seatPlans: result.seatPlans,
       invitesSent: result.invitesSent,
     };
@@ -270,8 +261,7 @@ export async function fulfillVipPackageFromPayment(input: {
   });
 
   const alloc = computeVipSeatAllocation({
-    totalGeneralCredits: scheme.generalCredits,
-    totalVideoCredits: scheme.videoCredits,
+    totalCredits: scheme.totalCredits,
     seats,
   });
 
@@ -294,12 +284,12 @@ export async function fulfillVipPackageFromPayment(input: {
       await updateTenantConfig({
         tenantId,
         seatLimit: seats,
-        perSeatCapCredits: alloc.perSeatGeneral > 0 ? alloc.perSeatGeneral : null,
+        perSeatCapCredits: alloc.perSeatCredits > 0 ? alloc.perSeatCredits : null,
       });
-    } else if (alloc.perSeatGeneral > 0) {
+    } else if (alloc.perSeatCredits > 0) {
       await updateTenantConfig({
         tenantId,
-        perSeatCapCredits: alloc.perSeatGeneral,
+        perSeatCapCredits: alloc.perSeatCredits,
       });
     }
   } else {
@@ -310,7 +300,7 @@ export async function fulfillVipPackageFromPayment(input: {
       packageLevel: "VIP",
       interval: null,
       seatLimit: seats,
-      perSeatCapCredits: alloc.perSeatGeneral > 0 ? alloc.perSeatGeneral : null,
+      perSeatCapCredits: alloc.perSeatCredits > 0 ? alloc.perSeatCredits : null,
     });
     tenantId = tenant.id;
     try {
@@ -324,7 +314,7 @@ export async function fulfillVipPackageFromPayment(input: {
     });
   }
 
-  const schemeLabel = input.scheme === "video_heavy" ? "视频多" : "通用多";
+  const schemeLabel = input.scheme === "video_heavy" ? "视频偏重" : "均衡";
   await grantVipCredits({
     tenantId,
     scheme,
@@ -352,10 +342,8 @@ export async function fulfillVipPackageFromPayment(input: {
 
   return {
     tenantId,
-    generalCredits: scheme.generalCredits,
-    videoCredits: scheme.videoCredits,
-    perSeatGeneral: alloc.perSeatGeneral,
-    perSeatVideo: alloc.perSeatVideo,
+    credits: scheme.totalCredits,
+    perSeatCredits: alloc.perSeatCredits,
     renewed: !!existing,
     seatPlans,
     invitesSent,

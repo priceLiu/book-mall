@@ -2,12 +2,16 @@ import { parseReferencedIds } from "@/components/canvas/mentions/MentionsTextare
 import type { MentionableItem } from "@/components/canvas/mentions/MentionsTextarea";
 import type { StoryCharacterRow } from "./story-workspace-types";
 
+import type { GridSplitCrop } from "./libtv-grid-split-crop";
+
 export type { MentionableItem };
 
 export type StoryRefImage = {
   id: string;
   label: string;
   url?: string;
+  /** 宫格参考 · Dock 缩略图 CSS 裁切（仅展示，提交时仍走服务端裁切） */
+  gridSplitCrop?: GridSplitCrop;
 };
 
 export function storyRefMentionToken(refId: string): string {

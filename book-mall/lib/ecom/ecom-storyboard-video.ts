@@ -6,14 +6,36 @@ import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
 import { buildCanvasVideoKieInput } from "@/lib/canvas/canvas-video-kie";
 import { buildCanvasVideoVolcengineInput } from "@/lib/canvas/canvas-video-volcengine";
 import {
+  buildDashscopeSbv1T2vVideoBody,
+  buildDashscopeWan30Media,
+} from "@/lib/canvas/dashscope-sbv1-t2v";
+import {
+  buildCanvasVideoMinimaxInput,
+  minimaxResolutionFromEcom,
+} from "@/lib/gateway/minimax-video-body";
+import { resolveMinimaxVideoModel } from "@/lib/gateway/minimax-video-models";
+import {
   ecomGwCreateBailianR2vJob,
+  ecomGwCreateDashscopeJob,
   ecomGwCreateKieJob,
+  ecomGwCreateMinimaxVideoJob,
   ecomGwCreateVolcengineVideoJob,
   ecomGwPollBailianR2v,
+  ecomGwPollDashscope,
   ecomGwPollKie,
+  ecomGwPollMinimax,
   ecomGwPollVolcengine,
 } from "@/lib/gateway/ecom-tool-gateway-client";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
+import { buildStoryboardImagePromptContext } from "@/lib/ecom/ecom-storyboard-image-prompt";
+import type { PanelScenePromptContext } from "@/lib/ecom/ecom-storyboard-scene-prompt";
+import { getEcomStoryboardProject } from "@/lib/ecom/ecom-storyboard-service";
+import { mergeStoryboardPanelMediaByIndex } from "@/lib/ecom/ecom-storyboard-sheet-reconcile";
+import {
+  clearStoryboardPanelVideosPending,
+  markStoryboardPanelVideosPending,
+  updateStoryboardPanelVideoPendingEntry,
+} from "@/lib/ecom/ecom-storyboard-pending-videos";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
 import { ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
 import {
@@ -37,21 +59,23 @@ import { composeStoryboardPanelGridPng } from "@/lib/ecom/ecom-storyboard-panel-
 import { normalizeImageForVolcengineVideo } from "@/lib/ecom/ecom-storyboard-video-image";
 import {
   bailianResolutionFromEcom,
+  resolveEcomVideoGenerateAudio,
   resolveVideoResolution,
   videoSrFromResolution,
   type EcomStoryboardVideoResolution,
 } from "@/lib/ecom/ecom-storyboard-gen-params";
 import { persistStoryboardDeliverableSnapshot } from "@/lib/ecom/ecom-storyboard-snapshot";
+import { ensureGatewayLogSucceededAfterVendorUrl } from "@/lib/gateway/gateway-log-reconcile";
 import { updateEcomStoryboardProject } from "@/lib/ecom/ecom-storyboard-service";
 import { requireStoryboardProductRef } from "@/lib/ecom/ecom-storyboard-refs";
 import {
   resolveStoryboardPanelVideoRefPlan,
   resolveStoryboardVideoRefPlan,
 } from "@/lib/ecom/ecom-storyboard-video-ref-rules";
-import { buildEcomStoryboardKling30VideoInput } from "@/lib/ecom/ecom-storyboard-video-kie";
+import { buildEcomStoryboardKling30DashscopeVideoJob } from "@/lib/canvas/dashscope-kling-v3-video";
 import {
-  isStoryboardBailianR2vVideoModel,
-  isStoryboardKling30KieVideoModel,
+  isStoryboardKling30VideoModel,
+  isStoryboardWan30VideoModel,
   resolveStoryboardKieVideoUpstreamModel,
   resolveStoryboardVideoModel,
   resolveStoryboardVideoProvider,
@@ -62,7 +86,7 @@ type PendingFullVideoJob = {
   taskId: string;
   logId: string;
   modelKey: string;
-  provider: "volcengine" | "kie" | "bailian";
+  provider: "volcengine" | "kie" | "bailian" | "minimax" | "dashscope";
   durationSec: number;
   startedAt: string;
   prompt: string;
@@ -81,6 +105,18 @@ async function pollFullVideoGatewayJob(
   }
   if (pending.provider === "bailian") {
     return ecomGwPollBailianR2v(userId, {
+      taskId: pending.taskId,
+      gatewayLogId: pending.logId,
+    });
+  }
+  if (pending.provider === "minimax") {
+    return ecomGwPollMinimax(userId, {
+      taskId: pending.taskId,
+      gatewayLogId: pending.logId,
+    });
+  }
+  if (pending.provider === "dashscope") {
+    return ecomGwPollDashscope(userId, {
       taskId: pending.taskId,
       gatewayLogId: pending.logId,
     });
@@ -104,7 +140,11 @@ function readPendingFullVideoJob(meta: unknown): PendingFullVideoJob | null {
     logId: j.logId,
     modelKey: typeof j.modelKey === "string" ? j.modelKey : ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL,
     provider:
-      j.provider === "kie" || j.provider === "volcengine" || j.provider === "bailian"
+      j.provider === "kie" ||
+      j.provider === "volcengine" ||
+      j.provider === "bailian" ||
+      j.provider === "minimax" ||
+      j.provider === "dashscope"
         ? j.provider
         : resolveStoryboardVideoProvider(
             typeof j.modelKey === "string" ? j.modelKey : "",
@@ -113,6 +153,21 @@ function readPendingFullVideoJob(meta: unknown): PendingFullVideoJob | null {
     startedAt: typeof j.startedAt === "string" ? j.startedAt : new Date().toISOString(),
     prompt: typeof j.prompt === "string" ? j.prompt : "",
     taskKey: typeof j.taskKey === "string" ? j.taskKey : "",
+  };
+}
+
+async function resolveVideoSceneCtx(
+  userId: string,
+  projectId: string,
+): Promise<PanelScenePromptContext | undefined> {
+  const project = await getEcomStoryboardProject(userId, projectId);
+  if (!project) return undefined;
+  const ctx = buildStoryboardImagePromptContext(project);
+  return {
+    scenePresetKey: ctx.scenePresetKey,
+    scenePresetLabel: ctx.scenePresetLabel,
+    scenePresetImageHint: ctx.scenePresetImageHint,
+    globalSceneAnchor: ctx.globalSceneAnchor,
   };
 }
 
@@ -216,6 +271,18 @@ async function finalizeFullVideoFromVendorUrl(opts: {
     videoMode: "full_sheet",
   }).catch(() => undefined);
 
+  await ensureGatewayLogSucceededAfterVendorUrl({
+    logId: opts.pending.logId,
+    taskId: opts.pending.taskId,
+    videoUrl: opts.videoUrl,
+  }).catch((e) => {
+    console.warn(
+      "[ecom-storyboard-video] ensureGatewayLogSucceededAfterVendorUrl failed",
+      opts.pending.logId,
+      e instanceof Error ? e.message : String(e),
+    );
+  });
+
   return { asset, chargePoints };
 }
 
@@ -236,6 +303,7 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
   ratio?: string;
   seedStr?: string;
   promptExtend?: boolean;
+  generateAudio?: boolean;
 }) {
   await assertEcomToolkitGatewayAccess(opts.userId);
   requireStoryboardProductRef(opts.references);
@@ -286,14 +354,30 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
     panelImages,
   });
 
-  const durationMin = provider === "bailian" ? 3 : 4;
+  const durationMin =
+    provider === "bailian" || provider === "dashscope"
+      ? 3
+      : provider === "minimax"
+        ? 4
+        : 4;
   const durationCap = refPlan.rules.apiMaxDurationSec ?? 15;
+  if (opts.durationSec != null) {
+    const requested = Math.round(opts.durationSec);
+    if (requested > durationCap) {
+      throw new Error(
+        requested > 15
+          ? `成片时长 ${requested}s 超过模型「${modelKey}」上限 ${durationCap}s，请改选万相 3.0（wan3.0-video）或缩短时长。`
+          : `成片时长 ${requested}s 超过模型「${modelKey}」上限 ${durationCap}s，请缩短时长或更换模型。`,
+      );
+    }
+  }
   const durationSec = Math.max(
     durationMin,
     Math.min(durationCap, Math.round(opts.durationSec ?? 10)),
   );
   const resolution = resolveVideoResolution(opts.resolution);
   const videoSr = videoSrFromResolution(resolution);
+  const generateAudio = resolveEcomVideoGenerateAudio(modelKey, opts.generateAudio);
   const taskKey = `ecom-sb-vid:${opts.projectId}:${workspaceId}`;
   const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
 
@@ -311,7 +395,7 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
       }));
     }
     const { url: sizedUrl } =
-      provider === "bailian"
+      provider === "bailian" || provider === "dashscope"
         ? await ensureStoryboardBailianR2vRefImage({
             userId: opts.userId,
             imageUrl: aspectUrl,
@@ -332,9 +416,11 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
     .slice(0, refPlan.rules.maxTotalImages);
   const videoImageUrl = firstFrameUrl;
 
-  const prompt = buildEcomStoryboardVideoPrompt(sheet, opts.brief, undefined, {
+  const sceneCtx = await resolveVideoSceneCtx(opts.userId, opts.projectId);
+  const prompt = buildEcomStoryboardVideoPrompt(sheet, opts.brief, opts.references, {
     refSlots: refPlan.slots,
     refRules: refPlan.rules,
+    sceneCtx,
   });
   const ratio =
     opts.ratio?.trim() || opts.aspectRatio?.trim() || "9:16";
@@ -344,45 +430,14 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
   let logId: string;
 
   if (provider === "kie") {
-    const aspect = opts.aspectRatio ?? "9:16";
-    const klingAspect: "16:9" | "9:16" | "1:1" =
-      aspect === "16:9" ? "16:9" : aspect === "1:1" ? "1:1" : "9:16";
-    const { model, input } = isStoryboardKling30KieVideoModel(modelKey)
-      ? await (async () => {
-          const klingFirst = (
-            await ensureStoryboardRefImageForWan27({
-              userId: opts.userId,
-              imageUrl: firstFrameUrl,
-            })
-          ).url;
-          const klingRefs = await Promise.all(
-            opts.references.map(async (ref) => ({
-              ...ref,
-              ossUrl: (
-                await ensureStoryboardRefImageForWan27({
-                  userId: opts.userId,
-                  imageUrl: ref.ossUrl,
-                })
-              ).url,
-            })),
-          );
-          return buildEcomStoryboardKling30VideoInput({
-            prompt,
-            firstFrameUrl: klingFirst,
-            references: klingRefs,
-            aspectRatio: klingAspect,
-            durationSec,
-            sound: true,
-          });
-        })()
-      : buildCanvasVideoKieInput({
-          modelKey: resolveStoryboardKieVideoUpstreamModel(modelKey),
-          prompt,
-          imageUrl: videoImageUrl,
-          referenceImageUrls: normalizedReferenceImageUrls,
-          options: { resolution, duration: durationSec, generateAudio: true },
-          aspectRatio: videoAspect,
-        });
+    const { model, input } = buildCanvasVideoKieInput({
+      modelKey: resolveStoryboardKieVideoUpstreamModel(modelKey),
+      prompt,
+      imageUrl: videoImageUrl,
+      referenceImageUrls: normalizedReferenceImageUrls,
+      options: { resolution, duration: durationSec, generateAudio },
+      aspectRatio: videoAspect,
+    });
     const created = await ecomGwCreateKieJob(opts.userId, {
       model,
       input,
@@ -416,13 +471,103 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
     });
     taskId = created.taskId;
     logId = created.logId;
+  } else if (provider === "minimax") {
+    const spec = resolveMinimaxVideoModel(modelKey);
+    const minimaxRes = minimaxResolutionFromEcom(resolution);
+    const mode = spec?.mode;
+    const refUrlsForMinimax =
+      mode === "r2v" || mode === "s2v" || mode === "i2v"
+        ? refPlan.slots.map((s) => norm(s.url))
+        : normalizedReferenceImageUrls;
+    const { input } = buildCanvasVideoMinimaxInput({
+      modelKey,
+      prompt,
+      imageUrl:
+        mode === "t2v" || mode === "r2v" || mode === "s2v" || mode === "i2v"
+          ? undefined
+          : firstFrameUrl,
+      referenceImageUrls: refUrlsForMinimax,
+      options: {
+        resolution: minimaxRes,
+        duration: durationSec,
+        ratio,
+        generateAudio,
+      },
+    });
+    const created = await ecomGwCreateMinimaxVideoJob(opts.userId, {
+      model: modelKey,
+      input,
+      clientPage,
+    });
+    taskId = created.taskId;
+    logId = created.logId;
+  } else if (provider === "dashscope") {
+    if (isStoryboardKling30VideoModel(modelKey)) {
+      const aspect = opts.aspectRatio ?? "9:16";
+      const klingAspect: "16:9" | "9:16" | "1:1" =
+        aspect === "16:9" ? "16:9" : aspect === "1:1" ? "1:1" : "9:16";
+      const klingFirst = (
+        await ensureStoryboardRefImageForWan27({
+          userId: opts.userId,
+          imageUrl: firstFrameUrl,
+        })
+      ).url;
+      const klingRefs = await Promise.all(
+        opts.references.map(async (ref) => ({
+          ...ref,
+          ossUrl: (
+            await ensureStoryboardRefImageForWan27({
+              userId: opts.userId,
+              imageUrl: ref.ossUrl,
+            })
+          ).url,
+        })),
+      );
+      const { model, videoBody } = buildEcomStoryboardKling30DashscopeVideoJob({
+        prompt,
+        firstFrameUrl: klingFirst,
+        references: klingRefs,
+        aspectRatio: klingAspect,
+        durationSec,
+        sound: true,
+      });
+      const created = await ecomGwCreateDashscopeJob(opts.userId, {
+        kind: "video",
+        model,
+        body: videoBody,
+        clientPage,
+      });
+      taskId = created.taskId;
+      logId = created.logId;
+    } else {
+      const media = buildDashscopeWan30Media({
+        firstFrameUrl,
+        referenceImageUrls: normalizedReferenceImageUrls,
+      });
+      const { input, parameters } = buildDashscopeSbv1T2vVideoBody({
+        prompt,
+        aspectRatio: videoAspect,
+        resolution,
+        durationSec,
+        modelKey,
+        media,
+      });
+      const created = await ecomGwCreateDashscopeJob(opts.userId, {
+        kind: "video",
+        model: modelKey,
+        body: { input, parameters },
+        clientPage,
+      });
+      taskId = created.taskId;
+      logId = created.logId;
+    }
   } else {
     const { body } = buildCanvasVideoVolcengineInput({
       modelKey,
       prompt,
       imageUrl: videoImageUrl,
       referenceImageUrls: normalizedReferenceImageUrls,
-      options: { resolution, duration: durationSec, generateAudio: true },
+      options: { resolution, duration: durationSec, generateAudio },
       aspectRatio: videoAspect,
     });
     const created = await ecomGwCreateVolcengineVideoJob(opts.userId, {
@@ -534,6 +679,58 @@ export async function ecomGenerateStoryboardVideo(opts: {
   throw new Error("视频生成超时");
 }
 
+async function runBailianR2vVideoJob(opts: {
+  userId: string;
+  projectId: string;
+  modelKey: string;
+  prompt: string;
+  referenceImageUrls: string[];
+  durationSec: number;
+  aspectRatio: "16:9" | "9:16";
+  resolution?: EcomStoryboardVideoResolution;
+}): Promise<{ ossUrl: string; taskId: string; logId: string; chargePoints: number | null }> {
+  const resolution = opts.resolution ?? "1080p";
+  const clientPage = ecomClientPage(opts.userId, opts.projectId, ECOM_STORYBOARD_TOOL_KEY);
+  const { taskId, logId } = await ecomGwCreateBailianR2vJob(opts.userId, {
+    model: opts.modelKey,
+    prompt: opts.prompt,
+    referenceImageUrls: opts.referenceImageUrls,
+    resolution: bailianResolutionFromEcom(resolution),
+    ratio: opts.aspectRatio,
+    duration: opts.durationSec,
+    clientPage,
+  });
+
+  let videoUrl: string | null = null;
+  for (let i = 0; i < 120; i++) {
+    await new Promise((r) => setTimeout(r, 3000));
+    const polled = await ecomGwPollBailianR2v(opts.userId, {
+      taskId,
+      gatewayLogId: logId,
+    });
+    if (polled.status === "SUCCEEDED" && polled.outputUrl) {
+      videoUrl = polled.outputUrl;
+      break;
+    }
+    if (polled.status === "FAILED") {
+      throw new Error(polled.failMessage ?? "视频任务失败");
+    }
+  }
+  if (!videoUrl) throw new Error("视频生成超时");
+
+  const res = await fetch(videoUrl);
+  if (!res.ok) throw new Error(`下载视频失败 HTTP ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const ossUrl = await uploadCanvasUserBuffer({
+    userId: opts.userId,
+    ext: "mp4",
+    buf,
+    contentType: "video/mp4",
+  });
+
+  return { ossUrl, taskId, logId, chargePoints: null };
+}
+
 async function runVolcengineVideoJob(opts: {
   userId: string;
   projectId: string;
@@ -544,20 +741,21 @@ async function runVolcengineVideoJob(opts: {
   durationSec: number;
   aspectRatio: "16:9" | "9:16";
   resolution?: EcomStoryboardVideoResolution;
+  generateAudio?: boolean;
   meta: Record<string, unknown>;
-}): Promise<{ ossUrl: string; taskId: string; chargePoints: number | null }> {
+}): Promise<{ ossUrl: string; taskId: string; logId: string; chargePoints: number | null }> {
   const resolution = opts.resolution ?? "1080p";
   const videoSr = videoSrFromResolution(resolution);
-  const workspaceId = randomUUID().slice(0, 8);
-  const taskKey = `ecom-sb-vid:${opts.projectId}:${workspaceId}`;
-  const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
+  const taskKey = `ecom-sb-vid:${opts.projectId}:${randomUUID().slice(0, 8)}`;
+  const clientPage = ecomClientPage(opts.userId, opts.projectId, ECOM_STORYBOARD_TOOL_KEY);
+  const generateAudio = resolveEcomVideoGenerateAudio(opts.modelKey, opts.generateAudio);
 
   const { body } = buildCanvasVideoVolcengineInput({
     modelKey: opts.modelKey,
     prompt: opts.prompt,
     imageUrl: opts.imageUrl,
     referenceImageUrls: opts.referenceImageUrls,
-    options: { resolution, duration: opts.durationSec, generateAudio: true },
+    options: { resolution, duration: opts.durationSec, generateAudio },
     aspectRatio: opts.aspectRatio,
   });
 
@@ -596,7 +794,68 @@ async function runVolcengineVideoJob(opts: {
   });
 
 
-  return { ossUrl, taskId, chargePoints: null };
+  return { ossUrl, taskId, logId, chargePoints: null };
+}
+
+async function runDashscopeWan30VideoJob(opts: {
+  userId: string;
+  projectId: string;
+  modelKey: string;
+  prompt: string;
+  firstFrameUrl: string;
+  referenceImageUrls: string[];
+  durationSec: number;
+  aspectRatio: "16:9" | "9:16";
+  resolution?: EcomStoryboardVideoResolution;
+}): Promise<{ ossUrl: string; taskId: string; logId: string; chargePoints: number | null }> {
+  const resolution = opts.resolution ?? "720p";
+  const clientPage = ecomClientPage(opts.userId, opts.projectId, ECOM_STORYBOARD_TOOL_KEY);
+  const media = buildDashscopeWan30Media({
+    firstFrameUrl: opts.firstFrameUrl,
+    referenceImageUrls: opts.referenceImageUrls,
+  });
+  const { input, parameters } = buildDashscopeSbv1T2vVideoBody({
+    prompt: opts.prompt,
+    aspectRatio: opts.aspectRatio,
+    resolution,
+    durationSec: opts.durationSec,
+    modelKey: opts.modelKey,
+    media,
+  });
+  const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
+    kind: "video",
+    model: opts.modelKey,
+    body: { input, parameters },
+    clientPage,
+  });
+
+  let videoUrl: string | null = null;
+  for (let i = 0; i < 120; i++) {
+    await new Promise((r) => setTimeout(r, 3000));
+    const polled = await ecomGwPollDashscope(opts.userId, {
+      taskId,
+      gatewayLogId: logId,
+    });
+    if (polled.status === "SUCCEEDED" && polled.outputUrl) {
+      videoUrl = polled.outputUrl;
+      break;
+    }
+    if (polled.status === "FAILED") {
+      throw new Error(polled.failMessage ?? "视频任务失败");
+    }
+  }
+  if (!videoUrl) throw new Error("视频生成超时");
+
+  const res = await fetch(videoUrl);
+  if (!res.ok) throw new Error(`下载视频失败 HTTP ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const ossUrl = await uploadCanvasUserBuffer({
+    userId: opts.userId,
+    ext: "mp4",
+    buf,
+    contentType: "video/mp4",
+  });
+  return { ossUrl, taskId, logId, chargePoints: null };
 }
 
 export async function ecomGenerateStoryboardPanelVideo(opts: {
@@ -610,6 +869,7 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
   resolution?: string;
   modelKey?: string;
   brief?: { productHighlight?: string; style?: string };
+  generateAudio?: boolean;
 }) {
   await assertEcomToolkitGatewayAccess(opts.userId);
   requireStoryboardProductRef(opts.references);
@@ -621,92 +881,159 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
     throw new Error("请先生成该镜头分镜图");
   }
 
-  const modelKey = opts.modelKey?.trim() || ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL;
+  const modelKey = resolveStoryboardVideoModel(
+    opts.modelKey?.trim() || ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL,
+  );
+  const provider = resolveStoryboardVideoProvider(modelKey);
   const resolution = resolveVideoResolution(opts.resolution);
+  const generateAudio = resolveEcomVideoGenerateAudio(modelKey, opts.generateAudio);
+  const panelDurationCap = isStoryboardWan30VideoModel(modelKey)
+    ? 30
+    : 8;
+  const requestedPanelSec = Math.round(
+    typeof opts.durationSec === "number"
+      ? opts.durationSec
+      : (panel.durationHintSec ?? 3),
+  );
+  if (opts.durationSec != null && requestedPanelSec > panelDurationCap) {
+    throw new Error(
+      requestedPanelSec > 15
+        ? `单镜时长 ${requestedPanelSec}s 超过模型「${modelKey}」上限 ${panelDurationCap}s，请改选万相 3.0（wan3.0-video）。`
+        : `单镜时长 ${requestedPanelSec}s 超过模型「${modelKey}」上限 ${panelDurationCap}s，请缩短时长或更换模型。`,
+    );
+  }
   const durationSec = Math.max(
     2,
-    Math.min(
-      8,
-      Math.round(
-        typeof opts.durationSec === "number"
-          ? opts.durationSec
-          : (panel.durationHintSec ?? 3),
-      ),
-    ),
+    Math.min(panelDurationCap, requestedPanelSec),
   );
-  const panelRefPlan = resolveStoryboardPanelVideoRefPlan({
-    modelKey,
-    references: opts.references,
-    panelImageUrl: imageUrl,
-  });
-  const uniqueUrls = [...new Set(panelRefPlan.slots.map((s) => s.url))];
-  const normalizedMap = new Map<string, string>();
-  for (const raw of uniqueUrls) {
-    const { url: sizedUrl } = await ensureStoryboardVideoRefImage({
-      userId: opts.userId,
-      imageUrl: raw,
+
+  const aspectRatio = opts.aspectRatio ?? "9:16";
+
+  let gatewaySubmitted = false;
+  const existingVideoUrl = panel.videoUrl?.trim();
+  try {
+    const panelRefPlan = resolveStoryboardPanelVideoRefPlan({
+      modelKey,
+      references: opts.references,
+      panelImageUrl: imageUrl,
     });
-    normalizedMap.set(raw, sizedUrl);
-  }
-  const norm = (u: string) => normalizedMap.get(u) ?? u;
-  const prompt = buildEcomStoryboardPanelVideoPrompt(panel, sheet, opts.brief, {
-    refSlots: panelRefPlan.slots,
-    refRules: panelRefPlan.rules,
-  });
-  const refUrls = panelRefPlan.referenceImageUrls.map(norm);
-  const panelFirstFrame = norm(panelRefPlan.firstFrameUrl);
+    const uniqueUrls = [...new Set(panelRefPlan.slots.map((s) => s.url))];
+    const normalizedMap = new Map<string, string>();
+    await Promise.all(
+      uniqueUrls.map(async (raw) => {
+        const { url: sizedUrl } =
+          provider === "bailian" || provider === "dashscope"
+            ? await ensureStoryboardBailianR2vRefImage({
+                userId: opts.userId,
+                imageUrl: raw,
+                modelKey,
+              })
+            : await ensureStoryboardVideoRefImage({
+                userId: opts.userId,
+                imageUrl: raw,
+              });
+        normalizedMap.set(raw, sizedUrl);
+      }),
+    );
+    const norm = (u: string) => normalizedMap.get(u) ?? u;
+    const sceneCtx = await resolveVideoSceneCtx(opts.userId, opts.projectId);
+    const prompt = buildEcomStoryboardPanelVideoPrompt(panel, sheet, opts.brief, {
+      refSlots: panelRefPlan.slots,
+      refRules: panelRefPlan.rules,
+      references: opts.references,
+      sceneCtx,
+    });
+    const refUrls = panelRefPlan.referenceImageUrls.map(norm);
+    const panelFirstFrame = norm(panelRefPlan.firstFrameUrl);
+    const bailianUrls = panelRefPlan.bailianAllUrls.map(norm);
+    const clientPage = ecomClientPage(
+      opts.userId,
+      opts.projectId,
+      ECOM_STORYBOARD_TOOL_KEY,
+    );
 
-  const { ossUrl, taskId, chargePoints } = await runVolcengineVideoJob({
-    userId: opts.userId,
-    projectId: opts.projectId,
-    modelKey,
-    prompt,
-    imageUrl: panelFirstFrame,
-    referenceImageUrls: refUrls,
-    durationSec,
-    aspectRatio: opts.aspectRatio ?? "9:16",
-    resolution,
-    meta: {
-      projectId: opts.projectId,
-      panelIndex: panel.index,
-      kind: "panel_video",
-      resolution,
-      durationSec,
-    },
-  });
+    let taskId: string;
+    let logId: string;
+    let pollProvider: "bailian" | "volcengine" | "dashscope";
 
-  const updatedPanels = sheet.panels.map((p) =>
-    p.index === panel.index ? { ...p, videoUrl: ossUrl } : p,
-  );
-  await updateEcomStoryboardProject(opts.userId, opts.projectId, {
-    sheet: { ...sheet, panels: updatedPanels },
-    status: "image_ready",
-  });
-
-  await prisma.ecomAsset.create({
-    data: {
-      userId: opts.userId,
-      module: ECOM_STORYBOARD_MODULE,
-      kind: "video",
-      title: `${sheet.overview.title} · 镜头${panel.index}`.slice(0, 80),
-      prompt,
-      ossUrl,
-      meta: {
-        projectId: opts.projectId,
-        panelIndex: panel.index,
+    if (provider === "bailian") {
+      ({ taskId, logId } = await ecomGwCreateBailianR2vJob(opts.userId, {
+        model: modelKey,
+        prompt,
+        referenceImageUrls: bailianUrls,
+        resolution: bailianResolutionFromEcom(resolution),
+        ratio: aspectRatio,
+        duration: durationSec,
+        clientPage,
+      }));
+      pollProvider = "bailian";
+    } else if (provider === "dashscope" && isStoryboardWan30VideoModel(modelKey)) {
+      const media = buildDashscopeWan30Media({
+        firstFrameUrl: panelFirstFrame,
+        referenceImageUrls: refUrls,
+      });
+      const { input, parameters } = buildDashscopeSbv1T2vVideoBody({
+        prompt,
+        aspectRatio,
+        resolution,
+        durationSec,
         modelKey,
-        kind: "panel_video",
-        taskId,
-      },
-    },
-  });
+        media,
+      });
+      ({ taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
+        kind: "video",
+        model: modelKey,
+        body: { input, parameters },
+        clientPage,
+      }));
+      pollProvider = "dashscope";
+    } else if (provider === "volcengine") {
+      const { body } = buildCanvasVideoVolcengineInput({
+        modelKey,
+        prompt,
+        imageUrl: panelFirstFrame,
+        referenceImageUrls: refUrls,
+        options: { resolution, duration: durationSec, generateAudio },
+        aspectRatio,
+      });
+      ({ taskId, logId } = await ecomGwCreateVolcengineVideoJob(opts.userId, {
+        model: modelKey,
+        body,
+        clientPage,
+      }));
+      pollProvider = "volcengine";
+    } else {
+      throw new Error(
+        `单镜头成片暂不支持模型「${modelKey}」；请选用百炼 R2V（如 happyhorse-1.1-r2v）、Wan 3.0 或 Seedance。`,
+      );
+    }
 
-  await persistStoryboardDeliverableSnapshot({
-    userId: opts.userId,
-    projectId: opts.projectId,
-  }).catch(() => undefined);
+    gatewaySubmitted = true;
+    await markStoryboardPanelVideosPending(opts.projectId, [panel.index], modelKey);
+    await updateStoryboardPanelVideoPendingEntry(opts.projectId, panel.index, {
+      taskId,
+      logId,
+      pollProvider,
+      durationSec,
+      resolution,
+      aspectRatio,
+      prompt,
+      modelKey,
+    });
 
-  return { videoUrl: ossUrl, panelIndex: panel.index, chargePoints: null };
+    return {
+      status: "submitted" as const,
+      panelIndex: panel.index,
+      taskId,
+      logId,
+      chargePoints: null,
+    };
+  } catch (e) {
+    if (!gatewaySubmitted) {
+      await clearStoryboardPanelVideosPending(opts.projectId, [panel.index]);
+    }
+    throw e;
+  }
 }
 
 export async function ecomMergeStoryboardPanelVideos(opts: {

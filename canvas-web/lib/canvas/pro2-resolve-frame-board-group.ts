@@ -1,3 +1,4 @@
+import { resolveFrameSyncGroupId } from "./pro2-group-row-resolve";
 import type { CanvasFlowNode } from "./types";
 
 function isFrameBoardMediaChild(n: CanvasFlowNode): boolean {
@@ -97,4 +98,13 @@ export function resolvePro2FrameBoardGroupIdForColumn(
       isPro2FrameBoardGroup(n, allNodes),
   );
   return byController?.id ?? null;
+}
+
+/** 分镜列已有（或正在绑定）媒体组时，画布上隐藏整板卡片，仅保留 1×1 数据锚点 */
+export function isPro2FrameBoardColumnVisualPlaceholder(
+  frameColumnId: string,
+  allNodes: CanvasFlowNode[],
+): boolean {
+  if (resolveFrameSyncGroupId(allNodes, frameColumnId)) return true;
+  return Boolean(resolvePro2FrameBoardGroupIdForColumn(frameColumnId, allNodes));
 }

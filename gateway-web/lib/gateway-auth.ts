@@ -37,12 +37,19 @@ export async function proxyBookMallAuth(
     return NextResponse.json({ error: "BOOK_MALL_ORIGIN 未配置" }, { status: 503 });
   }
 
+  const clientIp =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip")?.trim() ||
+    "";
+  const extraHeaders: Record<string, string> = { "Content-Type": "application/json" };
+  if (clientIp) extraHeaders["x-platform-client-ip"] = clientIp.slice(0, 45);
+
   const body = await request.text();
   let upstream: Response;
   try {
     upstream = await fetchBookMall(`${base}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: extraHeaders,
       body,
     });
   } catch (e: unknown) {

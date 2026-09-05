@@ -36,7 +36,7 @@ function resolveFeaturedFromMaps(args: {
     if (row.templateSource === "builtin") {
       const builtin = getBuiltinQrTemplateById(row.templateId);
       if (!builtin) return null;
-      return args.overrideMap.get(builtin.id) ?? builtin;
+      return applyCatalogOverridesToBuiltin([builtin], args.overrideMap)[0] ?? builtin;
     }
     return args.userFeaturedById.get(row.templateId) ?? null;
   }
@@ -59,7 +59,9 @@ export async function resolveFeaturedTemplate(args: {
   if (featured) {
     if (featured.templateSource === "builtin") {
       const builtin = getBuiltinQrTemplateById(featured.templateId);
-      if (builtin) return overrideMap.get(builtin.id) ?? builtin;
+      if (builtin) {
+        return applyCatalogOverridesToBuiltin([builtin], overrideMap)[0] ?? builtin;
+      }
     } else {
       const row = await prisma.qrTemplate.findFirst({
         where: { id: featured.templateId, deletedAt: null },

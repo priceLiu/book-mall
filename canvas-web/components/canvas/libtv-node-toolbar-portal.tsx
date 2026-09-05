@@ -4,10 +4,7 @@ import { createContext, useContext } from "react";
 import { createPortal } from "react-dom";
 import { useStore } from "@xyflow/react";
 import { useClientPortalMounted } from "@/lib/canvas/use-modal-portal-effects";
-import {
-  useLibtvNodeToolbarHidden,
-  useLibtvNodeToolbarScreenPlacement,
-} from "@/lib/canvas/use-libtv-node-toolbar-placement";
+import { useLibtvNodeToolbarHidden, useLibtvNodeToolbarScreenPlacement, useStableLibtvNodeToolbarScreenPlacement } from "@/lib/canvas/use-libtv-node-toolbar-placement";
 import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import {
   computeLibtvPortaledToolbarScale,
@@ -26,15 +23,23 @@ export function LibtvNodeToolbarPortal({
   nodeId,
   visible,
   children,
+  toolbarHeightEstimate,
 }: {
   nodeId: string;
   visible: boolean;
   children: React.ReactNode;
+  /** 顶栏预估高度（多行工具条须加大，以便靠近画布顶部时翻转到节点下方） */
+  toolbarHeightEstimate?: number;
 }) {
   const mounted = useClientPortalMounted();
   const marqueeSelecting = useCanvasMarqueeSelecting();
   const effectiveVisible = visible && !marqueeSelecting;
-  const placement = useLibtvNodeToolbarScreenPlacement(nodeId, effectiveVisible);
+  const rawPlacement = useLibtvNodeToolbarScreenPlacement(
+    nodeId,
+    effectiveVisible,
+    toolbarHeightEstimate,
+  );
+  const placement = useStableLibtvNodeToolbarScreenPlacement(rawPlacement);
   const hidden = useLibtvNodeToolbarHidden(nodeId);
   const zoom = useStore((s) => s.transform[2]);
   const toolbarScale = computeLibtvPortaledToolbarScale(zoom);
@@ -49,17 +54,20 @@ export function LibtvNodeToolbarPortal({
   return createPortal(
     <LibtvToolbarPortaledContext.Provider value={true}>
       <div
-        className="fixed z-[1500] flex justify-center"
+        data-canvas-block-nav-gesture
+        className="libtv-node-toolbar-portal pointer-events-none fixed z-[1500] flex max-w-[92vw] justify-center"
         style={{
           left: placement.x,
           top: placement.y,
           transform: `translate(-50%, ${translateY}) scale(${toolbarScale})`,
           transformOrigin: placement.place === "below" ? "center top" : "center bottom",
           visibility: hidden ? "hidden" : "visible",
-          pointerEvents: hidden ? "none" : "auto",
+          pointerEvents: hidden ? "none" : undefined,
         }}
       >
-        {children}
+        <div className="pointer-events-none [&_button]:pointer-events-auto [&_a]:pointer-events-auto [&_[role=menuitem]]:pointer-events-auto [&_[data-libtv-toolbar-interactive]]:pointer-events-auto">
+          {children}
+        </div>
       </div>
     </LibtvToolbarPortaledContext.Provider>,
     document.body,

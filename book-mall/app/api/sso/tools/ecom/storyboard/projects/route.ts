@@ -4,6 +4,7 @@ import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
   createEcomStoryboardProject,
   listEcomStoryboardProjects,
+  listEcomStoryboardProjectSummaries,
 } from "@/lib/ecom/ecom-storyboard-service";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
@@ -16,6 +17,11 @@ export async function GET(req: Request) {
   }
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
+    const url = new URL(req.url);
+    if (url.searchParams.get("summary") === "1") {
+      const items = await listEcomStoryboardProjectSummaries(auth.userId);
+      return NextResponse.json({ items });
+    }
     const items = await listEcomStoryboardProjects(auth.userId);
     return NextResponse.json({ items });
   } catch (e) {
@@ -42,7 +48,11 @@ export async function POST(req: Request) {
       body.brief && typeof body.brief === "object"
         ? (body.brief as Record<string, unknown>)
         : undefined;
-    const project = await createEcomStoryboardProject(auth.userId, { title, brief });
+    const meta =
+      body.meta && typeof body.meta === "object"
+        ? (body.meta as Record<string, unknown>)
+        : undefined;
+    const project = await createEcomStoryboardProject(auth.userId, { title, brief, meta });
     return NextResponse.json({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "创建失败";

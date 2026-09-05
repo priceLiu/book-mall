@@ -120,11 +120,12 @@ export function ModelsPageClient() {
     );
   }
 
-  const tabGroups: Record<ModelTab, CatalogGroup[]> = state.catalog.tabs ?? {
-    text: state.catalog.groups ?? [],
-    image: [],
-    video: [],
-    function: [],
+  const tabGroups: Record<ModelTab, CatalogGroup[]> = {
+    all: state.catalog.tabs?.all ?? state.catalog.groups ?? [],
+    text: state.catalog.tabs?.text ?? state.catalog.groups ?? [],
+    image: state.catalog.tabs?.image ?? [],
+    video: state.catalog.tabs?.video ?? [],
+    function: state.catalog.tabs?.function ?? [],
   };
 
   return (

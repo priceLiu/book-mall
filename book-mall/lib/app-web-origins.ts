@@ -3,6 +3,15 @@ function trimOrigin(raw: string | undefined, fallback: string): string {
   return v || fallback;
 }
 
+export function getToolWebOrigin(): string {
+  return trimOrigin(
+    process.env.NEXT_PUBLIC_TOOL_WEB_ORIGIN ?? process.env.TOOLS_PUBLIC_ORIGIN,
+    process.env.NODE_ENV === "production"
+      ? "https://tool.ai-code8.com"
+      : "http://localhost:3001",
+  );
+}
+
 export function getStoryWebOrigin(): string {
   return trimOrigin(
     process.env.NEXT_PUBLIC_STORY_WEB_ORIGIN,
@@ -46,9 +55,47 @@ export function getQuickReplicaOrigin(): string {
     process.env.NEXT_PUBLIC_QUICK_REPLICA_ORIGIN ??
       process.env.QUICK_REPLICA_PUBLIC_ORIGIN,
     process.env.NODE_ENV === "production"
-      ? "https://replica.ai-code8.com"
+      ? "https://cp.ai-code8.com"
       : "http://localhost:3008",
   );
+}
+
+export function getDirectorWebOrigin(): string {
+  return trimOrigin(
+    process.env.NEXT_PUBLIC_DIRECTOR_WEB_ORIGIN ??
+      process.env.DIRECTOR_WEB_PUBLIC_ORIGIN,
+    process.env.NODE_ENV === "production"
+      ? "https://director.ai-code8.com"
+      : "http://localhost:3009",
+  );
+}
+
+export function getCommonToolsOrigin(): string {
+  return trimOrigin(
+    process.env.NEXT_PUBLIC_COMMON_TOOLS_ORIGIN ??
+      process.env.COMMON_TOOLS_PUBLIC_ORIGIN,
+    process.env.NODE_ENV === "production"
+      ? "https://com.ai-code8.com"
+      : "http://localhost:3010",
+  );
+}
+
+export function getPublisherWebOrigin(): string {
+  const origin = trimOrigin(
+    process.env.NEXT_PUBLIC_PUBLISHER_WEB_ORIGIN ??
+      process.env.PUBLISHER_WEB_PUBLIC_ORIGIN,
+    process.env.NODE_ENV === "production"
+      ? "https://publish.ai-code8.com"
+      : "http://localhost:3011",
+  );
+  /** 本地常见误配：把 director-web (:3009) 写成 publisher */
+  if (
+    process.env.NODE_ENV !== "production" &&
+    (origin.includes(":3009") || origin.includes("director.ai-code8.com"))
+  ) {
+    return "http://localhost:3011";
+  }
+  return origin;
 }
 
 export function buildAppWebUrl(origin: string, path: string): string {

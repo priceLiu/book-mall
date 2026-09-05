@@ -1,7 +1,16 @@
-import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { isMembershipServiceActive } from "@/lib/billing/membership-service-period";
+import {
+  countPendingShareRewards,
+  sumShareRewardCreditsGranted,
+} from "@/lib/share/share-reward-service";
+import { getShareRewardConfig } from "@/lib/share/share-reward-config";
+import {
+  buildShareCodePageUrl,
+  generateReferralShareCode,
+} from "@/lib/share/share-code-service";
+import type { ReferralSharePersona } from "@/lib/referral/referral-share-persona";
 
 /**
  * 分享返佣 · 领域服务（分享链接 1.0）
@@ -31,6 +40,8 @@ export type ReferralEligibility = {
   eligible: boolean;
   planLabel: string | null;
   reason: string | null;
+  /** 可分享时：personal=个人订阅；team_owner=团队主账号 */
+  sharePersona: ReferralSharePersona | null;
 };
 
 /**
@@ -55,7 +66,12 @@ export async function getReferralEligibility(
     select: { id: true },
   });
   if (teamNonOwner) {
-    return { eligible: false, planLabel: null, reason: "团队成员不可分享" };
+    return {
+      eligible: false,
+      planLabel: null,
+      reason: "团队成员不可分享",
+      sharePersona: null,
+    };
   }
 
   // 2) 有效个人套餐（任意档，已取消 ¥599/¥1490 门槛）。
@@ -72,7 +88,12 @@ export async function getReferralEligibility(
       });
       if (plan?.family === "PERSONAL") {
         const planLabel = `个人 · ${plan.tier}（${plan.interval === "YEAR" ? "年付" : "月付"}）`;
-        return { eligible: true, planLabel, reason: null };
+        return {
+          eligible: true,
+          planLabel,
+          reason: null,
+          sharePersona: "personal",
+        };
       }
     }
   }
@@ -96,11 +117,23 @@ export async function getReferralEligibility(
     const t = ownerMembership.tenant;
     const intervalLabel = t.interval === "YEAR" ? "年付" : "月付";
     const planLabel = `团队 · ${t.name}${t.packageLevel ? `（${t.packageLevel} · ${intervalLabel}）` : ""}`;
-    return { eligible: true, planLabel, reason: null };
+    return {
+      eligible: true,
+      planLabel,
+      reason: null,
+      sharePersona: "team_owner",
+    };
   }
 
-  return { eligible: false, planLabel: null, reason: "无有效订阅" };
+  return {
+    eligible: false,
+    planLabel: null,
+    reason: "无有效订阅",
+    sharePersona: null,
+  };
 }
+
+export { getActiveTeamOwnerTenantId, isActiveTeamOwner } from "@/lib/referral/referral-share-persona";
 
 /** 读取分享返佣默认比例（财务可在 PlatformPricingConfig 调；缺省 0.05）。 */
 export async function getReferralDefaultRate(): Promise<number> {
@@ -119,16 +152,9 @@ export async function getReferralDefaultRate(): Promise<number> {
   }
 }
 
-const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 去掉易混淆 I O 0 1
-const CODE_LENGTH = 8;
 
-function generateReferralCode(): string {
-  const bytes = randomBytes(CODE_LENGTH);
-  let out = "";
-  for (let i = 0; i < CODE_LENGTH; i += 1) {
-    out += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
-  }
-  return out;
+async function generateReferralCode(): Promise<string> {
+  return generateReferralShareCode();
 }
 
 export type EnsureReferralProfileResult =
@@ -163,7 +189,7 @@ export async function ensureReferralProfile(
   const defaultRate = await getReferralDefaultRate();
 
   for (let attempt = 0; attempt < 6; attempt += 1) {
-    const code = generateReferralCode();
+    const code = await generateReferralCode();
     try {
       const created = await prisma.referralProfile.create({
         data: { referrerUserId: userId, code, commissionRate: defaultRate },
@@ -240,13 +266,25 @@ export type ReferredUserRow = {
 export type ReferralDashboard = {
   code: string;
   enabled: boolean;
-  commissionRate: number; // 0~1
+  /** @deprecated 分享规则 2.0 已改积分奖励；保留字段兼容旧 UI */
+  commissionRate: number;
   shareUrl: string;
+  shareCodeUrl: string;
+  legacyShareUrl: string;
   referredCount: number;
   totalPlanAmountYuan: number;
   totalRechargeAmountYuan: number;
   totalAmountYuan: number;
-  estimatedCommissionYuan: number; // total * rate（未设比例时为 0）
+  /** @deprecated 改用 creditsGranted */
+  estimatedCommissionYuan: number;
+  /** 分享规则 2.0 · 已获积分奖励合计 */
+  creditsGranted: number;
+  /** 待完成（已归因未发奖）人数 */
+  pendingRewardCount: number;
+  /** 邀请链路奖励积分（配置） */
+  referralRewardCredits: number;
+  /** 工作流链路奖励积分（配置） */
+  workflowShareRewardCredits: number;
   rows: ReferredUserRow[];
 };
 
@@ -305,17 +343,28 @@ export async function getReferralDashboard(
   );
   const totalAmountYuan = totalPlanAmountYuan + totalRechargeAmountYuan;
   const commissionRate = Number(profile.commissionRate);
+  const [creditsGranted, pendingRewardCount, shareCfg] = await Promise.all([
+    sumShareRewardCreditsGranted(userId),
+    countPendingShareRewards(userId),
+    getShareRewardConfig(),
+  ]);
 
   return {
     code: profile.code,
     enabled: profile.enabled,
     commissionRate,
-    shareUrl: `${shareBaseUrl.replace(/\/$/, "")}/r/${profile.code}`,
+    shareUrl: buildShareCodePageUrl(shareBaseUrl, profile.code),
+    shareCodeUrl: buildShareCodePageUrl(shareBaseUrl, profile.code),
+    legacyShareUrl: `${shareBaseUrl.replace(/\/$/, "")}/r/${profile.code}`,
     referredCount: rows.length,
     totalPlanAmountYuan,
     totalRechargeAmountYuan,
     totalAmountYuan,
     estimatedCommissionYuan: Math.round(totalAmountYuan * commissionRate * 100) / 100,
+    creditsGranted,
+    pendingRewardCount,
+    referralRewardCredits: shareCfg.referralRewardCredits,
+    workflowShareRewardCredits: shareCfg.workflowShareRewardCredits,
     rows,
   };
 }

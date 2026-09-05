@@ -2,6 +2,11 @@ import {
   type CharacterPresetKey,
   resolveCharacterPresetAppearance,
 } from "@/lib/ecom/ecom-storyboard-character-presets";
+import {
+  mergeSceneIntoImagePrompt,
+  resolvePanelSceneText,
+} from "@/lib/ecom/ecom-storyboard-scene-prompt";
+import { getStoryboardCharacterRefs, getStoryboardProductRefs, getStoryboardSceneRefs } from "@/lib/ecom/ecom-storyboard-refs";
 import type { StoryboardReference, StoryboardSheet } from "@/lib/ecom/ecom-storyboard-types";
 import {
   resolveScenePresetImageHint,
@@ -11,6 +16,36 @@ import {
 /** 分镜静帧禁止渲染口播/对白为画面文字 */
 export const STORYBOARD_NO_DIALOGUE_IN_IMAGE =
   "严禁在画面中出现任何对白字幕、台词文字、气泡对话框、口播文案叠字或横幅标语；口播内容仅作表演指导，不得渲染为可见文字";
+
+function storyboardHttpProductRefUrls(refs: StoryboardReference[]): string[] {
+  return getStoryboardProductRefs(refs).map((r) => r.ossUrl.trim());
+}
+
+/** 当前送入模型的 refUrls 是否包含任意产品图 */
+function sendsStoryboardProductRefs(
+  refs: StoryboardReference[],
+  refUrls?: string[],
+): boolean {
+  const products = storyboardHttpProductRefUrls(refs);
+  if (!products.length) return false;
+  if (!refUrls?.length) return true;
+  const sent = new Set(refUrls.map((u) => u.trim()));
+  return products.some((u) => sent.has(u));
+}
+
+/** Prompt 用：产品参考在 refUrls 中的序号（1-based），如「1、2」 */
+function formatStoryboardProductRefNumbers(
+  refUrls: string[] | undefined,
+  refs: StoryboardReference[],
+): string {
+  if (!refUrls?.length) return "1";
+  const productSet = new Set(storyboardHttpProductRefUrls(refs));
+  const nums = refUrls
+    .map((u, i) => (productSet.has(u.trim()) ? i + 1 : -1))
+    .filter((n) => n > 0);
+  if (!nums.length) return "1";
+  return nums.join("、");
+}
 
 export type StoryboardImagePromptContext = {
   productCategory?: string;
@@ -25,6 +60,8 @@ export type StoryboardImagePromptContext = {
   /** 全片须为同一人物：来自 LLM cast、系统预设或品类默认 */
   characterAppearance?: string;
   characterPresetKey?: string;
+  /** 全片场景锚点（服装 customScene / 策划 scenarioExpansion） */
+  globalSceneAnchor?: string;
 };
 
 const CHAT_PRODUCT_NAME_FILTERS = [
@@ -40,6 +77,20 @@ const CHAT_PRODUCT_NAME_FILTERS = [
   "服饰鞋包",
   "其他通用",
 ];
+
+/** 参数收集占位项，不能写入生图 Prompt */
+const STORYBOARD_PRODUCT_PARAM_PLACEHOLDERS = new Set([
+  "沿用产品名作卖点",
+  "无额外产品信息",
+  "输入卖点",
+]);
+
+function isStoryboardPlaceholderProductText(value?: string | null): boolean {
+  const s = value?.trim();
+  if (!s) return true;
+  if (STORYBOARD_PRODUCT_PARAM_PLACEHOLDERS.has(s)) return true;
+  return CHAT_PRODUCT_NAME_FILTERS.some((x) => s.includes(x)) || s.startsWith("方案");
+}
 
 type CategoryVisual = {
   style: string;
@@ -85,12 +136,36 @@ const CATEGORY_VISUAL: Record<string, CategoryVisual> = {
     sceneRefHint: "场景光线、环境与道具风格须与参考一致",
     characterHint: "friendly Chinese UGC creator, natural expression",
   },
+  bags: {
+    style: "Chinese e-commerce handbag and bag UGC micro-drama",
+    lighting: "urban lifestyle or boutique display lighting matching carry scene",
+    sceneRefHint: "场景光线、背携/展示环境与道具风格须与参考一致",
+    characterHint: "stylish commuter or lifestyle creator showcasing bag",
+  },
+  digital_3c: {
+    style: "Chinese e-commerce 3C digital gadget UGC micro-drama, tech aesthetic",
+    lighting: "modern desk setup, screen glow, unboxing flat lay or lifestyle tech scene",
+    sceneRefHint: "场景光线、数码展示环境与道具风格须与参考一致",
+    characterHint: "optional hands-on demo presenter or product-only hero shot",
+  },
 };
 
 function normalizeCategory(key?: string): string {
   const k = key?.trim().toLowerCase();
   if (k && k in CATEGORY_VISUAL) return k;
   return "general";
+}
+
+function isFashionApparelContext(ctx?: StoryboardImagePromptContext): boolean {
+  return normalizeCategory(ctx?.productCategory) === "fashion";
+}
+
+function isBagsContext(ctx?: StoryboardImagePromptContext): boolean {
+  return normalizeCategory(ctx?.productCategory) === "bags";
+}
+
+function isDigital3cContext(ctx?: StoryboardImagePromptContext): boolean {
+  return normalizeCategory(ctx?.productCategory) === "digital_3c";
 }
 
 function categoryVisual(ctx?: StoryboardImagePromptContext): CategoryVisual {
@@ -125,10 +200,12 @@ function resolveProductLabel(
     ctx?.productHighlight?.trim() ||
     ctx?.productName?.trim() ||
     sheet.overview.productHighlight?.trim();
-  if (fromCtx && !fromCtx.startsWith("方案")) return fromCtx;
+  if (fromCtx && !isStoryboardPlaceholderProductText(fromCtx)) return fromCtx;
   const title = sheet.overview.title?.trim();
-  if (title && !title.startsWith("方案")) return title;
-  return sheet.overview.logline?.trim() || "featured product";
+  if (title && !isStoryboardPlaceholderProductText(title)) return title;
+  const logline = sheet.overview.logline?.trim();
+  if (logline && !isStoryboardPlaceholderProductText(logline)) return logline;
+  return "主推产品";
 }
 
 /** 从项目 meta / deliverable / chat 组装生图上下文（book-mall 侧） */
@@ -137,10 +214,14 @@ export function buildStoryboardImagePromptContext(project: {
   meta?: {
     deliverable?: {
       productName?: string;
+      vertical?: string;
       params?: Record<string, string>;
       cast?: Array<{ name: string; role: string; appearance?: string }>;
+      creativeBrief?: { scenarioExpansion?: string };
+      dimensions?: { customScene?: string };
     };
     workflow?: {
+      vertical?: string;
       productCategory?: string;
       collectedParams?: Record<string, string>;
       scenePreset?: string;
@@ -171,7 +252,8 @@ export function buildStoryboardImagePromptContext(project: {
     rawSellpoint &&
     rawSellpoint.length < 200 &&
     !rawSellpoint.includes("storyboard-deliverable") &&
-    !rawSellpoint.startsWith("参数已确认")
+    !rawSellpoint.startsWith("参数已确认") &&
+    !isStoryboardPlaceholderProductText(rawSellpoint)
       ? rawSellpoint
       : undefined;
 
@@ -198,8 +280,21 @@ export function buildStoryboardImagePromptContext(project: {
     }
   }
 
+  const fashionVertical =
+    wf?.vertical === "fashion_apparel" ||
+    deliverable?.vertical === "fashion_apparel";
+  const bagsVertical = wf?.vertical === "bags" || deliverable?.vertical === "bags";
+  const digital3cVertical =
+    wf?.vertical === "digital_3c" || deliverable?.vertical === "digital_3c";
+
   return {
-    productCategory: wf?.productCategory ?? params?.品类,
+    productCategory: fashionVertical
+      ? "fashion"
+      : bagsVertical
+        ? "bags"
+        : digital3cVertical
+          ? "digital_3c"
+          : (wf?.productCategory ?? params?.品类),
     productName,
     productHighlight: productHighlight ?? productName,
     videoStyle: params?.视频风格?.trim(),
@@ -210,6 +305,10 @@ export function buildStoryboardImagePromptContext(project: {
     aspectRatio: aspect,
     characterAppearance,
     characterPresetKey,
+    globalSceneAnchor:
+      deliverable?.dimensions?.customScene?.trim() ||
+      deliverable?.creativeBrief?.scenarioExpansion?.trim() ||
+      undefined,
   };
 }
 
@@ -264,8 +363,8 @@ export function buildStoryboardCompositeImagePrompt(
     )
     .join("; ");
 
-  const productRef = refs.find((r) => r.role === "product");
-  const charRef = refs.find((r) => r.role === "character");
+  const productRef = getStoryboardProductRefs(refs)[0];
+  const charRef = getStoryboardCharacterRefs(refs)[0];
 
   const refHint = [
     productRef ? "include product reference styling from uploaded product image" : "",
@@ -292,73 +391,248 @@ export function buildStoryboardCompositeImagePrompt(
     .join(" ");
 }
 
-/** 与 wan2.7 多图 content 顺序一致：产品 → 角色 → 场景 */
-export function buildStoryboardPanelRefGuide(
+/** 与 wan2.7 多图 content 顺序一致：产品 → 角色 → 场景（须与实际上传 URL 列表对齐） */
+export function buildStoryboardPanelRefGuideForUrls(
+  refUrls: string[],
   refs: StoryboardReference[],
   ctx?: StoryboardImagePromptContext,
 ): string {
   const visual = categoryVisual(ctx);
+  const urlToRole = new Map<string, StoryboardReference["role"]>();
+  for (const ref of refs) {
+    const url = ref.ossUrl?.trim();
+    if (url && /^https?:\/\//.test(url)) {
+      urlToRole.set(url, ref.role);
+    }
+  }
+
+  const parts: string[] = [];
+  const productNums = formatStoryboardProductRefNumbers(refUrls, refs);
+  const productGuideLabel =
+    productNums.includes("、") ? `图${productNums}产品参考` : `图${productNums}产品参考`;
+  refUrls.forEach((rawUrl, i) => {
+    const url = rawUrl.trim();
+    const role = urlToRole.get(url) ?? "other";
+    const n = i + 1;
+    if (role === "product") {
+      parts.push(
+        isFashionApparelContext(ctx)
+          ? `图${n}为服装产品参考，模特须穿着与该参考图完全一致的款式、颜色、面料与细节，禁止擅自改色或换款`
+          : isBagsContext(ctx)
+            ? `图${n}为包包产品参考，包型、颜色、五金与材质须与参考图完全一致，禁止擅自改色或换款`
+            : `图${n}为产品包装参考，画面中须自然露出该产品，包装形态、Logo、配色与材质须与参考图一致`,
+      );
+    } else if (role === "character") {
+      parts.push(
+        isFashionApparelContext(ctx)
+          ? `图${n}为角色参考，人物面部、发型、体型须与参考图一致；服装款式与颜色以${productGuideLabel}为准，勿照搬本图服装`
+          : isBagsContext(ctx)
+            ? `图${n}为角色参考，人物面部、发型、体型须与参考图一致；背携包包须与${productGuideLabel}一致，勿换款改色`
+            : `图${n}为角色参考，人物面部、发型、体型与服装须与参考图完全一致`,
+      );
+    } else {
+      parts.push(`图${n}为场景参考，${visual.sceneRefHint}`);
+    }
+  });
+  return parts.join("；");
+}
+
+/** @deprecated 请使用 buildStoryboardPanelRefGuideForUrls，与 slice 后的 refUrls 对齐 */
+export function buildStoryboardPanelRefGuide(
+  refs: StoryboardReference[],
+  ctx?: StoryboardImagePromptContext,
+): string {
   const products = refs.filter((r) => r.role === "product");
   const characters = refs.filter((r) => r.role === "character");
   const scenes = refs.filter((r) => r.role === "scene" || r.role === "other");
+  const urls = [
+    ...products.map((r) => r.ossUrl.trim()),
+    ...characters.map((r) => r.ossUrl.trim()),
+    ...scenes.map((r) => r.ossUrl.trim()),
+  ].filter((u) => u && /^https?:\/\//.test(u));
+  return buildStoryboardPanelRefGuideForUrls(urls, refs, ctx);
+}
 
-  let idx = 1;
-  const parts: string[] = [];
-  if (products.length) {
-    parts.push(`图${idx}为产品包装参考，画面中须自然露出该产品`);
-    idx += products.length;
-  }
-  for (let i = 0; i < characters.length; i++) {
-    parts.push(
-      `图${idx + i}为角色参考${characters.length > 1 ? i + 1 : ""}，人物面部、发型、体型与服装须与参考图一致`,
+export function appendStoryboardImagePromptSuffix(opts: {
+  basePrompt: string;
+  aspectRatio?: "16:9" | "9:16";
+  sendsProductRef?: boolean;
+  refGuide?: string;
+  refCount?: number;
+  /** 产品参考在 refUrls 中的序号，如「1」或「1、2」 */
+  productRefNums?: string;
+  productCategory?: string;
+}): string {
+  const aspectZh = opts.aspectRatio === "16:9" ? "横版 16:9" : "竖版 9:16";
+  const fashion = isFashionApparelContext({ productCategory: opts.productCategory });
+  const bags = isBagsContext({ productCategory: opts.productCategory });
+  const digital3c = isDigital3cContext({ productCategory: opts.productCategory });
+  const productNums = opts.productRefNums?.trim() || "1";
+  const parts: string[] = [opts.basePrompt.trim()];
+  if (
+    opts.sendsProductRef &&
+    !opts.basePrompt.includes("参考图") &&
+    !opts.basePrompt.includes("图像编辑")
+  ) {
+    parts.unshift(
+      fashion
+        ? "根据参考图进行图像编辑：模特穿着须与产品参考图一致，按以下描述生成画面。"
+        : bags
+          ? "根据参考图进行图像编辑：背携/展示包包须与产品参考图一致，按以下描述生成画面。"
+          : digital3c
+            ? "根据参考图进行图像编辑：数码产品外观须与产品参考图一致，按以下描述生成画面。"
+            : "根据参考图进行图像编辑：保持产品包装与参考图一致，按以下描述生成画面。",
     );
   }
-  idx += characters.length;
-  for (let i = 0; i < scenes.length; i++) {
-    parts.push(`图${idx + i}为场景参考，${visual.sceneRefHint}`);
+  if (
+    (fashion || bags || digital3c) &&
+    opts.sendsProductRef &&
+    !opts.basePrompt.includes("改色")
+  ) {
+    parts.push(
+      fashion
+        ? `若文字描述中的服装颜色/款式与参考图${productNums}不一致，一律以参考图${productNums}为准，禁止擅自改色或换款。`
+        : bags
+          ? `若文字描述中的包型/颜色与参考图${productNums}不一致，一律以参考图${productNums}为准，禁止擅自改色或换款。`
+          : `若文字描述中的产品外观/颜色与参考图${productNums}不一致，一律以参考图${productNums}为准，禁止擅自改色或换款。`,
+    );
   }
-  return parts.join("；");
+  if (!opts.basePrompt.includes(aspectZh) && !opts.basePrompt.includes("画幅")) {
+    parts.push(`${aspectZh} 画幅。`);
+  }
+  if (!opts.basePrompt.includes("严禁") && !opts.basePrompt.includes("禁止")) {
+    parts.push(STORYBOARD_NO_DIALOGUE_IN_IMAGE);
+  }
+  return parts.filter(Boolean).join("");
+}
+
+/** 优先 panel.imagePrompt（v2），否则模板拼装（legacy） */
+export function resolveStoryboardPanelImagePrompt(
+  panel: StoryboardSheet["panels"][0],
+  sheet: StoryboardSheet,
+  refs: StoryboardReference[],
+  ctx?: StoryboardImagePromptContext,
+  refUrls?: string[],
+  refGuide?: string,
+): string {
+  const sendsProductRef = sendsStoryboardProductRefs(refs, refUrls);
+  const productRefNums = formatStoryboardProductRefNumbers(refUrls, refs);
+  const refCount = refUrls?.length ?? 0;
+
+  if (panel.imagePrompt?.trim()) {
+    const sceneText = resolvePanelSceneText(panel, refs, ctx);
+    const merged = mergeSceneIntoImagePrompt(panel.imagePrompt.trim(), sceneText);
+    return appendStoryboardImagePromptSuffix({
+      basePrompt: merged,
+      aspectRatio: ctx?.aspectRatio,
+      sendsProductRef,
+      refGuide,
+      refCount,
+      productRefNums,
+      productCategory: ctx?.productCategory,
+    });
+  }
+
+  return buildStoryboardPanelImagePrompt(panel, sheet, refs, ctx, refUrls, refGuide);
 }
 
 export function buildStoryboardPanelImagePrompt(
   panel: StoryboardSheet["panels"][0],
   sheet: StoryboardSheet,
-  _refs: StoryboardReference[],
+  refs: StoryboardReference[],
   ctx?: StoryboardImagePromptContext,
+  refUrls?: string[],
+  refGuide?: string,
 ): string {
-  const visual = categoryVisual(ctx);
-  const voiceoverHint = panel.dialogue?.trim()
-    ? `表演情绪参考（勿渲染为画面文字）：${panel.dialogue.trim()}`
-    : "";
+  const sendsProductRef = sendsStoryboardProductRefs(refs, refUrls);
+  const productRefNums = formatStoryboardProductRefNumbers(refUrls, refs);
+  const refCount = refUrls?.length ?? 0;
+
+  const productLabel = resolveProductLabel(sheet, ctx);
   const exposure = exposureHint(ctx?.exposure);
-  const styleHint = videoStyleHint(ctx?.videoStyle);
-  const presetHint = ctx?.scenePresetImageHint
-    ? `preset environment (${ctx.scenePresetLabel ?? ctx.scenePresetKey}): ${ctx.scenePresetImageHint}, all shots must use this environment unless panel scene explicitly differs`
+  const exposureZh =
+    exposure.includes("centered prominently")
+      ? "产品居中突出、包装清晰可辨"
+      : exposure.includes("subtly visible")
+        ? "产品自然融入画面、弱露出"
+        : "产品自然融入场景";
+  const aspectZh = ctx?.aspectRatio === "16:9" ? "横版 16:9" : "竖版 9:16";
+  const fashion = isFashionApparelContext(ctx);
+  const isFashionWear =
+    fashion &&
+    sendsProductRef &&
+    (panel.productInteraction === "wear" ||
+      panel.productVisibility === "hero" ||
+      !panel.productInteraction);
+  const charLine =
+    ctx?.characterAppearance?.trim() && !isFashionWear
+      ? `同一人物全片一致：${ctx.characterAppearance.trim()}。`
+      : isFashionWear && ctx?.characterAppearance?.trim()
+        ? `同一人物全片一致（面部发型体型与设定一致，主推款外观以参考图${productRefNums}为准）：${ctx.characterAppearance.trim()}。`
+        : "";
+  const presetLine =
+    !getStoryboardSceneRefs(refs).length && ctx?.scenePresetImageHint?.trim()
+      ? `环境预设（${ctx.scenePresetLabel ?? ctx.scenePresetKey}）：${ctx.scenePresetImageHint.trim()}。`
+      : "";
+  const sceneText = resolvePanelSceneText(panel, refs, ctx);
+  const moodLine = panel.dialogue?.trim()
+    ? `表演情绪（勿渲染为画面文字）：${panel.dialogue.trim()}。`
+    : "";
+  const productRefLine = sendsProductRef
+    ? fashion
+      ? `须严格还原参考图${productRefNums}的服装款式、颜色、面料、剪裁与细节，禁止替换为其他颜色或款式。`
+      : `须严格还原参考图${productRefNums}的产品包装（外形、标签、配色、材质），禁止替换为无关商品。`
+    : "";
+  const characterRefUrls = new Set(
+    getStoryboardCharacterRefs(refs).map((r) => r.ossUrl.trim()),
+  );
+  const characterRefIndex =
+    refUrls?.findIndex((u) => characterRefUrls.has(u.trim())) ?? -1;
+  const characterRefLine =
+    characterRefIndex >= 0
+      ? fashion && sendsProductRef
+        ? `人物面部、发型、体型须与参考图${characterRefIndex + 1}一致；穿着的服装款式、颜色与细节须严格以参考图${productRefNums}产品图为准，禁止换脸或换人。`
+        : `人物面部、发型、体型与服装须与参考图${characterRefIndex + 1}完全一致，禁止换脸或换人。`
+      : "";
+  const editPrefix = sendsProductRef
+    ? fashion
+      ? "根据参考图进行图像编辑：模特穿着须与产品参考图一致，按以下分镜描述生成画面。"
+      : "根据参考图进行图像编辑：保持产品包装与参考图一致，按以下分镜描述生成画面。"
     : "";
 
-  const charConsistency = characterConsistencyHint(ctx);
-
-  return [
-    "Single photorealistic storyboard frame for Chinese e-commerce UGC micro-drama,",
-    visual.style + ",",
-    styleHint + ",",
-    charConsistency,
-    presetHint,
-    `shot ${panel.index}, ${panel.shotType}, camera ${panel.camera ?? "static"},`,
-    `scene (background and location must match exactly): ${panel.scene},`,
-    `action: ${panel.action},`,
-    `emotion: ${panel.emotion ?? "natural"},`,
-    voiceoverHint,
-    `product: ${resolveProductLabel(sheet, ctx)},`,
-    exposure,
-    aspectLabel(ctx?.aspectRatio),
-    visual.lighting + ",",
-    "clean composition, no watermark, no panel borders,",
-    "do not invent kitchen or cleaning scene unless scene description says so",
+  const built = [
+    editPrefix,
+    "电商短视频分镜静帧，写实摄影，UGC 质感，",
+    charLine,
+    characterRefLine,
+    presetLine,
+    `镜头 ${panel.index}，${panel.shotType}，运镜 ${panel.camera ?? "固定"}。`,
+    `场景与背景须严格符合：${sceneText}。`,
+    `人物动作：${panel.action}。`,
+    `情绪：${panel.emotion ?? "自然"}。`,
+    moodLine,
+    `主推产品：${productLabel}，${exposureZh}。`,
+    productRefLine,
+    `${aspectZh} 画幅。`,
+    "构图干净，无水印，无边框，",
+    "禁止擅自改成厨房、家清或无关场景（除非场景描述如此）。",
     STORYBOARD_NO_DIALOGUE_IN_IMAGE,
   ]
     .filter(Boolean)
-    .join(" ");
+    .join("");
+
+  return built;
+}
+
+/** 分镜多图参考：refGuide 须与 multimodal 图序对齐，一并写入文本以锁定角色/产品指代 */
+export function buildStoryboardPanelInvokePrompt(opts: {
+  refGuide: string;
+  panelPrompt: string;
+  refCount: number;
+}): string {
+  const guide = opts.refGuide.trim();
+  if (!guide) return opts.panelPrompt;
+  return `${guide}\n\n${opts.panelPrompt}`;
 }
 
 export function buildCharacterRefPrompt(
@@ -366,8 +640,11 @@ export function buildCharacterRefPrompt(
   ctx?: StoryboardImagePromptContext,
 ): string {
   const appearance = ctx?.characterAppearance?.trim() || resolveCharacterAppearance(sheet, ctx);
+  const fashion = isFashionApparelContext(ctx);
   return [
-    "Portrait reference photo for short video character, front-facing half-body,",
+    fashion
+      ? "Fashion e-commerce portrait reference, front-facing half-body, model wearing the exact garment from product reference image — same style, color, fabric and details,"
+      : "Portrait reference photo for short video character, front-facing half-body,",
     appearance,
     `${resolveProductLabel(sheet, ctx)} product ad context, natural lighting,`,
     aspectLabel(ctx?.aspectRatio ?? "9:16"),

@@ -15,6 +15,9 @@ import {
   isKieCodexChatModel,
   resolveBailianChatModelKey,
   resolveDeepseekChatModelKey,
+  resolveDeepseekChatCompletionsBody,
+  isKimiChatModelKey,
+  resolveKimiChatCompletionsBody,
   resolveKieApiRoot,
   resolveKieGeminiChatPath,
   resolveMoonshotChatCompletionsBody,
@@ -33,6 +36,10 @@ import {
 } from "./kie-codex-chat";
 import { forwardQwenTtsSpeech, isQwenTtsModel } from "./qwen-tts-proxy";
 import {
+  forwardCosyVoiceTtsSpeech,
+  isCosyVoiceTtsModel,
+} from "./cosyvoice-tts-proxy";
+import {
   forwardMinimaxT2a,
   isMinimaxSpeechRouteModel,
 } from "./minimax-speech-proxy";
@@ -44,7 +51,12 @@ import {
 } from "./gateway-token-metrics";
 import { assertModelRegistered, UnregisteredGatewayModelError } from "./model-registry";
 import { gatewayFetch } from "./format-fetch-error";
-import { resolveBillableImageCountFromLog } from "./log-billing-metrics";
+import {
+  parseWan30InputVideoSec,
+  parseOutputVideoSecondsFromResult,
+  resolveBillableAudioSecondsFromLog,
+  resolveBillableImageCountFromLog,
+} from "./log-billing-metrics";
 import { inferGatewayFailCode } from "./log-fail-code";
 import { parseVideoPricingHints } from "./log-pricing-hints";
 import { estimateVendorCost } from "./pricing-estimate";
@@ -60,12 +72,10 @@ import {
 } from "@/lib/billing/gateway-credit-settlement";
 import { assertCreditsBeforeGenerate } from "@/lib/billing/credit-pre-check";
 import { InsufficientCreditsError } from "@/lib/billing/credit-account-service";
-import { ByokSubscriptionRequiredError } from "@/lib/billing/byok-subscription-service";
 import {
   guardVideoGenerate,
   releaseVideoGenerate,
 } from "@/lib/billing/video-risk-control";
-import { assertByokQuotaBeforeGenerate } from "@/lib/billing/byok-overage-service";
 import { resolveGatewayLogBillingMode } from "@/lib/billing/gateway-billing-mode";
 import {
   isStaffRole,
@@ -76,6 +86,15 @@ import {
   bumpGatewayStatusOnCreate,
   bumpGatewayStatusOnFinalize,
 } from "@/lib/gateway/stats-counter";
+import { resolveTrafficScopeFromIds } from "@/lib/generation/traffic-control/scope-key";
+import {
+  SubmitBurstLimitError,
+  assertSubmitBurstAllowed,
+} from "@/lib/generation/submit-rate/assert-submit-burst";
+import {
+  ModelDailyLimitError,
+  assertModelDailyLimitAllowed,
+} from "@/lib/gateway/model-daily-limit";
 
 export type { UsageFromResponse };
 
@@ -91,10 +110,13 @@ export function mapGatewayPreCreateLogError(e: unknown): { status: number; error
   if (e instanceof InsufficientCreditsError) {
     return { status: 402, error: e.message };
   }
-  if (e instanceof ByokSubscriptionRequiredError) {
-    return { status: 403, error: e.message };
-  }
   if (e instanceof VideoRiskError) {
+    return { status: 429, error: e.message };
+  }
+  if (e instanceof SubmitBurstLimitError) {
+    return { status: 429, error: e.message };
+  }
+  if (e instanceof ModelDailyLimitError) {
     return { status: 429, error: e.message };
   }
   const billing = mapGatewayBillingFailure(e);
@@ -150,6 +172,16 @@ export async function createRequestLog(opts: {
     throw e;
   });
 
+  const trafficScope = resolveTrafficScopeFromIds({
+    tenantId: opts.tenantId,
+    userId: opts.userId,
+    actorUserId: opts.actorBookUserId,
+  });
+  await assertSubmitBurstAllowed(trafficScope.scopeKey);
+
+  // 平台级保险丝：单模型当日（CST）调用超上限即熔断（GATEWAY_MODEL_DAILY_LIMIT，0=关）
+  await assertModelDailyLimitAllowed(opts.model);
+
   const route = routeGatewayModel(opts.model);
 
   let staffFlag = opts.staffFlag ?? false;
@@ -190,35 +222,26 @@ export async function createRequestLog(opts: {
   let riskPopup: string | undefined;
 
   // 团队共享积分池：余额不足则拒绝发起（用完即停）
-  if (billingMode === "PLATFORM_CREDIT") {
-    await assertCreditsBeforeGenerate({
+  await assertCreditsBeforeGenerate({
+    tenantId: opts.tenantId,
+    actorBookUserId: opts.actorBookUserId,
+    apiKeyId: opts.apiKeyId,
+    model: opts.model,
+    requestKind: opts.requestKind ?? route.requestKind,
+    inputSummary: opts.inputSummary,
+  });
+  // 视频专项风控（当前仅批量上限）
+  if (isVideoReq) {
+    const g = await guardVideoGenerate({
       tenantId: opts.tenantId,
       actorBookUserId: opts.actorBookUserId,
       apiKeyId: opts.apiKeyId,
-      model: opts.model,
-      requestKind: opts.requestKind ?? route.requestKind,
-      inputSummary: opts.inputSummary,
+      batchCount: 1,
     });
-    // 视频专项风控（当前仅批量上限）
-    if (isVideoReq) {
-      const g = await guardVideoGenerate({
-        tenantId: opts.tenantId,
-        actorBookUserId: opts.actorBookUserId,
-        apiKeyId: opts.apiKeyId,
-        batchCount: 1,
-      });
-      riskAccountId = g.accountId;
-      riskPopup = g.riskPopup;
-    }
-  } else if (billingMode === "BYOK") {
-    await assertByokQuotaBeforeGenerate({
-      tenantId: opts.tenantId,
-      actorBookUserId: opts.actorBookUserId,
-      apiKeyId: opts.apiKeyId,
-      requestKind: opts.requestKind ?? route.requestKind,
-      inputSummary: opts.inputSummary,
-    });
+    riskAccountId = g.accountId;
+    riskPopup = g.riskPopup;
   }
+
   const log = await prisma.gatewayRequestLog.create({
     data: {
       userId: opts.userId,
@@ -286,7 +309,7 @@ export async function createRequestLog(opts: {
 export async function finalizeRequestLog(
   logId: string,
   patch: {
-    status: "SUCCEEDED" | "FAILED";
+    status: "SUCCEEDED" | "FAILED" | "CANCELLED";
     durationMs: number;
     usage?: UsageFromResponse;
     vendorDurationMs?: number;
@@ -303,6 +326,9 @@ export async function finalizeRequestLog(
 ) {
   const log = await prisma.gatewayRequestLog.findUnique({ where: { id: logId } });
   if (!log) return;
+  if (log.status === "SUCCEEDED" || log.status === "FAILED" || log.status === "CANCELLED") {
+    return;
+  }
 
   const completedAt =
     patch.completedAt ??
@@ -320,6 +346,7 @@ export async function finalizeRequestLog(
     inputSummary: log.inputSummary,
     resultSummary: patch.resultSummary,
     requestKind: log.requestKind,
+    allowPlatformEstimate: patch.failCode !== "STALE_CHAT_ORPHAN",
   });
 
   const videoHints =
@@ -429,9 +456,16 @@ export async function finalizeRequestLog(
           log: settledLog,
           snapshot: costSnapshot,
           metrics: {
-            durationSec: videoHints.durationSec,
+            durationSec:
+              resolveBillableAudioSecondsFromLog(settledLog, patch.resultSummary) ??
+              parseOutputVideoSecondsFromResult(patch.resultSummary) ??
+              videoHints.durationSec,
             totalTokens: tokenMetrics.totalTokens ?? undefined,
+            promptTokens: tokenMetrics.promptTokens ?? undefined,
+            completionTokens: tokenMetrics.completionTokens ?? undefined,
             images: resolveBillableImageCountFromLog(settledLog),
+            inputVideoSec: parseWan30InputVideoSec(settledLog.inputSummary),
+            outputVideoSec: parseOutputVideoSecondsFromResult(patch.resultSummary),
           },
         });
       } else if (patch.status === "FAILED") {
@@ -479,12 +513,22 @@ export async function finalizeRequestLog(
   }
 }
 
-function resolveChatCompletionsBody(
+export function resolveGatewayChatCompletionsBody(
   providerKind: GatewayProviderKind,
   body: Record<string, unknown>,
 ): Record<string, unknown> {
   const model = typeof body.model === "string" ? body.model : "";
   if (!model) return body;
+
+  // Kimi 固定参数模型：须先于 providerKind 分支剥离 temperature 等（百炼代销时凭证可能是 DASHSCOPE）
+  if (isKimiChatModelKey(model)) {
+    const mapped =
+      providerKind === "BAILIAN" || providerKind === "DASHSCOPE"
+        ? resolveBailianChatModelKey(model)
+        : model;
+    return resolveKimiChatCompletionsBody({ ...body, model: mapped });
+  }
+
   if (providerKind === "BAILIAN") {
     return { ...body, model: resolveBailianChatModelKey(model) };
   }
@@ -492,7 +536,7 @@ function resolveChatCompletionsBody(
     return { ...body, model: resolveVolcengineModelKey(model) };
   }
   if (providerKind === "DEEPSEEK") {
-    return { ...body, model: resolveDeepseekChatModelKey(model) };
+    return resolveDeepseekChatCompletionsBody(body);
   }
   if (providerKind === "MOONSHOT") {
     return resolveMoonshotChatCompletionsBody(body);
@@ -570,6 +614,7 @@ export async function forwardChatCompletions(opts: {
   providerKind: GatewayProviderKind;
   body: Record<string, unknown>;
   baseUrlOverride?: string | null;
+  signal?: AbortSignal;
 }): Promise<{ status: number; text: string; durationMs: number }> {
   const cred = await getDecryptedCredentialApiKey(opts.credentialId);
   if (!cred) throw new Error("凭证不可用");
@@ -584,20 +629,21 @@ export async function forwardChatCompletions(opts: {
   );
   const url = `${base}/chat/completions`;
 
-  const requestBody = resolveChatCompletionsBody(cred.providerKind, opts.body);
+  const requestBody = resolveGatewayChatCompletionsBody(opts.providerKind, opts.body);
   const bearerKey =
     cred.providerKind === "VOLCENGINE"
       ? resolveVolcengineArkApiKey(cred.apiKey)
       : cred.apiKey;
 
   const started = Date.now();
-  const fetchOpts = {
+  const fetchOpts: RequestInit = {
     method: "POST" as const,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${bearerKey}`,
     },
     body: JSON.stringify(requestBody),
+    ...(opts.signal ? { signal: opts.signal } : {}),
   };
   const hopCtx = {
     hop: "upstream" as const,
@@ -620,6 +666,39 @@ export async function forwardChatCompletions(opts: {
   throw lastErr instanceof Error
     ? lastErr
     : new Error(String(lastErr ?? "chat/completions failed"));
+}
+
+/** OpenAI 兼容 /v1/embeddings 转发（平台 AI 导览助手 RAG；当前 BAILIAN 兼容模式）。 */
+export async function forwardEmbeddings(opts: {
+  credentialId: string;
+  providerKind: GatewayProviderKind;
+  body: Record<string, unknown>;
+  baseUrlOverride?: string | null;
+}): Promise<{ status: number; text: string; durationMs: number }> {
+  const cred = await getDecryptedCredentialApiKey(opts.credentialId);
+  if (!cred) throw new Error("凭证不可用");
+
+  const base = resolveOpenAiCompatibleBaseUrl(
+    cred.providerKind,
+    opts.baseUrlOverride || cred.baseUrl,
+  );
+  const url = `${base}/embeddings`;
+
+  const started = Date.now();
+  const r = await gatewayFetch(
+    url,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${cred.apiKey}`,
+      },
+      body: JSON.stringify(opts.body),
+    },
+    { hop: "upstream", providerKind: cred.providerKind },
+  );
+  const text = await r.text();
+  return { status: r.status, text, durationMs: Date.now() - started };
 }
 
 export async function forwardChatCompletionsStream(opts: {
@@ -647,7 +726,7 @@ export async function forwardChatCompletionsStream(opts: {
     }
   }
 
-  let requestBody = resolveChatCompletionsBody(cred.providerKind, opts.body);
+  let requestBody = resolveGatewayChatCompletionsBody(opts.providerKind, opts.body);
   if (
     cred.providerKind === "KIE" &&
     typeof opts.body.model === "string" &&
@@ -696,6 +775,10 @@ export async function forwardAudioSpeech(opts: {
   const model = String(opts.body.model ?? "").trim();
   if (isQwenTtsModel(model)) {
     return forwardQwenTtsSpeech(opts);
+  }
+
+  if (isCosyVoiceTtsModel(model)) {
+    return forwardCosyVoiceTtsSpeech(opts);
   }
 
   if (isMinimaxSpeechRouteModel(model) || opts.providerKind === "MINIMAX") {

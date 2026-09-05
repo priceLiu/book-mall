@@ -15,9 +15,63 @@ export type EcomStoryboardGatewayModel = {
   credentialBound: boolean;
   canonicalModelKey?: string;
   platformOffering?: boolean;
+  sourceLabel?: string;
+  sortOrder?: number;
 };
 
-export const ECOM_STORYBOARD_DEFAULT_CHAT_MODEL = "qwen3.5-flash";
+/** 电商工具箱 · 助手对话默认 LLM（须 Gateway 绑定 DEEPSEEK 凭证） */
+export const ECOM_DEFAULT_ASSISTANT_CHAT_MODEL = "deepseek-v4-pro";
+
+export const ECOM_STORYBOARD_DEFAULT_CHAT_MODEL = ECOM_DEFAULT_ASSISTANT_CHAT_MODEL;
+
+/** DeepSeek 助手默认生成参数（长 JSON / A–E 分镜须足够 max_tokens） */
+export const ECOM_DEEPSEEK_CHAT_DEFAULT_PARAMS = {
+  max_tokens: 24_000,
+  temperature: 0.7,
+} as const;
+
+/** 按 modelKey 解析电商助手 Chat 上游参数（DeepSeek 走长文超时 + 足够输出 token） */
+export function resolveEcomAssistantChatParams(
+  modelKey: string,
+): Record<string, unknown> {
+  const m = modelKey.trim().toLowerCase();
+  if (
+    m === "deepseek-v4-pro" ||
+    m === "deepseek-v4-flash" ||
+    m.startsWith("deepseek")
+  ) {
+    return { ...ECOM_DEEPSEEK_CHAT_DEFAULT_PARAMS };
+  }
+  return {};
+}
+
+/** 拆图拆视频 / 拉片 · 视频理解模型上游参数（GLM 须低开销思考，避免长时间只有 reasoning_content） */
+export function resolveEcomVisionChatParams(
+  modelKey: string,
+): Record<string, unknown> {
+  const m = modelKey.trim().toLowerCase();
+  const visionJsonMaxTokens = { max_tokens: 24_000 };
+  if (m === "glm-5.3-flash" || m.startsWith("zhipu/glm")) {
+    return {
+      ...visionJsonMaxTokens,
+      enable_thinking: true,
+      reasoning_effort: "low",
+    };
+  }
+  if (
+    m.includes("omni") ||
+    m.includes("vl") ||
+    m === "qwen3.8-max" ||
+    m.startsWith("qwen3.")
+  ) {
+    return { ...visionJsonMaxTokens };
+  }
+  return {};
+}
+
+export const ECOM_DEFAULT_VISION_MODEL = "qwen3.8-max";
+/** 电商 · AI 识产品（百炼 VL Flash · 低成本图片理解） */
+export const ECOM_RECOGNIZE_PRODUCT_MODEL = "qwen3-vl-flash";
 export const ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL = "wan2.7-image";
 export const ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL = "doubao-seedance-2.0";
 
@@ -31,6 +85,8 @@ export function registryRowsToEcomModels(rows: RegistryModelRow[]): EcomStoryboa
     credentialBound: r.credentialBound,
     canonicalModelKey: r.canonicalModelKey,
     platformOffering: r.platformOffering,
+    sourceLabel: r.sourceLabel,
+    sortOrder: r.sortOrder,
   }));
 }
 

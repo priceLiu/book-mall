@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { getBookMallBaseUrlServer } from "@/lib/book-mall-base-url.server";
+import { shouldRefreshToolsJwt } from "@/lib/tools-jwt-exp";
 
 export type ProxyToolsTokenRefresh = {
   accessToken: string;
@@ -52,14 +53,22 @@ function isJwtExpired(token: string, skewSec = 30): boolean {
   }
 }
 
+export { isJwtExpired as isToolsJwtExpiredServer };
+
 async function fetchRefreshToken(
   url: string,
   init: RequestInit,
-): Promise<Response> {
+): Promise<Response | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REFRESH_FETCH_TIMEOUT_MS);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
+  } catch (e) {
+    const name = e instanceof Error ? e.name : "";
+    if (name === "AbortError" || /abort/i.test(name)) {
+      return null;
+    }
+    throw e;
   } finally {
     clearTimeout(timer);
   }
@@ -89,7 +98,7 @@ async function callBookMallRefreshTokenOnce(
         cache: "no-store",
       },
     );
-    if (r.ok) {
+    if (r?.ok) {
       const data = (await r.json().catch(() => null)) as {
         access_token?: string;
         expires_in?: number;
@@ -119,7 +128,7 @@ async function callBookMallRefreshTokenOnce(
       cache: "no-store",
     },
   );
-  if (!r.ok) return null;
+  if (!r?.ok) return null;
   const data = (await r.json().catch(() => null)) as {
     access_token?: string;
     expires_in?: number;
@@ -165,7 +174,7 @@ export async function ensureProxyToolsBearer(
   refreshed: ProxyToolsTokenRefresh | null;
 }> {
   const existing = request.cookies.get("tools_token")?.value?.trim() ?? null;
-  if (existing && !isJwtExpired(existing)) {
+  if (existing && !shouldRefreshToolsJwt(existing)) {
     return { bearer: existing, refreshed: null };
   }
 
@@ -173,6 +182,11 @@ export async function ensureProxyToolsBearer(
   const refreshed = await callBookMallRefreshToken(request, existing, userId);
   if (refreshed) {
     return { bearer: refreshed.accessToken, refreshed };
+  }
+
+  // 过期且 refresh 失败：勿继续带失效 JWT 打 book-mall（会 401 且客户端难区分）
+  if (existing && isJwtExpired(existing)) {
+    return { bearer: null, refreshed: null };
   }
 
   return { bearer: existing, refreshed: null };

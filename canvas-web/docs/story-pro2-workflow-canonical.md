@@ -92,3 +92,19 @@
 | 协同 | 导出时可设团队可见；关联时 `acquireProjectAssetLease` 认领 |
 
 真源：`docs/2.0 工业标准化脚本生产.md` · 进度 `docs/影视标准化工作流改造.md`。
+
+---
+
+## 9. 结构化 JSON 交付（2026-08）
+
+Pro2 制作包 LLM **返回**由纯 GFM 表升级为 **JSON 围栏 + Zod 校验**；输入侧（上传剧本、参考图、Skill 正文）不变。
+
+| 项 | 说明 |
+|----|------|
+| 围栏 | 回复末尾唯一 ` ```pro2-production-script ` JSON |
+| 胖结构 | Hub `productionScript` · 含 `worldBackground` / `colorBlock` 等 |
+| 展示 | JSON → GFM 渲染 `outlineMd` 等（人读兼容） |
+| 回退 | 无围栏 → legacy `parse-md-tables` |
+
+需求真源：[book-mall/doc/product/25-canvas-pro2-script-structured-output.md](../../book-mall/doc/product/25-canvas-pro2-script-structured-output.md)  
+代码：`canvas-web/lib/canvas/data/pro2-production-script-schema.ts` · `pro2-production-script-structured.ts` · `pro2-production-script-apply.ts`

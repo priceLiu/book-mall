@@ -1,3 +1,4 @@
+import { RequireAuth } from "@/components/auth/require-auth";
 import { ModelsPageClient } from "./models-page-client";
 
 export const metadata = {
@@ -5,5 +6,9 @@ export const metadata = {
 };
 
 export default function ModelsPage() {
-  return <ModelsPageClient />;
+  return (
+    <RequireAuth>
+      <ModelsPageClient />
+    </RequireAuth>
+  );
 }

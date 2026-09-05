@@ -1,0 +1,90 @@
+---
+description: AI 空间作品墙自由画布 · 挂件注册表模式
+globs: book-mall/lib/ai-space/space-blocks/**,book-mall/components/ai-space/space-blocks/**,book-mall/components/ai-space/space-canvas/**,book-mall/app/space/**
+alwaysApply: false
+---
+
+# AI 空间作品墙 · 挂件注册表（强制）
+
+作品墙自由画布（`/account/ai-space?tab=wall` 与公开页 `/space/{slug}`）的每一种块 / 挂件 = **一条注册表条目 + 一对 View / Inspector 组件**。
+
+权威文档：`book-mall/doc/product/AI 空间功能设计文档.md`
+
+## 两张注册表（唯一真源）
+
+| 表 | 文件 | 内容 |
+|---|---|---|
+| 定义 | `book-mall/lib/ai-space/space-blocks/types.ts` · `SPACE_BLOCKS` | `label` / `group` / `refs{min,max}` / `acceptKinds` / `slots` / `allowedTiers` / `defaultTier` / `maxH` / `parseConfig` / `parseContent` |
+| 渲染 | `book-mall/components/ai-space/space-blocks/renderers.tsx` · `SPACE_BLOCK_RENDERERS` | `blockType` → `{ View, Inspector }` |
+
+定义表为 **纯逻辑**（不含 React），服务端校验与客户端渲染共用。
+
+## 新增挂件（唯一流程）
+
+1. `types.ts`：`SPACE_BLOCK_TYPES` 加类型名、`SpaceBlockConfigMap` 加 config 类型、`SPACE_BLOCKS` 加条目（`parseConfig` 走 **白名单**，未知字段丢弃）
+2. `components/ai-space/space-blocks/` 内实现 `XxxBlockView` + `XxxBlockInspector`（媒体一律用 `block-kit.tsx` 的 `SpaceImage` / `SpaceVideo` / `useInView`）
+3. `renderers.tsx` 的 `SPACE_BLOCK_RENDERERS` 加一行
+
+编辑器、素材抽屉、属性面板、公开页 **自动支持**，无需改动。
+
+## 禁止
+
+- 在 `space-canvas/**`、公开页或任何业务组件里写 `blockType === "xxx"` / `switch (blockType)` 分支
+- 绕过 `SPACE_BLOCK_RENDERERS` 直接 import 某个 `XxxBlockView` 渲染
+- 在编辑器里手写挂件清单（工具箱面板必须遍历 `SPACE_BLOCK_LIST`）
+- `config` / `content` 未经 `parseConfig` / `parseContent` 直接落库
+- `text` 挂件渲染 HTML（`dangerouslySetInnerHTML`）——公开页 XSS
+- 公开页渲染 `launch_button` 或任何 `launch` 深链（SSO 深链只对本人有意义）
+- 新增 iframe / embed 类挂件
+
+## 尺寸与布局
+
+- 尺寸只能取 `size-tiers.ts` 的 5 档：`sm` / `portrait` / `wide` / `lg` / `full`；**不加自由 resize 手柄**（`isResizable={false}`）
+- `layoutX/Y/W/H` 是 **12 列栅格单位**，不是像素；新代码不得写入像素坐标
+- 编辑器用 `react-grid-layout`；只读渲染（预览 / 公开页）用 `space-canvas.css` 的原生 CSS Grid，**不给访客加载栅格库**
+- 整页模板只加在 `page-templates.ts`，不在组件里拼版式
+- 套用模板的排版计算 **只** 走 `space-blocks/template-apply.ts` 的 `planTemplateApply`：
+  已有块 **按块类型** 认领同类槽位（不得按下标塞，标题槽塞图片会按图片 `maxH` 长高压穿下方槽位），
+  认领不到的追加到版式下方，最后统一无重叠回流；服务层只负责落库
+- 改动模板几何或配对规则须同步跑 `test/unit/ai-space-template-apply.test.ts`（断言任意两块不重叠）
+- 版式选择器的快照必须由 `buildTemplateBlocks` 推导（`space-template-preview.tsx`），**禁止**另画一张示意图
+
+## 弹层
+
+- AI 空间的所有覆盖层（弹层 / 灯箱 / 确认框）**必须**挂 `components/ai-space/ai-space-overlay.tsx` 的 `AiSpaceOverlay`
+- **禁止**在组件树里手写 `fixed inset-0 z-*`：账号侧栏是 `z-[410]` 的 sticky 元素，层级不足的遮罩罩不住顶栏与侧栏，四周露白边
+- 层级只取 `AI_SPACE_OVERLAY_Z`（dialog 460 / lightbox 470 / confirm 490）；需要新层级时改这张表，不在业务组件里写魔法值
+- 禁止 `window.alert` / `window.confirm` / `window.prompt`（见 `no-native-dialogs.mdc`）
+
+## 性能（硬约束）
+
+- 图片一律 `thumbnailUrl` + `loading="lazy"`，看原图走 `space-lightbox.tsx`
+- 视频 / 音频经 `useInView` 进视口才挂载真实媒体元素，`preload="none"`
+- 服务端上限：单页块 60、单页总 refs 500、`gallery` 60、`video_playlist` 20；新挂件的 `refs.max` 不得突破单页总量预算
+
+## 资产解析与删除
+
+- 资产元数据 **只** 由 `lib/ai-space/pin-resolvers.ts` 的 `SOURCE_ADAPTERS` 解析；新增资产源加进该注册表，画布、公开页与资产库聚合浏览自动支持，**禁止**第二套解析器
+- 一个源 **一条适配器**，同时服务「按 id 取」（`resolvePinSources`）与「按最近列举」（`listSourceAssets`）；两种读法必须共用同一段 `where` 与同一个行→展示字段映射
+- 新增源必须同步登记 `AI_SPACE_PIN_SOURCE_APP` / `AI_SPACE_PIN_SOURCE_LABEL` / `AI_SPACE_PIN_SOURCE_PUBLIC_SAFE`（TS 的 `Record` 会强制）
+- 媒体走 Book 鉴权代理的源（base64、私有对象）**必须** `PUBLIC_SAFE = false`，否则公开页会给访客 401 破图
+- 列表查询 **不得** select 大字段（base64 / 长 JSON）；这类媒体走单条代理路由
+- `AiSpacePin` 是 **快捷收藏夹**，不是引用前置条件：画布块可以直接引用未 Pin 的源记录
+- 删源级联清 `AiSpaceBlockRef` 但 **保留块**，渲染 `SpaceMissingAsset` 占位；不得改为连块一起删
+- 删除入口须二次确认（见 `destructive-delete-confirmation.mdc`）
+
+## AI 空间 tab 的数据加载
+
+- `/account/ai-space` 每个 tab 都是 `force-dynamic` 且要查库：**重 tab 的选材/聚合列表走客户端拉取**
+  （现有：`资产库`、`合成台`），页面骨架先出、失败可原地重试，不让一条慢 SQL 卡住整页导航
+- 服务端聚合函数里不得写 `Promise.all([f(await g())])` —— 数组元素里的 `await` 会先串行跑完再进 `Promise.all`
+- 多种收藏一次读：用 `getFavoriteTargetIdSets(userId, kinds)`，不要每种 kind 各发一条 `findMany`
+- tab 导航 `Link` 保持 `prefetch={false}`：鼠标划过就预取等于把一排 tab 的 SQL 全跑一遍，抢连接池
+- **排查期间不要在 dev:all 运行时跑 `next build`**：共用同一个 `.next` 会打碎 vendor chunk（表现为 `/api/auth/session` 500 → 页面 307 回登录）
+
+## Code Review
+
+- PR 出现 `blockType` 分支或新的挂件选择 UI → **驳回**，改为注册表条目
+- PR 新增 `fixed inset-0 z-*` 覆盖层 → **驳回**，改挂 `AiSpaceOverlay`
+- PR 在公开页引入 `launch` 深链、`dangerouslySetInnerHTML` 或非 `http(s)` 链接 → **驳回**
+- 新增挂件未同步更新 `book-mall/doc/product/AI 空间功能设计文档.md` §5 与 §9 清单 → 补齐后合并

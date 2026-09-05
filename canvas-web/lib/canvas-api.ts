@@ -7,8 +7,10 @@ import {
   refreshCanvasToolsSessionClient,
 } from "@/lib/canvas-tools-session-client";
 import { ensureCanvasUploadFileMeta } from "@/lib/canvas/normalize-canvas-image-file";
+import { recordCanvasApiTransfer } from "@/lib/canvas/use-canvas-network-status";
 import {
   isTransientDbApiError,
+  isTransientNetworkFetchError,
   sleepMs,
   transientDbRetryDelayMs,
 } from "@/lib/fetch-with-db-retry";
@@ -33,6 +35,18 @@ export function isCanvasApiAccessDeniedError(e: unknown): boolean {
   return /\b403\b/.test(msg) || /\b404\b/.test(msg);
 }
 
+export function isCanvasApiConflictError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /\b409\b/.test(msg) || /\bCONFLICT\b/i.test(msg);
+}
+
+/** 409 响应 message 中嵌入的服务端 updatedAt（见 book-mall canvas-delta-merge） */
+export function parseCanvasConflictUpdatedAt(e: unknown): string | undefined {
+  const msg = e instanceof Error ? e.message : String(e);
+  const m = /\|(\d{4}-\d{2}-\d{2}T[\d:.]+Z)\b/.exec(msg);
+  return m?.[1];
+}
+
 /** @deprecated 使用 isCanvasApiAccessDeniedError */
 export function isCanvasApiNotFoundError(e: unknown): boolean {
   return isCanvasApiAccessDeniedError(e);
@@ -53,8 +67,17 @@ export type CanvasProjectSummary = {
   description: string;
   thumbnailUrl: string;
   edition: "pro" | "pro2" | "sbv1" | "standard";
+  /** sbv1 · 列表封面媒体类型 */
+  coverMediaKind?: "image" | "video";
+  /** sbv1 · 悬停播放的成片 URL */
+  coverVideoUrl?: string;
+  /** sbv1 · 成片静态封面 */
+  coverPosterUrl?: string;
   /** 已绑定脚本包 / 公告栏的协同画布，禁止删除 */
   collaborationLocked?: boolean;
+  /** 列表接口可选 · 用于退役 Pro2 画布过滤 */
+  meta?: unknown;
+  nodeTypes?: string[] | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -100,6 +123,7 @@ export type CanvasTaskStoryScope = {
   rowKey?: string;
   mediaKind?: string;
   llmSection?: string;
+  polishMode?: "frame" | "video" | "both";
 };
 
 export type CanvasTaskRecord = {
@@ -111,6 +135,10 @@ export type CanvasTaskRecord = {
   ossUrl: string | null;
   ephemeralUrl: string | null;
   posterUrl?: string | null;
+  /** 列表 API 解析后的主预览 URL（视频/图片） */
+  previewUrl?: string | null;
+  thumbnailUrl?: string | null;
+  previewKind?: "image" | "video" | null;
   textOutput: string | null;
   failCode: string | null;
   failMessage: string | null;
@@ -130,14 +158,23 @@ export type CanvasTaskRecord = {
 export function formatCanvasApiError(raw: string): string {
   const t = raw.trim();
   if (!t) return "加载失败，请稍后重试";
+  if (t.includes("save_wait_timeout")) {
+    return "上一轮保存尚未结束，本次未再发起请求。请稍候或点手动保存。";
+  }
+  if (t.includes("save_timeout")) {
+    return "主站保存响应超时（非浏览器网络断开）。多半是任务轮询占满连接，请稍后重试。";
+  }
+  if (/operation was aborted|The user aborted|AbortError/i.test(t)) {
+    return "主站保存请求已取消（超时保护，非网络断开）。请稍后重试。";
+  }
   if (t.includes("DATABASE_UNAVAILABLE") || t.includes("503")) {
     return "服务繁忙，请稍后再试";
   }
   if (t.includes("401") || t.includes("UNAUTHORIZED")) {
-    return "登录已失效，请重新连接主站账号。";
+    return "登录连接已断开，正在自动重连；若操作仍失败请点「重新连接」。";
   }
   if (t.includes("缺少 Bearer Token") || t.includes("无效或过期的工具令牌")) {
-    return "工具站登录令牌缺失或已过期，请刷新页面或重新从主站进入画布。";
+    return "登录连接已断开，请刷新页面或重新从主站进入画布。";
   }
   if (t.includes("INTERNAL_ERROR")) {
     return "服务器处理失败，请稍后重试；若持续出现请查看 book-mall 终端日志。";
@@ -147,6 +184,9 @@ export function formatCanvasApiError(raw: string): string {
   }
   if (t.includes("book_mall_proxy_failed") || t.includes("ECONNREFUSED")) {
     return "无法连接主站 book-mall（:3000）。请确认已运行 pnpm dev:all，且 book-mall 进程正常。";
+  }
+  if (isTransientNetworkFetchError(t)) {
+    return "无法连接主站 book-mall（:3000）或请求被中断。请确认 pnpm dev:all 正常，而非出口网络故障。";
   }
   if (/<!DOCTYPE html>/i.test(t) || /<html[\s>]/i.test(t)) {
     if (/\b404\b/.test(t)) {
@@ -192,8 +232,35 @@ async function call<T>(
   let sessionRefreshAttempted = false;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const r = await fetch(url, i);
-    const raw = await r.text();
+    if (i.signal?.aborted) {
+      throw new Error("The operation was aborted");
+    }
+    let r: Response;
+    let raw: string;
+    const startedAt =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    try {
+      r = await fetch(url, i);
+      raw = await r.text();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (i.signal?.aborted) {
+        throw new Error(msg || "The operation was aborted");
+      }
+      if (attempt < maxAttempts - 1 && isTransientNetworkFetchError(msg)) {
+        await sleepMs(transientDbRetryDelayMs(attempt));
+        continue;
+      }
+      throw new Error(msg);
+    }
+    const elapsedMs =
+      (typeof performance !== "undefined" ? performance.now() : Date.now()) -
+      startedAt;
+    const bodyBytes =
+      typeof i.body === "string"
+        ? new TextEncoder().encode(i.body).length
+        : 0;
+    recordCanvasApiTransfer(bodyBytes + raw.length, elapsedMs);
     if (!r.ok) {
       const msg = sanitizeCanvasApiErrorBody(r.status, raw);
       if (
@@ -202,7 +269,7 @@ async function call<T>(
         isCanvasToolsSessionUnauthorized(msg, r.status)
       ) {
         sessionRefreshAttempted = true;
-        const refreshed = await refreshCanvasToolsSessionClient();
+        const refreshed = await refreshCanvasToolsSessionClient({ silent: true });
         if (refreshed) continue;
       }
       if (
@@ -228,27 +295,66 @@ async function call<T>(
 
 // ── projects ──
 
+export type CanvasProjectListPage = {
+  projects: CanvasProjectSummary[];
+  nextCursor: string | null;
+  hasMore: boolean;
+};
+
 export async function listMyCanvasProjects(
   base: string,
-): Promise<CanvasProjectSummary[]> {
-  const j = await call<{ projects: CanvasProjectSummary[] }>(
+  opts?: { limit?: number; cursor?: string | null },
+): Promise<CanvasProjectListPage> {
+  const params = new URLSearchParams();
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
+  if (opts?.cursor) params.set("cursor", opts.cursor);
+  const qs = params.toString();
+  const j = await call<CanvasProjectListPage>(
     base,
-    "/api/canvas/projects",
+    `/api/canvas/projects${qs ? `?${qs}` : ""}`,
   );
-  return Array.isArray(j.projects) ? j.projects : [];
+  return {
+    projects: Array.isArray(j.projects) ? j.projects : [],
+    nextCursor: j.nextCursor ?? null,
+    hasMore: Boolean(j.hasMore),
+  };
+}
+
+/** 需要全量列表的入口（资产页 / 剧本包扫描）· 分页合并，避免单次 200 条 */
+export async function listAllMyCanvasProjects(
+  base: string,
+  opts?: { pageSize?: number; maxItems?: number },
+): Promise<CanvasProjectSummary[]> {
+  const pageSize = opts?.pageSize ?? 50;
+  const maxItems = opts?.maxItems ?? 200;
+  const out: CanvasProjectSummary[] = [];
+  let cursor: string | null = null;
+  while (out.length < maxItems) {
+    const page = await listMyCanvasProjects(base, {
+      limit: pageSize,
+      cursor,
+    });
+    out.push(...page.projects);
+    if (!page.hasMore || !page.nextCursor) break;
+    cursor = page.nextCursor;
+  }
+  return out.slice(0, maxItems);
 }
 
 export type PortalFeaturedProjectSummary = CanvasProjectSummary & {
   portalFeaturedBlurb: string;
+  owner?: { id: string; name: string | null; email: string | null } | null;
 };
 
 /** 门户首页 · 精选示例项目（与「我的画布」同源 thumbnailUrl） */
 export async function listPortalFeaturedProjects(
   base: string,
+  init?: RequestInit,
 ): Promise<PortalFeaturedProjectSummary[]> {
   const j = await call<{ projects: PortalFeaturedProjectSummary[] }>(
     base,
     "/api/canvas/projects/portal-featured",
+    init,
   );
   return Array.isArray(j.projects) ? j.projects : [];
 }
@@ -284,6 +390,219 @@ export async function patchPortalFeaturedProject(
   return j.project;
 }
 
+export type PortalCaseProjectSummary = CanvasProjectSummary & {
+  portalCaseBlurb: string;
+  owner?: { id: string; name: string | null; email: string | null } | null;
+};
+
+export type PortalFilmShowcaseMedia = {
+  id: string;
+  url: string;
+  kind: "image" | "video";
+  posterUrl?: string;
+  sourceKind: "project" | "template";
+  sourceId: string;
+  projectName: string;
+  description: string;
+  owner?: { id: string; name: string | null; email: string | null } | null;
+};
+
+export type CanvasPortalPublishKind =
+  | "CASE"
+  | "FEATURED"
+  | "TEMPLATE"
+  | "PUBLIC_TEMPLATE";
+
+export type PortalSubmissionRecord = {
+  id: string;
+  projectId: string;
+  userId: string;
+  status: string;
+  requestKind: CanvasPortalPublishKind;
+  userNote: string;
+  adminNote: string;
+  reviewedAt: string | null;
+  approvedKind: CanvasPortalPublishKind | null;
+  createdAt: string;
+  project: {
+    id: string;
+    name: string;
+    thumbnailUrl: string;
+    edition: CanvasProjectSummary["edition"];
+  };
+  user: { id: string; name: string | null; email: string | null };
+};
+
+/** 门户首页 · 影视案例媒体墙（sbv1 已入库图/视频） */
+export async function listPortalFilmShowcase(
+  base: string,
+  limit?: number,
+): Promise<PortalFilmShowcaseMedia[]> {
+  const qs =
+    typeof limit === "number" && Number.isFinite(limit)
+      ? `?limit=${encodeURIComponent(String(limit))}`
+      : "";
+  const j = await call<{ items: PortalFilmShowcaseMedia[] }>(
+    base,
+    `/api/canvas/projects/portal-film-showcase${qs}`,
+  );
+  return Array.isArray(j.items) ? j.items : [];
+}
+
+export async function duplicatePortalFilmShowcaseProject(
+  base: string,
+  id: string,
+): Promise<CanvasProjectDetail> {
+  const j = await call<{ project: CanvasProjectDetail }>(
+    base,
+    `/api/canvas/projects/portal-film-showcase/${id}/duplicate`,
+    { method: "POST" },
+  );
+  return j.project;
+}
+
+/** 门户首页 · 案例墙（edition=sbv1 为分镜视频 1.0 影视案例） */
+export async function listPortalCaseProjects(
+  base: string,
+  edition?: "pro2" | "sbv1",
+  init?: RequestInit,
+): Promise<PortalCaseProjectSummary[]> {
+  const qs =
+    edition === "pro2" || edition === "sbv1"
+      ? `?edition=${encodeURIComponent(edition)}`
+      : "";
+  const j = await call<{ projects: PortalCaseProjectSummary[] }>(
+    base,
+    `/api/canvas/projects/portal-cases${qs}`,
+    init,
+  );
+  return Array.isArray(j.projects) ? j.projects : [];
+}
+
+export async function duplicatePortalCaseProject(
+  base: string,
+  id: string,
+): Promise<CanvasProjectDetail> {
+  const j = await call<{ project: CanvasProjectDetail }>(
+    base,
+    `/api/canvas/projects/portal-cases/${id}/duplicate`,
+    { method: "POST" },
+  );
+  return j.project;
+}
+
+/** 管理员 · 设置/取消门户案例 */
+export async function patchPortalCaseProject(
+  base: string,
+  id: string,
+  patch: { case: boolean; sort?: number; blurb?: string },
+): Promise<PortalCaseProjectSummary> {
+  const j = await call<{ project: PortalCaseProjectSummary }>(
+    base,
+    `/api/canvas/projects/${id}/portal-case`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    },
+  );
+  return j.project;
+}
+
+/** 用户 · 提交作品 / 发布（模板即时；精选/案例审核；管理员全部即时） */
+export async function submitCanvasPortalReview(
+  base: string,
+  projectId: string,
+  body: { requestKind: CanvasPortalPublishKind; userNote?: string },
+): Promise<{ appliedImmediately: boolean; submission?: PortalSubmissionRecord }> {
+  const j = await call<{
+    appliedImmediately?: boolean;
+    submission?: PortalSubmissionRecord;
+  }>(base, `/api/canvas/projects/${projectId}/portal-submit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return {
+    appliedImmediately: Boolean(j.appliedImmediately),
+    submission: j.submission,
+  };
+}
+
+export async function listPortalSubmissions(
+  base: string,
+  status: "PENDING" | "APPROVED" | "REJECTED" = "PENDING",
+): Promise<PortalSubmissionRecord[]> {
+  const j = await call<{ submissions: PortalSubmissionRecord[] }>(
+    base,
+    `/api/canvas/admin/portal-submissions?status=${encodeURIComponent(status)}`,
+  );
+  return Array.isArray(j.submissions) ? j.submissions : [];
+}
+
+export async function reviewPortalSubmission(
+  base: string,
+  submissionId: string,
+  body: {
+    approve: boolean;
+    approvedKind?: CanvasPortalPublishKind;
+    adminNote?: string;
+  },
+): Promise<PortalSubmissionRecord> {
+  const j = await call<{ submission: PortalSubmissionRecord }>(
+    base,
+    `/api/canvas/admin/portal-submissions/${submissionId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  return j.submission;
+}
+
+export type AdminPortalProjectPreview = {
+  id: string;
+  name: string;
+  description: string;
+  thumbnailUrl: string;
+  edition: CanvasProjectSummary["edition"];
+  portalFeatured: boolean;
+  portalCase: boolean;
+  portalFilmCase: boolean;
+  portalFeaturedBlurb: string;
+  portalCaseBlurb: string;
+  canvas: unknown;
+  owner?: { id: string; name: string | null; email: string | null } | null;
+};
+
+export type AdminPortalFilmProjectSummary = PortalCaseProjectSummary & {
+  portalFilmCase: boolean;
+  portalFilmCaseSort: number;
+  mediaCount: number;
+};
+
+export async function listAdminPortalFilmProjects(
+  base: string,
+): Promise<AdminPortalFilmProjectSummary[]> {
+  const j = await call<{ projects: AdminPortalFilmProjectSummary[] }>(
+    base,
+    "/api/canvas/admin/portal-film-projects",
+  );
+  return Array.isArray(j.projects) ? j.projects : [];
+}
+
+export async function getAdminPortalProjectPreview(
+  base: string,
+  projectId: string,
+): Promise<AdminPortalProjectPreview> {
+  const j = await call<{ project: AdminPortalProjectPreview }>(
+    base,
+    `/api/canvas/admin/portal-projects/${projectId}`,
+  );
+  return j.project;
+}
+
 export async function createCanvasProject(
   base: string,
   args: { name: string; description?: string; canvas?: unknown },
@@ -311,6 +630,129 @@ export async function getCanvasProject(
   return j.project;
 }
 
+/** 仅拉 updatedAt（乐观锁对齐），避免全量 canvas JSON 打满连接池 */
+export async function getCanvasProjectUpdatedAt(
+  base: string,
+  id: string,
+): Promise<string> {
+  const j = await call<{ updatedAt: string }>(
+    base,
+    `/api/canvas/projects/${id}/updated-at`,
+  );
+  return j.updatedAt;
+}
+
+const projectDetailCache = new Map<
+  string,
+  { at: number; data: CanvasProjectDetail }
+>();
+const projectDetailInflight = new Map<
+  string,
+  Promise<CanvasProjectDetail>
+>();
+const PROJECT_DETAIL_CACHE_TTL_MS = 90_000;
+
+function projectCacheKey(base: string, id: string): string {
+  return `${base.replace(/\/$/, "")}:${id}`;
+}
+
+function isProjectDetailCacheFresh(key: string): boolean {
+  const hit = projectDetailCache.get(key);
+  return Boolean(hit && Date.now() - hit.at < PROJECT_DETAIL_CACHE_TTL_MS);
+}
+
+/** 列表 hover / pointerdown 预取 · 进入画布时若命中缓存可秒开 */
+export function prefetchCanvasProject(base: string, id: string): void {
+  if (!base?.trim() || !id?.trim()) return;
+  const key = projectCacheKey(base, id);
+  if (isProjectDetailCacheFresh(key) || projectDetailInflight.has(key)) return;
+  void getCanvasProjectCached(base, id).catch(() => undefined);
+}
+
+/**
+ * 批量预取项目详情（全量 canvas JSON）。
+ * 默认最多预取前 `limit` 个且并发 1，避免打满腾讯云连接池。
+ * 列表页请勿对全部项目调用；优先用单条 prefetchCanvasProject（hover）。
+ */
+export function prefetchCanvasProjects(
+  base: string,
+  ids: string[],
+  opts?: { limit?: number; maxConcurrent?: number },
+): void {
+  if (!base?.trim() || ids.length === 0) return;
+  const limit = Math.max(0, opts?.limit ?? 3);
+  const maxConcurrent = Math.max(1, opts?.maxConcurrent ?? 1);
+  const pending = ids
+    .filter((id) => {
+      if (!id?.trim()) return false;
+      const key = projectCacheKey(base, id);
+      return !isProjectDetailCacheFresh(key) && !projectDetailInflight.has(key);
+    })
+    .slice(0, limit);
+  if (pending.length === 0) return;
+
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < pending.length) {
+      const id = pending[cursor++];
+      await getCanvasProjectCached(base, id).catch(() => undefined);
+    }
+  };
+  for (let i = 0; i < Math.min(maxConcurrent, pending.length); i++) {
+    void worker();
+  }
+}
+
+export async function getCanvasProjectCached(
+  base: string,
+  id: string,
+): Promise<CanvasProjectDetail> {
+  const key = projectCacheKey(base, id);
+  const hit = projectDetailCache.get(key);
+  if (hit && Date.now() - hit.at < PROJECT_DETAIL_CACHE_TTL_MS) {
+    return hit.data;
+  }
+  const inflight = projectDetailInflight.get(key);
+  if (inflight) return inflight;
+
+  const promise = getCanvasProject(base, id)
+    .then((project) => {
+      projectDetailCache.set(key, { at: Date.now(), data: project });
+      return project;
+    })
+    .finally(() => {
+      projectDetailInflight.delete(key);
+    });
+  projectDetailInflight.set(key, promise);
+  return promise;
+}
+
+export function invalidateCanvasProjectCache(base: string, id: string): void {
+  const key = projectCacheKey(base, id);
+  projectDetailCache.delete(key);
+  projectDetailInflight.delete(key);
+}
+
+/**
+ * 仅丢弃卡住的 in-flight 预取，保留已成功写入的详情缓存。
+ * 打开大剧本画布时：列表 hover 已拉过 JSON，编辑器应命中缓存，勿再清缓存重拉。
+ */
+export function abandonCanvasProjectInflight(base: string, id: string): void {
+  projectDetailInflight.delete(projectCacheKey(base, id));
+}
+
+/** 编辑器首屏拉取成功后写入缓存，供后续 updatedAt / 二次进入复用 */
+export function seedCanvasProjectDetailCache(
+  base: string,
+  id: string,
+  project: CanvasProjectDetail,
+): void {
+  projectDetailCache.set(projectCacheKey(base, id), {
+    at: Date.now(),
+    data: project,
+  });
+}
+
 export type CanvasProjectHistorySummary = {
   id: string;
   projectId: string;
@@ -330,6 +772,8 @@ export type CanvasProjectHistoryMeta = {
 export type CanvasProjectHistorySnapshotRequest = {
   source?: "autosave" | "manual";
   label?: string;
+  /** 画布视口截图（OSS）；缺省时服务端回退到项目封面 / 画布内媒体图 */
+  thumbnailUrl?: string;
 };
 
 export async function patchCanvasProject(
@@ -339,9 +783,11 @@ export async function patchCanvasProject(
     name?: string;
     description?: string;
     canvas?: unknown;
+    canvasDelta?: import("@/lib/canvas/canvas-persist-delta").CanvasDeltaPatch;
     thumbnailUrl?: string;
     historySnapshot?: CanvasProjectHistorySnapshotRequest;
   },
+  opts?: { signal?: AbortSignal },
 ): Promise<{
   project: CanvasProjectDetail;
   historyItem: CanvasProjectHistorySummary | null;
@@ -353,6 +799,11 @@ export async function patchCanvasProject(
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
+    signal: opts?.signal,
+  });
+  projectDetailCache.set(projectCacheKey(base, id), {
+    at: Date.now(),
+    data: j.project,
   });
   return { project: j.project, historyItem: j.historyItem ?? null };
 }
@@ -651,6 +1102,7 @@ export async function runCanvasNode(
       modelKey?: string;
       data: Record<string, unknown>;
       imageInputs?: string[];
+      audioInputs?: string[];
       textInputs?: string[];
       portraitAssetRefs?: Array<{
         url: string;
@@ -659,8 +1111,9 @@ export async function runCanvasNode(
     };
     /** 阶段 4：跳过缓存，强制创建新任务（"重新生成"） */
     forceFresh?: boolean;
-    llmSection?: "outline" | "character" | "scene" | "storyboard";
+    llmSection?: "outline" | "character" | "scene" | "storyboard" | "shot_prompts";
     rowKey?: string;
+    polishMode?: "frame" | "video" | "both";
     mediaKind?:
       | "threeView"
       | "frameImage"
@@ -668,6 +1121,7 @@ export async function runCanvasNode(
       | "tts"
       | "sceneRef"
       | "themeOutline"
+      | "scriptStudioBatch"
       | "generalText"
       | "music";
     /** 影视专业版 · 风格定稿门禁 */
@@ -704,6 +1158,19 @@ export async function deleteCanvasTask(
     base,
     `/api/canvas/projects/${projectId}/tasks/${taskId}`,
     { method: "DELETE" },
+  );
+}
+
+/** 用户主动中止进行中的生成任务（服务端可能已完成并计费）。 */
+export async function cancelCanvasGenerationTask(
+  base: string,
+  projectId: string,
+  taskId: string,
+): Promise<{ ok: true; alreadyTerminal: boolean }> {
+  return call<{ ok: true; alreadyTerminal: boolean }>(
+    base,
+    `/api/canvas/projects/${projectId}/tasks/${taskId}/cancel`,
+    { method: "POST" },
   );
 }
 
@@ -776,9 +1243,20 @@ export async function uploadCanvasImage(
   return uploadCanvasFile(base, ensureCanvasUploadFileMeta(file));
 }
 
+const UPLOAD_FETCH_TIMEOUT_MS = 120_000;
+const UPLOAD_VIDEO_FETCH_TIMEOUT_MS = 600_000;
+
+export async function uploadCanvasVideo(
+  base: string,
+  file: File,
+): Promise<string> {
+  return uploadCanvasFile(base, file, UPLOAD_VIDEO_FETCH_TIMEOUT_MS);
+}
+
 export async function uploadCanvasFile(
   base: string,
   file: File,
+  timeoutMs = UPLOAD_FETCH_TIMEOUT_MS,
 ): Promise<string> {
   const form = new FormData();
   form.append("file", file);
@@ -787,7 +1265,22 @@ export async function uploadCanvasFile(
     "/api/canvas/uploads",
     { method: "POST", body: form },
   );
-  const r = await fetch(url, init);
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(
+    () => controller.abort(),
+    timeoutMs,
+  );
+  let r: Response;
+  try {
+    r = await fetch(url, { ...init, signal: controller.signal });
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      throw new Error("upload failed: 上传超时，请检查网络后重试");
+    }
+    throw e;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
   if (!r.ok) {
     let detail = String(r.status);
     try {
@@ -801,6 +1294,42 @@ export async function uploadCanvasFile(
   const j = (await r.json()) as { ossUrl?: string };
   if (!j.ossUrl) throw new Error("upload missing ossUrl");
   return j.ossUrl;
+}
+
+export async function cropCanvasGridSplitCell(
+  base: string,
+  body: {
+    projectId: string;
+    imageUrl: string;
+    col: number;
+    row: number;
+    cols: number;
+    rows: number;
+  },
+): Promise<string> {
+  const { url, init } = resolveBookMallBrowserRequest(
+    base,
+    "/api/canvas/grid-split/crop-cell",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  const r = await fetch(url, init);
+  if (!r.ok) {
+    let detail = String(r.status);
+    try {
+      const j = (await r.json()) as { message?: string; error?: string };
+      detail = j.message ?? j.error ?? detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(`grid split crop failed: ${detail}`);
+  }
+  const j = (await r.json()) as { ossUrl?: string };
+  if (!j.ossUrl?.trim()) throw new Error("grid split crop missing ossUrl");
+  return j.ossUrl.trim();
 }
 
 // ── works (gallery) ──
@@ -847,11 +1376,13 @@ export type CanvasTemplateRecord = {
 export async function listCanvasTemplates(
   base: string,
   scope?: "featured" | "public" | "my" | "all",
+  init?: RequestInit,
 ): Promise<CanvasTemplateRecord[]> {
   const qs = scope && scope !== "all" ? `?scope=${encodeURIComponent(scope)}` : "";
   const j = await call<{ templates: CanvasTemplateRecord[] }>(
     base,
     `/api/canvas/templates${qs}`,
+    init,
   );
   return Array.isArray(j.templates) ? j.templates : [];
 }
@@ -1429,6 +1960,7 @@ export type JianyingExportFrame = {
   dialogue: string;
   videoUrl?: string | null;
   audioUrl?: string | null;
+  audioSourceNodeId?: string | null;
   durationSec?: number;
 };
 
@@ -1493,13 +2025,130 @@ export function resolveMediaRenderDownloadUrl(
   return null;
 }
 
+import type { SubtitleBurnInStyle } from "@private/media-render-subtitle-style/subtitle-style-options";
+
 export type MediaRenderScaleMode = "source" | "fit720p" | "fit1080p";
 
 export type MediaRenderProfile = {
   transition?: { type: "xfade"; durationSec: number } | { type: "none" };
-  subtitle?: { mode: "script" | "none"; burnIn?: boolean };
+  subtitle?: {
+    mode: "script" | "asr" | "none";
+    burnIn?: boolean;
+    asrModelKey?: string;
+    style?: SubtitleBurnInStyle;
+  };
+  audio?: {
+    mixTts?: boolean;
+  };
   video?: { scaleMode?: MediaRenderScaleMode };
 };
+
+const MEDIA_RENDER_FETCH_RETRIES = 4;
+const MEDIA_RENDER_FETCH_RETRY_MS = 1_500;
+const MEDIA_RENDER_FETCH_TIMEOUT_MS = 120_000;
+
+function isTransientMediaRenderFetchError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /fetch failed|failed to fetch|network|econnreset|etimedout|abort|timeout/i.test(
+    msg,
+  );
+}
+
+function parseMediaRenderApiError(
+  data: { message?: string; error?: string } | null | undefined,
+  status: number,
+): string {
+  const message = data?.message?.trim();
+  if (message) return message;
+  if (data?.error === "book_mall_proxy_failed") {
+    return "主站连接失败，请稍后重试";
+  }
+  if (data?.error === "book_mall_url_missing") {
+    return "未配置主站地址，无法提交剪辑任务";
+  }
+  return `剪辑请求失败 HTTP ${status}`;
+}
+
+async function fetchMediaRenderApi(
+  url: string,
+  init: RequestInit,
+): Promise<Response> {
+  let sessionRefreshAttempted = false;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= MEDIA_RENDER_FETCH_RETRIES; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(
+        () => controller.abort(),
+        MEDIA_RENDER_FETCH_TIMEOUT_MS,
+      );
+      let response: Response;
+      try {
+        response = await fetch(url, { ...init, signal: controller.signal });
+      } finally {
+        clearTimeout(timer);
+      }
+      if (
+        response.status === 401 &&
+        !sessionRefreshAttempted &&
+        typeof window !== "undefined"
+      ) {
+        sessionRefreshAttempted = true;
+        const refreshed = await refreshCanvasToolsSessionClient({ silent: true });
+        if (refreshed) {
+          attempt -= 1;
+          continue;
+        }
+      }
+      if (
+        response.status >= 502 &&
+        response.status <= 504 &&
+        attempt < MEDIA_RENDER_FETCH_RETRIES
+      ) {
+        await sleepMs(MEDIA_RENDER_FETCH_RETRY_MS * attempt);
+        continue;
+      }
+      return response;
+    } catch (err) {
+      lastErr = err;
+      if (isTransientMediaRenderFetchError(err) && attempt < MEDIA_RENDER_FETCH_RETRIES) {
+        await sleepMs(MEDIA_RENDER_FETCH_RETRY_MS * attempt);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error("fetch failed");
+}
+
+/** 自动成片提交前 · 同步单镜 TTS 配音到 OSS */
+export async function syncMediaRenderAudio(
+  base: string,
+  projectId: string,
+  audioSourceNodeId: string,
+): Promise<string> {
+  const { url, init } = resolveBookMallBrowserRequest(
+    base,
+    `/api/canvas/projects/${encodeURIComponent(projectId)}/media/render/sync-audio`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ audioSourceNodeId }),
+    },
+  );
+  const r = await fetchMediaRenderApi(url, init);
+  const data = (await r.json().catch(() => ({}))) as {
+    audioUrl?: string;
+    message?: string;
+    error?: string;
+  };
+  if (!r.ok) {
+    throw new Error(parseMediaRenderApiError(data, r.status));
+  }
+  const audioUrl = data.audioUrl?.trim();
+  if (!audioUrl) throw new Error("invalid sync-audio response");
+  return audioUrl;
+}
 
 export async function submitMediaRender(
   base: string,
@@ -1515,14 +2164,14 @@ export async function submitMediaRender(
       body: JSON.stringify({ frames: args.frames, profile: args.profile }),
     },
   );
-  const r = await fetch(url, init);
+  const r = await fetchMediaRenderApi(url, init);
   const data = (await r.json().catch(() => ({}))) as {
     job?: MediaRenderJob;
     message?: string;
     error?: string;
   };
   if (!r.ok) {
-    throw new Error(data.message ?? data.error ?? `render failed HTTP ${r.status}`);
+    throw new Error(parseMediaRenderApiError(data, r.status));
   }
   if (!data.job) throw new Error("invalid render response");
   return data.job;
@@ -1541,14 +2190,15 @@ export async function pollMediaRender(
       `/api/canvas/media/render/${encodeURIComponent(jobId)}`,
       { method: "GET" },
     );
-    const r = await fetch(url, init);
+    const r = await fetchMediaRenderApi(url, init);
     const data = (await r.json().catch(() => ({}))) as {
       job?: MediaRenderJob;
       message?: string;
+      error?: string;
     };
     if (r.ok && data.job) return data.job;
-    lastError = data.message ?? `poll failed HTTP ${r.status}`;
-    if (r.status >= 500 && attempt < maxAttempts) {
+    lastError = data.message ?? parseMediaRenderApiError(data, r.status);
+    if ((r.status >= 500 || r.status === 502) && attempt < maxAttempts) {
       await new Promise((resolve) => setTimeout(resolve, 1200 * attempt));
       continue;
     }
@@ -1566,15 +2216,39 @@ export async function retryMediaRenderUpload(
     `/api/canvas/media/render/${encodeURIComponent(jobId)}/retry-upload`,
     { method: "POST" },
   );
-  const r = await fetch(url, init);
+  const r = await fetchMediaRenderApi(url, init);
   const data = (await r.json().catch(() => ({}))) as {
     job?: MediaRenderJob;
     message?: string;
+    error?: string;
   };
   if (!r.ok || !data.job) {
-    throw new Error(data.message ?? `retry upload HTTP ${r.status}`);
+    throw new Error(parseMediaRenderApiError(data, r.status));
   }
   return data.job;
+}
+
+/** 用户主动中止进行中的云端剪辑（FFmpeg 可能仍在跑）。 */
+export async function cancelMediaRenderJob(
+  base: string,
+  jobId: string,
+): Promise<{ ok: true; alreadyTerminal: boolean }> {
+  const { url, init } = resolveBookMallBrowserRequest(
+    base,
+    `/api/canvas/media/render/${encodeURIComponent(jobId)}`,
+    { method: "DELETE" },
+  );
+  const r = await fetchMediaRenderApi(url, init);
+  const data = (await r.json().catch(() => ({}))) as {
+    ok?: boolean;
+    alreadyTerminal?: boolean;
+    message?: string;
+    error?: string;
+  };
+  if (!r.ok) {
+    throw new Error(parseMediaRenderApiError(data, r.status));
+  }
+  return { ok: true, alreadyTerminal: Boolean(data.alreadyTerminal) };
 }
 
 export async function waitMediaRenderJob(
@@ -1586,25 +2260,91 @@ export async function waitMediaRenderJob(
     onPoll?: (job: MediaRenderJob) => void;
   },
 ): Promise<MediaRenderJob> {
-  const intervalMs = opts?.intervalMs ?? 1500;
+  // 默认 2.5s：DB 紧张时 1.5s 轮询会与 tasks/保存叠压
+  let intervalMs = opts?.intervalMs ?? 2500;
   const timeoutMs = opts?.timeoutMs ?? 15 * 60 * 1000;
   const deadline = Date.now() + timeoutMs;
+  let lastJob: MediaRenderJob | null = null;
+  let consecutivePollErrors = 0;
   while (Date.now() < deadline) {
-    const job = await pollMediaRender(base, jobId);
-    opts?.onPoll?.(job);
-    if (
-      job.status === "SUCCEEDED" ||
-      job.status === "FAILED" ||
-      job.status === "EXPIRED"
-    ) {
-      return job;
+    const pollStarted = Date.now();
+    try {
+      const job = await pollMediaRender(base, jobId);
+      lastJob = job;
+      consecutivePollErrors = 0;
+      opts?.onPoll?.(job);
+      if (
+        job.status === "SUCCEEDED" ||
+        job.status === "FAILED" ||
+        job.status === "EXPIRED"
+      ) {
+        return job;
+      }
+      if (job.uploadFailed && job.localDownloadPath) {
+        return job;
+      }
+      const pollMs = Date.now() - pollStarted;
+      if (pollMs > 4000) {
+        intervalMs = Math.min(8000, Math.max(intervalMs, Math.floor(pollMs * 0.8)));
+      }
+      await new Promise((r) => setTimeout(r, intervalMs));
+    } catch (e) {
+      consecutivePollErrors += 1;
+      intervalMs = Math.min(8000, intervalMs + 1000);
+      const message = e instanceof Error ? e.message : String(e);
+      if (
+        lastJob?.localDownloadPath &&
+        (lastJob.uploadFailed || consecutivePollErrors >= 3)
+      ) {
+        return {
+          ...lastJob,
+          uploadFailed: true,
+          errorMessage:
+            lastJob.errorMessage ??
+            friendlyMediaRenderPollErrorMessage(message),
+        };
+      }
+      if (consecutivePollErrors >= 24) {
+        throw new Error(friendlyMediaRenderPollErrorMessage(message));
+      }
+      const backoffMs = Math.min(
+        20_000,
+        intervalMs * Math.min(consecutivePollErrors, 6),
+      );
+      opts?.onPoll?.({
+        ...(lastJob ?? {
+          id: jobId,
+          status: "RUNNING" as const,
+          progress: 0,
+          progressLabel: "连接中断，正在重试…",
+          downloadUrl: null,
+          localDownloadPath: null,
+          uploadFailed: false,
+          posterUrl: null,
+          expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+          errorMessage: null,
+        }),
+        progressLabel:
+          lastJob?.progressLabel?.trim() || "连接中断，正在重试…",
+      });
+      await new Promise((r) => setTimeout(r, backoffMs));
     }
-    if (job.uploadFailed && job.localDownloadPath) {
-      return job;
-    }
-    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  if (lastJob?.localDownloadPath) {
+    return {
+      ...lastJob,
+      uploadFailed: true,
+      errorMessage: lastJob.errorMessage ?? "云端同步超时，可下载本地成片后重试",
+    };
   }
   throw new Error("云端剪辑超时，请稍后重试");
+}
+
+function friendlyMediaRenderPollErrorMessage(message: string): string {
+  if (/book_mall_proxy|502|503|500|abort|timeout/i.test(message)) {
+    return "进度查询暂时失败，成片若已生成可直接下载；稍后可重试云端同步。";
+  }
+  return message;
 }
 
 export type {
@@ -1688,6 +2428,8 @@ export async function patchProjectAsset(
     visibility?: import("@/lib/canvas/project-asset-types").AssetVisibility;
     locked?: boolean;
     payload?: Record<string, unknown>;
+    /** 设为 null：提升为「我的空间可用」，跨画布可见 */
+    sourceProjectId?: null;
   },
 ): Promise<import("@/lib/canvas/project-asset-types").ProjectAssetRecord> {
   const j = await call<{ asset: import("@/lib/canvas/project-asset-types").ProjectAssetRecord }>(
@@ -1756,4 +2498,103 @@ export async function mapProjectAssetInsert(
     },
   );
   return j.insert;
+}
+
+export type {
+  Pro2ActiveTemplatesSnapshot,
+  Pro2HubPromptPackResolved,
+  Pro2PromptBlock,
+  Pro2PromptTemplatePassKind,
+  Pro2PromptTemplateRecord,
+  Pro2PromptTemplateRegistry,
+  Pro2TemplatePackRecord,
+} from "@/lib/canvas/pro2-prompt-template-types";
+
+export async function listAdminPro2Templates(
+  base: string,
+  filter?: {
+    registry?: import("@/lib/canvas/pro2-prompt-template-types").Pro2PromptTemplateRegistry;
+    passKind?: import("@/lib/canvas/pro2-prompt-template-types").Pro2PromptTemplatePassKind;
+    enabled?: boolean;
+  },
+): Promise<import("@/lib/canvas/pro2-prompt-template-types").Pro2PromptTemplateRecord[]> {
+  const qs = new URLSearchParams();
+  if (filter?.registry) qs.set("registry", filter.registry);
+  if (filter?.passKind) qs.set("passKind", filter.passKind);
+  if (filter?.enabled != null) qs.set("enabled", String(filter.enabled));
+  const j = await call<{
+    templates: import("@/lib/canvas/pro2-prompt-template-types").Pro2PromptTemplateRecord[];
+  }>(base, `/api/canvas/admin/pro2-templates?${qs.toString()}`);
+  return Array.isArray(j.templates) ? j.templates : [];
+}
+
+export async function patchAdminPro2Template(
+  base: string,
+  id: string,
+  patch: Partial<{
+    name: string;
+    description: string | null;
+    version: string;
+    enabled: boolean;
+    blocks: import("@/lib/canvas/pro2-prompt-template-types").Pro2PromptBlock[];
+    sortOrder: number;
+  }>,
+): Promise<import("@/lib/canvas/pro2-prompt-template-types").Pro2PromptTemplateRecord> {
+  const j = await call<{
+    template: import("@/lib/canvas/pro2-prompt-template-types").Pro2PromptTemplateRecord;
+  }>(base, `/api/canvas/admin/pro2-templates/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  return j.template;
+}
+
+export async function deleteAdminPro2Template(base: string, id: string): Promise<void> {
+  await call(base, `/api/canvas/admin/pro2-templates/${id}`, { method: "DELETE" });
+}
+
+export async function listAdminPro2TemplatePacks(
+  base: string,
+): Promise<import("@/lib/canvas/pro2-prompt-template-types").Pro2TemplatePackRecord[]> {
+  const j = await call<{
+    packs: import("@/lib/canvas/pro2-prompt-template-types").Pro2TemplatePackRecord[];
+  }>(base, "/api/canvas/admin/pro2-template-packs");
+  return Array.isArray(j.packs) ? j.packs : [];
+}
+
+export async function patchAdminPro2TemplatePack(
+  base: string,
+  id: string,
+  patch: Partial<{
+    name: string;
+    enabled: boolean;
+    categoryDocTitle: string | null;
+    categoryDocBody: string | null;
+    outlineTemplateId: string;
+    characterTemplateId: string;
+    sceneTemplateId: string;
+    storyboardTemplateId: string;
+    sortOrder: number;
+  }>,
+): Promise<import("@/lib/canvas/pro2-prompt-template-types").Pro2TemplatePackRecord> {
+  const j = await call<{
+    pack: import("@/lib/canvas/pro2-prompt-template-types").Pro2TemplatePackRecord;
+  }>(base, `/api/canvas/admin/pro2-template-packs/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  return j.pack;
+}
+
+export async function fetchActivePro2Templates(
+  base: string,
+  packKey?: string,
+): Promise<{
+  snapshot: import("@/lib/canvas/pro2-prompt-template-types").Pro2ActiveTemplatesSnapshot;
+  pack: import("@/lib/canvas/pro2-prompt-template-types").Pro2HubPromptPackResolved | null;
+}> {
+  const qs = packKey ? `?packKey=${encodeURIComponent(packKey)}` : "";
+  return call(base, `/api/canvas/pro2-templates/active${qs}`);
 }

@@ -49,11 +49,10 @@ export function VipCheckoutClient({
   const seatAlloc = useMemo(
     () =>
       computeVipSeatAllocation({
-        totalGeneralCredits: selected.generalCredits,
-        totalVideoCredits: selected.videoCredits,
+        totalCredits: selected.totalCredits,
         seats: initialSeats,
       }),
-    [selected.generalCredits, selected.videoCredits, initialSeats],
+    [selected.totalCredits, initialSeats],
   );
 
   const createPayload = {
@@ -78,14 +77,10 @@ export function VipCheckoutClient({
             本次到账积分（有效期 {VIP_CREDIT_VALIDITY_YEARS} 年，周期内无月度清零）
           </p>
           <p className="mt-1 text-muted-foreground">
-            {selected.totalCredits.toLocaleString()} 总积分
-            <span className="mx-1">·</span>
-            {selected.generalCredits.toLocaleString()} 通用 +{" "}
-            {selected.videoCredits.toLocaleString()} 视频
+            {selected.totalCredits.toLocaleString()} 积分
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            均分参考：{seatAlloc.perSeatGeneral.toLocaleString()} 通用 +{" "}
-            {seatAlloc.perSeatVideo.toLocaleString()} 视频 / 席
+            均分参考：约 {seatAlloc.perSeatCredits.toLocaleString()} 积分 / 席
           </p>
         </div>
 
@@ -104,22 +99,21 @@ export function VipCheckoutClient({
         <WechatPersonalCheckout
           createPayload={createPayload}
           adminInstant={adminInstant}
-          successRedirect="/account/team?success=vip"
-          onSuccessMessage="预充订单已提交，积分将在财务确认后发放至团队共享池。"
+          successRedirect="/account/billing?success=vip"
         />
 
-        <div className="rounded-lg border border-border/80 bg-muted/20 p-3">
-          <p className="text-[11px] font-medium text-foreground">{VIP_COMPLIANCE_FOOTER_TITLE}</p>
-          <ol className="mt-1.5 list-decimal space-y-1 pl-4 text-[10px] leading-relaxed text-muted-foreground">
-            {VIP_COMPLIANCE_FOOTER_ITEMS.map((item) => (
+        <Button variant="ghost" asChild className="w-full">
+          <Link href="/pricing#vip-package">返回 VIP 套餐说明</Link>
+        </Button>
+
+        <div className="rounded border border-border bg-muted/20 p-3 text-[11px] text-muted-foreground">
+          <p className="font-medium text-foreground">{VIP_COMPLIANCE_FOOTER_TITLE}</p>
+          <ol className="mt-1 list-decimal space-y-1 pl-4">
+            {VIP_COMPLIANCE_FOOTER_ITEMS.slice(0, 3).map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ol>
         </div>
-
-        <Button variant="outline" className="w-full" asChild>
-          <Link href="/pricing#vip-package">返回定价页</Link>
-        </Button>
       </CardContent>
     </Card>
   );

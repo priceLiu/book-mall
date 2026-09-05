@@ -14,6 +14,7 @@ import {
   PRO2_SCRIPT_NODE_WIDTH,
 } from "./story-pro2-node-chrome";
 import { sortNodesForReactFlow } from "./normalize-graph-nodes";
+import { resolveLibtvMediaNodeBoxSize } from "./libtv-media-node-size";
 import type { CanvasFlowNode } from "./types";
 
 export const PRO2_MEDIA_GRID_GAP = 28;
@@ -23,10 +24,10 @@ export function pro2MediaGridGap(cellWidth: number): number {
   return Math.max(PRO2_MEDIA_GRID_GAP, Math.round(cellWidth / 2));
 }
 export const PRO2_MEDIA_GROUP_HEADER = 48;
-/** 组内边距（大留白：空白区即「选中组」可点区域） */
-export const PRO2_MEDIA_GROUP_PAD = 64;
-/** 组右 / 下额外空白，进一步扩大可点选组区域（复刻图 2） */
-export const PRO2_MEDIA_GROUP_EXTRA = 56;
+/** 组内边距（留白即「选中组」可点区域） */
+export const PRO2_MEDIA_GROUP_PAD = 96;
+/** 组右 / 下额外空白，进一步扩大可点选组区域 */
+export const PRO2_MEDIA_GROUP_EXTRA = 84;
 
 /** 分镜图组 · 宫格单元（≈3:2 横版） */
 export const PRO2_FRAME_CELL_WIDTH = 296;
@@ -51,6 +52,38 @@ export function pro2MediaGridCols(count: number): number {
   return Math.ceil(count / rows);
 }
 
+export type MediaGroupArrangeMode = "auto" | "row" | "column";
+
+export type MediaGroupRelayoutOpts = {
+  resetOrigin?: boolean;
+  /** 用户点「组排列」时强制重排，忽略 manualSize */
+  force?: boolean;
+  mode?: MediaGroupArrangeMode;
+};
+
+/** 组排列 · 横排 / 竖排 / 自动宫格列数 */
+export function mediaGroupArrangeCols(
+  count: number,
+  mode: MediaGroupArrangeMode = "auto",
+): number {
+  if (count <= 1) return 1;
+  if (mode === "row") return count;
+  if (mode === "column") return 1;
+  return pro2MediaGridCols(count);
+}
+
+function clearGroupManualSizeFlags(
+  nodes: CanvasFlowNode[],
+  groupId: string,
+): CanvasFlowNode[] {
+  return nodes.map((n) => {
+    if (n.id !== groupId && n.parentId !== groupId) return n;
+    const d = n.data as { manualSize?: boolean };
+    if (!d.manualSize) return n;
+    return { ...n, data: { ...n.data, manualSize: false } };
+  });
+}
+
 export function pro2MediaChildSize(node: {
   type?: string;
   pro2MediaRole?: string;
@@ -64,8 +97,17 @@ export function pro2MediaChildSize(node: {
       height: PRO2_CHARACTER_THREE_VIEW_HEIGHT,
     };
   }
-  if (node.pro2MediaRole === "frame" || node.pro2MediaRole === "scene") {
-    return { width: PRO2_FRAME_CELL_WIDTH, height: PRO2_FRAME_CELL_HEIGHT };
+  if (node.pro2MediaRole === "scene") {
+    return {
+      width: PRO2_CHARACTER_THREE_VIEW_WIDTH,
+      height: PRO2_CHARACTER_THREE_VIEW_HEIGHT,
+    };
+  }
+  if (node.pro2MediaRole === "frame") {
+    return {
+      width: PRO2_CHARACTER_THREE_VIEW_WIDTH,
+      height: PRO2_CHARACTER_THREE_VIEW_HEIGHT,
+    };
   }
   if (node.pro2MediaRole === "video") {
     // 分镜视频组 · 与分镜图组同宫格尺寸（图 3/4）
@@ -92,41 +134,50 @@ export function pro2MediaGridLayout(
   };
 }
 
-/** 读取子节点实际外框（含 auto-fit 后尺寸），布局时取 max(模板, 实测) */
-export function effectivePro2MediaChildSize(node: CanvasFlowNode): {
+/** 读取子节点外框 · 委托 resolveLibtvMediaNodeBoxSize（禁止再读 node.width 旧值） */
+export function effectivePro2MediaChildSize(
+  node: CanvasFlowNode,
+  allNodes?: CanvasFlowNode[],
+): {
   width: number;
   height: number;
 } {
   const data = node.data as {
     pro2MediaRole?: string;
     gridSplitFrameCrop?: boolean;
-    mediaFit?: boolean;
   };
-  const cell = pro2MediaChildSize({
-    type: node.type,
-    pro2MediaRole: data.pro2MediaRole,
-  });
-  const style = node.style as { width?: number; height?: number } | undefined;
-  const w =
-    node.measured?.width ??
-    (typeof node.width === "number" ? node.width : undefined) ??
-    style?.width ??
-    cell.width;
-  const h =
-    node.measured?.height ??
-    (typeof node.height === "number" ? node.height : undefined) ??
-    style?.height ??
-    cell.height;
-  if (data.gridSplitFrameCrop && data.mediaFit) {
+  if (
+    data.pro2MediaRole === "frame" ||
+    data.pro2MediaRole === "scene" ||
+    node.type === "story-pro2-three-view" ||
+    data.pro2MediaRole === "character-three-view"
+  ) {
+    return resolveLibtvMediaNodeBoxSize(node, allNodes);
+  }
+  if (data.pro2MediaRole === "video") {
+    return pro2MediaChildSize({
+      type: node.type,
+      pro2MediaRole: data.pro2MediaRole,
+    });
+  }
+  if (data.gridSplitFrameCrop) {
+    const style = node.style as { width?: number; height?: number } | undefined;
+    const w =
+      node.measured?.width ??
+      (typeof node.width === "number" ? node.width : undefined) ??
+      style?.width ??
+      320;
+    const h =
+      node.measured?.height ??
+      (typeof node.height === "number" ? node.height : undefined) ??
+      style?.height ??
+      240;
     return {
       width: Math.max(1, Math.round(w)),
       height: Math.max(1, Math.round(h)),
     };
   }
-  return {
-    width: Math.max(cell.width, Math.round(w)),
-    height: Math.max(cell.height, Math.round(h)),
-  };
+  return resolveLibtvMediaNodeBoxSize(node, allNodes);
 }
 
 type MediaChildLayout = {
@@ -200,8 +251,11 @@ export function mediaGridLayoutForChildren(
 export function pro2MediaGridLayoutForChildren(
   children: CanvasFlowNode[],
   cols: number,
+  allNodes?: CanvasFlowNode[],
 ): MediaChildLayout[] {
-  return mediaGridLayoutForChildren(children, cols, effectivePro2MediaChildSize);
+  return mediaGridLayoutForChildren(children, cols, (n) =>
+    effectivePro2MediaChildSize(n, allNodes ?? children),
+  );
 }
 
 export function pro2MediaGroupDimensionsFromLayouts(
@@ -335,39 +389,52 @@ function isMediaGroupChildForRelayout(
   return n.type === "story-pro2-image" || n.type === "story-pro2-three-view";
 }
 
-/** 布局版本：hydrate 仅对更低版本做一次网格迁移，不覆盖已保存坐标 */
-export const PRO2_MEDIA_GROUP_LAYOUT_VERSION = 10;
+/** 布局版本：hydrate 仅对更低版本做一次 sbv1 组内网格迁移，不覆盖已保存坐标 */
+export const PRO2_MEDIA_GROUP_LAYOUT_VERSION = 11;
 
 /** 纯函数：收拢媒体子节点、宫格重排、组框贴合（与 createGroupContaining / group-node 共用） */
 export function applyPro2MediaGroupRelayout(
   nodes: CanvasFlowNode[],
   groupId: string,
-  opts?: { resetOrigin?: boolean },
+  opts?: MediaGroupRelayoutOpts,
 ): CanvasFlowNode[] {
   const group = nodes.find((n) => n.id === groupId && n.type === "group");
   if (!group) return nodes;
+  const force = opts?.force === true;
   // 用户手动拖过组框尺寸后，禁止 auto-fit / relayout 覆盖 width/height
   if (
+    !force &&
     Boolean((group.data as { manualSize?: boolean }).manualSize) &&
     opts?.resetOrigin !== true
   ) {
     return sortNodesForReactFlow(nodes);
   }
 
+  let next = force ? clearGroupManualSizeFlags(nodes, groupId) : [...nodes];
+
   const controllerId = (group.data as { pro2ControllerNodeId?: string })
     .pro2ControllerNodeId;
   const hubNodeId = (group.data as { pro2HubNodeId?: string }).pro2HubNodeId;
-
-  let next = [...nodes];
 
   const shouldReparent = (n: CanvasFlowNode): boolean => {
     if (!isMediaGroupChildForRelayout(n, group)) return false;
     if (n.parentId === groupId) return false;
     const d = n.data as { pro2GroupId?: string; pro2ControllerNodeId?: string };
     if (d.pro2GroupId === groupId) return true;
-    return Boolean(
-      controllerId && d.pro2ControllerNodeId === controllerId,
-    );
+    // 多组抽卡：已在其它媒体组内的节点不可被 relayout 吸走
+    if (n.parentId) {
+      const parent = next.find((x) => x.id === n.parentId);
+      if (parent?.type === "group" && groupUsesMediaGrid(parent)) {
+        return false;
+      }
+    }
+    if (d.pro2GroupId?.trim()) {
+      const tagged = next.find((x) => x.id === d.pro2GroupId);
+      if (tagged?.type === "group" && tagged.id !== groupId) {
+        return false;
+      }
+    }
+    return Boolean(controllerId && d.pro2ControllerNodeId === controllerId);
   };
 
   for (const orphan of next.filter(shouldReparent)) {
@@ -390,8 +457,11 @@ export function applyPro2MediaGroupRelayout(
 
   if (children.length === 0) return sortNodesForReactFlow(next);
 
-  const cols = pro2MediaGridCols(children.length);
-  const layouts = pro2MediaGridLayoutForChildren(children, cols);
+  const cols = mediaGroupArrangeCols(
+    children.length,
+    opts?.mode ?? "auto",
+  );
+  const layouts = pro2MediaGridLayoutForChildren(children, cols, next);
 
   for (let i = 0; i < children.length; i++) {
     const child = children[i]!;
@@ -440,11 +510,83 @@ export function applyPro2MediaGroupRelayout(
   return sortNodesForReactFlow(next);
 }
 
+function flowNodeGeometry(n: CanvasFlowNode): {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+} {
+  const style = n.style as { width?: number; height?: number } | undefined;
+  return {
+    x: n.position.x,
+    y: n.position.y,
+    w: Math.round(
+      (typeof n.width === "number" ? n.width : undefined) ??
+        style?.width ??
+        0,
+    ),
+    h: Math.round(
+      (typeof n.height === "number" ? n.height : undefined) ??
+        style?.height ??
+        0,
+    ),
+  };
+}
+
+function pro2MediaRelayoutChanged(
+  before: CanvasFlowNode[],
+  after: CanvasFlowNode[],
+  groupId: string,
+): boolean {
+  const ids = new Set<string>([groupId]);
+  for (const n of after) {
+    if (n.parentId === groupId) ids.add(n.id);
+  }
+  for (const id of ids) {
+    const a = before.find((n) => n.id === id);
+    const b = after.find((n) => n.id === id);
+    if (!a || !b) return true;
+    const ga = flowNodeGeometry(a);
+    const gb = flowNodeGeometry(b);
+    if (
+      ga.x !== gb.x ||
+      ga.y !== gb.y ||
+      ga.w !== gb.w ||
+      ga.h !== gb.h
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /** 收拢孤儿图片进组、网格重排、组框贴合子节点 */
 export function relayoutPro2MediaGroup(
   setNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void,
   groupId: string,
   opts?: { resetOrigin?: boolean },
 ): void {
-  setNodes((nodes) => applyPro2MediaGroupRelayout(nodes, groupId, opts));
+  setNodes((nodes) => {
+    const next = applyPro2MediaGroupRelayout(nodes, groupId, opts);
+    if (!pro2MediaRelayoutChanged(nodes, next, groupId)) return nodes;
+    return next;
+  });
+}
+
+const pro2GroupRelayoutTimers = new Map<string, number>();
+
+/** 组内多节点并发 aspect sync 时合并为一次 relayout，避免 Maximum update depth */
+export function scheduleRelayoutPro2MediaGroup(
+  setNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void,
+  groupId: string,
+  delayMs = 120,
+  opts?: { resetOrigin?: boolean },
+): void {
+  const prev = pro2GroupRelayoutTimers.get(groupId);
+  if (prev !== undefined) window.clearTimeout(prev);
+  const timer = window.setTimeout(() => {
+    pro2GroupRelayoutTimers.delete(groupId);
+    relayoutPro2MediaGroup(setNodes, groupId, opts);
+  }, delayMs);
+  pro2GroupRelayoutTimers.set(groupId, timer);
 }

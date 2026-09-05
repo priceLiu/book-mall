@@ -1,16 +1,10 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import { DialogProvider } from "@/components/dialogs/dialog-provider";
 import { EcomShell } from "@/components/layout/ecom-shell";
+import { EcomSiteNavGuard } from "@/components/layout/ecom-site-nav-guard";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: {
@@ -24,9 +18,10 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN" className={inter.variable}>
-      <body className="font-sans antialiased">
+    <html lang="zh-CN">
+      <body className="bg-[#0c0c0e] font-sans antialiased">
         <DialogProvider>
+          <EcomSiteNavGuard />
           <EcomShell>{children}</EcomShell>
         </DialogProvider>
       </body>

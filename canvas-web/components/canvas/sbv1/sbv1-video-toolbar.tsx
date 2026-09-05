@@ -70,7 +70,9 @@ export function Sbv1VideoToolbar({
         />
         <span className="mx-0.5 h-4 w-px bg-white/10" />
         <Sbv1VolcengineModelPicker
-          value={data.volcengineVariantId ?? data.jimengModelId}
+          value={migrateSbv1ModelVariantId(
+            data.volcengineVariantId ?? data.jimengModelId,
+          )}
           onChange={onModelChange}
         />
         <span className="mx-0.5 h-4 w-px bg-white/10" />

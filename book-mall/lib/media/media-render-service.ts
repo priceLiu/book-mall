@@ -10,13 +10,21 @@ import { deleteManagedOssObjectByUrl } from "@/lib/oss-delete-object";
 import { copyMediaRenderToPinned } from "@/lib/media/media-render-oss";
 import { assertFfmpegForMediaRender } from "@/lib/media/ffmpeg-preflight";
 import { prismaJsonValue } from "@/lib/media/prisma-json";
-import { runFfmpegMediaRender } from "@/lib/media/render-ffmpeg";
+import {
+  runCompositeRender,
+  runFfmpegMediaRender,
+} from "@/lib/media/render-ffmpeg";
 import {
   MEDIA_RENDER_JOB_TIMEOUT_SEC,
   MEDIA_RENDER_MAX_CONCURRENT_PER_USER,
   mediaRenderExpiresAt,
   validateTimelineLimits,
 } from "@/lib/media/render-limits";
+import {
+  countActiveRenderJobs,
+  findActiveMediaRenderJobForProject,
+  supersedeInFlightMediaRenderJobsForProject,
+} from "@/lib/media/media-render-concurrency";
 import {
   parseMediaTimelineV1,
   parseRenderProfile,
@@ -27,7 +35,15 @@ import {
   enqueueMediaRenderJobUpload,
   retryMediaRenderJobUpload,
 } from "@/lib/media/media-render-upload";
-import { hasMediaRenderLocalOutput } from "@/lib/media/media-render-local-output";
+import {
+  cleanupMediaRenderLocalOutput,
+  hasMediaRenderLocalOutput,
+} from "@/lib/media/media-render-local-output";
+import { mediaRenderErrorMessage } from "@/lib/media/media-render-errors";
+import {
+  chargeMediaRenderJobCredits,
+  refundMediaRenderJobCredits,
+} from "@/lib/media/media-render-credits";
 
 export type CreateMediaRenderJobInput = {
   userId: string;
@@ -35,20 +51,20 @@ export type CreateMediaRenderJobInput = {
   sourceRef?: Record<string, unknown>;
   timeline: MediaTimelineV1;
   profile?: RenderProfile;
+  /** 显式取代同项目进行中任务；默认复用已有任务（防连点） */
+  replaceInFlight?: boolean;
 };
 
-export async function countActiveRenderJobs(userId: string): Promise<number> {
-  return prisma.mediaRenderJob.count({
-    where: {
-      userId,
-      status: { in: [MediaRenderJobStatus.PENDING, MediaRenderJobStatus.RUNNING] },
-    },
-  });
-}
+export type CreateMediaRenderJobResult = {
+  id: string;
+  expiresAt: Date;
+  /** 同项目已有进行中任务，未新建 */
+  reusedExisting: boolean;
+};
 
 export async function createMediaRenderJob(
   input: CreateMediaRenderJobInput,
-): Promise<{ id: string; expiresAt: Date }> {
+): Promise<CreateMediaRenderJobResult> {
   await assertFfmpegForMediaRender();
   const timeline = parseMediaTimelineV1(input.timeline);
   const profile = input.profile ?? parseRenderProfile(null);
@@ -57,7 +73,27 @@ export async function createMediaRenderJob(
     throw new Error(limitErr.message);
   }
 
-  const active = await countActiveRenderJobs(input.userId);
+  const projectId =
+    typeof input.sourceRef?.projectId === "string"
+      ? input.sourceRef.projectId.trim()
+      : "";
+  if (projectId && !input.replaceInFlight) {
+    const existing = await findActiveMediaRenderJobForProject({
+      userId: input.userId,
+      projectId,
+    });
+    if (existing) {
+      return { ...existing, reusedExisting: true };
+    }
+  }
+  if (projectId && input.replaceInFlight) {
+    await supersedeInFlightMediaRenderJobsForProject({
+      userId: input.userId,
+      projectId,
+    });
+  }
+
+  const active = await countActiveRenderJobs(input.userId, { reclaim: false });
   if (active >= MEDIA_RENDER_MAX_CONCURRENT_PER_USER) {
     throw new Error(
       `同时进行的剪辑任务不能超过 ${MEDIA_RENDER_MAX_CONCURRENT_PER_USER} 个，请稍后再试`,
@@ -78,7 +114,89 @@ export async function createMediaRenderJob(
     },
     select: { id: true, expiresAt: true },
   });
-  return job;
+  try {
+    await chargeMediaRenderJobCredits({
+      ref: { ownerType: "USER", ownerId: input.userId },
+      jobId: job.id,
+      profile,
+      actorUserId: input.userId,
+    });
+  } catch (e) {
+    await prisma.mediaRenderJob.delete({ where: { id: job.id } }).catch(() => undefined);
+    throw e;
+  }
+  return { id: job.id, expiresAt: job.expiresAt, reusedExisting: false };
+}
+
+/** 本进程内正在执行的剪辑（dev 热重载后 Map 清空，轮询可据此恢复孤儿任务） */
+const activeMediaRenderRuns = new Map<string, Promise<void>>();
+const orphanResumeAttemptAt = new Map<string, number>();
+
+/** 刚提交后短暂宽限，避免与 POST enqueue 竞态双开 */
+export const MEDIA_RENDER_ORPHAN_RESUME_GRACE_MS = 45_000;
+/** 同一 job 两次恢复尝试的最小间隔 */
+export const MEDIA_RENDER_ORPHAN_RESUME_COOLDOWN_MS = 30_000;
+/**
+ * RUNNING 且进度已达合片前段（≥50%）时不再自动重跑。
+ * FFmpeg 合片（72%）可能持续数分钟且无中间写库；误恢复会整任务重来并导致进度条回跳。
+ */
+export const MEDIA_RENDER_ORPHAN_RESUME_MAX_PROGRESS = 50;
+
+export function isMediaRenderJobActivelyProcessing(jobId: string): boolean {
+  return activeMediaRenderRuns.has(jobId);
+}
+
+export function shouldResumeOrphanedMediaRenderJob(args: {
+  status: MediaRenderJobStatus;
+  progress: number;
+  createdAt: Date;
+  now?: number;
+  isActivelyProcessing: boolean;
+  lastResumeAttemptAt?: number | null;
+}): boolean {
+  if (
+    args.status !== MediaRenderJobStatus.PENDING &&
+    args.status !== MediaRenderJobStatus.RUNNING
+  ) {
+    return false;
+  }
+  if (args.status === MediaRenderJobStatus.RUNNING && args.progress >= 90) {
+    return false;
+  }
+  if (
+    args.status === MediaRenderJobStatus.RUNNING &&
+    args.progress >= MEDIA_RENDER_ORPHAN_RESUME_MAX_PROGRESS
+  ) {
+    return false;
+  }
+  if (args.isActivelyProcessing) return false;
+  const now = args.now ?? Date.now();
+  if (now - args.createdAt.getTime() < MEDIA_RENDER_ORPHAN_RESUME_GRACE_MS) {
+    return false;
+  }
+  const lastAttempt = args.lastResumeAttemptAt ?? 0;
+  return now - lastAttempt >= MEDIA_RENDER_ORPHAN_RESUME_COOLDOWN_MS;
+}
+
+function maybeResumeOrphanedMediaRenderJob(job: {
+  id: string;
+  status: MediaRenderJobStatus;
+  progress: number;
+  createdAt: Date;
+}): void {
+  if (
+    !shouldResumeOrphanedMediaRenderJob({
+      status: job.status,
+      progress: job.progress,
+      createdAt: job.createdAt,
+      isActivelyProcessing: isMediaRenderJobActivelyProcessing(job.id),
+      lastResumeAttemptAt: orphanResumeAttemptAt.get(job.id) ?? null,
+    })
+  ) {
+    return;
+  }
+  orphanResumeAttemptAt.set(job.id, Date.now());
+  enqueueMediaRenderJob(job.id);
 }
 
 export async function processMediaRenderJob(jobId: string): Promise<void> {
@@ -104,27 +222,37 @@ export async function processMediaRenderJob(jobId: string): Promise<void> {
   const timeline = parseMediaTimelineV1(job.timelineJson);
   const profile = parseRenderProfile(job.profileJson);
 
+  const onProgress = (pct: number, label: string) => {
+    if (Date.now() - startedAt > MEDIA_RENDER_JOB_TIMEOUT_SEC * 1000) {
+      throw new Error("剪辑任务超时，请减少分镜数量或降低输出画质后重试");
+    }
+    void prisma.mediaRenderJob
+      .update({
+        where: { id: jobId },
+        data: {
+          progress: Math.min(89, pct),
+          progressLabel: label,
+        },
+      })
+      .catch(() => undefined);
+  };
+
   try {
-    const result = await runFfmpegMediaRender({
-      userId: job.userId,
-      jobId: job.id,
-      timeline,
-      profile,
-      onProgress: (pct, label) => {
-        if (Date.now() - startedAt > MEDIA_RENDER_JOB_TIMEOUT_SEC * 1000) {
-          throw new Error("剪辑任务超时");
-        }
-        void prisma.mediaRenderJob
-          .update({
-            where: { id: jobId },
-            data: {
-              progress: Math.min(89, pct),
-              progressLabel: label,
-            },
-          })
-          .catch(() => undefined);
-      },
-    });
+    // composite（数字人画中画）与默认多镜拼接是两条滤镜链，入口按 timeline 分流
+    const result = timeline.composite
+      ? await runCompositeRender({
+          jobId: job.id,
+          timeline,
+          profile,
+          onProgress,
+        })
+      : await runFfmpegMediaRender({
+          userId: job.userId,
+          jobId: job.id,
+          timeline,
+          profile,
+          onProgress,
+        });
 
     await prisma.mediaRenderJob.update({
       where: { id: jobId },
@@ -144,7 +272,7 @@ export async function processMediaRenderJob(jobId: string): Promise<void> {
       bytesOut: result.bytesOut,
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "剪辑失败";
+    const message = mediaRenderErrorMessage(e);
     await prisma.mediaRenderJob.update({
       where: { id: jobId },
       data: {
@@ -153,11 +281,21 @@ export async function processMediaRenderJob(jobId: string): Promise<void> {
         completedAt: new Date(),
       },
     });
+    await refundMediaRenderJobCredits({
+      ref: { ownerType: "USER", ownerId: job.userId },
+      jobId,
+      profile,
+    }).catch(() => undefined);
   }
 }
 
 export function enqueueMediaRenderJob(jobId: string): void {
-  void processMediaRenderJob(jobId);
+  if (activeMediaRenderRuns.has(jobId)) return;
+  const run = processMediaRenderJob(jobId).finally(() => {
+    activeMediaRenderRuns.delete(jobId);
+    orphanResumeAttemptAt.delete(jobId);
+  });
+  activeMediaRenderRuns.set(jobId, run);
 }
 
 export async function waitForMediaRenderJob(
@@ -201,6 +339,35 @@ export type MediaRenderJobDto = {
   completedAt: string | null;
 };
 
+/** POST 新建任务：立即返回排队态，避免再查库/扫本地文件拖慢「提交中」 */
+export function buildPendingMediaRenderJobDto(args: {
+  id: string;
+  userId: string;
+  expiresAt: Date;
+  sourceApp?: MediaRenderSourceApp;
+}): MediaRenderJobDto {
+  const now = new Date().toISOString();
+  return {
+    id: args.id,
+    userId: args.userId,
+    sourceApp: args.sourceApp ?? MediaRenderSourceApp.canvas,
+    status: MediaRenderJobStatus.PENDING,
+    progress: 0,
+    progressLabel: "排队中",
+    downloadUrl: null,
+    localDownloadPath: null,
+    uploadFailed: false,
+    posterUrl: null,
+    expiresAt: args.expiresAt.toISOString(),
+    storageTier: MediaRenderStorageTier.ephemeral,
+    pinnedAt: null,
+    errorMessage: null,
+    bytesOut: null,
+    createdAt: now,
+    completedAt: null,
+  };
+}
+
 export async function getMediaRenderJobForUser(
   jobId: string,
   userId: string | null,
@@ -212,6 +379,8 @@ export async function getMediaRenderJobForUser(
     },
   });
   if (!job) return null;
+
+  maybeResumeOrphanedMediaRenderJob(job);
 
   const expired =
     job.storageTier === MediaRenderStorageTier.ephemeral &&
@@ -227,20 +396,29 @@ export async function getMediaRenderJobForUser(
     job.status === MediaRenderJobStatus.SUCCEEDED && job.resultOssUrl
       ? job.resultOssUrl
       : null;
+  // FFmpeg 阶段（progress<90）无需扫本地文件；避免轮询在 DB/磁盘上叠压
+  const shouldProbeLocal =
+    !downloadUrl &&
+    (job.status === MediaRenderJobStatus.SUCCEEDED ||
+      (job.status === MediaRenderJobStatus.RUNNING && job.progress >= 90));
   const localReady =
-    !downloadUrl && (await hasMediaRenderLocalOutput(job.id));
+    shouldProbeLocal && (await hasMediaRenderLocalOutput(job.id));
   const localDownloadPath = localReady
     ? `/api/canvas/media/render/${job.id}/download`
     : null;
   const uploadFailed = Boolean(
     localReady &&
       job.status === MediaRenderJobStatus.RUNNING &&
-      job.progressLabel?.includes("上传失败"),
+      (job.progressLabel?.includes("上传失败") ||
+        job.progressLabel?.includes("云端上传失败") ||
+        /oss|上传|upload/i.test(job.errorMessage ?? "")),
   );
   const posterUrl =
     job.status === MediaRenderJobStatus.SUCCEEDED && job.resultPosterOssUrl
       ? job.resultPosterOssUrl
       : null;
+
+  // 上传仅由剪辑完成 enqueue 或 POST retry-upload 触发；GET 轮询不再续传，避免拖垮 DB/OSS。
 
   return {
     id: job.id,
@@ -294,6 +472,7 @@ export async function expireDueMediaRenderJobs(limit = 50): Promise<number> {
   for (const row of due) {
     if (row.resultOssUrl) {
       await expireMediaRenderJob(row.id, row.resultOssUrl);
+      await cleanupMediaRenderLocalOutput(row.id).catch(() => undefined);
     }
   }
   return due.length;
@@ -381,3 +560,40 @@ export async function pinMediaRenderJob(args: {
 }
 
 export { retryMediaRenderJobUpload };
+
+/** 用户中止进行中的剪辑（FFmpeg 进程可能仍在跑，成片可能仍会产出）。 */
+export async function cancelMediaRenderJobForUser(
+  jobId: string,
+  userId: string,
+): Promise<{ ok: true; alreadyTerminal: boolean }> {
+  const job = await prisma.mediaRenderJob.findFirst({
+    where: { id: jobId, userId },
+    select: { id: true, status: true, profileJson: true },
+  });
+  if (!job) {
+    throw new Error("剪辑任务不存在");
+  }
+  if (
+    job.status === MediaRenderJobStatus.SUCCEEDED ||
+    job.status === MediaRenderJobStatus.FAILED ||
+    job.status === MediaRenderJobStatus.EXPIRED
+  ) {
+    return { ok: true, alreadyTerminal: true };
+  }
+  const profile = parseRenderProfile(job.profileJson);
+  await prisma.mediaRenderJob.update({
+    where: { id: jobId },
+    data: {
+      status: MediaRenderJobStatus.FAILED,
+      errorMessage: "用户已中止剪辑",
+      progressLabel: null,
+      completedAt: new Date(),
+    },
+  });
+  await refundMediaRenderJobCredits({
+    ref: { ownerType: "USER", ownerId: userId },
+    jobId,
+    profile,
+  }).catch(() => undefined);
+  return { ok: true, alreadyTerminal: false };
+}

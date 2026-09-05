@@ -2,10 +2,11 @@
 
 import { useMemo, useRef } from "react";
 import { useNodes } from "@xyflow/react";
-import { resolveLibtvFloatingDockSelection } from "./libtv-floating-dock-selection";
+import {
+  resolveLibtvSoleSelectedNodeId,
+} from "./libtv-floating-dock-selection";
 import { useCanvasMarqueeSelecting } from "./use-canvas-marquee-selecting";
 import { useCanvasStore } from "./store";
-import { libtvDetailEditorOpenForNode } from "./libtv-detail-editor-open";
 import {
   useLibtvDockFlowPlacement,
   useStableLibtvDockFlowPlacement,
@@ -18,27 +19,24 @@ type PlacementOpts = NonNullable<Parameters<typeof useLibtvDockFlowPlacement>[1]
 /**
  * LibTV 浮动 Dock · 某类型节点的选中 id（全局单选互斥）
  *
- * 仅当「当前全局选中 / 钉选」即该 nodeType 时才返回 id；禁止按类型各自匹配 RF selected
- * （否则选中图片节点时视频仍 selected → 视频 Dock 不消失）。
+ * 优先 RF 唯一选中；sync/zoom 时 RF 选中可能闪断，回退 store pin。
  */
 export function useLibtvSoleSelectedNodeId(nodeType: string): string | null {
   const rfNodes = useNodes();
   const marqueeSelecting = useCanvasMarqueeSelecting();
+  const pinnedId = useCanvasStore((s) => s.libtvFloatingDockNodeId);
+  const pinnedType = useCanvasStore((s) => s.libtvFloatingDockNodeType);
 
-  const rfGlobal = useMemo(
-    () => resolveLibtvFloatingDockSelection(rfNodes),
-    [rfNodes],
+  return useMemo(
+    () =>
+      resolveLibtvSoleSelectedNodeId(
+        rfNodes,
+        nodeType,
+        { nodeId: pinnedId, nodeType: pinnedType },
+        { marqueeSelecting },
+      ),
+    [rfNodes, nodeType, pinnedId, pinnedType, marqueeSelecting],
   );
-
-  if (marqueeSelecting) return null;
-
-  // RF 已无选中时 Dock 必须收起；勿回退 pin（否则点空白常需两次才关）
-  if (!rfGlobal) return null;
-
-  if (libtvDetailEditorOpenForNode(rfGlobal.nodeId)) return null;
-
-  if (rfGlobal.nodeType !== nodeType) return null;
-  return rfGlobal.nodeId;
 }
 
 /**
@@ -62,7 +60,7 @@ export function useLibtvFloatingDock(
   );
   const marqueeSelecting = useCanvasMarqueeSelecting();
 
-  const rawPlacement = useLibtvDockFlowPlacement(dockNodeId, placementOpts);
+  const rawPlacement = useLibtvDockFlowPlacement(dockNodeId, placementOpts, hidden);
   const stablePlacement = useStableLibtvDockFlowPlacement(rawPlacement);
 
   const pinRef = useRef<{
@@ -70,7 +68,7 @@ export function useLibtvFloatingDock(
     placement: LibtvDockFlowPlacement;
   } | null>(null);
 
-  if (dockNodeId && stablePlacement) {
+  if (dockNodeId && stablePlacement && !hidden) {
     pinRef.current = { nodeId: dockNodeId, placement: stablePlacement };
   } else if (!dockNodeId) {
     pinRef.current = null;

@@ -7,9 +7,15 @@
     "build": "next build",
     "build:docker": "next build",
     "start": "next start -p 3007",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:unit": "vitest run test/unit"
   },
   "dependencies": {
+    "@private/federated-portal-logout": "file:../shared/federated-portal-logout",
+    "@private/federated-portal-nav": "file:../shared/federated-portal-nav",
+    "@private/media-render-subtitle-style": "file:../shared/media-render-subtitle-style",
+    "@private/platform-assistant": "file:../shared/platform-assistant",
+    "@private/publisher-client": "file:../shared/publisher-client",
     "@radix-ui/react-dialog": "^1.0.5",
     "clsx": "^2.1.1",
     "framer-motion": "^12.39.0",
@@ -18,7 +24,8 @@
     "next": "14.2.3",
     "react": "^18",
     "react-dom": "^18",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "^3.6.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^20",
@@ -28,7 +35,8 @@
     "eslint-config-next": "14.2.3",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.8"
   },
   "packageManager": "pnpm@11.1.3+sha512.c85357fe17ca12dd23dd7071822666dfd7e3cb76fe214e3370b5ea2fb34f2a231185509b63e717f3cd0acb38dd3f8d82bcd5e8172400ae678b70ea4fbed0896d"
 }

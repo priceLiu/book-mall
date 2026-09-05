@@ -208,8 +208,13 @@ export function ReferralsClient() {
 
   return (
     <FinancePageShell>
+      <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <strong>分享规则 2.0</strong>：新奖励为积分自动发放（邀请 20 / 工作流 40），请在上方「分享奖励配置」调整。
+        下方现金返佣比例为<strong>历史口径</strong>，不再生成新返佣单。
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg font-medium text-[#262626]">分享返佣管理</h1>
+        <h1 className="text-lg font-medium text-[#262626]">分享返佣管理（历史）</h1>
         <button
           type="button"
           onClick={() => void reload()}

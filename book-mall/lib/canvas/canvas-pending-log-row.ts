@@ -1,7 +1,6 @@
 /**
- * 方向 2：把画布视频「QUEUED / DISPATCHING 且尚未创建 Gateway 日志」的任务，
- * 合成为一条「排队中（待提交）」日志行，使用户点击生成后，Logs 页第一时间就能看到
- * 完整过程（点击 → 排队 → 派发 → 提交厂商 …），而不是等几十秒厂商提交后才出现。
+ * 方向 2：把画布「尚未创建 Gateway 日志」的任务（交通控流排队 + Story LLM 异步窗口）
+ * 合成为一条「排队中（待提交）」日志行，使用户点击生成后 Logs 页能第一时间看到完整过程。
  *
  * 字段与 gateway-web `GatewayLogRow` 子集对齐：可直接并入日志列表渲染。
  * 不冻结任何耗时 ms —— 由前端按 `canvasStartedAt + liveTick` 实时累计「出队前 / 总耗时」，
@@ -9,8 +8,13 @@
  */
 import type { CanvasQueuedTaskRow } from "@/lib/canvas/canvas-queue-without-log";
 import { buildCanvasPendingInputSummary } from "@/lib/canvas/canvas-pending-input-summary";
+import {
+  isCanvasImageTrafficKind,
+  isCanvasLlmEngineKind,
+  readPipelineStage,
+} from "@/lib/canvas/canvas-traffic-kind";
 
-export type CanvasPendingLogStatus = "QUEUED" | "DISPATCHING";
+export type CanvasPendingLogStatus = "QUEUED" | "PREPARING" | "DISPATCHING";
 
 /** 与 gateway-web GatewayLogRow 必填字段对齐 + 排队专用扩展（pending / canvasTaskId）。 */
 export type CanvasPendingLogRow = {
@@ -21,7 +25,7 @@ export type CanvasPendingLogRow = {
   model: string;
   endpoint: string;
   status: CanvasPendingLogStatus;
-  requestKind: "VIDEO";
+  requestKind: "VIDEO" | "IMAGE" | "CHAT";
   providerKind: null;
   credentialKeyMasked: null;
   clientSource: "CANVAS";
@@ -50,17 +54,36 @@ export type CanvasPendingLogRow = {
 export function buildCanvasPendingLogRow(
   task: CanvasQueuedTaskRow,
 ): CanvasPendingLogRow {
-  const status: CanvasPendingLogStatus =
+  const payload = task.inputPayload ?? {};
+  const pipelineStage = readPipelineStage(payload);
+  let status: CanvasPendingLogStatus =
     task.status === "QUEUED" ? "QUEUED" : "DISPATCHING";
+  if (pipelineStage === "PREPARING") {
+    status = "PREPARING";
+  } else if (task.status === "QUEUED") {
+    status = "QUEUED";
+  } else {
+    status = "DISPATCHING";
+  }
+  const requestKind: "VIDEO" | "IMAGE" | "CHAT" = isCanvasLlmEngineKind(payload)
+    ? "CHAT"
+    : isCanvasImageTrafficKind(payload)
+      ? "IMAGE"
+      : "VIDEO";
+  const endpoint = isCanvasLlmEngineKind(payload)
+    ? "/v1/chat/completions"
+    : status === "PREPARING"
+      ? "canvas/grid-split/prepare"
+      : "jobs/createTask";
   const startedAt = task.trafficStartedAt;
   return {
     id: `pending:${task.id}`,
     canvasTaskId: task.id,
     pending: true,
     model: task.model ?? "",
-    endpoint: "jobs/createTask",
+    endpoint,
     status,
-    requestKind: "VIDEO",
+    requestKind,
     providerKind: null,
     credentialKeyMasked: null,
     clientSource: "CANVAS",

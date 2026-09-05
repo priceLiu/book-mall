@@ -59,6 +59,7 @@ const SECTION_LABEL: Record<StoryLlmSection, string> = {
   character: "角色",
   scene: "场景",
   storyboard: "分镜",
+  shot_prompts: "镜头提示词",
 };
 
 function isHubLlmSection(section: HubPreviewSection): section is StoryLlmSection {
@@ -66,7 +67,8 @@ function isHubLlmSection(section: HubPreviewSection): section is StoryLlmSection
     section === "outline" ||
     section === "character" ||
     section === "scene" ||
-    section === "storyboard"
+    section === "storyboard" ||
+    section === "shot_prompts"
   );
 }
 
@@ -187,6 +189,7 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
       character: "角色设定",
       scene: "场景设定",
       storyboard: "分镜脚本",
+      shot_prompts: "镜头提示词",
       dialogue: "对白",
     };
     return `暂无${labels[activeSection]} · 创作剧本后悬停白纸区，点击打开审阅`;

@@ -1,5 +1,6 @@
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import { showCanvasCreditsToast } from "@/components/canvas/canvas-credits-toast-host";
+import { dispatchPlatformCreditsBalanceRefresh } from "./canvas-credits-balance-events";
 import {
   clearCanvasNodeRunSession,
   isCanvasNodeRunSessionActive,
@@ -56,6 +57,8 @@ export function maybeNotifyCanvasCreditsSettled(task: CanvasTaskRecord): void {
   shownTaskIds.add(task.id);
   sessionInflightTaskIds.delete(task.id);
   clearCanvasNodeRunSession(task.nodeId);
+
+  dispatchPlatformCreditsBalanceRefresh();
 
   if (shownTaskIds.size > 400) {
     shownTaskIds.clear();

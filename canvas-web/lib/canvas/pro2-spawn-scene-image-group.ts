@@ -12,12 +12,42 @@ import {
   pro2MediaGroupOrigin,
   relayoutPro2MediaGroup,
 } from "./pro2-media-group-layout";
-import { ensurePro2HubToMediaGroupEdge } from "./pro2-hub-media-group-edge";
+import { ensurePro2HubToMediaGroupChildEdges } from "./pro2-hub-media-group-edge";
+import { optimisticLibtvMediaRunStart } from "./libtv-image-node-run";
+import { useCanvasStore } from "./store";
+import { pro2BatchImageToImageNodePatch } from "./pro2-three-view-engine";
 import { pickRuntimeImagePreviewUrl } from "./task-media-url";
 import { busEnqueueStoryRunsSequential } from "./canvas-run-bus";
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import { GROUP_COLOR_PRESETS } from "./types";
+import { formatSceneRowDockInput } from "./story-column-sync";
+import { buildPro2SceneMediaPrompt } from "./pro2-lazy-media-prompts";
+import { filterPro2RowsForSpawn } from "./pro2-media-row-spawn";
+import { parseVisualStylePackFromOutline } from "./story-pro-visual-style-pack";
+import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
 
+function readHubVisualStylePack(
+  hubNodeId: string,
+  nodes: CanvasFlowNode[],
+): StoryProScriptHubNodeData["visualStylePack"] {
+  const hub = nodes.find((n) => n.id === hubNodeId);
+  const d = (hub?.data ?? {}) as StoryProScriptHubNodeData;
+  if (d.visualStylePack) return d.visualStylePack;
+  if (d.outlineMd?.trim()) {
+    return parseVisualStylePackFromOutline(d.outlineMd) ?? undefined;
+  }
+  return undefined;
+}
+
+function sceneImagePatchForRow(
+  row: StoryProSceneRow,
+  hubNodeId: string,
+  nodes: CanvasFlowNode[],
+): Record<string, unknown> {
+  return buildSceneImageNodeDataPatch(row, {
+    visualStylePack: readHubVisualStylePack(hubNodeId, nodes),
+  });
+}
 function sceneRowPreview(row: StoryProSceneRow): {
   ossUrl?: string;
   uploading?: boolean;
@@ -51,11 +81,20 @@ function sceneRowPreview(row: StoryProSceneRow): {
 /** 同步到组内图片节点：避免 undefined 覆盖已有 ossUrl */
 export function buildSceneImageNodeDataPatch(
   row: StoryProSceneRow,
+  opts?: {
+    visualStylePack?: StoryProScriptHubNodeData["visualStylePack"];
+  },
 ): Record<string, unknown> {
   const preview = sceneRowPreview(row);
+  const dockInput =
+    buildPro2SceneMediaPrompt(row, opts?.visualStylePack) ||
+    formatSceneRowDockInput(row, opts?.visualStylePack) ||
+    row.prompt?.trim() ||
+    row.description?.trim() ||
+    "";
   const patch: Record<string, unknown> = {
     label: row.name?.trim() || "场景",
-    dockInput: row.prompt?.trim() || row.description?.trim() || "",
+    dockInput,
     pro2MediaRole: "scene",
     pro2RowKey: row.key,
     uploading: Boolean(preview.uploading),
@@ -115,10 +154,18 @@ export function findSceneImageNodeForRow(
   controllerId: string,
   row: StoryProSceneRow,
   usedIds: Set<string>,
+  opts?: { groupId?: string },
 ): CanvasFlowNode | undefined {
-  const candidates = nodes.filter(
+  let candidates = nodes.filter(
     (n) => isSceneImageChild(n, controllerId) && !usedIds.has(n.id),
   );
+  if (opts?.groupId) {
+    candidates = candidates.filter(
+      (n) =>
+        n.parentId === opts.groupId ||
+        (n.data as { pro2GroupId?: string }).pro2GroupId === opts.groupId,
+    );
+  }
   const byKey = candidates.find((n) =>
     sceneImageRowKeyMatches(
       (n.data as { pro2RowKey?: string }).pro2RowKey,
@@ -134,10 +181,40 @@ export function findSceneImageNodeForRow(
   );
 }
 
-function groupLabel(hubNodeId: string, nodes: CanvasFlowNode[]): string {
+function sceneEnginePatchFromHub(
+  hubNodeId: string,
+  nodes: CanvasFlowNode[],
+): Record<string, unknown> {
+  const hub = nodes.find((n) => n.id === hubNodeId);
+  const batch = (
+    hub?.data as {
+      sceneBatchImage?: {
+        providerId?: string;
+        modelKey?: string;
+        params?: Record<string, unknown>;
+      };
+    }
+  )?.sceneBatchImage;
+  return pro2BatchImageToImageNodePatch(batch);
+}
+
+function groupLabel(
+  hubNodeId: string,
+  nodes: CanvasFlowNode[],
+  spawnNewGroup?: boolean,
+): string {
   const hubs = nodes.filter((n) => n.type === "story-pro2-script-hub");
   const idx = hubs.findIndex((h) => h.id === hubNodeId);
-  return `场景图 · 脚本 ${idx >= 0 ? idx + 1 : 1}`;
+  const base = `场景图 · 脚本 ${idx >= 0 ? idx + 1 : 1}`;
+  if (!spawnNewGroup) return base;
+  const existing = nodes.filter(
+    (n) =>
+      n.type === "group" &&
+      (n.data as { pro2Kind?: string; pro2HubNodeId?: string }).pro2Kind ===
+        "scene-board" &&
+      (n.data as { pro2HubNodeId?: string }).pro2HubNodeId === hubNodeId,
+  ).length;
+  return existing > 0 ? `${base} (${existing + 1})` : base;
 }
 
 function isSceneImageChild(n: CanvasFlowNode, controllerId: string): boolean {
@@ -285,19 +362,35 @@ export type EnsurePro2SceneImageGroupArgs = {
   setNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void;
   setEdges?: (fn: (edges: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
   edges?: CanvasFlowEdge[];
+  /** 已有场景图组时追加新组（不覆盖旧组） */
+  spawnNewGroup?: boolean;
+  /** 仅 spawn 这些 rowKey 对应节点 */
+  rowKeys?: string[];
 };
+
+function resolveSceneSyncGroupId(
+  nodes: CanvasFlowNode[],
+  hubNodeId: string,
+): string | undefined {
+  const hub = nodes.find((n) => n.id === hubNodeId);
+  const d = hub?.data as { pro2PendingSyncSceneGroupId?: string };
+  return d?.pro2PendingSyncSceneGroupId?.trim() || undefined;
+}
 
 export function ensurePro2SceneImageGroup(
   args: EnsurePro2SceneImageGroupArgs,
 ): string | null {
   const controllerId = pro2SceneImageControllerId(args.hubNodeId);
+  const spawnNew = Boolean(args.spawnNewGroup);
   args.updateNodeData(args.hubNodeId, { sceneRows: args.rows });
 
-  let existingGroup = findSceneBoardGroup(
-    args.nodes,
-    args.hubNodeId,
-    args.legacySceneColumnId,
-  );
+  let existingGroup = spawnNew
+    ? undefined
+    : findSceneBoardGroup(
+        args.nodes,
+        args.hubNodeId,
+        args.legacySceneColumnId,
+      );
 
   if (existingGroup) {
     const gd = existingGroup.data as {
@@ -314,18 +407,29 @@ export function ensurePro2SceneImageGroup(
         pro2Kind: "scene-board",
         pro2HubNodeId: args.hubNodeId,
         pro2ControllerNodeId: controllerId,
-        label: groupLabel(args.hubNodeId, args.nodes),
+        label: groupLabel(args.hubNodeId, args.nodes, spawnNew),
       });
     }
   }
 
-  const sorted = [...args.rows].sort((a, b) => a.name.localeCompare(b.name, "zh"));
+  const sorted = [...filterPro2RowsForSpawn(args.rows, args.rowKeys)].sort(
+    (a, b) => a.name.localeCompare(b.name, "zh"),
+  );
+  const enginePatch = sceneEnginePatchFromHub(args.hubNodeId, args.nodes);
   if (!sorted.length) {
     if (existingGroup?.id && args.setEdges) {
-      ensurePro2HubToMediaGroupEdge(
+      const childIds = args.nodes
+        .filter(
+          (n) =>
+            isSceneImageChild(n, controllerId) &&
+            n.parentId === existingGroup!.id,
+        )
+        .map((n) => n.id);
+      ensurePro2HubToMediaGroupChildEdges(
         args.setEdges,
         args.hubNodeId,
         existingGroup.id,
+        childIds,
       );
     }
     if (args.starterNodeId && args.setEdges) {
@@ -345,19 +449,38 @@ export function ensurePro2SceneImageGroup(
   const origin = pro2MediaGroupOrigin(args.nodes, args.hubNodeId);
   let groupId = existingGroup?.id;
 
-  const childNodes = args.nodes.filter((n) => {
-    if (!isSceneImageChild(n, controllerId)) return false;
-    if (
-      args.legacySceneColumnId &&
-      (n.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId ===
-        args.legacySceneColumnId
-    ) {
-      return true;
+  if (spawnNew && !groupId) {
+    const shellId = args.addNode("group", origin, {
+      __t: "group",
+      label: groupLabel(args.hubNodeId, args.nodes, true),
+      color: GROUP_COLOR_PRESETS[3],
+      pro2Kind: "scene-board",
+      pro2HubNodeId: args.hubNodeId,
+      pro2ControllerNodeId: controllerId,
+    });
+    if (shellId) {
+      groupId = shellId;
+      args.updateNodeData(args.hubNodeId, {
+        pro2PendingSyncSceneGroupId: groupId,
+      });
     }
-    return (
-      (n.data as { pro2HubNodeId?: string }).pro2HubNodeId === args.hubNodeId
-    );
-  });
+  }
+
+  const childNodes = spawnNew
+    ? []
+    : args.nodes.filter((n) => {
+        if (!isSceneImageChild(n, controllerId)) return false;
+        if (
+          args.legacySceneColumnId &&
+          (n.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId ===
+            args.legacySceneColumnId
+        ) {
+          return true;
+        }
+        return (
+          (n.data as { pro2HubNodeId?: string }).pro2HubNodeId === args.hubNodeId
+        );
+      });
 
   const newChildIds: string[] = [];
   const usedChildIds = new Set<string>();
@@ -367,17 +490,20 @@ export function ensurePro2SceneImageGroup(
   for (let i = 0; i < sorted.length; i++) {
     const row = sorted[i]!;
     const label = row.name?.trim() || `场景 ${i + 1}`;
-    const existing = findSceneImageNodeForRow(
-      childNodes,
-      controllerId,
-      row,
-      usedChildIds,
-    );
+    const existing = spawnNew
+      ? undefined
+      : findSceneImageNodeForRow(
+          childNodes,
+          controllerId,
+          row,
+          usedChildIds,
+        );
 
     if (existing) {
       usedChildIds.add(existing.id);
       args.updateNodeData(existing.id, {
-        ...buildSceneImageNodeDataPatch(row),
+        ...sceneImagePatchForRow(row, args.hubNodeId, args.nodes),
+        ...enginePatch,
         pro2HubNodeId: args.hubNodeId,
         pro2ControllerNodeId: controllerId,
         pro2GroupId: groupId,
@@ -389,9 +515,11 @@ export function ensurePro2SceneImageGroup(
     const rel = pro2MediaGridLayout(i, cellSize, cols);
     const data = {
       ...buildPro2ImageNodeData({ label }),
-      ...buildSceneImageNodeDataPatch(row),
+      ...sceneImagePatchForRow(row, args.hubNodeId, args.nodes),
+      ...enginePatch,
       pro2HubNodeId: args.hubNodeId,
       pro2ControllerNodeId: controllerId,
+      pro2GroupId: groupId,
     };
 
     if (groupId) {
@@ -404,12 +532,20 @@ export function ensurePro2SceneImageGroup(
     }
   }
 
-  if (!newChildIds.length) return groupId ?? null;
+  if (!newChildIds.length) {
+    if (spawnNew && groupId) {
+      args.setNodes((prev) => prev.filter((n) => n.id !== groupId));
+      args.updateNodeData(args.hubNodeId, {
+        pro2PendingSyncSceneGroupId: undefined,
+      });
+    }
+    return spawnNew ? null : groupId ?? null;
+  }
 
   if (!groupId) {
     groupId =
       args.createGroupContaining(newChildIds, {
-        label: groupLabel(args.hubNodeId, args.nodes),
+        label: groupLabel(args.hubNodeId, args.nodes, spawnNew),
         color: GROUP_COLOR_PRESETS[3],
       }) ?? undefined;
     if (groupId) {
@@ -420,9 +556,22 @@ export function ensurePro2SceneImageGroup(
         pro2Kind: "scene-board",
         pro2HubNodeId: args.hubNodeId,
         pro2ControllerNodeId: controllerId,
-        label: groupLabel(args.hubNodeId, args.nodes),
+        label: groupLabel(args.hubNodeId, args.nodes, spawnNew),
       });
     }
+  } else if (spawnNew) {
+    args.updateNodeData(groupId, {
+      pro2Kind: "scene-board",
+      pro2HubNodeId: args.hubNodeId,
+      pro2ControllerNodeId: controllerId,
+      label: groupLabel(args.hubNodeId, args.nodes, spawnNew),
+    });
+  }
+
+  if (spawnNew && groupId) {
+    args.updateNodeData(args.hubNodeId, {
+      pro2PendingSyncSceneGroupId: groupId,
+    });
   }
 
   args.setNodes((prev) =>
@@ -446,7 +595,12 @@ export function ensurePro2SceneImageGroup(
   if (groupId) {
     relayoutPro2MediaGroup(args.setNodes, groupId, { resetOrigin: true });
     if (args.setEdges) {
-      ensurePro2HubToMediaGroupEdge(args.setEdges, args.hubNodeId, groupId);
+      ensurePro2HubToMediaGroupChildEdges(
+        args.setEdges,
+        args.hubNodeId,
+        groupId,
+        newChildIds,
+      );
     }
   }
 
@@ -471,9 +625,17 @@ export function syncPro2SceneImagesFromRows(
   rows: StoryProSceneRow[],
   updateNodeData: (id: string, patch: Record<string, unknown>) => void,
 ): void {
+  const enginePatch = sceneEnginePatchFromHub(controllerId, nodes);
+  const syncGroupId = resolveSceneSyncGroupId(nodes, controllerId);
   const usedIds = new Set<string>();
   for (const row of rows) {
-    const img = findSceneImageNodeForRow(nodes, controllerId, row, usedIds);
+    const img = findSceneImageNodeForRow(
+      nodes,
+      controllerId,
+      row,
+      usedIds,
+      syncGroupId ? { groupId: syncGroupId } : undefined,
+    );
     if (!img) continue;
     usedIds.add(img.id);
     const d = img.data as {
@@ -487,12 +649,15 @@ export function syncPro2SceneImagesFromRows(
     if (nodeInflight) {
       updateNodeData(img.id, {
         label: row.name?.trim() || "场景",
-        dockInput: row.prompt?.trim() || row.description?.trim() || "",
+        dockInput: sceneImagePatchForRow(row, controllerId, nodes).dockInput as string,
         pro2RowKey: row.key,
       });
       continue;
     }
-    updateNodeData(img.id, buildSceneImageNodeDataPatch(row));
+    updateNodeData(img.id, {
+      ...sceneImagePatchForRow(row, controllerId, nodes),
+      ...enginePatch,
+    });
   }
 }
 
@@ -502,10 +667,14 @@ export function batchRunPro2SceneImageNodes(
   hubNodeId: string,
   rows: StoryProSceneRow[],
   rowKeys: string[],
-  options?: { forceFresh?: boolean },
+  options?: { forceFresh?: boolean; groupId?: string },
 ): void {
   const allowed = new Set(rowKeys.filter(Boolean));
   if (!allowed.size) return;
+  const syncGroupId =
+    options?.groupId?.trim() ||
+    resolveSceneSyncGroupId(nodes, hubNodeId) ||
+    undefined;
   const usedIds = new Set<string>();
   const nodeIds: string[] = [];
   for (const row of rows) {
@@ -515,12 +684,17 @@ export function batchRunPro2SceneImageNodes(
       pro2SceneImageControllerId(hubNodeId),
       row,
       usedIds,
+      syncGroupId ? { groupId: syncGroupId } : undefined,
     );
     if (!img) continue;
     usedIds.add(img.id);
     nodeIds.push(img.id);
   }
   if (!nodeIds.length) return;
+  const { updateNodeData, setNodeRuntime } = useCanvasStore.getState();
+  for (const nodeId of nodeIds) {
+    optimisticLibtvMediaRunStart(nodeId, updateNodeData, setNodeRuntime);
+  }
   busEnqueueStoryRunsSequential(
     nodeIds.map((nodeId) => ({
       nodeId,
@@ -529,6 +703,8 @@ export function batchRunPro2SceneImageNodes(
     options,
   );
 }
+
+export { maybeClearHubPendingSceneSyncGroup } from "./pro2-group-row-resolve";
 
 /** hydrate / 打开画布：去掉多余「场景设计」列，场景行挂到脚本 hub */
 export function migratePro2SceneColumnOffCanvas(

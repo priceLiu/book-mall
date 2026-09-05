@@ -22,6 +22,13 @@ enum UserRole {
   SUPER_ADMIN // 超级管理员：全部权限 + 终审
 }
 
+/// Gateway 新生成请求 10s 窗口 burst 档位（个人/团队 scope 分别配置）
+enum GenerationSubmitTier {
+  STANDARD // 普通：10 次 / 10s
+  ELEVATED // 中度：15 次 / 10s
+  HEAVY // 重度：burst 可配（默认 25）
+}
+
 // —— NextAuth 适配模型 ——
 model Account {
   id                String  @id @default(cuid())
@@ -82,6 +89,8 @@ model User {
   walletRefundRequests             WalletRefundRequest[]
   subscriptionRefundRequests       SubscriptionRefundRequest[]
   ssoAuthorizationCodes            SsoAuthorizationCode[]
+  clientDevices                    ClientDevice[]
+  userDeviceSessionVersions        UserDeviceSessionVersion[]
   toolUsageEvents                  ToolUsageEvent[]
   aiFitCustomModels                AiFitCustomModel[]
   aiFitGarmentUploads              AiFitGarmentUpload[]
@@ -99,6 +108,8 @@ model User {
   storyProjects                    StoryProject[]
   canvasProjects                   CanvasProject[]
   canvasProjectHistories           CanvasProjectHistory[]
+  canvasPortalSubmissions          CanvasPortalSubmission[]
+  canvasPortalSubmissionsReviewed  CanvasPortalSubmission[] @relation("CanvasPortalSubmissionReviewer")
   canvasTemplates                  CanvasTemplate[]
   canvasCharacters                 CanvasCharacter[]
   storyProCharacterAssets          StoryProCharacterAsset[]
@@ -112,10 +123,28 @@ model User {
   toolServicePeriods               UserToolServicePeriod[]
   ecomAssets                       EcomAsset[]
   ecomStoryboardProjects           EcomStoryboardProject[]
+  ecomProductDesignProjects        EcomProductDesignProject[]
+  ecomSeedVideoProjects            EcomSeedVideoProject[]
+  ecomHandCraftProjects            EcomHandCraftProject[]
+  ecomModelShotProjects            EcomModelShotProject[]
+  ecomMediaDecomposeProjects       EcomMediaDecomposeProject[]
+  ecomVideoWorkflowProjects        EcomVideoWorkflowProject[]
+  ecomFilmPullProjects             EcomFilmPullProject[]
   mediaRenderJobs                  MediaRenderJob[]
   mediaStorageGrants               UserMediaStorageGrant[]
   qrTemplates                      QrTemplate[]
   qrKindFeaturedUpdates            QrKindFeatured[] @relation("QrKindFeaturedUpdater")
+  aiSpacePins                      AiSpacePin[]
+  aiSpacePage                      AiSpacePage?
+  aiSpaceFavorites                 AiSpaceFavorite[]
+  aiSpaceDigitalHumans             AiSpaceDigitalHuman[]
+  aiSpaceAudioAssets               AiSpaceAudioAsset[]
+  aiSpaceVideoMaterials            AiSpaceVideoMaterial[]
+  aiSpaceComposeTasks              AiSpaceComposeTask[]
+  aiSpaceBroadcastProjects         AiSpaceBroadcastProject[]
+  platformAssistantFeedbacks       PlatformAssistantFeedback[]
+  staticSnapshotGenerationRuns     StaticSnapshotGenerationRun[]
+  siteTrafficIpDaily               SiteTrafficIpDaily[]
 
   /// 多租户：主空间（个人租户）。回填脚本为每个用户建 PERSONAL 租户后写入。
   primaryTenantId      String?
@@ -126,10 +155,10 @@ model User {
   /// 单会话挤下线：每次成功登录自增；JWT 内 ver 与此不一致即失效（里程碑 7 启用）
   sessionVersion Int @default(0)
 
-  /// 电商工具箱计费：默认 BYOK 月费；PLATFORM_METERED 为代付按次扣点（由 billingPersona 推导，用户不可改）
-  ecomBillingMode EcomBillingMode @default(BYOK_SERVICE_FEE)
+  /// 电商工具箱计费：统一平台代付按量（由 billingPersona 推导，用户不可改）
+  ecomBillingMode EcomBillingMode @default(PLATFORM_METERED)
 
-  /// 计费身份：注册时选定，互斥（平台代付 vs 自带 Key）
+  /// 计费身份：注册时锁定为平台代付
   billingPersona         BillingPersona  @default(PLATFORM_CREDIT)
   billingPersonaLockedAt DateTime?
 
@@ -150,6 +179,16 @@ model User {
   referralProfile  ReferralProfile? @relation("ReferralProfileOwner")
   /// 分享返佣：作为分享人的历史返佣单
   referralPayouts  ReferralPayout[] @relation("ReferralPayoutOwner")
+  /// 分享规则 2.0
+  shareRewardAsInvitee   ShareRewardAttribution? @relation("ShareRewardInvitee")
+  shareRewardsAsReferrer ShareRewardAttribution[] @relation("ShareRewardReferrer")
+  shareRewardProgress    ShareRewardProgress?    @relation("ShareRewardProgressInvitee")
+  workflowShareLinks     WorkflowShareLink[]     @relation("WorkflowShareLinkOwner")
+  workflowShareClaims    WorkflowShareClaim[]    @relation("WorkflowShareClaimer")
+
+  /// 个人空间 Gateway 提交 burst 档位（团队项目走 Tenant）
+  generationSubmitTier          GenerationSubmitTier?
+  generationSubmitBurstOverride Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -220,6 +259,114 @@ model ReferralPayout {
   @@unique([referrerUserId, periodKey])
   @@index([periodKey])
   @@index([status])
+}
+
+/// 分享规则 2.0 · 归因渠道
+enum ShareRewardChannel {
+  REFERRAL
+  WORKFLOW
+}
+
+/// 分享规则 2.0 · 工作流分享所属应用
+enum WorkflowShareApp {
+  CANVAS
+  ECOM
+  QUICK_REPLICA
+}
+
+/// 分享规则 2.0 · 被邀请人归因（先到先得，终身一条）
+model ShareRewardAttribution {
+  id              String              @id @default(cuid())
+  inviteeUserId   String              @unique
+  invitee         User                @relation("ShareRewardInvitee", fields: [inviteeUserId], references: [id], onDelete: Cascade)
+  channel         ShareRewardChannel
+  referrerUserId  String
+  referrer        User                @relation("ShareRewardReferrer", fields: [referrerUserId], references: [id], onDelete: Cascade)
+  referralCode    String?
+  workflowClaimId String?             @unique
+  workflowClaim   WorkflowShareClaim? @relation(fields: [workflowClaimId], references: [id], onDelete: SetNull)
+  lockedAt        DateTime            @default(now())
+
+  @@index([referrerUserId])
+  @@index([channel])
+}
+
+/// 分享规则 2.0 · 被邀请人进度（首笔生成 / 首笔付费）
+model ShareRewardProgress {
+  inviteeUserId   String    @id
+  invitee         User      @relation("ShareRewardProgressInvitee", fields: [inviteeUserId], references: [id], onDelete: Cascade)
+  firstBillableAt DateTime?
+  firstPaidAt     DateTime?
+  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime  @default(now())
+}
+
+/// 分享规则 2.0 · 已发放奖励（幂等）
+model ShareRewardGrant {
+  id             String             @id @default(cuid())
+  inviteeUserId  String
+  referrerUserId String
+  channel        ShareRewardChannel
+  credits        Int
+  idempotencyKey String             @unique
+  grantedAt      DateTime           @default(now())
+
+  @@index([referrerUserId, grantedAt])
+  @@index([inviteeUserId])
+}
+
+/// 分享规则 2.0 · 工作流分享链接
+/// 分享码 3.0 · 前缀注册表（仅管理员可见映射）
+model ShareCodePrefix {
+  id        String              @id @default(cuid())
+  prefix    String              @unique
+  kind      ShareRewardChannel
+  app       WorkflowShareApp?
+  enabled   Boolean             @default(true)
+  note      String              @default("")
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@index([kind, enabled])
+}
+
+model WorkflowShareLink {
+  id           String               @id @default(cuid())
+  token        String               @unique
+  /// 分享码 3.0 · 10 位短码（4 前缀 + 6 随机）
+  shortCode    String?              @unique
+  app          WorkflowShareApp
+  resourceType String
+  resourceId   String
+  sharerUserId String
+  sharer       User                 @relation("WorkflowShareLinkOwner", fields: [sharerUserId], references: [id], onDelete: Cascade)
+  title        String?
+  enabled      Boolean              @default(true)
+  expiresAt    DateTime?
+  maxClaims    Int?
+  claimCount   Int                  @default(0)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  claims       WorkflowShareClaim[]
+
+  @@index([sharerUserId])
+  @@index([app, resourceId])
+}
+
+/// 分享规则 2.0 · 工作流 claim 记录
+model WorkflowShareClaim {
+  id               String                  @id @default(cuid())
+  shareLinkId      String
+  shareLink        WorkflowShareLink       @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+  claimerUserId    String
+  claimer          User                    @relation("WorkflowShareClaimer", fields: [claimerUserId], references: [id], onDelete: Cascade)
+  clonedResourceId String
+  claimedAt        DateTime                @default(now())
+  rewardGrantedAt  DateTime?
+  attribution      ShareRewardAttribution?
+
+  @@unique([shareLinkId, claimerUserId])
+  @@index([claimerUserId])
 }
 
 /// 按用户 + 模型 + 账期累计用量（用于云厂商阶梯价，如 aitryon-refiner 按生成张数分档）。
@@ -544,6 +691,217 @@ model EcomStoryboardProject {
   @@index([tenantId, visibility, updatedAt])
 }
 
+/// 电商工具箱 · 图片生种草视频项目（Skill 策划 + 成片）
+model EcomSeedVideoProject {
+  id           String  @id @default(cuid())
+  userId       String
+  title        String?
+  module       String  @default("seed-video")
+  status       String  @default("draft")
+  brief        Json?
+  settings     Json?
+  references   Json?
+  chatHistory  Json?
+  plan         Json?
+  videoAssetId String?
+  meta         Json?
+
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
+}
+
+/// 电商工具箱 · 电商产品创作项目（主图 + 详情页 9 步流水线）
+model EcomProductDesignProject {
+  id          String  @id @default(cuid())
+  userId      String
+  title       String?
+  module      String  @default("product-creation")
+  status      String  @default("draft")
+  platform    String?
+  brief       Json?
+  settings    Json?
+  references  Json?
+  chatHistory Json?
+  design      Json?
+  meta        Json?
+
+  /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
+}
+
+/// 电商工具箱 · 手伴创作项目（线稿 → 潮玩盲盒 IP 全案 10 步）
+model EcomHandCraftProject {
+  id          String  @id @default(cuid())
+  userId      String
+  title       String?
+  module      String  @default("hand-craft")
+  status      String  @default("draft")
+  brief       Json?
+  settings    Json?
+  references  Json?
+  chatHistory Json?
+  /// 10 步产出：每步槽位 Prompt / 成图 URL / 拼版 PNG，结构见 lib/ecom/ecom-hand-craft-types.ts
+  plan        Json?
+  meta        Json?
+
+  /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
+}
+
+/// 电商工具箱 · 服装模特图项目（多姿势编排 + 上身展示）
+model EcomModelShotProject {
+  id          String  @id @default(cuid())
+  userId      String
+  title       String?
+  module      String  @default("model-shot")
+  status      String  @default("draft")
+  brief       Json?
+  settings    Json?
+  references  Json?
+  chatHistory Json?
+  plan        Json?
+  meta        Json?
+
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
+}
+
+/// 电商工具箱 · 拆图拆视频（图片/视频反推拆解）
+model EcomMediaDecomposeProject {
+  id          String  @id @default(cuid())
+  userId      String
+  title       String?
+  module      String  @default("media-decompose")
+  status      String  @default("draft")
+  settings    Json?
+  /// 单条素材 { id, kind, ossUrl, source, sourceUrl?, label? }
+  references  Json?
+  /// { rawText, structured?, parseError?, completedAt? }
+  result      Json?
+  meta        Json?
+
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
+}
+
+/// 电商工具箱 · 短视频工作流（穿搭视频等模板化动作迁移）
+model EcomVideoWorkflowProject {
+  id          String  @id @default(cuid())
+  userId      String
+  title       String?
+  module      String  @default("video-outfit")
+  templateId  String  @default("outfit-v1")
+  status      String  @default("draft")
+  phase       String  @default("upload")
+  settings    Json?
+  /// 参考视频 + 模特 + 服装 { referenceVideo?, model?, clothing? }
+  references  Json?
+  /// 最新 envelope 快照 { [action]: WorkflowEnvelope }
+  structured  Json?
+  /// normalize 后分镜 UI 真源 SceneShot[]
+  sceneList   Json?
+  composeResult Json?
+  meta        Json?
+
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, updatedAt])
+  @@index([userId, templateId, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
+}
+
+/// 电商工具箱 · 专业拉片（工业化逐镜 + 换角成片）
+model EcomFilmPullProject {
+  id            String  @id @default(cuid())
+  userId        String
+  title         String?
+  module        String  @default("film-pull")
+  status        String  @default("draft")
+  settings      Json?
+  /// 源视频 { id, ossUrl, durationSec?, width?, height?, fps?, source, label? }
+  references    Json?
+  /// { rawText?, structured?, parseError?, completedAt? }
+  analyzeResult Json?
+  /// { rawText?, structured?, parseError?, completedAt? }
+  renderScript  Json?
+  /// [{ id, ossUrl, label? }]
+  characterRefs Json?
+  /// { shots: FilmPullRenderShot[] }
+  renderPlan    Json?
+  /// { shots: [{ shotNo, modelRefIds, productRefIds }] }
+  refMatch      Json?
+  /// { globalConfig?, shots: FilmPullProductionShot[], render? }
+  productionPlan Json?
+  chatHistory   Json?
+  meta          Json?
+
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
+}
+
 enum MediaRenderJobStatus {
   PENDING
   RUNNING
@@ -640,6 +998,19 @@ model PlatformConfig {
   walletHoldDefaultTtlMin    Int      @default(10)
   /// 生成耗时预警（秒）：Gateway 轮询池 / poll 升格；默认 800
   generationSlowWarnSec      Int      @default(800)
+
+  // —— 日志与保险丝（管理后台 /admin/settings 可调；0 = 关闭）——
+  /// 单模型当日（CST）Gateway 调用上限；0 = 关闭保险丝
+  gatewayModelDailyLimit        Int @default(300)
+  /// 按模型覆盖上限 JSON，如 {"deepseek-v4-flash":1000,"kling-x":0}（0=该模型不限）
+  gatewayModelDailyLimitOverrides Json?
+  /// 业务层直连厂商硬阻断 host 列表（["api.deepseek.com"]）；空 = 仅审计 WARN
+  vendorDirectBlockHosts      Json?
+  /// 常驻用量对账扫描开关
+  usageReconResidentEnabled   Boolean @default(true)
+  /// 常驻用量对账扫描间隔（分钟），默认 30
+  usageReconIntervalMin       Int     @default(30)
+
   updatedAt                  DateTime @updatedAt
 }
 
@@ -726,12 +1097,24 @@ model BillingReconciliationRun {
   csvFilename      String
   /// CSV 内涉及的账单月份（多月情形以逗号分隔）
   monthsCovered    String
+  /// 对账日历区间起（含）
+  periodFrom       DateTime? @db.Date
+  /// 对账日历区间止（含）
+  periodTo         DateTime? @db.Date
+  /// joinKey 末段：YYYYMMDD_YYYYMMDD
+  periodKey        String?
   /// 触发此批次的管理员 User.id
   importedByUserId String
   /// 自动统计摘要（JSON）：内/外行数、内/外总金额、差额、verdict、unbound 账号列表等
   summary          Json
   /// 状态：READY（已生成报告）、CLAWED_BACK（已补扣过任意行）、ARCHIVED（管理员归档）
   status           String   @default("READY")
+  /// v2：厂商 aliyun / kie / …
+  vendor           String?  @default("aliyun")
+  /// v2：list=挂牌价 payable=应付
+  priceMode        String?  @default("list")
+  /// v2：v1 旧引擎 / v2 Gateway 对账
+  engineVersion    String?  @default("v2")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -761,6 +1144,27 @@ model BillingReconciliationLine {
   /// BOTH / INTERNAL_ONLY / CLOUD_ONLY / UNBOUND
   matchKind        String
 
+  /// v2 对账扩展
+  vendor              String?
+  tierRaw             String?
+  unitKind            String?
+  tokenDirection      String?
+  vendorUnits         Decimal? @db.Decimal(18, 6)
+  platformUnits       Decimal? @db.Decimal(18, 6)
+  usageDiff           Decimal? @db.Decimal(18, 6)
+  listUnitYuan        Decimal? @db.Decimal(18, 8)
+  vendorListYuan      Decimal? @db.Decimal(18, 4)
+  platformListYuan    Decimal? @db.Decimal(18, 4)
+  amountDiffYuan      Decimal? @db.Decimal(18, 4)
+  platformCredits     Int?
+  platformRevenueYuan Decimal? @db.Decimal(18, 4)
+  reconStatus         String?
+  issueReason         String?
+  sampleLogIds        Json?
+  /// v2：对账 joinKey 与账单月份（总表 upsert 用）
+  joinKey             String?
+  periodMonth         String?
+
   /// 已补扣的金额（点）；null 表示未补扣
   clawbackPoints  Int?
   /// 补扣对应的 WalletEntry.id；用于审计
@@ -771,6 +1175,57 @@ model BillingReconciliationLine {
 
   @@index([runId, userId])
   @@index([runId, matchKind])
+}
+
+/// 对账总表：跨厂商、跨批次 upsert 的持久明细（joinKey 唯一）。
+/// 每次导入厂商 CSV 成功后，按 joinKey 合并更新对应行。
+model BillingReconciliationMasterLine {
+  id                 String   @id @default(cuid())
+  /// vendor|modelKey|tier|unitKind|tokenDirection|month
+  joinKey            String   @unique
+  periodMonth        String
+  /// 对账日历区间起（含）YYYY-MM-DD
+  periodFrom         DateTime? @db.Date
+  /// 对账日历区间止（含）
+  periodTo           DateTime? @db.Date
+  /// YYYYMMDD_YYYYMMDD，与 joinKey 末段一致
+  periodKey          String?
+  /// 账单 CSV 来源厂商（aliyun / kie / …）
+  importVendor       String
+  /// ModelCatalog.vendor 展示名（如 阿里云）
+  vendorDisplayName  String?
+  modelKey           String
+  modelDisplayName   String?
+  tierRaw            String?
+  unitKind           String
+  tokenDirection     String   @default("none")
+  userId             String?
+  cloudAccountId     String?
+  vendorUnits        Decimal? @db.Decimal(18, 6)
+  platformUnits      Decimal? @db.Decimal(18, 6)
+  usageDiff          Decimal? @db.Decimal(18, 6)
+  listUnitYuan       Decimal? @db.Decimal(18, 8)
+  vendorListYuan     Decimal? @db.Decimal(18, 4)
+  platformListYuan   Decimal? @db.Decimal(18, 4)
+  amountDiffYuan     Decimal? @db.Decimal(18, 4)
+  platformCredits    Int?
+  platformRevenueYuan Decimal? @db.Decimal(18, 4)
+  /// Gateway 用量 × 净成本单价（costSnapshot / ModelCostProfile.netCost）
+  platformNetCostYuan Decimal? @db.Decimal(18, 4)
+  reconStatus        String?
+  issueReason        String?
+  sampleLogIds       Json?
+  sourceRunId        String
+  sourceImportedAt   DateTime
+  updatedAt          DateTime @updatedAt
+  createdAt          DateTime @default(now())
+
+  @@index([periodMonth])
+  @@index([periodKey])
+  @@index([importVendor, periodMonth])
+  @@index([importVendor, periodKey])
+  @@index([reconStatus])
+  @@index([modelKey])
 }
 
 /// 版本间 diff（历史审计）。
@@ -904,6 +1359,8 @@ model ModelCatalog {
   mediaKind         ModelMediaKind?
   appTags           String[]           @default([])
   gatewayPublished  Boolean            @default(false)
+  /// 用户选模时展示的「来源」标签（如 第三方 / 平台 / Grok），与 vendor/providerKind 解耦
+  sourceLabel       String?
 
   /// v006（2026-05-17）：云厂商账单 5 列的"本 catalog 主映射"——配合费用明细展示。
   /// 一个 canonical 配 1 个 primary vendor 映射；未来若同 canonical 跨多家云需要并存，
@@ -1047,6 +1504,7 @@ enum PaymentProductKind {
 
 enum PaymentChannel {
   WECHAT_PERSONAL
+  WECHAT_ENTERPRISE
   MOCK
 }
 
@@ -1397,6 +1855,52 @@ model SsoAuthorizationCode {
 
   @@index([expiresAt])
   @@index([clientId])
+}
+
+/// 客户端设备类型（单会话挤下线按类型维度）
+enum ClientDeviceType {
+  WEB
+  EXTENSION
+  DESKTOP
+}
+
+/// 客户端长效凭证设备（扩展 / 桌面 / 网页客户端）
+model ClientDevice {
+  id               String           @id @default(cuid())
+  userId           String
+  deviceType       ClientDeviceType
+  deviceName       String?
+  refreshTokenHash String           @unique
+  expiresAt        DateTime
+  lastSeenAt       DateTime         @default(now())
+  revokedAt        DateTime?
+  /// 该设备签发 JWT 时的 sessionVersion（同类型再登录时旧设备失效）
+  sessionVersion   Int              @default(0)
+  userAgent        String?          @db.Text
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, deviceType])
+  @@index([expiresAt])
+}
+
+/// 按设备类型的会话版本（同类型挤下线，跨类型互不影响）
+model UserDeviceSessionVersion {
+  id             String           @id @default(cuid())
+  userId         String
+  deviceType     ClientDeviceType
+  sessionVersion Int              @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, deviceType])
+  @@index([userId])
 }
 
 /// Phase F：第三方 Platform SSO 客户端注册
@@ -1780,6 +2284,15 @@ model CanvasProject {
   /// 首页卡片副文案（空则用 description）
   portalFeaturedBlurb String  @default("") @db.Text
 
+  /// 门户首页案例墙（TV Show 式展示，与精选/社区模板并列）
+  portalCase      Boolean @default(false)
+  portalCaseSort  Int     @default(0)
+  portalCaseBlurb String  @default("") @db.Text
+
+  /// 门户首页影视案例（分镜视频 1.0 · 团队客户案例媒体墙）
+  portalFilmCase      Boolean @default(false)
+  portalFilmCaseSort  Int     @default(0)
+
   deletedAt DateTime?
 
   /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
@@ -1790,6 +2303,7 @@ model CanvasProject {
   tasks        CanvasGenerationTask[]
   cleanupItems CanvasOssCleanupQueue[]
   histories    CanvasProjectHistory[]
+  portalSubmissions CanvasPortalSubmission[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1797,6 +2311,46 @@ model CanvasProject {
   @@index([userId, deletedAt, updatedAt])
   @@index([tenantId, visibility, updatedAt])
   @@index([portalFeatured, portalFeaturedSort])
+  @@index([portalCase, portalCaseSort])
+  @@index([portalFilmCase, portalFilmCaseSort])
+}
+
+/// 用户提交画布 → 管理员审核 → 案例 / 精选 / 模板
+enum CanvasPortalPublishKind {
+  CASE
+  FEATURED
+  TEMPLATE
+  PUBLIC_TEMPLATE
+}
+
+enum CanvasPortalSubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CanvasPortalSubmission {
+  id        String @id @default(cuid())
+  projectId String
+  project   CanvasProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status      CanvasPortalSubmissionStatus @default(PENDING)
+  requestKind CanvasPortalPublishKind
+  userNote    String @default("") @db.Text
+  adminNote   String @default("") @db.Text
+
+  reviewedByUserId String?
+  reviewedBy       User?   @relation("CanvasPortalSubmissionReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  reviewedAt       DateTime?
+  approvedKind     CanvasPortalPublishKind?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([projectId])
 }
 
 /// 画布自动/手动保存历史（每项目最多保留 20 条）
@@ -2098,6 +2652,72 @@ enum CanvasPromptEngineKind {
   IMAGE
 }
 
+/// Pro2 平台提示词模板 · 剧本 LLM 或节点资产 Dock（见 docs/画布管理中心.md）
+enum Pro2PromptTemplateRegistry {
+  SCRIPT
+  ASSET
+}
+
+enum Pro2PromptTemplatePassKind {
+  OUTLINE
+  CHARACTER
+  SCENE
+  STORYBOARD
+  CHARACTER_FOUR_VIEW
+  SCENE_FOUR_PANORAMA
+  PROP_SIX_VIEW
+}
+
+model Pro2PromptTemplate {
+  id          String                     @id @default(cuid())
+  registry    Pro2PromptTemplateRegistry
+  passKind    Pro2PromptTemplatePassKind
+  templateKey String                     @unique
+  name        String
+  description String?                    @db.Text
+  version     String                     @default("1")
+  enabled     Boolean                    @default(true)
+  blocks      Json                       @default("[]")
+  sortOrder   Int                        @default(0)
+  deletedAt   DateTime?
+
+  outlinePacks     Pro2TemplatePack[] @relation("PackOutlineTemplate")
+  characterPacks   Pro2TemplatePack[] @relation("PackCharacterTemplate")
+  scenePacks       Pro2TemplatePack[] @relation("PackSceneTemplate")
+  storyboardPacks  Pro2TemplatePack[] @relation("PackStoryboardTemplate")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([registry, passKind, enabled])
+  @@index([deletedAt])
+}
+
+model Pro2TemplatePack {
+  id                  String  @id @default(cuid())
+  packKey             String  @unique
+  name                String
+  enabled             Boolean @default(true)
+  categoryDocTitle    String? @db.Text
+  categoryDocBody     String? @db.Text
+  outlineTemplateId   String
+  outlineTemplate     Pro2PromptTemplate @relation("PackOutlineTemplate", fields: [outlineTemplateId], references: [id])
+  characterTemplateId String
+  characterTemplate   Pro2PromptTemplate @relation("PackCharacterTemplate", fields: [characterTemplateId], references: [id])
+  sceneTemplateId     String
+  sceneTemplate       Pro2PromptTemplate @relation("PackSceneTemplate", fields: [sceneTemplateId], references: [id])
+  storyboardTemplateId String
+  storyboardTemplate  Pro2PromptTemplate @relation("PackStoryboardTemplate", fields: [storyboardTemplateId], references: [id])
+  sortOrder           Int     @default(0)
+  deletedAt           DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([enabled])
+  @@index([deletedAt])
+}
+
 /// 画布节点级 KIE 任务表（mirror StoryGenerationTask，加 nodeId / inputHash 实现节点缓存）
 model CanvasGenerationTask {
   id        String        @id @default(cuid())
@@ -2180,6 +2800,13 @@ model GenerationTrafficState {
   lastDispatchAt    DateTime?
   maxConcurrency    Int      @default(2)
   tokensPerSec      Float    @default(0.5)
+  /// 提交 burst 限流（与 video dispatch 字段独立）
+  submitBurstLimit    Int?
+  submitTier          GenerationSubmitTier?
+  submitWindowSec     Int       @default(10)
+  submitCount         Int       @default(0)
+  submitWindowStartAt DateTime?
+  quotaConfigVersion  Int       @default(0)
   updatedAt         DateTime @updatedAt
 
   @@index([ownerType, ownerId])
@@ -2503,6 +3130,8 @@ model GatewayRequestLog {
   @@index([status, submittedAt])
   @@index([status, lastPolledAt])
   @@index([clientSource, submittedAt])
+  // 单模型日调用上限（model-daily-limit）：按 model + 当日 submittedAt 计数
+  @@index([model, submittedAt])
   @@index([tenantId, submittedAt])
   @@index([actorBookUserId, submittedAt])
   @@index([channelSnapshot])
@@ -2552,6 +3181,63 @@ model PlatformErrorLog {
   @@index([code])
   @@index([fingerprint, createdAt(sort: Desc)])
   @@index([resolvedAt])
+}
+
+/// 全站访问统计 · 按 CST 日 + appKey 汇总 PV
+model SiteTrafficDaily {
+  id         String @id @default(cuid())
+  dateCst    String
+  appKey     String
+  pageViews  Int    @default(0)
+  /// 扫描/探测路径次数（计入 pageViews，单独标明）
+  probeViews Int    @default(0)
+
+  @@unique([dateCst, appKey])
+  @@index([dateCst])
+}
+
+/// 全站访问统计 · 按 CST 日 + appKey + IP 明细（UV 去重来源）
+model SiteTrafficIpDaily {
+  id            String   @id @default(cuid())
+  dateCst       String
+  appKey        String
+  ip            String   @db.VarChar(45)
+  hitCount      Int      @default(1)
+  /// 扫描/探测路径次数（计入 hitCount，单独标明）
+  probeHitCount Int      @default(0)
+  firstSeenAt   DateTime @default(now())
+  lastSeenAt    DateTime @default(now())
+  userId        String?
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([dateCst, appKey, ip])
+  @@index([dateCst, appKey, hitCount(sort: Desc)])
+}
+
+enum AdminPendingFeatureListKind {
+  /// 待做功能（产品路线图）
+  FEATURE
+  /// 待处理（docs 导入 / 日常 backlog）
+  PENDING
+}
+
+/// 管理后台 · 待开发功能清单（产品路线图）
+model AdminPendingFeature {
+  id          String                      @id @default(cuid())
+  title       String
+  description String                      @default("") @db.Text
+  /// 仓库根目录相对路径，如 docs/一键发布平台.md
+  docPath     String                      @default("")
+  listKind    AdminPendingFeatureListKind @default(PENDING)
+  completed   Boolean                     @default(false)
+  sortOrder   Int                         @default(0)
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
+
+  @@index([completed, sortOrder])
+  @@index([listKind, completed, sortOrder])
+  @@index([sortOrder])
 }
 
 /// Gen-HotCold-R2 Phase 5A：GatewayRequestLog 历史归档（只读冷数据）。
@@ -2643,7 +3329,6 @@ model CreditLedgerArchive {
   refType          String?
   refId            String?
   costSnapshotYuan Decimal?         @db.Decimal(16, 6)
-  pool             CreditPool       @default(GENERAL)
   idempotencyKey   String?          @unique
   description      String?
   staffFlag        Boolean          @default(false)
@@ -2787,10 +3472,17 @@ model PlatformPricingConfig {
   videoMarginM        Decimal  @default("4") @db.Decimal(6, 3) // 视频专项系数 M（4 → 75% 毛利）
   videoMinMarginGuard Decimal  @default("0.75") @db.Decimal(6, 4) // 视频专项毛利护栏 ≥75%
   // 新用户注册赠送积分（分享链接 1.0）：长期有效、不清零；财务可调
-  welcomeGiftGeneralCredits Int  @default(500) // 注册赠送通用积分
-  welcomeGiftVideoCredits   Int  @default(100) // 注册赠送视频专项积分
+  welcomeGiftGeneralCredits Int  @default(600) // 注册赠送积分（单池）
   // 分享返佣默认比例（0~1）：新建分享档案时的初始返佣（建议 0.05 保 20% 毛利）
   referralDefaultRate       Decimal @default("0.05") @db.Decimal(5, 4)
+  /// 分享规则 2.0 · 邀请链路奖励积分（注册+首笔付费）
+  referralRewardCredits           Int @default(20)
+  /// 分享规则 2.0 · 工作流链路奖励积分（首次生成+首笔付费）
+  workflowShareRewardCredits      Int @default(40)
+  /// 分享奖励 FREE 批次有效天数
+  shareRewardCreditsExpireDays    Int @default(90)
+  /// 单分享人每日奖励积分上限（0=不限）
+  shareRewardDailyCapPerReferrer  Int @default(0)
   updatedAt           DateTime @updatedAt
   createdAt           DateTime @default(now())
 }
@@ -2805,6 +3497,10 @@ model ModelCostProfile {
   unit              CreditCostUnit
   tierRaw           String? // 720P / 1080P / 1K 等
   listCostYuan      Decimal        @db.Decimal(16, 8) // 厂商挂牌成本
+  /// LLM 分价：输入侧 元/千 token（= 元/百万 ÷ 1000）
+  inputListCostYuan Decimal?       @db.Decimal(16, 8)
+  /// LLM 分价：输出侧 元/千 token
+  outputListCostYuan Decimal?      @db.Decimal(16, 8)
   discountRate      Decimal        @default("0") @db.Decimal(6, 4) // 渠道折扣 0~1（0.6=六折省）
   netCostYuan       Decimal        @db.Decimal(16, 8) // 派生：listCostYuan × (1 - discountRate)
   effectiveFrom     DateTime       @default(now())
@@ -2830,6 +3526,11 @@ model ModelCreditPrice {
   marginM           Decimal        @db.Decimal(6, 3) // 取价时的系数 M
   listPriceYuan     Decimal        @db.Decimal(16, 6) // 挂牌价 = netCost × M
   creditsPerUnit    Int // 积分/次（或 /秒、/张、/千token）
+  /// LLM 分价：输入/输出 积分/千 token
+  inputCreditsPerKToken  Int?
+  outputCreditsPerKToken Int?
+  inputListPriceYuan     Decimal?   @db.Decimal(16, 8)
+  outputListPriceYuan    Decimal?   @db.Decimal(16, 8)
   baseMarginRate    Decimal        @db.Decimal(6, 4) // 标准锚定下毛利率
   formulaSnapshot   Json // 公式与中间值快照，供后台查阅
   active            Boolean        @default(true)
@@ -2842,6 +3543,13 @@ model ModelCreditPrice {
 enum AppModelOfferingStatus {
   DRAFT
   ACTIVE
+  DEPRECATED
+}
+
+/// 应用/场景级模型上架（模型运营中心 · 应用分发）
+enum AppModelShelfStatus {
+  ACTIVE
+  HIDDEN
   DEPRECATED
 }
 
@@ -2871,6 +3579,26 @@ model GatewayModelRoute {
   @@unique([canonicalModelKey, vendor, modelKey])
   @@index([modelKey, active])
   @@index([canonicalModelKey, active])
+}
+
+/// 应用/场景级模型上架（模型运营中心 · L5 应用分发）
+model AppModelShelf {
+  id                  String              @id @default(cuid())
+  appTag              String
+  /// 空串 = 应用全局；非空如 pro2-video | qr-t2v
+  sceneKey            String              @default("")
+  canonicalModelKey   String
+  status              AppModelShelfStatus @default(ACTIVE)
+  sortOrder           Int                 @default(0)
+  displayNameOverride String?
+  sourceLabelOverride String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([appTag, sceneKey, canonicalModelKey])
+  @@index([appTag, sceneKey, status])
+  @@index([canonicalModelKey])
 }
 
 /// 四媒介槽默认 canonical（应用无用户选模时的 fallback）
@@ -2959,7 +3687,6 @@ model MembershipPlan {
   originalYuan        Decimal?           @db.Decimal(12, 2) // 划线原价
   promoLabel          String? // 限时67折等
   monthlyCredits      Int // 月积分（团队=每席位）
-  videoMonthlyCredits Int                @default(0) // 视频专项池月额度（0 = 不单独分池，复用通用池）
   pricePerCreditYuan  Decimal?           @db.Decimal(12, 6) // 派生快照：priceYuan ÷ monthlyCredits（逐档积分换算单价）
   includedSeats       Int                @default(1) // 套餐含席位数
   active              Boolean            @default(true)
@@ -2980,7 +3707,6 @@ model TeamSeatTier {
   seatMax             Int? // null = 不封顶（10人以上）
   perSeatPriceYuan    Decimal        @db.Decimal(12, 2)
   perSeatCredits      Int
-  perSeatVideoCredits Int            @default(0) // 每席视频专项池额度（0 = 复用通用池）
   sortOrder           Int            @default(0)
 
   @@index([planId, sortOrder])
@@ -2991,12 +3717,9 @@ model CreditAccount {
   id                   String          @id @default(cuid())
   ownerType            CreditOwnerType
   ownerId              String // userId 或 tenantId
-  balanceCredits       Int             @default(0) // 通用池可用余额
+  balanceCredits       Int             @default(0) // 可用余额
   monthlyGrantCredits  Int             @default(0) // 当前套餐月发放额
-  reservedCredits      Int             @default(0) // 通用池冻结中（已 RESERVE 未 SETTLE/RELEASE）
-  videoBalanceCredits  Int             @default(0) // 视频专项池可用余额
-  videoMonthlyGrant    Int             @default(0) // 视频专项池月发放额
-  videoReservedCredits Int             @default(0) // 视频专项池冻结中
+  reservedCredits      Int             @default(0) // 冻结中（已 RESERVE 未 SETTLE/RELEASE）
   pricePerCreditYuan   Decimal?        @db.Decimal(12, 6) // 该账户档位「每积分单价」快照（逐档积分换算）
   perSeatCapCredits    Int? // 子账号人均上限（可选）
   planId               String?
@@ -3024,7 +3747,6 @@ model CreditLedger {
   refType          String? // gateway_log / plan_grant / topup_order ...
   refId            String?
   costSnapshotYuan Decimal?         @db.Decimal(16, 6)
-  pool             CreditPool       @default(GENERAL) // 通用池 / 视频专项池
   idempotencyKey   String?          @unique
   description      String?
   staffFlag        Boolean          @default(false)
@@ -3032,12 +3754,6 @@ model CreditLedger {
   createdAt        DateTime         @default(now())
 
   @@index([accountId, createdAt])
-  @@index([staffFlag, createdAt])
-}
-
-enum CreditPool {
-  GENERAL // 通用积分池（文本/图像/其它）
-  VIDEO // 视频专项池
 }
 
 /// 积分批次来源（决定到期口径）
@@ -3048,14 +3764,13 @@ enum CreditSource {
 }
 
 /// 积分批次：账户余额的「按来源分别到期」覆盖层。
-/// 账户 CreditAccount.balanceCredits/videoBalanceCredits 仍为快路径真相，
+/// 账户 CreditAccount.balanceCredits 仍为快路径真相，
 /// 批次用于扣费优先级（先到期先扣）与到期清扫。
-/// 不变量：sum(active lot.remainingCredits, pool) == 账户该池余额。
+/// 不变量：sum(active lot.remainingCredits) == 余额 + 冻结。
 model CreditLot {
   id               String       @id @default(cuid())
   accountId        String
   account          CreditAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  pool             CreditPool   @default(GENERAL)
   source           CreditSource
   originalCredits  Int
   remainingCredits Int
@@ -3069,8 +3784,93 @@ model CreditLot {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  @@index([accountId, pool, expiresAt])
+  @@index([accountId, expiresAt])
   @@index([expiresAt])
+}
+
+// ——————————————————— 积分清零运维台（Credit Expiry Ops） ———————————————————
+
+enum CreditOpsJobType {
+  DAILY_EXPIRE_SWEEP
+  DAILY_SUBSCRIPTION_RESET
+  MANUAL_BACKFILL
+}
+
+enum CreditOpsJobTrigger {
+  CRON
+  ADMIN
+  SCRIPT
+}
+
+enum CreditOpsJobStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+enum CreditOpsWorkType {
+  BATCH_EXPIRE
+  SUBSCRIPTION_RESET
+}
+
+enum CreditOpsWorkStatus {
+  PENDING
+  OVERDUE
+  RUNNING
+  DONE
+  SKIPPED
+  FAILED
+}
+
+/// 积分清零批量执行记录（Cron / 手动补跑）
+model CreditOpsJobRun {
+  id             String              @id @default(cuid())
+  jobType        CreditOpsJobType
+  /// 业务日 YYYY-MM-DD（Asia/Shanghai）
+  scheduledDate  String
+  trigger        CreditOpsJobTrigger
+  triggeredByUserId String?
+  status         CreditOpsJobStatus  @default(RUNNING)
+  statsJson      Json?
+  errorSummary   String?
+  startedAt      DateTime            @default(now())
+  finishedAt     DateTime?
+  workItems      CreditOpsWorkItem[]
+
+  @@index([scheduledDate, jobType])
+  @@index([startedAt])
+}
+
+/// 积分清零单账户工单（运维台核心表）
+model CreditOpsWorkItem {
+  id                    String              @id @default(cuid())
+  workType              CreditOpsWorkType
+  /// 应处理业务日 YYYY-MM-DD（CST）
+  dueDate               String
+  dueAt                 DateTime
+  accountId             String
+  ownerType             CreditOwnerType
+  ownerId               String
+  ownerHint             String?
+  source                CreditSource?
+  periodKey             String              @default("")
+  expectedExpireCredits Int                 @default(0)
+  expectedGrantCredits  Int                 @default(0)
+  status                CreditOpsWorkStatus @default(PENDING)
+  isBackfill            Boolean             @default(false)
+  jobRunId              String?
+  jobRun                CreditOpsJobRun?    @relation(fields: [jobRunId], references: [id], onDelete: SetNull)
+  processedAt           DateTime?
+  resultJson            Json?
+  errorMessage          String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@unique([workType, accountId, dueDate, periodKey])
+  @@index([dueDate, status])
+  @@index([status])
+  @@index([accountId])
 }
 
 /// 调价提案审批流（运营提交 → 财务复核 → 超管终审 → 生效）
@@ -3125,21 +3925,7 @@ model PlanChangeEvent {
   @@index([proposalId, createdAt])
 }
 
-/// BYOK 技术服务费配置（个人 / 团队两档）
-model ByokServiceConfig {
-  id                 String             @id @default(cuid())
-  scopeKey           String             @unique // personal | team-seat
-  label              String
-  techServiceFeeYuan Decimal            @db.Decimal(12, 2)
-  interval           MembershipInterval @default(MONTH)
-  minSeats           Int? // 团队最低席位数（仅 team-seat）
-  active             Boolean            @default(true)
-  note               String?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-}
-
-/// BYOK 任务类型（套餐内额度 + 超额轻量包扣分）
+/// 历史 Gateway 日志任务类型快照（BYOK 退役；报表仍读此列）
 enum ByokTaskKind {
   TEXT_TO_IMAGE
   IMAGE_TO_VIDEO
@@ -3148,7 +3934,7 @@ enum ByokTaskKind {
   TTS
 }
 
-/// 七类计费 taxonomy（BYOK + 平台代付报表/结算共用；含无含次的 TEXT / OTHER）
+/// 七类计费 taxonomy（平台代付报表/结算；含无含次的 TEXT / OTHER）
 enum BillingCategory {
   TEXT_TO_IMAGE
   IMAGE_TO_VIDEO
@@ -3157,92 +3943,6 @@ enum BillingCategory {
   TTS
   TEXT
   OTHER
-}
-
-/// BYOK 套餐内月度额度与超额扣分（从轻量包/general 池扣）
-model ByokTaskQuota {
-  id              String       @id @default(cuid())
-  scopeKey        String // personal | team-seat
-  taskKind        ByokTaskKind
-  label           String
-  monthlyIncluded Int
-  overageCredits  Int
-  active          Boolean      @default(true)
-  updatedAt       DateTime     @updatedAt
-
-  @@unique([scopeKey, taskKind])
-  @@index([scopeKey])
-}
-
-enum ByokSubscriptionStatus {
-  ACTIVE
-  EXPIRED
-  SUSPENDED
-}
-
-/// BYOK 套餐订阅（个人或团队租户；与积分会员套餐并列）
-model ByokSubscription {
-  id                 String                 @id @default(cuid())
-  ownerType          CreditOwnerType
-  ownerId            String
-  scopeKey           String // personal | team-seat
-  status             ByokSubscriptionStatus @default(ACTIVE)
-  seats              Int                    @default(1)
-  techServiceFeeYuan Decimal                @db.Decimal(12, 2)
-  periodStart        DateTime
-  periodEnd          DateTime
-  lastOrderId        String?
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
-
-  @@index([ownerType, ownerId, status])
-  @@index([periodEnd])
-  @@index([scopeKey, status])
-}
-
-/// BYOK 月度任务用量（套餐内 + 超额）
-model ByokUsageMonthly {
-  id              String          @id @default(cuid())
-  ownerType       CreditOwnerType
-  ownerId         String
-  scopeKey        String // personal | team-seat
-  periodKey       String // YYYY-MM
-  taskKind        ByokTaskKind
-  seatsSnapshot   Int             @default(1)
-  includedUsed    Int             @default(0)
-  overageUsed     Int             @default(0)
-  overageCredits  Int             @default(0)
-  updatedAt       DateTime        @updatedAt
-
-  @@unique([ownerType, ownerId, periodKey, taskKind])
-  @@index([periodKey, scopeKey])
-  @@index([ownerType, ownerId, periodKey])
-}
-
-/// BYOK 资源计量单价（用量 × 系数）
-model ResourceMeterRate {
-  id              String            @id @default(cuid())
-  resourceType    ResourceMeterType @unique
-  coefficientYuan Decimal           @db.Decimal(16, 8) // 每单位资源单价
-  unitLabel       String // GB·月 / GB / 次
-  active          Boolean           @default(true)
-  updatedAt       DateTime          @updatedAt
-}
-
-/// BYOK 资源用量事件
-model ResourceMeterEvent {
-  id           String            @id @default(cuid())
-  ownerType    CreditOwnerType
-  ownerId      String
-  resourceType ResourceMeterType
-  quantity     Decimal           @db.Decimal(16, 6)
-  costYuan     Decimal           @db.Decimal(16, 6) // quantity × coefficient 快照
-  refType      String?
-  refId        String?
-  periodKey    String // YYYY-MM 结算桶
-  createdAt    DateTime          @default(now())
-
-  @@index([ownerType, ownerId, periodKey])
 }
 
 // ============================================================
@@ -3338,6 +4038,10 @@ model Tenant {
   gatewayApiKeyId   String?             @unique
   gatewayApiKey     GatewayApiKey?      @relation("TenantGatewayKey", fields: [gatewayApiKeyId], references: [id], onDelete: SetNull)
 
+  /// 团队空间 Gateway 提交 burst 档位
+  generationSubmitTier          GenerationSubmitTier?
+  generationSubmitBurstOverride Int?
+
   members TenantMember[]
   seats   Seat[]
   invites TenantInvite[]
@@ -3394,10 +4098,8 @@ model TenantInvite {
   token       String             @unique
   /// 邀请链接 query 中的验证码（与短信一并发出，供复制链接使用）
   urlCode     String?
-  /// VIP 预分配通用积分额度（受邀人加入后写入 monthlyCapCredits）
+  /// VIP 预分配积分额度（受邀人加入后写入 monthlyCapCredits）
   plannedGeneralCredits Int?
-  /// VIP 预分配视频积分额度（展示/台账；视频池按团队共享扣减）
-  plannedVideoCredits   Int?
   role        TenantRole         @default(MEMBER)
   status      TenantInviteStatus @default(PENDING)
   expiresAt   DateTime
@@ -3447,4 +4149,666 @@ model QrKindFeatured {
   updatedByUserId String
   updatedByUser   User     @relation("QrKindFeaturedUpdater", fields: [updatedByUserId], references: [id], onDelete: Cascade)
   updatedAt       DateTime @updatedAt
+}
+
+/// 电商工具箱 · 平台模板区 catalog（运营在 Book 模板管理维护）
+model EcomTemplateCatalogEntry {
+  id              String    @id
+  category        String
+  mediaKind       String
+  title           String
+  hot             Boolean   @default(false)
+  ossUrl          String
+  thumbUrl        String
+  coverUrl        String?
+  mainImageUrl    String?
+  referenceImages Json?
+  promptText      String?   @db.Text
+  negativePrompt  String?   @db.Text
+  defaultModelKey String?
+  defaultParams   Json?
+  posterUrl       String?
+  sortOrder       Int       @default(0)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([category, mediaKind, deletedAt])
+  @@index([sortOrder])
+}
+
+/// 电商工具箱 · 平台模特库
+model EcomModelLibraryEntry {
+  id        String    @id
+  name      String
+  gender    String
+  age       String
+  ossUrl    String
+  sortOrder Int       @default(0)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([gender, age, deletedAt])
+}
+
+model EcomPoseLibraryEntry {
+  id              String    @id
+  category        String
+  title           String
+  baseDescription String    @db.Text
+  ossUrl          String?
+  thumbUrl        String?
+  sourceImageKey  String?
+  tags            Json?
+  scope           String    @default("platform")
+  userId          String?
+  lockedAt        DateTime?
+  enabled         Boolean   @default(true)
+  sortOrder       Int       @default(0)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([category, deletedAt])
+  @@index([scope, userId, deletedAt])
+  @@index([sourceImageKey, deletedAt])
+}
+
+model EcomPropLibraryEntry {
+  id                String    @id
+  name              String
+  visualDescription String    @db.Text
+  conflictTags      Json?
+  ossUrl            String?
+  scope             String    @default("platform")
+  userId            String?
+  lockedAt          DateTime?
+  enabled           Boolean   @default(true)
+  sortOrder         Int       @default(0)
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([deletedAt])
+  @@index([scope, userId, deletedAt])
+}
+
+model EcomSceneLibraryEntry {
+  id           String    @id
+  name         String
+  visualPrompt String    @db.Text
+  tags         Json?
+  scope        String    @default("platform")
+  userId       String?
+  lockedAt     DateTime?
+  enabled      Boolean   @default(true)
+  sortOrder    Int       @default(0)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([deletedAt])
+  @@index([scope, userId, deletedAt])
+}
+
+// ---------------------------------------------------------------------------
+// 我的 AI 空间（doc/product/我的AI空间.md）
+// ---------------------------------------------------------------------------
+
+/// 作品墙「展示」指针。**只存指向**，禁止存 prompt / ossUrl / thumbnailUrl 等业务副本；
+/// 展示字段读时按 sourceType 批量 resolve 源记录。删源须 cascade 删 Pin。
+model AiSpacePin {
+  id     String @id @default(cuid())
+  userId String
+
+  /// 来源应用 navKey，如 ecom / tool / canvas / story / quick-replica / ai-space
+  sourceApp  String
+  /// 源记录类型，见 lib/ai-space/ai-space-pin-types.ts 的 AiSpacePinSourceType
+  sourceType String
+  /// 源记录主键
+  sourceId   String
+
+  /// 用户在空间内的排列顺序（升序）
+  sortOrder Int     @default(0)
+  /// 用户自定义展示标题（可空，空则用源记录标题）
+  caption   String? @db.VarChar(200)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, sourceType, sourceId])
+  @@index([userId, sortOrder, createdAt])
+  @@index([sourceType, sourceId])
+}
+
+// ---------------------------------------------------------------------------
+// 作品墙自由画布（doc/product/AI 空间功能设计文档.md）
+//
+// AiSpacePin 语义为「已收进空间的素材」（编辑器左侧素材抽屉）；
+// 画布上的实际排布由 AiSpaceBlock 承载，块引用的资产在 AiSpaceBlockRef。
+// ---------------------------------------------------------------------------
+
+/// 整页版式模板，见 lib/ai-space/space-blocks/page-templates.ts
+enum AiSpacePageTemplate {
+  MAGAZINE
+  PORTFOLIO
+  BENTO
+  TIMELINE
+  MINIMAL
+}
+
+enum AiSpacePagePublishStatus {
+  DRAFT
+  PUBLISHED
+}
+
+/// 空间页（v1 一人一页；slug 供 /space/{slug} 公开访问）
+model AiSpacePage {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// 公开访问标识，小写字母数字与连字符
+  slug  String @unique @db.VarChar(64)
+  title String @default("我的 AI 空间") @db.VarChar(120)
+  bio   String @default("") @db.Text
+
+  templateKey AiSpacePageTemplate @default(BENTO)
+  /// 主题：背景色 / 底图 / 主色 / 字体
+  theme       Json                @default("{}")
+
+  publishStatus AiSpacePagePublishStatus @default(DRAFT)
+  publishedAt   DateTime?
+
+  blocks AiSpaceBlock[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([publishStatus])
+}
+
+/// 画布块 / 挂件。blockType 取值见 lib/ai-space/space-blocks/registry.ts
+model AiSpaceBlock {
+  id     String      @id @default(cuid())
+  pageId String
+  page   AiSpacePage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  /// 冗余，便于鉴权过滤与运维查询
+  userId String
+
+  /// image | video | audio | gallery | before_after | character_card |
+  /// video_playlist | heading | text | divider_spacer | profile_card | launch_button
+  blockType String @db.VarChar(40)
+  /// 五档固定尺寸：sm | portrait | wide | lg | full
+  sizeTier  String @default("lg") @db.VarChar(16)
+
+  /// 12 列栅格单位（非像素），与 react-grid-layout 的 x/y/w/h 一一对应
+  layoutX Int @default(0)
+  layoutY Int @default(0)
+  layoutW Int @default(6)
+  layoutH Int @default(6)
+  layoutZ Int @default(0)
+  /// 窄屏单列时的排列顺序
+  mobileOrder Int @default(0)
+
+  /// 块配置：标题、图片墙布局/列数、播放器选项等
+  config  Json  @default("{}")
+  /// 纯内容型挂件的正文（heading / text 等）
+  content Json?
+
+  refs AiSpaceBlockRef[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([pageId, layoutY, layoutX])
+  @@index([userId])
+}
+
+/// 块引用的资产：单图块 1 条，图片墙 N 条。
+/// 无 unique 约束——同一资产可同时出现在多个块中。
+model AiSpaceBlockRef {
+  id      String       @id @default(cuid())
+  blockId String
+  block   AiSpaceBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  /// 与 AiSpacePin 同一套取值，读时复用 lib/ai-space/pin-resolvers.ts
+  sourceApp  String
+  sourceType String
+  sourceId   String
+  /// 命名槽位：before / after、face / full_body 等；无槽位块为空串
+  slotKey    String  @default("") @db.VarChar(32)
+  caption    String? @db.VarChar(200)
+  sortOrder  Int     @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([blockId, sortOrder])
+  /// 删源级联用，与 AiSpacePin 同款
+  @@index([sourceType, sourceId])
+}
+
+/// 我的收藏：个人音频 / 数字人 / TTS 音色快捷入口（与作品墙 Pin 分离）
+model AiSpaceFavorite {
+  id     String @id @default(cuid())
+  userId String
+
+  /// audio | digital_human | tts_voice
+  targetKind String
+  targetId   String
+  /// tts_voice 等展示快照：label / language / previewUrl / modelKey
+  meta       Json?
+
+  sortOrder Int @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, targetKind, targetId])
+  @@index([userId, targetKind, sortOrder])
+}
+
+/// 数字人形象库（Book 平台真源，全应用经 digitalHumanId 引用）
+model AiSpaceDigitalHuman {
+  id     String @id @default(cuid())
+  userId String
+
+  name           String @db.VarChar(120)
+  avatarImageUrl String @db.Text
+  /// active | inactive | detect_failed
+  status         String @default("active")
+  /// 形象检测结果、原图尺寸等
+  meta           Json?
+
+  /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([tenantId, visibility, createdAt])
+}
+
+/// 平台统一音频资产（Book 真源）。QuickReplica 生成音频同步写入，不双存 OSS。
+model AiSpaceAudioAsset {
+  id     String @id @default(cuid())
+  userId String
+
+  name        String @db.VarChar(160)
+  /// upload | tts | voice_clone | voice_changer | sound_effect | music
+  sourceType  String
+  audioUrl    String @db.Text
+  /// 秒；ffprobe 探测失败时为 0（合成台 20s 门禁依赖此字段）
+  durationSec Float  @default(0)
+  textScript  String? @db.Text
+
+  /// 溯源：quick-replica | ai-space
+  originApp String?
+  /// qrTemplateId / gatewayRequestLogId / qr job id
+  originRef String?
+  meta      Json?
+
+  /// 资产共享（租户体系）
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([tenantId, visibility, createdAt])
+  @@index([originApp, originRef])
+}
+
+/// 视频创作库自有记录。各应用视频 **不** 落本表（一律经 AiSpacePin 引用）；
+/// 本表只存用户真正拥有的新文件：upload（自拍）与 compose_output（合成成片）。
+model AiSpaceVideoMaterial {
+  id     String @id @default(cuid())
+  userId String
+
+  name String @db.VarChar(160)
+  /// product | outfit | lifestyle | upload | compose
+  category String @default("upload")
+  videoUrl String @db.Text
+  durationSec Float @default(0)
+  /// upload | compose_output
+  sourceKind  String @default("upload")
+  /// compose_output 时回指 AiSpaceComposeTask
+  composeTaskId String?
+  meta          Json?
+
+  /// 资产共享（租户体系）
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, category, createdAt])
+  @@index([tenantId, visibility, createdAt])
+  @@index([composeTaskId])
+}
+
+/// 数字人口播合成任务：S2V（Gateway，厂商并发 1）→ MediaRenderJob 画中画合成
+model AiSpaceComposeTask {
+  id     String @id @default(cuid())
+  userId String
+
+  digitalHumanId String
+  audioAssetId   String
+  /// 可空 = 不叠背景，直接输出口播视频
+  videoMaterialId String?
+
+  /// pending | generating_human | composing | completed | failed
+  status String @default("pending")
+
+  /// Gateway 侧 S2V 请求日志与厂商任务 id（排障用）
+  gatewayLogId  String?
+  gatewayTaskId String?
+
+  /// 阿里云 24h 临时结果转存后的 OSS 地址
+  tempHumanVideoUrl String? @db.Text
+  /// 复用 MediaRenderJob 做 composite 渲染
+  mediaRenderJobId  String?
+  finalVideoUrl     String? @db.Text
+  errorMessage      String? @db.Text
+  /// overlay 参数快照（缩放 / 位置 / 字幕开关）
+  options           Json?
+
+  tenantId String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+/// 口播分镜 · 项目壳
+model AiSpaceBroadcastProject {
+  id     String @id @default(cuid())
+  userId String
+  title  String @default("未命名口播项目")
+
+  sourceKind         String  @default("text")
+  sourceText         String? @db.Text
+  sourceAudioAssetId String?
+
+  brief             Json   @default("{}")
+  targetDurationSec Int?
+  aspectRatio       String @default("9:16")
+
+  /// draft | locked | rendering | done
+  status         String  @default("draft")
+  activeScriptId String?
+
+  tenantId String?
+
+  user       User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scripts    AiSpaceBroadcastScript[]
+  renderJobs AiSpaceBroadcastRenderJob[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, updatedAt])
+}
+
+/// 口播分镜 · 版本化脚本头
+model AiSpaceBroadcastScript {
+  id        String @id @default(cuid())
+  projectId String
+  version   Int
+  /// draft | locked
+  status    String @default("draft")
+  llmMeta   Json?
+
+  project AiSpaceBroadcastProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  shots   AiSpaceBroadcastShot[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, version])
+  @@index([projectId, createdAt])
+}
+
+/// 口播分镜 · 镜级行
+model AiSpaceBroadcastShot {
+  id       String @id @default(cuid())
+  scriptId String
+  index    Int
+
+  startSec    Float @default(0)
+  endSec      Float @default(0)
+  durationSec Float @default(0)
+
+  voiceoverText    String @db.Text
+  sceneDescription String @default("") @db.Text
+
+  presenter Json @default("{}")
+  visual    Json @default("{}")
+
+  audioAssetId      String?
+  backgroundVideoId String?
+  digitalHumanId    String?
+
+  /// draft | tts_ready | rendering | done | failed
+  shotStatus    String  @default("draft")
+  composeTaskId String?
+  outputVideoUrl String? @db.Text
+  errorMessage   String? @db.Text
+
+  script AiSpaceBroadcastScript @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([scriptId, index])
+  @@index([scriptId, index])
+}
+
+/// 口播分镜 · 总拼接任务
+model AiSpaceBroadcastRenderJob {
+  id        String @id @default(cuid())
+  projectId String
+  scriptId  String
+  status    String @default("pending")
+  finalVideoUrl String? @db.Text
+  errorMessage  String? @db.Text
+  meta          Json?
+
+  project AiSpaceBroadcastProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId, createdAt])
+}
+
+/// 平台 AI 导览助手 · 白名单文档切块（RAG 知识库）
+/// embedding 列由迁移以原生 `vector(dim)` 添加，Prisma 不识别该类型，检索走 $queryRaw。
+model PlatformDocChunk {
+  id          String   @id @default(cuid())
+  /// 相对仓库根的源文件路径，如 "book-mall/doc/product/00-overview.md"
+  source      String
+  /// functional | operational | intro
+  category    String
+  /// 所属标题层级路径（用于回答时引用来源）
+  heading     String
+  content     String   @db.Text
+  tokens      Int      @default(0)
+  /// 内容哈希，用于增量 upsert 去重
+  contentHash String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([source, heading, contentHash])
+  @@index([category])
+}
+
+enum PlatformAssistantFeedbackCategory {
+  BUG
+  QUESTION
+  FEATURE_REQUEST
+  OTHER
+}
+
+enum PlatformAssistantFeedbackStatus {
+  OPEN
+  REVIEWED
+  RESOLVED
+}
+
+/// AI 小智 · 用户反馈 / Bug / 未能解答的问题（管理员驾驶舱可见）
+model PlatformAssistantFeedback {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  category PlatformAssistantFeedbackCategory
+  status   PlatformAssistantFeedbackStatus   @default(OPEN)
+
+  userMessage    String  @db.Text
+  assistantReply String? @db.Text
+  sourceApp      String?
+  pageUrl        String? @db.Text
+  adminNote      String? @db.Text
+  reviewedAt     DateTime?
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([category, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+enum PlatformAssistantAiNewsStatus {
+  READY
+  FAILED
+}
+
+enum StaticSnapshotStatus {
+  READY
+  FAILED
+}
+
+enum StaticSnapshotTrigger {
+  CRON
+  ADMIN
+  CLI
+}
+
+/// 静态页快照（Cron/后台预生成，首页等只读）
+model StaticPageSnapshot {
+  id           String               @id @default(cuid())
+  pageKey      String
+  dateKey      String
+  status       StaticSnapshotStatus @default(READY)
+  payload      Json
+  errorMessage String?              @db.Text
+  generatedAt  DateTime             @default(now())
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@unique([pageKey, dateKey])
+  @@index([pageKey, dateKey(sort: Desc)])
+  @@index([pageKey, status, generatedAt(sort: Desc)])
+}
+
+/// 静态页快照生成流水
+model StaticSnapshotGenerationRun {
+  id                String                @id @default(cuid())
+  pageKey           String
+  dateKey           String
+  status            StaticSnapshotStatus
+  trigger           StaticSnapshotTrigger
+  startedAt         DateTime              @default(now())
+  finishedAt        DateTime?
+  durationMs        Int?
+  errorMessage      String?               @db.Text
+  summary           Json?
+  triggeredByUserId String?
+
+  triggeredBy User? @relation(fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+
+  @@index([pageKey, startedAt(sort: Desc)])
+  @@index([pageKey, dateKey])
+}
+
+/// AI 小智 · 每日热闻（Cron 预生成，全平台只读）
+model PlatformAssistantAiNewsDaily {
+  id           String                        @id @default(cuid())
+  dateKey      String                        @unique
+  content      String                        @db.Text
+  status       PlatformAssistantAiNewsStatus @default(READY)
+  errorMessage String?                       @db.Text
+  generatedAt  DateTime                      @default(now())
+  createdAt    DateTime                      @default(now())
+  updatedAt    DateTime                      @updatedAt
+
+  @@index([dateKey(sort: Desc)])
+  @@index([status, generatedAt(sort: Desc)])
+}
+
+/// AI 小智 · 模型配置（Book 管理后台可编辑，单行 default）
+model PlatformAssistantModelConfig {
+  id                    String   @id @default("default")
+  chatEnabled           Boolean  @default(true)
+  chatModelKey          String   @default("qwen3.5-27b")
+  chatFallbackModelKeys String[] @default(["qwen3.5-flash"])
+  newsEnabled           Boolean  @default(true)
+  newsModelKey          String   @default("qwen3.5-27b")
+  newsFallbackModelKeys String[] @default(["qwen3.5-flash"])
+  embedEnabled          Boolean  @default(true)
+  embedModelKey         String   @default("text-embedding-v3")
+  embedDim              Int      @default(1024)
+  updatedByUserId       String?
+  updatedAt             DateTime @updatedAt
+  createdAt             DateTime @default(now())
+}
+
+enum PlatformAssistantQaMatchMode {
+  EXACT
+  CONTAINS
+  KEYWORDS
+}
+
+/// AI 小智 · 管理员维护的问答库（价格/财务类仍走 guardrails，不入库）
+model PlatformAssistantQaEntry {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  enabled   Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  question      String                       @db.Text
+  answer        String                       @db.Text
+  matchMode     PlatformAssistantQaMatchMode @default(CONTAINS)
+  matchKeywords String[]                     @default([])
+
+  sourceFeedbackId String?
+  updatedByUserId  String?
+  adminNote        String? @db.Text
+
+  @@index([enabled, sortOrder(sort: Desc), updatedAt(sort: Desc)])
 }

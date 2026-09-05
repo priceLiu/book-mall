@@ -24,7 +24,7 @@ import {
 } from "@/lib/ecom/ecom-storyboard-types";
 import {
   resolveKlingV3Resolution,
-  resolveWan26ImageSize,
+  resolveStoryboardWan27JobSize,
   resolveWan27ImageSize,
   resolveWanxImageSize,
   type EcomStoryboardWanxSize,
@@ -33,18 +33,34 @@ import {
   buildCharacterRefPrompt,
   buildStoryboardImagePromptContext,
   resolveCharacterAppearance,
-  buildStoryboardPanelImagePrompt,
-  buildStoryboardPanelRefGuide,
+  resolveStoryboardPanelImagePrompt,
+  buildStoryboardPanelInvokePrompt,
+  buildStoryboardPanelRefGuideForUrls,
 } from "@/lib/ecom/ecom-storyboard-image-prompt";
 import {
+  isStoryboardDashscopeImageModel,
   isStoryboardKieImageModel,
   isStoryboardKlingImageModel,
+  isStoryboardRefCapableImageModel,
   isWan26ImageModel,
   resolveStoryboardDashscopeModel,
   resolveStoryboardKieModel,
   resolveStoryboardKlingModel,
 } from "@/lib/ecom/ecom-storyboard-image-models";
+import {
+  clearStoryboardPanelImagesPending,
+  markStoryboardPanelImagesPending,
+} from "@/lib/ecom/ecom-storyboard-pending-images";
 import { ensureStoryboardRefImagesForWan27 } from "@/lib/ecom/ecom-storyboard-ref-image";
+import {
+  isDashscopeMultimodalImageGenModel,
+  isQwenImageEditModel,
+  isZImageTurboModel,
+} from "@/lib/gateway/qwen-image-edit-proxy";
+import {
+  assertEcomStoryboardImageEditRefs,
+  ecomStoryboardImageEditMaxRefs,
+} from "@/lib/ecom/ecom-storyboard-image-edit";
 import {
   requireStoryboardProductRef,
   resolveStoryboardImageGenRefs,
@@ -54,6 +70,10 @@ import {
   getEcomStoryboardProject,
   updateEcomStoryboardProject,
 } from "@/lib/ecom/ecom-storyboard-service";
+import { resolveEcomImageGenConcurrency } from "@/lib/ecom/ecom-image-gen-concurrency";
+import type { ProductDesignSettings } from "@/lib/ecom/ecom-product-design-types";
+import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
+import { persistStoryboardPanelImageUrl } from "@/lib/ecom/ecom-storyboard-sheet-reconcile";
 
 function isTransientPollError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -152,7 +172,96 @@ async function generateOneImage(opts: {
   if (isStoryboardKlingImageModel(opts.modelKey)) {
     return generateOneKlingImage(opts);
   }
+  if (isDashscopeMultimodalImageGenModel(opts.modelKey)) {
+    return generateOneMultimodalSyncImage(opts);
+  }
+  if (isStoryboardDashscopeImageModel(opts.modelKey)) {
+    return generateOneWan27Image(opts);
+  }
   return generateOneWanxImage(opts);
+}
+
+async function generateOneMultimodalSyncImage(opts: {
+  userId: string;
+  projectId: string;
+  modelKey: string;
+  prompt: string;
+  imageSize: EcomStoryboardWanxSize;
+  refImg?: string;
+}): Promise<{ ossUrl: string; chargePoints: number | null; taskId: string }> {
+  const workspaceId = randomUUID().slice(0, 8);
+  const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
+  const refs =
+    !isZImageTurboModel(opts.modelKey) && opts.refImg
+      ? await ensureStoryboardRefImagesForWan27({
+          userId: opts.userId,
+          urls: [opts.refImg],
+        })
+      : [];
+  assertEcomStoryboardImageEditRefs(opts.modelKey, refs.length);
+  const content: Array<{ text: string } | { image: string }> =
+    refs.length > 0
+      ? [...refs.map((url) => ({ image: url })), { text: opts.prompt }]
+      : [{ text: opts.prompt }];
+  const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
+    kind: "multimodal-image-sync",
+    model: opts.modelKey,
+    content,
+    parameters: {
+      size: opts.imageSize,
+      n: 1,
+      prompt_extend: isQwenImageEditModel(opts.modelKey)
+        ? true
+        : !isZImageTurboModel(opts.modelKey),
+      watermark: false,
+    },
+    clientPage,
+  });
+  const vendorUrl = await pollWanxImage(opts.userId, taskId, logId);
+  const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
+  return { ossUrl, chargePoints: null, taskId };
+}
+
+async function generateOneWan27Image(opts: {
+  userId: string;
+  projectId: string;
+  modelKey: string;
+  prompt: string;
+  imageSize: EcomStoryboardWanxSize;
+  refImg?: string;
+}): Promise<{ ossUrl: string; chargePoints: number | null; taskId: string }> {
+  const apiModel = resolveStoryboardDashscopeModel(opts.modelKey);
+  const wan26 = isWan26ImageModel(apiModel) || isWan26ImageModel(opts.modelKey);
+  const workspaceId = randomUUID().slice(0, 8);
+  const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
+  const refs = opts.refImg
+    ? await ensureStoryboardRefImagesForWan27({
+        userId: opts.userId,
+        urls: [opts.refImg],
+      })
+    : [];
+  const content: Array<{ text: string } | { image: string }> =
+    refs.length > 0
+      ? wan26
+        ? [{ text: opts.prompt }, ...refs.map((url) => ({ image: url }))]
+        : [...refs.map((url) => ({ image: url })), { text: opts.prompt }]
+      : [{ text: opts.prompt }];
+  const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
+    kind: "wan27-image",
+    model: apiModel,
+    content,
+    size: resolveStoryboardWan27JobSize({
+      wan26,
+      refCount: refs.length,
+      wan27Size: opts.imageSize,
+    }),
+    n: 1,
+    contentOrder: wan26 ? "text-first" : "images-first",
+    clientPage,
+  });
+  const vendorUrl = await pollWanxImage(opts.userId, taskId, logId);
+  const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
+  return { ossUrl, chargePoints: null, taskId };
 }
 
 async function generateOneKlingImage(opts: {
@@ -167,9 +276,7 @@ async function generateOneKlingImage(opts: {
   const apiModel = resolveStoryboardKlingModel(opts.modelKey);
   const resolution = resolveKlingV3Resolution();
   const workspaceId = randomUUID().slice(0, 8);
-  const taskKey = `ecom-sb-img:${opts.projectId}:${workspaceId}`;
   const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
-
 
   const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
     kind: "kling-v3-image",
@@ -183,7 +290,6 @@ async function generateOneKlingImage(opts: {
 
   const vendorUrl = await pollWanxImage(opts.userId, taskId, logId);
   const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
-
 
   return { ossUrl, chargePoints: null, taskId };
 }
@@ -262,6 +368,55 @@ async function generateOneWanxImage(opts: {
   return { ossUrl, chargePoints: null, taskId };
 }
 
+/** 单镜头分镜图：千问/Z-Image 同步 multimodal-generation */
+async function generatePanelImageWithMultimodalSync(opts: {
+  userId: string;
+  projectId: string;
+  modelKey: string;
+  prompt: string;
+  refGuide: string;
+  wan27Size: string;
+  panelIndex: number;
+  refImageUrls: string[];
+}): Promise<{ ossUrl: string; chargePoints: number | null }> {
+  const refImageUrls =
+    !isZImageTurboModel(opts.modelKey) && opts.refImageUrls.length > 0
+      ? await ensureStoryboardRefImagesForWan27({
+          userId: opts.userId,
+          urls: opts.refImageUrls.slice(0, ecomStoryboardImageEditMaxRefs(opts.modelKey)),
+        })
+      : [];
+  assertEcomStoryboardImageEditRefs(opts.modelKey, refImageUrls.length);
+  const promptText = buildStoryboardPanelInvokePrompt({
+    refGuide: opts.refGuide,
+    panelPrompt: opts.prompt,
+    refCount: refImageUrls.length,
+  });
+  const content: Array<{ text: string } | { image: string }> =
+    refImageUrls.length > 0
+      ? [...refImageUrls.map((url) => ({ image: url })), { text: promptText }]
+      : [{ text: promptText }];
+  const workspaceId = randomUUID().slice(0, 8);
+  const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
+  const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
+    kind: "multimodal-image-sync",
+    model: opts.modelKey,
+    content,
+    parameters: {
+      size: opts.wan27Size,
+      n: 1,
+      prompt_extend: isQwenImageEditModel(opts.modelKey)
+        ? true
+        : !isZImageTurboModel(opts.modelKey),
+      watermark: false,
+    },
+    clientPage,
+  });
+  const vendorUrl = await pollWanxImage(opts.userId, taskId, logId);
+  const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
+  return { ossUrl, chargePoints: null };
+}
+
 /** 单镜头分镜图：wan2.7 多图参考（产品 + 角色 + 场景一次传入） */
 async function generatePanelImageWithRefs(opts: {
   userId: string;
@@ -275,22 +430,30 @@ async function generatePanelImageWithRefs(opts: {
 }): Promise<{ ossUrl: string; chargePoints: number | null }> {
   const apiModel = resolveStoryboardDashscopeModel(opts.modelKey);
   const wan26 = isWan26ImageModel(apiModel) || isWan26ImageModel(opts.modelKey);
-  const imageSize = wan26 ? resolveWan26ImageSize() : opts.wan27Size;
   const refImageUrls = await ensureStoryboardRefImagesForWan27({
     userId: opts.userId,
     urls: opts.refImageUrls,
+  });
+  const imageSize = resolveStoryboardWan27JobSize({
+    wan26,
+    refCount: refImageUrls.length,
+    wan27Size: opts.wan27Size,
   });
 
   const baseMeta: Record<string, unknown> = {
     projectId: opts.projectId,
     kind: "storyboard_panel",
     panelIndex: opts.panelIndex,
-    imageSize,
+    imageSize: imageSize ?? opts.wan27Size,
     refModel: apiModel,
     refCount: refImageUrls.length,
   };
 
-  const promptText = `${opts.refGuide}\n\n${opts.prompt}`;
+  const promptText = buildStoryboardPanelInvokePrompt({
+    refGuide: opts.refGuide,
+    panelPrompt: opts.prompt,
+    refCount: refImageUrls.length,
+  });
   const content: Array<{ text: string } | { image: string }> = wan26
     ? [{ text: promptText }, ...refImageUrls.map((url) => ({ image: url }))]
     : [...refImageUrls.map((url) => ({ image: url })), { text: promptText }];
@@ -343,9 +506,14 @@ async function generatePanelImageWithKling(opts: {
     refCount: refImageUrls.length,
   };
 
+  const promptText = buildStoryboardPanelInvokePrompt({
+    refGuide: opts.refGuide,
+    panelPrompt: opts.prompt,
+    refCount: refImageUrls.length,
+  });
   const content: Array<{ text: string } | { image: string }> = [
     ...refImageUrls.map((url) => ({ image: url })),
-    { text: `${opts.refGuide}\n\n${opts.prompt}` },
+    { text: promptText },
   ];
 
   const workspaceId = randomUUID().slice(0, 8);
@@ -382,7 +550,10 @@ async function generatePanelImageWithKie(opts: {
   refImageUrls: string[];
 }): Promise<{ ossUrl: string; chargePoints: number | null }> {
   const apiModel = resolveStoryboardKieModel(opts.modelKey);
-  const refImageUrls = opts.refImageUrls.slice(0, 8);
+  const refImageUrls = await ensureStoryboardRefImagesForWan27({
+    userId: opts.userId,
+    urls: opts.refImageUrls.slice(0, 8),
+  });
 
   const baseMeta: Record<string, unknown> = {
     projectId: opts.projectId,
@@ -393,9 +564,14 @@ async function generatePanelImageWithKie(opts: {
     refCount: refImageUrls.length,
   };
 
+  const promptText = buildStoryboardPanelInvokePrompt({
+    refGuide: opts.refGuide,
+    panelPrompt: opts.prompt,
+    refCount: refImageUrls.length,
+  });
   const { model, input } = buildKieImageCreateArgs({
     modelKey: apiModel,
-    prompt: `${opts.refGuide}\n\n${opts.prompt}`,
+    prompt: promptText,
     imageUrls: refImageUrls,
     params: {
       aspect_ratio: opts.aspectRatio,
@@ -431,6 +607,8 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
   aspectRatio?: "16:9" | "9:16";
   imageSize?: string;
   autoGenCharacter?: boolean;
+  /** 仅自动生成角色参考图，不生成分镜图 */
+  characterOnly?: boolean;
   /** 仅重生成指定镜头；省略则生成全部镜头 */
   panelIndex?: number;
 }): Promise<{
@@ -455,15 +633,36 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
         collectedParams: wf.collectedParams,
       }),
   };
-  const modelKey = opts.modelKey?.trim() || ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL;
+  const modelKey =
+    opts.modelKey?.trim() ||
+    wf.imageModelKey?.trim() ||
+    ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL;
+  if (!isStoryboardRefCapableImageModel(modelKey)) {
+    throw new Error(
+      "该模型仅支持纯文生图，分镜生图须使用支持参考图的模型（如 wan2.7-image、wan2.7-image-pro）",
+    );
+  }
   const aspectRatio = opts.aspectRatio ?? "9:16";
   const imageSize = resolveWanxImageSize({ aspectRatio, imageSize: opts.imageSize });
   const wan27Size = resolveWan27ImageSize({ aspectRatio, imageSize: opts.imageSize });
-  const { productRefUrl, extraRefUrls } = resolveStoryboardImageGenRefs(opts.references);
-  const refImageUrls = [productRefUrl, ...extraRefUrls];
 
   let references = [...opts.references];
-  let totalCharge = 0;
+
+  const panelsToGen =
+    typeof opts.panelIndex === "number"
+      ? sheet.panels.filter((p) => p.index === opts.panelIndex)
+      : sheet.panels;
+  if (!opts.characterOnly && panelsToGen.length === 0) {
+    throw new Error(
+      typeof opts.panelIndex === "number"
+        ? `找不到镜头 ${opts.panelIndex}`
+        : "分镜表为空，无法生图",
+    );
+  }
+  const panelIndexesToGen = panelsToGen.map((p) => p.index);
+  if (!opts.characterOnly) {
+    await markStoryboardPanelImagesPending(opts.projectId, panelIndexesToGen, modelKey);
+  }
 
   const hasCharacterRef = references.some((r) => r.role === "character");
   const shouldAutoGenCharacter =
@@ -471,104 +670,182 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
     !wf.skippedCharacter &&
     (opts.autoGenCharacter ||
       Boolean(wf.autoGenCharacter) ||
-      Boolean(wf.characterPresetKey));
-  if (shouldAutoGenCharacter) {
-    const charPrompt = buildCharacterRefPrompt(sheet, promptCtx);
-    const charResult = await generateOneImage({
-      userId: opts.userId,
-      projectId: opts.projectId,
-      modelKey,
-      prompt: charPrompt,
-      action: "image",
-      imageSize,
-      aspectRatio,
-      meta: { projectId: opts.projectId, kind: "character_ref" } as Prisma.InputJsonValue,
-    });
-    
-    const bufRes = await fetch(charResult.ossUrl);
-    const buf = Buffer.from(await bufRes.arrayBuffer());
-    const ref = await addStoryboardReferenceUpload(opts.userId, opts.projectId, {
-      label: "自动生成角色",
-      role: "character",
-      buf,
-    });
-    references = [...references, ref];
-  }
+      Boolean(wf.characterPresetKey) ||
+      wf.fashionCharacterMode === "ai" ||
+      wf.proCharacterMode === "ai");
 
-  const panelsToGen =
-    typeof opts.panelIndex === "number"
-      ? sheet.panels.filter((p) => p.index === opts.panelIndex)
-      : sheet.panels;
-  if (panelsToGen.length === 0) {
-    throw new Error(`找不到镜头 ${opts.panelIndex}`);
-  }
+  try {
+    if (shouldAutoGenCharacter) {
+      const charPrompt = buildCharacterRefPrompt(sheet, promptCtx);
+      const productRef = requireStoryboardProductRef(references);
+      const charResult = await generateOneImage({
+        userId: opts.userId,
+        projectId: opts.projectId,
+        modelKey,
+        prompt: charPrompt,
+        action: "image",
+        imageSize,
+        aspectRatio,
+        refImg: productRef.ossUrl.trim(),
+        meta: { projectId: opts.projectId, kind: "character_ref" } as Prisma.InputJsonValue,
+      });
 
-  let updatedPanels = [...sheet.panels];
-  const refGuide = buildStoryboardPanelRefGuide(references, promptCtx);
+      const bufRes = await fetch(charResult.ossUrl);
+      const buf = Buffer.from(await bufRes.arrayBuffer());
+      const ref = await addStoryboardReferenceUpload(opts.userId, opts.projectId, {
+        label: "自动生成角色",
+        role: "character",
+        buf,
+      });
+      references = [...references, ref];
+    }
 
-  for (const panel of panelsToGen) {
-    const prompt = buildStoryboardPanelImagePrompt(panel, sheet, references, promptCtx);
-    const imgResult = isStoryboardKieImageModel(modelKey)
-      ? await generatePanelImageWithKie({
-          userId: opts.userId,
-          projectId: opts.projectId,
-          modelKey,
-          prompt,
-          refGuide,
-          aspectRatio,
-          panelIndex: panel.index,
-          refImageUrls,
-        })
-      : isStoryboardKlingImageModel(modelKey)
-        ? await generatePanelImageWithKling({
-            userId: opts.userId,
-            projectId: opts.projectId,
-            modelKey,
-            prompt,
-            refGuide,
-            aspectRatio,
-            panelIndex: panel.index,
-            refImageUrls,
-          })
-        : await generatePanelImageWithRefs({
-            userId: opts.userId,
-            projectId: opts.projectId,
-            modelKey,
-            prompt,
-            refGuide,
-            wan27Size,
-            panelIndex: panel.index,
-            refImageUrls,
-          });
-    
-    updatedPanels = updatedPanels.map((p) =>
-      p.index === panel.index ? { ...p, imageUrl: imgResult.ossUrl } : p,
+    if (opts.characterOnly) {
+      if (!references.some((r) => r.role === "character")) {
+        throw new Error("角色参考图生成失败，请检查脚本中的角色描述，或改用手动上传角色图");
+      }
+      return { references, sheet, chargePoints: null };
+    }
+
+    const { refImageUrls, productRefUrls } = resolveStoryboardImageGenRefs(references);
+    assertEcomStoryboardImageEditRefs(modelKey, refImageUrls.length);
+    const maxRefs = ecomStoryboardImageEditMaxRefs(modelKey);
+    const panelRefUrls = refImageUrls.slice(0, maxRefs);
+    const refGuide = buildStoryboardPanelRefGuideForUrls(
+      panelRefUrls,
+      references,
+      promptCtx,
     );
 
-    await prisma.ecomAsset.create({
-      data: {
-        userId: opts.userId,
-        module: ECOM_STORYBOARD_MODULE,
-        kind: "image",
-        title: `${sheet.overview.title} · 镜头${panel.index}`.slice(0, 80),
-        prompt,
-        ossUrl: imgResult.ossUrl,
-        thumbnailUrl: imgResult.ossUrl,
-        meta: {
-          projectId: opts.projectId,
-          modelKey,
-          kind: "storyboard_panel",
-          panelIndex: panel.index,
-        },
+    const panelGenFailures: { index: number; message: string }[] = [];
+    const concurrency =
+      panelsToGen.length > 1
+        ? await resolveEcomImageGenConcurrency(
+            opts.userId,
+            {} as ProductDesignSettings,
+          )
+        : 1;
+
+    await mapWithConcurrency(
+      panelsToGen,
+      async (panel) => {
+        try {
+          const prompt = resolveStoryboardPanelImagePrompt(
+            panel,
+            sheet,
+            references,
+            promptCtx,
+            panelRefUrls,
+            refGuide,
+          );
+          const imgResult = isStoryboardKieImageModel(modelKey)
+            ? await generatePanelImageWithKie({
+                userId: opts.userId,
+                projectId: opts.projectId,
+                modelKey,
+                prompt,
+                refGuide,
+                aspectRatio,
+                panelIndex: panel.index,
+                refImageUrls: panelRefUrls,
+              })
+            : isStoryboardKlingImageModel(modelKey)
+              ? await generatePanelImageWithKling({
+                  userId: opts.userId,
+                  projectId: opts.projectId,
+                  modelKey,
+                  prompt,
+                  refGuide,
+                  aspectRatio,
+                  panelIndex: panel.index,
+                  refImageUrls: panelRefUrls,
+                })
+              : isDashscopeMultimodalImageGenModel(modelKey)
+                ? await generatePanelImageWithMultimodalSync({
+                    userId: opts.userId,
+                    projectId: opts.projectId,
+                    modelKey,
+                    prompt,
+                    refGuide,
+                    wan27Size,
+                    panelIndex: panel.index,
+                    refImageUrls: panelRefUrls,
+                  })
+                : await generatePanelImageWithRefs({
+                    userId: opts.userId,
+                    projectId: opts.projectId,
+                    modelKey,
+                    prompt,
+                    refGuide,
+                    wan27Size,
+                    panelIndex: panel.index,
+                    refImageUrls: panelRefUrls,
+                  });
+
+          await prisma.ecomAsset.create({
+            data: {
+              userId: opts.userId,
+              module: ECOM_STORYBOARD_MODULE,
+              kind: "image",
+              title: `${sheet.overview.title} · 镜头${panel.index}`.slice(0, 80),
+              prompt,
+              ossUrl: imgResult.ossUrl,
+              thumbnailUrl: imgResult.ossUrl,
+              meta: {
+                projectId: opts.projectId,
+                modelKey,
+                kind: "storyboard_panel",
+                panelIndex: panel.index,
+                productRefCount: productRefUrls.length,
+                refImageCount: panelRefUrls.length,
+              },
+            },
+          });
+
+          await persistStoryboardPanelImageUrl({
+            userId: opts.userId,
+            projectId: opts.projectId,
+            panelIndex: panel.index,
+            imageUrl: imgResult.ossUrl,
+          });
+          await clearStoryboardPanelImagesPending(opts.projectId, [panel.index]);
+        } catch (e) {
+          panelGenFailures.push({
+            index: panel.index,
+            message: e instanceof Error ? e.message : "生成失败",
+          });
+        }
       },
-    });
+      concurrency,
+    );
+
+    if (panelGenFailures.length > 0) {
+      const summary = panelGenFailures
+        .sort((a, b) => a.index - b.index)
+        .map((f) => `镜头 ${f.index}：${f.message}`)
+        .join("；");
+      throw new Error(summary);
+    }
+  } catch (e) {
+    await clearStoryboardPanelImagesPending(opts.projectId, panelIndexesToGen);
+    throw e;
   }
 
-  const updatedSheet: StoryboardSheet = { ...sheet, panels: updatedPanels };
-  const allPanelsReady = updatedPanels.every((p) => Boolean(p.imageUrl));
+  const latestAfterGen = await getEcomStoryboardProject(opts.userId, opts.projectId);
+  if (!latestAfterGen?.sheet) {
+    throw new Error("项目不存在");
+  }
+  const mergedPanels = latestAfterGen.sheet.panels;
+  const baseSheet = latestAfterGen.sheet;
+
+  const updatedSheet: StoryboardSheet = { ...baseSheet, panels: mergedPanels };
+  const allPanelsReady = mergedPanels.every((p) => Boolean(p.imageUrl));
 
   const existing = await getEcomStoryboardProject(opts.userId, opts.projectId);
   const existingMeta = (existing?.meta as Record<string, unknown> | null) ?? {};
+  const existingWorkflow =
+    (existingMeta.workflow as Record<string, unknown> | undefined) ?? {};
+  const { pendingPanelImages: _pending, ...workflowRest } = existingWorkflow;
 
   await updateEcomStoryboardProject(opts.userId, opts.projectId, {
     sheet: updatedSheet,
@@ -577,7 +854,7 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
     meta: {
       ...existingMeta,
       workflow: {
-        ...((existingMeta.workflow as Record<string, unknown> | undefined) ?? {}),
+        ...workflowRest,
         phase: "image",
         imageModelKey: modelKey,
         autoGenCharacter: Boolean(opts.autoGenCharacter),

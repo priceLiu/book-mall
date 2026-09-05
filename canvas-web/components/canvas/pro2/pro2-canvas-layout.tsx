@@ -12,8 +12,8 @@ import {
 import type { StyleLibraryPreset } from "@/lib/canvas/style-library/catalog";
 import { Pro2CanvasToolbar } from "./pro2-canvas-toolbar";
 import { Pro2CrewBulletin } from "./pro2-crew-bulletin";
-import { Pro2ProductionGateBanner } from "./pro2-production-gate-banner";
 import { shouldShowCrewBulletinRail } from "@/lib/canvas/crew-bulletin-context";
+import { useCrewCollaborationAccess } from "@/lib/canvas/use-crew-collaboration-access";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
   useCrewBulletinSubscription,
@@ -45,11 +45,13 @@ export function Pro2CanvasLayout({
 
   const [styleLibOpen, setStyleLibOpen] = useState(false);
 
+  const collaboration = useCrewCollaborationAccess();
   const nodes = useCanvasStore((s) => s.nodes);
   const graphMeta = useCanvasStore((s) => s.graphMeta);
   const showCrewBulletin = shouldShowCrewBulletinRail(
     nodes,
     graphMeta ?? undefined,
+    collaboration,
   );
 
   useCrewBulletinSubscription(base, projectId, showCrewBulletin);
@@ -111,7 +113,7 @@ export function Pro2CanvasLayout({
   );
 
   return (
-    <div className="relative h-full min-h-0 w-full flex-1 overflow-hidden">
+    <div className="relative h-full min-h-0 min-w-0 w-full max-w-full flex-1 overflow-hidden">
       <FlowCanvas
         projectId={projectId}
         onUndo={onUndo}
@@ -129,7 +131,6 @@ export function Pro2CanvasLayout({
           window.dispatchEvent(new CustomEvent("canvas:open-my-history"));
         }}
       />
-      <Pro2ProductionGateBanner />
       {showCrewBulletin ? <Pro2CrewBulletin /> : null}
       <StyleLibraryModal
         open={styleLibOpen}

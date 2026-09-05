@@ -1,7 +1,11 @@
 import { randomUUID } from "crypto";
 
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
-import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
+import { createOssClientFrom, ossGetBuffer, readOssEnv } from "@/lib/oss-client";
+import {
+  assertImageProcessingGatewayAccess,
+  buildImageProcessingClientPage,
+} from "@/lib/ecom/image-processing-request-context";
 import {
   buildBgRemovePrompt,
   buildCameraAnglePrompt,
@@ -20,7 +24,6 @@ import {
 import {
   buildOutpaintApiParameters,
   DEFAULT_ENHANCE_PROMPT,
-  ECOM_IMAGE_PROCESSING_TOOL_KEY,
   ECOM_OUTPAINT_MODEL_KEY,
   ECOM_SEEDREAM_EDITOR_MODEL_KEY,
   ECOM_WAN_I2I_MODEL_KEY,
@@ -35,7 +38,7 @@ import {
   resolveKieNanoProApiModel,
   type ImageProcessingMode,
 } from "@/lib/ecom/ecom-image-processing-models";
-import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
+import { applyMemeCaptionOverlay } from "@/lib/ecom/ecom-meme-caption-overlay";
 import { buildKieImageCreateArgs } from "@/lib/canvas/providers/kie";
 import {
   ecomGwCreateKieJob,
@@ -60,17 +63,102 @@ function parseDataUrl(dataUrl: string): { buf: Buffer; contentType: string; ext:
   return { buf, contentType, ext };
 }
 
+function tryParseManagedOssObjectKey(url: string): string | null {
+  const cfg = readOssEnv();
+  if ("error" in cfg) return null;
+  try {
+    const u = new URL(url);
+    const base = process.env.OSS_PUBLIC_URL_BASE?.trim().replace(/\/$/, "");
+    if (base && url.startsWith(`${base}/`)) {
+      return decodeURIComponent(url.slice(base.length + 1));
+    }
+    if (u.hostname === `${cfg.bucket}.${cfg.region}.aliyuncs.com`) {
+      return decodeURIComponent(u.pathname.replace(/^\//, ""));
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+async function isVendorFetchableHttpUrl(url: string): Promise<boolean> {
+  try {
+    const r = await fetch(url, {
+      method: "HEAD",
+      signal: AbortSignal.timeout(12_000),
+      redirect: "follow",
+    });
+    if (r.ok) return true;
+    if (r.status === 405) {
+      const getRes = await fetch(url, {
+        method: "GET",
+        signal: AbortSignal.timeout(20_000),
+        redirect: "follow",
+        headers: { Range: "bytes=0-0" },
+      });
+      return getRes.ok || getRes.status === 206;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+async function rehostImageForVendor(
+  userId: string,
+  url: string,
+): Promise<string> {
+  const ossKey = tryParseManagedOssObjectKey(url);
+  if (ossKey) {
+    const cfg = readOssEnv();
+    if (!("error" in cfg)) {
+      const client = await createOssClientFrom(cfg);
+      const buf = await ossGetBuffer(client, { key: ossKey });
+      if (buf?.byteLength) {
+        const ext = ossKey.includes(".") ? ossKey.split(".").pop()! : "png";
+        return uploadCanvasUserBuffer({
+          userId,
+          ext,
+          buf,
+          contentType: ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/png",
+        });
+      }
+    }
+  }
+
+  const res = await fetch(url, {
+    method: "GET",
+    signal: AbortSignal.timeout(45_000),
+    redirect: "follow",
+  });
+  if (!res.ok) {
+    throw new Error(`参考图不可被厂商拉取（HTTP ${res.status}），请重新上传后重试`);
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  const contentType = res.headers.get("content-type") ?? "image/png";
+  const ext = contentType.includes("jpeg")
+    ? "jpg"
+    : contentType.includes("webp")
+      ? "webp"
+      : "png";
+  return uploadCanvasUserBuffer({ userId, ext, buf, contentType });
+}
+
+/** data URL 上传 OSS；HTTP URL 须厂商可拉取（KIE image_input），不可达则转存 public-read */
 async function ensurePublicImageUrl(
   userId: string,
   image: string,
 ): Promise<string> {
   const trimmed = image.trim();
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-    return trimmed;
-  }
   if (trimmed.startsWith("data:")) {
     const { buf, contentType, ext } = parseDataUrl(trimmed);
     return uploadCanvasUserBuffer({ userId, ext, buf, contentType });
+  }
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    if (await isVendorFetchableHttpUrl(trimmed)) {
+      return trimmed;
+    }
+    return rehostImageForVendor(userId, trimmed);
   }
   throw new Error("不支持的图片格式");
 }
@@ -171,10 +259,10 @@ async function runQwenEdit(opts: {
   mode: ImageProcessingMode;
 }) {
   const workspaceId = randomUUID().slice(0, 8);
-  const clientPage = ecomClientPage(
+  const clientPage = buildImageProcessingClientPage(
     opts.userId,
     workspaceId,
-    ECOM_IMAGE_PROCESSING_TOOL_KEY,
+    opts.mode,
   );
   const content = buildQwenContent({
     images: opts.images,
@@ -206,17 +294,17 @@ export async function ecomImageProcessingRetouch(opts: {
   maskImageDataUrl?: string;
   parameters?: Record<string, unknown>;
 }) {
-  await assertEcomToolkitGatewayAccess(opts.userId);
+  await assertImageProcessingGatewayAccess(opts.userId);
 
   if (isWanxPaintingModelKey(opts.model)) {
     if (!opts.maskImageDataUrl?.trim()) {
       throw new Error("万相局部重绘需要涂抹蒙版");
     }
     const workspaceId = randomUUID().slice(0, 8);
-    const clientPage = ecomClientPage(
+    const clientPage = buildImageProcessingClientPage(
       opts.userId,
       workspaceId,
-      ECOM_IMAGE_PROCESSING_TOOL_KEY,
+      "retouch",
     );
     const baseUrl = await ensurePublicImageUrl(
       opts.userId,
@@ -273,7 +361,7 @@ export async function ecomImageProcessingEnhancer(opts: {
   sourceImageDataUrl: string;
   parameters?: Record<string, unknown>;
 }) {
-  await assertEcomToolkitGatewayAccess(opts.userId);
+  await assertImageProcessingGatewayAccess(opts.userId);
   if (!isQwenEditModelKey(opts.model)) {
     throw new Error("图像增强仅支持 Qwen 图像编辑模型");
   }
@@ -300,10 +388,10 @@ async function runSeedreamSingleImage(opts: {
   mode: ImageProcessingMode;
 }) {
   const workspaceId = randomUUID().slice(0, 8);
-  const clientPage = ecomClientPage(
+  const clientPage = buildImageProcessingClientPage(
     opts.userId,
     workspaceId,
-    ECOM_IMAGE_PROCESSING_TOOL_KEY,
+    opts.mode,
   );
   const { images: volcImages, logId } = await ecomGwVolcengineImageEdit(
     opts.userId,
@@ -365,7 +453,7 @@ export async function ecomImageProcessingRestore(opts: {
   upscaleFactor?: string;
   parameters?: Record<string, unknown>;
 }) {
-  await assertEcomToolkitGatewayAccess(opts.userId);
+  await assertImageProcessingGatewayAccess(opts.userId);
   const prompt = buildRestorePrompt(
     opts.repairType ?? "auto",
     opts.upscaleFactor ?? "1",
@@ -403,7 +491,7 @@ export async function ecomImageProcessingFaceSwap(opts: {
   algorithm?: string;
   parameters?: Record<string, unknown>;
 }) {
-  await assertEcomToolkitGatewayAccess(opts.userId);
+  await assertImageProcessingGatewayAccess(opts.userId);
   const prompt = buildFaceSwapPrompt({
     blendMode: opts.blendMode ?? "natural",
     postProcess: opts.postProcess ?? "auto-beauty",
@@ -439,7 +527,7 @@ export async function ecomImageProcessingOutpaint(opts: {
   sourceImageDataUrl: string;
   parameters?: Record<string, unknown>;
 }) {
-  await assertEcomToolkitGatewayAccess(opts.userId);
+  await assertImageProcessingGatewayAccess(opts.userId);
 
   if (isQwenEditModelKey(opts.model)) {
     const prompt =
@@ -460,10 +548,10 @@ export async function ecomImageProcessingOutpaint(opts: {
   }
 
   const workspaceId = randomUUID().slice(0, 8);
-  const clientPage = ecomClientPage(
+  const clientPage = buildImageProcessingClientPage(
     opts.userId,
     workspaceId,
-    ECOM_IMAGE_PROCESSING_TOOL_KEY,
+    "outpaint",
   );
   const imageUrl = await ensurePublicImageUrl(opts.userId, opts.sourceImageDataUrl);
   const apiParams = buildOutpaintApiParameters(opts.parameters ?? {});
@@ -491,7 +579,7 @@ export async function ecomImageProcessingEditor(opts: {
   parameters?: Record<string, unknown>;
   model?: string;
 }) {
-  await assertEcomToolkitGatewayAccess(opts.userId);
+  await assertImageProcessingGatewayAccess(opts.userId);
   const model = opts.model?.trim() || ECOM_SEEDREAM_EDITOR_MODEL_KEY;
   const images =
     opts.sourceImageDataUrls?.filter((u) => u.trim()) ??
@@ -501,10 +589,10 @@ export async function ecomImageProcessingEditor(opts: {
     if (images.length === 0) throw new Error("请上传至少一张图片");
     if (images.length > 3) throw new Error("最多上传 3 张图片");
     const workspaceId = randomUUID().slice(0, 8);
-    const clientPage = ecomClientPage(
+    const clientPage = buildImageProcessingClientPage(
       opts.userId,
       workspaceId,
-      ECOM_IMAGE_PROCESSING_TOOL_KEY,
+      "editor",
     );
     const resolved = await Promise.all(
       images.map((img) => ensurePublicImageUrl(opts.userId, img)),
@@ -562,10 +650,10 @@ export async function ecomImageProcessingEditor(opts: {
   }
 
   const workspaceId = randomUUID().slice(0, 8);
-  const clientPage = ecomClientPage(
+  const clientPage = buildImageProcessingClientPage(
     opts.userId,
     workspaceId,
-    ECOM_IMAGE_PROCESSING_TOOL_KEY,
+    "editor",
   );
 
   const { images: volcImages, logId } = await ecomGwVolcengineImageEdit(opts.userId, {
@@ -627,6 +715,15 @@ function buildGenerativeParameters(
   if (out.seed === "" || out.seed === undefined) delete out.seed;
   if (out.strength !== undefined) delete out.strength;
   if (out.styleImageDataUrl) delete out.styleImageDataUrl;
+  const nRaw = out.n;
+  if (nRaw !== undefined) {
+    const n = Number(nRaw);
+    if (!Number.isFinite(n) || n <= 1) {
+      delete out.n;
+    } else {
+      out.n = Math.min(15, Math.floor(n));
+    }
+  }
   return out;
 }
 
@@ -642,7 +739,7 @@ export async function ecomImageProcessingBgRemove(opts: {
   styleImageDataUrl?: string;
   parameters?: Record<string, unknown>;
 }) {
-  await assertEcomToolkitGatewayAccess(opts.userId);
+  await assertImageProcessingGatewayAccess(opts.userId);
   const prompt = buildBgRemovePrompt({
     bgMode: opts.bgMode ?? "transparent",
     edgeQuality: opts.edgeQuality ?? "auto",
@@ -692,7 +789,7 @@ export async function ecomImageProcessingObjectRemove(opts: {
   styleImageDataUrl?: string;
   parameters?: Record<string, unknown>;
 }) {
-  await assertEcomToolkitGatewayAccess(opts.userId);
+  await assertImageProcessingGatewayAccess(opts.userId);
   if (!opts.prompt.trim()) {
     throw new Error("请描述要移除的内容");
   }
@@ -743,7 +840,7 @@ export async function ecomImageProcessingDeblur(opts: {
   styleImageDataUrl?: string;
   parameters?: Record<string, unknown>;
 }) {
-  await assertEcomToolkitGatewayAccess(opts.userId);
+  await assertImageProcessingGatewayAccess(opts.userId);
   const builtPrompt = buildDeblurPrompt(
     opts.blurType ?? "auto",
     opts.sharpenStrength ?? "medium",
@@ -799,6 +896,54 @@ async function pollKieImageJob(
   throw new Error("生图超时，请稍后重试");
 }
 
+type ImageProcessingResultRow = {
+  asset: { id: string; ossUrl: string };
+  ossUrl: string;
+};
+
+type MemeCaptionOpts = {
+  topText?: string;
+  bottomText?: string;
+  textStyle?: string;
+};
+
+async function persistGeneratedImageBuffer(opts: {
+  userId: string;
+  buf: Buffer;
+  contentType: string;
+  ext: string;
+  prompt: string;
+  model: string;
+  mode: ImageProcessingMode;
+  logId: string;
+  meta?: Record<string, unknown>;
+}): Promise<ImageProcessingResultRow> {
+  const ossUrl = await uploadCanvasUserBuffer({
+    userId: opts.userId,
+    ext: opts.ext,
+    buf: opts.buf,
+    contentType: opts.contentType,
+  });
+  const asset = await prisma.ecomAsset.create({
+    data: {
+      userId: opts.userId,
+      module: "image-processing",
+      kind: "image",
+      title: opts.prompt.slice(0, 80),
+      prompt: opts.prompt,
+      ossUrl,
+      thumbnailUrl: ossUrl,
+      meta: {
+        model: opts.model,
+        mode: opts.mode,
+        logId: opts.logId,
+        ...opts.meta,
+      },
+    },
+  });
+  return { asset, ossUrl };
+}
+
 async function runVolcengineGenerate(opts: {
   userId: string;
   model: string;
@@ -806,12 +951,13 @@ async function runVolcengineGenerate(opts: {
   sourceImageDataUrl?: string;
   parameters?: Record<string, unknown>;
   mode: ImageProcessingMode;
+  memeCaption?: MemeCaptionOpts;
 }) {
   const workspaceId = randomUUID().slice(0, 8);
-  const clientPage = ecomClientPage(
+  const clientPage = buildImageProcessingClientPage(
     opts.userId,
     workspaceId,
-    ECOM_IMAGE_PROCESSING_TOOL_KEY,
+    opts.mode,
   );
   const { images: volcImages, logId } = await ecomGwVolcengineImageEdit(
     opts.userId,
@@ -825,39 +971,46 @@ async function runVolcengineGenerate(opts: {
   );
   const results = [];
   for (const img of volcImages) {
-    let url = img.url;
-    if (!url && img.b64) {
-      const buf = Buffer.from(img.b64, "base64");
-      const ossUrl = await uploadCanvasUserBuffer({
-        userId: opts.userId,
-        ext: "png",
-        buf,
-        contentType: "image/png",
-      });
-      const asset = await prisma.ecomAsset.create({
-        data: {
-          userId: opts.userId,
-          module: "image-processing",
-          kind: "image",
-          title: opts.prompt.slice(0, 80),
-          prompt: opts.prompt,
-          ossUrl,
-          thumbnailUrl: ossUrl,
-          meta: { model: opts.model, mode: opts.mode, logId },
-        },
-      });
-      results.push({ asset, ossUrl });
-      continue;
+    let buf: Buffer | null = null;
+    let contentType = "image/png";
+    let ext = "png";
+
+    if (img.b64) {
+      buf = Buffer.from(img.b64, "base64");
+    } else if (img.url) {
+      const res = await fetch(img.url);
+      if (!res.ok) throw new Error(`下载生成图失败 HTTP ${res.status}`);
+      contentType = res.headers.get("content-type") ?? "image/png";
+      ext = contentType.includes("jpeg")
+        ? "jpg"
+        : contentType.includes("webp")
+          ? "webp"
+          : "png";
+      buf = Buffer.from(await res.arrayBuffer());
     }
-    if (!url) continue;
-    const row = await downloadToOss({
+    if (!buf) continue;
+
+    if (opts.memeCaption) {
+      buf = await applyMemeCaptionOverlay({
+        image: buf,
+        topText: opts.memeCaption.topText,
+        bottomText: opts.memeCaption.bottomText,
+        textStyle: opts.memeCaption.textStyle,
+      });
+      contentType = "image/png";
+      ext = "png";
+    }
+
+    const row = await persistGeneratedImageBuffer({
       userId: opts.userId,
-      url,
-      title: opts.prompt,
+      buf,
+      contentType,
+      ext,
       prompt: opts.prompt,
       model: opts.model,
       mode: opts.mode,
       logId,
+      meta: opts.memeCaption ? { captionOverlay: true } : undefined,
     });
     results.push(row);
   }
@@ -906,10 +1059,10 @@ async function runKieTextToImage(opts: {
     },
   });
   const workspaceId = randomUUID().slice(0, 8);
-  const clientPage = ecomClientPage(
+  const clientPage = buildImageProcessingClientPage(
     opts.userId,
     workspaceId,
-    ECOM_IMAGE_PROCESSING_TOOL_KEY,
+    opts.mode,
   );
   const { taskId, logId } = await ecomGwCreateKieJob(opts.userId, {
     model,
@@ -938,7 +1091,7 @@ export async function ecomImageProcessingCameraAngle(opts: {
   styleImageDataUrl?: string;
   parameters?: Record<string, unknown>;
 }) {
-  await assertEcomToolkitGatewayAccess(opts.userId);
+  await assertImageProcessingGatewayAccess(opts.userId);
   const builtPrompt = buildCameraAnglePrompt(
     opts.cameraAngle ?? "three-quarter",
     opts.extraGuidance,
@@ -988,7 +1141,7 @@ export async function ecomImageProcessingPoster(opts: {
   styleImageDataUrl?: string;
   parameters?: Record<string, unknown>;
 }) {
-  await assertEcomToolkitGatewayAccess(opts.userId);
+  await assertImageProcessingGatewayAccess(opts.userId);
   if (!opts.sceneDescription.trim()) {
     throw new Error("请填写场景描述");
   }
@@ -1037,8 +1190,9 @@ async function ecomImageProcessingTextToImage(opts: {
   styleImageDataUrl?: string;
   parameters?: Record<string, unknown>;
   mode: ImageProcessingMode;
+  memeCaption?: MemeCaptionOpts;
 }) {
-  await assertEcomToolkitGatewayAccess(opts.userId);
+  await assertImageProcessingGatewayAccess(opts.userId);
   const model =
     opts.generativeModel?.trim() ||
     opts.model?.trim() ||
@@ -1057,12 +1211,21 @@ async function ecomImageProcessingTextToImage(opts: {
   }
 
   if (isSeedreamEditorModelKey(model)) {
+    let sourceImage: string | undefined;
+    if (opts.styleImageDataUrl?.trim()) {
+      sourceImage = await ensurePublicImageUrl(
+        opts.userId,
+        opts.styleImageDataUrl.trim(),
+      );
+    }
     return runVolcengineGenerate({
       userId: opts.userId,
       model,
       prompt: opts.prompt,
+      sourceImageDataUrl: sourceImage,
       parameters: params,
       mode: opts.mode,
+      memeCaption: opts.memeCaption,
     });
   }
 
@@ -1083,21 +1246,33 @@ export async function ecomImageProcessingMeme(opts: {
   if (!opts.sceneDescription.trim()) {
     throw new Error("请描述场景");
   }
+  const hasCaption = Boolean(
+    opts.topText?.trim() || opts.bottomText?.trim(),
+  );
   const prompt = buildMemePrompt({
     memeFormat: opts.memeFormat ?? "classic",
     sceneDescription: opts.sceneDescription,
     topText: opts.topText,
     bottomText: opts.bottomText,
     textStyle: opts.textStyle,
+    omitCaptionText: hasCaption,
   });
-  return ecomImageProcessingTextToImage({
+  const result = await ecomImageProcessingTextToImage({
     userId: opts.userId,
     prompt,
     generativeModel: opts.generativeModel,
     styleImageDataUrl: opts.styleImageDataUrl,
     parameters: opts.parameters,
     mode: "meme",
+    memeCaption: hasCaption
+      ? {
+          topText: opts.topText,
+          bottomText: opts.bottomText,
+          textStyle: opts.textStyle,
+        }
+      : undefined,
   });
+  return result;
 }
 
 export async function ecomImageProcessingAvatar(opts: {

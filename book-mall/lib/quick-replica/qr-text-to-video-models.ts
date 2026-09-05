@@ -50,7 +50,7 @@ export const QR_TEXT_TO_VIDEO_MODELS: QrTextToVideoModelDef[] = [
   {
     modelKey: "kling-3.0/video",
     label: "Kling 3.0",
-    subtitle: "图/文生视频",
+    subtitle: "百炼 · 图/文生视频",
     maxRefImages: 4,
     paramProfile: "kling30",
     defaultMode: "pro",
@@ -69,6 +69,20 @@ export const QR_TEXT_TO_VIDEO_MODELS: QrTextToVideoModelDef[] = [
     label: "Wan 2.7",
     subtitle: "文生视频",
     maxRefImages: 0,
+    paramProfile: "wan_t2v",
+  },
+  {
+    modelKey: "wan3.0-video",
+    label: "万相 3.0",
+    subtitle: "文生 / 图生 / 参考生视频 · 最长 30s",
+    maxRefImages: 10,
+    paramProfile: "wan_t2v",
+  },
+  {
+    modelKey: "wan3.0-video-prime",
+    label: "万相 3.0 优速版",
+    subtitle: "更快生成 · 文生 / 图生 / 参考生视频 · 最长 30s",
+    maxRefImages: 10,
     paramProfile: "wan_t2v",
   },
 ];

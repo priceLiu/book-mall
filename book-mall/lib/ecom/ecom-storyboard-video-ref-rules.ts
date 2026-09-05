@@ -13,16 +13,19 @@ import {
 import type { StoryboardReference } from "@/lib/ecom/ecom-storyboard-types";
 import {
   getStoryboardCharacterRefs,
-  getStoryboardProductRef,
+  getStoryboardProductRefs,
   getStoryboardSceneRefs,
 } from "@/lib/ecom/ecom-storyboard-refs";
 import {
   isStoryboardBailianR2vVideoModel,
   isStoryboardKieVideoModel,
   isStoryboardKling30KieVideoModel,
+  isStoryboardMinimaxVideoModel,
   isStoryboardVolcengineVideoModel,
+  isStoryboardWan30VideoModel,
   resolveStoryboardVideoProvider,
 } from "@/lib/ecom/ecom-storyboard-video-models";
+import { resolveMinimaxVideoModel } from "@/lib/gateway/minimax-video-models";
 
 export type StoryboardVideoRefSlotRole =
   | "full_sheet"
@@ -41,11 +44,15 @@ export type StoryboardVideoRefPackStrategy =
   /** 百炼 wan2.7 / HappyHorse：单张多宫格故事板 + 产品/角色/场景，不重复送各镜头分镜 */
   | "bailian_storyboard_grid"
   /** 百炼万相 2.6 multi：仅分镜镜头图（shot_type=multi），不送整版故事版 */
-  | "bailian_multi_shot_panels";
+  | "bailian_multi_shot_panels"
+  /** MiniMax H3 R2V/S2V：reference_* 角色，故事版 + 身份参考 */
+  | "minimax_reference_pack"
+  /** MiniMax H3 文生视频：不传参考图 */
+  | "minimax_t2v";
 
 export type StoryboardVideoInvokeRules = {
   modelKey: string;
-  provider: "volcengine" | "kie" | "bailian";
+  provider: "volcengine" | "kie" | "bailian" | "minimax" | "dashscope";
   strategy: StoryboardVideoRefPackStrategy;
   /** 参考图总上限（含首帧或 flat 数组全部条目） */
   maxTotalImages: number;
@@ -98,6 +105,20 @@ function dedupeUrls(urls: string[], exclude?: Set<string>): string[] {
 export function getStoryboardVideoInvokeRules(modelKey: string): StoryboardVideoInvokeRules {
   const key = modelKey.trim();
   const provider = resolveStoryboardVideoProvider(key);
+
+  if (isStoryboardWan30VideoModel(key)) {
+    return {
+      modelKey: key,
+      provider: "dashscope",
+      strategy: "volcengine_sheet_plus_identity",
+      maxTotalImages: 10,
+      supportsFullSheet: true,
+      hasFirstFrameRole: true,
+      apiMaxDurationSec: 30,
+      strategyNote:
+        "万相 3.0 All-in-One：首帧=故事版；其余产品/角色/场景作 reference_image（最多 10 张）。",
+    };
+  }
 
   if (isStoryboardKling30KieVideoModel(key)) {
     return {
@@ -159,6 +180,7 @@ export function getStoryboardVideoInvokeRules(modelKey: string): StoryboardVideo
       maxTotalImages: bailianR2vMaxRefs(key),
       supportsFullSheet: true,
       hasFirstFrameRole: false,
+      apiMaxDurationSec: 30,
       strategyNote:
         "万相 2.7 R2V：media[0]=多宫格故事板，再附产品/角色/场景；不送各镜头单图（官方多宫格脚本范式）。",
     };
@@ -174,6 +196,46 @@ export function getStoryboardVideoInvokeRules(modelKey: string): StoryboardVideo
       hasFirstFrameRole: false,
       strategyNote:
         "HappyHorse R2V：产品/角色/场景参考前置（[Image 1] 起），故事板置后仅作构图节奏；不重复送各镜头单图。",
+    };
+  }
+
+  if (isStoryboardMinimaxVideoModel(key)) {
+    const spec = resolveMinimaxVideoModel(key);
+    if (spec?.mode === "t2v") {
+      return {
+        modelKey: key,
+        provider: "minimax",
+        strategy: "minimax_t2v",
+        maxTotalImages: 0,
+        supportsFullSheet: false,
+        hasFirstFrameRole: false,
+        apiMaxDurationSec: 15,
+        strategyNote: "MiniMax H3 文生视频：仅文本 prompt，不传参考图。",
+      };
+    }
+    if (spec?.mode === "r2v" || spec?.mode === "s2v") {
+      return {
+        modelKey: key,
+        provider: "minimax",
+        strategy: "minimax_reference_pack",
+        maxTotalImages: 9,
+        supportsFullSheet: true,
+        hasFirstFrameRole: false,
+        apiMaxDurationSec: 15,
+        strategyNote:
+          "MiniMax H3 主体/参考生视频：故事版 + 产品/角色/场景作 reference_image。",
+      };
+    }
+    return {
+      modelKey: key,
+      provider: "minimax",
+      strategy: "minimax_reference_pack",
+      maxTotalImages: 9,
+      supportsFullSheet: true,
+      hasFirstFrameRole: false,
+      apiMaxDurationSec: 15,
+      strategyNote:
+        "MiniMax H3 图生视频：故事版 + 产品/角色/场景均作 reference_image（不可与 first_frame 混用）。",
     };
   }
 
@@ -204,30 +266,24 @@ function identitySlots(references: StoryboardReference[]): StoryboardVideoRefSlo
 }
 
 /**
- * 身份参考优先级：产品 → 场景 → 角色。
- * 万相 2.7 仅 5 张时，场景优先于第二张角色图，避免「场景不对」。
+ * 身份参考优先级：产品 → 角色 → 场景。
+ * 人物一致优先于场景参考；余量不足时先丢场景，保留角色参考。
  */
 function identitySlotsPrioritized(
   references: StoryboardReference[],
 ): StoryboardVideoRefSlot[] {
   const out: StoryboardVideoRefSlot[] = [];
-  const product = getStoryboardProductRef(references);
-  if (product) {
+  const products = getStoryboardProductRefs(references);
+  for (const [i, product] of products.entries()) {
     const name = product.label?.trim();
     out.push({
       role: "product",
       url: product.ossUrl.trim(),
       label: name
         ? `产品图「${name}」（包装外观须一致）`
-        : "产品图（包装外观须一致）",
-    });
-  }
-  for (const [i, s] of getStoryboardSceneRefs(references).entries()) {
-    const name = s.label?.trim();
-    out.push({
-      role: "scene",
-      url: s.ossUrl.trim(),
-      label: name ? `场景参考「${name}」` : `场景参考${i + 1}`,
+        : products.length > 1
+          ? `产品图${i + 1}（包装外观须一致）`
+          : "产品图（包装外观须一致）",
     });
   }
   for (const [i, c] of getStoryboardCharacterRefs(references).entries()) {
@@ -238,6 +294,14 @@ function identitySlotsPrioritized(
       label: name
         ? `角色「${name}」（五官发型穿搭须一致）`
         : `角色参考${i + 1}（五官发型穿搭须一致）`,
+    });
+  }
+  for (const [i, s] of getStoryboardSceneRefs(references).entries()) {
+    const name = s.label?.trim();
+    out.push({
+      role: "scene",
+      url: s.ossUrl.trim(),
+      label: name ? `场景参考「${name}」` : `场景参考${i + 1}`,
     });
   }
   return out;
@@ -315,7 +379,8 @@ export function resolveStoryboardVideoRefPlan(opts: {
       break;
     }
 
-    case "kie_flat_rich": {
+    case "kie_flat_rich":
+    case "minimax_reference_pack": {
       if (rules.supportsFullSheet && sheetUrl) {
         pushSlot(slots, cap, {
           role: "full_sheet",
@@ -331,6 +396,9 @@ export function resolveStoryboardVideoRefPlan(opts: {
       }
       break;
     }
+
+    case "minimax_t2v":
+      break;
 
     case "volcengine_sheet_plus_identity":
     case "kling_first_frame_elements":
@@ -352,11 +420,12 @@ export function resolveStoryboardVideoRefPlan(opts: {
   const urls = slots.map((s) => s.url);
   const sheetSlot = slots.find((s) => s.role === "full_sheet");
   const firstFrameUrl = sheetSlot?.url ?? urls[0] ?? sheetUrl;
-  const referenceImageUrls = rules.hasFirstFrameRole
-    ? urls.filter((u) => u !== firstFrameUrl)
-    : rules.provider === "kie"
+  const referenceImageUrls =
+    rules.hasFirstFrameRole || rules.provider === "kie"
       ? urls.filter((u) => u !== firstFrameUrl)
-      : [];
+      : rules.strategy === "minimax_reference_pack"
+        ? urls
+        : [];
 
   const bailianAllUrls = rules.provider === "bailian" ? urls : [];
 

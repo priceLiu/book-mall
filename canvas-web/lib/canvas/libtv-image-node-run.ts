@@ -1,8 +1,8 @@
 import { markCanvasNodeGenerationStarted } from "./canvas-credits-notify";
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 
-/** 组内分镜格：走列 batch，不用 Dock 模型选择（公告栏独立分镜节点除外） */
-export function isLibtvPipelineImageCell(
+/** 组内分镜格：走分镜列 batch（任务 nodeId=列 · scope.rowKey），非独立 freestanding runner */
+export function isPro2PipelineFrameCell(
   node: Pick<CanvasFlowNode, "type" | "data" | "parentId"> | undefined,
 ): boolean {
   if (node?.type !== "story-pro2-image") return false;
@@ -13,13 +13,39 @@ export function isLibtvPipelineImageCell(
   return Boolean(d.pro2ControllerNodeId?.trim() || node.parentId);
 }
 
+/** @deprecated 使用 isPro2PipelineFrameCell */
+export function isLibtvPipelineImageCell(
+  node: Pick<CanvasFlowNode, "type" | "data" | "parentId"> | undefined,
+): boolean {
+  return isPro2PipelineFrameCell(node);
+}
+
+/** 组内三视图格：走角色列 batch（任务 nodeId=列 · scope.rowKey），非独立 freestanding runner */
+export function isPro2PipelineThreeViewCell(
+  node: Pick<CanvasFlowNode, "type" | "data"> | undefined,
+): boolean {
+  if (!node) return false;
+  const d = node.data as {
+    pro2ControllerNodeId?: string;
+    pro2MediaRole?: string;
+  };
+  if (!d.pro2ControllerNodeId?.trim()) return false;
+  if (node.type === "story-pro2-three-view") return true;
+  return (
+    node.type === "story-pro2-image" &&
+    d.pro2MediaRole === "character-three-view"
+  );
+}
+
 /** sbv1-image · Pro2 独立/场景图格：Dock 模型选择 + sbv1-image runner */
 export function isLibtvFreestandingImageNode(
   node: Pick<CanvasFlowNode, "type" | "data"> | undefined,
 ): boolean {
   if (!node) return false;
   if (node.type === "sbv1-image") return true;
-  if (node.type === "story-pro2-three-view") return true;
+  if (node.type === "story-pro2-three-view") {
+    return !isPro2PipelineThreeViewCell(node);
+  }
   if (node.type === "story-pro2-image") {
     const role = (node.data as { pro2MediaRole?: string }).pro2MediaRole ?? "generic";
     if (role === "generic" || role === "scene" || role === "prop" || role === "mood") {
@@ -43,10 +69,18 @@ export function libtvMediaRunPendingRuntime(): CanvasNodeRuntime {
   return {
     status: "pending",
     taskId: undefined,
+    ossUrl: undefined,
+    ephemeralUrl: undefined,
+    posterUrl: undefined,
     failCode: undefined,
     failMessage: undefined,
     dismissedFailTaskId: undefined,
   };
+}
+
+/** setNodeRuntime 合并写 pending 时须清掉上一轮 runtime 媒体 URL，避免误判 idle */
+export function libtvMediaRunPendingRuntimePartial(): Partial<CanvasNodeRuntime> {
+  return libtvMediaRunPendingRuntime();
 }
 
 export function libtvMediaRunIdlePatch(): Record<string, unknown> {

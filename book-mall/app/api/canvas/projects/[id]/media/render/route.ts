@@ -1,4 +1,6 @@
-import { MediaRenderSourceApp } from "@prisma/client";
+import {
+  MediaRenderSourceApp,
+} from "@prisma/client";
 import { type NextRequest, NextResponse } from "next/server";
 
 import {
@@ -10,8 +12,12 @@ import {
 } from "@/lib/canvas/api-helpers";
 import type { JianyingFrameInput } from "@/lib/canvas/canvas-jianying-export";
 import { CanvasProjectError, getCanvasProjectForUser } from "@/lib/canvas/canvas-project-service";
+import { hydrateJianyingRenderFrameAudioUrls } from "@/lib/canvas/hydrate-jianying-render-frames";
+import { mapBillingFailureForGatewayLog } from "@/lib/billing/billing-failure-map";
+import { InsufficientCreditsError } from "@/lib/billing/credit-account-service";
 import { fromCanvasJianyingFrames } from "@/lib/media/timeline-adapters";
 import {
+  buildPendingMediaRenderJobDto,
   createMediaRenderJob,
   enqueueMediaRenderJob,
   getMediaRenderJobForUser,
@@ -45,18 +51,67 @@ export async function POST(request: NextRequest, ctx: Ctx) {
   }
 
   try {
-    await getCanvasProjectForUser(guard.user.id, projectId);
-    const timeline = fromCanvasJianyingFrames(frames);
+    const project = await getCanvasProjectForUser(guard.user.id, projectId);
+    const canvasNodes =
+      (
+        project.canvas as {
+          nodes?: Array<{ id: string; type?: string; data?: Record<string, unknown> }>;
+        }
+      ).nodes ?? [];
+    const hydratedFrames = await hydrateJianyingRenderFrameAudioUrls({
+      userId: guard.user.id,
+      projectId,
+      frames: frames as JianyingFrameInput[],
+      canvasNodes,
+    });
     const profile = parseRenderProfile(body.body.profile);
+    if (profile.audio?.mixTts) {
+      const videoFramesWithAudio = hydratedFrames.filter(
+        (f) => f.audioSourceNodeId?.trim() && f.videoUrl?.trim(),
+      );
+      const missingAudio = videoFramesWithAudio.filter(
+        (f) => !f.audioUrl?.trim(),
+      );
+      if (missingAudio.length > 0) {
+        return NextResponse.json(
+          {
+            error: "AUDIO_HYDRATE_FAILED",
+            message: `已勾选「烧录对白」，但有 ${missingAudio.length} 镜配音未能同步到云端。请确认 TTS 已生成完成，稍候重试；若仍失败请重新生成配音后再提交。`,
+          },
+          { status: 400, headers: jsonHeaders(request) },
+        );
+      }
+    }
+    const timeline = fromCanvasJianyingFrames(hydratedFrames);
+    const replaceInFlight = body.body.replaceInFlight === true;
     const job = await createMediaRenderJob({
       userId: guard.user.id,
       sourceApp: MediaRenderSourceApp.canvas,
       sourceRef: { projectId },
       timeline,
       profile,
+      replaceInFlight,
     });
-    enqueueMediaRenderJob(job.id);
+    if (!job.reusedExisting) {
+      enqueueMediaRenderJob(job.id);
+      return NextResponse.json(
+        {
+          job: buildPendingMediaRenderJobDto({
+            id: job.id,
+            userId: guard.user.id,
+            expiresAt: job.expiresAt,
+          }),
+        },
+        { headers: jsonHeaders(request) },
+      );
+    }
     const dto = await getMediaRenderJobForUser(job.id, guard.user.id);
+    if (!dto) {
+      return NextResponse.json(
+        { error: "NOT_FOUND", message: "剪辑任务不存在" },
+        { status: 404, headers: jsonHeaders(request) },
+      );
+    }
     return NextResponse.json({ job: dto }, { headers: jsonHeaders(request) });
   } catch (err) {
     if (err instanceof CanvasProjectError) {
@@ -66,6 +121,13 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       return NextResponse.json(
         { error: err.code, message: err.userMessage },
         { status: 503, headers: jsonHeaders(request) },
+      );
+    }
+    if (err instanceof InsufficientCreditsError) {
+      const mapped = mapBillingFailureForGatewayLog(err);
+      return NextResponse.json(
+        { error: mapped.failCode, message: mapped.failMessage },
+        { status: 402, headers: jsonHeaders(request) },
       );
     }
     const message = mediaRenderErrorMessage(err);

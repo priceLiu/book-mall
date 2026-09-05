@@ -250,7 +250,12 @@ export const STORY_LLM_MODEL_KEYS = [
   "deepseek-v4-flash",
   "deepseek-v4-pro",
   "deepseek-chat",
+  "qwen3.8-max",
+  "qwen3-omni-flash",
+  "qwen2.5-vl-72b-instruct",
+  "glm-5.3-flash",
   "qwen3.7-plus",
+  "qwen3.6-plus",
   "qwen3.5-plus",
   "qwen3-vl-plus",
   "qwen-plus",
@@ -266,14 +271,37 @@ export const STORY_VIDEO_MODEL_KEYS = [
   "happyhorse/image-to-video",
   "grok-imagine/image-to-video",
   "grok-imagine-video-1-5-preview",
+  "wan3.0-video",
+  "wan3.0-video-prime",
+  "MiniMax/MiniMax-H3-t2v",
+  "MiniMax/MiniMax-H3-i2v",
+  "MiniMax/MiniMax-H3-fl2v",
+  "MiniMax/MiniMax-H3-r2v",
+  "MiniMax/MiniMax-H3-s2v",
+  "MiniMax/MiniMax-H3-regeneration",
+] as const;
+
+/** 影视专业版 · MiniMax H3 直连 Gateway */
+export const STORY_PRO_VIDEO_MINIMAX_MODEL_KEYS = [
+  "MiniMax/MiniMax-H3-t2v",
+  "MiniMax/MiniMax-H3-i2v",
+  "MiniMax/MiniMax-H3-fl2v",
+  "MiniMax/MiniMax-H3-r2v",
+  "MiniMax/MiniMax-H3-s2v",
+  "MiniMax/MiniMax-H3-regeneration",
+  "MiniMax/MiniMax-H3-context-ir",
 ] as const;
 
 /** 影视专业版 · 百炼参考生视频（Gateway · 百炼，非 KIE 直连） */
 export const STORY_PRO_VIDEO_BAILIAN_MODEL_KEYS = [
+  "happyhorse-1.1-t2v",
+  "happyhorse-1.1-r2v",
   "happyhorse-1.0-r2v",
   "wan2.7-r2v",
   "wan2.6-r2v",
   "wan2.6-r2v-flash",
+  "wan3.0-video",
+  "wan3.0-video-prime",
 ] as const;
 
 /** 影视专业版 · 火山方舟 Seedance 图生视频（Gateway · VOLCENGINE） */
@@ -286,6 +314,7 @@ export const STORY_PRO_VIDEO_MODEL_KEYS = [
   ...STORY_PRO_VIDEO_VOLCENGINE_MODEL_KEYS,
   ...STORY_VIDEO_MODEL_KEYS,
   ...STORY_PRO_VIDEO_BAILIAN_MODEL_KEYS,
+  ...STORY_PRO_VIDEO_MINIMAX_MODEL_KEYS,
 ] as const;
 
 /**
@@ -293,12 +322,22 @@ export const STORY_PRO_VIDEO_MODEL_KEYS = [
  * 与 KIE_KNOWN_MODELS 对齐；含多参考图（image_input / image_urls / input_urls）
  */
 export const STORY_PRO_FRAME_IMAGE_MODEL_KEYS = [
+  "qwen-image-3.0-pro",
+  "z-image-turbo",
+  "qwen-image-edit",
+  "qwen-image-edit-max",
+  "wan2.7-image",
+  "wan2.7-image-pro",
+  "wan2.6-image",
   "nano-banana-pro",
   "kling-3.0-image",
   "4o-image",
   "nano-banana-2",
   "google/nano-banana",
+  "google/nano-banana-edit",
   "flux-2-pro",
+  "doubao-seedream-5-0-pro",
+  "doubao-seedream-5-0-lite",
   "seedream-5-lite",
   "seedream-4.5",
   "gpt-image-2",

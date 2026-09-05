@@ -66,4 +66,23 @@ describe("log-canvas-e2e-timing", () => {
     expect(row.e2eFrozen).toBe(true);
     expect(readCanvasE2eTiming(summary)?.e2eMs).toBe(1_000_000);
   });
+
+  it("resolveCanvasE2eForLogRow falls back to gateway wall clock without canvas task", () => {
+    const submitted = new Date("2026-09-03T14:29:32.708Z");
+    const completed = new Date("2026-09-03T14:34:28.000Z");
+    const row = resolveCanvasE2eForLogRow({
+      log: {
+        submittedAt: submitted,
+        completedAt: completed,
+        durationMs: 296_000,
+        status: "SUCCEEDED",
+        resultSummary: { task: { status: "succeeded" } },
+      },
+      canvasTask: null,
+    });
+    expect(row.e2eMs).toBe(296_000);
+    expect(row.preGatewayMs).toBe(0);
+    expect(row.gatewayMs).toBe(296_000);
+    expect(row.e2eFrozen).toBe(true);
+  });
 });

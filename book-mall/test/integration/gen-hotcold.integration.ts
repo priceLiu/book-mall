@@ -14,7 +14,7 @@
 import { randomUUID } from "node:crypto";
 
 import {
-  getPoolBalances,
+  getAccountCreditBalances,
   grantCredits,
   reserveCredits,
   settleReserved,
@@ -63,13 +63,12 @@ async function main() {
         reserveCredits({
           ref: { ownerType: "USER", ownerId: u1 },
           credits: 100,
-          pool: "GENERAL",
         }),
       ),
     );
-    const balAfter1 = await getPoolBalances({ ownerType: "USER", ownerId: u1 });
-    check("TC-1 余额 = 8000 − 800 = 7200", balAfter1.general.balance === 7200, balAfter1.general);
-    check("TC-1 预占 = 800", balAfter1.general.reserved === 800, balAfter1.general);
+    const balAfter1 = await getAccountCreditBalances({ ownerType: "USER", ownerId: u1 });
+    check("TC-1 余额 = 8000 − 800 = 7200", balAfter1.balance === 7200, balAfter1);
+    check("TC-1 预占 = 800", balAfter1.reserved === 800, balAfter1);
 
     const balanceAfters = reserves
       .map((r) => r?.balanceAfter)
@@ -97,17 +96,17 @@ async function main() {
     // 先预占 800（8×100），再并发结算其中 4 条
     await Promise.all(
       Array.from({ length: 8 }, () =>
-        reserveCredits({ ref: { ownerType: "USER", ownerId: u2 }, credits: 100, pool: "GENERAL" }),
+        reserveCredits({ ref: { ownerType: "USER", ownerId: u2 }, credits: 100 }),
       ),
     );
     await Promise.all(
       Array.from({ length: 4 }, () =>
-        settleReserved({ ref: { ownerType: "USER", ownerId: u2 }, credits: 100, pool: "GENERAL" }),
+        settleReserved({ ref: { ownerType: "USER", ownerId: u2 }, credits: 100 }),
       ),
     );
-    const balAfter2 = await getPoolBalances({ ownerType: "USER", ownerId: u2 });
-    check("TC-2 预占 = 800 − 400 = 400", balAfter2.general.reserved === 400, balAfter2.general);
-    check("TC-2 无负余额/负预占", balAfter2.general.balance >= 0 && balAfter2.general.reserved >= 0, balAfter2.general);
+    const balAfter2 = await getAccountCreditBalances({ ownerType: "USER", ownerId: u2 });
+    check("TC-2 预占 = 800 − 400 = 400", balAfter2.reserved === 400, balAfter2);
+    check("TC-2 无负余额/负预占", balAfter2.balance >= 0 && balAfter2.reserved >= 0, balAfter2);
 
     // ———————————— TC-3 不同账户 8 并发互不阻塞 ————————————
     const others = Array.from({ length: 8 }, () => `test-ghc-u3-${randomUUID()}`);
@@ -120,7 +119,7 @@ async function main() {
     const t0 = Date.now();
     const res3 = await Promise.all(
       others.map((o) =>
-        reserveCredits({ ref: { ownerType: "USER", ownerId: o }, credits: 100, pool: "GENERAL" }),
+        reserveCredits({ ref: { ownerType: "USER", ownerId: o }, credits: 100 }),
       ),
     );
     check("TC-3 不同账户 8 并发全部成功", res3.every((r) => r != null));

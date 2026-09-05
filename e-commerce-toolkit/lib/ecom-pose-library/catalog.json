@@ -1,0 +1,25 @@
+{
+  "poses": [
+    { "id": "A-01", "category": "A", "title": "正面直立拎包", "baseDescription": "正面直立，双腿微微分开，重心居中，双手自然下垂或拎包。", "sortOrder": 1 },
+    { "id": "A-02", "category": "A", "title": "正面插兜", "baseDescription": "正面直立，双腿并拢，双手插兜，肩部放松。", "sortOrder": 2 },
+    { "id": "A-03", "category": "A", "title": "错步撩发", "baseDescription": "正面站立，双腿一前一后错开，单手拎包，另一手抬起触碰头发。", "sortOrder": 3 },
+    { "id": "B-01", "category": "B", "title": "向前行走搭衣襟", "baseDescription": "向前行走，右腿迈出左腿在后，左手搭衣襟，右手拎包下垂，头微低。", "sortOrder": 10 },
+    { "id": "B-02", "category": "B", "title": "侧身行走", "baseDescription": "侧身行走，身体朝向左前方，左脚前迈，右手放身后包位，低头看斜下方。", "sortOrder": 11 },
+    { "id": "B-03", "category": "B", "title": "行走双臂舒展", "baseDescription": "行走姿态，右腿迈出左腿在后，双臂向身体两侧舒展张开，手掌朝下。", "sortOrder": 12 },
+    { "id": "C-01", "category": "C", "title": "侧身插兜回眸", "baseDescription": "身体侧对镜头约30°，单手插兜，另一手自然垂放，头部回转正对镜头。", "sortOrder": 20 },
+    { "id": "C-02", "category": "C", "title": "三分之二侧面", "baseDescription": "三分之二侧面，双手插兜或自然垂放，头部转回看向镜头，目光自信。", "sortOrder": 21 },
+    { "id": "D-01", "category": "D", "title": "侧蹲手贴额头", "baseDescription": "侧蹲姿态，右腿屈膝下蹲，左膝抬起，右手抬起手掌轻贴额头侧边，左臂手肘搭在左膝盖上。", "sortOrder": 30 },
+    { "id": "E-01", "category": "E", "title": "背面回眸", "baseDescription": "背面全身站立，双手背在身后，包斜挎肩上，头部向右侧回转露出侧脸。", "sortOrder": 40 },
+    { "id": "H-01", "category": "H", "title": "沙滩奔跑", "baseDescription": "身体前倾，右腿向前大步迈出，双臂自然前后交替摆动，头发随风扬起。", "sortOrder": 50 },
+    { "id": "H-02", "category": "H", "title": "星形跳跃", "baseDescription": "双腿向两侧大幅度张开，双臂同时向上向外伸展呈大字形，身体腾空离地。", "sortOrder": 51 },
+    { "id": "I-01", "category": "I", "title": "逛街翻包", "baseDescription": "正面站立，低头视线向下，双手在身前打开手提包翻找物品，双腿微微错开。", "sortOrder": 60 },
+    { "id": "I-02", "category": "I", "title": "咖啡店回眸", "baseDescription": "身体朝向右侧作即将离开状，右手端着咖啡杯，头部猛然转回看向镜头，面带微笑。", "sortOrder": 61 },
+    { "id": "J-01", "category": "J", "title": "干练行走商务风", "baseDescription": "身体正对镜头向前行走，右手拎公文包垂于身侧，左手整理西装外套领口，头部微抬。", "sortOrder": 70 },
+    { "id": "J-02", "category": "J", "title": "宴会举杯侧身", "baseDescription": "身体侧对镜头约45°，右手优雅举起高脚杯至胸前高度，双腿并拢直立。", "sortOrder": 71 },
+    { "id": "K-01", "category": "K", "title": "红毯经典回眸", "baseDescription": "身体向画面右侧走去，上身大幅度向左后方扭转，头部回正看向镜头，表情冷艳。", "sortOrder": 80 },
+    { "id": "K-02", "category": "K", "title": "手拿手包叉腰", "baseDescription": "身体正对镜头，左臂弯曲叉在腰部，右手自然下垂握住小巧手拿包，双腿微分开。", "sortOrder": 81 },
+    { "id": "L-01", "category": "L", "title": "双手抱头后仰", "baseDescription": "双手交叉抱在脑后，上半身向后仰，胸腔打开，头部后仰看向天空。", "sortOrder": 90 },
+    { "id": "L-02", "category": "L", "title": "单膝跪地前倾伸手", "baseDescription": "单膝跪地，另一腿屈膝在前，上半身极度前倾靠近镜头，单手撑地，另一手抬起伸向镜头方向。", "sortOrder": 91 },
+    { "id": "M-01", "category": "M", "title": "手贴下颌", "baseDescription": "正面全身站立，双腿微微错开，右手自然下垂拎小包，左手抬起轻贴脸颊下颌位置，面带微笑看向镜头。", "sortOrder": 100 }
+  ]
+}

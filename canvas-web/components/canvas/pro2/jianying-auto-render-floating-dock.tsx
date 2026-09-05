@@ -17,10 +17,12 @@ import {
   useLibtvFloatingDock,
   useLibtvSoleSelectedNodeId,
 } from "@/lib/canvas/use-libtv-floating-dock";
+import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-dock-selection";
 import { JianyingMediaRenderActions } from "../jianying-media-render-actions";
 
-/** 2.0 · 自动成片浮动 Dock（800×400 · 恒定屏上尺寸） */
+/** 2.0 · 自动成片浮动 Dock（800×600 · 恒定屏上尺寸） */
 export function JianyingAutoRenderFloatingDock() {
+  const suppressDock = useLibtvShouldSuppressFloatingDock();
   const dockNodeId = useLibtvSoleSelectedNodeId("jianying-auto-render-pro2");
 
   const nodeExists = useCanvasStore(
@@ -35,7 +37,7 @@ export function JianyingAutoRenderFloatingDock() {
     JIANYING_AUTO_RENDER_DOCK_PLACEMENT_OPTS,
   );
 
-  if (!dockNodeId || !nodeExists || !placement) return null;
+  if (suppressDock || !dockNodeId || !nodeExists || !placement) return null;
 
   return (
     <JianyingAutoRenderFloatingDockBody
@@ -80,8 +82,9 @@ const JianyingAutoRenderFloatingDockBody = memo(function JianyingAutoRenderFloat
         nodes,
         edges,
         data?.clipOrderNodeIds,
+        data?.audioOrderNodeIds,
       ),
-    [nodeId, nodes, edges, data?.clipOrderNodeIds],
+    [nodeId, nodes, edges, data?.clipOrderNodeIds, data?.audioOrderNodeIds],
   );
 
   const exportFrames = useMemo(
@@ -100,11 +103,19 @@ const JianyingAutoRenderFloatingDockBody = memo(function JianyingAutoRenderFloat
     [nodeId, updateNodeData],
   );
 
+  const onAudioOrderChange = useCallback(
+    (orderNodeIds: string[]) => {
+      updateNodeData(nodeId, { audioOrderNodeIds: orderNodeIds });
+    },
+    [nodeId, updateNodeData],
+  );
+
   return (
     <Pro2InputDockShell
       flowAnchor={placement}
       hidden={hidden}
       hideExpand
+      anchorNodeId={nodeId}
       flowSize={{
         w: JIANYING_AUTO_RENDER_DOCK_FLOW_W,
         h: JIANYING_AUTO_RENDER_DOCK_FLOW_H,
@@ -120,12 +131,16 @@ const JianyingAutoRenderFloatingDockBody = memo(function JianyingAutoRenderFloat
         clipSlots={snapshot.clipSlots}
         clipOrderNodeIds={snapshot.orderNodeIds}
         onClipOrderChange={onClipOrderChange}
+        audioClipSlots={snapshot.audioClipSlots}
+        audioOrderNodeIds={snapshot.audioOrderNodeIds}
+        onAudioOrderChange={onAudioOrderChange}
         persisted={data?.mediaRenderResult}
         inFlight={data?.mediaRenderInFlight}
         spawnPreview={false}
         layout="dock"
         connectedCount={snapshot.connectedCount}
         renderedCount={snapshot.renderedCount}
+        audioConnectedCount={snapshot.audioConnectedCount}
       />
     </Pro2InputDockShell>
   );

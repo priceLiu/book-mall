@@ -1,8 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo } from "react";
 
-import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
+import {
+  buildStoryboardPanelPreviewItems,
+  EcomImagePreviewHost,
+  useEcomImagePreview,
+} from "@/components/media";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +26,7 @@ type Props = {
   projectKeywords?: string;
   producer?: string;
   title?: string;
+  sheetHeading?: string;
 };
 
 /** 完整分镜图预览：各镜头/参考图可点击放大 */
@@ -35,11 +40,17 @@ export function StoryboardSheetPreviewDialog({
   projectKeywords,
   producer,
   title = "完整分镜图",
+  sheetHeading,
 }: Props) {
-  const [imagePreview, setImagePreview] = useState<{
-    src: string;
-    title: string;
-  } | null>(null);
+  const panelImagePreviewItems = useMemo(
+    () => buildStoryboardPanelPreviewItems(sheet.panels),
+    [sheet.panels],
+  );
+  const {
+    preview: imagePreview,
+    openPreview: openPanelImagePreview,
+    closePreview: closeImagePreview,
+  } = useEcomImagePreview(panelImagePreviewItems);
 
   return (
     <>
@@ -57,26 +68,20 @@ export function StoryboardSheetPreviewDialog({
               productHighlight={productHighlight}
               projectKeywords={projectKeywords}
               producer={producer}
+              sheetHeading={sheetHeading}
               exportRootId="storyboard-sheet-preview"
               variant="preview"
-              onPreviewImage={(src, imgTitle) =>
-                setImagePreview({ src, title: imgTitle })
-              }
+              onPreviewImage={openPanelImagePreview}
             />
           </div>
         </DialogContent>
       </Dialog>
 
-      {imagePreview ? (
-        <EcomImagePreviewDialog
-          src={imagePreview.src}
-          open
-          onOpenChange={(next) => {
-            if (!next) setImagePreview(null);
-          }}
-          title={imagePreview.title}
-        />
-      ) : null}
+      <EcomImagePreviewHost
+        preview={imagePreview}
+        galleryItems={panelImagePreviewItems}
+        onClose={closeImagePreview}
+      />
     </>
   );
 }

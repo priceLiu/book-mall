@@ -2,6 +2,12 @@ import { NextRequest } from "next/server";
 
 import { canViewFinanceCost } from "@/lib/auth/permissions";
 import {
+  isDbUnavailableError,
+  isPrismaConnectionUnavailable,
+  logDbUnavailable,
+  prismaConnectionUnavailableMessage,
+} from "@/lib/db-unavailable";
+import {
   financeForbidden,
   financeJson,
   financeOptions,
@@ -22,13 +28,26 @@ export async function GET(request: NextRequest) {
   }
 
   const sp = request.nextUrl.searchParams;
-  const data = await buildUsageOverviewData({
-    since: sp.get("since") ?? undefined,
-    tool: sp.get("tool") ?? undefined,
-    userId: sp.get("userId") ?? undefined,
-    billingPersona: sp.get("billingPersona") ?? undefined,
-    staffFlag: sp.get("staffFlag") ?? undefined,
-    tenantId: sp.get("tenantId") ?? undefined,
-  });
-  return financeJson(request, data);
+  try {
+    const data = await buildUsageOverviewData({
+      since: sp.get("since") ?? undefined,
+      tool: sp.get("tool") ?? undefined,
+      userId: sp.get("userId") ?? undefined,
+      billingPersona: sp.get("billingPersona") ?? undefined,
+      staffFlag: sp.get("staffFlag") ?? undefined,
+      tenantId: sp.get("tenantId") ?? undefined,
+    });
+    return financeJson(request, data);
+  } catch (e) {
+    if (isPrismaConnectionUnavailable(e) || isDbUnavailableError(e)) {
+      logDbUnavailable("usage-overview", e);
+      return financeJson(
+        request,
+        { error: prismaConnectionUnavailableMessage(e) },
+        { status: 503 },
+      );
+    }
+    const msg = e instanceof Error ? e.message : String(e);
+    return financeJson(request, { error: msg }, { status: 500 });
+  }
 }

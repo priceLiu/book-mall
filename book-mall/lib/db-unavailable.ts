@@ -1,13 +1,44 @@
 import { Prisma } from "@prisma/client";
+import { PrismaPoolBusyError } from "@/lib/prisma-db-gate";
+import { USER_SYSTEM_BUSY_MESSAGE } from "@/lib/db-user-messages";
 
 const CONNECTION_UNAVAILABLE_RE =
   /Can't reach database server|Server has closed the connection|PrismaClientInitializationError|connection pool|pool timeout|Timed out fetching a new connection|query_wait_timeout|transaction already closed|Transaction API error/i;
 
+/** 统一连接池/不可达错误（prisma 重试耗尽后抛出；error boundary / API 503 识别） */
+export class DbUnavailableError extends Error {
+  readonly code = "SYSTEM_BUSY";
+
+  constructor(message?: string, readonly cause?: unknown) {
+    super(message ?? "Database unavailable");
+    this.name = "DbUnavailableError";
+  }
+}
+
+export function isDbUnavailableError(error: unknown): error is DbUnavailableError {
+  return error instanceof DbUnavailableError;
+}
+
+export function toDbUnavailableError(error: unknown): DbUnavailableError {
+  if (error instanceof DbUnavailableError) return error;
+  const message =
+    error instanceof Error ? error.message : "Database unavailable";
+  return new DbUnavailableError(message, error);
+}
+
 /** 数据库不可达、连接池耗尽、连接关闭等：避免整页 500，用于前台读库降级 */
 export function isPrismaConnectionUnavailable(error: unknown): boolean {
+  if (isDbUnavailableError(error)) return true;
+  if (error instanceof PrismaPoolBusyError) return true;
   if (error instanceof Prisma.PrismaClientInitializationError) return true;
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    return error.code === "P1001" || error.code === "P1017";
+    return (
+      error.code === "P1001" ||
+      error.code === "P1002" ||
+      error.code === "P1008" ||
+      error.code === "P1017" ||
+      error.code === "P2024"
+    );
   }
   if (error instanceof Error) {
     return CONNECTION_UNAVAILABLE_RE.test(error.message);
@@ -18,21 +49,8 @@ export function isPrismaConnectionUnavailable(error: unknown): boolean {
 /** @deprecated 使用 isPrismaConnectionUnavailable */
 export const isDatabaseUnavailable = isPrismaConnectionUnavailable;
 
-export function prismaConnectionUnavailableMessage(error: unknown): string {
-  const msg = error instanceof Error ? error.message : String(error);
-  if (/connection pool|pool timeout|Timed out fetching a new connection|query_wait_timeout/i.test(msg)) {
-    if (process.env.NODE_ENV === "development") {
-      return "系统繁忙，任务正在排队重试。dev:all 下请确认 DATABASE_URL：经 PgBouncer 时 connection_limit 建议 15；直连 CDB 可用 30。poll-loop 子进程保持 PRISMA_CONNECTION_LIMIT=1。";
-    }
-    return "系统繁忙，请稍候再试；任务会自动排队重试。";
-  }
-  if (
-    process.env.NODE_ENV === "development" &&
-    /Can't reach database server|P1001|Server has closed the connection/i.test(msg)
-  ) {
-    return "数据库不可达（本地开发通常需 VPN 连接腾讯云）。请检查 VPN 后执行 pnpm --dir book-mall db:ping。";
-  }
-  return "系统繁忙，请稍候再试。";
+export function prismaConnectionUnavailableMessage(_error?: unknown): string {
+  return USER_SYSTEM_BUSY_MESSAGE;
 }
 
 export function logDbUnavailable(scope: string, error: unknown) {

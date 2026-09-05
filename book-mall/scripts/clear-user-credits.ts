@@ -1,5 +1,5 @@
 /**
- * 指定用户积分账户清零（通用池 + 视频池 + 冻结），并写入 EXPIRE 流水。
+ * 指定用户积分账户清零（余额 + 冻结），并写入 EXPIRE 流水。
  *
  *   cd book-mall && pnpm exec dotenv -e .env.local -- tsx scripts/clear-user-credits.ts --email=user@example.com [--confirm]
  */
@@ -36,10 +36,10 @@ async function main() {
 
   console.log(`[clear-credits] ${confirm ? "执行" : "DRY-RUN"} · ${email}`);
   console.log(
-    `[clear-credits] 当前：通用 ${account.balanceCredits} · 视频 ${account.videoBalanceCredits} · 冻结 ${account.reservedCredits}/${account.videoReservedCredits}`,
+    `[clear-credits] 当前：余额 ${account.balanceCredits} · 冻结 ${account.reservedCredits}`,
   );
   console.log(
-    `[clear-credits] 将清除 planId=${account.planId ?? "—"} monthlyGrant=${account.monthlyGrantCredits} videoGrant=${account.videoMonthlyGrant}`,
+    `[clear-credits] 将清除 planId=${account.planId ?? "—"} monthlyGrant=${account.monthlyGrantCredits}`,
   );
 
   if (!confirm) {
@@ -59,26 +59,9 @@ async function main() {
           type: "EXPIRE",
           credits: -acc.balanceCredits,
           balanceAfter: 0,
-          pool: "GENERAL",
           refType: "admin_zero",
-          idempotencyKey: `${idemBase}:general`,
-          description: `运维清零：通用池（${user.email}）`,
-          billingPersonaSnap: user.billingPersona,
-        },
-      });
-    }
-
-    if (acc.videoBalanceCredits !== 0) {
-      await tx.creditLedger.create({
-        data: {
-          accountId: acc.id,
-          type: "EXPIRE",
-          credits: -acc.videoBalanceCredits,
-          balanceAfter: 0,
-          pool: "VIDEO",
-          refType: "admin_zero",
-          idempotencyKey: `${idemBase}:video`,
-          description: `运维清零：视频池（${user.email}）`,
+          idempotencyKey: `${idemBase}:balance`,
+          description: `运维清零（${user.email}）`,
           billingPersonaSnap: user.billingPersona,
         },
       });
@@ -88,11 +71,8 @@ async function main() {
       where: { id: acc.id },
       data: {
         balanceCredits: 0,
-        videoBalanceCredits: 0,
         reservedCredits: 0,
-        videoReservedCredits: 0,
         monthlyGrantCredits: 0,
-        videoMonthlyGrant: 0,
         planId: null,
         currentPeriodEnd: null,
         pricePerCreditYuan: null,

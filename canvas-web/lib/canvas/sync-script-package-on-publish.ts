@@ -1,5 +1,6 @@
 import { createProjectAsset } from "@/lib/canvas-api";
 import { exportScriptPackageDraft } from "./export-script-package";
+import type { AssetVisibility } from "./project-asset-types";
 import type {
   StoryProScriptHubNodeData,
   StoryProStarterNodeData,
@@ -13,6 +14,7 @@ export async function syncScriptPackageAssetOnPublish(args: {
   hubData: StoryProScriptHubNodeData;
   starterId?: string;
   starterData?: StoryProStarterNodeData;
+  visibility?: AssetVisibility;
 }): Promise<string | undefined> {
   const starterData = args.starterData ?? ({} as StoryProStarterNodeData);
   const draft = exportScriptPackageDraft({
@@ -45,7 +47,7 @@ export async function syncScriptPackageAssetOnPublish(args: {
       sourceEdition: "pro2",
       payload,
       refs: [],
-      visibility: "PRIVATE",
+      visibility: args.visibility ?? "PRIVATE",
     });
     return asset.id;
   } catch {

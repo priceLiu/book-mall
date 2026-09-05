@@ -10,9 +10,14 @@ export function resolveAppLaunchBlockedRedirect(input: {
   canvasOriginConfigured: boolean;
   canvasReady: boolean;
   ecomReady: boolean;
+  canLaunchCommonTools: boolean;
+  commonToolsOriginConfigured: boolean;
+  commonToolsReady: boolean;
   canLaunchQuickReplica: boolean;
   quickReplicaOriginConfigured: boolean;
   quickReplicaReady: boolean;
+  publisherOriginConfigured: boolean;
+  publisherReady: boolean;
   billingPersona: BillingPersona | null;
   gatewayLinked: boolean;
 }): string | null {
@@ -20,6 +25,18 @@ export function resolveAppLaunchBlockedRedirect(input: {
 
   if (actionId === "launch-tools") {
     return input.canLaunchTools ? null : ACCOUNT_APP_SUBSCRIBE_HREF;
+  }
+
+  if (actionId === "launch-common-tools") {
+    if (
+      input.canLaunchCommonTools &&
+      input.commonToolsOriginConfigured &&
+      input.billingPersona === "BYOK" &&
+      !input.gatewayLinked
+    ) {
+      return "/account/gateway";
+    }
+    return input.commonToolsReady ? null : ACCOUNT_APP_SUBSCRIBE_HREF;
   }
 
   if (actionId === "launch-canvas") {
@@ -50,14 +67,20 @@ export function resolveAppLaunchBlockedRedirect(input: {
     return input.quickReplicaReady ? null : ACCOUNT_APP_SUBSCRIBE_HREF;
   }
 
+  if (actionId === "launch-publisher") {
+    return input.publisherReady ? null : ACCOUNT_APP_SUBSCRIBE_HREF;
+  }
+
   return null;
 }
 
 export function isAppLaunchAction(id: string): boolean {
   return (
+    id === "launch-common-tools" ||
     id === "launch-tools" ||
     id === "launch-canvas" ||
     id === "launch-ecom" ||
-    id === "launch-quick-replica"
+    id === "launch-quick-replica" ||
+    id === "launch-publisher"
   );
 }

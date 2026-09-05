@@ -1,22 +1,20 @@
 /**
  * Canvas 参考生视频 · 百炼 DashScope R2V（华北2 北京）
+ *
+ * Gateway 出站：apiKey 来自 DB 凭证（见 poll-service submitBailianR2vJobForLog），非 process.env。
  */
 import { buildBailianR2vRequestBody } from "@/lib/canvas/bailian-r2v-body";
+import { readVendorRequestIdFromJson } from "@/lib/gateway/vendor-request-id";
 
 const CREATE_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis";
 const TASK_URL_BASE = "https://dashscope.aliyuncs.com/api/v1/tasks";
 
-export function getDashScopeApiKey(): string | null {
-  const dash = process.env.DASHSCOPE_API_KEY?.trim();
-  if (dash) return dash;
-  return process.env.QWEN_API_KEY?.trim() || null;
-}
-
 type I2vCreateResponse = {
   output?: { task_id?: string; task_status?: string };
   code?: string;
   message?: string;
+  request_id?: string;
 };
 
 export type BailianR2vTaskOutput = {
@@ -37,7 +35,9 @@ export async function bailianR2vCreateTask(opts: {
   duration: number;
   seedStr?: string;
   parameterExtras?: Record<string, unknown>;
-}): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
+}): Promise<
+  { ok: true; taskId: string; requestId?: string } | { ok: false; error: string }
+> {
   const prompt = opts.prompt.trim();
   if (!prompt) return { ok: false, error: "提示词不能为空" };
 
@@ -88,7 +88,8 @@ export async function bailianR2vCreateTask(opts: {
         typeof json.message === "string" ? json.message : "接口未返回 task_id",
     };
   }
-  return { ok: true, taskId };
+  const requestId = readVendorRequestIdFromJson(json) ?? undefined;
+  return { ok: true, taskId, ...(requestId ? { requestId } : {}) };
 }
 
 export async function bailianR2vGetTask(opts: {
@@ -129,7 +130,7 @@ export function extractBailianR2vVideoUrlFromGatewaySummary(
   const root = summary as Record<string, unknown>;
 
   const fromObj = (obj: Record<string, unknown>): string | null => {
-    const url = obj.video_url;
+    const url = obj.video_url ?? obj.videoUrl;
     return typeof url === "string" && url.trim() ? url.trim() : null;
   };
 

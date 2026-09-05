@@ -22,6 +22,8 @@ import {
 } from "./types";
 import type { CanvasProviderKind } from "@prisma/client";
 
+import { auditVendorDirectEgress } from "@/lib/gateway/vendor-egress-audit";
+
 export type OpenAiCompatOptions = {
   /** 决定 fallback 模型清单与显示 kind */
   kind: CanvasProviderKind;
@@ -221,6 +223,12 @@ export class OpenAiCompatGateway implements CanvasProviderGateway {
   }
 
   async chat(req: CanvasGatewayChatRequest): Promise<CanvasGatewayChatResponse> {
+    auditVendorDirectEgress({
+      baseUrl: this.baseUrl,
+      model: req.modelKey,
+      apiKey: this.apiKey,
+      caller: "OpenAiCompatGateway.chat",
+    });
     const body: Record<string, unknown> = {
       model: req.modelKey,
       messages: req.messages,
@@ -289,6 +297,12 @@ export class OpenAiCompatGateway implements CanvasProviderGateway {
   async createImageTask(
     req: CanvasGatewayImageRequest,
   ): Promise<CanvasGatewayImageTask> {
+    auditVendorDirectEgress({
+      baseUrl: this.baseUrl,
+      model: req.modelKey,
+      apiKey: this.apiKey,
+      caller: "OpenAiCompatGateway.createImageTask",
+    });
     const params = (req.params ?? {}) as Record<string, unknown>;
     const body: Record<string, unknown> = {
       model: req.modelKey,

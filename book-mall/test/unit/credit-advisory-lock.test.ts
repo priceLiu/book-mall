@@ -35,8 +35,6 @@ function makeTx(execCalls: ExecCall[]) {
         id: "acc-1",
         balanceCredits: 1000,
         reservedCredits: 0,
-        videoBalanceCredits: 0,
-        videoReservedCredits: 0,
       })),
       update: vi.fn(async () => ({
         id: "acc-1",
@@ -70,7 +68,6 @@ async function runReserveFor(ownerId: string): Promise<ExecCall[]> {
   await reserveCredits({
     ref: { ownerType: "USER", ownerId },
     credits: 100,
-    pool: "GENERAL",
   });
   return execCalls;
 }

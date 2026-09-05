@@ -2,7 +2,10 @@
  * 分镜视频 1.0 · sbv1-video-engine runner
  */
 import { CanvasProjectError } from "./canvas-project-service";
-import { resolveVolcengineVideoRatio } from "./canvas-video-volcengine";
+import {
+  isVolcengineStoryVideoModelKey,
+  resolveVolcengineVideoRatio,
+} from "./canvas-video-volcengine";
 import {
   runVideoEngineNode,
   type RunEngineNodeArgs,
@@ -18,6 +21,8 @@ import {
   isDashscopeSbv1TextToVideoModel,
 } from "./dashscope-sbv1-t2v";
 import { isTopazCanvasVideoModelKey } from "./providers/topaz";
+import { isMinimaxCanvasVideoModelKey } from "./providers/minimax-video";
+import { runCanvasS2vVideoNode } from "./canvas-s2v-runner";
 
 type Sbv1ReferenceMode = "omni" | "first_last" | "smart_multi";
 type Sbv1DockInputMode = "t2v" | "i2v" | "first_last" | "omni" | "multi_ref";
@@ -30,6 +35,12 @@ export async function runSbv1VideoEngineNode(
   args: RunEngineNodeArgs,
 ): Promise<RunEngineNodeResult> {
   const data = args.node.data ?? {};
+  const pro2PresetKind = String(data.pro2PresetKind ?? "").trim();
+
+  if (pro2PresetKind === "lip-sync-broadcast") {
+    return runCanvasS2vVideoNode(args);
+  }
+
   const engine = (data.engine as Record<string, unknown> | undefined) ?? {};
   const providerId = String(engine.providerId ?? data.providerId ?? "");
   const modelKey = String(engine.modelKey ?? data.modelKey ?? "");
@@ -64,6 +75,23 @@ export async function runSbv1VideoEngineNode(
   const hasPortraitRefs = portraitRefs.length > 0;
   /** Seedance：已入库 asset://；其它模型：仅 OSS HTTPS */
   const imageInputs = httpsImageUrls(args.node.imageInputs ?? []);
+  const audioInputs = (args.node.audioInputs ?? []).filter(
+    (u): u is string => typeof u === "string" && /^https?:\/\//.test(u.trim()),
+  );
+
+  if (pro2PresetKind === "reference-audio-to-video") {
+    if (imageInputs.length === 0) {
+      throw new CanvasProjectError(
+        "INVALID_INPUT",
+        "参考音生视频需要至少一张参考图",
+      );
+    }
+    if (audioInputs.length > 0) {
+      params.reference_audio_urls = audioInputs.slice(0, 1);
+      params.generate_audio = false;
+      params.generateAudio = false;
+    }
+  }
 
   if (!providerId || !modelKey) {
     throw new CanvasProjectError(
@@ -127,12 +155,28 @@ export async function runSbv1VideoEngineNode(
   const isDashscopeT2v = isDashscopeSbv1TextToVideoModel(modelKey);
   const isKlingTextToVideo =
     modelKey === "kling-3.0/video" && dockInputMode === "t2v";
+  const isVolcengineTextToVideo =
+    isVolcengineStoryVideoModelKey(modelKey) && dockInputMode === "t2v";
+  const isMinimaxTextToVideo =
+    isMinimaxCanvasVideoModelKey(modelKey) &&
+    modelKey.toLowerCase().includes("-t2v") &&
+    dockInputMode === "t2v";
   const hasReferenceImages = imageInputs.length > 0 || hasPortraitRefs;
   /** 纯文生视频：无参考图；有 @图片 / 连线参考时保留图片并走 R2V 升级 */
   const isTextToVideoOnly =
-    (isDashscopeT2v || isKlingTextToVideo) && !hasReferenceImages;
+    (isDashscopeT2v ||
+      isKlingTextToVideo ||
+      isVolcengineTextToVideo ||
+      isMinimaxTextToVideo) &&
+    !hasReferenceImages;
 
   if (
+    pro2PresetKind === "reference-audio-to-video" &&
+    imageInputs.length > 0 &&
+    audioInputs.length > 0
+  ) {
+    // 参考音模式：有图 + 参考音频即可，prompt 可选
+  } else if (
     !promptRaw &&
     imageInputs.length === 0 &&
     !hasPortraitRefs &&
@@ -219,7 +263,15 @@ export async function runSbv1VideoEngineNode(
     (isDashscopeT2v && hasReferenceImages)
   ) {
     params.ratio = aspectRatio;
-    params.resolution = /^720p$/i.test(resolution) ? "720P" : "1080P";
+  if (modelKey === "wan3.0-video" || modelKey === "wan3.0-video-prime") {
+      params.resolution = /^480p$/i.test(resolution)
+        ? "480P"
+        : /^1080p$/i.test(resolution)
+          ? "1080P"
+          : "720P";
+    } else {
+      params.resolution = /^720p$/i.test(resolution) ? "720P" : "1080P";
+    }
     params.duration = durationSec;
   }
   if (referenceMode !== "smart_multi") {
@@ -230,6 +282,14 @@ export async function runSbv1VideoEngineNode(
   }
   params.generate_audio =
     params.generate_audio !== false && params.generateAudio !== false;
+
+  if (isMinimaxCanvasVideoModelKey(modelKey)) {
+    const minimaxRes =
+      resolution === "720p" || resolution === "768p" ? "768P" : "2K";
+    params.resolution = minimaxRes;
+    params.ratio = aspectRatio;
+    params.duration = durationSec > 0 ? durationSec : 5;
+  }
 
   if (isMotionControl) {
     const videoUrls = Array.isArray(params.reference_video_urls)

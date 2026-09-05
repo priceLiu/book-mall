@@ -16,6 +16,7 @@ import { projectHasInflightTasks, countInflightTasks } from "@/lib/projects/task
 import { cn } from "@/lib/utils";
 import { StorySetupTab } from "./story-setup-tab";
 import { StoryboardTab } from "./storyboard-tab";
+import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 
 const STEPS: { id: ProjectStep; label: string }[] = [
   { id: "story", label: "故事设定" },
@@ -30,6 +31,7 @@ export function ProjectWorkspaceClient({
   projectId,
 }: ProjectWorkspaceClientProps) {
   const router = useRouter();
+  const bookOrigin = useBookMallBaseUrl();
   const base = useBookMallBaseUrl();
   const [project, setProject] = useState<ComicProject | null>(null);
   const [loading, setLoading] = useState(true);
@@ -144,7 +146,13 @@ export function ProjectWorkspaceClient({
             ))}
           </nav>
 
-          <div className="hidden flex-1 sm:flex sm:justify-end">
+          <div className="hidden flex-1 items-center justify-end gap-2 sm:flex">
+            {bookOrigin ? (
+              <PlatformTopupNavLink
+                bookOrigin={bookOrigin}
+                className="inline-flex shrink-0 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-white/80 transition hover:border-white/20 hover:bg-white/5 hover:text-white"
+              />
+            ) : null}
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}

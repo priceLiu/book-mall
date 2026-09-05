@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { ADMIN_TEMPLATE_PAGE_SIZE, sliceAdminPage } from "@/lib/admin/admin-template-page";
 import { prisma } from "@/lib/prisma";
 import {
   getBuiltinQrTemplateById,
@@ -81,7 +82,11 @@ export function applyCatalogOverridesToBuiltin(
 export async function listAdminQrTemplates(filters: {
   category?: QrCategory | null;
   kind?: string | null;
-}): Promise<AdminQrTemplateRow[]> {
+  limit?: number;
+  offset?: number;
+}): Promise<{ templates: AdminQrTemplateRow[]; total: number }> {
+  if (!filters.category) return { templates: [], total: 0 };
+
   const overrideMap = await loadCatalogOverrideMap();
 
   const overrideRows = await prisma.qrTemplate.findMany({
@@ -152,9 +157,15 @@ export async function listAdminQrTemplates(filters: {
     };
   });
 
-  return [...builtinRows, ...platformRows].sort(
+  const merged = [...builtinRows, ...platformRows].sort(
     (a, b) => a.sortOrder - b.sortOrder || b.updatedAt.localeCompare(a.updatedAt),
   );
+  const page = sliceAdminPage(
+    merged,
+    filters.offset ?? 0,
+    filters.limit ?? ADMIN_TEMPLATE_PAGE_SIZE,
+  );
+  return { templates: page.items, total: page.total };
 }
 
 function defaultReference(args: AdminTemplateFormInput): QrTemplateJson["reference"] {
@@ -276,7 +287,10 @@ export async function upsertAdminQrTemplate(args: {
         ...data,
         catalogBuiltinId: args.catalogBuiltinId,
       },
-      update: data,
+      update: {
+        ...data,
+        deletedAt: null,
+      },
     });
   } else {
     row = await prisma.qrTemplate.create({

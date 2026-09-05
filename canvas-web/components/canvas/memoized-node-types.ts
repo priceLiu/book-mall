@@ -23,10 +23,12 @@ import { StoryFrameColumnNode } from "./nodes/story-frame-column-node";
 import { StoryProSceneColumnNode } from "./nodes/story-pro-scene-column-node";
 import { StoryProScriptHubNode } from "./nodes/story-pro-script-hub-node";
 import { StoryPro2StarterNode } from "./pro2/story-pro2-starter-node";
+import { StoryPro2PromptNode } from "./pro2/story-pro2-prompt-node";
 import { StoryPro2TagNode } from "./pro2/story-pro2-tag-node";
 import { StoryPro2ImageNode } from "./pro2/story-pro2-image-node";
 import { StoryPro2AudioNode } from "./pro2/story-pro2-audio-node";
 import { StoryPro2ThreeViewNode } from "./pro2/story-pro2-three-view-node";
+import { StoryPro23dDeskNode } from "./pro2/story-pro2-3d-desk-node";
 import { StoryPro2StyleAssetNode } from "./pro2/story-pro2-style-asset-node";
 import { StoryPro2ScriptHubNode } from "./pro2/story-pro2-script-hub-node";
 import { StoryPro2PlaceholderMediaNode } from "./pro2/story-pro2-placeholder-media-node";
@@ -77,9 +79,11 @@ export const memoizedNodeTypes = {
   "image-preview": memoFlowNode(ImagePreviewNode),
   "jianying-export": memoFlowNode(JianyingExportNode),
   "story-pro2-starter": memoFlowNode(StoryPro2StarterNode),
+  "story-pro2-prompt": memoFlowNode(StoryPro2PromptNode),
   "story-pro2-tag": memoFlowNode(StoryPro2TagNode),
   "story-pro2-image": memoFlowNode(StoryPro2ImageNode),
   "story-pro2-three-view": memoFlowNode(StoryPro2ThreeViewNode),
+  "story-pro2-3d-desk": memoFlowNode(StoryPro23dDeskNode),
   "story-pro2-style-asset": memoFlowNode(StoryPro2StyleAssetNode),
   "story-pro2-script-hub": memoFlowNode(StoryPro2ScriptHubNode),
   "story-pro2-style": memoFlowNode(StoryPro2StyleThinNode),

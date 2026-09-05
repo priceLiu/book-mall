@@ -1,11 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Languages, Zap } from "lucide-react";
+import { Languages } from "lucide-react";
+import { Pro2LlmDockCreditsBadge } from "./pro2-llm-dock-credits-badge";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { useLibtvFloatingDock, useLibtvSoleSelectedNodeId } from "@/lib/canvas/use-libtv-floating-dock";
+import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-dock-selection";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
@@ -21,10 +24,19 @@ import {
   pro2HubCanSendScriptPhase,
   pro2HubIsGenerating,
   pro2HubScriptPhaseLabel,
+  resolvePro2HubEffectiveOutline,
 } from "@/lib/canvas/pro2-script-hub-helpers";
+import {
+  pro2ScriptRefImageBadgeOffset,
+  stripLegacyPro2ScriptDockInput,
+} from "@/lib/canvas/pro2-script-category-doc";
+import { applyPro2ScriptCategoryFromHub } from "@/lib/canvas/spawn-pro2-script-category-from-hub";
+import type { Pro2ScriptCategoryId } from "@/lib/canvas/pro2-script-category-presets";
 import { pickDefaultStoryLlmEngine } from "@/lib/canvas/system-providers";
+import { STORY_LLM_MODEL_KEYS } from "@/lib/canvas/types";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
+import { canvasNotify } from "@/lib/canvas/canvas-notify";
 import { cn } from "@/lib/utils";
 import {
   Pro2LlmDockModelPicker,
@@ -38,9 +50,22 @@ import {
 import { Pro2DockUpstreamChips } from "./pro2-dock-upstream-chips";
 import { Pro2DockPasteZone } from "./pro2-dock-paste-zone";
 import { Pro2DockRefImages } from "./pro2-dock-ref-images";
+import { Pro2ScriptCategoryDocChip } from "./pro2-script-category-doc-chip";
+import { Pro2ScriptPackProfileChip } from "./pro2-script-pack-profile-chip";
+import {
+  listPro2UpstreamVideoUrls,
+  PRO2_FILM_PULL_NEED_INDUSTRIAL_MESSAGE,
+  resolvePro2HubFilmPullIntent,
+} from "@/lib/canvas/pro2-film-pull-intent";
 
 const SCRIPT_PLACEHOLDER =
   "一句话生成剧本：描述剧情或添加角色/场景参考，为你生成分镜脚本；上传剧本生成分镜脚本：在节点内点击上传按钮";
+
+const SCRIPT_FILM_PULL_PLACEHOLDER =
+  "输入拉片，或补充要求后发送：将按上游视频逐镜还原（专业版）";
+
+const CUSTOM_PROMPT_DOCK_PLACEHOLDER =
+  "在此编写你的完整剧本提示词（创意、风格、角色、分镜要求等）；发送后系统将按 JSON-only 制作包自动补全结构化输出";
 
 /** 2.0 脚本节点 · 底部输入坞（与文本节点统一外壳） */
 export function Pro2ScriptInputDock() {
@@ -49,8 +74,12 @@ export function Pro2ScriptInputDock() {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const addNode = useCanvasStore((s) => s.addNode);
+  const setEdges = useCanvasStore((s) => s.setEdges);
+  const setNodes = useCanvasStore((s) => s.setNodes);
 
   const dockNodeId = useLibtvSoleSelectedNodeId("story-pro2-script-hub");
+  const suppressDock = useLibtvShouldSuppressFloatingDock();
   const storeNode = useMemo(() => {
     if (!dockNodeId) return null;
     return nodes.find((n) => n.id === dockNodeId) ?? null;
@@ -61,7 +90,12 @@ export function Pro2ScriptInputDock() {
 
   const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
 
+  useEffect(() => {
+    setDockMenu(null);
+  }, [dockNodeId]);
+
   const d = (storeNode?.data ?? {}) as StoryProScriptHubNodeData;
+  const { history: hubTasks } = useNodeTaskHistory(storeNode?.id);
   const dockInput = d.dockInput ?? "";
   const dockRefImages = (d.dockRefImages ?? []) as StoryRefImage[];
   const phase = pro2HubScriptPhaseLabel(d, {
@@ -97,6 +131,35 @@ export function Pro2ScriptInputDock() {
     updateNodeData,
   });
 
+  useEffect(() => {
+    if (!storeNode) return;
+    const cleaned = stripLegacyPro2ScriptDockInput(dockInput);
+    if (cleaned !== dockInput) {
+      updateNodeData(storeNode.id, { dockInput: cleaned }, { commit: true });
+    }
+  }, [storeNode, dockInput, updateNodeData]);
+
+  const hasPromptChip = true;
+  const refBadgeOffset = pro2ScriptRefImageBadgeOffset(
+    upstreamLinks.length,
+    hasPromptChip,
+  );
+
+  const onCategoryApply = useCallback(
+    (categoryId: Pro2ScriptCategoryId) => {
+      if (!storeNode) return;
+      applyPro2ScriptCategoryFromHub(storeNode.id, categoryId, {
+        nodes: useCanvasStore.getState().nodes,
+        edges: useCanvasStore.getState().edges,
+        addNode,
+        setEdges,
+        setNodes,
+        updateNodeData,
+      });
+    },
+    [storeNode, addNode, setEdges, setNodes, updateNodeData],
+  );
+
   const hubRfNode = storeNode
     ? ({
         id: storeNode.id,
@@ -106,11 +169,23 @@ export function Pro2ScriptInputDock() {
       } as const)
     : null;
 
-  const isGenerating = hubRfNode ? pro2HubIsGenerating(hubRfNode as never) : false;
-  const canSendScript = hubRfNode
-    ? pro2HubCanSendScriptPhase(hubRfNode as never, d, { nodes, edges })
+  const isGenerating = hubRfNode
+    ? pro2HubIsGenerating(hubRfNode as never, hubTasks)
     : false;
-  const canSend = canSendScript || Boolean(dockInput.trim());
+  const canSendScript = hubRfNode
+    ? pro2HubCanSendScriptPhase(hubRfNode as never, d, { nodes, edges, hubTasks })
+    : false;
+  const isCustomPrompt = d.scriptCategoryId === "custom-prompt";
+  const hasUpstreamVideo = listPro2UpstreamVideoUrls(upstreamLinks).length > 0;
+  const canSendFilmPull =
+    d.packProfile === "industrial" && hasUpstreamVideo;
+  const canSend = isCustomPrompt
+    ? Boolean(dockInput.trim()) &&
+      Boolean(d.providerId?.trim() && d.modelKey?.trim()) &&
+      !isGenerating
+    : (canSendScript || Boolean(dockInput.trim()) || canSendFilmPull) &&
+      Boolean(d.providerId?.trim() && d.modelKey?.trim()) &&
+      !isGenerating;
 
   useEffect(() => {
     if (!storeNode || d.providerId) return;
@@ -122,6 +197,17 @@ export function Pro2ScriptInputDock() {
       params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
     });
   }, [storeNode, d.providerId, providers, updateNodeData]);
+
+  useEffect(() => {
+    if (!storeNode) return;
+    const modelKey = d.modelKey?.trim() ?? "";
+    const providerId = d.providerId?.trim() ?? "";
+    if (!modelKey.startsWith("kimi-")) return;
+    if (providerId === "gateway:bailian") return;
+    const bailian = providers.find((p) => p.id === "gateway:bailian" && p.active);
+    if (!bailian?.models.some((m) => m.modelKey === modelKey && m.enabled)) return;
+    updateNodeData(storeNode.id, { providerId: "gateway:bailian" });
+  }, [storeNode, d.modelKey, d.providerId, providers, updateNodeData]);
 
   const onPickEngine = useCallback(
     (next: {
@@ -139,10 +225,35 @@ export function Pro2ScriptInputDock() {
     [storeNode, updateNodeData],
   );
 
-  const onSend = useCallback(async () => {
-    if (!storeNode || !hubRfNode) return;
+  const nodeId = storeNode?.id;
 
-    if (!d.providerId?.trim() || !d.modelKey?.trim()) {
+  const onSend = useCallback(async () => {
+    if (!nodeId) return;
+    if (isGenerating) {
+      void canvasNotify({
+        title: "剧本生成进行中",
+        message: "请等待当前段落完成，或刷新页面后重试。",
+        variant: "info",
+      });
+      return;
+    }
+    // 发送钮在 pointerdown 已 flush 草稿；这里从 store 读最新值，避免用到上一帧的空 prompt
+    const snapshot = useCanvasStore.getState();
+    const freshNode = snapshot.nodes.find((n) => n.id === nodeId);
+    if (!freshNode) return;
+    const fd = (freshNode.data ?? {}) as StoryProScriptHubNodeData;
+    const freshInput = fd.dockInput ?? "";
+    const freshRefImages = (fd.dockRefImages ?? []) as StoryRefImage[];
+    const freshNodes = snapshot.nodes;
+    const freshEdges = snapshot.edges;
+    const freshRfNode = {
+      id: nodeId,
+      data: fd,
+      type: "story-pro2-script-hub",
+      position: freshNode.position,
+    } as const;
+
+    if (!fd.providerId?.trim() || !fd.modelKey?.trim()) {
       await alert({
         title: "请选择模型",
         message: "点击左下角模型选择器，选择 LLM 后再发送。",
@@ -151,10 +262,23 @@ export function Pro2ScriptInputDock() {
       return;
     }
 
-    const hasDockInput = Boolean(dockInput.trim());
-    const canRun =
-      hasDockInput ||
-      pro2HubCanSendScriptPhase(hubRfNode as never, d, { nodes, edges });
+    const freshUpstream = resolvePro2DockUpstreamLinks(
+      nodeId,
+      "story-pro2-script-hub",
+      freshNodes,
+      freshEdges,
+    );
+    const videoUrls = listPro2UpstreamVideoUrls(freshUpstream);
+    const isCustomPrompt = fd.scriptCategoryId === "custom-prompt";
+    const canRun = isCustomPrompt
+      ? Boolean(freshInput.trim())
+      : Boolean(freshInput.trim()) ||
+        (fd.packProfile === "industrial" && videoUrls.length > 0) ||
+        pro2HubCanSendScriptPhase(freshRfNode as never, fd, {
+          nodes: freshNodes,
+          edges: freshEdges,
+          hubTasks,
+        });
     if (!canRun) {
       await alert({
         title: "请先提供创意输入",
@@ -165,66 +289,121 @@ export function Pro2ScriptInputDock() {
       return;
     }
 
+    const pullIntent = resolvePro2HubFilmPullIntent({
+      packProfile: fd.packProfile,
+      dockInput: freshInput,
+      hasUpstreamVideo: videoUrls.length > 0,
+      hasOutline: Boolean(
+        resolvePro2HubEffectiveOutline(freshNodes, freshEdges, nodeId, fd),
+      ),
+    });
+    if (pullIntent === "blocked_need_industrial") {
+      await alert({
+        title: "请改用专业版",
+        message: PRO2_FILM_PULL_NEED_INDUSTRIAL_MESSAGE,
+        variant: "warning",
+      });
+      return;
+    }
+    if (pullIntent === "film_pull" && videoUrls.length < 1) {
+      await alert({
+        title: "请先连接源视频",
+        message: "在剧本节点左侧 + 拉出视频节点，上传 / 粘贴 / 拖入视频后再发送拉片。",
+        variant: "warning",
+      });
+      return;
+    }
+
     enqueuePro2ScriptGeneration(
-      storeNode.id,
-      dockInput,
-      dockRefImages,
+      nodeId,
+      freshInput,
+      freshRefImages,
       updateNodeData,
-      { forceFresh: true, nodes, edges, hubData: d, regenerateAll: true },
+      {
+        forceFresh: true,
+        nodes: freshNodes,
+        edges: freshEdges,
+        hubData: fd,
+      },
     );
-  }, [
-    storeNode,
-    hubRfNode,
-    d,
-    dockInput,
-    dockRefImages,
-    nodes,
-    edges,
-    updateNodeData,
-    alert,
-  ]);
+  }, [nodeId, updateNodeData, alert, isGenerating]);
 
-  if (!storeNode || !dockActive || !placement) return null;
+  if (suppressDock || !storeNode || !dockActive || !placement) return null;
 
-  const placeholder = SCRIPT_PLACEHOLDER;
+  const placeholder =
+    d.scriptCategoryId === "custom-prompt"
+      ? CUSTOM_PROMPT_DOCK_PLACEHOLDER
+      : d.packProfile === "industrial" && hasUpstreamVideo
+        ? SCRIPT_FILM_PULL_PLACEHOLDER
+        : SCRIPT_PLACEHOLDER;
   const llmParams = d.params ?? { ...STORY_PRO_LLM_PARAMS_DEFAULT };
 
   return (
     <>
     <Pro2InputDockShell
+      key={storeNode.id}
       flowAnchor={placement}
       dockClassName="pro2-script-dock"
       hidden={dockHidden}
+      anchorNodeId={storeNode.id}
       header={
         <Pro2DockHeader
           refRow={
-            upstreamLinks.length > 0 ? (
-              <Pro2DockUpstreamChips
-                links={upstreamLinks}
-                anchorNodeId={storeNode.id}
+            <>
+              {upstreamLinks.length > 0 ? (
+                <Pro2DockUpstreamChips
+                  links={upstreamLinks}
+                  anchorNodeId={storeNode.id}
+                  activeIds={activeRefIds}
+                />
+              ) : null}
+              <Pro2DockRefImages
+                refs={dockRefImages}
+                onChange={(next) =>
+                  updateNodeData(storeNode.id, { dockRefImages: next })
+                }
+                promptValue={dockInput}
+                onPromptChange={(next) =>
+                  updateNodeData(storeNode.id, { dockInput: next }, { commit: true })
+                }
+                disabled={isGenerating}
+                pasteActive={false}
                 activeIds={activeRefIds}
+                badgeIndexOffset={refBadgeOffset}
+                spawnAnchor={{
+                  nodeId: storeNode.id,
+                  nodeType: "story-pro2-script-hub",
+                }}
+                maxCount={12}
               />
-            ) : null
+            </>
           }
-          actionRow={
-            <Pro2DockRefImages
-              refs={dockRefImages}
-              onChange={(next) =>
-                updateNodeData(storeNode.id, { dockRefImages: next })
-              }
-              promptValue={dockInput}
-              onPromptChange={(next) =>
-                updateNodeData(storeNode.id, { dockInput: next }, { commit: true })
-              }
-              disabled={isGenerating}
-              pasteActive={false}
-              activeIds={activeRefIds}
-              spawnAnchor={{
-                nodeId: storeNode.id,
-                nodeType: "story-pro2-script-hub",
-              }}
-              maxCount={12}
-            />
+          trailingRow={
+            <div className="flex items-center gap-1.5">
+              <Pro2ScriptPackProfileChip
+                value={d.packProfile}
+                disabled={isGenerating}
+                onChange={(next) =>
+                  updateNodeData(storeNode.id, { packProfile: next }, { commit: true })
+                }
+              />
+              <Pro2ScriptCategoryDocChip
+                hubData={d}
+                upstreamLinks={upstreamLinks}
+                disabled={isGenerating}
+                onSaveBody={(body) =>
+                  updateNodeData(
+                    storeNode.id,
+                    { scriptCategoryDocBody: body },
+                    { commit: true },
+                  )
+                }
+                onSaveCustomPrompt={(body) =>
+                  updateNodeData(storeNode.id, { dockInput: body }, { commit: true })
+                }
+                onCategoryApply={onCategoryApply}
+              />
+            </div>
           }
         />
       }
@@ -251,6 +430,8 @@ export function Pro2ScriptInputDock() {
         maxImages={12}
       >
         <MentionsEditable
+          key={storeNode.id}
+          sourceId={storeNode.id}
           className={cn(
             PRO2_DOCK_TEXTAREA_CLASS,
             RF_FORM_CONTROL,
@@ -314,6 +495,7 @@ function Pro2ScriptDockFooter({
           providerId={providerId}
           modelKey={modelKey}
           params={params}
+          allowedModelKeys={[...STORY_LLM_MODEL_KEYS]}
           externalProviders={providers}
           disabled={isGenerating}
           open={dockMenu === "model"}
@@ -334,7 +516,7 @@ function Pro2ScriptDockFooter({
         />
       </div>
       <div
-        className="flex shrink-0 items-center gap-1.5 text-white/35"
+        className="relative z-20 flex shrink-0 items-center gap-1.5 text-white/35"
         style={{ fontSize: fontPx }}
       >
         <button
@@ -345,16 +527,7 @@ function Pro2ScriptDockFooter({
         >
           <Languages style={{ width: sendIconPx, height: sendIconPx }} />
         </button>
-        <button
-          type="button"
-          className="nodrag flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white/35"
-          style={{ fontSize: fontPx }}
-          title="消耗（预留）"
-          disabled
-        >
-          <Zap style={{ width: sendIconPx, height: sendIconPx }} />
-          <span>1</span>
-        </button>
+        <Pro2LlmDockCreditsBadge modelKey={modelKey} fontPx={fontPx} />
         <LibtvDockSendButton
           disabled={!canSend}
           loading={isGenerating}

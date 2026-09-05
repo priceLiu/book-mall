@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3001",
+    "dev": "node scripts/dev.mjs",
     "build": "next build",
     "build:docker": "next build",
     "start": "next start -p 3001",
@@ -11,6 +11,8 @@
     "pricing:extract-price-md": "npx --yes tsx scripts/pricing-extract-price-md.ts"
   },
   "dependencies": {
+    "@private/federated-portal-logout": "file:../shared/federated-portal-logout",
+    "@private/platform-assistant": "file:../shared/platform-assistant",
     "@radix-ui/react-slot": "^1.1.2",
     "ali-oss": "^6.23.0",
     "class-variance-authority": "^0.7.1",

@@ -4,6 +4,7 @@ import {
   getDecryptedCredentialApiKey,
   getGatewayCredentialForUser,
 } from "@/lib/gateway/credential-service";
+import { parseVolcengineGatewayCredential } from "@/lib/gateway/volcengine-gateway-credential";
 import { resolveGatewayCredentialScope } from "@/lib/gateway/platform-credential-delegate";
 import { requireGatewaySessionUser } from "@/lib/gateway/session";
 
@@ -24,6 +25,18 @@ export async function GET(request: NextRequest) {
   const decrypted = await getDecryptedCredentialApiKey(id);
   if (!decrypted) {
     return NextResponse.json({ error: "凭证不可用" }, { status: 404 });
+  }
+
+  if (row.providerKind === "VOLCENGINE") {
+    const parsed = parseVolcengineGatewayCredential(decrypted.apiKey);
+    return NextResponse.json({
+      apiKey: parsed.arkApiKey || decrypted.apiKey,
+      volcengine: {
+        arkApiKey: parsed.arkApiKey || null,
+        accessKeyId: parsed.portraitIam?.accessKeyId ?? null,
+        secretAccessKey: parsed.portraitIam?.secretAccessKey ?? null,
+      },
+    });
   }
 
   return NextResponse.json({ apiKey: decrypted.apiKey });

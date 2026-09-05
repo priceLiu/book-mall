@@ -2,7 +2,12 @@
 
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import type { CanvasNodeRuntime } from "./types";
+import {
+  canvasIdleRuntimeAfterUserCancel,
+  isUserCancelledCanvasTask,
+} from "./canvas-generation-cancel-messages";
 import { formatCanvasTaskError } from "./friendly-task-error";
+import { resolveLibtvAudioHttpsExportUrl } from "./libtv-audio-export-url";
 import { pickTaskResultMediaUrl } from "./task-media-url";
 import { isSameSbv1MediaDataPatch } from "./sbv1-image-task-apply";
 
@@ -29,16 +34,32 @@ export function libtvAudioPatchFromTask(
   const mediaUrl = pickTaskResultMediaUrl(task) ?? task.ossUrl ?? undefined;
 
   if (task.status === "SUCCEEDED" && mediaUrl) {
+    const httpsExportUrl =
+      resolveLibtvAudioHttpsExportUrl({
+        ossUrl: task.ossUrl ?? undefined,
+        runtime: {
+          ossUrl: task.ossUrl ?? undefined,
+          ephemeralUrl: task.ephemeralUrl ?? undefined,
+        },
+      }) ?? undefined;
+    const localPreviewUrl =
+      httpsExportUrl ??
+      task.ephemeralUrl?.trim() ??
+      mediaUrl;
+    const isLocalOnly =
+      !httpsExportUrl &&
+      (localPreviewUrl.startsWith("data:") ||
+        localPreviewUrl.startsWith("blob:"));
     return {
-      ossUrl: mediaUrl,
-      blobUrl: undefined,
+      ossUrl: httpsExportUrl,
+      blobUrl: isLocalOnly ? localPreviewUrl : undefined,
       uploading: false,
       uploadError: undefined,
       runtime: {
         status: "done",
         taskId: task.id,
-        ossUrl: mediaUrl,
-        ephemeralUrl: task.ephemeralUrl ?? undefined,
+        ossUrl: httpsExportUrl,
+        ephemeralUrl: task.ephemeralUrl ?? localPreviewUrl,
         failCode: undefined,
         failMessage: undefined,
       } satisfies CanvasNodeRuntime,
@@ -46,6 +67,13 @@ export function libtvAudioPatchFromTask(
   }
 
   if (task.status === "FAILED" || task.status === "CANCELLED") {
+    if (isUserCancelledCanvasTask(task)) {
+      return {
+        uploading: false,
+        uploadError: undefined,
+        runtime: canvasIdleRuntimeAfterUserCancel(task.id),
+      };
+    }
     return {
       uploading: false,
       uploadError: undefined,

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, Video } from "lucide-react";
+import { CheckCircle2, ChevronUp, Loader2, Video } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
@@ -15,10 +15,15 @@ import {
   type CanvasBackgroundVideoTaskRow,
 } from "@/lib/canvas-api";
 import { canvasNotify } from "@/lib/canvas/canvas-notify";
+import {
+  BACKGROUND_DOCK_LONG_TASK_MS,
+  formatBackgroundGenerationAge,
+} from "@/lib/canvas/background-generation-dock-policy";
 import { cn } from "@/lib/utils";
 
 const POLL_MS = 15_000;
 const PANEL_OPEN_EVENT = "canvas:background-video-panel-open";
+const LONG_TASK_SEC = BACKGROUND_DOCK_LONG_TASK_MS / 1000;
 
 function formatAge(sec: number): string {
   if (sec < 60) return `${sec}s`;
@@ -27,10 +32,10 @@ function formatAge(sec: number): string {
   return `${Math.floor(m / 60)} 小时 ${m % 60} 分`;
 }
 
-function syncPanelOpen(open: boolean) {
+function syncPanelExpanded(expanded: boolean) {
   window.dispatchEvent(
     new CustomEvent(PANEL_OPEN_EVENT, {
-      detail: { open },
+      detail: { open: expanded },
     }),
   );
 }
@@ -43,16 +48,25 @@ function syncTaskCount(count: number) {
   );
 }
 
+function countReadyTasks(tasks: CanvasBackgroundVideoTaskRow[]): number {
+  return tasks.filter((t) => t.kind === "ready_to_load").length;
+}
+
+function countRunningTasks(tasks: CanvasBackgroundVideoTaskRow[]): number {
+  return tasks.filter((t) => t.kind === "background_generating").length;
+}
+
+/** 画布 · 后台视频 Dock（默认最小化胶囊，不常驻展开） */
 export function CanvasBackgroundVideoPanel({ projectId }: { projectId: string }) {
   const base = useBookMallBaseUrl();
   const [mounted, setMounted] = useState(false);
   const [tasks, setTasks] = useState<CanvasBackgroundVideoTaskRow[]>([]);
-  const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const prevReadyRef = useRef<Set<string>>(new Set());
-  const prevTaskCountRef = useRef(0);
+  const prevLongRunningNotifiedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     setMounted(true);
@@ -62,11 +76,13 @@ export function CanvasBackgroundVideoPanel({ projectId }: { projectId: string })
     const onToggle = (e: Event) => {
       const next = (e as CustomEvent<{ open?: boolean }>).detail?.open;
       if (typeof next === "boolean") {
-        setOpen(next);
+        setExpanded(next);
+        syncPanelExpanded(next);
       } else {
-        setOpen((prev) => {
-          syncPanelOpen(!prev);
-          return !prev;
+        setExpanded((prev) => {
+          const v = !prev;
+          syncPanelExpanded(v);
+          return v;
         });
       }
     };
@@ -87,26 +103,31 @@ export function CanvasBackgroundVideoPanel({ projectId }: { projectId: string })
       setTasks(res.tasks);
       setFetchError(null);
       syncTaskCount(res.tasks.length);
+
       for (const t of res.tasks) {
-        if (t.kind === "recoverable_stall" && !prevReadyRef.current.has(t.taskId)) {
+        if (t.kind === "ready_to_load" && !prevReadyRef.current.has(t.taskId)) {
           prevReadyRef.current.add(t.taskId);
-          setOpen(true);
-          syncPanelOpen(true);
+          // 成功：不展开面板、不弹阻塞对话框
+        }
+        if (
+          (t.kind === "recoverable_stall" ||
+            t.kind === "background_generating") &&
+          t.ageSec >= LONG_TASK_SEC &&
+          !prevLongRunningNotifiedRef.current.has(t.taskId)
+        ) {
+          prevLongRunningNotifiedRef.current.add(t.taskId);
           canvasNotify({
-            title: "视频可能已生成",
-            message: `节点「${t.label}」可点右下角工具栏摄像机图标，在「后台视频」中加载到节点。`,
+            title: "视频仍在生成",
+            message: `「${t.label}」已等待 ${formatBackgroundGenerationAge(t.ageSec)}，仍在厂商侧生成。点右下角「后台视频」或工具栏摄像机图标查看进度。`,
             variant: "info",
           });
         }
       }
-      if (
-        res.tasks.length > prevTaskCountRef.current &&
-        prevTaskCountRef.current === 0
-      ) {
-        setOpen(true);
-        syncPanelOpen(true);
+
+      if (res.tasks.length === 0) {
+        setExpanded(false);
+        syncPanelExpanded(false);
       }
-      prevTaskCountRef.current = res.tasks.length;
     } catch (e) {
       setFetchError(e instanceof Error ? e.message : "加载失败");
       syncTaskCount(0);
@@ -121,9 +142,9 @@ export function CanvasBackgroundVideoPanel({ projectId }: { projectId: string })
     return () => window.clearInterval(id);
   }, [refresh]);
 
-  const closePanel = useCallback(() => {
-    setOpen(false);
-    syncPanelOpen(false);
+  const minimizePanel = useCallback(() => {
+    setExpanded(false);
+    syncPanelExpanded(false);
   }, []);
 
   const onRecover = useCallback(
@@ -133,13 +154,9 @@ export function CanvasBackgroundVideoPanel({ projectId }: { projectId: string })
       try {
         const res = await recoverCanvasBackgroundVideoTask(base, projectId, taskId);
         if (res.ok) {
-          canvasNotify({
-            title: "视频已加载",
-            message: "成片已写回节点，可在画布查看。",
-            variant: "info",
-          });
           window.dispatchEvent(new Event("canvas:video-library-changed"));
           await refresh();
+          minimizePanel();
         } else {
           canvasNotify({
             title: "暂未出片",
@@ -157,93 +174,146 @@ export function CanvasBackgroundVideoPanel({ projectId }: { projectId: string })
         setLoadingId(null);
       }
     },
-    [base, projectId, loadingId, refresh],
+    [base, minimizePanel, projectId, loadingId, refresh],
   );
 
-  if (!mounted || !open) return null;
+  if (!mounted) return null;
 
   const hasTasks = tasks.length > 0;
+  const readyCount = countReadyTasks(tasks);
+  const runningCount = countRunningTasks(tasks);
+  const showDock = hasTasks || expanded;
+
+  if (!showDock) return null;
+
+  const collapsedLabel =
+    readyCount > 0
+      ? `后台视频 · ${readyCount} 可加载`
+      : runningCount > 0
+        ? `后台视频 · ${runningCount} 生成中`
+        : `后台视频 · ${tasks.length}`;
 
   return createPortal(
     <div
       className={cn(
-        "pointer-events-auto fixed bottom-[5.75rem] right-4 z-[200] w-[min(100vw-2rem,22rem)] rounded-xl border shadow-xl",
-        hasTasks
-          ? "border-orange-400/35 bg-[#141418]/98"
-          : "border-orange-400/20 bg-[#141418]/95",
+        "pointer-events-none fixed bottom-[5.75rem] right-4 z-[200] flex flex-col items-end",
       )}
     >
-      <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
-        <span
+      {!expanded && hasTasks ? (
+        <button
+          type="button"
           className={cn(
-            "flex min-w-0 items-center gap-2 text-sm font-medium",
-            hasTasks ? "text-orange-100" : "text-zinc-200",
+            "pointer-events-auto flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium shadow-lg transition hover:shadow-xl",
+            readyCount > 0
+              ? "border-emerald-400/35 bg-[#141418]/96 text-emerald-100"
+              : "border-orange-400/40 bg-[#141418]/96 text-orange-100",
           )}
+          onClick={() => {
+            setExpanded(true);
+            syncPanelExpanded(true);
+          }}
+          aria-label="展开后台视频"
         >
-          {loading ? (
+          {runningCount > 0 && readyCount === 0 ? (
             <Loader2 className="size-4 shrink-0 animate-spin text-orange-300" />
+          ) : readyCount > 0 ? (
+            <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />
           ) : (
             <Video className="size-4 shrink-0 text-orange-300" />
           )}
-          <span className="truncate">
-            后台视频
-            {hasTasks ? ` · ${tasks.length}` : ""}
-          </span>
-        </span>
-        <button
-          type="button"
-          className="shrink-0 text-xs text-zinc-500 hover:text-zinc-300"
-          onClick={closePanel}
-        >
-          关闭
+          <span>{collapsedLabel}</span>
+          <ChevronUp className="size-3.5 opacity-50" />
         </button>
-      </div>
+      ) : expanded ? (
+        <div
+          className={cn(
+            "pointer-events-auto w-[min(100vw-2rem,22rem)] rounded-xl border shadow-xl",
+            hasTasks
+              ? "border-orange-400/35 bg-[#141418]/98"
+              : "border-orange-400/20 bg-[#141418]/95",
+          )}
+        >
+          <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+            <span
+              className={cn(
+                "flex min-w-0 items-center gap-2 text-sm font-medium",
+                hasTasks ? "text-orange-100" : "text-zinc-200",
+              )}
+            >
+              {loading ? (
+                <Loader2 className="size-4 shrink-0 animate-spin text-orange-300" />
+              ) : (
+                <Video className="size-4 shrink-0 text-orange-300" />
+              )}
+              <span className="truncate">
+                后台视频
+                {hasTasks ? ` · ${tasks.length}` : ""}
+              </span>
+            </span>
+            <button
+              type="button"
+              className="shrink-0 text-xs text-zinc-500 hover:text-zinc-300"
+              onClick={minimizePanel}
+            >
+              最小化
+            </button>
+          </div>
 
-      <div className="p-2">
-        {fetchError ? (
-          <p className="rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-[11px] leading-snug text-red-200/90">
-            {fetchError}
-          </p>
-        ) : null}
+          <div className="p-2">
+            {fetchError ? (
+              <p className="rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-[11px] leading-snug text-red-200/90">
+                {fetchError}
+              </p>
+            ) : null}
 
-        {!fetchError && !hasTasks ? (
-          <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-[11px] leading-relaxed text-zinc-400">
-            暂无后台视频任务。火山 Seedance 等长视频在生成超过约 10
-            分钟后会转入「持续后台生成」，并出现在此列表；可继续编辑画布，成片后点「加载到节点」。
-          </p>
-        ) : null}
+            {!fetchError && !hasTasks ? (
+              <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-[11px] leading-relaxed text-zinc-400">
+                暂无后台视频任务。长视频在生成超过约 15
+                分钟后会转入后台；成片就绪后点「加载到节点」写回画布。
+              </p>
+            ) : null}
 
-        {hasTasks ? (
-          <ul className="max-h-64 overflow-y-auto">
-            {tasks.map((t) => (
-              <li
-                key={t.taskId}
-                className="mb-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 last:mb-0"
-              >
-                <div className="truncate text-sm font-medium text-zinc-100">{t.label}</div>
-                <div className="mt-1 text-[11px] leading-snug text-zinc-400">{t.hint}</div>
-                <div className="mt-1 text-[10px] text-zinc-500">
-                  已等待 {formatAge(t.ageSec)}
-                  {t.kind === "recoverable_stall" ? " · 可恢复" : " · 后台生成中"}
-                </div>
-                {t.canRecover ? (
-                  <button
-                    type="button"
-                    disabled={loadingId === t.taskId}
-                    onClick={() => void onRecover(t.taskId)}
-                    className="mt-2 inline-flex items-center gap-1 rounded-md bg-orange-600/90 px-2 py-1 text-xs text-white hover:bg-orange-500 disabled:opacity-60"
+            {hasTasks ? (
+              <ul className="max-h-64 overflow-y-auto">
+                {tasks.map((t) => (
+                  <li
+                    key={t.taskId}
+                    className="mb-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 last:mb-0"
                   >
-                    {loadingId === t.taskId ? (
-                      <Loader2 className="size-3 animate-spin" />
+                    <div className="truncate text-sm font-medium text-zinc-100">
+                      {t.label}
+                    </div>
+                    <div className="mt-1 text-[11px] leading-snug text-zinc-400">
+                      {t.hint}
+                    </div>
+                    <div className="mt-1 text-[10px] text-zinc-500">
+                      已等待 {formatAge(t.ageSec)}
+                      {t.kind === "recoverable_stall"
+                        ? " · 可恢复"
+                        : t.kind === "ready_to_load"
+                          ? " · 可加载"
+                          : " · 后台生成中"}
+                    </div>
+                    {t.canRecover ? (
+                      <button
+                        type="button"
+                        disabled={loadingId === t.taskId}
+                        onClick={() => void onRecover(t.taskId)}
+                        className="mt-2 inline-flex items-center gap-1 rounded-md bg-orange-600/90 px-2 py-1 text-xs text-white hover:bg-orange-500 disabled:opacity-60"
+                      >
+                        {loadingId === t.taskId ? (
+                          <Loader2 className="size-3 animate-spin" />
+                        ) : null}
+                        加载到节点
+                      </button>
                     ) : null}
-                    加载到节点
-                  </button>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </div>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>,
     document.body,
   );

@@ -1,3 +1,5 @@
+import type { FashionDeliverable, FashionPhase } from "@/lib/fashion-types";
+
 export type StoryboardChatMessage = {
   id: string;
   role: "user" | "assistant";
@@ -12,11 +14,30 @@ export type StoryboardReference = {
   ossUrl: string;
 };
 
+export type StoryboardProductInteraction =
+  | "none"
+  | "hold"
+  | "wear"
+  | "use"
+  | "apply"
+  | "display"
+  | "unbox";
+
+export type StoryboardProductVisibility = "off" | "hint" | "partial" | "hero";
+
+export type StoryboardSellingPoint = {
+  id: string;
+  text: string;
+  source: "user" | "inferred" | "painpoint";
+};
+
 export type StoryboardPanel = {
   index: number;
   timeline?: string;
   shotType: string;
   scene: string;
+  /** 生图/生视频共用的场景描述 prompt */
+  scenePrompt?: string;
   action: string;
   dialogue?: string;
   camera?: string;
@@ -25,6 +46,20 @@ export type StoryboardPanel = {
   videoPromptEn?: string;
   imageUrl?: string;
   videoUrl?: string;
+  /** 最近一次单镜视频生成参数（模型选择器确认值，合并/重生成可读） */
+  videoGen?: {
+    modelKey: string;
+    durationSec: number;
+    resolution?: string;
+    aspectRatio?: "16:9" | "9:16";
+    generatedAt?: string;
+  };
+  productInteraction?: StoryboardProductInteraction;
+  productVisibility?: StoryboardProductVisibility;
+  sellpointTags?: string[];
+  imagePrompt?: string;
+  protagonistBeat?: string;
+  productBeat?: string;
 };
 
 export type StoryboardSheet = {
@@ -52,14 +87,36 @@ export type StoryboardScheme = {
   totalDurationHintSec?: number;
 };
 
+export type StoryboardAnalysisStructured = {
+  audience: Array<{ segment: string; description: string }>;
+  painPoints: Array<{ level: string; description: string }>;
+  strategies: Array<{
+    name: string;
+    hook3s: string;
+    middle: string;
+    closing: string;
+  }>;
+};
+
+/** @deprecated v0.1 legacy */
+export type StoryboardAnalysisLegacyMarkdown = {
+  audienceMarkdown: string;
+  painPointsMarkdown: string;
+  strategiesMarkdown: string;
+};
+
+
 export type StoryboardDeliverable = {
   productName?: string;
   params?: Record<string, string>;
-  analysis?: {
-    audienceMarkdown: string;
-    painPointsMarkdown: string;
-    strategiesMarkdown: string;
+  productSellingPoints?: StoryboardSellingPoint[];
+  creativeBrief?: {
+    audienceHook: string;
+    viralStructure: string;
+    scenarioExpansion: string;
   };
+  cast?: Array<{ name: string; role: string; appearance?: string }>;
+  analysis?: StoryboardAnalysisStructured | StoryboardAnalysisLegacyMarkdown;
   schemes?: StoryboardScheme[];
 };
 
@@ -69,6 +126,8 @@ export type StoryboardDeliverableSnapshot = {
   productName?: string;
   productHighlight?: string;
   projectKeywords?: string;
+  /** 策划定稿 Markdown（剧本 / 话术） */
+  deliverableMarkdown?: string;
   sheet: StoryboardSheet;
   references: StoryboardReference[];
   sheetPngUrl?: string;
@@ -95,10 +154,29 @@ export type StoryboardProject = {
   videoAssetId: string | null;
   videoOssUrl?: string | null;
   meta: {
-    deliverable?: StoryboardDeliverable;
+    deliverable?: StoryboardDeliverable | FashionDeliverable;
     deliverableMarkdown?: string;
     selectedSchemeIndex?: number;
     workflow?: {
+      vertical?: "fashion_apparel" | "bags" | "digital_3c";
+      /** 电商专业版统一入口（品类在会话区选择） */
+      proMode?: boolean;
+      fashionPhase?: FashionPhase;
+      proPhase?: FashionPhase;
+      /** 包包等 pro-v1 vertical 的卖点编辑标记 */
+      proSellpointsEdited?: boolean;
+      proStoryboardPanelsEdited?: boolean;
+      proProduceSetupPending?: boolean;
+      proImageModelKey?: string;
+      proCharacterMode?: "ai" | "upload";
+      /** 路径 B 进入 produce 后，须先选生图模型与角色参考方式 */
+      fashionProduceSetupPending?: boolean;
+      /** 服装路径 B 成片阶段选定的生图模型 */
+      fashionImageModelKey?: string;
+      /** 角色参考：AI 生成 / 用户上传 */
+      fashionCharacterMode?: "ai" | "upload";
+      dimensionStep?: number;
+      productName?: string;
       phase?: "planning" | "finalized" | "refs" | "image" | "video" | "done";
       replanning?: boolean;
       /** 自定义参数胶囊收集中 */
@@ -128,6 +206,12 @@ export type StoryboardProject = {
       scenePresetCustom?: string;
       /** 场景步骤选「自定义场景」后等待用户输入 */
       awaitingCustomSceneInput?: boolean;
+      /** 已记录场景描述，等待用户选择「自定义 / AI 生成」 */
+      awaitingSceneApplyMode?: boolean;
+      /** 用户已从多套方案中选定一套（定稿前仅记选择，不立即写 sheet） */
+      schemePicked?: boolean;
+      /** 开场上传产品图后用户已确认 */
+      initialProductRefAcknowledged?: boolean;
       videoMode?: "full_sheet" | "merged_panels";
       pendingFullVideoJob?: {
         taskId: string;
@@ -136,6 +220,16 @@ export type StoryboardProject = {
         startedAt: string;
         durationSec?: number;
       };
+      /** 分镜图生成中（刷新后可恢复 busy 态） */
+      pendingPanelImages?: Record<
+        string,
+        { startedAt: string; modelKey?: string }
+      >;
+      /** 单镜视频生成中（刷新后可恢复 busy 态） */
+      pendingPanelVideos?: Record<
+        string,
+        { startedAt: string; modelKey?: string }
+      >;
     };
     deliverableSnapshot?: StoryboardDeliverableSnapshot;
     deliverableSnapshotHistory?: StoryboardDeliverableSnapshot[];
@@ -153,4 +247,9 @@ export type StoryboardGatewayModel = {
   credentialBound: boolean;
   platformOffering?: boolean;
   scenarioKey?: string;
+  /** 用户可见来源（模型运营中心 sourceLabel） */
+  sourceLabel?: string;
+  sortOrder?: number;
+  /** 专业拉片 models 路由 · 是否支持 video_url 理解 */
+  supportsVideo?: boolean;
 };

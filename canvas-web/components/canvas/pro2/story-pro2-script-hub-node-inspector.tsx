@@ -64,6 +64,7 @@ const SECTION_LABEL: Record<StoryLlmSection, string> = {
   character: "角色",
   scene: "场景",
   storyboard: "分镜",
+  shot_prompts: "镜头提示词",
 };
 
 function isHubLlmSection(section: HubPreviewSection): section is StoryLlmSection {
@@ -71,7 +72,8 @@ function isHubLlmSection(section: HubPreviewSection): section is StoryLlmSection
     section === "outline" ||
     section === "character" ||
     section === "scene" ||
-    section === "storyboard"
+    section === "storyboard" ||
+    section === "shot_prompts"
   );
 }
 

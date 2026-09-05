@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
-import { getMainSiteOrigin } from "@/lib/site-origin";
+
+import { decodeToolsTokenProfile } from "@/lib/tools-token-decode";
 
 export type EcomShellUser = {
   name: string;
@@ -8,42 +9,19 @@ export type EcomShellUser = {
   avatarUrl: string | null;
 };
 
+/**
+ * 壳层用户信息：从 tools_token JWT 本地解码，避免每次路由切换都阻塞在 introspect（常 10s+）。
+ * 计费 / 生成准入仍由各 API 与客户端 tools-session 心跳负责。
+ */
 export async function getEcomShellUser(): Promise<EcomShellUser | null> {
-  const token = cookies().get("tools_token")?.value?.trim();
-  const origin = getMainSiteOrigin();
-  if (!token || !origin) return null;
-
-  const res = await fetch(`${origin}/api/sso/tools/introspect`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-
-  const data = (await res.json().catch(() => null)) as {
-    active?: boolean;
-    email?: string | null;
-    phone?: string | null;
-    name?: string | null;
-    image?: string | null;
-  } | null;
-
-  if (!data?.active) return null;
-
-  const email = typeof data.email === "string" ? data.email.trim() : "";
-  const phone =
-    typeof data.phone === "string" && data.phone.trim() ? data.phone.trim() : null;
-  const name =
-    (typeof data.name === "string" && data.name.trim()) ||
-    email.split("@")[0] ||
-    "用户";
+  const token = cookies().get("tools_token")?.value;
+  const profile = decodeToolsTokenProfile(token);
+  if (!profile) return null;
 
   return {
-    name,
-    email: email || "—",
-    phone,
-    avatarUrl:
-      typeof data.image === "string" && data.image.trim()
-        ? data.image.trim()
-        : null,
+    name: profile.name,
+    email: profile.email,
+    phone: profile.phone,
+    avatarUrl: profile.avatarUrl,
   };
 }

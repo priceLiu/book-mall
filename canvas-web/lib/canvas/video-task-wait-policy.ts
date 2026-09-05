@@ -1,6 +1,6 @@
 /** 与 book-mall/lib/gateway/video-task-wait-policy.ts 保持同步（前端不可跨包 import） */
 
-export const VIDEO_BACKGROUND_UI_MS = 10 * 60 * 1000;
+export const VIDEO_BACKGROUND_UI_MS = 15 * 60 * 1000;
 
 export const VIDEO_BACKGROUND_UI_LABEL = "持续后台生成中…";
 export const VIDEO_GENERATING_LABEL = "视频生成中…";

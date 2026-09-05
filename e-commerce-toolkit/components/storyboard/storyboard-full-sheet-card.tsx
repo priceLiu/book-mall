@@ -4,6 +4,10 @@ import { Download, Eye, Film, Loader2, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
+import {
+  ECOM_MEDIA_TILE_ACTION_ICON_CLASS,
+  ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS,
+} from "@/components/media/ecom-media-library-tile";
 import { StoryboardSheetLiveThumb } from "@/components/storyboard/storyboard-sheet-live-thumb";
 import { StoryboardSheetThumbnail } from "@/components/storyboard/storyboard-sheet-thumbnail";
 import { STORYBOARD_PREVIEW_MIN_H, storyboardPreviewAspectClass } from "@/lib/storyboard-aspect";
@@ -128,57 +132,57 @@ export function StoryboardFullSheetCard({
           <>
             {renderSheetVisual()}
             {hover ? (
-              <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-black/45 backdrop-blur-[1px]">
+              <div className="absolute inset-0 z-10 flex max-w-full flex-wrap items-center justify-center gap-1.5 overflow-hidden px-1 bg-black/45 backdrop-blur-[1px] sm:gap-2">
                 {onPreview ? (
                   <button
                     type="button"
                     title="放大预览"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow"
+                    className={ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS}
                     onClick={(e) => {
                       stopClick(e);
                       onPreview();
                     }}
                   >
-                    <Eye className="h-3.5 w-3.5" />
+                    <Eye className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
                   </button>
                 ) : null}
                 {canDownload && onDownloadPng ? (
                   <button
                     type="button"
                     title="下载 PNG"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow"
+                    className={ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS}
                     onClick={(e) => {
                       stopClick(e);
                       onDownloadPng();
                     }}
                   >
-                    <Download className="h-3.5 w-3.5" />
+                    <Download className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
                   </button>
                 ) : null}
                 {onRegenerateImage ? (
                   <button
                     type="button"
                     title="重新生图"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow"
+                    className={ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS}
                     onClick={(e) => {
                       stopClick(e);
                       onRegenerateImage();
                     }}
                   >
-                    <RefreshCw className="h-3.5 w-3.5" />
+                    <RefreshCw className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
                   </button>
                 ) : null}
                 {onGenerateVideo ? (
                   <button
                     type="button"
                     title="生成完整视频"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0071e3] text-white shadow"
+                    className={cn(ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS, "bg-[#0071e3] text-white hover:bg-[#0077ed]")}
                     onClick={(e) => {
                       stopClick(e);
                       onGenerateVideo();
                     }}
                   >
-                    <Film className="h-3.5 w-3.5" />
+                    <Film className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
                   </button>
                 ) : null}
               </div>

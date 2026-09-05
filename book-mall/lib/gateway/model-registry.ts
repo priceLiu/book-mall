@@ -15,6 +15,18 @@ import {
   GATEWAY_CANONICAL_REGISTRY,
 } from "@/lib/platform-model/canonical-registry";
 import { prisma } from "@/lib/prisma";
+import {
+  getCachedActiveRoutes,
+  getCachedModelsForApp,
+  setCachedActiveRoutes,
+  setCachedModelsForApp,
+} from "@/lib/gateway/model-list-cache";
+import {
+  getShelfMetaForCanonical,
+  isCanonicalVisibleOnShelf,
+  loadShelfIndexForApp,
+} from "@/lib/platform-model/app-model-shelf";
+import { resolveSourceLabel } from "@/lib/gateway/model-source-label";
 import { ensureGatewayCanonicalRegistrySynced } from "@/lib/gateway/sync-canonical-registry";
 import {
   gatewayRouteDisplayName,
@@ -53,11 +65,15 @@ export type RegistryModelRow = {
   credentialBound: boolean;
   creditsPerUnit: number | null;
   platformOffering: boolean;
+  sourceLabel: string;
+  sortOrder: number;
 };
 
 export type ListModelsForAppInput = {
   appTag: string;
   role?: CanvasModelRole;
+  /** 应用内场景（如 pro2-video、qr-t2v）；空则仅按 app 全局 shelf 过滤 */
+  sceneKey?: string | null;
   /** platform credit: 仅已上架 offering；byok: 全注册表 + 凭证过滤 */
   persona: "PLATFORM_CREDIT" | "BYOK";
   boundKinds: GatewayProviderKind[];
@@ -212,7 +228,7 @@ export function resolveKnownGatewayModelRegistration(modelKey: string): {
   }
 }
 
-export async function listActiveRoutes(): Promise<
+export async function listActiveRoutesUncached(): Promise<
   Array<{
     route: {
       id: string;
@@ -229,6 +245,7 @@ export async function listActiveRoutes(): Promise<
       mediaKind: ModelMediaKind | null;
       appTags: string[];
       gatewayPublished: boolean;
+      sourceLabel: string | null;
     };
   }>
 > {
@@ -245,6 +262,7 @@ export async function listActiveRoutes(): Promise<
           mediaKind: true,
           appTags: true,
           gatewayPublished: true,
+          sourceLabel: true,
         },
       },
     },
@@ -266,13 +284,29 @@ export async function listActiveRoutes(): Promise<
       mediaKind: r.catalog.mediaKind,
       appTags: r.catalog.appTags,
       gatewayPublished: r.catalog.gatewayPublished,
+      sourceLabel: r.catalog.sourceLabel,
     },
   }));
 }
 
+export async function listActiveRoutes(): Promise<
+  Awaited<ReturnType<typeof listActiveRoutesUncached>>
+> {
+  const cached = getCachedActiveRoutes();
+  if (cached) return cached;
+  const routes = await listActiveRoutesUncached();
+  setCachedActiveRoutes(routes);
+  return routes;
+}
+
 export async function listModelsForApp(input: ListModelsForAppInput): Promise<RegistryModelRow[]> {
+  const cached = getCachedModelsForApp(input);
+  if (cached) return cached;
+
   await ensureGatewayCanonicalRegistrySynced();
   const appTag = input.appTag.trim().toLowerCase();
+  const shelfCtx = { appTag, sceneKey: input.sceneKey };
+  const shelfByScene = await loadShelfIndexForApp(appTag);
   const routes = await listActiveRoutes();
 
   const offerings =
@@ -293,6 +327,52 @@ export async function listModelsForApp(input: ListModelsForAppInput): Promise<Re
       : [];
   const priceByCanonical = new Map(publishedPrices.map((p) => [p.canonicalModelKey, p]));
 
+  function appendRow(
+    out: RegistryModelRow[],
+    params: {
+      canonicalModelKey: string;
+      modelKey: string;
+      displayName: string;
+      description: string;
+      role: CanvasModelRole;
+      requestKind: string;
+      mediaKind: ModelMediaKind | null;
+      providerKind: GatewayProviderKind;
+      vendor: string;
+      catalogSourceLabel: string | null;
+      creditsPerUnit: number | null;
+      platformOffering: boolean;
+    },
+  ): void {
+    if (!isCanonicalVisibleOnShelf(shelfByScene, params.canonicalModelKey, shelfCtx)) return;
+    const shelfMeta = getShelfMetaForCanonical(shelfByScene, params.canonicalModelKey, shelfCtx);
+    const displayName = shelfMeta?.displayNameOverride?.trim() || params.displayName;
+    const sourceLabel = resolveSourceLabel({
+      canonicalModelKey: params.canonicalModelKey,
+      providerKind: params.providerKind,
+      vendor: params.vendor,
+      catalogSourceLabel: params.catalogSourceLabel,
+      shelfSourceLabelOverride: shelfMeta?.sourceLabelOverride,
+    });
+    out.push({
+      canonicalModelKey: params.canonicalModelKey,
+      modelKey: params.modelKey,
+      displayName,
+      description: params.description,
+      role: params.role,
+      requestKind: params.requestKind,
+      mediaKind: params.mediaKind,
+      mediaKindLabel: params.mediaKind ? PLATFORM_MEDIA_KIND_LABEL[params.mediaKind] : null,
+      providerKind: params.providerKind,
+      vendor: params.vendor,
+      credentialBound: true,
+      creditsPerUnit: params.creditsPerUnit,
+      platformOffering: params.platformOffering,
+      sourceLabel,
+      sortOrder: shelfMeta?.sortOrder ?? 0,
+    });
+  }
+
   // BYOK: 展示所有凭证匹配的 route（按 modelKey 去重，同 canonical 多厂商可出现多条）
   if (input.persona === "BYOK") {
     const seenKeys = new Set<string>();
@@ -305,56 +385,75 @@ export async function listModelsForApp(input: ListModelsForAppInput): Promise<Re
       seenKeys.add(route.modelKey);
 
       const def = canonicalByKey(catalog.canonicalKey);
-      out.push({
+      appendRow(out, {
         canonicalModelKey: catalog.canonicalKey,
         modelKey: route.modelKey,
-        displayName: catalog.displayName,
+        displayName: gatewayRouteDisplayName(
+          { displayName: catalog.displayName, canonicalKey: catalog.canonicalKey },
+          route.modelKey,
+        ),
         description: def?.description ?? "",
         role: catalog.role ?? "LLM",
         requestKind: catalog.requestKind ?? "CHAT",
         mediaKind: catalog.mediaKind,
-        mediaKindLabel: catalog.mediaKind ? PLATFORM_MEDIA_KIND_LABEL[catalog.mediaKind] : null,
         providerKind: route.providerKind,
         vendor: route.vendor,
-        credentialBound: true,
+        catalogSourceLabel: catalog.sourceLabel,
         creditsPerUnit: null,
         platformOffering: false,
       });
     }
-    return out.sort((a, b) => a.displayName.localeCompare(b.displayName, "zh"));
+    const outSorted = sortRegistryRows(out);
+    setCachedModelsForApp(input, outSorted);
+    return outSorted;
   }
 
   const rows: RegistryModelRow[] = [];
 
   for (const { route, catalog } of routes) {
+    // listActiveRoutes 已过滤 catalog.active + gatewayPublished
+    if (!catalog.gatewayPublished) continue;
     if (!catalog.appTags.some((t) => t.toLowerCase() === appTag)) continue;
     if (input.role && catalog.role !== input.role) continue;
+
+    const priceRow = priceByCanonical.get(catalog.canonicalKey);
+    if (!priceRow) continue;
+
+    const offering = offeringByCanonical.get(catalog.canonicalKey);
+    if (offering && offering.status !== "ACTIVE") continue;
 
     const def = canonicalByKey(catalog.canonicalKey);
     const description = def?.description ?? "";
 
-    const offering = offeringByCanonical.get(catalog.canonicalKey);
-    if (!offering?.activeModelKey) continue;
-    const priceRow = priceByCanonical.get(catalog.canonicalKey);
-    if (!priceRow) continue;
-    rows.push({
+    appendRow(rows, {
       canonicalModelKey: catalog.canonicalKey,
-      modelKey: offering.activeModelKey,
-      displayName: offering.displayName,
+      modelKey: route.modelKey,
+      displayName: gatewayRouteDisplayName(
+        { displayName: catalog.displayName, canonicalKey: catalog.canonicalKey },
+        route.modelKey,
+      ),
       description,
-      role: catalog.role ?? offering.role,
-      requestKind: offering.requestKind,
+      role: catalog.role ?? offering?.role ?? "LLM",
+      requestKind: catalog.requestKind ?? offering?.requestKind ?? "OTHER",
       mediaKind: catalog.mediaKind,
-      mediaKindLabel: catalog.mediaKind ? PLATFORM_MEDIA_KIND_LABEL[catalog.mediaKind] : null,
-      providerKind: offering.activeProviderKind ?? route.providerKind,
-      vendor: offering.activeVendor ?? route.vendor,
-      credentialBound: true,
-      creditsPerUnit: offering.publishedCreditsPerUnit ?? priceRow.creditsPerUnit,
+      providerKind: route.providerKind,
+      vendor: route.vendor,
+      catalogSourceLabel: catalog.sourceLabel,
+      creditsPerUnit: offering?.publishedCreditsPerUnit ?? priceRow.creditsPerUnit,
       platformOffering: true,
     });
   }
 
-  return dedupeByCanonical(rows);
+  const result = sortRegistryRows(dedupeByModelKey(rows));
+  setCachedModelsForApp(input, result);
+  return result;
+}
+
+function sortRegistryRows(rows: RegistryModelRow[]): RegistryModelRow[] {
+  return [...rows].sort((a, b) => {
+    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+    return a.displayName.localeCompare(b.displayName, "zh");
+  });
 }
 
 /** Gateway 控制台全量目录（按 provider 分组）。 */
@@ -525,6 +624,7 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
     totalCount: flatModels.length,
     boundKinds,
     tabs: {
+      all: groups,
       text: filterTabs(isText),
       image: filterTabs(isImage),
       video: filterTabs(isVideo),

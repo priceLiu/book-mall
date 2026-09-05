@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { navigatePortalLogout } from "@private/federated-portal-logout";
 import {
   createContext,
   useCallback,
@@ -42,6 +43,8 @@ import {
   introspectSessionRevoked,
   SESSION_KICKED_MESSAGE,
 } from "@/lib/session-revoked";
+import { ToolCreditBalanceChip } from "@/components/platform-credit-balance-chip";
+import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 
 const SESSION_POLL_MS = 60_000;
 
@@ -645,12 +648,25 @@ export function ToolShellClient({
 
             <div className="tool-topbar-fill" />
 
+            {mainOrigin ? (
+              <PlatformTopupNavLink
+                bookOrigin={mainOrigin}
+                className="tool-topup-link hidden shrink-0 sm:inline-flex"
+              />
+            ) : null}
+
+            <ToolCreditBalanceChip />
+
             <div className="tool-user">
               {userSlot}
               {hasTokenCookie ? (
-                <a href="/api/tools-logout" className="tool-logout">
+                <button
+                  type="button"
+                  className="tool-logout"
+                  onClick={() => navigatePortalLogout("/api/auth/logout")}
+                >
                   退出
-                </a>
+                </button>
               ) : null}
               {renewHref && !loading ? (
                 hasTokenCookie && session.active ? (

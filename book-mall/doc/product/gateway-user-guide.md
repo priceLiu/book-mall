@@ -2,7 +2,9 @@
 
 本文面向 **Book 注册用户**，说明如何通过 Gateway 使用 Canvas、Story 创作幻想家、AI 试衣/文生图/视频实验室/分析室等 AI 能力，以及在哪里查看用量。
 
-**计费身份（billingPersona）**：注册时选定 **平台代付（PLATFORM_CREDIT）** 或 **自带 Key（BYOK）**，锁定后不可切换。两种身份对应不同的 Gateway 控制台能力与账单入口，见下文 §1.1。
+**计费身份（billingPersona）**：注册时二选一 **订阅会员（平台代付 / PLATFORM_CREDIT）** 或 **API 会员（API_PLATFORM）**，锁定后不可切换；两种都要请用 **分身账号**。C 端已不再新开 BYOK。详见 [20-platform-api-member-proposal.md](./20-platform-api-member-proposal.md)。
+
+**前台报价**：**[订阅价格](/pricing)**（App 会员 + 轻量包）与 **[API 价格](/pricing/api)**（充值档位 + 统一模型扣费）分开展示，顶部 Tab 切换。
 
 模型清单见 [story-gateway-models.md](./story-gateway-models.md)。
 
@@ -10,28 +12,42 @@
 
 ## 1. 整体流程
 
-### 1.1 平台代付（PLATFORM_CREDIT）
+### 1.1 订阅会员（平台代付 · PLATFORM_CREDIT）
 
 ```text
-Book 注册（选择「平台代付」）
+Book 注册（选择「平台代付 / 订阅会员」）
   → 系统自动创建隐藏 sk-gw（用户不可见）
   → 开通会员套餐 / 团队套餐 → 积分池实时扣分
   → Canvas / Story / 工具站 直接生成（经 Gateway，Book 代绑平台厂商凭证）
   → 用量与账单：Book 财务中心 / finance-web（无需 Gateway Key 引导）
 ```
 
-### 1.2 自带 Key（BYOK）
+### 1.2 自带 key 会员（BYOK）
 
 ```text
-Book 注册（选择「自带 Key」）
-  → 开通 BYOK 套餐
+Book 注册（选择「自带 key 会员」）
+  → 开通会员订阅（工具准入）
   → Book 个人中心 → Gateway API Key → SSO 进入 Gateway
   → 绑定厂商凭证 → 创建 sk-gw → 回 Book 验证关联
   → 生成走用户 Key；超额任务扣轻量包积分
   → Gateway 控制台完整功能 + finance-web BYOK 账单
 ```
 
-### 1.3 共用步骤（BYOK）
+### 1.3 API 会员（API_PLATFORM · 规划中）
+
+```text
+Book 注册（选择「API 会员」）
+  → 浏览「API 价格」/pricing/api → 个人中心 · API 账单充值
+  → 余额 > 0 → 创建平台 API Key
+  → HTTP 调 /api/gw/v1/*；按 ModelCreditPrice 扣积分（与 App 扣数相同）
+  → 充值换算优于 App 订阅，鼓励多调用
+```
+
+- 报价页：**API 价格** `/pricing/api`（与 **订阅价格** `/pricing` 分轨，见方案 §3）。
+- 无 App 工具准入；无会员订阅套餐，仅 **随用随充**。
+- 详见 [20-platform-api-member-proposal.md](./20-platform-api-member-proposal.md)。
+
+### 1.4 共用步骤（自带 key 会员）
 
 | 步骤 | 在哪里 | 做什么 |
 |------|--------|--------|

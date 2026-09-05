@@ -24,7 +24,6 @@ const createSchema = z.object({
   action: z.literal("create"),
   phone: z.string().min(1),
   plannedGeneralCredits: z.number().int().min(0).optional().nullable(),
-  plannedVideoCredits: z.number().int().min(0).optional().nullable(),
 });
 
 const linkSchema = z.object({
@@ -58,7 +57,6 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         tenantId: params.tenantId,
         phone: parsed.data.phone,
         plannedGeneralCredits: parsed.data.plannedGeneralCredits,
-        plannedVideoCredits: parsed.data.plannedVideoCredits,
         adminUserId: user.id,
       });
       return financeJson(request, { ok: true, inviteUrl: result.inviteUrl, detail: result.detail });

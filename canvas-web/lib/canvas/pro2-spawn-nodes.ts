@@ -1,11 +1,13 @@
 "use client";
 
-import { nanoid } from "nanoid";
+import { connectScriptHubEdge } from "./pro2-script-hub-connect";
+import { patchPro2StarterOnScriptHubLink } from "./pro2-text-hub-link-sync";
+export { connectScriptHubEdge } from "./pro2-script-hub-connect";
 import {
-  STORY_PRO_HUB_LLM_SYSTEM,
   STORY_PRO_LLM_PARAMS_DEFAULT,
 } from "./story-pro-prompts";
 import {
+  STORY_PRO2_HUB_LLM_SYSTEM,
   STORY_PRO2_CHARACTER_PROMPT,
   STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
   STORY_PRO2_PACK_PROMPT_VERSION,
@@ -17,21 +19,10 @@ import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
 import { findStoryPro2ScriptHubForStarter } from "./spawn-story-pro2-workspace";
 
-export function buildPro2StarterNodeData(
-  overrides?: Record<string, unknown>,
-): Record<string, unknown> {
-  return {
-    starterMode: "generate",
-    themeInput: "",
-    generatedOutlineMd: "",
-    pro2TextPurpose: "general",
-    providerId: "",
-    modelKey: "",
-    params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
-    pipelineStage: "idle",
-    ...overrides,
-  };
-}
+import { buildPro2StarterNodeData } from "./pro2-starter-node-data";
+export { buildPro2StarterNodeData } from "./pro2-starter-node-data";
+import { buildPro2PromptNodeData } from "./pro2-prompt-node-data";
+export { buildPro2PromptNodeData } from "./pro2-prompt-node-data";
 
 export function buildPro2TagNodeData(
   overrides?: Record<string, unknown>,
@@ -63,7 +54,7 @@ export function buildPro2ScriptHubNodeData(
     providerId: "",
     modelKey: "",
     params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
-    outlineSystemPrompt: STORY_PRO_HUB_LLM_SYSTEM,
+    outlineSystemPrompt: STORY_PRO2_HUB_LLM_SYSTEM,
     promptOutline: STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
     promptCharacter: STORY_PRO2_CHARACTER_PROMPT,
     promptScene: STORY_PRO2_SCENE_PROMPT,
@@ -142,39 +133,6 @@ type SpawnScriptFromSourceArgs = {
   setNodes: Parameters<typeof selectPro2NodeAfterSpawn>[0];
 };
 
-function connectScriptHubEdge(
-  setEdges: SpawnScriptFromSourceArgs["setEdges"],
-  sourceId: string,
-  hubId: string,
-  sourceHandle: string,
-  targetHandle: string,
-) {
-  setEdges((prev) => {
-    if (
-      prev.some(
-        (e) =>
-          e.source === sourceId &&
-          e.target === hubId &&
-          e.sourceHandle === sourceHandle &&
-          e.targetHandle === targetHandle,
-      )
-    ) {
-      return prev;
-    }
-    return [
-      ...prev,
-      {
-        id: `e-${nanoid(6)}`,
-        source: sourceId,
-        target: hubId,
-        sourceHandle,
-        targetHandle,
-      },
-    ];
-  });
-}
-
-/** 从上游连出脚本 hub；文本节点已有关联 hub 时复用，避免重复空节点 */
 export function spawnPro2ScriptHubFromSource({
   sourceId,
   sourceHandle,
@@ -212,7 +170,10 @@ export function spawnPro2ScriptHubFromSource({
       );
       if (updateNodeData) {
         updateNodeData(sourceId, {
-          workspaceIds: { scriptHubId: existing.scriptHubId },
+          ...patchPro2StarterOnScriptHubLink(
+            source.data as import("./pro2-text-hub-link-sync").Pro2StarterLinkData,
+            existing.scriptHubId,
+          ),
         });
       }
       selectPro2NodeAfterSpawn(setNodes, existing.scriptHubId);
@@ -224,7 +185,12 @@ export function spawnPro2ScriptHubFromSource({
   if (!hubId) return "";
   connectScriptHubEdge(setEdges, sourceId, hubId, sourceHandle, targetHandle);
   if (source?.type === "story-pro2-starter" && updateNodeData) {
-    updateNodeData(sourceId, { workspaceIds: { scriptHubId: hubId } });
+    updateNodeData(sourceId, {
+      ...patchPro2StarterOnScriptHubLink(
+        source.data as import("./pro2-text-hub-link-sync").Pro2StarterLinkData,
+        hubId,
+      ),
+    });
   }
   selectPro2NodeAfterSpawn(setNodes, hubId);
   return hubId;

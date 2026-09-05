@@ -4,13 +4,17 @@ import type {
   StoryProStarterNodeData,
 } from "./story-pro-workspace-types";
 import type { CrewBulletinState } from "./crew-bulletin-types";
-import { findScriptStudioHub } from "./script-studio-run-apply";
+import { findCrewBulletinHub } from "./crew-bulletin-hub-find";
+import type { CrewCollaborationAccess } from "./crew-collaboration-access";
 import {
   CREW_BULLETIN_META_ANCHOR_ID,
   hubFieldsFromGraphAnchor,
 } from "./crew-bulletin-graph-anchor";
 
-export type CrewBulletinAnchorMode = "script-studio" | "linked-package";
+export type CrewBulletinAnchorMode =
+  | "script-studio"
+  | "published-hub"
+  | "linked-package";
 
 export type CrewBulletinAnchor = {
   mode: CrewBulletinAnchorMode;
@@ -93,11 +97,12 @@ export function resolveCrewBulletinAnchor(
   nodes: CanvasFlowNode[],
   graphMeta?: CanvasGraph["meta"],
 ): CrewBulletinAnchor | null {
-  const hub = findScriptStudioHub(nodes);
+  const hub = findCrewBulletinHub(nodes);
   if (hub) {
     const d = hub.data as StoryProScriptHubNodeData;
+    const isScriptStudio = d.scriptStudioMode === true;
     return {
-      mode: "script-studio",
+      mode: isScriptStudio ? "script-studio" : "published-hub",
       anchorStorage: "node",
       nodeId: hub.id,
       published: d.scriptPublished === true,
@@ -118,14 +123,21 @@ export function resolveCrewBulletinAnchor(
   return null;
 }
 
-/** 是否显示公告条（已发布剧本 / 已关联剧本包 · 不含未发布创作态） */
+/** 是否显示公告条（团队空间 · 已发布剧本 / 已关联剧本包） */
 export function shouldShowCrewBulletinRail(
   nodes: CanvasFlowNode[],
   graphMeta?: CanvasGraph["meta"],
+  collaboration?: Pick<CrewCollaborationAccess, "canUseCrewBulletin">,
 ): boolean {
+  if (collaboration && !collaboration.canUseCrewBulletin) return false;
   const anchor = resolveCrewBulletinAnchor(nodes, graphMeta);
   if (!anchor) return false;
-  if (anchor.mode === "script-studio" && !anchor.published) return false;
+  if (
+    (anchor.mode === "script-studio" || anchor.mode === "published-hub") &&
+    !anchor.published
+  ) {
+    return false;
+  }
   return true;
 }
 

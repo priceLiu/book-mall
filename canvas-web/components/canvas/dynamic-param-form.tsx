@@ -1,9 +1,14 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { CanvasParamSchema } from "@/lib/canvas-providers-api";
 import { onCanvasFormWheel } from "@/lib/canvas/canvas-form-wheel";
 import { RF_FORM_CONTROL, RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import { libtvDockSegmentButtonClass } from "@/components/canvas/libtv-dock-picker-chrome";
+import {
+  LibtvVoiceSelectList,
+  type LibtvVoiceSelectOption,
+} from "@/components/canvas/libtv-voice-select-list";
 import { cn } from "@/lib/utils";
 
 export type DynamicParamFormProps = {
@@ -12,6 +17,8 @@ export type DynamicParamFormProps = {
   onChange: (next: Record<string, unknown>) => void;
   /** compact=节点内折叠；panel=弹层大面板；dock=浮动 Dock 参数 Popover（紧凑、无亮白描边） */
   variant?: "compact" | "panel" | "dock";
+  /** dock 模式下字段标题行右侧附加内容（如 TTS 调参试听勾选） */
+  dockLabelExtra?: Partial<Record<string, ReactNode>>;
 };
 
 /**
@@ -24,6 +31,7 @@ export function DynamicParamForm({
   value,
   onChange,
   variant = "compact",
+  dockLabelExtra,
 }: DynamicParamFormProps) {
   if (!schema || schema.length === 0) {
     return (
@@ -42,7 +50,7 @@ export function DynamicParamForm({
   if (variant === "panel" || variant === "dock") {
     const isDock = variant === "dock";
     return (
-      <div className={isDock ? "space-y-2.5" : "space-y-5"}>
+      <div className={isDock ? "space-y-1.5" : "space-y-5"}>
         {schema.map((item) => (
           <PanelField
             key={item.key}
@@ -50,6 +58,7 @@ export function DynamicParamForm({
             cur={value[item.key]}
             onPatch={(v) => onChange({ ...value, [item.key]: v })}
             dock={isDock}
+            dockLabelExtra={isDock ? dockLabelExtra?.[item.key] : undefined}
           />
         ))}
       </div>
@@ -105,29 +114,65 @@ function PanelField({
   cur,
   onPatch,
   dock = false,
+  dockLabelExtra,
 }: {
   item: CanvasParamSchema[number];
   cur: unknown;
   onPatch: (v: unknown) => void;
   dock?: boolean;
+  dockLabelExtra?: ReactNode;
 }) {
   if (item.type === "select") {
     const val = String(cur ?? item.defaultValue ?? item.options[0]?.value ?? "");
+    const useVoiceList =
+      dock && (item.key === "voice" || item.key === "voice_id" || item.label === "音色");
+
+    if (useVoiceList) {
+      const voiceOptions: LibtvVoiceSelectOption[] = item.options.map((o) => ({
+        value: o.value,
+        label: o.label,
+      }));
+      return (
+        <div>
+          <p className="mb-1.5 text-[12px] text-white/50">{item.label}</p>
+          <LibtvVoiceSelectList
+            options={voiceOptions}
+            value={val}
+            pageSize={10}
+            onSelect={(next) => onPatch(next)}
+          />
+        </div>
+      );
+    }
+
     return (
       <div>
-        <p
+        <div
           className={
-            dock
-              ? "mb-1.5 text-[12px] text-white/50"
-              : "mb-2 text-[13px] text-white/85"
+            dock && dockLabelExtra
+              ? "mb-1 flex items-start justify-between gap-2"
+              : undefined
           }
         >
-          {item.label}
-        </p>
+          <p
+            className={
+              dock
+                ? dockLabelExtra
+                  ? "text-[11px] text-white/50"
+                  : "mb-1 text-[11px] text-white/50"
+                : "mb-2 text-[13px] text-white/85"
+            }
+          >
+            {item.label}
+          </p>
+          {dock && dockLabelExtra ? (
+            <div className="shrink-0 pt-px">{dockLabelExtra}</div>
+          ) : null}
+        </div>
         <div
           className={
             dock
-              ? "grid grid-cols-3 gap-1.5"
+              ? "grid grid-cols-3 gap-1"
               : "flex flex-wrap gap-2"
           }
           role="group"
@@ -179,13 +224,13 @@ function PanelField({
           <p
             className={
               dock
-                ? "mb-1.5 text-[12px] text-white/50"
+                ? "mb-1 text-[11px] text-white/50"
                 : "mb-2 text-[13px] text-white/85"
             }
           >
             {item.label}
           </p>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <input
               type="range"
               min={item.min}

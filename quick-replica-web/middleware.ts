@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { fireTrafficHitFromRequest } from "@/lib/platform-traffic";
 
 function incomingHost(request: NextRequest): string {
   const xf = request.headers.get("x-forwarded-host");
@@ -25,6 +26,19 @@ function getCanonicalOrigin(): string | null {
   }
 }
 
+function getMainSiteOrigin(): string | null {
+  const raw =
+    process.env.MAIN_SITE_ORIGIN?.trim() ||
+    process.env.NEXT_PUBLIC_BOOK_MALL_URL?.trim() ||
+    process.env.BOOK_MALL_URL?.trim();
+  if (!raw) return null;
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return null;
+  }
+}
+
 function isPublicPath(pathname: string): boolean {
   if (pathname.startsWith("/api/")) return true;
   if (pathname.startsWith("/auth/sso/callback")) return true;
@@ -39,15 +53,25 @@ function isPublicPath(pathname: string): boolean {
   return false;
 }
 
-/** 未认证访问受保护路径 → 跳本域品牌登录页（不再弹主站）。 */
-function buildLocalLoginUrl(request: NextRequest): URL {
-  const url = new URL("/login", request.url);
-  const redirect = request.nextUrl.pathname + request.nextUrl.search || "/";
-  url.searchParams.set("redirect", redirect);
+/** 未认证：优先 Book SSO 静默 re-enter（已登录主站可直接进）；否则本域登录页 */
+function buildAuthRedirectUrl(request: NextRequest): URL {
+  const redirectPath = request.nextUrl.pathname + request.nextUrl.search || "/";
+  const mainOrigin = getMainSiteOrigin();
+  if (mainOrigin) {
+    const reEnter = new URL("/api/sso/tools/re-enter", mainOrigin);
+    reEnter.searchParams.set("app", "quick-replica");
+    // 仅传站内路径；完整 URL 会被主站 sanitizeToolsRedirectPath 误判为非法并重定向到 /fitting-room
+    reEnter.searchParams.set("redirect", redirectPath);
+    return reEnter;
+  }
+  const url = new URL("/sso-error", request.url);
+  url.searchParams.set("reason", "missing_main_origin");
   return url;
 }
 
 export function middleware(request: NextRequest) {
+  fireTrafficHitFromRequest("quick-replica", request);
+
   if (process.env.NODE_ENV === "production") {
     const canonicalOrigin = getCanonicalOrigin();
     if (canonicalOrigin) {
@@ -81,7 +105,7 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get("tools_token")?.value?.trim();
   if (token) return NextResponse.next();
 
-  return NextResponse.redirect(buildLocalLoginUrl(request));
+  return NextResponse.redirect(buildAuthRedirectUrl(request));
 }
 
 export const config = {

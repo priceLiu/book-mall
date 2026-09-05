@@ -9,7 +9,6 @@ import {
   financeUnauthorized,
   getFinanceSession,
 } from "@/lib/finance/finance-api";
-import { generateReferralPayouts } from "@/lib/referral/referral-payout-service";
 
 export const dynamic = "force-dynamic";
 
@@ -36,12 +35,13 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return financeJson(request, { error: "周期格式应为 YYYY-MM" }, { status: 400 });
   }
-  const result = await generateReferralPayouts({
-    periodKey: parsed.data.periodKey,
-    adminUserId: user.id,
-  });
-  if (!result.ok) {
-    return financeJson(request, { error: result.reason }, { status: 400 });
-  }
-  return financeJson(request, { ...result });
+  return financeJson(
+    request,
+    {
+      error:
+        "现金返佣已退役（分享规则 2.0）。新奖励为积分自动发放，历史返佣单仅只读。",
+      deprecated: true,
+    },
+    { status: 410 },
+  );
 }

@@ -16,6 +16,9 @@ import {
   upsertModelCostAction,
 } from "@/app/admin/finance/credit-billing-actions";
 import { autoPublishPlatformOfferings } from "@/lib/platform-model/auto-publish-offerings";
+import { GATEWAY_CANONICAL_REGISTRY } from "@/lib/platform-model/canonical-registry";
+import { previewModelCostRow } from "@/lib/finance/model-cost-preview";
+import { loadPricingConfig } from "@/lib/pricing/credit-pricing-engine";
 
 export async function OPTIONS(request: NextRequest) {
   return financeOptions(request);
@@ -29,30 +32,90 @@ export async function GET(request: NextRequest) {
     return financeForbidden(request, "模型成本仅财务管理员可见");
   }
 
-  const [profiles, catalogs] = await Promise.all([
+  const [profiles, catalogs, pricingConfig, creditPrices] = await Promise.all([
     prisma.modelCostProfile.findMany({
       orderBy: [{ canonicalModelKey: "asc" }, { channel: "asc" }],
     }),
     prisma.modelCatalog
       .findMany({ select: { canonicalKey: true, displayName: true }, orderBy: { canonicalKey: "asc" } })
       .catch(() => [] as { canonicalKey: string; displayName: string }[]),
+    loadPricingConfig(),
+    prisma.modelCreditPrice.findMany({ where: { active: true } }),
   ]);
+  const creditByCanonical = new Map(creditPrices.map((p) => [p.canonicalModelKey, p]));
+
+  const costKeys = new Set(profiles.map((p) => p.canonicalModelKey));
+  const registryMissingCost = GATEWAY_CANONICAL_REGISTRY.filter(
+    (c) => !costKeys.has(c.canonicalModelKey),
+  ).map((c) => ({
+    canonicalModelKey: c.canonicalModelKey,
+    displayName: c.displayName,
+    mediaKind: c.mediaKind,
+  }));
 
   return financeJson(request, {
-    profiles: profiles.map((p) => ({
-      id: p.id,
-      vendor: p.vendor,
-      canonicalModelKey: p.canonicalModelKey,
-      channel: p.channel,
-      credentialId: p.credentialId,
-      unit: p.unit,
-      tierRaw: p.tierRaw,
-      listCostYuan: Number(p.listCostYuan),
-      discountRate: Number(p.discountRate),
-      netCostYuan: Number(p.netCostYuan),
-      note: p.note,
-      active: p.active,
-    })),
+    pricingConfig: {
+      creditAnchorYuan: pricingConfig.creditAnchorYuan,
+      defaultMarginM: pricingConfig.defaultMarginM,
+      videoMarginM: pricingConfig.videoMarginM,
+    },
+    registryMissingCost,
+    profiles: profiles.map((p) => {
+      const preview = previewModelCostRow(
+        {
+          canonicalModelKey: p.canonicalModelKey,
+          unit: p.unit,
+          listCostYuan: Number(p.listCostYuan),
+          discountRate: Number(p.discountRate),
+        },
+        pricingConfig,
+      );
+      const published = creditByCanonical.get(p.canonicalModelKey);
+      const inCost = p.inputListCostYuan != null ? Number(p.inputListCostYuan) : Number(p.listCostYuan);
+      const outCost = p.outputListCostYuan != null ? Number(p.outputListCostYuan) : null;
+      let officialSampleYuan = Number(p.listCostYuan);
+      if (p.unit === "PER_KTOKEN") {
+        officialSampleYuan = inCost * 4 + (outCost ?? inCost) * 2;
+      } else if (p.unit === "PER_SEC") {
+        officialSampleYuan = Number(p.listCostYuan) * (p.canonicalModelKey.includes("asr") ? 15 : 15);
+      } else if (p.unit === "PER_IMAGE") {
+        officialSampleYuan = Number(p.listCostYuan);
+      }
+      const samplePlatformCredits =
+        p.unit === "PER_KTOKEN" && published?.inputCreditsPerKToken
+          ? published.inputCreditsPerKToken * 4 + (published.outputCreditsPerKToken ?? 0) * 2
+          : published?.creditsPerUnit ?? preview.creditsPerUnit;
+      const samplePlatformYuan = samplePlatformCredits * pricingConfig.creditAnchorYuan;
+      return {
+        id: p.id,
+        vendor: p.vendor,
+        canonicalModelKey: p.canonicalModelKey,
+        channel: p.channel,
+        credentialId: p.credentialId,
+        unit: p.unit,
+        tierRaw: p.tierRaw,
+        listCostYuan: Number(p.listCostYuan),
+        inputListCostYuan: p.inputListCostYuan != null ? Number(p.inputListCostYuan) : null,
+        outputListCostYuan: p.outputListCostYuan != null ? Number(p.outputListCostYuan) : null,
+        officialSampleYuan,
+        discountRate: Number(p.discountRate),
+        netCostYuan: Number(p.netCostYuan),
+        note: p.note,
+        active: p.active,
+        mediaKind: preview.mediaKind,
+        mediaKindLabel: preview.mediaKindLabel,
+        displayName: preview.displayName,
+        marginM: preview.marginM,
+        creditsPerUnit: preview.creditsPerUnit,
+        inputCreditsPerKToken: published?.inputCreditsPerKToken ?? null,
+        outputCreditsPerKToken: published?.outputCreditsPerKToken ?? null,
+        samplePlatformCredits,
+        samplePlatformYuan,
+        listPriceYuan: published ? Number(published.listPriceYuan) : preview.listPriceYuan,
+        marginRate: preview.marginRate,
+        marginOk: preview.marginOk,
+      };
+    }),
     catalogKeys: catalogs.map((c) => ({ key: c.canonicalKey, name: c.displayName })),
   });
 }

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>一键发布</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+          <div class="sidebar-brand-icon">发</div>
+          <div class="sidebar-brand-text">
+            <strong>一键发布</strong>
+            <small>原生工作台，在下方选择功能</small>
+          </div>
+        </div>
+        <nav class="sidebar-nav" id="sidebar-nav"></nav>
+        <div class="sidebar-footer">
+          <button type="button" class="collapse-btn" id="btn-collapse" title="收起侧栏">«</button>
+        </div>
+      </aside>
+      <div class="main" id="main-root"></div>
+    </div>
+
+    <div class="modal-overlay hidden" id="modal-add-account">
+      <div class="modal" role="dialog" aria-labelledby="modal-add-title">
+        <div class="modal-header">
+          <div>
+            <h2 id="modal-add-title">添加账号</h2>
+            <p>选择账号平台；V1 支持小红书、抖音、微博、B 站、微信公众号</p>
+          </div>
+          <button type="button" class="modal-close" id="modal-add-close" aria-label="关闭">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-toolbar">
+            <input
+              type="search"
+              class="search-input"
+              id="modal-platform-search"
+              placeholder="搜索平台或账号"
+            />
+            <div class="filter-chips" id="modal-content-filters"></div>
+          </div>
+          <div id="modal-platform-sections"></div>
+          <div class="proxy-field">
+            <label for="modal-proxy">代理</label>
+            <select id="modal-proxy" disabled>
+              <option value="none">无代理</option>
+            </select>
+            <p class="proxy-hint">代理池将在后续版本开放；当前各账号使用系统网络直连。</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-ghost" id="modal-add-cancel">取消</button>
+          <button type="button" class="btn-secondary" id="modal-add-continue" disabled>
+            添加并继续
+          </button>
+          <button type="button" class="btn-primary" id="modal-add-submit" disabled>添加</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="platforms.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

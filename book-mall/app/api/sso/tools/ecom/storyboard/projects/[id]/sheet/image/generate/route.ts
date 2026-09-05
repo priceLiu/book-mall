@@ -45,21 +45,26 @@ export async function POST(req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "请先生成分镜故事版" }, { status: 400 });
   }
 
+  const wf = project.meta?.workflow ?? {};
   const modelKey =
     typeof body.modelKey === "string" && body.modelKey.trim()
       ? body.modelKey.trim()
-      : ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL;
+      : typeof wf.imageModelKey === "string" && wf.imageModelKey.trim()
+        ? wf.imageModelKey.trim()
+        : ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL;
   const aspectRatio =
     body.aspectRatio === "16:9" || body.aspectRatio === "9:16"
       ? body.aspectRatio
       : project.settings?.aspectRatio === "16:9"
         ? "16:9"
         : "9:16";
-  const wf = project.meta?.workflow ?? {};
   const autoGenCharacter =
     body.autoGenCharacter === true ||
     wf.autoGenCharacter === true ||
-    Boolean(wf.characterPresetKey);
+    Boolean(wf.characterPresetKey) ||
+    wf.fashionCharacterMode === "ai" ||
+    wf.proCharacterMode === "ai";
+  const characterOnly = body.characterOnly === true;
   const panelIndex =
     typeof body.panelIndex === "number" && Number.isFinite(body.panelIndex)
       ? Math.trunc(body.panelIndex)
@@ -81,6 +86,7 @@ export async function POST(req: Request, ctx: Ctx) {
       aspectRatio,
       imageSize,
       autoGenCharacter,
+      characterOnly,
       panelIndex,
     });
 

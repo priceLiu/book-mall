@@ -30,6 +30,28 @@ describe("qr-text-to-image-models", () => {
     ).toBe("当前模型不支持参考图，请移除参考图");
   });
 
+  it("rejects prompt [Image N] beyond uploaded refs", () => {
+    expect(
+      validateTextToImageDraft({
+        modelKey: "lib-nano-pro",
+        prompt: "use [Image 2] as face",
+        sceneImageUrls: ["https://example.com/a.jpg"],
+        targetImageUrl: "",
+      }),
+    ).toBe("提示词引用了 [Image 2]，但只有 1 张参考图");
+  });
+
+  it("allows prompt [Image N] within uploaded refs", () => {
+    expect(
+      validateTextToImageDraft({
+        modelKey: "lib-nano-pro",
+        prompt: "keep [Image 1] identity",
+        sceneImageUrls: ["https://example.com/a.jpg"],
+        targetImageUrl: "",
+      }),
+    ).toBeNull();
+  });
+
   it("enforces max reference images", () => {
     expect(
       validateTextToImageDraft({

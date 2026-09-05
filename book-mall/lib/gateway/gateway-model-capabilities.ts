@@ -62,10 +62,20 @@ export function marketTaskTagsForModel(input: {
   if (k.includes("topaz") || k.includes("upscale")) return ["video-upscale"];
 
   if (k === "google/nano-banana-edit") return ["image-to-image"];
+  if (
+    k === "qwen-image-edit" ||
+    k === "qwen-image-edit-max" ||
+    k.startsWith("qwen-image-edit")
+  ) {
+    return ["image-to-image"];
+  }
+  if (k === "wan2.6-image") return ["text-to-image", "image-to-image"];
+  if (k === "wan2.7-image-pro") return ["text-to-image", "image-to-image"];
   if (k === "google/nano-banana") return ["text-to-image", "image-to-image"];
   if (k === "4o-image") return ["text-to-image", "image-to-image"];
   if (k === "nano-banana-2") return ["text-to-image", "image-to-image"];
 
+  if (k === "wan3.0-video" || k === "wan3.0-video-prime") return ["image-to-video"];
   if (k === "bytedance/seedance-2") return ["image-to-video", "video-to-video"];
   if (k === "bytedance/seedance-2-mini") return ["image-to-video", "video-to-video"];
 
@@ -74,6 +84,15 @@ export function marketTaskTagsForModel(input: {
   }
 
   if (k.includes("hailuo") && k.includes("image-to-video")) return ["image-to-video"];
+  if (k.includes("minimax-h3-t2v")) return ["image-to-video"];
+  if (k.includes("minimax-h3-i2v") || k.includes("minimax-h3-fl2v")) {
+    return ["image-to-video"];
+  }
+  if (k.includes("minimax-h3-r2v") || k.includes("minimax-h3-s2v")) {
+    return ["image-to-video"];
+  }
+  if (k.includes("minimax-h3-regeneration")) return ["video-upscale"];
+  if (k.includes("minimax-h3-context-ir")) return ["chat"];
   if (k.includes("kling/v2-5-turbo-image-to-video")) return ["image-to-video"];
   if (k.includes("kling/v2-5-turbo-text-to-video")) return ["image-to-video"];
 
@@ -126,11 +145,28 @@ export function gatewayRouteDisplayName(
     "veo3.1": "Veo 3.1",
     "hailuo/2-3-image-to-video-standard": "Hailuo 2.3 I2V Standard",
     "hailuo/2-3-image-to-video-pro": "Hailuo 2.3 I2V Pro",
+    "MiniMax/MiniMax-H3-t2v": "MiniMax H3 文生视频",
+    "MiniMax/MiniMax-H3-i2v": "MiniMax H3 图生视频",
+    "MiniMax/MiniMax-H3-fl2v": "MiniMax H3 首尾帧",
+    "MiniMax/MiniMax-H3-r2v": "MiniMax H3 参考生视频",
+    "MiniMax/MiniMax-H3-s2v": "MiniMax H3 主体参考",
+    "MiniMax/MiniMax-H3-regeneration": "MiniMax H3 768P→2K",
+    "MiniMax/MiniMax-H3-context-ir": "MiniMax H3 Context-IR",
     "kling/v2-5-turbo-image-to-video-pro": "Kling 2.5 Turbo I2V",
     "kling/v2-5-turbo-text-to-video-pro": "Kling 2.5 Turbo T2V",
+    "wan3.0-video": "万相 3.0 · 文生/图生/参考生视频",
+    "wan3.0-video-prime": "万相 3.0 优速版 · 文生/图生/参考生视频",
+    "qwen3.8-max": "Qwen3.8 Max · 文本/视觉/视频理解",
+    "qwen3-omni-flash": "Qwen3-Omni Flash · 全模态/视频理解",
+    "qwen2.5-vl-72b-instruct": "Qwen2.5-VL 72B · 图片/视频理解",
+    "glm-5.3-flash": "GLM-5.3 Flash · 图片/视频/文件理解",
     "suno/generate": "Suno API · 文生音乐",
     "elevenlabs/text-to-dialogue-v3": "ElevenLabs V3",
     "elevenlabs/text-to-speech-multilingual-v2": "ElevenLabs Text to Speech",
+    "deepseek-v4-flash": "DeepSeek V4 Flash",
+    "deepseek-v4-pro": "DeepSeek V4 Pro",
+    "deepseek-chat": "DeepSeek Chat（旧 ID → V4 Flash）",
+    "deepseek-reasoner": "DeepSeek Reasoner（旧 ID → V4 思考）",
   };
   return labels[mk] ?? catalog.displayName;
 }

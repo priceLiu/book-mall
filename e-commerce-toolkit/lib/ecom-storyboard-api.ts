@@ -10,17 +10,53 @@ import type {
   StoryboardSheet,
 } from "@/lib/storyboard-types";
 
-export async function fetchStoryboardModels(): Promise<{
+const MODELS_CACHE_KEY = "ecom-storyboard-models-cache";
+const MODELS_CACHE_MS = 5 * 60 * 1000;
+
+type StoryboardModelsPayload = {
   chatModels: StoryboardGatewayModel[];
   imageModels: StoryboardGatewayModel[];
   videoModels: StoryboardGatewayModel[];
-}> {
+};
+
+export async function fetchStoryboardModels(): Promise<StoryboardModelsPayload> {
+  if (typeof window !== "undefined") {
+    try {
+      const raw = sessionStorage.getItem(MODELS_CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { at?: number; data?: StoryboardModelsPayload };
+        if (
+          parsed.data &&
+          typeof parsed.at === "number" &&
+          Date.now() - parsed.at < MODELS_CACHE_MS
+        ) {
+          return parsed.data;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   const data = await ecomBookFetch("api/sso/tools/ecom/storyboard/models");
-  return {
+  const result: StoryboardModelsPayload = {
     chatModels: (data.chatModels as StoryboardGatewayModel[]) ?? [],
     imageModels: (data.imageModels as StoryboardGatewayModel[]) ?? [],
     videoModels: (data.videoModels as StoryboardGatewayModel[]) ?? [],
   };
+
+  if (typeof window !== "undefined") {
+    try {
+      sessionStorage.setItem(
+        MODELS_CACHE_KEY,
+        JSON.stringify({ at: Date.now(), data: result }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return result;
 }
 
 export async function listStoryboardProjects(): Promise<StoryboardProject[]> {
@@ -28,9 +64,19 @@ export async function listStoryboardProjects(): Promise<StoryboardProject[]> {
   return (data.items as StoryboardProject[]) ?? [];
 }
 
+export async function listStoryboardProjectSummaries(): Promise<
+  Array<{ id: string; title: string | null; updatedAt: string }>
+> {
+  const data = await ecomBookFetch(
+    "api/sso/tools/ecom/storyboard/projects?summary=1",
+  );
+  return (data.items as Array<{ id: string; title: string | null; updatedAt: string }>) ?? [];
+}
+
 export async function createStoryboardProject(opts?: {
   title?: string;
   brief?: Record<string, unknown>;
+  meta?: StoryboardProject["meta"];
 }): Promise<StoryboardProject> {
   const data = await ecomBookFetch("api/sso/tools/ecom/storyboard/projects", {
     method: "POST",
@@ -99,51 +145,108 @@ export async function uploadStoryboardRef(
   return data.reference as StoryboardReference;
 }
 
+/** 把「我的资产」里的图挂为参考图（服务端会按厂商像素区间归一化） */
+export async function attachStoryboardRefsFromAssets(
+  projectId: string,
+  opts: { assetIds: string[]; role: StoryboardReference["role"] },
+): Promise<StoryboardProject> {
+  const data = await ecomBookFetch(
+    `api/sso/tools/ecom/storyboard/projects/${projectId}/references/attach`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(opts),
+    },
+  );
+  return data.project as StoryboardProject;
+}
+
 export async function streamStoryboardChat(opts: {
   projectId: string;
   messages: StoryboardChatMessage[];
   modelKey: string;
   onChunk: (text: string) => void;
+  /** 流式总时长上限（默认 6 分钟） */
+  maxDurationMs?: number;
+  /** 无新 chunk 超过该时长则中断（默认 2 分钟） */
+  idleTimeoutMs?: number;
 }): Promise<string> {
-  const res = await fetch(
-    `/api/book-mall/api/sso/tools/ecom/storyboard/projects/${opts.projectId}/assistant/chat`,
-    {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: opts.messages.map((m) => ({ role: m.role, content: m.content })),
-        modelKey: opts.modelKey,
-      }),
-    },
-  );
-  if (res.status === 401) {
-    throw new EcomUnauthorizedError("未登录");
-  }
-  if (!res.ok) {
-    const text = await res.text();
-    let err = `请求失败 (${res.status})`;
-    try {
-      const j = JSON.parse(text) as { error?: string };
-      if (j.error) err = j.error;
-    } catch {
-      /* */
+  const maxDurationMs = opts.maxDurationMs ?? 6 * 60_000;
+  const idleTimeoutMs = opts.idleTimeoutMs ?? 2 * 60_000;
+  const controller = new AbortController();
+  const maxTimer = setTimeout(() => controller.abort(), maxDurationMs);
+  let lastActivityAt = Date.now();
+  const idleTimer = setInterval(() => {
+    if (Date.now() - lastActivityAt > idleTimeoutMs) {
+      controller.abort();
     }
-    throw new Error(err);
-  }
-  if (!res.body) throw new Error("无响应流");
+  }, 5000);
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let full = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const piece = decoder.decode(value, { stream: true });
-    full += piece;
-    opts.onChunk(full);
+  try {
+    const res = await fetch(
+      `/api/book-mall/api/sso/tools/ecom/storyboard/projects/${opts.projectId}/assistant/chat`,
+      {
+        method: "POST",
+        credentials: "include",
+        signal: controller.signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: opts.messages.map((m) => ({ role: m.role, content: m.content })),
+          modelKey: opts.modelKey,
+        }),
+      },
+    );
+    if (res.status === 401) {
+      throw new EcomUnauthorizedError("未登录");
+    }
+    if (!res.ok) {
+      const text = await res.text();
+      let err = `请求失败 (${res.status})`;
+      try {
+        const j = JSON.parse(text) as { error?: string };
+        if (j.error) err = j.error;
+      } catch {
+        /* */
+      }
+      throw new Error(err);
+    }
+    if (!res.body) throw new Error("无响应流");
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let full = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        lastActivityAt = Date.now();
+        const piece = decoder.decode(value, { stream: true });
+        full += piece;
+        opts.onChunk(full);
+      }
+    } catch (readError) {
+      const msg = readError instanceof Error ? readError.message : String(readError);
+      if (readError instanceof Error && readError.name === "AbortError") {
+        const idleSec = Math.round(idleTimeoutMs / 1000);
+        const maxSec = Math.round(maxDurationMs / 1000);
+        throw new Error(
+          full.trim().length > 0
+            ? `助手流式响应超时（${full.length} 字已接收）。请点「重新生成分镜」重试；若多次失败请换 Gateway 聊天模型或缩短口播脚本。`
+            : `助手流式响应超时（${idleSec}s 无新内容或总时长超过 ${maxSec}s）。请稍后重试。`,
+        );
+      }
+      if (/network error|failed to fetch|load failed|aborted|abort/i.test(msg)) {
+        throw new Error(
+          "助手流式连接中断（可能是生成内容过长或服务超时）。请稍后重试「重新生成分镜」；若仍失败请检查 Gateway 聊天模型是否可用。",
+        );
+      }
+      throw readError instanceof Error ? readError : new Error(msg);
+    }
+    return full;
+  } finally {
+    clearTimeout(maxTimer);
+    clearInterval(idleTimer);
   }
-  return full;
 }
 
 export async function uploadStoryboardSheetPng(
@@ -203,6 +306,7 @@ export async function generateStoryboardSheetImage(
     aspectRatio?: "16:9" | "9:16";
     imageSize?: string;
     autoGenCharacter?: boolean;
+    characterOnly?: boolean;
     panelIndex?: number;
   },
 ): Promise<{
@@ -277,6 +381,7 @@ export async function submitStoryboardFullVideo(
     ratio?: string;
     seedStr?: string;
     promptExtend?: boolean;
+    generateAudio?: boolean;
   },
 ): Promise<{
   status: "running";
@@ -344,8 +449,18 @@ export async function generateStoryboardPanelVideo(
     durationSec?: number;
     resolution?: string;
     modelKey?: string;
+    generateAudio?: boolean;
   },
-): Promise<{ videoUrl: string; panelIndex: number; chargePoints?: number }> {
+): Promise<
+  | {
+      status: "submitted";
+      panelIndex: number;
+      taskId: string;
+      logId: string;
+      chargePoints?: number;
+    }
+  | { videoUrl: string; panelIndex: number; chargePoints?: number }
+> {
   const data = await ecomBookFetch(
     `api/sso/tools/ecom/storyboard/projects/${projectId}/video/panel/generate`,
     {
@@ -354,6 +469,16 @@ export async function generateStoryboardPanelVideo(
       body: JSON.stringify(opts),
     },
   );
+  if (data.status === "submitted") {
+    return {
+      status: "submitted",
+      panelIndex: data.panelIndex as number,
+      taskId: data.taskId as string,
+      logId: data.logId as string,
+      chargePoints:
+        typeof data.chargePoints === "number" ? data.chargePoints : undefined,
+    };
+  }
   return {
     videoUrl: data.videoUrl as string,
     panelIndex: data.panelIndex as number,
@@ -380,6 +505,62 @@ export async function saveStoryboardDeliverableSnapshot(
   };
 }
 
+/** 资产库「查看交付包」：拉取合并当前成图/成片后的快照 */
+export async function fetchStoryboardLibraryDeliverable(
+  projectId: string,
+  opts?: { savedAt?: string; title?: string },
+): Promise<import("@/lib/storyboard-types").StoryboardDeliverableSnapshot> {
+  const params = new URLSearchParams();
+  if (opts?.savedAt?.trim()) params.set("savedAt", opts.savedAt.trim());
+  if (opts?.title?.trim()) params.set("title", opts.title.trim());
+  const qs = params.toString();
+  const data = await ecomBookFetch(
+    `api/sso/tools/ecom/storyboard/projects/${projectId}/deliverable/snapshot${qs ? `?${qs}` : ""}`,
+    { method: "GET" },
+  );
+  return data.snapshot as import("@/lib/storyboard-types").StoryboardDeliverableSnapshot;
+}
+
+export type StoryboardWorkflowSnapshot = {
+  savedAt: string;
+  title: string;
+  projectName?: string;
+};
+
+/** 保存完整工作流镜像到资产库（微剧故事版类目） */
+export async function saveStoryboardWorkflow(
+  projectId: string,
+  projectName: string,
+): Promise<StoryboardWorkflowSnapshot> {
+  const trimmed = projectName.trim();
+  if (!trimmed) throw new Error("请填写项目名");
+  const data = await ecomBookFetch(
+    `api/sso/tools/ecom/storyboard/projects/${projectId}/save`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectName: trimmed }),
+    },
+  );
+  return data.snapshot as StoryboardWorkflowSnapshot;
+}
+
+/** 一键复用：打开已有项目或从历史快照创建新项目 */
+export async function reuseStoryboardProject(
+  projectId: string,
+  savedAt?: string,
+): Promise<StoryboardProject> {
+  const data = await ecomBookFetch(
+    `api/sso/tools/ecom/storyboard/projects/${projectId}/reuse`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(savedAt ? { savedAt } : {}),
+    },
+  );
+  return data.project as StoryboardProject;
+}
+
 export type MediaRenderJobDto = {
   id: string;
   status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "EXPIRED";
@@ -389,15 +570,29 @@ export type MediaRenderJobDto = {
   errorMessage: string | null;
 };
 
+export type EcomMediaRenderProfileInput = {
+  transition?: { type: "xfade"; durationSec: number } | { type: "none" };
+  subtitle?: {
+    mode?: "script" | "asr" | "none";
+    burnIn?: boolean;
+    style?: import("@private/media-render-subtitle-style/subtitle-style-options").SubtitleBurnInStyle;
+  };
+  video?: { scaleMode?: "source" | "fit720p" | "fit1080p" };
+};
+
 export async function renderStoryboardPanelVideos(
   projectId: string,
+  opts?: { profile?: EcomMediaRenderProfileInput; panelIndexes?: number[] },
 ): Promise<MediaRenderJobDto> {
+  const body: Record<string, unknown> = {};
+  if (opts?.profile) body.profile = opts.profile;
+  if (opts?.panelIndexes?.length) body.panelIndexes = opts.panelIndexes;
   const data = await ecomBookFetch(
     `api/sso/tools/ecom/storyboard/projects/${projectId}/video/render`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify(body),
     },
   );
   return data.job as MediaRenderJobDto;
@@ -453,4 +648,46 @@ export async function mergeStoryboardPanelVideos(
     expiresAt: data.expiresAt as string | undefined,
     jobId: data.jobId as string | undefined,
   };
+}
+
+/** 下载 ZIP 交付包（参考图 + 分镜脚本 + 分镜图/视频 + 成片 + 对话） */
+export async function downloadStoryboardExportZip(projectId: string): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(
+      `/api/book-mall/api/sso/tools/ecom/storyboard/projects/${projectId}/export`,
+      { method: "GET", credentials: "include" },
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(msg === "fetch failed" ? "与服务器连接中断，请稍后重试。" : msg);
+  }
+  if (res.status === 401) throw new EcomUnauthorizedError("未登录");
+  if (!res.ok) {
+    let message = `导出失败 (${res.status})`;
+    try {
+      const data = (await res.json()) as { error?: string };
+      if (typeof data.error === "string") message = data.error;
+    } catch {
+      /* 非 JSON */
+    }
+    throw new Error(message);
+  }
+
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;\s]+)/i);
+  const plainMatch = disposition.match(/filename="([^"]+)"/i);
+  const filename = utf8Match
+    ? decodeURIComponent(utf8Match[1]!)
+    : plainMatch
+      ? plainMatch[1]!
+      : "storyboard-export.zip";
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }

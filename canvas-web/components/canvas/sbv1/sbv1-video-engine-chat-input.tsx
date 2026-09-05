@@ -2,10 +2,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowUp,
   ImageIcon,
-  Loader2,
-  Zap,
 } from "lucide-react";
 import {
   type MentionableItem,
@@ -34,7 +31,10 @@ import {
   resolveSbv1VariantIdFromEngine,
 } from "@/lib/canvas/sbv1-video-models";
 import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
+import { LibtvDockCreditsLabel } from "@/components/canvas/libtv-dock-credits-label";
+import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
 import type { Sbv1UpstreamRefLink } from "@/lib/canvas/sbv1-upstream-ref-links";
+import { resolveSbv1UpstreamMotionVideoLinks } from "@/lib/canvas/sbv1-upstream-ref-links";
 import type { Sbv1UpstreamTextLink } from "@/lib/canvas/sbv1-upstream-text-links";
 import { sbv1TextLinksToDockUpstream } from "@/lib/canvas/sbv1-upstream-text-links";
 import type { Pro2DockUpstreamLink } from "@/lib/canvas/pro2-dock-upstream-links";
@@ -52,6 +52,7 @@ import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-men
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
 import {
+  buildDashscopeVideoModelRefSyncPatch,
   dockInputModeToPatch,
   getSbv1VideoDockModeChips,
   resolveSbv1DockInputMode,
@@ -108,10 +109,9 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     logoIconPx,
   } = useLibtvDockRefThumbMetrics();
   const chipFontPx = VIDEO_DOCK_HEADER_CHIP_FONT_AT_100;
+  const modeChipFontPx = Math.max(10, chipFontPx - 4);
   const dockTextFontPx = VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100;
   const creditsFontPx = VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100;
-  const sendBtnPx = 44;
-  const sendIconPx = 18;
   const addNode = useCanvasStore((s) => s.addNode);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -119,23 +119,17 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   const canvasEdges = useCanvasStore((s) => s.edges);
 
   const isHdVideo = isSbv1HdVideoNode(data);
-  const hasMotionVideo = useMemo(() => {
-    if (!isHdVideo) return false;
-    for (const e of canvasEdges) {
-      if (e.target !== nodeId || e.targetHandle !== "in_motion_video") continue;
-      const src = canvasNodes.find((n) => n.id === e.source);
-      if (!src || src.type !== "sbv1-video-engine") continue;
-      const url = String(
-        (src.data as { runtime?: { ossUrl?: string; ephemeralUrl?: string } })
-          .runtime?.ossUrl ??
-          (src.data as { runtime?: { ephemeralUrl?: string } }).runtime
-            ?.ephemeralUrl ??
-          "",
-      ).trim();
-      if (/^https?:\/\//.test(url)) return true;
-    }
-    return false;
-  }, [isHdVideo, nodeId, canvasEdges, canvasNodes]);
+
+  const motionVideoLinks = useMemo(
+    () => resolveSbv1UpstreamMotionVideoLinks(nodeId, canvasNodes, canvasEdges),
+    [nodeId, canvasNodes, canvasEdges],
+  );
+  const hasMotionVideo = motionVideoLinks.some((l) => l.previewUrl?.trim());
+
+  const dockRefLinks = useMemo(
+    () => [...motionVideoLinks, ...upstreamLinks],
+    [motionVideoLinks, upstreamLinks],
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const promptCommitRef = useRef<MentionsTextareaCommitHandle | null>(null);
@@ -190,6 +184,12 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   const selectedModel = getSbv1VolcengineModelById(variantId, providers);
   const modelKey =
     data.engine?.modelKey?.trim() || selectedModel.engine.modelKey;
+  const isVolcSeedance =
+    /seedance|doubao-seedance/i.test(modelKey);
+  const previewVariantId = isVolcSeedance ? variantId : undefined;
+  const previewResolution = String(
+    data.resolution ?? data.engine?.params?.resolution ?? "720P",
+  );
   const multiShots = data.engine?.params?.multi_shots === true;
   const dockChips = useMemo(
     () =>
@@ -224,6 +224,20 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   }, [upstreamTextLinks, extraDockUpstreamLinks]);
 
   useEffect(() => {
+    if (isHdVideo) return;
+    const patch = buildDashscopeVideoModelRefSyncPatch(data, upstreamLinks.length);
+    if (patch) onPatch(patch);
+  }, [
+    isHdVideo,
+    upstreamLinks.length,
+    data.engine?.modelKey,
+    data.engine?.providerId,
+    data.engine?.params,
+    onPatch,
+    data,
+  ]);
+
+  useEffect(() => {
     if (isHdVideo || !dockChips.length) return;
     if (
       !data.dockInputMode ||
@@ -238,9 +252,15 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     activeDockMode,
     onPatch,
   ]);
-  const estCredits = useModelCreditsPreview(modelKey, billableDurationSec, variantId);
+  const estCredits = useModelCreditsPreview(
+    modelKey,
+    billableDurationSec,
+    previewVariantId,
+    undefined,
+    previewResolution,
+  );
 
-  const hasRefs = upstreamLinks.some((l) => l.previewUrl);
+  const hasRefs = dockRefLinks.some((l) => l.previewUrl?.trim());
   const hasPrompt = Boolean(livePrompt.trim());
   const activeRefIds = useMemo(
     () => dockActiveRefIdsFromPrompt(livePrompt),
@@ -358,7 +378,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
       return (
         <div className="flex min-w-0 items-center gap-1">
           {[0, 1].map((slotIndex) => {
-            const link = upstreamLinks[slotIndex];
+            const link = dockRefLinks[slotIndex];
             const corner = refThumbCorner(slotIndex, 2) ?? "参考";
             if (link) {
               const sourceNode = canvasNodes.find((n) => n.id === link.sourceNodeId);
@@ -397,16 +417,19 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
       );
     }
 
-    if (upstreamLinks.length === 0) return null;
+    if (dockRefLinks.length === 0) return null;
 
     return (
       <div className="hide-scroll-bar flex min-w-0 items-center gap-1.5 overflow-x-auto">
-        {upstreamLinks.map((link, index) => {
+        {dockRefLinks.map((link, index) => {
           const sourceNode = canvasNodes.find((n) => n.id === link.sourceNodeId);
           const importState = portraitImportUiState(
             sourceNode?.data as CanvasPortraitNodeFields | undefined,
           );
-          const corner = refThumbCorner(index, upstreamLinks.length);
+          const corner =
+            link.id.startsWith("sbv1-motion-")
+              ? "视频"
+              : refThumbCorner(index, dockRefLinks.length);
           return (
             <DockUpstreamRefPreviewCard
               key={link.id}
@@ -430,7 +453,16 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   })();
 
   const dockHeader = (() => {
-    if (isHdVideo) return null;
+    if (isHdVideo) {
+      if (!refThumbnails) return null;
+      return (
+        <Pro2DockHeader
+          compact
+          minHeightPx={headerMinHeightPx}
+          refRow={refThumbnails}
+        />
+      );
+    }
     const hasModeBar = dockChips.length > 0;
     const hasRefRow = textDockLinks.length > 0 || refThumbnails;
     if (!hasModeBar && !hasRefRow) return null;
@@ -442,7 +474,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
             chips={dockChips}
             activeMode={activeDockMode}
             disabled={isGenerating}
-            chipFontPx={chipFontPx}
+            chipFontPx={modeChipFontPx}
             chipMinHeightPx={chipMinHeightPx}
             onSelect={(mode) => onPatch(dockInputModeToPatch(mode))}
           />
@@ -483,7 +515,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
             {activeModeLabel ? (
               <span
                 className="nodrag shrink-0 rounded-full border border-white/10 px-2.5 py-1 font-medium text-white/55"
-                style={{ fontSize: Math.max(10, chipFontPx - 1) }}
+                style={{ fontSize: Math.max(10, chipFontPx - 3) }}
               >
                 {activeModeLabel}
               </span>
@@ -492,6 +524,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
               data={data}
               disabled={isGenerating}
               onPatch={onPatch}
+              refLinkCount={upstreamLinks.length}
               open={dockMenu === "model"}
               onOpenChange={(next) => setDockMenu(next ? "model" : null)}
             />
@@ -512,36 +545,25 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
         className="flex shrink-0 items-center gap-1.5 text-white/80"
         style={{ fontSize: dockTextFontPx }}
       >
-        {estCredits?.credits != null ? (
-          <span
-            className="flex shrink-0 items-center gap-1 tabular-nums text-amber-200/90"
-            style={{ fontSize: creditsFontPx }}
-            title={`${billableDurationSec}s 封顶 · ${estCredits.canonicalModelKey} · 预计扣 ${estCredits.credits} 积分（按当前套餐折算，与实扣一致）`}
-          >
-            <Zap
-              className="fill-amber-300/90 text-amber-300/90"
-              style={{ width: 14, height: 14 }}
-            />
-            {estCredits.credits}
-          </span>
-        ) : null}
-        <button
-          type="button"
+        <LibtvDockCreditsLabel
+          credits={estCredits?.credits}
+          fontPx={creditsFontPx}
+          title={
+            estCredits?.credits != null
+              ? `${billableDurationSec}s 封顶 · ${estCredits.canonicalModelKey} · 预计扣 ${estCredits.credits} 积分（按当前套餐折算，与实扣一致）`
+              : undefined
+          }
+        />
+        <LibtvDockSendButton
           disabled={!canSend}
-          title={isGenerating ? "生成中" : sendTitle ?? (isHdVideo ? "生成高清视频" : "生成视频")}
-          className="nodrag flex shrink-0 items-center justify-center rounded-lg bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
-          style={{ width: sendBtnPx, height: sendBtnPx }}
+          loading={isGenerating}
+          title={
+            isGenerating
+              ? "生成中"
+              : sendTitle ?? (isHdVideo ? "生成高清视频" : "生成视频")
+          }
           onClick={runWithCommittedPrompt}
-        >
-          {isGenerating ? (
-            <Loader2
-              className="animate-spin"
-              style={{ width: sendIconPx, height: sendIconPx }}
-            />
-          ) : (
-            <ArrowUp style={{ width: sendIconPx, height: sendIconPx }} />
-          )}
-        </button>
+        />
       </div>
     </Pro2DockToolbar>
   );
@@ -552,6 +574,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
         flowAnchor={placement}
         dockClassName="sbv1-image-dock"
         hidden={hidden}
+        anchorNodeId={nodeId}
         header={dockHeader}
         footer={toolbar}
       >
@@ -590,11 +613,14 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
             >
               {hasMotionVideo
                 ? "已连接上游视频，选择参数后点击生成"
-                : "请从左侧连接上游视频节点，或在视频节点右侧 + 选择「高清视频」"}
+                : upstreamLinks.length > 0
+                  ? "已连接参考图；高清视频需连接上游视频节点后再生成"
+                  : "请从左侧连接上游视频节点，或在视频节点右侧 + 选择「高清视频」"}
             </div>
           ) : (
             <MentionsEditable
               key={nodeId}
+              sourceId={nodeId}
               className={cn(
                 SBV1_CHAT_INPUT_TEXTAREA_CLASS,
                 RF_FORM_CONTROL,
@@ -618,7 +644,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
               }}
               onPaste={onPaste}
               mentionPickerTitle="参考图 · ←→ Enter 插入"
-              mentionPickerEmptyHint="暂无已连接参考图，请先连线或上传图片。"
+              mentionPickerEmptyHint="暂无已连接参考，请先连线或上传图片/视频。"
               mentionInlineThumb
               mentionEdition="sbv1"
             />

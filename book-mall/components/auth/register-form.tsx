@@ -14,29 +14,13 @@ import {
 } from "@/components/auth/animated-auth-ui";
 import { SmsCodeField } from "@/components/auth/sms-code-field";
 import { navigateAfterAuth } from "@/lib/post-auth-navigate";
-import { cn } from "@/lib/utils";
-
-const PERSONA_OPTIONS: {
-  value: BillingPersona;
-  title: string;
-  description: string;
-}[] = [
-  {
-    value: "PLATFORM_CREDIT",
-    title: "平台代付（推荐）",
-    description: "购买会员套餐，平台代付 AI 费用，按积分实时扣费，无需自备云厂商 Key。",
-  },
-  {
-    value: "BYOK",
-    title: "自带 Key（BYOK）",
-    description: "自备云厂商 API Key，平台收取技术服务费；云账单在 Gateway 查看。",
-  },
-];
 
 export function RegisterForm({
   welcomeGift,
+  initialReferralCode,
 }: {
-  welcomeGift?: { generalCredits: number; videoCredits: number } | null;
+  welcomeGift?: { generalCredits: number } | null;
+  initialReferralCode?: string;
 } = {}) {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
@@ -44,7 +28,8 @@ export function RegisterForm({
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [billingPersona, setBillingPersona] = useState<BillingPersona>("PLATFORM_CREDIT");
+  const [referralCode, setReferralCode] = useState(initialReferralCode?.trim().toUpperCase() ?? "");
+  const billingPersona: BillingPersona = "PLATFORM_CREDIT";
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -62,17 +47,21 @@ export function RegisterForm({
           password,
           name: name || undefined,
           billingPersona,
+          ...(referralCode ? { referralCode } : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const err = data as { error?: unknown; detail?: string };
+        const err = data as { error?: unknown; detail?: string; hint?: string };
         let msg: string;
         if (typeof err.error === "string") msg = err.error;
         else if (err.error && typeof err.error === "object") msg = JSON.stringify(err.error);
         else msg = "注册失败，请检查表单";
+        if (typeof err.hint === "string" && err.hint.length > 0) {
+          msg = `${msg}\n${err.hint}`;
+        }
         if (typeof err.detail === "string" && err.detail.length > 0) {
-          msg = `${msg}：${err.detail}`;
+          msg = `${msg}\n${err.detail}`;
         }
         setError(msg);
         return;
@@ -106,51 +95,17 @@ export function RegisterForm({
 
         <BoxReveal boxColor="hsl(var(--primary))" duration={0.3} className="pb-2">
           <p className="max-w-sm text-sm text-neutral-600 dark:text-neutral-300">
-            使用手机号注册；请选择计费方式（注册后不可更改）
+            使用手机号注册；订阅会员由平台代付 AI 费用，按积分扣费。
           </p>
         </BoxReveal>
 
-        {welcomeGift &&
-        (welcomeGift.generalCredits > 0 || welcomeGift.videoCredits > 0) ? (
+        {welcomeGift && welcomeGift.generalCredits > 0 ? (
           <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
-            注册即送 {welcomeGift.generalCredits.toLocaleString()} 通用积分
-            {welcomeGift.videoCredits > 0
-              ? ` + ${welcomeGift.videoCredits.toLocaleString()} 视频积分`
-              : ""}
-            （含视频，30 天内有效）。
+            注册即送 {welcomeGift.generalCredits.toLocaleString()} 积分（30 天内有效）。
           </div>
         ) : null}
 
         <form onSubmit={onSubmit} className="space-y-4">
-          <div className="space-y-2">
-            {PERSONA_OPTIONS.map((opt) => (
-              <label
-                key={opt.value}
-                className={cn(
-                  "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition",
-                  billingPersona === opt.value
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/40",
-                )}
-              >
-                <input
-                  type="radio"
-                  name="billingPersona"
-                  value={opt.value}
-                  checked={billingPersona === opt.value}
-                  onChange={() => setBillingPersona(opt.value)}
-                  className="mt-1"
-                />
-                <span>
-                  <span className="block text-sm font-medium">{opt.title}</span>
-                  <span className="mt-1 block text-xs text-muted-foreground">
-                    {opt.description}
-                  </span>
-                </span>
-              </label>
-            ))}
-          </div>
-
           <AnimatedAuthFields
             fields={[
               {
@@ -178,6 +133,15 @@ export function RegisterForm({
                 value: password,
                 onChange: (e) => setPassword(e.target.value),
               },
+              {
+                name: "referralCode",
+                label: "邀请码（选填）",
+                type: "text",
+                placeholder: "8 位邀请码",
+                value: referralCode,
+                onChange: (e) => setReferralCode(e.target.value.toUpperCase()),
+                required: false,
+              },
             ]}
             passwordVisible={showPassword}
             onTogglePassword={() => setShowPassword((v) => !v)}
@@ -192,7 +156,7 @@ export function RegisterForm({
           />
 
           {error ? (
-            <p className="text-sm text-red-500" role="alert">
+            <p className="text-sm text-red-500 whitespace-pre-line" role="alert">
               {error}
             </p>
           ) : null}

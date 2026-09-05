@@ -26,6 +26,220 @@ export function hasVolcengineTimingTrace(resultSummary: unknown): boolean {
   return readVolcengineTimingTrace(resultSummary) != null;
 }
 
+type DashscopeTimingTrace = {
+  vendorSubmitAtMs?: number;
+  vendorScheduledAtMs?: number;
+  vendorEndAtMs?: number;
+  firstRunningAtMs?: number;
+  lastPolledAtMs?: number;
+  lastStatus?: string;
+};
+
+function readDashscopeTimingTrace(
+  resultSummary: unknown,
+): DashscopeTimingTrace | null {
+  if (!resultSummary || typeof resultSummary !== "object") return null;
+  const root = resultSummary as Record<string, unknown>;
+  const gateway = root._gateway;
+  if (gateway && typeof gateway === "object") {
+    const trace = (gateway as Record<string, unknown>).dashscopeTiming;
+    if (trace && typeof trace === "object") {
+      return trace as DashscopeTimingTrace;
+    }
+  }
+  const direct = root.dashscopeTiming;
+  if (direct && typeof direct === "object") {
+    return direct as DashscopeTimingTrace;
+  }
+  return null;
+}
+
+export function hasDashscopeTimingTrace(resultSummary: unknown): boolean {
+  return readDashscopeTimingTrace(resultSummary) != null;
+}
+
+export function hasGatewayVendorPhaseTrace(resultSummary: unknown): boolean {
+  return (
+    hasVolcengineTimingTrace(resultSummary) ||
+    hasDashscopeTimingTrace(resultSummary) ||
+    hasMinimaxTimingTrace(resultSummary)
+  );
+}
+
+type MinimaxTimingTrace = {
+  vendorCreatedAtMs?: number;
+  vendorUpdatedAtMs?: number;
+  firstRunningAtMs?: number;
+  lastPolledAtMs?: number;
+  lastStatus?: string;
+};
+
+function readMinimaxTimingTrace(
+  resultSummary: unknown,
+): MinimaxTimingTrace | null {
+  if (!resultSummary || typeof resultSummary !== "object") return null;
+  const root = resultSummary as Record<string, unknown>;
+  const gateway = root._gateway;
+  if (gateway && typeof gateway === "object") {
+    const trace = (gateway as Record<string, unknown>).minimaxTiming;
+    if (trace && typeof trace === "object") {
+      return trace as MinimaxTimingTrace;
+    }
+  }
+  const task = root.task as Record<string, unknown> | undefined;
+  if (task && typeof task.created_at === "number") {
+    const created =
+      task.created_at >= 1e12
+        ? Math.trunc(task.created_at)
+        : Math.trunc(task.created_at * 1000);
+    const updated =
+      typeof task.updated_at === "number"
+        ? task.updated_at >= 1e12
+          ? Math.trunc(task.updated_at)
+          : Math.trunc(task.updated_at * 1000)
+        : undefined;
+    return {
+      vendorCreatedAtMs: created,
+      vendorUpdatedAtMs: updated,
+      firstRunningAtMs: created,
+      lastStatus: String(task.status ?? ""),
+    };
+  }
+  return null;
+}
+
+export function hasMinimaxTimingTrace(resultSummary: unknown): boolean {
+  return readMinimaxTimingTrace(resultSummary) != null;
+}
+
+function minimaxVendorGpuMs(trace: MinimaxTimingTrace): number | null {
+  const created = trace.vendorCreatedAtMs;
+  const updated = trace.vendorUpdatedAtMs;
+  if (created == null || updated == null || updated <= created) return null;
+  return Math.max(0, updated - created);
+}
+
+/** 进行中 MiniMax 视频 · 分阶段计时 */
+export function liveMinimaxVideoTiming(input: {
+  submittedAt: string;
+  resultSummary: unknown;
+  nowMs: number;
+}): {
+  queueMs: number;
+  generateMs: number | null;
+  vendorPostProcessMs: number | null;
+  pollDelayMs: number;
+  totalMs: number;
+  stalled: boolean;
+} | null {
+  const submittedMs = new Date(input.submittedAt).getTime();
+  const trace = readMinimaxTimingTrace(input.resultSummary);
+  if (!trace) {
+    const totalMs = Math.max(0, input.nowMs - submittedMs);
+    return {
+      queueMs: 0,
+      generateMs: totalMs,
+      vendorPostProcessMs: null,
+      pollDelayMs: 0,
+      totalMs,
+      stalled: false,
+    };
+  }
+  const genStart =
+    trace.vendorCreatedAtMs ?? trace.firstRunningAtMs ?? null;
+  if (genStart == null) {
+    const totalMs = Math.max(0, input.nowMs - submittedMs);
+    return {
+      queueMs: 0,
+      generateMs: totalMs,
+      vendorPostProcessMs: null,
+      pollDelayMs: 0,
+      totalMs,
+      stalled: false,
+    };
+  }
+
+  const queueMs = Math.max(0, genStart - submittedMs);
+  const lastPolled = trace.lastPolledAtMs;
+  const pollDelayMs =
+    lastPolled != null ? Math.max(0, input.nowMs - lastPolled) : 0;
+
+  const gpuMs = minimaxVendorGpuMs(trace);
+  let generateMs: number | null = null;
+  if (gpuMs != null) {
+    generateMs = gpuMs;
+  } else {
+    generateMs = Math.max(0, input.nowMs - genStart);
+  }
+
+  return {
+    queueMs,
+    generateMs,
+    vendorPostProcessMs: null,
+    pollDelayMs,
+    totalMs: Math.max(0, input.nowMs - submittedMs),
+    stalled: false,
+  };
+}
+
+function dashscopeGenStartMs(trace: DashscopeTimingTrace): number | null {
+  return (
+    trace.vendorScheduledAtMs ??
+    trace.vendorSubmitAtMs ??
+    trace.firstRunningAtMs ??
+    null
+  );
+}
+
+function dashscopeVendorGpuMs(trace: DashscopeTimingTrace): number | null {
+  const genStart = dashscopeGenStartMs(trace);
+  const end = trace.vendorEndAtMs;
+  if (genStart == null || end == null) return null;
+  return Math.max(0, end - genStart);
+}
+
+/** 进行中百炼 / DashScope 异步任务 · 分阶段计时 */
+export function liveDashscopeAsyncTiming(input: {
+  submittedAt: string;
+  resultSummary: unknown;
+  nowMs: number;
+}): {
+  queueMs: number;
+  generateMs: number | null;
+  vendorPostProcessMs: number | null;
+  pollDelayMs: number;
+  totalMs: number;
+  stalled: boolean;
+} | null {
+  const trace = readDashscopeTimingTrace(input.resultSummary);
+  if (!trace) return null;
+  const genStart = dashscopeGenStartMs(trace);
+  if (genStart == null) return null;
+
+  const submittedMs = new Date(input.submittedAt).getTime();
+  const queueMs = Math.max(0, genStart - submittedMs);
+  const lastPolled = trace.lastPolledAtMs;
+  const pollDelayMs =
+    lastPolled != null ? Math.max(0, input.nowMs - lastPolled) : 0;
+
+  const gpuMs = dashscopeVendorGpuMs(trace);
+  let generateMs: number | null = null;
+  if (gpuMs != null) {
+    generateMs = gpuMs;
+  } else {
+    generateMs = Math.max(0, input.nowMs - genStart);
+  }
+
+  return {
+    queueMs,
+    generateMs,
+    vendorPostProcessMs: null,
+    pollDelayMs,
+    totalMs: Math.max(0, input.nowMs - submittedMs),
+    stalled: false,
+  };
+}
+
 function readVolcengineTimingTrace(
   resultSummary: unknown,
 ): VolcengineTimingTrace | null {
@@ -182,6 +396,24 @@ export function resolveLiveLogPhaseTiming(input: {
     return volc;
   }
 
+  const dashscope = liveDashscopeAsyncTiming({
+    submittedAt: input.submittedAt,
+    resultSummary: input.resultSummary,
+    nowMs: input.nowMs,
+  });
+  if (dashscope) {
+    return dashscope;
+  }
+
+  const minimax = liveMinimaxVideoTiming({
+    submittedAt: input.submittedAt,
+    resultSummary: input.resultSummary,
+    nowMs: input.nowMs,
+  });
+  if (minimax) {
+    return minimax;
+  }
+
   const submittedMs = new Date(input.submittedAt).getTime();
   return {
     queueMs: server.queueMs ?? null,
@@ -241,12 +473,42 @@ export function resolveVendorNativeTimingLive(input: {
         vendorTraceSpanMs = Math.max(0, end - trace.vendorCreatedAtMs);
       }
     }
+  } else if (
+    input.providerKind === "DASHSCOPE" ||
+    input.providerKind === "BAILIAN"
+  ) {
+    const trace = readDashscopeTimingTrace(input.resultSummary);
+    if (trace) {
+      if (trace.vendorSubmitAtMs != null && trace.vendorEndAtMs != null) {
+        vendorTraceSpanMs = Math.max(
+          0,
+          trace.vendorEndAtMs - trace.vendorSubmitAtMs,
+        );
+      } else {
+        vendorTraceSpanMs = dashscopeVendorGpuMs(trace);
+      }
+    }
   }
 
   const vendorNativeDurationMs = reported ?? vendorTraceSpanMs;
   let vendorNativeGenerateMs: number | null = null;
   if (input.providerKind === "VOLCENGINE" && input.requestKind === "VIDEO") {
     vendorNativeGenerateMs = vendorTraceSpanMs;
+  } else if (
+    input.providerKind === "DASHSCOPE" ||
+    input.providerKind === "BAILIAN"
+  ) {
+    const trace = readDashscopeTimingTrace(input.resultSummary);
+    vendorNativeGenerateMs = trace ? dashscopeVendorGpuMs(trace) : null;
+  } else if (input.providerKind === "MINIMAX" && input.requestKind === "VIDEO") {
+    const trace = readMinimaxTimingTrace(input.resultSummary);
+    vendorNativeGenerateMs = trace ? minimaxVendorGpuMs(trace) : null;
+    if (trace?.vendorCreatedAtMs != null && trace.vendorUpdatedAtMs != null) {
+      vendorTraceSpanMs = Math.max(
+        0,
+        trace.vendorUpdatedAtMs - trace.vendorCreatedAtMs,
+      );
+    }
   } else if (reported != null) {
     vendorNativeGenerateMs = reported;
   }

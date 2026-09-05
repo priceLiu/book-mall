@@ -59,7 +59,9 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
       return true;
     }
     const login = bookMallLoginHref(
-      typeof window !== "undefined" ? window.location.href : "/",
+      typeof window !== "undefined"
+        ? window.location.pathname + window.location.search
+        : "/",
     );
     if (login) {
       window.location.href = login;

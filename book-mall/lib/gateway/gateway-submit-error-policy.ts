@@ -38,8 +38,10 @@ export const MODEL_NOT_FOUND_MARKERS = [
 /** 厂商账户欠费 / 余额不足（非凭证无效）。火山 AccountOverdueError 走 403，须与凭证/权限问题区分 */
 export const UPSTREAM_BALANCE_MARKERS = [
   "overdue balance",
+  "overdue-payment",
   "accountoverdue",
   "account overdue",
+  "account is in good standing",
   "insufficient balance",
   "insufficient_balance",
   "arrears",
@@ -59,6 +61,9 @@ export const TRANSIENT_SUBMIT_MARKERS = [
   "gateway timeout",
   "recordinfo timeout",
   "createTask retry timeout",
+  "engineoverloaded",
+  "engine is currently overloaded",
+  "currently overloaded",
 ] as const;
 
 /** 瞬态 submit 重试：仅 TRANSIENT，指数退避，不阻塞 90s */
@@ -80,6 +85,21 @@ export type ClassifiedGatewaySubmitError = {
 
 function normalizeBlob(raw: string): string {
   return raw.trim().toLowerCase();
+}
+
+/** Kimi/Moonshot · EngineOverloadedError 等厂商引擎过载 */
+export function isEngineOverloadedMessage(message?: string | null): boolean {
+  const blob = normalizeBlob(message ?? "");
+  if (!blob) return false;
+  return (
+    blob.includes("engineoverloaded") ||
+    blob.includes("engine is currently overloaded") ||
+    blob.includes("currently overloaded")
+  );
+}
+
+export function engineOverloadedUserHintZh(): string {
+  return "文本模型引擎繁忙（厂商过载），请等待 1～2 分钟后重试，或暂时更换其它 LLM 模型。";
 }
 
 export function isContentPolicySubmitMessage(message?: string | null): boolean {

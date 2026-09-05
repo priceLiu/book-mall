@@ -17,13 +17,42 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-[110] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      // z-[300]：须高于侧栏 z-[200]，否则全屏预览盖不住导航
+      "fixed inset-0 z-[300] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className,
     )}
     {...props}
   />
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
+
+/** 全站 Dialog 右上角关闭钮（与图片预览 lightbox 一致） */
+export const ECOM_DIALOG_CLOSE_BUTTON_CLASS = cn(
+  "absolute right-4 top-4 z-20",
+  "flex h-8 w-8 items-center justify-center",
+  "rounded-full border-0 bg-black/75 text-white opacity-100 backdrop-blur-sm",
+  "shadow-md transition-colors",
+  "hover:bg-black hover:opacity-100",
+  "focus:outline-none focus:ring-2 focus:ring-white/40 focus:ring-offset-0",
+  "disabled:pointer-events-none disabled:opacity-40",
+);
+
+/** 自定义 overlay / portal 弹层右上角关闭（与故事版 DialogContent 一致） */
+export function EcomDialogCloseButton({
+  className,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      type="button"
+      className={cn(ECOM_DIALOG_CLOSE_BUTTON_CLASS, className)}
+      aria-label="关闭"
+      {...props}
+    >
+      <X className="h-4 w-4 stroke-[2.5]" />
+    </button>
+  );
+}
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
@@ -34,18 +63,14 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 z-[110] grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border border-[var(--ecom-hairline)] bg-white p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",
+        "fixed left-1/2 top-1/2 z-[300] grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border border-[var(--ecom-hairline)] bg-white p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",
         className,
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close
-        type="button"
-        className="absolute right-4 top-4 rounded-sm text-[var(--ecom-ink)] opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--ecom-primary)] focus:ring-offset-2"
-        aria-label="关闭"
-      >
-        <X className="h-4 w-4" />
+      <DialogPrimitive.Close asChild>
+        <EcomDialogCloseButton />
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>
