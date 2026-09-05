@@ -262,7 +262,8 @@ export function mergeKnownMinimaxSpeechModelsForCanvas(
   providers: CanvasProviderDto[],
   opts: { role?: CanvasModelRole },
 ): CanvasProviderDto[] {
-  if (opts.role && opts.role !== "TTS" && opts.role !== "LLM") return providers;
+  const role = opts.role as string | undefined;
+  if (role && role !== "TTS" && role !== "LLM") return providers;
 
   const presentKeys = new Set<string>();
   for (const p of providers) {

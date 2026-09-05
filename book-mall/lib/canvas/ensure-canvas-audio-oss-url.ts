@@ -173,6 +173,7 @@ async function persistAudioOssToCanvasNode(args: {
     args.ossUrl,
     {
       status: "done",
+      taskId: `audio-oss:${args.nodeId}`,
       ossUrl: args.ossUrl,
     },
   );

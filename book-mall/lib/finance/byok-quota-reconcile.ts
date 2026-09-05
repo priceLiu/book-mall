@@ -28,61 +28,12 @@ export type ByokQuotaReconcileRow = {
   afterIncludedUsed: number;
 };
 
-/**  dryRun=true 时只报告，不写库。 */
-export async function reconcileByokIncludedUsedFromSettlements(opts?: {
+/** dryRun=true 时只报告，不写库。BYOK 表已退役，恒返回空。 */
+export async function reconcileByokIncludedUsedFromSettlements(_opts?: {
   periodKey?: string;
   dryRun?: boolean;
 }): Promise<ByokQuotaReconcileRow[]> {
-  const periodKey = opts?.periodKey ?? currentPeriodKey();
-  const dryRun = opts?.dryRun ?? true;
-
-  const settlements = await prisma.billingSettlementLine.groupBy({
-    by: ["ownerType", "ownerId", "byokTaskKind"],
-    where: {
-      periodKey,
-      settlementKind: "BYOK_QUOTA_INCLUDED",
-      byokTaskKind: { not: null },
-    },
-    _count: { _all: true },
-  });
-
-  const out: ByokQuotaReconcileRow[] = [];
-
-  for (const s of settlements) {
-    if (!s.byokTaskKind) continue;
-    const row = await prisma.byokUsageMonthly.findUnique({
-      where: {
-        ownerType_ownerId_periodKey_taskKind: {
-          ownerType: s.ownerType,
-          ownerId: s.ownerId,
-          periodKey,
-          taskKind: s.byokTaskKind,
-        },
-      },
-    });
-    const before = row?.includedUsed ?? 0;
-    const target = s._count._all;
-    if (before === target) continue;
-
-    out.push({
-      ownerType: s.ownerType,
-      ownerId: s.ownerId,
-      taskKind: s.byokTaskKind,
-      periodKey,
-      beforeIncludedUsed: before,
-      settlementCount: target,
-      afterIncludedUsed: target,
-    });
-
-    if (!dryRun && row) {
-      await prisma.byokUsageMonthly.update({
-        where: { id: row.id },
-        data: { includedUsed: target },
-      });
-    }
-  }
-
-  return out;
+  return [];
 }
 
 export type ByokSettlementSnapshotFix = {
@@ -112,14 +63,10 @@ async function resolveMonthlyIncludedLimit(
 ): Promise<{ limit: number; seats: number }> {
   const ref = { ownerType, ownerId };
   const { scopeKey, seats } = await resolveByokScope(ref);
-  const quota = await prisma.byokTaskQuota.findUnique({
-    where: { scopeKey_taskKind: { scopeKey, taskKind } },
-  });
-  const perSeat =
-    quota?.monthlyIncluded ??
-    DEFAULT_BYOK_QUOTAS.find((q) => q.scopeKey === scopeKey && q.taskKind === taskKind)
-      ?.monthlyIncluded ??
-    0;
+  const quota = DEFAULT_BYOK_QUOTAS.find(
+    (q) => q.scopeKey === scopeKey && q.taskKind === taskKind,
+  );
+  const perSeat = quota?.monthlyIncluded ?? 0;
   const multiplier = scopeKey === BYOK_SCOPE_TEAM_SEAT ? seats : 1;
   return { limit: perSeat * multiplier, seats };
 }

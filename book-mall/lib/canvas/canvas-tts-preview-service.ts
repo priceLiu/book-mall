@@ -150,7 +150,7 @@ async function previewMinimaxTts(args: {
 
   if (!ok) {
     throw new CanvasProjectError(
-      "TTS_PREVIEW_FAILED",
+      "UPSTREAM_ERROR",
       result.buffer.toString("utf8").slice(0, 200) ||
         `MiniMax 试听失败（HTTP ${result.status}）`,
       502,

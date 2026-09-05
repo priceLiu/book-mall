@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 
 import { canManagePricing, canViewFinanceCost } from "@/lib/auth/permissions";
 import { buildByokFinanceReport } from "@/lib/billing/byok-pricing";
-import { bodyToFormData } from "@/lib/finance/body-to-form-data";
 import {
   financeForbidden,
   financeJson,
@@ -10,12 +9,6 @@ import {
   financeUnauthorized,
   getFinanceSession,
 } from "@/lib/finance/finance-api";
-import {
-  deleteByokConfigAction,
-  saveByokQuotaAction,
-  saveResourceRateAction,
-  upsertByokConfigAction,
-} from "@/app/admin/finance/credit-billing-actions";
 
 export async function OPTIONS(request: NextRequest) {
   return financeOptions(request);
@@ -43,24 +36,9 @@ export async function POST(request: NextRequest) {
   if (!user) return financeUnauthorized(request);
   if (!canManagePricing(user.role)) return financeForbidden(request);
 
-  const body = (await request.json()) as { action: string } & Record<string, unknown>;
-  const fd = bodyToFormData(body);
-  let result;
-  switch (body.action) {
-    case "upsertConfig":
-      result = await upsertByokConfigAction(fd);
-      break;
-    case "deleteConfig":
-      result = await deleteByokConfigAction(fd);
-      break;
-    case "saveRate":
-      result = await saveResourceRateAction(fd);
-      break;
-    case "saveQuota":
-      result = await saveByokQuotaAction(fd);
-      break;
-    default:
-      return financeJson(request, { ok: false, error: `未知操作: ${body.action}` }, { status: 400 });
-  }
-  return financeJson(request, result, { status: result.ok ? 200 : 400 });
+  return financeJson(
+    request,
+    { ok: false, error: "BYOK 产品已退役，配置操作不可用" },
+    { status: 410 },
+  );
 }

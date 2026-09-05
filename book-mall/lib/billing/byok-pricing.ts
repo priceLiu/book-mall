@@ -15,7 +15,6 @@
  */
 import type { ByokTaskKind } from "@prisma/client";
 
-import { prisma } from "@/lib/prisma";
 import { DEFAULT_CREDIT_ANCHOR_YUAN } from "@/lib/pricing/credit-pricing-formulas";
 import { CREDIT_TOPUP_PACKS } from "@/lib/billing/credit-topup-packs";
 
@@ -525,312 +524,35 @@ export function buildByokPricingStandards() {
 }
 
 export async function buildByokFinanceReport(periodKey: string) {
-  const since = new Date(`${periodKey}-01T00:00:00.000Z`);
-  const until = new Date(since);
-  until.setUTCMonth(until.getUTCMonth() + 1);
-
-  const [configs, quotas, rates, resourceEvents, gatewayLogs, usageRows] = await Promise.all([
-    prisma.byokServiceConfig.findMany({ where: { active: true }, orderBy: { scopeKey: "asc" } }),
-    prisma.byokTaskQuota.findMany({ where: { active: true }, orderBy: [{ scopeKey: "asc" }, { taskKind: "asc" }] }),
-    prisma.resourceMeterRate.findMany({ where: { active: true } }),
-    prisma.resourceMeterEvent.findMany({
-      where: { periodKey, createdAt: { gte: since, lt: until } },
-      select: { resourceType: true, quantity: true, costYuan: true },
-    }),
-    prisma.gatewayRequestLog.findMany({
-      where: {
-        billingMode: "BYOK",
-        status: "SUCCEEDED",
-        createdAt: { gte: since, lt: until },
-      },
-      select: {
-        requestKind: true,
-        inputSummary: true,
-        estimatedVendorCostYuan: true,
-        creditsCharged: true,
-      },
-    }),
-    prisma.byokUsageMonthly.findMany({
-      where: { periodKey },
-      orderBy: [{ ownerType: "asc" }, { ownerId: "asc" }, { taskKind: "asc" }],
-    }),
-  ]);
-
-  let resourceFeeYuan = 0;
-  const resourceByType: Record<string, { quantity: number; costYuan: number }> = {};
-  for (const e of resourceEvents) {
-    const cost = Number(e.costYuan);
-    resourceFeeYuan += cost;
-    const key = e.resourceType;
-    resourceByType[key] ??= { quantity: 0, costYuan: 0 };
-    resourceByType[key].quantity += Number(e.quantity);
-    resourceByType[key].costYuan += cost;
-  }
-
-  let vendorCostObservedYuan = 0;
-  const taskObserved: Record<string, number> = {
-    TEXT_TO_IMAGE: 0,
-    IMAGE_TO_VIDEO: 0,
-    VIDEO_TO_VIDEO: 0,
-    VIDEO_UNDERSTANDING: 0,
-    TTS: 0,
-    OTHER: 0,
-  };
-  for (const log of gatewayLogs) {
-    vendorCostObservedYuan += log.estimatedVendorCostYuan != null ? Number(log.estimatedVendorCostYuan) : 0;
-    const kind = mapLogToByokTaskKind(log);
-    if (kind) taskObserved[kind] += 1;
-    else taskObserved.OTHER += 1;
-  }
-
-  const ownerKeys = [...new Set(usageRows.map((r) => `${r.ownerType}:${r.ownerId}`))];
-  const userIds = usageRows.filter((r) => r.ownerType === "USER").map((r) => r.ownerId);
-  const tenantIds = usageRows.filter((r) => r.ownerType === "TENANT").map((r) => r.ownerId);
-  const [users, tenants, accounts] = await Promise.all([
-    userIds.length
-      ? prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true, email: true } })
-      : Promise.resolve([]),
-    tenantIds.length
-      ? prisma.tenant.findMany({ where: { id: { in: tenantIds } }, select: { id: true, name: true, type: true } })
-      : Promise.resolve([]),
-    ownerKeys.length
-      ? prisma.creditAccount.findMany({
-          where: {
-            OR: usageRows.map((r) => ({ ownerType: r.ownerType, ownerId: r.ownerId })),
-          },
-          select: { ownerType: true, ownerId: true, balanceCredits: true },
-        })
-      : Promise.resolve([]),
-  ]);
-  const userMap = new Map(users.map((u) => [u.id, u]));
-  const tenantMap = new Map(tenants.map((t) => [t.id, t]));
-  const accountMap = new Map(accounts.map((a) => [`${a.ownerType}:${a.ownerId}`, a]));
-
-  const ownerUsage = ownerKeys.map((key) => {
-    const [ownerType, ownerId] = key.split(":");
-    const rows = usageRows.filter((r) => r.ownerType === ownerType && r.ownerId === ownerId);
-    const scopeKey = rows[0]?.scopeKey ?? BYOK_SCOPE_PERSONAL;
-    const seats = rows[0]?.seatsSnapshot ?? 1;
-    const label =
-      ownerType === "TENANT"
-        ? `团队 · ${tenantMap.get(ownerId)?.name ?? ownerId}`
-        : `个人 · ${userMap.get(ownerId)?.name ?? userMap.get(ownerId)?.email ?? ownerId}`;
-    const account = accountMap.get(key);
-    const tasks = rows.map((r) => ({
-      taskKind: r.taskKind,
-      label: BYOK_TASK_KIND_LABEL[r.taskKind],
-      includedUsed: r.includedUsed,
-      overageUsed: r.overageUsed,
-      overageCredits: r.overageCredits,
-      quota: quotas.find((q) => q.scopeKey === scopeKey && q.taskKind === r.taskKind)?.monthlyIncluded ?? 0,
-    }));
-    return {
-      ownerType,
-      ownerId,
-      scopeKey,
-      seats,
-      label,
-      audience: ownerType === "TENANT" ? "团队" : "个人",
-      balanceCredits: account?.balanceCredits ?? 0,
-      totalOverageCredits: rows.reduce((s, r) => s + r.overageCredits, 0),
-      tasks,
-    };
-  });
-
   const standards = buildByokPricingStandards();
-
-  const memberLogs = await prisma.gatewayRequestLog.findMany({
-    where: {
-      billingMode: "BYOK",
-      status: "SUCCEEDED",
-      actorBookUserId: { not: null },
-      submittedAt: { gte: since, lt: until },
-    },
-    select: {
-      actorBookUserId: true,
-      tenantId: true,
-      creditsCharged: true,
-    },
-  });
-  const memberAgg = new Map<
-    string,
-    { actorBookUserId: string; tenantId: string | null; count: number; overageCredits: number }
-  >();
-  for (const log of memberLogs) {
-    if (!log.actorBookUserId) continue;
-    const key = `${log.tenantId ?? "personal"}:${log.actorBookUserId}`;
-    const cur = memberAgg.get(key) ?? {
-      actorBookUserId: log.actorBookUserId,
-      tenantId: log.tenantId,
-      count: 0,
-      overageCredits: 0,
-    };
-    cur.count += 1;
-    cur.overageCredits += log.creditsCharged ?? 0;
-    memberAgg.set(key, cur);
-  }
-  const actorIds = [...new Set([...memberAgg.values()].map((m) => m.actorBookUserId))];
-  const actorUsers =
-    actorIds.length > 0
-      ? await prisma.user.findMany({
-          where: { id: { in: actorIds } },
-          select: { id: true, name: true, email: true },
-        })
-      : [];
-  const actorUserMap = new Map(actorUsers.map((u) => [u.id, u]));
-  const memberActorUsage = [...memberAgg.values()]
-    .map((m) => ({
-      actorBookUserId: m.actorBookUserId,
-      tenantId: m.tenantId,
-      userName: actorUserMap.get(m.actorBookUserId)?.name ?? null,
-      userEmail: actorUserMap.get(m.actorBookUserId)?.email ?? null,
-      count: m.count,
-      overageCredits: m.overageCredits,
-    }))
-    .sort((a, b) => b.overageCredits - a.overageCredits);
-
-  const simulationScenarios = configs.flatMap((cfg) => {
-    const scopeQuotas = quotas
-      .filter((q) => q.scopeKey === cfg.scopeKey)
-      .map((q) => ({
-        taskKind: q.taskKind,
-        monthlyIncluded: q.monthlyIncluded,
-        overageCredits: q.overageCredits,
-      }));
-    const fee = Number(cfg.techServiceFeeYuan);
-    const seats = cfg.scopeKey === BYOK_SCOPE_TEAM_SEAT ? BYOK_TEAM_MIN_SEATS : 1;
-
-    const within = simulateByokMonth({
-      scopeKey: cfg.scopeKey,
-      techServiceFeeYuan: fee,
-      seats,
-      quotas: scopeQuotas,
-      usage: buildByokIncludedUsageFromQuotas(scopeQuotas, seats),
-    });
-
-    const includedUsage = buildByokIncludedUsageFromQuotas(scopeQuotas, seats);
-    const exceed = simulateByokMonth({
-      scopeKey: cfg.scopeKey,
-      techServiceFeeYuan: fee,
-      seats,
-      quotas: scopeQuotas,
-      usage: {
-        TEXT_TO_IMAGE: (includedUsage.TEXT_TO_IMAGE ?? 0) + 30,
-        IMAGE_TO_VIDEO: (includedUsage.IMAGE_TO_VIDEO ?? 0) + 10,
-        VIDEO_TO_VIDEO: (includedUsage.VIDEO_TO_VIDEO ?? 0) + 5,
-        VIDEO_UNDERSTANDING: (includedUsage.VIDEO_UNDERSTANDING ?? 0) + 10,
-        TTS: (includedUsage.TTS ?? 0) + 10,
-      },
-    });
-
-    return [
-      {
-        ...within,
-        scopeKey: cfg.scopeKey,
-        label: cfg.label,
-        scenario: "套餐内用满（无超额）",
-        description: cfg.scopeKey === BYOK_SCOPE_TEAM_SEAT ? `${seats} 席 × 各任务额度` : "个人各任务额度用满",
-      },
-      {
-        ...exceed,
-        scopeKey: cfg.scopeKey,
-        label: cfg.label,
-        scenario: "超出额度（需轻量包）",
-        description: "五类任务各 +5～30 次超额示例",
-      },
-    ];
-  });
-
   return {
     periodKey,
     standards,
-    configs: configs.map((c) => ({
-      id: c.id,
-      scopeKey: c.scopeKey,
-      label: c.label,
-      techServiceFeeYuan: Number(c.techServiceFeeYuan),
-      minSeats: c.minSeats,
-      interval: c.interval,
-      note: c.note,
-      active: c.active,
-    })),
-    quotas: quotas.map((q) => ({
-      id: q.id,
-      scopeKey: q.scopeKey,
-      taskKind: q.taskKind,
-      label: q.label,
-      monthlyIncluded: q.monthlyIncluded,
-      overageCredits: q.overageCredits,
-      overageYuan: round2(q.overageCredits * DEFAULT_CREDIT_ANCHOR_YUAN),
-      active: q.active,
-    })),
-    rates: rates.map((r) => ({
-      resourceType: r.resourceType,
-      coefficientYuan: Number(r.coefficientYuan),
-      unitLabel: r.unitLabel,
-    })),
+    configs: [],
+    quotas: [],
+    rates: [],
     observed: {
-      gatewayTaskCount: gatewayLogs.length,
-      overageCreditsTotal: gatewayLogs.reduce((s, l) => s + (l.creditsCharged ?? 0), 0),
-      vendorCostYuan: round2(vendorCostObservedYuan),
-      taskByKind: taskObserved,
-      resourceFeeYuan: round2(resourceFeeYuan),
-      resourceByType,
-      note: "厂商成本为用户自付观测值；平台收入 = 技术服务费 + 超额轻量包扣分 + 资源计量费",
+      gatewayTaskCount: 0,
+      overageCreditsTotal: 0,
+      vendorCostYuan: 0,
+      taskByKind: {
+        TEXT_TO_IMAGE: 0,
+        IMAGE_TO_VIDEO: 0,
+        VIDEO_TO_VIDEO: 0,
+        VIDEO_UNDERSTANDING: 0,
+        TTS: 0,
+        OTHER: 0,
+      },
+      resourceFeeYuan: 0,
+      resourceByType: {},
+      note: "BYOK 产品已退役；历史报表仅保留定价标准参考",
     },
-    ownerUsage,
-    memberActorUsage,
-    simulationScenarios,
+    ownerUsage: [],
+    memberActorUsage: [],
+    simulationScenarios: [],
   };
 }
 
 export async function seedByokSimplifiedPricing() {
-  for (const cfg of DEFAULT_BYOK_CONFIGS) {
-    await prisma.byokServiceConfig.upsert({
-      where: { scopeKey: cfg.scopeKey },
-      create: {
-        scopeKey: cfg.scopeKey,
-        label: cfg.label,
-        techServiceFeeYuan: 0,
-        minSeats: cfg.minSeats,
-        interval: "MONTH",
-        note: "积分换算 1.0：技术服务费已退役，仅保留配额定义",
-        active: false,
-      },
-      update: {
-        label: cfg.label,
-        techServiceFeeYuan: 0,
-        minSeats: cfg.minSeats,
-        note: "积分换算 1.0：技术服务费已退役，仅保留配额定义",
-        active: false,
-      },
-    });
-  }
-
-  for (const legacy of LEGACY_BYOK_SCOPES) {
-    await prisma.byokServiceConfig.updateMany({
-      where: { scopeKey: legacy },
-      data: { active: false },
-    });
-  }
-
-  for (const q of DEFAULT_BYOK_QUOTAS) {
-    await prisma.byokTaskQuota.upsert({
-      where: { scopeKey_taskKind: { scopeKey: q.scopeKey, taskKind: q.taskKind } },
-      create: {
-        scopeKey: q.scopeKey,
-        taskKind: q.taskKind,
-        label: q.label,
-        monthlyIncluded: q.monthlyIncluded,
-        overageCredits: q.overageCredits,
-        active: true,
-      },
-      update: {
-        label: q.label,
-        monthlyIncluded: q.monthlyIncluded,
-        overageCredits: q.overageCredits,
-        active: true,
-      },
-    });
-  }
+  return;
 }
