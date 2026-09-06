@@ -60,20 +60,20 @@ export default async function PricingPage() {
           priceYuan: Number(p.priceYuan),
           originalYuan: p.originalYuan == null ? null : Number(p.originalYuan),
           promoLabel: p.promoLabel,
-          monthlyCredits: p.monthlyCredits,
+          monthlyCredits: Number(p.monthlyCredits),
           includedSeats: p.includedSeats,
           seatTiers: p.seatTiers.map((t) => ({
             seatMin: t.seatMin,
             seatMax: t.seatMax,
             perSeatPriceYuan: Number(t.perSeatPriceYuan),
-            perSeatCredits: t.perSeatCredits,
+            perSeatCredits: Number(t.perSeatCredits),
           })),
         }))}
         models={pricesRaw.map((m) => ({
           canonicalModelKey: m.canonicalModelKey,
           displayName: m.displayName,
           unit: m.unit,
-          creditsPerUnit: m.creditsPerUnit,
+          creditsPerUnit: Number(m.creditsPerUnit),
         }))}
         teamTenants={teamTenants}
         welcomeGift={welcomeGift}

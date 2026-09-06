@@ -57,8 +57,8 @@ export async function buildPnlReport(periodKey: string): Promise<PnlReportRow> {
   let costYuan = 0;
   let consumeCredits = 0;
   for (const l of ledgers) {
-    const credits = Math.abs(l.credits);
-    const ppc = l.account.pricePerCreditYuan != null ? Number(l.account.pricePerCreditYuan) : 0.04;
+    const credits = Math.abs(Number(l.credits));
+    const ppc = l.account.pricePerCreditYuan != null ? Number(l.account.pricePerCreditYuan) : 0.03;
     revenueYuan += credits * ppc;
     if (l.refType === "gateway_log" && l.refId && logCostMap.has(l.refId)) {
       costYuan += logCostMap.get(l.refId) ?? 0;

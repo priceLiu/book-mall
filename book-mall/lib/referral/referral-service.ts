@@ -79,7 +79,7 @@ export async function getReferralEligibility(
     where: { ownerType_ownerId: { ownerType: "USER", ownerId: userId } },
     select: { planId: true, monthlyGrantCredits: true, membershipPaidUntil: true },
   });
-  if (acc?.planId && acc.monthlyGrantCredits > 0) {
+  if (acc?.planId && Number(acc.monthlyGrantCredits) > 0) {
     const periodOk = isMembershipServiceActive(acc.membershipPaidUntil, now);
     if (periodOk) {
       const plan = await prisma.membershipPlan.findUnique({

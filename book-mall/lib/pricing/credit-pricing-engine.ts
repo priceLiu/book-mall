@@ -185,7 +185,7 @@ export async function publishModelCreditPrice(input: {
     });
     return {
       canonicalModelKey: saved.canonicalModelKey,
-      creditsPerUnit: saved.creditsPerUnit,
+      creditsPerUnit: toNum(saved.creditsPerUnit),
       listPriceYuan: toNum(saved.listPriceYuan),
       baseMarginRate: toNum(saved.baseMarginRate),
       netCostYuan: toNum(saved.netCostYuan),
@@ -241,7 +241,7 @@ export async function publishModelCreditPrice(input: {
 
   return {
     canonicalModelKey: saved.canonicalModelKey,
-    creditsPerUnit: saved.creditsPerUnit,
+    creditsPerUnit: toNum(saved.creditsPerUnit),
     listPriceYuan: toNum(saved.listPriceYuan),
     baseMarginRate: toNum(saved.baseMarginRate),
     netCostYuan: toNum(saved.netCostYuan),

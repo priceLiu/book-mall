@@ -458,7 +458,7 @@ async function settleVideoFromReserve(
     select: { credits: true },
   });
   if (reserveLedger) {
-    const frozen = Math.abs(reserveLedger.credits);
+    const frozen = Math.abs(Number(reserveLedger.credits));
     if (frozen <= 0) return 0;
     const chargeCredits = settleCredits > 0 ? settleCredits : frozen;
     try {
@@ -564,7 +564,7 @@ export async function refundFailedGatewayLog(
       select: { credits: true },
     });
     if (!reserveLedger) return; // 未冻结（如发起即失败）
-    const frozen = Math.abs(reserveLedger.credits);
+    const frozen = Math.abs(Number(reserveLedger.credits));
     if (frozen <= 0) return;
     try {
       await releaseReserved({
@@ -579,11 +579,11 @@ export async function refundFailedGatewayLog(
   }
 
   // 文本/图像：失败即退（按已扣）
-  if (!log.creditsCharged || log.creditsCharged <= 0) return;
+  if (!log.creditsCharged || Number(log.creditsCharged) <= 0) return;
   try {
     await refundCredits({
       ref: target.ref,
-      credits: log.creditsCharged,
+      credits: Number(log.creditsCharged),
       gatewayLogId: log.id,
     });
   } catch (e) {

@@ -16,7 +16,7 @@ export function resolvePlanCreditGrants(
   totalSeats = 1,
 ): PlanCreditGrantAmounts {
   const seats = Math.max(1, Math.round(totalSeats));
-  const perSeatMonthly = plan.monthlyCredits;
+  const perSeatMonthly = Number(plan.monthlyCredits);
   const multiplier = plan.family === "TEAM" ? seats : 1;
   const totalCredits = perSeatMonthly * multiplier;
 

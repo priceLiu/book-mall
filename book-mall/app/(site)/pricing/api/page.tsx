@@ -29,7 +29,7 @@ export default async function ApiPricingPage() {
           canonicalModelKey: m.canonicalModelKey,
           displayName: m.displayName,
           unit: m.unit,
-          creditsPerUnit: m.creditsPerUnit,
+          creditsPerUnit: Number(m.creditsPerUnit),
         }))}
       />
     </Suspense>

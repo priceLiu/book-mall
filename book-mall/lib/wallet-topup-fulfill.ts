@@ -176,7 +176,7 @@ export async function fulfillWalletTopupCredits(
 
     return {
       orderId: order.id,
-      balanceAfterPoints: account?.balanceCredits ?? totalCredits,
+      balanceAfterPoints: account?.balanceCredits != null ? Number(account.balanceCredits) : totalCredits,
       creditedTotalPoints: total,
     };
   });

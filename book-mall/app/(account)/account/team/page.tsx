@@ -105,8 +105,8 @@ export default async function AccountTeamPage() {
                     overview.tenant.currentPeriodEnd?.toISOString() ?? null,
                 },
                 usedSeats: overview.usedSeats,
-                balanceCredits: overview.account?.balanceCredits ?? 0,
-                monthlyGrantCredits: overview.account?.monthlyGrantCredits ?? 0,
+                balanceCredits: overview.account?.balanceCredits != null ? Number(overview.account.balanceCredits) : 0,
+                monthlyGrantCredits: overview.account?.monthlyGrantCredits != null ? Number(overview.account.monthlyGrantCredits) : 0,
                 members: overview.members.map((m) => ({
                   id: m.id,
                   userId: m.userId,
@@ -141,7 +141,7 @@ export default async function AccountTeamPage() {
           tier: p.tier,
           interval: p.interval,
           priceYuan: Number(p.priceYuan),
-          monthlyCredits: p.monthlyCredits,
+          monthlyCredits: Number(p.monthlyCredits),
           includedSeats: p.includedSeats,
         }))}
       />

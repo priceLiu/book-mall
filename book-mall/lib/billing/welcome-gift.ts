@@ -18,7 +18,7 @@ export async function getWelcomeGiftConfig(): Promise<WelcomeGiftConfig> {
       select: { welcomeGiftGeneralCredits: true },
     });
     return {
-      generalCredits: Math.max(0, Math.round(cfg?.welcomeGiftGeneralCredits ?? WELCOME_GIFT_GENERAL_FALLBACK)),
+      generalCredits: Math.max(0, Math.round(Number(cfg?.welcomeGiftGeneralCredits ?? WELCOME_GIFT_GENERAL_FALLBACK))),
     };
   } catch {
     return { generalCredits: WELCOME_GIFT_GENERAL_FALLBACK };

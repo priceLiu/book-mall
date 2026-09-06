@@ -439,7 +439,7 @@ export async function listModelsForApp(input: ListModelsForAppInput): Promise<Re
       providerKind: route.providerKind,
       vendor: route.vendor,
       catalogSourceLabel: catalog.sourceLabel,
-      creditsPerUnit: offering?.publishedCreditsPerUnit ?? priceRow.creditsPerUnit,
+      creditsPerUnit: offering?.publishedCreditsPerUnit != null ? Number(offering.publishedCreditsPerUnit) : Number(priceRow.creditsPerUnit ?? 0),
       platformOffering: true,
     });
   }

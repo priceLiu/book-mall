@@ -316,7 +316,7 @@ export async function listPlatformModelsForApp(input: {
       description: def?.description ?? "",
       role: r.role,
       requestKind: r.requestKind,
-      creditsPerUnit: r.publishedCreditsPerUnit,
+      creditsPerUnit: r.publishedCreditsPerUnit != null ? Number(r.publishedCreditsPerUnit) : null,
       credentialBound: true as const,
     };
   });

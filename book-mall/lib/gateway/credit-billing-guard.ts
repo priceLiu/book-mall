@@ -183,7 +183,7 @@ export async function resolveCostSnapshot(canonicalModelKey: string): Promise<Co
 
   const price = await prisma.modelCreditPrice.findUnique({ where: { canonicalModelKey } });
   const anchor = DEFAULT_CREDIT_ANCHOR_YUAN;
-  const creditsPerUnit = price?.creditsPerUnit ?? null;
+  const creditsPerUnit = price?.creditsPerUnit != null ? num(price.creditsPerUnit) : null;
   const marginRate =
     creditsPerUnit != null
       ? computeBaseMarginRate(num(chosen.netCostYuan), creditsPerUnit, anchor)
@@ -195,8 +195,8 @@ export async function resolveCostSnapshot(canonicalModelKey: string): Promise<Co
     marginRate,
     creditsPerUnit,
     listPriceYuan: price?.listPriceYuan != null ? num(price.listPriceYuan) : null,
-    inputCreditsPerKToken: price?.inputCreditsPerKToken ?? null,
-    outputCreditsPerKToken: price?.outputCreditsPerKToken ?? null,
+    inputCreditsPerKToken: price?.inputCreditsPerKToken != null ? num(price.inputCreditsPerKToken) : null,
+    outputCreditsPerKToken: price?.outputCreditsPerKToken != null ? num(price.outputCreditsPerKToken) : null,
     inputListPriceYuan: price?.inputListPriceYuan != null ? num(price.inputListPriceYuan) : null,
     outputListPriceYuan: price?.outputListPriceYuan != null ? num(price.outputListPriceYuan) : null,
     unit: price?.unit ?? chosen.unit ?? null,

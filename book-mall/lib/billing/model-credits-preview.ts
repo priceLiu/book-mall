@@ -146,7 +146,7 @@ export async function previewModelCredits(
       listPriceYuan: true,
     },
   });
-  const creditsPerUnit = price?.creditsPerUnit ?? snap.creditsPerUnit;
+  const creditsPerUnit = price?.creditsPerUnit != null ? Number(price.creditsPerUnit) : snap.creditsPerUnit;
   if (!creditsPerUnit || creditsPerUnit <= 0) return null;
 
   const ppc = await resolvePricePerCredit(input);
@@ -157,8 +157,8 @@ export async function previewModelCredits(
     const pt = input.promptTokens ?? 4000;
     const ct = input.completionTokens ?? 2000;
     estimatedCredits = computeLlmSplitChargeCredits({
-      inputCreditsPerKToken: price?.inputCreditsPerKToken ?? snap.inputCreditsPerKToken,
-      outputCreditsPerKToken: price?.outputCreditsPerKToken ?? snap.outputCreditsPerKToken,
+      inputCreditsPerKToken: price?.inputCreditsPerKToken != null ? Number(price.inputCreditsPerKToken) : snap.inputCreditsPerKToken,
+      outputCreditsPerKToken: price?.outputCreditsPerKToken != null ? Number(price.outputCreditsPerKToken) : snap.outputCreditsPerKToken,
       inputListPriceYuan: price?.inputListPriceYuan != null ? Number(price.inputListPriceYuan) : snap.inputListPriceYuan,
       outputListPriceYuan: price?.outputListPriceYuan != null ? Number(price.outputListPriceYuan) : snap.outputListPriceYuan,
       creditsPerUnit,

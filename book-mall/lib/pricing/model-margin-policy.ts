@@ -18,38 +18,40 @@ export const EXPENSIVE_VIDEO_NET_COST_THRESHOLD = 0.75;
 /** 贵生图：净成本 ≥ ¥0.15/张 → M=1.5 */
 export const EXPENSIVE_IMAGE_NET_COST_THRESHOLD = 0.15;
 
-/** 贵视频公挂牌对齐最低 M（年框后仍有毛利） */
+/** 贵视频公挂牌对齐最低 M（年框后仍有毛利）@deprecated v3 不再按贵/便宜分档，M 统一由模型配置 marginM 控制 */
 export const VIDEO_PUBLIC_ALIGN_MIN_M = 1.25;
-/** @deprecated 旧版贴成本 M=1.0；v2 用公挂牌对齐 */
+/** @deprecated 旧版贴成本 M=1.0；v3 弃用 */
 export const VIDEO_MARGIN_M_EXPENSIVE = VIDEO_PUBLIC_ALIGN_MIN_M;
 export const VIDEO_MARGIN_M_NORMAL = 1.5;
+/** @deprecated 旧版贵生图分档 */
 export const IMAGE_MARGIN_M_EXPENSIVE = 1.5;
+/** @deprecated 旧版便宜生图分档 */
 export const IMAGE_MARGIN_M_CHEAP = 2.0;
+/** 生图默认 M=1.5（与视频一致） */
+export const IMAGE_MARGIN_M_NORMAL = 1.5;
 
 export function resolveModelMarginM(input: {
   unit: CreditCostUnit | string;
   netCostYuan: number;
-  /** 厂商公挂牌（元/计费单位），用于贵视频 M=list÷C */
+  /** 厂商公挂牌（元/计费单位），保留兼容 */
   listCostYuan?: number;
+  /** 模型配置的 marginM（ModelCostProfile.marginM）；>0 时优先采用 */
+  marginM?: number | null;
   defaultMarginM?: number;
   videoMarginM?: number;
 }): number {
-  const net = input.netCostYuan;
+  // 优先采用模型配置的 marginM（管理员后台可调）
+  if (input.marginM != null && input.marginM > 0) return input.marginM;
+  // 视频：默认 1.5
   if (isVideoBillingUnit(input.unit)) {
-    if (net >= EXPENSIVE_VIDEO_NET_COST_THRESHOLD) {
-      const list = input.listCostYuan ?? 0;
-      if (list > 0 && net > 0) {
-        return Math.max(list / net, VIDEO_PUBLIC_ALIGN_MIN_M);
-      }
-      return VIDEO_PUBLIC_ALIGN_MIN_M;
-    }
-    return input.videoMarginM ?? DEFAULT_VIDEO_MARGIN_M;
+    return VIDEO_MARGIN_M_NORMAL;
   }
+  // 图片：默认 1.5
   if (input.unit === "PER_IMAGE") {
-    if (net >= EXPENSIVE_IMAGE_NET_COST_THRESHOLD) return IMAGE_MARGIN_M_EXPENSIVE;
-    return IMAGE_MARGIN_M_CHEAP;
+    return IMAGE_MARGIN_M_NORMAL;
   }
-  return input.defaultMarginM ?? DEFAULT_MARGIN_M;
+  // 文本/音频等：默认 1.0（不加价）
+  return DEFAULT_MARGIN_M;
 }
 
 /** 按模型 M 推导锚定口径目标毛利（1 − 1/M，取整会有偏差）。 */

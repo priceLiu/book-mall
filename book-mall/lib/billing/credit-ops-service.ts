@@ -254,7 +254,7 @@ export async function generateCreditOpsWorkItems(input?: {
     const key = `BATCH_EXPIRE:${lot.accountId}:${dueDate}:${lot.source}`;
     const prev = lotGroups.get(key);
     if (prev) {
-      prev.expectedExpireCredits += lot.remainingCredits;
+      prev.expectedExpireCredits += Number(lot.remainingCredits);
     } else {
       lotGroups.set(key, {
         workType: "BATCH_EXPIRE",
@@ -266,7 +266,7 @@ export async function generateCreditOpsWorkItems(input?: {
         ownerHint: null,
         source: lot.source,
         periodKey: "",
-        expectedExpireCredits: lot.remainingCredits,
+        expectedExpireCredits: Number(lot.remainingCredits),
         expectedGrantCredits: 0,
       });
     }
@@ -314,7 +314,7 @@ export async function generateCreditOpsWorkItems(input?: {
       source: "SUBSCRIPTION",
       periodKey,
       expectedExpireCredits: 0,
-      expectedGrantCredits: acct.monthlyGrantCredits,
+      expectedGrantCredits: Number(acct.monthlyGrantCredits),
     });
   }
 
@@ -383,7 +383,7 @@ async function executeWorkItem(
       },
       _sum: { remainingCredits: true },
     });
-    const drift = (after._sum.remainingCredits ?? 0) > 0;
+    const drift = Number(after._sum.remainingCredits ?? 0) > 0;
     return {
       status: drift && total === 0 ? "FAILED" : "DONE",
       resultJson: {
@@ -426,11 +426,11 @@ async function executeWorkItem(
 
   const res = await resetMonthlyCredits({
     ref,
-    monthlyGrantCredits: acct.monthlyGrantCredits,
+    monthlyGrantCredits: Number(acct.monthlyGrantCredits),
     periodKey,
     planId: acct.planId,
     nextPeriodEnd: nextEnd,
-    perSeatCapCredits: acct.perSeatCapCredits,
+    perSeatCapCredits: acct.perSeatCapCredits != null ? Number(acct.perSeatCapCredits) : null,
   });
 
   return {

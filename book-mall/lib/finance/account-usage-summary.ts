@@ -88,7 +88,7 @@ export async function getAccountPlatformCategoryUsageRows(
     if (!s.billingCategory) continue;
     creditsByCat.set(
       s.billingCategory,
-      (creditsByCat.get(s.billingCategory) ?? 0) + (s.creditsCharged ?? 0),
+      (creditsByCat.get(s.billingCategory) ?? 0) + Number(s.creditsCharged ?? 0),
     );
   }
 
@@ -171,10 +171,10 @@ export async function getAccountUsageSummary(
         }),
   ]);
 
-  const topupRaw = Math.max(0, topupAgg._sum.credits ?? 0);
-  let grantCreditsThisMonth = Math.max(0, grantAgg._sum.credits ?? 0);
-  const adjustCreditsThisMonth = Math.max(0, adjustAgg._sum.credits ?? 0);
-  const creditsConsumed = Math.abs(consumedAgg._sum.credits ?? 0);
+  const topupRaw = Math.max(0, Number(topupAgg._sum.credits ?? 0));
+  let grantCreditsThisMonth = Math.max(0, Number(grantAgg._sum.credits ?? 0));
+  const adjustCreditsThisMonth = Math.max(0, Number(adjustAgg._sum.credits ?? 0));
+  const creditsConsumed = Math.abs(Number(consumedAgg._sum.credits ?? 0));
   const creditsRemaining = balances.balance;
 
   const topupCreditsThisMonth = Math.min(
@@ -233,7 +233,7 @@ export async function aggregateUsageByTool(bookUserId: string) {
       toolLabel: clientPageToToolLabel(log.clientPage),
     };
     ex.count += 1;
-    ex.creditsCharged += log.creditsCharged ?? 0;
+    ex.creditsCharged += Number(log.creditsCharged ?? 0);
     map.set(toolKey, ex);
   }
 

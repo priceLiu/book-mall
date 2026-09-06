@@ -35,7 +35,7 @@ export async function hasActivePersonalMembership(userId: string): Promise<boole
     where: { ownerType_ownerId: { ownerType: "USER", ownerId: userId } },
     select: { planId: true, monthlyGrantCredits: true, membershipPaidUntil: true },
   });
-  if (!acc?.planId || acc.monthlyGrantCredits <= 0) return false;
+  if (!acc?.planId || Number(acc.monthlyGrantCredits) <= 0) return false;
   if (!isMembershipServiceActive(acc.membershipPaidUntil, now)) return false;
   const plan = await prisma.membershipPlan.findUnique({
     where: { id: acc.planId },

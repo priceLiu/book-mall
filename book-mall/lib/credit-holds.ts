@@ -88,7 +88,7 @@ export async function reserveCreditHold(
       return {
         ok: true,
         holdId: taskKey,
-        reservedCredits: Math.abs(existed.credits),
+        reservedCredits: Math.abs(Number(existed.credits)),
         reused: true,
       };
     }
@@ -119,7 +119,7 @@ export async function releaseCreditHold(input: {
     select: { credits: true },
   });
   if (!ledger) return;
-  const frozen = Math.abs(ledger.credits);
+  const frozen = Math.abs(Number(ledger.credits));
   if (frozen <= 0) return;
   await releaseReserved({
     ref: accountRef(input.userId),
@@ -145,7 +145,7 @@ export async function settleCreditHold(input: {
   });
   if (!ledger) return false;
 
-  const frozen = Math.abs(ledger.credits);
+  const frozen = Math.abs(Number(ledger.credits));
   const actual = Math.max(0, Math.round(input.actualCredits));
   if (frozen <= 0) return false;
 

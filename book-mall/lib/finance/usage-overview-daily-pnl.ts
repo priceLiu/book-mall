@@ -101,7 +101,7 @@ export async function buildUsageOverviewDailyPnl(input: {
   >();
 
   for (const l of ledgers) {
-    const credits = Math.abs(l.credits);
+    const credits = Math.abs(Number(l.credits));
     if (credits <= 0) continue;
     const day = shanghaiDayKey(l.createdAt);
     const bucket = dayMap.get(day) ?? {
