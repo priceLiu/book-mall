@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { buildEcomLoginUrl } from "@/lib/ecom-auth";
+import { fetchEcomToolsSessionLite } from "@/lib/ecom-tools-session-client";
 
 type Props = {
   returnPath?: string;
@@ -13,9 +14,8 @@ export function EcomAuthBanner({ returnPath }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/tools-session", { credentials: "include" })
-      .then((r) => r.json())
-      .then((d: { active?: boolean }) => {
+    void fetchEcomToolsSessionLite()
+      .then((d) => {
         if (!cancelled) setSessionActive(Boolean(d.active));
       })
       .catch(() => {

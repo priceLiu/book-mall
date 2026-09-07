@@ -3,8 +3,12 @@
 import { useEffect, useState } from "react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { useOptionalCanvasShellSessionContext } from "@/components/auth/canvas-shell-session-provider";
 import { fetchCanvasViewerUser } from "@/lib/canvas-viewer-session";
-import { parseToolsSessionPayload } from "@/lib/parse-tools-session-payload";
+import {
+  adminFromToolsSessionPayload,
+} from "@/lib/canvas/use-canvas-shell-session";
+import { fetchCanvasToolsSessionFull } from "@/lib/canvas-tools-session-fetch";
 
 const SESSION_REFRESH_DEBOUNCE_MS = 30_000;
 
@@ -13,25 +17,16 @@ function isPlatformAdminRole(role: string | null | undefined): boolean {
   return r === "ADMIN" || r === "SUPER_ADMIN";
 }
 
-function adminFromToolsSession(toolsRaw: unknown): boolean | null {
-  const tools = parseToolsSessionPayload(toolsRaw);
-  const intro = tools.introspect;
-  if (!intro || typeof intro !== "object") return null;
-  const o = intro as Record<string, unknown>;
-  if (o.tools_role === "admin" || o.tier === "admin") return true;
-  if (o.tools_role === "user" || o.tier === "user") return false;
-  return null;
-}
-
 export async function resolveCanvasPortalAdmin(
   base: string,
   signal?: AbortSignal,
+  toolsRaw?: unknown,
 ): Promise<boolean> {
-  const toolsRaw = await fetch("/api/tools-session", { cache: "no-store", signal })
-    .then((r) => (r.ok ? r.json() : null))
-    .catch(() => null);
+  const payload =
+    toolsRaw ??
+    (await fetchCanvasToolsSessionFull().catch(() => null));
 
-  const fromTools = adminFromToolsSession(toolsRaw);
+  const fromTools = adminFromToolsSessionPayload(payload);
   if (fromTools === true) return true;
   if (fromTools === false) return false;
 
@@ -42,6 +37,7 @@ export async function resolveCanvasPortalAdmin(
 /** 门户 · 是否平台管理员（优先 tools-session，不确定时再 viewer-session） */
 export function useCanvasAdmin(): boolean {
   const base = useBookMallBaseUrl();
+  const shared = useOptionalCanvasShellSessionContext();
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
@@ -54,7 +50,7 @@ export function useCanvasAdmin(): boolean {
     let lastLoadAt = 0;
 
     const load = () => {
-      void resolveCanvasPortalAdmin(base, ac.signal)
+      void resolveCanvasPortalAdmin(base, ac.signal, shared?.payload ?? undefined)
         .then(setIsAdmin)
         .catch(() => setIsAdmin(false));
     };
@@ -82,7 +78,7 @@ export function useCanvasAdmin(): boolean {
       if (debounceTimer) window.clearTimeout(debounceTimer);
       window.removeEventListener("canvas:tools-session-refreshed", loadDebounced);
     };
-  }, [base]);
+  }, [base, shared?.payload]);
 
   return isAdmin;
 }

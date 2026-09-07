@@ -15,11 +15,11 @@ import { syncKieGatewayLogFromVendorPoll } from "@/lib/gateway/kie-gateway-log-s
 import { pollMinimaxVideoTaskForLog } from "@/lib/gateway/minimax-video-jobs";
 import { pickCredentialForKind } from "@/lib/gateway/proxy-common";
 import {
-  dashscopeExtractTaskVideoUrl,
   isDashscopeTaskFailed,
   isDashscopeTaskSuccess,
   type DashscopeTaskOutput,
 } from "@/lib/gateway/dashscope-client";
+import { ecomExtractMediaUrl } from "@/lib/gateway/ecom-tool-gateway-client";
 import {
   extractKieResultUrl,
   isKieRecordFail,
@@ -133,6 +133,18 @@ export async function ecomPollDashscopeVideoInProcess(
       pollProvider: "dashscope",
     });
     if (cachedUrl) return { status: "SUCCEEDED", outputUrl: cachedUrl };
+    const summary = log.resultSummary;
+    if (
+      summary &&
+      typeof summary === "object" &&
+      !Array.isArray(summary) &&
+      (summary as Record<string, unknown>).sync === true
+    ) {
+      return {
+        status: "FAILED",
+        failMessage: "同步出图已成功但未解析到图片 URL，请附上 Log ID 联系支持",
+      };
+    }
   }
   if (log?.status === "FAILED") {
     return { status: "FAILED", failMessage: log.failMessage?.trim() || "视频任务失败" };
@@ -156,7 +168,7 @@ export async function ecomPollDashscopeVideoInProcess(
 
   const status = output.task_status ?? "UNKNOWN";
   if (isDashscopeTaskSuccess(status)) {
-    const outputUrl = dashscopeExtractTaskVideoUrl(output as Record<string, unknown>) ?? undefined;
+    const outputUrl = ecomExtractMediaUrl(output) ?? undefined;
     return { status: "SUCCEEDED", outputUrl };
   }
   if (isDashscopeTaskFailed(status)) {

@@ -4,6 +4,14 @@ import { Check, Loader2, Pencil, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import {
+  ecomDataTableBodyRowClass,
+  ecomDataTableClass,
+  ecomDataTableHeadRowClass,
+  ecomDataTableTdClass,
+  ecomDataTableThClass,
+  ecomDataTableWrapClass,
+} from "@/components/ui/ecom-data-table";
 import type { FashionPanelRow, FashionSellpoint, FashionVersionKey } from "@/lib/fashion-types";
 import type { ProPanelRow } from "@/lib/pro-vertical/types";
 import { normalizeFashionOpsPack } from "@/lib/fashion-ops-pack-format";
@@ -219,21 +227,21 @@ export function FashionSellpointsTable({
 
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[28rem] border-collapse text-sm">
+      <div className={ecomDataTableWrapClass}>
+        <table className={cn(ecomDataTableClass, "min-w-[28rem]")}>
           <thead>
-            <tr className="border-b border-[#e8e8ed] text-left text-xs text-[#6e6e73]">
-              <th className="py-2 pr-2">ID</th>
-              <th className="py-2 pr-2">卖点</th>
-              <th className="py-2 pr-2">分层</th>
-              <th className="py-2">来源</th>
+            <tr className={ecomDataTableHeadRowClass}>
+              <th className={ecomDataTableThClass}>ID</th>
+              <th className={ecomDataTableThClass}>卖点</th>
+              <th className={ecomDataTableThClass}>分层</th>
+              <th className={ecomDataTableThClass}>来源</th>
             </tr>
           </thead>
           <tbody>
             {sellpoints.map((sp) => (
-              <tr key={sp.id} className="border-b border-[#f0f0f2] align-top">
-                <td className="py-2 pr-2 font-mono text-xs">{sp.id}</td>
-                <td className="py-2 pr-2">
+              <tr key={sp.id} className={ecomDataTableBodyRowClass}>
+                <td className={cn(ecomDataTableTdClass, "font-mono text-xs")}>{sp.id}</td>
+                <td className={ecomDataTableTdClass}>
                   <FashionEditableTextCell
                     value={sp.text}
                     editable={editable}
@@ -242,7 +250,7 @@ export function FashionSellpointsTable({
                     onSave={(text) => patchSellpoint(sp.id, { text })}
                   />
                 </td>
-                <td className="py-2 pr-2">
+                <td className={ecomDataTableTdClass}>
                   {editable ? (
                     <select
                       className="rounded-lg border border-[#d2d2d7] bg-white px-2 py-1 text-xs outline-none focus:border-[#0071e3]"
@@ -264,7 +272,7 @@ export function FashionSellpointsTable({
                     LAYER_LABELS[sp.layer] ?? sp.layer
                   )}
                 </td>
-                <td className="py-2">
+                <td className={ecomDataTableTdClass}>
                   {sp.source === "user" ? "用户" : sp.source === "ai" ? "AI" : "补充"}
                 </td>
               </tr>
@@ -346,8 +354,8 @@ export function FashionPanelsTable({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[72rem] table-fixed border-collapse text-xs">
+    <div className={ecomDataTableWrapClass}>
+      <table className={cn(ecomDataTableClass, "min-w-[72rem] table-fixed")}>
         <colgroup>
           <col className="w-10" />
           <col className="w-16" />
@@ -363,7 +371,7 @@ export function FashionPanelsTable({
           <col className="w-24" />
         </colgroup>
         <thead>
-          <tr className="border-b border-[#e8e8ed] text-left text-[#6e6e73]">
+          <tr className={ecomDataTableHeadRowClass}>
             {[
               "镜号",
               "景别",
@@ -378,7 +386,7 @@ export function FashionPanelsTable({
               "口播",
               "卖点ID",
             ].map((h) => (
-              <th key={h} className="px-1 py-2 font-medium">
+              <th key={h} className={ecomDataTableThClass}>
                 {h}
               </th>
             ))}
@@ -386,9 +394,9 @@ export function FashionPanelsTable({
         </thead>
         <tbody>
           {panels.map((p) => (
-            <tr key={p.index} className="border-b border-[#f0f0f2] align-top text-[#1d1d1f]">
-              <td className="min-w-0 px-1 py-2">{p.index}</td>
-              <td className="min-w-0 px-1 py-2">
+            <tr key={p.index} className={ecomDataTableBodyRowClass}>
+              <td className={ecomDataTableTdClass}>{p.index}</td>
+              <td className={ecomDataTableTdClass}>
                 {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.shotScale)}
@@ -401,7 +409,7 @@ export function FashionPanelsTable({
                   escCell(p.shotScale)
                 )}
               </td>
-              <td className="min-w-0 px-1 py-2">
+              <td className={cn(ecomDataTableTdClass, "min-w-0")}>
                 {editable ? (
                   <FashionEditableTextCell
                     value={String(p.durationSec)}
@@ -417,7 +425,7 @@ export function FashionPanelsTable({
                   `${p.durationSec}s`
                 )}
               </td>
-              <td className="min-w-0 px-1 py-2">
+              <td className={cn(ecomDataTableTdClass, "min-w-0")}>
                 {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.cameraMove)}
@@ -430,7 +438,7 @@ export function FashionPanelsTable({
                   escCell(p.cameraMove)
                 )}
               </td>
-              <td className="min-w-0 px-1 py-2">
+              <td className={cn(ecomDataTableTdClass, "min-w-0")}>
                 {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.sceneDesc)}
@@ -443,7 +451,7 @@ export function FashionPanelsTable({
                   escCell(p.sceneDesc)
                 )}
               </td>
-              <td className="min-w-0 px-1 py-2">
+              <td className={cn(ecomDataTableTdClass, "min-w-0")}>
                 {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.scenePrompt)}
@@ -456,7 +464,7 @@ export function FashionPanelsTable({
                   escCell(p.scenePrompt)
                 )}
               </td>
-              <td className="min-w-0 px-1 py-2">
+              <td className={cn(ecomDataTableTdClass, "min-w-0")}>
                 {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.imagePrompt)}
@@ -470,7 +478,7 @@ export function FashionPanelsTable({
                   escCell(p.imagePrompt)
                 )}
               </td>
-              <td className="min-w-0 px-1 py-2">
+              <td className={cn(ecomDataTableTdClass, "min-w-0")}>
                 {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.videoPrompt)}
@@ -484,7 +492,7 @@ export function FashionPanelsTable({
                   escCell(p.videoPrompt)
                 )}
               </td>
-              <td className="min-w-0 px-1 py-2">
+              <td className={cn(ecomDataTableTdClass, "min-w-0")}>
                 {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.modelAction)}
@@ -497,7 +505,7 @@ export function FashionPanelsTable({
                   escCell(p.modelAction)
                 )}
               </td>
-              <td className="min-w-0 px-1 py-2">
+              <td className={cn(ecomDataTableTdClass, "min-w-0")}>
                 {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.productFocus ?? p.garmentFocus ?? "")}
@@ -515,7 +523,7 @@ export function FashionPanelsTable({
                   escCell(p.productFocus ?? p.garmentFocus ?? "")
                 )}
               </td>
-              <td className="min-w-0 px-1 py-2">
+              <td className={cn(ecomDataTableTdClass, "min-w-0")}>
                 {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.dialogue ?? "")}
@@ -528,7 +536,7 @@ export function FashionPanelsTable({
                   escCell(p.dialogue)
                 )}
               </td>
-              <td className="min-w-0 px-1 py-2">
+              <td className={cn(ecomDataTableTdClass, "min-w-0")}>
                 {editable ? (
                   <FashionEditableTextCell
                     value={p.sellpointIds.join("、")}
@@ -559,15 +567,15 @@ export function FashionCoverageTable({
   const coreVisual = sellpoints.filter((sp) => sp.layer !== "aux");
   if (!coreVisual.length) return null;
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[24rem] border-collapse text-sm">
+    <div className={ecomDataTableWrapClass}>
+      <table className={cn(ecomDataTableClass, "min-w-[24rem]")}>
         <thead>
-          <tr className="border-b border-[#e8e8ed] text-left text-xs text-[#6e6e73]">
-            <th className="py-2 pr-2">卖点ID</th>
-            <th className="py-2 pr-2">内容</th>
-            <th className="py-2 pr-2">分层</th>
-            <th className="py-2 pr-2">镜号</th>
-            <th className="py-2">落地</th>
+          <tr className={ecomDataTableHeadRowClass}>
+            <th className={ecomDataTableThClass}>卖点ID</th>
+            <th className={ecomDataTableThClass}>内容</th>
+            <th className={ecomDataTableThClass}>分层</th>
+            <th className={ecomDataTableThClass}>镜号</th>
+            <th className={ecomDataTableThClass}>落地</th>
           </tr>
         </thead>
         <tbody>
@@ -576,12 +584,12 @@ export function FashionCoverageTable({
               .filter((p) => p.sellpointIds.includes(sp.id))
               .map((p) => p.index);
             return (
-              <tr key={sp.id} className="border-b border-[#f0f0f2]">
-                <td className="py-2 pr-2 font-mono text-xs">{sp.id}</td>
-                <td className="py-2 pr-2">{sp.text}</td>
-                <td className="py-2 pr-2">{LAYER_LABELS[sp.layer] ?? sp.layer}</td>
-                <td className="py-2 pr-2">{indexes.join(",") || "—"}</td>
-                <td className="py-2">{indexes.length ? "✅" : "❌"}</td>
+              <tr key={sp.id} className={ecomDataTableBodyRowClass}>
+                <td className={cn(ecomDataTableTdClass, "font-mono text-xs")}>{sp.id}</td>
+                <td className={ecomDataTableTdClass}>{sp.text}</td>
+                <td className={ecomDataTableTdClass}>{LAYER_LABELS[sp.layer] ?? sp.layer}</td>
+                <td className={ecomDataTableTdClass}>{indexes.join(",") || "—"}</td>
+                <td className={ecomDataTableTdClass}>{indexes.length ? "✅" : "❌"}</td>
               </tr>
             );
           })}

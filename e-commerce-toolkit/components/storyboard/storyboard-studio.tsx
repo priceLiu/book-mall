@@ -22,7 +22,7 @@ import { listAssets, type EcomAsset } from "@/lib/ecom-api";
 import {
   attachStoryboardRefsFromAssets,
   createStoryboardProject,
-  fetchStoryboardModels,
+  fetchStoryboardBoot,
   getStoryboardProject,
   listStoryboardProjectSummaries,
   removeStoryboardRef,
@@ -226,32 +226,6 @@ export function StoryboardStudio() {
   useEffect(() => {
     let cancelled = false;
 
-    void fetchStoryboardModels()
-      .then((models) => {
-        if (cancelled) return;
-        setChatModels(models.chatModels);
-        setImageModels(models.imageModels);
-        setVideoModels(models.videoModels);
-        setSettings((prev) => ({
-          ...prev,
-          chatModelKey: pickBoundStoryboardModelKey(
-            models.chatModels,
-            prev.chatModelKey,
-          ),
-          imageModelKey: pickBoundStoryboardModelKey(
-            models.imageModels,
-            prev.imageModelKey,
-          ),
-          videoModelKey: pickBoundStoryboardModelKey(
-            models.videoModels,
-            prev.videoModelKey,
-          ),
-        }));
-      })
-      .catch(() => {
-        /* 模型列表后台加载，不阻塞工作室 */
-      });
-
     (async () => {
       try {
         const urlProjectId =
@@ -263,6 +237,34 @@ export function StoryboardStudio() {
           (typeof window !== "undefined"
             ? sessionStorage.getItem(PROJECT_STORAGE_KEY)
             : null);
+
+        const boot = await fetchStoryboardBoot(savedId);
+        if (cancelled) return;
+
+        setChatModels(boot.chatModels);
+        setImageModels(boot.imageModels);
+        setVideoModels(boot.videoModels);
+        setSettings((prev) => ({
+          ...prev,
+          chatModelKey: pickBoundStoryboardModelKey(
+            boot.chatModels,
+            prev.chatModelKey,
+          ),
+          imageModelKey: pickBoundStoryboardModelKey(
+            boot.imageModels,
+            prev.imageModelKey,
+          ),
+          videoModelKey: pickBoundStoryboardModelKey(
+            boot.videoModels,
+            prev.videoModelKey,
+          ),
+        }));
+
+        if (boot.project) {
+          await reload(boot.project.id, boot.project);
+          if (!cancelled) setLoading(false);
+          return;
+        }
 
         let resolved: { id: string; project?: StoryboardProject };
         if (savedId) {

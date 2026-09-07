@@ -19,43 +19,100 @@ type StoryboardModelsPayload = {
   videoModels: StoryboardGatewayModel[];
 };
 
-export async function fetchStoryboardModels(): Promise<StoryboardModelsPayload> {
-  if (typeof window !== "undefined") {
-    try {
-      const raw = sessionStorage.getItem(MODELS_CACHE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as { at?: number; data?: StoryboardModelsPayload };
-        if (
-          parsed.data &&
-          typeof parsed.at === "number" &&
-          Date.now() - parsed.at < MODELS_CACHE_MS
-        ) {
-          return parsed.data;
-        }
-      }
-    } catch {
-      /* ignore */
-    }
-  }
+let inflightModels: Promise<StoryboardModelsPayload> | null = null;
+let modelsRevalidateInflight: Promise<void> | null = null;
 
+function readModelsCache(): { at: number; data: StoryboardModelsPayload } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(MODELS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { at?: number; data?: StoryboardModelsPayload };
+    if (!parsed.data || typeof parsed.at !== "number") return null;
+    return { at: parsed.at, data: parsed.data };
+  } catch {
+    return null;
+  }
+}
+
+function writeModelsCache(data: StoryboardModelsPayload): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(
+      MODELS_CACHE_KEY,
+      JSON.stringify({ at: Date.now(), data }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+async function fetchModelsFromNetwork(): Promise<StoryboardModelsPayload> {
   const data = await ecomBookFetch("api/sso/tools/ecom/storyboard/models");
   const result: StoryboardModelsPayload = {
     chatModels: (data.chatModels as StoryboardGatewayModel[]) ?? [],
     imageModels: (data.imageModels as StoryboardGatewayModel[]) ?? [],
     videoModels: (data.videoModels as StoryboardGatewayModel[]) ?? [],
   };
+  writeModelsCache(result);
+  return result;
+}
 
-  if (typeof window !== "undefined") {
-    try {
-      sessionStorage.setItem(
-        MODELS_CACHE_KEY,
-        JSON.stringify({ at: Date.now(), data: result }),
-      );
-    } catch {
-      /* ignore */
+function scheduleModelsRevalidate(): void {
+  if (modelsRevalidateInflight) return;
+  modelsRevalidateInflight = fetchModelsFromNetwork()
+    .then(() => undefined)
+    .catch(() => undefined)
+    .finally(() => {
+      modelsRevalidateInflight = null;
+    });
+}
+
+export async function fetchStoryboardModels(): Promise<StoryboardModelsPayload> {
+  const cached = readModelsCache();
+  if (cached && Date.now() - cached.at < MODELS_CACHE_MS) {
+    if (Date.now() - cached.at > MODELS_CACHE_MS / 2) {
+      scheduleModelsRevalidate();
     }
+    return cached.data;
   }
 
+  if (!inflightModels) {
+    inflightModels = fetchModelsFromNetwork().finally(() => {
+      inflightModels = null;
+    });
+  }
+  return inflightModels;
+}
+
+export type StoryboardBootPayload = StoryboardModelsPayload & {
+  project?: StoryboardProject | null;
+  platformOffering?: boolean;
+  defaults?: {
+    chat: string;
+    image: string;
+    video: string;
+  };
+};
+
+/** 工作室冷启动：模型 + 可选 project 合并请求 */
+export async function fetchStoryboardBoot(
+  projectId?: string | null,
+): Promise<StoryboardBootPayload> {
+  const qs =
+    projectId?.trim()
+      ? `?projectId=${encodeURIComponent(projectId.trim())}`
+      : "";
+  const data = await ecomBookFetch(`api/sso/tools/ecom/storyboard/boot${qs}`);
+  const result: StoryboardBootPayload = {
+    chatModels: (data.chatModels as StoryboardGatewayModel[]) ?? [],
+    imageModels: (data.imageModels as StoryboardGatewayModel[]) ?? [],
+    videoModels: (data.videoModels as StoryboardGatewayModel[]) ?? [],
+    project: (data.project as StoryboardProject | null | undefined) ?? null,
+    platformOffering: Boolean(data.platformOffering),
+    defaults: data.defaults as StoryboardBootPayload["defaults"],
+  };
+  writeModelsCache(result);
   return result;
 }
 

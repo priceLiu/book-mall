@@ -88,6 +88,16 @@ pool_timeout=30&connect_timeout=15
 
 poll-loop 子进程已在 `package.json` 设 `PRISMA_CONNECTION_LIMIT=1`（3 个 worker：story / canvas / gateway）。dev:all 估算总连接 = mall 进程 limit + 3×1；详见 health API `database.budget`。生产 PgBouncer / 连接预算见 `deploy/tencent/pgbouncer/README.md`。
 
+### 页面并发风暴 · 本地提速（2026-09）
+
+| 现象 | 做法 |
+|------|------|
+| 首次打开 canvas / 电商分镜极慢（20–170s） | **一次性**落库 Gateway 模型注册表：`pnpm --dir book-mall tsx scripts/seed-gateway-model-registry.ts --confirm`（勿依赖请求热路径全量 sync） |
+| DB 连接池打满 / P2024 | `pnpm dev:all:nopoll`（或根目录 `--no-poll`）减少 poll-loop；见上表连接预算 |
+| canvas 同页多次 `/api/tools-session` | 已合并：`CanvasShellSessionProvider` + `?lite=1` 心跳 + inflight 去重 |
+| 我的画布 SSR 后重复拉列表 | SSR `initialPage` 首屏展示，2.5s 后再后台 revalidate |
+| 电商分镜冷启动 models + project 并发 | 走 `storyboard/boot` 合并 API；models 缓存 stale-while-revalidate |
+
 **连接池饱和时的产品行为（2026-08）**：Prisma 重试耗尽 → 统一 `DbUnavailableError`；RSC 有 `app/error.tsx` + account 布局降级；SSO/auth API → 503 `SYSTEM_BUSY`（非 500 红屏）。
 
 Release 全文：`docs/releases/2026-06-db-resilience-r1.md`。

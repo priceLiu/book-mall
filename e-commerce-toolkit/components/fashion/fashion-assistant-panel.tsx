@@ -5,8 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { SeedVideoAssistantChoiceCards } from "@/components/seed-video/seed-video-assistant-choice-cards";
 import type { StoryboardSettingsValue } from "@/components/storyboard/storyboard-settings-dialog";
+import { EcomAssistantCollapsibleLayout } from "@/components/layout/ecom-assistant-collapsible-layout";
 import { EcomAssistantPanelHeader } from "@/components/layout/ecom-assistant-panel-header";
-import { EcomAssistantFloatingComposer } from "@/components/layout/ecom-assistant-floating-composer";
 import {
   EcomAssistantIconButton,
   ECOM_ASSISTANT_CONTROL_ICON_CLASS,
@@ -118,6 +118,7 @@ import {
   resolveFashionStoryboardPanelsForVersion,
   resolveProStoryboardPanelsForVersion,
 } from "@/lib/fashion-workflow";
+import { buildFashionHistoricalChoiceBlock } from "@/lib/fashion-assistant-choice-ui";
 import {
   isGenerateAllImagesChoice,
   isGenerateFullVideoChoice,
@@ -197,7 +198,6 @@ export function FashionAssistantPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const productAutoAckRef = useRef<string | null>(null);
   const metaRepairRef = useRef<string | null>(null);
-  const assistantRootRef = useRef<HTMLDivElement>(null);
   const isBusy = streaming || pendingChoice != null || refAutoAdvancing;
 
   const tryCollapse = useCallback(() => {
@@ -208,19 +208,6 @@ export function FashionAssistantPanel({
   const tryExpand = useCallback(() => {
     onCollapsedChange?.(false);
   }, [onCollapsedChange]);
-
-  const handleAssistantBlur = useCallback(
-    (e: React.FocusEvent) => {
-      if (collapsed || streaming || isBusy) return;
-      const root = assistantRootRef.current;
-      if (!root) return;
-      const next = e.relatedTarget as Node | null;
-      if (next && root.contains(next)) return;
-      if (next && (next as HTMLElement).closest?.("[data-ecom-floating-composer]")) return;
-      onCollapsedChange?.(true);
-    },
-    [collapsed, streaming, isBusy, onCollapsedChange],
-  );
 
   useEffect(() => {
     setWorkflowOverride({});
@@ -1013,8 +1000,8 @@ export function FashionAssistantPanel({
           onChange={(e) => setInput(e.target.value)}
           placeholder={fashionAssistantPlaceholder(effectiveProject)}
           disabled={legacyReadonly || isBusy}
-          rows={collapsed ? 1 : 2}
-          className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-[#d2d2d7] px-3 py-2 text-sm outline-none focus:border-[#0071e3] disabled:bg-[#f5f5f7]"
+          rows={2}
+          className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
           onFocus={() => {
             if (collapsed) tryExpand();
           }}
@@ -1053,7 +1040,7 @@ export function FashionAssistantPanel({
           placeholder={fashionAssistantPlaceholder(effectiveProject)}
           disabled={legacyReadonly || isBusy}
           rows={1}
-          className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-[#d2d2d7] px-3 py-2 text-sm outline-none focus:border-[#0071e3] disabled:bg-[#f5f5f7]"
+          className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
           onFocus={() => tryExpand()}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -1077,15 +1064,14 @@ export function FashionAssistantPanel({
   );
 
   return (
-    <>
-      <div
-        ref={assistantRootRef}
-        className={cn(
-          "flex h-full min-h-0 flex-col bg-[#fbfbfd]",
-          collapsed && "pointer-events-none invisible absolute h-0 w-0 overflow-hidden",
-        )}
-        onBlur={handleAssistantBlur}
-      >
+    <EcomAssistantCollapsibleLayout
+      collapsed={collapsed}
+      onCollapsedChange={onCollapsedChange}
+      collapseBlocked={streaming || isBusy}
+      attentionBadge={needsAttention}
+      composer={composerSection}
+      floatingComposer={floatingComposerSection}
+    >
       <EcomAssistantPanelHeader
         title={`${verticalConfig?.label ?? "专业版"}助手`}
         subtitle="V4.4 · 七维 → 卖点 → 口播 → 分镜"
@@ -1102,13 +1088,14 @@ export function FashionAssistantPanel({
         }
       />
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <div ref={scrollRef} className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {legacyReadonly ? (
           <div className={cn(ECOM_ASSISTANT_BUBBLE_CLASS, "mb-3")}>
             此为旧版电商口播故事版项目，仅支持只读浏览。请新建「{verticalConfig?.label ?? "专业版"}」项目继续创作。
           </div>
         ) : null}
 
+        <div className="space-y-3">
         {displayMessages.map((m, index) => {
           const parsedFromMessage =
             extractFashionDeliverableFromText(m.content) ?? extractProDeliverableFromText(m.content);
@@ -1120,6 +1107,17 @@ export function FashionAssistantPanel({
             m.role === "assistant" && index === displayMessages.findLastIndex((x) => x.role === "assistant");
           const dimMeta = m.role === "user" ? dimensionMessageLabels.get(m.id) : undefined;
           const choiceMeta = m.role === "user" ? workflowChoiceLabels.get(m.id) : undefined;
+          const priorMessages = displayMessages.slice(0, index);
+          const historical =
+            m.role === "user"
+              ? buildFashionHistoricalChoiceBlock({
+                  userMessage: m.content,
+                  project: effectiveProject,
+                  dimMeta,
+                  choiceMeta,
+                  priorMessages,
+                })
+              : null;
           const userStoryboardKey =
             m.role === "user" && deliverable
               ? isFashionStoryboardConfirmUserMessage(m.content)
@@ -1146,69 +1144,99 @@ export function FashionAssistantPanel({
                     deliverable?.voiceovers?.length,
                 )));
           return (
-            <div
-              key={m.id}
-              className={cn(
-                "mb-3 flex w-full flex-col",
-                m.role === "user" ? "items-end" : "items-start",
-              )}
-            >
-              {choiceMeta ? (
-                <div className="mb-1 max-w-[95%] text-right">
-                  <p className="text-[11px] font-semibold text-[#1d1d1f]">{choiceMeta.label}</p>
-                  <p className="text-[10px] text-[#86868b]">{choiceMeta.detail}</p>
-                </div>
-              ) : dimMeta ? (
-                <div className="mb-1 max-w-[95%] text-right">
-                  {canReviseDimensions ? (
-                    <button
-                      type="button"
-                      className="text-[11px] font-medium text-[#0071e3] underline decoration-[#0071e3]/45 underline-offset-2 hover:decoration-[#0071e3] disabled:opacity-50"
-                      disabled={isBusy}
-                      onClick={() =>
-                        void handleChoice(fashionReviseDimensionChoiceLabel(dimMeta.stepIndex))
-                      }
-                    >
-                      {dimMeta.label}
-                    </button>
-                  ) : (
-                    <span className="text-[11px] font-medium text-[#0071e3]">{dimMeta.label}</span>
-                  )}
-                </div>
-              ) : null}
+            <div key={m.id} className="space-y-2">
+              {m.role === "assistant" || !historical ? (
               <div
                 className={cn(
-                  m.role === "user"
-                    ? ECOM_ASSISTANT_USER_MESSAGE_BUBBLE_BASE
-                    : ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
-                  m.role === "user" ? ECOM_ASSISTANT_USER_BUBBLE_CLASS : ECOM_ASSISTANT_BUBBLE_CLASS,
+                  "flex w-full flex-col",
+                  m.role === "user" ? "items-end" : "items-start",
                 )}
               >
-                {m.role === "assistant" ? (
-                  showDeliverableView ? (
-                    <FashionAssistantDeliverableView
-                      content={m.content}
-                      projectDeliverable={messageDeliverable}
-                      showStoryboardPickHint={awaitingStoryboardPick && isLastAssistant}
-                      showStoryboardConfirmHint={awaitingStoryboardConfirm && isLastAssistant}
-                      showBrief={isLastAssistant}
-                    />
-                  ) : brief ? (
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed">{brief}</p>
-                  ) : m.id === "streaming" ? (
-                    <p className="text-sm text-[#86868b]">正在生成…</p>
-                  ) : null
-                ) : (
-                  <p className="whitespace-pre-wrap">{m.content}</p>
-                )}
-              </div>
-              {userStoryboardKey && userStoryboardVersion?.panels?.length ? (
+                {!historical && choiceMeta ? (
+                  <div className="mb-1 max-w-[95%] text-right">
+                    <p className="text-[11px] font-semibold text-[#1d1d1f]">{choiceMeta.label}</p>
+                    <p className="text-[10px] text-[#86868b]">{choiceMeta.detail}</p>
+                  </div>
+                ) : !historical && dimMeta ? (
+                  <div className="mb-1 max-w-[95%] text-right">
+                    {canReviseDimensions ? (
+                      <button
+                        type="button"
+                        className="text-[11px] font-medium text-[#0071e3] underline decoration-[#0071e3]/45 underline-offset-2 hover:decoration-[#0071e3] disabled:opacity-50"
+                        disabled={isBusy}
+                        onClick={() =>
+                          void handleChoice(fashionReviseDimensionChoiceLabel(dimMeta.stepIndex))
+                        }
+                      >
+                        {dimMeta.label}
+                      </button>
+                    ) : (
+                      <span className="text-[11px] font-medium text-[#0071e3]">{dimMeta.label}</span>
+                    )}
+                  </div>
+                ) : null}
+                {!historical ? (
                 <div
                   className={cn(
-                    "mt-2 max-w-[95%]",
-                    m.role === "user" ? "ml-auto" : "mr-auto",
+                    m.role === "user"
+                      ? ECOM_ASSISTANT_USER_MESSAGE_BUBBLE_BASE
+                      : ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
+                    m.role === "user" ? ECOM_ASSISTANT_USER_BUBBLE_CLASS : ECOM_ASSISTANT_BUBBLE_CLASS,
                   )}
                 >
+                  {m.role === "assistant" ? (
+                    showDeliverableView ? (
+                      <FashionAssistantDeliverableView
+                        content={m.content}
+                        projectDeliverable={messageDeliverable}
+                        showStoryboardPickHint={awaitingStoryboardPick && isLastAssistant}
+                        showStoryboardConfirmHint={awaitingStoryboardConfirm && isLastAssistant}
+                        showBrief={isLastAssistant}
+                      />
+                    ) : brief ? (
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed">{brief}</p>
+                    ) : m.id === "streaming" ? (
+                      <p className="text-sm text-[#86868b]">正在生成…</p>
+                    ) : null
+                  ) : (
+                    <p className="whitespace-pre-wrap">{m.content}</p>
+                  )}
+                </div>
+                ) : null}
+              </div>
+              ) : null}
+              {historical ? (
+                <div className="flex w-full flex-col items-start">
+                  <div className={cn(ECOM_ASSISTANT_CHOICE_SHELL_CLASS, "w-full max-w-[95%]")}>
+                    {canReviseDimensions && dimMeta ? (
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-medium text-[#6e6e73]">本次点选记录（只读）</p>
+                        <button
+                          type="button"
+                          className="text-[11px] font-medium text-[#0071e3] underline decoration-[#0071e3]/45 underline-offset-2 hover:decoration-[#0071e3] disabled:opacity-50"
+                          disabled={isBusy}
+                          onClick={() =>
+                            void handleChoice(fashionReviseDimensionChoiceLabel(dimMeta.stepIndex))
+                          }
+                        >
+                          修改{dimMeta.label}
+                        </button>
+                      </div>
+                    ) : null}
+                    <SeedVideoAssistantChoiceCards
+                      title={historical.title}
+                      subtitle={
+                        canReviseDimensions && dimMeta ? "" : "本次点选记录（只读）"
+                      }
+                      choices={historical.cards}
+                      selectedMessage={historical.selectedMessage}
+                    />
+                  </div>
+                </div>
+              ) : null}
+              {userStoryboardKey && userStoryboardVersion?.panels?.length ? (
+                <div className="flex w-full flex-col items-start">
+                  <div className="w-full max-w-[95%]">
                   <FashionStoryboardResultBlock
                     versionKey={userStoryboardKey}
                     title={userStoryboardVersion.title}
@@ -1219,11 +1247,13 @@ export function FashionAssistantPanel({
                       Boolean(deliverable?.storyboardLocked)
                     }
                   />
+                  </div>
                 </div>
               ) : null}
             </div>
           );
         })}
+        </div>
 
         {streaming && streamText ? (
           <div
@@ -1399,21 +1429,6 @@ export function FashionAssistantPanel({
           </div>
         ) : null}
       </div>
-
-      {!collapsed ? composerSection : null}
-      </div>
-
-      {collapsed ? (
-        <EcomAssistantFloatingComposer
-          open
-          attentionBadge={needsAttention}
-          onExpand={tryExpand}
-        >
-          <div data-ecom-floating-composer onClick={(e) => e.stopPropagation()}>
-            {floatingComposerSection}
-          </div>
-        </EcomAssistantFloatingComposer>
-      ) : null}
-    </>
+    </EcomAssistantCollapsibleLayout>
   );
 }

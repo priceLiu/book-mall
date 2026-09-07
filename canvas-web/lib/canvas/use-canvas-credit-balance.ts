@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { useOptionalCanvasShellSessionContext } from "@/components/auth/canvas-shell-session-provider";
 import { PLATFORM_CREDITS_BALANCE_REFRESH_EVENT } from "@/lib/canvas/canvas-credits-balance-events";
-import { parseToolsSessionPayload } from "@/lib/parse-tools-session-payload";
+import { fetchCanvasToolsSessionFull } from "@/lib/canvas-tools-session-fetch";
 import {
   getCachedToolsSession,
   setCachedToolsSession,
@@ -28,21 +29,20 @@ function parseCreditTotal(introspect: unknown): number | null {
 
 /** 用户剩余积分（introspect + 扣费事件即时刷新） */
 export function useCanvasCreditBalance(): CanvasCreditPools {
-  const [pools, setPools] = useState<CanvasCreditPools>({ total: null });
+  const shared = useOptionalCanvasShellSessionContext();
+  const [pools, setPools] = useState<CanvasCreditPools>(() => {
+    const intro = shared?.payload?.introspect ?? getCachedToolsSession()?.introspect;
+    return { total: parseCreditTotal(intro) };
+  });
 
   const refresh = useCallback(async () => {
-    const cached = getCachedToolsSession();
+    const cached = shared?.payload ?? getCachedToolsSession();
     if (cached?.active && cached.introspect) {
       setPools({ total: parseCreditTotal(cached.introspect) });
     }
 
     try {
-      const r = await fetch("/api/tools-session", {
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-      const raw = await r.json().catch(() => null);
-      const parsed = parseToolsSessionPayload(raw);
+      const parsed = await fetchCanvasToolsSessionFull();
       if (parsed.active) {
         setCachedToolsSession(parsed);
         setPools({ total: parseCreditTotal(parsed.introspect) });
@@ -50,7 +50,13 @@ export function useCanvasCreditBalance(): CanvasCreditPools {
     } catch {
       /* 静默 */
     }
-  }, []);
+  }, [shared?.payload]);
+
+  useEffect(() => {
+    if (shared?.payload?.introspect) {
+      setPools({ total: parseCreditTotal(shared.payload.introspect) });
+    }
+  }, [shared?.payload?.introspect]);
 
   useEffect(() => {
     void refresh();
@@ -58,6 +64,7 @@ export function useCanvasCreditBalance(): CanvasCreditPools {
     const timer = window.setInterval(() => void refresh(), POLL_MS);
     window.addEventListener(PLATFORM_CREDITS_BALANCE_REFRESH_EVENT, onRefresh);
     window.addEventListener("focus", onRefresh);
+    window.addEventListener("canvas:tools-session-refreshed", onRefresh);
     return () => {
       window.clearInterval(timer);
       window.removeEventListener(
@@ -65,6 +72,7 @@ export function useCanvasCreditBalance(): CanvasCreditPools {
         onRefresh,
       );
       window.removeEventListener("focus", onRefresh);
+      window.removeEventListener("canvas:tools-session-refreshed", onRefresh);
     };
   }, [refresh]);
 

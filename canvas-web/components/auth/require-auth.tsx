@@ -37,6 +37,7 @@ import {
   readToolsSessionOkHint,
   setCachedToolsSession,
 } from "@/lib/tools-session-client-cache";
+import { fetchCanvasToolsSessionFull } from "@/lib/canvas-tools-session-fetch";
 
 /** 须大于服务端 introspect 超时 + JWT 兜底余量，避免客户端先 abort */
 const SESSION_FETCH_TIMEOUT_MS = 22_000;
@@ -58,23 +59,7 @@ function isFetchAbortedError(e: unknown): boolean {
 async function fetchToolsSessionClientOnce(): Promise<
   ReturnType<typeof parseToolsSessionPayload>
 > {
-  const ac = new AbortController();
-  const timer = window.setTimeout(() => ac.abort(), SESSION_FETCH_TIMEOUT_MS);
-  try {
-    const r = await fetch("/api/tools-session", {
-      cache: "no-store",
-      credentials: "same-origin",
-      signal: ac.signal,
-    });
-    const raw = await r.json().catch(() => null);
-    const parsed = parseToolsSessionPayload(raw);
-    if (parsed.active) {
-      setCachedToolsSession(parsed);
-    }
-    return parsed;
-  } finally {
-    window.clearTimeout(timer);
-  }
+  return fetchCanvasToolsSessionFull();
 }
 
 async function fetchToolsSessionClient(opts?: {

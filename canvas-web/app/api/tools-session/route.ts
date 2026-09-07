@@ -4,6 +4,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { fetchToolsSessionUncachedWithDiag } from "@/lib/tools-introspect";
 import type { FetchToolsSessionResult } from "@/lib/tools-introspect";
 import { shouldClearToolsTokenOnInactive } from "@/lib/tools-session-inactive-reason";
+import { readJwtExpSec, isToolsJwtExpired } from "@/lib/tools-jwt-exp";
+import { getMainSiteOrigin } from "@/lib/site-origin";
 import {
   isToolsFederatedLogoutRequest,
   respondToolsFederatedLogout,
@@ -49,6 +51,30 @@ export async function GET(request: NextRequest) {
   const token = cookies().get("tools_token")?.value;
   const hadToken = Boolean(token?.trim());
   const bearer = token?.trim() ?? "";
+  const lite = request.nextUrl.searchParams.get("lite") === "1";
+  const tokenExpiresAt = bearer ? readJwtExpSec(bearer) : null;
+
+  if (lite) {
+    const session: FetchToolsSessionResult = bearer
+      ? {
+          hasCookie: true,
+          originConfigured: Boolean(getMainSiteOrigin()),
+          introspectStatus: null,
+          introspect: null,
+          active: !isToolsJwtExpired(bearer),
+        }
+      : {
+          hasCookie: false,
+          originConfigured: Boolean(getMainSiteOrigin()),
+          introspectStatus: null,
+          introspect: null,
+          active: false,
+        };
+    const res = NextResponse.json({ ...session, tokenExpiresAt });
+    maybeClearToolsTokenCookie(res, hadToken, session);
+    return res;
+  }
+
   const cacheKey = bearer ? toolsSessionRouteCacheKey(bearer) : "";
   const cached =
     bearer &&
@@ -66,7 +92,7 @@ export async function GET(request: NextRequest) {
     toolsSessionRouteCache = null;
   }
 
-  const res = NextResponse.json(session);
+  const res = NextResponse.json({ ...session, tokenExpiresAt });
   maybeClearToolsTokenCookie(res, hadToken, session);
   return res;
 }

@@ -120,7 +120,10 @@ export const GET = withApiDbGuard(async (req) => {
 
   const tElig0 = performance.now();
   const elig = await getToolsSsoEligibility(verified.sub);
-  const ecomOk = await userCanAccessEcommerceToolkit(verified.sub);
+  const lite = req.nextUrl.searchParams.get("lite") === "1";
+  const ecomOk = lite
+    ? false
+    : await userCanAccessEcommerceToolkit(verified.sub);
   const entitled = elig.ok || ecomOk;
   const msEligibility = performance.now() - tElig0;
 
@@ -140,6 +143,22 @@ export const GET = withApiDbGuard(async (req) => {
     msTotal: performance.now() - tRoute,
     userId: verified.sub,
   };
+
+  if (lite) {
+    const payload = {
+      active: true,
+      entitled,
+      sub: verified.sub,
+      tier: verified.tier,
+      tools_role: elig.isAdmin ? ("admin" as const) : ("member" as const),
+      exp: verified.exp,
+      introspect_mode: "lite" as const,
+    };
+    const body = diagEnabled
+      ? mergeDiag(payload, { ...baseDiag, phase: "ok_lite" })
+      : payload;
+    return NextResponse.json(body, { headers });
+  }
 
   // 准入解耦：有效令牌 + 有效会话即视为 active（已登录门户会话）；是否已开通工具能力由
   // `entitled` 表达。未开通用户可进门户浏览个人中心/定价/开通引导，生成时再由网关复查。

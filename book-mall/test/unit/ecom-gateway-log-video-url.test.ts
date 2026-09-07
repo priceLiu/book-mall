@@ -51,4 +51,27 @@ describe("extractVideoUrlFromGatewayLogSummary", () => {
       ),
     ).toBe("https://cdn.example/kie.mp4");
   });
+
+  it("reads DashScope sync multimodal imageUrls", () => {
+    expect(
+      extractVideoUrlFromGatewayLogSummary(
+        {
+          sync: true,
+          imageUrls: ["https://cdn.example/qwen-edit.png"],
+          output: {
+            task_status: "SUCCEEDED",
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: [{ image: "https://cdn.example/qwen-edit.png" }],
+                },
+              },
+            ],
+          },
+        },
+        { pollProvider: "dashscope" },
+      ),
+    ).toBe("https://cdn.example/qwen-edit.png");
+  });
 });

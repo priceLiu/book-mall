@@ -1,6 +1,9 @@
 import { extractBailianR2vVideoUrlFromGatewaySummary } from "@/lib/canvas/canvas-video-bailian-r2v";
 import { extractVolcengineVideoUrlFromGatewaySummary } from "@/lib/canvas/canvas-volcengine-recover";
-import { dashscopeExtractTaskVideoUrl } from "@/lib/gateway/dashscope-client";
+import {
+  dashscopeExtractTaskImageUrl,
+  dashscopeExtractTaskVideoUrl,
+} from "@/lib/gateway/dashscope-client";
 import { minimaxVideoTaskResultUrl } from "@/lib/gateway/minimax-video-client";
 import type { MinimaxVideoTaskRow } from "@/lib/gateway/minimax-video-client";
 import { extractKieResultUrl } from "@/lib/story/kie-client";
@@ -111,12 +114,24 @@ export function extractVideoUrlFromGatewayLogSummary(
   }
   if (provider === "dashscope") {
     if (summary && typeof summary === "object") {
-      const direct = dashscopeExtractTaskVideoUrl(summary as Record<string, unknown>);
-      if (direct) return direct;
-      const output = (summary as Record<string, unknown>).output;
+      const root = summary as Record<string, unknown>;
+      const imageUrls = root.imageUrls;
+      if (Array.isArray(imageUrls)) {
+        for (const raw of imageUrls) {
+          if (typeof raw === "string" && raw.trim()) return raw.trim();
+        }
+      }
+      const directVideo = dashscopeExtractTaskVideoUrl(root);
+      if (directVideo) return directVideo;
+      const directImage = dashscopeExtractTaskImageUrl(root);
+      if (directImage) return directImage;
+      const output = root.output;
       if (output && typeof output === "object") {
-        const nested = dashscopeExtractTaskVideoUrl(output as Record<string, unknown>);
-        if (nested) return nested;
+        const nestedOutput = output as Record<string, unknown>;
+        const nestedVideo = dashscopeExtractTaskVideoUrl(nestedOutput);
+        if (nestedVideo) return nestedVideo;
+        const nestedImage = dashscopeExtractTaskImageUrl(nestedOutput);
+        if (nestedImage) return nestedImage;
       }
     }
     return extractGenericVideoUrl(summary);

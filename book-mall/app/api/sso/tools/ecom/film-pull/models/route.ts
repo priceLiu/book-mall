@@ -13,7 +13,6 @@ import {
 } from "@/lib/ecom/ecom-film-pull-types";
 import { registryRowsToEcomModels } from "@/lib/gateway/ecom-storyboard-chat-models";
 import { listModelsForApp } from "@/lib/gateway/model-registry";
-import { ensureGatewayCanonicalRegistrySynced } from "@/lib/gateway/sync-canonical-registry";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +22,6 @@ export async function GET(req: Request) {
   if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
 
   const persona = await getUserBillingPersona(auth.userId);
-  await ensureGatewayCanonicalRegistrySynced();
 
   const boundKinds =
     persona === "PLATFORM_CREDIT"

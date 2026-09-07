@@ -16,7 +16,6 @@ import { useClientPortalMounted } from "@/lib/canvas/use-modal-portal-effects";
 import { CanvasBrandLoadingLogo } from "@/components/home/canvas-brand-loading-logo";
 import { cn } from "@/lib/utils";
 
-const SHOW_DELAY_MS = 250;
 const HIDE_DELAY_MS = 420;
 
 export type HoverVideoEnlargePayload = {
@@ -26,7 +25,8 @@ export type HoverVideoEnlargePayload = {
 };
 
 type HoverVideoEnlargeContextValue = {
-  requestShow: (
+  /** 点击放大钮：立即打开可关闭的居中预览 */
+  openPreview: (
     payload: HoverVideoEnlargePayload,
     sourceVideo?: HTMLVideoElement | null,
   ) => void;
@@ -46,19 +46,12 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
   const mounted = useClientPortalMounted();
   const [open, setOpen] = useState<HoverVideoEnlargePayload | null>(null);
   const [touchMode, setTouchMode] = useState(false);
+  const [interactive, setInteractive] = useState(false);
   const [videoLoading, setVideoLoading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sourceVideoRef = useRef<HTMLVideoElement | null>(null);
   const resumeTimeRef = useRef(0);
-
-  const clearShowTimer = useCallback(() => {
-    if (showTimerRef.current) {
-      clearTimeout(showTimerRef.current);
-      showTimerRef.current = null;
-    }
-  }, []);
 
   const clearHideTimer = useCallback(() => {
     if (hideTimerRef.current) {
@@ -68,7 +61,6 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
   }, []);
 
   const closeNow = useCallback(() => {
-    clearShowTimer();
     clearHideTimer();
     const portal = videoRef.current;
     if (portal) {
@@ -86,7 +78,8 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
     setVideoLoading(false);
     setOpen(null);
     setTouchMode(false);
-  }, [clearHideTimer, clearShowTimer]);
+    setInteractive(false);
+  }, [clearHideTimer]);
 
   const requestHide = useCallback(() => {
     clearHideTimer();
@@ -95,43 +88,42 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
     }, HIDE_DELAY_MS);
   }, [clearHideTimer, closeNow]);
 
-  const requestShow = useCallback(
+  const openPreview = useCallback(
     (payload: HoverVideoEnlargePayload, sourceVideo?: HTMLVideoElement | null) => {
-      if (!prefersHoverVideoEnlarge()) return;
       clearHideTimer();
-      if (open?.url === payload.url) return;
+      if (open?.url === payload.url && interactive) {
+        closeNow();
+        return;
+      }
 
-      clearShowTimer();
       sourceVideoRef.current = sourceVideo ?? null;
       resumeTimeRef.current = sourceVideo?.currentTime ?? 0;
-      showTimerRef.current = setTimeout(() => {
-        showTimerRef.current = null;
-        if (sourceVideo) {
-          sourceVideo.muted = true;
-          sourceVideo.pause();
-        }
-        setTouchMode(false);
-        setVideoLoading(true);
-        setOpen(payload);
-      }, SHOW_DELAY_MS);
+      if (sourceVideo) {
+        sourceVideo.muted = true;
+        sourceVideo.pause();
+      }
+      setTouchMode(false);
+      setInteractive(true);
+      setVideoLoading(true);
+      setOpen(payload);
     },
-    [clearHideTimer, clearShowTimer, open?.url],
+    [clearHideTimer, closeNow, interactive, open?.url],
   );
 
   const toggleTouchPreview = useCallback(
     (payload: HoverVideoEnlargePayload) => {
       if (prefersHoverVideoEnlarge()) return;
-      clearShowTimer();
       clearHideTimer();
       sourceVideoRef.current = null;
       resumeTimeRef.current = 0;
       setOpen((prev) => {
         const next = prev?.url === payload.url ? null : payload;
         setVideoLoading(next !== null);
+        setInteractive(next !== null);
         return next;
       });
     },
-    [clearHideTimer, clearShowTimer],
+    [clearHideTimer],
   );
 
   useEffect(() => {
@@ -183,15 +175,17 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
   }, [open]);
 
   useEffect(() => {
-    if (!touchMode || !open) return;
+    if ((!touchMode && !interactive) || !open) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") closeNow();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [touchMode, open, closeNow]);
+  }, [touchMode, interactive, open, closeNow]);
 
   useEffect(() => () => closeNow(), [closeNow]);
+
+  const dismissible = touchMode || interactive;
 
   const portal =
     open && mounted
@@ -199,13 +193,13 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
           <div
             className={cn(
               "fixed inset-0 z-[1100] flex items-center justify-center p-4 transition duration-200",
-              touchMode ? "pointer-events-auto" : "pointer-events-none",
+              dismissible ? "pointer-events-auto" : "pointer-events-none",
               open ? "opacity-100" : "opacity-0",
             )}
-            role={touchMode ? "dialog" : undefined}
-            aria-modal={touchMode || undefined}
-            aria-label={touchMode ? `预览：${open.alt}` : undefined}
-            onClick={touchMode ? () => closeNow() : undefined}
+            role={dismissible ? "dialog" : undefined}
+            aria-modal={dismissible || undefined}
+            aria-label={dismissible ? `预览：${open.alt}` : undefined}
+            onClick={dismissible ? () => closeNow() : undefined}
           >
             <div
               className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0.38)_0%,rgba(0,0,0,0.78)_100%)] transition duration-200"
@@ -214,10 +208,10 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
             <div
               className={cn(
                 "relative inline-block max-w-[min(90vw,640px)] transition duration-200",
-                touchMode ? "pointer-events-auto" : "pointer-events-none",
+                dismissible ? "pointer-events-auto" : "pointer-events-none",
                 open ? "scale-100 opacity-100" : "scale-[0.97] opacity-0",
               )}
-              onClick={touchMode ? (event) => event.stopPropagation() : undefined}
+              onClick={dismissible ? (event) => event.stopPropagation() : undefined}
             >
               <div
                 className="pointer-events-none absolute -inset-5 rounded-2xl bg-white/[0.06] backdrop-blur-2xl"
@@ -227,7 +221,7 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
                 className="pointer-events-none absolute -inset-3 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.5),0_28px_72px_rgba(0,0,0,0.42),0_48px_120px_rgba(0,0,0,0.28)]"
                 aria-hidden
               />
-              <div className="relative min-h-[min(40vh,320px)] min-w-[min(90vw,640px)] overflow-hidden rounded-xl bg-black">
+              <div className="relative flex min-h-[min(40vh,320px)] min-w-[min(90vw,640px)] items-center justify-center overflow-hidden rounded-xl bg-black">
                 {open.posterUrl && videoLoading ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -243,7 +237,7 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
                   src={open.url}
                   poster={open.posterUrl || undefined}
                   className={cn(
-                    "relative block h-auto max-h-[80vh] w-auto max-w-[min(90vw,640px)] object-contain transition-opacity duration-150",
+                    "relative max-h-[80vh] max-w-[min(90vw,640px)] object-contain transition-opacity duration-150",
                     videoLoading ? "opacity-0" : "opacity-100",
                   )}
                   muted
@@ -269,7 +263,7 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
 
   return (
     <HoverVideoEnlargeContext.Provider
-      value={{ requestShow, requestHide, toggleTouchPreview }}
+      value={{ openPreview, requestHide, toggleTouchPreview }}
     >
       {children}
       {portal}

@@ -31,7 +31,7 @@ async function resolveCanonicalForModelKey(modelKey: string): Promise<string | n
 }
 
 async function seedAllSourceLabels(force: boolean): Promise<number> {
-  await ensureGatewayCanonicalRegistrySynced();
+  await ensureGatewayCanonicalRegistrySynced({ blocking: true });
   const catalogs = await prisma.modelCatalog.findMany({
     where: { gatewayPublished: true },
     select: { canonicalKey: true, sourceLabel: true },

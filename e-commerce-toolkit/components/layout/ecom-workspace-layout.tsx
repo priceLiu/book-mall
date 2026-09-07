@@ -1,5 +1,8 @@
 "use client";
 
+import { useRef } from "react";
+
+import { EcomWorkspaceFloatingPortalProvider } from "@/components/layout/ecom-workspace-floating-portal-context";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -38,9 +41,14 @@ export function EcomWorkspaceLayout({
   onMainBlankPointerDown,
 }: Props) {
   const hasAssistant = Boolean(assistant) && !fullWidth;
+  const floatingPortalRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden md:flex-row">
+    <EcomWorkspaceFloatingPortalProvider portalRef={floatingPortalRef}>
+    <div
+      className="relative flex h-full min-h-0 w-full flex-col overflow-hidden md:flex-row"
+      data-ecom-workspace-root
+    >
       <div className="flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden md:h-full">
         <main
           className={cn(
@@ -82,6 +90,15 @@ export function EcomWorkspaceLayout({
           </div>
         </aside>
       ) : null}
+
+      {hasAssistant ? (
+        <div
+          ref={floatingPortalRef}
+          className="pointer-events-none absolute inset-0 z-[70] [&>*]:pointer-events-auto"
+          data-ecom-workspace-floating-portal
+        />
+      ) : null}
     </div>
+    </EcomWorkspaceFloatingPortalProvider>
   );
 }

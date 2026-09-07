@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { BookMallBaseUrlProvider } from "@/components/book-mall-base-url-provider";
 import { CanvasAuthGate } from "@/components/auth/canvas-auth-gate";
+import { CanvasShellSessionProvider } from "@/components/auth/canvas-shell-session-provider";
 import { CanvasShell } from "@/components/layout/canvas-shell";
 import { CanvasSiteNavGuard } from "@/components/layout/canvas-site-nav-guard";
 import { DialogProvider } from "@/components/dialogs/dialog-provider";
@@ -36,9 +37,11 @@ export default function RootLayout({
           <CanvasSiteNavGuard />
           <DialogProvider>
             <HoverVideoEnlargeProvider>
-              <CanvasAuthGate>
-                <CanvasShell bookOrigin={bookOrigin}>{children}</CanvasShell>
-              </CanvasAuthGate>
+              <CanvasShellSessionProvider>
+                <CanvasAuthGate>
+                  <CanvasShell bookOrigin={bookOrigin}>{children}</CanvasShell>
+                </CanvasAuthGate>
+              </CanvasShellSessionProvider>
             </HoverVideoEnlargeProvider>
           </DialogProvider>
         </BookMallBaseUrlProvider>

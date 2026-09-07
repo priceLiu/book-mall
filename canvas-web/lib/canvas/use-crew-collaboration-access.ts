@@ -5,7 +5,8 @@ import {
   crewCollaborationAccessFromIntrospect,
   type CrewCollaborationAccess,
 } from "@/lib/canvas/crew-collaboration-access";
-import { parseToolsSessionPayload } from "@/lib/parse-tools-session-payload";
+import { useOptionalCanvasShellSessionContext } from "@/components/auth/canvas-shell-session-provider";
+import { fetchCanvasToolsSessionFull } from "@/lib/canvas-tools-session-fetch";
 import { getCachedToolsSession } from "@/lib/tools-session-client-cache";
 
 const DEFAULT_ACCESS: CrewCollaborationAccess = {
@@ -16,20 +17,27 @@ const DEFAULT_ACCESS: CrewCollaborationAccess = {
   canTeamShareOnPublish: false,
 };
 
-async function fetchCollaborationAccess(): Promise<CrewCollaborationAccess> {
+function accessFromPayload(introspect: unknown): CrewCollaborationAccess | null {
+  if (!introspect || typeof introspect !== "object") return null;
+  return crewCollaborationAccessFromIntrospect(
+    introspect as Record<string, unknown>,
+  );
+}
+
+async function fetchCollaborationAccess(
+  cachedIntro?: unknown,
+): Promise<CrewCollaborationAccess> {
+  if (cachedIntro) {
+    const fromCache = accessFromPayload(cachedIntro);
+    if (fromCache) return fromCache;
+  }
   const cached = getCachedToolsSession();
   if (cached?.active && cached.introspect) {
-    return crewCollaborationAccessFromIntrospect(
-      cached.introspect as Record<string, unknown>,
-    );
+    const fromMem = accessFromPayload(cached.introspect);
+    if (fromMem) return fromMem;
   }
   try {
-    const r = await fetch("/api/tools-session", {
-      cache: "no-store",
-      credentials: "same-origin",
-    });
-    const raw = await r.json().catch(() => null);
-    const parsed = parseToolsSessionPayload(raw);
+    const parsed = await fetchCanvasToolsSessionFull();
     if (parsed.introspect) {
       return crewCollaborationAccessFromIntrospect(
         parsed.introspect as Record<string, unknown>,
@@ -43,23 +51,29 @@ async function fetchCollaborationAccess(): Promise<CrewCollaborationAccess> {
 
 /** 客户端 · 剧组协同权限（团队空间 / 发布剧本 / 公告条） */
 export function useCrewCollaborationAccess(): CrewCollaborationAccess {
+  const shared = useOptionalCanvasShellSessionContext();
   const [access, setAccess] = useState<CrewCollaborationAccess>(() => {
-    const cached = getCachedToolsSession();
-    if (cached?.active && cached.introspect) {
-      return crewCollaborationAccessFromIntrospect(
-        cached.introspect as Record<string, unknown>,
-      );
+    const intro =
+      shared?.payload?.introspect ?? getCachedToolsSession()?.introspect;
+    if (intro) {
+      return accessFromPayload(intro) ?? DEFAULT_ACCESS;
     }
     return DEFAULT_ACCESS;
   });
 
   useEffect(() => {
+    if (shared?.payload?.introspect) {
+      setAccess(accessFromPayload(shared.payload.introspect) ?? DEFAULT_ACCESS);
+    }
+  }, [shared?.payload?.introspect]);
+
+  useEffect(() => {
     let cancelled = false;
-    void fetchCollaborationAccess().then((next) => {
+    void fetchCollaborationAccess(shared?.payload?.introspect).then((next) => {
       if (!cancelled) setAccess(next);
     });
     const onRefresh = () => {
-      void fetchCollaborationAccess().then((next) => {
+      void fetchCollaborationAccess(shared?.payload?.introspect).then((next) => {
         if (!cancelled) setAccess(next);
       });
     };
@@ -68,7 +82,7 @@ export function useCrewCollaborationAccess(): CrewCollaborationAccess {
       cancelled = true;
       window.removeEventListener("canvas:tools-session-refreshed", onRefresh);
     };
-  }, []);
+  }, [shared?.payload?.introspect]);
 
   return access;
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+import { useEcomWorkspaceFloatingPortal } from "@/components/layout/ecom-workspace-floating-portal-context";
 import { cn } from "@/lib/utils";
 import { ECOM_ASSISTANT_FLOATING_COMPOSER_SHELL_CLASS } from "@/lib/ecom-assistant-chat-styles";
 
@@ -24,14 +25,23 @@ export function EcomAssistantFloatingComposer({
   className,
 }: Props) {
   const [mounted, setMounted] = useState(false);
+  const workspacePortalRef = useEcomWorkspaceFloatingPortal();
   useEffect(() => setMounted(true), []);
 
   if (!open || !mounted) return null;
 
+  const portalTarget =
+    workspacePortalRef?.current ?? (typeof document !== "undefined" ? document.body : null);
+  if (!portalTarget) return null;
+
+  const anchoredInWorkspace = workspacePortalRef?.current != null;
+
   return createPortal(
     <div
       className={cn(
-        "fixed bottom-4 right-4 z-[70] w-[min(calc(100vw-2rem),22rem)]",
+        anchoredInWorkspace
+          ? "absolute bottom-4 right-4 w-[min(calc(100%-2rem),22rem)]"
+          : "fixed bottom-4 right-3 w-[min(calc(100vw-1.5rem),22rem)] md:right-5 md:w-[min(calc(100vw-2.5rem),22rem)]",
         className,
       )}
     >
@@ -60,6 +70,6 @@ export function EcomAssistantFloatingComposer({
         {children}
       </div>
     </div>,
-    document.body,
+    portalTarget,
   );
 }

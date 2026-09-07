@@ -26,8 +26,7 @@ import {
   formatCanvasApiError,
   listCanvasTemplates,
   listMyCanvasProjects,
-  listPortalFeaturedProjects,
-  listPortalCaseProjects,
+  fetchPortalAdminMeta,
   patchCanvasProject,
   patchPortalFeaturedProject,
   patchPortalCaseProject,
@@ -238,8 +237,14 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
   }, [base]);
 
   useEffect(() => {
+    if (initialPage != null) {
+      saveCachedProjectsList(initialPage);
+      setLoading(false);
+      const timer = window.setTimeout(() => void load(), 2500);
+      return () => window.clearTimeout(timer);
+    }
     void load();
-  }, [load]);
+  }, [load, initialPage]);
 
   useEffect(() => {
     const el = loadMoreSentinelRef.current;
@@ -273,33 +278,20 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
     [router, base],
   );
 
-  const refreshPortalFeaturedIds = useCallback(async () => {
+  const refreshPortalAdminMeta = useCallback(async () => {
     if (!base?.trim() || !isAdmin) {
       setPortalFeaturedIds(new Set());
-      return;
-    }
-    try {
-      const list = await listPortalFeaturedProjects(base);
-      setPortalFeaturedIds(new Set(list.map((p) => p.id)));
-    } catch {
-      setPortalFeaturedIds(new Set());
-    }
-  }, [base, isAdmin]);
-
-  const refreshPortalCaseIds = useCallback(async () => {
-    if (!base?.trim() || !isAdmin) {
       setPortalCaseIds(new Set());
       setPortalFilmCaseIds(new Set());
       return;
     }
     try {
-      const [pro2Cases, sbv1Cases] = await Promise.all([
-        listPortalCaseProjects(base, "pro2"),
-        listPortalCaseProjects(base, "sbv1"),
-      ]);
-      setPortalCaseIds(new Set(pro2Cases.map((p) => p.id)));
-      setPortalFilmCaseIds(new Set(sbv1Cases.map((p) => p.id)));
+      const meta = await fetchPortalAdminMeta(base);
+      setPortalFeaturedIds(new Set(meta.featuredIds));
+      setPortalCaseIds(new Set(meta.pro2CaseIds));
+      setPortalFilmCaseIds(new Set(meta.sbv1CaseIds));
     } catch {
+      setPortalFeaturedIds(new Set());
       setPortalCaseIds(new Set());
       setPortalFilmCaseIds(new Set());
     }
@@ -308,18 +300,17 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
   useEffect(() => {
     if (!isAdmin || loading || !base?.trim()) return;
     const timer = window.setTimeout(() => {
-      void refreshPortalFeaturedIds();
-      void refreshPortalCaseIds();
+      void refreshPortalAdminMeta();
     }, PROJECTS_SECONDARY_DEFER_MS);
     return () => window.clearTimeout(timer);
-  }, [isAdmin, loading, base, refreshPortalFeaturedIds, refreshPortalCaseIds]);
+  }, [isAdmin, loading, base, refreshPortalAdminMeta]);
 
   const onTogglePortalCase = useCallback(
     async (id: string, caseFlag: boolean) => {
       if (!base?.trim()) return;
       try {
         await patchPortalCaseProject(base, id, { case: caseFlag });
-        await refreshPortalCaseIds();
+        await refreshPortalAdminMeta();
       } catch (e) {
         await dialogs.alert({
           title: caseFlag ? "设为案例失败" : "取消案例失败",
@@ -328,7 +319,7 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
         });
       }
     },
-    [base, dialogs, refreshPortalCaseIds],
+    [base, dialogs, refreshPortalAdminMeta],
   );
 
   const onSubmitPortalReview = useCallback(
@@ -345,15 +336,14 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
             ? "已发布 · 作品已发布到首页「视频作品」"
             : "已发布 · 作品已按所选类型对外展示",
         );
-        if (kind === "FEATURED") await refreshPortalFeaturedIds();
-        if (kind === "CASE") await refreshPortalCaseIds();
+        if (kind === "FEATURED" || kind === "CASE") await refreshPortalAdminMeta();
       } else {
         showCanvasSuccessToast(
           "已提交 · 管理员审核通过后将展示在首页相应位置",
         );
       }
     },
-    [base, dialogs, submitTarget, refreshPortalFeaturedIds, refreshPortalCaseIds],
+    [base, submitTarget, refreshPortalAdminMeta],
   );
 
   const onTogglePortalFeatured = useCallback(
@@ -361,7 +351,7 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
       if (!base?.trim()) return;
       try {
         await patchPortalFeaturedProject(base, id, { featured });
-        await refreshPortalFeaturedIds();
+        await refreshPortalAdminMeta();
       } catch (e) {
         await dialogs.alert({
           title: featured ? "设为首页示例失败" : "取消首页示例失败",
@@ -370,7 +360,7 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
         });
       }
     },
-    [base, dialogs, refreshPortalFeaturedIds],
+    [base, dialogs, refreshPortalAdminMeta],
   );
 
   const resetCreateWizard = useCallback(() => {
@@ -1198,7 +1188,7 @@ function ProjectsSection({
               >
                 <CanvasListCover
                   name={p.name}
-                  calm={Boolean(openingProjectId)}
+                  calm={openingProjectId === p.id}
                   {...canvasListCoverPropsFromProject(p)}
                 />
                 <ProjectNameEditor

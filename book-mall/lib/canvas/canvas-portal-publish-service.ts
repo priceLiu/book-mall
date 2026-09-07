@@ -531,4 +531,42 @@ export async function getAdminPortalProjectPreview(
   };
 }
 
+/** 管理员 · 门户上下架 ID 集合（我的画布列表一次拉取） */
+export async function listPortalAdminMetaIds(): Promise<{
+  featuredIds: string[];
+  pro2CaseIds: string[];
+  sbv1CaseIds: string[];
+}> {
+  const [featuredRows, pro2CaseRows, sbv1CaseRows] = await Promise.all([
+    prisma.canvasProject.findMany({
+      where: { portalFeatured: true, deletedAt: null },
+      select: { id: true, canvas: true },
+    }),
+    prisma.canvasProject.findMany({
+      where: { portalCase: true, deletedAt: null },
+      select: { id: true, canvas: true },
+    }),
+    prisma.canvasProject.findMany({
+      where: { portalFilmCase: true, deletedAt: null },
+      select: { id: true, canvas: true },
+    }),
+  ]);
+
+  return {
+    featuredIds: featuredRows
+      .filter(
+        (p) =>
+          canvasProjectEditionFromGraph(p.canvas) === "pro2" &&
+          !isRetiredLegacyPro2Canvas(p.canvas),
+      )
+      .map((p) => p.id),
+    pro2CaseIds: pro2CaseRows
+      .filter((p) => matchesPortalCaseEdition(p.canvas, "pro2"))
+      .map((p) => p.id),
+    sbv1CaseIds: sbv1CaseRows
+      .filter((p) => matchesPortalCaseEdition(p.canvas, "sbv1"))
+      .map((p) => p.id),
+  };
+}
+
 export { parsePublishKind };

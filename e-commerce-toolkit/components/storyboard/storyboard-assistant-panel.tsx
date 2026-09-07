@@ -81,8 +81,8 @@ import type {
   StoryboardGatewayModel,
   StoryboardProject,
 } from "@/lib/storyboard-types";
+import { EcomAssistantCollapsibleLayout } from "@/components/layout/ecom-assistant-collapsible-layout";
 import { EcomAssistantPanelHeader } from "@/components/layout/ecom-assistant-panel-header";
-import { EcomAssistantFloatingComposer } from "@/components/layout/ecom-assistant-floating-composer";
 import {
   EcomAssistantIconButton,
   ECOM_ASSISTANT_CONTROL_ICON_CLASS,
@@ -92,6 +92,7 @@ import {
   ECOM_ASSISTANT_BUBBLE_CLASS,
   ECOM_ASSISTANT_CHOICE_SHELL_CLASS,
   ECOM_ASSISTANT_COMPOSER_SHELL_BASE,
+  ECOM_ASSISTANT_COMPOSER_SHELL_COMPACT,
   ECOM_ASSISTANT_COMPOSER_SHELL_EXPANDED_BORDER,
   ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
   ECOM_ASSISTANT_USER_BUBBLE_CLASS,
@@ -166,7 +167,6 @@ export function StoryboardAssistantPanel({
   const [workflowOverride, setWorkflowOverride] = useState<Record<string, unknown>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
-  const assistantRootRef = useRef<HTMLDivElement>(null);
 
   const tryCollapse = useCallback(() => {
     if (streaming) return;
@@ -176,19 +176,6 @@ export function StoryboardAssistantPanel({
   const tryExpand = useCallback(() => {
     onCollapsedChange?.(false);
   }, [onCollapsedChange]);
-
-  const handleAssistantBlur = useCallback(
-    (e: React.FocusEvent) => {
-      if (collapsed || streaming) return;
-      const root = assistantRootRef.current;
-      if (!root) return;
-      const next = e.relatedTarget as Node | null;
-      if (next && root.contains(next)) return;
-      if (next && (next as HTMLElement).closest?.("[data-ecom-floating-composer]")) return;
-      onCollapsedChange?.(true);
-    },
-    [collapsed, streaming, onCollapsedChange],
-  );
 
   useEffect(() => {
     setWorkflowOverride({});
@@ -1092,13 +1079,13 @@ export function StoryboardAssistantPanel({
     <div
       className={cn(
         ECOM_ASSISTANT_COMPOSER_SHELL_BASE,
-        !collapsed && ECOM_ASSISTANT_COMPOSER_SHELL_EXPANDED_BORDER,
+        ECOM_ASSISTANT_COMPOSER_SHELL_EXPANDED_BORDER,
       )}
     >
       <div className="flex items-end gap-2">
         <textarea
           className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
-          rows={collapsed ? 1 : 2}
+          rows={2}
           placeholder={
             showSchemePickCards
               ? "也可输入补充说明；点选上方卡片可继续下一步…"
@@ -1109,9 +1096,6 @@ export function StoryboardAssistantPanel({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={composerDisabled}
-          onFocus={() => {
-            if (collapsed) tryExpand();
-          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -1124,31 +1108,61 @@ export function StoryboardAssistantPanel({
           busy={streaming}
           onClick={send}
         />
-        {!collapsed ? (
-          <EcomButtonSecondary
-            size="sm"
-            type="button"
-            disabled={streaming}
-            onClick={() => setMessages([WELCOME])}
-            className="shrink-0"
-          >
-            清空
-          </EcomButtonSecondary>
-        ) : null}
+        <EcomButtonSecondary
+          size="sm"
+          type="button"
+          disabled={streaming}
+          onClick={() => setMessages([WELCOME])}
+          className="shrink-0"
+        >
+          清空
+        </EcomButtonSecondary>
+      </div>
+    </div>
+  );
+
+  const floatingComposerSection = (
+    <div className={ECOM_ASSISTANT_COMPOSER_SHELL_COMPACT}>
+      <div className="flex items-end gap-2">
+        <textarea
+          className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
+          rows={1}
+          placeholder={
+            showSchemePickCards
+              ? "也可输入补充说明；点选上方卡片可继续下一步…"
+              : showPostPlanRefChoices
+                ? "也可输入补充说明；点选上方按钮继续…"
+                : resolveAssistantComposerPlaceholder(effectiveProject)
+          }
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          disabled={composerDisabled}
+          onFocus={() => tryExpand()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              send();
+            }
+          }}
+        />
+        <EcomAssistantSendButton
+          disabled={composerDisabled || !input.trim()}
+          busy={streaming}
+          onClick={send}
+        />
       </div>
     </div>
   );
 
   return (
-    <>
-      <div
-        ref={assistantRootRef}
-        className={cn(
-          "flex h-full min-h-0 flex-col bg-[var(--ecom-assistant-surface)]",
-          collapsed && "pointer-events-none invisible absolute h-0 w-0 overflow-hidden",
-        )}
-        onBlur={handleAssistantBlur}
-      >
+    <EcomAssistantCollapsibleLayout
+      collapsed={collapsed}
+      onCollapsedChange={onCollapsedChange}
+      collapseBlocked={streaming}
+      attentionBadge={needsAttention}
+      composer={composerSection}
+      floatingComposer={floatingComposerSection}
+    >
       <EcomAssistantPanelHeader
         title="电商口播故事版助手"
         subtitle={assistantSubtitle}
@@ -1273,21 +1287,6 @@ export function StoryboardAssistantPanel({
           ) : null}
         </div>
       </div>
-
-      {!collapsed ? composerSection : null}
-      </div>
-
-      {collapsed ? (
-        <EcomAssistantFloatingComposer
-          open
-          attentionBadge={needsAttention}
-          onExpand={tryExpand}
-        >
-          <div data-ecom-floating-composer onClick={(e) => e.stopPropagation()}>
-            {composerSection}
-          </div>
-        </EcomAssistantFloatingComposer>
-      ) : null}
-    </>
+    </EcomAssistantCollapsibleLayout>
   );
 }

@@ -346,6 +346,29 @@ export type PortalFeaturedProjectSummary = CanvasProjectSummary & {
   owner?: { id: string; name: string | null; email: string | null } | null;
 };
 
+export type PortalAdminMeta = {
+  featuredIds: string[];
+  pro2CaseIds: string[];
+  sbv1CaseIds: string[];
+};
+
+/** 管理员 · 门户上下架 ID（一次请求替代 featured + cases ×2） */
+export async function fetchPortalAdminMeta(
+  base: string,
+  init?: RequestInit,
+): Promise<PortalAdminMeta> {
+  const j = await call<PortalAdminMeta>(
+    base,
+    "/api/canvas/projects/portal-admin-meta",
+    init,
+  );
+  return {
+    featuredIds: Array.isArray(j.featuredIds) ? j.featuredIds : [],
+    pro2CaseIds: Array.isArray(j.pro2CaseIds) ? j.pro2CaseIds : [],
+    sbv1CaseIds: Array.isArray(j.sbv1CaseIds) ? j.sbv1CaseIds : [],
+  };
+}
+
 /** 门户首页 · 精选示例项目（与「我的画布」同源 thumbnailUrl） */
 export async function listPortalFeaturedProjects(
   base: string,

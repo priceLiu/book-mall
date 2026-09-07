@@ -27,7 +27,10 @@ import {
   loadShelfIndexForApp,
 } from "@/lib/platform-model/app-model-shelf";
 import { resolveSourceLabel } from "@/lib/gateway/model-source-label";
-import { ensureGatewayCanonicalRegistrySynced } from "@/lib/gateway/sync-canonical-registry";
+import {
+  ensureGatewayCanonicalRegistrySynced,
+  scheduleGatewayCanonicalRegistrySync,
+} from "@/lib/gateway/sync-canonical-registry";
 import {
   gatewayRouteDisplayName,
   marketTaskTagsForModel,
@@ -249,7 +252,7 @@ export async function listActiveRoutesUncached(): Promise<
     };
   }>
 > {
-  await ensureGatewayCanonicalRegistrySynced();
+  scheduleGatewayCanonicalRegistrySync();
   const routes = await prisma.gatewayModelRoute.findMany({
     where: { active: true, catalog: { active: true, gatewayPublished: true } },
     include: {
@@ -303,7 +306,8 @@ export async function listModelsForApp(input: ListModelsForAppInput): Promise<Re
   const cached = getCachedModelsForApp(input);
   if (cached) return cached;
 
-  await ensureGatewayCanonicalRegistrySynced();
+  scheduleGatewayCanonicalRegistrySync();
+
   const appTag = input.appTag.trim().toLowerCase();
   const shelfCtx = { appTag, sceneKey: input.sceneKey };
   const shelfByScene = await loadShelfIndexForApp(appTag);
@@ -458,7 +462,7 @@ function sortRegistryRows(rows: RegistryModelRow[]): RegistryModelRow[] {
 
 /** Gateway 控制台全量目录（按 provider 分组）。 */
 export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProviderKind[]) {
-  await ensureGatewayCanonicalRegistrySynced();
+  await ensureGatewayCanonicalRegistrySynced({ blocking: true });
   const routes = await listActiveRoutes();
   type GroupModel = {
     modelKey: string;

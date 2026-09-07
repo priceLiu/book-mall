@@ -117,7 +117,7 @@ export function RecentProjectsSection() {
                 >
                   <CanvasListCover
                     name={p.name}
-                    calm={Boolean(openingProjectId)}
+                    calm={openingProjectId === p.id}
                     {...canvasListCoverPropsFromProject(p)}
                   />
                   <p className="mt-3 truncate text-sm font-medium text-white">{p.name}</p>

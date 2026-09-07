@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { Maximize2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CanvasBrandLoadingLogo } from "@/components/home/canvas-brand-loading-logo";
 import { PROJECT_COVER_MEDIA_FILL_CLASS } from "@/components/canvas/project-cover-media";
 import {
@@ -47,7 +48,7 @@ function inactiveHint(kind: "image" | "video", failed: boolean, hasUrl: boolean)
   return kind === "video" ? "暂无成片" : "暂无预览";
 }
 
-/** 影视案例卡片媒体：视口内才加载；悬停自动播放并出声；成片可居中放大预览 */
+/** 影视案例卡片媒体：视口内才加载；悬停格子内播放；点击右下角放大钮居中预览 */
 export function FilmShowcaseCardMedia({
   url,
   alt,
@@ -58,8 +59,6 @@ export function FilmShowcaseCardMedia({
   disableEnlargePreview = false,
   eager = false,
 }: Props) {
-  const { ref, active } = useLazyMediaActive<HTMLDivElement>("360px", eager);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState(false);
   const [hovering, setHovering] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
@@ -70,48 +69,53 @@ export function FilmShowcaseCardMedia({
   const mediaUrl = url?.trim() ?? "";
   const poster = posterUrl?.trim();
   const showMedia = Boolean(mediaUrl) && !failed;
-  const isActive = eager || active;
+  // 悬停时立即激活媒体层，避免 IO 未触发时 videoRef 为空导致无法格内播放
+  const { ref, active } = useLazyMediaActive<HTMLDivElement>(
+    "360px",
+    eager || hovering,
+  );
+  const isActive = eager || active || hovering;
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (!hovering || !isActive || kind !== "video" || calm || !showMedia) return;
+    const el = videoRef.current;
+    if (!el) return;
+    if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      setVideoReady(true);
+    }
+    makeVideoAudible(el);
+    void el.play().catch(() => undefined);
+  }, [hovering, isActive, kind, calm, showMedia]);
 
   const onEnter = useCallback(() => {
     setHovering(true);
     setVideoReady(false);
-    const el = videoRef.current;
-    if (el?.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-      setVideoReady(true);
-    }
-    if (enlargeEnabled) {
-      if (el) {
-        el.muted = true;
-        void el.play().catch(() => undefined);
-      }
-      enlarge?.requestShow(
-        { url: mediaUrl, posterUrl: poster || undefined, alt },
-        el,
-      );
-      return;
-    }
-    if (!el) return;
-    makeVideoAudible(el);
-  }, [alt, enlarge, enlargeEnabled, mediaUrl, poster]);
+  }, []);
 
   const onLeave = useCallback(() => {
     setHovering(false);
     setVideoReady(false);
     const el = videoRef.current;
-    if (enlargeEnabled) {
-      enlarge?.requestHide();
-      if (el) {
-        muteVideo(el);
-        el.pause();
-        el.currentTime = 0;
-      }
-      return;
-    }
     if (!el) return;
     muteVideo(el);
     el.pause();
     el.currentTime = 0;
-  }, [enlarge, enlargeEnabled]);
+  }, []);
+
+  const onOpenEnlarge = useCallback(
+    (event: React.MouseEvent | React.PointerEvent) => {
+      event.stopPropagation();
+      event.preventDefault();
+      if (!enlargeEnabled) return;
+      const el = videoRef.current;
+      enlarge?.openPreview(
+        { url: mediaUrl, posterUrl: poster || undefined, alt },
+        el,
+      );
+    },
+    [alt, enlarge, enlargeEnabled, mediaUrl, poster],
+  );
 
   const onTouchToggle = useCallback(() => {
     if (!enlargeEnabled || prefersHoverVideoEnlarge()) return;
@@ -255,6 +259,19 @@ export function FilmShowcaseCardMedia({
             <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center bg-black/35">
               <CanvasBrandLoadingLogo size="sm" />
             </div>
+          ) : null}
+          {enlargeEnabled && hovering ? (
+            <button
+              type="button"
+              title="放大预览"
+              aria-label="放大预览"
+              className="pointer-events-auto absolute bottom-2 right-2 z-[6] inline-flex size-8 cursor-pointer items-center justify-center rounded-lg border border-white/20 bg-black/55 text-white/90 shadow-sm backdrop-blur-sm transition hover:border-white/35 hover:bg-black/70 hover:text-white"
+              onPointerDown={onOpenEnlarge}
+              onMouseDown={onOpenEnlarge}
+              onClick={onOpenEnlarge}
+            >
+              <Maximize2 className="size-4 pointer-events-none" strokeWidth={2.25} />
+            </button>
           ) : null}
         </>
       ) : (
