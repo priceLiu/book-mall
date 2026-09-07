@@ -96,7 +96,7 @@ export function StoryboardFullSheetCard({
   }
 
   return (
-    <div className="isolate flex min-w-0 flex-col">
+    <div className="isolate flex h-full min-w-0 flex-col">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-sm font-bold text-[#1d1d1f]">{label}</p>
         {onPreview && hasPreview && !busy ? (

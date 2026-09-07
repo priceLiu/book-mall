@@ -64,6 +64,7 @@ export const proPanelRowSchema = z.object({
   productFocus: z.string().min(1),
   dialogue: z.string().optional(),
   toneTexture: z.string().optional(),
+  subtitle: z.string().optional(),
   sellpointIds: z.array(z.string()).default([]),
   imagePrompt: z.string().min(20),
   videoPrompt: z.string().min(20),
@@ -98,6 +99,25 @@ export const proOpsPackSchema = z.object({
 
 export const proOutputModeSchema = z.enum(["script_compose", "direct_video"]);
 
+export const productionModeSchema = z.enum(["standard_script", "story_theater"]);
+
+export const storyTheaterVersionKeySchema = z.enum(["T1", "T2", "T3", "T4", "T5"]);
+
+export const storyTheaterTopicRefSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  storyCore: z.string().min(1),
+  storyType: z.string().min(1),
+});
+
+export const storyTheaterVersionSchema = z.object({
+  id: storyTheaterVersionKeySchema,
+  title: z.string().min(1),
+  summary: z.string().optional(),
+  panels: z.array(proPanelRowSchema).min(6).max(8),
+  totalDurationSec: z.number().positive().optional(),
+});
+
 export const proVerticalIdSchema = z.enum(["fashion_apparel", "bags", "digital_3c"]);
 
 export const proDeliverableSchema = z.object({
@@ -115,6 +135,14 @@ export const proDeliverableSchema = z.object({
   coverageChecklist: z.array(proCoverageRowSchema).default([]),
   opsPack: proOpsPackSchema.optional(),
   outputMode: proOutputModeSchema.nullable().optional(),
+  productionMode: productionModeSchema.nullable().optional(),
+  storyTopicCandidates: z.array(storyTheaterTopicRefSchema).optional(),
+  selectedStoryTopic: storyTheaterTopicRefSchema.nullable().optional(),
+  storyTheaterVersions: z
+    .record(storyTheaterVersionKeySchema, storyTheaterVersionSchema)
+    .optional(),
+  selectedStoryTheaterVersion: storyTheaterVersionKeySchema.nullable().optional(),
+  storyTheaterLocked: z.boolean().optional(),
 });
 
 export type ProDeliverable = z.infer<typeof proDeliverableSchema>;
@@ -269,11 +297,19 @@ export function isProDeliverable(raw: unknown): raw is ProDeliverable {
   return proDeliverableSchema.safeParse(raw).success;
 }
 
-export type ProLlmPhase = "sellpoints" | "voiceovers" | "storyboards" | "ops";
+export type ProLlmPhase = "sellpoints" | "voiceovers" | "storyboards" | "ops" | "story_theater";
 
 const proPhaseEnvelopeSchema = z.object({
   schemaVersion: z.literal(PRO_SCHEMA_VERSION).optional(),
   vertical: proVerticalIdSchema.optional(),
+});
+
+const proStoryTheaterPhasePatchSchema = proPhaseEnvelopeSchema.extend({
+  storyTheaterVersions: z
+    .record(storyTheaterVersionKeySchema, storyTheaterVersionSchema)
+    .refine((v) => Object.keys(v).length > 0, "storyTheaterVersions 不能为空"),
+  selectedStoryTopic: storyTheaterTopicRefSchema.optional(),
+  coverageChecklist: z.array(proCoverageRowSchema).optional(),
 });
 
 const proSellpointsPhasePatchSchema = proPhaseEnvelopeSchema.extend({
@@ -305,11 +341,16 @@ function schemaForProPhase(phase: ProLlmPhase) {
       return proStoryboardsPhasePatchSchema;
     case "ops":
       return proOpsPhasePatchSchema;
+    case "story_theater":
+      return proStoryTheaterPhasePatchSchema;
   }
 }
 
 function detectProPhaseFromPayload(parsed: Record<string, unknown>): ProLlmPhase | null {
   if (parsed.opsPack != null && typeof parsed.opsPack === "object") return "ops";
+  if (parsed.storyTheaterVersions != null && typeof parsed.storyTheaterVersions === "object") {
+    return "story_theater";
+  }
   if (parsed.storyboardVersions != null && typeof parsed.storyboardVersions === "object") {
     return "storyboards";
   }
@@ -340,6 +381,15 @@ export function pickProPhaseMergePatch(
     }
     case "ops":
       return patch.opsPack != null ? { opsPack: patch.opsPack } : {};
+    case "story_theater": {
+      const next: Partial<ProDeliverable> = {};
+      if (patch.storyTheaterVersions && Object.keys(patch.storyTheaterVersions).length > 0) {
+        next.storyTheaterVersions = patch.storyTheaterVersions;
+      }
+      if (patch.selectedStoryTopic) next.selectedStoryTopic = patch.selectedStoryTopic;
+      if (patch.coverageChecklist?.length) next.coverageChecklist = patch.coverageChecklist;
+      return next;
+    }
   }
 }
 
@@ -462,7 +512,22 @@ export function hasMeaningfulOpsPack(d: ProDeliverable): boolean {
 }
 
 export function inferProPhaseFromDeliverable(d: ProDeliverable): string {
+  if (
+    !d.productionMode &&
+    d.sellpointsLocked === false &&
+    (d.sellpoints?.length ?? 0) === 0 &&
+    Object.values(d.dimensions ?? {}).some((v) => typeof v === "string" && v.trim())
+  ) {
+    return "production_mode";
+  }
   if (!d.sellpoints?.length || !d.sellpointsLocked) return "sellpoints";
+  if (d.productionMode === "story_theater") {
+    if (!d.selectedStoryTopic) return "story_topic_pick";
+    if (!listProStoryTheaterVersionKeys(d).length) return "story_topic_pick";
+    if (!d.selectedStoryTheaterVersion) return "story_theater_pick";
+    if (!d.storyTheaterLocked) return "story_theater_confirm";
+    return "produce";
+  }
   if ((d.voiceovers?.length ?? 0) === 0) return "sellpoints";
   if (!d.selectedVoiceoverId) return "voiceover_pick";
   const versionCount = (["A", "B", "C", "D", "E"] as const).filter((k) => {
@@ -473,8 +538,18 @@ export function inferProPhaseFromDeliverable(d: ProDeliverable): string {
   if (!d.selectedVersion) return "storyboard_pick";
   if (!d.storyboardLocked) return "storyboard_confirm";
   if (!hasMeaningfulOpsPack(d)) return "storyboard_confirm";
-  if (!d.outputMode) return "output_mode";
+  if (!d.outputMode) return "produce";
   return "produce";
+}
+
+export function listProStoryTheaterVersionKeys(
+  d: Pick<ProDeliverable, "storyTheaterVersions"> | null | undefined,
+): Array<"T1" | "T2" | "T3" | "T4" | "T5"> {
+  const versions = d?.storyTheaterVersions ?? {};
+  return (["T1", "T2", "T3", "T4", "T5"] as const).filter((k) => {
+    const v = versions[k];
+    return Boolean(v?.panels?.length || v?.title?.trim());
+  });
 }
 
 export function pickProOpsMergePatch(
@@ -549,12 +624,33 @@ export function mergeProDeliverablePatch(
         ? { ...(base.opsPack ?? {}), ...(patch.opsPack ?? {}) }
         : base.opsPack,
     outputMode:
-      base.storyboardLocked || patch.storyboardLocked
+      base.storyboardLocked ||
+      patch.storyboardLocked ||
+      base.storyTheaterLocked ||
+      patch.storyTheaterLocked
         ? (patch.outputMode ?? base.outputMode)
         : null,
+    productionMode: patch.productionMode ?? base.productionMode ?? null,
+    storyTopicCandidates:
+      patch.storyTopicCandidates?.length
+        ? patch.storyTopicCandidates
+        : base.storyTopicCandidates,
+    selectedStoryTopic:
+      patch.selectedStoryTopic !== undefined
+        ? patch.selectedStoryTopic
+        : (base.selectedStoryTopic ?? null),
+    storyTheaterVersions: {
+      ...(base.storyTheaterVersions ?? {}),
+      ...(patch.storyTheaterVersions ?? {}),
+    },
+    selectedStoryTheaterVersion:
+      patch.selectedStoryTheaterVersion !== undefined
+        ? patch.selectedStoryTheaterVersion
+        : (base.selectedStoryTheaterVersion ?? null),
+    storyTheaterLocked: base.storyTheaterLocked || Boolean(patch.storyTheaterLocked),
   };
 
-  if (!merged.storyboardLocked) {
+  if (!merged.storyboardLocked && !merged.storyTheaterLocked) {
     merged.opsPack = undefined;
     merged.outputMode = null;
   }
@@ -649,14 +745,6 @@ export function proVersionToSheet(
 export function isProInternalLlmTrigger(text: string): boolean {
   const t = text.trim();
   return t.startsWith("pro-step:") || t.startsWith("fashion-step:");
-}
-
-export function resolveProPromptPhase(lastUserTurn: string): string {
-  if (lastUserTurn.includes("sellpoints")) return "sellpoints";
-  if (lastUserTurn.includes("voiceovers")) return "voiceovers";
-  if (lastUserTurn.includes("storyboards")) return "storyboards";
-  if (lastUserTurn.includes("ops")) return "ops";
-  return "general";
 }
 
 function parseProVersionPickFromChat(chatHistory: StoryboardChatMessage[]): ProVersionKey | null {

@@ -45,13 +45,21 @@ export function StoryboardSheetLiveThumb({
       const scale = Math.min(cw / SHEET_WIDTH, ch / contentH);
       const left = Math.max(0, (cw - SHEET_WIDTH * scale) / 2);
       const top = Math.max(0, (ch - contentH * scale) / 2);
-      setLayout({ scale, left, top });
+      setLayout((prev) => {
+        if (
+          Math.abs(prev.scale - scale) < 1e-4 &&
+          Math.abs(prev.left - left) < 0.5 &&
+          Math.abs(prev.top - top) < 0.5
+        ) {
+          return prev;
+        }
+        return { scale, left, top };
+      });
     };
 
     recompute();
     const ro = new ResizeObserver(recompute);
     ro.observe(container);
-    ro.observe(content);
     return () => ro.disconnect();
   }, [sheet, references, productName, productHighlight, projectKeywords]);
 

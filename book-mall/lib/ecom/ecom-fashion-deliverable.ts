@@ -5,6 +5,14 @@ import { mergeStoryboardPanelMediaByIndex } from "./ecom-storyboard-sheet-reconc
 import type { StoryboardSheet } from "./ecom-storyboard-types";
 import { parseStoryboardSheet } from "./ecom-storyboard-types";
 import type { StoryboardChatMessage } from "./ecom-storyboard-types";
+import {
+  effectiveProductionMode,
+  isStoryTheaterProductionMode,
+  resolveProductionMode,
+  type ProductionMode,
+  type StoryTheaterTopicRef,
+  type StoryTheaterVersionKey,
+} from "./story-theater-types";
 
 /** @see book-mall/doc/ecom/fashion-deliverable-spec-v4.md */
 export const FASHION_SCHEMA_VERSION = "fashion-v4" as const;
@@ -91,6 +99,7 @@ export const fashionPanelRowSchema = z.object({
   garmentFocus: z.string().min(1),
   dialogue: z.string().optional(),
   toneTexture: z.string().optional(),
+  subtitle: z.string().optional(),
   sellpointIds: z.array(z.string()).default([]),
   imagePrompt: z.string().min(20),
   /** 单镜视频 motion prompt */
@@ -123,6 +132,25 @@ export const fashionOpsPackSchema = z.object({
 
 export const fashionOutputModeSchema = z.enum(["script_compose", "direct_video"]);
 
+export const productionModeSchema = z.enum(["standard_script", "story_theater"]);
+
+export const storyTheaterVersionKeySchema = z.enum(["T1", "T2", "T3", "T4", "T5"]);
+
+export const storyTheaterTopicRefSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  storyCore: z.string().min(1),
+  storyType: z.string().min(1),
+});
+
+export const storyTheaterVersionSchema = z.object({
+  id: storyTheaterVersionKeySchema,
+  title: z.string().min(1),
+  summary: z.string().optional(),
+  panels: z.array(fashionPanelRowSchema).min(6).max(8),
+  totalDurationSec: z.number().positive().optional(),
+});
+
 export const fashionDeliverableSchema = z.object({
   schemaVersion: z.literal(FASHION_SCHEMA_VERSION),
   vertical: z.literal("fashion_apparel"),
@@ -140,6 +168,14 @@ export const fashionDeliverableSchema = z.object({
   coverageChecklist: z.array(fashionCoverageRowSchema).default([]),
   opsPack: fashionOpsPackSchema.optional(),
   outputMode: fashionOutputModeSchema.nullable().optional(),
+  productionMode: productionModeSchema.nullable().optional(),
+  storyTopicCandidates: z.array(storyTheaterTopicRefSchema).optional(),
+  selectedStoryTopic: storyTheaterTopicRefSchema.nullable().optional(),
+  storyTheaterVersions: z
+    .record(storyTheaterVersionKeySchema, storyTheaterVersionSchema)
+    .optional(),
+  selectedStoryTheaterVersion: storyTheaterVersionKeySchema.nullable().optional(),
+  storyTheaterLocked: z.boolean().optional(),
 });
 
 export type FashionDeliverable = z.infer<typeof fashionDeliverableSchema>;
@@ -176,9 +212,11 @@ function coerceFashionPanels(raw: unknown): unknown {
     const sceneDesc =
       typeof p.sceneDesc === "string" && p.sceneDesc.trim()
         ? p.sceneDesc.trim()
-        : typeof p.scene === "string" && p.scene.trim()
-          ? p.scene.trim()
-          : "—";
+        : typeof p.shot_desc === "string" && p.shot_desc.trim()
+          ? p.shot_desc.trim()
+          : typeof p.scene === "string" && p.scene.trim()
+            ? p.scene.trim()
+            : "—";
     const modelAction =
       typeof p.modelAction === "string" && p.modelAction.trim()
         ? p.modelAction.trim()
@@ -240,11 +278,42 @@ function coerceFashionPanels(raw: unknown): unknown {
       scenePrompt,
       modelAction,
       garmentFocus,
+      dialogue:
+        typeof p.dialogue === "string" && p.dialogue.trim()
+          ? p.dialogue.trim()
+          : typeof p.audio_voice === "string" && p.audio_voice.trim()
+            ? p.audio_voice.trim()
+            : undefined,
+      toneTexture:
+        typeof p.toneTexture === "string" && p.toneTexture.trim()
+          ? p.toneTexture.trim()
+          : typeof p.emotion === "string" && p.emotion.trim()
+            ? p.emotion.trim()
+            : undefined,
+      subtitle:
+        typeof p.subtitle === "string" && p.subtitle.trim() ? p.subtitle.trim() : undefined,
       sellpointIds: coerceSellpointIds(p.sellpointIds),
       imagePrompt,
       videoPrompt,
     };
   });
+}
+
+function coerceStoryTheaterVersions(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object") return raw;
+  const obj = raw as Record<string, unknown>;
+  const next: Record<string, unknown> = {};
+  for (const key of ["T1", "T2", "T3", "T4", "T5"]) {
+    const version = obj[key];
+    if (!version || typeof version !== "object") continue;
+    const v = version as Record<string, unknown>;
+    next[key] = {
+      ...v,
+      id: key,
+      panels: coerceFashionPanels(v.panels),
+    };
+  }
+  return next;
 }
 
 function coerceStoryboardVersions(raw: unknown): unknown {
@@ -308,6 +377,9 @@ function coerceFashionDeliverable(raw: unknown): unknown {
   const obj = raw as Record<string, unknown>;
   if (obj.storyboardVersions) {
     obj.storyboardVersions = coerceStoryboardVersions(obj.storyboardVersions);
+  }
+  if (obj.storyTheaterVersions) {
+    obj.storyTheaterVersions = coerceStoryTheaterVersions(obj.storyTheaterVersions);
   }
   if (Array.isArray(obj.sellpoints)) {
     obj.sellpoints = obj.sellpoints.map((sp, i) => {
@@ -424,11 +496,24 @@ export function stripFashionDeliverableFence(text: string): string {
   return out.replace(/\n{3,}/g, "\n\n").trim();
 }
 
-export type FashionLlmPhase = "sellpoints" | "voiceovers" | "storyboards" | "ops";
+export type FashionLlmPhase =
+  | "sellpoints"
+  | "voiceovers"
+  | "storyboards"
+  | "ops"
+  | "story_theater";
 
 const fashionPhaseEnvelopeSchema = z.object({
   schemaVersion: z.literal(FASHION_SCHEMA_VERSION).optional(),
   vertical: z.literal("fashion_apparel").optional(),
+});
+
+const fashionStoryTheaterPhasePatchSchema = fashionPhaseEnvelopeSchema.extend({
+  storyTheaterVersions: z
+    .record(storyTheaterVersionKeySchema, storyTheaterVersionSchema)
+    .refine((v) => Object.keys(v).length > 0, "storyTheaterVersions 不能为空"),
+  selectedStoryTopic: storyTheaterTopicRefSchema.optional(),
+  coverageChecklist: z.array(fashionCoverageRowSchema).optional(),
 });
 
 const fashionSellpointsPhasePatchSchema = fashionPhaseEnvelopeSchema.extend({
@@ -460,11 +545,16 @@ function schemaForFashionPhase(phase: FashionLlmPhase) {
       return fashionStoryboardsPhasePatchSchema;
     case "ops":
       return fashionOpsPhasePatchSchema;
+    case "story_theater":
+      return fashionStoryTheaterPhasePatchSchema;
   }
 }
 
 function detectFashionPhaseFromPayload(parsed: Record<string, unknown>): FashionLlmPhase | null {
   if (parsed.opsPack != null && typeof parsed.opsPack === "object") return "ops";
+  if (parsed.storyTheaterVersions != null && typeof parsed.storyTheaterVersions === "object") {
+    return "story_theater";
+  }
   if (parsed.storyboardVersions != null && typeof parsed.storyboardVersions === "object") {
     return "storyboards";
   }
@@ -495,7 +585,35 @@ export function pickFashionPhaseMergePatch(
     }
     case "ops":
       return patch.opsPack != null ? { opsPack: patch.opsPack } : {};
+    case "story_theater": {
+      const next: Partial<FashionDeliverable> = {};
+      if (patch.storyTheaterVersions && Object.keys(patch.storyTheaterVersions).length > 0) {
+        next.storyTheaterVersions = patch.storyTheaterVersions;
+      }
+      if (patch.selectedStoryTopic) {
+        next.selectedStoryTopic = patch.selectedStoryTopic;
+      }
+      if (patch.coverageChecklist?.length) {
+        next.coverageChecklist = patch.coverageChecklist;
+      }
+      return next;
+    }
   }
+}
+
+export function listStoryTheaterVersionKeys(
+  d: Pick<FashionDeliverable, "storyTheaterVersions"> | null | undefined,
+): StoryTheaterVersionKey[] {
+  const versions = d?.storyTheaterVersions ?? {};
+  return (["T1", "T2", "T3", "T4", "T5"] as StoryTheaterVersionKey[]).filter((k) => {
+    const v = versions[k];
+    if (!v || typeof v !== "object") return false;
+    return (
+      (v.panels?.length ?? 0) > 0 ||
+      Boolean(v.title?.trim()) ||
+      Boolean(v.summary?.trim())
+    );
+  });
 }
 
 function coerceStoryboardVersionsInPatch(parsed: Record<string, unknown>): void {
@@ -591,7 +709,27 @@ export function inferFashionPhaseFromDeliverable(
   d: FashionDeliverable,
   existingPhase?: string,
 ): string {
+  if (!d.productionMode && !d.sellpoints?.length && !d.sellpointsLocked) {
+    const dims = d.dimensions ?? {};
+    const hasAnyDim = Object.values(dims).some((v) => typeof v === "string" && v.trim());
+    if (hasAnyDim && existingPhase === "production_mode") return "production_mode";
+  }
+  if (
+    !resolveProductionMode(d.productionMode) &&
+    d.sellpointsLocked === false &&
+    (d.sellpoints?.length ?? 0) === 0 &&
+    Object.values(d.dimensions ?? {}).some((v) => typeof v === "string" && v.trim())
+  ) {
+    return "production_mode";
+  }
   if (!d.sellpoints?.length || !d.sellpointsLocked) return "sellpoints";
+  if (isStoryTheaterProductionMode(d.productionMode)) {
+    if (!d.selectedStoryTopic) return "story_topic_pick";
+    if (listStoryTheaterVersionKeys(d).length === 0) return "story_topic_pick";
+    if (!d.selectedStoryTheaterVersion) return "story_theater_pick";
+    if (!d.storyTheaterLocked) return "story_theater_confirm";
+    return "produce";
+  }
   if ((d.voiceovers?.length ?? 0) === 0) return "sellpoints";
   if (!d.selectedVoiceoverId) return "voiceover_pick";
   const storyboardVersionCount = (["A", "B", "C", "D", "E"] as const).filter((k) => {
@@ -602,7 +740,7 @@ export function inferFashionPhaseFromDeliverable(
   if (!d.selectedVersion) return "storyboard_pick";
   if (!d.storyboardLocked) return "storyboard_confirm";
   if (!hasMeaningfulOpsPack(d)) return "storyboard_confirm";
-  if (!d.outputMode) return "output_mode";
+  if (!d.outputMode) return "produce";
   return "produce";
 }
 
@@ -717,9 +855,49 @@ export function mergeFashionDeliverablePatch(
           : base.opsPack
         : base.opsPack,
     outputMode:
-      base.storyboardLocked || patch.storyboardLocked
+      base.storyboardLocked || patch.storyboardLocked || base.storyTheaterLocked || patch.storyTheaterLocked
         ? (patch.outputMode ?? base.outputMode)
-        : null,
+        : isStoryTheaterProductionMode(base.productionMode ?? patch.productionMode) &&
+            (base.storyTheaterLocked || patch.storyTheaterLocked)
+          ? (patch.outputMode ?? base.outputMode)
+          : null,
+    productionMode: patch.productionMode ?? base.productionMode ?? null,
+    storyTopicCandidates:
+      patch.storyTopicCandidates?.length
+        ? patch.storyTopicCandidates
+        : base.storyTopicCandidates,
+    selectedStoryTopic:
+      patch.selectedStoryTopic !== undefined
+        ? patch.selectedStoryTopic
+        : (base.selectedStoryTopic ?? null),
+    storyTheaterVersions: (() => {
+      const merged = {
+        ...(base.storyTheaterVersions ?? {}),
+        ...(patch.storyTheaterVersions ?? {}),
+      };
+      for (const [key, version] of Object.entries(base.storyTheaterVersions ?? {})) {
+        const incoming = patch.storyTheaterVersions?.[key as StoryTheaterVersionKey];
+        const incomingPanels = incoming?.panels?.length ?? 0;
+        const savedPanels = version?.panels?.length ?? 0;
+        if (savedPanels > 0 && incomingPanels === 0) {
+          merged[key as StoryTheaterVersionKey] = version;
+        }
+      }
+      if (
+        base.storyTheaterLocked &&
+        base.selectedStoryTheaterVersion &&
+        base.storyTheaterVersions?.[base.selectedStoryTheaterVersion]?.panels?.length
+      ) {
+        merged[base.selectedStoryTheaterVersion] =
+          base.storyTheaterVersions[base.selectedStoryTheaterVersion]!;
+      }
+      return merged;
+    })(),
+    selectedStoryTheaterVersion:
+      patch.selectedStoryTheaterVersion !== undefined
+        ? patch.selectedStoryTheaterVersion
+        : (base.selectedStoryTheaterVersion ?? null),
+    storyTheaterLocked: base.storyTheaterLocked || Boolean(patch.storyTheaterLocked),
   };
 
   const coerced = coerceFashionDeliverable(merged) as FashionDeliverable;
@@ -986,6 +1164,78 @@ export function fashionVersionToSheet(
   };
 
   void sellpointMap;
+  try {
+    return parseStoryboardSheet(sheet);
+  } catch {
+    return null;
+  }
+}
+
+export function storyTheaterVersionToSheet(
+  deliverable: Pick<
+    FashionDeliverable,
+    | "productName"
+    | "dimensions"
+    | "sellpoints"
+    | "selectedStoryTheaterVersion"
+    | "storyTheaterVersions"
+    | "selectedStoryTopic"
+  >,
+  versionKey?: import("./story-theater-types").StoryTheaterVersionKey,
+): StoryboardSheet | null {
+  const key = versionKey ?? deliverable.selectedStoryTheaterVersion;
+  if (!key) return null;
+  const version = deliverable.storyTheaterVersions?.[key];
+  if (!version?.panels?.length) return null;
+
+  const sellpoints = deliverable.sellpoints ?? [];
+  const highlight = sellpoints
+    .filter((sp) => sp.layer === "core")
+    .map((sp) => sp.text)
+    .join("；");
+
+  const sheet = {
+    overview: {
+      title: version.title || `故事剧场 ${key}`,
+      logline:
+        version.summary?.trim() ||
+        deliverable.selectedStoryTopic?.storyCore ||
+        deliverable.productName,
+      productHighlight: highlight || undefined,
+    },
+    cast: [],
+    panels: version.panels.map((p, idx) => {
+      const index = typeof p.index === "number" ? p.index : idx + 1;
+      const scene = p.sceneDesc?.trim() || "—";
+      const action = p.modelAction?.trim() || scene;
+      const globalAnchor = deliverable.dimensions?.customScene?.trim();
+      const scenePrompt =
+        p.scenePrompt?.trim() ||
+        derivePanelScenePrompt({ scene, scenePrompt: undefined }, globalAnchor);
+      return {
+        index,
+        timeline: undefined,
+        shotType: p.shotScale?.trim() || "中景",
+        scene,
+        scenePrompt: scenePrompt || undefined,
+        action,
+        dialogue: p.dialogue?.trim() || undefined,
+        camera: p.cameraMove?.trim() || "固定",
+        durationHintSec: p.durationSec > 0 ? p.durationSec : 4,
+        sellpointTags: p.sellpointIds ?? [],
+        imagePrompt: p.imagePrompt?.trim() || undefined,
+        videoPromptEn: p.videoPrompt?.trim() || undefined,
+        productInteraction: "wear" as const,
+        productVisibility: "hero" as const,
+        productBeat: p.garmentFocus?.trim() || "服装展示",
+        emotion: p.toneTexture?.trim() || undefined,
+      };
+    }),
+    totalDurationHintSec:
+      version.totalDurationSec ??
+      version.panels.reduce((sum, p) => sum + (p.durationSec > 0 ? p.durationSec : 4), 0),
+  };
+
   try {
     return parseStoryboardSheet(sheet);
   } catch {

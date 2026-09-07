@@ -150,10 +150,22 @@ export function defaultImageSizeForModel(
   const filtered = filterImageSizeOptionsByEcomRatio(pickerOpts, aspectRatio);
   if (filtered.length > 0) {
     const preferred =
-      filtered.find((o) => o.value === "1080*1440") ??
-      filtered.find((o) => o.label.includes("1080P")) ??
-      filtered.find((o) => o.label.includes("推荐")) ??
-      filtered[0];
+      aspectRatio === "9:16"
+        ? filtered.find((o) => o.value === "1080*1920") ??
+          filtered.find((o) => o.value === "720*1280") ??
+          filtered.find((o) => o.label.includes("1080P")) ??
+          filtered.find((o) => o.label.includes("推荐")) ??
+          filtered[0]
+        : aspectRatio === "16:9"
+          ? filtered.find((o) => o.value === "1920*1080") ??
+            filtered.find((o) => o.value === "1280*720") ??
+            filtered.find((o) => o.label.includes("1080P")) ??
+            filtered.find((o) => o.label.includes("推荐")) ??
+            filtered[0]
+          : filtered.find((o) => o.value === "1080*1440") ??
+            filtered.find((o) => o.label.includes("1080P")) ??
+            filtered.find((o) => o.label.includes("推荐")) ??
+            filtered[0];
     return preferred!.value;
   }
   if (isStoryboardWan27FamilyImageModel(modelKey)) {
@@ -162,6 +174,13 @@ export function defaultImageSizeForModel(
   if (aspectRatio === "16:9") {
     return pickerOpts.find((o) => o.value.includes("1280*720") || o.value.includes("1440*810"))
       ?.value ?? pickerOpts[0]!.value;
+  }
+  if (aspectRatio === "9:16") {
+    return (
+      pickerOpts.find((o) => o.value === "1080*1920" || o.value === "720*1280")?.value ??
+      pickerOpts.find((o) => aspectRatioForImageSize(o.value) === "9:16")?.value ??
+      pickerOpts[0]!.value
+    );
   }
   return (
     pickerOpts.find((o) => o.value === "1080*1440" || o.value === "720*1280")?.value ??
@@ -195,7 +214,7 @@ export function imageSizeToEcomRatio(size: string): "1:1" | "3:4" | "4:5" | "16:
   return "3:4";
 }
 
-/** 按电商比例过滤像素尺寸（平台锁定比例时仍可选具体分辨率） */
+/** 按电商/分镜比例过滤像素尺寸（9:16 与 3:4 分开，不再混用） */
 export function filterImageSizeOptionsByEcomRatio(
   options: StoryboardImageSizeOption[],
   ratio?: string,
@@ -203,7 +222,30 @@ export function filterImageSizeOptionsByEcomRatio(
   if (!ratio?.trim()) return options;
   const r = ratio.trim();
   const target =
-    r === "1:1" ? "1:1" : r === "16:9" ? "16:9" : r === "4:5" ? "4:5" : "3:4";
+    r === "1:1"
+      ? "1:1"
+      : r === "16:9"
+        ? "16:9"
+        : r === "9:16"
+          ? "9:16"
+          : r === "4:5"
+            ? "4:5"
+            : "3:4";
   const filtered = options.filter((o) => aspectRatioForImageSize(o.value) === target);
   return filtered.length > 0 ? filtered : options;
+}
+
+/** 下发前校验：像素尺寸须与 16:9 / 9:16 一致，否则回退默认尺寸 */
+export function coerceImageSizeForAspectRatio(
+  imageSize: string | undefined,
+  aspectRatio: "16:9" | "9:16",
+  modelKey: string,
+  opts?: { lockedRatio?: boolean },
+): string {
+  const raw = imageSize?.trim();
+  if (raw && raw.includes("*")) {
+    const ar = aspectRatioForImageSize(raw);
+    if (ar === aspectRatio) return raw;
+  }
+  return defaultImageSizeForModel(modelKey, aspectRatio, opts);
 }

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, Copy, ExternalLink, Layers, RotateCcw, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, ExternalLink, Layers, RotateCcw, ScrollText, Sparkles } from "lucide-react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
@@ -792,6 +792,21 @@ export default function LibraryPage() {
                 </span>
                 <span className="mt-0.5 block text-xs text-[#6e6e73]">
                   管理服装模特图用的姿势、场景与道具；系统推荐只读，可自建「我的」条目
+                </span>
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-[#86868b]" />
+            </Link>
+            <Link
+              href="/ecom/story-theater-catalog"
+              className="mt-3 flex items-center gap-3 rounded-xl border border-[#e8e8ed] bg-[#fafafa] px-4 py-3 transition hover:border-[#0071e3]/30 hover:bg-[#f0f6ff]"
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#0071e3] shadow-sm">
+                <ScrollText className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-[#1d1d1f]">剧情故事</span>
+                <span className="mt-0.5 block text-xs text-[#6e6e73]">
+                  故事剧场模式选题库；系统推荐只读，可自建「我的」故事主题
                 </span>
               </span>
               <ChevronRight className="size-4 shrink-0 text-[#86868b]" />

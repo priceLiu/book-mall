@@ -116,6 +116,26 @@ export async function fetchStoryboardBoot(
   return result;
 }
 
+export type StoryTheaterTopicSample = {
+  id: string;
+  vertical: string;
+  title: string;
+  storyCore: string;
+  storyType: string;
+  tags?: string[];
+};
+
+export async function fetchStoryTheaterTopicSample(
+  vertical: "fashion_apparel" | "bags" | "digital_3c",
+  count = 5,
+): Promise<StoryTheaterTopicSample[]> {
+  const qs = new URLSearchParams({ vertical, count: String(count) });
+  const data = await ecomBookFetch(
+    `api/sso/tools/ecom/storyboard/story-theater/topics/sample?${qs.toString()}`,
+  );
+  return (data.topics as StoryTheaterTopicSample[]) ?? [];
+}
+
 export async function listStoryboardProjects(): Promise<StoryboardProject[]> {
   const data = await ecomBookFetch("api/sso/tools/ecom/storyboard/projects");
   return (data.items as StoryboardProject[]) ?? [];

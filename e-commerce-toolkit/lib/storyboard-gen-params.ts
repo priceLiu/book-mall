@@ -7,6 +7,7 @@ export {
   aspectRatioForImageSize,
   imageSizeToEcomRatio,
   filterImageSizeOptionsByEcomRatio,
+  coerceImageSizeForAspectRatio,
 } from "@/lib/storyboard-image-size-options";
 
 import {

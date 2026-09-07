@@ -12,7 +12,7 @@ type Props = {
 };
 
 /**
- * 服装路径 B · 首次生图前选择角色参考方式。
+ * 服装路径 B · 首次生图前选择模特参考方式。
  * 使用 portal 全屏层，避免与 StoryboardModelPickerDialog 叠加 Radix Presence 循环。
  */
 export function FashionCharacterRefChoiceDialog({ open, onOpenChange, onChoose }: Props) {
@@ -20,8 +20,8 @@ export function FashionCharacterRefChoiceDialog({ open, onOpenChange, onChoose }
     <EcomFullScreenOverlay
       open={open}
       onClose={() => onOpenChange(false)}
-      title="选择角色参考方式"
-      description="生成分镜图需要角色参考。请选择自行上传角色图，或由 AI 根据脚本自动生成角色参考图（首次生图时执行，不单独展示提示词）。"
+      title="选择模特参考方式"
+      description="生成分镜图需要模特参考。请选择自行上传模特图，或由 AI 根据脚本自动生成模特参考图（首次生图时执行，不单独展示提示词）。"
       panelClassName="max-h-none w-[min(94vw,28rem)] max-w-none"
       backdropClassName="bg-black/45"
       footer={

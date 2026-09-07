@@ -51,9 +51,36 @@ import { isFashionDeliverable } from "@/lib/fashion-types";
 import { asStoryboardDeliverable } from "@/lib/storyboard-deliverable-parse";
 import type { StoryboardProject, StoryboardChatMessage } from "@/lib/storyboard-types";
 import {
+  FASHION_AI_STORY_THEATER,
+  PRODUCTION_MODE_SCRIPT,
+  PRODUCTION_MODE_STORY,
+  PRO_AI_STORY_THEATER,
+  listStoryTheaterVersionKeys,
+  parseStoryTheaterVersionChoice,
+  parseStoryTopicChoice,
+  storyTheaterLlmTrigger,
+  storyTheaterVersionCardTitle,
+  storyTheaterVersionChoiceLabel,
+  storyTopicChoiceLabel,
+  deliverableProductionMode,
+  isStoryTheaterDeliverable,
+} from "@/lib/story-theater-workflow";
+import { effectiveProductionMode, type StoryTheaterTopicRef } from "@/lib/story-theater-types";
+import {
   STORYBOARD_GENERATE_FULL_VIDEO_CHOICE,
   hasSheetImagesReady,
+  hasStoryboardCharacterRef,
 } from "@/lib/storyboard-workflow";
+
+export {
+  PRODUCTION_MODE_SCRIPT,
+  PRODUCTION_MODE_STORY,
+  FASHION_AI_STORY_THEATER,
+  PRO_AI_STORY_THEATER,
+  storyTopicChoiceLabel,
+  storyTheaterVersionChoiceLabel,
+  listStoryTheaterVersionKeys,
+} from "@/lib/story-theater-workflow";
 
 export const FASHION_PRODUCT_REF_ACK = "已上传产品图";
 export const FASHION_CUSTOM_DIMENSION_CHOICE = "自定义";
@@ -69,12 +96,16 @@ export const FASHION_LOCK_SELLPOINTS = "确认卖点清单";
 export const FASHION_OUTPUT_SCRIPT = "分镜脚本交付";
 export const FASHION_OUTPUT_VIDEO = "故事版一键成片";
 export const FASHION_REGENERATE_SELLPOINTS = "重新生成卖点";
+export const FASHION_GENERATE_VOICEOVERS = "生成口播文案";
 export const FASHION_REGENERATE_VOICEOVERS = "重新生成口播文案";
 export const FASHION_REGENERATE_STORYBOARDS = "重新生成分镜";
+export const FASHION_REGENERATE_STORY_THEATER = "重新生成故事版";
 export const FASHION_GENERATE_STORYBOARDS_LABEL = "生成 A–E 分镜方案";
 export const FASHION_CONFIRM_STORYBOARD = "确认分镜，生成运营包";
 export const FASHION_REGENERATE_OPS = "重新生成运营包";
 export const FASHION_REPICK_STORYBOARD = "重新选择分镜版本";
+export const FASHION_CONFIRM_STORY_THEATER = "确认故事版，开始成片";
+export const FASHION_REPICK_STORY_THEATER = "重新选择故事版";
 
 export const PRO_AI_SELLPOINTS = "pro-step:sellpoints-generate";
 export const PRO_AI_SELLPOINTS_POLISH = "pro-step:sellpoints-polish";
@@ -87,9 +118,19 @@ export type FashionBusyStatus = {
   detail: string;
 };
 
-export function fashionBusyStatusForUserMessage(message: string): FashionBusyStatus {
+export function fashionBusyStatusForUserMessage(
+  message: string,
+  project?: StoryboardProject,
+): FashionBusyStatus {
   const trimmed = message.trim();
   if (trimmed === FASHION_LOCK_SELLPOINTS) {
+    const d = project ? resolveProVerticalDeliverable(project) : null;
+    if (isStoryTheaterDeliverable(d)) {
+      return {
+        title: "卖点已定稿",
+        detail: "即将进入故事主题选择，请稍候…",
+      };
+    }
     return {
       title: "正在确认卖点",
       detail: "卖点已定稿，AI 正在生成 6 套口播文案，约需 30–60 秒…",
@@ -113,6 +154,18 @@ export function fashionBusyStatusForUserMessage(message: string): FashionBusySta
       detail: "请在输入框或左侧表格填写您的卖点",
     };
   }
+  if (trimmed.startsWith("选择故事主题：")) {
+    return {
+      title: "正在生成故事版",
+      detail: "AI 正在根据所选主题输出 T1–T5 剧情分镜，请稍候…",
+    };
+  }
+  if (trimmed === FASHION_REGENERATE_STORY_THEATER) {
+    return {
+      title: "正在重新生成故事版",
+      detail: "AI 正在重新输出 T1–T5 剧情分镜，请稍候…",
+    };
+  }
   if (trimmed.startsWith("选择口播")) {
     return {
       title: "正在生成分镜",
@@ -123,6 +176,24 @@ export function fashionBusyStatusForUserMessage(message: string): FashionBusySta
     return {
       title: "已选定分镜",
       detail: "请查看左侧 12.1 分镜脚本表与验收清单，确认后继续…",
+    };
+  }
+  if (trimmed.startsWith("选择故事版")) {
+    return {
+      title: "已选定故事版",
+      detail: "请查看左侧故事剧场分镜表，编辑保存后点「确认故事版，开始成片」…",
+    };
+  }
+  if (trimmed === FASHION_CONFIRM_STORY_THEATER) {
+    return {
+      title: "正在同步故事版",
+      detail: "已确认故事版定稿，正在写入左侧工作台并进入成片…",
+    };
+  }
+  if (trimmed === FASHION_REPICK_STORY_THEATER) {
+    return {
+      title: "重新选版",
+      detail: "已清除当前选定，请重新选择 T1–T5 故事版…",
     };
   }
   if (trimmed === FASHION_CONFIRM_STORYBOARD || trimmed === FASHION_REGENERATE_OPS) {
@@ -143,9 +214,9 @@ export function fashionBusyStatusForUserMessage(message: string): FashionBusySta
       detail: "AI 正在重新输出 A–E 五套分镜脚本，请稍候…",
     };
   }
-  if (trimmed === FASHION_REGENERATE_VOICEOVERS) {
+  if (trimmed === FASHION_REGENERATE_VOICEOVERS || trimmed === FASHION_GENERATE_VOICEOVERS) {
     return {
-      title: "正在重新生成口播",
+      title: trimmed === FASHION_REGENERATE_VOICEOVERS ? "正在重新生成口播" : "正在生成口播",
       detail: "AI 正在重新输出 6 套口播文案，请稍候…",
     };
   }
@@ -177,6 +248,9 @@ export function fashionBusyStatusForLlmTrigger(trigger: string): FashionBusyStat
   if (trigger.includes("voiceovers")) {
     return fashionBusyStatusForUserMessage(FASHION_LOCK_SELLPOINTS);
   }
+  if (trigger.includes("story-theater")) {
+    return fashionBusyStatusForUserMessage(FASHION_REGENERATE_STORY_THEATER);
+  }
   if (trigger.includes("storyboards")) {
     return {
       title: "正在生成分镜",
@@ -191,6 +265,7 @@ export function fashionBusyStatusForLlmTrigger(trigger: string): FashionBusyStat
 
 /** 内部 LLM 步骤 · 流式总时长上限 */
 export function fashionLlmStreamTimeoutMs(trigger: string): number {
+  if (trigger.includes("story-theater")) return 8 * 60_000;
   if (trigger.includes("storyboards")) return 12 * 60_000;
   if (trigger.includes("ops")) return 8 * 60_000;
   if (trigger.includes("voiceovers")) return 6 * 60_000;
@@ -219,6 +294,9 @@ export function fashionLlmTriggerSucceeded(
     return listFashionStoryboardVersionKeys(d).length > 0;
   }
   if (trigger.includes("ops")) return hasMeaningfulDeliverableOpsPack(d);
+  if (trigger.includes("story-theater")) {
+    return listStoryTheaterVersionKeys(d).length > 0;
+  }
   return true;
 }
 
@@ -261,6 +339,52 @@ export type FashionChoice = {
   recommended?: boolean;
 };
 
+export function buildProductionModeChoices(): FashionChoice[] {
+  return [
+    {
+      id: "production-standard",
+      title: PRODUCTION_MODE_SCRIPT,
+      description: "口播 A–E 分镜 → 运营包 → 分镜脚本交付",
+      message: PRODUCTION_MODE_SCRIPT,
+      recommended: true,
+    },
+    {
+      id: "production-story",
+      title: PRODUCTION_MODE_STORY,
+      description: "选题库 5 选 1 → T1–T5 剧情分镜 → 故事版一键成片",
+      message: PRODUCTION_MODE_STORY,
+    },
+  ];
+}
+
+export function buildStoryTopicChoices(
+  candidates: StoryTheaterTopicRef[],
+): FashionChoice[] {
+  return candidates.map((t) => ({
+    id: `story-topic-${t.id}`,
+    title: t.title,
+    description: t.storyCore,
+    message: storyTopicChoiceLabel(t.title),
+    recommended: false,
+  }));
+}
+
+export function buildStoryTheaterVersionChoices(
+  d: FashionDeliverable | ProDeliverable | null | undefined,
+): FashionChoice[] {
+  const versions = d?.storyTheaterVersions ?? {};
+  return listStoryTheaterVersionKeys(d).map((k) => {
+    const v = versions[k]!;
+    return {
+      id: `story-theater-${k}`,
+      title: storyTheaterVersionCardTitle(k, v.title),
+      description: v.summary,
+      message: storyTheaterVersionChoiceLabel(k),
+      recommended: k === "T1",
+    };
+  });
+}
+
 export function isFashionProject(project: StoryboardProject): boolean {
   return getProjectVertical(project) === "fashion_apparel";
 }
@@ -296,9 +420,23 @@ function deliverableSchemaForProject(project: StoryboardProject): "pro-v1" | "fa
 
 function llmTriggerFor(
   project: StoryboardProject,
-  step: "sellpoints" | "sellpoints-polish" | "voiceovers" | "storyboards" | "ops",
+  step: "sellpoints" | "sellpoints-polish" | "voiceovers" | "storyboards" | "ops" | "story_theater",
 ): string {
+  if (step === "story_theater") return storyTheaterLlmTrigger(usesProPhase(project));
   return usesProPhase(project) ? `pro-step:${step}-generate` : `fashion-step:${step}-generate`;
+}
+
+function needsProductionModePick(project: StoryboardProject): boolean {
+  const d = workflowDeliverable(project);
+  if (d?.productionMode) return false;
+  if (d?.sellpointsLocked || (d?.sellpoints?.length ?? 0) > 0) return false;
+  if ((d?.voiceovers?.length ?? 0) > 0) return false;
+  const storyboardKeys = usesProPhase(project)
+    ? listProStoryboardVersionKeys(d as ProDeliverable | null)
+    : listFashionStoryboardVersionKeys(d as FashionDeliverable | null);
+  if (storyboardKeys.length > 0) return false;
+  if (listStoryTheaterVersionKeys(d as FashionDeliverable | null).length > 0) return false;
+  return dimensionsComplete(project);
 }
 
 const SELLPOINT_WORKFLOW_MESSAGES = new Set([
@@ -307,6 +445,7 @@ const SELLPOINT_WORKFLOW_MESSAGES = new Set([
   FASHION_AI_POLISH_SELLPOINTS,
   FASHION_LOCK_SELLPOINTS,
   FASHION_REGENERATE_SELLPOINTS,
+  FASHION_GENERATE_VOICEOVERS,
   FASHION_REGENERATE_VOICEOVERS,
   FASHION_REGENERATE_STORYBOARDS,
   FASHION_CONFIRM_STORYBOARD,
@@ -314,6 +453,8 @@ const SELLPOINT_WORKFLOW_MESSAGES = new Set([
   FASHION_REPICK_STORYBOARD,
   FASHION_OUTPUT_SCRIPT,
   FASHION_OUTPUT_VIDEO,
+  PRODUCTION_MODE_SCRIPT,
+  PRODUCTION_MODE_STORY,
   FASHION_PRODUCT_REF_ACK,
   FASHION_CUSTOM_DIMENSION_CHOICE,
 ]);
@@ -327,6 +468,10 @@ function isSellpointWorkflowMessage(message: string): boolean {
     trimmed.startsWith("选择品类·") ||
     trimmed.startsWith("选择口播") ||
     trimmed.startsWith("选择分镜") ||
+    trimmed.startsWith("选择故事主题：") ||
+    trimmed.startsWith("选择故事版 ") ||
+    trimmed === PRODUCTION_MODE_SCRIPT ||
+    trimmed === PRODUCTION_MODE_STORY ||
     trimmed.startsWith("修改七维·")
   );
 }
@@ -448,7 +593,9 @@ export function isFashionProduceSetupReady(project: StoryboardProject): boolean 
   const pending = wf.proProduceSetupPending ?? wf.fashionProduceSetupPending;
   if (pending === false) return true;
   const charMode = wf.proCharacterMode ?? wf.fashionCharacterMode;
-  return charMode === "ai" || charMode === "upload";
+  if (charMode === "ai" || charMode === "upload") return true;
+  if (hasStoryboardCharacterRef(project)) return true;
+  return false;
 }
 
 /** sheet 脚本字段缺失但 deliverable 有内容时需 re-sync */
@@ -494,7 +641,11 @@ export function parseFashionVoiceoverPickFromChat(
   for (const msg of chatHistory) {
     if (msg?.role === "user") {
       const trimmed = msg.content.trim();
-      if (trimmed === FASHION_LOCK_SELLPOINTS || trimmed === FASHION_REGENERATE_VOICEOVERS) {
+      if (
+        trimmed === FASHION_LOCK_SELLPOINTS ||
+        trimmed === FASHION_REGENERATE_VOICEOVERS ||
+        trimmed === FASHION_GENERATE_VOICEOVERS
+      ) {
         voiceoversReady = false;
         picked = null;
         continue;
@@ -535,6 +686,18 @@ function parseFashionVersionPickFromChat(
     if (msg?.role !== "user") continue;
     const m = msg.content.trim().match(/^选择分镜\s*([A-E])版/);
     if (m?.[1]) picked = m[1] as FashionVersionKey;
+  }
+  return picked;
+}
+
+function parseStoryTheaterVersionPickFromChat(
+  chatHistory: StoryboardChatMessage[],
+): import("@/lib/story-theater-types").StoryTheaterVersionKey | null {
+  let picked: import("@/lib/story-theater-types").StoryTheaterVersionKey | null = null;
+  for (const msg of chatHistory) {
+    if (msg?.role !== "user") continue;
+    const key = parseStoryTheaterVersionChoice(msg.content);
+    if (key) picked = key;
   }
   return picked;
 }
@@ -583,6 +746,13 @@ export function buildFashionWorkflowChoiceMessageLabels(
       });
       continue;
     }
+    if (trimmed === FASHION_CONFIRM_STORY_THEATER) {
+      labels.set(m.id, {
+        label: "故事版定稿",
+        detail: "已确认故事版分镜，开始成片",
+      });
+      continue;
+    }
     if (trimmed === FASHION_USER_SELLPOINTS_CHOICE) {
       labels.set(m.id, { label: "卖点录入", detail: "我来输入卖点" });
       continue;
@@ -599,6 +769,38 @@ export function buildFashionWorkflowChoiceMessageLabels(
       labels.set(m.id, { label: "卖点定稿", detail: "确认卖点清单" });
       continue;
     }
+    if (trimmed === FASHION_REGENERATE_SELLPOINTS) {
+      labels.set(m.id, { label: "卖点生成", detail: "重新生成卖点" });
+      continue;
+    }
+    if (trimmed === FASHION_REGENERATE_STORY_THEATER) {
+      labels.set(m.id, { label: "故事版", detail: "重新生成故事版" });
+      continue;
+    }
+    const storyTopic = parseStoryTopicChoice(trimmed);
+    if (storyTopic) {
+      labels.set(m.id, {
+        label: "故事主题",
+        detail: `已选 ${storyTopic}`,
+      });
+      continue;
+    }
+    if (trimmed === PRODUCTION_MODE_SCRIPT) {
+      labels.set(m.id, { label: "产出模式", detail: "分镜脚本标准线" });
+      continue;
+    }
+    if (trimmed === PRODUCTION_MODE_STORY) {
+      labels.set(m.id, { label: "产出模式", detail: "故事剧场线" });
+      continue;
+    }
+    const storyTheaterKey = parseStoryTheaterVersionChoice(trimmed);
+    if (storyTheaterKey) {
+      labels.set(m.id, {
+        label: "故事版",
+        detail: `已选 ${storyTheaterVersionCardTitle(storyTheaterKey)}`,
+      });
+      continue;
+    }
   }
   return labels;
 }
@@ -613,6 +815,96 @@ function hasMeaningfulOpsPack(d: FashionDeliverable | null | undefined): boolean
       (ops.detailBullets?.length ?? 0) > 0 ||
       Boolean(ops.xiaohongshuBody?.trim()),
   );
+}
+
+type StoryTheaterDeliverableLike = Pick<
+  FashionDeliverable,
+  | "productionMode"
+  | "sellpoints"
+  | "sellpointsLocked"
+  | "selectedStoryTopic"
+  | "storyTopicCandidates"
+  | "storyTheaterVersions"
+  | "selectedStoryTheaterVersion"
+  | "storyTheaterLocked"
+  | "outputMode"
+>;
+
+/** 故事剧场线 phase guard：定稿仅以 meta.storyTheaterLocked 为准，chat 确认消息不得绕过编辑步 */
+function applyStoryTheaterPhaseGuards<T extends StoryTheaterDeliverableLike>(
+  deliverable: T,
+  project: StoryboardProject,
+  metaDeliverable: T | null,
+): T {
+  let guarded: T = {
+    ...deliverable,
+    productionMode: (deliverable.productionMode ??
+      metaDeliverable?.productionMode ??
+      "story_theater") as T["productionMode"],
+  };
+
+  if (metaDeliverable?.sellpointsLocked && metaDeliverable.sellpoints?.length) {
+    guarded = {
+      ...guarded,
+      sellpoints: metaDeliverable.sellpoints,
+      sellpointsLocked: true,
+    };
+  }
+  if (metaDeliverable?.selectedStoryTopic) {
+    guarded = { ...guarded, selectedStoryTopic: metaDeliverable.selectedStoryTopic };
+  }
+  if (metaDeliverable?.storyTopicCandidates?.length) {
+    guarded = { ...guarded, storyTopicCandidates: metaDeliverable.storyTopicCandidates };
+  }
+  if (listStoryTheaterVersionKeys(metaDeliverable).length > 0) {
+    guarded = {
+      ...guarded,
+      storyTheaterVersions: {
+        ...(guarded.storyTheaterVersions ?? {}),
+        ...metaDeliverable!.storyTheaterVersions,
+      },
+    };
+  }
+
+  const wf = getFashionWorkflowMeta(project);
+  const wfPhase = (wf.proPhase ?? wf.fashionPhase ?? "product_ref") as FashionPhase;
+  const wfPhaseRank = FASHION_PHASE_RANK[wfPhase] ?? 0;
+  const theaterKeyPickedFromChat = parseStoryTheaterVersionPickFromChat(project.chatHistory);
+  const metaTheaterAuthoritative =
+    Boolean(metaDeliverable?.selectedStoryTheaterVersion) &&
+    wfPhaseRank >= FASHION_PHASE_RANK.story_theater_confirm;
+
+  if (theaterKeyPickedFromChat) {
+    guarded = { ...guarded, selectedStoryTheaterVersion: theaterKeyPickedFromChat };
+  } else if (metaTheaterAuthoritative && metaDeliverable?.selectedStoryTheaterVersion) {
+    guarded = {
+      ...guarded,
+      selectedStoryTheaterVersion: metaDeliverable.selectedStoryTheaterVersion,
+    };
+  } else if (
+    guarded.selectedStoryTheaterVersion &&
+    listStoryTheaterVersionKeys(guarded).length > 0 &&
+    !guarded.storyTheaterLocked &&
+    !metaDeliverable?.storyTheaterLocked
+  ) {
+    guarded = { ...guarded, selectedStoryTheaterVersion: null };
+  }
+
+  if (metaDeliverable?.storyTheaterLocked) {
+    guarded = {
+      ...guarded,
+      storyTheaterLocked: true,
+      outputMode: metaDeliverable.outputMode ?? guarded.outputMode ?? "direct_video",
+    };
+  } else {
+    guarded = {
+      ...guarded,
+      storyTheaterLocked: false,
+      outputMode: null,
+    };
+  }
+
+  return guarded;
 }
 
 function applyFashionDeliverablePhaseGuards(
@@ -635,6 +927,10 @@ function applyFashionDeliverablePhaseGuards(
       opsPack: undefined,
       outputMode: null,
     };
+  }
+
+  if (isStoryTheaterDeliverable(metaDeliverable) || isStoryTheaterDeliverable(next)) {
+    return applyStoryTheaterPhaseGuards(next, project, metaDeliverable);
   }
 
   const voiceoversReady = (next.voiceovers?.length ?? 0) > 0;
@@ -735,6 +1031,7 @@ export function applyFashionMetaAuthorityToDeliverable(
     if (metaDeliverable.sellpointsLocked) {
       next = {
         ...next,
+        sellpoints: metaDeliverable.sellpoints,
         sellpointsLocked: true,
       };
     } else if (shouldUseMetaSellpointsDraft(project, metaDeliverable, next.sellpoints)) {
@@ -796,6 +1093,58 @@ export function applyFashionMetaAuthorityToDeliverable(
     next.outputMode = metaDeliverable.outputMode;
   }
 
+  if (isStoryTheaterDeliverable(metaDeliverable)) {
+    if (metaDeliverable.selectedStoryTopic) {
+      next.selectedStoryTopic = metaDeliverable.selectedStoryTopic;
+    }
+    if (metaDeliverable.storyTopicCandidates?.length) {
+      next.storyTopicCandidates = metaDeliverable.storyTopicCandidates;
+    }
+    if (listStoryTheaterVersionKeys(metaDeliverable).length > 0) {
+      next.storyTheaterVersions = {
+        ...(next.storyTheaterVersions ?? {}),
+        ...metaDeliverable.storyTheaterVersions,
+      };
+    }
+    const theaterKey =
+      next.selectedStoryTheaterVersion ??
+      metaDeliverable.selectedStoryTheaterVersion ??
+      parseStoryTheaterVersionPickFromChat(project.chatHistory);
+    if (theaterKey) {
+      const panels =
+        metaDeliverable.storyTheaterVersions?.[theaterKey]?.panels ??
+        next.storyTheaterVersions?.[theaterKey]?.panels;
+      if (panels?.length) {
+        next = {
+          ...next,
+          selectedStoryTheaterVersion: theaterKey,
+          storyTheaterVersions: {
+            ...(next.storyTheaterVersions ?? {}),
+            [theaterKey]: {
+              ...(next.storyTheaterVersions?.[theaterKey] ??
+                metaDeliverable.storyTheaterVersions?.[theaterKey] ?? {
+                  id: theaterKey,
+                  title: `${theaterKey}版`,
+                  panels: [],
+                }),
+              panels,
+            },
+          },
+        };
+      } else {
+        next.selectedStoryTheaterVersion = theaterKey;
+      }
+    }
+    if (metaDeliverable.storyTheaterLocked) {
+      next.storyTheaterLocked = true;
+      next.outputMode = metaDeliverable.outputMode ?? next.outputMode ?? "direct_video";
+    } else if (next.selectedStoryTheaterVersion) {
+      next.storyTheaterLocked = false;
+      next.outputMode = null;
+    }
+    next.productionMode = metaDeliverable.productionMode ?? next.productionMode;
+  }
+
   return next;
 }
 
@@ -809,6 +1158,10 @@ function applyProDeliverablePhaseGuards(
     : null;
   const wf = getFashionWorkflowMeta(project);
   const wfPhase = wf.proPhase ?? wf.fashionPhase ?? "product_ref";
+
+  if (isStoryTheaterDeliverable(metaDeliverable) || isStoryTheaterDeliverable(next)) {
+    return applyStoryTheaterPhaseGuards(next, project, metaDeliverable);
+  }
 
   if (!next.sellpointsLocked) {
     return {
@@ -907,6 +1260,7 @@ function applyProMetaAuthorityToDeliverable(
     if (metaDeliverable.sellpointsLocked) {
       next = {
         ...next,
+        sellpoints: metaDeliverable.sellpoints,
         sellpointsLocked: true,
       };
     } else if (shouldUseMetaSellpointsDraft(project, metaDeliverable, next.sellpoints)) {
@@ -966,6 +1320,58 @@ function applyProMetaAuthorityToDeliverable(
   }
   if (hasFashionOutputModeChoiceInChat(project) && metaDeliverable.outputMode) {
     next.outputMode = metaDeliverable.outputMode;
+  }
+
+  if (isStoryTheaterDeliverable(metaDeliverable)) {
+    if (metaDeliverable.selectedStoryTopic) {
+      next.selectedStoryTopic = metaDeliverable.selectedStoryTopic;
+    }
+    if (metaDeliverable.storyTopicCandidates?.length) {
+      next.storyTopicCandidates = metaDeliverable.storyTopicCandidates;
+    }
+    if (listStoryTheaterVersionKeys(metaDeliverable).length > 0) {
+      next.storyTheaterVersions = {
+        ...(next.storyTheaterVersions ?? {}),
+        ...metaDeliverable.storyTheaterVersions,
+      };
+    }
+    const theaterKey =
+      next.selectedStoryTheaterVersion ??
+      metaDeliverable.selectedStoryTheaterVersion ??
+      parseStoryTheaterVersionPickFromChat(project.chatHistory);
+    if (theaterKey) {
+      const panels =
+        metaDeliverable.storyTheaterVersions?.[theaterKey]?.panels ??
+        next.storyTheaterVersions?.[theaterKey]?.panels;
+      if (panels?.length) {
+        next = {
+          ...next,
+          selectedStoryTheaterVersion: theaterKey,
+          storyTheaterVersions: {
+            ...(next.storyTheaterVersions ?? {}),
+            [theaterKey]: {
+              ...(next.storyTheaterVersions?.[theaterKey] ??
+                metaDeliverable.storyTheaterVersions?.[theaterKey] ?? {
+                  id: theaterKey,
+                  title: `${theaterKey}版`,
+                  panels: [],
+                }),
+              panels,
+            },
+          },
+        };
+      } else {
+        next.selectedStoryTheaterVersion = theaterKey;
+      }
+    }
+    if (metaDeliverable.storyTheaterLocked) {
+      next.storyTheaterLocked = true;
+      next.outputMode = metaDeliverable.outputMode ?? next.outputMode ?? "direct_video";
+    } else if (next.selectedStoryTheaterVersion) {
+      next.storyTheaterLocked = false;
+      next.outputMode = null;
+    }
+    next.productionMode = metaDeliverable.productionMode ?? next.productionMode;
   }
 
   return next;
@@ -1101,6 +1507,29 @@ export function buildProDeliverableWithVersionPanels(
     storyboardVersions: {
       ...(deliverable.storyboardVersions ?? {}),
       [versionKey]: { ...versionMeta, panels },
+    },
+  };
+}
+
+export function buildStoryTheaterDeliverableWithVersionPanels<T extends FashionDeliverable | ProDeliverable>(
+  project: StoryboardProject,
+  deliverable: T,
+  versionKey: import("@/lib/story-theater-types").StoryTheaterVersionKey,
+): T {
+  const versions = deliverable.storyTheaterVersions ?? {};
+  const metaDeliverable = project.meta?.deliverable;
+  const metaVersions =
+    metaDeliverable && typeof metaDeliverable === "object"
+      ? ((metaDeliverable as FashionDeliverable | ProDeliverable).storyTheaterVersions ?? {})
+      : {};
+  const versionMeta = versions[versionKey] ?? metaVersions[versionKey];
+  if (!versionMeta?.panels?.length) return deliverable;
+  return {
+    ...deliverable,
+    selectedStoryTheaterVersion: versionKey,
+    storyTheaterVersions: {
+      ...versions,
+      [versionKey]: versionMeta,
     },
   };
 }
@@ -1244,6 +1673,7 @@ export function inferFashionPhaseFromState(project: StoryboardProject): FashionP
     if (!hasProProductRef(project)) return "product_ref";
     return "category_pick";
   }
+  if (needsProductionModePick(project)) return "production_mode";
   if (isNonFashionProVertical(project)) {
     const d = resolveProVerticalDeliverable(project) as ProDeliverable | null;
     if (!hasFashionProductRef(project)) return "product_ref";
@@ -1252,32 +1682,48 @@ export function inferFashionPhaseFromState(project: StoryboardProject): FashionP
       (d?.sellpoints?.length ?? 0) > 0 ||
       (d?.voiceovers?.length ?? 0) > 0 ||
       listProStoryboardVersionKeys(d).length > 0 ||
+      listStoryTheaterVersionKeys(d).length > 0 ||
       Boolean(d?.selectedVersion) ||
+      Boolean(d?.selectedStoryTheaterVersion) ||
       hasMeaningfulProOpsPack(d ?? ({} as ProDeliverable));
     if (!pastDimensions && !dimensionsComplete(project)) return "dimensions";
     if (!d?.sellpoints?.length || !d.sellpointsLocked) return "sellpoints";
+    if (isStoryTheaterDeliverable(d)) {
+      if (!d.selectedStoryTopic) return "story_topic_pick";
+      if (listStoryTheaterVersionKeys(d).length === 0) return "story_topic_pick";
+      if (!d.selectedStoryTheaterVersion) return "story_theater_pick";
+      if (!d.storyTheaterLocked) return "story_theater_confirm";
+      return "produce";
+    }
     if ((d.voiceovers?.length ?? 0) === 0) return "sellpoints";
     if (!d.selectedVoiceoverId) return "voiceover_pick";
     if (listProStoryboardVersionKeys(d).length === 0) return "voiceover_pick";
     if (!d.selectedVersion) return "storyboard_pick";
     if (!d.storyboardLocked) return "storyboard_confirm";
     if (!hasMeaningfulProOpsPack(d)) return "storyboard_confirm";
-    if (!d.outputMode) return "output_mode";
     return "produce";
   }
   const raw = workflowDeliverable(project);
   const d = raw && isFashionDeliverable(raw) ? raw : null;
   if (!hasFashionProductRef(project)) return "product_ref";
-  // 已进入卖点之后，禁止因 dimensions 字段被 LLM 冲掉而回退到七维
   const pastDimensions =
     Boolean(d?.sellpointsLocked) ||
     (d?.sellpoints?.length ?? 0) > 0 ||
     (d?.voiceovers?.length ?? 0) > 0 ||
     listFashionStoryboardVersionKeys(d).length > 0 ||
+    listStoryTheaterVersionKeys(d).length > 0 ||
     Boolean(d?.selectedVersion) ||
+    Boolean(d?.selectedStoryTheaterVersion) ||
     hasMeaningfulOpsPack(d);
   if (!pastDimensions && !dimensionsComplete(project)) return "dimensions";
   if (!d?.sellpoints?.length || !d.sellpointsLocked) return "sellpoints";
+  if (isStoryTheaterDeliverable(d)) {
+    if (!d.selectedStoryTopic) return "story_topic_pick";
+    if (listStoryTheaterVersionKeys(d).length === 0) return "story_topic_pick";
+    if (!d.selectedStoryTheaterVersion) return "story_theater_pick";
+    if (!d.storyTheaterLocked) return "story_theater_confirm";
+    return "produce";
+  }
   if ((d.voiceovers?.length ?? 0) === 0) return "sellpoints";
   if (!d.selectedVoiceoverId) return "voiceover_pick";
   if (listFashionStoryboardVersionKeys(d).length === 0) return "voiceover_pick";
@@ -1285,7 +1731,6 @@ export function inferFashionPhaseFromState(project: StoryboardProject): FashionP
   const storyboardConfirmed = isStoryboardConfirmAfterLastVersionPick(project);
   if (!storyboardConfirmed) return "storyboard_confirm";
   if (!hasMeaningfulOpsPack(d)) return "storyboard_confirm";
-  if (!d.outputMode || !hasFashionOutputModeChoiceInChat(project)) return "output_mode";
   return "produce";
 }
 
@@ -1297,15 +1742,59 @@ const FASHION_PHASE_RANK: Record<FashionPhase, number> = {
   product_ref: 0,
   category_pick: 1,
   dimensions: 2,
-  sellpoints: 3,
-  voiceover_pick: 4,
-  storyboard_pick: 5,
-  storyboard_confirm: 6,
-  ops_pack: 7,
-  output_mode: 8,
-  produce: 9,
-  done: 10,
+  production_mode: 3,
+  sellpoints: 4,
+  story_topic_pick: 5,
+  voiceover_pick: 6,
+  storyboard_pick: 7,
+  storyboard_confirm: 8,
+  story_theater_pick: 9,
+  story_theater_confirm: 10,
+  ops_pack: 11,
+  output_mode: 12,
+  produce: 13,
+  done: 14,
 };
+
+export function fashionPhaseRank(phase: FashionPhase | string | undefined): number {
+  return FASHION_PHASE_RANK[phase as FashionPhase] ?? 0;
+}
+
+/** meta repair / 脏 JSON 校正：卖点已定稿后禁止 phase 回退到 sellpoints */
+export function resolveFashionPhaseAfterRepair(opts: {
+  wfPhase?: FashionPhase;
+  inferredPhase: FashionPhase;
+  metaDeliverable?: FashionDeliverable | ProDeliverable | null;
+}): FashionPhase {
+  const wfRank = fashionPhaseRank(opts.wfPhase);
+  const inferredRank = fashionPhaseRank(opts.inferredPhase);
+  const meta = opts.metaDeliverable;
+  const lockedFloor: FashionPhase | null =
+    meta?.sellpointsLocked && (meta.sellpoints?.length ?? 0) > 0
+      ? isStoryTheaterDeliverable(meta)
+        ? "story_topic_pick"
+        : "sellpoints"
+      : null;
+  const floorRank = lockedFloor ? fashionPhaseRank(lockedFloor) : 0;
+
+  let next: FashionPhase;
+  if (wfRank > inferredRank) {
+    if (lockedFloor && inferredRank < floorRank) {
+      next = opts.wfPhase ?? lockedFloor;
+    } else {
+      next = opts.inferredPhase;
+    }
+  } else if (inferredRank > wfRank) {
+    next = opts.inferredPhase;
+  } else {
+    next = opts.wfPhase ?? opts.inferredPhase;
+  }
+
+  if (lockedFloor && fashionPhaseRank(next) < floorRank) {
+    next = lockedFloor;
+  }
+  return next;
+}
 
 export function getFashionPhase(project: StoryboardProject): FashionPhase {
   const inferred = inferFashionPhaseFromState(project);
@@ -1318,11 +1807,29 @@ export function getFashionPhase(project: StoryboardProject): FashionPhase {
 
   const inferredRank = FASHION_PHASE_RANK[inferred] ?? 0;
   const wfRank = FASHION_PHASE_RANK[storedPhase] ?? 0;
+  const metaDeliverable = workflowDeliverable(project);
+  const lockedFloor: FashionPhase | null =
+    metaDeliverable?.sellpointsLocked && (metaDeliverable.sellpoints?.length ?? 0) > 0
+      ? isStoryTheaterDeliverable(metaDeliverable)
+        ? "story_topic_pick"
+        : "sellpoints"
+      : null;
+  const floorRank = lockedFloor ? fashionPhaseRank(lockedFloor) : 0;
 
   // workflow 记录比实际状态超前（LLM 脏 JSON）时，以 inferred 回退
-  if (wfRank > inferredRank) return inferred;
+  if (wfRank > inferredRank) {
+    if (lockedFloor && inferredRank < floorRank) {
+      return storedPhase;
+    }
+    return inferred;
+  }
 
-  if (inferredRank >= wfRank) return inferred;
+  if (inferredRank >= wfRank) {
+    if (lockedFloor && inferredRank < floorRank) {
+      return lockedFloor;
+    }
+    return inferred;
+  }
   return storedPhase;
 }
 
@@ -1522,7 +2029,7 @@ function buildFashionDimensionStepPatch(
     workflow: {
       ...wf,
       vertical,
-      [workflowPhaseKey(project)]: done ? "sellpoints" : "dimensions",
+      [workflowPhaseKey(project)]: done ? "production_mode" : "dimensions",
       dimensionStep: done ? steps.length : nextStep,
       awaitingFashionCustomDimension: false,
       ...extraWorkflow,
@@ -1585,12 +2092,24 @@ export function buildFashionSellpointsSavePatch(
 
 export function isFashionStoryboardPanelsEditable(project: StoryboardProject): boolean {
   const d = workflowDeliverable(project);
+  if (isStoryTheaterDeliverable(d)) return false;
   return Boolean(
     d?.selectedVersion &&
       !d.storyboardLocked &&
       !hasMeaningfulDeliverableOpsPack(d) &&
       !d.outputMode &&
       isAwaitingFashionStoryboardConfirm(project),
+  );
+}
+
+export function isStoryTheaterPanelsEditable(project: StoryboardProject): boolean {
+  const d = workflowDeliverable(project);
+  return Boolean(
+    isStoryTheaterDeliverable(d) &&
+      d?.selectedStoryTheaterVersion &&
+      !d.storyTheaterLocked &&
+      !d.outputMode &&
+      isAwaitingStoryTheaterConfirm(project),
   );
 }
 
@@ -1639,8 +2158,120 @@ export function buildFashionStoryboardPanelsSavePatch(
   };
 }
 
+export function buildStoryTheaterPanelsSavePatch(
+  project: StoryboardProject,
+  panels: FashionPanelRow[],
+): { deliverable: FashionDeliverable | ProDeliverable; workflow: Record<string, unknown> } | null {
+  const resolved = workflowDeliverable(project);
+  const metaDeliverable = resolveProVerticalDeliverable(project);
+  const current = resolved ?? metaDeliverable;
+  if (!current || !isStoryTheaterDeliverable(current)) return null;
+  const versionKey =
+    current.selectedStoryTheaterVersion ?? metaDeliverable?.selectedStoryTheaterVersion;
+  if (!versionKey || current.storyTheaterLocked || current.outputMode) return null;
+  const version =
+    current.storyTheaterVersions?.[versionKey] ??
+    metaDeliverable?.storyTheaterVersions?.[versionKey];
+  if (!version || !panels.length) return null;
+
+  const wf = getFashionWorkflowMeta(project);
+  const phaseKey = usesProPhase(project) ? "proPhase" : "fashionPhase";
+  const nextDeliverable = {
+    ...current,
+    selectedStoryTheaterVersion: versionKey,
+    storyTheaterVersions: {
+      ...(current.storyTheaterVersions ?? {}),
+      [versionKey]: { ...version, panels },
+    },
+  };
+  return {
+    deliverable: nextDeliverable,
+    workflow: {
+      ...wf,
+      [phaseKey]: "story_theater_confirm",
+      ...(usesProPhase(project)
+        ? { proStoryboardPanelsEdited: true }
+        : { fashionStoryboardPanelsEdited: true }),
+    },
+  };
+}
+
+export function isAwaitingProductionModePick(project: StoryboardProject): boolean {
+  return needsProductionModePick(project) && getFashionPhase(project) === "production_mode";
+}
+
+export function isAwaitingStoryTopicPick(project: StoryboardProject): boolean {
+  const d = workflowDeliverable(project);
+  if (!isStoryTheaterDeliverable(d)) return false;
+  if (!d?.sellpointsLocked) return false;
+  if (d.selectedStoryTopic) return false;
+  return getFashionPhase(project) === "story_topic_pick";
+}
+
+export function isAwaitingStoryTheaterVersionsPending(project: StoryboardProject): boolean {
+  const d = workflowDeliverable(project);
+  if (!isStoryTheaterDeliverable(d)) return false;
+  if (!d?.sellpointsLocked || !d.selectedStoryTopic) return false;
+  return listStoryTheaterVersionKeys(d).length === 0;
+}
+
+export function hasStoryTheaterGenerationFailed(project: StoryboardProject): boolean {
+  let lastRequestIdx = -1;
+  for (let i = 0; i < project.chatHistory.length; i++) {
+    const msg = project.chatHistory[i];
+    if (msg?.role !== "user") continue;
+    const t = msg.content.trim();
+    if (
+      t.startsWith("选择故事主题：") ||
+      t === FASHION_REGENERATE_STORY_THEATER ||
+      t === FASHION_AI_STORY_THEATER ||
+      t === PRO_AI_STORY_THEATER
+    ) {
+      lastRequestIdx = i;
+    }
+  }
+  if (lastRequestIdx < 0) return false;
+
+  let sawAssistantAfter = false;
+  for (let i = lastRequestIdx + 1; i < project.chatHistory.length; i++) {
+    const msg = project.chatHistory[i];
+    if (msg?.role !== "assistant") continue;
+    sawAssistantAfter = true;
+    const content = msg.content;
+    if (
+      content.includes("故事版生成未完成") ||
+      content.includes("故事版生成失败") ||
+      content.includes("生成失败")
+    ) {
+      return true;
+    }
+    const parsed =
+      extractFashionDeliverableFromText(content) ?? extractProDeliverableFromText(content);
+    if (listStoryTheaterVersionKeys(parsed as FashionDeliverable | null).length > 0) {
+      return false;
+    }
+  }
+  return sawAssistantAfter;
+}
+
+export function isAwaitingStoryTheaterVersionsGeneration(project: StoryboardProject): boolean {
+  return (
+    isAwaitingStoryTheaterVersionsPending(project) && hasStoryTheaterGenerationFailed(project)
+  );
+}
+
+export function isAwaitingStoryTheaterPick(project: StoryboardProject): boolean {
+  const d = workflowDeliverable(project);
+  if (!isStoryTheaterDeliverable(d)) return false;
+  if (!d?.selectedStoryTopic) return false;
+  if (listStoryTheaterVersionKeys(d).length === 0) return false;
+  if (d.selectedStoryTheaterVersion || d.storyTheaterLocked || d.outputMode) return false;
+  return getFashionPhase(project) === "story_theater_pick";
+}
+
 export function isAwaitingFashionSellpoints(project: StoryboardProject): boolean {
   const d = workflowDeliverable(project);
+  if (needsProductionModePick(project)) return false;
   return (
     dimensionsComplete(project) &&
     !d?.sellpointsLocked &&
@@ -1648,12 +2279,54 @@ export function isAwaitingFashionSellpoints(project: StoryboardProject): boolean
   );
 }
 
-export function isAwaitingFashionVoiceoverGeneration(project: StoryboardProject): boolean {
+/** AI 卖点已触发但尚未产出（含生成失败待重试） */
+export function isAwaitingFashionSellpointGeneration(project: StoryboardProject): boolean {
+  if (!isAwaitingFashionSellpoints(project)) return false;
+  if (getSellpointInputMode(project) !== "ai") return false;
   const d = workflowDeliverable(project);
-  return Boolean(
-    d?.sellpointsLocked &&
-      (d.voiceovers?.length ?? 0) === 0 &&
-      !d.selectedVoiceoverId,
+  return (d?.sellpoints?.length ?? 0) === 0;
+}
+
+export function hasFashionVoiceoverGenerationFailed(project: StoryboardProject): boolean {
+  let lastRequestIdx = -1;
+  for (let i = 0; i < project.chatHistory.length; i++) {
+    const msg = project.chatHistory[i];
+    if (msg?.role !== "user") continue;
+    const t = msg.content.trim();
+    if (t === FASHION_LOCK_SELLPOINTS || t === FASHION_REGENERATE_VOICEOVERS || t === FASHION_GENERATE_VOICEOVERS) {
+      lastRequestIdx = i;
+    }
+  }
+  if (lastRequestIdx < 0) return false;
+
+  let sawAssistantAfter = false;
+  for (let i = lastRequestIdx + 1; i < project.chatHistory.length; i++) {
+    const msg = project.chatHistory[i];
+    if (msg?.role !== "assistant") continue;
+    sawAssistantAfter = true;
+    const content = msg.content;
+    if (content.includes("口播文案生成未完成") || content.includes("口播文案生成失败")) {
+      return true;
+    }
+    const parsed =
+      extractFashionDeliverableFromText(content) ?? extractProDeliverableFromText(content);
+    if ((parsed?.voiceovers?.length ?? 0) > 0) return false;
+  }
+  return sawAssistantAfter;
+}
+
+/** 标准分镜线：卖点已定稿、口播尚未产出（故事剧场线不走口播） */
+export function isAwaitingFashionVoiceoverPending(project: StoryboardProject): boolean {
+  const d = workflowDeliverable(project);
+  if (!d?.sellpointsLocked) return false;
+  if (isStoryTheaterDeliverable(d)) return false;
+  if ((d.voiceovers?.length ?? 0) > 0 || d.selectedVoiceoverId) return false;
+  return true;
+}
+
+export function isAwaitingFashionVoiceoverGeneration(project: StoryboardProject): boolean {
+  return (
+    isAwaitingFashionVoiceoverPending(project) && hasFashionVoiceoverGenerationFailed(project)
   );
 }
 
@@ -1703,6 +2376,13 @@ function isStoryboardConfirmAfterLastVersionPick(project: StoryboardProject): bo
     }
   }
   return lastConfirmIdx >= 0 && lastConfirmIdx > lastVersionIdx;
+}
+
+export function isAwaitingStoryTheaterConfirm(project: StoryboardProject): boolean {
+  const d = workflowDeliverable(project);
+  if (!isStoryTheaterDeliverable(d)) return false;
+  if (!d?.selectedStoryTheaterVersion || d.storyTheaterLocked) return false;
+  return getFashionPhase(project) === "story_theater_confirm";
 }
 
 export function isFashionPendingOpsGeneration(project: StoryboardProject): boolean {
@@ -1771,21 +2451,27 @@ export function isFashionInProduce(project: StoryboardProject): boolean {
       ? (project.meta!.deliverable as ProDeliverable).outputMode
       : null;
   const outputMode = d?.outputMode ?? metaOut ?? null;
+  if (isStoryTheaterDeliverable(d) && d?.selectedStoryTheaterVersion) {
+    if (!d.storyTheaterLocked || outputMode !== "direct_video") return false;
+    return wfPhase === "produce" || wfPhase === "done" || getFashionPhase(project) === "produce";
+  }
   if (!outputMode) return false;
   if (wfPhase === "produce" || wfPhase === "done") return true;
-  return getFashionPhase(project) === "produce" && hasFashionOutputModeChoiceInChat(project);
+  return getFashionPhase(project) === "produce";
 }
 
-export function isAwaitingFashionOutputMode(project: StoryboardProject): boolean {
-  if (isFashionInProduce(project)) return false;
-  const d = workflowDeliverable(project);
-  return Boolean(
-    d?.selectedVersion &&
-      d.storyboardLocked &&
-      hasMeaningfulDeliverableOpsPack(d) &&
-      !d.outputMode &&
-      getFashionPhase(project) === "output_mode",
-  );
+/** 路径 B 成片工作区：须已定稿；故事剧场线以 meta.storyTheaterLocked 为准 */
+export function isDirectVideoProduceReady(project: StoryboardProject): boolean {
+  const d = resolveProVerticalDeliverable(project);
+  if (!d || d.outputMode !== "direct_video") return false;
+  if (isStoryTheaterDeliverable(d)) {
+    return Boolean(d.storyTheaterLocked);
+  }
+  return Boolean(d.storyboardLocked);
+}
+
+export function isAwaitingFashionOutputMode(_project: StoryboardProject): boolean {
+  return false;
 }
 
 export function fashionVoiceoverChoiceLabel(v: { id: string; type: string }): string {
@@ -1831,6 +2517,10 @@ export function parseFashionVersionKeyFromUserMessage(
 
 export function isFashionStoryboardConfirmUserMessage(message: string): boolean {
   return message.trim() === FASHION_CONFIRM_STORYBOARD;
+}
+
+export function isStoryTheaterConfirmUserMessage(message: string): boolean {
+  return message.trim() === FASHION_CONFIRM_STORY_THEATER;
 }
 
 export function parseFashionVersionPick(
@@ -1932,16 +2622,42 @@ export function inferFashionChoices(project: StoryboardProject): FashionChoice[]
     }
   }
 
-  if (isAwaitingFashionVoiceoverGeneration(project)) {
+  if (isAwaitingProductionModePick(project)) {
+    return buildProductionModeChoices();
+  }
+
+  if (isAwaitingFashionVoiceoverPending(project)) {
+    const retry = hasFashionVoiceoverGenerationFailed(project);
+    const title = retry ? FASHION_REGENERATE_VOICEOVERS : FASHION_GENERATE_VOICEOVERS;
     return [
       {
-        id: "regen-voiceovers",
-        title: FASHION_REGENERATE_VOICEOVERS,
-        description: "上次口播生成未完成或失败，点此重新生成 6 套口播文案",
-        message: FASHION_REGENERATE_VOICEOVERS,
+        id: retry ? "regen-voiceovers" : "gen-voiceovers",
+        title,
+        description: retry
+          ? "上次口播生成未完成或失败，点此重新生成 6 套口播文案"
+          : "卖点已定稿，点此生成 6 套口播文案",
+        message: retry ? FASHION_REGENERATE_VOICEOVERS : FASHION_GENERATE_VOICEOVERS,
         recommended: true,
       },
     ];
+  }
+
+  if (isAwaitingStoryTheaterVersionsGeneration(project)) {
+    return [
+      {
+        id: "regen-story-theater",
+        title: FASHION_REGENERATE_STORY_THEATER,
+        description: "上次故事版生成未完成或失败，点此重新生成 T1–T5 剧情分镜",
+        message: FASHION_REGENERATE_STORY_THEATER,
+        recommended: true,
+      },
+    ];
+  }
+
+  if (isAwaitingStoryTopicPick(project)) {
+    const candidates = workflowDeliverable(project)?.storyTopicCandidates ?? [];
+    if (candidates.length > 0) return buildStoryTopicChoices(candidates);
+    return [];
   }
 
   if (isAwaitingSellpointModePick(project)) {
@@ -1962,6 +2678,24 @@ export function inferFashionChoices(project: StoryboardProject): FashionChoice[]
     ];
   }
 
+  if (isAwaitingFashionSellpointGeneration(project)) {
+    return [
+      {
+        id: "regen-sellpoints",
+        title: FASHION_REGENERATE_SELLPOINTS,
+        description: "上次卖点生成未完成或失败，点此重新生成 5–8 条分层卖点",
+        message: FASHION_REGENERATE_SELLPOINTS,
+        recommended: true,
+      },
+      {
+        id: "user-sellpoints-switch",
+        title: FASHION_USER_SELLPOINTS_CHOICE,
+        description: "改为手动输入卖点",
+        message: FASHION_USER_SELLPOINTS_CHOICE,
+      },
+    ];
+  }
+
   if (isAwaitingFashionSellpoints(project)) {
     const d = workflowDeliverable(project);
     if (!d?.sellpoints?.length) return [];
@@ -1976,7 +2710,9 @@ export function inferFashionChoices(project: StoryboardProject): FashionChoice[]
         {
           id: "lock-sellpoints",
           title: FASHION_LOCK_SELLPOINTS,
-          description: "跳过润色，直接定稿并生成口播",
+          description: isStoryTheaterDeliverable(d)
+            ? "跳过润色，直接定稿并选择故事主题"
+            : "跳过润色，直接定稿并生成口播",
           message: FASHION_LOCK_SELLPOINTS,
           recommended: true,
         },
@@ -2063,10 +2799,37 @@ export function inferFashionChoices(project: StoryboardProject): FashionChoice[]
     dPendingStoryboards?.sellpointsLocked &&
     !dPendingStoryboards.selectedVersion &&
     listFashionStoryboardVersionKeys(dPendingStoryboards).length === 0 &&
-    dPendingStoryboards.voiceovers.length > 0 &&
+    (dPendingStoryboards.voiceovers?.length ?? 0) > 0 &&
     !dPendingStoryboards.selectedVoiceoverId
   ) {
     return [];
+  }
+
+  if (isAwaitingStoryTheaterPick(project)) {
+    return buildStoryTheaterVersionChoices(workflowDeliverable(project));
+  }
+
+  if (isAwaitingStoryTheaterConfirm(project)) {
+    const d = workflowDeliverable(project);
+    const key = d?.selectedStoryTheaterVersion;
+    const title = key ? d?.storyTheaterVersions?.[key]?.title : undefined;
+    return [
+      {
+        id: "confirm-story-theater",
+        title: FASHION_CONFIRM_STORY_THEATER,
+        description: key
+          ? `定稿 ${storyTheaterVersionCardTitle(key, title)}；左侧分镜表可先编辑保存`
+          : "确认左侧故事版分镜后继续",
+        message: FASHION_CONFIRM_STORY_THEATER,
+        recommended: true,
+      },
+      {
+        id: "repick-story-theater",
+        title: FASHION_REPICK_STORY_THEATER,
+        description: "返回 T1–T5 方案列表重新选择",
+        message: FASHION_REPICK_STORY_THEATER,
+      },
+    ];
   }
 
   if (isAwaitingFashionOutputMode(project)) {
@@ -2105,6 +2868,9 @@ export function fashionLlmFailureAssistantMessage(
     if (trigger.includes("voiceovers")) {
       return `口播文案生成未完成：${causeMsg}。请点击「重新生成口播文案」重试。`;
     }
+    if (trigger.includes("story-theater")) {
+      return `故事版生成未完成：${causeMsg}。请点击「重新生成故事版」重试。`;
+    }
     if (trigger.includes("storyboards")) {
       return `分镜脚本生成未完成：${causeMsg}。请点击「生成 A–E 分镜方案」重试。`;
     }
@@ -2115,6 +2881,9 @@ export function fashionLlmFailureAssistantMessage(
   }
   if (trigger.includes("voiceovers")) {
     return "口播文案生成失败（网络或服务中断）。卖点已定稿，请点击下方「重新生成口播文案」重试。";
+  }
+  if (trigger.includes("story-theater")) {
+    return "故事版生成失败（网络或服务中断）。主题已选定，请点击下方「重新生成故事版」重试。";
   }
   if (trigger.includes("storyboards")) {
     return "分镜脚本生成失败（网络或服务中断）。口播已选定，请点击下方「生成 A–E 分镜方案」重试。";
@@ -2205,6 +2974,21 @@ export function fashionMetaAfterLlmFailure(
           }
         : prevDeliverable,
       workflow: { ...prevWf, fashionPhase: "storyboard_confirm" },
+    };
+  }
+  if (trigger.includes("story-theater")) {
+    const phaseKey =
+      prevWf.proPhase != null ||
+      (typeof prevWf.vertical === "string" && prevWf.vertical !== "fashion_apparel")
+        ? "proPhase"
+        : "fashionPhase";
+    return {
+      deliverable: metaPatch.deliverable ?? prevDeliverable,
+      workflow: {
+        ...prevWf,
+        ...(metaPatch.workflow ?? {}),
+        [phaseKey]: "story_topic_pick",
+      },
     };
   }
   return { deliverable: prevDeliverable, workflow: prevWf };
@@ -2309,6 +3093,119 @@ export function fashionWorkflowPatchForChoice(
       assistantReply: config
         ? `已切换至【${config.label}】。${config.productRefAdvanceHint}`
         : undefined,
+    };
+  }
+
+  if (message === PRODUCTION_MODE_SCRIPT && deliverable) {
+    return {
+      deliverable: { ...deliverable, productionMode: "standard_script" },
+      workflow: { ...wf, ...phaseWorkflowPatch(project, "sellpoints") },
+    };
+  }
+
+  if (message === PRODUCTION_MODE_STORY && deliverable) {
+    return {
+      deliverable: { ...deliverable, productionMode: "story_theater" },
+      workflow: { ...wf, ...phaseWorkflowPatch(project, "sellpoints") },
+    };
+  }
+
+  const storyTheaterKey = parseStoryTheaterVersionChoice(message);
+  if (storyTheaterKey && deliverable && isStoryTheaterDeliverable(deliverable)) {
+    const withPanels = buildStoryTheaterDeliverableWithVersionPanels(
+      project,
+      deliverable,
+      storyTheaterKey,
+    );
+    return {
+      deliverable: {
+        ...withPanels,
+        selectedStoryTheaterVersion: storyTheaterKey,
+        storyTheaterLocked: false,
+        outputMode: null,
+      },
+      workflow: {
+        ...wf,
+        ...phaseWorkflowPatch(project, "story_theater_confirm"),
+        ...(usesProPhase(project)
+          ? { proStoryboardPanelsEdited: false }
+          : { fashionStoryboardPanelsEdited: false }),
+      },
+    };
+  }
+
+  if (message === FASHION_CONFIRM_STORY_THEATER && deliverable?.selectedStoryTheaterVersion) {
+    if (!isStoryTheaterDeliverable(deliverable)) return null;
+    if (deliverable.storyTheaterLocked && deliverable.outputMode === "direct_video") {
+      return null;
+    }
+    const key = deliverable.selectedStoryTheaterVersion;
+    const withPanels = buildStoryTheaterDeliverableWithVersionPanels(project, deliverable, key);
+    return {
+      deliverable: {
+        ...withPanels,
+        selectedStoryTheaterVersion: key,
+        storyTheaterLocked: true,
+        outputMode: "direct_video",
+      },
+      workflow: {
+        ...wf,
+        ...phaseWorkflowPatch(project, "produce"),
+        ...(usesProPhase(project)
+          ? { proProduceSetupPending: true, proStoryboardPanelsEdited: false }
+          : { fashionProduceSetupPending: true, fashionStoryboardPanelsEdited: false }),
+      },
+      syncSheet: true,
+    };
+  }
+
+  if (message === FASHION_REPICK_STORY_THEATER && deliverable && isStoryTheaterDeliverable(deliverable)) {
+    return {
+      deliverable: {
+        ...deliverable,
+        selectedStoryTheaterVersion: null,
+        storyTheaterLocked: false,
+        outputMode: null,
+      },
+      workflow: {
+        ...wf,
+        ...phaseWorkflowPatch(project, "story_theater_pick"),
+        ...(usesProPhase(project)
+          ? { proStoryboardPanelsEdited: false }
+          : { fashionStoryboardPanelsEdited: false }),
+      },
+    };
+  }
+
+  const storyTopicTitle = parseStoryTopicChoice(message);
+  if (storyTopicTitle && deliverable && isStoryTheaterDeliverable(deliverable)) {
+    const topic =
+      deliverable.selectedStoryTopic?.title === storyTopicTitle
+        ? deliverable.selectedStoryTopic
+        : deliverable.storyTopicCandidates?.find((t) => t.title === storyTopicTitle);
+    if (!topic) return null;
+    return {
+      deliverable: {
+        ...deliverable,
+        selectedStoryTopic: topic,
+        storyTopicCandidates: deliverable.storyTopicCandidates?.length
+          ? deliverable.storyTopicCandidates
+          : [topic],
+      },
+      workflow: { ...wf, ...phaseWorkflowPatch(project, "story_topic_pick") },
+      llmTrigger: llmTriggerFor(project, "story_theater"),
+    };
+  }
+
+  if (
+    message === FASHION_REGENERATE_STORY_THEATER &&
+    deliverable?.selectedStoryTopic &&
+    isStoryTheaterDeliverable(deliverable)
+  ) {
+    return {
+      deliverable,
+      workflow: { ...wf, ...phaseWorkflowPatch(project, "story_topic_pick") },
+      llmTrigger: llmTriggerFor(project, "story_theater"),
     };
   }
 
@@ -2457,9 +3354,21 @@ export function fashionWorkflowPatchForChoice(
   }
 
   if (
-    (message === FASHION_LOCK_SELLPOINTS || message === FASHION_REGENERATE_VOICEOVERS) &&
-    deliverable
+    (message === FASHION_GENERATE_VOICEOVERS || message === FASHION_REGENERATE_VOICEOVERS) &&
+    deliverable?.sellpointsLocked
   ) {
+    return {
+      deliverable: {
+        ...deliverable,
+        voiceovers: [],
+        selectedVoiceoverId: null,
+      },
+      workflow: wf,
+      llmTrigger: llmTriggerFor(project, "voiceovers"),
+    };
+  }
+
+  if (message === FASHION_LOCK_SELLPOINTS && deliverable) {
     const metaRaw = project.meta?.deliverable;
     const metaDeliverable =
       isProDeliverable(metaRaw) || isFashionDeliverable(metaRaw) ? metaRaw : null;
@@ -2486,10 +3395,15 @@ export function fashionWorkflowPatchForChoice(
       },
       workflow: {
         ...wf,
-        ...phaseWorkflowPatch(project, "sellpoints"),
+        ...phaseWorkflowPatch(
+          project,
+          isStoryTheaterDeliverable(deliverable) ? "story_topic_pick" : "sellpoints",
+        ),
         ...(usesProPhase(project) ? { proSellpointsEdited: false } : { fashionSellpointsEdited: false }),
       },
-      llmTrigger: llmTriggerFor(project, "voiceovers"),
+      llmTrigger: isStoryTheaterDeliverable(deliverable)
+        ? undefined
+        : llmTriggerFor(project, "voiceovers"),
     };
   }
 
@@ -2666,14 +3580,19 @@ export function fashionAssistantPlaceholder(project: StoryboardProject): string 
   if (isAwaitingUserSellpointInput(project)) {
     return "输入卖点（换行/分号分隔），或在左侧表格添加";
   }
+  if (isAwaitingFashionSellpointGeneration(project)) {
+    return "卖点生成未完成，请点「重新生成卖点」，或改为「我来输入卖点」";
+  }
   if (isAwaitingFashionSellpoints(project) && getSellpointInputMode(project) === "user") {
     return "可编辑左侧卖点表；选 AI润色 或 确认卖点清单";
   }
   if (isAwaitingFashionSellpoints(project)) {
     return "输入卖点关键词，或点选「AI自动生成卖点」";
   }
-  if (isAwaitingFashionVoiceoverGeneration(project)) {
-    return "口播文案生成未完成，请点「重新生成口播文案」";
+  if (isAwaitingFashionVoiceoverPending(project)) {
+    return hasFashionVoiceoverGenerationFailed(project)
+      ? "口播文案生成未完成，请点「重新生成口播文案」"
+      : "卖点已定稿，请点「生成口播文案」";
   }
   if (isAwaitingFashionVoiceoverPick(project)) {
     return "请点选一套口播文案继续";
@@ -2687,8 +3606,20 @@ export function fashionAssistantPlaceholder(project: StoryboardProject): string 
   if (isAwaitingFashionStoryboardConfirm(project)) {
     return "请查看左侧 12.1 分镜表，确认定稿后点「确认分镜，生成运营包」";
   }
-  if (isAwaitingFashionOutputMode(project)) {
-    return "请选择成片方式：分镜脚本交付，或故事版一键成片";
+  if (isAwaitingProductionModePick(project)) {
+    return "请选择产出方式：分镜脚本标准线，或故事剧场线";
+  }
+  if (isAwaitingStoryTopicPick(project)) {
+    return "请点选下方故事主题（5 选 1）";
+  }
+  if (isAwaitingStoryTheaterPick(project)) {
+    const count = listStoryTheaterVersionKeys(workflowDeliverable(project)).length;
+    return count > 0
+      ? `请点选 T1–T5 故事版方案继续（已生成 ${count} 套）`
+      : "请点选 T1–T5 故事版分镜方案";
+  }
+  if (isAwaitingStoryTheaterConfirm(project)) {
+    return "请查看左侧故事剧场分镜表，编辑保存后点「确认故事版，开始成片」";
   }
   const d = workflowDeliverable(project);
   if (getFashionPhase(project) === "produce" && d?.outputMode) {

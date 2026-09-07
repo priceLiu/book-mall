@@ -22,6 +22,8 @@ type Props = {
   mergeBusy?: boolean;
   canMerge?: boolean;
   onMergePanels?: () => void;
+  /** 与左侧完整分镜图同高（路径 B 分镜图就绪、待成片） */
+  matchSheetPreview?: boolean;
   onPreviewVideo?: () => void;
 };
 
@@ -41,18 +43,23 @@ export function StoryboardResultCard({
   canMerge,
   onMergePanels,
   onPreviewVideo,
+  matchSheetPreview = false,
 }: Props) {
   const hasVideo = isStoryboardVideoUrl(videoSrc);
+  const usePreviewFrame = hasVideo || busy || matchSheetPreview;
 
   return (
-    <div className="isolate flex min-w-0 flex-col">
+    <div className="isolate flex h-full min-w-0 flex-col">
       <p className="mb-2 text-sm font-bold text-[#1d1d1f]">{label}</p>
       <div
         className={cn(
           "relative isolate w-full overflow-hidden rounded-xl border border-[#e8e8ed]",
           STORYBOARD_PREVIEW_MIN_H,
-          hasVideo || busy
-            ? cn(storyboardPreviewAspectClass(aspectRatio), "bg-black")
+          usePreviewFrame
+            ? cn(
+                storyboardPreviewAspectClass(aspectRatio),
+                hasVideo || busy ? "bg-black" : "bg-[#f5f5f7]",
+              )
             : "bg-[#f5f5f7]",
         )}
       >

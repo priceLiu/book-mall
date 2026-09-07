@@ -436,9 +436,10 @@ export function StoryboardModelPickerDialog({
     () =>
       filterImageSizeOptionsByEcomRatio(
         imageSizeOptionsForModel(draftKey, { lockedRatio: hasLockedRatio }),
-        lockedRatioHint,
+        lockedRatioHint ||
+          (aspectRatio === "16:9" || aspectRatio === "9:16" ? aspectRatio : undefined),
       ),
-    [draftKey, lockedRatioHint, hasLockedRatio],
+    [draftKey, lockedRatioHint, hasLockedRatio, aspectRatio],
   );
   const currentVideoResolutionOptions = useMemo(
     () => videoResolutionOptionsForModel(draftKey),

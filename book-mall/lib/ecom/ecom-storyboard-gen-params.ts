@@ -34,7 +34,21 @@ export function resolveWan27ImageSize(opts: {
     "928*1664": "960*1696",
   };
   if (raw && map[raw]) return map[raw]!;
-  if (raw?.includes("*")) return raw;
+  if (raw?.includes("*")) {
+    const [w, h] = raw.split("*").map(Number);
+    if (w > 0 && h > 0) {
+      const r = w / h;
+      const isLandscape = Math.abs(r - 16 / 9) < 0.08;
+      const isPortrait916 = Math.abs(r - 9 / 16) < 0.08;
+      const aspectRatio = opts.aspectRatio === "16:9" ? "16:9" : "9:16";
+      if (
+        (aspectRatio === "16:9" && isLandscape) ||
+        (aspectRatio === "9:16" && isPortrait916)
+      ) {
+        return raw;
+      }
+    }
+  }
   return opts.aspectRatio === "16:9" ? "1696*960" : "960*1696";
 }
 
@@ -69,14 +83,26 @@ export function resolveWanxImageSize(opts: {
   aspectRatio?: "16:9" | "9:16";
   imageSize?: string;
 }): EcomStoryboardWanxSize {
+  const aspectRatio = opts.aspectRatio === "16:9" ? "16:9" : "9:16";
   const raw = opts.imageSize?.trim();
   if (raw && raw.includes("*")) {
-    return raw as EcomStoryboardWanxSize;
+    const [w, h] = raw.split("*").map(Number);
+    if (w > 0 && h > 0) {
+      const r = w / h;
+      const isLandscape = Math.abs(r - 16 / 9) < 0.08;
+      const isPortrait916 = Math.abs(r - 9 / 16) < 0.08;
+      if (
+        (aspectRatio === "16:9" && isLandscape) ||
+        (aspectRatio === "9:16" && isPortrait916)
+      ) {
+        return raw as EcomStoryboardWanxSize;
+      }
+    }
   }
   if (raw && (ECOM_STORYBOARD_WANX_SIZES as readonly string[]).includes(raw)) {
     return raw as EcomStoryboardWanxSize;
   }
-  return opts.aspectRatio === "16:9" ? "1280*720" : "720*1280";
+  return aspectRatio === "16:9" ? "1280*720" : "720*1280";
 }
 
 /** 统一生图链路：模型 + 比例 + 可选像素尺寸 → 下发厂商 size */

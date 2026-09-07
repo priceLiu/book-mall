@@ -329,6 +329,7 @@ export function FashionPanelsTable({
   editable = false,
   saving = false,
   onSavePanels,
+  storyTheaterMode = false,
 }: {
   panels: StoryboardPanelRow[];
   sellpoints?: FashionSellpoint[];
@@ -336,8 +337,10 @@ export function FashionPanelsTable({
   editable?: boolean;
   saving?: boolean;
   onSavePanels?: (panels: FashionPanelRow[]) => void | Promise<void>;
+  storyTheaterMode?: boolean;
 }) {
   const spMap = new Map((sellpoints ?? []).map((sp) => [sp.id, sp.text]));
+  const sellpointIdsFor = (p: StoryboardPanelRow) => p.sellpointIds ?? [];
   if (!panels.length) return <p className="text-sm text-[#86868b]">暂无分镜</p>;
 
   function patchPanel(index: FashionPanelRow["index"], patch: Partial<FashionPanelRow>) {
@@ -383,7 +386,8 @@ export function FashionPanelsTable({
               "生视频Prompt",
               "动作",
               panelFocusLabel,
-              "口播",
+              storyTheaterMode ? "旁白" : "口播",
+              ...(storyTheaterMode ? ["情绪", "字幕"] : []),
               "卖点ID",
             ].map((h) => (
               <th key={h} className={ecomDataTableThClass}>
@@ -524,7 +528,7 @@ export function FashionPanelsTable({
                 )}
               </td>
               <td className={cn(ecomDataTableTdClass, "min-w-0")}>
-                {editable ? (
+                {editable && !storyTheaterMode ? (
                   <FashionEditableTextCell
                     value={escCell(p.dialogue ?? "")}
                     editable
@@ -536,17 +540,27 @@ export function FashionPanelsTable({
                   escCell(p.dialogue)
                 )}
               </td>
+              {storyTheaterMode ? (
+                <>
+                  <td className={cn(ecomDataTableTdClass, "min-w-0")}>
+                    {escCell(p.toneTexture)}
+                  </td>
+                  <td className={cn(ecomDataTableTdClass, "min-w-0")}>
+                    {escCell(p.subtitle)}
+                  </td>
+                </>
+              ) : null}
               <td className={cn(ecomDataTableTdClass, "min-w-0")}>
                 {editable ? (
                   <FashionEditableTextCell
-                    value={p.sellpointIds.join("、")}
+                    value={sellpointIdsFor(p).join("、")}
                     editable
                     saving={saving}
                     editTitle="编辑卖点ID"
                     onSave={(text) => patchPanel(p.index, { sellpointIds: parseSellpointIds(text) })}
                   />
                 ) : (
-                  p.sellpointIds.map((id) => spMap.get(id) ?? id).join("、") || "—"
+                  sellpointIdsFor(p).map((id) => spMap.get(id) ?? id).join("、") || "—"
                 )}
               </td>
             </tr>
@@ -581,7 +595,7 @@ export function FashionCoverageTable({
         <tbody>
           {coreVisual.map((sp) => {
             const indexes = panels
-              .filter((p) => p.sellpointIds.includes(sp.id))
+              .filter((p) => (p.sellpointIds ?? []).includes(sp.id))
               .map((p) => p.index);
             return (
               <tr key={sp.id} className={ecomDataTableBodyRowClass}>

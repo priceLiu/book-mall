@@ -1,13 +1,14 @@
-import type { ProDeliverable, ProPanelRow, ProVersionKey, ProVerticalId } from "@/lib/pro-vertical/types";
+import type { ProDeliverable, ProPanelRow, ProVersionKey, ProVerticalId, StoryTheaterVersion } from "@/lib/pro-vertical/types";
 import { isProDeliverable } from "@/lib/pro-vertical/types";
 import { isProVerticalId } from "@/lib/pro-vertical/registry";
+import type { StoryTheaterVersionKey } from "@/lib/story-theater-types";
 
 const PRO_FENCE_RE = /```pro-deliverable\s*([\s\S]*?)```/i;
 const FASHION_FENCE_RE = /```fashion-deliverable\s*([\s\S]*?)```/i;
 const GENERIC_FENCE_RE = /```(?:json)?\s*([\s\S]*?)```/i;
 
 /** 与 book-mall/doc/ecom/pro-deliverable-spec-v1.md §7.1 一致 */
-export type ProLlmPhase = "sellpoints" | "voiceovers" | "storyboards" | "ops";
+export type ProLlmPhase = "sellpoints" | "voiceovers" | "storyboards" | "ops" | "story_theater";
 
 function productFocusFallback(vertical: ProVerticalId): string {
   if (vertical === "bags") return "包包展示";
@@ -66,8 +67,34 @@ function coerceProPanels(raw: unknown, vertical: ProVerticalId): ProPanelRow[] {
     .filter(Boolean) as ProPanelRow[];
 }
 
+function coerceStoryTheaterVersionsInPatch(
+  raw: unknown,
+  vertical: ProVerticalId,
+): Partial<Record<StoryTheaterVersionKey, StoryTheaterVersion>> {
+  if (!raw || typeof raw !== "object") return {};
+  const obj = raw as Record<string, unknown>;
+  const next: Partial<Record<StoryTheaterVersionKey, StoryTheaterVersion>> = {};
+  for (const key of ["T1", "T2", "T3", "T4", "T5"] as StoryTheaterVersionKey[]) {
+    const version = obj[key];
+    if (!version || typeof version !== "object") continue;
+    const v = version as Record<string, unknown>;
+    next[key] = {
+      id: key,
+      title: typeof v.title === "string" ? v.title : `${key}版`,
+      summary: typeof v.summary === "string" ? v.summary : undefined,
+      panels: coerceProPanels(v.panels, vertical),
+      totalDurationSec:
+        typeof v.totalDurationSec === "number" ? v.totalDurationSec : undefined,
+    };
+  }
+  return next;
+}
+
 function detectProPhaseFromPayload(parsed: Record<string, unknown>): ProLlmPhase | null {
   if (parsed.opsPack != null && typeof parsed.opsPack === "object") return "ops";
+  if (parsed.storyTheaterVersions != null && typeof parsed.storyTheaterVersions === "object") {
+    return "story_theater";
+  }
   if (parsed.storyboardVersions != null && typeof parsed.storyboardVersions === "object") {
     return "storyboards";
   }
@@ -98,6 +125,19 @@ export function pickProPhaseMergePatch(
     }
     case "ops":
       return patch.opsPack != null ? { opsPack: patch.opsPack } : {};
+    case "story_theater": {
+      const next: Partial<ProDeliverable> = {};
+      if (patch.storyTheaterVersions && Object.keys(patch.storyTheaterVersions).length > 0) {
+        next.storyTheaterVersions = patch.storyTheaterVersions;
+      }
+      if (patch.selectedStoryTopic) {
+        next.selectedStoryTopic = patch.selectedStoryTopic;
+      }
+      if (patch.coverageChecklist?.length) {
+        next.coverageChecklist = patch.coverageChecklist;
+      }
+      return next;
+    }
   }
 }
 
@@ -155,6 +195,19 @@ function validateProPhasePatch(
     case "ops":
       if (parsed.opsPack == null || typeof parsed.opsPack !== "object") return null;
       return { opsPack: parsed.opsPack as ProDeliverable["opsPack"] };
+    case "story_theater": {
+      const storyTheaterVersions = coerceStoryTheaterVersionsInPatch(
+        parsed.storyTheaterVersions,
+        vertical,
+      );
+      if (Object.keys(storyTheaterVersions).length === 0) return null;
+      const patch: Partial<ProDeliverable> = { storyTheaterVersions };
+      if (parsed.selectedStoryTopic && typeof parsed.selectedStoryTopic === "object") {
+        patch.selectedStoryTopic =
+          parsed.selectedStoryTopic as ProDeliverable["selectedStoryTopic"];
+      }
+      return patch;
+    }
   }
 }
 
@@ -271,6 +324,27 @@ export function mergeProDeliverableState(
       base.storyboardLocked || patch.storyboardLocked
         ? (patch.outputMode ?? base.outputMode)
         : base.outputMode,
+    productionMode: patch.productionMode ?? base.productionMode ?? null,
+    storyTopicCandidates:
+      patch.storyTopicCandidates?.length
+        ? patch.storyTopicCandidates
+        : base.storyTopicCandidates,
+    selectedStoryTopic:
+      patch.selectedStoryTopic !== undefined
+        ? patch.selectedStoryTopic
+        : base.selectedStoryTopic,
+    storyTheaterVersions: coerceStoryTheaterVersionsInPatch(
+      {
+        ...(base.storyTheaterVersions ?? {}),
+        ...(patch.storyTheaterVersions ?? {}),
+      },
+      base.vertical,
+    ),
+    selectedStoryTheaterVersion:
+      patch.selectedStoryTheaterVersion !== undefined
+        ? patch.selectedStoryTheaterVersion
+        : base.selectedStoryTheaterVersion,
+    storyTheaterLocked: base.storyTheaterLocked || Boolean(patch.storyTheaterLocked),
   };
 }
 

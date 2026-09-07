@@ -17,7 +17,6 @@ type Props = {
   projectKeywords?: string;
   activeImageGenPanels: ReadonlySet<number>;
   imgBusy?: boolean;
-  submitBusy?: boolean;
   charGenBusy?: boolean;
   characterMode?: FashionCharacterRefMode;
   hasCharacterRef?: boolean;
@@ -28,13 +27,16 @@ type Props = {
   onGenerateSelected: (panelIndexes: number[]) => void;
   onGenerateAll: () => void;
   onClearPanelImages: () => void;
-  onSubmitStoryboard?: () => void;
+  /** 6 镜分镜图就绪后，提交整页故事版至视频模型（不再生成分镜图） */
+  onSubmitStoryboardVideo?: () => void;
+  videoSubmitBusy?: boolean;
   onResyncSheet?: () => void;
   resyncBusy?: boolean;
   onOpenSheetPreview?: () => void;
   onPreviewImage?: (src: string, title: string) => void;
   onPreviewPanelPrompt?: (panelIndex: number) => void;
   sheetHeading?: string;
+  panelAspectRatio?: "16:9" | "9:16";
 };
 
 /**
@@ -48,7 +50,6 @@ export function FashionStoryboardSheetWorkspace({
   projectKeywords,
   activeImageGenPanels,
   imgBusy = false,
-  submitBusy = false,
   charGenBusy = false,
   characterMode,
   hasCharacterRef = false,
@@ -59,16 +60,17 @@ export function FashionStoryboardSheetWorkspace({
   onGenerateSelected,
   onGenerateAll,
   onClearPanelImages,
-  onSubmitStoryboard,
+  onSubmitStoryboardVideo,
+  videoSubmitBusy = false,
   onResyncSheet,
   resyncBusy = false,
   onOpenSheetPreview,
   onPreviewImage,
   onPreviewPanelPrompt,
   sheetHeading = "服装专业版分镜故事版",
+  panelAspectRatio = "9:16",
 }: Props) {
   const [selectedPanels, setSelectedPanels] = useState<Set<number>>(() => new Set());
-  const busy = imgBusy || activeImageGenPanels.size > 0 || submitBusy || resyncBusy || charGenBusy;
 
   const togglePanel = useCallback((panelIndex: number) => {
     setSelectedPanels((prev) => {
@@ -84,13 +86,20 @@ export function FashionStoryboardSheetWorkspace({
     [selectedPanels],
   );
 
+  const setupLocked = resyncBusy || charGenBusy || videoSubmitBusy;
+  const batchImageBusy = imgBusy;
+  const selectedReady = useMemo(
+    () => selectedList.filter((index) => !activeImageGenPanels.has(index)),
+    [selectedList, activeImageGenPanels],
+  );
+
   const charModeLabel =
     characterMode === "ai"
-      ? "AI 生成角色"
+      ? "AI 生成模特"
       : characterMode === "upload"
         ? hasCharacterRef
-          ? "已上传角色图"
-          : "上传角色图（待上传）"
+          ? "已上传模特图"
+          : "上传模特图（待上传）"
         : "未选择";
 
   return (
@@ -101,7 +110,7 @@ export function FashionStoryboardSheetWorkspace({
           <EcomButtonSecondary
             type="button"
             size="sm"
-            disabled={busy}
+            disabled={setupLocked || batchImageBusy}
             className={characterMode === "ai" ? "bg-[#f0f6ff]" : undefined}
             onClick={() => onCharacterModeChange("ai")}
           >
@@ -111,28 +120,33 @@ export function FashionStoryboardSheetWorkspace({
                 AI 生成中…
               </>
             ) : (
-              "AI 生成角色"
+              "AI 生成模特"
             )}
           </EcomButtonSecondary>
           <EcomButtonSecondary
             type="button"
             size="sm"
-            disabled={busy}
+            disabled={setupLocked || batchImageBusy}
             className={characterMode === "upload" ? "bg-[#f0f6ff]" : undefined}
             onClick={() => onCharacterModeChange("upload")}
           >
-            上传角色图
+            上传模特图
           </EcomButtonSecondary>
           {onResyncSheet ? (
-            <EcomButtonSecondary type="button" size="sm" disabled={busy} onClick={onResyncSheet}>
+            <EcomButtonSecondary
+              type="button"
+              size="sm"
+              disabled={setupLocked || batchImageBusy}
+              onClick={onResyncSheet}
+            >
               {resyncBusy ? "同步中…" : "重新同步故事版"}
             </EcomButtonSecondary>
           ) : null}
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-[#6e6e73]">
-          当前：角色 {charModeLabel}。
+          当前：模特 {charModeLabel}。
           {!setupReady
-            ? " 点击「生成分镜图」时会先选择角色参考方式，再选择生图模型。"
+            ? " 点击「生成分镜图」时会先选择模特参考方式，再选择生图模型。"
             : " 可勾选镜头单独生成，或一键生成全部；每次生成前会弹出模型选择。"}
         </p>
       </div>
@@ -140,35 +154,45 @@ export function FashionStoryboardSheetWorkspace({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[11px] leading-relaxed text-[#6e6e73]">
           各镜下方为分镜脚本；勾选后可「生成选中镜」。
+          {onSubmitStoryboardVideo
+            ? allPanelsHaveImages
+              ? " 6 镜分镜图已就绪，可点「提交故事版生视频」选择模型并提交成片（不会重新生成分镜图）。"
+              : " 全部镜位生图完成后，「提交故事版生视频」才会可用。"
+            : null}
         </p>
         <div className="flex flex-wrap gap-2">
           {onOpenSheetPreview ? (
-            <EcomButtonSecondary type="button" size="sm" disabled={busy} onClick={onOpenSheetPreview}>
+            <EcomButtonSecondary
+              type="button"
+              size="sm"
+              disabled={setupLocked}
+              onClick={onOpenSheetPreview}
+            >
               放大预览
             </EcomButtonSecondary>
           ) : null}
           <EcomButtonSecondary
             type="button"
             size="sm"
-            disabled={busy || selectedList.length === 0}
+            disabled={setupLocked || batchImageBusy || selectedReady.length === 0}
             onClick={() => {
-              const indexes = selectedList;
+              const indexes = selectedReady;
               setSelectedPanels(new Set());
               onGenerateSelected(indexes);
             }}
           >
-            生成选中镜{selectedList.length > 0 ? `（${selectedList.length}）` : ""}
+            生成选中镜{selectedReady.length > 0 ? `（${selectedReady.length}）` : ""}
           </EcomButtonSecondary>
           <EcomButtonPrimary
             type="button"
             size="sm"
-            disabled={busy}
+            disabled={setupLocked || batchImageBusy}
             onClick={() => {
               setSelectedPanels(new Set());
               onGenerateAll();
             }}
           >
-            {busy ? (
+            {batchImageBusy ? (
               <>
                 <Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />
                 生成中…
@@ -177,17 +201,22 @@ export function FashionStoryboardSheetWorkspace({
               "生成全部分镜图"
             )}
           </EcomButtonPrimary>
-          <EcomButtonSecondary type="button" size="sm" disabled={busy} onClick={onClearPanelImages}>
+          <EcomButtonSecondary
+            type="button"
+            size="sm"
+            disabled={setupLocked || batchImageBusy}
+            onClick={onClearPanelImages}
+          >
             清空分镜图
           </EcomButtonSecondary>
-          {onSubmitStoryboard ? (
+          {onSubmitStoryboardVideo ? (
             <EcomButtonPrimary
               type="button"
               size="sm"
-              disabled={busy || !allPanelsHaveImages}
-              onClick={onSubmitStoryboard}
+              disabled={setupLocked || batchImageBusy || !allPanelsHaveImages}
+              onClick={onSubmitStoryboardVideo}
             >
-              {submitBusy ? "提交中…" : "生成故事版并提交"}
+              {videoSubmitBusy ? "生成中…" : "提交故事版生视频"}
             </EcomButtonPrimary>
           ) : null}
         </div>
@@ -201,6 +230,7 @@ export function FashionStoryboardSheetWorkspace({
           productHighlight={productHighlight}
           projectKeywords={projectKeywords}
           sheetHeading={sheetHeading}
+          panelAspectRatio={panelAspectRatio}
           exportRootId="fashion-storyboard-sheet-workspace"
           variant="preview"
           interactive

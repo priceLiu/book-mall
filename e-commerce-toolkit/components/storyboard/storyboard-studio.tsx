@@ -31,6 +31,10 @@ import {
 } from "@/lib/ecom-storyboard-api";
 import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
 import {
+  defaultImageSizeForModel,
+  type StoryboardWanxSize,
+} from "@/lib/storyboard-gen-params";
+import {
   resolveStoryboardVideoFullSheetDurationRange,
   resolveSheetTotalDurationHintSec,
 } from "@/lib/storyboard-video-params";
@@ -479,7 +483,7 @@ export function StoryboardStudio() {
     if (!project) return;
     const ref = project.references.find((r) => r.id === refId);
     const roleLabel =
-      ref?.role === "product" ? "产品图" : ref?.role === "character" ? "角色图" : "场景图";
+      ref?.role === "product" ? "产品图" : ref?.role === "character" ? "模特图" : "场景图";
     if (
       !(await doubleConfirm({
         title: `删除${roleLabel}`,
@@ -692,8 +696,14 @@ export function StoryboardStudio() {
           onAspectChange={(v) => {
             setAspectRatio(v);
             setVideoAspectRatio(v);
+            const nextImageSize = defaultImageSizeForModel(settings.imageModelKey, v);
+            setSettings((s) => ({ ...s, imageSize: nextImageSize as StoryboardWanxSize }));
             updateStoryboardProject(project.id, {
               settings: { ...project.settings, durationSec, aspectRatio: v },
+              meta: {
+                ...project.meta,
+                workflow: { ...project.meta?.workflow, imageSize: nextImageSize },
+              },
             }).catch(() => undefined);
           }}
           onPngReady={(url) =>

@@ -465,3 +465,266 @@ export function SceneLibraryAdmin() {
     </CatalogListShell>
   );
 }
+
+type StoryTheaterVertical = "fashion_apparel" | "bags" | "digital_3c";
+
+type StoryTheaterTopicRow = {
+  id: string;
+  vertical: StoryTheaterVertical;
+  title: string;
+  storyCore: string;
+  storyType: string;
+  tags?: string[];
+  sortOrder?: number;
+  enabled?: boolean;
+};
+
+const STORY_THEATER_VERTICAL_OPTIONS: Array<{ value: StoryTheaterVertical | "all"; label: string }> = [
+  { value: "all", label: "全部垂类" },
+  { value: "fashion_apparel", label: "服装" },
+  { value: "bags", label: "包包" },
+  { value: "digital_3c", label: "3C数码" },
+];
+
+export function StoryTheaterTopicAdmin() {
+  const [rows, setRows] = useState<StoryTheaterTopicRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState<StoryTheaterTopicRow | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [verticalFilter, setVerticalFilter] = useState<StoryTheaterVertical | "all">("all");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const qs =
+        verticalFilter !== "all"
+          ? `?vertical=${encodeURIComponent(verticalFilter)}`
+          : "";
+      const res = await fetch(`/api/admin/ecom/story-theater-topics/models${qs}`);
+      const data = (await res.json()) as { topics?: StoryTheaterTopicRow[]; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "加载失败");
+      setRows(data.topics ?? []);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "加载失败");
+    } finally {
+      setLoading(false);
+    }
+  }, [verticalFilter]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function save() {
+    if (!form) return;
+    setSaving(true);
+    try {
+      const isEdit = form.id && rows.some((r) => r.id === form.id);
+      const payload = {
+        ...form,
+        tags: form.tags ?? [],
+      };
+      const res = await fetch(
+        isEdit
+          ? `/api/admin/ecom/story-theater-topics/models/${encodeURIComponent(form.id)}`
+          : "/api/admin/ecom/story-theater-topics/models",
+        {
+          method: isEdit ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "保存失败");
+      setForm(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "保存失败");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove(row: StoryTheaterTopicRow) {
+    if (
+      !confirmDestructiveTwice(
+        `确定删除故事主题「${row.title}」？`,
+        "此操作不可恢复，删除后助手将不再展示该选题。",
+      )
+    ) {
+      return;
+    }
+    const res = await fetch(
+      `/api/admin/ecom/story-theater-topics/models/${encodeURIComponent(row.id)}`,
+      { method: "DELETE" },
+    );
+    if (res.ok) await load();
+  }
+
+  return (
+    <CatalogListShell
+      title="故事主题库"
+      loading={loading}
+      error={error}
+      onAdd={() =>
+        setForm({
+          id: "",
+          vertical: verticalFilter !== "all" ? verticalFilter : "fashion_apparel",
+          title: "",
+          storyCore: "",
+          storyType: "",
+          tags: [],
+          sortOrder: 0,
+          enabled: true,
+        })
+      }
+    >
+      <div className="mb-2">
+        <select
+          className="rounded border px-2 py-1 text-xs"
+          value={verticalFilter}
+          onChange={(e) => setVerticalFilter(e.target.value as StoryTheaterVertical | "all")}
+        >
+          {STORY_THEATER_VERTICAL_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="overflow-x-auto rounded border">
+        <table className="min-w-[900px] w-full text-left text-xs">
+          <thead className="bg-[#1d1d1f] text-white">
+            <tr>
+              <th className="px-2 py-2 align-top">ID</th>
+              <th className="px-2 py-2 align-top">垂类</th>
+              <th className="px-2 py-2 align-top">标题</th>
+              <th className="px-2 py-2 align-top">故事核心</th>
+              <th className="px-2 py-2 align-top">类型</th>
+              <th className="px-2 py-2 align-top">标签</th>
+              <th className="px-2 py-2 align-top">排序</th>
+              <th className="px-2 py-2 align-top">启用</th>
+              <th className="px-2 py-2 align-top">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} className="border-t align-top">
+                <td className="px-2 py-2 font-mono">{r.id}</td>
+                <td className="px-2 py-2">{r.vertical}</td>
+                <td className="px-2 py-2">{r.title}</td>
+                <td className="max-w-xs px-2 py-2 text-muted-foreground">{r.storyCore}</td>
+                <td className="px-2 py-2">{r.storyType}</td>
+                <td className="px-2 py-2 text-muted-foreground">
+                  {r.tags?.length ? r.tags.join(", ") : "—"}
+                </td>
+                <td className="px-2 py-2">{r.sortOrder ?? 0}</td>
+                <td className="px-2 py-2">{r.enabled !== false ? "是" : "否"}</td>
+                <td className="px-2 py-2">
+                  <button type="button" className="mr-2 text-[#0969da]" onClick={() => setForm(r)}>
+                    编辑
+                  </button>
+                  <button type="button" className="text-red-600" onClick={() => void remove(r)}>
+                    删除
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {form ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-4 shadow">
+            <h4 className="mb-3 font-semibold">
+              {form.id && rows.some((r) => r.id === form.id) ? "编辑" : "新建"}故事主题
+            </h4>
+            <div className="space-y-2 text-xs">
+              <input
+                className="w-full rounded border px-2 py-1"
+                placeholder="id"
+                value={form.id}
+                onChange={(e) => setForm({ ...form, id: e.target.value })}
+              />
+              <select
+                className="w-full rounded border px-2 py-1"
+                value={form.vertical}
+                onChange={(e) =>
+                  setForm({ ...form, vertical: e.target.value as StoryTheaterVertical })
+                }
+              >
+                <option value="fashion_apparel">服装 (fashion_apparel)</option>
+                <option value="bags">包包 (bags)</option>
+                <option value="digital_3c">3C数码 (digital_3c)</option>
+              </select>
+              <input
+                className="w-full rounded border px-2 py-1"
+                placeholder="title"
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+              />
+              <textarea
+                className="min-h-[80px] w-full rounded border px-2 py-1"
+                placeholder="storyCore"
+                value={form.storyCore}
+                onChange={(e) => setForm({ ...form, storyCore: e.target.value })}
+              />
+              <input
+                className="w-full rounded border px-2 py-1"
+                placeholder="storyType（如：痛点治愈、场景适配）"
+                value={form.storyType}
+                onChange={(e) => setForm({ ...form, storyType: e.target.value })}
+              />
+              <input
+                className="w-full rounded border px-2 py-1"
+                placeholder="tags 逗号分隔"
+                value={form.tags?.join(", ") ?? ""}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    tags: e.target.value
+                      .split(",")
+                      .map((s) => s.trim())
+                      .filter(Boolean),
+                  })
+                }
+              />
+              <input
+                type="number"
+                className="w-full rounded border px-2 py-1"
+                placeholder="sortOrder"
+                value={form.sortOrder ?? 0}
+                onChange={(e) =>
+                  setForm({ ...form, sortOrder: Number(e.target.value) || 0 })
+                }
+              />
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.enabled !== false}
+                  onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
+                />
+                启用
+              </label>
+            </div>
+            <div className="mt-3 flex justify-end gap-2">
+              <button type="button" className="rounded border px-3 py-1" onClick={() => setForm(null)}>
+                取消
+              </button>
+              <button
+                type="button"
+                className="rounded bg-[#0969da] px-3 py-1 text-white"
+                disabled={saving}
+                onClick={() => void save()}
+              >
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </CatalogListShell>
+  );
+}

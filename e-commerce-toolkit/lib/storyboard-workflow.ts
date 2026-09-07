@@ -272,7 +272,7 @@ export function isAwaitingProductNameInput(project: StoryboardProject): boolean 
 export function characterRefStepDone(project: StoryboardProject): boolean {
   const wf = project.meta?.workflow ?? {};
   return (
-    userSaid(project, ["已上传角色图"]) ||
+    userSaid(project, ["已上传模特图", "已上传角色图"]) ||
     Boolean(wf.autoGenCharacter) ||
     Boolean(wf.characterPresetKey) ||
     Boolean(wf.skippedCharacter)
@@ -302,7 +302,7 @@ export function willStoryboardAutoGenCharacter(
 }
 
 export const STORYBOARD_CHARACTER_REF_REQUIRED_MESSAGE =
-  "各镜头人物一致须绑定角色参考图。请在左侧上传角色图，或在流程中完成「角色图」步骤（选择自动生成），再重新生成分镜图与视频。";
+  "各镜头人物一致须绑定模特参考图。请在左侧上传模特图，或在流程中完成「模特图」步骤（选择自动生成），再重新生成分镜图与视频。";
 
 export function hasSceneReference(project: StoryboardProject): boolean {
   return project.references.some((r) => r.role === "scene" || r.role === "other");
@@ -592,7 +592,7 @@ export function resolveAssistantComposerPlaceholder(project: StoryboardProject):
 
   if (isInPostPlanRefWorkflow(project)) {
     if (!characterRefStepDone(project)) {
-      return "请上传角色图、选择预设，或点击「跳过」…";
+      return "请上传模特图、选择预设，或点击「跳过」…";
     }
     if (!sceneRefStepDone(project)) {
       return "请选择场景预设、上传场景图，或点击「跳过」…";
@@ -605,7 +605,7 @@ export function resolveAssistantComposerPlaceholder(project: StoryboardProject):
 
   if (hasPlanning && !hasSheet) {
     if (!characterRefStepDone(project)) {
-      return "请上传角色图、选择预设，或点击「跳过」…";
+      return "请上传模特图、选择预设，或点击「跳过」…";
     }
     if (!sceneRefStepDone(project)) {
       return "请选择场景预设、上传场景图，或点击「跳过」…";
@@ -672,7 +672,7 @@ export function inferAssistantChoices(project: StoryboardProject): string[] {
   if (isInPostPlanRefWorkflow(project)) {
     if (!characterRefStepDone(project)) {
       return [
-        "已上传角色图",
+        "已上传模特图",
         CHARACTER_PRESET_FEMALE_CHOICE,
         CHARACTER_PRESET_MALE_CHOICE,
         "是，自动生成角色",

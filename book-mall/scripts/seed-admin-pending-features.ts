@@ -1087,6 +1087,70 @@ const SEED_ITEMS: {
     sortOrder: 629,
     listKind: "PENDING",
   },
+  // —— 故事剧场模式 · 见 book-mall/doc/plans/2026-09-story-theater-mode.md ——
+  {
+    title: "ST-001 故事剧场 · 总规格",
+    description: "productionMode story_theater、T1–T5 故事版、三垂类选题与助手流程 SSOT。",
+    docPath: "book-mall/doc/plans/2026-09-story-theater-mode.md",
+    sortOrder: 720,
+    listKind: "PENDING",
+  },
+  {
+    title: "ST-002 故事剧场 · Schema 与迁移",
+    description: "EcomStoryTheaterTopic 表 + db:apply-pending + Prisma generate。",
+    docPath: "book-mall/doc/plans/2026-09-story-theater-mode.md",
+    sortOrder: 721,
+    listKind: "PENDING",
+  },
+  {
+    title: "ST-003 故事剧场 · 选题 service 与 API",
+    description: "list/upsert/delete + Admin GET/POST/PATCH/DELETE + SSO sample 路由。",
+    docPath: "book-mall/doc/plans/2026-09-story-theater-mode.md",
+    sortOrder: 722,
+    listKind: "PENDING",
+  },
+  {
+    title: "ST-004 故事剧场 · Admin 故事主题库 UI",
+    description: "模板管理后台 ecom=story-topics Tab：垂类筛选、CRUD、黑表头。",
+    docPath: "book-mall/doc/plans/2026-09-story-theater-mode.md",
+    sortOrder: 723,
+    listKind: "PENDING",
+  },
+  {
+    title: "ST-005 故事剧场 · 种子选题库",
+    description: "story-theater-topic-seed-data 三垂类各 10 条 + seed-story-theater-topics 脚本。",
+    docPath: "book-mall/doc/plans/2026-09-story-theater-mode.md",
+    sortOrder: 724,
+    listKind: "PENDING",
+  },
+  {
+    title: "ST-006 故事剧场 · 服装提示词库",
+    description: "fashion_apparel 垂类 T1–T5 系统提示词与选题对齐（docs/故事版服装提示词 库.md）。",
+    docPath: "docs/故事版服装提示词 库.md",
+    sortOrder: 725,
+    listKind: "PENDING",
+  },
+  {
+    title: "ST-007 故事剧场 · 包包提示词库",
+    description: "bags 垂类 T1–T5 系统提示词与选题对齐（docs/故事版包包提示词 库.md）。",
+    docPath: "docs/故事版包包提示词 库.md",
+    sortOrder: 726,
+    listKind: "PENDING",
+  },
+  {
+    title: "ST-008 故事剧场 · 3C数码提示词库",
+    description: "digital_3c 垂类 T1–T5 系统提示词与选题对齐（docs/故事版3C数码提示词 库.md）。",
+    docPath: "docs/故事版3C数码提示词 库.md",
+    sortOrder: 727,
+    listKind: "PENDING",
+  },
+  {
+    title: "ST-009 故事剧场 · 助手工作流接入",
+    description: "Fashion/Pro deliverable phase 路由、choice chips、T 版卡片与中栏展示。",
+    docPath: "book-mall/doc/plans/2026-09-story-theater-mode.md",
+    sortOrder: 728,
+    listKind: "PENDING",
+  },
 ];
 
 async function main() {

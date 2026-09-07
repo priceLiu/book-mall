@@ -61,6 +61,7 @@ export type FashionPromptPhase =
   | "voiceovers"
   | "storyboards"
   | "ops"
+  | "story_theater"
   | "general";
 
 export function buildFashionDeliverableContextBlock(
@@ -165,6 +166,8 @@ E/C 版口播允许 ±15% 微调，其余 100% 忠实。`,
 - coverWords、tags、xiaohongshuBody、detailBullets
 语言与 dimensions.outputLanguage 一致。`,
 
+    story_theater: `【当前任务：故事剧场 T1–T5】由专用 story-theater prompt 注入；输出 storyTheaterVersions + selectedStoryTopic。`,
+
     general: `【通用】按用户消息推进；内部 trigger 消息以 fashion-step: 开头时只输出对应 phase JSON。`,
   };
 
@@ -177,6 +180,7 @@ export function resolveFashionPromptPhase(lastUserTurn: string): FashionPromptPh
   if (lastUserTurn.includes("fashion-step:sellpoints")) return "sellpoints";
   if (lastUserTurn.includes("fashion-step:voiceovers")) return "voiceovers";
   if (lastUserTurn.includes("fashion-step:storyboards")) return "storyboards";
+  if (lastUserTurn.includes("fashion-step:story-theater")) return "story_theater";
   if (lastUserTurn.includes("fashion-step:ops")) return "ops";
   return "general";
 }

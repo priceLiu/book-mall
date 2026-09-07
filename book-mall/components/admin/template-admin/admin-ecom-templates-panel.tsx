@@ -18,9 +18,10 @@ import {
   PoseLibraryAdmin,
   PropLibraryAdmin,
   SceneLibraryAdmin,
+  StoryTheaterTopicAdmin,
 } from "@/components/admin/template-admin/admin-ecom-catalog-libraries";
 
-type EcomSub = "templates" | "models" | "poses" | "props" | "scenes";
+type EcomSub = "templates" | "models" | "poses" | "props" | "scenes" | "story-topics";
 
 type TemplateRow = {
   id: string;
@@ -209,7 +210,8 @@ export function AdminEcomTemplatesPanel() {
     ecomParam === "models" ||
     ecomParam === "poses" ||
     ecomParam === "props" ||
-    ecomParam === "scenes"
+    ecomParam === "scenes" ||
+    ecomParam === "story-topics"
       ? ecomParam
       : "templates";
 
@@ -226,6 +228,7 @@ export function AdminEcomTemplatesPanel() {
     { id: "poses", label: "姿势库" },
     { id: "props", label: "道具库" },
     { id: "scenes", label: "场景库" },
+    { id: "story-topics", label: "故事主题库" },
   ];
 
   return (
@@ -250,8 +253,10 @@ export function AdminEcomTemplatesPanel() {
         <PoseLibraryAdmin />
       ) : sub === "props" ? (
         <PropLibraryAdmin />
-      ) : (
+      ) : sub === "scenes" ? (
         <SceneLibraryAdmin />
+      ) : (
+        <StoryTheaterTopicAdmin />
       )}
     </div>
   );

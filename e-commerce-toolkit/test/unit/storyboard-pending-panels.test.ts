@@ -1,11 +1,38 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isFullSheetPanelImageGenWatch,
   listOrphanStoryboardPendingPanelImageIndices,
   resolveActiveStoryboardPanelImageBusyIndices,
   resolveActiveStoryboardPanelVideoBusyIndices,
+  resolvePanelImageGenWatchTargets,
   resolveStoryboardMergeTargetIndexes,
 } from "@/lib/storyboard-pending-panels";
+
+describe("resolvePanelImageGenWatchTargets", () => {
+  it("prefers batch indexes over single panel", () => {
+    expect(
+      resolvePanelImageGenWatchTargets({
+        panelIndex: 1,
+        batchIndexes: [2, 3],
+        sheetPanelIndexes: [1, 2, 3, 4],
+      }),
+    ).toEqual([2, 3]);
+  });
+
+  it("falls back to all sheet panels", () => {
+    expect(
+      resolvePanelImageGenWatchTargets({
+        sheetPanelIndexes: [1, 2, 3],
+      }),
+    ).toEqual([1, 2, 3]);
+  });
+
+  it("detects full-sheet watch", () => {
+    expect(isFullSheetPanelImageGenWatch([1, 2, 3], 3)).toBe(true);
+    expect(isFullSheetPanelImageGenWatch([1, 2], 3)).toBe(false);
+  });
+});
 
 describe("resolveActiveStoryboardPanelImageBusyIndices", () => {
   const panels = [

@@ -36,7 +36,7 @@ function formatSavedAt(iso: string) {
   }
 }
 
-/** 交付快照查阅：产品/角色图、分镜图、镜头视频、成片，只读预览 */
+/** 交付快照查阅：产品/模特图、分镜图、镜头视频、成片，只读预览 */
 export function StoryboardDeliverableReviewDialog({
   open,
   onOpenChange,
@@ -106,7 +106,7 @@ export function StoryboardDeliverableReviewDialog({
                   onPreview={(src, title) => openDeliverableImagePreview(src, title)}
                 />
                 <RefPreviewCard
-                  title="角色图"
+                  title="模特图"
                   refs={characters}
                   onPreview={(src, title) => openDeliverableImagePreview(src, title)}
                 />

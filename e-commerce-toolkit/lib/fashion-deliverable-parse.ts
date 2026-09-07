@@ -3,12 +3,15 @@ import type {
   FashionPanelRow,
   FashionStoryboardVersion,
   FashionVersionKey,
+  StoryTheaterVersion,
 } from "@/lib/fashion-types";
+import type { StoryTheaterVersionKey } from "@/lib/story-theater-types";
+import { isStoryTheaterProductionMode } from "@/lib/story-theater-types";
 import { isFashionDeliverable } from "@/lib/fashion-types";
 import { normalizeFashionOpsPack } from "@/lib/fashion-ops-pack-format";
 
 /** 与 book-mall/doc/ecom/fashion-deliverable-spec-v4.md §7.1 一致 */
-export type FashionLlmPhase = "sellpoints" | "voiceovers" | "storyboards" | "ops";
+export type FashionLlmPhase = "sellpoints" | "voiceovers" | "storyboards" | "ops" | "story_theater";
 
 function deriveScenePrompt(sceneDesc: string, scenePromptRaw?: string): string {
   const explicit = scenePromptRaw?.trim();
@@ -144,8 +147,33 @@ function coerceStoryboardVersions(
   return next;
 }
 
+function coerceStoryTheaterVersions(
+  raw: unknown,
+): Partial<Record<StoryTheaterVersionKey, StoryTheaterVersion>> {
+  if (!raw || typeof raw !== "object") return {};
+  const obj = raw as Record<string, unknown>;
+  const next: Partial<Record<StoryTheaterVersionKey, StoryTheaterVersion>> = {};
+  for (const key of ["T1", "T2", "T3", "T4", "T5"] as StoryTheaterVersionKey[]) {
+    const version = obj[key];
+    if (!version || typeof version !== "object") continue;
+    const v = version as Record<string, unknown>;
+    next[key] = {
+      id: key,
+      title: typeof v.title === "string" ? v.title : `${key}版`,
+      summary: typeof v.summary === "string" ? v.summary : undefined,
+      panels: coerceFashionPanels(v.panels),
+      totalDurationSec:
+        typeof v.totalDurationSec === "number" ? v.totalDurationSec : undefined,
+    };
+  }
+  return next;
+}
+
 function detectFashionPhaseFromPayload(parsed: Record<string, unknown>): FashionLlmPhase | null {
   if (parsed.opsPack != null && typeof parsed.opsPack === "object") return "ops";
+  if (parsed.storyTheaterVersions != null && typeof parsed.storyTheaterVersions === "object") {
+    return "story_theater";
+  }
   if (parsed.storyboardVersions != null && typeof parsed.storyboardVersions === "object") {
     return "storyboards";
   }
@@ -176,6 +204,19 @@ export function pickFashionPhaseMergePatch(
     }
     case "ops":
       return patch.opsPack != null ? { opsPack: patch.opsPack } : {};
+    case "story_theater": {
+      const next: Partial<FashionDeliverable> = {};
+      if (patch.storyTheaterVersions && Object.keys(patch.storyTheaterVersions).length > 0) {
+        next.storyTheaterVersions = patch.storyTheaterVersions;
+      }
+      if (patch.selectedStoryTopic) {
+        next.selectedStoryTopic = patch.selectedStoryTopic;
+      }
+      if (patch.coverageChecklist?.length) {
+        next.coverageChecklist = patch.coverageChecklist;
+      }
+      return next;
+    }
   }
 }
 
@@ -211,6 +252,16 @@ function validateFashionPhasePatch(
     case "ops":
       if (parsed.opsPack == null || typeof parsed.opsPack !== "object") return null;
       return { opsPack: parsed.opsPack as FashionDeliverable["opsPack"] };
+    case "story_theater": {
+      const storyTheaterVersions = coerceStoryTheaterVersions(parsed.storyTheaterVersions);
+      if (Object.keys(storyTheaterVersions).length === 0) return null;
+      const patch: Partial<FashionDeliverable> = { storyTheaterVersions };
+      if (parsed.selectedStoryTopic && typeof parsed.selectedStoryTopic === "object") {
+        patch.selectedStoryTopic =
+          parsed.selectedStoryTopic as FashionDeliverable["selectedStoryTopic"];
+      }
+      return patch;
+    }
   }
 }
 
@@ -245,10 +296,14 @@ function sanitizePreLockFashionDeliverable(d: FashionDeliverable): FashionDelive
 }
 
 function stripPrematureFashionDeliverableFields(d: FashionDeliverable): FashionDeliverable {
+  let next = d;
   if (!d.storyboardLocked) {
-    return { ...d, opsPack: undefined, outputMode: null };
+    next = { ...next, opsPack: undefined, outputMode: null };
   }
-  return d;
+  if (isStoryTheaterProductionMode(d.productionMode) && !d.storyTheaterLocked) {
+    next = { ...next, outputMode: null };
+  }
+  return next;
 }
 
 function coerceFashionDeliverableLoose(raw: unknown): FashionDeliverable | null {
@@ -311,6 +366,7 @@ export function extractFashionDeliverableFromText(
     }
   }
   const markers = [
+    /\{\s*"storyTheaterVersions"\s*:/,
     /\{\s*"storyboardVersions"\s*:/,
     /\{\s*"schemaVersion"\s*:\s*"fashion-v4"/,
     /\{\s*"vertical"\s*:\s*"fashion_apparel"/,
@@ -343,7 +399,7 @@ export function stripFashionDeliverableFence(text: string): string {
     .replace(/```[\s\S]*?```/g, "")
     .trim();
   const jsonStart = out.search(
-    /\{\s*"schemaVersion"\s*:\s*"fashion-v4"|\{\s*"vertical"\s*:\s*"fashion_apparel"|\{\s*"storyboardVersions"\s*:/,
+    /\{\s*"schemaVersion"\s*:\s*"fashion-v4"|\{\s*"vertical"\s*:\s*"fashion_apparel"|\{\s*"storyboardVersions"\s*:|\{\s*"storyTheaterVersions"\s*:/,
   );
   if (jsonStart >= 0) out = out.slice(0, jsonStart).trim();
   return out.replace(/\n{3,}/g, "\n\n").trim();
@@ -411,9 +467,30 @@ export function mergeFashionDeliverableState(
           : base.opsPack
         : base.opsPack,
     outputMode:
-      base.storyboardLocked || patch.storyboardLocked
+      base.storyboardLocked ||
+      patch.storyboardLocked ||
+      base.storyTheaterLocked ||
+      patch.storyTheaterLocked
         ? (patch.outputMode ?? base.outputMode)
         : null,
+    productionMode: patch.productionMode ?? base.productionMode ?? null,
+    storyTopicCandidates:
+      patch.storyTopicCandidates?.length
+        ? patch.storyTopicCandidates
+        : base.storyTopicCandidates,
+    selectedStoryTopic:
+      patch.selectedStoryTopic !== undefined
+        ? patch.selectedStoryTopic
+        : base.selectedStoryTopic,
+    storyTheaterVersions: coerceStoryTheaterVersions({
+      ...(base.storyTheaterVersions ?? {}),
+      ...(patch.storyTheaterVersions ?? {}),
+    }),
+    selectedStoryTheaterVersion:
+      patch.selectedStoryTheaterVersion !== undefined
+        ? patch.selectedStoryTheaterVersion
+        : base.selectedStoryTheaterVersion,
+    storyTheaterLocked: base.storyTheaterLocked || Boolean(patch.storyTheaterLocked),
   };
   return sanitizePreLockFashionDeliverable(stripPrematureFashionDeliverableFields(merged));
 }
@@ -425,6 +502,7 @@ export function isFashionInternalLlmTrigger(text: string): boolean {
 function resolveFashionLlmPhaseFromTrigger(trigger: string): FashionLlmPhase | undefined {
   if (trigger.includes("sellpoints")) return "sellpoints";
   if (trigger.includes("voiceovers")) return "voiceovers";
+  if (trigger.includes("story-theater")) return "story_theater";
   if (trigger.includes("storyboards")) return "storyboards";
   if (trigger.includes("ops")) return "ops";
   return undefined;

@@ -9,7 +9,9 @@ import {
   mergeFashionSheetWithExisting,
   readMetaFashionDeliverable,
   resolveFashionDeliverableForProject,
+  storyTheaterVersionToSheet,
 } from "@/lib/ecom/ecom-fashion-deliverable";
+import { isStoryTheaterProductionMode } from "@/lib/ecom/story-theater-types";
 import {
   normalizeToProDeliverable,
   proVersionToSheet,
@@ -42,6 +44,40 @@ export async function syncEcomStoryboardSheetFromMeta(
       meta: metaRecord,
       chatHistory: project.chatHistory,
     });
+    if (deliverable && isStoryTheaterProductionMode(deliverable.productionMode)) {
+      if (deliverable.selectedStoryTheaterVersion && deliverable.storyTheaterLocked) {
+        const sheet = storyTheaterVersionToSheet(deliverable);
+        if (sheet) {
+          const mergedSheet = mergeFashionSheetWithExisting(sheet, project.sheet);
+          const deliverableToSave = {
+            ...deliverable,
+            outputMode: existingDeliverable?.outputMode ?? deliverable.outputMode ?? "direct_video",
+            storyTheaterLocked: true,
+          };
+          const existingWf =
+            (project.meta?.workflow as Record<string, unknown> | undefined) ?? {};
+          await updateEcomStoryboardProject(userId, projectId, {
+            sheet: mergedSheet,
+            status: "sheet_ready",
+            meta: {
+              ...project.meta,
+              deliverable: deliverableToSave,
+              workflow: {
+                ...existingWf,
+                vertical: "fashion_apparel",
+                fashionPhase: "produce",
+                fashionProduceSetupPending: true,
+              },
+            },
+          });
+          return { sheet: mergedSheet, deliverable: null, selectedSchemeIndex: 0 };
+        }
+        throw new Error(
+          `故事版 ${deliverable.selectedStoryTheaterVersion} 缺少分镜表数据，请在中栏确认故事版分镜表已保存后重试`,
+        );
+      }
+      throw new Error("请先确认故事版定稿后再同步分镜表");
+    }
     if (deliverable?.selectedVersion) {
       const sheet = fashionVersionToSheet(deliverable);
       if (sheet) {
@@ -63,7 +99,7 @@ export async function syncEcomStoryboardSheetFromMeta(
             workflow: {
               ...existingWf,
               vertical: "fashion_apparel",
-              fashionPhase: deliverableToSave.outputMode ? "produce" : "output_mode",
+              fashionPhase: deliverableToSave.outputMode ? "produce" : "storyboard_confirm",
               ...(deliverableToSave.outputMode === "direct_video"
                 ? { fashionProduceSetupPending: true }
                 : {}),
@@ -94,6 +130,40 @@ export async function syncEcomStoryboardSheetFromMeta(
       meta: metaRecord,
       chatHistory: project.chatHistory,
     });
+    if (deliverable && isStoryTheaterProductionMode(deliverable.productionMode)) {
+      if (deliverable.selectedStoryTheaterVersion && deliverable.storyTheaterLocked) {
+        const sheet = storyTheaterVersionToSheet(deliverable as Parameters<typeof storyTheaterVersionToSheet>[0]);
+        if (sheet) {
+          const mergedSheet = mergeFashionSheetWithExisting(sheet, project.sheet);
+          const deliverableToSave = {
+            ...deliverable,
+            outputMode: existingDeliverable?.outputMode ?? deliverable.outputMode ?? "direct_video",
+            storyTheaterLocked: true,
+          };
+          const existingWf =
+            (project.meta?.workflow as Record<string, unknown> | undefined) ?? {};
+          await updateEcomStoryboardProject(userId, projectId, {
+            sheet: mergedSheet,
+            status: "sheet_ready",
+            meta: {
+              ...project.meta,
+              deliverable: deliverableToSave,
+              workflow: {
+                ...existingWf,
+                vertical: deliverable.vertical,
+                proPhase: "produce",
+                proProduceSetupPending: true,
+              },
+            },
+          });
+          return { sheet: mergedSheet, deliverable: null, selectedSchemeIndex: 0 };
+        }
+        throw new Error(
+          `故事版 ${deliverable.selectedStoryTheaterVersion} 缺少分镜表数据，请在中栏确认故事版分镜表已保存后重试`,
+        );
+      }
+      throw new Error("请先确认故事版定稿后再同步分镜表");
+    }
     if (deliverable?.selectedVersion) {
       const sheet = proVersionToSheet(deliverable);
       if (sheet) {
@@ -115,7 +185,7 @@ export async function syncEcomStoryboardSheetFromMeta(
             workflow: {
               ...existingWf,
               vertical: deliverable.vertical,
-              proPhase: deliverableToSave.outputMode ? "produce" : "output_mode",
+              proPhase: deliverableToSave.outputMode ? "produce" : "storyboard_confirm",
               ...(deliverableToSave.outputMode === "direct_video"
                 ? { proProduceSetupPending: true }
                 : {}),

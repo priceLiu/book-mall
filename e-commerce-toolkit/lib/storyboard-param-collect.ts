@@ -160,7 +160,7 @@ const SYSTEM_USER_TEXT_FILTERS = [
   ...PRODUCT_CATEGORIES.map((c) => c.label),
   ...getScenePresetChoiceLabels(),
   "已上传场景图",
-  "已上传角色图",
+  "已上传模特图",
   "已上传产品图",
   CHARACTER_PRESET_FEMALE_CHOICE,
   CHARACTER_PRESET_MALE_CHOICE,

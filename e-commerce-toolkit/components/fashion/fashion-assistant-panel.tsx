@@ -28,8 +28,12 @@ import {
   syncStoryboardSheet,
   updateStoryboardProject,
 } from "@/lib/ecom-storyboard-api";
+import {
+  parsedMessageHasStoryTheaterContent,
+  shouldReplaySellpointsInAssistant,
+} from "@/lib/fashion-assistant-deliverable-display";
 import { FashionAssistantDeliverableView } from "@/components/fashion/fashion-assistant-deliverable-view";
-import { FashionStoryboardResultBlock } from "@/components/fashion/fashion-deliverable-tables";
+import { FashionStoryboardResultBlock, FashionPanelsTable } from "@/components/fashion/fashion-deliverable-tables";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import {
   buildFashionDimensionMessageLabels,
@@ -97,14 +101,22 @@ import {
   FASHION_REVISE_DIMENSION_PREFIX,
   inferFashionChoices,
   inferFashionPhaseFromState,
+  resolveFashionPhaseAfterRepair,
+  isAwaitingProductionModePick,
+  isAwaitingStoryTopicPick,
+  isAwaitingStoryTheaterPick,
+  isAwaitingStoryTheaterConfirm,
   isAwaitingFashionCustomDimensionInput,
   isAwaitingFashionOutputMode,
   isAwaitingFashionSellpoints,
+  isAwaitingFashionSellpointGeneration,
   isAwaitingSellpointModePick,
   isAwaitingUserSellpointInput,
   isAwaitingFashionStoryboardConfirm,
   isAwaitingFashionStoryboardPick,
   isAwaitingFashionVoiceoverPick,
+  isAwaitingFashionVoiceoverPending,
+  isAwaitingFashionVoiceoverGeneration,
   isFashionDimensionCollecting,
   isFashionDimensionRevisionAllowed,
   isFashionInProduce,
@@ -115,9 +127,12 @@ import {
   parseFashionVersionKeyFromUserMessage,
   resolveProVerticalDeliverable,
   isProVerticalProject,
+  listStoryTheaterVersionKeys,
   resolveFashionStoryboardPanelsForVersion,
   resolveProStoryboardPanelsForVersion,
 } from "@/lib/fashion-workflow";
+import { storyTopicChoiceLabel, parseStoryTheaterVersionChoice, parseStoryTopicChoice } from "@/lib/story-theater-workflow";
+import { fetchStoryTheaterTopicSample, type StoryTheaterTopicSample } from "@/lib/ecom-storyboard-api";
 import { buildFashionHistoricalChoiceBlock } from "@/lib/fashion-assistant-choice-ui";
 import {
   isGenerateAllImagesChoice,
@@ -128,7 +143,39 @@ import type {
   StoryboardGatewayModel,
   StoryboardProject,
 } from "@/lib/storyboard-types";
+import type { StoryTheaterTopicRef } from "@/lib/story-theater-types";
 import { cn } from "@/lib/utils";
+
+function mapStoryTopicSamplesToCandidates(
+  topics: StoryTheaterTopicSample[],
+): StoryTheaterTopicRef[] {
+  return topics.map((t) => ({
+    id: t.id,
+    title: t.title,
+    storyCore: t.storyCore,
+    storyType: t.storyType,
+  }));
+}
+
+function resolveStoryTopicPickFromMessage(
+  message: string,
+  deliverable: FashionDeliverable | ProDeliverable | null | undefined,
+  samples: StoryTheaterTopicSample[],
+): StoryTheaterTopicRef | null {
+  const trimmed = message.trim();
+  const fromSample = samples.find((t) => storyTopicChoiceLabel(t.title) === trimmed);
+  if (fromSample) {
+    return {
+      id: fromSample.id,
+      title: fromSample.title,
+      storyCore: fromSample.storyCore,
+      storyType: fromSample.storyType,
+    };
+  }
+  const title = parseStoryTopicChoice(trimmed);
+  if (!title) return null;
+  return deliverable?.storyTopicCandidates?.find((t) => t.title === title) ?? null;
+}
 
 function formatStreamElapsed(startedAt: number | null): string {
   if (startedAt == null) return "";
@@ -193,11 +240,13 @@ export function FashionAssistantPanel({
     FashionDeliverable | ProDeliverable | null
   >(null);
   const [pendingChoice, setPendingChoice] = useState<string | null>(null);
+  const [storyTopicSamples, setStoryTopicSamples] = useState<StoryTheaterTopicSample[]>([]);
   const [busyStatus, setBusyStatus] = useState<{ title: string; detail: string } | null>(null);
   const [refAutoAdvancing, setRefAutoAdvancing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const productAutoAckRef = useRef<string | null>(null);
   const metaRepairRef = useRef<string | null>(null);
+  const storyTopicFetchRef = useRef(false);
   const isBusy = streaming || pendingChoice != null || refAutoAdvancing;
 
   const tryCollapse = useCallback(() => {
@@ -219,6 +268,7 @@ export function FashionAssistantPanel({
     setStreamText("");
     setInput("");
     productAutoAckRef.current = null;
+    storyTopicFetchRef.current = false;
   }, [projectId]);
 
   useEffect(() => {
@@ -325,28 +375,30 @@ export function FashionAssistantPanel({
     });
     const wfPhase = (
       project.meta?.workflow as { fashionPhase?: string; proPhase?: string } | undefined
-    )?.[isNonFashionProVertical(project) ? "proPhase" : "fashionPhase"];
-    const phaseRank: Record<string, number> = {
-      product_ref: 0,
-      dimensions: 1,
-      sellpoints: 2,
-      voiceover_pick: 3,
-      storyboard_pick: 4,
-      storyboard_confirm: 5,
-      ops_pack: 6,
-      output_mode: 7,
-      produce: 8,
-      done: 9,
-    };
-    const canAdvancePhase =
-      !wfPhase || (phaseRank[inferredPhase] ?? 0) > (phaseRank[wfPhase] ?? 0);
+    )?.[isNonFashionProVertical(project) ? "proPhase" : "fashionPhase"] as
+      | import("@/lib/fashion-types").FashionPhase
+      | undefined;
+    const metaDeliverableForPhase =
+      isFashionDeliverable(project.meta?.deliverable)
+        ? (project.meta!.deliverable as FashionDeliverable)
+        : isProDeliverable(project.meta?.deliverable)
+          ? (project.meta!.deliverable as ProDeliverable)
+          : null;
     const phaseDeliverableReady =
       inferredPhase !== "voiceover_pick" ||
       (resolved.voiceovers?.length ?? 0) > 0;
+    const nextPhaseCandidate = resolveFashionPhaseAfterRepair({
+      wfPhase,
+      inferredPhase,
+      metaDeliverable: metaDeliverableForPhase,
+    });
+    const shouldAdvancePhase =
+      nextPhaseCandidate !== wfPhase &&
+      phaseDeliverableReady;
     const needsRepair =
       !metaOk ||
       (wfPhase === "voiceover_pick" && resolved.selectedVoiceoverId) ||
-      (canAdvancePhase && phaseDeliverableReady && inferredPhase !== wfPhase) ||
+      shouldAdvancePhase ||
       (inferredPhase === "storyboard_pick" &&
         (isFashionDeliverable(project.meta?.deliverable) ||
           isProDeliverable(project.meta?.deliverable)) &&
@@ -356,13 +408,10 @@ export function FashionAssistantPanel({
         !resolved.opsPack &&
         !resolved.selectedVersion);
     if (!needsRepair) return;
-    const repairKey = `${projectId}:${history.length}:${resolved.selectedVoiceoverId ?? ""}:${Object.keys(resolved.storyboardVersions ?? {}).length}:${resolved.selectedVersion ?? ""}:${inferredPhase}`;
+    const repairKey = `${projectId}:${history.length}:${resolved.selectedVoiceoverId ?? ""}:${Object.keys(resolved.storyboardVersions ?? {}).length}:${resolved.selectedVersion ?? ""}:${nextPhaseCandidate}`;
     if (metaRepairRef.current === repairKey) return;
     metaRepairRef.current = repairKey;
-    const nextPhase =
-      canAdvancePhase || !wfPhase
-        ? inferredPhase
-        : (wfPhase as typeof inferredPhase);
+    const nextPhase = nextPhaseCandidate;
     void (async () => {
       try {
         if (isProDeliverable(resolved)) {
@@ -462,21 +511,115 @@ export function FashionAssistantPanel({
     };
   }, [project, messages, workflowOverride, deliverableOverride]);
 
+  const effectiveProjectForChoices = useMemo(() => {
+    const d = resolveProVerticalDeliverable(effectiveProject);
+    const sampleCandidates =
+      storyTopicSamples.length > 0 ? mapStoryTopicSamplesToCandidates(storyTopicSamples) : null;
+    if (!d || !sampleCandidates?.length || d.storyTopicCandidates?.length) {
+      return effectiveProject;
+    }
+    return {
+      ...effectiveProject,
+      meta: {
+        ...effectiveProject.meta,
+        deliverable: {
+          ...d,
+          storyTopicCandidates: sampleCandidates,
+        },
+      },
+    } satisfies StoryboardProject;
+  }, [effectiveProject, storyTopicSamples]);
+
   const choices = useMemo(() => {
     if (legacyReadonly) return [];
-    const primary = inferFashionChoices(effectiveProject);
+    const primary = inferFashionChoices(effectiveProjectForChoices);
     if (primary.length > 0) return primary;
     if (isAwaitingFashionStoryboardPick(effectiveProject)) {
       return buildFashionStoryboardPickChoices(effectiveProject);
     }
     return [];
-  }, [effectiveProject, legacyReadonly]);
+  }, [effectiveProject, effectiveProjectForChoices, legacyReadonly]);
+
+  useEffect(() => {
+    const d = resolveProVerticalDeliverable(project);
+    if (!d?.storyTopicCandidates?.length) return;
+    setStoryTopicSamples(
+      d.storyTopicCandidates.map((c) => ({
+        id: c.id,
+        vertical: vertical ?? "fashion_apparel",
+        title: c.title,
+        storyCore: c.storyCore,
+        storyType: c.storyType,
+      })),
+    );
+  }, [project.id, project.meta?.deliverable, vertical]);
+
+  const awaitingStoryTopicPickForFetch = isAwaitingStoryTopicPick(effectiveProject);
+  const savedStoryTopicCandidates =
+    resolveProVerticalDeliverable(effectiveProject)?.storyTopicCandidates?.length ?? 0;
+
+  useEffect(() => {
+    if (legacyReadonly || !awaitingStoryTopicPickForFetch) {
+      storyTopicFetchRef.current = false;
+      return;
+    }
+    if (savedStoryTopicCandidates > 0) return;
+    if (storyTopicFetchRef.current) return;
+    storyTopicFetchRef.current = true;
+
+    const v = vertical ?? "fashion_apparel";
+    let cancelled = false;
+    void fetchStoryTheaterTopicSample(v, 5)
+      .then(async (topics) => {
+        if (cancelled) return;
+        if (topics.length === 0) {
+          storyTopicFetchRef.current = false;
+          return;
+        }
+        setStoryTopicSamples(topics);
+        const d = resolveProVerticalDeliverable(project);
+        if (!d) {
+          storyTopicFetchRef.current = false;
+          return;
+        }
+        if (d.storyTopicCandidates?.length) return;
+        const candidates = mapStoryTopicSamplesToCandidates(topics);
+        const nextDeliverable = { ...d, storyTopicCandidates: candidates };
+        setDeliverableOverride(nextDeliverable as FashionDeliverable | ProDeliverable);
+        await updateStoryboardProject(projectId, {
+          meta: {
+            ...project.meta,
+            deliverable: nextDeliverable,
+          },
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setStoryTopicSamples([]);
+          storyTopicFetchRef.current = false;
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    awaitingStoryTopicPickForFetch,
+    savedStoryTopicCandidates,
+    legacyReadonly,
+    vertical,
+    projectId,
+    project.meta,
+    project,
+  ]);
 
   const awaitingCategoryPick =
     isAwaitingProCategoryPick(effectiveProject) ||
     getFashionPhase(effectiveProject) === "category_pick";
   const awaitingStoryboardPick = isAwaitingFashionStoryboardPick(effectiveProject);
   const awaitingStoryboardConfirm = isAwaitingFashionStoryboardConfirm(effectiveProject);
+  const awaitingStoryTheaterPick = isAwaitingStoryTheaterPick(effectiveProject);
+  const awaitingStoryTheaterConfirm = isAwaitingStoryTheaterConfirm(effectiveProject);
+  const awaitingStoryTopicPick = isAwaitingStoryTopicPick(effectiveProject);
   const canReviseDimensions = isFashionDimensionRevisionAllowed(effectiveProject);
 
   const displayMessages = useMemo(
@@ -579,6 +722,8 @@ export function FashionAssistantPanel({
               ? ("sellpoints" as ProLlmPhase)
               : llmTrigger.includes("voiceovers")
                 ? "voiceovers"
+                : llmTrigger.includes("story-theater")
+                  ? ("story_theater" as ProLlmPhase)
                 : llmTrigger.includes("storyboards")
                   ? "storyboards"
                   : llmTrigger.includes("ops")
@@ -590,13 +735,17 @@ export function FashionAssistantPanel({
                 : null;
             const parsed = parsedPro ?? parsedFashion;
             const hint =
-              llmTrigger.includes("storyboards") &&
+              llmTrigger.includes("story-theater")
+                ? "模型返回了故事版内容但 JSON 未完整解析"
+                : llmTrigger.includes("storyboards") &&
               (parsed?.storyboardVersions ||
                 (parsedPro && listProStoryboardVersionKeys(parsedPro).length > 0))
                 ? "模型返回了分镜内容但 JSON 未完整解析"
                 : "模型已回复但未写入预期数据";
             throw new Error(
-              `${hint}。请点「重新生成分镜」重试；若多次失败请更换 Gateway 聊天模型或缩短口播脚本。`,
+              llmTrigger.includes("story-theater")
+                ? `${hint}。请点「重新生成故事版」重试；若多次失败请更换 Gateway 聊天模型。`
+                : `${hint}。请点「重新生成分镜」重试；若多次失败请更换 Gateway 聊天模型或缩短口播脚本。`,
             );
           }
         }
@@ -643,6 +792,12 @@ export function FashionAssistantPanel({
         return;
       }
 
+      const dBeforeChoice = resolveProVerticalDeliverable(effectiveProject);
+      const pickedTopicTitle = parseStoryTopicChoice(message.trim());
+      if (pickedTopicTitle && dBeforeChoice?.selectedStoryTopic?.title === pickedTopicTitle) {
+        return;
+      }
+
       const phaseNow = getFashionPhase(effectiveProject);
       const dNow = resolveProVerticalDeliverable(effectiveProject);
       if (
@@ -654,7 +809,7 @@ export function FashionAssistantPanel({
       }
 
       setPendingChoice(message);
-      setBusyStatus(fashionBusyStatusForUserMessage(message));
+      setBusyStatus(fashionBusyStatusForUserMessage(message, effectiveProject));
 
       const history = messages.filter((m) => m.id !== "welcome" && m.id !== "streaming");
       const userMsg: StoryboardChatMessage = {
@@ -671,7 +826,36 @@ export function FashionAssistantPanel({
           deliverable: project.meta?.deliverable,
           workflow: { ...(project.meta?.workflow ?? {}) } as Record<string, unknown>,
         };
-        const patchResult = fashionWorkflowPatchForChoice(effectiveProject, message);
+        const baseDeliverable = resolveProVerticalDeliverable(effectiveProject);
+        const topicPick = resolveStoryTopicPickFromMessage(
+          message,
+          baseDeliverable,
+          storyTopicSamples,
+        );
+        const topicCandidates =
+          storyTopicSamples.length > 0
+            ? mapStoryTopicSamplesToCandidates(storyTopicSamples)
+            : (baseDeliverable?.storyTopicCandidates ?? []);
+        const projectForPatch =
+          topicPick && baseDeliverable
+            ? ({
+                ...effectiveProject,
+                meta: {
+                  ...effectiveProject.meta,
+                  deliverable: {
+                    ...baseDeliverable,
+                    ...(topicCandidates.length ? { storyTopicCandidates: topicCandidates } : {}),
+                    selectedStoryTopic: {
+                      id: topicPick.id,
+                      title: topicPick.title,
+                      storyCore: topicPick.storyCore,
+                      storyType: topicPick.storyType,
+                    },
+                  },
+                },
+              } satisfies StoryboardProject)
+            : effectiveProject;
+        const patchResult = fashionWorkflowPatchForChoice(projectForPatch, message);
         if (patchResult) {
           const {
             llmTrigger,
@@ -884,6 +1068,16 @@ export function FashionAssistantPanel({
           return;
         }
 
+        if (parseStoryTopicChoice(message.trim())) {
+          setMessages(history);
+          await onAlert({
+            title: "故事主题未识别",
+            message: "未能匹配所选故事主题，请从下方卡片重新点选。",
+            variant: "error",
+          });
+          return;
+        }
+
         setStreaming(true);
         setStreamText("");
         setStreamStartedAt(Date.now());
@@ -952,7 +1146,15 @@ export function FashionAssistantPanel({
   const awaitingVoiceoverPick = isAwaitingFashionVoiceoverPick(effectiveProject);
   const pendingStoryboardGen = isFashionPendingStoryboardGeneration(effectiveProject);
   const pendingOpsGen = isFashionPendingOpsGeneration(effectiveProject);
-  const sellpointChoiceSubtitle = awaitingStoryboardPick
+  const pendingSellpointGen = isAwaitingFashionSellpointGeneration(effectiveProject);
+  const pendingVoiceoverGen = isAwaitingFashionVoiceoverPending(effectiveProject);
+  const sellpointChoiceSubtitle = awaitingStoryTopicPick
+    ? "请点选下方故事主题（5 选 1）"
+    : awaitingStoryTheaterPick
+      ? "已生成 T1–T5 故事版，请点选一套继续"
+    : awaitingStoryTheaterConfirm
+      ? "左侧故事剧场分镜表可编辑并保存，确认后进入成片工作区"
+    : awaitingStoryboardPick
     ? "已生成分镜方案，请点选 A–E 版继续；不足 5 套可选「重新生成分镜」"
     : pendingOpsGen
       ? "分镜已定稿，运营包生成未完成或失败，请重新生成"
@@ -964,8 +1166,14 @@ export function FashionAssistantPanel({
       ? "口播已选定，请生成 A–E 分镜脚本后继续"
     : awaitingVoiceoverPick
       ? "请点选一套口播文案，系统将自动生成 A–E 分镜方案"
+    : pendingVoiceoverGen
+      ? isAwaitingFashionVoiceoverGeneration(effectiveProject)
+        ? "上次口播生成未完成或失败，请重新生成"
+        : "卖点已定稿，请生成 6 套口播文案"
     : isAwaitingSellpointModePick(effectiveProject)
       ? "专业卖家通常自带卖点；也可让 AI 根据七维参数生成"
+    : pendingSellpointGen
+      ? "上次 AI 卖点生成未完成或失败，请重新生成或改用手动输入"
     : isAwaitingUserSellpointInput(effectiveProject)
       ? "在下方输入卖点（换行/分号分隔），或在左侧表格添加"
     : deliverable?.sellpoints?.length && !deliverable.sellpointsLocked
@@ -1099,6 +1307,19 @@ export function FashionAssistantPanel({
         {displayMessages.map((m, index) => {
           const parsedFromMessage =
             extractFashionDeliverableFromText(m.content) ?? extractProDeliverableFromText(m.content);
+          const hasStoryTheaterInMessage = parsedMessageHasStoryTheaterContent(parsedFromMessage);
+          const replaySellpoints = shouldReplaySellpointsInAssistant(deliverable);
+          const theaterVersionCount = listStoryTheaterVersionKeys(deliverable).length;
+          const isSellpointOnlyAssistant =
+            m.role === "assistant" &&
+            replaySellpoints &&
+            Boolean(parsedFromMessage?.sellpoints?.length) &&
+            !(parsedFromMessage?.voiceovers?.length ?? 0) &&
+            !(
+              parsedFromMessage?.storyboardVersions &&
+              Object.keys(parsedFromMessage.storyboardVersions).length
+            ) &&
+            !hasStoryTheaterInMessage;
           const brief =
             m.role === "assistant"
               ? stripProDeliverableFence(m.content)
@@ -1124,24 +1345,35 @@ export function FashionAssistantPanel({
                 ? deliverable.selectedVersion
                 : parseFashionVersionKeyFromUserMessage(m.content)
               : null;
+          const userStoryTheaterKey =
+            m.role === "user" && deliverable
+              ? parseStoryTheaterVersionChoice(m.content.trim())
+              : null;
           const userStoryboardVersion =
             userStoryboardKey && deliverable
               ? deliverable.storyboardVersions?.[userStoryboardKey]
               : undefined;
+          const userStoryTheaterVersion =
+            userStoryTheaterKey && deliverable
+              ? deliverable.storyTheaterVersions?.[userStoryTheaterKey]
+              : undefined;
           const messageDeliverable = deliverable;
           const showDeliverableView =
             m.role === "assistant" &&
-            (Boolean(parsedFromMessage?.sellpoints?.length) ||
+            (isSellpointOnlyAssistant ||
               Boolean(parsedFromMessage?.voiceovers?.length) ||
               Boolean(
                 parsedFromMessage?.storyboardVersions &&
                   Object.keys(parsedFromMessage.storyboardVersions).length,
               ) ||
+              hasStoryTheaterInMessage ||
               (isLastAssistant &&
                 Boolean(
-                  deliverable?.sellpoints?.length ||
-                    deliverable?.storyboardVersions ||
-                    deliverable?.voiceovers?.length,
+                  theaterVersionCount > 0 ||
+                    (parsedFromMessage?.storyboardVersions &&
+                      Object.keys(parsedFromMessage.storyboardVersions).length) ||
+                    deliverable?.voiceovers?.length ||
+                    (deliverable?.sellpoints?.length && replaySellpoints),
                 )));
           return (
             <div key={m.id} className="space-y-2">
@@ -1191,6 +1423,8 @@ export function FashionAssistantPanel({
                         projectDeliverable={messageDeliverable}
                         showStoryboardPickHint={awaitingStoryboardPick && isLastAssistant}
                         showStoryboardConfirmHint={awaitingStoryboardConfirm && isLastAssistant}
+                        showStoryTheaterPickHint={awaitingStoryTheaterPick && isLastAssistant}
+                        showStoryTheaterConfirmHint={awaitingStoryTheaterConfirm && isLastAssistant}
                         showBrief={isLastAssistant}
                       />
                     ) : brief ? (
@@ -1247,6 +1481,22 @@ export function FashionAssistantPanel({
                       Boolean(deliverable?.storyboardLocked)
                     }
                   />
+                  </div>
+                </div>
+              ) : null}
+              {userStoryTheaterKey && userStoryTheaterVersion?.panels?.length ? (
+                <div className="flex w-full flex-col items-start">
+                  <div className="w-full max-w-[95%] rounded-lg border border-[#e8e8ed] bg-white p-3">
+                    <p className="mb-2 text-xs font-semibold text-[#6e6e73]">
+                      故事剧场 · {userStoryTheaterKey}
+                      {userStoryTheaterVersion.title ? ` · ${userStoryTheaterVersion.title}` : ""}
+                      {deliverable?.storyTheaterLocked ? " · 已定稿" : ""}
+                    </p>
+                    <FashionPanelsTable
+                      panels={userStoryTheaterVersion.panels}
+                      sellpoints={deliverable?.sellpoints}
+                      storyTheaterMode
+                    />
                   </div>
                 </div>
               ) : null}
@@ -1351,6 +1601,17 @@ export function FashionAssistantPanel({
           </div>
         ) : null}
 
+        {!legacyReadonly && awaitingStoryTopicPick && choices.length === 0 && !isBusy ? (
+          <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
+            <div className="rounded-2xl border border-[#0071e3]/25 bg-[#f0f6ff] p-4 shadow-sm">
+              <p className="text-sm font-semibold text-[#1d1d1f]">选择故事主题</p>
+              <p className="mt-1 text-xs leading-relaxed text-[#6e6e73]">
+                正在从选题库加载 5 个故事主题，请稍候…
+              </p>
+            </div>
+          </div>
+        ) : null}
+
         {!legacyReadonly && choices.length > 0 && !isBusy && !showSearchDimensionSelect ? (
           <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
             <SeedVideoAssistantChoiceCards
@@ -1359,10 +1620,22 @@ export function FashionAssistantPanel({
                   ? "选择大类品类"
                   : isAwaitingSellpointModePick(effectiveProject)
                     ? "选择卖点录入方式"
+                  : awaitingStoryTopicPick
+                    ? "选择故事主题"
+                  : pendingSellpointGen
+                    ? "重新生成卖点"
+                  : pendingVoiceoverGen
+                    ? isAwaitingFashionVoiceoverGeneration(effectiveProject)
+                      ? "重新生成口播"
+                      : "生成口播文案"
                   : awaitingStoryboardPick
                   ? "选择分镜方案"
+                  : awaitingStoryTheaterPick
+                    ? "选择故事版方案"
                   : pendingOpsGen
                     ? "生成运营包"
+                  : awaitingStoryTheaterConfirm
+                    ? "确认定稿故事版"
                   : awaitingStoryboardConfirm
                     ? "确认定稿分镜"
                   : awaitingOutputMode
@@ -1393,25 +1666,6 @@ export function FashionAssistantPanel({
               disabled={isBusy}
               selectedMessage={pendingChoice}
               onSelect={(message) => void handleChoice(message)}
-            />
-          </div>
-        ) : null}
-
-        {!legacyReadonly && pendingChoice && isBusy && choices.length === 0 ? (
-          <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
-            <SeedVideoAssistantChoiceCards
-              title="处理中"
-              subtitle="请稍候，完成后将自动展示下一步选项"
-              choices={[
-                {
-                  id: "pending",
-                  label: pendingChoice,
-                  title: pendingChoice,
-                  message: pendingChoice,
-                },
-              ]}
-              disabled
-              selectedMessage={pendingChoice}
             />
           </div>
         ) : null}

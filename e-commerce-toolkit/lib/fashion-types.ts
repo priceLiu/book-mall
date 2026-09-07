@@ -1,5 +1,13 @@
 /** 服装专业版 deliverable 类型（与 book-mall fashion-deliverable-spec-v4 对齐） */
 
+import type {
+  ProductionMode,
+  StoryTheaterTopicRef,
+  StoryTheaterVersionKey,
+} from "@/lib/story-theater-types";
+
+export type { ProductionMode, StoryTheaterTopicRef, StoryTheaterVersionKey };
+
 export type FashionVersionKey = "A" | "B" | "C" | "D" | "E";
 
 export type FashionSellpoint = {
@@ -30,6 +38,8 @@ export type FashionPanelRow = {
   productFocus?: string;
   dialogue?: string;
   toneTexture?: string;
+  /** 故事剧场 · 字幕文案（只读展示） */
+  subtitle?: string;
   sellpointIds: string[];
   imagePrompt: string;
   /** 单镜视频 motion prompt */
@@ -38,6 +48,14 @@ export type FashionPanelRow = {
 
 export type FashionStoryboardVersion = {
   id: FashionVersionKey;
+  title: string;
+  summary?: string;
+  panels: FashionPanelRow[];
+  totalDurationSec?: number;
+};
+
+export type StoryTheaterVersion = {
+  id: StoryTheaterVersionKey;
   title: string;
   summary?: string;
   panels: FashionPanelRow[];
@@ -79,13 +97,25 @@ export type FashionDeliverable = {
   coverageChecklist: FashionCoverageRow[];
   opsPack?: FashionOpsPack;
   outputMode: "script_compose" | "direct_video" | null;
+  /** 七维完成后前置：标准分镜线 / 故事剧场线；空视为 standard_script */
+  productionMode?: ProductionMode | null;
+  /** 故事主题 5 选 1 时展示的候选（持久化供历史回放） */
+  storyTopicCandidates?: StoryTheaterTopicRef[];
+  selectedStoryTopic?: StoryTheaterTopicRef | null;
+  storyTheaterVersions?: Partial<Record<StoryTheaterVersionKey, StoryTheaterVersion>>;
+  selectedStoryTheaterVersion?: StoryTheaterVersionKey | null;
+  storyTheaterLocked?: boolean;
 };
 
 export type FashionPhase =
   | "product_ref"
   | "category_pick"
   | "dimensions"
+  | "production_mode"
   | "sellpoints"
+  | "story_topic_pick"
+  | "story_theater_pick"
+  | "story_theater_confirm"
   | "voiceover_pick"
   | "storyboard_pick"
   | "storyboard_confirm"

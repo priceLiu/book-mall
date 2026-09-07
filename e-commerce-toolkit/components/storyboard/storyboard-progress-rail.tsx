@@ -23,7 +23,7 @@ export type StoryboardStepId =
 const STEPS: { id: StoryboardStepId; label: string }[] = [
   { id: "product", label: "产品图" },
   { id: "plan", label: "策划" },
-  { id: "character", label: "角色图" },
+  { id: "character", label: "模特图" },
   { id: "refs", label: "场景图" },
   { id: "script", label: "分镜脚本" },
   { id: "images", label: "分镜图" },

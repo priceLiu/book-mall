@@ -2,6 +2,11 @@
 
 import { FashionSellpointsTable } from "@/components/fashion/fashion-deliverable-tables";
 import {
+  isNonSellpointDeliverableMessage,
+  shouldReplaySellpointsInAssistant,
+  type VerticalDeliverable,
+} from "@/lib/fashion-assistant-deliverable-display";
+import {
   extractFashionDeliverableFromText,
   mergeFashionDeliverableState,
 } from "@/lib/fashion-deliverable-parse";
@@ -15,9 +20,8 @@ import type { ProDeliverable } from "@/lib/pro-vertical/types";
 import { isProDeliverable } from "@/lib/pro-vertical/types";
 import type { FashionDeliverable } from "@/lib/fashion-types";
 import { isFashionDeliverable } from "@/lib/fashion-types";
-import { listFashionStoryboardVersionKeys } from "@/lib/fashion-workflow";
-
-type VerticalDeliverable = FashionDeliverable | ProDeliverable;
+import { listFashionStoryboardVersionKeys, listStoryTheaterVersionKeys } from "@/lib/fashion-workflow";
+import { storyTheaterVersionCardTitle } from "@/lib/story-theater-workflow";
 
 type Props = {
   content: string;
@@ -26,6 +30,10 @@ type Props = {
   showStoryboardPickHint?: boolean;
   /** 已定稿版本、等待用户确认时展示 */
   showStoryboardConfirmHint?: boolean;
+  /** 故事剧场 · 等待选 T1–T5 */
+  showStoryTheaterPickHint?: boolean;
+  /** 故事剧场 · 已选版待确认 */
+  showStoryTheaterConfirmHint?: boolean;
   /** 非最后一条助手消息时不重复展示 Brief 摘要 */
   showBrief?: boolean;
 };
@@ -50,23 +58,13 @@ function hasOpsPackContent(
   );
 }
 
-/** 本条助手 JSON 是否为口播/分镜/运营包阶段（此类消息不应再重复展示卖点表） */
-function isNonSellpointDeliverableMessage(
-  parsed: Partial<FashionDeliverable> | Partial<ProDeliverable> | null,
-): boolean {
-  if (!parsed) return false;
-  if (listFashionStoryboardVersionKeys(parsed).length > 0) return true;
-  if (listProStoryboardVersionKeys(parsed as ProDeliverable).length > 0) return true;
-  if ((parsed.voiceovers?.length ?? 0) > 0) return true;
-  if (hasOpsPackContent(parsed)) return true;
-  return false;
-}
-
 export function FashionAssistantDeliverableView({
   content,
   projectDeliverable,
   showStoryboardPickHint = false,
   showStoryboardConfirmHint = false,
+  showStoryTheaterPickHint = false,
+  showStoryTheaterConfirmHint = false,
   showBrief = true,
 }: Props) {
   const fashionParsed = extractFashionDeliverableFromText(content);
@@ -82,12 +80,18 @@ export function FashionAssistantDeliverableView({
   const deliverable = projectDeliverable ?? merged;
   const brief = stripProDeliverableFence(content);
   const nonSellpointPhaseMessage = isNonSellpointDeliverableMessage(parsed);
+  const replaySellpoints = shouldReplaySellpointsInAssistant(
+    deliverable as VerticalDeliverable | null | undefined,
+  );
   /** 本条消息 JSON 内的卖点（历史快照）；定稿后仍须在会话区展示 */
   const sellpointsFromMessage =
-    parsed?.sellpoints?.length && !nonSellpointPhaseMessage ? parsed.sellpoints : null;
+    parsed?.sellpoints?.length && !nonSellpointPhaseMessage && replaySellpoints
+      ? parsed.sellpoints
+      : null;
   /** 当前进行中的卖点（未锁定）或已定稿卖点（锁定后在会话区展示） */
   const sellpointsFromProject =
     showBrief &&
+    replaySellpoints &&
     !sellpointsFromMessage &&
     !nonSellpointPhaseMessage &&
     deliverable?.sellpoints?.length &&
@@ -97,11 +101,16 @@ export function FashionAssistantDeliverableView({
       : null;
   const sellpointsToShow = sellpointsFromMessage ?? sellpointsFromProject;
   const sellpointsLocked = Boolean(deliverable?.sellpointsLocked);
-  /** 定稿后权威表格在中栏；会话区仅保留过程反馈，不重复大表 */
-  const showSellpointsTable = Boolean(sellpointsToShow?.length) && !sellpointsLocked;
-  const showBriefText =
-    Boolean(brief) &&
-    (showBrief || Boolean(sellpointsFromMessage?.length));
+  /** 消息 JSON 快照始终只读展示；进行中或未锁定时可编辑预览 */
+  const showSellpointsTable =
+    Boolean(sellpointsToShow?.length) &&
+    (Boolean(sellpointsFromMessage) || (showBrief && !nonSellpointPhaseMessage));
+  const sellpointsTableCaption = sellpointsLocked
+    ? "卖点清单（已定稿 · 只读）"
+    : sellpointsFromMessage && !showBrief
+      ? "卖点清单（只读）"
+      : "卖点清单（过程预览）";
+  const showBriefText = Boolean(brief) && showBrief;
   const versionCount = storyboardVersionCount(
     deliverable as VerticalDeliverable | null | undefined,
   );
@@ -115,12 +124,29 @@ export function FashionAssistantDeliverableView({
   const confirmKey = deliverable?.selectedVersion;
   const confirmVersion = confirmKey ? deliverable?.storyboardVersions?.[confirmKey] : undefined;
 
+  const theaterVersionCount = listStoryTheaterVersionKeys(
+    deliverable as VerticalDeliverable | null | undefined,
+  ).length;
+  const awaitingTheaterPick =
+    showStoryTheaterPickHint &&
+    theaterVersionCount > 0 &&
+    !deliverable?.selectedStoryTheaterVersion &&
+    !deliverable?.storyTheaterLocked;
+
+  const theaterConfirmKey = deliverable?.selectedStoryTheaterVersion;
+  const theaterConfirmVersion = theaterConfirmKey
+    ? deliverable?.storyTheaterVersions?.[theaterConfirmKey]
+    : undefined;
+
   if (
     !showSellpointsTable &&
     !showBriefText &&
     versionCount === 0 &&
+    theaterVersionCount === 0 &&
     !showStoryboardConfirmHint &&
-    !awaitingPick
+    !showStoryTheaterConfirmHint &&
+    !awaitingPick &&
+    !awaitingTheaterPick
   ) {
     return null;
   }
@@ -136,15 +162,26 @@ export function FashionAssistantDeliverableView({
           12.1 分镜表可编辑并保存，确认后点下方「确认分镜，生成运营包」。
         </div>
       ) : null}
-      {sellpointsLocked && showBrief && deliverable?.sellpoints?.length ? (
+      {showStoryTheaterConfirmHint && theaterConfirmKey ? (
+        <div className="rounded-lg border border-[#e8e8ed] bg-[#f0f6ff] px-3 py-2 text-xs text-[#0071e3]">
+          已选定 {storyTheaterVersionCardTitle(theaterConfirmKey, theaterConfirmVersion?.title)}。左侧
+          故事剧场分镜表可编辑并保存，确认后点下方「确认故事版，开始成片」。
+        </div>
+      ) : null}
+      {sellpointsLocked && showBrief && deliverable?.sellpoints?.length && !showSellpointsTable ? (
         <p className="text-xs text-[#0071e3]">
           卖点已定稿，完整清单见中栏「定稿卖点清单」。
         </p>
       ) : null}
       {showSellpointsTable && sellpointsToShow ? (
         <div className="rounded-lg border border-[#e8e8ed] bg-white p-3">
-          <p className="mb-2 text-xs font-semibold text-[#6e6e73]">卖点清单（过程预览）</p>
+          <p className="mb-2 text-xs font-semibold text-[#6e6e73]">{sellpointsTableCaption}</p>
           <FashionSellpointsTable sellpoints={sellpointsToShow} />
+        </div>
+      ) : null}
+      {awaitingTheaterPick ? (
+        <div className="rounded-lg border border-[#e8e8ed] bg-[#f0f6ff] px-3 py-2 text-xs text-[#0071e3]">
+          已生成 {theaterVersionCount} 套故事版方案，请在下方选择 T1–T5 继续。
         </div>
       ) : null}
       {awaitingPick ? (

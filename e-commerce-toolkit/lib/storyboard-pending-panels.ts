@@ -146,6 +146,32 @@ export function isStoryboardPanelVideoPending(
  * 合并本地 busy、meta pending 与 HTTP 进行中的 watch。
  * sheet 已有 imageUrl、且不在 in-flight watch 时不展示生成中（含 stale pending）。
  */
+/** 模型弹层确认后立刻展示「生成中」用的镜头索引 */
+export function resolvePanelImageGenWatchTargets(opts: {
+  panelIndex?: number | null;
+  batchIndexes?: readonly number[] | null;
+  sheetPanelIndexes?: readonly number[];
+}): number[] {
+  const batch =
+    opts.batchIndexes?.filter((n) => Number.isFinite(n) && n > 0) ?? [];
+  if (batch.length > 0) {
+    return [...new Set(batch)].sort((a, b) => a - b);
+  }
+  if (typeof opts.panelIndex === "number" && opts.panelIndex > 0) {
+    return [opts.panelIndex];
+  }
+  return (opts.sheetPanelIndexes ?? [])
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .sort((a, b) => a - b);
+}
+
+export function isFullSheetPanelImageGenWatch(
+  watchIndexes: readonly number[],
+  totalPanels: number,
+): boolean {
+  return totalPanels > 0 && watchIndexes.length >= totalPanels;
+}
+
 export function resolveActiveStoryboardPanelImageBusyIndices(opts: {
   regeneratingPanels: readonly number[];
   pendingPanelIndices: readonly number[];

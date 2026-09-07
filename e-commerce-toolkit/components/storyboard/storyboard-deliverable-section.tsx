@@ -91,7 +91,7 @@ export function StoryboardDeliverableSection({
 }: Props) {
   const resolvedVideo = isStoryboardVideoUrl(videoUrl) ? videoUrl!.trim() : null;
   const [mergeSettingsOpen, setMergeSettingsOpen] = useState(false);
-  const showVideoGenerating = videoOverlayBusy ?? vidBusy;
+  const showVideoGenerating = vidBusy || Boolean(videoOverlayBusy);
 
   return (
     <div className="space-y-4">
@@ -136,8 +136,8 @@ export function StoryboardDeliverableSection({
         </EcomIconToolbar>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="isolate min-w-0 overflow-hidden">
+      <div className="grid gap-4 md:grid-cols-2 md:items-stretch">
+        <div className="flex min-h-0 min-w-0 flex-col">
           <StoryboardFullSheetCard
             label="完整分镜图"
             aspectRatio={videoAspectRatio}
@@ -185,7 +185,7 @@ export function StoryboardDeliverableSection({
           />
         </div>
 
-        <div className="isolate min-w-0 overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-col">
           <StoryboardResultCard
             label="完整视频"
             aspectRatio={videoAspectRatio}
@@ -196,6 +196,7 @@ export function StoryboardDeliverableSection({
                 : "整图成片或合并分镜视频"
             }
             busy={showVideoGenerating}
+            matchSheetPreview={fullSheetOnly && hasSheetImages}
             disabled={!hasSheetImages && !canMergePanels}
             primaryActionLabel={
               hasSheetImages && !resolvedVideo

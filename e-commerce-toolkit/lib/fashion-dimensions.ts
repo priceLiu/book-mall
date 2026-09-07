@@ -1,5 +1,7 @@
 /** 服装专业版 V4.4 · 七维枚举（与 docs/服装电商.md 一致） */
 
+import { parseProCategoryPick } from "@/lib/pro-vertical/categories";
+
 export const FASHION_GENDER_OPTIONS = ["男装", "女装", "裙装"] as const;
 export type FashionGender = (typeof FASHION_GENDER_OPTIONS)[number];
 
@@ -134,9 +136,15 @@ function parseFashionDimensionReviseStepIndex(text: string): number | null {
 function isFashionPostDimensionUserMessage(text: string): boolean {
   const trimmed = text.trim();
   if (FASHION_POST_DIMENSION_USER_MESSAGES.has(trimmed)) return true;
+  if (parseProCategoryPick(trimmed)) return true;
+  if (trimmed.startsWith("选择品类·")) return true;
   if (trimmed.startsWith("选择口播")) return true;
   if (trimmed.startsWith("选择分镜")) return true;
+  if (trimmed.startsWith("选择故事主题：")) return true;
+  if (trimmed.startsWith("选择故事版 ")) return true;
+  if (trimmed.startsWith("选择产出：")) return true;
   if (trimmed.startsWith("fashion-step:")) return true;
+  if (trimmed.startsWith("pro-step:")) return true;
   return false;
 }
 
@@ -152,6 +160,7 @@ export function buildFashionDimensionMessageLabels(
     if (m.role !== "user") continue;
     const trimmed = m.content.trim();
     if (!trimmed || trimmed === "已上传产品图") continue;
+    if (parseProCategoryPick(trimmed)) continue;
 
     const reviseStep = parseFashionDimensionReviseStepIndex(trimmed);
     if (reviseStep != null) {
@@ -198,6 +207,7 @@ export function buildFashionDimensionsFromChat(
     if (m.role !== "user") continue;
     const trimmed = m.content.trim();
     if (!trimmed || trimmed === "已上传产品图") continue;
+    if (parseProCategoryPick(trimmed)) continue;
 
     const reviseStep = parseFashionDimensionReviseStepIndex(trimmed);
     if (reviseStep != null) {

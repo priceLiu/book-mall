@@ -33,25 +33,54 @@ describe("fashion storyboard workspace helpers", () => {
     );
   });
 
-  it("isFashionProduceSetupReady requires character mode only", () => {
-    const project = {
-      meta: {
-        deliverable: { outputMode: "direct_video" },
-        workflow: { vertical: "fashion_apparel" },
-      },
+  it("isFashionProduceSetupReady accepts saved mode or uploaded model ref", () => {
+    const deliverable: FashionDeliverable = {
+      schemaVersion: "fashion-v4",
+      vertical: "fashion_apparel",
+      productName: "Test",
+      dimensions: {},
+      sellpoints: [],
+      sellpointsLocked: true,
+      voiceovers: [],
+      selectedVoiceoverId: null,
+      storyboardVersions: {},
+      selectedVersion: null,
+      coverageChecklist: [],
+      outputMode: "direct_video",
+    };
+    const base = {
+      references: [],
+      chatHistory: [],
     } as unknown as StoryboardProject;
-    expect(isFashionProduceSetupReady(project)).toBe(false);
 
     const ready = {
-      ...project,
+      ...base,
       meta: {
-        deliverable: { outputMode: "direct_video" },
+        deliverable,
         workflow: {
           vertical: "fashion_apparel",
           fashionCharacterMode: "ai",
+          fashionProduceSetupPending: true,
         },
       },
     } as unknown as StoryboardProject;
     expect(isFashionProduceSetupReady(ready)).toBe(true);
+
+    const uploaded = {
+      ...base,
+      references: [
+        {
+          id: "c1",
+          role: "character",
+          label: "模特",
+          ossUrl: "https://example.com/model.jpg",
+        },
+      ],
+      meta: {
+        deliverable,
+        workflow: { vertical: "fashion_apparel", fashionProduceSetupPending: true },
+      },
+    } as unknown as StoryboardProject;
+    expect(isFashionProduceSetupReady(uploaded)).toBe(true);
   });
 });

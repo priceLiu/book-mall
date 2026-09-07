@@ -3,6 +3,7 @@
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
 import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
 import { handCraftComposeImageSrc } from "@/lib/hand-craft-compose-image-src";
+import { storyboardPanelCardWidth } from "@/lib/storyboard-aspect";
 import { StoryboardPanelImageHoverActions } from "@/components/storyboard/storyboard-panel-image-hover-actions";
 import { buildPanelTimelineMap } from "@/lib/storyboard-gen-params";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,8 @@ type Props = {
   onGeneratePanel?: (panelIndex: number) => void;
   onRegeneratePanel?: (panelIndex: number) => void;
   onPreviewPanelPrompt?: (panelIndex: number) => void;
+  /** preview / 成片工作区：按项目比例展示镜头位 */
+  panelAspectRatio?: "16:9" | "9:16";
   selectedPanelIndexes?: ReadonlySet<number>;
   onTogglePanelSelect?: (panelIndex: number) => void;
 };
@@ -111,12 +114,15 @@ export function StoryboardProSheetView({
   onGeneratePanel,
   onRegeneratePanel,
   onPreviewPanelPrompt,
+  panelAspectRatio = "9:16",
   selectedPanelIndexes,
   onTogglePanelSelect,
 }: Props) {
   const isPreview = variant === "preview";
+  const panelColumnWidth = isPreview ? storyboardPanelCardWidth(panelAspectRatio) : undefined;
+  const panelImageAspectCss = panelAspectRatio === "16:9" ? "16/9" : "9/16";
   /** 导出 PNG 须满足火山图生视频宽高比 ≤2.50（1920/768≈2.5） */
-  const panelImgHeight = isPreview ? 420 : 300;
+  const panelImgHeight = isPreview ? undefined : 300;
   const baseFontSize = isPreview ? 14 : 13;
   const useCrossOrigin = variant === "export";
 
@@ -227,9 +233,9 @@ export function StoryboardProSheetView({
           onPreviewImage={onPreviewImage}
         />
         <RefGroup
-          title="角色图"
+          title="模特图"
           refs={chars}
-          emptyLabel="角色参考"
+          emptyLabel="模特参考"
           useCrossOrigin={useCrossOrigin}
           previewable={isPreview}
           onPreviewImage={onPreviewImage}
@@ -266,8 +272,8 @@ export function StoryboardProSheetView({
             key={panel.index}
             style={{
               flex: isPreview ? "0 0 auto" : 1,
-              minWidth: isPreview ? 220 : 0,
-              width: isPreview ? 220 : undefined,
+              minWidth: isPreview ? panelColumnWidth : 0,
+              width: isPreview ? panelColumnWidth : undefined,
               borderRight: i < sheet.panels.length - 1 ? "1px solid #1d1d1f" : undefined,
               position: "relative",
               isolation: "isolate",
@@ -304,7 +310,8 @@ export function StoryboardProSheetView({
                 interactive && panel.imageUrl && !generating && "group/image",
               )}
               style={{
-                height: panelImgHeight,
+                ...(panelImgHeight != null ? { height: panelImgHeight } : { aspectRatio: panelImageAspectCss }),
+                width: "100%",
                 borderBottom: "1px solid #1d1d1f",
                 background: generating ? "#000" : "#e8e8ed",
                 display: "flex",
@@ -320,7 +327,7 @@ export function StoryboardProSheetView({
                     src={panel.imageUrl}
                     alt={`镜头 ${panel.index}`}
                     useCrossOrigin={useCrossOrigin}
-                    objectFit={isPreview ? "contain" : "cover"}
+                    objectFit="cover"
                     previewable={Boolean(isPreview && onPreviewImage && !interactive)}
                     onPreview={onPreviewImage}
                   />

@@ -5,13 +5,24 @@ import { getProVerticalConfig } from "@/lib/pro-vertical/registry";
 import { getProjectVertical } from "@/lib/pro-vertical/project-vertical";
 import {
   fashionLlmTriggerSucceeded,
+  fashionWorkflowPatchForChoice,
+  getFashionPhase,
   inferFashionChoices,
+  resolveFashionPhaseAfterRepair,
   FASHION_LOCK_SELLPOINTS,
+  FASHION_REGENERATE_SELLPOINTS,
+  FASHION_GENERATE_VOICEOVERS,
   FASHION_CONFIRM_STORYBOARD,
+  FASHION_CONFIRM_STORY_THEATER,
   isAwaitingFashionStoryboardPick,
   isAwaitingFashionStoryboardConfirm,
+  isAwaitingStoryTheaterPick,
+  isAwaitingStoryTheaterConfirm,
+  isFashionInProduce,
+  isDirectVideoProduceReady,
   resolveProVerticalDeliverable,
 } from "@/lib/fashion-workflow";
+import { storyTopicChoiceLabel } from "@/lib/story-theater-workflow";
 import type { StoryboardProject } from "@/lib/storyboard-types";
 
 function bagProject(chatHistory: StoryboardProject["chatHistory"]): StoryboardProject {
@@ -172,6 +183,154 @@ describe("pro-vertical · LLM trigger success check", () => {
     expect(fashionLlmTriggerSucceeded("pro-step:sellpoints-generate", project)).toBe(false);
   });
 
+  it("shows regen-sellpoints when AI sellpoint generation failed with empty list", () => {
+    const project: StoryboardProject = {
+      ...digital3cProject({
+        schemaVersion: "pro-v1",
+        vertical: "digital_3c",
+        productName: "测试手机",
+        productionMode: "story_theater",
+        dimensions: {
+          productCategory: "手机",
+          productSubCategory: "旗舰机",
+          designLanguage: "极简科技",
+          coreFunctionAttributes: "快充",
+          tier: "高端旗舰",
+          customScene: "通勤",
+          platform: "淘宝",
+          outputLanguage: "中文",
+        },
+        sellpoints: [],
+        sellpointsLocked: false,
+        voiceovers: [],
+        storyboardVersions: {},
+        selectedVersion: null,
+        coverageChecklist: [],
+        outputMode: null,
+      }),
+      meta: {
+        workflow: {
+          vertical: "digital_3c",
+          proPhase: "sellpoints",
+          sellpointInputMode: "ai",
+        },
+        deliverable: {
+          schemaVersion: "pro-v1",
+          vertical: "digital_3c",
+          productName: "测试手机",
+          productionMode: "story_theater",
+          dimensions: {
+            productCategory: "手机",
+            productSubCategory: "旗舰机",
+            designLanguage: "极简科技",
+            coreFunctionAttributes: "快充",
+            tier: "高端旗舰",
+            customScene: "通勤",
+            platform: "淘宝",
+            outputLanguage: "中文",
+          },
+          sellpoints: [],
+          sellpointsLocked: false,
+          voiceovers: [],
+          storyboardVersions: {},
+          selectedVersion: null,
+          coverageChecklist: [],
+          outputMode: null,
+        },
+      },
+    };
+    const choices = inferFashionChoices(project);
+    expect(choices.some((c) => c.message === FASHION_REGENERATE_SELLPOINTS)).toBe(true);
+  });
+
+  it("does not offer voiceover regen on story theater line after sellpoints locked", () => {
+    const project: StoryboardProject = {
+      ...digital3cProject({
+        schemaVersion: "pro-v1",
+        vertical: "digital_3c",
+        productName: "测试手机",
+        productionMode: "story_theater",
+        dimensions: {
+          productCategory: "手机",
+          productSubCategory: "旗舰机",
+          designLanguage: "极简科技",
+          coreFunctionAttributes: "快充",
+          tier: "高端旗舰",
+          customScene: "通勤",
+          platform: "淘宝",
+          outputLanguage: "中文",
+        },
+        sellpoints: [{ id: "S01", text: "快充", layer: "core", source: "ai" }],
+        sellpointsLocked: true,
+        voiceovers: [],
+        storyboardVersions: {},
+        selectedVersion: null,
+        coverageChecklist: [],
+        outputMode: null,
+      }),
+      meta: {
+        workflow: {
+          vertical: "digital_3c",
+          proPhase: "story_topic_pick",
+        },
+        deliverable: {
+          schemaVersion: "pro-v1",
+          vertical: "digital_3c",
+          productName: "测试手机",
+          productionMode: "story_theater",
+          dimensions: {
+            productCategory: "手机",
+            productSubCategory: "旗舰机",
+            designLanguage: "极简科技",
+            coreFunctionAttributes: "快充",
+            tier: "高端旗舰",
+            customScene: "通勤",
+            platform: "淘宝",
+            outputLanguage: "中文",
+          },
+          sellpoints: [{ id: "S01", text: "快充", layer: "core", source: "ai" }],
+          sellpointsLocked: true,
+          voiceovers: [],
+          storyboardVersions: {},
+          selectedVersion: null,
+          coverageChecklist: [],
+          outputMode: null,
+        },
+      },
+    };
+    const choices = inferFashionChoices(project);
+    expect(choices.some((c) => c.message === FASHION_GENERATE_VOICEOVERS)).toBe(false);
+    expect(choices.some((c) => c.message === FASHION_REGENERATE_SELLPOINTS)).toBe(false);
+  });
+
+  it("shows generate-voiceovers before first voiceover attempt on standard line", () => {
+    const project = digital3cProject({
+      schemaVersion: "pro-v1",
+      vertical: "digital_3c",
+      productName: "测试手机",
+      productionMode: "standard_script",
+      dimensions: {
+        productCategory: "手机",
+        productSubCategory: "旗舰机",
+        designLanguage: "极简科技",
+        coreFunctionAttributes: "快充",
+        tier: "高端旗舰",
+        customScene: "通勤",
+        platform: "淘宝",
+        outputLanguage: "中文",
+      },
+      sellpoints: [{ id: "S01", text: "快充", layer: "core", source: "ai" }],
+      sellpointsLocked: true,
+      voiceovers: [],
+      storyboardVersions: {},
+      selectedVersion: null,
+      coverageChecklist: [],
+      outputMode: null,
+    });
+    const choices = inferFashionChoices(project);
+    expect(choices.some((c) => c.message === FASHION_GENERATE_VOICEOVERS)).toBe(true);
+  });
+
   it("shows lock-sellpoints choice after pro sellpoints generated", () => {
     const project = digital3cProject({
       schemaVersion: "pro-v1",
@@ -200,6 +359,86 @@ describe("pro-vertical · LLM trigger success check", () => {
     });
     const choices = inferFashionChoices(project);
     expect(choices.some((c) => c.message === FASHION_LOCK_SELLPOINTS)).toBe(true);
+  });
+
+  it("locks story topic from candidates without pre-selectedStoryTopic", () => {
+    const topic = {
+      id: "t-weekend",
+      title: "周末出游纠结穿搭不好搭配",
+      storyCore: "出门前反复换衣",
+      storyType: "场景适配",
+    };
+    const project = digital3cProject({
+      schemaVersion: "pro-v1",
+      vertical: "digital_3c",
+      productionMode: "story_theater",
+      sellpointsLocked: true,
+      sellpoints: [{ id: "S01", text: "轻薄", layer: "core", source: "ai" }],
+      storyTopicCandidates: [topic],
+      selectedStoryTopic: null,
+    });
+    project.meta!.workflow = {
+      ...project.meta!.workflow,
+      proPhase: "story_topic_pick",
+    };
+    const patch = fashionWorkflowPatchForChoice(project, storyTopicChoiceLabel(topic.title));
+    expect(patch).not.toBeNull();
+    const d = (patch as { deliverable: { selectedStoryTopic?: { title: string } } }).deliverable;
+    expect(d.selectedStoryTopic?.title).toBe(topic.title);
+    expect(patch).toHaveProperty("llmTrigger");
+  });
+
+  it("does not regress story theater phase after locked sellpoints when chat resolve is empty", () => {
+    const deliverable = {
+      schemaVersion: "pro-v1",
+      vertical: "digital_3c",
+      productionMode: "story_theater",
+      sellpointsLocked: true,
+      sellpoints: [{ id: "S01", text: "轻薄", layer: "core", source: "ai" }],
+      selectedStoryTopic: {
+        id: "t1",
+        title: "主题",
+        storyCore: "核心",
+        storyType: "场景适配",
+      },
+      storyTopicCandidates: [],
+      voiceovers: [],
+      storyboardVersions: {},
+      selectedVersion: null,
+      coverageChecklist: [],
+      outputMode: null,
+    };
+    const project = digital3cProject(deliverable);
+    project.meta!.workflow = { ...project.meta!.workflow, proPhase: "story_topic_pick" };
+    const phase = resolveFashionPhaseAfterRepair({
+      wfPhase: "story_topic_pick",
+      inferredPhase: "sellpoints",
+      metaDeliverable: deliverable,
+    });
+    expect(phase).toBe("story_topic_pick");
+    expect(getFashionPhase(project)).toBe("story_topic_pick");
+  });
+
+  it("story-theater LLM trigger fails when versions missing", () => {
+    const project = digital3cProject({
+      schemaVersion: "pro-v1",
+      vertical: "digital_3c",
+      productionMode: "story_theater",
+      sellpointsLocked: true,
+      sellpoints: [{ id: "S01", text: "轻薄", layer: "core", source: "ai" }],
+      selectedStoryTopic: {
+        id: "t1",
+        title: "主题",
+        storyCore: "核心",
+        storyType: "场景适配",
+      },
+      voiceovers: [],
+      storyboardVersions: {},
+      selectedVersion: null,
+      coverageChecklist: [],
+      outputMode: null,
+    });
+    expect(fashionLlmTriggerSucceeded("pro-step:story-theater-generate", project)).toBe(false);
   });
 });
 
@@ -289,5 +528,135 @@ describe("pro-vertical · storyboard version pick", () => {
     const choices = inferFashionChoices(project);
     expect(choices.some((c) => c.message === FASHION_CONFIRM_STORYBOARD)).toBe(true);
     expect(choices.some((c) => c.message.startsWith("选择分镜"))).toBe(false);
+  });
+});
+
+describe("pro-vertical · story theater version pick", () => {
+  const storyTheaterVersions = {
+    T1: {
+      id: "T1",
+      title: "情绪共鸣版",
+      panels: [
+        {
+          index: 1,
+          shotScale: "中景",
+          durationSec: 4,
+          cameraMove: "固定",
+          sceneDesc: "场景",
+          scenePrompt: "scene prompt long enough here",
+          modelAction: "动作",
+          garmentFocus: "展示",
+          sellpointIds: [],
+          imagePrompt: "image prompt long enough",
+          videoPrompt: "video prompt long enough",
+        },
+      ],
+    },
+    T2: { id: "T2", title: "T2版", panels: [{ index: 1, shotScale: "中景", durationSec: 4, cameraMove: "固定", sceneDesc: "展示", scenePrompt: "scene", modelAction: "动作", garmentFocus: "展示", sellpointIds: [], imagePrompt: "image prompt long", videoPrompt: "video prompt long" }] },
+  };
+
+  function digital3cStoryTheaterProject(
+    chatHistory: StoryboardProject["chatHistory"],
+  ): StoryboardProject {
+    return {
+      id: "p3c-st",
+      title: "3C故事剧场",
+      module: "storyboard",
+      status: "deliverable_ready",
+      brief: null,
+      settings: null,
+      references: [
+        { id: "p1", role: "product", label: "产品", ossUrl: "https://example.com/p.jpg" },
+      ],
+      chatHistory,
+      sheet: null,
+      sheetPngUrl: null,
+      sheetHtmlUrl: null,
+      videoAssetId: null,
+      meta: {
+        workflow: { vertical: "digital_3c", proPhase: "story_theater_confirm" },
+        deliverable: {
+          schemaVersion: "pro-v1",
+          vertical: "digital_3c",
+          productionMode: "story_theater",
+          productName: "测试手机",
+          dimensions: { productCategory: "手机", outputLanguage: "中文" },
+          sellpoints: [{ id: "S01", text: "旗舰芯片", layer: "core", source: "ai" }],
+          sellpointsLocked: true,
+          selectedStoryTopic: {
+            id: "t1",
+            title: "主题",
+            storyCore: "核心",
+            storyType: "场景适配",
+          },
+          storyTheaterVersions,
+          selectedStoryTheaterVersion: "T1",
+          storyTheaterLocked: false,
+          voiceovers: [],
+          storyboardVersions: {},
+          selectedVersion: null,
+          coverageChecklist: [],
+          outputMode: null,
+        },
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  it("advances to story theater confirm after user picks T1", () => {
+    const assistantFence = `\`\`\`pro-deliverable\n${JSON.stringify({
+      schemaVersion: "pro-v1",
+      vertical: "digital_3c",
+      productionMode: "story_theater",
+      sellpointsLocked: true,
+      storyTheaterVersions,
+      selectedStoryTheaterVersion: null,
+    })}\n\`\`\``;
+    const project = digital3cStoryTheaterProject([
+      { id: "a1", role: "assistant", content: assistantFence },
+      { id: "u1", role: "user", content: "选择故事版 T1" },
+    ]);
+
+    const resolved = resolveProVerticalDeliverable(project);
+    expect(resolved?.selectedStoryTheaterVersion).toBe("T1");
+    expect(resolved?.storyTheaterLocked).toBe(false);
+    expect(isAwaitingStoryTheaterPick(project)).toBe(false);
+    expect(isAwaitingStoryTheaterConfirm(project)).toBe(true);
+
+    const choices = inferFashionChoices(project);
+    expect(choices.some((c) => c.message === FASHION_CONFIRM_STORY_THEATER)).toBe(true);
+  });
+
+  it("does not skip story theater confirm when chat has confirm but meta is not locked", () => {
+    const project = digital3cStoryTheaterProject([
+      { id: "u1", role: "user", content: "选择故事版 T1" },
+      { id: "u2", role: "user", content: FASHION_CONFIRM_STORY_THEATER },
+    ]);
+
+    expect(isAwaitingStoryTheaterConfirm(project)).toBe(true);
+    expect(isFashionInProduce(project)).toBe(false);
+    expect(isDirectVideoProduceReady(project)).toBe(false);
+    expect(resolveProVerticalDeliverable(project)?.outputMode).toBeNull();
+  });
+
+  it("enters direct video produce only after meta story theater lock", () => {
+    const project = digital3cStoryTheaterProject([
+      { id: "u1", role: "user", content: "选择故事版 T1" },
+      { id: "u2", role: "user", content: FASHION_CONFIRM_STORY_THEATER },
+    ]);
+    project.meta = {
+      ...project.meta,
+      workflow: { vertical: "digital_3c", proPhase: "produce" },
+      deliverable: {
+        ...(project.meta!.deliverable as object),
+        storyTheaterLocked: true,
+        outputMode: "direct_video",
+      },
+    };
+
+    expect(isAwaitingStoryTheaterConfirm(project)).toBe(false);
+    expect(isFashionInProduce(project)).toBe(true);
+    expect(isDirectVideoProduceReady(project)).toBe(true);
   });
 });

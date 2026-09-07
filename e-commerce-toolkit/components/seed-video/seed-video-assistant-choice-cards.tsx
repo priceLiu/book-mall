@@ -15,6 +15,18 @@ type Props = {
   className?: string;
 };
 
+function isChoiceSelected(
+  choice: SeedVideoAssistantChoice,
+  selectedMessage?: string | null,
+): boolean {
+  if (!selectedMessage) return false;
+  return (
+    selectedMessage === choice.message ||
+    selectedMessage === choice.label ||
+    selectedMessage === choice.title
+  );
+}
+
 export function SeedVideoAssistantChoiceCards({
   title,
   subtitle,
@@ -24,25 +36,24 @@ export function SeedVideoAssistantChoiceCards({
   selectedMessage,
   className,
 }: Props) {
+  const readOnly = !onSelect;
+
   return (
     <div className={cn("space-y-3", className)}>
       <div>
         <p className="text-sm font-semibold leading-snug text-[#1d1d1f]">{title}</p>
-        <p className="mt-1 text-[11px] text-[#6e6e73]">{subtitle}</p>
+        {subtitle ? <p className="mt-1 text-[11px] text-[#6e6e73]">{subtitle}</p> : null}
       </div>
       <div className="space-y-2">
         {choices.map((choice) => {
-          const selected =
-            selectedMessage === choice.message ||
-            selectedMessage === choice.label ||
-            selectedMessage === choice.title;
-          const readOnly = disabled && !onSelect;
+          const selected = isChoiceSelected(choice, selectedMessage);
           const shellClass = cn(
             "flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left transition",
             "border-[#e8e8ed] bg-white",
             selected && "border-[#1d1d1f] bg-[#fafafa]",
-            !readOnly && "hover:border-[#86868b] hover:bg-[#fafafa]",
-            disabled && onSelect && "cursor-not-allowed opacity-50",
+            !readOnly && !disabled && "hover:border-[#86868b] hover:bg-[#fafafa]",
+            !readOnly && disabled && "cursor-not-allowed opacity-50",
+            readOnly && "cursor-default",
           );
           const body = (
             <>

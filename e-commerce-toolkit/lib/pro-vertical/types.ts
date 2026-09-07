@@ -1,5 +1,13 @@
 /** Pro Vertical 前端 deliverable 类型（与 book-mall pro-v1 对齐） */
 
+import type {
+  ProductionMode,
+  StoryTheaterTopicRef,
+  StoryTheaterVersionKey,
+} from "@/lib/story-theater-types";
+
+export type { ProductionMode, StoryTheaterTopicRef, StoryTheaterVersionKey };
+
 export type ProVerticalId = "fashion_apparel" | "bags" | "digital_3c";
 
 export type DimensionStepDef = {
@@ -78,6 +86,7 @@ export type ProPanelRow = {
   garmentFocus?: string;
   dialogue?: string;
   toneTexture?: string;
+  subtitle?: string;
   sellpointIds: string[];
   imagePrompt: string;
   videoPrompt: string;
@@ -85,6 +94,14 @@ export type ProPanelRow = {
 
 export type ProStoryboardVersion = {
   id: ProVersionKey;
+  title: string;
+  summary?: string;
+  panels: ProPanelRow[];
+  totalDurationSec?: number;
+};
+
+export type StoryTheaterVersion = {
+  id: StoryTheaterVersionKey;
   title: string;
   summary?: string;
   panels: ProPanelRow[];
@@ -125,12 +142,23 @@ export type ProDeliverable = {
   coverageChecklist: ProCoverageRow[];
   opsPack?: ProOpsPack;
   outputMode: "script_compose" | "direct_video" | null;
+  productionMode?: ProductionMode | null;
+  /** 故事主题 5 选 1 时展示的候选（持久化供历史回放） */
+  storyTopicCandidates?: StoryTheaterTopicRef[];
+  selectedStoryTopic?: StoryTheaterTopicRef | null;
+  storyTheaterVersions?: Partial<Record<StoryTheaterVersionKey, StoryTheaterVersion>>;
+  selectedStoryTheaterVersion?: StoryTheaterVersionKey | null;
+  storyTheaterLocked?: boolean;
 };
 
 export type ProPhase =
   | "product_ref"
   | "dimensions"
+  | "production_mode"
   | "sellpoints"
+  | "story_topic_pick"
+  | "story_theater_pick"
+  | "story_theater_confirm"
   | "voiceover_pick"
   | "storyboard_pick"
   | "storyboard_confirm"

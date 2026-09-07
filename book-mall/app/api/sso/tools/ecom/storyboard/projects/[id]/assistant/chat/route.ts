@@ -37,6 +37,10 @@ import {
 } from "@/lib/ecom/ecom-fashion-deliverable";
 import { renderFashionDeliverableMarkdown } from "@/lib/ecom/ecom-fashion-deliverable-render";
 import {
+  buildStoryTheaterSystemPrompt,
+} from "@/lib/ecom/ecom-story-theater-prompts";
+import { isStoryTheaterProductionMode } from "@/lib/ecom/story-theater-types";
+import {
   isLegacyGenericStoryboardMeta,
   stripDeliverableFence,
 } from "@/lib/ecom/ecom-storyboard-deliverable";
@@ -133,6 +137,35 @@ export async function POST(req: Request, ctx: Ctx) {
     : isProVertical && proVerticalId
       ? buildProAssistantSystemPrompt(proVerticalId, proPromptPhase)
       : buildFashionAssistantSystemPrompt("general");
+  if (
+    isFashion &&
+    fashionPromptPhase === "story_theater" &&
+    prevFashionDeliverable?.selectedStoryTopic
+  ) {
+    systemPrompt = buildStoryTheaterSystemPrompt("fashion_apparel", {
+      productName: prevFashionDeliverable.productName,
+      dimensions: prevFashionDeliverable.dimensions as Record<string, string | undefined>,
+      sellpoints: prevFashionDeliverable.sellpoints ?? [],
+      selectedTopicTitle: prevFashionDeliverable.selectedStoryTopic.title,
+      selectedStoryCore: prevFashionDeliverable.selectedStoryTopic.storyCore,
+      selectedStoryType: prevFashionDeliverable.selectedStoryTopic.storyType,
+    });
+  }
+  if (
+    isProVertical &&
+    proVerticalId &&
+    proPromptPhase === "story_theater" &&
+    prevProDeliverable?.selectedStoryTopic
+  ) {
+    systemPrompt = buildStoryTheaterSystemPrompt(proVerticalId, {
+      productName: prevProDeliverable.productName,
+      dimensions: prevProDeliverable.dimensions,
+      sellpoints: prevProDeliverable.sellpoints ?? [],
+      selectedTopicTitle: prevProDeliverable.selectedStoryTopic.title,
+      selectedStoryCore: prevProDeliverable.selectedStoryTopic.storyCore,
+      selectedStoryType: prevProDeliverable.selectedStoryTopic.storyType,
+    });
+  }
   if (
     !isFashion &&
     !isProVertical &&
@@ -239,7 +272,8 @@ export async function POST(req: Request, ctx: Ctx) {
               ? "sellpoints"
               : fashionPromptPhase === "voiceovers" ||
                   fashionPromptPhase === "storyboards" ||
-                  fashionPromptPhase === "ops"
+                  fashionPromptPhase === "ops" ||
+                  fashionPromptPhase === "story_theater"
                 ? fashionPromptPhase
                 : undefined;
           const fashionDeliverablePatch = isFashion
@@ -250,7 +284,8 @@ export async function POST(req: Request, ctx: Ctx) {
               ? "sellpoints"
               : proPromptPhase === "voiceovers" ||
                   proPromptPhase === "storyboards" ||
-                  proPromptPhase === "ops"
+                  proPromptPhase === "ops" ||
+                  proPromptPhase === "story_theater"
                 ? proPromptPhase
                 : undefined;
           const proDeliverablePatch =
@@ -367,6 +402,22 @@ export async function POST(req: Request, ctx: Ctx) {
                 ...(merged.storyboardVersions ?? {}),
               };
             }
+            if (
+              fashionPromptPhase === "story_theater" &&
+              prevFashion?.storyTheaterVersions
+            ) {
+              merged.storyTheaterVersions = {
+                ...(prevFashion.storyTheaterVersions ?? {}),
+                ...(merged.storyTheaterVersions ?? {}),
+              };
+            }
+            if (
+              fashionPromptPhase === "ops" &&
+              !isStoryTheaterProductionMode(merged.productionMode) &&
+              merged.storyboardLocked
+            ) {
+              merged.outputMode = "script_compose";
+            }
             const versionKey = merged.selectedVersion ?? undefined;
             const systemMarkdown = renderFashionDeliverableMarkdown(merged, {
               versionKey,
@@ -449,6 +500,19 @@ export async function POST(req: Request, ctx: Ctx) {
                 ...(prevPro.storyboardVersions ?? {}),
                 ...(merged.storyboardVersions ?? {}),
               };
+            }
+            if (proPromptPhase === "story_theater" && prevPro?.storyTheaterVersions) {
+              merged.storyTheaterVersions = {
+                ...(prevPro.storyTheaterVersions ?? {}),
+                ...(merged.storyTheaterVersions ?? {}),
+              };
+            }
+            if (
+              proPromptPhase === "ops" &&
+              merged.productionMode !== "story_theater" &&
+              merged.storyboardLocked
+            ) {
+              merged.outputMode = "script_compose";
             }
             const versionKey = merged.selectedVersion ?? undefined;
             const systemMarkdown = renderProDeliverableMarkdown(merged, {

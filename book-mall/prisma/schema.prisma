@@ -4252,6 +4252,27 @@ model EcomSceneLibraryEntry {
   @@index([scope, userId, deletedAt])
 }
 
+/// 电商故事版 · 故事剧场选题库（系统 + 用户；vertical 分服装/包包/3C）
+model EcomStoryTheaterTopic {
+  id        String    @id
+  vertical  String
+  title     String
+  storyCore String    @db.Text
+  storyType String
+  tags      Json?
+  scope     String    @default("platform")
+  userId    String?
+  enabled   Boolean   @default(true)
+  sortOrder Int       @default(0)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([vertical, deletedAt, enabled])
+  @@index([scope, userId, deletedAt])
+  @@index([vertical, sortOrder])
+}
+
 // ---------------------------------------------------------------------------
 // 我的 AI 空间（doc/product/我的AI空间.md）
 // ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@
 import { getProVerticalConfig } from "@/lib/ecom/pro-vertical/registry";
 import type { ProVerticalId } from "@/lib/ecom/pro-vertical/types";
 
-export type ProPromptPhase = "sellpoints" | "sellpoints_polish" | "voiceovers" | "storyboards" | "ops" | "general";
+export type ProPromptPhase = "sellpoints" | "sellpoints_polish" | "voiceovers" | "storyboards" | "ops" | "story_theater" | "general";
 
 function buildCoreBlock(vertical: ProVerticalId): string {
   const config = getProVerticalConfig(vertical);
@@ -163,6 +163,8 @@ E/C 版口播允许 ±15% 微调，其余 100% 忠实。`,
 输出 JSON 仅含 opsPack（可选 schemaVersion/vertical）。
 语言与 dimensions.outputLanguage 一致。`,
 
+    story_theater: `【当前任务：故事剧场 T1–T5】由专用 story-theater prompt 注入；输出 storyTheaterVersions + selectedStoryTopic。`,
+
     general: `【通用】按用户消息推进；内部 trigger 以 pro-step: 开头时只输出对应 phase JSON。`,
   };
 
@@ -177,6 +179,7 @@ export function resolveProPromptPhase(lastUserTurn: string): ProPromptPhase {
   if (lastUserTurn.includes("sellpoints")) return "sellpoints";
   if (lastUserTurn.includes("voiceovers")) return "voiceovers";
   if (lastUserTurn.includes("storyboards")) return "storyboards";
+  if (lastUserTurn.includes("story-theater")) return "story_theater";
   if (lastUserTurn.includes("ops")) return "ops";
   return "general";
 }

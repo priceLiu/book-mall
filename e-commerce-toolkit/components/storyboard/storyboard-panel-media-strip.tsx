@@ -125,7 +125,7 @@ export function StoryboardPanelMediaStrip({
     [selectedImageList, panelByIndex],
   );
 
-  const imageStripBusy = imgBusy || activeImageGenPanels.size > 0;
+  const imageStripBusy = imgBusy;
   const generateVideoDisabled = videoActionTargets.length === 0;
 
   const imageBatchDisabled =

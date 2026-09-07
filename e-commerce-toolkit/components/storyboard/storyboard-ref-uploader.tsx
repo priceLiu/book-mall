@@ -40,7 +40,7 @@ const ROLE_SECTIONS: Array<{
   },
   {
     role: "character",
-    title: "角色图",
+    title: "模特图",
     refRole: "character",
     emptyHint: "拖放图片到此处，或点击「上传」后 Ctrl+V / ⌘V 粘贴",
   },

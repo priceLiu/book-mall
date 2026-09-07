@@ -625,6 +625,7 @@ export function ShootCatalogPanel() {
             系统姿势参与助手自动编排；自建姿势仅供姿势表内手动替换，不会进入自动抽取池。
           </p>
           <CatalogSection title="系统推荐（只读）">
+            <p className="text-[11px] text-[#86868b]">共 {poses.platform.length} 条姿势参考</p>
             {poses.platform.length === 0 ? (
               <p className="text-xs text-[#86868b]">暂无系统姿势。</p>
             ) : (
