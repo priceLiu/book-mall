@@ -36,6 +36,7 @@ export const ECOM_TEMPLATE_CATEGORY_META = [
     keywords: ["床垫", "枕芯"],
     primary: false,
   },
+  { id: "digital-3c", label: "3C数码", keywords: ["数码", "3C", "3c"], primary: false },
 ] as const;
 
 export type EcomTemplateCategoryMeta =

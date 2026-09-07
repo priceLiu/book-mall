@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { FlowCanvas } from "@/components/canvas/flow-canvas";
+import { FlowCanvas } from "@/lib/canvas/canvas-page-heavy-chunks";
 import { CanvasCreditsToastHost } from "@/components/canvas/canvas-credits-toast-host";
 import { StyleLibraryModal } from "@/components/canvas/style-library-modal";
 import { useCanvasStore } from "@/lib/canvas/store";

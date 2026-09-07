@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ChevronRight, Loader2 } from "lucide-react";
 
@@ -22,7 +21,6 @@ import {
 } from "@/lib/canvas/recent-projects-invalidate";
 import {
   listMyCanvasProjects,
-  prefetchCanvasProject,
   type CanvasProjectSummary,
 } from "@/lib/canvas-api";
 
@@ -34,28 +32,15 @@ function formatDate(iso: string): string {
   return d.toLocaleString("zh-CN");
 }
 
-const RECENT_DEFER_MS = 600;
-
 /** 登录用户项目列表 · 不走门户静态快照，始终实时拉取 */
 export function RecentProjectsSection() {
   const base = useBookMallBaseUrl();
-  const router = useRouter();
   const [projects, setProjects] = useState<CanvasProjectSummary[]>([]);
   const [loading, setLoading] = useState(false);
-  const [enabled, setEnabled] = useState(false);
   const [openingProjectId, setOpeningProjectId] = useState<string | null>(null);
 
-  const prefetchProject = useCallback(
-    (id: string) => {
-      router.prefetch(`/canvas/${id}`);
-      if (base) prefetchCanvasProject(base, id);
-    },
-    [router, base],
-  );
-
-  useEffect(() => {
-    const t = window.setTimeout(() => setEnabled(true), RECENT_DEFER_MS);
-    return () => window.clearTimeout(t);
+  const prefetchProject = useCallback((_id: string) => {
+    /* 详情预取已内置于 CanvasProjectOpenLink.pointerdown */
   }, []);
 
   const loadProjects = useCallback(async () => {
@@ -79,25 +64,22 @@ export function RecentProjectsSection() {
   }, [base]);
 
   useEffect(() => {
-    if (!enabled) return;
     consumeRecentProjectsStale();
     void loadProjects();
-  }, [enabled, loadProjects]);
+  }, [loadProjects]);
 
   useEffect(() => subscribeRecentProjectsInvalidate(() => void loadProjects()), [loadProjects]);
 
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState !== "visible" || !enabled) return;
+      if (document.visibilityState !== "visible") return;
       if (!isRecentProjectsStale()) return;
       consumeRecentProjectsStale();
       void loadProjects();
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [enabled, loadProjects]);
-
-  if (!enabled) return null;
+  }, [loadProjects]);
 
   if (!loading && projects.length === 0) return null;
 
@@ -126,7 +108,6 @@ export function RecentProjectsSection() {
               <li
                 key={p.id}
                 className="group relative rounded-2xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-4 transition hover:border-[var(--canvas-accent)]/40"
-                onMouseEnter={() => prefetchProject(p.id)}
               >
                 <CanvasProjectOpenLink
                   projectId={p.id}

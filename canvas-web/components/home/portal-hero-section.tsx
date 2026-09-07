@@ -153,8 +153,12 @@ export function PortalHeroSection() {
   );
   const cursorRef = useRef(stablePool.length > 1 ? 2 % stablePool.length : 0);
   const updateLeftRef = useRef(true);
+  const heroBootstrappedRef = useRef(false);
 
   useEffect(() => {
+    if (heroBootstrappedRef.current) return;
+    heroBootstrappedRef.current = true;
+
     setChips(pickRandomItems(featured, CHIP_COUNT));
     const pool = pickRandomItems(stablePool, stablePool.length);
     setImagePool(pool);

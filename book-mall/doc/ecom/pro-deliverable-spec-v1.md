@@ -66,9 +66,9 @@ type ProPanelRow = {
 
 UI 列 label 由 `VerticalConfig.panelFocusLabel` 决定（如「包包展示重点」）。
 
-## 5. 七维（按 vertical）
+## 5. 参数维度（按 vertical）
 
-### fashion_apparel
+### fashion_apparel（七维）
 
 | key | 说明 |
 |-----|------|
@@ -92,17 +92,22 @@ UI 列 label 由 `VerticalConfig.panelFocusLabel` 决定（如「包包展示重
 | platform | 同共享 |
 | outputLanguage | 同共享 |
 
-### digital_3c
+### digital_3c（八维）
+
+规则详见 [`digital-3c-rules-v1.md`](./digital-3c-rules-v1.md)。
 
 | key | 说明 |
 |-----|------|
-| productCategory | 产品大类（可搜索） |
+| productCategory | 产品大类（可搜索）；含手机/耳机/…/显示器/拓展坞/影音设备/游戏设备/智能家居小硬件/数码配件 等 25 项 |
 | productSubCategory | 产品细项（随大类级联） |
-| designLanguage | 设计语言 |
-| tier | 档次 |
+| designLanguage | 设计语言（含桌面美学/智能家居/办公效率） |
+| coreFunctionAttributes | 核心功能属性（快充/降噪/长续航 等，主方向单选） |
+| tier | 平价性价比 / 中端均衡 / 高端旗舰 |
 | customScene | 使用场景（自由输入） |
 | platform | 同共享 |
 | outputLanguage | 同共享 |
+
+`opsPack` 3C 扩展字段（可选）：`bgmDirection`、`subtitleGuide`、`sfxNotes`。
 
 ## 6. 围栏示例（bags）
 

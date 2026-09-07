@@ -27,6 +27,7 @@ import {
 } from "@/lib/canvas/pick-project-thumbnail";
 import { cloneCanvasGraphForDuplicate } from "@/lib/canvas/clone-canvas-graph";
 import { isPortalFilmShowcaseProject } from "@/lib/canvas/sbv1-film-showcase";
+import { scheduleCanvasHomeSnapshotRegeneration } from "@/lib/static-snapshots/canvas-home-snapshot-schedule";
 import {
   embedListCoverInCanvas,
   projectListCoverSummaryFields,
@@ -744,6 +745,7 @@ export async function setCanvasProjectPortalFeatured(args: {
       ...(typeof args.blurb === "string" ? { portalFeaturedBlurb: args.blurb } : {}),
     },
   });
+  scheduleCanvasHomeSnapshotRegeneration();
   return {
     ...toSummary(updated),
     portalFeaturedBlurb: portalFeaturedBlurbOf(updated),

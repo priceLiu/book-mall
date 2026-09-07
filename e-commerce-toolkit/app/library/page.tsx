@@ -812,7 +812,7 @@ export default function LibraryPage() {
           ) : empty ? (
             <p className="mt-6 text-sm text-[#6e6e73]">
               {activeTab === "workflows"
-                ? "暂无已保存工作流。请在拆图拆视频 / 手伴创作 / 主图创作 / 种草视频 / 微剧故事版等工作台点「保存」后再来此处一键复用。"
+                ? "暂无已保存工作流。请在拆图拆视频 / 手伴创作 / 主图创作 / 种草视频 / 电商口播故事版等工作台点「保存」后再来此处一键复用。"
                 : "该分类暂无资产，去各模块生成后会出现在对应 Tab。"}
             </p>
           ) : activeTab === "workflows" ? (

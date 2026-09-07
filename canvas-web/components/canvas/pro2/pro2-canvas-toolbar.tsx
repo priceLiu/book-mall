@@ -196,7 +196,11 @@ export function Pro2CanvasToolbar({
 
   return (
     <>
-      <LibtvCanvasDockBarSlot storageKey={`pro2:${projectId}`} dockRef={dockBarRef}>
+      <LibtvCanvasDockBarSlot
+        storageKey="pro2:dock-bar-v1"
+        legacyStorageKeys={[`pro2:${projectId}`]}
+        dockRef={dockBarRef}
+      >
         <Sbv1Dock items={dockItems} />
       </LibtvCanvasDockBarSlot>
       <input

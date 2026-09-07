@@ -11,8 +11,6 @@ import { getMainSiteOrigin } from "@/lib/site-origin";
 import { PlatformAssistant } from "@private/platform-assistant";
 import "./globals.css";
 
-export const dynamic = "force-dynamic";
-
 export const metadata: Metadata = {
   title: {
     default: "ZH 无限画布",

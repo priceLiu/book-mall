@@ -21,7 +21,9 @@ import {
 } from "@/lib/canvas/background-generation-dock-policy";
 import { cn } from "@/lib/utils";
 
-const POLL_MS = 15_000;
+const POLL_MS_ACTIVE = 15_000;
+const POLL_MS_IDLE = 60_000;
+const INITIAL_POLL_DEFER_MS = 8_000;
 const PANEL_OPEN_EVENT = "canvas:background-video-panel-open";
 const LONG_TASK_SEC = BACKGROUND_DOCK_LONG_TASK_MS / 1000;
 
@@ -67,6 +69,7 @@ export function CanvasBackgroundVideoPanel({ projectId }: { projectId: string })
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const prevReadyRef = useRef<Set<string>>(new Set());
   const prevLongRunningNotifiedRef = useRef<Set<string>>(new Set());
+  const taskCountRef = useRef(0);
 
   useEffect(() => {
     setMounted(true);
@@ -91,11 +94,12 @@ export function CanvasBackgroundVideoPanel({ projectId }: { projectId: string })
       window.removeEventListener(CANVAS_BACKGROUND_VIDEO_PANEL_TOGGLE_EVENT, onToggle);
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<number> => {
     if (!base) {
       setFetchError("未连接主站，无法加载后台视频任务");
       syncTaskCount(0);
-      return;
+      taskCountRef.current = 0;
+      return 0;
     }
     setLoading(true);
     try {
@@ -103,6 +107,7 @@ export function CanvasBackgroundVideoPanel({ projectId }: { projectId: string })
       setTasks(res.tasks);
       setFetchError(null);
       syncTaskCount(res.tasks.length);
+      taskCountRef.current = res.tasks.length;
 
       for (const t of res.tasks) {
         if (t.kind === "ready_to_load" && !prevReadyRef.current.has(t.taskId)) {
@@ -128,18 +133,54 @@ export function CanvasBackgroundVideoPanel({ projectId }: { projectId: string })
         setExpanded(false);
         syncPanelExpanded(false);
       }
+      return res.tasks.length;
     } catch (e) {
       setFetchError(e instanceof Error ? e.message : "加载失败");
       syncTaskCount(0);
+      taskCountRef.current = 0;
+      return 0;
     } finally {
       setLoading(false);
     }
   }, [base, projectId]);
 
   useEffect(() => {
-    void refresh();
-    const id = window.setInterval(() => void refresh(), POLL_MS);
-    return () => window.clearInterval(id);
+    let cancelled = false;
+    let timer: number | undefined;
+    let pollMs = POLL_MS_IDLE;
+
+    const schedule = (delayMs: number) => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        void tick();
+      }, delayMs);
+    };
+
+    const tick = async () => {
+      if (cancelled || document.visibilityState === "hidden") {
+        schedule(pollMs);
+        return;
+      }
+      const count = await refresh();
+      if (cancelled) return;
+      pollMs = count > 0 ? POLL_MS_ACTIVE : POLL_MS_IDLE;
+      schedule(pollMs);
+    };
+
+    schedule(INITIAL_POLL_DEFER_MS);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        schedule(0);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [refresh]);
 
   const minimizePanel = useCallback(() => {

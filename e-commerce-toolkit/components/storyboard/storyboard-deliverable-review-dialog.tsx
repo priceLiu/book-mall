@@ -232,12 +232,14 @@ export function StoryboardDeliverableReviewDialog({
         productHighlight={snapshot.productHighlight}
         projectKeywords={snapshot.projectKeywords}
         title={`交付快照 · ${snapshot.title}`}
+        sheetPngUrl={snapshot.sheetPngUrl}
       />
 
       <EcomImagePreviewHost
         preview={deliverableImagePreview}
         galleryItems={snapshotImagePreviewItems}
         onClose={closeDeliverableImagePreview}
+        nativeOverlay
       />
     </>
   );

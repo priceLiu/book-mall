@@ -67,8 +67,8 @@ export function StoryboardPanelImageHoverActions({
         {onPreviewPrompt ? (
           <button
             type="button"
-            title="提示词预览"
-            aria-label="提示词预览"
+            title="提示词编辑"
+            aria-label="提示词编辑"
             className={cn(btnClass, "pointer-events-auto")}
             onClick={(e) => {
               stopClick(e);

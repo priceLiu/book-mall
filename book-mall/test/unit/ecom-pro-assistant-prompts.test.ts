@@ -34,5 +34,18 @@ describe("ecom-pro-assistant-prompts · digital_3c", () => {
     expect(prompt).toContain("开箱惊艳");
     expect(prompt).toContain("六镜职能");
     expect(prompt).toContain("productFocus");
+    expect(prompt).toContain("场景痛点引入·产品亮相");
+  });
+
+  it("sellpoints phase requires coreFunctionAttributes", () => {
+    const prompt = buildProAssistantSystemPrompt("digital_3c", "sellpoints");
+    expect(prompt).toContain("coreFunctionAttributes");
+  });
+
+  it("ops phase includes bgmDirection for digital_3c", () => {
+    const prompt = buildProAssistantSystemPrompt("digital_3c", "ops");
+    expect(prompt).toContain("bgmDirection");
+    expect(prompt).toContain("subtitleGuide");
+    expect(prompt).toContain("#3C数码");
   });
 });

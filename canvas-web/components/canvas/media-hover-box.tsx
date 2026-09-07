@@ -137,8 +137,10 @@ export function MediaHoverBox({
     [stageShortSide],
   );
   const alreadyLoaded = isMediaSrcLoaded(src);
-  /** 画布已生成图/视频：不 lazy，避免 onlyRenderVisibleElements 重挂载时灰底 */
-  const eagerMedia = variant === "generated" || alreadyLoaded;
+  /** 视频默认 lazy；仅已加载过的 src 或纯图片生成态 eager，避免开画布时并发拉满 mp4 */
+  const eagerMedia =
+    alreadyLoaded ||
+    (variant === "generated" && mediaKind !== "video");
   const { ref: lazyRef, active: mediaActive } = useLazyMediaActive(
     "240px",
     eagerMedia,

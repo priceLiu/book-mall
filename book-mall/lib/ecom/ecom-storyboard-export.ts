@@ -16,7 +16,7 @@ const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
 
 function sanitizeZipSegment(name: string): string {
-  return name.replace(/[^\w\u4e00-\u9fff.-]+/g, "_").slice(0, 80) || "微剧故事版";
+  return name.replace(/[^\w\u4e00-\u9fff.-]+/g, "_").slice(0, 80) || "电商口播故事版";
 }
 
 function guessExt(url: string, contentType?: string | null): string {
@@ -116,7 +116,7 @@ function buildManifestMarkdown(project: EcomStoryboardProjectDto): string {
   const imageCount = sheet?.panels.filter((p) => p.imageUrl?.trim()).length ?? 0;
   const panelVideoCount = sheet?.panels.filter((p) => p.videoUrl?.trim()).length ?? 0;
   const lines: string[] = [
-    `# ${project.title ?? "微剧故事版"}`,
+    `# ${project.title ?? "电商口播故事版"}`,
     "",
     `- 参考图：${project.references.length} 张`,
     `- 分镜：${panelCount} 镜 · 成图 ${imageCount} · 镜头视频 ${panelVideoCount}`,
@@ -158,7 +158,7 @@ export async function exportStoryboardProjectZip(
     throw new Error("暂无可导出内容，请先上传参考图或生成分镜");
   }
 
-  const root = sanitizeZipSegment(project.title?.trim() || "微剧故事版");
+  const root = sanitizeZipSegment(project.title?.trim() || "电商口播故事版");
   const failures: string[] = [];
   const sheet = project.sheet;
 

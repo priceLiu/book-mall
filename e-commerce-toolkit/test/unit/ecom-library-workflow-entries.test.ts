@@ -9,7 +9,7 @@ import type { EcomLibrarySection } from "@/lib/ecom-library-api";
 function emptySection(overrides: Partial<EcomLibrarySection>): EcomLibrarySection {
   return {
     moduleId: "storyboard-micro-drama",
-    title: "微剧故事版",
+    title: "电商口播故事版",
     kind: "video",
     domainLabel: "视频",
     assets: [],

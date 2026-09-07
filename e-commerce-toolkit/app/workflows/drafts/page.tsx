@@ -29,7 +29,7 @@ import {
 type DraftTab = "all" | "ecom" | "video";
 
 const NEW_DRAFT_OPTIONS: Array<{ kind: EcomWorkflowDraftKind; label: string }> = [
-  { kind: "storyboard", label: "微剧 / 专业版故事版" },
+  { kind: "storyboard", label: "电商口播故事版" },
   { kind: "product-design-main", label: "电商主图" },
   { kind: "product-design-detail", label: "电商详情页" },
   { kind: "hand-craft", label: "手伴创作" },

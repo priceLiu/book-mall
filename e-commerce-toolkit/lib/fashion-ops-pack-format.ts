@@ -32,5 +32,8 @@ export function normalizeFashionOpsPack(ops?: FashionOpsPack | null): FashionOps
     tags: coerceFashionOpsPackStringList(ops.tags),
     detailBullets: coerceFashionOpsPackStringList(ops.detailBullets),
     xiaohongshuBody: coerceFashionOpsPackText(ops.xiaohongshuBody),
+    bgmDirection: coerceFashionOpsPackText(ops.bgmDirection) || undefined,
+    subtitleGuide: coerceFashionOpsPackText(ops.subtitleGuide) || undefined,
+    sfxNotes: coerceFashionOpsPackText(ops.sfxNotes) || undefined,
   };
 }

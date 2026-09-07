@@ -104,7 +104,10 @@ export function Sbv1CanvasToolbar({ projectId }: { projectId: string }) {
 
   return (
     <>
-      <LibtvCanvasDockBarSlot storageKey={`sbv1:${projectId}`}>
+      <LibtvCanvasDockBarSlot
+        storageKey="sbv1:dock-bar-v1"
+        legacyStorageKeys={[`sbv1:${projectId}`]}
+      >
         <Sbv1Dock items={dockItems} />
       </LibtvCanvasDockBarSlot>
       <input

@@ -651,6 +651,34 @@ const projectDetailInflight = new Map<
   Promise<CanvasProjectDetail>
 >();
 const PROJECT_DETAIL_CACHE_TTL_MS = 90_000;
+/** 列表 pointerdown 预取：全局最多 1 条在飞，避免 hover/连点多项目打满连接池 */
+const MAX_PROJECT_PREFETCH_INFLIGHT = 1;
+let projectPrefetchInflight = 0;
+const projectPrefetchQueue: Array<{ base: string; id: string; key: string }> =
+  [];
+
+function drainProjectPrefetchQueue(): void {
+  while (
+    projectPrefetchInflight < MAX_PROJECT_PREFETCH_INFLIGHT &&
+    projectPrefetchQueue.length > 0
+  ) {
+    const next = projectPrefetchQueue.shift();
+    if (!next) break;
+    if (
+      isProjectDetailCacheFresh(next.key) ||
+      projectDetailInflight.has(next.key)
+    ) {
+      continue;
+    }
+    projectPrefetchInflight += 1;
+    void getCanvasProjectCached(next.base, next.id)
+      .catch(() => undefined)
+      .finally(() => {
+        projectPrefetchInflight = Math.max(0, projectPrefetchInflight - 1);
+        drainProjectPrefetchQueue();
+      });
+  }
+}
 
 function projectCacheKey(base: string, id: string): string {
   return `${base.replace(/\/$/, "")}:${id}`;
@@ -661,12 +689,14 @@ function isProjectDetailCacheFresh(key: string): boolean {
   return Boolean(hit && Date.now() - hit.at < PROJECT_DETAIL_CACHE_TTL_MS);
 }
 
-/** 列表 hover / pointerdown 预取 · 进入画布时若命中缓存可秒开 */
+/** 列表 pointerdown 预取 · 进入画布时若命中缓存可秒开 */
 export function prefetchCanvasProject(base: string, id: string): void {
   if (!base?.trim() || !id?.trim()) return;
   const key = projectCacheKey(base, id);
   if (isProjectDetailCacheFresh(key) || projectDetailInflight.has(key)) return;
-  void getCanvasProjectCached(base, id).catch(() => undefined);
+  if (projectPrefetchQueue.some((item) => item.key === key)) return;
+  projectPrefetchQueue.push({ base, id, key });
+  drainProjectPrefetchQueue();
 }
 
 /**

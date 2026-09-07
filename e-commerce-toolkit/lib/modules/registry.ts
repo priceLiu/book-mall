@@ -19,7 +19,6 @@ export const VIDEO_PRESETS = [
   { slug: "digital-human", title: "数字人", action: "digital-human" },
   { slug: "mirror-selfie", title: "户外对镜自拍", action: "mirror-selfie" },
   { slug: "hit-product", title: "爆款服装带货", action: "hit-product" },
-  { slug: "voiceover", title: "电商口播带货", action: "voiceover" },
 ] as const;
 
 export function ecomToolKey(module: string, action: string): string {
@@ -99,8 +98,8 @@ export const ECOM_MODULES: EcomModuleDef[] = [
   },
   {
     id: "storyboard-micro-drama",
-    title: "微剧故事版",
-    tagline: "带货微剧故事版与整片视频",
+    title: "电商口播故事版",
+    tagline: "口播带货故事版与整片视频",
     href: "/ecom/storyboard/micro-drama",
     kind: "video",
     toolKey: "ecom-toolkit__storyboard",

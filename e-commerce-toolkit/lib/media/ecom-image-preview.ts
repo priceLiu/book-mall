@@ -16,12 +16,26 @@ export type EcomImagePreviewOpenState = {
   fallbackTitle: string;
 };
 
+/** 预览画廊匹配：忽略 query/hash，避免 OSS 处理参数导致索引错位 */
+export function normalizeEcomImagePreviewUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return trimmed;
+  try {
+    const u = new URL(trimmed);
+    return `${u.origin}${u.pathname}`;
+  } catch {
+    return trimmed.split(/[?#]/)[0] ?? trimmed;
+  }
+}
+
 export function findEcomImagePreviewIndex(
   items: readonly EcomImagePreviewItem[],
   src: string,
 ): number {
-  const trimmed = src.trim();
-  return items.findIndex((it) => it.src.trim() === trimmed);
+  const needle = normalizeEcomImagePreviewUrl(src);
+  return items.findIndex(
+    (it) => normalizeEcomImagePreviewUrl(it.src) === needle,
+  );
 }
 
 export function buildEcomImagePreviewOpenState(
@@ -68,6 +82,44 @@ export function buildStoryboardPanelPreviewItems(
       src: p.imageUrl!.trim(),
       title: `镜头 ${p.index}`,
     }));
+}
+
+/** 成片区预览画廊：各镜在前，合成完整分镜 PNG 在最后（可选） */
+export function buildStoryboardSheetPreviewGalleryItems(
+  panels: readonly { index: number; imageUrl?: string | null }[],
+  sheetPngUrl?: string | null,
+  opts?: { includeSheetPng?: boolean },
+): EcomImagePreviewItem[] {
+  const items = buildStoryboardPanelPreviewItems(panels);
+  if (opts?.includeSheetPng === false) return items;
+  const png = sheetPngUrl?.trim();
+  if (png) {
+    items.push({ src: png, title: "完整分镜图" });
+  }
+  return items;
+}
+
+export function buildStoryboardReferencePreviewItems(
+  references: readonly { role: string; label: string; ossUrl: string }[],
+): EcomImagePreviewItem[] {
+  return references
+    .filter((r) => r.ossUrl?.trim())
+    .map((r) => ({
+      src: r.ossUrl.trim(),
+      title: `${r.role === "product" ? "产品" : r.role === "character" ? "角色" : "场景"} · ${r.label}`,
+    }));
+}
+
+/** 分镜表 Dialog 内点击放大：参考图 + 各镜（不含易过期的合成 PNG） */
+export function buildStoryboardSheetDialogPreviewGalleryItems(
+  panels: readonly { index: number; imageUrl?: string | null }[],
+  references: readonly { role: string; label: string; ossUrl: string }[],
+  _sheetPngUrl?: string | null,
+): EcomImagePreviewItem[] {
+  return [
+    ...buildStoryboardReferencePreviewItems(references),
+    ...buildStoryboardSheetPreviewGalleryItems(panels, null, { includeSheetPng: false }),
+  ];
 }
 
 /** 模特姿势各姿势已生成图（含历史版本） */

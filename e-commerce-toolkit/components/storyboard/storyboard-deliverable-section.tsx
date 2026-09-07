@@ -151,7 +151,9 @@ export function StoryboardDeliverableSection({
             imageGenBusy={imageGenBusy}
             sheetPngBusy={sheetPngBusy}
             emptyHint={fullSheetOnly ? "请先在故事版工作区生成各镜分镜图" : "请先生成分镜图"}
-            onPreview={sheet ? onOpenSheetPreview : undefined}
+            onPreview={
+              sheet || sheetPngUrl?.trim() ? onOpenSheetPreview : undefined
+            }
             onRegenerateImage={
               fullSheetOnly ? undefined : hasSheetImages ? onOpenImagePicker : undefined
             }

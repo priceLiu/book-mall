@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
 import {
   buildEcomImagePreviewOpenState,
+  findEcomImagePreviewIndex,
   type EcomImagePreviewItem,
   type EcomImagePreviewOpenState,
 } from "@/lib/media/ecom-image-preview";
@@ -18,17 +19,20 @@ export function useEcomImagePreview(initialGallery: EcomImagePreviewItem[] = [])
   const [preview, setPreview] = useState<EcomImagePreviewOpenState | null>(null);
 
   useEffect(() => {
+    if (preview) return;
     setGalleryItems(initialGallery);
-  }, [initialGallery]);
+  }, [initialGallery, preview]);
 
   const openPreview = useCallback(
     (src: string, title: string, items?: readonly EcomImagePreviewItem[]) => {
-      const gallery =
-        items && items.length > 0 ? [...items] : galleryItems;
-      if (items && items.length > 0) {
-        setGalleryItems([...items]);
+      const trimmed = src.trim();
+      let gallery =
+        items && items.length > 0 ? [...items] : [...galleryItems];
+      if (findEcomImagePreviewIndex(gallery, trimmed) < 0) {
+        gallery = [{ src: trimmed, title }, ...gallery];
       }
-      setPreview(buildEcomImagePreviewOpenState(src, title, gallery));
+      setGalleryItems(gallery);
+      setPreview(buildEcomImagePreviewOpenState(trimmed, title, gallery));
     },
     [galleryItems],
   );

@@ -385,7 +385,7 @@ export function StoryboardStudio() {
     const items = await listStoryboardProjectSummaries();
     return items.map((p) => ({
       id: p.id,
-      title: p.title?.trim() || "微剧故事版",
+      title: p.title?.trim() || "电商口播故事版",
       updatedAt: p.updatedAt,
     }));
   }, []);
@@ -508,7 +508,7 @@ export function StoryboardStudio() {
     return (
       <EcomLoginPrompt
         returnPath="/ecom/storyboard/micro-drama"
-        message="加载微剧故事版需要登录。请点击下方按钮，经主站 Book 完成 SSO 后自动回到本页。"
+        message="加载电商口播故事版需要登录。请点击下方按钮，经主站 Book 完成 SSO 后自动回到本页。"
       />
     );
   }
@@ -741,7 +741,7 @@ export function StoryboardStudio() {
 
       <WorkflowShareLinkDialog
         projectId={project.id}
-        projectTitle={project.title?.trim() || "微剧故事版"}
+        projectTitle={project.title?.trim() || "电商口播故事版"}
         open={workflowShareOpen}
         onClose={() => setWorkflowShareOpen(false)}
       />

@@ -34,6 +34,7 @@ import {
 import {
   clearCachedToolsSession,
   getCachedToolsSession,
+  readToolsSessionOkHint,
   setCachedToolsSession,
 } from "@/lib/tools-session-client-cache";
 
@@ -320,6 +321,15 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
         setHasTokenCookie(Boolean(cached.hasCookie));
         setSessionActive(true);
         setInactiveReason(parseToolsSessionInactiveReason(cached));
+        setReady(true);
+        setLoading(false);
+        void loadSession({ background: true });
+        return;
+      }
+      if (readToolsSessionOkHint()) {
+        readyRef.current = true;
+        setHasTokenCookie(true);
+        setSessionActive(true);
         setReady(true);
         setLoading(false);
         void loadSession({ background: true });

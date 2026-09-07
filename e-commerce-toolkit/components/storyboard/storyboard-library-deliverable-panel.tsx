@@ -232,6 +232,7 @@ export function StoryboardLibraryDeliverablePanel({
         productHighlight={snapshot.productHighlight}
         projectKeywords={snapshot.projectKeywords}
         title={title}
+        sheetPngUrl={snapshot.sheetPngUrl}
       />
     </>
   );

@@ -13,9 +13,11 @@ import { createPortal } from "react-dom";
 
 import { makeVideoAudible, muteVideo } from "@/lib/canvas/hover-video-audio";
 import { useClientPortalMounted } from "@/lib/canvas/use-modal-portal-effects";
+import { CanvasBrandLoadingLogo } from "@/components/home/canvas-brand-loading-logo";
 import { cn } from "@/lib/utils";
 
 const SHOW_DELAY_MS = 250;
+const HIDE_DELAY_MS = 420;
 
 export type HoverVideoEnlargePayload = {
   url: string;
@@ -44,8 +46,10 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
   const mounted = useClientPortalMounted();
   const [open, setOpen] = useState<HoverVideoEnlargePayload | null>(null);
   const [touchMode, setTouchMode] = useState(false);
+  const [videoLoading, setVideoLoading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sourceVideoRef = useRef<HTMLVideoElement | null>(null);
   const resumeTimeRef = useRef(0);
 
@@ -56,8 +60,16 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
     }
   }, []);
 
-  const requestHide = useCallback(() => {
+  const clearHideTimer = useCallback(() => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
+
+  const closeNow = useCallback(() => {
     clearShowTimer();
+    clearHideTimer();
     const portal = videoRef.current;
     if (portal) {
       muteVideo(portal);
@@ -71,37 +83,55 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
       sourceVideoRef.current = null;
     }
     resumeTimeRef.current = 0;
+    setVideoLoading(false);
     setOpen(null);
     setTouchMode(false);
-  }, [clearShowTimer]);
+  }, [clearHideTimer, clearShowTimer]);
+
+  const requestHide = useCallback(() => {
+    clearHideTimer();
+    hideTimerRef.current = setTimeout(() => {
+      closeNow();
+    }, HIDE_DELAY_MS);
+  }, [clearHideTimer, closeNow]);
 
   const requestShow = useCallback(
     (payload: HoverVideoEnlargePayload, sourceVideo?: HTMLVideoElement | null) => {
       if (!prefersHoverVideoEnlarge()) return;
+      clearHideTimer();
+      if (open?.url === payload.url) return;
+
       clearShowTimer();
       sourceVideoRef.current = sourceVideo ?? null;
       resumeTimeRef.current = sourceVideo?.currentTime ?? 0;
       showTimerRef.current = setTimeout(() => {
+        showTimerRef.current = null;
         if (sourceVideo) {
           sourceVideo.muted = true;
           sourceVideo.pause();
         }
         setTouchMode(false);
+        setVideoLoading(true);
         setOpen(payload);
       }, SHOW_DELAY_MS);
     },
-    [clearShowTimer],
+    [clearHideTimer, clearShowTimer, open?.url],
   );
 
   const toggleTouchPreview = useCallback(
     (payload: HoverVideoEnlargePayload) => {
       if (prefersHoverVideoEnlarge()) return;
       clearShowTimer();
+      clearHideTimer();
       sourceVideoRef.current = null;
       resumeTimeRef.current = 0;
-      setOpen((prev) => (prev?.url === payload.url ? null : payload));
+      setOpen((prev) => {
+        const next = prev?.url === payload.url ? null : payload;
+        setVideoLoading(next !== null);
+        return next;
+      });
     },
-    [clearShowTimer],
+    [clearHideTimer, clearShowTimer],
   );
 
   useEffect(() => {
@@ -125,15 +155,28 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
       makeVideoAudible(el);
     };
 
-    const onLoaded = () => startPlayback();
+    const markReady = () => {
+      setVideoLoading(false);
+      startPlayback();
+    };
+
+    const onLoaded = () => markReady();
     el.addEventListener("loadeddata", onLoaded, { once: true });
-    void el.play().catch(() => {
-      el.muted = true;
-      void el.play().catch(() => undefined);
-    });
+    el.addEventListener("canplay", onLoaded, { once: true });
+    el.addEventListener("loadedmetadata", onLoaded, { once: true });
+    if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      markReady();
+    } else {
+      void el.play().catch(() => {
+        el.muted = true;
+        void el.play().catch(() => undefined);
+      });
+    }
 
     return () => {
       el.removeEventListener("loadeddata", onLoaded);
+      el.removeEventListener("canplay", onLoaded);
+      el.removeEventListener("loadedmetadata", onLoaded);
       muteVideo(el);
       el.pause();
     };
@@ -142,11 +185,13 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
   useEffect(() => {
     if (!touchMode || !open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") requestHide();
+      if (event.key === "Escape") closeNow();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [touchMode, open, requestHide]);
+  }, [touchMode, open, closeNow]);
+
+  useEffect(() => () => closeNow(), [closeNow]);
 
   const portal =
     open && mounted
@@ -160,7 +205,7 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
             role={touchMode ? "dialog" : undefined}
             aria-modal={touchMode || undefined}
             aria-label={touchMode ? `预览：${open.alt}` : undefined}
-            onClick={touchMode ? () => requestHide() : undefined}
+            onClick={touchMode ? () => closeNow() : undefined}
           >
             <div
               className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0.38)_0%,rgba(0,0,0,0.78)_100%)] transition duration-200"
@@ -182,19 +227,39 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
                 className="pointer-events-none absolute -inset-3 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.5),0_28px_72px_rgba(0,0,0,0.42),0_48px_120px_rgba(0,0,0,0.28)]"
                 aria-hidden
               />
-              <div className="relative overflow-hidden rounded-xl bg-black">
+              <div className="relative min-h-[min(40vh,320px)] min-w-[min(90vw,640px)] overflow-hidden rounded-xl bg-black">
+                {open.posterUrl && videoLoading ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={open.posterUrl}
+                    alt=""
+                    aria-hidden
+                    className="absolute inset-0 size-full object-contain opacity-50"
+                  />
+                ) : null}
                 <video
                   ref={videoRef}
                   key={open.url}
                   src={open.url}
                   poster={open.posterUrl || undefined}
-                  className="block h-auto max-h-[80vh] w-auto max-w-[min(90vw,640px)] object-contain"
+                  className={cn(
+                    "relative block h-auto max-h-[80vh] w-auto max-w-[min(90vw,640px)] object-contain transition-opacity duration-150",
+                    videoLoading ? "opacity-0" : "opacity-100",
+                  )}
                   muted
                   playsInline
                   loop
                   preload="auto"
                   aria-label={open.alt}
+                  onLoadedData={() => setVideoLoading(false)}
+                  onCanPlay={() => setVideoLoading(false)}
+                  onError={() => setVideoLoading(false)}
                 />
+                {videoLoading ? (
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <CanvasBrandLoadingLogo size="lg" />
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>,

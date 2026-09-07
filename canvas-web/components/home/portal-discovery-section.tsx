@@ -20,7 +20,10 @@ import {
   type PortalCaseProjectSummary,
   type PortalFeaturedProjectSummary,
 } from "@/lib/canvas-api";
-import { canvasListCoverPropsFromProject } from "@/lib/canvas/canvas-list-cover-props";
+import {
+  canvasListCoverPropsFromProject,
+  canvasListCoverPropsFromTemplate,
+} from "@/lib/canvas/canvas-list-cover-props";
 import { cloneGraphForNewProject } from "@/lib/canvas/clone";
 import { migrateGraphV1ToV2 } from "@/lib/canvas/migrate";
 import type { CanvasGraph } from "@/lib/canvas/types";
@@ -78,6 +81,7 @@ function isOwnItem(item: DiscoveryItem, viewerUserId: string | null): boolean {
 function discoveryListCoverProps(item: DiscoveryItem) {
   const project = item.featuredProject ?? item.caseProject;
   if (project) return canvasListCoverPropsFromProject(project);
+  if (item.template) return canvasListCoverPropsFromTemplate(item.template);
   return { url: item.thumbnailUrl };
 }
 
@@ -99,7 +103,6 @@ export function PortalDiscoverySection() {
   const base = useBookMallBaseUrl();
   const {
     viewerUserId,
-    portalContentLoading,
     featured: featuredProjects,
     templates: publicTemplates,
     cases,
@@ -304,16 +307,9 @@ export function PortalDiscoverySection() {
       {error ? <p className="mb-4 text-sm text-red-300/90">{error}</p> : null}
 
       {filtered.length === 0 ? (
-        portalContentLoading ? (
-          <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 px-4 py-10 text-sm text-white/45">
-            <Loader2 className="size-4 animate-spin" />
-            加载发现内容…
-          </div>
-        ) : (
-          <p className="rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-white/40">
-            暂无匹配内容。
-          </p>
-        )
+        <p className="rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-white/40">
+          暂无匹配内容。
+        </p>
       ) : (
         <ul className={CANVAS_LIST_GRID_CLASS}>
           {filtered.map((item) => {

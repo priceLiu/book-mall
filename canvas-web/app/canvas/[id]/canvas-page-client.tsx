@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LayoutTemplate, Loader2 } from "lucide-react";
+import { LayoutTemplate } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
   CanvasToolsSessionProvider,
@@ -20,21 +20,27 @@ import {
   CanvasCreditsToastHost,
   showCanvasSuccessToast,
 } from "@/components/canvas/canvas-credits-toast-host";
-import { FlowCanvas } from "@/components/canvas/flow-canvas";
-import { Pro2CanvasLayout } from "@/components/canvas/pro2/pro2-canvas-layout";
+import { CanvasEditorRouteLoading } from "@/components/canvas/canvas-editor-loading";
 import { Pro2ProductionGateToolbarLink } from "@/components/canvas/pro2/pro2-production-gate-banner";
-import { Sbv1CanvasLayout } from "@/components/canvas/sbv1/sbv1-canvas-layout";
-import { ScriptWritingAssistantPanel } from "@/components/canvas/script-writing-assistant-panel";
-import { MyTemplatesPanel } from "@/components/canvas/my-templates-panel";
-import { MyCharactersPanel } from "@/components/canvas/my-characters-panel";
-import { MySavedScriptsPanel } from "@/components/canvas/my-saved-scripts-panel";
-import { MyVideoLibraryPanel } from "@/components/canvas/my-video-library-panel";
-import { MyProjectCharacterAssetsPanel } from "@/components/canvas/my-project-character-assets-panel";
+import {
+  FlowCanvas,
+  MyCanvasGenerationRecordsPanel,
+  MyCanvasHistoryPanel,
+  MyCharactersPanel,
+  MyProjectCharacterAssetsPanel,
+  MyPromptHistoryPanel,
+  MySavedScriptsPanel,
+  MyTemplatesPanel,
+  MyVideoLibraryPanel,
+  Pro2CanvasLayout,
+  Sbv1CanvasLayout,
+  ScriptWritingAssistantPanel,
+  StyleLibraryModal,
+} from "@/lib/canvas/canvas-page-heavy-chunks";
 import { useCanvasTaskEventStream } from "@/lib/canvas/use-canvas-task-event-stream";
 import { useCrewCollaborationAccess } from "@/lib/canvas/use-crew-collaboration-access";
 import { useCanvasTaskSse } from "@/lib/canvas/use-canvas-task-sse";
 import { hasAnyMediaRenderInFlight } from "@/lib/canvas/media-render-in-flight";
-import { StyleLibraryModal } from "@/components/canvas/style-library-modal";
 import { NodePalette } from "@/components/canvas/node-palette";
 import { CanvasToolbar } from "@/components/canvas/toolbar";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -67,7 +73,6 @@ import type {
 import {
   clearCanvasProjectTasksForbidden,
   getCanvasProjectCached,
-  abandonCanvasProjectInflight,
   seedCanvasProjectDetailCache,
   isCanvasApiConflictError,
   parseCanvasConflictUpdatedAt,
@@ -112,9 +117,6 @@ import { useCanvasImmersiveMode } from "@/lib/canvas/use-canvas-immersive-mode";
 import { getBuiltinCanvasTemplate } from "@/lib/canvas/templates";
 import { SBV1_BUILTIN_TEMPLATE_ID } from "@/lib/canvas/project-edition";
 import { SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
-import { MyCanvasHistoryPanel } from "@/components/canvas/my-canvas-history-panel";
-import { MyCanvasGenerationRecordsPanel } from "@/components/canvas/my-canvas-generation-records-panel";
-import { MyPromptHistoryPanel } from "@/components/canvas/my-prompt-history-panel";
 import { PortalSubmitDialog } from "@/components/home/portal-submit-dialog";
 import { WorkflowShareLinkDialog } from "@/components/canvas/workflow-share-link-dialog";
 import { useCanvasAdmin } from "@/components/home/use-canvas-admin";
@@ -142,6 +144,7 @@ import {
 } from "@/lib/canvas/canvas-pending-image-uploads";
 import { getCanvasProjectHistoryEntry } from "@/lib/canvas-api";
 import { warmPro2TemplateCache } from "@/lib/canvas/pro2-template-resolver";
+import { graphHasPro2ScriptHub } from "@/lib/canvas/pro2-script-graph-detect";
 const STORY_COMIC_TEMPLATE_ID = "builtin/story-comic-pipeline";
 /** 单项目 GET 超时：避免 BFF/DB 挂起时「加载画布…」永不结束 */
 const CANVAS_PROJECT_LOAD_TIMEOUT_MS = 90_000;
@@ -174,11 +177,6 @@ function Inner({ projectId }: { projectId: string }) {
   const dialogs = useDialogs();
 
   useEffect(() => {
-    prefetchUserProviders(base);
-    void warmPro2TemplateCache(base).catch(() => {});
-  }, [base]);
-
-  useEffect(() => {
     const onBlocked = (ev: Event) => {
       const detail = (ev as CustomEvent<{ message?: string }>).detail;
       const message = detail?.message?.trim();
@@ -198,6 +196,9 @@ function Inner({ projectId }: { projectId: string }) {
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const { nodes, edges } = useCanvasGraphSnapshot();
+  const hasPro2ScriptHub = useCanvasStore((s) =>
+    graphHasPro2ScriptHub(s.nodes),
+  );
   const graphMeta = useCanvasStore((s) => s.graphMeta);
   const reflowStoryComicLayout = useCanvasStore(
     (s) => s.reflowStoryComicLayout,
@@ -336,6 +337,19 @@ function Inner({ projectId }: { projectId: string }) {
   const taskSyncEnabled = !loading && !mediaRenderActive;
   useCanvasTaskEventStream(base, projectId, taskSyncEnabled);
   useCanvasTaskSse(base, projectId, inflightTaskCount, taskSyncEnabled);
+
+  useEffect(() => {
+    if (!base?.trim() || loading) return;
+    prefetchUserProviders(base);
+  }, [base, loading]);
+
+  useEffect(() => {
+    if (!base?.trim() || loading || !isStoryPro2Canvas || !hasPro2ScriptHub) {
+      return;
+    }
+    void warmPro2TemplateCache(base).catch(() => {});
+  }, [base, loading, isStoryPro2Canvas, hasPro2ScriptHub]);
+
   const [saving, setSaving] = useState(false);
   const [savePhase, setSavePhase] = useState<CanvasSavePhase>("idle");
   const [saveRetryAttempt, setSaveRetryAttempt] = useState(0);
@@ -496,8 +510,6 @@ function Inner({ projectId }: { projectId: string }) {
     setProject(null);
     setLoading(true);
     clearCanvasProjectTasksForbidden(projectId);
-    // 只放弃卡住的 inflight，保留列表 hover 已拉到的大 JSON 缓存
-    abandonCanvasProjectInflight(base, projectId);
     void (async () => {
       try {
         const p = await withCanvasProjectLoadTimeout(
@@ -513,11 +525,13 @@ function Inner({ projectId }: { projectId: string }) {
         hydrate(projectId, p.canvas as never);
         useCanvasStore.temporal.getState().clear();
         useCanvasStore.temporal.getState().resume();
-        setProject(p);
         lastBaseUpdatedAtRef.current = p.updatedAt;
         setNameDraft(p.name);
         canvasReadyRef.current = true;
         canvasHydratingUntilRef.current = Date.now() + 2000;
+        setProject(p);
+        setLoadError(null);
+        if (!cancelled) setLoading(false);
         const syncLoadedPersistedSnapshot = () => {
           lastPersistedSnapshotRef.current = readCanvasPersistSnapshot(
             useCanvasStore.getState(),
@@ -526,12 +540,12 @@ function Inner({ projectId }: { projectId: string }) {
           historyWrittenRevisionRef.current =
             useCanvasStore.getState().graphRevision;
         };
-        syncLoadedPersistedSnapshot();
-        reconcileStaleCanvasImageUploadFlags(updateNodeData);
-        // hydrate 可能 queueMicrotask 二次 finalize，延迟对齐 revision 避免误判已保存
-        queueMicrotask(syncLoadedPersistedSnapshot);
-        requestAnimationFrame(syncLoadedPersistedSnapshot);
-        setLoadError(null);
+        queueMicrotask(() => {
+          if (cancelled) return;
+          syncLoadedPersistedSnapshot();
+          reconcileStaleCanvasImageUploadFlags(updateNodeData);
+          requestAnimationFrame(syncLoadedPersistedSnapshot);
+        });
       } catch (e) {
         if (!cancelled) {
           const raw = e instanceof Error ? e.message : "加载失败";
@@ -540,9 +554,8 @@ function Inner({ projectId }: { projectId: string }) {
               ? "加载画布超时（主站响应过慢）。请确认 book-mall 已启动且数据库可访问，然后刷新重试。"
               : formatCanvasApiError(raw);
           setLoadError(message);
+          setLoading(false);
         }
-      } finally {
-        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
@@ -1562,16 +1575,7 @@ function Inner({ projectId }: { projectId: string }) {
 
   let body: React.ReactNode;
   if (loading) {
-    body = (
-      <div
-        className="fixed inset-0 z-[200] flex h-[100dvh] items-center justify-center bg-[var(--canvas-bg)] text-[var(--canvas-muted)]"
-        data-canvas-editor
-        data-canvas-block-nav-gesture
-      >
-        <Loader2 className="mr-2 size-5 animate-spin" />
-        加载画布…
-      </div>
-    );
+    body = <CanvasEditorRouteLoading label="加载画布…" />;
   } else if (loadError || !project) {
     const retiredHint =
       loadError && /\b404\b/.test(loadError)
@@ -1683,51 +1687,67 @@ function Inner({ projectId }: { projectId: string }) {
           />
           <GatewayLinkBanner />
         </div>
-      <MyCanvasHistoryPanel
-        open={myHistoryOpen}
-        onClose={() => setMyHistoryOpen(false)}
-        projectId={projectId}
-        onRestore={restoreFromHistory}
-      />
-      <MyCanvasGenerationRecordsPanel
-        open={myGenerationRecordsOpen}
-        onClose={() => setMyGenerationRecordsOpen(false)}
-        projectId={projectId}
-        onRestoreCanvas={restoreFromHistory}
-      />
-      <MyTemplatesPanel
-        open={myTemplatesOpen}
-        onClose={() => setMyTemplatesOpen(false)}
-        refreshKey={templatesRefreshKey}
-      />
-      <MyCharactersPanel
-        open={myCharactersOpen}
-        onClose={() => setMyCharactersOpen(false)}
-        onInsertCharacter={onInsertCharacter}
-      />
-      <MySavedScriptsPanel
-        open={mySavedScriptsOpen}
-        onClose={() => setMySavedScriptsOpen(false)}
-      />
-      <MyVideoLibraryPanel
-        open={myVideoLibraryOpen}
-        onClose={() => setMyVideoLibraryOpen(false)}
-        refreshKey={videoLibraryRefreshKey}
-      />
-      <MyProjectCharacterAssetsPanel
-        open={myProjectCharacterAssetsOpen}
-        onClose={() => setMyProjectCharacterAssetsOpen(false)}
-        onInsertToCanvas={(assetId) => {
-          void insertProjectAssetAtViewportCenter(assetId);
-        }}
-      />
-      <MyPromptHistoryPanel
-        open={myPromptHistoryOpen}
-        onClose={() => setMyPromptHistoryOpen(false)}
-        projectId={projectId}
-        initialScope="mine"
-      />
-      {isStoryProCanvas || isStoryPro2Canvas ? (
+      {myHistoryOpen ? (
+        <MyCanvasHistoryPanel
+          open={myHistoryOpen}
+          onClose={() => setMyHistoryOpen(false)}
+          projectId={projectId}
+          onRestore={restoreFromHistory}
+        />
+      ) : null}
+      {myGenerationRecordsOpen ? (
+        <MyCanvasGenerationRecordsPanel
+          open={myGenerationRecordsOpen}
+          onClose={() => setMyGenerationRecordsOpen(false)}
+          projectId={projectId}
+          onRestoreCanvas={restoreFromHistory}
+        />
+      ) : null}
+      {myTemplatesOpen ? (
+        <MyTemplatesPanel
+          open={myTemplatesOpen}
+          onClose={() => setMyTemplatesOpen(false)}
+          refreshKey={templatesRefreshKey}
+        />
+      ) : null}
+      {myCharactersOpen ? (
+        <MyCharactersPanel
+          open={myCharactersOpen}
+          onClose={() => setMyCharactersOpen(false)}
+          onInsertCharacter={onInsertCharacter}
+        />
+      ) : null}
+      {mySavedScriptsOpen ? (
+        <MySavedScriptsPanel
+          open={mySavedScriptsOpen}
+          onClose={() => setMySavedScriptsOpen(false)}
+        />
+      ) : null}
+      {myVideoLibraryOpen ? (
+        <MyVideoLibraryPanel
+          open={myVideoLibraryOpen}
+          onClose={() => setMyVideoLibraryOpen(false)}
+          refreshKey={videoLibraryRefreshKey}
+        />
+      ) : null}
+      {myProjectCharacterAssetsOpen ? (
+        <MyProjectCharacterAssetsPanel
+          open={myProjectCharacterAssetsOpen}
+          onClose={() => setMyProjectCharacterAssetsOpen(false)}
+          onInsertToCanvas={(assetId) => {
+            void insertProjectAssetAtViewportCenter(assetId);
+          }}
+        />
+      ) : null}
+      {myPromptHistoryOpen ? (
+        <MyPromptHistoryPanel
+          open={myPromptHistoryOpen}
+          onClose={() => setMyPromptHistoryOpen(false)}
+          projectId={projectId}
+          initialScope="mine"
+        />
+      ) : null}
+      {(isStoryProCanvas || isStoryPro2Canvas) && styleLibraryOpen ? (
         <StyleLibraryModal
           open={styleLibraryOpen}
           onClose={() => setStyleLibraryOpen(false)}

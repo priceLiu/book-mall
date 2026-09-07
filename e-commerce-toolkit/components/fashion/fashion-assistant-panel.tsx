@@ -1105,7 +1105,7 @@ export function FashionAssistantPanel({
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {legacyReadonly ? (
           <div className={cn(ECOM_ASSISTANT_BUBBLE_CLASS, "mb-3")}>
-            此为旧版微剧故事版项目，仅支持只读浏览。请新建「{verticalConfig?.label ?? "专业版"}」项目继续创作。
+            此为旧版电商口播故事版项目，仅支持只读浏览。请新建「{verticalConfig?.label ?? "专业版"}」项目继续创作。
           </div>
         ) : null}
 

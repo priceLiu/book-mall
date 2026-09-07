@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-
+import { CanvasBrandLoadingLogo } from "@/components/home/canvas-brand-loading-logo";
 import { PROJECT_COVER_MEDIA_FILL_CLASS } from "@/components/canvas/project-cover-media";
 import {
   prefersHoverVideoEnlarge,
@@ -9,6 +9,7 @@ import {
 } from "@/components/home/hover-video-enlarge-preview";
 import { makeVideoAudible, muteVideo } from "@/lib/canvas/hover-video-audio";
 import { useLazyMediaActive } from "@/lib/canvas/use-lazy-media-active";
+import { cn } from "@/lib/utils";
 
 type Props = {
   url: string;
@@ -20,9 +21,17 @@ type Props = {
   calm?: boolean;
   /** 禁用居中放大预览（弹层内嵌封面等） */
   disableEnlargePreview?: boolean;
+  /** 首屏网格等：跳过 IO 等待，直接加载媒体 */
+  eager?: boolean;
 };
 
-function MediaPlaceholder({ letter, hint }: { letter?: string; hint?: string }) {
+function MediaPlaceholder({
+  letter,
+  hint,
+}: {
+  letter?: string;
+  hint?: string;
+}) {
   return (
     <div className="flex size-full flex-col items-center justify-center bg-gradient-to-br from-cyan-400/10 to-[var(--canvas-surface-2)] text-[var(--canvas-muted)]">
       <span className="text-3xl font-light text-white/25">
@@ -31,6 +40,11 @@ function MediaPlaceholder({ letter, hint }: { letter?: string; hint?: string }) 
       {hint ? <span className="mt-1 text-[10px] text-white/30">{hint}</span> : null}
     </div>
   );
+}
+
+function inactiveHint(kind: "image" | "video", failed: boolean, hasUrl: boolean) {
+  if (hasUrl && failed) return "媒体已失效";
+  return kind === "video" ? "暂无成片" : "暂无预览";
 }
 
 /** 影视案例卡片媒体：视口内才加载；悬停自动播放并出声；成片可居中放大预览 */
@@ -42,36 +56,58 @@ export function FilmShowcaseCardMedia({
   placeholderLetter,
   calm = false,
   disableEnlargePreview = false,
+  eager = false,
 }: Props) {
-  const { ref, active } = useLazyMediaActive<HTMLDivElement>("360px");
+  const { ref, active } = useLazyMediaActive<HTMLDivElement>("360px", eager);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState(false);
+  const [hovering, setHovering] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
   const enlarge = useHoverVideoEnlarge();
   const enlargeEnabled =
     !calm && !disableEnlargePreview && kind === "video" && Boolean(enlarge);
 
+  const mediaUrl = url?.trim() ?? "";
+  const poster = posterUrl?.trim();
+  const showMedia = Boolean(mediaUrl) && !failed;
+  const isActive = eager || active;
+
   const onEnter = useCallback(() => {
+    setHovering(true);
+    setVideoReady(false);
     const el = videoRef.current;
-    if (!el) return;
+    if (el?.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      setVideoReady(true);
+    }
     if (enlargeEnabled) {
-      el.muted = true;
-      void el.play().catch(() => undefined);
+      if (el) {
+        el.muted = true;
+        void el.play().catch(() => undefined);
+      }
       enlarge?.requestShow(
-        { url, posterUrl: posterUrl?.trim() || undefined, alt },
+        { url: mediaUrl, posterUrl: poster || undefined, alt },
         el,
       );
       return;
     }
+    if (!el) return;
     makeVideoAudible(el);
-  }, [alt, enlarge, enlargeEnabled, posterUrl, url]);
+  }, [alt, enlarge, enlargeEnabled, mediaUrl, poster]);
 
   const onLeave = useCallback(() => {
+    setHovering(false);
+    setVideoReady(false);
     const el = videoRef.current;
-    if (!el) return;
     if (enlargeEnabled) {
       enlarge?.requestHide();
+      if (el) {
+        muteVideo(el);
+        el.pause();
+        el.currentTime = 0;
+      }
       return;
     }
+    if (!el) return;
     muteVideo(el);
     el.pause();
     el.currentTime = 0;
@@ -80,40 +116,92 @@ export function FilmShowcaseCardMedia({
   const onTouchToggle = useCallback(() => {
     if (!enlargeEnabled || prefersHoverVideoEnlarge()) return;
     enlarge?.toggleTouchPreview({
-      url,
-      posterUrl: posterUrl?.trim() || undefined,
+      url: mediaUrl,
+      posterUrl: poster || undefined,
       alt,
     });
-  }, [alt, enlarge, enlargeEnabled, posterUrl, url]);
+  }, [alt, enlarge, enlargeEnabled, mediaUrl, poster]);
 
-  const poster = posterUrl?.trim();
+  const onVideoReady = useCallback(() => setVideoReady(true), []);
+
+  const onMediaError = useCallback(() => setFailed(true), []);
+
+  const showHoverLoading =
+    kind === "video" &&
+    !calm &&
+    hovering &&
+    showMedia &&
+    !videoReady &&
+    !failed;
+
+  const renderInactivePreview = () => {
+    if (!showMedia) {
+      return (
+        <MediaPlaceholder
+          letter={placeholderLetter}
+          hint={inactiveHint(kind, failed, Boolean(mediaUrl))}
+        />
+      );
+    }
+    if (kind === "image") {
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={mediaUrl}
+          alt={alt}
+          className={PROJECT_COVER_MEDIA_FILL_CLASS}
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={onMediaError}
+        />
+      );
+    }
+    if (poster) {
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={poster}
+          alt=""
+          aria-hidden
+          className={PROJECT_COVER_MEDIA_FILL_CLASS}
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={onMediaError}
+        />
+      );
+    }
+    return (
+      <video
+        src={mediaUrl}
+        className={PROJECT_COVER_MEDIA_FILL_CLASS}
+        muted
+        playsInline
+        preload="metadata"
+        onError={onMediaError}
+      />
+    );
+  };
 
   return (
     <div
       ref={ref}
-      className="size-full"
-      onPointerLeave={enlargeEnabled ? onLeave : undefined}
+      className="relative size-full"
+      onMouseEnter={
+        kind === "video" && !calm && showMedia ? onEnter : undefined
+      }
+      onMouseLeave={
+        kind === "video" && !calm && showMedia ? onLeave : undefined
+      }
     >
-      {!url?.trim() || failed ? (
+      {!showMedia ? (
         <MediaPlaceholder
           letter={placeholderLetter}
-          hint={url && failed ? "媒体已失效" : "暂无预览"}
+          hint={inactiveHint(kind, failed, Boolean(mediaUrl))}
         />
-      ) : !active ? (
-        poster && kind === "video" ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={poster}
-            alt=""
-            aria-hidden
-            className={PROJECT_COVER_MEDIA_FILL_CLASS}
-            loading="lazy"
-            decoding="async"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <MediaPlaceholder letter={placeholderLetter} />
-        )
+      ) : !isActive ? (
+        renderInactivePreview()
       ) : kind === "video" && calm && poster ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -124,34 +212,61 @@ export function FilmShowcaseCardMedia({
           loading="lazy"
           decoding="async"
           referrerPolicy="no-referrer"
+          onError={onMediaError}
         />
       ) : kind === "video" ? (
-        <video
-          ref={videoRef}
-          src={url}
-          poster={poster || undefined}
-          className={PROJECT_COVER_MEDIA_FILL_CLASS}
-          muted
-          playsInline
-          loop
-          preload={calm ? "none" : "metadata"}
-          onMouseEnter={calm ? undefined : onEnter}
-          onMouseLeave={calm || enlargeEnabled ? undefined : onLeave}
-          onFocus={calm ? undefined : onEnter}
-          onBlur={calm ? undefined : onLeave}
-          onClick={enlargeEnabled ? onTouchToggle : undefined}
-          onError={() => setFailed(true)}
-        />
+        <>
+          {poster ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={poster}
+              alt=""
+              aria-hidden
+              className={cn(
+                PROJECT_COVER_MEDIA_FILL_CLASS,
+                "pointer-events-none absolute inset-0 z-[1] transition-opacity duration-150",
+                hovering ? "opacity-0" : "opacity-100",
+              )}
+              loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer"
+              onError={onMediaError}
+            />
+          ) : null}
+          <video
+            ref={videoRef}
+            src={mediaUrl}
+            poster={poster || undefined}
+            className={cn(
+              PROJECT_COVER_MEDIA_FILL_CLASS,
+              poster && !hovering ? "opacity-0" : "opacity-100",
+              "transition-opacity duration-150",
+            )}
+            muted
+            playsInline
+            loop
+            preload={calm || hovering ? "metadata" : "none"}
+            onClick={enlargeEnabled ? onTouchToggle : undefined}
+            onLoadedData={onVideoReady}
+            onCanPlay={onVideoReady}
+            onError={onMediaError}
+          />
+          {showHoverLoading ? (
+            <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center bg-black/35">
+              <CanvasBrandLoadingLogo size="sm" />
+            </div>
+          ) : null}
+        </>
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={url}
+          src={mediaUrl}
           alt={alt}
           className={PROJECT_COVER_MEDIA_FILL_CLASS}
           loading="lazy"
           decoding="async"
           referrerPolicy="no-referrer"
-          onError={() => setFailed(true)}
+          onError={onMediaError}
         />
       )}
     </div>

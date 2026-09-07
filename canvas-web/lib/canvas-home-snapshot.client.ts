@@ -6,7 +6,8 @@ import {
   listPortalFilmShowcase,
 } from "@/lib/canvas-api";
 import {
-  isCanvasHomeSnapshotEmpty,
+  isCanvasHomeDiscoveryEmpty,
+  isCanvasHomeFilmShowcaseEmpty,
   isCanvasHomeSnapshotPayload,
   type CanvasHomeSnapshotPayload,
 } from "@/lib/canvas-home-snapshot-types";
@@ -33,6 +34,38 @@ export async function fetchCanvasHomeSnapshotClient(
   }
 }
 
+/** 发现区实时兜底（精选 / 模板 / 案例） */
+export async function fetchCanvasHomeDiscoveryLiveClient(
+  base: string,
+  signal?: AbortSignal,
+): Promise<
+  Pick<CanvasHomeSnapshotPayload, "featured" | "templates" | "cases">
+> {
+  const init = signal ? { signal } : undefined;
+  const [featuredR, templatesR, casesR] = await Promise.allSettled([
+    listPortalFeaturedProjects(base, init),
+    listCanvasTemplates(base, "public", init),
+    listPortalCaseProjects(base, "pro2", init),
+  ]);
+  return {
+    featured: featuredR.status === "fulfilled" ? featuredR.value : [],
+    templates: templatesR.status === "fulfilled" ? templatesR.value : [],
+    cases: casesR.status === "fulfilled" ? casesR.value : [],
+  };
+}
+
+/** 分镜 1.0 视频作品墙实时兜底 */
+export async function fetchCanvasHomeFilmShowcaseLiveClient(
+  base: string,
+  signal?: AbortSignal,
+): Promise<CanvasHomeSnapshotPayload["filmShowcase"]> {
+  try {
+    return await listPortalFilmShowcase(base);
+  } catch {
+    return [];
+  }
+}
+
 /** SSR 快照为空时的实时兜底（各接口均为公开 GET） */
 export async function fetchCanvasHomeLiveClient(
   base: string,
@@ -54,16 +87,54 @@ export async function fetchCanvasHomeLiveClient(
   };
 }
 
-/** 先静态快照，仍空则实时列表 */
+function mergeDiscoveryFrom(
+  seed: CanvasHomeSnapshotPayload,
+  source: Pick<CanvasHomeSnapshotPayload, "featured" | "templates" | "cases">,
+): CanvasHomeSnapshotPayload {
+  return {
+    ...seed,
+    featured: source.featured.length > 0 ? source.featured : seed.featured,
+    templates: source.templates.length > 0 ? source.templates : seed.templates,
+    cases: source.cases.length > 0 ? source.cases : seed.cases,
+  };
+}
+
+function mergeFilmShowcaseFrom(
+  seed: CanvasHomeSnapshotPayload,
+  source: Pick<CanvasHomeSnapshotPayload, "filmShowcase">,
+): CanvasHomeSnapshotPayload {
+  return {
+    ...seed,
+    filmShowcase:
+      source.filmShowcase.length > 0 ? source.filmShowcase : seed.filmShowcase,
+  };
+}
+
+/** 按区块补拉缺失数据（发现区与分镜 1.0 视频墙互不阻塞） */
 export async function hydrateCanvasHomeSnapshotClient(
   base: string,
   seed: CanvasHomeSnapshotPayload,
   signal?: AbortSignal,
 ): Promise<CanvasHomeSnapshotPayload> {
-  if (!isCanvasHomeSnapshotEmpty(seed)) return seed;
+  let next = seed;
+
   const snap = await fetchCanvasHomeSnapshotClient(base, signal);
-  if (snap && !isCanvasHomeSnapshotEmpty(snap)) return snap;
-  const live = await fetchCanvasHomeLiveClient(base, signal);
-  if (!isCanvasHomeSnapshotEmpty(live)) return live;
-  return snap ?? live;
+  if (snap) {
+    next = mergeDiscoveryFrom(next, snap);
+    next = mergeFilmShowcaseFrom(next, snap);
+  }
+
+  if (isCanvasHomeDiscoveryEmpty(next)) {
+    next = mergeDiscoveryFrom(
+      next,
+      await fetchCanvasHomeDiscoveryLiveClient(base, signal),
+    );
+  }
+
+  if (isCanvasHomeFilmShowcaseEmpty(next)) {
+    const film = await fetchCanvasHomeFilmShowcaseLiveClient(base, signal);
+    next = mergeFilmShowcaseFrom(next, { filmShowcase: film });
+  }
+
+  return next;
 }

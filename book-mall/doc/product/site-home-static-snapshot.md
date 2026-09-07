@@ -45,7 +45,7 @@ Phase 1 仅 `pageKey = site-home`；**画布门户首页** `canvas-home` 已接�
 ## 5. 读路径
 
 - 首页：`getSiteHomeSnapshotForRender()` → 当日 READY → 昨日 → `buildSiteHomeSnapshotFallback`
-- 画布门户：`canvas-web` 首页 SSR 读 `canvas-home` 快照；**「最近项目」**实时 API；**发现/视频墙**不再客户端拉 portal-* 列表。
+- 画布门户：`canvas-web` 首页 SSR 读 `canvas-home` 快照；book-mall 读路径对缺失分区 **服务端 merge**；**「最近项目」**实时 API；**发现/视频墙**不再客户端拉 portal-* 列表。
 
 ## 6. showcase 来源（静态 gallery）
 
@@ -69,5 +69,6 @@ Phase 1 仅 `pageKey = site-home`；**画布门户首页** `canvas-home` 已接�
 
 | 日期 | 说明 |
 |------|------|
+| 2026-09-06 | canvas-home 读路径 `resolveCanvasHomeSnapshotComplete` 服务端 merge |
 | 2026-08-22 | canvas-home：画布门户首页快照 + 管理页 Tab + canvas-web 读公开 API |
 | 2026-08-22 | Phase 1：首页 ISR + 快照 CMS + 管理页 + Cron |

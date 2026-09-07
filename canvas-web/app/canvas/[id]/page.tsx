@@ -1,4 +1,18 @@
-import { CanvasPageClient } from "./canvas-page-client";
+import dynamic from "next/dynamic";
+
+import { CanvasEditorRouteLoading } from "@/components/canvas/canvas-editor-loading";
+
+const CanvasPageClient = dynamic(
+  () =>
+    import("./canvas-page-client").then((m) => ({
+      default: m.CanvasPageClient,
+    })),
+  {
+    loading: () => (
+      <CanvasEditorRouteLoading label="正在打开编辑器…" />
+    ),
+  },
+);
 
 export const metadata = { title: "画布编辑器 · canvas-web" };
 

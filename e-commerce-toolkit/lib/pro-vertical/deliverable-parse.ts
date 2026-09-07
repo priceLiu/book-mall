@@ -299,6 +299,9 @@ export function hasMeaningfulProOpsPack(d: ProDeliverable): boolean {
       (ops.coverWords?.length ?? 0) > 0 ||
       (ops.tags?.length ?? 0) > 0 ||
       (ops.detailBullets?.length ?? 0) > 0 ||
-      Boolean(ops.xiaohongshuBody?.trim()),
+      Boolean(ops.xiaohongshuBody?.trim()) ||
+      Boolean(ops.bgmDirection?.trim()) ||
+      Boolean(ops.subtitleGuide?.trim()) ||
+      Boolean(ops.sfxNotes?.trim()),
   );
 }

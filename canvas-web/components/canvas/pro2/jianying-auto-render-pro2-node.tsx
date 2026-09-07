@@ -29,6 +29,7 @@ import type { JianyingAutoRenderNodeData } from "@/lib/canvas/types";
 import { RF_NO_DRAG } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
 import { LazyViewportImage, LazyViewportVideo } from "../lazy-viewport-media";
+import { isMediaSrcLoaded } from "@/lib/canvas/loaded-media-src-cache";
 import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
 import { useMediaRenderCancel } from "@/lib/canvas/use-media-render-cancel";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
@@ -53,6 +54,7 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
   const posterUrl =
     d.posterUrl?.trim() || d.mediaRenderResult?.posterUrl?.trim() || undefined;
   const hasVideo = Boolean(videoUrl);
+  const videoMediaEager = isMediaSrcLoaded(videoUrl ?? "");
   /**
    * 扫光：剪辑进行中且尚未拿到本地成片（progressLabel 非空）。
    * 本地成片就绪后 Dock 仍可显示「云端同步中」，节点结束扫光并刷新预览。
@@ -203,7 +205,6 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
                   <LazyViewportImage
                     src={posterUrl}
                     alt=""
-                    eager
                     className="absolute inset-0"
                     imgClassName={cn("pointer-events-none", stageVideoFitClass)}
                     rootMargin="280px"
@@ -212,7 +213,7 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
                   <LazyViewportVideo
                     src={videoUrl}
                     poster={posterUrl}
-                    eager
+                    eager={videoMediaEager}
                     preload="metadata"
                     className="absolute inset-0"
                     videoClassName={cn("pointer-events-none", stageVideoFitClass)}

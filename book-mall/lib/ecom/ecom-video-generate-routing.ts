@@ -128,7 +128,7 @@ export function resolveEcomVideoGenerationPlan(opts: {
   }
   if (plan.provider === "dashscope") {
     throw new Error(
-      `「${opts.action}」需要参考图，当前页面仅支持纯文案生成；请使用微剧故事版或上传参考图后再试`,
+      `「${opts.action}」需要参考图，当前页面仅支持纯文案生成；请使用电商口播故事版或上传参考图后再试`,
     );
   }
   return plan;

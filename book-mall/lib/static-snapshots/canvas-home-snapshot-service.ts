@@ -2,7 +2,7 @@
  * 画布门户首页静态快照 · 读写与生成编排。
  */
 import type { StaticSnapshotTrigger } from "@prisma/client";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { unstable_cache } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
@@ -18,7 +18,9 @@ import {
 } from "@/lib/static-snapshots/cst-date";
 import {
   CANVAS_HOME_PAGE_KEY,
+  canvasHomeNeedsCompletePayload,
   isCanvasHomeSnapshotPayload,
+  mergeCanvasHomeSnapshotPayload,
   summarizeCanvasHomePayload,
   type CanvasHomeSnapshotPayload,
 } from "@/lib/static-snapshots/canvas-home-payload";
@@ -43,6 +45,30 @@ async function readReadySnapshot(
   if (!row || row.status !== "READY") return null;
   if (!isCanvasHomeSnapshotPayload(row.payload)) return null;
   return row.payload;
+}
+
+const fetchLiveCanvasHomeSnapshotCached = unstable_cache(
+  async () => buildCanvasHomeSnapshot(),
+  ["canvas-home-live-fill"],
+  { revalidate: 3600, tags: ["canvas-home-snapshot"] },
+);
+
+/** 读路径：快照分区缺失时用 live build 补全（短缓存，避免每次请求打满 DB） */
+export async function resolveCanvasHomeSnapshotComplete(
+  payload: CanvasHomeSnapshotPayload,
+): Promise<CanvasHomeSnapshotPayload> {
+  if (!canvasHomeNeedsCompletePayload(payload)) return payload;
+  const live = await fetchLiveCanvasHomeSnapshotCached();
+  return mergeCanvasHomeSnapshotPayload(payload, live);
+}
+
+async function finalizeCanvasHomeReadResult(
+  result: CanvasHomeSnapshotReadResult,
+): Promise<CanvasHomeSnapshotReadResult> {
+  return {
+    ...result,
+    payload: await resolveCanvasHomeSnapshotComplete(result.payload),
+  };
 }
 
 export async function getCanvasHomeSnapshotForRender(
@@ -75,7 +101,7 @@ export async function getCanvasHomeSnapshotForRender(
     [`canvas-home-snapshot-${today}`],
     { revalidate: 3600, tags: ["canvas-home-snapshot"] },
   );
-  return cached();
+  return finalizeCanvasHomeReadResult(await cached());
 }
 
 export async function getPublicCanvasHomeSnapshot(
@@ -84,18 +110,28 @@ export async function getPublicCanvasHomeSnapshot(
   const key = dateKey ?? cstDateKey();
   const payload = await readReadySnapshot(CANVAS_HOME_PAGE_KEY, key);
   if (payload) {
-    return { payload, dateKey: key, stale: false, source: "snapshot" };
+    return finalizeCanvasHomeReadResult({
+      payload,
+      dateKey: key,
+      stale: false,
+      source: "snapshot",
+    });
   }
   const prev = await readReadySnapshot(CANVAS_HOME_PAGE_KEY, previousCstDateKey(key));
   if (prev) {
-    return { payload: prev, dateKey: previousCstDateKey(key), stale: true, source: "snapshot" };
+    return finalizeCanvasHomeReadResult({
+      payload: prev,
+      dateKey: previousCstDateKey(key),
+      stale: true,
+      source: "snapshot",
+    });
   }
-  return {
+  return finalizeCanvasHomeReadResult({
     payload: buildCanvasHomeSnapshotFallback(),
     dateKey: key,
     stale: true,
     source: "fallback",
-  };
+  });
 }
 
 async function pruneOldSnapshots(pageKey: string, now: Date) {
@@ -174,6 +210,7 @@ export async function runCanvasHomeSnapshotGeneration(input: {
     await pruneOldSnapshots(CANVAS_HOME_PAGE_KEY, now);
     try {
       revalidatePath("/api/public/static-snapshots/canvas-home");
+      revalidateTag("canvas-home-snapshot");
     } catch {
       // CLI 脚本无 Next 静态生成上下文，跳过 ISR 刷新
     }

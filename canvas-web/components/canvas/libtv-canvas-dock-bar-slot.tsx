@@ -17,22 +17,30 @@ import {
 import { cn } from "@/lib/utils";
 
 export type LibtvCanvasDockBarSlotProps = {
-  /** localStorage 键，建议 `pro2:${projectId}` / `sbv1:${projectId}` */
+  /** localStorage 键，建议 edition 级如 `pro2:dock-bar-v1` */
   storageKey: string;
+  /** 旧版 per-project 键，用于迁移 */
+  legacyStorageKeys?: readonly string[];
   children: ReactElement;
   dockRef?: MutableRefObject<HTMLDivElement | null>;
   className?: string;
 };
 
-/** 画布底部 Dock 槽：仅握把可拖动，位置持久化 */
+/** 画布底部 Dock 槽：仅握把可拖动，拖拽结束才持久化 */
 export function LibtvCanvasDockBarSlot({
   storageKey,
+  legacyStorageKeys = [],
   children,
   dockRef,
   className,
 }: LibtvCanvasDockBarSlotProps) {
-  const [position, setPosition] = useCanvasDockBarPosition(storageKey);
+  const { position, setPositionLocal, commitPosition } = useCanvasDockBarPosition(
+    storageKey,
+    { legacyKeys: legacyStorageKeys },
+  );
   const innerRef = useRef<HTMLDivElement | null>(null);
+  const positionRef = useRef(position);
+  positionRef.current = position;
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
@@ -62,17 +70,17 @@ export function LibtvCanvasDockBarSlot({
 
   useEffect(() => {
     const onResize = () => {
-      setPosition((prev) => clampToViewport(prev));
+      setPositionLocal((prev) => clampToViewport(prev));
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [setPosition, clampToViewport]);
+  }, [setPositionLocal, clampToViewport]);
 
   useEffect(() => {
     const el = innerRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
-      setPosition((prev) => {
+      setPositionLocal((prev) => {
         const next = clampToViewport(prev);
         if (next.offsetX === prev.offsetX && next.offsetY === prev.offsetY) {
           return prev;
@@ -82,7 +90,7 @@ export function LibtvCanvasDockBarSlot({
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [setPosition, clampToViewport]);
+  }, [setPositionLocal, clampToViewport]);
 
   useEffect(() => {
     if (!dragging) return;
@@ -92,7 +100,7 @@ export function LibtvCanvasDockBarSlot({
       if (!drag || drag.pointerId !== e.pointerId) return;
       const deltaX = e.clientX - drag.startX;
       const deltaY = drag.startY - e.clientY;
-      setPosition(
+      setPositionLocal(
         clampToViewport({
           offsetX: drag.startOffsetX + deltaX,
           offsetY: drag.startOffsetY + deltaY,
@@ -105,6 +113,7 @@ export function LibtvCanvasDockBarSlot({
       if (!drag || drag.pointerId !== e.pointerId) return;
       dragRef.current = null;
       setDragging(false);
+      commitPosition(clampToViewport(positionRef.current));
     };
 
     window.addEventListener("pointermove", onMove);
@@ -115,7 +124,7 @@ export function LibtvCanvasDockBarSlot({
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
-  }, [dragging, setPosition, clampToViewport]);
+  }, [dragging, setPositionLocal, commitPosition, clampToViewport]);
 
   const onGripPointerDown = useCallback(
     (e: React.PointerEvent<HTMLButtonElement>) => {

@@ -12,6 +12,10 @@ export {
   buildEcomImagePreviewOpenState,
   buildModelShotPosePreviewItems,
   buildStoryboardPanelPreviewItems,
+  buildStoryboardReferencePreviewItems,
+  buildStoryboardSheetDialogPreviewGalleryItems,
+  buildStoryboardSheetPreviewGalleryItems,
   findEcomImagePreviewIndex,
+  normalizeEcomImagePreviewUrl,
   mapPreviewItemsFromEntries,
 } from "@/lib/media/ecom-image-preview";

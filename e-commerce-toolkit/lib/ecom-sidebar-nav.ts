@@ -102,7 +102,9 @@ function imageModuleIcon(id: string): LucideIcon {
 }
 
 function videoModuleIcon(id: string): LucideIcon {
-  return id === "storyboard-micro-drama" ? Clapperboard : Film;
+  if (id === "storyboard-micro-drama") return Clapperboard;
+  if (id === "seed-video") return Video;
+  return Film;
 }
 
 function brandModuleIcon(id: string): LucideIcon {
@@ -116,7 +118,6 @@ const MARKETING_ECOM_VIDEO_IDS = new Set([
   "storyboard-micro-drama",
   "video-digital-human",
   "video-hit-product",
-  "video-voiceover",
 ]);
 
 const PORTAL_ICONS: Record<PortalKey, LucideIcon> = {
@@ -158,23 +159,12 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
       !MARKETING_ECOM_VIDEO_IDS.has(m.id),
   );
 
-  const seedVideoMod = ECOM_MODULES.find((m) => m.id === "seed-video");
   const mediaDecomposeMod = ECOM_MODULES.find((m) => m.id === "media-decompose");
   const filmPullMod = ECOM_MODULES.find((m) => m.id === "film-pull");
   const imageModLinks = imageMods.map((m) => link(m.title, m.href, imageModuleIcon(m.id)));
-  const detailIdx = imageModLinks.findIndex((l) => l.href === "/ecom/detail-page-creation");
-  if (seedVideoMod && detailIdx >= 0) {
-    imageModLinks.splice(
-      detailIdx + 1,
-      0,
-      link(seedVideoMod.title, seedVideoMod.href, Video),
-    );
-  } else if (seedVideoMod) {
-    imageModLinks.push(link(seedVideoMod.title, seedVideoMod.href, Video));
-  }
   if (mediaDecomposeMod) {
-    const seedIdx = imageModLinks.findIndex((l) => l.href === "/ecom/seed-video");
-    const insertAt = seedIdx >= 0 ? seedIdx + 1 : imageModLinks.length;
+    const detailIdx = imageModLinks.findIndex((l) => l.href === "/ecom/detail-page-creation");
+    const insertAt = detailIdx >= 0 ? detailIdx + 1 : imageModLinks.length;
     imageModLinks.splice(
       insertAt,
       0,
@@ -199,9 +189,9 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
     "hand-craft",
     "promo",
     "ad",
-    "video-digital-human",
+    "seed-video",
     "video-hit-product",
-    "video-voiceover",
+    "video-digital-human",
     "ip",
     "poster",
     "vi",

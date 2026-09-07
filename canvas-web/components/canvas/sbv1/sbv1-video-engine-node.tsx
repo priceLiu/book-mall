@@ -60,6 +60,7 @@ import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-sel
 import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
 import { useLibtvMediaAspectPresetSync } from "@/lib/canvas/libtv-media-aspect-preset-apply";
 import { LazyViewportImage, LazyViewportVideo } from "@/components/canvas/lazy-viewport-media";
+import { isMediaSrcLoaded } from "@/lib/canvas/loaded-media-src-cache";
 import { Pro2MediaNodeEmptyState } from "../pro2/pro2-media-node-empty";
 import {
   attachPro2VideoShortcutPreset,
@@ -227,6 +228,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     pro2VideoBoardRowMediaUrl({ runtime: rowRuntime, task: rowDisplayTask }) ??
     undefined;
   const hasVideo = Boolean(videoUrl);
+  const videoMediaEager = isMediaSrcLoaded(videoUrl ?? "");
   const isUploadNaturalFit = Boolean(
     d.mediaFit &&
       d.mediaFitKey?.startsWith("upload|") &&
@@ -765,7 +767,6 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                     <LazyViewportImage
                       src={posterUrl}
                       alt=""
-                      eager
                       className="absolute inset-0"
                       imgClassName={cn("pointer-events-none opacity-60", stageVideoFitClass)}
                       rootMargin="280px"
@@ -774,7 +775,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                     <LazyViewportVideo
                       src={videoUrl ?? undefined}
                       poster={posterUrl}
-                      eager
+                      eager={videoMediaEager}
                       className="absolute inset-0"
                       videoClassName={cn("pointer-events-none opacity-60", stageVideoFitClass)}
                       rootMargin="280px"
@@ -788,7 +789,6 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                   <LazyViewportImage
                     src={posterUrl}
                     alt=""
-                    eager
                     className="absolute inset-0"
                     imgClassName={cn("pointer-events-none", stageVideoFitClass)}
                     rootMargin="280px"
@@ -797,8 +797,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                   <LazyViewportVideo
                     src={videoUrl ?? undefined}
                     poster={posterUrl}
-                    eager
-                    preload="auto"
+                    eager={videoMediaEager}
+                    preload="metadata"
                     className="absolute inset-0"
                     videoClassName={cn("pointer-events-none", stageVideoFitClass)}
                     rootMargin="280px"

@@ -36,6 +36,9 @@ export function proDimensionPrompt(vertical: ProVerticalId, stepIndex: number): 
   if (step.ui === "searchSelect") {
     return `请搜索并选择${step.label}，或选「自定义」后在下方输入`;
   }
+  if (vertical === "digital_3c" && step.key === "coreFunctionAttributes") {
+    return "请选择本产品最主要的一项核心功能方向（如快充、降噪、长续航）；更多功能可在卖点环节补充";
+  }
   return `请选择${step.label}`;
 }
 

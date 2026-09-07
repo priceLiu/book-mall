@@ -1307,7 +1307,7 @@ export function ProductDesignContentPanel({
       });
       return;
     }
-    setBusy("正在创建微剧故事版…");
+    setBusy("正在创建电商口播故事版…");
     try {
       const { projectId } = await createStoryboardFromAssets({
         assetIds,

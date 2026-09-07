@@ -6,7 +6,7 @@ import { BookOpen, GitBranch } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { clearScriptAssistantOnFinalize } from "@/components/canvas/script-writing-assistant-panel";
+import { clearScriptAssistantOnFinalize } from "@/lib/canvas/script-assistant-finalize";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { runStoryHubSection } from "@/lib/canvas/batch-run-nodes";
 import {

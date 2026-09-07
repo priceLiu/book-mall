@@ -16,7 +16,7 @@ export async function fetchCanvasHomeSnapshotServer(): Promise<CanvasHomeSnapsho
 
   try {
     const res = await fetch(`${base}/api/public/static-snapshots/canvas-home`, {
-      next: { revalidate: 3600, tags: ["canvas-home-snapshot"] },
+      next: { revalidate: 86400, tags: ["canvas-home-snapshot"] },
     });
     if (!res.ok) return null;
     const data = (await res.json()) as {

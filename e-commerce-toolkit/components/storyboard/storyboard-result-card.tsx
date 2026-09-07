@@ -1,8 +1,9 @@
 "use client";
 
-import { Clapperboard, Eye, Film, Loader2 } from "lucide-react";
+import { Clapperboard, Film, Loader2 } from "lucide-react";
 
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
+import { EcomVideoStagePreview } from "@/components/media/ecom-video-stage-preview";
 import { STORYBOARD_PREVIEW_MIN_H, storyboardPreviewAspectClass } from "@/lib/storyboard-aspect";
 import { isStoryboardVideoUrl } from "@/lib/storyboard-media";
 import { cn } from "@/lib/utils";
@@ -57,29 +58,12 @@ export function StoryboardResultCard({
       >
         {busy ? (
           <EcomMediaGeneratingBusy background="black" label="成片生成中…" />
-        ) : hasVideo ? (
-          <>
-            <video
-              key={videoSrc}
-              src={videoSrc!}
-              controls
-              playsInline
-              preload="metadata"
-              className="absolute inset-0 z-0 h-full w-full object-contain"
-            />
-            {onPreviewVideo ? (
-              <div className="absolute right-2 top-2 z-10">
-                <button
-                  type="button"
-                  title="全屏预览"
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white shadow"
-                  onClick={onPreviewVideo}
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ) : null}
-          </>
+        ) : hasVideo && onPreviewVideo ? (
+          <EcomVideoStagePreview
+            src={videoSrc!}
+            onPreview={onPreviewVideo}
+            className="absolute inset-0"
+          />
         ) : (
           <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-2 px-3 text-center">
             <p className="text-xs text-[#86868b]">{emptyHint}</p>

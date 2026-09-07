@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutTemplate } from "lucide-react";
 import {
@@ -150,15 +151,30 @@ import { Pro2SelectionBatchConnectLayer } from "./pro2/pro2-selection-batch-conn
 import { LibtvSideConnectLayer } from "./pro2/libtv-side-connect-layer";
 import { Pro2StarterInputDock } from "./pro2/pro2-starter-input-dock";
 import { Pro2PromptInputDock } from "./pro2/pro2-prompt-input-dock";
-import { Pro2ScriptInputDock } from "./pro2/pro2-script-input-dock";
+import { graphHasPro2ScriptHub } from "@/lib/canvas/pro2-script-graph-detect";
 import { LibtvImageInputDock } from "./libtv-image-input-dock";
 import { LibtvAudioInputDock } from "./libtv-audio-input-dock";
 import { Sbv1VideoEngineFloatingDock } from "./sbv1/sbv1-video-engine-floating-dock";
 import { JianyingAutoRenderFloatingDock } from "./pro2/jianying-auto-render-floating-dock";
 import { Pro2ThreeViewInputDock } from "./pro2/pro2-three-view-input-dock";
 import { Pro2TextNodeOutlineEditorHost } from "./pro2/pro2-text-node-outline-editor-host";
-import { Pro2ScriptTableEditorHost } from "./pro2/pro2-script-table-editor-host";
 import { Director3dDeskEditorHost } from "./pro2/director-3d-desk-editor-host";
+
+const Pro2ScriptInputDock = dynamic(
+  () =>
+    import("./pro2/pro2-script-input-dock").then((m) => ({
+      default: m.Pro2ScriptInputDock,
+    })),
+  { ssr: false },
+);
+
+const Pro2ScriptTableEditorHost = dynamic(
+  () =>
+    import("./pro2/pro2-script-table-editor-host").then((m) => ({
+      default: m.Pro2ScriptTableEditorHost,
+    })),
+  { ssr: false },
+);
 import type {
   StoryProScriptHubNodeData,
   StoryProStarterNodeData,
@@ -241,6 +257,10 @@ function FlowCanvasInner({
   sbv1Canvas?: boolean;
 }) {
   const storeNodes = useCanvasStore((s) => s.nodes);
+  const hasPro2ScriptHub = useMemo(
+    () => graphHasPro2ScriptHub(storeNodes),
+    [storeNodes],
+  );
   const base = useBookMallBaseUrl();
   const wrapRef = useRef<HTMLDivElement>(null);
   const {
@@ -2451,12 +2471,16 @@ function FlowCanvasInner({
         <>
           <Pro2StarterInputDock />
           <Pro2PromptInputDock />
-          <Pro2ScriptInputDock />
+          {hasPro2ScriptHub ? (
+            <>
+              <Pro2ScriptInputDock />
+              <Pro2ScriptTableEditorHost />
+            </>
+          ) : null}
           <Pro2FrameCellInputDock />
           <Pro2ThreeViewInputDock />
           <Pro2FloatingInspector />
           <Pro2TextNodeOutlineEditorHost />
-          <Pro2ScriptTableEditorHost />
         </>
       ) : null}
       {pro2FloatingInspector || sbv1Canvas ? <LibtvImageInputDock /> : null}

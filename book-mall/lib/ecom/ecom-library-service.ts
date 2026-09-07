@@ -164,7 +164,6 @@ const VIDEO_MODULE_IDS = [
   "video-digital-human",
   "video-mirror-selfie",
   "video-hit-product",
-  "video-voiceover",
 ] as const;
 const BRAND_MODULE_IDS = ["ip", "poster", "vi", "promo", "ad"] as const;
 
@@ -173,7 +172,7 @@ const MODULE_TITLES: Record<string, { title: string; kind: "image" | "video" | "
   "detail-page": { title: "电商详情页", kind: "image" },
   "hand-craft": { title: "手伴创作", kind: "image" },
   "model-shot": { title: "服装模特图", kind: "image" },
-  "storyboard-micro-drama": { title: "微剧故事版", kind: "video" },
+  "storyboard-micro-drama": { title: "电商口播故事版", kind: "video" },
   "seed-video": { title: "图片生种草视频", kind: "video" },
   "media-decompose": { title: "拆图拆视频", kind: "video" },
   "video-motion": { title: "视频动作", kind: "video" },
@@ -183,7 +182,6 @@ const MODULE_TITLES: Record<string, { title: string; kind: "image" | "video" | "
   "video-digital-human": { title: "数字人", kind: "video" },
   "video-mirror-selfie": { title: "户外对镜自拍", kind: "video" },
   "video-hit-product": { title: "爆款服装带货", kind: "video" },
-  "video-voiceover": { title: "电商口播带货", kind: "video" },
   ip: { title: "IP 设计", kind: "brand" },
   poster: { title: "海报制作", kind: "brand" },
   vi: { title: "品牌 VI · 表情包", kind: "brand" },
@@ -557,7 +555,7 @@ function snapshotToBundle(
   return {
     projectId,
     savedAt: snap.savedAt,
-    title: workflowSnapshot?.title || snap.title || "微剧故事版",
+    title: workflowSnapshot?.title || snap.title || "电商口播故事版",
     panelCount,
     hasScript:
       markdown.length > 80 ||
@@ -924,7 +922,7 @@ export function buildStoryboardReusePayload(
     deliverableMarkdown?.trim() ||
     "";
   return {
-    title: snap.title?.trim() || "微剧故事版",
+    title: snap.title?.trim() || "电商口播故事版",
     references: snap.references,
     sheet: snap.sheet,
     meta: {

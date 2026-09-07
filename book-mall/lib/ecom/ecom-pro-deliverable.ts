@@ -91,6 +91,9 @@ export const proOpsPackSchema = z.object({
   tags: z.array(z.string()).optional(),
   xiaohongshuBody: z.string().optional(),
   detailBullets: z.array(z.string()).optional(),
+  bgmDirection: z.string().optional(),
+  subtitleGuide: z.string().optional(),
+  sfxNotes: z.string().optional(),
 });
 
 export const proOutputModeSchema = z.enum(["script_compose", "direct_video"]);
@@ -451,7 +454,10 @@ export function hasMeaningfulOpsPack(d: ProDeliverable): boolean {
       (ops.coverWords?.length ?? 0) > 0 ||
       (ops.tags?.length ?? 0) > 0 ||
       (ops.detailBullets?.length ?? 0) > 0 ||
-      Boolean(ops.xiaohongshuBody?.trim()),
+      Boolean(ops.xiaohongshuBody?.trim()) ||
+      Boolean(ops.bgmDirection?.trim()) ||
+      Boolean(ops.subtitleGuide?.trim()) ||
+      Boolean(ops.sfxNotes?.trim()),
   );
 }
 

@@ -78,12 +78,22 @@ function EcomPreviewImageStage({
   }, [src, onImageMeta]);
 
   const showProgress = !fullLoaded && !fullFailed;
+  const isWide =
+    naturalSize != null && naturalSize.w / naturalSize.h > 1.35;
   const intrinsicClass = compact
-    ? "block max-h-[90vh] max-w-[min(calc(100vw-7.5rem),78vw)] w-auto h-auto"
-    : "block max-h-[90vh] max-w-[96vw] w-auto h-auto";
+    ? isWide
+      ? "block max-h-[90vh] max-w-[min(calc(100vw-7.5rem),96vw)] w-auto h-auto object-contain"
+      : "block max-h-[90vh] max-w-[min(calc(100vw-7.5rem),78vw)] w-auto h-auto object-contain"
+    : isWide
+      ? "block max-h-[90vh] max-w-[96vw] w-auto h-auto object-contain"
+      : "block max-h-[90vh] max-w-[96vw] w-auto h-auto object-contain";
   const skeletonClass = compact
-    ? "ecom-skeleton aspect-[3/4] max-h-[90vh] w-[min(calc(100vw-7.5rem),420px)] rounded-sm bg-white/10"
-    : "ecom-skeleton aspect-[3/4] max-h-[90vh] w-[min(72vw,420px)] rounded-sm bg-white/10";
+    ? isWide
+      ? "ecom-skeleton aspect-[16/9] max-h-[90vh] w-[min(calc(100vw-7.5rem),960px)] rounded-sm bg-white/10"
+      : "ecom-skeleton aspect-[3/4] max-h-[90vh] w-[min(calc(100vw-7.5rem),420px)] rounded-sm bg-white/10"
+    : isWide
+      ? "ecom-skeleton aspect-[16/9] max-h-[90vh] w-[min(88vw,960px)] rounded-sm bg-white/10"
+      : "ecom-skeleton aspect-[3/4] max-h-[90vh] w-[min(72vw,420px)] rounded-sm bg-white/10";
 
   return (
     <div
@@ -330,7 +340,7 @@ export function EcomImagePreviewDialog({
     if (!open || typeof document === "undefined") return null;
     return createPortal(
       <div
-        className="fixed inset-0 z-[300] flex items-stretch justify-center bg-black/90"
+        className="fixed inset-0 z-[2000] flex items-stretch justify-center bg-black/90"
         role="dialog"
         aria-modal="true"
         aria-label={dialogTitle}

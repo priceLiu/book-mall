@@ -26,24 +26,36 @@ function ownerLabel(
   return "团队客户";
 }
 
+const TAB_VIDEO = "视频";
+const TAB_IMAGE = "图片";
+const MEDIA_TABS = [TAB_VIDEO, TAB_IMAGE] as const;
+type MediaTab = (typeof MEDIA_TABS)[number];
+
+function tabToKind(tab: MediaTab): PortalFilmShowcaseMedia["kind"] {
+  return tab === TAB_VIDEO ? "video" : "image";
+}
+
 export function PortalFilmCasesSection() {
   const base = useBookMallBaseUrl();
   const { viewerUserId, filmShowcase: items } = usePortalHome();
+  const [activeTab, setActiveTab] = useState<MediaTab>(TAB_VIDEO);
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState<PortalFilmShowcaseMedia | null>(null);
   const [copyingId, setCopyingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
+    const kind = tabToKind(activeTab);
+    const byKind = items.filter((item) => item.kind === kind);
     const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((item) => {
+    if (!q) return byKind;
+    return byKind.filter((item) => {
       const haystack = [item.projectName, item.description, ownerLabel(item.owner)]
         .join(" ")
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [items, search]);
+  }, [items, search, activeTab]);
 
   const onCopy = useCallback(
     async (item: PortalFilmShowcaseMedia) => {
@@ -93,13 +105,30 @@ export function PortalFilmCasesSection() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索视频作品"
+            placeholder={activeTab === TAB_VIDEO ? "搜索视频作品" : "搜索分镜图片"}
             className="w-full rounded-full border border-[var(--canvas-border)] bg-[var(--canvas-surface)] py-2 pl-9 pr-4 text-sm text-white placeholder:text-[var(--canvas-muted)] focus:border-cyan-400/40 focus:outline-none"
           />
         </div>
       </div>
 
-      {error ? <p className="mb-4 mt-4 text-sm text-red-300/90">{error}</p> : null}
+      <div className="mb-6 flex flex-wrap gap-2">
+        {MEDIA_TABS.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            className={
+              activeTab === tab
+                ? "rounded-full bg-white/15 px-4 py-1.5 text-sm font-medium text-white"
+                : "rounded-full px-4 py-1.5 text-sm text-[var(--canvas-muted)] transition hover:text-white"
+            }
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {error ? <p className="mb-4 text-sm text-red-300/90">{error}</p> : null}
 
       {filtered.length > 0 ? (
         <ul className={`mt-8 ${CANVAS_LIST_GRID_CLASS}`}>
@@ -168,7 +197,11 @@ export function PortalFilmCasesSection() {
             );
           })}
         </ul>
-      ) : null}
+      ) : (
+        <p className="rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-white/40">
+          {activeTab === TAB_VIDEO ? "暂无视频作品。" : "暂无分镜图片。"}
+        </p>
+      )}
 
       {preview ? (
         <TemplatePreviewDialog

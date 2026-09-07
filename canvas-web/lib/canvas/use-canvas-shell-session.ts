@@ -8,11 +8,20 @@ import {
 } from "@/lib/map-fetch-tools-session";
 import type { ToolShellSession } from "@/lib/tool-shell-session-types";
 import { GUEST_TOOL_SHELL_SESSION } from "@/lib/tool-shell-session-types";
-import { getCachedToolsSession, setCachedToolsSession } from "@/lib/tools-session-client-cache";
+import {
+  getCachedToolsSession,
+  readToolsSessionOkHint,
+  setCachedToolsSession,
+} from "@/lib/tools-session-client-cache";
 
 type ShellSessionState = {
   loading: boolean;
   session: ToolShellSession;
+};
+
+const SSR_SHELL_SESSION_STATE: ShellSessionState = {
+  loading: true,
+  session: GUEST_TOOL_SHELL_SESSION,
 };
 
 async function fetchShellSession(): Promise<ToolShellSession> {
@@ -34,10 +43,7 @@ async function fetchShellSession(): Promise<ToolShellSession> {
 
 /** 门户壳层登录态（与 RequireAuth 同源：tools_token + introspect） */
 export function useCanvasShellSession(): ShellSessionState {
-  const [state, setState] = useState<ShellSessionState>({
-    loading: true,
-    session: GUEST_TOOL_SHELL_SESSION,
-  });
+  const [state, setState] = useState<ShellSessionState>(SSR_SHELL_SESSION_STATE);
 
   const refresh = useCallback(async () => {
     try {
@@ -49,6 +55,19 @@ export function useCanvasShellSession(): ShellSessionState {
   }, []);
 
   useEffect(() => {
+    const cached = getCachedToolsSession();
+    if (cached?.active) {
+      setState({
+        loading: false,
+        session: mapFetchToolsSessionResultToShell(cached),
+      });
+    } else if (readToolsSessionOkHint()) {
+      setState({
+        loading: false,
+        session: { ...GUEST_TOOL_SHELL_SESSION, active: true },
+      });
+    }
+
     void refresh();
     const onRefresh = () => void refresh();
     window.addEventListener("canvas:tools-session-refreshed", onRefresh);

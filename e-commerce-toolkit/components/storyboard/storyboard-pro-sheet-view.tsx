@@ -1,6 +1,8 @@
 "use client";
 
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
+import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
+import { handCraftComposeImageSrc } from "@/lib/hand-craft-compose-image-src";
 import { StoryboardPanelImageHoverActions } from "@/components/storyboard/storyboard-panel-image-hover-actions";
 import { buildPanelTimelineMap } from "@/lib/storyboard-gen-params";
 import { cn } from "@/lib/utils";
@@ -45,20 +47,25 @@ function SheetImage({
   previewable?: boolean;
   onPreview?: (src: string, title: string) => void;
 }) {
+  const displaySrc = useCrossOrigin ? handCraftComposeImageSrc(src) : src;
   const img = (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={src}
+      src={displaySrc}
       alt={alt}
-      {...(useCrossOrigin ? { crossOrigin: "anonymous" as const } : {})}
       style={{ width: "100%", height: "100%", objectFit, display: "block" }}
       onError={(e) => {
         const imgEl = e.currentTarget;
-        if (imgEl.dataset.retried) return;
-        imgEl.dataset.retried = "1";
-        if (useCrossOrigin) {
-          imgEl.removeAttribute("crossorigin");
+        if (imgEl.dataset.retried === "2") return;
+        if (imgEl.dataset.retried === "1") {
+          imgEl.dataset.retried = "2";
           imgEl.src = src;
+          return;
+        }
+        imgEl.dataset.retried = "1";
+        const thumb = buildEcomOssThumbUrl(src);
+        if (thumb !== displaySrc) {
+          imgEl.src = thumb;
         }
       }}
     />
@@ -69,7 +76,7 @@ function SheetImage({
       <button
         type="button"
         title="点击放大预览"
-        onClick={() => onPreview(src, alt)}
+        onClick={() => onPreview(src.trim(), alt)}
         style={{
           width: "100%",
           height: "100%",
@@ -314,6 +321,8 @@ export function StoryboardProSheetView({
                     alt={`镜头 ${panel.index}`}
                     useCrossOrigin={useCrossOrigin}
                     objectFit={isPreview ? "contain" : "cover"}
+                    previewable={Boolean(isPreview && onPreviewImage && !interactive)}
+                    onPreview={onPreviewImage}
                   />
                   {interactive && !generating ? (
                     <StoryboardPanelImageHoverActions

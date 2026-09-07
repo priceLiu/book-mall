@@ -19,22 +19,18 @@ import {
   EcomImagePreviewHost,
   useEcomImagePreview,
   buildStoryboardPanelPreviewItems,
+  buildStoryboardSheetPreviewGalleryItems,
 } from "@/components/media";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { EcomIconButton, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { StoryboardDeliverableReviewDialog } from "@/components/storyboard/storyboard-deliverable-review-dialog";
 import { StoryboardDeliverableSection } from "@/components/storyboard/storyboard-deliverable-section";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { StoryboardPanelMediaStrip } from "@/components/storyboard/storyboard-panel-media-strip";
 import { StoryboardPanelEditDialog } from "@/components/storyboard/storyboard-panel-edit-dialog";
+import { StoryboardPanelPromptEditDialog } from "@/components/storyboard/storyboard-panel-prompt-edit-dialog";
 import { StoryboardSheetPreviewDialog } from "@/components/storyboard/storyboard-sheet-preview-dialog";
 import { StoryboardRefUploader } from "@/components/storyboard/storyboard-ref-uploader";
 import { FashionStepResults } from "@/components/fashion/fashion-step-results";
@@ -114,8 +110,6 @@ import {
   BACKGROUND_DOCK_FOREGROUND_POLL_MS,
   STORYBOARD_FULL_VIDEO_EXPECTED_MS,
 } from "@/lib/generation/background-generation-policy";
-import { formatPanelPromptPreview } from "@/lib/storyboard-scene-prompt";
-
 /** 整图成片前台轮询（超时后移交右下角 Dock，Dock 继续 poll） */
 const VIDEO_POLL_INTERVAL_MS = BACKGROUND_DOCK_FOREGROUND_POLL_MS;
 const VIDEO_POLL_MAX_ITERS = Math.ceil(
@@ -386,15 +380,41 @@ export function StoryboardContentPanel({
     () => buildStoryboardPanelPreviewItems(project.sheet?.panels ?? []),
     [project.sheet?.panels],
   );
+  const deliverableImageGalleryItems = useMemo(
+    () =>
+      buildStoryboardSheetPreviewGalleryItems(
+        project.sheet?.panels ?? [],
+        project.sheetPngUrl,
+        { includeSheetPng: false },
+      ),
+    [project.sheet?.panels],
+  );
   const {
     preview: imagePreview,
     openPreview: openPanelImagePreview,
     closePreview: closeImagePreview,
-  } = useEcomImagePreview(panelImagePreviewItems);
-  const [panelPromptPreview, setPanelPromptPreview] = useState<{
-    title: string;
-    prompt: string;
-  } | null>(null);
+  } = useEcomImagePreview(deliverableImageGalleryItems);
+  const openSheetPanelImagePreview = useCallback(
+    (src: string, title: string) => {
+      openPanelImagePreview(src, title, deliverableImageGalleryItems);
+    },
+    [openPanelImagePreview, deliverableImageGalleryItems],
+  );
+  const openFullSheetPreview = useCallback(() => {
+    if (project.sheet) {
+      setSheetPreviewOpen(true);
+      if (hasAllPanelImages(project)) {
+        void refreshSheetPngInBackground();
+      }
+      return;
+    }
+    const png = project.sheetPngUrl?.trim();
+    if (png) {
+      openPanelImagePreview(png, "完整分镜图");
+      return;
+    }
+  }, [project, openPanelImagePreview]);
+  const [promptEditPanelIndex, setPromptEditPanelIndex] = useState<number | null>(null);
   const [panelDurationSec, setPanelDurationSec] = useState(3);
   const [panelImageStripSelected, setPanelImageStripSelected] = useState<Set<number>>(
     () => new Set(),
@@ -925,6 +945,20 @@ export function StoryboardContentPanel({
       ),
     );
     await new Promise((r) => setTimeout(r, 300));
+  }
+
+  /** 后台刷新完整分镜 PNG（不占用 sheetPngBusy，避免卡片「合成中」遮罩） */
+  async function refreshSheetPngInBackground() {
+    if (!project.sheet || !hasAllPanelImages(project)) return;
+    try {
+      onPrepareExport?.(project.sheet);
+      await waitForExportImages();
+      const b64 = await capturePng();
+      const url = await uploadStoryboardSheetPng(project.id, b64);
+      onPngReady(url);
+    } catch {
+      /* 静默失败；预览仍走实时分镜表 */
+    }
   }
 
   const deliverable = asStoryboardDeliverable(project.meta?.deliverable);
@@ -2330,7 +2364,7 @@ export function StoryboardContentPanel({
           }
           openImagePicker(panelIndex);
         }}
-        onPreviewImage={openPanelImagePreview}
+        onPreviewImage={openSheetPanelImagePreview}
         onPreviewPanelPrompt={openPanelPromptPreview}
         onPreviewPanelVideo={(_panelIndex, videoUrl) =>
           onPreviewVideo(videoUrl, `镜头 ${_panelIndex}`)
@@ -2361,7 +2395,7 @@ export function StoryboardContentPanel({
       setSaveDialogOpen(false);
       toast({
         title: "工作流已保存",
-        message: `「${snapshot.title}」已保存到「我的资产 · 微剧故事版」，可一键复用。`,
+        message: `「${snapshot.title}」已保存到「我的资产 · 电商口播故事版」，可一键复用。`,
         variant: "success",
       });
     } catch (e) {
@@ -2379,7 +2413,7 @@ export function StoryboardContentPanel({
     resolveProVerticalDeliverable(project)?.productName?.trim() ||
     deliverable?.productName?.trim() ||
     project.title?.trim() ||
-    "微剧故事版";
+    "电商口播故事版";
   const canSaveWorkflow =
     references.length > 0 ||
     Boolean(project.sheet?.panels?.length) ||
@@ -2489,17 +2523,25 @@ export function StoryboardContentPanel({
   }
 
   function openPanelPromptPreview(panelIndex: number) {
-    const panel = project.sheet?.panels.find((p) => p.index === panelIndex);
-    if (!panel) return;
-    const fashionD = isProVerticalProject(project) ? resolveProVerticalDeliverable(project) : null;
-    setPanelPromptPreview({
-      title: `镜头 ${panel.index} · Prompt 预览`,
-      prompt: formatPanelPromptPreview({
-        panel,
-        references,
-        globalSceneAnchor: fashionD?.dimensions?.customScene?.trim(),
-      }),
-    });
+    if (!project.sheet?.panels.some((p) => p.index === panelIndex)) return;
+    setPromptEditPanelIndex(panelIndex);
+  }
+
+  async function handlePromptSaveAndRegenerateImage(panel: StoryboardPanel) {
+    await handlePanelSave(panel);
+    if (
+      isProVerticalProject(project) &&
+      resolveProVerticalDeliverable(project)?.outputMode === "direct_video"
+    ) {
+      beginFashionImageGeneration({ panelIndex: panel.index });
+      return;
+    }
+    openImagePicker(panel.index);
+  }
+
+  async function handlePromptSaveAndRegenerateVideo(panel: StoryboardPanel) {
+    await handlePanelSave(panel);
+    openVideoPicker({ panelIndex: panel.index });
   }
 
   async function runFashionCharacterGeneration(modelKeyOverride?: string) {
@@ -2643,14 +2685,14 @@ export function StoryboardContentPanel({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-semibold text-[#1d1d1f]">
-                {project.title?.trim() || "微剧故事版"}
+                {project.title?.trim() || "电商口播故事版"}
               </h2>
               <p className="text-[11px] text-[#6e6e73]">
                 带货短视频分镜 · {durationSec}秒 · {aspectRatio}
                 {project.sheet?.panels.length
                   ? ` · ${project.sheet.panels.length} 镜`
                   : ""}
-                {" · 成图自动入库「我的资产 · 微剧故事版」"}
+                {" · 成图自动入库「我的资产 · 电商口播故事版」"}
               </p>
             </div>
             <EcomIconToolbar>
@@ -2669,8 +2711,8 @@ export function StoryboardContentPanel({
                     currentProjectId={project.id}
                     loadProjects={loadProjectList}
                     onSelectProject={onOpenProject}
-                    title="微剧故事版 · 项目列表"
-                    emptyHint="还没有保存过的微剧故事版项目。"
+                    title="电商口播故事版 · 项目列表"
+                    emptyHint="还没有保存过的电商口播故事版项目。"
                   />
                 ) : null}
               </EcomIconToolbarGroup>
@@ -2819,8 +2861,8 @@ export function StoryboardContentPanel({
                   onSubmitStoryboard={() => void handleFashionSubmitStoryboard()}
                   onResyncSheet={() => void handleRetryFashionSheetSync()}
                   resyncBusy={fashionSheetSyncing}
-                  onOpenSheetPreview={() => setSheetPreviewOpen(true)}
-                  onPreviewImage={openPanelImagePreview}
+                  onOpenSheetPreview={openFullSheetPreview}
+                  onPreviewImage={openSheetPanelImagePreview}
                   onPreviewPanelPrompt={openPanelPromptPreview}
                   sheetHeading={`${getProVerticalConfig(getProjectVertical(project) ?? "fashion_apparel")?.label ?? "专业版"}分镜故事版`}
                 />
@@ -2866,7 +2908,7 @@ export function StoryboardContentPanel({
                   onOpenDeliverableReview={() => setDeliverableReviewOpen(true)}
                   onSaveSnapshot={() => void handleSaveDeliverableSnapshot()}
                   onOpenImagePicker={() => openImagePicker()}
-                  onOpenSheetPreview={() => setSheetPreviewOpen(true)}
+                  onOpenSheetPreview={openFullSheetPreview}
                   onReloadProject={handleReloadProject}
                   onMergePanelVideos={() => void handleMergePanelVideos()}
                   onPreviewVideo={onPreviewVideo}
@@ -2878,7 +2920,7 @@ export function StoryboardContentPanel({
         <StoryboardStepResults
           project={project}
           references={references}
-          onPreviewImage={openPanelImagePreview}
+          onPreviewImage={openSheetPanelImagePreview}
           onEditScriptPanel={
             project.sheet ? (panelIndex) => setEditPanelIndex(panelIndex) : undefined
           }
@@ -2921,7 +2963,7 @@ export function StoryboardContentPanel({
                 onOpenDeliverableReview={() => setDeliverableReviewOpen(true)}
                 onSaveSnapshot={() => void handleSaveDeliverableSnapshot()}
                 onOpenImagePicker={() => openImagePicker()}
-                onOpenSheetPreview={() => setSheetPreviewOpen(true)}
+                onOpenSheetPreview={openFullSheetPreview}
                 onReloadProject={handleReloadProject}
                 onMergePanelVideos={() => void handleMergePanelVideos()}
                 onPreviewVideo={onPreviewVideo}
@@ -3083,32 +3125,42 @@ export function StoryboardContentPanel({
               ? `${getProVerticalConfig(getProjectVertical(project) ?? "fashion_apparel")?.label ?? "专业版"}分镜故事版`
               : undefined
           }
+          sheetPngUrl={project.sheetPngUrl}
         />
       ) : null}
 
       <EcomImagePreviewHost
         preview={imagePreview}
-        galleryItems={panelImagePreviewItems}
+        galleryItems={deliverableImageGalleryItems}
         onClose={closeImagePreview}
+        nativeOverlay
       />
 
-      <Dialog
-        open={Boolean(panelPromptPreview)}
+      <StoryboardPanelPromptEditDialog
+        open={promptEditPanelIndex != null}
         onOpenChange={(open) => {
-          if (!open) setPanelPromptPreview(null);
+          if (!open) setPromptEditPanelIndex(null);
         }}
-      >
-        <DialogContent className="flex max-h-[min(92vh,880px)] w-[min(94vw,56rem)] max-w-none flex-col gap-4 p-6 sm:max-w-none">
-          <DialogHeader className="shrink-0">
-            <DialogTitle>{panelPromptPreview?.title ?? "生图 Prompt"}</DialogTitle>
-          </DialogHeader>
-          <div
-            className="ecom-scrollbar-thin min-h-[min(58vh,560px)] max-h-[min(72vh,680px)] w-full flex-1 overflow-y-auto whitespace-pre-wrap rounded-lg bg-[#f5f5f7] px-4 py-3 text-[13px] leading-relaxed text-[#1d1d1f]"
-          >
-            {panelPromptPreview?.prompt ?? ""}
-          </div>
-        </DialogContent>
-      </Dialog>
+        panel={
+          promptEditPanelIndex != null && project.sheet
+            ? project.sheet.panels.find((p) => p.index === promptEditPanelIndex) ?? null
+            : null
+        }
+        references={references}
+        globalSceneAnchor={
+          isProVerticalProject(project)
+            ? resolveProVerticalDeliverable(project)?.dimensions?.customScene?.trim()
+            : undefined
+        }
+        onSave={handlePanelSave}
+        onSaveAndRegenerateImage={handlePromptSaveAndRegenerateImage}
+        onSaveAndRegenerateVideo={handlePromptSaveAndRegenerateVideo}
+        saving={savingPanel}
+        canRegenerateVideo={Boolean(
+          promptEditPanelIndex != null &&
+            project.sheet?.panels.find((p) => p.index === promptEditPanelIndex)?.imageUrl?.trim(),
+        )}
+      />
 
       <StoryboardPanelEditDialog
         open={editPanelIndex != null}

@@ -22,7 +22,10 @@ import {
   pickProjectThumbnailUrlPreferVideo,
 } from "@/lib/canvas/pick-project-thumbnail";
 import { projectListCoverSummaryFields } from "@/lib/canvas/canvas-project-list-cover";
-import { collectSbv1ShowcaseMediaEntries } from "@/lib/canvas/sbv1-film-showcase";
+import {
+  collectSbv1ShowcaseMediaEntries,
+} from "@/lib/canvas/sbv1-film-showcase";
+import { scheduleCanvasHomeSnapshotRegeneration } from "@/lib/static-snapshots/canvas-home-snapshot-schedule";
 
 export type PortalCaseProjectSummary = CanvasProjectSummary & {
   portalCaseBlurb: string;
@@ -217,6 +220,7 @@ export async function setCanvasProjectPortalCase(args: {
         },
     include: { user: { select: { id: true, name: true, email: true } } },
   });
+  scheduleCanvasHomeSnapshotRegeneration();
   return {
     ...toSummaryWithEdition(updated),
     portalCaseBlurb: portalCaseBlurbOf(updated),
@@ -376,6 +380,7 @@ async function applyPortalPublication(
     default:
       throw new CanvasProjectError("INVALID_INPUT", "invalid publish kind", 400);
   }
+  scheduleCanvasHomeSnapshotRegeneration();
 }
 
 /** 管理员审核 */

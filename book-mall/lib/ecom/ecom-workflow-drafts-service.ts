@@ -85,7 +85,7 @@ function storyboardFeatureLabel(meta: unknown): string {
   const config = getProVerticalConfig(vertical);
   if (config?.label) return `${config.label}专业版`;
   if (vertical === "fashion_apparel") return "服装专业版";
-  return "微剧故事版";
+  return "电商口播故事版";
 }
 
 function storyboardPhaseLabel(meta: unknown): string {

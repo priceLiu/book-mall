@@ -16,7 +16,7 @@ import type {
 } from "@/lib/ecom/ecom-storyboard-types";
 import { prisma } from "@/lib/prisma";
 
-/** 微剧故事版完整工作流镜像（策划会话、服装交付物、分镜表与设置，可一键复用） */
+/** 电商口播故事版完整工作流镜像（策划会话、服装交付物、分镜表与设置，可一键复用） */
 export type StoryboardWorkflowSnapshot = {
   savedAt: string;
   /** 展示名：项目名_时间戳 */
@@ -32,7 +32,7 @@ export type StoryboardWorkflowSnapshot = {
 };
 
 function sanitizeTitleSegment(name: string): string {
-  return name.replace(/[^\w\u4e00-\u9fff.-]+/g, "_").slice(0, 80) || "微剧故事版";
+  return name.replace(/[^\w\u4e00-\u9fff.-]+/g, "_").slice(0, 80) || "电商口播故事版";
 }
 
 function formatSnapshotTimestamp(d = new Date()): string {
@@ -44,7 +44,7 @@ function formatSnapshotTimestamp(d = new Date()): string {
 }
 
 export function buildStoryboardWorkflowSnapshotTitle(projectName: string): string {
-  const base = sanitizeTitleSegment(projectName.trim() || "微剧故事版");
+  const base = sanitizeTitleSegment(projectName.trim() || "电商口播故事版");
   return `${base}_${formatSnapshotTimestamp()}`;
 }
 
@@ -82,7 +82,7 @@ export function buildStoryboardWorkflowSnapshot(
   const trimmed = projectName.trim();
   return {
     savedAt,
-    title: buildStoryboardWorkflowSnapshotTitle(trimmed || project.title?.trim() || "微剧故事版"),
+    title: buildStoryboardWorkflowSnapshotTitle(trimmed || project.title?.trim() || "电商口播故事版"),
     projectName: trimmed || undefined,
     brief: project.brief,
     settings: project.settings,

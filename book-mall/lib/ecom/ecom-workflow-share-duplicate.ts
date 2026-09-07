@@ -128,7 +128,7 @@ async function duplicateStoryboard(input: {
   if (!source) throw new Error("分镜项目不存在或无权分享");
 
   const created = await createEcomStoryboardProject(input.claimerUserId, {
-    title: shareTitle(source.title, "微剧故事版"),
+    title: shareTitle(source.title, "电商口播故事版"),
     brief: (source.brief ?? {}) as Record<string, unknown>,
   });
   await prisma.ecomStoryboardProject.update({

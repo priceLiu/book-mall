@@ -21,7 +21,6 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { ScriptAssistantPackPreviewModal } from "@/components/canvas/script-assistant-pack-preview-modal";
 import { StoryErrorLine } from "@/components/canvas/story-status-line";
 import {
-  clearScriptAssistantHistory,
   getScriptAssistantHistory,
   listScriptAssistantHistoryThreads,
   saveScriptAssistantHistory,
@@ -1099,25 +1098,4 @@ export function ScriptWritingAssistantPanel({
       ) : null}
     </>
   );
-}
-
-/** 故事定稿时由 hub 节点调用 */
-export async function clearScriptAssistantOnFinalize(
-  base: string,
-  projectId: string,
-  scriptHubId: string,
-  starterId?: string,
-): Promise<void> {
-  try {
-    await clearScriptAssistantHistory(base, projectId, scriptHubId);
-    if (starterId) {
-      await clearScriptAssistantHistory(
-        base,
-        projectId,
-        `starter:${starterId}`,
-      );
-    }
-  } catch {
-    /* ignore */
-  }
 }

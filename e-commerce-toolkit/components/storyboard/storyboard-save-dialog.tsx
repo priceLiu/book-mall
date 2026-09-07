@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 
 function sanitizeSaveName(name: string): string {
-  return name.replace(/[^\w\u4e00-\u9fff.-]+/g, "_").slice(0, 80) || "微剧故事版";
+  return name.replace(/[^\w\u4e00-\u9fff.-]+/g, "_").slice(0, 80) || "电商口播故事版";
 }
 
 function formatSaveTimestampPreview(d = new Date()): string {
@@ -32,7 +32,7 @@ type Props = {
   onConfirm: (projectName: string) => void | Promise<void>;
 };
 
-/** 保存微剧故事版工作流镜像到资产库 */
+/** 保存电商口播故事版工作流镜像到资产库 */
 export function StoryboardSaveDialog({
   open,
   onOpenChange,
@@ -48,7 +48,7 @@ export function StoryboardSaveDialog({
   }, [open, defaultProjectName]);
 
   const titlePreview = useMemo(() => {
-    const base = sanitizeSaveName(name.trim() || "微剧故事版");
+    const base = sanitizeSaveName(name.trim() || "电商口播故事版");
     return `${base}_${timestampPreview}`;
   }, [name, timestampPreview]);
 
@@ -58,7 +58,7 @@ export function StoryboardSaveDialog({
         <DialogHeader>
           <DialogTitle>保存工作流</DialogTitle>
           <DialogDescription>
-            将参考图、助手会话、服装策划交付物与分镜表镜像保存到「我的资产 · 微剧故事版」。
+            将参考图、助手会话、服装策划交付物与分镜表镜像保存到「我的资产 · 电商口播故事版」。
             可在资产库一键复用：复制流程后换参考图即可继续策划与成片。
           </DialogDescription>
         </DialogHeader>

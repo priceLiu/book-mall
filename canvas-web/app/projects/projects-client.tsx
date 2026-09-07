@@ -33,9 +33,15 @@ import {
   patchPortalCaseProject,
   submitCanvasPortalReview,
   prefetchCanvasProject,
+  type CanvasProjectListPage,
   type CanvasProjectSummary,
   type CanvasTemplateRecord,
 } from "@/lib/canvas-api";
+import {
+  invalidateCachedProjectsList,
+  loadCachedProjectsList,
+  saveCachedProjectsList,
+} from "@/lib/canvas/projects-list-client-cache";
 import { markRecentProjectsStale } from "@/lib/canvas/recent-projects-invalidate";
 import { canvasListCoverPropsFromProject } from "@/lib/canvas/canvas-list-cover-props";
 import {
@@ -92,13 +98,16 @@ function normalizeEdition(
   return "standard";
 }
 
-function Inner() {
+function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) {
   const router = useRouter();
   const base = useBookMallBaseUrl();
   const dialogs = useDialogs();
   const collaboration = useCrewCollaborationAccess();
   const isAdmin = useCanvasAdmin();
-  const [projects, setProjects] = useState<CanvasProjectSummary[]>([]);
+  const bootPage = initialPage ?? loadCachedProjectsList();
+  const [projects, setProjects] = useState<CanvasProjectSummary[]>(
+    () => bootPage?.projects ?? [],
+  );
   const [portalFeaturedIds, setPortalFeaturedIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -116,10 +125,12 @@ function Inner() {
   const [userTemplates, setUserTemplates] = useState<CanvasTemplateRecord[]>([]);
   const [userTemplatesLoading, setUserTemplatesLoading] = useState(false);
   const userTemplatesLoadedRef = useRef(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !bootPage);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(
+    () => bootPage?.nextCursor ?? null,
+  );
+  const [hasMore, setHasMore] = useState(() => Boolean(bootPage?.hasMore));
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
   const [creating, setCreating] = useState(false);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
@@ -158,24 +169,28 @@ function Inner() {
       setError("未配置主站地址（NEXT_PUBLIC_BOOK_MALL_URL），无法加载画布列表。");
       return;
     }
-    setLoading(true);
+    const hadData = projects.length > 0;
+    if (!hadData) setLoading(true);
     setError(null);
     try {
       const page = await fetchProjectsPage(null, PROJECTS_FIRST_PAGE_SIZE);
       setProjects(page.projects);
       setNextCursor(page.nextCursor);
       setHasMore(page.hasMore);
+      saveCachedProjectsList(page);
       setError(null);
     } catch (e) {
-      const raw = e instanceof Error ? e.message : "加载失败";
-      setError(formatCanvasApiError(raw));
-      setProjects([]);
-      setNextCursor(null);
-      setHasMore(false);
+      if (!hadData) {
+        const raw = e instanceof Error ? e.message : "加载失败";
+        setError(formatCanvasApiError(raw));
+        setProjects([]);
+        setNextCursor(null);
+        setHasMore(false);
+      }
     } finally {
       setLoading(false);
     }
-  }, [base, fetchProjectsPage]);
+  }, [base, fetchProjectsPage, projects.length]);
 
   const loadMore = useCallback(async () => {
     if (!base || !hasMore || !nextCursor || loadingMore || loading) return;
@@ -551,6 +566,8 @@ function Inner() {
         name: finalName,
         canvas: graph,
       });
+      invalidateCachedProjectsList();
+      markRecentProjectsStale();
       window.location.href = `/canvas/${created.id}`;
     } catch (e) {
       setError(e instanceof Error ? e.message : "创建失败");
@@ -596,6 +613,8 @@ function Inner() {
       setDuplicatingId(id);
       try {
         const created = await duplicateCanvasProject(base, id);
+        invalidateCachedProjectsList();
+        markRecentProjectsStale();
         await load();
         window.location.href = `/canvas/${created.id}`;
       } catch (e) {
@@ -639,6 +658,8 @@ function Inner() {
       if (!ok) return;
       try {
         await deleteCanvasProject(base, id);
+        invalidateCachedProjectsList();
+        markRecentProjectsStale();
         await load();
       } catch (e) {
         setError(e instanceof Error ? e.message : "删除失败");
@@ -1420,6 +1441,10 @@ function PickCard({
   );
 }
 
-export function ProjectsClient() {
-  return <Inner />;
+export function ProjectsClient({
+  initialPage,
+}: {
+  initialPage?: CanvasProjectListPage | null;
+}) {
+  return <Inner initialPage={initialPage} />;
 }

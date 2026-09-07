@@ -39,6 +39,13 @@ ${config.sellpointVocabHint}`;
 
 function buildJsonShape(vertical: ProVerticalId, opsOnly: boolean): string {
   if (opsOnly) {
+    const opsExtra =
+      vertical === "digital_3c"
+        ? `,
+    "bgmDirection": "科技电子 / Future Bass",
+    "subtitleGuide": "现代无衬线，白/浅灰，重点词上浮",
+    "sfxNotes": "开箱声、连接提示音"`
+        : "";
     return `\`\`\`pro-deliverable
 {
   "schemaVersion": "pro-v1",
@@ -50,7 +57,7 @@ function buildJsonShape(vertical: ProVerticalId, opsOnly: boolean): string {
     "coverWords": ["词1"],
     "tags": ["#标签1"],
     "xiaohongshuBody": "正文…",
-    "detailBullets": ["卖点1"]
+    "detailBullets": ["卖点1"]${opsExtra}
   }
 }
 \`\`\``;
@@ -99,17 +106,38 @@ export function buildProDeliverableContextBlock(
   return `\n\n【项目已定稿数据 · 必须以此为准】\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``;
 }
 
+function digital3cSellpointsExtra(): string {
+  return `
+- **必须结合** dimensions.coreFunctionAttributes（用户选定的核心功能方向）生成卖点
+- 至少 1 条 core 卖点须直接体现 coreFunctionAttributes`;
+}
+
+function digital3cOpsExtra(): string {
+  return `
+
+【3C 数码运营素材强制要求】
+- titles：10 条，顺序标注类型——【痛点型】3 条、【卖点型】3 条、【场景型】2 条、【价格型】2 条
+- coverWords：3 套，分别侧重功能强卖点 / 科技氛围感 / 真实使用场景
+- tags：含 #3C数码 #数码好物 #快充充电器 #桌面好物 #通勤必备 #办公效率 #游戏设备 #学生党数码 等
+- bgmDirection：科技电子 / 轻节奏 Future Bass / 简洁脉冲音 / 电竞节奏 / 轻松办公 Lo-fi 之一或组合
+- subtitleGuide：现代无衬线；白/浅灰/蓝紫点缀；重点词（快充、降噪、续航、低延迟、秒连）轻微上浮
+- sfxNotes：可选开箱声、连接提示音、快充动画音效等
+- xiaohongshuBody：痛点一句 + 产品卖点一句 + 使用场景一句 + 适合人群一句 + 推荐理由一句`;
+}
+
 export function buildProAssistantSystemPrompt(
   vertical: ProVerticalId,
   phase: ProPromptPhase = "general",
 ): string {
   const config = getProVerticalConfig(vertical);
   const focusField = "productFocus";
+  const sellpointsExtra = vertical === "digital_3c" ? digital3cSellpointsExtra() : "";
+  const opsExtra = vertical === "digital_3c" ? digital3cOpsExtra() : "";
   const phaseBlock: Record<ProPromptPhase, string> = {
     sellpoints: `【当前任务：卖点 AI 生成】
-根据七维参数生成 5–8 条卖点，编号 S01–S0N，分层 core/visual/aux。
+根据八维参数生成 5–8 条卖点，编号 S01–S0N，分层 core/visual/aux。
 参考词库：${config?.sellpointVocabHint ?? ""}
-用户卖点不足 3 条时补充 supplemented 来源卖点。
+用户卖点不足 3 条时补充 supplemented 来源卖点。${sellpointsExtra}
 输出 JSON 仅含 sellpoints（可选 schemaVersion/vertical，其余字段勿输出）。`,
 
     sellpoints_polish: `【当前任务：卖点润色（用户已提供原始卖点）】
@@ -131,7 +159,7 @@ E/C 版口播允许 ±15% 微调，其余 100% 忠实。`,
 
     ops: `【当前任务：运营素材包】
 分镜已定稿锁定；禁止输出 storyboardVersions / coverageChecklist / voiceovers / sellpoints。
-仅输出 opsPack：titles（10条分层标题）、coverWords、tags、xiaohongshuBody、detailBullets。
+仅输出 opsPack：titles（10条分层标题）、coverWords、tags、xiaohongshuBody、detailBullets${vertical === "digital_3c" ? "、bgmDirection、subtitleGuide、sfxNotes" : ""}。${opsExtra}
 输出 JSON 仅含 opsPack（可选 schemaVersion/vertical）。
 语言与 dimensions.outputLanguage 一致。`,
 

@@ -22,10 +22,13 @@ export function CanvasShellAuthSlot() {
 
   if (loading) {
     return (
-      <span className="inline-flex items-center gap-1 text-[11px] text-[var(--canvas-muted)]">
+      <div
+        className="inline-flex shrink-0 items-center gap-1 text-[11px] text-[var(--canvas-muted)]"
+        aria-busy="true"
+      >
         <Loader2 className="size-3 animate-spin" aria-hidden />
         <span className="hidden sm:inline">登录检查</span>
-      </span>
+      </div>
     );
   }
 

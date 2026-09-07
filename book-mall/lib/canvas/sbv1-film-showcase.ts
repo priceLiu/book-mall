@@ -216,6 +216,7 @@ function flattenProjectMedia(
   const videos = entries.filter((e) => e.kind === "video");
   const images = entries.filter((e) => e.kind === "image");
   const ordered = [...videos, ...images];
+  const fallbackPosterUrl = images[0]?.url;
 
   const description = blurbOf(p);
   for (const entry of ordered) {
@@ -225,7 +226,9 @@ function flattenProjectMedia(
       id: `${p.id}:${entry.url}`,
       url: entry.url,
       kind: entry.kind,
-      posterUrl: entry.posterUrl,
+      posterUrl:
+        entry.posterUrl ||
+        (entry.kind === "video" ? fallbackPosterUrl : undefined),
       sourceKind: "project",
       sourceId: p.id,
       projectName: p.name,

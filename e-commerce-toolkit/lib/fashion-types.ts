@@ -58,6 +58,9 @@ export type FashionOpsPack = {
   tags?: string[];
   xiaohongshuBody?: string;
   detailBullets?: string[];
+  bgmDirection?: string;
+  subtitleGuide?: string;
+  sfxNotes?: string;
 };
 
 export type FashionDeliverable = {

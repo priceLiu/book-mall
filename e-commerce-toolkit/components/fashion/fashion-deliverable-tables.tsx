@@ -611,7 +611,10 @@ export function FashionOpsPackBlock({
       !normalized.coverWords?.length &&
       !normalized.tags?.length &&
       !normalized.xiaohongshuBody &&
-      !normalized.detailBullets?.length)
+      !normalized.detailBullets?.length &&
+      !normalized.bgmDirection &&
+      !normalized.subtitleGuide &&
+      !normalized.sfxNotes)
   ) {
     return <p className="text-sm text-[#86868b]">运营包待生成</p>;
   }
@@ -653,6 +656,24 @@ export function FashionOpsPackBlock({
               <li key={`${t}-${i}`}>{t}</li>
             ))}
           </ul>
+        </div>
+      ) : null}
+      {normalized.bgmDirection ? (
+        <div>
+          <h4 className="mb-1 text-xs font-semibold text-[#6e6e73]">BGM 方向</h4>
+          <p>{normalized.bgmDirection}</p>
+        </div>
+      ) : null}
+      {normalized.subtitleGuide ? (
+        <div>
+          <h4 className="mb-1 text-xs font-semibold text-[#6e6e73]">字幕规范</h4>
+          <p>{normalized.subtitleGuide}</p>
+        </div>
+      ) : null}
+      {normalized.sfxNotes ? (
+        <div>
+          <h4 className="mb-1 text-xs font-semibold text-[#6e6e73]">音效建议</h4>
+          <p>{normalized.sfxNotes}</p>
         </div>
       ) : null}
     </div>

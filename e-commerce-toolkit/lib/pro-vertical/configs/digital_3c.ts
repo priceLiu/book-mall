@@ -25,6 +25,12 @@ export const DIGITAL_PRODUCT_CATEGORIES = [
   "键盘",
   "鼠标",
   "散热器",
+  "显示器",
+  "拓展坞",
+  "影音设备",
+  "游戏设备",
+  "智能家居小硬件",
+  "数码配件",
 ] as const;
 
 export const DIGITAL_DESIGN_LANGUAGES = [
@@ -35,6 +41,27 @@ export const DIGITAL_DESIGN_LANGUAGES = [
   "户外硬核",
   "复古胶片",
   "未来感",
+  "桌面美学",
+  "智能家居",
+  "办公效率",
+] as const;
+
+export const DIGITAL_CORE_FUNCTIONS = [
+  "快充",
+  "长续航",
+  "降噪",
+  "高清音质",
+  "轻薄便携",
+  "大屏护眼",
+  "高性能",
+  "低延迟",
+  "磁吸",
+  "多设备兼容",
+  "人体工学",
+  "桌面收纳",
+  "智能连接",
+  "防水防汗",
+  "耐用抗造",
 ] as const;
 
 export const DIGITAL_TIERS = ["平价性价比", "中端均衡", "高端旗舰"] as const;
@@ -60,6 +87,12 @@ export const DIGITAL_SUBCATEGORIES_BY_CATEGORY: Record<string, readonly string[]
   键盘: ["机械键盘", "薄膜键盘", "无线键盘", "通用"],
   鼠标: ["游戏鼠标", "办公鼠标", "无线鼠标", "通用"],
   散热器: ["手机散热器", "笔记本散热器", "通用"],
+  显示器: ["办公显示器", "电竞显示器", "便携显示器", "通用"],
+  拓展坞: ["USB-C拓展坞", "雷电拓展坞", "多屏拓展", "通用"],
+  影音设备: ["投影仪", "电视盒子", "麦克风", "通用"],
+  游戏设备: ["游戏主机配件", "掌机", "VR设备", "通用"],
+  智能家居小硬件: ["智能插座", "传感器", "网关", "通用"],
+  数码配件: ["读卡器", "存储卡", "U盘", "通用"],
 };
 
 export const DIGITAL_3C_CONFIG: ProVerticalConfig = {
@@ -72,7 +105,7 @@ export const DIGITAL_3C_CONFIG: ProVerticalConfig = {
   welcomeMessage:
     "我将分步为你全自动制作专业3C数码短视频全案，全程右侧交互、左侧实时预览，只需简单选择即可完成成片。请先上传产品图。",
   productRefAdvanceHint:
-    "已检测到产品图，无需再点确认。请从下方选择产品大类，开始七维参数采集。",
+    "已检测到产品图，无需再点确认。请从下方选择产品大类，开始八维参数采集。",
   dimensionSteps: [
     {
       key: "productCategory",
@@ -93,6 +126,12 @@ export const DIGITAL_3C_CONFIG: ProVerticalConfig = {
       options: DIGITAL_DESIGN_LANGUAGES,
     },
     {
+      key: "coreFunctionAttributes",
+      label: "核心功能属性",
+      options: DIGITAL_CORE_FUNCTIONS,
+      ui: "chips",
+    },
+    {
       key: "tier",
       label: "档次定位",
       options: DIGITAL_TIERS,
@@ -102,7 +141,7 @@ export const DIGITAL_3C_CONFIG: ProVerticalConfig = {
     { key: "outputLanguage", label: "输出语言", options: PRO_OUTPUT_LANGUAGES },
   ],
   mirrorRoles: [
-    { index: 1, role: "开篇钩子·产品亮相", shotScale: PRO_SHOT_SCALE_BY_INDEX[1]! },
+    { index: 1, role: "场景痛点引入·产品亮相", shotScale: PRO_SHOT_SCALE_BY_INDEX[1]! },
     { index: 2, role: "整体外观·工业设计", shotScale: PRO_SHOT_SCALE_BY_INDEX[2]! },
     { index: 3, role: "材质工艺·细节特写", shotScale: PRO_SHOT_SCALE_BY_INDEX[3]! },
     { index: 4, role: "核心功能·动态演示", shotScale: PRO_SHOT_SCALE_BY_INDEX[4]! },
@@ -118,7 +157,13 @@ export const DIGITAL_3C_CONFIG: ProVerticalConfig = {
   ],
   imagePromptCategory: "digital_3c",
   characterRefPolicy: "optional",
-  keywordDimensionKeys: ["productCategory", "designLanguage", "platform", "customScene"],
+  keywordDimensionKeys: [
+    "productCategory",
+    "designLanguage",
+    "coreFunctionAttributes",
+    "platform",
+    "customScene",
+  ],
   llmRoleName: "3C数码AI短视频专业策划师",
   rulesDocRef: "《3C数码AI短视频生产规则手册 V1.0》",
   voiceoverTypes: [

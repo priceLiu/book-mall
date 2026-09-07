@@ -69,11 +69,17 @@ describe("pro-vertical workflow · digital_3c dimensions", () => {
     expect(config?.label).toBe("3C数码专业版");
     expect(config?.panelFocusLabel).toBe("产品展示重点");
     expect(config?.characterRefPolicy).toBe("optional");
-    expect(config?.dimensionSteps).toHaveLength(7);
+    expect(config?.dimensionSteps).toHaveLength(8);
     expect(config?.dimensionSteps[0]?.ui).toBe("searchSelect");
     expect(config?.dimensionSteps[0]?.key).toBe("productCategory");
+    expect(config?.dimensionSteps[0]?.options).toHaveLength(25);
+    expect(config?.dimensionSteps[0]?.options).toContain("显示器");
+    expect(config?.dimensionSteps[0]?.options).toContain("数码配件");
     expect(config?.dimensionSteps[1]?.parentKey).toBe("productCategory");
     expect(config?.dimensionSteps[1]?.subOptionsMap?.手机).toContain("旗舰机");
+    expect(config?.dimensionSteps[2]?.options).toContain("桌面美学");
+    expect(config?.dimensionSteps[3]?.key).toBe("coreFunctionAttributes");
+    expect(config?.mirrorRoles[0]?.role).toBe("场景痛点引入·产品亮相");
   });
 
   it("resolveDimensionStepOptions filters sub category by parent", () => {
@@ -82,6 +88,21 @@ describe("pro-vertical workflow · digital_3c dimensions", () => {
     const opts = resolveDimensionStepOptions("digital_3c", subStep, { productCategory: "手机" });
     expect(opts).toContain("旗舰机");
     expect(opts).not.toContain("游戏本");
+    const monitorOpts = resolveDimensionStepOptions("digital_3c", subStep, {
+      productCategory: "显示器",
+    });
+    expect(monitorOpts).toContain("电竞显示器");
+  });
+
+  it("buildProDimensionsFromChat captures coreFunctionAttributes", () => {
+    const dims = buildProDimensionsFromChat("digital_3c", [
+      { role: "user", content: "手机" },
+      { role: "user", content: "旗舰机" },
+      { role: "user", content: "极简科技" },
+      { role: "user", content: "快充" },
+      { role: "user", content: "高端旗舰" },
+    ]);
+    expect(dims.coreFunctionAttributes).toBe("快充");
   });
 });
 
@@ -160,6 +181,7 @@ describe("pro-vertical · LLM trigger success check", () => {
         productCategory: "手机",
         productSubCategory: "旗舰机",
         designLanguage: "极简科技",
+        coreFunctionAttributes: "快充",
         tier: "高端旗舰",
         customScene: "通勤",
         platform: "淘宝",

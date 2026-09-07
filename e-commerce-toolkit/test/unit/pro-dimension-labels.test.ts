@@ -15,9 +15,9 @@ describe("pro dimension message labels", () => {
       { id: "u3", role: "user", content: "极简科技" },
     ];
     const labels = buildProDimensionMessageLabels("digital_3c", messages);
-    expect(labels.get("u1")).toMatchObject({ label: "产品大类", progress: "1/7" });
-    expect(labels.get("u2")).toMatchObject({ label: "产品细项", progress: "2/7" });
-    expect(labels.get("u3")).toMatchObject({ label: "设计语言", progress: "3/7" });
+    expect(labels.get("u1")).toMatchObject({ label: "产品大类", progress: "1/8" });
+    expect(labels.get("u2")).toMatchObject({ label: "产品细项", progress: "2/8" });
+    expect(labels.get("u3")).toMatchObject({ label: "设计语言", progress: "3/8" });
   });
 
   it("builds dimensions from chat without consuming category pick as productCategory", () => {

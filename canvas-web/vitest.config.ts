@@ -103,6 +103,8 @@ export default defineConfig({
       "test/unit/pro2-template-resolver.test.ts",
       "test/unit/admin-sub-nav.test.ts",
       "test/unit/canvas-public-paths.test.ts",
+      "test/unit/canvas-home-snapshot-types.test.ts",
+      "test/unit/projects-list-client-cache.test.ts",
       "test/unit/pro2-template-admin-validate.test.ts",
       "test/unit/canvas-task-generating-state.test.ts",
       "test/unit/libtv-audio-task-apply.test.ts",

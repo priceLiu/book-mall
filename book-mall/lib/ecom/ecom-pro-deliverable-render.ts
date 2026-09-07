@@ -155,6 +155,9 @@ export function renderProOpsPackMarkdown(deliverable: ProDeliverable): string {
   if (ops.xiaohongshuBody?.trim()) lines.push("**小红书正文**", "", ops.xiaohongshuBody.trim(), "");
   const detailBullets = coerceStringList(ops.detailBullets);
   if (detailBullets.length) lines.push("**详情要点**", ...detailBullets.map((t) => `- ${t}`), "");
+  if (ops.bgmDirection?.trim()) lines.push("**BGM 方向**", "", ops.bgmDirection.trim(), "");
+  if (ops.subtitleGuide?.trim()) lines.push("**字幕规范**", "", ops.subtitleGuide.trim(), "");
+  if (ops.sfxNotes?.trim()) lines.push("**音效建议**", "", ops.sfxNotes.trim(), "");
   return lines.join("\n").trim();
 }
 

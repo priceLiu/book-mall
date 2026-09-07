@@ -1150,7 +1150,7 @@ export function StoryboardAssistantPanel({
         onBlur={handleAssistantBlur}
       >
       <EcomAssistantPanelHeader
-        title="微剧故事版助手"
+        title="电商口播故事版助手"
         subtitle={assistantSubtitle}
         composerWide={composerWide}
         onComposerWideChange={onComposerWideChange}
@@ -1172,7 +1172,7 @@ export function StoryboardAssistantPanel({
         <div className="space-y-3">
           {legacyReadonly ? (
             <div className={ECOM_ASSISTANT_BUBBLE_CLASS}>
-              此为旧版微剧故事版项目，仅支持只读浏览。请新建「服装专业版」项目继续创作。
+              此为旧版电商口播故事版项目，仅支持只读浏览。请新建「服装专业版」项目继续创作。
             </div>
           ) : null}
           {displayMessages.map((m) => {

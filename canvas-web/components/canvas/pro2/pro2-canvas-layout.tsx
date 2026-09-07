@@ -1,7 +1,8 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
-import { FlowCanvas } from "@/components/canvas/flow-canvas";
+import { FlowCanvas } from "@/lib/canvas/canvas-page-heavy-chunks";
 import { CanvasCreditsToastHost } from "@/components/canvas/canvas-credits-toast-host";
 import { StyleLibraryModal } from "@/components/canvas/style-library-modal";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -11,7 +12,6 @@ import {
 } from "@/lib/canvas/pro2-spawn-style-asset";
 import type { StyleLibraryPreset } from "@/lib/canvas/style-library/catalog";
 import { Pro2CanvasToolbar } from "./pro2-canvas-toolbar";
-import { Pro2CrewBulletin } from "./pro2-crew-bulletin";
 import { shouldShowCrewBulletinRail } from "@/lib/canvas/crew-bulletin-context";
 import { useCrewCollaborationAccess } from "@/lib/canvas/use-crew-collaboration-access";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -19,6 +19,27 @@ import {
   useCrewBulletinSubscription,
   broadcastCrewBulletinLocalChange,
 } from "@/lib/canvas/use-crew-bulletin-subscription";
+
+const Pro2CrewBulletin = dynamic(
+  () =>
+    import("./pro2-crew-bulletin").then((m) => ({
+      default: m.Pro2CrewBulletin,
+    })),
+  { ssr: false },
+);
+
+function Pro2CrewBulletinRail({
+  projectId,
+  enabled,
+}: {
+  projectId: string;
+  enabled: boolean;
+}) {
+  const base = useBookMallBaseUrl();
+  useCrewBulletinSubscription(base, projectId, enabled);
+  if (!enabled) return null;
+  return <Pro2CrewBulletin />;
+}
 
 export type Pro2CanvasLayoutProps = {
   projectId: string;
@@ -31,7 +52,6 @@ export function Pro2CanvasLayout({
   onUndo,
   onRedo,
 }: Pro2CanvasLayoutProps) {
-  const base = useBookMallBaseUrl();
   const addNode = useCanvasStore((s) => s.addNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
@@ -53,8 +73,6 @@ export function Pro2CanvasLayout({
     graphMeta ?? undefined,
     collaboration,
   );
-
-  useCrewBulletinSubscription(base, projectId, showCrewBulletin);
 
   useEffect(() => {
     const onChanged = () => broadcastCrewBulletinLocalChange(projectId);
@@ -131,7 +149,7 @@ export function Pro2CanvasLayout({
           window.dispatchEvent(new CustomEvent("canvas:open-my-history"));
         }}
       />
-      {showCrewBulletin ? <Pro2CrewBulletin /> : null}
+      <Pro2CrewBulletinRail projectId={projectId} enabled={showCrewBulletin} />
       <StyleLibraryModal
         open={styleLibOpen}
         mode="spawn"

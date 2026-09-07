@@ -62,6 +62,8 @@ export type StoryboardImagePromptContext = {
   characterPresetKey?: string;
   /** 全片场景锚点（服装 customScene / 策划 scenarioExpansion） */
   globalSceneAnchor?: string;
+  /** 3C 设计语言，用于色调 hint */
+  designLanguage?: string;
 };
 
 const CHAT_PRODUCT_NAME_FILTERS = [
@@ -166,6 +168,29 @@ function isBagsContext(ctx?: StoryboardImagePromptContext): boolean {
 
 function isDigital3cContext(ctx?: StoryboardImagePromptContext): boolean {
   return normalizeCategory(ctx?.productCategory) === "digital_3c";
+}
+
+/** 3C 设计语言 → 画面色调 hint（见 digital-3c-rules-v1.md §色调） */
+function digital3cToneHint(designLanguage?: string): string {
+  const lang = designLanguage?.trim();
+  if (!lang) return "";
+  if (lang.includes("硬核电竞") || lang.includes("未来感")) {
+    return "色调：黑色背景、RGB 灯效、蓝紫霓虹、高对比光影，电竞科技感。";
+  }
+  if (lang.includes("桌面美学") || lang.includes("办公效率")) {
+    return "色调：暖白光、木质桌面、整洁线材、柔和环境光，桌面美学风。";
+  }
+  if (lang.includes("潮流时尚")) {
+    return "色调：亮色点缀、多巴胺配色、干净背景、活泼灯光，年轻潮流风。";
+  }
+  if (
+    lang.includes("极简科技") ||
+    lang.includes("商务沉稳") ||
+    lang.includes("智能家居")
+  ) {
+    return "色调：深蓝黑灰、银色金属高光、冷白光、低饱和背景，科技旗舰风。";
+  }
+  return "";
 }
 
 function categoryVisual(ctx?: StoryboardImagePromptContext): CategoryVisual {
@@ -309,6 +334,7 @@ export function buildStoryboardImagePromptContext(project: {
       deliverable?.dimensions?.customScene?.trim() ||
       deliverable?.creativeBrief?.scenarioExpansion?.trim() ||
       undefined,
+    designLanguage: deliverable?.dimensions?.designLanguage?.trim() || undefined,
   };
 }
 
@@ -558,6 +584,7 @@ export function buildStoryboardPanelImagePrompt(
         : "产品自然融入场景";
   const aspectZh = ctx?.aspectRatio === "16:9" ? "横版 16:9" : "竖版 9:16";
   const fashion = isFashionApparelContext(ctx);
+  const digital3c = isDigital3cContext(ctx);
   const isFashionWear =
     fashion &&
     sendsProductRef &&
@@ -600,12 +627,14 @@ export function buildStoryboardPanelImagePrompt(
       : "根据参考图进行图像编辑：保持产品包装与参考图一致，按以下分镜描述生成画面。"
     : "";
 
+  const toneLine = digital3c ? digital3cToneHint(ctx?.designLanguage) : "";
   const built = [
     editPrefix,
     "电商短视频分镜静帧，写实摄影，UGC 质感，",
     charLine,
     characterRefLine,
     presetLine,
+    toneLine,
     `镜头 ${panel.index}，${panel.shotType}，运镜 ${panel.camera ?? "固定"}。`,
     `场景与背景须严格符合：${sceneText}。`,
     `人物动作：${panel.action}。`,

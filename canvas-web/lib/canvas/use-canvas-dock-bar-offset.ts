@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
 const STORAGE_PREFIX = "libtv-canvas-dock-offset:";
 
@@ -11,32 +11,52 @@ export type CanvasDockBarPosition = {
 
 const DEFAULT_POSITION: CanvasDockBarPosition = { offsetX: 0, offsetY: 0 };
 
-function readStoredPosition(storageKey: string): CanvasDockBarPosition {
-  if (typeof window === "undefined") return DEFAULT_POSITION;
-  try {
-    const raw = localStorage.getItem(`${STORAGE_PREFIX}${storageKey}`);
-    if (raw == null) return DEFAULT_POSITION;
-    if (raw.trim().startsWith("{")) {
-      const parsed = JSON.parse(raw) as Partial<CanvasDockBarPosition>;
-      return {
-        offsetX:
-          typeof parsed.offsetX === "number" && Number.isFinite(parsed.offsetX)
-            ? parsed.offsetX
-            : 0,
-        offsetY:
-          typeof parsed.offsetY === "number" && Number.isFinite(parsed.offsetY)
-            ? parsed.offsetY
-            : 0,
-      };
-    }
-    const legacyX = Number(raw);
+function parseStoredPosition(raw: string): CanvasDockBarPosition {
+  if (raw.trim().startsWith("{")) {
+    const parsed = JSON.parse(raw) as Partial<CanvasDockBarPosition>;
     return {
-      offsetX: Number.isFinite(legacyX) ? legacyX : 0,
-      offsetY: 0,
+      offsetX:
+        typeof parsed.offsetX === "number" && Number.isFinite(parsed.offsetX)
+          ? parsed.offsetX
+          : 0,
+      offsetY:
+        typeof parsed.offsetY === "number" && Number.isFinite(parsed.offsetY)
+          ? parsed.offsetY
+          : 0,
     };
-  } catch {
-    return DEFAULT_POSITION;
   }
+  const legacyX = Number(raw);
+  return {
+    offsetX: Number.isFinite(legacyX) ? legacyX : 0,
+    offsetY: 0,
+  };
+}
+
+function readStoredPositionFromKey(key: string): CanvasDockBarPosition | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(`${STORAGE_PREFIX}${key}`);
+    if (raw == null) return null;
+    return parseStoredPosition(raw);
+  } catch {
+    return null;
+  }
+}
+
+function readStoredPosition(
+  storageKey: string,
+  legacyKeys: readonly string[] = [],
+): CanvasDockBarPosition {
+  const primary = readStoredPositionFromKey(storageKey);
+  if (primary != null) return primary;
+  for (const legacyKey of legacyKeys) {
+    const legacy = readStoredPositionFromKey(legacyKey);
+    if (legacy != null) {
+      writeStoredPosition(storageKey, legacy);
+      return legacy;
+    }
+  }
+  return DEFAULT_POSITION;
 }
 
 function writeStoredPosition(storageKey: string, pos: CanvasDockBarPosition) {
@@ -84,17 +104,41 @@ export function clampCanvasDockBarPosition(
   };
 }
 
-/** 画布底部 Dock 相对默认位置的偏移，按 storageKey（建议 edition + projectId）持久化 */
-export function useCanvasDockBarPosition(storageKey: string) {
-  const [position, setPositionState] = useState<CanvasDockBarPosition>(() =>
-    readStoredPosition(storageKey),
+type UseCanvasDockBarPositionOptions = {
+  /** 旧版 per-project 键，读到后会迁移到 storageKey */
+  legacyKeys?: readonly string[];
+};
+
+/** 画布底部 Dock 相对默认位置的偏移；commitPosition 才写入 localStorage */
+export function useCanvasDockBarPosition(
+  storageKey: string,
+  options?: UseCanvasDockBarPositionOptions,
+) {
+  const legacyKeys = options?.legacyKeys ?? [];
+  const legacyKeySig = legacyKeys.join("\0");
+  const [position, setPositionState] =
+    useState<CanvasDockBarPosition>(DEFAULT_POSITION);
+  const hydratedRef = useRef(false);
+
+  useLayoutEffect(() => {
+    setPositionState(readStoredPosition(storageKey, legacyKeys));
+    hydratedRef.current = true;
+  }, [storageKey, legacyKeySig]);
+
+  const setPositionLocal = useCallback(
+    (
+      next:
+        | CanvasDockBarPosition
+        | ((prev: CanvasDockBarPosition) => CanvasDockBarPosition),
+    ) => {
+      setPositionState((prev) =>
+        typeof next === "function" ? next(prev) : next,
+      );
+    },
+    [],
   );
 
-  useEffect(() => {
-    setPositionState(readStoredPosition(storageKey));
-  }, [storageKey]);
-
-  const setPosition = useCallback(
+  const commitPosition = useCallback(
     (
       next:
         | CanvasDockBarPosition
@@ -102,27 +146,29 @@ export function useCanvasDockBarPosition(storageKey: string) {
     ) => {
       setPositionState((prev) => {
         const value = typeof next === "function" ? next(prev) : next;
-        writeStoredPosition(storageKey, value);
+        if (hydratedRef.current) {
+          writeStoredPosition(storageKey, value);
+        }
         return value;
       });
     },
     [storageKey],
   );
 
-  return [position, setPosition] as const;
+  return { position, setPositionLocal, commitPosition } as const;
 }
 
 /** @deprecated 使用 useCanvasDockBarPosition */
 export function useCanvasDockBarOffset(storageKey: string) {
-  const [position, setPosition] = useCanvasDockBarPosition(storageKey);
+  const { position, commitPosition } = useCanvasDockBarPosition(storageKey);
   const setOffsetX = useCallback(
     (next: number | ((prev: number) => number)) => {
-      setPosition((prev) => {
+      commitPosition((prev) => {
         const offsetX = typeof next === "function" ? next(prev.offsetX) : next;
         return { ...prev, offsetX };
       });
     },
-    [setPosition],
+    [commitPosition],
   );
   return [position.offsetX, setOffsetX] as const;
 }
