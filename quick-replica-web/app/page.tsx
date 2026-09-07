@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 
 import { QrAppClient } from "@/components/quick-replica/qr-app-client";
 import { QrLanding } from "@/components/qr-landing";
+import { QrInactiveSessionRecover } from "@/components/qr-inactive-session-recover";
 import { fetchToolsSession } from "@/lib/tools-introspect";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
@@ -24,32 +25,41 @@ async function fetchCanManageFeatured(token: string | undefined): Promise<boolea
 }
 
 export default async function HomePage() {
-  const token = cookies().get("tools_token")?.value;
-  const session = await fetchToolsSession(token);
-  // 未登录：展示可被搜索引擎收录的公开落地页（独立门户 SEO）。
-  if (!session.active) {
-    return <QrLanding />;
-  }
-  const intro = session.introspect;
-  const canManageFeatured = await fetchCanManageFeatured(token);
-  const mainOrigin = getMainSiteOrigin();
-  const bookMallAdminUrl = mainOrigin
-    ? `${mainOrigin}/admin/templates?tab=quick-replica`
-    : null;
+  const token = cookies().get("tools_token")?.value?.trim() ?? "";
+  const session = await fetchToolsSession(token || undefined);
+  if (session.active) {
+    const intro = session.introspect;
+    const canManageFeatured = await fetchCanManageFeatured(token);
+    const mainOrigin = getMainSiteOrigin();
+    const bookMallAdminUrl = mainOrigin
+      ? `${mainOrigin}/admin/templates?tab=quick-replica`
+      : null;
 
-  return (
-    <QrAppClient
-      canManageFeatured={canManageFeatured}
-      bookMallAdminUrl={bookMallAdminUrl}
-      session={
-        intro
-          ? {
-              name: typeof intro.name === "string" ? intro.name : null,
-              email: typeof intro.email === "string" ? intro.email : null,
-              phone: typeof intro.phone === "string" ? intro.phone : null,
-            }
-          : null
-      }
-    />
-  );
+    return (
+      <QrAppClient
+        canManageFeatured={canManageFeatured}
+        bookMallAdminUrl={bookMallAdminUrl}
+        session={
+          intro
+            ? {
+                name: typeof intro.name === "string" ? intro.name : null,
+                email: typeof intro.email === "string" ? intro.email : null,
+                phone: typeof intro.phone === "string" ? intro.phone : null,
+              }
+            : null
+        }
+      />
+    );
+  }
+
+  // 有 token 但 introspect 未 active：续签 / re-enter，勿误展示落地页
+  if (token) {
+    return (
+      <main className="flex h-dvh flex-col bg-[var(--qr-bg-page)]">
+        <QrInactiveSessionRecover />
+      </main>
+    );
+  }
+
+  return <QrLanding />;
 }

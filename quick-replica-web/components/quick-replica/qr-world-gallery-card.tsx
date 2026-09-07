@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { QrHoverEyeOverlay } from "@/components/quick-replica/qr-hover-eye-overlay";
 import { useIntersectionVisible } from "@/lib/use-intersection-visible";
 import type { QrTemplate } from "@/lib/qr-template-types";
+import { resolveWorldId } from "@/lib/qr-world-marble-url";
+import { prefetchQrWorldViewerPayload } from "@/lib/qr-world-viewer-api";
 
 function readThumbHint(template: QrTemplate): { width: number; height: number } | null {
   const params = template.reference.model.params;
@@ -35,6 +36,15 @@ export function QrWorldGalleryCard({
     }
   }, []);
 
+  const prefetchWorld = useCallback(() => {
+    const worldId = resolveWorldId(template);
+    if (worldId) prefetchQrWorldViewerPayload(worldId);
+  }, [template]);
+
+  useEffect(() => {
+    if (visible) prefetchWorld();
+  }, [visible, prefetchWorld]);
+
   const aspectStyle =
     natural != null
       ? { aspectRatio: `${natural.width} / ${natural.height}` as const }
@@ -48,6 +58,8 @@ export function QrWorldGalleryCard({
       tabIndex={0}
       ref={ref}
       onClick={onSelect}
+      onMouseEnter={prefetchWorld}
+      onFocus={prefetchWorld}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
@@ -84,7 +96,6 @@ export function QrWorldGalleryCard({
               className="relative z-[1] block w-full max-w-full align-top transition duration-300 group-hover:scale-[1.01]"
               style={{ height: "auto" }}
             />
-            <QrHoverEyeOverlay src={thumbUrl} title={template.title} />
           </>
         )}
       </div>

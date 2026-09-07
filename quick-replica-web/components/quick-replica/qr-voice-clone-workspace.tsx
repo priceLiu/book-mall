@@ -7,6 +7,7 @@ import {
   QrAudioEmotionControlGrid,
   QrAudioOptionSheet,
 } from "@/components/quick-replica/qr-audio-form-parts";
+import { QrAudioCatalogLoadState } from "@/components/quick-replica/qr-audio-catalog-load-state";
 import { HorizontalOscilloscopeWaveform } from "@/components/quick-replica/qr-audio-generate-preview";
 import { QrModelPicker, QrModelPickerTrigger } from "@/components/quick-replica/qr-model-picker";
 import {
@@ -186,7 +187,7 @@ function VoiceReferenceCard({
 
 /** 音色快速复刻工作区 */
 export function QrVoiceCloneForm({ draft, onDraftChange, busy }: Props) {
-  const { catalog, loading } = useQrAudioCatalog();
+  const { catalog, loading, error, retry } = useQrAudioCatalog();
   const [modelSheetOpen, setModelSheetOpen] = useState(false);
   const [langSheetOpen, setLangSheetOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -204,13 +205,9 @@ export function QrVoiceCloneForm({ draft, onDraftChange, busy }: Props) {
     [modelCatalog, draft.modelKey],
   );
 
-  if (loading || !catalog) {
+  if (!catalog) {
     return (
-      <div className="space-y-4">
-        <div className="qr-skeleton h-20 w-full rounded-2xl" />
-        <div className="qr-skeleton min-h-[160px] w-full rounded-2xl" />
-        <div className="qr-skeleton min-h-[240px] w-full rounded-2xl" />
-      </div>
+      <QrAudioCatalogLoadState loading={loading} error={error} onRetry={retry} />
     );
   }
 

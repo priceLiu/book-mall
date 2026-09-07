@@ -20,9 +20,12 @@ import {
 import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-link-dialog";
 import { listAssets, type EcomAsset } from "@/lib/ecom-api";
 import {
+  attachStoryboardCharacterFromLibrary,
   attachStoryboardRefsFromAssets,
   createStoryboardProject,
   fetchStoryboardBoot,
+  fetchStoryboardModels,
+  generateStoryboardReference,
   getStoryboardProject,
   listStoryboardProjectSummaries,
   removeStoryboardRef,
@@ -89,6 +92,9 @@ export function StoryboardStudio() {
   );
   const [loading, setLoading] = useState(true);
   const [refBusy, setRefBusy] = useState(false);
+  const [refGenBusyRole, setRefGenBusyRole] = useState<
+    "character" | "product" | "scene" | "other" | null
+  >(null);
   const [uploadingRole, setUploadingRole] = useState<
     "character" | "product" | "scene" | "other" | null
   >(null);
@@ -479,6 +485,71 @@ export function StoryboardStudio() {
     }
   }
 
+  async function handleAttachModelFromLibrary(entry: {
+    id: string;
+    name: string;
+    ossUrl: string;
+  }) {
+    if (!project) return;
+    setRefBusy(true);
+    setUploadingRole("character");
+    try {
+      await attachStoryboardCharacterFromLibrary(project.id, entry);
+      await reload(project.id);
+    } catch (e) {
+      await alert({
+        title: "选择失败",
+        message: e instanceof Error ? e.message : "无法绑定模特",
+        variant: "error",
+      });
+    } finally {
+      setRefBusy(false);
+      setUploadingRole(null);
+    }
+  }
+
+  async function handleGenerateRef(
+    role: "character" | "scene",
+    opts: { prompt: string; modelKey: string },
+  ) {
+    if (!project) return;
+    if (role === "character" && !project.references.some((r) => r.role === "product")) {
+      await alert({
+        title: "缺少产品图",
+        message: "生成模特参考图前须先上传产品图（必填）。",
+        variant: "error",
+      });
+      return;
+    }
+    setRefGenBusyRole(role);
+    try {
+      await generateStoryboardReference(project.id, {
+        role,
+        prompt: opts.prompt,
+        modelKey: opts.modelKey,
+      });
+      setSettings((s) => ({ ...s, imageModelKey: opts.modelKey }));
+      await reload(project.id);
+    } catch (e) {
+      await alert({
+        title: "AI 生成失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    } finally {
+      setRefGenBusyRole(null);
+    }
+  }
+
+  async function handleRetryLoadImageModels() {
+    try {
+      const payload = await fetchStoryboardModels();
+      setImageModels(payload.imageModels);
+    } catch {
+      /* ignore */
+    }
+  }
+
   async function handleRefRemove(refId: string) {
     if (!project) return;
     const ref = project.references.find((r) => r.id === refId);
@@ -618,6 +689,10 @@ export function StoryboardStudio() {
           onRefUpload={handleRefUpload}
           onRefRemove={handleRefRemove}
           onAttachAssets={handleAttachAssets}
+          onAttachModelFromLibrary={handleAttachModelFromLibrary}
+          onGenerateRef={handleGenerateRef}
+          refGenBusyRole={refGenBusyRole}
+          onRetryLoadImageModels={handleRetryLoadImageModels}
           imageModels={imageModels}
           videoModels={videoModels}
           settings={settings}

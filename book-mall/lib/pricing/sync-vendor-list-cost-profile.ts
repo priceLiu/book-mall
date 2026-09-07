@@ -4,6 +4,7 @@
 import { CreditChannel, CreditCostUnit } from "@prisma/client";
 
 import { publishModelCreditPrice } from "@/lib/pricing/credit-pricing-engine";
+import { findModelCreditPriceDisplayName } from "@/lib/pricing/model-credit-price-store";
 import {
   upsertModelCostProfileVersioned,
 } from "@/lib/pricing/upsert-model-cost-profile-versioned";
@@ -164,11 +165,8 @@ async function upsertProfileFromPatch(
 }
 
 async function displayNameForKey(canonicalModelKey: string): Promise<string> {
-  const existing = await prisma.modelCreditPrice.findUnique({
-    where: { canonicalModelKey },
-    select: { displayName: true },
-  });
-  if (existing?.displayName) return existing.displayName;
+  const existingName = await findModelCreditPriceDisplayName(canonicalModelKey);
+  if (existingName) return existingName;
   const catalog = await prisma.modelCatalog.findUnique({
     where: { canonicalKey: canonicalModelKey },
     select: { displayName: true },

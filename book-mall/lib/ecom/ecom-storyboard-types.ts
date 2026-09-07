@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const ECOM_STORYBOARD_TOOL_KEY = "ecom-toolkit__storyboard";
 export const ECOM_STORYBOARD_MODULE = "storyboard-micro-drama";
+export const ECOM_STORYBOARD_REF_GENERATE_ACTION = "ref-generate";
 
 export type StoryboardAssistantMode = "chat" | "sheet";
 

@@ -163,8 +163,44 @@ export async function listQrTemplates(
     return userRows.map(rowToJson);
   }
 
-  const builtinRaw = listBuiltinQrTemplates(filters);
   const overrideMap = await loadCatalogOverrideMap();
+  return listQrTemplatesGallery(userId, filters, overrideMap);
+}
+
+/** 首页四宫格类目（与 quick-replica-web/lib/qr-home-feed 保持一致） */
+export const QR_HOME_FEED_CATEGORIES = [
+  "video",
+  "image",
+  "character",
+  "audio",
+] as const satisfies readonly QrCategory[];
+
+export type QrHomeFeedCategory = (typeof QR_HOME_FEED_CATEGORIES)[number];
+
+/** 单次鉴权 + 共享 catalog override，供首页四宫格批量拉取 */
+export async function listQrTemplatesHomeFeed(
+  userId: string,
+): Promise<Record<QrHomeFeedCategory, QrTemplateJson[]>> {
+  const overrideMap = await loadCatalogOverrideMap();
+  const entries = await Promise.all(
+    QR_HOME_FEED_CATEGORIES.map(async (category) => {
+      const templates = await listQrTemplatesGallery(
+        userId,
+        { category, scope: "all" },
+        overrideMap,
+      );
+      return [category, templates] as const;
+    }),
+  );
+  return Object.fromEntries(entries) as Record<QrHomeFeedCategory, QrTemplateJson[]>;
+}
+
+async function listQrTemplatesGallery(
+  userId: string,
+  filters: QrTemplateListFilters,
+  overrideMap: Map<string, QrTemplateJson>,
+): Promise<QrTemplateJson[]> {
+  const builtinRaw = listBuiltinQrTemplates(filters);
   const builtin = applyCatalogOverridesToBuiltin(builtinRaw, overrideMap);
 
   const ownWhere: Prisma.QrTemplateWhereInput = {
@@ -213,6 +249,68 @@ export async function listQrTemplates(
   return filtered.sort(
     (a, b) => a.sortOrder - b.sortOrder || b.createdAt.localeCompare(a.createdAt),
   );
+}
+
+/** 静态快照：运营 gallery（builtin + catalog + 全部 public），不含任何用户私有条目 */
+export async function listQrTemplatesGalleryForSnapshot(
+  filters: QrTemplateListFilters,
+  overrideMap?: Map<string, QrTemplateJson>,
+): Promise<QrTemplateJson[]> {
+  const map = overrideMap ?? (await loadCatalogOverrideMap());
+  const builtinRaw = listBuiltinQrTemplates(filters);
+  const builtin = applyCatalogOverridesToBuiltin(builtinRaw, map);
+
+  const publicWhere: Prisma.QrTemplateWhereInput = {
+    visibility: "public",
+    deletedAt: null,
+    catalogBuiltinId: null,
+    isPlatformCatalog: false,
+  };
+  if (filters.category) publicWhere.category = filters.category;
+  if (filters.kind) publicWhere.kind = filters.kind;
+  if (filters.toolKey) publicWhere.toolKey = filters.toolKey;
+
+  const catalogWhere = buildPlatformCatalogWhere(filters);
+
+  const [publicRows, catalogRows] = await Promise.all([
+    prisma.qrTemplate.findMany({
+      where: publicWhere,
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    }),
+    prisma.qrTemplate.findMany({
+      where: catalogWhere,
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    }),
+  ]);
+
+  const merged = dedupeTemplates([
+    ...publicRows.map(rowToJson),
+    ...catalogRows.map(rowToJson),
+    ...builtin,
+  ]);
+  const filtered = filterTemplatesForGallery(merged, { ...filters, scope: "all" });
+  return filtered.sort(
+    (a, b) => a.sortOrder - b.sortOrder || b.createdAt.localeCompare(a.createdAt),
+  );
+}
+
+/** 当前用户在 gallery 中的自有条目（scope=all 时与快照 merge） */
+export async function listUserOwnGalleryTemplates(
+  userId: string,
+  filters: QrTemplateListFilters,
+): Promise<QrTemplateJson[]> {
+  const where: Prisma.QrTemplateWhereInput = {
+    ownerUserId: userId,
+    deletedAt: null,
+  };
+  if (filters.category) where.category = filters.category;
+  if (filters.kind) where.kind = filters.kind;
+  if (filters.toolKey) where.toolKey = filters.toolKey;
+  const rows = await prisma.qrTemplate.findMany({
+    where,
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+  });
+  return rows.map(rowToJson);
 }
 
 /** 工作流分享：按 resourceId 解析模板（DB / 内置 / 运营 override），不校验归属 */

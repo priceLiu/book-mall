@@ -83,3 +83,37 @@ export function resolveElevenLabsApiRoot(baseUrl?: string | null): string {
   const raw = (baseUrl?.trim() || ELEVENLABS_DEFAULT_API_ROOT).replace(/\/$/, "");
   return raw || ELEVENLABS_DEFAULT_API_ROOT;
 }
+
+/** ElevenLabs 仅接受 sk_ 开头的 API Key；Key ID / docs 里的 hex 串会触发 invalid_api_key。 */
+export function assertElevenLabsApiKeyFormat(apiKey: string): void {
+  const trimmed = apiKey.trim();
+  if (!trimmed.startsWith("sk_")) {
+    throw new Error(
+      "ElevenLabs API Key 须以 sk_ 开头（创建/轮换时在控制台复制完整 Key，勿填 Key ID）",
+    );
+  }
+}
+
+export function describeElevenLabsVendorFailure(args: {
+  status: number;
+  vendorJson?: unknown;
+}): string {
+  if (args.status >= 200 && args.status < 300) return "";
+
+  const detail =
+    args.vendorJson && typeof args.vendorJson === "object"
+      ? (args.vendorJson as Record<string, unknown>).detail
+      : null;
+  if (detail && typeof detail === "object") {
+    const d = detail as Record<string, unknown>;
+    const code = typeof d.code === "string" ? d.code : "";
+    if (code === "api_key_id_used_as_api_key" || code === "invalid_api_key") {
+      return "ElevenLabs 平台凭证无效：Gateway 中保存的是 Key ID 而非 sk_ 开头的 API Key，请在 Gateway 模型管理页（:3005/dashboard/models）更新 ElevenLabs 凭证，或运行 pnpm --dir book-mall qr:bind-elevenlabs-gateway";
+    }
+    if (typeof d.message === "string" && d.message.trim()) {
+      return `ElevenLabs 音色列表失败：${d.message.trim()}`;
+    }
+  }
+
+  return `ElevenLabs 音色列表失败（HTTP ${args.status}）`;
+}

@@ -34,7 +34,7 @@ import {
 } from "@/lib/qr-world-template-splat";
 import type { QrTemplate } from "@/lib/qr-template-types";
 import {
-  fetchQrWorldViewerPayload,
+  fetchQrWorldViewerPayloadCached,
   proxifyWorldImageUrl,
   repairQrWorldTemplate,
   type QrWorldViewerPayload,
@@ -299,7 +299,7 @@ export function QrWorldViewer({ template, onClose, onEditPrompt, onToast }: Prop
     setHasFirstVisual(false);
     setLoadProgress(0);
 
-    void fetchQrWorldViewerPayload(worldId)
+    void fetchQrWorldViewerPayloadCached(worldId)
       .then((data) => {
         if (cancelled) return;
         setPayload(data);

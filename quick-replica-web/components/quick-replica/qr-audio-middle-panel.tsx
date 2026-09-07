@@ -125,7 +125,7 @@ export function QrAudioMiddlePanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        {draft.kind === "voice-changer" ? (
+        <div className={draft.kind === "voice-changer" ? "" : "hidden"}>
           <QrVoiceChangerForm
             draft={draft}
             onDraftChange={onDraftChange}
@@ -133,13 +133,17 @@ export function QrAudioMiddlePanel({
             voicePickerActive={voicePickerActive}
             onOpenVoiceGallery={onOpenVoiceGallery}
           />
-        ) : draft.kind === "voice-clone" ? (
+        </div>
+        <div className={draft.kind === "voice-clone" ? "" : "hidden"}>
           <QrVoiceCloneForm draft={draft} onDraftChange={onDraftChange} busy={generating} />
-        ) : draft.kind === "create-music" ? (
+        </div>
+        <div className={draft.kind === "create-music" ? "" : "hidden"}>
           <QrCreateMusicForm draft={draft} onDraftChange={onDraftChange} busy={generating} />
-        ) : draft.kind === "create-sfx" ? (
+        </div>
+        <div className={draft.kind === "create-sfx" ? "" : "hidden"}>
           <QrCreateSfxForm draft={draft} onDraftChange={onDraftChange} busy={generating} />
-        ) : (
+        </div>
+        <div className={draft.kind === "create-voiceover" ? "" : "hidden"}>
           <QrCreateVoiceoverForm
             draft={draft}
             onDraftChange={onDraftChange}
@@ -147,7 +151,7 @@ export function QrAudioMiddlePanel({
             voicePickerActive={voicePickerActive}
             onOpenVoiceGallery={onOpenVoiceGallery}
           />
-        )}
+        </div>
       </div>
 
       <div

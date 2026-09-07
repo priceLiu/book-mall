@@ -12,6 +12,7 @@
     "build:prompt-vendor:copy": "node prompt-optimizer-platform/scripts/copy-vendor-dist.mjs --copy-only",
     "dev:all:story": "pnpm dev:all",
     "dev:all:nopoll": "CI=true pnpm install --prefer-offline && node scripts/ensure-platform-assistant.mjs && pnpm dev:preflight && node scripts/dev-all.mjs --no-poll",
+    "dev:all:stagger": "CI=true pnpm install --prefer-offline && node scripts/ensure-platform-assistant.mjs && pnpm dev:preflight && node scripts/dev-all.mjs --stagger",
     "sync:pro2-gu-feng-doc": "node scripts/sync-pro2-gu-feng-category-doc.mjs",
     "sync:docker-shared": "node scripts/sync-docker-shared.mjs",
     "sync:docker-shared:check": "node scripts/sync-docker-shared.mjs --check",

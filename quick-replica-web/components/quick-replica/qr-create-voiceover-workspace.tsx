@@ -13,6 +13,7 @@ import {
   QrAudioPromptTemplatePills,
   resolveActivePromptTemplateId,
 } from "@/components/quick-replica/qr-audio-prompt-template-pills";
+import { QrAudioCatalogLoadState } from "@/components/quick-replica/qr-audio-catalog-load-state";
 import { QrModelPicker } from "@/components/quick-replica/qr-model-picker";
 import { useQrAudioCatalog } from "@/lib/qr-audio-catalog-client";
 import {
@@ -40,7 +41,7 @@ export function QrCreateVoiceoverForm({
   voicePickerActive,
   onOpenVoiceGallery,
 }: Props) {
-  const { catalog, loading } = useQrAudioCatalog();
+  const { catalog, loading, error, retry } = useQrAudioCatalog();
   const [modelSheetOpen, setModelSheetOpen] = useState(false);
 
   const promptLength = draft.prompt.length;
@@ -49,13 +50,9 @@ export function QrCreateVoiceoverForm({
     [catalog?.models],
   );
 
-  if (loading || !catalog) {
+  if (!catalog) {
     return (
-      <div className="space-y-4">
-        <div className="qr-skeleton h-20 w-full rounded-2xl" />
-        <div className="qr-skeleton min-h-[360px] w-full rounded-2xl" />
-        <div className="qr-skeleton h-24 w-full rounded-2xl" />
-      </div>
+      <QrAudioCatalogLoadState loading={loading} error={error} onRetry={retry} />
     );
   }
 

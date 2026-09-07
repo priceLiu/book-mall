@@ -80,6 +80,7 @@ export {
   storyTopicChoiceLabel,
   storyTheaterVersionChoiceLabel,
   listStoryTheaterVersionKeys,
+  isStoryTheaterDeliverable,
 } from "@/lib/story-theater-workflow";
 
 export const FASHION_PRODUCT_REF_ACK = "已上传产品图";

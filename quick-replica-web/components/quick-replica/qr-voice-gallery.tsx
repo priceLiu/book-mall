@@ -1,11 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Volume2 } from "lucide-react";
 
-import { fetchQrPlatform } from "@/lib/qr-platform-fetch";
+import {
+  fetchQrVoicePage,
+  filterCatalogSeedVoices,
+  useQrAudioCatalog,
+  type QrVoiceCatalogItem,
+} from "@/lib/qr-audio-catalog-client";
 import { useIntersectionVisible } from "@/lib/use-intersection-visible";
-import type { QrVoiceCatalogItem } from "@/lib/qr-audio-catalog-client";
 
 type Props = {
   selectedVoiceId?: string;
@@ -13,6 +17,9 @@ type Props = {
   voiceProvider?: "minimax" | "elevenlabs";
   onSelectVoice: (voice: QrVoiceCatalogItem) => void;
 };
+
+const INITIAL_PAGE_SIZE = 24;
+const LOAD_MORE_PAGE_SIZE = 40;
 
 function VoiceCard({
   voice,
@@ -94,83 +101,166 @@ export function QrVoiceGallery({
   voiceProvider = "minimax",
   onSelectVoice,
 }: Props) {
+  const { catalog } = useQrAudioCatalog();
+  const seedItems = useMemo(
+    () => (catalog ? filterCatalogSeedVoices(catalog, voiceProvider) : []),
+    [catalog, voiceProvider],
+  );
+
+  const { ref: panelRef, visible: panelVisible } = useIntersectionVisible("80px 0px");
   const [items, setItems] = useState<QrVoiceCatalogItem[]>([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hydratedFromSeed, setHydratedFromSeed] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadingRef = useRef(false);
 
-  const loadPage = useCallback(async (nextPage: number) => {
-    if (loadingRef.current) return;
-    loadingRef.current = true;
-    setLoading(true);
+  useEffect(() => {
+    setItems([]);
+    setPage(0);
+    setHasMore(true);
     setError(null);
-    try {
-      const providerQs =
-        voiceProvider === "elevenlabs" ? "&provider=elevenlabs" : "";
-      const res = await fetchQrPlatform(
-        `/api/book-mall/api/platform/v1/quick-replica/voices?page=${nextPage}&pageSize=40${providerQs}`,
-      );
-      if (!res.ok) throw new Error(`加载音色失败（${res.status}）`);
-      const data = (await res.json()) as {
-        items: QrVoiceCatalogItem[];
-        hasMore: boolean;
-      };
-      setItems((prev) => (nextPage === 1 ? data.items : [...prev, ...data.items]));
-      setHasMore(data.hasMore);
-      setPage(nextPage);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "加载失败");
-    } finally {
-      loadingRef.current = false;
-      setLoading(false);
-    }
+    setHydratedFromSeed(false);
   }, [voiceProvider]);
 
   useEffect(() => {
+    if (hydratedFromSeed || seedItems.length === 0) return;
+    setItems(seedItems);
+    setHydratedFromSeed(true);
+    setError(null);
+  }, [hydratedFromSeed, seedItems]);
+
+  const loadPage = useCallback(
+    async (nextPage: number) => {
+      if (loadingRef.current) return;
+      loadingRef.current = true;
+      setLoading(true);
+      setError(null);
+      const pageSize = nextPage === 1 ? INITIAL_PAGE_SIZE : LOAD_MORE_PAGE_SIZE;
+      try {
+        const data = await fetchQrVoicePage(nextPage, pageSize, voiceProvider);
+        setItems((prev) => {
+          if (nextPage === 1) {
+            const merged = [...data.items];
+            for (const seed of seedItems) {
+              if (!merged.some((v) => v.voiceId === seed.voiceId)) {
+                merged.push(seed);
+              }
+            }
+            return merged;
+          }
+          const seen = new Set(prev.map((v) => v.voiceId));
+          const appended = data.items.filter((v) => !seen.has(v.voiceId));
+          return [...prev, ...appended];
+        });
+        setHasMore(data.hasMore);
+        setPage(nextPage);
+        if ("warning" in data && typeof data.warning === "string" && data.warning.trim()) {
+          setError(data.warning.trim());
+        }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "加载失败";
+        setError(message);
+        if (nextPage === 1 && seedItems.length > 0) {
+          setItems(seedItems);
+          setHydratedFromSeed(true);
+        }
+      } finally {
+        loadingRef.current = false;
+        setLoading(false);
+      }
+    },
+    [seedItems, voiceProvider],
+  );
+
+  useEffect(() => {
+    if (!panelVisible) return;
+    if (page > 0 || loadingRef.current) return;
     void loadPage(1);
-  }, [loadPage]);
+  }, [panelVisible, page, loadPage]);
 
   useEffect(() => {
     const el = sentinelRef.current;
-    if (!el || !hasMore) return;
+    if (!el || !hasMore || !panelVisible) return;
     const obs = new IntersectionObserver(
       ([entry]) => {
-        if (entry?.isIntersecting && hasMore && !loadingRef.current) {
+        if (entry?.isIntersecting && hasMore && !loadingRef.current && page > 0) {
           void loadPage(page + 1);
         }
       },
-      { rootMargin: "240px 0px" },
+      { rootMargin: "320px 0px" },
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [hasMore, loadPage, page]);
+  }, [hasMore, loadPage, page, panelVisible]);
+
+  const showInitialSpinner = loading && items.length === 0;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
-        <Volume2 className="h-4 w-4 text-[var(--qr-text-muted)]" />
-        <span className="text-sm font-medium">音色列表</span>
-        {selectedVoiceId ? (
-          <span className="ml-auto text-[11px] text-[var(--qr-text-muted)]">点击卡片选用</span>
+    <div ref={panelRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex flex-col gap-1 border-b border-white/10 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Volume2 className="h-4 w-4 text-[var(--qr-text-muted)]" />
+          <span className="text-sm font-medium">音色列表</span>
+          {selectedVoiceId ? (
+            <span className="ml-auto text-[11px] text-[var(--qr-text-muted)]">点击卡片选用</span>
+          ) : null}
+        </div>
+        {voiceProvider === "elevenlabs" ? (
+          <p className="text-[11px] text-[var(--qr-text-muted)]">
+            变声器使用 ElevenLabs 音色；制作旁白请在「制作旁白」中选用 MiniMax 音色（100+）
+          </p>
         ) : null}
       </div>
-      {error ? <div className="p-4 text-sm text-red-400">{error}</div> : null}
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {items.map((v) => (
-            <VoiceCard
-              key={v.voiceId}
-              voice={v}
-              selected={selectedVoiceId === v.voiceId}
-              scrollIntoView={focusSelected}
-              onSelect={() => onSelectVoice(v)}
-            />
-          ))}
+      {error && items.length === 0 ? (
+        <div className="flex items-center justify-between gap-2 p-4 text-sm text-red-400">
+          <span>{error}</span>
+          <button
+            type="button"
+            className="qr-btn-secondary shrink-0 text-xs"
+            onClick={() => void loadPage(page > 0 ? page + 1 : 1)}
+          >
+            重试
+          </button>
         </div>
-        {loading ? (
+      ) : null}
+      {error && items.length > 0 ? (
+        <div className="flex items-center justify-between gap-2 border-b border-white/10 px-4 py-2 text-xs text-amber-400/90">
+          <span>
+            {voiceProvider === "elevenlabs" && /ElevenLabs|凭证|sk_/i.test(error)
+              ? `仅显示内置音色；${error}`
+              : `部分音色加载失败：${error}`}
+          </span>
+          <button
+            type="button"
+            className="qr-btn-secondary shrink-0 text-[11px]"
+            onClick={() => void loadPage(page > 0 ? page + 1 : 1)}
+          >
+            重试
+          </button>
+        </div>
+      ) : null}
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        {showInitialSpinner ? (
+          <div className="flex justify-center py-16 text-[var(--qr-text-muted)]">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {items.map((v) => (
+              <VoiceCard
+                key={v.voiceId}
+                voice={v}
+                selected={selectedVoiceId === v.voiceId}
+                scrollIntoView={focusSelected}
+                onSelect={() => onSelectVoice(v)}
+              />
+            ))}
+          </div>
+        )}
+        {loading && items.length > 0 ? (
           <div className="flex justify-center py-4 text-[var(--qr-text-muted)]">
             <Loader2 className="h-5 w-5 animate-spin" />
           </div>

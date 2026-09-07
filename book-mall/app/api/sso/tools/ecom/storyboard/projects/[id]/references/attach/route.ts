@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { ensureStoryboardRefImageForWan27 } from "@/lib/ecom/ecom-storyboard-ref-image";
 import {
+  attachStoryboardCharacterFromLibrary,
   getEcomStoryboardProject,
   updateEcomStoryboardProject,
 } from "@/lib/ecom/ecom-storyboard-service";
@@ -24,11 +25,43 @@ export async function POST(req: Request, ctx: Ctx) {
   }
   const { id } = await ctx.params;
 
-  let body: { assetIds?: unknown; role?: unknown };
+  let body: {
+    assetIds?: unknown;
+    role?: unknown;
+    modelEntry?: unknown;
+  };
   try {
     body = (await req.json()) as typeof body;
   } catch {
     return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+  }
+
+  const roleRaw = typeof body.role === "string" ? body.role : "product";
+  const role: StoryboardReference["role"] =
+    roleRaw === "product" || roleRaw === "character" || roleRaw === "scene"
+      ? roleRaw
+      : "other";
+
+  if (body.modelEntry && typeof body.modelEntry === "object" && role === "character") {
+    const entry = body.modelEntry as { id?: string; name?: string; ossUrl?: string };
+    if (!entry.id || !entry.ossUrl) {
+      return NextResponse.json({ error: "modelEntry 无效" }, { status: 400 });
+    }
+    try {
+      await assertEcomToolkitGatewayAccess(auth.userId);
+      const project = await attachStoryboardCharacterFromLibrary(auth.userId, id, {
+        id: entry.id,
+        name: entry.name ?? "模特",
+        ossUrl: entry.ossUrl,
+      });
+      if (!project) {
+        return NextResponse.json({ error: "项目不存在" }, { status: 404 });
+      }
+      return NextResponse.json({ project });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "挂载失败";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
   }
 
   const assetIds = Array.isArray(body.assetIds)
@@ -37,12 +70,6 @@ export async function POST(req: Request, ctx: Ctx) {
   if (assetIds.length === 0) {
     return NextResponse.json({ error: "请至少选择一张资产图" }, { status: 400 });
   }
-
-  const roleRaw = typeof body.role === "string" ? body.role : "product";
-  const role: StoryboardReference["role"] =
-    roleRaw === "product" || roleRaw === "character" || roleRaw === "scene"
-      ? roleRaw
-      : "other";
 
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
@@ -79,7 +106,10 @@ export async function POST(req: Request, ctx: Ctx) {
     }
 
     const updated = await updateEcomStoryboardProject(auth.userId, id, {
-      references: [...project.references, ...added],
+      references:
+        role === "character" || role === "scene"
+          ? [...project.references.filter((r) => r.role !== role), ...added]
+          : [...project.references, ...added],
     });
     return NextResponse.json({ project: updated, added });
   } catch (e) {

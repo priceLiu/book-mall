@@ -5,6 +5,7 @@ import { RefreshCw, Trash2 } from "lucide-react";
 import {
   QrAudioVoiceControlSlider,
 } from "@/components/quick-replica/qr-audio-form-parts";
+import { QrAudioCatalogLoadState } from "@/components/quick-replica/qr-audio-catalog-load-state";
 import {
   QrAudioPromptTemplatePills,
   resolveActivePromptTemplateId,
@@ -65,13 +66,11 @@ function QrToggleRow({
 
 /** 创建音效 · ElevenLabs（UI 不暴露模型，Gateway 固定 eleven_text_to_sound_v2） */
 export function QrCreateSfxForm({ draft, onDraftChange, busy }: Props) {
-  const { catalog, loading } = useQrAudioCatalog();
+  const { catalog, loading, error, retry } = useQrAudioCatalog();
 
-  if (loading || !catalog) {
+  if (!catalog) {
     return (
-      <div className="space-y-4">
-        <div className="qr-skeleton min-h-[280px] w-full rounded-2xl" />
-      </div>
+      <QrAudioCatalogLoadState loading={loading} error={error} onRetry={retry} />
     );
   }
 

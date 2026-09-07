@@ -94,6 +94,40 @@ export async function fetchQrWorldViewerPayload(worldId: string): Promise<QrWorl
   return proxifyWorldViewerPayload(data);
 }
 
+const worldPayloadCache = new Map<string, Promise<QrWorldViewerPayload>>();
+
+/** 卡片 hover / 进入视口时预取，打开 3D  viewer 时更快 */
+export function prefetchQrWorldViewerPayload(worldId: string): void {
+  const id = worldId.trim();
+  if (!id || worldPayloadCache.has(id)) return;
+  worldPayloadCache.set(id, fetchQrWorldViewerPayload(id));
+}
+
+export async function fetchQrWorldViewerPayloadCached(
+  worldId: string,
+): Promise<QrWorldViewerPayload> {
+  const id = worldId.trim();
+  if (!id) throw new Error("缺少 world_id");
+
+  const pending = worldPayloadCache.get(id);
+  if (pending) {
+    try {
+      return await pending;
+    } catch {
+      worldPayloadCache.delete(id);
+    }
+  }
+
+  const promise = fetchQrWorldViewerPayload(id);
+  worldPayloadCache.set(id, promise);
+  try {
+    return await promise;
+  } catch (e) {
+    worldPayloadCache.delete(id);
+    throw e;
+  }
+}
+
 /** 修复旧场景作品缺失的 world_id 元数据 */
 export async function repairQrWorldTemplate(
   templateId: string,

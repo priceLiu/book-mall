@@ -8,7 +8,14 @@
  */
 import { prisma } from "@/lib/prisma";
 
-import { computeCreditPrice,
+import {
+  findModelCreditPriceDisplayName,
+  modelCreditPriceCompositeKey,
+  normalizeModelCreditTierRaw,
+  pickActiveCostProfile,
+} from "./model-credit-price-store";
+import {
+  computeCreditPrice,
   computeNetCost,
   computeSplitTokenCreditPrice,
   DEFAULT_CREDIT_ANCHOR_YUAN,
@@ -100,15 +107,15 @@ export async function publishModelCreditPrice(input: {
     throw new Error(`未找到生效中的成本档：${input.canonicalModelKey}`);
   }
 
-  // 渠道优先级：CHANNEL（折扣）→ RESELLER → OWN；同档取净成本最低
-  const channelRank: Record<string, number> = { CHANNEL: 0, RESELLER: 1, OWN: 2 };
-  const chosen = [...profiles].sort((a, b) => {
-    const r = (channelRank[a.channel] ?? 9) - (channelRank[b.channel] ?? 9);
-    if (r !== 0) return r;
-    const netA = computeNetCost(toNum(a.listCostYuan), toNum(a.discountRate));
-    const netB = computeNetCost(toNum(b.listCostYuan), toNum(b.discountRate));
-    return netA - netB;
-  })[0];
+  const chosen = pickActiveCostProfile(profiles);
+  if (!chosen) {
+    throw new Error(`未找到生效中的成本档：${input.canonicalModelKey}`);
+  }
+  const tierRaw = normalizeModelCreditTierRaw(chosen.tierRaw);
+  const priceKey = modelCreditPriceCompositeKey({
+    canonicalModelKey: input.canonicalModelKey,
+    tierRaw,
+  });
 
   const netCostYuan = computeNetCost(toNum(chosen.listCostYuan), toNum(chosen.discountRate));
   const marginM =
@@ -143,13 +150,13 @@ export async function publishModelCreditPrice(input: {
     }
     const snapshot = { ...split.formulaSnapshot, publishedAt: new Date().toISOString() };
     const saved = await prisma.modelCreditPrice.upsert({
-      where: { canonicalModelKey: input.canonicalModelKey },
+      where: { canonicalModelKey_tierRaw: priceKey },
       create: {
-        canonicalModelKey: input.canonicalModelKey,
+        canonicalModelKey: priceKey.canonicalModelKey,
+        tierRaw: priceKey.tierRaw,
         displayName: input.displayName,
         vendor: chosen.vendor,
         unit: chosen.unit,
-        tierRaw: chosen.tierRaw,
         netCostYuan: split.netCostYuan,
         marginM,
         listPriceYuan: split.inputListPriceYuan,
@@ -167,7 +174,7 @@ export async function publishModelCreditPrice(input: {
         displayName: input.displayName,
         vendor: chosen.vendor,
         unit: chosen.unit,
-        tierRaw: chosen.tierRaw,
+        tierRaw: priceKey.tierRaw,
         netCostYuan: split.netCostYuan,
         marginM,
         listPriceYuan: split.inputListPriceYuan,
@@ -206,13 +213,13 @@ export async function publishModelCreditPrice(input: {
   const snapshot = { ...comp.formulaSnapshot, publishedAt: new Date().toISOString() };
 
   const saved = await prisma.modelCreditPrice.upsert({
-    where: { canonicalModelKey: input.canonicalModelKey },
+    where: { canonicalModelKey_tierRaw: priceKey },
     create: {
-      canonicalModelKey: input.canonicalModelKey,
+      canonicalModelKey: priceKey.canonicalModelKey,
+      tierRaw: priceKey.tierRaw,
       displayName: input.displayName,
       vendor: chosen.vendor,
       unit: chosen.unit,
-      tierRaw: chosen.tierRaw,
       netCostYuan: comp.netCostYuan,
       marginM,
       listPriceYuan: comp.listPriceYuan,
@@ -226,7 +233,7 @@ export async function publishModelCreditPrice(input: {
       displayName: input.displayName,
       vendor: chosen.vendor,
       unit: chosen.unit,
-      tierRaw: chosen.tierRaw,
+      tierRaw: priceKey.tierRaw,
       netCostYuan: comp.netCostYuan,
       marginM,
       listPriceYuan: comp.listPriceYuan,
@@ -250,15 +257,30 @@ export async function publishModelCreditPrice(input: {
 
 /** 成本档晚于积分报价发布 → 视为过期，生成前应重发报价 */
 export async function isCreditPriceStale(canonicalModelKey: string): Promise<boolean> {
+  const now = new Date();
+  const profiles = await prisma.modelCostProfile.findMany({
+    where: {
+      canonicalModelKey,
+      active: true,
+      effectiveFrom: { lte: now },
+      OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }],
+    },
+  });
+  const chosen = pickActiveCostProfile(profiles);
+  if (!chosen) return true;
+
+  const priceKey = modelCreditPriceCompositeKey({
+    canonicalModelKey,
+    tierRaw: chosen.tierRaw,
+  });
   const price = await prisma.modelCreditPrice.findUnique({
-    where: { canonicalModelKey },
+    where: { canonicalModelKey_tierRaw: priceKey },
     select: { publishedAt: true },
   });
   if (!price) return true;
 
   const profile = await prisma.modelCostProfile.findFirst({
-    where: { canonicalModelKey, active: true },
-    orderBy: { updatedAt: "desc" },
+    where: { canonicalModelKey, active: true, id: chosen.id },
     select: { updatedAt: true },
   });
   if (!profile) return false;
@@ -274,13 +296,10 @@ export async function refreshCreditPriceIfStale(input: {
   const stale = await isCreditPriceStale(input.canonicalModelKey);
   if (!stale) return false;
 
-  const existing = await prisma.modelCreditPrice.findUnique({
-    where: { canonicalModelKey: input.canonicalModelKey },
-    select: { displayName: true },
-  });
+  const existingName = await findModelCreditPriceDisplayName(input.canonicalModelKey);
   const displayName =
     input.displayName ??
-    existing?.displayName ??
+    existingName ??
     input.canonicalModelKey.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
   await publishModelCreditPrice({

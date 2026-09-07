@@ -4,6 +4,7 @@
  *   pnpm exec dotenv -e .env.local -- tsx scripts/republish-model-credit-prices.ts
  */
 import { publishModelCreditPrice } from "../lib/pricing/credit-pricing-engine";
+import { findModelCreditPriceDisplayName } from "../lib/pricing/model-credit-price-store";
 import { prisma } from "../lib/prisma";
 
 async function main() {
@@ -20,12 +21,9 @@ async function main() {
   let published = 0;
   let skipped = 0;
   for (const p of byKey.values()) {
-    const existing = await prisma.modelCreditPrice.findUnique({
-      where: { canonicalModelKey: p.canonicalModelKey },
-      select: { displayName: true },
-    });
+    const existingName = await findModelCreditPriceDisplayName(p.canonicalModelKey);
     const displayName =
-      existing?.displayName ??
+      existingName ??
       p.canonicalModelKey.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     try {
       const r = await publishModelCreditPrice({

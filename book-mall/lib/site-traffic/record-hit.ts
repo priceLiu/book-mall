@@ -20,53 +20,49 @@ export async function recordTrafficHit(input: RecordTrafficHitInput): Promise<vo
   const userId = input.userId?.trim() || null;
   const isProbe = Boolean(input.isProbe);
 
-  await prisma.$transaction(
-    async (tx) => {
-      await tx.siteTrafficDaily.upsert({
-        where: { dateCst_appKey: { dateCst, appKey: input.appKey } },
-        create: {
-          dateCst,
-          appKey: input.appKey,
-          pageViews: 1,
-          probeViews: isProbe ? 1 : 0,
-        },
-        update: {
-          pageViews: { increment: 1 },
-          ...(isProbe ? { probeViews: { increment: 1 } } : {}),
-        },
-      });
-
-      await tx.siteTrafficIpDaily.upsert({
-        where: { dateCst_appKey_ip: { dateCst, appKey: input.appKey, ip } },
-        create: {
-          dateCst,
-          appKey: input.appKey,
-          ip,
-          hitCount: 1,
-          probeHitCount: isProbe ? 1 : 0,
-          firstSeenAt: at,
-          lastSeenAt: at,
-          userId,
-        },
-        update: {
-          hitCount: { increment: 1 },
-          lastSeenAt: at,
-          ...(isProbe ? { probeHitCount: { increment: 1 } } : {}),
-        },
-      });
-
-      if (userId) {
-        await tx.siteTrafficIpDaily.updateMany({
-          where: {
-            dateCst,
-            appKey: input.appKey,
-            ip,
-            userId: null,
-          },
-          data: { userId },
-        });
-      }
+  // 访问统计允许最终一致，不用交互式 $transaction（dev:all 并发 hit 时易 P2028 池/事务超时）
+  await prisma.siteTrafficDaily.upsert({
+    where: { dateCst_appKey: { dateCst, appKey: input.appKey } },
+    create: {
+      dateCst,
+      appKey: input.appKey,
+      pageViews: 1,
+      probeViews: isProbe ? 1 : 0,
     },
-    { timeout: 15_000 },
-  );
+    update: {
+      pageViews: { increment: 1 },
+      ...(isProbe ? { probeViews: { increment: 1 } } : {}),
+    },
+  });
+
+  await prisma.siteTrafficIpDaily.upsert({
+    where: { dateCst_appKey_ip: { dateCst, appKey: input.appKey, ip } },
+    create: {
+      dateCst,
+      appKey: input.appKey,
+      ip,
+      hitCount: 1,
+      probeHitCount: isProbe ? 1 : 0,
+      firstSeenAt: at,
+      lastSeenAt: at,
+      userId,
+    },
+    update: {
+      hitCount: { increment: 1 },
+      lastSeenAt: at,
+      ...(isProbe ? { probeHitCount: { increment: 1 } } : {}),
+    },
+  });
+
+  if (userId) {
+    await prisma.siteTrafficIpDaily.updateMany({
+      where: {
+        dateCst,
+        appKey: input.appKey,
+        ip,
+        userId: null,
+      },
+      data: { userId },
+    });
+  }
 }

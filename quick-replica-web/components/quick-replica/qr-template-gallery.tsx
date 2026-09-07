@@ -21,7 +21,6 @@ import {
   QrMasonryGallerySkeleton,
 } from "@/components/quick-replica/qr-panel-skeletons";
 import { HorizontalOscilloscopeWaveform } from "@/components/quick-replica/qr-audio-generate-preview";
-import { QrHoverEyeOverlay } from "@/components/quick-replica/qr-hover-eye-overlay";
 import { downloadQrTemplateOutput } from "@/lib/qr-download-output";
 
 export function useMasonryColumnCount(): number {
@@ -270,8 +269,6 @@ export function MasonryTemplateCard({
   const showThumbImg = Boolean(imageThumbUrl && posterMode === "thumbnail" && visible);
   const hideThumbForVideo = Boolean(previewVideoUrl && hovering);
 
-  const showImagePreviewEye = Boolean(imageThumbUrl) && !previewVideoUrl;
-
   return (
     <div className="group relative w-full">
     <div
@@ -366,10 +363,6 @@ export function MasonryTemplateCard({
                 : ` absolute inset-0 h-full w-full${hovering || useVideoFramePoster ? " opacity-100" : " opacity-0"}`
             }${!videoInDocumentFlow && hovering ? " scale-[1.03]" : ""}`}
           />
-        ) : null}
-
-        {showImagePreviewEye && imageThumbUrl ? (
-          <QrHoverEyeOverlay src={imageThumbUrl} title={template.title} />
         ) : null}
 
         {!hideRecreateOnHover ? (

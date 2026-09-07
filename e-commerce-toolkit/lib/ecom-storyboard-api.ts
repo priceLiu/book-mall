@@ -238,6 +238,45 @@ export async function attachStoryboardRefsFromAssets(
   return data.project as StoryboardProject;
 }
 
+/** AI 生成模特/场景参考图 */
+export async function generateStoryboardReference(
+  projectId: string,
+  opts: {
+    role: "character" | "scene";
+    prompt: string;
+    modelKey?: string;
+  },
+): Promise<{ project: StoryboardProject; reference: StoryboardReference }> {
+  const data = await ecomBookFetch(
+    `api/sso/tools/ecom/storyboard/projects/${projectId}/references/generate`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(opts),
+    },
+  );
+  return {
+    project: data.project as StoryboardProject,
+    reference: data.reference as StoryboardReference,
+  };
+}
+
+/** 从模特库绑定角色参考图 */
+export async function attachStoryboardCharacterFromLibrary(
+  projectId: string,
+  entry: { id: string; name: string; ossUrl: string },
+): Promise<StoryboardProject> {
+  const data = await ecomBookFetch(
+    `api/sso/tools/ecom/storyboard/projects/${projectId}/references/attach`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: "character", modelEntry: entry }),
+    },
+  );
+  return data.project as StoryboardProject;
+}
+
 export async function streamStoryboardChat(opts: {
   projectId: string;
   messages: StoryboardChatMessage[];

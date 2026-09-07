@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, startTransition } from "react";
 
 import { useMasonryColumnCount } from "@/components/quick-replica/qr-template-gallery";
 import { QrWorldGalleryCard } from "@/components/quick-replica/qr-world-gallery-card";
@@ -149,7 +149,9 @@ export function QrWorldBrowsePanel({
                 <div key={template.id} className="mb-4 break-inside-avoid">
                   <QrWorldGalleryCard
                     template={template}
-                    onSelect={() => setViewingTemplate(template)}
+                    onSelect={() => {
+                      startTransition(() => setViewingTemplate(template));
+                    }}
                   />
                 </div>
               ))}

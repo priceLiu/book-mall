@@ -4,8 +4,15 @@ import { requireQuickReplicaSession } from "@/lib/quick-replica/qr-platform-auth
 import {
   createUserQrTemplate,
   listQrTemplates,
+  listUserOwnGalleryTemplates,
 } from "@/lib/quick-replica/qr-template-service";
 import type { QrCategory, QrTemplateJson } from "@/lib/quick-replica/qr-types";
+import {
+  mergeUserOwnTemplatesIntoGallery,
+  pickHomeFeedFromSnapshot,
+  pickTemplatesFromSnapshot,
+} from "@/lib/static-snapshots/quick-replica-gallery-query";
+import { getQuickReplicaGallerySnapshotForApi } from "@/lib/static-snapshots/quick-replica-gallery-snapshot-service";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +23,14 @@ function parseCategory(raw: string | null): QrCategory | null {
     return v;
   }
   return null;
+}
+
+function snapshotMeta(result: Awaited<ReturnType<typeof getQuickReplicaGallerySnapshotForApi>>) {
+  return {
+    dateKey: result.dateKey,
+    stale: result.stale,
+    source: result.source,
+  };
 }
 
 export async function GET(request: Request) {
@@ -29,8 +44,56 @@ export async function GET(request: Request) {
   const scopeRaw = url.searchParams.get("scope")?.trim();
   const scope = scopeRaw === "my" ? "my" : "all";
 
-  const templates = await listQrTemplates(auth.userId, { category, kind, toolKey, scope });
-  return NextResponse.json({ templates, scope });
+  if (scope === "my") {
+    const templates = await listQrTemplates(auth.userId, { category, kind, toolKey, scope: "my" });
+    return NextResponse.json({ templates, scope });
+  }
+
+  try {
+    const snap = await getQuickReplicaGallerySnapshotForApi();
+
+    if (url.searchParams.get("homeFeed") === "1") {
+      return NextResponse.json({
+        templatesByCategory: pickHomeFeedFromSnapshot(snap.payload),
+        scope,
+        homeFeed: true,
+        snapshot: snapshotMeta(snap),
+      });
+    }
+
+    const fromSnapshot = pickTemplatesFromSnapshot(snap.payload, {
+      category,
+      kind,
+      toolKey,
+      scope: "all",
+    });
+    const own = await listUserOwnGalleryTemplates(auth.userId, {
+      category,
+      kind,
+      toolKey,
+      scope: "all",
+    });
+    const templates = mergeUserOwnTemplatesIntoGallery(fromSnapshot, own, {
+      category,
+      kind,
+      toolKey,
+      scope: "all",
+    });
+
+    return NextResponse.json({
+      templates,
+      scope,
+      snapshot: snapshotMeta(snap),
+    });
+  } catch {
+    const templates = await listQrTemplates(auth.userId, { category, kind, toolKey, scope: "all" });
+    if (url.searchParams.get("homeFeed") === "1") {
+      const { listQrTemplatesHomeFeed } = await import("@/lib/quick-replica/qr-template-service");
+      const templatesByCategory = await listQrTemplatesHomeFeed(auth.userId);
+      return NextResponse.json({ templatesByCategory, scope, homeFeed: true });
+    }
+    return NextResponse.json({ templates, scope });
+  }
 }
 
 export async function POST(request: Request) {

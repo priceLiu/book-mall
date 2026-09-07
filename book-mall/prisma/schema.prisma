@@ -3517,11 +3517,11 @@ model ModelCostProfile {
 /// 已发布的模型积分报价（派生自 ModelCostProfile，对外报价页读它）
 model ModelCreditPrice {
   id                String         @id @default(cuid())
-  canonicalModelKey String         @unique
+  canonicalModelKey String
   displayName       String
   vendor            String
   unit              CreditCostUnit
-  tierRaw           String?
+  tierRaw           String         @default("")
   netCostYuan       Decimal        @db.Decimal(16, 8) // 取价时的净成本快照
   marginM           Decimal        @db.Decimal(6, 3) // 取价时的系数 M
   listPriceYuan     Decimal        @db.Decimal(16, 6) // 挂牌价 = netCost × M
@@ -3537,6 +3537,7 @@ model ModelCreditPrice {
   publishedAt       DateTime       @default(now())
   publishedBy       String?
 
+  @@unique([canonicalModelKey, tierRaw])
   @@index([active])
 }
 

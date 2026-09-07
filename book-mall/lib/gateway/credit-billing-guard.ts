@@ -19,6 +19,10 @@ import {
   DEFAULT_CREDIT_ANCHOR_YUAN,
 } from "@/lib/pricing/credit-pricing-formulas";
 import { refreshCreditPriceIfStale } from "@/lib/pricing/credit-pricing-engine";
+import {
+  findModelCreditPrice,
+  pickActiveCostProfile,
+} from "@/lib/pricing/model-credit-price-store";
 
 /** providerKind → 财务口径 vendor（与 ModelCatalog.vendor / ModelCostProfile.vendor 对齐） */
 export function vendorForProviderKind(kind: GatewayProviderKind): string {
@@ -155,7 +159,10 @@ export interface CostSnapshot {
  * 取某模型当前生效的成本快照（优先 CHANNEL 折扣档），用于日志审计与积分扣费。
  * 找不到成本档返回 null（由调用方决定是否阻断）。
  */
-export async function resolveCostSnapshot(canonicalModelKey: string): Promise<CostSnapshot | null> {
+export async function resolveCostSnapshot(
+  canonicalModelKey: string,
+  opts?: { tierRaw?: string | null; resolution?: string | null },
+): Promise<CostSnapshot | null> {
   await refreshCreditPriceIfStale({
     canonicalModelKey,
     publishedBy: "resolveCostSnapshot",
@@ -174,14 +181,16 @@ export async function resolveCostSnapshot(canonicalModelKey: string): Promise<Co
   });
   if (profiles.length === 0) return null;
 
-  const rank: Record<string, number> = { CHANNEL: 0, RESELLER: 1, OWN: 2 };
-  const chosen = [...profiles].sort((a, b) => {
-    const r = (rank[a.channel] ?? 9) - (rank[b.channel] ?? 9);
-    if (r !== 0) return r;
-    return num(a.netCostYuan) - num(b.netCostYuan);
-  })[0];
+  const chosen = pickActiveCostProfile(profiles);
+  if (!chosen) return null;
 
-  const price = await prisma.modelCreditPrice.findUnique({ where: { canonicalModelKey } });
+  const price =
+    (await findModelCreditPrice({
+      canonicalModelKey,
+      tierRaw: opts?.tierRaw ?? chosen.tierRaw,
+      resolution: opts?.resolution,
+    })) ??
+    (await findModelCreditPrice({ canonicalModelKey, tierRaw: chosen.tierRaw }));
   const anchor = DEFAULT_CREDIT_ANCHOR_YUAN;
   const creditsPerUnit = price?.creditsPerUnit ?? null;
   const marginRate =

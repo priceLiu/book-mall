@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { fetchToolsSessionUncachedWithDiag } from "@/lib/tools-introspect";
+import type { FetchToolsSessionResult } from "@/lib/tools-introspect";
+import { shouldClearToolsTokenOnInactive } from "@/lib/tools-session-inactive-reason";
 import {
   isToolsFederatedLogoutRequest,
   respondToolsFederatedLogout,
@@ -11,9 +13,10 @@ export const dynamic = "force-dynamic";
 function maybeClearToolsTokenCookie(
   res: NextResponse,
   hadToken: boolean,
-  active: boolean,
+  session: FetchToolsSessionResult,
 ): void {
-  if (!hadToken || active) return;
+  if (!hadToken || session.active) return;
+  if (!shouldClearToolsTokenOnInactive(session)) return;
   res.cookies.set("tools_token", "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -32,6 +35,6 @@ export async function GET(request: NextRequest) {
   const hadToken = Boolean(token?.trim());
   const { session } = await fetchToolsSessionUncachedWithDiag(token);
   const res = NextResponse.json(session);
-  maybeClearToolsTokenCookie(res, hadToken, session.active);
+  maybeClearToolsTokenCookie(res, hadToken, session);
   return res;
 }

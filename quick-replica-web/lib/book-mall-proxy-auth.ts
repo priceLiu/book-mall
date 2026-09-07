@@ -8,7 +8,7 @@ export type ProxyToolsTokenRefresh = {
 
 const REFRESH_FETCH_TIMEOUT_MS = (() => {
   const v = Number(process.env.TOOLS_TOKEN_REFRESH_TIMEOUT_MS);
-  return Number.isFinite(v) && v > 0 ? v : 12_000;
+  return Number.isFinite(v) && v > 0 ? v : 45_000;
 })();
 
 let refreshInflight: Promise<ProxyToolsTokenRefresh | null> | null = null;
@@ -55,11 +55,22 @@ function isJwtExpired(token: string, skewSec = 30): boolean {
 async function fetchRefreshToken(
   url: string,
   init: RequestInit,
-): Promise<Response> {
+): Promise<Response | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REFRESH_FETCH_TIMEOUT_MS);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
+  } catch (e) {
+    const name = e instanceof Error ? e.name : "";
+    if (
+      (e instanceof DOMException && e.name === "AbortError") ||
+      name === "AbortError" ||
+      /abort/i.test(name)
+    ) {
+      console.warn("[book-mall-proxy-auth] refresh-token timed out");
+      return null;
+    }
+    throw e;
   } finally {
     clearTimeout(timer);
   }
@@ -89,7 +100,7 @@ async function callBookMallRefreshTokenOnce(
         cache: "no-store",
       },
     );
-    if (r.ok) {
+    if (r?.ok) {
       const data = (await r.json().catch(() => null)) as {
         access_token?: string;
         expires_in?: number;
@@ -119,7 +130,7 @@ async function callBookMallRefreshTokenOnce(
       cache: "no-store",
     },
   );
-  if (!r.ok) return null;
+  if (!r?.ok) return null;
   const data = (await r.json().catch(() => null)) as {
     access_token?: string;
     expires_in?: number;
@@ -162,16 +173,22 @@ export async function ensureProxyToolsBearer(
   bearer: string | null;
   refreshed: ProxyToolsTokenRefresh | null;
 }> {
-  const existing = request.cookies.get("tools_token")?.value?.trim() ?? null;
-  if (existing && !isJwtExpired(existing)) {
+  const fallbackBearer = request.cookies.get("tools_token")?.value?.trim() ?? null;
+  try {
+    const existing = fallbackBearer;
+    if (existing && !isJwtExpired(existing)) {
+      return { bearer: existing, refreshed: null };
+    }
+
+    const userId = existing ? decodeJwtSub(existing) : null;
+    const refreshed = await callBookMallRefreshToken(request, existing, userId);
+    if (refreshed) {
+      return { bearer: refreshed.accessToken, refreshed };
+    }
+
     return { bearer: existing, refreshed: null };
+  } catch (e) {
+    console.warn("[book-mall-proxy-auth] ensureProxyToolsBearer failed:", e);
+    return { bearer: fallbackBearer, refreshed: null };
   }
-
-  const userId = existing ? decodeJwtSub(existing) : null;
-  const refreshed = await callBookMallRefreshToken(request, existing, userId);
-  if (refreshed) {
-    return { bearer: refreshed.accessToken, refreshed };
-  }
-
-  return { bearer: existing, refreshed: null };
 }

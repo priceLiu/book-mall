@@ -199,6 +199,9 @@ export const QR_KIND_GALLERY_PREFETCH: ReadonlyArray<{
   { category: "audio", kind: "create-voiceover" },
 ];
 
+/** 类目模板 / kinds 客户端缓存有效期（命中则不再重复请求） */
+export const QR_BROWSE_CACHE_TTL_MS = 5 * 60_000;
+
 export function isQrTextToImageKind(kind: string): boolean {
   return kind === "create-image" || kind === "create-character" || kind === "character-image";
 }

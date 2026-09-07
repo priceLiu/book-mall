@@ -6,10 +6,17 @@
 pnpm install                        # 根目录 concurrently
 pnpm --dir e-commerce-toolkit install   # 首次：电商工具箱依赖（dev:all 会起 :3007）
 pnpm --dir book-mall install            # 主站与其它子站按需在各自目录 install
-pnpm dev:all                        # 同时启动 3000–3011（含 e-commerce-toolkit、quick-replica-web、director-web、common-tools、publisher-web）
+pnpm dev:all                        # book-mall 先就绪，再并行启其余子站
+pnpm dev:all:stagger                # mall 先就绪，其余子站间隔 3s 错峰启动
 ```
 
 `dev:all` 进程表见仓库根 `scripts/dev-all.mjs`；终端里电商工具箱日志前缀为 `[ecom]`。
+
+启动顺序：**book-mall 立即启动** → `dev-all-wait-mall.mjs` 探测 `:3000` HTTP 就绪 → **默认再等待 20s** → 其余子站 `pnpm dev`（`--stagger` 时在上述基础上再间隔 3s）。poll-loop 在 mall 就绪后约 5s 启动。
+
+可选环境变量：`DEV_ALL_STAGGER_SEC=3`（子站间隔秒）、`DEV_ALL_MALL_SETTLE_SEC=20`（mall HTTP 就绪后额外等待秒）、`DEV_ALL_POLL_SETTLE_SEC=5`（poll-loop 额外等待秒）。
+
+全部子站 HTTP 就绪后，终端会自动打印 **就绪汇总表**（`scripts/dev-all-ready.mjs`）；也可单独运行 `node scripts/dev-all-ready.mjs` 探测当前机器上的 dev 端口。
 
 启动后在浏览器打开 **开发导航页**（需 book-mall 已起来）：
 
@@ -209,4 +216,20 @@ pnpm gateway:seed-registry     # 模型注册表（已含 5 个 MiniMax modelKey
 ```
 
 Gateway 路由：`POST /api/gw/v1/minimax/tts`、`/voices/query`、`/voice-convert`、`/music/generate` 等。接口说明见 [docs/minimax.md](./minimax.md)（**不含** API Key）。
+
+## QuickReplica · 浏览 gallery 静态快照
+
+首页 feed、分类模板列表、kind 浏览数据经 `StaticPageSnapshot`（`pageKey=quick-replica-gallery`）预生成，减少进入分类时的 DB 查询风暴。
+
+```bash
+cd book-mall
+pnpm qr:gallery-snapshot-generate   # 写入当日快照；Admin → 静态资源管理 → QuickReplica 可手动触发
+```
+
+- 公开读：`GET /api/public/static-snapshots/quick-replica-gallery`（Book）
+- QuickReplica BFF：`GET /api/gallery-snapshot`（同域代理）
+- 平台 API `scope=all` / `homeFeed=1` / `kinds` 优先读快照，再合并用户自有模板（小查询）
+- Cron：与其它静态页快照一并走 `runAllStaticSnapshotGenerations`（Admin 静态资源管理 / 内部 generate 路由）
+
+发布/上下架模板后建议重新生成快照，或等 Cron 刷新。
 

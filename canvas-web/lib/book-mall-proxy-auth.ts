@@ -9,7 +9,7 @@ export type ProxyToolsTokenRefresh = {
 
 const REFRESH_FETCH_TIMEOUT_MS = (() => {
   const v = Number(process.env.TOOLS_TOKEN_REFRESH_TIMEOUT_MS);
-  return Number.isFinite(v) && v > 0 ? v : 12_000;
+  return Number.isFinite(v) && v > 0 ? v : 45_000;
 })();
 
 let refreshInflight: Promise<ProxyToolsTokenRefresh | null> | null = null;

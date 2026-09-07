@@ -516,13 +516,22 @@ function buildRecoverCandidate(
   const media = Boolean(t.ossUrl?.trim() || t.ephemeralUrl?.trim());
   const runtimeOk = canvasNodeShowsPersistedMedia(canvas, t.nodeId, t.id);
 
+  const failedRecoverable =
+    t.status === "FAILED" &&
+    t.failCode != null &&
+    (t.failCode.startsWith("timeout") ||
+      t.failCode === "VOLCENGINE_GATEWAY_POLL_STALL" ||
+      t.failCode === "GATEWAY_TASK_FAILED");
+
+  /** Gateway 已 FAILED/CANCELLED 时 vendor 侧通常已 404，反复 reconcile 只会刷屏 */
+  const failedNeedsRecovery =
+    failedRecoverable &&
+    gatewayStatus !== "FAILED" &&
+    gatewayStatus !== "CANCELLED";
+
   const needsRecovery =
     (t.status === "SUBMITTED" && gatewayStatus === "SUCCEEDED") ||
-    (t.status === "FAILED" &&
-      t.failCode != null &&
-      (t.failCode.startsWith("timeout") ||
-        t.failCode === "VOLCENGINE_GATEWAY_POLL_STALL" ||
-        t.failCode === "GATEWAY_TASK_FAILED")) ||
+    failedNeedsRecovery ||
     (t.status === "SUCCEEDED" && media && !runtimeOk) ||
     (gatewayStatus === "SUCCEEDED" && !runtimeOk && !media);
 
@@ -836,6 +845,7 @@ export type CanvasDisplayReconcileSummary = {
   noop: number;
   failed: number;
   actions: Record<CanvasVideoRecoverAction, number>;
+  failureReasons?: Record<string, number>;
 };
 
 /**
@@ -860,11 +870,18 @@ export async function runCanvasDisplayReconcileWorker(opts?: {
   let recovered = 0;
   let failed = 0;
 
+  const failureReasons = new Map<string, number>();
+
   for (const c of candidates) {
     const r = await recoverCanvasVideoTaskDisplay(c.taskId);
     actions[r.action] += 1;
     if (r.ok && r.action !== "noop" && r.action !== "failed") recovered += 1;
-    if (!r.ok || r.action === "failed") failed += 1;
+    if (!r.ok || r.action === "failed") {
+      failed += 1;
+      if (r.reason) {
+        failureReasons.set(r.reason, (failureReasons.get(r.reason) ?? 0) + 1);
+      }
+    }
   }
 
   return {
@@ -873,5 +890,8 @@ export async function runCanvasDisplayReconcileWorker(opts?: {
     noop: actions.noop,
     failed,
     actions,
+    ...(failureReasons.size > 0
+      ? { failureReasons: Object.fromEntries(failureReasons) }
+      : {}),
   };
 }

@@ -9,6 +9,7 @@ import {
   QrAudioVoiceControlSlider,
   QrAudioVoicePickerButton,
 } from "@/components/quick-replica/qr-audio-form-parts";
+import { QrAudioCatalogLoadState } from "@/components/quick-replica/qr-audio-catalog-load-state";
 import { QrModelPicker } from "@/components/quick-replica/qr-model-picker";
 import { useQrAudioCatalog, isElevenLabsStsModelKey } from "@/lib/qr-audio-catalog-client";
 import {
@@ -52,7 +53,7 @@ export function QrVoiceChangerForm({
   voicePickerActive,
   onOpenVoiceGallery,
 }: Props) {
-  const { catalog, loading } = useQrAudioCatalog();
+  const { catalog, loading, error, retry } = useQrAudioCatalog();
   const [modelSheetOpen, setModelSheetOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -67,13 +68,9 @@ export function QrVoiceChangerForm({
     [vcModels],
   );
 
-  if (loading || !catalog) {
+  if (!catalog) {
     return (
-      <div className="space-y-4">
-        <div className="qr-skeleton h-20 w-full rounded-2xl" />
-        <div className="qr-skeleton min-h-[280px] w-full rounded-2xl" />
-        <div className="qr-skeleton h-24 w-full rounded-2xl" />
-      </div>
+      <QrAudioCatalogLoadState loading={loading} error={error} onRetry={retry} />
     );
   }
 

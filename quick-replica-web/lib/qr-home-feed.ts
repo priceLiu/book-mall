@@ -43,7 +43,7 @@ export const QR_HOME_CATEGORY_CARD_META: Record<
 };
 
 const HOME_FEED_LIMIT = 36;
-const HOME_CARD_BG_COUNT = 4;
+const HOME_CARD_BG_COUNT = 6;
 
 function isKindThumbBuiltin(id: string): boolean {
   return (

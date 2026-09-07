@@ -5,10 +5,16 @@ import type { StaticSnapshotTrigger } from "@prisma/client";
 
 import { runCanvasHomeSnapshotGeneration } from "@/lib/static-snapshots/canvas-home-snapshot-service";
 import { CANVAS_HOME_PAGE_KEY } from "@/lib/static-snapshots/canvas-home-payload";
+import { runQuickReplicaGallerySnapshotGeneration } from "@/lib/static-snapshots/quick-replica-gallery-snapshot-service";
+import { QUICK_REPLICA_GALLERY_PAGE_KEY } from "@/lib/static-snapshots/quick-replica-gallery-payload";
 import { runSiteHomeSnapshotGeneration } from "@/lib/static-snapshots/site-home-snapshot-service";
 import { SITE_HOME_PAGE_KEY } from "@/lib/static-snapshots/site-home-payload";
 
-export const STATIC_SNAPSHOT_PAGE_KEYS = [SITE_HOME_PAGE_KEY, CANVAS_HOME_PAGE_KEY] as const;
+export const STATIC_SNAPSHOT_PAGE_KEYS = [
+  SITE_HOME_PAGE_KEY,
+  CANVAS_HOME_PAGE_KEY,
+  QUICK_REPLICA_GALLERY_PAGE_KEY,
+] as const;
 
 export type StaticSnapshotPageKey = (typeof STATIC_SNAPSHOT_PAGE_KEYS)[number];
 
@@ -27,6 +33,8 @@ export async function runStaticSnapshotGeneration(input: {
       return runSiteHomeSnapshotGeneration(input);
     case CANVAS_HOME_PAGE_KEY:
       return runCanvasHomeSnapshotGeneration(input);
+    case QUICK_REPLICA_GALLERY_PAGE_KEY:
+      return runQuickReplicaGallerySnapshotGeneration(input);
     default: {
       const _exhaustive: never = input.pageKey;
       throw new Error(`unsupported pageKey: ${_exhaustive}`);

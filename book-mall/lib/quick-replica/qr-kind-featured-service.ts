@@ -155,6 +155,67 @@ export async function listKindBrowseItems(
   }));
 }
 
+/** 静态快照：kind 浏览卡片（不含用户自己的 featured / 作品） */
+export async function listKindBrowseItemsForSnapshot(
+  category: QrCategory,
+): Promise<QrKindBrowseItem[]> {
+  const defs = getKindsForCategory(category);
+  const kindIds = defs.map((d) => d.id);
+  if (kindIds.length === 0) return [];
+
+  const overrideMap = await loadCatalogOverrideMap();
+
+  const featuredRows = await prisma.qrKindFeatured.findMany({
+    where: { kind: { in: kindIds } },
+  });
+  const featuredMap = new Map(featuredRows.map((r) => [r.kind, r]));
+
+  const userFeaturedIds = featuredRows
+    .filter((r) => r.templateSource === "user")
+    .map((r) => r.templateId);
+
+  const [userFeaturedRows, publicRows] = await Promise.all([
+    userFeaturedIds.length
+      ? prisma.qrTemplate.findMany({
+          where: { id: { in: userFeaturedIds }, deletedAt: null },
+        })
+      : Promise.resolve([]),
+    prisma.qrTemplate.findMany({
+      where: { kind: { in: kindIds }, visibility: "public", deletedAt: null },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    }),
+  ]);
+
+  const userFeaturedById = new Map(userFeaturedRows.map((r) => [r.id, rowToJson(r)]));
+  const publicByKind = firstTemplateByKind(publicRows);
+  const ownByKind = new Map<string, QrTemplateJson>();
+  const builtinByKind = new Map<string, QrTemplateJson>();
+  for (const t of applyCatalogOverridesToBuiltin(
+    filterBuiltinsForKindBrowse(listBuiltinQrTemplates({ category })),
+    overrideMap,
+  )) {
+    if (!kindIds.includes(t.kind)) continue;
+    if (!builtinByKind.has(t.kind)) builtinByKind.set(t.kind, t);
+  }
+
+  return defs.map((def) => ({
+    kind: def.id,
+    label: def.label,
+    labelEn: def.labelEn,
+    description: def.description,
+    toolKey: def.toolKey,
+    featuredTemplate: resolveFeaturedFromMaps({
+      kind: def.id,
+      featuredRow: featuredMap.get(def.id),
+      userFeaturedById,
+      builtinByKind,
+      publicByKind,
+      ownByKind,
+      overrideMap,
+    }),
+  }));
+}
+
 export async function setKindFeaturedTemplate(args: {
   kind: string;
   templateId: string;

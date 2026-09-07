@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
 import { canShareQrTemplate } from "@/lib/qr-workflow-share-eligibility";
 import { Menu, Sparkles, Video, ImageIcon, Smile, Globe, Volume2, Home } from "lucide-react";
 
@@ -30,6 +30,7 @@ import {
 } from "@/components/quick-replica/qr-workspace-panel";
 import {
   QR_CATEGORIES,
+  QR_BROWSE_CACHE_TTL_MS,
   QR_KIND_GALLERY_PREFETCH,
   defaultWorkspaceDraft,
   getKindDef,
@@ -47,14 +48,22 @@ import {
   watchQrGenerateJob,
 } from "@/lib/run-qr-generate-job";
 import { fetchQrPlatform, formatQrPlatformError } from "@/lib/qr-platform-fetch";
+import { fetchQrAudioCatalog } from "@/lib/qr-audio-catalog-client";
 import { PortalNav } from "@/components/portal-nav";
 import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 import { getBookAccountUrl, getMainSiteOrigin } from "@/lib/site-origin";
 import {
   buildHomeCategoryCards,
-  type QrHomeCategoryCard,
   QR_HOME_CARD_CATEGORIES,
+  type QrHomeCategoryCard,
 } from "@/lib/qr-home-feed";
+import {
+  fetchQrGallerySnapshot,
+  pickHomeFeedFromGallerySnapshot,
+  pickKindsFromGallerySnapshot,
+  pickTemplatesFromGallerySnapshot,
+} from "@/lib/qr-gallery-snapshot-client";
+import { isQrHomeCardCategory } from "@/components/qr-landing-home";
 
 type SessionInfo = {
   name?: string | null;
@@ -103,6 +112,8 @@ export function QrAppClient({
   const [kindsLoading, setKindsLoading] = useState(false);
   const kindsCacheRef = useRef<Map<QrCategory, QrKindBrowseItem[]>>(new Map());
   const templatesCacheRef = useRef<Map<string, QrTemplate[]>>(new Map());
+  const templatesCacheTsRef = useRef<Map<string, number>>(new Map());
+  const kindsCacheTsRef = useRef<Map<QrCategory, number>>(new Map());
   const [draft, setDraft] = useState<QrWorkspaceDraft>(
     defaultWorkspaceDraft({ category: "video", kind: "text-to-video" }),
   );
@@ -114,6 +125,7 @@ export function QrAppClient({
   const [shareTemplate, setShareTemplate] = useState<QrTemplate | null>(null);
   const audioRightPanelRef = useRef<HTMLElement>(null);
   const voiceGalleryFocusTimerRef = useRef<number | null>(null);
+  const lastSilentRefreshRef = useRef(0);
   const focusedGenerate = generateSessions.find((s) => s.id === focusedGenerateId);
   const focusedGenerating =
     Boolean(focusedGenerate) &&
@@ -189,24 +201,35 @@ export function QrAppClient({
 
     if (!silent) setTemplatesLoading(true);
     const requestNav = "home";
-    try {
-      const results = await Promise.all(
-        QR_HOME_CARD_CATEGORIES.map(async (cat) => {
-          const res = await fetchQrPlatform(
-            `/api/book-mall/api/platform/v1/quick-replica/templates?scope=all&category=${encodeURIComponent(cat)}`,
-          );
-          if (!res.ok) return [] as QrTemplate[];
-          const data = (await res.json()) as { templates?: QrTemplate[] };
-          return data.templates ?? [];
-        }),
-      );
-      if (navModeRef.current !== requestNav) return;
-      const byCategory = Object.fromEntries(
-        QR_HOME_CARD_CATEGORIES.map((cat, index) => [cat, results[index] ?? []]),
-      ) as Partial<Record<QrCategory, QrTemplate[]>>;
-      const cards = buildHomeCategoryCards(byCategory);
+
+    const snap = !force ? await fetchQrGallerySnapshot(false) : null;
+    if (snap?.payload && navModeRef.current === requestNav) {
+      const cards = buildHomeCategoryCards(pickHomeFeedFromGallerySnapshot(snap.payload));
       homeCardsCacheRef.current = cards;
       setHomeCategoryCards(cards);
+      if (navModeRef.current === requestNav) setTemplatesLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetchQrPlatform(
+        "/api/book-mall/api/platform/v1/quick-replica/templates?scope=all&homeFeed=1",
+      );
+      if (navModeRef.current !== requestNav) return;
+      if (!res.ok) {
+        setHomeCategoryCards(buildHomeCategoryCards({}));
+        return;
+      }
+      const data = (await res.json()) as {
+        templatesByCategory?: Partial<Record<QrCategory, QrTemplate[]>>;
+      };
+      const cards = buildHomeCategoryCards(data.templatesByCategory ?? {});
+      homeCardsCacheRef.current = cards;
+      setHomeCategoryCards(cards);
+    } catch {
+      if (navModeRef.current === requestNav) {
+        setHomeCategoryCards(buildHomeCategoryCards({}));
+      }
     } finally {
       if (navModeRef.current === requestNav) {
         setTemplatesLoading(false);
@@ -214,21 +237,47 @@ export function QrAppClient({
     }
   }, []);
 
-  const loadTemplates = useCallback(async (options?: { silent?: boolean }) => {
+  const loadTemplates = useCallback(async (options?: { silent?: boolean; force?: boolean }) => {
     const silent = options?.silent ?? false;
+    const force = options?.force ?? false;
     if (navMode === "home") {
-      await loadHomeFeed(false, silent);
+      await loadHomeFeed(force, silent);
       return;
     }
 
     const requestKey = browseKeyRef.current;
     const cached = templatesCacheRef.current.get(requestKey);
-    if (!silent) {
-      if (cached) {
-        setTemplates(cached);
-      } else {
-        setTemplates([]);
-        setTemplatesLoading(true);
+    const fetchedAt = templatesCacheTsRef.current.get(requestKey) ?? 0;
+    const cacheFresh =
+      Boolean(cached) && Date.now() - fetchedAt < QR_BROWSE_CACHE_TTL_MS;
+
+    if (!silent && cached) {
+      setTemplates(cached);
+      setTemplatesLoading(false);
+    } else if (!silent && !cached) {
+      setTemplates([]);
+      setTemplatesLoading(true);
+    }
+
+    if (!force && cacheFresh) {
+      return;
+    }
+
+    const snap = !force ? await fetchQrGallerySnapshot(false) : null;
+    if (
+      snap?.payload &&
+      category &&
+      templateScope !== "my" &&
+      browseKeyRef.current === requestKey
+    ) {
+      const fromSnap = pickTemplatesFromGallerySnapshot(snap.payload, {
+        category,
+        kind: selectedKind,
+        toolKey: pinnedToolKey && navMode === "pinned-tool" ? pinnedToolKey : null,
+      });
+      if (fromSnap.length > 0 || cached) {
+        setTemplates(fromSnap.length > 0 ? fromSnap : (cached ?? []));
+        setTemplatesLoading(false);
       }
     }
 
@@ -249,8 +298,13 @@ export function QrAppClient({
         const data = (await res.json()) as { templates: QrTemplate[] };
         const list = data.templates ?? [];
         templatesCacheRef.current.set(requestKey, list);
+        templatesCacheTsRef.current.set(requestKey, Date.now());
         setTemplates(list);
-      } else {
+      } else if (!silent && !cached) {
+        setTemplates([]);
+      }
+    } catch {
+      if (browseKeyRef.current === requestKey) {
         setTemplates([]);
       }
     } finally {
@@ -260,8 +314,9 @@ export function QrAppClient({
     }
   }, [navMode, category, selectedKind, pinnedToolKey, templateScope, myWorksCategory, loadHomeFeed]);
 
-  const loadKinds = useCallback(async (options?: { silent?: boolean }) => {
+  const loadKinds = useCallback(async (options?: { silent?: boolean; force?: boolean }) => {
     const silent = options?.silent ?? false;
+    const force = options?.force ?? false;
     if (navMode === "my-works" || navMode === "home" || navMode === "pinned-tool" || navMode === "generate-history") {
       setKindItems([]);
       setKindsLoading(false);
@@ -270,14 +325,34 @@ export function QrAppClient({
 
     const requestCategory = category;
     const cached = kindsCacheRef.current.get(requestCategory);
-    if (!silent) {
-      if (cached) {
-        setKindItems(cached);
-      } else {
-        setKindItems([]);
-        setKindsLoading(true);
+    const fetchedAt = kindsCacheTsRef.current.get(requestCategory) ?? 0;
+    const cacheFresh =
+      Boolean(cached) && Date.now() - fetchedAt < QR_BROWSE_CACHE_TTL_MS;
+
+    if (!silent && cached) {
+      setKindItems(cached);
+      setKindsLoading(false);
+    } else if (!silent && !cached) {
+      setKindItems([]);
+      setKindsLoading(true);
+    }
+
+    if (!force && cacheFresh) {
+      return;
+    }
+
+    const snap = !force ? await fetchQrGallerySnapshot(false) : null;
+    if (snap?.payload && category === requestCategory) {
+      const kinds = pickKindsFromGallerySnapshot(snap.payload, requestCategory);
+      if (kinds.length > 0) {
+        kindsCacheRef.current.set(requestCategory, kinds);
+        kindsCacheTsRef.current.set(requestCategory, Date.now());
+        setKindItems(kinds);
+        setKindsLoading(false);
+        return;
       }
     }
+
     try {
       const res = await fetchQrPlatform(
         `/api/book-mall/api/platform/v1/quick-replica/kinds?category=${encodeURIComponent(requestCategory)}`,
@@ -286,8 +361,11 @@ export function QrAppClient({
         const data = (await res.json()) as { kinds: QrKindBrowseItem[] };
         const kinds = data.kinds ?? [];
         kindsCacheRef.current.set(requestCategory, kinds);
+        kindsCacheTsRef.current.set(requestCategory, Date.now());
         setKindItems(kinds);
       }
+    } catch {
+      /* 主站未就绪时保留空列表，避免 Unhandled Runtime Error */
     } finally {
       if (category === requestCategory) {
         setKindsLoading(false);
@@ -304,8 +382,13 @@ export function QrAppClient({
   }, [loadKinds]);
 
   useEffect(() => {
+    const SILENT_REFRESH_MIN_MS = 60_000;
+
     const refreshFromServer = () => {
       if (document.visibilityState === "hidden") return;
+      const now = Date.now();
+      if (now - lastSilentRefreshRef.current < SILENT_REFRESH_MIN_MS) return;
+      lastSilentRefreshRef.current = now;
       void loadTemplates({ silent: true });
       void loadKinds({ silent: true });
     };
@@ -318,24 +401,15 @@ export function QrAppClient({
     };
   }, [loadTemplates, loadKinds]);
 
-  useEffect(() => {
-    if (navMode !== "category") return;
-    for (const cat of QR_CATEGORIES) {
-      if (kindsCacheRef.current.has(cat.id)) continue;
-      void fetch(
-        `/api/book-mall/api/platform/v1/quick-replica/kinds?category=${encodeURIComponent(cat.id)}`,
-      )
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data: { kinds?: QrKindBrowseItem[] } | null) => {
-          if (data?.kinds) kindsCacheRef.current.set(cat.id, data.kinds);
-        })
-        .catch(() => undefined);
-    }
-  }, [navMode, category]);
-
   const prefetchTemplateList = useCallback(
     (cacheKey: string, params: { category: QrCategory; kind?: string }) => {
-      if (templatesCacheRef.current.has(cacheKey)) return;
+      const fetchedAt = templatesCacheTsRef.current.get(cacheKey) ?? 0;
+      if (
+        templatesCacheRef.current.has(cacheKey) &&
+        Date.now() - fetchedAt < QR_BROWSE_CACHE_TTL_MS
+      ) {
+        return;
+      }
       const qs = new URLSearchParams({ scope: "all", category: params.category });
       if (params.kind) qs.set("kind", params.kind);
       void fetch(
@@ -343,17 +417,77 @@ export function QrAppClient({
       )
         .then((res) => (res.ok ? res.json() : null))
         .then((data: { templates?: QrTemplate[] } | null) => {
-          if (data?.templates) templatesCacheRef.current.set(cacheKey, data.templates);
+          if (data?.templates) {
+            templatesCacheRef.current.set(cacheKey, data.templates);
+            templatesCacheTsRef.current.set(cacheKey, Date.now());
+          }
         })
         .catch(() => undefined);
     },
     [],
   );
 
+  const prefetchKinds = useCallback((cat: QrCategory) => {
+    const fetchedAt = kindsCacheTsRef.current.get(cat) ?? 0;
+    if (
+      kindsCacheRef.current.has(cat) &&
+      Date.now() - fetchedAt < QR_BROWSE_CACHE_TTL_MS
+    ) {
+      return;
+    }
+    void fetchQrPlatform(
+      `/api/book-mall/api/platform/v1/quick-replica/kinds?category=${encodeURIComponent(cat)}`,
+    )
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { kinds?: QrKindBrowseItem[] } | null) => {
+        if (data?.kinds) {
+          kindsCacheRef.current.set(cat, data.kinds);
+          kindsCacheTsRef.current.set(cat, Date.now());
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+
+  /** 登录后拉取 gallery 静态快照，填充 browse 缓存（替代多路 templates/kinds 预取） */
+  useEffect(() => {
+    void (async () => {
+      const snap = await fetchQrGallerySnapshot(false);
+      if (!snap?.payload) return;
+      for (const id of QR_HOME_CARD_CATEGORIES) {
+        const templates = pickTemplatesFromGallerySnapshot(snap.payload, { category: id });
+        if (templates.length > 0) {
+          templatesCacheRef.current.set(qrTemplateCacheKey("all", id), templates);
+          templatesCacheTsRef.current.set(qrTemplateCacheKey("all", id), Date.now());
+        }
+        const kinds = pickKindsFromGallerySnapshot(snap.payload, id);
+        if (kinds.length > 0) {
+          kindsCacheRef.current.set(id, kinds);
+          kindsCacheTsRef.current.set(id, Date.now());
+        }
+      }
+      for (const { category: cat, kind } of QR_KIND_GALLERY_PREFETCH) {
+        const templates = pickTemplatesFromGallerySnapshot(snap.payload, { category: cat, kind });
+        if (templates.length > 0) {
+          templatesCacheRef.current.set(qrTemplateCacheKey("all", cat, kind), templates);
+          templatesCacheTsRef.current.set(qrTemplateCacheKey("all", cat, kind), Date.now());
+        }
+      }
+      if (!homeCardsCacheRef.current) {
+        const cards = buildHomeCategoryCards(pickHomeFeedFromGallerySnapshot(snap.payload));
+        homeCardsCacheRef.current = cards;
+        if (navModeRef.current === "home") {
+          setHomeCategoryCards(cards);
+          setTemplatesLoading(false);
+        }
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     if (navMode !== "category" && navMode !== "my-works") return;
     for (const cat of QR_CATEGORIES) {
       prefetchTemplateList(qrTemplateCacheKey("all", cat.id), { category: cat.id });
+      prefetchKinds(cat.id);
     }
     for (const { category: cat, kind } of QR_KIND_GALLERY_PREFETCH) {
       prefetchTemplateList(qrTemplateCacheKey("all", cat, kind), {
@@ -361,18 +495,15 @@ export function QrAppClient({
         kind,
       });
     }
-  }, [navMode, prefetchTemplateList]);
+  }, [navMode, prefetchTemplateList, prefetchKinds]);
 
   useEffect(() => {
-    if (navMode !== "category" || category !== "video") return;
-    for (const { category: cat, kind } of QR_KIND_GALLERY_PREFETCH) {
-      if (cat !== "video") continue;
-      prefetchTemplateList(qrTemplateCacheKey("all", cat, kind), {
-        category: cat,
-        kind,
-      });
-    }
-  }, [navMode, category, prefetchTemplateList]);
+    if (navMode !== "category" || category !== "audio") return;
+    void fetchQrAudioCatalog(false).catch(() => undefined);
+    void fetch("/api/voices?page=1&pageSize=24", { credentials: "same-origin" }).catch(
+      () => undefined,
+    );
+  }, [navMode, category]);
 
   const galleryTitleSuffix = useMemo(() => {
     if (navMode === "my-works") return "我的作品";
@@ -399,31 +530,58 @@ export function QrAppClient({
   }, [loadHomeFeed]);
 
   const onCategory = (cat: QrCategory) => {
-    setNavMode("category");
-    setCategory(cat);
-    setPinnedToolKey(null);
-    if (cat === "audio") {
-      setSelectedKind("create-voiceover");
-      setMiddleMode("workspace");
-      setDraft(defaultWorkspaceDraft({ category: "audio", kind: "create-voiceover" }));
-    } else if (cat === "world") {
-      setMiddleMode("browse");
-      setSelectedKind(null);
-      setWorldOmniboxExpanded(false);
-      setDraft(defaultWorkspaceDraft({ category: "world", kind: "create-world" }));
-    } else {
-      setMiddleMode("browse");
-      setSelectedKind(null);
-    }
     const cachedKinds = kindsCacheRef.current.get(cat);
-    setKindItems(cachedKinds ?? []);
-    setKindsLoading(true);
-    const cachedTemplates = templatesCacheRef.current.get(
-      qrTemplateCacheKey("all", cat),
-    );
-    setTemplates(cachedTemplates ?? []);
-    setTemplatesLoading(!cachedTemplates);
+    const cacheKey = qrTemplateCacheKey("all", cat);
+    const cachedTemplates = templatesCacheRef.current.get(cacheKey);
+    const kindsFresh =
+      Boolean(cachedKinds) &&
+      Date.now() - (kindsCacheTsRef.current.get(cat) ?? 0) < QR_BROWSE_CACHE_TTL_MS;
+    const templatesFresh =
+      Boolean(cachedTemplates) &&
+      Date.now() - (templatesCacheTsRef.current.get(cacheKey) ?? 0) < QR_BROWSE_CACHE_TTL_MS;
+
+    startTransition(() => {
+      setNavMode("category");
+      setCategory(cat);
+      setPinnedToolKey(null);
+      if (cat === "audio") {
+        setSelectedKind("create-voiceover");
+        setMiddleMode("workspace");
+        setDraft(defaultWorkspaceDraft({ category: "audio", kind: "create-voiceover" }));
+      } else if (cat === "world") {
+        setMiddleMode("browse");
+        setSelectedKind(null);
+        setWorldOmniboxExpanded(false);
+        setDraft(defaultWorkspaceDraft({ category: "world", kind: "create-world" }));
+      } else {
+        setMiddleMode("browse");
+        setSelectedKind(null);
+      }
+      setKindItems(cachedKinds ?? []);
+      setKindsLoading(!kindsFresh);
+      setTemplates(cachedTemplates ?? []);
+      setTemplatesLoading(!templatesFresh);
+    });
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("templateId")?.trim()) return;
+    const categoryParam = params.get("category")?.trim();
+    if (!categoryParam || !isQrHomeCardCategory(categoryParam)) return;
+
+    onCategory(categoryParam);
+    params.delete("category");
+    const qs = params.toString();
+    window.history.replaceState(
+      {},
+      "",
+      `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`,
+    );
+    // 仅处理 SSO 回跳 deep-link
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onMyWorks = () => {
     setNavMode("my-works");
@@ -503,6 +661,10 @@ export function QrAppClient({
   };
 
   const dismissCopyToast = useCallback(() => setCopyToast(null), []);
+
+  const openPreviewTemplate = useCallback((t: QrTemplate) => {
+    startTransition(() => setPreviewTemplate(t));
+  }, []);
 
   const applyWorldTemplate = useCallback((t: QrTemplate) => {
     const nextDraft = templateToWorkspaceDraft(t);
@@ -622,9 +784,15 @@ export function QrAppClient({
   const onGenerateSaved = (template: QrTemplate) => {
     setTemplates((prev) => [template, ...prev.filter((x) => x.id !== template.id)]);
     kindsCacheRef.current.delete(category);
+    kindsCacheTsRef.current.delete(category);
     invalidateQrTemplateCacheForCategory(templatesCacheRef.current, category);
-    void loadTemplates();
-    void loadKinds();
+    for (const key of [...templatesCacheTsRef.current.keys()]) {
+      if (key === `all|${category}` || key.startsWith(`all|${category}|`)) {
+        templatesCacheTsRef.current.delete(key);
+      }
+    }
+    void loadTemplates({ force: true });
+    void loadKinds({ force: true });
   };
 
   const handleDeleteTemplate = useCallback(
@@ -636,11 +804,12 @@ export function QrAppClient({
       }
       setTemplates((prev) => prev.filter((t) => t.id !== template.id));
       templatesCacheRef.current.clear();
+      templatesCacheTsRef.current.clear();
       invalidateQrTemplateCacheForCategory(templatesCacheRef.current, category);
       setPreviewTemplate(null);
       setMyWorksPreview((prev) => (prev?.id === template.id ? null : prev));
       setCopyToast("已删除");
-      void loadTemplates();
+      void loadTemplates({ force: true });
     },
     [category, loadTemplates],
   );
@@ -939,7 +1108,7 @@ export function QrAppClient({
                 templatesLoading={templatesLoading}
                 draft={draft}
                 onDraftChange={setDraft}
-                onSelectTemplate={setPreviewTemplate}
+                onSelectTemplate={openPreviewTemplate}
                 activeTab={audioRightTab}
                 onTabChange={setAudioRightTab}
                 voiceGalleryFocus={voiceGalleryFocus}
@@ -963,7 +1132,7 @@ export function QrAppClient({
                     setMyWorksPreview(t);
                     return;
                   }
-                  setPreviewTemplate(t);
+                  openPreviewTemplate(t);
                 }}
                 allowDownload={navMode === "my-works"}
               />

@@ -87,7 +87,14 @@ async function proxyToBookMall(request: NextRequest, pathSegments: string[]) {
       ? undefined
       : await request.arrayBuffer();
 
-  let { bearer, refreshed } = await ensureProxyToolsBearer(request);
+  let bearer: string | null = null;
+  let refreshed: Awaited<ReturnType<typeof ensureProxyToolsBearer>>["refreshed"] = null;
+  try {
+    ({ bearer, refreshed } = await ensureProxyToolsBearer(request));
+  } catch (e) {
+    console.warn("[book-mall-proxy] ensureProxyToolsBearer failed:", e);
+    bearer = request.cookies.get("tools_token")?.value?.trim() ?? null;
+  }
 
   try {
     let r = await fetchUpstream(request, upstream, bearer, body);

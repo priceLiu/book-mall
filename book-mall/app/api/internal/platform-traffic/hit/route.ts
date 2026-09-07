@@ -10,6 +10,12 @@ import { recordTrafficHit } from "@/lib/site-traffic/record-hit";
 
 export const dynamic = "force-dynamic";
 
+function isTrafficIngestTransientDbError(e: unknown): boolean {
+  if (!e || typeof e !== "object" || !("code" in e)) return false;
+  const code = String((e as { code?: string }).code ?? "");
+  return code === "P2028" || code === "P2024" || code === "P2034";
+}
+
 const bodySchema = z.object({
   appKey: z.string().min(1),
   path: z.string().max(512).optional(),
@@ -44,17 +50,21 @@ export async function POST(request: NextRequest) {
     return new NextResponse(null, { status: 204 });
   }
 
-  try {
-    await recordTrafficHit({
-      appKey,
-      ip,
-      userId: parsed.data.userId,
-      isProbe: isProbeTrafficPath(parsed.data.path ?? ""),
-    });
-  } catch (e) {
+  const hitInput = {
+    appKey,
+    ip,
+    userId: parsed.data.userId,
+    isProbe: isProbeTrafficPath(parsed.data.path ?? ""),
+  };
+
+  // 统计为 fire-and-forget：立即 204，避免 dev:all 启动高峰阻塞 mall 连接池
+  void recordTrafficHit(hitInput).catch((e) => {
+    if (isTrafficIngestTransientDbError(e)) {
+      console.warn("[platform-traffic/hit] dropped (transient db busy):", e);
+      return;
+    }
     console.error("[platform-traffic/hit]", e);
-    return NextResponse.json({ error: "写入失败" }, { status: 500 });
-  }
+  });
 
   return new NextResponse(null, { status: 204 });
 }

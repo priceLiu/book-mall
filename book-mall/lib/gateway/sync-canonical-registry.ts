@@ -5,6 +5,7 @@ import {
   PLATFORM_MEDIA_DEFAULTS,
 } from "@/lib/platform-model/canonical-registry";
 import { invalidateGatewayModelListCache } from "@/lib/gateway/model-list-cache";
+import { isPrismaConnectionUnavailable, logDbUnavailable } from "@/lib/db-unavailable";
 import { prisma } from "@/lib/prisma";
 
 function billingKind(
@@ -331,48 +332,69 @@ export async function ensureGatewayCanonicalRegistrySynced(
 ): Promise<void> {
   const blocking = options?.blocking === true;
 
-  if (syncInFlight) {
-    if (blocking) await syncInFlight;
-    return;
-  }
-  if (Date.now() < nextSyncAllowedAt) {
-    await ensureShelfHelpers();
-    return;
-  }
-
-  const registryKeys = registryCanonicalKeys();
-  const existing = await prisma.modelCatalog.findMany({
-    where: {
-      canonicalKey: { in: registryKeys },
-      gatewayPublished: true,
-      active: true,
-    },
-    select: { canonicalKey: true },
-  });
-  const existingSet = new Set(existing.map((row) => row.canonicalKey));
-  const missingKeys = registryKeys.filter((key) => !existingSet.has(key));
-
-  if (missingKeys.length === 0) {
-    await ensureShelfHelpers();
-    return;
-  }
-
-  nextSyncAllowedAt = Date.now() + SYNC_COOLDOWN_MS;
-  syncInFlight = syncMissingCanonicalKeys(missingKeys)
-    .then(async () => {
+  try {
+    if (syncInFlight) {
+      if (blocking) await syncInFlight;
+      return;
+    }
+    if (Date.now() < nextSyncAllowedAt) {
       await ensureShelfHelpers();
-      void deactivateStaleGatewayRoutes().catch(() => {
-        /* 后台清理失败不阻塞读路径 */
-      });
-    })
-    .finally(() => {
-      syncInFlight = null;
-    });
+      return;
+    }
 
-  if (blocking) await syncInFlight;
+    const registryKeys = registryCanonicalKeys();
+    const existing = await prisma.modelCatalog.findMany({
+      where: {
+        canonicalKey: { in: registryKeys },
+        gatewayPublished: true,
+        active: true,
+      },
+      select: { canonicalKey: true },
+    });
+    const existingSet = new Set(existing.map((row) => row.canonicalKey));
+    const missingKeys = registryKeys.filter((key) => !existingSet.has(key));
+
+    if (missingKeys.length === 0) {
+      await ensureShelfHelpers();
+      return;
+    }
+
+    nextSyncAllowedAt = Date.now() + SYNC_COOLDOWN_MS;
+    syncInFlight = syncMissingCanonicalKeys(missingKeys)
+      .then(async () => {
+        await ensureShelfHelpers();
+        void deactivateStaleGatewayRoutes().catch(() => {
+          /* 后台清理失败不阻塞读路径 */
+        });
+      })
+      .catch((error) => {
+        if (isPrismaConnectionUnavailable(error)) {
+          logDbUnavailable("syncMissingCanonicalKeys", error);
+          return;
+        }
+        console.error("[syncMissingCanonicalKeys]", error);
+      })
+      .finally(() => {
+        syncInFlight = null;
+      });
+
+    if (blocking) await syncInFlight;
+  } catch (error) {
+    if (!blocking && isPrismaConnectionUnavailable(error)) {
+      logDbUnavailable("ensureGatewayCanonicalRegistrySynced", error);
+      return;
+    }
+    throw error;
+  }
 }
 
 /** API 热路径：触发增量同步但不 await */
 export function scheduleGatewayCanonicalRegistrySync(): void {
-  void ensureGatewayCanonicalRegistrySynced({ blocking: false });
+  void ensureGatewayCanonicalRegistrySynced({ blocking: false }).catch((error) => {
+    if (isPrismaConnectionUnavailable(error)) {
+      logDbUnavailable("scheduleGatewayCanonicalRegistrySync", error);
+      return;
+    }
+    console.error("[scheduleGatewayCanonicalRegistrySync]", error);
+  });
 }

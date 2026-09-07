@@ -107,12 +107,46 @@ export function invalidateQrAudioCatalogClientCache(): void {
   inflight = null;
 }
 
+function normalizeClientFetchError(err: unknown): string {
+  if (err instanceof DOMException && err.name === "AbortError") {
+    return "连接超时，请稍后重试";
+  }
+  if (err instanceof Error) {
+    const msg = err.message.trim();
+    if (
+      msg === "signal is aborted without reason" ||
+      msg === "The user aborted a request." ||
+      msg.toLowerCase().includes("aborted")
+    ) {
+      return "连接超时，请稍后重试";
+    }
+    return msg || "加载失败";
+  }
+  return "加载失败";
+}
+
+async function fetchAudioCatalogResponse(force = false): Promise<Response> {
+  return fetch("/api/audio-catalog", {
+    cache: force ? "no-store" : "default",
+    credentials: "same-origin",
+  });
+}
+
 export async function fetchQrAudioCatalog(force = false): Promise<QrAudioCatalog> {
+  if (inflight) return inflight;
   if (!force && cachedCatalog) return cachedCatalog;
-  if (!force && inflight) return inflight;
-  inflight = fetchQrPlatform("/api/book-mall/api/platform/v1/quick-replica/audio-catalog")
+  if (force) cachedCatalog = null;
+
+  inflight = fetchAudioCatalogResponse(force)
     .then(async (res) => {
-      if (!res.ok) throw new Error(`加载声音目录失败（${res.status}）`);
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(
+          data?.error === "audio_catalog_timeout"
+            ? "连接主站超时，请稍后重试"
+            : `加载声音目录失败（${res.status}）`,
+        );
+      }
       const data = (await res.json()) as QrAudioCatalog;
       cachedCatalog = data;
       return data;
@@ -123,61 +157,115 @@ export async function fetchQrAudioCatalog(force = false): Promise<QrAudioCatalog
   return inflight;
 }
 
-export async function fetchQrVoicePage(page: number, pageSize = 40): Promise<{
-  items: QrVoiceCatalogItem[];
-  total: number;
-  hasMore: boolean;
-}> {
-  const res = await fetchQrPlatform(
-    `/api/book-mall/api/platform/v1/quick-replica/voices?page=${page}&pageSize=${pageSize}`,
-  );
-  if (!res.ok) throw new Error(`加载音色失败（${res.status}）`);
-  return (await res.json()) as {
-    items: QrVoiceCatalogItem[];
-    total: number;
-    hasMore: boolean;
-  };
-}
-
 export function useQrAudioCatalog() {
   const [catalog, setCatalog] = useState<QrAudioCatalog | null>(cachedCatalog);
   const [loading, setLoading] = useState(!cachedCatalog);
   const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+
+  const retry = () => {
+    invalidateQrAudioCatalogClientCache();
+    setRetryKey((k) => k + 1);
+  };
 
   useEffect(() => {
-    const reload = () => {
-      invalidateQrAudioCatalogClientCache();
-      void fetchQrAudioCatalog(true)
-        .then((data) => {
-          if (!cancelled) setCatalog(data);
-        })
-        .catch((err) => {
-          if (!cancelled) setError(err instanceof Error ? err.message : "加载失败");
-        });
-    };
     let cancelled = false;
-    if (!cachedCatalog) {
-      void fetchQrAudioCatalog()
+
+    const load = (force: boolean) => {
+      if (cancelled) return;
+      if (!cachedCatalog) setLoading(true);
+      setError(null);
+      void fetchQrAudioCatalog(force)
         .then((data) => {
-          if (!cancelled) setCatalog(data);
+          if (!cancelled) {
+            setCatalog(data);
+            setError(null);
+          }
         })
         .catch((err) => {
           if (!cancelled) {
-            setError(err instanceof Error ? err.message : "加载失败");
+            setError(normalizeClientFetchError(err));
+            if (cachedCatalog) setCatalog(cachedCatalog);
           }
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
         });
+    };
+
+    if (cachedCatalog) {
+      setCatalog(cachedCatalog);
+      setLoading(false);
+      setError(null);
+    } else {
+      load(retryKey > 0);
     }
-    window.addEventListener("qr-audio-catalog-invalidate", reload);
+
+    const onInvalidate = () => load(true);
+    window.addEventListener("qr-audio-catalog-invalidate", onInvalidate);
     return () => {
       cancelled = true;
-      window.removeEventListener("qr-audio-catalog-invalidate", reload);
+      window.removeEventListener("qr-audio-catalog-invalidate", onInvalidate);
     };
-  }, []);
+  }, [retryKey]);
 
-  return { catalog, loading, error };
+  return { catalog, loading, error, retry };
+}
+
+export function filterCatalogSeedVoices(
+  catalog: QrAudioCatalog,
+  provider: "minimax" | "elevenlabs",
+): QrVoiceCatalogItem[] {
+  const items = catalog.voices.map((v) => ({
+    voiceId: v.voiceId,
+    label: v.label,
+    subtitle: v.subtitle,
+    language: v.language,
+    previewUrl: v.previewUrl,
+    tags: v.tags,
+    avatarLetter: v.avatarLetter,
+  }));
+  if (provider === "elevenlabs") {
+    return items.filter((v) => v.tags?.includes("elevenlabs"));
+  }
+  return items.filter((v) => !v.tags?.includes("elevenlabs"));
+}
+
+export async function fetchQrVoicePage(
+  page: number,
+  pageSize = 40,
+  provider: "minimax" | "elevenlabs" = "minimax",
+): Promise<{
+  items: QrVoiceCatalogItem[];
+  total: number;
+  hasMore: boolean;
+}> {
+  const qs = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+  });
+  if (provider === "elevenlabs") qs.set("provider", "elevenlabs");
+
+  const res = await fetch(`/api/voices?${qs.toString()}`, {
+    cache: "no-store",
+    credentials: "same-origin",
+  });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+    const detail = data?.error?.trim();
+    throw new Error(
+      data?.error === "voices_timeout"
+        ? "连接主站超时，请稍后重试"
+        : detail || `加载音色失败（${res.status}）`,
+    );
+  }
+  return (await res.json()) as {
+    items: QrVoiceCatalogItem[];
+    total: number;
+    hasMore: boolean;
+    warning?: string;
+    live?: boolean;
+  };
 }
 
 export function getQrAudioModelFromCatalog(catalog: QrAudioCatalog, modelKey: string) {

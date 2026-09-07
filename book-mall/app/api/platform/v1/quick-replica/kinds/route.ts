@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { listKindBrowseItems } from "@/lib/quick-replica/qr-kind-featured-service";
 import { requireQuickReplicaSession } from "@/lib/quick-replica/qr-platform-auth";
 import type { QrCategory } from "@/lib/quick-replica/qr-types";
+import { pickKindsFromSnapshot } from "@/lib/static-snapshots/quick-replica-gallery-query";
+import { getQuickReplicaGallerySnapshotForApi } from "@/lib/static-snapshots/quick-replica-gallery-snapshot-service";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,20 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "缺少有效 category" }, { status: 400 });
   }
 
-  const kinds = await listKindBrowseItems(auth.userId, category);
-  return NextResponse.json({ category, kinds });
+  try {
+    const snap = await getQuickReplicaGallerySnapshotForApi();
+    const kinds = pickKindsFromSnapshot(snap.payload, category);
+    return NextResponse.json({
+      category,
+      kinds,
+      snapshot: {
+        dateKey: snap.dateKey,
+        stale: snap.stale,
+        source: snap.source,
+      },
+    });
+  } catch {
+    const kinds = await listKindBrowseItems(auth.userId, category);
+    return NextResponse.json({ category, kinds });
+  }
 }

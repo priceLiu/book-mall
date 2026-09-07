@@ -3,6 +3,7 @@
 import { Music2, RefreshCw, Trash2 } from "lucide-react";
 
 import { QrAudioVoiceControlSlider } from "@/components/quick-replica/qr-audio-form-parts";
+import { QrAudioCatalogLoadState } from "@/components/quick-replica/qr-audio-catalog-load-state";
 import {
   QrAudioPromptTemplatePills,
   resolveActivePromptTemplateId,
@@ -110,10 +111,12 @@ function QrAutoControlRow({
 
 /** 创作音乐 · Eleven Music v2（UI 不暴露模型） */
 export function QrCreateMusicForm({ draft, onDraftChange, busy }: Props) {
-  const { catalog, loading } = useQrAudioCatalog();
+  const { catalog, loading, error, retry } = useQrAudioCatalog();
 
-  if (loading || !catalog) {
-    return <div className="qr-skeleton h-64 w-full rounded-2xl" />;
+  if (!catalog) {
+    return (
+      <QrAudioCatalogLoadState loading={loading} error={error} onRetry={retry} />
+    );
   }
 
   const clipMode = draft.musicClipMode ?? catalog.defaults.musicClipMode ?? "quick";

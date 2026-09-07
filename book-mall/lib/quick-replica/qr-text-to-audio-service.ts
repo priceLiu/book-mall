@@ -15,6 +15,7 @@ import {
   ELEVENLABS_DEFAULT_SFX_MODEL_KEY,
   ELEVENLABS_DEFAULT_STS_MODEL_KEY,
   ELEVENLABS_DEFAULT_VOICE_ID,
+  describeElevenLabsVendorFailure,
   isElevenLabsStsModelKey,
 } from "@/lib/gateway/elevenlabs-models";
 import {
@@ -286,7 +287,7 @@ export async function qrListElevenLabsVoices(userId: string) {
   const { credentialId } = await requireElevenLabsAuth(userId);
   const result = await forwardElevenLabsListVoices({ credentialId });
   if (result.status < 200 || result.status >= 300) {
-    throw new Error("ElevenLabs 音色列表加载失败");
+    throw new Error(describeElevenLabsVendorFailure(result));
   }
   return result.voices.map((v) => ({
     voiceId: v.voice_id,

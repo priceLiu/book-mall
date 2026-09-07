@@ -12,6 +12,11 @@ import {
   canvasHomeNeedsCompletePayload,
 } from "@/lib/static-snapshots/canvas-home-payload";
 import { isStaticSnapshotPageKey } from "@/lib/static-snapshots/static-snapshot-run";
+import {
+  isQuickReplicaGallerySnapshotPayload,
+  normalizeQuickReplicaGallerySnapshotPayload,
+  summarizeQuickReplicaGalleryPayload,
+} from "@/lib/static-snapshots/quick-replica-gallery-payload";
 
 describe("mergeCanvasHomeSnapshotPayload", () => {
   it("fills discovery from live while keeping existing film showcase", () => {
@@ -65,6 +70,7 @@ describe("isStaticSnapshotPageKey", () => {
   it("accepts site-home and canvas-home", () => {
     expect(isStaticSnapshotPageKey("site-home")).toBe(true);
     expect(isStaticSnapshotPageKey("canvas-home")).toBe(true);
+    expect(isStaticSnapshotPageKey("quick-replica-gallery")).toBe(true);
     expect(isStaticSnapshotPageKey("unknown")).toBe(false);
   });
 });
@@ -79,5 +85,37 @@ describe("buildCanvasHomeSnapshotFallback", () => {
       caseCount: 0,
       filmShowcaseCount: 0,
     });
+  });
+});
+
+describe("quickReplicaGallerySnapshotPayload", () => {
+  it("validates and summarizes empty normalized payload", () => {
+    const payload = normalizeQuickReplicaGallerySnapshotPayload({
+      version: 1,
+      generatedAt: "2026-09-07T00:00:00.000Z",
+      homeFeed: {} as never,
+      templatesByCategory: {} as never,
+      kindsByCategory: {} as never,
+    });
+    expect(isQuickReplicaGallerySnapshotPayload(payload)).toBe(true);
+    const summary = summarizeQuickReplicaGalleryPayload(payload);
+    expect(Object.values(summary.templateCounts).every((n) => n === 0)).toBe(true);
+    expect(Object.values(summary.kindCounts).every((n) => n === 0)).toBe(true);
+  });
+});
+
+describe("quickReplicaGallerySnapshotPayload", () => {
+  it("validates and summarizes empty normalized payload", () => {
+    const payload = normalizeQuickReplicaGallerySnapshotPayload({
+      version: 1,
+      generatedAt: "2026-09-07T00:00:00.000Z",
+      homeFeed: {} as never,
+      templatesByCategory: {} as never,
+      kindsByCategory: {} as never,
+    });
+    expect(isQuickReplicaGallerySnapshotPayload(payload)).toBe(true);
+    const summary = summarizeQuickReplicaGalleryPayload(payload);
+    expect(Object.values(summary.templateCounts).every((n) => n === 0)).toBe(true);
+    expect(Object.values(summary.kindCounts).every((n) => n === 0)).toBe(true);
   });
 });

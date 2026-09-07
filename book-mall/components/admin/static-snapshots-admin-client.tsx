@@ -11,6 +11,11 @@ import {
   CANVAS_HOME_PAGE_KEY,
 } from "@/lib/static-snapshots/canvas-home-payload";
 import {
+  isQuickReplicaGallerySnapshotPayload,
+  summarizeQuickReplicaGalleryPayload,
+  QUICK_REPLICA_GALLERY_PAGE_KEY,
+} from "@/lib/static-snapshots/quick-replica-gallery-payload";
+import {
   isSiteHomeSnapshotPayload,
   summarizeSiteHomePayload,
   SITE_HOME_PAGE_KEY,
@@ -49,6 +54,13 @@ const PAGE_TABS: {
     generateLabel: "立即生成画布首页快照",
     emptyHint: "尚无快照，请点击生成或运行 pnpm canvas-home:snapshot-generate",
   },
+  {
+    pageKey: QUICK_REPLICA_GALLERY_PAGE_KEY,
+    title: "QuickReplica 浏览（quick-replica-gallery）",
+    description: "首页四宫格 / 类目模板 / kind 卡片（不含用户私有作品）",
+    generateLabel: "立即生成 QuickReplica gallery 快照",
+    emptyHint: "尚无快照，请点击生成或运行 pnpm --dir book-mall qr:gallery-snapshot-generate",
+  },
 ];
 
 function fmtTime(d: Date | string) {
@@ -86,6 +98,14 @@ function summaryTextFromPayload(pageKey: string, payload: unknown): string | nul
     const s = summarizeCanvasHomePayload(payload);
     return `${s.featuredCount} 精选 · ${s.templateCount} 模板 · ${s.caseCount} 案例 · ${s.filmShowcaseCount} 视频`;
   }
+  if (
+    pageKey === QUICK_REPLICA_GALLERY_PAGE_KEY &&
+    isQuickReplicaGallerySnapshotPayload(payload)
+  ) {
+    const s = summarizeQuickReplicaGalleryPayload(payload);
+    const totalTemplates = Object.values(s.templateCounts).reduce((a, b) => a + b, 0);
+    return `${totalTemplates} 模板 · ${Object.keys(s.kindCounts).length} 类目 kinds`;
+  }
   return null;
 }
 
@@ -101,6 +121,13 @@ function runSummaryText(pageKey: string, summary: unknown): string {
       filmShowcaseCount?: number;
     } | null;
     return `${s?.featuredCount ?? "—"} 精选 · ${s?.templateCount ?? "—"} 模板 · ${s?.filmShowcaseCount ?? "—"} 视频`;
+  }
+  if (pageKey === QUICK_REPLICA_GALLERY_PAGE_KEY) {
+    const s = summary as { templateCounts?: Record<string, number> } | null;
+    const total = s?.templateCounts
+      ? Object.values(s.templateCounts).reduce((a, b) => a + b, 0)
+      : null;
+    return total != null ? `${total} 模板` : "—";
   }
   return "—";
 }

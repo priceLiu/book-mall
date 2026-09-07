@@ -4,6 +4,7 @@ import { encryptApiKey, maskApiKey, decryptApiKey } from "@/lib/canvas/secret";
 import { maskVolcengineCredentialDisplay } from "@/lib/gateway/volcengine-gateway-credential";
 import { syncPersonalGatewayApiKeyBindings } from "@/lib/gateway/api-key-service";
 import { resolveKieApiRoot, resolveOpenAiCompatibleBaseUrl } from "@/lib/gateway/model-router";
+import { assertElevenLabsApiKeyFormat } from "@/lib/gateway/elevenlabs-models";
 import { testGatewayCredentialConnection } from "@/lib/gateway/gateway-credential-test";
 
 export const GATEWAY_PROVIDER_KINDS = [
@@ -84,7 +85,11 @@ export async function createGatewayCredential(opts: {
   sortOrder?: number;
   isDefaultForProvider?: boolean;
 }) {
-  const blob = encryptApiKey(opts.apiKey.trim());
+  const trimmedKey = opts.apiKey.trim();
+  if (opts.providerKind === "ELEVENLABS") {
+    assertElevenLabsApiKeyFormat(trimmedKey);
+  }
+  const blob = encryptApiKey(trimmedKey);
   const rawBase = opts.baseUrl?.trim() || null;
   const baseUrl =
     rawBase &&
@@ -178,6 +183,10 @@ export async function updateGatewayCredential(
     where: { id, userId },
   });
   if (!row) return null;
+
+  if (patch.apiKey?.trim() && row.providerKind === "ELEVENLABS") {
+    assertElevenLabsApiKeyFormat(patch.apiKey);
+  }
 
   let baseUrl = row.baseUrl;
   if (patch.baseUrl !== undefined) {

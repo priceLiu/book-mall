@@ -43,7 +43,7 @@ export function openQrSessionReconnect(): void {
   if (href) window.location.href = href;
 }
 
-/** 调用 book-mall BFF；401 时先静默 refresh 并重试，仍失败则返回 401（不自动跳转）。 */
+/** 调用 book-mall BFF；401 时先静默 refresh 并重试，仍失败则返回 401（不自动跳转）。网络失败返回 503，不抛未捕获异常。 */
 export async function fetchQrPlatform(
   input: RequestInfo | URL,
   init?: RequestInit,
@@ -55,14 +55,21 @@ export async function fetchQrPlatform(
       cache: init?.cache ?? "no-store",
     });
 
-  let res = await doFetch();
-  if (await isPlatformUnauthorized(res)) {
-    const refreshed = await tryClientSessionRefresh();
-    if (refreshed) {
-      res = await doFetch();
+  try {
+    let res = await doFetch();
+    if (await isPlatformUnauthorized(res)) {
+      const refreshed = await tryClientSessionRefresh();
+      if (refreshed) {
+        res = await doFetch();
+      }
     }
+    return res;
+  } catch {
+    return new Response(JSON.stringify({ error: "book_mall_proxy_failed" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
   }
-  return res;
 }
 
 export function formatQrPlatformError(error: string | undefined): string {

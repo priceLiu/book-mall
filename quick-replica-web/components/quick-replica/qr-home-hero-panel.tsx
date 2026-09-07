@@ -50,8 +50,8 @@ function CategoryCardBackground({ urls }: { urls: string[] }) {
 
   return (
     <>
-      <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-px bg-black/30">
-        {urls.slice(0, 4).map((url, index) => (
+      <div className="absolute inset-0 grid grid-cols-2 grid-rows-3 gap-px bg-black/30">
+        {urls.slice(0, 6).map((url, index) => (
           <div key={`${url}-${index}`} className="relative min-h-0 min-w-0 overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -82,7 +82,7 @@ function CategoryCard({
     <button
       type="button"
       onClick={onClick}
-      className="qr-home-category-card group relative flex min-h-[168px] flex-col justify-end overflow-hidden rounded-[20px] border border-[var(--qr-border)] p-5 text-left transition hover:border-[var(--qr-brand)]/45 hover:shadow-[var(--qr-shadow-brand)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--qr-brand)]/60"
+      className="qr-home-category-card group relative flex min-h-[280px] flex-col justify-end overflow-hidden rounded-[20px] border border-[var(--qr-border)] p-5 text-left transition hover:border-[var(--qr-brand)]/45 hover:shadow-[var(--qr-shadow-brand)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--qr-brand)]/60"
     >
       <CategoryCardBackground urls={card.backgroundUrls} />
       <div className="relative z-10 flex flex-col gap-2">
@@ -121,7 +121,7 @@ export function QrHomeHeroPanel({
     >
       <div
         className={clsx(
-          "mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center gap-10 px-4 sm:gap-14 sm:px-6 lg:gap-20",
+          "mx-auto flex w-full max-w-[min(100%,88rem)] flex-1 flex-col justify-center gap-10 px-4 sm:gap-14 sm:px-8 lg:px-10 lg:gap-20",
           isLanding ? "pt-8 pb-[18vh] sm:pt-10 sm:pb-[22vh]" : "pt-6 pb-[16vh] sm:pt-10 sm:pb-[20vh]",
         )}
       >
@@ -161,7 +161,7 @@ export function QrHomeHeroPanel({
 
           <div
             className={clsx(
-              "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4",
+              "grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6",
               loading && cards.every((c) => c.backgroundUrls.length === 0)
                 ? "opacity-70"
                 : undefined,

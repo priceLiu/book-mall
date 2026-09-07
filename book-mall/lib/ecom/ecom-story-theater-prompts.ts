@@ -14,7 +14,7 @@ import {
 export type StoryTheaterPromptContext = {
   productName: string;
   dimensions: Record<string, string | undefined>;
-  sellpoints: Array<{ id: string; text: string }>;
+  sellpoints: Array<{ id: string; text: string; layer?: string }>;
   selectedTopicTitle: string;
   selectedStoryCore: string;
   selectedStoryType?: string;
@@ -29,32 +29,44 @@ const FASHION_CORE = `【角色】
 本模式为【剧情故事分镜模式】，区别于纯展示口播分镜；必须带有完整微型生活剧情，禁止单纯背诵卖点式口播。
 
 【核心定义】
-1. 仅限单人主角，不出现第二个人物、无任何画面内人物对白，单一场景为主。
+1. 以单人主角、单一场景为主；可按剧情需要写画外旁白或主角口播/对白，不强制只用一种。
 2. 严格基于传入的 selected_story_core 作为剧情骨架。
 3. 产品卖点融入剧情动作、上身效果、神态变化。
 4. 叙事闭环：烦恼纠结 → 换上服装转变 → 状态改善 → 自然带货引导
 
-【音频旁白】
-无画面内对白；audio_voice 字段填画外旁白（内心独白风格）。人物靠动作表情演出。
-禁止旁白独立背诵面料参数；卖点用镜头与动作展示。
+【卖点绑定 · 必填】
+上下文 sellpoints（已定稿）中的 id（如 S01、S02…）是唯一合法卖点 ID。
+- 每镜 panels 必填 sellpointIds：字符串数组，引用上述 id，每镜至少 1 条；禁止空数组或「—」。
+- 全片须覆盖全部 core + visual 卖点（aux 可进运营包）；同一卖点可出现在多镜。
+- 必须输出 coverageChecklist：逐条列出每个 core/visual 卖点的 sellpointId、sellpointText、layer、panelIndexes、covered:true。
+- garmentFocus / productFocus 须与当镜 sellpointIds 语义一致。
+
+【台词 / 配音 · 基于卖点设计】
+每镜 dialogue（或 audio_voice）须根据当镜 sellpointIds 对应的卖点文案来设计，可写画外旁白、主角口播或内心独白，按剧情选用。
+- layer=core 的卖点：优先在本镜 dialogue 中自然带出（口语化、不背参数表）。
+- layer=visual 的卖点：dialogue 可轻点或留空，但须在 sellpointIds 中绑定并在镜头/动作中展示。
+- 6–8 镜中至少 4 镜应有非空 dialogue；仅纯动作特写镜可留空。
+用户可在中栏分镜表自行修改；禁止全片 dialogue 留空或 sellpointIds 与上方卖点表脱节。
 
 【硬性规则】
 - 总时长 30–45s，6–8 镜，单镜最少 2s
 - 前 3–7s 先演痛点，禁止一上来直接展示服装
-- T5 情绪共鸣型：同一 story_core，强化内心独白节奏与微表情，禁止改 story_core 主线
+- T5 情绪共鸣型：同一 story_core，可强化旁白/口播节奏与微表情，禁止改 story_core 主线
 
 【五套固定角度】
 ${T_VERSION_RULES}
 
 【字段映射】输出 panels 时使用：
-- shot_desc → 写入 sceneDesc
+- index, shotScale, durationSec, cameraMove
+- shot_desc → sceneDesc
 - model_action → modelAction
-- audio_voice → dialogue（画外旁白）
+- audio_voice / dialogue → dialogue（口播或旁白，同义；须呼应 sellpointIds）
 - emotion → toneTexture
 - subtitle → subtitle（可选）
+- sellpointIds → 必填，引用已定稿卖点 id 数组
 同时生成 scenePrompt / imagePrompt / videoPrompt（≥20 字）与 garmentFocus / productFocus
 
-【输出 JSON】仅含 storyTheaterVersions（T1–T5 各一套）+ selectedStoryTopic 回传 + coverageChecklist（可选）。
+【输出 JSON】须含 storyTheaterVersions（T1–T5 各一套）+ selectedStoryTopic 回传 + coverageChecklist（必填）。
 禁止 Markdown 表与额外解释文字。`;
 
 const BAGS_CORE = FASHION_CORE.replace(/服装/g, "包袋")
@@ -72,13 +84,37 @@ const STORY_THEATER_JSON_SHAPE = `{
   "vertical": "fashion_apparel | bags | digital_3c",
   "selectedStoryTopic": { "id": "...", "title": "...", "storyCore": "...", "storyType": "..." },
   "storyTheaterVersions": {
-    "T1": { "id": "T1", "title": "...", "summary": "...", "panels": [ /* 6-8 镜 */ ], "totalDurationSec": 35 },
-    "T2": { ... },
-    "T3": { ... },
-    "T4": { ... },
-    "T5": { ... }
+    "T1": {
+      "id": "T1",
+      "title": "...",
+      "summary": "...",
+      "panels": [
+        {
+          "index": 1,
+          "shotScale": "中全景",
+          "durationSec": 4,
+          "cameraMove": "固定",
+          "sceneDesc": "...",
+          "scenePrompt": "...",
+          "imagePrompt": "...",
+          "videoPrompt": "...",
+          "modelAction": "...",
+          "garmentFocus": "...",
+          "dialogue": "（基于 sellpointIds 设计的口播/旁白）",
+          "toneTexture": "...",
+          "sellpointIds": ["S01"]
+        }
+      ],
+      "totalDurationSec": 35
+    },
+    "T2": { "...": "同上结构，6-8 镜" },
+    "T3": { "...": "..." },
+    "T4": { "...": "..." },
+    "T5": { "...": "..." }
   },
-  "coverageChecklist": [ { "sellpointId": "S01", "sellpointText": "...", "layer": "core", "panelIndexes": [1,3], "covered": true } ]
+  "coverageChecklist": [
+    { "sellpointId": "S01", "sellpointText": "...", "layer": "core", "panelIndexes": [1, 3], "covered": true }
+  ]
 }`;
 
 function formatDimensions(dimensions: Record<string, string | undefined>): string {
@@ -88,8 +124,15 @@ function formatDimensions(dimensions: Record<string, string | undefined>): strin
     .join("\n");
 }
 
-function formatSellpoints(sellpoints: Array<{ id: string; text: string }>): string {
-  return sellpoints.map((s) => `${s.id}: ${s.text}`).join("\n");
+function formatSellpoints(
+  sellpoints: Array<{ id: string; text: string; layer?: string }>,
+): string {
+  return sellpoints
+    .map((s) => {
+      const layer = s.layer?.trim() ? ` [${s.layer.trim()}]` : "";
+      return `${s.id}${layer}: ${s.text}`;
+    })
+    .join("\n");
 }
 
 export function buildStoryTheaterSystemPrompt(

@@ -1,8 +1,11 @@
+import { randomUUID } from "crypto";
+
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
 import { buildStoryboardStandaloneHtml } from "@/lib/ecom/ecom-storyboard-html";
+import { ensureStoryboardRefImageForWan27 } from "@/lib/ecom/ecom-storyboard-ref-image";
 import {
   schemeToSheet,
   type StoryboardDeliverable,
@@ -428,6 +431,35 @@ export async function addStoryboardReferenceUpload(
   const refs = [...project.references, ref];
   await updateEcomStoryboardProject(userId, projectId, { references: refs });
   return ref;
+}
+
+export async function attachStoryboardCharacterFromLibrary(
+  userId: string,
+  projectId: string,
+  entry: { id: string; name: string; ossUrl: string },
+): Promise<EcomStoryboardProjectDto | null> {
+  const project = await getEcomStoryboardProject(userId, projectId);
+  if (!project) return null;
+
+  const url = entry.ossUrl?.trim();
+  if (!url || !/^https?:\/\//.test(url)) {
+    throw new Error("模特库图片不可用");
+  }
+
+  const { url: normalized } = await ensureStoryboardRefImageForWan27({
+    userId,
+    imageUrl: url,
+  });
+
+  const refs = project.references.filter((r) => r.role !== "character");
+  refs.push({
+    id: randomUUID(),
+    label: (entry.name ?? "模特库").slice(0, 40),
+    role: "character",
+    ossUrl: normalized,
+  });
+
+  return updateEcomStoryboardProject(userId, projectId, { references: refs });
 }
 
 export async function saveStoryboardSheetPng(

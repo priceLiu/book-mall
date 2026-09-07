@@ -4,6 +4,7 @@
  *   pnpm exec dotenv -e .env.local -- tsx scripts/seed-lib-nano-pro-credit-prices.ts
  */
 import { publishModelCreditPrice } from "../lib/pricing/credit-pricing-engine";
+import { findModelCreditPrice } from "../lib/pricing/model-credit-price-store";
 import { importModelCostProfileVersioned } from "../lib/pricing/import-model-cost-profile-versioned";
 import { prisma } from "../lib/prisma";
 
@@ -46,10 +47,7 @@ async function upsertCost(row: (typeof TIERS)[number]) {
 }
 
 async function syncOfferingCredits(defaultTierKey: string) {
-  const price = await prisma.modelCreditPrice.findUnique({
-    where: { canonicalModelKey: defaultTierKey },
-    select: { creditsPerUnit: true },
-  });
+  const price = await findModelCreditPrice({ canonicalModelKey: defaultTierKey });
   if (!price) return;
   await prisma.appModelOffering.updateMany({
     where: { canonicalModelKey: "lib-nano-pro", status: "ACTIVE" },

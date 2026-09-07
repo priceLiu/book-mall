@@ -386,7 +386,7 @@ export function FashionPanelsTable({
               "生视频Prompt",
               "动作",
               panelFocusLabel,
-              storyTheaterMode ? "旁白" : "口播",
+              storyTheaterMode ? "口播/旁白" : "口播",
               ...(storyTheaterMode ? ["情绪", "字幕"] : []),
               "卖点ID",
             ].map((h) => (
@@ -528,12 +528,12 @@ export function FashionPanelsTable({
                 )}
               </td>
               <td className={cn(ecomDataTableTdClass, "min-w-0")}>
-                {editable && !storyTheaterMode ? (
+                {editable ? (
                   <FashionEditableTextCell
                     value={escCell(p.dialogue ?? "")}
                     editable
                     saving={saving}
-                    editTitle="编辑口播"
+                    editTitle={storyTheaterMode ? "编辑口播/旁白" : "编辑口播"}
                     onSave={(text) => patchPanel(p.index, { dialogue: text })}
                   />
                 ) : (
@@ -543,10 +543,30 @@ export function FashionPanelsTable({
               {storyTheaterMode ? (
                 <>
                   <td className={cn(ecomDataTableTdClass, "min-w-0")}>
-                    {escCell(p.toneTexture)}
+                    {editable ? (
+                      <FashionEditableTextCell
+                        value={escCell(p.toneTexture ?? "")}
+                        editable
+                        saving={saving}
+                        editTitle="编辑情绪"
+                        onSave={(text) => patchPanel(p.index, { toneTexture: text })}
+                      />
+                    ) : (
+                      escCell(p.toneTexture)
+                    )}
                   </td>
                   <td className={cn(ecomDataTableTdClass, "min-w-0")}>
-                    {escCell(p.subtitle)}
+                    {editable ? (
+                      <FashionEditableTextCell
+                        value={escCell(p.subtitle ?? "")}
+                        editable
+                        saving={saving}
+                        editTitle="编辑字幕"
+                        onSave={(text) => patchPanel(p.index, { subtitle: text })}
+                      />
+                    ) : (
+                      escCell(p.subtitle)
+                    )}
                   </td>
                 </>
               ) : null}

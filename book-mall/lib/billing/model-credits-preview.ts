@@ -14,6 +14,7 @@ import {
   computeUnifiedChargeCredits,
   videoBillableSeconds,
 } from "@/lib/pricing/credit-pricing-formulas";
+import { findModelCreditPrice } from "@/lib/pricing/model-credit-price-store";
 
 import { libNanoProCanonicalFromModelKey } from "@/lib/billing/lib-nano-pro-canonical";
 import {
@@ -132,19 +133,14 @@ export async function previewModelCredits(
   const canonical = (await resolvePreviewCanonical(input)) ?? input.modelKey.trim();
   if (!canonical) return null;
 
-  const snap = await resolveCostSnapshot(canonical);
+  const snap = await resolveCostSnapshot(canonical, {
+    resolution: input.resolution,
+  });
   if (!snap?.listPriceYuan || !snap.unit) return null;
 
-  const price = await prisma.modelCreditPrice.findUnique({
-    where: { canonicalModelKey: canonical },
-    select: {
-      creditsPerUnit: true,
-      inputCreditsPerKToken: true,
-      outputCreditsPerKToken: true,
-      inputListPriceYuan: true,
-      outputListPriceYuan: true,
-      listPriceYuan: true,
-    },
+  const price = await findModelCreditPrice({
+    canonicalModelKey: canonical,
+    resolution: input.resolution,
   });
   const creditsPerUnit = price?.creditsPerUnit ?? snap.creditsPerUnit;
   if (!creditsPerUnit || creditsPerUnit <= 0) return null;

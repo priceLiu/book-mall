@@ -144,6 +144,17 @@ type Props = {
     assetIds: string[],
     role: StoryboardReference["role"],
   ) => void | Promise<void>;
+  onAttachModelFromLibrary?: (entry: {
+    id: string;
+    name: string;
+    ossUrl: string;
+  }) => void | Promise<void>;
+  onGenerateRef?: (
+    role: "character" | "scene",
+    opts: { prompt: string; modelKey: string },
+  ) => void | Promise<void>;
+  refGenBusyRole?: StoryboardReference["role"] | null;
+  onRetryLoadImageModels?: () => void | Promise<void>;
   imageModels: StoryboardGatewayModel[];
   videoModels: StoryboardGatewayModel[];
   settings: StoryboardSettingsValue;
@@ -221,6 +232,10 @@ export function StoryboardContentPanel({
   onRefUpload,
   onRefRemove,
   onAttachAssets,
+  onAttachModelFromLibrary,
+  onGenerateRef,
+  refGenBusyRole = null,
+  onRetryLoadImageModels,
   imageModels,
   videoModels,
   settings,
@@ -2841,11 +2856,26 @@ export function StoryboardContentPanel({
             onUpload={onRefUpload}
             onRemove={onRefRemove}
             onAttachAssets={(assetIds, role) => Promise.resolve(onAttachAssets(assetIds, role))}
+            onAttachModelFromLibrary={
+              onAttachModelFromLibrary
+                ? (entry) => Promise.resolve(onAttachModelFromLibrary(entry))
+                : undefined
+            }
+            onGenerateRef={
+              onGenerateRef
+                ? (role, opts) => Promise.resolve(onGenerateRef(role, opts))
+                : undefined
+            }
+            imageModels={imageModels}
+            imageModelKey={settings.imageModelKey}
+            onRetryLoadModels={onRetryLoadImageModels}
+            genBusyRole={refGenBusyRole}
             busy={refBusy}
             uploadingRole={uploadingRole}
             uploadProgress={uploadProgress}
             activeRole={uploadRole}
             onActiveRoleChange={onUploadRoleChange}
+            characterTitle="模特图"
           />
         </section>
 
@@ -2855,6 +2885,15 @@ export function StoryboardContentPanel({
         title="整图成片生成中"
         surface="content"
         detail={`Gateway 视频任务进行中，通常需 3–8 分钟。${videoTaskStartedAt ? `已等待 ${formatTaskElapsed(videoTaskStartedAt)}` : ""}${videoPollCount > 0 ? ` · 轮询 ${videoPollCount} 次` : ""}。请勿重复提交。`}
+      />
+      <StoryboardTaskStatus
+        className="mx-6 mb-2"
+        active={Boolean(refGenBusyRole)}
+        surface="content"
+        title={
+          refGenBusyRole === "scene" ? "AI 场景参考图生成中" : "AI 模特参考图生成中"
+        }
+        detail="Gateway 图像任务进行中，完成后写入左侧素材区。"
       />
       <StoryboardTaskStatus
         className="mx-6 mb-2"

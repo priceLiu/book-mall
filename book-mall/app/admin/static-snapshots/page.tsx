@@ -3,6 +3,11 @@ import {
   snapshotInfoFromRow,
 } from "@/components/admin/static-snapshots-admin-client";
 import { CANVAS_HOME_PAGE_KEY } from "@/lib/static-snapshots/canvas-home-payload";
+import {
+  QUICK_REPLICA_GALLERY_PAGE_KEY,
+  isQuickReplicaGallerySnapshotPayload,
+  summarizeQuickReplicaGalleryPayload,
+} from "@/lib/static-snapshots/quick-replica-gallery-payload";
 import { SITE_HOME_PAGE_KEY } from "@/lib/static-snapshots/site-home-payload";
 import {
   getLatestStaticPageSnapshot,
@@ -14,11 +19,14 @@ export const metadata = {
 };
 
 export default async function AdminStaticSnapshotsPage() {
-  const [siteHomeLatest, canvasHomeLatest, siteHomeRuns, canvasHomeRuns] = await Promise.all([
+  const [siteHomeLatest, canvasHomeLatest, qrGalleryLatest, siteHomeRuns, canvasHomeRuns, qrGalleryRuns] =
+    await Promise.all([
     getLatestStaticPageSnapshot(SITE_HOME_PAGE_KEY),
     getLatestStaticPageSnapshot(CANVAS_HOME_PAGE_KEY),
+    getLatestStaticPageSnapshot(QUICK_REPLICA_GALLERY_PAGE_KEY),
     listStaticSnapshotGenerationRuns(SITE_HOME_PAGE_KEY, 30),
     listStaticSnapshotGenerationRuns(CANVAS_HOME_PAGE_KEY, 30),
+    listStaticSnapshotGenerationRuns(QUICK_REPLICA_GALLERY_PAGE_KEY, 30),
   ]);
 
   const mapRuns = (runs: typeof siteHomeRuns) =>
@@ -33,10 +41,14 @@ export default async function AdminStaticSnapshotsPage() {
       snapshots={{
         [SITE_HOME_PAGE_KEY]: siteHomeLatest ? snapshotInfoFromRow(siteHomeLatest) : null,
         [CANVAS_HOME_PAGE_KEY]: canvasHomeLatest ? snapshotInfoFromRow(canvasHomeLatest) : null,
+        [QUICK_REPLICA_GALLERY_PAGE_KEY]: qrGalleryLatest
+          ? snapshotInfoFromRow(qrGalleryLatest)
+          : null,
       }}
       runsByPageKey={{
         [SITE_HOME_PAGE_KEY]: mapRuns(siteHomeRuns),
         [CANVAS_HOME_PAGE_KEY]: mapRuns(canvasHomeRuns),
+        [QUICK_REPLICA_GALLERY_PAGE_KEY]: mapRuns(qrGalleryRuns),
       }}
     />
   );

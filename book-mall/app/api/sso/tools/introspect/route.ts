@@ -157,20 +157,29 @@ export const GET = withApiDbGuard(async (req) => {
     const body = diagEnabled
       ? mergeDiag(payload, { ...baseDiag, phase: "ok_lite" })
       : payload;
+    logToolsIntrospectToConsole({
+      phase: "ok",
+      msJwtVerify,
+      msEligibility,
+      msTotal: performance.now() - tRoute,
+    });
     return NextResponse.json(body, { headers });
   }
 
   // 准入解耦：有效令牌 + 有效会话即视为 active（已登录门户会话）；是否已开通工具能力由
   // `entitled` 表达。未开通用户可进门户浏览个人中心/定价/开通引导，生成时再由网关复查。
-  logToolsIntrospectToConsole({
-    // 控制台仅记录会话是否有效；是否开通由响应体 `entitled` 表达。
-    phase: "ok",
-    msJwtVerify,
-    msEligibility,
-    msTotal: performance.now() - tRoute,
-  });
+  let msNavKeys = 0;
+  let msServicePeriods = 0;
+  let msEcomNav = 0;
+  let msBilling = 0;
+  let msTenant = 0;
+  let msCredit = 0;
 
+  const tNav0 = performance.now();
   const resolvedNav = await resolveToolsNavKeysForUser(verified.sub);
+  msNavKeys = performance.now() - tNav0;
+
+  const tSp0 = performance.now();
   const servicePeriods = elig.isAdmin
     ? []
     : (await getActiveToolServicePeriods(verified.sub)).map((p) => ({
@@ -178,30 +187,69 @@ export const GET = withApiDbGuard(async (req) => {
         periodEnd: p.periodEnd.toISOString(),
         lastChargedPoints: p.lastChargedPoints,
       }));
+  msServicePeriods = performance.now() - tSp0;
 
   let tools_nav_keys = elig.isAdmin
     ? [...TOOL_SUITE_NAV_KEYS]
     : resolvedNav.keys;
+
+  const tEcomNav0 = performance.now();
   tools_nav_keys = await mergeEcomToolkitNavKeys(
     verified.sub,
     tools_nav_keys,
     elig.isAdmin,
   );
+  msEcomNav = performance.now() - tEcomNav0;
 
+  const tBilling0 = performance.now();
   const ecom_billing_mode =
     verified.ecom_billing_mode ?? (await getUserEcomBillingMode(verified.sub));
+  msBilling = performance.now() - tBilling0;
 
-  // 多租户上下文 + 当前空间积分余额（团队取共享池，个人取个人账户）
+  const tTenant0 = performance.now();
   const tenantCtx = await resolveTenantContextForUser(
     verified.sub,
     verified.tenant_id ?? null,
   );
+  msTenant = performance.now() - tTenant0;
+
   let creditBalance: number | null = null;
   if (tenantCtx) {
+    const tCredit0 = performance.now();
     creditBalance = await getCreditBalance(tenantCtx.billingOwnerRef).catch(
       () => null,
     );
+    msCredit = performance.now() - tCredit0;
   }
+
+  const msTotal = performance.now() - tRoute;
+  logToolsIntrospectToConsole({
+    phase: "ok",
+    msJwtVerify,
+    msEligibility,
+    msNavKeys,
+    msServicePeriods,
+    msEcomNav,
+    msBilling,
+    msTenant,
+    msCredit,
+    msTotal,
+  });
+
+  headers.set(
+    "Server-Timing",
+    [
+      `jwt_verify;dur=${Math.round(msJwtVerify)}`,
+      `eligibility;dur=${Math.round(msEligibility)}`,
+      `nav_keys;dur=${Math.round(msNavKeys)}`,
+      `service_periods;dur=${Math.round(msServicePeriods)}`,
+      `ecom_nav;dur=${Math.round(msEcomNav)}`,
+      `billing;dur=${Math.round(msBilling)}`,
+      `tenant;dur=${Math.round(msTenant)}`,
+      `credit;dur=${Math.round(msCredit)}`,
+      `route;dur=${Math.round(msTotal)}`,
+    ].join(", "),
+  );
 
   const payload = {
     active: true,
@@ -229,6 +277,18 @@ export const GET = withApiDbGuard(async (req) => {
     image: elig.image,
   };
 
-  const body = diagEnabled ? mergeDiag(payload, { ...baseDiag, phase: "ok" }) : payload;
+  const body = diagEnabled
+    ? mergeDiag(payload, {
+        ...baseDiag,
+        phase: "ok",
+        msNavKeys,
+        msServicePeriods,
+        msEcomNav,
+        msBilling,
+        msTenant,
+        msCredit,
+        msTotal,
+      })
+    : payload;
   return NextResponse.json(body, { headers });
 });
