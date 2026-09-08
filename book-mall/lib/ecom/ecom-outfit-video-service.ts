@@ -918,6 +918,7 @@ const OUTFIT_GARMENT_KIND_LABELS: Record<VtonGarmentItem["kind"], string> = {
   top: "上装",
   bottom: "下装",
   one_piece: "连体/裙",
+  full_set: "套装",
 };
 
 export async function patchEcomOutfitVideoLooks(

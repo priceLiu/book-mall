@@ -142,7 +142,7 @@ export function EcomRefUploadCard({
   allowVideo = false,
   listenPaste = true,
 }: Props) {
-  const { dragOver, pasteReady, focusZone, dropZoneProps } = useImageDropPaste({
+  const { dragOver, focusZone, dropZoneProps } = useImageDropPaste({
     enabled: !busy && !generating,
     multiple,
     allowVideo,
@@ -150,7 +150,7 @@ export function EcomRefUploadCard({
     onFiles: onUploadFiles,
   });
 
-  const highlight = dragOver || pasteReady;
+  const highlight = dragOver;
 
   const setInputRef = (el: HTMLInputElement | null) => {
     if (typeof inputRef === "function") {
@@ -169,7 +169,7 @@ export function EcomRefUploadCard({
         "rounded-lg border px-2.5 py-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#0071e3]/30",
         highlight && "border-[#0071e3] bg-white ring-1 ring-[#0071e3]/30",
         !highlight && suggested && "border-[#0071e3]/45 bg-white ring-1 ring-[#0071e3]/15",
-        !highlight && !suggested && "border-[#e8e8ed] bg-white",
+        !highlight && !suggested && "border-[#e8e8ed] bg-white hover:border-[#0071e3]/40",
       )}
       onMouseEnter={() => {
         dropZoneProps.onMouseEnter?.();
@@ -180,22 +180,31 @@ export function EcomRefUploadCard({
         onMouseLeaveCard?.();
       }}
     >
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <TitleTag
-          type={onTitleClick ? "button" : undefined}
-          className="text-left text-xs font-semibold text-[#1d1d1f]"
-          onClick={onTitleClick}
-        >
-          {title}
-          {highlight ? (
-            <span className="ml-1.5 text-[10px] font-normal text-[#0071e3]">
-              可拖放 / Ctrl+V 粘贴
-            </span>
-          ) : null}
-        </TitleTag>
-        <div className="flex shrink-0 gap-1.5">
-          {toolbarPrefix}
-          {onOpenAssetPicker ? (
+      <div className={cn("mb-1.5", toolbarPrefix ? "space-y-2" : undefined)}>
+        <div className="flex items-center justify-between gap-2">
+          <TitleTag
+            type={onTitleClick ? "button" : undefined}
+            className="min-w-0 text-left text-xs font-semibold text-[#1d1d1f]"
+            onClick={onTitleClick}
+          >
+            {title}
+          </TitleTag>
+          <div className="flex shrink-0 gap-1.5">
+            {onOpenAssetPicker ? (
+              <EcomButtonSecondary
+                size="sm"
+                type="button"
+                disabled={busy}
+                className="h-7 px-2 text-[10px]"
+                onClick={() => {
+                  focusZone();
+                  onOpenAssetPicker();
+                }}
+              >
+                <Images className="h-3 w-3 shrink-0" />
+                我的资产
+              </EcomButtonSecondary>
+            ) : null}
             <EcomButtonSecondary
               size="sm"
               type="button"
@@ -203,27 +212,17 @@ export function EcomRefUploadCard({
               className="h-7 px-2 text-[10px]"
               onClick={() => {
                 focusZone();
-                onOpenAssetPicker();
+                onOpenFilePicker();
               }}
             >
-              <Images className="h-3 w-3 shrink-0" />
-              我的资产
+              <Plus className="h-3 w-3 shrink-0" />
+              上传
             </EcomButtonSecondary>
-          ) : null}
-          <EcomButtonSecondary
-            size="sm"
-            type="button"
-            disabled={busy}
-            className="h-7 px-2 text-[10px]"
-            onClick={() => {
-              focusZone();
-              onOpenFilePicker();
-            }}
-          >
-            <Plus className="h-3 w-3 shrink-0" />
-            上传
-          </EcomButtonSecondary>
+          </div>
         </div>
+        {toolbarPrefix ? (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">{toolbarPrefix}</div>
+        ) : null}
       </div>
 
       <input
@@ -256,7 +255,7 @@ export function EcomRefUploadCard({
         </div>
       ) : null}
 
-      <div className="relative min-h-[56px]">
+      <div className={cn("relative", toolbarPrefix ? "min-h-[80px]" : "min-h-[56px]")}>
         {generating && items.length === 0 ? (
           <EcomRefGeneratingThumb label={generatingLabel} />
         ) : null}
@@ -313,7 +312,9 @@ export function EcomRefUploadCard({
             )}
           </div>
         ) : !generating ? (
-          <p className="text-[10px] text-[#86868b]">{emptyHint}</p>
+          <p className={cn("text-[10px]", highlight ? "text-[#0071e3]" : "text-[#86868b]")}>
+            {highlight ? "松开以上传" : emptyHint}
+          </p>
         ) : null}
       </div>
     </div>

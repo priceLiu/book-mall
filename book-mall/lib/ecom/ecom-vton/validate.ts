@@ -54,6 +54,18 @@ export function resolveLookTryonUrls(opts: {
     };
   }
 
+  if (look.kind === "full_set") {
+    const set = findGarmentInPool(garmentPool, look.fullSetGarmentId);
+    if (!set || set.kind !== "full_set") {
+      throw new Error(`搭配 ${look.label ?? look.id} 缺少套装`);
+    }
+    return {
+      personImageUrl,
+      topGarmentUrl: set.ossUrl,
+      lookKind: "full_set",
+    };
+  }
+
   if (look.kind === "top_only") {
     const top = findGarmentInPool(garmentPool, look.topGarmentId);
     if (!top || top.kind !== "top") throw new Error(`搭配 ${look.label ?? look.id} 缺少上装`);

@@ -23,7 +23,7 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "缺少 file" }, { status: 400 });
   }
-  if (kind !== "top" && kind !== "bottom" && kind !== "one_piece") {
+  if (kind !== "top" && kind !== "bottom" && kind !== "one_piece" && kind !== "full_set") {
     return NextResponse.json({ error: "无效 kind" }, { status: 400 });
   }
 

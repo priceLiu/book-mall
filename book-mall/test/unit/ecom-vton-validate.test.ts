@@ -87,6 +87,7 @@ describe("batch look validate", () => {
     { id: "t1", kind: "top" as const, ossUrl: "https://x/top.jpg" },
     { id: "b1", kind: "bottom" as const, ossUrl: "https://x/bottom.jpg" },
     { id: "d1", kind: "one_piece" as const, ossUrl: "https://x/dress.jpg" },
+    { id: "s1", kind: "full_set" as const, ossUrl: "https://x/set.jpg" },
   ];
 
   it("resolveLookTryonUrls maps four look kinds", () => {
@@ -125,6 +126,14 @@ describe("batch look validate", () => {
         modelUrl: "https://x/model.jpg",
       }),
     ).toMatchObject({ lookKind: "bottom_only", bottomGarmentUrl: "https://x/bottom.jpg" });
+
+    expect(
+      resolveLookTryonUrls({
+        look: { id: "l5", kind: "full_set", fullSetGarmentId: "s1" },
+        garmentPool: pool,
+        modelUrl: "https://x/model.jpg",
+      }),
+    ).toMatchObject({ lookKind: "full_set", topGarmentUrl: "https://x/set.jpg" });
   });
 
   it("assertBatchLooksValid enforces 1-9 limit", () => {

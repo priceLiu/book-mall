@@ -34,6 +34,10 @@ function lookLabel(looks: VtonLookSpec[], lookId: string): string {
   return look?.label ?? lookId.slice(0, 6);
 }
 
+/** 试衣结果 · 最多 6 列，小屏自适应 */
+const VTON_RESULTS_GRID_CLASS =
+  "grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
+
 function resultCellClass(result: VtonTryonResult, selected: boolean): string {
   return cn(
     "relative overflow-hidden rounded-lg border bg-[#fafafa]",
@@ -62,7 +66,11 @@ export function VtonResultsGrid({
   onBatchTryon,
 }: Props) {
   const results = batch?.results ?? [];
-  const slots = Array.from({ length: ECOM_VTON_MAX_BATCH_LOOKS }, (_, i) => results[i] ?? null);
+  const slotCount = Math.min(
+    ECOM_VTON_MAX_BATCH_LOOKS,
+    Math.max(looks.length, results.length),
+  );
+  const slots = Array.from({ length: slotCount }, (_, i) => results[i] ?? null);
   const running = batch?.status === "running" || tryonBusy;
   const hasSuccess = results.some((r) => r.status === "success" && r.ossUrl);
   const lockedResultIds = new Set(lockedLooks.map((l) => l.resultId).filter(Boolean));
@@ -102,8 +110,9 @@ export function VtonResultsGrid({
         </EcomButtonPrimary>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-3 md:grid-cols-3">
-        {slots.slice(0, Math.max(looks.length, results.length, 3)).map((result, i) => {
+      {slotCount > 0 ? (
+        <div className={VTON_RESULTS_GRID_CLASS}>
+          {slots.map((result, i) => {
           if (!result) {
             return (
               <div
@@ -165,7 +174,8 @@ export function VtonResultsGrid({
             </div>
           );
         })}
-      </div>
+        </div>
+      ) : null}
 
       {hasSuccess ? (
         <div className="flex flex-wrap gap-2">
@@ -186,14 +196,14 @@ export function VtonResultsGrid({
             已锁定参考 ({lockedLooks.length})
             {mode === "outfit-video" ? " · 锁定后可进入逐镜生成" : ""}
           </h4>
-          <div className="flex flex-wrap gap-2">
+          <div className={VTON_RESULTS_GRID_CLASS}>
             {lockedLooks.map((look) => {
               const isDefault = look.id === defaultLockedLookId;
               return (
                 <div
                   key={look.id}
                   className={cn(
-                    "relative w-20 overflow-hidden rounded-lg border",
+                    "relative w-full overflow-hidden rounded-lg border",
                     isDefault ? "border-[#0071e3]" : "border-[#e8e8ed]",
                   )}
                 >

@@ -13,8 +13,8 @@ import type {
 } from "@/lib/ecom/ecom-vton/types";
 import { ECOM_VTON_MAX_BATCH_LOOKS } from "@/lib/ecom/ecom-vton/types";
 
-const GARMENT_KINDS = new Set(["top", "bottom", "one_piece"]);
-const LOOK_KINDS = new Set(["two_piece", "one_piece", "top_only", "bottom_only"]);
+const GARMENT_KINDS = new Set(["top", "bottom", "one_piece", "full_set"]);
+const LOOK_KINDS = new Set(["two_piece", "one_piece", "top_only", "bottom_only", "full_set"]);
 
 export function emptyVtonProjectMeta(): VtonProjectMeta {
   return {
@@ -59,6 +59,8 @@ function sanitizeLookSpec(raw: unknown): VtonLookSpec | null {
     bottomGarmentId: typeof o.bottomGarmentId === "string" ? o.bottomGarmentId : undefined,
     onePieceGarmentId:
       typeof o.onePieceGarmentId === "string" ? o.onePieceGarmentId : undefined,
+    fullSetGarmentId:
+      typeof o.fullSetGarmentId === "string" ? o.fullSetGarmentId : undefined,
   };
 }
 

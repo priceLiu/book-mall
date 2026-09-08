@@ -230,8 +230,8 @@ export function ModelTryonStudio() {
   const useBatch = outfitRefMode === "need_tryon";
 
   return (
-    <EcomWorkspaceLayout fullWidth>
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-5">
+    <EcomWorkspaceLayout fullWidth contentClassName="overflow-y-auto">
+      <div className="flex min-h-full w-full flex-col gap-4 p-4 md:p-5 lg:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-lg font-semibold text-[#1d1d1f]">模特试衣</h1>

@@ -11,9 +11,9 @@ export const ECOM_VTON_MAX_BATCH_LOOKS = 9;
 export type VtonGarmentMode = "two_piece" | "one_piece";
 export type VtonRefMode = "already_dressed" | "need_tryon";
 
-export type VtonLookKind = "two_piece" | "one_piece" | "top_only" | "bottom_only";
+export type VtonLookKind = "two_piece" | "one_piece" | "top_only" | "bottom_only" | "full_set";
 
-export type VtonGarmentKind = "top" | "bottom" | "one_piece";
+export type VtonGarmentKind = "top" | "bottom" | "one_piece" | "full_set";
 
 export type VtonGarmentItem = {
   id: string;
@@ -30,6 +30,7 @@ export type VtonLookSpec = {
   topGarmentId?: string;
   bottomGarmentId?: string;
   onePieceGarmentId?: string;
+  fullSetGarmentId?: string;
 };
 
 export type VtonTryonResultStatus = "pending" | "running" | "success" | "failed";

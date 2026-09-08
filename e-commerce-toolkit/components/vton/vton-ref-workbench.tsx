@@ -223,7 +223,11 @@ export function VtonRefWorkbench({
       <div
         className={cn(
           "grid gap-4",
-          isAlreadyDressed ? "md:grid-cols-1" : isTwoPiece ? "md:grid-cols-3" : "md:grid-cols-2",
+          isAlreadyDressed || useBatch
+            ? "md:grid-cols-1"
+            : isTwoPiece
+              ? "md:grid-cols-3"
+              : "md:grid-cols-2",
         )}
       >
         <div className="space-y-2">

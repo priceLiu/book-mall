@@ -2,8 +2,8 @@ import type { VtonTryonProgress } from "@/lib/vton-tryon-progress";
 
 export const ECOM_VTON_MAX_BATCH_LOOKS = 9;
 
-export type VtonLookKind = "two_piece" | "one_piece" | "top_only" | "bottom_only";
-export type VtonGarmentKind = "top" | "bottom" | "one_piece";
+export type VtonLookKind = "two_piece" | "one_piece" | "top_only" | "bottom_only" | "full_set";
+export type VtonGarmentKind = "top" | "bottom" | "one_piece" | "full_set";
 
 export type VtonGarmentItem = {
   id: string;
@@ -20,6 +20,7 @@ export type VtonLookSpec = {
   topGarmentId?: string;
   bottomGarmentId?: string;
   onePieceGarmentId?: string;
+  fullSetGarmentId?: string;
 };
 
 export type VtonTryonResult = {
@@ -80,10 +81,19 @@ export const VTON_LOOK_KIND_LABELS: Record<VtonLookKind, string> = {
   one_piece: "连体/裙",
   top_only: "仅上装",
   bottom_only: "仅下装",
+  full_set: "套装",
 };
 
 export const VTON_GARMENT_KIND_LABELS: Record<VtonGarmentKind, string> = {
   top: "上装",
   bottom: "下装",
   one_piece: "连体/裙",
+  full_set: "套装",
 };
+
+export const VTON_GARMENT_POOL_KINDS: VtonGarmentKind[] = [
+  "top",
+  "bottom",
+  "one_piece",
+  "full_set",
+];
