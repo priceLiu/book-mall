@@ -12,6 +12,7 @@ import {
 } from "@/components/outfit-video/outfit-video-bottom-dock";
 import { OutfitVideoMediaInput } from "@/components/outfit-video/outfit-video-media-input";
 import { OutfitRefSetupPanel } from "@/components/outfit-video/outfit-ref-setup-panel";
+import type { VtonBatchWorkflowProps } from "@/components/vton/vton-ref-workbench";
 import { OutfitSceneTable } from "@/components/outfit-video/outfit-scene-table";
 import { OutfitShotProductionPanel } from "@/components/outfit-video/outfit-shot-production-panel";
 import { SeedVideoRenderProgressPanel } from "@/components/seed-video/seed-video-render-progress-panel";
@@ -37,11 +38,13 @@ import {
 import type { SeedVideoRenderProgressState } from "@/lib/seed-video-render-progress";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import {
+  isOutfitRefsLocked,
   isOutfitRefsReadyToLock,
   type OutfitGarmentMode,
   type OutfitRefMode,
   type OutfitWorkflowPhase,
 } from "@/lib/video-workflow/templates/outfit-v1/ui-config";
+import { parseVtonTryonProgress, type VtonTryonProgress } from "@/lib/vton-tryon-progress";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -55,6 +58,11 @@ type Props = {
   mediaBusy?: boolean;
   splitting?: boolean;
   refBusy?: boolean;
+  tryonBusy?: boolean;
+  tryonProgress?: VtonTryonProgress | null;
+  imageModels: StoryboardGatewayModel[];
+  imageModelKey: string;
+  fusionModelKey: string;
   generateBusy?: boolean;
   renderBusy?: boolean;
   saveBusy?: boolean;
@@ -79,7 +87,14 @@ type Props = {
   onOutfitRefModeChange: (mode: OutfitRefMode) => void;
   onGarmentModeChange: (mode: OutfitGarmentMode) => void;
   onPickModelFromLibrary: (ossUrl: string, label?: string) => Promise<void>;
+  onAttachModelFromAssets: (
+    assets: Array<{ id: string; ossUrl: string; title: string }>,
+  ) => Promise<void>;
+  onGenerateModel: (opts: { prompt: string; modelKey: string }) => Promise<void>;
+  onExpandFullBody: (opts: { prompt?: string; modelKey: string }) => Promise<void>;
+  onTryon: () => Promise<void>;
   onLockRefs: () => Promise<void>;
+  batchWorkflow?: VtonBatchWorkflowProps;
   onGenerateShots: (indices: number[], modelKey: string) => Promise<void>;
   onCancelGeneratingSelection?: (index: number) => void;
   onCompose: () => Promise<void>;
@@ -99,7 +114,6 @@ type Props = {
   onSplitUserChange: (value: string) => void;
   onResetSplitSystem: () => void;
   onResetSplitUser: () => void;
-  fusionModelKey?: string;
   fusingIndices?: ReadonlySet<number>;
   onPickSceneFusionMode: (
     index: number,
@@ -122,6 +136,11 @@ export function OutfitVideoWorkspace({
   mediaBusy,
   splitting,
   refBusy,
+  tryonBusy,
+  tryonProgress,
+  imageModels,
+  imageModelKey,
+  fusionModelKey,
   generateBusy,
   renderBusy,
   saveBusy,
@@ -146,7 +165,12 @@ export function OutfitVideoWorkspace({
   onOutfitRefModeChange,
   onGarmentModeChange,
   onPickModelFromLibrary,
+  onAttachModelFromAssets,
+  onGenerateModel,
+  onExpandFullBody,
+  onTryon,
   onLockRefs,
+  batchWorkflow,
   onGenerateShots,
   onCancelGeneratingSelection,
   onCompose,
@@ -166,7 +190,6 @@ export function OutfitVideoWorkspace({
   onSplitUserChange,
   onResetSplitSystem,
   onResetSplitUser,
-  fusionModelKey,
   fusingIndices,
   onPickSceneFusionMode,
   onUploadSceneRef,
@@ -215,8 +238,10 @@ export function OutfitVideoWorkspace({
     { outfitRefMode, garmentMode },
     project.references,
   );
+  const refsLocked = isOutfitRefsLocked(project.structured);
   const hasDressedImage = Boolean(project.references.dressedImage?.ossUrl);
-  const hasRefs = hasDressedImage;
+  const hasRefs = refsLocked;
+  const parsedTryonProgress = tryonProgress ?? parseVtonTryonProgress(project.meta?.tryonProgress);
   const finalVideoUrl = project.composeResult?.videoUrl?.trim() || "";
   const jobBusy = Boolean(mediaBusy || splitting || generateBusy || renderBusy || refBusy);
 
@@ -418,11 +443,14 @@ export function OutfitVideoWorkspace({
             refs={project.references}
             outfitRefMode={outfitRefMode}
             garmentMode={garmentMode}
+            refsLocked={refsLocked}
             busy={refBusy}
-            lockLabel={
-              outfitRefMode === "need_tryon" ? "AI 试衣并锁定特征" : "锁定特征并进入逐镜生成"
-            }
-            confirmDisabled={!refsReadyToLock}
+            tryonBusy={tryonBusy}
+            tryonProgress={parsedTryonProgress}
+            imageModels={imageModels}
+            imageModelKey={imageModelKey}
+            fusionModelKey={fusionModelKey}
+            modelsLoading={modelsLoading}
             onOutfitRefModeChange={onOutfitRefModeChange}
             onGarmentModeChange={onGarmentModeChange}
             onUploadModel={onUploadModel}
@@ -430,7 +458,12 @@ export function OutfitVideoWorkspace({
             onUploadTopGarment={onUploadTopGarment}
             onUploadBottomGarment={onUploadBottomGarment}
             onPickModelFromLibrary={onPickModelFromLibrary}
-            onConfirm={() => void onLockRefs()}
+            onAttachModelFromAssets={onAttachModelFromAssets}
+            onGenerateModel={onGenerateModel}
+            onExpandFullBody={onExpandFullBody}
+            onTryon={() => onTryon()}
+            onLockRefs={() => onLockRefs()}
+            batchWorkflow={batchWorkflow}
           />
         ) : null}
 
@@ -438,6 +471,8 @@ export function OutfitVideoWorkspace({
           <OutfitShotProductionPanel
             scenes={project.sceneList}
             refs={project.references}
+            lockedLooks={project.meta?.lockedLooks}
+            defaultLockedLookId={project.meta?.defaultLockedLookId}
             disabled={generateBusy || renderBusy}
             generatingIndices={generatingIndices}
             generateBusy={generateBusy}

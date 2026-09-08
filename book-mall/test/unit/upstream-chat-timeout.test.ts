@@ -67,6 +67,26 @@ describe("resolveUpstreamChatTimeoutMs", () => {
     expect(ms).toBeGreaterThanOrEqual(600_000);
   });
 
+  it("uses story timeout when body contains image_url multimodal chat (replica script)", () => {
+    const ms = resolveUpstreamChatTimeoutMs("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", {
+      method: "POST",
+      body: JSON.stringify({
+        model: "qwen3.8-max",
+        max_tokens: 24_000,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "image_url", image_url: { url: "https://example.com/a.png" } },
+              { type: "text", text: "复刻脚本" },
+            ],
+          },
+        ],
+      }),
+    });
+    expect(ms).toBeGreaterThanOrEqual(600_000);
+  });
+
   it("exports story threshold at 8000", () => {
     expect(UPSTREAM_STORY_CHAT_MAX_TOKENS_THRESHOLD).toBe(8_000);
   });

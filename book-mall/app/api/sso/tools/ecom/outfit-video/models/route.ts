@@ -10,7 +10,7 @@ import { mergeOutfitFusionGatewayModels, OUTFIT_DEFAULT_FUSION_MODEL } from "@/l
 import { OUTFIT_V1_DEFAULT_SPLIT_MODEL } from "@/lib/ecom/ecom-outfit-video-split-prompts";
 import { resolveEcomGatewayBoundKindsForModelPicker } from "@/lib/ecom/ecom-gateway-auth";
 import { OUTFIT_V1_DEFAULT_VIDEO_MODEL } from "@/lib/ecom/video-workflow/templates/outfit-v1/constants";
-import { registryRowsToEcomModels } from "@/lib/gateway/ecom-storyboard-chat-models";
+import { ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL, registryRowsToEcomModels } from "@/lib/gateway/ecom-storyboard-chat-models";
 import { listModelsForApp } from "@/lib/gateway/model-registry";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
@@ -26,7 +26,7 @@ export async function GET(req: Request) {
 
   const billingPersona = persona === "PLATFORM_CREDIT" ? "PLATFORM_CREDIT" : "BYOK";
 
-  const [videoModels, chatModels, fusionRegistry] = await Promise.all([
+  const [videoModels, chatModels, fusionRegistry, imageRegistry] = await Promise.all([
     listModelsForApp({
       appTag: "ecom",
       sceneKey: "ecom-outfit-video",
@@ -44,6 +44,13 @@ export async function GET(req: Request) {
     listModelsForApp({
       appTag: "ecom",
       sceneKey: "ecom-outfit-video",
+      role: "IMAGE",
+      persona: billingPersona,
+      boundKinds,
+    }),
+    listModelsForApp({
+      appTag: "ecom",
+      sceneKey: "ecom-model-shot",
       role: "IMAGE",
       persona: billingPersona,
       boundKinds,
@@ -78,17 +85,25 @@ export async function GET(req: Request) {
     registryRowsToEcomModels(fusionRegistry),
     boundKinds,
   );
+  const imageModels = registryRowsToEcomModels(imageRegistry);
   const defaultFusion =
     fusionModels.find((m) => m.modelKey === OUTFIT_DEFAULT_FUSION_MODEL)?.modelKey ??
     fusionModels.find((m) => m.credentialBound)?.modelKey ??
     fusionModels[0]?.modelKey ??
     OUTFIT_DEFAULT_FUSION_MODEL;
 
+  const defaultImage =
+    imageModels.find((m) => m.modelKey === ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL)?.modelKey ??
+    imageModels.find((m) => m.credentialBound)?.modelKey ??
+    imageModels[0]?.modelKey ??
+    ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL;
+
   return NextResponse.json({
     videoModels: videoList,
     chatModels: chatRows,
     fusionModels,
+    imageModels,
     platformOffering: persona === "PLATFORM_CREDIT",
-    defaults: { video: defaultVideo, split: defaultSplit, fusion: defaultFusion },
+    defaults: { video: defaultVideo, split: defaultSplit, fusion: defaultFusion, image: defaultImage },
   });
 }

@@ -97,6 +97,16 @@ export const ECOM_MODULES: EcomModuleDef[] = [
     tile: "dark",
   },
   {
+    id: "model-tryon",
+    title: "模特试衣",
+    tagline: "上下装 AI 试衣 · 保存成片",
+    href: "/ecom/model-tryon",
+    kind: "image",
+    toolKey: "ecom-toolkit__model-tryon",
+    action: "tryon",
+    tile: "light",
+  },
+  {
     id: "storyboard-micro-drama",
     title: "电商口播故事版",
     tagline: "口播带货故事版与整片视频",

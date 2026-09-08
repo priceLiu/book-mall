@@ -8,6 +8,7 @@ import {
   type RunEngineNodeArgs,
   type RunEngineNodeResult,
 } from "./canvas-engine-runner";
+import { shouldSkipUpstreamTextForImageRefs } from "./canvas-image-engine-prompt";
 import { finalizeStoryPro2SceneImagePrompt } from "./story-pro2-scene-image-prompt";
 
 function httpsImageUrls(urls: string[]): string[] {
@@ -151,7 +152,12 @@ export async function runSbv1ImageNode(
 
   const hasRefs = imageUrls.length > 0;
   const stylePrompt = styleRef?.prompt?.trim() ?? "";
-  const promptParts = [stylePrompt, promptRaw, ...upstreamText].filter(Boolean);
+  const skipUpstream = shouldSkipUpstreamTextForImageRefs(promptRaw, hasRefs);
+  const promptParts = [
+    stylePrompt,
+    promptRaw,
+    ...(skipUpstream ? [] : upstreamText),
+  ].filter(Boolean);
   let prompt =
     promptParts.join("\n\n") ||
     (hasRefs ? "根据参考图生成或编辑画面" : "");

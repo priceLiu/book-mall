@@ -13,8 +13,10 @@ import {
   buildOutfitShotPrefilledGeneratePrompt,
   resolveOutfitShotGeneratePrompt,
 } from "@/lib/ecom/ecom-outfit-video-generate-prompts";
-import type { SceneShot, WorkflowRefs } from "@/lib/ecom/video-workflow/shot-spine";
+import { resolveDefaultLockedLookUrl } from "@/lib/ecom/ecom-vton/meta";
+import type { VtonProjectMeta } from "@/lib/ecom/ecom-vton/types";
 import { resolveOutfitShotKlingCharacterImage } from "@/lib/ecom/ecom-outfit-video-scene-fusion";
+import type { SceneShot, WorkflowRefs } from "@/lib/ecom/video-workflow/shot-spine";
 
 export {
   OUTFIT_V1_GENERATE_BASE_PROMPT_ZH,
@@ -31,6 +33,7 @@ export {
 export type OutfitShotGenerateContext = {
   scene: SceneShot;
   refs: WorkflowRefs;
+  meta?: VtonProjectMeta | null;
   videoModelKey: string;
   durationSec?: number;
 };
@@ -40,8 +43,13 @@ export function buildOutfitShotNegativePrompt(): string {
   return OUTFIT_V1_NEGATIVE_PROMPT_ZH;
 }
 
-/** 逐镜生成唯一人物参考：锁定后的 dressedImage */
-export function resolveOutfitDressedImageUrl(refs: WorkflowRefs): string {
+/** 逐镜生成人物参考：优先 default locked look，回退 dressedImage */
+export function resolveOutfitDressedImageUrl(
+  refs: WorkflowRefs,
+  meta?: VtonProjectMeta | null,
+): string {
+  const fromMeta = meta ? resolveDefaultLockedLookUrl(meta) : null;
+  if (fromMeta) return fromMeta;
   const dressed = refs.dressedImage?.ossUrl?.trim();
   if (dressed) return dressed;
   throw new Error("请先锁定穿搭参考图");
@@ -60,7 +68,7 @@ export function buildOutfitShotGenerateBody(ctx: OutfitShotGenerateContext): {
   generateConstraint: typeof OUTFIT_V1_DEFAULT_GENERATE_CONSTRAINT;
   videoConfig: typeof OUTFIT_V1_DEFAULT_VIDEO_CONFIG;
 } {
-  const dressedUrl = resolveOutfitShotKlingCharacterImage(ctx.scene, ctx.refs);
+  const dressedUrl = resolveOutfitShotKlingCharacterImage(ctx.scene, ctx.refs, ctx.meta);
   if (!ctx.scene.sceneFusion?.fusedImageUrl?.trim() && !ctx.refs.dressedImage?.ossUrl) {
     throw new Error("请先锁定穿搭参考并生成场景融合图");
   }

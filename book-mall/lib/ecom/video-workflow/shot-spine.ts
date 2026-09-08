@@ -55,6 +55,7 @@ const refImageSourceSchema = z.enum([
   "asset",
   "wardrobe",
   "aitryon-plus",
+  "ai-generate",
 ]);
 
 export const workflowRefImageSchema = z.object({

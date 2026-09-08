@@ -8,5 +8,6 @@ export type ReplicaCollectPhase =
   | "model"
   | "product"
   | "product-info"
+  | "asset-upload"
   | "ready"
   | "script-done";

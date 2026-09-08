@@ -1,6 +1,8 @@
 import {
   attachMediaDecomposeReplicaModelFromLibrary,
+  attachMediaDecomposeReplicaModelToSlot,
   attachMediaDecomposeReplicaRefsFromAssets,
+  attachMediaDecomposeReplicaAssetSlotFromAssets,
   generateMediaDecomposeReplicaModelImage,
   generateMediaDecomposeReplicaModelPrompt,
   generateMediaDecomposeReplicaScript,
@@ -9,6 +11,7 @@ import {
   recognizeMediaDecomposeReplicaProduct,
   removeMediaDecomposeReplicaRef,
   saveMediaDecomposeReplicaCopyFields,
+  uploadMediaDecomposeReplicaAssetSlot,
   uploadMediaDecomposeReplicaRef,
 } from "@/lib/ecom-media-decompose-api";
 import {
@@ -33,6 +36,7 @@ import {
   REPLICA_REF_MAX_PER_ROLE,
 } from "@/lib/media-decompose-replica-refs";
 import { readProductBrief, readSellingPoints, readVoiceoverDraft, type ReplicaVoiceoverDraft } from "@/lib/media-decompose-replica-workflow";
+import { readReplicaAssetPlan, type ReplicaAssetPlan } from "@/lib/replica-asset-plan";
 import type { FilmPullProject } from "@/lib/film-pull-types";
 import type { MediaDecomposeProject } from "@/lib/media-decompose-types";
 import type { SeedVideoProject } from "@/lib/seed-video-types";
@@ -60,10 +64,17 @@ export type ReplicaSetupApi = {
   listRefs: () => ReplicaSetupRefItem[];
   isModelRefId: (id: string) => boolean;
   isProductRefId: (id: string) => boolean;
+  readAssetPlan?: () => ReplicaAssetPlan | null;
   readProductBrief: () => string;
   readSellingPoints?: () => string;
   readVoiceoverDraft?: () => ReplicaVoiceoverDraft | null;
   uploadRef: (role: ReplicaSetupRole, file: File) => Promise<void>;
+  uploadAssetSlot?: (slotId: string, file: File) => Promise<void>;
+  attachAssetSlotFromAssets?: (slotId: string, assetIds: string[]) => Promise<void>;
+  attachModelToSlot?: (
+    slotId: string,
+    entry: { id: string; name: string; ossUrl: string },
+  ) => Promise<void>;
   removeRef: (refId: string) => Promise<void>;
   saveProductBrief: (brief: string) => Promise<void>;
   saveCopyFields?: (patch: { productBrief?: string; sellingPoints?: string }) => Promise<void>;
@@ -99,11 +110,11 @@ export type ReplicaSetupApi = {
 export const MEDIA_DECOMPOSE_REPLICA_SETUP_COPY: ReplicaSetupCopy = {
   panelTitle: "一键复刻 · 素材采集",
   panelDescription:
-    "上传新模特与产品参考图，填写卖点后生成复刻脚本。参考图编号按顺序为 @图片1、@图片2…（先模特后产品）。",
-  refSectionLabel: "复刻参考图",
+    "系统已从拆解结果列出全身人物 / 产品 / 道具 / 场景四槽方案。按需上传替换图（Prompt 用 @人物A 等 token），未上传则 inherit 原片描述；原片无产品也可在复刻阶段新增产品槽。填写卖点后生成复刻脚本。",
+  refSectionLabel: "复刻资产方案",
   modelEmptyHint: `拖放 / 粘贴 / 我的资产，或 AI 生成模特参考图（可多张，最多 ${REPLICA_REF_MAX_PER_ROLE} 张）。@图片1 起为模特编号。`,
   productEmptyHint: `拖放 / 粘贴 / 我的资产导入产品图（可多张，最多 ${REPLICA_REF_MAX_PER_ROLE} 张）。排在模特图之后的 @图片N 为产品。`,
-  scriptGeneratingDetail: "正在根据拆解结果与参考图匹配替换分镜…",
+  scriptGeneratingDetail: "正在根据拆解结果与资产方案匹配替换分镜…",
   recognizeStatusDetail: "视觉模型正在分析产品图；若已填写草稿将一并润色补全…",
 };
 
@@ -136,11 +147,39 @@ export function createMediaDecomposeReplicaSetupApi(opts: {
       })),
     isModelRefId: isReplicaModelRefId,
     isProductRefId: isReplicaProductRefId,
+    readAssetPlan: () => readReplicaAssetPlan(getSeedVideo().meta),
     readProductBrief: () => readProductBrief(getProject(), getSeedVideo()),
     readSellingPoints: () => readSellingPoints(getProject(), getSeedVideo()),
     readVoiceoverDraft: () => readVoiceoverDraft(getSeedVideo()),
     uploadRef: async (role, file) => {
       const { project, seedVideo } = await uploadMediaDecomposeReplicaRef(projectId, role, file);
+      onProjectUpdated(project);
+      onSeedVideoUpdated(seedVideo);
+    },
+    uploadAssetSlot: async (slotId, file) => {
+      const { project, seedVideo } = await uploadMediaDecomposeReplicaAssetSlot(
+        projectId,
+        slotId,
+        file,
+      );
+      onProjectUpdated(project);
+      onSeedVideoUpdated(seedVideo);
+    },
+    attachAssetSlotFromAssets: async (slotId, assetIds) => {
+      const { project, seedVideo } = await attachMediaDecomposeReplicaAssetSlotFromAssets(
+        projectId,
+        slotId,
+        assetIds,
+      );
+      onProjectUpdated(project);
+      onSeedVideoUpdated(seedVideo);
+    },
+    attachModelToSlot: async (slotId, entry) => {
+      const { project, seedVideo } = await attachMediaDecomposeReplicaModelToSlot(
+        projectId,
+        slotId,
+        entry,
+      );
       onProjectUpdated(project);
       onSeedVideoUpdated(seedVideo);
     },

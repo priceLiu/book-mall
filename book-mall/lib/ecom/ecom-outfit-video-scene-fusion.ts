@@ -230,8 +230,9 @@ export async function runOutfitVideoSceneFusion(opts: {
 export function resolveOutfitShotKlingCharacterImage(
   scene: SceneShot,
   refs: WorkflowRefs,
+  meta?: import("@/lib/ecom/ecom-vton/types").VtonProjectMeta | null,
 ): string {
   const fused = scene.sceneFusion?.fusedImageUrl?.trim();
   if (fused) return fused;
-  return resolveOutfitDressedImageUrl(refs);
+  return resolveOutfitDressedImageUrl(refs, meta);
 }

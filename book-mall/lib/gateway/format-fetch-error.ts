@@ -75,7 +75,7 @@ export function resolveUpstreamChatTimeoutMs(
   ) {
     return UPSTREAM_STORY_CHAT_TIMEOUT_MS;
   }
-  if (chatBodyHasVideoMedia(init.body)) {
+  if (chatBodyHasVisionMedia(init.body)) {
     return UPSTREAM_STORY_CHAT_TIMEOUT_MS;
   }
   return UPSTREAM_CHAT_TIMEOUT_MS;
@@ -84,6 +84,27 @@ export function resolveUpstreamChatTimeoutMs(
 /** 供单测与日志 UI：Chat body 是否含 video_url 多模态输入（拉片 / 视频理解） */
 export function chatBodyHasVideoMedia(
   body: BodyInit | null | undefined,
+): boolean {
+  return chatBodyHasVisionPart(body, "video_url");
+}
+
+/** Chat body 是否含 image_url（识产品 / 复刻脚本 vision refs） */
+export function chatBodyHasImageMedia(
+  body: BodyInit | null | undefined,
+): boolean {
+  return chatBodyHasVisionPart(body, "image_url");
+}
+
+/** image_url 或 video_url 多模态 Chat（DashScope VL 常 >3min） */
+export function chatBodyHasVisionMedia(
+  body: BodyInit | null | undefined,
+): boolean {
+  return chatBodyHasImageMedia(body) || chatBodyHasVideoMedia(body);
+}
+
+function chatBodyHasVisionPart(
+  body: BodyInit | null | undefined,
+  partType: "image_url" | "video_url",
 ): boolean {
   if (typeof body !== "string" || !body.trim()) return false;
   try {
@@ -97,7 +118,7 @@ export function chatBodyHasVideoMedia(
         if (
           part &&
           typeof part === "object" &&
-          (part as { type?: string }).type === "video_url"
+          (part as { type?: string }).type === partType
         ) {
           return true;
         }

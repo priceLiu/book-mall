@@ -11,6 +11,8 @@ export function mergeSeedVideoShots(
     const ls = localByIndex.get(rs.index);
     return {
       ...rs,
+      imageUrl: rs.imageUrl?.trim() || ls?.imageUrl,
+      imageTaskId: rs.imageTaskId?.trim() || ls?.imageTaskId,
       videoUrl: rs.videoUrl?.trim() || ls?.videoUrl,
       ttsUrl: rs.ttsUrl?.trim() || ls?.ttsUrl,
       videoTaskId: rs.videoTaskId?.trim() || ls?.videoTaskId,
@@ -30,6 +32,9 @@ export function mergeSeedVideoShotsForPersist(
     if (!rs) return ls;
     return {
       ...ls,
+      // 分镜图以本地为准（刚生图时父级 seedVideo 可能尚未刷新）
+      imageUrl: ls.imageUrl?.trim() || rs.imageUrl?.trim(),
+      imageTaskId: ls.imageTaskId?.trim() || rs.imageTaskId?.trim(),
       videoUrl: rs.videoUrl?.trim() || ls.videoUrl,
       ttsUrl: rs.ttsUrl?.trim() || ls.ttsUrl,
       videoTaskId: rs.videoTaskId?.trim() || ls.videoTaskId,

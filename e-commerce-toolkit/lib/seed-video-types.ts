@@ -57,9 +57,13 @@ export type SeedVideoShot = {
   refImageId: string;
   refImageLabel: string;
   sceneDescription: string;
+  /** 拆图复刻 · 分镜图 Prompt（静态画面） */
+  imagePrompt?: string;
   videoPrompt: string;
   voiceover: string;
   durationSec: number;
+  imageUrl?: string;
+  imageTaskId?: string;
   videoUrl?: string;
   ttsUrl?: string;
   videoTaskId?: string;
@@ -171,6 +175,7 @@ export type SeedVideoProject = {
     >;
     /** 拆图拆视频 · 一键复刻采集 */
     replicaCollectPhase?: string;
+    replicaDecomposeMediaType?: "image" | "video";
     replicaProductBrief?: string | null;
     replicaSellingPoints?: string | null;
     replicaModelPrompt?: string;

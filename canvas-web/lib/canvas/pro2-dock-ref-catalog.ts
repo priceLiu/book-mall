@@ -71,13 +71,14 @@ export function resolveDockRefUrlsForRun(
 }
 
 /**
- * 图片节点生图 run：始终带入 Dock 全部参考图（上游 chip + 粘贴）。
- * prompt 内 @ 仅影响文案指代（resolveDockRunPrompt），不过滤 imageInputs。
+ * 图片节点生图 run：有 @ 时按 prompt 内 @ 顺序带入参考图（与 图N / image_input 对齐）；
+ * 无 @ 时带入 catalog 全部。
  */
 export function resolveDockImageUrlsForRun(
   upstreamLinks: Pro2DockUpstreamLink[],
   dockRefImages: StoryRefImage[] = [],
+  prompt = "",
 ): string[] {
   const catalog = pro2DockMentionRefCatalog(upstreamLinks, dockRefImages);
-  return dockMentionRefUrlsForPrompt("", catalog);
+  return dockMentionRefUrlsForPrompt(prompt, catalog);
 }

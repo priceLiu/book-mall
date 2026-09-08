@@ -22,16 +22,18 @@ import {
   OUTFIT_V1_POSITIVE_PROMPT,
   OUTFIT_V1_TEMPLATE_ID,
 } from "@/lib/ecom/video-workflow/templates/outfit-v1/constants";
-import { inferOutfitPhase, isOutfitRefsReadyToLock } from "@/lib/ecom/video-workflow/templates/outfit-v1/ui-config";
+import { inferOutfitPhase, isOutfitRefsReadyToLock, isOutfitRefsLocked } from "@/lib/ecom/video-workflow/templates/outfit-v1/ui-config";
 import type { WorkflowEnvelope } from "@/lib/ecom/video-workflow/envelope";
 import {
   ECOM_OUTFIT_VIDEO_MODULE,
+  ECOM_OUTFIT_VIDEO_TOOL_KEY,
   type OutfitGarmentMode,
   type OutfitRefMode,
   type OutfitVideoProjectDto,
   type OutfitVideoSettings,
   type OutfitSplitProgress,
 } from "@/lib/ecom/ecom-outfit-video-types";
+import { getEcomModelTryonProject } from "@/lib/ecom/ecom-model-tryon-service";
 import {
   isOutfitSplitInProgress,
   reconcileStaleOutfitSplitState,
@@ -44,7 +46,23 @@ import {
   resolveMediaDecomposeUpload,
 } from "@/lib/ecom/ecom-media-decompose-media";
 import { ecomGenerateOutfitVideoShot } from "@/lib/ecom/ecom-outfit-video-generate";
-import { runEcomOutfitVideoTryOn } from "@/lib/ecom/ecom-outfit-video-tryon";
+import { generateVtonModelImage } from "@/lib/ecom/ecom-vton/model-generate";
+import { expandVtonModelFullBody } from "@/lib/ecom/ecom-vton/model-full-body";
+import {
+  assertVtonReadyToFinalizeLock,
+  importVtonLockedLooksFromMeta,
+  lockVtonTryonResults,
+  lockVtonUploadAsLook,
+  patchVtonGarmentPool,
+  patchVtonLookDrafts,
+  runVtonProjectBatchTryon,
+} from "@/lib/ecom/ecom-vton-project-mutations";
+import { sanitizeVtonProjectMeta, syncRefsDressedImageFromLocked, emptyVtonProjectMeta } from "@/lib/ecom/ecom-vton/meta";
+import type { VtonGarmentItem, VtonLookSpec } from "@/lib/ecom/ecom-vton/types";
+import type { VtonTryonProgress } from "@/lib/ecom/ecom-vton/types";
+import {
+  isVtonRefsReadyForTryon,
+} from "@/lib/ecom/ecom-vton/validate";
 import {
   runOutfitVideoSceneFusion,
   type OutfitSceneFusionMode,
@@ -200,14 +218,16 @@ function inferPhaseFromProject(row: {
   references: unknown;
   sceneList: unknown;
   composeResult: unknown;
+  structured: unknown;
 }): ReturnType<typeof inferOutfitPhase> {
   const refs = sanitizeRefs(row.references);
   const scenes = sanitizeOutfitSceneList(row.sceneList);
   const compose = sanitizeComposeResult(row.composeResult);
+  const structured = sanitizeStructured(row.structured);
   return inferOutfitPhase({
     hasReferenceVideo: Boolean(refs.referenceVideo?.ossUrl),
     sceneCount: scenes.length,
-    hasDressedImage: Boolean(refs.dressedImage?.ossUrl),
+    hasRefsLocked: isOutfitRefsLocked(structured),
     allShotsHaveVideo:
       scenes.length > 0 && scenes.every((s) => Boolean(s.videoUrl?.trim())),
     hasComposeVideo: Boolean(compose?.videoUrl?.trim()),
@@ -286,6 +306,7 @@ export async function createEcomOutfitVideoProject(
       structured: Prisma.JsonNull,
       sceneList: Prisma.JsonNull,
       composeResult: Prisma.JsonNull,
+      meta: emptyVtonProjectMeta() as Prisma.InputJsonValue,
     },
   });
   return rowToDto(row);
@@ -765,8 +786,247 @@ export async function attachEcomOutfitVideoRefs(
       ...(project.structured ?? {}),
       refs_locked: envelope,
     },
-    phase: refs.dressedImage?.ossUrl ? "generate_shots" : "bind_refs",
+    phase: "bind_refs",
   });
+}
+
+export async function generateEcomOutfitVideoModel(
+  userId: string,
+  projectId: string,
+  opts: { prompt: string; modelKey?: string },
+): Promise<OutfitVideoProjectDto> {
+  const project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+
+  const ossUrl = await generateVtonModelImage({
+    userId,
+    prompt: opts.prompt,
+    modelKey: opts.modelKey,
+    toolKeySuffix: "video-outfit__model-generate",
+  });
+
+  const refs = sanitizeRefs(project.references);
+  delete refs.dressedImage;
+
+  return updateEcomOutfitVideoProject(userId, projectId, {
+    references: {
+      ...refs,
+      model: {
+        ossUrl,
+        source: "ai-generate",
+        label: "AI 生模特",
+      },
+    },
+    phase: "bind_refs",
+  });
+}
+
+export async function expandEcomOutfitVideoModelFullBody(
+  userId: string,
+  projectId: string,
+  opts?: { prompt?: string; modelKey?: string },
+): Promise<OutfitVideoProjectDto> {
+  const project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+
+  const portraitUrl = project.references.model?.ossUrl?.trim();
+  if (!portraitUrl) throw new Error("请先上传或选择模特图");
+
+  const ossUrl = await expandVtonModelFullBody({
+    userId,
+    portraitUrl,
+    prompt: opts?.prompt,
+    modelKey: opts?.modelKey,
+    toolKeySuffix: "video-outfit__expand-full-body",
+  });
+
+  const refs = sanitizeRefs(project.references);
+  delete refs.dressedImage;
+
+  return updateEcomOutfitVideoProject(userId, projectId, {
+    references: {
+      ...refs,
+      model: {
+        ossUrl,
+        source: "ai-generate",
+        label: "全身模特",
+      },
+    },
+    phase: "bind_refs",
+  });
+}
+
+async function writeOutfitTryonProgress(
+  userId: string,
+  projectId: string,
+  progress: VtonTryonProgress,
+): Promise<void> {
+  const existing = await getOwnedRow(userId, projectId);
+  if (!existing) return;
+  await prisma.ecomVideoWorkflowProject.update({
+    where: { id: projectId },
+    data: {
+      meta: {
+        ...((existing.meta as Record<string, unknown> | null) ?? {}),
+        tryonProgress: progress,
+      } as Prisma.InputJsonValue,
+    },
+  });
+}
+
+export async function patchEcomOutfitVideoGarments(
+  userId: string,
+  projectId: string,
+  opts: {
+    add?: Array<Omit<VtonGarmentItem, "id"> & { id?: string }>;
+    removeIds?: string[];
+  },
+): Promise<OutfitVideoProjectDto> {
+  const project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  const meta = patchVtonGarmentPool(project.meta, opts);
+  return updateEcomOutfitVideoProject(userId, projectId, { meta });
+}
+
+export async function uploadEcomOutfitVideoGarment(
+  userId: string,
+  projectId: string,
+  kind: VtonGarmentItem["kind"],
+  file: File,
+): Promise<OutfitVideoProjectDto> {
+  const buf = Buffer.from(await file.arrayBuffer());
+  const uploaded = await resolveMediaDecomposeUpload({
+    userId,
+    buf,
+    contentType: file.type,
+    fileName: file.name,
+  });
+  if (uploaded.kind !== "image") throw new Error("请上传图片");
+  return patchEcomOutfitVideoGarments(userId, projectId, {
+    add: [
+      {
+        kind,
+        ossUrl: uploaded.ossUrl,
+        source: "upload",
+        label: file.name.replace(/\.[^.]+$/, "") || OUTFIT_GARMENT_KIND_LABELS[kind],
+      },
+    ],
+  });
+}
+
+const OUTFIT_GARMENT_KIND_LABELS: Record<VtonGarmentItem["kind"], string> = {
+  top: "上装",
+  bottom: "下装",
+  one_piece: "连体/裙",
+};
+
+export async function patchEcomOutfitVideoLooks(
+  userId: string,
+  projectId: string,
+  looks: VtonLookSpec[],
+): Promise<OutfitVideoProjectDto> {
+  const project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  const meta = patchVtonLookDrafts(project.meta, looks);
+  return updateEcomOutfitVideoProject(userId, projectId, { meta });
+}
+
+export async function runEcomOutfitVideoTryonBatch(
+  userId: string,
+  projectId: string,
+  opts?: { looks?: VtonLookSpec[] },
+): Promise<OutfitVideoProjectDto> {
+  const project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  if (isOutfitRefsLocked(project.structured)) throw new Error("特征已锁定，无法试衣");
+
+  const settings = sanitizeSettings(project.settings);
+  if ((settings.outfitRefMode ?? "need_tryon") === "already_dressed") {
+    throw new Error("已穿搭模式无需 AI 试衣");
+  }
+
+  const modelUrl = project.references.model?.ossUrl?.trim();
+  if (!modelUrl) throw new Error("请先上传模特全身照");
+
+  const meta = await runVtonProjectBatchTryon({
+    userId,
+    projectId,
+    consumerToolKey: ECOM_OUTFIT_VIDEO_TOOL_KEY,
+    modelUrl,
+    metaRaw: project.meta,
+    looks: opts?.looks,
+    persistMeta: async (m) => {
+      await updateEcomOutfitVideoProject(userId, projectId, { meta: m });
+    },
+  });
+
+  const latest = await getEcomOutfitVideoProject(userId, projectId);
+  if (!latest) throw new Error("项目不存在");
+  const refs = syncRefsDressedImageFromLocked(latest.references, meta);
+  return updateEcomOutfitVideoProject(userId, projectId, { meta, references: refs, phase: "bind_refs" });
+}
+
+export async function lockEcomOutfitVideoTryonResults(
+  userId: string,
+  projectId: string,
+  resultIds: string[],
+): Promise<OutfitVideoProjectDto> {
+  const project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  const { meta, references } = lockVtonTryonResults(project.meta, resultIds, project.references);
+  return updateEcomOutfitVideoProject(userId, projectId, { meta, references });
+}
+
+export async function importEcomOutfitVideoLooks(
+  userId: string,
+  projectId: string,
+  opts: { sourceProjectId: string; resultIds?: string[]; lockedLookIds?: string[] },
+): Promise<OutfitVideoProjectDto> {
+  const project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  const source = await getEcomModelTryonProject(userId, opts.sourceProjectId);
+  if (!source) throw new Error("来源模特试衣项目不存在");
+
+  const meta = importVtonLockedLooksFromMeta(project.meta, source.meta, {
+    resultIds: opts.resultIds,
+    lockedLookIds: opts.lockedLookIds,
+  });
+  const refs = syncRefsDressedImageFromLocked(project.references, meta);
+  return updateEcomOutfitVideoProject(userId, projectId, { meta, references: refs });
+}
+
+export async function runEcomOutfitVideoTryonPreview(
+  userId: string,
+  projectId: string,
+): Promise<OutfitVideoProjectDto> {
+  const project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  if (isOutfitRefsLocked(project.structured)) {
+    throw new Error("特征已锁定，无法重新试衣");
+  }
+
+  const settings = sanitizeSettings(project.settings);
+  const refs = sanitizeRefs(project.references);
+  const mode = settings.outfitRefMode ?? "need_tryon";
+  const garmentMode = settings.garmentMode ?? "two_piece";
+
+  if (mode === "already_dressed") {
+    throw new Error("已穿搭模式无需 AI 试衣");
+  }
+
+  if (!isVtonRefsReadyForTryon({ outfitRefMode: mode, garmentMode, refs })) {
+    throw new Error(
+      garmentMode === "two_piece"
+        ? "请先上传模特全身照、上装与下装"
+        : "请先上传模特全身照与服装图",
+    );
+  }
+
+  const looks = sanitizeVtonProjectMeta(project.meta).lookDrafts ?? [];
+  if (looks.length !== 1) {
+    throw new Error("请使用批量试衣；单套试衣请只保留 1 条搭配");
+  }
+  return runEcomOutfitVideoTryonBatch(userId, projectId, { looks });
 }
 
 export async function lockEcomOutfitVideoRefs(
@@ -775,61 +1035,32 @@ export async function lockEcomOutfitVideoRefs(
 ): Promise<OutfitVideoProjectDto> {
   const project = await getEcomOutfitVideoProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
+  if (isOutfitRefsLocked(project.structured)) {
+    throw new Error("穿搭参考已锁定");
+  }
 
   const settings = sanitizeSettings(project.settings);
-  const refs = sanitizeRefs(project.references);
   const mode = settings.outfitRefMode ?? "need_tryon";
-  const garmentMode = settings.garmentMode ?? "two_piece";
 
-  if (!isOutfitRefsReadyToLock(settings, refs)) {
-    if (mode === "already_dressed") {
-      throw new Error("请先上传已穿搭全身照");
-    }
-    if (garmentMode === "two_piece") {
-      throw new Error("请先上传模特全身照、上装与下装");
-    }
-    throw new Error("请先上传模特全身照与服装图");
-  }
-
-  let dressedImage: NonNullable<WorkflowRefs["dressedImage"]>;
+  let meta = sanitizeVtonProjectMeta(project.meta);
+  let refs = sanitizeRefs(project.references);
 
   if (mode === "already_dressed") {
-    const url = refs.model!.ossUrl.trim();
-    dressedImage = {
-      ossUrl: url,
-      source: refs.model?.source ?? "upload",
-      label: refs.model?.label ?? "已穿搭",
-    };
+    if (!refs.model?.ossUrl?.trim()) throw new Error("请先上传已穿搭全身照");
+    const locked = lockVtonUploadAsLook(meta, {
+      ossUrl: refs.model.ossUrl,
+      label: refs.model.label ?? "已穿搭",
+    }, refs);
+    meta = locked.meta;
+    refs = locked.references ?? refs;
   } else {
-    const personImageUrl = refs.model!.ossUrl.trim();
-    let topGarmentUrl: string;
-    let bottomGarmentUrl: string | undefined;
-    if (garmentMode === "two_piece") {
-      topGarmentUrl = refs.topGarment!.ossUrl.trim();
-      bottomGarmentUrl = refs.bottomGarment!.ossUrl.trim();
-    } else {
-      topGarmentUrl = refs.clothing!.ossUrl.trim();
-    }
-
-    const tryOnUrl = await runEcomOutfitVideoTryOn({
-      userId,
-      projectId,
-      personImageUrl,
-      garmentMode,
-      topGarmentUrl,
-      bottomGarmentUrl,
-    });
-    dressedImage = {
-      ossUrl: tryOnUrl,
-      source: "aitryon-plus",
-      label: "AI 试衣成片",
-    };
+    if (!refs.model?.ossUrl?.trim()) throw new Error("请先上传模特全身照");
+    assertVtonReadyToFinalizeLock(meta, "need_tryon");
+    refs = syncRefsDressedImageFromLocked(refs, meta);
   }
 
-  const nextRefs: WorkflowRefs = {
-    ...refs,
-    dressedImage,
-  };
+  const dressedImage = refs.dressedImage;
+  if (!dressedImage?.ossUrl) throw new Error("缺少锁定参考图");
 
   const envelope = buildWorkflowEnvelope({
     templateId: OUTFIT_V1_TEMPLATE_ID,
@@ -837,18 +1068,22 @@ export async function lockEcomOutfitVideoRefs(
     taskStatus: "success",
     taskId: `refs_locked_${Date.now()}`,
     payload: {
-      refs: nextRefs,
+      refs,
       sceneList: project.sceneList,
     },
   });
 
   return updateEcomOutfitVideoProject(userId, projectId, {
-    references: nextRefs,
+    references: refs,
     structured: {
       ...(project.structured ?? {}),
       refs_locked: envelope,
     },
     phase: "generate_shots",
+    meta: {
+      ...meta,
+      tryonProgress: null,
+    },
   });
 }
 
@@ -916,6 +1151,7 @@ export async function generateEcomOutfitVideoShot(
       projectId,
       scene,
       refs: project.references,
+      meta: sanitizeVtonProjectMeta(project.meta),
       videoModelKey: opts?.videoModelKey ?? project.settings.videoModelKey,
     });
   }

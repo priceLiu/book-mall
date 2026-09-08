@@ -100,6 +100,14 @@ export function buildDashscopeCreateTaskInputForLog(
       ...(parameters ? { parameters } : {}),
     };
   }
+  if (jobKind === "tryon") {
+    return {
+      jobKind: "tryon",
+      personImageUrl: ds.personImageUrl,
+      topGarmentUrl: ds.topGarmentUrl,
+      bottomGarmentUrl: ds.bottomGarmentUrl,
+    };
+  }
   const contentImageUrls = extractDashscopeContentImageUrls(ds.content);
   return {
     jobKind: ds.jobKind,

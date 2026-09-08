@@ -15,17 +15,34 @@ import {
   type MediaDecomposePatch,
 } from "@/lib/ecom/ecom-media-decompose-structured";
 import {
+  allowedReplicaMentionTokens,
   appendReplicaReference,
   buildReplicaMentionCatalog,
+  buildReplicaMentionCatalogFromPlan,
+  collectUploadedReplicaSlotIds,
+  findReplicaSlotRef,
   listReplicaModelRefs,
+  listReplicaProductImageRefs,
   listReplicaProductRefs,
+  listReplicaSlotRefs,
   primaryReplicaModelRef,
   removeReplicaReference,
   REPLICA_REF_MAX_PER_ROLE,
   resolveReplicaCollectPhase,
   replicaMentionSummary,
+  sanitizeReplicaPromptTokens,
+  upsertReplicaSlotReference,
 } from "@/lib/ecom/ecom-media-decompose-replica-refs";
 import {
+  buildReplicaAssetPlanFromDecompose,
+  buildReplicaAssetReplaceSummary,
+  formatReplicaAssetPlanForPrompt,
+  listReplicaAssetPlanSlots,
+  readReplicaAssetPlan,
+  type ReplicaAssetPlan,
+} from "@/lib/ecom/ecom-replica-asset-plan";
+import {
+  applyReplicaReplacePostProcess,
   buildDraftShotsFromDecompose,
   buildReplicaModelImagePromptSystem,
   buildReplicaModelImagePromptUserMessage,
@@ -38,7 +55,9 @@ import {
   buildReplicaVoiceoverUserPrompt,
   extractReplicaScriptPatch,
   extractReplicaVoiceoverPatch,
+  finalizeImageReplicaScriptShots,
   formatProductBriefFromRecognition,
+  formatReplicaProductDisplayAction,
   mapReplicaScriptToShots,
   normalizeReplicaModelImagePrompt,
   normalizeSellingPointsText,
@@ -129,11 +148,107 @@ export function parseMediaDecomposeShotDurationSec(raw: string, fallback = 5): n
   return fallback;
 }
 
-function joinPromptParts(parts: string[]): string {
+function joinPromptParts(parts: Array<string | undefined | null>): string {
   return parts
-    .map((p) => p.trim())
+    .map((p) => (p ?? "").trim())
     .filter(Boolean)
     .join("，");
+}
+
+function formatElementsLightingForPrompt(
+  lighting: Extract<MediaDecomposePatch, { mediaType: "image" }>["elements"]["lighting"],
+): string {
+  return joinPromptParts([
+    lighting.keyLight,
+    lighting.fillLight,
+    lighting.rimLight,
+    lighting.ambientLight,
+    lighting.direction,
+    lighting.hardSoft,
+    lighting.colorTemperature,
+  ]);
+}
+
+/** 拆图复刻 · 机械映射草稿的生图 Prompt（elements + 实拍静态要素 + positivePrompt） */
+export function buildImageDecomposeDraftImagePrompt(
+  structured: Extract<MediaDecomposePatch, { mediaType: "image" }>,
+): string {
+  const e = structured.elements;
+  const rep = structured.liveActionReplication;
+  const lighting = formatElementsLightingForPrompt(e.lighting);
+  return joinPromptParts([
+    structured.positivePrompt.trim(),
+    e.subject,
+    e.subjectPose,
+    e.sceneEnvironment,
+    e.spatialPerspective,
+    e.composition,
+    e.equivalentFocalLength,
+    e.shootingAngle,
+    lighting ? `布光${lighting}` : "",
+    e.materialTexture,
+    e.colorSystem,
+    e.atmosphere,
+    e.detailNotes,
+    rep.sceneSetup,
+    rep.talentBlocking,
+    rep.compositionFraming,
+    rep.cameraPlacement,
+    rep.lightingSetup,
+    rep.props,
+    rep.cameraParams,
+    rep.postProcessing,
+  ]);
+}
+
+/** 拆图复刻 · 机械映射草稿的视频 Prompt（运镜/微动 + 实拍复刻要素，非生图 Prompt） */
+export function buildImageDecomposeDraftVideoPrompt(
+  structured: Extract<MediaDecomposePatch, { mediaType: "image" }>,
+): string {
+  const e = structured.elements;
+  const rep = structured.liveActionReplication;
+  const lighting = formatElementsLightingForPrompt(e.lighting);
+  return joinPromptParts([
+    e.subject,
+    e.subjectPose,
+    e.sceneEnvironment,
+    e.spatialPerspective,
+    e.composition,
+    e.equivalentFocalLength,
+    e.shootingAngle,
+    rep.compositionFraming,
+    rep.cameraPlacement,
+    rep.lightingSetup,
+    rep.cameraParams,
+    rep.talentBlocking,
+    rep.props,
+    rep.postProcessing,
+    rep.sceneSetup,
+    "固定机位或缓慢推镜",
+    "人物与产品自然微动",
+    lighting ? `布光${lighting}` : "",
+    e.materialTexture,
+    e.colorSystem,
+    e.atmosphere,
+    e.detailNotes,
+  ]);
+}
+
+function applyReplicaMentionPrefix(
+  prompt: string,
+  modelTokens: string[],
+  productTokens: string[],
+  defaultMentionPrefix: string,
+): string {
+  const trimmed = prompt.trim();
+  if (!trimmed) return trimmed;
+  if (
+    modelTokens.some((t) => trimmed.includes(t)) &&
+    productTokens.some((t) => trimmed.includes(t))
+  ) {
+    return trimmed;
+  }
+  return defaultMentionPrefix ? `${defaultMentionPrefix}，${trimmed}` : trimmed;
 }
 
 export function readReplicaSellingPoints(
@@ -186,7 +301,7 @@ export function readReplicaVoiceoverDraft(
 function mergeReplicaCopyMeta(
   decompose: MediaDecomposeProjectDto,
   seedVideo: EcomSeedVideoProjectDto,
-  patch: { productBrief?: string; sellingPoints?: string },
+  patch: { productBrief?: string; sellingPoints?: string; productDisplayAction?: string },
 ): { projectMeta: Record<string, unknown>; seedMeta: Record<string, unknown> } {
   const projectMeta = { ...(decompose.meta ?? {}) };
   const seedMeta = { ...(seedVideo.meta ?? {}) };
@@ -197,6 +312,10 @@ function mergeReplicaCopyMeta(
   if (patch.sellingPoints !== undefined) {
     projectMeta.replicaSellingPoints = patch.sellingPoints;
     seedMeta.replicaSellingPoints = patch.sellingPoints;
+  }
+  if (patch.productDisplayAction !== undefined) {
+    projectMeta.replicaProductDisplayAction = patch.productDisplayAction;
+    seedMeta.replicaProductDisplayAction = patch.productDisplayAction;
   }
   return { projectMeta, seedMeta };
 }
@@ -215,6 +334,12 @@ export function buildReplicaShotsFromDecompose(
       e.colorSystem,
       e.atmosphere,
     ]);
+    const imagePrompt =
+      buildImageDecomposeDraftImagePrompt(structured) ||
+      structured.positivePrompt.trim();
+    const videoPrompt =
+      buildImageDecomposeDraftVideoPrompt(structured) ||
+      "固定机位，自然微动，延续原片布光与色调";
     return [
       {
         index: 1,
@@ -222,7 +347,8 @@ export function buildReplicaShotsFromDecompose(
         refImageId: ref.id,
         refImageLabel: ref.label,
         sceneDescription: sceneDescription || "静态画面复刻",
-        videoPrompt: structured.positivePrompt.trim(),
+        imagePrompt,
+        videoPrompt,
         voiceover: "",
         durationSec: 5,
       },
@@ -282,9 +408,25 @@ function readDecomposeStructured(decompose: MediaDecomposeProjectDto): MediaDeco
 }
 
 function normalizeReplicaReferences(existing: SeedVideoReference[]): SeedVideoReference[] {
+  const slots = listReplicaSlotRefs(existing);
+  if (slots.length > 0) return slots;
   const models = listReplicaModelRefs(existing);
   const products = listReplicaProductRefs(existing);
   return [...models, ...products];
+}
+
+function readReplicaProductDisplayAction(
+  decompose: MediaDecomposeProjectDto,
+  seedVideo: EcomSeedVideoProjectDto,
+): string {
+  const fromSeed =
+    typeof seedVideo.meta?.replicaProductDisplayAction === "string"
+      ? seedVideo.meta.replicaProductDisplayAction.trim()
+      : "";
+  if (fromSeed) return fromSeed;
+  return typeof decompose.meta?.replicaProductDisplayAction === "string"
+    ? decompose.meta.replicaProductDisplayAction.trim()
+    : "";
 }
 
 async function requireReplicaPair(
@@ -327,6 +469,16 @@ export async function ensureReplicaSeedProject(
   if (existingId && existingAt === resultAt) {
     const existing = await getEcomSeedVideoProject(userId, existingId);
     if (existing) {
+      if (!readReplicaAssetPlan(existing.meta)) {
+        const plan = buildReplicaAssetPlanFromDecompose(structured);
+        await updateEcomSeedVideoProject(userId, existingId, {
+          meta: { ...(existing.meta ?? {}), replicaAssetPlan: plan },
+        });
+        const refreshed = await getEcomSeedVideoProject(userId, existingId);
+        if (refreshed) {
+          return { project: decompose, seedVideo: refreshed };
+        }
+      }
       return { project: decompose, seedVideo: existing };
     }
   }
@@ -349,7 +501,9 @@ export async function ensureReplicaSeedProject(
         planSynced: false,
       },
       sourceMediaDecomposeProjectId: projectId,
-      replicaCollectPhase: "model",
+      replicaDecomposeMediaType: structured.mediaType,
+      replicaCollectPhase: "asset-upload",
+      replicaAssetPlan: buildReplicaAssetPlanFromDecompose(structured),
     },
     status: "production",
   });
@@ -359,6 +513,7 @@ export async function ensureReplicaSeedProject(
       replicaSeedVideoProjectId: seedVideo.id,
       replicaResultAt: resultAt || new Date().toISOString(),
       replicaProductBrief: null,
+      replicaSellingPoints: null,
     },
   });
   const freshSeed = await getEcomSeedVideoProject(userId, seedVideo.id);
@@ -390,6 +545,119 @@ export async function upsertReplicaReference(
     seedVideo,
     source: "upload",
   });
+}
+
+export async function upsertReplicaAssetSlotReference(
+  userId: string,
+  decomposeProjectId: string,
+  slotId: string,
+  buf: Buffer,
+): Promise<{
+  project: MediaDecomposeProjectDto;
+  seedVideo: EcomSeedVideoProjectDto;
+  reference: SeedVideoReference;
+}> {
+  const ossUrl = await uploadCanvasUserBuffer({
+    userId,
+    ext: "png",
+    buf,
+    contentType: "image/png",
+  });
+
+  return upsertReplicaAssetSlotOssUrl(userId, decomposeProjectId, slotId, ossUrl);
+}
+
+async function upsertReplicaAssetSlotOssUrl(
+  userId: string,
+  decomposeProjectId: string,
+  slotId: string,
+  ossUrl: string,
+): Promise<{
+  project: MediaDecomposeProjectDto;
+  seedVideo: EcomSeedVideoProjectDto;
+  reference: SeedVideoReference;
+}> {
+  const url = ossUrl.trim();
+  if (!url || !/^https?:\/\//i.test(url)) {
+    throw new Error("无效的图片 URL");
+  }
+  const { decompose, seedVideo, structured } = await requireReplicaPair(userId, decomposeProjectId);
+  const plan =
+    readReplicaAssetPlan(seedVideo.meta) ??
+    readReplicaAssetPlan(decompose.meta) ??
+    buildReplicaAssetPlanFromDecompose(structured);
+  const slot = listReplicaAssetPlanSlots(plan).find((s) => s.id === slotId);
+  if (!slot) throw new Error(`无效的复刻槽位：${slotId}`);
+
+  const { references, reference } = upsertReplicaSlotReference(seedVideo.references, slot, url);
+  const updatedSeed = await updateEcomSeedVideoProject(userId, seedVideo.id, {
+    references,
+    meta: {
+      ...(seedVideo.meta ?? {}),
+      replicaAssetPlan: plan,
+      replicaCollectPhase: resolveReplicaCollectPhase(references, plan),
+    },
+  });
+
+  return { project: decompose, seedVideo: updatedSeed, reference };
+}
+
+/** 槽位直引 OSS URL（资产库 / 模特库，不上传副本） */
+export async function attachReplicaAssetSlotFromUrl(
+  userId: string,
+  decomposeProjectId: string,
+  slotId: string,
+  ossUrl: string,
+): Promise<{
+  project: MediaDecomposeProjectDto;
+  seedVideo: EcomSeedVideoProjectDto;
+  reference: SeedVideoReference;
+}> {
+  await ensureReplicaSeedProject(userId, decomposeProjectId);
+  return upsertReplicaAssetSlotOssUrl(userId, decomposeProjectId, slotId, ossUrl);
+}
+
+export async function attachReplicaAssetSlotFromAssets(
+  userId: string,
+  decomposeProjectId: string,
+  slotId: string,
+  assetIds: string[],
+): Promise<{
+  project: MediaDecomposeProjectDto;
+  seedVideo: EcomSeedVideoProjectDto;
+  reference: SeedVideoReference;
+}> {
+  const ids = [...new Set(assetIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length === 0) throw new Error("请至少选择一张资产图");
+
+  const assets = await prisma.ecomAsset.findMany({
+    where: { userId, id: { in: ids }, kind: "image" },
+    select: { id: true, ossUrl: true },
+  });
+  const url = assets[0]?.ossUrl?.trim();
+  if (!url || !/^https?:\/\//i.test(url)) throw new Error("所选资产不可用");
+
+  await ensureReplicaSeedProject(userId, decomposeProjectId);
+  return upsertReplicaAssetSlotOssUrl(userId, decomposeProjectId, slotId, url);
+}
+
+/** 从平台模特库绑定到指定复刻槽位 */
+export async function attachReplicaModelFromLibraryToSlot(
+  userId: string,
+  decomposeProjectId: string,
+  slotId: string,
+  entry: { id: string; name?: string; ossUrl: string },
+): Promise<{
+  project: MediaDecomposeProjectDto;
+  seedVideo: EcomSeedVideoProjectDto;
+  reference: SeedVideoReference;
+}> {
+  const ossUrl = entry.ossUrl?.trim();
+  if (!entry.id?.trim() || !ossUrl || !/^https?:\/\//i.test(ossUrl)) {
+    throw new Error("无效的模特库条目");
+  }
+  await ensureReplicaSeedProject(userId, decomposeProjectId);
+  return upsertReplicaAssetSlotOssUrl(userId, decomposeProjectId, slotId, ossUrl);
 }
 
 /** 从平台模特库追加模特参考图（OSS URL 直引，不上传副本） */
@@ -615,7 +883,9 @@ export async function recognizeReplicaProduct(
   productBrief: string;
 }> {
   const { decompose, seedVideo } = await requireReplicaPair(userId, decomposeProjectId);
-  const productRefs = listReplicaProductRefs(seedVideo.references);
+  const assetPlan =
+    readReplicaAssetPlan(seedVideo.meta) ?? readReplicaAssetPlan(decompose.meta) ?? null;
+  const productRefs = listReplicaProductImageRefs(seedVideo.references, assetPlan);
   if (productRefs.length === 0) throw new Error("请先上传产品图");
 
   const chatModel = resolveRecognizeProductModel();
@@ -644,9 +914,11 @@ export async function recognizeReplicaProduct(
 
   const productBrief = formatProductBriefFromRecognition(text);
   const parsed = parseProductRecognitionResult(text);
+  const productDisplayAction = formatReplicaProductDisplayAction(parsed);
+  // 识产品只写产品描述；卖点由用户单独「AI 生成卖点」，避免视觉模型臆造与拆解无关的文案
   const { projectMeta, seedMeta } = mergeReplicaCopyMeta(decompose, seedVideo, {
     productBrief: parsed.productBrief || productBrief,
-    sellingPoints: parsed.sellingPoints,
+    ...(productDisplayAction ? { productDisplayAction } : {}),
   });
   const project = await updateEcomMediaDecomposeProject(userId, decomposeProjectId, {
     meta: projectMeta,
@@ -674,13 +946,14 @@ export async function generateReplicaScript(
     decomposeProjectId,
   );
 
-  const modelRefs = listReplicaModelRefs(seedVideo.references);
-  const productRefs = listReplicaProductRefs(seedVideo.references);
-  if (modelRefs.length === 0) throw new Error("请先上传模特图");
-  if (productRefs.length === 0) throw new Error("请先上传产品图");
+  const assetPlan =
+    readReplicaAssetPlan(seedVideo.meta) ??
+    readReplicaAssetPlan(decompose.meta) ??
+    buildReplicaAssetPlanFromDecompose(structured);
 
-  const mentionCatalog = buildReplicaMentionCatalog(seedVideo.references);
-  const primaryModel = primaryReplicaModelRef(seedVideo.references)!;
+  const uploadedSlotIds = collectUploadedReplicaSlotIds(seedVideo.references);
+  const mentionCatalog = buildReplicaMentionCatalogFromPlan(assetPlan, seedVideo.references);
+  const primaryModel = primaryReplicaModelRef(seedVideo.references);
 
   const productBrief =
     opts?.productBrief?.trim() ||
@@ -695,8 +968,12 @@ export async function generateReplicaScript(
     (typeof opts?.sellingPoints === "string" ? opts.sellingPoints.trim() : "") ||
     readReplicaSellingPoints(decompose, seedVideo);
 
-  if (!productBrief && !sellingPoints) {
-    throw new Error("请先 AI 识产品或填写产品描述/卖点");
+  const hasProductSlots = assetPlan.products.some(
+    (s) => !s.description.startsWith("（原片无独立产品"),
+  );
+  const uploadedProduct = assetPlan.products.some((s) => uploadedSlotIds.has(s.id));
+  if (hasProductSlots && !productBrief && !sellingPoints && !uploadedProduct) {
+    throw new Error("有产品槽位时请填写产品描述/卖点，或上传产品参考图");
   }
 
   const draftShots = buildDraftShotsFromDecompose(structured);
@@ -710,13 +987,23 @@ export async function generateReplicaScript(
     "复刻脚本",
   );
   const mentionSummary = replicaMentionSummary(mentionCatalog);
+  const productDisplayAction = readReplicaProductDisplayAction(decompose, seedVideo);
+  const assetReplaceSummary = buildReplicaAssetReplaceSummary(assetPlan, uploadedSlotIds, {
+    productDisplayAction: productDisplayAction || undefined,
+  });
   const clientPage = ecomClientPage(
     userId,
     decomposeProjectId,
     `${ECOM_MEDIA_DECOMPOSE_TOOL_KEY}__${ECOM_MEDIA_DECOMPOSE_REPLICA_SCRIPT_ACTION}`,
   );
   const baseMessages: CanvasChatMessage[] = [
-    { role: "system", content: buildReplicaScriptSystemPrompt(mentionCatalog) },
+    {
+      role: "system",
+      content: buildReplicaScriptSystemPrompt(mentionCatalog, {
+        mediaType: structured.mediaType,
+        assetPlan,
+      }),
+    },
     {
       role: "user",
       content: buildReplicaScriptUserContent({
@@ -726,6 +1013,9 @@ export async function generateReplicaScript(
         draftShots,
         mentionSummary,
         mentionCatalog,
+        assetPlan,
+        assetReplaceSummary,
+        productDisplayAction: productDisplayAction || undefined,
       }),
     },
   ];
@@ -745,7 +1035,7 @@ export async function generateReplicaScript(
     text = await callReplicaScriptModel([
       ...baseMessages,
       { role: "assistant", content: text },
-      { role: "user", content: buildReplicaScriptRetryUserPrompt(draftShots.length) },
+      { role: "user", content: buildReplicaScriptRetryUserPrompt(draftShots.length, structured.mediaType, { mentionCatalog, assetPlan }) },
     ]);
     patch = extractReplicaScriptPatch(text);
   }
@@ -753,22 +1043,62 @@ export async function generateReplicaScript(
     throw new Error("脚本生成失败：模型未返回有效的 replica-script JSON");
   }
 
-  let shots = mapReplicaScriptToShots(patch, draftShots, primaryModel, mentionCatalog);
-  const modelTokens = mentionCatalog.filter((e) => e.role === "model").map((e) => e.token);
-  const productTokens = mentionCatalog.filter((e) => e.role === "product").map((e) => e.token);
-  const defaultMentionPrefix = [...modelTokens, ...productTokens].join(" ");
+  const primaryRef =
+    primaryModel ??
+    mentionCatalog.find((e) => e.role === "character" || e.role === "model")?.ref ?? {
+      id: "ref-replica-model-draft",
+      label: "@人物A",
+      role: "seed-material" as const,
+      ossUrl: "",
+    };
+  let shots = mapReplicaScriptToShots(patch, draftShots, primaryRef, mentionCatalog);
+  shots = finalizeImageReplicaScriptShots(structured, shots, { assetPlan, uploadedSlotIds });
+
+  const allowedTokens = allowedReplicaMentionTokens(mentionCatalog);
+  const characterTokens = mentionCatalog
+    .filter((e) => e.role === "character" || e.role === "model")
+    .map((e) => e.token);
+
   shots = shots.map((s) => ({
     ...s,
-    refImageId: primaryModel.id,
-    refImageLabel: modelTokens[0] ?? "@图片1",
-    videoPrompt:
-      modelTokens.some((t) => s.videoPrompt.includes(t)) &&
-      productTokens.some((t) => s.videoPrompt.includes(t))
-        ? s.videoPrompt
-        : defaultMentionPrefix
-          ? `${defaultMentionPrefix}，${s.videoPrompt}`
-          : s.videoPrompt,
+    refImageId: primaryRef.id,
+    refImageLabel: characterTokens[0] ?? s.refImageLabel,
+    sceneDescription: sanitizeReplicaPromptTokens(s.sceneDescription, allowedTokens),
+    imagePrompt: s.imagePrompt
+      ? sanitizeReplicaPromptTokens(s.imagePrompt, allowedTokens)
+      : s.imagePrompt,
+    videoPrompt: sanitizeReplicaPromptTokens(s.videoPrompt, allowedTokens),
   }));
+
+  shots = applyReplicaReplacePostProcess(shots, {
+    assetPlan,
+    uploadedSlotIds,
+    productDisplayAction: productDisplayAction || undefined,
+  });
+
+  // 已上传 replace 槽的 token 若全镜未出现，补入首镜（避免 LLM 遗漏）
+  const missingReplace = mentionCatalog.filter(
+    (e) =>
+      !shots.some(
+        (s) =>
+          s.sceneDescription.includes(e.token) ||
+          s.imagePrompt?.includes(e.token) ||
+          s.videoPrompt.includes(e.token),
+      ),
+  );
+  if (missingReplace.length > 0 && shots[0]) {
+    const addendum = missingReplace.map((e) => e.token).join(" ");
+    const first = shots[0]!;
+    shots[0] = {
+      ...first,
+      imagePrompt: first.imagePrompt?.includes(addendum)
+        ? first.imagePrompt
+        : [addendum, first.imagePrompt].filter(Boolean).join("，"),
+      videoPrompt: first.videoPrompt.includes(addendum)
+        ? first.videoPrompt
+        : [addendum, first.videoPrompt].filter(Boolean).join("，"),
+    };
+  }
 
   const references = normalizeReplicaReferences(seedVideo.references);
 
@@ -791,6 +1121,7 @@ export async function generateReplicaScript(
       },
       replicaCollectPhase: "script-done",
       replicaScriptGeneratedAt: new Date().toISOString(),
+      replicaAssetPlan: assetPlan,
     },
   });
 
@@ -833,7 +1164,9 @@ export async function generateReplicaSellingPoints(
   sellingPoints: string;
 }> {
   const { decompose, seedVideo } = await requireReplicaPair(userId, decomposeProjectId);
-  const productRefs = listReplicaProductRefs(seedVideo.references);
+  const assetPlan =
+    readReplicaAssetPlan(seedVideo.meta) ?? readReplicaAssetPlan(decompose.meta) ?? null;
+  const productRefs = listReplicaProductImageRefs(seedVideo.references, assetPlan);
   if (productRefs.length === 0) throw new Error("请先上传产品图");
 
   const productBrief =

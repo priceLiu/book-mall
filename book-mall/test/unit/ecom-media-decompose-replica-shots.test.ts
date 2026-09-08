@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildReplicaShotsFromDecompose } from "@/lib/ecom/ecom-media-decompose-replica";
+import { buildImageDecomposeDraftImagePrompt, buildReplicaShotsFromDecompose } from "@/lib/ecom/ecom-media-decompose-replica";
 import {
   buildReplicaProductRecognizePrompt,
   buildReplicaScriptSystemPrompt,
+  finalizeImageReplicaScriptShots,
+  pickReplicaPromptPreservingDensity,
 } from "@/lib/ecom/ecom-media-decompose-replica-script";
 import type { MediaDecomposePatch } from "@/lib/ecom/ecom-media-decompose-structured";
 import type { SeedVideoReference } from "@/lib/ecom/ecom-seed-video-types";
@@ -30,6 +32,56 @@ const baseVideoPatch = {
 } as const;
 
 describe("buildReplicaShotsFromDecompose", () => {
+  it("maps image decompose into separate imagePrompt and videoPrompt", () => {
+    const structured: MediaDecomposePatch = {
+      mediaType: "image",
+      action: "decompose_complete",
+      elements: {
+        subject: "模特展示针织开衫",
+        subjectPose: "侧身站立",
+        sceneEnvironment: "室内棚拍",
+        composition: "三分法构图",
+        colorSystem: "暖金色调",
+        atmosphere: "lookbook 氛围",
+        lighting: {
+          keyLight: "柔光",
+          fillLight: "辅光",
+          rimLight: "",
+          ambientLight: "",
+          direction: "侧顺光",
+          hardSoft: "软光",
+          colorTemperature: "暖色温",
+        },
+      },
+      positivePrompt: "lookbook 针织开衫，柔光侧顺光，暖金色调",
+      negativePrompt: "",
+      liveActionReplication: {
+        sceneSetup: "室内棚",
+        talentBlocking: "模特居中",
+        compositionFraming: "半身构图",
+        cameraPlacement: "平视机位",
+        lightingSetup: "柔光箱侧顺",
+        props: "无",
+        cameraParams: "50mm",
+        postProcessing: "低饱和",
+        shootingChecklist: "步骤一",
+      },
+    };
+
+    const [shot] = buildReplicaShotsFromDecompose(structured, ref);
+
+    expect(shot.imagePrompt).toContain("lookbook 针织开衫，柔光侧顺光，暖金色调");
+    expect(shot.imagePrompt).toContain("三分法构图");
+    expect(shot.imagePrompt).toContain("50mm");
+    expect(shot.imagePrompt).toContain("室内棚");
+    expect(shot.imagePrompt.length).toBeGreaterThan(structured.positivePrompt.length);
+    expect(shot.videoPrompt).not.toBe(shot.imagePrompt);
+    expect(shot.videoPrompt).toContain("缓慢推镜");
+    expect(shot.videoPrompt).toContain("暖金色调");
+    expect(shot.videoPrompt).toContain("50mm");
+    expect(shot.videoPrompt).toContain("室内棚");
+  });
+
   it("maps non-voiceover storyboard fields into videoPrompt", () => {
     const structured: MediaDecomposePatch = {
       mediaType: "video",
@@ -109,7 +161,77 @@ describe("buildReplicaShotsFromDecompose", () => {
   });
 });
 
+describe("pickReplicaPromptPreservingDensity", () => {
+  it("falls back to draft when LLM over-compresses", () => {
+    const draft = "A".repeat(200);
+    expect(pickReplicaPromptPreservingDensity("短句", draft, 0.75)).toBe(draft);
+    expect(pickReplicaPromptPreservingDensity("B".repeat(160), draft, 0.75)).toBe("B".repeat(160));
+  });
+});
+
+describe("finalizeImageReplicaScriptShots", () => {
+  it("restores full draft imagePrompt when script imagePrompt is too short", () => {
+    const structured: MediaDecomposePatch = {
+      mediaType: "image",
+      action: "decompose_complete",
+      elements: {
+        subject: "模特",
+        subjectPose: "站立",
+        sceneEnvironment: "棚拍",
+        composition: "三分法",
+        colorSystem: "暖色",
+        atmosphere: "lookbook",
+        lighting: {
+          keyLight: "柔光",
+          fillLight: "",
+          rimLight: "",
+          ambientLight: "",
+          direction: "侧光",
+          hardSoft: "软",
+          colorTemperature: "5500K",
+        },
+      },
+      positivePrompt: "完整生图 Prompt ".repeat(20).trim(),
+      negativePrompt: "",
+      liveActionReplication: {
+        sceneSetup: "棚",
+        talentBlocking: "居中",
+        compositionFraming: "半身",
+        cameraPlacement: "平视",
+        lightingSetup: "柔光箱",
+        props: "无",
+        cameraParams: "50mm f/4",
+        postProcessing: "低饱和",
+        shootingChecklist: "步骤",
+      },
+    };
+    const draftImage = buildImageDecomposeDraftImagePrompt(structured);
+    const [finalized] = finalizeImageReplicaScriptShots(structured, [
+      {
+        index: 1,
+        timeSlice: "0-5s",
+        refImageId: "r1",
+        refImageLabel: "@图片1",
+        sceneDescription: "场景",
+        imagePrompt: "过短的 LLM 输出",
+        videoPrompt: "短",
+        voiceover: "",
+        durationSec: 5,
+      },
+    ]);
+    expect(finalized.imagePrompt).toBe(draftImage);
+    expect(finalized.imagePrompt.length).toBeGreaterThan(structured.positivePrompt.length);
+    expect(finalized.videoPrompt.length).toBeGreaterThan(20);
+  });
+});
+
 describe("buildReplicaScriptSystemPrompt", () => {
+  it("requires imagePrompt for image decompose replica script", () => {
+    const prompt = buildReplicaScriptSystemPrompt([], { mediaType: "image" });
+    expect(prompt).toMatch(/imagePrompt/);
+    expect(prompt).toMatch(/不得.*与 imagePrompt 逐字相同/);
+  });
+
   it("requires sfx/bgm in videoPrompt and keeps voiceover separate", () => {
     const prompt = buildReplicaScriptSystemPrompt([]);
     expect(prompt).toMatch(/videoPrompt 与 voiceover \*\*严格分离\*\*/);

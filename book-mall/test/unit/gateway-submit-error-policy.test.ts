@@ -59,6 +59,14 @@ describe("gateway-submit-error-policy", () => {
     expect(calls).toBe(1);
   });
 
+  it("detects KIE/Google image safety filter messages", () => {
+    expect(
+      isContentPolicySubmitMessage(
+        "No images found in AI response. Unable to show the generated image. The image was filtered out because it violated Google's safety policies.",
+      ),
+    ).toBe(true);
+  });
+
   it("buildSubmitFailureFinalizePayload uses classified failCode", async () => {
     const payload = await buildSubmitFailureFinalizePayload(
       new VolcengineUpstreamError("sensitive information", {

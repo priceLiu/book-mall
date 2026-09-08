@@ -98,6 +98,7 @@ function imageModuleIcon(id: string): LucideIcon {
   if (id === "hand-craft") return Blocks;
   if (id === "media-decompose") return ScanSearch;
   if (id === "film-pull") return Clapperboard;
+  if (id === "model-tryon") return Sparkles;
   return Shirt;
 }
 

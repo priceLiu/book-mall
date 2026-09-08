@@ -237,6 +237,8 @@ export async function generateSeedVideoShot(opts: {
   aspectRatio?: "9:16" | "16:9";
   resolution?: string;
   generateAudio?: boolean;
+  /** 拆图复刻：优先作为 I2V/R2V 首帧（分镜图 URL） */
+  panelImageUrl?: string;
 }): Promise<
   | { status: "submitted"; shotIndex: number; taskId: string; logId: string }
   | { videoUrl: string; shotIndex: number }
@@ -258,6 +260,24 @@ export async function generateSeedVideoShot(opts: {
     };
   }
   return data as { videoUrl: string; shotIndex: number };
+}
+
+export async function generateSeedVideoShotImage(opts: {
+  projectId: string;
+  shotIndex: number;
+  modelKey: string;
+  aspectRatio?: "9:16" | "16:9";
+  imageSize?: string;
+}): Promise<{ shotIndex: number; imageUrl: string; project: SeedVideoProject }> {
+  const data = await ecomBookFetch(
+    `${BASE}/projects/${opts.projectId}/video/panel/image/generate`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(opts),
+    },
+  );
+  return data as { shotIndex: number; imageUrl: string; project: SeedVideoProject };
 }
 
 export async function generateSeedVideoDirect(opts: {

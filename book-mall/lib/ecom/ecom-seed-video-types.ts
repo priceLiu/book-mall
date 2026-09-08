@@ -83,9 +83,13 @@ export type SeedVideoShot = {
   refImageId: string;
   refImageLabel: string;
   sceneDescription: string;
+  /** 拆图复刻 · 分镜图 Prompt（静态画面） */
+  imagePrompt?: string;
   videoPrompt: string;
   voiceover: string;
   durationSec: number;
+  imageUrl?: string;
+  imageTaskId?: string;
   videoUrl?: string;
   ttsUrl?: string;
   videoTaskId?: string;
@@ -203,9 +207,12 @@ export const seedVideoShotSchema = z.object({
   refImageId: z.string().min(1),
   refImageLabel: z.string().min(1),
   sceneDescription: z.string().default(""),
+  imagePrompt: z.string().optional(),
   videoPrompt: z.string().min(1),
   voiceover: z.string().default(""),
   durationSec: z.number().positive(),
+  imageUrl: z.string().optional(),
+  imageTaskId: z.string().optional(),
   videoUrl: z.string().optional(),
   ttsUrl: z.string().optional(),
   videoTaskId: z.string().optional(),

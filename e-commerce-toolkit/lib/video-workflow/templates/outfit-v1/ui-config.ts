@@ -68,14 +68,24 @@ export function isOutfitRefsReadyToLock(
 export function inferOutfitPhase(opts: {
   hasReferenceVideo: boolean;
   sceneCount: number;
-  hasDressedImage: boolean;
+  hasRefsLocked: boolean;
   allShotsHaveVideo: boolean;
   hasComposeVideo: boolean;
 }): OutfitWorkflowPhase {
   if (opts.hasComposeVideo) return "done";
   if (opts.allShotsHaveVideo && opts.sceneCount > 0) return "compose";
-  if (opts.hasDressedImage && opts.sceneCount > 0) return "generate_shots";
+  if (opts.hasRefsLocked && opts.sceneCount > 0) return "generate_shots";
   if (opts.sceneCount > 0) return "bind_refs";
   if (opts.hasReferenceVideo) return "split";
   return "upload";
+}
+
+export function isOutfitRefsLocked(structured: Record<string, unknown> | null | undefined): boolean {
+  if (!structured || typeof structured !== "object") return false;
+  const env = structured.refs_locked;
+  return Boolean(
+    env &&
+      typeof env === "object" &&
+      (env as { schemaVersion?: string }).schemaVersion === "ecom-video-workflow/v1",
+  );
 }

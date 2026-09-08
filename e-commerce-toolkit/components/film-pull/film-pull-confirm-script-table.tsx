@@ -76,6 +76,7 @@ function MentionOrTextarea({
           referenceImages={mentionRefs}
           disabled
           hideQuickInsert
+          showTopRefBar={false}
           minHeightClass="min-h-[2rem]"
           className="max-w-[12rem] rounded border border-transparent bg-transparent px-0 py-0 text-xs leading-relaxed"
           onChange={() => {}}
@@ -95,6 +96,7 @@ function MentionOrTextarea({
         referenceImages={mentionRefs}
         disabled={disabled}
         hideQuickInsert
+        showTopRefBar={false}
         pickerZIndex={pickerZIndex}
         minHeightClass={minHeightClass ?? "min-h-[3rem]"}
         className="min-w-[10rem] rounded border border-[#d2d2d7] bg-white px-1.5 py-1 text-xs leading-relaxed"
@@ -151,9 +153,6 @@ export function FilmPullConfirmScriptTable({
     <div className={cn("overflow-x-auto rounded-lg border border-[#e8e8ed]", className)}>
       {showRefsGallery ? (
         <div className="border-b border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5">
-          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[#6e6e73]">
-            参考图 · 在 Prompt 中用 @图片1 … 引用
-          </p>
           <FilmPullRefsGalleryStrip characterRefs={characterRefs} />
         </div>
       ) : null}

@@ -18,6 +18,7 @@ import { AnalysisCell } from "@/components/outfit-video/outfit-scene-analysis-ce
 import { OutfitShotSceneFusionCell } from "@/components/outfit-video/outfit-shot-scene-fusion-cell";
 import { batchComposeButtonLabel } from "@/lib/seed-video-tts-selection";
 import type { SceneShot, WorkflowRefs } from "@/lib/video-workflow/shot-spine";
+import type { VtonLockedLook } from "@/lib/vton-types";
 import {
   outfitSceneActionLabel,
   outfitSceneBackgroundLabel,
@@ -28,6 +29,8 @@ import {
 type Props = {
   scenes: SceneShot[];
   refs: WorkflowRefs;
+  lockedLooks?: VtonLockedLook[];
+  defaultLockedLookId?: string;
   disabled?: boolean;
   generatingIndices?: ReadonlySet<number>;
   generateBusy?: boolean;
@@ -66,6 +69,8 @@ function isOutfitShotComposeReady(shot: SceneShot): boolean {
 export function OutfitShotProductionPanel({
   scenes,
   refs,
+  lockedLooks,
+  defaultLockedLookId,
   disabled,
   generatingIndices,
   generateBusy,
@@ -89,15 +94,24 @@ export function OutfitShotProductionPanel({
   const columnCount = 10;
 
   const refGallery = useMemo(() => {
-    const items: Array<{ label: string; url: string }> = [];
-    if (refs.dressedImage?.ossUrl) {
+    const items: Array<{ label: string; url: string; isDefault?: boolean }> = [];
+    if (lockedLooks?.length) {
+      for (const look of lockedLooks) {
+        items.push({
+          label: look.label ?? "锁定参考",
+          url: look.ossUrl,
+          isDefault: look.id === defaultLockedLookId,
+        });
+      }
+    } else if (refs.dressedImage?.ossUrl) {
       items.push({
         label: refs.dressedImage.label ?? "穿搭成片",
         url: refs.dressedImage.ossUrl,
+        isDefault: true,
       });
     }
     return items;
-  }, [refs.dressedImage?.label, refs.dressedImage?.ossUrl]);
+  }, [defaultLockedLookId, lockedLooks, refs.dressedImage?.label, refs.dressedImage?.ossUrl]);
 
   const idleIndices = useMemo(
     () =>

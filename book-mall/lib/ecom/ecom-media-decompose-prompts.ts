@@ -161,10 +161,35 @@ const MEDIA_DECOMPOSE_JSON_CONTRACT = `
   "positivePrompt": "（须体现布光+色彩体系+画面氛围）…",
   "negativePrompt": "…",
   "liveActionReplication": {
-    "cameraPlacement": "…",
-    "lightingSetup": "…",
-    "props": "…",
-    "cameraParams": "…"
+    "sceneSetup": "（场地选址、背景布置、环境还原步骤…）",
+    "talentBlocking": "（人数、站位、姿态、表情、服装造型…）",
+    "compositionFraming": "（景别、构图线、留白、对焦主体、画幅…）",
+    "cameraPlacement": "（机位距离、高度、角度、三脚架/手持…）",
+    "lightingSetup": "（主/辅/轮廓/环境光具体摆位，展开 elements.lighting…）",
+    "props": "（道具清单 + 服装搭配…）",
+    "cameraParams": "（焦距、光圈、快门、ISO、胶片倾向…）",
+    "postProcessing": "（调色、颗粒、对比度、裁切输出…）",
+    "shootingChecklist": "1. …\\n2. …\\n3. …"
+  },
+  "replicaAssetCatalog": {
+    "characterCount": 2,
+    "characters": [
+      { "label": "人物A", "description": "（单独写 A：性别、年龄、发型、站位、动作…不含服装）", "roleInShot": "前景主体" },
+      { "label": "人物B", "description": "（单独写 B：…勿与 A 混写）", "roleInShot": "后方远景" }
+    ],
+    "characterWardrobe": [
+      { "characterLabel": "人物A", "garments": "（A 的服装：上装/下装/鞋…）", "stylingNotes": "可选" },
+      { "characterLabel": "人物B", "garments": "（B 的服装…）" }
+    ],
+    "products": [
+      { "label": "产品1", "description": "（售卖主体 SKU/品类/材质/颜色…）", "roleInShot": "手持/穿戴" }
+    ],
+    "props": [
+      { "label": "道具1", "description": "（画面内道具，与人物分开写）", "roleInShot": "手持" }
+    ],
+    "scenes": [
+      { "label": "场景1", "description": "（场地/背景/环境光氛围…）", "roleInShot": "主拍摄环境" }
+    ]
   }
 }
 \`\`\`
@@ -213,7 +238,8 @@ export const DEFAULT_VIDEO_DECOMPOSE_USER_PROMPT = `你作为资深影视分镜&
 10. **narrativeLogic**：按时间/镜序写全片叙事弧线与卖点推进，详实不写一句带过。
 11. **beatPoints**：带秒数/时间码的卡点清单；每条须含画面事件 + 运镜方式 + 转场/切换类型（硬切/叠化/划像/匹配剪辑/J-Cut/L-Cut 等）。
 12. **replicableShootingScript**：可直接落地的复刻脚本；须写机位与高度、运镜轨迹、镜头切换节奏、布光、模特走位/动作、BGM 与口播时段。
-13. 禁止 Markdown 表格/前言/闲聊。`;
+13. **replicaAssetCatalog**（复刻资产清单）：characterCount + characters/products/props/scenes + **characterWardrobe**；多人须逐人「人物A/B/C…」独立 description（**外貌/站位/动作，不含服装**），服装写入 characterWardrobe 逐条对应。
+14. 禁止 Markdown 表格/前言/闲聊。`;
 
 export const DEFAULT_IMAGE_DECOMPOSE_USER_PROMPT = `你作为资深视觉画面解析师，接下来我会上传一张静态画面，请做完整反推拆解。
 
@@ -222,8 +248,25 @@ export const DEFAULT_IMAGE_DECOMPOSE_USER_PROMPT = `你作为资深视觉画面�
 1. **elements** 对象：主体、姿态、场景、透视、构图、等效焦距、拍摄角度、lighting 子对象（主/辅/轮廓/环境光、方向、软硬、色温）、材质、色彩体系、氛围、细节。
 2. **positivePrompt**：须体现布光 + 色彩体系 + 画面氛围，可直接用于 AI 绘图。
 3. **negativePrompt**：反向负面提示词。
-4. **liveActionReplication**：机位、灯光、道具、相机参数。
-5. 禁止 Markdown 表格/前言/闲聊。`;
+4. **liveActionReplication** 对象（须**综合 elements 全文**，每项详实可落地，禁止一句话摘要）：
+   - sceneSetup：场景搭建与环境还原
+   - talentBlocking：人物走位、姿态、表情、服装造型
+   - compositionFraming：构图、景别、留白、对焦主体
+   - cameraPlacement：机位距离、高度、角度
+   - lightingSetup：主/辅/轮廓/环境光具体摆位（展开 elements.lighting）
+   - props：道具与服装清单
+   - cameraParams：焦距、光圈、快门、ISO
+   - postProcessing：后期调色与输出规格
+   - shootingChecklist：分步拍摄清单（1→2→3…）
+5. liveActionReplication **不受简洁限制，宁可写长写细**。
+6. **replicaAssetCatalog**（复刻资产清单，**与 liveActionReplication 分工**）：
+   - **characterCount** 须等于 characters 数组长度；多人时 **逐人一条**，label 用「人物A/B/C…」，**禁止**把 A/B 混写在同一条 description。
+   - **characters[]**：每人单独 description（**外貌、站位、动作、与他人的空间关系；不含服装**）。
+   - **characterWardrobe[]**：与 characters 一一对应，逐人写 garments（上装/下装/鞋/配饰等）；可选 stylingNotes。
+   - **products[]**：每个售卖/展示主体单独一条（可与人物穿戴关系写在 roleInShot）；原片无产品时可留空数组（复刻阶段可新增）。
+   - **props[]**：每个关键道具单独一条（勿与人物/产品混写）。
+   - **scenes[]**：每个拍摄环境/背景单独一条。
+7. 禁止 Markdown 表格/前言/闲聊。`;
 
 /** 拆解输出未通过 Zod/光影质量校验时的重试 user 提示 */
 export function buildMediaDecomposeDecomposeRetryUserPrompt(reason: string): string {
@@ -236,5 +279,7 @@ export function buildMediaDecomposeDecomposeRetryUserPrompt(reason: string): str
 4. visualContent 写画面主体与动作，光影写入专用列；
 5. 有口播时 JSON 字段 voiceover 只填该镜时段；该镜无人声则留空；
 6. 根字段须含 openingHook、fullTranscript、talentAnalysis、wardrobeAnalysis；模特/服装覆盖全片；
-7. 围栏语言标记必须是 media-decompose；禁止 json；禁止尾逗号与 JSON 注释。`);
+7. 围栏语言标记必须是 media-decompose；禁止 json；禁止尾逗号与 JSON 注释。
+8. 图片分支：liveActionReplication 九项字段每项须详实（≥50 字），须综合 elements 写成可逐步执行的实拍清单。
+9. 图片/视频均须输出 replicaAssetCatalog：characterCount 与 characters 条数一致，多人逐条人物A/B/C…，**characterWardrobe 与 characters 逐人对应**，产品/道具/场景各自独立数组。`);
 }

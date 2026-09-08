@@ -152,7 +152,7 @@ export type EcomLibrarySection = {
   modelShotBundles: EcomLibraryModelShotBundle[];
 };
 
-const IMAGE_MODULE_IDS = ["main-image", "detail-page", "hand-craft", "model-shot"] as const;
+const IMAGE_MODULE_IDS = ["main-image", "detail-page", "hand-craft", "model-shot", "model-tryon"] as const;
 const VIDEO_MODULE_IDS = [
   "storyboard-micro-drama",
   "seed-video",
@@ -172,6 +172,7 @@ const MODULE_TITLES: Record<string, { title: string; kind: "image" | "video" | "
   "detail-page": { title: "电商详情页", kind: "image" },
   "hand-craft": { title: "手伴创作", kind: "image" },
   "model-shot": { title: "服装模特图", kind: "image" },
+  "model-tryon": { title: "模特试衣", kind: "image" },
   "storyboard-micro-drama": { title: "电商口播故事版", kind: "video" },
   "seed-video": { title: "图片生种草视频", kind: "video" },
   "media-decompose": { title: "拆图拆视频", kind: "video" },

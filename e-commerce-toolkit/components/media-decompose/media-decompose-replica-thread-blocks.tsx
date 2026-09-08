@@ -1,11 +1,26 @@
 "use client";
 
-import { ChevronDown, ChevronUp, ImageIcon, Loader2, Save, Sparkles } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ChevronDown, ChevronUp, ImageIcon, Loader2, Save, Sparkles, UserRound } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
 
+import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import type { ReplicaVoiceoverDraft } from "@/lib/media-decompose-replica-workflow";
+import {
+  findReplicaSlotRef,
+  listReplicaSlotRefs,
+} from "@/lib/media-decompose-replica-refs";
+import {
+  listReplicaAssetPlanSlots,
+  replicaAssetCategoryTitle,
+  replicaAssetSlotToken,
+  type ReplicaAssetCategory,
+  type ReplicaAssetPlan,
+  type ReplicaAssetPlanSlot,
+} from "@/lib/replica-asset-plan";
+import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
+import type { SeedVideoReference } from "@/lib/seed-video-types";
 import { cn } from "@/lib/utils";
 
 type RefSlotProps = {
@@ -72,7 +87,7 @@ type RefGridProps = {
   modelGenerating?: boolean;
 };
 
-/** 内容区 · 模特 / 产品参考图占位 */
+/** 内容区 · 模特 / 产品参考图占位（旧版两槽） */
 export function ReplicaRefSlotGrid({
   modelUrl,
   productUrl,
@@ -101,6 +116,156 @@ export function ReplicaRefSlotGrid({
           required
         />
       </div>
+    </div>
+  );
+}
+
+type AssetPlanGridProps = {
+  plan: ReplicaAssetPlan;
+  references: SeedVideoReference[];
+  activeSlotId?: string | null;
+  uploadingSlotId?: string | null;
+  uploadProgress?: number | null;
+  uploadProgressLabel?: string;
+  onActiveSlotChange?: (slotId: string) => void;
+  onUploadSlot?: (slot: ReplicaAssetPlanSlot, files: File[]) => void;
+  onRemoveSlot?: (slot: ReplicaAssetPlanSlot, refId: string) => void;
+  onOpenAssetPicker?: (slot: ReplicaAssetPlanSlot) => void;
+  onOpenModelLibrary?: (slot: ReplicaAssetPlanSlot) => void;
+  slotInputRef?: (slotId: string, el: HTMLInputElement | null) => void;
+  disabled?: boolean;
+  supportsAssets?: boolean;
+  supportsModelLibrary?: boolean;
+};
+
+const REF_TOOLBAR_BTN_CLASS = "h-7 px-2 text-[10px]";
+
+/** 四槽复刻方案 · 全身人物/产品/道具/场景（对齐 EcomRefUploadCard 上传交互） */
+export function ReplicaAssetPlanGrid({
+  plan,
+  references,
+  activeSlotId,
+  uploadingSlotId,
+  uploadProgress,
+  uploadProgressLabel,
+  onActiveSlotChange,
+  onUploadSlot,
+  onRemoveSlot,
+  onOpenAssetPicker,
+  onOpenModelLibrary,
+  slotInputRef,
+  disabled,
+  supportsAssets,
+  supportsModelLibrary,
+}: AssetPlanGridProps) {
+  const slotInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const sections = useMemo(() => {
+    const groups: Array<{ category: ReplicaAssetCategory; slots: ReplicaAssetPlanSlot[] }> = [
+      { category: "character", slots: plan.characters },
+      { category: "product", slots: plan.products },
+      { category: "prop", slots: plan.props },
+      { category: "scene", slots: plan.scenes },
+    ];
+    return groups.filter((g) => g.slots.length > 0);
+  }, [plan]);
+
+  if (sections.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-[#e8e8ed] bg-white p-4">
+      <p className="mb-1 text-xs font-semibold text-[#1d1d1f]">复刻资产方案</p>
+      <p className="mb-3 text-[11px] text-[#6e6e73]">
+        按拆解结果列出全身人物 / 产品 / 道具 / 场景；支持上传、粘贴、拖入与「我的资产」。上传即 replace（Prompt 用 @token），不上传则 inherit 原片描述。
+        {IMAGE_UPLOAD_DROP_HINT}
+      </p>
+      <div className="space-y-4">
+        {sections.map(({ category, slots }) => (
+          <div key={category}>
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[#6e6e73]">
+              {replicaAssetCategoryTitle(category)}
+            </p>
+            <div className="space-y-3">
+              {slots.map((slot) => {
+                const ref = findReplicaSlotRef(references, slot.id);
+                const uploading = uploadingSlotId === slot.id;
+                const title = `${slot.label} ${replicaAssetSlotToken(slot)}`;
+                return (
+                  <div key={slot.id} className="max-w-xl">
+                    <EcomRefUploadCard
+                      title={title}
+                      suggested={activeSlotId === slot.id}
+                      listenPaste={false}
+                      items={
+                        ref?.ossUrl?.trim()
+                          ? [
+                              {
+                                id: ref.id,
+                                ossUrl: ref.ossUrl,
+                                label: slot.label,
+                              },
+                            ]
+                          : []
+                      }
+                      emptyHint={`${slot.description || "（原片无描述）"} · 可选上传，否则沿用原片`}
+                      busy={disabled}
+                      uploadProgress={uploading ? uploadProgress : null}
+                      uploadProgressLabel={uploading ? uploadProgressLabel : undefined}
+                      onUploadFiles={(files) => onUploadSlot?.(slot, files)}
+                      onOpenFilePicker={() => {
+                        onActiveSlotChange?.(slot.id);
+                        slotInputRefs.current[slot.id]?.click();
+                      }}
+                      onMouseEnterCard={() => onActiveSlotChange?.(slot.id)}
+                      onOpenAssetPicker={
+                        supportsAssets && onOpenAssetPicker
+                          ? () => {
+                              onActiveSlotChange?.(slot.id);
+                              onOpenAssetPicker(slot);
+                            }
+                          : undefined
+                      }
+                      onRemove={
+                        ref && onRemoveSlot ? (id) => onRemoveSlot(slot, id) : undefined
+                      }
+                      removeLabel={`删除${slot.label}`}
+                      onTitleClick={() => onActiveSlotChange?.(slot.id)}
+                      inputRef={(el) => {
+                        slotInputRefs.current[slot.id] = el;
+                        slotInputRef?.(slot.id, el);
+                      }}
+                      toolbarPrefix={
+                        category === "character" && supportsModelLibrary && onOpenModelLibrary ? (
+                          <EcomButtonSecondary
+                            size="sm"
+                            type="button"
+                            disabled={disabled}
+                            className={REF_TOOLBAR_BTN_CLASS}
+                            onClick={() => {
+                              onActiveSlotChange?.(slot.id);
+                              onOpenModelLibrary(slot);
+                            }}
+                          >
+                            <UserRound className="h-3 w-3 shrink-0" />
+                            模特库
+                          </EcomButtonSecondary>
+                        ) : undefined
+                      }
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      {listReplicaSlotRefs(references).length > 0 ? (
+        <p className="mt-3 text-[10px] text-[#0071e3]">
+          已上传 {listReplicaSlotRefs(references).length} 张替换图；未上传槽位将沿用原片文字描述。
+        </p>
+      ) : (
+        <p className="mt-3 text-[10px] text-[#86868b]">尚未上传替换图，可直接生成脚本（全部 inherit）。</p>
+      )}
     </div>
   );
 }
@@ -213,6 +378,8 @@ type SellingPointsCardProps = {
   voiceoverDisabled?: boolean;
   dirty?: boolean;
   showVoiceover?: boolean;
+  /** 原片拆解中的产品/服装描述，仅展示为参考 */
+  decomposeHint?: string;
 };
 
 /** 内容区 · 卖点（可选单行/短段） */
@@ -230,6 +397,7 @@ export function ReplicaSellingPointsCard({
   voiceoverDisabled,
   dirty,
   showVoiceover = false,
+  decomposeHint,
 }: SellingPointsCardProps) {
   const generateLabel = value.trim() ? "AI 润色卖点" : "AI 生成卖点";
   return (
@@ -243,7 +411,10 @@ export function ReplicaSellingPointsCard({
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-xs font-semibold text-[#1d1d1f]">卖点</p>
-          <p className="text-[11px] text-[#6e6e73]">可选；用于脚本与口播生成。不填也可继续，AI 可后续补全。</p>
+          <p className="text-[11px] text-[#6e6e73]">
+            描述<strong>你上传的替换产品</strong>的卖点（非拆解原片文案）。可手动填写，或上传产品图后点「AI
+            生成卖点」；与拆解无关的旧内容请清空。
+          </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-1.5">
           {onGenerate ? (
@@ -298,11 +469,20 @@ export function ReplicaSellingPointsCard({
           ) : null}
         </div>
       </div>
+      {decomposeHint?.trim() && !value.trim() ? (
+        <p className="mb-2 text-[10px] leading-relaxed text-[#86868b]">
+          原片拆解 · 产品/服装描述（仅供参考，非卖点）：{decomposeHint.trim()}
+        </p>
+      ) : null}
       <input
         type="text"
         value={value}
         disabled={disabled || saving || generating || voiceoverGenerating}
-        placeholder="例如：轻薄透气、莫兰迪配色、通勤百搭（可不填）"
+        placeholder={
+          decomposeHint?.trim()
+            ? "填写你上传替换产品的卖点；或点 AI 生成卖点"
+            : "例如：轻薄透气、莫兰迪配色、通勤百搭（可不填）"
+        }
         className="w-full rounded-lg border border-[#d2d2d7] bg-[#fafafa] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[#0071e3] focus:bg-white focus:ring-2 focus:ring-[#0071e3]/20 disabled:opacity-60"
         onChange={(e) => onChange(e.target.value)}
       />

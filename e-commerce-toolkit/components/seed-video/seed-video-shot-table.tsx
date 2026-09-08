@@ -1,13 +1,14 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useMemo } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import { EcomPromptMentionRefBar } from "@/components/media/ecom-prompt-mention-ref-bar";
 import { ProductDesignPromptMentionTextarea } from "@/components/product-design/product-design-prompt-mention-textarea";
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
-import { SeedVideoRefsGalleryStrip } from "@/components/seed-video/seed-video-refs-gallery-strip";
 import { SeedVideoShotRefCell } from "@/components/seed-video/seed-video-shot-ref-cell";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import type { EcomPromptImageRef } from "@/lib/ecom-prompt-mention";
+import { buildSeedVideoMentionRefs } from "@/lib/seed-video-mention-refs";
 import type { SeedVideoReference, SeedVideoShot } from "@/lib/seed-video-types";
 
 type Props = {
@@ -142,36 +143,19 @@ export function SeedVideoShotTable({
   const voiceoverDraftCount = voiceoverDraftByIndex?.size ?? 0;
   const showVoiceoverDraftActions = voiceoverDraftCount > 0 && Boolean(onApplyVoiceoverDraft);
 
+  const resolvedMentionRefs = useMemo(
+    () => videoPromptMentionRefs ?? buildSeedVideoMentionRefs(references),
+    [videoPromptMentionRefs, references],
+  );
+
   return (
     <div className="overflow-x-auto rounded-xl border border-[#e8e8ed]">
       {showRefsGallery ? (
         <div className="border-b border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5">
-          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[#6e6e73]">
-            参考图 · 在视频 Prompt 中用 @图片1 … 引用
-          </p>
-          {videoPromptMentionRefs && videoPromptMentionRefs.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {videoPromptMentionRefs.map((ref) => (
-                <div
-                  key={ref.token}
-                  className="flex items-center gap-1.5 rounded-lg border border-[#e8e8ed] bg-white px-1.5 py-1"
-                  title={ref.label}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={ref.url}
-                    alt={ref.label}
-                    className="h-10 w-10 shrink-0 rounded-md border border-[#e8e8ed] object-cover"
-                  />
-                  <span className="pr-1 font-mono text-[10px] font-medium text-[#0071e3]">
-                    {ref.token}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <SeedVideoRefsGalleryStrip references={references} />
-          )}
+          <EcomPromptMentionRefBar
+            refs={resolvedMentionRefs}
+            refsEmptyHint="尚未上传参考图；请在上方上传，并在视频 Prompt 中用 @ 插入代号。"
+          />
         </div>
       ) : null}
       <table className="min-w-full text-left text-xs">
@@ -281,13 +265,15 @@ export function SeedVideoShotTable({
                   />
                 </td>
                 <td className="px-3 py-2">
-                  {videoPromptMentionRefs && videoPromptMentionRefs.length > 0 ? (
+                  {resolvedMentionRefs.length > 0 ? (
                     <ProductDesignPromptMentionTextarea
                       value={shot.videoPrompt}
-                      referenceImages={videoPromptMentionRefs}
+                      referenceImages={resolvedMentionRefs}
                       disabled={disabled || isGenerating}
                       minHeightClass="min-h-[4rem]"
                       className="rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-xs leading-relaxed"
+                      hideQuickInsert
+                      showTopRefBar={false}
                       onChange={(next) => patchShot(shot.index, { videoPrompt: next })}
                     />
                   ) : (

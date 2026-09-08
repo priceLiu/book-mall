@@ -25,12 +25,84 @@ const elementsSchema = z.object({
   detailNotes: z.string().default(""),
 });
 
+export const LIVE_ACTION_REPLICATION_FIELD_KEYS = [
+  "sceneSetup",
+  "talentBlocking",
+  "compositionFraming",
+  "cameraPlacement",
+  "lightingSetup",
+  "props",
+  "cameraParams",
+  "postProcessing",
+  "shootingChecklist",
+] as const;
+
+export type LiveActionReplicationFieldKey =
+  (typeof LIVE_ACTION_REPLICATION_FIELD_KEYS)[number];
+
+export const LIVE_ACTION_REPLICATION_FIELD_LABELS: Record<
+  LiveActionReplicationFieldKey,
+  string
+> = {
+  sceneSetup: "场景搭建",
+  talentBlocking: "人物走位与造型",
+  compositionFraming: "构图与取景",
+  cameraPlacement: "机位",
+  lightingSetup: "灯光布置",
+  props: "道具与服装",
+  cameraParams: "相机参数",
+  postProcessing: "后期调色",
+  shootingChecklist: "拍摄步骤清单",
+};
+
 const liveActionReplicationSchema = z.object({
+  sceneSetup: z.string().default(""),
+  talentBlocking: z.string().default(""),
+  compositionFraming: z.string().default(""),
   cameraPlacement: z.string().default(""),
   lightingSetup: z.string().default(""),
   props: z.string().default(""),
   cameraParams: z.string().default(""),
+  postProcessing: z.string().default(""),
+  shootingChecklist: z.string().default(""),
 });
+
+/** 复刻资产清单 · LLM 逐条输出（人物 A/B/C…、产品、道具、场景） */
+export const replicaAssetCatalogEntrySchema = z.object({
+  label: z.string().min(1),
+  description: z.string().min(1),
+  roleInShot: z.string().optional(),
+});
+
+/** 逐人物服装（与 characters[].description 外貌/站位分离，便于 replace 时剥离旧服装） */
+export const characterWardrobeEntrySchema = z.object({
+  characterLabel: z.string().min(1),
+  garments: z.string().min(1),
+  stylingNotes: z.string().optional(),
+});
+
+export const replicaAssetCatalogSchema = z.object({
+  characterCount: z.number().int().positive().optional(),
+  characters: z.array(replicaAssetCatalogEntrySchema).default([]),
+  characterWardrobe: z.array(characterWardrobeEntrySchema).default([]),
+  products: z.array(replicaAssetCatalogEntrySchema).default([]),
+  props: z.array(replicaAssetCatalogEntrySchema).default([]),
+  scenes: z.array(replicaAssetCatalogEntrySchema).default([]),
+});
+
+export type ReplicaAssetCatalogEntry = z.infer<typeof replicaAssetCatalogEntrySchema>;
+export type CharacterWardrobeEntry = z.infer<typeof characterWardrobeEntrySchema>;
+export type ReplicaAssetCatalog = z.infer<typeof replicaAssetCatalogSchema>;
+
+const EMPTY_REPLICA_ASSET_CATALOG: ReplicaAssetCatalog = {
+  characters: [],
+  characterWardrobe: [],
+  products: [],
+  props: [],
+  scenes: [],
+};
+
+const MIN_LIVE_ACTION_REPLICATION_FIELD_CHARS = 50;
 
 const scenePrepSchema = z.object({
   venue: z.string().default(""),
@@ -99,6 +171,7 @@ const videoPatchSchema = z.object({
   narrativeLogic: z.string().default(""),
   beatPoints: z.string().default(""),
   replicableShootingScript: z.string().default(""),
+  replicaAssetCatalog: replicaAssetCatalogSchema.default(EMPTY_REPLICA_ASSET_CATALOG),
 });
 
 const imagePatchSchema = z.object({
@@ -108,6 +181,7 @@ const imagePatchSchema = z.object({
   positivePrompt: z.string().min(1),
   negativePrompt: z.string().default(""),
   liveActionReplication: liveActionReplicationSchema,
+  replicaAssetCatalog: replicaAssetCatalogSchema.default(EMPTY_REPLICA_ASSET_CATALOG),
 });
 
 export const mediaDecomposePatchSchema = z.discriminatedUnion("mediaType", [
@@ -116,6 +190,166 @@ export const mediaDecomposePatchSchema = z.discriminatedUnion("mediaType", [
 ]);
 
 export type MediaDecomposePatch = z.infer<typeof mediaDecomposePatchSchema>;
+
+function coerceLighting(raw: unknown): z.infer<typeof lightingSchema> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return lightingSchema.parse({});
+  }
+  const o = raw as Record<string, unknown>;
+  return {
+    keyLight: pickString(o, ["keyLight", "主光", "key"]),
+    fillLight: pickString(o, ["fillLight", "辅光", "fill"]),
+    rimLight: pickString(o, ["rimLight", "轮廓光", "rim"]),
+    ambientLight: pickString(o, ["ambientLight", "环境光", "ambient"]),
+    direction: pickString(o, ["direction", "方向", "光源方向"]),
+    hardSoft: pickString(o, ["hardSoft", "软硬", "光质"]),
+    colorTemperature: pickString(o, ["colorTemperature", "色温", "colorTemp"]),
+  };
+}
+
+function coerceLiveActionReplication(
+  raw: unknown,
+): z.infer<typeof liveActionReplicationSchema> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return liveActionReplicationSchema.parse({});
+  }
+  const o = raw as Record<string, unknown>;
+  return {
+    sceneSetup: pickString(o, ["sceneSetup", "场景搭建", "场地搭建", "环境还原"]),
+    talentBlocking: pickString(o, [
+      "talentBlocking",
+      "人物走位",
+      "模特走位",
+      "人物走位与造型",
+      "talent",
+      "blocking",
+    ]),
+    compositionFraming: pickString(o, [
+      "compositionFraming",
+      "构图取景",
+      "构图与取景",
+      "framing",
+      "composition",
+    ]),
+    cameraPlacement: pickString(o, ["cameraPlacement", "机位", "机位摆放", "camera"]),
+    lightingSetup: pickString(o, ["lightingSetup", "灯光", "灯光布置", "lighting"]),
+    props: pickString(o, ["props", "道具", "道具搭配", "道具与服装", "wardrobe"]),
+    cameraParams: pickString(o, ["cameraParams", "相机参数", "相机参数参考", "cameraSettings"]),
+    postProcessing: pickString(o, ["postProcessing", "后期", "后期调色", "colorGrading"]),
+    shootingChecklist: pickString(o, [
+      "shootingChecklist",
+      "拍摄步骤",
+      "拍摄步骤清单",
+      "shootingSteps",
+      "checklist",
+    ]),
+  };
+}
+
+function coerceReplicaAssetCatalogEntry(raw: unknown): ReplicaAssetCatalogEntry | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const o = raw as Record<string, unknown>;
+  const label = pickString(o, ["label", "名称", "name", "title"]);
+  const description = pickString(o, ["description", "描述", "desc", "detail", "summary"]);
+  if (!label || !description) return null;
+  const roleInShot = pickString(o, ["roleInShot", "role", "镜头角色", "出镜角色"]);
+  return {
+    label,
+    description,
+    ...(roleInShot ? { roleInShot } : {}),
+  };
+}
+
+function coerceCharacterWardrobeEntry(raw: unknown): CharacterWardrobeEntry | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const o = raw as Record<string, unknown>;
+  const characterLabel = pickString(o, ["characterLabel", "label", "人物", "character"]);
+  const garments = pickString(o, ["garments", "wardrobe", "服装", "clothing", "description"]);
+  if (!characterLabel || !garments) return null;
+  const stylingNotes = pickString(o, ["stylingNotes", "styling", "搭配说明", "notes"]);
+  return {
+    characterLabel,
+    garments,
+    ...(stylingNotes ? { stylingNotes } : {}),
+  };
+}
+
+function coerceReplicaAssetCatalog(raw: unknown): ReplicaAssetCatalog {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { ...EMPTY_REPLICA_ASSET_CATALOG };
+  }
+  const o = raw as Record<string, unknown>;
+  const mapEntries = (key: string, altKeys: string[]): ReplicaAssetCatalogEntry[] => {
+    const source = o[key] ?? altKeys.map((k) => o[k]).find((v) => v != null);
+    if (!Array.isArray(source)) return [];
+    return source
+      .map((row) => coerceReplicaAssetCatalogEntry(row))
+      .filter((row): row is ReplicaAssetCatalogEntry => row != null);
+  };
+  const characterCountRaw = o.characterCount ?? o.人物数量 ?? o.characterNum;
+  let characterCount: number | undefined;
+  if (typeof characterCountRaw === "number" && Number.isFinite(characterCountRaw) && characterCountRaw > 0) {
+    characterCount = Math.trunc(characterCountRaw);
+  } else if (typeof characterCountRaw === "string") {
+    const parsed = Number.parseInt(characterCountRaw.replace(/[^\d]/g, ""), 10);
+    if (Number.isFinite(parsed) && parsed > 0) characterCount = parsed;
+  }
+  const wardrobeSource =
+    o.characterWardrobe ?? o.人物服装 ?? o.characterWardrobes ?? o.wardrobeByCharacter;
+  const characterWardrobe = Array.isArray(wardrobeSource)
+    ? wardrobeSource
+        .map((row) => coerceCharacterWardrobeEntry(row))
+        .filter((row): row is CharacterWardrobeEntry => row != null)
+    : [];
+
+  return {
+    ...(characterCount ? { characterCount } : {}),
+    characters: mapEntries("characters", ["人物", "charactersList", "talents"]),
+    characterWardrobe,
+    products: mapEntries("products", ["产品", "productsList", "garments"]),
+    props: mapEntries("props", ["道具", "propsList"]),
+    scenes: mapEntries("scenes", ["场景", "scenesList", "environments"]),
+  };
+}
+
+/** 图片拆解 · 实拍复刻方案质量校验；失败返回人类可读原因 */
+export function validateMediaDecomposeImageReplicationQuality(
+  patch: Extract<MediaDecomposePatch, { mediaType: "image" }>,
+): string | null {
+  const rep = patch.liveActionReplication;
+  const weakFields = LIVE_ACTION_REPLICATION_FIELD_KEYS.filter((key) => {
+    const text = rep[key]?.trim() ?? "";
+    return text.length < MIN_LIVE_ACTION_REPLICATION_FIELD_CHARS;
+  });
+  if (weakFields.length === 0) {
+    const catalog = patch.replicaAssetCatalog;
+    if (catalog.characters.length === 0) {
+      return "replicaAssetCatalog.characters 为空：须逐人列出人物A/B/C…（含 label、description、roleInShot）";
+    }
+    for (const entry of catalog.characters) {
+      if (entry.description.trim().length < 20) {
+        return `${entry.label} 描述过短（须 ≥20 字，写清外貌/站位/动作；服装写入 characterWardrobe，勿与下一位混写）`;
+      }
+    }
+    const expectedCount = catalog.characterCount ?? catalog.characters.length;
+    if (catalog.characters.length !== expectedCount) {
+      return `replicaAssetCatalog 人物条数（${catalog.characters.length}）须与 characterCount（${expectedCount}）一致`;
+    }
+    return null;
+  }
+
+  const labels = weakFields.map((key) => LIVE_ACTION_REPLICATION_FIELD_LABELS[key]).join("、");
+  return `liveActionReplication 以下字段过短（每项须 ≥${MIN_LIVE_ACTION_REPLICATION_FIELD_CHARS} 字，且须综合 elements 写成可逐步执行的实拍清单）：${labels}`;
+}
+
+function validateMediaDecomposePatchQuality(patch: MediaDecomposePatch): string | null {
+  const videoError = validateMediaDecomposeVisualQuality(patch);
+  if (videoError) return videoError;
+  if (patch.mediaType === "image") {
+    return validateMediaDecomposeImageReplicationQuality(patch);
+  }
+  return null;
+}
 
 export function toMediaDecomposeFence(patch: MediaDecomposePatch): string {
   return `\`\`\`media-decompose\n${JSON.stringify(patch, null, 2)}\n\`\`\``;
@@ -365,10 +599,82 @@ export function coerceMediaDecomposePayload(raw: unknown): unknown | null {
   if (!mediaType) return null;
 
   if (mediaType === "image") {
+    const elementsRaw = o.elements ?? o.画面要素 ?? o.imageElements;
     return {
-      ...o,
       mediaType: "image",
       action: "decompose_complete",
+      elements:
+        elementsRaw && typeof elementsRaw === "object" && !Array.isArray(elementsRaw)
+          ? {
+              subject: pickString(elementsRaw as Record<string, unknown>, [
+                "subject",
+                "主体",
+                "画面主体",
+              ]),
+              subjectPose: pickString(elementsRaw as Record<string, unknown>, [
+                "subjectPose",
+                "姿态",
+                "主体姿态",
+              ]),
+              sceneEnvironment: pickString(elementsRaw as Record<string, unknown>, [
+                "sceneEnvironment",
+                "场景",
+                "场景环境",
+              ]),
+              spatialPerspective: pickString(elementsRaw as Record<string, unknown>, [
+                "spatialPerspective",
+                "透视",
+                "空间透视",
+              ]),
+              composition: pickString(elementsRaw as Record<string, unknown>, [
+                "composition",
+                "构图",
+                "构图方式",
+              ]),
+              equivalentFocalLength: pickString(elementsRaw as Record<string, unknown>, [
+                "equivalentFocalLength",
+                "焦距",
+                "等效焦距",
+              ]),
+              shootingAngle: pickString(elementsRaw as Record<string, unknown>, [
+                "shootingAngle",
+                "拍摄角度",
+                "角度",
+              ]),
+              lighting: coerceLighting(
+                (elementsRaw as Record<string, unknown>).lighting ??
+                  (elementsRaw as Record<string, unknown>).布光,
+              ),
+              materialTexture: pickString(elementsRaw as Record<string, unknown>, [
+                "materialTexture",
+                "材质",
+                "材质质感",
+              ]),
+              colorSystem: pickString(elementsRaw as Record<string, unknown>, [
+                "colorSystem",
+                "色彩",
+                "色彩体系",
+              ]),
+              atmosphere: pickString(elementsRaw as Record<string, unknown>, [
+                "atmosphere",
+                "氛围",
+                "画面氛围",
+              ]),
+              detailNotes: pickString(elementsRaw as Record<string, unknown>, [
+                "detailNotes",
+                "细节",
+                "detailNotes",
+              ]),
+            }
+          : elementsSchema.parse({}),
+      positivePrompt: pickString(o, ["positivePrompt", "正向提示词", "positive"]),
+      negativePrompt: pickString(o, ["negativePrompt", "反向提示词", "negative"]),
+      liveActionReplication: coerceLiveActionReplication(
+        o.liveActionReplication ?? o.实拍复刻方案 ?? o.replication,
+      ),
+      replicaAssetCatalog: coerceReplicaAssetCatalog(
+        o.replicaAssetCatalog ?? o.复刻资产清单 ?? o.replicaAssets,
+      ),
     };
   }
 
@@ -415,6 +721,9 @@ export function coerceMediaDecomposePayload(raw: unknown): unknown | null {
       "可复刻拍摄脚本",
       "shootingScript",
     ]),
+    replicaAssetCatalog: coerceReplicaAssetCatalog(
+      o.replicaAssetCatalog ?? o.复刻资产清单 ?? o.replicaAssets,
+    ),
   };
 }
 
@@ -491,7 +800,7 @@ function parseMediaDecomposePatchFromParsed(parsed: unknown): MediaDecomposePatc
   const coerced = coerceMediaDecomposePayload(parsed) ?? parsed;
   const safe = mediaDecomposePatchSchema.safeParse(coerced);
   if (!safe.success) return null;
-  const qualityError = validateMediaDecomposeVisualQuality(safe.data);
+  const qualityError = validateMediaDecomposePatchQuality(safe.data);
   if (qualityError) return null;
   return finalizeMediaDecomposePatch(safe.data);
 }
@@ -528,7 +837,7 @@ function resolveVisualQualityParseError(text: string): string | null {
   const coerced = coerceMediaDecomposePayload(parsed) ?? parsed;
   const safe = mediaDecomposePatchSchema.safeParse(coerced);
   if (!safe.success) return null;
-  return validateMediaDecomposeVisualQuality(safe.data);
+  return validateMediaDecomposePatchQuality(safe.data);
 }
 
 export function resolveMediaDecomposeParseError(fullText: string): string | null {
@@ -541,7 +850,7 @@ export function resolveMediaDecomposeParseError(fullText: string): string | null
   if (fenceComplete) {
     const visualError = resolveVisualQualityParseError(fullText);
     if (visualError) {
-      return `结构化 JSON 光影/色调质量未达标：${visualError}。请按 table-format.md 重新输出 \`\`\`media-decompose 围栏。`;
+      return `结构化 JSON 质量未达标：${visualError}。请按 table-format.md 重新输出 \`\`\`media-decompose 围栏。`;
     }
     return "结构化 JSON 解析失败或未通过校验，请按 table-format.md 重新输出 ```media-decompose 围栏。";
   }
@@ -657,10 +966,36 @@ function formatImageDecomposeMarkdown(patch: Extract<MediaDecomposePatch, { medi
     "",
     "## 实拍复刻方案",
     "",
-    `- **机位**：${patch.liveActionReplication.cameraPlacement}`,
-    `- **灯光**：${patch.liveActionReplication.lightingSetup}`,
-    `- **道具**：${patch.liveActionReplication.props}`,
-    `- **相机参数**：${patch.liveActionReplication.cameraParams}`,
+    ...LIVE_ACTION_REPLICATION_FIELD_KEYS.flatMap((key) => [
+      `- **${LIVE_ACTION_REPLICATION_FIELD_LABELS[key]}**：${patch.liveActionReplication[key]}`,
+    ]),
+    "",
+    "## 复刻资产清单",
+    "",
+    `- **出镜人数**：${patch.replicaAssetCatalog.characterCount ?? patch.replicaAssetCatalog.characters.length}`,
+    ...(["characters", "products", "props", "scenes"] as const).flatMap((group) => {
+      const title = { characters: "全身人物", products: "产品", props: "道具", scenes: "场景" }[group];
+      const entries = patch.replicaAssetCatalog[group];
+      if (entries.length === 0) return [];
+      return [
+        "",
+        `### ${title}`,
+        ...entries.map(
+          (entry) =>
+            `- **${entry.label}**${entry.roleInShot ? `（${entry.roleInShot}）` : ""}：${entry.description}`,
+        ),
+      ];
+    }),
+    ...(patch.replicaAssetCatalog.characterWardrobe.length > 0
+      ? [
+          "",
+          "### 人物服装（characterWardrobe · 与外貌分离）",
+          ...patch.replicaAssetCatalog.characterWardrobe.map(
+            (w) =>
+              `- **${w.characterLabel}**：${w.garments}${w.stylingNotes ? `（${w.stylingNotes}）` : ""}`,
+          ),
+        ]
+      : []),
   ];
   return lines.join("\n").trim();
 }

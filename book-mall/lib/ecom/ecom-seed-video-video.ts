@@ -20,6 +20,11 @@ import {
   isStoryboardMinimaxVideoModel,
 } from "@/lib/ecom/ecom-storyboard-video-models";
 import { resolveStoryboardPanelVideoRefPlan, getStoryboardVideoInvokeRules } from "@/lib/ecom/ecom-storyboard-video-ref-rules";
+import {
+  buildReplicaMentionCatalogFromPlan,
+  resolveReplicaMentionImageUrls,
+} from "@/lib/ecom/ecom-media-decompose-replica-refs";
+import { readReplicaAssetPlan } from "@/lib/ecom/ecom-replica-asset-plan";
 import { resolveEcomVideoGenerateAudio } from "@/lib/ecom/ecom-storyboard-gen-params";
 import { resolveSeedVideoChatImageUrls } from "@/lib/ecom/ecom-seed-video-mention";
 import {
@@ -61,6 +66,8 @@ export async function ecomGenerateSeedVideoShot(opts: {
   shotIndex: number;
   references: SeedVideoReference[];
   shots: SeedVideoShot[];
+  /** 客户端传入时优先于 DB 中 shot.imageUrl（避免生图后父级未刷新） */
+  panelImageUrl?: string;
   aspectRatio?: "16:9" | "9:16";
   durationSec?: number;
   resolution?: string;
@@ -93,22 +100,35 @@ export async function ecomGenerateSeedVideoShot(opts: {
   if (!prompt) throw new Error("视频提示词不能为空");
 
   const refRules = getStoryboardVideoInvokeRules(modelKey);
-  const refUrls = resolveSeedVideoChatImageUrls(
-    opts.references,
-    prompt,
-    refRules.maxTotalImages,
-  );
-  const imageUrl = refUrls[0]?.trim();
+  const seedProject = await getEcomSeedVideoProject(opts.userId, opts.projectId);
+  const assetPlan = readReplicaAssetPlan(seedProject?.meta);
+  const mentionCatalog = assetPlan
+    ? buildReplicaMentionCatalogFromPlan(assetPlan, opts.references)
+    : [];
+  const mentionRefUrls =
+    mentionCatalog.length > 0
+      ? resolveReplicaMentionImageUrls(prompt, mentionCatalog, opts.references, refRules.maxTotalImages)
+      : resolveSeedVideoChatImageUrls(opts.references, prompt, refRules.maxTotalImages);
+  const storyboardImageUrl = (opts.panelImageUrl?.trim() || shot.imageUrl?.trim()) ?? "";
+  const imageUrl =
+    storyboardImageUrl && /^https?:\/\//.test(storyboardImageUrl)
+      ? storyboardImageUrl
+      : mentionRefUrls[0]?.trim();
   if (!imageUrl || !/^https?:\/\//.test(imageUrl)) {
     throw new Error(
-      `镜头 ${opts.shotIndex} 缺少参考图：请上传参考图，或在视频 Prompt 中用 @图片1 … 引用`,
+      `镜头 ${opts.shotIndex} 缺少参考图：请先生成分镜图，或上传参考图并在视频 Prompt 中用 @图片1 … 引用`,
     );
   }
 
   const materials = opts.references.filter(
     (r) => r.role === "seed-material" && r.ossUrl?.trim(),
   );
-  const refUrlSet = new Set(refUrls.map((u) => u.trim()));
+  const refUrlSet = new Set(
+    [
+      ...mentionRefUrls.map((u) => u.trim()),
+      ...(storyboardImageUrl ? [storyboardImageUrl] : []),
+    ].filter(Boolean),
+  );
   const identityMaterials = materials.filter(
     (m) => refUrlSet.has(m.ossUrl.trim()) && m.ossUrl.trim() !== imageUrl,
   );

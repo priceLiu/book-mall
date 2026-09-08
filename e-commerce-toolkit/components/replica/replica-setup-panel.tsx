@@ -1,17 +1,18 @@
 "use client";
 
 import { Loader2, Sparkles, UserRound } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
-import { ReplicaProductBriefCard, ReplicaSellingPointsCard, ReplicaVoiceoverDraftCard } from "@/components/media-decompose/media-decompose-replica-thread-blocks";
+import { ReplicaProductBriefCard, ReplicaSellingPointsCard, ReplicaVoiceoverDraftCard, ReplicaAssetPlanGrid } from "@/components/media-decompose/media-decompose-replica-thread-blocks";
 import { EcomModelLibraryPickerDialog } from "@/components/model-shot/ecom-model-library-picker-dialog";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { useImageDropPaste } from "@/hooks/use-image-drop-paste";
+import { REPLICA_SCRIPT_TASK_STEPS } from "@/lib/replica-script-task-steps";
 import { useStagedTaskDetail } from "@/hooks/use-staged-task-detail";
 import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
 import type {
@@ -20,7 +21,11 @@ import type {
   ReplicaSetupRole,
 } from "@/lib/replica-setup-api";
 import type { ReplicaVoiceoverDraft } from "@/lib/media-decompose-replica-workflow";
+import { listReplicaAssetPlanSlots } from "@/lib/replica-asset-plan";
+import { findReplicaSlotRef } from "@/lib/media-decompose-replica-refs";
+import type { ReplicaAssetPlanSlot } from "@/lib/replica-asset-plan";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import type { SeedVideoReference } from "@/lib/seed-video-types";
 import { cn } from "@/lib/utils";
 
 const REF_TOOLBAR_BTN_CLASS = "h-7 px-2 text-[10px]";
@@ -31,12 +36,7 @@ const VOICEOVER_TASK_STEPS = [
   "校验 JSON 并写入口播方案…",
 ] as const;
 
-const SCRIPT_TASK_STEPS = [
-  "校验模特/产品参考图与文案…",
-  "匹配 @图片 引用与分镜草稿…",
-  "调用视觉模型生成复刻脚本…",
-  "解析 JSON 并写入方案②分镜表…",
-] as const;
+const SCRIPT_TASK_STEPS = REPLICA_SCRIPT_TASK_STEPS;
 
 type ImportVia = "upload" | "paste" | "drop" | "asset" | "library";
 
@@ -147,9 +147,32 @@ export function ReplicaSetupPanel({
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const [modelLibraryOpen, setModelLibraryOpen] = useState(false);
   const [assetPickerRole, setAssetPickerRole] = useState<ReplicaSetupRole | null>(null);
+  const [assetPickerSlot, setAssetPickerSlot] = useState<ReplicaAssetPlanSlot | null>(null);
+  const [modelLibrarySlot, setModelLibrarySlot] = useState<ReplicaAssetPlanSlot | null>(null);
+  const [activeSlotId, setActiveSlotId] = useState<string | null>(null);
+  const [slotImportState, setSlotImportState] = useState<{ slotId: string; via: ImportVia } | null>(
+    null,
+  );
   const [imageSize, setImageSize] = useState<string | undefined>();
+  const [uploadingSlotId, setUploadingSlotId] = useState<string | null>(null);
 
   const allRefs = api.listRefs();
+  const assetPlan = api.readAssetPlan?.() ?? null;
+  const hasAssetPlan = Boolean(assetPlan && listReplicaAssetPlanSlots(assetPlan).length > 0);
+  const assetPlanSlots = useMemo(
+    () => (assetPlan ? listReplicaAssetPlanSlots(assetPlan) : []),
+    [assetPlan],
+  );
+  const activeSlot = useMemo(
+    () => assetPlanSlots.find((s) => s.id === activeSlotId) ?? assetPlanSlots[0] ?? null,
+    [assetPlanSlots, activeSlotId],
+  );
+  const slotReferences: SeedVideoReference[] = allRefs.map((r) => ({
+    id: r.id,
+    ossUrl: r.ossUrl,
+    label: r.label?.trim() || "参考",
+    role: "seed-material",
+  }));
   const modelRefs = allRefs.filter((r) => api.isModelRefId(r.id));
   const productRefs = allRefs.filter((r) => api.isProductRefId(r.id));
   const savedProductBrief = api.readProductBrief();
@@ -164,6 +187,7 @@ export function ReplicaSetupPanel({
   const actionLocked =
     busy ||
     Boolean(importState) ||
+    Boolean(slotImportState) ||
     briefSaveBusy ||
     sellingPointsSaveBusy ||
     recognizeBusy ||
@@ -182,6 +206,13 @@ export function ReplicaSetupPanel({
     };
   }, []);
 
+  useEffect(() => {
+    if (!hasAssetPlan || assetPlanSlots.length === 0) return;
+    setActiveSlotId((prev) =>
+      prev && assetPlanSlots.some((s) => s.id === prev) ? prev : assetPlanSlots[0]!.id,
+    );
+  }, [hasAssetPlan, assetPlanSlots]);
+
   function clearProgressTick() {
     if (progressTickRef.current != null) {
       window.clearInterval(progressTickRef.current);
@@ -196,6 +227,46 @@ export function ReplicaSetupPanel({
     progressTickRef.current = window.setInterval(() => {
       setUploadProgress((p) => (p != null && p < 88 ? p + 7 : p));
     }, 180);
+  }
+
+  function beginSlotImportProgress(slotId: string, via: ImportVia) {
+    setSlotImportState({ slotId, via });
+    setUploadingSlotId(slotId);
+    setUploadProgress(10);
+    clearProgressTick();
+    progressTickRef.current = window.setInterval(() => {
+      setUploadProgress((p) => (p != null && p < 88 ? p + 7 : p));
+    }, 180);
+  }
+
+  function finishSlotImportProgress() {
+    clearProgressTick();
+    setUploadProgress(100);
+    setSlotImportState(null);
+    setUploadingSlotId(null);
+    window.setTimeout(() => setUploadProgress(null), 450);
+  }
+
+  function failSlotImportProgress() {
+    clearProgressTick();
+    setUploadProgress(null);
+    setSlotImportState(null);
+    setUploadingSlotId(null);
+  }
+
+  function slotImportStatusLabel(via: ImportVia): string {
+    switch (via) {
+      case "paste":
+        return "正在粘贴…";
+      case "drop":
+        return "正在导入拖入图片…";
+      case "asset":
+        return "正在导入资产…";
+      case "library":
+        return "正在从模特库导入…";
+      default:
+        return "正在上传…";
+    }
   }
 
   function finishImportProgress() {
@@ -276,10 +347,30 @@ export function ReplicaSetupPanel({
   const activeRoleRef = useRef(activeRole);
   activeRoleRef.current = activeRole;
 
+  const activeSlotRef = useRef(activeSlot);
+  activeSlotRef.current = activeSlot;
+
   const { dropZoneProps, dragOver, pasteReady, focusZone } = useImageDropPaste({
-    enabled: !actionLocked,
+    enabled: !actionLocked && !hasAssetPlan,
     multiple: true,
     onFiles: (files, via) => void handleFiles(files, activeRoleRef.current, via ?? "drop"),
+    onError: (title, message) => {
+      void onAlert({ title, message, variant: "error" });
+    },
+  });
+
+  const {
+    dropZoneProps: slotDropZoneProps,
+    dragOver: slotDragOver,
+    pasteReady: slotPasteReady,
+    focusZone: slotFocusZone,
+  } = useImageDropPaste({
+    enabled: hasAssetPlan && !actionLocked,
+    multiple: true,
+    onFiles: (files, via) => {
+      const slot = activeSlotRef.current;
+      if (slot) void handleSlotUpload(slot, files, via ?? "drop");
+    },
     onError: (title, message) => {
       void onAlert({ title, message, variant: "error" });
     },
@@ -366,10 +457,6 @@ export function ReplicaSetupPanel({
       });
       briefDirtyRef.current = false;
       setProductBriefDraft(result.productBrief);
-      if (api.readSellingPoints) {
-        sellingPointsDirtyRef.current = false;
-        setSellingPointsDraft(api.readSellingPoints());
-      }
     } catch (e) {
       await onAlert({
         title: mock ? "Mock 识产品失败" : "识产品失败",
@@ -383,8 +470,8 @@ export function ReplicaSetupPanel({
 
   async function handleGenerateSellingPoints() {
     if (!api.generateSellingPoints) return;
-    if (!productRefs.length) {
-      await onAlert({ title: "缺少产品图", message: "请至少上传 1 张产品图。", variant: "error" });
+    if (!hasProductForRecognize) {
+      await onAlert({ title: "缺少产品图", message: "请先上传产品槽位参考图。", variant: "error" });
       return;
     }
     setSellingPointsGenBusy(true);
@@ -436,15 +523,30 @@ export function ReplicaSetupPanel({
     if (!api.generateScript) return;
     const brief = productBriefDraft.trim();
     const sellingPoints = sellingPointsDraft.trim();
-    if (!modelRefs.length) {
-      await onAlert({ title: "缺少模特图", message: "请至少上传 1 张模特图。", variant: "error" });
-      return;
+    if (!hasAssetPlan) {
+      if (!modelRefs.length) {
+        await onAlert({ title: "缺少模特图", message: "请至少上传 1 张模特图。", variant: "error" });
+        return;
+      }
+      if (!productRefs.length) {
+        await onAlert({ title: "缺少产品图", message: "请至少上传 1 张产品图。", variant: "error" });
+        return;
+      }
     }
-    if (!productRefs.length) {
-      await onAlert({ title: "缺少产品图", message: "请至少上传 1 张产品图。", variant: "error" });
-      return;
-    }
-    if (!brief && !sellingPoints) {
+    const hasProductSlots = (assetPlan?.products.length ?? 0) > 0;
+    if (hasProductSlots && !brief && !sellingPoints) {
+      const hasProductUpload = assetPlan!.products.some((slot) =>
+        Boolean(findReplicaSlotRef(slotReferences, slot.id)?.ossUrl?.trim()),
+      );
+      if (!hasProductUpload) {
+        await onAlert({
+          title: "缺少文案素材",
+          message: "有产品槽位时请填写产品描述/卖点，或上传产品参考图。",
+          variant: "error",
+        });
+        return;
+      }
+    } else if (!hasAssetPlan && !brief && !sellingPoints) {
       await onAlert({
         title: "缺少文案素材",
         message: "请先填写产品描述或卖点，或使用 AI 识产品 / AI 卖点。",
@@ -571,6 +673,72 @@ export function ReplicaSetupPanel({
     }
   }
 
+  async function handleSlotUpload(
+    slot: ReplicaAssetPlanSlot,
+    files: File[],
+    via: ImportVia = "upload",
+  ) {
+    if (!api.uploadAssetSlot || actionLocked) return;
+    const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+    if (imageFiles.length === 0) return;
+    setActiveSlotId(slot.id);
+    beginSlotImportProgress(slot.id, via);
+    try {
+      for (const file of imageFiles) {
+        await api.uploadAssetSlot(slot.id, file);
+      }
+      finishSlotImportProgress();
+    } catch (e) {
+      failSlotImportProgress();
+      await onAlert({
+        title: `${slot.label} 上传失败`,
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    }
+  }
+
+  async function handleSlotAttachFromAssets(slot: ReplicaAssetPlanSlot, assetIds: string[]) {
+    if (!api.attachAssetSlotFromAssets || actionLocked || assetIds.length === 0) return;
+    setActiveSlotId(slot.id);
+    beginSlotImportProgress(slot.id, "asset");
+    try {
+      await api.attachAssetSlotFromAssets(slot.id, assetIds);
+      finishSlotImportProgress();
+    } catch (e) {
+      failSlotImportProgress();
+      await onAlert({
+        title: `${slot.label} 资产导入失败`,
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    }
+  }
+
+  async function handleSlotAttachModelFromLibrary(
+    slot: ReplicaAssetPlanSlot,
+    entry: { id: string; name: string; ossUrl: string },
+  ) {
+    if (!api.attachModelToSlot || actionLocked) return;
+    setActiveSlotId(slot.id);
+    beginSlotImportProgress(slot.id, "library");
+    try {
+      await api.attachModelToSlot(slot.id, entry);
+      finishSlotImportProgress();
+    } catch (e) {
+      failSlotImportProgress();
+      await onAlert({
+        title: `${slot.label} 模特库导入失败`,
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    }
+  }
+
+  async function handleSlotRemove(slot: ReplicaAssetPlanSlot, refId: string) {
+    await handleRemove(refId, slot.label);
+  }
+
   function filterRefItems(role: ReplicaSetupRole) {
     return allRefs
       .filter((r) => (role === "model" ? api.isModelRefId(r.id) : api.isProductRefId(r.id)))
@@ -590,6 +758,14 @@ export function ReplicaSetupPanel({
     { role: "product", title: "产品图", emptyHint: copy.productEmptyHint },
   ];
 
+  const showProductBrief =
+    variant === "full" && (!hasAssetPlan || (assetPlan?.products.length ?? 0) > 0);
+  const hasProductForRecognize = hasAssetPlan
+    ? assetPlan!.products.some((slot) =>
+        Boolean(findReplicaSlotRef(slotReferences, slot.id)?.ossUrl?.trim()),
+      )
+    : productRefs.length > 0;
+
   return (
     <div className="space-y-4 rounded-xl border border-[#e8e8ed] bg-white p-4">
       <div>
@@ -598,11 +774,72 @@ export function ReplicaSetupPanel({
         </h3>
         <p className="mt-1 text-[11px] leading-relaxed text-[#6e6e73]">
           {variant === "refs-only"
-            ? "可随时更换模特/产品参考图；更换后下方分镜表中的 @图片N 引用将自动同步。"
+            ? hasAssetPlan
+              ? "可随时更换各槽位替换图；更换后分镜表中的 @token 引用将自动同步。"
+              : "可随时更换模特/产品参考图；更换后下方分镜表中的 @图片N 引用将自动同步。"
             : copy.panelDescription}
         </p>
       </div>
 
+      {hasAssetPlan && assetPlan ? (
+        <div
+          {...slotDropZoneProps}
+          className={cn(
+            "rounded-lg outline-none transition-shadow",
+            slotDragOver && "ring-2 ring-[var(--ecom-chrome-accent)]/30",
+            slotPasteReady && "ring-2 ring-[#0071e3]/20",
+            slotImportState && "ring-2 ring-[#0071e3]/25",
+          )}
+          onMouseEnter={() => slotFocusZone()}
+        >
+          <div className="mb-2 flex items-center justify-between gap-2 px-0.5">
+            <span className="text-[10px] text-[#86868b]">
+              {IMAGE_UPLOAD_DROP_HINT}
+              {activeSlot ? ` · 粘贴/拖入至 ${activeSlot.label}` : ""}
+              {slotPasteReady ? " · 可粘贴" : ""}
+            </span>
+          </div>
+          <ReplicaAssetPlanGrid
+            plan={assetPlan}
+            references={slotReferences}
+            activeSlotId={activeSlotId}
+            uploadingSlotId={uploadingSlotId}
+            uploadProgress={
+              slotImportState ? uploadProgress : uploadingSlotId ? uploadProgress : null
+            }
+            uploadProgressLabel={
+              slotImportState
+                ? slotImportStatusLabel(slotImportState.via)
+                : uploadingSlotId
+                  ? "正在上传…"
+                  : undefined
+            }
+            onActiveSlotChange={setActiveSlotId}
+            onUploadSlot={api.uploadAssetSlot ? handleSlotUpload : undefined}
+            onRemoveSlot={handleSlotRemove}
+            onOpenAssetPicker={
+              supportsAssets
+                ? (slot) => {
+                    setActiveSlotId(slot.id);
+                    setAssetPickerSlot(slot);
+                  }
+                : undefined
+            }
+            onOpenModelLibrary={
+              supportsModelLibrary
+                ? (slot) => {
+                    setActiveSlotId(slot.id);
+                    setModelLibrarySlot(slot);
+                    setModelLibraryOpen(true);
+                  }
+                : undefined
+            }
+            disabled={actionLocked}
+            supportsAssets={supportsAssets}
+            supportsModelLibrary={supportsModelLibrary}
+          />
+        </div>
+      ) : (
       <div
         {...dropZoneProps}
         className={cn(
@@ -701,7 +938,9 @@ export function ReplicaSetupPanel({
           />
         ))}
       </div>
+      )}
 
+      {showProductBrief ? (
       <ReplicaProductBriefCard
         value={productBriefDraft}
         onChange={(value) => {
@@ -710,12 +949,13 @@ export function ReplicaSetupPanel({
         }}
         onSave={() => void handleSaveCopyFields({ briefOnly: true, sellingOnly: false })}
         onRecognize={() => handleRecognizeProduct(false)}
-        recognizeDisabled={!productRefs.length}
+        recognizeDisabled={!hasProductForRecognize}
         saving={briefSaveBusy}
         recognizing={recognizeBusy}
         disabled={actionLocked && !recognizeBusy}
         dirty={productBriefDirty}
       />
+      ) : null}
 
       {api.readSellingPoints || api.generateSellingPoints ? (
         <ReplicaSellingPointsCard
@@ -730,13 +970,14 @@ export function ReplicaSetupPanel({
             api.generateVoiceover ? () => void handleGenerateVoiceover() : undefined
           }
           showVoiceover={Boolean(api.generateVoiceover)}
-          generateDisabled={!productRefs.length}
-          voiceoverDisabled={!productRefs.length}
+          generateDisabled={!hasProductForRecognize}
+          voiceoverDisabled={!hasProductForRecognize}
           saving={sellingPointsSaveBusy}
           generating={sellingPointsGenBusy}
           voiceoverGenerating={voiceoverGenBusy}
           disabled={actionLocked && !sellingPointsGenBusy && !voiceoverGenBusy}
           dirty={sellingPointsDirty}
+          decomposeHint={assetPlan?.products[0]?.description}
         />
       ) : null}
 
@@ -759,7 +1000,7 @@ export function ReplicaSetupPanel({
               size="sm"
               type="button"
               dark
-              disabled={actionLocked || !productRefs.length}
+              disabled={actionLocked || !hasProductForRecognize}
               onClick={() => void handleRecognizeProduct(true)}
             >
               Mock 识产品
@@ -839,11 +1080,42 @@ export function ReplicaSetupPanel({
         />
       ) : null}
 
+      {supportsAssets ? (
+        <EcomAssetPickerDialog
+          open={assetPickerSlot !== null}
+          onOpenChange={(open) => {
+            if (!open) setAssetPickerSlot(null);
+          }}
+          maxSelect={1}
+          onConfirm={async (assets) => {
+            const slot = assetPickerSlot;
+            if (!slot || assets.length === 0) return;
+            setAssetPickerSlot(null);
+            await handleSlotAttachFromAssets(
+              slot,
+              assets.map((a) => a.id),
+            );
+          }}
+        />
+      ) : null}
+
       {supportsModelLibrary ? (
         <EcomModelLibraryPickerDialog
           open={modelLibraryOpen}
-          onOpenChange={setModelLibraryOpen}
+          onOpenChange={(open) => {
+            setModelLibraryOpen(open);
+            if (!open) setModelLibrarySlot(null);
+          }}
           onPick={async (entry) => {
+            if (modelLibrarySlot) {
+              await handleSlotAttachModelFromLibrary(modelLibrarySlot, {
+                id: entry.id,
+                name: entry.name,
+                ossUrl: entry.ossUrl,
+              });
+              setModelLibrarySlot(null);
+              return;
+            }
             await handleAttachModelFromLibrary({
               id: entry.id,
               name: entry.name,

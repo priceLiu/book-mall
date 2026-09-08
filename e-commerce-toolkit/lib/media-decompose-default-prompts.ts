@@ -27,8 +27,18 @@ export const DEFAULT_IMAGE_DECOMPOSE_PROMPT = `你作为资深视觉画面解析
 1. **elements** 对象：主体、姿态、场景、透视、构图、等效焦距、拍摄角度、lighting 子对象（主/辅/轮廓/环境光、方向、软硬、色温）、材质、色彩体系、氛围、细节。
 2. **positivePrompt**：须体现布光 + 色彩体系 + 画面氛围，可直接用于 AI 绘图。
 3. **negativePrompt**：反向负面提示词。
-4. **liveActionReplication**：机位、灯光、道具、相机参数。
-5. 禁止 Markdown 表格/前言/闲聊。`;
+4. **liveActionReplication** 对象（须**综合 elements 全文**，每项详实可落地，禁止一句话摘要）：
+   - sceneSetup：场景搭建与环境还原
+   - talentBlocking：人物走位、姿态、表情、服装造型
+   - compositionFraming：构图、景别、留白、对焦主体
+   - cameraPlacement：机位距离、高度、角度
+   - lightingSetup：主/辅/轮廓/环境光具体摆位（展开 elements.lighting）
+   - props：道具与服装清单
+   - cameraParams：焦距、光圈、快门、ISO
+   - postProcessing：后期调色与输出规格
+   - shootingChecklist：分步拍摄清单（1→2→3…）
+5. liveActionReplication **不受简洁限制，宁可写长写细**。
+6. 禁止 Markdown 表格/前言/闲聊。`;
 
 export function defaultPromptForKind(kind: MediaDecomposeKind | null | undefined): string {
   return kind === "video" ? DEFAULT_VIDEO_DECOMPOSE_PROMPT : DEFAULT_IMAGE_DECOMPOSE_PROMPT;

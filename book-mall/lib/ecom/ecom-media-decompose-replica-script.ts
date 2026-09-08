@@ -1,37 +1,68 @@
 import type { CanvasChatContentPart } from "@/lib/canvas/providers/types";
 import type { MediaDecomposePatch } from "@/lib/ecom/ecom-media-decompose-structured";
 import type { ReplicaMentionEntry } from "@/lib/ecom/ecom-media-decompose-replica-refs";
+import {
+  collectReplicaStripFragments,
+  formatReplicaAssetPlanForPrompt,
+  listReplicaAssetPlanSlots,
+  replicaAssetSlotToken,
+  type ReplicaAssetPlan,
+} from "@/lib/ecom/ecom-replica-asset-plan";
 import type { SeedVideoReference, SeedVideoShot } from "@/lib/ecom/ecom-seed-video-types";
-import { buildReplicaShotsFromDecompose } from "@/lib/ecom/ecom-media-decompose-replica";
+import {
+  buildImageDecomposeDraftImagePrompt,
+  buildReplicaShotsFromDecompose,
+} from "@/lib/ecom/ecom-media-decompose-replica";
 
 const FENCE = "replica-script";
 /** 解析兜底：模型仍可能输出 ```json；契约层禁止，解析层宽容 */
 const SCRIPT_FENCE_PARSE_ALIASES = [FENCE, "json"] as const;
 
-const REPLICA_SCRIPT_FENCE_CONTRACT = `
-## 【强制 · 机器校验】\`\`\`${FENCE} JSON 契约
+export type ReplicaScriptPatch = {
+  shots: Array<{
+    index: number;
+    timeSlice?: string;
+    sceneDescription: string;
+    imagePrompt?: string;
+    videoPrompt: string;
+    voiceover: string;
+    durationSec?: number;
+    refImageLabel?: string;
+  }>;
+};
 
-系统**只解析**回复**最末尾**唯一围栏 \`\`\`${FENCE}（语言标记必须是 ${FENCE}，**禁止**用 json / media-decompose / film-pull 代替）。
-
-### 输出顺序
-1. 可选：1–3 句中文摘要（可省略）；
-2. **最后一行起**输出唯一 \`\`\`${FENCE} 围栏，内含合法 JSON（无注释、无尾逗号）。
-
-### 根对象
-| 字段 | 类型 | 规则 |
-|------|------|------|
-| shots | array | **至少 1 镜**；镜数须与用户提供的机械映射草稿一致 |
-
-### 每镜 shots[]
-| 字段 | 类型 | 规则 |
-|------|------|------|
-| index | number | 从 1 递增，与草稿镜号一致 |
-| timeSlice | string | 如 \`0-3s\` |
-| sceneDescription | string | 换模特/产品后的画面描述，非空 |
+function replicaScriptFenceContract(mediaType?: "image" | "video"): string {
+  const imageShotFields =
+    mediaType === "image"
+      ? `
+| imagePrompt | string | **拆图专用** · 分镜图 Prompt（静态定格画面）；景别/构图/布光/影调/色调/主体姿态；须含 @图片N；**禁止**口播与运镜动词 |
+| videoPrompt | string | **拆图专用** · 分镜视频 Prompt；运镜/微动/节奏/光影延续；须含 @图片N；**不得**与 imagePrompt 逐字相同；**禁止**口播原文 |
+`
+      : `
 | videoPrompt | string | 景别/运镜/构图/布光/影调/全片色调/动作/音效/BGM/转场/剪辑；须含 @图片N；**禁止**口播原文 |
-| voiceover | string | 仅口播/字幕（可空字符串）；**禁止**写入 videoPrompt |
-| durationSec | number | 3–15 整数 |
+`;
 
+  const imageExample =
+    mediaType === "image"
+      ? `
+### 示例（拆图 · 1 镜）
+\`\`\`${FENCE}
+{
+  "shots": [
+    {
+      "index": 1,
+      "timeSlice": "0-5s",
+      "sceneDescription": "新模特 @图片1 手持 @图片2 面向镜头",
+      "imagePrompt": "@图片1 @图片2，中景，三分法构图，柔光侧顺光，暖金色调，lookbook 定格姿态",
+      "videoPrompt": "@图片1 @图片2，固定机位缓慢推镜，人物自然微动，延续柔光侧顺光与暖金色调",
+      "voiceover": "",
+      "durationSec": 5
+    }
+  ]
+}
+\`\`\`
+`
+      : `
 ### 示例（2 镜，围栏名勿改）
 \`\`\`${FENCE}
 {
@@ -57,36 +88,76 @@ const REPLICA_SCRIPT_FENCE_CONTRACT = `
 \`\`\`
 `;
 
-export type ReplicaScriptPatch = {
-  shots: Array<{
-    index: number;
-    timeSlice?: string;
-    sceneDescription: string;
-    videoPrompt: string;
-    voiceover: string;
-    durationSec?: number;
-    refImageLabel?: string;
-  }>;
-};
+  return `
+## 【强制 · 机器校验】\`\`\`${FENCE} JSON 契约
 
-export function buildReplicaScriptSystemPrompt(catalog: ReplicaMentionEntry[]): string {
-  const mentionLines = catalog.map((e) => `${e.token}：${e.ref.label}（${e.role === "model" ? "模特" : "产品"}）`);
-  const mentionBlock = mentionLines.length ? mentionLines.join("\n") : "@图片1：模特；@图片2：产品";
-  return `你是电商短视频复刻编剧。用户已从原视频/图拆解出分镜，并提供了新的模特图与产品图（可各多张）及产品说明。
-你的任务：在保留原片镜头语言、节奏、景别、运镜、**布光、影调、全片色调与视觉风格**的前提下，将画面与口播中的旧模特、旧产品替换为新模特与新商品。
+系统**只解析**回复**最末尾**唯一围栏 \`\`\`${FENCE}（语言标记必须是 ${FENCE}，**禁止**用 json / media-decompose / film-pull 代替）。
 
-参考图编号（须在 videoPrompt 中按需引用）：
+### 输出顺序
+1. 可选：1–3 句中文摘要（可省略）；
+2. **最后一行起**输出唯一 \`\`\`${FENCE} 围栏，内含合法 JSON（无注释、无尾逗号）。
+
+### 根对象
+| 字段 | 类型 | 规则 |
+|------|------|------|
+| shots | array | **至少 1 镜**；镜数须与用户提供的机械映射草稿一致 |
+
+### 每镜 shots[]
+| 字段 | 类型 | 规则 |
+|------|------|------|
+| index | number | 从 1 递增，与草稿镜号一致 |
+| timeSlice | string | 如 \`0-3s\` |
+| sceneDescription | string | 换模特/产品后的画面描述，非空 |
+${imageShotFields}| voiceover | string | 仅口播/字幕（可空字符串）；**禁止**写入 videoPrompt |
+| durationSec | number | 3–15 整数 |
+
+${imageExample}
+`;
+}
+
+export function buildReplicaScriptSystemPrompt(
+  catalog: ReplicaMentionEntry[],
+  opts?: { mediaType?: "image" | "video"; assetPlan?: ReplicaAssetPlan },
+): string {
+  const mentionLines = catalog.map((e) => `${e.token}：${e.ref.label}（${e.role}）`);
+  const mentionBlock = mentionLines.length
+    ? mentionLines.join("\n")
+    : "（用户尚未上传替换图；各槽位 inherit 原片描述，禁止写 @token）";
+  const mediaType = opts?.mediaType ?? "video";
+  const useSemanticTokens = Boolean(opts?.assetPlan && listReplicaAssetPlanSlots(opts.assetPlan).length > 0);
+  const tokenHint = useSemanticTokens
+    ? "@人物A @产品1 @道具1 @场景1 等语义 token（仅 replace 槽位）"
+    : "@图片N";
+  const assetPlanBlock = opts?.assetPlan
+    ? `\n## 复刻资产方案（四槽 · 须严格对齐）\n${formatReplicaAssetPlanForPrompt(opts.assetPlan)}\n`
+    : "";
+  const imageRules =
+    mediaType === "image"
+      ? `
+7. **拆图复刻**：每镜须同时输出 imagePrompt（静态分镜图）与 videoPrompt（分镜视频）；
+   - imagePrompt 以机械草稿 imagePrompt（= positivePrompt + elements 全字段 + liveActionReplication 静态实拍要素）为**完整骨架**，只做模特/产品替换与 @图片N 引用，**字符数不得低于机械草稿 imagePrompt 的 75%**，禁止压缩成短句；
+   - videoPrompt 须继承 mechanical draft 中的机位/镜头参数/布光/运镜/微动，**不得**与 imagePrompt 逐字相同；
+`
+      : "";
+  return `你是电商短视频复刻编剧。用户已从原视频/图拆解出分镜，并按「人物 / 产品 / 道具 / 场景」四槽准备了可选替换参考图。
+你的任务：在保留原片镜头语言、节奏、景别、运镜、**布光、影调、全片色调与视觉风格**的前提下，将 **replace 槽位** 替换为用户上传的参考图（语义 token），**inherit 槽位** 保留原片文字描述且 **禁止** 写对应 @token。
+
+已上传替换图（仅这些 token 可在 Prompt 中出现）：
 ${mentionBlock}
-
-${REPLICA_SCRIPT_FENCE_CONTRACT}
+${assetPlanBlock}
+${replicaScriptFenceContract(mediaType)}
 
 ### 业务规则（与 JSON 一并满足）
 1. videoPrompt 与 voiceover **严格分离**（见上表）；
-2. 机械映射草稿的 videoPrompt 已含景别/运镜/布光/影调/音效/BGM/转场/剪辑；改写时须保留信息密度，**不得删减**光影、影调、色调与运镜描述；
-3. **继承**原片场景、道具感、BGM/音效气质、转场与剪辑节奏；**只替换**模特（@图片N）、产品、与旧 SKU 绑定的动作描述；
-4. cameraMove 不得弱化（慢推不可改固定，横移不可省略）；
-5. sceneDescription 用中文描述换模特换产品后的画面；
-6. 镜数与拆解表一致，除非原表为空则输出 1 镜。`;
+2. **inherit / replace 分轨**：用户未上传的槽位 inherit 原片描述（人物含外貌+服装）；已上传的人物槽 **replace** 时只写 ${tokenHint} + 站位/动作，**禁止**写原片服装文字；已上传的产品/道具/场景槽须写 token 与展示/摆放关系；
+2a. **videoPrompt 角色分轨（强制）**：每镜 videoPrompt **开头**先写「人物 @人物A …；产品 @产品1 …」分轨（仅 replace 槽），再写景别/运镜/布光/音效；**禁止**把人物外貌/服装与产品外观混在同一句；
+2b. **参考图只绑定一次**：用户消息开头已按 token 附上参考图；各镜 imagePrompt / videoPrompt / sceneDescription 内**只需写 @token 文本**，**禁止**重复粘贴/描述参考图外观，**禁止**在 JSON 中嵌入图片 URL；
+3. 多人物时：人物A/B/C… 须分别对应方案中的描述，禁止把多人合并成一句「两位模特」；
+4. 机械映射草稿的 videoPrompt 已含景别/运镜/布光/影调/音效/BGM/转场/剪辑；改写时须保留信息密度，**不得删减**光影、影调、色调与运镜描述；
+5. **继承**原片场景、道具感、BGM/音效气质、转场与剪辑节奏；**只替换** replace 槽位相关描述；
+6. cameraMove 不得弱化（慢推不可改固定，横移不可省略）；
+7. sceneDescription 用中文描述换素材后的画面；
+8. 镜数与拆解表一致，除非原表为空则输出 1 镜。${imageRules}`;
 }
 
 export function buildReplicaScriptUserPrompt(opts: {
@@ -95,6 +166,9 @@ export function buildReplicaScriptUserPrompt(opts: {
   sellingPoints?: string;
   draftShots: SeedVideoShot[];
   mentionSummary: string;
+  assetPlan?: ReplicaAssetPlan;
+  assetReplaceSummary?: string;
+  productDisplayAction?: string;
 }): string {
   const tableJson = JSON.stringify(opts.structured, null, 2);
   const draftJson = JSON.stringify(
@@ -102,6 +176,7 @@ export function buildReplicaScriptUserPrompt(opts: {
       index: s.index,
       timeSlice: s.timeSlice,
       sceneDescription: s.sceneDescription,
+      imagePrompt: s.imagePrompt,
       videoPrompt: s.videoPrompt,
       voiceover: s.voiceover,
       durationSec: s.durationSec,
@@ -112,15 +187,41 @@ export function buildReplicaScriptUserPrompt(opts: {
   const sellingBlock = opts.sellingPoints?.trim()
     ? opts.sellingPoints.trim()
     : "（用户未填写卖点）";
+  const imageFocusBlock =
+    opts.structured.mediaType === "image"
+      ? (() => {
+          const draftImageLen = buildImageDecomposeDraftImagePrompt(opts.structured).length;
+          return [
+            "",
+            "## 拆图复刻 · Prompt 完整性（强制）",
+            `- 机械草稿 imagePrompt 长度约 ${draftImageLen} 字（含 positivePrompt + elements 全维度 + liveActionReplication 静态实拍要素）；改写后 imagePrompt **不得低于该长度的 75%**；`,
+            "- imagePrompt 须保留：主体/姿态/场景/透视/构图/等效焦距/拍摄角度/布光/材质/色彩/氛围/细节/场景搭建/机位/灯光/道具/相机参数/后期等维度；",
+            "- videoPrompt 在 imagePrompt 信息基础上补充运镜或微动，禁止只输出一句概括；",
+            "- 仅替换旧模特/旧产品相关描述，加入 @图片N；**禁止**删减光影、影调、色调与镜头语言。",
+          ].join("\n");
+        })()
+      : "";
   return [
     "## 拆解结果（原片）",
     tableJson,
     "",
-    "## 机械映射草稿（待你改写替换模特/产品）",
+    "## 机械映射草稿（待你改写 replace/inherit）",
     draftJson,
+    imageFocusBlock,
+    opts.assetPlan
+      ? ["", "## 复刻资产方案（四槽）", formatReplicaAssetPlanForPrompt(opts.assetPlan)].join("\n")
+      : "",
+    opts.assetReplaceSummary
+      ? ["", "## 槽位 replace / inherit 对照（强制）", opts.assetReplaceSummary].join("\n")
+      : "",
+    opts.productDisplayAction?.trim()
+      ? ["", "## 产品展示动作（识产品结果 · replace 产品槽时须写入 Prompt）", opts.productDisplayAction.trim()].join(
+          "\n",
+        )
+      : "",
     "",
-    "## 参考图编号",
-    opts.mentionSummary.trim() || "（见系统说明）",
+    "## 已上传替换图",
+    opts.mentionSummary.trim() || "（无；全部 inherit）",
     "",
     "## 新产品说明",
     opts.productBrief.trim() || "（用户未填写，请根据产品图推断品类与展示方式）",
@@ -139,6 +240,9 @@ export function buildReplicaScriptUserContent(opts: {
   draftShots: SeedVideoShot[];
   mentionSummary: string;
   mentionCatalog: ReplicaMentionEntry[];
+  assetPlan?: ReplicaAssetPlan;
+  assetReplaceSummary?: string;
+  productDisplayAction?: string;
 }): CanvasChatContentPart[] {
   const parts: CanvasChatContentPart[] = [
     {
@@ -149,34 +253,302 @@ export function buildReplicaScriptUserContent(opts: {
         sellingPoints: opts.sellingPoints,
         draftShots: opts.draftShots,
         mentionSummary: opts.mentionSummary,
+        assetPlan: opts.assetPlan,
+        assetReplaceSummary: opts.assetReplaceSummary,
+        productDisplayAction: opts.productDisplayAction,
       }),
     },
   ];
 
-  for (const entry of opts.mentionCatalog.slice(0, 8)) {
+  for (const entry of opts.mentionCatalog.slice(0, 12)) {
     const url = entry.ref.ossUrl?.trim();
     if (!url) continue;
     parts.push({ type: "image_url", image_url: { url } });
     parts.push({
       type: "text",
-      text: `${entry.token}（${entry.role === "model" ? "模特" : "产品"}：${entry.ref.label ?? ""}）`,
+      text: `${entry.token}（${entry.ref.label ?? entry.role} · replace 参考图，下文 Prompt 只写 token 勿重复描述外观）`,
+    });
+  }
+
+  if (opts.mentionCatalog.some((e) => e.ref.ossUrl?.trim())) {
+    parts.push({
+      type: "text",
+      text: "【参考图绑定完成】以上每张图仅出现一次；改写各镜时只使用对应 @token，勿在 JSON 中重复描述参考图外貌/产品细节。",
     });
   }
 
   return parts;
 }
 
-export function buildReplicaScriptRetryUserPrompt(expectedShotCount: number): string {
+export function buildReplicaScriptRetryUserPrompt(
+  expectedShotCount: number,
+  mediaType?: "image" | "video",
+  opts?: { mentionCatalog?: ReplicaMentionEntry[]; assetPlan?: ReplicaAssetPlan },
+): string {
+  const useSemantic =
+    Boolean(opts?.assetPlan && listReplicaAssetPlanSlots(opts.assetPlan).length > 0) ||
+    (opts?.mentionCatalog?.some((e) => e.token.startsWith("@人物")) ?? false);
+  const tokenRule = useSemantic
+    ? `4. Prompt 须引用已上传 replace 槽的语义 token（${opts?.mentionCatalog?.map((e) => e.token).join(" ") || "@人物A @产品1"}）；inherit 槽禁止写 @token；`
+    : "4. videoPrompt 须引用 @图片N（至少 1 张模特 + 1 张产品），禁止写入口播原文；";
+  const imageFields =
+    mediaType === "image"
+      ? `
+3b. 拆图复刻：每镜 **必须**含 imagePrompt（完整继承 mechanical draft：positivePrompt + elements + liveActionReplication 静态要素，≥草稿 75% 字数）与 videoPrompt（含运镜/微动）；
+3c. imagePrompt 与 videoPrompt **禁止**压缩成短句；`
+      : "";
   return `上次输出未通过机器校验：缺少可解析的 \`\`\`${FENCE} 围栏，或使用了 json 等其他围栏名，或 shots 为空/字段不完整。
 
 请**仅**重输出完整 \`\`\`${FENCE} 围栏（可省略 Markdown 前言），并严格遵守：
 1. 围栏语言标记必须是 ${FENCE}，**禁止** json / media-decompose / film-pull；
 2. 根对象仅含 shots 数组，镜数须为 ${expectedShotCount}（与机械映射草稿一致）；
-3. 每镜含 index、timeSlice、sceneDescription、videoPrompt、voiceover、durationSec（3–15 整数）；
-4. videoPrompt 须引用 @图片N（至少 1 张模特 + 1 张产品），禁止写入口播原文；
+3. 每镜含 index、timeSlice、sceneDescription、videoPrompt、voiceover、durationSec（3–15 整数）；${imageFields}
+${tokenRule}
 5. voiceover 仅写口播/字幕，禁止写入 videoPrompt；
 6. videoPrompt 须保留原片布光/影调/色调/运镜，禁止删除或弱化；
 7. 禁止尾逗号与 JSON 注释。`;
+}
+
+/** LLM 过度压缩时回退到机械草稿，避免复刻 Prompt 信息密度丢失；保留 LLM 中的 @token，且剥离 replace 槽旧描述 */
+export function pickReplicaPromptPreservingDensity(
+  llmPrompt: string | undefined,
+  draftPrompt: string,
+  minLengthRatio = 0.75,
+  stripFragments?: string[],
+): string {
+  const llm = llmPrompt?.trim() ?? "";
+  let draft = draftPrompt.trim();
+  if (stripFragments?.length) {
+    draft = stripWardrobeTextFromPrompt(draft, stripFragments);
+    draft = stripGarmentClausesFromPrompt(draft);
+  }
+  if (!draft) return llm;
+  if (!llm) return draft;
+  if (llm.length >= draft.length * minLengthRatio) return llm;
+  const tokens = [...llm.matchAll(/@(?:人物[A-F\d]+|产品\d+|道具\d+|场景\d+)/g)].map((m) => m[0]);
+  const uniqueTokens = [...new Set(tokens)];
+  if (uniqueTokens.length === 0) return draft;
+  const missing = uniqueTokens.filter((t) => !draft.includes(t));
+  if (missing.length === 0) {
+    return mergeReplicaPromptTokensWithDraftCinematic(llm, draft, uniqueTokens);
+  }
+  return mergeReplicaPromptTokensWithDraftCinematic(`${missing.join(" ")}，${llm}`, draft, uniqueTokens);
+}
+
+function mergeReplicaPromptTokensWithDraftCinematic(
+  llm: string,
+  draft: string,
+  tokens: string[],
+): string {
+  const base = llm.trim();
+  if (!draft.trim()) return base;
+  const segments = draft
+    .split(/[，,、；;\n]/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 4);
+  const extras = segments.filter(
+    (seg) => !base.includes(seg) && !tokens.some((t) => seg.includes(t)),
+  );
+  if (extras.length === 0) return base;
+  return `${base}，${extras.join("，")}`;
+}
+
+const GARMENT_CLAUSE_PATTERNS: RegExp[] = [
+  /(?:wearing|dressed in|clad in)\s+[^，,；;.\n]+/gi,
+  /(?:white|black|grey|gray|brown|red|blue|green|dark|light)[\w\s-]*(?:shirt|t-shirt|tee|trousers|pants|jeans|shorts|sandals|shoes|sneakers|dress|skirt|jacket|coat|hoodie|polo|blouse|sweater)[^.，,；;\n]*/gi,
+  /(?:穿着|身穿|身着)[^，,；;\n]{2,48}/g,
+  /(?:白色|黑色|灰色|棕色|红色|蓝色|绿色|深色|浅色)[^，,；;\n]{0,10}(?:衬衫|T恤|短袖|长袖|长裤|短裤|裤|裙|鞋|凉鞋|运动鞋|外套|夹克|卫衣|Polo|开衫|连衣裙)[^，,；;\n]*/g,
+];
+
+/** replace 人物时剥离中英服装从句（机械草稿/LLM 漏删兜底） */
+export function stripGarmentClausesFromPrompt(prompt: string): string {
+  let result = prompt;
+  for (const pattern of GARMENT_CLAUSE_PATTERNS) {
+    result = result.replace(pattern, "");
+  }
+  return result
+    .replace(/[，,、；;]{2,}/g, "，")
+    .replace(/^[，,、；;\s]+|[，,、；;\s]+$/g, "")
+    .trim();
+}
+
+const REPLICA_MENTION_TOKEN_RE = /@(?:人物[A-F\d]+|产品\d+|道具\d+|场景\d+)/g;
+
+function extractReplicaMentionTokens(text: string): string[] {
+  return [...new Set([...text.matchAll(REPLICA_MENTION_TOKEN_RE)].map((m) => m[0]))];
+}
+
+/** 将 imagePrompt 中的 replace token 同步到 videoPrompt（密度回退后 video 常丢失 @） */
+export function mergeReplicaReplaceTokensFromImageToVideo(
+  imagePrompt: string,
+  videoPrompt: string,
+): string {
+  const imageTokens = extractReplicaMentionTokens(imagePrompt);
+  if (imageTokens.length === 0) return videoPrompt;
+  const missing = imageTokens.filter((t) => !videoPrompt.includes(t));
+  if (missing.length === 0) return videoPrompt;
+  const trimmed = videoPrompt.trim();
+  return trimmed ? `${missing.join(" ")}，${trimmed}` : missing.join(" ");
+}
+
+/** replace 人物槽时从 Prompt 剥离原片服装片段 */
+export function stripWardrobeTextFromPrompt(prompt: string, wardrobeFragments: string[]): string {
+  let result = prompt;
+  const parts = new Set<string>();
+  for (const fragment of wardrobeFragments) {
+    const trimmed = fragment.trim();
+    if (trimmed.length >= 3) parts.add(trimmed);
+    for (const seg of trimmed.split(/[，,、；;\n]/)) {
+      const p = seg.trim();
+      if (p.length >= 4) parts.add(p);
+    }
+  }
+  const sorted = [...parts].sort((a, b) => b.length - a.length);
+  for (const part of sorted) {
+    if (result.includes(part)) {
+      result = result.split(part).join("");
+    }
+  }
+  return result
+    .replace(/[，,、；;]{2,}/g, "，")
+    .replace(/^[，,、；;\s]+|[，,、；;\s]+$/g, "")
+    .trim();
+}
+
+/** 将 replace 槽 token 按人物/产品分轨置于 Prompt 开头 */
+export function structureReplicaPromptByRole(
+  prompt: string,
+  opts: {
+    assetPlan: ReplicaAssetPlan;
+    uploadedSlotIds: ReadonlySet<string>;
+    productDisplayAction?: string;
+  },
+): string {
+  const characterTokens: string[] = [];
+  const productTokens: string[] = [];
+  const propTokens: string[] = [];
+  const sceneTokens: string[] = [];
+
+  for (const slot of listReplicaAssetPlanSlots(opts.assetPlan)) {
+    if (!opts.uploadedSlotIds.has(slot.id)) continue;
+    const token = replicaAssetSlotToken(slot);
+    switch (slot.category) {
+      case "character":
+        characterTokens.push(token);
+        break;
+      case "product":
+        productTokens.push(token);
+        break;
+      case "prop":
+        propTokens.push(token);
+        break;
+      case "scene":
+        sceneTokens.push(token);
+        break;
+    }
+  }
+
+  const hasReplace = characterTokens.length + productTokens.length + propTokens.length + sceneTokens.length > 0;
+  if (!hasReplace) return prompt.trim();
+
+  const trimmed = prompt.trim();
+  if (/^人物\s@/.test(trimmed) || /^【人物】/.test(trimmed)) return trimmed;
+
+  const headerParts: string[] = [];
+  if (characterTokens.length) headerParts.push(`人物 ${characterTokens.join(" ")}`);
+  if (productTokens.length) {
+    const action = opts.productDisplayAction?.trim();
+    headerParts.push(
+      action ? `产品 ${productTokens.join(" ")}（${action}）` : `产品 ${productTokens.join(" ")}`,
+    );
+  }
+  if (propTokens.length) headerParts.push(`道具 ${propTokens.join(" ")}`);
+  if (sceneTokens.length) headerParts.push(`场景 ${sceneTokens.join(" ")}`);
+
+  const header = headerParts.join("；");
+  if (!trimmed) return header;
+  if (characterTokens.some((t) => trimmed.startsWith(t)) || productTokens.some((t) => trimmed.startsWith(t))) {
+    return `${header}。${trimmed}`;
+  }
+  return `${header}。${trimmed}`;
+}
+
+/** 脚本生成后：剥离 replace 人物旧服装、同步 image→video 的 @token、分轨人物/产品 */
+export function applyReplicaReplacePostProcess(
+  shots: SeedVideoShot[],
+  opts: {
+    assetPlan: ReplicaAssetPlan;
+    uploadedSlotIds: ReadonlySet<string>;
+    productDisplayAction?: string;
+  },
+): SeedVideoShot[] {
+  const stripFragments = collectReplicaStripFragments(opts.assetPlan, opts.uploadedSlotIds);
+  const characterReplaced = opts.assetPlan.characters.some((s) => opts.uploadedSlotIds.has(s.id));
+  const productReplaced = opts.assetPlan.products.some((s) => opts.uploadedSlotIds.has(s.id));
+  const displayAction = opts.productDisplayAction?.trim();
+
+  return shots.map((shot) => {
+    let sceneDescription = shot.sceneDescription;
+    let imagePrompt = shot.imagePrompt ?? "";
+    let videoPrompt = shot.videoPrompt;
+
+    if (stripFragments.length > 0) {
+      sceneDescription = stripWardrobeTextFromPrompt(sceneDescription, stripFragments);
+      imagePrompt = stripWardrobeTextFromPrompt(imagePrompt, stripFragments);
+      videoPrompt = stripWardrobeTextFromPrompt(videoPrompt, stripFragments);
+    }
+    if (characterReplaced) {
+      sceneDescription = stripGarmentClausesFromPrompt(sceneDescription);
+      imagePrompt = stripGarmentClausesFromPrompt(imagePrompt);
+      videoPrompt = stripGarmentClausesFromPrompt(videoPrompt);
+    }
+
+    imagePrompt = structureReplicaPromptByRole(imagePrompt, opts);
+    videoPrompt = structureReplicaPromptByRole(videoPrompt, opts);
+
+    videoPrompt = mergeReplicaReplaceTokensFromImageToVideo(imagePrompt, videoPrompt);
+
+    if (productReplaced && displayAction && !videoPrompt.includes(displayAction)) {
+      videoPrompt = videoPrompt ? `${videoPrompt}，${displayAction}` : displayAction;
+      if (imagePrompt && !imagePrompt.includes(displayAction)) {
+        imagePrompt = `${imagePrompt}，${displayAction}`;
+      }
+    }
+
+    return {
+      ...shot,
+      sceneDescription,
+      imagePrompt: imagePrompt || undefined,
+      videoPrompt,
+    };
+  });
+}
+
+/** 拆图复刻 · 脚本合并后确保 image/video Prompt 不低于机械草稿密度 */
+export function finalizeImageReplicaScriptShots(
+  structured: MediaDecomposePatch,
+  shots: SeedVideoShot[],
+  replaceOpts?: { assetPlan: ReplicaAssetPlan; uploadedSlotIds: ReadonlySet<string> },
+): SeedVideoShot[] {
+  if (structured.mediaType !== "image") return shots;
+  const stripFragments = replaceOpts
+    ? collectReplicaStripFragments(replaceOpts.assetPlan, replaceOpts.uploadedSlotIds)
+    : [];
+  const drafts = buildDraftShotsFromDecompose(structured);
+  return shots.map((shot, i) => {
+    const draft = drafts[i] ?? drafts[drafts.length - 1];
+    if (!draft) return shot;
+    const draftImage =
+      draft.imagePrompt?.trim() ||
+      buildImageDecomposeDraftImagePrompt(structured) ||
+      structured.positivePrompt.trim();
+    const draftVideo = draft.videoPrompt.trim();
+    return {
+      ...shot,
+      imagePrompt: pickReplicaPromptPreservingDensity(shot.imagePrompt, draftImage, 0.75, stripFragments),
+      videoPrompt: pickReplicaPromptPreservingDensity(shot.videoPrompt, draftVideo, 0.65, stripFragments),
+    };
+  });
 }
 
 function normalizeReplicaScriptPatch(raw: unknown): ReplicaScriptPatch | null {
@@ -190,15 +562,17 @@ function normalizeReplicaScriptPatch(raw: unknown): ReplicaScriptPatch | null {
       const r = row as Record<string, unknown>;
       const sceneDescription =
         typeof r.sceneDescription === "string" ? r.sceneDescription.trim() : "";
+      const imagePrompt = typeof r.imagePrompt === "string" ? r.imagePrompt.trim() : "";
       const videoPrompt = typeof r.videoPrompt === "string" ? r.videoPrompt.trim() : "";
       const voiceover = typeof r.voiceover === "string" ? r.voiceover.trim() : "";
-      if (!sceneDescription && !videoPrompt && !voiceover) return null;
+      if (!sceneDescription && !imagePrompt && !videoPrompt && !voiceover) return null;
       const index =
         Number.isFinite(r.index) && Number(r.index) > 0 ? Math.round(Number(r.index)) : i + 1;
       return {
         index,
         timeSlice: typeof r.timeSlice === "string" ? r.timeSlice : undefined,
         sceneDescription,
+        imagePrompt: imagePrompt || undefined,
         videoPrompt,
         voiceover,
         durationSec:
@@ -267,7 +641,8 @@ export function mapReplicaScriptToShots(
   primaryModel: SeedVideoReference,
   catalog: ReplicaMentionEntry[],
 ): SeedVideoShot[] {
-  const defaultModelToken = catalog.find((e) => e.role === "model")?.token ?? "@图片1";
+  const defaultModelToken =
+    catalog.find((e) => e.role === "character" || e.role === "model")?.token ?? "@人物A";
   return patch.shots.map((row, i) => {
     const fb = fallback[i] ?? fallback[fallback.length - 1];
     const index = Number.isFinite(row.index) && row.index > 0 ? row.index : i + 1;
@@ -281,6 +656,7 @@ export function mapReplicaScriptToShots(
       refImageId: primaryModel.id,
       refImageLabel: row.refImageLabel?.trim() || defaultModelToken,
       sceneDescription: row.sceneDescription?.trim() || fb?.sceneDescription || "",
+      imagePrompt: row.imagePrompt?.trim() || fb?.imagePrompt || "",
       videoPrompt: row.videoPrompt?.trim() || fb?.videoPrompt || "",
       voiceover: row.voiceover?.trim() ?? fb?.voiceover ?? "",
       durationSec,
@@ -305,8 +681,8 @@ export function buildReplicaProductRecognizePrompt(imageCount = 1, userDraft?: s
     ? `\n\n用户已填写的产品描述草稿（请结合产品图核对、补全、润色；保留正确信息，修正与图片不符之处）：\n${draft}`
     : "";
   return `你是电商产品识别助手。${multi}根据产品图输出简洁 JSON（不要 markdown 围栏）：
-{"productName":"","category":"","sellingPoints":"","materialOrCraft":"","displayTips":""}
-字段用中文，sellingPoints 为 1–3 条逗号分隔。${draftBlock}`;
+{"productName":"","category":"","materialOrCraft":"","displayTips":"","displayAction":"","displayActionDetail":""}
+字段用中文。displayAction 为展示动作类型（如：手持展示/佩戴/抱着/摆放/试穿/开箱等，按品类选择最自然的一种）；displayActionDetail 为 1 句可写入 Prompt 的具体动作描述（含与人物/场景的空间关系）。**不要**输出 sellingPoints（卖点由用户另行生成）。${draftBlock}`;
 }
 
 export function buildReplicaModelImagePromptSystem(): string {
@@ -365,20 +741,43 @@ function extractRecognitionJsonBody(text: string): string {
 export function parseProductRecognitionResult(jsonText: string): {
   productBrief: string;
   sellingPoints: string;
+  displayAction?: string;
+  displayActionDetail?: string;
 } {
   try {
     const o = JSON.parse(extractRecognitionJsonBody(jsonText)) as Record<string, string>;
     const sellingPoints = typeof o.sellingPoints === "string" ? o.sellingPoints.trim() : "";
+    const displayAction = typeof o.displayAction === "string" ? o.displayAction.trim() : "";
+    const displayActionDetail =
+      typeof o.displayActionDetail === "string" ? o.displayActionDetail.trim() : "";
     const parts = [
       o.productName && `产品：${o.productName}`,
       o.category && `品类：${o.category}`,
       o.materialOrCraft && `材质/工艺：${o.materialOrCraft}`,
       o.displayTips && `展示建议：${o.displayTips}`,
+      displayAction && `展示动作：${displayAction}`,
+      displayActionDetail && `动作细节：${displayActionDetail}`,
     ].filter(Boolean);
-    return { productBrief: parts.join("\n"), sellingPoints };
+    return {
+      productBrief: parts.join("\n"),
+      sellingPoints,
+      ...(displayAction ? { displayAction } : {}),
+      ...(displayActionDetail ? { displayActionDetail } : {}),
+    };
   } catch {
     return { productBrief: jsonText.trim(), sellingPoints: "" };
   }
+}
+
+/** 识产品 · 写入脚本的展示动作（优先 detail，其次 action） */
+export function formatReplicaProductDisplayAction(parsed: {
+  displayAction?: string;
+  displayActionDetail?: string;
+}): string {
+  const detail = parsed.displayActionDetail?.trim();
+  if (detail) return detail;
+  const action = parsed.displayAction?.trim();
+  return action ?? "";
 }
 
 export function formatProductBriefFromRecognition(jsonText: string): string {

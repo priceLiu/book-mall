@@ -6,7 +6,15 @@ import {
 } from "@/lib/gateway/gateway-submit-error-policy";
 
 const CONTENT_POLICY_USER_ZH =
-  "内容被 Seedream/KIE 安全策略拦截。请修改场景描述、上下文案或参考图后重试（避免暴力、色情、辱骂等敏感表述）。";
+  "内容被模型安全策略拦截。请修改 Prompt、参考图或换用其它生图模型后重试（避免敏感、暴力、裸露等描述）。";
+
+/** 电商生图（模特试衣 / 穿搭 / 分镜等经 generateEcomImage）· 面向用户的错误文案 */
+export function formatEcomImageGenUserError(error: unknown): {
+  message: string;
+  status: number;
+} {
+  return formatEcomImageProcessingUserError(error);
+}
 
 /** 电商 AI 修图 / 表情包等 · 面向用户的错误文案（非 Gateway 原始英文） */
 export function formatEcomImageProcessingUserError(error: unknown): {

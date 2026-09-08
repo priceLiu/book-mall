@@ -13,6 +13,8 @@ export function mergeSeedVideoShotsPreserveMedia(
     return {
       ...prev,
       ...s,
+      imageUrl: s.imageUrl?.trim() || prev.imageUrl,
+      imageTaskId: s.imageTaskId?.trim() || prev.imageTaskId,
       videoUrl: s.videoUrl?.trim() || prev.videoUrl,
       ttsUrl: s.ttsUrl?.trim() || prev.ttsUrl,
       videoTaskId: s.videoTaskId?.trim() || prev.videoTaskId,

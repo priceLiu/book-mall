@@ -109,7 +109,25 @@
 | `elements` | object | 画面底层要素 |
 | `positivePrompt` | string | 正向生图 Prompt |
 | `negativePrompt` | string | 反向负面 Prompt |
-| `liveActionReplication` | object | 实拍复刻方案 |
+| `liveActionReplication` | object | 实拍复刻方案（机位/布光/步骤等执行细节） |
+| `replicaAssetCatalog` | object | 复刻资产清单（全身人物/产品/道具/场景逐条拆分，供 replace/inherit 上传槽） |
+
+### `replicaAssetCatalog`
+
+与 `liveActionReplication` **分工**：后者写执行方案；本对象供 UI 生成全身人物/产品/道具/场景上传槽与脚本 `@token`。**可替换**：人物（可多位）、产品（可新增）、道具、场景；其余 inherit 原片。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `characterCount` | number? | 出镜总人数，须与 `characters.length` 一致 |
+| `characters` | array | 逐人条目，label 为 `人物A` / `人物B` / …；description **仅外貌/站位/动作** |
+| `characterWardrobe` | array | 与 characters 逐人对应；garments 写服装，replace 人物时从 Prompt 剥离 |
+| `products` | array | 产品条目；原片无产品可 `[]`，复刻 UI 仍提供可选产品槽 |
+| `props` | array | 道具条目 |
+| `scenes` | array | 场景/环境条目 |
+
+每条 entry：`label`（必填）、`description`（≥20 字，可独立用于 inherit）、`roleInShot`（可选，如「前景主体」）。
+
+`characterWardrobe` 每条：`characterLabel`、`garments`（必填）、`stylingNotes`（可选）。
 
 ### `elements`
 
@@ -144,7 +162,14 @@
 
 | 字段 | 说明 |
 |------|------|
-| `cameraPlacement` | 机位摆放 |
-| `lightingSetup` | 灯光布置 |
-| `props` | 道具搭配 |
-| `cameraParams` | 相机参数参考 |
+| `sceneSetup` | 场地选址、背景/道具布置、环境还原步骤（须可逐步执行） |
+| `talentBlocking` | 人数、站位、姿态、表情、服装造型与人物关系 |
+| `compositionFraming` | 景别、构图线、留白、对焦主体、画幅比例 |
+| `cameraPlacement` | 机位距离、高度、角度、支撑方式、与主体相对位置 |
+| `lightingSetup` | 主/辅/轮廓/环境光具体摆位（展开 `elements.lighting`） |
+| `props` | 可见道具 + 服装搭配与摆放 |
+| `cameraParams` | 焦距、光圈、快门、ISO、胶片/色彩倾向 |
+| `postProcessing` | 后期调色、颗粒、对比度、裁切与输出规格 |
+| `shootingChecklist` | 分步拍摄清单（1→2→3…，含准备/拍摄/验收） |
+
+**质量要求**：每项须详实可落地（建议 ≥50 字），须综合 `elements` 全文，禁止仅写 4 条摘要。

@@ -32,8 +32,17 @@
 
 1. **`elements` 对象**：主体、姿态、场景、透视、构图、等效焦距、拍摄角度、布光（`lighting` 子对象）、材质、色彩体系、氛围、细节。
 2. **`positivePrompt` / `negativePrompt`**：正向须体现布光 + 色彩 + 氛围。
-3. **`liveActionReplication`**：机位、灯光、道具、相机参数。
-4. 简洁可执行。
+3. **`liveActionReplication` 对象**（须**综合 `elements` 全文**写成可逐步执行的实拍清单，**每项详实可落地，禁止一句话带过**）：
+   - `sceneSetup`：场地选址、背景/道具布置、环境还原步骤
+   - `talentBlocking`：人数、站位、姿态、表情、服装造型与互动关系
+   - `compositionFraming`：景别、构图线、留白、对焦主体、画幅比例
+   - `cameraPlacement`：机位距离、高度、角度、三脚架/手持、与主体相对位置
+   - `lightingSetup`：主/辅/轮廓/环境光具体摆位（须展开 `elements.lighting`）
+   - `props`：可见道具清单 + 服装搭配与摆放
+   - `cameraParams`：焦距、光圈、快门、ISO、胶片/色彩倾向
+   - `postProcessing`：后期调色、颗粒、对比度、裁切与输出规格
+   - `shootingChecklist`：分步拍摄清单（1→2→3…，含准备/拍摄/验收）
+4. **`liveActionReplication` 不受「简洁」限制，宁可写长写细**；须与 `elements` 信息一致且更偏执行层。
 
 ---
 

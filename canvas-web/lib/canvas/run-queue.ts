@@ -35,7 +35,11 @@ import type { StoryRefImage } from "./story-ref-image";
 import { resolvePro2DockUpstreamLinks } from "./pro2-dock-upstream-links";
 import { findStyleAssetLinkedToImage } from "./pro2-style-asset-connect";
 import { pro2DockMentionRefCatalog, resolveDockImageUrlsForRun } from "./pro2-dock-ref-catalog";
-import { resolveDockRunPrompt, resolveSbv1VideoEngineRunPrompt } from "./resolve-dock-run-prompt";
+import {
+  resolveDockRunPrompt,
+  resolveSbv1ImageEngineRunPrompt,
+  resolveSbv1VideoEngineRunPrompt,
+} from "./resolve-dock-run-prompt";
 import { resolveSbv1UpstreamRefLinks, resolveSbv1UpstreamMotionVideoLinks } from "./sbv1-upstream-ref-links";
 import { resolveSbv1UpstreamTextLinks } from "./sbv1-upstream-text-links";
 import { buildSbv1VideoEngineDockUpstreamLinks } from "./sbv1-dock-mentionables";
@@ -591,13 +595,53 @@ function resolveImageInputs(
   const dockRefImages = (
     (node.data as { dockRefImages?: StoryRefImage[] }).dockRefImages ?? []
   ) as StoryRefImage[];
-  const fromDock = resolveDockImageUrlsForRun(links, dockRefImages);
-  const merged = Array.from(new Set([...fromDock, ...raw])).filter(
+  const fromDock = resolveDockImageUrlsForRun(links, dockRefImages, prompt).filter(
     (u) =>
       typeof u === "string" &&
       (u.startsWith("blob:") || /^https?:\/\//.test(u.trim())),
   );
-  return merged.length > 0 ? merged : raw;
+  if (fromDock.length > 0) return fromDock;
+  return raw;
+}
+
+function applySbv1ImageDockRunResolution(
+  nodeId: string,
+  nodeType: string,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  runData: Record<string, unknown>,
+  imageInputs: string[],
+): { runData: Record<string, unknown>; imageInputs: string[] } {
+  if (
+    nodeType !== "sbv1-image" &&
+    nodeType !== "story-pro2-image" &&
+    nodeType !== "story-pro2-three-view"
+  ) {
+    return { runData, imageInputs };
+  }
+  const links = resolvePro2DockUpstreamLinks(nodeId, nodeType, nodes, edges);
+  const dockPrompt = String((runData as { dockInput?: string }).dockInput ?? "");
+  const dockRefImages = (
+    (runData as { dockRefImages?: StoryRefImage[] }).dockRefImages ?? []
+  ) as StoryRefImage[];
+  const runPrompt = resolveSbv1ImageEngineRunPrompt(
+    dockPrompt,
+    links,
+    dockRefImages,
+  );
+  let nextRunData = runData;
+  if (runPrompt !== dockPrompt) {
+    nextRunData = { ...runData, dockInput: runPrompt };
+  }
+  const mentionOrdered = resolveDockImageUrlsForRun(
+    links,
+    dockRefImages,
+    dockPrompt,
+  );
+  if (mentionOrdered.length > 0) {
+    return { runData: nextRunData, imageInputs: mentionOrdered };
+  }
+  return { runData: nextRunData, imageInputs };
 }
 
 function resolveSbv1ImageRunData(
@@ -1415,25 +1459,16 @@ export function useCanvasRunner(
           node.type === "story-pro2-image" ||
           node.type === "story-pro2-three-view"
         ) {
-          const links = resolvePro2DockUpstreamLinks(
+          const resolved = applySbv1ImageDockRunResolution(
             nodeId,
             node.type ?? "",
             state.nodes,
             state.edges,
+            runData,
+            imageInputs,
           );
-          const dockPrompt = String(
-            (runData as { dockInput?: string }).dockInput ?? "",
-          );
-          const { prompt: cleanedPrompt, extraText } = resolveDockRunPrompt(
-            dockPrompt,
-            links,
-          );
-          if (cleanedPrompt !== dockPrompt) {
-            runData = { ...runData, dockInput: cleanedPrompt };
-          }
-          if (extraText.length) {
-            mergedTextInputs = [...extraText, ...mergedTextInputs];
-          }
+          runData = resolved.runData;
+          imageInputs = resolved.imageInputs;
         }
         if (node.type === "sbv1-video-engine") {
           const latestState = useCanvasStore.getState();
@@ -1696,6 +1731,22 @@ export function useCanvasRunner(
               return;
             }
           }
+        }
+
+        {
+          const latestForDock = useCanvasStore.getState();
+          const nodeForDock =
+            latestForDock.nodes.find((n) => n.id === nodeId) ?? node;
+          const resolved = applySbv1ImageDockRunResolution(
+            nodeId,
+            nodeForDock.type ?? "",
+            latestForDock.nodes,
+            latestForDock.edges,
+            runData,
+            imageInputs,
+          );
+          runData = resolved.runData;
+          imageInputs = resolved.imageInputs;
         }
 
         if (

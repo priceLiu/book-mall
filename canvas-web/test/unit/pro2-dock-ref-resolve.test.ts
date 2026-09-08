@@ -43,11 +43,23 @@ describe("resolveDockRefsForRun", () => {
 });
 
 describe("resolveDockImageUrlsForRun", () => {
-  it("includes all dock refs even when prompt @ mentions only one", () => {
-    const urls = resolveDockImageUrlsForRun(upstream, []);
+  it("returns all catalog urls when prompt has no @", () => {
+    const urls = resolveDockImageUrlsForRun(upstream, [], "");
     expect(urls).toEqual([
       "https://cdn.example/a.png",
       "https://cdn.example/b.png",
+    ]);
+  });
+
+  it("orders urls by @ mention order in prompt", () => {
+    const urls = resolveDockImageUrlsForRun(
+      upstream,
+      [],
+      "女孩 @<up-img-b> 与男孩 @<up-img-a>",
+    );
+    expect(urls).toEqual([
+      "https://cdn.example/b.png",
+      "https://cdn.example/a.png",
     ]);
   });
 });

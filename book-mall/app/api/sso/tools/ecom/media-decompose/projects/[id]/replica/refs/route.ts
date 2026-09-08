@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
   ensureReplicaSeedProject,
+  upsertReplicaAssetSlotReference,
   upsertReplicaReference,
 } from "@/lib/ecom/ecom-media-decompose-replica";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
@@ -24,10 +25,8 @@ export async function POST(req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "无效表单" }, { status: 400 });
   }
 
+  const slotId = String(form.get("slotId") ?? "").trim();
   const roleRaw = String(form.get("role") ?? "").trim();
-  if (roleRaw !== "model" && roleRaw !== "product") {
-    return NextResponse.json({ error: "role 须为 model 或 product" }, { status: 400 });
-  }
 
   const file = form.get("file");
   if (!(file instanceof Blob)) {
@@ -41,6 +40,24 @@ export async function POST(req: Request, ctx: Ctx) {
     await assertEcomToolkitGatewayAccess(auth.userId);
     await ensureReplicaSeedProject(auth.userId, id);
     const buf = Buffer.from(await file.arrayBuffer());
+
+    if (slotId) {
+      const { project, seedVideo, reference } = await upsertReplicaAssetSlotReference(
+        auth.userId,
+        id,
+        slotId,
+        buf,
+      );
+      return NextResponse.json({ project, seedVideo, reference });
+    }
+
+    if (roleRaw !== "model" && roleRaw !== "product") {
+      return NextResponse.json(
+        { error: "须提供 slotId，或 role 为 model / product（兼容旧版）" },
+        { status: 400 },
+      );
+    }
+
     const { project, seedVideo, reference } = await upsertReplicaReference(
       auth.userId,
       id,
@@ -50,7 +67,7 @@ export async function POST(req: Request, ctx: Ctx) {
     return NextResponse.json({ project, seedVideo, reference });
   } catch (e) {
     const message = e instanceof Error ? e.message : "上传失败";
-    const status = message.includes("请先") || message.includes("缺少") ? 400 : 502;
+    const status = message.includes("请先") || message.includes("缺少") || message.includes("无效") ? 400 : 502;
     return NextResponse.json({ error: message }, { status });
   }
 }

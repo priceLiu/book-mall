@@ -225,6 +225,7 @@ export async function ecomGenerateOutfitVideoShot(opts: {
   projectId: string;
   scene: SceneShot;
   refs: WorkflowRefs;
+  meta?: import("@/lib/ecom/ecom-vton/types").VtonProjectMeta | null;
   videoModelKey?: string;
 }): Promise<string> {
   await assertEcomToolkitGatewayAccess(opts.userId);
@@ -232,6 +233,7 @@ export async function ecomGenerateOutfitVideoShot(opts: {
   const body = buildOutfitShotGenerateBody({
     scene: opts.scene,
     refs: opts.refs,
+    meta: opts.meta,
     videoModelKey: opts.videoModelKey ?? "kling-3.0/motion-control",
     durationSec: opts.scene.durationSec,
   });

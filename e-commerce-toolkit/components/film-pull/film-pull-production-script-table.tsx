@@ -99,6 +99,7 @@ function ScriptMentionField({
       referenceImages={mentionRefs}
       disabled={disabled}
       hideQuickInsert
+      showTopRefBar={false}
       pickerZIndex={pickerZIndex}
       minHeightClass={minHeightClass}
       className={MENTION_FIELD_CLASS}

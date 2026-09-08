@@ -218,6 +218,31 @@ export async function uploadMediaDecomposeReplicaRef(
   return { project: data.project!, seedVideo: data.seedVideo! };
 }
 
+export async function uploadMediaDecomposeReplicaAssetSlot(
+  projectId: string,
+  slotId: string,
+  file: File,
+): Promise<{
+  project: MediaDecomposeProject;
+  seedVideo: SeedVideoProject;
+}> {
+  const form = new FormData();
+  form.set("slotId", slotId);
+  form.set("file", file);
+  const res = await fetch(`/api/book-mall/${BASE}/projects/${projectId}/replica/refs`, {
+    method: "POST",
+    body: form,
+  });
+  if (res.status === 401) throw new EcomUnauthorizedError();
+  const data = (await res.json()) as {
+    project?: MediaDecomposeProject;
+    seedVideo?: SeedVideoProject;
+    error?: string;
+  };
+  if (!res.ok) throw new Error(data.error ?? "上传失败");
+  return { project: data.project!, seedVideo: data.seedVideo! };
+}
+
 export async function attachMediaDecomposeReplicaModelFromLibrary(
   projectId: string,
   entry: { id: string; name: string; ossUrl: string },
@@ -254,6 +279,44 @@ export async function attachMediaDecomposeReplicaRefsFromAssets(
     project: data.project as MediaDecomposeProject,
     seedVideo: data.seedVideo as SeedVideoProject,
     addedCount: Number(data.addedCount ?? 0),
+  };
+}
+
+export async function attachMediaDecomposeReplicaAssetSlotFromAssets(
+  projectId: string,
+  slotId: string,
+  assetIds: string[],
+): Promise<{
+  project: MediaDecomposeProject;
+  seedVideo: SeedVideoProject;
+}> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/replica/refs/attach`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ slotId, assetIds }),
+  });
+  return {
+    project: data.project as MediaDecomposeProject,
+    seedVideo: data.seedVideo as SeedVideoProject,
+  };
+}
+
+export async function attachMediaDecomposeReplicaModelToSlot(
+  projectId: string,
+  slotId: string,
+  entry: { id: string; name: string; ossUrl: string },
+): Promise<{
+  project: MediaDecomposeProject;
+  seedVideo: SeedVideoProject;
+}> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/replica/refs/attach`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ slotId, modelEntry: entry }),
+  });
+  return {
+    project: data.project as MediaDecomposeProject,
+    seedVideo: data.seedVideo as SeedVideoProject,
   };
 }
 

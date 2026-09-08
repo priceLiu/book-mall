@@ -62,6 +62,27 @@ export type MediaDecomposeWardrobeAnalysis = {
   stylingNotes: string;
 };
 
+export type MediaDecomposeReplicaAssetCatalogEntry = {
+  label: string;
+  description: string;
+  roleInShot?: string;
+};
+
+export type MediaDecomposeCharacterWardrobeEntry = {
+  characterLabel: string;
+  garments: string;
+  stylingNotes?: string;
+};
+
+export type MediaDecomposeReplicaAssetCatalog = {
+  characterCount?: number;
+  characters: MediaDecomposeReplicaAssetCatalogEntry[];
+  characterWardrobe?: MediaDecomposeCharacterWardrobeEntry[];
+  products: MediaDecomposeReplicaAssetCatalogEntry[];
+  props: MediaDecomposeReplicaAssetCatalogEntry[];
+  scenes: MediaDecomposeReplicaAssetCatalogEntry[];
+};
+
 export type MediaDecomposePatch =
   | {
       mediaType: "video";
@@ -78,6 +99,7 @@ export type MediaDecomposePatch =
       narrativeLogic: string;
       beatPoints: string;
       replicableShootingScript: string;
+      replicaAssetCatalog?: MediaDecomposeReplicaAssetCatalog;
     }
   | {
       mediaType: "image";
@@ -107,11 +129,17 @@ export type MediaDecomposePatch =
       positivePrompt: string;
       negativePrompt: string;
       liveActionReplication: {
+        sceneSetup: string;
+        talentBlocking: string;
+        compositionFraming: string;
         cameraPlacement: string;
         lightingSetup: string;
         props: string;
         cameraParams: string;
+        postProcessing: string;
+        shootingChecklist: string;
       };
+      replicaAssetCatalog?: MediaDecomposeReplicaAssetCatalog;
     };
 
 export type MediaDecomposeResult = {

@@ -10,12 +10,80 @@ import {
   ecomDataTableThClass,
   ecomDataTableWrapClass,
 } from "@/components/ui/ecom-data-table";
-import type { MediaDecomposePatch } from "@/lib/media-decompose-types";
+import type { MediaDecomposePatch, MediaDecomposeReplicaAssetCatalog } from "@/lib/media-decompose-types";
 import { effectiveDecomposeVoiceover } from "@/lib/media-decompose-structured";
+import {
+  LIVE_ACTION_REPLICATION_FIELD_KEYS,
+  LIVE_ACTION_REPLICATION_FIELD_LABELS,
+} from "@/lib/media-decompose-live-action-labels";
 
 type Props = {
   structured: MediaDecomposePatch;
 };
+
+const REPLICA_CATALOG_GROUPS: Array<{
+  key: keyof Pick<
+    MediaDecomposeReplicaAssetCatalog,
+    "characters" | "products" | "props" | "scenes"
+  >;
+  title: string;
+}> = [
+  { key: "characters", title: "全身人物" },
+  { key: "products", title: "产品" },
+  { key: "props", title: "道具" },
+  { key: "scenes", title: "场景" },
+];
+
+function ReplicaAssetCatalogSection({ catalog }: { catalog: MediaDecomposeReplicaAssetCatalog }) {
+  const hasEntries = REPLICA_CATALOG_GROUPS.some((g) => catalog[g.key].length > 0);
+  if (!hasEntries) return null;
+
+  return (
+    <Section title="复刻资产清单">
+      {catalog.characterCount != null && catalog.characters.length > 0 ? (
+        <p className="mb-2 text-xs text-[#6e6e73]">
+          出镜人数：{catalog.characterCount}（已逐条列出 {catalog.characters.length} 人）
+        </p>
+      ) : null}
+      <div className="space-y-3">
+        {REPLICA_CATALOG_GROUPS.map(({ key, title }) =>
+          catalog[key].length > 0 ? (
+            <div key={key}>
+              <p className="mb-1 text-xs font-semibold text-[#1d1d1f]">{title}</p>
+              <ul className="list-inside list-disc space-y-2 text-sm text-[#424245]">
+                {catalog[key].map((entry) => (
+                  <li key={`${key}-${entry.label}`}>
+                    <span className="font-medium text-[#1d1d1f]">{entry.label}</span>
+                    {entry.roleInShot?.trim() ? (
+                      <span className="text-[#6e6e73]">（{entry.roleInShot}）</span>
+                    ) : null}
+                    <span className="whitespace-pre-wrap">：{entry.description}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null,
+        )}
+      </div>
+      {catalog.characterWardrobe && catalog.characterWardrobe.length > 0 ? (
+        <div className="mt-3">
+          <p className="mb-1 text-xs font-semibold text-[#1d1d1f]">人物服装</p>
+          <ul className="list-inside list-disc space-y-2 text-sm text-[#424245]">
+            {catalog.characterWardrobe.map((entry) => (
+              <li key={entry.characterLabel}>
+                <span className="font-medium text-[#1d1d1f]">{entry.characterLabel}</span>
+                <span className="whitespace-pre-wrap">：{entry.garments}</span>
+                {entry.stylingNotes?.trim() ? (
+                  <span className="text-[#6e6e73]">（{entry.stylingNotes}）</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </Section>
+  );
+}
 
 export function MediaDecomposeResultPanel({ structured }: Props) {
   if (structured.mediaType === "video") {
@@ -130,6 +198,9 @@ export function MediaDecomposeResultPanel({ structured }: Props) {
         <Section title="整体叙事逻辑">{structured.narrativeLogic}</Section>
         <Section title="镜头卡点要点">{structured.beatPoints}</Section>
         <Section title="可复刻拍摄脚本">{structured.replicableShootingScript}</Section>
+        {structured.replicaAssetCatalog ? (
+          <ReplicaAssetCatalogSection catalog={structured.replicaAssetCatalog} />
+        ) : null}
       </div>
     );
   }
@@ -159,12 +230,21 @@ export function MediaDecomposeResultPanel({ structured }: Props) {
       </Section>
       <CopyBlock title="正向生图 Prompt" text={structured.positivePrompt} />
       <CopyBlock title="反向负面 Prompt" text={structured.negativePrompt} />
+      {structured.replicaAssetCatalog ? (
+        <ReplicaAssetCatalogSection catalog={structured.replicaAssetCatalog} />
+      ) : null}
       <Section title="实拍复刻方案">
-        <ul className="list-inside list-disc space-y-1 text-[#424245]">
-          <li>机位：{structured.liveActionReplication.cameraPlacement}</li>
-          <li>灯光：{structured.liveActionReplication.lightingSetup}</li>
-          <li>道具：{structured.liveActionReplication.props}</li>
-          <li>相机参数：{structured.liveActionReplication.cameraParams}</li>
+        <ul className="list-inside list-disc space-y-2 text-[#424245]">
+          {LIVE_ACTION_REPLICATION_FIELD_KEYS.map((key) => (
+            <li key={key}>
+              <span className="font-medium text-[#1d1d1f]">
+                {LIVE_ACTION_REPLICATION_FIELD_LABELS[key]}：
+              </span>
+              <span className="whitespace-pre-wrap">
+                {structured.liveActionReplication[key]?.trim() || "—"}
+              </span>
+            </li>
+          ))}
         </ul>
       </Section>
     </div>

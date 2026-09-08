@@ -21,26 +21,33 @@ import { EcomAssistantSendButton } from "@/components/layout/ecom-assistant-send
 import { STORYBOARD_ASSISTANT_CHOICE_CLASS } from "@/components/storyboard/storyboard-assistant-choices";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
+import { useStagedTaskDetail } from "@/hooks/use-staged-task-detail";
 import {
   ECOM_ASSISTANT_BUBBLE_CLASS,
   ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
   ECOM_ASSISTANT_USER_BUBBLE_CLASS,
 } from "@/lib/ecom-assistant-chat-styles";
+import { REPLICA_SCRIPT_TASK_STEPS } from "@/lib/replica-script-task-steps";
 import {
   generateMediaDecomposeReplicaModelImage,
   generateMediaDecomposeReplicaModelPrompt,
   generateMediaDecomposeReplicaScript,
   recognizeMediaDecomposeReplicaProduct,
   updateMediaDecomposeProject,
+  uploadMediaDecomposeReplicaAssetSlot,
   uploadMediaDecomposeReplicaRef,
 } from "@/lib/ecom-media-decompose-api";
 import { updateSeedVideoProject } from "@/lib/ecom-seed-video-api";
 import { useImageDropPaste } from "@/hooks/use-image-drop-paste";
 import {
   ReplicaAttachmentTile,
+  ReplicaAssetPlanGrid,
   ReplicaProductBriefCard,
   ReplicaRefSlotGrid,
 } from "@/components/media-decompose/media-decompose-replica-thread-blocks";
+import { listReplicaAssetPlanSlots, readReplicaAssetPlan, replicaAssetSlotToken } from "@/lib/replica-asset-plan";
+import type { ReplicaAssetPlanSlot } from "@/lib/replica-asset-plan";
+import { findReplicaSlotRef } from "@/lib/media-decompose-replica-refs";
 import {
   REPLICA_MODEL_REF_ID,
   REPLICA_PRODUCT_REF_ID,
@@ -123,6 +130,7 @@ export function MediaDecomposeReplicaAssistantProvider({
   const uploadRoleRef = useRef<"model" | "product">("model");
 
   const phase = readReplicaPhase(seedVideo);
+  const assetPlan = useMemo(() => readReplicaAssetPlan(seedVideo.meta), [seedVideo.meta]);
   const modelRef = seedVideo.references.find((r) => r.id === REPLICA_MODEL_REF_ID);
   const productRef = seedVideo.references.find((r) => r.id === REPLICA_PRODUCT_REF_ID);
   const modelReady = Boolean(modelRef?.ossUrl?.trim());
@@ -130,7 +138,12 @@ export function MediaDecomposeReplicaAssistantProvider({
   const scriptReady = isReplicaScriptReady(seedVideo, phase);
 
   const [messages, setMessages] = useState<ReplicaAssistantMessage[]>(() => [
-    { id: WELCOME_ID, role: "assistant", content: replicaWelcomeMessage(), createdAt: new Date().toISOString() },
+    {
+      id: WELCOME_ID,
+      role: "assistant",
+      content: replicaWelcomeMessage({ assetPlan: readReplicaAssetPlan(seedVideo.meta) }),
+      createdAt: new Date().toISOString(),
+    },
   ]);
   const [input, setInput] = useState("");
   const [productBriefDraft, setProductBriefDraft] = useState(() =>
@@ -139,6 +152,8 @@ export function MediaDecomposeReplicaAssistantProvider({
   const productBriefDirtyRef = useRef(false);
   const [briefSaveBusy, setBriefSaveBusy] = useState(false);
   const [uploadingRole, setUploadingRole] = useState<"model" | "product" | null>(null);
+  const [uploadingSlotId, setUploadingSlotId] = useState<string | null>(null);
+  const [activeSlotId, setActiveSlotId] = useState<string | null>(null);
   const [modelPreviewUrl, setModelPreviewUrl] = useState<string | null>(null);
   const [productPreviewUrl, setProductPreviewUrl] = useState<string | null>(null);
   const [modelPromptDraft, setModelPromptDraft] = useState("");
@@ -150,6 +165,29 @@ export function MediaDecomposeReplicaAssistantProvider({
   const [scriptBusy, setScriptBusy] = useState(false);
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const [imageSize, setImageSize] = useState<string | undefined>();
+
+  const assetPlanSlots = useMemo(
+    () => (assetPlan ? listReplicaAssetPlanSlots(assetPlan) : []),
+    [assetPlan],
+  );
+  const activeSlot = useMemo(
+    () => assetPlanSlots.find((s) => s.id === activeSlotId) ?? assetPlanSlots[0] ?? null,
+    [assetPlanSlots, activeSlotId],
+  );
+
+  useEffect(() => {
+    if (!assetPlan || assetPlanSlots.length === 0) return;
+    setActiveSlotId((prev) =>
+      prev && assetPlanSlots.some((s) => s.id === prev) ? prev : assetPlanSlots[0]!.id,
+    );
+  }, [assetPlan, assetPlanSlots]);
+
+  const productUploadReady = useMemo(() => {
+    if (!assetPlan) return productReady;
+    return assetPlan.products.some((slot) =>
+      Boolean(findReplicaSlotRef(seedVideo.references, slot.id)?.ossUrl?.trim()),
+    );
+  }, [assetPlan, productReady, seedVideo.references]);
 
   const actionLocked =
     busy ||
@@ -163,6 +201,16 @@ export function MediaDecomposeReplicaAssistantProvider({
   const savedProductBrief = readProductBrief(project, seedVideo);
   const productBriefDirty =
     productBriefDraft.trim() !== savedProductBrief.trim();
+
+  useEffect(() => {
+    if (!assetPlan) return;
+    const nextContent = replicaWelcomeMessage({ assetPlan });
+    setMessages((prev) => {
+      const welcome = prev.find((m) => m.id === WELCOME_ID);
+      if (welcome?.content === nextContent) return prev;
+      return prev.map((m) => (m.id === WELCOME_ID ? { ...m, content: nextContent } : m));
+    });
+  }, [assetPlan]);
 
   useEffect(() => {
     if (productBriefDirtyRef.current) return;
@@ -208,13 +256,54 @@ export function MediaDecomposeReplicaAssistantProvider({
     ]);
   }, []);
 
-  const canIngestImage = !scriptReady && (!modelReady || !productReady) && !actionLocked;
+  const canIngestImage =
+    !scriptReady &&
+    !actionLocked &&
+    !assetPlan &&
+    (!modelReady || !productReady);
+
+  const canIngestSlotImage = !scriptReady && !actionLocked && Boolean(assetPlan);
 
   const resolveUploadRole = useCallback((): "model" | "product" | null => {
     if (!modelReady) return "model";
     if (!productReady) return "product";
     return null;
   }, [modelReady, productReady]);
+
+  const handleSlotUpload = useCallback(
+    async (slot: ReplicaAssetPlanSlot, files: File[]) => {
+      const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+      if (imageFiles.length === 0) return;
+      setActiveSlotId(slot.id);
+      setUploadingSlotId(slot.id);
+      try {
+        let nextProject = project;
+        let nextSeed = seedVideo;
+        for (const file of imageFiles) {
+          const result = await uploadMediaDecomposeReplicaAssetSlot(project.id, slot.id, file);
+          nextProject = result.project;
+          nextSeed = result.seedVideo;
+        }
+        onProjectUpdated(nextProject);
+        onSeedVideoUpdated(nextSeed);
+        appendAssistant(
+          `${slot.label} 已上传（${replicaAssetSlotToken(slot)}）。未上传的槽位仍沿用原片描述。`,
+        );
+      } catch (e) {
+        await onAlert({
+          title: `${slot.label} 上传失败`,
+          message: e instanceof Error ? e.message : "请稍后重试",
+          variant: "error",
+        });
+      } finally {
+        setUploadingSlotId(null);
+      }
+    },
+    [appendAssistant, onAlert, onProjectUpdated, onSeedVideoUpdated, project, seedVideo],
+  );
+
+  const activeSlotRef = useRef(activeSlot);
+  activeSlotRef.current = activeSlot;
 
   const ingestImageFile = useCallback(
     async (file: File, source: "upload" | "paste" | "drop") => {
@@ -303,8 +392,13 @@ export function MediaDecomposeReplicaAssistantProvider({
   );
 
   const { dropZoneProps, dragOver, pasteReady, focusZone } = useImageDropPaste({
-    enabled: canIngestImage,
+    enabled: canIngestImage || canIngestSlotImage,
     onFiles: (files, via) => {
+      if (assetPlan) {
+        const slot = activeSlotRef.current;
+        if (slot) void handleSlotUpload(slot, files);
+        return;
+      }
       const file = files.find((f) => f.type.startsWith("image/"));
       if (file) void ingestImageFile(file, via === "drop" ? "drop" : "paste");
     },
@@ -401,7 +495,20 @@ export function MediaDecomposeReplicaAssistantProvider({
 
   async function handleGenerateScript(briefOverride?: string) {
     const brief = (briefOverride ?? productBriefDraft).trim();
-    if (!brief) {
+    const hasProductSlots = (assetPlan?.products.length ?? 0) > 0;
+    if (hasProductSlots && !brief) {
+      const hasProductUpload = assetPlan!.products.some((slot) =>
+        Boolean(findReplicaSlotRef(seedVideo.references, slot.id)?.ossUrl?.trim()),
+      );
+      if (!hasProductUpload) {
+        await onAlert({
+          title: "缺少产品描述",
+          message: "有产品槽位时请填写产品描述，或上传产品参考图后再生成脚本。",
+          variant: "error",
+        });
+        return;
+      }
+    } else if (!assetPlan && !brief) {
       await onAlert({
         title: "缺少产品描述",
         message: "请先在上方产品描述卡片 AI 识产品或手动填写。",
@@ -521,6 +628,18 @@ export function MediaDecomposeReplicaAssistantProvider({
 
     appendUser(trimmed);
 
+    if (assetPlan) {
+      if (assetPlan.products.length > 0) {
+        productBriefDirtyRef.current = true;
+        setProductBriefDraft(trimmed);
+        appendAssistant("已写入上方产品描述卡片。确认后点「保存」或「生成复刻脚本」。");
+      } else {
+        appendAssistant("备注已收到。可在上方四槽方案中上传替换图，或直接点「生成复刻脚本」。");
+      }
+      setInput("");
+      return;
+    }
+
     if (modelGenDraft && !modelReady) {
       setModelPromptDraft(trimmed);
       appendAssistant("Prompt 已更新。点「选择模型并生成」挑选 IMAGE 模型并出图。");
@@ -553,8 +672,9 @@ export function MediaDecomposeReplicaAssistantProvider({
         modelGenDraft,
         productBrief: productBriefDraft,
         modelPromptDraft: modelPromptDraft || input,
+        assetPlan,
       }),
-    [phase, modelReady, productReady, scriptReady, modelGenDraft, productBriefDraft, modelPromptDraft, input],
+    [phase, modelReady, productReady, scriptReady, modelGenDraft, productBriefDraft, modelPromptDraft, input, assetPlan],
   );
 
   const renderMessageAttachments = (attachments: ReplicaAssistantAttachment[]) => (
@@ -588,13 +708,15 @@ export function MediaDecomposeReplicaAssistantProvider({
           variant="muted"
           title={
             !canIngestImage
-              ? "当前不可上传图片"
+              ? assetPlan
+                ? "请在上方四槽方案中上传替换图"
+                : "当前不可上传图片"
               : !modelReady
                 ? "上传模特图"
                 : "上传产品图"
           }
           disabled={!canIngestImage}
-          className="mb-0.5"
+          className={cn("mb-0.5", assetPlan && "invisible w-0 overflow-hidden p-0")}
           onClick={() => {
             const role = resolveUploadRole();
             if (!role) return;
@@ -613,6 +735,7 @@ export function MediaDecomposeReplicaAssistantProvider({
             scriptReady,
             modelGenDraft,
             pasteReady: canIngestImage && pasteReady,
+            assetPlan,
           })}
           value={input}
           disabled={actionLocked || scriptReady}
@@ -667,6 +790,12 @@ export function MediaDecomposeReplicaAssistantProvider({
         onRecognizeProduct={handleRecognizeProduct}
         briefSaveBusy={briefSaveBusy}
         productBriefDirty={productBriefDirty}
+        assetPlan={assetPlan}
+        references={seedVideo.references}
+        uploadingSlotId={uploadingSlotId}
+        onUploadAssetSlot={handleSlotUpload}
+        activeSlotId={activeSlotId}
+        onActiveSlotChange={setActiveSlotId}
         imageModels={imageModels}
         imageModelKey={imageModelKey}
         onImageModelChange={onImageModelChange}
@@ -711,6 +840,12 @@ const ReplicaThreadContext = createContext<{
   onRecognizeProduct: () => void | Promise<void>;
   briefSaveBusy: boolean;
   productBriefDirty: boolean;
+  assetPlan: ReturnType<typeof readReplicaAssetPlan>;
+  references: SeedVideoProject["references"];
+  uploadingSlotId?: string | null;
+  onUploadAssetSlot?: (slot: ReplicaAssetPlanSlot, files: File[]) => void;
+  activeSlotId?: string | null;
+  onActiveSlotChange?: (slotId: string) => void;
 } | null>(null);
 
 function useReplicaThread() {
@@ -743,6 +878,12 @@ type RuntimeProps = {
   onRecognizeProduct: () => void | Promise<void>;
   briefSaveBusy: boolean;
   productBriefDirty: boolean;
+  assetPlan: ReturnType<typeof readReplicaAssetPlan>;
+  references: SeedVideoProject["references"];
+  uploadingSlotId?: string | null;
+  onUploadAssetSlot?: (slot: ReplicaAssetPlanSlot, files: File[]) => void;
+  activeSlotId?: string | null;
+  onActiveSlotChange?: (slotId: string) => void;
   imageModels: StoryboardGatewayModel[];
   imageModelKey: string;
   onImageModelChange: (key: string) => void;
@@ -782,6 +923,12 @@ function ReplicaAssistantRuntime({
   onRecognizeProduct,
   briefSaveBusy,
   productBriefDirty,
+  assetPlan,
+  references,
+  uploadingSlotId,
+  onUploadAssetSlot,
+  activeSlotId,
+  onActiveSlotChange,
   imageModels,
   imageModelKey,
   onImageModelChange,
@@ -821,6 +968,12 @@ function ReplicaAssistantRuntime({
       onRecognizeProduct,
       briefSaveBusy,
       productBriefDirty,
+      assetPlan,
+      references,
+      uploadingSlotId,
+      onUploadAssetSlot,
+      activeSlotId,
+      onActiveSlotChange,
     }),
     [
       threadEndRef,
@@ -846,6 +999,12 @@ function ReplicaAssistantRuntime({
       onRecognizeProduct,
       briefSaveBusy,
       productBriefDirty,
+      assetPlan,
+      references,
+      uploadingSlotId,
+      onUploadAssetSlot,
+      activeSlotId,
+      onActiveSlotChange,
     ],
   );
 
@@ -910,18 +1069,42 @@ export function MediaDecomposeReplicaAssistantThread() {
     onRecognizeProduct,
     briefSaveBusy,
     productBriefDirty,
+    assetPlan,
+    references,
+    uploadingSlotId,
+    onUploadAssetSlot,
+    activeSlotId,
+    onActiveSlotChange,
   } = useReplicaThread();
+
+  const scriptTaskDetail = useStagedTaskDetail(REPLICA_SCRIPT_TASK_STEPS, scriptBusy);
+
+  const showProductBrief =
+    !scriptReady &&
+    (assetPlan ? assetPlan.products.length > 0 : productReady);
 
   return (
     <section className="space-y-3" aria-label="复刻对话">
-      <ReplicaRefSlotGrid
-        modelUrl={modelUrl}
-        productUrl={productUrl}
-        modelPreviewUrl={modelPreviewUrl ?? undefined}
-        productPreviewUrl={productPreviewUrl ?? undefined}
-        uploadingRole={uploadingRole}
-        modelGenerating={modelGenBusy}
-      />
+      {assetPlan ? (
+        <ReplicaAssetPlanGrid
+          plan={assetPlan}
+          references={references}
+          activeSlotId={activeSlotId}
+          uploadingSlotId={uploadingSlotId}
+          onActiveSlotChange={onActiveSlotChange}
+          onUploadSlot={onUploadAssetSlot}
+          disabled={actionLocked || scriptReady}
+        />
+      ) : (
+        <ReplicaRefSlotGrid
+          modelUrl={modelUrl}
+          productUrl={productUrl}
+          modelPreviewUrl={modelPreviewUrl ?? undefined}
+          productPreviewUrl={productPreviewUrl ?? undefined}
+          uploadingRole={uploadingRole}
+          modelGenerating={modelGenBusy}
+        />
+      )}
 
       <div className="space-y-3">
         {messages.map((m) => (
@@ -941,13 +1124,13 @@ export function MediaDecomposeReplicaAssistantThread() {
           </div>
         ))}
 
-        {productReady && !scriptReady ? (
+        {showProductBrief ? (
           <ReplicaProductBriefCard
             value={productBriefDraft}
             onChange={onProductBriefDraftChange}
             onSave={onSaveProductBrief}
             onRecognize={onRecognizeProduct}
-            recognizeDisabled={!productReady}
+            recognizeDisabled={assetPlan ? !productUploadReady : !productReady}
             saving={briefSaveBusy}
             recognizing={recognizeBusy}
             disabled={actionLocked && !recognizeBusy}
@@ -994,8 +1177,8 @@ export function MediaDecomposeReplicaAssistantThread() {
           active
           sweep
           surface="content"
-          title="脚本生成中"
-          detail="正在根据拆解结果匹配替换分镜…"
+          title="复刻脚本生成中"
+          detail={scriptTaskDetail || REPLICA_SCRIPT_TASK_STEPS[0]}
         />
       ) : null}
 

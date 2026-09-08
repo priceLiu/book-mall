@@ -169,6 +169,7 @@ export function syncSeedVideoShotsAfterRefChange(
       ...shot,
       refImageId,
       refImageLabel,
+      imagePrompt: syncMentionText(shot.imagePrompt ?? "", oldCatalog, newCatalog),
       videoPrompt: syncMentionText(shot.videoPrompt ?? "", oldCatalog, newCatalog),
     };
   });

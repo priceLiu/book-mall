@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
+  attachReplicaAssetSlotFromAssets,
   attachReplicaModelFromLibrary,
+  attachReplicaModelFromLibraryToSlot,
   attachReplicaRefsFromAssets,
 } from "@/lib/ecom/ecom-media-decompose-replica";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
@@ -40,12 +42,22 @@ export async function POST(req: Request, ctx: Ctx) {
     await assertEcomToolkitGatewayAccess(auth.userId);
 
     if (Array.isArray(body.assetIds)) {
+      const assetIds = body.assetIds.filter((x): x is string => typeof x === "string");
+      const slotId = typeof body.slotId === "string" ? body.slotId.trim() : "";
+      if (slotId) {
+        const { project, seedVideo, reference } = await attachReplicaAssetSlotFromAssets(
+          auth.userId,
+          id,
+          slotId,
+          assetIds,
+        );
+        return NextResponse.json({ project, seedVideo, reference, addedCount: 1 });
+      }
       const roleRaw = body.role;
       const role = roleRaw === "model" || roleRaw === "product" ? roleRaw : null;
       if (!role) {
-        return NextResponse.json({ error: "role 须为 model 或 product" }, { status: 400 });
+        return NextResponse.json({ error: "role 须为 model 或 product，或提供 slotId" }, { status: 400 });
       }
-      const assetIds = body.assetIds.filter((x): x is string => typeof x === "string");
       const { project, seedVideo, addedCount } = await attachReplicaRefsFromAssets(
         auth.userId,
         id,
@@ -59,6 +71,20 @@ export async function POST(req: Request, ctx: Ctx) {
       const entry = body.modelEntry as { id?: string; name?: string; ossUrl?: string };
       if (!entry.id || !entry.ossUrl) {
         return NextResponse.json({ error: "modelEntry 无效" }, { status: 400 });
+      }
+      const slotId = typeof body.slotId === "string" ? body.slotId.trim() : "";
+      if (slotId) {
+        const { project, seedVideo, reference } = await attachReplicaModelFromLibraryToSlot(
+          auth.userId,
+          id,
+          slotId,
+          {
+            id: entry.id,
+            name: entry.name ?? "模特",
+            ossUrl: entry.ossUrl,
+          },
+        );
+        return NextResponse.json({ project, seedVideo, reference });
       }
       const { project, seedVideo, reference } = await attachReplicaModelFromLibrary(
         auth.userId,

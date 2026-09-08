@@ -508,9 +508,18 @@ export function MediaDecomposeWorkspace({
       {showReplicaPanel ? (
         <MediaDecomposeReplicaPanel
           seedVideo={replicaSeedVideo!}
+          decomposeMediaType={
+            structured?.mediaType ??
+            (project.media?.kind === "video" ? "video" : project.media ? "image" : undefined)
+          }
           videoModels={videoModels}
           videoModelKey={videoModelKey}
           onVideoModelChange={onVideoModelChange!}
+          imageModels={imageModels}
+          imageModelKey={imageModelKey}
+          onImageModelChange={onImageModelChange}
+          modelsLoading={modelsLoading}
+          onRefreshModels={onRefreshModels}
           onSeedVideoChange={onReplicaProjectChange!}
           onPreviewVideo={onPreviewVideo!}
           onAlert={onAlert!}

@@ -4,10 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Clapperboard, Loader2 } from "lucide-react";
 
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
+import {
+  EcomImagePreviewHost,
+  useEcomImagePreview,
+} from "@/components/media/ecom-image-preview-host";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { SeedVideoComposeDialog } from "@/components/seed-video/seed-video-compose-dialog";
 import { SeedVideoRenderProgressPanel } from "@/components/seed-video/seed-video-render-progress-panel";
 import { SeedVideoShotTable } from "@/components/seed-video/seed-video-shot-table";
+import { MediaDecomposeReplicaImageShotTable } from "@/components/media-decompose/media-decompose-replica-image-shot-table";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import {
   type StoryboardVideoResolution,
@@ -16,6 +21,7 @@ import { videoModelSupportsGenerateAudio } from "@/lib/storyboard-video-params";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
   generateSeedVideoShot,
+  generateSeedVideoShotImage,
   generateSeedVideoTts,
   getSeedVideoProject,
   resumeSeedVideoPendingShots,
@@ -23,7 +29,8 @@ import {
   renderSeedVideo,
   updateSeedVideoProject,
 } from "@/lib/ecom-seed-video-api";
-import { buildReplicaMentionRefs } from "@/lib/media-decompose-replica-refs";
+import { buildReplicaMentionRefs, buildReplicaMentionRefsFromPlan } from "@/lib/media-decompose-replica-refs";
+import { readReplicaAssetPlan } from "@/lib/replica-asset-plan";
 import {
   readVoiceoverDraft,
   type ReplicaVoiceoverDraft,
@@ -108,21 +115,35 @@ function removeGeneratingShot(prev: Set<number>, index: number): Set<number> {
 
 type Props = {
   seedVideo: SeedVideoProject;
+  decomposeMediaType?: "image" | "video";
   videoModels: StoryboardGatewayModel[];
   videoModelKey: string;
   onVideoModelChange: (key: string) => void;
+  imageModels?: StoryboardGatewayModel[];
+  imageModelKey?: string;
+  onImageModelChange?: (key: string) => void;
+  modelsLoading?: boolean;
+  onRefreshModels?: () => void;
   onSeedVideoChange: () => void | Promise<void>;
   onPreviewVideo: (src: string, title?: string) => void;
+  onPreviewImage?: (src: string, title: string) => void;
   onAlert: (opts: { title: string; message: string; variant?: "error" }) => Promise<void>;
 };
 
 export function MediaDecomposeReplicaPanel({
   seedVideo,
+  decomposeMediaType,
   videoModels,
   videoModelKey,
   onVideoModelChange,
+  imageModels = [],
+  imageModelKey = "",
+  onImageModelChange,
+  modelsLoading,
+  onRefreshModels,
   onSeedVideoChange,
   onPreviewVideo,
+  onPreviewImage,
   onAlert,
 }: Props) {
   const { toast } = useDialogs();
@@ -133,6 +154,13 @@ export function MediaDecomposeReplicaPanel({
     () =>
       new Set(listEffectivePendingShotIndices(seedVideo.meta, seedVideo.plan?.shots)),
   );
+  const [generatingImages, setGeneratingImages] = useState<Set<number>>(() => new Set());
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const [pendingImageShotIndex, setPendingImageShotIndex] = useState<number | null>(null);
+  const [draftImageModelKey, setDraftImageModelKey] = useState(imageModelKey);
+  const isImageReplica =
+    decomposeMediaType === "image" ||
+    seedVideo.meta?.replicaDecomposeMediaType === "image";
   const generatingShotsRef = useRef(generatingShots);
   generatingShotsRef.current = generatingShots;
   /** 各镜号乐观 generating 的起始时间，用于过期清理从未到达服务端的标记 */
@@ -271,10 +299,24 @@ export function MediaDecomposeReplicaPanel({
     }
   }, [seedVideo.id, seedVideo.settings, filteredModels, videoModelKey, onVideoModelChange]);
 
-  const mentionRefs = useMemo(
-    () => buildReplicaMentionRefs(syncedReferences),
-    [syncedReferences],
+  const mentionRefs = useMemo(() => {
+    const plan = readReplicaAssetPlan(seedVideo.meta);
+    if (plan) return buildReplicaMentionRefsFromPlan(plan, syncedReferences);
+    return buildReplicaMentionRefs(syncedReferences);
+  }, [seedVideo.meta, syncedReferences]);
+
+  const imagePreviewItems = useMemo(
+    () =>
+      localShots
+        .filter((s) => s.imageUrl?.trim())
+        .map((s) => ({
+          src: s.imageUrl!.trim(),
+          title: `镜 ${s.index} · 分镜图`,
+        })),
+    [localShots],
   );
+  const { preview: imagePreview, openPreview: openImagePreview, closePreview: closeImagePreview } =
+    useEcomImagePreview(imagePreviewItems);
 
   const voiceoverDraft = useMemo(
     () => readVoiceoverDraft(seedVideo),
@@ -308,17 +350,26 @@ export function MediaDecomposeReplicaPanel({
 
 
   const batchProductionBusy = ttsBusy || renderBusy;
-  const singleShotBusy = activeGeneratingIndices.size > 0;
+  const singleShotBusy = activeGeneratingIndices.size > 0 || generatingImages.size > 0;
   const pipelineBusy = batchProductionBusy || singleShotBusy;
   const planSynced = localShots.length >= 1;
   const scriptReady = planSynced;
-  const anyGenerating = activeGeneratingIndices.size > 0;
+  const anyGenerating =
+    activeGeneratingIndices.size > 0 || (isImageReplica && generatingImages.size > 0);
   const generatingStatusLabel = useMemo(() => {
-    const nums = [...activeGeneratingIndices].sort((a, b) => a - b);
-    if (nums.length === 0) return "";
-    if (nums.length === 1) return `镜头 ${nums[0]} 视频生成中（约 1～3 分钟，Gateway 处理中）…`;
-    return `镜头 ${nums.join("、")} 生成中（约 1～3 分钟，Gateway 处理中）…`;
-  }, [activeGeneratingIndices]);
+    const videoNums = [...activeGeneratingIndices].sort((a, b) => a - b);
+    const imageNums = [...generatingImages].sort((a, b) => a - b);
+    if (videoNums.length > 0 && imageNums.length > 0) {
+      return `镜头 ${videoNums.join("、")} 视频生成中；镜头 ${imageNums.join("、")} 分镜图生成中…`;
+    }
+    if (imageNums.length > 0) {
+      if (imageNums.length === 1) return `镜头 ${imageNums[0]} 分镜图生成中…`;
+      return `镜头 ${imageNums.join("、")} 分镜图生成中…`;
+    }
+    if (videoNums.length === 0) return "";
+    if (videoNums.length === 1) return `镜头 ${videoNums[0]} 视频生成中（约 1～3 分钟，Gateway 处理中）…`;
+    return `镜头 ${videoNums.join("、")} 生成中（约 1～3 分钟，Gateway 处理中）…`;
+  }, [activeGeneratingIndices, generatingImages]);
   const idleGeneratableIndices = localShots
     .filter((s) => !activeGeneratingIndices.has(s.index))
     .map((s) => s.index);
@@ -495,6 +546,31 @@ export function MediaDecomposeReplicaPanel({
     [localShots, onSeedVideoChange, seedVideo, toast],
   );
 
+  useEffect(() => {
+    setDraftImageModelKey(imageModelKey);
+  }, [imageModelKey]);
+
+  function previewImage(src: string, title: string) {
+    if (onPreviewImage) {
+      onPreviewImage(src, title);
+      return;
+    }
+    openImagePreview(src, title, imagePreviewItems);
+  }
+
+  const applyRemoteShotImage = useCallback((panelIndex: number, remote: SeedVideoShot | undefined) => {
+    if (!remote?.imageUrl?.trim()) return false;
+    let changed = false;
+    setLocalShots((prev) => {
+      const cur = prev.find((s) => s.index === panelIndex);
+      if (cur?.imageUrl?.trim() === remote.imageUrl?.trim()) return prev;
+      changed = true;
+      return prev.map((s) =>
+        s.index === panelIndex ? { ...s, imageUrl: remote.imageUrl } : s,
+      );
+    });
+    return changed;
+  }, []);
   const applyRemoteShotVideo = useCallback((panelIndex: number, remote: SeedVideoShot | undefined) => {
     if (!remote?.videoUrl?.trim()) return false;
     let changed = false;
@@ -541,11 +617,11 @@ export function MediaDecomposeReplicaPanel({
 
       for (const idx of watch) {
         const remote = fresh.plan?.shots?.find((s) => s.index === idx);
-        if (!remote?.videoUrl?.trim()) continue;
-        applyRemoteShotVideo(idx, remote);
+        if (remote?.videoUrl?.trim()) applyRemoteShotVideo(idx, remote);
+        if (remote?.imageUrl?.trim()) applyRemoteShotImage(idx, remote);
       }
     },
-    [applyRemoteShotVideo],
+    [applyRemoteShotImage, applyRemoteShotVideo],
   );
 
   const syncRemoteShotVideos = useCallback(async () => {
@@ -585,6 +661,59 @@ export function MediaDecomposeReplicaPanel({
     syncRemoteShotVideos,
   ]);
 
+  async function runImageGenerate(modelKey: string, panelIndex: number) {
+    try {
+      await persistShots(localShots);
+      setGeneratingImages((prev) => addGeneratingShot(prev, panelIndex));
+      const result = await generateSeedVideoShotImage({
+        projectId: seedVideo.id,
+        shotIndex: panelIndex,
+        modelKey,
+        aspectRatio: seedVideo.settings.aspectRatio ?? "9:16",
+      });
+      const nextShots = localShots.map((s) =>
+        s.index === panelIndex ? { ...s, imageUrl: result.imageUrl } : s,
+      );
+      setLocalShots(nextShots);
+      await persistShots(nextShots);
+      if (result.project?.plan?.shots?.length) {
+        applyFreshShotProject(result.project);
+      }
+      await onSeedVideoChange();
+    } catch (e) {
+      await onAlert({
+        title: "生图失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    } finally {
+      setGeneratingImages((prev) => removeGeneratingShot(prev, panelIndex));
+    }
+  }
+
+  function confirmImageGenerate(modelKey: string) {
+    const shotIndex = pendingImageShotIndex;
+    onImageModelChange?.(modelKey);
+    setImagePickerOpen(false);
+    setPendingImageShotIndex(null);
+    if (shotIndex == null) return;
+    void runImageGenerate(modelKey, shotIndex);
+  }
+
+  function openImageGeneratePicker(panelIndex: number) {
+    if (imageModels.length === 0) {
+      void onAlert({
+        title: "暂无生图模型",
+        message: "请检查 Gateway 凭证或刷新模型列表。",
+        variant: "error",
+      });
+      return;
+    }
+    setPendingImageShotIndex(panelIndex);
+    setDraftImageModelKey(imageModelKey || imageModels[0]?.modelKey || "");
+    setImagePickerOpen(true);
+  }
+
   async function runPanelGenerate(
     modelKey: string,
     panelIndex: number,
@@ -592,6 +721,8 @@ export function MediaDecomposeReplicaPanel({
     opts?: { skipPersist?: boolean },
   ) {
     submitInFlightRef.current = true;
+    const panelShot = localShots.find((s) => s.index === panelIndex);
+    const panelImageUrl = panelShot?.imageUrl?.trim() || undefined;
     try {
       if (!opts?.skipPersist) {
         await persistShots(localShots);
@@ -606,6 +737,7 @@ export function MediaDecomposeReplicaPanel({
         aspectRatio: seedVideo.settings.aspectRatio ?? "9:16",
         resolution: pickerVideoResolution,
         generateAudio: pickerVideoGenerateAudio,
+        panelImageUrl,
       });
       if ("status" in result) {
         void syncRemoteShotVideos();
@@ -918,8 +1050,12 @@ export function MediaDecomposeReplicaPanel({
     <>
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-[#1d1d1f]">方案② · 精细成片</h2>
+          <h2 className="text-sm font-semibold text-[#1d1d1f]">
+            {isImageReplica ? "拆图复刻 · 精细成片" : "方案② · 精细成片"}
+          </h2>
           <div className="flex flex-wrap gap-2">
+            {!isImageReplica ? (
+              <>
             <EcomButtonSecondary
               type="button"
               size="sm"
@@ -940,14 +1076,6 @@ export function MediaDecomposeReplicaPanel({
               {selectedGeneratableCount > 0
                 ? `生成 (${selectedGeneratableCount})`
                 : "生成"}
-            </EcomButtonSecondary>
-            <EcomButtonSecondary
-              type="button"
-              size="sm"
-              disabled={batchProductionBusy || !scriptReady}
-              onClick={() => void handleSaveShots()}
-            >
-              保存编辑
             </EcomButtonSecondary>
             <EcomButtonSecondary
               type="button"
@@ -985,10 +1113,22 @@ export function MediaDecomposeReplicaPanel({
             >
               {batchComposeLabel}
             </EcomButtonPrimary>
+              </>
+            ) : null}
+            <EcomButtonSecondary
+              type="button"
+              size="sm"
+              disabled={batchProductionBusy || !scriptReady}
+              onClick={() => void handleSaveShots()}
+            >
+              保存编辑
+            </EcomButtonSecondary>
           </div>
         </div>
         <p className="text-[11px] leading-relaxed text-[#6e6e73]">
-          推荐顺序：① 勾选后「生成 (N)」→ ② 含口播「批量 TTS (N)」→ ③ 就绪镜头「合成成片 (N)」。
+          {isImageReplica
+            ? "每镜两行：先生成分镜图，或直接用视频 Prompt 生成分镜视频（有分镜图时自动带入首帧）。"
+            : "推荐顺序：① 勾选后「生成 (N)」→ ② 含口播「批量 TTS (N)」→ ③ 就绪镜头「合成成片 (N)」。"}
         </p>
 
         {anyGenerating ? (
@@ -1007,6 +1147,7 @@ export function MediaDecomposeReplicaPanel({
           </div>
         ) : null}
 
+        {!isImageReplica ? (
         <SeedVideoShotTable
           shots={localShots}
           references={syncedReferences}
@@ -1065,6 +1206,20 @@ export function MediaDecomposeReplicaPanel({
             void applyVoiceoverDraftIndices([...voiceoverDraftByIndex.keys()])
           }
         />
+        ) : (
+        <MediaDecomposeReplicaImageShotTable
+          shots={localShots}
+          onChange={setLocalShots}
+          disabled={batchProductionBusy || !planSynced}
+          mentionRefs={mentionRefs}
+          generatingImageIndices={generatingImages}
+          generatingVideoIndices={activeGeneratingIndices}
+          onPreviewVideo={onPreviewVideo}
+          onPreviewImage={previewImage}
+          onGenerateImage={(index) => openImageGeneratePicker(index)}
+          onGenerateVideo={(index) => openGeneratePicker([index])}
+        />
+        )}
 
         {finalUrl ? (
           <div className="space-y-2 border-t border-[#e8e8ed] pt-4">
@@ -1081,6 +1236,31 @@ export function MediaDecomposeReplicaPanel({
           </div>
         ) : null}
       </section>
+
+      {isImageReplica && imageModels.length > 0 ? (
+        <StoryboardModelPickerDialog
+          open={imagePickerOpen}
+          onOpenChange={setImagePickerOpen}
+          mode="image"
+          dialogTitle="选择生图模型"
+          dialogDescription="确认后将生成该镜分镜图。"
+          confirmLabel="开始生图"
+          models={imageModels}
+          modelsLoading={modelsLoading}
+          onRetryLoadModels={onRefreshModels}
+          value={draftImageModelKey}
+          onChange={setDraftImageModelKey}
+          onConfirm={confirmImageGenerate}
+        />
+      ) : null}
+
+      {isImageReplica ? (
+        <EcomImagePreviewHost
+          preview={imagePreview}
+          galleryItems={imagePreviewItems}
+          onClose={closeImagePreview}
+        />
+      ) : null}
 
       <StoryboardModelPickerDialog
         open={pickerOpen}

@@ -19,6 +19,13 @@ import {
   createOutfitVideoProject,
   fetchOutfitVideoModels,
   fuseOutfitShotScene,
+  expandOutfitModelFullBody,
+  batchOutfitTryon,
+  lockOutfitTryonResults,
+  patchOutfitGarments,
+  patchOutfitLooks,
+  uploadOutfitGarment,
+  generateOutfitModel,
   getOutfitVideoProject,
   listOutfitVideoProjectSummaries,
   lockOutfitVideoRefs,
@@ -65,8 +72,11 @@ import {
   formatOutfitSplitPromptValidationError,
   validateOutfitSplitPrompts,
 } from "@/lib/outfit-video-split-prompt-validate";
+import { parseVtonTryonProgress } from "@/lib/vton-tryon-progress";
+import type { VtonGarmentKind, VtonLookSpec } from "@/lib/vton-types";
 import {
   inferOutfitPhase,
+  isOutfitRefsLocked,
   isOutfitRefsReadyToLock,
   type OutfitGarmentMode,
   type OutfitRefMode,
@@ -104,7 +114,9 @@ function OutfitVideoStudioInner() {
   const [chatModels, setChatModels] = useState<MediaDecomposeChatModel[]>([]);
   const [splitModelKey, setSplitModelKey] = useState(ECOM_MEDIA_DECOMPOSE_DEFAULT_VISION_MODEL);
   const [videoModels, setVideoModels] = useState<StoryboardGatewayModel[]>([]);
+  const [imageModels, setImageModels] = useState<StoryboardGatewayModel[]>([]);
   const [videoModelKey, setVideoModelKey] = useState("wan2.7-r2v");
+  const [imageModelKey, setImageModelKey] = useState("wanx2.1-t2i-turbo");
   const [fusionModelKey, setFusionModelKey] = useState("qwen-image-edit");
   const [modelsLoading, setModelsLoading] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -114,6 +126,9 @@ function OutfitVideoStudioInner() {
   /** 点击拆解后立即反馈，不等 meta / 后台任务轮询 */
   const [splitUiPending, setSplitUiPending] = useState(false);
   const [refBusy, setRefBusy] = useState(false);
+  const [tryonBusy, setTryonBusy] = useState(false);
+  const [selectedResultIds, setSelectedResultIds] = useState<string[]>([]);
+  const tryonPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [generateBusy, setGenerateBusy] = useState(false);
   const [renderBusy, setRenderBusy] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
@@ -227,7 +242,7 @@ function OutfitVideoStudioInner() {
     return inferOutfitPhase({
       hasReferenceVideo: Boolean(project.references.referenceVideo?.ossUrl),
       sceneCount: project.sceneList.length,
-      hasDressedImage: Boolean(project.references.dressedImage?.ossUrl),
+      hasRefsLocked: isOutfitRefsLocked(project.structured),
       allShotsHaveVideo:
         project.sceneList.length > 0 &&
         project.sceneList.every((s) => Boolean(s.videoUrl?.trim())),
@@ -235,16 +250,32 @@ function OutfitVideoStudioInner() {
     });
   }, [project]);
 
+  const tryonProgress = useMemo(
+    () => parseVtonTryonProgress(project?.meta?.tryonProgress),
+    [project?.meta?.tryonProgress],
+  );
+
+  useEffect(() => {
+    return () => stopTryonPoll();
+  }, []);
+
   const loadModels = useCallback(async () => {
     setModelsLoading(true);
     try {
       const models = await fetchOutfitVideoModels();
       setVideoModels(models.videoModels);
       setChatModels(models.chatModels);
+      setImageModels(models.imageModels ?? models.fusionModels);
       setFusionModelKey(
         pickBoundStoryboardModelKey(
           models.fusionModels,
           models.defaults?.fusion ?? "qwen-image-edit",
+        ),
+      );
+      setImageModelKey(
+        pickBoundStoryboardModelKey(
+          models.imageModels ?? models.fusionModels,
+          models.defaults?.image ?? "wanx2.1-t2i-turbo",
         ),
       );
       setVideoModelKey((prev) =>
@@ -788,15 +819,20 @@ function OutfitVideoStudioInner() {
       outfitRefMode: project.settings.outfitRefMode ?? "need_tryon",
       garmentMode: project.settings.garmentMode ?? "two_piece",
     };
-    if (!isOutfitRefsReadyToLock(settings, project.references)) {
+    const lockedCount = project.meta?.lockedLooks?.length ?? 0;
+    if (settings.outfitRefMode === "already_dressed") {
+      if (!project.references.model?.ossUrl) {
+        await alert({
+          title: "请先补齐穿搭参考",
+          message: "请上传已穿搭全身照后再锁定。",
+          variant: "error",
+        });
+        return;
+      }
+    } else if (lockedCount < 1) {
       await alert({
-        title: "请先补齐穿搭参考",
-        message:
-          settings.outfitRefMode === "already_dressed"
-            ? "请上传已穿搭全身照后再锁定。"
-            : settings.garmentMode === "two_piece"
-              ? "请上传模特全身照、上装与下装后再锁定。"
-              : "请上传模特全身照与服装图后再锁定。",
+        title: "请先锁定试衣参考",
+        message: "批量试衣后在结果墙选择并锁定至少 1 张参考，再进入逐镜生成。",
         variant: "error",
       });
       return;
@@ -806,14 +842,166 @@ function OutfitVideoStudioInner() {
       applyProject(await lockOutfitVideoRefs(project.id));
       await toast({
         title: "特征已锁定",
-        message:
-          settings.outfitRefMode === "need_tryon"
-            ? "AI 试衣完成，请在分镜表逐镜融图后再生成视频"
-            : "请在分镜表逐镜融图后再生成视频",
+        message: "请在分镜表逐镜融图后再生成视频",
         variant: "success",
       });
     } catch (e) {
       await alert({ title: "锁定失败", message: formatEcomTransportError(e), variant: "error" });
+    } finally {
+      setRefBusy(false);
+    }
+  }
+
+  function stopTryonPoll() {
+    if (tryonPollRef.current) {
+      clearInterval(tryonPollRef.current);
+      tryonPollRef.current = null;
+    }
+  }
+
+  async function handleTryon() {
+    if (!project) return;
+    setTryonBusy(true);
+    stopTryonPoll();
+    tryonPollRef.current = setInterval(() => {
+      void getOutfitVideoProject(project.id)
+        .then(applyProject)
+        .catch(() => undefined);
+    }, 2200);
+    try {
+      applyProject(await batchOutfitTryon(project.id));
+      await toast({ title: "批量试衣完成", message: "请锁定参考后进入逐镜生成", variant: "success" });
+    } catch (e) {
+      await alert({ title: "AI 试衣失败", message: formatEcomTransportError(e), variant: "error" });
+    } finally {
+      stopTryonPoll();
+      setTryonBusy(false);
+    }
+  }
+
+  function toggleResultSelection(resultId: string) {
+    setSelectedResultIds((prev) =>
+      prev.includes(resultId) ? prev.filter((id) => id !== resultId) : [...prev, resultId],
+    );
+  }
+
+  const outfitRefMode = project?.settings.outfitRefMode ?? "need_tryon";
+  const outfitBatchWorkflow =
+    project && outfitRefMode === "need_tryon"
+      ? {
+          meta: project.meta ?? { garmentPool: [], lookDrafts: [], lockedLooks: [] },
+          selectedResultIds,
+          onToggleResult: toggleResultSelection,
+          onUploadGarment: async (kind: VtonGarmentKind, file: File) => {
+            setRefBusy(true);
+            try {
+              applyProject(await uploadOutfitGarment(project.id, kind, file));
+            } catch (e) {
+              await alert({ title: "上传失败", message: formatEcomTransportError(e), variant: "error" });
+            } finally {
+              setRefBusy(false);
+            }
+          },
+          onAddGarmentsFromAssets: async (
+            kind: VtonGarmentKind,
+            assets: Array<{ ossUrl: string; title: string }>,
+          ) => {
+            setRefBusy(true);
+            try {
+              applyProject(
+                await patchOutfitGarments(project.id, {
+                  add: assets.map((a) => ({
+                    kind,
+                    ossUrl: a.ossUrl,
+                    label: a.title,
+                    source: "asset" as const,
+                  })),
+                }),
+              );
+            } catch (e) {
+              await alert({ title: "添加失败", message: formatEcomTransportError(e), variant: "error" });
+            } finally {
+              setRefBusy(false);
+            }
+          },
+          onRemoveGarments: async (ids: string[]) => {
+            setRefBusy(true);
+            try {
+              applyProject(await patchOutfitGarments(project.id, { removeIds: ids }));
+            } finally {
+              setRefBusy(false);
+            }
+          },
+          onChangeLooks: async (looks: VtonLookSpec[]) => {
+            setRefBusy(true);
+            try {
+              applyProject(await patchOutfitLooks(project.id, looks));
+            } catch (e) {
+              await alert({ title: "保存搭配失败", message: formatEcomTransportError(e), variant: "error" });
+            } finally {
+              setRefBusy(false);
+            }
+          },
+          onBatchTryon: handleTryon,
+          onLockSelected: async () => {
+            if (!selectedResultIds.length) return;
+            setRefBusy(true);
+            try {
+              applyProject(await lockOutfitTryonResults(project.id, selectedResultIds));
+              setSelectedResultIds([]);
+              await toast({ title: "已锁定", message: "参考已加入锁定列表", variant: "success" });
+            } catch (e) {
+              await alert({ title: "锁定失败", message: formatEcomTransportError(e), variant: "error" });
+            } finally {
+              setRefBusy(false);
+            }
+          },
+        }
+      : undefined;
+
+  async function handleGenerateModel(opts: { prompt: string; modelKey: string }) {
+    if (!project) return;
+    setRefBusy(true);
+    try {
+      applyProject(await generateOutfitModel(project.id, opts));
+    } catch (e) {
+      await alert({ title: "生成模特失败", message: formatEcomTransportError(e), variant: "error" });
+    } finally {
+      setRefBusy(false);
+    }
+  }
+
+  async function handleExpandFullBody(opts: { prompt?: string; modelKey: string }) {
+    if (!project) return;
+    setRefBusy(true);
+    try {
+      applyProject(
+        await expandOutfitModelFullBody(project.id, {
+          prompt: opts.prompt,
+          modelKey: opts.modelKey,
+        }),
+      );
+    } catch (e) {
+      await alert({ title: "生成全身图失败", message: formatEcomTransportError(e), variant: "error" });
+    } finally {
+      setRefBusy(false);
+    }
+  }
+
+  async function handleAttachModelFromAssets(
+    assets: Array<{ id: string; ossUrl: string; title: string }>,
+  ) {
+    if (!project || !assets.length) return;
+    const asset = assets[0]!;
+    setRefBusy(true);
+    try {
+      applyProject(
+        await attachOutfitVideoRefs(project.id, {
+          model: { ossUrl: asset.ossUrl, source: "asset", label: asset.title ?? "我的资产" },
+        }),
+      );
+    } catch (e) {
+      await alert({ title: "选择资产失败", message: formatEcomTransportError(e), variant: "error" });
     } finally {
       setRefBusy(false);
     }
@@ -1179,6 +1367,11 @@ function OutfitVideoStudioInner() {
           mediaBusy={mediaBusy}
           splitting={splitting}
           refBusy={refBusy}
+          tryonBusy={tryonBusy}
+          tryonProgress={tryonProgress}
+          imageModels={imageModels}
+          imageModelKey={imageModelKey}
+          fusionModelKey={fusionModelKey}
           generateBusy={generateBusy}
           renderBusy={renderBusy}
           saveBusy={saveBusy}
@@ -1213,7 +1406,12 @@ function OutfitVideoStudioInner() {
           onOutfitRefModeChange={(mode) => void handleOutfitRefModeChange(mode)}
           onGarmentModeChange={(mode) => void handleGarmentModeChange(mode)}
           onPickModelFromLibrary={handlePickModelFromLibrary}
+          onAttachModelFromAssets={handleAttachModelFromAssets}
+          onGenerateModel={handleGenerateModel}
+          onExpandFullBody={handleExpandFullBody}
+          onTryon={handleTryon}
           onLockRefs={handleLockRefs}
+          batchWorkflow={outfitBatchWorkflow}
           onGenerateShots={handleGenerateShots}
           onCancelGeneratingSelection={handleCancelGeneratingSelection}
           onCompose={handleCompose}
@@ -1249,7 +1447,6 @@ function OutfitVideoStudioInner() {
             setSplitUserDraft(DEFAULT_SPLIT_USER_PROMPT);
             scheduleSplitPromptSave({ user: DEFAULT_SPLIT_USER_PROMPT });
           }}
-          fusionModelKey={fusionModelKey}
           fusingIndices={fusingIndices}
           onPickSceneFusionMode={handlePickSceneFusionMode}
           onUploadSceneRef={handleUploadSceneRef}

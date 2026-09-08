@@ -94,6 +94,7 @@ import {
 } from "@/lib/gateway/volcengine-chat-models";
 import { ensureCanvasVendorImageUrls } from "@/lib/canvas/ensure-vendor-image-url";
 import type { CanvasRunNodeInput } from "./canvas-task-service";
+import { expandImageEnginePrompt } from "./canvas-image-engine-prompt";
 import {
   buildCanvasRefVideoKieInput,
   buildCanvasVideoKieInput,
@@ -562,17 +563,19 @@ export async function runImageEngineNode(
     engineKind === "three-view-engine"
       ? []
       : (node.textInputs ?? []).filter((s) => s && s.trim());
-  const expandedPrompt = expandMentionsText(
-    [promptRaw.trim(), ...upstreamText].filter(Boolean).join("\n\n"),
-    node,
-  );
-  if (!expandedPrompt.trim()) {
-    throw new CanvasProjectError("EMPTY_PROMPT", `${engineKind} prompt 为空`);
-  }
 
   const imageUrlsRaw = (node.imageInputs ?? [])
     .filter((u): u is string => typeof u === "string" && /^https?:\/\//.test(u))
     .slice(0, 8);
+
+  const expandedPrompt = expandImageEnginePrompt(
+    [promptRaw.trim(), ...upstreamText].filter(Boolean).join("\n\n"),
+    node,
+    { refCount: imageUrlsRaw.length },
+  );
+  if (!expandedPrompt.trim()) {
+    throw new CanvasProjectError("EMPTY_PROMPT", `${engineKind} prompt 为空`);
+  }
 
   const gridSplitPrepare = buildGridSplitPrepareFromNodeData(data);
   /** 宫格高清待裁切：参考图由 dispatch PREPARING 写入，不入队 imageUrls */

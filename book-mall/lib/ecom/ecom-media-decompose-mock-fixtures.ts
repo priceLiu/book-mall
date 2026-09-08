@@ -136,10 +136,24 @@ export const MOCK_MEDIA_DECOMPOSE_IMAGE_PATCH: MediaDecomposePatch = {
     "【Mock】Full-body fashion lookbook, young woman, casual outfit, soft studio light, clean background, e-commerce style, 3:4 vertical",
   negativePrompt: "blurry, watermark, text, logo, deformed hands",
   liveActionReplication: {
-    cameraPlacement: "三脚架，距模特 3m",
-    lightingSetup: "主光 + 辅光 + 轮廓光",
-    props: "无",
-    cameraParams: "50mm f/2.8 ISO200",
+    sceneSetup:
+      "选址江南老巷石板路：保留两侧粉墙与深色木窗，提前清理地面杂物；左侧挂 2～3 条浅色晾晒床单作纵深引导，右侧留 1.2m 通行缝；拍摄前 30 分钟踩点确认无现代招牌入画，必要时黑布遮挡。",
+    talentBlocking:
+      "两名 8～12 岁男童：A 穿红色 Polo + 深蓝短裤站画面左前 1/3，B 穿白 T + 灰裤在右后形成三角构图；A 微侧向 B，自然对视或共视远方，表情松弛不摆拍；禁止遮挡彼此面部与背景晾衣线条。",
+    compositionFraming:
+      "中景偏全身，三角构图：前景 A、中景 B、背景晾衣与巷道透视线；机位低角度 1.4m 平视略仰，40mm 等效，主体占画面高度约 60%，顶部留 10% 天空/墙檐，底部石板路占 15%。",
+    cameraPlacement:
+      "主机位三脚架：距主体约 3.6m，镜头高度 1.4m（与儿童眼平），略仰 5°；相机与巷道中轴偏左 0.5m，避免对称呆板；辅机位可选 45° 侧位仅作 B-roll，本方案以主机位为准。",
+    lightingSetup:
+      "阴天漫射自然光为主：无需闪光灯；若反差不足，在相机左侧 2m 处加 1.2×1.2m 白反光板补面；避免硬阴影；轮廓光来自环境，不强补；色温约 5500K 日光，保持胶片低饱和。",
+    props:
+      "服装：A 红色 Polo、深蓝短裤；B 白 T、灰长裤；环境：石板路、粉墙、深色木窗、2～3 条浅色床单；禁止现代塑料玩具、运动鞋 logo 特写入画。",
+    cameraParams:
+      "全画幅等效 40mm，f/8，1/500s，ISO 400；手动白平衡日光；RAW 拍摄；可参考 Kodak Gold 200 / Portra 400 颗粒与肤色倾向。",
+    postProcessing:
+      "Lightroom：降饱和 10～15%，略提阴影、压高光；加轻微胶片颗粒；HSL 中红色略降饱和避免 Polo 过艳；输出 3:2 或 4:5 电商竖图时保留头顶与脚部裁切安全区。",
+    shootingChecklist:
+      "1. 踩点确认巷道光线与杂物\n2. 挂床单、清地面、遮挡现代元素\n3. 儿童换装与站位 rehearsal\n4. 测曝光（灰卡/人脸）\n5. 主机位连拍 20+ 张选表情\n6. 回看焦点与构图三角\n7. 导入 RAW 调色导出交付",
   },
 };
 

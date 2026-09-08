@@ -11,12 +11,16 @@ import {
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 
+import { EcomPromptMentionRefBar } from "@/components/media/ecom-prompt-mention-ref-bar";
 import {
   buildPromptEditableFragment,
-  createEcomImageRefBadge,
+  createEcomImageRefMentionNode,
+  ECOM_IMAGE_REF_BADGE_ATTR,
+  ECOM_IMAGE_REF_TOKEN_ATTR,
   resolveCaretTextAnchor,
   scanImageRefTriggerBeforeCursor,
   serializePromptEditable,
+  type EcomMentionBadgeVariant,
   type EcomPromptImageRef,
 } from "@/lib/ecom-prompt-mention";
 import { mentionRefRoleLabel } from "@/lib/product-design-mention-refs";
@@ -30,6 +34,26 @@ const PICKER_GAP = 8;
 const PICKER_Z = 5000;
 const PICKER_EST_HEIGHT = 280;
 const PICKER_MAX_WIDTH = 420;
+const HOVER_PREVIEW_Z = 5100;
+const HOVER_PREVIEW_MAX = 240;
+
+function resolveRefFromBadgeEl(
+  badge: Element,
+  refs: EcomPromptImageRef[],
+): EcomPromptImageRef | undefined {
+  const token = badge.getAttribute(ECOM_IMAGE_REF_TOKEN_ATTR);
+  if (token) {
+    const normalized = token.startsWith("@") ? token : `@${token}`;
+    const byToken = refs.find((r) => r.token === normalized);
+    if (byToken) return byToken;
+  }
+  const idxRaw = badge.getAttribute(ECOM_IMAGE_REF_BADGE_ATTR);
+  const idx = idxRaw ? Number.parseInt(idxRaw, 10) : NaN;
+  if (Number.isFinite(idx) && idx > 0) {
+    return refs.find((r) => r.index === idx);
+  }
+  return undefined;
+}
 
 function filterImageRefs(items: EcomPromptImageRef[], query: string): EcomPromptImageRef[] {
   if (!query) return items;
@@ -74,6 +98,10 @@ type Props = {
   pickerZIndex?: number;
   /** 表格密排时隐藏格内快捷插入钮（顶部已有参考图条） */
   hideQuickInsert?: boolean;
+  /** 表格/面板顶栏已有参考图条时设为 false，避免重复 */
+  showTopRefBar?: boolean;
+  /** top-bar-bound：顶栏绑定带图，正文只显示代号；thumbnail/token-only 为旧模式 */
+  mentionBadgeVariant?: EcomMentionBadgeVariant;
 };
 
 export function ProductDesignPromptMentionTextarea({
@@ -86,6 +114,8 @@ export function ProductDesignPromptMentionTextarea({
   minHeightClass = "min-h-[7rem]",
   pickerZIndex = PICKER_Z,
   hideQuickInsert = false,
+  showTopRefBar = true,
+  mentionBadgeVariant = "top-bar-bound",
 }: Props) {
   const pathname = usePathname();
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -96,6 +126,12 @@ export function ProductDesignPromptMentionTextarea({
   const lastValueRef = useRef<string>("\u0000");
   const refsRef = useRef(referenceImages);
   refsRef.current = referenceImages;
+  const badgeVariantRef = useRef(mentionBadgeVariant);
+  badgeVariantRef.current = mentionBadgeVariant;
+  const suppressInlineQuickInsert =
+    hideQuickInsert || mentionBadgeVariant === "top-bar-bound";
+  const showEmbeddedRefBar =
+    showTopRefBar && mentionBadgeVariant === "top-bar-bound" && referenceImages.length > 0;
 
   const [isEmpty, setIsEmpty] = useState(!value);
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -104,6 +140,13 @@ export function ProductDesignPromptMentionTextarea({
   const [anchorTick, setAnchorTick] = useState(0);
   const [pickerPos, setPickerPos] = useState<PickerPosition | null>(null);
   const [pickerHeight, setPickerHeight] = useState(PICKER_EST_HEIGHT);
+  const [hoverPreview, setHoverPreview] = useState<{
+    url: string;
+    label: string;
+    left: number;
+    top: number;
+  } | null>(null);
+  const hoverPreviewRef = useRef<HTMLDivElement>(null);
 
   const filteredImages = useMemo(
     () => filterImageRefs(referenceImages, popoverFilter),
@@ -126,10 +169,18 @@ export function ProductDesignPromptMentionTextarea({
     const root = editorRef.current;
     if (!root || focusedRef.current) return;
     if (value === lastValueRef.current) {
-      root.replaceChildren(buildPromptEditableFragment(value, refsRef.current));
+      root.replaceChildren(
+        buildPromptEditableFragment(value, refsRef.current, undefined, {
+          badgeVariant: badgeVariantRef.current,
+        }),
+      );
       return;
     }
-    root.replaceChildren(buildPromptEditableFragment(value, refsRef.current));
+    root.replaceChildren(
+      buildPromptEditableFragment(value, refsRef.current, undefined, {
+        badgeVariant: badgeVariantRef.current,
+      }),
+    );
     lastValueRef.current = value;
     setIsEmpty(value.length === 0);
   }, [value, referenceImages]);
@@ -216,10 +267,13 @@ export function ProductDesignPromptMentionTextarea({
       }
       closePopover();
       const item = refsRef.current.find((r) => r.index === imageIndex);
-      const badge = createEcomImageRefBadge(item, imageIndex);
+      const node = createEcomImageRefMentionNode(item, imageIndex, {
+        variant: badgeVariantRef.current,
+        boundInTopBar: Boolean(item),
+      });
       const space = document.createTextNode("\u00a0");
       const frag = document.createDocumentFragment();
-      frag.appendChild(badge);
+      frag.appendChild(node);
       frag.appendChild(space);
       range.deleteContents();
       range.insertNode(frag);
@@ -275,6 +329,50 @@ export function ProductDesignPromptMentionTextarea({
   useEffect(() => {
     closePopover();
   }, [closePopover, pathname]);
+
+  useEffect(() => {
+    const root = editorRef.current;
+    if (!root) return;
+
+    const onMouseOver = (e: MouseEvent) => {
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+      const badge = target.closest(`[${ECOM_IMAGE_REF_BADGE_ATTR}], [${ECOM_IMAGE_REF_TOKEN_ATTR}]`);
+      if (!badge || !root.contains(badge)) return;
+      const item = resolveRefFromBadgeEl(badge, refsRef.current);
+      if (!item?.url?.trim()) return;
+      const rect = badge.getBoundingClientRect();
+      const width = Math.min(HOVER_PREVIEW_MAX, window.innerWidth - 24);
+      let left = rect.left + rect.width / 2 - width / 2;
+      left = Math.max(12, Math.min(left, window.innerWidth - width - 12));
+      const spaceBelow = window.innerHeight - rect.bottom - PICKER_GAP;
+      const spaceAbove = rect.top - PICKER_GAP;
+      const openAbove = spaceBelow < width * 0.75 && spaceAbove > spaceBelow;
+      const top = openAbove ? rect.top - PICKER_GAP - width * 0.75 : rect.bottom + PICKER_GAP;
+      setHoverPreview({
+        url: item.url.trim(),
+        label: item.label || item.token,
+        left,
+        top: Math.max(12, Math.min(top, window.innerHeight - width * 0.75 - 12)),
+      });
+    };
+
+    const onMouseOut = (e: MouseEvent) => {
+      const related = e.relatedTarget;
+      if (related instanceof Node) {
+        if (root.contains(related)) return;
+        if (hoverPreviewRef.current?.contains(related)) return;
+      }
+      setHoverPreview(null);
+    };
+
+    root.addEventListener("mouseover", onMouseOver);
+    root.addEventListener("mouseout", onMouseOut);
+    return () => {
+      root.removeEventListener("mouseover", onMouseOver);
+      root.removeEventListener("mouseout", onMouseOut);
+    };
+  }, [referenceImages]);
 
   useEffect(() => {
     if (!popoverOpen) return;
@@ -390,7 +488,12 @@ export function ProductDesignPromptMentionTextarea({
 
   return (
     <div ref={wrapperRef} className="relative">
-      {!hideQuickInsert && referenceImages.length > 0 ? (
+      {showEmbeddedRefBar ? (
+        <div className="mb-2 rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-2.5 py-2">
+          <EcomPromptMentionRefBar refs={referenceImages} />
+        </div>
+      ) : null}
+      {!suppressInlineQuickInsert && referenceImages.length > 0 ? (
         <div className="mb-2 flex flex-wrap gap-1.5">
           {referenceImages.map((item) => (
             <button
@@ -438,11 +541,38 @@ export function ProductDesignPromptMentionTextarea({
       />
       {isEmpty ? (
         <p className="mt-1 text-[10px] text-[#86868b]">
-          输入 @ 引用参考图，或点上方缩略图快速插入
+          {mentionBadgeVariant === "top-bar-bound"
+            ? "输入 @ 插入代号（如 人物A）；参考图见上方顶栏"
+            : "输入 @ 引用参考图，或点上方缩略图快速插入"}
         </p>
       ) : null}
       {typeof document !== "undefined" && pickerPanel
         ? createPortal(pickerPanel, document.body)
+        : null}
+      {typeof document !== "undefined" && hoverPreview
+        ? createPortal(
+            <div
+              ref={hoverPreviewRef}
+              className="pointer-events-none overflow-hidden rounded-xl border border-[#e8e8ed] bg-white shadow-xl"
+              style={{
+                position: "fixed",
+                left: hoverPreview.left,
+                top: hoverPreview.top,
+                width: HOVER_PREVIEW_MAX,
+                zIndex: HOVER_PREVIEW_Z,
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={hoverPreview.url}
+                alt={hoverPreview.label}
+                className="aspect-[3/4] w-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+              <p className="truncate px-2 py-1.5 text-[11px] text-[#6e6e73]">{hoverPreview.label}</p>
+            </div>,
+            document.body,
+          )
         : null}
     </div>
   );

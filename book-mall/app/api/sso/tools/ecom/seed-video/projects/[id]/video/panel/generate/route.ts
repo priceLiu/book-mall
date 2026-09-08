@@ -46,12 +46,18 @@ export async function POST(req: Request, ctx: Ctx) {
 
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
+    const panelImageUrl =
+      typeof body.panelImageUrl === "string" && body.panelImageUrl.trim()
+        ? body.panelImageUrl.trim()
+        : undefined;
+
     const result = await ecomGenerateSeedVideoShot({
       userId: auth.userId,
       projectId,
       shotIndex,
       references: project!.references,
       shots,
+      panelImageUrl,
       aspectRatio:
         body.aspectRatio === "16:9" || body.aspectRatio === "9:16"
           ? body.aspectRatio

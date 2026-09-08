@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { resolveDockRunPrompt, resolveSbv1VideoEngineRunPrompt } from "@/lib/canvas/resolve-dock-run-prompt";
+import {
+  resolveDockRunPrompt,
+  resolveSbv1ImageEngineRunPrompt,
+  resolveSbv1VideoEngineRunPrompt,
+} from "@/lib/canvas/resolve-dock-run-prompt";
 import { resolveSbv1VideoModelRefRunWarning } from "@/lib/canvas/sbv1-video-model-reference";
 import type { Pro2DockUpstreamLink } from "@/lib/canvas/pro2-dock-upstream-links";
 
@@ -116,6 +120,53 @@ describe("resolveSbv1VideoEngineRunPrompt", () => {
         withVideo,
       ),
     ).toBe("请去掉 右下角水印");
+  });
+});
+
+describe("resolveSbv1ImageEngineRunPrompt", () => {
+  const upstream: Pro2DockUpstreamLink[] = [
+    {
+      id: "img-boy",
+      kind: "image",
+      label: "图片 1",
+      previewUrl: "https://cdn.example/boy.png",
+      sourceNodeId: "n1",
+    },
+    {
+      id: "img-girl",
+      kind: "image",
+      label: "图片 2",
+      previewUrl: "https://cdn.example/girl.png",
+      sourceNodeId: "n2",
+    },
+  ];
+
+  it("maps image @ to 图N for canvas image engines (qwen / nano-banana-pro)", () => {
+    expect(
+      resolveSbv1ImageEngineRunPrompt(
+        "角色：小蓝 @<img-boy> ，小红 @<img-girl> 在公园玩耍",
+        upstream,
+      ),
+    ).toBe("角色：小蓝 图1 ，小红 图2 在公园玩耍");
+  });
+
+  it("numbers 图N by @ mention order, not upstream chip order", () => {
+    expect(
+      resolveSbv1ImageEngineRunPrompt(
+        "女孩 @<img-girl> 与男孩 @<img-boy>",
+        upstream,
+      ),
+    ).toBe("女孩 图1 与男孩 图2");
+  });
+
+  it("indexes @mentioned pasted dockRefImages by mention order", () => {
+    expect(
+      resolveSbv1ImageEngineRunPrompt(
+        "风格参考 @<paste-style>",
+        upstream,
+        [{ id: "paste-style", label: "图片 3", url: "https://cdn.example/s.png" }],
+      ),
+    ).toBe("风格参考 图1");
   });
 });
 

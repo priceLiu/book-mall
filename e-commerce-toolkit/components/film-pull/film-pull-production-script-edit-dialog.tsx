@@ -103,7 +103,6 @@ export function FilmPullProductionScriptEditDialog({
       }
     >
       <div className="shrink-0 border-b border-[#e8e8ed] bg-[#fafafa] px-5 py-3">
-        <p className="mb-2 text-[11px] font-medium text-[#6e6e73]">参考图 · Prompt 可 @ 引用</p>
         <FilmPullRefsGalleryStrip characterRefs={characterRefs} />
       </div>
 

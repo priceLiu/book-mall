@@ -296,6 +296,7 @@ export async function ecomGwChatComplete(
     messages: opts.messages,
     stream: false,
     ...resolveEcomAssistantChatParams(model),
+    ...resolveEcomVisionChatParams(model),
     ...chatParams,
   };
 
