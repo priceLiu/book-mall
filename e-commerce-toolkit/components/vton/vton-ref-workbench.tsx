@@ -204,7 +204,7 @@ export function VtonRefWorkbench({
             batchWorkflow.meta.lookDrafts ?? [],
           )
         : [],
-    [batchWorkflow?.meta.garmentPool, batchWorkflow?.meta.lookDrafts],
+    [batchWorkflow],
   );
   const lockedCount = batchWorkflow?.meta.lockedLooks?.length ?? 0;
   const hasTryonPreview = useBatch

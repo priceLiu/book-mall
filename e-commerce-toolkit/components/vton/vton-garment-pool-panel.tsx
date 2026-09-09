@@ -577,8 +577,8 @@ function GarmentKindSlot({
   items: VtonGarmentItem[];
   lookCount?: number;
   disabled?: boolean;
-  onUpload: (kind: VtonGarmentKind, file: File) => Promise<void>;
-  onOpenAssets: (kind: VtonGarmentKind) => void;
+  onUpload: (kind: Exclude<VtonGarmentKind, "full_set">, file: File) => Promise<void>;
+  onOpenAssets: (kind: Exclude<VtonGarmentKind, "full_set">) => void;
   onRemove: (ids: string[]) => Promise<void>;
   onPreviewGarment?: (item: VtonGarmentItem) => void;
   onAddLook?: (kind: VtonLookKind, opts?: AddLookDraftOpts) => void | Promise<void>;

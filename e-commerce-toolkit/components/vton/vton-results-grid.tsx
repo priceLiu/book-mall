@@ -187,7 +187,7 @@ export function VtonResultsGrid({
   const modelImageSize = coerceVtonModelImageSize(modelImageSizeProp);
   const results = useMemo(() => batch?.results ?? [], [batch?.results]);
   const slotLooks = looks.slice(0, ECOM_VTON_MAX_BATCH_LOOKS);
-  const running = batch?.status === "running" || tryonBusy;
+  const running = batch?.status === "running" || Boolean(tryonBusy);
   const hasSuccess = results.some((r) => normalizeVtonTryonResultVersions(r).length > 0);
   const lockedResultIds = new Set(lockedLooks.map((l) => l.resultId).filter(Boolean));
   const selectedTryonCount = selectedLookIds.length;
