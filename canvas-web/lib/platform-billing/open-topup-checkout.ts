@@ -13,7 +13,7 @@ function checkoutAllowedOrigins(bookOrigin: string): string[] {
       "http://localhost:3004",
     );
   }
-  return [...new Set(origins.map((o) => o.replace(/\/$/, "")))];
+  return Array.from(new Set(origins.map((o) => o.replace(/\/$/, ""))));
 }
 
 /** 主站积分充值深链，支付成功后回到当前页 */

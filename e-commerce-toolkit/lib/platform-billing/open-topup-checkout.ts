@@ -9,7 +9,7 @@ function checkoutAllowedOrigins(bookOrigin: string): string[] {
   if (process.env.NODE_ENV === "development") {
     origins.push("http://localhost:3000", "http://localhost:3007");
   }
-  return [...new Set(origins.map((o) => o.replace(/\/$/, "")))];
+  return Array.from(new Set(origins.map((o) => o.replace(/\/$/, ""))));
 }
 
 export function buildEcomTopupHref(returnTo?: string | null): string {
