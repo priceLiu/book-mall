@@ -73,12 +73,12 @@ export async function quoteTeamPlan(input: {
     seatMin: t.seatMin,
     seatMax: t.seatMax,
     perSeatPriceYuan: num(t.perSeatPriceYuan),
-    perSeatCredits: t.perSeatCredits,
+    perSeatCredits: num(t.perSeatCredits),
   }));
   // 整单按席计价：命中席数所在量价档 → 每席价 × 席数（席数越多每席越便宜）
   const band = pickSeatTier(tiers, totalSeats);
   const perSeatPriceYuan = band?.perSeatPriceYuan ?? num(plan.priceYuan) / minSeats;
-  const perSeatCredits = band?.perSeatCredits ?? plan.monthlyCredits;
+  const perSeatCredits = band?.perSeatCredits ?? num(plan.monthlyCredits);
 
   const basePriceYuan = num(plan.priceYuan);
   const totalPriceYuan = round2Local(perSeatPriceYuan * totalSeats);
@@ -150,7 +150,7 @@ export async function consumeTeamCredits(input: {
   const account = await prisma.creditAccount.findUnique({
     where: { ownerType_ownerId: { ownerType: "TENANT", ownerId: input.tenantId } },
   });
-  const cap = account?.perSeatCapCredits ?? null;
+  const cap = account?.perSeatCapCredits != null ? num(account.perSeatCapCredits) : null;
   if (cap != null && !input.allowNegative) {
     const used = await seatMonthlyConsumed({
       tenantId: input.tenantId,

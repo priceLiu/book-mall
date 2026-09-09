@@ -94,7 +94,7 @@ export async function resolveTenantPackageSnapshot(tenant: {
   const periodStart = computePeriodStart(periodEnd, interval) ?? tenant.createdAt;
 
   let packageTotalPriceYuan: number | null = plan ? num(plan.priceYuan) : null;
-  let monthlyGrantCredits = account?.monthlyGrantCredits ?? 0;
+  let monthlyGrantCredits = account?.monthlyGrantCredits != null ? Number(account.monthlyGrantCredits) : 0;
 
   if (tenant.planId) {
     try {
@@ -116,7 +116,7 @@ export async function resolveTenantPackageSnapshot(tenant: {
   }
 
   const packageTotalCredits = monthlyGrantCredits > 0 ? monthlyGrantCredits : null;
-  const remainingCredits = account?.balanceCredits ?? 0;
+  const remainingCredits = account?.balanceCredits != null ? Number(account.balanceCredits) : 0;
 
   return {
     packageTotalCredits,

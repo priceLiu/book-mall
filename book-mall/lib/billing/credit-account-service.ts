@@ -40,6 +40,7 @@ import {
   runTxWithRetry,
 } from "@/lib/db-tx-retry";
 import { prisma } from "@/lib/prisma";
+import { round2 } from "@/lib/pricing/credit-pricing-formulas";
 
 export interface AccountRef {
   ownerType: CreditOwnerType;
@@ -87,14 +88,15 @@ async function allocateFromLots(
   now: Date,
 ): Promise<void> {
   if (amount <= 0) return;
-  const lots = (await tx.creditLot.findMany({
+  const rows = await tx.creditLot.findMany({
     where: {
       accountId,
       remainingCredits: { gt: 0 },
       OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
     },
     select: { id: true, source: true, remainingCredits: true, expiresAt: true, grantedAt: true },
-  })) as LotRow[];
+  });
+  const lots: LotRow[] = rows.map((r) => ({ ...r, remainingCredits: Number(r.remainingCredits) }));
   const { steps } = planAllocation(lots, amount);
   for (const step of steps) {
     await tx.creditLot.update({ where: { id: step.id }, data: { remainingCredits: step.newRemaining } });
@@ -109,19 +111,20 @@ async function restoreToLots(
   now: Date,
 ): Promise<void> {
   if (amount <= 0) return;
-  const lots = (await tx.creditLot.findMany({
+  const rows = await tx.creditLot.findMany({
     where: {
       accountId,
       OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
     },
     select: { id: true, source: true, remainingCredits: true, expiresAt: true, grantedAt: true },
-  })) as LotRow[];
+  });
+  const lots: LotRow[] = rows.map((r) => ({ ...r, remainingCredits: Number(r.remainingCredits) }));
   const targetId = planRestoreTargetId(lots);
   if (targetId) {
     const target = lots.find((l) => l.id === targetId)!;
     await tx.creditLot.update({
       where: { id: targetId },
-      data: { remainingCredits: target.remainingCredits + amount },
+      data: { remainingCredits: round2(Number(target.remainingCredits) + amount) },
     });
     return;
   }
@@ -176,7 +179,7 @@ export async function getCreditBalance(ref: AccountRef): Promise<number> {
     where: { ownerType_ownerId: { ownerType: ref.ownerType, ownerId: ref.ownerId } },
     select: { balanceCredits: true },
   });
-  return acc?.balanceCredits ?? 0;
+  return Number(acc?.balanceCredits ?? 0);
 }
 
 export interface AccountCreditBalances {
@@ -196,8 +199,8 @@ export async function getAccountCreditBalances(ref: AccountRef): Promise<Account
     },
   });
   return {
-    balance: acc?.balanceCredits ?? 0,
-    reserved: acc?.reservedCredits ?? 0,
+    balance: Number(acc?.balanceCredits ?? 0),
+    reserved: Number(acc?.reservedCredits ?? 0),
     pricePerCreditYuan: acc?.pricePerCreditYuan != null ? Number(acc.pricePerCreditYuan) : null,
   };
 }
@@ -275,14 +278,6 @@ function accountAdvisoryLockKeys(ref: AccountRef): [number, number] {
 
 async function writeLedger(input: LedgerWriteInput) {
   const now = new Date();
-  // 幂等：相同 idempotencyKey 已存在则直接返回原流水
-  if (input.idempotencyKey) {
-    const existing = await prisma.creditLedger.findUnique({
-      where: { idempotencyKey: input.idempotencyKey },
-    });
-    if (existing) return { ledger: existing, balanceAfter: existing.balanceAfter, deduped: true as const };
-  }
-
   const personaFields = await resolveLedgerPersonaFields(input);
 
   const [lockK1, lockK2] = accountAdvisoryLockKeys(input.ref);
@@ -292,21 +287,36 @@ async function writeLedger(input: LedgerWriteInput) {
       prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(${lockK1}::int, ${lockK2}::int)`;
 
+        // 幂等检查（事务内、抢锁后）：并发同幂等键在此串行，命中即返回，
+        // 避免「先改余额后建流水」在 P2002 时余额被二次 apply（多充/多扣）。
+        if (input.idempotencyKey) {
+          const existing = await tx.creditLedger.findUnique({
+            where: { idempotencyKey: input.idempotencyKey },
+          });
+          if (existing) {
+            return {
+              ledger: existing,
+              balanceAfter: Number(existing.balanceAfter ?? 0),
+              deduped: true as const,
+            };
+          }
+        }
+
         const account = await tx.creditAccount.upsert({
           where: { ownerType_ownerId: { ownerType: input.ref.ownerType, ownerId: input.ref.ownerId } },
           create: { ownerType: input.ref.ownerType, ownerId: input.ref.ownerId },
           update: {},
         });
 
-        const curBalance = account.balanceCredits ?? 0;
-        const curReserved = account.reservedCredits ?? 0;
-        const balanceAfter = curBalance + input.credits;
+        const curBalance = Number(account.balanceCredits ?? 0);
+        const curReserved = Number(account.reservedCredits ?? 0);
+        const balanceAfter = round2(curBalance + input.credits);
         if (balanceAfter < 0 && !input.allowNegative) {
           throw new InsufficientCreditsError(curBalance, -input.credits);
         }
-        const reservedAfter = Math.max(0, curReserved + (input.reservedDelta ?? 0));
+        const reservedAfter = Math.max(0, round2(curReserved + (input.reservedDelta ?? 0)));
 
-        const updated = await tx.creditAccount.update({
+        await tx.creditAccount.update({
           where: { id: account.id },
           data: {
             balanceCredits: balanceAfter,
@@ -314,49 +324,28 @@ async function writeLedger(input: LedgerWriteInput) {
           },
         });
 
-        let ledger;
-        try {
-          ledger = await tx.creditLedger.create({
-            data: {
-              accountId: account.id,
-              type: input.type,
-              credits: input.credits,
-              balanceAfter,
-              actorUserId: input.actorUserId ?? null,
-              refType: input.refType ?? null,
-              refId: input.refId ?? null,
-              costSnapshotYuan: input.costSnapshotYuan ?? null,
-              idempotencyKey: input.idempotencyKey ?? null,
-              description: input.description ?? null,
-              staffFlag: personaFields.staffFlag,
-              billingPersonaSnap: personaFields.billingPersonaSnap,
-            },
-          });
-        } catch (e) {
-          if (
-            input.idempotencyKey &&
-            e instanceof Prisma.PrismaClientKnownRequestError &&
-            e.code === "P2002"
-          ) {
-            const existing = await tx.creditLedger.findUnique({
-              where: { idempotencyKey: input.idempotencyKey },
-            });
-            if (existing) {
-              return {
-                ledger: existing,
-                balanceAfter: existing.balanceAfter,
-                deduped: true as const,
-              };
-            }
-          }
-          throw e;
-        }
+        const ledger = await tx.creditLedger.create({
+          data: {
+            accountId: account.id,
+            type: input.type,
+            credits: input.credits,
+            balanceAfter,
+            actorUserId: input.actorUserId ?? null,
+            refType: input.refType ?? null,
+            refId: input.refId ?? null,
+            costSnapshotYuan: input.costSnapshotYuan ?? null,
+            idempotencyKey: input.idempotencyKey ?? null,
+            description: input.description ?? null,
+            staffFlag: personaFields.staffFlag,
+            billingPersonaSnap: personaFields.billingPersonaSnap,
+          },
+        });
 
         await syncLotsForLedger(tx, account.id, input, now);
 
         return {
           ledger,
-          balanceAfter: updated.balanceCredits ?? balanceAfter,
+          balanceAfter,
           deduped: false as const,
         };
       }, BILLING_DB_TX_OPTIONS),
@@ -387,7 +376,7 @@ export async function grantCredits(input: {
   const lotSource: CreditSource = input.lotSource ?? "SUBSCRIPTION";
   const lotExpiresAt =
     input.lotExpiresAt !== undefined ? input.lotExpiresAt : (input.currentPeriodEnd ?? null);
-  const grantTotal = Math.max(0, Math.round(input.credits));
+  const grantTotal = Math.max(0, round2(input.credits));
   const res = await writeLedger({
     ref: input.ref,
     type: "GRANT",
@@ -428,7 +417,7 @@ async function expireSubscriptionLots(
     },
     select: { id: true, remainingCredits: true },
   });
-  const sum = oldLots.reduce((s, l) => s + l.remainingCredits, 0);
+  const sum = oldLots.reduce((s, l) => s + Number(l.remainingCredits), 0);
   if (sum <= 0) return 0;
   await writeLedger({
     ref,
@@ -455,8 +444,8 @@ export async function resetMonthlyCredits(input: {
   perSeatCapCredits?: number | null;
 }) {
   const account = await ensureCreditAccount(input.ref, input.planId);
-  const balanceBefore = account.balanceCredits;
-  const target = Math.max(0, Math.round(input.monthlyGrantCredits));
+  const balanceBefore = Number(account.balanceCredits ?? 0);
+  const target = Math.max(0, round2(input.monthlyGrantCredits));
   const idempotencyKey = `monthly_grant:${account.id}:${input.periodKey}`;
 
   await expireSubscriptionLots(input.ref, account.id, input.periodKey);
@@ -500,14 +489,15 @@ export async function expireDueLotsForAccount(
     where: { ownerType_ownerId: { ownerType: ref.ownerType, ownerId: ref.ownerId } },
     select: { id: true, balanceCredits: true },
   });
-  if (!account || account.balanceCredits <= 0) return { expiredCredits: 0 };
+  if (!account || Number(account.balanceCredits ?? 0) <= 0) return { expiredCredits: 0 };
 
-  const dueLots = await prisma.creditLot.findMany({
+  const dueRows = await prisma.creditLot.findMany({
     where: { accountId: account.id, remainingCredits: { gt: 0 }, expiresAt: { lte: now } },
     orderBy: { expiresAt: "asc" },
     select: { id: true, remainingCredits: true },
   });
-  const { toExpire, steps } = planExpiry(dueLots, account.balanceCredits);
+  const dueLots = dueRows.map((r) => ({ id: r.id, remainingCredits: Number(r.remainingCredits) }));
+  const { toExpire, steps } = planExpiry(dueLots, Number(account.balanceCredits ?? 0));
   if (toExpire <= 0) return { expiredCredits: 0 };
   await writeLedger({
     ref,
@@ -603,11 +593,11 @@ export async function runMonthlyResetSweep(now: Date = new Date()): Promise<{
     const periodKey = subscriptionCreditPeriodKey(base);
     await resetMonthlyCredits({
       ref: { ownerType: a.ownerType, ownerId: a.ownerId },
-      monthlyGrantCredits: a.monthlyGrantCredits,
+      monthlyGrantCredits: Number(a.monthlyGrantCredits ?? 0),
       periodKey,
       planId: a.planId,
       nextPeriodEnd: nextEnd,
-      perSeatCapCredits: a.perSeatCapCredits,
+      perSeatCapCredits: a.perSeatCapCredits != null ? Number(a.perSeatCapCredits) : null,
     });
     reset += 1;
   }
@@ -632,7 +622,7 @@ export async function getLotBreakdown(ref: AccountRef, now: Date = new Date()) {
   });
   return lots.map((l) => ({
     source: l.source,
-    remainingCredits: l.remainingCredits,
+    remainingCredits: Number(l.remainingCredits),
     expiresAt: l.expiresAt,
   }));
 }
@@ -666,7 +656,7 @@ export async function topupCredits(input: {
   return writeLedger({
     ref: input.ref,
     type: "TOPUP",
-    credits: Math.max(0, Math.round(input.credits)),
+    credits: Math.max(0, round2(input.credits)),
     refType: input.refType ?? "topup_order",
     refId: input.refId,
     idempotencyKey: input.idempotencyKey,
@@ -689,8 +679,8 @@ export async function reconcileCreditBalanceFromLots(
     },
     select: { remainingCredits: true },
   });
-  const balance = lots.reduce((s, l) => s + l.remainingCredits, 0);
-  const changed = balance !== account.balanceCredits;
+  const balance = round2(lots.reduce((s, l) => s + Number(l.remainingCredits), 0));
+  const changed = balance !== Number(account.balanceCredits ?? 0);
   if (changed) {
     await prisma.creditAccount.update({
       where: { id: account.id },
@@ -717,7 +707,7 @@ export async function consumeCredits(input: {
   description?: string | null;
   allowNegative?: boolean;
 }) {
-  const credits = Math.max(0, Math.round(input.credits));
+  const credits = Math.max(0, round2(input.credits));
   const res = await writeLedger({
     ref: input.ref,
     type: "CONSUME",
@@ -757,7 +747,7 @@ export async function refundCredits(input: {
   idempotencyKey?: string | null;
   description?: string | null;
 }) {
-  const credits = Math.max(0, Math.round(input.credits));
+  const credits = Math.max(0, round2(input.credits));
   if (credits === 0) return null;
   const res = await writeLedger({
     ref: input.ref,
@@ -791,7 +781,7 @@ export async function reserveCredits(input: {
   idempotencyKey?: string | null;
   description?: string | null;
 }) {
-  const credits = Math.max(0, Math.round(input.credits));
+  const credits = Math.max(0, round2(input.credits));
   if (credits === 0) return null;
   return writeLedger({
     ref: input.ref,
@@ -823,7 +813,7 @@ export async function settleReserved(input: {
   idempotencyKey?: string | null;
   description?: string | null;
 }) {
-  const credits = Math.max(0, Math.round(input.credits));
+  const credits = Math.max(0, round2(input.credits));
   if (credits === 0) return null;
   const res = await writeLedger({
     ref: input.ref,
@@ -866,7 +856,7 @@ export async function releaseReserved(input: {
   idempotencyKey?: string | null;
   description?: string | null;
 }) {
-  const credits = Math.max(0, Math.round(input.credits));
+  const credits = Math.max(0, round2(input.credits));
   if (credits === 0) return null;
   const res = await writeLedger({
     ref: input.ref,
@@ -895,7 +885,7 @@ export async function adjustCredits(input: {
   idempotencyKey?: string | null;
   description?: string | null;
 }) {
-  const credits = Math.round(input.credits);
+  const credits = round2(input.credits);
   if (credits === 0) return null;
   return writeLedger({
     ref: input.ref,

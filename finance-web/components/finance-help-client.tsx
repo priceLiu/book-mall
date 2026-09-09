@@ -47,7 +47,7 @@ export function FinanceHelpClient() {
             <strong>模型挂牌价（元）</strong> = 渠道净成本 × 系数 M（贵视频 M=1.0、普通视频 M=1.5、生图 1.5–2.0、LLM 默认 2.5）
           </li>
           <li>
-            <strong>全局锚定</strong>（默认 ¥0.04/积分）用于报价计算器预览：
+            <strong>全局锚定</strong>（默认 ¥0.03/积分）用于报价计算器预览：
             <code className="mx-1 rounded bg-[#fafafa] px-1">积分/次 = round(挂牌价 ÷ 锚定)</code>
           </li>
           <li>

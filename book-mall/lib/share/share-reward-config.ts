@@ -30,10 +30,10 @@ export async function getShareRewardConfig(): Promise<ShareRewardConfig> {
     });
     if (!cfg) return FALLBACK;
     return {
-      referralRewardCredits: Math.max(0, cfg.referralRewardCredits ?? FALLBACK.referralRewardCredits),
+      referralRewardCredits: Math.max(0, Number(cfg.referralRewardCredits ?? FALLBACK.referralRewardCredits)),
       workflowShareRewardCredits: Math.max(
         0,
-        cfg.workflowShareRewardCredits ?? FALLBACK.workflowShareRewardCredits,
+        Number(cfg.workflowShareRewardCredits ?? FALLBACK.workflowShareRewardCredits),
       ),
       shareRewardCreditsExpireDays: Math.max(
         1,

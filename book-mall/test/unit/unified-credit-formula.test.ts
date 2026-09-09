@@ -13,15 +13,15 @@ describe("unified credit formula v2 — Seedance 年框", () => {
   const seedance = REFERENCE_VENDOR_MODELS.find((m) => m.id === "seedance-2.0-720p-real")!;
   const config = { ...FALLBACK_PRICING_CONFIG, videoMinMarginGuard: 0.22 };
 
-  it("公挂牌 1.4 / 年框净 1.0 → M=1.4、15s 扣 525、锚定毛利 28.6%", () => {
+  it("公挂牌 1.4 / 年框净 1.0 → M=1.5、15s 扣 750、锚定毛利 33.3%", () => {
     const row = computeModelQuoteRow(seedance, config);
     expect(row.netCostYuan).toBeCloseTo(1.0, 4);
-    expect(row.marginM).toBeCloseTo(1.4, 4);
-    expect(row.listPriceYuan).toBeCloseTo(1.4, 4);
-    expect(row.creditsPerUnit).toBe(35);
-    expect(row.chargeCredits15s).toBe(525);
+    expect(row.marginM).toBeCloseTo(1.5, 4);
+    expect(row.listPriceYuan).toBeCloseTo(1.5, 4);
+    expect(row.creditsPerUnit).toBe(50);
+    expect(row.chargeCredits15s).toBe(750);
     expect(row.netCost15s).toBeCloseTo(15, 4);
-    expect(row.baseMarginRate).toBeCloseTo(1 - 1 / 1.4, 2);
+    expect(row.baseMarginRate).toBeCloseTo(1 - 1 / 1.5, 2);
   });
 
   it("订阅五档 + API 充值在 Seedance 15s 上毛利 ≥ 22%", () => {
@@ -35,7 +35,7 @@ describe("unified credit formula v2 — Seedance 年框", () => {
   it("人人扣分相同：各 SKU 表 chargeCredits 一致", () => {
     const sim = buildUnifiedFormulaSimulation(config);
     const charge = sim.subscriptionSkus[0].chargeCredits;
-    expect(charge).toBe(525);
+    expect(charge).toBe(750);
     for (const row of [...sim.subscriptionSkus, ...sim.topupSkus, ...sim.apiSkus]) {
       expect(row.chargeCredits).toBe(charge);
     }
@@ -68,7 +68,7 @@ describe("personal-tier-margins — 五档月付", () => {
 
 describe("team-seat-margins — 团队每席 ppc", () => {
   const config = { ...FALLBACK_PRICING_CONFIG, videoMinMarginGuard: 0.22 };
-  const anchorCharge = 525;
+  const anchorCharge = 750;
 
   const TEAM_SEAT_SKUS = [
     { tier: "标准版", priceYuan: 199, credits: 4600 },
@@ -85,7 +85,7 @@ describe("team-seat-margins — 团队每席 ppc", () => {
     }
     for (const sku of TEAM_SEAT_SKUS) {
       const ppc = sku.priceYuan / sku.credits;
-      expect(computeUnifiedChargeCredits({ creditsPerUnit: 35, units: 15 })).toBe(anchorCharge);
+      expect(computeUnifiedChargeCredits({ creditsPerUnit: 50, units: 15 })).toBe(anchorCharge);
       expect(ppc).toBeGreaterThan(0);
     }
   });
@@ -97,7 +97,7 @@ describe("multi-vendor-models", () => {
   it("参考模型均有 U₀；锚定 Seedance 过护栏", () => {
     for (const model of REFERENCE_VENDOR_MODELS) {
       const row = computeModelQuoteRow(model, config);
-      expect(row.creditsPerUnit).toBeGreaterThanOrEqual(1);
+      expect(row.creditsPerUnit).toBeGreaterThanOrEqual(0.01);
       if (model.unit === "PER_SEC") {
         expect(row.chargeCredits15s).toBeGreaterThan(0);
       }
@@ -109,13 +109,13 @@ describe("multi-vendor-models", () => {
     expect(seedance.marginOk).toBe(true);
   });
 
-  it("Seedance U₀=35/秒、15s=525", () => {
+  it("Seedance U₀=50/秒、15s=750", () => {
     const row = computeModelQuoteRow(
       REFERENCE_VENDOR_MODELS.find((m) => m.id === "seedance-2.0-720p-real")!,
       config,
     );
-    expect(row.creditsPerUnit).toBe(35);
-    expect(row.chargeCredits15s).toBe(525);
+    expect(row.creditsPerUnit).toBe(50);
+    expect(row.chargeCredits15s).toBe(750);
   });
 });
 

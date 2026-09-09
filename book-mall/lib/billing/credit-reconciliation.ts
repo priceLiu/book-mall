@@ -484,9 +484,9 @@ export async function buildTeamCreditBill(input: {
 
   return {
     ...base,
-    balanceCredits: account?.balanceCredits ?? 0,
-    monthlyGrantCredits: account?.monthlyGrantCredits ?? 0,
-    perSeatCapCredits: account?.perSeatCapCredits ?? null,
+    balanceCredits: Number(account?.balanceCredits ?? 0),
+    monthlyGrantCredits: Number(account?.monthlyGrantCredits ?? 0),
+    perSeatCapCredits: account?.perSeatCapCredits != null ? Number(account.perSeatCapCredits) : null,
     members,
   };
 }
@@ -669,7 +669,7 @@ export async function buildTeamDashboard(input: {
       actorUserId: l.actorBookUserId,
       actorName: l.actorBookUserId ? actorMap.get(l.actorBookUserId) ?? null : null,
       canonicalModelKey: l.canonicalModelKey ?? l.model,
-      creditsCharged: l.creditsCharged,
+      creditsCharged: l.creditsCharged != null ? Number(l.creditsCharged) : null,
       status: l.status,
       billingMode: l.billingMode,
     })),

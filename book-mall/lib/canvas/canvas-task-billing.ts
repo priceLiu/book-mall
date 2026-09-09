@@ -28,7 +28,7 @@ export async function loadGatewayBillingByLogIds(
     rows.map((r) => [
       r.id,
       {
-        creditsCharged: r.creditsCharged,
+        creditsCharged: r.creditsCharged != null ? Number(r.creditsCharged) : null,
         billingMode: r.billingMode,
       },
     ]),

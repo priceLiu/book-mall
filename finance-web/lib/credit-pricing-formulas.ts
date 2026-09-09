@@ -1,6 +1,6 @@
 /** 与 book-mall/lib/pricing/credit-pricing-formulas.ts 保持同步（纯公式，无 DB）。 */
 
-export const DEFAULT_CREDIT_ANCHOR_YUAN = 0.04;
+export const DEFAULT_CREDIT_ANCHOR_YUAN = 0.03;
 export const DEFAULT_MARGIN_M = 2.5;
 export const DEFAULT_MIN_MARGIN_GUARD = 0.3;
 export const DEFAULT_VIDEO_SEC = 15;

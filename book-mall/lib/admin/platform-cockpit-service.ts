@@ -286,10 +286,10 @@ function buildMetricsSectionFromCounts(
     courseSubscriptions: { active: activeSubscriptions },
     credits: {
       accountCount: creditAgg._count.id,
-      totalBalance: creditAgg._sum.balanceCredits ?? 0,
+      totalBalance: Number(creditAgg._sum.balanceCredits ?? 0),
       subscriptionAccounts: subscriptionAccountCount,
-      consumedAllTime: Math.abs(creditConsumeAll._sum.credits ?? 0),
-      consumedToday: Math.abs(creditConsumeToday._sum.credits ?? 0),
+      consumedAllTime: Math.abs(Number(creditConsumeAll._sum.credits ?? 0)),
+      consumedToday: Math.abs(Number(creditConsumeToday._sum.credits ?? 0)),
     },
     teams: { activeTenants, activeMembers },
     gateway: {
@@ -320,9 +320,9 @@ function buildMetricsSectionFromCounts(
         { label: "今日新增", value: newUsersToday },
       ],
       creditsBilling: [
-        { label: "积分池余额", value: creditAgg._sum.balanceCredits ?? 0 },
-        { label: "今日消耗", value: Math.abs(creditConsumeToday._sum.credits ?? 0) },
-        { label: "累计消耗", value: Math.abs(creditConsumeAll._sum.credits ?? 0) },
+        { label: "积分池余额", value: Number(creditAgg._sum.balanceCredits ?? 0) },
+        { label: "今日消耗", value: Math.abs(Number(creditConsumeToday._sum.credits ?? 0)) },
+        { label: "累计消耗", value: Math.abs(Number(creditConsumeAll._sum.credits ?? 0)) },
         { label: "钱包余额", value: balanceSum._sum.balancePoints ?? 0 },
       ],
       creditConsumptionTrend: trendKeys.map((date) => ({
@@ -391,7 +391,7 @@ export async function fetchPlatformCockpitMetricsSection(
         createdAt: { gte: trendSince },
       },
       select: { createdAt: true, credits: true },
-    }),
+    }).then((rows) => rows.map((r) => ({ createdAt: r.createdAt, credits: Number(r.credits) }))),
     getTodayTrafficTotals(now),
     buildCockpitCommerceMonthKpis({ now }),
     buildCockpitModelUsageSnapshot({ now }),

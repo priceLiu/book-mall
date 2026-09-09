@@ -329,7 +329,7 @@ export async function upsertMembershipPlanAction(formData: FormData): Promise<Ac
     .map((p) => ({
       tier: p.tier,
       priceYuan: Number(p.priceYuan),
-      monthlyCredits: p.monthlyCredits,
+      monthlyCredits: Number(p.monthlyCredits),
       includedSeats: p.includedSeats,
     }));
   tierRows.push({

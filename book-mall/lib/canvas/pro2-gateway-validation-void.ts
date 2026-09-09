@@ -86,7 +86,7 @@ export async function voidGatewayLogForPro2ValidationFailure(
       },
     });
     const settled = await prisma.gatewayRequestLog.findUnique({ where: { id } });
-    if (settled?.creditsCharged && settled.creditsCharged > 0) {
+    if (settled?.creditsCharged != null && Number(settled.creditsCharged) > 0) {
       await refundFailedGatewayLog(settled);
     }
   }

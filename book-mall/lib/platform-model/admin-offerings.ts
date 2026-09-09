@@ -161,7 +161,8 @@ export async function listPlatformOfferingsForAdmin(): Promise<PlatformOfferingA
       activeCanonicalKey: r.activeCanonicalKey,
       activeProviderKind: r.activeProviderKind as GatewayProviderKind | null,
       activeModelKey: r.activeModelKey,
-      publishedCreditsPerUnit: r.publishedCreditsPerUnit,
+      publishedCreditsPerUnit:
+        r.publishedCreditsPerUnit != null ? toNum(r.publishedCreditsPerUnit) : null,
       estimatedMargin,
       marginWarning: r.status === "DRAFT" || (estimatedMargin != null && estimatedMargin < 0.5),
       appTags: cat?.appTags ?? def?.appTags ?? [],

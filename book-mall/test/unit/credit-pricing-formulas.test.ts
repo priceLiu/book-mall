@@ -10,10 +10,9 @@ import {
   videoBillableSeconds,
 } from "@/lib/pricing/credit-pricing-formulas";
 import {
-  EXPENSIVE_VIDEO_NET_COST_THRESHOLD,
+  IMAGE_MARGIN_M_NORMAL,
   resolveModelMarginM,
   VIDEO_MARGIN_M_NORMAL,
-  VIDEO_PUBLIC_ALIGN_MIN_M,
 } from "@/lib/pricing/model-margin-policy";
 
 describe("computeUnifiedChargeCredits — 人人相同扣分", () => {
@@ -45,32 +44,21 @@ describe("videoBillableSeconds — 15s 封顶", () => {
   it("缺省时长取封顶", () => expect(videoBillableSeconds(null, 15)).toBe(15));
 });
 
-describe("resolveModelMarginM — 公挂牌对齐", () => {
-  const guards = { minMarginGuard: 0.3, videoMinMarginGuard: 0.22 };
-
-  it("Seedance 1.4/1.0 → M=1.4", () => {
-    expect(
-      resolveModelMarginM({
-        unit: "PER_SEC",
-        netCostYuan: 1.0,
-        listCostYuan: 1.4,
-      }),
-    ).toBe(1.4);
-    expect(marginGuardForUnit("PER_SEC", guards)).toBe(0.22);
+describe("resolveModelMarginM — 类型分档（v3）", () => {
+  it("视频 → M=1.5", () => {
+    expect(resolveModelMarginM({ unit: "PER_SEC", netCostYuan: 1.0 })).toBe(VIDEO_MARGIN_M_NORMAL);
   });
 
-  it("贵视频 net≥0.75 且 list/C<1.25 → M=1.25", () => {
-    expect(
-      resolveModelMarginM({
-        unit: "PER_SEC",
-        netCostYuan: EXPENSIVE_VIDEO_NET_COST_THRESHOLD,
-        listCostYuan: 0.9,
-      }),
-    ).toBe(VIDEO_PUBLIC_ALIGN_MIN_M);
+  it("图片 → M=1.5", () => {
+    expect(resolveModelMarginM({ unit: "PER_IMAGE", netCostYuan: 0.2 })).toBe(IMAGE_MARGIN_M_NORMAL);
   });
 
-  it("普通视频 net<0.75 → M=1.5", () => {
-    expect(resolveModelMarginM({ unit: "PER_SEC", netCostYuan: 0.5 })).toBe(VIDEO_MARGIN_M_NORMAL);
+  it("文本 → M=1.0（不加价）", () => {
+    expect(resolveModelMarginM({ unit: "PER_KTOKEN", netCostYuan: 0.002 })).toBe(1.0);
+  });
+
+  it("模型配置 marginM 优先", () => {
+    expect(resolveModelMarginM({ unit: "PER_SEC", netCostYuan: 1.0, marginM: 2.0 })).toBe(2.0);
   });
 });
 

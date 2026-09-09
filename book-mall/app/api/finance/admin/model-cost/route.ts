@@ -83,8 +83,10 @@ export async function GET(request: NextRequest) {
       }
       const samplePlatformCredits =
         p.unit === "PER_KTOKEN" && published?.inputCreditsPerKToken
-          ? published.inputCreditsPerKToken * 4 + (published.outputCreditsPerKToken ?? 0) * 2
-          : published?.creditsPerUnit ?? preview.creditsPerUnit;
+          ? Number(published.inputCreditsPerKToken) * 4 + Number(published.outputCreditsPerKToken ?? 0) * 2
+          : published?.creditsPerUnit != null
+            ? Number(published.creditsPerUnit)
+            : preview.creditsPerUnit;
       const samplePlatformYuan = samplePlatformCredits * pricingConfig.creditAnchorYuan;
       return {
         id: p.id,

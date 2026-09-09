@@ -82,7 +82,7 @@ async function resolveTiers(payload: ProposalPayload): Promise<TierPricing[]> {
   return plans.map((p) => ({
     tier: p.tier,
     priceYuan: num(p.priceYuan),
-    monthlyCredits: p.monthlyCredits,
+    monthlyCredits: num(p.monthlyCredits),
     includedSeats: p.includedSeats,
   }));
 }

@@ -123,7 +123,7 @@ export async function applyMockMembershipSubscribe(input: {
     credits: grants.credits,
     monthlyGrantCredits: grants.monthlyGrantCredits,
     pricePerCreditYuan:
-      plan.monthlyCredits > 0 ? Number(plan.priceYuan) / plan.monthlyCredits : null,
+      Number(plan.monthlyCredits) > 0 ? Number(plan.priceYuan) / Number(plan.monthlyCredits) : null,
     planId: plan.id,
     currentPeriodEnd: creditPeriodEnd,
     membershipPaidUntil,

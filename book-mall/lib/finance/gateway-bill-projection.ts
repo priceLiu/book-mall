@@ -148,7 +148,7 @@ function feeDescription(
       : `调用失败 · ${catLabel}`;
   }
   if (settlement?.feeDescription) return settlement.feeDescription;
-  const credits = settlement?.creditsCharged ?? log.creditsCharged ?? 0;
+  const credits = settlement?.creditsCharged != null ? Number(settlement.creditsCharged) : (log.creditsCharged != null ? Number(log.creditsCharged) : 0);
   if (credits > 0) {
     return `平台代付 · ${catLabel} · 扣 ${credits} 积分`;
   }

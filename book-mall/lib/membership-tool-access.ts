@@ -62,7 +62,7 @@ async function getPlatformCreditToolAccess(
       balanceCredits: true,
     },
   });
-  if (creditAcc?.planId && creditAcc.monthlyGrantCredits > 0) {
+  if (creditAcc?.planId && Number(creditAcc.monthlyGrantCredits) > 0) {
     const periodOk = isMembershipServiceActive(creditAcc.membershipPaidUntil, now);
     if (periodOk) {
       const plan = await prisma.membershipPlan.findUnique({
@@ -115,12 +115,13 @@ async function getPlatformCreditToolAccess(
 async function sumUsableCredits(
   creditAcc: {
     id: string;
-    balanceCredits: number;
+    balanceCredits: unknown;
   } | null,
   now: Date,
 ): Promise<number> {
   if (!creditAcc) return 0;
-  if (creditAcc.balanceCredits > 0) return creditAcc.balanceCredits;
+  const balance = Number(creditAcc.balanceCredits ?? 0);
+  if (balance > 0) return balance;
   const lots = await prisma.creditLot.findMany({
     where: {
       accountId: creditAcc.id,
@@ -129,7 +130,7 @@ async function sumUsableCredits(
     },
     select: { remainingCredits: true },
   });
-  return lots.reduce((sum, lot) => sum + lot.remainingCredits, 0);
+  return lots.reduce((sum, lot) => sum + Number(lot.remainingCredits), 0);
 }
 
 export async function userHasMembershipToolAccess(userId: string): Promise<boolean> {

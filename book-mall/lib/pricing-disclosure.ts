@@ -110,7 +110,7 @@ export async function getEffectiveBillablePricesForDisclosure(
       toolKey: c?.vendor ?? prof?.vendor ?? "platform",
       action: "invoke",
       schemeARefModelKey: price.canonicalModelKey,
-      pricePoints: price.creditsPerUnit,
+      pricePoints: Number(price.creditsPerUnit),
       effectiveFrom: price.publishedAt,
       effectiveTo: null,
       note: "财务2.0 积分报价",

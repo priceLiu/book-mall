@@ -31,7 +31,7 @@ export function CreditPricingClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
-  const [anchor, setAnchor] = useState(0.04);
+  const [anchor, setAnchor] = useState(0.03);
   const [marginM, setMarginM] = useState(2.5);
   const [minGuard, setMinGuard] = useState(0.3);
   const [videoSec, setVideoSec] = useState(15);

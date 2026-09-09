@@ -235,7 +235,7 @@ export async function listMarketModelsForGatewayUser(input: {
       where: { active: true },
       select: { canonicalModelKey: true, creditsPerUnit: true },
     });
-    const priceMap = new Map(prices.map((p) => [p.canonicalModelKey, p.creditsPerUnit]));
+    const priceMap = new Map(prices.map((p) => [p.canonicalModelKey, Number(p.creditsPerUnit)]));
 
     const routes = await listActiveRoutes();
     const catalogByKey = new Map(routes.map((r) => [r.catalog.canonicalKey, r.catalog]));
@@ -266,7 +266,7 @@ export async function listMarketModelsForGatewayUser(input: {
           boundKinds,
           o.activeProviderKind ?? "KIE",
         ),
-        creditsPerUnit: o.publishedCreditsPerUnit ?? price,
+        creditsPerUnit: o.publishedCreditsPerUnit != null ? Number(o.publishedCreditsPerUnit) : price,
         platformOffering: true,
         sourceLabel: resolveSourceLabel({
           canonicalModelKey: o.canonicalModelKey,
@@ -433,7 +433,7 @@ export async function listPublicMarketShowcaseModels(
     where: { active: true },
     select: { canonicalModelKey: true, creditsPerUnit: true },
   });
-  const priceMap = new Map(prices.map((p) => [p.canonicalModelKey, p.creditsPerUnit]));
+  const priceMap = new Map(prices.map((p) => [p.canonicalModelKey, Number(p.creditsPerUnit)]));
 
   const seen = new Set<string>();
   const items: MarketShowcaseItem[] = [];

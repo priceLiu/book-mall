@@ -9,12 +9,12 @@
  */
 import type { CreditCostUnit } from "@prisma/client";
 
-export const DEFAULT_CREDIT_ANCHOR_YUAN = 0.04;
-export const DEFAULT_MARGIN_M = 2.5;
+export const DEFAULT_CREDIT_ANCHOR_YUAN = 0.03; // 积分兑换配置：1 积分抵扣 ¥0.03
+export const DEFAULT_MARGIN_M = 1.0; // 默认系数 M=1.0（文本/音频不加价；视频/图片由 model-margin-policy 取 1.5）
 export const DEFAULT_MIN_MARGIN_GUARD = 0.3;
 /** 财务 2.0：视频固定 15s 计费封顶 */
 export const DEFAULT_VIDEO_SEC = 15;
-/** 定价 1.5：普通视频默认 M=1.5（≈33% 毛利） */
+/** 定价 1.5：视频默认 M=1.5 */
 export const DEFAULT_VIDEO_MARGIN_M = 1.5;
 /** 单积分 v2：贵视频 SKU 最低毛利护栏（订阅/轻量包/API 购入单价验算） */
 export const DEFAULT_VIDEO_MIN_MARGIN_GUARD = 0.22;
@@ -110,10 +110,10 @@ export function computeListPrice(netCostYuan: number, marginM: number): number {
   return netCostYuan * marginM;
 }
 
-/** 积分/次 U = round(挂牌价 ÷ 锚定)，至少 1 积分 */
+/** 积分/次 U = round2(挂牌价 ÷ 锚定)，最低 0.01 积分（保留 2 位小数） */
 export function computeCreditsPerUnit(listPriceYuan: number, anchorYuan: number): number {
   const anchor = anchorYuan > 0 ? anchorYuan : DEFAULT_CREDIT_ANCHOR_YUAN;
-  return Math.max(1, Math.round(listPriceYuan / anchor));
+  return Math.max(0.01, round2(listPriceYuan / anchor));
 }
 
 /** 某月配额积分能生成多少次：N = floor(credits ÷ U) */
@@ -160,7 +160,7 @@ export function computeTierCredits(
   pricePerCreditYuan: number,
 ): number {
   if (!(pricePerCreditYuan > 0) || !(totalListPriceYuan > 0)) return 0;
-  return Math.max(1, Math.round(totalListPriceYuan / pricePerCreditYuan));
+  return Math.max(0.01, round2(totalListPriceYuan / pricePerCreditYuan));
 }
 
 /** 某档「每积分单价」= 套餐价 ÷ 月积分（团队传每席价 ÷ 每席积分）。 */
@@ -248,7 +248,7 @@ export function computeSplitTokenCreditPrice(input: {
   const avgNet = (inNet + outNet) / 2;
   const avgList = (inList + outList) / 2;
   const avgCredits = (inputCreditsPerKToken + outputCreditsPerKToken) / 2;
-  const baseMarginRate = computeBaseMarginRate(avgNet, Math.max(1, Math.round(avgCredits)), input.anchorYuan);
+  const baseMarginRate = computeBaseMarginRate(avgNet, Math.max(0.01, round2(avgCredits)), input.anchorYuan);
   return {
     inputCreditsPerKToken,
     outputCreditsPerKToken,
@@ -337,7 +337,7 @@ export function computeLlmSplitChargeCredits(input: {
       pricePerCreditYuan: input.pricePerCreditYuan,
     });
   }
-  return Math.max(credits, inK + outK > 0 ? 1 : 0);
+  return Math.max(credits, inK + outK > 0 ? 0.01 : 0);
 }
 
 /**
@@ -353,7 +353,7 @@ export function computeChargeCreditsFromSnapshot(input: {
   const units = Math.max(1, input.units);
   const cpu = input.creditsPerUnit ?? 0;
   if (cpu > 0) {
-    return Math.max(1, Math.round(cpu * units));
+    return Math.max(0.01, round2(cpu * units));
   }
   const list = input.listPriceYuan;
   const ppc = input.pricePerCreditYuan;
