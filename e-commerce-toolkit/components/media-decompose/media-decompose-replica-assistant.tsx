@@ -780,6 +780,7 @@ export function MediaDecomposeReplicaAssistantProvider({
         uploadingRole={uploadingRole}
         modelReady={modelReady}
         productReady={productReady}
+        productUploadReady={productUploadReady}
         scriptReady={scriptReady}
         productBriefDraft={productBriefDraft}
         onProductBriefDraftChange={(value) => {
@@ -833,6 +834,7 @@ const ReplicaThreadContext = createContext<{
   uploadingRole?: "model" | "product" | null;
   modelReady: boolean;
   productReady: boolean;
+  productUploadReady: boolean;
   scriptReady: boolean;
   productBriefDraft: string;
   onProductBriefDraftChange: (value: string) => void;
@@ -871,6 +873,7 @@ type RuntimeProps = {
   uploadingRole?: "model" | "product" | null;
   modelReady: boolean;
   productReady: boolean;
+  productUploadReady: boolean;
   scriptReady: boolean;
   productBriefDraft: string;
   onProductBriefDraftChange: (value: string) => void;
@@ -916,6 +919,7 @@ function ReplicaAssistantRuntime({
   uploadingRole,
   modelReady,
   productReady,
+  productUploadReady,
   scriptReady,
   productBriefDraft,
   onProductBriefDraftChange,
@@ -961,6 +965,7 @@ function ReplicaAssistantRuntime({
       uploadingRole,
       modelReady,
       productReady,
+      productUploadReady,
       scriptReady,
       productBriefDraft,
       onProductBriefDraftChange,
@@ -992,6 +997,7 @@ function ReplicaAssistantRuntime({
       uploadingRole,
       modelReady,
       productReady,
+      productUploadReady,
       scriptReady,
       productBriefDraft,
       onProductBriefDraftChange,
@@ -1062,6 +1068,7 @@ export function MediaDecomposeReplicaAssistantThread() {
     productPreviewUrl,
     uploadingRole,
     productReady,
+    productUploadReady,
     scriptReady,
     productBriefDraft,
     onProductBriefDraftChange,
