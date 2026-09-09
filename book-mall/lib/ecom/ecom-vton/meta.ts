@@ -9,8 +9,6 @@ import type {
   VtonGarmentItem,
   VtonLockedLook,
   VtonLookSpec,
-  VtonModelBodyShotType,
-  VtonModelImageCheck,
   VtonProjectMeta,
   VtonTryonBatchState,
   VtonTryonHistoryEntry,
@@ -21,35 +19,6 @@ import { ECOM_VTON_MAX_BATCH_LOOKS } from "@/lib/ecom/ecom-vton/types";
 
 const GARMENT_KINDS = new Set(["top", "bottom", "one_piece", "full_set"]);
 const LOOK_KINDS = new Set(["two_piece", "one_piece", "top_only", "bottom_only", "full_set"]);
-const BODY_SHOT_TYPES = new Set<VtonModelBodyShotType>([
-  "portrait",
-  "half_body",
-  "full_body",
-  "unknown",
-]);
-
-function sanitizeModelImageCheck(raw: unknown): VtonModelImageCheck | null | undefined {
-  if (raw === null) return null;
-  if (!raw || typeof raw !== "object") return undefined;
-  const o = raw as Record<string, unknown>;
-  const ossUrl = typeof o.ossUrl === "string" ? o.ossUrl.trim() : "";
-  const shotType = o.shotType;
-  if (
-    !ossUrl ||
-    typeof shotType !== "string" ||
-    !BODY_SHOT_TYPES.has(shotType as VtonModelBodyShotType)
-  ) {
-    return undefined;
-  }
-  return {
-    ossUrl,
-    isFullBody: o.isFullBody === true,
-    shotType: shotType as VtonModelBodyShotType,
-    checkedAt: typeof o.checkedAt === "string" ? o.checkedAt : new Date().toISOString(),
-    fromAiFourView: o.fromAiFourView === true ? true : undefined,
-  };
-}
-
 export function emptyVtonProjectMeta(): VtonProjectMeta {
   return {
     garmentPool: [],
@@ -67,6 +36,18 @@ function sanitizeGarmentItem(raw: unknown): VtonGarmentItem | null {
   const kind = o.kind;
   const ossUrl = typeof o.ossUrl === "string" ? o.ossUrl.trim() : "";
   if (!id || !ossUrl || typeof kind !== "string" || !GARMENT_KINDS.has(kind)) return null;
+  const parsedTopUrl =
+    typeof o.parsedTopUrl === "string" && o.parsedTopUrl.trim()
+      ? o.parsedTopUrl.trim()
+      : undefined;
+  const parsedBottomUrl =
+    typeof o.parsedBottomUrl === "string" && o.parsedBottomUrl.trim()
+      ? o.parsedBottomUrl.trim()
+      : undefined;
+  const fullSetInputMode =
+    o.fullSetInputMode === "composite" || o.fullSetInputMode === "manual"
+      ? o.fullSetInputMode
+      : undefined;
   return {
     id,
     kind: kind as VtonGarmentItem["kind"],
@@ -76,6 +57,9 @@ function sanitizeGarmentItem(raw: unknown): VtonGarmentItem | null {
       typeof o.source === "string"
         ? (o.source as VtonGarmentItem["source"])
         : undefined,
+    ...(fullSetInputMode ? { fullSetInputMode } : {}),
+    ...(parsedTopUrl ? { parsedTopUrl } : {}),
+    ...(parsedBottomUrl ? { parsedBottomUrl } : {}),
   };
 }
 
@@ -241,7 +225,6 @@ export function sanitizeVtonProjectMeta(raw: unknown): VtonProjectMeta {
     ? (o.tryonHistory as VtonTryonHistoryEntry[])
     : undefined;
 
-  const modelImageCheck = sanitizeModelImageCheck(o.modelImageCheck);
   const modelGenerations = sanitizeModelGenerations(o.modelGenerations);
   const previewModelGenerationId =
     typeof o.previewModelGenerationId === "string" ? o.previewModelGenerationId : undefined;
@@ -261,7 +244,6 @@ export function sanitizeVtonProjectMeta(raw: unknown): VtonProjectMeta {
     ...(tryonBatchCancelBatchId !== undefined ? { tryonBatchCancelBatchId } : {}),
     ...(tryonProgress !== undefined ? { tryonProgress } : {}),
     ...(tryonHistory ? { tryonHistory } : {}),
-    ...(modelImageCheck !== undefined ? { modelImageCheck } : {}),
     ...(modelGenerations.length ? { modelGenerations } : {}),
     ...(previewModelGenerationId ? { previewModelGenerationId } : {}),
     ...(confirmedModelGenerationIds?.length ? { confirmedModelGenerationIds } : {}),
@@ -288,8 +270,6 @@ export function mergeVtonMeta(
         ? patch.tryonBatchCancelBatchId
         : base.tryonBatchCancelBatchId,
     tryonProgress: patch.tryonProgress !== undefined ? patch.tryonProgress : base.tryonProgress,
-    modelImageCheck:
-      patch.modelImageCheck !== undefined ? patch.modelImageCheck : base.modelImageCheck,
     defaultLockedLookId:
       patch.defaultLockedLookId !== undefined ? patch.defaultLockedLookId : base.defaultLockedLookId,
     modelGenerations: patch.modelGenerations ?? base.modelGenerations,

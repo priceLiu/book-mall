@@ -30,9 +30,16 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPick: (entry: EcomModelLibraryEntry) => void | Promise<void>;
+  /** 默认 true；false 时导入后不关弹层，可连续选多张 */
+  closeOnPick?: boolean;
 };
 
-export function EcomModelLibraryPickerDialog({ open, onOpenChange, onPick }: Props) {
+export function EcomModelLibraryPickerDialog({
+  open,
+  onOpenChange,
+  onPick,
+  closeOnPick = true,
+}: Props) {
   const [models, setModels] = useState<EcomModelLibraryEntry[]>(() =>
     listEcomModelLibraryEntries(),
   );
@@ -84,12 +91,12 @@ export function EcomModelLibraryPickerDialog({ open, onOpenChange, onPick }: Pro
       setBusyId(entry.id);
       try {
         await onPick(entry);
-        onOpenChange(false);
+        if (closeOnPick) onOpenChange(false);
       } finally {
         setBusyId(null);
       }
     },
-    [onOpenChange, onPick],
+    [closeOnPick, onOpenChange, onPick],
   );
 
   if (!open || typeof document === "undefined") return null;
@@ -111,7 +118,9 @@ export function EcomModelLibraryPickerDialog({ open, onOpenChange, onPick }: Pro
             选择模特
           </h3>
           <p className="mt-1 text-xs text-[#86868b]">
-            来自平台模特库；可按性别筛选，大码女模特排在列表末尾。
+            {closeOnPick
+              ? "来自平台模特库；可按性别筛选，大码女模特排在列表末尾。"
+              : "来自平台模特库；点选即导入，可连续选多张，完成后请自行关闭。"}
           </p>
           <div className="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="性别筛选">
             {GENDER_FILTERS.map((opt) => {

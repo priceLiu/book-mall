@@ -45,7 +45,7 @@ export function VtonModelLibraryPanel() {
         assets.map((a) => ({
           url: a.ossUrl,
           title: a.title ?? "模特全身照",
-          thumbUrl: buildEcomOssThumbUrl(a.thumbnailUrl ?? a.ossUrl, 320),
+          thumbUrl: buildEcomOssThumbUrl(a.ossUrl, a.thumbnailUrl),
         })),
       ),
     [assets],

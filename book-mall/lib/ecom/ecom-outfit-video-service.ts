@@ -58,6 +58,12 @@ import {
   runVtonProjectBatchTryon,
   cancelVtonProjectBatchTryon,
 } from "@/lib/ecom/ecom-vton-project-mutations";
+import {
+  applyFullSetGarmentUpload,
+  enrichFullSetGarmentRows,
+  finalizeFullSetGarmentAfterCompositeUpload,
+  type VtonFullSetUploadSlot,
+} from "@/lib/ecom/ecom-vton/full-set-garment-upload";
 import { sanitizeVtonProjectMeta, syncRefsDressedImageFromLocked, emptyVtonProjectMeta } from "@/lib/ecom/ecom-vton/meta";
 import type { VtonGarmentItem, VtonLookSpec } from "@/lib/ecom/ecom-vton/types";
 import type { VtonTryonProgress } from "@/lib/ecom/ecom-vton/types";
@@ -879,11 +885,24 @@ export async function patchEcomOutfitVideoGarments(
   opts: {
     add?: Array<Omit<VtonGarmentItem, "id"> & { id?: string }>;
     removeIds?: string[];
+    update?: Array<{ id: string; patch: Partial<VtonGarmentItem> }>;
   },
 ): Promise<OutfitVideoProjectDto> {
   const project = await getEcomOutfitVideoProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
-  const meta = patchVtonGarmentPool(project.meta, opts);
+  const add = opts.add?.length
+    ? await enrichFullSetGarmentRows(
+        userId,
+        projectId,
+        ECOM_OUTFIT_VIDEO_TOOL_KEY,
+        opts.add,
+      )
+    : undefined;
+  const meta = patchVtonGarmentPool(project.meta, {
+    add,
+    removeIds: opts.removeIds,
+    update: opts.update,
+  });
   return updateEcomOutfitVideoProject(userId, projectId, { meta });
 }
 
@@ -892,6 +911,7 @@ export async function uploadEcomOutfitVideoGarment(
   projectId: string,
   kind: VtonGarmentItem["kind"],
   file: File,
+  opts?: { fullSetSlot?: VtonFullSetUploadSlot; garmentId?: string },
 ): Promise<OutfitVideoProjectDto> {
   const buf = Buffer.from(await file.arrayBuffer());
   const uploaded = await resolveMediaDecomposeUpload({
@@ -901,16 +921,58 @@ export async function uploadEcomOutfitVideoGarment(
     fileName: file.name,
   });
   if (uploaded.kind !== "image") throw new Error("请上传图片");
-  return patchEcomOutfitVideoGarments(userId, projectId, {
-    add: [
-      {
-        kind,
-        ossUrl: uploaded.ossUrl,
-        source: "upload",
-        label: file.name.replace(/\.[^.]+$/, "") || OUTFIT_GARMENT_KIND_LABELS[kind],
-      },
-    ],
-  });
+  const label = file.name.replace(/\.[^.]+$/, "") || OUTFIT_GARMENT_KIND_LABELS[kind];
+  const project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+
+  const slot = opts?.fullSetSlot ?? (kind === "full_set" ? "composite" : undefined);
+  if (kind === "full_set" && slot && slot !== "composite") {
+    const meta = applyFullSetGarmentUpload({
+      meta: sanitizeVtonProjectMeta(project.meta),
+      kind,
+      ossUrl: uploaded.ossUrl,
+      label,
+      source: "upload",
+      fullSetSlot: slot,
+      garmentId: opts?.garmentId,
+    });
+    return updateEcomOutfitVideoProject(userId, projectId, { meta });
+  }
+
+  if (kind === "full_set" && slot === "composite" && opts?.garmentId?.trim()) {
+    let meta = applyFullSetGarmentUpload({
+      meta: sanitizeVtonProjectMeta(project.meta),
+      kind,
+      ossUrl: uploaded.ossUrl,
+      label,
+      source: "upload",
+      fullSetSlot: "composite",
+      garmentId: opts.garmentId,
+    });
+    meta = await finalizeFullSetGarmentAfterCompositeUpload({
+      meta,
+      garmentId: opts.garmentId.trim(),
+      userId,
+      projectId,
+      consumerToolKey: ECOM_OUTFIT_VIDEO_TOOL_KEY,
+    });
+    return updateEcomOutfitVideoProject(userId, projectId, { meta });
+  }
+
+  const row: Omit<VtonGarmentItem, "id"> = {
+    kind,
+    ossUrl: uploaded.ossUrl,
+    source: "upload",
+    label,
+  };
+  const [enriched] = await enrichFullSetGarmentRows(
+    userId,
+    projectId,
+    ECOM_OUTFIT_VIDEO_TOOL_KEY,
+    [row],
+  );
+  const meta = patchVtonGarmentPool(project.meta, { add: [enriched ?? row] });
+  return updateEcomOutfitVideoProject(userId, projectId, { meta });
 }
 
 const OUTFIT_GARMENT_KIND_LABELS: Record<VtonGarmentItem["kind"], string> = {

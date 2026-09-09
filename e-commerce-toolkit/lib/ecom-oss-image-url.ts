@@ -36,7 +36,9 @@ export function buildEcomOssImageUrl(url: string, opts: OssImageOpts): string {
 }
 
 export function buildEcomOssThumbUrl(url: string, bakedThumbUrl?: string | null): string {
-  if (bakedThumbUrl?.trim()) return bakedThumbUrl.trim();
+  if (typeof bakedThumbUrl === "string" && bakedThumbUrl.trim()) {
+    return bakedThumbUrl.trim();
+  }
   return buildEcomOssImageUrl(url, { width: ECOM_OSS_THUMB_WIDTH });
 }
 

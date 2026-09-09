@@ -20,15 +20,24 @@ export async function POST(req: Request, ctx: Ctx) {
   const form = await req.formData();
   const file = form.get("file");
   const kind = form.get("kind");
+  const fullSetSlot = form.get("fullSetSlot");
+  const garmentId = form.get("garmentId");
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "缺少 file" }, { status: 400 });
   }
   if (kind !== "top" && kind !== "bottom" && kind !== "one_piece" && kind !== "full_set") {
     return NextResponse.json({ error: "无效 kind" }, { status: 400 });
   }
+  const slot =
+    fullSetSlot === "top" || fullSetSlot === "bottom" || fullSetSlot === "composite"
+      ? fullSetSlot
+      : undefined;
 
   try {
-    const project = await uploadEcomModelTryonGarment(auth.userId, id, kind, file);
+    const project = await uploadEcomModelTryonGarment(auth.userId, id, kind, file, {
+      fullSetSlot: slot,
+      garmentId: typeof garmentId === "string" ? garmentId : undefined,
+    });
     return NextResponse.json({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "上传服装失败";
@@ -45,6 +54,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   let body: {
     add?: Array<Omit<VtonGarmentItem, "id"> & { id?: string }>;
     removeIds?: string[];
+    update?: Array<{ id: string; patch: Partial<VtonGarmentItem> }>;
   } = {};
   try {
     body = (await req.json()) as typeof body;

@@ -124,10 +124,13 @@ export async function uploadModelTryonGarment(
   projectId: string,
   kind: VtonGarmentKind,
   file: File,
+  opts?: { fullSetSlot?: "composite" | "top" | "bottom"; garmentId?: string },
 ): Promise<ModelTryonProject> {
   const form = new FormData();
   form.append("file", file);
   form.append("kind", kind);
+  if (opts?.fullSetSlot) form.append("fullSetSlot", opts.fullSetSlot);
+  if (opts?.garmentId) form.append("garmentId", opts.garmentId);
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/garments`, {
     method: "POST",
     body: form,
@@ -140,6 +143,7 @@ export async function patchModelTryonGarments(
   body: {
     add?: Array<Omit<VtonGarmentItem, "id"> & { id?: string }>;
     removeIds?: string[];
+    update?: Array<{ id: string; patch: Partial<VtonGarmentItem> }>;
   },
 ): Promise<ModelTryonProject> {
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/garments`, {

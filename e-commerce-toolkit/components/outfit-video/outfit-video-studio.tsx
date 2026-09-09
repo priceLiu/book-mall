@@ -81,6 +81,7 @@ import {
   validateOutfitSplitPrompts,
 } from "@/lib/outfit-video-split-prompt-validate";
 import { mergeVtonTryonProgressWithBatch, parseVtonTryonProgress } from "@/lib/vton-tryon-progress";
+import { buildFullSetAssetPatch } from "@/lib/vton-full-set-garment";
 import type { VtonGarmentKind, VtonLookSpec } from "@/lib/vton-types";
 import {
   inferOutfitPhase,
@@ -1007,32 +1008,38 @@ function OutfitVideoStudioInner() {
           onClearLookSelection: () => setSelectedLookIds([]),
           selectedResultIds,
           onToggleResult: toggleResultSelection,
-          onUploadGarment: async (kind: VtonGarmentKind, file: File) => {
+          onUploadGarment: async (kind, file, opts) => {
             setRefBusy(true);
             try {
-              applyProject(await uploadOutfitGarment(project.id, kind, file));
+              applyProject(await uploadOutfitGarment(project.id, kind, file, opts));
             } catch (e) {
               await alert({ title: "上传失败", message: formatEcomTransportError(e), variant: "error" });
             } finally {
               setRefBusy(false);
             }
           },
-          onAddGarmentsFromAssets: async (
-            kind: VtonGarmentKind,
-            assets: Array<{ ossUrl: string; title: string }>,
-          ) => {
+          onAddGarmentsFromAssets: async (kind, assets, opts) => {
             setRefBusy(true);
             try {
-              applyProject(
-                await patchOutfitGarments(project.id, {
-                  add: assets.map((a) => ({
-                    kind,
-                    ossUrl: a.ossUrl,
-                    label: a.title,
-                    source: "asset" as const,
-                  })),
-                }),
-              );
+              if (kind === "full_set" && opts?.fullSetSlot) {
+                applyProject(
+                  await patchOutfitGarments(
+                    project.id,
+                    buildFullSetAssetPatch(assets, opts.fullSetSlot, opts.garmentId),
+                  ),
+                );
+              } else {
+                applyProject(
+                  await patchOutfitGarments(project.id, {
+                    add: assets.map((a) => ({
+                      kind,
+                      ossUrl: a.ossUrl,
+                      label: a.title,
+                      source: "asset" as const,
+                    })),
+                  }),
+                );
+              }
             } catch (e) {
               await alert({ title: "添加失败", message: formatEcomTransportError(e), variant: "error" });
             } finally {
@@ -1108,15 +1115,20 @@ function OutfitVideoStudioInner() {
     assets: Array<{ id: string; ossUrl: string; title: string }>,
   ) {
     if (!project || !assets.length) return;
-    const asset = assets[0]!;
     setRefBusy(true);
     setModelPipelineBusy("importing-model");
     try {
-      applyProject(
-        await attachOutfitVideoRefs(project.id, {
-          model: { ossUrl: asset.ossUrl, source: "asset", label: asset.title ?? "我的资产" },
-        }),
-      );
+      for (const asset of assets) {
+        applyProject(
+          await attachOutfitVideoRefs(project.id, {
+            model: {
+              ossUrl: asset.ossUrl,
+              source: "asset",
+              label: asset.title ?? "我的模特",
+            },
+          }),
+        );
+      }
     } catch (e) {
       await alert({ title: "选择资产失败", message: formatEcomTransportError(e), variant: "error" });
     } finally {

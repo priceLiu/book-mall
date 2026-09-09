@@ -56,6 +56,10 @@ type Props = {
   listenPaste?: boolean;
   /** 标题由父级渲染在卡片外时使用 */
   hideTitle?: boolean;
+  /** 内容区最小高度（服装池等需更高空状态） */
+  contentMinHeightClass?: string;
+  /** 为 true 时不于内容区展示 emptyHint（提示由父级放在卡片外） */
+  hideEmptyHint?: boolean;
 };
 
 const REF_THUMB_SIZE = 56;
@@ -150,6 +154,8 @@ export function EcomRefUploadCard({
   allowVideo = false,
   listenPaste = true,
   hideTitle = false,
+  contentMinHeightClass = "min-h-[56px]",
+  hideEmptyHint = false,
 }: Props) {
   const { dragOver, focusZone, dropZoneProps } = useImageDropPaste({
     enabled: !busy && !generating,
@@ -280,7 +286,7 @@ export function EcomRefUploadCard({
         </div>
       ) : null}
 
-      <div className={cn("relative", toolbarPrefix ? "min-h-[80px]" : "min-h-[56px]")}>
+      <div className={cn("relative", toolbarPrefix ? "min-h-[80px]" : contentMinHeightClass)}>
         {generating && items.length === 0 ? (
           <EcomRefGeneratingThumb label={generatingLabel} />
         ) : null}
@@ -338,9 +344,15 @@ export function EcomRefUploadCard({
             )}
           </div>
         ) : !generating ? (
-          <p className={cn("text-[10px]", highlight ? "text-[#0071e3]" : "text-[#86868b]")}>
-            {highlight ? "松开以上传" : emptyHint}
-          </p>
+          hideEmptyHint ? (
+            highlight ? (
+              <p className="text-[10px] text-[#0071e3]">松开以上传</p>
+            ) : null
+          ) : (
+            <p className={cn("text-[10px]", highlight ? "text-[#0071e3]" : "text-[#86868b]")}>
+              {highlight ? "松开以上传" : emptyHint}
+            </p>
+          )
         ) : null}
       </div>
     </div>

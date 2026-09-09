@@ -14,13 +14,24 @@ export const ECOM_VTON_MAX_BATCH_LOOKS = 9;
 
 export type VtonModelBodyShotType = "portrait" | "half_body" | "full_body" | "unknown";
 
+/** VLM 全身检测原始结果（仅入库时写入 generation.bodyCheck） */
 export type VtonModelImageCheck = {
   ossUrl: string;
   isFullBody: boolean;
   shotType: VtonModelBodyShotType;
   checkedAt: string;
-  /** AI 生成全身底图 · 跳过 VLM 复检 */
+  /** @deprecated 使用 generation.bodyCheck.fromAiGenerate */
   fromAiFourView?: boolean;
+};
+
+/** 每张模特版本独立的全身取景标签 */
+export type VtonModelGenerationBodyCheck = {
+  status: "pending" | "done" | "failed";
+  shotType?: VtonModelBodyShotType;
+  isFullBody?: boolean;
+  checkedAt?: string;
+  /** AI 生模特 / 扩全身 · 跳过 VLM */
+  fromAiGenerate?: boolean;
 };
 
 export type VtonGarmentMode = "two_piece" | "one_piece";
@@ -30,12 +41,20 @@ export type VtonLookKind = "two_piece" | "one_piece" | "top_only" | "bottom_only
 
 export type VtonGarmentKind = "top" | "bottom" | "one_piece" | "full_set";
 
+export type VtonFullSetInputMode = "composite" | "manual";
+
 export type VtonGarmentItem = {
   id: string;
   kind: VtonGarmentKind;
   ossUrl: string;
   label?: string;
   source?: WorkflowRefImage["source"];
+  /** 套装入库方式：整图自动分割 vs 用户已拆分双槽 */
+  fullSetInputMode?: VtonFullSetInputMode;
+  /** 套装图上传时预分割的上装平铺图（供 aitryon 双槽） */
+  parsedTopUrl?: string;
+  /** 套装图上传时预分割的下装平铺图（供 aitryon 双槽） */
+  parsedBottomUrl?: string;
 };
 
 export type VtonLookSpec = {
@@ -96,6 +115,8 @@ export type VtonModelGeneration = {
   label?: string;
   source?: WorkflowRefImage["source"];
   createdAt: string;
+  /** 入库时写入 · 上传/VLM 或 AI 直标 */
+  bodyCheck?: VtonModelGenerationBodyCheck;
   /** 用户点击「确认加入待试衣」后写入 */
   confirmedAt?: string;
 };
@@ -111,8 +132,6 @@ export type VtonProjectMeta = {
   tryonHistory?: VtonTryonHistoryEntry[];
   /** 与 tryonBatch.batchId 一致时表示请求停止当前批量试衣 */
   tryonBatchCancelBatchId?: string | null;
-  /** 模特全身照 VLM 检测结果（qwen3-vl-flash） */
-  modelImageCheck?: VtonModelImageCheck | null;
   /** 本项目内全部模特版本（左栏候选历史） */
   modelGenerations?: VtonModelGeneration[];
   /** 中栏预览选中的候选 id */

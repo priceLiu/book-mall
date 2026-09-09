@@ -47,6 +47,7 @@ import {
 } from "@/lib/ecom-model-tryon-api";
 import type { ModelTryonProject } from "@/lib/ecom-model-tryon-api";
 import { mergeVtonTryonProgressWithBatch, parseVtonTryonProgress } from "@/lib/vton-tryon-progress";
+import { buildFullSetAssetPatch } from "@/lib/vton-full-set-garment";
 import type { VtonGarmentKind, VtonLookSpec } from "@/lib/vton-types";
 import type { OutfitGarmentMode, OutfitRefMode } from "@/lib/video-workflow/templates/outfit-v1/ui-config";
 import { Plus } from "lucide-react";
@@ -76,6 +77,25 @@ export function ModelTryonStudio() {
       sessionStorage.setItem(PROJECT_STORAGE_KEY, p.id);
     }
   }, []);
+
+  const uploadModelFiles = useCallback(
+    async (files: File[]) => {
+      if (!project || files.length < 1) return;
+      setRefBusy(true);
+      setModelPipelineBusy("uploading");
+      try {
+        for (const file of files) {
+          applyProject(await uploadModelTryonRefImage(project.id, "model", file));
+        }
+      } catch (e) {
+        await alert({ title: "上传失败", message: formatEcomTransportError(e), variant: "error" });
+      } finally {
+        setRefBusy(false);
+        setModelPipelineBusy(null);
+      }
+    },
+    [project, applyProject, alert],
+  );
 
   const vtonMeta = project?.meta ?? { garmentPool: [], lookDrafts: [], lockedLooks: [] };
 
@@ -367,17 +387,13 @@ export function ModelTryonStudio() {
           tryonBusy={tryonBusy}
           tryonProgress={tryonProgress}
           builtinModelPipeline
-          modelImageCheck={vtonMeta.modelImageCheck}
           vtonMeta={vtonMeta}
           onSelectPreviewModelGeneration={async (generationId) => {
             if (!project) return;
-            setRefBusy(true);
             try {
               applyProject(await setPreviewModelTryonGeneration(project.id, generationId));
             } catch (e) {
               await alert({ title: "切换预览失败", message: formatEcomTransportError(e), variant: "error" });
-            } finally {
-              setRefBusy(false);
             }
           }}
           onConfirmModelGeneration={async (generationId) => {
@@ -398,13 +414,10 @@ export function ModelTryonStudio() {
           }}
           onSelectTryonModelGeneration={async (generationId) => {
             if (!project) return;
-            setRefBusy(true);
             try {
               applyProject(await setActiveModelTryonGeneration(project.id, generationId));
             } catch (e) {
               await alert({ title: "切换试衣模特失败", message: formatEcomTransportError(e), variant: "error" });
-            } finally {
-              setRefBusy(false);
             }
           }}
           onUnconfirmModelGeneration={async (generationId) => {
@@ -454,18 +467,8 @@ export function ModelTryonStudio() {
           }}
           onOutfitRefModeChange={(mode) => void patchSettings({ outfitRefMode: mode })}
           onGarmentModeChange={(mode) => void patchSettings({ garmentMode: mode })}
-          onUploadModel={async (file) => {
-            setRefBusy(true);
-            setModelPipelineBusy("uploading");
-            try {
-              applyProject(await uploadModelTryonRefImage(project.id, "model", file));
-            } catch (e) {
-              await alert({ title: "上传失败", message: formatEcomTransportError(e), variant: "error" });
-            } finally {
-              setRefBusy(false);
-              setModelPipelineBusy(null);
-            }
-          }}
+          onUploadModels={uploadModelFiles}
+          onUploadModel={async (file) => uploadModelFiles([file])}
           onUploadClothing={async (file) => {
             setRefBusy(true);
             try {
@@ -513,16 +516,21 @@ export function ModelTryonStudio() {
             }
           }}
           onAttachModelFromAssets={async (assets) => {
-            const asset = assets[0];
-            if (!asset) return;
+            if (!assets.length) return;
             setRefBusy(true);
             setModelPipelineBusy("importing-model");
             try {
-              applyProject(
-                await attachModelTryonRefs(project.id, {
-                  model: { ossUrl: asset.ossUrl, source: "asset", label: asset.title ?? "我的资产" },
-                }),
-              );
+              for (const asset of assets) {
+                applyProject(
+                  await attachModelTryonRefs(project.id, {
+                    model: {
+                      ossUrl: asset.ossUrl,
+                      source: "asset",
+                      label: asset.title ?? "我的模特",
+                    },
+                  }),
+                );
+              }
             } catch (e) {
               await alert({ title: "选择资产失败", message: formatEcomTransportError(e), variant: "error" });
             } finally {
@@ -573,29 +581,38 @@ export function ModelTryonStudio() {
                   meta: vtonMeta,
                   selectedResultIds,
                   onToggleResult: toggleResultSelection,
-                  onUploadGarment: async (kind: VtonGarmentKind, file: File) => {
+                  onUploadGarment: async (kind, file, opts) => {
                     setRefBusy(true);
                     try {
-                      applyProject(await uploadModelTryonGarment(project.id, kind, file));
+                      applyProject(await uploadModelTryonGarment(project.id, kind, file, opts));
                     } catch (e) {
                       await alert({ title: "上传失败", message: formatEcomTransportError(e), variant: "error" });
                     } finally {
                       setRefBusy(false);
                     }
                   },
-                  onAddGarmentsFromAssets: async (kind, assets) => {
+                  onAddGarmentsFromAssets: async (kind, assets, opts) => {
                     setRefBusy(true);
                     try {
-                      applyProject(
-                        await patchModelTryonGarments(project.id, {
-                          add: assets.map((a) => ({
-                            kind,
-                            ossUrl: a.ossUrl,
-                            label: a.title,
-                            source: "asset",
-                          })),
-                        }),
-                      );
+                      if (kind === "full_set" && opts?.fullSetSlot) {
+                        applyProject(
+                          await patchModelTryonGarments(
+                            project.id,
+                            buildFullSetAssetPatch(assets, opts.fullSetSlot, opts.garmentId),
+                          ),
+                        );
+                      } else {
+                        applyProject(
+                          await patchModelTryonGarments(project.id, {
+                            add: assets.map((a) => ({
+                              kind,
+                              ossUrl: a.ossUrl,
+                              label: a.title,
+                              source: "asset",
+                            })),
+                          }),
+                        );
+                      }
                     } catch (e) {
                       await alert({ title: "添加失败", message: formatEcomTransportError(e), variant: "error" });
                     } finally {

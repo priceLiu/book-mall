@@ -69,15 +69,62 @@ function friendlyTryonFailReason(raw?: string): string {
   return raw.trim();
 }
 
-function resultCellClass(result: VtonTryonResult, selected: boolean): string {
+function resultCellClass(
+  result: VtonTryonResult,
+  selected: boolean,
+  opts?: { cellRunning?: boolean },
+): string {
+  const cellRunning = opts?.cellRunning ?? false;
   return cn(
     "group/image relative overflow-hidden rounded-lg border bg-[#fafafa]",
     result.status === "success" && selected && "border-[#0071e3] ring-2 ring-[#0071e3]/30",
     result.status === "success" && !selected && "border-[#e8e8ed]",
     result.status === "failed" && "border-[#ff3b30]/40",
-    result.status === "running" && "border-[#0071e3]/40",
-    result.status === "pending" && "border-dashed border-[#d2d2d7]",
+    cellRunning && "ecom-media-generating-sweep border-[#0071e3]/40",
+    result.status === "pending" && !cellRunning && "border-dashed border-[#d2d2d7]",
     result.status === "cancelled" && "border-[#86868b]/40 bg-[#f5f5f7]",
+  );
+}
+
+/** 仅当前正在试衣的一格显示扫光；排队中/待试衣格不带动效 */
+function resolveActiveTryonLookId(
+  batch: VtonTryonBatchState | null | undefined,
+  tryonBusy: boolean | undefined,
+  runningLookIds: string[] | undefined,
+): string | null {
+  if (batch?.status === "running") {
+    const running = batch.results.find((r) => r.status === "running");
+    if (running) return running.lookId;
+  }
+  if (tryonBusy && runningLookIds?.length) {
+    return runningLookIds[0] ?? null;
+  }
+  return null;
+}
+
+function VtonTryonRunningSlot({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        "relative aspect-[3/4] overflow-hidden rounded-lg bg-[#fafafa] ecom-media-generating-sweep",
+        className,
+      )}
+    >
+      <EcomMediaGeneratingBusy label="试衣中" />
+    </div>
+  );
+}
+
+function VtonTryonQueuedSlot({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        "relative flex aspect-[3/4] flex-col items-center justify-center rounded-lg border border-dashed border-[#e8e8ed] bg-[#fafafa] px-1 text-center text-[10px] text-[#86868b]",
+        className,
+      )}
+    >
+      排队中
+    </div>
   );
 }
 
@@ -104,8 +151,11 @@ export function VtonResultsGrid({
 }: Props) {
   const results = batch?.results ?? [];
   const slotLooks = looks.slice(0, ECOM_VTON_MAX_BATCH_LOOKS);
-  const runningLookIdSet = new Set(runningLookIds ?? []);
   const running = batch?.status === "running" || tryonBusy;
+  const activeTryonLookId = useMemo(
+    () => resolveActiveTryonLookId(batch, tryonBusy, runningLookIds),
+    [batch, tryonBusy, runningLookIds],
+  );
   const hasSuccess = results.some((r) => normalizeVtonTryonResultVersions(r).length > 0);
   const lockedResultIds = new Set(lockedLooks.map((l) => l.resultId).filter(Boolean));
   const selectedTryonCount = selectedLookIds.length;
@@ -232,27 +282,24 @@ export function VtonResultsGrid({
             {slotLooks.map((look) => {
               const result = resultForLook(results, look.id);
               if (!result) {
-                if (runningLookIdSet.has(look.id)) {
+                if (activeTryonLookId === look.id) {
                   return (
-                    <div
-                      key={look.id}
-                      className="relative flex aspect-[3/4] flex-col items-center justify-center rounded-lg border border-[#0071e3]/40 bg-[#fafafa]"
-                    >
-                      <EcomMediaGeneratingBusy className="absolute inset-0 h-full w-full" />
-                      <span className="relative z-[1] text-[10px] text-[#0071e3]">试衣中</span>
-                      <span className="relative z-[1] mt-0.5 truncate px-1 text-[9px] text-[#6e6e73]">
+                    <div key={look.id}>
+                      <VtonTryonRunningSlot className="border border-[#0071e3]/40" />
+                      <p className="truncate px-1 py-0.5 text-[10px] text-[#6e6e73]">
                         {lookLabel(looks, look.id)}
-                      </span>
+                      </p>
                     </div>
                   );
                 }
                 return (
-                  <div
-                    key={look.id}
-                    className="flex aspect-[3/4] flex-col items-center justify-center rounded-lg border border-dashed border-[#e8e8ed] bg-[#fafafa] px-1 text-center text-[10px] text-[#86868b]"
-                  >
-                    待试衣
-                    <span className="mt-0.5 truncate text-[9px]">{lookLabel(looks, look.id)}</span>
+                  <div key={look.id}>
+                    <div className="flex aspect-[3/4] flex-col items-center justify-center rounded-lg border border-dashed border-[#e8e8ed] bg-[#fafafa] px-1 text-center text-[10px] text-[#86868b]">
+                      待试衣
+                    </div>
+                    <p className="truncate px-1 py-0.5 text-[10px] text-[#6e6e73]">
+                      {lookLabel(looks, look.id)}
+                    </p>
                   </div>
                 );
               }
@@ -267,11 +314,13 @@ export function VtonResultsGrid({
               const displayUrl = versions[versionIndex]?.ossUrl ?? result.ossUrl ?? null;
               const hasMultipleVersions = versions.length > 1;
               const showImage = Boolean(displayUrl);
-              const cellRunning =
-                result.status === "running" || runningLookIdSet.has(look.id);
+              const cellRunning = activeTryonLookId === look.id && running;
 
               return (
-                <div key={result.id} className={resultCellClass(result, selected)}>
+                <div
+                  key={result.id}
+                  className={resultCellClass(result, selected, { cellRunning })}
+                >
                   {showImage ? (
                     <>
                       <div className="relative block w-full group/image">
@@ -283,7 +332,7 @@ export function VtonResultsGrid({
                           draggable={false}
                         />
                         {cellRunning ? (
-                          <EcomMediaGeneratingBusy className="absolute inset-0 z-[2] h-full w-full" />
+                          <EcomMediaGeneratingBusy label="试衣中" className="z-[2]" />
                         ) : null}
                         {result.status === "failed" && !cellRunning ? (
                           <div className="absolute inset-x-0 bottom-0 z-[2] bg-[#ff3b30]/90 px-1 py-0.5 text-center text-[9px] text-white">
@@ -363,10 +412,7 @@ export function VtonResultsGrid({
                       ) : null}
                     </>
                   ) : cellRunning ? (
-                    <div className="flex aspect-[3/4] flex-col items-center justify-center gap-1 text-[#0071e3]">
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      <span className="text-[10px]">试衣中</span>
-                    </div>
+                    <VtonTryonRunningSlot />
                   ) : result.status === "failed" ? (
                     <div className="flex aspect-[3/4] flex-col items-center justify-center gap-1 p-2 text-center text-[10px] text-[#ff3b30]">
                       <span>{friendlyTryonFailReason(result.failReason)}</span>
@@ -386,9 +432,7 @@ export function VtonResultsGrid({
                       {result.failReason ?? "已停止"}
                     </div>
                   ) : (
-                    <div className="flex aspect-[3/4] items-center justify-center text-[10px] text-[#86868b]">
-                      排队中
-                    </div>
+                    <VtonTryonQueuedSlot />
                   )}
                   <p className="truncate px-1 py-0.5 text-[10px] text-[#6e6e73]">{label}</p>
                 </div>

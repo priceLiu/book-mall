@@ -21,6 +21,7 @@ import {
 } from "@/components/media/ecom-media-library-tile";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { listAssets, type EcomAsset } from "@/lib/ecom-api";
+import { ECOM_VTON_MODEL_ASSET_MODULE } from "@/lib/vton-model-library";
 import { cn } from "@/lib/utils";
 
 /** 可挑选的资产分组，与「我的资产」分组保持一致 */
@@ -31,7 +32,11 @@ const GROUPS: Array<{ module: string; label: string }> = [
   { module: "storyboard-micro-drama", label: "分镜图" },
   { module: "hand-craft", label: "手伴创作" },
   { module: "seed-video", label: "种草视频" },
+  { module: ECOM_VTON_MODEL_ASSET_MODULE, label: "我的模特" },
 ];
+
+/** 「我的模特」分组至少允许多选（与左栏批量上传一致） */
+const MY_MODELS_MIN_MAX_SELECT = 8;
 
 type Props = {
   open: boolean;
@@ -58,6 +63,11 @@ export function EcomAssetPickerDialog({
   const [selected, setSelected] = useState<string[]>([]);
   const [confirming, setConfirming] = useState(false);
 
+  const effectiveMaxSelect =
+    activeModule === ECOM_VTON_MODEL_ASSET_MODULE
+      ? Math.max(maxSelect, MY_MODELS_MIN_MAX_SELECT)
+      : maxSelect;
+
   const pickerImagePreviewItems = useMemo(
     () =>
       mapPreviewItemsFromEntries(
@@ -66,7 +76,7 @@ export function EcomAssetPickerDialog({
           .map((a) => ({
             url: a.ossUrl,
             title: a.title ?? "资产图",
-            thumbUrl: a.thumbnailUrl,
+            thumbUrl: a.thumbnailUrl ?? undefined,
           })),
       ),
     [assets],
@@ -110,7 +120,7 @@ export function EcomAssetPickerDialog({
     setSelected((prev) =>
       prev.includes(id)
         ? prev.filter((x) => x !== id)
-        : prev.length >= maxSelect
+        : prev.length >= effectiveMaxSelect
           ? prev
           : [...prev, id],
     );
@@ -136,7 +146,7 @@ export function EcomAssetPickerDialog({
         <DialogHeader className="border-b border-[#f0f0f2] px-5 py-4">
           <DialogTitle className="text-[15px]">从我的资产选择</DialogTitle>
           <p className="text-[12px] text-[#86868b]">
-            最多选择 {maxSelect} 张，已选 {selected.length} 张。
+            最多选择 {effectiveMaxSelect} 张，已选 {selected.length} 张。
           </p>
         </DialogHeader>
 
@@ -151,7 +161,10 @@ export function EcomAssetPickerDialog({
                   ? "border-[#1d1d1f] bg-[#1d1d1f] text-white"
                   : "border-[#d2d2d7] bg-white text-[#1d1d1f] hover:border-[#86868b]",
               )}
-              onClick={() => setActiveModule(g.module)}
+              onClick={() => {
+                setActiveModule(g.module);
+                setSelected([]);
+              }}
             >
               {g.label}
             </button>
@@ -178,8 +191,14 @@ export function EcomAssetPickerDialog({
                   <EcomMediaLibraryTile
                     key={asset.id}
                     kind={asset.kind === "video" ? "video" : "image"}
-                    src={asset.thumbnailUrl ?? asset.ossUrl}
+                    src={asset.ossUrl}
+                    thumbnailSrc={asset.thumbnailUrl}
                     alt={asset.title ?? "资产"}
+                    aspectClass={
+                      activeModule === ECOM_VTON_MODEL_ASSET_MODULE
+                        ? "aspect-[3/4]"
+                        : undefined
+                    }
                     selected={active}
                     onSelect={() => toggle(asset.id)}
                     onPreview={() =>

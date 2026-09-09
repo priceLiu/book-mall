@@ -12,7 +12,7 @@ import { ModelShotRefGenerateDialog } from "@/components/model-shot/model-shot-r
 import { VtonFourViewGenerateDialog } from "@/components/vton/vton-four-view-generate-dialog";
 import { VtonModelWorkbenchPanel } from "@/components/vton/vton-model-workbench-panel";
 import { VtonGarmentPoolPanel } from "@/components/vton/vton-garment-pool-panel";
-import { VtonLookComposer } from "@/components/vton/vton-look-composer";
+import { appendLookDraft, VtonLookComposer } from "@/components/vton/vton-look-composer";
 import { VtonResultsGrid } from "@/components/vton/vton-results-grid";
 import { VtonTryonProgressStrip } from "@/components/vton/vton-tryon-progress-strip";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
@@ -29,15 +29,17 @@ import {
   VTON_TOP_GARMENT_SCOPE,
   type VtonGarmentKind,
   type VtonLookSpec,
-  type VtonModelImageCheck,
   type VtonModelPipelineBusy,
   type VtonProjectMeta,
 } from "@/lib/vton-types";
+import { activeTryonModelBodyHint } from "@/lib/vton-model-generation-body-check";
 import {
   modelGenerationLabel,
+  resolveActiveModelGeneration,
   resolveConfirmedModelGenerations,
   sortModelGenerationsNewestFirst,
 } from "@/lib/vton-model-generations";
+import { filterAvailableGarmentPool } from "@/lib/vton-garment-pool";
 import { cn } from "@/lib/utils";
 
 export type VtonBatchWorkflowProps = {
@@ -48,10 +50,15 @@ export type VtonBatchWorkflowProps = {
   onClearLookSelection: () => void;
   selectedResultIds: string[];
   onToggleResult: (resultId: string) => void;
-  onUploadGarment: (kind: VtonGarmentKind, file: File) => Promise<void>;
+  onUploadGarment: (
+    kind: VtonGarmentKind,
+    file: File,
+    opts?: { fullSetSlot?: "composite" | "top" | "bottom"; garmentId?: string },
+  ) => Promise<void>;
   onAddGarmentsFromAssets: (
     kind: VtonGarmentKind,
     assets: Array<{ ossUrl: string; title: string }>,
+    opts?: { fullSetSlot?: "composite" | "top" | "bottom"; garmentId?: string },
   ) => Promise<void>;
   onRemoveGarments: (ids: string[]) => Promise<void>;
   onChangeLooks: (looks: VtonLookSpec[]) => Promise<void>;
@@ -82,7 +89,6 @@ type Props = {
   tryonProgress?: VtonTryonProgress | null;
   /** 模特试衣 · 系统内置生模特/扩全身，不展示模型选择器 */
   builtinModelPipeline?: boolean;
-  modelImageCheck?: VtonModelImageCheck | null;
   vtonMeta?: VtonProjectMeta;
   onSelectPreviewModelGeneration?: (generationId: string) => Promise<void>;
   onConfirmModelGeneration?: (generationId: string) => Promise<void>;
@@ -97,6 +103,8 @@ type Props = {
   onOutfitRefModeChange: (mode: OutfitRefMode) => void;
   onGarmentModeChange: (mode: OutfitGarmentMode) => void;
   onUploadModel: (file: File) => Promise<void>;
+  /** 模特工作台 · 批量上传/拖入 */
+  onUploadModels?: (files: File[]) => Promise<void>;
   onUploadClothing: (file: File) => Promise<void>;
   onUploadTopGarment: (file: File) => Promise<void>;
   onUploadBottomGarment: (file: File) => Promise<void>;
@@ -133,7 +141,6 @@ export function VtonRefWorkbench({
   tryonBusy,
   tryonProgress,
   builtinModelPipeline = false,
-  modelImageCheck,
   vtonMeta,
   onSelectPreviewModelGeneration,
   onConfirmModelGeneration,
@@ -148,6 +155,7 @@ export function VtonRefWorkbench({
   onOutfitRefModeChange,
   onGarmentModeChange,
   onUploadModel,
+  onUploadModels,
   onUploadClothing,
   onUploadTopGarment,
   onUploadBottomGarment,
@@ -177,6 +185,16 @@ export function VtonRefWorkbench({
   const isAlreadyDressed = outfitRefMode === "already_dressed";
   const isTwoPiece = garmentMode === "two_piece";
   const useBatch = Boolean(batchWorkflow) && !isAlreadyDressed;
+  const availableGarmentPool = useMemo(
+    () =>
+      batchWorkflow
+        ? filterAvailableGarmentPool(
+            batchWorkflow.meta.garmentPool ?? [],
+            batchWorkflow.meta.lookDrafts ?? [],
+          )
+        : [],
+    [batchWorkflow?.meta.garmentPool, batchWorkflow?.meta.lookDrafts],
+  );
   const lockedCount = batchWorkflow?.meta.lockedLooks?.length ?? 0;
   const hasTryonPreview = useBatch
     ? lockedCount > 0 || Boolean(refs.dressedImage?.ossUrl)
@@ -268,19 +286,9 @@ export function VtonRefWorkbench({
 
   const modelBodyHint = useMemo(() => {
     if (!builtinModelPipeline || isAlreadyDressed || !refs.model?.ossUrl) return null;
-    if (!modelImageCheck || modelImageCheck.ossUrl !== refs.model.ossUrl) {
-      return "正在识别模特取景…";
-    }
-    if (modelImageCheck.isFullBody) {
-      return modelImageCheck.fromAiFourView
-        ? "已就绪：AI 全身模特，可开始试衣。"
-        : "已就绪：全身模特照，可开始试衣。";
-    }
-    if (modelImageCheck.shotType === "portrait" || modelImageCheck.shotType === "half_body") {
-      return "当前为头像/半身，请点击「头像生成全身图」后再试衣。";
-    }
-    return "未识别为全身照，请上传全身图或 AI 生成全身模特。";
-  }, [builtinModelPipeline, isAlreadyDressed, refs.model?.ossUrl, modelImageCheck]);
+    const active = resolveActiveModelGeneration(vtonMeta);
+    return activeTryonModelBodyHint(active);
+  }, [builtinModelPipeline, isAlreadyDressed, refs.model?.ossUrl, vtonMeta]);
 
   const sectionTitle =
     mode === "model-tryon" ? "模特试衣" : "穿搭参考";
@@ -454,8 +462,14 @@ export function VtonRefWorkbench({
             busy={busy}
             refsLocked={refsLocked}
             modelPipelineBusy={modelPipelineBusy}
-            modelImageCheck={modelImageCheck}
-            onUploadModel={onUploadModel}
+            onUploadModels={
+              onUploadModels ??
+              (async (files) => {
+                for (const file of files) {
+                  await onUploadModel(file);
+                }
+              })
+            }
             onOpenAssetPicker={
               onAttachModelFromAssets ? () => setAssetPickerOpen(true) : undefined
             }
@@ -503,7 +517,7 @@ export function VtonRefWorkbench({
               <p
                 className={cn(
                   "text-[11px] leading-relaxed",
-                  modelImageCheck?.isFullBody ? "text-[#248a3d]" : "text-[#b45309]",
+                  modelBodyHint?.startsWith("已就绪") ? "text-[#248a3d]" : "text-[#b45309]",
                 )}
               >
                 {modelBodyHint}
@@ -575,13 +589,21 @@ export function VtonRefWorkbench({
       {useBatch && batchWorkflow ? (
         <div className="space-y-3">
           <VtonGarmentPoolPanel
-            pool={batchWorkflow.meta.garmentPool ?? []}
+            pool={availableGarmentPool}
+            lookCount={batchWorkflow.meta.lookDrafts?.length ?? 0}
             busy={busy}
             disabled={refsLocked}
             onUploadGarment={batchWorkflow.onUploadGarment}
             onAddFromAssets={batchWorkflow.onAddGarmentsFromAssets}
             onRemove={batchWorkflow.onRemoveGarments}
             onPreviewGarment={(g) => openRefPreview(g.ossUrl, g.label ?? "服装池")}
+            onAddLook={async (kind, opts) => {
+              const poolAll = batchWorkflow.meta.garmentPool ?? [];
+              const looks = batchWorkflow.meta.lookDrafts ?? [];
+              const next = appendLookDraft(looks, poolAll, kind, opts);
+              if (next.length === looks.length) return;
+              await batchWorkflow.onChangeLooks(next);
+            }}
           />
           <VtonLookComposer
             looks={batchWorkflow.meta.lookDrafts ?? []}
@@ -708,13 +730,14 @@ export function VtonRefWorkbench({
               <EcomModelLibraryPickerDialog
                 open={libraryOpen}
                 onOpenChange={setLibraryOpen}
+                closeOnPick={false}
                 onPick={(entry) => onPickModelFromLibrary(entry.ossUrl, entry.name)}
               />
               {onAttachModelFromAssets ? (
                 <EcomAssetPickerDialog
                   open={assetPickerOpen}
                   onOpenChange={setAssetPickerOpen}
-                  maxSelect={1}
+                  maxSelect={8}
                   onConfirm={async (assets) => {
                     setAssetPickerOpen(false);
                     if (assets.length) await onAttachModelFromAssets(assets);

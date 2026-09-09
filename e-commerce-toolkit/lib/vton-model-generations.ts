@@ -1,4 +1,12 @@
-import type { VtonModelGeneration, VtonModelImageCheck, VtonProjectMeta } from "@/lib/vton-types";
+import type { VtonModelGeneration, VtonProjectMeta } from "@/lib/vton-types";
+
+export {
+  canConfirmModelGeneration,
+  modelGenerationBodyBadge,
+  modelGenerationConfirmedBadge,
+  previewModelBodyHint,
+  activeTryonModelBodyHint,
+} from "@/lib/vton-model-generation-body-check";
 
 export function sortModelGenerationsNewestFirst(
   list: VtonModelGeneration[],
@@ -62,33 +70,4 @@ export function modelGenerationLabel(
   index: number,
 ): string {
   return generation.label?.trim() || `模特 ${index + 1}`;
-}
-
-export function previewModelBodyHint(
-  preview: VtonModelGeneration | null,
-  modelImageCheck: VtonModelImageCheck | null | undefined,
-): string | null {
-  if (!preview?.ossUrl) return null;
-  if (!modelImageCheck || modelImageCheck.ossUrl !== preview.ossUrl) {
-    return "正在识别模特取景…";
-  }
-  if (modelImageCheck.isFullBody) {
-    return modelImageCheck.fromAiFourView
-      ? "全身模特，可确认加入待试衣。"
-      : "全身模特照，可确认加入待试衣。";
-  }
-  if (modelImageCheck.shotType === "portrait" || modelImageCheck.shotType === "half_body") {
-    return "当前为头像/半身，请先「头像生成全身图」后再确认试衣。";
-  }
-  return "未识别为全身照，请上传全身图或 AI 生成全身模特。";
-}
-
-export function canConfirmModelGeneration(
-  preview: VtonModelGeneration | null,
-  modelImageCheck: VtonModelImageCheck | null | undefined,
-): boolean {
-  if (!preview) return false;
-  if (preview.source === "ai-generate") return true;
-  if (!modelImageCheck || modelImageCheck.ossUrl !== preview.ossUrl) return false;
-  return modelImageCheck.isFullBody;
 }

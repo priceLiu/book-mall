@@ -31,17 +31,43 @@ export function normalizeLookForTryon(
       onePieceGarmentId: undefined,
     };
   }
-  if (look.kind === "full_set") return look;
-  const topAsSet = findGarmentInPool(garmentPool, look.topGarmentId);
-  if (topAsSet?.kind === "full_set") {
-    return {
-      ...look,
-      kind: "full_set",
-      fullSetGarmentId: topAsSet.id,
-      topGarmentId: undefined,
-      bottomGarmentId: undefined,
-      onePieceGarmentId: undefined,
-    };
+  if (look.kind === "full_set") {
+    for (const garmentId of [
+      look.topGarmentId,
+      look.onePieceGarmentId,
+      look.bottomGarmentId,
+    ] as const) {
+      const garment = findGarmentInPool(garmentPool, garmentId);
+      if (garment?.kind === "full_set") {
+        return {
+          ...look,
+          fullSetGarmentId: garment.id,
+          topGarmentId: undefined,
+          bottomGarmentId: undefined,
+          onePieceGarmentId: undefined,
+        };
+      }
+    }
+    return look;
+  }
+
+  const poolGarmentIds = [
+    look.topGarmentId,
+    look.onePieceGarmentId,
+    look.bottomGarmentId,
+  ] as const;
+  for (const garmentId of poolGarmentIds) {
+    const garment = findGarmentInPool(garmentPool, garmentId);
+    if (garment?.kind === "full_set") {
+      return {
+        ...look,
+        kind: "full_set",
+        fullSetGarmentId: garment.id,
+        topGarmentId: undefined,
+        bottomGarmentId: undefined,
+        onePieceGarmentId: undefined,
+      };
+    }
   }
   return look;
 }
@@ -88,6 +114,16 @@ export function resolveLookTryonUrls(opts: {
     const set = findGarmentInPool(garmentPool, look.fullSetGarmentId);
     if (!set?.ossUrl?.trim()) {
       throw new Error(`搭配 ${look.label ?? look.id} 缺少套装`);
+    }
+    const parsedTop = set.parsedTopUrl?.trim();
+    const parsedBottom = set.parsedBottomUrl?.trim();
+    if (parsedTop && parsedBottom) {
+      return {
+        personImageUrl,
+        topGarmentUrl: parsedTop,
+        bottomGarmentUrl: parsedBottom,
+        lookKind: "two_piece",
+      };
     }
     return {
       personImageUrl,

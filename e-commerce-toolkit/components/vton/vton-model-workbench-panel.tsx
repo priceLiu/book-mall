@@ -1,16 +1,21 @@
 "use client";
 
 import { Check, Images, Loader2, Plus, Sparkles, UserRound } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
+import { useImageDropPaste } from "@/hooks/use-image-drop-paste";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { VtonModelGenerationBadgeStack } from "@/components/vton/vton-model-generation-badge";
 import { VtonModelImageHoverActions } from "@/components/vton/vton-model-image-hover-actions";
-import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
+import { IMAGE_UPLOAD_ACCEPT, IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
 import { cn } from "@/lib/utils";
 import {
   canConfirmModelGeneration,
   isModelGenerationConfirmed,
+  modelGenerationBodyBadge,
+  modelGenerationConfirmedBadge,
   modelGenerationLabel,
   previewModelBodyHint,
   resolveActiveModelGeneration,
@@ -19,7 +24,6 @@ import {
   sortModelGenerationsNewestFirst,
 } from "@/lib/vton-model-generations";
 import type {
-  VtonModelImageCheck,
   VtonModelGeneration,
   VtonModelPipelineBusy,
   VtonProjectMeta,
@@ -30,8 +34,7 @@ type Props = {
   busy?: boolean;
   refsLocked?: boolean;
   modelPipelineBusy?: VtonModelPipelineBusy | null;
-  modelImageCheck?: VtonModelImageCheck | null;
-  onUploadModel: (file: File) => Promise<void>;
+  onUploadModels: (files: File[]) => Promise<void>;
   onOpenAssetPicker?: () => void;
   onOpenModelLibrary: () => void;
   onGenerateModel: () => void;
@@ -61,8 +64,7 @@ export function VtonModelWorkbenchPanel({
   busy,
   refsLocked,
   modelPipelineBusy,
-  modelImageCheck,
-  onUploadModel,
+  onUploadModels,
   onOpenAssetPicker,
   onOpenModelLibrary,
   onGenerateModel,
@@ -76,34 +78,53 @@ export function VtonModelWorkbenchPanel({
   onSaveToMyModels,
   onDeleteGeneration,
 }: Props) {
+  const { alert } = useDialogs();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const ingestModelFiles = useCallback(
+    (files: File[]) => {
+      if (files.length < 1) return;
+      void onUploadModels(files);
+    },
+    [onUploadModels],
+  );
   const candidates = sortModelGenerationsNewestFirst(meta.modelGenerations ?? []);
   const confirmed = resolveConfirmedModelGenerations(meta);
   const leftSelection = resolvePreviewModelGeneration(meta);
   const tryonModel = resolveActiveModelGeneration(meta);
   const leftSelectionId = leftSelection?.id ?? meta.previewModelGenerationId;
   const tryonModelId = tryonModel?.id ?? meta.activeModelGenerationId;
-  const leftSelectionHint = previewModelBodyHint(leftSelection, modelImageCheck);
-  const leftSelectionConfirmable =
-    !!leftSelection && canConfirmModelGeneration(leftSelection, modelImageCheck);
-  const leftSelectionConfirmed = leftSelection
-    ? isModelGenerationConfirmed(meta, leftSelection.id)
-    : false;
   /** 中栏焦点：左栏浏览 vs 右栏待试衣点选（互不抢占，除非左栏选中变化） */
   const [centerSource, setCenterSource] = useState<"left" | "right">("left");
+  /** 左栏点选后立即切换中栏，不等待 preview API */
+  const [optimisticPreviewId, setOptimisticPreviewId] = useState<string | null>(null);
   const prevLeftSelectionIdRef = useRef(leftSelectionId);
 
   useEffect(() => {
     if (leftSelectionId !== prevLeftSelectionIdRef.current) {
       prevLeftSelectionIdRef.current = leftSelectionId;
       setCenterSource("left");
+      setOptimisticPreviewId(null);
     }
   }, [leftSelectionId]);
+
+  const displayLeftSelection =
+    optimisticPreviewId != null
+      ? (candidates.find((g) => g.id === optimisticPreviewId) ?? leftSelection)
+      : leftSelection;
+  const displayLeftSelectionId = displayLeftSelection?.id ?? leftSelectionId;
+
+  const leftSelectionHint = previewModelBodyHint(displayLeftSelection);
+  const leftSelectionConfirmable =
+    !!displayLeftSelection && canConfirmModelGeneration(displayLeftSelection);
+  const leftSelectionConfirmed = displayLeftSelection
+    ? isModelGenerationConfirmed(meta, displayLeftSelection.id)
+    : false;
 
   const centerModel =
     centerSource === "right" && tryonModel
       ? tryonModel
-      : (leftSelection ?? tryonModel);
+      : (displayLeftSelection ?? tryonModel);
   const centerModelIndex = centerModel
     ? Math.max(0, candidates.findIndex((g) => g.id === centerModel.id))
     : 0;
@@ -115,6 +136,19 @@ export function VtonModelWorkbenchPanel({
   const modelExpanding = modelPipelineBusy === "expanding-full-body";
   const modelUploading =
     modelPipelineBusy === "uploading" || modelPipelineBusy === "importing-model";
+  /** 切换左/右栏选中时不应因 refBusy 禁用，否则连点无反馈 */
+  const thumbSelectLocked =
+    refsLocked || modelGenerating || modelExpanding || modelUploading;
+  const thumbActionsLocked = thumbSelectLocked || busy;
+
+  const { dragOver, dropZoneProps } = useImageDropPaste({
+    enabled: !thumbSelectLocked,
+    multiple: true,
+    onFiles: ingestModelFiles,
+    onError: (title, message) => {
+      void alert({ title, message, variant: "error" });
+    },
+  });
 
   const headerBtnClass = "h-7 px-2 text-[10px]";
 
@@ -140,7 +174,7 @@ export function VtonModelWorkbenchPanel({
           <EcomButtonSecondary
             size="sm"
             type="button"
-            disabled={busy || refsLocked || !leftSelection?.ossUrl}
+            disabled={thumbSelectLocked || !displayLeftSelection?.ossUrl}
             className={headerBtnClass}
             onClick={onExpandFullBody}
           >
@@ -191,16 +225,25 @@ export function VtonModelWorkbenchPanel({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept={IMAGE_UPLOAD_ACCEPT}
+        multiple
         className="hidden"
         onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) void onUploadModel(f);
+          const files = Array.from(e.target.files ?? []);
+          if (files.length) ingestModelFiles(files);
           e.target.value = "";
         }}
       />
 
-      <div className="flex items-start gap-3 rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-3">
+      <div
+        {...dropZoneProps}
+        className={cn(
+          "flex items-start gap-3 rounded-xl border bg-[#fafafa] p-3 outline-none transition-colors",
+          dragOver
+            ? "border-[#0071e3] bg-[#f0f6ff] ring-1 ring-[#0071e3]/30"
+            : "border-[#e8e8ed]",
+        )}
+      >
         <aside className={SIDE_COLUMN_CLASS}>
           <p className="text-[10px] font-medium text-[#86868b]">上传历史</p>
           {candidates.length > 0 ? (
@@ -210,9 +253,11 @@ export function VtonModelWorkbenchPanel({
                   key={g.id}
                   generation={g}
                   index={index}
-                  active={g.id === leftSelectionId}
-                  disabled={busy || refsLocked}
+                  active={g.id === displayLeftSelectionId}
+                  selectLocked={thumbSelectLocked}
+                  actionsLocked={thumbActionsLocked}
                   onSelect={() => {
+                    setOptimisticPreviewId(g.id);
                     setCenterSource("left");
                     void onSelectPreview(g.id);
                   }}
@@ -220,6 +265,7 @@ export function VtonModelWorkbenchPanel({
                   onPreview={onPreviewCandidate}
                   onSaveToMyModels={onSaveToMyModels}
                   onDelete={() => void onDeleteGeneration(g.id)}
+                  showConfirmedBadge
                 />
               ))}
             </div>
@@ -247,6 +293,7 @@ export function VtonModelWorkbenchPanel({
                 style={{ maxWidth: `min(100%, ${THUMB_COLUMN_PX * 2.6}px)` }}
               >
                 <ModelImageFrame
+                  key={centerModel.id}
                   src={centerModel.ossUrl}
                   alt={centerModelLabel}
                   className="rounded-lg border border-[#e8e8ed]"
@@ -254,9 +301,15 @@ export function VtonModelWorkbenchPanel({
                 {(modelGenerating || modelExpanding) && (
                   <EcomMediaGeneratingBusy className="absolute inset-0 rounded-lg" />
                 )}
+                <VtonModelGenerationBadgeStack
+                  badges={collectGenerationBadges(centerModel, {
+                    includeConfirmed: centerSource === "left",
+                  })}
+                  className="pointer-events-none absolute left-2 top-2 z-[6]"
+                />
                 {!modelGenerating && !modelExpanding ? (
                   <VtonModelImageHoverActions
-                    disabled={busy || refsLocked}
+                    disabled={thumbActionsLocked}
                     onPreview={() =>
                       (centerSource === "right" ? onPreviewTryon : onPreviewCandidate)(
                         centerModel.ossUrl,
@@ -267,7 +320,7 @@ export function VtonModelWorkbenchPanel({
                       void onSaveToMyModels(centerModel.ossUrl, centerModelLabel)
                     }
                     onDelete={
-                      leftSelection?.id === centerModel.id
+                      displayLeftSelection?.id === centerModel.id
                         ? () => void onDeleteGeneration(centerModel.id)
                         : undefined
                     }
@@ -275,13 +328,13 @@ export function VtonModelWorkbenchPanel({
                 ) : null}
               </div>
 
-              {leftSelection && !leftSelectionConfirmed ? (
+              {displayLeftSelection && !leftSelectionConfirmed ? (
                 <EcomButtonPrimary
                   size="sm"
                   type="button"
-                  disabled={busy || refsLocked || !leftSelectionConfirmable}
+                  disabled={thumbActionsLocked || !leftSelectionConfirmable}
                   className="h-8 px-3 text-[11px]"
-                  onClick={() => void onConfirmGeneration(leftSelection.id)}
+                  onClick={() => void onConfirmGeneration(displayLeftSelection.id)}
                 >
                   <Check className="mr-1 h-3.5 w-3.5" />
                   确认左栏选中加入待试衣
@@ -319,7 +372,8 @@ export function VtonModelWorkbenchPanel({
                   generation={g}
                   index={index}
                   active={g.id === tryonModelId}
-                  disabled={busy || refsLocked}
+                  selectLocked={thumbSelectLocked}
+                  actionsLocked={thumbActionsLocked}
                   onSelect={() => {
                     setCenterSource("right");
                     void onSelectTryonGeneration(g.id);
@@ -339,7 +393,7 @@ export function VtonModelWorkbenchPanel({
         </aside>
       </div>
 
-      {leftSelection && !leftSelectionConfirmed && leftSelectionHint ? (
+      {displayLeftSelection && !leftSelectionConfirmed && leftSelectionHint ? (
         <p
           className={cn(
             "text-[11px] leading-relaxed",
@@ -351,6 +405,21 @@ export function VtonModelWorkbenchPanel({
       ) : null}
     </div>
   );
+}
+
+function collectGenerationBadges(
+  generation: VtonModelGeneration | null | undefined,
+  opts?: { includeConfirmed?: boolean },
+) {
+  if (!generation) return [];
+  const badges = [];
+  const body = modelGenerationBodyBadge(generation);
+  if (body) badges.push(body);
+  if (opts?.includeConfirmed) {
+    const confirmed = modelGenerationConfirmedBadge(generation);
+    if (confirmed) badges.push(confirmed);
+  }
+  return badges;
 }
 
 function ModelImageFrame({
@@ -379,19 +448,23 @@ function ModelGenerationThumb({
   generation,
   index,
   active,
-  disabled,
+  selectLocked,
+  actionsLocked,
   allowPreview = false,
   onSelect,
   onPreview,
   onSaveToMyModels,
   onDelete,
   onUnconfirm,
+  showConfirmedBadge,
 }: {
   generation: VtonModelGeneration;
   index: number;
   active: boolean;
-  disabled?: boolean;
+  selectLocked?: boolean;
+  actionsLocked?: boolean;
   allowPreview?: boolean;
+  showConfirmedBadge?: boolean;
   onSelect: () => void;
   onPreview: (ossUrl: string, title: string) => void;
   onSaveToMyModels: (ossUrl: string, title: string) => void | Promise<void>;
@@ -403,9 +476,11 @@ function ModelGenerationThumb({
   return (
     <button
       type="button"
+      disabled={selectLocked}
       className={cn(
         "group/image relative block w-full shrink-0 rounded-lg border-2 bg-white text-left transition",
         active ? "border-[#1d1d1f]" : "border-[#e8e8ed] hover:border-[#86868b]",
+        selectLocked && "cursor-not-allowed opacity-60",
       )}
       onClick={onSelect}
     >
@@ -414,9 +489,13 @@ function ModelGenerationThumb({
         alt={label}
         className="overflow-hidden rounded-[6px]"
       />
+      <VtonModelGenerationBadgeStack
+        badges={collectGenerationBadges(generation, { includeConfirmed: showConfirmedBadge })}
+        className="pointer-events-none absolute left-1 top-1 z-[6] max-w-[calc(100%-8px)]"
+      />
       <VtonModelImageHoverActions
         variant="thumb"
-        disabled={disabled}
+        disabled={actionsLocked}
         onPreview={allowPreview ? () => onPreview(generation.ossUrl, label) : undefined}
         onSaveToMyModels={() => void onSaveToMyModels(generation.ossUrl, label)}
         onDelete={onDelete ?? onUnconfirm}

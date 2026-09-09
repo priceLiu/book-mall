@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Check, Plus, Trash2 } from "lucide-react";
+import { Check, Trash2 } from "lucide-react";
 
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomRefImageThumb } from "@/components/media/ecom-ref-image-thumb";
@@ -9,10 +9,17 @@ import {
   ECOM_VTON_MAX_BATCH_LOOKS,
   VTON_GARMENT_KIND_LABELS,
   VTON_LOOK_KIND_LABELS,
+  type VtonFullSetInputMode,
   type VtonGarmentItem,
   type VtonLookKind,
   type VtonLookSpec,
 } from "@/lib/vton-types";
+import { collectLookDraftGarmentIds } from "@/lib/vton-garment-pool";
+import {
+  garmentPreviewThumbUrls,
+  isFullSetGarmentReady,
+  resolveFullSetInputMode,
+} from "@/lib/vton-full-set-garment";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -32,8 +39,30 @@ type VtonGarmentKind = VtonGarmentItem["kind"];
 
 type GarmentField = "topGarmentId" | "bottomGarmentId" | "onePieceGarmentId" | "fullSetGarmentId";
 
+export type AddLookDraftOpts = {
+  fullSetMode?: VtonFullSetInputMode;
+};
+
 function newLookId(): string {
   return crypto.randomUUID();
+}
+
+function poolGarmentCandidates(
+  pool: VtonGarmentItem[],
+  kind: VtonGarmentKind,
+  opts?: { fullSetMode?: VtonFullSetInputMode; excludeIds?: Set<string> },
+): VtonGarmentItem[] {
+  let candidates = pool.filter((g) => g.kind === kind);
+  if (kind === "full_set") {
+    candidates = candidates.filter(isFullSetGarmentReady);
+    if (opts?.fullSetMode) {
+      candidates = candidates.filter((g) => resolveFullSetInputMode(g) === opts.fullSetMode);
+    }
+  }
+  if (opts?.excludeIds) {
+    candidates = candidates.filter((g) => !opts.excludeIds!.has(g.id));
+  }
+  return candidates;
 }
 
 function isGenericGarmentLabel(label: string | undefined): boolean {
@@ -58,26 +87,17 @@ function defaultGarmentForKind(
   pool: VtonGarmentItem[],
   kind: VtonGarmentKind,
   excludeIds: Set<string> = new Set(),
+  opts?: { fullSetMode?: VtonFullSetInputMode },
 ): string | undefined {
-  const candidates = pool.filter((g) => g.kind === kind);
-  return candidates.find((g) => !excludeIds.has(g.id))?.id ?? candidates[0]?.id;
-}
-
-function usedGarmentIds(looks: VtonLookSpec[]): Set<string> {
-  const ids = new Set<string>();
-  for (const look of looks) {
-    if (look.topGarmentId) ids.add(look.topGarmentId);
-    if (look.bottomGarmentId) ids.add(look.bottomGarmentId);
-    if (look.onePieceGarmentId) ids.add(look.onePieceGarmentId);
-    if (look.fullSetGarmentId) ids.add(look.fullSetGarmentId);
-  }
-  return ids;
+  const candidates = poolGarmentCandidates(pool, kind, { ...opts, excludeIds });
+  return candidates[0]?.id;
 }
 
 function defaultGarmentIdsForLookKind(
   kind: VtonLookKind,
   pool: VtonGarmentItem[],
   excludeIds: Set<string> = new Set(),
+  opts?: AddLookDraftOpts,
 ): Partial<VtonLookSpec> {
   if (kind === "two_piece") {
     return {
@@ -97,7 +117,7 @@ function defaultGarmentIdsForLookKind(
   }
   if (kind === "full_set") {
     return {
-      fullSetGarmentId: defaultGarmentForKind(pool, "full_set", excludeIds),
+      fullSetGarmentId: defaultGarmentForKind(pool, "full_set", excludeIds, opts),
       topGarmentId: undefined,
       bottomGarmentId: undefined,
       onePieceGarmentId: undefined,
@@ -126,7 +146,7 @@ function pickUniqueGarment(
   pool: VtonGarmentItem[],
   used: Set<string>,
 ): string | undefined {
-  const candidates = pool.filter((g) => g.kind === kind);
+  const candidates = poolGarmentCandidates(pool, kind);
   if (candidates.length === 0) return undefined;
 
   const current = look[field];
@@ -191,6 +211,23 @@ export function assignUniqueGarments(
   return changed ? next : null;
 }
 
+/** 新增一条搭配行并尽量自动分配服装池条目 */
+export function appendLookDraft(
+  looks: VtonLookSpec[],
+  pool: VtonGarmentItem[],
+  kind: VtonLookKind,
+  opts?: AddLookDraftOpts,
+): VtonLookSpec[] {
+  if (looks.length >= ECOM_VTON_MAX_BATCH_LOOKS) return looks;
+  const look: VtonLookSpec = {
+    id: newLookId(),
+    kind,
+    label: `${VTON_LOOK_KIND_LABELS[kind]} ${looks.length + 1}`,
+    ...defaultGarmentIdsForLookKind(kind, pool, collectLookDraftGarmentIds(looks), opts),
+  };
+  return assignUniqueGarments([...looks, look], pool) ?? [...looks, look];
+}
+
 function looksGarmentSignature(looks: VtonLookSpec[]): string {
   return looks
     .map(
@@ -244,15 +281,10 @@ export function VtonLookComposer({
     await onChange(fixed);
   }
 
-  async function addLook(kind: VtonLookKind) {
-    if (looks.length >= ECOM_VTON_MAX_BATCH_LOOKS) return;
-    const look: VtonLookSpec = {
-      id: newLookId(),
-      kind,
-      label: `${VTON_LOOK_KIND_LABELS[kind]} ${looks.length + 1}`,
-      ...defaultGarmentIdsForLookKind(kind, pool, usedGarmentIds(looks)),
-    };
-    await commitLooks([...looks, look]);
+  async function addLook(kind: VtonLookKind, opts?: AddLookDraftOpts) {
+    const next = appendLookDraft(looks, pool, kind, opts);
+    if (next.length === looks.length) return;
+    await commitLooks(next);
   }
 
   async function updateLook(id: string, patch: Partial<VtonLookSpec>) {
@@ -267,7 +299,7 @@ export function VtonLookComposer({
           ? {
               ...l,
               kind,
-              ...defaultGarmentIdsForLookKind(kind, pool, usedGarmentIds(others)),
+              ...defaultGarmentIdsForLookKind(kind, pool, collectLookDraftGarmentIds(others)),
             }
           : l,
       ),
@@ -316,30 +348,16 @@ export function VtonLookComposer({
             ) : null}
           </p>
         </div>
-        <div className="flex flex-wrap gap-1">
-          {(Object.keys(VTON_LOOK_KIND_LABELS) as VtonLookKind[]).map((kind) => (
-            <button
-              key={kind}
-              type="button"
-              className="rounded-md border border-[#e8e8ed] px-2 py-1 text-[10px] text-[#0071e3] hover:bg-[#f0f6ff] disabled:opacity-50"
-              disabled={busy || disabled || looks.length >= ECOM_VTON_MAX_BATCH_LOOKS}
-              onClick={() => void addLook(kind)}
-            >
-              <Plus className="mr-0.5 inline h-3 w-3" />
-              {VTON_LOOK_KIND_LABELS[kind]}
-            </button>
-          ))}
-          {onCartesian && tops.length > 0 && bottoms.length > 0 ? (
-            <EcomButtonSecondary
-              type="button"
-              size="sm"
-              disabled={busy || disabled}
-              onClick={() => void onCartesian(tops.map((t) => t.id), bottoms.map((b) => b.id))}
-            >
-              上×下组合
-            </EcomButtonSecondary>
-          ) : null}
-        </div>
+        {onCartesian && tops.length > 0 && bottoms.length > 0 ? (
+          <EcomButtonSecondary
+            type="button"
+            size="sm"
+            disabled={busy || disabled}
+            onClick={() => void onCartesian(tops.map((t) => t.id), bottoms.map((b) => b.id))}
+          >
+            上×下组合
+          </EcomButtonSecondary>
+        ) : null}
       </div>
 
       <div className="space-y-2">
@@ -447,6 +465,33 @@ export function VtonLookComposer({
   );
 }
 
+function GarmentPreviewThumbs({ garment, alt }: { garment: VtonGarmentItem; alt: string }) {
+  const urls = garmentPreviewThumbUrls(garment);
+  if (urls.length === 0) return null;
+
+  const thumbClass = cn("rounded-lg [&>div]:rounded-lg [&>div]:border-[#0071e3]");
+
+  if (urls.length === 1) {
+    return (
+      <EcomRefImageThumb src={urls[0]!} alt={alt} size={64} className={thumbClass} />
+    );
+  }
+
+  return (
+    <div className="flex shrink-0 items-center gap-1">
+      {urls.map((url, index) => (
+        <EcomRefImageThumb
+          key={url}
+          src={url}
+          alt={`${alt} · ${index === 0 ? "上装" : "下装"}`}
+          size={48}
+          className={thumbClass}
+        />
+      ))}
+    </div>
+  );
+}
+
 function GarmentSlotField({
   label,
   value,
@@ -473,17 +518,9 @@ function GarmentSlotField({
 
   const canCycle = options.length > 1 && !disabled;
 
-  const thumb =
-    selected ? (
-      <EcomRefImageThumb
-        src={selected.ossUrl}
-        alt={displayName}
-        size={64}
-        className={cn(
-          "rounded-lg [&>div]:rounded-lg [&>div]:border-[#0071e3]",
-        )}
-      />
-    ) : null;
+  const thumb = selected ? (
+    <GarmentPreviewThumbs garment={selected} alt={displayName} />
+  ) : null;
 
   return (
     <div className="flex items-center gap-2">

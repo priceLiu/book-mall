@@ -1,7 +1,31 @@
 import { randomUUID } from "crypto";
 
 import type { WorkflowRefImage, WorkflowRefs } from "@/lib/ecom/video-workflow/shot-spine";
-import type { VtonModelGeneration, VtonProjectMeta } from "@/lib/ecom/ecom-vton/types";
+import type {
+  VtonModelGeneration,
+  VtonModelGenerationBodyCheck,
+  VtonProjectMeta,
+} from "@/lib/ecom/ecom-vton/types";
+
+const BODY_SHOT_TYPES = new Set(["portrait", "half_body", "full_body", "unknown"]);
+
+function sanitizeGenerationBodyCheck(raw: unknown): VtonModelGenerationBodyCheck | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const status = o.status;
+  if (status !== "pending" && status !== "done" && status !== "failed") return undefined;
+  const shotTypeRaw = typeof o.shotType === "string" ? o.shotType : undefined;
+  const shotType = shotTypeRaw && BODY_SHOT_TYPES.has(shotTypeRaw)
+    ? (shotTypeRaw as VtonModelGenerationBodyCheck["shotType"])
+    : undefined;
+  return {
+    status,
+    ...(shotType ? { shotType } : {}),
+    ...(typeof o.isFullBody === "boolean" ? { isFullBody: o.isFullBody } : {}),
+    ...(typeof o.checkedAt === "string" ? { checkedAt: o.checkedAt } : {}),
+    ...(o.fromAiGenerate === true ? { fromAiGenerate: true } : {}),
+  };
+}
 
 export function newModelGenerationId(): string {
   return randomUUID();
@@ -23,6 +47,7 @@ function sanitizeModelGeneration(raw: unknown): VtonModelGeneration | null {
         ? (source as VtonModelGeneration["source"])
         : undefined,
     createdAt: typeof o.createdAt === "string" ? o.createdAt : new Date().toISOString(),
+    bodyCheck: sanitizeGenerationBodyCheck(o.bodyCheck),
     confirmedAt: typeof o.confirmedAt === "string" ? o.confirmedAt : undefined,
   };
 }
@@ -222,6 +247,7 @@ export function appendModelGeneration(
     source?: VtonModelGeneration["source"];
     id?: string;
     createdAt?: string;
+    bodyCheck?: VtonModelGenerationBodyCheck;
   },
 ): { meta: VtonProjectMeta; generation: VtonModelGeneration } {
   const generation: VtonModelGeneration = {
@@ -230,6 +256,7 @@ export function appendModelGeneration(
     label: entry.label,
     source: entry.source,
     createdAt: entry.createdAt ?? new Date().toISOString(),
+    ...(entry.bodyCheck ? { bodyCheck: entry.bodyCheck } : {}),
   };
   const modelGenerations = [...(meta.modelGenerations ?? []), generation];
   return {

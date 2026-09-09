@@ -39,12 +39,13 @@ export function patchVtonGarmentPool(
   opts: {
     add?: Array<Omit<VtonGarmentItem, "id"> & { id?: string }>;
     removeIds?: string[];
+    update?: Array<{ id: string; patch: Partial<VtonGarmentItem> }>;
   },
 ): VtonProjectMeta {
   const meta = sanitizeVtonProjectMeta(metaRaw);
   const pool = [...(meta.garmentPool ?? [])];
   const remove = new Set(opts.removeIds ?? []);
-  const next = pool.filter((g) => !remove.has(g.id));
+  let next = pool.filter((g) => !remove.has(g.id));
   for (const row of opts.add ?? []) {
     next.push({
       id: row.id?.trim() || newGarmentId(),
@@ -52,7 +53,32 @@ export function patchVtonGarmentPool(
       ossUrl: row.ossUrl.trim(),
       label: row.label,
       source: row.source,
+      fullSetInputMode: row.fullSetInputMode,
+      parsedTopUrl: row.parsedTopUrl?.trim() || undefined,
+      parsedBottomUrl: row.parsedBottomUrl?.trim() || undefined,
     });
+  }
+  for (const row of opts.update ?? []) {
+    const id = row.id.trim();
+    const idx = next.findIndex((g) => g.id === id);
+    if (idx < 0) continue;
+    const current = next[idx]!;
+    const patch = row.patch;
+    next[idx] = {
+      ...current,
+      ...patch,
+      id: current.id,
+      kind: current.kind,
+      ossUrl: patch.ossUrl?.trim() || current.ossUrl,
+      parsedTopUrl:
+        "parsedTopUrl" in patch
+          ? patch.parsedTopUrl?.trim() || undefined
+          : current.parsedTopUrl,
+      parsedBottomUrl:
+        "parsedBottomUrl" in patch
+          ? patch.parsedBottomUrl?.trim() || undefined
+          : current.parsedBottomUrl,
+    };
   }
   return mergeVtonMeta(meta, { garmentPool: next });
 }
@@ -93,7 +119,8 @@ export async function runVtonProjectBatchTryon(opts: {
   const allLooks = meta.lookDrafts ?? [];
   const targetLooks = opts.looks?.length ? opts.looks : allLooks;
   if (targetLooks.length < 1) throw new Error("请至少选择 1 套搭配");
-  const garmentPool = meta.garmentPool ?? [];
+  const garmentPool = [...(meta.garmentPool ?? [])];
+  let garmentPoolParsedDuringRun = false;
 
   let mergedResults = buildVtonBatchResultsForRun({
     allLooks,
@@ -130,6 +157,16 @@ export async function runVtonProjectBatchTryon(opts: {
       const latest = await opts.loadMeta();
       return isVtonBatchCancelRequested(latest, activeBatchId);
     },
+    onGarmentParsed: (garmentId, parsed) => {
+      const idx = garmentPool.findIndex((g) => g.id === garmentId);
+      if (idx < 0) return;
+      garmentPool[idx] = {
+        ...garmentPool[idx]!,
+        parsedTopUrl: parsed.topUrl,
+        parsedBottomUrl: parsed.bottomUrl,
+      };
+      garmentPoolParsedDuringRun = true;
+    },
     onProgress: async ({ batch: b, itemProgress }) => {
       const latest = await opts.loadMeta();
       mergedResults = mergeVtonBatchRunIntoResults(mergedResults, b.results);
@@ -143,6 +180,7 @@ export async function runVtonProjectBatchTryon(opts: {
           updatedAt: b.updatedAt,
         },
         tryonBatchCancelBatchId: latest.tryonBatchCancelBatchId ?? null,
+        ...(garmentPoolParsedDuringRun ? { garmentPool: [...garmentPool] } : {}),
       });
       await opts.persistMeta(workingMeta);
     },
@@ -157,6 +195,7 @@ export async function runVtonProjectBatchTryon(opts: {
       label: batch.label ?? (batch.status === "cancelled" ? "已停止批量试衣" : "批量试衣完成"),
       updatedAt: batch.updatedAt,
     },
+    ...(garmentPoolParsedDuringRun ? { garmentPool: [...garmentPool] } : {}),
   });
   await opts.persistMeta(workingMeta);
   return workingMeta;

@@ -4,6 +4,7 @@ export const ECOM_VTON_MAX_BATCH_LOOKS = 9;
 
 export type VtonLookKind = "two_piece" | "one_piece" | "top_only" | "bottom_only" | "full_set";
 export type VtonGarmentKind = "top" | "bottom" | "one_piece" | "full_set";
+export type VtonFullSetInputMode = "composite" | "manual";
 
 export type VtonGarmentItem = {
   id: string;
@@ -11,6 +12,12 @@ export type VtonGarmentItem = {
   ossUrl: string;
   label?: string;
   source?: string;
+  /** 套装入库方式：整图自动分割 vs 用户已拆分双槽 */
+  fullSetInputMode?: VtonFullSetInputMode;
+  /** 套装图预分割上装 */
+  parsedTopUrl?: string;
+  /** 套装图预分割下装 */
+  parsedBottomUrl?: string;
 };
 
 export type VtonLookSpec = {
@@ -61,12 +68,12 @@ export type VtonLockedLook = {
 
 export type VtonModelBodyShotType = "portrait" | "half_body" | "full_body" | "unknown";
 
-export type VtonModelImageCheck = {
-  ossUrl: string;
-  isFullBody: boolean;
-  shotType: VtonModelBodyShotType;
-  checkedAt: string;
-  fromAiFourView?: boolean;
+export type VtonModelGenerationBodyCheck = {
+  status: "pending" | "done" | "failed";
+  shotType?: VtonModelBodyShotType;
+  isFullBody?: boolean;
+  checkedAt?: string;
+  fromAiGenerate?: boolean;
 };
 
 export type VtonModelGeneration = {
@@ -75,6 +82,7 @@ export type VtonModelGeneration = {
   label?: string;
   source?: string;
   createdAt: string;
+  bodyCheck?: VtonModelGenerationBodyCheck;
   confirmedAt?: string;
 };
 
@@ -86,7 +94,6 @@ export type VtonProjectMeta = {
   defaultLockedLookId?: string;
   tryonProgress?: VtonTryonProgress | null;
   tryonBatchCancelBatchId?: string | null;
-  modelImageCheck?: VtonModelImageCheck | null;
   modelGenerations?: VtonModelGeneration[];
   previewModelGenerationId?: string;
   confirmedModelGenerationIds?: string[];
@@ -114,7 +121,6 @@ export function parseVtonProjectMeta(raw: unknown): VtonProjectMeta {
     defaultLockedLookId:
       typeof o.defaultLockedLookId === "string" ? o.defaultLockedLookId : undefined,
     tryonProgress: o.tryonProgress as VtonTryonProgress | null | undefined,
-    modelImageCheck: (o.modelImageCheck as VtonModelImageCheck | null | undefined) ?? undefined,
     modelGenerations: Array.isArray(o.modelGenerations)
       ? (o.modelGenerations as VtonModelGeneration[])
       : undefined,
@@ -136,9 +142,18 @@ export const VTON_GARMENT_UPLOAD_HINTS: Record<VtonGarmentKind, string> = {
   top: "平铺或上身图，单一上装、背景简洁、主体完整",
   bottom: "平铺或上身图，单一的下装、背景简洁、主体完整",
   one_piece: "平铺或上身图，连衣裙/连体衣单一主体",
-  full_set:
-    "一张图同时包含上装与下装（平铺或上身均可）；试衣前将自动分割并传入上下装双槽",
+  full_set: "试衣时双槽同时传入上装与下装",
 };
+
+/** 服装池 · 套装整图列 */
+export const VTON_FULL_SET_COMPOSITE_LABEL = "套装（整图自动分割）";
+export const VTON_FULL_SET_COMPOSITE_HINT =
+  "上传一张同时含上下装的整图，系统自动分割；无需手动切图";
+
+/** 服装池 · 套装双槽列 */
+export const VTON_FULL_SET_MANUAL_LABEL = "套装（上下装双槽）";
+export const VTON_FULL_SET_MANUAL_HINT =
+  "上装、下装分别上传或粘贴，凑齐一套后试衣";
 
 /** 入库默认名、缩略图副标题等短文案 */
 export const VTON_GARMENT_KIND_SHORT_LABELS: Record<VtonGarmentKind, string> = {
@@ -160,7 +175,7 @@ export const VTON_GARMENT_KIND_LABELS: Record<VtonGarmentKind, string> = {
   top: `上装 (${VTON_TOP_GARMENT_SCOPE})`,
   bottom: `下装 (${VTON_BOTTOM_GARMENT_SCOPE})`,
   one_piece: "连体/裙",
-  full_set: "套装（上下装双槽）",
+  full_set: "套装",
 };
 
 export const VTON_GARMENT_POOL_KINDS: VtonGarmentKind[] = [
@@ -168,4 +183,17 @@ export const VTON_GARMENT_POOL_KINDS: VtonGarmentKind[] = [
   "bottom",
   "one_piece",
   "full_set",
+];
+
+/** 服装池网格列（套装拆为整图 / 双槽两格） */
+export type VtonGarmentPoolColumn =
+  | { type: "kind"; kind: Exclude<VtonGarmentKind, "full_set"> }
+  | { type: "full_set"; mode: VtonFullSetInputMode };
+
+export const VTON_GARMENT_POOL_COLUMNS: VtonGarmentPoolColumn[] = [
+  { type: "kind", kind: "top" },
+  { type: "kind", kind: "bottom" },
+  { type: "kind", kind: "one_piece" },
+  { type: "full_set", mode: "composite" },
+  { type: "full_set", mode: "manual" },
 ];

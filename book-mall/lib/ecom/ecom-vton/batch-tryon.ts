@@ -5,7 +5,10 @@ import {
   isVtonTryonCancelledError,
   VtonTryonCancelledError,
 } from "@/lib/ecom/ecom-vton/cancel";
-import type { VtonGarmentParseCache } from "@/lib/ecom/ecom-vton/garment-parsing";
+import {
+  ensureFullSetGarmentParsed,
+  type VtonGarmentParseCache,
+} from "@/lib/ecom/ecom-vton/garment-parsing";
 import { runEcomVtonTryOn } from "@/lib/ecom/ecom-vton/tryon";
 import type {
   VtonGarmentItem,
@@ -13,6 +16,7 @@ import type {
   VtonTryonBatchState,
   VtonTryonProgress,
   VtonTryonResult,
+  VtonTryonUrlInputs,
 } from "@/lib/ecom/ecom-vton/types";
 import {
   appendVtonTryonResultVersion,
@@ -20,6 +24,8 @@ import {
 } from "@/lib/ecom/ecom-vton/tryon-result-versions";
 import {
   assertLooksResolvable,
+  findGarmentInPool,
+  normalizeLookForTryon,
   resolveLookTryonUrls,
 } from "@/lib/ecom/ecom-vton/validate";
 
@@ -129,6 +135,54 @@ export function resolveVtonBatchTryonProgressPhase(
   return "polling";
 }
 
+async function resolveTryonUrlsForBatchLook(opts: {
+  look: VtonLookSpec;
+  garmentPool: VtonGarmentItem[];
+  modelUrl: string;
+  userId: string;
+  projectId: string;
+  consumerToolKey: string;
+  garmentParseCache: VtonGarmentParseCache;
+  onGarmentParsed?: (garmentId: string, parsed: { topUrl: string; bottomUrl: string }) => void;
+}): Promise<VtonTryonUrlInputs> {
+  const normalizedLook = normalizeLookForTryon(opts.look, opts.garmentPool);
+  const urls = resolveLookTryonUrls({
+    look: normalizedLook,
+    garmentPool: opts.garmentPool,
+    modelUrl: opts.modelUrl,
+  });
+  if (urls.lookKind !== "full_set") return urls;
+
+  const set = findGarmentInPool(opts.garmentPool, normalizedLook.fullSetGarmentId);
+  if (!set?.ossUrl?.trim()) {
+    throw new Error(`搭配 ${normalizedLook.label ?? normalizedLook.id} 缺少套装`);
+  }
+
+  const parsed = await ensureFullSetGarmentParsed({
+    userId: opts.userId,
+    garment: set,
+    projectId: opts.projectId,
+    consumerToolKey: opts.consumerToolKey,
+    cache: opts.garmentParseCache,
+  });
+
+  if (!set.parsedTopUrl?.trim() || !set.parsedBottomUrl?.trim()) {
+    set.parsedTopUrl = parsed.topGarmentUrl;
+    set.parsedBottomUrl = parsed.bottomGarmentUrl;
+    opts.onGarmentParsed?.(set.id, {
+      topUrl: parsed.topGarmentUrl,
+      bottomUrl: parsed.bottomGarmentUrl,
+    });
+  }
+
+  return {
+    personImageUrl: urls.personImageUrl,
+    topGarmentUrl: parsed.topGarmentUrl,
+    bottomGarmentUrl: parsed.bottomGarmentUrl,
+    lookKind: "two_piece",
+  };
+}
+
 export async function runEcomVtonTryOnBatch(opts: {
   userId: string;
   consumerToolKey: string;
@@ -140,6 +194,8 @@ export async function runEcomVtonTryOnBatch(opts: {
   initialResults?: VtonTryonResult[];
   shouldCancel?: () => boolean | Promise<boolean>;
   onProgress?: (progress: VtonBatchTryonProgress) => void | Promise<void>;
+  /** 套装首次分割后回写服装池（持久化预分割 URL） */
+  onGarmentParsed?: (garmentId: string, parsed: { topUrl: string; bottomUrl: string }) => void;
 }): Promise<VtonTryonBatchState> {
   assertLooksResolvable(opts.looks, opts.garmentPool, opts.modelUrl);
 
@@ -179,10 +235,15 @@ export async function runEcomVtonTryOnBatch(opts: {
     await opts.onProgress?.({ batch, result });
 
     try {
-      const urls = resolveLookTryonUrls({
+      const urls = await resolveTryonUrlsForBatchLook({
         look,
         garmentPool: opts.garmentPool,
         modelUrl: opts.modelUrl,
+        userId: opts.userId,
+        projectId: opts.projectId,
+        consumerToolKey: opts.consumerToolKey,
+        garmentParseCache,
+        onGarmentParsed: opts.onGarmentParsed,
       });
       const ossUrl = await runEcomVtonTryOn({
         userId: opts.userId,
