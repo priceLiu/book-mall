@@ -16,11 +16,10 @@
 import {
   DEFAULT_CREDIT_ANCHOR_YUAN,
   DEFAULT_VIDEO_MIN_MARGIN_GUARD,
-  FALLBACK_PRICING_CONFIG,
 } from "@/lib/pricing/credit-pricing-formulas";
 import {
-  computeModelQuoteRow,
-  REFERENCE_VENDOR_MODELS,
+  SEEDANCE_CHARGE_CREDITS_15S,
+  SEEDANCE_NET_COST_15S_YUAN,
 } from "@/lib/pricing/unified-credit-formula";
 
 /** VIP 起订金额（元）。 */
@@ -29,18 +28,9 @@ export const VIP_MIN_AMOUNT_YUAN = 100_000;
 /** 企业大额预充积分有效期（年）。公示见 docs/大额vip.md */
 export const VIP_CREDIT_VALIDITY_YEARS = 5;
 
-const SEEDANCE_REFERENCE =
-  REFERENCE_VENDOR_MODELS.find((m) => m.id === "seedance-2.0-720p-real") ??
-  REFERENCE_VENDOR_MODELS[0]!;
-
-const SEEDANCE_QUOTE = computeModelQuoteRow(SEEDANCE_REFERENCE, {
-  ...FALLBACK_PRICING_CONFIG,
-  videoMinMarginGuard: DEFAULT_VIDEO_MIN_MARGIN_GUARD,
-});
-
 /** 锚定 Seedance 15s（与 unified-credit-formula v2 一致）。 */
-export const VIP_SEEDANCE_CHARGE_CREDITS = SEEDANCE_QUOTE.chargeCredits15s ?? 750;
-export const VIP_SEEDANCE_NET_COST_YUAN = SEEDANCE_QUOTE.netCost15s ?? 15;
+export const VIP_SEEDANCE_CHARGE_CREDITS = SEEDANCE_CHARGE_CREDITS_15S;
+export const VIP_SEEDANCE_NET_COST_YUAN = SEEDANCE_NET_COST_15S_YUAN;
 export const VIP_COST_WORST_PER_CREDIT =
   VIP_SEEDANCE_NET_COST_YUAN / VIP_SEEDANCE_CHARGE_CREDITS;
 

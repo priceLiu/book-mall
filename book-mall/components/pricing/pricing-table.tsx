@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
  * 由 `/pricing-disclosure` 引用（#ai-tryon 试衣 / #all-tools 其他），确保对外可见的「按次 / 按图 / 按秒」
  * 平台零售价与 ToolBillablePrice 真源同源。本组件不直接读 DB，调用方通过 `rows` 注入。
  *
- * `showPlatformCostColumns=false`（个人中心普通用户）：隐藏云挂牌价、M、公式三列（仅管理员可见）。
+ * `showPlatformCostColumns=false`（默认）：对外隐藏云挂牌价、系数 M、公式列；财务见 finance-web。
  *
  * 列设计：
  *   工具分组卡片头部：toolLabel + toolKey
@@ -76,7 +76,7 @@ function fmtMoney(v: number | null | undefined): string {
 export function PricingTable({
   rows,
   /** 为 false 时隐藏「云挂牌价（成本）」「M」「公式」（个人中心普通用户）。公示页 / 管理员见全文。 */
-  showPlatformCostColumns = true,
+  showPlatformCostColumns = false,
 }: {
   rows: PricingRow[];
   showPlatformCostColumns?: boolean;

@@ -53,12 +53,12 @@
 ```json
 {
   "billingPersona": "PLATFORM_CREDIT",
-  "estimatedCredits": 525,
-  "items": [{ "label": "文生视频", "modelKey": "kling/v3-turbo-text-to-video", "credits": 525 }],
+  "estimatedCredits": 750,
+  "items": [{ "label": "文生视频", "modelKey": "doubao-seedance-2.0", "credits": 750 }],
   "balance": 1200,
   "reserved": 0,
   "sufficient": true,
-  "label": "约 525 积分"
+  "label": "约 750 积分"
 }
 ```
 

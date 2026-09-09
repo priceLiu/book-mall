@@ -6,7 +6,7 @@ import { assertReasonableTopupBonus } from "@/lib/wallet-topup-fulfill-shared";
 
 /**
  * 充值入账（财务 2.0）：写入 CreditAccount，不再写 WalletEntry。
- * 100 点 = 1 元；积分按锚定 ¥0.04/积分换算（1 元 ≈ 25 积分）。
+ * 100 点 = 1 元；积分按锚定 ¥0.03/积分换算（1 元 ≈ 33 积分）。
  */
 
 export type WalletTopupMetaTopup = {

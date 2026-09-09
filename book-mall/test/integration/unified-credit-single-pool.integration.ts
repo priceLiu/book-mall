@@ -18,8 +18,11 @@ import {
   computePricePerCredit,
   computeUnifiedChargeCredits,
 } from "@/lib/pricing/credit-pricing-formulas";
+import {
+  SEEDANCE_CHARGE_CREDITS_15S,
+  SEEDANCE_U0_PER_SEC,
+} from "@/lib/pricing/unified-credit-formula";
 
-const SEEDANCE_U0_PER_SEC = 35;
 const VIDEO_UNITS = 15;
 const UNIFIED_CHARGE = computeUnifiedChargeCredits({
   creditsPerUnit: SEEDANCE_U0_PER_SEC,
@@ -57,7 +60,10 @@ async function main() {
   const createdAccountIds: string[] = [];
 
   try {
-    check("Seedance 15s 统一扣分 = 525", UNIFIED_CHARGE === 525);
+    check(
+      `Seedance 15s 统一扣分 = ${SEEDANCE_CHARGE_CREDITS_15S}`,
+      UNIFIED_CHARGE === SEEDANCE_CHARGE_CREDITS_15S,
+    );
 
     // —————————————— 单池发放与结算 ——————————————
     const userId = `test-single-pool-${randomUUID()}`;

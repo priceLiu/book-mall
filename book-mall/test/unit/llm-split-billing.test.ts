@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeLlmSplitChargeCredits,
   computeSplitTokenCreditPrice,
+  DEFAULT_CREDIT_ANCHOR_YUAN,
 } from "@/lib/pricing/credit-pricing-formulas";
 import { ktokenFromMillion } from "@/lib/pricing/gateway-bailian-price-catalog";
 
@@ -13,7 +14,7 @@ describe("LLM split billing", () => {
       outputListCostYuan: ktokenFromMillion(100),
       discountRate: 0,
       marginM: 2.5,
-      anchorYuan: 0.04,
+      anchorYuan: DEFAULT_CREDIT_ANCHOR_YUAN,
     });
     expect(split.inputCreditsPerKToken).toBeGreaterThan(0);
     expect(split.outputCreditsPerKToken).toBeGreaterThan(split.inputCreditsPerKToken);
@@ -25,7 +26,7 @@ describe("LLM split billing", () => {
       outputListCostYuan: ktokenFromMillion(100),
       discountRate: 0,
       marginM: 2.5,
-      anchorYuan: 0.04,
+      anchorYuan: DEFAULT_CREDIT_ANCHOR_YUAN,
     });
     const credits = computeLlmSplitChargeCredits({
       inputCreditsPerKToken: split.inputCreditsPerKToken,
@@ -36,7 +37,7 @@ describe("LLM split billing", () => {
       listPriceYuan: split.inputListPriceYuan,
       promptTokens: 4000,
       completionTokens: 2000,
-      pricePerCreditYuan: 0.04,
+      pricePerCreditYuan: DEFAULT_CREDIT_ANCHOR_YUAN,
     });
     expect(credits).toBeGreaterThan(split.inputCreditsPerKToken);
   });

@@ -26,15 +26,7 @@ export function PricingDisclosureMeteredSection({
         <h2 className="text-lg font-semibold">二、按次扣费单价（工具）</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
           以下与主站计费结算同源；实际扣费以调用成功为准。
-          {showPricingInternals ? (
-            <>
-              平台单价 = 云挂牌成本 × M（当前 M = 2）。
-            </>
-          ) : (
-            <>
-              下表「平台单价」「点数」为对外零售参考；实际扣费以调用成功为准。
-            </>
-          )}{" "}
+          下表「平台单价」「点数」为对外零售参考。
           试衣模型见{" "}
           <Link href="#ai-tryon" className="text-primary underline">
             本节 · AI 试衣
@@ -56,7 +48,7 @@ export function PricingDisclosureMeteredSection({
             其他工具
           </Link>
         </nav>
-        {showPricingInternals ? <PricingFormulaCard /> : null}
+        {showPricingInternals ? <PricingFormulaCard showRetailCoefficient={false} /> : null}
       </div>
 
       <div id="ai-tryon" className="scroll-mt-28 space-y-4">

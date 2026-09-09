@@ -104,19 +104,8 @@ export async function PricingDisclosureContent({
             为单位记账，
             <strong className="text-foreground">1 点 = ¥0.01</strong>
             （与历史「分」整数口径一致）。
-            {showPricingInternals ? (
-              <>
-                <br />
-                平台零售价 ={" "}
-                <strong className="text-foreground">云厂商挂牌价（成本价）× M</strong>
-                ；当前 M = 2（每个模型 / 档位独立公示）。
-              </>
-            ) : (
-              <>
-                <br />
-                按次工具价目见下文「平台单价」与「点数」列；实际扣费以调用成功为准。
-              </>
-            )}
+            <br />
+            按次工具价目见下文「平台单价」与「点数」列；实际扣费以调用成功为准。
           </p>
         </div>
       ) : (

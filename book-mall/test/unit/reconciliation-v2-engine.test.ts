@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { aggregatePlatformUsageFromLogs } from "@/lib/finance/reconciliation-v2/platform-usage-aggregator";
 import { reconcileVendorAndPlatform } from "@/lib/finance/reconciliation-v2/reconcile-engine";
 import type { VendorBillLine } from "@/lib/finance/reconciliation-v2/types";
+import { DEFAULT_CREDIT_ANCHOR_YUAN } from "@/lib/pricing/credit-pricing-formulas";
 
 describe("reconciliation v2 engine", () => {
   const vendorLine = (over: Partial<VendorBillLine>): VendorBillLine => ({
@@ -36,7 +37,7 @@ describe("reconciliation v2 engine", () => {
           canonicalModelKey: "wan2.7-image",
           submittedAt: new Date("2026-08-15T12:00:00Z"),
           creditsCharged: 100,
-          pricePerCreditSnapshotYuan: 0.04,
+          pricePerCreditSnapshotYuan: DEFAULT_CREDIT_ANCHOR_YUAN,
         },
       ],
       { "wan2.7-image": 0.2 },

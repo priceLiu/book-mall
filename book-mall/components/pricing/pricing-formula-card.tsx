@@ -1,9 +1,9 @@
 /**
  * "公式说明卡片"：与共享 PricingTable 成对使用。
- * `showRetailCoefficient=false` 时略去系数 M 等对内口径（与 `/account/pricing` 普通用户视图一致）。
+ * `showRetailCoefficient=false`（默认）：对外不展示系数 M 与成本公式；财务见 finance-web。
  */
 export function PricingFormulaCard({
-  showRetailCoefficient = true,
+  showRetailCoefficient = false,
 }: {
   showRetailCoefficient?: boolean;
 }) {

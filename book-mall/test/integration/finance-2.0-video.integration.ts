@@ -19,14 +19,18 @@ import {
   computeUnifiedChargeCredits,
 } from "@/lib/pricing/credit-pricing-formulas";
 import { deriveEcomBillingMode } from "@/lib/billing/billing-persona";
+import {
+  SEEDANCE_CHARGE_CREDITS_15S,
+  SEEDANCE_NET_COST_15S_YUAN,
+  SEEDANCE_U0_PER_SEC,
+} from "@/lib/pricing/unified-credit-formula";
 
-const SEEDANCE_U0_PER_SEC = 35;
 const VIDEO_UNITS = 15;
 const UNIFIED_CHARGE = computeUnifiedChargeCredits({
   creditsPerUnit: SEEDANCE_U0_PER_SEC,
   units: VIDEO_UNITS,
 });
-const VIDEO_COST_YUAN = 15;
+const VIDEO_COST_YUAN = SEEDANCE_NET_COST_15S_YUAN;
 
 let failures = 0;
 function check(label: string, cond: boolean, extra?: unknown) {

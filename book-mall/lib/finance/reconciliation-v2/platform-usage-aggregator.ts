@@ -19,6 +19,7 @@ import {
 } from "./billable-units";
 import type { PlatformUsageLine, TokenDirection, UnitKind } from "./types";
 import { unitNetCostYuan } from "@/lib/finance/gateway-log-line-cost";
+import { DEFAULT_CREDIT_ANCHOR_YUAN } from "@/lib/pricing/credit-pricing-formulas";
 import {
   calendarDateFromIso,
   dateInPeriod,
@@ -227,7 +228,7 @@ export async function aggregatePlatformUsageForReconciliation(
   async function pricePerCreditForUser(bookUserId: string | null | undefined): Promise<number> {
     const key = bookUserId ?? "_default";
     if (ppcCache.has(key)) return ppcCache.get(key)!;
-    let ppc = 0.04;
+    let ppc = DEFAULT_CREDIT_ANCHOR_YUAN;
     if (bookUserId) {
       const acct = await prisma.creditAccount.findFirst({
         where: { ownerType: "USER", ownerId: bookUserId },
@@ -573,7 +574,7 @@ export function aggregatePlatformUsageFromLogs(
     cur.platformUnits += usage.amount;
     cur.platformCredits += num(log.creditsCharged);
     cur.platformRevenueYuan +=
-      num(log.creditsCharged) * num(log.pricePerCreditSnapshotYuan, 0.04);
+      num(log.creditsCharged) * num(log.pricePerCreditSnapshotYuan, DEFAULT_CREDIT_ANCHOR_YUAN);
     const unitNet = unitNetCostYuan(log);
     const netUnit =
       unitNet != null && unitNet > 0 ? unitNet : (netUnitByModel[modelKey] ?? 0);

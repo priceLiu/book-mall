@@ -15,6 +15,7 @@ import {
   DEFAULT_CREDIT_ANCHOR_YUAN,
   DEFAULT_MIN_MARGIN_GUARD,
   DEFAULT_VIDEO_MIN_MARGIN_GUARD,
+  FALLBACK_PRICING_CONFIG,
   marginGuardForUnit,
   marginPassesGuard,
   type PricingConfig,
@@ -334,3 +335,19 @@ export function computeModelQuoteFromCostProfile(input: {
     input.config,
   );
 }
+
+const SEEDANCE_REFERENCE_MODEL =
+  REFERENCE_VENDOR_MODELS.find((m) => m.id === "seedance-2.0-720p-real") ??
+  REFERENCE_VENDOR_MODELS[0]!;
+
+/** 全站毛利 / SKU 锚定：Seedance 2.0 720P · 15s（随 FALLBACK_PRICING_CONFIG 更新） */
+export const SEEDANCE_REFERENCE_ROW = computeModelQuoteRow(
+  SEEDANCE_REFERENCE_MODEL,
+  FALLBACK_PRICING_CONFIG,
+);
+
+export const SEEDANCE_U0_PER_SEC = SEEDANCE_REFERENCE_ROW.creditsPerUnit;
+export const SEEDANCE_CHARGE_CREDITS_15S =
+  SEEDANCE_REFERENCE_ROW.chargeCredits15s ??
+  SEEDANCE_U0_PER_SEC * FALLBACK_PRICING_CONFIG.defaultVideoSec;
+export const SEEDANCE_NET_COST_15S_YUAN = SEEDANCE_REFERENCE_ROW.netCost15s ?? 15;

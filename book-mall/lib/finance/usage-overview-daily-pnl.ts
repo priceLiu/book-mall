@@ -4,6 +4,7 @@
 import { estimateGatewayLogNetCostYuan } from "@/lib/finance/gateway-log-line-cost";
 import { GATEWAY_USAGE_LOG_SELECT } from "@/lib/gateway/gateway-token-usage-aggregate";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_CREDIT_ANCHOR_YUAN } from "@/lib/pricing/credit-pricing-formulas";
 
 export type DailyPnlRow = {
   day: string;
@@ -111,7 +112,9 @@ export async function buildUsageOverviewDailyPnl(input: {
       calls: new Set<string>(),
     };
     const ppc =
-      l.account.pricePerCreditYuan != null ? Number(l.account.pricePerCreditYuan) : 0.04;
+      l.account.pricePerCreditYuan != null
+        ? Number(l.account.pricePerCreditYuan)
+        : DEFAULT_CREDIT_ANCHOR_YUAN;
     bucket.revenue += credits * ppc;
     if (l.refType === "gateway_log" && l.refId && logCostMap.has(l.refId)) {
       bucket.cost += logCostMap.get(l.refId) ?? 0;

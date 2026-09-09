@@ -69,9 +69,9 @@
 | canonicalKey / modelKey | `doubao-seedance-2.0` |
 | 计费单位 | 秒 |
 | 净成本 C | ¥1.0/秒 |
-| M（毛利系数） | 1.4 |
-| U₀ | 35 积分/秒 |
-| 典型用量扣分 | 15s → 525 积分 |
+| M（毛利系数） | 1.5 |
+| U₀ | 50 积分/秒 |
+| 典型用量扣分 | 15s → 750 积分 |
 | 锚定毛利 | ≥ 22% |
 
 验算工具：`lib/pricing/unified-credit-formula.ts`、Finance `/admin/credit-pricing`。

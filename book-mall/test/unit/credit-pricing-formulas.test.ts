@@ -6,6 +6,7 @@ import {
   computeEffectiveMargin,
   computePricePerCredit,
   computeUnifiedChargeCredits,
+  DEFAULT_CREDIT_ANCHOR_YUAN,
   marginGuardForUnit,
   videoBillableSeconds,
 } from "@/lib/pricing/credit-pricing-formulas";
@@ -14,13 +15,17 @@ import {
   resolveModelMarginM,
   VIDEO_MARGIN_M_NORMAL,
 } from "@/lib/pricing/model-margin-policy";
+import {
+  SEEDANCE_CHARGE_CREDITS_15S,
+  SEEDANCE_U0_PER_SEC,
+} from "@/lib/pricing/unified-credit-formula";
 
 describe("computeUnifiedChargeCredits — 人人相同扣分", () => {
   it("高级版 ppc 与标准版 ppc 扣分相同", () => {
-    const creditsPerUnit = 35;
+    const creditsPerUnit = SEEDANCE_U0_PER_SEC;
     const units = 15;
     const u = computeUnifiedChargeCredits({ creditsPerUnit, units });
-    expect(u).toBe(525);
+    expect(u).toBe(SEEDANCE_CHARGE_CREDITS_15S);
     expect(
       computeChargeCreditsFromSnapshot({
         creditsPerUnit,
@@ -32,7 +37,7 @@ describe("computeUnifiedChargeCredits — 人人相同扣分", () => {
       computeChargeCreditsFromSnapshot({
         creditsPerUnit,
         units,
-        pricePerCreditYuan: 0.04,
+        pricePerCreditYuan: DEFAULT_CREDIT_ANCHOR_YUAN,
       }),
     ).toBe(u);
   });
@@ -62,30 +67,30 @@ describe("resolveModelMarginM — 类型分档（v3）", () => {
   });
 });
 
-describe("computeCreditPrice — Seedance 单秒", () => {
-  it("net 1.0 / M=1.4 → 挂牌 1.4、35 积分/秒", () => {
+describe("computeCreditPrice — Seedance 单秒（v3）", () => {
+  it("net 1.0 / M=1.5 / anchor 0.03 → 挂牌 1.5、50 积分/秒", () => {
     const r = computeCreditPrice({
       listCostYuan: 1.4,
       discountRate: 0.2857,
-      marginM: 1.4,
-      anchorYuan: 0.04,
+      marginM: 1.5,
+      anchorYuan: DEFAULT_CREDIT_ANCHOR_YUAN,
     });
     expect(r.netCostYuan).toBeCloseTo(1.0, 3);
-    expect(r.listPriceYuan).toBeCloseTo(1.4, 4);
-    expect(r.creditsPerUnit).toBe(35);
-    expect(r.baseMarginRate).toBeCloseTo(1 - 1 / 1.4, 2);
+    expect(r.listPriceYuan).toBeCloseTo(1.5, 4);
+    expect(r.creditsPerUnit).toBe(SEEDANCE_U0_PER_SEC);
+    expect(r.baseMarginRate).toBeCloseTo(1 - 1 / 1.5, 2);
   });
 });
 
 describe("computeEffectiveMargin — 高级版 Seedance 15s", () => {
-  it("ppc=0.046、525 分、成本 15 → 毛利约 38%", () => {
+  it(`ppc≈0.046、${SEEDANCE_CHARGE_CREDITS_15S} 分、成本 15 → 毛利约 56%`, () => {
     const ppc = computePricePerCredit(299, 6500);
     const margin = computeEffectiveMargin({
       netCostYuan: 15,
-      creditsPerUnit: 525,
+      creditsPerUnit: SEEDANCE_CHARGE_CREDITS_15S,
       pricePerCreditYuan: ppc,
     });
-    expect(margin).toBeGreaterThan(0.3);
-    expect(margin).toBeLessThan(0.45);
+    expect(margin).toBeGreaterThan(0.5);
+    expect(margin).toBeLessThan(0.6);
   });
 });

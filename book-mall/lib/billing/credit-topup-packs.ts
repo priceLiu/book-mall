@@ -1,5 +1,5 @@
 /**
- * 积分加油包（加量包）— 三档，锚定 ¥0.04/积分。
+ * 积分加油包（加量包）— 三档，锚定 ¥0.03/积分。
  */
 import { DEFAULT_CREDIT_ANCHOR_YUAN } from "@/lib/pricing/credit-pricing-formulas";
 

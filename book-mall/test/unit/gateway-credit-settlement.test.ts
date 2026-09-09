@@ -5,6 +5,7 @@ import {
   computeChargeCredits,
   computeVideoChargeCredits,
 } from "@/lib/billing/gateway-credit-settlement";
+import { DEFAULT_CREDIT_ANCHOR_YUAN } from "@/lib/pricing/credit-pricing-formulas";
 
 describe("video billing units", () => {
   const snap = {
@@ -29,12 +30,12 @@ describe("video billing units", () => {
     const c5 = computeVideoChargeCredits({
       snapshot: snap,
       durationSec: 5,
-      pricePerCreditYuan: 0.04,
+      pricePerCreditYuan: DEFAULT_CREDIT_ANCHOR_YUAN,
     });
     const c15 = computeVideoChargeCredits({
       snapshot: snap,
       durationSec: 15,
-      pricePerCreditYuan: 0.04,
+      pricePerCreditYuan: DEFAULT_CREDIT_ANCHOR_YUAN,
     });
     expect(c5.units).toBe(5);
     expect(c15.units).toBe(15);
@@ -55,7 +56,7 @@ describe("video billing units", () => {
       computeChargeCredits({
         snapshot: snap25,
         units: 5,
-        pricePerCreditYuan: 0.04,
+        pricePerCreditYuan: DEFAULT_CREDIT_ANCHOR_YUAN,
       }),
     ).toBe(125);
     expect(

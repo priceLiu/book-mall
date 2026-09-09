@@ -9,7 +9,6 @@ import {
   X,
   Sparkles,
   Users,
-  Calculator,
   Minus,
   Plus,
   Film,
@@ -404,14 +403,14 @@ export function PricingPageClient({
         ) : null}
 
         {/* 规则说明 + 用完处理 */}
-        <section className="mt-16 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <section className="mt-16">
           <div className={cn(PANEL_CLASS, "p-6")}>
             <div className="site-pricing-panel-title flex items-center gap-2">
               <Info className="h-5 w-5 text-muted-foreground" /> 计费规则（一看就懂）
             </div>
             <ul className="mt-3 space-y-2 site-pricing-body-text">
               <li>一种积分：图文、视频、文本模型均从同一积分池扣减。</li>
-              <li>人人同一扣分（U₀×单位数）；高级会员积分单价更低，可生成更多次。</li>
+              <li>同一模型每人扣分相同；高级会员积分单价更低，可生成更多次。</li>
               <li>每次生成按该模型「积分/单位」扣减；不是每个模型各有独立配额。</li>
               <li>
                 上表视频按 <strong className="text-foreground">15 秒/条</strong> 估算；「X 张 / X 条」是只用该模型的上限，同池内互斥。
@@ -436,26 +435,6 @@ export function PricingPageClient({
                 <li>① 暂停生成，待下一积分周期（31 天）自动重置发放，或续费延长会员服务；</li>
                 <li>② 随时购买积分加油包（含视频专项包），即时到账（团队进共享池）；</li>
                 <li>③ 升级更高档，立即补足差额积分。</li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className={cn(PANEL_CLASS, "p-6")}>
-              <div className="site-pricing-panel-title flex items-center gap-2">
-                <Calculator className="h-5 w-5 text-muted-foreground" /> 透明计价公式
-              </div>
-              <ul className="mt-3 space-y-2 site-pricing-body-text">
-                <li>1 积分 ≈ ¥{anchorYuan} 挂牌价值</li>
-                <li>
-                  每次消耗 ={" "}
-                  <code className="rounded bg-muted px-1 text-foreground">
-                    round2(净成本 × M ÷ {anchorYuan})，最低 0.01 积分
-                  </code>
-                </li>
-                <li>
-                  可生成数量 = <code className="rounded bg-muted px-1 text-foreground">套餐积分 ÷ 每次消耗</code>
-                </li>
               </ul>
             </div>
           </div>

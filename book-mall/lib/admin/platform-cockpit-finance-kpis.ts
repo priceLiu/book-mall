@@ -13,6 +13,7 @@ import {
 } from "@/lib/finance/team-finance-guard";
 import { GATEWAY_USAGE_LOG_SELECT } from "@/lib/gateway/gateway-token-usage-aggregate";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_CREDIT_ANCHOR_YUAN } from "@/lib/pricing/credit-pricing-formulas";
 
 /** 驾驶舱厂商分组扫描上限（避免长查询占满连接池） */
 const COCKPIT_FINANCE_LOG_CAP = 2500;
@@ -110,7 +111,7 @@ export async function buildCockpitFinanceKpis(input?: {
   async function pricePerCreditForUser(userId: string | null | undefined): Promise<number> {
     const key = userId ?? "_default";
     if (ppcCache.has(key)) return ppcCache.get(key)!;
-    let ppc = 0.04;
+    let ppc = DEFAULT_CREDIT_ANCHOR_YUAN;
     if (userId) {
       const acct = await prisma.creditAccount.findFirst({
         where: { ownerType: "USER", ownerId: userId },

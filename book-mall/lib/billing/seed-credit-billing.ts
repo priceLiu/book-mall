@@ -2,7 +2,7 @@
  * 统一积分计费 — 首版数据落库（unified-credit-billing）
  *
  * 幂等：全部 upsert。可重复执行。
- *  - PlatformPricingConfig（锚定 0.04 / M=2.5 / 护栏 0.30 / 视频 5s）
+ *  - PlatformPricingConfig（锚定 0.03 / M=1.5 / 护栏 0.22 / 视频 15s）
  *  - MembershipPlan + TeamSeatTier（个人/团队 × 月/年 × 五档；算法2 g=60%）
  *  - ModelCostProfile（示例成本档）→ publishModelCreditPrice 生成首版报价快照
  *
@@ -46,7 +46,7 @@ interface PlanSeed {
   includedSeats: number;
 }
 
-// 个人 · 月付（锚定 ¥0.04；积分 ≈ 价 ÷ 0.04，会员利润主要来自模型渠道差价）
+// 个人 · 月付（锚定 ¥0.03；积分 ≈ 价 ÷ ppc，会员利润主要来自模型渠道差价）
 const PERSONAL_MONTH: PlanSeed[] = [
   { tier: "标准版", sortOrder: 1, priceYuan: 69, originalYuan: 99, monthlyCredits: 1000, includedSeats: 1 },
   { tier: "进阶版", sortOrder: 2, priceYuan: 149, originalYuan: 219, monthlyCredits: 3000, includedSeats: 1 },
