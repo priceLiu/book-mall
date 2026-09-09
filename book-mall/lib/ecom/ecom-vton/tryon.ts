@@ -165,8 +165,8 @@ export async function runEcomVtonTryOn(opts: {
     prepareGarment(resolved.topGarmentUrl),
     prepareGarment(resolved.bottomGarmentUrl),
   ]);
-  const topGarmentUrl = topNorm?.url;
-  const bottomGarmentUrl = bottomNorm?.url;
+  const topGarmentUrl = topNorm ?? undefined;
+  const bottomGarmentUrl = bottomNorm ?? undefined;
   if (!topGarmentUrl && !bottomGarmentUrl) throw new Error("缺少服装参考图");
   if (opts.lookKind === "full_set" && (!topGarmentUrl || !bottomGarmentUrl)) {
     throw new Error("套装试衣需要同时识别上装与下装，请换一张包含完整上下装的套装参考图");
