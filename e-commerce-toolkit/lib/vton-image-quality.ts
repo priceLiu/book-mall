@@ -28,3 +28,32 @@ export function coerceVtonModelImageSize(raw: string | undefined | null): VtonMo
   }
   return VTON_DEFAULT_MODEL_IMAGE_SIZE;
 }
+
+export function parseVtonModelImagePixelSize(
+  size: VtonModelImageSize = VTON_DEFAULT_MODEL_IMAGE_SIZE,
+): { width: number; height: number } {
+  const [widthRaw, heightRaw] = size.split("*");
+  const width = Number(widthRaw);
+  const height = Number(heightRaw);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1) {
+    return { width: 720, height: 960 };
+  }
+  return { width, height };
+}
+
+/**
+ * 试衣成片（aitryon-plus resolution=-1）与模特底图同尺寸；网格按此比例展示。
+ */
+export function vtonTryonResultAspectRatio(
+  size: VtonModelImageSize = VTON_DEFAULT_MODEL_IMAGE_SIZE,
+): number {
+  const { width, height } = parseVtonModelImagePixelSize(size);
+  return width / height;
+}
+
+export function vtonTryonResultAspectStyle(
+  size: VtonModelImageSize = VTON_DEFAULT_MODEL_IMAGE_SIZE,
+): { aspectRatio: string } {
+  const { width, height } = parseVtonModelImagePixelSize(size);
+  return { aspectRatio: `${width} / ${height}` };
+}

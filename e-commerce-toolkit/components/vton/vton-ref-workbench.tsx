@@ -636,6 +636,7 @@ export function VtonRefWorkbench({
           />
           <VtonResultsGrid
             batch={batchWorkflow.meta.tryonBatch}
+            modelImageSize={effectiveModelImageSize}
             looks={batchWorkflow.meta.lookDrafts ?? []}
             selectedLookIds={batchWorkflow.selectedLookIds}
             lockedLooks={batchWorkflow.meta.lockedLooks ?? []}

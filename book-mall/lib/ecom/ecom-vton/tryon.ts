@@ -1,5 +1,6 @@
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
 import { ensureDashscopeImageUrl } from "@/lib/ecom/ecom-dashscope-image-normalize";
+import { prepareVtonGarmentUrlForTryon } from "@/lib/ecom/ecom-vton/garment-tryon-prepare";
 import { VtonTryonCancelledError, vtonInterruptibleDelay } from "@/lib/ecom/ecom-vton/cancel";
 import {
   parseVtonFullSetGarmentFromImage,
@@ -123,6 +124,8 @@ export async function runEcomVtonTryOn(opts: {
   bottomGarmentUrl?: string;
   /** 批量试衣时复用分割结果 */
   garmentParseCache?: VtonGarmentParseCache;
+  /** 批量试衣已在 resolve 阶段完成 tighten + dashscope 规范化 */
+  garmentUrlsPrepared?: boolean;
   /** @deprecated 使用 lookKind */
   garmentMode?: VtonGarmentMode;
   onProgress?: (progress: VtonTryonProgress) => void | Promise<void>;
@@ -151,13 +154,16 @@ export async function runEcomVtonTryOn(opts: {
     onProgress: opts.onProgress,
   });
 
+  const prepareGarment = async (garmentUrl: string | undefined) => {
+    const raw = garmentUrl?.trim();
+    if (!raw) return null;
+    if (opts.garmentUrlsPrepared) return raw;
+    return prepareVtonGarmentUrlForTryon({ userId: opts.userId, garmentUrl: raw });
+  };
+
   const [topNorm, bottomNorm] = await Promise.all([
-    resolved.topGarmentUrl
-      ? ensureDashscopeImageUrl({ userId: opts.userId, imageUrl: resolved.topGarmentUrl })
-      : Promise.resolve(null),
-    resolved.bottomGarmentUrl
-      ? ensureDashscopeImageUrl({ userId: opts.userId, imageUrl: resolved.bottomGarmentUrl })
-      : Promise.resolve(null),
+    prepareGarment(resolved.topGarmentUrl),
+    prepareGarment(resolved.bottomGarmentUrl),
   ]);
   const topGarmentUrl = topNorm?.url;
   const bottomGarmentUrl = bottomNorm?.url;

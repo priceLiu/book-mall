@@ -9,6 +9,10 @@ import {
   ensureFullSetGarmentParsed,
   type VtonGarmentParseCache,
 } from "@/lib/ecom/ecom-vton/garment-parsing";
+import {
+  prepareVtonGarmentUrlForTryon,
+  type VtonGarmentPrepareCache,
+} from "@/lib/ecom/ecom-vton/garment-tryon-prepare";
 import { runEcomVtonTryOn } from "@/lib/ecom/ecom-vton/tryon";
 import type {
   VtonGarmentItem,
@@ -168,51 +172,126 @@ export function resolveVtonBatchTryonProgressPhase(
   return "polling";
 }
 
-async function resolveTryonUrlsForBatchLook(opts: {
-  look: VtonLookSpec;
+type FullSetGarmentUrls = { topGarmentUrl: string; bottomGarmentUrl: string };
+
+function applyParsedFullSetToPool(opts: {
+  set: VtonGarmentItem;
+  parsed: FullSetGarmentUrls;
+  onGarmentParsed?: (garmentId: string, parsed: { topUrl: string; bottomUrl: string }) => void;
+}): void {
+  const prevTop = opts.set.parsedTopUrl?.trim();
+  const prevBottom = opts.set.parsedBottomUrl?.trim();
+  if (
+    opts.parsed.topGarmentUrl !== prevTop ||
+    opts.parsed.bottomGarmentUrl !== prevBottom
+  ) {
+    opts.set.parsedTopUrl = opts.parsed.topGarmentUrl;
+    opts.set.parsedBottomUrl = opts.parsed.bottomGarmentUrl;
+    opts.onGarmentParsed?.(opts.set.id, {
+      topUrl: opts.parsed.topGarmentUrl,
+      bottomUrl: opts.parsed.bottomGarmentUrl,
+    });
+  }
+}
+
+/** 批量试衣前统一分割/收紧套装，避免并行 worker 各自解析导致上下装 URL 不一致 */
+async function prefetchFullSetGarmentUrlsForBatch(opts: {
+  looks: VtonLookSpec[];
   garmentPool: VtonGarmentItem[];
-  modelUrl: string;
   userId: string;
   projectId: string;
   consumerToolKey: string;
   garmentParseCache: VtonGarmentParseCache;
   onGarmentParsed?: (garmentId: string, parsed: { topUrl: string; bottomUrl: string }) => void;
+}): Promise<Map<string, FullSetGarmentUrls>> {
+  const bySetId = new Map<string, FullSetGarmentUrls>();
+  for (const look of opts.looks) {
+    const normalizedLook = normalizeLookForTryon(look, opts.garmentPool);
+    const setId = normalizedLook.fullSetGarmentId?.trim();
+    if (!setId || bySetId.has(setId)) continue;
+
+    const set = findGarmentInPool(opts.garmentPool, setId);
+    if (!set?.ossUrl?.trim()) {
+      throw new Error(`搭配 ${normalizedLook.label ?? normalizedLook.id} 缺少套装`);
+    }
+
+    const parsed = await ensureFullSetGarmentParsed({
+      userId: opts.userId,
+      garment: set,
+      projectId: opts.projectId,
+      consumerToolKey: opts.consumerToolKey,
+      cache: opts.garmentParseCache,
+    });
+    applyParsedFullSetToPool({ set, parsed, onGarmentParsed: opts.onGarmentParsed });
+    bySetId.set(setId, parsed);
+  }
+  return bySetId;
+}
+
+async function resolveTryonUrlsForBatchLook(opts: {
+  look: VtonLookSpec;
+  garmentPool: VtonGarmentItem[];
+  modelUrl: string;
+  userId: string;
+  garmentPrepareCache: VtonGarmentPrepareCache;
+  prefetchedFullSets: Map<string, FullSetGarmentUrls>;
 }): Promise<VtonTryonUrlInputs> {
   const normalizedLook = normalizeLookForTryon(opts.look, opts.garmentPool);
+  const personImageUrl = opts.modelUrl.trim();
+  if (!personImageUrl) throw new Error("缺少模特全身照");
+
+  const setId = normalizedLook.fullSetGarmentId?.trim();
+  if (setId) {
+    const parsed = opts.prefetchedFullSets.get(setId);
+    if (!parsed) {
+      throw new Error(`搭配 ${normalizedLook.label ?? normalizedLook.id} 缺少套装上下装`);
+    }
+    const [topGarmentUrl, bottomGarmentUrl] = await Promise.all([
+      prepareVtonGarmentUrlForTryon({
+        userId: opts.userId,
+        garmentUrl: parsed.topGarmentUrl,
+        cache: opts.garmentPrepareCache,
+      }),
+      prepareVtonGarmentUrlForTryon({
+        userId: opts.userId,
+        garmentUrl: parsed.bottomGarmentUrl,
+        cache: opts.garmentPrepareCache,
+      }),
+    ]);
+    return {
+      personImageUrl,
+      topGarmentUrl,
+      bottomGarmentUrl,
+      lookKind: "two_piece",
+    };
+  }
+
   const urls = resolveLookTryonUrls({
     look: normalizedLook,
     garmentPool: opts.garmentPool,
-    modelUrl: opts.modelUrl,
+    modelUrl: personImageUrl,
   });
-  if (urls.lookKind !== "full_set") return urls;
-
-  const set = findGarmentInPool(opts.garmentPool, normalizedLook.fullSetGarmentId);
-  if (!set?.ossUrl?.trim()) {
-    throw new Error(`搭配 ${normalizedLook.label ?? normalizedLook.id} 缺少套装`);
-  }
-
-  const parsed = await ensureFullSetGarmentParsed({
-    userId: opts.userId,
-    garment: set,
-    projectId: opts.projectId,
-    consumerToolKey: opts.consumerToolKey,
-    cache: opts.garmentParseCache,
-  });
-
-  if (!set.parsedTopUrl?.trim() || !set.parsedBottomUrl?.trim()) {
-    set.parsedTopUrl = parsed.topGarmentUrl;
-    set.parsedBottomUrl = parsed.bottomGarmentUrl;
-    opts.onGarmentParsed?.(set.id, {
-      topUrl: parsed.topGarmentUrl,
-      bottomUrl: parsed.bottomGarmentUrl,
-    });
-  }
-
+  const [topGarmentUrl, bottomGarmentUrl] = await Promise.all([
+    urls.topGarmentUrl
+      ? prepareVtonGarmentUrlForTryon({
+          userId: opts.userId,
+          garmentUrl: urls.topGarmentUrl,
+          cache: opts.garmentPrepareCache,
+        })
+      : Promise.resolve(undefined),
+    urls.bottomGarmentUrl
+      ? prepareVtonGarmentUrlForTryon({
+          userId: opts.userId,
+          garmentUrl: urls.bottomGarmentUrl,
+          cache: opts.garmentPrepareCache,
+        })
+      : Promise.resolve(undefined),
+  ]);
   return {
     personImageUrl: urls.personImageUrl,
-    topGarmentUrl: parsed.topGarmentUrl,
-    bottomGarmentUrl: parsed.bottomGarmentUrl,
-    lookKind: "two_piece",
+    topGarmentUrl,
+    bottomGarmentUrl,
+    lookKind: urls.lookKind,
   };
 }
 
@@ -259,6 +338,16 @@ export async function runEcomVtonTryOnBatch(opts: {
   await emitProgress({ batch });
 
   const garmentParseCache: VtonGarmentParseCache = new Map();
+  const garmentPrepareCache: VtonGarmentPrepareCache = new Map();
+  const prefetchedFullSets = await prefetchFullSetGarmentUrlsForBatch({
+    looks: opts.looks,
+    garmentPool: opts.garmentPool,
+    userId: opts.userId,
+    projectId: opts.projectId,
+    consumerToolKey: opts.consumerToolKey,
+    garmentParseCache,
+    onGarmentParsed: opts.onGarmentParsed,
+  });
   let stopStarting = false;
 
   const shouldAbort = async (): Promise<boolean> => {
@@ -286,10 +375,8 @@ export async function runEcomVtonTryOnBatch(opts: {
         garmentPool: opts.garmentPool,
         modelUrl: opts.modelUrl,
         userId: opts.userId,
-        projectId: opts.projectId,
-        consumerToolKey: opts.consumerToolKey,
-        garmentParseCache,
-        onGarmentParsed: opts.onGarmentParsed,
+        garmentPrepareCache,
+        prefetchedFullSets,
       });
       const ossUrl = await runEcomVtonTryOn({
         userId: opts.userId,
@@ -300,6 +387,7 @@ export async function runEcomVtonTryOnBatch(opts: {
         topGarmentUrl: urls.topGarmentUrl,
         bottomGarmentUrl: urls.bottomGarmentUrl,
         garmentParseCache,
+        garmentUrlsPrepared: true,
         shouldCancel: shouldAbort,
         onProgress: async (p) => {
           batch.updatedAt = new Date().toISOString();

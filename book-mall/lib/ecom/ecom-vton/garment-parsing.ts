@@ -1,10 +1,30 @@
 import { ensureDashscopeImageUrl } from "@/lib/ecom/ecom-dashscope-image-normalize";
+import {
+  assessVtonGarmentUrlQuality,
+  normalizeVtonGarmentCropUrl,
+  tightenVtonGarmentUrlIfNeeded,
+} from "@/lib/ecom/ecom-vton/garment-crop-normalize";
 import { ensureVtonParsingImageUrl } from "@/lib/ecom/ecom-vton/parsing-image-normalize";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
 import type { DashscopeClothesType, DashscopeParsingOutput } from "@/lib/gateway/dashscope-client";
 import { ecomGwImageParsing } from "@/lib/gateway/ecom-tool-gateway-client";
 
 export type VtonGarmentParseCache = Map<string, string>;
+
+const fullSetParseInflight = new Map<
+  string,
+  Promise<{ topGarmentUrl: string; bottomGarmentUrl: string }>
+>();
+
+async function parsedGarmentUrlsNeedReparse(topUrl: string, bottomUrl: string): Promise<boolean> {
+  const [topQ, bottomQ] = await Promise.all([
+    assessVtonGarmentUrlQuality(topUrl),
+    assessVtonGarmentUrlQuality(bottomUrl),
+  ]);
+  if (topQ.needsTightening || topQ.fillRatio < 0.22) return true;
+  if (bottomQ.needsTightening || bottomQ.fillRatio < 0.15) return true;
+  return false;
+}
 
 function parseCacheKey(personImageUrl: string, clothesType: DashscopeClothesType): string {
   return `${personImageUrl.trim()}::${clothesType}`;
@@ -18,7 +38,12 @@ function pickGarmentCropUrlAtIndex(output: DashscopeParsingOutput, index: number
   return null;
 }
 
-type ParsedGarmentPiece = { url: string; centerY: number; source: "crop" | "parsing" };
+type ParsedGarmentPiece = {
+  url: string;
+  centerY: number;
+  source: "crop" | "parsing";
+  bbox: number[] | null;
+};
 
 function bboxCenterY(bbox: number[] | null | undefined): number | null {
   if (!bbox || bbox.length < 4) return null;
@@ -38,11 +63,12 @@ function collectParsedGarmentPieces(output: DashscopeParsingOutput): ParsedGarme
   for (let i = 0; i < maxLen; i++) {
     const crop = output.crop_img_url?.[i];
     const parsing = output.parsing_img_url?.[i];
-    const centerY = bboxCenterY(output.bbox?.[i] ?? null) ?? i;
+    const bbox = output.bbox?.[i] ?? null;
+    const centerY = bboxCenterY(bbox) ?? i;
     if (typeof crop === "string" && crop.trim()) {
-      pieces.push({ url: crop.trim(), centerY, source: "crop" });
+      pieces.push({ url: crop.trim(), centerY, source: "crop", bbox });
     } else if (typeof parsing === "string" && parsing.trim()) {
-      pieces.push({ url: parsing.trim(), centerY, source: "parsing" });
+      pieces.push({ url: parsing.trim(), centerY, source: "parsing", bbox });
     }
   }
   return pieces;
@@ -51,19 +77,37 @@ function collectParsedGarmentPieces(output: DashscopeParsingOutput): ParsedGarme
 /** 从一次 upper+lower 联合分割结果中拆出上装/下装 URL（按 bbox 纵向位置排序） */
 export function pickFullSetGarmentPiecesFromOutput(
   output: DashscopeParsingOutput,
-): { topGarmentUrl?: string; bottomGarmentUrl?: string } {
+): {
+  topGarmentUrl?: string;
+  bottomGarmentUrl?: string;
+  topBbox?: number[] | null;
+  bottomBbox?: number[] | null;
+} {
   const pieces = collectParsedGarmentPieces(output);
   if (pieces.length >= 2) {
     const sorted = [...pieces].sort((a, b) => a.centerY - b.centerY);
     return {
       topGarmentUrl: sorted[0]!.url,
+      topBbox: sorted[0]!.bbox,
       bottomGarmentUrl: sorted[sorted.length - 1]!.url,
+      bottomBbox: sorted[sorted.length - 1]!.bbox,
     };
   }
   if (pieces.length === 1) {
-    return { topGarmentUrl: pieces[0]!.url };
+    return { topGarmentUrl: pieces[0]!.url, topBbox: pieces[0]!.bbox };
   }
   return {};
+}
+
+async function persistParsedGarmentCropUrl(opts: {
+  userId: string;
+  vendorCropUrl: string;
+  bbox?: number[] | null;
+  sourceImageUrl?: string;
+}): Promise<string> {
+  const normalized = await normalizeVtonGarmentCropUrl(opts);
+  const persisted = await ensureDashscopeImageUrl({ userId: opts.userId, imageUrl: normalized });
+  return persisted.url;
 }
 
 function pickFullSetGarmentPieceUrl(output: DashscopeParsingOutput, index: number): string | null {
@@ -120,8 +164,14 @@ export async function parseVtonGarmentFromPersonImage(opts: {
     );
   }
 
-  opts.cache?.set(key, cropUrl);
-  return cropUrl;
+  const persisted = await persistParsedGarmentCropUrl({
+    userId: opts.userId,
+    vendorCropUrl: cropUrl,
+    bbox: output.bbox?.[0] ?? null,
+    sourceImageUrl: parsingUrl,
+  });
+  opts.cache?.set(key, persisted);
+  return persisted;
 }
 
 type FullSetParseCacheValue = { topGarmentUrl: string; bottomGarmentUrl: string };
@@ -162,9 +212,14 @@ async function parseVtonOutfitPieceFromGarmentImage(opts: {
     );
   }
 
-  const persisted = await ensureDashscopeImageUrl({ userId: opts.userId, imageUrl: pieceUrl });
-  opts.cache?.set(key, persisted.url);
-  return persisted.url;
+  const persisted = await persistParsedGarmentCropUrl({
+    userId: opts.userId,
+    vendorCropUrl: pieceUrl,
+    bbox: output.bbox?.[0] ?? null,
+    sourceImageUrl: opts.parsingUrl,
+  });
+  opts.cache?.set(key, persisted);
+  return persisted;
 }
 
 async function parseFullSetPiecesCombined(opts: {
@@ -186,15 +241,25 @@ async function parseFullSetPiecesCombined(opts: {
   const bottomRaw = picked.bottomGarmentUrl ?? pickFullSetGarmentPieceUrl(output, 1);
   const [topNorm, bottomNorm] = await Promise.all([
     topRaw
-      ? ensureDashscopeImageUrl({ userId: opts.userId, imageUrl: topRaw })
+      ? persistParsedGarmentCropUrl({
+          userId: opts.userId,
+          vendorCropUrl: topRaw,
+          bbox: picked.topBbox ?? output.bbox?.[0] ?? null,
+          sourceImageUrl: opts.parsingUrl,
+        })
       : Promise.resolve(null),
     bottomRaw
-      ? ensureDashscopeImageUrl({ userId: opts.userId, imageUrl: bottomRaw })
+      ? persistParsedGarmentCropUrl({
+          userId: opts.userId,
+          vendorCropUrl: bottomRaw,
+          bbox: picked.bottomBbox ?? output.bbox?.[1] ?? null,
+          sourceImageUrl: opts.parsingUrl,
+        })
       : Promise.resolve(null),
   ]);
   return {
-    topGarmentUrl: topNorm?.url,
-    bottomGarmentUrl: bottomNorm?.url,
+    topGarmentUrl: topNorm ?? undefined,
+    bottomGarmentUrl: bottomNorm ?? undefined,
   };
 }
 
@@ -267,14 +332,35 @@ export async function ensureFullSetGarmentParsed(opts: {
   consumerToolKey: string;
   cache?: VtonGarmentParseCache;
 }): Promise<{ topGarmentUrl: string; bottomGarmentUrl: string }> {
+  const compositeUrl = opts.garment.ossUrl.trim();
+  if (!compositeUrl) throw new Error("缺少套装参考图");
+
   const top = opts.garment.parsedTopUrl?.trim();
   const bottom = opts.garment.parsedBottomUrl?.trim();
-  if (top && bottom) return { topGarmentUrl: top, bottomGarmentUrl: bottom };
-  return parseVtonFullSetGarmentFromImage({
+  if (top && bottom) {
+    const shouldReparse = await parsedGarmentUrlsNeedReparse(top, bottom);
+    if (!shouldReparse) {
+      const [topGarmentUrl, bottomGarmentUrl] = await Promise.all([
+        tightenVtonGarmentUrlIfNeeded({ userId: opts.userId, garmentUrl: top }),
+        tightenVtonGarmentUrlIfNeeded({ userId: opts.userId, garmentUrl: bottom }),
+      ]);
+      return { topGarmentUrl, bottomGarmentUrl };
+    }
+    opts.cache?.delete(fullSetParseCacheKey(compositeUrl));
+  }
+
+  const inflight = fullSetParseInflight.get(compositeUrl);
+  if (inflight) return inflight;
+
+  const job = parseVtonFullSetGarmentFromImage({
     userId: opts.userId,
-    garmentImageUrl: opts.garment.ossUrl,
+    garmentImageUrl: compositeUrl,
     projectId: opts.projectId,
     consumerToolKey: opts.consumerToolKey,
     cache: opts.cache,
+  }).finally(() => {
+    fullSetParseInflight.delete(compositeUrl);
   });
+  fullSetParseInflight.set(compositeUrl, job);
+  return job;
 }

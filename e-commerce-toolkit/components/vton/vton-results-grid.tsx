@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, Loader2, Star } from "lucide-react";
 
 import { EcomImagePreviewHost, useEcomImagePreview } from "@/components/media";
@@ -9,6 +9,11 @@ import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-but
 import { VtonResultImageHoverActions } from "@/components/vton/vton-result-image-hover-actions";
 import { downloadRemoteImageUrl } from "@/lib/ecom-download-url";
 import { openVtonFittingRoomInNewTab } from "@/lib/vton-fitting-room-link";
+import {
+  coerceVtonModelImageSize,
+  vtonTryonResultAspectStyle,
+  type VtonModelImageSize,
+} from "@/lib/vton-image-quality";
 import {
   ECOM_VTON_MAX_BATCH_LOOKS,
   type VtonLockedLook,
@@ -46,6 +51,8 @@ type Props = {
   onStopBatchTryon?: () => Promise<void>;
   /** 客户端乐观态：试衣已开始但服务端 batch 尚未写入 running */
   runningLookIds?: string[];
+  /** 与模特生图/扩全身尺寸一致，试衣成片同比例（aitryon resolution=-1） */
+  modelImageSize?: VtonModelImageSize;
 };
 
 function lookLabel(looks: VtonLookSpec[], lookId: string): string {
@@ -57,9 +64,12 @@ function resultForLook(results: VtonTryonResult[], lookId: string): VtonTryonRes
   return results.find((r) => r.lookId === lookId) ?? null;
 }
 
-/** 试衣结果 · 最多 6 列，小屏自适应 */
+/** 试衣结果 · 最多 5 列（3:4 竖图格过窄时模特显怪），小屏自适应 */
 const VTON_RESULTS_GRID_CLASS =
-  "grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
+  "grid grid-cols-2 items-start gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5";
+
+const VTON_RESULT_LABEL_CLASS =
+  "mt-0.5 h-4 shrink-0 truncate px-1 text-[10px] leading-4 text-[#6e6e73]";
 
 function friendlyTryonFailReason(raw?: string): string {
   if (!raw?.trim()) return "失败";
@@ -96,29 +106,59 @@ function isTryonLookCellRunning(
   return false;
 }
 
-function VtonTryonRunningSlot({ className }: { className?: string }) {
+function VtonTryonResultAspectFrame({
+  modelImageSize,
+  className,
+  children,
+}: {
+  modelImageSize: VtonModelImageSize;
+  className?: string;
+  children?: ReactNode;
+}) {
   return (
     <div
-      className={cn(
-        "relative aspect-[3/4] overflow-hidden rounded-lg bg-[#fafafa] ecom-media-generating-sweep",
-        className,
-      )}
+      className={cn("relative w-full overflow-hidden bg-[#fafafa]", className)}
+      style={vtonTryonResultAspectStyle(modelImageSize)}
     >
-      <EcomMediaGeneratingBusy label="试衣中" />
+      {children}
     </div>
   );
 }
 
-function VtonTryonQueuedSlot({ className }: { className?: string }) {
+function VtonTryonRunningSlot({
+  modelImageSize,
+  className,
+}: {
+  modelImageSize: VtonModelImageSize;
+  className?: string;
+}) {
   return (
-    <div
+    <VtonTryonResultAspectFrame
+      modelImageSize={modelImageSize}
+      className={cn("ecom-media-generating-sweep", className)}
+    >
+      <EcomMediaGeneratingBusy label="试衣中" />
+    </VtonTryonResultAspectFrame>
+  );
+}
+
+function VtonTryonQueuedSlot({
+  modelImageSize,
+  className,
+}: {
+  modelImageSize: VtonModelImageSize;
+  className?: string;
+}) {
+  return (
+    <VtonTryonResultAspectFrame
+      modelImageSize={modelImageSize}
       className={cn(
-        "relative flex aspect-[3/4] flex-col items-center justify-center rounded-lg border border-dashed border-[#e8e8ed] bg-[#fafafa] px-1 text-center text-[10px] text-[#86868b]",
+        "flex flex-col items-center justify-center border border-dashed border-[#e8e8ed] px-1 text-center text-[10px] text-[#86868b]",
         className,
       )}
     >
       排队中
-    </div>
+    </VtonTryonResultAspectFrame>
   );
 }
 
@@ -142,7 +182,9 @@ export function VtonResultsGrid({
   onSaveResultToAssets,
   onStopBatchTryon,
   runningLookIds: _runningLookIds,
+  modelImageSize: modelImageSizeProp,
 }: Props) {
+  const modelImageSize = coerceVtonModelImageSize(modelImageSizeProp);
   const results = useMemo(() => batch?.results ?? [], [batch?.results]);
   const slotLooks = looks.slice(0, ECOM_VTON_MAX_BATCH_LOOKS);
   const running = batch?.status === "running" || tryonBusy;
@@ -273,13 +315,16 @@ export function VtonResultsGrid({
               const result = resultForLook(results, look.id);
               if (!result) {
                 return (
-                  <div key={look.id}>
-                    <div className="flex aspect-[3/4] flex-col items-center justify-center rounded-lg border border-dashed border-[#e8e8ed] bg-[#fafafa] px-1 text-center text-[10px] text-[#86868b]">
-                      待试衣
+                  <div key={look.id} className="flex min-w-0 flex-col">
+                    <div className="overflow-hidden rounded-lg border border-dashed border-[#e8e8ed] bg-[#fafafa]">
+                      <VtonTryonResultAspectFrame
+                        modelImageSize={modelImageSize}
+                        className="flex flex-col items-center justify-center px-1 text-center text-[10px] text-[#86868b]"
+                      >
+                        待试衣
+                      </VtonTryonResultAspectFrame>
                     </div>
-                    <p className="truncate px-1 py-0.5 text-[10px] text-[#6e6e73]">
-                      {lookLabel(looks, look.id)}
-                    </p>
+                    <p className={VTON_RESULT_LABEL_CLASS}>{lookLabel(looks, look.id)}</p>
                   </div>
                 );
               }
@@ -297,18 +342,18 @@ export function VtonResultsGrid({
               const cellRunning = isTryonLookCellRunning(look.id, result, running);
 
               return (
-                <div
-                  key={result.id}
-                  className={resultCellClass(result, selected, { cellRunning })}
-                >
-                  {showImage ? (
-                    <>
-                      <div className="relative block w-full group/image">
+                <div key={result.id} className="flex min-w-0 flex-col">
+                  <div className={resultCellClass(result, selected, { cellRunning })}>
+                    {showImage ? (
+                      <VtonTryonResultAspectFrame
+                        modelImageSize={modelImageSize}
+                        className="group/image"
+                      >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={displayUrl!}
                           alt={label}
-                          className="aspect-[3/4] w-full object-cover"
+                          className="h-full w-full object-contain object-top"
                           draggable={false}
                         />
                         {cellRunning ? (
@@ -330,12 +375,17 @@ export function VtonResultsGrid({
                                 : undefined
                             }
                             onOpenFittingRoom={openVtonFittingRoomInNewTab}
+                            onRegenerate={
+                              onRegenerateLook && !running
+                                ? () => void onRegenerateLook(result.lookId)
+                                : undefined
+                            }
                           />
                         ) : null}
                         {hasMultipleVersions && !cellRunning ? (
                           <>
-                            <div className="pointer-events-none absolute inset-x-0 top-2 z-[3] flex justify-center">
-                              <span className="rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-medium text-white">
+                            <div className="pointer-events-none absolute right-1 top-1 z-[30]">
+                              <span className="rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-medium leading-none text-white">
                                 {versionIndex + 1} / {versions.length}
                               </span>
                             </div>
@@ -361,60 +411,56 @@ export function VtonResultsGrid({
                             </div>
                           </>
                         ) : null}
-                      </div>
-                      <button
-                        type="button"
-                        className={cn(
-                          "absolute left-1 top-1 z-30 rounded-full p-0.5",
-                          selected ? "bg-[#0071e3] text-white" : "bg-black/40 text-white",
-                          (busy || disabled || isLocked) && "pointer-events-none opacity-50",
-                        )}
-                        disabled={busy || disabled || isLocked}
-                        onClick={() => onToggleResult(result.id)}
-                        aria-label="选择结果"
+                        <button
+                          type="button"
+                          className={cn(
+                            "absolute left-1 top-1 z-[30] rounded-full p-0.5",
+                            selected ? "bg-[#0071e3] text-white" : "bg-black/40 text-white",
+                            (busy || disabled || isLocked) && "pointer-events-none opacity-50",
+                          )}
+                          disabled={busy || disabled || isLocked}
+                          onClick={() => onToggleResult(result.id)}
+                          aria-label="选择结果"
+                        >
+                          <Check className="h-3 w-3" />
+                        </button>
+                        {isLocked ? (
+                          <span className="absolute right-1 top-1 z-[31] rounded bg-[#34c759] px-1 py-0.5 text-[9px] leading-none text-white">
+                            已锁定
+                          </span>
+                        ) : null}
+                      </VtonTryonResultAspectFrame>
+                    ) : cellRunning ? (
+                      <VtonTryonRunningSlot modelImageSize={modelImageSize} />
+                    ) : result.status === "failed" ? (
+                      <VtonTryonResultAspectFrame
+                        modelImageSize={modelImageSize}
+                        className="flex flex-col items-center justify-center gap-1 p-2 text-center text-[10px] text-[#ff3b30]"
                       >
-                        <Check className="h-3 w-3" />
-                      </button>
-                      {isLocked ? (
-                        <span className="absolute right-1 top-1 z-30 rounded bg-[#34c759] px-1 py-0.5 text-[9px] text-white">
-                          已锁定
-                        </span>
-                      ) : null}
-                      {onRegenerateLook && !running ? (
-                        <button
-                          type="button"
-                          className="absolute bottom-6 right-1 z-30 rounded bg-white/90 px-1 py-0.5 text-[9px] text-[#0071e3] shadow hover:bg-white disabled:opacity-50"
-                          disabled={busy || disabled}
-                          onClick={() => void onRegenerateLook(result.lookId)}
-                        >
-                          重生成
-                        </button>
-                      ) : null}
-                    </>
-                  ) : cellRunning ? (
-                    <VtonTryonRunningSlot />
-                  ) : result.status === "failed" ? (
-                    <div className="flex aspect-[3/4] flex-col items-center justify-center gap-1 p-2 text-center text-[10px] text-[#ff3b30]">
-                      <span>{friendlyTryonFailReason(result.failReason)}</span>
-                      {onRegenerateLook && !running ? (
-                        <button
-                          type="button"
-                          className="text-[#0071e3] hover:underline disabled:opacity-50"
-                          disabled={busy || disabled}
-                          onClick={() => void onRegenerateLook(result.lookId)}
-                        >
-                          重试
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : result.status === "cancelled" ? (
-                    <div className="flex aspect-[3/4] flex-col items-center justify-center p-2 text-center text-[10px] text-[#86868b]">
-                      {result.failReason ?? "已停止"}
-                    </div>
-                  ) : (
-                    <VtonTryonQueuedSlot />
-                  )}
-                  <p className="truncate px-1 py-0.5 text-[10px] text-[#6e6e73]">{label}</p>
+                        <span>{friendlyTryonFailReason(result.failReason)}</span>
+                        {onRegenerateLook && !running ? (
+                          <button
+                            type="button"
+                            className="text-[#0071e3] hover:underline disabled:opacity-50"
+                            disabled={busy || disabled}
+                            onClick={() => void onRegenerateLook(result.lookId)}
+                          >
+                            重试
+                          </button>
+                        ) : null}
+                      </VtonTryonResultAspectFrame>
+                    ) : result.status === "cancelled" ? (
+                      <VtonTryonResultAspectFrame
+                        modelImageSize={modelImageSize}
+                        className="flex flex-col items-center justify-center p-2 text-center text-[10px] text-[#86868b]"
+                      >
+                        {result.failReason ?? "已停止"}
+                      </VtonTryonResultAspectFrame>
+                    ) : (
+                      <VtonTryonQueuedSlot modelImageSize={modelImageSize} />
+                    )}
+                  </div>
+                  <p className={VTON_RESULT_LABEL_CLASS}>{label}</p>
                 </div>
               );
             })}
@@ -444,32 +490,35 @@ export function VtonResultsGrid({
               {lockedLooks.map((look) => {
                 const isDefault = look.id === defaultLockedLookId;
                 return (
-                  <div
-                    key={look.id}
-                    className={cn(
-                      "relative w-full overflow-hidden rounded-lg border",
-                      isDefault ? "border-[#0071e3]" : "border-[#e8e8ed]",
-                    )}
-                  >
-                    <button
-                      type="button"
-                      className="block w-full cursor-zoom-in"
-                      title="点击查看大图"
-                      onClick={() =>
-                        openPreview(look.ossUrl, look.label ?? "已锁定参考", previewItems)
-                      }
+                  <div key={look.id} className="flex min-w-0 flex-col">
+                    <div
+                      className={cn(
+                        "relative w-full overflow-hidden rounded-lg border",
+                        isDefault ? "border-[#0071e3]" : "border-[#e8e8ed]",
+                      )}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={look.ossUrl}
-                        alt={look.label}
-                        className="aspect-[3/4] w-full object-cover"
-                        draggable={false}
-                      />
-                    </button>
-                    {isDefault ? (
-                      <Star className="absolute left-1 top-1 h-3 w-3 fill-[#0071e3] text-[#0071e3]" />
-                    ) : null}
+                      <button
+                        type="button"
+                        className="block w-full cursor-zoom-in"
+                        title="点击查看大图"
+                        onClick={() =>
+                          openPreview(look.ossUrl, look.label ?? "已锁定参考", previewItems)
+                        }
+                      >
+                        <VtonTryonResultAspectFrame modelImageSize={modelImageSize}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={look.ossUrl}
+                            alt={look.label}
+                            className="h-full w-full object-contain object-top"
+                            draggable={false}
+                          />
+                        </VtonTryonResultAspectFrame>
+                      </button>
+                      {isDefault ? (
+                        <Star className="absolute left-1 top-1 z-[30] h-3 w-3 fill-[#0071e3] text-[#0071e3]" />
+                      ) : null}
+                    </div>
                     <div className="flex gap-0.5 p-0.5">
                       {onSetDefaultLocked && !isDefault ? (
                         <button

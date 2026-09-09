@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   VTON_DEFAULT_MODEL_IMAGE_SIZE,
   coerceVtonModelImageSize,
+  parseVtonModelImagePixelSize,
+  vtonTryonResultAspectRatio,
+  vtonTryonResultAspectStyle,
 } from "@/lib/vton-image-quality";
 
 describe("coerceVtonModelImageSize", () => {
@@ -15,5 +18,13 @@ describe("coerceVtonModelImageSize", () => {
   it("keeps allowed sizes", () => {
     expect(coerceVtonModelImageSize("1080*1440")).toBe("1080*1440");
     expect(coerceVtonModelImageSize("1536*2048")).toBe("1536*2048");
+  });
+});
+
+describe("vton tryon result aspect", () => {
+  it("matches model image pixel ratio (3:4)", () => {
+    expect(parseVtonModelImagePixelSize("720*960")).toEqual({ width: 720, height: 960 });
+    expect(vtonTryonResultAspectRatio("1080*1440")).toBeCloseTo(0.75, 4);
+    expect(vtonTryonResultAspectStyle("720*960")).toEqual({ aspectRatio: "720 / 960" });
   });
 });

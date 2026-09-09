@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Eye, Save, Shirt } from "lucide-react";
+import { Download, Eye, RefreshCw, Save, Shirt } from "lucide-react";
 
 import {
   ECOM_MEDIA_TILE_ACTION_ICON_CLASS,
@@ -14,6 +14,7 @@ type Props = {
   onPreview?: () => void;
   onDownload?: () => void;
   onSaveToAssets?: () => void;
+  onRegenerate?: () => void;
   onOpenFittingRoom?: () => void;
   disabled?: boolean;
 };
@@ -26,10 +27,13 @@ export function VtonResultImageHoverActions({
   onPreview,
   onDownload,
   onSaveToAssets,
+  onRegenerate,
   onOpenFittingRoom,
   disabled,
 }: Props) {
-  if (!onPreview && !onDownload && !onSaveToAssets && !onOpenFittingRoom) return null;
+  if (!onPreview && !onDownload && !onSaveToAssets && !onRegenerate && !onOpenFittingRoom) {
+    return null;
+  }
 
   const btnClass = cn(
     ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS,
@@ -83,6 +87,21 @@ export function VtonResultImageHoverActions({
             }}
           >
             <Save className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
+          </button>
+        ) : null}
+        {onRegenerate ? (
+          <button
+            type="button"
+            title="重新生成"
+            aria-label="重新生成"
+            className={cn(btnClass, "pointer-events-auto")}
+            disabled={disabled}
+            onClick={(e) => {
+              stopClick(e);
+              onRegenerate();
+            }}
+          >
+            <RefreshCw className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
           </button>
         ) : null}
         {onOpenFittingRoom ? (
