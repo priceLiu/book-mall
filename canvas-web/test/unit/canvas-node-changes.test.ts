@@ -10,6 +10,7 @@ import {
   findGroupResizeSessionId,
   hasNodeRemoveChanges,
   isCanvasInternalDimensionsOnlyChange,
+  isCanvasInteractiveGeometryInProgress,
   isCanvasRfLocalOnlyChange,
   isGroupResizeCommitFrame,
 } from "@/lib/canvas/canvas-node-changes";
@@ -84,6 +85,48 @@ describe("isCanvasInternalDimensionsOnlyChange", () => {
     ];
     expect(isCanvasInternalDimensionsOnlyChange(resizingStart)).toBe(false);
     expect(isCanvasInternalDimensionsOnlyChange(resizingEnd)).toBe(false);
+  });
+});
+
+describe("isCanvasInteractiveGeometryInProgress", () => {
+  it("treats drag position mixed with RF measure dimensions as in-progress", () => {
+    const changes: NodeChange[] = [
+      {
+        type: "position",
+        id: "n1",
+        dragging: true,
+        position: { x: 10, y: 20 },
+      },
+      {
+        type: "dimensions",
+        id: "n1",
+        dimensions: { width: 320, height: 240 },
+      },
+    ];
+    expect(isCanvasInteractiveGeometryInProgress(changes)).toBe(true);
+  });
+
+  it("returns false for drag commit (dragging:false)", () => {
+    const changes: NodeChange[] = [
+      {
+        type: "position",
+        id: "n1",
+        dragging: false,
+        position: { x: 10, y: 20 },
+      },
+    ];
+    expect(isCanvasInteractiveGeometryInProgress(changes)).toBe(false);
+  });
+
+  it("returns false for RF-local-only batches", () => {
+    const changes: NodeChange[] = [
+      {
+        type: "dimensions",
+        id: "n1",
+        dimensions: { width: 320, height: 240 },
+      },
+    ];
+    expect(isCanvasInteractiveGeometryInProgress(changes)).toBe(false);
   });
 });
 

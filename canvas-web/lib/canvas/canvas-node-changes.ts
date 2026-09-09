@@ -170,7 +170,10 @@ export function isCanvasInteractiveGeometryInProgress(
   changes: NodeChange[],
 ): boolean {
   if (changes.length === 0) return false;
-  return changes.every((c) => {
+  // 拖动帧常混有 RF 纯测量 dimensions（无 resizing）· 须先剥离本地 echo
+  const bound = filterStoreBoundNodeChanges(changes);
+  if (bound.length === 0) return false;
+  return bound.every((c) => {
     if (c.type === "position" && "dragging" in c) {
       return c.dragging === true;
     }

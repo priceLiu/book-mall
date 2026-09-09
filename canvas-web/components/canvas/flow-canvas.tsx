@@ -1092,20 +1092,27 @@ function FlowCanvasInner({
       }
 
       if (libtvCanvas) {
-        setCanvasGeometryDragging(false);
-        setCanvasDraggingNodeId(null);
+        const stillDragging =
+          isNodeDraggingRef.current ||
+          useCanvasStore.getState().canvasGeometryDragging;
+        if (!stillDragging) {
+          setCanvasGeometryDragging(false);
+          setCanvasDraggingNodeId(null);
+          deferStoreGraphSyncRef.current = false;
+        }
         const committed = augmentStoreChangesWithResizePositions(
           storeChanges,
           getNodes() as CanvasFlowNode[],
         );
-        deferStoreGraphSyncRef.current = false;
         storeOnNodesChange(committed);
         syncLibtvFloatingDockPinFromRf();
         return;
       }
-      deferStoreGraphSyncRef.current = false;
-      setCanvasGeometryDragging(false);
-      setCanvasDraggingNodeId(null);
+      if (!isNodeDraggingRef.current) {
+        deferStoreGraphSyncRef.current = false;
+        setCanvasGeometryDragging(false);
+        setCanvasDraggingNodeId(null);
+      }
       storeOnNodesChange(
         augmentStoreChangesWithResizePositions(
           storeChanges,
