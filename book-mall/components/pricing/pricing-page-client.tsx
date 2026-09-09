@@ -448,7 +448,10 @@ export function PricingPageClient({
               <ul className="mt-3 space-y-2 site-pricing-body-text">
                 <li>1 积分 ≈ ¥{anchorYuan} 挂牌价值</li>
                 <li>
-                  每次消耗 = <code className="rounded bg-muted px-1 text-foreground">round(模型挂牌价 ÷ {anchorYuan})</code>
+                  每次消耗 ={" "}
+                  <code className="rounded bg-muted px-1 text-foreground">
+                    round2(净成本 × M ÷ {anchorYuan})，最低 0.01 积分
+                  </code>
                 </li>
                 <li>
                   可生成数量 = <code className="rounded bg-muted px-1 text-foreground">套餐积分 ÷ 每次消耗</code>

@@ -22,6 +22,9 @@ import {
 } from "@/components/ui/table";
 
 import { maskPhone } from "@/lib/auth/phone";
+import {
+  DEFAULT_CREDIT_ANCHOR_YUAN,
+} from "@/lib/pricing/credit-pricing-formulas";
 
 interface ByModel {
   canonicalModelKey: string;
@@ -54,9 +57,9 @@ function fmt(n: number): string {
   return new Intl.NumberFormat("zh-CN").format(Math.round(n));
 }
 
-/** 1 积分 = ¥0.04（锚定价），用于参考金额展示。 */
+/** 锚定价参考金额展示（与 PlatformPricingConfig 一致）。 */
 function yuan(credits: number): string {
-  return `¥${(credits * 0.04).toFixed(2)}`;
+  return `¥${(credits * DEFAULT_CREDIT_ANCHOR_YUAN).toFixed(2)}`;
 }
 
 function downloadCsv(filename: string, rows: string[][]): void {
@@ -91,7 +94,7 @@ export function TeamBillingClient(props: {
       m.name ?? m.actorUserId,
       m.phone ? maskPhone(m.phone) : "",
       String(Math.round(m.consumed)),
-      (m.consumed * 0.04).toFixed(2),
+      (m.consumed * DEFAULT_CREDIT_ANCHOR_YUAN).toFixed(2),
       String(m.count),
       ((m.consumed / total) * 100).toFixed(1),
     ]);

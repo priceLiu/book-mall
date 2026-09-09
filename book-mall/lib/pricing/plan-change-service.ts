@@ -225,7 +225,7 @@ export async function applyEffectiveProposal(proposalId: string, actorId: string
       where: { id: "default" },
       create: {
         id: "default",
-        creditAnchorYuan: 0.04,
+        creditAnchorYuan: 0.03,
         defaultMarginM: 2.5,
         minMarginGuard: 0.3,
         defaultVideoSec: 15,

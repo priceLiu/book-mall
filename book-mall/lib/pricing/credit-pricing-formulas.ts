@@ -3,7 +3,7 @@
  *
  *   C = listCost × (1 - discountRate)          // 渠道净成本
  *   P = C × M                                  // 挂牌价
- *   U = round(P ÷ anchor)                       // 积分/次
+ *   U = round2(P ÷ anchor)，最低 0.01 积分              // 积分/次
  *   N = floor(monthlyCredits ÷ U)              // 次数
  *   g = 1 - C ÷ (U × pricePerCreditYuan)       // 实际毛利
  */
@@ -97,6 +97,16 @@ export function round2(n: number): number {
 }
 export function round4(n: number): number {
   return Math.round(n * 10000) / 10000;
+}
+
+/** 价格页 / API 价目：积分展示（支持 2 位小数）。 */
+export function formatCreditsDisplay(credits: number): string {
+  const n = Number(credits);
+  if (!Number.isFinite(n)) return "0";
+  if (Math.abs(n - Math.round(n)) < 1e-9) {
+    return Math.round(n).toLocaleString("zh-CN");
+  }
+  return n.toLocaleString("zh-CN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
 /** 渠道净成本：listCost × (1 - discountRate) */

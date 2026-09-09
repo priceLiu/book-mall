@@ -16,7 +16,7 @@ import {
   API_CREDIT_TOPUP_PACKS,
   type ApiCreditTopupPack,
 } from "@/lib/billing/api-credit-topup-packs";
-import { unitLabel } from "@/lib/pricing/credit-pricing-formulas";
+import { formatCreditsDisplay, unitLabel } from "@/lib/pricing/credit-pricing-formulas";
 import { cn } from "@/lib/utils";
 
 const PANEL_CLASS = "rounded-2xl border border-border bg-card";
@@ -110,7 +110,7 @@ export function ApiPricingPageClient({
                     <TableRow key={m.canonicalModelKey}>
                       <TableCell className="font-medium">{m.displayName}</TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {m.creditsPerUnit.toLocaleString("zh-CN")} 积分
+                        {formatCreditsDisplay(m.creditsPerUnit)} 积分
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">
                         {unitLabel(m.unit)}

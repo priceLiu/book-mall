@@ -5,7 +5,7 @@
  * 输出「均衡 / 视频偏重」两套 **总积分** 方案（单池发放）；人人扣分相同，价差仅在 ppc。
  *
  * 毛利护栏（锚定 Seedance 2.0 15s）：
- *   U₀ = 525 积分，净成本 C = ¥15 → 最坏单位成本 c_worst = 15/525
+ *   U₀ = 统一公式 v2 锚定扣分，净成本 C = ¥15 → 最坏单位成本 c_worst = C / U₀
  *   若客户全部用于该模型：毛利 g = 1 − c_worst / ppc，ppc = A / T
  *
  * 用量画像 f（预期视频算力占比，非双池拆分）：
@@ -13,7 +13,15 @@
  *   T = A·(1−m) / c_blend(f)  → 目标毛利 m（按预期用量）
  *   再按 c_worst 验算锚定毛利，不足 22% 护栏时下调 T。
  */
-import { DEFAULT_VIDEO_MIN_MARGIN_GUARD } from "@/lib/pricing/credit-pricing-formulas";
+import {
+  DEFAULT_CREDIT_ANCHOR_YUAN,
+  DEFAULT_VIDEO_MIN_MARGIN_GUARD,
+  FALLBACK_PRICING_CONFIG,
+} from "@/lib/pricing/credit-pricing-formulas";
+import {
+  computeModelQuoteRow,
+  REFERENCE_VENDOR_MODELS,
+} from "@/lib/pricing/unified-credit-formula";
 
 /** VIP 起订金额（元）。 */
 export const VIP_MIN_AMOUNT_YUAN = 100_000;
@@ -21,14 +29,23 @@ export const VIP_MIN_AMOUNT_YUAN = 100_000;
 /** 企业大额预充积分有效期（年）。公示见 docs/大额vip.md */
 export const VIP_CREDIT_VALIDITY_YEARS = 5;
 
+const SEEDANCE_REFERENCE =
+  REFERENCE_VENDOR_MODELS.find((m) => m.id === "seedance-2.0-720p-real") ??
+  REFERENCE_VENDOR_MODELS[0]!;
+
+const SEEDANCE_QUOTE = computeModelQuoteRow(SEEDANCE_REFERENCE, {
+  ...FALLBACK_PRICING_CONFIG,
+  videoMinMarginGuard: DEFAULT_VIDEO_MIN_MARGIN_GUARD,
+});
+
 /** 锚定 Seedance 15s（与 unified-credit-formula v2 一致）。 */
-export const VIP_SEEDANCE_CHARGE_CREDITS = 525;
-export const VIP_SEEDANCE_NET_COST_YUAN = 15;
+export const VIP_SEEDANCE_CHARGE_CREDITS = SEEDANCE_QUOTE.chargeCredits15s ?? 750;
+export const VIP_SEEDANCE_NET_COST_YUAN = SEEDANCE_QUOTE.netCost15s ?? 15;
 export const VIP_COST_WORST_PER_CREDIT =
   VIP_SEEDANCE_NET_COST_YUAN / VIP_SEEDANCE_CHARGE_CREDITS;
 
-/** 图文 / 文本等轻量用量保守单位成本（锚定 ÷ M2.5）。 */
-export const VIP_DEFAULT_COST_LIGHT_YUAN = 0.016;
+/** 图文 / 文本等轻量用量保守单位成本（锚定 ÷ 2.5）。 */
+export const VIP_DEFAULT_COST_LIGHT_YUAN = DEFAULT_CREDIT_ANCHOR_YUAN / 2.5;
 
 /** @deprecated 别名，兼容旧引用 */
 export const VIP_DEFAULT_COST_GENERAL_YUAN = VIP_DEFAULT_COST_LIGHT_YUAN;
@@ -46,7 +63,7 @@ export const VIP_MIN_MARGIN_GUARD = DEFAULT_VIDEO_MIN_MARGIN_GUARD;
 export const VIP_DEFAULT_TARGET_MARGIN = 0.5;
 
 /** 锚定价（用于展示面值）。 */
-export const VIP_ANCHOR_YUAN = 0.04;
+export const VIP_ANCHOR_YUAN = DEFAULT_CREDIT_ANCHOR_YUAN;
 
 export interface VipCreditSchemeInput {
   amountYuan: number;

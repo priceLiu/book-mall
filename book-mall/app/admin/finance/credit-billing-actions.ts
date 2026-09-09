@@ -56,7 +56,7 @@ function str(v: FormDataEntryValue | null): string {
 export async function savePricingConfigAction(formData: FormData): Promise<ActionResult> {
   const auth = await requireAdmin();
   if (!auth.ok) return auth;
-  const creditAnchorYuan = num(formData.get("creditAnchorYuan"), 0.04);
+  const creditAnchorYuan = num(formData.get("creditAnchorYuan"), 0.03);
   const defaultMarginM = num(formData.get("defaultMarginM"), 2.5);
   const minMarginGuard = num(formData.get("minMarginGuard"), 0.3);
   const defaultVideoSec = Math.max(1, Math.round(num(formData.get("defaultVideoSec"), 15)));
