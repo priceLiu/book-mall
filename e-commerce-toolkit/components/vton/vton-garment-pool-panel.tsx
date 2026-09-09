@@ -48,6 +48,23 @@ export type VtonGarmentUploadOpts = {
   garmentId?: string;
 };
 
+/** 服装池上传 busy 作用域（避免整图列与双槽列互相误显示 loading） */
+type GarmentBusyScope =
+  | { column: "kind"; kind: Exclude<VtonGarmentKind, "full_set"> }
+  | { column: "full_set_composite" }
+  | { column: "full_set_manual"; garmentId?: string }
+  | null;
+
+function isCompositeGarmentBusy(scope: GarmentBusyScope): boolean {
+  return scope?.column === "full_set_composite";
+}
+
+function isManualGarmentRowBusy(scope: GarmentBusyScope, garmentId?: string): boolean {
+  if (scope?.column !== "full_set_manual") return false;
+  if (scope.garmentId === undefined) return garmentId === undefined;
+  return scope.garmentId === garmentId;
+}
+
 type Props = {
   pool: VtonGarmentItem[];
   lookCount?: number;
@@ -163,17 +180,20 @@ export function VtonGarmentPoolPanel({
   const [assetKind, setAssetKind] = useState<VtonGarmentKind>("top");
   const [assetFullSetSlot, setAssetFullSetSlot] = useState<VtonFullSetUploadSlot>("composite");
   const [assetGarmentId, setAssetGarmentId] = useState<string | undefined>();
-  const [garmentBusy, setGarmentBusy] = useState(false);
+  const [garmentBusyScope, setGarmentBusyScope] = useState<GarmentBusyScope>(null);
   const poolDisabled = Boolean(busy || disabled);
 
-  const runGarmentOp = useCallback(async (fn: () => Promise<void>) => {
-    setGarmentBusy(true);
-    try {
-      await fn();
-    } finally {
-      setGarmentBusy(false);
-    }
-  }, []);
+  const runGarmentOp = useCallback(
+    async (scope: NonNullable<GarmentBusyScope>, fn: () => Promise<void>) => {
+      setGarmentBusyScope(scope);
+      try {
+        await fn();
+      } finally {
+        setGarmentBusyScope(null);
+      }
+    },
+    [],
+  );
 
   function openAssets(kind: VtonGarmentKind, opts?: VtonGarmentUploadOpts) {
     setAssetKind(kind);
@@ -211,7 +231,7 @@ export function VtonGarmentPoolPanel({
                 lookCount={lookCount}
                 disabled={poolDisabled}
                 onUpload={(kind, file) =>
-                  runGarmentOp(() => onUploadGarment(kind, file))
+                  runGarmentOp({ column: "kind", kind }, () => onUploadGarment(kind, file))
                 }
                 onOpenAssets={openAssets}
                 onRemove={onRemove}
@@ -226,10 +246,10 @@ export function VtonGarmentPoolPanel({
                 key="full_set-composite"
                 items={compositeFullSets}
                 lookCount={lookCount}
-                garmentBusy={garmentBusy}
+                garmentBusy={isCompositeGarmentBusy(garmentBusyScope)}
                 disabled={poolDisabled}
                 onUpload={(file) =>
-                  runGarmentOp(() =>
+                  runGarmentOp({ column: "full_set_composite" }, () =>
                     onUploadGarment("full_set", file, { fullSetSlot: "composite" }),
                   )
                 }
@@ -245,10 +265,10 @@ export function VtonGarmentPoolPanel({
               key="full_set-manual"
               items={manualFullSets}
               lookCount={lookCount}
-              garmentBusy={garmentBusy}
+              isRowBusy={(garmentId) => isManualGarmentRowBusy(garmentBusyScope, garmentId)}
               disabled={poolDisabled}
               onUpload={(slot, file, garmentId) =>
-                runGarmentOp(() =>
+                runGarmentOp({ column: "full_set_manual", garmentId }, () =>
                   onUploadGarment("full_set", file, { fullSetSlot: slot, garmentId }),
                 )
               }
@@ -274,7 +294,13 @@ export function VtonGarmentPoolPanel({
             ossUrl: a.ossUrl,
             title: a.title ?? VTON_GARMENT_KIND_LABELS[assetKind],
           }));
-          await runGarmentOp(() =>
+          const busyScope: NonNullable<GarmentBusyScope> =
+            assetKind === "full_set"
+              ? assetFullSetSlot === "composite"
+                ? { column: "full_set_composite" }
+                : { column: "full_set_manual", garmentId: assetGarmentId }
+              : { column: "kind", kind: assetKind };
+          await runGarmentOp(busyScope, () =>
             onAddFromAssets(assetKind, mapped, {
               fullSetSlot: assetKind === "full_set" ? assetFullSetSlot : undefined,
               garmentId: assetGarmentId,
@@ -426,7 +452,7 @@ function CompositeFullSetColumn({
 function ManualFullSetColumn({
   items,
   lookCount,
-  garmentBusy,
+  isRowBusy,
   disabled,
   onUpload,
   onOpenAssets,
@@ -436,7 +462,7 @@ function ManualFullSetColumn({
 }: {
   items: VtonGarmentItem[];
   lookCount?: number;
-  garmentBusy?: boolean;
+  isRowBusy: (garmentId?: string) => boolean;
   disabled?: boolean;
   onUpload: (
     slot: Exclude<VtonFullSetUploadSlot, "composite">,
@@ -478,7 +504,7 @@ function ManualFullSetColumn({
             garment={g}
             index={index}
             garmentId={g.id}
-            busy={garmentBusy}
+            busy={isRowBusy(g.id)}
             disabled={disabled}
             onUpload={(slot, file, garmentId) => void onUpload(slot, file, garmentId)}
             onOpenAssets={(slot, garmentId) => onOpenAssets(slot, garmentId ?? g.id)}
@@ -492,7 +518,7 @@ function ManualFullSetColumn({
         ))}
         {showDraftRow ? (
           <VtonManualDualSlotRow
-            busy={garmentBusy}
+            busy={isRowBusy(undefined)}
             disabled={disabled}
             onUpload={(slot, file, garmentId) => void uploadDraftSlot(slot, file, garmentId)}
             onOpenAssets={(slot, garmentId) => onOpenAssets(slot, garmentId)}

@@ -23,9 +23,13 @@ export async function POST(req: Request, ctx: Ctx) {
   }
 
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : undefined;
+  const imageSize = typeof body.imageSize === "string" ? body.imageSize.trim() : undefined;
 
   try {
-    const project = await expandEcomModelTryonModelFullBody(auth.userId, id, { prompt });
+    const project = await expandEcomModelTryonModelFullBody(auth.userId, id, {
+      prompt,
+      imageSize,
+    });
     return NextResponse.json({ project });
   } catch (e) {
     const { message, status } = formatEcomImageGenUserError(e);

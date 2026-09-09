@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Check, Trash2 } from "lucide-react";
 
+import { VtonImageQualityPicker } from "@/components/vton/vton-image-quality-picker";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomRefImageThumb } from "@/components/media/ecom-ref-image-thumb";
 import {
@@ -20,6 +21,7 @@ import {
   isFullSetGarmentReady,
   resolveFullSetInputMode,
 } from "@/lib/vton-full-set-garment";
+import type { VtonModelImageSize } from "@/lib/vton-image-quality";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -33,6 +35,8 @@ type Props = {
   disabled?: boolean;
   onChange: (looks: VtonLookSpec[]) => Promise<void>;
   onCartesian?: (topIds: string[], bottomIds: string[]) => Promise<void>;
+  modelImageSize?: VtonModelImageSize;
+  onModelImageSizeChange?: (size: VtonModelImageSize) => void;
 };
 
 type VtonGarmentKind = VtonGarmentItem["kind"];
@@ -259,6 +263,8 @@ export function VtonLookComposer({
   disabled,
   onChange,
   onCartesian,
+  modelImageSize,
+  onModelImageSizeChange,
 }: Props) {
   const selectedSet = new Set(selectedLookIds);
   const allSelected = looks.length > 0 && looks.every((l) => selectedSet.has(l.id));
@@ -316,8 +322,8 @@ export function VtonLookComposer({
 
   return (
     <section className="space-y-3 rounded-xl border border-[#e8e8ed] bg-white p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <div className="min-w-0">
           <h3 className="text-xs font-semibold text-[#1d1d1f]">搭配编排</h3>
           <p className="text-[11px] text-[#6e6e73]">
             已添加 {looks.length}/{ECOM_VTON_MAX_BATCH_LOOKS} 套
@@ -348,16 +354,28 @@ export function VtonLookComposer({
             ) : null}
           </p>
         </div>
-        {onCartesian && tops.length > 0 && bottoms.length > 0 ? (
-          <EcomButtonSecondary
-            type="button"
-            size="sm"
+        {modelImageSize && onModelImageSizeChange ? (
+          <VtonImageQualityPicker
+            value={modelImageSize}
+            onChange={onModelImageSizeChange}
             disabled={busy || disabled}
-            onClick={() => void onCartesian(tops.map((t) => t.id), bottoms.map((b) => b.id))}
-          >
-            上×下组合
-          </EcomButtonSecondary>
-        ) : null}
+            className="justify-self-center"
+          />
+        ) : (
+          <span aria-hidden className="justify-self-center" />
+        )}
+        <div className="flex justify-end">
+          {onCartesian && tops.length > 0 && bottoms.length > 0 ? (
+            <EcomButtonSecondary
+              type="button"
+              size="sm"
+              disabled={busy || disabled}
+              onClick={() => void onCartesian(tops.map((t) => t.id), bottoms.map((b) => b.id))}
+            >
+              上×下组合
+            </EcomButtonSecondary>
+          ) : null}
+        </div>
       </div>
 
       <div className="space-y-2">

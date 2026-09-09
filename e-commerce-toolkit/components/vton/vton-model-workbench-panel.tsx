@@ -7,6 +7,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
 import { useImageDropPaste } from "@/hooks/use-image-drop-paste";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { VtonImageQualityPicker } from "@/components/vton/vton-image-quality-picker";
 import { VtonModelGenerationBadgeStack } from "@/components/vton/vton-model-generation-badge";
 import { VtonModelImageHoverActions } from "@/components/vton/vton-model-image-hover-actions";
 import { IMAGE_UPLOAD_ACCEPT, IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
@@ -23,6 +24,7 @@ import {
   resolvePreviewModelGeneration,
   sortModelGenerationsNewestFirst,
 } from "@/lib/vton-model-generations";
+import type { VtonModelImageSize } from "@/lib/vton-image-quality";
 import type {
   VtonModelGeneration,
   VtonModelPipelineBusy,
@@ -49,6 +51,8 @@ type Props = {
   onPreviewTryon: (ossUrl: string, title: string) => void;
   onSaveToMyModels: (ossUrl: string, title: string) => void | Promise<void>;
   onDeleteGeneration: (generationId: string) => void | Promise<void>;
+  modelImageSize: VtonModelImageSize;
+  onModelImageSizeChange: (size: VtonModelImageSize) => void;
 };
 
 /** 左/右栏固定同宽，缩略图 3:4 槽位（列表内 px 避免边框被 scroll 裁切） */
@@ -77,6 +81,8 @@ export function VtonModelWorkbenchPanel({
   onPreviewTryon,
   onSaveToMyModels,
   onDeleteGeneration,
+  modelImageSize,
+  onModelImageSizeChange,
 }: Props) {
   const { alert } = useDialogs();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -96,17 +102,65 @@ export function VtonModelWorkbenchPanel({
   const tryonModelId = tryonModel?.id ?? meta.activeModelGenerationId;
   /** 中栏焦点：左栏浏览 vs 右栏待试衣点选（互不抢占，除非左栏选中变化） */
   const [centerSource, setCenterSource] = useState<"left" | "right">("left");
+  /** 中栏展示版本（可与左栏 preview 选中解耦，如扩全身后中栏看新图、左栏仍选头像） */
+  const [centerGenerationId, setCenterGenerationId] = useState<string | null>(null);
   /** 左栏点选后立即切换中栏，不等待 preview API */
   const [optimisticPreviewId, setOptimisticPreviewId] = useState<string | null>(null);
   const prevLeftSelectionIdRef = useRef(leftSelectionId);
+  const prevPipelineBusyRef = useRef(modelPipelineBusy);
+  const genPipelineBaselineIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (leftSelectionId !== prevLeftSelectionIdRef.current) {
       prevLeftSelectionIdRef.current = leftSelectionId;
       setCenterSource("left");
       setOptimisticPreviewId(null);
+      if (leftSelectionId) setCenterGenerationId(leftSelectionId);
     }
   }, [leftSelectionId]);
+
+  useEffect(() => {
+    const prev = prevPipelineBusyRef.current;
+    prevPipelineBusyRef.current = modelPipelineBusy;
+
+    const enteringGenPipeline =
+      (modelPipelineBusy === "generating-model" ||
+        modelPipelineBusy === "expanding-full-body") &&
+      prev !== modelPipelineBusy;
+    if (enteringGenPipeline) {
+      genPipelineBaselineIdRef.current = candidates[0]?.id ?? null;
+    }
+
+    const leavingGenPipeline =
+      (prev === "generating-model" || prev === "expanding-full-body") &&
+      modelPipelineBusy !== "generating-model" &&
+      modelPipelineBusy !== "expanding-full-body";
+    if (leavingGenPipeline) {
+      const newest = candidates[0];
+      if (newest && newest.id !== genPipelineBaselineIdRef.current) {
+        setCenterGenerationId(newest.id);
+        setCenterSource("left");
+        genPipelineBaselineIdRef.current = null;
+      }
+    }
+  }, [modelPipelineBusy, candidates]);
+
+  useEffect(() => {
+    if (
+      modelPipelineBusy === "generating-model" ||
+      modelPipelineBusy === "expanding-full-body"
+    ) {
+      return;
+    }
+    const baseline = genPipelineBaselineIdRef.current;
+    if (!baseline) return;
+    const newest = candidates[0];
+    if (newest && newest.id !== baseline) {
+      setCenterGenerationId(newest.id);
+      setCenterSource("left");
+      genPipelineBaselineIdRef.current = null;
+    }
+  }, [candidates, modelPipelineBusy]);
 
   const displayLeftSelection =
     optimisticPreviewId != null
@@ -121,10 +175,14 @@ export function VtonModelWorkbenchPanel({
     ? isModelGenerationConfirmed(meta, displayLeftSelection.id)
     : false;
 
+  const centerFromFocus =
+    centerGenerationId != null
+      ? (candidates.find((g) => g.id === centerGenerationId) ?? null)
+      : null;
   const centerModel =
     centerSource === "right" && tryonModel
       ? tryonModel
-      : (displayLeftSelection ?? tryonModel);
+      : (centerFromFocus ?? displayLeftSelection ?? tryonModel);
   const centerModelIndex = centerModel
     ? Math.max(0, candidates.findIndex((g) => g.id === centerModel.id))
     : 0;
@@ -222,6 +280,14 @@ export function VtonModelWorkbenchPanel({
         </div>
       </div>
 
+      <div className="flex justify-center">
+        <VtonImageQualityPicker
+          value={modelImageSize}
+          onChange={onModelImageSizeChange}
+          disabled={busy || refsLocked || modelGenerating || modelExpanding}
+        />
+      </div>
+
       <input
         ref={fileInputRef}
         type="file"
@@ -258,6 +324,7 @@ export function VtonModelWorkbenchPanel({
                   actionsLocked={thumbActionsLocked}
                   onSelect={() => {
                     setOptimisticPreviewId(g.id);
+                    setCenterGenerationId(g.id);
                     setCenterSource("left");
                     void onSelectPreview(g.id);
                   }}

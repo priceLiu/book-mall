@@ -14,7 +14,10 @@ import {
   runVtonBatchTryonWithPoll,
   vtonBatchTryonFailureMessage,
 } from "@/lib/vton-batch-tryon-run";
-import { useVtonLookSelectionSync } from "@/lib/vton-look-selection";
+import {
+  shouldClearVtonLookSelectionAfterBatch,
+  useVtonLookSelectionSync,
+} from "@/lib/vton-look-selection";
 import { VtonRefWorkbench } from "@/components/vton/vton-ref-workbench";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
@@ -48,6 +51,7 @@ import {
 import type { ModelTryonProject } from "@/lib/ecom-model-tryon-api";
 import { mergeVtonTryonProgressWithBatch, parseVtonTryonProgress } from "@/lib/vton-tryon-progress";
 import { buildFullSetAssetPatch } from "@/lib/vton-full-set-garment";
+import { coerceVtonModelImageSize, type VtonModelImageSize } from "@/lib/vton-image-quality";
 import type { VtonGarmentKind, VtonLookSpec } from "@/lib/vton-types";
 import type { OutfitGarmentMode, OutfitRefMode } from "@/lib/video-workflow/templates/outfit-v1/ui-config";
 import { Plus } from "lucide-react";
@@ -196,6 +200,9 @@ export function ModelTryonStudio() {
         signal: ac.signal,
       });
       const batch = finalProject.meta?.tryonBatch;
+      if (shouldClearVtonLookSelectionAfterBatch(batch?.status)) {
+        setSelectedLookIds([]);
+      }
       if (batch?.status === "cancelled") {
         await toast({
           title: "已停止",
@@ -300,6 +307,7 @@ export function ModelTryonStudio() {
   async function patchSettings(patch: {
     outfitRefMode?: OutfitRefMode;
     garmentMode?: OutfitGarmentMode;
+    modelImageSize?: VtonModelImageSize;
   }) {
     if (!project) return;
     applyProject(
@@ -336,6 +344,7 @@ export function ModelTryonStudio() {
 
   const outfitRefMode = project.settings.outfitRefMode ?? "need_tryon";
   const garmentMode = project.settings.garmentMode ?? "two_piece";
+  const modelImageSize = coerceVtonModelImageSize(project.settings.modelImageSize);
   const useBatch = outfitRefMode === "need_tryon";
 
   return (
@@ -465,6 +474,8 @@ export function ModelTryonStudio() {
               setRefBusy(false);
             }
           }}
+          modelImageSize={modelImageSize}
+          onModelImageSizeChange={(size) => void patchSettings({ modelImageSize: size })}
           onOutfitRefModeChange={(mode) => void patchSettings({ outfitRefMode: mode })}
           onGarmentModeChange={(mode) => void patchSettings({ garmentMode: mode })}
           onUploadModels={uploadModelFiles}
@@ -542,7 +553,12 @@ export function ModelTryonStudio() {
             setRefBusy(true);
             setModelPipelineBusy("generating-model");
             try {
-              applyProject(await generateModelTryonModel(project.id, opts));
+              applyProject(
+                await generateModelTryonModel(project.id, {
+                  ...opts,
+                  imageSize: opts?.imageSize ?? modelImageSize,
+                }),
+              );
             } catch (e) {
               await alert({
                 title: "生成全身模特失败",
@@ -558,7 +574,17 @@ export function ModelTryonStudio() {
             setRefBusy(true);
             setModelPipelineBusy("expanding-full-body");
             try {
-              applyProject(await expandModelTryonFullBody(project.id, opts));
+              applyProject(
+                await expandModelTryonFullBody(project.id, {
+                  ...opts,
+                  imageSize: opts?.imageSize ?? modelImageSize,
+                }),
+              );
+              await toast({
+                title: "全身图已生成",
+                message: "新图已加入左侧上传历史；原头像仍保持选中，可点缩略图切换查看。",
+                variant: "success",
+              });
             } catch (e) {
               await alert({
                 title: "生成全身图失败",

@@ -21,6 +21,7 @@ import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import type { OutfitGarmentMode, OutfitRefMode } from "@/lib/video-workflow/templates/outfit-v1/ui-config";
 import type { WorkflowRefs } from "@/lib/video-workflow/shot-spine";
 import type { VtonTryonProgress } from "@/lib/vton-tryon-progress";
+import { ECOM_VTON_MODEL_ASSET_MODULE } from "@/lib/vton-model-library";
 import type { VtonBatchTryonMode } from "@/components/vton/vton-results-grid";
 import {
   VTON_BOTTOM_GARMENT_SCOPE,
@@ -40,6 +41,10 @@ import {
   sortModelGenerationsNewestFirst,
 } from "@/lib/vton-model-generations";
 import { filterAvailableGarmentPool } from "@/lib/vton-garment-pool";
+import {
+  coerceVtonModelImageSize,
+  type VtonModelImageSize,
+} from "@/lib/vton-image-quality";
 import { cn } from "@/lib/utils";
 
 export type VtonBatchWorkflowProps = {
@@ -112,8 +117,10 @@ type Props = {
   onAttachModelFromAssets?: (
     assets: Array<{ id: string; ossUrl: string; title: string }>,
   ) => Promise<void>;
-  onGenerateModel: (opts?: { prompt?: string }) => Promise<void>;
-  onExpandFullBody: (opts?: { prompt?: string }) => Promise<void>;
+  onGenerateModel: (opts?: { prompt?: string; imageSize?: string }) => Promise<void>;
+  onExpandFullBody: (opts?: { prompt?: string; imageSize?: string }) => Promise<void>;
+  modelImageSize?: VtonModelImageSize;
+  onModelImageSizeChange?: (size: VtonModelImageSize) => void;
   onTryon: () => Promise<void>;
   onLockRefs?: () => Promise<void>;
   onSaveToAssets?: () => Promise<void>;
@@ -163,12 +170,16 @@ export function VtonRefWorkbench({
   onAttachModelFromAssets,
   onGenerateModel,
   onExpandFullBody,
+  modelImageSize,
+  onModelImageSizeChange,
   onTryon,
   onLockRefs,
   onSaveToAssets,
   saveBusy,
   batchWorkflow,
 }: Props) {
+  const effectiveModelImageSize = coerceVtonModelImageSize(modelImageSize);
+
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [assetPickerOpen, setAssetPickerOpen] = useState(false);
   const [genModelOpen, setGenModelOpen] = useState(false);
@@ -336,7 +347,7 @@ export function VtonRefWorkbench({
           className={modelHeaderBtnClass}
           onClick={() => {
             if (builtinModelPipeline) {
-              void onExpandFullBody();
+              void onExpandFullBody({ imageSize: effectiveModelImageSize });
               return;
             }
             setExpandOpen(true);
@@ -475,7 +486,9 @@ export function VtonRefWorkbench({
             }
             onOpenModelLibrary={() => setLibraryOpen(true)}
             onGenerateModel={() => setFourViewGenOpen(true)}
-            onExpandFullBody={() => void onExpandFullBody()}
+            onExpandFullBody={() =>
+              void onExpandFullBody({ imageSize: effectiveModelImageSize })
+            }
             onSelectPreview={(id) => void onSelectPreviewModelGeneration?.(id)}
             onConfirmGeneration={(id) => void onConfirmModelGeneration?.(id)}
             onSelectTryonGeneration={(id) => void onSelectTryonModelGeneration?.(id)}
@@ -484,6 +497,8 @@ export function VtonRefWorkbench({
             onPreviewTryon={(src, title) => openModelTryonPreview(src, title)}
             onSaveToMyModels={(ossUrl, title) => void onSaveModelToMyModels?.(ossUrl, title)}
             onDeleteGeneration={(id) => void onDeleteModelGeneration?.(id)}
+            modelImageSize={effectiveModelImageSize}
+            onModelImageSizeChange={(size) => onModelImageSizeChange?.(size)}
           />
         ) : (
           <div className="space-y-2">
@@ -616,6 +631,8 @@ export function VtonRefWorkbench({
             disabled={refsLocked}
             onChange={batchWorkflow.onChangeLooks}
             onCartesian={batchWorkflow.onCartesianLooks}
+            modelImageSize={effectiveModelImageSize}
+            onModelImageSizeChange={(size) => onModelImageSizeChange?.(size)}
           />
           <VtonResultsGrid
             batch={batchWorkflow.meta.tryonBatch}
@@ -737,6 +754,7 @@ export function VtonRefWorkbench({
                 <EcomAssetPickerDialog
                   open={assetPickerOpen}
                   onOpenChange={setAssetPickerOpen}
+                  defaultModule={ECOM_VTON_MODEL_ASSET_MODULE}
                   maxSelect={8}
                   onConfirm={async (assets) => {
                     setAssetPickerOpen(false);
@@ -751,7 +769,10 @@ export function VtonRefWorkbench({
                   busy={busy}
                   onConfirm={async (opts) => {
                     setFourViewGenOpen(false);
-                    await onGenerateModel({ prompt: opts.prompt });
+                    await onGenerateModel({
+                      prompt: opts.prompt,
+                      imageSize: effectiveModelImageSize,
+                    });
                   }}
                 />
               ) : (
@@ -766,7 +787,10 @@ export function VtonRefWorkbench({
                   busy={busy}
                   onConfirm={async (opts) => {
                     setGenModelOpen(false);
-                    await onGenerateModel({ prompt: opts.prompt });
+                    await onGenerateModel({
+                      prompt: opts.prompt,
+                      imageSize: effectiveModelImageSize,
+                    });
                   }}
                 />
               )}
@@ -781,6 +805,7 @@ export function VtonRefWorkbench({
                     setExpandOpen(false);
                     await onExpandFullBody({
                       prompt: expandPrompt.trim() || undefined,
+                      imageSize: effectiveModelImageSize,
                     });
                   }}
                 />

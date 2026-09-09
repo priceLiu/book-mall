@@ -249,6 +249,7 @@ export function appendModelGeneration(
     createdAt?: string;
     bodyCheck?: VtonModelGenerationBodyCheck;
   },
+  opts?: { keepPreviewGenerationId?: string },
 ): { meta: VtonProjectMeta; generation: VtonModelGeneration } {
   const generation: VtonModelGeneration = {
     id: entry.id ?? newModelGenerationId(),
@@ -259,12 +260,17 @@ export function appendModelGeneration(
     ...(entry.bodyCheck ? { bodyCheck: entry.bodyCheck } : {}),
   };
   const modelGenerations = [...(meta.modelGenerations ?? []), generation];
+  const keepPreviewId = opts?.keepPreviewGenerationId?.trim();
+  const previewModelGenerationId =
+    keepPreviewId && modelGenerations.some((g) => g.id === keepPreviewId)
+      ? keepPreviewId
+      : generation.id;
   return {
     generation,
     meta: finalizeModelGenerationsMeta({
       ...meta,
       modelGenerations,
-      previewModelGenerationId: generation.id,
+      previewModelGenerationId,
     }),
   };
 }

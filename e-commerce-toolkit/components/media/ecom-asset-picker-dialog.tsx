@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   Dialog,
@@ -47,6 +47,8 @@ type Props = {
   maxSelect?: number;
   /** 为 true 时同时展示图片与视频资产（拆图拆视频等） */
   allowVideo?: boolean;
+  /** 打开弹层时默认选中的资产分组（如模特试衣选模特） */
+  defaultModule?: string;
 };
 
 export function EcomAssetPickerDialog({
@@ -55,13 +57,25 @@ export function EcomAssetPickerDialog({
   onConfirm,
   maxSelect = 8,
   allowVideo = false,
+  defaultModule,
 }: Props) {
-  const [activeModule, setActiveModule] = useState(GROUPS[0]!.module);
+  const [activeModule, setActiveModule] = useState(
+    defaultModule ?? GROUPS[0]!.module,
+  );
   const [assets, setAssets] = useState<EcomAsset[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [confirming, setConfirming] = useState(false);
+  const wasOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (open && !wasOpenRef.current && defaultModule) {
+      setActiveModule(defaultModule);
+      setSelected([]);
+    }
+    wasOpenRef.current = open;
+  }, [open, defaultModule]);
 
   const effectiveMaxSelect =
     activeModule === ECOM_VTON_MODEL_ASSET_MODULE
@@ -90,6 +104,7 @@ export function EcomAssetPickerDialog({
   useEffect(() => {
     if (!open) {
       setSelected([]);
+      setLoading(false);
       return;
     }
     let cancelled = false;

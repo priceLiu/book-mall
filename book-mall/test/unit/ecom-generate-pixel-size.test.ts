@@ -16,6 +16,23 @@ describe("resolveEcomGeneratePixelSize", () => {
     ).toBe("1696*960");
   });
 
+  it("passes through 3:4 pixel size for wan2.7-image-pro", () => {
+    expect(
+      resolveEcomGeneratePixelSize({
+        modelKey: "wan2.7-image-pro",
+        ratio: "3:4",
+        imageSize: "720*960",
+      }),
+    ).toBe("720*960");
+    expect(
+      resolveEcomGeneratePixelSize({
+        modelKey: "wan2.7-image-pro",
+        ratio: "3:4",
+        imageSize: "1536*2048",
+      }),
+    ).toBe("1536*2048");
+  });
+
   it("keeps portrait pixel size when refs present and forced", () => {
     expect(
       resolveStoryboardWan27JobSize({

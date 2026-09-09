@@ -1,5 +1,10 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 
+/** 批量试衣结束后清空搭配编排多选 */
+export function shouldClearVtonLookSelectionAfterBatch(status: string | undefined): boolean {
+  return status === "done" || status === "cancelled";
+}
+
 /** 编排表勾选：仅剔除已删除搭配，不默认全选、不在轮询时补回取消勾选项 */
 export function useVtonLookSelectionSync(
   lookDraftIdSig: string,

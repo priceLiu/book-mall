@@ -36,13 +36,46 @@ export type VtonBatchTryonProgress = {
   itemProgress?: VtonTryonProgress;
 };
 
+/** 批量试衣默认并行度（aitryon-plus 异步任务，可安全并行） */
+export const VTON_BATCH_TRYON_CONCURRENCY = 4;
+
+export function countVtonBatchFinishedResults(results: VtonTryonResult[]): number {
+  return results.filter(
+    (r) => r.status === "success" || r.status === "failed" || r.status === "cancelled",
+  ).length;
+}
+
+export function formatVtonBatchRunningProgressLabel(
+  batch: Pick<VtonTryonBatchState, "total" | "results">,
+): string {
+  const done = countVtonBatchFinishedResults(batch.results);
+  const running = batch.results.filter((r) => r.status === "running").length;
+  if (done === 0 && running === 0) return "排队中…";
+  if (running > 1) return `试衣中 ${done}/${batch.total}（${running} 套并行）…`;
+  return `试衣中 ${done}/${batch.total}…`;
+}
+
+function refreshVtonBatchRunningProgress(batch: VtonTryonBatchState): void {
+  batch.currentIndex = countVtonBatchFinishedResults(batch.results);
+  batch.label = formatVtonBatchRunningProgressLabel(batch);
+}
+
 /** 批量试衣对外文案：始终按套次序号，不采纳单套「提交 AI 试衣任务…」等 */
 export function formatVtonBatchTryonLabel(batch: VtonTryonBatchState): string {
   if (batch.status === "running") {
+    const custom = batch.label?.trim();
+    if (
+      custom &&
+      custom !== "准备批量试衣…" &&
+      custom !== "排队中…" &&
+      /^试衣中 \d+\/\d+/.test(custom)
+    ) {
+      return custom;
+    }
     if (batch.currentIndex > 0) {
       return `试衣中 ${batch.currentIndex}/${batch.total}…`;
     }
-    return batch.label?.trim() || "排队中…";
+    return custom || "排队中…";
   }
   if (batch.label?.trim()) return batch.label.trim();
   if (batch.status === "cancelled") return "已停止批量试衣";
@@ -215,24 +248,37 @@ export async function runEcomVtonTryOnBatch(opts: {
     updatedAt: new Date().toISOString(),
   };
 
-  await opts.onProgress?.({ batch });
+  let progressChain: Promise<void> = Promise.resolve();
+  const emitProgress = (progress: VtonBatchTryonProgress) => {
+    progressChain = progressChain.then(async () => {
+      await opts.onProgress?.(progress);
+    });
+    return progressChain;
+  };
+
+  await emitProgress({ batch });
 
   const garmentParseCache: VtonGarmentParseCache = new Map();
+  let stopStarting = false;
 
-  for (let i = 0; i < opts.looks.length; i++) {
+  const shouldAbort = async (): Promise<boolean> => {
+    if (stopStarting) return true;
     if (await opts.shouldCancel?.()) {
-      finalizeCancelledVtonBatch(batch);
-      await opts.onProgress?.({ batch });
-      return batch;
+      stopStarting = true;
+      return true;
     }
+    return false;
+  };
+
+  async function processLookIndex(i: number): Promise<boolean> {
+    if (await shouldAbort()) return false;
 
     const look = opts.looks[i]!;
     const result = results[i]!;
     result.status = "running";
-    batch.currentIndex = i + 1;
-    batch.label = `试衣中 ${i + 1}/${opts.looks.length}…`;
     batch.updatedAt = new Date().toISOString();
-    await opts.onProgress?.({ batch, result });
+    refreshVtonBatchRunningProgress(batch);
+    await emitProgress({ batch, result });
 
     try {
       const urls = await resolveTryonUrlsForBatchLook({
@@ -254,10 +300,10 @@ export async function runEcomVtonTryOnBatch(opts: {
         topGarmentUrl: urls.topGarmentUrl,
         bottomGarmentUrl: urls.bottomGarmentUrl,
         garmentParseCache,
-        shouldCancel: opts.shouldCancel,
+        shouldCancel: shouldAbort,
         onProgress: async (p) => {
           batch.updatedAt = new Date().toISOString();
-          await opts.onProgress?.({ batch, result, itemProgress: p });
+          await emitProgress({ batch, result, itemProgress: p });
         },
       });
       result.status = "success";
@@ -268,17 +314,42 @@ export async function runEcomVtonTryOnBatch(opts: {
         result.status = "cancelled";
         result.failReason = "已停止";
         result.createdAt = new Date().toISOString();
-        finalizeCancelledVtonBatch(batch);
-        batch.updatedAt = new Date().toISOString();
-        await opts.onProgress?.({ batch, result });
-        return batch;
+        stopStarting = true;
+        return false;
       }
       result.status = "failed";
       result.failReason = e instanceof Error ? e.message : "试衣失败";
     }
+
     result.createdAt = new Date().toISOString();
     batch.updatedAt = new Date().toISOString();
-    await opts.onProgress?.({ batch, result });
+    refreshVtonBatchRunningProgress(batch);
+    await emitProgress({ batch, result });
+    return true;
+  }
+
+  let nextIndex = 0;
+  const workerCount = Math.min(VTON_BATCH_TRYON_CONCURRENCY, opts.looks.length);
+
+  async function worker(): Promise<void> {
+    while (!stopStarting) {
+      if (await shouldAbort()) return;
+      const i = nextIndex;
+      nextIndex += 1;
+      if (i >= opts.looks.length) return;
+      const ok = await processLookIndex(i);
+      if (!ok) return;
+    }
+  }
+
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  await progressChain;
+
+  if (stopStarting || (await opts.shouldCancel?.())) {
+    finalizeCancelledVtonBatch(batch);
+    batch.updatedAt = new Date().toISOString();
+    await emitProgress({ batch });
+    return batch;
   }
 
   batch.status = batch.results.every((r) => r.status === "failed") ? "failed" : "done";
@@ -287,7 +358,7 @@ export async function runEcomVtonTryOnBatch(opts: {
       ? `批量试衣完成（${batch.results.filter((r) => r.status === "success").length}/${batch.total}）`
       : "批量试衣结束（存在失败）";
   batch.updatedAt = new Date().toISOString();
-  await opts.onProgress?.({ batch });
+  await emitProgress({ batch });
 
   return batch;
 }

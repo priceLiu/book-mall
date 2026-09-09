@@ -15,6 +15,8 @@ import { parseVtonProjectMeta } from "@/lib/vton-types";
 export type ModelTryonSettings = {
   outfitRefMode?: OutfitRefMode;
   garmentMode?: OutfitGarmentMode;
+  /** wan2.7 全身生图像素尺寸（720P / 1080P / 2K） */
+  modelImageSize?: string;
 };
 
 export type ModelTryonProject = {
@@ -235,7 +237,7 @@ export async function unlockModelTryonLockedLook(
 
 export async function generateModelTryonModel(
   projectId: string,
-  opts?: { prompt?: string },
+  opts?: { prompt?: string; imageSize?: string },
 ): Promise<ModelTryonProject> {
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/refs/generate-model`, {
     method: "POST",
@@ -247,7 +249,7 @@ export async function generateModelTryonModel(
 
 export async function expandModelTryonFullBody(
   projectId: string,
-  opts?: { prompt?: string },
+  opts?: { prompt?: string; imageSize?: string },
 ): Promise<ModelTryonProject> {
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/refs/expand-full-body`, {
     method: "POST",

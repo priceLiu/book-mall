@@ -86,20 +86,14 @@ function resultCellClass(
   );
 }
 
-/** 仅当前正在试衣的一格显示扫光；排队中/待试衣格不带动效 */
-function resolveActiveTryonLookId(
-  batch: VtonTryonBatchState | null | undefined,
-  tryonBusy: boolean | undefined,
-  runningLookIds: string[] | undefined,
-): string | null {
-  if (batch?.status === "running") {
-    const running = batch.results.find((r) => r.status === "running");
-    if (running) return running.lookId;
-  }
-  if (tryonBusy && runningLookIds?.length) {
-    return runningLookIds[0] ?? null;
-  }
-  return null;
+function isTryonLookCellRunning(
+  lookId: string,
+  result: VtonTryonResult | undefined,
+  batchRunning: boolean,
+): boolean {
+  if (!batchRunning) return false;
+  if (result?.status === "running") return true;
+  return false;
 }
 
 function VtonTryonRunningSlot({ className }: { className?: string }) {
@@ -147,15 +141,11 @@ export function VtonResultsGrid({
   onRegenerateLook,
   onSaveResultToAssets,
   onStopBatchTryon,
-  runningLookIds,
+  runningLookIds: _runningLookIds,
 }: Props) {
   const results = useMemo(() => batch?.results ?? [], [batch?.results]);
   const slotLooks = looks.slice(0, ECOM_VTON_MAX_BATCH_LOOKS);
   const running = batch?.status === "running" || tryonBusy;
-  const activeTryonLookId = useMemo(
-    () => resolveActiveTryonLookId(batch, tryonBusy, runningLookIds),
-    [batch, tryonBusy, runningLookIds],
-  );
   const hasSuccess = results.some((r) => normalizeVtonTryonResultVersions(r).length > 0);
   const lockedResultIds = new Set(lockedLooks.map((l) => l.resultId).filter(Boolean));
   const selectedTryonCount = selectedLookIds.length;
@@ -282,16 +272,6 @@ export function VtonResultsGrid({
             {slotLooks.map((look) => {
               const result = resultForLook(results, look.id);
               if (!result) {
-                if (activeTryonLookId === look.id) {
-                  return (
-                    <div key={look.id}>
-                      <VtonTryonRunningSlot className="border border-[#0071e3]/40" />
-                      <p className="truncate px-1 py-0.5 text-[10px] text-[#6e6e73]">
-                        {lookLabel(looks, look.id)}
-                      </p>
-                    </div>
-                  );
-                }
                 return (
                   <div key={look.id}>
                     <div className="flex aspect-[3/4] flex-col items-center justify-center rounded-lg border border-dashed border-[#e8e8ed] bg-[#fafafa] px-1 text-center text-[10px] text-[#86868b]">
@@ -314,7 +294,7 @@ export function VtonResultsGrid({
               const displayUrl = versions[versionIndex]?.ossUrl ?? result.ossUrl ?? null;
               const hasMultipleVersions = versions.length > 1;
               const showImage = Boolean(displayUrl);
-              const cellRunning = activeTryonLookId === look.id && running;
+              const cellRunning = isTryonLookCellRunning(look.id, result, running);
 
               return (
                 <div

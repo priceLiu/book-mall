@@ -14,7 +14,10 @@ import {
   runVtonBatchTryonWithPoll,
   vtonBatchTryonFailureMessage,
 } from "@/lib/vton-batch-tryon-run";
-import { useVtonLookSelectionSync } from "@/lib/vton-look-selection";
+import {
+  shouldClearVtonLookSelectionAfterBatch,
+  useVtonLookSelectionSync,
+} from "@/lib/vton-look-selection";
 import { EcomVideoPreviewDialog } from "@/components/media/ecom-video-preview-dialog";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
@@ -908,6 +911,9 @@ function OutfitVideoStudioInner() {
         signal: ac.signal,
       });
       const batch = finalProject.meta?.tryonBatch;
+      if (shouldClearVtonLookSelectionAfterBatch(batch?.status)) {
+        setSelectedLookIds([]);
+      }
       if (batch?.status === "cancelled") {
         await toast({
           title: "已停止",

@@ -8,6 +8,8 @@ export const MODEL_TRYON_V1_TEMPLATE_ID = "model-tryon-v1";
 export type ModelTryonSettings = {
   outfitRefMode?: VtonRefMode;
   garmentMode?: VtonGarmentMode;
+  /** wan2.7 全身生图像素尺寸（720P / 1080P / 2K） */
+  modelImageSize?: string;
 };
 
 export type ModelTryonProjectDto = {

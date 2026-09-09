@@ -40,10 +40,12 @@ export function resolveWan27ImageSize(opts: {
       const r = w / h;
       const isLandscape = Math.abs(r - 16 / 9) < 0.08;
       const isPortrait916 = Math.abs(r - 9 / 16) < 0.08;
+      const isPortrait34 = Math.abs(r - 3 / 4) < 0.08;
       const aspectRatio = opts.aspectRatio === "16:9" ? "16:9" : "9:16";
       if (
         (aspectRatio === "16:9" && isLandscape) ||
-        (aspectRatio === "9:16" && isPortrait916)
+        (aspectRatio === "9:16" && isPortrait916) ||
+        isPortrait34
       ) {
         return raw;
       }

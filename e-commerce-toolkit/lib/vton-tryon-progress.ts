@@ -59,10 +59,19 @@ type BatchLabelInput = {
 /** 批量试衣结果区 / 步骤条：按套次序号展示，忽略单套「提交 AI 试衣任务…」 */
 export function formatVtonBatchTryonLabel(batch: BatchLabelInput): string {
   if (batch.status === "running") {
+    const custom = batch.label?.trim();
+    if (
+      custom &&
+      custom !== "准备批量试衣…" &&
+      custom !== "排队中…" &&
+      /^试衣中 \d+\/\d+/.test(custom)
+    ) {
+      return custom;
+    }
     if (batch.currentIndex > 0) {
       return `试衣中 ${batch.currentIndex}/${batch.total}…`;
     }
-    return batch.label?.trim() || "排队中…";
+    return custom || "排队中…";
   }
   if (batch.label?.trim()) return batch.label.trim();
   if (batch.status === "cancelled") return "已停止批量试衣";

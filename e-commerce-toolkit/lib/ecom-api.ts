@@ -14,14 +14,23 @@ export type EcomAsset = {
 };
 
 async function bookFetch(path: string, init?: RequestInit) {
-  const res = await fetch(`/api/book-mall/${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`/api/book-mall/${path}`, {
+      ...init,
+      credentials: "include",
+      signal: init?.signal ?? AbortSignal.timeout(60_000),
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+  } catch (e: unknown) {
+    if (e instanceof DOMException && e.name === "TimeoutError") {
+      throw new Error("请求超时，请刷新页面后重试");
+    }
+    throw e instanceof Error ? e : new Error("网络请求失败");
+  }
   const text = await res.text();
   let data: Record<string, unknown> = {};
   try {

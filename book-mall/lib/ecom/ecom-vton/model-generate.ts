@@ -10,6 +10,7 @@ import {
 export async function generateVtonModelImage(opts: {
   userId: string;
   prompt?: string;
+  imageSize?: string;
   toolKeySuffix?: string;
 }): Promise<string> {
   await assertEcomToolkitGatewayAccess(opts.userId);
@@ -24,6 +25,7 @@ export async function generateVtonModelImage(opts: {
     modelKey: ECOM_VTON_MODEL_GEN_MODEL,
     prompt,
     ratio: "3:4",
+    imageSize: opts.imageSize,
     refImageUrls: [],
     toolKey,
   });

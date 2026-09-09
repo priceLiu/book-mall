@@ -86,14 +86,27 @@ function sanitizeGarmentMode(raw: unknown): VtonGarmentMode {
   return raw === "one_piece" ? "one_piece" : "two_piece";
 }
 
+const VTON_MODEL_IMAGE_SIZE_VALUES = ["720*960", "1080*1440", "1536*2048"] as const;
+
+function sanitizeModelImageSize(raw: unknown): string {
+  const v = typeof raw === "string" ? raw.trim() : "";
+  if ((VTON_MODEL_IMAGE_SIZE_VALUES as readonly string[]).includes(v)) return v;
+  return "720*960";
+}
+
 function sanitizeSettings(raw: unknown): ModelTryonSettings {
   if (!raw || typeof raw !== "object") {
-    return { outfitRefMode: "need_tryon", garmentMode: "two_piece" };
+    return {
+      outfitRefMode: "need_tryon",
+      garmentMode: "two_piece",
+      modelImageSize: "720*960",
+    };
   }
   const o = raw as Record<string, unknown>;
   return {
     outfitRefMode: sanitizeOutfitRefMode(o.outfitRefMode),
     garmentMode: sanitizeGarmentMode(o.garmentMode),
+    modelImageSize: sanitizeModelImageSize(o.modelImageSize),
   };
 }
 
@@ -132,6 +145,7 @@ async function persistNewModelGeneration(
     source?: NonNullable<WorkflowRefs["model"]>["source"];
     bodyCheck?: VtonModelGeneration["bodyCheck"];
   },
+  opts?: { keepPreviewGenerationId?: string },
 ): Promise<ModelTryonProjectDto> {
   let meta = ensureModelGenerationsFromRefs(
     sanitizeVtonProjectMeta(project.meta),
@@ -152,12 +166,18 @@ async function persistNewModelGeneration(
     }
   }
 
-  const appended = appendModelGeneration(meta, {
-    ossUrl: entry.ossUrl,
-    label: entry.label,
-    source: entry.source,
-    bodyCheck,
-  });
+  const appended = appendModelGeneration(
+    meta,
+    {
+      ossUrl: entry.ossUrl,
+      label: entry.label,
+      source: entry.source,
+      bodyCheck,
+    },
+    opts?.keepPreviewGenerationId
+      ? { keepPreviewGenerationId: opts.keepPreviewGenerationId }
+      : undefined,
+  );
   meta = mergeVtonMeta(appended.meta, { tryonProgress: null });
   const references = refsWithActiveModelGeneration(project.references, meta);
 
@@ -403,14 +423,18 @@ export async function uploadEcomModelTryonRefImage(
 export async function generateEcomModelTryonModel(
   userId: string,
   projectId: string,
-  opts?: { prompt?: string },
+  opts?: { prompt?: string; imageSize?: string },
 ): Promise<ModelTryonProjectDto> {
   const project = await getEcomModelTryonProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
 
+  const settings = sanitizeSettings(project.settings);
+  const imageSize = sanitizeModelImageSize(opts?.imageSize ?? settings.modelImageSize);
+
   const ossUrl = await generateVtonModelImage({
     userId,
     prompt: opts?.prompt,
+    imageSize,
     toolKeySuffix: "model-tryon__model-generate",
   });
 
@@ -425,10 +449,13 @@ export async function generateEcomModelTryonModel(
 export async function expandEcomModelTryonModelFullBody(
   userId: string,
   projectId: string,
-  opts?: { prompt?: string },
+  opts?: { prompt?: string; imageSize?: string },
 ): Promise<ModelTryonProjectDto> {
   const project = await getEcomModelTryonProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
+
+  const settings = sanitizeSettings(project.settings);
+  const imageSize = sanitizeModelImageSize(opts?.imageSize ?? settings.modelImageSize);
 
   let meta = ensureModelGenerationsFromRefs(
     sanitizeVtonProjectMeta(project.meta),
@@ -439,19 +466,29 @@ export async function expandEcomModelTryonModelFullBody(
     preview?.ossUrl?.trim() ?? project.references.model?.ossUrl?.trim();
   if (!portraitUrl) throw new Error("请先上传或选择模特图");
 
+  const sourcePreviewId = preview?.id;
+
   const ossUrl = await expandVtonModelFullBody({
     userId,
     portraitUrl,
     prompt: opts?.prompt,
+    imageSize,
+    shotType: preview?.bodyCheck?.shotType,
     toolKeySuffix: "model-tryon__expand-full-body",
   });
 
-  return persistNewModelGeneration(userId, projectId, project, {
-    ossUrl,
-    label: "AI 全身模特",
-    source: "ai-generate",
-    bodyCheck: vtonGenerationBodyCheckForAi(),
-  });
+  return persistNewModelGeneration(
+    userId,
+    projectId,
+    { ...project, meta },
+    {
+      ossUrl,
+      label: "AI 全身模特",
+      source: "ai-generate",
+      bodyCheck: vtonGenerationBodyCheckForAi(),
+    },
+    sourcePreviewId ? { keepPreviewGenerationId: sourcePreviewId } : undefined,
+  );
 }
 
 async function persistModelTryonMeta(
