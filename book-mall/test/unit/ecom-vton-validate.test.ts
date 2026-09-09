@@ -134,6 +134,27 @@ describe("batch look validate", () => {
         modelUrl: "https://x/model.jpg",
       }),
     ).toMatchObject({ lookKind: "full_set", topGarmentUrl: "https://x/set.jpg" });
+
+    expect(
+      resolveLookTryonUrls({
+        look: {
+          id: "l6",
+          kind: "top_only",
+          fullSetGarmentId: "s1",
+          topGarmentId: "t1",
+        },
+        garmentPool: pool,
+        modelUrl: "https://x/model.jpg",
+      }),
+    ).toMatchObject({ lookKind: "full_set", topGarmentUrl: "https://x/set.jpg" });
+
+    expect(
+      resolveLookTryonUrls({
+        look: { id: "l7", kind: "top_only", topGarmentId: "s1" },
+        garmentPool: pool,
+        modelUrl: "https://x/model.jpg",
+      }),
+    ).toMatchObject({ lookKind: "full_set", topGarmentUrl: "https://x/set.jpg" });
   });
 
   it("assertBatchLooksValid enforces 1-9 limit", () => {

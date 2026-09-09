@@ -19,6 +19,7 @@ type Props = {
   open: boolean;
   title: string;
   entries: CatalogPickerEntry[];
+  headerContent?: React.ReactNode;
   onOpenChange: (open: boolean) => void;
   onPick: (entry: CatalogPickerEntry) => void | Promise<void>;
 };
@@ -27,6 +28,7 @@ export function EcomCatalogPickerDialog({
   open,
   title,
   entries,
+  headerContent,
   onOpenChange,
   onPick,
 }: Props) {
@@ -51,6 +53,7 @@ export function EcomCatalogPickerDialog({
           <EcomDialogCloseButton onClick={() => onOpenChange(false)} />
         </div>
         <div className="flex-1 space-y-4 overflow-y-auto p-4">
+          {headerContent ? <div>{headerContent}</div> : null}
           {grouped.platform.length > 0 ? (
             <section>
               <p className="mb-2 text-xs font-medium text-[#86868b]">系统推荐</p>

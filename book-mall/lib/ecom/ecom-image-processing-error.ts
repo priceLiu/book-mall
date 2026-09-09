@@ -67,5 +67,13 @@ export function formatEcomImageProcessingUserError(error: unknown): {
     return { message: raw, status: 402 };
   }
 
+  if (/image resolution is invalid|largest length of image|smallest length of image/i.test(raw)) {
+    return {
+      message:
+        "参考图尺寸或体积不符合要求（最短边须大于 150px、最长边小于 4096px，文件 5KB～5MB）。请换用更高清的模特/服装图，或先使用「头像生成全身图」。",
+      status: 400,
+    };
+  }
+
   return { message: raw || "处理失败", status: 500 };
 }

@@ -15,8 +15,6 @@ import { parseVtonProjectMeta } from "@/lib/vton-types";
 export type ModelTryonSettings = {
   outfitRefMode?: OutfitRefMode;
   garmentMode?: OutfitGarmentMode;
-  imageModelKey?: string;
-  fusionModelKey?: string;
 };
 
 export type ModelTryonProject = {
@@ -179,12 +177,20 @@ export async function buildModelTryonCartesianLooks(
 
 export async function batchModelTryon(
   projectId: string,
-  opts?: { looks?: VtonLookSpec[] },
+  opts?: { looks?: VtonLookSpec[]; signal?: AbortSignal },
 ): Promise<ModelTryonProject> {
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/tryon/batch`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(opts ?? {}),
+    body: JSON.stringify({ looks: opts?.looks }),
+    signal: opts?.signal,
+  });
+  return parseProject(data.project as ModelTryonProject);
+}
+
+export async function cancelModelTryonBatch(projectId: string): Promise<ModelTryonProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/tryon/batch/cancel`, {
+    method: "POST",
   });
   return parseProject(data.project as ModelTryonProject);
 }
@@ -225,19 +231,19 @@ export async function unlockModelTryonLockedLook(
 
 export async function generateModelTryonModel(
   projectId: string,
-  opts: { prompt: string; modelKey?: string },
+  opts?: { prompt?: string },
 ): Promise<ModelTryonProject> {
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/refs/generate-model`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(opts),
+    body: JSON.stringify(opts ?? {}),
   });
   return parseProject(data.project as ModelTryonProject);
 }
 
 export async function expandModelTryonFullBody(
   projectId: string,
-  opts?: { prompt?: string; modelKey?: string },
+  opts?: { prompt?: string },
 ): Promise<ModelTryonProject> {
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/refs/expand-full-body`, {
     method: "POST",
@@ -259,7 +265,7 @@ export async function tryModelTryon(projectId: string): Promise<ModelTryonProjec
 
 export async function saveModelTryonToAssets(
   projectId: string,
-  opts?: { title?: string },
+  opts?: { title?: string; ossUrl?: string },
 ): Promise<{ assetId: string }> {
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/save-to-assets`, {
     method: "POST",
@@ -267,4 +273,73 @@ export async function saveModelTryonToAssets(
     body: JSON.stringify(opts ?? {}),
   });
   return { assetId: data.assetId as string };
+}
+
+export async function setPreviewModelTryonGeneration(
+  projectId: string,
+  generationId: string,
+): Promise<ModelTryonProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/model-generations/preview`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ generationId }),
+  });
+  return parseProject(data.project as ModelTryonProject);
+}
+
+export async function confirmModelTryonGeneration(
+  projectId: string,
+  generationId: string,
+): Promise<ModelTryonProject> {
+  const data = await ecomBookFetch(
+    `${BASE}/projects/${projectId}/model-generations/${generationId}/confirm`,
+    { method: "POST" },
+  );
+  return parseProject(data.project as ModelTryonProject);
+}
+
+export async function unconfirmModelTryonGeneration(
+  projectId: string,
+  generationId: string,
+): Promise<ModelTryonProject> {
+  const data = await ecomBookFetch(
+    `${BASE}/projects/${projectId}/model-generations/${generationId}/confirm`,
+    { method: "DELETE" },
+  );
+  return parseProject(data.project as ModelTryonProject);
+}
+
+export async function setActiveModelTryonGeneration(
+  projectId: string,
+  generationId: string,
+): Promise<ModelTryonProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/model-generations/active`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ generationId }),
+  });
+  return parseProject(data.project as ModelTryonProject);
+}
+
+export async function saveModelTryonModelImage(
+  projectId: string,
+  opts: { ossUrl: string; title?: string },
+): Promise<{ assetId: string }> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/save-model`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts),
+  });
+  return { assetId: data.assetId as string };
+}
+
+export async function removeModelTryonGeneration(
+  projectId: string,
+  generationId: string,
+): Promise<ModelTryonProject> {
+  const data = await ecomBookFetch(
+    `${BASE}/projects/${projectId}/model-generations/${generationId}`,
+    { method: "DELETE" },
+  );
+  return parseProject(data.project as ModelTryonProject);
 }

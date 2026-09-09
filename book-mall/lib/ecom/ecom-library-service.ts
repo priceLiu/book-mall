@@ -152,7 +152,8 @@ export type EcomLibrarySection = {
   modelShotBundles: EcomLibraryModelShotBundle[];
 };
 
-const IMAGE_MODULE_IDS = ["main-image", "detail-page", "hand-craft", "model-shot", "model-tryon"] as const;
+/** model-tryon 成片仅在电商工具箱「试衣库」展示，不入成图与视频 */
+const IMAGE_MODULE_IDS = ["main-image", "detail-page", "hand-craft", "model-shot"] as const;
 const VIDEO_MODULE_IDS = [
   "storyboard-micro-drama",
   "seed-video",

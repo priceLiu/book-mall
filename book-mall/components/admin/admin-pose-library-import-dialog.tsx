@@ -2,7 +2,17 @@
 
 import { useState } from "react";
 
+import {
+  ECOM_POSE_GENDER_OPTIONS,
+  ECOM_POSE_SCENE_TAG_OPTIONS,
+  type EcomPoseGender,
+} from "@/lib/ecom/ecom-pose-library-meta";
+
 const POSE_CATEGORIES = ["A", "B", "C", "D", "E", "H", "I", "J", "K", "L", "M"];
+
+function toggleValue<T extends string>(list: T[], value: T): T[] {
+  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+}
 
 type Props = {
   open: boolean;
@@ -26,6 +36,8 @@ export function AdminPoseLibraryImportDialog({
   const [savePrompt, setSavePrompt] = useState(Boolean(prompt?.trim()));
   const [promptText, setPromptText] = useState(prompt ?? "");
   const [category, setCategory] = useState("A");
+  const [genders, setGenders] = useState<EcomPoseGender[]>(["unisex"]);
+  const [sceneTags, setSceneTags] = useState<string[]>(["电商"]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,6 +55,8 @@ export function AdminPoseLibraryImportDialog({
           savePrompt,
           prompt: savePrompt ? promptText : undefined,
           category,
+          genders: genders.length ? genders : ["unisex"],
+          sceneTags: sceneTags.length ? sceneTags : ["电商"],
           sourceModule,
           sourceAssetId,
         }),
@@ -119,6 +133,39 @@ export function AdminPoseLibraryImportDialog({
             ))}
           </select>
         </label>
+        <div className="mb-3 space-y-1 text-xs">
+          <span className="font-medium">性别（可多选）</span>
+          <div className="flex flex-wrap gap-2">
+            {ECOM_POSE_GENDER_OPTIONS.map((opt) => (
+              <label key={opt.value} className="flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={genders.includes(opt.value)}
+                  onChange={() => {
+                    const next = toggleValue(genders, opt.value);
+                    setGenders(next.length ? next : ["unisex"]);
+                  }}
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="mb-3 space-y-1 text-xs">
+          <span className="font-medium">场景标签（可多选）</span>
+          <div className="flex flex-wrap gap-2">
+            {ECOM_POSE_SCENE_TAG_OPTIONS.map((opt) => (
+              <label key={opt.value} className="flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={sceneTags.includes(opt.value)}
+                  onChange={() => setSceneTags(toggleValue(sceneTags, opt.value))}
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+        </div>
         {error ? <p className="mb-2 text-xs text-red-600">{error}</p> : null}
         <div className="flex justify-end gap-2">
           <button type="button" className="rounded border px-3 py-1 text-sm" onClick={onClose}>

@@ -56,6 +56,7 @@ import {
   patchVtonGarmentPool,
   patchVtonLookDrafts,
   runVtonProjectBatchTryon,
+  cancelVtonProjectBatchTryon,
 } from "@/lib/ecom/ecom-vton-project-mutations";
 import { sanitizeVtonProjectMeta, syncRefsDressedImageFromLocked, emptyVtonProjectMeta } from "@/lib/ecom/ecom-vton/meta";
 import type { VtonGarmentItem, VtonLookSpec } from "@/lib/ecom/ecom-vton/types";
@@ -801,7 +802,6 @@ export async function generateEcomOutfitVideoModel(
   const ossUrl = await generateVtonModelImage({
     userId,
     prompt: opts.prompt,
-    modelKey: opts.modelKey,
     toolKeySuffix: "video-outfit__model-generate",
   });
 
@@ -836,7 +836,6 @@ export async function expandEcomOutfitVideoModelFullBody(
     userId,
     portraitUrl,
     prompt: opts?.prompt,
-    modelKey: opts?.modelKey,
     toolKeySuffix: "video-outfit__expand-full-body",
   });
 
@@ -959,12 +958,26 @@ export async function runEcomOutfitVideoTryonBatch(
     persistMeta: async (m) => {
       await updateEcomOutfitVideoProject(userId, projectId, { meta: m });
     },
+    loadMeta: async () => {
+      const latest = await getEcomOutfitVideoProject(userId, projectId);
+      return sanitizeVtonProjectMeta(latest?.meta);
+    },
   });
 
   const latest = await getEcomOutfitVideoProject(userId, projectId);
   if (!latest) throw new Error("项目不存在");
   const refs = syncRefsDressedImageFromLocked(latest.references, meta);
   return updateEcomOutfitVideoProject(userId, projectId, { meta, references: refs, phase: "bind_refs" });
+}
+
+export async function cancelEcomOutfitVideoTryonBatch(
+  userId: string,
+  projectId: string,
+): Promise<OutfitVideoProjectDto> {
+  const project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  const meta = cancelVtonProjectBatchTryon(project.meta);
+  return updateEcomOutfitVideoProject(userId, projectId, { meta });
 }
 
 export async function lockEcomOutfitVideoTryonResults(

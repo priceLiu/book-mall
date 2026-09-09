@@ -1,10 +1,16 @@
 import { randomUUID } from "crypto";
 
 import type { WorkflowRefs } from "@/lib/ecom/video-workflow/shot-spine";
+import {
+  finalizeModelGenerationsMeta,
+  sanitizeModelGenerations,
+} from "@/lib/ecom/ecom-vton/model-generations";
 import type {
   VtonGarmentItem,
   VtonLockedLook,
   VtonLookSpec,
+  VtonModelBodyShotType,
+  VtonModelImageCheck,
   VtonProjectMeta,
   VtonTryonBatchState,
   VtonTryonHistoryEntry,
@@ -15,6 +21,34 @@ import { ECOM_VTON_MAX_BATCH_LOOKS } from "@/lib/ecom/ecom-vton/types";
 
 const GARMENT_KINDS = new Set(["top", "bottom", "one_piece", "full_set"]);
 const LOOK_KINDS = new Set(["two_piece", "one_piece", "top_only", "bottom_only", "full_set"]);
+const BODY_SHOT_TYPES = new Set<VtonModelBodyShotType>([
+  "portrait",
+  "half_body",
+  "full_body",
+  "unknown",
+]);
+
+function sanitizeModelImageCheck(raw: unknown): VtonModelImageCheck | null | undefined {
+  if (raw === null) return null;
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const ossUrl = typeof o.ossUrl === "string" ? o.ossUrl.trim() : "";
+  const shotType = o.shotType;
+  if (
+    !ossUrl ||
+    typeof shotType !== "string" ||
+    !BODY_SHOT_TYPES.has(shotType as VtonModelBodyShotType)
+  ) {
+    return undefined;
+  }
+  return {
+    ossUrl,
+    isFullBody: o.isFullBody === true,
+    shotType: shotType as VtonModelBodyShotType,
+    checkedAt: typeof o.checkedAt === "string" ? o.checkedAt : new Date().toISOString(),
+    fromAiFourView: o.fromAiFourView === true ? true : undefined,
+  };
+}
 
 export function emptyVtonProjectMeta(): VtonProjectMeta {
   return {
@@ -76,9 +110,24 @@ function sanitizeTryonResult(raw: unknown): VtonTryonResult | null {
     (status !== "pending" &&
       status !== "running" &&
       status !== "success" &&
-      status !== "failed")
+      status !== "failed" &&
+      status !== "cancelled")
   ) {
     return null;
+  }
+  const versions: VtonTryonResult["versions"] = [];
+  if (Array.isArray(o.versions)) {
+    for (const row of o.versions) {
+      if (!row || typeof row !== "object") continue;
+      const v = row as Record<string, unknown>;
+      const ossUrl = typeof v.ossUrl === "string" ? v.ossUrl.trim() : "";
+      if (!ossUrl) continue;
+      versions.push({
+        ossUrl,
+        createdAt: typeof v.createdAt === "string" ? v.createdAt : new Date().toISOString(),
+        resultId: typeof v.resultId === "string" ? v.resultId : id,
+      });
+    }
   }
   return {
     id,
@@ -87,6 +136,9 @@ function sanitizeTryonResult(raw: unknown): VtonTryonResult | null {
     ossUrl: typeof o.ossUrl === "string" ? o.ossUrl : undefined,
     failReason: typeof o.failReason === "string" ? o.failReason : undefined,
     createdAt: typeof o.createdAt === "string" ? o.createdAt : new Date().toISOString(),
+    versions: versions.length > 0 ? versions : undefined,
+    activeVersionIndex:
+      typeof o.activeVersionIndex === "number" ? o.activeVersionIndex : undefined,
   };
 }
 
@@ -98,7 +150,7 @@ function sanitizeTryonBatch(raw: unknown): VtonTryonBatchState | null | undefine
   const status = o.status;
   if (
     !batchId ||
-    (status !== "running" && status !== "done" && status !== "failed")
+    (status !== "running" && status !== "done" && status !== "failed" && status !== "cancelled")
   ) {
     return undefined;
   }
@@ -173,6 +225,12 @@ export function sanitizeVtonProjectMeta(raw: unknown): VtonProjectMeta {
 
   const tryonBatch = sanitizeTryonBatch(o.tryonBatch);
 
+  let tryonBatchCancelBatchId: string | null | undefined;
+  if (o.tryonBatchCancelBatchId === null) tryonBatchCancelBatchId = null;
+  else if (typeof o.tryonBatchCancelBatchId === "string") {
+    tryonBatchCancelBatchId = o.tryonBatchCancelBatchId;
+  }
+
   let tryonProgress: VtonTryonProgress | null | undefined;
   if (o.tryonProgress === null) tryonProgress = null;
   else if (o.tryonProgress && typeof o.tryonProgress === "object") {
@@ -183,16 +241,34 @@ export function sanitizeVtonProjectMeta(raw: unknown): VtonProjectMeta {
     ? (o.tryonHistory as VtonTryonHistoryEntry[])
     : undefined;
 
-  return {
+  const modelImageCheck = sanitizeModelImageCheck(o.modelImageCheck);
+  const modelGenerations = sanitizeModelGenerations(o.modelGenerations);
+  const previewModelGenerationId =
+    typeof o.previewModelGenerationId === "string" ? o.previewModelGenerationId : undefined;
+  const confirmedModelGenerationIds = Array.isArray(o.confirmedModelGenerationIds)
+    ? o.confirmedModelGenerationIds.filter((id): id is string => typeof id === "string")
+    : undefined;
+  const activeModelGenerationId =
+    typeof o.activeModelGenerationId === "string" ? o.activeModelGenerationId : undefined;
+
+  const base: VtonProjectMeta = {
     garmentPool,
     lookDrafts,
     lockedLooks,
     tryonBatch: tryonBatch === undefined ? null : tryonBatch,
     defaultLockedLookId:
       typeof o.defaultLockedLookId === "string" ? o.defaultLockedLookId : undefined,
+    ...(tryonBatchCancelBatchId !== undefined ? { tryonBatchCancelBatchId } : {}),
     ...(tryonProgress !== undefined ? { tryonProgress } : {}),
     ...(tryonHistory ? { tryonHistory } : {}),
+    ...(modelImageCheck !== undefined ? { modelImageCheck } : {}),
+    ...(modelGenerations.length ? { modelGenerations } : {}),
+    ...(previewModelGenerationId ? { previewModelGenerationId } : {}),
+    ...(confirmedModelGenerationIds?.length ? { confirmedModelGenerationIds } : {}),
+    ...(activeModelGenerationId ? { activeModelGenerationId } : {}),
   };
+
+  return modelGenerations.length ? finalizeModelGenerationsMeta(base) : base;
 }
 
 export function mergeVtonMeta(
@@ -200,13 +276,39 @@ export function mergeVtonMeta(
   patch: Partial<VtonProjectMeta>,
 ): VtonProjectMeta {
   const base = sanitizeVtonProjectMeta(existing);
-  return {
+  const merged: VtonProjectMeta = {
     ...base,
     ...patch,
     garmentPool: patch.garmentPool ?? base.garmentPool,
     lookDrafts: patch.lookDrafts ?? base.lookDrafts,
     lockedLooks: patch.lockedLooks ?? base.lockedLooks,
+    tryonBatch: patch.tryonBatch !== undefined ? patch.tryonBatch : base.tryonBatch,
+    tryonBatchCancelBatchId:
+      patch.tryonBatchCancelBatchId !== undefined
+        ? patch.tryonBatchCancelBatchId
+        : base.tryonBatchCancelBatchId,
+    tryonProgress: patch.tryonProgress !== undefined ? patch.tryonProgress : base.tryonProgress,
+    modelImageCheck:
+      patch.modelImageCheck !== undefined ? patch.modelImageCheck : base.modelImageCheck,
+    defaultLockedLookId:
+      patch.defaultLockedLookId !== undefined ? patch.defaultLockedLookId : base.defaultLockedLookId,
+    modelGenerations: patch.modelGenerations ?? base.modelGenerations,
+    previewModelGenerationId:
+      patch.previewModelGenerationId !== undefined
+        ? patch.previewModelGenerationId
+        : base.previewModelGenerationId,
+    confirmedModelGenerationIds:
+      patch.confirmedModelGenerationIds !== undefined
+        ? patch.confirmedModelGenerationIds
+        : base.confirmedModelGenerationIds,
+    activeModelGenerationId:
+      patch.activeModelGenerationId !== undefined
+        ? patch.activeModelGenerationId
+        : base.activeModelGenerationId,
   };
+  return merged.modelGenerations?.length
+    ? finalizeModelGenerationsMeta(merged)
+    : merged;
 }
 
 export function resolveDefaultLockedLookUrl(meta: VtonProjectMeta): string | null {

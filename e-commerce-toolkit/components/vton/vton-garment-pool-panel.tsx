@@ -8,7 +8,9 @@ import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
 import {
   ECOM_VTON_MAX_BATCH_LOOKS,
   VTON_GARMENT_KIND_LABELS,
+  VTON_GARMENT_KIND_SHORT_LABELS,
   VTON_GARMENT_POOL_KINDS,
+  VTON_GARMENT_UPLOAD_HINTS,
   type VtonGarmentItem,
   type VtonGarmentKind,
 } from "@/lib/vton-types";
@@ -20,6 +22,7 @@ type Props = {
   onUploadGarment: (kind: VtonGarmentKind, file: File) => Promise<void>;
   onAddFromAssets: (kind: VtonGarmentKind, assets: Array<{ ossUrl: string; title: string }>) => Promise<void>;
   onRemove: (ids: string[]) => Promise<void>;
+  onPreviewGarment?: (item: VtonGarmentItem) => void;
 };
 
 export function VtonGarmentPoolPanel({
@@ -29,6 +32,7 @@ export function VtonGarmentPoolPanel({
   onUploadGarment,
   onAddFromAssets,
   onRemove,
+  onPreviewGarment,
 }: Props) {
   const [assetOpen, setAssetOpen] = useState(false);
   const [assetKind, setAssetKind] = useState<VtonGarmentKind>("top");
@@ -50,7 +54,8 @@ export function VtonGarmentPoolPanel({
       <div>
         <h3 className="text-xs font-semibold text-[#1d1d1f]">服装池</h3>
         <p className="text-[11px] text-[#6e6e73]">
-          上传或从资产选择，用于编排最多 {ECOM_VTON_MAX_BATCH_LOOKS} 套搭配。
+          上传或从资产选择，用于编排最多 {ECOM_VTON_MAX_BATCH_LOOKS} 套搭配。服饰图建议平铺、背景干净、主体完整（见百炼
+          aitryon-plus 要求）。
         </p>
       </div>
 
@@ -65,6 +70,7 @@ export function VtonGarmentPoolPanel({
             onUpload={onUploadGarment}
             onOpenAssets={openAssets}
             onRemove={onRemove}
+            onPreviewGarment={onPreviewGarment}
           />
         ))}
       </div>
@@ -94,6 +100,7 @@ function GarmentKindSlot({
   onUpload,
   onOpenAssets,
   onRemove,
+  onPreviewGarment,
 }: {
   kind: VtonGarmentKind;
   items: VtonGarmentItem[];
@@ -102,30 +109,44 @@ function GarmentKindSlot({
   onUpload: (kind: VtonGarmentKind, file: File) => Promise<void>;
   onOpenAssets: (kind: VtonGarmentKind) => void;
   onRemove: (ids: string[]) => Promise<void>;
+  onPreviewGarment?: (item: VtonGarmentItem) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const label = VTON_GARMENT_KIND_LABELS[kind];
+  const uploadHint = `${VTON_GARMENT_UPLOAD_HINTS[kind]}。${IMAGE_UPLOAD_DROP_HINT}`;
 
   return (
-    <EcomRefUploadCard
-      title={label}
-      items={items.map((g) => ({
-        id: g.id,
-        ossUrl: g.ossUrl,
-        label: g.label ?? label,
-      }))}
-      emptyHint={IMAGE_UPLOAD_DROP_HINT}
-      accept="image/*"
-      busy={busy || disabled}
-      multiple
-      onUploadFiles={(files) => {
-        for (const file of files) void onUpload(kind, file);
-      }}
-      onOpenFilePicker={() => inputRef.current?.click()}
-      onOpenAssetPicker={() => onOpenAssets(kind)}
-      onRemove={(id) => void onRemove([id])}
-      removeLabel={`删除${label}`}
-      inputRef={inputRef}
-    />
+    <div className="space-y-1.5">
+      <h4 className="text-xs font-semibold leading-snug text-[#1d1d1f]">{label}</h4>
+      <EcomRefUploadCard
+        title={label}
+        hideTitle
+        items={items.map((g) => ({
+          id: g.id,
+          ossUrl: g.ossUrl,
+          label: g.label ?? VTON_GARMENT_KIND_SHORT_LABELS[kind],
+        }))}
+        emptyHint={uploadHint}
+        accept="image/*"
+        busy={busy || disabled}
+        multiple
+        onUploadFiles={(files) => {
+          for (const file of files) void onUpload(kind, file);
+        }}
+        onOpenFilePicker={() => inputRef.current?.click()}
+        onOpenAssetPicker={() => onOpenAssets(kind)}
+        onRemove={(id) => void onRemove([id])}
+        onPreviewItem={
+          onPreviewGarment
+            ? (item) => {
+                const garment = items.find((g) => g.id === item.id);
+                if (garment) onPreviewGarment(garment);
+              }
+            : undefined
+        }
+        removeLabel={`删除${label}`}
+        inputRef={inputRef}
+      />
+    </div>
   );
 }

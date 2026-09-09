@@ -1,12 +1,16 @@
 "use client";
 
+import { Loader2, Sparkles, UserRound } from "lucide-react";
 import { createPortal } from "react-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
+import { EcomImagePreviewHost, useEcomImagePreview } from "@/components/media";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
 import { EcomModelLibraryPickerDialog } from "@/components/model-shot/ecom-model-library-picker-dialog";
 import { ModelShotRefGenerateDialog } from "@/components/model-shot/model-shot-ref-generate-dialog";
+import { VtonFourViewGenerateDialog } from "@/components/vton/vton-four-view-generate-dialog";
+import { VtonModelWorkbenchPanel } from "@/components/vton/vton-model-workbench-panel";
 import { VtonGarmentPoolPanel } from "@/components/vton/vton-garment-pool-panel";
 import { VtonLookComposer } from "@/components/vton/vton-look-composer";
 import { VtonResultsGrid } from "@/components/vton/vton-results-grid";
@@ -17,11 +21,31 @@ import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import type { OutfitGarmentMode, OutfitRefMode } from "@/lib/video-workflow/templates/outfit-v1/ui-config";
 import type { WorkflowRefs } from "@/lib/video-workflow/shot-spine";
 import type { VtonTryonProgress } from "@/lib/vton-tryon-progress";
-import type { VtonGarmentKind, VtonLookSpec, VtonProjectMeta } from "@/lib/vton-types";
+import type { VtonBatchTryonMode } from "@/components/vton/vton-results-grid";
+import {
+  VTON_BOTTOM_GARMENT_SCOPE,
+  VTON_GARMENT_KIND_LABELS,
+  VTON_GARMENT_KIND_SHORT_LABELS,
+  VTON_TOP_GARMENT_SCOPE,
+  type VtonGarmentKind,
+  type VtonLookSpec,
+  type VtonModelImageCheck,
+  type VtonModelPipelineBusy,
+  type VtonProjectMeta,
+} from "@/lib/vton-types";
+import {
+  modelGenerationLabel,
+  resolveConfirmedModelGenerations,
+  sortModelGenerationsNewestFirst,
+} from "@/lib/vton-model-generations";
 import { cn } from "@/lib/utils";
 
 export type VtonBatchWorkflowProps = {
   meta: VtonProjectMeta;
+  selectedLookIds: string[];
+  onToggleLookSelection: (lookId: string) => void;
+  onSelectAllLooks: () => void;
+  onClearLookSelection: () => void;
   selectedResultIds: string[];
   onToggleResult: (resultId: string) => void;
   onUploadGarment: (kind: VtonGarmentKind, file: File) => Promise<void>;
@@ -32,13 +56,19 @@ export type VtonBatchWorkflowProps = {
   onRemoveGarments: (ids: string[]) => Promise<void>;
   onChangeLooks: (looks: VtonLookSpec[]) => Promise<void>;
   onCartesianLooks?: (topIds: string[], bottomIds: string[]) => Promise<void>;
-  onBatchTryon: () => Promise<void>;
+  onBatchTryon: (mode: VtonBatchTryonMode) => Promise<void>;
+  onRegenerateLook?: (lookId: string) => Promise<void>;
+  onSaveResultToAssets?: (ossUrl: string, title: string) => Promise<void>;
+  onStopBatchTryon?: () => Promise<void>;
   onLockSelected: () => Promise<void>;
   onSetDefaultLocked?: (lockedLookId: string) => Promise<void>;
   onUnlockLocked?: (lockedLookId: string) => Promise<void>;
+  runningLookIds?: string[];
 };
 
 export type VtonWorkbenchMode = "outfit-video" | "model-tryon";
+
+export type { VtonModelPipelineBusy } from "@/lib/vton-types";
 
 type Props = {
   mode: VtonWorkbenchMode;
@@ -47,11 +77,22 @@ type Props = {
   garmentMode: OutfitGarmentMode;
   refsLocked?: boolean;
   busy?: boolean;
+  modelPipelineBusy?: VtonModelPipelineBusy | null;
   tryonBusy?: boolean;
   tryonProgress?: VtonTryonProgress | null;
-  imageModels: StoryboardGatewayModel[];
-  imageModelKey: string;
-  fusionModelKey: string;
+  /** 模特试衣 · 系统内置生模特/扩全身，不展示模型选择器 */
+  builtinModelPipeline?: boolean;
+  modelImageCheck?: VtonModelImageCheck | null;
+  vtonMeta?: VtonProjectMeta;
+  onSelectPreviewModelGeneration?: (generationId: string) => Promise<void>;
+  onConfirmModelGeneration?: (generationId: string) => Promise<void>;
+  onSelectTryonModelGeneration?: (generationId: string) => Promise<void>;
+  onUnconfirmModelGeneration?: (generationId: string) => Promise<void>;
+  onSaveModelToMyModels?: (ossUrl: string, title: string) => Promise<void>;
+  onDeleteModelGeneration?: (generationId: string) => Promise<void>;
+  imageModels?: StoryboardGatewayModel[];
+  imageModelKey?: string;
+  fusionModelKey?: string;
   modelsLoading?: boolean;
   onOutfitRefModeChange: (mode: OutfitRefMode) => void;
   onGarmentModeChange: (mode: OutfitGarmentMode) => void;
@@ -63,8 +104,8 @@ type Props = {
   onAttachModelFromAssets?: (
     assets: Array<{ id: string; ossUrl: string; title: string }>,
   ) => Promise<void>;
-  onGenerateModel: (opts: { prompt: string; modelKey: string }) => Promise<void>;
-  onExpandFullBody: (opts: { prompt?: string; modelKey: string }) => Promise<void>;
+  onGenerateModel: (opts?: { prompt?: string }) => Promise<void>;
+  onExpandFullBody: (opts?: { prompt?: string }) => Promise<void>;
   onTryon: () => Promise<void>;
   onLockRefs?: () => Promise<void>;
   onSaveToAssets?: () => Promise<void>;
@@ -88,11 +129,21 @@ export function VtonRefWorkbench({
   garmentMode,
   refsLocked = false,
   busy,
+  modelPipelineBusy,
   tryonBusy,
   tryonProgress,
-  imageModels,
-  imageModelKey,
-  fusionModelKey,
+  builtinModelPipeline = false,
+  modelImageCheck,
+  vtonMeta,
+  onSelectPreviewModelGeneration,
+  onConfirmModelGeneration,
+  onSelectTryonModelGeneration,
+  onUnconfirmModelGeneration,
+  onSaveModelToMyModels,
+  onDeleteModelGeneration,
+  imageModels = [],
+  imageModelKey = "",
+  fusionModelKey = "",
   modelsLoading,
   onOutfitRefModeChange,
   onGarmentModeChange,
@@ -113,9 +164,11 @@ export function VtonRefWorkbench({
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [assetPickerOpen, setAssetPickerOpen] = useState(false);
   const [genModelOpen, setGenModelOpen] = useState(false);
+  const [fourViewGenOpen, setFourViewGenOpen] = useState(false);
   const [expandOpen, setExpandOpen] = useState(false);
   const [expandPrompt, setExpandPrompt] = useState("");
   const [genModelKey, setGenModelKey] = useState(imageModelKey);
+  const modelFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setGenModelKey(imageModelKey);
@@ -140,6 +193,69 @@ export function VtonRefWorkbench({
       ]
     : [];
 
+  const refPreviewItems = useMemo(() => {
+    const items: Array<{ src: string; title: string; thumbSrc: string }> = [];
+    const push = (url?: string, title?: string) => {
+      const src = url?.trim();
+      if (!src || items.some((i) => i.src === src)) return;
+      items.push({ src, title: title ?? "参考图", thumbSrc: src });
+    };
+    push(refs.model?.ossUrl, refs.model?.label ?? "模特全身照");
+    push(refs.clothing?.ossUrl, refs.clothing?.label ?? "服装");
+    push(refs.topGarment?.ossUrl, refs.topGarment?.label ?? "上装");
+    push(refs.bottomGarment?.ossUrl, refs.bottomGarment?.label ?? "下装");
+    push(refs.dressedImage?.ossUrl, refs.dressedImage?.label ?? "试衣效果");
+    for (const g of batchWorkflow?.meta.garmentPool ?? []) {
+      push(g.ossUrl, g.label ?? "服装池");
+    }
+    return items;
+  }, [refs, batchWorkflow?.meta.garmentPool]);
+
+  const modelCandidatePreviewItems = useMemo(() => {
+    const items: Array<{ src: string; title: string; thumbSrc: string }> = [];
+    const list = sortModelGenerationsNewestFirst(vtonMeta?.modelGenerations ?? []);
+    list.forEach((g, index) => {
+      const src = g.ossUrl?.trim();
+      if (!src || items.some((i) => i.src === src)) return;
+      items.push({
+        src,
+        title: modelGenerationLabel(g, index),
+        thumbSrc: src,
+      });
+    });
+    return items;
+  }, [vtonMeta?.modelGenerations]);
+
+  const modelTryonPreviewItems = useMemo(() => {
+    const items: Array<{ src: string; title: string; thumbSrc: string }> = [];
+    const list = resolveConfirmedModelGenerations(vtonMeta);
+    list.forEach((g, index) => {
+      const src = g.ossUrl?.trim();
+      if (!src || items.some((i) => i.src === src)) return;
+      items.push({
+        src,
+        title: modelGenerationLabel(g, index),
+        thumbSrc: src,
+      });
+    });
+    return items;
+  }, [vtonMeta]);
+
+  const { preview, openPreview, closePreview, galleryItems } =
+    useEcomImagePreview(refPreviewItems);
+
+  const openRefPreview = (src: string, title: string) => {
+    openPreview(src, title, refPreviewItems);
+  };
+
+  const openModelCandidatePreview = (src: string, title: string) => {
+    openPreview(src, title, modelCandidatePreviewItems);
+  };
+
+  const openModelTryonPreview = (src: string, title: string) => {
+    openPreview(src, title, modelTryonPreviewItems);
+  };
+
   const genModelDisplayName = useMemo(
     () => imageModels.find((m) => m.modelKey === genModelKey)?.displayName ?? genModelKey,
     [genModelKey, imageModels],
@@ -150,6 +266,22 @@ export function VtonRefWorkbench({
     [fusionModelKey, imageModels],
   );
 
+  const modelBodyHint = useMemo(() => {
+    if (!builtinModelPipeline || isAlreadyDressed || !refs.model?.ossUrl) return null;
+    if (!modelImageCheck || modelImageCheck.ossUrl !== refs.model.ossUrl) {
+      return "正在识别模特取景…";
+    }
+    if (modelImageCheck.isFullBody) {
+      return modelImageCheck.fromAiFourView
+        ? "已就绪：AI 全身模特，可开始试衣。"
+        : "已就绪：全身模特照，可开始试衣。";
+    }
+    if (modelImageCheck.shotType === "portrait" || modelImageCheck.shotType === "half_body") {
+      return "当前为头像/半身，请点击「头像生成全身图」后再试衣。";
+    }
+    return "未识别为全身照，请上传全身图或 AI 生成全身模特。";
+  }, [builtinModelPipeline, isAlreadyDressed, refs.model?.ossUrl, modelImageCheck]);
+
   const sectionTitle =
     mode === "model-tryon" ? "模特试衣" : "穿搭参考";
   const sectionHint =
@@ -157,7 +289,75 @@ export function VtonRefWorkbench({
       ? "选择模特与服装，AI 试衣后可保存到我的资产。"
       : "锁定全片人物与服装特征；动作由参考视频驱动，无需编辑 Prompt。";
 
+  const modelHeaderBtnClass = "h-7 px-2 text-[10px]";
+
+  const modelGenerating = modelPipelineBusy === "generating-model";
+  const modelExpanding = modelPipelineBusy === "expanding-full-body";
+  const modelUploading =
+    modelPipelineBusy === "uploading" || modelPipelineBusy === "importing-model";
+  const modelUploadProgressLabel =
+    modelPipelineBusy === "importing-model" ? "正在导入模特…" : "正在上传模特…";
+
+  const modelHeaderActions =
+    !isAlreadyDressed ? (
+      <>
+        <EcomButtonSecondary
+          size="sm"
+          type="button"
+          disabled={busy || refsLocked}
+          className={modelHeaderBtnClass}
+          onClick={() => {
+            if (builtinModelPipeline) {
+              setFourViewGenOpen(true);
+              return;
+            }
+            setGenModelOpen(true);
+          }}
+        >
+          {modelGenerating ? (
+            <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+          ) : (
+            <Sparkles className="h-3 w-3 shrink-0" />
+          )}
+          {modelGenerating ? "生成中…" : "AI 生模特"}
+        </EcomButtonSecondary>
+        <EcomButtonSecondary
+          size="sm"
+          type="button"
+          disabled={busy || refsLocked || !refs.model?.ossUrl}
+          className={modelHeaderBtnClass}
+          onClick={() => {
+            if (builtinModelPipeline) {
+              void onExpandFullBody();
+              return;
+            }
+            setExpandOpen(true);
+          }}
+        >
+          {modelExpanding ? (
+            <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+          ) : null}
+          {modelExpanding ? "扩全身中…" : "头像生成全身图"}
+        </EcomButtonSecondary>
+        <EcomButtonSecondary
+          size="sm"
+          type="button"
+          disabled={busy || refsLocked || modelUploading}
+          className={modelHeaderBtnClass}
+          onClick={() => setLibraryOpen(true)}
+        >
+          {modelPipelineBusy === "importing-model" ? (
+            <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+          ) : (
+            <UserRound className="h-3 w-3 shrink-0" />
+          )}
+          {modelPipelineBusy === "importing-model" ? "导入中…" : "模特库"}
+        </EcomButtonSecondary>
+      </>
+    ) : null;
+
   return (
+    <>
     <section className="space-y-4 rounded-xl border border-[#e8e8ed] bg-white p-4">
       <div>
         <h2 className="text-sm font-semibold text-[#1d1d1f]">{sectionTitle}</h2>
@@ -230,115 +430,127 @@ export function VtonRefWorkbench({
               : "md:grid-cols-2",
         )}
       >
-        <div className="space-y-2">
-          <span className="text-xs font-medium text-[#6e6e73]">
-            {isAlreadyDressed ? "已穿搭全身照" : "模特全身照"}
-          </span>
-          <EcomRefUploadCard
-            title={isAlreadyDressed ? "已穿搭" : "模特"}
-            items={modelItems}
-            emptyHint={
-              isAlreadyDressed
-                ? `单人正面全身照，已穿好目标服装。${IMAGE_UPLOAD_DROP_HINT}`
-                : `单人正面全身素模照；头像/半身可点「生成全身图」。${IMAGE_UPLOAD_DROP_HINT}`
-            }
-            accept="image/*"
+        {isAlreadyDressed ? (
+          <div className="space-y-2">
+            <span className="text-xs font-medium text-[#6e6e73]">已穿搭全身照</span>
+            <EcomRefUploadCard
+              title="已穿搭"
+              items={modelItems}
+              emptyHint={`单人正面全身照，已穿好目标服装。${IMAGE_UPLOAD_DROP_HINT}`}
+              accept="image/*"
+              busy={busy}
+              onPreviewItem={(item) => openRefPreview(item.ossUrl, item.label)}
+              onUploadFiles={(files) => {
+                const f = files[0];
+                if (f) void onUploadModel(f);
+              }}
+              onOpenFilePicker={() => modelFileInputRef.current?.click()}
+              inputRef={modelFileInputRef}
+            />
+          </div>
+        ) : builtinModelPipeline && vtonMeta ? (
+          <VtonModelWorkbenchPanel
+            meta={vtonMeta}
             busy={busy}
-            onUploadFiles={(files) => {
-              const f = files[0];
-              if (f) void onUploadModel(f);
-            }}
-            onOpenFilePicker={() => {
-              const input = document.getElementById("vton-model-file") as HTMLInputElement | null;
-              input?.click();
-            }}
-            toolbarPrefix={
-              !isAlreadyDressed ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    className="text-[11px] text-[#0071e3] hover:underline disabled:opacity-50"
-                    disabled={busy || refsLocked}
-                    onClick={() => setGenModelOpen(true)}
-                  >
-                    AI 生模特
-                  </button>
-                  <button
-                    type="button"
-                    className="text-[11px] text-[#0071e3] hover:underline disabled:opacity-50"
-                    disabled={busy || refsLocked || !refs.model?.ossUrl}
-                    onClick={() => setExpandOpen(true)}
-                  >
-                    生成全身图
-                  </button>
-                  <button
-                    type="button"
-                    className="text-[11px] text-[#0071e3] hover:underline disabled:opacity-50"
-                    disabled={busy || refsLocked}
-                    onClick={() => setLibraryOpen(true)}
-                  >
-                    模特库
-                  </button>
-                  {onAttachModelFromAssets ? (
-                    <button
-                      type="button"
-                      className="text-[11px] text-[#0071e3] hover:underline disabled:opacity-50"
-                      disabled={busy || refsLocked}
-                      onClick={() => setAssetPickerOpen(true)}
-                    >
-                      我的资产
-                    </button>
-                  ) : null}
-                </div>
-              ) : undefined
+            refsLocked={refsLocked}
+            modelPipelineBusy={modelPipelineBusy}
+            modelImageCheck={modelImageCheck}
+            onUploadModel={onUploadModel}
+            onOpenAssetPicker={
+              onAttachModelFromAssets ? () => setAssetPickerOpen(true) : undefined
             }
+            onOpenModelLibrary={() => setLibraryOpen(true)}
+            onGenerateModel={() => setFourViewGenOpen(true)}
+            onExpandFullBody={() => void onExpandFullBody()}
+            onSelectPreview={(id) => void onSelectPreviewModelGeneration?.(id)}
+            onConfirmGeneration={(id) => void onConfirmModelGeneration?.(id)}
+            onSelectTryonGeneration={(id) => void onSelectTryonModelGeneration?.(id)}
+            onUnconfirmGeneration={(id) => void onUnconfirmModelGeneration?.(id)}
+            onPreviewCandidate={(src, title) => openModelCandidatePreview(src, title)}
+            onPreviewTryon={(src, title) => openModelTryonPreview(src, title)}
+            onSaveToMyModels={(ossUrl, title) => void onSaveModelToMyModels?.(ossUrl, title)}
+            onDeleteGeneration={(id) => void onDeleteModelGeneration?.(id)}
           />
-          <input
-            id="vton-model-file"
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void onUploadModel(f);
-              e.target.value = "";
-            }}
-          />
-        </div>
+        ) : (
+          <div className="space-y-2">
+            <span className="text-xs font-medium text-[#6e6e73]">模特全身照</span>
+            <EcomRefUploadCard
+              title="模特"
+              items={modelItems}
+              emptyHint={`单人正面全身素模照；头像/半身可点「生成全身图」。${IMAGE_UPLOAD_DROP_HINT}`}
+              accept="image/*"
+              busy={busy}
+              showUploadProgress={modelUploading}
+              uploadProgress={null}
+              uploadProgressLabel={modelUploadProgressLabel}
+              generating={modelGenerating || modelExpanding}
+              generatingLabel={
+                modelExpanding ? "头像扩全身生成中…" : modelGenerating ? "AI 生成模特中…" : undefined
+              }
+              onPreviewItem={(item) => openRefPreview(item.ossUrl, item.label)}
+              onUploadFiles={(files) => {
+                const f = files[0];
+                if (f) void onUploadModel(f);
+              }}
+              onOpenFilePicker={() => modelFileInputRef.current?.click()}
+              onOpenAssetPicker={
+                onAttachModelFromAssets ? () => setAssetPickerOpen(true) : undefined
+              }
+              headerActions={modelHeaderActions}
+              inputRef={modelFileInputRef}
+            />
+            {modelBodyHint ? (
+              <p
+                className={cn(
+                  "text-[11px] leading-relaxed",
+                  modelImageCheck?.isFullBody ? "text-[#248a3d]" : "text-[#b45309]",
+                )}
+              >
+                {modelBodyHint}
+              </p>
+            ) : null}
+          </div>
+        )}
 
         {!useBatch && !isAlreadyDressed && isTwoPiece ? (
           <>
             <GarmentSlot
-              label="上装"
-              title="上装"
+              label={VTON_GARMENT_KIND_LABELS.top}
+              title={VTON_GARMENT_KIND_LABELS.top}
               items={
                 refs.topGarment?.ossUrl
-                  ? [{ id: "top", ossUrl: refs.topGarment.ossUrl, label: refs.topGarment.label ?? "上装" }]
+                  ? [
+                      {
+                        id: "top",
+                        ossUrl: refs.topGarment.ossUrl,
+                        label: refs.topGarment.label ?? VTON_GARMENT_KIND_SHORT_LABELS.top,
+                      },
+                    ]
                   : []
               }
-              hint={`上传上装平铺/上身图。${IMAGE_UPLOAD_DROP_HINT}`}
-              inputId="vton-top-file"
+              hint={`上传上装平铺/上身图（${VTON_TOP_GARMENT_SCOPE}）。${IMAGE_UPLOAD_DROP_HINT}`}
               busy={busy}
               onUpload={(f) => void onUploadTopGarment(f)}
+              onPreviewItem={(item) => openRefPreview(item.ossUrl, item.label)}
             />
             <GarmentSlot
-              label="下装"
-              title="下装"
+              label={VTON_GARMENT_KIND_LABELS.bottom}
+              title={VTON_GARMENT_KIND_LABELS.bottom}
               items={
                 refs.bottomGarment?.ossUrl
                   ? [
                       {
                         id: "bottom",
                         ossUrl: refs.bottomGarment.ossUrl,
-                        label: refs.bottomGarment.label ?? "下装",
+                        label: refs.bottomGarment.label ?? VTON_GARMENT_KIND_SHORT_LABELS.bottom,
                       },
                     ]
                   : []
               }
-              hint={`上传下装平铺/上身图。${IMAGE_UPLOAD_DROP_HINT}`}
-              inputId="vton-bottom-file"
+              hint={`上传下装平铺/上身图（${VTON_BOTTOM_GARMENT_SCOPE}）。${IMAGE_UPLOAD_DROP_HINT}`}
               busy={busy}
               onUpload={(f) => void onUploadBottomGarment(f)}
+              onPreviewItem={(item) => openRefPreview(item.ossUrl, item.label)}
             />
           </>
         ) : null}
@@ -353,9 +565,9 @@ export function VtonRefWorkbench({
                 : []
             }
             hint={`上传连体或单件服装图。${IMAGE_UPLOAD_DROP_HINT}`}
-            inputId="vton-clothing-file"
             busy={busy}
             onUpload={(f) => void onUploadClothing(f)}
+            onPreviewItem={(item) => openRefPreview(item.ossUrl, item.label)}
           />
         ) : null}
       </div>
@@ -369,10 +581,15 @@ export function VtonRefWorkbench({
             onUploadGarment={batchWorkflow.onUploadGarment}
             onAddFromAssets={batchWorkflow.onAddGarmentsFromAssets}
             onRemove={batchWorkflow.onRemoveGarments}
+            onPreviewGarment={(g) => openRefPreview(g.ossUrl, g.label ?? "服装池")}
           />
           <VtonLookComposer
             looks={batchWorkflow.meta.lookDrafts ?? []}
             pool={batchWorkflow.meta.garmentPool ?? []}
+            selectedLookIds={batchWorkflow.selectedLookIds}
+            onToggleLookSelection={batchWorkflow.onToggleLookSelection}
+            onSelectAllLooks={batchWorkflow.onSelectAllLooks}
+            onClearLookSelection={batchWorkflow.onClearLookSelection}
             busy={busy}
             disabled={refsLocked}
             onChange={batchWorkflow.onChangeLooks}
@@ -381,6 +598,7 @@ export function VtonRefWorkbench({
           <VtonResultsGrid
             batch={batchWorkflow.meta.tryonBatch}
             looks={batchWorkflow.meta.lookDrafts ?? []}
+            selectedLookIds={batchWorkflow.selectedLookIds}
             lockedLooks={batchWorkflow.meta.lockedLooks ?? []}
             defaultLockedLookId={batchWorkflow.meta.defaultLockedLookId}
             tryonBusy={tryonBusy}
@@ -393,6 +611,10 @@ export function VtonRefWorkbench({
             onSetDefaultLocked={batchWorkflow.onSetDefaultLocked}
             onUnlockLocked={batchWorkflow.onUnlockLocked}
             onBatchTryon={batchWorkflow.onBatchTryon}
+            onRegenerateLook={batchWorkflow.onRegenerateLook}
+            onSaveResultToAssets={batchWorkflow.onSaveResultToAssets}
+            onStopBatchTryon={batchWorkflow.onStopBatchTryon}
+            runningLookIds={batchWorkflow.runningLookIds}
           />
         </div>
       ) : null}
@@ -401,12 +623,22 @@ export function VtonRefWorkbench({
         <div className="space-y-2">
           <span className="text-xs font-medium text-[#6e6e73]">试衣效果预览</span>
           <div className="overflow-hidden rounded-xl border border-[#e8e8ed] bg-[#fafafa]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={refs.dressedImage!.ossUrl}
-              alt="试衣预览"
-              className="mx-auto max-h-[420px] w-auto object-contain"
-            />
+            <button
+              type="button"
+              className="mx-auto block max-h-[420px] w-full cursor-zoom-in"
+              title="点击查看大图"
+              onClick={() =>
+                openRefPreview(refs.dressedImage!.ossUrl, refs.dressedImage!.label ?? "试衣预览")
+              }
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={refs.dressedImage!.ossUrl}
+                alt="试衣预览"
+                className="mx-auto max-h-[420px] w-auto object-contain"
+                draggable={false}
+              />
+            </button>
           </div>
         </div>
       ) : null}
@@ -476,10 +708,7 @@ export function VtonRefWorkbench({
               <EcomModelLibraryPickerDialog
                 open={libraryOpen}
                 onOpenChange={setLibraryOpen}
-                onPick={(entry) => {
-                  setLibraryOpen(false);
-                  void onPickModelFromLibrary(entry.ossUrl, entry.name);
-                }}
+                onPick={(entry) => onPickModelFromLibrary(entry.ossUrl, entry.name)}
               />
               {onAttachModelFromAssets ? (
                 <EcomAssetPickerDialog
@@ -492,21 +721,33 @@ export function VtonRefWorkbench({
                   }}
                 />
               ) : null}
-              <ModelShotRefGenerateDialog
-                open={genModelOpen}
-                onClose={() => setGenModelOpen(false)}
-                role="model"
-                modelKey={genModelKey}
-                modelDisplayName={genModelDisplayName}
-                imageModels={imageModels}
-                modelsLoading={modelsLoading}
-                busy={busy}
-                onConfirm={async (opts) => {
-                  setGenModelOpen(false);
-                  await onGenerateModel(opts);
-                }}
-              />
-              {expandOpen ? (
+              {builtinModelPipeline ? (
+                <VtonFourViewGenerateDialog
+                  open={fourViewGenOpen}
+                  onClose={() => setFourViewGenOpen(false)}
+                  busy={busy}
+                  onConfirm={async (opts) => {
+                    setFourViewGenOpen(false);
+                    await onGenerateModel({ prompt: opts.prompt });
+                  }}
+                />
+              ) : (
+                <ModelShotRefGenerateDialog
+                  open={genModelOpen}
+                  onClose={() => setGenModelOpen(false)}
+                  role="model"
+                  modelKey={genModelKey}
+                  modelDisplayName={genModelDisplayName}
+                  imageModels={imageModels}
+                  modelsLoading={modelsLoading}
+                  busy={busy}
+                  onConfirm={async (opts) => {
+                    setGenModelOpen(false);
+                    await onGenerateModel({ prompt: opts.prompt });
+                  }}
+                />
+              )}
+              {!builtinModelPipeline && expandOpen ? (
                 <VtonExpandFullBodyDialog
                   fusionDisplayName={fusionDisplayName}
                   prompt={expandPrompt}
@@ -517,7 +758,6 @@ export function VtonRefWorkbench({
                     setExpandOpen(false);
                     await onExpandFullBody({
                       prompt: expandPrompt.trim() || undefined,
-                      modelKey: fusionModelKey,
                     });
                   }}
                 />
@@ -527,6 +767,8 @@ export function VtonRefWorkbench({
           )
         : null}
     </section>
+    <EcomImagePreviewHost preview={preview} galleryItems={galleryItems} onClose={closePreview} />
+    </>
   );
 }
 
@@ -535,18 +777,20 @@ function GarmentSlot({
   title,
   items,
   hint,
-  inputId,
   busy,
   onUpload,
+  onPreviewItem,
 }: {
   label: string;
   title: string;
   items: Array<{ id: string; ossUrl: string; label: string }>;
   hint: string;
-  inputId: string;
   busy?: boolean;
   onUpload: (file: File) => void;
+  onPreviewItem?: (item: { id: string; ossUrl: string; label: string }) => void;
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   return (
     <div className="space-y-2">
       <span className="text-xs font-medium text-[#6e6e73]">{label}</span>
@@ -556,25 +800,13 @@ function GarmentSlot({
         emptyHint={hint}
         accept="image/*"
         busy={busy}
+        inputRef={fileInputRef}
+        onPreviewItem={onPreviewItem}
         onUploadFiles={(files) => {
           const f = files[0];
           if (f) onUpload(f);
         }}
-        onOpenFilePicker={() => {
-          const input = document.getElementById(inputId) as HTMLInputElement | null;
-          input?.click();
-        }}
-      />
-      <input
-        id={inputId}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onUpload(f);
-          e.target.value = "";
-        }}
+        onOpenFilePicker={() => fileInputRef.current?.click()}
       />
     </div>
   );

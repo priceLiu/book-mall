@@ -9,6 +9,8 @@ import {
   resolveModelShotSceneText,
 } from "@/lib/ecom/model-shot/prompt-assembler";
 import { pickModelShotPoses, posesToPromptTexts } from "@/lib/ecom/model-shot/pose-picker";
+import { getModelLibraryEntry } from "@/lib/ecom/ecom-model-library-service";
+import type { EcomPoseGender } from "@/lib/ecom/ecom-pose-library-meta";
 import { readPoseLibraryCatalogLive } from "@/lib/ecom/ecom-pose-library-service";
 import { getPropLibraryEntry } from "@/lib/ecom/ecom-prop-library-service";
 import { getSceneLibraryEntry } from "@/lib/ecom/ecom-scene-library-service";
@@ -212,16 +214,26 @@ export async function generateModelShotPosePlan(
   const poseCount = project.brief?.poseCount ?? MODEL_SHOT_POSE_COUNT_DEFAULT;
   const styles = project.brief?.styles ?? ["优雅"];
   const sceneRef = project.references.find((r) => r.role === "scene");
+  const modelRef = project.references.find((r) => r.role === "model");
   const scene =
     sceneRef?.catalogId && sceneRef.source !== "none"
       ? await getSceneLibraryEntry(sceneRef.catalogId)
       : null;
+  let modelGender: EcomPoseGender | null = null;
+  if (modelRef?.catalogId && modelRef.source !== "none") {
+    const modelEntry = await getModelLibraryEntry(modelRef.catalogId);
+    if (modelEntry?.gender === "male") modelGender = "male";
+    else if (modelEntry?.gender === "female" || modelEntry?.gender === "plus_female") {
+      modelGender = "female";
+    }
+  }
 
   const picked = pickModelShotPoses({
     pool: catalog.poses.filter((p) => (p.scope ?? "platform") === "platform"),
     styles,
     count: poseCount,
     scene,
+    modelGender,
   });
   const descriptions = posesToPromptTexts({ poses: picked, styles });
   const sceneText = resolveModelShotSceneText(project.references, project.brief);

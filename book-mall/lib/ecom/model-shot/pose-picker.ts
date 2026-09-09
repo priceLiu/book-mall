@@ -1,3 +1,7 @@
+import {
+  filterPoseEntries,
+  type EcomPoseGender,
+} from "@/lib/ecom/ecom-pose-library-meta";
 import type { EcomPoseLibraryEntry } from "@/lib/ecom/ecom-pose-library-service";
 import { sortPoseEntriesWithImageFirst } from "@/lib/ecom/ecom-pose-library-sort";
 import type { EcomPropLibraryEntry } from "@/lib/ecom/ecom-prop-library-service";
@@ -112,6 +116,7 @@ export function pickModelShotPoses(opts: {
   count: number;
   prop?: EcomPropLibraryEntry | null;
   scene?: EcomSceneLibraryEntry | null;
+  modelGender?: EcomPoseGender | null;
 }): EcomPoseLibraryEntry[] {
   const style = resolveStyle(opts.styles);
   const sceneArchetype = resolveSceneArchetype(opts.scene);
@@ -120,7 +125,11 @@ export function pickModelShotPoses(opts: {
   const picked: EcomPoseLibraryEntry[] = [];
   const usedIds = new Set<string>();
 
-  const platformPool = opts.pool.filter((p) => p.enabled !== false);
+  const genderFiltered =
+    opts.modelGender && opts.modelGender !== "unisex"
+      ? filterPoseEntries(opts.pool, { genders: [opts.modelGender] })
+      : opts.pool;
+  const platformPool = genderFiltered.filter((p) => p.enabled !== false);
   const candidates = shuffle(
     platformPool.filter((p) =>
       passesVeto({ pose: p, style, prop: opts.prop, sceneArchetype }),

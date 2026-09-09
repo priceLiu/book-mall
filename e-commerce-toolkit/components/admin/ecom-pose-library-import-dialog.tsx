@@ -3,6 +3,11 @@
 import { useState } from "react";
 
 import { importPoseToLibraryAdmin } from "@/lib/ecom-pose-library-admin-api";
+import {
+  ECOM_POSE_GENDER_OPTIONS,
+  ECOM_POSE_SCENE_TAG_OPTIONS,
+  type EcomPoseGender,
+} from "@/lib/ecom-pose-library/meta";
 
 const POSE_CATEGORIES = ["A", "B", "C", "D", "E", "H", "I", "J", "K", "L", "M"];
 
@@ -16,6 +21,10 @@ type Props = {
   onSaved?: () => void;
 };
 
+function toggleValue<T extends string>(list: T[], value: T): T[] {
+  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+}
+
 export function EcomPoseLibraryImportDialog({
   open,
   imageUrl,
@@ -28,6 +37,8 @@ export function EcomPoseLibraryImportDialog({
   const [savePrompt, setSavePrompt] = useState(Boolean(prompt?.trim()));
   const [promptText, setPromptText] = useState(prompt ?? "");
   const [category, setCategory] = useState("A");
+  const [genders, setGenders] = useState<EcomPoseGender[]>(["unisex"]);
+  const [sceneTags, setSceneTags] = useState<string[]>(["电商"]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,6 +53,8 @@ export function EcomPoseLibraryImportDialog({
         savePrompt,
         prompt: savePrompt ? promptText : undefined,
         category,
+        genders: genders.length ? genders : ["unisex"],
+        sceneTags: sceneTags.length ? sceneTags : ["电商"],
         sourceModule,
         sourceAssetId,
       });
@@ -93,7 +106,7 @@ export function EcomPoseLibraryImportDialog({
           </label>
         ) : null}
         <label className="mb-3 block space-y-1 text-xs">
-          <span className="font-medium text-[#424245]">分类</span>
+          <span className="font-medium text-[#424245]">动作分类 (A–M)</span>
           <select
             className="w-full rounded-lg border border-[#d2d2d7] px-2 py-1"
             value={category}
@@ -106,6 +119,39 @@ export function EcomPoseLibraryImportDialog({
             ))}
           </select>
         </label>
+        <div className="mb-3 space-y-1 text-xs">
+          <span className="font-medium text-[#424245]">性别（可多选）</span>
+          <div className="flex flex-wrap gap-2">
+            {ECOM_POSE_GENDER_OPTIONS.map((opt) => (
+              <label key={opt.value} className="flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={genders.includes(opt.value)}
+                  onChange={() => {
+                    const next = toggleValue(genders, opt.value);
+                    setGenders(next.length ? next : ["unisex"]);
+                  }}
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="mb-3 space-y-1 text-xs">
+          <span className="font-medium text-[#424245]">场景标签（可多选）</span>
+          <div className="flex flex-wrap gap-2">
+            {ECOM_POSE_SCENE_TAG_OPTIONS.map((opt) => (
+              <label key={opt.value} className="flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={sceneTags.includes(opt.value)}
+                  onChange={() => setSceneTags(toggleValue(sceneTags, opt.value))}
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+        </div>
         {error ? <p className="mb-2 text-xs text-red-600">{error}</p> : null}
         <div className="flex justify-end gap-2">
           <button

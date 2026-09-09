@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireFinanceAdminApi } from "@/lib/admin/require-finance-admin-api";
 import { importPoseFromImage } from "@/lib/ecom/ecom-pose-library-import";
+import type { EcomPoseGender } from "@/lib/ecom/ecom-pose-library-meta";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,12 @@ export async function POST(request: Request) {
   const savePrompt = body.savePrompt === true;
   const prompt = typeof body.prompt === "string" ? body.prompt : undefined;
   const category = typeof body.category === "string" ? body.category : undefined;
+  const genders = Array.isArray(body.genders)
+    ? body.genders.filter((g): g is string => typeof g === "string")
+    : undefined;
+  const sceneTags = Array.isArray(body.sceneTags)
+    ? body.sceneTags.filter((t): t is string => typeof t === "string")
+    : undefined;
   const sourceModule = typeof body.sourceModule === "string" ? body.sourceModule : undefined;
   const sourceAssetId = typeof body.sourceAssetId === "string" ? body.sourceAssetId : undefined;
 
@@ -33,6 +40,8 @@ export async function POST(request: Request) {
       savePrompt,
       prompt,
       category,
+      genders: genders as EcomPoseGender[] | undefined,
+      sceneTags,
       sourceModule,
       sourceAssetId,
       adminUserId: auth.userId,

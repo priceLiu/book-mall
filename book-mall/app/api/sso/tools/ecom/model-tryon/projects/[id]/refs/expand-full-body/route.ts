@@ -23,13 +23,9 @@ export async function POST(req: Request, ctx: Ctx) {
   }
 
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : undefined;
-  const modelKey = typeof body.modelKey === "string" ? body.modelKey.trim() : undefined;
 
   try {
-    const project = await expandEcomModelTryonModelFullBody(auth.userId, id, {
-      prompt,
-      modelKey,
-    });
+    const project = await expandEcomModelTryonModelFullBody(auth.userId, id, { prompt });
     return NextResponse.json({ project });
   } catch (e) {
     const { message, status } = formatEcomImageGenUserError(e);

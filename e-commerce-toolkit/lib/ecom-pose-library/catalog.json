@@ -1,25 +1,3672 @@
 {
   "poses": [
-    { "id": "A-01", "category": "A", "title": "正面直立拎包", "baseDescription": "正面直立，双腿微微分开，重心居中，双手自然下垂或拎包。", "sortOrder": 1 },
-    { "id": "A-02", "category": "A", "title": "正面插兜", "baseDescription": "正面直立，双腿并拢，双手插兜，肩部放松。", "sortOrder": 2 },
-    { "id": "A-03", "category": "A", "title": "错步撩发", "baseDescription": "正面站立，双腿一前一后错开，单手拎包，另一手抬起触碰头发。", "sortOrder": 3 },
-    { "id": "B-01", "category": "B", "title": "向前行走搭衣襟", "baseDescription": "向前行走，右腿迈出左腿在后，左手搭衣襟，右手拎包下垂，头微低。", "sortOrder": 10 },
-    { "id": "B-02", "category": "B", "title": "侧身行走", "baseDescription": "侧身行走，身体朝向左前方，左脚前迈，右手放身后包位，低头看斜下方。", "sortOrder": 11 },
-    { "id": "B-03", "category": "B", "title": "行走双臂舒展", "baseDescription": "行走姿态，右腿迈出左腿在后，双臂向身体两侧舒展张开，手掌朝下。", "sortOrder": 12 },
-    { "id": "C-01", "category": "C", "title": "侧身插兜回眸", "baseDescription": "身体侧对镜头约30°，单手插兜，另一手自然垂放，头部回转正对镜头。", "sortOrder": 20 },
-    { "id": "C-02", "category": "C", "title": "三分之二侧面", "baseDescription": "三分之二侧面，双手插兜或自然垂放，头部转回看向镜头，目光自信。", "sortOrder": 21 },
-    { "id": "D-01", "category": "D", "title": "侧蹲手贴额头", "baseDescription": "侧蹲姿态，右腿屈膝下蹲，左膝抬起，右手抬起手掌轻贴额头侧边，左臂手肘搭在左膝盖上。", "sortOrder": 30 },
-    { "id": "E-01", "category": "E", "title": "背面回眸", "baseDescription": "背面全身站立，双手背在身后，包斜挎肩上，头部向右侧回转露出侧脸。", "sortOrder": 40 },
-    { "id": "H-01", "category": "H", "title": "沙滩奔跑", "baseDescription": "身体前倾，右腿向前大步迈出，双臂自然前后交替摆动，头发随风扬起。", "sortOrder": 50 },
-    { "id": "H-02", "category": "H", "title": "星形跳跃", "baseDescription": "双腿向两侧大幅度张开，双臂同时向上向外伸展呈大字形，身体腾空离地。", "sortOrder": 51 },
-    { "id": "I-01", "category": "I", "title": "逛街翻包", "baseDescription": "正面站立，低头视线向下，双手在身前打开手提包翻找物品，双腿微微错开。", "sortOrder": 60 },
-    { "id": "I-02", "category": "I", "title": "咖啡店回眸", "baseDescription": "身体朝向右侧作即将离开状，右手端着咖啡杯，头部猛然转回看向镜头，面带微笑。", "sortOrder": 61 },
-    { "id": "J-01", "category": "J", "title": "干练行走商务风", "baseDescription": "身体正对镜头向前行走，右手拎公文包垂于身侧，左手整理西装外套领口，头部微抬。", "sortOrder": 70 },
-    { "id": "J-02", "category": "J", "title": "宴会举杯侧身", "baseDescription": "身体侧对镜头约45°，右手优雅举起高脚杯至胸前高度，双腿并拢直立。", "sortOrder": 71 },
-    { "id": "K-01", "category": "K", "title": "红毯经典回眸", "baseDescription": "身体向画面右侧走去，上身大幅度向左后方扭转，头部回正看向镜头，表情冷艳。", "sortOrder": 80 },
-    { "id": "K-02", "category": "K", "title": "手拿手包叉腰", "baseDescription": "身体正对镜头，左臂弯曲叉在腰部，右手自然下垂握住小巧手拿包，双腿微分开。", "sortOrder": 81 },
-    { "id": "L-01", "category": "L", "title": "双手抱头后仰", "baseDescription": "双手交叉抱在脑后，上半身向后仰，胸腔打开，头部后仰看向天空。", "sortOrder": 90 },
-    { "id": "L-02", "category": "L", "title": "单膝跪地前倾伸手", "baseDescription": "单膝跪地，另一腿屈膝在前，上半身极度前倾靠近镜头，单手撑地，另一手抬起伸向镜头方向。", "sortOrder": 91 },
-    { "id": "M-01", "category": "M", "title": "手贴下颌", "baseDescription": "正面全身站立，双腿微微错开，右手自然下垂拎小包，左手抬起轻贴脸颊下颌位置，面带微笑看向镜头。", "sortOrder": 100 }
+    {
+      "id": "COMM-F-01",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 01",
+      "baseDescription": "正面标准站姿，双脚与肩同宽，双肩放平，双手自然垂落在身体两侧，头部平视镜头，体态端正放松",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 1
+    },
+    {
+      "id": "A-01",
+      "category": "A",
+      "title": "正面直立拎包",
+      "baseDescription": "正面直立，双腿微微分开，重心居中，双手自然下垂或拎包。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "电商",
+        "影棚"
+      ],
+      "sortOrder": 1
+    },
+    {
+      "id": "COMM-F-02",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 02",
+      "baseDescription": "正面站姿，重心均匀，右手自然下垂，左手轻搭斜挎包肩带，肩膀微微下沉，表情柔和",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 2
+    },
+    {
+      "id": "A-02",
+      "category": "A",
+      "title": "正面插兜",
+      "baseDescription": "正面直立，双腿并拢，双手插兜，肩部放松。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "电商",
+        "影棚"
+      ],
+      "sortOrder": 2
+    },
+    {
+      "id": "A-03",
+      "category": "A",
+      "title": "错步撩发",
+      "baseDescription": "正面站立，双腿一前一后错开，单手拎包，另一手抬起触碰头发。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "电商",
+        "影棚"
+      ],
+      "sortOrder": 3
+    },
+    {
+      "id": "COMM-F-03",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 03",
+      "baseDescription": "45° 微侧站姿，身体转向画面右方，头部转回正对镜头，后腿承重，前脚尖轻点地面，双手自然垂放",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 3
+    },
+    {
+      "id": "COMM-F-04",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 04",
+      "baseDescription": "45° 侧身站姿，重心在后腿，前腿微微向前伸，右手弯曲、手提托特包放在胯侧，左手自然垂落",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 4
+    },
+    {
+      "id": "COMM-F-05",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 05",
+      "baseDescription": "轻微侧身站立，身体朝左，左手拎手提包置于小腹前方，右手轻贴大腿，站姿松弛不僵硬",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 5
+    },
+    {
+      "id": "COMM-F-06",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 06",
+      "baseDescription": "正面站姿，双脚微微外八，双手浅插西裤口袋，大拇指露出口袋边缘，肩膀放松",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 6
+    },
+    {
+      "id": "COMM-F-07",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 07",
+      "baseDescription": "侧身站立，身体朝向画面右侧，一只手轻搭在单肩包的包身，另一只手自然垂落，头部看向镜头",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 7
+    },
+    {
+      "id": "COMM-F-08",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 08",
+      "baseDescription": "正对镜头站姿，重心偏向右腿，左腿膝盖轻微向内放松，右手垂落，左手轻握包带放在腰边",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 8
+    },
+    {
+      "id": "COMM-F-09",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 09",
+      "baseDescription": "大侧身 90° 站姿，身体侧向画面，头部回转看向镜头，双脚前后错开，双手自然垂于身前",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 9
+    },
+    {
+      "id": "COMM-F-10",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 10",
+      "baseDescription": "正面松弛站姿，一腿站直承重，另一条腿脚尖点地，双手自然放在小腹前轻叠，气质温柔通勤",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 10
+    },
+    {
+      "id": "B-01",
+      "category": "B",
+      "title": "向前行走搭衣襟",
+      "baseDescription": "向前行走，右腿迈出左腿在后，左手搭衣襟，右手拎包下垂，头微低。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "电商",
+        "扫街",
+        "运动"
+      ],
+      "sortOrder": 10
+    },
+    {
+      "id": "B-02",
+      "category": "B",
+      "title": "侧身行走",
+      "baseDescription": "侧身行走，身体朝向左前方，左脚前迈，右手放身后包位，低头看斜下方。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "电商",
+        "扫街",
+        "运动"
+      ],
+      "sortOrder": 11
+    },
+    {
+      "id": "COMM-F-11",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 11",
+      "baseDescription": "45 度侧身，右手挎腋下包，手臂自然弯曲，左手垂落，重心在后脚，肩膀打开",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 11
+    },
+    {
+      "id": "COMM-F-12",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 12",
+      "baseDescription": "正面站姿，右手拎包垂在身体右侧，左手随意搭在大腿外侧，双脚轻微错开",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 12
+    },
+    {
+      "id": "B-03",
+      "category": "B",
+      "title": "行走双臂舒展",
+      "baseDescription": "行走姿态，右腿迈出左腿在后，双臂向身体两侧舒展张开，手掌朝下。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "电商",
+        "扫街",
+        "运动"
+      ],
+      "sortOrder": 12
+    },
+    {
+      "id": "COMM-F-13",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 13",
+      "baseDescription": "身体微向左侧倾斜站立，左手插裤兜，右手自然下垂，头部微微倾斜看向镜头",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 13
+    },
+    {
+      "id": "COMM-F-14",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 14",
+      "baseDescription": "侧身站姿，前脚向前半步，右手自然垂落，左手把托特包拎在身体后侧胯部位置",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 14
+    },
+    {
+      "id": "COMM-F-15",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 15",
+      "baseDescription": "正对镜头，双脚一前一后错开，双手轻放在身后，腰背挺直，简约干练",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 15
+    },
+    {
+      "id": "COMM-F-16",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 16",
+      "baseDescription": "45° 右侧身，重心放在后腿，前腿放松，右手轻扶手提包顶部，左手自然垂于身侧",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 16
+    },
+    {
+      "id": "COMM-F-17",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 17",
+      "baseDescription": "轻微内八松弛站姿，身体正对镜头，双手在身前自然轻握，肩膀下沉，适合温柔风穿搭",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 17
+    },
+    {
+      "id": "COMM-F-18",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 18",
+      "baseDescription": "侧身站立，面向画面左侧，右胳膊弯曲、手拎包包，头部回正看向镜头，双腿前后分开",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 18
+    },
+    {
+      "id": "COMM-F-19",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 19",
+      "baseDescription": "正面站姿，左手插裤袋，右手自然下垂，重心微微偏向一侧，不紧绷",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 19
+    },
+    {
+      "id": "C-01",
+      "category": "C",
+      "title": "侧身插兜回眸",
+      "baseDescription": "身体侧对镜头约30°，单手插兜，另一手自然垂放，头部回转正对镜头。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "电商",
+        "扫街"
+      ],
+      "sortOrder": 20
+    },
+    {
+      "id": "COMM-F-20",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 20",
+      "baseDescription": "45 度侧身站姿，双手共同握住手提包提手，包包放在身体前侧大腿上方",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 20
+    },
+    {
+      "id": "C-02",
+      "category": "C",
+      "title": "三分之二侧面",
+      "baseDescription": "三分之二侧面，双手插兜或自然垂放，头部转回看向镜头，目光自信。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "电商",
+        "扫街"
+      ],
+      "sortOrder": 21
+    },
+    {
+      "id": "COMM-F-21",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 21",
+      "baseDescription": "身体微微侧向右方，后腿承重，前腿放松，右手自然垂落，左手轻搭肩膀上的包带",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 21
+    },
+    {
+      "id": "COMM-F-22",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 22",
+      "baseDescription": "标准正面站姿，一只手整理袖口，另一只手自然下垂，双脚平稳站立",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 22
+    },
+    {
+      "id": "COMM-F-23",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 23",
+      "baseDescription": "侧身站姿，重心在前脚，后脚脚尖点地，双手自然垂落，头部平视镜头，干练气质",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 23
+    },
+    {
+      "id": "COMM-F-24",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 24",
+      "baseDescription": "正对镜头站姿，右腿承重，左腿向外轻开，右手拎包，左手轻轻搭在包侧面",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 24
+    },
+    {
+      "id": "COMM-F-25",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 25",
+      "baseDescription": "45° 左侧身，左手浅插裤兜，右手自然下垂，肩膀放松，头部转向镜头",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 25
+    },
+    {
+      "id": "COMM-F-26",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 26",
+      "baseDescription": "全身站姿，身体略微侧转，双手背在身后，一只手轻握住另一只手腕，站姿沉稳",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 26
+    },
+    {
+      "id": "COMM-F-27",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 27",
+      "baseDescription": "正面松弛站，双脚分开略窄于肩，右手放在腰侧，左手拎包放在身体左边",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 27
+    },
+    {
+      "id": "COMM-F-28",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 28",
+      "baseDescription": "90 度侧身站立，双腿前后错开，右手挎包，手臂弯曲，头部回头看向镜头",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 28
+    },
+    {
+      "id": "COMM-F-29",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 29",
+      "baseDescription": "正对镜头，重心偏向左腿，右腿膝盖微松，双手自然垂落，脖颈舒展",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 29
+    },
+    {
+      "id": "D-01",
+      "category": "D",
+      "title": "侧蹲手贴额头",
+      "baseDescription": "侧蹲姿态，右腿屈膝下蹲，左膝抬起，右手抬起手掌轻贴额头侧边，左臂手肘搭在左膝盖上。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "夸张",
+        "戏剧"
+      ],
+      "sortOrder": 30
+    },
+    {
+      "id": "COMM-F-30",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 30",
+      "baseDescription": "45° 侧身站姿，左手拎包放在胯前，右手轻轻捋一下衣角，动作轻柔自然",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 30
+    },
+    {
+      "id": "COMM-F-31",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 31",
+      "baseDescription": "身体向右侧微转，双手自然叠放在腰前，站姿平稳，适合套装展示",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 31
+    },
+    {
+      "id": "COMM-F-32",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 32",
+      "baseDescription": "正面站姿，右手插裤兜，左手轻握包带，包包斜挎于身侧，肩膀放平",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 32
+    },
+    {
+      "id": "COMM-F-33",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 33",
+      "baseDescription": "侧身站姿，前腿微微弯曲放松，后腿站直，双手自然垂在身体前方",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 33
+    },
+    {
+      "id": "COMM-F-34",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 34",
+      "baseDescription": "正对镜头，双脚前后错开半步，右手拎包下垂，左手自然放在大腿外侧",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 34
+    },
+    {
+      "id": "COMM-F-35",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 35",
+      "baseDescription": "45 度左向侧身，右手搭在单肩包上，左手垂落，重心在后脚，体态舒展",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 35
+    },
+    {
+      "id": "COMM-F-36",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 36",
+      "baseDescription": "轻微侧身站姿，身体朝右，双手轻轻拎着包放在身体一侧，肩膀不耸肩",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 36
+    },
+    {
+      "id": "COMM-F-37",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 37",
+      "baseDescription": "正面站姿，重心偏左，右腿放松，双手自然放在胯部两侧，指尖轻触裤线",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 37
+    },
+    {
+      "id": "COMM-F-38",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 38",
+      "baseDescription": "90° 侧身，身体侧向画面，头部回视镜头，右手自然垂落，左手把包挎在胳膊上",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 38
+    },
+    {
+      "id": "COMM-F-39",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 39",
+      "baseDescription": "45° 站姿，一腿站直，另一腿脚尖点地向外，双手在身前自然分开，不僵硬",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 39
+    },
+    {
+      "id": "E-01",
+      "category": "E",
+      "title": "背面回眸",
+      "baseDescription": "背面全身站立，双手背在身后，包斜挎肩上，头部向右侧回转露出侧脸。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "电商",
+        "影棚"
+      ],
+      "sortOrder": 40
+    },
+    {
+      "id": "COMM-F-40",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 40",
+      "baseDescription": "正对镜头，左手挎腋下包，右手自然垂落，双脚平稳与肩同宽",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 40
+    },
+    {
+      "id": "COMM-F-41",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 41",
+      "baseDescription": "身体微微向左倾斜站立，右手轻扶包的提手，左手自然垂于大腿，站姿慵懒通勤",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 41
+    },
+    {
+      "id": "COMM-F-42",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 42",
+      "baseDescription": "侧身站姿，前脚内收，后脚承重，双手轻放在身后，腰背自然挺直",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 42
+    },
+    {
+      "id": "COMM-F-43",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 43",
+      "baseDescription": "正面松弛站姿，双脚轻微错开，右手轻搭左胳膊，左手拎包放在身侧",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 43
+    },
+    {
+      "id": "COMM-F-44",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 44",
+      "baseDescription": "45° 右侧身站姿，左手插裤袋，右手自然下垂，头部正对镜头",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 44
+    },
+    {
+      "id": "COMM-F-45",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 45",
+      "baseDescription": "全身站姿，身体侧转，双手共同把包包抱在小腹位置，肩膀放松",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 45
+    },
+    {
+      "id": "COMM-F-46",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 46",
+      "baseDescription": "正对镜头，重心右腿，左腿微松，右手自然垂落，左手轻轻整理丝巾领口",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 46
+    },
+    {
+      "id": "COMM-F-47",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 47",
+      "baseDescription": "侧身站姿，面向左侧，右手拎包置于身后胯部，左手垂落，头部转向镜头",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 47
+    },
+    {
+      "id": "COMM-F-48",
+      "category": "A",
+      "title": "通勤站姿 · 女装 · 48",
+      "baseDescription": "正面站姿，双手自然垂落，肩膀一高一低轻微松弛感，双脚前后错开",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 48
+    },
+    {
+      "id": "COMM-F-49",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 49",
+      "baseDescription": "45° 侧身，右手放在腰后，左手拎包在身前，双腿一前一后站立",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 49
+    },
+    {
+      "id": "H-01",
+      "category": "H",
+      "title": "沙滩奔跑",
+      "baseDescription": "身体前倾，右腿向前大步迈出，双臂自然前后交替摆动，头发随风扬起。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "夸张",
+        "游玩",
+        "运动",
+        "户外"
+      ],
+      "sortOrder": 50
+    },
+    {
+      "id": "COMM-F-50",
+      "category": "C",
+      "title": "通勤站姿 · 女装 · 50",
+      "baseDescription": "轻微侧身，身体朝右前方，双手自然垂放，重心均匀分配，温和大方通勤姿态",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 50
+    },
+    {
+      "id": "H-02",
+      "category": "H",
+      "title": "星形跳跃",
+      "baseDescription": "双腿向两侧大幅度张开，双臂同时向上向外伸展呈大字形，身体腾空离地。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "夸张",
+        "游玩",
+        "运动",
+        "户外"
+      ],
+      "sortOrder": 51
+    },
+    {
+      "id": "I-01",
+      "category": "I",
+      "title": "逛街翻包",
+      "baseDescription": "正面站立，低头视线向下，双手在身前打开手提包翻找物品，双腿微微错开。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "扫街",
+        "生活",
+        "游玩"
+      ],
+      "sortOrder": 60
+    },
+    {
+      "id": "I-02",
+      "category": "I",
+      "title": "咖啡店回眸",
+      "baseDescription": "身体朝向右侧作即将离开状，右手端着咖啡杯，头部猛然转回看向镜头，面带微笑。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "扫街",
+        "生活",
+        "游玩"
+      ],
+      "sortOrder": 61
+    },
+    {
+      "id": "J-01",
+      "category": "J",
+      "title": "干练行走商务风",
+      "baseDescription": "身体正对镜头向前行走，右手拎公文包垂于身侧，左手整理西装外套领口，头部微抬。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "电商",
+        "商务",
+        "通勤"
+      ],
+      "sortOrder": 70
+    },
+    {
+      "id": "J-02",
+      "category": "J",
+      "title": "宴会举杯侧身",
+      "baseDescription": "身体侧对镜头约45°，右手优雅举起高脚杯至胸前高度，双腿并拢直立。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "电商",
+        "商务",
+        "通勤"
+      ],
+      "sortOrder": 71
+    },
+    {
+      "id": "K-01",
+      "category": "K",
+      "title": "红毯经典回眸",
+      "baseDescription": "身体向画面右侧走去，上身大幅度向左后方扭转，头部回正看向镜头，表情冷艳。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "商务"
+      ],
+      "sortOrder": 80
+    },
+    {
+      "id": "K-02",
+      "category": "K",
+      "title": "手拿手包叉腰",
+      "baseDescription": "身体正对镜头，左臂弯曲叉在腰部，右手自然下垂握住小巧手拿包，双腿微分开。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "商务"
+      ],
+      "sortOrder": 81
+    },
+    {
+      "id": "L-01",
+      "category": "L",
+      "title": "双手抱头后仰",
+      "baseDescription": "双手交叉抱在脑后，上半身向后仰，胸腔打开，头部后仰看向天空。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "夸张",
+        "戏剧"
+      ],
+      "sortOrder": 90
+    },
+    {
+      "id": "L-02",
+      "category": "L",
+      "title": "单膝跪地前倾伸手",
+      "baseDescription": "单膝跪地，另一腿屈膝在前，上半身极度前倾靠近镜头，单手撑地，另一手抬起伸向镜头方向。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "夸张",
+        "戏剧"
+      ],
+      "sortOrder": 91
+    },
+    {
+      "id": "M-01",
+      "category": "M",
+      "title": "手贴下颌",
+      "baseDescription": "正面全身站立，双腿微微错开，右手自然下垂拎小包，左手抬起轻贴脸颊下颌位置，面带微笑看向镜头。",
+      "genders": [
+        "unisex"
+      ],
+      "sceneTags": [
+        "电商",
+        "生活",
+        "影棚"
+      ],
+      "sortOrder": 100
+    },
+    {
+      "id": "COMM-M-01",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 01",
+      "baseDescription": "标准正面商务站姿，双脚与肩同宽，双肩放平，双手自然垂于身体两侧，平视镜头，腰背挺直",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 101
+    },
+    {
+      "id": "COMM-M-02",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 02",
+      "baseDescription": "正面站姿，重心稳定，右手自然下垂，左手轻握公文包提手放在身体左侧，姿态沉稳",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 102
+    },
+    {
+      "id": "COMM-M-03",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 03",
+      "baseDescription": "45° 微侧身站姿，身体转向画面右侧，头部转回正对镜头，后腿承重，前脚尖轻点地面，双手自然垂落",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 103
+    },
+    {
+      "id": "COMM-M-04",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 04",
+      "baseDescription": "45° 侧身站姿，重心放在后腿，前腿微微前伸，右手拎公文包放在胯侧，左手自然垂落",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 104
+    },
+    {
+      "id": "COMM-M-05",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 05",
+      "baseDescription": "轻微侧身站立，身体朝左，左手将手提包拎在小腹前方，右手轻贴大腿，站姿放松不刻板",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 105
+    },
+    {
+      "id": "COMM-M-06",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 06",
+      "baseDescription": "正面站姿，双脚微微分开，双手浅插西裤口袋，大拇指露出口袋，肩膀放松，松弛商务风",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 106
+    },
+    {
+      "id": "COMM-M-07",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 07",
+      "baseDescription": "侧身站立，身体朝向画面右侧，单手轻搭斜挎包肩带，另一只手自然垂落，头部看向镜头",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 107
+    },
+    {
+      "id": "COMM-M-08",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 08",
+      "baseDescription": "正对镜头站姿，重心偏向右腿，左腿膝盖轻微放松，右手垂落，左手轻握包带置于腰边",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 108
+    },
+    {
+      "id": "COMM-M-09",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 09",
+      "baseDescription": "90° 大侧身站姿，身体侧向画面，头部回转看向镜头，双脚前后错开，双手自然垂于身前",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 109
+    },
+    {
+      "id": "COMM-M-10",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 10",
+      "baseDescription": "正面松弛站姿，一腿承重，另一条腿脚尖点地，双手自然放在小腹前，气质沉稳休闲通勤",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 110
+    },
+    {
+      "id": "COMM-M-11",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 11",
+      "baseDescription": "45 度侧身，右臂弯曲把包挎在腋下，左手自然垂落，重心在后脚，肩膀打开",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 111
+    },
+    {
+      "id": "COMM-M-12",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 12",
+      "baseDescription": "正面站姿，右手拎包垂于身体右侧，左手搭在大腿外侧，双脚轻微错开",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 112
+    },
+    {
+      "id": "COMM-M-13",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 13",
+      "baseDescription": "身体微向左侧倾斜站立，左手插入裤兜，右手自然下垂，头部平视镜头",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 113
+    },
+    {
+      "id": "COMM-M-14",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 14",
+      "baseDescription": "侧身站姿，前脚向前半步，右手自然垂落，左手将公文包拎至身后胯部",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 114
+    },
+    {
+      "id": "COMM-M-15",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 15",
+      "baseDescription": "正对镜头站姿，双脚一前一后错开，双手轻放在身后，腰背挺直，干练商务感",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 115
+    },
+    {
+      "id": "COMM-M-16",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 16",
+      "baseDescription": "45° 右侧身，重心在后腿，前腿放松，右手轻扶公文包顶部，左手自然垂于身侧",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 116
+    },
+    {
+      "id": "COMM-M-17",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 17",
+      "baseDescription": "正面松弛站姿，双脚自然分开，双手在身前随意轻搭，肩膀下沉，适合休闲西装",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 117
+    },
+    {
+      "id": "COMM-M-18",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 18",
+      "baseDescription": "侧身站立，面向画面左侧，右手弯曲拎包，头部回正看向镜头，双腿前后分开",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 118
+    },
+    {
+      "id": "COMM-M-19",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 19",
+      "baseDescription": "正面站姿，右手插裤袋，左手自然下垂，重心轻微偏向一侧，姿态放松",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 119
+    },
+    {
+      "id": "COMM-M-20",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 20",
+      "baseDescription": "45 度侧身站姿，双手共同握住公文包提手，包包放在大腿前侧",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 120
+    },
+    {
+      "id": "COMM-M-21",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 21",
+      "baseDescription": "身体微微侧向右方，后腿承重，前腿放松，右手垂落，左手轻搭肩上的包带",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 121
+    },
+    {
+      "id": "COMM-M-22",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 22",
+      "baseDescription": "标准正面站姿，单手整理衬衫袖口，另一只手自然下垂，双脚平稳站立",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 122
+    },
+    {
+      "id": "COMM-M-23",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 23",
+      "baseDescription": "侧身站姿，重心在前脚，后脚脚尖点地，双手自然垂落，平视镜头",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 123
+    },
+    {
+      "id": "COMM-M-24",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 24",
+      "baseDescription": "正对镜头站姿，右腿承重，左腿向外轻开，右手拎包，左手轻搭包身侧面",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 124
+    },
+    {
+      "id": "COMM-M-25",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 25",
+      "baseDescription": "45° 左侧身，左手浅插裤兜，右手自然下垂，肩膀放松，头部转向镜头",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 125
+    },
+    {
+      "id": "COMM-M-26",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 26",
+      "baseDescription": "全身站姿，身体略微侧转，双手背在身后，一手轻握另一手腕，站姿稳重",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 126
+    },
+    {
+      "id": "COMM-M-27",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 27",
+      "baseDescription": "正面松弛站姿，双脚略窄于肩，右手放在腰侧，左手拎包置于身体左边",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 127
+    },
+    {
+      "id": "COMM-M-28",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 28",
+      "baseDescription": "90 度侧身站立，双腿前后错开，右手挎包，手臂弯曲，回头看向镜头",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 128
+    },
+    {
+      "id": "COMM-M-29",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 29",
+      "baseDescription": "正对镜头，重心偏向左腿，右腿膝盖放松，双手自然垂落，脖颈舒展",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 129
+    },
+    {
+      "id": "COMM-M-30",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 30",
+      "baseDescription": "45° 侧身站姿，左手拎包放在胯前，右手轻轻抚平外套下摆，动作自然",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 130
+    },
+    {
+      "id": "COMM-M-31",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 31",
+      "baseDescription": "身体向右侧微转，双手自然叠放在腰前，站姿平稳，适合西装套装",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 131
+    },
+    {
+      "id": "COMM-M-32",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 32",
+      "baseDescription": "正面站姿，右手插裤兜，左手握住斜挎包带，肩膀放平",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 132
+    },
+    {
+      "id": "COMM-M-33",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 33",
+      "baseDescription": "侧身站姿，前腿微微弯曲放松，后腿站直，双手自然垂在身体前方",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 133
+    },
+    {
+      "id": "COMM-M-34",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 34",
+      "baseDescription": "正对镜头，双脚前后错开半步，右手拎包下垂，左手自然放在大腿外侧",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 134
+    },
+    {
+      "id": "COMM-M-35",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 35",
+      "baseDescription": "45 度左向侧身，右手搭在单肩包上，左手垂落，重心在后脚",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 135
+    },
+    {
+      "id": "COMM-M-36",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 36",
+      "baseDescription": "轻微侧身站姿，身体朝右，双手拎包放在身体一侧，肩膀不耸肩",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 136
+    },
+    {
+      "id": "COMM-M-37",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 37",
+      "baseDescription": "正面站姿，重心偏左，右腿放松，双手自然放在胯部两侧，指尖沿裤线",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 137
+    },
+    {
+      "id": "COMM-M-38",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 38",
+      "baseDescription": "90° 侧身，身体侧向画面，头部回视镜头，右手垂落，左手将包挎在小臂上",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 138
+    },
+    {
+      "id": "COMM-M-39",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 39",
+      "baseDescription": "45° 站姿，一腿站直，另一腿脚尖点地向外，双手身前自然分开，松弛感",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 139
+    },
+    {
+      "id": "COMM-M-40",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 40",
+      "baseDescription": "正对镜头，左手挎腋下公文包，右手自然垂落，双脚与肩同宽平稳站立",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 140
+    },
+    {
+      "id": "COMM-M-41",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 41",
+      "baseDescription": "身体微微向左倾斜站立，右手轻扶包的提手，左手垂于大腿，休闲商务站姿",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 141
+    },
+    {
+      "id": "COMM-M-42",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 42",
+      "baseDescription": "侧身站姿，前脚内收，后脚承重，双手轻放在身后，腰背自然挺直",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 142
+    },
+    {
+      "id": "COMM-M-43",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 43",
+      "baseDescription": "正面松弛站姿，双脚轻微错开，右手轻搭左前臂，左手拎包放在身侧",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 143
+    },
+    {
+      "id": "COMM-M-44",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 44",
+      "baseDescription": "45° 右侧身站姿，左手插裤袋，右手自然下垂，头部正对镜头",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 144
+    },
+    {
+      "id": "COMM-M-45",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 45",
+      "baseDescription": "全身站姿，身体侧转，双手把公文包抱在小腹位置，肩膀放松",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 145
+    },
+    {
+      "id": "COMM-M-46",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 46",
+      "baseDescription": "正对镜头，重心右腿，左腿微松，右手垂落，左手整理西装领口",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 146
+    },
+    {
+      "id": "COMM-M-47",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 47",
+      "baseDescription": "侧身站姿，面向左侧，右手拎包置于身后胯部，左手垂落，头部转向镜头",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 147
+    },
+    {
+      "id": "COMM-M-48",
+      "category": "A",
+      "title": "通勤站姿 · 男装 · 48",
+      "baseDescription": "正面站姿，双手自然垂落，轻微松弛体态，双脚前后错开",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 148
+    },
+    {
+      "id": "COMM-M-49",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 49",
+      "baseDescription": "45° 侧身，右手放在腰后，左手拎包在身前，双腿一前一后站立",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 149
+    },
+    {
+      "id": "COMM-M-50",
+      "category": "C",
+      "title": "通勤站姿 · 男装 · 50",
+      "baseDescription": "轻微侧身朝右前方，双手自然垂放，重心均匀，简约大气通勤姿态",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "电商",
+        "通勤",
+        "影棚"
+      ],
+      "sortOrder": 150
+    },
+    {
+      "id": "TRAV-F-01",
+      "category": "A",
+      "title": "旅游玩乐 · 女装 · 01",
+      "baseDescription": "正面站立，身体微微后仰，面带笑容，双手举起来轻撩头发，双脚一前一后，看向镜头，海边度假松弛感",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1001
+    },
+    {
+      "id": "TRAV-F-02",
+      "category": "C",
+      "title": "旅游玩乐 · 女装 · 02",
+      "baseDescription": "45° 侧身，面朝风景方向，头部回转看向镜头，一只手轻扶草帽帽檐，另一只手自然垂落，一脚轻点地面",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1002
+    },
+    {
+      "id": "TRAV-F-03",
+      "category": "E",
+      "title": "旅游玩乐 · 女装 · 03",
+      "baseDescription": "背对镜头站立，头部回头回眸看向镜头，双臂自然张开，感受微风，双脚微微分开，户外山野场景",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1003
+    },
+    {
+      "id": "TRAV-F-04",
+      "category": "C",
+      "title": "旅游玩乐 · 女装 · 04",
+      "baseDescription": "侧身站立，重心放在后腿，前腿微微抬起脚尖点地，双手拎帆布包，手肘微弯，笑容轻松，城市街头旅拍",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1004
+    },
+    {
+      "id": "TRAV-F-05",
+      "category": "A",
+      "title": "旅游玩乐 · 女装 · 05",
+      "baseDescription": "正面站姿，双手在身前捧起一小束野花，肩膀放松，双脚错开，身体微微侧向一边，温柔度假感",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1005
+    },
+    {
+      "id": "TRAV-F-06",
+      "category": "C",
+      "title": "旅游玩乐 · 女装 · 06",
+      "baseDescription": "大侧身，一只手搭在栏杆上，另一只手自然垂落，看向远方风景，身体舒展，观景台打卡姿势",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1006
+    },
+    {
+      "id": "TRAV-F-07",
+      "category": "A",
+      "title": "旅游玩乐 · 女装 · 07",
+      "baseDescription": "正面松弛站姿，双手背在身后，重心偏向一侧，脑袋轻轻歪向肩膀，微笑看向镜头",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1007
+    },
+    {
+      "id": "TRAV-F-08",
+      "category": "C",
+      "title": "旅游玩乐 · 女装 · 08",
+      "baseDescription": "侧身站立，单手提起裙摆一角，轻轻向外展开，另一只手自然垂落，双脚前后错开，适合长裙",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1008
+    },
+    {
+      "id": "TRAV-F-09",
+      "category": "E",
+      "title": "旅游玩乐 · 女装 · 09",
+      "baseDescription": "背对镜头，肩膀微微侧转，一只手举起遮阳帽，另一只手自然下垂，望向远处风景",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1009
+    },
+    {
+      "id": "TRAV-F-10",
+      "category": "C",
+      "title": "旅游玩乐 · 女装 · 10",
+      "baseDescription": "45° 侧身，双手抓着双肩包背带，重心在后腿，前腿弯曲放松，看向镜头，活力出游姿态",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1010
+    },
+    {
+      "id": "TRAV-F-11",
+      "category": "A",
+      "title": "旅游玩乐 · 女装 · 11",
+      "baseDescription": "正面站立，双臂微微向两侧打开，像拥抱风景，头部微微上扬闭眼感受风，双脚分开",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1011
+    },
+    {
+      "id": "TRAV-F-12",
+      "category": "I",
+      "title": "旅游玩乐 · 女装 · 12",
+      "baseDescription": "侧身，身体倚靠在墙面 / 树干，一只脚弯曲，脚尖点地，单手托腮，另一只手垂落，慵懒打卡",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1012
+    },
+    {
+      "id": "TRAV-F-13",
+      "category": "A",
+      "title": "旅游玩乐 · 女装 · 13",
+      "baseDescription": "正面站姿，一只手搭在额头前遮挡阳光，另一只手拎编织托特包，双脚前后错开，海边夏日感",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1013
+    },
+    {
+      "id": "TRAV-F-14",
+      "category": "C",
+      "title": "旅游玩乐 · 女装 · 14",
+      "baseDescription": "半侧身，双手比简单的 OK 手势在脸颊旁边，身体微微倾斜，笑容活泼，街头打卡",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1014
+    },
+    {
+      "id": "TRAV-F-15",
+      "category": "E",
+      "title": "旅游玩乐 · 女装 · 15",
+      "baseDescription": "背对镜头，双手举在头顶比爱心，头部微微侧转回眸，双腿轻轻分开",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1015
+    },
+    {
+      "id": "TRAV-F-16",
+      "category": "C",
+      "title": "旅游玩乐 · 女装 · 16",
+      "baseDescription": "45° 侧身，一只手插在休闲裤口袋，另一只手自然抬起轻撩耳边头发，看向镜头",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1016
+    },
+    {
+      "id": "TRAV-F-17",
+      "category": "A",
+      "title": "旅游玩乐 · 女装 · 17",
+      "baseDescription": "站立，身体微微侧向画面，双手握住饮品杯举到腰侧，轻松看向镜头，小镇街拍",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1017
+    },
+    {
+      "id": "TRAV-F-18",
+      "category": "C",
+      "title": "旅游玩乐 · 女装 · 18",
+      "baseDescription": "侧身，重心在前脚，后脚脚尖点地，双臂环抱自己，望向远处风景，安静氛围感",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1018
+    },
+    {
+      "id": "TRAV-F-19",
+      "category": "A",
+      "title": "旅游玩乐 · 女装 · 19",
+      "baseDescription": "正面站姿，双脚交叉站立，一只手搭在胯部，另一只手自然下垂，自信松弛",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1019
+    },
+    {
+      "id": "TRAV-F-20",
+      "category": "C",
+      "title": "旅游玩乐 · 女装 · 20",
+      "baseDescription": "侧身回头，一只手向外伸出，仿佛指向远方风景，另一只手自然垂落，双腿前后分开",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1020
+    },
+    {
+      "id": "TRAV-F-21",
+      "category": "A",
+      "title": "旅游玩乐 · 女装 · 21",
+      "baseDescription": "站立，身体轻轻侧倾，双手提着草编包放在身体前方，脑袋微歪，笑容甜美",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1021
+    },
+    {
+      "id": "TRAV-F-22",
+      "category": "I",
+      "title": "旅游玩乐 · 女装 · 22",
+      "baseDescription": "倚靠围栏站立，双手搭在栏杆上，上半身微微前倾，看向镜头，观景打卡",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1022
+    },
+    {
+      "id": "TRAV-F-23",
+      "category": "H",
+      "title": "旅游玩乐 · 女装 · 23",
+      "baseDescription": "正面，双手举高整理防晒帽，手肘向外打开，一脚在前一脚在后，阳光户外",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1023
+    },
+    {
+      "id": "TRAV-F-24",
+      "category": "B",
+      "title": "旅游玩乐 · 女装 · 24",
+      "baseDescription": "大侧身，一只手拎包搭在小臂，另一只手自然摆动，身体轻微动态感，边走边回头看镜头",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1024
+    },
+    {
+      "id": "TRAV-F-25",
+      "category": "E",
+      "title": "旅游玩乐 · 女装 · 25",
+      "baseDescription": "背对镜头，双手轻轻拉着裙摆向两边展开，头部侧转回眸看向镜头",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1025
+    },
+    {
+      "id": "TRAV-F-26",
+      "category": "C",
+      "title": "旅游玩乐 · 女装 · 26",
+      "baseDescription": "45° 侧身站姿，双手背在臀部后方，重心偏移，肩膀放松，微笑看镜头",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1026
+    },
+    {
+      "id": "TRAV-F-27",
+      "category": "A",
+      "title": "旅游玩乐 · 女装 · 27",
+      "baseDescription": "正面站立，单手举相机，放在眼前假装拍照，另一只手自然垂落，旅行记录感",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1027
+    },
+    {
+      "id": "TRAV-F-28",
+      "category": "C",
+      "title": "旅游玩乐 · 女装 · 28",
+      "baseDescription": "侧身，双脚交叉，一只手轻扶树干，另一只手自然垂落，看向镜头，森林户外",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1028
+    },
+    {
+      "id": "TRAV-F-29",
+      "category": "A",
+      "title": "旅游玩乐 · 女装 · 29",
+      "baseDescription": "正面，身体微微侧转，双手捧着草帽放在小腹前，双脚错开，安静温柔度假姿态",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1029
+    },
+    {
+      "id": "TRAV-F-30",
+      "category": "C",
+      "title": "旅游玩乐 · 女装 · 30",
+      "baseDescription": "侧身站立，重心在后腿，前腿轻轻向前伸，双手在身侧轻轻提着包，看向远方风景",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1030
+    },
+    {
+      "id": "TRAV-M-01",
+      "category": "A",
+      "title": "旅游玩乐 · 男装 · 01",
+      "baseDescription": "正面站立，双脚与肩同宽，双手插在休闲裤口袋，身体微微后仰，轻松看向镜头，城市旅拍",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1101
+    },
+    {
+      "id": "TRAV-M-02",
+      "category": "C",
+      "title": "旅游玩乐 · 男装 · 02",
+      "baseDescription": "45° 侧身，面朝风景，头部转回看向镜头，一只手搭在背包肩带，另一只手自然垂落，一脚轻点地面",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1102
+    },
+    {
+      "id": "TRAV-M-03",
+      "category": "E",
+      "title": "旅游玩乐 · 男装 · 03",
+      "baseDescription": "背对镜头站立，头部回头回眸看向镜头，双臂自然张开，双脚微微分开，山野户外氛围感",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1103
+    },
+    {
+      "id": "TRAV-M-04",
+      "category": "C",
+      "title": "旅游玩乐 · 男装 · 04",
+      "baseDescription": "侧身站立，重心在后腿，前腿脚尖轻点地面，单手拎帆布包，手肘微弯，笑容松弛",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1104
+    },
+    {
+      "id": "TRAV-M-05",
+      "category": "A",
+      "title": "旅游玩乐 · 男装 · 05",
+      "baseDescription": "正面站姿，双手在身前握住饮料瓶，肩膀放松，双脚错开，身体微微侧倾，小镇打卡",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1105
+    },
+    {
+      "id": "TRAV-M-06",
+      "category": "C",
+      "title": "旅游玩乐 · 男装 · 06",
+      "baseDescription": "大侧身，一只手搭栏杆，另一只手自然垂落，望向远方风景，身体舒展，观景台姿势",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1106
+    },
+    {
+      "id": "TRAV-M-07",
+      "category": "A",
+      "title": "旅游玩乐 · 男装 · 07",
+      "baseDescription": "正面松弛站姿，双手背在身后，重心偏向一侧，脑袋微微倾斜，看着镜头",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1107
+    },
+    {
+      "id": "TRAV-M-08",
+      "category": "C",
+      "title": "旅游玩乐 · 男装 · 08",
+      "baseDescription": "侧身站立，单手轻拉外套领口，另一只手自然垂落，双脚前后错开，休闲穿搭展示",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1108
+    },
+    {
+      "id": "TRAV-M-09",
+      "category": "E",
+      "title": "旅游玩乐 · 男装 · 09",
+      "baseDescription": "背对镜头，肩膀侧转，单手举棒球帽，另一只手自然下垂，眺望远处风景",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1109
+    },
+    {
+      "id": "TRAV-M-10",
+      "category": "C",
+      "title": "旅游玩乐 · 男装 · 10",
+      "baseDescription": "45° 侧身，双手抓住双肩包背带，重心在后腿，前腿膝盖放松，活力出游姿态",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1110
+    },
+    {
+      "id": "TRAV-M-11",
+      "category": "H",
+      "title": "旅游玩乐 · 男装 · 11",
+      "baseDescription": "正面站立，双臂微微向两侧张开，仰头感受微风，双脚自然分开，开阔风景地",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1111
+    },
+    {
+      "id": "TRAV-M-12",
+      "category": "I",
+      "title": "旅游玩乐 · 男装 · 12",
+      "baseDescription": "侧身倚靠墙面 / 树干，一条腿弯曲脚尖点地，单手插裤兜，另一只手自然垂落，慵懒打卡",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1112
+    },
+    {
+      "id": "TRAV-M-13",
+      "category": "A",
+      "title": "旅游玩乐 · 男装 · 13",
+      "baseDescription": "正面站姿，单手举在额头前遮挡阳光，另一只手提托特包，双脚前后错开，夏日户外",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1113
+    },
+    {
+      "id": "TRAV-M-14",
+      "category": "C",
+      "title": "旅游玩乐 · 男装 · 14",
+      "baseDescription": "半侧身，单手比简单手势，身体微微倾斜，轻松看向镜头，街头打卡",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1114
+    },
+    {
+      "id": "TRAV-M-15",
+      "category": "E",
+      "title": "旅游玩乐 · 男装 · 15",
+      "baseDescription": "背对镜头，双手举在头顶比简单手势，头部侧转回眸，双腿轻轻分开",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1115
+    },
+    {
+      "id": "TRAV-M-16",
+      "category": "C",
+      "title": "旅游玩乐 · 男装 · 16",
+      "baseDescription": "45° 侧身，一只手插裤袋，另一只手抬起整理帽子，看向镜头",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1116
+    },
+    {
+      "id": "TRAV-M-17",
+      "category": "A",
+      "title": "旅游玩乐 · 男装 · 17",
+      "baseDescription": "站立，身体微侧，单手拿着咖啡杯放在腰侧，看向镜头，城市旅行",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1117
+    },
+    {
+      "id": "TRAV-M-18",
+      "category": "C",
+      "title": "旅游玩乐 · 男装 · 18",
+      "baseDescription": "侧身，重心放在前脚，后脚脚尖点地，双臂环抱，望向远处风景，安静氛围感",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1118
+    },
+    {
+      "id": "TRAV-M-19",
+      "category": "A",
+      "title": "旅游玩乐 · 男装 · 19",
+      "baseDescription": "正面站姿，双脚交叉站立，单手搭胯，另一只手自然下垂，松弛大气",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1119
+    },
+    {
+      "id": "TRAV-M-20",
+      "category": "C",
+      "title": "旅游玩乐 · 男装 · 20",
+      "baseDescription": "侧身回头，一只手伸出指向远方景色，另一只手自然垂落，双腿前后分开",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1120
+    },
+    {
+      "id": "TRAV-M-21",
+      "category": "A",
+      "title": "旅游玩乐 · 男装 · 21",
+      "baseDescription": "站立，身体轻微侧倾，双手将背包拎在身前，姿态轻松自然",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1121
+    },
+    {
+      "id": "TRAV-M-22",
+      "category": "I",
+      "title": "旅游玩乐 · 男装 · 22",
+      "baseDescription": "倚靠围栏站立，双手搭在栏杆，上半身微微前倾，看向镜头，观景打卡",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1122
+    },
+    {
+      "id": "TRAV-M-23",
+      "category": "H",
+      "title": "旅游玩乐 · 男装 · 23",
+      "baseDescription": "正面站姿，双手举高调整棒球帽，手肘向外打开，双脚前后错开，阳光户外",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1123
+    },
+    {
+      "id": "TRAV-M-24",
+      "category": "C",
+      "title": "旅游玩乐 · 男装 · 24",
+      "baseDescription": "大侧身，单肩挎包，手臂自然摆动，边走回头看向镜头，带轻微动态感",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1124
+    },
+    {
+      "id": "TRAV-M-25",
+      "category": "E",
+      "title": "旅游玩乐 · 男装 · 25",
+      "baseDescription": "背对镜头，双手插外套口袋，头部侧转回眸看向镜头",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1125
+    },
+    {
+      "id": "TRAV-M-26",
+      "category": "C",
+      "title": "旅游玩乐 · 男装 · 26",
+      "baseDescription": "45° 侧身站姿，双手背在臀部后方，重心偏移，肩膀放松，微笑看镜头",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1126
+    },
+    {
+      "id": "TRAV-M-27",
+      "category": "A",
+      "title": "旅游玩乐 · 男装 · 27",
+      "baseDescription": "正面站立，单手举相机放在眼前假装拍摄，另一只手自然垂落，旅行记录感",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1127
+    },
+    {
+      "id": "TRAV-M-28",
+      "category": "C",
+      "title": "旅游玩乐 · 男装 · 28",
+      "baseDescription": "侧身，双脚交叉，单手扶树干，另一只手自然垂落，看向镜头，森林户外",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1128
+    },
+    {
+      "id": "TRAV-M-29",
+      "category": "A",
+      "title": "旅游玩乐 · 男装 · 29",
+      "baseDescription": "正面，身体微微侧转，双手拿着棒球帽放在小腹前，双脚错开，休闲度假姿态",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1129
+    },
+    {
+      "id": "TRAV-M-30",
+      "category": "C",
+      "title": "旅游玩乐 · 男装 · 30",
+      "baseDescription": "侧身站立，重心在后腿，前腿向前轻伸，手提包自然垂在身侧，望向远方风景",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "游玩",
+        "扫街",
+        "生活",
+        "户外"
+      ],
+      "sortOrder": 1130
+    },
+    {
+      "id": "DRAM-F-01",
+      "category": "K",
+      "title": "红毯大动作 · 女装 · 01",
+      "baseDescription": "正面定点站姿，双脚分开形成稳定重心，一只手叉腰，另一只手高举挥手，身体微微后仰，气场全开。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2001
+    },
+    {
+      "id": "DRAM-F-02",
+      "category": "C",
+      "title": "红毯大动作 · 女装 · 02",
+      "baseDescription": "45° 侧身站姿，头部突然回眸看向镜头，单手撩起长发，另一只手轻扶礼服裙侧，动作有抓拍感。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2002
+    },
+    {
+      "id": "DRAM-F-03",
+      "category": "L",
+      "title": "红毯大动作 · 女装 · 03",
+      "baseDescription": "大侧身站立，双臂向两侧大幅展开，像接受掌声，胸口打开，下巴微抬，礼服裙摆自然铺开。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2003
+    },
+    {
+      "id": "DRAM-F-04",
+      "category": "K",
+      "title": "红毯大动作 · 女装 · 04",
+      "baseDescription": "正面站立，双手向上举起，手指形成优雅线条，身体轻微侧倾，露出肩颈和礼服上身剪裁。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2004
+    },
+    {
+      "id": "DRAM-F-05",
+      "category": "B",
+      "title": "红毯大动作 · 女装 · 05",
+      "baseDescription": "单腿向前迈出的猫步站姿，一只手插腰，另一只手自然摆动，视线直视镜头，自信强势。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2005
+    },
+    {
+      "id": "DRAM-F-06",
+      "category": "E",
+      "title": "红毯大动作 · 女装 · 06",
+      "baseDescription": "背对镜头半侧身回望，一只手轻扶腰侧，另一只手提起裙摆，展示背部设计和裙型。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2006
+    },
+    {
+      "id": "DRAM-F-07",
+      "category": "L",
+      "title": "红毯大动作 · 女装 · 07",
+      "baseDescription": "身体大幅度转向画面一侧，裙摆呈旋转展开状态，头部回看镜头，动作带风、有戏剧张力。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2007
+    },
+    {
+      "id": "DRAM-F-08",
+      "category": "K",
+      "title": "红毯大动作 · 女装 · 08",
+      "baseDescription": "正面仰头站姿，双肩打开，一手放在胸前，一手自然下垂，表情冷静高级，适合封面大片。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2008
+    },
+    {
+      "id": "DRAM-F-09",
+      "category": "L",
+      "title": "红毯大动作 · 女装 · 09",
+      "baseDescription": "双手轻扶太阳穴或发丝，头部微仰，身体形成 S 型曲线，礼服长裙拖地，突出奢华面料。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2009
+    },
+    {
+      "id": "DRAM-F-10",
+      "category": "K",
+      "title": "红毯大动作 · 女装 · 10",
+      "baseDescription": "侧身交叉腿站姿，一只手抬起轻触下颌，另一只手拎起大摆裙边，眼神冷艳。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2010
+    },
+    {
+      "id": "DRAM-F-11",
+      "category": "K",
+      "title": "红毯大动作 · 女装 · 11",
+      "baseDescription": "双脚前后错开，身体前倾与镜头互动，单手伸出指向镜头，另一只手叉腰，有压迫感。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2011
+    },
+    {
+      "id": "DRAM-F-12",
+      "category": "K",
+      "title": "红毯大动作 · 女装 · 12",
+      "baseDescription": "正面站立，双臂环抱在胸前但姿态开放，肩线挺直，一只脚向前轻点，冷艳红毯姿态。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2012
+    },
+    {
+      "id": "DRAM-F-13",
+      "category": "D",
+      "title": "红毯大动作 · 女装 · 13",
+      "baseDescription": "半跪式俯身站姿，单膝微屈，另一条腿向前伸展，单手撑在膝盖上，抬头看镜头。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2013
+    },
+    {
+      "id": "DRAM-F-14",
+      "category": "C",
+      "title": "红毯大动作 · 女装 · 14",
+      "baseDescription": "大侧面站立，一只手高举过头形成弧线，另一只手压住裙身，腰部侧弯，形成强烈线条。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2014
+    },
+    {
+      "id": "DRAM-F-15",
+      "category": "L",
+      "title": "红毯大动作 · 女装 · 15",
+      "baseDescription": "正面张开双臂，手掌朝外，身体略微后仰，像在舞台中央谢幕，裙摆大面积铺开。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2015
+    },
+    {
+      "id": "DRAM-F-16",
+      "category": "B",
+      "title": "红毯大动作 · 女装 · 16",
+      "baseDescription": "侧身迈步定格，一只手撩起长发，另一只手轻提裙摆，腿部向前伸出，动态抓拍感。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2016
+    },
+    {
+      "id": "DRAM-F-17",
+      "category": "K",
+      "title": "红毯大动作 · 女装 · 17",
+      "baseDescription": "双手提起裙摆向两侧展开，身体微微下沉，露出礼服全貌和鞋履，适合红毯展示。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2017
+    },
+    {
+      "id": "DRAM-F-18",
+      "category": "E",
+      "title": "红毯大动作 · 女装 · 18",
+      "baseDescription": "背对镜头，双手向后抓住裙摆，头部侧转回眸，肩背线条优雅，强调背影杀。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2018
+    },
+    {
+      "id": "DRAM-F-19",
+      "category": "L",
+      "title": "红毯大动作 · 女装 · 19",
+      "baseDescription": "正面站姿，单手高举整理披肩或披风，另一只手叉腰，披风呈展开状态，女王感。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2019
+    },
+    {
+      "id": "DRAM-F-20",
+      "category": "C",
+      "title": "红毯大动作 · 女装 · 20",
+      "baseDescription": "45° 斜侧站姿，身体重心后移，前腿伸直脚尖点地，双手轻叠在腰前，表情克制高冷。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2020
+    },
+    {
+      "id": "DRAM-F-21",
+      "category": "L",
+      "title": "红毯大动作 · 女装 · 21",
+      "baseDescription": "身体夸张倾斜，一只手撑在大腿侧，另一只手轻撩头发，镜头低角度，气场更强。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2021
+    },
+    {
+      "id": "DRAM-F-22",
+      "category": "K",
+      "title": "红毯大动作 · 女装 · 22",
+      "baseDescription": "双脚交叉站立，双手在头顶形成心形或弧形线条，头部微偏，适合华丽礼服。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2022
+    },
+    {
+      "id": "DRAM-F-23",
+      "category": "L",
+      "title": "红毯大动作 · 女装 · 23",
+      "baseDescription": "正面站立，一手轻捂胸口，一手向后甩开，身体微仰，像听到掌声后的谢幕动作。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2023
+    },
+    {
+      "id": "DRAM-F-24",
+      "category": "K",
+      "title": "红毯大动作 · 女装 · 24",
+      "baseDescription": "侧身展开姿态，单手向外甩出披风或长裙面料，另一只手保持腰侧，动作有舞台感。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2024
+    },
+    {
+      "id": "DRAM-F-25",
+      "category": "L",
+      "title": "红毯大动作 · 女装 · 25",
+      "baseDescription": "低角度全身站姿，双脚分开，双手叉腰，下巴抬起，肩膀下压，典型超模定点。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2025
+    },
+    {
+      "id": "DRAM-F-26",
+      "category": "C",
+      "title": "红毯大动作 · 女装 · 26",
+      "baseDescription": "半侧身回望镜头，一只手轻扶颈部或耳饰，另一只手提起裙摆，姿态精致但有幅度。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2026
+    },
+    {
+      "id": "DRAM-F-27",
+      "category": "B",
+      "title": "红毯大动作 · 女装 · 27",
+      "baseDescription": "正面走动定格，双腿前后跨度较大，一只手自然甩动，另一只手轻扶包或礼服边缘。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2027
+    },
+    {
+      "id": "DRAM-F-28",
+      "category": "L",
+      "title": "红毯大动作 · 女装 · 28",
+      "baseDescription": "双手大幅度展开裙摆，身体微微转向一侧，头部仰起，像在旋转后的静止瞬间。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2028
+    },
+    {
+      "id": "DRAM-F-29",
+      "category": "C",
+      "title": "红毯大动作 · 女装 · 29",
+      "baseDescription": "单腿交叉于另一腿前方，身体侧弯，单手从肩部划过胸前，另一只手自然下垂。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2029
+    },
+    {
+      "id": "DRAM-F-30",
+      "category": "K",
+      "title": "红毯大动作 · 女装 · 30",
+      "baseDescription": "正面女王站姿，双脚稳定分开，双肩打开，一只手叉腰，另一只手轻抬至胸前，镜头前定格，裙摆完整铺地。",
+      "genders": [
+        "female"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2030
+    },
+    {
+      "id": "DRAM-M-01",
+      "category": "K",
+      "title": "红毯大动作 · 男装 · 01",
+      "baseDescription": "正面定点站姿，双脚大幅分开，双手叉腰，胸口打开，下巴微抬，强势封面姿态。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2101
+    },
+    {
+      "id": "DRAM-M-02",
+      "category": "C",
+      "title": "红毯大动作 · 男装 · 02",
+      "baseDescription": "45° 侧身站姿，头部突然回眸看向镜头，单手整理西装领口，另一只手自然插袋。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2102
+    },
+    {
+      "id": "DRAM-M-03",
+      "category": "L",
+      "title": "红毯大动作 · 男装 · 03",
+      "baseDescription": "大侧面站立，双臂向两侧展开，像接受掌声，肩膀打开，礼服披风或外套自然展开。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2103
+    },
+    {
+      "id": "DRAM-M-04",
+      "category": "K",
+      "title": "红毯大动作 · 男装 · 04",
+      "baseDescription": "正面站立，单手高举挥手，另一只手插腰，身体微微后仰，红毯压轴定点感。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2104
+    },
+    {
+      "id": "DRAM-M-05",
+      "category": "B",
+      "title": "红毯大动作 · 男装 · 05",
+      "baseDescription": "单腿向前迈出的猫步定格，一只手放在腰侧，另一只手自然摆动，眼神直视镜头。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2105
+    },
+    {
+      "id": "DRAM-M-06",
+      "category": "E",
+      "title": "红毯大动作 · 男装 · 06",
+      "baseDescription": "背对镜头半侧身回望，双手整理西装下摆，头部回看镜头，突出背部剪裁。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2106
+    },
+    {
+      "id": "DRAM-M-07",
+      "category": "L",
+      "title": "红毯大动作 · 男装 · 07",
+      "baseDescription": "身体大幅转向画面一侧，外套或披风呈展开状态，头部回看镜头，动作带风。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2107
+    },
+    {
+      "id": "DRAM-M-08",
+      "category": "K",
+      "title": "红毯大动作 · 男装 · 08",
+      "baseDescription": "正面仰头站姿，双肩打开，一手放在胸前，一手自然下垂，冷峻高级的封面姿态。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2108
+    },
+    {
+      "id": "DRAM-M-09",
+      "category": "K",
+      "title": "红毯大动作 · 男装 · 09",
+      "baseDescription": "双手轻扶头发或后脑，头部微仰，身体形成轻微后仰，适合黑色西装大片。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2109
+    },
+    {
+      "id": "DRAM-M-10",
+      "category": "K",
+      "title": "红毯大动作 · 男装 · 10",
+      "baseDescription": "侧身交叉腿站姿，一只手抬起轻触下颌，另一只手插袋，眼神冷艳克制。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2110
+    },
+    {
+      "id": "DRAM-M-11",
+      "category": "K",
+      "title": "红毯大动作 · 男装 · 11",
+      "baseDescription": "双脚前后错开，身体前倾与镜头互动，单手伸出指向镜头，另一只手叉腰，有压迫感。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2111
+    },
+    {
+      "id": "DRAM-M-12",
+      "category": "K",
+      "title": "红毯大动作 · 男装 · 12",
+      "baseDescription": "正面站立，双臂环抱胸前，肩线挺直，一只脚向前轻点，冷峻商务红毯感。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2112
+    },
+    {
+      "id": "DRAM-M-13",
+      "category": "D",
+      "title": "红毯大动作 · 男装 · 13",
+      "baseDescription": "半跪式俯身站姿，单膝微屈，另一条腿向前伸展，单手撑在膝盖上，抬头看镜头。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2113
+    },
+    {
+      "id": "DRAM-M-14",
+      "category": "C",
+      "title": "红毯大动作 · 男装 · 14",
+      "baseDescription": "大侧面站立，一只手高举过头形成弧线，另一只手插袋，腰部侧弯，形成强烈线条。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2114
+    },
+    {
+      "id": "DRAM-M-15",
+      "category": "L",
+      "title": "红毯大动作 · 男装 · 15",
+      "baseDescription": "正面张开双臂，手掌朝外，身体略微后仰，像在舞台中央谢幕，礼服下摆自然展开。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2115
+    },
+    {
+      "id": "DRAM-M-16",
+      "category": "B",
+      "title": "红毯大动作 · 男装 · 16",
+      "baseDescription": "侧身迈步定格，一只手撩起头发，另一只手轻扶西装下摆，腿部向前伸出。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2116
+    },
+    {
+      "id": "DRAM-M-17",
+      "category": "K",
+      "title": "红毯大动作 · 男装 · 17",
+      "baseDescription": "正面站立，双手整理西装外套边缘，身体微微下沉，完整展示礼服结构和鞋履。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2117
+    },
+    {
+      "id": "DRAM-M-18",
+      "category": "E",
+      "title": "红毯大动作 · 男装 · 18",
+      "baseDescription": "背对镜头，双手向后整理衣摆，头部侧转回眸，肩背线条利落，强调背影杀。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2118
+    },
+    {
+      "id": "DRAM-M-19",
+      "category": "L",
+      "title": "红毯大动作 · 男装 · 19",
+      "baseDescription": "正面站姿，单手高举整理披风或外套肩部，另一只手叉腰，披风呈展开状态。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2119
+    },
+    {
+      "id": "DRAM-M-20",
+      "category": "C",
+      "title": "红毯大动作 · 男装 · 20",
+      "baseDescription": "45° 斜侧站姿，身体重心后移，前腿伸直脚尖点地，双手轻叠在腰前，表情冷感。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2120
+    },
+    {
+      "id": "DRAM-M-21",
+      "category": "L",
+      "title": "红毯大动作 · 男装 · 21",
+      "baseDescription": "身体夸张倾斜，一只手撑在大腿侧，另一只手轻撩头发，镜头低角度，气场更强。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2121
+    },
+    {
+      "id": "DRAM-M-22",
+      "category": "K",
+      "title": "红毯大动作 · 男装 · 22",
+      "baseDescription": "双脚交叉站立，单手高举形成强势线条，另一只手插袋，适合黑色礼服大片。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2122
+    },
+    {
+      "id": "DRAM-M-23",
+      "category": "L",
+      "title": "红毯大动作 · 男装 · 23",
+      "baseDescription": "正面站立，一手轻捂胸口，一手向后甩开，身体微仰，像谢幕时的克制动作。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2123
+    },
+    {
+      "id": "DRAM-M-24",
+      "category": "K",
+      "title": "红毯大动作 · 男装 · 24",
+      "baseDescription": "侧身展开姿态，单手向外展开披风或外套面料，另一只手保持腰侧，舞台感强。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2124
+    },
+    {
+      "id": "DRAM-M-25",
+      "category": "L",
+      "title": "红毯大动作 · 男装 · 25",
+      "baseDescription": "低角度全身站姿，双脚分开，双手叉腰，下巴抬起，肩膀下压，典型男模定点。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2125
+    },
+    {
+      "id": "DRAM-M-26",
+      "category": "C",
+      "title": "红毯大动作 · 男装 · 26",
+      "baseDescription": "半侧身回望镜头，一只手轻扶耳饰或领口，另一只手插袋，姿态精致但有幅度。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2126
+    },
+    {
+      "id": "DRAM-M-27",
+      "category": "B",
+      "title": "红毯大动作 · 男装 · 27",
+      "baseDescription": "正面走动定格，双腿前后跨度较大，一只手自然甩动，另一只手轻扶西装边缘。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2127
+    },
+    {
+      "id": "DRAM-M-28",
+      "category": "L",
+      "title": "红毯大动作 · 男装 · 28",
+      "baseDescription": "双手大幅度展开外套下摆，身体微微转向一侧，头部仰起，像旋转后的静止瞬间。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2128
+    },
+    {
+      "id": "DRAM-M-29",
+      "category": "C",
+      "title": "红毯大动作 · 男装 · 29",
+      "baseDescription": "单腿交叉于另一腿前方，身体侧弯，单手从肩部划过胸前，另一只手自然下垂。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2129
+    },
+    {
+      "id": "DRAM-M-30",
+      "category": "K",
+      "title": "红毯大动作 · 男装 · 30",
+      "baseDescription": "正面女王感站姿，双脚稳定分开，双肩打开，一只手叉腰，另一只手轻抬至胸前，镜头前定格，礼服轮廓完整。",
+      "genders": [
+        "male"
+      ],
+      "sceneTags": [
+        "夸张",
+        "红毯",
+        "戏剧"
+      ],
+      "sortOrder": 2130
+    }
   ]
 }

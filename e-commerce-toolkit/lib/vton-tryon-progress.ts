@@ -47,3 +47,42 @@ export function vtonTryonProgressHeadline(progress: VtonTryonProgress | null): s
   const step = VTon_TRYON_PHASE_STEPS.find((s) => s.phase === progress.phase);
   return step?.label ?? "AI 试衣中…";
 }
+
+type BatchLabelInput = {
+  status: string;
+  currentIndex: number;
+  total: number;
+  label?: string;
+  updatedAt?: string;
+};
+
+/** 批量试衣结果区 / 步骤条：按套次序号展示，忽略单套「提交 AI 试衣任务…」 */
+export function formatVtonBatchTryonLabel(batch: BatchLabelInput): string {
+  if (batch.status === "running") {
+    if (batch.currentIndex > 0) {
+      return `试衣中 ${batch.currentIndex}/${batch.total}…`;
+    }
+    return batch.label?.trim() || "排队中…";
+  }
+  if (batch.label?.trim()) return batch.label.trim();
+  if (batch.status === "cancelled") return "已停止批量试衣";
+  if (batch.status === "done") return "批量试衣完成";
+  return "批量试衣结束";
+}
+
+/** 轮询 meta 时合并 batch 与 tryonProgress，修正历史脏 label */
+export function mergeVtonTryonProgressWithBatch(
+  progress: VtonTryonProgress | null,
+  batch: BatchLabelInput | null | undefined,
+): VtonTryonProgress | null {
+  if (!batch || batch.status !== "running") return progress;
+  const label = formatVtonBatchTryonLabel(batch);
+  const phase =
+    progress?.phase === "submitting" && batch.currentIndex > 0 ? "polling" : progress?.phase ?? "polling";
+  return {
+    phase,
+    label,
+    pollCount: progress?.pollCount,
+    updatedAt: batch.updatedAt ?? progress?.updatedAt ?? new Date().toISOString(),
+  };
+}

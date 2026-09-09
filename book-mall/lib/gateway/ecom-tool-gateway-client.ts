@@ -21,6 +21,7 @@ import {
   gatewayV1CreateTask,
   gatewayV1Image2ImageAsync,
   gatewayV1ImageOutPainting,
+  gatewayV1ImageParsing,
   gatewayV1QwenImageEdit,
   gatewayV1VolcengineImageGenerations,
 } from "@/lib/gateway/gateway-v1-http-client";
@@ -38,8 +39,11 @@ import {
 } from "@/lib/gateway/gateway-v1-ecom-async-job-service";
 import type { QwenImageEditParams } from "@/lib/gateway/qwen-image-edit-proxy";
 import {
+  AITRYON_PARSING_MODEL,
   dashscopeExtractTaskImageUrl,
   dashscopeExtractTaskVideoUrl,
+  type DashscopeClothesType,
+  type DashscopeParsingOutput,
   type DashscopeTaskOutput,
 } from "@/lib/gateway/dashscope-client";
 import { resolveEcomGatewayAuthForUser } from "@/lib/ecom/ecom-gateway-auth";
@@ -672,4 +676,42 @@ export async function ecomGwImage2ImageAsync(
       bookUserId,
     }),
   });
+}
+
+/** 电商 · 百炼 AI 试衣图片分割（同步，经 Gateway） */
+export async function ecomGwImageParsing(
+  bookUserId: string,
+  opts: {
+    imageUrl: string;
+    clothesType?: DashscopeClothesType[];
+    clientPage?: string;
+  },
+): Promise<{ output: DashscopeParsingOutput; logId: string }> {
+  const auth = await requireEcomGatewayAuth(bookUserId);
+  routeGatewayModel(AITRYON_PARSING_MODEL);
+  if (!pickCredentialForKind(auth.credentials, "DASHSCOPE")) {
+    throw new GatewayRequiredError("Gateway Key 未绑定 DashScope 凭证");
+  }
+
+  const clothesType = opts.clothesType?.length
+    ? opts.clothesType
+    : (["upper", "lower"] as DashscopeClothesType[]);
+
+  const result = await gatewayV1ImageParsing({
+    apiKeyId: auth.id,
+    body: {
+      imageUrl: opts.imageUrl,
+      clothesType,
+      model: AITRYON_PARSING_MODEL,
+    },
+    meta: gatewayV1ClientMeta("E_COMMERCE", {
+      clientPage: opts.clientPage,
+      bookUserId,
+    }),
+  });
+
+  return {
+    output: result.output as DashscopeParsingOutput,
+    logId: result.logId,
+  };
 }

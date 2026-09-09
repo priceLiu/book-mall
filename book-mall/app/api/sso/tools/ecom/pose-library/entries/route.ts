@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
+import {
+  normalizePoseGenders,
+  normalizePoseSceneTags,
+  type EcomPoseGender,
+} from "@/lib/ecom/ecom-pose-library-meta";
 import { createUserPoseEntry } from "@/lib/ecom/ecom-pose-library-service";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
@@ -22,10 +27,17 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
+    const genders = normalizePoseGenders(
+      Array.isArray(body.genders) ? (body.genders as EcomPoseGender[]) : ["unisex"],
+    );
+    const sceneTags = normalizePoseSceneTags(Array.isArray(body.sceneTags) ? body.sceneTags : []);
     const entry = await createUserPoseEntry(auth.userId, {
       category,
       title,
       baseDescription,
+      genders,
+      sceneTags,
+      tags: { genders, sceneTags },
     });
     return NextResponse.json({ entry });
   } catch (e) {

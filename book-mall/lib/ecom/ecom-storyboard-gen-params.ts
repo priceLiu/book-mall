@@ -73,9 +73,11 @@ export function resolveStoryboardWan27JobSize(opts: {
   wan26: boolean;
   refCount: number;
   wan27Size: string;
+  /** 有参考图时仍传竖向像素 size（如头像扩全身，避免 API 默认 2K 裁成半身） */
+  keepPixelSizeWithRefs?: boolean;
 }): string | undefined {
   if (opts.wan26) return resolveWan26ImageSize();
-  if (opts.refCount > 0) return undefined;
+  if (opts.refCount > 0 && !opts.keepPixelSizeWithRefs) return undefined;
   return opts.wan27Size;
 }
 
@@ -114,7 +116,18 @@ export function resolveEcomGeneratePixelSize(opts: {
   const raw = opts.imageSize?.trim();
   const aspectRatio: "16:9" | "9:16" =
     opts.ratio === "16:9" ? "16:9" : "9:16";
-  if (raw === "2K" || raw === "4K") return raw;
+  if (raw === "2K" || raw === "4K") {
+    if (/wan2\.[67]-image/i.test(opts.modelKey)) {
+      if (raw === "4K") {
+        return resolveWan27ImageSize({
+          aspectRatio,
+          imageSize: aspectRatio === "16:9" ? "2048*1152" : "1152*2048",
+        });
+      }
+      return resolveWan27ImageSize({ aspectRatio });
+    }
+    return raw;
+  }
   if (raw?.includes("*")) {
     if (/wan2\.[67]-image/i.test(opts.modelKey)) {
       return resolveWan27ImageSize({ aspectRatio, imageSize: raw });

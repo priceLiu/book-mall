@@ -19,17 +19,13 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    /* */
+    /* optional body */
   }
 
-  const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
-  const modelKey = typeof body.modelKey === "string" ? body.modelKey.trim() : undefined;
-  if (!prompt) {
-    return NextResponse.json({ error: "请填写 Prompt" }, { status: 400 });
-  }
+  const prompt = typeof body.prompt === "string" ? body.prompt.trim() : undefined;
 
   try {
-    const project = await generateEcomModelTryonModel(auth.userId, id, { prompt, modelKey });
+    const project = await generateEcomModelTryonModel(auth.userId, id, { prompt });
     return NextResponse.json({ project });
   } catch (e) {
     const { message, status } = formatEcomImageGenUserError(e);

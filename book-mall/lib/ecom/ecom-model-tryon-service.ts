@@ -1,6 +1,11 @@
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import {
+  assertVtonModelFullBodyForTryon,
+  detectVtonModelImageBody,
+  vtonModelImageCheckForAiGenerated,
+} from "@/lib/ecom/ecom-vton/model-body-detect";
 import { generateVtonModelImage } from "@/lib/ecom/ecom-vton/model-generate";
 import { expandVtonModelFullBody } from "@/lib/ecom/ecom-vton/model-full-body";
 import {
@@ -11,15 +16,35 @@ import {
   patchVtonGarmentPool,
   patchVtonLookDrafts,
   runVtonProjectBatchTryon,
+  cancelVtonProjectBatchTryon,
   setVtonDefaultLockedLook,
   unlockVtonLockedLook,
 } from "@/lib/ecom/ecom-vton-project-mutations";
 import {
   emptyVtonProjectMeta,
+  mergeVtonMeta,
   resolveDefaultLockedLookUrl,
   sanitizeVtonProjectMeta,
 } from "@/lib/ecom/ecom-vton/meta";
-import type { VtonGarmentItem, VtonLookSpec, VtonProjectMeta } from "@/lib/ecom/ecom-vton/types";
+import {
+  appendModelGeneration,
+  confirmModelGeneration,
+  ensureModelGenerationsFromRefs,
+  refsWithActiveModelGeneration,
+  removeModelGeneration,
+  resolveActiveModelGeneration,
+  resolvePreviewModelGeneration,
+  setActiveModelGeneration,
+  setPreviewModelGeneration,
+  unconfirmModelGeneration,
+} from "@/lib/ecom/ecom-vton/model-generations";
+import type {
+  VtonGarmentItem,
+  VtonLookSpec,
+  VtonModelGeneration,
+  VtonProjectMeta,
+} from "@/lib/ecom/ecom-vton/types";
+import { ECOM_VTON_MODEL_ASSET_MODULE } from "@/lib/ecom/ecom-vton/types";
 import {
   ECOM_MODEL_TRYON_MODULE,
   ECOM_MODEL_TRYON_TOOL_KEY,
@@ -60,15 +85,94 @@ function sanitizeSettings(raw: unknown): ModelTryonSettings {
   return {
     outfitRefMode: sanitizeOutfitRefMode(o.outfitRefMode),
     garmentMode: sanitizeGarmentMode(o.garmentMode),
-    imageModelKey:
-      typeof o.imageModelKey === "string" && o.imageModelKey.trim()
-        ? o.imageModelKey.trim()
-        : undefined,
-    fusionModelKey:
-      typeof o.fusionModelKey === "string" && o.fusionModelKey.trim()
-        ? o.fusionModelKey.trim()
-        : undefined,
   };
+}
+
+async function refreshModelImageCheck(
+  userId: string,
+  projectId: string,
+  ossUrl: string,
+): Promise<VtonProjectMeta["modelImageCheck"]> {
+  return detectVtonModelImageBody({
+    userId,
+    imageUrl: ossUrl,
+    projectId,
+    action: "model-tryon__model-body-detect",
+  });
+}
+
+function hydrateModelTryonDto(dto: ModelTryonProjectDto): ModelTryonProjectDto {
+  const meta = ensureModelGenerationsFromRefs(
+    sanitizeVtonProjectMeta(dto.meta),
+    dto.references,
+  );
+  return {
+    ...dto,
+    meta,
+    references: refsWithActiveModelGeneration(dto.references, meta),
+  };
+}
+
+async function persistNewModelGeneration(
+  userId: string,
+  projectId: string,
+  project: ModelTryonProjectDto,
+  entry: {
+    ossUrl: string;
+    label?: string;
+    source?: NonNullable<WorkflowRefs["model"]>["source"];
+    modelImageCheck?: VtonProjectMeta["modelImageCheck"];
+  },
+): Promise<ModelTryonProjectDto> {
+  let meta = ensureModelGenerationsFromRefs(
+    sanitizeVtonProjectMeta(project.meta),
+    project.references,
+  );
+  const appended = appendModelGeneration(meta, {
+    ossUrl: entry.ossUrl,
+    label: entry.label,
+    source: entry.source,
+  });
+  meta = appended.meta;
+
+  let modelImageCheck = entry.modelImageCheck;
+  if (modelImageCheck === undefined) {
+    try {
+      modelImageCheck = await refreshModelImageCheck(userId, projectId, entry.ossUrl);
+    } catch {
+      modelImageCheck = null;
+    }
+  }
+
+  meta = mergeVtonMeta(meta, { modelImageCheck, tryonProgress: null });
+  const references = refsWithActiveModelGeneration(project.references, meta);
+
+  return updateEcomModelTryonProject(userId, projectId, { references, meta });
+}
+
+async function attachModelWithBodyCheck(
+  userId: string,
+  projectId: string,
+  project: ModelTryonProjectDto,
+  patch: Partial<WorkflowRefs>,
+): Promise<ModelTryonProjectDto> {
+  const model = patch.model;
+  const ossUrl = model?.ossUrl?.trim();
+  if (!ossUrl) {
+    return updateEcomModelTryonProject(userId, projectId, {
+      references: { ...project.references, ...patch },
+      meta: mergeVtonMeta(sanitizeVtonProjectMeta(project.meta), {
+        tryonProgress: null,
+        modelImageCheck: null,
+      }),
+    });
+  }
+
+  return persistNewModelGeneration(userId, projectId, project, {
+    ossUrl,
+    label: model?.label,
+    source: model?.source,
+  });
 }
 
 function sanitizeRefImageEntry(
@@ -116,7 +220,7 @@ function rowToDto(row: {
   createdAt: Date;
   updatedAt: Date;
 }): ModelTryonProjectDto {
-  return {
+  return hydrateModelTryonDto({
     id: row.id,
     title: row.title,
     module: row.module,
@@ -128,7 +232,7 @@ function rowToDto(row: {
     meta: sanitizeMeta(row.meta),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-  };
+  });
 }
 
 async function getOwnedRow(userId: string, projectId: string) {
@@ -225,6 +329,10 @@ export async function attachEcomModelTryonRefs(
   const project = await getEcomModelTryonProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
 
+  if (patch.model !== undefined) {
+    return attachModelWithBodyCheck(userId, projectId, project, patch);
+  }
+
   const refs: WorkflowRefs = {
     ...project.references,
     ...patch,
@@ -262,70 +370,74 @@ export async function uploadEcomModelTryonRefImage(
     bottomGarment: "下装",
   };
 
-  return attachEcomModelTryonRefs(userId, projectId, {
+  const patch: Partial<WorkflowRefs> = {
     [role]: {
       ossUrl: uploaded.ossUrl,
       source: "upload",
       label: labelByRole[role],
     },
-  });
+  };
+
+  if (role === "model") {
+    const project = await getEcomModelTryonProject(userId, projectId);
+    if (!project) throw new Error("项目不存在");
+    return attachModelWithBodyCheck(userId, projectId, project, patch);
+  }
+
+  return attachEcomModelTryonRefs(userId, projectId, patch);
 }
 
 export async function generateEcomModelTryonModel(
   userId: string,
   projectId: string,
-  opts: { prompt: string; modelKey?: string },
+  opts?: { prompt?: string },
 ): Promise<ModelTryonProjectDto> {
   const project = await getEcomModelTryonProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
 
   const ossUrl = await generateVtonModelImage({
     userId,
-    prompt: opts.prompt,
-    modelKey: opts.modelKey ?? project.settings.imageModelKey,
+    prompt: opts?.prompt,
     toolKeySuffix: "model-tryon__model-generate",
   });
 
-  const refs = sanitizeRefs(project.references);
-  delete refs.dressedImage;
-
-  return updateEcomModelTryonProject(userId, projectId, {
-    references: {
-      ...refs,
-      model: { ossUrl, source: "ai-generate", label: "AI 生模特" },
-    },
-    meta: { ...(project.meta ?? {}), tryonProgress: null },
+  return persistNewModelGeneration(userId, projectId, project, {
+    ossUrl,
+    label: "AI 全身模特",
+    source: "ai-generate",
+    modelImageCheck: vtonModelImageCheckForAiGenerated(ossUrl),
   });
 }
 
 export async function expandEcomModelTryonModelFullBody(
   userId: string,
   projectId: string,
-  opts?: { prompt?: string; modelKey?: string },
+  opts?: { prompt?: string },
 ): Promise<ModelTryonProjectDto> {
   const project = await getEcomModelTryonProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
 
-  const portraitUrl = project.references.model?.ossUrl?.trim();
+  let meta = ensureModelGenerationsFromRefs(
+    sanitizeVtonProjectMeta(project.meta),
+    project.references,
+  );
+  const preview = resolvePreviewModelGeneration(meta);
+  const portraitUrl =
+    preview?.ossUrl?.trim() ?? project.references.model?.ossUrl?.trim();
   if (!portraitUrl) throw new Error("请先上传或选择模特图");
 
   const ossUrl = await expandVtonModelFullBody({
     userId,
     portraitUrl,
     prompt: opts?.prompt,
-    modelKey: opts?.modelKey ?? project.settings.fusionModelKey,
     toolKeySuffix: "model-tryon__expand-full-body",
   });
 
-  const refs = sanitizeRefs(project.references);
-  delete refs.dressedImage;
-
-  return updateEcomModelTryonProject(userId, projectId, {
-    references: {
-      ...refs,
-      model: { ossUrl, source: "ai-generate", label: "全身模特" },
-    },
-    meta: { ...(project.meta ?? {}), tryonProgress: null },
+  return persistNewModelGeneration(userId, projectId, project, {
+    ossUrl,
+    label: "AI 全身模特",
+    source: "ai-generate",
+    modelImageCheck: vtonModelImageCheckForAiGenerated(ossUrl),
   });
 }
 
@@ -425,6 +537,14 @@ export async function runEcomModelTryonBatch(
   const modelUrl = project.references.model?.ossUrl?.trim();
   if (!modelUrl) throw new Error("请先上传或选择模特全身照");
 
+  const metaSnapshot = sanitizeVtonProjectMeta(project.meta);
+  let bodyCheck = metaSnapshot.modelImageCheck;
+  if (!bodyCheck || bodyCheck.ossUrl !== modelUrl) {
+    bodyCheck = await refreshModelImageCheck(userId, projectId, modelUrl);
+    await persistModelTryonMeta(userId, projectId, mergeVtonMeta(metaSnapshot, { modelImageCheck: bodyCheck }));
+  }
+  assertVtonModelFullBodyForTryon(bodyCheck);
+
   const meta = await runVtonProjectBatchTryon({
     userId,
     projectId,
@@ -434,6 +554,10 @@ export async function runEcomModelTryonBatch(
     looks: opts?.looks,
     persistMeta: async (m) => {
       await persistModelTryonMeta(userId, projectId, m);
+    },
+    loadMeta: async () => {
+      const latest = await getEcomModelTryonProject(userId, projectId);
+      return sanitizeVtonProjectMeta(latest?.meta);
     },
   });
 
@@ -453,6 +577,16 @@ export async function runEcomModelTryonBatch(
     : latest.references;
 
   return updateEcomModelTryonProject(userId, projectId, { meta, references: refs });
+}
+
+export async function cancelEcomModelTryonBatch(
+  userId: string,
+  projectId: string,
+): Promise<ModelTryonProjectDto> {
+  const project = await getEcomModelTryonProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  const meta = cancelVtonProjectBatchTryon(project.meta);
+  return updateEcomModelTryonProject(userId, projectId, { meta });
 }
 
 export async function lockEcomModelTryonResults(
@@ -506,18 +640,236 @@ export async function runEcomModelTryonPreview(
   return runEcomModelTryonBatch(userId, projectId, { looks });
 }
 
+async function refreshModelImageCheckForGeneration(
+  userId: string,
+  projectId: string,
+  generation: VtonModelGeneration,
+  existing?: VtonProjectMeta["modelImageCheck"],
+): Promise<VtonProjectMeta["modelImageCheck"]> {
+  if (generation.source === "ai-generate") {
+    return vtonModelImageCheckForAiGenerated(generation.ossUrl);
+  }
+  if (existing?.ossUrl === generation.ossUrl) return existing;
+  try {
+    return await refreshModelImageCheck(userId, projectId, generation.ossUrl);
+  } catch {
+    return existing ?? null;
+  }
+}
+
+async function assertGenerationConfirmable(
+  userId: string,
+  projectId: string,
+  generation: VtonModelGeneration,
+  existing?: VtonProjectMeta["modelImageCheck"],
+): Promise<VtonProjectMeta["modelImageCheck"]> {
+  const check = await refreshModelImageCheckForGeneration(
+    userId,
+    projectId,
+    generation,
+    existing,
+  );
+  if (!check?.isFullBody) {
+    throw new Error("该图为头像/半身或未识别为全身，请先「头像生成全身图」或换全身照后再确认试衣。");
+  }
+  return check;
+}
+
+async function syncActiveModelTryonGeneration(
+  userId: string,
+  projectId: string,
+  project: ModelTryonProjectDto,
+  meta: VtonProjectMeta,
+): Promise<ModelTryonProjectDto> {
+  const active = resolveActiveModelGeneration(meta);
+  if (!active) throw new Error("未找到试衣模特");
+
+  const modelImageCheck = await refreshModelImageCheckForGeneration(
+    userId,
+    projectId,
+    active,
+    meta.modelImageCheck ?? undefined,
+  );
+
+  meta = mergeVtonMeta(meta, { modelImageCheck, tryonProgress: null });
+  const references = refsWithActiveModelGeneration(project.references, meta);
+  return updateEcomModelTryonProject(userId, projectId, { references, meta });
+}
+
+export async function setPreviewEcomModelTryonGeneration(
+  userId: string,
+  projectId: string,
+  generationId: string,
+): Promise<ModelTryonProjectDto> {
+  const project = await getEcomModelTryonProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+
+  let meta = ensureModelGenerationsFromRefs(
+    sanitizeVtonProjectMeta(project.meta),
+    project.references,
+  );
+  meta = setPreviewModelGeneration(meta, generationId);
+
+  const preview = resolvePreviewModelGeneration(meta);
+  if (!preview) throw new Error("未找到该模特版本");
+
+  let modelImageCheck = meta.modelImageCheck ?? null;
+  if (preview.ossUrl !== modelImageCheck?.ossUrl) {
+    try {
+      modelImageCheck = await refreshModelImageCheckForGeneration(
+        userId,
+        projectId,
+        preview,
+        modelImageCheck ?? undefined,
+      );
+    } catch {
+      modelImageCheck = null;
+    }
+  }
+
+  meta = mergeVtonMeta(meta, { modelImageCheck });
+  return updateEcomModelTryonProject(userId, projectId, { meta });
+}
+
+export async function confirmEcomModelTryonGeneration(
+  userId: string,
+  projectId: string,
+  generationId: string,
+): Promise<ModelTryonProjectDto> {
+  const project = await getEcomModelTryonProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+
+  let meta = ensureModelGenerationsFromRefs(
+    sanitizeVtonProjectMeta(project.meta),
+    project.references,
+  );
+  const generation = (meta.modelGenerations ?? []).find((g) => g.id === generationId.trim());
+  if (!generation) throw new Error("未找到该模特版本");
+
+  const modelImageCheck = await assertGenerationConfirmable(
+    userId,
+    projectId,
+    generation,
+    meta.modelImageCheck ?? undefined,
+  );
+  meta = confirmModelGeneration(meta, generationId);
+  meta = mergeVtonMeta(meta, { modelImageCheck, tryonProgress: null });
+
+  return syncActiveModelTryonGeneration(userId, projectId, project, meta);
+}
+
+export async function unconfirmEcomModelTryonGeneration(
+  userId: string,
+  projectId: string,
+  generationId: string,
+): Promise<ModelTryonProjectDto> {
+  const project = await getEcomModelTryonProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+
+  let meta = ensureModelGenerationsFromRefs(
+    sanitizeVtonProjectMeta(project.meta),
+    project.references,
+  );
+  meta = unconfirmModelGeneration(meta, generationId);
+
+  const active = resolveActiveModelGeneration(meta);
+  if (!active) {
+    meta = mergeVtonMeta(meta, { tryonProgress: null });
+    return updateEcomModelTryonProject(userId, projectId, {
+      meta,
+      references: { ...project.references, model: undefined },
+    });
+  }
+
+  return syncActiveModelTryonGeneration(userId, projectId, project, meta);
+}
+
+export async function setActiveEcomModelTryonGeneration(
+  userId: string,
+  projectId: string,
+  generationId: string,
+): Promise<ModelTryonProjectDto> {
+  const project = await getEcomModelTryonProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+
+  let meta = ensureModelGenerationsFromRefs(
+    sanitizeVtonProjectMeta(project.meta),
+    project.references,
+  );
+  meta = setActiveModelGeneration(meta, generationId);
+  return syncActiveModelTryonGeneration(userId, projectId, project, meta);
+}
+
+export async function saveEcomModelTryonModelImage(
+  userId: string,
+  opts: { ossUrl: string; title?: string },
+): Promise<{ assetId: string }> {
+  const url = opts.ossUrl?.trim();
+  if (!url) throw new Error("缺少模特图地址");
+
+  const title = opts.title?.trim() || "模特全身照";
+
+  const asset = await prisma.ecomAsset.create({
+    data: {
+      userId,
+      module: ECOM_VTON_MODEL_ASSET_MODULE,
+      kind: "image",
+      title: title.slice(0, 120),
+      ossUrl: url,
+      thumbnailUrl: url,
+      meta: { libraryRole: "my-model" as const },
+    },
+  });
+
+  return { assetId: asset.id };
+}
+
+export async function removeEcomModelTryonGeneration(
+  userId: string,
+  projectId: string,
+  generationId: string,
+): Promise<ModelTryonProjectDto> {
+  const project = await getEcomModelTryonProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+
+  let meta = ensureModelGenerationsFromRefs(
+    sanitizeVtonProjectMeta(project.meta),
+    project.references,
+  );
+  meta = removeModelGeneration(meta, generationId);
+
+  const active = resolveActiveModelGeneration(meta);
+  let modelImageCheck: VtonProjectMeta["modelImageCheck"] = null;
+  if (active?.ossUrl) {
+    try {
+      modelImageCheck = await refreshModelImageCheck(userId, projectId, active.ossUrl);
+    } catch {
+      modelImageCheck = null;
+    }
+  }
+
+  meta = mergeVtonMeta(meta, { modelImageCheck, tryonProgress: null });
+  const references = refsWithActiveModelGeneration(project.references, meta);
+  if (!active) {
+    delete references.model;
+  }
+
+  return updateEcomModelTryonProject(userId, projectId, { references, meta });
+}
+
 export async function saveEcomModelTryonResultToAssets(
   userId: string,
   projectId: string,
-  opts?: { title?: string },
+  opts?: { title?: string; ossUrl?: string },
 ): Promise<{ assetId: string }> {
   const project = await getEcomModelTryonProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
 
   const url =
-    resolveDefaultLockedLookUrl(sanitizeVtonProjectMeta(project.meta)) ??
+    opts?.ossUrl?.trim() ||
+    resolveDefaultLockedLookUrl(sanitizeVtonProjectMeta(project.meta)) ||
     project.references.dressedImage?.ossUrl?.trim();
-  if (!url) throw new Error("请先完成 AI 试衣并锁定参考");
+  if (!url) throw new Error("请先完成 AI 试衣");
 
   const kind = inferKindFromOssUrl(url);
   const title =

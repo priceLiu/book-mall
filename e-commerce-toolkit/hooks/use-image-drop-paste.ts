@@ -12,6 +12,9 @@ import {
   type ImageUploadError,
 } from "@/lib/image-upload-utils";
 
+/** 多热区并存时，仅最后激活的热区响应粘贴（避免模特区 focus 未释放时误粘贴） */
+let lastActiveImageUploadZone: symbol | null = null;
+
 type Options = {
   enabled?: boolean;
   multiple?: boolean;
@@ -36,12 +39,17 @@ export function useImageDropPaste({
   onError,
 }: Options) {
   const zoneRef = useRef<HTMLDivElement>(null);
+  const zoneId = useRef(Symbol("image-upload-zone")).current;
   const onFilesRef = useRef(onFiles);
   onFilesRef.current = onFiles;
 
   const [dragOver, setDragOver] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
+
+  const activateZone = useCallback(() => {
+    lastActiveImageUploadZone = zoneId;
+  }, [zoneId]);
 
   const ingestFiles = useCallback(
     async (raw: File[], via?: "paste" | "drop") => {
@@ -67,13 +75,14 @@ export function useImageDropPaste({
   );
 
   const isPasteTargetActive = useCallback(() => {
+    if (lastActiveImageUploadZone !== zoneId) return false;
     const zone = zoneRef.current;
     if (!zone) return false;
     const active = document.activeElement;
     return (
       hovered || focused || (active != null && zone.contains(active as Node))
     );
-  }, [hovered, focused]);
+  }, [focused, hovered, zoneId]);
 
   useEffect(() => {
     if (!enabled || !listenPaste) return;
@@ -98,14 +107,24 @@ export function useImageDropPaste({
     return () => document.removeEventListener("paste", onPaste);
   }, [allowVideo, enabled, ingestFiles, isPasteTargetActive, listenPaste, multiple]);
 
+  const onDragEnter = useCallback(
+    (e: DragEvent) => {
+      if (!enabled) return;
+      e.preventDefault();
+      activateZone();
+    },
+    [activateZone, enabled],
+  );
+
   const onDragOver = useCallback(
     (e: DragEvent) => {
       if (!enabled) return;
       e.preventDefault();
       e.stopPropagation();
+      activateZone();
       setDragOver(true);
     },
-    [enabled],
+    [activateZone, enabled],
   );
 
   const onDragLeave = useCallback((e: DragEvent) => {
@@ -120,15 +139,17 @@ export function useImageDropPaste({
       if (!enabled) return;
       e.preventDefault();
       e.stopPropagation();
+      activateZone();
       setDragOver(false);
       void ingestFiles(extractMediaFilesFromDataTransfer(e.dataTransfer, { allowVideo }), "drop");
     },
-    [allowVideo, enabled, ingestFiles],
+    [activateZone, allowVideo, enabled, ingestFiles],
   );
 
   const focusZone = useCallback(() => {
+    activateZone();
     zoneRef.current?.focus({ preventScroll: true });
-  }, []);
+  }, [activateZone]);
 
   return {
     zoneRef,
@@ -138,9 +159,16 @@ export function useImageDropPaste({
     dropZoneProps: {
       ref: zoneRef,
       tabIndex: enabled ? 0 : undefined,
-      onMouseEnter: () => setHovered(true),
+      onMouseEnter: () => {
+        activateZone();
+        setHovered(true);
+      },
       onMouseLeave: () => setHovered(false),
-      onFocus: () => setFocused(true),
+      onFocus: () => {
+        activateZone();
+        setFocused(true);
+      },
+      onDragEnter,
       onBlur: (e: FocusEvent<HTMLDivElement>) => {
         if (!zoneRef.current?.contains(e.relatedTarget as Node)) {
           setFocused(false);

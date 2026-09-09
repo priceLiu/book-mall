@@ -1,12 +1,23 @@
 import { randomUUID } from "crypto";
 
+import {
+  finalizeCancelledVtonBatch,
+  isVtonTryonCancelledError,
+  VtonTryonCancelledError,
+} from "@/lib/ecom/ecom-vton/cancel";
+import type { VtonGarmentParseCache } from "@/lib/ecom/ecom-vton/garment-parsing";
 import { runEcomVtonTryOn } from "@/lib/ecom/ecom-vton/tryon";
 import type {
   VtonGarmentItem,
   VtonLookSpec,
   VtonTryonBatchState,
+  VtonTryonProgress,
   VtonTryonResult,
 } from "@/lib/ecom/ecom-vton/types";
+import {
+  appendVtonTryonResultVersion,
+  normalizeVtonTryonResultVersions,
+} from "@/lib/ecom/ecom-vton/tryon-result-versions";
 import {
   assertLooksResolvable,
   resolveLookTryonUrls,
@@ -15,7 +26,108 @@ import {
 export type VtonBatchTryonProgress = {
   batch: VtonTryonBatchState;
   result?: VtonTryonResult;
+  /** 当前套次单任务进度（仅用于步骤条 phase，勿覆盖 batch.label） */
+  itemProgress?: VtonTryonProgress;
 };
+
+/** 批量试衣对外文案：始终按套次序号，不采纳单套「提交 AI 试衣任务…」等 */
+export function formatVtonBatchTryonLabel(batch: VtonTryonBatchState): string {
+  if (batch.status === "running") {
+    if (batch.currentIndex > 0) {
+      return `试衣中 ${batch.currentIndex}/${batch.total}…`;
+    }
+    return batch.label?.trim() || "排队中…";
+  }
+  if (batch.label?.trim()) return batch.label.trim();
+  if (batch.status === "cancelled") return "已停止批量试衣";
+  if (batch.status === "done") return "批量试衣完成";
+  return "批量试衣结束";
+}
+
+/** 部分重跑：保留未选中套的已有结果，选中套重置为 pending */
+export function buildVtonBatchResultsForRun(opts: {
+  allLooks: VtonLookSpec[];
+  targetLooks: VtonLookSpec[];
+  previousResults?: VtonTryonResult[];
+}): VtonTryonResult[] {
+  const targetIds = new Set(opts.targetLooks.map((l) => l.id));
+  const now = new Date().toISOString();
+  return opts.allLooks.map((look) => {
+    if (targetIds.has(look.id)) {
+      const kept = opts.previousResults?.find((r) => r.lookId === look.id);
+      const versions = kept ? normalizeVtonTryonResultVersions(kept) : [];
+      const lastUrl = versions.length > 0 ? versions[versions.length - 1]!.ossUrl : undefined;
+      return {
+        id: randomUUID(),
+        lookId: look.id,
+        status: "pending",
+        createdAt: now,
+        versions: versions.length > 0 ? versions : undefined,
+        activeVersionIndex: versions.length > 0 ? versions.length - 1 : undefined,
+        ossUrl: lastUrl,
+      };
+    }
+    const kept = opts.previousResults?.find((r) => r.lookId === look.id);
+    if (kept) return kept;
+    return {
+      id: randomUUID(),
+      lookId: look.id,
+      status: "pending",
+      createdAt: now,
+    };
+  });
+}
+
+function seedResultForLookRun(
+  look: VtonLookSpec,
+  initial?: VtonTryonResult,
+): VtonTryonResult {
+  const now = new Date().toISOString();
+  if (!initial) {
+    return {
+      id: randomUUID(),
+      lookId: look.id,
+      status: "pending",
+      createdAt: now,
+    };
+  }
+
+  const versions = normalizeVtonTryonResultVersions(initial);
+  const lastUrl = versions.length > 0 ? versions[versions.length - 1]!.ossUrl : initial.ossUrl;
+  return {
+    id: initial.id || randomUUID(),
+    lookId: look.id,
+    status: "pending",
+    createdAt: now,
+    versions: versions.length > 0 ? [...versions] : undefined,
+    activeVersionIndex: versions.length > 0 ? versions.length - 1 : undefined,
+    ossUrl: lastUrl,
+  };
+}
+
+export function mergeVtonBatchRunIntoResults(
+  merged: VtonTryonResult[],
+  runResults: VtonTryonResult[],
+): VtonTryonResult[] {
+  const next = [...merged];
+  for (const r of runResults) {
+    const idx = next.findIndex((x) => x.lookId === r.lookId);
+    if (idx >= 0) next[idx] = r;
+    else next.push(r);
+  }
+  return next;
+}
+
+export function resolveVtonBatchTryonProgressPhase(
+  batch: VtonTryonBatchState,
+  itemProgress?: VtonTryonProgress,
+): VtonTryonProgress["phase"] {
+  if (batch.status === "done") return "done";
+  if (batch.status === "cancelled" || batch.status === "failed") return "failed";
+  if (itemProgress?.phase === "persisting") return "persisting";
+  if (itemProgress?.phase === "submitting") return "submitting";
+  return "polling";
+}
 
 export async function runEcomVtonTryOnBatch(opts: {
   userId: string;
@@ -24,17 +136,18 @@ export async function runEcomVtonTryOnBatch(opts: {
   modelUrl: string;
   looks: VtonLookSpec[];
   garmentPool: VtonGarmentItem[];
+  /** 重跑时传入，保留已有 versions 供 appendVtonTryonResultVersion 追加 */
+  initialResults?: VtonTryonResult[];
+  shouldCancel?: () => boolean | Promise<boolean>;
   onProgress?: (progress: VtonBatchTryonProgress) => void | Promise<void>;
 }): Promise<VtonTryonBatchState> {
   assertLooksResolvable(opts.looks, opts.garmentPool, opts.modelUrl);
 
   const batchId = randomUUID();
-  const results: VtonTryonResult[] = opts.looks.map((look) => ({
-    id: randomUUID(),
-    lookId: look.id,
-    status: "pending",
-    createdAt: new Date().toISOString(),
-  }));
+  const results: VtonTryonResult[] = opts.looks.map((look) => {
+    const initial = opts.initialResults?.find((r) => r.lookId === look.id);
+    return seedResultForLookRun(look, initial);
+  });
 
   const batch: VtonTryonBatchState = {
     batchId,
@@ -48,7 +161,15 @@ export async function runEcomVtonTryOnBatch(opts: {
 
   await opts.onProgress?.({ batch });
 
+  const garmentParseCache: VtonGarmentParseCache = new Map();
+
   for (let i = 0; i < opts.looks.length; i++) {
+    if (await opts.shouldCancel?.()) {
+      finalizeCancelledVtonBatch(batch);
+      await opts.onProgress?.({ batch });
+      return batch;
+    }
+
     const look = opts.looks[i]!;
     const result = results[i]!;
     result.status = "running";
@@ -71,16 +192,26 @@ export async function runEcomVtonTryOnBatch(opts: {
         lookKind: urls.lookKind,
         topGarmentUrl: urls.topGarmentUrl,
         bottomGarmentUrl: urls.bottomGarmentUrl,
+        garmentParseCache,
+        shouldCancel: opts.shouldCancel,
         onProgress: async (p) => {
-          batch.label = p.label || batch.label;
           batch.updatedAt = new Date().toISOString();
-          await opts.onProgress?.({ batch, result });
+          await opts.onProgress?.({ batch, result, itemProgress: p });
         },
       });
       result.status = "success";
-      result.ossUrl = ossUrl;
+      appendVtonTryonResultVersion(result, ossUrl);
       result.failReason = undefined;
     } catch (e) {
+      if (isVtonTryonCancelledError(e)) {
+        result.status = "cancelled";
+        result.failReason = "已停止";
+        result.createdAt = new Date().toISOString();
+        finalizeCancelledVtonBatch(batch);
+        batch.updatedAt = new Date().toISOString();
+        await opts.onProgress?.({ batch, result });
+        return batch;
+      }
       result.status = "failed";
       result.failReason = e instanceof Error ? e.message : "试衣失败";
     }
@@ -99,3 +230,5 @@ export async function runEcomVtonTryOnBatch(opts: {
 
   return batch;
 }
+
+export { VtonTryonCancelledError };

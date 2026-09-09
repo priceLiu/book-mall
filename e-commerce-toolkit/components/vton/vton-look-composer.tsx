@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Check, Plus, Trash2 } from "lucide-react";
 
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomRefImageThumb } from "@/components/media/ecom-ref-image-thumb";
@@ -18,6 +18,10 @@ import { cn } from "@/lib/utils";
 type Props = {
   looks: VtonLookSpec[];
   pool: VtonGarmentItem[];
+  selectedLookIds: string[];
+  onToggleLookSelection: (lookId: string) => void;
+  onSelectAllLooks: () => void;
+  onClearLookSelection: () => void;
   busy?: boolean;
   disabled?: boolean;
   onChange: (looks: VtonLookSpec[]) => Promise<void>;
@@ -210,11 +214,17 @@ function cycleGarmentId(currentId: string | undefined, options: VtonGarmentItem[
 export function VtonLookComposer({
   looks,
   pool,
+  selectedLookIds,
+  onToggleLookSelection,
+  onSelectAllLooks,
+  onClearLookSelection,
   busy,
   disabled,
   onChange,
   onCartesian,
 }: Props) {
+  const selectedSet = new Set(selectedLookIds);
+  const allSelected = looks.length > 0 && looks.every((l) => selectedSet.has(l.id));
   const tops = pool.filter((g) => g.kind === "top");
   const bottoms = pool.filter((g) => g.kind === "bottom");
   const lastAutoFixRef = useRef<string>("");
@@ -279,6 +289,31 @@ export function VtonLookComposer({
           <h3 className="text-xs font-semibold text-[#1d1d1f]">搭配编排</h3>
           <p className="text-[11px] text-[#6e6e73]">
             已添加 {looks.length}/{ECOM_VTON_MAX_BATCH_LOOKS} 套
+            {looks.length > 0 ? (
+              <>
+                {" · "}
+                已选 {selectedLookIds.length} 套
+                {!allSelected ? (
+                  <button
+                    type="button"
+                    className="ml-1 text-[#0071e3] hover:underline disabled:opacity-50"
+                    disabled={busy || disabled}
+                    onClick={onSelectAllLooks}
+                  >
+                    全选
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="ml-1 text-[#0071e3] hover:underline disabled:opacity-50"
+                    disabled={busy || disabled}
+                    onClick={onClearLookSelection}
+                  >
+                    清空
+                  </button>
+                )}
+              </>
+            ) : null}
           </p>
         </div>
         <div className="flex flex-wrap gap-1">
@@ -311,8 +346,29 @@ export function VtonLookComposer({
         {looks.map((look, idx) => (
           <div
             key={look.id}
-            className="flex flex-wrap items-center gap-3 rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5"
+            className={cn(
+              "flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2.5",
+              selectedSet.has(look.id)
+                ? "border-[#0071e3]/40 bg-[#f0f6ff]"
+                : "border-[#e8e8ed] bg-[#fafafa]",
+            )}
           >
+            <button
+              type="button"
+              className={cn(
+                "flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors",
+                selectedSet.has(look.id)
+                  ? "border-[#0071e3] bg-[#0071e3] text-white"
+                  : "border-[#c7c7cc] bg-white text-transparent hover:border-[#0071e3]",
+                (busy || disabled) && "pointer-events-none opacity-40",
+              )}
+              disabled={busy || disabled}
+              aria-label={selectedSet.has(look.id) ? "取消选择搭配" : "选择搭配"}
+              aria-pressed={selectedSet.has(look.id)}
+              onClick={() => onToggleLookSelection(look.id)}
+            >
+              <Check className="h-3 w-3" strokeWidth={3} />
+            </button>
             <span className="text-[11px] font-medium text-[#6e6e73]">#{idx + 1}</span>
             <select
               className="rounded border border-[#e8e8ed] bg-white px-2 py-1 text-[11px]"

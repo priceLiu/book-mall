@@ -3,7 +3,18 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, Copy, ExternalLink, Layers, RotateCcw, ScrollText, Sparkles } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  ExternalLink,
+  Layers,
+  RotateCcw,
+  ScrollText,
+  Shirt,
+  Sparkles,
+  UserRound,
+} from "lucide-react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
@@ -780,8 +791,38 @@ export default function LibraryPage() {
               </div>
             </div>
             <Link
-              href="/ecom/shoot-catalog"
+              href="/library/tryon"
               className="mt-4 flex items-center gap-3 rounded-xl border border-[#e8e8ed] bg-[#fafafa] px-4 py-3 transition hover:border-[#0071e3]/30 hover:bg-[#f0f6ff]"
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#0071e3] shadow-sm">
+                <Shirt className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-[#1d1d1f]">试衣库</span>
+                <span className="mt-0.5 block text-xs text-[#6e6e73]">
+                  电商模特试衣保存的成片；与工具站试衣间独立
+                </span>
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-[#86868b]" />
+            </Link>
+            <Link
+              href="/library/models"
+              className="mt-3 flex items-center gap-3 rounded-xl border border-[#e8e8ed] bg-[#fafafa] px-4 py-3 transition hover:border-[#0071e3]/30 hover:bg-[#f0f6ff]"
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#0071e3] shadow-sm">
+                <UserRound className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-[#1d1d1f]">我的模特</span>
+                <span className="mt-0.5 block text-xs text-[#6e6e73]">
+                  模特试衣保存的 AI / 上传全身模特图
+                </span>
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-[#86868b]" />
+            </Link>
+            <Link
+              href="/ecom/shoot-catalog"
+              className="mt-3 flex items-center gap-3 rounded-xl border border-[#e8e8ed] bg-[#fafafa] px-4 py-3 transition hover:border-[#0071e3]/30 hover:bg-[#f0f6ff]"
             >
               <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#0071e3] shadow-sm">
                 <Sparkles className="size-4" />

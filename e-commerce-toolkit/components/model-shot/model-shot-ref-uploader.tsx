@@ -368,7 +368,7 @@ export function ModelShotRefUploader({
                 inputRef={(el) => {
                   inputRefs.current[role] = el;
                 }}
-                toolbarPrefix={
+                headerActions={
                   <>
                     {refRole === "model" && onAttachModelFromLibrary ? (
                       <EcomButtonSecondary

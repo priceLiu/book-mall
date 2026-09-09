@@ -7,6 +7,13 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { BackgroundGenerationProvider, useBackgroundGeneration } from "@/components/generation";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { OutfitVideoWorkspace } from "@/components/outfit-video/outfit-video-workspace";
+import type { VtonBatchTryonMode } from "@/components/vton/vton-results-grid";
+import {
+  isEcomTransportDisconnectError,
+  runVtonBatchTryonWithPoll,
+  vtonBatchTryonFailureMessage,
+} from "@/lib/vton-batch-tryon-run";
+import { useVtonLookSelectionSync } from "@/lib/vton-look-selection";
 import { EcomVideoPreviewDialog } from "@/components/media/ecom-video-preview-dialog";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
@@ -21,6 +28,7 @@ import {
   fuseOutfitShotScene,
   expandOutfitModelFullBody,
   batchOutfitTryon,
+  cancelOutfitTryonBatch,
   lockOutfitTryonResults,
   patchOutfitGarments,
   patchOutfitLooks,
@@ -72,7 +80,7 @@ import {
   formatOutfitSplitPromptValidationError,
   validateOutfitSplitPrompts,
 } from "@/lib/outfit-video-split-prompt-validate";
-import { parseVtonTryonProgress } from "@/lib/vton-tryon-progress";
+import { mergeVtonTryonProgressWithBatch, parseVtonTryonProgress } from "@/lib/vton-tryon-progress";
 import type { VtonGarmentKind, VtonLookSpec } from "@/lib/vton-types";
 import {
   inferOutfitPhase,
@@ -126,9 +134,15 @@ function OutfitVideoStudioInner() {
   /** 点击拆解后立即反馈，不等 meta / 后台任务轮询 */
   const [splitUiPending, setSplitUiPending] = useState(false);
   const [refBusy, setRefBusy] = useState(false);
+  const [modelPipelineBusy, setModelPipelineBusy] = useState<
+    "uploading" | "importing-model" | "generating-model" | "expanding-full-body" | null
+  >(null);
   const [tryonBusy, setTryonBusy] = useState(false);
   const [selectedResultIds, setSelectedResultIds] = useState<string[]>([]);
+  const [selectedLookIds, setSelectedLookIds] = useState<string[]>([]);
+  const [runningLookIds, setRunningLookIds] = useState<string[]>([]);
   const tryonPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const batchAbortRef = useRef<AbortController | null>(null);
   const [generateBusy, setGenerateBusy] = useState(false);
   const [renderBusy, setRenderBusy] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
@@ -251,13 +265,24 @@ function OutfitVideoStudioInner() {
   }, [project]);
 
   const tryonProgress = useMemo(
-    () => parseVtonTryonProgress(project?.meta?.tryonProgress),
-    [project?.meta?.tryonProgress],
+    () =>
+      mergeVtonTryonProgressWithBatch(
+        parseVtonTryonProgress(project?.meta?.tryonProgress),
+        project?.meta?.tryonBatch,
+      ),
+    [project?.meta?.tryonProgress, project?.meta?.tryonBatch],
   );
 
   useEffect(() => {
     return () => stopTryonPoll();
   }, []);
+
+  const lookDraftIdSig = useMemo(
+    () => (project?.meta?.lookDrafts ?? []).map((l) => l.id).join("|"),
+    [project?.meta?.lookDrafts],
+  );
+
+  useVtonLookSelectionSync(lookDraftIdSig, setSelectedLookIds);
 
   const loadModels = useCallback(async () => {
     setModelsLoading(true);
@@ -726,12 +751,14 @@ function OutfitVideoStudioInner() {
   async function handleUploadModel(file: File) {
     if (!project) return;
     setRefBusy(true);
+    setModelPipelineBusy("uploading");
     try {
       applyProject(await uploadOutfitVideoRefImage(project.id, "model", file));
     } catch (e) {
       await alert({ title: "模特图上传失败", message: formatEcomTransportError(e), variant: "error" });
     } finally {
       setRefBusy(false);
+      setModelPipelineBusy(null);
     }
   }
 
@@ -800,6 +827,7 @@ function OutfitVideoStudioInner() {
   async function handlePickModelFromLibrary(ossUrl: string, label?: string) {
     if (!project) return;
     setRefBusy(true);
+    setModelPipelineBusy("importing-model");
     try {
       applyProject(
         await attachOutfitVideoRefs(project.id, {
@@ -810,6 +838,7 @@ function OutfitVideoStudioInner() {
       await alert({ title: "选择模特失败", message: formatEcomTransportError(e), variant: "error" });
     } finally {
       setRefBusy(false);
+      setModelPipelineBusy(null);
     }
   }
 
@@ -859,23 +888,103 @@ function OutfitVideoStudioInner() {
     }
   }
 
-  async function handleTryon() {
-    if (!project) return;
+  async function runOutfitBatchTryon(looks: VtonLookSpec[]) {
+    if (!project || looks.length < 1) {
+      await alert({ title: "请先选择搭配", message: "在编排表左侧勾选至少 1 套搭配", variant: "error" });
+      return;
+    }
+    setRunningLookIds(looks.map((l) => l.id));
     setTryonBusy(true);
-    stopTryonPoll();
-    tryonPollRef.current = setInterval(() => {
-      void getOutfitVideoProject(project.id)
-        .then(applyProject)
-        .catch(() => undefined);
-    }, 2200);
+    const ac = new AbortController();
+    batchAbortRef.current = ac;
     try {
-      applyProject(await batchOutfitTryon(project.id));
-      await toast({ title: "批量试衣完成", message: "请锁定参考后进入逐镜生成", variant: "success" });
+      const { project: finalProject, postError } = await runVtonBatchTryonWithPoll({
+        startBatch: (signal) => batchOutfitTryon(project.id, { looks, signal }),
+        fetchProject: () => getOutfitVideoProject(project.id),
+        readBatch: (p) => p.meta?.tryonBatch,
+        applyProject,
+        signal: ac.signal,
+      });
+      const batch = finalProject.meta?.tryonBatch;
+      if (batch?.status === "cancelled") {
+        await toast({
+          title: "已停止",
+          message: batch.label ?? "批量试衣已停止，已完成的结果已保留",
+        });
+        return;
+      }
+      if (batch?.status === "done") {
+        await toast({ title: "批量试衣完成", message: "请锁定参考后进入逐镜生成", variant: "success" });
+        return;
+      }
+      if (postError && !isEcomTransportDisconnectError(postError)) {
+        await alert({
+          title: "AI 试衣失败",
+          message: vtonBatchTryonFailureMessage(postError, batch?.label),
+          variant: "error",
+        });
+      } else if (batch?.status === "failed") {
+        await alert({
+          title: "AI 试衣失败",
+          message: batch.label ?? "部分试衣失败，可逐套重试",
+          variant: "error",
+        });
+      }
     } catch (e) {
-      await alert({ title: "AI 试衣失败", message: formatEcomTransportError(e), variant: "error" });
+      if (ac.signal.aborted || (e instanceof DOMException && e.name === "AbortError")) {
+        try {
+          applyProject(await getOutfitVideoProject(project.id));
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+      await alert({ title: "AI 试衣", message: formatEcomTransportError(e), variant: "error" });
     } finally {
-      stopTryonPoll();
+      batchAbortRef.current = null;
       setTryonBusy(false);
+      setRunningLookIds([]);
+      setSelectedLookIds([]);
+    }
+  }
+
+  async function handleTryon(mode: VtonBatchTryonMode = "all") {
+    if (!project) return;
+    const allLooks = project.meta?.lookDrafts ?? [];
+    const looks =
+      mode === "all" ? allLooks : allLooks.filter((l) => selectedLookIds.includes(l.id));
+    await runOutfitBatchTryon(looks);
+  }
+
+  async function handleRegenerateOutfitLook(lookId: string) {
+    if (!project) return;
+    const look = (project.meta?.lookDrafts ?? []).find((l) => l.id === lookId);
+    if (!look) return;
+    await runOutfitBatchTryon([look]);
+  }
+
+  function toggleLookSelection(lookId: string) {
+    setSelectedLookIds((prev) =>
+      prev.includes(lookId) ? prev.filter((id) => id !== lookId) : [...prev, lookId],
+    );
+  }
+
+  async function handleStopTryon() {
+    if (!project) return;
+    if (
+      !(await confirm({
+        title: "停止批量试衣",
+        message: "确定停止？已完成的结果会保留，未完成的将取消。",
+      }))
+    ) {
+      return;
+    }
+    try {
+      applyProject(await cancelOutfitTryonBatch(project.id));
+      batchAbortRef.current?.abort();
+      await toast({ title: "正在停止", message: "已发送停止请求，已完成的结果会保留" });
+    } catch (e) {
+      await alert({ title: "停止失败", message: formatEcomTransportError(e), variant: "error" });
     }
   }
 
@@ -890,6 +999,12 @@ function OutfitVideoStudioInner() {
     project && outfitRefMode === "need_tryon"
       ? {
           meta: project.meta ?? { garmentPool: [], lookDrafts: [], lockedLooks: [] },
+          selectedLookIds,
+          runningLookIds,
+          onToggleLookSelection: toggleLookSelection,
+          onSelectAllLooks: () =>
+            setSelectedLookIds((project.meta?.lookDrafts ?? []).map((l) => l.id)),
+          onClearLookSelection: () => setSelectedLookIds([]),
           selectedResultIds,
           onToggleResult: toggleResultSelection,
           onUploadGarment: async (kind: VtonGarmentKind, file: File) => {
@@ -943,6 +1058,8 @@ function OutfitVideoStudioInner() {
             }
           },
           onBatchTryon: handleTryon,
+          onRegenerateLook: handleRegenerateOutfitLook,
+          onStopBatchTryon: handleStopTryon,
           onLockSelected: async () => {
             if (!selectedResultIds.length) return;
             setRefBusy(true);
@@ -959,32 +1076,31 @@ function OutfitVideoStudioInner() {
         }
       : undefined;
 
-  async function handleGenerateModel(opts: { prompt: string; modelKey: string }) {
+  async function handleGenerateModel(opts?: { prompt?: string }) {
     if (!project) return;
     setRefBusy(true);
+    setModelPipelineBusy("generating-model");
     try {
-      applyProject(await generateOutfitModel(project.id, opts));
+      applyProject(await generateOutfitModel(project.id, { prompt: opts?.prompt ?? "" }));
     } catch (e) {
       await alert({ title: "生成模特失败", message: formatEcomTransportError(e), variant: "error" });
     } finally {
       setRefBusy(false);
+      setModelPipelineBusy(null);
     }
   }
 
-  async function handleExpandFullBody(opts: { prompt?: string; modelKey: string }) {
+  async function handleExpandFullBody(opts?: { prompt?: string }) {
     if (!project) return;
     setRefBusy(true);
+    setModelPipelineBusy("expanding-full-body");
     try {
-      applyProject(
-        await expandOutfitModelFullBody(project.id, {
-          prompt: opts.prompt,
-          modelKey: opts.modelKey,
-        }),
-      );
+      applyProject(await expandOutfitModelFullBody(project.id, { prompt: opts?.prompt }));
     } catch (e) {
       await alert({ title: "生成全身图失败", message: formatEcomTransportError(e), variant: "error" });
     } finally {
       setRefBusy(false);
+      setModelPipelineBusy(null);
     }
   }
 
@@ -994,6 +1110,7 @@ function OutfitVideoStudioInner() {
     if (!project || !assets.length) return;
     const asset = assets[0]!;
     setRefBusy(true);
+    setModelPipelineBusy("importing-model");
     try {
       applyProject(
         await attachOutfitVideoRefs(project.id, {
@@ -1004,6 +1121,7 @@ function OutfitVideoStudioInner() {
       await alert({ title: "选择资产失败", message: formatEcomTransportError(e), variant: "error" });
     } finally {
       setRefBusy(false);
+      setModelPipelineBusy(null);
     }
   }
 
@@ -1367,6 +1485,7 @@ function OutfitVideoStudioInner() {
           mediaBusy={mediaBusy}
           splitting={splitting}
           refBusy={refBusy}
+          modelPipelineBusy={modelPipelineBusy}
           tryonBusy={tryonBusy}
           tryonProgress={tryonProgress}
           imageModels={imageModels}

@@ -1,3 +1,5 @@
+export type EcomPoseGender = "male" | "female" | "unisex";
+
 export type EcomPoseLibraryEntry = {
   id: string;
   category: string;
@@ -6,6 +8,8 @@ export type EcomPoseLibraryEntry = {
   ossUrl?: string | null;
   thumbUrl?: string | null;
   sourceImageKey?: string | null;
+  genders?: EcomPoseGender[];
+  sceneTags?: string[];
   tags?: Record<string, unknown>;
   scope?: "platform" | "user";
   userId?: string | null;

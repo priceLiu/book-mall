@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
+  normalizePoseGenders,
+  normalizePoseSceneTags,
+  type EcomPoseGender,
+} from "@/lib/ecom/ecom-pose-library-meta";
+import {
   deleteUserPoseEntry,
+  getPoseLibraryEntry,
   updateUserPoseEntry,
 } from "@/lib/ecom/ecom-pose-library-service";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
@@ -23,6 +29,22 @@ export async function PATCH(req: Request, ctx: Ctx) {
     if (typeof body.title === "string") patch.title = body.title.trim();
     if (typeof body.baseDescription === "string") {
       patch.baseDescription = body.baseDescription.trim();
+    }
+    if (Array.isArray(body.genders) || Array.isArray(body.sceneTags)) {
+      const existing = await getPoseLibraryEntry(id);
+      const genders = Array.isArray(body.genders)
+        ? normalizePoseGenders(body.genders as EcomPoseGender[])
+        : existing?.genders;
+      const sceneTags = Array.isArray(body.sceneTags)
+        ? normalizePoseSceneTags(body.sceneTags)
+        : existing?.sceneTags;
+      patch.genders = genders;
+      patch.sceneTags = sceneTags;
+      patch.tags = {
+        ...(existing?.tags ?? {}),
+        ...(genders ? { genders } : {}),
+        ...(sceneTags ? { sceneTags } : {}),
+      };
     }
     const entry = await updateUserPoseEntry(auth.userId, id, patch);
     return NextResponse.json({ entry });

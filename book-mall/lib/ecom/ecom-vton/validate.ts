@@ -17,6 +17,35 @@ export function findGarmentInPool(
   return pool.find((g) => g.id === id.trim());
 }
 
+/** 试衣前归一化搭配行：有 fullSetGarmentId 时强制走套装双槽逻辑 */
+export function normalizeLookForTryon(
+  look: VtonLookSpec,
+  garmentPool: VtonGarmentItem[] = [],
+): VtonLookSpec {
+  if (look.fullSetGarmentId?.trim()) {
+    return {
+      ...look,
+      kind: "full_set",
+      topGarmentId: undefined,
+      bottomGarmentId: undefined,
+      onePieceGarmentId: undefined,
+    };
+  }
+  if (look.kind === "full_set") return look;
+  const topAsSet = findGarmentInPool(garmentPool, look.topGarmentId);
+  if (topAsSet?.kind === "full_set") {
+    return {
+      ...look,
+      kind: "full_set",
+      fullSetGarmentId: topAsSet.id,
+      topGarmentId: undefined,
+      bottomGarmentId: undefined,
+      onePieceGarmentId: undefined,
+    };
+  }
+  return look;
+}
+
 export function resolveLookTryonUrls(opts: {
   look: VtonLookSpec;
   garmentPool: VtonGarmentItem[];
@@ -25,7 +54,8 @@ export function resolveLookTryonUrls(opts: {
   const personImageUrl = opts.modelUrl.trim();
   if (!personImageUrl) throw new Error("缺少模特全身照");
 
-  const { look, garmentPool } = opts;
+  const garmentPool = opts.garmentPool;
+  const look = normalizeLookForTryon(opts.look, garmentPool);
 
   if (look.kind === "two_piece") {
     const top = findGarmentInPool(garmentPool, look.topGarmentId);
@@ -56,7 +86,7 @@ export function resolveLookTryonUrls(opts: {
 
   if (look.kind === "full_set") {
     const set = findGarmentInPool(garmentPool, look.fullSetGarmentId);
-    if (!set || set.kind !== "full_set") {
+    if (!set?.ossUrl?.trim()) {
       throw new Error(`搭配 ${look.label ?? look.id} 缺少套装`);
     }
     return {

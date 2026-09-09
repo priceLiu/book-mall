@@ -12,12 +12,22 @@ import {
   ECOM_LIBRARY_MEDIA_GRID_CLASS,
 } from "@/components/media/ecom-media-library-tile";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomPoseLibraryFilterBar } from "@/components/model-shot/ecom-pose-library-filter-bar";
 import {
   createEcomPoseLibraryEntry,
   deleteEcomPoseLibraryEntry,
   fetchEcomPoseLibraryCatalog,
   updateEcomPoseLibraryEntry,
 } from "@/lib/ecom-pose-library-api";
+import {
+  ECOM_POSE_GENDER_OPTIONS,
+  ECOM_POSE_SCENE_TAG_OPTIONS,
+  filterPoseEntries,
+  poseGenderLabel,
+  resolvePoseGenders,
+  resolvePoseSceneTags,
+  type EcomPoseGender,
+} from "@/lib/ecom-pose-library/meta";
 import type { EcomPoseLibraryEntry } from "@/lib/ecom-pose-library/types";
 import {
   createEcomPropLibraryEntry,
@@ -107,6 +117,24 @@ function PoseCatalogCard({
         </span>
       </div>
       <div className="flex flex-1 flex-col gap-1 p-2">
+        <div className="flex flex-wrap gap-1">
+          {resolvePoseGenders(entry).map((g) => (
+            <span
+              key={g}
+              className="rounded bg-[#f0f6ff] px-1 py-0.5 text-[9px] text-[#0071e3]"
+            >
+              {poseGenderLabel(g)}
+            </span>
+          ))}
+          {resolvePoseSceneTags(entry).slice(0, 3).map((tag) => (
+            <span
+              key={tag}
+              className="rounded bg-[#f5f5f7] px-1 py-0.5 text-[9px] text-[#6e6e73]"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
         <p className="line-clamp-1 text-xs font-medium text-[#1d1d1f]">
           {entry.title}
           {!readonly ? <LockedBadge lockedAt={entry.lockedAt} /> : null}
@@ -178,7 +206,11 @@ export function ShootCatalogPanel() {
     category: string;
     title: string;
     baseDescription: string;
+    genders: EcomPoseGender[];
+    sceneTags: string[];
   } | null>(null);
+  const [poseGenderFilter, setPoseGenderFilter] = useState<EcomPoseGender[]>([]);
+  const [poseSceneTagFilter, setPoseSceneTagFilter] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   const reload = useCallback(async () => {
@@ -218,6 +250,15 @@ export function ShootCatalogPanel() {
         pose: "姿势",
       }) as const,
     [],
+  );
+
+  const filteredPlatformPoses = useMemo(
+    () =>
+      filterPoseEntries(poses.platform, {
+        genders: poseGenderFilter,
+        sceneTags: poseSceneTagFilter,
+      }),
+    [poses.platform, poseGenderFilter, poseSceneTagFilter],
   );
 
   const posePreviewItems = useMemo(
@@ -316,12 +357,16 @@ export function ShootCatalogPanel() {
           category: poseForm.category,
           title: poseForm.title.trim(),
           baseDescription: poseForm.baseDescription.trim(),
+          genders: poseForm.genders,
+          sceneTags: poseForm.sceneTags,
         });
       } else {
         await createEcomPoseLibraryEntry({
           category: poseForm.category,
           title: poseForm.title.trim(),
           baseDescription: poseForm.baseDescription.trim(),
+          genders: poseForm.genders,
+          sceneTags: poseForm.sceneTags,
         });
       }
       setPoseForm(null);
@@ -625,12 +670,23 @@ export function ShootCatalogPanel() {
             系统姿势参与助手自动编排；自建姿势仅供姿势表内手动替换，不会进入自动抽取池。
           </p>
           <CatalogSection title="系统推荐（只读）">
-            <p className="text-[11px] text-[#86868b]">共 {poses.platform.length} 条姿势参考</p>
+            <EcomPoseLibraryFilterBar
+              selectedGenders={poseGenderFilter}
+              selectedSceneTags={poseSceneTagFilter}
+              onGendersChange={setPoseGenderFilter}
+              onSceneTagsChange={setPoseSceneTagFilter}
+              className="mb-2"
+            />
+            <p className="text-[11px] text-[#86868b]">
+              共 {poses.platform.length} 条 · 筛选后 {filteredPlatformPoses.length} 条
+            </p>
             {poses.platform.length === 0 ? (
               <p className="text-xs text-[#86868b]">暂无系统姿势。</p>
+            ) : filteredPlatformPoses.length === 0 ? (
+              <p className="text-xs text-[#86868b]">无匹配姿势，请调整筛选条件。</p>
             ) : (
               <ul className={ECOM_LIBRARY_MEDIA_GRID_CLASS}>
-                {poses.platform.map((p) => (
+                {filteredPlatformPoses.map((p) => (
                   <PoseCatalogCard
                     key={p.id}
                     entry={p}
@@ -647,7 +703,13 @@ export function ShootCatalogPanel() {
               <EcomButtonSecondary
                 type="button"
                 onClick={() =>
-                  setPoseForm({ category: "A", title: "", baseDescription: "" })
+                  setPoseForm({
+                    category: "A",
+                    title: "",
+                    baseDescription: "",
+                    genders: ["unisex"],
+                    sceneTags: ["电商"],
+                  })
                 }
               >
                 新建姿势
@@ -668,6 +730,8 @@ export function ShootCatalogPanel() {
                         category: p.category,
                         title: p.title,
                         baseDescription: p.baseDescription,
+                        genders: resolvePoseGenders(p),
+                        sceneTags: resolvePoseSceneTags(p),
                       })
                     }
                     onRemove={() => void removeUserPose(p)}
@@ -783,6 +847,55 @@ export function ShootCatalogPanel() {
               onChange={(e) => setPoseForm({ ...poseForm, baseDescription: e.target.value })}
             />
           </label>
+          <div className="space-y-2 text-xs">
+            <span className="text-[#86868b]">性别（可多选）</span>
+            <div className="flex flex-wrap gap-2">
+              {ECOM_POSE_GENDER_OPTIONS.map((opt) => {
+                const active = poseForm.genders.includes(opt.value);
+                return (
+                  <label key={opt.value} className="flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      onChange={() => {
+                        const next = active
+                          ? poseForm.genders.filter((g) => g !== opt.value)
+                          : [...poseForm.genders, opt.value];
+                        setPoseForm({
+                          ...poseForm,
+                          genders: next.length ? next : ["unisex"],
+                        });
+                      }}
+                    />
+                    {opt.label}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+          <div className="space-y-2 text-xs">
+            <span className="text-[#86868b]">场景标签（可多选）</span>
+            <div className="flex flex-wrap gap-2">
+              {ECOM_POSE_SCENE_TAG_OPTIONS.map((opt) => {
+                const active = poseForm.sceneTags.includes(opt.value);
+                return (
+                  <label key={opt.value} className="flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      onChange={() => {
+                        const next = active
+                          ? poseForm.sceneTags.filter((t) => t !== opt.value)
+                          : [...poseForm.sceneTags, opt.value];
+                        setPoseForm({ ...poseForm, sceneTags: next });
+                      }}
+                    />
+                    {opt.label}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
           <div className="mt-4 flex justify-end gap-2">
             <EcomButtonSecondary type="button" onClick={() => setPoseForm(null)}>
               取消

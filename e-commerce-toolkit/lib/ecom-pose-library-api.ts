@@ -20,6 +20,8 @@ export async function createEcomPoseLibraryEntry(input: {
   category: string;
   title: string;
   baseDescription: string;
+  genders?: EcomPoseLibraryEntry["genders"];
+  sceneTags?: string[];
 }): Promise<EcomPoseLibraryEntry> {
   const res = await fetch("/api/book-mall/api/sso/tools/ecom/pose-library/entries", {
     method: "POST",
@@ -37,7 +39,13 @@ export async function createEcomPoseLibraryEntry(input: {
 
 export async function updateEcomPoseLibraryEntry(
   id: string,
-  patch: Partial<{ category: string; title: string; baseDescription: string }>,
+  patch: Partial<{
+    category: string;
+    title: string;
+    baseDescription: string;
+    genders: EcomPoseLibraryEntry["genders"];
+    sceneTags: string[];
+  }>,
 ): Promise<EcomPoseLibraryEntry> {
   const res = await fetch(`/api/book-mall/api/sso/tools/ecom/pose-library/entries/${id}`, {
     method: "PATCH",

@@ -27,6 +27,8 @@ type Props = {
   uploadProgress?: number | null;
   /** 进度条下方文案；默认「正在上传…」 */
   uploadProgressLabel?: string;
+  /** 为 true 时展示上传进度（uploadProgress 为 null 时为不确定进度） */
+  showUploadProgress?: boolean;
   /** AI 生图进行中（槽位扫光） */
   generating?: boolean;
   generatingLabel?: string;
@@ -42,7 +44,9 @@ type Props = {
   onMouseEnterCard?: () => void;
   onMouseLeaveCard?: () => void;
   inputRef?: ((el: HTMLInputElement | null) => void) | React.RefObject<HTMLInputElement | null>;
-  /** 渲染在「上传」钮左侧（与上传钮同排） */
+  /** 渲染在标题行右侧、「我的资产 / 上传」钮左侧（与上传钮同排） */
+  headerActions?: React.ReactNode;
+  /** @deprecated 使用 headerActions；保留兼容旧布局（标题下方第二行） */
   toolbarPrefix?: React.ReactNode;
   accept?: string;
   multiple?: boolean;
@@ -50,6 +54,8 @@ type Props = {
   allowVideo?: boolean;
   /** 为 false 时仅拖放，粘贴由父级热区统一处理 */
   listenPaste?: boolean;
+  /** 标题由父级渲染在卡片外时使用 */
+  hideTitle?: boolean;
 };
 
 const REF_THUMB_SIZE = 56;
@@ -121,8 +127,9 @@ export function EcomRefUploadCard({
   items,
   emptyHint,
   busy,
-  uploadProgress = null,
+  uploadProgress,
   uploadProgressLabel,
+  showUploadProgress = false,
   generating = false,
   generatingLabel = "AI 生成中…",
   suggested = false,
@@ -136,11 +143,13 @@ export function EcomRefUploadCard({
   onMouseEnterCard,
   onMouseLeaveCard,
   inputRef,
+  headerActions,
   toolbarPrefix,
   accept = IMAGE_UPLOAD_ACCEPT,
   multiple = true,
   allowVideo = false,
   listenPaste = true,
+  hideTitle = false,
 }: Props) {
   const { dragOver, focusZone, dropZoneProps } = useImageDropPaste({
     enabled: !busy && !generating,
@@ -161,6 +170,7 @@ export function EcomRefUploadCard({
   };
 
   const TitleTag = onTitleClick ? "button" : "span";
+  const progressVisible = showUploadProgress || typeof uploadProgress === "number";
 
   return (
     <div
@@ -181,15 +191,23 @@ export function EcomRefUploadCard({
       }}
     >
       <div className={cn("mb-1.5", toolbarPrefix ? "space-y-2" : undefined)}>
-        <div className="flex items-center justify-between gap-2">
-          <TitleTag
-            type={onTitleClick ? "button" : undefined}
-            className="min-w-0 text-left text-xs font-semibold text-[#1d1d1f]"
-            onClick={onTitleClick}
-          >
-            {title}
-          </TitleTag>
-          <div className="flex shrink-0 gap-1.5">
+        <div
+          className={cn(
+            "flex items-center gap-2",
+            hideTitle ? "justify-end" : "justify-between",
+          )}
+        >
+          {!hideTitle ? (
+            <TitleTag
+              type={onTitleClick ? "button" : undefined}
+              className="min-w-0 text-left text-xs font-semibold text-[#1d1d1f]"
+              onClick={onTitleClick}
+            >
+              {title}
+            </TitleTag>
+          ) : null}
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+            {headerActions}
             {onOpenAssetPicker ? (
               <EcomButtonSecondary
                 size="sm"
@@ -238,17 +256,24 @@ export function EcomRefUploadCard({
         }}
       />
 
-      {uploadProgress != null ? (
+      {progressVisible ? (
         <div className="mb-2 space-y-1">
-          <div className="ecom-upload-progress">
+          <div
+            className={cn(
+              "ecom-upload-progress",
+              typeof uploadProgress !== "number" && "ecom-upload-progress-indeterminate",
+            )}
+          >
             <span
-              style={{
-                width: `${Math.min(100, Math.max(0, uploadProgress))}%`,
-              }}
+              style={
+                typeof uploadProgress === "number"
+                  ? { width: `${Math.min(100, Math.max(0, uploadProgress))}%` }
+                  : undefined
+              }
             />
           </div>
           <p className="text-[10px] text-[#0071e3]">
-            {uploadProgress >= 100
+            {typeof uploadProgress === "number" && uploadProgress >= 100
               ? "完成"
               : (uploadProgressLabel?.trim() || "正在上传…")}
           </p>
@@ -296,6 +321,7 @@ export function EcomRefUploadCard({
                     src={r.ossUrl}
                     alt={r.label}
                     size={REF_THUMB_SIZE}
+                    onPreview={onPreviewItem ? () => onPreviewItem(r) : undefined}
                     onRemove={onRemove ? () => void onRemove(r.id) : undefined}
                     removeLabel={removeLabel}
                   />

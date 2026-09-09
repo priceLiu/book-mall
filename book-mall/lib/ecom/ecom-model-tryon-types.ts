@@ -8,8 +8,6 @@ export const MODEL_TRYON_V1_TEMPLATE_ID = "model-tryon-v1";
 export type ModelTryonSettings = {
   outfitRefMode?: VtonRefMode;
   garmentMode?: VtonGarmentMode;
-  imageModelKey?: string;
-  fusionModelKey?: string;
 };
 
 export type ModelTryonProjectDto = {

@@ -1,5 +1,6 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -144,26 +145,41 @@ export function EcomModelLibraryPickerDialog({ open, onOpenChange, onPick }: Pro
           ) : (
             <>
               <div className={GRID_CLASS}>
-                {visibleModels.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    disabled={busyId === m.id}
-                    className="overflow-hidden rounded-xl border border-[#e5e5ea] text-left transition hover:border-[#0071e3]"
-                    onClick={() => void handlePick(m)}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={m.ossUrl}
-                      alt={m.name}
-                      loading="lazy"
-                      className="aspect-[3/4] w-full object-cover"
-                    />
-                    <p className="truncate px-2 py-1 text-[11px] font-medium text-[#1d1d1f]">
-                      {m.name}
-                    </p>
-                  </button>
-                ))}
+                {visibleModels.map((m) => {
+                  const picking = busyId === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      disabled={busyId != null}
+                      className={cn(
+                        "relative overflow-hidden rounded-xl border text-left transition",
+                        picking
+                          ? "border-[#0071e3] bg-[#f0f6ff]"
+                          : "border-[#e5e5ea] hover:border-[#0071e3]",
+                        busyId != null && !picking && "opacity-60",
+                      )}
+                      onClick={() => void handlePick(m)}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={m.ossUrl}
+                        alt={m.name}
+                        loading="lazy"
+                        className="aspect-[3/4] w-full object-cover"
+                      />
+                      {picking ? (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/35">
+                          <Loader2 className="h-6 w-6 animate-spin text-white" aria-hidden />
+                          <span className="text-[11px] font-medium text-white">导入中…</span>
+                        </div>
+                      ) : null}
+                      <p className="truncate px-2 py-1 text-[11px] font-medium text-[#1d1d1f]">
+                        {m.name}
+                      </p>
+                    </button>
+                  );
+                })}
               </div>
               <EcomScrollLoadFooter
                 sentinelRef={sentinelRef}

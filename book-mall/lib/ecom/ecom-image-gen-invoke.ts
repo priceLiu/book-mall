@@ -121,6 +121,8 @@ async function generateMultimodalSyncImage(opts: {
   userId: string;
   modelKey: string;
   prompt: string;
+  negativePrompt?: string;
+  promptExtend?: boolean;
   ratio: EcomImageRatio;
   imageSize?: string;
   refImageUrls: string[];
@@ -145,6 +147,10 @@ async function generateMultimodalSyncImage(opts: {
     ratio: opts.ratio,
     imageSize: opts.imageSize,
   });
+  const negativePrompt = opts.negativePrompt?.trim();
+  const defaultPromptExtend = isQwenImageEditModel(opts.modelKey)
+    ? true
+    : !isZImageTurboModel(opts.modelKey);
   const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
     kind: "multimodal-image-sync",
     model: opts.modelKey,
@@ -152,10 +158,9 @@ async function generateMultimodalSyncImage(opts: {
     parameters: {
       size: pixelSize,
       n: 1,
-      prompt_extend: isQwenImageEditModel(opts.modelKey)
-        ? true
-        : !isZImageTurboModel(opts.modelKey),
+      prompt_extend: opts.promptExtend ?? defaultPromptExtend,
       watermark: false,
+      ...(negativePrompt ? { negative_prompt: negativePrompt } : {}),
     },
     clientPage,
   });
@@ -167,9 +172,14 @@ export async function generateEcomImage(opts: {
   userId: string;
   modelKey: string;
   prompt: string;
+  negativePrompt?: string;
+  /** 关闭时可避免厂商扩写覆盖精细 Prompt（如头像扩全身） */
+  promptExtend?: boolean;
   ratio: EcomImageRatio;
   /** 像素 size（如 1080*1440）或 KIE 档位 2K/4K */
   imageSize?: string;
+  /** wan2.7 有参考图时仍下发竖向 pixel size（头像扩全身等） */
+  wan27KeepPixelSizeWithRefs?: boolean;
   refImageUrls: string[];
   /** Gateway clientPage 里的计费 toolKey（含 action 后缀） */
   toolKey: string;
@@ -285,6 +295,7 @@ export async function generateEcomImage(opts: {
       wan26,
       refCount: refs.length,
       wan27Size: size,
+      keepPixelSizeWithRefs: opts.wan27KeepPixelSizeWithRefs,
     }),
     n: 1,
     contentOrder: wan26 ? "text-first" : "images-first",

@@ -10,6 +10,11 @@ import {
   normalizePoseSourceImageUrl,
 } from "@/lib/ecom/ecom-pose-library-import-helpers";
 import {
+  normalizePoseGenders,
+  normalizePoseSceneTags,
+  type EcomPoseGender,
+} from "@/lib/ecom/ecom-pose-library-meta";
+import {
   findPoseEntryByNormalizedSourceUrl,
   findPoseEntryBySourceImageKey,
   getPoseLibraryEntry,
@@ -22,6 +27,8 @@ export type ImportPoseFromImageInput = {
   savePrompt: boolean;
   prompt?: string;
   category?: string;
+  genders?: EcomPoseGender[];
+  sceneTags?: string[];
   sourceModule?: string;
   sourceAssetId?: string;
   adminUserId: string;
@@ -76,6 +83,8 @@ export async function importPoseFromImage(
   }
 
   const category = (input.category?.trim() || "A").toUpperCase();
+  const genders = normalizePoseGenders(input.genders ?? ["unisex"]);
+  const sceneTags = normalizePoseSceneTags(input.sceneTags ?? ["电商"]);
   const id = nextPlatformPoseId(category);
   const ossUrl = await uploadEcomPoseLibraryPreview({ id, buf, contentType, ext });
 
@@ -88,10 +97,14 @@ export async function importPoseFromImage(
     category,
     title,
     baseDescription: poseDescription,
+    genders,
+    sceneTags,
     ossUrl,
     thumbUrl: ossUrl,
     sourceImageKey: hashKey,
     tags: {
+      genders,
+      sceneTags,
       fullPrompt: fullPrompt || undefined,
       sourceImageUrl: normalizePoseSourceImageUrl(imageUrl),
       sourceModule: input.sourceModule,

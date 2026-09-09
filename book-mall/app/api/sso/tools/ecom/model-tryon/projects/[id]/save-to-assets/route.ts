@@ -20,9 +20,10 @@ export async function POST(req: Request, ctx: Ctx) {
     /* */
   }
   const title = typeof body.title === "string" ? body.title : undefined;
+  const ossUrl = typeof body.ossUrl === "string" ? body.ossUrl : undefined;
 
   try {
-    const result = await saveEcomModelTryonResultToAssets(auth.userId, id, { title });
+    const result = await saveEcomModelTryonResultToAssets(auth.userId, id, { title, ossUrl });
     return NextResponse.json(result);
   } catch (e) {
     const message = e instanceof Error ? e.message : "保存失败";

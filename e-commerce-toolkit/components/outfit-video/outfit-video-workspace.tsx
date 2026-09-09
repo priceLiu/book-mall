@@ -12,7 +12,7 @@ import {
 } from "@/components/outfit-video/outfit-video-bottom-dock";
 import { OutfitVideoMediaInput } from "@/components/outfit-video/outfit-video-media-input";
 import { OutfitRefSetupPanel } from "@/components/outfit-video/outfit-ref-setup-panel";
-import type { VtonBatchWorkflowProps } from "@/components/vton/vton-ref-workbench";
+import type { VtonBatchWorkflowProps, VtonModelPipelineBusy } from "@/components/vton/vton-ref-workbench";
 import { OutfitSceneTable } from "@/components/outfit-video/outfit-scene-table";
 import { OutfitShotProductionPanel } from "@/components/outfit-video/outfit-shot-production-panel";
 import { SeedVideoRenderProgressPanel } from "@/components/seed-video/seed-video-render-progress-panel";
@@ -58,6 +58,7 @@ type Props = {
   mediaBusy?: boolean;
   splitting?: boolean;
   refBusy?: boolean;
+  modelPipelineBusy?: VtonModelPipelineBusy | null;
   tryonBusy?: boolean;
   tryonProgress?: VtonTryonProgress | null;
   imageModels: StoryboardGatewayModel[];
@@ -136,6 +137,7 @@ export function OutfitVideoWorkspace({
   mediaBusy,
   splitting,
   refBusy,
+  modelPipelineBusy,
   tryonBusy,
   tryonProgress,
   imageModels,
@@ -445,6 +447,7 @@ export function OutfitVideoWorkspace({
             garmentMode={garmentMode}
             refsLocked={refsLocked}
             busy={refBusy}
+            modelPipelineBusy={modelPipelineBusy}
             tryonBusy={tryonBusy}
             tryonProgress={parsedTryonProgress}
             imageModels={imageModels}

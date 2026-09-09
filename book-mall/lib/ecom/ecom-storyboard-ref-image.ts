@@ -1,6 +1,7 @@
 import sharp from "sharp";
 
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
+import { ensureDashscopeImageUrl } from "@/lib/ecom/ecom-dashscope-image-normalize";
 
 /** 分镜垫图 / 可灵：短边 ≥300px */
 const KLING_REF_MIN_SIDE = 300;
@@ -85,11 +86,9 @@ export async function ensureStoryboardRefImageForWan27(opts: {
   userId: string;
   imageUrl: string;
 }): Promise<{ url: string; normalized: boolean }> {
-  return ensureRefImageInBounds({
+  return ensureDashscopeImageUrl({
     userId: opts.userId,
     imageUrl: opts.imageUrl,
-    minSide: KLING_REF_MIN_SIDE,
-    maxSide: KLING_REF_MAX_SIDE,
   });
 }
 

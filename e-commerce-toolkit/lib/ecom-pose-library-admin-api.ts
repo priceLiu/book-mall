@@ -5,6 +5,8 @@ export type ImportPoseFromImageBody = {
   savePrompt: boolean;
   prompt?: string;
   category?: string;
+  genders?: Array<"male" | "female" | "unisex">;
+  sceneTags?: string[];
   sourceModule?: string;
   sourceAssetId?: string;
 };

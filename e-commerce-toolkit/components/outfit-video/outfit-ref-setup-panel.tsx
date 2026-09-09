@@ -1,6 +1,10 @@
 "use client";
 
-import { VtonRefWorkbench, type VtonBatchWorkflowProps } from "@/components/vton/vton-ref-workbench";
+import {
+  VtonRefWorkbench,
+  type VtonBatchWorkflowProps,
+  type VtonModelPipelineBusy,
+} from "@/components/vton/vton-ref-workbench";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import type { OutfitGarmentMode, OutfitRefMode } from "@/lib/video-workflow/templates/outfit-v1/ui-config";
 import type { WorkflowRefs } from "@/lib/video-workflow/shot-spine";
@@ -12,6 +16,7 @@ type Props = {
   garmentMode: OutfitGarmentMode;
   refsLocked?: boolean;
   busy?: boolean;
+  modelPipelineBusy?: VtonModelPipelineBusy | null;
   tryonBusy?: boolean;
   tryonProgress?: VtonTryonProgress | null;
   imageModels: StoryboardGatewayModel[];
@@ -28,8 +33,8 @@ type Props = {
   onAttachModelFromAssets?: (
     assets: Array<{ id: string; ossUrl: string; title: string }>,
   ) => Promise<void>;
-  onGenerateModel: (opts: { prompt: string; modelKey: string }) => Promise<void>;
-  onExpandFullBody: (opts: { prompt?: string; modelKey: string }) => Promise<void>;
+  onGenerateModel: (opts?: { prompt?: string }) => Promise<void>;
+  onExpandFullBody: (opts?: { prompt?: string }) => Promise<void>;
   onTryon: () => Promise<void>;
   onLockRefs: () => Promise<void>;
   batchWorkflow?: VtonBatchWorkflowProps;

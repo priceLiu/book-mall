@@ -8,7 +8,9 @@ import {
   type CatalogPickerEntry,
 } from "@/components/model-shot/ecom-catalog-picker-dialog";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomPoseLibraryFilterBar } from "@/components/model-shot/ecom-pose-library-filter-bar";
 import { fetchEcomPoseLibraryCatalog } from "@/lib/ecom-pose-library-api";
+import { filterPoseEntries, type EcomPoseGender } from "@/lib/ecom-pose-library/meta";
 import type { EcomPoseLibraryEntry } from "@/lib/ecom-pose-library/types";
 import { fetchEcomPropLibraryCatalog } from "@/lib/ecom-prop-library-api";
 import type { EcomPropLibraryEntry } from "@/lib/ecom-prop-library/types";
@@ -135,20 +137,37 @@ export function ModelShotPosePlanTable({
   const [sceneCatalog, setSceneCatalog] = useState<EcomSceneLibraryEntry[]>([]);
   const [propCatalog, setPropCatalog] = useState<EcomPropLibraryEntry[]>([]);
   const [poseCatalog, setPoseCatalog] = useState<EcomPoseLibraryEntry[]>([]);
+  const [poseGenderFilter, setPoseGenderFilter] = useState<EcomPoseGender[]>([]);
+  const [poseSceneTagFilter, setPoseSceneTagFilter] = useState<string[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
+
+  const filteredPoseCatalog = useMemo(
+    () =>
+      filterPoseEntries(poseCatalog, {
+        genders: poseGenderFilter,
+        sceneTags: poseSceneTagFilter,
+      }),
+    [poseCatalog, poseGenderFilter, poseSceneTagFilter],
+  );
 
   const pickerEntries = useMemo((): CatalogPickerEntry[] => {
     if (pickerKind === "scene") return sceneCatalog.map(sceneToPickerEntry);
     if (pickerKind === "prop") return propCatalog.map(propToPickerEntry);
-    if (pickerKind === "pose") return sortPosesWithImageFirst(poseCatalog).map(poseToPickerEntry);
+    if (pickerKind === "pose") {
+      return sortPosesWithImageFirst(filteredPoseCatalog).map(poseToPickerEntry);
+    }
     return [];
-  }, [pickerKind, sceneCatalog, propCatalog, poseCatalog]);
+  }, [pickerKind, sceneCatalog, propCatalog, filteredPoseCatalog]);
 
   const openPicker = useCallback(
     async (kind: "scene" | "prop" | "pose", index: number, all = false) => {
       setPickerKind(kind);
       setPickerTargetIndex(index);
       setApplyToAll(all);
+      if (kind === "pose") {
+        setPoseGenderFilter([]);
+        setPoseSceneTagFilter([]);
+      }
       setCatalogLoading(true);
       setPickerOpen(true);
       try {
@@ -494,6 +513,16 @@ export function ModelShotPosePlanTable({
                 : "从姿势库选择"
         }
         entries={catalogLoading ? [] : pickerEntries}
+        headerContent={
+          pickerKind === "pose" && !catalogLoading ? (
+            <EcomPoseLibraryFilterBar
+              selectedGenders={poseGenderFilter}
+              selectedSceneTags={poseSceneTagFilter}
+              onGendersChange={setPoseGenderFilter}
+              onSceneTagsChange={setPoseSceneTagFilter}
+            />
+          ) : null
+        }
         onOpenChange={setPickerOpen}
         onPick={handlePickerPick}
       />

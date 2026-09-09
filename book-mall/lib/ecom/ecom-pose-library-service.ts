@@ -6,7 +6,14 @@ import { randomUUID } from "crypto";
 import type { EcomCatalogScope } from "@/lib/ecom/ecom-catalog-scope";
 import { assertUserCatalogEditable } from "@/lib/ecom/ecom-catalog-lock";
 import { normalizePoseSourceImageUrl } from "@/lib/ecom/ecom-pose-library-import-helpers";
+import {
+  attachPoseMeta,
+  mergePoseEntryTags,
+  type EcomPoseGender,
+} from "@/lib/ecom/ecom-pose-library-meta";
 import { prisma } from "@/lib/prisma";
+
+export type { EcomPoseGender };
 
 export type EcomPoseLibraryEntry = {
   id: string;
@@ -16,6 +23,8 @@ export type EcomPoseLibraryEntry = {
   ossUrl?: string | null;
   thumbUrl?: string | null;
   sourceImageKey?: string | null;
+  genders?: EcomPoseGender[];
+  sceneTags?: string[];
   tags?: Record<string, unknown>;
   scope?: EcomCatalogScope;
   userId?: string | null;
@@ -67,7 +76,7 @@ function rowToEntry(row: {
   enabled: boolean;
   sortOrder: number;
 }): EcomPoseLibraryEntry {
-  return {
+  return attachPoseMeta({
     id: row.id,
     category: row.category,
     title: row.title,
@@ -84,7 +93,7 @@ function rowToEntry(row: {
     lockedAt: row.lockedAt?.toISOString() ?? null,
     enabled: row.enabled,
     sortOrder: row.sortOrder,
-  };
+  });
 }
 
 export async function listPlatformPoseEntriesFromDb(): Promise<EcomPoseLibraryEntry[]> {
@@ -178,26 +187,34 @@ export async function findPoseEntryByNormalizedSourceUrl(
 export async function upsertPoseLibraryEntry(
   entry: EcomPoseLibraryEntry,
 ): Promise<EcomPoseLibraryEntry> {
+  const normalized = attachPoseMeta(entry);
   const data = {
-    category: entry.category,
-    title: entry.title,
-    baseDescription: entry.baseDescription,
-    ossUrl: entry.ossUrl ?? null,
-    thumbUrl: entry.thumbUrl ?? null,
-    sourceImageKey: entry.sourceImageKey ?? null,
-    tags: entry.tags ? (entry.tags as Prisma.InputJsonValue) : undefined,
-    scope: entry.scope ?? "platform",
-    userId: entry.userId ?? null,
-    enabled: entry.enabled ?? true,
-    sortOrder: entry.sortOrder ?? 0,
+    category: normalized.category,
+    title: normalized.title,
+    baseDescription: normalized.baseDescription,
+    ossUrl: normalized.ossUrl ?? null,
+    thumbUrl: normalized.thumbUrl ?? null,
+    sourceImageKey: normalized.sourceImageKey ?? null,
+    tags: normalized.tags ? (normalized.tags as Prisma.InputJsonValue) : undefined,
+    scope: normalized.scope ?? "platform",
+    userId: normalized.userId ?? null,
+    enabled: normalized.enabled ?? true,
+    sortOrder: normalized.sortOrder ?? 0,
     deletedAt: null,
   };
   const row = await prisma.ecomPoseLibraryEntry.upsert({
-    where: { id: entry.id },
-    create: { id: entry.id, ...data },
+    where: { id: normalized.id },
+    create: { id: normalized.id, ...data },
     update: data,
   });
   return rowToEntry(row);
+}
+
+export function buildPoseEntryTags(
+  existing: Record<string, unknown> | undefined,
+  meta: { genders?: EcomPoseGender[]; sceneTags?: string[] },
+): Record<string, unknown> {
+  return mergePoseEntryTags(existing, meta);
 }
 
 export async function createUserPoseEntry(

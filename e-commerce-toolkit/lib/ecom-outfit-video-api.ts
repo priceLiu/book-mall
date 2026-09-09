@@ -144,12 +144,20 @@ export async function patchOutfitLooks(
 
 export async function batchOutfitTryon(
   projectId: string,
-  opts?: { looks?: VtonLookSpec[] },
+  opts?: { looks?: VtonLookSpec[]; signal?: AbortSignal },
 ): Promise<OutfitVideoProject> {
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/tryon/batch`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(opts ?? {}),
+    body: JSON.stringify({ looks: opts?.looks }),
+    signal: opts?.signal,
+  });
+  return parseOutfitProject(data.project as OutfitVideoProject);
+}
+
+export async function cancelOutfitTryonBatch(projectId: string): Promise<OutfitVideoProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/tryon/batch/cancel`, {
+    method: "POST",
   });
   return parseOutfitProject(data.project as OutfitVideoProject);
 }

@@ -14,14 +14,21 @@ type Props = {
   className?: string;
   onRemove?: () => void;
   removeLabel?: string;
+  /** 点击缩略图打开全屏预览（滚轮缩放 / 拖拽平移） */
+  onPreview?: () => void;
 };
 
-const PREVIEW_W = 240;
-const PREVIEW_MAX_H = 272;
+const PREVIEW_W = 360;
+const PREVIEW_MAX_H = 400;
+const VIEWPORT_MAX_W_RATIO = 0.65;
 const VIEWPORT_PAD = 8;
 
+function previewWidth(): number {
+  return Math.min(PREVIEW_W, window.innerWidth * VIEWPORT_MAX_W_RATIO);
+}
+
 function computePreviewPos(anchor: DOMRect): { top: number; left: number } {
-  const previewW = Math.min(PREVIEW_W, window.innerWidth * 0.55);
+  const previewW = previewWidth();
   const previewH = PREVIEW_MAX_H + 28;
 
   let left = anchor.left - previewW - VIEWPORT_PAD;
@@ -52,6 +59,7 @@ export function EcomRefImageThumb({
   className,
   onRemove,
   removeLabel = "删除",
+  onPreview,
 }: Props) {
   const anchorRef = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState(false);
@@ -82,9 +90,7 @@ export function EcomRefImageThumb({
     };
   }, [hover, updatePos]);
 
-  const previewW = typeof window !== "undefined"
-    ? Math.min(PREVIEW_W, window.innerWidth * 0.55)
-    : PREVIEW_W;
+  const previewW = typeof window !== "undefined" ? previewWidth() : PREVIEW_W;
 
   return (
     <>
@@ -95,12 +101,23 @@ export function EcomRefImageThumb({
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
       >
-        <div
-          className="relative h-full w-full overflow-hidden rounded-md border border-[#d2d2d7] bg-white"
-          title={alt}
-        >
-          <Image src={src} alt={alt} fill className="object-cover" unoptimized />
-        </div>
+        {onPreview ? (
+          <button
+            type="button"
+            className="relative h-full w-full overflow-hidden rounded-md border border-[#d2d2d7] bg-white"
+            title={alt}
+            onClick={onPreview}
+          >
+            <Image src={src} alt={alt} fill className="object-cover" unoptimized />
+          </button>
+        ) : (
+          <div
+            className="relative h-full w-full overflow-hidden rounded-md border border-[#d2d2d7] bg-white"
+            title={alt}
+          >
+            <Image src={src} alt={alt} fill className="object-cover" unoptimized />
+          </div>
+        )}
 
         {onRemove ? (
           <button
@@ -129,7 +146,8 @@ export function EcomRefImageThumb({
               <img
                 src={src}
                 alt={alt}
-                className="max-h-64 w-full rounded-lg object-contain"
+                className="w-full rounded-lg object-contain"
+                style={{ maxHeight: PREVIEW_MAX_H }}
               />
               <p className="truncate px-1.5 py-1 text-[10px] text-[#6e6e73]">{alt}</p>
             </div>,

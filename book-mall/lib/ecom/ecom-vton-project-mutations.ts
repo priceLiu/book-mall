@@ -1,6 +1,13 @@
 import { randomUUID } from "crypto";
 
-import { runEcomVtonTryOnBatch } from "@/lib/ecom/ecom-vton/batch-tryon";
+import {
+  buildVtonBatchResultsForRun,
+  formatVtonBatchTryonLabel,
+  mergeVtonBatchRunIntoResults,
+  resolveVtonBatchTryonProgressPhase,
+  runEcomVtonTryOnBatch,
+} from "@/lib/ecom/ecom-vton/batch-tryon";
+import { isVtonBatchCancelRequested, requestVtonBatchTryonCancel } from "@/lib/ecom/ecom-vton/cancel";
 import {
   mergeVtonMeta,
   newGarmentId,
@@ -80,55 +87,86 @@ export async function runVtonProjectBatchTryon(opts: {
   metaRaw: unknown;
   looks?: VtonLookSpec[];
   persistMeta: (meta: VtonProjectMeta) => Promise<void>;
+  loadMeta: () => Promise<VtonProjectMeta>;
 }): Promise<VtonProjectMeta> {
   const meta = sanitizeVtonProjectMeta(opts.metaRaw);
-  const looks = opts.looks ?? meta.lookDrafts ?? [];
+  const allLooks = meta.lookDrafts ?? [];
+  const targetLooks = opts.looks?.length ? opts.looks : allLooks;
+  if (targetLooks.length < 1) throw new Error("请至少选择 1 套搭配");
   const garmentPool = meta.garmentPool ?? [];
 
+  let mergedResults = buildVtonBatchResultsForRun({
+    allLooks,
+    targetLooks,
+    previousResults: meta.tryonBatch?.results,
+  });
+
   let workingMeta = mergeVtonMeta(meta, {
+    tryonBatchCancelBatchId: null,
     tryonBatch: {
       batchId: randomUUID(),
       status: "running",
       currentIndex: 0,
-      total: looks.length,
+      total: targetLooks.length,
       label: "排队中…",
-      results: [],
+      results: mergedResults,
       updatedAt: new Date().toISOString(),
     },
     tryonProgress: { phase: "submitting", label: "批量试衣开始…", updatedAt: new Date().toISOString() },
   });
   await opts.persistMeta(workingMeta);
 
+  const activeBatchId = workingMeta.tryonBatch!.batchId;
+
   const batch = await runEcomVtonTryOnBatch({
     userId: opts.userId,
     consumerToolKey: opts.consumerToolKey,
     projectId: opts.projectId,
     modelUrl: opts.modelUrl,
-    looks,
+    looks: targetLooks,
     garmentPool,
-    onProgress: async ({ batch: b }) => {
+    initialResults: mergedResults,
+    shouldCancel: async () => {
+      const latest = await opts.loadMeta();
+      return isVtonBatchCancelRequested(latest, activeBatchId);
+    },
+    onProgress: async ({ batch: b, itemProgress }) => {
+      const latest = await opts.loadMeta();
+      mergedResults = mergeVtonBatchRunIntoResults(mergedResults, b.results);
+      const batchLabel = formatVtonBatchTryonLabel(b);
       workingMeta = mergeVtonMeta(workingMeta, {
-        tryonBatch: b,
+        tryonBatch: { ...b, label: batchLabel, results: mergedResults },
         tryonProgress: {
-          phase: b.status === "running" ? "polling" : b.status === "done" ? "done" : "failed",
-          label: b.label ?? "批量试衣中…",
+          phase: resolveVtonBatchTryonProgressPhase(b, itemProgress),
+          label: batchLabel,
+          pollCount: itemProgress?.pollCount,
           updatedAt: b.updatedAt,
         },
+        tryonBatchCancelBatchId: latest.tryonBatchCancelBatchId ?? null,
       });
       await opts.persistMeta(workingMeta);
     },
   });
 
+  mergedResults = mergeVtonBatchRunIntoResults(mergedResults, batch.results);
   workingMeta = mergeVtonMeta(workingMeta, {
-    tryonBatch: batch,
+    tryonBatch: { ...batch, results: mergedResults },
+    tryonBatchCancelBatchId: null,
     tryonProgress: {
       phase: batch.status === "done" ? "done" : "failed",
-      label: batch.label ?? "批量试衣完成",
+      label: batch.label ?? (batch.status === "cancelled" ? "已停止批量试衣" : "批量试衣完成"),
       updatedAt: batch.updatedAt,
     },
   });
   await opts.persistMeta(workingMeta);
   return workingMeta;
+}
+
+export function cancelVtonProjectBatchTryon(metaRaw: unknown): VtonProjectMeta {
+  const meta = sanitizeVtonProjectMeta(metaRaw);
+  const batchId = meta.tryonBatch?.batchId;
+  if (!batchId) throw new Error("当前没有进行中的批量试衣");
+  return requestVtonBatchTryonCancel(meta, batchId);
 }
 
 export function lockVtonTryonResults(
