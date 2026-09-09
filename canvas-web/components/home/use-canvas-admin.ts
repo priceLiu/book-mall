@@ -46,7 +46,7 @@ export function useCanvasAdmin(): boolean {
       return;
     }
     const ac = new AbortController();
-    let debounceTimer: ReturnType<typeof window.setTimeout> | null = null;
+    let debounceTimer: number | null = null;
     let lastLoadAt = 0;
 
     const load = () => {
