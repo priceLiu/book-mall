@@ -18,7 +18,7 @@ export function checkoutAllowedOriginsForApp(bookOrigin: string): string[] {
       "http://localhost:3012",
     );
   }
-  return [...new Set(origins)];
+  return Array.from(new Set(origins));
 }
 
 function resolveReturnTo(returnTo?: string | null): string | undefined {
