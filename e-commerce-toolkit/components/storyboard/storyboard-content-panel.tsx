@@ -1297,17 +1297,18 @@ export function StoryboardContentPanel({
       if (inlineCharGenStarted) {
         endFashionCharGenWatch();
       }
-      if (runtimeOpts?.batchInner) return;
-      if (!runtimeOpts?.skipAutoRefresh) {
-        try {
-          const refreshed = await getStoryboardProject(project.id);
-          onProjectChange(refreshed);
-          endPanelImageGenWatch(watchIndexes, refreshed);
-        } catch {
+      if (!runtimeOpts?.batchInner) {
+        if (!runtimeOpts?.skipAutoRefresh) {
+          try {
+            const refreshed = await getStoryboardProject(project.id);
+            onProjectChange(refreshed);
+            endPanelImageGenWatch(watchIndexes, refreshed);
+          } catch {
+            endPanelImageGenWatch(watchIndexes);
+          }
+        } else {
           endPanelImageGenWatch(watchIndexes);
         }
-      } else {
-        endPanelImageGenWatch(watchIndexes);
       }
     }
   }

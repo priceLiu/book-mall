@@ -2,7 +2,73 @@ import type { MediaDecomposeKind } from "@/lib/ecom/ecom-media-decompose-types";
 import {
   mediaDecomposePatchSchema,
   type MediaDecomposePatch,
+  type ReplicaAssetCatalog,
 } from "@/lib/ecom/ecom-media-decompose-structured";
+
+const MOCK_VIDEO_REPLICA_ASSET_CATALOG: ReplicaAssetCatalog = {
+  characterCount: 1,
+  characters: [
+    {
+      label: "人物A",
+      description: "约25岁女性模特，长直发，自然淡妆，偏瘦高",
+      roleInShot: "全片主演",
+    },
+  ],
+  characterWardrobe: [
+    {
+      characterLabel: "人物A",
+      garments: "米白针织开衫 + 浅色阔腿裤",
+      stylingNotes: "突出面料垂感与领口层次",
+    },
+  ],
+  products: [
+    {
+      label: "产品",
+      description: "【Mock】休闲针织开衫",
+      roleInShot: "手持展示",
+    },
+  ],
+  props: [
+    {
+      label: "展示台",
+      description: "简约白色展示台与绿植",
+      roleInShot: "背景道具",
+    },
+  ],
+  scenes: [
+    {
+      label: "场景",
+      description: "简约室内摄影棚，浅灰背景",
+      roleInShot: "全片",
+    },
+  ],
+};
+
+const MOCK_IMAGE_REPLICA_ASSET_CATALOG: ReplicaAssetCatalog = {
+  characterCount: 1,
+  characters: [
+    {
+      label: "人物A",
+      description: "年轻女性模特，休闲穿搭，自然站立",
+      roleInShot: "主体",
+    },
+  ],
+  characterWardrobe: [
+    {
+      characterLabel: "人物A",
+      garments: "休闲针织开衫与下装",
+    },
+  ],
+  products: [],
+  props: [],
+  scenes: [
+    {
+      label: "场景",
+      description: "简约室内，浅灰背景墙",
+      roleInShot: "全片",
+    },
+  ],
+};
 
 /** Dev mock · 视频拆解（3 镜，供复刻脚本匹配） */
 export const MOCK_MEDIA_DECOMPOSE_VIDEO_PATCH: MediaDecomposePatch = {
@@ -95,6 +161,7 @@ export const MOCK_MEDIA_DECOMPOSE_VIDEO_PATCH: MediaDecomposePatch = {
       editRhythm: "快节奏",
     },
   ],
+  replicaAssetCatalog: MOCK_VIDEO_REPLICA_ASSET_CATALOG,
 };
 
 /** Dev mock · 产品识图 brief */
@@ -155,6 +222,7 @@ export const MOCK_MEDIA_DECOMPOSE_IMAGE_PATCH: MediaDecomposePatch = {
     shootingChecklist:
       "1. 踩点确认巷道光线与杂物\n2. 挂床单、清地面、遮挡现代元素\n3. 儿童换装与站位 rehearsal\n4. 测曝光（灰卡/人脸）\n5. 主机位连拍 20+ 张选表情\n6. 回看焦点与构图三角\n7. 导入 RAW 调色导出交付",
   },
+  replicaAssetCatalog: MOCK_IMAGE_REPLICA_ASSET_CATALOG,
 };
 
 export function mockMediaDecomposePatchForKind(kind: MediaDecomposeKind): MediaDecomposePatch {

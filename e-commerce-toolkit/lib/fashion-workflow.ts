@@ -818,21 +818,8 @@ function hasMeaningfulOpsPack(d: FashionDeliverable | null | undefined): boolean
   );
 }
 
-type StoryTheaterDeliverableLike = Pick<
-  FashionDeliverable,
-  | "productionMode"
-  | "sellpoints"
-  | "sellpointsLocked"
-  | "selectedStoryTopic"
-  | "storyTopicCandidates"
-  | "storyTheaterVersions"
-  | "selectedStoryTheaterVersion"
-  | "storyTheaterLocked"
-  | "outputMode"
->;
-
 /** 故事剧场线 phase guard：定稿仅以 meta.storyTheaterLocked 为准，chat 确认消息不得绕过编辑步 */
-function applyStoryTheaterPhaseGuards<T extends StoryTheaterDeliverableLike>(
+function applyStoryTheaterPhaseGuards<T extends FashionDeliverable | ProDeliverable>(
   deliverable: T,
   project: StoryboardProject,
   metaDeliverable: T | null,
@@ -2159,6 +2146,28 @@ export function buildFashionStoryboardPanelsSavePatch(
   };
 }
 
+function toStoryTheaterPanels(panels: FashionPanelRow[]): ProPanelRow[] {
+  return panels.map(
+    (p): ProPanelRow => ({
+      index: p.index,
+      shotScale: p.shotScale,
+      durationSec: p.durationSec,
+      cameraMove: p.cameraMove,
+      sceneDesc: p.sceneDesc,
+      scenePrompt: p.scenePrompt,
+      modelAction: p.modelAction,
+      productFocus: p.productFocus?.trim() || p.garmentFocus?.trim() || "",
+      garmentFocus: p.garmentFocus,
+      dialogue: p.dialogue,
+      toneTexture: p.toneTexture,
+      subtitle: p.subtitle,
+      sellpointIds: p.sellpointIds,
+      imagePrompt: p.imagePrompt,
+      videoPrompt: p.videoPrompt,
+    }),
+  );
+}
+
 export function buildStoryTheaterPanelsSavePatch(
   project: StoryboardProject,
   panels: FashionPanelRow[],
@@ -2177,24 +2186,40 @@ export function buildStoryTheaterPanelsSavePatch(
 
   const wf = getFashionWorkflowMeta(project);
   const phaseKey = usesProPhase(project) ? "proPhase" : "fashionPhase";
-  const nextDeliverable = {
-    ...current,
-    selectedStoryTheaterVersion: versionKey,
-    storyTheaterVersions: {
-      ...(current.storyTheaterVersions ?? {}),
-      [versionKey]: { ...version, panels },
-    },
+  const workflowPatch = {
+    ...wf,
+    [phaseKey]: "story_theater_confirm" as const,
+    ...(usesProPhase(project)
+      ? { proStoryboardPanelsEdited: true }
+      : { fashionStoryboardPanelsEdited: true }),
   };
-  return {
-    deliverable: nextDeliverable,
-    workflow: {
-      ...wf,
-      [phaseKey]: "story_theater_confirm",
-      ...(usesProPhase(project)
-        ? { proStoryboardPanelsEdited: true }
-        : { fashionStoryboardPanelsEdited: true }),
-    },
-  };
+
+  if (isProDeliverable(current)) {
+    const storyPanels = toStoryTheaterPanels(panels);
+    const nextDeliverable: ProDeliverable = {
+      ...current,
+      selectedStoryTheaterVersion: versionKey,
+      storyTheaterVersions: {
+        ...(current.storyTheaterVersions ?? {}),
+        [versionKey]: { ...version, panels: storyPanels },
+      },
+    };
+    return { deliverable: nextDeliverable, workflow: workflowPatch };
+  }
+
+  if (isFashionDeliverable(current)) {
+    const nextDeliverable: FashionDeliverable = {
+      ...current,
+      selectedStoryTheaterVersion: versionKey,
+      storyTheaterVersions: {
+        ...(current.storyTheaterVersions ?? {}),
+        [versionKey]: { ...version, panels },
+      },
+    };
+    return { deliverable: nextDeliverable, workflow: workflowPatch };
+  }
+
+  return null;
 }
 
 export function isAwaitingProductionModePick(project: StoryboardProject): boolean {

@@ -243,7 +243,7 @@ export function buildStoryboardImagePromptContext(project: {
       params?: Record<string, string>;
       cast?: Array<{ name: string; role: string; appearance?: string }>;
       creativeBrief?: { scenarioExpansion?: string };
-      dimensions?: { customScene?: string };
+      dimensions?: { customScene?: string; designLanguage?: string };
     };
     workflow?: {
       vertical?: string;

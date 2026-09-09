@@ -29,7 +29,7 @@ export async function expandVtonModelFullBody(opts: {
     userId: opts.userId,
     modelKey,
     prompt,
-    ratio: "9:16",
+    ratio: "3:4",
     refImageUrls: [portraitUrl],
     toolKey,
   });

@@ -73,11 +73,11 @@ export function readProductBrief(
 export function readDecomposeProductDescriptionHint(
   seedVideo: SeedVideoProject,
 ): string {
-  const plan = seedVideo.meta?.replicaAssetPlan;
-  if (!plan || typeof plan !== "object") return "";
-  const products = (plan as { products?: Array<{ description?: string }> }).products;
-  const desc = products?.[0]?.description?.trim();
-  return desc ?? "";
+  const plan = readReplicaAssetPlan(
+    seedVideo.meta as Record<string, unknown> | null | undefined,
+  );
+  if (!plan) return "";
+  return plan.products[0]?.description?.trim() ?? "";
 }
 
 export function readSellingPoints(

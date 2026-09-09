@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     const storyCore = typeof body.storyCore === "string" ? body.storyCore.trim() : "";
     const storyType = typeof body.storyType === "string" ? body.storyType.trim() : "";
     const tags = Array.isArray(body.tags)
-      ? body.tags.filter((t): t is string => typeof t === "string" && t.trim()).map((t) => t.trim())
+      ? body.tags.filter((t): t is string => typeof t === "string" && t.trim().length > 0).map((t) => t.trim())
       : undefined;
     if (!vertical || !title || !storyCore || !storyType) {
       return NextResponse.json(

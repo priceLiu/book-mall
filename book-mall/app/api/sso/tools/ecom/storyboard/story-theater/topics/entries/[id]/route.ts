@@ -32,7 +32,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     if (typeof body.storyType === "string") patch.storyType = body.storyType.trim();
     if (Array.isArray(body.tags)) {
       patch.tags = body.tags
-        .filter((t): t is string => typeof t === "string" && t.trim())
+        .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
         .map((t) => t.trim());
     }
     const entry = await updateUserStoryTheaterTopic(auth.userId, id, patch);

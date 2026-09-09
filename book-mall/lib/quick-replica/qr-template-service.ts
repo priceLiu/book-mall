@@ -9,7 +9,8 @@ import {
 } from "@/lib/quick-replica/builtin-templates";
 import { ADMIN_TEMPLATE_PAGE_SIZE } from "@/lib/admin/admin-template-page";
 import { filterTemplatesForGallery } from "@/lib/quick-replica/qr-template-catalog";
-import type { QrCategory, QrTemplateJson, QrTemplateListFilters } from "@/lib/quick-replica/qr-types";
+import type { QrCategory, QrHomeFeedCategory, QrTemplateJson, QrTemplateListFilters } from "@/lib/quick-replica/qr-types";
+import { QR_HOME_FEED_CATEGORIES } from "@/lib/quick-replica/qr-types";
 
 function mergeBuiltinWithOverride(
   builtin: QrTemplateJson,
@@ -167,15 +168,8 @@ export async function listQrTemplates(
   return listQrTemplatesGallery(userId, filters, overrideMap);
 }
 
-/** 首页四宫格类目（与 quick-replica-web/lib/qr-home-feed 保持一致） */
-export const QR_HOME_FEED_CATEGORIES = [
-  "video",
-  "image",
-  "character",
-  "audio",
-] as const satisfies readonly QrCategory[];
-
-export type QrHomeFeedCategory = (typeof QR_HOME_FEED_CATEGORIES)[number];
+/** @deprecated 从 `@/lib/quick-replica/qr-types` 导入 */
+export { QR_HOME_FEED_CATEGORIES, type QrHomeFeedCategory } from "@/lib/quick-replica/qr-types";
 
 /** 单次鉴权 + 共享 catalog override，供首页四宫格批量拉取 */
 export async function listQrTemplatesHomeFeed(

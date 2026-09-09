@@ -1,9 +1,6 @@
 import { listKindBrowseItemsForSnapshot } from "@/lib/quick-replica/qr-kind-featured-service";
-import {
-  listQrTemplatesGalleryForSnapshot,
-  QR_HOME_FEED_CATEGORIES,
-} from "@/lib/quick-replica/qr-template-service";
-import type { QrCategory } from "@/lib/quick-replica/qr-types";
+import { listQrTemplatesGalleryForSnapshot } from "@/lib/quick-replica/qr-template-service";
+import { QR_HOME_FEED_CATEGORIES, type QrCategory } from "@/lib/quick-replica/qr-types";
 import {
   normalizeQuickReplicaGallerySnapshotPayload,
   QR_GALLERY_SNAPSHOT_CATEGORIES,

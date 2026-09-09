@@ -120,7 +120,7 @@ export const GET = withApiDbGuard(async (req) => {
 
   const tElig0 = performance.now();
   const elig = await getToolsSsoEligibility(verified.sub);
-  const lite = req.nextUrl.searchParams.get("lite") === "1";
+  const lite = new URL(req.url).searchParams.get("lite") === "1";
   const ecomOk = lite
     ? false
     : await userCanAccessEcommerceToolkit(verified.sub);

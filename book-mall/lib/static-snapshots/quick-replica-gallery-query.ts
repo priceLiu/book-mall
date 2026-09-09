@@ -5,7 +5,7 @@ import type {
   QrTemplateJson,
   QrTemplateListFilters,
 } from "@/lib/quick-replica/qr-types";
-import type { QrHomeFeedCategory } from "@/lib/quick-replica/qr-template-service";
+import type { QrHomeFeedCategory } from "@/lib/quick-replica/qr-types";
 import type { QuickReplicaGallerySnapshotPayload } from "@/lib/static-snapshots/quick-replica-gallery-payload";
 
 function filterTemplatesFromCategoryPool(

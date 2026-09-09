@@ -1,5 +1,15 @@
 export type QrCategory = "video" | "image" | "character" | "world" | "audio";
 
+/** 首页四宫格类目（与 quick-replica-web/lib/qr-home-feed 保持一致） */
+export const QR_HOME_FEED_CATEGORIES = [
+  "video",
+  "image",
+  "character",
+  "audio",
+] as const satisfies readonly QrCategory[];
+
+export type QrHomeFeedCategory = (typeof QR_HOME_FEED_CATEGORIES)[number];
+
 export type QrTemplateBadge = "new" | "hot" | "pinned";
 
 export type QrMediaRole = "IMAGE" | "VIDEO" | "LLM" | "AUDIO";

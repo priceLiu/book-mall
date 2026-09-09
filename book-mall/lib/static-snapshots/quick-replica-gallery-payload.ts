@@ -3,7 +3,7 @@ import type { QrTemplateJson } from "@/lib/quick-replica/qr-types";
 import {
   QR_HOME_FEED_CATEGORIES,
   type QrHomeFeedCategory,
-} from "@/lib/quick-replica/qr-template-service";
+} from "@/lib/quick-replica/qr-types";
 
 export const QUICK_REPLICA_GALLERY_PAGE_KEY = "quick-replica-gallery" as const;
 
