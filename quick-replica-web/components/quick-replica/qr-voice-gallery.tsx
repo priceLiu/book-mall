@@ -32,7 +32,7 @@ function VoiceCard({
   scrollIntoView?: boolean;
   onSelect: () => void;
 }) {
-  const { ref: visRef, visible } = useIntersectionVisible("200px 0px");
+  const { ref: visRef, visible } = useIntersectionVisible<HTMLButtonElement>("200px 0px");
   const [hover, setHover] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const preload = visible || hover;
@@ -44,7 +44,7 @@ function VoiceCard({
 
   return (
     <button
-      ref={visRef as React.RefObject<HTMLButtonElement>}
+      ref={visRef}
       type="button"
       data-voice-id={voice.voiceId}
       onClick={onSelect}
@@ -107,7 +107,7 @@ export function QrVoiceGallery({
     [catalog, voiceProvider],
   );
 
-  const { ref: panelRef, visible: panelVisible } = useIntersectionVisible("80px 0px");
+  const { ref: panelRef, visible: panelVisible } = useIntersectionVisible<HTMLDivElement>("80px 0px");
   const [items, setItems] = useState<QrVoiceCatalogItem[]>([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
