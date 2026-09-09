@@ -149,7 +149,7 @@ export function VtonResultsGrid({
   onStopBatchTryon,
   runningLookIds,
 }: Props) {
-  const results = batch?.results ?? [];
+  const results = useMemo(() => batch?.results ?? [], [batch?.results]);
   const slotLooks = looks.slice(0, ECOM_VTON_MAX_BATCH_LOOKS);
   const running = batch?.status === "running" || tryonBusy;
   const activeTryonLookId = useMemo(

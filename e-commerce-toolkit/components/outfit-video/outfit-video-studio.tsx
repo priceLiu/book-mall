@@ -8,6 +8,7 @@ import { BackgroundGenerationProvider, useBackgroundGeneration } from "@/compone
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { OutfitVideoWorkspace } from "@/components/outfit-video/outfit-video-workspace";
 import type { VtonBatchTryonMode } from "@/components/vton/vton-results-grid";
+import type { VtonBatchWorkflowProps } from "@/components/vton/vton-ref-workbench";
 import {
   isEcomTransportDisconnectError,
   runVtonBatchTryonWithPoll,
@@ -996,7 +997,7 @@ function OutfitVideoStudioInner() {
   }
 
   const outfitRefMode = project?.settings.outfitRefMode ?? "need_tryon";
-  const outfitBatchWorkflow =
+  const outfitBatchWorkflow: VtonBatchWorkflowProps | undefined =
     project && outfitRefMode === "need_tryon"
       ? {
           meta: project.meta ?? { garmentPool: [], lookDrafts: [], lockedLooks: [] },

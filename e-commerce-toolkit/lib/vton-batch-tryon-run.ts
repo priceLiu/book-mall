@@ -76,7 +76,7 @@ export async function runVtonBatchTryonWithPoll<T>(opts: {
   const relayAbort = () => ac.abort();
   opts.signal?.addEventListener("abort", relayAbort, { once: true });
 
-  let latest = await opts.fetchProject();
+  let latest: T = await opts.fetchProject();
   opts.applyProject(latest);
   const initialBatchId = opts.readBatch(latest)?.batchId;
 

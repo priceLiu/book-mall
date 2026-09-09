@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, type RefObject } from "react";
+import { useCallback, useRef, type Ref } from "react";
 import { Plus, X } from "lucide-react";
 
 import { EcomRefImageThumb } from "@/components/media/ecom-ref-image-thumb";
@@ -65,7 +65,7 @@ function PieceSlot({
             src={url}
             alt={label}
             size={size}
-            onClick={onPreview}
+            onPreview={onPreview}
             className={cn(onPreview && "cursor-zoom-in")}
           />
           {parsing ? (
@@ -127,10 +127,7 @@ function PieceSlot({
   );
 }
 
-function bindFileInput(
-  ref: RefObject<HTMLInputElement | null>,
-  onFile: (file: File) => void,
-) {
+function bindFileInput(ref: Ref<HTMLInputElement>, onFile: (file: File) => void) {
   return (
     <input
       ref={ref}

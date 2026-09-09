@@ -91,8 +91,8 @@ type Props = {
   onAttachModelFromAssets: (
     assets: Array<{ id: string; ossUrl: string; title: string }>,
   ) => Promise<void>;
-  onGenerateModel: (opts: { prompt: string; modelKey: string }) => Promise<void>;
-  onExpandFullBody: (opts: { prompt?: string; modelKey: string }) => Promise<void>;
+  onGenerateModel: (opts?: { prompt?: string }) => Promise<void>;
+  onExpandFullBody: (opts?: { prompt?: string }) => Promise<void>;
   onTryon: () => Promise<void>;
   onLockRefs: () => Promise<void>;
   batchWorkflow?: VtonBatchWorkflowProps;
