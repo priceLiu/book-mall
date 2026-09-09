@@ -89,6 +89,12 @@ function isHttpUrl(value: unknown): value is string {
   return typeof value === "string" && /^https?:\/\//.test(value.trim());
 }
 
+/** HTTP(S) 或 data:audio/ 预览 URL（日志 Result 音频） */
+function isLogMediaUrl(value: string): boolean {
+  const trimmed = value.trim();
+  return /^https?:\/\//.test(trimmed) || trimmed.startsWith("data:audio/");
+}
+
 function isLogImageRef(value: unknown): value is string {
   if (typeof value !== "string") return false;
   const t = value.trim();
@@ -411,8 +417,9 @@ export function extractLogResultUrls(resultSummary: unknown): string[] {
     const obj = resultSummary as Record<string, unknown>;
     for (const key of ["audio_url", "url", "dataUrl"]) {
       const v = obj[key];
-      if (typeof v === "string" && (isHttpUrl(v) || v.startsWith("data:audio/"))) {
-        urls.push(v.trim());
+      if (typeof v === "string") {
+        const trimmed = v.trim();
+        if (isLogMediaUrl(trimmed)) urls.push(trimmed);
       }
     }
     if (Array.isArray(obj.imageUrls)) {
@@ -442,7 +449,7 @@ export function extractLogResultUrls(resultSummary: unknown): string[] {
   }
 
   collectUrls(resultSummary, urls);
-  return [...new Set(urls.filter((u) => isHttpUrl(u) || u.startsWith("data:audio/")))];
+  return Array.from(new Set(urls.filter(isLogMediaUrl)));
 }
 
 export function pickLogAudioPreviewUrl(resultSummary: unknown): string | null {
