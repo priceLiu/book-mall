@@ -118,7 +118,7 @@ import {
   runCanvasDisplayReconcileWorker,
 } from "@/lib/canvas/canvas-video-display-recover";
 import { recoverCanvasKieImageFromGateway } from "@/lib/canvas/canvas-kie-image-recover";
-import { syncCanvasGatewayLogAfterVideoSuccess } from "@/lib/canvas/canvas-gateway-log-sync";
+import { syncCanvasGatewayLogAfterMediaSuccess } from "@/lib/canvas/canvas-gateway-log-sync";
 import {
   scheduleCanvasKieImageOssBackfill,
   scheduleCanvasVideoOssBackfill,
@@ -662,7 +662,7 @@ export async function applyCanvasBailianR2vPollResult(
       polled.raw,
     );
   }
-  await syncCanvasGatewayLogAfterVideoSuccess(taskId, ephemeralUrl).catch(
+  await syncCanvasGatewayLogAfterMediaSuccess(taskId, ephemeralUrl).catch(
     () => undefined,
   );
 }
@@ -795,6 +795,9 @@ export async function applyCanvasDashscopeImagePollResult(
     await patchCanvasProjectNodeMediaFromTask(updated);
     scheduleCanvasKieImageOssBackfill(taskId, ephemeralUrl, updated.projectId);
   }
+  await syncCanvasGatewayLogAfterMediaSuccess(taskId, ephemeralUrl).catch(
+    () => undefined,
+  );
   logKieEvent("info", "[canvas] dashscope image succeeded (ephemeral; OSS deferred)", {
     taskId,
     ephemeralUrl,
@@ -824,7 +827,7 @@ export async function applyCanvasVolcengineVideoResult(
       ) {
         await patchCanvasProjectNodeMediaFromTask(task);
       }
-      await syncCanvasGatewayLogAfterVideoSuccess(
+      await syncCanvasGatewayLogAfterMediaSuccess(
         taskId,
         task.ossUrl?.trim() || task.ephemeralUrl!.trim(),
       ).catch(() => undefined);
@@ -876,7 +879,7 @@ export async function applyCanvasVolcengineVideoResult(
     await patchCanvasProjectNodeRuntimeFromTask(updated);
     scheduleCanvasVideoOssBackfill(taskId, ephemeralUrl, updated.projectId);
   }
-  await syncCanvasGatewayLogAfterVideoSuccess(taskId, ephemeralUrl).catch(
+  await syncCanvasGatewayLogAfterMediaSuccess(taskId, ephemeralUrl).catch(
     () => undefined,
   );
   await persistCanvasE2eForTask(taskId).catch(() => undefined);
@@ -908,6 +911,10 @@ export async function applyCanvasKieTaskResult(
       ) {
         await patchCanvasProjectNodeMediaFromTask(task);
       }
+      await syncCanvasGatewayLogAfterMediaSuccess(
+        taskId,
+        task.ossUrl?.trim() || task.ephemeralUrl!.trim(),
+      ).catch(() => undefined);
     }
     return;
   }
@@ -983,6 +990,9 @@ export async function applyCanvasKieTaskResult(
         );
       }
     }
+    await syncCanvasGatewayLogAfterMediaSuccess(taskId, ephemeralUrl).catch(
+      () => undefined,
+    );
     logKieEvent("info", "[canvas] task succeeded (ephemeral; OSS deferred)", {
       taskId,
       kind: task.kind,
@@ -1089,6 +1099,9 @@ export async function applyCanvasGatewayPollResult(
     },
   });
   scheduleCanvasKieImageOssBackfill(taskId, imageEphemeral, task.projectId);
+  await syncCanvasGatewayLogAfterMediaSuccess(taskId, imageEphemeral).catch(
+    () => undefined,
+  );
   logKieEvent("info", "[canvas] gateway task succeeded (ephemeral; OSS deferred)", {
     taskId,
     kind: task.kind,

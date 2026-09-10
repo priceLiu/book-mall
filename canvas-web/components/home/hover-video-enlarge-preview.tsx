@@ -18,6 +18,15 @@ import { cn } from "@/lib/utils";
 
 const HIDE_DELAY_MS = 420;
 
+type VideoPreviewOrientation = "landscape" | "portrait" | "unknown";
+
+function readVideoOrientation(
+  el: HTMLVideoElement | null | undefined,
+): VideoPreviewOrientation {
+  if (!el?.videoWidth || !el?.videoHeight) return "unknown";
+  return el.videoWidth > el.videoHeight ? "landscape" : "portrait";
+}
+
 export type HoverVideoEnlargePayload = {
   url: string;
   posterUrl?: string;
@@ -48,6 +57,8 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
   const [touchMode, setTouchMode] = useState(false);
   const [interactive, setInteractive] = useState(false);
   const [videoLoading, setVideoLoading] = useState(false);
+  const [orientation, setOrientation] =
+    useState<VideoPreviewOrientation>("unknown");
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sourceVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -76,6 +87,7 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
     }
     resumeTimeRef.current = 0;
     setVideoLoading(false);
+    setOrientation("unknown");
     setOpen(null);
     setTouchMode(false);
     setInteractive(false);
@@ -105,6 +117,7 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
       setTouchMode(false);
       setInteractive(true);
       setVideoLoading(true);
+      setOrientation(readVideoOrientation(sourceVideo));
       setOpen(payload);
     },
     [clearHideTimer, closeNow, interactive, open?.url],
@@ -152,10 +165,18 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
       startPlayback();
     };
 
+    const onMetadata = () => {
+      setOrientation((prev) => {
+        const next = readVideoOrientation(el);
+        return next === "unknown" ? prev : next;
+      });
+      markReady();
+    };
+
     const onLoaded = () => markReady();
     el.addEventListener("loadeddata", onLoaded, { once: true });
     el.addEventListener("canplay", onLoaded, { once: true });
-    el.addEventListener("loadedmetadata", onLoaded, { once: true });
+    el.addEventListener("loadedmetadata", onMetadata, { once: true });
     if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
       markReady();
     } else {
@@ -168,7 +189,7 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
     return () => {
       el.removeEventListener("loadeddata", onLoaded);
       el.removeEventListener("canplay", onLoaded);
-      el.removeEventListener("loadedmetadata", onLoaded);
+      el.removeEventListener("loadedmetadata", onMetadata);
       muteVideo(el);
       el.pause();
     };
@@ -186,6 +207,7 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
   useEffect(() => () => closeNow(), [closeNow]);
 
   const dismissible = touchMode || interactive;
+  const isLandscape = orientation === "landscape";
 
   const portal =
     open && mounted
@@ -207,7 +229,10 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
             />
             <div
               className={cn(
-                "relative inline-block max-w-[min(90vw,640px)] transition duration-200",
+                "relative inline-block transition duration-200",
+                isLandscape
+                  ? "max-w-[min(92vw,1280px)]"
+                  : "max-w-[min(90vw,640px)]",
                 dismissible ? "pointer-events-auto" : "pointer-events-none",
                 open ? "scale-100 opacity-100" : "scale-[0.97] opacity-0",
               )}
@@ -221,7 +246,14 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
                 className="pointer-events-none absolute -inset-3 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.5),0_28px_72px_rgba(0,0,0,0.42),0_48px_120px_rgba(0,0,0,0.28)]"
                 aria-hidden
               />
-              <div className="relative flex min-h-[min(40vh,320px)] min-w-[min(90vw,640px)] items-center justify-center overflow-hidden rounded-xl bg-black">
+              <div
+                className={cn(
+                  "relative flex items-center justify-center overflow-hidden rounded-xl bg-black",
+                  isLandscape
+                    ? "min-h-[min(50vh,480px)] min-w-0"
+                    : "min-h-[min(40vh,320px)] min-w-[min(90vw,640px)]",
+                )}
+              >
                 {open.posterUrl && videoLoading ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -237,7 +269,10 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
                   src={open.url}
                   poster={open.posterUrl || undefined}
                   className={cn(
-                    "relative max-h-[80vh] max-w-[min(90vw,640px)] object-contain transition-opacity duration-150",
+                    "relative object-contain transition-opacity duration-150",
+                    isLandscape
+                      ? "max-h-[85vh] max-w-[min(92vw,1280px)]"
+                      : "max-h-[80vh] max-w-[min(90vw,640px)]",
                     videoLoading ? "opacity-0" : "opacity-100",
                   )}
                   muted

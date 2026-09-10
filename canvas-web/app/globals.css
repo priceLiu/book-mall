@@ -227,6 +227,8 @@ body {
 html[data-canvas-editor-open],
 html[data-canvas-editor-open] body {
   overflow: hidden;
+  overscroll-behavior: none;
+  overscroll-behavior-x: none;
 }
 
 /** 添加节点菜单 · 屏上固定字号（不受画布 zoom / 系统 text-size-adjust 影响） */

@@ -10,15 +10,92 @@ import { recoverVolcengineGatewayLogFromVendor } from "@/lib/gateway/volcengine-
 import { isGatewayLogTerminalStatus } from "@/lib/gateway/gateway-log-record-info";
 import { prisma } from "@/lib/prisma";
 
-/** 业务已拿到厂商成片 URL 后，确保指定 logId 收口为 SUCCEEDED */
+function isVideoResultUrl(url: string): boolean {
+  const u = url.trim();
+  if (!u.startsWith("http")) return false;
+  if (/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(u)) return true;
+  return /\/node-video\//i.test(u);
+}
+
+function isImageResultUrl(url: string): boolean {
+  const u = url.trim();
+  if (u.startsWith("data:image/")) return true;
+  if (!u.startsWith("http")) return false;
+  if (isVideoResultUrl(u)) return false;
+  if (/\.(png|jpe?g|webp|gif|avif)(\?|#|$)/i.test(u)) return true;
+  return /\/node-image\//i.test(u) || /\/node-audio\//i.test(u);
+}
+
+export function isGatewayMediaResultUrl(url: string): boolean {
+  return isVideoResultUrl(url) || isImageResultUrl(url);
+}
+
+function buildGatewayMediaResultSummary(mediaUrl: string): Record<string, unknown> {
+  if (isVideoResultUrl(mediaUrl)) {
+    return (
+      (buildGatewayTaskResultSummary(null, {
+        videoUrl: mediaUrl,
+        video_url: mediaUrl,
+        status: "succeeded",
+      }) as Record<string, unknown> | undefined) ?? {
+        videoUrl: mediaUrl,
+        video_url: mediaUrl,
+        status: "succeeded",
+      }
+    );
+  }
+  return (
+    (buildGatewayTaskResultSummary(null, {
+      imageUrls: [mediaUrl],
+      url: mediaUrl,
+      status: "succeeded",
+    }) as Record<string, unknown> | undefined) ?? {
+      imageUrls: [mediaUrl],
+      url: mediaUrl,
+      status: "succeeded",
+    }
+  );
+}
+
+/** 从 resultSummary 提取首个可展示的媒体 URL（非 task_progress 占位） */
+export function extractGatewayLogMediaUrl(resultSummary: unknown): string | null {
+  if (!resultSummary || typeof resultSummary !== "object") return null;
+  const obj = resultSummary as Record<string, unknown>;
+  if (obj.kind === "task_progress") return null;
+
+  for (const key of ["video_url", "videoUrl", "url", "audio_url"]) {
+    const v = obj[key];
+    if (typeof v === "string" && isGatewayMediaResultUrl(v)) return v.trim();
+  }
+  if (Array.isArray(obj.imageUrls)) {
+    for (const u of obj.imageUrls) {
+      if (typeof u === "string" && isGatewayMediaResultUrl(u)) return u.trim();
+    }
+  }
+  if (typeof obj.resultJson === "string") {
+    try {
+      const parsed = JSON.parse(obj.resultJson) as unknown;
+      if (parsed && typeof parsed === "object") {
+        const nested = extractGatewayLogMediaUrl(parsed);
+        if (nested) return nested;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
+}
+
+/** 业务已拿到厂商媒体 URL 后，确保指定 logId 收口为 SUCCEEDED */
 export async function ensureGatewayLogSucceededAfterVendorUrl(input: {
   logId: string;
   taskId: string;
-  videoUrl: string;
+  videoUrl?: string;
+  imageUrl?: string;
 }): Promise<void> {
   const logId = input.logId.trim();
-  const videoUrl = input.videoUrl.trim();
-  if (!logId || !videoUrl) return;
+  const mediaUrl = (input.videoUrl ?? input.imageUrl ?? "").trim();
+  if (!logId || !mediaUrl) return;
 
   const log = await prisma.gatewayRequestLog.findUnique({
     where: { id: logId },
@@ -28,18 +105,20 @@ export async function ensureGatewayLogSucceededAfterVendorUrl(input: {
       submittedAt: true,
       model: true,
       providerKind: true,
+      requestKind: true,
       externalTaskId: true,
     },
   });
   if (!log || isGatewayLogTerminalStatus(log.status)) return;
 
   const polledAtMs = Date.now();
-  const resultSummary = buildGatewayTaskResultSummary(null, {
-    videoUrl,
-    status: "succeeded",
-  });
+  const resultSummary = buildGatewayMediaResultSummary(mediaUrl);
 
-  if (log.providerKind === "VOLCENGINE" && log.externalTaskId) {
+  if (
+    log.providerKind === "VOLCENGINE" &&
+    log.externalTaskId &&
+    log.requestKind === "VIDEO"
+  ) {
     const recovered = await recoverVolcengineGatewayLogFromVendor(log.id);
     if (
       recovered.ok &&
@@ -84,23 +163,18 @@ export async function ensureGatewayChatLogSucceededAfterStream(input: {
   });
 }
 
-const CANVAS_VIDEO_RECONCILE_LIMIT = 48;
-const CANVAS_VIDEO_RECONCILE_MIN_AGE_MS = 60 * 1000;
-
-function isVideoResultUrl(url: string): boolean {
-  const u = url.trim();
-  if (!u.startsWith("http")) return false;
-  if (/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(u)) return true;
-  return /\/node-video\//i.test(u);
-}
+const CANVAS_MEDIA_RECONCILE_LIMIT = 48;
+const CANVAS_MEDIA_RECONCILE_MIN_AGE_MS = 60 * 1000;
+const GATEWAY_MEDIA_SUMMARY_RECONCILE_LIMIT = 32;
+const GATEWAY_MEDIA_SUMMARY_RECONCILE_MIN_AGE_MS = 45 * 1000;
 
 /**
- * 画布：CanvasGenerationTask 已成功且已有成片，但 Gateway 仍 RUNNING → 强制收口。
+ * 画布：CanvasGenerationTask 已成功且已有媒体结果，但 Gateway 仍 RUNNING → 强制收口。
  */
-export async function reconcileStaleCanvasVideoGatewayLogs(
+export async function reconcileStaleCanvasMediaGatewayLogs(
   nowMs: number,
 ): Promise<number> {
-  const cutoff = new Date(nowMs - CANVAS_VIDEO_RECONCILE_MIN_AGE_MS);
+  const cutoff = new Date(nowMs - CANVAS_MEDIA_RECONCILE_MIN_AGE_MS);
   const rows = await prisma.gatewayRequestLog.findMany({
     where: {
       status: "RUNNING",
@@ -112,7 +186,7 @@ export async function reconcileStaleCanvasVideoGatewayLogs(
       ],
     },
     orderBy: { submittedAt: "asc" },
-    take: CANVAS_VIDEO_RECONCILE_LIMIT,
+    take: CANVAS_MEDIA_RECONCILE_LIMIT,
     select: { id: true, storyTaskId: true, externalTaskId: true },
   });
   if (rows.length === 0) return 0;
@@ -134,9 +208,9 @@ export async function reconcileStaleCanvasVideoGatewayLogs(
     });
     if (task?.status !== "SUCCEEDED") continue;
 
-    const videoUrl =
+    const mediaUrl =
       task.ossUrl?.trim() || task.ephemeralUrl?.trim() || "";
-    if (!videoUrl || !isVideoResultUrl(videoUrl)) continue;
+    if (!mediaUrl || !isGatewayMediaResultUrl(mediaUrl)) continue;
 
     const vendorTaskId =
       task.kieTaskId?.trim() || row.externalTaskId?.trim() || canvasTaskId;
@@ -145,7 +219,9 @@ export async function reconcileStaleCanvasVideoGatewayLogs(
       await ensureGatewayLogSucceededAfterVendorUrl({
         logId: row.id,
         taskId: vendorTaskId,
-        videoUrl,
+        ...(isVideoResultUrl(mediaUrl)
+          ? { videoUrl: mediaUrl }
+          : { imageUrl: mediaUrl }),
       });
       const after = await prisma.gatewayRequestLog.findUnique({
         where: { id: row.id },
@@ -156,7 +232,68 @@ export async function reconcileStaleCanvasVideoGatewayLogs(
       }
     } catch (e) {
       console.warn(
-        "[gateway-poll] reconcileStaleCanvasVideoGatewayLogs failed",
+        "[gateway-poll] reconcileStaleCanvasMediaGatewayLogs failed",
+        row.id,
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+  }
+  return closed;
+}
+
+/** @deprecated 使用 reconcileStaleCanvasMediaGatewayLogs（含生图） */
+export async function reconcileStaleCanvasVideoGatewayLogs(
+  nowMs: number,
+): Promise<number> {
+  return reconcileStaleCanvasMediaGatewayLogs(nowMs);
+}
+
+/**
+ * resultSummary 已含媒体 URL 但 status 仍 RUNNING（例如画布先落结果、Gateway poll 未收口）。
+ */
+export async function reconcileRunningGatewayLogsWithMediaSummary(
+  nowMs: number,
+): Promise<number> {
+  const cutoff = new Date(nowMs - GATEWAY_MEDIA_SUMMARY_RECONCILE_MIN_AGE_MS);
+  const rows = await prisma.gatewayRequestLog.findMany({
+    where: {
+      status: "RUNNING",
+      requestKind: { in: ["IMAGE", "VIDEO"] },
+      submittedAt: { lt: cutoff },
+    },
+    orderBy: { submittedAt: "asc" },
+    take: GATEWAY_MEDIA_SUMMARY_RECONCILE_LIMIT,
+    select: {
+      id: true,
+      externalTaskId: true,
+      resultSummary: true,
+    },
+  });
+  if (rows.length === 0) return 0;
+
+  let closed = 0;
+  for (const row of rows) {
+    const mediaUrl = extractGatewayLogMediaUrl(row.resultSummary);
+    if (!mediaUrl) continue;
+
+    try {
+      await ensureGatewayLogSucceededAfterVendorUrl({
+        logId: row.id,
+        taskId: row.externalTaskId?.trim() || row.id,
+        ...(isVideoResultUrl(mediaUrl)
+          ? { videoUrl: mediaUrl }
+          : { imageUrl: mediaUrl }),
+      });
+      const after = await prisma.gatewayRequestLog.findUnique({
+        where: { id: row.id },
+        select: { status: true },
+      });
+      if (after && isGatewayLogTerminalStatus(after.status)) {
+        closed += 1;
+      }
+    } catch (e) {
+      console.warn(
+        "[gateway-poll] reconcileRunningGatewayLogsWithMediaSummary failed",
         row.id,
         e instanceof Error ? e.message : String(e),
       );

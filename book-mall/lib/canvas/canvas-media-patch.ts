@@ -8,6 +8,7 @@ import {
   patchCanvasJsonNodeRuntime,
   type CanvasNodeRuntimePatch,
 } from "@/lib/canvas/canvas-volcengine-recover";
+import { embedListCoverInCanvas } from "@/lib/canvas/canvas-project-list-cover";
 import { isCanvasManagedOssUrl } from "@/lib/canvas/canvas-managed-oss-url";
 import { prisma } from "@/lib/prisma";
 
@@ -207,12 +208,14 @@ export async function patchCanvasProjectNodeMediaFromTask(
   }
 
   const runtime = buildMediaRuntimePatchFromTask(task, mediaUrl);
-  const nextCanvas = patchCanvasJsonNodeMedia(
-    canvas,
-    task.nodeId,
-    nodeType,
-    mediaUrl,
-    runtime,
+  const nextCanvas = embedListCoverInCanvas(
+    patchCanvasJsonNodeMedia(
+      canvas,
+      task.nodeId,
+      nodeType,
+      mediaUrl,
+      runtime,
+    ),
   );
   const posterUrl =
     extractPosterUrlFromResultPayload(task.resultPayload) ?? undefined;

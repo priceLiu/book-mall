@@ -13,7 +13,12 @@ import {
 } from "@/lib/gateway/volcengine-stall-recover";
 import { syncKieGatewayLogFromVendorPoll } from "@/lib/gateway/kie-gateway-log-sync";
 import { gatewayV1RecordInfo } from "@/lib/gateway/gateway-v1-http-client";
-import { reconcileStaleEcomVideoGatewayLogs, reconcileStaleEcomChatGatewayLogs, reconcileStaleCanvasVideoGatewayLogs } from "@/lib/gateway/gateway-log-reconcile";
+import {
+  reconcileStaleEcomVideoGatewayLogs,
+  reconcileStaleEcomChatGatewayLogs,
+  reconcileStaleCanvasMediaGatewayLogs,
+  reconcileRunningGatewayLogsWithMediaSummary,
+} from "@/lib/gateway/gateway-log-reconcile";
 import { runGatewaySubmitWithRetry } from "@/lib/gateway/gateway-submit-error-policy";
 import {
   createKieTaskWithKey,
@@ -233,10 +238,20 @@ export async function expireStaleGatewayLogs(): Promise<number> {
 
   let r3e = 0;
   try {
-    r3e = await reconcileStaleCanvasVideoGatewayLogs(now);
+    r3e = await reconcileStaleCanvasMediaGatewayLogs(now);
   } catch (e) {
     console.warn(
-      "[gateway-poll] reconcileStaleCanvasVideoGatewayLogs skipped",
+      "[gateway-poll] reconcileStaleCanvasMediaGatewayLogs skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
+  let r3f = 0;
+  try {
+    r3f = await reconcileRunningGatewayLogsWithMediaSummary(now);
+  } catch (e) {
+    console.warn(
+      "[gateway-poll] reconcileRunningGatewayLogsWithMediaSummary skipped",
       e instanceof Error ? e.message : String(e),
     );
   }
@@ -271,6 +286,8 @@ export async function expireStaleGatewayLogs(): Promise<number> {
     r3 +
     r3c +
     r3d +
+    r3e +
+    r3f +
     r3b +
     r4
   );

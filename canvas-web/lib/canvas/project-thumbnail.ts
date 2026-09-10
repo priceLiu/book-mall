@@ -4,7 +4,9 @@ const IMAGE_THUMBNAIL_NODE_TYPES = new Set([
   "sbv1-image",
   "story-pro2-image",
   "story-pro2-three-view",
+  "story-pro-image",
   "image-engine",
+  "ai-image-engine",
   "three-view-engine",
   "image",
 ]);
@@ -12,6 +14,7 @@ const IMAGE_THUMBNAIL_NODE_TYPES = new Set([
 const VIDEO_THUMBNAIL_NODE_TYPES = new Set([
   "sbv1-video-engine",
   "video-engine",
+  "ai-video-engine",
   "story-pro2-video",
   "story-pro-video",
 ]);

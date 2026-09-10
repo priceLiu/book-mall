@@ -3,7 +3,6 @@ import { BookMallBaseUrlProvider } from "@/components/book-mall-base-url-provide
 import { CanvasAuthGate } from "@/components/auth/canvas-auth-gate";
 import { CanvasShellSessionProvider } from "@/components/auth/canvas-shell-session-provider";
 import { CanvasShell } from "@/components/layout/canvas-shell";
-import { CanvasSiteNavGuard } from "@/components/layout/canvas-site-nav-guard";
 import { DialogProvider } from "@/components/dialogs/dialog-provider";
 import { HoverVideoEnlargeProvider } from "@/components/home/hover-video-enlarge-preview";
 import { getBookMallBaseUrlServer } from "@/lib/book-mall-base-url.server";
@@ -34,7 +33,6 @@ export default function RootLayout({
     <html lang="zh-CN" suppressHydrationWarning>
       <body className="canvas-sans" suppressHydrationWarning>
         <BookMallBaseUrlProvider baseUrl={bookMallBaseUrl}>
-          <CanvasSiteNavGuard />
           <DialogProvider>
             <HoverVideoEnlargeProvider>
               <CanvasShellSessionProvider>

@@ -640,6 +640,13 @@ export async function dispatchCanvasImageQueuedTask(
           ext: "png",
         });
       }
+      const { syncCanvasGatewayLogAfterMediaSuccess } = await import(
+        "@/lib/canvas/canvas-gateway-log-sync"
+      );
+      await syncCanvasGatewayLogAfterMediaSuccess(
+        task.id,
+        job.immediate.sourceUrl ?? job.immediate.ephemeralUrl,
+      ).catch(() => undefined);
       await deps.releaseTrafficSlot(scopeKey);
       return "dispatched";
     }

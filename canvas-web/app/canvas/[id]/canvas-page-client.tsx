@@ -10,7 +10,7 @@ import {
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { CanvasGlobalAssetLibraryRoot } from "@/components/global-asset-library/canvas-global-asset-library-root";
 import { handleCanvasWheel } from "@/lib/canvas/canvas-form-wheel";
-import { installCanvasEditorPageScrollLock } from "@/lib/canvas/canvas-block-browser-nav";
+import { installCanvasEditorPageNavGuards } from "@/lib/canvas/canvas-block-browser-nav";
 import { defaultCanvasProjectName } from "@/lib/canvas/default-project-name";
 import { registerCanvasNotifier } from "@/lib/canvas/canvas-notify";
 import {
@@ -413,7 +413,7 @@ function Inner({ projectId }: { projectId: string }) {
       document.removeEventListener("wheel", onWheel, { capture: true });
   }, []);
 
-  useEffect(() => installCanvasEditorPageScrollLock(), []);
+  useEffect(() => installCanvasEditorPageNavGuards(), []);
 
   useEffect(() => {
     const open = () => {

@@ -1215,7 +1215,7 @@ function ProjectsSection({
                 <CanvasListCover
                   name={p.name}
                   calm={openingProjectId === p.id}
-                  eager={index < 5}
+                  eager={index < 15}
                   {...canvasListCoverPropsFromProject(p)}
                 />
                 <ProjectNameEditor

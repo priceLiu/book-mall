@@ -29,10 +29,11 @@ import { cloneCanvasGraphForDuplicate } from "@/lib/canvas/clone-canvas-graph";
 import { isPortalFilmShowcaseProject } from "@/lib/canvas/sbv1-film-showcase";
 import { scheduleCanvasHomeSnapshotRegeneration } from "@/lib/static-snapshots/canvas-home-snapshot-schedule";
 import {
+  coverSummaryFromLatestTask,
   embedListCoverInCanvas,
   projectListCoverSummaryFields,
-  readListCoverFromMeta,
   resolveProjectListCoverForListRow,
+  type ResolvedListCover,
 } from "@/lib/canvas/canvas-project-list-cover";
 import {
   applyCanvasDelta,
@@ -228,12 +229,14 @@ function decodeListCursor(raw: string | null | undefined): {
 function listRowToSummary(
   row: CanvasProjectListRow,
   nodesFallback?: unknown,
+  taskCover?: ResolvedListCover,
 ): CanvasProjectSummary {
   const storedThumb = row.thumbnailUrl?.trim() ?? "";
   const listCover = resolveProjectListCoverForListRow({
     meta: row.meta,
     nodes: nodesFallback,
     storedThumbnailUrl: storedThumb,
+    taskCover,
   });
   return {
     id: row.id,
@@ -250,9 +253,8 @@ function listRowToSummary(
   };
 }
 
-function rowNeedsNodesCoverFallback(row: CanvasProjectListRow): boolean {
-  const metaCover = readListCoverFromMeta(row.meta);
-  if (metaCover?.coverVideoUrl?.trim()) return false;
+function rowNeedsNodesCoverFallback(_row: CanvasProjectListRow): boolean {
+  // 始终从 nodes 解析封面：meta.listCover 在任务落库与 autosave 之间可能过期。
   return true;
 }
 
@@ -269,6 +271,50 @@ async function fetchCanvasNodesByProjectIds(
       AND cp.id IN (${Prisma.join(ids)})
   `;
   return new Map(rows.map((r) => [r.id, r.nodes]));
+}
+
+/** 节点/meta 无封面时，用最近成功任务的成片 URL 兜底 */
+async function fetchLatestTaskCoverByProjectIds(
+  userId: string,
+  projectIds: string[],
+): Promise<Map<string, ResolvedListCover>> {
+  if (projectIds.length === 0) return new Map();
+
+  const rows = await prisma.canvasGenerationTask.findMany({
+    where: {
+      projectId: { in: projectIds },
+      status: "SUCCEEDED",
+      project: { userId, deletedAt: null },
+      OR: [{ ossUrl: { not: null } }, { ephemeralUrl: { not: null } }],
+    },
+    orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }],
+    select: {
+      projectId: true,
+      ossUrl: true,
+      ephemeralUrl: true,
+      resultPayload: true,
+    },
+  });
+
+  const out = new Map<string, ResolvedListCover>();
+  for (const row of rows) {
+    if (out.has(row.projectId)) continue;
+    const cover = coverSummaryFromLatestTask(row);
+    if (cover.thumbnailUrl || cover.coverVideoUrl) {
+      out.set(row.projectId, cover);
+    }
+  }
+  return out;
+}
+
+function rowNeedsTaskCoverFallback(
+  row: CanvasProjectListRow,
+  nodesFallback: unknown | undefined,
+): boolean {
+  const fromNodes = nodesFallback
+    ? projectListCoverSummaryFields({ nodes: nodesFallback }, { forDisplay: true })
+    : null;
+  return !fromNodes?.thumbnailUrl?.trim() && !fromNodes?.coverVideoUrl?.trim();
 }
 
 function isVisibleListRow(row: CanvasProjectListRow): boolean {
@@ -329,8 +375,19 @@ export async function listCanvasProjectsForUser(
     userId,
     nodesFallbackIds,
   );
+  const taskFallbackIds = visibleRows
+    .filter((row) => rowNeedsTaskCoverFallback(row, nodesByProjectId.get(row.id)))
+    .map((r) => r.id);
+  const taskCoverByProjectId = await fetchLatestTaskCoverByProjectIds(
+    userId,
+    taskFallbackIds,
+  );
   const projects = visibleRows.map((row) =>
-    listRowToSummary(row, nodesByProjectId.get(row.id)),
+    listRowToSummary(
+      row,
+      nodesByProjectId.get(row.id),
+      taskCoverByProjectId.get(row.id),
+    ),
   );
   const last = pageRows.at(-1);
   const nextCursor =

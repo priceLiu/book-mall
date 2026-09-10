@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  blockCanvasBrowserNavKeyboard,
   CANVAS_EDITOR_PAGE_HTML_ATTR,
   CANVAS_SITE_NAV_BLOCK_HTML_ATTR,
   isCanvasBrowserNavMouseButton,
@@ -59,5 +60,33 @@ describe("canvas-block-browser-nav", () => {
     expect(shouldBlockCanvasBrowserNavMouse(event)).toBe(true);
 
     editor.remove();
+  });
+
+  it("blocks Alt+ArrowLeft keyboard back when nav block is active", () => {
+    document.documentElement.setAttribute(CANVAS_EDITOR_PAGE_HTML_ATTR, "");
+    const event = new KeyboardEvent("keydown", {
+      key: "ArrowLeft",
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    blockCanvasBrowserNavKeyboard(event);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("does not block Alt+ArrowLeft inside editable fields", () => {
+    document.documentElement.setAttribute(CANVAS_EDITOR_PAGE_HTML_ATTR, "");
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    const event = new KeyboardEvent("keydown", {
+      key: "ArrowLeft",
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    Object.defineProperty(event, "target", { value: input });
+    blockCanvasBrowserNavKeyboard(event);
+    expect(event.defaultPrevented).toBe(false);
+    input.remove();
   });
 });

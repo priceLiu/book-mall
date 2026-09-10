@@ -4,7 +4,7 @@ import { useEffect } from "react";
 
 import { installCanvasSiteNavGuards } from "@/lib/canvas/canvas-block-browser-nav";
 
-/** 画布整站 · 禁止浏览器后退/前进（侧键、触控板手势、history.back） */
+/** 非编辑页可选挂载；编辑页请用 canvas-page-client 内的 installCanvasEditorPageNavGuards */
 export function CanvasSiteNavGuard() {
   useEffect(() => installCanvasSiteNavGuards(), []);
   return null;

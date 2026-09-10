@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { isProjectThumbnailVideoUrl } from "@/lib/canvas/project-thumbnail";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +25,12 @@ function CoverPlaceholder({
   );
 }
 
+function withCoverRetryToken(url: string, retry: number): string {
+  if (retry <= 0) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}_cover=${retry}`;
+}
+
 /** 画布列表 / 历史记录封面：支持图片与视频，加载失败时显示占位而非浏览器坏图图标 */
 export function ProjectCoverMedia({
   url,
@@ -42,35 +48,53 @@ export function ProjectCoverMedia({
 }) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     setFailed(false);
     setLoaded(false);
+    setRetry(0);
   }, [url]);
 
-  if (!url?.trim() || failed) {
+  const mediaSrc = useMemo(
+    () => (url?.trim() ? withCoverRetryToken(url.trim(), retry) : ""),
+    [url, retry],
+  );
+
+  const onError = () => {
+    if (retry < 1) {
+      setRetry((n) => n + 1);
+      setLoaded(false);
+      return;
+    }
+    setFailed(true);
+  };
+
+  if (!mediaSrc || failed) {
     return (
       <CoverPlaceholder
         placeholderLetter={placeholderLetter}
-        hint={url && failed ? "封面已失效" : "等待出图"}
+        hint={mediaSrc && failed ? "封面已失效" : "等待出图"}
       />
     );
   }
 
-  if (isProjectThumbnailVideoUrl(url)) {
+  if (isProjectThumbnailVideoUrl(mediaSrc)) {
     return (
       <div className="relative size-full">
         {!loaded ? (
           <CoverPlaceholder placeholderLetter={placeholderLetter} hint="加载封面…" />
         ) : null}
         <video
-          src={url}
+          key={mediaSrc}
+          src={mediaSrc}
           className={cn(className, !loaded && "opacity-0")}
           muted
           playsInline
           preload={eager ? "auto" : "metadata"}
           onLoadedData={() => setLoaded(true)}
-          onError={() => setFailed(true)}
+          onCanPlay={() => setLoaded(true)}
+          onError={onError}
         />
       </div>
     );
@@ -83,14 +107,19 @@ export function ProjectCoverMedia({
       ) : null}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={url}
+        key={mediaSrc}
+        src={mediaSrc}
         alt={alt}
-        className={cn(className, "transition-opacity duration-200", loaded ? "opacity-100" : "opacity-0")}
+        className={cn(
+          className,
+          "transition-opacity duration-200",
+          loaded ? "opacity-100" : "opacity-0",
+        )}
         loading={eager ? "eager" : "lazy"}
         decoding="async"
         referrerPolicy="no-referrer"
         onLoad={() => setLoaded(true)}
-        onError={() => setFailed(true)}
+        onError={onError}
       />
     </div>
   );
