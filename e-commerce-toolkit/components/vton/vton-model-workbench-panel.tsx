@@ -102,7 +102,7 @@ export function VtonModelWorkbenchPanel({
   const tryonModelId = tryonModel?.id ?? meta.activeModelGenerationId;
   /** 中栏焦点：左栏浏览 vs 右栏待试衣点选（互不抢占，除非左栏选中变化） */
   const [centerSource, setCenterSource] = useState<"left" | "right">("left");
-  /** 中栏展示版本（可与左栏 preview 选中解耦，如扩全身后中栏看新图、左栏仍选头像） */
+  /** 中栏展示版本（可与左栏 preview 选中解耦，如右栏待试衣点选时） */
   const [centerGenerationId, setCenterGenerationId] = useState<string | null>(null);
   /** 左栏点选后立即切换中栏，不等待 preview API */
   const [optimisticPreviewId, setOptimisticPreviewId] = useState<string | null>(null);
@@ -138,12 +138,14 @@ export function VtonModelWorkbenchPanel({
     if (leavingGenPipeline) {
       const newest = candidates[0];
       if (newest && newest.id !== genPipelineBaselineIdRef.current) {
+        setOptimisticPreviewId(newest.id);
         setCenterGenerationId(newest.id);
         setCenterSource("left");
+        void onSelectPreview(newest.id);
         genPipelineBaselineIdRef.current = null;
       }
     }
-  }, [modelPipelineBusy, candidates]);
+  }, [modelPipelineBusy, candidates, onSelectPreview]);
 
   useEffect(() => {
     if (
@@ -156,11 +158,13 @@ export function VtonModelWorkbenchPanel({
     if (!baseline) return;
     const newest = candidates[0];
     if (newest && newest.id !== baseline) {
+      setOptimisticPreviewId(newest.id);
       setCenterGenerationId(newest.id);
       setCenterSource("left");
+      void onSelectPreview(newest.id);
       genPipelineBaselineIdRef.current = null;
     }
-  }, [candidates, modelPipelineBusy]);
+  }, [candidates, modelPipelineBusy, onSelectPreview]);
 
   const displayLeftSelection =
     optimisticPreviewId != null

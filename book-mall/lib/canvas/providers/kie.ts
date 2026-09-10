@@ -1168,7 +1168,7 @@ function normalizeKieAudioParamsSchema(
   });
 }
 
-function isKieGptImageModelKey(modelKey: string): boolean {
+export function isKieGptImageModelKey(modelKey: string): boolean {
   const k = modelKey.trim().toLowerCase();
   return k === "4o-image" || k.startsWith("gpt-image");
 }

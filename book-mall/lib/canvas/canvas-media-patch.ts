@@ -236,3 +236,34 @@ export async function patchCanvasProjectNodeMediaFromTask(
   });
   return true;
 }
+
+/** FAILED 任务写回节点 runtime.error，避免 Gateway 已收口但画布仍扫光。 */
+export async function patchCanvasProjectNodeErrorFromTask(
+  task: Pick<
+    CanvasGenerationTask,
+    "id" | "projectId" | "nodeId" | "failCode" | "failMessage"
+  >,
+): Promise<boolean> {
+  const project = await prisma.canvasProject.findUnique({
+    where: { id: task.projectId },
+    select: { canvas: true },
+  });
+  if (!project?.canvas) return false;
+
+  const runtime: CanvasNodeRuntimePatch = {
+    status: "error",
+    taskId: task.id,
+    failCode: task.failCode ?? "FAILED",
+    failMessage: (task.failMessage ?? "生成失败").slice(0, 500),
+  };
+  const nextCanvas = patchCanvasJsonNodeRuntime(
+    project.canvas,
+    task.nodeId,
+    runtime,
+  );
+  await prisma.canvasProject.update({
+    where: { id: task.projectId },
+    data: { canvas: nextCanvas as Prisma.InputJsonValue },
+  });
+  return true;
+}

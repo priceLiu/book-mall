@@ -41,7 +41,8 @@ export function useLibtvNodeToolbarHidden(nodeId: string): boolean {
       s.pro2TextOutlineEditorNodeId === nodeId,
   );
   const dockFocused = useCanvasStore((s) => s.libtvInputDockFocused);
-  return dragHidden || detailOpen || dockFocused;
+  const galOpen = useCanvasStore((s) => s.globalAssetLibraryOpen);
+  return dragHidden || detailOpen || dockFocused || galOpen;
 }
 
 /** 节点顶栏 · 屏幕坐标（portal 固定定位，避免组内/相邻节点 z 轴夹住工具条） */

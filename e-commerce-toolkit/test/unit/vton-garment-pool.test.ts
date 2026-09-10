@@ -23,14 +23,31 @@ describe("filterAvailableGarmentPool", () => {
     expect(filterAvailableGarmentPool(pool, looks)).toHaveLength(1);
   });
 
-  it("keeps complete full_set visible in pool even when used in a look", () => {
+  it("hides complete manual full_set from pool once assigned to a look", () => {
     const complete = [
       {
         ...pool[0]!,
         parsedBottomUrl: "https://x/bottom.jpg",
       },
     ];
-    expect(filterAvailableGarmentPool(complete, looks)).toHaveLength(1);
+    expect(filterAvailableGarmentPool(complete, looks)).toHaveLength(0);
+  });
+
+  it("keeps composite full_set visible in pool when used in a look", () => {
+    const compositePool: VtonGarmentItem[] = [
+      {
+        id: "set-composite",
+        kind: "full_set",
+        ossUrl: "https://x/original.jpg",
+        parsedTopUrl: "https://x/top.jpg",
+        parsedBottomUrl: "https://x/bottom.jpg",
+        fullSetInputMode: "composite",
+      },
+    ];
+    const compositeLooks: VtonLookSpec[] = [
+      { id: "look-1", kind: "full_set", fullSetGarmentId: "set-composite" },
+    ];
+    expect(filterAvailableGarmentPool(compositePool, compositeLooks)).toHaveLength(1);
   });
 });
 

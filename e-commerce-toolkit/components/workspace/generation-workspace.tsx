@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { EcomSaveToPoseLibraryButton } from "@/components/admin/ecom-save-to-pose-library-button";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
+import { useSaveToCatalog } from "@/lib/use-save-to-catalog";
 import {
   EcomImagePreviewHost,
   mapPreviewItemsFromEntries,
@@ -32,6 +32,7 @@ import {
 import { downloadMediaUrl, mediaDownloadFilename } from "@/lib/ecom-media-download";
 
 export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
+  const saveToCatalog = useSaveToCatalog();
   const { confirm, doubleConfirm, alert, toast } = useDialogs();
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
@@ -258,16 +259,18 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
                       onDelete={() => void handleDelete(a)}
                       onPinToAiSpace={() => void handlePin(a)}
                       pinnedToAiSpace={pinnedAssetIds.has(a.id)}
+                      onSaveToCatalog={
+                        !isVideo
+                          ? () =>
+                              saveToCatalog({
+                                url: a.ossUrl,
+                                prompt: a.prompt,
+                                sourceModule: `ecom-${module.id}`,
+                                sourceAssetId: a.id,
+                              })
+                          : undefined
+                      }
                     />
-                    {!isVideo ? (
-                      <EcomSaveToPoseLibraryButton
-                        imageUrl={a.ossUrl}
-                        prompt={a.prompt}
-                        sourceModule={`ecom-${module.id}`}
-                        sourceAssetId={a.id}
-                        className="self-start px-0.5"
-                      />
-                    ) : null}
                   </li>
                 );
               })}

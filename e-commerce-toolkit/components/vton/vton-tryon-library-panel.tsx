@@ -15,10 +15,13 @@ import { EcomMediaSkeletonGrid } from "@/components/media/ecom-media-skeleton";
 import { deleteAsset, listAssets, type EcomAsset } from "@/lib/ecom-api";
 import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
 import { downloadMediaUrl, mediaDownloadFilename } from "@/lib/ecom-media-download";
+import { backfillTodayTextTryonToTryonLibrary } from "@/lib/ecom-generation-record-api";
+import { useSaveToCatalog } from "@/lib/use-save-to-catalog";
 import { ECOM_VTON_TRYON_ASSET_MODULE } from "@/lib/vton-tryon-library";
 
 export function VtonTryonLibraryPanel() {
   const { confirm, doubleConfirm, alert } = useDialogs();
+  const saveToCatalog = useSaveToCatalog();
   const [assets, setAssets] = useState<EcomAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +40,12 @@ export function VtonTryonLibraryPanel() {
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  useEffect(() => {
+    const onReload = () => void load();
+    window.addEventListener("ecom-tryon-library-reload", onReload);
+    return () => window.removeEventListener("ecom-tryon-library-reload", onReload);
   }, [load]);
 
   const previewItems = useMemo(
@@ -124,6 +133,15 @@ export function VtonTryonLibraryPanel() {
                       )
                     }
                     onDelete={() => void handleDelete(asset)}
+                    onSaveToCatalog={() =>
+                      saveToCatalog({
+                        url: asset.ossUrl,
+                        prompt: asset.prompt,
+                        sourceModule: ECOM_VTON_TRYON_ASSET_MODULE,
+                        sourceAssetId: asset.id,
+                        defaultCatalog: "full-body",
+                      })
+                    }
                   />
                   <p className="truncate px-0.5 text-[11px] text-[#6e6e73]" title={title}>
                     {title}
@@ -140,22 +158,55 @@ export function VtonTryonLibraryPanel() {
 }
 
 export function VtonTryonLibraryPageHeader() {
+  const { alert } = useDialogs();
+  const [backfillBusy, setBackfillBusy] = useState(false);
+
+  async function handleBackfillToday() {
+    setBackfillBusy(true);
+    try {
+      const result = await backfillTodayTextTryonToTryonLibrary();
+      await alert({
+        title: "恢复完成",
+        message: `扫描 ${result.resultsScanned} 条文生试衣结果，新写入试衣库 ${result.saved} 条，已有 ${result.skippedExisting} 条跳过。`,
+      });
+      window.dispatchEvent(new CustomEvent("ecom-tryon-library-reload"));
+    } catch (e) {
+      await alert({
+        title: "恢复失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    } finally {
+      setBackfillBusy(false);
+    }
+  }
+
   return (
     <header className="shrink-0 border-b border-[#e8e8ed] bg-white px-4 py-4 sm:px-6 sm:py-5">
       <div className="mx-auto flex max-w-6xl flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-[#1d1d1f]">试衣库</h1>
           <p className="mt-1 max-w-xl text-sm text-[#6e6e73]">
-            电商模特试衣保存的成片；与工具站「试衣间」独立，仅在本工具箱内管理。
+            电商模特试衣保存的成片；文生试衣成功后会自动写入。悬停可入库（个人库 / 管理员全平台库）。
           </p>
         </div>
-        <Link
-          href="/ecom/model-tryon"
-          className="inline-flex items-center gap-1 rounded-lg border border-[#e8e8ed] px-3 py-1.5 text-xs text-[#0071e3] hover:bg-[#f0f6ff]"
-        >
-          <ArrowLeft className="size-3.5" />
-          返回模特试衣
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={backfillBusy}
+            onClick={() => void handleBackfillToday()}
+            className="inline-flex items-center rounded-lg border border-[#e8e8ed] px-3 py-1.5 text-xs text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
+          >
+            {backfillBusy ? "恢复中…" : "恢复今日文生试衣"}
+          </button>
+          <Link
+            href="/ecom/model-tryon"
+            className="inline-flex items-center gap-1 rounded-lg border border-[#e8e8ed] px-3 py-1.5 text-xs text-[#0071e3] hover:bg-[#f0f6ff]"
+          >
+            <ArrowLeft className="size-3.5" />
+            返回模特试衣
+          </Link>
+        </div>
       </div>
     </header>
   );

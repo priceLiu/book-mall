@@ -132,7 +132,7 @@ export function PortalFilmCasesSection() {
 
       {filtered.length > 0 ? (
         <ul className={`mt-8 ${CANVAS_LIST_GRID_CLASS}`}>
-          {filtered.map((item) => {
+          {filtered.map((item, index) => {
             const own = viewerUserId != null && item.owner?.id === viewerUserId;
             const busy = copyingId === item.sourceId;
 
@@ -147,6 +147,7 @@ export function PortalFilmCasesSection() {
                       posterUrl={item.posterUrl}
                       placeholderLetter={item.projectName}
                       calm={preview != null}
+                      eager={index < 10}
                     />
                   </div>
                   <ShowcaseMediaKindBadge kind={item.kind} />

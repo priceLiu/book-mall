@@ -32,11 +32,23 @@ export function buildOutfitShotPrefilledGeneratePrompt(scene: SceneShot): string
 /**
  * 解析提交给视频模型的正向 Prompt：
  * - 用户曾编辑（含清空为 ""）→ 用 userGeneratePrompt
+ * - 否则若分镜适配成功 → 用 positivePrompt
  * - 否则 → 系统预填
  */
 export function resolveOutfitShotGeneratePrompt(scene: SceneShot): string {
   if (scene.userGeneratePrompt !== undefined && scene.userGeneratePrompt !== null) {
     return scene.userGeneratePrompt.trim();
   }
+  const adapted = scene.outfitStoryboardAdapt;
+  if (adapted?.status === "success" && adapted.positivePrompt?.trim()) {
+    return adapted.positivePrompt.trim();
+  }
   return buildOutfitShotPrefilledGeneratePrompt(scene);
+}
+
+/** 负向：优先分镜适配结果，否则全局默认 */
+export function resolveOutfitShotNegativePrompt(scene: SceneShot): string {
+  const adapted = scene.outfitStoryboardAdapt?.negativePrompt?.trim();
+  if (adapted) return adapted;
+  return OUTFIT_V1_NEGATIVE_PROMPT_ZH;
 }

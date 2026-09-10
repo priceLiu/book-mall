@@ -94,6 +94,10 @@ const STALE_VOLCENGINE_RECONCILE_LIMIT = (() => {
 })();
 /** 百炼 / KIE / 通义异步视频：超过此时长仍 RUNNING 则自动失败收口 */
 const STALE_ASYNC_VIDEO_MS = 45 * 60 * 1000;
+const STALE_ASYNC_VIDEO_RECONCILE_LIMIT = (() => {
+  const v = Number(process.env.STALE_ASYNC_VIDEO_RECONCILE_LIMIT);
+  return Number.isFinite(v) && v > 0 ? Math.floor(v) : 12;
+})();
 
 /** 清理无 taskId 或超时仍 RUNNING 的日志，避免界面一直 running */
 export async function expireStaleGatewayLogs(): Promise<number> {
@@ -237,23 +241,15 @@ export async function expireStaleGatewayLogs(): Promise<number> {
     );
   }
 
-  const asyncVideoCutoff = new Date(now - STALE_ASYNC_VIDEO_MS);
-  const r3b = await prisma.gatewayRequestLog.updateMany({
-    where: {
-      status: "RUNNING",
-      requestKind: "VIDEO",
-      externalTaskId: { not: null },
-      submittedAt: { lt: asyncVideoCutoff },
-      providerKind: { in: ["BAILIAN", "KIE", "DASHSCOPE", "MINIMAX"] },
-    },
-    data: {
-      status: "FAILED",
-      failCode: "STALE_TIMEOUT",
-      failMessage:
-        "异步视频任务轮询超时（超过 45 分钟），请在厂商控制台核对任务状态后重试",
-      completedAt: new Date(),
-    },
-  });
+  let r3b = 0;
+  try {
+    r3b = await reconcileStaleAsyncVideoGatewayLogs(now);
+  } catch (e) {
+    console.warn(
+      "[gateway-poll] reconcileStaleAsyncVideoGatewayLogs skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
 
   let r4 = 0;
   try {
@@ -275,7 +271,7 @@ export async function expireStaleGatewayLogs(): Promise<number> {
     r3 +
     r3c +
     r3d +
-    r3b.count +
+    r3b +
     r4
   );
 }
@@ -355,6 +351,96 @@ async function reconcileStaleVolcengineVideoLogs(nowMs: number): Promise<number>
     Math.min(4, rows.length),
   );
 
+  return closed;
+}
+
+/**
+ * 非火山异步视频（DashScope / 百炼 / KIE / MiniMax）：超过 45min 仍 RUNNING 时
+ * 先尝试 recover 画布成片，失败则 STALE_TIMEOUT 并同步 CanvasGenerationTask。
+ */
+async function reconcileStaleAsyncVideoGatewayLogs(
+  nowMs: number,
+): Promise<number> {
+  const cutoff = new Date(nowMs - STALE_ASYNC_VIDEO_MS);
+  const rows = await prisma.gatewayRequestLog.findMany({
+    where: {
+      status: "RUNNING",
+      requestKind: "VIDEO",
+      externalTaskId: { not: null },
+      submittedAt: { lt: cutoff },
+      providerKind: { in: ["BAILIAN", "KIE", "DASHSCOPE", "MINIMAX"] },
+    },
+    orderBy: { submittedAt: "asc" },
+    take: STALE_ASYNC_VIDEO_RECONCILE_LIMIT,
+    select: { id: true, storyTaskId: true, submittedAt: true },
+  });
+  if (rows.length === 0) return 0;
+
+  const { recoverCanvasVideoTaskDisplay } = await import(
+    "@/lib/canvas/canvas-video-display-recover"
+  );
+  const { failCanvasGenerationTaskFromGatewayLog } = await import(
+    "@/lib/canvas/canvas-task-service"
+  );
+
+  let closed = 0;
+  for (const row of rows) {
+    const canvasTaskId = row.storyTaskId?.trim();
+    if (canvasTaskId) {
+      try {
+        const recovered = await recoverCanvasVideoTaskDisplay(canvasTaskId);
+        if (
+          recovered.ok &&
+          recovered.action !== "failed" &&
+          recovered.action !== "noop"
+        ) {
+          const after = await prisma.gatewayRequestLog.findUnique({
+            where: { id: row.id },
+            select: { status: true },
+          });
+          if (after && after.status !== "RUNNING") {
+            closed += 1;
+            continue;
+          }
+        }
+      } catch (e) {
+        console.warn(
+          "[gateway-poll] reconcileStaleAsyncVideo recover failed",
+          row.id,
+          e instanceof Error ? e.message : String(e),
+        );
+      }
+    }
+
+    try {
+      const r = await prisma.gatewayRequestLog.updateMany({
+        where: { id: row.id, status: "RUNNING" },
+        data: {
+          status: "FAILED",
+          failCode: "STALE_TIMEOUT",
+          failMessage:
+            "异步视频任务轮询超时（超过 45 分钟），请在厂商控制台核对任务状态后重试",
+          completedAt: new Date(),
+        },
+      });
+      if (r.count <= 0) continue;
+      closed += r.count;
+      if (canvasTaskId) {
+        await failCanvasGenerationTaskFromGatewayLog({
+          canvasTaskId,
+          failCode: "timeout_gateway_sync",
+          failMessage:
+            "异步视频任务轮询超时（超过 45 分钟），请在 Gateway 日志核对 Vendor Task ID 后重试",
+        }).catch(() => undefined);
+      }
+    } catch (e) {
+      console.warn(
+        "[gateway-poll] reconcileStaleAsyncVideo stale-fail skipped",
+        row.id,
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+  }
   return closed;
 }
 

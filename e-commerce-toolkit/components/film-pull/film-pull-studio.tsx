@@ -11,6 +11,7 @@ import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
+import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import {
   streamFilmPullAnalyze,
   attachFilmPullAsset,
@@ -57,7 +58,7 @@ export function FilmPullStudio() {
 }
 
 function FilmPullStudioInner() {
-  const { alert, toast, doubleConfirm } = useDialogs();
+  const { alert, confirm, toast, doubleConfirm } = useDialogs();
   const backgroundGen = useBackgroundGeneration();
   const analyzeSubmitLockRef = useRef(false);
   const [project, setProject] = useState<FilmPullProject | null>(null);
@@ -202,16 +203,31 @@ function FilmPullStudioInner() {
       });
       return;
     }
-    try {
-      applyProject(await createFilmPullProject({ title: "专业拉片" }));
-      setStreamText("");
-    } catch (e) {
-      await alert({
-        title: "新建失败",
-        message: formatEcomTransportError(e),
-        variant: "error",
-      });
-    }
+    if (!project) return;
+    const hasWork =
+      Boolean(project.references?.video?.ossUrl) ||
+      Boolean(project.analyzeResult?.completedAt) ||
+      (project.chatHistory?.length ?? 0) > 0;
+    await runEcomNewProjectWithSavePrompt({
+      confirm,
+      hasWorkToSave: hasWork,
+      message: "当前拉片项目有未保存的进度。是否先保存项目？",
+      save: async () => {
+        await handleSaveProject();
+      },
+      onProceed: async () => {
+        try {
+          applyProject(await createFilmPullProject({ title: "专业拉片" }));
+          setStreamText("");
+        } catch (e) {
+          await alert({
+            title: "新建失败",
+            message: formatEcomTransportError(e),
+            variant: "error",
+          });
+        }
+      },
+    });
   }
 
   async function handleOpenProject(id: string) {

@@ -4249,19 +4249,73 @@ model EcomTemplateCatalogEntry {
   @@index([sortOrder])
 }
 
-/// 电商工具箱 · 平台模特库
+/// 电商工具箱 · 模特头像库（原平台模特库；platform + user/team 条目）
 model EcomModelLibraryEntry {
   id        String    @id
   name      String
   gender    String
   age       String
   ossUrl    String
+  thumbUrl  String?
+  scope     String    @default("platform")
+  userId    String?
+  tenantId  String?
   sortOrder Int       @default(0)
+  enabled   Boolean   @default(true)
   deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
   @@index([gender, age, deletedAt])
+  @@index([scope, userId, deletedAt])
+  @@index([tenantId, deletedAt])
+}
+
+/// 电商工具箱 · 服装库（系统 + 用户 + 团队）
+model EcomGarmentLibraryEntry {
+  id             String    @id
+  name           String
+  gender         String
+  ossUrl         String
+  thumbUrl       String?
+  garmentKind    String    @default("flat")
+  sourceImageKey String?
+  tags           Json?
+  scope          String    @default("platform")
+  userId         String?
+  tenantId       String?
+  enabled        Boolean   @default(true)
+  sortOrder      Int       @default(0)
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([gender, deletedAt])
+  @@index([scope, userId, deletedAt])
+  @@index([tenantId, deletedAt])
+}
+
+/// 电商工具箱 · 全身模特库（从「我的模特」晋升或成图入库）
+model EcomFullBodyModelEntry {
+  id            String    @id
+  name          String
+  gender        String
+  ossUrl        String
+  thumbUrl      String?
+  sourceAssetId String?
+  sourceImageKey String?
+  scope         String    @default("user")
+  userId        String?
+  tenantId      String?
+  enabled       Boolean   @default(true)
+  sortOrder     Int       @default(0)
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([gender, deletedAt])
+  @@index([scope, userId, deletedAt])
+  @@index([tenantId, deletedAt])
 }
 
 model EcomPoseLibraryEntry {

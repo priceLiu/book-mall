@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDashscopeVideoModelRefSyncPatch,
+  buildSbv1DockModeRefSyncPatch,
   getSbv1VideoDockModeChips,
   getSbv1VideoModelRefCaps,
   resolveDashscopeVideoModelForRefLinks,
   resolveSbv1VideoModelRefLinkBlock,
   resolveSbv1VideoModelRefRunWarning,
+  suggestSbv1DockModeForRefCount,
   sbv1DockRefCornerLabel,
   clampSbv1ReferenceMode,
 } from "@/lib/canvas/sbv1-video-model-reference";
@@ -176,5 +178,25 @@ describe("sbv1-video-model-reference", () => {
       "first_last",
       "omni",
     ]);
+  });
+
+  it("suggestSbv1DockModeForRefCount maps ref count to Wan 3.0 modes", () => {
+    expect(suggestSbv1DockModeForRefCount(0, "wan3.0-video")).toBe("t2v");
+    expect(suggestSbv1DockModeForRefCount(1, "wan3.0-video")).toBe("i2v");
+    expect(suggestSbv1DockModeForRefCount(2, "wan3.0-video")).toBe("first_last");
+    expect(suggestSbv1DockModeForRefCount(6, "wan3.0-video")).toBe("omni");
+  });
+
+  it("buildSbv1DockModeRefSyncPatch switches omni when refs exceed 2", () => {
+    const patch = buildSbv1DockModeRefSyncPatch(
+      {
+        engine: { providerId: "p", modelKey: "wan3.0-video", params: {} },
+        dockInputMode: "first_last",
+        referenceMode: "first_last",
+      },
+      5,
+    );
+    expect(patch?.dockInputMode).toBe("omni");
+    expect(patch?.referenceMode).toBe("omni");
   });
 });

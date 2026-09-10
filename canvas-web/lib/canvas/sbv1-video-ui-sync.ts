@@ -1,8 +1,5 @@
 import { GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID } from "@/lib/canvas/system-providers";
-import {
-  SBV1_ASPECT_RATIOS,
-  sbv1AspectRatioLabel,
-} from "@/lib/canvas/sbv1-video-models";
+import { sbv1AspectRatioLabel } from "@/lib/canvas/sbv1-video-models";
 import {
   clampSbv1ReferenceMode,
   getSbv1VideoModelRefCaps,
@@ -50,11 +47,8 @@ export function syncSbv1UiFromModelParams(
     setters.setDurationSec(Math.round(dur));
   }
   const ar = p.aspect_ratio ?? p.ratio;
-  if (
-    typeof ar === "string" &&
-    (SBV1_ASPECT_RATIOS as readonly string[]).includes(ar)
-  ) {
-    setters.setAspectRatio(ar as Sbv1AspectRatio);
+  if (typeof ar === "string" && ar.trim()) {
+    setters.setAspectRatio(ar.trim() as Sbv1AspectRatio);
   }
   const audio = p.generate_audio ?? p.generateAudio ?? p.sound;
   if (audio !== undefined) setters.setGenerateAudio(audio !== false);

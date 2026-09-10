@@ -1,9 +1,6 @@
 "use client";
 
-import { useState } from "react";
-
-import { CanvasPoseLibraryImportDialog } from "@/components/admin/canvas-pose-library-import-dialog";
-import { useCanvasAdmin } from "@/components/home/use-canvas-admin";
+import { useSaveToCatalog } from "@/lib/use-save-to-catalog";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -11,47 +8,44 @@ type Props = {
   prompt?: string | null;
   sourceModule?: string;
   sourceAssetId?: string;
+  onCatalogSaved?: () => void;
   className?: string;
   label?: string;
 };
 
-/** 管理员成图 · 保存到姿势库（仅 platform admin 可见） */
+/** 画布成图 · 保存到全局资产库（全员） */
 export function CanvasSaveToPoseLibraryButton({
   imageUrl,
   prompt,
-  sourceModule,
+  sourceModule = "canvas-web",
   sourceAssetId,
+  onCatalogSaved,
   className,
-  label = "保存到姿势库",
+  label = "保存到库",
 }: Props) {
-  const isAdmin = useCanvasAdmin();
-  const [open, setOpen] = useState(false);
+  const saveToCatalog = useSaveToCatalog();
 
-  if (!isAdmin || !imageUrl.trim()) return null;
+  if (!imageUrl.trim()) return null;
 
   return (
-    <>
-      <button
-        type="button"
-        className={cn(
-          "nodrag text-[10px] text-[var(--canvas-accent)] underline-offset-2 hover:underline",
-          className,
-        )}
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen(true);
-        }}
-      >
-        {label}
-      </button>
-      <CanvasPoseLibraryImportDialog
-        open={open}
-        imageUrl={imageUrl}
-        prompt={prompt}
-        sourceModule={sourceModule}
-        sourceAssetId={sourceAssetId}
-        onClose={() => setOpen(false)}
-      />
-    </>
+    <button
+      type="button"
+      className={cn(
+        "nodrag text-[10px] text-[var(--canvas-accent)] underline-offset-2 hover:underline",
+        className,
+      )}
+      onClick={(e) => {
+        e.stopPropagation();
+        saveToCatalog({
+          url: imageUrl,
+          prompt,
+          sourceModule,
+          sourceAssetId,
+          onCatalogSaved,
+        });
+      }}
+    >
+      {label}
+    </button>
   );
 }

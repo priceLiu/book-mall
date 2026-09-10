@@ -7,6 +7,7 @@ import {
   resolveLibtvMediaNodeBoxSize,
   libtvMediaNodesNeedViewportReflow,
 } from "@/lib/canvas/libtv-media-node-size";
+import { effectivePro2MediaChildSize } from "@/lib/canvas/pro2-media-group-layout";
 import {
   LIBTV_AUDIO_TRACK_LAYOUT_VERSION,
   LIBTV_AUDIO_TRACK_NODE_HEIGHT,
@@ -67,6 +68,26 @@ describe("libtvMediaNodesNeedViewportReflow", () => {
 });
 
 describe("resolveLibtvMediaNodeBoxSize", () => {
+  it("pro2 video board cell follows 9:16 aspect preset", () => {
+    const node: CanvasFlowNode = {
+      id: "v-pro2",
+      type: "sbv1-video-engine",
+      position: { x: 0, y: 0 },
+      data: {
+        pro2MediaRole: "video",
+        aspectRatio: "9:16",
+        mediaFit: true,
+        mediaAspectPreset: "9:16",
+      },
+      width: 296,
+      height: 196,
+    };
+    const expected = computeLibtvMediaAspectPresetSize("9:16", "pro2-video-cell");
+    expect(resolveLibtvMediaNodeBoxSize(node)).toEqual(expected);
+    expect(effectivePro2MediaChildSize(node)).toEqual(expected);
+    expect(expected.width).toBeLessThan(expected.height);
+  });
+
   it("uses sbv1-video profile for story-pro2-image when group has videos", () => {
     const nodes = mixedGroupNodes();
     const image = nodes.find((n) => n.id === "img1")!;

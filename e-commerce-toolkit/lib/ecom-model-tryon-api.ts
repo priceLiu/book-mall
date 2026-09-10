@@ -17,6 +17,8 @@ export type ModelTryonSettings = {
   garmentMode?: OutfitGarmentMode;
   /** wan2.7 全身生图像素尺寸（720P / 1080P / 2K） */
   modelImageSize?: string;
+  /** 文生试衣 · 图片编辑模型 */
+  textTryonModelKey?: string;
 };
 
 export type ModelTryonProject = {
@@ -45,13 +47,17 @@ function parseProject(raw: ModelTryonProject): ModelTryonProject {
 export async function fetchModelTryonModels(): Promise<{
   imageModels: StoryboardGatewayModel[];
   fusionModels: StoryboardGatewayModel[];
-  defaults?: { image?: string; fusion?: string };
+  textTryonModels: StoryboardGatewayModel[];
+  defaults?: { image?: string; fusion?: string; textTryon?: string };
 }> {
   const data = await ecomBookFetch(`${BASE}/models`);
   return {
     imageModels: (data.imageModels as StoryboardGatewayModel[]) ?? [],
     fusionModels: (data.fusionModels as StoryboardGatewayModel[]) ?? [],
-    defaults: data.defaults as { image?: string; fusion?: string } | undefined,
+    textTryonModels: (data.textTryonModels as StoryboardGatewayModel[]) ?? [],
+    defaults: data.defaults as
+      | { image?: string; fusion?: string; textTryon?: string }
+      | undefined,
   };
 }
 
@@ -347,5 +353,77 @@ export async function removeModelTryonGeneration(
     `${BASE}/projects/${projectId}/model-generations/${generationId}`,
     { method: "DELETE" },
   );
+  return parseProject(data.project as ModelTryonProject);
+}
+
+export async function uploadModelTryonTextTryonRef(
+  projectId: string,
+  file: File,
+): Promise<ModelTryonProject> {
+  const form = new FormData();
+  form.append("file", file);
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/text-tryon/refs`, {
+    method: "POST",
+    body: form,
+  });
+  return parseProject(data.project as ModelTryonProject);
+}
+
+export async function attachModelTryonTextTryonRef(
+  projectId: string,
+  ossUrl: string,
+  label?: string,
+): Promise<ModelTryonProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/text-tryon/refs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ossUrl, label }),
+  });
+  return parseProject(data.project as ModelTryonProject);
+}
+
+export async function removeModelTryonTextTryonRef(
+  projectId: string,
+  refId: string,
+): Promise<ModelTryonProject> {
+  const data = await ecomBookFetch(
+    `${BASE}/projects/${projectId}/text-tryon/refs?refId=${encodeURIComponent(refId)}`,
+    { method: "DELETE" },
+  );
+  return parseProject(data.project as ModelTryonProject);
+}
+
+export async function patchModelTryonTextTryonEditor(
+  projectId: string,
+  patch: { prompt?: string; modelKey?: string },
+): Promise<ModelTryonProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/text-tryon`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  return parseProject(data.project as ModelTryonProject);
+}
+
+export async function clearModelTryonTextTryonEditor(
+  projectId: string,
+): Promise<ModelTryonProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/text-tryon`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "clear" }),
+  });
+  return parseProject(data.project as ModelTryonProject);
+}
+
+export async function generateModelTryonTextTryonImage(
+  projectId: string,
+  opts?: { prompt?: string; modelKey?: string; ratio?: "3:4" | "4:5" | "1:1" },
+): Promise<ModelTryonProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/text-tryon/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts ?? {}),
+  });
   return parseProject(data.project as ModelTryonProject);
 }

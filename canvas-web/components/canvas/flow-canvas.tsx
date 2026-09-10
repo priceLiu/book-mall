@@ -41,6 +41,7 @@ import {
   hasNodeRemoveChanges,
   isGroupResizeCommitFrame,
   isCanvasInteractiveGeometryInProgress,
+  isCanvasSelectionOnlyChange,
   isCanvasPositionCommitOnly,
   isCanvasDimensionCommitOnly,
   isResizeRelatedChange,
@@ -198,6 +199,8 @@ import {
   type Pro2AddNodePickStore,
 } from "@/lib/canvas/pro2-add-node-pick";
 import { Pro2AddNodePopover } from "./pro2/pro2-add-node-popover";
+import { useGlobalAssetLibrary } from "@/docker-shared/global-asset-library";
+import { spawnCanvasNodesFromGlobalAssetPick } from "@/lib/canvas/spawn-global-asset-pick";
 
 const PANE_ADD_DBL_CLICK_MS = 420;
 const PANE_ADD_DBL_CLICK_PX = 10;
@@ -459,6 +462,7 @@ function FlowCanvasInner({
     ]);
   }, [getViewport]);
   const { alert, confirm } = useDialogs();
+  const { openGlobalAssetLibrary } = useGlobalAssetLibrary();
   const [paneMenu, setPaneMenu] = useState<{ x: number; y: number } | null>(
     null,
   );
@@ -580,6 +584,26 @@ function FlowCanvasInner({
     async (itemId: string, nodeType?: string) => {
       const spawnAtScreen = paneAddAnchorRef.current ?? undefined;
       closePaneAddMenu();
+
+      if (itemId === "global-asset-library") {
+        openGlobalAssetLibrary({
+          mode: "pick",
+          defaultTab: "catalog",
+          media: "image",
+          maxSelect: 9,
+          title: "平台资产库",
+          onPick: (items) => {
+            spawnCanvasNodesFromGlobalAssetPick(items, {
+              edition: sbv1Canvas ? "sbv1" : "pro2",
+              spawnAtScreen,
+              addNode: addNode as Pro2AddNodePickStore["addNode"],
+              setNodes,
+            });
+          },
+        });
+        return;
+      }
+
       await handlePro2ToolbarAddNodePick(
         itemId,
         nodeType,
@@ -594,7 +618,15 @@ function FlowCanvasInner({
         },
       );
     },
-    [addNode, setNodes, alert, confirm, sbv1Canvas, closePaneAddMenu],
+    [
+      addNode,
+      setNodes,
+      alert,
+      confirm,
+      sbv1Canvas,
+      closePaneAddMenu,
+      openGlobalAssetLibrary,
+    ],
   );
 
   useEffect(() => {
@@ -1082,19 +1114,31 @@ function FlowCanvasInner({
       }
 
       if (storeChanges.length === 0) {
-        deferStoreGraphSyncRef.current = false;
-        setCanvasGeometryDragging(false);
-        setCanvasDraggingNodeId(null);
+        // 拖动中 RF 可能只回传纯测量 dimensions；勿提前清 defer，否则 store↔RF 互写死循环
+        if (!isNodeDraggingRef.current) {
+          deferStoreGraphSyncRef.current = false;
+          setCanvasGeometryDragging(false);
+          setCanvasDraggingNodeId(null);
+        }
         if (libtvCanvas && rfChanges.some((c) => c.type === "select")) {
           syncLibtvFloatingDockPinFromRf();
         }
         return;
       }
 
+      const stillDragging =
+        isNodeDraggingRef.current ||
+        useCanvasStore.getState().canvasGeometryDragging;
+
+      if (stillDragging && !isCanvasSelectionOnlyChange(storeChanges)) {
+        deferStoreGraphSyncRef.current = true;
+        if (libtvCanvas && storeChanges.some((c) => c.type === "select")) {
+          syncLibtvFloatingDockPinFromRf();
+        }
+        return;
+      }
+
       if (libtvCanvas) {
-        const stillDragging =
-          isNodeDraggingRef.current ||
-          useCanvasStore.getState().canvasGeometryDragging;
         if (!stillDragging) {
           setCanvasGeometryDragging(false);
           setCanvasDraggingNodeId(null);
@@ -1108,7 +1152,7 @@ function FlowCanvasInner({
         syncLibtvFloatingDockPinFromRf();
         return;
       }
-      if (!isNodeDraggingRef.current) {
+      if (!stillDragging) {
         deferStoreGraphSyncRef.current = false;
         setCanvasGeometryDragging(false);
         setCanvasDraggingNodeId(null);

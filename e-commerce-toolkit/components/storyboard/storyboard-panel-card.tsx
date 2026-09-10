@@ -4,8 +4,8 @@ import Image from "next/image";
 import { ImageIcon } from "lucide-react";
 
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
-import { EcomSaveToPoseLibraryButton } from "@/components/admin/ecom-save-to-pose-library-button";
 import { StoryboardPanelImageHoverActions } from "@/components/storyboard/storyboard-panel-image-hover-actions";
+import { useSaveToCatalog } from "@/lib/use-save-to-catalog";
 import { storyboardPanelCardWidth, storyboardPreviewAspectClass } from "@/lib/storyboard-aspect";
 import type { StoryboardPanel } from "@/lib/storyboard-types";
 import { cn } from "@/lib/utils";
@@ -44,6 +44,7 @@ export function StoryboardPanelCard({
   indexLabel = "镜头",
   generateImageTitle = "生成此镜头分镜图",
 }: Props) {
+  const saveToCatalog = useSaveToCatalog();
   const hasPanelVideo = Boolean(panel.videoUrl);
   const cardWidth = storyboardPanelCardWidth(aspectRatio);
 
@@ -109,6 +110,14 @@ export function StoryboardPanelCard({
             onPreview={onPreviewImage}
             onRegenerate={onRegenerateImage}
             onPreviewPrompt={onPreviewImagePrompt}
+            onSaveToCatalog={() =>
+              saveToCatalog({
+                url: imageUrl,
+                prompt: panel.imagePrompt,
+                sourceModule: "ecom-storyboard",
+                sourceAssetId: `panel-${panel.index}`,
+              })
+            }
           />
         ) : null}
       </div>
@@ -131,13 +140,6 @@ export function StoryboardPanelCard({
           >
             有视频
           </button>
-        ) : imageUrl ? (
-          <EcomSaveToPoseLibraryButton
-            imageUrl={imageUrl}
-            prompt={panel.imagePrompt}
-            sourceModule="ecom-storyboard"
-            sourceAssetId={`panel-${panel.index}`}
-          />
         ) : null}
       </div>
     </article>

@@ -54,11 +54,11 @@ export function outfitBottomDockWelcome(mode: OutfitBottomDockMode): string {
     case "split-busy":
       return "正在拆解分镜，请稍候…";
     case "refs-setup":
-      return "分镜已生成。请在上方设置穿搭参考（已穿搭或需穿衣），完成后可锁定并逐镜生成。";
+      return "分镜已生成。请上传穿搭参考、可选填写卖点，手动「识别服装」后逐镜「适配此镜」。";
     case "refs-ready":
-      return "穿搭参考已齐。点击「锁定特征」后，即可逐镜动作迁移。";
+      return "穿搭参考已齐。可锁定特征，或先识别服装并适配分镜后再逐镜生成。";
     case "generate-ready":
-      return "特征已锁定。点击「逐镜生成视频」，按参考片段批量生成各镜。";
+      return "参考与分镜已就绪。勾选镜头后「生成 (N)」逐镜动作迁移。";
     case "generate-busy":
       return "镜头生成进行中，可在上方表格查看进度。";
     case "compose-ready":
@@ -67,7 +67,7 @@ export function outfitBottomDockWelcome(mode: OutfitBottomDockMode): string {
       return "正在合成成片，请稍候…";
     case "idle":
     default:
-      return "上传竖屏参考视频并完成拆镜后，可锁定穿搭参考、逐镜生成并合成成片。";
+      return "上传参考视频并拆镜后，上传穿搭参考、识别服装、逐镜适配分镜，再生成并合成成片。";
   }
 }
 

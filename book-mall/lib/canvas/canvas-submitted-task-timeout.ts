@@ -72,12 +72,21 @@ export async function resolveCanvasSubmittedTaskTimeoutContext(
   };
 }
 
-/** 后台生成中厂商仍在跑时，跳过 canvas 侧误杀超时。 */
+/** 后台生成中厂商仍在跑时，跳过 canvas 侧误杀超时（但不超过后台硬上限）。 */
 export function shouldDeferCanvasBackgroundVideoTimeout(input: {
   inBackground: boolean;
   cause: string;
+  waitedMs?: number;
 }): boolean {
   if (!input.inBackground) return false;
+  const hardMs = getCanvasBackgroundVideoTimeoutMin() * 60_000;
+  if (
+    input.waitedMs != null &&
+    Number.isFinite(input.waitedMs) &&
+    input.waitedMs >= hardMs
+  ) {
+    return false;
+  }
   return (
     input.cause === "vendor_still_running" ||
     input.cause === "gateway_stuck_running"

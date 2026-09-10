@@ -45,6 +45,8 @@ export async function POST(request: Request) {
       sourceModule,
       sourceAssetId,
       adminUserId: auth.userId,
+      actorUserId: auth.userId,
+      scope: "platform",
     });
 
     if (!result.ok) {

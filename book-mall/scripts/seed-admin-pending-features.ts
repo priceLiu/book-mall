@@ -1151,6 +1151,14 @@ const SEED_ITEMS: {
     sortOrder: 728,
     listKind: "PENDING",
   },
+  {
+    title: "全局资产库",
+    description:
+      "统一弹层 GALD：平台素材四库 + 我的作品；电商/Canvas/AI 空间接入；灰阶 UI；全员入库。",
+    docPath: "docs/全局资产库.md",
+    sortOrder: 730,
+    listKind: "PENDING",
+  },
 ];
 
 async function main() {

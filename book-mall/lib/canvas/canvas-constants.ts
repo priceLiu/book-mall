@@ -238,6 +238,33 @@ export function buildEcomPoseLibraryThumbOssKey(id: string): string {
   return `ecom/pose-library/${safeId}-thumb.webp`;
 }
 
+/** 电商工具箱 · 模特库列表缩略图 */
+export function buildEcomModelLibraryThumbOssKey(id: string): string {
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `ecom/model-library/${safeId}-thumb.webp`;
+}
+
+/** 电商工具箱 · 服装库列表缩略图 */
+export function buildEcomGarmentLibraryThumbOssKey(id: string): string {
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `ecom/garment-library/${safeId}-thumb.webp`;
+}
+
+/** 电商工具箱 · 全身模特库列表缩略图 */
+export function buildEcomFullBodyLibraryThumbOssKey(id: string): string {
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `ecom/full-body-library/${safeId}-thumb.webp`;
+}
+
+/** 电商工具箱 · 文生试衣内置示例参考图（固定 key，部署前 seed 上传） */
+export function buildEcomTextTryonDemoOssKey(
+  slot: "garment" | "accessory-glasses",
+  ext: string,
+): string {
+  const safeExt = ext.replace(/^\./, "").toLowerCase() || "png";
+  return `ecom/text-tryon-demo/${slot}.${safeExt}`;
+}
+
 /** 电商工具箱 · 模板区案例图（固定 key，按 category 分子目录） */
 export function buildEcomTemplateGalleryOssKey(
   category: string,

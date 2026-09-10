@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Eye, RefreshCw, Save, Shirt } from "lucide-react";
+import { Archive, Download, Eye, RefreshCw, Save, Shirt } from "lucide-react";
 
 import {
   ECOM_MEDIA_TILE_ACTION_ICON_CLASS,
@@ -14,6 +14,7 @@ type Props = {
   onPreview?: () => void;
   onDownload?: () => void;
   onSaveToAssets?: () => void;
+  onSaveToCatalog?: () => void;
   onRegenerate?: () => void;
   onOpenFittingRoom?: () => void;
   disabled?: boolean;
@@ -27,11 +28,19 @@ export function VtonResultImageHoverActions({
   onPreview,
   onDownload,
   onSaveToAssets,
+  onSaveToCatalog,
   onRegenerate,
   onOpenFittingRoom,
   disabled,
 }: Props) {
-  if (!onPreview && !onDownload && !onSaveToAssets && !onRegenerate && !onOpenFittingRoom) {
+  if (
+    !onPreview &&
+    !onDownload &&
+    !onSaveToAssets &&
+    !onSaveToCatalog &&
+    !onRegenerate &&
+    !onOpenFittingRoom
+  ) {
     return null;
   }
 
@@ -87,6 +96,21 @@ export function VtonResultImageHoverActions({
             }}
           >
             <Save className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
+          </button>
+        ) : null}
+        {onSaveToCatalog ? (
+          <button
+            type="button"
+            title="保存到库"
+            aria-label="保存到库"
+            className={cn(btnClass, "pointer-events-auto")}
+            disabled={disabled}
+            onClick={(e) => {
+              stopClick(e);
+              onSaveToCatalog();
+            }}
+          >
+            <Archive className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
           </button>
         ) : null}
         {onRegenerate ? (

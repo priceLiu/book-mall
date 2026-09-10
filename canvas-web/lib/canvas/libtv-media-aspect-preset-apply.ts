@@ -140,6 +140,15 @@ export function applyLibtvMediaAspectPreset(nodeId: string): void {
   relayoutParentGroupIfNeeded(nodeId, node.parentId);
 }
 
+function patchChangesAspectRatio(patch: Record<string, unknown>): boolean {
+  if ("aspectRatio" in patch) return true;
+  const engine = patch.engine;
+  if (!engine || typeof engine !== "object") return false;
+  const params = (engine as { params?: Record<string, unknown> }).params;
+  if (!params || typeof params !== "object") return false;
+  return "ratio" in params || "aspect_ratio" in params;
+}
+
 export function maybeApplyLibtvMediaAspectPresetFromPatch(
   nodeId: string,
   patch: Record<string, unknown>,
@@ -158,7 +167,7 @@ export function maybeApplyLibtvMediaAspectPresetFromPatch(
       }
     }
   }
-  if (!("aspectRatio" in patch)) return;
+  if (!patchChangesAspectRatio(patch)) return;
   queueMicrotask(() => applyLibtvMediaAspectPreset(nodeId));
 }
 

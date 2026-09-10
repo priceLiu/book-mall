@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
@@ -44,6 +44,7 @@ type Props = {
   ) => Promise<void>;
   onUploadSceneRef: (index: number, file: File) => Promise<void>;
   onFuse: (index: number) => Promise<void>;
+  onClearFusion?: () => void;
 };
 
 export function OutfitShotSceneFusionCell({
@@ -54,6 +55,7 @@ export function OutfitShotSceneFusionCell({
   onPickMode,
   onUploadSceneRef,
   onFuse,
+  onClearFusion,
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -87,8 +89,23 @@ export function OutfitShotSceneFusionCell({
     <div className="relative flex min-w-[9rem] flex-col gap-1.5">
       <div className="relative aspect-[9/16] w-14 overflow-hidden rounded-md border border-[#e8e8ed] bg-[#fafafa]">
         {fusedUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={fusedUrl} alt="场景融合图" className="h-full w-full object-cover" />
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={fusedUrl} alt="场景融合图" className="h-full w-full object-cover" />
+            {onClearFusion ? (
+              <button
+                type="button"
+                className="absolute right-0.5 top-0.5 z-[1] rounded-full bg-black/65 p-0.5 text-white"
+                aria-label="删除场景融合图"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClearFusion();
+                }}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            ) : null}
+          </>
         ) : (
           <div className="flex h-full items-center justify-center px-1 text-center text-[9px] leading-tight text-[#86868b]">
             场景图

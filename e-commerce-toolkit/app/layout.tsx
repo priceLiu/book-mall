@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DialogProvider } from "@/components/dialogs/dialog-provider";
+import { EcomGlobalAssetLibraryRoot } from "@/components/global-asset-library/ecom-global-asset-library-root";
 import { EcomShell } from "@/components/layout/ecom-shell";
 import { EcomSiteNavGuard } from "@/components/layout/ecom-site-nav-guard";
 import "./globals.css";
@@ -21,8 +22,10 @@ export default function RootLayout({
     <html lang="zh-CN">
       <body className="bg-[#0c0c0e] font-sans antialiased">
         <DialogProvider>
-          <EcomSiteNavGuard />
-          <EcomShell>{children}</EcomShell>
+          <EcomGlobalAssetLibraryRoot>
+            <EcomSiteNavGuard />
+            <EcomShell>{children}</EcomShell>
+          </EcomGlobalAssetLibraryRoot>
         </DialogProvider>
       </body>
     </html>

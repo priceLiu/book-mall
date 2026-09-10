@@ -5,8 +5,8 @@ import { ChevronLeft, ChevronRight, ImageIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
-import { EcomSaveToPoseLibraryButton } from "@/components/admin/ecom-save-to-pose-library-button";
 import { StoryboardPanelImageHoverActions } from "@/components/storyboard/storyboard-panel-image-hover-actions";
+import { useSaveToCatalog } from "@/lib/use-save-to-catalog";
 import { storyboardPanelCardWidth, storyboardPreviewAspectClass } from "@/lib/storyboard-aspect";
 import type { StoryboardPanel } from "@/lib/storyboard-types";
 import {
@@ -49,6 +49,7 @@ export function ModelShotPoseCard({
   indexLabel = "姿势",
   generateImageTitle = "生成此姿势模特图",
 }: Props) {
+  const saveToCatalog = useSaveToCatalog();
   const history = useMemo(() => resolveModelShotPoseImageHistory(item), [item]);
   const serverActiveIndex = useMemo(() => resolveModelShotActiveImageIndex(item), [item]);
   const [activeIndex, setActiveIndex] = useState(serverActiveIndex);
@@ -201,6 +202,14 @@ export function ModelShotPoseCard({
             onPreview={onPreviewImage ? () => onPreviewImage(displayUrl) : undefined}
             onRegenerate={onRegenerateImage}
             onPreviewPrompt={onPreviewImagePrompt}
+            onSaveToCatalog={() =>
+              saveToCatalog({
+                url: displayUrl,
+                prompt: item.prompt ?? item.poseDescription,
+                sourceModule: "ecom-model-shot",
+                sourceAssetId: `${item.index}`,
+              })
+            }
           />
         ) : null}
       </div>
@@ -217,14 +226,6 @@ export function ModelShotPoseCard({
             <span className="text-[10px] text-[#86868b]">
               {history.length > 1 ? `${history.length} 版` : "已生成"}
             </span>
-          ) : null}
-          {displayUrl ? (
-            <EcomSaveToPoseLibraryButton
-              imageUrl={displayUrl}
-              prompt={item.prompt ?? item.poseDescription}
-              sourceModule="ecom-model-shot"
-              sourceAssetId={`${item.index}`}
-            />
           ) : null}
         </div>
       </div>

@@ -13,6 +13,8 @@ import type {
   VtonTryonBatchState,
   VtonTryonHistoryEntry,
   VtonTryonProgress,
+  VtonTextTryonRef,
+  VtonTextTryonResult,
   VtonTryonResult,
 } from "@/lib/ecom/ecom-vton/types";
 import { ECOM_VTON_MAX_BATCH_LOOKS } from "@/lib/ecom/ecom-vton/types";
@@ -60,6 +62,49 @@ function sanitizeGarmentItem(raw: unknown): VtonGarmentItem | null {
     ...(fullSetInputMode ? { fullSetInputMode } : {}),
     ...(parsedTopUrl ? { parsedTopUrl } : {}),
     ...(parsedBottomUrl ? { parsedBottomUrl } : {}),
+  };
+}
+
+function sanitizeTextTryonRef(raw: unknown): VtonTextTryonRef | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const id = typeof o.id === "string" ? o.id.trim() : "";
+  const ossUrl = typeof o.ossUrl === "string" ? o.ossUrl.trim() : "";
+  const createdAt = typeof o.createdAt === "string" ? o.createdAt : "";
+  if (!id || !ossUrl || !createdAt) return null;
+  return {
+    id,
+    ossUrl,
+    label: typeof o.label === "string" ? o.label : undefined,
+    createdAt,
+  };
+}
+
+const TEXT_TRYON_RATIOS = new Set(["1:1", "3:4", "4:5", "16:9"]);
+
+export function parseVtonTextTryonResult(raw: unknown): VtonTextTryonResult | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const id = typeof o.id === "string" ? o.id.trim() : "";
+  const ossUrl = typeof o.ossUrl === "string" ? o.ossUrl.trim() : "";
+  const prompt = typeof o.prompt === "string" ? o.prompt : "";
+  const modelKey = typeof o.modelKey === "string" ? o.modelKey.trim() : "";
+  const createdAt = typeof o.createdAt === "string" ? o.createdAt : "";
+  if (!id || !ossUrl || !modelKey || !createdAt) return null;
+  const ratioRaw = typeof o.ratio === "string" ? o.ratio.trim() : "";
+  const ratio = TEXT_TRYON_RATIOS.has(ratioRaw)
+    ? (ratioRaw as VtonTextTryonResult["ratio"])
+    : undefined;
+  const width = typeof o.width === "number" && o.width > 0 ? Math.round(o.width) : undefined;
+  const height = typeof o.height === "number" && o.height > 0 ? Math.round(o.height) : undefined;
+  return {
+    id,
+    ossUrl,
+    prompt,
+    modelKey,
+    createdAt,
+    ...(ratio ? { ratio } : {}),
+    ...(width && height ? { width, height } : {}),
   };
 }
 
@@ -234,6 +279,27 @@ export function sanitizeVtonProjectMeta(raw: unknown): VtonProjectMeta {
   const activeModelGenerationId =
     typeof o.activeModelGenerationId === "string" ? o.activeModelGenerationId : undefined;
 
+  const textTryonRefs: VtonTextTryonRef[] = [];
+  if (Array.isArray(o.textTryonRefs)) {
+    for (const row of o.textTryonRefs) {
+      const parsed = sanitizeTextTryonRef(row);
+      if (parsed) textTryonRefs.push(parsed);
+    }
+  }
+
+  const textTryonResults: VtonTextTryonResult[] = [];
+  if (Array.isArray(o.textTryonResults)) {
+    for (const row of o.textTryonResults) {
+      const parsed = parseVtonTextTryonResult(row);
+      if (parsed) textTryonResults.push(parsed);
+    }
+  }
+
+  const textTryonPrompt =
+    typeof o.textTryonPrompt === "string" ? o.textTryonPrompt : undefined;
+
+  const textTryonDemoSuppressed = o.textTryonDemoSuppressed === true ? true : undefined;
+
   const base: VtonProjectMeta = {
     garmentPool,
     lookDrafts,
@@ -248,6 +314,10 @@ export function sanitizeVtonProjectMeta(raw: unknown): VtonProjectMeta {
     ...(previewModelGenerationId ? { previewModelGenerationId } : {}),
     ...(confirmedModelGenerationIds?.length ? { confirmedModelGenerationIds } : {}),
     ...(activeModelGenerationId ? { activeModelGenerationId } : {}),
+    ...(textTryonRefs.length ? { textTryonRefs } : {}),
+    ...(textTryonPrompt !== undefined ? { textTryonPrompt } : {}),
+    ...(textTryonResults.length ? { textTryonResults } : {}),
+    ...(textTryonDemoSuppressed ? { textTryonDemoSuppressed } : {}),
   };
 
   return modelGenerations.length ? finalizeModelGenerationsMeta(base) : base;
@@ -285,6 +355,10 @@ export function mergeVtonMeta(
       patch.activeModelGenerationId !== undefined
         ? patch.activeModelGenerationId
         : base.activeModelGenerationId,
+    textTryonRefs: patch.textTryonRefs ?? base.textTryonRefs,
+    textTryonPrompt:
+      patch.textTryonPrompt !== undefined ? patch.textTryonPrompt : base.textTryonPrompt,
+    textTryonResults: patch.textTryonResults ?? base.textTryonResults,
   };
   return merged.modelGenerations?.length
     ? finalizeModelGenerationsMeta(merged)

@@ -95,12 +95,13 @@ export function buildVtonBatchResultsForRun(opts: {
 }): VtonTryonResult[] {
   const targetIds = new Set(opts.targetLooks.map((l) => l.id));
   const now = new Date().toISOString();
-  return opts.allLooks.map((look) => {
+  const out: VtonTryonResult[] = [];
+  for (const look of opts.allLooks) {
     if (targetIds.has(look.id)) {
       const kept = opts.previousResults?.find((r) => r.lookId === look.id);
       const versions = kept ? normalizeVtonTryonResultVersions(kept) : [];
       const lastUrl = versions.length > 0 ? versions[versions.length - 1]!.ossUrl : undefined;
-      return {
+      out.push({
         id: randomUUID(),
         lookId: look.id,
         status: "pending",
@@ -108,17 +109,13 @@ export function buildVtonBatchResultsForRun(opts: {
         versions: versions.length > 0 ? versions : undefined,
         activeVersionIndex: versions.length > 0 ? versions.length - 1 : undefined,
         ossUrl: lastUrl,
-      };
+      });
+      continue;
     }
     const kept = opts.previousResults?.find((r) => r.lookId === look.id);
-    if (kept) return kept;
-    return {
-      id: randomUUID(),
-      lookId: look.id,
-      status: "pending",
-      createdAt: now,
-    };
-  });
+    if (kept) out.push(kept);
+  }
+  return out;
 }
 
 function seedResultForLookRun(

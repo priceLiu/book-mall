@@ -41,7 +41,13 @@ import {
   loadCachedProjectsList,
   saveCachedProjectsList,
 } from "@/lib/canvas/projects-list-client-cache";
-import { markRecentProjectsStale } from "@/lib/canvas/recent-projects-invalidate";
+import { mergeProjectsListRefresh } from "@/lib/canvas/projects-list-merge";
+import {
+  consumeRecentProjectsStale,
+  isRecentProjectsStale,
+  markRecentProjectsStale,
+  subscribeRecentProjectsInvalidate,
+} from "@/lib/canvas/recent-projects-invalidate";
 import { canvasListCoverPropsFromProject } from "@/lib/canvas/canvas-list-cover-props";
 import {
   BLANK_CANVAS,
@@ -151,6 +157,8 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
   >([]);
   const [openingProjectId, setOpeningProjectId] = useState<string | null>(null);
   const [scriptPackageLoading, setScriptPackageLoading] = useState(false);
+  const projectsRef = useRef(projects);
+  projectsRef.current = projects;
 
   const fetchProjectsPage = useCallback(
     async (cursor: string | null, limit: number) => {
@@ -162,18 +170,22 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
     [base],
   );
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { replace?: boolean }) => {
     if (!base) {
       setLoading(false);
       setError("未配置主站地址（NEXT_PUBLIC_BOOK_MALL_URL），无法加载画布列表。");
       return;
     }
-    const hadData = projects.length > 0;
+    const hadData = projectsRef.current.length > 0;
     if (!hadData) setLoading(true);
     setError(null);
     try {
       const page = await fetchProjectsPage(null, PROJECTS_FIRST_PAGE_SIZE);
-      setProjects(page.projects);
+      if (!hadData || opts?.replace) {
+        setProjects(page.projects);
+      } else {
+        setProjects((prev) => mergeProjectsListRefresh(prev, page.projects));
+      }
       setNextCursor(page.nextCursor);
       setHasMore(page.hasMore);
       saveCachedProjectsList(page);
@@ -189,7 +201,7 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
     } finally {
       setLoading(false);
     }
-  }, [base, fetchProjectsPage, projects.length]);
+  }, [base, fetchProjectsPage]);
 
   const loadMore = useCallback(async () => {
     if (!base || !hasMore || !nextCursor || loadingMore || loading) return;
@@ -240,11 +252,25 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
     if (initialPage != null) {
       saveCachedProjectsList(initialPage);
       setLoading(false);
-      const timer = window.setTimeout(() => void load(), 2500);
-      return () => window.clearTimeout(timer);
+      return;
     }
     void load();
   }, [load, initialPage]);
+
+  useEffect(() => {
+    return subscribeRecentProjectsInvalidate(() => void load());
+  }, [load]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!isRecentProjectsStale()) return;
+      consumeRecentProjectsStale();
+      void load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [load]);
 
   useEffect(() => {
     const el = loadMoreSentinelRef.current;
@@ -650,7 +676,7 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
         await deleteCanvasProject(base, id);
         invalidateCachedProjectsList();
         markRecentProjectsStale();
-        await load();
+        setProjects((list) => list.filter((p) => p.id !== id));
       } catch (e) {
         setError(e instanceof Error ? e.message : "删除失败");
       }
@@ -735,8 +761,8 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
         </div>
       ) : null}
 
-      {loading ? (
-        <CanvasListSkeleton sections={1} cardsPerSection={10} />
+      {loading && projects.length === 0 ? (
+        <CanvasListSkeleton sections={3} cardsPerSection={5} />
       ) : projects.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-12 text-center text-sm text-[var(--canvas-muted)]">
           还没有画布。请使用上方按钮创建影视专业版或分镜视频画布。
@@ -1174,7 +1200,7 @@ function ProjectsSection({
         </div>
       ) : (
         <ul className={CANVAS_LIST_GRID_CLASS}>
-          {projects.map((p) => (
+          {projects.map((p, index) => (
             <li
               key={p.id}
               className="@container group relative rounded-2xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-4 transition hover:border-[var(--canvas-accent)]/40"
@@ -1189,6 +1215,7 @@ function ProjectsSection({
                 <CanvasListCover
                   name={p.name}
                   calm={openingProjectId === p.id}
+                  eager={index < 5}
                   {...canvasListCoverPropsFromProject(p)}
                 />
                 <ProjectNameEditor

@@ -35,7 +35,26 @@ export type VtonModelGenerationBodyCheck = {
 };
 
 export type VtonGarmentMode = "two_piece" | "one_piece";
-export type VtonRefMode = "already_dressed" | "need_tryon";
+export type VtonRefMode = "already_dressed" | "need_tryon" | "text_to_tryon";
+
+export type VtonTextTryonRef = {
+  id: string;
+  ossUrl: string;
+  label?: string;
+  createdAt: string;
+};
+
+export type VtonTextTryonResult = {
+  id: string;
+  ossUrl: string;
+  prompt: string;
+  modelKey: string;
+  createdAt: string;
+  /** 出图比例（如 3:4）；与 width/height 一并写入，便于结果格按成片比例展示 */
+  ratio?: "1:1" | "3:4" | "4:5" | "16:9";
+  width?: number;
+  height?: number;
+};
 
 export type VtonLookKind = "two_piece" | "one_piece" | "top_only" | "bottom_only" | "full_set";
 
@@ -140,6 +159,14 @@ export type VtonProjectMeta = {
   confirmedModelGenerationIds?: string[];
   /** 当前试衣使用的模特版本 id（须在 confirmed 内） */
   activeModelGenerationId?: string;
+  /** 文生试衣 · 参考图列表 */
+  textTryonRefs?: VtonTextTryonRef[];
+  /** 文生试衣 · Prompt（含 @图片N） */
+  textTryonPrompt?: string;
+  /** 文生试衣 · 生成结果（新结果追加在前） */
+  textTryonResults?: VtonTextTryonResult[];
+  /** 用户点击「清空编辑区」后为 true，不再自动注入内置示例 */
+  textTryonDemoSuppressed?: boolean;
 };
 
 /** 电商工具箱 · 我的模特库 module */

@@ -8,6 +8,7 @@ import {
   CanvasToolsSessionProvider,
 } from "@/components/auth/canvas-tools-session-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { CanvasGlobalAssetLibraryRoot } from "@/components/global-asset-library/canvas-global-asset-library-root";
 import { handleCanvasWheel } from "@/lib/canvas/canvas-form-wheel";
 import { installCanvasEditorPageScrollLock } from "@/lib/canvas/canvas-block-browser-nav";
 import { defaultCanvasProjectName } from "@/lib/canvas/default-project-name";
@@ -1886,9 +1887,11 @@ function Inner({ projectId }: { projectId: string }) {
 export function CanvasPageClient({ projectId }: { projectId: string }) {
   return (
     <CanvasToolsSessionProvider>
-      <SaveProjectAssetDialogHost />
-      <PortraitImportProgressHost />
-      <Inner projectId={projectId} />
+      <CanvasGlobalAssetLibraryRoot>
+        <SaveProjectAssetDialogHost />
+        <PortraitImportProgressHost />
+        <Inner projectId={projectId} />
+      </CanvasGlobalAssetLibraryRoot>
     </CanvasToolsSessionProvider>
   );
 }

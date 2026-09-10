@@ -18,6 +18,7 @@ import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-mark
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { EcomIconButton, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomGlobalAssetLibraryToolbarButton } from "@/components/global-asset-library/ecom-global-asset-library-toolbar-button";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
@@ -349,6 +350,7 @@ export function FilmPullWorkspace({
               ) : null}
             </EcomIconToolbarGroup>
             <EcomIconToolbarGroup label="资产与交付">
+              <EcomGlobalAssetLibraryToolbarButton defaultCatalog="pose" />
               <EcomIconButton label="我的资产" icon={Images} onClick={() => router.push("/library")} />
               {onExportZip ? (
                 <EcomIconButton

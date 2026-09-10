@@ -6,6 +6,7 @@ import { EcomLoginPrompt } from "@/components/auth/ecom-login-prompt";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { EcomIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomGlobalAssetLibraryToolbarButton } from "@/components/global-asset-library/ecom-global-asset-library-toolbar-button";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import type { VtonBatchTryonMode } from "@/components/vton/vton-results-grid";
@@ -22,21 +23,28 @@ import { VtonRefWorkbench } from "@/components/vton/vton-ref-workbench";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
 import { formatEcomImageGenUserMessage } from "@/lib/ecom-image-gen-user-error";
+import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import {
   attachModelTryonRefs,
+  attachModelTryonTextTryonRef,
   batchModelTryon,
   cancelModelTryonBatch,
   buildModelTryonCartesianLooks,
+  clearModelTryonTextTryonEditor,
   createModelTryonProject,
   expandModelTryonFullBody,
+  fetchModelTryonModels,
   generateModelTryonModel,
+  generateModelTryonTextTryonImage,
   getModelTryonProject,
   listModelTryonProjectSummaries,
   lockModelTryonResults,
   patchModelTryonGarments,
   patchModelTryonLooks,
+  patchModelTryonTextTryonEditor,
   confirmModelTryonGeneration,
   removeModelTryonGeneration,
+  removeModelTryonTextTryonRef,
   saveModelTryonModelImage,
   saveModelTryonToAssets,
   setActiveModelTryonGeneration,
@@ -47,7 +55,14 @@ import {
   updateModelTryonProject,
   uploadModelTryonGarment,
   uploadModelTryonRefImage,
+  uploadModelTryonTextTryonRef,
 } from "@/lib/ecom-model-tryon-api";
+import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import {
+  bindTextTryonPromptRefTokens,
+  normalizeVtonTextTryonPrompt,
+  VTON_TEXT_TRYON_DEFAULT_PROMPT,
+} from "@/lib/vton-text-tryon-default-prompt";
 import type { ModelTryonProject } from "@/lib/ecom-model-tryon-api";
 import { mergeVtonTryonProgressWithBatch, parseVtonTryonProgress } from "@/lib/vton-tryon-progress";
 import { buildFullSetAssetPatch } from "@/lib/vton-full-set-garment";
@@ -72,6 +87,13 @@ export function ModelTryonStudio() {
   const [modelPipelineBusy, setModelPipelineBusy] = useState<
     "uploading" | "importing-model" | "generating-model" | "expanding-full-body" | null
   >(null);
+  const [textTryonModels, setTextTryonModels] = useState<StoryboardGatewayModel[]>([]);
+  const [textTryonModelsLoading, setTextTryonModelsLoading] = useState(true);
+  const [textTryonGenerating, setTextTryonGenerating] = useState(false);
+  const [textTryonPromptDraft, setTextTryonPromptDraft] = useState("");
+  const [textTryonUploading, setTextTryonUploading] = useState(false);
+  const [textTryonUploadProgress, setTextTryonUploadProgress] = useState<number | null>(null);
+  const [textTryonUploadLabel, setTextTryonUploadLabel] = useState("正在上传…");
   const tryonPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const batchAbortRef = useRef<AbortController | null>(null);
 
@@ -81,6 +103,52 @@ export function ModelTryonStudio() {
       sessionStorage.setItem(PROJECT_STORAGE_KEY, p.id);
     }
   }, []);
+
+  const applyTextTryonProjectWithPromptSync = useCallback(
+    async (next: ModelTryonProject, promptSeed?: string) => {
+      const refCount = (next.meta?.textTryonRefs ?? []).filter((r) => r.ossUrl?.trim()).length;
+      const basePrompt = promptSeed ?? textTryonPromptDraft;
+      const boundPrompt = bindTextTryonPromptRefTokens(basePrompt, refCount);
+      let merged = next;
+      if (boundPrompt !== normalizeVtonTextTryonPrompt(basePrompt)) {
+        setTextTryonPromptDraft(boundPrompt);
+        merged = await patchModelTryonTextTryonEditor(next.id, { prompt: boundPrompt });
+      }
+      applyProject(merged);
+      return merged;
+    },
+    [applyProject, textTryonPromptDraft],
+  );
+
+  const runTextTryonRefTask = useCallback(
+    async (
+      label: string,
+      task: () => Promise<ModelTryonProject>,
+      opts?: { simulateProgress?: boolean },
+    ) => {
+      setRefBusy(true);
+      setTextTryonUploading(true);
+      setTextTryonUploadLabel(label);
+      const simulate = opts?.simulateProgress !== false;
+      setTextTryonUploadProgress(simulate ? 10 : null);
+      const tick = simulate
+        ? window.setInterval(() => {
+            setTextTryonUploadProgress((p) => (p != null && p < 88 ? p + 7 : p));
+          }, 180)
+        : null;
+      try {
+        const next = await task();
+        if (simulate) setTextTryonUploadProgress(100);
+        await applyTextTryonProjectWithPromptSync(next);
+      } finally {
+        if (tick != null) window.clearInterval(tick);
+        setRefBusy(false);
+        setTextTryonUploading(false);
+        window.setTimeout(() => setTextTryonUploadProgress(null), 450);
+      }
+    },
+    [applyTextTryonProjectWithPromptSync],
+  );
 
   const uploadModelFiles = useCallback(
     async (files: File[]) => {
@@ -127,6 +195,29 @@ export function ModelTryonStudio() {
 
   useEffect(() => {
     let cancelled = false;
+    void fetchModelTryonModels()
+      .then((data) => {
+        if (!cancelled) setTextTryonModels(data.textTryonModels ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setTextTryonModels([]);
+      })
+      .finally(() => {
+        if (!cancelled) setTextTryonModelsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    setTextTryonPromptDraft(
+      normalizeVtonTextTryonPrompt(project?.meta?.textTryonPrompt ?? ""),
+    );
+  }, [project?.meta?.textTryonPrompt, project?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
     (async () => {
       setLoading(true);
       try {
@@ -157,8 +248,37 @@ export function ModelTryonStudio() {
   }, [applyProject]);
 
   async function handleNewProject() {
-    applyProject(await createModelTryonProject());
-    setSelectedResultIds([]);
+    if (!project) return;
+    await runEcomNewProjectWithSavePrompt({
+      confirm,
+      hasWorkToSave:
+        (project.settings.outfitRefMode ?? "need_tryon") !== "text_to_tryon" &&
+        Boolean(
+          project.references.dressedImage?.ossUrl?.trim() ||
+            (vtonMeta.lockedLooks?.length ?? 0) > 0,
+        ),
+      message: "当前试衣成片尚未保存到试衣库。是否先保存？",
+      save: async () => {
+        setSaveBusy(true);
+        try {
+          await saveModelTryonToAssets(project.id);
+          await toast({
+            title: "已保存",
+            message: "试衣成片已写入「我的资产 → 试衣库」",
+            variant: "success",
+          });
+        } catch (e) {
+          await alert({ title: "保存失败", message: formatEcomTransportError(e), variant: "error" });
+          throw e;
+        } finally {
+          setSaveBusy(false);
+        }
+      },
+      onProceed: async () => {
+        applyProject(await createModelTryonProject());
+        setSelectedResultIds([]);
+      },
+    });
   }
 
   async function handleOpenProject(id: string) {
@@ -308,13 +428,18 @@ export function ModelTryonStudio() {
     outfitRefMode?: OutfitRefMode;
     garmentMode?: OutfitGarmentMode;
     modelImageSize?: VtonModelImageSize;
+    textTryonModelKey?: string;
   }) {
     if (!project) return;
-    applyProject(
-      await updateModelTryonProject(project.id, {
-        settings: { ...project.settings, ...patch },
-      }),
-    );
+    const next = await updateModelTryonProject(project.id, {
+      settings: { ...project.settings, ...patch },
+    });
+    if (patch.outfitRefMode === "text_to_tryon") {
+      setTextTryonPromptDraft(
+        normalizeVtonTextTryonPrompt(next.meta?.textTryonPrompt ?? VTON_TEXT_TRYON_DEFAULT_PROMPT),
+      );
+    }
+    applyProject(next);
   }
 
   function toggleResultSelection(resultId: string) {
@@ -346,6 +471,12 @@ export function ModelTryonStudio() {
   const garmentMode = project.settings.garmentMode ?? "two_piece";
   const modelImageSize = coerceVtonModelImageSize(project.settings.modelImageSize);
   const useBatch = outfitRefMode === "need_tryon";
+  const isTextToTryon = outfitRefMode === "text_to_tryon";
+  const textTryonModelKey =
+    project.settings.textTryonModelKey ??
+    textTryonModels.find((m) => m.credentialBound)?.modelKey ??
+    textTryonModels[0]?.modelKey ??
+    "wan2.7-image-pro";
 
   return (
     <EcomWorkspaceLayout fullWidth contentClassName="overflow-y-auto">
@@ -354,7 +485,9 @@ export function ModelTryonStudio() {
           <div>
             <h1 className="text-lg font-semibold text-[#1d1d1f]">模特试衣</h1>
             <p className="text-xs text-[#6e6e73]">
-              服装池 + 最多 9 套搭配批量试衣，锁定后可保存到资产库。
+              {isTextToTryon
+                ? "文生试衣：参考图 + Prompt 引用，图片编辑模型生成时尚试衣大片。"
+                : "服装池 + 最多 9 套搭配批量试衣，锁定后可保存到资产库。"}
             </p>
           </div>
           <EcomIconToolbar>
@@ -382,6 +515,9 @@ export function ModelTryonStudio() {
                 title="模特试衣 · 项目列表"
                 emptyHint="还没有保存过的模特试衣项目。"
               />
+            </EcomIconToolbarGroup>
+            <EcomIconToolbarGroup label="资产">
+              <EcomGlobalAssetLibraryToolbarButton defaultCatalog="full-body" />
             </EcomIconToolbarGroup>
           </EcomIconToolbar>
         </div>
@@ -582,7 +718,7 @@ export function ModelTryonStudio() {
               );
               await toast({
                 title: "全身图已生成",
-                message: "新图已加入左侧上传历史；原头像仍保持选中，可点缩略图切换查看。",
+                message: "新图已选中，可点「确认左栏选中加入待试衣」。",
                 variant: "success",
               });
             } catch (e) {
@@ -601,6 +737,153 @@ export function ModelTryonStudio() {
             await handleSaveToAssets();
           }}
           saveBusy={saveBusy}
+          textTryonWorkflow={
+            isTextToTryon
+              ? {
+                  refs: project.meta?.textTryonRefs ?? [],
+                  prompt: textTryonPromptDraft,
+                  results: project.meta?.textTryonResults ?? [],
+                  modelKey: textTryonModelKey,
+                  models: textTryonModels,
+                  modelsLoading: textTryonModelsLoading,
+                  generating: textTryonGenerating,
+                  modelImageSize,
+                  uploading: textTryonUploading,
+                  uploadProgress: textTryonUploadProgress,
+                  uploadProgressLabel: textTryonUploadLabel,
+                  onPromptChange: setTextTryonPromptDraft,
+                  onPromptBlur: () => {
+                    if (!project) return;
+                    const prompt = textTryonPromptDraft.trim();
+                    if (prompt === (project.meta?.textTryonPrompt ?? "").trim()) return;
+                    void patchModelTryonTextTryonEditor(project.id, { prompt: textTryonPromptDraft }).then(
+                      applyProject,
+                    );
+                  },
+                  onModelChange: (modelKey) => {
+                    void patchSettings({ textTryonModelKey: modelKey });
+                  },
+                  onUploadRef: async (file) => {
+                    if (!project) return;
+                    try {
+                      await runTextTryonRefTask("正在上传…", () =>
+                        uploadModelTryonTextTryonRef(project.id, file),
+                      );
+                    } catch (e) {
+                      await alert({ title: "上传失败", message: formatEcomTransportError(e), variant: "error" });
+                    }
+                  },
+                  onRemoveRef: async (refId) => {
+                    if (!project) return;
+                    setRefBusy(true);
+                    try {
+                      applyProject(await removeModelTryonTextTryonRef(project.id, refId));
+                    } catch (e) {
+                      await alert({ title: "删除失败", message: formatEcomTransportError(e), variant: "error" });
+                    } finally {
+                      setRefBusy(false);
+                    }
+                  },
+                  onAttachAssets: async (assets) => {
+                    if (!project || !assets.length) return;
+                    try {
+                      await runTextTryonRefTask(
+                        "正在添加参考图…",
+                        async () => {
+                          let next = project;
+                          for (const asset of assets) {
+                            next = await attachModelTryonTextTryonRef(
+                              project.id,
+                              asset.ossUrl,
+                              asset.title,
+                            );
+                          }
+                          return next;
+                        },
+                        { simulateProgress: false },
+                      );
+                    } catch (e) {
+                      await alert({ title: "添加失败", message: formatEcomTransportError(e), variant: "error" });
+                    }
+                  },
+                  onAttachFromModelLibrary: async (ossUrl, label) => {
+                    if (!project) return;
+                    try {
+                      await runTextTryonRefTask(
+                        "正在添加模特…",
+                        () =>
+                          attachModelTryonTextTryonRef(project.id, ossUrl, label ?? "模特库"),
+                        { simulateProgress: false },
+                      );
+                    } catch (e) {
+                      await alert({
+                        title: "选择模特失败",
+                        message: formatEcomTransportError(e),
+                        variant: "error",
+                      });
+                    }
+                  },
+                  onGenerate: async () => {
+                    if (!project) return;
+                    setTextTryonGenerating(true);
+                    try {
+                      applyProject(
+                        await generateModelTryonTextTryonImage(project.id, {
+                          prompt: textTryonPromptDraft,
+                          modelKey: textTryonModelKey,
+                        }),
+                      );
+                      await toast({
+                        title: "生成完成",
+                        message: "试衣图已加入结果区，并自动保存到试衣库",
+                        variant: "success",
+                      });
+                    } catch (e) {
+                      await alert({
+                        title: "生成失败",
+                        message: formatEcomImageGenUserMessage(formatEcomTransportError(e)),
+                        variant: "error",
+                      });
+                    } finally {
+                      setTextTryonGenerating(false);
+                    }
+                  },
+                  onClearEditor: async () => {
+                    if (!project) return;
+                    if (
+                      !(await confirm({
+                        title: "清空编辑区？",
+                        message: "将清除已上传的参考图与 Prompt 内容，生成结果会保留。",
+                      }))
+                    ) {
+                      return;
+                    }
+                    setRefBusy(true);
+                    try {
+                      setTextTryonPromptDraft("");
+                      applyProject(await clearModelTryonTextTryonEditor(project.id));
+                    } catch (e) {
+                      await alert({ title: "清空失败", message: formatEcomTransportError(e), variant: "error" });
+                    } finally {
+                      setRefBusy(false);
+                    }
+                  },
+                  onSaveResultToAssets: async (ossUrl, title) => {
+                    if (!project) return;
+                    try {
+                      await saveModelTryonToAssets(project.id, { ossUrl, title });
+                      await toast({
+                        title: "已保存",
+                        message: "试衣成片已写入「我的资产 → 试衣库」",
+                        variant: "success",
+                      });
+                    } catch (e) {
+                      await alert({ title: "保存失败", message: formatEcomTransportError(e), variant: "error" });
+                    }
+                  },
+                }
+              : undefined
+          }
           batchWorkflow={
             useBatch
               ? {

@@ -72,9 +72,8 @@ import {
   pro2MediaGroupDefaultLabel,
   syncPro2MediaGroupZIndex,
 } from "./pro2-media-group-meta";
+import { computeLibtvMediaAspectPresetSize } from "./libtv-media-aspect-preset";
 import {
-  PRO2_FRAME_CELL_HEIGHT,
-  PRO2_FRAME_CELL_WIDTH,
   PRO2_MEDIA_GROUP_LAYOUT_VERSION,
   PRO2_MEDIA_GROUP_PAD,
   pro2MediaChildSize,
@@ -314,6 +313,8 @@ type CanvasState = {
   libtvFloatingDockNodeType: string | null;
   /** 用户正在操作输入坞：隐藏节点顶栏，避免遮挡 Dock */
   libtvInputDockFocused: boolean;
+  /** 全局资产库弹层打开时隐藏 LibTV 节点顶栏 */
+  globalAssetLibraryOpen: boolean;
   /** 鼠标悬停的 LibTV 媒体组（未选中时也可显示顶栏） */
   hoveredMediaGroupId: string | null;
   setConnectingFrom: (id: string | null, handleId?: string | null) => void;
@@ -334,6 +335,7 @@ type CanvasState = {
     nodeType: string | null,
   ) => void;
   setLibtvInputDockFocused: (focused: boolean) => void;
+  setGlobalAssetLibraryOpen: (open: boolean) => void;
 
   /** 故事大纲审阅弹窗（全局，避免节点重渲染丢失 open 状态） */
   storyHubReview: { hubId: string; section: HubPreviewSection } | null;
@@ -527,10 +529,11 @@ function defaultNodeSize(
     return STORY_FRAME_IMAGE_ENGINE_SIZE;
   }
   if (type === "sbv1-video-engine" && data?.pro2MediaRole === "video") {
-    return {
-      width: PRO2_FRAME_CELL_WIDTH,
-      height: PRO2_FRAME_CELL_HEIGHT,
-    };
+    const ar =
+      typeof data.aspectRatio === "string" && data.aspectRatio.trim()
+        ? data.aspectRatio.trim()
+        : "4:3";
+    return computeLibtvMediaAspectPresetSize(ar, "pro2-video-cell");
   }
   return NODE_DEFAULT_SIZE[type] ?? { width: 320, height: 240 };
 }
@@ -565,6 +568,7 @@ export const useCanvasStore = create<CanvasState>()(
       libtvFloatingDockNodeId: null,
       libtvFloatingDockNodeType: null,
       libtvInputDockFocused: false,
+      globalAssetLibraryOpen: false,
       setConnectingFrom: (id, handleId = null) =>
         set({
           connectingFromNodeId: id,
@@ -586,6 +590,7 @@ export const useCanvasStore = create<CanvasState>()(
           libtvFloatingDockNodeId: null,
           libtvFloatingDockNodeType: null,
           libtvInputDockFocused: false,
+          globalAssetLibraryOpen: false,
           canvasGeometryDragging: false,
           canvasDraggingNodeId: null,
           canvasMarqueeSelecting: false,
@@ -615,6 +620,8 @@ export const useCanvasStore = create<CanvasState>()(
         }),
       setLibtvInputDockFocused: (focused) =>
         set({ libtvInputDockFocused: focused }),
+      setGlobalAssetLibraryOpen: (open) =>
+        set({ globalAssetLibraryOpen: open }),
 
       storyHubReview: null,
       openStoryHubReview: (hubId, section) =>

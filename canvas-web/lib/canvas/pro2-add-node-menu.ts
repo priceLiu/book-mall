@@ -3,6 +3,7 @@ import {
   Boxes,
   Box,
   Clapperboard,
+  Package,
   Download,
   FileText,
   Film,
@@ -266,6 +267,13 @@ export const PRO2_STYLE_ASSET_RIGHT_MENU: Pro2AddMenuSection[] = [
 export const PRO2_ASSET_LIB_SUBMENU: Pro2AddMenuSection[] = [
   {
     items: [
+      {
+        id: "global-asset-library",
+        label: "平台资产库",
+        icon: Package,
+        enabled: true,
+        badge: "NEW",
+      },
       {
         id: "style-library",
         label: "风格库",

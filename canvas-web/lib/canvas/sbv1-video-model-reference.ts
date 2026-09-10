@@ -521,6 +521,60 @@ export function defaultSbv1DockInputModeForModel(
   return chips[0]?.id ?? "omni";
 }
 
+/**
+ * 按参考图数量推荐 Dock 模式（须在模型支持的 chip 内）。
+ * 0 → 文生；1 → 图生；2 → 首尾帧；3+ → 全能参考 / 多图。
+ */
+export function suggestSbv1DockModeForRefCount(
+  refLinkCount: number,
+  modelKey: string,
+  opts?: { multiShots?: boolean; providerId?: string },
+): Sbv1DockInputMode | null {
+  const chips = getSbv1VideoDockModeChips(modelKey, opts);
+  if (!chips.length) return null;
+  const ids = new Set(chips.map((c) => c.id));
+  const pick = (id: Sbv1DockInputMode): Sbv1DockInputMode | null =>
+    ids.has(id) ? id : null;
+
+  const n = Math.max(0, Math.floor(refLinkCount));
+  if (n === 0) return pick("t2v") ?? pick("i2v") ?? chips[0]!.id;
+  if (n === 1) return pick("i2v") ?? pick("omni") ?? chips[0]!.id;
+  if (n === 2) return pick("first_last") ?? pick("omni") ?? chips[0]!.id;
+  return pick("omni") ?? pick("multi_ref") ?? chips[0]!.id;
+}
+
+/** 参考图连线数量变化时同步 dockInputMode / referenceMode */
+export function buildSbv1DockModeRefSyncPatch(
+  data: Pick<
+    Sbv1VideoEngineNodeData,
+    "engine" | "dockInputMode" | "referenceMode"
+  >,
+  refLinkCount: number,
+): Partial<Sbv1VideoEngineNodeData> | null {
+  const modelKey = data.engine?.modelKey?.trim() ?? "";
+  if (!modelKey) return null;
+
+  const chipOpts = {
+    providerId: data.engine?.providerId,
+    multiShots: data.engine?.params?.multi_shots === true,
+  };
+  const suggested = suggestSbv1DockModeForRefCount(
+    refLinkCount,
+    modelKey,
+    chipOpts,
+  );
+  if (!suggested) return null;
+
+  const chips = getSbv1VideoDockModeChips(modelKey, chipOpts);
+  const current = resolveSbv1DockInputMode(
+    data.referenceMode ?? "omni",
+    data.dockInputMode,
+    chips,
+  );
+  if (current === suggested) return null;
+  return dockInputModeToPatch(suggested);
+}
+
 export function isDashscopeSbv1TextToVideoModel(modelKey: string): boolean {
   return DASHSCOPE_T2V_KEYS.has(modelKey.trim());
 }

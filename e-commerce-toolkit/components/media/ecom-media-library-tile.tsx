@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Download, Eye, Sparkles, Trash2 } from "lucide-react";
+import { Archive, Check, Download, Eye, Sparkles, Trash2 } from "lucide-react";
 
 import {
   EcomVideoHoverPreview,
@@ -57,6 +57,8 @@ type Props = {
   alt?: string;
   onPreview: () => void;
   onDownload?: () => void;
+  /** 保存到全局资产库 catalog */
+  onSaveToCatalog?: () => void;
   onDelete?: () => void;
   /** 展示到「我的 AI 空间」作品墙（Book 只存指向） */
   onPinToAiSpace?: () => void;
@@ -82,6 +84,7 @@ export function EcomMediaLibraryTile({
   alt = "",
   onPreview,
   onDownload,
+  onSaveToCatalog,
   onDelete,
   onPinToAiSpace,
   pinnedToAiSpace,
@@ -230,6 +233,17 @@ export function EcomMediaLibraryTile({
             onClick={onDownload}
           >
             <Download className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
+          </button>
+        ) : null}
+        {onSaveToCatalog ? (
+          <button
+            type="button"
+            className={ECOM_MEDIA_TILE_ACTION_BTN_CLASS}
+            aria-label="保存到库"
+            title="保存到库"
+            onClick={onSaveToCatalog}
+          >
+            <Archive className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
           </button>
         ) : null}
         {onPinToAiSpace ? (

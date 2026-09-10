@@ -25,6 +25,7 @@ import {
   Wrench,
   Blocks,
   Boxes,
+  History,
 } from "lucide-react";
 import {
   buildPortalNavItems,
@@ -224,6 +225,7 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
       link("姿势·场景·道具库", "/ecom/shoot-catalog", Sparkles),
       link("剧情故事", "/ecom/story-theater-catalog", ScrollText),
       link("我的模特", "/library/models", Users),
+      link("生成记录", "/library/generation-records", History),
     ]),
     sep(),
     link("计费与账户", bookAccountHref(bookOrigin, "/account/billing"), Settings, {

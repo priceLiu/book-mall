@@ -22,6 +22,18 @@ export type OutfitVideoSettings = {
   /** 用户自定义拆镜 User（含交付格式；时间轴/截图仍由服务端追加） */
   splitUserPrompt?: string;
   lastSplitPrompt?: string;
+  /** 全局卖点（选填；空则 LLM 走 B 分支自动推导） */
+  userSellPoint?: string;
+};
+
+/** meta.outfitClothAnalyse · 服装视觉识别结果 */
+export type OutfitClothAnalyseMeta = {
+  structuredText: string;
+  imageUrl: string;
+  modelKey: string;
+  analysedAt: string;
+  status: "generating" | "success" | "failed";
+  failReason?: string;
 };
 
 export type OutfitSplitProgress = {

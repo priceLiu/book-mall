@@ -47,6 +47,8 @@ import {
 } from "@/lib/canvas/libtv-media-preview-url";
 import { Sbv1PortraitLivenessModal } from "./sbv1/sbv1-portrait-liveness-modal";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
+import { GlobalAssetCatalogBadge } from "@/docker-shared/global-asset-library";
+import { useSaveToCatalog } from "@/lib/use-save-to-catalog";
 import { selectLibtvNodeAfterDuplicate } from "@/lib/canvas/select-libtv-node";
 import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
 import {
@@ -125,6 +127,8 @@ export type LibtvImageNodeData = CanvasPortraitNodeFields & {
   pro2ControllerNodeId?: string;
   gridSplit?: LibtvImageGridSplitState;
   gridSplitCrop?: GridSplitCrop;
+  /** 全局资产库素材 · UI 角标（平台入库 / 从平台库选用） */
+  globalCatalogMarked?: boolean;
 };
 
 export type LibtvImageNodeProps = NodeProps & {
@@ -262,6 +266,14 @@ export function LibtvImageNode({
     }
   }, [d, preferEphemeralPreview]);
   const saveAsAsset = useSaveNodeAsAsset();
+  const saveToCatalog = useSaveToCatalog();
+  const markGlobalCatalog = useCallback(() => {
+    updateNodeData(id, { globalCatalogMarked: true });
+  }, [id, updateNodeData]);
+  const catalogImageUrl = (d.ossUrl?.trim() || previewUrl?.trim() || "").trim();
+  const canSaveToCatalog =
+    Boolean(catalogImageUrl) &&
+    (catalogImageUrl.startsWith("http://") || catalogImageUrl.startsWith("https://"));
   const self = nodes.find((n) => n.id === id);
   const insideGroup = Boolean(self?.parentId);
   const mediaRole = d.pro2MediaRole ?? "generic";
@@ -947,6 +959,19 @@ export function LibtvImageNode({
               onSaveAsAsset={() =>
                 saveAsAsset(id, saveAsAssetKind, d as unknown as Record<string, unknown>)
               }
+              onSaveToCatalog={
+                canSaveToCatalog
+                  ? () =>
+                      saveToCatalog({
+                        url: catalogImageUrl,
+                        prompt: d.dockInput,
+                        sourceModule: `canvas-${edition}-image`,
+                        sourceAssetId: id,
+                        defaultCatalog: "garment",
+                        onCatalogSaved: markGlobalCatalog,
+                      })
+                  : undefined
+              }
               onImportPortrait={
                 d.ossUrl ? () => void importPortrait() : undefined
               }
@@ -1039,6 +1064,7 @@ export function LibtvImageNode({
                     prompt={d.dockInput}
                     sourceModule={`canvas-${edition}-image`}
                     sourceAssetId={id}
+                    onCatalogSaved={markGlobalCatalog}
                   />
                 ) : null}
                 {!isGenerating ? (
@@ -1055,6 +1081,7 @@ export function LibtvImageNode({
 
           <div className={cn(LIBTV_MEDIA_STAGE_CLASS, "relative flex min-h-0 flex-col")}>
             {renderStage()}
+            {hasImage && d.globalCatalogMarked ? <GlobalAssetCatalogBadge /> : null}
             <LibtvNodeErrorBanner
               message={errorBanner.message}
               visible={errorBanner.visible}

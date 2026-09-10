@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import {
   attachEcomOutfitVideoRefs,
+  clearEcomOutfitVideoSceneRef,
+  setEcomOutfitVideoSceneLibraryPreset,
   uploadEcomOutfitVideoRefImage,
 } from "@/lib/ecom/ecom-outfit-video-service";
 import type { WorkflowRefs } from "@/lib/ecom/video-workflow/shot-spine";
@@ -12,10 +14,10 @@ export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-const UPLOAD_ROLES = ["model", "clothing", "topGarment", "bottomGarment"] as const;
+const UPLOAD_ROLES = ["model", "clothing", "topGarment", "bottomGarment", "sceneRef"] as const;
 type UploadRole = (typeof UPLOAD_ROLES)[number];
 
-const PATCH_KEYS = ["model", "clothing", "topGarment", "bottomGarment"] as const;
+const PATCH_KEYS = ["model", "clothing", "topGarment", "bottomGarment", "sceneRef"] as const;
 
 function isUploadRole(v: unknown): v is UploadRole {
   return typeof v === "string" && (UPLOAD_ROLES as readonly string[]).includes(v);
@@ -34,7 +36,7 @@ export async function POST(req: Request, ctx: Ctx) {
     const role = isUploadRole(roleRaw) ? roleRaw : null;
     if (!(file instanceof File) || !role) {
       return NextResponse.json(
-        { error: "请上传图片并指定 role=model|clothing|topGarment|bottomGarment" },
+        { error: "请上传图片并指定 role=model|clothing|topGarment|bottomGarment|sceneRef" },
         { status: 400 },
       );
     }
@@ -52,6 +54,38 @@ export async function POST(req: Request, ctx: Ctx) {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
     return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+  }
+
+  if (body.sceneRef === null) {
+    try {
+      const project = await clearEcomOutfitVideoSceneRef(auth.userId, id);
+      return NextResponse.json({ project });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "清除场景参考失败";
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+  }
+
+  const presetRaw = body.sceneLibraryPreset;
+  if (presetRaw && typeof presetRaw === "object") {
+    const o = presetRaw as Record<string, unknown>;
+    const entryId = typeof o.entryId === "string" ? o.entryId.trim() : "";
+    const entryName = typeof o.entryName === "string" ? o.entryName.trim() : "";
+    const visualPromptFragment =
+      typeof o.visualPromptFragment === "string" ? o.visualPromptFragment.trim() : "";
+    if (entryId && entryName && visualPromptFragment) {
+      try {
+        const project = await setEcomOutfitVideoSceneLibraryPreset(auth.userId, id, {
+          entryId,
+          entryName,
+          visualPromptFragment,
+        });
+        return NextResponse.json({ project });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "设置场景预设失败";
+        return NextResponse.json({ error: message }, { status: 400 });
+      }
+    }
   }
 
   const patch: Partial<WorkflowRefs> = {};

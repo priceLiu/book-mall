@@ -29,9 +29,11 @@ import {
   getStoryboardProject,
   listStoryboardProjectSummaries,
   removeStoryboardRef,
+  saveStoryboardWorkflow,
   updateStoryboardProject,
   uploadStoryboardRef,
 } from "@/lib/ecom-storyboard-api";
+import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
 import {
   defaultImageSizeForModel,
@@ -76,7 +78,7 @@ async function resolveFallbackStoryboardProject(): Promise<{
 }
 
 export function StoryboardStudio() {
-  const { alert, doubleConfirm } = useDialogs();
+  const { alert, confirm, doubleConfirm, toast } = useDialogs();
   const [project, setProject] = useState<StoryboardProject | null>(null);
   const [chatModels, setChatModels] = useState<StoryboardGatewayModel[]>([]);
   const [imageModels, setImageModels] = useState<StoryboardGatewayModel[]>([]);
@@ -362,35 +364,57 @@ export function StoryboardStudio() {
       });
       return;
     }
-    setLoading(true);
-    try {
-      const created = await createStoryboardProject({
-        title: "电商专业版",
-        meta: {
-          workflow: {
-            proMode: true,
-            proPhase: "product_ref",
-            dimensionStep: 0,
-          },
-        },
-      });
-      setGenerateAllImagesToken(0);
-      setGenerateFullVideoToken(0);
-      setMergePanelVideosToken(0);
-      setExportSheet(null);
-      setAssistantWide(false);
-      setAssistantCollapsed(false);
-      setVideoAsset(null);
-      applyProject(created);
-    } catch (e) {
-      await alert({
-        title: "新建失败",
-        message: e instanceof Error ? e.message : "无法创建故事版",
-        variant: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
+    if (!project) return;
+    const hasWork =
+      project.references.length > 0 ||
+      Boolean(project.sheet?.panels?.length) ||
+      Boolean(project.meta?.deliverableMarkdown?.trim()) ||
+      (project.chatHistory?.length ?? 0) > 0;
+    const defaultName = project.title?.trim() || "电商口播故事版";
+    await runEcomNewProjectWithSavePrompt({
+      confirm,
+      hasWorkToSave: hasWork,
+      message: "当前故事版尚未保存工作流。是否先保存到「我的资产」？",
+      save: async () => {
+        const snapshot = await saveStoryboardWorkflow(project.id, defaultName);
+        toast({
+          title: "工作流已保存",
+          message: `「${snapshot.title}」已保存，可继续新建。`,
+          variant: "success",
+        });
+      },
+      onProceed: async () => {
+        setLoading(true);
+        try {
+          const created = await createStoryboardProject({
+            title: "电商专业版",
+            meta: {
+              workflow: {
+                proMode: true,
+                proPhase: "product_ref",
+                dimensionStep: 0,
+              },
+            },
+          });
+          setGenerateAllImagesToken(0);
+          setGenerateFullVideoToken(0);
+          setMergePanelVideosToken(0);
+          setExportSheet(null);
+          setAssistantWide(false);
+          setAssistantCollapsed(false);
+          setVideoAsset(null);
+          applyProject(created);
+        } catch (e) {
+          await alert({
+            title: "新建失败",
+            message: e instanceof Error ? e.message : "无法创建故事版",
+            variant: "error",
+          });
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
   }
 
   const loadProjectList = useCallback(async () => {

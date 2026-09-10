@@ -21,6 +21,8 @@ const IMAGE_CAPABILITY_ORDER: StoryboardImageModelCapability[] = [
 ];
 
 const EXPLICIT: Record<string, StoryboardImageModelCapability[]> = {
+  "gpt-image-2": ["image_t2i", "image_edit", "image_multi_ref"],
+  "gpt-image-1": ["image_t2i", "image_edit", "image_multi_ref"],
   "qwen-image-edit": ["image_edit", "image_multi_ref"],
   "qwen-image-edit-max": ["image_edit", "image_multi_ref"],
   "qwen-image-3.0-pro": ["image_t2i", "image_edit", "image_multi_ref"],

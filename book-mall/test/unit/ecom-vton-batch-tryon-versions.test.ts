@@ -13,6 +13,16 @@ describe("ecom-vton batch tryon versions", () => {
     { id: "l2", kind: "top_only", topGarmentId: "g2", label: "仅上装 2" },
   ];
 
+  it("buildVtonBatchResultsForRun skips never-tried non-target looks", () => {
+    const built = buildVtonBatchResultsForRun({
+      allLooks: looks,
+      targetLooks: [looks[0]!],
+      previousResults: [],
+    });
+    expect(built).toHaveLength(1);
+    expect(built[0]?.lookId).toBe("l1");
+  });
+
   it("buildVtonBatchResultsForRun preserves versions for target looks", () => {
     const previous: VtonTryonResult[] = [
       {

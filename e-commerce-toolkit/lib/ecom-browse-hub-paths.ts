@@ -2,6 +2,7 @@
 export function isEcomBrowseHubPath(pathname: string): boolean {
   return (
     pathname === "/library" ||
+    pathname.startsWith("/library/") ||
     pathname === "/workflows/drafts" ||
     pathname === "/ecom/shoot-catalog"
   );

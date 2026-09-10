@@ -13,6 +13,7 @@ import {
   PRO2_IMAGE_NODE_WIDTH,
   PRO2_SCRIPT_NODE_WIDTH,
 } from "./story-pro2-node-chrome";
+import { computeLibtvMediaAspectPresetSize } from "./libtv-media-aspect-preset";
 import { sortNodesForReactFlow } from "./normalize-graph-nodes";
 import { resolveLibtvMediaNodeBoxSize } from "./libtv-media-node-size";
 import type { CanvasFlowNode } from "./types";
@@ -110,8 +111,8 @@ export function pro2MediaChildSize(node: {
     };
   }
   if (node.pro2MediaRole === "video") {
-    // 分镜视频组 · 与分镜图组同宫格尺寸（图 3/4）
-    return { width: PRO2_FRAME_CELL_WIDTH, height: PRO2_FRAME_CELL_HEIGHT };
+    // 分镜视频格 · 出厂默认 4:3；用户选比例后由 resolveLibtvMediaNodeBoxSize 接管
+    return computeLibtvMediaAspectPresetSize("4:3", "pro2-video-cell");
   }
   return { width: PRO2_IMAGE_NODE_WIDTH, height: PRO2_IMAGE_NODE_HEIGHT };
 }
@@ -155,10 +156,7 @@ export function effectivePro2MediaChildSize(
     return resolveLibtvMediaNodeBoxSize(node, allNodes);
   }
   if (data.pro2MediaRole === "video") {
-    return pro2MediaChildSize({
-      type: node.type,
-      pro2MediaRole: data.pro2MediaRole,
-    });
+    return resolveLibtvMediaNodeBoxSize(node, allNodes);
   }
   if (data.gridSplitFrameCrop) {
     const style = node.style as { width?: number; height?: number } | undefined;

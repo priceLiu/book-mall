@@ -40,6 +40,8 @@ type Props = {
   disableEnlargePreview?: boolean;
   /** 导航中 / 弹层打开：禁用悬停播放 */
   calm?: boolean;
+  /** 首屏卡片：跳过 IO 等待，避免封面层切换闪烁 */
+  eager?: boolean;
 };
 
 /**
@@ -57,6 +59,7 @@ export function CanvasListCover({
   showMediaKindBadge = false,
   disableEnlargePreview = false,
   calm = false,
+  eager = false,
 }: Props) {
   const coverUrl = url?.trim() || "";
   const hoverVideo =
@@ -81,12 +84,14 @@ export function CanvasListCover({
             placeholderLetter={name}
             disableEnlargePreview={disableEnlargePreview}
             calm={calm}
+            eager={eager}
           />
         ) : coverUrl ? (
           <ProjectCoverMedia
             url={coverUrl}
             alt={name ?? "封面"}
             placeholderLetter={name}
+            eager={eager}
           />
         ) : showDiagram ? (
           <TemplateWorkflowDiagramPreview graph={graph!} className="size-full" />

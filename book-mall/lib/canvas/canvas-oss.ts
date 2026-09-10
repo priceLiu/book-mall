@@ -17,6 +17,7 @@ import {
   buildStyleLibraryOssKey,
   buildEcomModelLibraryOssKey,
   buildEcomPoseLibraryOssKey,
+  buildEcomTextTryonDemoOssKey,
   buildEcomTemplateGalleryOssKey,
   buildEcomTemplateGallerySlotOssKey,
   buildEcomTemplateGalleryThumbOssKey,
@@ -356,6 +357,26 @@ export async function uploadEcomModelLibraryPreview(args: {
   });
 }
 
+/** 电商工具箱 · 文生试衣内置示例图（固定 OSS key）。 */
+export async function uploadEcomTextTryonDemoAsset(args: {
+  slot: "garment" | "accessory-glasses";
+  buf: Buffer;
+  contentType: string;
+  ext: string;
+}): Promise<string> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const key = buildEcomTextTryonDemoOssKey(args.slot, args.ext);
+  return uploadBufferToOss({
+    cfg: cfgRaw,
+    key,
+    buf: args.buf,
+    contentType: args.contentType,
+  });
+}
+
 /** 电商工具箱 · 姿势库参考图（固定 OSS key）。 */
 export async function uploadEcomPoseLibraryPreview(args: {
   id: string;
@@ -373,6 +394,23 @@ export async function uploadEcomPoseLibraryPreview(args: {
     key,
     buf: args.buf,
     contentType: args.contentType,
+  });
+}
+
+/** 电商 catalog · 预生成 WebP 缩略图（固定 key，如 *-thumb.webp）。 */
+export async function uploadEcomCatalogThumbWebp(args: {
+  key: string;
+  buf: Buffer;
+}): Promise<string> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  return uploadBufferToOss({
+    cfg: cfgRaw,
+    key: args.key,
+    buf: args.buf,
+    contentType: "image/webp",
   });
 }
 

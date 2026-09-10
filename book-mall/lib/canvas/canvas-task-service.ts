@@ -110,6 +110,7 @@ import {
 } from "@/lib/gateway/minimax-video-client";
 import {
   canvasNodeShowsPersistedMedia,
+  patchCanvasProjectNodeErrorFromTask,
   patchCanvasProjectNodeMediaFromTask,
 } from "@/lib/canvas/canvas-media-patch";
 import {
@@ -664,6 +665,50 @@ export async function applyCanvasBailianR2vPollResult(
   await syncCanvasGatewayLogAfterVideoSuccess(taskId, ephemeralUrl).catch(
     () => undefined,
   );
+}
+
+/** Gateway 日志 STALE / 超时收口时，同步失败画布任务并写回节点 runtime。 */
+export async function failCanvasGenerationTaskFromGatewayLog(input: {
+  canvasTaskId: string;
+  failCode: string;
+  failMessage: string;
+}): Promise<boolean> {
+  const canvasTaskId = input.canvasTaskId.trim();
+  if (!canvasTaskId) return false;
+
+  const failCode = input.failCode.trim() || "GATEWAY_TASK_FAILED";
+  const failMessage = input.failMessage.trim() || "Gateway 任务失败";
+
+  const updated = await prisma.canvasGenerationTask.updateMany({
+    where: {
+      id: canvasTaskId,
+      status: { in: ["QUEUED", "DISPATCHING", "PENDING", "SUBMITTED"] },
+    },
+    data: {
+      status: "FAILED",
+      failCode,
+      failMessage: failMessage.slice(0, 500),
+      completedAt: new Date(),
+      lastPolledAt: new Date(),
+    },
+  });
+  if (updated.count === 0) return false;
+
+  const task = await prisma.canvasGenerationTask.findUnique({
+    where: { id: canvasTaskId },
+    select: {
+      id: true,
+      projectId: true,
+      nodeId: true,
+      failCode: true,
+      failMessage: true,
+    },
+  });
+  if (task) {
+    await patchCanvasProjectNodeErrorFromTask(task).catch(() => undefined);
+    void notifyCanvasTaskSnapshotChanged(task.projectId);
+  }
+  return true;
 }
 
 export async function applyCanvasDashscopeImagePollResult(
@@ -1549,6 +1594,7 @@ async function pollOneSubmittedCanvasTask(
   if (
     isSlowGenerationAge(task.submittedAt, task.createdAt) &&
     (isCanvasVolcengineVideoTaskPayload(payload) ||
+      isCanvasDashscopeVideoTaskPayload(payload) ||
       isCanvasMinimaxVideoTaskPayload(payload) ||
       isCanvasBailianR2vVideoTaskPayload(payload) ||
       isCanvasKieVideoTaskPayload(payload))
@@ -1806,6 +1852,7 @@ async function advanceOneSubmittedCanvasTask(
       shouldDeferCanvasBackgroundVideoTimeout({
         inBackground,
         cause: diagnosis.cause,
+        waitedMs: now - submittedTs,
       })
     ) {
       await prisma.canvasGenerationTask.update({

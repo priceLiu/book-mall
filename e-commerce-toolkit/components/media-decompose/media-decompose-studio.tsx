@@ -19,9 +19,11 @@ import {
   setMediaDecomposeFromUrl,
   startMediaDecomposeReplica,
   streamMediaDecompose,
+  saveMediaDecomposeDeliverableSnapshot,
   updateMediaDecomposeProject,
   uploadMediaDecomposeFile,
 } from "@/lib/ecom-media-decompose-api";
+import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import { fetchSeedVideoModels, getSeedVideoProject } from "@/lib/ecom-seed-video-api";
 import {
   ECOM_MEDIA_DECOMPOSE_DEFAULT_VISION_MODEL,
@@ -40,7 +42,7 @@ import {
 const PROJECT_STORAGE_KEY = "ecom-media-decompose-active-project";
 
 export function MediaDecomposeStudio() {
-  const { alert, doubleConfirm } = useDialogs();
+  const { alert, confirm, doubleConfirm, toast } = useDialogs();
   const [project, setProject] = useState<MediaDecomposeProject | null>(null);
   const [chatModels, setChatModels] = useState<MediaDecomposeChatModel[]>([]);
   const [chatModelKey, setChatModelKey] = useState(ECOM_MEDIA_DECOMPOSE_DEFAULT_VISION_MODEL);
@@ -240,17 +242,34 @@ export function MediaDecomposeStudio() {
       });
       return;
     }
-    try {
-      const created = await createMediaDecomposeProject();
-      applyProject(created);
-      setStreamText("");
-    } catch (e) {
-      await alert({
-        title: "新建失败",
-        message: e instanceof Error ? e.message : "无法创建项目",
-        variant: "error",
-      });
-    }
+    if (!project) return;
+    const hasWork =
+      Boolean(project.media?.ossUrl) ||
+      Boolean(project.result?.structured) ||
+      Boolean(project.result?.rawText?.trim());
+    const defaultName = project.title?.trim() || "拆图拆视频";
+    await runEcomNewProjectWithSavePrompt({
+      confirm,
+      hasWorkToSave: hasWork,
+      message: "当前拆解项目尚未保存工作流。是否先保存到「我的资产」？",
+      save: async () => {
+        const { snapshot } = await saveMediaDecomposeDeliverableSnapshot(project.id, defaultName);
+        toast({ title: "已保存", message: snapshot.title, variant: "success" });
+      },
+      onProceed: async () => {
+        try {
+          const created = await createMediaDecomposeProject();
+          applyProject(created);
+          setStreamText("");
+        } catch (e) {
+          await alert({
+            title: "新建失败",
+            message: e instanceof Error ? e.message : "无法创建项目",
+            variant: "error",
+          });
+        }
+      },
+    });
   }
 
   async function handleOpenProject(id: string) {

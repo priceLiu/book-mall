@@ -48,24 +48,14 @@ export type OutfitRefSettings = {
 };
 
 export function isOutfitRefsReadyToLock(
-  settings: OutfitRefSettings,
+  _settings: OutfitRefSettings,
   refs: {
     model?: { ossUrl?: string };
-    clothing?: { ossUrl?: string };
-    topGarment?: { ossUrl?: string };
-    bottomGarment?: { ossUrl?: string };
+    modelGallery?: Array<{ ossUrl?: string }>;
   },
 ): boolean {
-  const mode = settings.outfitRefMode ?? "need_tryon";
-  if (mode === "already_dressed") {
-    return Boolean(refs.model?.ossUrl?.trim());
-  }
-  const garmentMode = settings.garmentMode ?? "two_piece";
-  if (!refs.model?.ossUrl?.trim()) return false;
-  if (garmentMode === "two_piece") {
-    return Boolean(refs.topGarment?.ossUrl?.trim() && refs.bottomGarment?.ossUrl?.trim());
-  }
-  return Boolean(refs.clothing?.ossUrl?.trim());
+  if (refs.model?.ossUrl?.trim()) return true;
+  return (refs.modelGallery?.length ?? 0) > 0;
 }
 
 export function inferOutfitPhase(opts: {

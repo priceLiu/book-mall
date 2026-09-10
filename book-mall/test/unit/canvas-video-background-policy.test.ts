@@ -46,12 +46,24 @@ describe("canvas async video background policy", () => {
       shouldDeferCanvasBackgroundVideoTimeout({
         inBackground: true,
         cause: "vendor_still_running",
+        waitedMs: 60 * 60_000,
       }),
     ).toBe(true);
     expect(
       shouldDeferCanvasBackgroundVideoTimeout({
         inBackground: false,
         cause: "vendor_still_running",
+      }),
+    ).toBe(false);
+  });
+
+  it("does not defer past background hard cap", () => {
+    const hardMs = getCanvasBackgroundVideoTimeoutMin() * 60_000;
+    expect(
+      shouldDeferCanvasBackgroundVideoTimeout({
+        inBackground: true,
+        cause: "vendor_still_running",
+        waitedMs: hardMs,
       }),
     ).toBe(false);
   });

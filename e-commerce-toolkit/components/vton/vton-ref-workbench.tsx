@@ -14,6 +14,7 @@ import { VtonModelWorkbenchPanel } from "@/components/vton/vton-model-workbench-
 import { VtonGarmentPoolPanel } from "@/components/vton/vton-garment-pool-panel";
 import { appendLookDraft, VtonLookComposer } from "@/components/vton/vton-look-composer";
 import { VtonResultsGrid } from "@/components/vton/vton-results-grid";
+import { VtonTextTryonPanel } from "@/components/vton/vton-text-tryon-panel";
 import { VtonTryonProgressStrip } from "@/components/vton/vton-tryon-progress-strip";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
@@ -32,6 +33,8 @@ import {
   type VtonLookSpec,
   type VtonModelPipelineBusy,
   type VtonProjectMeta,
+  type VtonTextTryonRef,
+  type VtonTextTryonResult,
 } from "@/lib/vton-types";
 import { activeTryonModelBodyHint } from "@/lib/vton-model-generation-body-check";
 import {
@@ -126,6 +129,30 @@ type Props = {
   onSaveToAssets?: () => Promise<void>;
   saveBusy?: boolean;
   batchWorkflow?: VtonBatchWorkflowProps;
+  /** 文生试衣 · 上下布局编辑区 + 结果区 */
+  textTryonWorkflow?: {
+    refs: VtonTextTryonRef[];
+    prompt: string;
+    results: VtonTextTryonResult[];
+    modelKey: string;
+    models: StoryboardGatewayModel[];
+    modelsLoading?: boolean;
+    generating?: boolean;
+    onPromptChange: (prompt: string) => void;
+    onPromptBlur?: () => void;
+    onModelChange: (modelKey: string) => void;
+    onUploadRef: (file: File) => Promise<void>;
+    onRemoveRef: (refId: string) => Promise<void>;
+    onAttachAssets?: (assets: Array<{ id: string; ossUrl: string; title: string }>) => Promise<void>;
+    onAttachFromModelLibrary?: (ossUrl: string, label?: string) => Promise<void>;
+    onGenerate: () => Promise<void>;
+    onClearEditor: () => Promise<void>;
+    onSaveResultToAssets?: (ossUrl: string, title: string) => Promise<void>;
+    modelImageSize?: VtonModelImageSize;
+    uploading?: boolean;
+    uploadProgress?: number | null;
+    uploadProgressLabel?: string;
+  };
 };
 
 function modeButtonClass(active: boolean): string {
@@ -177,6 +204,7 @@ export function VtonRefWorkbench({
   onSaveToAssets,
   saveBusy,
   batchWorkflow,
+  textTryonWorkflow,
 }: Props) {
   const effectiveModelImageSize = coerceVtonModelImageSize(modelImageSize);
 
@@ -194,8 +222,10 @@ export function VtonRefWorkbench({
   }, [imageModelKey]);
 
   const isAlreadyDressed = outfitRefMode === "already_dressed";
+  const isNeedTryon = outfitRefMode === "need_tryon";
+  const isTextToTryon = outfitRefMode === "text_to_tryon";
   const isTwoPiece = garmentMode === "two_piece";
-  const useBatch = Boolean(batchWorkflow) && !isAlreadyDressed;
+  const useBatch = Boolean(batchWorkflow) && isNeedTryon;
   const availableGarmentPool = useMemo(
     () =>
       batchWorkflow
@@ -305,7 +335,9 @@ export function VtonRefWorkbench({
     mode === "model-tryon" ? "模特试衣" : "穿搭参考";
   const sectionHint =
     mode === "model-tryon"
-      ? "选择模特与服装，AI 试衣后可保存到我的资产。"
+      ? isTextToTryon
+        ? "上传参考图并用 Prompt 描述试衣场景，使用图片编辑模型生成时尚大片。"
+        : "选择模特与服装，AI 试衣后可保存到我的资产。"
       : "锁定全片人物与服装特征；动作由参考视频驱动，无需编辑 Prompt。";
 
   const modelHeaderBtnClass = "h-7 px-2 text-[10px]";
@@ -383,7 +415,7 @@ export function VtonRefWorkbench({
         <p className="mt-1 text-xs text-[#6e6e73]">{sectionHint}</p>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2 sm:grid-cols-3">
         <button
           type="button"
           className={modeButtonClass(isAlreadyDressed)}
@@ -397,7 +429,7 @@ export function VtonRefWorkbench({
         </button>
         <button
           type="button"
-          className={modeButtonClass(!isAlreadyDressed)}
+          className={modeButtonClass(isNeedTryon)}
           disabled={busy || tryonBusy || refsLocked}
           onClick={() => onOutfitRefModeChange("need_tryon")}
         >
@@ -406,9 +438,49 @@ export function VtonRefWorkbench({
             上传模特全身照与服装，AI 试衣合成穿搭图。
           </span>
         </button>
+        {mode === "model-tryon" ? (
+          <button
+            type="button"
+            className={modeButtonClass(isTextToTryon)}
+            disabled={busy || tryonBusy || refsLocked}
+            onClick={() => onOutfitRefModeChange("text_to_tryon")}
+          >
+            <span className="font-medium text-[#1d1d1f]">文生试衣</span>
+            <span className="mt-0.5 block text-[11px] leading-relaxed">
+              上传参考图 + Prompt 引用素材，图片编辑模型生成试衣大片。
+            </span>
+          </button>
+        ) : null}
       </div>
 
-      {!isAlreadyDressed ? (
+      {isTextToTryon && textTryonWorkflow ? (
+        <VtonTextTryonPanel
+          refs={textTryonWorkflow.refs}
+          prompt={textTryonWorkflow.prompt}
+          results={textTryonWorkflow.results}
+          modelKey={textTryonWorkflow.modelKey}
+          models={textTryonWorkflow.models}
+          modelsLoading={textTryonWorkflow.modelsLoading}
+          busy={busy}
+          generating={textTryonWorkflow.generating}
+          onPromptChange={textTryonWorkflow.onPromptChange}
+          onPromptBlur={textTryonWorkflow.onPromptBlur}
+          onModelChange={textTryonWorkflow.onModelChange}
+          onUpload={textTryonWorkflow.onUploadRef}
+          onRemoveRef={textTryonWorkflow.onRemoveRef}
+          onAttachAssets={textTryonWorkflow.onAttachAssets}
+          onAttachFromModelLibrary={textTryonWorkflow.onAttachFromModelLibrary}
+          onGenerate={textTryonWorkflow.onGenerate}
+          onClearEditor={textTryonWorkflow.onClearEditor}
+          onSaveResultToAssets={textTryonWorkflow.onSaveResultToAssets}
+          modelImageSize={textTryonWorkflow.modelImageSize}
+          uploading={textTryonWorkflow.uploading}
+          uploadProgress={textTryonWorkflow.uploadProgress}
+          uploadProgressLabel={textTryonWorkflow.uploadProgressLabel}
+        />
+      ) : null}
+
+      {!isAlreadyDressed && !isTextToTryon ? (
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -439,6 +511,8 @@ export function VtonRefWorkbench({
         </div>
       ) : null}
 
+      {!isTextToTryon ? (
+      <>
       <div
         className={cn(
           "grid gap-4",
@@ -601,7 +675,7 @@ export function VtonRefWorkbench({
         ) : null}
       </div>
 
-      {useBatch && batchWorkflow ? (
+      {useBatch && batchWorkflow && !isTextToTryon ? (
         <div className="space-y-3">
           <VtonGarmentPoolPanel
             pool={availableGarmentPool}
@@ -741,6 +815,8 @@ export function VtonRefWorkbench({
           </EcomButtonSecondary>
         ) : null}
       </div>
+      </>
+      ) : null}
 
       {typeof document !== "undefined"
         ? createPortal(

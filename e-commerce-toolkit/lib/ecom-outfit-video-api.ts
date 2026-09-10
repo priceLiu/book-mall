@@ -24,6 +24,16 @@ export type OutfitVideoSettings = {
   splitSystemPrompt?: string;
   splitUserPrompt?: string;
   lastSplitPrompt?: string;
+  userSellPoint?: string;
+};
+
+export type OutfitClothAnalyseMeta = {
+  structuredText: string;
+  imageUrl: string;
+  modelKey: string;
+  analysedAt: string;
+  status: "generating" | "success" | "failed";
+  failReason?: string;
 };
 
 export type OutfitVideoProject = {
@@ -355,6 +365,100 @@ export async function uploadOutfitVideoRefImage(
   return data.project as OutfitVideoProject;
 }
 
+export async function uploadOutfitVideoModelGallery(
+  projectId: string,
+  files: File[],
+): Promise<OutfitVideoProject> {
+  const form = new FormData();
+  for (const file of files) form.append("file", file);
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/refs/model-gallery`, {
+    method: "POST",
+    body: form,
+  });
+  return data.project as OutfitVideoProject;
+}
+
+export async function attachOutfitVideoModelGalleryAssets(
+  projectId: string,
+  assets: Array<{ ossUrl: string; title?: string }>,
+): Promise<OutfitVideoProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/refs/model-gallery`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ assets }),
+  });
+  return data.project as OutfitVideoProject;
+}
+
+export async function removeOutfitVideoModelGalleryItem(
+  projectId: string,
+  refId: string,
+): Promise<OutfitVideoProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/refs/model-gallery`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refId }),
+  });
+  return data.project as OutfitVideoProject;
+}
+
+export async function uploadOutfitVideoSceneRef(
+  projectId: string,
+  file: File,
+): Promise<OutfitVideoProject> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("role", "sceneRef");
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/refs`, {
+    method: "POST",
+    body: form,
+  });
+  return data.project as OutfitVideoProject;
+}
+
+export async function attachOutfitVideoSceneRefAsset(
+  projectId: string,
+  asset: { ossUrl: string; title?: string },
+): Promise<OutfitVideoProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/refs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sceneRef: {
+        ossUrl: asset.ossUrl,
+        label: asset.title ?? "场景参考",
+        source: "asset",
+      },
+    }),
+  });
+  return data.project as OutfitVideoProject;
+}
+
+export async function clearOutfitVideoSceneRef(projectId: string): Promise<OutfitVideoProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/refs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sceneRef: null }),
+  });
+  return data.project as OutfitVideoProject;
+}
+
+export async function setOutfitVideoSceneLibraryPreset(
+  projectId: string,
+  preset: {
+    entryId: string;
+    entryName: string;
+    visualPromptFragment: string;
+  },
+): Promise<OutfitVideoProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/refs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sceneLibraryPreset: preset }),
+  });
+  return data.project as OutfitVideoProject;
+}
+
 export async function generateOutfitVideoShot(
   projectId: string,
   index: number,
@@ -493,4 +597,56 @@ export async function patchOutfitShotSceneFusionConfig(
     },
   );
   return data.project as OutfitVideoProject;
+}
+
+export function parseOutfitClothAnalyseMeta(
+  meta: OutfitVideoProject["meta"],
+): OutfitClothAnalyseMeta | null {
+  const raw = meta?.outfitClothAnalyse;
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const structuredText = typeof o.structuredText === "string" ? o.structuredText.trim() : "";
+  const imageUrl = typeof o.imageUrl === "string" ? o.imageUrl.trim() : "";
+  const modelKey = typeof o.modelKey === "string" ? o.modelKey.trim() : "";
+  const analysedAt = typeof o.analysedAt === "string" ? o.analysedAt : "";
+  const status = o.status;
+  if (
+    !imageUrl ||
+    !analysedAt ||
+    (status !== "generating" && status !== "success" && status !== "failed")
+  ) {
+    return null;
+  }
+  return {
+    structuredText,
+    imageUrl,
+    modelKey,
+    analysedAt,
+    status,
+    failReason: typeof o.failReason === "string" ? o.failReason : undefined,
+  };
+}
+
+export async function analyseOutfitVideoCloth(projectId: string): Promise<OutfitVideoProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/cloth-analyse`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  return parseOutfitProject(data.project as OutfitVideoProject);
+}
+
+export async function adaptOutfitVideoSceneStoryboard(
+  projectId: string,
+  sceneIndex: number,
+): Promise<OutfitVideoProject> {
+  const data = await ecomBookFetch(
+    `${BASE}/projects/${projectId}/shots/${sceneIndex}/adapt-storyboard`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    },
+  );
+  return parseOutfitProject(data.project as OutfitVideoProject);
 }

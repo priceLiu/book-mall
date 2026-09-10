@@ -62,6 +62,7 @@ export function FilmShowcaseCardMedia({
   const [failed, setFailed] = useState(false);
   const [hovering, setHovering] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const enlarge = useHoverVideoEnlarge();
   const enlargeEnabled =
     !calm && !disableEnlargePreview && kind === "video" && Boolean(enlarge);
@@ -69,16 +70,23 @@ export function FilmShowcaseCardMedia({
   const mediaUrl = url?.trim() ?? "";
   const poster = posterUrl?.trim();
   const showMedia = Boolean(mediaUrl) && !failed;
-  // 悬停时立即激活媒体层，避免 IO 未触发时 videoRef 为空导致无法格内播放
   const { ref, active } = useLazyMediaActive<HTMLDivElement>(
     "360px",
     eager || hovering,
   );
-  const isActive = eager || active || hovering;
+  /** 视频层：仅延迟挂载 video；poster / 静态图不等待 IO */
+  const shouldMountVideo =
+    kind === "video" && showMedia && !calm && (eager || active || hovering);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (!hovering || !isActive || kind !== "video" || calm || !showMedia) return;
+    setFailed(false);
+    setImageLoaded(false);
+    setVideoReady(false);
+  }, [mediaUrl, poster, kind]);
+
+  useEffect(() => {
+    if (!hovering || !shouldMountVideo || kind !== "video" || !showMedia) return;
     const el = videoRef.current;
     if (!el) return;
     if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
@@ -86,7 +94,7 @@ export function FilmShowcaseCardMedia({
     }
     makeVideoAudible(el);
     void el.play().catch(() => undefined);
-  }, [hovering, isActive, kind, calm, showMedia]);
+  }, [hovering, shouldMountVideo, kind, showMedia]);
 
   const onEnter = useCallback(() => {
     setHovering(true);
@@ -127,7 +135,6 @@ export function FilmShowcaseCardMedia({
   }, [alt, enlarge, enlargeEnabled, mediaUrl, poster]);
 
   const onVideoReady = useCallback(() => setVideoReady(true), []);
-
   const onMediaError = useCallback(() => setFailed(true), []);
 
   const showHoverLoading =
@@ -135,108 +142,87 @@ export function FilmShowcaseCardMedia({
     !calm &&
     hovering &&
     showMedia &&
+    shouldMountVideo &&
     !videoReady &&
     !failed;
 
-  const renderInactivePreview = () => {
-    if (!showMedia) {
-      return (
-        <MediaPlaceholder
-          letter={placeholderLetter}
-          hint={inactiveHint(kind, failed, Boolean(mediaUrl))}
-        />
-      );
-    }
-    if (kind === "image") {
-      return (
-        // eslint-disable-next-line @next/next/no-img-element
+  if (!showMedia) {
+    return (
+      <MediaPlaceholder
+        letter={placeholderLetter}
+        hint={inactiveHint(kind, failed, Boolean(mediaUrl))}
+      />
+    );
+  }
+
+  if (kind === "image") {
+    return (
+      <div className="relative size-full">
+        {!imageLoaded ? (
+          <MediaPlaceholder letter={placeholderLetter} hint="加载封面…" />
+        ) : null}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={mediaUrl}
           alt={alt}
-          className={PROJECT_COVER_MEDIA_FILL_CLASS}
-          loading="lazy"
+          className={cn(
+            PROJECT_COVER_MEDIA_FILL_CLASS,
+            "transition-opacity duration-200",
+            imageLoaded ? "opacity-100" : "opacity-0",
+          )}
+          loading={eager ? "eager" : "lazy"}
           decoding="async"
           referrerPolicy="no-referrer"
+          onLoad={() => setImageLoaded(true)}
           onError={onMediaError}
         />
-      );
-    }
-    if (poster) {
-      return (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={poster}
-          alt=""
-          aria-hidden
-          className={PROJECT_COVER_MEDIA_FILL_CLASS}
-          loading="lazy"
-          decoding="async"
-          referrerPolicy="no-referrer"
-          onError={onMediaError}
-        />
-      );
-    }
-    return (
-      <video
-        src={mediaUrl}
-        className={PROJECT_COVER_MEDIA_FILL_CLASS}
-        muted
-        playsInline
-        preload="metadata"
-        onError={onMediaError}
-      />
+      </div>
     );
-  };
+  }
 
   return (
     <div
       ref={ref}
       className="relative size-full"
-      onMouseEnter={
-        kind === "video" && !calm && showMedia ? onEnter : undefined
-      }
-      onMouseLeave={
-        kind === "video" && !calm && showMedia ? onLeave : undefined
-      }
+      onMouseEnter={!calm && showMedia ? onEnter : undefined}
+      onMouseLeave={!calm && showMedia ? onLeave : undefined}
     >
-      {!showMedia ? (
-        <MediaPlaceholder
-          letter={placeholderLetter}
-          hint={inactiveHint(kind, failed, Boolean(mediaUrl))}
-        />
-      ) : !isActive ? (
-        renderInactivePreview()
-      ) : kind === "video" && calm && poster ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={poster}
-          alt=""
-          aria-hidden
+      {poster ? (
+        <>
+          {!imageLoaded ? (
+            <MediaPlaceholder letter={placeholderLetter} hint="加载封面…" />
+          ) : null}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={poster}
+            alt=""
+            aria-hidden
+            className={cn(
+              PROJECT_COVER_MEDIA_FILL_CLASS,
+              "pointer-events-none absolute inset-0 z-[1] transition-opacity duration-150",
+              hovering && videoReady ? "opacity-0" : "opacity-100",
+              !imageLoaded && "opacity-0",
+            )}
+            loading={eager ? "eager" : "lazy"}
+            decoding="async"
+            referrerPolicy="no-referrer"
+            onLoad={() => setImageLoaded(true)}
+            onError={onMediaError}
+          />
+        </>
+      ) : shouldMountVideo ? null : (
+        <video
+          src={mediaUrl}
           className={PROJECT_COVER_MEDIA_FILL_CLASS}
-          loading="lazy"
-          decoding="async"
-          referrerPolicy="no-referrer"
+          muted
+          playsInline
+          preload="metadata"
           onError={onMediaError}
         />
-      ) : kind === "video" ? (
+      )}
+
+      {shouldMountVideo ? (
         <>
-          {poster ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={poster}
-              alt=""
-              aria-hidden
-              className={cn(
-                PROJECT_COVER_MEDIA_FILL_CLASS,
-                "pointer-events-none absolute inset-0 z-[1] transition-opacity duration-150",
-                hovering ? "opacity-0" : "opacity-100",
-              )}
-              loading="lazy"
-              decoding="async"
-              referrerPolicy="no-referrer"
-              onError={onMediaError}
-            />
-          ) : null}
           <video
             ref={videoRef}
             src={mediaUrl}
@@ -274,18 +260,7 @@ export function FilmShowcaseCardMedia({
             </button>
           ) : null}
         </>
-      ) : (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={mediaUrl}
-          alt={alt}
-          className={PROJECT_COVER_MEDIA_FILL_CLASS}
-          loading="lazy"
-          decoding="async"
-          referrerPolicy="no-referrer"
-          onError={onMediaError}
-        />
-      )}
+      ) : null}
     </div>
   );
 }

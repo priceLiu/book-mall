@@ -1,6 +1,6 @@
 "use client";
 
-import { Play } from "lucide-react";
+import { Play, X } from "lucide-react";
 
 import {
   ECOM_TEMPLATE_GALLERY_TILE_ASPECT_RATIO,
@@ -80,6 +80,8 @@ type Props = {
   /** gallery = 模板区单格 3:4 */
   layout?: EcomVideoSlotLayout;
   className?: string;
+  onRemove?: () => void;
+  removeLabel?: string;
 };
 
 /** 固定尺寸视频格 · 黑底 fill · 圆形播放钮（对齐 canvas sbv1 视频节点） */
@@ -94,6 +96,8 @@ export function EcomVideoSlot({
   compact = false,
   layout,
   className,
+  onRemove,
+  removeLabel = "删除",
 }: Props) {
   const resolvedLayout: EcomVideoSlotLayout =
     layout ?? (compact ? "compact" : "default");
@@ -129,6 +133,20 @@ export function EcomVideoSlot({
       ) : src?.trim() ? (
         <>
           <EcomVideoThumb src={src} className="absolute inset-0 size-full" />
+          {onRemove ? (
+            <button
+              type="button"
+              className="absolute right-1 top-1 z-20 rounded-full bg-black/65 p-0.5 text-white opacity-0 transition-opacity group-hover/video:opacity-100"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove();
+              }}
+              aria-label={removeLabel}
+              title={removeLabel}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          ) : null}
           {onPreview ? (
             <div className="absolute inset-0 z-10 flex items-center justify-center">
               <button

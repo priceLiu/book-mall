@@ -199,16 +199,23 @@ export async function runOutfitVideoSceneFusion(opts: {
     });
     fragment = resolved.fragment;
     libraryEntryName = resolved.libraryEntryName ?? libraryEntryName;
-  } else if (!opts.fusion.sceneRefUrl?.trim()) {
-    throw new Error("请先上传场景参考图");
+  } else {
+    const sceneRefUrl =
+      opts.fusion.sceneRefUrl?.trim() || opts.refs.sceneRef?.ossUrl?.trim() || "";
+    if (!sceneRefUrl) throw new Error("请先上传场景参考图");
   }
+
+  const uploadSceneRefUrl =
+    mode === "upload_ref"
+      ? opts.fusion.sceneRefUrl?.trim() || opts.refs.sceneRef?.ossUrl?.trim()
+      : undefined;
 
   const prompt = buildOutfitSceneFusionPositivePrompt(fragment);
   const fusedImageUrl = await invokeOutfitSceneFusion({
     userId: opts.userId,
     projectId: opts.projectId,
     personImageUrl,
-    sceneRefUrl: mode === "upload_ref" ? opts.fusion.sceneRefUrl : undefined,
+    sceneRefUrl: uploadSceneRefUrl,
     prompt,
     fusionModelKey: modelKey,
   });

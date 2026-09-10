@@ -5,6 +5,7 @@ import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
 import { handCraftComposeImageSrc } from "@/lib/hand-craft-compose-image-src";
 import { storyboardPanelCardWidth } from "@/lib/storyboard-aspect";
 import { StoryboardPanelImageHoverActions } from "@/components/storyboard/storyboard-panel-image-hover-actions";
+import { useSaveToCatalog } from "@/lib/use-save-to-catalog";
 import { buildPanelTimelineMap } from "@/lib/storyboard-gen-params";
 import { cn } from "@/lib/utils";
 import type { StoryboardReference, StoryboardSheet } from "@/lib/storyboard-types";
@@ -118,6 +119,7 @@ export function StoryboardProSheetView({
   selectedPanelIndexes,
   onTogglePanelSelect,
 }: Props) {
+  const saveToCatalog = useSaveToCatalog();
   const isPreview = variant === "preview";
   const panelColumnWidth = isPreview ? storyboardPanelCardWidth(panelAspectRatio) : undefined;
   const panelImageAspectCss = panelAspectRatio === "16:9" ? "16/9" : "9/16";
@@ -351,6 +353,14 @@ export function StoryboardProSheetView({
                         onPreviewPanelPrompt
                           ? () => onPreviewPanelPrompt(panel.index)
                           : undefined
+                      }
+                      onSaveToCatalog={() =>
+                        saveToCatalog({
+                          url: panel.imageUrl!,
+                          prompt: panel.imagePrompt,
+                          sourceModule: "ecom-storyboard",
+                          sourceAssetId: `panel-${panel.index}`,
+                        })
                       }
                     />
                   ) : null}

@@ -12,16 +12,16 @@ import {
 } from "@/components/outfit-video/outfit-video-bottom-dock";
 import { OutfitVideoMediaInput } from "@/components/outfit-video/outfit-video-media-input";
 import { OutfitRefSetupPanel } from "@/components/outfit-video/outfit-ref-setup-panel";
-import type { VtonBatchWorkflowProps, VtonModelPipelineBusy } from "@/components/vton/vton-ref-workbench";
 import { OutfitSceneTable } from "@/components/outfit-video/outfit-scene-table";
 import { OutfitShotProductionPanel } from "@/components/outfit-video/outfit-shot-production-panel";
 import { SeedVideoRenderProgressPanel } from "@/components/seed-video/seed-video-render-progress-panel";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { EcomIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomGlobalAssetLibraryToolbarButton } from "@/components/global-asset-library/ecom-global-asset-library-toolbar-button";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
-import type { OutfitVideoProject } from "@/lib/ecom-outfit-video-api";
+import type { OutfitClothAnalyseMeta, OutfitVideoProject } from "@/lib/ecom-outfit-video-api";
 import type { MediaDecomposeChatModel } from "@/lib/media-decompose-types";
 import {
   ECOM_MEDIA_DECOMPOSE_DEFAULT_VISION_MODEL,
@@ -40,11 +40,8 @@ import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import {
   isOutfitRefsLocked,
   isOutfitRefsReadyToLock,
-  type OutfitGarmentMode,
-  type OutfitRefMode,
   type OutfitWorkflowPhase,
 } from "@/lib/video-workflow/templates/outfit-v1/ui-config";
-import { parseVtonTryonProgress, type VtonTryonProgress } from "@/lib/vton-tryon-progress";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -58,11 +55,6 @@ type Props = {
   mediaBusy?: boolean;
   splitting?: boolean;
   refBusy?: boolean;
-  modelPipelineBusy?: VtonModelPipelineBusy | null;
-  tryonBusy?: boolean;
-  tryonProgress?: VtonTryonProgress | null;
-  imageModels: StoryboardGatewayModel[];
-  imageModelKey: string;
   fusionModelKey: string;
   generateBusy?: boolean;
   renderBusy?: boolean;
@@ -81,21 +73,32 @@ type Props = {
   onScenePromptChange: (sceneId: string, prompt: string) => void;
   onScenePromptReset: (sceneId: string) => void;
   onDeleteScene: (index: number) => Promise<void>;
-  onUploadModel: (file: File) => Promise<void>;
-  onUploadClothing: (file: File) => Promise<void>;
-  onUploadTopGarment: (file: File) => Promise<void>;
-  onUploadBottomGarment: (file: File) => Promise<void>;
-  onOutfitRefModeChange: (mode: OutfitRefMode) => void;
-  onGarmentModeChange: (mode: OutfitGarmentMode) => void;
-  onPickModelFromLibrary: (ossUrl: string, label?: string) => Promise<void>;
-  onAttachModelFromAssets: (
+  onUploadModelGallery: (files: File[]) => Promise<void>;
+  onAttachModelGalleryFromAssets: (
     assets: Array<{ id: string; ossUrl: string; title: string }>,
   ) => Promise<void>;
-  onGenerateModel: (opts?: { prompt?: string }) => Promise<void>;
-  onExpandFullBody: (opts?: { prompt?: string }) => Promise<void>;
-  onTryon: () => Promise<void>;
+  onRemoveModelGalleryItem: (refId: string) => Promise<void>;
+  onUploadGlobalSceneRef: (file: File) => Promise<void>;
+  onAttachGlobalSceneRefFromAssets: (
+    assets: Array<{ id: string; ossUrl: string; title: string }>,
+  ) => Promise<void>;
+  onPickGlobalSceneLibraryPreset: (preset: {
+    entryId: string;
+    entryName: string;
+    visualPromptFragment: string;
+  }) => Promise<void>;
+  onRemoveGlobalSceneRef: () => Promise<void>;
+  onClearShotVideo: (index: number) => Promise<void>;
+  onClearSceneFusion: (index: number) => Promise<void>;
+  userSellPoint?: string;
+  clothAnalyse?: OutfitClothAnalyseMeta | null;
+  clothAnalyseBusy?: boolean;
+  onUserSellPointChange: (value: string) => void;
+  onSaveUserSellPoint: (value: string) => Promise<void>;
+  onAnalyseCloth: () => Promise<void>;
+  adaptingIndices?: ReadonlySet<number>;
+  onAdaptSceneStoryboard: (index: number) => Promise<void>;
   onLockRefs: () => Promise<void>;
-  batchWorkflow?: VtonBatchWorkflowProps;
   onGenerateShots: (indices: number[], modelKey: string) => Promise<void>;
   onCancelGeneratingSelection?: (index: number) => void;
   onCompose: () => Promise<void>;
@@ -137,11 +140,6 @@ export function OutfitVideoWorkspace({
   mediaBusy,
   splitting,
   refBusy,
-  modelPipelineBusy,
-  tryonBusy,
-  tryonProgress,
-  imageModels,
-  imageModelKey,
   fusionModelKey,
   generateBusy,
   renderBusy,
@@ -160,19 +158,24 @@ export function OutfitVideoWorkspace({
   onScenePromptChange,
   onScenePromptReset,
   onDeleteScene,
-  onUploadModel,
-  onUploadClothing,
-  onUploadTopGarment,
-  onUploadBottomGarment,
-  onOutfitRefModeChange,
-  onGarmentModeChange,
-  onPickModelFromLibrary,
-  onAttachModelFromAssets,
-  onGenerateModel,
-  onExpandFullBody,
-  onTryon,
+  onUploadModelGallery,
+  onAttachModelGalleryFromAssets,
+  onRemoveModelGalleryItem,
+  onUploadGlobalSceneRef,
+  onAttachGlobalSceneRefFromAssets,
+  onPickGlobalSceneLibraryPreset,
+  onRemoveGlobalSceneRef,
+  onClearShotVideo,
+  onClearSceneFusion,
+  userSellPoint,
+  clothAnalyse,
+  clothAnalyseBusy,
+  onUserSellPointChange,
+  onSaveUserSellPoint,
+  onAnalyseCloth,
+  adaptingIndices,
+  onAdaptSceneStoryboard,
   onLockRefs,
-  batchWorkflow,
   onGenerateShots,
   onCancelGeneratingSelection,
   onCompose,
@@ -234,16 +237,16 @@ export function OutfitVideoWorkspace({
   const refVideo = project.references.referenceVideo;
   const splitProgress = parseOutfitSplitProgress(project.meta);
   const hasScenes = project.sceneList.length > 0;
-  const outfitRefMode = project.settings.outfitRefMode ?? "need_tryon";
-  const garmentMode = project.settings.garmentMode ?? "two_piece";
-  const refsReadyToLock = isOutfitRefsReadyToLock(
-    { outfitRefMode, garmentMode },
-    project.references,
-  );
+  const refsReadyToLock = isOutfitRefsReadyToLock({}, project.references);
   const refsLocked = isOutfitRefsLocked(project.structured);
   const hasDressedImage = Boolean(project.references.dressedImage?.ossUrl);
-  const hasRefs = refsLocked;
-  const parsedTryonProgress = tryonProgress ?? parseVtonTryonProgress(project.meta?.tryonProgress);
+  const modelGallery = project.references.modelGallery ?? [];
+  const hasModelRef =
+    modelGallery.length > 0 ||
+    Boolean(project.references.model?.ossUrl) ||
+    hasDressedImage ||
+    refsLocked;
+  const clothAnalyseReady = clothAnalyse?.status === "success";
   const finalVideoUrl = project.composeResult?.videoUrl?.trim() || "";
   const jobBusy = Boolean(mediaBusy || splitting || generateBusy || renderBusy || refBusy);
 
@@ -325,6 +328,7 @@ export function OutfitVideoWorkspace({
               />
             </EcomIconToolbarGroup>
             <EcomIconToolbarGroup label="资产与交付">
+              <EcomGlobalAssetLibraryToolbarButton defaultCatalog="pose" />
               <EcomIconButton
                 label="我的资产"
                 icon={Images}
@@ -442,35 +446,28 @@ export function OutfitVideoWorkspace({
 
         {hasScenes ? (
           <OutfitRefSetupPanel
-            refs={project.references}
-            outfitRefMode={outfitRefMode}
-            garmentMode={garmentMode}
+            gallery={modelGallery}
+            sceneRef={project.references.sceneRef}
+            sceneLibraryPreset={project.references.sceneLibraryPreset}
             refsLocked={refsLocked}
             busy={refBusy}
-            modelPipelineBusy={modelPipelineBusy}
-            tryonBusy={tryonBusy}
-            tryonProgress={parsedTryonProgress}
-            imageModels={imageModels}
-            imageModelKey={imageModelKey}
-            fusionModelKey={fusionModelKey}
-            modelsLoading={modelsLoading}
-            onOutfitRefModeChange={onOutfitRefModeChange}
-            onGarmentModeChange={onGarmentModeChange}
-            onUploadModel={onUploadModel}
-            onUploadClothing={onUploadClothing}
-            onUploadTopGarment={onUploadTopGarment}
-            onUploadBottomGarment={onUploadBottomGarment}
-            onPickModelFromLibrary={onPickModelFromLibrary}
-            onAttachModelFromAssets={onAttachModelFromAssets}
-            onGenerateModel={onGenerateModel}
-            onExpandFullBody={onExpandFullBody}
-            onTryon={() => onTryon()}
-            onLockRefs={() => onLockRefs()}
-            batchWorkflow={batchWorkflow}
+            userSellPoint={userSellPoint}
+            clothAnalyse={clothAnalyse}
+            clothAnalyseBusy={clothAnalyseBusy}
+            onUserSellPointChange={onUserSellPointChange}
+            onSaveUserSellPoint={onSaveUserSellPoint}
+            onAnalyseCloth={onAnalyseCloth}
+            onUploadModelGallery={onUploadModelGallery}
+            onAttachModelGalleryFromAssets={onAttachModelGalleryFromAssets}
+            onRemoveModelGalleryItem={onRemoveModelGalleryItem}
+            onUploadGlobalSceneRef={onUploadGlobalSceneRef}
+            onAttachGlobalSceneRefFromAssets={onAttachGlobalSceneRefFromAssets}
+            onPickGlobalSceneLibraryPreset={onPickGlobalSceneLibraryPreset}
+            onRemoveGlobalSceneRef={onRemoveGlobalSceneRef}
           />
         ) : null}
 
-        {hasScenes && hasRefs ? (
+        {hasScenes && hasModelRef ? (
           <OutfitShotProductionPanel
             scenes={project.sceneList}
             refs={project.references}
@@ -493,6 +490,11 @@ export function OutfitVideoWorkspace({
             onUploadSceneRef={onUploadSceneRef}
             onFuseScene={onFuseScene}
             onApplySceneFusionToAll={onApplySceneFusionToAll}
+            clothAnalyseReady={clothAnalyseReady}
+            adaptingIndices={adaptingIndices}
+            onAdaptSceneStoryboard={onAdaptSceneStoryboard}
+            onClearShotVideo={onClearShotVideo}
+            onClearSceneFusion={onClearSceneFusion}
           />
         ) : null}
 

@@ -14,7 +14,29 @@ import {
 import { emptyVtonProjectMeta } from "@/lib/ecom/ecom-vton/meta";
 
 describe("ecom-vton model-generations", () => {
-  it("can append while keeping left preview on source portrait", () => {
+  it("selects newest generation as left preview after expand full body", () => {
+    let meta = emptyVtonProjectMeta();
+    const portrait = appendModelGeneration(meta, {
+      ossUrl: "https://example.com/head.jpg",
+      label: "模特库",
+      source: "library",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    meta = portrait.meta;
+    const expanded = appendModelGeneration(meta, {
+      ossUrl: "https://example.com/full.jpg",
+      label: "AI 全身模特",
+      source: "ai-generate",
+      createdAt: "2026-01-02T00:00:00.000Z",
+    });
+    expect(expanded.meta.modelGenerations).toHaveLength(2);
+    expect(expanded.meta.previewModelGenerationId).toBe(expanded.generation.id);
+    expect(resolvePreviewModelGeneration(expanded.meta)?.ossUrl).toBe(
+      "https://example.com/full.jpg",
+    );
+  });
+
+  it("can append while keeping left preview when keepPreviewGenerationId is set", () => {
     let meta = emptyVtonProjectMeta();
     const portrait = appendModelGeneration(meta, {
       ossUrl: "https://example.com/head.jpg",
@@ -33,11 +55,7 @@ describe("ecom-vton model-generations", () => {
       },
       { keepPreviewGenerationId: portrait.generation.id },
     );
-    expect(expanded.meta.modelGenerations).toHaveLength(2);
     expect(expanded.meta.previewModelGenerationId).toBe(portrait.generation.id);
-    expect(resolvePreviewModelGeneration(expanded.meta)?.ossUrl).toBe(
-      "https://example.com/head.jpg",
-    );
   });
 
   it("appends to candidate history without switching active try-on model", () => {

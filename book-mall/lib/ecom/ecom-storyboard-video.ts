@@ -45,6 +45,7 @@ import {
   type StoryboardSheet,
   storyboardSheetSchema,
 } from "@/lib/ecom/ecom-storyboard-types";
+import { persistEcomGenerationRecord } from "@/lib/ecom/ecom-generation-record";
 import {
   buildEcomStoryboardPanelVideoPrompt,
   buildEcomStoryboardVideoPrompt,
@@ -216,12 +217,13 @@ async function finalizeFullVideoFromVendorUrl(opts: {
 
   let chargePoints: number | null = null;
 
+  const videoTitle = opts.sheet.overview.title.slice(0, 80);
   const asset = await prisma.ecomAsset.create({
     data: {
       userId: opts.userId,
       module: ECOM_STORYBOARD_MODULE,
       kind: "video",
-      title: opts.sheet.overview.title.slice(0, 80),
+      title: videoTitle,
       prompt: opts.pending.prompt,
       ossUrl,
       meta: {
@@ -233,6 +235,26 @@ async function finalizeFullVideoFromVendorUrl(opts: {
       },
     },
   });
+
+  try {
+    await persistEcomGenerationRecord({
+      userId: opts.userId,
+      ossUrl,
+      kind: "video",
+      title: videoTitle,
+      prompt: opts.pending.prompt,
+      meta: {
+        sourceModule: ECOM_STORYBOARD_MODULE,
+        sourceToolKey: ECOM_STORYBOARD_TOOL_KEY,
+        projectId: opts.projectId,
+        sourceResultId: asset.id,
+        versionKey: `${opts.projectId}:full-video:${asset.id}`,
+        modelKey: opts.pending.modelKey,
+      },
+    });
+  } catch (e) {
+    console.warn("[storyboard-video] generation record failed:", e);
+  }
 
   const existing = await prisma.ecomStoryboardProject.findFirst({
     where: { id: opts.projectId },

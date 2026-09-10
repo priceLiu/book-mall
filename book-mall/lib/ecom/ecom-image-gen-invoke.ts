@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
-import { buildKieImageCreateArgs } from "@/lib/canvas/providers/kie";
+import { buildKieImageCreateArgs, isKieGptImageModelKey } from "@/lib/canvas/providers/kie";
 import type { EcomImageRatio } from "@/lib/ecom/ecom-platform-spec";
 import {
   resolveEcomGeneratePixelSize,
@@ -196,7 +196,7 @@ export async function generateEcomImage(opts: {
     return generateMultimodalSyncImage(opts);
   }
 
-  if (isStoryboardKieImageModel(opts.modelKey)) {
+  if (isStoryboardKieImageModel(opts.modelKey) || isKieGptImageModelKey(opts.modelKey)) {
     const kieResolution =
       opts.imageSize?.trim() === "4K"
         ? "4K"

@@ -32,6 +32,8 @@ import {
 import { PRO2_TEXT_NODE_TITLE_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import type { StoryPro2ThreeViewNodeData } from "@/lib/canvas/story-pro2-workspace-types";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
+import { GlobalAssetCatalogBadge } from "@/docker-shared/global-asset-library";
+import { useSaveToCatalog } from "@/lib/use-save-to-catalog";
 import { openPro2StyleLibraryForMediaNode } from "@/lib/canvas/pro2-open-style-library";
 import { cn } from "@/lib/utils";
 import { MediaHoverBox, MediaPreviewLightbox } from "../media-hover-box";
@@ -77,7 +79,15 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
 
   const d = data as unknown as StoryPro2ThreeViewNodeData;
   const saveAsAsset = useSaveNodeAsAsset();
+  const saveToCatalog = useSaveToCatalog();
+  const markGlobalCatalog = useCallback(() => {
+    updateNodeData(id, { globalCatalogMarked: true });
+  }, [id, updateNodeData]);
   const previewUrl = d.ossUrl ?? d.blobUrl ?? "";
+  const catalogImageUrl = (d.ossUrl?.trim() || previewUrl?.trim() || "").trim();
+  const canSaveToCatalog =
+    Boolean(catalogImageUrl) &&
+    (catalogImageUrl.startsWith("http://") || catalogImageUrl.startsWith("https://"));
   const hasImage = Boolean(previewUrl);
   const isGenerating = isLibtvMediaGenerating(d);
   const hasRuntimeError = d.runtime?.status === "error";
@@ -248,6 +258,19 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
                   "CHARACTER",
                 )
               }
+              onSaveToCatalog={
+                canSaveToCatalog
+                  ? () =>
+                      saveToCatalog({
+                        url: catalogImageUrl,
+                        prompt: d.dockInput,
+                        sourceModule: "canvas-pro2-three-view",
+                        sourceAssetId: id,
+                        defaultCatalog: "garment",
+                        onCatalogSaved: markGlobalCatalog,
+                      })
+                  : undefined
+              }
               onDuplicateNode={onDuplicateNode}
             />
           </LibtvNodeToolbarPortal>
@@ -309,6 +332,9 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
                 </p>
               </div>
             )}
+            {hasImage && !isGenerating && d.globalCatalogMarked ? (
+              <GlobalAssetCatalogBadge />
+            ) : null}
           </div>
         </div>
       </div>

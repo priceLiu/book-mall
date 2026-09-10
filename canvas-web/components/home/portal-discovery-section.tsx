@@ -312,7 +312,7 @@ export function PortalDiscoverySection() {
         </p>
       ) : (
         <ul className={CANVAS_LIST_GRID_CLASS}>
-          {filtered.map((item) => {
+          {filtered.map((item, index) => {
             const own = isOwnItem(item, viewerUserId);
             const busy =
               item.template && forkingId === item.template.id
@@ -326,6 +326,7 @@ export function PortalDiscoverySection() {
                 <CanvasListCover
                   name={item.name}
                   graph={item.template?.canvas as CanvasGraph | undefined}
+                  eager={index < 10}
                   {...discoveryListCoverProps(item)}
                 />
                 <div className="mt-3 flex items-center gap-2">

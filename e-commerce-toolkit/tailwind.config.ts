@@ -7,6 +7,7 @@ const config: Config = {
     "./lib/**/*.{js,ts,jsx,tsx,mdx}",
     "../shared/federated-portal-nav/**/*.{js,ts,jsx,tsx}",
     "./docker-shared/federated-portal-nav/**/*.{js,ts,jsx,tsx}",
+    "./docker-shared/global-asset-library/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {

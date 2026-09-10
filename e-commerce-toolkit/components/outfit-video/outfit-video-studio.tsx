@@ -51,8 +51,18 @@ import {
   updateOutfitVideoProject,
   uploadOutfitReferenceVideo,
   uploadOutfitSceneRefImage,
-  uploadOutfitVideoRefImage,
+  attachOutfitVideoModelGalleryAssets,
+  removeOutfitVideoModelGalleryItem,
+  uploadOutfitVideoModelGallery,
+  uploadOutfitVideoSceneRef,
+  attachOutfitVideoSceneRefAsset,
+  clearOutfitVideoSceneRef,
+  setOutfitVideoSceneLibraryPreset,
+  analyseOutfitVideoCloth,
+  adaptOutfitVideoSceneStoryboard,
+  parseOutfitClothAnalyseMeta,
 } from "@/lib/ecom-outfit-video-api";
+import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import type { OutfitSceneFusionMode, OutfitVideoProject } from "@/lib/ecom-outfit-video-api";
 import {
   isOutfitSplitActive,
@@ -153,6 +163,9 @@ function OutfitVideoStudioInner() {
   const [saveBusy, setSaveBusy] = useState(false);
   const [generatingIndices, setGeneratingIndices] = useState<ReadonlySet<number>>(new Set());
   const [fusingIndices, setFusingIndices] = useState<ReadonlySet<number>>(new Set());
+  const [userSellPointDraft, setUserSellPointDraft] = useState("");
+  const [clothAnalyseBusy, setClothAnalyseBusy] = useState(false);
+  const [adaptingIndices, setAdaptingIndices] = useState<ReadonlySet<number>>(new Set());
   const [renderProgress, setRenderProgress] = useState<SeedVideoRenderProgressState | null>(null);
   const [previewVideo, setPreviewVideo] = useState<{ src: string; title?: string } | null>(null);
   const [splitSystemDraft, setSplitSystemDraft] = useState(DEFAULT_SPLIT_SYSTEM_PROMPT);
@@ -204,6 +217,11 @@ function OutfitVideoStudioInner() {
     setSplitUserDraft(project.settings.splitUserPrompt?.trim() || DEFAULT_SPLIT_USER_PROMPT);
     setSplitPromptErrors([]);
   }, [project?.id, project?.settings.splitSystemPrompt, project?.settings.splitUserPrompt]);
+
+  useEffect(() => {
+    if (!project) return;
+    setUserSellPointDraft(project.settings.userSellPoint ?? "");
+  }, [project?.id, project?.settings.userSellPoint]);
 
   const validateSplitPromptDrafts = useCallback((system: string, user: string) => {
     const validation = validateOutfitSplitPrompts(system, user);
@@ -753,53 +771,208 @@ function OutfitVideoStudioInner() {
     await handleSceneChange(next);
   }
 
-  async function handleUploadModel(file: File) {
-    if (!project) return;
-    setRefBusy(true);
-    setModelPipelineBusy("uploading");
-    try {
-      applyProject(await uploadOutfitVideoRefImage(project.id, "model", file));
-    } catch (e) {
-      await alert({ title: "模特图上传失败", message: formatEcomTransportError(e), variant: "error" });
-    } finally {
-      setRefBusy(false);
-      setModelPipelineBusy(null);
-    }
-  }
-
-  async function handleUploadClothing(file: File) {
-    if (!project) return;
+  async function handleUploadModelGallery(files: File[]) {
+    if (!project || files.length < 1) return;
     setRefBusy(true);
     try {
-      applyProject(await uploadOutfitVideoRefImage(project.id, "clothing", file));
+      applyProject(await uploadOutfitVideoModelGallery(project.id, files));
     } catch (e) {
-      await alert({ title: "服装图上传失败", message: formatEcomTransportError(e), variant: "error" });
+      await alert({ title: "参考图上传失败", message: formatEcomTransportError(e), variant: "error" });
     } finally {
       setRefBusy(false);
     }
   }
 
-  async function handleUploadTopGarment(file: File) {
+  async function handleRemoveModelGalleryItem(refId: string) {
     if (!project) return;
     setRefBusy(true);
     try {
-      applyProject(await uploadOutfitVideoRefImage(project.id, "topGarment", file));
+      applyProject(await removeOutfitVideoModelGalleryItem(project.id, refId));
     } catch (e) {
-      await alert({ title: "上装上传失败", message: formatEcomTransportError(e), variant: "error" });
+      await alert({ title: "删除失败", message: formatEcomTransportError(e), variant: "error" });
     } finally {
       setRefBusy(false);
     }
   }
 
-  async function handleUploadBottomGarment(file: File) {
+  async function handleUploadGlobalSceneRef(file: File) {
     if (!project) return;
     setRefBusy(true);
     try {
-      applyProject(await uploadOutfitVideoRefImage(project.id, "bottomGarment", file));
+      applyProject(await uploadOutfitVideoSceneRef(project.id, file));
+      await toast({ title: "场景参考已上传", variant: "success" });
     } catch (e) {
-      await alert({ title: "下装上传失败", message: formatEcomTransportError(e), variant: "error" });
+      await alert({ title: "场景参考上传失败", message: formatEcomTransportError(e), variant: "error" });
     } finally {
       setRefBusy(false);
+    }
+  }
+
+  async function handleAttachGlobalSceneRefFromAssets(
+    assets: Array<{ id: string; ossUrl: string; title: string }>,
+  ) {
+    if (!project || !assets.length) return;
+    setRefBusy(true);
+    try {
+      const asset = assets[0]!;
+      applyProject(
+        await attachOutfitVideoSceneRefAsset(project.id, {
+          ossUrl: asset.ossUrl,
+          title: asset.title,
+        }),
+      );
+    } catch (e) {
+      await alert({ title: "导入场景参考失败", message: formatEcomTransportError(e), variant: "error" });
+    } finally {
+      setRefBusy(false);
+    }
+  }
+
+  async function handleRemoveGlobalSceneRef() {
+    if (!project) return;
+    setRefBusy(true);
+    try {
+      applyProject(await clearOutfitVideoSceneRef(project.id));
+    } catch (e) {
+      await alert({ title: "删除失败", message: formatEcomTransportError(e), variant: "error" });
+    } finally {
+      setRefBusy(false);
+    }
+  }
+
+  async function handlePickGlobalSceneLibraryPreset(preset: {
+    entryId: string;
+    entryName: string;
+    visualPromptFragment: string;
+  }) {
+    if (!project) return;
+    setRefBusy(true);
+    try {
+      applyProject(await setOutfitVideoSceneLibraryPreset(project.id, preset));
+      await toast({ title: "场景词库已选择", message: preset.entryName, variant: "success" });
+    } catch (e) {
+      await alert({ title: "选择场景失败", message: formatEcomTransportError(e), variant: "error" });
+    } finally {
+      setRefBusy(false);
+    }
+  }
+
+  async function handleClearShotVideo(index: number) {
+    if (!project) return;
+    const shot = project.sceneList.find((s) => s.index === index);
+    if (!shot?.videoUrl?.trim()) return;
+    if (
+      !(await confirm({
+        title: `删除镜 ${index} 视频？`,
+        message: "清除后可重新生成该镜视频。",
+        confirmLabel: "删除",
+      }))
+    ) {
+      return;
+    }
+    const next = project.sceneList.map((s) =>
+      s.index === index
+        ? { ...s, videoUrl: undefined, status: "pending" as const, failReason: undefined }
+        : s,
+    );
+    await handleSceneChange(next);
+    await toast({ title: `镜 ${index} 视频已清除`, variant: "success" });
+  }
+
+  async function handleClearSceneFusion(index: number) {
+    if (!project) return;
+    const shot = project.sceneList.find((s) => s.index === index);
+    if (!shot?.sceneFusion?.fusedImageUrl?.trim()) return;
+    if (
+      !(await confirm({
+        title: `删除镜 ${index} 场景融合图？`,
+        message: "清除后可重新选择场景并融图。",
+        confirmLabel: "删除",
+      }))
+    ) {
+      return;
+    }
+    const next = project.sceneList.map((s) => {
+      if (s.index !== index || !s.sceneFusion) return s;
+      const {
+        fusedImageUrl: _fused,
+        status: _status,
+        sharedFromShotIndex: _shared,
+        failReason: _fail,
+        ...rest
+      } = s.sceneFusion;
+      return {
+        ...s,
+        sceneFusion: Object.keys(rest).length > 0 ? rest : undefined,
+      };
+    });
+    await handleSceneChange(next);
+    await toast({ title: `镜 ${index} 场景融合图已清除`, variant: "success" });
+  }
+
+  async function handleSaveUserSellPoint(value: string) {
+    if (!project) return;
+    try {
+      applyProject(
+        await updateOutfitVideoProject(project.id, {
+          settings: {
+            ...project.settings,
+            userSellPoint: value.trim() || undefined,
+          },
+        }),
+      );
+    } catch (e) {
+      await alert({ title: "卖点保存失败", message: formatEcomTransportError(e), variant: "error" });
+    }
+  }
+
+  async function handleAnalyseCloth() {
+    if (!project) return;
+    setClothAnalyseBusy(true);
+    try {
+      const next = await analyseOutfitVideoCloth(project.id);
+      applyProject(next);
+      const cloth = parseOutfitClothAnalyseMeta(next.meta);
+      if (cloth?.status === "success") {
+        await toast({ title: "服装识别完成", message: "可为各镜点击「适配此镜」", variant: "success" });
+      } else if (cloth?.status === "failed") {
+        await alert({
+          title: "服装识别失败",
+          message: cloth.failReason ?? "请稍后重试",
+          variant: "error",
+        });
+      }
+    } catch (e) {
+      await alert({ title: "服装识别失败", message: formatEcomTransportError(e), variant: "error" });
+    } finally {
+      setClothAnalyseBusy(false);
+    }
+  }
+
+  async function handleAdaptSceneStoryboard(index: number) {
+    if (!project) return;
+    setAdaptingIndices((prev) => new Set(prev).add(index));
+    try {
+      const next = await adaptOutfitVideoSceneStoryboard(project.id, index);
+      applyProject(next);
+      const shot = next.sceneList.find((s) => s.index === index);
+      if (shot?.outfitStoryboardAdapt?.status === "success") {
+        await toast({ title: `镜 ${index} 分镜已适配`, variant: "success" });
+      } else if (shot?.outfitStoryboardAdapt?.status === "failed") {
+        await alert({
+          title: `镜 ${index} 适配失败`,
+          message: shot.outfitStoryboardAdapt.failReason ?? "请重试",
+          variant: "error",
+        });
+      }
+    } catch (e) {
+      await alert({ title: "分镜适配失败", message: formatEcomTransportError(e), variant: "error" });
+    } finally {
+      setAdaptingIndices((prev) => {
+        const next = new Set(prev);
+        next.delete(index);
+        return next;
+      });
     }
   }
 
@@ -849,24 +1022,10 @@ function OutfitVideoStudioInner() {
 
   async function handleLockRefs() {
     if (!project) return;
-    const settings = {
-      outfitRefMode: project.settings.outfitRefMode ?? "need_tryon",
-      garmentMode: project.settings.garmentMode ?? "two_piece",
-    };
-    const lockedCount = project.meta?.lockedLooks?.length ?? 0;
-    if (settings.outfitRefMode === "already_dressed") {
-      if (!project.references.model?.ossUrl) {
-        await alert({
-          title: "请先补齐穿搭参考",
-          message: "请上传已穿搭全身照后再锁定。",
-          variant: "error",
-        });
-        return;
-      }
-    } else if (lockedCount < 1) {
+    if (!isOutfitRefsReadyToLock({}, project.references)) {
       await alert({
-        title: "请先锁定试衣参考",
-        message: "批量试衣后在结果墙选择并锁定至少 1 张参考，再进入逐镜生成。",
+        title: "请先上传参考图",
+        message: "请至少上传 1 张穿搭参考图后再锁定。",
         variant: "error",
       });
       return;
@@ -1118,29 +1277,22 @@ function OutfitVideoStudioInner() {
     }
   }
 
-  async function handleAttachModelFromAssets(
+  async function handleAttachModelGalleryFromAssets(
     assets: Array<{ id: string; ossUrl: string; title: string }>,
   ) {
     if (!project || !assets.length) return;
     setRefBusy(true);
-    setModelPipelineBusy("importing-model");
     try {
-      for (const asset of assets) {
-        applyProject(
-          await attachOutfitVideoRefs(project.id, {
-            model: {
-              ossUrl: asset.ossUrl,
-              source: "asset",
-              label: asset.title ?? "我的模特",
-            },
-          }),
-        );
-      }
+      applyProject(
+        await attachOutfitVideoModelGalleryAssets(
+          project.id,
+          assets.map((a) => ({ ossUrl: a.ossUrl, title: a.title })),
+        ),
+      );
     } catch (e) {
-      await alert({ title: "选择资产失败", message: formatEcomTransportError(e), variant: "error" });
+      await alert({ title: "导入资产失败", message: formatEcomTransportError(e), variant: "error" });
     } finally {
       setRefBusy(false);
-      setModelPipelineBusy(null);
     }
   }
 
@@ -1455,11 +1607,28 @@ function OutfitVideoStudioInner() {
       await alert({ title: "请稍候", message: "当前任务进行中，请完成后再新建。", variant: "error" });
       return;
     }
-    try {
-      applyProject(await createOutfitVideoProject({ title: "穿搭视频" }));
-    } catch (e) {
-      await alert({ title: "新建失败", message: formatEcomTransportError(e), variant: "error" });
-    }
+    if (!project) return;
+    const hasWork =
+      Boolean(project.references?.model?.ossUrl) ||
+      project.sceneList.some((s) => Boolean(s.imageUrl?.trim() || s.videoUrl?.trim())) ||
+      Boolean(project.composeResult?.videoUrl?.trim());
+    const defaultName = project.title?.trim() || "穿搭视频";
+    await runEcomNewProjectWithSavePrompt({
+      confirm,
+      hasWorkToSave: hasWork,
+      message: "当前穿搭视频尚未保存作品。是否先保存到「我的资产」？",
+      save: async () => {
+        const { title } = await saveOutfitVideoDeliverableSnapshot(project.id, defaultName);
+        await toast({ title: "已保存", message: title, variant: "success" });
+      },
+      onProceed: async () => {
+        try {
+          applyProject(await createOutfitVideoProject({ title: "穿搭视频" }));
+        } catch (e) {
+          await alert({ title: "新建失败", message: formatEcomTransportError(e), variant: "error" });
+        }
+      },
+    });
   }
 
   async function handleOpenProject(id: string) {
@@ -1504,11 +1673,6 @@ function OutfitVideoStudioInner() {
           mediaBusy={mediaBusy}
           splitting={splitting}
           refBusy={refBusy}
-          modelPipelineBusy={modelPipelineBusy}
-          tryonBusy={tryonBusy}
-          tryonProgress={tryonProgress}
-          imageModels={imageModels}
-          imageModelKey={imageModelKey}
           fusionModelKey={fusionModelKey}
           generateBusy={generateBusy}
           renderBusy={renderBusy}
@@ -1537,19 +1701,24 @@ function OutfitVideoStudioInner() {
           onScenePromptChange={handleScenePromptChange}
           onScenePromptReset={handleScenePromptReset}
           onDeleteScene={handleDeleteScene}
-          onUploadModel={handleUploadModel}
-          onUploadClothing={handleUploadClothing}
-          onUploadTopGarment={handleUploadTopGarment}
-          onUploadBottomGarment={handleUploadBottomGarment}
-          onOutfitRefModeChange={(mode) => void handleOutfitRefModeChange(mode)}
-          onGarmentModeChange={(mode) => void handleGarmentModeChange(mode)}
-          onPickModelFromLibrary={handlePickModelFromLibrary}
-          onAttachModelFromAssets={handleAttachModelFromAssets}
-          onGenerateModel={handleGenerateModel}
-          onExpandFullBody={handleExpandFullBody}
-          onTryon={handleTryon}
+          onUploadModelGallery={handleUploadModelGallery}
+          onAttachModelGalleryFromAssets={handleAttachModelGalleryFromAssets}
+          onRemoveModelGalleryItem={handleRemoveModelGalleryItem}
+          onUploadGlobalSceneRef={handleUploadGlobalSceneRef}
+          onAttachGlobalSceneRefFromAssets={handleAttachGlobalSceneRefFromAssets}
+          onPickGlobalSceneLibraryPreset={handlePickGlobalSceneLibraryPreset}
+          onRemoveGlobalSceneRef={handleRemoveGlobalSceneRef}
+          onClearShotVideo={handleClearShotVideo}
+          onClearSceneFusion={handleClearSceneFusion}
+          userSellPoint={userSellPointDraft}
+          clothAnalyse={project ? parseOutfitClothAnalyseMeta(project.meta) : null}
+          clothAnalyseBusy={clothAnalyseBusy}
+          onUserSellPointChange={setUserSellPointDraft}
+          onSaveUserSellPoint={handleSaveUserSellPoint}
+          onAnalyseCloth={handleAnalyseCloth}
+          adaptingIndices={adaptingIndices}
+          onAdaptSceneStoryboard={handleAdaptSceneStoryboard}
           onLockRefs={handleLockRefs}
-          batchWorkflow={outfitBatchWorkflow}
           onGenerateShots={handleGenerateShots}
           onCancelGeneratingSelection={handleCancelGeneratingSelection}
           onCompose={handleCompose}

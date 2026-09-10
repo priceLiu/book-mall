@@ -1,6 +1,8 @@
-import {
-  uploadEcomPoseLibraryPreview,
-} from "@/lib/canvas/canvas-oss";
+import { randomUUID } from "crypto";
+
+import { uploadEcomPoseLibraryPreview } from "@/lib/canvas/canvas-oss";
+import { generateAndUploadCatalogThumb } from "@/lib/ecom/ecom-catalog-thumb-upload";
+import { findCatalogDuplicateByImageUrl } from "@/lib/ecom/ecom-catalog-import-dedup";
 import {
   buildAutoPoseTitle,
   buildPoseSourceImageKeyFromBuffer,
@@ -31,7 +33,10 @@ export type ImportPoseFromImageInput = {
   sceneTags?: string[];
   sourceModule?: string;
   sourceAssetId?: string;
-  adminUserId: string;
+  adminUserId?: string;
+  actorUserId: string;
+  scope?: "platform" | "user" | "team";
+  tenantId?: string | null;
 };
 
 export type ImportPoseFromImageResult =
@@ -60,6 +65,16 @@ export async function importPoseFromImage(
   const imageUrl = input.imageUrl?.trim();
   if (!imageUrl) throw new Error("imageUrl 必填");
 
+  const catalogDup = await findCatalogDuplicateByImageUrl(imageUrl);
+  if (catalogDup) {
+    return {
+      ok: false,
+      duplicate: true,
+      existingId: catalogDup.existingId,
+      existingTitle: catalogDup.existingTitle,
+    };
+  }
+
   const existingByUrl = await findPoseEntryByNormalizedSourceUrl(imageUrl);
   if (existingByUrl) {
     return {
@@ -85,8 +100,17 @@ export async function importPoseFromImage(
   const category = (input.category?.trim() || "A").toUpperCase();
   const genders = normalizePoseGenders(input.genders ?? ["unisex"]);
   const sceneTags = normalizePoseSceneTags(input.sceneTags ?? ["电商"]);
-  const id = nextPlatformPoseId(category);
+  const scope = input.scope ?? (input.adminUserId ? "platform" : "user");
+  const id =
+    scope === "platform"
+      ? nextPlatformPoseId(category)
+      : `user-pose-${randomUUID()}`;
   const ossUrl = await uploadEcomPoseLibraryPreview({ id, buf, contentType, ext });
+  const thumbUrl = await generateAndUploadCatalogThumb({
+    catalogKind: "pose",
+    id,
+    sourceBuf: buf,
+  });
 
   const fullPrompt = input.savePrompt ? input.prompt?.trim() || "" : "";
   const poseDescription = input.savePrompt ? extractPoseDescriptionFromPrompt(fullPrompt) : "";
@@ -96,11 +120,11 @@ export async function importPoseFromImage(
     id,
     category,
     title,
-    baseDescription: poseDescription,
+    baseDescription: poseDescription || title,
     genders,
     sceneTags,
     ossUrl,
-    thumbUrl: ossUrl,
+    thumbUrl,
     sourceImageKey: hashKey,
     tags: {
       genders,
@@ -110,9 +134,12 @@ export async function importPoseFromImage(
       sourceModule: input.sourceModule,
       sourceAssetId: input.sourceAssetId,
       importedByAdminId: input.adminUserId,
+      importedByUserId: input.actorUserId,
+      tenantId: input.tenantId ?? undefined,
       importedAt: new Date().toISOString(),
     },
-    scope: "platform",
+    scope,
+    userId: scope === "user" ? input.actorUserId : scope === "team" ? input.actorUserId : null,
     enabled: true,
     sortOrder: Date.now() % 100000,
   });

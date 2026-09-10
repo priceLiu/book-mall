@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Archive,
   BookmarkPlus,
   ChevronDown,
   Copy,
@@ -74,6 +75,8 @@ export type Pro2ImageNodeToolbarProps = {
   previewUrl?: string;
   onExpandPreview?: () => void;
   onSaveAsAsset?: () => void;
+  /** 保存到全局资产库（姿势/服装/模特等） */
+  onSaveToCatalog?: () => void;
   /** 私域人像入库（火山 portrait 库 → asset://） */
   onImportPortrait?: () => void;
   portraitImporting?: boolean;
@@ -101,6 +104,7 @@ export function Pro2ImageNodeToolbar({
   previewUrl,
   onExpandPreview,
   onSaveAsAsset,
+  onSaveToCatalog,
   onImportPortrait,
   portraitImporting = false,
   portraitActive = false,
@@ -194,6 +198,17 @@ export function Pro2ImageNodeToolbar({
             <BookmarkPlus className="size-5" />
           </button>
         ) : null}
+        {onSaveToCatalog ? (
+          <button
+            type="button"
+            className={ICON_BTN}
+            title="保存到全局资产库"
+            disabled={!previewUrl}
+            onClick={onSaveToCatalog}
+          >
+            <Archive className="size-5" />
+          </button>
+        ) : null}
       </ToolbarShell>
     );
   }
@@ -285,6 +300,19 @@ export function Pro2ImageNodeToolbar({
         <button type="button" className={TOOL_BTN} onClick={onSaveAsAsset}>
           <BookmarkPlus className="size-3.5" />
           <span>保存为资产</span>
+        </button>
+      ) : null}
+
+      {onSaveToCatalog ? (
+        <button
+          type="button"
+          className={TOOL_BTN}
+          title="保存到全局资产库（姿势/服装/模特头像/全身模特）"
+          disabled={!previewUrl}
+          onClick={onSaveToCatalog}
+        >
+          <Archive className="size-3.5" />
+          <span>保存到库</span>
         </button>
       ) : null}
 

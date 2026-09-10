@@ -53,6 +53,7 @@ import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
 import {
   buildDashscopeVideoModelRefSyncPatch,
+  buildSbv1DockModeRefSyncPatch,
   dockInputModeToPatch,
   getSbv1VideoDockModeChips,
   resolveSbv1DockInputMode,
@@ -233,6 +234,22 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     data.engine?.modelKey,
     data.engine?.providerId,
     data.engine?.params,
+    onPatch,
+    data,
+  ]);
+
+  useEffect(() => {
+    if (isHdVideo) return;
+    const patch = buildSbv1DockModeRefSyncPatch(data, upstreamLinks.length);
+    if (patch) onPatch(patch);
+  }, [
+    isHdVideo,
+    upstreamLinks.length,
+    data.engine?.modelKey,
+    data.engine?.providerId,
+    data.engine?.params?.multi_shots,
+    data.dockInputMode,
+    data.referenceMode,
     onPatch,
     data,
   ]);

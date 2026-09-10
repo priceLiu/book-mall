@@ -21,9 +21,11 @@ import {
   listSeedVideoProjectSummaries,
   removeSeedVideoRef,
   attachSeedVideoRefsFromAssets,
+  saveSeedVideoDeliverableSnapshot,
   updateSeedVideoProject,
   uploadSeedVideoRef,
 } from "@/lib/ecom-seed-video-api";
+import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import { commitFormalScriptFromRows } from "@/lib/seed-video-formal-script-commit";
@@ -53,7 +55,7 @@ import {
 const PROJECT_STORAGE_KEY = "ecom-seed-video-active-project";
 
 export function SeedVideoStudio() {
-  const { alert, doubleConfirm } = useDialogs();
+  const { alert, confirm, doubleConfirm, toast } = useDialogs();
   const [project, setProject] = useState<SeedVideoProject | null>(null);
   const [chatModels, setChatModels] = useState<StoryboardGatewayModel[]>([]);
   const [videoModels, setVideoModels] = useState<StoryboardGatewayModel[]>([]);
@@ -288,8 +290,28 @@ export function SeedVideoStudio() {
     }
   }
 
-  function handleRequestNewProject() {
-    setSkillPickerOpen(true);
+  async function handleRequestNewProject() {
+    if (!project) {
+      setSkillPickerOpen(true);
+      return;
+    }
+    const hasWork =
+      (project.references?.length ?? 0) > 0 ||
+      (project.chatHistory?.length ?? 0) > 0 ||
+      Boolean(readStoryboardDraftFromMeta(project.meta)?.rows?.length);
+    const defaultName = project.title?.trim() || "种草视频";
+    await runEcomNewProjectWithSavePrompt({
+      confirm,
+      hasWorkToSave: hasWork,
+      message: "当前种草视频尚未保存工作流。是否先保存到「我的资产」？",
+      save: async () => {
+        const { snapshot } = await saveSeedVideoDeliverableSnapshot(project.id, defaultName);
+        toast({ title: "已保存", message: snapshot.title, variant: "success" });
+      },
+      onProceed: () => {
+        setSkillPickerOpen(true);
+      },
+    });
   }
 
   const loadProjectList = useCallback(async () => {

@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -91,6 +92,7 @@ export function EcomRefImageThumb({
   }, [hover, updatePos]);
 
   const previewW = typeof window !== "undefined" ? previewWidth() : PREVIEW_W;
+  const thumbSrc = buildEcomOssThumbUrl(src);
 
   return (
     <>
@@ -108,14 +110,14 @@ export function EcomRefImageThumb({
             title={alt}
             onClick={onPreview}
           >
-            <Image src={src} alt={alt} fill className="object-cover" unoptimized />
+            <Image src={thumbSrc} alt={alt} fill className="object-cover" unoptimized />
           </button>
         ) : (
           <div
             className="relative h-full w-full overflow-hidden rounded-md border border-[#d2d2d7] bg-white"
             title={alt}
           >
-            <Image src={src} alt={alt} fill className="object-cover" unoptimized />
+            <Image src={thumbSrc} alt={alt} fill className="object-cover" unoptimized />
           </div>
         )}
 

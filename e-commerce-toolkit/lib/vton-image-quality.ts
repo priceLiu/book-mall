@@ -57,3 +57,32 @@ export function vtonTryonResultAspectStyle(
   const { width, height } = parseVtonModelImagePixelSize(size);
   return { aspectRatio: `${width} / ${height}` };
 }
+
+/** 文生试衣等 · 按成片像素或出图比例设置格子 aspect-ratio */
+export function vtonDynamicResultAspectStyle(opts: {
+  width?: number;
+  height?: number;
+  ratio?: string;
+  fallbackRatio?: string;
+}): { aspectRatio: string } {
+  const width = opts.width;
+  const height = opts.height;
+  if (typeof width === "number" && typeof height === "number" && width > 0 && height > 0) {
+    return { aspectRatio: `${width} / ${height}` };
+  }
+  const ratio = opts.ratio?.trim() || opts.fallbackRatio?.trim() || "3:4";
+  switch (ratio) {
+    case "3:4":
+      return { aspectRatio: "3 / 4" };
+    case "4:5":
+      return { aspectRatio: "4 / 5" };
+    case "16:9":
+      return { aspectRatio: "16 / 9" };
+    case "9:16":
+      return { aspectRatio: "9 / 16" };
+    case "1:1":
+      return { aspectRatio: "1 / 1" };
+    default:
+      return { aspectRatio: "3 / 4" };
+  }
+}

@@ -7,7 +7,7 @@ export default function ProjectsLoading() {
       <header className="mb-6">
         <ProjectsSubNav align="start" className="min-w-0 max-w-full" />
       </header>
-      <CanvasListSkeleton sections={1} cardsPerSection={10} />
+      <CanvasListSkeleton sections={3} cardsPerSection={5} />
     </div>
   );
 }

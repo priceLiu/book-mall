@@ -10,6 +10,7 @@ module.exports = {
     "./components/**/*.{ts,tsx}",
     "./app/**/*.{ts,tsx}",
     "./src/**/*.{ts,tsx}",
+    "./docker-shared/global-asset-library/**/*.{js,ts,jsx,tsx}",
   ],
 
   theme: {

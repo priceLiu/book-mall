@@ -217,5 +217,23 @@ describe("libtv-media-aspect-preset", () => {
         },
       }),
     ).toBe(true);
+    expect(
+      shouldSkipLibtvMediaAspectPresetForNaturalMedia({
+        type: "sbv1-video-engine",
+        data: {
+          aspectRatio: "9:16",
+          runtime: { status: "done", ossUrl: "https://cdn.example/v.mp4" },
+        },
+      }),
+    ).toBe(false);
+    expect(
+      shouldSkipLibtvMediaAspectPresetForNaturalMedia({
+        type: "sbv1-video-engine",
+        data: {
+          engine: { params: { ratio: "9:16" } },
+          runtime: { status: "idle", ossUrl: "https://cdn.example/v.mp4" },
+        },
+      }),
+    ).toBe(false);
   });
 });

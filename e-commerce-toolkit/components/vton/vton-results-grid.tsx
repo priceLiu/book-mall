@@ -11,6 +11,7 @@ import { downloadRemoteImageUrl } from "@/lib/ecom-download-url";
 import { openVtonFittingRoomInNewTab } from "@/lib/vton-fitting-room-link";
 import {
   coerceVtonModelImageSize,
+  vtonDynamicResultAspectStyle,
   vtonTryonResultAspectStyle,
   type VtonModelImageSize,
 } from "@/lib/vton-image-quality";
@@ -22,6 +23,7 @@ import {
   type VtonTryonResult,
 } from "@/lib/vton-types";
 import { formatVtonBatchTryonLabel } from "@/lib/vton-tryon-progress";
+import { useSaveToCatalog } from "@/lib/use-save-to-catalog";
 import {
   normalizeVtonTryonResultVersions,
   resolveVtonTryonActiveVersionIndex,
@@ -65,10 +67,10 @@ function resultForLook(results: VtonTryonResult[], lookId: string): VtonTryonRes
 }
 
 /** 试衣结果 · 最多 5 列（3:4 竖图格过窄时模特显怪），小屏自适应 */
-const VTON_RESULTS_GRID_CLASS =
+export const VTON_RESULTS_GRID_CLASS =
   "grid grid-cols-2 items-start gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5";
 
-const VTON_RESULT_LABEL_CLASS =
+export const VTON_RESULT_LABEL_CLASS =
   "mt-0.5 h-4 shrink-0 truncate px-1 text-[10px] leading-4 text-[#6e6e73]";
 
 function friendlyTryonFailReason(raw?: string): string {
@@ -77,6 +79,19 @@ function friendlyTryonFailReason(raw?: string): string {
     return "参考图尺寸不符合要求，请换更清晰的服装图后重试";
   }
   return raw.trim();
+}
+
+/** 试衣结果格外壳（需穿衣 / 文生试衣共用） */
+export function vtonTryonResultShellClass(opts?: {
+  running?: boolean;
+  selected?: boolean;
+}): string {
+  return cn(
+    "group/image relative overflow-hidden rounded-lg border bg-[#fafafa]",
+    opts?.running && "ecom-media-generating-sweep border-[#0071e3]/40",
+    opts?.selected && "border-[#0071e3] ring-2 ring-[#0071e3]/30",
+    !opts?.running && !opts?.selected && "border-[#e8e8ed]",
+  );
 }
 
 function resultCellClass(
@@ -100,13 +115,35 @@ function isTryonLookCellRunning(
   lookId: string,
   result: VtonTryonResult | undefined,
   batchRunning: boolean,
+  runningLookIds: string[],
 ): boolean {
-  if (!batchRunning) return false;
   if (result?.status === "running") return true;
+  if (runningLookIds.includes(lookId) && (!result || result.status === "pending")) return true;
+  if (batchRunning && result?.status === "running") return true;
   return false;
 }
 
-function VtonTryonResultAspectFrame({
+/** 仅展示已试衣 / 正在试衣的格子，不为未试衣搭配预占位 */
+function isVisibleTryonResult(
+  result: VtonTryonResult,
+  batchRunning: boolean,
+  runningLookIds: string[],
+): boolean {
+  if (result.status === "success" || result.status === "failed" || result.status === "cancelled") {
+    return true;
+  }
+  if (normalizeVtonTryonResultVersions(result).some((v) => v.ossUrl.trim())) return true;
+  if (result.status === "running") return true;
+  if (
+    result.status === "pending" &&
+    (batchRunning || runningLookIds.includes(result.lookId))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function VtonTryonResultAspectFrame({
   modelImageSize,
   className,
   children,
@@ -125,6 +162,71 @@ function VtonTryonResultAspectFrame({
   );
 }
 
+/** 文生试衣 · 按成片 width/height 或 ratio 动态比例，避免固定 3:4 裁切 */
+export function VtonDynamicAspectFrame({
+  width,
+  height,
+  ratio,
+  fallbackRatio = "3:4",
+  className,
+  children,
+}: {
+  width?: number;
+  height?: number;
+  ratio?: string;
+  fallbackRatio?: string;
+  className?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div
+      className={cn("relative w-full overflow-hidden bg-[#fafafa]", className)}
+      style={vtonDynamicResultAspectStyle({ width, height, ratio, fallbackRatio })}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function VtonTryonGeneratingSlot({
+  modelImageSize,
+  width,
+  height,
+  ratio,
+  label = "试衣中",
+  className,
+}: {
+  modelImageSize?: VtonModelImageSize;
+  width?: number;
+  height?: number;
+  ratio?: string;
+  label?: string;
+  className?: string;
+}) {
+  const frameProps =
+    width || height || ratio
+      ? { width, height, ratio, fallbackRatio: "3:4" as const }
+      : null;
+  if (frameProps) {
+    return (
+      <VtonDynamicAspectFrame
+        {...frameProps}
+        className={cn("ecom-media-generating-sweep", className)}
+      >
+        <EcomMediaGeneratingBusy label={label} />
+      </VtonDynamicAspectFrame>
+    );
+  }
+  return (
+    <VtonTryonResultAspectFrame
+      modelImageSize={coerceVtonModelImageSize(modelImageSize)}
+      className={cn("ecom-media-generating-sweep", className)}
+    >
+      <EcomMediaGeneratingBusy label={label} />
+    </VtonTryonResultAspectFrame>
+  );
+}
+
 function VtonTryonRunningSlot({
   modelImageSize,
   className,
@@ -132,14 +234,7 @@ function VtonTryonRunningSlot({
   modelImageSize: VtonModelImageSize;
   className?: string;
 }) {
-  return (
-    <VtonTryonResultAspectFrame
-      modelImageSize={modelImageSize}
-      className={cn("ecom-media-generating-sweep", className)}
-    >
-      <EcomMediaGeneratingBusy label="试衣中" />
-    </VtonTryonResultAspectFrame>
-  );
+  return <VtonTryonGeneratingSlot modelImageSize={modelImageSize} className={className} />;
 }
 
 function VtonTryonQueuedSlot({
@@ -181,13 +276,26 @@ export function VtonResultsGrid({
   onRegenerateLook,
   onSaveResultToAssets,
   onStopBatchTryon,
-  runningLookIds: _runningLookIds,
+  runningLookIds: runningLookIdsProp,
   modelImageSize: modelImageSizeProp,
 }: Props) {
+  const saveToCatalog = useSaveToCatalog();
   const modelImageSize = coerceVtonModelImageSize(modelImageSizeProp);
+  const runningLookIds = runningLookIdsProp ?? [];
   const results = useMemo(() => batch?.results ?? [], [batch?.results]);
   const slotLooks = looks.slice(0, ECOM_VTON_MAX_BATCH_LOOKS);
   const running = batch?.status === "running" || Boolean(tryonBusy);
+  const visibleLooks = useMemo(() => {
+    const ids = new Set<string>();
+    for (const result of results) {
+      if (isVisibleTryonResult(result, running, runningLookIds)) {
+        ids.add(result.lookId);
+      }
+    }
+    for (const lookId of runningLookIds) ids.add(lookId);
+    return slotLooks.filter((look) => ids.has(look.id));
+  }, [results, running, runningLookIds, slotLooks]);
+  const showResultsGrid = visibleLooks.length > 0;
   const hasSuccess = results.some((r) => normalizeVtonTryonResultVersions(r).length > 0);
   const lockedResultIds = new Set(lockedLooks.map((l) => l.resultId).filter(Boolean));
   const selectedTryonCount = selectedLookIds.length;
@@ -216,7 +324,7 @@ export function VtonResultsGrid({
   const previewItems = useMemo(() => {
     const seen = new Set<string>();
     const items: Array<{ src: string; title: string; thumbSrc: string }> = [];
-    for (const look of slotLooks) {
+    for (const look of visibleLooks) {
       const result = resultForLook(results, look.id);
       if (!result) continue;
       const label = lookLabel(looks, result.lookId);
@@ -238,7 +346,7 @@ export function VtonResultsGrid({
       });
     }
     return items;
-  }, [results, looks, lockedLooks, slotLooks]);
+  }, [results, looks, lockedLooks, visibleLooks]);
 
   const { preview, openPreview, closePreview } = useEcomImagePreview(previewItems);
 
@@ -309,29 +417,31 @@ export function VtonResultsGrid({
           </div>
         </div>
 
-        {slotLooks.length > 0 ? (
+        {!showResultsGrid ? (
+          <div className="flex min-h-[28vh] flex-col items-center justify-center rounded-lg border border-dashed border-[#e8e8ed] bg-[#fafafa] px-6 py-10 text-center">
+            <p className="max-w-md text-sm text-[#6e6e73]">
+              勾选搭配并点击「试衣」后，成片将显示在此。生成完成后可勾选结果并锁定为参考图。
+            </p>
+          </div>
+        ) : (
           <div className={VTON_RESULTS_GRID_CLASS}>
-            {slotLooks.map((look) => {
+            {visibleLooks.map((look) => {
               const result = resultForLook(results, look.id);
+              const label = lookLabel(looks, look.id);
+
               if (!result) {
                 return (
                   <div key={look.id} className="flex min-w-0 flex-col">
-                    <div className="overflow-hidden rounded-lg border border-dashed border-[#e8e8ed] bg-[#fafafa]">
-                      <VtonTryonResultAspectFrame
-                        modelImageSize={modelImageSize}
-                        className="flex flex-col items-center justify-center px-1 text-center text-[10px] text-[#86868b]"
-                      >
-                        待试衣
-                      </VtonTryonResultAspectFrame>
+                    <div className={vtonTryonResultShellClass({ running: true })}>
+                      <VtonTryonGeneratingSlot modelImageSize={modelImageSize} label="试衣中" />
                     </div>
-                    <p className={VTON_RESULT_LABEL_CLASS}>{lookLabel(looks, look.id)}</p>
+                    <p className={VTON_RESULT_LABEL_CLASS}>{label}</p>
                   </div>
                 );
               }
 
               const selected = selectedResultIds.includes(result.id);
               const isLocked = lockedResultIds.has(result.id);
-              const label = lookLabel(looks, result.lookId);
               const versions = normalizeVtonTryonResultVersions(result);
               const versionIndex =
                 versionIndexByLookId[result.lookId] ??
@@ -339,7 +449,12 @@ export function VtonResultsGrid({
               const displayUrl = versions[versionIndex]?.ossUrl ?? result.ossUrl ?? null;
               const hasMultipleVersions = versions.length > 1;
               const showImage = Boolean(displayUrl);
-              const cellRunning = isTryonLookCellRunning(look.id, result, running);
+              const cellRunning = isTryonLookCellRunning(
+                look.id,
+                result,
+                running,
+                runningLookIds,
+              );
 
               return (
                 <div key={result.id} className="flex min-w-0 flex-col">
@@ -373,6 +488,13 @@ export function VtonResultsGrid({
                               onSaveResultToAssets
                                 ? () => void onSaveResultToAssets(displayUrl!, label)
                                 : undefined
+                            }
+                            onSaveToCatalog={() =>
+                              saveToCatalog({
+                                url: displayUrl!,
+                                sourceModule: mode === "model-tryon" ? "ecom-vton" : "ecom-outfit-video",
+                                sourceAssetId: result.id,
+                              })
                             }
                             onOpenFittingRoom={openVtonFittingRoomInNewTab}
                             onRegenerate={
@@ -465,7 +587,7 @@ export function VtonResultsGrid({
               );
             })}
           </div>
-        ) : null}
+        )}
 
         {hasSuccess ? (
           <div className="flex flex-wrap gap-2">

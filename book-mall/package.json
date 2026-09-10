@@ -88,6 +88,8 @@
     "ecom:import-pose-library-md": "dotenv -e .env.local -- tsx scripts/import-ecom-pose-library-md.ts",
     "ecom:import-template-gallery": "dotenv -e .env.local -- tsx scripts/import-ecom-template-gallery.ts",
     "ecom:import-template-gallery:thumbs": "dotenv -e .env.local -- tsx scripts/import-ecom-template-gallery.ts --thumb-only",
+    "ecom:backfill-catalog-thumbs": "dotenv -e .env.local -- tsx scripts/backfill-global-catalog-thumbs.ts",
+    "ecom:backfill-catalog-thumbs:dry-run": "dotenv -e .env.local -- tsx scripts/backfill-global-catalog-thumbs.ts --dry-run",
     "wechat-pay:cloudbase-env": "node scripts/wechat-pay-cloudbase-env.mjs",
     "ecom:template-source-manifest": "dotenv -e .env.local -- tsx scripts/ecom-template-source-manifest.ts",
     "qr:sync-image-gallery": "dotenv -e .env.local -- tsx scripts/sync-quick-replica-image-gallery.ts",

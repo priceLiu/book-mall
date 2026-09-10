@@ -12,6 +12,7 @@ import {
 import {
   buildOutfitShotPrefilledGeneratePrompt,
   resolveOutfitShotGeneratePrompt,
+  resolveOutfitShotNegativePrompt,
 } from "@/lib/ecom/ecom-outfit-video-generate-prompts";
 import { resolveDefaultLockedLookUrl } from "@/lib/ecom/ecom-vton/meta";
 import type { VtonProjectMeta } from "@/lib/ecom/ecom-vton/types";
@@ -38,21 +39,26 @@ export type OutfitShotGenerateContext = {
   durationSec?: number;
 };
 
-/** §十：负向固定（中文） */
-export function buildOutfitShotNegativePrompt(): string {
+/** §十：负向固定（中文）；有 scene 时优先适配结果 */
+export function buildOutfitShotNegativePrompt(scene?: SceneShot): string {
+  if (scene) return resolveOutfitShotNegativePrompt(scene);
   return OUTFIT_V1_NEGATIVE_PROMPT_ZH;
 }
 
-/** 逐镜生成人物参考：优先 default locked look，回退 dressedImage */
+/** 逐镜生成人物参考：locked look → modelGallery 首张 → model → dressedImage */
 export function resolveOutfitDressedImageUrl(
   refs: WorkflowRefs,
   meta?: VtonProjectMeta | null,
 ): string {
   const fromMeta = meta ? resolveDefaultLockedLookUrl(meta) : null;
   if (fromMeta) return fromMeta;
+  const galleryPrimary = refs.modelGallery?.[0]?.ossUrl?.trim();
+  if (galleryPrimary) return galleryPrimary;
+  const model = refs.model?.ossUrl?.trim();
+  if (model) return model;
   const dressed = refs.dressedImage?.ossUrl?.trim();
   if (dressed) return dressed;
-  throw new Error("请先锁定穿搭参考图");
+  throw new Error("请先上传穿搭参考图");
 }
 
 export function buildOutfitShotGenerateBody(ctx: OutfitShotGenerateContext): {
@@ -69,12 +75,6 @@ export function buildOutfitShotGenerateBody(ctx: OutfitShotGenerateContext): {
   videoConfig: typeof OUTFIT_V1_DEFAULT_VIDEO_CONFIG;
 } {
   const dressedUrl = resolveOutfitShotKlingCharacterImage(ctx.scene, ctx.refs, ctx.meta);
-  if (!ctx.scene.sceneFusion?.fusedImageUrl?.trim() && !ctx.refs.dressedImage?.ossUrl) {
-    throw new Error("请先锁定穿搭参考并生成场景融合图");
-  }
-  if (!ctx.scene.sceneFusion?.fusedImageUrl?.trim()) {
-    throw new Error("请先在分镜表生成场景融合图");
-  }
 
   const durationSec =
     typeof ctx.durationSec === "number" && ctx.durationSec > 0
@@ -83,7 +83,7 @@ export function buildOutfitShotGenerateBody(ctx: OutfitShotGenerateContext): {
 
   return {
     prompt: resolveOutfitShotGeneratePrompt(ctx.scene),
-    negativePrompt: buildOutfitShotNegativePrompt(),
+    negativePrompt: buildOutfitShotNegativePrompt(ctx.scene),
     modelImageUrl: dressedUrl,
     clothingImageUrl: dressedUrl,
     previewImageUrl: ctx.scene.previewImageUrl,

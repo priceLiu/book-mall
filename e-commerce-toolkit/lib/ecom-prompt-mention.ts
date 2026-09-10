@@ -1,3 +1,4 @@
+import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
 import {
   findMentionRefByLegacyIndex,
   findMentionRefByToken,
@@ -25,6 +26,14 @@ export type EcomPromptImageRef = {
 
 export const ECOM_IMAGE_REF_BADGE_ATTR = "data-ecom-image-ref";
 export const ECOM_IMAGE_REF_TOKEN_ATTR = "data-ecom-image-ref-token";
+
+/** 从 @图片N 解析序号（SEMANTIC_REF_TOKEN_RE 无捕获组，须单独解析） */
+export function parseLegacyImageIndexFromToken(token: string): number | null {
+  const m = /^@图片(\d+)$/.exec(token.trim());
+  if (!m) return null;
+  const n = Number.parseInt(m[1]!, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 function appendTextWithBreaks(target: DocumentFragment, text: string): void {
   const parts = text.split("\n");
@@ -56,9 +65,9 @@ export function createEcomImageRefBadge(
   badge.style.marginInline = "1px";
   badge.style.verticalAlign = "middle";
 
-  if (!tokenOnly && item?.url) {
+  if (!tokenOnly && item?.url?.trim()) {
     const img = document.createElement("img");
-    img.src = item.url;
+    img.src = buildEcomOssThumbUrl(item.url.trim());
     img.alt = "";
     img.draggable = false;
     img.referrerPolicy = "no-referrer";
@@ -121,7 +130,9 @@ function resolveBadgeItem(
   semantic: SemanticMentionRef[],
   m: RegExpExecArray,
 ): EcomPromptImageRef | undefined {
-  const legacy = m[2] ? Number.parseInt(m[2], 10) : NaN;
+  const fullToken = m[0]!;
+  const legacyFromToken = parseLegacyImageIndexFromToken(fullToken);
+  const legacy = legacyFromToken ?? (m[2] ? Number.parseInt(m[2], 10) : NaN);
   if (Number.isFinite(legacy) && legacy > 0) {
     const sem = findMentionRefByLegacyIndex(semantic, legacy);
     if (sem) {
@@ -137,7 +148,6 @@ function resolveBadgeItem(
     }
     return refs.find((r) => r.index === legacy);
   }
-  const fullToken = m[0]!;
   const sem = findMentionRefByToken(semantic, fullToken);
   if (sem) {
     return refs.find((r) => r.index === sem.index) ?? {
@@ -151,6 +161,28 @@ function resolveBadgeItem(
     };
   }
   return refs.find((r) => r.token === fullToken);
+}
+
+/** 从 Prompt 存储串提取全部 @ 引用 token（含 @图片N / 语义 token） */
+export function collectMentionTokensFromPrompt(value: string): Set<string> {
+  const tokens = new Set<string>();
+  if (!value.trim()) return tokens;
+  const re = new RegExp(SEMANTIC_REF_TOKEN_RE.source, "g");
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(value)) !== null) {
+    tokens.add(m[0]!);
+  }
+  return tokens;
+}
+
+/** 仅保留 Prompt 正文中仍被 @ 引用的参考资产（顶栏绑定模式） */
+export function filterEcomPromptImageRefsUsedInPrompt(
+  value: string,
+  refs: EcomPromptImageRef[],
+): EcomPromptImageRef[] {
+  const used = collectMentionTokensFromPrompt(value);
+  if (used.size === 0) return [];
+  return refs.filter((r) => used.has(r.token) && Boolean(r.url?.trim()));
 }
 
 export function buildPromptEditableFragment(
@@ -193,8 +225,10 @@ export function buildPromptEditableFragment(
         appendTextWithBreaks(frag, fullToken);
       }
     } else {
+      const legacyIdx =
+        item?.index ?? parseLegacyImageIndexFromToken(fullToken) ?? undefined;
       frag.appendChild(
-        createEcomImageRefBadge(item, item?.index, {
+        createEcomImageRefBadge(item, legacyIdx, {
           variant: variant === "token-only" ? "token-only" : "thumbnail",
         }),
       );

@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, FileText, RefreshCw } from "lucide-react";
+import { Archive, Eye, FileText, RefreshCw } from "lucide-react";
 
 import {
   ECOM_MEDIA_TILE_ACTION_ICON_CLASS,
@@ -14,6 +14,7 @@ type Props = {
   onPreview?: () => void;
   onRegenerate?: () => void;
   onPreviewPrompt?: () => void;
+  onSaveToCatalog?: () => void;
   btnClass?: string;
 };
 
@@ -28,9 +29,10 @@ export function StoryboardPanelImageHoverActions({
   onPreview,
   onRegenerate,
   onPreviewPrompt,
+  onSaveToCatalog,
   btnClass = ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS,
 }: Props) {
-  if (!onPreview && !onRegenerate && !onPreviewPrompt) return null;
+  if (!onPreview && !onRegenerate && !onPreviewPrompt && !onSaveToCatalog) return null;
 
   return (
     <>
@@ -76,6 +78,20 @@ export function StoryboardPanelImageHoverActions({
             }}
           >
             <FileText className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
+          </button>
+        ) : null}
+        {onSaveToCatalog ? (
+          <button
+            type="button"
+            title="保存到库"
+            aria-label="保存到库"
+            className={cn(btnClass, "pointer-events-auto")}
+            onClick={(e) => {
+              stopClick(e);
+              onSaveToCatalog();
+            }}
+          >
+            <Archive className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
           </button>
         ) : null}
       </div>

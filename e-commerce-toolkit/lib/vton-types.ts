@@ -86,6 +86,24 @@ export type VtonModelGeneration = {
   confirmedAt?: string;
 };
 
+export type VtonTextTryonRef = {
+  id: string;
+  ossUrl: string;
+  label?: string;
+  createdAt: string;
+};
+
+export type VtonTextTryonResult = {
+  id: string;
+  ossUrl: string;
+  prompt: string;
+  modelKey: string;
+  createdAt: string;
+  ratio?: "1:1" | "3:4" | "4:5" | "16:9";
+  width?: number;
+  height?: number;
+};
+
 export type VtonProjectMeta = {
   garmentPool?: VtonGarmentItem[];
   lookDrafts?: VtonLookSpec[];
@@ -98,6 +116,9 @@ export type VtonProjectMeta = {
   previewModelGenerationId?: string;
   confirmedModelGenerationIds?: string[];
   activeModelGenerationId?: string;
+  textTryonRefs?: VtonTextTryonRef[];
+  textTryonPrompt?: string;
+  textTryonResults?: VtonTextTryonResult[];
 };
 
 export const ECOM_VTON_MODEL_ASSET_MODULE = "model-tryon-model";
@@ -131,6 +152,28 @@ export function parseVtonProjectMeta(raw: unknown): VtonProjectMeta {
       : undefined,
     activeModelGenerationId:
       typeof o.activeModelGenerationId === "string" ? o.activeModelGenerationId : undefined,
+    textTryonRefs: Array.isArray(o.textTryonRefs)
+      ? o.textTryonRefs
+          .map((row) => {
+            if (!row || typeof row !== "object") return null;
+            const r = row as Record<string, unknown>;
+            const id = typeof r.id === "string" ? r.id.trim() : "";
+            const ossUrl = typeof r.ossUrl === "string" ? r.ossUrl.trim() : "";
+            const createdAt = typeof r.createdAt === "string" ? r.createdAt : "";
+            if (!id || !ossUrl || !createdAt) return null;
+            return {
+              id,
+              ossUrl,
+              createdAt,
+              label: typeof r.label === "string" ? r.label : undefined,
+            } satisfies VtonTextTryonRef;
+          })
+          .filter((r): r is VtonTextTryonRef => Boolean(r))
+      : undefined,
+    textTryonPrompt: typeof o.textTryonPrompt === "string" ? o.textTryonPrompt : undefined,
+    textTryonResults: Array.isArray(o.textTryonResults)
+      ? (o.textTryonResults as VtonTextTryonResult[])
+      : undefined,
   };
 }
 

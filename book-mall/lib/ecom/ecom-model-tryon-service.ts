@@ -66,6 +66,8 @@ import {
   resolveMediaDecomposeUpload,
 } from "@/lib/ecom/ecom-media-decompose-media";
 import type { WorkflowRefs } from "@/lib/ecom/video-workflow/shot-spine";
+import { resolveVtonTextTryonModelKey } from "@/lib/ecom/ecom-vton-text-tryon-models";
+import { ensureEcomVtonTextTryonDemoState } from "@/lib/ecom/ecom-vton-text-tryon-demo";
 import type { VtonGarmentMode, VtonRefMode } from "@/lib/ecom/ecom-vton/types";
 
 const REF_IMAGE_KEYS = [
@@ -79,7 +81,9 @@ const REF_IMAGE_KEYS = [
 type RefImageKey = (typeof REF_IMAGE_KEYS)[number];
 
 function sanitizeOutfitRefMode(raw: unknown): VtonRefMode {
-  return raw === "already_dressed" ? "already_dressed" : "need_tryon";
+  if (raw === "already_dressed") return "already_dressed";
+  if (raw === "text_to_tryon") return "text_to_tryon";
+  return "need_tryon";
 }
 
 function sanitizeGarmentMode(raw: unknown): VtonGarmentMode {
@@ -103,10 +107,15 @@ function sanitizeSettings(raw: unknown): ModelTryonSettings {
     };
   }
   const o = raw as Record<string, unknown>;
+  const outfitRefMode = sanitizeOutfitRefMode(o.outfitRefMode);
   return {
-    outfitRefMode: sanitizeOutfitRefMode(o.outfitRefMode),
+    outfitRefMode,
     garmentMode: sanitizeGarmentMode(o.garmentMode),
     modelImageSize: sanitizeModelImageSize(o.modelImageSize),
+    textTryonModelKey:
+      typeof o.textTryonModelKey === "string"
+        ? resolveVtonTextTryonModelKey(o.textTryonModelKey)
+        : resolveVtonTextTryonModelKey(undefined),
   };
 }
 
@@ -315,7 +324,9 @@ export async function getEcomModelTryonProject(
   projectId: string,
 ): Promise<ModelTryonProjectDto | null> {
   const row = await getOwnedRow(userId, projectId);
-  return row ? rowToDto(row) : null;
+  if (!row) return null;
+  const dto = rowToDto(row);
+  return ensureEcomVtonTextTryonDemoState(userId, dto);
 }
 
 export async function updateEcomModelTryonProject(
@@ -351,7 +362,8 @@ export async function updateEcomModelTryonProject(
     where: { id: projectId },
     data,
   });
-  return rowToDto(row);
+  const dto = rowToDto(row);
+  return ensureEcomVtonTextTryonDemoState(userId, dto);
 }
 
 export async function attachEcomModelTryonRefs(
@@ -466,8 +478,6 @@ export async function expandEcomModelTryonModelFullBody(
     preview?.ossUrl?.trim() ?? project.references.model?.ossUrl?.trim();
   if (!portraitUrl) throw new Error("请先上传或选择模特图");
 
-  const sourcePreviewId = preview?.id;
-
   const ossUrl = await expandVtonModelFullBody({
     userId,
     portraitUrl,
@@ -487,7 +497,6 @@ export async function expandEcomModelTryonModelFullBody(
       source: "ai-generate",
       bodyCheck: vtonGenerationBodyCheckForAi(),
     },
-    sourcePreviewId ? { keepPreviewGenerationId: sourcePreviewId } : undefined,
   );
 }
 
@@ -907,6 +916,12 @@ export async function saveEcomModelTryonResultToAssets(
     project.references.dressedImage?.ossUrl?.trim();
   if (!url) throw new Error("请先完成 AI 试衣");
 
+  const existing = await prisma.ecomAsset.findFirst({
+    where: { userId, module: ECOM_MODEL_TRYON_MODULE, ossUrl: url },
+    select: { id: true },
+  });
+  if (existing) return { assetId: existing.id };
+
   const kind = inferKindFromOssUrl(url);
   const title =
     opts?.title?.trim() ||
@@ -928,6 +943,24 @@ export async function saveEcomModelTryonResultToAssets(
       },
     },
   });
+
+  try {
+    const { persistEcomGenerationRecord } = await import("@/lib/ecom/ecom-generation-record");
+    await persistEcomGenerationRecord({
+      userId,
+      ossUrl: url,
+      kind: kind === "video" ? "video" : "image",
+      title,
+      meta: {
+        sourceModule: ECOM_MODEL_TRYON_MODULE,
+        sourceToolKey: ECOM_MODEL_TRYON_TOOL_KEY,
+        projectId,
+        versionKey: `${projectId}:tryon:${asset.id}`,
+      },
+    });
+  } catch (e) {
+    console.warn("[model-tryon] generation record failed:", e);
+  }
 
   return { assetId: asset.id };
 }

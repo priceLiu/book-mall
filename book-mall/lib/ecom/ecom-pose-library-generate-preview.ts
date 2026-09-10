@@ -1,3 +1,4 @@
+import { generateAndUploadCatalogThumbFromUrl } from "@/lib/ecom/ecom-catalog-thumb-upload";
 import { generateEcomImage } from "@/lib/ecom/ecom-image-gen-invoke";
 import { getModelLibraryEntry } from "@/lib/ecom/ecom-model-library-service";
 import { assemblePoseStudioPreviewPrompt } from "@/lib/ecom/ecom-pose-library-generate-prompt";
@@ -77,11 +78,16 @@ export async function generatePoseLibraryPreviews(
           refImageUrls,
           toolKey: POSE_STUDIO_TOOL_KEY,
         });
+        const thumbUrl = await generateAndUploadCatalogThumbFromUrl({
+          catalogKind: "pose",
+          id: poseId,
+          imageUrl: ossUrl,
+        });
 
         const entry = await upsertPoseLibraryEntry({
           ...pose,
           ossUrl,
-          thumbUrl: ossUrl,
+          thumbUrl,
           tags: {
             ...(pose.tags ?? {}),
             generatedFrom: "pose-studio",

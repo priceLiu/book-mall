@@ -480,7 +480,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const showToolbar = Boolean(showFloatingToolbar && hasToolbarContent);
   const showSidePlus = Boolean((hovered || selected || connectingFromNodeId) && !isGenerating);
 
-  useLibtvMediaAspectPresetSync(id, d.aspectRatio, !isPro2VideoBoardCell);
+  useLibtvMediaAspectPresetSync(id, d.aspectRatio);
 
   useLibtvMediaNodeAutoFit({
     nodeId: id,

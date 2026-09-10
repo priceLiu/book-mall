@@ -17,12 +17,14 @@ import {
   createEcomImageRefMentionNode,
   ECOM_IMAGE_REF_BADGE_ATTR,
   ECOM_IMAGE_REF_TOKEN_ATTR,
+  filterEcomPromptImageRefsUsedInPrompt,
   resolveCaretTextAnchor,
   scanImageRefTriggerBeforeCursor,
   serializePromptEditable,
   type EcomMentionBadgeVariant,
   type EcomPromptImageRef,
 } from "@/lib/ecom-prompt-mention";
+import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
 import { mentionRefRoleLabel } from "@/lib/product-design-mention-refs";
 import { cn } from "@/lib/utils";
 
@@ -102,6 +104,10 @@ type Props = {
   showTopRefBar?: boolean;
   /** top-bar-bound：顶栏绑定带图，正文只显示代号；thumbnail/token-only 为旧模式 */
   mentionBadgeVariant?: EcomMentionBadgeVariant;
+  /** 为 true 时顶栏参考资产条仅展示 Prompt 内仍存在的 @ 引用（上传区不受影响） */
+  syncRefBarWithPrompt?: boolean;
+  /** 顶栏参考资产说明文案 */
+  refBarHint?: string;
 };
 
 export function ProductDesignPromptMentionTextarea({
@@ -116,6 +122,8 @@ export function ProductDesignPromptMentionTextarea({
   hideQuickInsert = false,
   showTopRefBar = true,
   mentionBadgeVariant = "top-bar-bound",
+  syncRefBarWithPrompt = false,
+  refBarHint,
 }: Props) {
   const pathname = usePathname();
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -130,8 +138,16 @@ export function ProductDesignPromptMentionTextarea({
   badgeVariantRef.current = mentionBadgeVariant;
   const suppressInlineQuickInsert =
     hideQuickInsert || mentionBadgeVariant === "top-bar-bound";
+
+  const refBarImages = useMemo(() => {
+    if (!syncRefBarWithPrompt) return referenceImages;
+    return filterEcomPromptImageRefsUsedInPrompt(value, referenceImages);
+  }, [syncRefBarWithPrompt, value, referenceImages]);
+
   const showEmbeddedRefBar =
-    showTopRefBar && mentionBadgeVariant === "top-bar-bound" && referenceImages.length > 0;
+    showTopRefBar &&
+    refBarImages.length > 0 &&
+    (mentionBadgeVariant === "top-bar-bound" || syncRefBarWithPrompt);
 
   const [isEmpty, setIsEmpty] = useState(!value);
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -490,7 +506,7 @@ export function ProductDesignPromptMentionTextarea({
     <div ref={wrapperRef} className="relative">
       {showEmbeddedRefBar ? (
         <div className="mb-2 rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-2.5 py-2">
-          <EcomPromptMentionRefBar refs={referenceImages} />
+          <EcomPromptMentionRefBar refs={refBarImages} hint={refBarHint} />
         </div>
       ) : null}
       {!suppressInlineQuickInsert && referenceImages.length > 0 ? (
@@ -505,9 +521,10 @@ export function ProductDesignPromptMentionTextarea({
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={item.url}
+                src={buildEcomOssThumbUrl(item.url)}
                 alt=""
                 className="h-4 w-4 rounded object-cover"
+                referrerPolicy="no-referrer"
               />
               {item.token.replace(/^@/, "")}
             </button>

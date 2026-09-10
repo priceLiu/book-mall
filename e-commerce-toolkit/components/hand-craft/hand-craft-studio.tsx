@@ -22,9 +22,11 @@ import {
   listHandCraftProjectSummaries,
   removeHandCraftSketch,
   attachHandCraftSketchesFromAssets,
+  saveHandCraftWorkflow,
   updateHandCraftProject,
   uploadHandCraftSketch,
 } from "@/lib/ecom-hand-craft-api";
+import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import type { HandCraftProject, HandCraftStepId } from "@/lib/hand-craft-types";
 import { inferCurrentStepId } from "@/lib/hand-craft-workflow";
 import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
@@ -39,7 +41,7 @@ const PROJECT_STORAGE_KEY = "ecom-hand-craft-active-project";
 const ENTRY_PATH = "/ecom/hand-craft";
 
 export function HandCraftStudio() {
-  const { alert, confirm, doubleConfirm } = useDialogs();
+  const { alert, confirm, doubleConfirm, toast } = useDialogs();
   const [project, setProject] = useState<HandCraftProject | null>(null);
   const [chatModels, setChatModels] = useState<StoryboardGatewayModel[]>([]);
   const [imageModels, setImageModels] = useState<StoryboardGatewayModel[]>([]);
@@ -164,20 +166,43 @@ export function HandCraftStudio() {
   }, [alert, loadModels, reload]);
 
   async function handleNewProject() {
-    setLoading(true);
-    setEmpty(false);
-    try {
-      const created = await createHandCraftProject({ title: "手伴创作" });
-      await reload(created.id, created);
-    } catch (e) {
-      await alert({
-        title: "新建失败",
-        message: e instanceof Error ? e.message : "无法创建项目",
-        variant: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
+    const hasWork =
+      Boolean(project?.references?.length) ||
+      (project?.chatHistory?.length ?? 0) > 0 ||
+      Object.values(project?.plan?.steps ?? {}).some(
+        (step) => (step?.outputs?.length ?? 0) > 0 || (step?.slots?.length ?? 0) > 0,
+      );
+    const defaultName = project?.title?.trim() || "手伴创作";
+    await runEcomNewProjectWithSavePrompt({
+      confirm,
+      hasWorkToSave: Boolean(project && hasWork),
+      message: "当前项目尚未保存工作流。是否先保存到「我的资产」？",
+      save: async () => {
+        if (!project) return;
+        const snapshot = await saveHandCraftWorkflow(project.id, defaultName);
+        toast({
+          title: "工作流已保存",
+          message: `「${snapshot.title}」已保存，可继续新建。`,
+          variant: "success",
+        });
+      },
+      onProceed: async () => {
+        setLoading(true);
+        setEmpty(false);
+        try {
+          const created = await createHandCraftProject({ title: "手伴创作" });
+          await reload(created.id, created);
+        } catch (e) {
+          await alert({
+            title: "新建失败",
+            message: e instanceof Error ? e.message : "无法创建项目",
+            variant: "error",
+          });
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
   }
 
   const loadProjectList = useCallback(async () => {

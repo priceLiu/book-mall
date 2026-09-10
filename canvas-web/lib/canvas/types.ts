@@ -329,6 +329,8 @@ export type ImageNodeData = {
   /** 上传错误信息 */
   uploadError?: string;
   runtime?: CanvasNodeRuntime;
+  /** 全局资产库素材 · UI 角标（入库成功 / 从平台库选用） */
+  globalCatalogMarked?: boolean;
 };
 
 /**

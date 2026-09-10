@@ -1,3 +1,7 @@
+import {
+  isFullSetGarmentReady,
+  resolveFullSetInputMode,
+} from "@/lib/vton-full-set-garment";
 import type { VtonGarmentItem, VtonLookSpec } from "@/lib/vton-types";
 
 /** 搭配编排中已占用的服装 id */
@@ -13,8 +17,15 @@ export function collectLookDraftGarmentIds(looks: VtonLookSpec[]): Set<string> {
 }
 
 function shouldShowGarmentInPool(g: VtonGarmentItem, used: Set<string>): boolean {
-  // 套装始终留在服装池，展示原图与分割双槽（编排区另有一份预览）
-  if (g.kind === "full_set") return true;
+  if (g.kind === "full_set") {
+    const mode = resolveFullSetInputMode(g);
+    // 双槽套装已编入搭配且上下装齐全 → 清空上传区，留空槽给下一套
+    if (mode === "manual" && used.has(g.id) && isFullSetGarmentReady(g)) {
+      return false;
+    }
+    // 整图分割套装仍留在池，展示原图与分割结果（编排区另有预览）
+    return true;
+  }
   return !used.has(g.id);
 }
 

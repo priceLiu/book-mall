@@ -11,6 +11,7 @@ import { useCallback, useState } from "react";
 
 import type { AiSpaceLibraryAsset } from "@/lib/ai-space/ai-space-asset-library";
 
+import { AiSpacePlatformCatalogPanel } from "./ai-space-platform-catalog-panel";
 import { AiSpaceAssetDetailDialog } from "./ai-space-asset-detail-dialog";
 import {
   AssetLibraryFilters,
@@ -22,8 +23,11 @@ import {
   unpinLibraryAsset,
 } from "./asset-library/asset-library-client";
 
+type LibrarySubTab = "works" | "catalog";
+
 export function AiSpaceAssetLibraryDesk() {
   const library = useAssetLibrary();
+  const [subTab, setSubTab] = useState<LibrarySubTab>("works");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detailKey, setDetailKey] = useState<string | null>(null);
@@ -62,28 +66,56 @@ export function AiSpaceAssetLibraryDesk() {
         </p>
       </div>
 
-      <AssetLibraryFilters state={library} />
+      <div className="flex rounded-full border border-[#e8e8ed] bg-[#fafafa] p-0.5 w-fit">
+        {(
+          [
+            { id: "works" as const, label: "我的作品" },
+            { id: "catalog" as const, label: "平台素材" },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
+              subTab === t.id
+                ? "bg-[#1d1d1f] text-white"
+                : "text-[#86868b] hover:text-[#1d1d1f]"
+            }`}
+            onClick={() => setSubTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {subTab === "works" ? (
+        <>
+          <AssetLibraryFilters state={library} />
 
-      <AssetLibraryGrid
-        state={library}
-        columnsClassName="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
-        busy={busy}
-        primaryLabel="查看详情"
-        onPrimary={(a) => setDetailKey(a.key)}
-        secondaryLabel={(a) => (a.pinned ? "移出空间" : "收进空间")}
-        onSecondary={(a) => void togglePin(a)}
-      />
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      {detail ? (
-        <AiSpaceAssetDetailDialog
-          asset={detail}
-          busy={busy}
-          onTogglePin={() => void togglePin(detail)}
-          onClose={() => setDetailKey(null)}
-        />
-      ) : null}
+          <AssetLibraryGrid
+            state={library}
+            columnsClassName="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+            busy={busy}
+            primaryLabel="查看详情"
+            onPrimary={(a) => setDetailKey(a.key)}
+            secondaryLabel={(a) => (a.pinned ? "移出空间" : "收进空间")}
+            onSecondary={(a) => void togglePin(a)}
+          />
+
+          {detail ? (
+            <AiSpaceAssetDetailDialog
+              asset={detail}
+              busy={busy}
+              onTogglePin={() => void togglePin(detail)}
+              onClose={() => setDetailKey(null)}
+            />
+          ) : null}
+        </>
+      ) : (
+        <AiSpacePlatformCatalogPanel />
+      )}
     </div>
   );
 }

@@ -22,6 +22,13 @@ import {
   OUTFIT_V1_POSITIVE_PROMPT,
   OUTFIT_V1_TEMPLATE_ID,
 } from "@/lib/ecom/video-workflow/templates/outfit-v1/constants";
+import {
+  appendOutfitModelGalleryItems,
+  normalizeOutfitModelGalleryRefs,
+  removeOutfitModelGalleryItem,
+  sanitizeOutfitModelGallery,
+  OUTFIT_MODEL_GALLERY_MAX,
+} from "@/lib/ecom/ecom-outfit-model-gallery";
 import { inferOutfitPhase, isOutfitRefsReadyToLock, isOutfitRefsLocked } from "@/lib/ecom/video-workflow/templates/outfit-v1/ui-config";
 import type { WorkflowEnvelope } from "@/lib/ecom/video-workflow/envelope";
 import {
@@ -86,6 +93,13 @@ import {
   validateOutfitSplitPrompts,
 } from "@/lib/ecom/ecom-outfit-video-split-prompt-validate";
 import { splitOutfitReferenceVideoPhysical } from "@/lib/ecom/ecom-outfit-video-split";
+import {
+  adaptOutfitSceneStoryboardLlm,
+  analyseOutfitClothFromImage,
+  toOutfitStoryboardAdaptPatch,
+} from "@/lib/ecom/ecom-outfit-storyboard-adapt";
+import { normalizeOutfitUserSellPointForLlm } from "@/lib/ecom/ecom-outfit-storyboard-adapt-prompts";
+import type { OutfitClothAnalyseMeta } from "@/lib/ecom/ecom-outfit-video-types";
 
 function assertOutfitVideoPrismaDelegate(): void {
   const delegate = (
@@ -155,9 +169,21 @@ const REF_IMAGE_KEYS = [
   "topGarment",
   "bottomGarment",
   "dressedImage",
+  "sceneRef",
 ] as const;
 
 type RefImageKey = (typeof REF_IMAGE_KEYS)[number];
+
+function sanitizeSceneLibraryPreset(raw: unknown): WorkflowRefs["sceneLibraryPreset"] {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const entryId = typeof o.entryId === "string" ? o.entryId.trim() : "";
+  const entryName = typeof o.entryName === "string" ? o.entryName.trim() : "";
+  const visualPromptFragment =
+    typeof o.visualPromptFragment === "string" ? o.visualPromptFragment.trim() : "";
+  if (!entryId || !entryName || !visualPromptFragment) return undefined;
+  return { entryId, entryName, visualPromptFragment };
+}
 
 function sanitizeRefImageEntry(
   v: unknown,
@@ -195,7 +221,11 @@ function sanitizeRefs(raw: unknown): WorkflowRefs {
     const parsed = sanitizeRefImageEntry(v);
     if (parsed) out[key] = parsed;
   }
-  return out;
+  const gallery = sanitizeOutfitModelGallery(o.modelGallery);
+  if (gallery.length) out.modelGallery = gallery;
+  const preset = sanitizeSceneLibraryPreset(o.sceneLibraryPreset);
+  if (preset) out.sceneLibraryPreset = preset;
+  return normalizeOutfitModelGalleryRefs(out);
 }
 
 function sanitizeStructured(raw: unknown): Record<string, WorkflowEnvelope> | null {
@@ -771,10 +801,12 @@ export async function attachEcomOutfitVideoRefs(
   const project = await getEcomOutfitVideoProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
 
-  const refs: WorkflowRefs = {
-    ...project.references,
+  const refs = normalizeOutfitModelGalleryRefs({
+    ...sanitizeRefs(project.references),
     ...patch,
-  };
+  });
+  if (patch.sceneRef?.ossUrl) delete refs.sceneLibraryPreset;
+  if (patch.sceneLibraryPreset) delete refs.sceneRef;
 
   const envelope = buildWorkflowEnvelope({
     templateId: OUTFIT_V1_TEMPLATE_ID,
@@ -1115,25 +1147,20 @@ export async function lockEcomOutfitVideoRefs(
     throw new Error("穿搭参考已锁定");
   }
 
-  const settings = sanitizeSettings(project.settings);
-  const mode = settings.outfitRefMode ?? "need_tryon";
-
   let meta = sanitizeVtonProjectMeta(project.meta);
   let refs = sanitizeRefs(project.references);
 
-  if (mode === "already_dressed") {
-    if (!refs.model?.ossUrl?.trim()) throw new Error("请先上传已穿搭全身照");
-    const locked = lockVtonUploadAsLook(meta, {
+  if (!refs.model?.ossUrl?.trim()) throw new Error("请先上传穿搭参考图");
+  const locked = lockVtonUploadAsLook(
+    meta,
+    {
       ossUrl: refs.model.ossUrl,
-      label: refs.model.label ?? "已穿搭",
-    }, refs);
-    meta = locked.meta;
-    refs = locked.references ?? refs;
-  } else {
-    if (!refs.model?.ossUrl?.trim()) throw new Error("请先上传模特全身照");
-    assertVtonReadyToFinalizeLock(meta, "need_tryon");
-    refs = syncRefsDressedImageFromLocked(refs, meta);
-  }
+      label: refs.model.label ?? "穿搭参考",
+    },
+    refs,
+  );
+  meta = locked.meta;
+  refs = locked.references ?? refs;
 
   const dressedImage = refs.dressedImage;
   if (!dressedImage?.ossUrl) throw new Error("缺少锁定参考图");
@@ -1163,12 +1190,7 @@ export async function lockEcomOutfitVideoRefs(
   });
 }
 
-export async function uploadEcomOutfitVideoRefImage(
-  userId: string,
-  projectId: string,
-  role: "model" | "clothing" | "topGarment" | "bottomGarment",
-  file: File,
-): Promise<OutfitVideoProjectDto> {
+async function uploadOutfitImageFile(userId: string, file: File): Promise<string> {
   const buf = Buffer.from(await file.arrayBuffer());
   const uploaded = await resolveMediaDecomposeUpload({
     userId,
@@ -1177,23 +1199,135 @@ export async function uploadEcomOutfitVideoRefImage(
     fileName: file.name,
   });
   if (uploaded.kind !== "image") throw new Error("请上传图片");
+  return uploaded.ossUrl;
+}
 
-  const labelByRole: Record<typeof role, string> = {
-    model: "模特图",
+export async function appendEcomOutfitVideoModelGalleryUploads(
+  userId: string,
+  projectId: string,
+  files: File[],
+): Promise<OutfitVideoProjectDto> {
+  const project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  if (isOutfitRefsLocked(project.structured)) throw new Error("特征已锁定，无法修改参考图");
+
+  const items: Array<{ ossUrl: string; source: "upload"; label: string }> = [];
+  for (const file of files) {
+    if (items.length >= OUTFIT_MODEL_GALLERY_MAX) break;
+    const ossUrl = await uploadOutfitImageFile(userId, file);
+    const base = file.name.replace(/\.[^.]+$/, "").trim() || "穿搭参考";
+    items.push({ ossUrl, source: "upload", label: base });
+  }
+  if (items.length < 1) throw new Error("请上传至少 1 张图片");
+
+  const refs = appendOutfitModelGalleryItems(sanitizeRefs(project.references), items);
+  return updateEcomOutfitVideoProject(userId, projectId, { references: refs, phase: "bind_refs" });
+}
+
+export async function appendEcomOutfitVideoModelGalleryAssets(
+  userId: string,
+  projectId: string,
+  assets: Array<{ ossUrl: string; title?: string }>,
+): Promise<OutfitVideoProjectDto> {
+  const project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  if (isOutfitRefsLocked(project.structured)) throw new Error("特征已锁定，无法修改参考图");
+
+  const items = assets
+    .map((a) => ({
+      ossUrl: a.ossUrl.trim(),
+      source: "asset" as const,
+      label: a.title?.trim() || "我的资产",
+    }))
+    .filter((a) => a.ossUrl);
+  if (items.length < 1) throw new Error("请选择至少 1 张资产");
+
+  const refs = appendOutfitModelGalleryItems(sanitizeRefs(project.references), items);
+  return updateEcomOutfitVideoProject(userId, projectId, { references: refs, phase: "bind_refs" });
+}
+
+export async function removeEcomOutfitVideoModelGalleryItem(
+  userId: string,
+  projectId: string,
+  refId: string,
+): Promise<OutfitVideoProjectDto> {
+  const project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  if (isOutfitRefsLocked(project.structured)) throw new Error("特征已锁定，无法修改参考图");
+
+  const refs = removeOutfitModelGalleryItem(sanitizeRefs(project.references), refId);
+  return updateEcomOutfitVideoProject(userId, projectId, { references: refs, phase: "bind_refs" });
+}
+
+export async function uploadEcomOutfitVideoRefImage(
+  userId: string,
+  projectId: string,
+  role: "model" | "clothing" | "topGarment" | "bottomGarment" | "sceneRef",
+  file: File,
+): Promise<OutfitVideoProjectDto> {
+  if (role === "model") {
+    return appendEcomOutfitVideoModelGalleryUploads(userId, projectId, [file]);
+  }
+
+  const project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  if (isOutfitRefsLocked(project.structured)) throw new Error("特征已锁定，无法修改参考图");
+
+  const ossUrl = await uploadOutfitImageFile(userId, file);
+  const labelByRole: Record<Exclude<typeof role, "model">, string> = {
     clothing: "服装图",
     topGarment: "上装",
     bottomGarment: "下装",
+    sceneRef: "场景参考",
   };
 
-  const patch: Partial<WorkflowRefs> = {
+  if (role === "sceneRef") {
+    const refs = sanitizeRefs(project!.references);
+    refs.sceneRef = {
+      ossUrl,
+      source: "upload",
+      label: labelByRole.sceneRef,
+    };
+    delete refs.sceneLibraryPreset;
+    return updateEcomOutfitVideoProject(userId, projectId, { references: refs, phase: "bind_refs" });
+  }
+
+  return attachEcomOutfitVideoRefs(userId, projectId, {
     [role]: {
-      ossUrl: uploaded.ossUrl,
+      ossUrl,
       source: "upload",
       label: labelByRole[role],
     },
-  };
+  });
+}
 
-  return attachEcomOutfitVideoRefs(userId, projectId, patch);
+export async function setEcomOutfitVideoSceneLibraryPreset(
+  userId: string,
+  projectId: string,
+  preset: NonNullable<WorkflowRefs["sceneLibraryPreset"]>,
+): Promise<OutfitVideoProjectDto> {
+  const project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  if (isOutfitRefsLocked(project.structured)) throw new Error("特征已锁定，无法修改参考图");
+
+  const refs = sanitizeRefs(project.references);
+  delete refs.sceneRef;
+  refs.sceneLibraryPreset = preset;
+  return updateEcomOutfitVideoProject(userId, projectId, { references: refs, phase: "bind_refs" });
+}
+
+export async function clearEcomOutfitVideoSceneRef(
+  userId: string,
+  projectId: string,
+): Promise<OutfitVideoProjectDto> {
+  const project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  if (isOutfitRefsLocked(project.structured)) throw new Error("特征已锁定，无法修改参考图");
+
+  const refs = { ...sanitizeRefs(project.references) };
+  delete refs.sceneRef;
+  delete refs.sceneLibraryPreset;
+  return updateEcomOutfitVideoProject(userId, projectId, { references: refs, phase: "bind_refs" });
 }
 
 export async function generateEcomOutfitVideoShot(
@@ -1587,4 +1721,203 @@ export async function patchEcomOutfitShotSceneFusionConfig(
         : s,
     ),
   });
+}
+
+function readOutfitClothAnalyseMeta(meta: Record<string, unknown> | null): OutfitClothAnalyseMeta | null {
+  const raw = meta?.outfitClothAnalyse;
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const structuredText = typeof o.structuredText === "string" ? o.structuredText.trim() : "";
+  const imageUrl = typeof o.imageUrl === "string" ? o.imageUrl.trim() : "";
+  const modelKey = typeof o.modelKey === "string" ? o.modelKey.trim() : "";
+  const analysedAt = typeof o.analysedAt === "string" ? o.analysedAt : "";
+  const status = o.status;
+  if (
+    !structuredText ||
+    !imageUrl ||
+    !modelKey ||
+    !analysedAt ||
+    (status !== "generating" && status !== "success" && status !== "failed")
+  ) {
+    return null;
+  }
+  return {
+    structuredText,
+    imageUrl,
+    modelKey,
+    analysedAt,
+    status,
+    failReason: typeof o.failReason === "string" ? o.failReason : undefined,
+  };
+}
+
+function resolveOutfitPrimaryModelImageUrl(refs: WorkflowRefs): string {
+  const normalized = normalizeOutfitModelGalleryRefs(refs);
+  const url =
+    normalized.modelGallery?.[0]?.ossUrl?.trim() ||
+    normalized.model?.ossUrl?.trim() ||
+    normalized.dressedImage?.ossUrl?.trim();
+  if (!url) throw new Error("请先上传穿搭参考图");
+  return url;
+}
+
+function patchSceneStoryboardAdapt(
+  scenes: SceneShot[],
+  sceneId: string,
+  patch: SceneShot["outfitStoryboardAdapt"],
+): SceneShot[] {
+  return scenes.map((s) =>
+    s.sceneId === sceneId
+      ? {
+          ...s,
+          outfitStoryboardAdapt: patch,
+        }
+      : s,
+  );
+}
+
+/** 视觉识别上传图上的服装（全局一次，手动触发） */
+export async function analyseEcomOutfitVideoCloth(
+  userId: string,
+  projectId: string,
+): Promise<OutfitVideoProjectDto> {
+  let project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+
+  const imageUrl = resolveOutfitPrimaryModelImageUrl(project.references);
+  const pendingMeta: OutfitClothAnalyseMeta = {
+    structuredText: "",
+    imageUrl,
+    modelKey: "",
+    analysedAt: new Date().toISOString(),
+    status: "generating",
+  };
+
+  project = await updateEcomOutfitVideoProject(userId, projectId, {
+    meta: {
+      ...(project.meta ?? {}),
+      outfitClothAnalyse: pendingMeta,
+    },
+  });
+
+  try {
+    const { structuredText, modelKey } = await analyseOutfitClothFromImage({
+      userId,
+      projectId,
+      imageUrl,
+    });
+    const successMeta: OutfitClothAnalyseMeta = {
+      structuredText,
+      imageUrl,
+      modelKey,
+      analysedAt: new Date().toISOString(),
+      status: "success",
+    };
+    return updateEcomOutfitVideoProject(userId, projectId, {
+      meta: {
+        ...(project.meta ?? {}),
+        outfitClothAnalyse: successMeta,
+      },
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "服装识别失败";
+    const failedMeta: OutfitClothAnalyseMeta = {
+      structuredText: "",
+      imageUrl,
+      modelKey: "",
+      analysedAt: new Date().toISOString(),
+      status: "failed",
+      failReason: message,
+    };
+    return updateEcomOutfitVideoProject(userId, projectId, {
+      meta: {
+        ...(project.meta ?? {}),
+        outfitClothAnalyse: failedMeta,
+      },
+    });
+  }
+}
+
+/** 单镜分镜适配（手动触发，可重试） */
+export async function adaptEcomOutfitVideoSceneStoryboard(
+  userId: string,
+  projectId: string,
+  sceneIndex: number,
+): Promise<OutfitVideoProjectDto> {
+  let project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  if (project.sceneList.length === 0) throw new Error("请先拆解分镜");
+
+  const cloth = readOutfitClothAnalyseMeta(project.meta);
+  if (!cloth || cloth.status !== "success" || !cloth.structuredText.trim()) {
+    throw new Error("请先完成服装识别");
+  }
+
+  const scene = project.sceneList.find((s) => s.index === sceneIndex);
+  if (!scene) throw new Error(`找不到分镜 ${sceneIndex}`);
+
+  const splitModelKey =
+    project.settings.splitModelKey?.trim() || OUTFIT_V1_DEFAULT_SPLIT_MODEL;
+  const userSellPointForLlm = normalizeOutfitUserSellPointForLlm(
+    project.settings.userSellPoint,
+  );
+
+  project = await updateEcomOutfitVideoProject(userId, projectId, {
+    sceneList: patchSceneStoryboardAdapt(project.sceneList, scene.sceneId, {
+      status: "generating",
+      userSellPoint: userSellPointForLlm,
+      splitModelKey,
+    }),
+  });
+
+  try {
+    const parsed = await adaptOutfitSceneStoryboardLlm({
+      userId,
+      projectId,
+      scene,
+      clothAnalyseText: cloth.structuredText,
+      userSellPoint: project.settings.userSellPoint,
+      splitModelKey,
+    });
+
+    const adaptPatch = toOutfitStoryboardAdaptPatch(parsed, {
+      splitModelKey,
+      userSellPointForLlm,
+      status: "success",
+    });
+
+    return updateEcomOutfitVideoProject(userId, projectId, {
+      sceneList: patchSceneStoryboardAdapt(
+        project.sceneList,
+        scene.sceneId,
+        adaptPatch,
+      ),
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "分镜适配失败";
+    return updateEcomOutfitVideoProject(userId, projectId, {
+      sceneList: patchSceneStoryboardAdapt(
+        project.sceneList,
+        scene.sceneId,
+        toOutfitStoryboardAdaptPatch(
+          {
+            originalStoryboard: "",
+            clothAnalyse: "",
+            userSellPoint: "",
+            mode: "",
+            adjustLogic: "",
+            finalStoryboard: "",
+            positivePrompt: "",
+            negativePrompt: "",
+          },
+          {
+            splitModelKey,
+            userSellPointForLlm,
+            status: "failed",
+            failReason: message,
+          },
+        ),
+      ),
+    });
+  }
 }

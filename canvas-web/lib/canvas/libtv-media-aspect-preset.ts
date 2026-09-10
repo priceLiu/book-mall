@@ -335,17 +335,41 @@ export function resolveLibtvMediaAspectPresetProfile(
   return null;
 }
 
+/** Dock 用户显式选择的比例（含 Gateway engine.params.ratio；不含 readNode 默认值） */
+export function hasExplicitLibtvAspectRatioSelection(
+  node: Pick<CanvasFlowNode, "type" | "data">,
+): boolean {
+  const d = node.data as {
+    aspectRatio?: string;
+    engine?: { params?: Record<string, unknown> };
+  };
+  const raw = d.aspectRatio?.trim();
+  if (raw && raw !== "auto") return true;
+  if (node.type === "sbv1-video-engine") {
+    const fromParams = d.engine?.params?.aspect_ratio ?? d.engine?.params?.ratio;
+    if (typeof fromParams === "string" && fromParams.trim()) return true;
+  }
+  return false;
+}
+
 export function readNodeAspectRatio(
   node: Pick<CanvasFlowNode, "type" | "data">,
 ): string {
   const d = node.data as {
     aspectRatio?: Sbv1ImageAspectRatio | Sbv1AspectRatio | string;
     pro2MediaRole?: string;
+    engine?: { params?: Record<string, unknown> };
   };
   const raw = d.aspectRatio?.trim();
   if (raw) return raw;
+  if (node.type === "sbv1-video-engine") {
+    const fromParams = d.engine?.params?.aspect_ratio ?? d.engine?.params?.ratio;
+    if (typeof fromParams === "string" && fromParams.trim()) {
+      return fromParams.trim();
+    }
+    return "4:3";
+  }
   if (node.type === "story-pro2-three-view") return "16:9";
-  if (node.type === "sbv1-video-engine") return "4:3";
   if (
     d.pro2MediaRole === "frame" ||
     d.pro2MediaRole === "scene" ||
@@ -434,6 +458,9 @@ export function shouldSkipLibtvMediaAspectPresetForNaturalMedia(
   /** 本地上传 / 拖入：须优先于 aspectRatio（视频节点默认 16:9 不应挡住 natural fit） */
   if (d.uploading || d.imageMode === "upload") return true;
   if (d.blobUrl?.trim()) return true;
+
+  /** Dock 已选比例 · 生成前/后均须走 preset，不被成片 natural 尺寸覆盖 */
+  if (hasExplicitLibtvAspectRatioSelection(node)) return false;
   if (node.type === "sbv1-video-engine") {
     const mediaUrl =
       d.runtime?.ossUrl?.trim() || d.runtime?.ephemeralUrl?.trim();
@@ -442,9 +469,6 @@ export function shouldSkipLibtvMediaAspectPresetForNaturalMedia(
       if (!rt || rt === "done" || rt === "idle") return true;
     }
   }
-
-  const ar = d.aspectRatio?.trim();
-  if (ar && ar !== "auto") return false;
 
   if (
     d.ossUrl?.trim() &&

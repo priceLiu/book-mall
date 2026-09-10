@@ -10,6 +10,8 @@ export type ModelTryonSettings = {
   garmentMode?: VtonGarmentMode;
   /** wan2.7 全身生图像素尺寸（720P / 1080P / 2K） */
   modelImageSize?: string;
+  /** 文生试衣 · 图片编辑模型 */
+  textTryonModelKey?: string;
 };
 
 export type ModelTryonProjectDto = {

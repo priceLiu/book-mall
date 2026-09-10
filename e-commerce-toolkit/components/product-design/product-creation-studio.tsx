@@ -22,9 +22,11 @@ import {
   getProductDesignProject,
   listProductDesignProjects,
   removeProductDesignRef,
+  saveProductDesignWorkflow,
   updateProductDesignProject,
   uploadProductDesignRef,
 } from "@/lib/ecom-product-design-api";
+import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import type {
   EcomPlatformSpec,
   EcomProjectModule,
@@ -82,7 +84,7 @@ type StudioProps = {
 export function ProductCreationStudio({ module }: StudioProps) {
   const entry = ENTRY_COPY[module];
   const router = useRouter();
-  const { alert, confirm, doubleConfirm } = useDialogs();
+  const { alert, confirm, doubleConfirm, toast } = useDialogs();
   const [project, setProject] = useState<ProductDesignProject | null>(null);
   const [specs, setSpecs] = useState<EcomPlatformSpec[]>([]);
   const [chatModels, setChatModels] = useState<StoryboardGatewayModel[]>([]);
@@ -245,24 +247,65 @@ export function ProductCreationStudio({ module }: StudioProps) {
   }, [alert, loadModels, module, reload]);
 
   async function handleNewProject(importFrom?: ProductDesignStrategyImport) {
-    setLoading(true);
-    setEmpty(false);
-    try {
-      const created = await createProductDesignProject({
-        module,
-        title: entry.newTitle,
-        importFrom,
-      });
-      await reload(created.id, created);
-    } catch (e) {
-      await alert({
-        title: "新建失败",
-        message: e instanceof Error ? e.message : "无法创建项目",
-        variant: "error",
-      });
-    } finally {
-      setLoading(false);
+    if (importFrom) {
+      setLoading(true);
+      setEmpty(false);
+      try {
+        const created = await createProductDesignProject({
+          module,
+          title: entry.newTitle,
+          importFrom,
+        });
+        await reload(created.id, created);
+      } catch (e) {
+        await alert({
+          title: "新建失败",
+          message: e instanceof Error ? e.message : "无法创建项目",
+          variant: "error",
+        });
+      } finally {
+        setLoading(false);
+      }
+      return;
     }
+    const hasWork =
+      Boolean(project?.references?.length) ||
+      (project?.chatHistory?.length ?? 0) > 0 ||
+      Boolean(project?.meta?.deliverableMarkdown?.trim());
+    const defaultName = project?.title?.trim() || entry.newTitle;
+    await runEcomNewProjectWithSavePrompt({
+      confirm,
+      hasWorkToSave: Boolean(project && hasWork),
+      message: "当前项目尚未保存工作流。是否先保存到「我的资产」？",
+      save: async () => {
+        if (!project) return;
+        const snapshot = await saveProductDesignWorkflow(project.id, defaultName);
+        toast({
+          title: "工作流已保存",
+          message: `「${snapshot.title}」已保存，可继续新建。`,
+          variant: "success",
+        });
+      },
+      onProceed: async () => {
+        setLoading(true);
+        setEmpty(false);
+        try {
+          const created = await createProductDesignProject({
+            module,
+            title: entry.newTitle,
+          });
+          await reload(created.id, created);
+        } catch (e) {
+          await alert({
+            title: "新建失败",
+            message: e instanceof Error ? e.message : "无法创建项目",
+            variant: "error",
+          });
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
   }
 
   const loadProjectList = useCallback(async () => {

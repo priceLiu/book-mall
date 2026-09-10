@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/ecom-data-table";
 import { AnalysisCell } from "@/components/outfit-video/outfit-scene-analysis-cell";
 import { OutfitShotSceneFusionCell } from "@/components/outfit-video/outfit-shot-scene-fusion-cell";
+import { OutfitShotStoryboardAdaptCell } from "@/components/outfit-video/outfit-shot-storyboard-adapt-cell";
 import { batchComposeButtonLabel } from "@/lib/seed-video-tts-selection";
 import type { SceneShot, WorkflowRefs } from "@/lib/video-workflow/shot-spine";
 import type { VtonLockedLook } from "@/lib/vton-types";
@@ -53,6 +54,11 @@ type Props = {
   onUploadSceneRef: (index: number, file: File) => Promise<void>;
   onFuseScene: (index: number) => Promise<void>;
   onApplySceneFusionToAll: (sourceIndex: number) => Promise<void>;
+  clothAnalyseReady?: boolean;
+  adaptingIndices?: ReadonlySet<number>;
+  onAdaptSceneStoryboard: (index: number) => Promise<void>;
+  onClearShotVideo: (index: number) => Promise<void>;
+  onClearSceneFusion: (index: number) => Promise<void>;
 };
 
 function shotStatusLabel(shot: SceneShot, generating: boolean): { label: string; className: string } {
@@ -88,10 +94,15 @@ export function OutfitShotProductionPanel({
   onUploadSceneRef,
   onFuseScene,
   onApplySceneFusionToAll,
+  clothAnalyseReady,
+  adaptingIndices,
+  onAdaptSceneStoryboard,
+  onClearShotVideo,
+  onClearSceneFusion,
 }: Props) {
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
-  const columnCount = 10;
+  const columnCount = 11;
 
   const refGallery = useMemo(() => {
     const items: Array<{ label: string; url: string; isDefault?: boolean }> = [];
@@ -103,15 +114,40 @@ export function OutfitShotProductionPanel({
           isDefault: look.id === defaultLockedLookId,
         });
       }
+    } else if (refs.modelGallery?.length) {
+      for (const [index, item] of refs.modelGallery.entries()) {
+        items.push({
+          label:
+            index === 0
+              ? `${item.label ?? `穿搭参考 ${index + 1}`} · 默认参考`
+              : item.label ?? `穿搭参考 ${index + 1}`,
+          url: item.ossUrl,
+          isDefault: index === 0,
+        });
+      }
     } else if (refs.dressedImage?.ossUrl) {
       items.push({
         label: refs.dressedImage.label ?? "穿搭成片",
         url: refs.dressedImage.ossUrl,
         isDefault: true,
       });
+    } else if (refs.model?.ossUrl) {
+      items.push({
+        label: refs.model.label ?? "穿搭参考",
+        url: refs.model.ossUrl,
+        isDefault: true,
+      });
     }
     return items;
-  }, [defaultLockedLookId, lockedLooks, refs.dressedImage?.label, refs.dressedImage?.ossUrl]);
+  }, [
+    defaultLockedLookId,
+    lockedLooks,
+    refs.dressedImage?.label,
+    refs.dressedImage?.ossUrl,
+    refs.model?.label,
+    refs.model?.ossUrl,
+    refs.modelGallery,
+  ]);
 
   const idleIndices = useMemo(
     () =>
@@ -240,7 +276,7 @@ export function OutfitShotProductionPanel({
       </div>
 
       <p className="text-[11px] leading-relaxed text-[#6e6e73]">
-        推荐顺序：① 每镜「选场景 → 融图」生成人物+场景参考（可应用全部共用）→ ② 勾选后「生成 (N)」逐镜动作迁移 → ③ 全部镜头就绪后「合成成片」。背景无法 100% 锁定，片段间可能存在轻微跳动。
+        推荐顺序：① 上传参考并完成「识别服装」→ ② 每镜「适配此镜」微调动作与生成 Prompt（可单镜重试）→ ③ 可选「选场景 → 融图」→ ④ 勾选后「生成 (N)」逐镜动作迁移 → ⑤ 合成成片。
       </p>
 
       <div className="flex flex-wrap gap-2">
@@ -324,7 +360,7 @@ export function OutfitShotProductionPanel({
         <table className={`min-w-full ${ecomDataTableClass}`}>
           <thead>
             <tr className={ecomDataTableHeadRowClass}>
-              {["", "镜号", "时长", "运镜", "动作", "光影", "场景", "场景图", "镜头视频", "状态"].map((h, i) => (
+              {["", "镜号", "时长", "运镜", "动作", "光影", "场景", "分镜适配", "场景图", "镜头视频", "状态"].map((h, i) => (
                 <th key={h || i} className={`whitespace-nowrap ${ecomDataTableThClass}`}>
                   {h}
                 </th>
@@ -373,6 +409,15 @@ export function OutfitShotProductionPanel({
                       <AnalysisCell text={outfitSceneBackgroundLabel(row)} />
                     </td>
                     <td className={`${ecomDataTableTdClass} align-top`}>
+                      <OutfitShotStoryboardAdaptCell
+                        shot={row}
+                        clothReady={clothAnalyseReady}
+                        adapting={adaptingIndices?.has(row.index)}
+                        disabled={tableBusy}
+                        onAdapt={onAdaptSceneStoryboard}
+                      />
+                    </td>
+                    <td className={`${ecomDataTableTdClass} align-top`}>
                       <OutfitShotSceneFusionCell
                         shot={row}
                         disabled={tableBusy}
@@ -381,6 +426,11 @@ export function OutfitShotProductionPanel({
                         onPickMode={onPickSceneFusionMode}
                         onUploadSceneRef={onUploadSceneRef}
                         onFuse={onFuseScene}
+                        onClearFusion={
+                          row.sceneFusion?.fusedImageUrl && !tableBusy
+                            ? () => void onClearSceneFusion(row.index)
+                            : undefined
+                        }
                       />
                     </td>
                     <td className={ecomDataTableTdClass}>
@@ -397,6 +447,12 @@ export function OutfitShotProductionPanel({
                             ? () => onPreviewVideo?.(row.videoUrl!, `镜 ${row.index}`)
                             : undefined
                         }
+                        onRemove={
+                          row.videoUrl?.trim() && !generating && !tableBusy
+                            ? () => void onClearShotVideo(row.index)
+                            : undefined
+                        }
+                        removeLabel={`删除镜 ${row.index} 视频`}
                       />
                     </td>
                     <td className={`${ecomDataTableTdClass} ${status.className}`}>{status.label}</td>

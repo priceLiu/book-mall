@@ -1,6 +1,7 @@
 "use client";
 
 import type { EcomPromptImageRef } from "@/lib/ecom-prompt-mention";
+import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
 import { mentionTokenDisplay } from "@/lib/product-design-mention-tokens";
 import { cn } from "@/lib/utils";
 
@@ -41,7 +42,7 @@ export function EcomPromptMentionRefBar({
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={ref.url}
+                src={buildEcomOssThumbUrl(ref.url)}
                 alt={ref.label}
                 className="h-10 w-10 shrink-0 rounded-md border border-[#e8e8ed] object-cover"
                 referrerPolicy="no-referrer"

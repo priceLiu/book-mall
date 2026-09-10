@@ -16,6 +16,24 @@ export const outfitSceneFusionSchema = z.object({
 
 export type OutfitSceneFusion = z.infer<typeof outfitSceneFusionSchema>;
 
+/** 拉片后 · 单镜分镜适配（服装识别 + LLM 改写） */
+export const outfitStoryboardAdaptSchema = z.object({
+  status: z.enum(["pending", "generating", "success", "failed"]).optional(),
+  failReason: z.string().optional(),
+  originalStoryboard: z.string().optional(),
+  clothAnalyse: z.string().optional(),
+  userSellPoint: z.string().optional(),
+  mode: z.string().optional(),
+  adjustLogic: z.string().optional(),
+  finalStoryboard: z.string().optional(),
+  positivePrompt: z.string().optional(),
+  negativePrompt: z.string().optional(),
+  adaptedAt: z.string().optional(),
+  splitModelKey: z.string().optional(),
+});
+
+export type OutfitStoryboardAdapt = z.infer<typeof outfitStoryboardAdaptSchema>;
+
 export const sceneShotSchema = z.object({
   sceneId: z.string().min(1),
   index: z.number().int().positive(),
@@ -45,6 +63,8 @@ export const sceneShotSchema = z.object({
   status: z.enum(["pending", "generating", "success", "failed"]).optional(),
   failReason: z.string().optional(),
   sceneFusion: outfitSceneFusionSchema.optional(),
+  /** 服装适配后的单镜分镜（手动触发，逐镜） */
+  outfitStoryboardAdapt: outfitStoryboardAdaptSchema.optional(),
 });
 
 export type SceneShot = z.infer<typeof sceneShotSchema>;
@@ -66,6 +86,21 @@ export const workflowRefImageSchema = z.object({
 
 export type WorkflowRefImage = z.infer<typeof workflowRefImageSchema>;
 
+export const outfitModelGalleryItemSchema = workflowRefImageSchema.extend({
+  id: z.string().min(1),
+});
+
+export type OutfitModelGalleryItem = z.infer<typeof outfitModelGalleryItemSchema>;
+
+/** 穿搭参考 · 场景库预设（无参考图，仅 prompt 片段） */
+export const outfitSceneLibraryPresetSchema = z.object({
+  entryId: z.string().min(1),
+  entryName: z.string().min(1),
+  visualPromptFragment: z.string().min(1),
+});
+
+export type OutfitSceneLibraryPreset = z.infer<typeof outfitSceneLibraryPresetSchema>;
+
 export const workflowRefsSchema = z.object({
   referenceVideo: z
     .object({
@@ -74,6 +109,8 @@ export const workflowRefsSchema = z.object({
     })
     .optional(),
   model: workflowRefImageSchema.optional(),
+  /** 穿搭视频 · 多张穿搭参考；首张同步为 model */
+  modelGallery: z.array(outfitModelGalleryItemSchema).optional(),
   clothing: workflowRefImageSchema.optional(),
   /** 上下装 · 上装（需穿衣 two_piece） */
   topGarment: workflowRefImageSchema.optional(),
@@ -81,6 +118,10 @@ export const workflowRefsSchema = z.object({
   bottomGarment: workflowRefImageSchema.optional(),
   /** 锁定后的穿搭成片 · 逐镜生成唯一人物参考 */
   dressedImage: workflowRefImageSchema.optional(),
+  /** 全片默认场景参考图（融图 style_ref；逐镜可覆盖） */
+  sceneRef: workflowRefImageSchema.optional(),
+  /** 全片默认场景库预设（场景提示词；与 sceneRef 二选一） */
+  sceneLibraryPreset: outfitSceneLibraryPresetSchema.optional(),
 });
 
 export type WorkflowRefs = z.infer<typeof workflowRefsSchema>;

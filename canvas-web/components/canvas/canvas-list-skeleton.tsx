@@ -3,9 +3,9 @@ import { cn } from "@/lib/utils";
 
 function CanvasListCardSkeleton() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[var(--canvas-surface)]">
-      <div className="aspect-[340/190] animate-pulse bg-white/[0.04]" />
-      <div className="space-y-2 p-3">
+    <div className="rounded-2xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-4">
+      <div className="aspect-[340/190] animate-pulse overflow-hidden rounded-xl bg-[var(--canvas-surface-2)]" />
+      <div className="mt-3 space-y-2">
         <div className="h-4 w-3/5 animate-pulse rounded bg-white/[0.06]" />
         <div className="h-3 w-2/5 animate-pulse rounded bg-white/[0.04]" />
       </div>

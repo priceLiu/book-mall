@@ -22,6 +22,7 @@ import {
   type StoryboardSheet,
   storyboardSheetSchema,
 } from "@/lib/ecom/ecom-storyboard-types";
+import { persistEcomGenerationRecord } from "@/lib/ecom/ecom-generation-record";
 import {
   resolveKlingV3Resolution,
   resolveStoryboardWan27JobSize,
@@ -782,12 +783,13 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
                     refImageUrls: panelRefUrls,
                   });
 
+          const panelTitle = `${sheet.overview.title} · 镜头${panel.index}`.slice(0, 80);
           await prisma.ecomAsset.create({
             data: {
               userId: opts.userId,
               module: ECOM_STORYBOARD_MODULE,
               kind: "image",
-              title: `${sheet.overview.title} · 镜头${panel.index}`.slice(0, 80),
+              title: panelTitle,
               prompt,
               ossUrl: imgResult.ossUrl,
               thumbnailUrl: imgResult.ossUrl,
@@ -801,6 +803,25 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
               },
             },
           });
+
+          try {
+            await persistEcomGenerationRecord({
+              userId: opts.userId,
+              ossUrl: imgResult.ossUrl,
+              title: panelTitle,
+              prompt,
+              meta: {
+                sourceModule: ECOM_STORYBOARD_MODULE,
+                sourceToolKey: ECOM_STORYBOARD_TOOL_KEY,
+                projectId: opts.projectId,
+                versionKey: `${opts.projectId}:panel:${panel.index}`,
+                modelKey,
+                panelIndex: panel.index,
+              },
+            });
+          } catch (e) {
+            console.warn("[storyboard-image] generation record failed:", e);
+          }
 
           await persistStoryboardPanelImageUrl({
             userId: opts.userId,
