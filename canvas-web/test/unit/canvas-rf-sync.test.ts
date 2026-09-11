@@ -64,4 +64,31 @@ describe("mergeStoreNodesIntoRf", () => {
     expect(merged[1]!.zIndex).toBe(1201);
     expect(merged[1]!.data).toBe(storeNodes[1]!.data);
   });
+
+  it("preserves RF stretched size for selected node before store commit", () => {
+    const storeNodes: CanvasFlowNode[] = [
+      {
+        id: "hub",
+        type: "story-pro2-script-hub",
+        position: { x: 0, y: 0 },
+        width: 420,
+        height: 320,
+        data: {},
+      },
+    ];
+    const rfNodes: CanvasFlowNode[] = [
+      {
+        ...storeNodes[0]!,
+        selected: true,
+        width: 560,
+        height: 400,
+        style: { width: 560, height: 400 },
+      },
+    ];
+    const merged = mergeStoreNodesIntoRf(rfNodes, storeNodes, {
+      preserveRfSelection: true,
+    });
+    expect(merged[0]!.width).toBe(560);
+    expect(merged[0]!.height).toBe(400);
+  });
 });

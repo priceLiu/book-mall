@@ -117,6 +117,7 @@ import {
   syncNodeDimensionsFromChanges,
 } from "./canvas-node-changes";
 import { dispatchCanvasRfSelectNode } from "./canvas-rf-sync";
+import { hasLibtvMediaCanvasNodes } from "./libtv-canvas-detect";
 import { preserveLocalInflightOnHydrateLayout } from "./hydrate-inflight-preserve";
 import { libtvMediaNodesNeedViewportReflow } from "./libtv-media-node-size";
 import { libtvCanvasNeedsViewportReflow } from "./libtv-canvas-viewport-reflow";
@@ -613,11 +614,19 @@ export const useCanvasStore = create<CanvasState>()(
         if (get().canvasMultiSelectActive === active) return;
         set({ canvasMultiSelectActive: active });
       },
-      setLibtvFloatingDockSelection: (nodeId, nodeType) =>
+      setLibtvFloatingDockSelection: (nodeId, nodeType) => {
+        const cur = get();
+        if (
+          cur.libtvFloatingDockNodeId === nodeId &&
+          cur.libtvFloatingDockNodeType === nodeType
+        ) {
+          return;
+        }
         set({
           libtvFloatingDockNodeId: nodeId,
           libtvFloatingDockNodeType: nodeType,
-        }),
+        });
+      },
       setLibtvInputDockFocused: (focused) =>
         set({ libtvInputDockFocused: focused }),
       setGlobalAssetLibraryOpen: (open) =>
@@ -891,6 +900,8 @@ export const useCanvasStore = create<CanvasState>()(
           filteredChanges,
         );
         if (isCanvasSelectionOnlyChange(filteredChanges)) {
+          // LibTV 选中态仅 RF 本地 · 写 store 会与 merge preserveRfSelection 互抢
+          if (hasLibtvMediaCanvasNodes(prev)) return;
           // 选中态不改 zIndex（CSS 抬层），也不进撤销栈
           if (canvasNodesSelectionAndZEqual(prev, next)) return;
           useCanvasStore.temporal.getState().pause();

@@ -141,12 +141,12 @@ function TextUpstreamChip({
             minSizePx={badgeMinPx}
           />
         ) : deletable ? null : (
-          <span
-            className="pointer-events-none absolute right-0.5 top-0.5 z-10 flex min-h-[14px] min-w-[14px] items-center justify-center rounded bg-black/75 px-1 py-px text-[8px] font-medium leading-none text-white/90"
-            aria-hidden
-          >
-            {index + 1}
-          </span>
+          <DockRefCornerBadge
+            label={String(index + 1)}
+            readOnly
+            fontSizePx={badgeFontPx}
+            minSizePx={badgeMinPx}
+          />
         )}
       </div>
 

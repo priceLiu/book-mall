@@ -57,6 +57,34 @@ export function extractSelectNodeChanges(
   return changes.filter((c) => c.type === "select");
 }
 
+/** LibTV · store 仅 selected/zIndex 漂移时跳过 store→RF merge */
+export function canvasNodesEqualIgnoringSelectionAndZ(
+  prev: CanvasFlowNode[],
+  next: CanvasFlowNode[],
+): boolean {
+  if (prev.length !== next.length) return false;
+  for (let i = 0; i < prev.length; i++) {
+    const a = prev[i]!;
+    const b = next[i]!;
+    if (a.id !== b.id || a.parentId !== b.parentId || a.type !== b.type) {
+      return false;
+    }
+    if (
+      a.data !== b.data &&
+      JSON.stringify(a.data) !== JSON.stringify(b.data)
+    ) {
+      return false;
+    }
+    if (a.position.x !== b.position.x || a.position.y !== b.position.y) {
+      return false;
+    }
+    if ((a.width ?? 0) !== (b.width ?? 0) || (a.height ?? 0) !== (b.height ?? 0)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /** RF 回写选中 / zIndex 与 store 一致时跳过 set，避免 store↔RF 无限循环 */
 export function canvasNodesSelectionAndZEqual(
   prev: CanvasFlowNode[],
@@ -108,6 +136,61 @@ export function extractNodeRemoveChanges(
 /** 批次是否全部为 RF 本地变更（选中 + 纯测量），无需写 store */
 export function isCanvasRfLocalOnlyChange(changes: NodeChange[]): boolean {
   return changes.length > 0 && changes.every(isRfLocalNodeChange);
+}
+
+/**
+ * LibTV 画布 · 忽略 RF 内部 echo（ResizeObserver 尺寸 / 组内选中相对坐标）。
+ * 仅保留用户真实缩放（resizing 键）与组框缩放 commit 帧。
+ */
+export function filterLibtvRfChangesBeforeApply(
+  changes: NodeChange[],
+  opts: {
+    groupResizeUserActive: boolean;
+    isGroupResizeCommit: boolean;
+    resizeCommitIds?: string[];
+  },
+): NodeChange[] {
+  const resizeCommitIds = new Set(opts.resizeCommitIds ?? []);
+  return changes.filter((c) => {
+    // 坐标落库走 onNodeDragStop · 组内选中常混 position dragging:false echo
+    if (c.type === "position") {
+      return "dragging" in c && c.dragging === true;
+    }
+    if (c.type !== "dimensions") return true;
+    if ("resizing" in c && c.resizing === true) return true;
+    if (
+      "resizing" in c &&
+      c.resizing === false &&
+      "id" in c &&
+      c.id &&
+      resizeCommitIds.has(c.id)
+    ) {
+      return true;
+    }
+    if (
+      opts.groupResizeUserActive &&
+      opts.isGroupResizeCommit &&
+      "resizing" in c &&
+      c.resizing === false
+    ) {
+      return true;
+    }
+    return false;
+  });
+}
+
+/** select 变更是否会改变 RF 当前选中态（避免 onNodeClick 与 RF 重复 setNodes） */
+export function selectChangesWouldChangeSelection(
+  changes: NodeChange[],
+  rfNodes: Array<{ id: string; selected?: boolean }>,
+): boolean {
+  for (const c of changes) {
+    if (c.type !== "select" || !("id" in c) || !c.id) continue;
+    const n = rfNodes.find((x) => x.id === c.id);
+    if (!n) continue;
+    if (Boolean(n.selected) !== Boolean(c.selected)) return true;
+  }
+  return false;
 }
 
 /**

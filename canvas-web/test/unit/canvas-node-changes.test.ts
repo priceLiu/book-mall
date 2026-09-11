@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { NodeChange } from "@xyflow/react";
 import {
+  canvasNodesEqualIgnoringSelectionAndZ,
   canvasNodesLayoutFieldsEqual,
   canvasNodesSelectionAndZEqual,
   extractNodeRemoveChanges,
   extractResizeCommitIds,
   extractSelectNodeChanges,
+  filterLibtvRfChangesBeforeApply,
   resolveActiveResizeCommitIds,
   shouldFilterDimensionResizeCommit,
   trackNonGroupNodeResizeSession,
@@ -133,6 +135,89 @@ describe("isCanvasInteractiveGeometryInProgress", () => {
   });
 });
 
+describe("filterLibtvRfChangesBeforeApply", () => {
+  it("drops RF measurement dimensions but keeps select and user resize", () => {
+    const measure: NodeChange[] = [
+      { type: "select", id: "n1", selected: true },
+      {
+        type: "dimensions",
+        id: "n1",
+        dimensions: { width: 320, height: 240 },
+      },
+    ];
+    expect(
+      filterLibtvRfChangesBeforeApply(measure, {
+        groupResizeUserActive: false,
+        isGroupResizeCommit: false,
+      }),
+    ).toEqual([{ type: "select", id: "n1", selected: true }]);
+
+    const resizing: NodeChange[] = [
+      {
+        type: "dimensions",
+        id: "n1",
+        resizing: false,
+        dimensions: { width: 400, height: 300 },
+      },
+    ];
+    expect(
+      filterLibtvRfChangesBeforeApply(resizing, {
+        groupResizeUserActive: false,
+        isGroupResizeCommit: false,
+        resizeCommitIds: ["n1"],
+      }),
+    ).toEqual(resizing);
+  });
+
+  it("strips position echo without dragging key", () => {
+    const changes: NodeChange[] = [
+      { type: "select", id: "c1", selected: true },
+      { type: "position", id: "c1", position: { x: 12, y: 8 } },
+    ];
+    expect(
+      filterLibtvRfChangesBeforeApply(changes, {
+        groupResizeUserActive: false,
+        isGroupResizeCommit: false,
+      }),
+    ).toEqual([{ type: "select", id: "c1", selected: true }]);
+  });
+
+  it("strips position dragging:false (LibTV drag commit uses onNodeDragStop)", () => {
+    const changes: NodeChange[] = [
+      { type: "select", id: "c1", selected: true },
+      {
+        type: "position",
+        id: "c1",
+        dragging: false,
+        position: { x: 12, y: 8 },
+      },
+    ];
+    expect(
+      filterLibtvRfChangesBeforeApply(changes, {
+        groupResizeUserActive: false,
+        isGroupResizeCommit: false,
+      }),
+    ).toEqual([{ type: "select", id: "c1", selected: true }]);
+  });
+
+  it("keeps position dragging:true during drag", () => {
+    const dragging: NodeChange[] = [
+      {
+        type: "position",
+        id: "c1",
+        dragging: true,
+        position: { x: 12, y: 8 },
+      },
+    ];
+    expect(
+      filterLibtvRfChangesBeforeApply(dragging, {
+        groupResizeUserActive: false,
+        isGroupResizeCommit: false,
+      }),
+    ).toEqual(dragging);
+  });
+});
+
 describe("filterStoreBoundNodeChanges", () => {
   it("strips mixed RF echo batches (select + measure + position echo)", () => {
     const changes: NodeChange[] = [
@@ -159,6 +244,26 @@ describe("filterStoreBoundNodeChanges", () => {
     ];
     expect(filterStoreBoundNodeChanges(changes)).toEqual(changes);
     expect(isCanvasRfLocalOnlyChange(changes)).toBe(false);
+  });
+});
+
+describe("canvasNodesEqualIgnoringSelectionAndZ", () => {
+  it("returns true when only selected/zIndex differ", () => {
+    const prev = [
+      node("a", { selected: false, zIndex: 5 }),
+      node("b", { selected: true, zIndex: 22 }),
+    ];
+    const next = [
+      node("a", { selected: true, zIndex: 1201 }),
+      node("b", { selected: false, zIndex: 22 }),
+    ];
+    expect(canvasNodesEqualIgnoringSelectionAndZ(prev, next)).toBe(true);
+  });
+
+  it("returns false when data or layout differs", () => {
+    const prev = [node("a", { width: 320 })];
+    const next = [node("a", { width: 400 })];
+    expect(canvasNodesEqualIgnoringSelectionAndZ(prev, next)).toBe(false);
   });
 });
 

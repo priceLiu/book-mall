@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
 export const TAG_RICH_TEXT_PROSE_CLASS = cn(
   "tag-rich-text-prose min-h-0 w-full text-[11px] leading-relaxed text-white/88",
   "[&_.ProseMirror]:min-h-[3rem] [&_.ProseMirror]:outline-none",
-  "[&_.ProseMirror_h1]:mb-2 [&_.ProseMirror_h1]:mt-3 [&_.ProseMirror_h1]:border-b [&_.ProseMirror_h1]:border-white/15 [&_.ProseMirror_h1]:pb-1 [&_.ProseMirror_h1]:text-[1.45em] [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h1]:text-white",
-  "[&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h2]:mt-3 [&_.ProseMirror_h2]:border-b [&_.ProseMirror_h2]:border-white/15 [&_.ProseMirror_h2]:pb-1 [&_.ProseMirror_h2]:text-[1.28em] [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_h2]:text-white",
+  "[&_.ProseMirror_h1]:mb-2 [&_.ProseMirror_h1]:mt-3 [&_.ProseMirror_h1]:text-[1.45em] [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h1]:text-white",
+  "[&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h2]:mt-3 [&_.ProseMirror_h2]:text-[1.28em] [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_h2]:text-white",
   "[&_.ProseMirror_h3]:mb-2 [&_.ProseMirror_h3]:mt-2 [&_.ProseMirror_h3]:text-[1.12em] [&_.ProseMirror_h3]:font-semibold [&_.ProseMirror_h3]:text-white/95",
   "[&_.ProseMirror_p]:mb-2 [&_.ProseMirror_p]:leading-relaxed [&_.ProseMirror_p]:text-white/90",
   "[&_.ProseMirror_ul]:mb-2 [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-5",
@@ -22,8 +22,8 @@ export const TAG_RICH_TEXT_PROSE_CLASS = cn(
   "[&_.ProseMirror_u]:underline [&_.ProseMirror_u]:decoration-white/40",
   "[&_.tag-rich-text-empty:first-child]:before:pointer-events-none [&_.tag-rich-text-empty:first-child]:before:text-white/30 [&_.tag-rich-text-empty:first-child]:before:content-[attr(data-placeholder)]",
   // 只读静态 HTML（与 ProseMirror 输出结构一致）
-  "[&_h1]:mb-2 [&_h1]:mt-3 [&_h1]:border-b [&_h1]:border-white/15 [&_h1]:pb-1 [&_h1]:text-[1.45em] [&_h1]:font-bold [&_h1]:text-white",
-  "[&_h2]:mb-2 [&_h2]:mt-3 [&_h2]:border-b [&_h2]:border-white/15 [&_h2]:pb-1 [&_h2]:text-[1.28em] [&_h2]:font-semibold [&_h2]:text-white",
+  "[&_h1]:mb-2 [&_h1]:mt-3 [&_h1]:text-[1.45em] [&_h1]:font-bold [&_h1]:text-white",
+  "[&_h2]:mb-2 [&_h2]:mt-3 [&_h2]:text-[1.28em] [&_h2]:font-semibold [&_h2]:text-white",
   "[&_h3]:mb-2 [&_h3]:mt-2 [&_h3]:text-[1.12em] [&_h3]:font-semibold [&_h3]:text-white/95",
   "[&_p]:mb-2 [&_p]:leading-relaxed [&_p]:text-white/90",
   "[&_ul]:mb-2 [&_ul]:list-disc [&_ul]:pl-5",
@@ -80,7 +80,7 @@ export function TagRichTextEditor({
     editable,
     editorProps: {
       attributes: {
-        class: "nodrag nowheel outline-none",
+        class: "nodrag nowheel nopan select-text outline-none",
       },
     },
     onUpdate: ({ editor: ed }) => {

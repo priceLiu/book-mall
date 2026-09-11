@@ -971,7 +971,6 @@ function Inner({ projectId }: { projectId: string }) {
 
     const scheduleAutosave = () => {
       if (!canvasReadyRef.current) return;
-      if (!isCanvasDirty()) return;
       if (Date.now() < autosaveFailCooldownUntilRef.current) return;
       clearAutosaveTimer();
       autosaveTimerRef.current = window.setTimeout(() => {

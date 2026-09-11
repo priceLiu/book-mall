@@ -350,26 +350,30 @@ export function Pro2ScriptHubEditorModal({
     >
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-violet-400/15 bg-[#14101c]/95 px-5 py-3">
         <div className="flex min-w-0 flex-1 items-center gap-4">
-          <div className="min-w-0">
-            <p className="truncate text-[14px] font-semibold text-white">
-              {title}
-            </p>
+          <p className="min-w-0 shrink truncate text-[14px] font-semibold text-white">
+            {title}
+          </p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <Pro2ScriptHubViewTabs
+              value={tab}
+              onChange={onTabChange}
+              size="modal"
+            />
             {savedHint ? (
-              <p className="text-[11px] text-violet-300/70">已自动保存</p>
+              <p className="min-w-0 truncate text-[11px] text-violet-300/70">
+                已自动保存
+              </p>
             ) : hubIsGenerating ? (
-              <p className="flex items-center gap-1 text-[11px] text-violet-300/80">
-                <RefreshCw className="size-3 animate-spin" />
+              <p className="flex min-w-0 items-center gap-1 truncate text-[11px] text-violet-300/80">
+                <RefreshCw className="size-3 shrink-0 animate-spin" />
                 剧本生成中…
               </p>
             ) : (
-              <p className="text-[11px] text-white/40">{subtitle}</p>
+              <p className="min-w-0 truncate text-[11px] text-white/40">
+                {subtitle}
+              </p>
             )}
           </div>
-          <Pro2ScriptHubViewTabs
-            value={tab}
-            onChange={onTabChange}
-            size="modal"
-          />
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {hubId && hubData && collaboration.canPublishScript ? (

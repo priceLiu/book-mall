@@ -49,7 +49,10 @@ import {
   isCanvasDimensionCommitOnly,
   isResizeRelatedChange,
   extractSelectNodeChanges,
+  canvasNodesEqualIgnoringSelectionAndZ,
+  filterLibtvRfChangesBeforeApply,
   filterStoreBoundNodeChanges,
+  selectChangesWouldChangeSelection,
   readGroupResizeGeometry,
   type GroupResizeFrozenAbs,
   type GroupResizeSnapshot,
@@ -303,6 +306,8 @@ function FlowCanvasInner({
   const nodeResizeSessionRef = useRef<Set<string>>(new Set());
   /** store→RF 推送期间忽略 RF 回写的选中/测量/坐标 echo，避免打组后 Maximum update depth */
   const syncingGraphFromStoreRef = useRef(false);
+  /** LibTV onNodesChange 内直接 setRfNodes 时，防止 RF 嵌套回调再次进入 handleNodesChange */
+  const handlingRfNodesChangeRef = useRef(false);
   const syncingGraphFromStoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -637,13 +642,22 @@ function FlowCanvasInner({
     setCanvasGeometryDragging(false);
     setCanvasDraggingNodeId(null);
     const s = useCanvasStore.getState();
+    const isLibtv =
+      pro2FloatingInspector ||
+      sbv1Canvas ||
+      hasLibtvMediaCanvasNodes(s.nodes);
     setRfNodes(
       ensureNodeDragHandles(s.nodes).map((n) => ({ ...n, selected: false })),
     );
     s.setLibtvFloatingDockSelection(null, null);
+    if (isLibtv && s.nodes.some((n) => n.selected)) {
+      s.setNodes((prev) => prev.map((n) => ({ ...n, selected: false })));
+    }
     setRfEdges(s.edges);
   }, [
     projectId,
+    pro2FloatingInspector,
+    sbv1Canvas,
     setRfNodes,
     setRfEdges,
     setCanvasViewportMoving,
@@ -667,6 +681,12 @@ function FlowCanvasInner({
   useEffect(() => {
     const unsub = useCanvasStore.subscribe((state, prev) => {
       if (state.nodes !== prev.nodes) {
+        if (
+          hasLibtvMediaCanvasNodes(state.nodes) &&
+          canvasNodesEqualIgnoringSelectionAndZ(prev.nodes, state.nodes)
+        ) {
+          return;
+        }
         if (
           deferStoreGraphSyncRef.current ||
           state.canvasGeometryDragging
@@ -906,6 +926,9 @@ function FlowCanvasInner({
 
   const handleNodesChange = useCallback(
     (changes: NodeChange<CanvasFlowNode>[]) => {
+      if (handlingRfNodesChangeRef.current) return;
+      handlingRfNodesChangeRef.current = true;
+      try {
       let rfChanges = changes;
       const removeIds = changes
         .filter(
@@ -978,6 +1001,21 @@ function FlowCanvasInner({
         resizeCommitIdsEarly,
       );
 
+      if (libtvCanvas) {
+        rfChanges = filterLibtvRfChangesBeforeApply(rfChanges, {
+          groupResizeUserActive: groupResizeUserActiveRef.current,
+          isGroupResizeCommit,
+          resizeCommitIds: resizeCommitIdsEarly,
+        });
+        if (
+          rfChanges.length === 0 &&
+          !groupResizeIdRef.current &&
+          !isCanvasInteractiveGeometryInProgress(changes)
+        ) {
+          return;
+        }
+      }
+
       // 组框缩放：绿框实时跟手；子节点保持 parentId（z-index 正常），
       // 每帧钉回冻结绝对坐标；extent 暂解除避免组框小于内容时被裁切。
       let rfAfterChange = rfBeforeChange;
@@ -992,21 +1030,51 @@ function FlowCanvasInner({
         setRfNodes(rfAfterChange);
         appliedRfChanges = true;
       }
+      const applyRfChangesLocally = (
+        batch: NodeChange<CanvasFlowNode>[],
+        base: CanvasFlowNode[],
+      ): CanvasFlowNode[] => {
+        if (batch.length === 0) return base;
+        if (
+          libtvCanvas &&
+          batch.every((c) => c.type === "select") &&
+          !selectChangesWouldChangeSelection(batch, base)
+        ) {
+          return base;
+        }
+        const next = applyNodeChanges(batch, base) as CanvasFlowNode[];
+        // LibTV 纯选中：直接 setRfNodes，勿在 onNodesChange 内再调 onRfNodesChange（嵌套 Maximum update depth）
+        if (libtvCanvas && batch.every((c) => c.type === "select")) {
+          setRfNodes(next);
+          return next;
+        }
+        onRfNodesChange(batch);
+        return next;
+      };
+
       if (!appliedRfChanges) {
-        onRfNodesChange(rfChanges);
-        rfAfterChange = applyNodeChanges(
-          rfChanges,
-          rfBeforeChange,
-        ) as CanvasFlowNode[];
+        rfAfterChange = applyRfChangesLocally(rfChanges, rfBeforeChange);
       } else {
         const selectChanges = extractSelectNodeChanges(rfChanges);
         if (selectChanges.length > 0) {
-          onRfNodesChange(selectChanges);
-          rfAfterChange = applyNodeChanges(
-            selectChanges,
-            rfAfterChange,
-          ) as CanvasFlowNode[];
+          rfAfterChange = applyRfChangesLocally(selectChanges, rfAfterChange);
         }
+      }
+
+      if (
+        libtvCanvas &&
+        rfChanges.length > 0 &&
+        rfChanges.every((c) => c.type === "select")
+      ) {
+        const sel = resolveLibtvFloatingDockSelection(rfAfterChange);
+        useCanvasStore.getState().setLibtvFloatingDockSelection(
+          sel?.nodeId ?? null,
+          sel?.nodeType ?? null,
+        );
+        deferStoreGraphSyncRef.current = false;
+        setCanvasGeometryDragging(false);
+        setCanvasDraggingNodeId(null);
+        return;
       }
 
       if (
@@ -1071,12 +1139,9 @@ function FlowCanvasInner({
       if (syncingGraphFromStoreRef.current) {
         setCanvasGeometryDragging(false);
         setCanvasDraggingNodeId(null);
-        const selectChanges = extractSelectNodeChanges(rfChanges);
-        if (selectChanges.length > 0) {
-          onRfNodesChange(selectChanges);
-          if (libtvCanvas) {
-            syncLibtvFloatingDockPinFromRf();
-          }
+        // store→RF 推送期间勿再写 RF（选中已由 merge preserveRfSelection 对齐）
+        if (libtvCanvas && rfChanges.some((c) => c.type === "select")) {
+          syncLibtvFloatingDockPinFromRf();
         }
         if (hasNodeRemoveChanges(storeChanges)) {
           deferStoreGraphSyncRef.current = false;
@@ -1192,11 +1257,10 @@ function FlowCanvasInner({
           setCanvasDraggingNodeId(null);
           deferStoreGraphSyncRef.current = false;
         }
-        const committed = augmentStoreChangesWithResizePositions(
-          storeChanges,
-          getNodes() as CanvasFlowNode[],
-        );
-        storeOnNodesChange(committed);
+        // LibTV：选中/坐标/尺寸 echo 仅 RF 本地；删除仍须落库
+        if (hasNodeRemoveChanges(storeChanges)) {
+          storeOnNodesChange(extractNodeRemoveChanges(storeChanges));
+        }
         syncLibtvFloatingDockPinFromRf();
         return;
       }
@@ -1211,6 +1275,9 @@ function FlowCanvasInner({
           getNodes() as CanvasFlowNode[],
         ),
       );
+      } finally {
+        handlingRfNodesChangeRef.current = false;
+      }
     },
     [
       onRfNodesChange,
@@ -2450,28 +2517,23 @@ function FlowCanvasInner({
                   ) {
                     return;
                   }
-                  commitLibtvRfNodeSelection(
-                    setRfNodes,
-                    node.id,
-                    node.type ?? null,
+                  // 选中由 onNodesChange 写入 RF；组无单节点 Dock
+                  useCanvasStore.getState().setLibtvFloatingDockSelection(
+                    null,
+                    null,
                   );
                   return;
                 }
                 useCanvasStore.getState().setLibtvInputDockFocused(false);
                 const additive =
                   e.metaKey || e.ctrlKey || e.shiftKey || e.altKey;
-                if (!additive) {
-                  commitLibtvRfNodeSelection(
-                    setRfNodes,
-                    node.id,
-                    node.type ?? null,
-                  );
-                } else {
+                if (additive) {
                   useCanvasStore.getState().setLibtvFloatingDockSelection(
                     node.id,
                     node.type ?? null,
                   );
                 }
+                // 单选由 RF onNodesChange 处理 · 勿二次 setRfNodes
               }
             : undefined
         }

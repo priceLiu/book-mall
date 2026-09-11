@@ -1,17 +1,9 @@
-import type { CanvasFlowNode } from "./types";
-import { ensureNodeDragHandles } from "./normalize-graph-nodes";
-
-/** + 菜单生成节点后选中、聚焦视口并确保 Pro2 整卡可拖 */
+/** + 菜单生成节点后选中、聚焦视口（LibTV 选中态只写 RF，勿写 store.selected） */
 export function selectPro2NodeAfterSpawn(
-  setNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void,
+  _setNodes: unknown,
   nodeId: string,
 ): void {
   if (!nodeId) return;
-  setNodes((prev) =>
-    ensureNodeDragHandles(
-      prev.map((n) => ({ ...n, selected: n.id === nodeId })),
-    ),
-  );
   queueMicrotask(() => {
     void import("./store").then(({ useCanvasStore }) => {
       useCanvasStore.getState().focusCanvasNode(nodeId);

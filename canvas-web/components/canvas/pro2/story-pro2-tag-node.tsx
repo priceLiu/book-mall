@@ -227,8 +227,10 @@ export function StoryPro2TagNode({ id, data, selected, height }: NodeProps) {
             "relative min-h-0 flex-1 overflow-y-auto",
             bodyPadClass,
             resizeCorner && "pr-6 pb-6",
-            mountEditor && LIBTV_CARD_DRAG_CLASS,
+            mountEditor && "nodrag nowheel nopan select-text",
           )}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           {mountEditor ? (
             <TagRichTextEditor

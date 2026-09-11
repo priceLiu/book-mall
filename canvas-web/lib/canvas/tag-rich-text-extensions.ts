@@ -38,14 +38,21 @@ export function createTagRichTextExtensions(placeholder?: string) {
 }
 
 export function applyTagRichTextFontSize(editor: Editor, fontSize: string): void {
-  editor
-    .chain()
-    .focus()
-    .extendMarkRange("textStyle")
-    .setFontSize(fontSize)
-    .run();
+  const { empty } = editor.state.selection;
+  const chain = editor.chain().focus();
+  if (empty) {
+    chain.setMark("textStyle", { fontSize }).run();
+  } else {
+    chain.setFontSize(fontSize).run();
+  }
 }
 
 export function applyTagRichTextColor(editor: Editor, color: string): void {
-  editor.chain().focus().extendMarkRange("textStyle").setColor(color).run();
+  const { empty } = editor.state.selection;
+  const chain = editor.chain().focus();
+  if (empty) {
+    chain.setMark("textStyle", { color }).run();
+  } else {
+    chain.setColor(color).run();
+  }
 }

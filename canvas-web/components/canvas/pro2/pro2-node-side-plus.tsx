@@ -189,16 +189,16 @@ export function Pro2NodeSidePlus({
   }, [side]);
 
   /**
-   * 磁吸只移动可见圆点，handle 锚点恒在边框上，故不随 magnetOffset 重测。
+   * 磁吸只移动可见圆点，handle 锚点恒在边框上，故不随 magnetOffset / 选中显隐重测。
    * 须 rAF 合并 + 去重：全画布多节点同步 updateNodeInternals 会经 RF→zustand 打出
    * Maximum update depth exceeded。
    */
   useLayoutEffect(() => {
     if (!nodeId) return;
     scheduleUpdateNodeInternals(
-      `${dotVisible ? 1 : 0}|${size}|${canvasConnecting ? 1 : 0}`,
+      `${size}|${canvasConnecting ? 1 : 0}`,
     );
-  }, [nodeId, dotVisible, size, canvasConnecting, scheduleUpdateNodeInternals]);
+  }, [nodeId, size, canvasConnecting, scheduleUpdateNodeInternals]);
 
   useEffect(() => {
     if (!dotVisible) setOpen(false);

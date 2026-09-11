@@ -25,6 +25,25 @@ function isStyledMediaGroupNode(
 }
 
 /** 媒体组 zIndex 随 RF 选中态本地计算 · store 合并时勿用陈旧 zIndex 覆盖 */
+/** store→RF 合并时保留 RF 已选中节点的实测外框，避免 ResizeObserver 与 store 互写 */
+function mergeDimensionsFromStoreToRf(
+  rf: CanvasFlowNode,
+  sn: CanvasFlowNode,
+  preserveRfSelection: boolean,
+): { width: number | undefined; height: number | undefined } {
+  if (preserveRfSelection && rf.selected) {
+    const measured = rf as CanvasFlowNode & {
+      measured?: { width?: number; height?: number };
+    };
+    const w = rf.width ?? measured.measured?.width;
+    const h = rf.height ?? measured.measured?.height;
+    if (typeof w === "number" && typeof h === "number") {
+      return { width: w, height: h };
+    }
+  }
+  return { width: sn.width, height: sn.height };
+}
+
 function mergeZIndexFromStoreToRf(
   rf: CanvasFlowNode,
   sn: CanvasFlowNode,
@@ -93,14 +112,19 @@ export function mergeStoreNodesIntoRf(
     }
     const selected = preserveRfSelection ? rf.selected : sn.selected;
     const zIndex = mergeZIndexFromStoreToRf(rf, sn, storeNodes);
+    const { width, height } = mergeDimensionsFromStoreToRf(
+      rf,
+      sn,
+      preserveRfSelection,
+    );
     if (
       rf.type === sn.type &&
       rf.data === sn.data &&
       rf.selected === selected &&
       rf.position.x === sn.position.x &&
       rf.position.y === sn.position.y &&
-      rf.width === sn.width &&
-      rf.height === sn.height &&
+      rf.width === width &&
+      rf.height === height &&
       rf.zIndex === zIndex &&
       rf.parentId === sn.parentId
     ) {
@@ -120,8 +144,8 @@ export function mergeStoreNodesIntoRf(
         rfPosition: rf.position,
         storePosition: sn.position,
       }),
-      width: sn.width,
-      height: sn.height,
+      width,
+      height,
       zIndex,
       parentId: sn.parentId,
       extent: sn.extent,
