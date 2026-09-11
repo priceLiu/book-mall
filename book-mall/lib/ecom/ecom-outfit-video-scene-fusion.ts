@@ -26,6 +26,7 @@ import {
   isQwenImageEditModel,
 } from "@/lib/gateway/qwen-image-edit-proxy";
 import type { OutfitSceneFusion, SceneShot, WorkflowRefs } from "@/lib/ecom/video-workflow/shot-spine";
+import { sceneWithOutfitProductionOverlay } from "@/lib/ecom/ecom-outfit-production";
 import { resolveOutfitDressedImageUrl } from "@/lib/ecom/video-workflow/templates/outfit-v1/generation";
 
 export type OutfitSceneFusionMode = NonNullable<OutfitSceneFusion["mode"]>;
@@ -76,7 +77,9 @@ export async function resolveOutfitSceneFusionFragment(opts: {
   libraryEntryId?: string;
 }): Promise<{ fragment: string; libraryEntryName?: string }> {
   if (opts.mode === "follow_reference") {
-    const fragment = buildOutfitFollowReferenceSceneFragment(opts.scene);
+    const fragment = buildOutfitFollowReferenceSceneFragment(
+      sceneWithOutfitProductionOverlay(opts.scene),
+    );
     if (!fragment) {
       throw new Error("该镜缺少光影/场景描述，请选手动场景或上传场景参考图");
     }
@@ -191,14 +194,19 @@ export async function runOutfitVideoSceneFusion(opts: {
   let libraryEntryId = opts.fusion.libraryEntryId;
 
   if (mode !== "upload_ref") {
-    const resolved = await resolveOutfitSceneFusionFragment({
-      userId: opts.userId,
-      mode,
-      scene: opts.scene,
-      libraryEntryId,
-    });
-    fragment = resolved.fragment;
-    libraryEntryName = resolved.libraryEntryName ?? libraryEntryName;
+    const customFragment = opts.fusion.visualPromptFragment?.trim();
+    if (customFragment) {
+      fragment = customFragment;
+    } else {
+      const resolved = await resolveOutfitSceneFusionFragment({
+        userId: opts.userId,
+        mode,
+        scene: sceneWithOutfitProductionOverlay(opts.scene),
+        libraryEntryId,
+      });
+      fragment = resolved.fragment;
+      libraryEntryName = resolved.libraryEntryName ?? libraryEntryName;
+    }
   } else {
     const sceneRefUrl =
       opts.fusion.sceneRefUrl?.trim() || opts.refs.sceneRef?.ossUrl?.trim() || "";

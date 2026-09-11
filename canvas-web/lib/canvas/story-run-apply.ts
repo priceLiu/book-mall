@@ -14,11 +14,13 @@ import {
 } from "./story-column-sync";
 import { syncProductionScaffoldDataToHubFromStore } from "./hydrate-production-scaffold";
 import {
+  finalizePro2HubContentPatch,
   hubSectionIsRunning,
   hubSectionRuntime,
   hubHasDisplayableScriptContent,
   shouldSkipHubSectionInflightTaskApply,
 } from "./story-hub-runtime";
+import { hubScriptPreviewReady } from "./pro2-script-hub-helpers";
 import { isCanvasInflightStatus } from "./story-column-runtime";
 import type {
   StoryLlmSection,
@@ -683,7 +685,6 @@ export function storyApplyTaskResult(
       runtime,
       task.textOutput ?? undefined,
     );
-    if (!hubSectionPatchChanged(prev, hubLlmSection, patch)) return;
     let hubPatch = patch as Partial<StoryProScriptHubNodeData>;
     if (
       task.status === "SUCCEEDED" &&
@@ -699,6 +700,14 @@ export function storyApplyTaskResult(
       );
       hubPatch = { ...hubPatch, ...originPatch };
     }
+    if (node.type === "story-pro2-script-hub") {
+      const finalizePatch = finalizePro2HubContentPatch(
+        { ...(prev as StoryProScriptHubNodeData), ...hubPatch },
+        node.id,
+      );
+      if (finalizePatch) hubPatch = { ...hubPatch, ...finalizePatch };
+    }
+    if (!hubSectionPatchChanged(prev, hubLlmSection, hubPatch)) return;
     const mergedHubData = {
       ...(prev as StoryProScriptHubNodeData),
       ...hubPatch,
@@ -707,10 +716,10 @@ export function storyApplyTaskResult(
       task.status === "SUCCEEDED" ||
       task.status === "FAILED" ||
       task.status === "CANCELLED";
-    // SUCCEEDED：须等剧本内容落库后再清 intent / 会话，避免「已链接」空态闪一下
+    // SUCCEEDED：预览 Tab 可渲染后再清 intent / 会话，避免扫光停而卡面仍「已链接」
     const clearHubGenerateIntent =
       task.status === "SUCCEEDED"
-        ? hubHasDisplayableScriptContent(mergedHubData)
+        ? hubScriptPreviewReady(mergedHubData)
         : task.status === "CANCELLED" && task.failCode !== "SUPERSEDED"
           ? true
           : task.status === "FAILED" &&
@@ -738,7 +747,7 @@ export function storyApplyTaskResult(
       ).some((s) => hubSectionIsRunning(mergedNode, s));
       const hubReady =
         task.status === "SUCCEEDED"
-          ? hubHasDisplayableScriptContent({
+          ? hubScriptPreviewReady({
               ...(mergedNode.data as StoryProScriptHubNodeData),
             })
           : true;

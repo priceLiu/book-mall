@@ -22,6 +22,8 @@ import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 import type { OutfitClothAnalyseMeta, OutfitVideoProject } from "@/lib/ecom-outfit-video-api";
+import { isOutfitProductionTableReady } from "@/lib/outfit-production-fields";
+import type { OutfitProductionTextField } from "@/lib/outfit-production-fields";
 import type { MediaDecomposeChatModel } from "@/lib/media-decompose-types";
 import {
   ECOM_MEDIA_DECOMPOSE_DEFAULT_VISION_MODEL,
@@ -55,6 +57,10 @@ type Props = {
   mediaBusy?: boolean;
   splitting?: boolean;
   refBusy?: boolean;
+  modelRefUploading?: boolean;
+  modelRefUploadLabel?: string;
+  sceneRefUploading?: boolean;
+  sceneRefUploadLabel?: string;
   fusionModelKey: string;
   generateBusy?: boolean;
   renderBusy?: boolean;
@@ -96,12 +102,23 @@ type Props = {
   onUserSellPointChange: (value: string) => void;
   onSaveUserSellPoint: (value: string) => Promise<void>;
   onAnalyseCloth: () => Promise<void>;
-  adaptingIndices?: ReadonlySet<number>;
-  onAdaptSceneStoryboard: (index: number) => Promise<void>;
+  productionGenerating?: boolean;
+  productionStale?: boolean;
+  onGenerateProductionStoryboard: () => Promise<void>;
+  onProductionFieldChange: (
+    sceneId: string,
+    field: OutfitProductionTextField,
+    value: string,
+  ) => void;
+  onSceneFusionPromptChange: (sceneId: string, fragment: string) => void;
+  onAttachSceneRefFromAssets: (
+    index: number,
+    assets: Array<{ id: string; ossUrl: string; title: string }>,
+  ) => Promise<void>;
   onLockRefs: () => Promise<void>;
   onGenerateShots: (indices: number[], modelKey: string) => Promise<void>;
   onCancelGeneratingSelection?: (index: number) => void;
-  onCompose: () => Promise<void>;
+  onCompose: (sceneIndexes?: number[]) => Promise<void>;
   onSaveSnapshot: () => Promise<void>;
   onNewProject: () => Promise<void>;
   loadProjectList: () => Promise<EcomProjectListItem[]>;
@@ -140,6 +157,10 @@ export function OutfitVideoWorkspace({
   mediaBusy,
   splitting,
   refBusy,
+  modelRefUploading,
+  modelRefUploadLabel,
+  sceneRefUploading,
+  sceneRefUploadLabel,
   fusionModelKey,
   generateBusy,
   renderBusy,
@@ -173,8 +194,12 @@ export function OutfitVideoWorkspace({
   onUserSellPointChange,
   onSaveUserSellPoint,
   onAnalyseCloth,
-  adaptingIndices,
-  onAdaptSceneStoryboard,
+  productionGenerating,
+  productionStale,
+  onGenerateProductionStoryboard,
+  onProductionFieldChange,
+  onSceneFusionPromptChange,
+  onAttachSceneRefFromAssets,
   onLockRefs,
   onGenerateShots,
   onCancelGeneratingSelection,
@@ -246,7 +271,7 @@ export function OutfitVideoWorkspace({
     Boolean(project.references.model?.ossUrl) ||
     hasDressedImage ||
     refsLocked;
-  const clothAnalyseReady = clothAnalyse?.status === "success";
+  const productionReady = isOutfitProductionTableReady(project.meta, project.sceneList);
   const finalVideoUrl = project.composeResult?.videoUrl?.trim() || "";
   const jobBusy = Boolean(mediaBusy || splitting || generateBusy || renderBusy || refBusy);
 
@@ -291,63 +316,65 @@ export function OutfitVideoWorkspace({
     await onSplitScenes(splitModelKey);
   }
 
+  const workspaceHeader = (
+    <header className="z-20 shrink-0 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold text-[#1d1d1f]">穿搭视频</h2>
+          <p className="text-[11px] text-[#6e6e73]">
+            上传参考视频，拆镜后锁定穿搭参考，逐镜动作迁移并合成竖屏成片。
+          </p>
+        </div>
+        <EcomIconToolbar>
+          <EcomIconToolbarGroup label="项目">
+            <EcomIconButton
+              label="新建项目"
+              icon={Plus}
+              disabled={jobBusy}
+              onClick={() => void onNewProject()}
+            />
+            <EcomProjectListButton
+              disabled={jobBusy}
+              currentProjectId={project.id}
+              loadProjects={loadProjectList}
+              onSelectProject={(id) => void onOpenProject(id)}
+              title="穿搭视频 · 项目列表"
+              emptyHint="还没有保存过的穿搭视频项目。"
+            />
+          </EcomIconToolbarGroup>
+          <EcomIconToolbarGroup label="工作流">
+            <EcomIconButton
+              label="保存作品"
+              icon={Save}
+              busy={saveBusy}
+              disabled={!refVideo?.ossUrl || saveBusy || jobBusy}
+              onClick={() => void onSaveSnapshot()}
+            />
+          </EcomIconToolbarGroup>
+          <EcomIconToolbarGroup label="资产与交付">
+            <EcomGlobalAssetLibraryToolbarButton defaultCatalog="pose" />
+            <EcomIconButton
+              label="我的资产"
+              icon={Images}
+              onClick={() => router.push("/library")}
+            />
+            <EcomIconButton
+              label="导出交付包"
+              icon={Download}
+              disabled={!finalVideoUrl}
+              onClick={() => {
+                if (finalVideoUrl) onPreviewVideo(finalVideoUrl, "穿搭成片");
+              }}
+            />
+          </EcomIconToolbarGroup>
+        </EcomIconToolbar>
+      </div>
+    </header>
+  );
+
   const mainScroll = (
     <>
-      <header className="sticky top-0 z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-sm font-semibold text-[#1d1d1f]">穿搭视频</h2>
-            <p className="text-[11px] text-[#6e6e73]">
-              上传参考视频，拆镜后锁定穿搭参考，逐镜动作迁移并合成竖屏成片。
-            </p>
-          </div>
-          <EcomIconToolbar>
-            <EcomIconToolbarGroup label="项目">
-              <EcomIconButton
-                label="新建项目"
-                icon={Plus}
-                disabled={jobBusy}
-                onClick={() => void onNewProject()}
-              />
-              <EcomProjectListButton
-                disabled={jobBusy}
-                currentProjectId={project.id}
-                loadProjects={loadProjectList}
-                onSelectProject={(id) => void onOpenProject(id)}
-                title="穿搭视频 · 项目列表"
-                emptyHint="还没有保存过的穿搭视频项目。"
-              />
-            </EcomIconToolbarGroup>
-            <EcomIconToolbarGroup label="工作流">
-              <EcomIconButton
-                label="保存作品"
-                icon={Save}
-                busy={saveBusy}
-                disabled={!refVideo?.ossUrl || saveBusy || jobBusy}
-                onClick={() => void onSaveSnapshot()}
-              />
-            </EcomIconToolbarGroup>
-            <EcomIconToolbarGroup label="资产与交付">
-              <EcomGlobalAssetLibraryToolbarButton defaultCatalog="pose" />
-              <EcomIconButton
-                label="我的资产"
-                icon={Images}
-                onClick={() => router.push("/library")}
-              />
-              <EcomIconButton
-                label="导出交付包"
-                icon={Download}
-                disabled={!finalVideoUrl}
-                onClick={() => {
-                  if (finalVideoUrl) onPreviewVideo(finalVideoUrl, "穿搭成片");
-                }}
-              />
-            </EcomIconToolbarGroup>
-          </EcomIconToolbar>
-        </div>
-      </header>
-
-      <div className="flex flex-col gap-5 px-5 py-4">
+      <div className="flex min-w-0 max-w-full flex-col gap-5 px-5 py-4">
         <OutfitVideoMediaInput
           referenceVideo={refVideo}
           busy={mediaBusy}
@@ -427,7 +454,10 @@ export function OutfitVideoWorkspace({
 
             {hasScenes ? (
               <section className="space-y-3 rounded-xl border border-[#e8e8ed] bg-white p-4">
-                <h2 className="text-sm font-semibold text-[#1d1d1f]">分镜表</h2>
+                <h2 className="text-sm font-semibold text-[#1d1d1f]">拆解分镜表</h2>
+                <p className="text-xs text-[#6e6e73]">
+                  来自参考视频拉片；可删镜、调序、编辑运镜/动作/光影/场景描述，作为 AI 生成制作表的输入。
+                </p>
                 {isStubSplitSceneList ? (
                   <p className="rounded-lg border border-[#ffe8bf] bg-[#fffbf0] px-3 py-2 text-xs leading-relaxed text-[#8a6d3b]">
                     当前为<strong className="font-semibold">开发占位拆镜</strong>
@@ -451,6 +481,10 @@ export function OutfitVideoWorkspace({
             sceneLibraryPreset={project.references.sceneLibraryPreset}
             refsLocked={refsLocked}
             busy={refBusy}
+            modelUploading={modelRefUploading}
+            modelUploadLabel={modelRefUploadLabel}
+            sceneUploading={sceneRefUploading}
+            sceneUploadLabel={sceneRefUploadLabel}
             userSellPoint={userSellPoint}
             clothAnalyse={clothAnalyse}
             clothAnalyseBusy={clothAnalyseBusy}
@@ -464,6 +498,9 @@ export function OutfitVideoWorkspace({
             onAttachGlobalSceneRefFromAssets={onAttachGlobalSceneRefFromAssets}
             onPickGlobalSceneLibraryPreset={onPickGlobalSceneLibraryPreset}
             onRemoveGlobalSceneRef={onRemoveGlobalSceneRef}
+            productionGenerating={productionGenerating}
+            productionStale={productionStale}
+            onGenerateProductionStoryboard={onGenerateProductionStoryboard}
           />
         ) : null}
 
@@ -473,26 +510,26 @@ export function OutfitVideoWorkspace({
             refs={project.references}
             lockedLooks={project.meta?.lockedLooks}
             defaultLockedLookId={project.meta?.defaultLockedLookId}
-            disabled={generateBusy || renderBusy}
+            productionReady={productionReady}
+            productionGenerating={productionGenerating}
+            disabled={renderBusy}
             generatingIndices={generatingIndices}
             generateBusy={generateBusy}
             renderBusy={renderBusy}
             finalVideoUrl={finalVideoUrl || undefined}
             onPreviewVideo={onPreviewVideo}
             onRequestGenerate={openGeneratePicker}
-            onRequestCompose={() => void onCompose()}
+            onRequestCompose={(indices) => void onCompose(indices)}
             onCancelGeneratingSelection={onCancelGeneratingSelection}
-            onScenePromptChange={onScenePromptChange}
-            onScenePromptReset={onScenePromptReset}
+            onProductionFieldChange={onProductionFieldChange}
             fusionModelKey={fusionModelKey}
             fusingIndices={fusingIndices}
             onPickSceneFusionMode={onPickSceneFusionMode}
             onUploadSceneRef={onUploadSceneRef}
+            onAttachSceneRefFromAssets={onAttachSceneRefFromAssets}
+            onSceneFusionPromptChange={onSceneFusionPromptChange}
             onFuseScene={onFuseScene}
             onApplySceneFusionToAll={onApplySceneFusionToAll}
-            clothAnalyseReady={clothAnalyseReady}
-            adaptingIndices={adaptingIndices}
-            onAdaptSceneStoryboard={onAdaptSceneStoryboard}
             onClearShotVideo={onClearShotVideo}
             onClearSceneFusion={onClearSceneFusion}
           />
@@ -543,8 +580,9 @@ export function OutfitVideoWorkspace({
 
   return (
     <>
-      <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white">
-        <div className="ecom-scrollbar-overlay min-h-0 w-full flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain [overflow-anchor:none]">
+      <div className="flex h-full min-h-0 min-w-0 max-w-full flex-col overflow-hidden bg-white">
+        {workspaceHeader}
+        <div className="ecom-scrollbar-overlay min-h-0 min-w-0 w-full max-w-full flex-1 overflow-x-clip overflow-y-auto overscroll-y-contain [contain:inline-size] [overflow-anchor:none]">
           {mainScroll}
         </div>
         {showDock ? (

@@ -46,13 +46,13 @@ export function EcomWorkspaceLayout({
   return (
     <EcomWorkspaceFloatingPortalProvider portalRef={floatingPortalRef}>
     <div
-      className="relative flex h-full min-h-0 w-full flex-col overflow-hidden md:flex-row"
+      className="relative flex h-full min-h-0 min-w-0 w-full max-w-full flex-col overflow-hidden md:flex-row"
       data-ecom-workspace-root
     >
-      <div className="flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden md:h-full">
+      <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-row overflow-hidden md:h-full">
         <main
           className={cn(
-            "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white",
+            "flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-clip bg-white",
             contentClassName,
           )}
           onPointerDown={onMainBlankPointerDown}

@@ -135,7 +135,7 @@ export function EcomAppShell({
     <div className="relative h-dvh overflow-hidden bg-[#0c0c0e] p-3 md:p-5">
       <div
         className={cn(
-          "grid h-full min-h-0 grid-cols-1 gap-3 overflow-visible md:gap-4",
+          "grid h-full min-h-0 grid-cols-1 gap-3 overflow-hidden md:gap-4",
           sidebarInset,
         )}
       >
@@ -147,7 +147,7 @@ export function EcomAppShell({
           className="relative z-[200] hidden h-full max-h-full md:flex"
         />
         <div
-          className="relative z-0 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl bg-white shadow-inner"
+          className="relative z-0 flex min-h-0 min-w-0 max-w-full flex-col overflow-clip rounded-xl bg-white"
           onPointerDown={isBrowseHub ? undefined : collapseNavOnWorkspaceClick}
         >
           <EcomMobileBar bookOrigin={bookOrigin} />

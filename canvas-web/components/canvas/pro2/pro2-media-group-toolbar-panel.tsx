@@ -743,7 +743,7 @@ export function Pro2MediaGroupToolbarPanel({
         />
         <Pro2ToolbarDropdownItem
           icon={LayoutGrid}
-          label="自动"
+          label="宫格排列"
           disabled={childrenIds.length < 2}
           onClick={() => applyGroupArrange("auto")}
         />

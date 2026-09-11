@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { RefreshCw, X } from "lucide-react";
+import { RefreshCw, Square } from "lucide-react";
 import { libtvMediaLooksGenerating } from "@/lib/canvas/canvas-task-generating-state";
 import {
   LIBTV_MEDIA_GENERATING_CYAN_CLASS,
@@ -121,11 +121,11 @@ export function LibtvMediaGeneratingState({
             <button
               type="button"
               className={cn(
-                "nodrag absolute right-2 top-2 flex size-7 items-center justify-center rounded-md border transition",
+                "nodrag absolute right-2 top-2 flex size-7 items-center justify-center rounded-full border bg-[var(--canvas-bg)] shadow-sm transition",
                 passNodeDrag && "pointer-events-auto",
                 variant === "violet"
-                  ? "border-violet-400/35 bg-violet-950/55 text-violet-100 hover:bg-violet-900/60"
-                  : "border-cyan-400/35 bg-cyan-950/55 text-cyan-100 hover:bg-cyan-900/60",
+                  ? "border-violet-400/35 text-violet-100 hover:border-violet-400/50 hover:text-violet-50"
+                  : "border-cyan-400/35 text-cyan-100 hover:border-cyan-400/50 hover:text-cyan-50",
                 tone === "background" && "opacity-90",
               )}
               aria-label="中止生成"
@@ -136,7 +136,7 @@ export function LibtvMediaGeneratingState({
                 handleCancel();
               }}
             >
-              <X className="size-3.5" aria-hidden />
+              <Square className="size-3 fill-current" aria-hidden />
             </button>
           ) : null}
         </div>

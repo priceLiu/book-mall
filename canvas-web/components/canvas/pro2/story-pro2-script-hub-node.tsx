@@ -83,7 +83,6 @@ import {
 import { STORY_PRO_UPLOAD_SCRIPT_ACCEPT } from "@/lib/canvas/story-pro-upload-script";
 import { cn } from "@/lib/utils";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
-import { Pro2NodeResizeGrip } from "./pro2-node-resize-grip";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 import { Pro2ScriptHubToolbar } from "./pro2-script-hub-toolbar";
 import { Pro2ScriptHubContentPreview } from "./pro2-script-hub-content-preview";
@@ -287,7 +286,11 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
     if (hasPreviewContent && (displayState === "generated" || isGenerating)) {
       return "preview";
     }
-    if (displayState === "connected" || (isGenerating && isLinked)) {
+    // 结果尚未解析为 Tab 前：保持连线/空态底图 + 扫光，勿闪回无扫光的「已链接」
+    if (isGenerating && isLinked) {
+      return "connected";
+    }
+    if (displayState === "connected") {
       return "connected";
     }
     return "initial";
@@ -483,13 +486,6 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
     >
-      <Pro2NodeResizer
-        isVisible={!!selected}
-        minWidth={PRO2_SCRIPT_NODE_MIN_WIDTH}
-        minHeight={PRO2_SCRIPT_NODE_MIN_HEIGHT}
-      />
-      {selected ? <Pro2NodeResizeGrip /> : null}
-
       {/* 左侧入边吸附；plus_left / text 由 Pro2NodeSidePlus 提供，勿重复声明（会露出左右竖条） */}
       <Handle
         id="in_text"
@@ -671,6 +667,14 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
         className="hidden"
         onChange={(e) => void onScriptFileChange(e)}
       />
+
+      {selected ? (
+        <Pro2NodeResizer
+          isVisible
+          minWidth={PRO2_SCRIPT_NODE_MIN_WIDTH}
+          minHeight={PRO2_SCRIPT_NODE_MIN_HEIGHT}
+        />
+      ) : null}
     </div>
   );
 }

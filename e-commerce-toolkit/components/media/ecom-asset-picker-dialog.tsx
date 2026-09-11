@@ -4,13 +4,6 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   EcomImagePreviewHost,
   mapPreviewItemsFromEntries,
   useEcomImagePreview,
@@ -20,6 +13,7 @@ import {
   ECOM_LIBRARY_MEDIA_GRID_CLASS,
 } from "@/components/media/ecom-media-library-tile";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomFullScreenOverlay } from "@/components/ui/ecom-full-screen-overlay";
 import { listAssets, type EcomAsset } from "@/lib/ecom-api";
 import { ECOM_VTON_MODEL_ASSET_MODULE } from "@/lib/vton-model-library";
 import { cn } from "@/lib/utils";
@@ -156,100 +150,102 @@ export function EcomAssetPickerDialog({
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] max-w-3xl flex-col gap-0 overflow-hidden p-0">
-        <DialogHeader className="border-b border-[#f0f0f2] px-5 py-4">
-          <DialogTitle className="text-[15px]">从我的资产选择</DialogTitle>
-          <p className="text-[12px] text-[#86868b]">
-            最多选择 {effectiveMaxSelect} 张，已选 {selected.length} 张。
-          </p>
-        </DialogHeader>
-
-        <div className="flex gap-2 border-b border-[#f0f0f2] px-5 py-2.5">
-          {GROUPS.map((g) => (
-            <button
-              key={g.module}
+      <EcomFullScreenOverlay
+        open={open}
+        onClose={() => onOpenChange(false)}
+        title="从我的资产选择"
+        description={`最多选择 ${effectiveMaxSelect} 张，已选 ${selected.length} 张。`}
+        panelClassName="flex max-h-[85vh] w-full max-w-3xl flex-col"
+        footer={
+          <div className="flex justify-end gap-2">
+            <EcomButtonSecondary size="sm" type="button" onClick={() => onOpenChange(false)}>
+              取消
+            </EcomButtonSecondary>
+            <EcomButtonPrimary
+              size="sm"
               type="button"
-              className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                activeModule === g.module
-                  ? "border-[#1d1d1f] bg-[#1d1d1f] text-white"
-                  : "border-[#d2d2d7] bg-white text-[#1d1d1f] hover:border-[#86868b]",
-              )}
-              onClick={() => {
-                setActiveModule(g.module);
-                setSelected([]);
-              }}
+              disabled={selected.length === 0 || confirming}
+              onClick={() => void handleConfirm()}
             >
-              {g.label}
-            </button>
-          ))}
+              {confirming ? "正在添加…" : `使用所选 ${selected.length} 张`}
+            </EcomButtonPrimary>
+          </div>
+        }
+      >
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex shrink-0 flex-wrap gap-2 border-b border-[#f0f0f2] px-5 py-2.5">
+            {GROUPS.map((g) => (
+              <button
+                key={g.module}
+                type="button"
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                  activeModule === g.module
+                    ? "border-[#1d1d1f] bg-[#1d1d1f] text-white"
+                    : "border-[#d2d2d7] bg-white text-[#1d1d1f] hover:border-[#86868b]",
+                )}
+                onClick={() => {
+                  setActiveModule(g.module);
+                  setSelected([]);
+                }}
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            {loading ? (
+              <div className="grid place-items-center gap-2 py-14 text-sm text-[#86868b]">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                正在加载资产…
+              </div>
+            ) : error ? (
+              <p className="py-14 text-center text-sm text-[#c0392b]">{error}</p>
+            ) : assets.length === 0 ? (
+              <p className="py-14 text-center text-sm text-[#86868b]">
+                该分组下还没有{allowVideo ? "图片或视频" : "图片"}资产。
+              </p>
+            ) : (
+              <div className={ECOM_LIBRARY_MEDIA_GRID_CLASS}>
+                {assets.map((asset) => {
+                  const active = selected.includes(asset.id);
+                  return (
+                    <EcomMediaLibraryTile
+                      key={asset.id}
+                      kind={asset.kind === "video" ? "video" : "image"}
+                      src={asset.ossUrl}
+                      thumbnailSrc={asset.thumbnailUrl}
+                      alt={asset.title ?? "资产"}
+                      aspectClass={
+                        activeModule === ECOM_VTON_MODEL_ASSET_MODULE
+                          ? "aspect-[3/4]"
+                          : undefined
+                      }
+                      disableLazy
+                      selected={active}
+                      onSelect={() => toggle(asset.id)}
+                      onPreview={() =>
+                        openPickerImagePreview(
+                          asset.ossUrl,
+                          asset.title ?? "资产图",
+                        )
+                      }
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
+      </EcomFullScreenOverlay>
 
-        <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          {loading ? (
-            <div className="grid place-items-center gap-2 py-14 text-sm text-[#86868b]">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              正在加载资产…
-            </div>
-          ) : error ? (
-            <p className="py-14 text-center text-sm text-[#c0392b]">{error}</p>
-          ) : assets.length === 0 ? (
-            <p className="py-14 text-center text-sm text-[#86868b]">
-              该分组下还没有{allowVideo ? "图片或视频" : "图片"}资产。
-            </p>
-          ) : (
-            <div className={ECOM_LIBRARY_MEDIA_GRID_CLASS}>
-              {assets.map((asset) => {
-                const active = selected.includes(asset.id);
-                return (
-                  <EcomMediaLibraryTile
-                    key={asset.id}
-                    kind={asset.kind === "video" ? "video" : "image"}
-                    src={asset.ossUrl}
-                    thumbnailSrc={asset.thumbnailUrl}
-                    alt={asset.title ?? "资产"}
-                    aspectClass={
-                      activeModule === ECOM_VTON_MODEL_ASSET_MODULE
-                        ? "aspect-[3/4]"
-                        : undefined
-                    }
-                    selected={active}
-                    onSelect={() => toggle(asset.id)}
-                    onPreview={() =>
-                      openPickerImagePreview(
-                        asset.ossUrl,
-                        asset.title ?? "资产图",
-                      )
-                    }
-                  />
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <DialogFooter className="border-t border-[#f0f0f2] px-5 py-3">
-          <EcomButtonSecondary size="sm" type="button" onClick={() => onOpenChange(false)}>
-            取消
-          </EcomButtonSecondary>
-          <EcomButtonPrimary
-            size="sm"
-            type="button"
-            disabled={selected.length === 0 || confirming}
-            onClick={() => void handleConfirm()}
-          >
-            {confirming ? "正在添加…" : `使用所选 ${selected.length} 张`}
-          </EcomButtonPrimary>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    <EcomImagePreviewHost
-      preview={pickerImagePreview}
-      galleryItems={pickerImagePreviewItems}
-      onClose={closePickerImagePreview}
-    />
-  </>
+      <EcomImagePreviewHost
+        preview={pickerImagePreview}
+        galleryItems={pickerImagePreviewItems}
+        onClose={closePickerImagePreview}
+        nativeOverlay
+      />
+    </>
   );
 }

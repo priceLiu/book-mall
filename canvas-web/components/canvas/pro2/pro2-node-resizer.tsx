@@ -10,7 +10,35 @@ export type Pro2NodeResizerProps = {
   handleClassName?: string;
 };
 
-/** 2.0 可拉伸节点：仅右下角大热区把手（不渲染边线） */
+/** 右下角突出 tab 内容（须作为 NodeResizeControl 子节点，保证 nodrag + 命中一致） */
+export function Pro2NodeResizeTabVisual() {
+  return (
+    <div className="pointer-events-none flex size-full items-center justify-center rounded-[3px] border border-white/45 bg-[var(--canvas-bg)] text-white/50 shadow-[0_1px_4px_rgba(0,0,0,0.35)]">
+      <svg
+        viewBox="0 0 16 16"
+        className="size-2.5"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden
+      >
+        <path
+          d="M16 6L6 16"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+        <path
+          d="M16 10.5L10.5 16"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+      </svg>
+    </div>
+  );
+}
+
+/** 2.0 可拉伸节点：右下角突出 tab（NodeResizeControl · nodrag · 非整卡拖动） */
 export function Pro2NodeResizer({
   isVisible,
   minWidth,
@@ -25,6 +53,9 @@ export function Pro2NodeResizer({
       minHeight={minHeight}
       color="transparent"
       className={handleClassName}
-    />
+      autoScale={false}
+    >
+      <Pro2NodeResizeTabVisual />
+    </NodeResizeControl>
   );
 }

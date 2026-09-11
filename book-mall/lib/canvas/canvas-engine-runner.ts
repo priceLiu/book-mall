@@ -147,7 +147,10 @@ import {
 } from "@/lib/generation/traffic-control/constants";
 import { computeCanvasQueueDispatchAfter } from "@/lib/generation/traffic-control/queue-dispatch-after";
 import { fireCanvasDispatchForProject } from "@/lib/generation/traffic-control/fire-canvas-dispatch";
-import { buildGridSplitPrepareFromNodeData } from "@/lib/generation/traffic-control/dispatch-canvas-image";
+import {
+  buildGridSplitPrepareFromNodeData,
+  prepareCanvasImagePayload,
+} from "@/lib/generation/traffic-control/dispatch-canvas-image";
 import { assertVideoCreditsBeforeTrafficQueue } from "@/lib/generation/traffic-control/video-queue-precheck";
 import { resolveCanvasProjectTrafficScope } from "@/lib/generation/traffic-control/scope-key";
 import {
@@ -578,8 +581,8 @@ export async function runImageEngineNode(
   }
 
   const gridSplitPrepare = buildGridSplitPrepareFromNodeData(data);
-  /** 宫格高清待裁切：参考图由 dispatch PREPARING 写入，不入队 imageUrls */
-  const imageUrls = gridSplitPrepare ? [] : imageUrlsRaw;
+  /** 宫格高清待裁切：参考图由 PREPARING / 同步 prepare 写入，不入队 imageUrls */
+  let imageUrls = gridSplitPrepare ? [] : imageUrlsRaw;
 
   const isHunyuan =
     modelKey === "hunyuan-3d-pro" || modelKey === "hunyuan-3d-express";
@@ -656,6 +659,28 @@ export async function runImageEngineNode(
   if (created.status === "QUEUED") {
     fireCanvasDispatchForProject(projectId, "runImageEngineNode");
     return { reused: false, task: created };
+  }
+
+  if (gridSplitPrepareForPayload) {
+    const prepared = await prepareCanvasImagePayload({
+      task: created,
+      payload: imageInputPayload as Record<string, unknown>,
+    });
+    if (prepared.prepared) {
+      const nextUrls = (prepared.payload.imageUrls as unknown[] | undefined)
+        ?.filter(
+          (u): u is string =>
+            typeof u === "string" && /^https?:\/\//.test(u.trim()),
+        )
+        .slice(0, 8);
+      if (nextUrls?.length) {
+        imageUrls = nextUrls;
+        await prisma.canvasGenerationTask.update({
+          where: { id: created.id },
+          data: { inputPayload: prepared.payload as Prisma.InputJsonValue },
+        });
+      }
+    }
   }
 
   const callBackUrl = buildCanvasAiKieCallbackUrl("image", created.id);

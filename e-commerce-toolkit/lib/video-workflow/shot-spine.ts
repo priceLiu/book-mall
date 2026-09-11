@@ -25,6 +25,10 @@ export const outfitStoryboardAdaptSchema = z.object({
   userSellPoint: z.string().optional(),
   mode: z.string().optional(),
   adjustLogic: z.string().optional(),
+  cameraMove: z.string().optional(),
+  characterAction: z.string().optional(),
+  lightingSetup: z.string().optional(),
+  sceneBackground: z.string().optional(),
   finalStoryboard: z.string().optional(),
   positivePrompt: z.string().optional(),
   negativePrompt: z.string().optional(),
@@ -33,6 +37,25 @@ export const outfitStoryboardAdaptSchema = z.object({
 });
 
 export type OutfitStoryboardAdapt = z.infer<typeof outfitStoryboardAdaptSchema>;
+
+/** AI 生成后的分镜制作表（用户可编辑；与拆解分镜表字段分离） */
+export const outfitProductionSchema = z.object({
+  status: z.enum(["pending", "generating", "success", "failed"]).optional(),
+  failReason: z.string().optional(),
+  cameraMove: z.string().optional(),
+  characterAction: z.string().optional(),
+  lightingSetup: z.string().optional(),
+  sceneBackground: z.string().optional(),
+  finalStoryboard: z.string().optional(),
+  positivePrompt: z.string().optional(),
+  negativePrompt: z.string().optional(),
+  adjustLogic: z.string().optional(),
+  mode: z.string().optional(),
+  generatedAt: z.string().optional(),
+  splitModelKey: z.string().optional(),
+});
+
+export type OutfitProduction = z.infer<typeof outfitProductionSchema>;
 
 export const sceneShotSchema = z.object({
   sceneId: z.string().min(1),
@@ -63,8 +86,10 @@ export const sceneShotSchema = z.object({
   status: z.enum(["pending", "generating", "success", "failed"]).optional(),
   failReason: z.string().optional(),
   sceneFusion: outfitSceneFusionSchema.optional(),
-  /** 服装适配后的单镜分镜（手动触发，逐镜） */
+  /** 服装适配后的单镜分镜（LLM 快照，批量生成时写入） */
   outfitStoryboardAdapt: outfitStoryboardAdaptSchema.optional(),
+  /** 分镜制作表 · 用户可编辑的生产字段 */
+  outfitProduction: outfitProductionSchema.optional(),
 });
 
 export type SceneShot = z.infer<typeof sceneShotSchema>;

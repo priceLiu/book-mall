@@ -32,8 +32,16 @@ export type OutfitClothAnalyseMeta = {
   imageUrl: string;
   modelKey: string;
   analysedAt: string;
-  status: "generating" | "success" | "failed";
+  status: "generating" | "success" | "failed" | "stale";
   failReason?: string;
+};
+
+/** meta.outfitProductionMeta · 分镜制作表批量生成状态 */
+export type OutfitProductionMeta = {
+  status: "none" | "generating" | "ready" | "stale" | "partial_failed" | "failed";
+  generatedAt?: string;
+  failCount?: number;
+  splitModelKey?: string;
 };
 
 export type OutfitSplitProgress = {

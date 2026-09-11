@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, ScanEye } from "lucide-react";
+import { Loader2, ScanEye, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { OutfitModelRefsPanel } from "@/components/outfit-video/outfit-model-refs-panel";
@@ -18,6 +18,10 @@ type Props = {
   sceneLibraryPreset?: OutfitSceneLibraryPreset | null;
   refsLocked?: boolean;
   busy?: boolean;
+  modelUploading?: boolean;
+  modelUploadLabel?: string;
+  sceneUploading?: boolean;
+  sceneUploadLabel?: string;
   userSellPoint?: string;
   clothAnalyse?: OutfitClothAnalyseMeta | null;
   clothAnalyseBusy?: boolean;
@@ -35,6 +39,9 @@ type Props = {
   ) => Promise<void>;
   onPickGlobalSceneLibraryPreset: (preset: OutfitSceneLibraryPreset) => Promise<void>;
   onRemoveGlobalSceneRef: () => Promise<void>;
+  productionGenerating?: boolean;
+  productionStale?: boolean;
+  onGenerateProductionStoryboard: () => Promise<void>;
 };
 
 export function OutfitRefSetupPanel({
@@ -43,6 +50,10 @@ export function OutfitRefSetupPanel({
   sceneLibraryPreset,
   refsLocked,
   busy,
+  modelUploading,
+  modelUploadLabel,
+  sceneUploading,
+  sceneUploadLabel,
   userSellPoint = "",
   clothAnalyse,
   clothAnalyseBusy,
@@ -56,10 +67,14 @@ export function OutfitRefSetupPanel({
   onAttachGlobalSceneRefFromAssets,
   onPickGlobalSceneLibraryPreset,
   onRemoveGlobalSceneRef,
+  productionGenerating,
+  productionStale,
+  onGenerateProductionStoryboard,
 }: Props) {
   const [sellDraft, setSellDraft] = useState(userSellPoint);
   const hasGallery = gallery.length > 0;
   const analyseBusy = Boolean(clothAnalyseBusy || clothAnalyse?.status === "generating");
+  const clothReady = clothAnalyse?.status === "success";
 
   useEffect(() => {
     setSellDraft(userSellPoint);
@@ -73,6 +88,10 @@ export function OutfitRefSetupPanel({
         sceneLibraryPreset={sceneLibraryPreset}
         refsLocked={refsLocked}
         busy={busy}
+        modelUploading={modelUploading}
+        modelUploadLabel={modelUploadLabel}
+        sceneUploading={sceneUploading}
+        sceneUploadLabel={sceneUploadLabel}
         onUploadModelFiles={onUploadModelGallery}
         onAttachModelAssets={onAttachModelGalleryFromAssets}
         onRemoveModelItem={onRemoveModelGalleryItem}
@@ -86,7 +105,7 @@ export function OutfitRefSetupPanel({
         <div>
           <h2 className="text-sm font-semibold text-[#1d1d1f]">卖点与服装识别</h2>
           <p className="mt-1 text-xs text-[#6e6e73]">
-            卖点选填；留空时 AI 将根据识别结果自动推导展示重点。识别完成后可逐镜「适配此镜」。
+            卖点选填；留空时 AI 将根据识别结果自动推导展示重点。识别完成后可一键生成下方「分镜制作表」。
           </p>
         </div>
 
@@ -125,6 +144,10 @@ export function OutfitRefSetupPanel({
           </EcomButtonPrimary>
           {clothAnalyse?.status === "success" ? (
             <span className="text-[11px] text-[#34c759]">识别完成</span>
+          ) : clothAnalyse?.status === "stale" ? (
+            <span className="text-[11px] text-[#8a6d3b]">
+              {clothAnalyse.failReason ?? "参考图已变更，请重新识别"}
+            </span>
           ) : clothAnalyse?.status === "failed" ? (
             <span className="text-[11px] text-[#ff3b30]">
               {clothAnalyse.failReason ?? "识别失败"}
@@ -137,6 +160,38 @@ export function OutfitRefSetupPanel({
             {clothAnalyse.structuredText}
           </pre>
         ) : null}
+      </section>
+
+      <section className="space-y-3 rounded-xl border border-[#e8e8ed] bg-white p-4">
+        <div>
+          <h2 className="text-sm font-semibold text-[#1d1d1f]">生成分镜制作表</h2>
+          <p className="mt-1 text-xs text-[#6e6e73]">
+            将「拆解分镜表」+ 服装识别 + 卖点提交 AI，批量生成可编辑的分镜制作表；动作/场景/Prompt 支持 @图片N 引用上方参考资产。
+          </p>
+        </div>
+        {productionStale ? (
+          <p className="rounded-lg border border-[#ffe8bf] bg-[#fffbf0] px-3 py-2 text-xs text-[#8a6d3b]">
+            拆解或识别信息已变更，建议重新生成分镜制作表。
+          </p>
+        ) : null}
+        <EcomButtonPrimary
+          type="button"
+          size="sm"
+          disabled={!hasGallery || !clothReady || analyseBusy || busy || productionGenerating}
+          onClick={() => void onGenerateProductionStoryboard()}
+        >
+          {productionGenerating ? (
+            <>
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+              生成中…
+            </>
+          ) : (
+            <>
+              <Sparkles className="mr-1 h-3.5 w-3.5" />
+              生成分镜制作表
+            </>
+          )}
+        </EcomButtonPrimary>
       </section>
     </div>
   );

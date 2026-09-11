@@ -196,13 +196,24 @@ export function syncPro2MediaGroupZIndex(
       isStyledMediaGroup(n) &&
       Boolean((n as { dragging?: boolean }).dragging),
   );
-  const activeGroupIds = new Set<string>();
-  if (selectedGroup?.id) activeGroupIds.add(selectedGroup.id);
-  if (draggingGroup?.id) activeGroupIds.add(draggingGroup.id);
   const styledGroupIds = new Set(
     nodes.filter(isStyledMediaGroup).map((n) => n.id),
   );
   if (!styledGroupIds.size) return nodes;
+
+  const activeGroupIds = new Set<string>();
+  if (selectedGroup?.id) activeGroupIds.add(selectedGroup.id);
+  if (draggingGroup?.id) activeGroupIds.add(draggingGroup.id);
+  for (const n of nodes) {
+    if (
+      n.selected &&
+      n.parentId &&
+      n.type !== "group" &&
+      styledGroupIds.has(n.parentId)
+    ) {
+      activeGroupIds.add(n.parentId);
+    }
+  }
 
   let changed = false;
   const next = nodes.map((n) => {

@@ -46,5 +46,17 @@ export async function register() {
         e instanceof Error ? e.message : String(e),
       );
     }
+
+    try {
+      const { startResidentPlatformAssistantAiNewsScheduler } = await import(
+        "./lib/platform-assistant/ai-news-scheduler"
+      );
+      startResidentPlatformAssistantAiNewsScheduler();
+    } catch (e) {
+      console.warn(
+        "[platform-assistant/ai-news] resident scheduler init skipped",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
   }
 }

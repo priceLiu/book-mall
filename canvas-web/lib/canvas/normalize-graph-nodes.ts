@@ -12,7 +12,6 @@ import { RF_NODE_DRAG_HANDLE_SELECTOR } from "./react-flow-classes";
 import {
   isPro2StyledGroup,
   reconcilePro2MediaGroupMetadata,
-  syncPro2MediaGroupZIndex,
 } from "./pro2-media-group-meta";
 import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
 import { LIBTV_MEDIA_FIT_VERSION } from "./libtv-node-chrome";
@@ -1015,15 +1014,7 @@ export function normalizeCanvasNodes(
 
   if (!hasStoryTemplateGroups(withPro2Groups)) {
     const sorted = sortNodesForReactFlow(repairOrphanParentIds(withPro2Groups));
-    const needsMediaGroupZ = sorted.some(
-      (n) =>
-        n.type === "group" &&
-        (isPro2StyledGroup(n, sorted) || isSbv1MediaGroup(n, sorted)),
-    );
-    const stacked = needsMediaGroupZ
-      ? syncPro2MediaGroupZIndex(sorted)
-      : sorted;
-    return ensureNodeDragHandles(isolateSharedCanvasNodeData(stacked));
+    return ensureNodeDragHandles(isolateSharedCanvasNodeData(sorted));
   }
   return ensureNodeDragHandles(
     isolateSharedCanvasNodeData(applyStoryLayout(withPro2Groups, edges)),

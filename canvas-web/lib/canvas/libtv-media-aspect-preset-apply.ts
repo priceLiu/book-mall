@@ -10,6 +10,7 @@ import {
   readAspectPresetProfileFromFitKey,
   resolveEffectiveAspectRatioForPreset,
   resolveLibtvMediaAspectPresetProfile,
+  shouldSkipLibtvImageNodeNaturalSizeAutoFit,
   shouldSkipLibtvMediaAspectPresetForNaturalMedia,
 } from "./libtv-media-aspect-preset";
 import { isPro2StyledGroup, isPro2PipelineMediaGroupChild } from "./pro2-media-group-meta";
@@ -44,6 +45,10 @@ export type { LibtvMediaAspectPresetProfile } from "./libtv-media-aspect-preset"
 function relayoutParentGroupIfNeeded(nodeId: string, parentId?: string): void {
   if (!parentId) return;
   const state = useCanvasStore.getState();
+  const self = state.nodes.find((n) => n.id === nodeId);
+  if (self && shouldSkipLibtvImageNodeNaturalSizeAutoFit(self, state.nodes)) {
+    return;
+  }
   const parentGroup = state.nodes.find((n) => n.id === parentId);
   if (!parentGroup) return;
 
@@ -77,13 +82,22 @@ function relayoutParentGroupIfNeeded(nodeId: string, parentId?: string): void {
 }
 
 /** 按节点 data.aspectRatio 立即调整外框；写入 mediaAspectPreset 后生成完成不再 auto-fit */
-export function applyLibtvMediaAspectPreset(nodeId: string): void {
+export function applyLibtvMediaAspectPreset(
+  nodeId: string,
+  opts?: { forcePreset?: boolean },
+): void {
   const state = useCanvasStore.getState();
   const node = state.nodes.find((n) => n.id === nodeId);
   if (!node?.type || !LIBTV_MEDIA_ASPECT_PRESET_NODE_TYPES.has(node.type)) {
     return;
   }
-  if (shouldSkipLibtvMediaAspectPresetForNaturalMedia(node)) {
+  if (shouldSkipLibtvImageNodeNaturalSizeAutoFit(node, state.nodes)) {
+    return;
+  }
+  if (
+    !opts?.forcePreset &&
+    shouldSkipLibtvMediaAspectPresetForNaturalMedia(node)
+  ) {
     return;
   }
   if (isPro2PipelineMediaGroupChild(node, state.nodes)) {
@@ -97,7 +111,7 @@ export function applyLibtvMediaAspectPreset(nodeId: string): void {
     readNodeAspectRatio(node),
     profile,
   );
-  const size = resolveLibtvMediaNodeBoxSize(node, state.nodes);
+  const size = computeLibtvMediaAspectPresetSize(effectiveRatio, profile);
   const nodeW = Math.round(
     (typeof node.width === "number" ? node.width : undefined) ??
       (node.style as { width?: number } | undefined)?.width ??
@@ -168,7 +182,10 @@ export function maybeApplyLibtvMediaAspectPresetFromPatch(
     }
   }
   if (!patchChangesAspectRatio(patch)) return;
-  queueMicrotask(() => applyLibtvMediaAspectPreset(nodeId));
+  const forcePreset = "aspectRatio" in patch;
+  queueMicrotask(() =>
+    applyLibtvMediaAspectPreset(nodeId, { forcePreset }),
+  );
 }
 
 /** 粘贴/上传 blob 后按 natural 尺寸调整外框（跳固定 1:1 preset） */
@@ -185,7 +202,10 @@ export function fitLibtvUploadedImageNaturalSize(
       if (!node?.type || !LIBTV_MEDIA_ASPECT_PRESET_NODE_TYPES.has(node.type)) {
         return;
       }
-      if (!shouldSkipLibtvMediaAspectPresetForNaturalMedia(node)) {
+      if (
+        shouldSkipLibtvImageNodeNaturalSizeAutoFit(node, state.nodes) ||
+        !shouldSkipLibtvMediaAspectPresetForNaturalMedia(node)
+      ) {
         return;
       }
       const size = computeLibtvMediaNodeSize(w, h, "sbv1-media");

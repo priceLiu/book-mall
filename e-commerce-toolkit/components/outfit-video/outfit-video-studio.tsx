@@ -59,9 +59,14 @@ import {
   clearOutfitVideoSceneRef,
   setOutfitVideoSceneLibraryPreset,
   analyseOutfitVideoCloth,
-  adaptOutfitVideoSceneStoryboard,
+  generateOutfitVideoProductionStoryboard,
   parseOutfitClothAnalyseMeta,
+  parseOutfitProductionMeta,
 } from "@/lib/ecom-outfit-video-api";
+import {
+  patchOutfitProductionField,
+  type OutfitProductionTextField,
+} from "@/lib/outfit-production-fields";
 import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import type { OutfitSceneFusionMode, OutfitVideoProject } from "@/lib/ecom-outfit-video-api";
 import {
@@ -69,6 +74,11 @@ import {
   outfitSplitTaskId,
 } from "@/lib/outfit-video-split-progress";
 import { isOutfitVideoMockDevUiEnabled } from "@/lib/outfit-video-mock-dev";
+import {
+  isOutfitVideoDirtySinceDeliverableSave,
+  mergeOutfitDeliverableSnapshotIntoMeta,
+  outfitVideoHasSaveableWork,
+} from "@/lib/outfit-video-deliverable-dirty";
 import {
   ECOM_MEDIA_DECOMPOSE_DEFAULT_VISION_MODEL,
   pickMediaDecomposeChatModelKey,
@@ -82,10 +92,7 @@ import {
   type SeedVideoRenderProgressState,
 } from "@/lib/seed-video-render-progress";
 import type { SceneShot } from "@/lib/video-workflow/shot-spine";
-import {
-  buildOutfitShotPrefilledGeneratePrompt,
-  resolveOutfitShotGeneratePrompt,
-} from "@/lib/ecom-outfit-video-generate-prompts";
+import { resolveOutfitShotGeneratePrompt } from "@/lib/ecom-outfit-video-generate-prompts";
 import {
   buildOutfitSplitSystemPromptDisplay,
   outfitSplitUserPromptDisplay,
@@ -146,9 +153,15 @@ function OutfitVideoStudioInner() {
   const [needLogin, setNeedLogin] = useState(false);
   const [mediaBusy, setMediaBusy] = useState(false);
   const splitSubmitLockRef = useRef(false);
+  /** 服务端 splitInProgress 曾激活 · 用于仅在拆镜结束后清理 UI pending */
+  const splitCoreWasActiveRef = useRef(false);
   /** 点击拆解后立即反馈，不等 meta / 后台任务轮询 */
   const [splitUiPending, setSplitUiPending] = useState(false);
   const [refBusy, setRefBusy] = useState(false);
+  const [modelRefUploading, setModelRefUploading] = useState(false);
+  const [modelRefUploadLabel, setModelRefUploadLabel] = useState("");
+  const [sceneRefUploading, setSceneRefUploading] = useState(false);
+  const [sceneRefUploadLabel, setSceneRefUploadLabel] = useState("");
   const [modelPipelineBusy, setModelPipelineBusy] = useState<
     "uploading" | "importing-model" | "generating-model" | "expanding-full-body" | null
   >(null);
@@ -165,7 +178,7 @@ function OutfitVideoStudioInner() {
   const [fusingIndices, setFusingIndices] = useState<ReadonlySet<number>>(new Set());
   const [userSellPointDraft, setUserSellPointDraft] = useState("");
   const [clothAnalyseBusy, setClothAnalyseBusy] = useState(false);
-  const [adaptingIndices, setAdaptingIndices] = useState<ReadonlySet<number>>(new Set());
+  const [productionGenerating, setProductionGenerating] = useState(false);
   const [renderProgress, setRenderProgress] = useState<SeedVideoRenderProgressState | null>(null);
   const [previewVideo, setPreviewVideo] = useState<{ src: string; title?: string } | null>(null);
   const [splitSystemDraft, setSplitSystemDraft] = useState(DEFAULT_SPLIT_SYSTEM_PROMPT);
@@ -595,13 +608,12 @@ function OutfitVideoStudioInner() {
           }
           backgroundGen.failTask(taskId, formatEcomTransportError(e));
           setSplitUiPending(false);
+          splitSubmitLockRef.current = false;
           await alert({
             title: "拆解失败",
             message: formatEcomTransportError(e),
             variant: "error",
           });
-        } finally {
-          splitSubmitLockRef.current = false;
         }
       })();
     },
@@ -653,9 +665,13 @@ function OutfitVideoStudioInner() {
       });
       return;
     }
+    splitSubmitLockRef.current = true;
+    setSplitUiPending(true);
     try {
       await flushSplitPrompts();
     } catch (e) {
+      splitSubmitLockRef.current = false;
+      setSplitUiPending(false);
       await alert({
         title: "保存拆镜指令失败",
         message: formatEcomTransportError(e),
@@ -663,16 +679,18 @@ function OutfitVideoStudioInner() {
       });
       return;
     }
-    splitSubmitLockRef.current = true;
-    setSplitUiPending(true);
     startOutfitSplitStatusJob(project.id, { fire: true, splitModelKey: modelKey, forceResplit });
   }
 
   useEffect(() => {
-    if (!splittingCore) {
-      setSplitUiPending(false);
-      splitSubmitLockRef.current = false;
+    if (splittingCore) {
+      splitCoreWasActiveRef.current = true;
+      return;
     }
+    if (!splitCoreWasActiveRef.current) return;
+    setSplitUiPending(false);
+    splitSubmitLockRef.current = false;
+    splitCoreWasActiveRef.current = false;
   }, [splittingCore]);
 
   useEffect(() => {
@@ -748,9 +766,12 @@ function OutfitVideoStudioInner() {
 
   function handleScenePromptReset(sceneId: string) {
     if (!project) return;
-    const scene = project.sceneList.find((s) => s.sceneId === sceneId);
-    if (!scene) return;
-    handleScenePromptChange(sceneId, buildOutfitShotPrefilledGeneratePrompt(scene));
+    const next = project.sceneList.map((s) =>
+      s.sceneId === sceneId ? { ...s, userGeneratePrompt: undefined } : s,
+    );
+    applyProject({ ...project, sceneList: next });
+    pendingPromptScenesRef.current = next;
+    void flushScenePromptPatch();
   }
 
   async function handleDeleteScene(index: number) {
@@ -773,12 +794,20 @@ function OutfitVideoStudioInner() {
 
   async function handleUploadModelGallery(files: File[]) {
     if (!project || files.length < 1) return;
+    setModelRefUploading(true);
+    setModelRefUploadLabel(
+      files.length > 1
+        ? `正在上传 ${files.length} 张模特参考…`
+        : "正在上传模特参考…",
+    );
     setRefBusy(true);
     try {
       applyProject(await uploadOutfitVideoModelGallery(project.id, files));
     } catch (e) {
       await alert({ title: "参考图上传失败", message: formatEcomTransportError(e), variant: "error" });
     } finally {
+      setModelRefUploading(false);
+      setModelRefUploadLabel("");
       setRefBusy(false);
     }
   }
@@ -797,6 +826,8 @@ function OutfitVideoStudioInner() {
 
   async function handleUploadGlobalSceneRef(file: File) {
     if (!project) return;
+    setSceneRefUploading(true);
+    setSceneRefUploadLabel("正在上传场景参考…");
     setRefBusy(true);
     try {
       applyProject(await uploadOutfitVideoSceneRef(project.id, file));
@@ -804,6 +835,8 @@ function OutfitVideoStudioInner() {
     } catch (e) {
       await alert({ title: "场景参考上传失败", message: formatEcomTransportError(e), variant: "error" });
     } finally {
+      setSceneRefUploading(false);
+      setSceneRefUploadLabel("");
       setRefBusy(false);
     }
   }
@@ -812,6 +845,8 @@ function OutfitVideoStudioInner() {
     assets: Array<{ id: string; ossUrl: string; title: string }>,
   ) {
     if (!project || !assets.length) return;
+    setSceneRefUploading(true);
+    setSceneRefUploadLabel("正在从资产库导入场景参考…");
     setRefBusy(true);
     try {
       const asset = assets[0]!;
@@ -821,9 +856,12 @@ function OutfitVideoStudioInner() {
           title: asset.title,
         }),
       );
+      await toast({ title: "场景参考已导入", variant: "success" });
     } catch (e) {
       await alert({ title: "导入场景参考失败", message: formatEcomTransportError(e), variant: "error" });
     } finally {
+      setSceneRefUploading(false);
+      setSceneRefUploadLabel("");
       setRefBusy(false);
     }
   }
@@ -846,6 +884,8 @@ function OutfitVideoStudioInner() {
     visualPromptFragment: string;
   }) {
     if (!project) return;
+    setSceneRefUploading(true);
+    setSceneRefUploadLabel("正在应用场景库…");
     setRefBusy(true);
     try {
       applyProject(await setOutfitVideoSceneLibraryPreset(project.id, preset));
@@ -853,6 +893,8 @@ function OutfitVideoStudioInner() {
     } catch (e) {
       await alert({ title: "选择场景失败", message: formatEcomTransportError(e), variant: "error" });
     } finally {
+      setSceneRefUploading(false);
+      setSceneRefUploadLabel("");
       setRefBusy(false);
     }
   }
@@ -934,7 +976,11 @@ function OutfitVideoStudioInner() {
       applyProject(next);
       const cloth = parseOutfitClothAnalyseMeta(next.meta);
       if (cloth?.status === "success") {
-        await toast({ title: "服装识别完成", message: "可为各镜点击「适配此镜」", variant: "success" });
+        await toast({
+          title: "服装识别完成",
+          message: "可点击「生成分镜制作表」",
+          variant: "success",
+        });
       } else if (cloth?.status === "failed") {
         await alert({
           title: "服装识别失败",
@@ -949,30 +995,108 @@ function OutfitVideoStudioInner() {
     }
   }
 
-  async function handleAdaptSceneStoryboard(index: number) {
+  async function handleGenerateProductionStoryboard() {
     if (!project) return;
-    setAdaptingIndices((prev) => new Set(prev).add(index));
+    setProductionGenerating(true);
     try {
-      const next = await adaptOutfitVideoSceneStoryboard(project.id, index);
+      const next = await generateOutfitVideoProductionStoryboard(project.id);
       applyProject(next);
-      const shot = next.sceneList.find((s) => s.index === index);
-      if (shot?.outfitStoryboardAdapt?.status === "success") {
-        await toast({ title: `镜 ${index} 分镜已适配`, variant: "success" });
-      } else if (shot?.outfitStoryboardAdapt?.status === "failed") {
+      const meta = parseOutfitProductionMeta(next.meta);
+      if (meta?.status === "ready") {
+        await toast({ title: "分镜制作表已生成", variant: "success" });
+      } else if (meta?.status === "partial_failed") {
+        const failedShots = next.sceneList.filter((s) => s.outfitProduction?.status === "failed");
+        const reasonPreview = failedShots
+          .map((s) => {
+            const reason = s.outfitProduction?.failReason?.trim();
+            return reason ? `镜 ${s.index}：${reason}` : `镜 ${s.index}`;
+          })
+          .slice(0, 3)
+          .join("\n");
         await alert({
-          title: `镜 ${index} 适配失败`,
-          message: shot.outfitStoryboardAdapt.failReason ?? "请重试",
+          title: "部分分镜制作表生成失败",
+          message: [
+            reasonPreview,
+            `${meta.failCount ?? 0} 镜未成功。可在制作表「状态」列查看详情，修正后重试「生成分镜制作表」。`,
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
+          variant: "error",
+        });
+      } else if (meta?.status === "failed") {
+        await alert({
+          title: "分镜制作表生成失败",
+          message: "请检查网络与模型配置后重试",
           variant: "error",
         });
       }
     } catch (e) {
-      await alert({ title: "分镜适配失败", message: formatEcomTransportError(e), variant: "error" });
-    } finally {
-      setAdaptingIndices((prev) => {
-        const next = new Set(prev);
-        next.delete(index);
-        return next;
+      await alert({
+        title: "分镜制作表生成失败",
+        message: formatEcomTransportError(e),
+        variant: "error",
       });
+    } finally {
+      setProductionGenerating(false);
+    }
+  }
+
+  function handleProductionFieldChange(
+    sceneId: string,
+    field: OutfitProductionTextField,
+    value: string,
+  ) {
+    if (!project) return;
+    const nextScenes = project.sceneList.map((s) =>
+      s.sceneId === sceneId ? patchOutfitProductionField(s, field, value) : s,
+    );
+    applyProject({ ...project, sceneList: nextScenes });
+    pendingPromptScenesRef.current = nextScenes;
+    if (promptPatchTimerRef.current) clearTimeout(promptPatchTimerRef.current);
+    promptPatchTimerRef.current = setTimeout(() => {
+      void flushScenePromptPatch();
+    }, 600);
+  }
+
+  async function handleSceneFusionPromptChange(sceneId: string, fragment: string) {
+    if (!project) return;
+    const index = project.sceneList.find((s) => s.sceneId === sceneId)?.index;
+    if (index == null) return;
+    try {
+      applyProject(
+        await patchOutfitShotSceneFusionConfig(project.id, index, {
+          visualPromptFragment: fragment.trim() || undefined,
+          fusedImageUrl: undefined,
+          status: undefined,
+          failReason: undefined,
+          sharedFromShotIndex: undefined,
+        }),
+      );
+    } catch (e) {
+      await alert({ title: "场景描述保存失败", message: formatEcomTransportError(e), variant: "error" });
+    }
+  }
+
+  async function handleAttachSceneRefFromAssets(
+    index: number,
+    assets: Array<{ id: string; ossUrl: string; title: string }>,
+  ) {
+    if (!project || !assets.length) return;
+    const asset = assets[0]!;
+    try {
+      applyProject(
+        await patchOutfitShotSceneFusionConfig(project.id, index, {
+          mode: "upload_ref",
+          sceneRefUrl: asset.ossUrl,
+          fusedImageUrl: undefined,
+          status: undefined,
+          failReason: undefined,
+          sharedFromShotIndex: undefined,
+        }),
+      );
+      await toast({ title: "场景参考已设置", variant: "success" });
+    } catch (e) {
+      await alert({ title: "导入场景参考失败", message: formatEcomTransportError(e), variant: "error" });
     }
   }
 
@@ -1281,6 +1405,12 @@ function OutfitVideoStudioInner() {
     assets: Array<{ id: string; ossUrl: string; title: string }>,
   ) {
     if (!project || !assets.length) return;
+    setModelRefUploading(true);
+    setModelRefUploadLabel(
+      assets.length > 1
+        ? `正在从资产库导入 ${assets.length} 张…`
+        : "正在从资产库导入模特参考…",
+    );
     setRefBusy(true);
     try {
       applyProject(
@@ -1289,9 +1419,12 @@ function OutfitVideoStudioInner() {
           assets.map((a) => ({ ossUrl: a.ossUrl, title: a.title })),
         ),
       );
+      await toast({ title: "模特参考已导入", variant: "success" });
     } catch (e) {
       await alert({ title: "导入资产失败", message: formatEcomTransportError(e), variant: "error" });
     } finally {
+      setModelRefUploading(false);
+      setModelRefUploadLabel("");
       setRefBusy(false);
     }
   }
@@ -1490,13 +1623,19 @@ function OutfitVideoStudioInner() {
     throw new Error("合成超时");
   }
 
-  async function handleCompose() {
+  async function handleCompose(sceneIndexes?: number[]) {
     if (!project) return;
-    const missing = project.sceneList.some((s) => !s.videoUrl?.trim());
-    if (missing) {
+    const indexFilter =
+      sceneIndexes && sceneIndexes.length > 0 ? new Set(sceneIndexes) : null;
+    const ready = project.sceneList.filter((s) => {
+      if (!s.videoUrl?.trim()) return false;
+      if (indexFilter && !indexFilter.has(s.index)) return false;
+      return true;
+    });
+    if (ready.length < 2) {
       await alert({
         title: "暂不能合成",
-        message: "请先生成全部镜头视频。",
+        message: "请至少生成 2 镜视频后再合成；若已勾选镜头，须至少 2 镜为「视频 OK」。",
         variant: "error",
       });
       return;
@@ -1541,7 +1680,9 @@ function OutfitVideoStudioInner() {
     });
 
     try {
-      await renderOutfitVideo(project.id);
+      await renderOutfitVideo(project.id, {
+        sceneIndexes: ready.map((s) => s.index),
+      });
       setRenderProgress((prev) =>
         prev
           ? {
@@ -1593,7 +1734,12 @@ function OutfitVideoStudioInner() {
     }
     setSaveBusy(true);
     try {
-      const { title } = await saveOutfitVideoDeliverableSnapshot(project.id, defaultName);
+      const { title, snapshot } = await saveOutfitVideoDeliverableSnapshot(project.id, defaultName);
+      if (snapshot) {
+        applyProject(mergeOutfitDeliverableSnapshotIntoMeta(project, snapshot));
+      } else {
+        applyProject(await getOutfitVideoProject(project.id));
+      }
       await toast({ title: "已保存", message: title, variant: "success" });
     } catch (e) {
       await alert({ title: "保存失败", message: formatEcomTransportError(e), variant: "error" });
@@ -1608,17 +1754,21 @@ function OutfitVideoStudioInner() {
       return;
     }
     if (!project) return;
-    const hasWork =
-      Boolean(project.references?.model?.ossUrl) ||
-      project.sceneList.some((s) => Boolean(s.imageUrl?.trim() || s.videoUrl?.trim())) ||
-      Boolean(project.composeResult?.videoUrl?.trim());
+    const hasWork = outfitVideoHasSaveableWork(project);
+    const needsSavePrompt =
+      hasWork && isOutfitVideoDirtySinceDeliverableSave(project);
     const defaultName = project.title?.trim() || "穿搭视频";
     await runEcomNewProjectWithSavePrompt({
       confirm,
-      hasWorkToSave: hasWork,
-      message: "当前穿搭视频尚未保存作品。是否先保存到「我的资产」？",
+      hasWorkToSave: needsSavePrompt,
+      message: "当前穿搭视频有未保存的改动。是否先保存到「我的资产」？",
       save: async () => {
-        const { title } = await saveOutfitVideoDeliverableSnapshot(project.id, defaultName);
+        const { title, snapshot } = await saveOutfitVideoDeliverableSnapshot(project.id, defaultName);
+        if (snapshot) {
+          applyProject(mergeOutfitDeliverableSnapshotIntoMeta(project, snapshot));
+        } else {
+          applyProject(await getOutfitVideoProject(project.id));
+        }
         await toast({ title: "已保存", message: title, variant: "success" });
       },
       onProceed: async () => {
@@ -1673,6 +1823,10 @@ function OutfitVideoStudioInner() {
           mediaBusy={mediaBusy}
           splitting={splitting}
           refBusy={refBusy}
+          modelRefUploading={modelRefUploading}
+          modelRefUploadLabel={modelRefUploadLabel}
+          sceneRefUploading={sceneRefUploading}
+          sceneRefUploadLabel={sceneRefUploadLabel}
           fusionModelKey={fusionModelKey}
           generateBusy={generateBusy}
           renderBusy={renderBusy}
@@ -1716,8 +1870,12 @@ function OutfitVideoStudioInner() {
           onUserSellPointChange={setUserSellPointDraft}
           onSaveUserSellPoint={handleSaveUserSellPoint}
           onAnalyseCloth={handleAnalyseCloth}
-          adaptingIndices={adaptingIndices}
-          onAdaptSceneStoryboard={handleAdaptSceneStoryboard}
+          productionGenerating={productionGenerating}
+          productionStale={parseOutfitProductionMeta(project.meta)?.status === "stale"}
+          onGenerateProductionStoryboard={handleGenerateProductionStoryboard}
+          onProductionFieldChange={handleProductionFieldChange}
+          onSceneFusionPromptChange={handleSceneFusionPromptChange}
+          onAttachSceneRefFromAssets={handleAttachSceneRefFromAssets}
           onLockRefs={handleLockRefs}
           onGenerateShots={handleGenerateShots}
           onCancelGeneratingSelection={handleCancelGeneratingSelection}

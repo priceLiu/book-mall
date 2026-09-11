@@ -367,6 +367,11 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
   --canvas-edge-stroke-width-active: 3;
   --canvas-edge-stroke-width-sweep: 3.5;
   --canvas-edge-stroke-width-connecting: 2.5;
+  /* 深色画布 · 灰色左/底/右投影（避免纯黑贴死看不出） */
+  --libtv-node-elevation-shadow:
+    -4px 0 10px -3px rgba(120, 120, 128, 0.45),
+    0 7px 16px -3px rgba(130, 130, 138, 0.5),
+    4px 0 10px -3px rgba(120, 120, 128, 0.45);
   /* 框选 / 多选外框 · 保留 React Flow 点线蓝，仅加粗到 2px */
   --xy-selection-border: 2px dotted rgba(0, 89, 220, 0.8);
   --xy-selection-background-color: rgba(0, 89, 220, 0.08);
@@ -393,9 +398,15 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
 .canvas-flow-wrap .react-flow__edges svg:has(.canvas-edge-node-gap) {
   z-index: 12 !important;
 }
-/* 非 group 节点默认在连线之上 */
+/* 非 group 节点默认在连线之上；选中再抬一层（勿写回 node.zIndex，否则 store↔RF 死循环） */
 .canvas-flow-wrap .react-flow__node:not(.react-flow__node-group) {
   z-index: 22 !important;
+}
+.canvas-flow-wrap .react-flow__node.selected:not(.react-flow__node-group) {
+  z-index: 1201 !important;
+}
+.canvas-flow-wrap .react-flow__node-group {
+  z-index: 5 !important;
 }
 
 /* LibTV 侧 + · 置顶于连线交互层 */
@@ -449,10 +460,14 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
   transition: opacity 0.2s ease-out;
 }
 
-/* 静止连线 · 白线（选中高亮 pro2-edge-active 保持原色与流动动效） */
+/* 静止连线 · 柔白（选中高亮 pro2-edge-active 保持原色与流动动效） */
 .canvas-flow-wrap .react-flow__edge:not(.pro2-edge-active) .react-flow__edge-path {
-  stroke: #ffffff !important;
+  stroke: rgba(255, 255, 255, 0.38) !important;
   stroke-width: var(--canvas-edge-stroke-width, 2.5) !important;
+}
+
+.libtv-node-elevation {
+  box-shadow: var(--libtv-node-elevation-shadow);
 }
 
 /* Pro2 脚本 / 大纲节点 · 横纵滚动条（避开右侧连线 Handle 热区） */
@@ -757,22 +772,24 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
 }
 
 .canvas-flow-wrap .react-flow__resize-control.handle.pro2-node-resizer-handle {
-  z-index: 100 !important;
+  z-index: 20100 !important;
   pointer-events: auto !important;
   background: transparent !important;
   border: none !important;
-  width: 20px !important;
-  height: 20px !important;
+  width: 16px !important;
+  height: 16px !important;
   border-radius: 0 !important;
-  margin: 0 !important;
-  inset: auto 4px 4px auto !important;
+  /* 负 margin 向外突出（勿用 transform，否则命中区与视觉错位 → 误触发整卡拖动） */
+  margin: 0 -10px -10px 0 !important;
+  inset: auto 0 0 auto !important;
+  transform: none !important;
   cursor: nwse-resize !important;
-  opacity: 0 !important;
+  opacity: 1 !important;
 }
 
 .canvas-flow-wrap .react-flow__node.selected:hover .react-flow__resize-control.handle.pro2-node-resizer-handle,
 .canvas-flow-wrap .react-flow__resize-control.handle.pro2-node-resizer-handle:active {
-  opacity: 0 !important;
+  opacity: 1 !important;
 }
 
 /* 分组容器 · 选中时可拖角调整组框大小 */

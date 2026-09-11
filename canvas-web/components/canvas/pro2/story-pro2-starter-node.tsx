@@ -73,7 +73,6 @@ import { Pro2NodeScrollArea } from "./pro2-node-scroll-area";
 import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
 import { Pro2ThinNodeToolbar } from "./pro2-thin-node-toolbar";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
-import { Pro2NodeResizeGrip } from "./pro2-node-resize-grip";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
 import { Pro2NodeErrorBanner } from "./pro2-node-error-banner";
@@ -425,13 +424,6 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
     >
-      <Pro2NodeResizer
-        isVisible={!!selected}
-        minWidth={PRO2_TEXT_NODE_MIN_WIDTH}
-        minHeight={PRO2_TEXT_NODE_MIN_HEIGHT}
-      />
-      {selected ? <Pro2NodeResizeGrip /> : null}
-
       <Handle
         id="in_text"
         type="target"
@@ -561,6 +553,14 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
           />
         )}
       </div>
+
+      {selected ? (
+        <Pro2NodeResizer
+          isVisible
+          minWidth={PRO2_TEXT_NODE_MIN_WIDTH}
+          minHeight={PRO2_TEXT_NODE_MIN_HEIGHT}
+        />
+      ) : null}
     </div>
   );
 }

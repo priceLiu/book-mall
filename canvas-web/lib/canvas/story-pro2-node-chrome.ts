@@ -145,6 +145,9 @@ export const PRO2_MEDIA_NODE_TITLE_CLASS =
 export const PRO2_TEXT_NODE_TITLE_CLASS =
   "flex w-full min-h-[26px] shrink-0 cursor-grab items-center gap-1.5 px-1 text-[11px] text-white active:cursor-grabbing";
 
+/** Pro2 媒体节点 · 外置标题行占用（min-h 26 + mb-1.5）· 须与 `computeLibtvMediaBoxFromAspect` header 一致 */
+export const PRO2_EXTERNAL_MEDIA_TITLE_CHROME_HEIGHT = 32;
+
 /** 列摘要薄卡 */
 export const PRO2_COLUMN_CARD_WIDTH = 320;
 export const PRO2_COLUMN_CARD_HEIGHT = 120;

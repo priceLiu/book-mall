@@ -18,6 +18,11 @@ import {
   resolveOutfitKlingMotionControlInputImage,
   resolveOutfitShotGenerateRoute,
 } from "@/lib/ecom/ecom-outfit-video-kling-input";
+import {
+  buildOutfitBailianR2vReferenceUrlOrder,
+  enrichOutfitBailianR2vGeneratePrompt,
+  outfitBailianR2vMaxRefs,
+} from "@/lib/ecom/ecom-outfit-video-generate-refs";
 import { buildOutfitShotGenerateBody } from "@/lib/ecom/video-workflow/templates/outfit-v1/generation";
 import type { SceneShot, WorkflowRefs } from "@/lib/ecom/video-workflow/shot-spine";
 import { buildKieKlingMotionControlCreateArgs } from "@/lib/canvas/kie-video-tool-builders";
@@ -169,34 +174,35 @@ async function runBailianR2vGenerate(opts: {
   }
 
   const { body } = opts;
-  const refUrls: string[] = [];
-  const pushRef = async (url: string | undefined) => {
-    if (!url?.trim()) return;
-    refUrls.push(
-      (
-        await ensureStoryboardBailianR2vRefImage({
-          userId: opts.userId,
-          imageUrl: url.trim(),
-          modelKey,
-        })
-      ).url,
-    );
-  };
 
-  await pushRef(body.previewImageUrl);
-  await pushRef(body.modelImageUrl);
-  if (body.clothingImageUrl.trim() && body.clothingImageUrl !== body.modelImageUrl) {
-    await pushRef(body.clothingImageUrl);
-  }
+  let clipKeyframeUrls: string[] = [];
   if (body.referenceClipUrl?.trim()) {
-    const clipFrames = await extractClipKeyframeUrls({
+    clipKeyframeUrls = await extractClipKeyframeUrls({
       userId: opts.userId,
       clipUrl: body.referenceClipUrl.trim(),
       durationSec: body.durationSec,
     });
-    for (const frameUrl of clipFrames) {
-      await pushRef(frameUrl);
-    }
+  }
+
+  const orderedRaw = buildOutfitBailianR2vReferenceUrlOrder({
+    modelImageUrl: body.modelImageUrl,
+    clothingImageUrl: body.clothingImageUrl,
+    previewImageUrl: body.previewImageUrl,
+    clipKeyframeUrls,
+    maxRefs: outfitBailianR2vMaxRefs(modelKey),
+  });
+
+  const refUrls: string[] = [];
+  for (const url of orderedRaw) {
+    refUrls.push(
+      (
+        await ensureStoryboardBailianR2vRefImage({
+          userId: opts.userId,
+          imageUrl: url,
+          modelKey,
+        })
+      ).url,
+    );
   }
 
   if (refUrls.length === 0) {
@@ -206,7 +212,7 @@ async function runBailianR2vGenerate(opts: {
   const clientPage = ecomClientPage(opts.userId, opts.projectId, ECOM_OUTFIT_VIDEO_TOOL_KEY);
   const { taskId, logId } = await ecomGwCreateBailianR2vJob(opts.userId, {
     model: modelKey,
-    prompt: body.prompt,
+    prompt: enrichOutfitBailianR2vGeneratePrompt(body.prompt),
     referenceImageUrls: refUrls,
     resolution: bailianResolutionFromEcom("1080p"),
     ratio: body.aspectRatio,

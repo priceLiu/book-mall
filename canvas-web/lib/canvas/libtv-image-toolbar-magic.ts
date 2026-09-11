@@ -2,7 +2,14 @@
 
 import { nanoid } from "nanoid";
 import type { LucideIcon } from "lucide-react";
-import { Expand, Sparkles } from "lucide-react";
+import {
+  Crop,
+  Eraser,
+  Expand,
+  Paintbrush,
+  ScanFace,
+  Sparkles,
+} from "lucide-react";
 import { buildPro2ImageNodeData } from "./pro2-spawn-nodes";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
 import { PRO2_IMAGE_NODE_WIDTH } from "./story-pro2-node-chrome";
@@ -10,7 +17,13 @@ import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 
 const GAP = 48;
 
-export type LibtvImageMagicMenuId = "hd-upscale" | "source-expand";
+export type LibtvImageMagicMenuId =
+  | "hd-upscale"
+  | "source-expand"
+  | "inpaint-redraw"
+  | "erase"
+  | "cutout"
+  | "crop";
 
 export type LibtvImageMagicMenuItem = {
   id: LibtvImageMagicMenuId;
@@ -20,7 +33,11 @@ export type LibtvImageMagicMenuItem = {
 
 export const LIBTV_IMAGE_MAGIC_MENU: LibtvImageMagicMenuItem[] = [
   { id: "hd-upscale", label: "高清", icon: Sparkles },
-  { id: "source-expand", label: "原图扩图", icon: Expand },
+  { id: "source-expand", label: "扩图", icon: Expand },
+  { id: "inpaint-redraw", label: "重绘", icon: Paintbrush },
+  { id: "erase", label: "擦除", icon: Eraser },
+  { id: "cutout", label: "抠图", icon: ScanFace },
+  { id: "crop", label: "裁剪", icon: Crop },
 ];
 
 export type LibtvImageMagicSpawnStore = {
@@ -39,12 +56,35 @@ function magicTargetData(menuId: LibtvImageMagicMenuId): Record<string, unknown>
     case "hd-upscale":
       return buildPro2ImageNodeData({
         label: "高清",
-        dockInput: "将参考图超分辨率增强为高清画质，保持内容与构图一致。",
+        dockInput:
+          "将参考图超分辨率增强为高清画质，保持内容与构图一致。",
       });
     case "source-expand":
       return buildPro2ImageNodeData({
-        label: "原图扩图",
-        dockInput: "在保持原图主体不变的前提下向外扩图，补全画幅边缘。",
+        label: "扩图",
+        dockInput:
+          "在保持原图主体不变的前提下向外扩图，补全画幅边缘。",
+      });
+    case "inpaint-redraw":
+      return buildPro2ImageNodeData({
+        label: "重绘",
+        dockInput:
+          "根据参考图局部重绘指定区域，保持整体构图与风格一致。",
+      });
+    case "erase":
+      return buildPro2ImageNodeData({
+        label: "擦除",
+        dockInput: "擦除参考图中指定物体或瑕疵，自然补全背景。",
+      });
+    case "cutout":
+      return buildPro2ImageNodeData({
+        label: "抠图",
+        dockInput: "提取参考图主体，生成透明背景或纯色背景抠图结果。",
+      });
+    case "crop":
+      return buildPro2ImageNodeData({
+        label: "裁剪",
+        dockInput: "按指定比例或构图裁剪参考图，保留主体并去除多余边缘。",
       });
   }
 }

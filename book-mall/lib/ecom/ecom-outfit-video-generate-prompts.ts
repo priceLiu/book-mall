@@ -1,3 +1,4 @@
+import { stripOutfitVideoMentionTokensForVideoApi } from "@/lib/ecom/ecom-outfit-video-mention-refs";
 import type { SceneShot } from "@/lib/ecom/video-workflow/shot-spine";
 import { OUTFIT_SPLIT_MANUAL_EDIT_HINT } from "@/lib/ecom/ecom-outfit-video-split-enrich-validate";
 
@@ -14,17 +15,31 @@ function isManualEditPlaceholder(text: string | undefined): boolean {
   return t === OUTFIT_SPLIT_MANUAL_EDIT_HINT || t.startsWith("【AI识别不足");
 }
 
+function resolveProductionOrSplitField(
+  scene: SceneShot,
+  field: "lightingSetup" | "sceneBackground",
+): string | undefined {
+  const production = scene.outfitProduction;
+  if (production?.status === "success") {
+    const fromProduction = production[field]?.trim();
+    if (fromProduction) return fromProduction;
+  }
+  return scene[field]?.trim();
+}
+
 /** §十 §四：预填正向 Prompt（不含运镜/动作） */
 export function buildOutfitShotPrefilledGeneratePrompt(scene: SceneShot): string {
   const parts = [OUTFIT_V1_GENERATE_BASE_PROMPT_ZH];
   if (scene.parseIncomplete) {
     return parts.join("，");
   }
-  if (scene.lightingSetup?.trim() && !isManualEditPlaceholder(scene.lightingSetup)) {
-    parts.push(scene.lightingSetup.trim());
+  const lighting = resolveProductionOrSplitField(scene, "lightingSetup");
+  const background = resolveProductionOrSplitField(scene, "sceneBackground");
+  if (lighting && !isManualEditPlaceholder(lighting)) {
+    parts.push(lighting);
   }
-  if (scene.sceneBackground?.trim() && !isManualEditPlaceholder(scene.sceneBackground)) {
-    parts.push(scene.sceneBackground.trim());
+  if (background && !isManualEditPlaceholder(background)) {
+    parts.push(background);
   }
   return parts.join("，");
 }
@@ -36,18 +51,29 @@ export function buildOutfitShotPrefilledGeneratePrompt(scene: SceneShot): string
  * - 否则 → 系统预填
  */
 export function resolveOutfitShotGeneratePrompt(scene: SceneShot): string {
+  let prompt: string;
   if (scene.userGeneratePrompt !== undefined && scene.userGeneratePrompt !== null) {
-    return scene.userGeneratePrompt.trim();
+    prompt = scene.userGeneratePrompt.trim();
+  } else {
+    const production = scene.outfitProduction;
+    if (production?.status === "success" && production.positivePrompt?.trim()) {
+      prompt = production.positivePrompt.trim();
+    } else {
+      const adapted = scene.outfitStoryboardAdapt;
+      if (adapted?.status === "success" && adapted.positivePrompt?.trim()) {
+        prompt = adapted.positivePrompt.trim();
+      } else {
+        prompt = buildOutfitShotPrefilledGeneratePrompt(scene);
+      }
+    }
   }
-  const adapted = scene.outfitStoryboardAdapt;
-  if (adapted?.status === "success" && adapted.positivePrompt?.trim()) {
-    return adapted.positivePrompt.trim();
-  }
-  return buildOutfitShotPrefilledGeneratePrompt(scene);
+  return stripOutfitVideoMentionTokensForVideoApi(prompt);
 }
 
-/** 负向：优先分镜适配结果，否则全局默认 */
+/** 负向：优先制作表，其次分镜适配结果，否则全局默认 */
 export function resolveOutfitShotNegativePrompt(scene: SceneShot): string {
+  const fromProduction = scene.outfitProduction?.negativePrompt?.trim();
+  if (fromProduction) return fromProduction;
   const adapted = scene.outfitStoryboardAdapt?.negativePrompt?.trim();
   if (adapted) return adapted;
   return OUTFIT_V1_NEGATIVE_PROMPT_ZH;

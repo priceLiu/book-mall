@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 /** 内层卡片（非媒体 · 文本 / 脚本 / 薄卡等） */
 export const LIBTV_CONTROL_CARD_BG = "#141418";
 export const LIBTV_CONTROL_CARD_SHELL_CLASS =
-  "libtv-control-node-bg flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-solid shadow-lg";
+  "libtv-control-node-bg libtv-node-elevation flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-solid";
 
 /** 内层卡片（挂在外层 overflow-visible 容器上，避免 + 被裁切） */
 export const LIBTV_CARD_SHELL_CLASS = LIBTV_CONTROL_CARD_SHELL_CLASS;
@@ -17,7 +17,7 @@ export const LIBTV_CARD_SHELL_CLASS = LIBTV_CONTROL_CARD_SHELL_CLASS;
 /** 媒体节点卡片（图片 / 视频 / 三视图） */
 export const LIBTV_MEDIA_CARD_BG = "#262626";
 export const LIBTV_MEDIA_CARD_SHELL_CLASS =
-  "libtv-media-node-bg flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-solid shadow-lg";
+  "libtv-media-node-bg libtv-node-elevation flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-solid";
 
 /** 媒体节点预览区（与卡片同色） */
 export const LIBTV_MEDIA_STAGE_CLASS =
@@ -157,7 +157,7 @@ export function libtvNodeBorderStyle(options: {
       borderWidth: LIBTV_NODE_BORDER_DEFAULT_WIDTH,
       borderColor: ringColor,
       borderStyle: "solid",
-      boxShadow: `0 0 0 ${LIBTV_NODE_BORDER_SELECTED_RING_OUTSET}px ${ringColor}, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)`,
+      boxShadow: `0 0 0 ${LIBTV_NODE_BORDER_SELECTED_RING_OUTSET}px ${ringColor}, var(--libtv-node-elevation-shadow)`,
     };
   }
   return {

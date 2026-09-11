@@ -28,7 +28,6 @@ import { ensureTagRichTextHtmlDocument, normalizeTagRichTextBody } from "@/lib/c
 import type { StoryPro2TagNodeData } from "@/lib/canvas/story-pro2-workspace-types";
 import { cn } from "@/lib/utils";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
-import { Pro2NodeResizeGrip } from "./pro2-node-resize-grip";
 import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
 import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
 import { StoryPro2TagExpandModal } from "./story-pro2-tag-expand-modal";
@@ -249,17 +248,11 @@ export function StoryPro2TagNode({ id, data, selected, height }: NodeProps) {
         </div>
 
         {resizeCorner ? (
-          <>
-            <Pro2NodeResizer
-              isVisible
-              minWidth={PRO2_TAG_NODE_MIN_WIDTH}
-              minHeight={PRO2_TAG_NODE_MIN_HEIGHT}
-            />
-            <Pro2NodeResizeGrip
-              className="!bottom-1 !right-1 !z-[101]"
-              style={{ width: 20, height: 20 }}
-            />
-          </>
+          <Pro2NodeResizer
+            isVisible
+            minWidth={PRO2_TAG_NODE_MIN_WIDTH}
+            minHeight={PRO2_TAG_NODE_MIN_HEIGHT}
+          />
         ) : null}
       </div>
 

@@ -33,6 +33,7 @@ import {
 import {
   resolveHubProductionScript,
   tryRepairHubFromStoredProductionJson,
+  trySyncResolvedProductionScriptToHub,
 } from "./pro2-production-script-apply";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
 import type { StoryLlmSection, StoryScriptHubNodeData } from "./story-workspace-types";
@@ -340,6 +341,26 @@ export function buildHubEmbeddedPackRepairPatch(
     if (derivedRuntime) patch.storyboardRuntime = derivedRuntime;
   }
   return patch;
+}
+
+/**
+ * 任务写回后同步 repair / sync（原仅 mount useEffect 做，会导致扫光已停但预览晚 1～数秒）。
+ */
+export function finalizePro2HubContentPatch(
+  data: StoryProScriptHubNodeData,
+  hubId: string,
+): Partial<StoryProScriptHubNodeData> | null {
+  let merged: StoryProScriptHubNodeData = { ...data };
+  const out: Partial<StoryProScriptHubNodeData> = {};
+  const absorb = (patch: Partial<StoryProScriptHubNodeData> | null) => {
+    if (!patch || !Object.keys(patch).length) return;
+    Object.assign(out, patch);
+    merged = { ...merged, ...patch };
+  };
+  absorb(buildHubStoryboardBackfillPatch(merged));
+  absorb(tryRepairHubFromStoredProductionJson(merged, hubId));
+  absorb(trySyncResolvedProductionScriptToHub(merged));
+  return Object.keys(out).length ? out : null;
 }
 
 /** 大纲已落库但 storyboardMd / productionScript 缺失时，从 textOutput 或 outline 原文补分镜表 */

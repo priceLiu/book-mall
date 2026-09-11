@@ -16,19 +16,31 @@ import {
 import { computeLibtvMediaAspectPresetSize } from "./libtv-media-aspect-preset";
 import { sortNodesForReactFlow } from "./normalize-graph-nodes";
 import { resolveLibtvMediaNodeBoxSize } from "./libtv-media-node-size";
+import { isPro2StyledGroup } from "./pro2-media-group-meta";
 import type { CanvasFlowNode } from "./types";
 
-export const PRO2_MEDIA_GRID_GAP = 28;
+export const PRO2_MEDIA_GRID_GAP = 24;
+export const PRO2_MEDIA_GRID_GAP_Y = 8;
 
-/** 组内宫格间距 · 约为单元宽度的一半 */
-export function pro2MediaGridGap(cellWidth: number): number {
-  return Math.max(PRO2_MEDIA_GRID_GAP, Math.round(cellWidth / 2));
+/** 组内宫格横向间距 · 固定值，不随单元宽度放大 */
+export function pro2MediaGridGap(_cellWidth?: number): number {
+  return PRO2_MEDIA_GRID_GAP;
 }
-export const PRO2_MEDIA_GROUP_HEADER = 48;
-/** 组内边距（留白即「选中组」可点区域） */
-export const PRO2_MEDIA_GROUP_PAD = 96;
-/** 组右 / 下额外空白，进一步扩大可点选组区域 */
-export const PRO2_MEDIA_GROUP_EXTRA = 84;
+export function pro2MediaGridGapY(): number {
+  return PRO2_MEDIA_GRID_GAP_Y;
+}
+/** 组名在框外，组内不再预留标题行 */
+export const PRO2_MEDIA_GROUP_HEADER = 0;
+/** 四边统一内边距（对齐右侧视觉空隙） */
+export const PRO2_MEDIA_GROUP_PAD_X = 28;
+export const PRO2_MEDIA_GROUP_PAD_Y = 28;
+/** @deprecated 兼容旧调用 · 等同 PAD_X */
+export const PRO2_MEDIA_GROUP_PAD = PRO2_MEDIA_GROUP_PAD_X;
+/** 四边已对称，不再额外加右/下空白 */
+export const PRO2_MEDIA_GROUP_EXTRA_X = 0;
+export const PRO2_MEDIA_GROUP_EXTRA_Y = 0;
+/** @deprecated 兼容旧调用 · 等同 EXTRA_X */
+export const PRO2_MEDIA_GROUP_EXTRA = PRO2_MEDIA_GROUP_EXTRA_X;
 
 /** 分镜图组 · 宫格单元（≈3:2 横版） */
 export const PRO2_FRAME_CELL_WIDTH = 296;
@@ -125,13 +137,14 @@ export function pro2MediaGridLayout(
   const c = Math.max(1, cols);
   const col = index % c;
   const row = Math.floor(index / c);
-  const gap = pro2MediaGridGap(cell.width);
+  const gapX = pro2MediaGridGap(cell.width);
+  const gapY = pro2MediaGridGapY();
   return {
-    x: PRO2_MEDIA_GROUP_PAD + col * (cell.width + gap),
+    x: PRO2_MEDIA_GROUP_PAD_X + col * (cell.width + gapX),
     y:
-      PRO2_MEDIA_GROUP_PAD +
+      PRO2_MEDIA_GROUP_PAD_Y +
       PRO2_MEDIA_GROUP_HEADER +
-      row * (cell.height + gap),
+      row * (cell.height + gapY),
   };
 }
 
@@ -218,18 +231,19 @@ export function mediaGridLayoutForChildren(
   });
 
   const colX: number[] = [];
-  const gap = pro2MediaGridGap(Math.max(...colWidths, PRO2_IMAGE_NODE_WIDTH));
-  let x = PRO2_MEDIA_GROUP_PAD;
+  const gapX = pro2MediaGridGap(Math.max(...colWidths, PRO2_IMAGE_NODE_WIDTH));
+  const gapY = pro2MediaGridGapY();
+  let x = PRO2_MEDIA_GROUP_PAD_X;
   for (let col = 0; col < c; col++) {
     colX.push(x);
-    x += colWidths[col]! + gap;
+    x += colWidths[col]! + gapX;
   }
 
   const rowY: number[] = [];
-  let y = PRO2_MEDIA_GROUP_PAD + PRO2_MEDIA_GROUP_HEADER;
+  let y = PRO2_MEDIA_GROUP_PAD_Y + PRO2_MEDIA_GROUP_HEADER;
   for (let row = 0; row < rows; row++) {
     rowY.push(y);
-    y += rowHeights[row]! + gap;
+    y += rowHeights[row]! + gapY;
   }
 
   return children.map((_, index) => {
@@ -263,8 +277,8 @@ export function pro2MediaGroupDimensionsFromLayouts(
   if (layouts.length === 0) {
     return { width: 320, height: 240 };
   }
-  let maxRight = PRO2_MEDIA_GROUP_PAD;
-  let maxBottom = PRO2_MEDIA_GROUP_PAD + PRO2_MEDIA_GROUP_HEADER;
+  let maxRight = PRO2_MEDIA_GROUP_PAD_X;
+  let maxBottom = PRO2_MEDIA_GROUP_PAD_Y + PRO2_MEDIA_GROUP_HEADER;
 
   for (const lay of layouts) {
     maxRight = Math.max(maxRight, lay.x + lay.width);
@@ -272,8 +286,8 @@ export function pro2MediaGroupDimensionsFromLayouts(
   }
 
   return {
-    width: maxRight + PRO2_MEDIA_GROUP_PAD + PRO2_MEDIA_GROUP_EXTRA,
-    height: maxBottom + PRO2_MEDIA_GROUP_PAD + PRO2_MEDIA_GROUP_EXTRA,
+    width: maxRight + PRO2_MEDIA_GROUP_PAD_X + PRO2_MEDIA_GROUP_EXTRA_X,
+    height: maxBottom + PRO2_MEDIA_GROUP_PAD_Y + PRO2_MEDIA_GROUP_EXTRA_Y,
   };
 }
 
@@ -287,18 +301,19 @@ export function pro2MediaGroupDimensions(
 } {
   const c = Math.max(1, cols);
   const rows = Math.max(1, Math.ceil(childCount / c));
-  const gap = pro2MediaGridGap(cell.width);
+  const gapX = pro2MediaGridGap(cell.width);
+  const gapY = pro2MediaGridGapY();
   const width =
-    PRO2_MEDIA_GROUP_PAD * 2 +
+    PRO2_MEDIA_GROUP_PAD_X * 2 +
     c * cell.width +
-    (c - 1) * gap +
-    PRO2_MEDIA_GROUP_EXTRA;
+    (c - 1) * gapX +
+    PRO2_MEDIA_GROUP_EXTRA_X;
   const height =
-    PRO2_MEDIA_GROUP_PAD * 2 +
+    PRO2_MEDIA_GROUP_PAD_Y * 2 +
     PRO2_MEDIA_GROUP_HEADER +
     rows * cell.height +
-    (rows - 1) * gap +
-    PRO2_MEDIA_GROUP_EXTRA;
+    (rows - 1) * gapY +
+    PRO2_MEDIA_GROUP_EXTRA_Y;
   return { width, height };
 }
 
@@ -387,8 +402,25 @@ function isMediaGroupChildForRelayout(
   return n.type === "story-pro2-image" || n.type === "story-pro2-three-view";
 }
 
-/** 布局版本：hydrate 仅对更低版本做一次 sbv1 组内网格迁移，不覆盖已保存坐标 */
-export const PRO2_MEDIA_GROUP_LAYOUT_VERSION = 11;
+/** 布局版本：hydrate 仅对更低版本做一次组内网格迁移，不覆盖已保存坐标 */
+export const PRO2_MEDIA_GROUP_LAYOUT_VERSION = 14;
+
+/** 打开旧项目时按新边距收拢媒体组（用户未手动改过组框） */
+export function migrateStalePro2MediaGroupLayouts(
+  nodes: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  let next = nodes;
+  for (const n of nodes) {
+    if (n.type !== "group") continue;
+    if (!isPro2StyledGroup(n, next)) continue;
+    const version =
+      (n.data as { pro2LayoutVersion?: number }).pro2LayoutVersion ?? 0;
+    if (version >= PRO2_MEDIA_GROUP_LAYOUT_VERSION) continue;
+    if (Boolean((n.data as { manualSize?: boolean }).manualSize)) continue;
+    next = applyPro2MediaGroupRelayout(next, n.id);
+  }
+  return next;
+}
 
 /** 纯函数：收拢媒体子节点、宫格重排、组框贴合（与 createGroupContaining / group-node 共用） */
 export function applyPro2MediaGroupRelayout(

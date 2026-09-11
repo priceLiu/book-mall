@@ -62,10 +62,7 @@ import {
 import { cloneCanvasNodeData } from "@/lib/canvas/clone-node-data";
 import { remapClonedNodeData } from "@/lib/canvas/remap-cloned-graph-refs";
 import { isSbv1MediaGroup } from "@/lib/canvas/sbv1-media-group-meta";
-import {
-  isPro2StyledGroup,
-  syncPro2MediaGroupZIndex,
-} from "@/lib/canvas/pro2-media-group-meta";
+import { isPro2StyledGroup } from "@/lib/canvas/pro2-media-group-meta";
 import type {
   CanvasFlowEdge,
   CanvasFlowNode,
@@ -1018,7 +1015,15 @@ function FlowCanvasInner({
         return;
       }
 
-      const storeChanges = filterStoreBoundNodeChanges(rfChanges);
+      const storeChanges = filterStoreBoundNodeChanges(rfChanges).filter(
+        (c) =>
+          !(
+            !groupResizeUserActiveRef.current &&
+            c.type === "dimensions" &&
+            "resizing" in c &&
+            c.resizing === false
+          ),
+      );
       const syncLibtvFloatingDockPinFromRf = () => {
         const sel = resolveLibtvFloatingDockSelection(
           getNodes() as CanvasFlowNode[],
@@ -1067,7 +1072,9 @@ function FlowCanvasInner({
         }
       }
 
-      const resizeCommitIds = extractResizeCommitIds(rfChanges);
+      const resizeCommitIds = groupResizeUserActiveRef.current
+        ? extractResizeCommitIds(rfChanges)
+        : [];
       if (resizeCommitIds.length > 0) {
         deferStoreGraphSyncRef.current = false;
         setCanvasGeometryDragging(false);
@@ -1809,16 +1816,10 @@ function FlowCanvasInner({
     [setConnectingFrom, screenToFlowPosition, getNodes, onConnect, clearCanvasPaneSelection],
   );
 
-  // 媒体组 zIndex 随选中变化；在 RF 本地完成，不触发 zustand
-  const rfNodesForRender = useMemo(
-    () => syncPro2MediaGroupZIndex(rfNodes),
-    [rfNodes],
-  );
-
   // 分组拖入高亮：仅 patch 目标 group，避免每帧克隆全图 nodes
   const decoratedNodes = useMemo(() => {
-    if (!dragHoverGroupId) return rfNodesForRender;
-    return rfNodesForRender.map((n) =>
+    if (!dragHoverGroupId) return rfNodes;
+    return rfNodes.map((n) =>
       n.id === dragHoverGroupId
         ? {
             ...n,
@@ -1826,7 +1827,7 @@ function FlowCanvasInner({
           }
         : n,
     );
-  }, [rfNodesForRender, dragHoverGroupId]);
+  }, [rfNodes, dragHoverGroupId]);
 
   const EDGE_FOCUS_MAX = libtvCanvas ? 256 : 48;
 

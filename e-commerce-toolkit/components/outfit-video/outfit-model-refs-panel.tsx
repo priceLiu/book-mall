@@ -28,6 +28,10 @@ type Props = {
   sceneLibraryPreset?: OutfitSceneLibraryPreset | null;
   refsLocked?: boolean;
   busy?: boolean;
+  modelUploading?: boolean;
+  modelUploadLabel?: string;
+  sceneUploading?: boolean;
+  sceneUploadLabel?: string;
   onUploadModelFiles: (files: File[]) => Promise<void>;
   onAttachModelAssets: (assets: Array<{ id: string; ossUrl: string; title: string }>) => Promise<void>;
   onRemoveModelItem: (refId: string) => Promise<void>;
@@ -53,6 +57,10 @@ export function OutfitModelRefsPanel({
   sceneLibraryPreset,
   refsLocked,
   busy,
+  modelUploading,
+  modelUploadLabel,
+  sceneUploading,
+  sceneUploadLabel,
   onUploadModelFiles,
   onAttachModelAssets,
   onRemoveModelItem,
@@ -71,8 +79,10 @@ export function OutfitModelRefsPanel({
 
   const refsDisabled = Boolean(busy) || Boolean(refsLocked);
   const modelAtLimit = gallery.length >= OUTFIT_MODEL_GALLERY_MAX;
-  const modelUploadDisabled = refsDisabled || modelAtLimit;
-  const sceneUploadDisabled = refsDisabled;
+  const modelRemainingSlots = OUTFIT_MODEL_GALLERY_MAX - gallery.length;
+  const modelCardBusy = refsDisabled || modelAtLimit || Boolean(modelUploading);
+  const modelAssetPickerDisabled = refsDisabled || modelRemainingSlots <= 0 || Boolean(modelUploading);
+  const sceneCardBusy = refsDisabled || Boolean(sceneUploading);
 
   const previewItems = useMemo(
     () =>
@@ -124,7 +134,7 @@ export function OutfitModelRefsPanel({
   }, [sceneCatalog.length, sceneCatalogOpen]);
 
   async function handleModelFiles(files: File[]) {
-    if (!files.length || modelUploadDisabled) return;
+    if (!files.length || modelCardBusy) return;
     const remaining = OUTFIT_MODEL_GALLERY_MAX - gallery.length;
     await onUploadModelFiles(files.slice(0, remaining));
     if (modelInputRef.current) modelInputRef.current.value = "";
@@ -132,7 +142,7 @@ export function OutfitModelRefsPanel({
 
   async function handleSceneFile(files: File[]) {
     const file = files[0];
-    if (!file || sceneUploadDisabled) return;
+    if (!file || sceneCardBusy) return;
     await onUploadSceneRef(file);
     if (sceneInputRef.current) sceneInputRef.current.value = "";
   }
@@ -163,12 +173,17 @@ export function OutfitModelRefsPanel({
           removeLabel="删除"
           accept="image/*"
           multiple
-          busy={modelUploadDisabled}
+          busy={modelCardBusy}
+          showUploadProgress={Boolean(modelUploading)}
+          uploadProgress={null}
+          uploadProgressLabel={modelUploadLabel}
           inputRef={modelInputRef}
           onPreviewItem={(item) => openPreview(item.ossUrl, item.label)}
           onUploadFiles={(files) => void handleModelFiles(files)}
           onOpenFilePicker={() => modelInputRef.current?.click()}
-          onOpenAssetPicker={() => setModelAssetPickerOpen(true)}
+          onOpenAssetPicker={
+            modelAssetPickerDisabled ? undefined : () => setModelAssetPickerOpen(true)
+          }
           onRemove={refsDisabled ? undefined : (id) => void onRemoveModelItem(id)}
         />
 
@@ -183,13 +198,16 @@ export function OutfitModelRefsPanel({
           removeLabel="删除"
           accept="image/*"
           multiple={false}
-          busy={sceneUploadDisabled}
+          busy={sceneCardBusy}
+          showUploadProgress={Boolean(sceneUploading)}
+          uploadProgress={null}
+          uploadProgressLabel={sceneUploadLabel}
           inputRef={sceneInputRef}
           headerActions={
             <EcomButtonSecondary
               size="sm"
               type="button"
-              disabled={sceneUploadDisabled}
+              disabled={sceneCardBusy}
               className="h-7 px-2 text-[10px]"
               onClick={() => setSceneCatalogOpen(true)}
             >
@@ -238,7 +256,7 @@ export function OutfitModelRefsPanel({
       <EcomAssetPickerDialog
         open={modelAssetPickerOpen}
         onOpenChange={setModelAssetPickerOpen}
-        maxSelect={OUTFIT_MODEL_GALLERY_MAX - gallery.length}
+        maxSelect={Math.max(1, modelRemainingSlots)}
         onConfirm={async (assets) => {
           setModelAssetPickerOpen(false);
           if (assets.length && !refsDisabled) await onAttachModelAssets(assets);

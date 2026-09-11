@@ -39,7 +39,6 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { cn } from "@/lib/utils";
 import { Pro2NodeScrollArea } from "./pro2-node-scroll-area";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
-import { Pro2NodeResizeGrip } from "./pro2-node-resize-grip";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 import { Pro2NodeErrorBanner } from "./pro2-node-error-banner";
 import { LibtvEditableNodeTitle } from "../libtv-editable-node-title";
@@ -148,13 +147,6 @@ export function StoryPro2PromptNode({ id, data, selected }: NodeProps) {
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
     >
-      <Pro2NodeResizer
-        isVisible={!!selected}
-        minWidth={PRO2_TEXT_NODE_MIN_WIDTH}
-        minHeight={PRO2_TEXT_NODE_MIN_HEIGHT}
-      />
-      {selected ? <Pro2NodeResizeGrip /> : null}
-
       <Handle
         id="in_text"
         type="target"
@@ -252,6 +244,14 @@ export function StoryPro2PromptNode({ id, data, selected }: NodeProps) {
           </div>
         )}
       </div>
+
+      {selected ? (
+        <Pro2NodeResizer
+          isVisible
+          minWidth={PRO2_TEXT_NODE_MIN_WIDTH}
+          minHeight={PRO2_TEXT_NODE_MIN_HEIGHT}
+        />
+      ) : null}
     </div>
   );
 }

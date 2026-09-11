@@ -8,6 +8,7 @@ import {
   isLibtvMediaNodeBoxStale,
   type LibtvMediaAutoFitProfile,
 } from "./libtv-media-node-size";
+import { shouldSkipLibtvImageNodeNaturalSizeAutoFit } from "./libtv-media-aspect-preset";
 import { expandLibtvGroupToFitChildren } from "./libtv-group-content-bounds";
 import { isPro2StyledGroup } from "./pro2-media-group-meta";
 import { relayoutPro2MediaGroup } from "./pro2-media-group-layout";
@@ -104,8 +105,13 @@ function applyFitAndMaybeRelayout(args: {
   naturalW: number;
   naturalH: number;
 }) {
-  const applyLibtvMediaFit = useCanvasStore.getState().applyLibtvMediaFit;
-  const setNodes = useCanvasStore.getState().setNodes;
+  const state = useCanvasStore.getState();
+  const self = state.nodes.find((n) => n.id === args.nodeId);
+  if (self && shouldSkipLibtvImageNodeNaturalSizeAutoFit(self, state.nodes)) {
+    return;
+  }
+  const applyLibtvMediaFit = state.applyLibtvMediaFit;
+  const setNodes = state.setNodes;
   applyLibtvMediaFit(args.nodeId, args.size, {
     mediaFit: true,
     mediaFitKey: args.fitKey,
@@ -114,8 +120,6 @@ function applyFitAndMaybeRelayout(args: {
     mediaNaturalH: args.naturalH,
   });
 
-  const state = useCanvasStore.getState();
-  const self = state.nodes.find((n) => n.id === args.nodeId);
   const parentGroup = args.parentId
     ? state.nodes.find((n) => n.id === args.parentId)
     : undefined;

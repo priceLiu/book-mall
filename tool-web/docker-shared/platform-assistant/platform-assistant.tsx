@@ -64,6 +64,7 @@ type Msg = {
   /** 热闻 · Markdown（与问候同条消息，显示在导航上方） */
   newsContent?: string;
   newsStale?: boolean;
+  newsDateKey?: string;
   newsLoading?: boolean;
   /** @deprecated 保留兼容；新逻辑用 newsContent */
   richMarkdown?: boolean;
@@ -113,6 +114,12 @@ const AI_NEWS_PREVIEW_COUNT = 3;
 
 function countAiNewsItems(text: string): number {
   return text.split("\n").filter((line) => /^\s*\d+\.\s/.test(line)).length;
+}
+
+function formatAiNewsDateKey(dateKey?: string): string {
+  const m = String(dateKey ?? "").trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return dateKey?.trim() || "最近一期";
+  return `${Number(m[1])}年${Number(m[2])}月${Number(m[3])}日`;
 }
 
 function truncateAiNewsMarkdown(text: string, maxItems: number): string {
@@ -802,6 +809,7 @@ export function PlatformAssistant({
           newsLoading: loading && !news?.content,
           newsContent: news?.content,
           newsStale: news?.stale,
+          newsDateKey: news?.dateKey,
         });
 
         const cached = getPrefetchedAiNews();
@@ -1143,7 +1151,10 @@ export function PlatformAssistant({
                       {!isUser && m.newsContent ? (
                         <div className="pa-news-block">
                           <div className="pa-news-block-title">
-                            📰 {m.newsStale ? "AI 热闻（最近一期）" : "今日 AI 热闻"}
+                            📰{" "}
+                            {m.newsStale
+                              ? `AI 热闻（${formatAiNewsDateKey(m.newsDateKey)}）`
+                              : "今日 AI 热闻"}
                           </div>
                           <AssistantAiNewsBlock text={m.newsContent} />
                         </div>

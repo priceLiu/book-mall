@@ -155,9 +155,7 @@ export function SubtitleBurnInFields({
 
       {styleVisible && showSubtitleMode && onSubtitleModeChange ? (
         <fieldset className={modeFieldsetClass}>
-          <legend className={compact ? "mb-0.5 w-full text-[12px] text-white/55" : "sr-only"}>
-            字幕来源
-          </legend>
+          <legend className="sr-only">字幕来源</legend>
           <label className={v.radioLabel}>
             <input
               type="radio"

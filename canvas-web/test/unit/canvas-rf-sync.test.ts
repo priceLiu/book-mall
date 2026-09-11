@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { mergeStoreNodesIntoRf } from "@/lib/canvas/canvas-rf-sync";
 import { pickStoreToRfPosition } from "@/lib/canvas/canvas-rf-sync-position";
+import type { CanvasFlowNode } from "@/lib/canvas/types";
 
 describe("pickStoreToRfPosition", () => {
   it("keeps RF drag position while parentId is unchanged", () => {
@@ -25,5 +27,41 @@ describe("pickStoreToRfPosition", () => {
         storePosition: { x: 520, y: 280 },
       }),
     ).toEqual({ x: 520, y: 280 });
+  });
+});
+
+describe("mergeStoreNodesIntoRf", () => {
+  it("preserves RF zIndex for pro2 media group children when store data changes", () => {
+    const storeNodes: CanvasFlowNode[] = [
+      {
+        id: "g1",
+        type: "group",
+        position: { x: 0, y: 0 },
+        data: { pro2Kind: "frame-board", pro2Styled: true },
+        zIndex: 5,
+      },
+      {
+        id: "f1",
+        type: "story-pro2-image",
+        parentId: "g1",
+        position: { x: 40, y: 40 },
+        data: { pro2MediaRole: "frame", gridSplitFrameCrop: true },
+        zIndex: 22,
+      },
+    ];
+    const rfNodes: CanvasFlowNode[] = [
+      { ...storeNodes[0]!, selected: false, zIndex: 22 },
+      {
+        ...storeNodes[1]!,
+        selected: true,
+        zIndex: 1201,
+        data: { pro2MediaRole: "frame" },
+      },
+    ];
+    const merged = mergeStoreNodesIntoRf(rfNodes, storeNodes, {
+      preserveRfSelection: true,
+    });
+    expect(merged[1]!.zIndex).toBe(1201);
+    expect(merged[1]!.data).toBe(storeNodes[1]!.data);
   });
 });

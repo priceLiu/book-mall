@@ -60,6 +60,7 @@ import {
   fitLibtvUploadedImageNaturalSize,
   useLibtvMediaAspectPresetSync,
 } from "@/lib/canvas/libtv-media-aspect-preset-apply";
+import { shouldSkipLibtvImageNodeNaturalSizeAutoFit } from "@/lib/canvas/libtv-media-aspect-preset";
 import { LIBTV_MEDIA_FIT_VERSION } from "@/lib/canvas/libtv-node-chrome";
 import { PRO2_TEXT_NODE_TITLE_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { cn } from "@/lib/utils";
@@ -415,10 +416,24 @@ export function LibtvImageNode({
 
   const gridSplitCropCss = d.gridSplitCrop;
 
+  const skipNaturalSizeAutoFit = useCanvasStore((s) => {
+    const node = s.nodes.find((n) => n.id === id);
+    if (!node) {
+      return Boolean((d as { gridSplitFrameCrop?: boolean }).gridSplitFrameCrop);
+    }
+    return shouldSkipLibtvImageNodeNaturalSizeAutoFit(node, s.nodes);
+  });
+
   useLibtvMediaAspectPresetSync(
     id,
     (d as { aspectRatio?: string }).aspectRatio,
-    !isCharacterThreeView && !gridSplitCropCss,
+    !isCharacterThreeView &&
+      !gridSplitCropCss &&
+      !skipNaturalSizeAutoFit &&
+      !(
+        (d as { pro2HdFromGridSplit?: boolean }).pro2HdFromGridSplit &&
+        !(d as { mediaAspectPreset?: string }).mediaAspectPreset?.trim()
+      ),
   );
 
   useLibtvMediaNodeAutoFit({
@@ -432,6 +447,7 @@ export function LibtvImageNode({
     disabled:
       !hasImage ||
       isCharacterThreeView ||
+      skipNaturalSizeAutoFit ||
       Boolean(d.uploading) ||
       (isGenerating && !d.uploading),
   });
@@ -439,8 +455,12 @@ export function LibtvImageNode({
   /** 侧 + 拉出邻居后 graph 变更 · 若外框仍停在默认横条则按 natural 重算 */
   useEffect(() => {
     if (!hasImage || isCharacterThreeView || d.uploading) return;
-    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
-    if (!node || !isLibtvMediaNodeBoxStale(node, "sbv1-media")) return;
+    const state = useCanvasStore.getState();
+    const node = state.nodes.find((n) => n.id === id);
+    if (!node || shouldSkipLibtvImageNodeNaturalSizeAutoFit(node, state.nodes)) {
+      return;
+    }
+    if (!isLibtvMediaNodeBoxStale(node, "sbv1-media")) return;
     const url = previewUrl?.trim();
     if (!url) return;
     fitLibtvUploadedImageNaturalSize(id, url);
@@ -450,8 +470,12 @@ export function LibtvImageNode({
   const onStageNaturalSize = useCallback(
     ({ w, h }: { w: number; h: number }) => {
       if (isCharacterThreeView || !previewUrl?.trim()) return;
-      const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
+      const state = useCanvasStore.getState();
+      const node = state.nodes.find((n) => n.id === id);
       if (!node) return;
+      if (shouldSkipLibtvImageNodeNaturalSizeAutoFit(node, state.nodes)) {
+        return;
+      }
       if (
         (node.data as { mediaAspectPreset?: string }).mediaAspectPreset?.trim()
       ) {
@@ -674,8 +698,8 @@ export function LibtvImageNode({
         });
         return;
       }
-      void (() => {
-        const { runnableIds } = spawnHdImageFromGridSplit(
+      void (async () => {
+        const { runnableIds } = await spawnHdImageFromGridSplit(
           id,
           gridSplit,
           scaleId,
@@ -693,7 +717,7 @@ export function LibtvImageNode({
         if (!runnableIds.length) {
           void alert({
             title: "生成失败",
-            message: "无法创建高清图片节点，请确认原图已加载。",
+            message: "宫格裁切失败，无法生成高清图，请确认原图已加载后重试。",
             variant: "error",
           });
           return;
@@ -842,7 +866,9 @@ export function LibtvImageNode({
           fit={stageImageFit}
           previewChrome="ecom"
           onImageError={onPreviewLoadError}
-          onNaturalSize={onStageNaturalSize}
+          onNaturalSize={
+            skipNaturalSizeAutoFit ? undefined : onStageNaturalSize
+          }
           className="absolute inset-0"
         />
       );

@@ -1,10 +1,16 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
-import { Clapperboard, Film, Loader2 } from "lucide-react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Clapperboard, Film, Loader2, Plus } from "lucide-react";
 
+import {
+  EcomImagePreviewHost,
+  useEcomImagePreview,
+} from "@/components/media/ecom-image-preview-host";
+import { EcomPromptMentionRefBar } from "@/components/media/ecom-prompt-mention-ref-bar";
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
-import { OutfitShotGeneratePromptPanel } from "@/components/outfit-video/outfit-shot-generate-prompt-panel";
+import { OutfitEditableMentionCell } from "@/components/outfit-video/outfit-editable-mention-cell";
+import { OutfitShotSceneSetupDialog } from "@/components/outfit-video/outfit-shot-scene-setup-dialog";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
   ecomDataTableBodyRowClass,
@@ -14,24 +20,22 @@ import {
   ecomDataTableThClass,
   ecomDataTableWrapClass,
 } from "@/components/ui/ecom-data-table";
-import { AnalysisCell } from "@/components/outfit-video/outfit-scene-analysis-cell";
-import { OutfitShotSceneFusionCell } from "@/components/outfit-video/outfit-shot-scene-fusion-cell";
-import { OutfitShotStoryboardAdaptCell } from "@/components/outfit-video/outfit-shot-storyboard-adapt-cell";
 import { batchComposeButtonLabel } from "@/lib/seed-video-tts-selection";
+import type { OutfitProductionTextField } from "@/lib/outfit-production-fields";
+import { getOutfitProductionField } from "@/lib/outfit-production-fields";
 import type { SceneShot, WorkflowRefs } from "@/lib/video-workflow/shot-spine";
 import type { VtonLockedLook } from "@/lib/vton-types";
-import {
-  outfitSceneActionLabel,
-  outfitSceneBackgroundLabel,
-  outfitSceneCameraLabel,
-  outfitSceneLightingLabel,
-} from "@/lib/video-workflow/templates/outfit-v1/shot-analysis";
+import type { OutfitSceneFusionMode } from "@/lib/ecom-outfit-video-api";
+import { buildOutfitVideoMentionRefs } from "@/lib/outfit-video-mention-refs";
+import { cn } from "@/lib/utils";
 
 type Props = {
   scenes: SceneShot[];
   refs: WorkflowRefs;
   lockedLooks?: VtonLockedLook[];
   defaultLockedLookId?: string;
+  productionReady: boolean;
+  productionGenerating?: boolean;
   disabled?: boolean;
   generatingIndices?: ReadonlySet<number>;
   generateBusy?: boolean;
@@ -39,31 +43,50 @@ type Props = {
   finalVideoUrl?: string;
   onPreviewVideo?: (src: string, title?: string) => void;
   onRequestGenerate: (indices: number[]) => void;
-  onRequestCompose: () => void;
-  /** 生成中取消勾选某镜（仅更新 UI 选中态；服务端任务可能仍在跑） */
+  onRequestCompose: (indices: number[]) => void;
   onCancelGeneratingSelection?: (index: number) => void;
-  onScenePromptChange: (sceneId: string, prompt: string) => void;
-  onScenePromptReset: (sceneId: string) => void;
+  onProductionFieldChange: (
+    sceneId: string,
+    field: OutfitProductionTextField,
+    value: string,
+  ) => void;
   fusionModelKey?: string;
   fusingIndices?: ReadonlySet<number>;
   onPickSceneFusionMode: (
     index: number,
-    mode: "follow_reference" | "library" | "upload_ref",
+    mode: OutfitSceneFusionMode,
     libraryEntryId?: string,
   ) => Promise<void>;
   onUploadSceneRef: (index: number, file: File) => Promise<void>;
+  onAttachSceneRefFromAssets: (
+    index: number,
+    assets: Array<{ id: string; ossUrl: string; title: string }>,
+  ) => Promise<void>;
+  onSceneFusionPromptChange: (sceneId: string, fragment: string) => void;
   onFuseScene: (index: number) => Promise<void>;
   onApplySceneFusionToAll: (sourceIndex: number) => Promise<void>;
-  clothAnalyseReady?: boolean;
-  adaptingIndices?: ReadonlySet<number>;
-  onAdaptSceneStoryboard: (index: number) => Promise<void>;
   onClearShotVideo: (index: number) => Promise<void>;
   onClearSceneFusion: (index: number) => Promise<void>;
 };
 
+function resolveShotFailReason(shot: SceneShot): string | undefined {
+  const productionReason = shot.outfitProduction?.failReason?.trim();
+  if (shot.outfitProduction?.status === "failed" && productionReason) {
+    return productionReason;
+  }
+  const videoReason = shot.failReason?.trim();
+  if (shot.status === "failed" && videoReason) {
+    return videoReason;
+  }
+  return productionReason || videoReason;
+}
+
 function shotStatusLabel(shot: SceneShot, generating: boolean): { label: string; className: string } {
   if (generating) return { label: "生成中", className: "text-[#0071e3]" };
-  if (shot.status === "failed") return { label: "失败", className: "text-[#ff3b30]" };
+  if (shot.outfitProduction?.status === "failed") {
+    return { label: "策划失败", className: "text-[#ff3b30]" };
+  }
+  if (shot.status === "failed") return { label: "生成失败", className: "text-[#ff3b30]" };
   if (shot.videoUrl?.trim()) return { label: "视频 OK", className: "text-[#34c759]" };
   return { label: "待生成", className: "text-[#86868b]" };
 }
@@ -72,11 +95,15 @@ function isOutfitShotComposeReady(shot: SceneShot): boolean {
   return Boolean(shot.videoUrl?.trim());
 }
 
+const OUTFIT_MIN_COMPOSE_SHOTS = 2;
+
 export function OutfitShotProductionPanel({
   scenes,
   refs,
   lockedLooks,
   defaultLockedLookId,
+  productionReady,
+  productionGenerating,
   disabled,
   generatingIndices,
   generateBusy,
@@ -86,23 +113,31 @@ export function OutfitShotProductionPanel({
   onRequestGenerate,
   onRequestCompose,
   onCancelGeneratingSelection,
-  onScenePromptChange,
-  onScenePromptReset,
+  onProductionFieldChange,
   fusionModelKey = "qwen-image-edit",
   fusingIndices,
   onPickSceneFusionMode,
   onUploadSceneRef,
+  onAttachSceneRefFromAssets,
+  onSceneFusionPromptChange,
   onFuseScene,
   onApplySceneFusionToAll,
-  clothAnalyseReady,
-  adaptingIndices,
-  onAdaptSceneStoryboard,
   onClearShotVideo,
   onClearSceneFusion,
 }: Props) {
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
-  const [focusIndex, setFocusIndex] = useState<number | null>(null);
-  const columnCount = 11;
+  const [sceneDialogIndex, setSceneDialogIndex] = useState<number | null>(null);
+  const prevGenerateBusyRef = useRef(false);
+  const columnCount = 10;
+
+  useEffect(() => {
+    if (prevGenerateBusyRef.current && !generateBusy) {
+      setSelected(new Set());
+    }
+    prevGenerateBusyRef.current = Boolean(generateBusy);
+  }, [generateBusy]);
+
+  const mentionRefs = useMemo(() => buildOutfitVideoMentionRefs(refs), [refs]);
 
   const refGallery = useMemo(() => {
     const items: Array<{ label: string; url: string; isDefault?: boolean }> = [];
@@ -149,6 +184,31 @@ export function OutfitShotProductionPanel({
     refs.modelGallery,
   ]);
 
+  const previewGallery = useMemo(() => {
+    const items: Array<{ src: string; title: string }> = [];
+    const seen = new Set<string>();
+    const push = (src: string, title: string) => {
+      const url = src.trim();
+      if (!url || seen.has(url)) return;
+      seen.add(url);
+      items.push({ src: url, title });
+    };
+    for (const ref of mentionRefs) {
+      push(ref.url, `${ref.token} · ${ref.label}`);
+    }
+    for (const item of refGallery) {
+      push(item.url, item.label);
+    }
+    for (const scene of scenes) {
+      const fused = scene.sceneFusion?.fusedImageUrl?.trim();
+      if (fused) push(fused, `镜 ${scene.index} 场景融图`);
+    }
+    return items;
+  }, [mentionRefs, refGallery, scenes]);
+
+  const { preview, openPreview, closePreview, galleryItems } =
+    useEcomImagePreview(previewGallery);
+
   const idleIndices = useMemo(
     () =>
       scenes
@@ -160,25 +220,10 @@ export function OutfitShotProductionPanel({
     [generatingIndices, scenes],
   );
 
-  const regeneratableIndices = useMemo(
-    () =>
-      scenes
-        .filter(
-          (s) =>
-            Boolean(s.videoUrl?.trim()) &&
-            !(generatingIndices?.has(s.index) ?? false),
-        )
-        .map((s) => s.index),
-    [generatingIndices, scenes],
-  );
-
   const composeReadyIndices = useMemo(
     () => scenes.filter(isOutfitShotComposeReady).map((s) => s.index),
     [scenes],
   );
-
-  const allShotsReady =
-    scenes.length > 0 && scenes.every((s) => isOutfitShotComposeReady(s));
 
   function toggle(index: number, checked: boolean) {
     if (!checked && (generatingIndices?.has(index) ?? false)) {
@@ -196,54 +241,58 @@ export function OutfitShotProductionPanel({
   const selectedActionList = selectedList.filter(
     (index) => !(generatingIndices?.has(index) ?? false),
   );
-  const selectedGeneratableCount = selectedActionList.length;
-  const generateTargets =
-    selectedGeneratableCount > 0 ? selectedActionList : idleIndices;
-  const canGenerate = generateTargets.length > 0;
+  const hasSelection = selectedList.length > 0;
+  const generateTargets = hasSelection ? selectedActionList : idleIndices;
+  const canGenerate = productionReady && generateTargets.length > 0;
 
   const selectedComposeList = selectedList.filter((index) => {
     const shot = scenes.find((s) => s.index === index);
     return shot && isOutfitShotComposeReady(shot);
   });
   const selectedComposeCount = selectedComposeList.length;
+  const composeTargets =
+    hasSelection && selectedComposeCount > 0 ? selectedComposeList : composeReadyIndices;
+  const canCompose = composeTargets.length >= OUTFIT_MIN_COMPOSE_SHOTS;
+  const composeLabelCount =
+    hasSelection && selectedComposeCount > 0 ? selectedComposeCount : composeReadyIndices.length;
   const composeLabel = batchComposeButtonLabel({
     busy: renderBusy,
-    selectedCount: selectedComposeCount,
+    selectedCount: composeLabelCount >= OUTFIT_MIN_COMPOSE_SHOTS ? composeLabelCount : 0,
   });
-  const generateLabel =
-    selectedGeneratableCount > 0
-      ? `生成 (${selectedGeneratableCount})`
-      : idleIndices.length > 0
-        ? `生成 (${idleIndices.length})`
-        : regeneratableIndices.length > 0
-          ? "生成"
-          : "生成";
+  const generateLabel = hasSelection
+    ? `生成 (${selectedList.length})`
+    : idleIndices.length > 0
+      ? `生成 (${idleIndices.length})`
+      : "生成";
 
   const anyGenerating = (generatingIndices?.size ?? 0) > 0 || generateBusy;
-  const generatingStatusLabel =
-    generateBusy && (generatingIndices?.size ?? 0) === 0
-      ? "正在提交逐镜生成任务…"
-      : (generatingIndices?.size ?? 0) > 0
-        ? `正在生成 ${generatingIndices!.size} 镜视频…（取消勾选可移出队列显示）`
-        : "逐镜生成中…";
+  const tableBusy = Boolean(disabled || renderBusy || productionGenerating);
+  const generateButtonsBusy = Boolean(disabled || renderBusy || generateBusy || productionGenerating);
 
-  const tableBusy = Boolean(disabled || renderBusy);
-  const generateButtonsBusy = Boolean(disabled || renderBusy || generateBusy);
+  const sceneDialogShot =
+    sceneDialogIndex != null
+      ? scenes.find((s) => s.index === sceneDialogIndex) ?? null
+      : null;
 
-  const focusScene = useMemo(() => {
-    if (focusIndex != null) {
-      return scenes.find((s) => s.index === focusIndex) ?? null;
-    }
-    if (selectedList.length === 1) {
-      return scenes.find((s) => s.index === selectedList[0]) ?? null;
-    }
-    return null;
-  }, [focusIndex, scenes, selectedList]);
+  if (!productionReady && !productionGenerating) {
+    return (
+      <section className="space-y-2 rounded-xl border border-dashed border-[#e8e8ed] bg-[#fafafa] p-4">
+        <h2 className="text-sm font-semibold text-[#1d1d1f]">分镜制作表</h2>
+        <p className="text-xs leading-relaxed text-[#6e6e73]">
+          完成上方「拆解分镜表」调整、上传模特参考并完成「识别服装」后，点击「生成分镜制作表」，AI
+          将根据卖点与服装信息生成可编辑的制作表（运镜/动作/光影/场景/Prompt、场景融图、逐镜视频）。
+        </p>
+      </section>
+    );
+  }
 
   return (
-    <section className="space-y-3 rounded-xl border border-[#e8e8ed] bg-white p-4" aria-busy={anyGenerating || renderBusy || undefined}>
+    <section
+      className="min-w-0 max-w-full space-y-3 overflow-hidden rounded-xl border border-[#e8e8ed] bg-white p-4"
+      aria-busy={anyGenerating || renderBusy || productionGenerating || undefined}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-[#1d1d1f]">逐镜动作迁移</h2>
+        <h2 className="text-sm font-semibold text-[#1d1d1f]">分镜制作表</h2>
         <div className="flex flex-wrap gap-2">
           <EcomButtonSecondary
             size="sm"
@@ -257,13 +306,8 @@ export function OutfitShotProductionPanel({
           <EcomButtonPrimary
             size="sm"
             type="button"
-            disabled={
-              generateButtonsBusy ||
-              Boolean(finalVideoUrl) ||
-              !allShotsReady ||
-              composeReadyIndices.length === 0
-            }
-            onClick={() => onRequestCompose()}
+            disabled={generateButtonsBusy || Boolean(finalVideoUrl) || !canCompose}
+            onClick={() => onRequestCompose(composeTargets)}
           >
             {renderBusy ? (
               <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
@@ -276,8 +320,25 @@ export function OutfitShotProductionPanel({
       </div>
 
       <p className="text-[11px] leading-relaxed text-[#6e6e73]">
-        推荐顺序：① 上传参考并完成「识别服装」→ ② 每镜「适配此镜」微调动作与生成 Prompt（可单镜重试）→ ③ 可选「选场景 → 融图」→ ④ 勾选后「生成 (N)」逐镜动作迁移 → ⑤ 合成成片。
+        可编辑各镜字段；动作/场景/Prompt 支持 @ 引用下方参考资产（点击缩略图可放大）。至少 2 镜「视频 OK」即可合成；勾选后仅合成选中且已生成的镜头。
       </p>
+
+      {mentionRefs.length > 0 ? (
+        <div className="rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5">
+          <EcomPromptMentionRefBar
+            refs={mentionRefs}
+            hint="参考资产 · 分镜表内输入 @ 可插入代号（@图片1=全片模特/穿搭参考，场景参考在后）"
+            onPreviewImage={(url, label) => openPreview(url, label, previewGallery)}
+          />
+        </div>
+      ) : null}
+
+      {productionGenerating ? (
+        <div className="flex items-center gap-2 rounded-lg border border-[#0071e3]/25 bg-[#f0f6ff] px-3 py-2 text-xs text-[#0058c7]">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          正在 AI 生成分镜制作表…
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         <EcomButtonSecondary
@@ -293,38 +354,6 @@ export function OutfitShotProductionPanel({
         </EcomButtonSecondary>
       </div>
 
-      {anyGenerating ? (
-        <div
-          className="flex flex-wrap items-center gap-3 rounded-xl border border-[#0071e3]/25 bg-[#f0f6ff] px-3 py-2.5"
-          role="status"
-          aria-live="polite"
-        >
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#0071e3]" />
-          <span className="min-w-0 flex-1 text-xs leading-relaxed text-[#0058c7]">
-            {generatingStatusLabel}
-          </span>
-          <div className="ecom-upload-progress ecom-upload-progress-indeterminate w-full min-w-[8rem] sm:w-32">
-            <span />
-          </div>
-        </div>
-      ) : null}
-
-      {renderBusy ? (
-        <div
-          className="flex flex-wrap items-center gap-3 rounded-xl border border-[#0071e3]/25 bg-[#f0f6ff] px-3 py-2.5"
-          role="status"
-          aria-live="polite"
-        >
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#0071e3]" />
-          <span className="min-w-0 flex-1 text-xs leading-relaxed text-[#0058c7]">
-            正在合成竖屏成片…
-          </span>
-          <div className="ecom-upload-progress ecom-upload-progress-indeterminate w-full min-w-[8rem] sm:w-32">
-            <span />
-          </div>
-        </div>
-      ) : null}
-
       {refGallery.length > 0 ? (
         <div className="rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5">
           <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[#6e6e73]">
@@ -332,9 +361,12 @@ export function OutfitShotProductionPanel({
           </p>
           <div className="flex flex-wrap gap-2">
             {refGallery.map((item) => (
-              <div
-                key={item.label}
-                className="flex items-center gap-1.5 rounded-lg border border-[#e8e8ed] bg-white px-1.5 py-1"
+              <button
+                key={item.url}
+                type="button"
+                className="flex items-center gap-1.5 rounded-lg border border-[#e8e8ed] bg-white px-1.5 py-1 text-left transition hover:border-[#0071e3]/35 hover:bg-[#f0f6ff]"
+                title={`${item.label} · 点击放大`}
+                onClick={() => openPreview(item.url, item.label, previewGallery)}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -343,28 +375,23 @@ export function OutfitShotProductionPanel({
                   className="h-10 w-10 shrink-0 rounded-md border border-[#e8e8ed] object-cover"
                 />
                 <span className="pr-1 text-[10px] font-medium text-[#1d1d1f]">{item.label}</span>
-              </div>
+              </button>
             ))}
           </div>
         </div>
       ) : null}
 
-      <OutfitShotGeneratePromptPanel
-        scene={focusScene}
-        disabled={tableBusy || generateBusy}
-        onPromptChange={onScenePromptChange}
-        onResetPrefill={onScenePromptReset}
-      />
-
-      <div className={ecomDataTableWrapClass}>
-        <table className={`min-w-full ${ecomDataTableClass}`}>
+      <div className={cn(ecomDataTableWrapClass, "min-w-0 max-w-full w-full ecom-scrollbar-overlay")}>
+        <table className={cn("min-w-full", ecomDataTableClass)}>
           <thead>
             <tr className={ecomDataTableHeadRowClass}>
-              {["", "镜号", "时长", "运镜", "动作", "光影", "场景", "分镜适配", "场景图", "镜头视频", "状态"].map((h, i) => (
-                <th key={h || i} className={`whitespace-nowrap ${ecomDataTableThClass}`}>
-                  {h}
-                </th>
-              ))}
+              {["", "镜号", "时长", "运镜", "动作", "光影", "场景", "场景图", "镜头视频", "状态"].map(
+                (h, i) => (
+                  <th key={h || i} className={`whitespace-nowrap ${ecomDataTableThClass}`}>
+                    {h}
+                  </th>
+                ),
+              )}
             </tr>
           </thead>
           <tbody>
@@ -372,6 +399,9 @@ export function OutfitShotProductionPanel({
               const generating = generatingIndices?.has(row.index) ?? false;
               const status = shotStatusLabel(row, generating);
               const isSelected = selected.has(row.index);
+              const fusedUrl = row.sceneFusion?.fusedImageUrl?.trim();
+              const productionBusy =
+                row.outfitProduction?.status === "generating" || productionGenerating;
               return (
                 <Fragment key={row.sceneId}>
                   <tr className={ecomDataTableBodyRowClass}>
@@ -380,58 +410,74 @@ export function OutfitShotProductionPanel({
                         type="checkbox"
                         className="size-3.5 rounded border-[#d2d2d7] text-[#0071e3] focus:ring-[#0071e3]/30 disabled:opacity-40"
                         checked={isSelected}
-                        disabled={tableBusy}
+                        disabled={tableBusy || !productionReady}
                         aria-label={`选择镜 ${row.index}`}
                         onChange={(e) => toggle(row.index, e.target.checked)}
                       />
                     </td>
                     <td className={ecomDataTableTdClass}>
-                      <button
-                        type="button"
-                        className="font-medium text-[#0071e3] hover:underline"
-                        disabled={tableBusy}
-                        onClick={() => setFocusIndex(row.index)}
-                      >
-                        {row.index}
-                      </button>
+                      <span className="font-medium text-[#1d1d1f]">{row.index}</span>
                     </td>
                     <td className={ecomDataTableTdClass}>{row.durationSec}s</td>
                     <td className={ecomDataTableTdClass}>
-                      <AnalysisCell text={outfitSceneCameraLabel(row)} />
+                      <OutfitEditableMentionCell
+                        value={getOutfitProductionField(row, "cameraMove")}
+                        mentionRefs={mentionRefs}
+                        disabled={tableBusy || productionBusy}
+                        onChange={(v) => onProductionFieldChange(row.sceneId, "cameraMove", v)}
+                      />
                     </td>
                     <td className={ecomDataTableTdClass}>
-                      <AnalysisCell text={outfitSceneActionLabel(row)} />
+                      <OutfitEditableMentionCell
+                        value={getOutfitProductionField(row, "characterAction")}
+                        mentionRefs={mentionRefs}
+                        disabled={tableBusy || productionBusy}
+                        minRows={3}
+                        onChange={(v) => onProductionFieldChange(row.sceneId, "characterAction", v)}
+                      />
                     </td>
                     <td className={ecomDataTableTdClass}>
-                      <AnalysisCell text={outfitSceneLightingLabel(row)} />
+                      <OutfitEditableMentionCell
+                        value={getOutfitProductionField(row, "lightingSetup")}
+                        mentionRefs={mentionRefs}
+                        disabled={tableBusy || productionBusy}
+                        onChange={(v) => onProductionFieldChange(row.sceneId, "lightingSetup", v)}
+                      />
                     </td>
                     <td className={ecomDataTableTdClass}>
-                      <AnalysisCell text={outfitSceneBackgroundLabel(row)} />
-                    </td>
-                    <td className={`${ecomDataTableTdClass} align-top`}>
-                      <OutfitShotStoryboardAdaptCell
-                        shot={row}
-                        clothReady={clothAnalyseReady}
-                        adapting={adaptingIndices?.has(row.index)}
-                        disabled={tableBusy}
-                        onAdapt={onAdaptSceneStoryboard}
+                      <OutfitEditableMentionCell
+                        value={getOutfitProductionField(row, "sceneBackground")}
+                        mentionRefs={mentionRefs}
+                        disabled={tableBusy || productionBusy}
+                        minRows={3}
+                        onChange={(v) => onProductionFieldChange(row.sceneId, "sceneBackground", v)}
                       />
                     </td>
                     <td className={`${ecomDataTableTdClass} align-top`}>
-                      <OutfitShotSceneFusionCell
-                        shot={row}
-                        disabled={tableBusy}
-                        fusing={fusingIndices?.has(row.index)}
-                        fusionModelKey={fusionModelKey}
-                        onPickMode={onPickSceneFusionMode}
-                        onUploadSceneRef={onUploadSceneRef}
-                        onFuse={onFuseScene}
-                        onClearFusion={
-                          row.sceneFusion?.fusedImageUrl && !tableBusy
-                            ? () => void onClearSceneFusion(row.index)
-                            : undefined
-                        }
-                      />
+                      <button
+                        type="button"
+                        disabled={tableBusy || productionBusy}
+                        className={cn(
+                          "relative flex aspect-[9/16] w-14 items-center justify-center overflow-hidden rounded-md border border-[#e8e8ed] bg-[#fafafa] transition-colors hover:border-[#0071e3]",
+                          fusingIndices?.has(row.index) && "opacity-70",
+                        )}
+                        aria-label={`镜 ${row.index} 场景设置`}
+                        onClick={() => setSceneDialogIndex(row.index)}
+                      >
+                        {fusedUrl ? (
+                          <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={fusedUrl} alt="" className="h-full w-full object-cover" />
+                            {fusingIndices?.has(row.index) ? (
+                              <div className="absolute inset-0 flex items-center justify-center bg-white/70">
+                                <Loader2 className="h-4 w-4 animate-spin text-[#0071e3]" />
+                              </div>
+                            ) : null}
+                          </>
+                        ) : (
+                          <Plus className="h-5 w-5 text-[#86868b]" />
+                        )}
+                      </button>
                     </td>
                     <td className={ecomDataTableTdClass}>
                       <EcomVideoSlot
@@ -455,8 +501,31 @@ export function OutfitShotProductionPanel({
                         removeLabel={`删除镜 ${row.index} 视频`}
                       />
                     </td>
-                    <td className={`${ecomDataTableTdClass} ${status.className}`}>{status.label}</td>
+                    <td className={`${ecomDataTableTdClass} ${status.className}`}>
+                      <div className="space-y-0.5">
+                        <span>{productionBusy ? "生成中" : status.label}</span>
+                        {(() => {
+                          const failReason = resolveShotFailReason(row);
+                          return failReason ? (
+                            <p
+                              className="max-w-[12rem] text-[10px] leading-snug text-[#ff3b30]"
+                              title={failReason}
+                            >
+                              {failReason}
+                            </p>
+                          ) : null;
+                        })()}
+                      </div>
+                    </td>
                   </tr>
+                  {getOutfitProductionField(row, "adjustLogic") ? (
+                    <tr className="border-0 bg-[#fafafa]">
+                      <td colSpan={columnCount} className="px-3 py-1.5 text-[10px] leading-relaxed text-[#6e6e73]">
+                        <span className="font-medium text-[#86868b]">适配说明：</span>
+                        {getOutfitProductionField(row, "adjustLogic")}
+                      </td>
+                    </tr>
+                  ) : null}
                   {generating ? (
                     <tr aria-hidden="true" className="pointer-events-none border-0">
                       <td colSpan={columnCount} className="border-0 px-3 py-0">
@@ -493,13 +562,8 @@ export function OutfitShotProductionPanel({
                     type="button"
                     size="sm"
                     className="min-w-[9rem] px-6"
-                    disabled={
-                      generateButtonsBusy ||
-                      Boolean(finalVideoUrl) ||
-                      !allShotsReady ||
-                      composeReadyIndices.length === 0
-                    }
-                    onClick={() => onRequestCompose()}
+                    disabled={generateButtonsBusy || Boolean(finalVideoUrl) || !canCompose}
+                    onClick={() => onRequestCompose(composeTargets)}
                   >
                     {composeLabel}
                   </EcomButtonPrimary>
@@ -509,6 +573,23 @@ export function OutfitShotProductionPanel({
           </tfoot>
         </table>
       </div>
+
+      <OutfitShotSceneSetupDialog
+        open={sceneDialogIndex != null}
+        shot={sceneDialogShot}
+        globalSceneRef={refs.sceneRef}
+        globalScenePreset={refs.sceneLibraryPreset}
+        fusionModelKey={fusionModelKey}
+        fusing={sceneDialogIndex != null && (fusingIndices?.has(sceneDialogIndex) ?? false)}
+        disabled={tableBusy}
+        onClose={() => setSceneDialogIndex(null)}
+        onScenePromptChange={onSceneFusionPromptChange}
+        onPickMode={onPickSceneFusionMode}
+        onUploadSceneRef={onUploadSceneRef}
+        onAttachSceneRefFromAssets={onAttachSceneRefFromAssets}
+        onFuse={onFuseScene}
+        onClearFusion={onClearSceneFusion}
+      />
 
       {finalVideoUrl ? (
         <div className="space-y-2 border-t border-[#e8e8ed] pt-4">
@@ -522,6 +603,13 @@ export function OutfitShotProductionPanel({
           />
         </div>
       ) : null}
+
+      <EcomImagePreviewHost
+        preview={preview}
+        galleryItems={galleryItems}
+        onClose={closePreview}
+        nativeOverlay
+      />
     </section>
   );
 }

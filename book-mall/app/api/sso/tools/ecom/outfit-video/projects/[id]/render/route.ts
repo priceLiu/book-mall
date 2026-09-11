@@ -22,7 +22,20 @@ export async function POST(req: Request, ctx: Ctx) {
 
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
-    const result = await renderEcomOutfitVideo(auth.userId, id);
+    let sceneIndexes: number[] | undefined;
+    try {
+      const body = (await req.json()) as { sceneIndexes?: unknown };
+      if (Array.isArray(body.sceneIndexes)) {
+        sceneIndexes = body.sceneIndexes.filter(
+          (n): n is number => typeof n === "number" && Number.isInteger(n) && n > 0,
+        );
+      }
+    } catch {
+      sceneIndexes = undefined;
+    }
+    const result = await renderEcomOutfitVideo(auth.userId, id, {
+      sceneIndexes: sceneIndexes?.length ? sceneIndexes : undefined,
+    });
     return NextResponse.json(result);
   } catch (e) {
     if (e instanceof MediaRenderUnavailableError) {

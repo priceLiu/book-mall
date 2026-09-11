@@ -16,6 +16,18 @@
     {
       "path": "/api/internal/static-snapshots/generate?pageKey=all",
       "schedule": "30 21 * * *"
+    },
+    {
+      "path": "/api/internal/platform-assistant/ai-news/generate",
+      "schedule": "30 22 * * *"
+    },
+    {
+      "path": "/api/internal/platform-assistant/ai-news/generate",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/internal/platform-assistant/ai-news/generate",
+      "schedule": "30 10 * * *"
     }
   ]
 }

@@ -99,7 +99,15 @@ import {
   toOutfitStoryboardAdaptPatch,
 } from "@/lib/ecom/ecom-outfit-storyboard-adapt";
 import { normalizeOutfitUserSellPointForLlm } from "@/lib/ecom/ecom-outfit-storyboard-adapt-prompts";
-import type { OutfitClothAnalyseMeta } from "@/lib/ecom/ecom-outfit-video-types";
+import {
+  applyDefaultSceneFusionToShot,
+  buildOutfitProductionFromAdapt,
+  readOutfitProductionMeta,
+} from "@/lib/ecom/ecom-outfit-production";
+import type {
+  OutfitClothAnalyseMeta,
+  OutfitProductionMeta,
+} from "@/lib/ecom/ecom-outfit-video-types";
 
 function assertOutfitVideoPrismaDelegate(): void {
   const delegate = (
@@ -758,6 +766,7 @@ export async function splitEcomOutfitVideoScenes(
       splitLlmStreamTail: null,
       ...(enrichWithLlm ? { splitEnrichCallCount: 1 } : {}),
       ...(totalDurationSec != null ? { referenceVideoDurationSec: totalDurationSec } : {}),
+      outfitProductionMeta: { status: "none" } satisfies OutfitProductionMeta,
     },
   });
 
@@ -783,6 +792,12 @@ export async function patchEcomOutfitVideoScenes(
   const project = await getEcomOutfitVideoProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
 
+  const prevProduction = readOutfitProductionMeta(project.meta);
+  const productionMeta: OutfitProductionMeta | undefined =
+    prevProduction?.status === "ready" || prevProduction?.status === "partial_failed"
+      ? { status: "stale", generatedAt: prevProduction.generatedAt }
+      : prevProduction ?? undefined;
+
   return updateEcomOutfitVideoProject(userId, projectId, {
     sceneList: normalized,
     structured: {
@@ -790,6 +805,10 @@ export async function patchEcomOutfitVideoScenes(
       scenes_edited: envelope,
     },
     phase: "bind_refs",
+    meta: {
+      ...(project.meta ?? {}),
+      ...(productionMeta ? { outfitProductionMeta: productionMeta } : {}),
+    },
   });
 }
 
@@ -1221,7 +1240,14 @@ export async function appendEcomOutfitVideoModelGalleryUploads(
   if (items.length < 1) throw new Error("请上传至少 1 张图片");
 
   const refs = appendOutfitModelGalleryItems(sanitizeRefs(project.references), items);
-  return updateEcomOutfitVideoProject(userId, projectId, { references: refs, phase: "bind_refs" });
+  const primaryImageUrl = refs.modelGallery?.[0]?.ossUrl?.trim() || refs.model?.ossUrl?.trim() || "";
+  return updateEcomOutfitVideoProject(userId, projectId, {
+    references: refs,
+    phase: "bind_refs",
+    meta: primaryImageUrl
+      ? mergeOutfitMetaAfterPrimaryImageChange(project.meta, primaryImageUrl)
+      : project.meta ?? undefined,
+  });
 }
 
 export async function appendEcomOutfitVideoModelGalleryAssets(
@@ -1243,7 +1269,14 @@ export async function appendEcomOutfitVideoModelGalleryAssets(
   if (items.length < 1) throw new Error("请选择至少 1 张资产");
 
   const refs = appendOutfitModelGalleryItems(sanitizeRefs(project.references), items);
-  return updateEcomOutfitVideoProject(userId, projectId, { references: refs, phase: "bind_refs" });
+  const primaryImageUrl = refs.modelGallery?.[0]?.ossUrl?.trim() || refs.model?.ossUrl?.trim() || "";
+  return updateEcomOutfitVideoProject(userId, projectId, {
+    references: refs,
+    phase: "bind_refs",
+    meta: primaryImageUrl
+      ? mergeOutfitMetaAfterPrimaryImageChange(project.meta, primaryImageUrl)
+      : project.meta ?? undefined,
+  });
 }
 
 export async function removeEcomOutfitVideoModelGalleryItem(
@@ -1256,7 +1289,14 @@ export async function removeEcomOutfitVideoModelGalleryItem(
   if (isOutfitRefsLocked(project.structured)) throw new Error("特征已锁定，无法修改参考图");
 
   const refs = removeOutfitModelGalleryItem(sanitizeRefs(project.references), refId);
-  return updateEcomOutfitVideoProject(userId, projectId, { references: refs, phase: "bind_refs" });
+  const primaryImageUrl = refs.modelGallery?.[0]?.ossUrl?.trim() || refs.model?.ossUrl?.trim() || "";
+  return updateEcomOutfitVideoProject(userId, projectId, {
+    references: refs,
+    phase: "bind_refs",
+    meta: primaryImageUrl
+      ? mergeOutfitMetaAfterPrimaryImageChange(project.meta, primaryImageUrl)
+      : mergeOutfitMetaAfterSceneChange(project.meta),
+  });
 }
 
 export async function uploadEcomOutfitVideoRefImage(
@@ -1289,7 +1329,11 @@ export async function uploadEcomOutfitVideoRefImage(
       label: labelByRole.sceneRef,
     };
     delete refs.sceneLibraryPreset;
-    return updateEcomOutfitVideoProject(userId, projectId, { references: refs, phase: "bind_refs" });
+    return updateEcomOutfitVideoProject(userId, projectId, {
+      references: refs,
+      phase: "bind_refs",
+      meta: mergeOutfitMetaAfterSceneChange(project.meta),
+    });
   }
 
   return attachEcomOutfitVideoRefs(userId, projectId, {
@@ -1313,7 +1357,11 @@ export async function setEcomOutfitVideoSceneLibraryPreset(
   const refs = sanitizeRefs(project.references);
   delete refs.sceneRef;
   refs.sceneLibraryPreset = preset;
-  return updateEcomOutfitVideoProject(userId, projectId, { references: refs, phase: "bind_refs" });
+  return updateEcomOutfitVideoProject(userId, projectId, {
+    references: refs,
+    phase: "bind_refs",
+    meta: mergeOutfitMetaAfterSceneChange(project.meta),
+  });
 }
 
 export async function clearEcomOutfitVideoSceneRef(
@@ -1327,7 +1375,11 @@ export async function clearEcomOutfitVideoSceneRef(
   const refs = { ...sanitizeRefs(project.references) };
   delete refs.sceneRef;
   delete refs.sceneLibraryPreset;
-  return updateEcomOutfitVideoProject(userId, projectId, { references: refs, phase: "bind_refs" });
+  return updateEcomOutfitVideoProject(userId, projectId, {
+    references: refs,
+    phase: "bind_refs",
+    meta: mergeOutfitMetaAfterSceneChange(project.meta),
+  });
 }
 
 export async function generateEcomOutfitVideoShot(
@@ -1434,6 +1486,7 @@ export function sanitizeSceneListExport(raw: unknown): SceneShot[] {
 export async function renderEcomOutfitVideo(
   userId: string,
   projectId: string,
+  opts?: { sceneIndexes?: number[] },
 ): Promise<{ jobId: string; expiresAt: string }> {
   const { MediaRenderSourceApp } = await import("@prisma/client");
   const { fromOutfitVideoScenes } = await import("@/lib/media/timeline-adapters");
@@ -1445,14 +1498,24 @@ export async function renderEcomOutfitVideo(
   const project = await getEcomOutfitVideoProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
 
-  const missing = project.sceneList.filter((s) => !s.videoUrl?.trim());
-  if (missing.length > 0) {
-    throw new Error("请先为全部分镜生成视频后再合成");
+  const indexFilter =
+    opts?.sceneIndexes && opts.sceneIndexes.length > 0
+      ? new Set(opts.sceneIndexes)
+      : null;
+  const readyScenes = project.sceneList.filter((s) => {
+    if (!s.videoUrl?.trim()) return false;
+    if (indexFilter && !indexFilter.has(s.index)) return false;
+    return true;
+  });
+  if (readyScenes.length < 2) {
+    throw new Error("请至少生成 2 镜视频后再合成（可勾选已完成的镜头）");
   }
 
-  const timeline = fromOutfitVideoScenes(project.sceneList);
-  if (timeline.clips.length < 1) {
-    throw new Error("没有可合成的视频片段");
+  const timeline = fromOutfitVideoScenes(project.sceneList, {
+    sceneIndexes: [...readyScenes.map((s) => s.index)],
+  });
+  if (timeline.clips.length < 2) {
+    throw new Error("没有可合成的视频片段（至少需要 2 镜）");
   }
 
   const profile = parseRenderProfile(null);
@@ -1578,9 +1641,7 @@ export async function fuseEcomOutfitVideoShotScene(
 ): Promise<OutfitVideoProjectDto> {
   const project = await getEcomOutfitVideoProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
-  if (!project.references.dressedImage?.ossUrl) {
-    throw new Error("请先锁定穿搭参考图");
-  }
+  resolveOutfitPrimaryModelImageUrl(project.references);
 
   const scene = project.sceneList.find((s) => s.index === sceneIndex);
   if (!scene) throw new Error(`找不到分镜 ${sceneIndex}`);
@@ -1733,14 +1794,29 @@ function readOutfitClothAnalyseMeta(meta: Record<string, unknown> | null): Outfi
   const analysedAt = typeof o.analysedAt === "string" ? o.analysedAt : "";
   const status = o.status;
   if (
-    !structuredText ||
     !imageUrl ||
-    !modelKey ||
     !analysedAt ||
-    (status !== "generating" && status !== "success" && status !== "failed")
+    (status !== "generating" &&
+      status !== "success" &&
+      status !== "failed" &&
+      status !== "stale")
   ) {
     return null;
   }
+  if (status === "stale") {
+    return {
+      structuredText,
+      imageUrl,
+      modelKey,
+      analysedAt,
+      status: "stale",
+      failReason:
+        typeof o.failReason === "string"
+          ? o.failReason
+          : "参考图已变更，请重新识别服装",
+    };
+  }
+  if (!structuredText || !modelKey) return null;
   return {
     structuredText,
     imageUrl,
@@ -1749,6 +1825,46 @@ function readOutfitClothAnalyseMeta(meta: Record<string, unknown> | null): Outfi
     status,
     failReason: typeof o.failReason === "string" ? o.failReason : undefined,
   };
+}
+
+function markOutfitProductionMetaStale(
+  meta: Record<string, unknown> | null | undefined,
+): OutfitProductionMeta | undefined {
+  const prev = readOutfitProductionMeta(meta);
+  if (prev?.status === "ready" || prev?.status === "partial_failed") {
+    return { status: "stale", generatedAt: prev.generatedAt, splitModelKey: prev.splitModelKey };
+  }
+  return undefined;
+}
+
+function mergeOutfitMetaAfterPrimaryImageChange(
+  meta: Record<string, unknown> | null | undefined,
+  primaryImageUrl: string,
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...(meta ?? {}) };
+  const cloth = readOutfitClothAnalyseMeta(meta ?? null);
+  if (cloth && cloth.imageUrl !== primaryImageUrl) {
+    next.outfitClothAnalyse = {
+      structuredText: "",
+      imageUrl: primaryImageUrl,
+      modelKey: "",
+      analysedAt: new Date().toISOString(),
+      status: "stale",
+      failReason: "参考图已变更，请重新识别服装",
+    } satisfies OutfitClothAnalyseMeta;
+  }
+  const productionMeta = markOutfitProductionMetaStale(meta);
+  if (productionMeta) next.outfitProductionMeta = productionMeta;
+  return next;
+}
+
+function mergeOutfitMetaAfterSceneChange(
+  meta: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...(meta ?? {}) };
+  const productionMeta = markOutfitProductionMetaStale(meta);
+  if (productionMeta) next.outfitProductionMeta = productionMeta;
+  return next;
 }
 
 function resolveOutfitPrimaryModelImageUrl(refs: WorkflowRefs): string {
@@ -1774,6 +1890,51 @@ function patchSceneStoryboardAdapt(
         }
       : s,
   );
+}
+
+function patchSceneProduction(
+  scenes: SceneShot[],
+  sceneId: string,
+  patch: SceneShot["outfitProduction"],
+): SceneShot[] {
+  return scenes.map((s) =>
+    s.sceneId === sceneId ? { ...s, outfitProduction: patch } : s,
+  );
+}
+
+async function adaptSingleOutfitSceneStoryboardInternal(opts: {
+  userId: string;
+  projectId: string;
+  scene: SceneShot;
+  refs: WorkflowRefs;
+  clothAnalyseText: string;
+  userSellPoint?: string | null;
+  splitModelKey: string;
+  userSellPointForLlm: string;
+}): Promise<{
+  adaptPatch: NonNullable<SceneShot["outfitStoryboardAdapt"]>;
+  productionPatch: NonNullable<SceneShot["outfitProduction"]>;
+}> {
+  const parsed = await adaptOutfitSceneStoryboardLlm({
+    userId: opts.userId,
+    projectId: opts.projectId,
+    scene: opts.scene,
+    refs: opts.refs,
+    clothAnalyseText: opts.clothAnalyseText,
+    userSellPoint: opts.userSellPoint,
+    splitModelKey: opts.splitModelKey,
+  });
+
+  const adaptPatch = toOutfitStoryboardAdaptPatch(parsed, {
+    splitModelKey: opts.splitModelKey,
+    userSellPointForLlm: opts.userSellPointForLlm,
+    status: "success",
+  });
+
+  return {
+    adaptPatch,
+    productionPatch: buildOutfitProductionFromAdapt(opts.scene, adaptPatch),
+  };
 }
 
 /** 视觉识别上传图上的服装（全局一次，手动触发） */
@@ -1813,10 +1974,15 @@ export async function analyseEcomOutfitVideoCloth(
       analysedAt: new Date().toISOString(),
       status: "success",
     };
+    const productionMeta: OutfitProductionMeta = {
+      status: "stale",
+      generatedAt: readOutfitProductionMeta(project.meta)?.generatedAt,
+    };
     return updateEcomOutfitVideoProject(userId, projectId, {
       meta: {
         ...(project.meta ?? {}),
         outfitClothAnalyse: successMeta,
+        outfitProductionMeta: productionMeta,
       },
     });
   } catch (e) {
@@ -1871,27 +2037,34 @@ export async function adaptEcomOutfitVideoSceneStoryboard(
   });
 
   try {
-    const parsed = await adaptOutfitSceneStoryboardLlm({
+    const { adaptPatch, productionPatch } = await adaptSingleOutfitSceneStoryboardInternal({
       userId,
       projectId,
       scene,
+      refs: project.references,
       clothAnalyseText: cloth.structuredText,
       userSellPoint: project.settings.userSellPoint,
       splitModelKey,
+      userSellPointForLlm,
     });
 
-    const adaptPatch = toOutfitStoryboardAdaptPatch(parsed, {
-      splitModelKey,
-      userSellPointForLlm,
-      status: "success",
-    });
+    let nextScenes = patchSceneStoryboardAdapt(
+      project.sceneList,
+      scene.sceneId,
+      adaptPatch,
+    );
+    nextScenes = patchSceneProduction(nextScenes, scene.sceneId, productionPatch);
 
     return updateEcomOutfitVideoProject(userId, projectId, {
-      sceneList: patchSceneStoryboardAdapt(
-        project.sceneList,
-        scene.sceneId,
-        adaptPatch,
-      ),
+      sceneList: nextScenes,
+      meta: {
+        ...(project.meta ?? {}),
+        outfitProductionMeta: {
+          status: "ready",
+          generatedAt: new Date().toISOString(),
+          splitModelKey,
+        } satisfies OutfitProductionMeta,
+      },
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "分镜适配失败";
@@ -1918,6 +2091,141 @@ export async function adaptEcomOutfitVideoSceneStoryboard(
           },
         ),
       ),
+      meta: {
+        ...(project.meta ?? {}),
+        outfitProductionMeta: {
+          status: "partial_failed",
+          failCount: 1,
+          splitModelKey,
+        } satisfies OutfitProductionMeta,
+      },
     });
   }
+}
+
+/** 批量生成分镜制作表（拆解 + 服装识别 + 卖点 → 全镜 LLM 适配） */
+export async function generateEcomOutfitVideoProductionStoryboard(
+  userId: string,
+  projectId: string,
+): Promise<OutfitVideoProjectDto> {
+  let project = await getEcomOutfitVideoProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  if (project.sceneList.length === 0) throw new Error("请先拆解分镜");
+
+  const primaryImageUrl = resolveOutfitPrimaryModelImageUrl(project.references);
+
+  const cloth = readOutfitClothAnalyseMeta(project.meta);
+  if (!cloth || cloth.status !== "success" || !cloth.structuredText.trim()) {
+    if (cloth?.status === "stale") {
+      throw new Error("参考图已变更，请先重新识别服装");
+    }
+    throw new Error("请先完成服装识别");
+  }
+  if (cloth.imageUrl !== primaryImageUrl) {
+    throw new Error("参考图与服装识别不一致，请先重新识别服装");
+  }
+
+  const splitModelKey =
+    project.settings.splitModelKey?.trim() || OUTFIT_V1_DEFAULT_SPLIT_MODEL;
+  const userSellPointForLlm = normalizeOutfitUserSellPointForLlm(
+    project.settings.userSellPoint,
+  );
+  const startedAt = new Date().toISOString();
+
+  project = await updateEcomOutfitVideoProject(userId, projectId, {
+    meta: {
+      ...(project.meta ?? {}),
+      outfitProductionMeta: {
+        status: "generating",
+        splitModelKey,
+      } satisfies OutfitProductionMeta,
+    },
+    sceneList: project.sceneList.map((s) => ({
+      ...applyDefaultSceneFusionToShot(
+        {
+          ...s,
+          userGeneratePrompt: undefined,
+          outfitStoryboardAdapt: {
+            status: "generating",
+            userSellPoint: userSellPointForLlm,
+            splitModelKey,
+          },
+          outfitProduction: { status: "generating", splitModelKey },
+          sceneFusion: undefined,
+        },
+        project.references,
+      ),
+    })),
+  });
+
+  const results = await Promise.allSettled(
+    project.sceneList.map((scene) =>
+      adaptSingleOutfitSceneStoryboardInternal({
+        userId,
+        projectId,
+        scene,
+        refs: project.references,
+        clothAnalyseText: cloth.structuredText,
+        userSellPoint: project.settings.userSellPoint,
+        splitModelKey,
+        userSellPointForLlm,
+      }),
+    ),
+  );
+
+  let failCount = 0;
+  const nextScenes = project.sceneList.map((scene, i) => {
+    const result = results[i];
+    if (result.status === "fulfilled") {
+      return applyDefaultSceneFusionToShot(
+        {
+          ...scene,
+          outfitStoryboardAdapt: result.value.adaptPatch,
+          outfitProduction: result.value.productionPatch,
+        },
+        project.references,
+      );
+    }
+    failCount += 1;
+    const message =
+      result.reason instanceof Error ? result.reason.message : "分镜制作表生成失败";
+    return applyDefaultSceneFusionToShot(
+      {
+        ...scene,
+        outfitStoryboardAdapt: {
+          status: "failed",
+          failReason: message,
+          userSellPoint: userSellPointForLlm,
+          splitModelKey,
+          adaptedAt: new Date().toISOString(),
+        },
+        outfitProduction: {
+          status: "failed",
+          failReason: message,
+          splitModelKey,
+          generatedAt: new Date().toISOString(),
+        },
+      },
+      project.references,
+    );
+  });
+
+  const total = project.sceneList.length;
+  let metaStatus: OutfitProductionMeta["status"] = "ready";
+  if (failCount >= total) metaStatus = "failed";
+  else if (failCount > 0) metaStatus = "partial_failed";
+
+  return updateEcomOutfitVideoProject(userId, projectId, {
+    sceneList: nextScenes,
+    phase: "bind_refs",
+    meta: {
+      ...(project.meta ?? {}),
+      outfitProductionMeta: {
+        status: metaStatus,
+        generatedAt: startedAt,
+        failCount: failCount > 0 ? failCount : undefined,
+        splitModelKey,
+      } satisfies OutfitProductionMeta,
+    },
+  });
 }

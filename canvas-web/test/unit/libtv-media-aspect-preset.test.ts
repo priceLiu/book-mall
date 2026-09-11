@@ -6,6 +6,7 @@ import {
   parseAspectRatioToNumbers,
   resolveEffectiveAspectRatioForPreset,
   resolveLibtvMediaAspectPresetProfile,
+  shouldSkipLibtvImageNodeNaturalSizeAutoFit,
   shouldSkipLibtvMediaAspectPresetForNaturalMedia,
 } from "@/lib/canvas/libtv-media-aspect-preset";
 import {
@@ -19,7 +20,10 @@ import {
   LIBTV_MEDIA_TOP_EDGE_SQUARE_BASE,
   LIBTV_VIDEO_NODE_HEADER_HEIGHT,
 } from "@/lib/canvas/libtv-node-chrome";
-import { PRO2_CHARACTER_THREE_VIEW_WIDTH } from "@/lib/canvas/story-pro2-node-chrome";
+import {
+  PRO2_CHARACTER_THREE_VIEW_WIDTH,
+  PRO2_EXTERNAL_MEDIA_TITLE_CHROME_HEIGHT,
+} from "@/lib/canvas/story-pro2-node-chrome";
 
 describe("libtv-media-aspect-preset", () => {
   it("parses common aspect strings", () => {
@@ -46,7 +50,7 @@ describe("libtv-media-aspect-preset", () => {
   it("three-view 16:9 uses character three-view base width at 100%", () => {
     const size = computeLibtvMediaAspectPresetSize("16:9", "three-view");
     expect(size.width).toBe(PRO2_CHARACTER_THREE_VIEW_WIDTH);
-    const stageH = size.height - LIBTV_IMAGE_NODE_HEADER_HEIGHT;
+    const stageH = size.height - PRO2_EXTERNAL_MEDIA_TITLE_CHROME_HEIGHT;
     expect(stageH).toBe(Math.round(PRO2_CHARACTER_THREE_VIEW_WIDTH * (9 / 16)));
   });
 
@@ -158,17 +162,17 @@ describe("libtv-media-aspect-preset", () => {
     const square = computeLibtvMediaAspectPresetSize("1:1", "pro2-image");
 
     expect(land.width).toBe(LIBTV_MEDIA_STAGE_LANDSCAPE_WIDTH);
-    expect(land.height - LIBTV_IMAGE_NODE_HEADER_HEIGHT).toBe(
+    expect(land.height - PRO2_EXTERNAL_MEDIA_TITLE_CHROME_HEIGHT).toBe(
       Math.round(LIBTV_MEDIA_STAGE_LANDSCAPE_WIDTH * (9 / 16)),
     );
     expect(port.width).toBe(
       Math.round(LIBTV_MEDIA_STAGE_PORTRAIT_HEIGHT * (9 / 16)),
     );
-    expect(port.height - LIBTV_IMAGE_NODE_HEADER_HEIGHT).toBe(
+    expect(port.height - PRO2_EXTERNAL_MEDIA_TITLE_CHROME_HEIGHT).toBe(
       LIBTV_MEDIA_STAGE_PORTRAIT_HEIGHT,
     );
     expect(square.width).toBe(LIBTV_MEDIA_STAGE_SQUARE_EDGE);
-    expect(square.height - LIBTV_IMAGE_NODE_HEADER_HEIGHT).toBe(
+    expect(square.height - PRO2_EXTERNAL_MEDIA_TITLE_CHROME_HEIGHT).toBe(
       LIBTV_MEDIA_STAGE_SQUARE_EDGE,
     );
     expect(port.height).toBeGreaterThan(land.height);
@@ -178,6 +182,53 @@ describe("libtv-media-aspect-preset", () => {
     const size = computeLibtvMediaAspectPresetSize("16:9", "sbv1-video");
     expect(size.width).toBe(630);
     expect(size.height - LIBTV_VIDEO_NODE_HEADER_HEIGHT).toBe(354);
+  });
+
+  it("skips natural size auto-fit for grid-split frame cells and pro2 pipeline group children", () => {
+    expect(
+      shouldSkipLibtvImageNodeNaturalSizeAutoFit({
+        type: "story-pro2-image",
+        data: { gridSplitFrameCrop: true, pro2MediaRole: "frame" },
+      }),
+    ).toBe(true);
+    const nodes = [
+      {
+        id: "g1",
+        type: "group" as const,
+        position: { x: 0, y: 0 },
+        data: { pro2Kind: "frame-board", pro2Styled: true },
+      },
+      {
+        id: "f1",
+        type: "story-pro2-image" as const,
+        parentId: "g1",
+        position: { x: 0, y: 0 },
+        data: { pro2MediaRole: "frame", blobUrl: "blob:cell" },
+      },
+    ];
+    expect(
+      shouldSkipLibtvImageNodeNaturalSizeAutoFit(nodes[1]!, nodes),
+    ).toBe(true);
+    const nodesNoRole = [
+      nodes[0]!,
+      {
+        ...nodes[1]!,
+        data: { blobUrl: "blob:cell" },
+      },
+    ];
+    expect(
+      shouldSkipLibtvImageNodeNaturalSizeAutoFit(nodesNoRole[1]!, nodesNoRole),
+    ).toBe(true);
+    expect(
+      shouldSkipLibtvMediaAspectPresetForNaturalMedia({
+        type: "story-pro2-image",
+        data: {
+          gridSplitFrameCrop: true,
+          pro2MediaRole: "frame",
+          blobUrl: "blob:cell",
+        },
+      }),
+    ).toBe(true);
   });
 
   it("skips aspect preset for pasted upload blobs", () => {

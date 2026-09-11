@@ -6,7 +6,8 @@
   "types": "./index.ts",
   "exports": {
     ".": "./index.ts",
-    "./subtitle-style-options": "./subtitle-style-options.ts"
+    "./subtitle-style-options": "./subtitle-style-options.ts",
+    "./subtitle-preview": "./subtitle-preview.tsx"
   },
   "peerDependencies": {
     "react": "^18"

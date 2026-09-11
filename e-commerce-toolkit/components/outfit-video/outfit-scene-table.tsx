@@ -10,6 +10,7 @@ import {
   ECOM_SLOT_HOVER_OVERLAY_CLASS,
 } from "@/components/media/ecom-media-library-tile";
 import { EcomImagePreviewHost, useEcomImagePreview } from "@/components/media";
+import { OutfitEditableCell } from "@/components/outfit-video/outfit-editable-cell";
 import {
   ecomDataTableBodyRowClass,
   ecomDataTableClass,
@@ -19,7 +20,6 @@ import {
   ecomDataTableWrapClass,
 } from "@/components/ui/ecom-data-table";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
-import { AnalysisCell } from "@/components/outfit-video/outfit-scene-analysis-cell";
 import type { SceneShot } from "@/lib/video-workflow/shot-spine";
 import {
   outfitSceneActionLabel,
@@ -28,6 +28,8 @@ import {
   outfitSceneLightingLabel,
 } from "@/lib/video-workflow/templates/outfit-v1/shot-analysis";
 import { cn } from "@/lib/utils";
+
+type SplitField = "cameraMove" | "characterAction" | "lightingSetup" | "sceneBackground";
 
 type Props = {
   scenes: SceneShot[];
@@ -76,6 +78,15 @@ function ScenePreviewThumb({
   );
 }
 
+function patchSplitField(
+  scenes: SceneShot[],
+  sceneId: string,
+  field: SplitField,
+  value: string,
+): SceneShot[] {
+  return scenes.map((s) => (s.sceneId === sceneId ? { ...s, [field]: value } : s));
+}
+
 export function OutfitSceneTable({ scenes, disabled, onChange, onDelete }: Props) {
   const previewItems = useMemo(
     () =>
@@ -99,6 +110,10 @@ export function OutfitSceneTable({ scenes, disabled, onChange, onDelete }: Props
     next[pos] = next[nextPos]!;
     next[nextPos] = tmp;
     onChange(next.map((s, i) => ({ ...s, index: i + 1 })));
+  }
+
+  function updateField(sceneId: string, field: SplitField, value: string) {
+    onChange(patchSplitField(scenes, sceneId, field, value));
   }
 
   return (
@@ -126,11 +141,7 @@ export function OutfitSceneTable({ scenes, disabled, onChange, onDelete }: Props
                       index={row.index}
                       disabled={disabled}
                       onPreview={() => {
-                        openPreview(
-                          row.previewImageUrl!,
-                          `分镜 ${row.index}`,
-                          previewItems,
-                        );
+                        openPreview(row.previewImageUrl!, `分镜 ${row.index}`, previewItems);
                       }}
                     />
                   ) : (
@@ -138,16 +149,32 @@ export function OutfitSceneTable({ scenes, disabled, onChange, onDelete }: Props
                   )}
                 </td>
                 <td className={ecomDataTableTdClass}>
-                  <AnalysisCell text={outfitSceneCameraLabel(row)} />
+                  <OutfitEditableCell
+                    value={outfitSceneCameraLabel(row)}
+                    disabled={disabled}
+                    onChange={(v) => updateField(row.sceneId, "cameraMove", v)}
+                  />
                 </td>
                 <td className={ecomDataTableTdClass}>
-                  <AnalysisCell text={outfitSceneActionLabel(row)} />
+                  <OutfitEditableCell
+                    value={outfitSceneActionLabel(row)}
+                    disabled={disabled}
+                    onChange={(v) => updateField(row.sceneId, "characterAction", v)}
+                  />
                 </td>
                 <td className={ecomDataTableTdClass}>
-                  <AnalysisCell text={outfitSceneLightingLabel(row)} />
+                  <OutfitEditableCell
+                    value={outfitSceneLightingLabel(row)}
+                    disabled={disabled}
+                    onChange={(v) => updateField(row.sceneId, "lightingSetup", v)}
+                  />
                 </td>
                 <td className={ecomDataTableTdClass}>
-                  <AnalysisCell text={outfitSceneBackgroundLabel(row)} />
+                  <OutfitEditableCell
+                    value={outfitSceneBackgroundLabel(row)}
+                    disabled={disabled}
+                    onChange={(v) => updateField(row.sceneId, "sceneBackground", v)}
+                  />
                 </td>
                 <td className={ecomDataTableTdClass}>
                   <div className="flex flex-wrap gap-1">

@@ -70,12 +70,12 @@ import {
   isPro2MediaChildNode,
   isPro2StyledGroup,
   pro2MediaGroupDefaultLabel,
-  syncPro2MediaGroupZIndex,
 } from "./pro2-media-group-meta";
 import { computeLibtvMediaAspectPresetSize } from "./libtv-media-aspect-preset";
 import {
   PRO2_MEDIA_GROUP_LAYOUT_VERSION,
   PRO2_MEDIA_GROUP_PAD,
+  migrateStalePro2MediaGroupLayouts,
   pro2MediaChildSize,
 } from "./pro2-media-group-layout";
 import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
@@ -682,14 +682,16 @@ export const useCanvasStore = create<CanvasState>()(
         );
         edges = migrated.edges;
         let normalized = normalizeCanvasNodes(migrated.nodes, edges);
-        let nodes = stripPersistedNodeSelection(
-          normalized.some((n) => String(n.type ?? "").startsWith("story-pro2-"))
-            ? stripStaleHubGenerateIntent(
-                repairHubStructuredProductionScriptNodes(
-                  repairHubEmbeddedPackSections(reconcileStoryPro2Workspace(normalized)),
-                ),
-              )
-            : reconcileStoryProWorkspace(normalized),
+        let nodes = migrateStalePro2MediaGroupLayouts(
+          stripPersistedNodeSelection(
+            normalized.some((n) => String(n.type ?? "").startsWith("story-pro2-"))
+              ? stripStaleHubGenerateIntent(
+                  repairHubStructuredProductionScriptNodes(
+                    repairHubEmbeddedPackSections(reconcileStoryPro2Workspace(normalized)),
+                  ),
+                )
+              : reconcileStoryProWorkspace(normalized),
+          ),
         );
         const needsMediaViewportReflow = libtvCanvasNeedsViewportReflow(
           migrated.nodes as CanvasFlowNode[],
@@ -889,8 +891,7 @@ export const useCanvasStore = create<CanvasState>()(
           filteredChanges,
         );
         if (isCanvasSelectionOnlyChange(filteredChanges)) {
-          next = syncPro2MediaGroupZIndex(next);
-          // 选中态不进撤销栈，否则撤销只会来回切选中
+          // 选中态不改 zIndex（CSS 抬层），也不进撤销栈
           if (canvasNodesSelectionAndZEqual(prev, next)) return;
           useCanvasStore.temporal.getState().pause();
           set({ nodes: next });

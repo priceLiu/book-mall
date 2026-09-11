@@ -10,6 +10,7 @@ import {
   PRO2_CHARACTER_THREE_VIEW_MIN_HEIGHT,
   PRO2_CHARACTER_THREE_VIEW_MIN_WIDTH,
   PRO2_CHARACTER_THREE_VIEW_WIDTH,
+  PRO2_EXTERNAL_MEDIA_TITLE_CHROME_HEIGHT,
   PRO2_IMAGE_NODE_MIN_HEIGHT,
   PRO2_IMAGE_NODE_MIN_WIDTH,
 } from "./story-pro2-node-chrome";
@@ -22,6 +23,10 @@ import {
 import type { Sbv1ImageAspectRatio } from "./sbv1-image-models";
 import type { Sbv1AspectRatio } from "./sbv1-workspace-types";
 import type { CanvasFlowNode } from "./types";
+import {
+  isPro2PipelineMediaGroupChild,
+  isPro2StyledGroup,
+} from "./pro2-media-group-meta";
 import { groupHasSbv1VideoChildren } from "./sbv1-media-group-meta";
 
 export type LibtvMediaAspectPresetProfile =
@@ -267,20 +272,20 @@ export function libtvMediaProfileBoxLimits(profile: LibtvMediaAspectPresetProfil
   }
   if (profile === "pro2-frame-cell") {
     return {
-      headerHeight: LIBTV_IMAGE_NODE_HEADER_HEIGHT,
+      headerHeight: PRO2_EXTERNAL_MEDIA_TITLE_CHROME_HEIGHT,
       minWidth: PRO2_FRAME_CELL_MIN_WIDTH,
       minHeight: PRO2_FRAME_CELL_MIN_HEIGHT,
     };
   }
   if (profile === "three-view") {
     return {
-      headerHeight: LIBTV_IMAGE_NODE_HEADER_HEIGHT,
+      headerHeight: PRO2_EXTERNAL_MEDIA_TITLE_CHROME_HEIGHT,
       minWidth: aspectPresetDim(PRO2_CHARACTER_THREE_VIEW_MIN_WIDTH),
       minHeight: aspectPresetDim(PRO2_CHARACTER_THREE_VIEW_MIN_HEIGHT),
     };
   }
   return {
-    headerHeight: LIBTV_IMAGE_NODE_HEADER_HEIGHT,
+    headerHeight: PRO2_EXTERNAL_MEDIA_TITLE_CHROME_HEIGHT,
     minWidth: aspectPresetDim(PRO2_IMAGE_NODE_MIN_WIDTH),
     minHeight: aspectPresetDim(PRO2_IMAGE_NODE_MIN_HEIGHT),
   };
@@ -430,6 +435,28 @@ export function readAspectPresetProfileFromFitKey(
 }
 
 /**
+ * 宫格裁切分镜 / Pro2 媒体组内格位：外框由 spawn + relayout 决定，
+ * 禁止 stage natural 探测用 sbv1-media 重算（会与组布局互写 → Maximum update depth）。
+ */
+export function shouldSkipLibtvImageNodeNaturalSizeAutoFit(
+  node: Pick<CanvasFlowNode, "type" | "data" | "parentId">,
+  allNodes?: CanvasFlowNode[],
+): boolean {
+  const d = (node.data ?? {}) as { gridSplitFrameCrop?: boolean };
+  if (d.gridSplitFrameCrop) return true;
+  if (!allNodes?.length) return false;
+  if (isPro2PipelineMediaGroupChild(node, allNodes)) return true;
+  if (
+    node.parentId &&
+    (node.type === "story-pro2-image" || node.type === "story-pro2-three-view")
+  ) {
+    const parent = allNodes.find((n) => n.id === node.parentId);
+    if (parent && isPro2StyledGroup(parent, allNodes)) return true;
+  }
+  return false;
+}
+
+/**
  * 粘贴/本地上传：按图片 natural 尺寸自适配外框，不用固定 1:1 比例预设。
  * 分镜/场景/视频格与用户显式选择 aspectRatio 时仍走 preset。
  */
@@ -445,9 +472,15 @@ export function shouldSkipLibtvMediaAspectPresetForNaturalMedia(
     pro2MediaRole?: string;
     pro2HdFromGridSplit?: boolean;
     gridSplitCrop?: unknown;
+    gridSplitFrameCrop?: boolean;
+    mediaAspectPreset?: string;
     runtime?: { status?: string; ossUrl?: string; ephemeralUrl?: string };
   };
 
+  /** 宫格裁切分镜/高清 · spawn 已按单元比例定框；用户选手型比例后走 preset */
+  if (d.gridSplitFrameCrop && !(d.mediaAspectPreset?.trim())) {
+    return true;
+  }
   if (d.pro2HdFromGridSplit || d.gridSplitCrop) return false;
 
   const role = d.pro2MediaRole?.trim();

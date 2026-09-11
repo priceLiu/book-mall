@@ -633,6 +633,15 @@ function applySbv1ImageDockRunResolution(
   if (runPrompt !== dockPrompt) {
     nextRunData = { ...runData, dockInput: runPrompt };
   }
+  const pendingHdGridCrop = Boolean(
+    (runData as { pro2HdFromGridSplit?: boolean }).pro2HdFromGridSplit &&
+      (runData as { gridSplitCrop?: unknown }).gridSplitCrop &&
+      (runData as { gridSplitFrameCrop?: boolean }).gridSplitFrameCrop !== true,
+  );
+  if (pendingHdGridCrop) {
+    return { runData: nextRunData, imageInputs };
+  }
+
   const mentionOrdered = resolveDockImageUrlsForRun(
     links,
     dockRefImages,

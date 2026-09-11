@@ -32,8 +32,15 @@ export type OutfitClothAnalyseMeta = {
   imageUrl: string;
   modelKey: string;
   analysedAt: string;
-  status: "generating" | "success" | "failed";
+  status: "generating" | "success" | "failed" | "stale";
   failReason?: string;
+};
+
+export type OutfitProductionMeta = {
+  status: "none" | "generating" | "ready" | "stale" | "partial_failed" | "failed";
+  generatedAt?: string;
+  failCount?: number;
+  splitModelKey?: string;
 };
 
 export type OutfitVideoProject = {
@@ -488,14 +495,17 @@ export async function batchGenerateOutfitVideoShots(
   return data.project as OutfitVideoProject;
 }
 
-export async function renderOutfitVideo(projectId: string): Promise<{
+export async function renderOutfitVideo(
+  projectId: string,
+  opts?: { sceneIndexes?: number[] },
+): Promise<{
   jobId: string;
   expiresAt: string;
 }> {
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/render`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
+    body: JSON.stringify(opts?.sceneIndexes?.length ? { sceneIndexes: opts.sceneIndexes } : {}),
   });
   return { jobId: data.jobId as string, expiresAt: data.expiresAt as string };
 }
@@ -522,13 +532,18 @@ export async function pollOutfitVideoRender(projectId: string): Promise<{
 export async function saveOutfitVideoDeliverableSnapshot(
   projectId: string,
   workName: string,
-): Promise<{ title: string }> {
+): Promise<{ title: string; snapshot?: import("@/lib/outfit-video-deliverable-dirty").OutfitVideoDeliverableSnapshot }> {
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/deliverable/snapshot`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ workName }),
   });
-  return { title: data.title as string };
+  return {
+    title: data.title as string,
+    snapshot: data.snapshot as
+      | import("@/lib/outfit-video-deliverable-dirty").OutfitVideoDeliverableSnapshot
+      | undefined,
+  };
 }
 
 export type OutfitSceneFusionMode = "follow_reference" | "library" | "upload_ref";
@@ -613,10 +628,27 @@ export function parseOutfitClothAnalyseMeta(
   if (
     !imageUrl ||
     !analysedAt ||
-    (status !== "generating" && status !== "success" && status !== "failed")
+    (status !== "generating" &&
+      status !== "success" &&
+      status !== "failed" &&
+      status !== "stale")
   ) {
     return null;
   }
+  if (status === "stale") {
+    return {
+      structuredText,
+      imageUrl,
+      modelKey,
+      analysedAt,
+      status: "stale",
+      failReason:
+        typeof o.failReason === "string"
+          ? o.failReason
+          : "参考图已变更，请重新识别服装",
+    };
+  }
+  if (!modelKey) return null;
   return {
     structuredText,
     imageUrl,
@@ -642,6 +674,45 @@ export async function adaptOutfitVideoSceneStoryboard(
 ): Promise<OutfitVideoProject> {
   const data = await ecomBookFetch(
     `${BASE}/projects/${projectId}/shots/${sceneIndex}/adapt-storyboard`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    },
+  );
+  return parseOutfitProject(data.project as OutfitVideoProject);
+}
+
+export function parseOutfitProductionMeta(
+  meta: OutfitVideoProject["meta"],
+): OutfitProductionMeta | null {
+  const raw = meta?.outfitProductionMeta;
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const status = o.status;
+  if (
+    status !== "none" &&
+    status !== "generating" &&
+    status !== "ready" &&
+    status !== "stale" &&
+    status !== "partial_failed" &&
+    status !== "failed"
+  ) {
+    return null;
+  }
+  return {
+    status,
+    generatedAt: typeof o.generatedAt === "string" ? o.generatedAt : undefined,
+    failCount: typeof o.failCount === "number" ? o.failCount : undefined,
+    splitModelKey: typeof o.splitModelKey === "string" ? o.splitModelKey : undefined,
+  };
+}
+
+export async function generateOutfitVideoProductionStoryboard(
+  projectId: string,
+): Promise<OutfitVideoProject> {
+  const data = await ecomBookFetch(
+    `${BASE}/projects/${projectId}/generate-production-storyboard`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

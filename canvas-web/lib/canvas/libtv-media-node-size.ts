@@ -170,10 +170,23 @@ export function resolveLibtvMediaNodeBoxSize(
     mediaFit?: boolean;
     mediaNaturalW?: number;
     mediaNaturalH?: number;
+    mediaAspectPreset?: string;
   };
 
-  if (data.gridSplitFrameCrop && data.mediaFit) {
-    return readNodeMeasuredBox(node);
+  if (
+    data.gridSplitFrameCrop &&
+    data.mediaFit &&
+    !data.mediaAspectPreset?.trim() &&
+    typeof data.mediaNaturalW === "number" &&
+    typeof data.mediaNaturalH === "number" &&
+    data.mediaNaturalW >= 1 &&
+    data.mediaNaturalH >= 1
+  ) {
+    return computeLibtvMediaNodeSize(
+      data.mediaNaturalW,
+      data.mediaNaturalH,
+      "square-image",
+    );
   }
 
   const presetProfile = resolveLibtvMediaAspectPresetProfile(node, allNodes);
@@ -298,6 +311,32 @@ export function reconcileLibtvMediaNodeBoxSizes(
       };
     } else if (n.type && LIBTV_MEDIA_ASPECT_PRESET_NODE_TYPES.has(n.type)) {
       if (shouldSkipLibtvMediaAspectPresetForNaturalMedia(n)) {
+        const gd = n.data as {
+          gridSplitFrameCrop?: boolean;
+          mediaFit?: boolean;
+        };
+        if (gd.gridSplitFrameCrop && gd.mediaFit) {
+          if (n.parentId) return n;
+          expected = resolveLibtvMediaNodeBoxSize(n, nodes);
+          const measured = readNodeMeasuredBox(n);
+          if (
+            measured.width === expected.width &&
+            measured.height === expected.height
+          ) {
+            return n;
+          }
+          changed = true;
+          return {
+            ...n,
+            width: expected.width,
+            height: expected.height,
+            style: {
+              ...(typeof n.style === "object" && n.style ? n.style : {}),
+              width: expected.width,
+              height: expected.height,
+            },
+          };
+        }
         return n;
       }
       profile = resolveLibtvMediaAspectPresetProfile(n, nodes);
@@ -404,7 +443,18 @@ export function isLibtvMediaNodeBoxStale(
     mediaNaturalH?: number;
     manualSize?: boolean;
     mediaAspectPreset?: string;
+    gridSplitFrameCrop?: boolean;
+    pro2MediaRole?: string;
   };
+
+  if (d.gridSplitFrameCrop) return false;
+  if (
+    d.pro2MediaRole === "frame" ||
+    d.pro2MediaRole === "scene" ||
+    d.pro2MediaRole === "character-three-view"
+  ) {
+    return false;
+  }
 
   if (d.mediaAspectPreset?.trim()) return false;
 

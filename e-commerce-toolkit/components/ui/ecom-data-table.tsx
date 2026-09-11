@@ -5,7 +5,8 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /** 模式 A · 数据表外壳（见 design/TABLE.md） */
-export const ecomDataTableWrapClass = "overflow-x-auto rounded-lg border border-[#e8e8ed]";
+export const ecomDataTableWrapClass =
+  "min-w-0 max-w-full w-full overflow-x-auto rounded-lg border border-[#e8e8ed]";
 
 /** 模式 A · 表格本体 */
 export const ecomDataTableClass = "w-full border-collapse text-left text-xs";

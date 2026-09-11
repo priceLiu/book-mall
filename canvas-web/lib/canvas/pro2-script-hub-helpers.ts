@@ -33,6 +33,7 @@ import { PRO2_PRODUCTION_SCRIPT_SCHEMA_VERSION } from "./data/pro2-production-sc
 import {
   hubAggregateStatus,
   hubDataForColumnSync,
+  hubHasDisplayableScriptContent,
   hubSectionIsRunning,
   hubShowsGeneratingUi,
   resolveHubStoryboardMd,
@@ -173,6 +174,29 @@ export function pro2HubHasOutlineContent(d: StoryProScriptHubNodeData): boolean 
   }
   if (isUnparsedPro2ProductionJsonBlob(raw)) return true;
   return Boolean(resolveHubOutlineMd(d).trim());
+}
+
+/** 节点卡预览区是否已有可渲染 Tab（与 story-pro2-script-hub-node hasPreviewContent 一致） */
+export function hubScriptPreviewReady(
+  d: StoryProScriptHubNodeData,
+  ctx?: Pro2HubSceneResolveContext,
+): boolean {
+  return (
+    pro2HubHasScriptTable(d) ||
+    pro2HubHasCharacterTable(d) ||
+    pro2HubHasSceneTable(d, ctx) ||
+    pro2HubHasOutlineContent(d)
+  );
+}
+
+/** 任务已落库但 repair/sync 尚未完成 · 勿提前清扫光/勿闪回「已链接」空态 */
+export function hubContentPendingPreview(
+  d: StoryProScriptHubNodeData,
+  ctx?: Pro2HubSceneResolveContext,
+): boolean {
+  return (
+    hubHasDisplayableScriptContent(d) && !hubScriptPreviewReady(d, ctx)
+  );
 }
 
 /** @deprecated 别名 · 使用 hubHasDisplayableScriptContent */
@@ -467,6 +491,7 @@ export function pro2HubIsGenerating(
     hubTasks != null && hubTasks.length > 0
       ? hubHasServerInflightLlmTask(node.id, hubTasks)
       : false;
+  if (hubContentPendingPreview(d)) return true;
   return hubShowsGeneratingUi(node, d.hubGenerateIntent, serverInflight);
 }
 

@@ -1,6 +1,46 @@
 import type { CanvasFlowNode } from "./types";
 import { ensureNodeDragHandles } from "./normalize-graph-nodes";
 import { pickStoreToRfPosition } from "./canvas-rf-sync-position";
+import {
+  isPro2StyledGroup,
+  syncPro2MediaGroupZIndex,
+} from "./pro2-media-group-meta";
+import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
+
+/** RF 节点列表 · 媒体组 zIndex 与选中态对齐（须写回 useNodesState，勿仅 useMemo 派生） */
+export function applyRfNodesMediaGroupZIndex(
+  nodes: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  return syncPro2MediaGroupZIndex(nodes);
+}
+
+function isStyledMediaGroupNode(
+  node: CanvasFlowNode,
+  allNodes: CanvasFlowNode[],
+): boolean {
+  return (
+    node.type === "group" &&
+    (isPro2StyledGroup(node, allNodes) || isSbv1MediaGroup(node, allNodes))
+  );
+}
+
+/** 媒体组 zIndex 随 RF 选中态本地计算 · store 合并时勿用陈旧 zIndex 覆盖 */
+function mergeZIndexFromStoreToRf(
+  rf: CanvasFlowNode,
+  sn: CanvasFlowNode,
+  storeNodes: CanvasFlowNode[],
+): number | undefined {
+  if (isStyledMediaGroupNode(sn, storeNodes)) {
+    return rf.zIndex ?? sn.zIndex;
+  }
+  if (sn.parentId) {
+    const parent = storeNodes.find((n) => n.id === sn.parentId);
+    if (parent && isStyledMediaGroupNode(parent, storeNodes)) {
+      return rf.zIndex ?? sn.zIndex;
+    }
+  }
+  return sn.zIndex;
+}
 
 /** 仅更新 RF 本地选中（不写 zustand），供 focusCanvasNode / 打组后选中新组 */
 export const CANVAS_RF_SELECT_NODE_EVENT = "canvas:rf-select-node";
@@ -52,6 +92,7 @@ export function mergeStoreNodesIntoRf(
         : rebuilt;
     }
     const selected = preserveRfSelection ? rf.selected : sn.selected;
+    const zIndex = mergeZIndexFromStoreToRf(rf, sn, storeNodes);
     if (
       rf.type === sn.type &&
       rf.data === sn.data &&
@@ -60,7 +101,7 @@ export function mergeStoreNodesIntoRf(
       rf.position.y === sn.position.y &&
       rf.width === sn.width &&
       rf.height === sn.height &&
-      rf.zIndex === sn.zIndex &&
+      rf.zIndex === zIndex &&
       rf.parentId === sn.parentId
     ) {
       next.push(rf);
@@ -81,7 +122,7 @@ export function mergeStoreNodesIntoRf(
       }),
       width: sn.width,
       height: sn.height,
-      zIndex: sn.zIndex,
+      zIndex,
       parentId: sn.parentId,
       extent: sn.extent,
       style: sn.style,

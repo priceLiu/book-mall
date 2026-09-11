@@ -29,8 +29,11 @@ import {
   hdResolutionForScale,
   hdScaleLabel,
   hdUpscaleDockPrompt,
+  snapHdGridCellAspectRatio,
   type LibtvGridHdScaleId,
 } from "./libtv-grid-split-hd";
+import { gridSplitCellExtractRect } from "./grid-split-cell-extract";
+import type { Sbv1ImageAspectRatio } from "./sbv1-image-models";
 import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 import type { StoryRefImage } from "./story-ref-image";
 import { resolveHdGridSplitImageInputs } from "./resolve-hd-grid-split-image-inputs";
@@ -124,6 +127,52 @@ function computeGridCellNodeSizeFromNatural(
   return computeLibtvMediaNodeSize(cellW, cellH, "square-image");
 }
 
+function estimateGridCellPixelSize(
+  source: CanvasFlowNode,
+  split: LibtvImageGridSplitState,
+  cellIndex: number,
+): { cellW: number; cellH: number } {
+  const crop = buildGridSplitCrop(source.id, split, cellIndex);
+  const frameW = source.width ?? PRO2_IMAGE_NODE_WIDTH;
+  const frameH = source.height ?? PRO2_IMAGE_NODE_HEIGHT;
+  const stageW = Math.max(1, frameW);
+  const stageH = Math.max(1, frameH - LIBTV_IMAGE_NODE_HEADER_HEIGHT);
+  const cellNw = stageW / Math.max(1, split.cols);
+  const cellNh = stageH / Math.max(1, split.rows);
+  return {
+    cellW: cellNw * split.cols,
+    cellH: cellNh * split.rows,
+  };
+}
+
+function aspectRatioForGridCell(
+  source: CanvasFlowNode,
+  split: LibtvImageGridSplitState,
+  cellIndex: number,
+  imgNatural?: { w: number; h: number },
+): Sbv1ImageAspectRatio {
+  if (imgNatural) {
+    const crop = buildGridSplitCrop(source.id, split, cellIndex);
+    const rect = gridSplitCellExtractRect(
+      imgNatural.w,
+      imgNatural.h,
+      crop.col,
+      crop.row,
+      crop.cols,
+      crop.rows,
+    );
+    return snapHdGridCellAspectRatio(rect.width, rect.height);
+  }
+  const { cellW, cellH } = estimateGridCellPixelSize(source, split, cellIndex);
+  const region = gridSplitCropRegion(
+    buildGridSplitCrop(source.id, split, cellIndex),
+  );
+  return snapHdGridCellAspectRatio(
+    cellW * region.w,
+    cellH * region.h,
+  );
+}
+
 function estimateGridCellNodeSize(
   source: CanvasFlowNode,
   split: LibtvImageGridSplitState,
@@ -166,6 +215,17 @@ function scheduleHdGridSplitNodeSizeBackfill(
           const idx = nodeIds.indexOf(n.id);
           if (idx < 0) return n;
           const size = sizes[idx]!;
+          const cellIndex = split.selected[idx]!;
+          const crop = buildGridSplitCrop(sourceNodeId, split, cellIndex);
+          const rect = gridSplitCellExtractRect(
+            w,
+            h,
+            crop.col,
+            crop.row,
+            crop.cols,
+            crop.rows,
+          );
+          const aspectRatio = snapHdGridCellAspectRatio(rect.width, rect.height);
           return {
             ...n,
             width: size.width,
@@ -174,6 +234,12 @@ function scheduleHdGridSplitNodeSizeBackfill(
               ...(n.style ?? {}),
               width: size.width,
               height: size.height,
+            },
+            data: {
+              ...n.data,
+              aspectRatio,
+              mediaNaturalW: rect.width,
+              mediaNaturalH: rect.height,
             },
           };
         }),
@@ -199,6 +265,7 @@ function applyHdGridSplitPlaceholderNode(
   crop: GridSplitCrop,
   size: LibtvMediaNodeSize,
   dockInput: string,
+  aspectRatio: Sbv1ImageAspectRatio,
 ): void {
   const previewUrl = gridSplitSourceUrl(sourceData) ?? sourceUrl;
   const dockRefImages: StoryRefImage[] = [
@@ -223,6 +290,7 @@ function applyHdGridSplitPlaceholderNode(
               gridSplitCrop: crop,
               gridSplitSourceUrl: sourceUrl,
               imageMode: "img2img",
+              aspectRatio,
               pro2HdFromGridSplit: true,
               gridSplitFrameCrop: false,
               mediaFit: true,
@@ -242,7 +310,30 @@ function applyCroppedFrameNode(
   cellWidth: number,
   cellHeight: number,
 ): void {
-  const size = computeLibtvMediaNodeSize(cellWidth, cellHeight, "square-image");
+  applyPrecroppedGridSplitNode(setNodes, nodeId, `hd-ref-${nodeId}`, blobUrl, {
+    cellWidth,
+    cellHeight,
+    isOss: false,
+  });
+}
+
+/** 宫格裁切完成 · 写入参考图并按单元比例自适应节点 */
+function applyPrecroppedGridSplitNode(
+  setNodes: GridSplitFrameGroupStore["setNodes"],
+  nodeId: string,
+  refId: string,
+  url: string,
+  opts: { cellWidth: number; cellHeight: number; isOss: boolean },
+): void {
+  const aspectRatio = snapHdGridCellAspectRatio(opts.cellWidth, opts.cellHeight);
+  const size = computeLibtvMediaNodeSize(
+    opts.cellWidth,
+    opts.cellHeight,
+    "square-image",
+  );
+  const dockRefImages: StoryRefImage[] = [
+    { id: refId, label: "参考图", url },
+  ];
   setNodes((prev) =>
     prev.map((n) =>
       n.id === nodeId
@@ -257,13 +348,20 @@ function applyCroppedFrameNode(
             },
             data: {
               ...n.data,
-              blobUrl,
-              ossUrl: undefined,
+              dockRefImages,
+              ...(opts.isOss
+                ? { ossUrl: url, blobUrl: undefined, uploading: false }
+                : { blobUrl: url, ossUrl: undefined }),
               gridSplitCrop: undefined,
+              gridSplitSourceUrl: undefined,
               gridSplitFrameCrop: true,
+              aspectRatio,
+              mediaAspectPreset: "",
               mediaFit: true,
-              mediaFitKey: blobUrl,
+              mediaFitKey: url,
               mediaFitVersion: LIBTV_MEDIA_FIT_VERSION,
+              mediaNaturalW: opts.cellWidth,
+              mediaNaturalH: opts.cellHeight,
             },
           }
         : n,
@@ -470,34 +568,63 @@ export type GridSplitExpandStore = {
   updateNodeData?: (id: string, patch: Record<string, unknown>) => void;
 };
 
-/** spawn 后后台服务端裁切（顺序执行，预览与提交共用 OSS，避免 CSS 精灵串格） */
-function scheduleHdGridSplitServerCropBackfill(
+/** 宫格高清 · 提交前裁切选中格（OSS 优先，本地 blob 走 canvas 裁切） */
+async function finalizeHdGridSplitCellCrop(
   store: GridSplitExpandStore,
   sourceUrl: string,
-  entries: { nodeId: string; crop: GridSplitCrop }[],
-): void {
+  nodeId: string,
+  crop: GridSplitCrop,
+): Promise<boolean> {
+  const refId = `hd-ref-${nodeId}`;
   const { base, projectId, updateNodeData } = store;
-  if (!base || !projectId || !updateNodeData || !entries.length) return;
 
-  void (async () => {
-    for (const { nodeId, crop } of entries) {
+  if (base && projectId && updateNodeData && /^https?:\/\//.test(sourceUrl)) {
+    try {
+      const urls = await resolveHdGridSplitImageInputs(
+        base,
+        projectId,
+        nodeId,
+        {
+          pro2HdFromGridSplit: true,
+          gridSplitCrop: crop,
+          gridSplitSourceUrl: sourceUrl,
+        },
+        updateNodeData,
+      );
+      if (!urls.length) return false;
       try {
-        await resolveHdGridSplitImageInputs(
-          base,
-          projectId,
-          nodeId,
-          {
-            pro2HdFromGridSplit: true,
-            gridSplitCrop: crop,
-            gridSplitSourceUrl: sourceUrl,
-          },
-          updateNodeData,
-        );
+        const { w, h } = await loadImageNaturalSize(urls[0]!);
+        applyPrecroppedGridSplitNode(store.setNodes, nodeId, refId, urls[0]!, {
+          cellWidth: w,
+          cellHeight: h,
+          isOss: true,
+        });
       } catch {
-        /* 生成时 run-queue 仍会重试裁切 */
+        /* resolveHdGridSplitImageInputs 已写入 ossUrl / dockRefImages */
       }
+      return true;
+    } catch {
+      return false;
     }
-  })();
+  }
+
+  try {
+    const cropped = await cropGridSplitCell(sourceUrl, crop);
+    applyPrecroppedGridSplitNode(
+      store.setNodes,
+      nodeId,
+      refId,
+      cropped.blobUrl,
+      {
+        cellWidth: cropped.cellWidth,
+        cellHeight: cropped.cellHeight,
+        isOss: false,
+      },
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function relayoutSpawnedHdNodes(
@@ -596,13 +723,13 @@ export async function spawnExpandImageFromGridSplit(
   return newIds;
 }
 
-/** 选中宫格 · 生成高清图（即时建节点 + 连线；裁切在提交时由服务端完成） */
-export function spawnHdImageFromGridSplit(
+/** 选中宫格 · 生成高清图（建节点 + 裁切选中格后再提交） */
+export async function spawnHdImageFromGridSplit(
   sourceNodeId: string,
   split: LibtvImageGridSplitState,
   scaleId: LibtvGridHdScaleId,
   store: GridSplitExpandStore,
-): { nodeIds: string[]; runnableIds: string[] } {
+): Promise<{ nodeIds: string[]; runnableIds: string[] }> {
   if (!split.selected.length) return { nodeIds: [], runnableIds: [] };
 
   const readNodes = () => store.getNodes?.() ?? store.nodes;
@@ -621,12 +748,12 @@ export function spawnHdImageFromGridSplit(
   const positions = layoutGridSplitSpawnPositions(source, cellSizes);
 
   const nodeIds: string[] = [];
-  const runnableIds: string[] = [];
   const cropEntries: { nodeId: string; crop: GridSplitCrop }[] = [];
 
   for (let i = 0; i < split.selected.length; i++) {
     const cellIndex = split.selected[i]!;
     const crop = buildGridSplitCrop(sourceNodeId, split, cellIndex);
+    const aspectRatio = aspectRatioForGridCell(source, split, cellIndex);
     const pos = positions[i] ?? spawnPositionRightOf(source, i);
     const newId = store.addNode("story-pro2-image", pos, {
       ...buildPro2ImageNodeData({
@@ -639,7 +766,7 @@ export function spawnHdImageFromGridSplit(
         resolution: hdResolutionForScale(scaleId),
         imageQuality: "high",
         engine: sourceData.engine,
-        aspectRatio: "auto",
+        aspectRatio,
         outputCount: sourceData.outputCount ?? 1,
         pro2HubNodeId: sourceNodeId,
         pro2HdFromGridSplit: true,
@@ -648,7 +775,6 @@ export function spawnHdImageFromGridSplit(
     if (!newId) continue;
 
     nodeIds.push(newId);
-    runnableIds.push(newId);
     cropEntries.push({ nodeId: newId, crop });
 
     const refId = `hd-ref-${newId}`;
@@ -662,6 +788,7 @@ export function spawnHdImageFromGridSplit(
       crop,
       cellSize,
       dockInput,
+      aspectRatio,
     );
 
     store.setEdges((prev) => [
@@ -684,7 +811,17 @@ export function spawnHdImageFromGridSplit(
     sourceUrl,
     nodeIds,
   );
-  scheduleHdGridSplitServerCropBackfill(store, sourceUrl, cropEntries);
+
+  const runnableIds: string[] = [];
+  for (const entry of cropEntries) {
+    const ok = await finalizeHdGridSplitCellCrop(
+      store,
+      sourceUrl,
+      entry.nodeId,
+      entry.crop,
+    );
+    if (ok) runnableIds.push(entry.nodeId);
+  }
 
   const lastId = nodeIds[nodeIds.length - 1];
   if (lastId) selectPro2NodeAfterSpawn(store.setNodes, lastId);

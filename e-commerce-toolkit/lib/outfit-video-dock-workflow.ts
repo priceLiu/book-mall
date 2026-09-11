@@ -62,7 +62,7 @@ export function outfitBottomDockWelcome(mode: OutfitBottomDockMode): string {
     case "generate-busy":
       return "镜头生成进行中，可在上方表格查看进度。";
     case "compose-ready":
-      return "全部镜头已就绪。点击「合成成片」输出竖屏成片。";
+      return "至少 2 镜视频已就绪。点击「合成成片」输出竖屏成片（可在制作表勾选部分镜头）。";
     case "compose-busy":
       return "正在合成成片，请稍候…";
     case "idle":
