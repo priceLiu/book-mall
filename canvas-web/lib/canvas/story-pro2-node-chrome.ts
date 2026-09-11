@@ -156,6 +156,16 @@ export const PRO2_COLUMN_CARD_HEIGHT = 120;
 export const PRO2_CARD_SHELL_CLASS =
   "libtv-control-node-bg rounded-xl border shadow-sm transition-shadow";
 
+/** 2.0 文本 / 标签 / 剧本节点卡片 · #262626（与媒体节点一致） */
+export const PRO2_TEXT_TAG_SCRIPT_CARD_SHELL_CLASS =
+  "libtv-media-node-bg rounded-xl border shadow-sm transition-shadow";
+
+/** 剧本节点内表格 · 表头 #2E2E2E / 表体 #1E1E1E（见 globals.css） */
+export const PRO2_SCRIPT_TABLE_HEADER_CLASS =
+  "pro2-script-table-header-bg border border-violet-400/15 px-2 py-1 font-medium whitespace-nowrap text-violet-100/90";
+export const PRO2_SCRIPT_TABLE_CELL_CLASS =
+  "pro2-script-table-body-bg border border-violet-400/10 align-top px-2 py-1 text-white/75";
+
 /** 2.0 风格素材节点（与媒体节点同色 #262626） */
 export const PRO2_STYLE_ASSET_CARD_SHELL_CLASS =
   "libtv-media-node-bg rounded-xl border shadow-sm transition-shadow";

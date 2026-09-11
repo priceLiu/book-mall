@@ -9,6 +9,10 @@ import {
 import type { Pro2ScriptHubViewTab } from "@/lib/canvas/pro2-script-hub-view-types";
 import { resolveShotPropNames } from "@/lib/canvas/pro2-production-script-render-md";
 import { formatPro2CharacterAppearanceCell } from "@/lib/canvas/pro2-character-script-fields";
+import {
+  PRO2_SCRIPT_TABLE_CELL_CLASS,
+  PRO2_SCRIPT_TABLE_HEADER_CLASS,
+} from "@/lib/canvas/story-pro2-node-chrome";
 import { cn } from "@/lib/utils";
 
 function DarkTable({
@@ -32,7 +36,7 @@ function DarkTable({
           {headers.map((h) => (
             <th
               key={h}
-              className="border border-violet-400/15 bg-violet-500/10 px-2 py-1 font-medium whitespace-nowrap text-violet-100/90"
+              className={PRO2_SCRIPT_TABLE_HEADER_CLASS}
             >
               {h}
             </th>
@@ -45,7 +49,10 @@ function DarkTable({
             {cells.map((cell, j) => (
               <td
                 key={j}
-                className="max-w-[280px] border border-violet-400/10 bg-black/20 px-2 py-1 align-top text-white/75"
+                className={cn(
+                  "max-w-[280px]",
+                  PRO2_SCRIPT_TABLE_CELL_CLASS,
+                )}
               >
                 <p
                   className={cn(

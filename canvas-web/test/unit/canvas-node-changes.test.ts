@@ -6,6 +6,9 @@ import {
   extractNodeRemoveChanges,
   extractResizeCommitIds,
   extractSelectNodeChanges,
+  resolveActiveResizeCommitIds,
+  shouldFilterDimensionResizeCommit,
+  trackNonGroupNodeResizeSession,
   filterStoreBoundNodeChanges,
   findGroupResizeSessionId,
   hasNodeRemoveChanges,
@@ -192,6 +195,93 @@ describe("findGroupResizeSessionId", () => {
     ];
     expect(findGroupResizeSessionId(changes, [{ id: "g1", type: "group" }])).toBe(
       "g1",
+    );
+  });
+});
+
+describe("resolveActiveResizeCommitIds", () => {
+  it("commits non-group node resize when session is active", () => {
+    const session = new Set<string>();
+    const changes: NodeChange[] = [
+      {
+        type: "dimensions",
+        id: "n1",
+        resizing: false,
+        dimensions: { width: 400, height: 300 },
+      },
+    ];
+    trackNonGroupNodeResizeSession(
+      [
+        {
+          type: "dimensions",
+          id: "n1",
+          resizing: true,
+          dimensions: { width: 380, height: 280 },
+        },
+      ],
+      [{ id: "n1", type: "story-pro2-image" }],
+      session,
+    );
+    expect(
+      resolveActiveResizeCommitIds(changes, [{ id: "n1", type: "story-pro2-image" }], {
+        groupResizeUserActive: false,
+        nodeResizeSession: session,
+      }),
+    ).toEqual(["n1"]);
+  });
+
+  it("ignores non-group resize commit without session", () => {
+    const changes: NodeChange[] = [
+      {
+        type: "dimensions",
+        id: "n1",
+        resizing: false,
+        dimensions: { width: 400, height: 300 },
+      },
+    ];
+    expect(
+      resolveActiveResizeCommitIds(changes, [{ id: "n1", type: "story-pro2-image" }], {
+        groupResizeUserActive: false,
+        nodeResizeSession: new Set(),
+      }),
+    ).toEqual([]);
+  });
+
+  it("commits group resize only when group session is active", () => {
+    const changes: NodeChange[] = [
+      {
+        type: "dimensions",
+        id: "g1",
+        resizing: false,
+        dimensions: { width: 400, height: 300 },
+      },
+    ];
+    expect(
+      resolveActiveResizeCommitIds(changes, [{ id: "g1", type: "group" }], {
+        groupResizeUserActive: true,
+        nodeResizeSession: new Set(),
+      }),
+    ).toEqual(["g1"]);
+    expect(
+      resolveActiveResizeCommitIds(changes, [{ id: "g1", type: "group" }], {
+        groupResizeUserActive: false,
+        nodeResizeSession: new Set(),
+      }),
+    ).toEqual([]);
+  });
+});
+
+describe("shouldFilterDimensionResizeCommit", () => {
+  it("filters inactive dimension commits", () => {
+    const change: NodeChange = {
+      type: "dimensions",
+      id: "n1",
+      resizing: false,
+      dimensions: { width: 400, height: 300 },
+    };
+    expect(shouldFilterDimensionResizeCommit(change, new Set())).toBe(true);
+    expect(shouldFilterDimensionResizeCommit(change, new Set(["n1"]))).toBe(
+      false,
     );
   });
 });

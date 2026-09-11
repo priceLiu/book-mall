@@ -11,7 +11,11 @@ import { resolvePro2StoryboardMdFromPackSource } from "@/lib/canvas/story-hub-ru
 import { mergeStoryboardRowsWithProductionScript } from "@/lib/canvas/pro2-production-script-render-md";
 import type { Pro2ScriptHubViewTab } from "@/lib/canvas/pro2-script-hub-view-types";
 import type { Pro2ProductionScript } from "@/lib/canvas/data/pro2-production-script-schema";
-import { PRO2_TEXT_NODE_TITLE_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
+import {
+  PRO2_SCRIPT_TABLE_CELL_CLASS,
+  PRO2_SCRIPT_TABLE_HEADER_CLASS,
+  PRO2_TEXT_NODE_TITLE_CLASS,
+} from "@/lib/canvas/story-pro2-node-chrome";
 import { Pro2ProductionScriptHtmlPreview } from "./pro2-production-script-html-preview";
 import { LIBTV_NODE_STAGE_DRAG_CLASS } from "@/components/canvas/libtv-thin-node-try-row";
 import { cn } from "@/lib/utils";
@@ -49,10 +53,8 @@ const CHARACTER_COLS = [
 
 const TABLE =
   "w-max min-w-full border-collapse border border-violet-400/20 text-left text-[10px]";
-const TH =
-  "border border-violet-400/15 bg-violet-500/10 px-2 py-1 font-medium text-violet-100/90 whitespace-nowrap";
-const TD =
-  "border border-violet-400/10 bg-black/20 align-top px-2 py-1 text-white/75";
+const TH = PRO2_SCRIPT_TABLE_HEADER_CLASS;
+const TD = PRO2_SCRIPT_TABLE_CELL_CLASS;
 
 /** 2.0 脚本节点 · 大纲 / 场景 / 角色 / 分镜表卡片预览 */
 export function Pro2ScriptHubContentPreview({

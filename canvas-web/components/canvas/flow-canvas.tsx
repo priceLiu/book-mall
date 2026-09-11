@@ -38,6 +38,9 @@ import {
   extractNodeRemoveChanges,
   extractResizeCommitIds,
   findGroupResizeSessionId,
+  resolveActiveResizeCommitIds,
+  shouldFilterDimensionResizeCommit,
+  trackNonGroupNodeResizeSession,
   hasNodeRemoveChanges,
   isGroupResizeCommitFrame,
   isCanvasInteractiveGeometryInProgress,
@@ -296,6 +299,8 @@ function FlowCanvasInner({
   const groupChildDragLiftRef = useRef<Set<string>>(new Set());
   /** 用户真实拖过组框角/边（resizing:true）· pointerup 仅此时落库 */
   const groupResizeUserActiveRef = useRef(false);
+  /** 非组框 NodeResizer session · 松手后 commitNodesGeometryFromRf */
+  const nodeResizeSessionRef = useRef<Set<string>>(new Set());
   /** store→RF 推送期间忽略 RF 回写的选中/测量/坐标 echo，避免打组后 Maximum update depth */
   const syncingGraphFromStoreRef = useRef(false);
   const syncingGraphFromStoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -854,20 +859,36 @@ function FlowCanvasInner({
   /** RF 末帧无 resizing:false 时，pointerup 兜底提交；须曾出现 resizing:true */
   useEffect(() => {
     const onPointerUp = () => {
-      if (!groupResizeUserActiveRef.current) {
+      if (groupResizeUserActiveRef.current) {
+        const groupId = groupResizeIdRef.current;
+        if (!groupId || !groupResizeFrozenRef.current) {
+          clearGroupResizeSession();
+          return;
+        }
+        const rfNodeList = getNodes() as CanvasFlowNode[];
+        if (performGroupResizeCommit(groupId, rfNodeList)) {
+          flushAutosaveAfterDrag();
+        }
         clearGroupResizeSession();
+        deferStoreGraphSyncRef.current = false;
+        setCanvasGeometryDragging(false);
+        setCanvasDraggingNodeId(null);
         return;
       }
-      const groupId = groupResizeIdRef.current;
-      if (!groupId || !groupResizeFrozenRef.current) {
+
+      const pendingNodeIds = [...nodeResizeSessionRef.current];
+      if (pendingNodeIds.length === 0) {
         clearGroupResizeSession();
         return;
       }
       const rfNodeList = getNodes() as CanvasFlowNode[];
-      if (performGroupResizeCommit(groupId, rfNodeList)) {
-        flushAutosaveAfterDrag();
+      const patches = buildGeometryPatchesFromRf(pendingNodeIds, rfNodeList);
+      if (patches.length > 0) {
+        useCanvasStore.getState().commitNodesGeometryFromRf(patches);
       }
-      clearGroupResizeSession();
+      for (const id of pendingNodeIds) {
+        nodeResizeSessionRef.current.delete(id);
+      }
       deferStoreGraphSyncRef.current = false;
       setCanvasGeometryDragging(false);
       setCanvasDraggingNodeId(null);
@@ -920,8 +941,20 @@ function FlowCanvasInner({
 
       // 始终只更新本地 RF 状态 → 拖动每帧只重绘被拖节点，画面流畅
       const rfBeforeChange = getNodes() as CanvasFlowNode[];
+      trackNonGroupNodeResizeSession(
+        rfChanges,
+        rfBeforeChange,
+        nodeResizeSessionRef.current,
+      );
       const groupResizingId = findGroupResizeSessionId(changes, rfBeforeChange);
-      const resizeCommitIdsEarly = extractResizeCommitIds(rfChanges);
+      const resizeCommitIdsEarly = resolveActiveResizeCommitIds(
+        rfChanges,
+        rfBeforeChange,
+        {
+          groupResizeUserActive: groupResizeUserActiveRef.current,
+          nodeResizeSession: nodeResizeSessionRef.current,
+        },
+      );
       if (groupResizingId) {
         groupResizeUserActiveRef.current = true;
         if (groupResizeIdRef.current !== groupResizingId) {
@@ -1015,14 +1048,14 @@ function FlowCanvasInner({
         return;
       }
 
+      const activeResizeCommitIdSet = new Set(
+        resolveActiveResizeCommitIds(rfChanges, rfAfterChange, {
+          groupResizeUserActive: groupResizeUserActiveRef.current,
+          nodeResizeSession: nodeResizeSessionRef.current,
+        }),
+      );
       const storeChanges = filterStoreBoundNodeChanges(rfChanges).filter(
-        (c) =>
-          !(
-            !groupResizeUserActiveRef.current &&
-            c.type === "dimensions" &&
-            "resizing" in c &&
-            c.resizing === false
-          ),
+        (c) => !shouldFilterDimensionResizeCommit(c, activeResizeCommitIdSet),
       );
       const syncLibtvFloatingDockPinFromRf = () => {
         const sel = resolveLibtvFloatingDockSelection(
@@ -1072,9 +1105,14 @@ function FlowCanvasInner({
         }
       }
 
-      const resizeCommitIds = groupResizeUserActiveRef.current
-        ? extractResizeCommitIds(rfChanges)
-        : [];
+      const resizeCommitIds = resolveActiveResizeCommitIds(
+        rfChanges,
+        rfAfterChange,
+        {
+          groupResizeUserActive: groupResizeUserActiveRef.current,
+          nodeResizeSession: nodeResizeSessionRef.current,
+        },
+      );
       if (resizeCommitIds.length > 0) {
         deferStoreGraphSyncRef.current = false;
         setCanvasGeometryDragging(false);
@@ -1105,6 +1143,9 @@ function FlowCanvasInner({
           );
           if (patches.length > 0) {
             useCanvasStore.getState().commitNodesGeometryFromRf(patches);
+          }
+          for (const id of nonGroupResizeIds) {
+            nodeResizeSessionRef.current.delete(id);
           }
         }
         const resizeIdSet = new Set(resizeCommitIds);

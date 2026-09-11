@@ -17,7 +17,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
-  PRO2_CARD_SHELL_CLASS,
+  PRO2_TEXT_TAG_SCRIPT_CARD_SHELL_CLASS,
   pro2NodeBorderColor,
   PRO2_NODE_HANDLE_CLASS,
   PRO2_TEXT_NODE_MIN_HEIGHT,
@@ -484,7 +484,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
 
       <div
         className={cn(
-          PRO2_CARD_SHELL_CLASS,
+          PRO2_TEXT_TAG_SCRIPT_CARD_SHELL_CLASS,
           LIBTV_CARD_DRAG_CLASS,
           "relative flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden",
         )}

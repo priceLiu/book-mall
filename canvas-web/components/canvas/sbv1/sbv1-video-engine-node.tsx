@@ -229,18 +229,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     undefined;
   const hasVideo = Boolean(videoUrl);
   const videoMediaEager = isMediaSrcLoaded(videoUrl ?? "");
-  const isUploadNaturalFit = Boolean(
-    d.mediaFit &&
-      d.mediaFitKey?.startsWith("upload|") &&
-      (d.runtime?.ephemeralUrl?.trim() || d.runtime?.ossUrl?.trim()),
-  );
-  const stageVideoFit: "cover" | "contain" = isPro2VideoBoardCell
-    ? "cover"
-    : isUploadNaturalFit
-      ? "cover"
-      : "contain";
-  const stageVideoFitClass =
-    stageVideoFit === "cover" ? "object-cover" : "object-contain";
+  /** Stage 内视频 · cover 铺满，避免比例未齐时出现深色留边（与 libtv-image-node 一致） */
+  const stageVideoFitClass = "object-cover object-center";
 
   const videoModelKey = d.engine?.modelKey;
   const errorBanner = useLibtvRuntimeErrorBanner({

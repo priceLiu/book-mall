@@ -13,7 +13,7 @@ import { selectPro2TagNodeDefaultLabel } from "@/lib/canvas/pro2-tag-node-label"
 import { useTagRichTextCommit } from "@/lib/canvas/use-tag-rich-text-commit";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
-  PRO2_CARD_SHELL_CLASS,
+  PRO2_TEXT_TAG_SCRIPT_CARD_SHELL_CLASS,
   pro2NodeBorderColor,
   PRO2_TAG_NODE_MIN_HEIGHT,
   PRO2_TAG_NODE_MIN_WIDTH,
@@ -203,7 +203,7 @@ export function StoryPro2TagNode({ id, data, selected, height }: NodeProps) {
 
       <div
         className={cn(
-          PRO2_CARD_SHELL_CLASS,
+          PRO2_TEXT_TAG_SCRIPT_CARD_SHELL_CLASS,
           LIBTV_CARD_DRAG_CLASS,
           "relative flex min-h-0 flex-1 flex-col",
           resizeCorner ? "overflow-visible" : "overflow-hidden",

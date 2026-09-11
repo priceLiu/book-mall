@@ -38,7 +38,7 @@ import {
 import { useCanvasStore } from "@/lib/canvas/store";
 import { PRO2_SCRIPT_HUB_NODE_LABEL } from "@/lib/canvas/story-pro2-node-chrome";
 import {
-  PRO2_CARD_SHELL_CLASS,
+  PRO2_TEXT_TAG_SCRIPT_CARD_SHELL_CLASS,
   PRO2_NODE_HANDLE_CLASS,
   PRO2_SCRIPT_NODE_MIN_HEIGHT,
   PRO2_SCRIPT_NODE_MIN_WIDTH,
@@ -550,7 +550,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
       <div
         className={cn(
           "canvas-node-shell",
-          PRO2_CARD_SHELL_CLASS,
+          PRO2_TEXT_TAG_SCRIPT_CARD_SHELL_CLASS,
           LIBTV_CARD_DRAG_CLASS,
           "relative flex h-full min-h-0 flex-col overflow-hidden",
           isGenerating && "canvas-node-generating",

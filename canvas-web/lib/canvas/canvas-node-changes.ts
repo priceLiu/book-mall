@@ -250,6 +250,61 @@ export function extractResizeCommitIds(changes: NodeChange[]): string[] {
   return ids;
 }
 
+/** 非组框 NodeResizer：`resizing: true` 时记入 session，松手后由 resolveActiveResizeCommitIds 落库 */
+export function trackNonGroupNodeResizeSession(
+  changes: NodeChange[],
+  rfNodes: Array<{ id: string; type?: string }>,
+  session: Set<string>,
+): void {
+  for (const c of changes) {
+    if (
+      c.type === "dimensions" &&
+      "id" in c &&
+      c.id &&
+      "resizing" in c &&
+      c.resizing === true
+    ) {
+      const n = rfNodes.find((x) => x.id === c.id);
+      if (n?.type !== "group") {
+        session.add(c.id);
+      }
+    }
+  }
+}
+
+/** 组框缩放须 group session；普通节点须 node resize session */
+export function resolveActiveResizeCommitIds(
+  changes: NodeChange[],
+  rfNodes: Array<{ id: string; type?: string }>,
+  opts: {
+    groupResizeUserActive: boolean;
+    nodeResizeSession: Set<string>;
+  },
+): string[] {
+  return extractResizeCommitIds(changes).filter((id) => {
+    const n = rfNodes.find((x) => x.id === id);
+    if (n?.type === "group") {
+      return opts.groupResizeUserActive;
+    }
+    return opts.nodeResizeSession.has(id);
+  });
+}
+
+/** store 同步时过滤未激活 session 的 dimensions 松手帧，避免 ResizeObserver echo 落库 */
+export function shouldFilterDimensionResizeCommit(
+  c: NodeChange,
+  activeResizeCommitIds: Set<string>,
+): boolean {
+  return (
+    c.type === "dimensions" &&
+    "resizing" in c &&
+    c.resizing === false &&
+    "id" in c &&
+    typeof c.id === "string" &&
+    !activeResizeCommitIds.has(c.id)
+  );
+}
+
 /**
  * LibTV 组框缩放松手：仅认 RF 明确发出的 `resizing: false`。
  * 末帧仅有 dimensions、无 resizing 键时由 pointerup 兜底提交（见 flow-canvas）。
