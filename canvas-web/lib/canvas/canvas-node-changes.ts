@@ -142,14 +142,14 @@ export function isCanvasRfLocalOnlyChange(changes: NodeChange[]): boolean {
  * LibTV 画布 · 忽略 RF 内部 echo（ResizeObserver 尺寸 / 组内选中相对坐标）。
  * 仅保留用户真实缩放（resizing 键）与组框缩放 commit 帧。
  */
-export function filterLibtvRfChangesBeforeApply(
-  changes: NodeChange[],
+export function filterLibtvRfChangesBeforeApply<T extends NodeChange>(
+  changes: T[],
   opts: {
     groupResizeUserActive: boolean;
     isGroupResizeCommit: boolean;
     resizeCommitIds?: string[];
   },
-): NodeChange[] {
+): T[] {
   const resizeCommitIds = new Set(opts.resizeCommitIds ?? []);
   return changes.filter((c) => {
     // 坐标落库走 onNodeDragStop · 组内选中常混 position dragging:false echo
