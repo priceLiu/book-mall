@@ -24,23 +24,27 @@ export function LibtvNodeToolbarPortal({
   visible,
   children,
   toolbarHeightEstimate,
+  /** 重绘等会话：不因 Dock 聚焦 / 拖节点而隐藏 */
+  pinVisible = false,
 }: {
   nodeId: string;
   visible: boolean;
   children: React.ReactNode;
   /** 顶栏预估高度（多行工具条须加大，以便靠近画布顶部时翻转到节点下方） */
   toolbarHeightEstimate?: number;
+  pinVisible?: boolean;
 }) {
   const mounted = useClientPortalMounted();
   const marqueeSelecting = useCanvasMarqueeSelecting();
-  const effectiveVisible = visible && !marqueeSelecting;
+  const effectiveVisible = pinVisible ? visible : visible && !marqueeSelecting;
   const rawPlacement = useLibtvNodeToolbarScreenPlacement(
     nodeId,
     effectiveVisible,
     toolbarHeightEstimate,
   );
   const placement = useStableLibtvNodeToolbarScreenPlacement(rawPlacement);
-  const hidden = useLibtvNodeToolbarHidden(nodeId);
+  const hiddenByInteraction = useLibtvNodeToolbarHidden(nodeId);
+  const hidden = pinVisible ? false : hiddenByInteraction;
   const zoom = useStore((s) => s.transform[2]);
   const toolbarScale = computeLibtvPortaledToolbarScale(zoom);
 
@@ -65,7 +69,13 @@ export function LibtvNodeToolbarPortal({
           pointerEvents: hidden ? "none" : undefined,
         }}
       >
-        <div className="pointer-events-none [&_button]:pointer-events-auto [&_a]:pointer-events-auto [&_[role=menuitem]]:pointer-events-auto [&_[data-libtv-toolbar-interactive]]:pointer-events-auto">
+        <div
+          className={
+            pinVisible
+              ? "pointer-events-auto"
+              : "pointer-events-none [&_button]:pointer-events-auto [&_input]:pointer-events-auto [&_select]:pointer-events-auto [&_a]:pointer-events-auto [&_[role=menuitem]]:pointer-events-auto [&_[data-libtv-toolbar-interactive]]:pointer-events-auto"
+          }
+        >
           {children}
         </div>
       </div>

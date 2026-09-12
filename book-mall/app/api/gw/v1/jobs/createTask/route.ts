@@ -457,6 +457,7 @@ export async function POST(request: NextRequest) {
           size: typeof ds.size === "string" ? ds.size : undefined,
           n: Number(ds.n ?? 1),
           contentOrder: ds.contentOrder,
+          bboxList: Array.isArray(ds.bboxList) ? ds.bboxList : undefined,
         });
         return NextResponse.json({
           code: 200,

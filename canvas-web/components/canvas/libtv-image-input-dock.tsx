@@ -28,8 +28,11 @@ import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import { pickDefaultSbv1ImageEngine, resolveDockImageEnginePick } from "@/lib/canvas/sbv1-image-models";
 import {
+  CANVAS_IMAGE_EDIT_MODEL_KEYS,
   canvasImageEditModelLabel,
   canvasImageEditRequiresRefs,
+  pickCanvasImageEditEngine,
+  type CanvasImageEditModelKey,
 } from "@/lib/canvas/canvas-image-edit-models";
 import {
   pickDefaultPro2FrameImageEngine,
@@ -57,6 +60,21 @@ import type { StoryProFrameRow } from "@/lib/canvas/story-pro-workspace-types";
 import type { StoryPro2ImageNodeData } from "@/lib/canvas/story-pro2-workspace-types";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 import { isLibtvMediaGenerating } from "@/components/canvas/libtv-media-generating-state";
+import { getInpaintCanvasHandle } from "@/lib/canvas/libtv-inpaint-canvas-registry";
+import {
+  isLibtvInpaintSessionActive,
+  patchLibtvInpaintSession,
+} from "@/lib/canvas/libtv-inpaint-session";
+import {
+  clearLibtvEraseSession,
+  isLibtvEraseSessionActive,
+  LIBTV_ERASE_FIXED_DOCK_PROMPT,
+} from "@/lib/canvas/libtv-erase-session";
+import { isLibtvExpandSessionActive } from "@/lib/canvas/libtv-expand-session";
+import { libtvDockFlowSize } from "@/lib/canvas/libtv-dock-scale";
+import { isLibtvCropSessionActive } from "@/lib/canvas/libtv-crop-session";
+import { runLibtvInpaint } from "@/lib/canvas/libtv-inpaint-run";
+import { runLibtvExpand } from "@/lib/canvas/libtv-expand-run";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import {
   normalizeModelKey,
@@ -198,6 +216,10 @@ function LibtvImageInputDockBody({
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
+  const projectId = useCanvasStore((s) => s.projectId);
+  const addNode = useCanvasStore((s) => s.addNode);
+  const setNodes = useCanvasStore((s) => s.setNodes);
+  const setEdges = useCanvasStore((s) => s.setEdges);
   const setPro2StyleLibImageNodeId = useCanvasStore(
     (s) => s.setPro2StyleLibImageNodeId,
   );
@@ -243,9 +265,26 @@ function LibtvImageInputDockBody({
   const dockRefImages = settingsData.dockRefImages ?? [];
   const previewUrl = settingsData.ossUrl ?? settingsData.blobUrl ?? "";
   const hasImage = Boolean(previewUrl);
-  const isRunning = isLibtvMediaGenerating(
-    (storeNode?.data ?? {}) as { uploading?: boolean; runtime?: { status?: string } },
-  );
+  const nodeDataRecord = (storeNode?.data ?? {}) as Record<string, unknown>;
+  const isInpaintSession = isLibtvInpaintSessionActive(nodeDataRecord);
+  const isEraseSession = isLibtvEraseSessionActive(nodeDataRecord);
+  const isExpandSession = isLibtvExpandSessionActive(nodeDataRecord);
+  const isCropSession = isLibtvCropSessionActive(nodeDataRecord);
+  /** 扩图 / 裁剪：贴框 Dock；擦除/重绘：完整模型与参数 */
+  const hideDockModelPicker = false;
+
+  const isRunning =
+    isLibtvMediaGenerating(
+      (storeNode?.data ?? {}) as { uploading?: boolean; runtime?: { status?: string } },
+    ) ||
+    Boolean(
+      (storeNode?.data as {
+        libtvInpaintGenerating?: boolean;
+        libtvMagicEditGenerating?: boolean;
+      })?.libtvInpaintGenerating ||
+        (storeNode?.data as { libtvMagicEditGenerating?: boolean })
+          ?.libtvMagicEditGenerating,
+    );
   const orphanInflight = Boolean(
     storeNode &&
       isOrphanLibtvMediaInflight((storeNode.data ?? {}) as Sbv1ImageNodeData),
@@ -319,12 +358,39 @@ function LibtvImageInputDockBody({
     pro2Data.pro2MediaRole !== "scene" &&
     !promptHasEmbeddedVisualStyleBlock(dockInput);
   const imageModelKeys =
-    isFrameFreestanding || pro2Data.pro2MediaRole === "frame"
-      ? PRO2_FRAME_IMAGE_MODEL_KEYS
-      : undefined;
+    isInpaintSession || isEraseSession
+      ? CANVAS_IMAGE_EDIT_MODEL_KEYS
+      : isFrameFreestanding || pro2Data.pro2MediaRole === "frame"
+        ? PRO2_FRAME_IMAGE_MODEL_KEYS
+        : undefined;
+
+  useEffect(() => {
+    if (!storeNode || !isEraseSession) return;
+    if (engine?.providerId?.trim()) return;
+    const picked = pickCanvasImageEditEngine(providers, "qwen-image-edit");
+    if (picked) {
+      updateNodeData(storeNode.id, { engine: picked });
+    }
+  }, [storeNode, isEraseSession, engine?.providerId, providers, updateNodeData]);
+
+  useEffect(() => {
+    if (!storeNode || !isInpaintSession) return;
+    const session = (
+      storeNode.data as { libtvInpaintSession?: { modelKey: string } }
+    ).libtvInpaintSession;
+    const sessionMk = normalizeModelKey(session?.modelKey);
+    const engineMk = normalizeModelKey(engine?.modelKey);
+    if (engine?.providerId?.trim() && sessionMk && engineMk === sessionMk) return;
+    const preferred = (sessionMk || "wan2.7-image-pro") as CanvasImageEditModelKey;
+    const picked = pickCanvasImageEditEngine(providers, preferred);
+    if (picked) {
+      updateNodeData(storeNode.id, { engine: picked });
+    }
+  }, [storeNode, isInpaintSession, engine?.providerId, engine?.modelKey, providers, updateNodeData]);
 
   useEffect(() => {
     if (!storeNode || !showModelPicker || engine?.providerId?.trim()) return;
+    if (isInpaintSession) return;
     if (pro2Data.pro2MediaRole === "scene") {
       const fromHub = resolveSceneEngineFromHub(pro2Data.pro2HubNodeId, nodes);
       if (fromHub) {
@@ -475,6 +541,180 @@ function LibtvImageInputDockBody({
     const latestNode = latestNodes.find((n) => n.id === storeNode.id);
     const latestData = (latestNode?.data ?? {}) as Sbv1ImageNodeData;
 
+    if (isLibtvEraseSessionActive(latestData as Record<string, unknown>)) {
+      const sourceUrl = latestData.ossUrl ?? latestData.blobUrl ?? "";
+      const eraseModelKey =
+        normalizeModelKey(latestData.engine?.modelKey) || "qwen-image-edit";
+      if (!sourceUrl) {
+        await alert({
+          title: "缺少源图",
+          message: "请确认节点已有图片后再擦除。",
+          variant: "warning",
+        });
+        return;
+      }
+      if (!projectId) {
+        await alert({
+          title: "画布未就绪",
+          message: "请刷新页面后重试。",
+          variant: "error",
+        });
+        return;
+      }
+      const selection =
+        getInpaintCanvasHandle(storeNode.id)?.exportSelection() ?? null;
+      if (!selection) {
+        await alert({
+          title: "请先框选区域",
+          message: "在图片上涂抹或框选需要擦除的区域后再生成。",
+          variant: "warning",
+        });
+        return;
+      }
+      try {
+        await runLibtvInpaint({
+          sourceNodeId: storeNode.id,
+          projectId,
+          modelKey: eraseModelKey,
+          prompt: LIBTV_ERASE_FIXED_DOCK_PROMPT,
+          sourceImageUrl: sourceUrl,
+          nodes: latestNodes,
+          addNode,
+          setNodes,
+          setEdges,
+          resultLabel: "擦除",
+          clearSession: clearLibtvEraseSession,
+          onGeneratingChange: (generating) =>
+            updateNodeData(storeNode.id, {
+              libtvMagicEditGenerating: generating,
+            }),
+        });
+      } catch (e) {
+        await alert({
+          title: "擦除失败",
+          message: e instanceof Error ? e.message : "请稍后重试",
+          variant: "error",
+        });
+      }
+      return;
+    }
+
+    if (isLibtvExpandSessionActive(latestData as Record<string, unknown>)) {
+      const sourceUrl = latestData.ossUrl ?? latestData.blobUrl ?? "";
+      if (!sourceUrl) {
+        await alert({
+          title: "缺少源图",
+          message: "请确认节点已有图片后再扩图。",
+          variant: "warning",
+        });
+        return;
+      }
+      if (!projectId) {
+        await alert({
+          title: "画布未就绪",
+          message: "请刷新页面后重试。",
+          variant: "error",
+        });
+        return;
+      }
+      try {
+        await runLibtvExpand({
+          sourceNodeId: storeNode.id,
+          projectId,
+          sourceImageUrl: sourceUrl,
+          nodes: latestNodes,
+          addNode,
+          setNodes,
+          setEdges,
+          onGeneratingChange: (generating) =>
+            updateNodeData(storeNode.id, {
+              libtvMagicEditGenerating: generating,
+            }),
+        });
+      } catch (e) {
+        await alert({
+          title: "扩图失败",
+          message: e instanceof Error ? e.message : "请稍后重试",
+          variant: "error",
+        });
+      }
+      return;
+    }
+
+    if (isLibtvCropSessionActive(latestData as Record<string, unknown>)) {
+      return;
+    }
+
+    if (isLibtvInpaintSessionActive(latestData as Record<string, unknown>)) {
+      const session = (
+        latestData as { libtvInpaintSession: { modelKey: string; dockInput: string } }
+      ).libtvInpaintSession;
+      const inpaintModelKey =
+        normalizeModelKey(latestData.engine?.modelKey) ||
+        normalizeModelKey(session.modelKey);
+      const sourceUrl = latestData.ossUrl ?? latestData.blobUrl ?? "";
+      const prompt = String(latestData.dockInput ?? livePrompt).trim();
+      if (!sourceUrl) {
+        await alert({
+          title: "缺少源图",
+          message: "请确认节点已有图片后再重绘。",
+          variant: "warning",
+        });
+        return;
+      }
+      if (!prompt) {
+        await alert({
+          title: "请输入提示词",
+          message: "说明重绘区域应替换成什么。",
+          variant: "warning",
+        });
+        return;
+      }
+      if (!projectId) {
+        await alert({
+          title: "画布未就绪",
+          message: "请刷新页面后重试。",
+          variant: "error",
+        });
+        return;
+      }
+      const selection =
+        getInpaintCanvasHandle(storeNode.id)?.exportSelection() ?? null;
+      if (!selection) {
+        await alert({
+          title: "请先框选区域",
+          message: "在图片上框选或涂抹需要重绘的区域后再生成。",
+          variant: "warning",
+        });
+        return;
+      }
+      try {
+        await runLibtvInpaint({
+          sourceNodeId: storeNode.id,
+          projectId,
+          modelKey: inpaintModelKey || session.modelKey,
+          prompt,
+          sourceImageUrl: sourceUrl,
+          nodes: latestNodes,
+          addNode,
+          setNodes,
+          setEdges,
+          onGeneratingChange: (generating) =>
+            updateNodeData(storeNode.id, {
+              libtvInpaintGenerating: generating,
+              libtvMagicEditGenerating: generating,
+            }),
+        });
+      } catch (e) {
+        await alert({
+          title: "重绘失败",
+          message: e instanceof Error ? e.message : "请稍后重试",
+          variant: "error",
+        });
+      }
+      return;
+    }
+
     let runEngine = resolveDockImageEnginePick(latestData.engine, providers, () =>
       pro2Data.pro2MediaRole === "frame"
         ? pickDefaultPro2FrameImageEngine(providers)
@@ -568,6 +808,11 @@ function LibtvImageInputDockBody({
     base,
     alert,
     isRunning,
+    livePrompt,
+    projectId,
+    addNode,
+    setNodes,
+    setEdges,
   ]);
 
   const runWithCommittedPrompt = useCallback(() => {
@@ -607,6 +852,21 @@ function LibtvImageInputDockBody({
         }
         return;
       }
+      if (
+        isLibtvInpaintSessionActive(
+          (storeNode.data ?? {}) as Record<string, unknown>,
+        )
+      ) {
+        const nextMk = normalizeModelKey(patch.engine?.modelKey);
+        if (nextMk) {
+          const isWan27 = nextMk === "wan2.7-image-pro";
+          patchLibtvInpaintSession(
+            storeNode.id,
+            { modelKey: nextMk, ...(isWan27 ? { tool: "rect" as const } : {}) },
+            setNodes,
+          );
+        }
+      }
       updateNodeData(storeNode.id, patch);
     },
     [
@@ -615,6 +875,7 @@ function LibtvImageInputDockBody({
       framePipelineController,
       pickerData,
       updateNodeData,
+      setNodes,
     ],
   );
 
@@ -631,6 +892,7 @@ function LibtvImageInputDockBody({
           soleSelected: true,
         });
   if (usesEmbedded) return null;
+  if (isCropSession || isExpandSession) return null;
 
   const styleRef = dockStyleRef;
   const linkedStyle = resolvePro2DockStyleFromUpstream(upstreamLinks);
@@ -644,22 +906,52 @@ function LibtvImageInputDockBody({
     (Boolean(livePrompt.trim()) || hasImage) &&
     (isFramePipelineCell ? hasEngine : true);
 
-  const canSendFreestanding =
-    showModelPicker &&
-    hasEngine &&
-    !freestandingBlocked &&
-    (Boolean(livePrompt.trim()) ||
-      hasImage ||
-      upstreamLinks.some((l) => l.previewUrl) ||
-      Boolean(styleRef?.imageUrl) ||
-      Boolean(linkedStyle));
+  const canSendFreestanding = isInpaintSession
+    ? showModelPicker &&
+      hasEngine &&
+      !freestandingBlocked &&
+      hasImage &&
+      Boolean(livePrompt.trim())
+    : isEraseSession
+      ? showModelPicker && hasEngine && !freestandingBlocked && hasImage
+      : isExpandSession
+        ? !freestandingBlocked && hasImage
+        : showModelPicker &&
+          hasEngine &&
+          !freestandingBlocked &&
+          (Boolean(livePrompt.trim()) ||
+            hasImage ||
+            upstreamLinks.some((l) => l.previewUrl) ||
+            Boolean(styleRef?.imageUrl) ||
+            Boolean(linkedStyle));
 
   const canSend = isPipelineCell ? canSendPipeline : canSendFreestanding;
 
-  const placeholder = hasImage
-    ? "输入文字指令对图片进行编辑，如：将背景改为雪夜"
-    : placeholderDockLabel(nodeType) ??
-      framePromptPlaceholder(pro2Data.pro2MediaRole);
+  const sendButtonTitle = isRunning
+    ? "生成中"
+    : isEraseSession
+      ? "擦除"
+      : isExpandSession
+        ? "扩图"
+        : isInpaintSession
+          ? "重绘"
+          : isPipelineCell
+            ? "重新生成"
+            : "生成图片";
+
+  const dockPromptLocked = isEraseSession;
+  const dockPromptValue = isEraseSession ? LIBTV_ERASE_FIXED_DOCK_PROMPT : dockInput;
+
+  const placeholder = isEraseSession
+    ? LIBTV_ERASE_FIXED_DOCK_PROMPT
+    : isExpandSession
+      ? "向外拖动外框扩大画幅，点击生成。"
+      : isInpaintSession
+        ? "说明重绘区域应替换成什么。"
+        : hasImage
+          ? "输入文字指令对图片进行编辑，如：将背景改为雪夜"
+          : placeholderDockLabel(nodeType) ??
+            framePromptPlaceholder(pro2Data.pro2MediaRole);
 
   const mentionEdition = nodeType === "sbv1-image" ? "sbv1" : "pro2";
 
@@ -715,7 +1007,11 @@ function LibtvImageInputDockBody({
           <LibtvImageDockFooter
             isPipelineCell={isPipelineCell && !isFramePipelineCell}
             isRunning={isRunning}
-            showModelPicker={showModelPicker || isFramePipelineCell}
+            showModelPicker={
+              (showModelPicker || isFramePipelineCell) &&
+              !hideDockModelPicker &&
+              !isCropSession
+            }
             pickerData={pickerData}
             imageModelKeys={imageModelKeys}
             dockMenu={dockMenu}
@@ -723,6 +1019,7 @@ function LibtvImageInputDockBody({
             onImagePatch={onImagePatch}
             estCredits={estCredits}
             canSend={canSend}
+            sendButtonTitle={sendButtonTitle}
             onRun={onRun}
           />
         }
@@ -747,9 +1044,9 @@ function LibtvImageInputDockBody({
               PRO2_DOCK_TEXTAREA_INSET_CLASS,
             )}
             placeholder={placeholder}
-            value={dockInput}
+            value={dockPromptValue}
             mentionables={mentionables}
-            disabled={isRunning}
+            disabled={isRunning || dockPromptLocked}
             rows={3}
             mentionInlineThumb
             mentionInlineThumbHoverOnText
@@ -773,6 +1070,7 @@ function LibtvImageDockFooter({
   onImagePatch,
   estCredits,
   canSend,
+  sendButtonTitle,
   onRun,
 }: {
   isPipelineCell: boolean;
@@ -785,6 +1083,7 @@ function LibtvImageDockFooter({
   onImagePatch: (patch: Partial<Sbv1ImageNodeData>) => void;
   estCredits: ReturnType<typeof useModelCreditsPreview>;
   canSend: boolean;
+  sendButtonTitle: string;
   onRun: () => void;
 }) {
   const { fontPx, sendIconPx } = useLibtvDockToolbarMetrics();
@@ -825,13 +1124,7 @@ function LibtvImageDockFooter({
         <LibtvDockSendButton
           disabled={!canSend}
           loading={isRunning}
-          title={
-            isRunning
-              ? "生成中"
-              : isPipelineCell
-                ? "重新生成"
-                : "生成图片"
-          }
+          title={sendButtonTitle}
           onClick={onRun}
         />
       </div>

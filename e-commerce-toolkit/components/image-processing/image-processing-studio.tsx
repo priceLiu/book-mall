@@ -77,6 +77,7 @@ const EDITOR_QUICK_PROMPTS = [
 const QWEN_EDIT_MODEL_KEYS = new Set(["qwen-image-edit", "qwen-image-edit-max"]);
 const WAN_I2I_MODEL_KEY = "wan2.5-i2i-preview";
 const WANX_PAINTING_MODEL_KEY = "wanx-x-painting";
+const WAN27_EDIT_MODEL_KEY = "wan2.7-image-pro";
 const OUTPAINT_MODEL_KEY = "image-out-painting";
 
 const EDITOR_MODEL_FALLBACKS: Array<{ modelKey: string; displayName: string }> = [
@@ -104,6 +105,10 @@ function isWanI2iModel(modelKey: string) {
 
 function isWanxPaintingModel(modelKey: string) {
   return modelKey === WANX_PAINTING_MODEL_KEY;
+}
+
+function isWan27RetouchModel(modelKey: string) {
+  return modelKey === WAN27_EDIT_MODEL_KEY;
 }
 
 function isOutpaintBailianModel(modelKey: string) {
@@ -416,9 +421,12 @@ export function ImageProcessingStudio() {
   const retouchModels = useMemo(
     () =>
       models.filter((m) =>
-        ["qwen-image-edit", "qwen-image-edit-max", WANX_PAINTING_MODEL_KEY].includes(
-          m.modelKey,
-        ),
+        [
+          "qwen-image-edit",
+          "qwen-image-edit-max",
+          WANX_PAINTING_MODEL_KEY,
+          WAN27_EDIT_MODEL_KEY,
+        ].includes(m.modelKey),
       ),
     [models],
   );
@@ -560,10 +568,19 @@ export function ImageProcessingStudio() {
       return;
     }
     const mask = maskRef.current?.getMaskDataUrl() ?? undefined;
+    const bbox = maskRef.current?.getBbox() ?? undefined;
     if (isWanxPaintingModel(retouchModel) && !mask) {
       await showAlert({
         title: "请涂抹区域",
         message: "万相局部重绘需要涂抹蒙版区域",
+        variant: "error",
+      });
+      return;
+    }
+    if (isWan27RetouchModel(retouchModel) && !bbox) {
+      await showAlert({
+        title: "请框选区域",
+        message: "万相 2.7 Pro 局部重绘需要框选区域",
         variant: "error",
       });
       return;
@@ -577,6 +594,7 @@ export function ImageProcessingStudio() {
         prompt: retouchPrompt.trim(),
         sourceImageDataUrl: retouchImage,
         maskImageDataUrl: mask,
+        bbox,
         parameters: buildRetouchParameters(),
       });
       setResults(res.imageUrls);
@@ -796,18 +814,25 @@ export function ImageProcessingStudio() {
                   </button>
                 ) : (
                   <>
-                    <MaskToolbar
-                      brushSize={brushSize}
-                      onBrushSizeChange={setBrushSize}
-                      showTransparentMask={transparentMask}
-                      onToggleTransparentMask={() => setTransparentMask((v) => !v)}
-                      onClearImage={() => setRetouchImage(null)}
-                    />
+                    {isWan27RetouchModel(retouchModel) ? (
+                      <div className="mb-3 rounded-lg border border-[#e5e5ea] bg-white px-3 py-2 text-xs text-[#6e6e73]">
+                        万相 2.7 Pro 使用框选工具标记重绘区域
+                      </div>
+                    ) : (
+                      <MaskToolbar
+                        brushSize={brushSize}
+                        onBrushSizeChange={setBrushSize}
+                        showTransparentMask={transparentMask}
+                        onToggleTransparentMask={() => setTransparentMask((v) => !v)}
+                        onClearImage={() => setRetouchImage(null)}
+                      />
+                    )}
                     <ImageMaskCanvas
                       ref={maskRef}
                       imageDataUrl={retouchImage}
                       brushSize={brushSize}
                       showTransparentMask={transparentMask}
+                      mode={isWan27RetouchModel(retouchModel) ? "bbox" : "mask"}
                     />
                   </>
                 )}

@@ -557,6 +557,8 @@ export async function dashscopeCreateWan27ImageTask(opts: {
   n?: number;
   /** wan2.6-image 要求 text 在前；wan2.7 为 images 在前 */
   contentOrder?: "text-first" | "images-first";
+  /** 局部编辑框选（每图最多 2 框，原图像素坐标） */
+  bboxList?: number[][][];
 }): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
   const items = opts.content.filter(
     (c) =>
@@ -592,6 +594,10 @@ export async function dashscopeCreateWan27ImageTask(opts: {
         n,
         watermark: false,
       };
+
+  if (opts.bboxList?.length && !isWan26Image) {
+    parameters.bbox_list = opts.bboxList;
+  }
 
   let res: Response;
   try {

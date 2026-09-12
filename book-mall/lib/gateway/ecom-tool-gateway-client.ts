@@ -156,6 +156,7 @@ export async function ecomGwCreateDashscopeJob(
         size?: string;
         n?: number;
         contentOrder?: "text-first" | "images-first";
+        bboxList?: number[][][];
         clientPage?: string;
       }
     | {
@@ -214,6 +215,7 @@ export async function ecomGwCreateDashscopeJob(
               size: opts.size,
               n: opts.n,
               contentOrder: opts.contentOrder,
+              bboxList: opts.bboxList,
             },
           }
         : opts.kind === "kling-v3-image"

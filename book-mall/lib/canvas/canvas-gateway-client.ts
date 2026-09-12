@@ -598,6 +598,7 @@ export async function canvasGwCreateDashscopeWan27ImageJob(
     size?: string;
     n?: number;
     contentOrder?: "text-first" | "images-first";
+    bboxList?: number[][][];
     clientPage?: string;
     projectId?: string;
     canvasTaskId?: string;
@@ -622,6 +623,7 @@ export async function canvasGwCreateDashscopeWan27ImageJob(
         size: opts.size,
         n: opts.n,
         contentOrder: opts.contentOrder,
+        bboxList: opts.bboxList,
       },
     },
     meta: await canvasGwMeta(userId, {

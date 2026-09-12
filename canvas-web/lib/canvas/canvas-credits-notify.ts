@@ -78,3 +78,22 @@ export function maybeNotifyCanvasCreditsSettled(task: CanvasTaskRecord): void {
     showCanvasCreditsToast(`本次消耗 ${task.creditsCharged} 积分`);
   }
 }
+
+const shownGatewayLogIds = new Set<string>();
+
+/** Platform API / Gateway log 直扣费时弹出积分提示（inpaint 等不经 CanvasGenerationTask 的路径） */
+export function notifyCreditsFromGatewayLog(
+  logId: string,
+  creditsCharged?: number | null,
+): void {
+  if (!logId || shownGatewayLogIds.has(logId)) return;
+  shownGatewayLogIds.add(logId);
+  dispatchPlatformCreditsBalanceRefresh();
+  if (shownGatewayLogIds.size > 200) {
+    shownGatewayLogIds.clear();
+    shownGatewayLogIds.add(logId);
+  }
+  if (creditsCharged != null && creditsCharged > 0) {
+    showCanvasCreditsToast(`本次消耗 ${creditsCharged} 积分`);
+  }
+}

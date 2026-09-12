@@ -13,6 +13,11 @@ import {
 import { buildPro2ImageNodeData } from "./pro2-spawn-nodes";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
 import { PRO2_IMAGE_NODE_WIDTH } from "./story-pro2-node-chrome";
+import { startLibtvInpaintSession } from "./libtv-inpaint-session";
+import { startLibtvEraseSession } from "./libtv-erase-session";
+import { startLibtvCropSession } from "./libtv-crop-session";
+import { startLibtvExpandSession } from "./libtv-expand-session";
+import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 
 const GAP = 48;
@@ -124,4 +129,40 @@ export function spawnLibtvImageMagicTarget(
 
   selectPro2NodeAfterSpawn(store.setNodes, newId);
   return newId;
+}
+
+/** 图片节点 ·「魔术」→ 重绘：进入原位 inpaint 会话（不 spawn 占位节点） */
+export function startLibtvInpaintFromMagic(
+  sourceNodeId: string,
+  store: LibtvImageMagicSpawnStore,
+  providers: CanvasProviderDto[],
+): void {
+  startLibtvInpaintSession(sourceNodeId, store.setNodes, providers);
+}
+
+export function startLibtvMagicEditFromMenu(
+  sourceNodeId: string,
+  menuId: LibtvImageMagicMenuId,
+  store: LibtvImageMagicSpawnStore,
+  providers: CanvasProviderDto[],
+): void {
+  switch (menuId) {
+    case "inpaint-redraw":
+      startLibtvInpaintFromMagic(sourceNodeId, store, providers);
+      return;
+    case "erase":
+      startLibtvEraseSession(sourceNodeId, store.setNodes, providers);
+      return;
+    case "crop":
+      startLibtvCropSession(sourceNodeId, store.setNodes);
+      return;
+    case "source-expand":
+      startLibtvExpandSession(sourceNodeId, store.setNodes);
+      return;
+    case "cutout":
+      spawnLibtvImageMagicTarget(sourceNodeId, menuId, store);
+      return;
+    default:
+      spawnLibtvImageMagicTarget(sourceNodeId, menuId, store);
+  }
 }

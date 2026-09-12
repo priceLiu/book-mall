@@ -25,12 +25,14 @@ import {
   ECOM_WANX_PAINTING_MODEL_KEY,
   isQwenEditModelKey,
 } from "@/lib/ecom/ecom-image-processing-models";
+import { LOCAL_EDIT_WAN27_MODEL_KEY } from "@/lib/image-local-edit/model-capabilities";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 import { formatEcomImageProcessingUserError } from "@/lib/ecom/ecom-image-processing-error";
 
 const RETOUCH_MODELS = new Set<string>([
   ...ECOM_QWEN_EDIT_MODEL_KEYS,
   ECOM_WANX_PAINTING_MODEL_KEY,
+  LOCAL_EDIT_WAN27_MODEL_KEY,
 ]);
 
 const RESTORE_FACE_SWAP_MODELS = new Set<string>([
@@ -83,6 +85,13 @@ export async function handleImageProcessingEditPost(req: Request) {
         typeof body.maskImageDataUrl === "string"
           ? body.maskImageDataUrl.trim()
           : undefined;
+      let bbox: [number, number, number, number] | undefined;
+      if (Array.isArray(body.bbox) && body.bbox.length === 4) {
+        const nums = body.bbox.map((v) => Number(v));
+        if (nums.every((n) => Number.isFinite(n))) {
+          bbox = nums as [number, number, number, number];
+        }
+      }
       if (!RETOUCH_MODELS.has(model)) {
         return NextResponse.json({ error: "无效修图模型" }, { status: 400 });
       }
@@ -98,6 +107,7 @@ export async function handleImageProcessingEditPost(req: Request) {
         prompt,
         sourceImageDataUrl,
         maskImageDataUrl,
+        bbox,
         parameters,
       });
       return NextResponse.json({

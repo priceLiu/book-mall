@@ -82,6 +82,7 @@ const EDITOR_QUICK_PROMPTS = [
 const QWEN_EDIT_MODEL_KEYS = new Set(["qwen-image-edit", "qwen-image-edit-max"]);
 const WAN_I2I_MODEL_KEY = "wan2.5-i2i-preview";
 const WANX_PAINTING_MODEL_KEY = "wanx-x-painting";
+const WAN27_EDIT_MODEL_KEY = "wan2.7-image-pro";
 const OUTPAINT_MODEL_KEY = "image-out-painting";
 
 const EDITOR_MODEL_FALLBACKS: Array<{ modelKey: string; displayName: string }> = [
@@ -109,6 +110,10 @@ function isWanI2iModel(modelKey: string) {
 
 function isWanxPaintingModel(modelKey: string) {
   return modelKey === WANX_PAINTING_MODEL_KEY;
+}
+
+function isWan27RetouchModel(modelKey: string) {
+  return modelKey === WAN27_EDIT_MODEL_KEY;
 }
 
 function isOutpaintBailianModel(modelKey: string) {
@@ -408,9 +413,12 @@ export function ToolPageClient({ slug }: { slug: ImageProcessingTagId }) {
   const retouchModels = useMemo(
     () =>
       models.filter((m) =>
-        ["qwen-image-edit", "qwen-image-edit-max", WANX_PAINTING_MODEL_KEY].includes(
-          m.modelKey,
-        ),
+        [
+          "qwen-image-edit",
+          "qwen-image-edit-max",
+          WANX_PAINTING_MODEL_KEY,
+          WAN27_EDIT_MODEL_KEY,
+        ].includes(m.modelKey),
       ),
     [models],
   );
@@ -536,10 +544,19 @@ export function ToolPageClient({ slug }: { slug: ImageProcessingTagId }) {
       return;
     }
     const mask = maskRef.current?.getMaskDataUrl() ?? undefined;
-    if (!mask) {
+    const bbox = maskRef.current?.getBbox() ?? undefined;
+    if (isWanxPaintingModel(retouchModel) && !mask) {
       await showAlert({
         title: "请涂抹区域",
-        message: "请用画笔涂抹需要修改的区域后再提交",
+        message: "万相局部重绘需要涂抹蒙版区域",
+        variant: "error",
+      });
+      return;
+    }
+    if (isWan27RetouchModel(retouchModel) && !bbox) {
+      await showAlert({
+        title: "请框选区域",
+        message: "万相 2.7 Pro 局部重绘需要框选区域",
         variant: "error",
       });
       return;
@@ -553,6 +570,7 @@ export function ToolPageClient({ slug }: { slug: ImageProcessingTagId }) {
         prompt: retouchPrompt.trim(),
         sourceImageDataUrl: retouchImage,
         maskImageDataUrl: mask,
+        bbox,
         parameters: buildRetouchParameters(),
       });
       setResults(res.imageUrls);
@@ -737,6 +755,7 @@ export function ToolPageClient({ slug }: { slug: ImageProcessingTagId }) {
                       brushSize={brushSize}
                       brushType={brushType}
                       showTransparentMask={transparentMask}
+                      mode={isWan27RetouchModel(retouchModel) ? "bbox" : "mask"}
                     />
                     <p className="mt-2 text-center text-[10px] text-[#86868b]">
                       可拖放或粘贴替换图片

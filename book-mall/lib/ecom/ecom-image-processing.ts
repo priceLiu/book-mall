@@ -292,65 +292,56 @@ export async function ecomImageProcessingRetouch(opts: {
   prompt: string;
   sourceImageDataUrl: string;
   maskImageDataUrl?: string;
+  bbox?: [number, number, number, number];
   parameters?: Record<string, unknown>;
 }) {
   await assertImageProcessingGatewayAccess(opts.userId);
 
-  if (isWanxPaintingModelKey(opts.model)) {
-    if (!opts.maskImageDataUrl?.trim()) {
-      throw new Error("万相局部重绘需要涂抹蒙版");
-    }
-    const workspaceId = randomUUID().slice(0, 8);
-    const clientPage = buildImageProcessingClientPage(
-      opts.userId,
-      workspaceId,
-      "retouch",
-    );
-    const baseUrl = await ensurePublicImageUrl(
-      opts.userId,
-      opts.sourceImageDataUrl,
-    );
-    const maskUrl = await ensurePublicImageUrl(
-      opts.userId,
-      opts.maskImageDataUrl,
-    );
-    const params = { ...(opts.parameters ?? {}) };
-    const n = params.n !== undefined ? Number(params.n) : 1;
-    if (params.n !== undefined) delete params.n;
-    const { imageUrls, logId } = await ecomGwImage2ImageAsync(opts.userId, {
-      model: ECOM_WANX_PAINTING_MODEL_KEY,
-      input: {
-        prompt: opts.prompt.trim(),
-        base_image_url: baseUrl,
-        mask_image_url: maskUrl,
-      },
-      parameters: { ...params, n },
-      clientPage,
-    });
-    const results = await persistGatewayImageUrls({
-      userId: opts.userId,
-      imageUrls,
-      prompt: opts.prompt,
-      model: opts.model,
-      mode: "retouch",
-      logId,
-    });
-    return { results, logId };
+  const { getImageProcessingRequestContext } = await import(
+    "@/lib/ecom/image-processing-request-context"
+  );
+  const { runLocalImageEdit } = await import(
+    "@/lib/image-local-edit/run-local-image-edit"
+  );
+  const clientApp =
+    getImageProcessingRequestContext().clientApp === "common-tools"
+      ? "common-tools"
+      : "ecom";
+
+  const workspaceId = randomUUID().slice(0, 8);
+  const clientPage = buildImageProcessingClientPage(
+    opts.userId,
+    workspaceId,
+    "retouch",
+  );
+
+  let selection:
+    | { kind: "mask"; maskDataUrl: string }
+    | { kind: "bbox"; bbox: [number, number, number, number] }
+    | undefined;
+  if (opts.maskImageDataUrl?.trim()) {
+    selection = { kind: "mask", maskDataUrl: opts.maskImageDataUrl.trim() };
+  } else if (opts.bbox) {
+    selection = { kind: "bbox", bbox: opts.bbox };
   }
 
-  if (!isQwenEditModelKey(opts.model)) {
-    throw new Error("不支持的修图模型");
-  }
-
-  return runQwenEdit({
+  const result = await runLocalImageEdit({
     userId: opts.userId,
-    model: opts.model,
-    images: [opts.sourceImageDataUrl],
+    modelKey: opts.model,
     prompt: opts.prompt,
-    maskImageDataUrl: opts.maskImageDataUrl,
+    sourceImageUrls: [opts.sourceImageDataUrl],
+    selection,
     parameters: opts.parameters,
-    mode: "retouch",
+    clientApp,
+    clientPage,
+    persistEcomAssets: true,
+    ecomMode: "retouch",
   });
+
+  const results =
+    result.ecomAssets?.map((r) => ({ asset: r.asset, ossUrl: r.ossUrl })) ?? [];
+  if (results.length === 0) throw new Error("未获得可保存的图像");
+  return { results, logId: result.logId };
 }
 
 export async function ecomImageProcessingEnhancer(opts: {

@@ -45,4 +45,32 @@ describe("dashscopeCreateWan27ImageTask", () => {
     });
     expect(result).toEqual({ ok: false, error: "缺少 text 提示词" });
   });
+
+  it("passes bbox_list for wan2.7 local edit", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as {
+          parameters: { bbox_list?: number[][][] };
+        };
+        expect(body.parameters.bbox_list).toEqual([[[10, 20, 100, 200]]]);
+        return new Response(
+          JSON.stringify({ output: { task_id: "task-wan27-bbox" } }),
+          { status: 200 },
+        );
+      }),
+    );
+
+    const result = await dashscopeCreateWan27ImageTask({
+      apiKey: "sk-test",
+      model: "wan2.7-image-pro",
+      content: [
+        { image: "https://example.com/a.jpg" },
+        { text: "replace sky" },
+      ],
+      bboxList: [[[10, 20, 100, 200]]],
+    });
+
+    expect(result).toEqual({ ok: true, taskId: "task-wan27-bbox" });
+  });
 });

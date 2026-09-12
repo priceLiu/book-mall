@@ -803,6 +803,91 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
   opacity: 1 !important;
 }
 
+/* LibTV 裁剪 / 扩图 · 四角拖动手柄（始终可见） */
+.libtv-frame-corner-handle {
+  z-index: 80;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 2px solid #fff;
+  background: rgba(139, 92, 246, 0.95);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.55),
+    0 2px 8px rgba(0, 0, 0, 0.35);
+  touch-action: none;
+}
+
+.libtv-frame-corner-handle[data-libtv-frame-handle="nw"],
+.libtv-frame-corner-handle[data-libtv-frame-handle="se"] {
+  cursor: nwse-resize;
+}
+
+.libtv-frame-corner-handle[data-libtv-frame-handle="ne"],
+.libtv-frame-corner-handle[data-libtv-frame-handle="sw"] {
+  cursor: nesw-resize;
+}
+
+.libtv-frame-move-plate {
+  z-index: 40;
+}
+
+/* 扩图 · 8 向手柄（角圆点 + 边胶囊，参考截图/裁剪 UI） */
+.libtv-frame-expand-corner {
+  z-index: 82;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  background: rgba(120, 120, 128, 0.92);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  touch-action: none;
+}
+
+.libtv-frame-expand-edge {
+  z-index: 81;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  background: rgba(120, 120, 128, 0.88);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+  touch-action: none;
+}
+
+.libtv-frame-expand-edge-h {
+  width: 28px;
+  height: 10px;
+  cursor: ns-resize;
+}
+
+.libtv-frame-expand-edge-v {
+  width: 10px;
+  height: 28px;
+  cursor: ew-resize;
+}
+
+.libtv-frame-expand-corner[data-libtv-frame-handle="nw"],
+.libtv-frame-expand-corner[data-libtv-frame-handle="se"] {
+  cursor: nwse-resize;
+}
+
+.libtv-frame-expand-corner[data-libtv-frame-handle="ne"],
+.libtv-frame-expand-corner[data-libtv-frame-handle="sw"] {
+  cursor: nesw-resize;
+}
+
+/* 扩图 · 仅底栏 Dock（不显示 prompt 区） */
+.libtv-expand-dock-shell .libtv-dock-content-zoom {
+  display: none !important;
+}
+
+.libtv-expand-dock-shell[data-libtv-dock-expanded="false"] {
+  min-height: unset !important;
+}
+
+.libtv-expand-handle {
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  touch-action: none;
+}
+
 /* 分组容器 · 选中时可拖角调整组框大小 */
 .canvas-flow-wrap .react-flow__resize-control.handle.canvas-group-resizer-handle {
   z-index: 100 !important;

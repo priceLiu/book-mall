@@ -1159,6 +1159,14 @@ const SEED_ITEMS: {
     sortOrder: 730,
     listKind: "PENDING",
   },
+  {
+    title: "图片编辑功能",
+    description:
+      "画布重绘 inpaint 会话 + 与 AI 修图共用 book-mall runLocalImageEdit（Qwen / wanx / wan2.7 bbox_list）。",
+    docPath: "docs/图片编辑功能.md",
+    sortOrder: 735,
+    listKind: "PENDING",
+  },
 ];
 
 async function main() {

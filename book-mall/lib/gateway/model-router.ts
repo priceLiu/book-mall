@@ -282,6 +282,7 @@ export function routeGatewayModel(model: string): RoutedModel {
 
   if (
     m === "image-out-painting" ||
+    m === "image-erase-completion" ||
     m === "wanx-x-painting" ||
     m === "wan2.5-i2i-preview"
   ) {

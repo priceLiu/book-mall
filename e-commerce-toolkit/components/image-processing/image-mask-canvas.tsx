@@ -13,12 +13,15 @@ import { cn } from "@/lib/utils";
 
 export type ImageMaskCanvasHandle = {
   getMaskDataUrl: () => string | null;
+  getBbox: () => [number, number, number, number] | null;
 };
 
 type Props = {
   imageDataUrl: string;
   brushSize: number;
   showTransparentMask: boolean;
+  /** mask 笔刷涂抹；bbox 框选（wan2.7-image-pro） */
+  mode?: "mask" | "bbox";
   onMaskChange?: (hasMask: boolean) => void;
   className?: string;
 };
@@ -47,7 +50,14 @@ function exportMaskDataUrl(maskCanvas: HTMLCanvasElement | null): string | null 
 
 export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
   function ImageMaskCanvas(
-    { imageDataUrl, brushSize, showTransparentMask, onMaskChange, className },
+    {
+      imageDataUrl,
+      brushSize,
+      showTransparentMask,
+      mode = "mask",
+      onMaskChange,
+      className,
+    },
     ref,
   ) {
     const imageRef = useRef<HTMLImageElement>(null);
@@ -55,9 +65,34 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
     const maskCanvasRef = useRef<HTMLCanvasElement>(null);
     const [drawing, setDrawing] = useState(false);
     const [dims, setDims] = useState({ w: 0, h: 0 });
+    const rectStart = useRef<{ x: number; y: number } | null>(null);
+    const [bboxDisplay, setBboxDisplay] = useState<{
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+    } | null>(null);
 
     useImperativeHandle(ref, () => ({
       getMaskDataUrl: () => exportMaskDataUrl(maskCanvasRef.current),
+      getBbox: () => {
+        if (!bboxDisplay || !maskCanvasRef.current) return null;
+        const display = displayCanvasRef.current;
+        const mask = maskCanvasRef.current;
+        if (!display?.width) return null;
+        const scaleX = mask.width / display.width;
+        const scaleY = mask.height / display.height;
+        const x1 = Math.min(bboxDisplay.x1, bboxDisplay.x2);
+        const y1 = Math.min(bboxDisplay.y1, bboxDisplay.y2);
+        const x2 = Math.max(bboxDisplay.x1, bboxDisplay.x2);
+        const y2 = Math.max(bboxDisplay.y1, bboxDisplay.y2);
+        return [
+          Math.round(x1 * scaleX),
+          Math.round(y1 * scaleY),
+          Math.round(x2 * scaleX),
+          Math.round(y2 * scaleY),
+        ];
+      },
     }));
 
     const syncCanvasSize = useCallback(() => {
@@ -117,8 +152,29 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
       const mask = maskCanvasRef.current;
       display?.getContext("2d")?.clearRect(0, 0, display.width, display.height);
       mask?.getContext("2d")?.clearRect(0, 0, mask.width, mask.height);
+      setBboxDisplay(null);
       onMaskChange?.(false);
     };
+
+    const drawRectPreview = useCallback(
+      (x1: number, y1: number, x2: number, y2: number) => {
+        const display = displayCanvasRef.current;
+        if (!display) return;
+        const ctx = display.getContext("2d");
+        if (!ctx) return;
+        ctx.clearRect(0, 0, display.width, display.height);
+        const x = Math.min(x1, x2);
+        const y = Math.min(y1, y2);
+        const w = Math.abs(x2 - x1);
+        const h = Math.abs(y2 - y1);
+        ctx.strokeStyle = "rgba(0, 113, 227, 0.95)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, w, h);
+        ctx.fillStyle = "rgba(0, 113, 227, 0.15)";
+        ctx.fillRect(x, y, w, h);
+      },
+      [],
+    );
 
     return (
       <div className={cn("w-full", className)}>
@@ -143,19 +199,49 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
             onPointerDown={(e) => {
               e.currentTarget.setPointerCapture(e.pointerId);
               setDrawing(true);
+              const display = displayCanvasRef.current;
+              if (!display) return;
+              const rect = display.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const y = e.clientY - rect.top;
+              if (mode === "bbox") {
+                rectStart.current = { x, y };
+                setBboxDisplay({ x1: x, y1: y, x2: x, y2: y });
+                return;
+              }
               paint(e.clientX, e.clientY);
             }}
             onPointerMove={(e) => {
               if (!drawing) return;
+              if (mode === "bbox") {
+                const display = displayCanvasRef.current;
+                const start = rectStart.current;
+                if (!display || !start) return;
+                const rect = display.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                setBboxDisplay({ x1: start.x, y1: start.y, x2: x, y2: y });
+                drawRectPreview(start.x, start.y, x, y);
+                onMaskChange?.(true);
+                return;
+              }
               paint(e.clientX, e.clientY);
             }}
-            onPointerUp={() => setDrawing(false)}
-            onPointerLeave={() => setDrawing(false)}
+            onPointerUp={() => {
+              setDrawing(false);
+              rectStart.current = null;
+            }}
+            onPointerLeave={() => {
+              setDrawing(false);
+              rectStart.current = null;
+            }}
           />
           <canvas ref={maskCanvasRef} className="hidden" aria-hidden />
         </div>
         <p className="mt-2 text-center text-xs text-[#6e6e73]">
-          点击并拖动鼠标，涂抹到您想要更改的区域。
+          {mode === "bbox"
+            ? "拖动鼠标框选需要重绘的区域。"
+            : "点击并拖动鼠标，涂抹到您想要更改的区域。"}
         </p>
         <div className="mt-1 flex justify-center">
           <button

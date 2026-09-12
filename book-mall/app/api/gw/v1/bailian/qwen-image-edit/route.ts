@@ -87,10 +87,12 @@ export async function POST(request: NextRequest) {
       requestKind: "IMAGE",
       clientSource,
       inputSummary: buildGatewayInputSummary(model, {
-        imageCount: content.filter((c) => "image" in c).length,
         prompt: content
           .find((c): c is { text: string } => "text" in c && Boolean(c.text))
           ?.text.slice(0, 200),
+        imageCount: content.filter((c) => "image" in c).length,
+        sourceImageIncluded: content.some((c) => "image" in c),
+        maskIncluded: content.filter((c) => "image" in c).length >= 2,
       }),
       ...logMetaToRequestLogFields(logMeta),
     });

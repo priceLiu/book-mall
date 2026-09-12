@@ -1090,6 +1090,7 @@ export async function submitDashscopeWan27ImageJobForLog(opts: {
   size?: string;
   n?: number;
   contentOrder?: "text-first" | "images-first";
+  bboxList?: number[][][];
 }) {
   const cred = await getDecryptedCredentialApiKey(opts.credentialId);
   if (!cred) throw new Error("凭证不可用");
@@ -1100,6 +1101,7 @@ export async function submitDashscopeWan27ImageJobForLog(opts: {
     size: opts.size,
     n: opts.n,
     contentOrder: opts.contentOrder,
+    bboxList: opts.bboxList,
   });
   if (!created.ok) throw new Error(created.error);
   await prisma.gatewayRequestLog.update({

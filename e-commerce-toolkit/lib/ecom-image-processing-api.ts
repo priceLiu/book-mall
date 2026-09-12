@@ -112,6 +112,7 @@ export async function submitImageProcessingEdit(body: {
   postProcess?: string;
   algorithm?: string;
   maskImageDataUrl?: string;
+  bbox?: [number, number, number, number];
   styleImageDataUrl?: string;
   lighting?: string;
   styleId?: string;

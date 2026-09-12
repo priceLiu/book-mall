@@ -20,7 +20,11 @@ import { routeGatewayModel } from "@/lib/gateway/model-router";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-const ALLOWED = new Set(["wanx-x-painting", "wan2.5-i2i-preview"]);
+const ALLOWED = new Set([
+  "wanx-x-painting",
+  "wan2.5-i2i-preview",
+  "image-erase-completion",
+]);
 
 export async function POST(request: NextRequest) {
   const authOrResp = await requireGatewayV1Auth(request);
@@ -48,7 +52,16 @@ export async function POST(request: NextRequest) {
   }
 
   const input = body.input && typeof body.input === "object" ? body.input : {};
-  if (model === "wanx-x-painting") {
+  if (model === "image-erase-completion") {
+    const image = typeof input.image_url === "string" ? input.image_url.trim() : "";
+    const mask = typeof input.mask_url === "string" ? input.mask_url.trim() : "";
+    if (!image || !mask) {
+      return NextResponse.json(
+        { error: "image-erase-completion 需要 image_url、mask_url" },
+        { status: 400 },
+      );
+    }
+  } else if (model === "wanx-x-painting") {
     const prompt = typeof input.prompt === "string" ? input.prompt.trim() : "";
     const base = typeof input.base_image_url === "string" ? input.base_image_url.trim() : "";
     const mask = typeof input.mask_image_url === "string" ? input.mask_image_url.trim() : "";

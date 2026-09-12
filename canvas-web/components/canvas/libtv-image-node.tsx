@@ -107,9 +107,54 @@ import {
   type LibtvImageEditMenuId,
 } from "@/lib/canvas/libtv-image-toolbar-edit";
 import {
-  spawnLibtvImageMagicTarget,
+  startLibtvMagicEditFromMenu,
   type LibtvImageMagicMenuId,
 } from "@/lib/canvas/libtv-image-toolbar-magic";
+import {
+  clearLibtvInpaintSession,
+  isLibtvInpaintSessionActive,
+  patchLibtvInpaintSession,
+  type LibtvInpaintSession,
+} from "@/lib/canvas/libtv-inpaint-session";
+import {
+  clearLibtvEraseSession,
+  isLibtvEraseSessionActive,
+  patchLibtvEraseSession,
+  type LibtvEraseSession,
+} from "@/lib/canvas/libtv-erase-session";
+import {
+  clearLibtvCropSession,
+  isLibtvCropSessionActive,
+  patchLibtvCropSession,
+  type LibtvCropSession,
+} from "@/lib/canvas/libtv-crop-session";
+import {
+  clearLibtvExpandSession,
+  isLibtvExpandSessionActive,
+  patchLibtvExpandSession,
+  type LibtvExpandSession,
+} from "@/lib/canvas/libtv-expand-session";
+import { runLibtvCrop } from "@/lib/canvas/libtv-crop-run";
+import { runLibtvExpand } from "@/lib/canvas/libtv-expand-run";
+import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
+import {
+  registerCropCanvas,
+  registerExpandCanvas,
+  registerInpaintCanvas,
+} from "@/lib/canvas/libtv-inpaint-canvas-registry";
+import { ImageLocalEditCanvas } from "@/components/canvas/inpaint/image-local-edit-canvas";
+import type { ImageLocalEditCanvasHandle } from "@/components/canvas/inpaint/image-local-edit-canvas";
+import { ImageCropCanvas } from "@/components/canvas/inpaint/image-crop-canvas";
+import type { ImageCropCanvasHandle } from "@/components/canvas/inpaint/image-crop-canvas";
+import { ImageExpandCanvas } from "@/components/canvas/inpaint/image-expand-canvas";
+import type { ImageExpandCanvasHandle } from "@/components/canvas/inpaint/image-expand-canvas";
+import { ImageLocalEditToolbar } from "@/components/canvas/inpaint/image-local-edit-toolbar";
+import { LibtvMagicEditFrameDockPortal } from "@/components/canvas/inpaint/libtv-magic-edit-frame-dock-portal";
+import {
+  ImageCropFrameDock,
+  ImageExpandFrameDock,
+} from "@/components/canvas/inpaint/image-magic-edit-frame-dock";
+import { useUserProviders } from "@/lib/canvas/use-user-providers";
 
 export type LibtvImageNodeEdition = "pro2" | "sbv1";
 
@@ -130,6 +175,13 @@ export type LibtvImageNodeData = CanvasPortraitNodeFields & {
   gridSplitCrop?: GridSplitCrop;
   /** 全局资产库素材 · UI 角标（平台入库 / 从平台库选用） */
   globalCatalogMarked?: boolean;
+  /** 原位重绘会话（魔术 · 重绘） */
+  libtvInpaintSession?: LibtvInpaintSession;
+  libtvInpaintGenerating?: boolean;
+  libtvMagicEditGenerating?: boolean;
+  libtvEraseSession?: LibtvEraseSession;
+  libtvCropSession?: LibtvCropSession;
+  libtvExpandSession?: LibtvExpandSession;
 };
 
 export type LibtvImageNodeProps = NodeProps & {
@@ -297,9 +349,12 @@ export function LibtvImageNode({
     hasImage &&
     Boolean(d.uploading) &&
     !d.runtime?.taskId;
+  const isInpaintGenerating = Boolean(
+    d.libtvInpaintGenerating || d.libtvMagicEditGenerating,
+  );
   const isGenerating = isDirectorDeskShotLocalPreview
     ? false
-    : Boolean(inflightTask) || isLibtvMediaGenerating(d);
+    : Boolean(inflightTask) || isLibtvMediaGenerating(d) || isInpaintGenerating;
 
   useLayoutEffect(() => {
     if (inflightTask) return;
@@ -388,8 +443,29 @@ export function LibtvImageNode({
       });
     },
   });
+  const inpaintSession = isLibtvInpaintSessionActive(d as Record<string, unknown>)
+    ? (d as { libtvInpaintSession: LibtvInpaintSession }).libtvInpaintSession
+    : undefined;
+  const eraseSession = isLibtvEraseSessionActive(d as Record<string, unknown>)
+    ? (d as { libtvEraseSession: LibtvEraseSession }).libtvEraseSession
+    : undefined;
+  const cropSession = isLibtvCropSessionActive(d as Record<string, unknown>)
+    ? (d as { libtvCropSession: LibtvCropSession }).libtvCropSession
+    : undefined;
+  const expandSession = isLibtvExpandSessionActive(d as Record<string, unknown>)
+    ? (d as { libtvExpandSession: LibtvExpandSession }).libtvExpandSession
+    : undefined;
+  const inpaintActive = Boolean(inpaintSession?.active && hasImage);
+  const eraseActive = Boolean(eraseSession?.active && hasImage);
+  const cropActive = Boolean(cropSession?.active && hasImage);
+  const expandActive = Boolean(expandSession?.active && hasImage);
+  const selectionEditActive = inpaintActive || eraseActive;
+  const magicEditActive =
+    selectionEditActive || cropActive || expandActive;
   const showSidePlus = Boolean(
-    (hovered || selected || connectingFromNodeId) && !isGenerating,
+    (hovered || selected || connectingFromNodeId) &&
+      !isGenerating &&
+      !magicEditActive,
   );
   const soleSelected = useLibtvIsNodeSoleSelected(id, Boolean(selected));
   const showTryMenu =
@@ -403,10 +479,204 @@ export function LibtvImageNode({
       !gridSplitActive &&
       hasImage,
   );
-  const showNormalToolbar = showImageTools;
+  const inpaintModelKey =
+    String((d as { engine?: { modelKey?: string } }).engine?.modelKey ?? "").trim() ||
+    inpaintSession?.modelKey ||
+    "qwen-image-edit";
+  const inpaintSelectionMode =
+    inpaintModelKey.trim().toLowerCase() === "wan2.7-image-pro" ? "bbox" : "mask";
+  const showNormalToolbar = showImageTools && !magicEditActive;
+  const showInpaintToolbar = Boolean(inpaintActive && !isGenerating);
+  const showEraseToolbar = Boolean(eraseActive && !isGenerating);
+  const showCropFrameDock = Boolean(cropActive && !isGenerating);
+  const showExpandFrameDock = Boolean(expandActive && !isGenerating);
   const showGridSplitToolbar = Boolean(
     soleSelected && gridSplitActive && !isGenerating,
   );
+  const { providers } = useUserProviders();
+  const inpaintCanvasRef = useRef<ImageLocalEditCanvasHandle | null>(null);
+  const inpaintCanvasUnregisterRef = useRef<(() => void) | null>(null);
+  const [inpaintCanUndo, setInpaintCanUndo] = useState(false);
+  const [inpaintCanRedo, setInpaintCanRedo] = useState(false);
+
+  const bindInpaintCanvasRef = useCallback(
+    (handle: ImageLocalEditCanvasHandle | null) => {
+      inpaintCanvasUnregisterRef.current?.();
+      inpaintCanvasUnregisterRef.current = null;
+      inpaintCanvasRef.current = handle;
+      if (handle && selectionEditActive) {
+        inpaintCanvasUnregisterRef.current = registerInpaintCanvas(id, handle);
+      }
+    },
+    [id, selectionEditActive],
+  );
+
+  const cropCanvasRef = useRef<ImageCropCanvasHandle | null>(null);
+  const cropCanvasUnregisterRef = useRef<(() => void) | null>(null);
+  const expandCanvasRef = useRef<ImageExpandCanvasHandle | null>(null);
+  const expandCanvasUnregisterRef = useRef<(() => void) | null>(null);
+  const [cropConfirming, setCropConfirming] = useState(false);
+  const magicEditGenerating = Boolean(
+    (d as { libtvMagicEditGenerating?: boolean }).libtvMagicEditGenerating,
+  );
+  const expandCredits = useModelCreditsPreview(
+    "image-out-painting",
+    0,
+    undefined,
+    expandSession?.outputCount ?? 1,
+    expandSession?.resolution ?? "2K",
+  );
+
+  const bindCropCanvasRef = useCallback(
+    (handle: ImageCropCanvasHandle | null) => {
+      cropCanvasUnregisterRef.current?.();
+      cropCanvasUnregisterRef.current = null;
+      cropCanvasRef.current = handle;
+      if (handle && cropActive) {
+        cropCanvasUnregisterRef.current = registerCropCanvas(id, handle);
+      }
+    },
+    [id, cropActive],
+  );
+
+  const bindExpandCanvasRef = useCallback(
+    (handle: ImageExpandCanvasHandle | null) => {
+      expandCanvasUnregisterRef.current?.();
+      expandCanvasUnregisterRef.current = null;
+      expandCanvasRef.current = handle;
+      if (handle && expandActive) {
+        expandCanvasUnregisterRef.current = registerExpandCanvas(id, handle);
+      }
+    },
+    [id, expandActive],
+  );
+
+  useEffect(() => {
+    if (selectionEditActive) return;
+    inpaintCanvasUnregisterRef.current?.();
+    inpaintCanvasUnregisterRef.current = null;
+  }, [selectionEditActive]);
+
+  useEffect(() => {
+    if (cropActive) return;
+    cropCanvasUnregisterRef.current?.();
+    cropCanvasUnregisterRef.current = null;
+  }, [cropActive]);
+
+  useEffect(() => {
+    if (expandActive) return;
+    expandCanvasUnregisterRef.current?.();
+    expandCanvasUnregisterRef.current = null;
+  }, [expandActive]);
+
+  useEffect(
+    () => () => {
+      inpaintCanvasUnregisterRef.current?.();
+      inpaintCanvasUnregisterRef.current = null;
+    },
+    [id],
+  );
+
+  useEffect(() => {
+    if (!selectionEditActive) return;
+    const t = window.setInterval(() => {
+      const h = inpaintCanvasRef.current;
+      if (!h) return;
+      setInpaintCanUndo(h.canUndo());
+      setInpaintCanRedo(h.canRedo());
+    }, 200);
+    return () => window.clearInterval(t);
+  }, [selectionEditActive]);
+
+  const closeInpaintSession = useCallback(() => {
+    clearLibtvInpaintSession(id, setNodes, rfSetNodes);
+  }, [id, rfSetNodes, setNodes]);
+
+  const closeEraseSession = useCallback(() => {
+    clearLibtvEraseSession(id, setNodes, rfSetNodes);
+  }, [id, rfSetNodes, setNodes]);
+
+  const closeCropSession = useCallback(() => {
+    clearLibtvCropSession(id, setNodes, rfSetNodes);
+  }, [id, rfSetNodes, setNodes]);
+
+  const closeExpandSession = useCallback(() => {
+    clearLibtvExpandSession(id, setNodes, rfSetNodes);
+  }, [id, rfSetNodes, setNodes]);
+
+  const onConfirmExpand = useCallback(() => {
+    const sourceUrl = d.ossUrl ?? d.blobUrl ?? "";
+    if (!sourceUrl) return;
+    if (!projectId) {
+      void alert({
+        title: "画布未就绪",
+        message: "请刷新页面后重试。",
+        variant: "error",
+      });
+      return;
+    }
+    void (async () => {
+      try {
+        await runLibtvExpand({
+          sourceNodeId: id,
+          projectId,
+          sourceImageUrl: sourceUrl,
+          nodes,
+          addNode,
+          setNodes,
+          setEdges,
+          onGeneratingChange: (generating) =>
+            updateNodeData(id, { libtvMagicEditGenerating: generating }),
+        });
+      } catch (e) {
+        await alert({
+          title: "扩图失败",
+          message: e instanceof Error ? e.message : "请稍后重试",
+          variant: "error",
+        });
+      }
+    })();
+  }, [
+    d.ossUrl,
+    d.blobUrl,
+    id,
+    projectId,
+    nodes,
+    addNode,
+    setNodes,
+    setEdges,
+    updateNodeData,
+    alert,
+  ]);
+
+  const onConfirmCrop = useCallback(() => {
+    const sourceUrl = d.ossUrl ?? d.blobUrl ?? "";
+    if (!sourceUrl) return;
+    void (async () => {
+      setCropConfirming(true);
+      try {
+        await runLibtvCrop({
+          sourceNodeId: id,
+          sourceImageUrl: sourceUrl,
+          nodes,
+          addNode,
+          setNodes,
+          setEdges,
+          onGeneratingChange: (generating) =>
+            updateNodeData(id, { libtvMagicEditGenerating: generating }),
+        });
+      } catch (e) {
+        await alert({
+          title: "裁剪失败",
+          message: e instanceof Error ? e.message : "请稍后重试",
+          variant: "error",
+        });
+      } finally {
+        setCropConfirming(false);
+      }
+    })();
+  }, [d.ossUrl, d.blobUrl, id, nodes, addNode, setNodes, setEdges, updateNodeData, alert]);
+
   const pro2ImageToolbarExtras = Boolean(
     edition === "pro2" && hasImage && !isCharacterThreeView,
   );
@@ -600,14 +870,14 @@ export function LibtvImageNode({
   const onMagicPick = useCallback(
     (menuId: LibtvImageMagicMenuId) => {
       if (edition !== "pro2") return;
-      spawnLibtvImageMagicTarget(id, menuId, {
-        nodes,
-        addNode,
-        setNodes,
-        setEdges,
-      });
+      startLibtvMagicEditFromMenu(
+        id,
+        menuId,
+        { nodes, addNode, setNodes, setEdges },
+        providers,
+      );
     },
-    [edition, id, nodes, addNode, setNodes, setEdges],
+    [edition, id, nodes, addNode, setNodes, setEdges, providers],
   );
 
   const onGridSplitPick = useCallback(
@@ -858,6 +1128,38 @@ export function LibtvImageNode({
           />
         );
       }
+      if (selectionEditActive && previewUrl) {
+        const session = inpaintActive ? inpaintSession : eraseSession;
+        return (
+          <ImageLocalEditCanvas
+            ref={bindInpaintCanvasRef}
+            imageUrl={previewUrl}
+            tool={session?.tool ?? (eraseActive ? "brush" : "rect")}
+            brushSize={session?.brushSize ?? 24}
+            selectionMode={eraseActive ? "mask" : inpaintSelectionMode}
+          />
+        );
+      }
+      if (cropActive && previewUrl && cropSession) {
+        return (
+          <ImageCropCanvas
+            ref={bindCropCanvasRef}
+            frameAnchorNodeId={id}
+            imageUrl={previewUrl}
+            aspectRatio={cropSession.aspectRatio}
+          />
+        );
+      }
+      if (expandActive && previewUrl && expandSession) {
+        return (
+          <ImageExpandCanvas
+            ref={bindExpandCanvasRef}
+            frameAnchorNodeId={id}
+            imageUrl={previewUrl}
+            aspectRatio={expandSession.aspectRatio ?? "original"}
+          />
+        );
+      }
       return (
         <MediaHoverBox
           src={previewUrl}
@@ -928,6 +1230,7 @@ export function LibtvImageNode({
       <div
         className={cn(
           LIBTV_NODE_OUTER_CLASS,
+          magicEditActive && "!overflow-visible",
           edition === "pro2" && LIBTV_CARD_DRAG_CLASS,
           edition === "pro2" && "flex flex-col",
           "image-paste-host",
@@ -1008,6 +1311,105 @@ export function LibtvImageNode({
           </LibtvNodeToolbarPortal>
         ) : null}
 
+        {showInpaintToolbar && inpaintSession ? (
+          <LibtvNodeToolbarPortal
+            nodeId={id}
+            visible={showInpaintToolbar}
+            pinVisible
+            toolbarHeightEstimate={52}
+          >
+            <ImageLocalEditToolbar
+              variant="inpaint"
+              tool={inpaintSession.tool}
+              brushSize={inpaintSession.brushSize}
+              modelKey={inpaintModelKey}
+              canUndo={inpaintCanUndo}
+              canRedo={inpaintCanRedo}
+              onToolChange={(tool) =>
+                patchLibtvInpaintSession(id, { tool }, setNodes)
+              }
+              onBrushSizeChange={(brushSize) =>
+                patchLibtvInpaintSession(id, { brushSize }, setNodes)
+              }
+              onModelChange={() => {}}
+              onUndo={() => inpaintCanvasRef.current?.undo()}
+              onRedo={() => inpaintCanvasRef.current?.redo()}
+              onClose={closeInpaintSession}
+            />
+          </LibtvNodeToolbarPortal>
+        ) : null}
+
+        {showEraseToolbar && eraseSession ? (
+          <LibtvNodeToolbarPortal
+            nodeId={id}
+            visible={showEraseToolbar}
+            pinVisible
+            toolbarHeightEstimate={52}
+          >
+            <ImageLocalEditToolbar
+              variant="erase"
+              tool={eraseSession.tool}
+              brushSize={eraseSession.brushSize}
+              modelKey=""
+              canUndo={inpaintCanUndo}
+              canRedo={inpaintCanRedo}
+              onToolChange={(tool) =>
+                patchLibtvEraseSession(id, { tool }, setNodes)
+              }
+              onBrushSizeChange={(brushSize) =>
+                patchLibtvEraseSession(id, { brushSize }, setNodes)
+              }
+              onModelChange={() => {}}
+              onUndo={() => inpaintCanvasRef.current?.undo()}
+              onRedo={() => inpaintCanvasRef.current?.redo()}
+              onClose={closeEraseSession}
+            />
+          </LibtvNodeToolbarPortal>
+        ) : null}
+
+        {showCropFrameDock && cropSession ? (
+          <LibtvMagicEditFrameDockPortal nodeId={id} visible={showCropFrameDock}>
+            <ImageCropFrameDock
+              aspectRatio={cropSession.aspectRatio}
+              confirming={cropConfirming}
+              onAspectRatioChange={(aspectRatio) =>
+                patchLibtvCropSession(id, { aspectRatio }, setNodes)
+              }
+              onConfirm={onConfirmCrop}
+              onClose={closeCropSession}
+            />
+          </LibtvMagicEditFrameDockPortal>
+        ) : null}
+
+        {showExpandFrameDock && expandSession ? (
+          <LibtvMagicEditFrameDockPortal nodeId={id} visible={showExpandFrameDock}>
+            <ImageExpandFrameDock
+              aspectRatio={expandSession.aspectRatio ?? "original"}
+              resolution={expandSession.resolution ?? "2K"}
+              outputCount={expandSession.outputCount ?? 1}
+              running={magicEditGenerating}
+              canSubmit={!magicEditGenerating && hasImage}
+              credits={expandCredits?.credits}
+              creditsTitle={
+                expandCredits?.credits != null
+                  ? `image-out-painting · 挂牌 ${expandCredits.creditsPerUnit} 积分/张`
+                  : undefined
+              }
+              onAspectRatioChange={(aspectRatio) =>
+                patchLibtvExpandSession(id, { aspectRatio }, setNodes)
+              }
+              onResolutionChange={(resolution) =>
+                patchLibtvExpandSession(id, { resolution }, setNodes)
+              }
+              onOutputCountChange={(outputCount) =>
+                patchLibtvExpandSession(id, { outputCount }, setNodes)
+              }
+              onClose={closeExpandSession}
+              onSubmit={onConfirmExpand}
+            />
+          </LibtvMagicEditFrameDockPortal>
+        ) : null}
+
         {showGridSplitToolbar && gridSplit ? (
           <LibtvNodeToolbarPortal nodeId={id} visible={showGridSplitToolbar}>
             <Pro2ImageGridSplitToolbar
@@ -1039,7 +1441,8 @@ export function LibtvImageNode({
         <div
           className={cn(
             LIBTV_MEDIA_CARD_SHELL_CLASS,
-            LIBTV_CARD_DRAG_CLASS,
+            magicEditActive && "!overflow-visible",
+            !magicEditActive && LIBTV_CARD_DRAG_CLASS,
             "min-h-0 flex-1",
           )}
           style={libtvNodeBorderStyle({
@@ -1105,7 +1508,14 @@ export function LibtvImageNode({
             </div>
           ) : null}
 
-          <div className={cn(LIBTV_MEDIA_STAGE_CLASS, "relative flex min-h-0 flex-col")}>
+          <div
+            className={cn(
+              LIBTV_MEDIA_STAGE_CLASS,
+              magicEditActive && "!overflow-visible",
+              "relative flex min-h-0 flex-col",
+              magicEditActive && "nodrag nopan nowheel cursor-crosshair",
+            )}
+          >
             {renderStage()}
             {hasImage && d.globalCatalogMarked ? <GlobalAssetCatalogBadge /> : null}
             <LibtvNodeErrorBanner
