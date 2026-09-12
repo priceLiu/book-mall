@@ -229,6 +229,22 @@ describe("libtv-media-aspect-preset", () => {
         },
       }),
     ).toBe(true);
+    expect(
+      shouldSkipLibtvImageNodeNaturalSizeAutoFit({
+        type: "story-pro2-image",
+        data: { gridSplitFrameCrop: true, pro2HdFromGridSplit: true },
+      }),
+    ).toBe(false);
+    expect(
+      shouldSkipLibtvMediaAspectPresetForNaturalMedia({
+        type: "story-pro2-image",
+        data: {
+          gridSplitFrameCrop: true,
+          pro2HdFromGridSplit: true,
+          aspectRatio: "16:9",
+        },
+      }),
+    ).toBe(false);
   });
 
   it("skips aspect preset for pasted upload blobs", () => {

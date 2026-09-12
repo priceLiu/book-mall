@@ -685,11 +685,19 @@ export function LibtvImageNode({
   const stageImageFit: "cover" | "contain" = "cover";
 
   const gridSplitCropCss = d.gridSplitCrop;
+  const hdFromGridSplit = Boolean(
+    (d as { pro2HdFromGridSplit?: boolean }).pro2HdFromGridSplit,
+  );
+  /** 宫格高清预览仍带 gridSplitCrop · 不应挡住 Dock 比例改外框 */
+  const blockAspectPresetSync = Boolean(gridSplitCropCss && !hdFromGridSplit);
 
   const skipNaturalSizeAutoFit = useCanvasStore((s) => {
     const node = s.nodes.find((n) => n.id === id);
     if (!node) {
-      return Boolean((d as { gridSplitFrameCrop?: boolean }).gridSplitFrameCrop);
+      return Boolean(
+        (d as { gridSplitFrameCrop?: boolean }).gridSplitFrameCrop &&
+          !hdFromGridSplit,
+      );
     }
     return shouldSkipLibtvImageNodeNaturalSizeAutoFit(node, s.nodes);
   });
@@ -697,13 +705,7 @@ export function LibtvImageNode({
   useLibtvMediaAspectPresetSync(
     id,
     (d as { aspectRatio?: string }).aspectRatio,
-    !isCharacterThreeView &&
-      !gridSplitCropCss &&
-      !skipNaturalSizeAutoFit &&
-      !(
-        (d as { pro2HdFromGridSplit?: boolean }).pro2HdFromGridSplit &&
-        !(d as { mediaAspectPreset?: string }).mediaAspectPreset?.trim()
-      ),
+    !isCharacterThreeView && !blockAspectPresetSync && !skipNaturalSizeAutoFit,
   );
 
   useLibtvMediaNodeAutoFit({

@@ -2,6 +2,8 @@
  * 电商工具箱 · 图像处理 · Gateway 模型与参数定义
  */
 
+import { OUTPAINT_API_BASE_PARAMETERS } from "@/lib/canvas-image-edit/constants";
+
 export const ECOM_IMAGE_PROCESSING_TOOL_KEY = "ecom-toolkit__image-processing";
 export const COMMON_TOOLS_IMAGE_PROCESSING_TOOL_KEY =
   "common-tools__image-processing";
@@ -427,7 +429,7 @@ export function buildOutpaintApiParameters(
   raw: Record<string, unknown>,
 ): Record<string, unknown> {
   const mode = String(raw.expand_mode ?? "scale");
-  const out: Record<string, unknown> = {};
+  const out: Record<string, unknown> = { ...OUTPAINT_API_BASE_PARAMETERS };
 
   if (mode === "ratio") {
     if (raw.output_ratio) out.output_ratio = raw.output_ratio;
@@ -462,5 +464,6 @@ export function buildOutpaintApiParameters(
 
   out.x_scale = Number(raw.x_scale ?? 1.5);
   out.y_scale = Number(raw.y_scale ?? 1.5);
+  if (raw.add_watermark === true) out.add_watermark = true;
   return out;
 }

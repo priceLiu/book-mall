@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
 import { ensurePublicImageUrl } from "@/lib/image-local-edit/image-url";
+import { OUTPAINT_API_BASE_PARAMETERS } from "./constants";
 import { invokeCanvasImageOutpaint } from "./gateway-invoke";
 
 async function rehostResultUrl(userId: string, url: string): Promise<string> {
@@ -49,7 +50,7 @@ export function buildOutpaintParametersFromOffsets(
   if (Object.keys(params).length === 0) {
     throw new Error("请向外拖动扩图框后再生成");
   }
-  return params;
+  return { ...OUTPAINT_API_BASE_PARAMETERS, ...params };
 }
 
 export async function runCanvasImageOutpaint(opts: {

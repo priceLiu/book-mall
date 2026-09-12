@@ -25,12 +25,46 @@ function isStyledMediaGroupNode(
 }
 
 /** 媒体组 zIndex 随 RF 选中态本地计算 · store 合并时勿用陈旧 zIndex 覆盖 */
+function readStoreNodeBox(
+  sn: CanvasFlowNode,
+): { width: number | undefined; height: number | undefined } {
+  const style = sn.style as { width?: number; height?: number } | undefined;
+  return {
+    width:
+      (typeof sn.width === "number" ? sn.width : undefined) ?? style?.width,
+    height:
+      (typeof sn.height === "number" ? sn.height : undefined) ?? style?.height,
+  };
+}
+
+/** store 程序化改外框（Dock 比例 / 媒体自适配）须落到 RF，即使节点仍选中 */
+function storeLedMediaLayoutResize(
+  rf: CanvasFlowNode,
+  sn: CanvasFlowNode,
+): { width: number; height: number } | null {
+  const { width: storeW, height: storeH } = readStoreNodeBox(sn);
+  if (typeof storeW !== "number" || typeof storeH !== "number") return null;
+  if (storeW === rf.width && storeH === rf.height) return null;
+
+  const fitKey = (sn.data as { mediaFitKey?: string } | undefined)?.mediaFitKey;
+  if (
+    fitKey?.startsWith("aspect-preset|") ||
+    fitKey?.startsWith("upload|")
+  ) {
+    return { width: storeW, height: storeH };
+  }
+  return null;
+}
+
 /** store→RF 合并时保留 RF 已选中节点的实测外框，避免 ResizeObserver 与 store 互写 */
 function mergeDimensionsFromStoreToRf(
   rf: CanvasFlowNode,
   sn: CanvasFlowNode,
   preserveRfSelection: boolean,
 ): { width: number | undefined; height: number | undefined } {
+  const storeLed = storeLedMediaLayoutResize(rf, sn);
+  if (storeLed) return storeLed;
+
   if (preserveRfSelection && rf.selected) {
     const measured = rf as CanvasFlowNode & {
       measured?: { width?: number; height?: number };
@@ -41,7 +75,7 @@ function mergeDimensionsFromStoreToRf(
       return { width: w, height: h };
     }
   }
-  return { width: sn.width, height: sn.height };
+  return readStoreNodeBox(sn);
 }
 
 function mergeZIndexFromStoreToRf(

@@ -442,8 +442,12 @@ export function shouldSkipLibtvImageNodeNaturalSizeAutoFit(
   node: Pick<CanvasFlowNode, "type" | "data" | "parentId">,
   allNodes?: CanvasFlowNode[],
 ): boolean {
-  const d = (node.data ?? {}) as { gridSplitFrameCrop?: boolean };
-  if (d.gridSplitFrameCrop) return true;
+  const d = (node.data ?? {}) as {
+    gridSplitFrameCrop?: boolean;
+    pro2HdFromGridSplit?: boolean;
+  };
+  /** 宫格分镜格固定框；高清节点允许 Dock 改比例 */
+  if (d.gridSplitFrameCrop && !d.pro2HdFromGridSplit) return true;
   if (!allNodes?.length) return false;
   if (isPro2PipelineMediaGroupChild(node, allNodes)) return true;
   if (
@@ -477,8 +481,12 @@ export function shouldSkipLibtvMediaAspectPresetForNaturalMedia(
     runtime?: { status?: string; ossUrl?: string; ephemeralUrl?: string };
   };
 
-  /** 宫格裁切分镜/高清 · spawn 已按单元比例定框；用户选手型比例后走 preset */
-  if (d.gridSplitFrameCrop && !(d.mediaAspectPreset?.trim())) {
+  /** 宫格裁切分镜 · spawn 已定框；高清节点仍允许 Dock 改比例 */
+  if (
+    d.gridSplitFrameCrop &&
+    !d.pro2HdFromGridSplit &&
+    !(d.mediaAspectPreset?.trim())
+  ) {
     return true;
   }
   if (d.pro2HdFromGridSplit || d.gridSplitCrop) return false;

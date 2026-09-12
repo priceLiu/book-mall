@@ -91,4 +91,36 @@ describe("mergeStoreNodesIntoRf", () => {
     expect(merged[0]!.width).toBe(560);
     expect(merged[0]!.height).toBe(400);
   });
+
+  it("applies store aspect-preset size to selected LibTV image node", () => {
+    const storeNodes: CanvasFlowNode[] = [
+      {
+        id: "img1",
+        type: "story-pro2-image",
+        position: { x: 0, y: 0 },
+        width: 354,
+        height: 674,
+        style: { width: 354, height: 674 },
+        data: {
+          aspectRatio: "9:16",
+          mediaFitKey: "aspect-preset|9:16|pro2-image",
+          mediaAspectPreset: "9:16",
+        },
+      },
+    ];
+    const rfNodes: CanvasFlowNode[] = [
+      {
+        ...storeNodes[0]!,
+        selected: true,
+        width: 630,
+        height: 442,
+        style: { width: 630, height: 442 },
+      },
+    ];
+    const merged = mergeStoreNodesIntoRf(rfNodes, storeNodes, {
+      preserveRfSelection: true,
+    });
+    expect(merged[0]!.width).toBe(354);
+    expect(merged[0]!.height).toBe(674);
+  });
 });
