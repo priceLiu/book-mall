@@ -3,6 +3,28 @@
 import { isPro2FrameBoardGroup } from "./pro2-resolve-frame-board-group";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 
+function isPro2ScriptHubNode(
+  node: CanvasFlowNode | undefined,
+): node is CanvasFlowNode {
+  return node?.type === "story-pro2-script-hub";
+}
+
+/** 同一对端点已有 media 入边（如宫格源图 image→in_image）时勿再补 hub text 边 */
+function hasPro2HubMediaInboundEdge(
+  edges: CanvasFlowEdge[],
+  hubNodeId: string,
+  childId: string,
+): boolean {
+  return edges.some(
+    (e) =>
+      e.source === hubNodeId &&
+      e.target === childId &&
+      (e.targetHandle === "in_image" ||
+        e.targetHandle === "in_text" ||
+        e.targetHandle === "default"),
+  );
+}
+
 /** 分镜图组 → 分镜视频组（frame 组 out_media → video 组 in_text） */
 export function ensurePro2FrameBoardToVideoBoardEdge(
   setEdges: (fn: (edges: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void,
@@ -98,6 +120,7 @@ export function ensurePro2HubToMediaGroupChildEdges(
     const next = [...withoutGroupInbound];
     for (const childId of childIds) {
       if (
+        hasPro2HubMediaInboundEdge(next, hubNodeId, childId) ||
         next.some(
           (e) =>
             e.source === hubNodeId &&
@@ -148,16 +171,48 @@ function isPro2MediaBoardGroup(
   });
 }
 
-/** 打开/保存画布：hub → 组容器 改为 hub → 组内媒体子节点 */
+/**
+ * 宫格分镜组误把源图当 pro2HubNodeId 时，hydrate 会补 text→in_image 与 image→in_image 重复，
+ * 点击组内节点触发 RF setEdges 死循环。移除非 script-hub 的多余 text 边。
+ */
+export function stripSpuriousPro2HubTextEdges(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): CanvasFlowEdge[] {
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  let changed = false;
+  const next = edges.filter((e) => {
+    if (e.sourceHandle !== "text" || e.targetHandle !== "in_image") return true;
+    const hub = nodeById.get(e.source);
+    if (isPro2ScriptHubNode(hub)) return true;
+    const hasImageParallel = edges.some(
+      (o) =>
+        o.id !== e.id &&
+        o.source === e.source &&
+        o.target === e.target &&
+        o.sourceHandle === "image",
+    );
+    if (hasImageParallel) {
+      changed = true;
+      return false;
+    }
+    return true;
+  });
+  return changed ? next : edges;
+}
+
+/** 打开/保存画布：hub → 组容器 改为 hub → 组内媒体子节点（仅 script hub） */
 export function migratePro2HubMediaGroupEdgesToChildren(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
 ): CanvasFlowEdge[] {
-  let next = edges;
+  let next = stripSpuriousPro2HubTextEdges(nodes, edges);
   for (const group of nodes) {
     if (!isPro2MediaBoardGroup(group, nodes)) continue;
     const hubId = (group.data as { pro2HubNodeId?: string }).pro2HubNodeId?.trim();
-    if (!hubId || !nodes.some((n) => n.id === hubId)) continue;
+    if (!hubId) continue;
+    const hub = nodes.find((n) => n.id === hubId);
+    if (!isPro2ScriptHubNode(hub)) continue;
     const childIds = nodes
       .filter((n) => n.parentId === group.id)
       .map((n) => n.id);

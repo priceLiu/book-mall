@@ -97,6 +97,7 @@ import {
 import { ensureNodeDragHandles } from "@/lib/canvas/normalize-graph-nodes";
 import {
   CANVAS_RF_SELECT_NODE_EVENT,
+  applyRfNodesMediaGroupZIndex,
   CANVAS_RF_VIEWPORT_READY_EVENT,
   mergeStoreNodesIntoRf,
 } from "@/lib/canvas/canvas-rf-sync";
@@ -104,12 +105,9 @@ import { commitLibtvRfNodeSelection } from "@/lib/canvas/select-libtv-node";
 import { useLibtvCanvasOverlayClickThrough } from "@/lib/canvas/use-libtv-canvas-overlay-click-through";
 import { filterSpuriousRfEdgeRemoves } from "@/lib/canvas/canvas-edge-change-guard";
 import {
+  applyLibtvEdgesLayerZ,
   CANVAS_EDGE_STROKE_WIDTH,
-  CANVAS_EDGE_STROKE_WIDTH_ACTIVE,
   CANVAS_EDGE_STROKE_WIDTH_CONNECTING,
-  CANVAS_EDGE_Z_NODE_GAP,
-  canvasEdgeLayerClassName,
-  resolveLibtvCanvasEdgeZIndex,
 } from "@/lib/canvas/canvas-edge-layer-z";
 import { CANVAS_GRAPH_UNDO_REDO_EVENT } from "@/lib/canvas/canvas-graph-undo-redo";
 import { resolveSnapConnectionOnNodeHit, findNearestSidePlusHandle } from "@/lib/canvas/libtv-connection-snap";
@@ -190,6 +188,7 @@ import {
 } from "@/lib/canvas/pro2-script-hub-helpers";
 import { DeletableEdge } from "./edges/deletable-edge";
 import { useCanvasEdgeCutHover } from "./edges/canvas-edge-cut-portal";
+import { CanvasEdgeFocusProvider } from "./edges/canvas-edge-focus-context";
 import {
   CanvasPaneContextMenu,
   type CanvasPaneContextMenuItem,
@@ -337,6 +336,17 @@ function FlowCanvasInner({
       syncingGraphFromStoreTimerRef.current = null;
     }, 300);
   }, []);
+
+  const resolveRfEdgesFromStore = useCallback(
+    (edges: CanvasFlowEdge[], nodes: CanvasFlowNode[]) => {
+      const isLibtv =
+        pro2FloatingInspector ||
+        sbv1Canvas ||
+        hasLibtvMediaCanvasNodes(nodes);
+      return isLibtv ? applyLibtvEdgesLayerZ(edges, nodes) : edges;
+    },
+    [pro2FloatingInspector, sbv1Canvas],
+  );
 
   const clearDragSnapGuides = useCallback(() => {
     if (dragSnapRafRef.current !== null) {
@@ -653,13 +663,14 @@ function FlowCanvasInner({
     if (isLibtv && s.nodes.some((n) => n.selected)) {
       s.setNodes((prev) => prev.map((n) => ({ ...n, selected: false })));
     }
-    setRfEdges(s.edges);
+    setRfEdges(resolveRfEdgesFromStore(s.edges, s.nodes));
   }, [
     projectId,
     pro2FloatingInspector,
     sbv1Canvas,
     setRfNodes,
     setRfEdges,
+    resolveRfEdgesFromStore,
     setCanvasViewportMoving,
     setCanvasGeometryDragging,
     setCanvasDraggingNodeId,
@@ -710,15 +721,22 @@ function FlowCanvasInner({
           }),
         );
       }
-      if (state.edges !== prev.edges) {
+      const libtvNodes = hasLibtvMediaCanvasNodes(state.nodes);
+      const edgesNeedResync =
+        state.edges !== prev.edges ||
+        (libtvNodes &&
+          state.nodes !== prev.nodes &&
+          !canvasNodesEqualIgnoringSelectionAndZ(prev.nodes, state.nodes));
+      if (edgesNeedResync) {
         if (deferStoreGraphSyncRef.current) {
           deferStoreGraphSyncRef.current = false;
         }
-        setRfEdges(state.edges);
+        armStoreToRfSyncGuard();
+        setRfEdges(resolveRfEdgesFromStore(state.edges, state.nodes));
       }
     });
     return unsub;
-  }, [armStoreToRfSyncGuard, setRfNodes, setRfEdges]);
+  }, [armStoreToRfSyncGuard, resolveRfEdgesFromStore, setRfNodes, setRfEdges]);
 
   /** 撤销/重做后强制 RF 与 store 对齐（拖动中 defer 同步时 undo 可能不生效） */
   useEffect(() => {
@@ -732,12 +750,12 @@ function FlowCanvasInner({
           preserveRfPositions: useCanvasStore.getState().canvasGeometryDragging,
         }),
       );
-      setRfEdges(s.edges);
+      setRfEdges(resolveRfEdgesFromStore(s.edges, s.nodes));
     };
     window.addEventListener(CANVAS_GRAPH_UNDO_REDO_EVENT, onUndoRedo);
     return () =>
       window.removeEventListener(CANVAS_GRAPH_UNDO_REDO_EVENT, onUndoRedo);
-  }, [armStoreToRfSyncGuard, setRfNodes, setRfEdges]);
+  }, [armStoreToRfSyncGuard, resolveRfEdgesFromStore, setRfNodes, setRfEdges]);
 
   /** RF 本地选中（打组 / focusCanvasNode），不写 zustand */
   useEffect(() => {
@@ -1045,8 +1063,9 @@ function FlowCanvasInner({
         const next = applyNodeChanges(batch, base) as CanvasFlowNode[];
         // LibTV 纯选中：直接 setRfNodes，勿在 onNodesChange 内再调 onRfNodesChange（嵌套 Maximum update depth）
         if (libtvCanvas && batch.every((c) => c.type === "select")) {
-          setRfNodes(next);
-          return next;
+          const withZ = applyRfNodesMediaGroupZIndex(next);
+          setRfNodes(withZ);
+          return withZ;
         }
         onRfNodesChange(batch);
         return next;
@@ -1961,70 +1980,6 @@ function FlowCanvasInner({
     return ids;
   }, [rfNodes, isNodeDragging, rfEdges.length, libtvCanvas]);
 
-  const edgesWithLayerZ = useMemo(
-    () =>
-      rfEdges.map((e) => {
-        const z = libtvCanvas
-          ? resolveLibtvCanvasEdgeZIndex(e, storeNodes, focusEdgeIds)
-          : CANVAS_EDGE_Z_INDEX;
-        const layerClass = libtvCanvas ? canvasEdgeLayerClassName(z) : undefined;
-        const className = layerClass
-          ? `${e.className ?? ""} ${layerClass}`.trim()
-          : e.className;
-        return {
-          ...e,
-          className,
-          zIndex: Math.max(typeof e.zIndex === "number" ? e.zIndex : 0, z),
-        };
-      }),
-    [rfEdges, libtvCanvas, storeNodes, focusEdgeIds],
-  );
-
-  const decoratedEdges = useMemo(() => {
-    if (!focusEdgeIds) return edgesWithLayerZ;
-    let changed = false;
-    const next = edgesWithLayerZ.map((e) => {
-      if (focusEdgeIds.has(e.target)) {
-        const className = `${e.className ?? ""} pro2-edge-active pro2-edge-up`.trim();
-        if (
-          e.zIndex === CANVAS_EDGE_Z_NODE_GAP &&
-          className === e.className &&
-          e.style?.stroke === "#60a5fa"
-        ) {
-          return e;
-        }
-        changed = true;
-        return {
-          ...e,
-          zIndex: CANVAS_EDGE_Z_NODE_GAP,
-          className,
-          style: { ...(e.style ?? {}), stroke: "#60a5fa", strokeWidth: CANVAS_EDGE_STROKE_WIDTH_ACTIVE },
-        };
-      }
-      if (focusEdgeIds.has(e.source)) {
-        const className =
-          `${e.className ?? ""} pro2-edge-active pro2-edge-down`.trim();
-        if (
-          e.zIndex === CANVAS_EDGE_Z_NODE_GAP &&
-          className === e.className &&
-          e.style?.stroke === "#238636"
-        ) {
-          return e;
-        }
-        changed = true;
-        return {
-          ...e,
-          zIndex: CANVAS_EDGE_Z_NODE_GAP,
-          className,
-          style: { ...(e.style ?? {}), stroke: "#238636", strokeWidth: CANVAS_EDGE_STROKE_WIDTH_ACTIVE },
-        };
-      }
-      // 勿批量压低非关联连线 opacity — 单选时全图 SVG 重绘导致明显屏闪
-      return e;
-    });
-    return changed ? next : edgesWithLayerZ;
-  }, [edgesWithLayerZ, focusEdgeIds, rfEdges]);
-
   const onlyRenderVisible =
     forceOnlyRenderVisible || libtvCanvas || rfNodes.length >= 8;
 
@@ -2398,10 +2353,11 @@ function FlowCanvasInner({
       onDragOver={onDragOver}
       onWheelCapture={onCanvasWheelCapture}
     >
+      <CanvasEdgeFocusProvider focusNodeIds={libtvCanvas ? focusEdgeIds : null}>
       <ReactFlow
         key={projectId}
         nodes={decoratedNodes}
-        edges={decoratedEdges}
+        edges={rfEdges}
         nodeTypes={memoNodeTypes}
         edgeTypes={memoEdgeTypes}
         defaultEdgeOptions={CANVAS_DEFAULT_EDGE_OPTIONS}
@@ -2617,6 +2573,7 @@ function FlowCanvasInner({
         ) : null}
         <LibtvSideConnectLayer />
       </ReactFlow>
+      </CanvasEdgeFocusProvider>
       {enableDragSnapGuides ? (
         <CanvasSnapGuidesOverlay guides={snapGuides} />
       ) : null}

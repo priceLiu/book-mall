@@ -10,7 +10,7 @@ export function isPro2PipelineFrameCell(
     return false;
   }
   const d = node.data as { pro2ControllerNodeId?: string };
-  return Boolean(d.pro2ControllerNodeId?.trim() || node.parentId);
+  return Boolean(d.pro2ControllerNodeId?.trim());
 }
 
 /** @deprecated 使用 isPro2PipelineFrameCell */

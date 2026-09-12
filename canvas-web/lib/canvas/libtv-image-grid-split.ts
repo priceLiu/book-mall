@@ -532,24 +532,28 @@ export async function spawnFrameGroupFromGridSplit(
   });
   if (!groupId) return null;
 
-  for (const cid of childIds) {
-    store.updateNodeData(cid, { pro2GroupId: groupId });
-    store.setEdges((prev) => [
-      ...prev,
-      {
+  store.setEdges((prev) => {
+    const next = [...prev];
+    for (const cid of childIds) {
+      next.push({
         id: `e-${nanoid(6)}`,
         source: sourceNodeId,
         target: cid,
         sourceHandle: "image",
         targetHandle: "in_image",
-      },
-    ]);
+      });
+    }
+    return next;
+  });
+  for (const cid of childIds) {
+    store.updateNodeData(cid, { pro2GroupId: groupId });
   }
 
   store.updateNodeData(groupId, {
     pro2Kind: "frame-board",
     pro2Styled: true,
-    pro2HubNodeId: sourceNodeId,
+    /** 宫格源图（非 script hub）· 勿写 pro2HubNodeId，避免 hydrate 补重复 text 边 */
+    pro2GridSplitSourceId: sourceNodeId,
   });
 
   relayoutPro2MediaGroup(store.setNodes, groupId, { resetOrigin: true });

@@ -98,6 +98,34 @@ export function canvasEdgeLayerClassName(zIndex: number): string | undefined {
  * LibTV 画布连线分层：统一 z=12（高于组框 5、低于子节点 22）。
  * 组内/跨组入组须可见；不再把跨组线压到 z=4，否则在组区域整段被组底色遮住。
  */
+/** store→RF 同步时写入 className/zIndex，避免 render 期派生 edges 与 rfEdges 不同步 */
+export function applyLibtvEdgesLayerZ(
+  edges: CanvasFlowEdge[],
+  nodes: CanvasFlowNode[],
+): CanvasFlowEdge[] {
+  let changed = false;
+  const next = edges.map((e) => {
+    const z = resolveLibtvCanvasEdgeZIndex(e, nodes, null);
+    const layerClass = canvasEdgeLayerClassName(z);
+    const baseClass = (e.className ?? "")
+      .replace(/\bcanvas-edge-(?:node-gap|behind-group)\b/g, "")
+      .trim();
+    const className = layerClass
+      ? `${baseClass} ${layerClass}`.trim()
+      : baseClass || undefined;
+    const zIndex = Math.max(typeof e.zIndex === "number" ? e.zIndex : 0, z);
+    if (
+      (e.className ?? "") === (className ?? "") &&
+      (typeof e.zIndex === "number" ? e.zIndex : 0) === zIndex
+    ) {
+      return e;
+    }
+    changed = true;
+    return { ...e, className: className || undefined, zIndex };
+  });
+  return changed ? next : edges;
+}
+
 export function resolveLibtvCanvasEdgeZIndex(
   edge: CanvasFlowEdge,
   nodes: CanvasFlowNode[],

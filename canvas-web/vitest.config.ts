@@ -53,6 +53,7 @@ export default defineConfig({
       "test/unit/canvas-node-changes.test.ts",
       "test/unit/canvas-edge-change-guard.test.ts",
       "test/unit/canvas-edge-layer-z.test.ts",
+      "test/unit/pro2-hub-media-group-edge.test.ts",
       "test/unit/canvas-node-internals-refresh.test.ts",
       "test/unit/canvas-persist-snapshot.test.ts",
       "test/unit/canvas-persist-delta.test.ts",

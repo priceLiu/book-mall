@@ -609,6 +609,8 @@ export type GroupNodeData = {
   /** Pro2 · 媒体组语义 */
   pro2Kind?: Pro2MediaGroupKind;
   pro2HubNodeId?: string;
+  /** 宫格拆格建分镜组时的源图节点（非 script hub） */
+  pro2GridSplitSourceId?: string;
   /** 批量跑任务的隐藏列节点 id */
   pro2ControllerNodeId?: string;
   /** Pro2 · 手动框选打的组：统一走图1 暗色壳（即便不是媒体组） */
