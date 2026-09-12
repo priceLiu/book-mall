@@ -1,5 +1,6 @@
 "use client";
 
+import { patchLibtvRfNodes, type LibtvRfSetNodes } from "./libtv-rf-node-patch";
 import type { CanvasFlowNode } from "./types";
 
 export type LibtvCropAspectRatio =
@@ -82,12 +83,12 @@ export function startLibtvCropSession(
 export function clearLibtvCropSession(
   nodeId: string,
   setNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void,
-  rfSetNodes?: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void,
+  rfSetNodes?: LibtvRfSetNodes,
 ): void {
   const apply = (prev: CanvasFlowNode[]) =>
     prev.map((n) => patchCropClear(n, nodeId));
   setNodes(apply);
-  rfSetNodes?.(apply);
+  patchLibtvRfNodes(rfSetNodes, apply);
 }
 
 export function patchLibtvCropSession(

@@ -6,6 +6,7 @@ import {
 } from "./canvas-image-edit-models";
 import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
 import type { LibtvInpaintTool } from "./libtv-inpaint-session";
+import { patchLibtvRfNodes, type LibtvRfSetNodes } from "./libtv-rf-node-patch";
 import type { CanvasFlowNode } from "./types";
 
 /** 擦除 · Dock 固定提示词（用户不可改，与重绘共用 image-local-edit） */
@@ -93,12 +94,12 @@ export function startLibtvEraseSession(
 export function clearLibtvEraseSession(
   nodeId: string,
   setNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void,
-  rfSetNodes?: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void,
+  rfSetNodes?: LibtvRfSetNodes,
 ): void {
   const apply = (prev: CanvasFlowNode[]) =>
     prev.map((n) => patchEraseClear(n, nodeId));
   setNodes(apply);
-  rfSetNodes?.(apply);
+  patchLibtvRfNodes(rfSetNodes, apply);
 }
 
 export function patchLibtvEraseSession(

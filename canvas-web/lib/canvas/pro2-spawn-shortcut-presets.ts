@@ -90,7 +90,7 @@ type SpawnStore = {
     data?: Record<string, unknown>,
   ) => string;
   setEdges: (fn: (e: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
-  setNodes: Parameters<typeof selectPro2NodeAfterSpawn>[0];
+  setNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void;
   createGroupContaining: (
     childIds: string[],
     opts?: {

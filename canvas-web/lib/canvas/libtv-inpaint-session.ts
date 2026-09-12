@@ -2,6 +2,7 @@
 
 import { pickCanvasImageEditEngine } from "./canvas-image-edit-models";
 import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
+import { patchLibtvRfNodes, type LibtvRfSetNodes } from "./libtv-rf-node-patch";
 import type { CanvasFlowNode } from "./types";
 
 export type LibtvInpaintTool = "brush" | "rect" | "eraser";
@@ -104,12 +105,12 @@ export function startLibtvInpaintSession(
 export function clearLibtvInpaintSession(
   nodeId: string,
   setNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void,
-  rfSetNodes?: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void,
+  rfSetNodes?: LibtvRfSetNodes,
 ): void {
   const apply = (prev: CanvasFlowNode[]) =>
     prev.map((n) => patchInpaintSessionClear(n, nodeId));
   setNodes(apply);
-  rfSetNodes?.(apply);
+  patchLibtvRfNodes(rfSetNodes, apply);
 }
 
 export function patchLibtvInpaintSession(
