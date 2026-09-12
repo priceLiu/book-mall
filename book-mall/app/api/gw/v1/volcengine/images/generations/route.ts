@@ -17,6 +17,7 @@ import { parseGatewayClientSource } from "@/lib/gateway/poll-service";
 import { parseUsageFromUnknown } from "@/lib/gateway/gateway-token-metrics";
 import {
   buildVolcengineImageLogResultSummary,
+  parseSeedreamLayerDecomposeResponse,
   volcengineImageGenerations,
   type VolcengineImageGenerationsParams,
 } from "@/lib/gateway/volcengine-image-generations-proxy";
@@ -128,9 +129,14 @@ export async function POST(request: NextRequest) {
       usage: parseUsageFromUnknown(result.raw),
       model,
     });
+    const layers = parseSeedreamLayerDecomposeResponse(result.raw);
     return NextResponse.json({
       code: 200,
-      data: { images: result.images, usage: result.usage },
+      data: {
+        images: result.images,
+        usage: result.usage,
+        ...(layers.length ? { layers } : {}),
+      },
       logId: log.id,
       providerKind: "VOLCENGINE",
     });

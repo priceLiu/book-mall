@@ -248,7 +248,17 @@ export async function gatewayV1VolcengineImageGenerations(
       parameters?: Record<string, unknown>;
     };
   },
-): Promise<{ images: Array<{ url?: string; b64?: string }>; logId: string }> {
+): Promise<{
+  images: Array<{ url?: string; b64?: string }>;
+  layers?: Array<{
+    url: string;
+    zIndex: number;
+    bbox?: { normalized?: number[]; absolute?: number[] };
+    name?: string;
+    isBackground: boolean;
+  }>;
+  logId: string;
+}> {
   const r = await gatewayV1Fetch(opts.apiKeyId, "volcengine/images/generations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -264,7 +274,16 @@ export async function gatewayV1VolcengineImageGenerations(
   }
   let json: {
     code?: number;
-    data?: { images?: Array<{ url?: string; b64?: string }> };
+    data?: {
+      images?: Array<{ url?: string; b64?: string }>;
+      layers?: Array<{
+        url: string;
+        zIndex: number;
+        bbox?: { normalized?: number[]; absolute?: number[] };
+        name?: string;
+        isBackground: boolean;
+      }>;
+    };
     logId?: string;
     error?: string;
   };
@@ -277,7 +296,12 @@ export async function gatewayV1VolcengineImageGenerations(
   if (images.length === 0) {
     throw new Error(json.error ?? "Gateway volcengine images 未返回图像");
   }
-  return { images, logId: json.logId ?? "" };
+  const layers = json.data?.layers;
+  return {
+    images,
+    ...(layers?.length ? { layers } : {}),
+    logId: json.logId ?? "",
+  };
 }
 
 async function parseGatewayImageUrlsResponse(

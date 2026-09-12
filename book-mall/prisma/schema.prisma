@@ -128,6 +128,7 @@ model User {
   ecomHandCraftProjects            EcomHandCraftProject[]
   ecomModelShotProjects            EcomModelShotProject[]
   ecomMediaDecomposeProjects       EcomMediaDecomposeProject[]
+  ecomImageLayerProjects           EcomImageLayerProject[]
   ecomVideoWorkflowProjects        EcomVideoWorkflowProject[]
   ecomFilmPullProjects             EcomFilmPullProject[]
   mediaRenderJobs                  MediaRenderJob[]
@@ -817,6 +818,32 @@ model EcomMediaDecomposeProject {
   /// { rawText, structured?, parseError?, completedAt? }
   result     Json?
   meta       Json?
+
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
+}
+
+/// 电商工具箱 · 图片分层编辑项目
+model EcomImageLayerProject {
+  id          String  @id @default(cuid())
+  userId      String
+  title       String?
+  module      String  @default("image-layer")
+  status      String  @default("draft")
+  /// 画布状态：sourceImageUrl / stack / pendingBbox / canvasDims / selectedLayerId
+  workspace   Json?
+  /// 本项目内生成记录 [{ id, kind, at, prompt, ossUrl, logId, title }]
+  generations Json?
+  meta        Json?
 
   tenantId    String?
   ownerUserId String?

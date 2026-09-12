@@ -1167,6 +1167,85 @@ const SEED_ITEMS: {
     sortOrder: 735,
     listKind: "PENDING",
   },
+  {
+    title: "IL-001 图片分层编辑 · 总规格",
+    description:
+      "电商营销菜单 /ecom/image-layer：Seedream 5.0 Pro 图层拆分 + 交互编辑 + 合成导出；SSOT docs/图片分层.md。",
+    docPath: "docs/图片分层.md",
+    sortOrder: 740,
+    listKind: "PENDING",
+  },
+  {
+    title: "IL-002 Gateway POC · 图层拆分",
+    description: "poc-seedream-image-layer.ts 跑通 decompose，记录 data[] metadata 字段名。",
+    docPath: "docs/图片分层.md",
+    sortOrder: 741,
+    listKind: "PENDING",
+  },
+  {
+    title: "IL-003 Gateway POC · 交互编辑 + 更新策略",
+    description: "POC 验证 <bbox> 改层；定稿改层后策略 A（整图 OSS → 重拆）。",
+    docPath: "docs/图片分层.md",
+    sortOrder: 742,
+    listKind: "PENDING",
+  },
+  {
+    title: "IL-004 Gateway · metadata 解析与 size 分支",
+    description:
+      "volcengine-image-generations-proxy parseSeedreamLayerDecomposeResponse；拆分 size=auto、编辑 size=2K。",
+    docPath: "docs/图片分层.md",
+    sortOrder: 743,
+    listKind: "PENDING",
+  },
+  {
+    title: "IL-005 book-mall · decompose/edit SSO API",
+    description: "ecom-image-layer-service + POST .../image-layer/decompose|edit|upload。",
+    docPath: "docs/图片分层.md",
+    sortOrder: 744,
+    listKind: "PENDING",
+  },
+  {
+    title: "IL-006 ecom · 营销菜单与模块注册",
+    description: "registry image-layer、marketingOrder、/ecom/image-layer 路由。",
+    docPath: "docs/图片分层.md",
+    sortOrder: 745,
+    listKind: "PENDING",
+  },
+  {
+    title: "IL-007 ecom · ImageLayerStudio 画布与框选",
+    description: "底图 + 透明层叠加；ImageMaskCanvas bbox 模式绘制拆分框。",
+    docPath: "docs/图片分层.md",
+    sortOrder: 746,
+    listKind: "PENDING",
+  },
+  {
+    title: "IL-008 ecom · 改层 + BackgroundGenerationDock",
+    description: "选中层 prompt 编辑；长等待走 BackgroundGenerationDock + toast。",
+    docPath: "docs/图片分层.md",
+    sortOrder: 747,
+    listKind: "PENDING",
+  },
+  {
+    title: "IL-009 ecom · 合并导出 PNG",
+    description: "前端按 zIndex 合成 Canvas → toBlob 下载，不调 AI。",
+    docPath: "docs/图片分层.md",
+    sortOrder: 748,
+    listKind: "PENDING",
+  },
+  {
+    title: "IL-010 计费展示与 Gateway 日志 clientPage",
+    description: "clientPage ecom/image-layer/decompose|edit；厂商 URL 落 OSS。",
+    docPath: "docs/图片分层.md",
+    sortOrder: 749,
+    listKind: "PENDING",
+  },
+  {
+    title: "IL-011 架构文档 / dev.md 端口说明",
+    description: "docs/dev.md 路由说明；全站架构 §7 变更记录。",
+    docPath: "docs/图片分层.md",
+    sortOrder: 750,
+    listKind: "PENDING",
+  },
 ];
 
 async function main() {

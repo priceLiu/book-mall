@@ -603,7 +603,17 @@ export async function ecomGwVolcengineImageEdit(
     parameters?: Record<string, unknown>;
     clientPage?: string;
   },
-): Promise<{ images: Array<{ url?: string; b64?: string }>; logId: string }> {
+): Promise<{
+  images: Array<{ url?: string; b64?: string }>;
+  layers?: Array<{
+    url: string;
+    zIndex: number;
+    bbox?: { normalized?: number[]; absolute?: number[] };
+    name?: string;
+    isBackground: boolean;
+  }>;
+  logId: string;
+}> {
   const auth = await requireEcomGatewayAuth(bookUserId);
   const model = opts.model.trim();
   routeGatewayModel(model);

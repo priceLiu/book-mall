@@ -57,6 +57,16 @@ export const ECOM_MODULES: EcomModuleDef[] = [
     tile: "parchment",
   },
   {
+    id: "image-layer",
+    title: "图片分层",
+    tagline: "AI 拆层 · 逐层改 · 合成导出",
+    href: "/ecom/image-layer",
+    kind: "image",
+    toolKey: "ecom-toolkit__image-layer",
+    action: "layer",
+    tile: "light",
+  },
+  {
     id: "media-decompose",
     title: "拆图拆视频",
     tagline: "图片/视频反推拆解 · 分镜与生图提示词",

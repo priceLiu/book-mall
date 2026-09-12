@@ -43,7 +43,7 @@ import {
   CanvasToolbarDropdownItem,
   CanvasToolbarDropdownMenu,
   CanvasToolbarDropdownTrigger,
-  useCanvasToolbarDropdown,
+  useCanvasToolbarDropdownAnchor,
 } from "@/components/canvas/canvas-toolbar-dropdown";
 import { CanvasToolbarIconButton } from "@/components/canvas/canvas-toolbar-icon-button";
 import {
@@ -139,7 +139,7 @@ export function CanvasToolbar({
   const networkSpeedLabel = formatCanvasNetworkSpeedLabel(network);
   const creditPools = useCanvasCreditBalance();
   const bookMallBase = useBookMallBaseUrl();
-  const mineMenu = useCanvasToolbarDropdown();
+  const mineMenu = useCanvasToolbarDropdownAnchor(openMenu === "mine");
 
   const formatCreditBalance = (n: number | null) =>
     n == null ? "—" : n.toLocaleString("zh-CN");
@@ -171,10 +171,6 @@ export function CanvasToolbar({
     },
     [leavingProject, router],
   );
-
-  useEffect(() => {
-    mineMenu.setOpen(openMenu === "mine");
-  }, [openMenu, mineMenu]);
 
   const closeMenus = useCallback(() => {
     setOpenMenu(null);

@@ -74,6 +74,7 @@ const SOURCE_MODULE_LABELS: Record<string, string> = {
   "seed-video": "种草视频",
   "model-shot": "模特大片",
   "outfit-video": "穿搭视频",
+  "image-layer": "图片分层",
 };
 
 export function generationRecordSourceLabel(meta: EcomGenerationRecordMeta | null): string {

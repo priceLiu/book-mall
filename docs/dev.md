@@ -49,6 +49,12 @@ pnpm dev:all:stagger                # mall 先就绪，其余子站间隔 3s 错
 - Platform API：`book-mall/app/api/sso/tools/ecom/outfit-video/*`
 - 技术契约：`book-mall/doc/ecom/video-workflow-template-spec.md`（`ecom-video-workflow/v1` · 模板 `outfit-v1`）
 
+### 电商工具箱 · 图片分层 Studio
+
+- 路由：**http://localhost:3007/ecom/image-layer**（营销侧栏 · Seedream 5.0 Pro）
+- Platform API：`book-mall/app/api/sso/tools/ecom/image-layer/{upload,decompose,edit}`
+- 产品 SSOT：`docs/图片分层.md` · POC：`book-mall/scripts/poc-seedream-image-layer.ts`
+
 ## 漫剧：带上 KIE 轮询
 
 本地没有公网回调时，生成任务靠 poll worker 拉结果。在 `dev:all` 基础上多加一条 poll-loop：

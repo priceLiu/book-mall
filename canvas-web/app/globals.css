@@ -264,6 +264,11 @@ html[data-canvas-editor-open] body {
   overflow-y: visible;
 }
 
+/* portal 到 body 的顶栏 · 始终可点（高于节点下拉 z-[200] 与 GAL z-[300]） */
+body > [data-canvas-toolbar-shell] {
+  pointer-events: auto;
+}
+
 [data-canvas-toolbar] {
   overflow: visible !important;
 }

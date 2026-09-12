@@ -8,13 +8,18 @@
  * 可选指定 canonical 平台账号邮箱（默认 PLATFORM_POOL_OWNER_EMAIL / 首个 ADMIN）：
  *   ARK_API_KEY='ark-...' pnpm exec dotenv -e .env.local -- tsx scripts/setup-seedream-5-volcengine-gateway.ts 13808816802@126.com
  */
+import { encryptApiKey } from "../lib/canvas/secret";
 import {
+  createGatewayCredential,
   getDecryptedCredentialApiKey,
-  updateGatewayCredential,
 } from "../lib/gateway/credential-service";
+import { syncPersonalGatewayApiKeyBindings } from "../lib/gateway/api-key-service";
+import {
+  rebindManagedKeysToPlatformPool,
+  syncCanonicalPlatformAdminKeyBindings,
+} from "../lib/gateway/platform-credential-pool";
 import { buildVolcengineCredentialStorage } from "../lib/gateway/volcengine-gateway-credential";
 import { getCanonicalPlatformPoolOwnerEmail } from "../lib/gateway/platform-credential-copy";
-import { rebindManagedKeysToPlatformPool } from "../lib/gateway/platform-credential-pool";
 import { prisma } from "../lib/prisma";
 import {
   findGatewayUserByBookUserId,
@@ -55,48 +60,66 @@ async function main() {
     process.exit(1);
   }
 
-  const defaultCred = await prisma.gatewayVendorCredential.findFirst({
+  let volcCreds = await prisma.gatewayVendorCredential.findMany({
+    where: { userId: gwUser.id, providerKind: "VOLCENGINE" },
+    orderBy: [{ isDefaultForProvider: "desc" }, { createdAt: "asc" }],
+    select: { id: true, alias: true, isDefaultForProvider: true },
+  });
+
+  if (volcCreds.length === 0) {
+    const created = await createGatewayCredential({
+      userId: gwUser.id,
+      alias: ALIAS,
+      providerKind: "VOLCENGINE",
+      apiKey,
+      baseUrl: BASE_URL,
+      channel: "platform-pool",
+      isDefaultForProvider: true,
+    });
+    volcCreds = [
+      {
+        id: created.id,
+        alias: created.alias,
+        isDefaultForProvider: created.isDefaultForProvider,
+      },
+    ];
+    console.log(`[ok] 已创建 ${ALIAS} 凭证 id=${created.id}`);
+  }
+
+  let defaultId = volcCreds.find((c) => c.isDefaultForProvider)?.id ?? volcCreds[0]!.id;
+
+  for (const cred of volcCreds) {
+    const existing = await getDecryptedCredentialApiKey(cred.id);
+    const blob = buildVolcengineCredentialStorage({
+      apiKey,
+      existingRaw: existing?.apiKey,
+    });
+    await prisma.gatewayVendorCredential.update({
+      where: { id: cred.id },
+      data: {
+        apiKeyEncrypted: encryptApiKey(blob),
+        active: true,
+        baseUrl: BASE_URL,
+        isDefaultForProvider: cred.id === defaultId,
+      },
+    });
+    console.log(`[ok] 已更新 VOLCENGINE 凭证 alias=${cred.alias} id=${cred.id}`);
+  }
+
+  await prisma.gatewayVendorCredential.updateMany({
     where: {
       userId: gwUser.id,
       providerKind: "VOLCENGINE",
-      alias: ALIAS,
       isDefaultForProvider: true,
+      id: { not: defaultId },
     },
-    select: { id: true },
+    data: { isDefaultForProvider: false },
   });
 
-  const anyVolc = defaultCred
-    ? defaultCred
-    : await prisma.gatewayVendorCredential.findFirst({
-        where: {
-          userId: gwUser.id,
-          providerKind: "VOLCENGINE",
-          alias: ALIAS,
-        },
-        orderBy: { createdAt: "asc" },
-        select: { id: true },
-      });
-
-  if (!anyVolc) {
-    console.error(`未找到「${ALIAS}」凭证，请先在 Gateway 模型管理页创建 VOLCENGINE 凭证`);
-    process.exit(1);
-  }
-
-  const existing = await getDecryptedCredentialApiKey(anyVolc.id);
-  const blob = buildVolcengineCredentialStorage({
-    apiKey,
-    existingRaw: existing?.apiKey,
-  });
-
-  await updateGatewayCredential(gwUser.id, anyVolc.id, {
-    apiKey: blob,
-    active: true,
-    baseUrl: BASE_URL,
-    isDefaultForProvider: true,
-  });
-
+  await syncPersonalGatewayApiKeyBindings(gwUser.id);
+  await syncCanonicalPlatformAdminKeyBindings(gwUser.id);
   const { updated } = await rebindManagedKeysToPlatformPool();
-  console.log(`[ok] 已更新 ${bookUser.email} · ${ALIAS} 默认凭证（Seedream 5.0 / 图像编辑）`);
+  console.log(`[ok] 已更新 ${bookUser.email} · 全部 ${volcCreds.length} 条火山凭证（Seedream / 图像编辑）`);
   console.log(`[ok] 平台托管 sk-gw 凭证绑定已刷新: ${updated} 把`);
   console.log("模型: doubao-seedream-5-0-260128 (canonical: doubao-seedream-5-0-lite)");
 }

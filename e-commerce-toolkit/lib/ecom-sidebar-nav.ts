@@ -189,6 +189,7 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
   const marketingOrder = [
     "storyboard-micro-drama",
     "hand-craft",
+    "image-layer",
     "promo",
     "ad",
     "seed-video",

@@ -106,7 +106,7 @@ export function Pro2ToolbarDropdownMenu({
     <>
       <button
         type="button"
-        className="fixed inset-0 z-[200]"
+        className="fixed bottom-0 left-0 right-0 top-[var(--canvas-toolbar-height,3rem)] z-[200]"
         aria-label="关闭菜单"
         onClick={() => setOpen(false)}
       />

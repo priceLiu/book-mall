@@ -43,6 +43,7 @@ import { useCrewCollaborationAccess } from "@/lib/canvas/use-crew-collaboration-
 import { useCanvasTaskSse } from "@/lib/canvas/use-canvas-task-sse";
 import { hasAnyMediaRenderInFlight } from "@/lib/canvas/media-render-in-flight";
 import { NodePalette } from "@/components/canvas/node-palette";
+import { CanvasToolbarShellPortal } from "@/components/canvas/canvas-toolbar-shell-portal";
 import { CanvasToolbar } from "@/components/canvas/toolbar";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useCanvasGraphSnapshot } from "@/lib/canvas/canvas-store-hooks";
@@ -1598,17 +1599,11 @@ function Inner({ projectId }: { projectId: string }) {
         data-canvas-block-nav-gesture
         style={{ ["--canvas-toolbar-height" as string]: "3rem" }}
       >
-        <div
-          ref={toolbarShellRef}
-          data-canvas-toolbar-shell
+        <CanvasToolbarShellPortal
+          shellRef={toolbarShellRef}
           className={cn(
-            "z-[300] w-full min-w-0 max-w-full shrink-0 overflow-visible bg-[var(--canvas-bg)] shadow-[0_1px_0_rgba(255,255,255,0.06)] transition-transform duration-300 ease-out",
-            showImmersiveChrome && immersive
-              ? cn(
-                  "fixed left-0 right-0 top-0",
-                  !topChromeVisible && "-translate-y-full",
-                )
-              : "sticky top-0",
+            "fixed left-0 right-0 top-0 z-[500] w-full min-w-0 max-w-full shrink-0 overflow-visible bg-[var(--canvas-bg)] shadow-[0_1px_0_rgba(255,255,255,0.06)] transition-transform duration-300 ease-out",
+            showImmersiveChrome && immersive && !topChromeVisible && "-translate-y-full",
           )}
         >
           <CanvasToolbar
@@ -1686,7 +1681,12 @@ function Inner({ projectId }: { projectId: string }) {
             }
           />
           <GatewayLinkBanner />
-        </div>
+        </CanvasToolbarShellPortal>
+        <div
+          aria-hidden
+          className="shrink-0"
+          style={{ height: "var(--canvas-toolbar-height, 3rem)" }}
+        />
       {myHistoryOpen ? (
         <MyCanvasHistoryPanel
           open={myHistoryOpen}

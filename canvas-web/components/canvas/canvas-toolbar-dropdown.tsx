@@ -14,16 +14,11 @@ import { cn } from "@/lib/utils";
 import { CANVAS_TOOLBAR_BTN_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import { CanvasToolbarTooltip } from "@/components/canvas/canvas-toolbar-tooltip";
 
-export function useCanvasToolbarDropdown(): {
+export function useCanvasToolbarDropdownAnchor(open: boolean): {
   anchorRef: RefObject<HTMLButtonElement>;
-  open: boolean;
-  setOpen: (v: boolean) => void;
   rect: DOMRect | null;
-  toggle: () => void;
-  close: () => void;
 } {
   const anchorRef = useRef<HTMLButtonElement>(null!);
-  const [open, setOpen] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
 
   const updateRect = useCallback(() => {
@@ -31,7 +26,10 @@ export function useCanvasToolbarDropdown(): {
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setRect(null);
+      return;
+    }
     updateRect();
     window.addEventListener("resize", updateRect);
     window.addEventListener("scroll", updateRect, true);
@@ -41,14 +39,7 @@ export function useCanvasToolbarDropdown(): {
     };
   }, [open, updateRect]);
 
-  return {
-    anchorRef,
-    open,
-    setOpen,
-    rect,
-    toggle: () => setOpen((v) => !v),
-    close: () => setOpen(false),
-  };
+  return { anchorRef, rect };
 }
 
 export function CanvasToolbarDropdownTrigger({
@@ -114,7 +105,7 @@ export function CanvasToolbarDropdownMenu({
     <>
       <button
         type="button"
-        className="fixed inset-0 z-[350]"
+        className="fixed bottom-0 left-0 right-0 top-[var(--canvas-toolbar-height,3rem)] z-[520]"
         aria-label="关闭菜单"
         onClick={onClose}
       />
@@ -125,7 +116,7 @@ export function CanvasToolbarDropdownMenu({
           position: "fixed",
           left: Math.max(8, left),
           top: rect.bottom + 4,
-          zIndex: 351,
+          zIndex: 521,
           minWidth,
         }}
       >
