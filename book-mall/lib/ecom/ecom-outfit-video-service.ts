@@ -99,6 +99,7 @@ import { splitOutfitReferenceVideoPhysical } from "@/lib/ecom/ecom-outfit-video-
 import {
   adaptOutfitSceneStoryboardLlm,
   analyseOutfitClothFromImage,
+  EMPTY_PARSED_OUTFIT_STORYBOARD_ADAPT,
   toOutfitStoryboardAdaptPatch,
 } from "@/lib/ecom/ecom-outfit-storyboard-adapt";
 import { normalizeOutfitUserSellPointForLlm } from "@/lib/ecom/ecom-outfit-storyboard-adapt-prompts";
@@ -2075,24 +2076,12 @@ export async function adaptEcomOutfitVideoSceneStoryboard(
       sceneList: patchSceneStoryboardAdapt(
         project.sceneList,
         scene.sceneId,
-        toOutfitStoryboardAdaptPatch(
-          {
-            originalStoryboard: "",
-            clothAnalyse: "",
-            userSellPoint: "",
-            mode: "",
-            adjustLogic: "",
-            finalStoryboard: "",
-            positivePrompt: "",
-            negativePrompt: "",
-          },
-          {
-            splitModelKey,
-            userSellPointForLlm,
-            status: "failed",
-            failReason: message,
-          },
-        ),
+        toOutfitStoryboardAdaptPatch(EMPTY_PARSED_OUTFIT_STORYBOARD_ADAPT, {
+          splitModelKey,
+          userSellPointForLlm,
+          status: "failed",
+          failReason: message,
+        }),
       ),
       meta: {
         ...(project.meta ?? {}),
@@ -2134,16 +2123,17 @@ export async function generateEcomOutfitVideoProductionStoryboard(
     project.settings.userSellPoint,
   );
   const startedAt = new Date().toISOString();
+  const projectBeforeGenerate = project;
 
   project = await updateEcomOutfitVideoProject(userId, projectId, {
     meta: {
-      ...(project.meta ?? {}),
+      ...(projectBeforeGenerate.meta ?? {}),
       outfitProductionMeta: {
         status: "generating",
         splitModelKey,
       } satisfies OutfitProductionMeta,
     },
-    sceneList: project.sceneList.map((s) => ({
+    sceneList: projectBeforeGenerate.sceneList.map((s) => ({
       ...applyDefaultSceneFusionToShot(
         {
           ...s,
@@ -2156,7 +2146,7 @@ export async function generateEcomOutfitVideoProductionStoryboard(
           outfitProduction: { status: "generating", splitModelKey },
           sceneFusion: undefined,
         },
-        project.references,
+        projectBeforeGenerate.references,
       ),
     })),
   });

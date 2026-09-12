@@ -86,6 +86,22 @@ const outfitStoryboardAdaptLlmSchema = z
 
 export type ParsedOutfitStoryboardAdapt = z.infer<typeof outfitStoryboardAdaptLlmSchema>;
 
+/** 分镜适配失败时占位 · `toOutfitStoryboardAdaptPatch` failed 分支不读内容 */
+export const EMPTY_PARSED_OUTFIT_STORYBOARD_ADAPT: ParsedOutfitStoryboardAdapt = {
+  originalStoryboard: "",
+  clothAnalyse: "",
+  userSellPoint: "",
+  mode: "",
+  adjustLogic: "",
+  cameraMove: "",
+  characterAction: "",
+  lightingSetup: "",
+  sceneBackground: "",
+  finalStoryboard: "",
+  positivePrompt: "",
+  negativePrompt: "",
+};
+
 function tryParseJson(text: string): unknown | null {
   try {
     return JSON.parse(text) as unknown;
