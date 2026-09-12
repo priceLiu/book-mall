@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, Eye, FileText, RefreshCw } from "lucide-react";
+import { Archive, Eye, FileText, RefreshCw, Sparkles } from "lucide-react";
 
 import {
   ECOM_MEDIA_TILE_ACTION_ICON_CLASS,
@@ -13,8 +13,10 @@ import { cn } from "@/lib/utils";
 type Props = {
   onPreview?: () => void;
   onRegenerate?: () => void;
+  onRefine?: () => void;
   onPreviewPrompt?: () => void;
   onSaveToCatalog?: () => void;
+  disabled?: boolean;
   btnClass?: string;
 };
 
@@ -28,11 +30,17 @@ function stopClick(e: React.MouseEvent) {
 export function StoryboardPanelImageHoverActions({
   onPreview,
   onRegenerate,
+  onRefine,
   onPreviewPrompt,
   onSaveToCatalog,
+  disabled,
   btnClass = ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS,
 }: Props) {
-  if (!onPreview && !onRegenerate && !onPreviewPrompt && !onSaveToCatalog) return null;
+  if (!onPreview && !onRegenerate && !onRefine && !onPreviewPrompt && !onSaveToCatalog) {
+    return null;
+  }
+
+  const actionBtnClass = cn(btnClass, disabled && "pointer-events-none opacity-50");
 
   return (
     <>
@@ -43,7 +51,8 @@ export function StoryboardPanelImageHoverActions({
             type="button"
             title="预览"
             aria-label="预览"
-            className={cn(btnClass, "pointer-events-auto")}
+            className={cn(actionBtnClass, "pointer-events-auto")}
+            disabled={disabled}
             onClick={(e) => {
               stopClick(e);
               onPreview();
@@ -57,7 +66,8 @@ export function StoryboardPanelImageHoverActions({
             type="button"
             title="重新生成"
             aria-label="重新生成"
-            className={cn(btnClass, "pointer-events-auto")}
+            className={cn(actionBtnClass, "pointer-events-auto")}
+            disabled={disabled}
             onClick={(e) => {
               stopClick(e);
               onRegenerate();
@@ -66,12 +76,28 @@ export function StoryboardPanelImageHoverActions({
             <RefreshCw className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
           </button>
         ) : null}
+        {onRefine ? (
+          <button
+            type="button"
+            title="精修"
+            aria-label="精修"
+            className={cn(actionBtnClass, "pointer-events-auto")}
+            disabled={disabled}
+            onClick={(e) => {
+              stopClick(e);
+              onRefine();
+            }}
+          >
+            <Sparkles className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
+          </button>
+        ) : null}
         {onPreviewPrompt ? (
           <button
             type="button"
             title="提示词编辑"
             aria-label="提示词编辑"
-            className={cn(btnClass, "pointer-events-auto")}
+            className={cn(actionBtnClass, "pointer-events-auto")}
+            disabled={disabled}
             onClick={(e) => {
               stopClick(e);
               onPreviewPrompt();
@@ -85,7 +111,8 @@ export function StoryboardPanelImageHoverActions({
             type="button"
             title="保存到库"
             aria-label="保存到库"
-            className={cn(btnClass, "pointer-events-auto")}
+            className={cn(actionBtnClass, "pointer-events-auto")}
+            disabled={disabled}
             onClick={(e) => {
               stopClick(e);
               onSaveToCatalog();

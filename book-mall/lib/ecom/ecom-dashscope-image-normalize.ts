@@ -16,6 +16,26 @@ async function downloadImageBuffer(imageUrl: string): Promise<Buffer> {
   return Buffer.from(await res.arrayBuffer());
 }
 
+export function resolveDashscopeTargetDimensions(
+  w: number,
+  h: number,
+): { width: number; height: number } {
+  let targetW = w;
+  let targetH = h;
+  if (Math.min(w, h) < DASHSCOPE_IMAGE_MIN_SIDE) {
+    const scale = DASHSCOPE_IMAGE_MIN_SIDE / Math.min(w, h);
+    targetW = Math.ceil(w * scale);
+    targetH = Math.ceil(h * scale);
+  }
+  const maxDim = Math.max(targetW, targetH);
+  if (maxDim >= DASHSCOPE_IMAGE_MAX_SIDE) {
+    const shrink = (DASHSCOPE_IMAGE_MAX_SIDE - 1) / maxDim;
+    targetW = Math.max(DASHSCOPE_IMAGE_MIN_SIDE, Math.floor(targetW * shrink));
+    targetH = Math.max(DASHSCOPE_IMAGE_MIN_SIDE, Math.floor(targetH * shrink));
+  }
+  return { width: targetW, height: targetH };
+}
+
 async function encodeDashscopeImage(buf: Buffer, w: number, h: number): Promise<Buffer> {
   let quality = 92;
   for (let attempt = 0; attempt < 6; attempt++) {
@@ -73,19 +93,7 @@ export async function ensureDashscopeImageUrl(opts: {
     return { url: imageUrl, normalized: false };
   }
 
-  let targetW = w;
-  let targetH = h;
-  if (Math.min(w, h) < DASHSCOPE_IMAGE_MIN_SIDE) {
-    const scale = DASHSCOPE_IMAGE_MIN_SIDE / Math.min(w, h);
-    targetW = Math.ceil(w * scale);
-    targetH = Math.ceil(h * scale);
-  }
-  const maxDim = Math.max(targetW, targetH);
-  if (maxDim >= DASHSCOPE_IMAGE_MAX_SIDE) {
-    const shrink = (DASHSCOPE_IMAGE_MAX_SIDE - 1) / maxDim;
-    targetW = Math.max(DASHSCOPE_IMAGE_MIN_SIDE, Math.floor(targetW * shrink));
-    targetH = Math.max(DASHSCOPE_IMAGE_MIN_SIDE, Math.floor(targetH * shrink));
-  }
+  const { width: targetW, height: targetH } = resolveDashscopeTargetDimensions(w, h);
 
   const out = await encodeDashscopeImage(input, targetW, targetH);
   const url = await uploadCanvasUserBuffer({
@@ -107,4 +115,50 @@ export async function ensureDashscopeImageUrls(opts: {
     out.push(row.url);
   }
   return out;
+}
+
+/**
+ * aitryon-refiner 要求 person_image 与 coarse_image 宽高完全一致。
+ * 以试衣成片（coarse）尺寸为基准，将模特图缩放到相同分辨率后再上传。
+ */
+export async function ensureAitryonRefinerAlignedUrls(opts: {
+  userId: string;
+  personImageUrl: string;
+  coarseImageUrl: string;
+}): Promise<{ personImageUrl: string; coarseImageUrl: string }> {
+  const coarseRaw = opts.coarseImageUrl.trim();
+  const personRaw = opts.personImageUrl.trim();
+  if (!coarseRaw) throw new Error("缺少试衣成片");
+  if (!personRaw) throw new Error("缺少模特图");
+
+  const coarseBuf = await downloadImageBuffer(coarseRaw);
+  const coarseMeta = await sharp(coarseBuf).metadata();
+  const cw = coarseMeta.width ?? 0;
+  const ch = coarseMeta.height ?? 0;
+  if (!cw || !ch) throw new Error("无法读取试衣成片尺寸");
+
+  const { width: targetW, height: targetH } = resolveDashscopeTargetDimensions(cw, ch);
+  const personBuf = await downloadImageBuffer(personRaw);
+
+  const [coarseOut, personOut] = await Promise.all([
+    encodeDashscopeImage(coarseBuf, targetW, targetH),
+    encodeDashscopeImage(personBuf, targetW, targetH),
+  ]);
+
+  const [coarseImageUrl, personImageUrl] = await Promise.all([
+    uploadCanvasUserBuffer({
+      userId: opts.userId,
+      ext: "jpg",
+      buf: coarseOut,
+      contentType: "image/jpeg",
+    }),
+    uploadCanvasUserBuffer({
+      userId: opts.userId,
+      ext: "jpg",
+      buf: personOut,
+      contentType: "image/jpeg",
+    }),
+  ]);
+
+  return { personImageUrl, coarseImageUrl };
 }

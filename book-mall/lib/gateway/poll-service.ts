@@ -38,6 +38,7 @@ import {
 } from "@/lib/canvas/canvas-video-bailian-r2v";
 import {
   dashscopeCreateTryOnTask,
+  dashscopeCreateTryonRefinerTask,
   dashscopeCreateVideoTask,
   dashscopeCreateKlingV3ImageTask,
   dashscopeCreateWan27ImageTask,
@@ -1073,6 +1074,35 @@ export async function submitDashscopeTryOnJobForLog(opts: {
     personImageUrl: opts.personImageUrl,
     topGarmentUrl: opts.topGarmentUrl,
     bottomGarmentUrl: opts.bottomGarmentUrl,
+  });
+  if (!created.ok) throw new Error(created.error);
+  await prisma.gatewayRequestLog.update({
+    where: { id: opts.logId },
+    data: { externalTaskId: created.taskId, status: "RUNNING" },
+  });
+  return created.taskId;
+}
+
+export async function submitDashscopeTryonRefinerJobForLog(opts: {
+  logId: string;
+  credentialId: string;
+  model: string;
+  personImageUrl: string;
+  topGarmentUrl: string;
+  bottomGarmentUrl?: string;
+  coarseImageUrl: string;
+  gender: "woman" | "man";
+}) {
+  const cred = await getDecryptedCredentialApiKey(opts.credentialId);
+  if (!cred) throw new Error("凭证不可用");
+  const created = await dashscopeCreateTryonRefinerTask({
+    apiKey: cred.apiKey,
+    model: opts.model,
+    personImageUrl: opts.personImageUrl,
+    topGarmentUrl: opts.topGarmentUrl,
+    bottomGarmentUrl: opts.bottomGarmentUrl,
+    coarseImageUrl: opts.coarseImageUrl,
+    gender: opts.gender,
   });
   if (!created.ok) throw new Error(created.error);
   await prisma.gatewayRequestLog.update({

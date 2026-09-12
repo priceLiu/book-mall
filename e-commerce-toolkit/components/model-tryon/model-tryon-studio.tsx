@@ -42,6 +42,7 @@ import {
   patchModelTryonGarments,
   patchModelTryonLooks,
   patchModelTryonTextTryonEditor,
+  refineModelTryonResult,
   confirmModelTryonGeneration,
   removeModelTryonGeneration,
   removeModelTryonTextTryonRef,
@@ -68,6 +69,7 @@ import { mergeVtonTryonProgressWithBatch, parseVtonTryonProgress } from "@/lib/v
 import { buildFullSetAssetPatch } from "@/lib/vton-full-set-garment";
 import { coerceVtonModelImageSize, type VtonModelImageSize } from "@/lib/vton-image-quality";
 import type { VtonGarmentKind, VtonLookSpec } from "@/lib/vton-types";
+import { useVtonTryonRefine } from "@/lib/use-vton-tryon-refine";
 import type { OutfitGarmentMode, OutfitRefMode } from "@/lib/video-workflow/templates/outfit-v1/ui-config";
 import { Plus } from "lucide-react";
 
@@ -103,6 +105,24 @@ export function ModelTryonStudio() {
       sessionStorage.setItem(PROJECT_STORAGE_KEY, p.id);
     }
   }, []);
+
+  const tryonRefine = useVtonTryonRefine({
+    defaultGender: project?.settings?.tryonRefinerGender,
+    blocked: tryonBusy,
+    refine: async ({ targetId, gender }) => {
+      if (!project) return;
+      const next = await refineModelTryonResult(project.id, { resultId: targetId, gender });
+      applyProject(next);
+    },
+    onGenderPersist: (gender) => {
+      if (!project) return;
+      void updateModelTryonProject(project.id, {
+        settings: { ...project.settings, tryonRefinerGender: gender },
+      }).catch(() => undefined);
+    },
+    alert,
+    toast,
+  });
 
   const applyTextTryonProjectWithPromptSync = useCallback(
     async (next: ModelTryonProject, promptSeed?: string) => {
@@ -380,6 +400,10 @@ export function ModelTryonStudio() {
     const look = (project.meta?.lookDrafts ?? []).find((l) => l.id === lookId);
     if (!look) return;
     await runBatchTryon([look]);
+  }
+
+  async function handleRefineResult(resultId: string, _lookId: string) {
+    await tryonRefine.requestRefine(resultId);
   }
 
   function toggleLookSelection(lookId: string) {
@@ -718,7 +742,7 @@ export function ModelTryonStudio() {
               );
               await toast({
                 title: "全身图已生成",
-                message: "新图已选中，可点「确认左栏选中加入待试衣」。",
+                message: "已加入待试衣，可直接批量试衣。",
                 variant: "success",
               });
             } catch (e) {
@@ -963,6 +987,8 @@ export function ModelTryonStudio() {
                   onClearLookSelection: () => setSelectedLookIds([]),
                   onBatchTryon: handleBatchTryon,
                   onRegenerateLook: handleRegenerateLook,
+                  onRefineResult: handleRefineResult,
+                  refiningResultIds: tryonRefine.refiningTargetIds,
                   onSaveResultToAssets: async (ossUrl, title) => {
                     if (!project) return;
                     try {
@@ -1015,6 +1041,7 @@ export function ModelTryonStudio() {
               : undefined
           }
         />
+        {tryonRefine.refineGenderDialog}
       </div>
     </EcomWorkspaceLayout>
   );

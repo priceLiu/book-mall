@@ -460,6 +460,56 @@ export async function dashscopeCreateTryOnTask(opts: {
   return { ok: true, taskId };
 }
 
+export async function dashscopeCreateTryonRefinerTask(opts: {
+  apiKey: string;
+  personImageUrl: string;
+  topGarmentUrl: string;
+  bottomGarmentUrl?: string;
+  coarseImageUrl: string;
+  gender: "woman" | "man";
+  model?: string;
+}): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
+  const model = opts.model ?? "aitryon-refiner";
+  const input: Record<string, string> = {
+    person_image_url: opts.personImageUrl,
+    top_garment_url: opts.topGarmentUrl,
+    coarse_image_url: opts.coarseImageUrl,
+  };
+  if (opts.bottomGarmentUrl?.trim()) {
+    input.bottom_garment_url = opts.bottomGarmentUrl.trim();
+  }
+
+  const res = await fetch(TRYON_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${opts.apiKey}`,
+      "X-DashScope-Async": "enable",
+    },
+    body: JSON.stringify({
+      model,
+      input,
+      parameters: { gender: opts.gender },
+    }),
+  });
+
+  const json = (await res.json()) as Record<string, unknown>;
+  if (!res.ok) {
+    const msg =
+      typeof json.message === "string"
+        ? json.message
+        : typeof json.code === "string"
+          ? json.code
+          : `HTTP ${res.status}`;
+    return { ok: false, error: msg };
+  }
+  const output = json.output as Record<string, unknown> | undefined;
+  const taskId =
+    typeof output?.task_id === "string" ? output.task_id : undefined;
+  if (!taskId) return { ok: false, error: "未返回 task_id" };
+  return { ok: true, taskId };
+}
+
 export async function dashscopeCreateWanxTask(opts: {
   apiKey: string;
   prompt: string;

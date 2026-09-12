@@ -114,7 +114,7 @@ async function resolveTryonGarmentUrls(opts: {
   return { topGarmentUrl: top, bottomGarmentUrl: bottom };
 }
 
-export async function runEcomVtonTryOn(opts: {
+export async function prepareEcomVtonTryonInputs(opts: {
   userId: string;
   consumerToolKey: string;
   projectId: string;
@@ -122,15 +122,14 @@ export async function runEcomVtonTryOn(opts: {
   lookKind: VtonLookKind;
   topGarmentUrl?: string;
   bottomGarmentUrl?: string;
-  /** 批量试衣时复用分割结果 */
   garmentParseCache?: VtonGarmentParseCache;
-  /** 批量试衣已在 resolve 阶段完成 tighten + dashscope 规范化 */
   garmentUrlsPrepared?: boolean;
-  /** @deprecated 使用 lookKind */
-  garmentMode?: VtonGarmentMode;
   onProgress?: (progress: VtonTryonProgress) => void | Promise<void>;
-  shouldCancel?: () => boolean | Promise<boolean>;
-}): Promise<string> {
+}): Promise<{
+  personImageUrl: string;
+  topGarmentUrl?: string;
+  bottomGarmentUrl?: string;
+}> {
   const personRaw = opts.personImageUrl.trim();
   if (!personRaw) throw new Error("缺少模特全身照");
   if (!opts.topGarmentUrl?.trim() && !opts.bottomGarmentUrl?.trim()) {
@@ -174,6 +173,39 @@ export async function runEcomVtonTryOn(opts: {
   if (opts.lookKind === "two_piece" && (!topGarmentUrl || !bottomGarmentUrl)) {
     throw new Error("上下装试衣缺少上装或下装参考图");
   }
+
+  return { personImageUrl, topGarmentUrl, bottomGarmentUrl };
+}
+
+export async function runEcomVtonTryOn(opts: {
+  userId: string;
+  consumerToolKey: string;
+  projectId: string;
+  personImageUrl: string;
+  lookKind: VtonLookKind;
+  topGarmentUrl?: string;
+  bottomGarmentUrl?: string;
+  /** 批量试衣时复用分割结果 */
+  garmentParseCache?: VtonGarmentParseCache;
+  /** 批量试衣已在 resolve 阶段完成 tighten + dashscope 规范化 */
+  garmentUrlsPrepared?: boolean;
+  /** @deprecated 使用 lookKind */
+  garmentMode?: VtonGarmentMode;
+  onProgress?: (progress: VtonTryonProgress) => void | Promise<void>;
+  shouldCancel?: () => boolean | Promise<boolean>;
+}): Promise<string> {
+  const { personImageUrl, topGarmentUrl, bottomGarmentUrl } = await prepareEcomVtonTryonInputs({
+    userId: opts.userId,
+    consumerToolKey: opts.consumerToolKey,
+    projectId: opts.projectId,
+    personImageUrl: opts.personImageUrl,
+    lookKind: opts.lookKind,
+    topGarmentUrl: opts.topGarmentUrl,
+    bottomGarmentUrl: opts.bottomGarmentUrl,
+    garmentParseCache: opts.garmentParseCache,
+    garmentUrlsPrepared: opts.garmentUrlsPrepared,
+    onProgress: opts.onProgress,
+  });
 
   await opts.onProgress?.(progressNow("submitting", "提交 AI 试衣任务…"));
 

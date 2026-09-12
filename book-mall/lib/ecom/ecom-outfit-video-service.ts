@@ -72,8 +72,11 @@ import {
   type VtonFullSetUploadSlot,
 } from "@/lib/ecom/ecom-vton/full-set-garment-upload";
 import { sanitizeVtonProjectMeta, syncRefsDressedImageFromLocked, emptyVtonProjectMeta } from "@/lib/ecom/ecom-vton/meta";
-import type { VtonGarmentItem, VtonLookSpec } from "@/lib/ecom/ecom-vton/types";
-import type { VtonTryonProgress } from "@/lib/ecom/ecom-vton/types";
+import type {
+  VtonGarmentItem,
+  VtonLookSpec,
+  VtonTryonProgress,
+} from "@/lib/ecom/ecom-vton/types";
 import {
   isVtonRefsReadyForTryon,
 } from "@/lib/ecom/ecom-vton/validate";

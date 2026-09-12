@@ -23,6 +23,7 @@ type Props = {
   panel: StoryboardPanel;
   aspectRatio?: "16:9" | "9:16";
   busy?: boolean;
+  busyLabel?: string;
   selectable?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
@@ -39,6 +40,7 @@ export function ModelShotPoseCard({
   panel,
   aspectRatio = "9:16",
   busy,
+  busyLabel,
   selectable = false,
   selected = false,
   onToggleSelect,
@@ -158,7 +160,12 @@ export function ModelShotPoseCard({
           </button>
         )}
 
-        {busy ? <EcomMediaGeneratingBusy className="absolute inset-0 z-[2] h-full w-full" /> : null}
+        {busy ? (
+          <EcomMediaGeneratingBusy
+            label={busyLabel}
+            className="absolute inset-0 z-[2] h-full w-full"
+          />
+        ) : null}
 
         {hasMultiple && displayUrl && !busy ? (
           <div className="pointer-events-none absolute inset-x-0 top-2 z-[3] flex justify-center opacity-0 transition group-hover/image:opacity-100">

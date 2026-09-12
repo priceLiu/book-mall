@@ -1,3 +1,9 @@
+import {
+  confirmModelGeneration,
+  finalizeModelGenerationsMeta,
+  resolveActiveModelGeneration,
+  resolvePreviewModelGeneration,
+} from "@/lib/ecom/ecom-vton/model-generations";
 import type { VtonModelImageCheck } from "@/lib/ecom/ecom-vton/types";
 import type {
   VtonModelGeneration,
@@ -72,6 +78,42 @@ export function assertGenerationFullBodyForTryon(generation: VtonModelGeneration
     throw new Error("当前试衣模特为头像/半身，请先「头像生成全身图」后再试衣。");
   }
   throw new Error("当前试衣模特未识别为全身照，请换全身模特后再试衣。");
+}
+
+/**
+ * 批量试衣/精修前解析试衣模特：
+ * 优先已确认 active；否则若左栏 preview 已是可试衣全身，自动确认并设为 active。
+ */
+export function prepareTryonModelGeneration(meta: VtonProjectMeta): {
+  meta: VtonProjectMeta;
+  generation: VtonModelGeneration;
+  didAutoConfirm: boolean;
+} {
+  let working = finalizeModelGenerationsMeta(meta);
+
+  const active = resolveActiveModelGeneration(working);
+  if (active?.ossUrl?.trim()) {
+    assertGenerationFullBodyForTryon(active);
+    return { meta: working, generation: active, didAutoConfirm: false };
+  }
+
+  const preview = resolvePreviewModelGeneration(working);
+  if (!preview?.ossUrl?.trim()) {
+    throw new Error("请先上传或选择模特全身照");
+  }
+
+  if (canConfirmModelGenerationByBody(preview)) {
+    working = confirmModelGeneration(working, preview.id);
+    const confirmed = resolveActiveModelGeneration(working);
+    if (!confirmed?.ossUrl?.trim()) {
+      throw new Error("请先上传或选择模特全身照");
+    }
+    assertGenerationFullBodyForTryon(confirmed);
+    return { meta: working, generation: confirmed, didAutoConfirm: true };
+  }
+
+  assertGenerationFullBodyForTryon(preview);
+  throw new Error("请先上传或选择模特全身照");
 }
 
 export type ModelGenerationBodyBadge = {

@@ -4,8 +4,12 @@ export const ECOM_VTON_TOOL_KEY = "ecom-toolkit__vton";
 export const ECOM_VTON_MODEL_GENERATE_ACTION = "model-generate";
 export const ECOM_VTON_EXPAND_FULL_BODY_ACTION = "expand-full-body";
 export const ECOM_VTON_TRYON_ACTION = "tryon";
+export const ECOM_VTON_REFINE_ACTION = "tryon-refine";
 
 export const ECOM_VTON_TRYON_MODEL = "aitryon-plus";
+export const ECOM_VTON_REFINER_MODEL = "aitryon-refiner";
+
+export type VtonTryonRefinerGender = "woman" | "man";
 /** 模特试衣 · 生模特 / 头像扩全身 · 固定模型（用户不可选） */
 export const ECOM_VTON_MODEL_GEN_MODEL = "wan2.7-image-pro";
 /** 模特试衣 · 上传图全身检测 */

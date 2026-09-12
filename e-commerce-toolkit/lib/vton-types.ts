@@ -2,6 +2,8 @@ import type { VtonTryonProgress } from "@/lib/vton-tryon-progress";
 
 export const ECOM_VTON_MAX_BATCH_LOOKS = 9;
 
+export type VtonTryonRefinerGender = "woman" | "man";
+
 export type VtonLookKind = "two_piece" | "one_piece" | "top_only" | "bottom_only" | "full_set";
 export type VtonGarmentKind = "top" | "bottom" | "one_piece" | "full_set";
 export type VtonFullSetInputMode = "composite" | "manual";

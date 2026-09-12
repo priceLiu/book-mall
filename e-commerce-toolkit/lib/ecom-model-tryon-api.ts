@@ -9,6 +9,7 @@ import type {
   VtonGarmentKind,
   VtonLookSpec,
   VtonProjectMeta,
+  VtonTryonRefinerGender,
 } from "@/lib/vton-types";
 import { parseVtonProjectMeta } from "@/lib/vton-types";
 
@@ -19,6 +20,8 @@ export type ModelTryonSettings = {
   modelImageSize?: string;
   /** 文生试衣 · 图片编辑模型 */
   textTryonModelKey?: string;
+  /** 试衣精修 · 模特性别（aitryon-refiner 必填） */
+  tryonRefinerGender?: VtonTryonRefinerGender;
 };
 
 export type ModelTryonProject = {
@@ -203,6 +206,18 @@ export async function batchModelTryon(
 export async function cancelModelTryonBatch(projectId: string): Promise<ModelTryonProject> {
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/tryon/batch/cancel`, {
     method: "POST",
+  });
+  return parseProject(data.project as ModelTryonProject);
+}
+
+export async function refineModelTryonResult(
+  projectId: string,
+  opts: { resultId: string; gender: VtonTryonRefinerGender },
+): Promise<ModelTryonProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/tryon/refine`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts),
   });
   return parseProject(data.project as ModelTryonProject);
 }

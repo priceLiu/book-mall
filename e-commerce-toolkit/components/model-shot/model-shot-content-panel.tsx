@@ -1022,6 +1022,7 @@ export function ModelShotContentPanel({
         onClose={closePreview}
         nativeOverlay
       />
+
     </div>
   );
 }

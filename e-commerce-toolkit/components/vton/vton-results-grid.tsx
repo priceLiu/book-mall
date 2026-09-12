@@ -49,10 +49,13 @@ type Props = {
   onUnlockLocked?: (lockedLookId: string) => Promise<void>;
   onBatchTryon: (mode: VtonBatchTryonMode) => Promise<void>;
   onRegenerateLook?: (lookId: string) => Promise<void>;
+  onRefineResult?: (resultId: string, lookId: string) => Promise<void>;
   onSaveResultToAssets?: (ossUrl: string, title: string) => Promise<void>;
   onStopBatchTryon?: () => Promise<void>;
   /** 客户端乐观态：试衣已开始但服务端 batch 尚未写入 running */
   runningLookIds?: string[];
+  /** 客户端精修进行中（按 resultId） */
+  refiningResultIds?: string[];
   /** 与模特生图/扩全身尺寸一致，试衣成片同比例（aitryon resolution=-1） */
   modelImageSize?: VtonModelImageSize;
 };
@@ -274,14 +277,17 @@ export function VtonResultsGrid({
   onUnlockLocked,
   onBatchTryon,
   onRegenerateLook,
+  onRefineResult,
   onSaveResultToAssets,
   onStopBatchTryon,
   runningLookIds: runningLookIdsProp,
+  refiningResultIds: refiningResultIdsProp,
   modelImageSize: modelImageSizeProp,
 }: Props) {
   const saveToCatalog = useSaveToCatalog();
   const modelImageSize = coerceVtonModelImageSize(modelImageSizeProp);
   const runningLookIds = runningLookIdsProp ?? [];
+  const refiningResultIds = refiningResultIdsProp ?? [];
   const results = useMemo(() => batch?.results ?? [], [batch?.results]);
   const slotLooks = looks.slice(0, ECOM_VTON_MAX_BATCH_LOOKS);
   const running = batch?.status === "running" || Boolean(tryonBusy);
@@ -455,10 +461,12 @@ export function VtonResultsGrid({
                 running,
                 runningLookIds,
               );
+              const cellRefining = refiningResultIds.includes(result.id);
+              const cellBusy = cellRunning || cellRefining;
 
               return (
                 <div key={result.id} className="flex min-w-0 flex-col">
-                  <div className={resultCellClass(result, selected, { cellRunning })}>
+                  <div className={resultCellClass(result, selected, { cellRunning: cellBusy })}>
                     {showImage ? (
                       <VtonTryonResultAspectFrame
                         modelImageSize={modelImageSize}
@@ -471,17 +479,19 @@ export function VtonResultsGrid({
                           className="h-full w-full object-contain object-top"
                           draggable={false}
                         />
-                        {cellRunning ? (
+                        {cellRefining ? (
+                          <EcomMediaGeneratingBusy label="精修中" className="z-[2]" />
+                        ) : cellRunning ? (
                           <EcomMediaGeneratingBusy label="试衣中" className="z-[2]" />
                         ) : null}
-                        {result.status === "failed" && !cellRunning ? (
+                        {result.status === "failed" && !cellBusy ? (
                           <div className="absolute inset-x-0 bottom-0 z-[2] bg-[#ff3b30]/90 px-1 py-0.5 text-center text-[9px] text-white">
                             {friendlyTryonFailReason(result.failReason)}
                           </div>
                         ) : null}
-                        {!cellRunning ? (
+                        {!cellBusy ? (
                           <VtonResultImageHoverActions
-                            disabled={busy || disabled}
+                            disabled={busy || disabled || refiningResultIds.length > 0}
                             onPreview={() => openPreview(displayUrl!, label, previewItems)}
                             onDownload={() => void handleDownload(displayUrl!, label)}
                             onSaveToAssets={
@@ -502,9 +512,17 @@ export function VtonResultsGrid({
                                 ? () => void onRegenerateLook(result.lookId)
                                 : undefined
                             }
+                            onRefine={
+                              onRefineResult &&
+                              result.status === "success" &&
+                              !running &&
+                              refiningResultIds.length === 0
+                                ? () => void onRefineResult(result.id, result.lookId)
+                                : undefined
+                            }
                           />
                         ) : null}
-                        {hasMultipleVersions && !cellRunning ? (
+                        {hasMultipleVersions && !cellBusy ? (
                           <>
                             <div className="pointer-events-none absolute right-1 top-1 z-[30]">
                               <span className="rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-medium leading-none text-white">

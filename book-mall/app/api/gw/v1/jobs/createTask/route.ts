@@ -26,6 +26,7 @@ import {
   submitDashscopeKlingV3ImageJobForLog,
   submitDashscopeMultimodalImageSyncForLog,
   submitDashscopeTryOnJobForLog,
+  submitDashscopeTryonRefinerJobForLog,
   submitDashscopeVideoJobForLog,
   submitDashscopeWan27ImageJobForLog,
   submitDashscopeWanxJobForLog,
@@ -89,10 +90,12 @@ export async function POST(request: NextRequest) {
       parameterExtras?: Record<string, unknown>;
     };
     dashscope?: {
-      jobKind?: "tryon" | "wanx" | "video" | "wan27-image" | "kling-v3-image" | "multimodal-image-sync";
+      jobKind?: "tryon" | "tryon-refiner" | "wanx" | "video" | "wan27-image" | "kling-v3-image" | "multimodal-image-sync";
       personImageUrl?: string;
       topGarmentUrl?: string;
       bottomGarmentUrl?: string;
+      coarseImageUrl?: string;
+      gender?: "woman" | "man";
       prompt?: string;
       negativePrompt?: string;
       n?: number;
@@ -426,6 +429,46 @@ export async function POST(request: NextRequest) {
             typeof ds.topGarmentUrl === "string" ? ds.topGarmentUrl : undefined,
           bottomGarmentUrl:
             typeof ds.bottomGarmentUrl === "string" ? ds.bottomGarmentUrl : undefined,
+        });
+        return NextResponse.json({
+          code: 200,
+          data: { taskId, logId: log.id, providerKind: "DASHSCOPE" },
+        });
+      }
+
+      if (jobKind === "tryon-refiner") {
+        const personImageUrl = String(
+          ds.personImageUrl ?? body.input?.person_image_url ?? "",
+        ).trim();
+        const topGarmentUrl = String(
+          ds.topGarmentUrl ?? body.input?.top_garment_url ?? "",
+        ).trim();
+        const coarseImageUrl = String(
+          ds.coarseImageUrl ?? body.input?.coarse_image_url ?? "",
+        ).trim();
+        const gender = ds.gender === "man" ? "man" : ds.gender === "woman" ? "woman" : null;
+        if (!personImageUrl) {
+          return NextResponse.json({ error: "personImageUrl required" }, { status: 400 });
+        }
+        if (!topGarmentUrl) {
+          return NextResponse.json({ error: "topGarmentUrl required" }, { status: 400 });
+        }
+        if (!coarseImageUrl) {
+          return NextResponse.json({ error: "coarseImageUrl required" }, { status: 400 });
+        }
+        if (!gender) {
+          return NextResponse.json({ error: "gender required (woman|man)" }, { status: 400 });
+        }
+        const taskId = await submitDashscopeTryonRefinerJobForLog({
+          logId: log.id,
+          credentialId,
+          model,
+          personImageUrl,
+          topGarmentUrl,
+          bottomGarmentUrl:
+            typeof ds.bottomGarmentUrl === "string" ? ds.bottomGarmentUrl : undefined,
+          coarseImageUrl,
+          gender,
         });
         return NextResponse.json({
           code: 200,

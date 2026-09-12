@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, Download, Eye, RefreshCw, Save, Shirt } from "lucide-react";
+import { Archive, Download, Eye, RefreshCw, Save, Shirt, Sparkles } from "lucide-react";
 
 import {
   ECOM_MEDIA_TILE_ACTION_ICON_CLASS,
@@ -16,6 +16,7 @@ type Props = {
   onSaveToAssets?: () => void;
   onSaveToCatalog?: () => void;
   onRegenerate?: () => void;
+  onRefine?: () => void;
   onOpenFittingRoom?: () => void;
   disabled?: boolean;
 };
@@ -30,6 +31,7 @@ export function VtonResultImageHoverActions({
   onSaveToAssets,
   onSaveToCatalog,
   onRegenerate,
+  onRefine,
   onOpenFittingRoom,
   disabled,
 }: Props) {
@@ -39,6 +41,7 @@ export function VtonResultImageHoverActions({
     !onSaveToAssets &&
     !onSaveToCatalog &&
     !onRegenerate &&
+    !onRefine &&
     !onOpenFittingRoom
   ) {
     return null;
@@ -126,6 +129,21 @@ export function VtonResultImageHoverActions({
             }}
           >
             <RefreshCw className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
+          </button>
+        ) : null}
+        {onRefine ? (
+          <button
+            type="button"
+            title="精修"
+            aria-label="精修"
+            className={cn(btnClass, "pointer-events-auto")}
+            disabled={disabled}
+            onClick={(e) => {
+              stopClick(e);
+              onRefine();
+            }}
+          >
+            <Sparkles className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
           </button>
         ) : null}
         {onOpenFittingRoom ? (

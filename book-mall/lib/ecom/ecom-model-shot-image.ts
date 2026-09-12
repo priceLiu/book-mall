@@ -12,6 +12,7 @@ import {
   ECOM_MODEL_SHOT_TOOL_KEY,
   hasGarmentReference,
   parseModelShotPlan,
+  refByRole,
   type ModelShotPoseItem,
 } from "@/lib/ecom/ecom-model-shot-types";
 import { touchCatalogLockOnProjectUse } from "@/lib/ecom/ecom-catalog-lock";

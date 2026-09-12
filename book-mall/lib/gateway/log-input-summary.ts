@@ -108,6 +108,16 @@ export function buildDashscopeCreateTaskInputForLog(
       bottomGarmentUrl: ds.bottomGarmentUrl,
     };
   }
+  if (jobKind === "tryon-refiner") {
+    return {
+      jobKind: "tryon-refiner",
+      personImageUrl: ds.personImageUrl,
+      topGarmentUrl: ds.topGarmentUrl,
+      bottomGarmentUrl: ds.bottomGarmentUrl,
+      coarseImageUrl: ds.coarseImageUrl,
+      gender: ds.gender,
+    };
+  }
   const contentImageUrls = extractDashscopeContentImageUrls(ds.content);
   return {
     jobKind: ds.jobKind,

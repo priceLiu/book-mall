@@ -73,12 +73,14 @@ export type VtonBatchWorkflowProps = {
   onCartesianLooks?: (topIds: string[], bottomIds: string[]) => Promise<void>;
   onBatchTryon: (mode: VtonBatchTryonMode) => Promise<void>;
   onRegenerateLook?: (lookId: string) => Promise<void>;
+  onRefineResult?: (resultId: string, lookId: string) => Promise<void>;
   onSaveResultToAssets?: (ossUrl: string, title: string) => Promise<void>;
   onStopBatchTryon?: () => Promise<void>;
   onLockSelected: () => Promise<void>;
   onSetDefaultLocked?: (lockedLookId: string) => Promise<void>;
   onUnlockLocked?: (lockedLookId: string) => Promise<void>;
   runningLookIds?: string[];
+  refiningResultIds?: string[];
 };
 
 export type VtonWorkbenchMode = "outfit-video" | "model-tryon";
@@ -726,9 +728,11 @@ export function VtonRefWorkbench({
             onUnlockLocked={batchWorkflow.onUnlockLocked}
             onBatchTryon={batchWorkflow.onBatchTryon}
             onRegenerateLook={batchWorkflow.onRegenerateLook}
+            onRefineResult={batchWorkflow.onRefineResult}
             onSaveResultToAssets={batchWorkflow.onSaveResultToAssets}
             onStopBatchTryon={batchWorkflow.onStopBatchTryon}
             runningLookIds={batchWorkflow.runningLookIds}
+            refiningResultIds={batchWorkflow.refiningResultIds}
           />
         </div>
       ) : null}

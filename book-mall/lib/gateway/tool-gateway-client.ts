@@ -70,6 +70,16 @@ export async function toolGwCreateDashscopeJob(
         clientPage?: string;
       }
     | {
+        kind: "tryon-refiner";
+        model: string;
+        personImageUrl: string;
+        topGarmentUrl: string;
+        bottomGarmentUrl?: string;
+        coarseImageUrl: string;
+        gender: "woman" | "man";
+        clientPage?: string;
+      }
+    | {
         kind: "wanx";
         model: string;
         prompt: string;
@@ -105,6 +115,18 @@ export async function toolGwCreateDashscopeJob(
             bottomGarmentUrl: opts.bottomGarmentUrl,
           },
         }
+      : opts.kind === "tryon-refiner"
+        ? {
+            model,
+            dashscope: {
+              jobKind: "tryon-refiner" as const,
+              personImageUrl: opts.personImageUrl,
+              topGarmentUrl: opts.topGarmentUrl,
+              bottomGarmentUrl: opts.bottomGarmentUrl,
+              coarseImageUrl: opts.coarseImageUrl,
+              gender: opts.gender,
+            },
+          }
       : opts.kind === "wanx"
         ? {
             model,
