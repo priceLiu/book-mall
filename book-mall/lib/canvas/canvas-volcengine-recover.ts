@@ -27,7 +27,7 @@ function taskInputPayload(
   return task.inputPayload as Record<string, unknown>;
 }
 
-export type CanvasNodeRuntimePatch = {
+export type CanvasNodeRuntimeDonePatch = {
   status: "done";
   taskId: string;
   ossUrl: string;
@@ -37,6 +37,21 @@ export type CanvasNodeRuntimePatch = {
   failMessage?: undefined;
   dismissedFailTaskId?: undefined;
 };
+
+export type CanvasNodeRuntimeErrorPatch = {
+  status: "error";
+  taskId: string;
+  failCode: string;
+  failMessage: string;
+  ossUrl?: undefined;
+  ephemeralUrl?: undefined;
+  posterUrl?: undefined;
+  dismissedFailTaskId?: undefined;
+};
+
+export type CanvasNodeRuntimePatch =
+  | CanvasNodeRuntimeDonePatch
+  | CanvasNodeRuntimeErrorPatch;
 
 export function patchCanvasJsonNodeRuntime(
   canvas: unknown,
