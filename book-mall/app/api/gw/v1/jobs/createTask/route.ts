@@ -106,6 +106,7 @@ export async function POST(request: NextRequest) {
       videoBody?: Record<string, unknown>;
       content?: Array<{ text: string } | { image: string }>;
       contentOrder?: "text-first" | "images-first";
+      bboxList?: number[][][];
       aspectRatio?: "16:9" | "9:16" | "1:1";
       resolution?: "1k" | "2k" | "4k";
       parameters?: {
