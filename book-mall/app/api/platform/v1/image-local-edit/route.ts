@@ -1,8 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { resolvePlatformUser } from "@/lib/platform-auth";
+import { parseLocalEditSelection } from "@/lib/image-local-edit/parse-local-edit-selection";
 import { runLocalImageEdit } from "@/lib/image-local-edit/run-local-image-edit";
-import type { LocalEditClientApp, LocalEditSelection } from "@/lib/image-local-edit/types";
+import type { LocalEditClientApp } from "@/lib/image-local-edit/types";
 import {
   runWithImageProcessingContext,
   type ImageProcessingClientApp,
@@ -13,31 +14,6 @@ export const dynamic = "force-dynamic";
 function parseClientApp(raw: unknown): LocalEditClientApp | null {
   if (raw === "canvas" || raw === "ecom" || raw === "common-tools") return raw;
   return null;
-}
-
-function parseSelection(body: Record<string, unknown>): LocalEditSelection | undefined {
-  const sel = body.selection;
-  if (!sel || typeof sel !== "object") return undefined;
-  const s = sel as Record<string, unknown>;
-  const kind = s.kind;
-  if (kind === "mask" && typeof s.maskDataUrl === "string") {
-    return { kind: "mask", maskDataUrl: s.maskDataUrl.trim() };
-  }
-  if (kind === "bbox" && Array.isArray(s.bbox) && s.bbox.length === 4) {
-    const nums = s.bbox.map((v) => Number(v));
-    if (nums.every((n) => Number.isFinite(n))) {
-      return { kind: "bbox", bbox: nums as [number, number, number, number] };
-    }
-  }
-  if (kind === "multi-bbox" && Array.isArray(s.bboxList)) {
-    return {
-      kind: "multi-bbox",
-      bboxList: s.bboxList as LocalEditSelection extends { kind: "multi-bbox" }
-        ? LocalEditSelection["bboxList"]
-        : never,
-    };
-  }
-  return undefined;
 }
 
 function toImageProcessingClientApp(app: LocalEditClientApp): ImageProcessingClientApp {
@@ -87,7 +63,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "sourceImageUrls 必填" }, { status: 400 });
   }
 
-  const selection = parseSelection(body);
+  const selection = parseLocalEditSelection(body.selection);
   const persistEcomAssets = clientApp !== "canvas";
 
   let sourceImageSize: { width: number; height: number } | undefined;
@@ -127,6 +103,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       imageUrls: result.imageUrls,
       logId: result.logId,
+      modelKey: result.modelKeyUsed,
       creditsCharged: result.creditsCharged ?? undefined,
     });
   } catch (e) {

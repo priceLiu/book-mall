@@ -16,6 +16,7 @@ import {
   isWan27LocalEditModel,
 } from "./model-capabilities";
 import { mergeLocalEditOutputSize } from "./output-size";
+import { resolveRetouchModelForSelection } from "./resolve-retouch-model";
 import type { LocalEditRequest, LocalEditResult } from "./types";
 
 async function assertLocalEditGatewayAccess(
@@ -108,7 +109,12 @@ async function readCreditsCharged(logId: string): Promise<number | null> {
 
 export async function runLocalImageEdit(opts: LocalEditRequest): Promise<LocalEditResult> {
   await assertLocalEditGatewayAccess(opts.userId, opts.clientApp);
-  assertLocalEditSelection(opts.modelKey, opts.selection);
+
+  const modelKeyUsed = resolveRetouchModelForSelection({
+    model: opts.modelKey,
+    selection: opts.selection,
+  });
+  assertLocalEditSelection(modelKeyUsed, opts.selection);
 
   if (!opts.prompt.trim()) {
     throw new Error("prompt 必填");
@@ -130,7 +136,7 @@ export async function runLocalImageEdit(opts: LocalEditRequest): Promise<LocalEd
 
   let gatewayResult: { imageUrls: string[]; logId: string };
 
-  if (isWanxPaintingModelKey(opts.modelKey)) {
+  if (isWanxPaintingModelKey(modelKeyUsed)) {
     gatewayResult = await runWanxPaintingLocalEditAdapter({
       userId: opts.userId,
       clientApp: opts.clientApp,
@@ -140,7 +146,7 @@ export async function runLocalImageEdit(opts: LocalEditRequest): Promise<LocalEd
       parameters,
       clientPage,
     });
-  } else if (isWan27LocalEditModel(opts.modelKey)) {
+  } else if (isWan27LocalEditModel(modelKeyUsed)) {
     gatewayResult = await runWan27LocalEditAdapter({
       userId: opts.userId,
       clientApp: opts.clientApp,
@@ -150,11 +156,11 @@ export async function runLocalImageEdit(opts: LocalEditRequest): Promise<LocalEd
       parameters,
       clientPage,
     });
-  } else if (isQwenEditModelKey(opts.modelKey)) {
+  } else if (isQwenEditModelKey(modelKeyUsed)) {
     gatewayResult = await runQwenLocalEditAdapter({
       userId: opts.userId,
       clientApp: opts.clientApp,
-      modelKey: opts.modelKey,
+      modelKey: modelKeyUsed,
       prompt: opts.prompt,
       sourceImageUrls: opts.sourceImageUrls,
       selection: opts.selection,
@@ -172,12 +178,13 @@ export async function runLocalImageEdit(opts: LocalEditRequest): Promise<LocalEd
       userId: opts.userId,
       imageUrls: gatewayResult.imageUrls,
       prompt: opts.prompt,
-      model: opts.modelKey,
+      model: modelKeyUsed,
       logId: gatewayResult.logId,
     });
     return {
       imageUrls: ecomAssets.map((r) => r.ossUrl),
       logId: gatewayResult.logId,
+      modelKeyUsed,
       creditsCharged,
       ecomAssets,
     };
@@ -187,6 +194,7 @@ export async function runLocalImageEdit(opts: LocalEditRequest): Promise<LocalEd
   return {
     imageUrls,
     logId: gatewayResult.logId,
+    modelKeyUsed,
     creditsCharged,
   };
 }

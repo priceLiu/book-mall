@@ -27,6 +27,8 @@ export type LocalEditRequest = {
 export type LocalEditResult = {
   imageUrls: string[];
   logId: string;
+  /** 经 resolveRetouchModelForSelection 后的实际 Gateway 模型 */
+  modelKeyUsed: string;
   creditsCharged?: number | null;
   ecomAssets?: Array<{ asset: { id: string }; ossUrl: string }>;
 };

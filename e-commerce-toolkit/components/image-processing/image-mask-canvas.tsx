@@ -45,6 +45,15 @@ function exportMaskDataUrl(maskCanvas: HTMLCanvasElement | null): string | null 
   octx.fillStyle = "#000000";
   octx.fillRect(0, 0, out.width, out.height);
   octx.drawImage(maskCanvas, 0, 0);
+  const imgData = octx.getImageData(0, 0, out.width, out.height);
+  for (let i = 0; i < imgData.data.length; i += 4) {
+    const v = imgData.data[i]! > 128 ? 255 : 0;
+    imgData.data[i] = v;
+    imgData.data[i + 1] = v;
+    imgData.data[i + 2] = v;
+    imgData.data[i + 3] = 255;
+  }
+  octx.putImageData(imgData, 0, 0);
   return out.toDataURL("image/png");
 }
 
@@ -79,9 +88,10 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
         if (!bboxDisplay || !maskCanvasRef.current) return null;
         const display = displayCanvasRef.current;
         const mask = maskCanvasRef.current;
-        if (!display?.width) return null;
-        const scaleX = mask.width / display.width;
-        const scaleY = mask.height / display.height;
+        const rect = display?.getBoundingClientRect();
+        if (!rect?.width) return null;
+        const scaleX = mask.width / rect.width;
+        const scaleY = mask.height / rect.height;
         const x1 = Math.min(bboxDisplay.x1, bboxDisplay.x2);
         const y1 = Math.min(bboxDisplay.y1, bboxDisplay.y2);
         const x2 = Math.max(bboxDisplay.x1, bboxDisplay.x2);
@@ -122,10 +132,11 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
         const mask = maskCanvasRef.current;
         if (!display || !mask) return;
         const rect = display.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
         const x = clientX - rect.left;
         const y = clientY - rect.top;
-        const scaleX = mask.width / display.width;
-        const scaleY = mask.height / display.height;
+        const scaleX = mask.width / rect.width;
+        const scaleY = mask.height / rect.height;
 
         const dctx = display.getContext("2d");
         const mctx = mask.getContext("2d");

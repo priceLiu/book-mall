@@ -114,7 +114,7 @@ export async function handleImageProcessingEditPost(req: Request) {
         assets: result.results.map((r) => r.asset),
         imageUrls: result.results.map((r) => r.ossUrl),
         logId: result.logId,
-        model,
+        model: result.model ?? model,
       });
     }
 

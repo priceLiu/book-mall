@@ -38,27 +38,7 @@ export type Pro2AddNodePickDialogs = {
 
 export type Pro2AddNodePickStore = {
   addNode: (
-    type:
-      | "story-pro2-starter"
-      | "story-pro2-prompt"
-      | "story-pro2-tag"
-      | "story-pro2-image"
-      | "story-pro2-script-hub"
-      | "story-pro2-style-asset"
-      | "story-pro2-three-view"
-      | "story-pro2-3d-desk"
-      | "story-pro2-style"
-      | "story-pro2-character"
-      | "story-pro2-scene"
-      | "story-pro2-frame"
-      | "story-pro2-video"
-      | "story-pro2-prop"
-      | "story-pro2-mood"
-      | "story-pro2-audio"
-      | "jianying-export-pro2"
-      | "jianying-auto-render-pro2"
-      | "sbv1-image"
-      | "sbv1-video-engine",
+    type: CanvasNodeType,
     position: { x: number; y: number },
     data: Record<string, unknown>,
   ) => string;

@@ -55,3 +55,37 @@ body {
 .ecom-scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.32);
 }
+
+@keyframes ct-media-shimmer {
+  0% {
+    transform: translate3d(-120%, 0, 0);
+  }
+  100% {
+    transform: translate3d(120%, 0, 0);
+  }
+}
+
+/* 常用工具 · 生图生成中扫光（对齐 canvas / 电商工具箱） */
+.ct-media-generating-sweep {
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(0, 113, 227, 0.45),
+    0 0 14px rgba(0, 113, 227, 0.22);
+}
+
+.ct-media-generating-sweep::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(0, 113, 227, 0.2) 50%,
+    transparent 65%
+  );
+  animation: ct-media-shimmer 2.2s linear infinite;
+  will-change: transform;
+  pointer-events: none;
+}

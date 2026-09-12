@@ -268,7 +268,11 @@ export function ImageMemePanel({
         </div>
       </div>
 
-      <ImageProcessingInlineResults urls={resultUrls} title="表情包结果" />
+      <ImageProcessingInlineResults
+        urls={resultUrls}
+        title="表情包结果"
+        generating={submitting}
+      />
 
       <section className="rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-[#1d1d1f]">你可以做什么</h3>

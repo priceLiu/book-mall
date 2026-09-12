@@ -545,7 +545,7 @@ export function ToolPageClient({ slug }: { slug: ImageProcessingTagId }) {
     }
     const mask = maskRef.current?.getMaskDataUrl() ?? undefined;
     const bbox = maskRef.current?.getBbox() ?? undefined;
-    if (isWanxPaintingModel(retouchModel) && !mask) {
+    if (!mask && isWanxPaintingModel(retouchModel)) {
       await showAlert({
         title: "请涂抹区域",
         message: "万相局部重绘需要涂抹蒙版区域",
@@ -720,7 +720,7 @@ export function ToolPageClient({ slug }: { slug: ImageProcessingTagId }) {
                 <span className="mr-2 inline-flex align-middle text-sky-600">
                   <Pencil className="h-4 w-4" />
                 </span>
-                用画笔涂抹你想修改的区域——比如瑕疵、背景物体、污渍、标志等等——然后描述该区域应该显示什么内容。图像的其余部分保持不变。
+                用画笔涂抹你想修改的区域——比如瑕疵、背景物体、污渍、标志等等——然后描述该区域应该显示什么内容。图像的其余部分保持不变。涂抹后请使用「万相局部重绘」模型（选千问时会自动切换）。
               </div>
 
               <div className="rounded-2xl border border-[#e5e5ea] bg-white p-4 shadow-sm sm:p-6">
@@ -756,6 +756,16 @@ export function ToolPageClient({ slug }: { slug: ImageProcessingTagId }) {
                       brushType={brushType}
                       showTransparentMask={transparentMask}
                       mode={isWan27RetouchModel(retouchModel) ? "bbox" : "mask"}
+                      onMaskChange={(hasMask) => {
+                        if (
+                          hasMask &&
+                          (isQwenEditModel(retouchModel) ||
+                            isWan27RetouchModel(retouchModel))
+                        ) {
+                          setRetouchModel(WANX_PAINTING_MODEL_KEY);
+                          setRetouchParams({});
+                        }
+                      }}
                     />
                     <p className="mt-2 text-center text-[10px] text-[#86868b]">
                       可拖放或粘贴替换图片
@@ -1340,7 +1350,7 @@ export function ToolPageClient({ slug }: { slug: ImageProcessingTagId }) {
             </div>
           )}
 
-          <ImageProcessingInlineResults urls={results} />
+          <ImageProcessingInlineResults urls={results} generating={submitting} />
 
       </div>
     </div>

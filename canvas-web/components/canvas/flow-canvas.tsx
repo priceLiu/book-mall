@@ -196,10 +196,7 @@ import {
 import { CanvasSnapGuidesOverlay } from "./canvas-snap-guides-overlay";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { PRO2_TOOLBAR_ADD_MENU } from "@/lib/canvas/pro2-add-node-menu";
-import {
-  handlePro2ToolbarAddNodePick,
-  type Pro2AddNodePickStore,
-} from "@/lib/canvas/pro2-add-node-pick";
+import { handlePro2ToolbarAddNodePick } from "@/lib/canvas/pro2-add-node-pick";
 import { Pro2AddNodePopover } from "./pro2/pro2-add-node-popover";
 import { useGlobalAssetLibrary } from "@/docker-shared/global-asset-library";
 import { spawnCanvasNodesFromGlobalAssetPick } from "@/lib/canvas/spawn-global-asset-pick";
@@ -613,7 +610,7 @@ function FlowCanvasInner({
             spawnCanvasNodesFromGlobalAssetPick(items, {
               edition: sbv1Canvas ? "sbv1" : "pro2",
               spawnAtScreen,
-              addNode: addNode as Pro2AddNodePickStore["addNode"],
+              addNode,
               setNodes,
             });
           },
@@ -625,7 +622,7 @@ function FlowCanvasInner({
         itemId,
         nodeType,
         {
-          addNode: addNode as Pro2AddNodePickStore["addNode"],
+          addNode,
           setNodes,
         },
         { alert, confirm },

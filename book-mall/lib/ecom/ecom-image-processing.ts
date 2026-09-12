@@ -315,15 +315,13 @@ export async function ecomImageProcessingRetouch(opts: {
     "retouch",
   );
 
-  let selection:
-    | { kind: "mask"; maskDataUrl: string }
-    | { kind: "bbox"; bbox: [number, number, number, number] }
-    | undefined;
-  if (opts.maskImageDataUrl?.trim()) {
-    selection = { kind: "mask", maskDataUrl: opts.maskImageDataUrl.trim() };
-  } else if (opts.bbox) {
-    selection = { kind: "bbox", bbox: opts.bbox };
-  }
+  const { buildLocalEditSelectionFromRetouchInput } = await import(
+    "@/lib/image-local-edit/parse-local-edit-selection"
+  );
+  const selection = buildLocalEditSelectionFromRetouchInput({
+    maskImageDataUrl: opts.maskImageDataUrl,
+    bbox: opts.bbox,
+  });
 
   const result = await runLocalImageEdit({
     userId: opts.userId,
@@ -341,7 +339,7 @@ export async function ecomImageProcessingRetouch(opts: {
   const results =
     result.ecomAssets?.map((r) => ({ asset: r.asset, ossUrl: r.ossUrl })) ?? [];
   if (results.length === 0) throw new Error("未获得可保存的图像");
-  return { results, logId: result.logId };
+  return { results, logId: result.logId, model: result.modelKeyUsed };
 }
 
 export async function ecomImageProcessingEnhancer(opts: {
