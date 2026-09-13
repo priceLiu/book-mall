@@ -25,6 +25,16 @@ RUN corepack enable && corepack prepare pnpm@11.1.3 --activate \
   && CI=true pnpm install --frozen-lockfile --ignore-scripts \
   && pnpm exec prisma generate
 
+# 扁平化 Prisma CLI（pnpm symlink → 实体目录），供 runner 拷贝。
+# 避免 runner 阶段 `npm install -g prisma` 访问 registry.npmjs.org 在 CloudBase 构建机 ECONNRESET。
+FROM deps AS prisma-cli
+RUN set -eux; \
+  PKG="$(find node_modules/.pnpm -maxdepth 1 -type d -name 'prisma@*' | head -1)/node_modules"; \
+  test -d "$PKG/prisma"; \
+  mkdir -p /opt/prisma-cli/node_modules; \
+  cp -rL "$PKG/prisma" /opt/prisma-cli/node_modules/prisma; \
+  cp -rL "$PKG/@prisma" /opt/prisma-cli/node_modules/@prisma
+
 FROM with-shared AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/package.json ./package.json
@@ -42,9 +52,6 @@ RUN corepack enable && corepack prepare pnpm@11.1.3 --activate \
 FROM base AS runner
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-# 与 lockfile 中 @prisma/client 解析版本保持一致，便于 migrate
-RUN npm install -g prisma@6.19.3 \
-  && npm cache clean --force
 
 RUN groupadd --gid 1001 nodejs \
   && useradd --uid 1001 --gid nodejs --shell /bin/bash nextjs
@@ -53,6 +60,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+# 与 deps 阶段 lockfile 解析版本一致；不经过 npm registry
+COPY --from=prisma-cli --chown=nextjs:nodejs /opt/prisma-cli/node_modules/prisma ./node_modules/prisma
+COPY --from=prisma-cli --chown=nextjs:nodejs /opt/prisma-cli/node_modules/@prisma ./node_modules/@prisma
 COPY --chown=nextjs:nodejs certs/wechat_pay_pub_key.pem ./certs/wechat_pay_pub_key.pem
 
 COPY docker-entrypoint.sh ./docker-entrypoint.sh

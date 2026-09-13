@@ -157,6 +157,7 @@ export default defineConfig({
       "test/unit/libtv-media-node-box.test.ts",
       "test/unit/libtv-grid-split-hd.test.ts",
       "test/unit/libtv-plain-text-display.test.ts",
+      "test/unit/format-credits-display.test.ts",
       "test/unit/libtv-node-border.test.ts",
       "test/unit/canvas-block-browser-nav.test.ts",
       "test/unit/libtv-canvas-node-pick.test.ts",

@@ -103,9 +103,22 @@ fi
 if [ "${SKIP_PRISMA_MIGRATE_ON_START:-}" = "1" ]; then
   should_migrate=0
 fi
+run_prisma_migrate() {
+  if [ -f ./node_modules/prisma/build/index.js ]; then
+    node ./node_modules/prisma/build/index.js migrate deploy
+    return
+  fi
+  if command -v prisma >/dev/null 2>&1; then
+    prisma migrate deploy
+    return
+  fi
+  echo "[book-mall] ERROR: Prisma CLI not found in image (expected node_modules/prisma)"
+  exit 1
+}
+
 if [ "$should_migrate" = "1" ]; then
   echo "[book-mall] Running prisma migrate deploy..."
-  prisma migrate deploy
+  run_prisma_migrate
 else
   echo "[book-mall] Skipping prisma migrate deploy on start (run pnpm db:deploy before release)"
 fi

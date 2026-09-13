@@ -47,6 +47,7 @@ import {
   LIBTV_DOCK_TOOLBAR_SCREEN_SCALE,
   LibtvDockToolbarMetricsContext,
 } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
+import { formatCreditsDisplay } from "@/lib/canvas/format-credits-display";
 import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
 import { cn } from "@/lib/utils";
 import { LibtvToolbarDropdownZProvider } from "../../sbv1/sbv1-toolbar-anchor-popover";
@@ -543,7 +544,7 @@ export function Pro2ProductionWizardShotStudioModal({
             {estCredits?.credits != null ? (
               <span className="inline-flex items-center gap-1 text-[11px] tabular-nums text-yellow-300">
                 <Zap className="size-3.5" />
-                {Math.round(estCredits.credits)}
+                {formatCreditsDisplay(estCredits.credits)}
               </span>
             ) : null}
             <button

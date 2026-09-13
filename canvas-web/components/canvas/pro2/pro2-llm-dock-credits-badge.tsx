@@ -15,7 +15,7 @@ export function Pro2LlmDockCreditsBadge(props: {
     <LibtvDockCreditsLabel
       credits={estCredits.credits}
       fontPx={props.fontPx}
-      title={`${estCredits.canonicalModelKey} · 预计扣 ${estCredits.credits} 积分（LLM 按 in/out token 分价，与实扣一致）`}
+      title={`${estCredits.canonicalModelKey} · 预计约 ${estCredits.credits} 积分（按 4k 输入 + 2k 输出估算，LLM 按 token 分价，实扣以实际用量为准）`}
     />
   );
 }

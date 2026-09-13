@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCreditsDisplay } from "@/lib/canvas/format-credits-display";
 import { cn } from "@/lib/utils";
 
 /** 生成 Dock · 积分预估（生成钮左侧：≈ N积分 · 柠檬黄） */
@@ -15,7 +16,6 @@ export function LibtvDockCreditsLabel({
   className?: string;
 }) {
   if (credits == null || !Number.isFinite(credits)) return null;
-  const rounded = Math.max(0, Math.round(credits));
   return (
     <span
       className={cn(
@@ -25,7 +25,7 @@ export function LibtvDockCreditsLabel({
       style={fontPx != null ? { fontSize: fontPx } : undefined}
       title={title}
     >
-      ≈ {rounded}积分
+      ≈ {formatCreditsDisplay(credits)}积分
     </span>
   );
 }

@@ -78,7 +78,7 @@ export async function fetchModelCreditsPreview(
     const data: ModelCreditsPreview = {
       credits:
         typeof j.credits === "number" && Number.isFinite(j.credits)
-          ? Math.max(0, Math.round(j.credits))
+          ? Math.max(0, Math.round(j.credits * 100) / 100)
           : null,
       creditsPerUnit: j.creditsPerUnit ?? 0,
       unit: j.unit ?? "PER_SEC",
