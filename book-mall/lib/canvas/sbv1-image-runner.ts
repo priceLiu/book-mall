@@ -22,6 +22,8 @@ export function resolveSbv1ImageReferenceUrls(input: {
   precroppedUrl: string;
   selfUrl: string;
   upstreamUrls: string[];
+  /** prompt 已展开为 图N 时禁止回退节点旧输出，避免「看起来像带了参考图」实则只喂了自己 */
+  skipSelfFallback?: boolean;
 }): string[] {
   if (input.pendingGridCrop) return [];
   if (input.precroppedUrl) return [input.precroppedUrl];
@@ -30,7 +32,7 @@ export function resolveSbv1ImageReferenceUrls(input: {
   const urls =
     input.upstreamUrls.length > 0
       ? input.upstreamUrls
-      : input.selfUrl
+      : !input.skipSelfFallback && input.selfUrl
         ? [input.selfUrl]
         : [];
   return Array.from(new Set(urls.filter(Boolean))).slice(0, 8);
@@ -148,6 +150,7 @@ export async function runSbv1ImageNode(
     precroppedUrl,
     selfUrl,
     upstreamUrls,
+    skipSelfFallback: /(?:图\s*\d+|\[Image\s+\d+\])/i.test(promptRaw),
   });
 
   const hasRefs = imageUrls.length > 0;

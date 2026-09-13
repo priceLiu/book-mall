@@ -13,7 +13,7 @@
 | `asrModelKey` | `string?` | 默认 `qwen3-asr-flash-filetrans` |
 
 - **script**：分镜表对白 → `buildMergedSrt`
-- **asr**：逐镜 HTTPS 视频 URL → Gateway ASR → `buildAsrSubtitleSrt`（含 xfade 时间偏移）
+- **asr**：先按成片时间线合并预览轨（多镜）→ 提取 MP3 上传 OSS → **一次** Gateway ASR；单镜直接用该镜 `videoUrl`。时间戳相对成片 0 点 → `buildAsrSubtitleSrtFromGlobalSegments`。同时间线 24h 内按 `cacheKey` 复用日志缓存，避免孤儿恢复重复调厂商。
 - **none**：不生成 SRT
 
 ## Gateway
@@ -27,8 +27,9 @@
 ## 服务端调用链
 
 1. `runFfmpegMediaRender`（`mode === "asr" && burnIn`）
-2. `transcribeClipViaGateway` → `gatewayV1AsrTranscribe`
-3. `buildAsrSubtitleSrt` → SRT 文件 → `renderXfade` burn-in（`buildSubtitlesFilterExpr` 强制 CJK 字体，避免 Arial 方框）
+2. 多镜：`renderXfade` 预览合并 → `uploadMediaRenderAsrScratchFromPath`；单镜：直接用镜 `videoUrl`
+3. `transcribeMediaTimelineViaGateway`（含 `cacheKey` 缓存）→ `gatewayV1AsrTranscribe`
+4. `buildAsrSubtitleSrtFromGlobalSegments` → SRT → `renderXfade` burn-in（`buildSubtitlesFilterExpr` 强制 CJK 字体，避免 Arial 方框）
 
 ## 前端
 
@@ -39,6 +40,6 @@
 
 ## 限制
 
-- ASR 仅接受 **公网 HTTPS** 音视频 URL（各镜 `videoUrl`）
-- 无语音镜：空 segments，该镜无字幕轨
-- Job 超时：默认 `MEDIA_RENDER_JOB_TIMEOUT_SEC=900`；ASR 增加逐镜轮询耗时
+- ASR 仅接受 **公网 HTTPS** 音视频 URL（单镜用 `videoUrl`；多镜用临时 OSS 音轨）
+- 无语音：空 segments；若分镜表有对白则回退 `buildAsrSubtitleSrtFromClipScriptFallback`
+- Job 超时：默认 `MEDIA_RENDER_JOB_TIMEOUT_SEC=900`；ASR 为单次 filetrans 轮询

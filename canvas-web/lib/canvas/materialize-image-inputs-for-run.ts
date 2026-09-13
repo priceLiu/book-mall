@@ -15,7 +15,7 @@ export async function materializeImageInputsForRun(
       if (!out.includes(u)) out.push(u);
       continue;
     }
-    if (!u.startsWith("blob:")) continue;
+    if (!u.startsWith("blob:") && !u.startsWith("data:")) continue;
     const blob = await fetch(u).then((r) => r.blob());
     const file = new File([blob], `canvas-ref-${Date.now()}-${i}.jpg`, {
       type: blob.type || "image/jpeg",

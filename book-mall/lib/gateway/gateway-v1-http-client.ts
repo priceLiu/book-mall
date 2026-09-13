@@ -370,6 +370,7 @@ export async function gatewayV1AsrTranscribe(
     body: {
       fileUrl: string;
       modelKey?: string;
+      cacheKey?: string;
     };
   },
 ): Promise<{

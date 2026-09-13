@@ -62,4 +62,30 @@ describe("resolveDockImageUrlsForRun", () => {
       "https://cdn.example/a.png",
     ]);
   });
+
+  it("keeps blob preview urls so run-queue can materialize them", () => {
+    const withBlob: Pro2DockUpstreamLink[] = [
+      {
+        id: "up-img-a",
+        kind: "image",
+        label: "巴鲁",
+        previewUrl: "blob:http://localhost/balu",
+        sourceNodeId: "n1",
+      },
+      {
+        id: "up-img-b",
+        kind: "image",
+        label: "希达",
+        previewUrl: "https://cdn.example/xida.png",
+        sourceNodeId: "n2",
+      },
+    ];
+    expect(
+      resolveDockImageUrlsForRun(
+        withBlob,
+        [],
+        "角色 @<up-img-a> 与 @<up-img-b>",
+      ),
+    ).toEqual(["blob:http://localhost/balu", "https://cdn.example/xida.png"]);
+  });
 });

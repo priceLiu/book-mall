@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
     audioUrl?: string;
     model?: string;
     modelKey?: string;
+    cacheKey?: string;
   };
   try {
     body = await request.json();
@@ -32,12 +33,14 @@ export async function POST(request: NextRequest) {
 
   const fileUrl = String(body.fileUrl ?? body.audioUrl ?? "").trim();
   const model = body.model?.trim() || body.modelKey?.trim();
+  const cacheKey = body.cacheKey?.trim();
 
   try {
     const result = await runGatewayV1AsrTranscribe({
       auth,
       fileUrl,
       model,
+      cacheKey,
       logMeta,
     });
     return NextResponse.json({

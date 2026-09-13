@@ -38,6 +38,8 @@ export async function runGatewayV1AsrTranscribe(opts: {
   auth: ResolvedGatewayApiKeyAuth;
   fileUrl: string;
   model?: string;
+  /** 成片 ASR 去重键；写入日志供 findCachedMediaRenderAsrSegments 复用 */
+  cacheKey?: string;
   logMeta?: GatewayV1LogMeta;
 }): Promise<{
   segments: Array<{ startMs: number; endMs: number; text: string }>;
@@ -71,6 +73,7 @@ export async function runGatewayV1AsrTranscribe(opts: {
       inputSummary: buildGatewayInputSummary(model, {
         fileUrl,
         canonicalModelKey: "qwen3-asr-flash-filetrans",
+        ...(opts.cacheKey?.trim() ? { cacheKey: opts.cacheKey.trim() } : {}),
       }),
       ...logMetaToRequestLogFields(opts.logMeta ?? {}),
     });
@@ -132,6 +135,9 @@ export async function runGatewayV1AsrTranscribe(opts: {
         audioDurationSec,
         sourceAudioDurationSec: audioDurationSec,
         speechDurationSec,
+        ...(opts.cacheKey?.trim() && segments.length > 0
+          ? { segments: segments.slice(0, 200) }
+          : {}),
       },
       model,
     });

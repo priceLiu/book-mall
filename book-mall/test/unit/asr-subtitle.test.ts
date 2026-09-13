@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildAsrSubtitleSrt,
+  buildAsrSubtitleSrtFromClipScriptFallback,
+  buildAsrSubtitleSrtFromGlobalSegments,
+  buildMediaRenderAsrCacheKey,
   expandAsrSegmentToBurnInCues,
 } from "@/lib/media/asr-subtitle";
 
@@ -24,6 +27,44 @@ describe("buildAsrSubtitleSrt", () => {
   it("skips empty segments", () => {
     const srt = buildAsrSubtitleSrt([[{ startMs: 0, endMs: 1000, text: "  " }]], [3]);
     expect(srt.trim()).toBe("");
+  });
+
+  it("builds global timeline srt from merged asr segments", () => {
+    const srt = buildAsrSubtitleSrtFromGlobalSegments([
+      { startMs: 1200, endMs: 3400, text: "你好世界" },
+      { startMs: 8000, endMs: 10500, text: "第二句" },
+    ]);
+    expect(srt).toContain("你好世界");
+    expect(srt).toContain("第二句");
+    expect(srt).toMatch(/00:00:01,200 --> 00:00:03,400/);
+  });
+
+  it("falls back to clip script when asr empty", () => {
+    const srt = buildAsrSubtitleSrtFromClipScriptFallback({
+      clipSubtitles: ["镜一", undefined, "镜三"],
+      mergeDurationsSec: [4, 5, 6],
+    });
+    expect(srt).toContain("镜一");
+    expect(srt).toContain("镜三");
+    expect(srt).not.toContain("镜二");
+  });
+
+  it("builds stable cache keys for same timeline", () => {
+    const a = buildMediaRenderAsrCacheKey({
+      clipVideoUrls: ["https://a/1.mp4", "https://a/2.mp4"],
+      mergeDurationsSec: [4, 5.001],
+      modelKey: "qwen3-asr-flash-filetrans",
+      transitionType: "xfade",
+      transitionSec: 0.6,
+    });
+    const b = buildMediaRenderAsrCacheKey({
+      clipVideoUrls: ["https://a/1.mp4", "https://a/2.mp4"],
+      mergeDurationsSec: [4, 5.001],
+      modelKey: "qwen3-asr-flash-filetrans",
+      transitionType: "xfade",
+      transitionSec: 0.6,
+    });
+    expect(a).toBe(b);
   });
 
   it("chunks long ASR sentence into short timed cues within vendor window", () => {

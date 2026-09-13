@@ -4,6 +4,7 @@ import { collectRefImageUrlsFromGridNode } from "./ref-video-edges";
 import { isRefGridNodeType } from "./ref-video-models";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import type { ImageNodeData, ImageEngineNodeData } from "./types";
+import { resolveLibtvMediaPreviewUrl } from "./libtv-media-preview-url";
 import {
   isLikelyVideoUrl,
   pickRuntimeImagePreviewUrl,
@@ -41,30 +42,22 @@ export type Pro2DockUpstreamLink = {
   sourceNodeId: string;
 };
 
-function imageUrlFromNode(node: CanvasFlowNode): string | undefined {
+/**
+ * 上游节点可作参考图的预览 URL。
+ * 生成刚成功时常只有 runtime/ephemeral，data.ossUrl 要等 OSS 回填；
+ * 只读 ossUrl/blobUrl 会导致 Dock 无图或生图不带参考图。
+ */
+export function pickPro2DockNodePreviewUrl(
+  node: CanvasFlowNode,
+): string | undefined {
   if (node.type === "story-pro2-style-asset") {
     const d = node.data as { imageUrl?: string };
     return d.imageUrl?.trim() || undefined;
-  }
-  if (
-    node.type === "image" ||
-    node.type === "story-pro2-image" ||
-    node.type === "story-pro2-three-view" ||
-    node.type === "sbv1-image"
-  ) {
-    const d = node.data as unknown as ImageNodeData;
-    return d.ossUrl ?? d.blobUrl;
-  }
-  if (node.type === "image-preview") {
-    const d = node.data as { url?: string; ossUrl?: string };
-    return d.ossUrl ?? d.url;
   }
   if (isRefGridNodeType(node.type ?? "")) {
     return collectRefImageUrlsFromGridNode(node)[0];
   }
   if (
-    node.type === "image-engine" ||
-    node.type === "three-view-engine" ||
     node.type === "video-engine" ||
     node.type === "sbv1-video-engine"
   ) {
@@ -79,15 +72,44 @@ function imageUrlFromNode(node: CanvasFlowNode): string | undefined {
         ? d.videoUrl.trim()
         : undefined);
     if (videoUrl) return videoUrl;
-    return (
-      pickRuntimeImagePreviewUrl(d.runtime, d.modelKey) ??
-      d.runtime?.ossUrl ??
-      d.ossUrl ??
-      d.blobUrl ??
-      d.videoUrl
-    );
+  }
+  if (
+    node.type === "image" ||
+    node.type === "image-preview" ||
+    node.type === "story-pro2-image" ||
+    node.type === "story-pro2-three-view" ||
+    node.type === "story-pro2-3d-desk" ||
+    node.type === "sbv1-image" ||
+    node.type === "image-engine" ||
+    node.type === "three-view-engine" ||
+    node.type === "video-engine" ||
+    node.type === "sbv1-video-engine"
+  ) {
+    const d = node.data as unknown as ImageNodeData &
+      ImageEngineNodeData & {
+        url?: string;
+        videoUrl?: string;
+        ephemeralUrl?: string;
+      };
+    const oss = (d.ossUrl ?? d.url)?.trim();
+    if (oss && /^https?:\/\//.test(oss)) return oss;
+    const runtimeHttps = pickRuntimeImagePreviewUrl(d.runtime, d.modelKey);
+    if (runtimeHttps && /^https?:\/\//.test(runtimeHttps)) return runtimeHttps;
+    const preview = resolveLibtvMediaPreviewUrl({
+      ossUrl: d.ossUrl ?? d.url,
+      blobUrl: d.blobUrl,
+      ephemeralUrl: d.ephemeralUrl,
+      uploading: d.uploading,
+      runtime: d.runtime,
+    }).trim();
+    if (preview) return preview;
+    return d.blobUrl?.trim() || undefined;
   }
   return undefined;
+}
+
+function imageUrlFromNode(node: CanvasFlowNode): string | undefined {
+  return pickPro2DockNodePreviewUrl(node);
 }
 
 function linkFromSource(
@@ -251,6 +273,7 @@ const IMAGE_UPSTREAM_SOURCE_TYPES = new Set([
   "image-preview",
   "story-pro2-image",
   "story-pro2-three-view",
+  "story-pro2-3d-desk",
   "story-pro2-style-asset",
   "sbv1-image",
   "sbv1-video-engine",

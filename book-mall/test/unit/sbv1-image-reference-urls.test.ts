@@ -33,4 +33,17 @@ describe("resolveSbv1ImageReferenceUrls", () => {
       }),
     ).toEqual([NODE_OUTPUT]);
   });
+
+  it("does not fall back to self when prompt already named 图N refs", () => {
+    expect(
+      resolveSbv1ImageReferenceUrls({
+        isHdGridSplit: false,
+        pendingGridCrop: false,
+        precroppedUrl: "",
+        selfUrl: NODE_OUTPUT,
+        upstreamUrls: [],
+        skipSelfFallback: true,
+      }),
+    ).toEqual([]);
+  });
 });

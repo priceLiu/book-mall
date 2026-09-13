@@ -26,6 +26,15 @@ export function buildMediaRenderEphemeralPosterKey(
   return `media-render/ephemeral/${safeUser}/${jobId}.poster.jpg`;
 }
 
+/** ASR 识别用临时音轨（合成前上传，任务结束后可随 ephemeral 生命周期清理） */
+export function buildMediaRenderAsrScratchKey(
+  userId: string,
+  jobId: string,
+): string {
+  const safeUser = userId.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `media-render/asr-scratch/${safeUser}/${jobId}.mp3`;
+}
+
 export function buildMediaRenderPinnedPosterKey(
   userId: string,
   jobId: string,
@@ -132,6 +141,28 @@ export async function uploadMediaRenderPosterFromBuffer(args: {
     key,
     buf: args.buf,
     contentType: "image/jpeg",
+    preferBucketUrl: true,
+  });
+}
+
+/** 上传自动成片 ASR 临时音轨（公网 URL 供百炼 filetrans 拉取） */
+export async function uploadMediaRenderAsrScratchFromPath(args: {
+  userId: string;
+  jobId: string;
+  filePath: string;
+}): Promise<string> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const fileStat = await stat(args.filePath);
+  const key = buildMediaRenderAsrScratchKey(args.userId, args.jobId);
+  return uploadFilePathToOss({
+    cfg: cfgRaw,
+    key,
+    filePath: args.filePath,
+    bytesOut: fileStat.size,
+    contentType: "audio/mpeg",
     preferBucketUrl: true,
   });
 }

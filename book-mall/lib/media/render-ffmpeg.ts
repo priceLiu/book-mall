@@ -10,10 +10,14 @@ import { join } from "path";
 import type { JianyingFrameInput } from "@/lib/canvas/canvas-jianying-export";
 import { buildMergedSrt } from "@/lib/canvas/canvas-jianying-export";
 import {
-  buildAsrSubtitleSrt,
-  transcribeClipViaGateway,
+  buildAsrSubtitleSrtFromClipScriptFallback,
+  buildAsrSubtitleSrtFromGlobalSegments,
+  buildMediaRenderAsrCacheKey,
+  transcribeMediaTimelineViaGateway,
+  type AsrSegment,
 } from "@/lib/media/asr-subtitle";
 import { QWEN3_ASR_FLASH_FILETRANS_MODEL } from "@/lib/gateway/dashscope-client";
+import { uploadMediaRenderAsrScratchFromPath } from "@/lib/media/media-render-oss";
 import { remuxMp4FaststartFromPath } from "@/lib/canvas/video-poster-ffmpeg";
 import { runFfmpeg, runFfprobe } from "@/lib/media/ffmpeg-exec";
 import { persistMediaRenderLocalOutput } from "@/lib/media/media-render-local-output";
@@ -477,6 +481,24 @@ function buildXfadeFilterChain(
     audioLabel: withAudio ? "aout" : null,
     totalDurationSec: total,
   };
+}
+
+/** 从已合并预览轨提取 MP3，供百炼 filetrans 拉取（比整段 MP4 更小） */
+async function extractAudioTrackForAsr(
+  videoPath: string,
+  outPath: string,
+): Promise<void> {
+  await runFfmpeg([
+    "-y",
+    "-i",
+    videoPath,
+    "-vn",
+    "-acodec",
+    "libmp3lame",
+    "-q:a",
+    "4",
+    outPath,
+  ]);
 }
 
 async function concatCopy(partPaths: string[], outPath: string): Promise<void> {
@@ -1052,49 +1074,68 @@ export async function runFfmpegMediaRender(args: {
     } else if (profile.subtitle.mode === "asr" && profile.subtitle.burnIn) {
       const asrModelKey =
         profile.subtitle.asrModelKey?.trim() || QWEN3_ASR_FLASH_FILETRANS_MODEL;
-      const clipSegments: Array<
-        Array<{ startMs: number; endMs: number; text: string }>
-      > = [];
-      for (let i = 0; i < timeline.clips.length; i++) {
-        const clip = timeline.clips[i]!;
-        args.onProgress?.(
-          66 + Math.round((i / Math.max(timeline.clips.length, 1)) * 4),
-          `识别第 ${i + 1}/${timeline.clips.length} 镜台词…`,
-        );
-        let segments: Array<{ startMs: number; endMs: number; text: string }> =
-          [];
-        try {
-          segments = await transcribeClipViaGateway({
-            userId: args.userId,
-            fileUrl: clip.videoUrl,
-            modelKey: asrModelKey,
-          });
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          if (/Gateway API Key|未关联 Gateway/i.test(msg)) {
-            throw e;
-          }
-          segments = [];
-        }
-        if (segments.length === 0 && clip.subtitle?.trim()) {
-          const durMs = Math.max(
-            500,
-            Math.round((mergeDurations[i] ?? 3) * 1000),
-          );
-          segments = [
-            {
-              startMs: 0,
-              endMs: durMs,
-              text: clip.subtitle.trim(),
-            },
-          ];
-        }
-        clipSegments.push(segments);
-      }
-      srtContent = buildAsrSubtitleSrt(clipSegments, mergeDurations, {
+      const asrCacheKey = buildMediaRenderAsrCacheKey({
+        clipVideoUrls: timeline.clips.map((c) => c.videoUrl),
+        mergeDurationsSec: mergeDurations,
+        modelKey: asrModelKey,
         transitionType: profile.transition.type,
         transitionSec,
       });
+
+      let asrFileUrl: string;
+      if (timeline.clips.length === 1) {
+        asrFileUrl = timeline.clips[0]!.videoUrl;
+        args.onProgress?.(66, "识别台词…");
+      } else {
+        args.onProgress?.(64, "合并预览用于语音识别…");
+        const mergedAsrPath = join(tmp, "merged-asr-preview.mp4");
+        await renderXfade(
+          normPaths,
+          mergeDurations,
+          profile,
+          mergedAsrPath,
+          undefined,
+        );
+        args.onProgress?.(65, "准备识别音频…");
+        const audioPath = join(tmp, "merged-asr-audio.mp3");
+        await extractAudioTrackForAsr(mergedAsrPath, audioPath);
+        asrFileUrl = await uploadMediaRenderAsrScratchFromPath({
+          userId: args.userId,
+          jobId: args.jobId,
+          filePath: audioPath,
+        });
+        args.onProgress?.(66, "识别台词…");
+      }
+
+      let segments: AsrSegment[] = [];
+      try {
+        segments = await transcribeMediaTimelineViaGateway({
+          userId: args.userId,
+          fileUrl: asrFileUrl,
+          modelKey: asrModelKey,
+          cacheKey: asrCacheKey,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (/Gateway API Key|未关联 Gateway/i.test(msg)) {
+          throw e;
+        }
+        segments = [];
+      }
+
+      const timing = {
+        transitionType: profile.transition.type,
+        transitionSec,
+      };
+      if (segments.length === 0) {
+        srtContent = buildAsrSubtitleSrtFromClipScriptFallback({
+          clipSubtitles: timeline.clips.map((c) => c.subtitle),
+          mergeDurationsSec: mergeDurations,
+          timing,
+        });
+      } else {
+        srtContent = buildAsrSubtitleSrtFromGlobalSegments(segments);
+      }
     }
     let srtPath: string | undefined;
     if (srtContent?.trim()) {

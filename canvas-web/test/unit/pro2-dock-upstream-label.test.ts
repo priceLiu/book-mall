@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { resolvePro2StarterDockLinkLabel, resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
+import {
+  pickPro2DockNodePreviewUrl,
+  resolvePro2StarterDockLinkLabel,
+  resolvePro2DockUpstreamLinks,
+} from "@/lib/canvas/pro2-dock-upstream-links";
 import { pro2ScriptHubLinkedMessage } from "@/lib/canvas/pro2-thin-node-display-state";
 
 describe("resolvePro2StarterDockLinkLabel", () => {
@@ -69,6 +73,70 @@ describe("resolvePro2DockUpstreamLinks · starter outline chip", () => {
     );
     expect(links).toHaveLength(1);
     expect(links[0]?.label).toBe("提取pose 描述");
+  });
+});
+
+describe("pickPro2DockNodePreviewUrl", () => {
+  it("uses runtime preview when ossUrl has not been backfilled", () => {
+    expect(
+      pickPro2DockNodePreviewUrl({
+        id: "char-1",
+        type: "story-pro2-image",
+        position: { x: 0, y: 0 },
+        data: {
+          label: "巴鲁",
+          runtime: {
+            status: "done",
+            ossUrl: "https://cdn.example/runtime-balu.png",
+          },
+        },
+      }),
+    ).toBe("https://cdn.example/runtime-balu.png");
+  });
+});
+
+describe("resolvePro2DockUpstreamLinks · image refs", () => {
+  it("exposes runtime-only character images as dock chips", () => {
+    const links = resolvePro2DockUpstreamLinks(
+      "n-out",
+      "story-pro2-image",
+      [
+        {
+          id: "char-1",
+          type: "story-pro2-image",
+          position: { x: 0, y: 0 },
+          data: {
+            label: "巴鲁",
+            runtime: {
+              status: "done",
+              ossUrl: "https://cdn.example/runtime-balu.png",
+            },
+          },
+        },
+        {
+          id: "n-out",
+          type: "story-pro2-image",
+          position: { x: 400, y: 0 },
+          data: { dockInput: "角色 @<up-img-char-1>" },
+        },
+      ],
+      [
+        {
+          id: "e1",
+          source: "char-1",
+          target: "n-out",
+          targetHandle: "in_image",
+        },
+      ],
+    );
+    expect(links).toEqual([
+      expect.objectContaining({
+        id: "up-img-char-1",
+        kind: "image",
+        label: "巴鲁",
+        previewUrl: "https://cdn.example/runtime-balu.png",
+      }),
+    ]);
   });
 });
 

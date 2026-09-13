@@ -33,7 +33,10 @@ import { tagRichTextToPlainText } from "./tag-rich-text-migrate";
 import { dockMentionRefUrlsForPrompt } from "./dock-mention-ref-urls";
 import { parseReferencedIds } from "./dock-mention-parse";
 import type { StoryRefImage } from "./story-ref-image";
-import { resolvePro2DockUpstreamLinks } from "./pro2-dock-upstream-links";
+import {
+  pickPro2DockNodePreviewUrl,
+  resolvePro2DockUpstreamLinks,
+} from "./pro2-dock-upstream-links";
 import { findStyleAssetLinkedToImage } from "./pro2-style-asset-connect";
 import { pro2DockMentionRefCatalog, resolveDockImageUrlsForRun } from "./pro2-dock-ref-catalog";
 import {
@@ -51,8 +54,6 @@ import type {
   CanvasFlowEdge,
   CanvasFlowNode,
   CanvasNodeRuntime,
-  ImageNodeData,
-  ImageEngineNodeData,
   TextNodeData,
   AiEngineNodeData,
   StoryEngineNodeData,
@@ -133,9 +134,6 @@ import {
   storyLlmNodeNeedsRun,
 } from "./story-llm-runtime";
 import {
-  isLikelyVideoUrl,
-  pickRuntimeImagePreviewUrl,
-  pickRuntimeVideoUrl,
   pickTaskImagePreviewUrl,
   pickTaskModelDownloadUrl,
   pickTaskResultMediaUrl,
@@ -360,50 +358,15 @@ function resolveImageInputsRaw(
   for (const pid of directPredecessors(edges, nodeId)) {
     const p = nodes.find((n) => n.id === pid);
     if (!p) continue;
-    if (p.type === "image") {
-      const d = p.data as unknown as ImageNodeData;
-      if (d.ossUrl) out.push(d.ossUrl);
-    } else if (
-      p.type === "sbv1-image" ||
-      p.type === "story-pro2-image" ||
-      p.type === "story-pro2-three-view"
-    ) {
-      const d = p.data as { ossUrl?: string; blobUrl?: string };
-      const url = d.ossUrl ?? d.blobUrl;
-      if (url) out.push(url);
-    } else if (p.type === "story-pro2-style-asset") {
-      const d = p.data as { imageUrl?: string };
-      if (d.imageUrl?.trim()) out.push(d.imageUrl.trim());
-    } else if (isRefGridNodeType(p.type ?? "")) {
+    if (isRefGridNodeType(p.type ?? "")) {
       out.push(...collectRefImageUrlsFromGridNode(p));
-    } else if (p.type === "image-engine" || p.type === "three-view-engine") {
-      const d = p.data as unknown as ImageEngineNodeData;
-      const url =
-        pickRuntimeImagePreviewUrl(d.runtime, d.modelKey) ?? d.runtime?.ossUrl;
-      if (url) out.push(url);
-    } else if (p.type === "tts-engine") {
+      continue;
+    }
+    const url = pickPro2DockNodePreviewUrl(p);
+    if (url) out.push(url);
+    else if (p.type === "tts-engine") {
       const d = p.data as unknown as { runtime?: { ossUrl?: string } };
       if (d.runtime?.ossUrl) out.push(d.runtime.ossUrl);
-    } else if (p.type === "sbv1-video-engine" || p.type === "video-engine") {
-      const d = p.data as {
-        runtime?: { ossUrl?: string; ephemeralUrl?: string };
-        ossUrl?: string;
-        blobUrl?: string;
-        videoUrl?: string;
-        modelKey?: string;
-      };
-      const videoUrl =
-        pickRuntimeVideoUrl(d.runtime) ??
-        [d.runtime?.ossUrl, d.ossUrl, d.blobUrl, d.videoUrl]
-          .map((u) => String(u ?? "").trim())
-          .find((u) => u && isLikelyVideoUrl(u));
-      if (videoUrl) {
-        out.push(videoUrl);
-      } else {
-        const preview =
-          pickRuntimeImagePreviewUrl(d.runtime, d.modelKey) ?? d.runtime?.ossUrl;
-        if (preview) out.push(preview);
-      }
     }
   }
   return Array.from(new Set(out));
@@ -1721,40 +1684,6 @@ export function useCanvasRunner(
             nodeId,
             { rowKey: job.rowKey },
           );
-          if (base && imageInputs.some((u) => u.startsWith("blob:"))) {
-            try {
-              imageInputs = await materializeImageInputsForRun(
-                base,
-                imageInputs,
-              );
-              const ossUrl = imageInputs[0]?.trim();
-              if (
-                ossUrl &&
-                /^https?:\/\//.test(ossUrl) &&
-                (runData as { pro2HdFromGridSplit?: boolean })
-                  .pro2HdFromGridSplit
-              ) {
-                const refId = `hd-ref-${nodeId}`;
-                updateNodeData(nodeId, {
-                  ossUrl,
-                  blobUrl: undefined,
-                  uploading: false,
-                  mediaFitKey: ossUrl,
-                  dockRefImages: [
-                    { id: refId, label: "参考图", url: ossUrl },
-                  ],
-                });
-              }
-            } catch (e) {
-              abortSequential(
-                job,
-                e instanceof Error
-                  ? e.message
-                  : "参考图上传 OSS 失败，无法发起图生图",
-              );
-              return;
-            }
-          }
         }
 
         {
@@ -1771,6 +1700,46 @@ export function useCanvasRunner(
           );
           runData = resolved.runData;
           imageInputs = resolved.imageInputs;
+        }
+
+        if (
+          base &&
+          imageInputs.some(
+            (u) => u.startsWith("blob:") || u.startsWith("data:"),
+          )
+        ) {
+          try {
+            imageInputs = await materializeImageInputsForRun(
+              base,
+              imageInputs,
+            );
+            const ossUrl = imageInputs[0]?.trim();
+            if (
+              ossUrl &&
+              /^https?:\/\//.test(ossUrl) &&
+              (runData as { pro2HdFromGridSplit?: boolean })
+                .pro2HdFromGridSplit
+            ) {
+              const refId = `hd-ref-${nodeId}`;
+              updateNodeData(nodeId, {
+                ossUrl,
+                blobUrl: undefined,
+                uploading: false,
+                mediaFitKey: ossUrl,
+                dockRefImages: [
+                  { id: refId, label: "参考图", url: ossUrl },
+                ],
+              });
+            }
+          } catch (e) {
+            abortSequential(
+              job,
+              e instanceof Error
+                ? e.message
+                : "参考图上传 OSS 失败，无法发起图生图",
+            );
+            return;
+          }
         }
 
         if (
