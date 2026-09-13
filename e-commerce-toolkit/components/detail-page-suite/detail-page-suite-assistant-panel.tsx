@@ -57,6 +57,8 @@ type Props = {
   busyStatus?: DetailPageSuiteBusyStatus | null;
   composerWide?: boolean;
   onComposerWideChange?: (wide: boolean) => void;
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
   onChoice: (message: string) => void;
   /** 故事版同款 · composer 内「参数」钮 */
   onOpenImageModel?: () => void;
@@ -69,6 +71,10 @@ type AssistantContextValue = {
   busyStatus: DetailPageSuiteBusyStatus | null;
   composerWide?: boolean;
   onComposerWideChange?: (wide: boolean) => void;
+  collapsed: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
+  tryCollapse: () => void;
+  tryExpand: () => void;
   onChoice: (message: string) => void;
   phase: DetailPageSuitePhase;
   dimStep: number;
@@ -148,9 +154,20 @@ function useDetailPageSuiteAssistant(props: Props): AssistantContextValue {
     busyStatus = null,
     composerWide,
     onComposerWideChange,
+    collapsed = false,
+    onCollapsedChange,
     onChoice,
     onOpenImageModel,
   } = props;
+
+  const tryCollapse = useCallback(() => {
+    if (busy) return;
+    onCollapsedChange?.(true);
+  }, [busy, onCollapsedChange]);
+
+  const tryExpand = useCallback(() => {
+    onCollapsedChange?.(false);
+  }, [onCollapsedChange]);
 
   const [input, setInput] = useState("");
   const [optimisticSelected, setOptimisticSelected] = useState<string | null>(null);
@@ -259,6 +276,7 @@ function useDetailPageSuiteAssistant(props: Props): AssistantContextValue {
               disabled={busy}
               onChange={(e) => setInput(e.target.value)}
               onFocus={() => {
+                if (collapsed) tryExpand();
                 if (!compact) onComposerWideChange?.(true);
               }}
               onKeyDown={(e) => {
@@ -290,8 +308,10 @@ function useDetailPageSuiteAssistant(props: Props): AssistantContextValue {
       input,
       inputEnabled,
       onComposerWideChange,
+      collapsed,
       onOpenImageModel,
       placeholder,
+      tryExpand,
     ],
   );
 
@@ -302,6 +322,10 @@ function useDetailPageSuiteAssistant(props: Props): AssistantContextValue {
     busyStatus,
     composerWide,
     onComposerWideChange,
+    collapsed,
+    onCollapsedChange,
+    tryCollapse,
+    tryExpand,
     onChoice,
     phase,
     dimStep,
@@ -338,6 +362,9 @@ export function DetailPageSuiteAssistantPanel() {
     busyStatus,
     composerWide,
     onComposerWideChange,
+    collapsed,
+    onCollapsedChange,
+    tryCollapse,
     phase,
     dimensionMessageLabels,
     liveStep,
@@ -350,10 +377,12 @@ export function DetailPageSuiteAssistantPanel() {
 
   return (
     <EcomAssistantCollapsibleLayout
-      collapsed={false}
+      collapsed={collapsed}
+      onCollapsedChange={onCollapsedChange}
       collapseBlocked={busy}
       attentionBadge={showChoices}
       composer={null}
+      floatingComposer={renderComposer("compact")}
       className="h-full min-h-0"
     >
       <EcomAssistantPanelHeader
@@ -361,6 +390,8 @@ export function DetailPageSuiteAssistantPanel() {
         subtitle={`${phaseLabel(phase)} · 产品图 → 七维 → 卖点 → 模板 → 出图`}
         composerWide={composerWide}
         onComposerWideChange={onComposerWideChange}
+        onCollapse={onCollapsedChange ? tryCollapse : undefined}
+        collapseDisabled={busy}
       />
 
       <div

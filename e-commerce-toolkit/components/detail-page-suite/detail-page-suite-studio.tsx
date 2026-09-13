@@ -13,6 +13,7 @@ import { DetailPageSuiteContentPanel } from "@/components/detail-page-suite/deta
 import { DetailPageSuiteProgressRail } from "@/components/detail-page-suite/detail-page-suite-progress-rail";
 import { BackgroundGenerationProvider, useBackgroundGeneration } from "@/components/generation";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
+import { useEcomStudioAssistantCollapse } from "@/lib/ecom-assistant-collapse";
 import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
 import { ProductCreationStudioSkeleton } from "@/components/product-design/product-creation-studio-skeleton";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
@@ -143,6 +144,8 @@ function DetailPageSuiteStudioInner() {
   const llmBusy = llmBusyStatus != null;
   const [activeGenSlotKeys, setActiveGenSlotKeys] = useState<Set<string>>(() => new Set());
   const [assistantWide, setAssistantWide] = useState(false);
+  const { assistantCollapsed, setAssistantCollapsed, handleMainBlankPointerDown } =
+    useEcomStudioAssistantCollapse(llmBusy);
   const [imagePicker, setImagePicker] = useState<ImagePickerRequest | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [promptPreview, setPromptPreview] = useState<{ title: string; prompt: string } | null>(
@@ -759,6 +762,8 @@ function DetailPageSuiteStudioInner() {
     busyStatus: llmBusyStatus,
     composerWide: assistantWide,
     onComposerWideChange: setAssistantWide,
+    collapsed: assistantCollapsed,
+    onCollapsedChange: setAssistantCollapsed,
     onChoice: (m: string) => void handleChoice(m),
     onOpenImageModel: () => requestImagePicker({ settingsOnly: true }),
   };
@@ -768,9 +773,13 @@ function DetailPageSuiteStudioInner() {
       <DetailPageSuiteAssistantRoot {...assistantProps}>
         <EcomWorkspaceLayout
           assistantWide={assistantWide}
+          assistantCollapsed={assistantCollapsed}
+          onMainBlankPointerDown={handleMainBlankPointerDown}
           progress={<DetailPageSuiteProgressRail project={project} />}
           assistant={<DetailPageSuiteAssistantPanel />}
-          assistantFooter={<DetailPageSuiteAssistantComposer />}
+          assistantFooter={
+            assistantCollapsed ? null : <DetailPageSuiteAssistantComposer />
+          }
         >
           <DetailPageSuiteContentPanel
             project={project}
