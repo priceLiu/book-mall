@@ -39,8 +39,8 @@ export function ImageLayerUploadZone({
     <div
       {...dropZoneProps}
       className={cn(
-        "flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed outline-none transition-colors",
-        "min-h-[360px] cursor-pointer",
+        "flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed outline-none transition-colors",
+        "min-h-[min(420px,50vh)] w-full cursor-pointer",
         dragOver
           ? "border-[#0071e3] bg-[#f0f6ff] ring-2 ring-[#0071e3]/20"
           : "border-[#d2d2d7] bg-[#fafafa] hover:border-[#0071e3]/50 hover:bg-white",
@@ -84,7 +84,7 @@ export function ImageLayerUploadZone({
           openPicker();
         }}
         className={cn(
-          "flex h-16 w-16 items-center justify-center rounded-full border transition-colors",
+          "flex h-16 w-16 items-center justify-center rounded-full border transition-colors sm:h-20 sm:w-20",
           dragOver
             ? "border-[#0071e3] bg-[#0071e3] text-white"
             : "border-[#d2d2d7] bg-white text-[#6e6e73] hover:border-[#0071e3] hover:text-[#0071e3]",
@@ -99,14 +99,14 @@ export function ImageLayerUploadZone({
         )}
       </button>
 
-      <p className="mt-4 text-sm font-medium text-[#1d1d1f]">
+      <p className="mt-5 text-base font-medium text-[#1d1d1f] sm:text-lg">
         {dragOver ? "松开以上传" : busy ? "处理中…" : "点击或拖入图片"}
       </p>
-      <p className="mt-1 text-xs text-[#86868b]">
+      <p className="mt-2 text-sm text-[#86868b]">
         {pasteReady ? "支持 Ctrl+V / ⌘V 粘贴 · png / jpeg" : "支持拖放、粘贴 · png / jpeg"}
       </p>
-      <p className="mt-3 text-[11px] text-[#aeaeb2]">
-        载入后请手动点击「AI 图层分离」
+      <p className="mt-4 max-w-md px-6 text-center text-xs leading-relaxed text-[#aeaeb2] sm:text-sm">
+        载入后可连续框选最多 16 个区域（无需提示词），再点「AI 图层分离」；不画框则全自动拆分
       </p>
     </div>
   );

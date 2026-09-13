@@ -82,7 +82,26 @@ describe("getLayerCanvasStyle", () => {
     expect(className).toContain("absolute");
     expect(style.left).toBe("10%");
     expect(style.top).toBe(`${(200 / 1000) * 100}%`);
+    expect(style.height).toBe("60%");
     expect(style.transform).toBe("translate(5px, 10px)");
+  });
+
+  it("uses bbox placement even when PNG is full-frame size", () => {
+    const item = layer({
+      id: "e",
+      bbox: { normalized: [200, 300, 600, 900] },
+    });
+    const p = resolveLayerDrawPlacement({
+      layer: item,
+      naturalWidth: 1000,
+      naturalHeight: 1500,
+      canvasWidth: 1000,
+      canvasHeight: 1500,
+      displayScale: 1,
+    });
+    expect(p.mode).toBe("bbox-crop");
+    expect(p.width).toBeCloseTo(400);
+    expect(p.height).toBeCloseTo(900);
   });
 });
 

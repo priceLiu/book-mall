@@ -71,7 +71,7 @@ export function resolveLayerDrawPlacement(opts: {
   const userDy = (layer.offsetY ?? 0) * displayScale;
 
   const bbox = layer.bbox?.normalized;
-  if (!layer.isBackground && bbox && isBboxCropLayer(naturalWidth, naturalHeight, canvasWidth, canvasHeight)) {
+  if (!layer.isBackground && bbox) {
     const rect = normalizedBboxRect(bbox, canvasWidth, canvasHeight);
     return {
       x: rect.x + userDx,
@@ -134,19 +134,14 @@ export function getLayerCanvasStyle(
   style: CSSProperties;
 } {
   const bbox = layer.bbox?.normalized;
-  const isCrop =
-    !layer.isBackground &&
-    bbox &&
-    isBboxCropLayer(naturalWidth, naturalHeight, canvasWidth, canvasHeight);
-
-  if (isCrop && bbox) {
+  if (!layer.isBackground && bbox) {
     return {
-      className: "absolute select-none",
+      className: "absolute select-none object-contain",
       style: {
         left: `${(bbox[0] / 1000) * 100}%`,
         top: `${(bbox[1] / 1000) * 100}%`,
         width: `${((bbox[2] - bbox[0]) / 1000) * 100}%`,
-        height: "auto",
+        height: `${((bbox[3] - bbox[1]) / 1000) * 100}%`,
         transform: `translate(${offsetX}px, ${offsetY}px)`,
       },
     };

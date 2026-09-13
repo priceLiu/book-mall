@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { editImageLayerRegion } from "@/lib/ecom/ecom-image-layer-service";
+import { editImageLayerRegions } from "@/lib/ecom/ecom-image-layer-service";
 import {
   appendEcomImageLayerGeneration,
   saveEcomImageLayerWorkspace,
@@ -18,6 +18,34 @@ function parseBbox(raw: unknown): [number, number, number, number] | null {
   return [nums[0]!, nums[1]!, nums[2]!, nums[3]!];
 }
 
+function parseBboxList(raw: unknown): Array<[number, number, number, number]> {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => parseBbox(item))
+    .filter((b): b is [number, number, number, number] => b !== null);
+}
+
+function parseEdits(
+  body: Record<string, unknown>,
+): Array<{ bbox: [number, number, number, number]; prompt: string }> {
+  if (Array.isArray(body.edits)) {
+    const out: Array<{ bbox: [number, number, number, number]; prompt: string }> = [];
+    for (const item of body.edits) {
+      if (!item || typeof item !== "object") continue;
+      const row = item as Record<string, unknown>;
+      const bbox = parseBbox(row.bbox);
+      const prompt = typeof row.prompt === "string" ? row.prompt.trim() : "";
+      if (bbox && prompt) out.push({ bbox, prompt });
+    }
+    return out;
+  }
+
+  const bbox = parseBbox(body.bbox);
+  const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
+  if (bbox && prompt) return [{ bbox, prompt }];
+  return [];
+}
+
 export async function POST(req: Request) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) return auth.res;
@@ -31,8 +59,8 @@ export async function POST(req: Request) {
 
   const compositeImageUrl =
     typeof body.compositeImageUrl === "string" ? body.compositeImageUrl.trim() : "";
-  const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
-  const bbox = parseBbox(body.bbox);
+  const edits = parseEdits(body);
+  const redecomposeBboxes = parseBboxList(body.redecomposeBboxes);
   const size = typeof body.size === "string" ? body.size.trim() : undefined;
   const projectId =
     typeof body.projectId === "string" && body.projectId.trim()
@@ -42,19 +70,16 @@ export async function POST(req: Request) {
   if (!compositeImageUrl) {
     return NextResponse.json({ error: "缺少 compositeImageUrl" }, { status: 400 });
   }
-  if (!prompt) {
-    return NextResponse.json({ error: "缺少 prompt" }, { status: 400 });
-  }
-  if (!bbox) {
-    return NextResponse.json({ error: "缺少有效 bbox" }, { status: 400 });
+  if (edits.length === 0) {
+    return NextResponse.json({ error: "缺少有效 edits（bbox + prompt）" }, { status: 400 });
   }
 
   try {
-    const stack = await editImageLayerRegion({
+    const stack = await editImageLayerRegions({
       userId: auth.userId,
       compositeImageUrl,
-      bbox,
-      prompt,
+      edits,
+      ...(redecomposeBboxes.length ? { redecomposeBboxes } : {}),
       size,
     });
     if (projectId) {
@@ -63,10 +88,14 @@ export async function POST(req: Request) {
         projectId,
         workspaceFromStack(stack, { sourceImageUrl: stack.sourceImageUrl ?? compositeImageUrl }),
       );
+      const promptSummary =
+        edits.length === 1
+          ? edits[0]!.prompt
+          : edits.map((e, i) => `层${i + 1}：${e.prompt}`).join("；");
       await appendEcomImageLayerGeneration(auth.userId, projectId, {
         kind: "edit",
-        title: "AI 修改本层",
-        prompt,
+        title: edits.length > 1 ? "AI 批量修改图层" : "AI 修改本层",
+        prompt: promptSummary,
         ossUrl: stack.background.url,
         logId: stack.logId ?? null,
       });

@@ -285,9 +285,70 @@ export const LIBTV_INPUT_DOCK_SHELL_CLASS =
 export const LIBTV_INPUT_DOCK_DIVIDER = "border-white/[0.06]";
 export const LIBTV_INPUT_DOCK_TOOLBAR_ICON_CLASS =
   "nodrag rounded-md p-1.5 text-white/40 transition hover:bg-white/[0.06] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40";
-/** 与画布磁吸 Dock「上传」图标同色（pro2-canvas-toolbar · emerald-400） */
+/** Dock 发送钮 · 结构类（背景色见 libtvDockSendButtonClass） */
+export const LIBTV_INPUT_DOCK_SEND_BTN_BASE_CLASS =
+  "nodrag flex shrink-0 items-center justify-center rounded-full transition touch-manipulation";
+
+/** @deprecated 使用 libtvDockSendButtonClass */
 export const LIBTV_INPUT_DOCK_SEND_BTN_CLASS =
-  "nodrag flex shrink-0 items-center justify-center rounded-full bg-emerald-400 text-black transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40";
+  LIBTV_INPUT_DOCK_SEND_BTN_BASE_CLASS;
+
+export type LibtvDockSendButtonVisualState = "empty" | "ready" | "generating";
+
+export function libtvDockSendButtonVisualState(args: {
+  loading?: boolean;
+  hasContent?: boolean;
+}): LibtvDockSendButtonVisualState {
+  if (args.loading) return "generating";
+  if (args.hasContent) return "ready";
+  return "empty";
+}
+
+/** Dock 内用户主动输入（提示词 / 参考图）；不含节点成图、上游连线等被动内容 */
+export function libtvDockHasUserInput(args: {
+  prompt?: string;
+  refImageCount?: number;
+}): boolean {
+  return Boolean(args.prompt?.trim()) || (args.refImageCount ?? 0) > 0;
+}
+
+/** Dock 发送钮箭头 · 默认 lucide 2，略加粗更易辨认 */
+export const LIBTV_DOCK_SEND_ARROW_STROKE = 3.5;
+
+export const LIBTV_DOCK_SEND_BTN_COLORS: Record<
+  LibtvDockSendButtonVisualState,
+  { backgroundColor: string; color: string }
+> = {
+  empty: { backgroundColor: "#ffffff", color: "rgba(0,0,0,0.85)" },
+  ready: { backgroundColor: "#34d399", color: "#000000" },
+  generating: { backgroundColor: "#F1B467", color: "#000000" },
+};
+
+/** Dock 右下角圆形发送钮 · 空=白 / 有内容=绿 / 生成中=#F1B467 */
+export function libtvDockSendButtonClass(args: {
+  loading?: boolean;
+  hasContent?: boolean;
+  disabled?: boolean;
+}): string {
+  const state = libtvDockSendButtonVisualState(args);
+  const base = LIBTV_INPUT_DOCK_SEND_BTN_BASE_CLASS;
+  if (state === "generating") {
+    return base;
+  }
+  if (state === "ready") {
+    return `${base} hover:brightness-110${args.disabled ? " cursor-not-allowed" : ""}`;
+  }
+  // 空态须保持纯白；disabled 仅改光标，勿降透明度（否则像灰色）
+  return `${base}${args.disabled ? " cursor-not-allowed" : ""}`;
+}
+
+export function libtvDockSendButtonStyle(args: {
+  loading?: boolean;
+  hasContent?: boolean;
+}): { backgroundColor: string; color: string } {
+  const state = libtvDockSendButtonVisualState(args);
+  return LIBTV_DOCK_SEND_BTN_COLORS[state];
+}
 /** 输入坞内 textarea · 无边框（字号随画布 zoom · 见 libtvDockPromptFontScreenMetrics） */
 export const LIBTV_INPUT_DOCK_TEXTAREA_CLASS =
   "nodrag w-full resize-none border-0 bg-transparent text-[length:var(--libtv-dock-prompt-font,15px)] leading-relaxed text-white placeholder:text-white/30 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-45";

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { ArrowUp, Loader2 } from "lucide-react";
 import { useNodes } from "@xyflow/react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -29,7 +28,8 @@ import {
   PRO2_DOCK_TEXTAREA_CLASS,
   PRO2_DOCK_TEXTAREA_INSET_CLASS,
 } from "@/lib/canvas/story-pro2-node-chrome";
-import { LIBTV_INPUT_DOCK_SEND_BTN_CLASS } from "@/lib/canvas/libtv-node-chrome";
+import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
+import { useLibtvDockGenerationStop } from "@/lib/canvas/use-libtv-dock-generation-stop";
 import type {
   StoryProCharacterRow,
   StoryProFrameRow,
@@ -272,6 +272,10 @@ export function Pro2FrameCellInputDock() {
 
   const running = frameRowStatus(row) === "running";
   const prompt = row.prompt ?? "";
+  const onStopGeneration = useLibtvDockGenerationStop(storeNode.id, {
+    rowKey: activeFocus.rowKey,
+    mediaKind: "frameImage",
+  });
 
   return (
     <Pro2InputDockShell
@@ -300,19 +304,16 @@ export function Pro2FrameCellInputDock() {
       footer={
         <Pro2DockToolbar>
           <div className="min-w-0 flex-1" />
-          <button
-            type="button"
+          <LibtvDockSendButton
             disabled={running || !prompt.trim()}
-            className={cn(LIBTV_INPUT_DOCK_SEND_BTN_CLASS, "size-9")}
+            loading={running}
+            hasContent={Boolean(prompt.trim())}
+            sizePx={36}
+            iconPx={18}
             title="重新生成该镜分镜图"
             onClick={onRegenerate}
-          >
-            {running ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <ArrowUp className="size-4" />
-            )}
-          </button>
+            onStop={onStopGeneration}
+          />
         </Pro2DockToolbar>
       }
     >

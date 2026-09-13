@@ -89,29 +89,36 @@ export function resizeRectByHandle(
   }
 
   const s = normalizeRect(start);
+  /** 相对按下点位移扩边（与扩图一致），避免绝对坐标 + 画布 zoom 导致右下角「一点就跳」 */
+  const dx = ip.x - startPoint.x;
+  const dy = ip.y - startPoint.y;
+
   let x1 = s.x1;
   let y1 = s.y1;
   let x2 = s.x2;
   let y2 = s.y2;
 
-  if (handle.includes("w")) x1 = ip.x;
-  if (handle.includes("e")) x2 = ip.x;
-  if (handle.includes("n")) y1 = ip.y;
-  if (handle.includes("s")) y2 = ip.y;
+  if (handle.includes("w")) x1 = s.x1 + dx;
+  if (handle.includes("e")) x2 = s.x2 + dx;
+  if (handle.includes("n")) y1 = s.y1 + dy;
+  if (handle.includes("s")) y2 = s.y2 + dy;
 
   let n = normalizeRect({ x1, y1, x2, y2 });
 
   if (aspect && aspect > 0) {
     const anchorX = handle.includes("w") ? s.x2 : s.x1;
     const anchorY = handle.includes("n") ? s.y2 : s.y1;
-    let w = Math.abs(n.x2 - anchorX);
-    let h = Math.abs(n.y2 - anchorY);
+    let w: number;
+    let h: number;
     if (handle === "n" || handle === "s") {
       w = s.x2 - s.x1;
-      h = Math.abs(ip.y - anchorY);
+      h = Math.max(8, Math.abs((handle.includes("n") ? n.y1 : n.y2) - anchorY));
     } else if (handle === "e" || handle === "w") {
       h = s.y2 - s.y1;
-      w = Math.abs(ip.x - anchorX);
+      w = Math.max(8, Math.abs((handle.includes("w") ? n.x1 : n.x2) - anchorX));
+    } else {
+      w = Math.max(8, Math.abs((handle.includes("w") ? n.x1 : n.x2) - anchorX));
+      h = Math.max(8, Math.abs((handle.includes("n") ? n.y1 : n.y2) - anchorY));
     }
     if (w / Math.max(h, 1) > aspect) {
       h = w / aspect;

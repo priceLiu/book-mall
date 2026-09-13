@@ -78,6 +78,7 @@ export const ImageCropCanvas = forwardRef<ImageCropCanvasHandle, Props>(
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
+    const overlayRef = useRef<HTMLDivElement>(null);
     const frameRef = useRef<HTMLDivElement>(null);
     const imgElRef = useRef<HTMLImageElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -214,16 +215,16 @@ export const ImageCropCanvas = forwardRef<ImageCropCanvasHandle, Props>(
 
     const clientToImagePoint = useCallback(
       (clientX: number, clientY: number): { x: number; y: number } | null => {
-        const container = containerRef.current;
+        const overlay = overlayRef.current;
         const nat = naturalRef.current;
-        const box = displayBoxRef.current;
-        if (!container || !nat.w || !box.w) return null;
-        const cr = container.getBoundingClientRect();
-        const lx = clientX - cr.left - box.ox;
-        const ly = clientY - cr.top - box.oy;
+        if (!overlay || !nat.w) return null;
+        const or = overlay.getBoundingClientRect();
+        if (or.width <= 0 || or.height <= 0) return null;
+        const lx = clientX - or.left;
+        const ly = clientY - or.top;
         return {
-          x: (lx / box.w) * nat.w,
-          y: (ly / box.h) * nat.h,
+          x: (lx / or.width) * nat.w,
+          y: (ly / or.height) * nat.h,
         };
       },
       [],
@@ -235,6 +236,11 @@ export const ImageCropCanvas = forwardRef<ImageCropCanvasHandle, Props>(
         e.stopPropagation();
         const ip = clientToImagePoint(e.clientX, e.clientY);
         if (!ip) return;
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          /* ignore */
+        }
         setDrag({
           handle,
           startRect: { ...rectRef.current },
@@ -314,6 +320,7 @@ export const ImageCropCanvas = forwardRef<ImageCropCanvasHandle, Props>(
           onLoad={syncLayoutFromImg}
         />
         <div
+          ref={overlayRef}
           data-libtv-crop-overlay
           className="absolute touch-none"
           style={{

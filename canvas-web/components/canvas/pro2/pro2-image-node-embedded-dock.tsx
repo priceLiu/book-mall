@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { ArrowUp, Loader2, MapPin, Upload } from "lucide-react";
+import { MapPin, Upload } from "lucide-react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
 import { optimisticLibtvMediaRunStart } from "@/lib/canvas/libtv-image-node-run";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
-import { LIBTV_INPUT_DOCK_SEND_BTN_CLASS } from "@/lib/canvas/libtv-node-chrome";
+import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
+import { useLibtvDockGenerationStop } from "@/lib/canvas/use-libtv-dock-generation-stop";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import {
   resolvePro2DockUpstreamLinks,
@@ -175,6 +176,13 @@ export function Pro2ImageNodeEmbeddedDock({
     mediaRole === "frame" &&
     Boolean(d.pro2ControllerNodeId && d.pro2RowKey && dockInput.trim());
 
+  const onStopGeneration = useLibtvDockGenerationStop(
+    d.pro2ControllerNodeId ?? storeNode?.id,
+    mediaRole === "frame" && d.pro2RowKey
+      ? { rowKey: d.pro2RowKey, mediaKind: "frameImage" }
+      : undefined,
+  );
+
   return (
     <Pro2EmbeddedInputDock
       header={
@@ -259,19 +267,16 @@ export function Pro2ImageNodeEmbeddedDock({
       footer={
         <Pro2DockToolbar>
           <div className="min-w-0 flex-1" />
-          <button
-            type="button"
+          <LibtvDockSendButton
             disabled={!canRegenerate || isRunning}
-            className={cn(LIBTV_INPUT_DOCK_SEND_BTN_CLASS, "size-8")}
+            loading={isRunning}
+            hasContent={Boolean(dockInput.trim())}
+            sizePx={32}
+            iconPx={16}
             title={canRegenerate ? "重新生成" : "发送（即将推出）"}
             onClick={onRegenerate}
-          >
-            {isRunning ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <ArrowUp className="size-3.5" />
-            )}
-          </button>
+            onStop={onStopGeneration}
+          />
         </Pro2DockToolbar>
       }
     >

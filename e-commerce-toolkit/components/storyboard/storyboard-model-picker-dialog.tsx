@@ -100,6 +100,8 @@ type Props = {
   onRetryLoadModels?: () => void | Promise<void>;
   /** 隐藏文生图/图生视频类型筛选（视觉理解 LLM 等纯选型场景） */
   hideTypeFilter?: boolean;
+  /** 仅选模型：隐藏弹层内参数区，确认钮为「确定」而非「开始生图」 */
+  selectionOnly?: boolean;
   /**
    * 使用 createPortal + 自定义 overlay，不经 Radix Dialog。
    * 素材区粘贴热区与 Radix 焦点陷阱冲突时启用（如服装模特图）。
@@ -356,6 +358,7 @@ export function StoryboardModelPickerDialog({
   modelsEmptyHint,
   onRetryLoadModels,
   hideTypeFilter = false,
+  selectionOnly = false,
   contentClassName,
   nativeOverlay = false,
   running = false,
@@ -377,15 +380,23 @@ export function StoryboardModelPickerDialog({
   onVideoGenerateAudioChange,
   panelHasVoiceover = false,
 }: Props) {
-  const action = confirmLabel ?? (mode === "image" ? "开始生图" : "开始生成");
+  const action =
+    confirmLabel ??
+    (selectionOnly ? "确定" : mode === "image" ? "开始生图" : "开始生成");
   const subtitle =
     dialogDescription ??
-    (mode === "image" ? "选择生图模型并调整尺寸，用于生成分镜图。" : "");
+    (selectionOnly
+      ? "选择模型；可调参数与生成在右栏底部操作。"
+      : mode === "image"
+        ? "选择生图模型并调整尺寸，用于生成分镜图。"
+        : "");
   const footerLeftHint =
     footerHint ??
     (confirming || running
       ? "任务进行中，请稍候…"
-      : "选好模型与参数后开始生成。");
+      : selectionOnly
+        ? "参数在右栏编辑，生成请点右栏底部按钮。"
+        : "选好模型与参数后开始生成。");
   const showImageSize = mode === "image";
   const showFullDuration = mode === "video" && videoTarget === "fullSheet";
   const showPanelDuration = mode === "video" && videoTarget === "panel";
@@ -660,7 +671,12 @@ export function StoryboardModelPickerDialog({
           ) : null}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] lg:items-start">
+        <div
+          className={cn(
+            "grid grid-cols-1 gap-5",
+            !selectionOnly && "lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] lg:items-start",
+          )}
+        >
           <div className="space-y-4">
             {!hideTypeFilter ? (
               <ModelMediaFilterBar
@@ -705,6 +721,7 @@ export function StoryboardModelPickerDialog({
             )}
           </div>
 
+          {!selectionOnly ? (
           <section className="rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-4 lg:sticky lg:top-0">
             <p className="mb-3 flex flex-wrap items-center gap-2 text-[12px] font-semibold text-[#1d1d1f]">
               <Cpu className="h-3.5 w-3.5 text-[#86868b]" />
@@ -961,6 +978,7 @@ export function StoryboardModelPickerDialog({
               ) : null}
             </div>
           </section>
+          ) : null}
         </div>
       )}
     </div>

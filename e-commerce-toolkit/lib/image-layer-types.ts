@@ -30,7 +30,9 @@ export type ImageLayerEditEntry = {
 export type ImageLayerWorkspace = {
   sourceImageUrl?: string | null;
   stack?: ImageLayerStack | null;
+  /** @deprecated 使用 pendingBboxes */
   pendingBbox?: [number, number, number, number] | null;
+  pendingBboxes?: Array<[number, number, number, number]> | null;
   canvasDims?: { w: number; h: number };
   displayDims?: { w: number; h: number };
   selectedLayerId?: string | null;

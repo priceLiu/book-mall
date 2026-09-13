@@ -5,6 +5,7 @@ import { Languages } from "lucide-react";
 import { Pro2LlmDockCreditsBadge } from "./pro2-llm-dock-credits-badge";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
+import { useLibtvDockGenerationStop } from "@/lib/canvas/use-libtv-dock-generation-stop";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { useLibtvFloatingDock, useLibtvSoleSelectedNodeId } from "@/lib/canvas/use-libtv-floating-dock";
@@ -172,6 +173,7 @@ export function Pro2ScriptInputDock() {
   const isGenerating = hubRfNode
     ? pro2HubIsGenerating(hubRfNode as never, hubTasks)
     : false;
+  const onStopGeneration = useLibtvDockGenerationStop(storeNode?.id);
   const canSendScript = hubRfNode
     ? pro2HubCanSendScriptPhase(hubRfNode as never, d, { nodes, edges, hubTasks })
     : false;
@@ -417,6 +419,8 @@ export function Pro2ScriptInputDock() {
           onDockMenuChange={setDockMenu}
           isGenerating={isGenerating}
           canSend={canSend}
+          hasContent={Boolean(dockInput.trim())}
+          onStop={onStopGeneration}
           phase={phase}
           onPickEngine={onPickEngine}
           onSend={() => void onSend()}
@@ -466,6 +470,8 @@ function Pro2ScriptDockFooter({
   onDockMenuChange,
   isGenerating,
   canSend,
+  hasContent,
+  onStop,
   phase,
   onPickEngine,
   onSend,
@@ -478,6 +484,8 @@ function Pro2ScriptDockFooter({
   onDockMenuChange: (menu: "model" | "params" | null) => void;
   isGenerating: boolean;
   canSend: boolean;
+  hasContent: boolean;
+  onStop: () => void;
   phase: string;
   onPickEngine: (next: {
     providerId: string;
@@ -531,8 +539,10 @@ function Pro2ScriptDockFooter({
         <LibtvDockSendButton
           disabled={!canSend}
           loading={isGenerating}
+          hasContent={hasContent}
           title={phase === "frame" ? "重新生成脚本" : "生成分镜脚本"}
           onClick={onSend}
+          onStop={onStop}
         />
       </div>
     </Pro2DockToolbar>

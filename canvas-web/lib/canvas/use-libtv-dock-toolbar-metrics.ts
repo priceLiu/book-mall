@@ -29,7 +29,7 @@ export function useLibtvDockToolbarMetrics() {
       fontPx: px(VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100),
       minHeightPx: px(48),
       sendBtnPx: px(48),
-      sendIconPx: px(18),
+      sendIconPx: px(22),
       chevronPx: px(18),
       fontScreenPx: px(VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100),
     };

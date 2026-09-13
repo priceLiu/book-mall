@@ -8,6 +8,7 @@ import { LibtvDockCreditsLabel } from "@/components/canvas/libtv-dock-credits-la
 import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
 import { Pro2DockToolbar } from "@/components/canvas/pro2/pro2-input-dock-shell";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
+import { useLibtvDockGenerationStop } from "@/lib/canvas/use-libtv-dock-generation-stop";
 import { SBV1_IMAGE_RESOLUTIONS } from "@/lib/canvas/sbv1-image-models";
 
 const ASPECT_OPTIONS: { value: LibtvExpandAspectRatio; label: string }[] = [
@@ -34,6 +35,8 @@ type Props = {
   onOutputCountChange: (v: number) => void;
   onClose: () => void;
   onSubmit: () => void;
+  stopNodeId?: string;
+  onStop?: () => void;
 };
 
 function DockSelect({
@@ -92,8 +95,12 @@ export function ImageExpandDockBar({
   onOutputCountChange,
   onClose,
   onSubmit,
+  stopNodeId,
+  onStop,
 }: Props) {
   const { fontPx, minHeightPx } = useLibtvDockToolbarMetrics();
+  const onStopGeneration = useLibtvDockGenerationStop(stopNodeId);
+  const handleStop = onStop ?? onStopGeneration;
   const aspectLabel =
     ASPECT_OPTIONS.find((o) => o.value === aspectRatio)?.label ?? "原图比例";
 
@@ -148,8 +155,10 @@ export function ImageExpandDockBar({
         <LibtvDockSendButton
           disabled={!canSubmit}
           loading={running}
+          hasContent={Boolean(canSubmit)}
           title="扩图"
           onClick={onSubmit}
+          onStop={handleStop}
         />
       </div>
     </Pro2DockToolbar>

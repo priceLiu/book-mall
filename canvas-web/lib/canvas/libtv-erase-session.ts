@@ -77,14 +77,27 @@ export function startLibtvEraseSession(
       const dockInputBefore = String(
         (n.data as { dockInput?: string }).dockInput ?? "",
       );
+      const resolvedEngine =
+        engine ?? (n.data as { engine?: { modelKey?: string } }).engine;
+      const resolvedModelKey = String(resolvedEngine?.modelKey ?? "")
+        .trim()
+        .toLowerCase();
+      const eraseTool =
+        resolvedModelKey === "wan2.7-image-pro"
+          ? ("rect" as const)
+          : DEFAULT_ERASE_SESSION.tool;
       return {
         ...n,
         selected: true,
         data: {
           ...n.data,
-          libtvEraseSession: { ...DEFAULT_ERASE_SESSION, dockInputBefore },
+          libtvEraseSession: {
+            ...DEFAULT_ERASE_SESSION,
+            tool: eraseTool,
+            dockInputBefore,
+          },
           dockInput: LIBTV_ERASE_FIXED_DOCK_PROMPT,
-          engine: engine ?? (n.data as { engine?: unknown }).engine,
+          engine: resolvedEngine,
         },
       };
     }),

@@ -45,6 +45,7 @@ export async function POST(req: Request) {
       await saveEcomImageLayerWorkspace(auth.userId, projectId, {
         sourceImageUrl: result.ossUrl,
         stack: null,
+        pendingBboxes: [],
         pendingBbox: null,
       });
       await appendEcomImageLayerGeneration(auth.userId, projectId, {

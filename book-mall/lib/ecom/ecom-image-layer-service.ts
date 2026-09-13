@@ -2,15 +2,23 @@ import { randomUUID } from "crypto";
 
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
+import {
+  buildBatchEditPrompt,
+  buildDecomposePrompt,
+  validateDecomposeBboxes,
+} from "@/lib/ecom/ecom-image-layer-prompt";
+import {
+  ensureSeedreamLayerDecomposeImageUrl,
+  mapSeedreamLayerDecomposeError,
+} from "@/lib/ecom/ecom-image-layer-source-normalize";
 import { createOssClientFrom, ossGetBuffer, readOssEnv } from "@/lib/oss-client";
 import { ecomGwVolcengineImageEdit } from "@/lib/gateway/ecom-tool-gateway-client";
 import type { SeedreamLayerItem } from "@/lib/gateway/volcengine-image-generations-proxy";
 
 export const ECOM_IMAGE_LAYER_MODEL = "doubao-seedream-5-0-pro";
 export const ECOM_IMAGE_LAYER_TOOL_KEY = "ecom-toolkit__image-layer";
-
-const AUTO_DECOMPOSE_PROMPT =
-  "将图片进行精确图层分离，对图片做完整图层语义分离。";
+/** 与 Seedream 物体层上限一致 */
+export const ECOM_IMAGE_LAYER_MAX_BBOXES = 16;
 
 export type ImageLayerBbox = {
   normalized?: [number, number, number, number];
@@ -33,45 +41,6 @@ export type ImageLayerStack = {
   logId?: string;
 };
 
-function clamp999(n: number): number {
-  return Math.max(0, Math.min(999, Math.round(n)));
-}
-
-export function buildDecomposePrompt(
-  bboxes: Array<[number, number, number, number]>,
-): string {
-  if (bboxes.length === 0) return AUTO_DECOMPOSE_PROMPT;
-  const tags = bboxes
-    .map(
-      (b) =>
-        `<bbox>${clamp999(b[0])} ${clamp999(b[1])} ${clamp999(b[2])} ${clamp999(b[3])}</bbox>`,
-    )
-    .join("、");
-  return `将图片进行精确图层分离，需分离的区域坐标为 ${tags}。`;
-}
-
-export function buildEditPrompt(
-  bbox: [number, number, number, number],
-  userText: string,
-): string {
-  const text = userText.trim();
-  const tag = `<bbox>${clamp999(bbox[0])} ${clamp999(bbox[1])} ${clamp999(bbox[2])} ${clamp999(bbox[3])}</bbox>`;
-  return `把图 1 ${tag} 区域${text}`;
-}
-
-function parseDataUrl(dataUrl: string): { buf: Buffer; contentType: string; ext: string } {
-  const m = /^data:([^;]+);base64,([\s\S]+)$/.exec(dataUrl.trim());
-  if (!m) throw new Error("无效的图片 data URL");
-  const contentType = m[1] || "image/png";
-  const buf = Buffer.from(m[2], "base64");
-  const ext = contentType.includes("jpeg")
-    ? "jpg"
-    : contentType.includes("webp")
-      ? "webp"
-      : "png";
-  return { buf, contentType, ext };
-}
-
 function tryParseManagedOssObjectKey(url: string): string | null {
   const cfg = readOssEnv();
   if ("error" in cfg) return null;
@@ -88,29 +57,6 @@ function tryParseManagedOssObjectKey(url: string): string | null {
     return null;
   }
   return null;
-}
-
-async function isVendorFetchableHttpUrl(url: string): Promise<boolean> {
-  try {
-    const r = await fetch(url, {
-      method: "HEAD",
-      signal: AbortSignal.timeout(12_000),
-      redirect: "follow",
-    });
-    if (r.ok) return true;
-    if (r.status === 405) {
-      const getRes = await fetch(url, {
-        method: "GET",
-        signal: AbortSignal.timeout(20_000),
-        redirect: "follow",
-        headers: { Range: "bytes=0-0" },
-      });
-      return getRes.ok || getRes.status === 206;
-    }
-    return false;
-  } catch {
-    return false;
-  }
 }
 
 async function rehostImageForVendor(userId: string, url: string): Promise<string> {
@@ -148,19 +94,6 @@ async function rehostImageForVendor(userId: string, url: string): Promise<string
       ? "webp"
       : "png";
   return uploadCanvasUserBuffer({ userId, ext, buf, contentType });
-}
-
-async function ensurePublicImageUrl(userId: string, image: string): Promise<string> {
-  const trimmed = image.trim();
-  if (trimmed.startsWith("data:")) {
-    const { buf, contentType, ext } = parseDataUrl(trimmed);
-    return uploadCanvasUserBuffer({ userId, ext, buf, contentType });
-  }
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-    if (await isVendorFetchableHttpUrl(trimmed)) return trimmed;
-    return rehostImageForVendor(userId, trimmed);
-  }
-  throw new Error("不支持的图片格式");
 }
 
 async function persistVendorImage(
@@ -308,50 +241,129 @@ export async function decomposeImageLayer(opts: {
   size?: string;
 }): Promise<ImageLayerStack> {
   await assertEcomToolkitGatewayAccess(opts.userId);
-  const publicUrl = await ensurePublicImageUrl(opts.userId, opts.sourceImageUrl);
+  if (opts.bboxes && opts.bboxes.length > ECOM_IMAGE_LAYER_MAX_BBOXES) {
+    throw new Error(`最多 ${ECOM_IMAGE_LAYER_MAX_BBOXES} 个拆分框`);
+  }
+  if (opts.bboxes?.length) {
+    validateDecomposeBboxes(opts.bboxes);
+  }
+  let publicUrl: string;
+  try {
+    publicUrl = await ensureSeedreamLayerDecomposeImageUrl({
+      userId: opts.userId,
+      imageUrl: opts.sourceImageUrl,
+    });
+  } catch (e) {
+    throw new Error(e instanceof Error ? e.message : "原图预处理失败");
+  }
   const prompt = buildDecomposePrompt(opts.bboxes ?? []);
   const size = opts.size?.trim() || "auto";
 
-  const { layers, logId } = await callSeedreamLayerGenerations({
-    userId: opts.userId,
-    prompt,
-    image: publicUrl,
-    size,
-    outputFormat: "jpeg",
-    clientPage: "ecom/image-layer/decompose",
-  });
+  let layers: SeedreamLayerItem[];
+  let logId: string;
+  try {
+    const result = await callSeedreamLayerGenerations({
+      userId: opts.userId,
+      prompt,
+      image: publicUrl,
+      size,
+      outputFormat: "jpeg",
+      clientPage: "ecom/image-layer/decompose",
+    });
+    layers = result.layers;
+    logId = result.logId;
+  } catch (e) {
+    const raw = e instanceof Error ? e.message : "图层拆分失败";
+    throw new Error(
+      mapSeedreamLayerDecomposeError(raw, { bboxCount: opts.bboxes?.length ?? 0 }),
+    );
+  }
 
   const persisted = await persistLayerStack(opts.userId, layers);
   return buildStackFromLayers(persisted, logId, publicUrl);
 }
 
-export async function editImageLayerRegion(opts: {
-  userId: string;
-  compositeImageUrl: string;
+export type ImageLayerEditJob = {
   bbox: [number, number, number, number];
   prompt: string;
-  /** 策略 A：编辑后自动重拆 */
+};
+
+/**
+ * 批量改层：一次交互编辑（多 bbox prompt）→ 一次重拆（优先沿用原框坐标）。
+ */
+export async function editImageLayerRegions(opts: {
+  userId: string;
+  compositeImageUrl: string;
+  edits: ImageLayerEditJob[];
+  /** 重拆时沿用的框选坐标（与初次拆分一致时成功率更高） */
+  redecomposeBboxes?: Array<[number, number, number, number]>;
   size?: string;
 }): Promise<ImageLayerStack> {
   await assertEcomToolkitGatewayAccess(opts.userId);
-  const publicUrl = await ensurePublicImageUrl(opts.userId, opts.compositeImageUrl);
-  const editPrompt = buildEditPrompt(opts.bbox, opts.prompt);
+  if (opts.edits.length === 0) {
+    throw new Error("缺少编辑区域");
+  }
+  if (opts.edits.length > ECOM_IMAGE_LAYER_MAX_BBOXES) {
+    throw new Error(`最多 ${ECOM_IMAGE_LAYER_MAX_BBOXES} 个改层区域`);
+  }
+
+  let publicUrl: string;
+  try {
+    publicUrl = await ensureSeedreamLayerDecomposeImageUrl({
+      userId: opts.userId,
+      imageUrl: opts.compositeImageUrl,
+    });
+  } catch (e) {
+    throw new Error(e instanceof Error ? e.message : "改层底图预处理失败");
+  }
+
+  const editPrompt = buildBatchEditPrompt(opts.edits);
 
   const { images, logId: editLogId } = await ecomGwVolcengineImageEdit(opts.userId, {
     model: ECOM_IMAGE_LAYER_MODEL,
     prompt: editPrompt,
     image: publicUrl,
-    parameters: { size: "2K", output_format: "png" },
+    parameters: { size: "auto", output_format: "png" },
     clientPage: "ecom/image-layer/edit",
   });
 
   const editedUrl = await persistVendorImage(opts.userId, images[0] ?? {}, "png");
 
-  const stack = await decomposeImageLayer({
-    userId: opts.userId,
-    sourceImageUrl: editedUrl,
-    size: opts.size?.trim() || "auto",
-  });
+  let stack: ImageLayerStack;
+  try {
+    stack = await decomposeImageLayer({
+      userId: opts.userId,
+      sourceImageUrl: editedUrl,
+      bboxes: opts.redecomposeBboxes,
+      size: opts.size?.trim() || "auto",
+    });
+  } catch (e) {
+    const raw = e instanceof Error ? e.message : "图层重拆失败";
+    throw new Error(
+      mapSeedreamLayerDecomposeError(raw, {
+        bboxCount: opts.redecomposeBboxes?.length ?? 0,
+        afterEdit: true,
+      }),
+    );
+  }
 
   return { ...stack, logId: editLogId || stack.logId };
+}
+
+/** @deprecated 请用 editImageLayerRegions；保留单区域签名供兼容 */
+export async function editImageLayerRegion(opts: {
+  userId: string;
+  compositeImageUrl: string;
+  bbox: [number, number, number, number];
+  prompt: string;
+  redecomposeBboxes?: Array<[number, number, number, number]>;
+  size?: string;
+}): Promise<ImageLayerStack> {
+  return editImageLayerRegions({
+    userId: opts.userId,
+    compositeImageUrl: opts.compositeImageUrl,
+    edits: [{ bbox: opts.bbox, prompt: opts.prompt }],
+    redecomposeBboxes: opts.redecomposeBboxes,
+    size: opts.size,
+  });
 }

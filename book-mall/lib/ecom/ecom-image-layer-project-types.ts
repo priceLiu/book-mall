@@ -41,6 +41,7 @@ export const imageLayerWorkspaceSchema = z.object({
   sourceImageUrl: z.string().nullable().optional(),
   stack: stackSchema.nullable().optional(),
   pendingBbox: bboxSchema.nullable().optional(),
+  pendingBboxes: z.array(bboxSchema).max(16).optional(),
   canvasDims: z.object({ w: z.number(), h: z.number() }).optional(),
   displayDims: z.object({ w: z.number(), h: z.number() }).optional(),
   selectedLayerId: z.string().nullable().optional(),
@@ -74,7 +75,13 @@ export type ImageLayerProjectDto = {
 
 export function sanitizeImageLayerWorkspace(raw: unknown): ImageLayerWorkspace {
   const parsed = imageLayerWorkspaceSchema.safeParse(raw ?? {});
-  if (parsed.success) return parsed.data;
+  if (parsed.success) {
+    const ws = parsed.data;
+    if (!ws.pendingBboxes?.length && ws.pendingBbox) {
+      return { ...ws, pendingBboxes: [ws.pendingBbox] };
+    }
+    return ws;
+  }
   return {};
 }
 

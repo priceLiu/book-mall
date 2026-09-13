@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { buildDecomposePrompt, decomposeImageLayer } from "@/lib/ecom/ecom-image-layer-service";
+import { buildDecomposePrompt } from "@/lib/ecom/ecom-image-layer-prompt";
+import {
+  decomposeImageLayer,
+  ECOM_IMAGE_LAYER_MAX_BBOXES,
+} from "@/lib/ecom/ecom-image-layer-service";
 import {
   appendEcomImageLayerGeneration,
   saveEcomImageLayerWorkspace,
@@ -42,6 +46,12 @@ export async function POST(req: Request) {
 
   const size = typeof body.size === "string" ? body.size.trim() : undefined;
   const bboxes = parseBboxes(body.bboxes);
+  if (bboxes && bboxes.length > ECOM_IMAGE_LAYER_MAX_BBOXES) {
+    return NextResponse.json(
+      { error: `最多 ${ECOM_IMAGE_LAYER_MAX_BBOXES} 个拆分框` },
+      { status: 400 },
+    );
+  }
   const projectId =
     typeof body.projectId === "string" && body.projectId.trim()
       ? body.projectId.trim()
@@ -60,7 +70,8 @@ export async function POST(req: Request) {
         projectId,
         workspaceFromStack(stack, {
           sourceImageUrl: stack.sourceImageUrl ?? sourceImageUrl,
-          pendingBbox: bboxes?.[0] ?? null,
+          pendingBboxes: [],
+          pendingBbox: null,
         }),
       );
       const previewUrl = stack.background.url;

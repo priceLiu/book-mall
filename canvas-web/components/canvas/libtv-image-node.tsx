@@ -9,6 +9,10 @@ import { AlertTriangle, GripVertical, ImageIcon } from "lucide-react";
 import { CanvasSaveToPoseLibraryButton } from "@/components/admin/canvas-save-to-pose-library-button";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import {
+  GENERATION_CANCEL_CONFIRM_MESSAGE,
+  GENERATION_CANCEL_CONFIRM_TITLE,
+} from "@/lib/canvas/canvas-generation-cancel-messages";
 import { confirmOpenTopupCheckout } from "@/lib/platform-billing/open-topup-checkout";
 import { scheduleCanvasImageUpload } from "@/lib/canvas/canvas-image-preview-upload";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -604,6 +608,21 @@ export function LibtvImageNode({
     clearLibtvExpandSession(id, setNodes, rfSetNodes);
   }, [id, rfSetNodes, setNodes]);
 
+  const onStopMagicEdit = useCallback(async () => {
+    if (
+      !(await confirm({
+        title: GENERATION_CANCEL_CONFIRM_TITLE,
+        message: GENERATION_CANCEL_CONFIRM_MESSAGE,
+      }))
+    ) {
+      return;
+    }
+    updateNodeData(id, {
+      libtvMagicEditGenerating: false,
+      libtvInpaintGenerating: false,
+    });
+  }, [confirm, id, updateNodeData]);
+
   const onConfirmExpand = useCallback(() => {
     const sourceUrl = d.ossUrl ?? d.blobUrl ?? "";
     if (!sourceUrl) return;
@@ -1138,7 +1157,7 @@ export function LibtvImageNode({
             imageUrl={previewUrl}
             tool={session?.tool ?? (eraseActive ? "brush" : "rect")}
             brushSize={session?.brushSize ?? 24}
-            selectionMode={eraseActive ? "mask" : inpaintSelectionMode}
+            selectionMode={inpaintSelectionMode}
           />
         );
       }
@@ -1408,6 +1427,8 @@ export function LibtvImageNode({
               }
               onClose={closeExpandSession}
               onSubmit={onConfirmExpand}
+              stopNodeId={id}
+              onStop={onStopMagicEdit}
             />
           </LibtvMagicEditFrameDockPortal>
         ) : null}

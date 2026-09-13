@@ -45,10 +45,15 @@ export async function decomposeImageLayers(opts: {
   return stack;
 }
 
-export async function editImageLayer(opts: {
-  compositeImageUrl: string;
+export type ImageLayerEditInput = {
   bbox: [number, number, number, number];
   prompt: string;
+};
+
+export async function editImageLayer(opts: {
+  compositeImageUrl: string;
+  edits: ImageLayerEditInput[];
+  redecomposeBboxes?: Array<[number, number, number, number]>;
   size?: string;
   projectId?: string;
 }): Promise<ImageLayerStack> {
@@ -116,4 +121,22 @@ export async function updateImageLayerProject(
 
 export async function deleteImageLayerProject(id: string): Promise<void> {
   await ecomBookFetch(`${BASE}/projects/${id}`, { method: "DELETE" });
+}
+
+export async function eraseImageLayerRegion(opts: {
+  sourceImageUrl: string;
+  maskDataUrl: string;
+  projectId?: string;
+}): Promise<{ imageUrl: string; logId?: string }> {
+  const data = await ecomBookFetch(`${BASE}/erase`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts),
+  });
+  const imageUrl = typeof data.imageUrl === "string" ? data.imageUrl : "";
+  if (!imageUrl) throw new Error("擦除未返回有效图像");
+  return {
+    imageUrl,
+    logId: typeof data.logId === "string" ? data.logId : undefined,
+  };
 }

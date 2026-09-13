@@ -44,6 +44,7 @@ import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
 import { cn } from "@/lib/utils";
 import { LibtvDockSendButton } from "../libtv-dock-send-button";
+import { useLibtvDockGenerationStop } from "@/lib/canvas/use-libtv-dock-generation-stop";
 import { LibtvDockCreditsLabel } from "../libtv-dock-credits-label";
 import {
   Sbv1ImageDockModelPicker,
@@ -363,6 +364,21 @@ export function Pro2ThreeViewInputDock() {
   const styleRef = d.dockStyleRef;
   const canRegenerate = Boolean(dockInput.trim() && hasImageModel);
 
+  const onStopGeneration = useLibtvDockGenerationStop(
+    controllerId ?? storeNode?.id,
+    controllerId && d.pro2RowKey
+      ? {
+          rowKey: d.pro2RowKey,
+          mediaKind: "threeView",
+          ...(settingsData.runtime?.taskId?.trim()
+            ? { taskId: settingsData.runtime.taskId.trim() }
+            : {}),
+        }
+      : settingsData.runtime?.taskId?.trim()
+        ? { taskId: settingsData.runtime.taskId.trim() }
+        : undefined,
+  );
+
   return (
     <>
       <Pro2InputDockShell
@@ -402,10 +418,12 @@ export function Pro2ThreeViewInputDock() {
             settingsData={settingsData}
             isRunning={isRunning}
             canRegenerate={canRegenerate}
+            hasContent={Boolean(dockInput.trim())}
             dockMenu={dockMenu}
             onDockMenuChange={setDockMenu}
             onConfirmSettings={onConfirmSettings}
             onRegenerate={onRegenerate}
+            onStop={onStopGeneration}
           />
         }
       >
@@ -436,18 +454,22 @@ function Pro2ThreeViewDockFooter({
   settingsData,
   isRunning,
   canRegenerate,
+  hasContent,
   dockMenu,
   onDockMenuChange,
   onConfirmSettings,
   onRegenerate,
+  onStop,
 }: {
   settingsData: Sbv1ImageNodeData;
   isRunning: boolean;
   canRegenerate: boolean;
+  hasContent: boolean;
   dockMenu: "model" | "params" | null;
   onDockMenuChange: (menu: "model" | "params" | null) => void;
   onConfirmSettings: (patch: Partial<Sbv1ImageNodeData>) => void;
   onRegenerate: () => void;
+  onStop: () => void;
 }) {
   const modelKey = settingsData.engine?.modelKey?.trim() ?? "";
   const resolution = String(settingsData.resolution ?? "2K");
@@ -476,10 +498,12 @@ function Pro2ThreeViewDockFooter({
       <LibtvDockSendButton
         disabled={!canRegenerate}
         loading={isRunning}
+        hasContent={hasContent}
         title={
           canRegenerate ? "重新生成三视图" : "请先选择生图模型并填写提示词"
         }
         onClick={onRegenerate}
+        onStop={onStop}
       />
     </Pro2DockToolbar>
   );

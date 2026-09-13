@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useMemo, useRef } from "react";
-import { ArrowUp, Loader2 } from "lucide-react";
 import {
   VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
 } from "@/lib/canvas/libtv-dock-scale";
@@ -15,7 +14,8 @@ import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import type { MentionsTextareaCommitHandle } from "@/components/canvas/mentions/MentionsTextarea";
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
-import { LIBTV_INPUT_DOCK_SEND_BTN_CLASS } from "@/lib/canvas/libtv-node-chrome";
+import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
+import { useLibtvDockGenerationStop } from "@/lib/canvas/use-libtv-dock-generation-stop";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
@@ -87,6 +87,7 @@ function Pro2PromptInputDockBody({
   const d = (storeNode?.data ?? {}) as StoryPro2PromptNodeData;
   const prompt = d.prompt ?? "";
   const isGenerating = isPro2StarterTextGenerating(d);
+  const onStopGeneration = useLibtvDockGenerationStop(dockNodeId);
 
   const readLivePrompt = useCallback((nodeId: string) => {
     promptCommitRef.current?.flushDraft();
@@ -293,23 +294,16 @@ function Pro2PromptInputDockBody({
             className="flex shrink-0 items-center gap-1"
             style={{ fontSize: dockTextFontPx }}
           >
-            <button
-              type="button"
+            <LibtvDockSendButton
               disabled={isGenerating || !canSend}
-              className={cn(LIBTV_INPUT_DOCK_SEND_BTN_CLASS)}
-              style={{ width: sendBtnPx, height: sendBtnPx }}
+              loading={isGenerating}
+              hasContent={
+                Boolean(prompt.trim()) || (d.dockRefImages ?? []).length > 0
+              }
               title="生成"
               onClick={() => void onSend()}
-            >
-              {isGenerating ? (
-                <Loader2
-                  className="animate-spin"
-                  style={{ width: sendIconPx, height: sendIconPx }}
-                />
-              ) : (
-                <ArrowUp style={{ width: sendIconPx, height: sendIconPx }} />
-              )}
-            </button>
+              onStop={onStopGeneration}
+            />
           </div>
         </Pro2DockToolbar>
       }

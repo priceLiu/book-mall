@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { RefreshCw, Square } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { libtvMediaLooksGenerating } from "@/lib/canvas/canvas-task-generating-state";
 import {
   LIBTV_MEDIA_GENERATING_CYAN_CLASS,
@@ -10,7 +10,6 @@ import {
 import { CANVAS_SEMANTIC_STATUS_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import { storyEditionSpinClass } from "@/lib/canvas/story-edition-chrome";
 import type { CanvasCancelGenerationJob } from "@/lib/canvas/canvas-run-bus";
-import { useCanvasGenerationCancel } from "@/lib/canvas/use-canvas-generation-cancel";
 import { cn } from "@/lib/utils";
 
 /** LibTV 媒体节点是否处于生图/生视频/上传进行中 */
@@ -39,9 +38,9 @@ export function LibtvMediaGeneratingState({
   tone = "active",
   className,
   children,
-  cancelNodeId,
-  cancelScope,
-  onCancel,
+  cancelNodeId: _cancelNodeId,
+  cancelScope: _cancelScope,
+  onCancel: _onCancel,
   passNodeDrag = false,
 }: {
   /** 留空则仅显示扫光 + 旋转图标，不渲染文字（避免「排队中…」等影响心情的提示） */
@@ -53,19 +52,13 @@ export function LibtvMediaGeneratingState({
   className?: string;
   /** 可选：上传中半透明底图等 */
   children?: ReactNode;
-  /** 传入则显示右上角中止钮（无文案，避免挤偏中央加载态） */
+  /** @deprecated 中止改由 Dock 生成钮（黑色停止方块）；保留 props 兼容旧调用 */
   cancelNodeId?: string;
   cancelScope?: LibtvMediaGeneratingCancelScope;
   onCancel?: () => void;
-  /** 画布节点：遮罩不挡整卡拖动，仅中止钮可点 */
+  /** 画布节点：遮罩不挡整卡拖动 */
   passNodeDrag?: boolean;
 }) {
-  const { requestCancel } = useCanvasGenerationCancel(
-    cancelNodeId ?? "",
-    cancelScope,
-  );
-  const showCancel = Boolean(onCancel || cancelNodeId?.trim());
-
   const shimmerClass =
     variant === "violet"
       ? LIBTV_MEDIA_GENERATING_VIOLET_CLASS
@@ -77,16 +70,6 @@ export function LibtvMediaGeneratingState({
       ? "border-violet-400/45 bg-black/55 text-violet-200"
       : "border-cyan-400/45 bg-black/55 text-cyan-200";
   const labelClass = `text-[11px] font-medium ${CANVAS_SEMANTIC_STATUS_CLASS}`;
-
-  const handleCancel = () => {
-    if (onCancel) {
-      void onCancel();
-      return;
-    }
-    if (cancelNodeId?.trim()) {
-      void requestCancel();
-    }
-  };
 
   return (
     <div className={cn("absolute inset-0", className)}>
@@ -117,28 +100,6 @@ export function LibtvMediaGeneratingState({
               </span>
             ) : null}
           </div>
-          {showCancel ? (
-            <button
-              type="button"
-              className={cn(
-                "nodrag absolute right-2 top-2 flex size-7 items-center justify-center rounded-full border bg-[var(--canvas-bg)] shadow-sm transition",
-                passNodeDrag && "pointer-events-auto",
-                variant === "violet"
-                  ? "border-violet-400/35 text-violet-100 hover:border-violet-400/50 hover:text-violet-50"
-                  : "border-cyan-400/35 text-cyan-100 hover:border-cyan-400/50 hover:text-cyan-50",
-                tone === "background" && "opacity-90",
-              )}
-              aria-label="中止生成"
-              title="中止生成"
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleCancel();
-              }}
-            >
-              <Square className="size-3 fill-current" aria-hidden />
-            </button>
-          ) : null}
         </div>
       </div>
     </div>

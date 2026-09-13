@@ -1,55 +1,88 @@
 "use client";
 
-import { ArrowUp, Loader2 } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import { flushCanvasTextDrafts } from "@/lib/canvas/flush-text-drafts";
-import { LIBTV_INPUT_DOCK_SEND_BTN_CLASS } from "@/lib/canvas/libtv-node-chrome";
+import {
+  LIBTV_DOCK_SEND_ARROW_STROKE,
+  libtvDockSendButtonClass,
+  libtvDockSendButtonStyle,
+} from "@/lib/canvas/libtv-node-chrome";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import { cn } from "@/lib/utils";
 
-/** Dock 底栏 · 发送/生成钮（emerald 正圆 · 与画布磁吸 Dock 上传图标同色） */
+/** Dock 底栏 · 发送/生成钮（空=白 · 有内容=绿 · 生成中=琥珀+停止方块） */
 export function LibtvDockSendButton({
   disabled,
   loading,
+  hasContent = false,
   title,
+  stopTitle = "中止生成",
   onClick,
+  onStop,
   className,
+  sizePx,
+  iconPx,
 }: {
   disabled?: boolean;
   loading?: boolean;
+  hasContent?: boolean;
   title: string;
+  stopTitle?: string;
   onClick: () => void;
+  /** 生成中点击 · 中止（替代节点右上角 X） */
+  onStop?: () => void;
   className?: string;
+  sizePx?: number;
+  iconPx?: number;
 }) {
   const { sendBtnPx, sendIconPx } = useLibtvDockToolbarMetrics();
-  const faded = Boolean(disabled || loading);
+  const btnPx = sizePx ?? sendBtnPx;
+  const arrowPx = iconPx ?? sendIconPx;
+  const btnColors = libtvDockSendButtonStyle({ loading, hasContent });
+  const stoppable = Boolean(loading && onStop);
+  const displayTitle = stoppable ? stopTitle : title;
 
   const activate = () => {
-    if (loading || disabled) return;
+    if (loading) {
+      if (onStop) onStop();
+      return;
+    }
+    if (disabled) return;
     flushCanvasTextDrafts();
     onClick();
   };
 
+  /** 停止方块 · 相对圆形钮直径约 38%（与箭头视觉重量接近） */
+  const stopSquarePx = Math.max(12, Math.round(btnPx * 0.38));
+
   return (
-    // 外层负边距扩大可点区域
     <span className="relative -m-2 inline-flex shrink-0 p-2">
       <button
         type="button"
-        aria-disabled={faded}
-        title={title}
+        aria-disabled={!stoppable && (disabled || loading)}
+        title={displayTitle}
         data-libtv-dock-interactive=""
         className={cn(
-          LIBTV_INPUT_DOCK_SEND_BTN_CLASS,
-          "relative z-10 touch-manipulation",
-          faded && "opacity-40",
-          loading ? "cursor-wait" : disabled ? "cursor-not-allowed" : "",
+          libtvDockSendButtonClass({
+            loading,
+            hasContent,
+            disabled: !stoppable && disabled,
+          }),
+          "relative z-10",
+          stoppable && "cursor-pointer",
           "before:absolute before:-inset-3 before:rounded-full before:content-['']",
           className,
         )}
-        style={{ width: sendBtnPx, height: sendBtnPx }}
+        style={{
+          width: btnPx,
+          height: btnPx,
+          backgroundColor: btnColors.backgroundColor,
+          color: btnColors.color,
+        }}
         onMouseDown={(e) => {
           if (e.button !== 0) return;
           e.stopPropagation();
-          // 须在 blur 提交前 flush；勿 preventDefault，否则配合 Dock footer capture 会吞掉 click
+          if (stoppable) return;
           if (!loading && !disabled) flushCanvasTextDrafts();
         }}
         onClick={(e) => {
@@ -58,12 +91,16 @@ export function LibtvDockSendButton({
         }}
       >
         {loading ? (
-          <Loader2
-            className="animate-spin"
-            style={{ width: sendIconPx, height: sendIconPx }}
+          <span
+            className="block shrink-0 rounded-[3px] bg-black"
+            style={{ width: stopSquarePx, height: stopSquarePx }}
+            aria-hidden
           />
         ) : (
-          <ArrowUp style={{ width: sendIconPx, height: sendIconPx }} />
+          <ArrowUp
+            strokeWidth={LIBTV_DOCK_SEND_ARROW_STROKE}
+            style={{ width: arrowPx, height: arrowPx }}
+          />
         )}
       </button>
     </span>

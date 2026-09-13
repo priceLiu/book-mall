@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { ArrowUp, Loader2, MapPin, Upload } from "lucide-react";
+import { MapPin, Upload } from "lucide-react";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
-import { LIBTV_INPUT_DOCK_SEND_BTN_CLASS } from "@/lib/canvas/libtv-node-chrome";
+import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
+import { useLibtvDockGenerationStop } from "@/lib/canvas/use-libtv-dock-generation-stop";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import {
   resolvePro2DockUpstreamLinks,
@@ -111,6 +112,8 @@ export function Sbv1ImageNodeEmbeddedDock({
     window.dispatchEvent(new CustomEvent("canvas:open-pro2-style-library"));
   }, [nodeId, setPro2StyleLibImageNodeId]);
 
+  const onStopGeneration = useLibtvDockGenerationStop(nodeId);
+
   if (!storeNode) return null;
 
   const styleRef = d.dockStyleRef;
@@ -200,18 +203,16 @@ export function Sbv1ImageNodeEmbeddedDock({
       footer={
         <Pro2DockToolbar>
           <div className="min-w-0 flex-1" />
-          <button
-            type="button"
+          <LibtvDockSendButton
             disabled
-            className={cn(LIBTV_INPUT_DOCK_SEND_BTN_CLASS, "size-8")}
+            loading={isRunning}
+            hasContent={Boolean(dockInput.trim())}
+            sizePx={32}
+            iconPx={16}
             title="发送（即将推出）"
-          >
-            {isRunning ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <ArrowUp className="size-3.5" />
-            )}
-          </button>
+            onClick={() => {}}
+            onStop={onStopGeneration}
+          />
         </Pro2DockToolbar>
       }
     >

@@ -22,6 +22,15 @@ describe("image-layer-coords", () => {
     expect(buildDecomposePrompt([])).toContain("完整图层语义分离");
   });
 
+  it("buildDecomposePrompt multi bbox", () => {
+    const prompt = buildDecomposePrompt([
+      [10, 20, 90, 80],
+      [100, 100, 200, 200],
+    ]);
+    expect(prompt).toContain("区域1<bbox>10 20 90 80</bbox>");
+    expect(prompt).toContain("区域2<bbox>100 100 200 200</bbox>");
+  });
+
   it("buildEditPrompt", () => {
     expect(buildEditPrompt([1, 2, 3, 4], "改成红色")).toContain("<bbox>1 2 3 4</bbox>");
     expect(buildEditPrompt([1, 2, 3, 4], "改成红色")).toContain("改成红色");

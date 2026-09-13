@@ -25,6 +25,7 @@ import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
 import { LibtvDockSendButton } from "./libtv-dock-send-button";
+import { useLibtvDockGenerationStop } from "@/lib/canvas/use-libtv-dock-generation-stop";
 import { LibtvDockCreditsLabel } from "./libtv-dock-credits-label";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import {
@@ -105,6 +106,7 @@ export function LibtvAudioInputDock() {
   const voiceLabel = String(engine.params?.voice_label ?? "");
   const dockInput = String(d.dockInput ?? "");
   const isRunning = isLibtvMediaGenerating(d);
+  const onStopGeneration = useLibtvDockGenerationStop(storeNode?.id);
 
   const voicePreviewContext = useMemo((): LibtvTtsPreviewContext | undefined => {
     const modelKey = engine.modelKey?.trim();
@@ -494,8 +496,10 @@ export function LibtvAudioInputDock() {
           <LibtvDockSendButton
             disabled={!canSend}
             loading={isRunning}
+            hasContent={effectiveText.length > 0}
             title={isRunning ? "生成中" : "生成音频"}
             onClick={() => void onRun()}
+            onStop={onStopGeneration}
           />
         </Pro2DockToolbar>
       }

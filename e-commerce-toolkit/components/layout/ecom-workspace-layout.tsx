@@ -10,6 +10,8 @@ type Props = {
   assistant?: React.ReactNode;
   /** 助手栏顶部（标题、参考图等） */
   assistantHeader?: React.ReactNode;
+  /** 助手栏底部固定区（生成按钮等，与内容区 sibling，避免被滚动裁切） */
+  assistantFooter?: React.ReactNode;
   /** 主内容与助手之间的进度轨 */
   progress?: React.ReactNode;
   /** 左侧主内容（结果、画布、资产列表等） */
@@ -32,6 +34,7 @@ type Props = {
 export function EcomWorkspaceLayout({
   assistant,
   assistantHeader,
+  assistantFooter,
   progress,
   children,
   contentClassName,
@@ -68,14 +71,12 @@ export function EcomWorkspaceLayout({
       {hasAssistant ? (
         <aside
           className={cn(
-            "flex shrink-0 flex-col overflow-hidden border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] md:h-full md:border-l md:border-t-0",
+            "flex min-h-0 flex-col overflow-hidden border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] max-md:max-h-[min(52dvh,520px)] max-md:min-h-[240px] max-md:shrink-0 md:min-h-0 md:w-[380px] md:min-w-[380px] md:max-w-[380px] md:self-stretch md:border-l md:border-t-0",
             assistantCollapsed
               ? "hidden"
               : cn(
                   "w-full",
-                  assistantWide
-                    ? "md:w-1/2 md:min-w-0 md:max-w-[50%]"
-                    : "md:w-[380px] md:min-w-[380px] md:max-w-[380px]",
+                  assistantWide && "md:w-1/2 md:min-w-0 md:max-w-[50%]",
                 ),
           )}
           data-ecom-assistant-root
@@ -86,7 +87,14 @@ export function EcomWorkspaceLayout({
             </div>
           ) : null}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            {assistant}
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              {assistant}
+            </div>
+            {assistantFooter ? (
+              <div className="shrink-0" data-ecom-assistant-bottom-dock>
+                {assistantFooter}
+              </div>
+            ) : null}
           </div>
         </aside>
       ) : null}

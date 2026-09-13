@@ -33,6 +33,7 @@ import {
 import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
 import { LibtvDockCreditsLabel } from "@/components/canvas/libtv-dock-credits-label";
 import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
+import { useLibtvDockGenerationStop } from "@/lib/canvas/use-libtv-dock-generation-stop";
 import type { Sbv1UpstreamRefLink } from "@/lib/canvas/sbv1-upstream-ref-links";
 import { resolveSbv1UpstreamMotionVideoLinks } from "@/lib/canvas/sbv1-upstream-ref-links";
 import type { Sbv1UpstreamTextLink } from "@/lib/canvas/sbv1-upstream-text-links";
@@ -299,6 +300,8 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     : (hasPrompt || hasRefs || hasExistingVideo) &&
       !isGenerating &&
       Boolean(data.engine?.providerId && data.engine?.modelKey);
+
+  const onStopGeneration = useLibtvDockGenerationStop(nodeId);
 
   const runWithCommittedPrompt = useCallback(() => {
     promptCommitRef.current?.flushDraft();
@@ -574,12 +577,14 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
         <LibtvDockSendButton
           disabled={!canSend}
           loading={isGenerating}
+          hasContent={hasPrompt || hasRefs}
           title={
             isGenerating
               ? "生成中"
               : sendTitle ?? (isHdVideo ? "生成高清视频" : "生成视频")
           }
           onClick={runWithCommittedPrompt}
+          onStop={onStopGeneration}
         />
       </div>
     </Pro2DockToolbar>

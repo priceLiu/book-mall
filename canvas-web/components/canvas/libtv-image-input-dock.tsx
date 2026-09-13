@@ -43,6 +43,7 @@ import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import {
   isLibtvFreestandingImageNode,
   isLibtvPipelineImageCell,
+  isPro2PipelineThreeViewCell,
   isOrphanLibtvMediaInflight,
   optimisticLibtvMediaRunStart,
   revertOptimisticLibtvMediaRunStart,
@@ -69,9 +70,16 @@ import {
   clearLibtvEraseSession,
   isLibtvEraseSessionActive,
   LIBTV_ERASE_FIXED_DOCK_PROMPT,
+  patchLibtvEraseSession,
 } from "@/lib/canvas/libtv-erase-session";
 import { isLibtvExpandSessionActive } from "@/lib/canvas/libtv-expand-session";
 import { libtvDockFlowSize } from "@/lib/canvas/libtv-dock-scale";
+import { libtvDockHasUserInput } from "@/lib/canvas/libtv-node-chrome";
+import { useLibtvDockGenerationStop } from "@/lib/canvas/use-libtv-dock-generation-stop";
+import {
+  GENERATION_CANCEL_CONFIRM_MESSAGE,
+  GENERATION_CANCEL_CONFIRM_TITLE,
+} from "@/lib/canvas/canvas-generation-cancel-messages";
 import { isLibtvCropSessionActive } from "@/lib/canvas/libtv-crop-session";
 import { runLibtvInpaint } from "@/lib/canvas/libtv-inpaint-run";
 import { runLibtvExpand } from "@/lib/canvas/libtv-expand-run";
@@ -210,7 +218,7 @@ function LibtvImageInputDockBody({
   dockHidden: boolean;
 }) {
   const base = useBookMallBaseUrl();
-  const { alert } = useDialogs();
+  const { alert, confirm } = useDialogs();
   const { providers } = useUserProviders();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
@@ -290,6 +298,68 @@ function LibtvImageInputDockBody({
       isOrphanLibtvMediaInflight((storeNode.data ?? {}) as Sbv1ImageNodeData),
   );
   const freestandingBlocked = isRunning && !orphanInflight;
+
+  const imageGenerationStopScope = useMemo(() => {
+    const taskId = settingsData.runtime?.taskId?.trim();
+    if (isFramePipelineCell && pro2Data.pro2RowKey) {
+      return {
+        rowKey: pro2Data.pro2RowKey,
+        mediaKind: "frameImage" as const,
+        ...(taskId ? { taskId } : {}),
+      };
+    }
+    if (isPro2PipelineThreeViewCell(storeNode ?? undefined) && pro2Data.pro2RowKey) {
+      return {
+        rowKey: pro2Data.pro2RowKey,
+        mediaKind: "threeView" as const,
+        ...(taskId ? { taskId } : {}),
+      };
+    }
+    return taskId ? { taskId } : undefined;
+  }, [
+    settingsData.runtime?.taskId,
+    isFramePipelineCell,
+    pro2Data.pro2RowKey,
+    storeNode,
+  ]);
+
+  const imageGenerationStopNodeId =
+    (isFramePipelineCell || isPro2PipelineThreeViewCell(storeNode ?? undefined)) &&
+    pro2Data.pro2ControllerNodeId?.trim()
+      ? pro2Data.pro2ControllerNodeId.trim()
+      : dockNodeId;
+
+  const onStopCanvasGeneration = useLibtvDockGenerationStop(
+    imageGenerationStopNodeId,
+    imageGenerationStopScope,
+  );
+
+  const onStopGeneration = useCallback(async () => {
+    const latestData = useCanvasStore.getState().nodes.find((n) => n.id === dockNodeId)
+      ?.data as {
+      libtvMagicEditGenerating?: boolean;
+      libtvInpaintGenerating?: boolean;
+    } | undefined;
+    if (
+      latestData?.libtvMagicEditGenerating ||
+      latestData?.libtvInpaintGenerating
+    ) {
+      if (
+        !(await confirm({
+          title: GENERATION_CANCEL_CONFIRM_TITLE,
+          message: GENERATION_CANCEL_CONFIRM_MESSAGE,
+        }))
+      ) {
+        return;
+      }
+      updateNodeData(dockNodeId, {
+        libtvMagicEditGenerating: false,
+        libtvInpaintGenerating: false,
+      });
+      return;
+    }
+    onStopCanvasGeneration();
+  }, [confirm, dockNodeId, onStopCanvasGeneration, updateNodeData]);
 
   const isFrameFreestanding =
     pro2Data.pro2MediaRole === "frame" && !isPipelineCell;
@@ -563,10 +633,18 @@ function LibtvImageInputDockBody({
       }
       const selection =
         getInpaintCanvasHandle(storeNode.id)?.exportSelection() ?? null;
-      if (!selection) {
+      const eraseNeedsBbox = eraseModelKey === "wan2.7-image-pro";
+      if (
+        !selection ||
+        (eraseNeedsBbox &&
+          selection.kind !== "bbox" &&
+          selection.kind !== "multi-bbox")
+      ) {
         await alert({
           title: "请先框选区域",
-          message: "在图片上涂抹或框选需要擦除的区域后再生成。",
+          message: eraseNeedsBbox
+            ? "万相 2.7 Pro 擦除需使用框选工具划定区域后再生成。"
+            : "在图片上涂抹或框选需要擦除的区域后再生成。",
           variant: "warning",
         });
         return;
@@ -867,6 +945,20 @@ function LibtvImageInputDockBody({
           );
         }
       }
+      if (
+        isLibtvEraseSessionActive(
+          (storeNode.data ?? {}) as Record<string, unknown>,
+        )
+      ) {
+        const nextMk = normalizeModelKey(patch.engine?.modelKey);
+        if (nextMk === "wan2.7-image-pro") {
+          patchLibtvEraseSession(
+            storeNode.id,
+            { tool: "rect" },
+            setNodes,
+          );
+        }
+      }
       updateNodeData(storeNode.id, patch);
     },
     [
@@ -926,6 +1018,14 @@ function LibtvImageInputDockBody({
             Boolean(linkedStyle));
 
   const canSend = isPipelineCell ? canSendPipeline : canSendFreestanding;
+
+  const hasDockContent =
+    isEraseSession || isExpandSession
+      ? hasImage
+      : libtvDockHasUserInput({
+          prompt: livePrompt,
+          refImageCount: dockRefImages.length,
+        });
 
   const sendButtonTitle = isRunning
     ? "生成中"
@@ -1019,8 +1119,10 @@ function LibtvImageInputDockBody({
             onImagePatch={onImagePatch}
             estCredits={estCredits}
             canSend={canSend}
+            hasContent={hasDockContent}
             sendButtonTitle={sendButtonTitle}
             onRun={onRun}
+            onStop={onStopGeneration}
           />
         }
       >
@@ -1070,8 +1172,10 @@ function LibtvImageDockFooter({
   onImagePatch,
   estCredits,
   canSend,
+  hasContent,
   sendButtonTitle,
   onRun,
+  onStop,
 }: {
   isPipelineCell: boolean;
   isRunning: boolean;
@@ -1083,10 +1187,12 @@ function LibtvImageDockFooter({
   onImagePatch: (patch: Partial<Sbv1ImageNodeData>) => void;
   estCredits: ReturnType<typeof useModelCreditsPreview>;
   canSend: boolean;
+  hasContent: boolean;
   sendButtonTitle: string;
   onRun: () => void;
+  onStop: () => void;
 }) {
-  const { fontPx, sendIconPx } = useLibtvDockToolbarMetrics();
+  const { fontPx } = useLibtvDockToolbarMetrics();
 
   return (
     <Pro2DockToolbar className="gap-2">
@@ -1124,8 +1230,10 @@ function LibtvImageDockFooter({
         <LibtvDockSendButton
           disabled={!canSend}
           loading={isRunning}
+          hasContent={hasContent}
           title={sendButtonTitle}
           onClick={onRun}
+          onStop={onStop}
         />
       </div>
     </Pro2DockToolbar>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef } from "react";
-import { ArrowUp, Languages, Loader2 } from "lucide-react";
+import { Languages } from "lucide-react";
 import {
   VIDEO_DOCK_TOOLBAR_FONT_SCREEN_AT_100,
 } from "@/lib/canvas/libtv-dock-scale";
@@ -15,7 +15,8 @@ import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import type { MentionsTextareaCommitHandle } from "@/components/canvas/mentions/MentionsTextarea";
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
-import { LIBTV_INPUT_DOCK_SEND_BTN_CLASS } from "@/lib/canvas/libtv-node-chrome";
+import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
+import { useLibtvDockGenerationStop } from "@/lib/canvas/use-libtv-dock-generation-stop";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
@@ -113,6 +114,7 @@ function Pro2StarterInputDockBody({
   const isStoryOutlineMode = textPurpose === "story-outline";
   const themeInput = d.themeInput ?? "";
   const isGenerating = isPro2StarterTextGenerating(d);
+  const onStopGeneration = useLibtvDockGenerationStop(storeNode?.id);
   const outlineErrorMessage =
     isStoryOutlineMode && d.themeOutlineRuntime?.status === "error"
       ? formatCanvasTaskError(
@@ -466,26 +468,17 @@ function Pro2StarterInputDockBody({
                 modelKey={d.modelKey}
                 fontPx={dockTextFontPx}
               />
-              <button
-                type="button"
+              <LibtvDockSendButton
                 disabled={
                   isGenerating ||
                   (isStoryOutlineMode ? !themeInput.trim() : !canSendGeneral)
                 }
-                className={cn(LIBTV_INPUT_DOCK_SEND_BTN_CLASS)}
-                style={{ width: sendBtnPx, height: sendBtnPx }}
+                loading={isGenerating}
+                hasContent={Boolean(themeInput.trim())}
                 title={sendTitle}
                 onClick={() => void onSend()}
-              >
-                {isGenerating ? (
-                  <Loader2
-                    className="animate-spin"
-                    style={{ width: sendIconPx, height: sendIconPx }}
-                  />
-                ) : (
-                  <ArrowUp style={{ width: sendIconPx, height: sendIconPx }} />
-                )}
-              </button>
+                onStop={onStopGeneration}
+              />
             </div>
           </Pro2DockToolbar>
         </>

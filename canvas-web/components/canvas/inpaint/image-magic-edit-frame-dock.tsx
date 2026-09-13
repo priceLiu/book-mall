@@ -8,6 +8,7 @@ import type { LibtvExpandAspectRatio } from "@/lib/canvas/libtv-expand-session";
 import { LibtvDockCreditsLabel } from "@/components/canvas/libtv-dock-credits-label";
 import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
+import { useLibtvDockGenerationStop } from "@/lib/canvas/use-libtv-dock-generation-stop";
 import { SBV1_IMAGE_RESOLUTIONS } from "@/lib/canvas/sbv1-image-models";
 
 const EXPAND_ASPECT_OPTIONS: { value: LibtvExpandAspectRatio; label: string }[] =
@@ -122,6 +123,9 @@ type ExpandProps = {
   onOutputCountChange: (v: number) => void;
   onClose: () => void;
   onSubmit: () => void;
+  /** 中止扩图（标准任务 cancel + 本地 generating 标记） */
+  stopNodeId?: string;
+  onStop?: () => void;
 };
 
 export function ImageExpandFrameDock({
@@ -137,8 +141,12 @@ export function ImageExpandFrameDock({
   onOutputCountChange,
   onClose,
   onSubmit,
+  stopNodeId,
+  onStop,
 }: ExpandProps) {
   const { fontPx } = useLibtvDockToolbarMetrics();
+  const onStopGeneration = useLibtvDockGenerationStop(stopNodeId);
+  const handleStop = onStop ?? onStopGeneration;
   const aspectLabel =
     EXPAND_ASPECT_OPTIONS.find((o) => o.value === aspectRatio)?.label ?? "原图比例";
 
@@ -184,8 +192,10 @@ export function ImageExpandFrameDock({
         <LibtvDockSendButton
           disabled={!canSubmit}
           loading={running}
+          hasContent={Boolean(canSubmit)}
           title="扩图"
           onClick={onSubmit}
+          onStop={handleStop}
         />
       </div>
     </FrameDockShell>
