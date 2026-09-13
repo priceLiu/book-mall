@@ -60,6 +60,8 @@ type Props = {
   modelImageSize?: VtonModelImageSize;
 };
 
+const EMPTY_LOOK_IDS: string[] = [];
+
 function lookLabel(looks: VtonLookSpec[], lookId: string): string {
   const look = looks.find((l) => l.id === lookId);
   return look?.label ?? lookId.slice(0, 6);
@@ -122,7 +124,6 @@ function isTryonLookCellRunning(
 ): boolean {
   if (result?.status === "running") return true;
   if (runningLookIds.includes(lookId) && (!result || result.status === "pending")) return true;
-  if (batchRunning && result?.status === "running") return true;
   return false;
 }
 
@@ -286,10 +287,19 @@ export function VtonResultsGrid({
 }: Props) {
   const saveToCatalog = useSaveToCatalog();
   const modelImageSize = coerceVtonModelImageSize(modelImageSizeProp);
-  const runningLookIds = runningLookIdsProp ?? [];
-  const refiningResultIds = refiningResultIdsProp ?? [];
+  const runningLookIds = useMemo(
+    () => runningLookIdsProp ?? EMPTY_LOOK_IDS,
+    [runningLookIdsProp],
+  );
+  const refiningResultIds = useMemo(
+    () => refiningResultIdsProp ?? EMPTY_LOOK_IDS,
+    [refiningResultIdsProp],
+  );
   const results = useMemo(() => batch?.results ?? [], [batch?.results]);
-  const slotLooks = looks.slice(0, ECOM_VTON_MAX_BATCH_LOOKS);
+  const slotLooks = useMemo(
+    () => looks.slice(0, ECOM_VTON_MAX_BATCH_LOOKS),
+    [looks],
+  );
   const running = batch?.status === "running" || Boolean(tryonBusy);
   const visibleLooks = useMemo(() => {
     const ids = new Set<string>();

@@ -142,17 +142,11 @@ export function StoryScriptHubModal({
   const persistedMd = useMemo(() => {
     if (section === "outline") return data.outlineMd ?? "";
     return resolveHubSectionMd(data, section);
-  }, [
-    section,
-    data.outlineMd,
-    data.characterMd,
-    data.sceneMd,
-    data.storyboardMd,
-  ]);
+  }, [section, data]);
 
   const resolvedStoryboardMd = useMemo(
     () => resolveHubStoryboardMd(data),
-    [data.outlineMd, data.storyboardMd],
+    [data],
   );
 
   const dialogueLines = useMemo(

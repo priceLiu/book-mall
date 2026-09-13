@@ -268,10 +268,14 @@ export function ProductCreationStudio({ module }: StudioProps) {
       }
       return;
     }
+    const deliverableMarkdown =
+      typeof project?.meta?.deliverableMarkdown === "string"
+        ? project.meta.deliverableMarkdown.trim()
+        : "";
     const hasWork =
       Boolean(project?.references?.length) ||
       (project?.chatHistory?.length ?? 0) > 0 ||
-      Boolean(project?.meta?.deliverableMarkdown?.trim());
+      Boolean(deliverableMarkdown);
     const defaultName = project?.title?.trim() || entry.newTitle;
     await runEcomNewProjectWithSavePrompt({
       confirm,

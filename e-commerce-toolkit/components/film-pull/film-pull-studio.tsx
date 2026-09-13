@@ -205,9 +205,10 @@ function FilmPullStudioInner() {
     }
     if (!project) return;
     const hasWork =
-      Boolean(project.references?.video?.ossUrl) ||
+      Boolean(project.media?.ossUrl) ||
       Boolean(project.analyzeResult?.completedAt) ||
-      (project.chatHistory?.length ?? 0) > 0;
+      Boolean(project.renderScript?.completedAt) ||
+      (project.characterRefs?.length ?? 0) > 0;
     await runEcomNewProjectWithSavePrompt({
       confirm,
       hasWorkToSave: hasWork,

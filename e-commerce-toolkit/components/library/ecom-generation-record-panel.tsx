@@ -188,8 +188,10 @@ export function EcomGenerationRecordPanel() {
       <EcomImagePreviewHost preview={preview} galleryItems={previewItems} onClose={closePreview} />
       <EcomVideoPreviewDialog
         open={Boolean(videoPreviewUrl)}
-        url={videoPreviewUrl ?? ""}
-        onClose={() => setVideoPreviewUrl(null)}
+        src={videoPreviewUrl ?? ""}
+        onOpenChange={(open) => {
+          if (!open) setVideoPreviewUrl(null);
+        }}
       />
     </>
   );

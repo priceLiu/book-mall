@@ -670,7 +670,7 @@ export function JianyingMediaRenderActions({
             return;
           }
         }
-        if (job.status === "FAILED" || job.status === "CANCELLED") {
+        if (job.status === "FAILED") {
           clearResumeJobId();
           if (job.errorMessage?.trim()) {
             await showRenderError(friendlyMediaRenderError(job.errorMessage));

@@ -116,12 +116,14 @@ export function useCanvasDockBarPosition(
 ) {
   const legacyKeys = options?.legacyKeys ?? [];
   const legacyKeySig = legacyKeys.join("\0");
+  const legacyKeysRef = useRef(legacyKeys);
+  legacyKeysRef.current = legacyKeys;
   const [position, setPositionState] =
     useState<CanvasDockBarPosition>(DEFAULT_POSITION);
   const hydratedRef = useRef(false);
 
   useLayoutEffect(() => {
-    setPositionState(readStoredPosition(storageKey, legacyKeys));
+    setPositionState(readStoredPosition(storageKey, legacyKeysRef.current));
     hydratedRef.current = true;
   }, [storageKey, legacyKeySig]);
 

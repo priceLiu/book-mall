@@ -298,7 +298,7 @@ export function SeedVideoStudio() {
     const hasWork =
       (project.references?.length ?? 0) > 0 ||
       (project.chatHistory?.length ?? 0) > 0 ||
-      Boolean(readStoryboardDraftFromMeta(project.meta)?.rows?.length);
+      readStoryboardDraftFromMeta(project.meta).length > 0;
     const defaultName = project.title?.trim() || "种草视频";
     await runEcomNewProjectWithSavePrompt({
       confirm,
