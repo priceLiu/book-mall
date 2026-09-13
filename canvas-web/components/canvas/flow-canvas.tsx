@@ -13,6 +13,7 @@ import {
   useEdgesState,
   useReactFlow,
   useStoreApi,
+  useUpdateNodeInternals,
   type NodeChange,
   type OnConnectEnd,
   type Viewport,
@@ -104,6 +105,7 @@ import {
 } from "@/lib/canvas/canvas-rf-sync";
 import { commitLibtvRfNodeSelection } from "@/lib/canvas/select-libtv-node";
 import { useLibtvCanvasOverlayClickThrough } from "@/lib/canvas/use-libtv-canvas-overlay-click-through";
+import { scheduleUpdateNodeInternals } from "@/lib/canvas/use-schedule-update-node-internals";
 import { filterSpuriousRfEdgeRemoves } from "@/lib/canvas/canvas-edge-change-guard";
 import {
   applyLibtvEdgesLayerZ,
@@ -275,6 +277,9 @@ function FlowCanvasInner({
     getViewport,
   } = useReactFlow();
   const rfStore = useStoreApi();
+  const updateNodeInternals = useUpdateNodeInternals();
+  const updateNodeInternalsRef = useRef(updateNodeInternals);
+  updateNodeInternalsRef.current = updateNodeInternals;
   const initialFitDoneRef = useRef(false);
   const rfReadyRef = useRef(false);
   const viewportTimerRef = useRef<number | null>(null);
@@ -363,6 +368,8 @@ function FlowCanvasInner({
   const [rfEdges, setRfEdges, onRfEdgesChange] = useEdgesState<CanvasFlowEdge>(
     [],
   );
+  const rfEdgesRef = useRef(rfEdges);
+  rfEdgesRef.current = rfEdges;
 
   const viewport = useCanvasStore((s) => s.viewport);
   const setViewport = useCanvasStore((s) => s.setViewport);
@@ -385,6 +392,9 @@ function FlowCanvasInner({
   const fitViewNonce = useCanvasStore((s) => s.fitViewNonce);
   const canvasFocusNodeId = useCanvasStore((s) => s.canvasFocusNodeId);
   const canvasFocusNonce = useCanvasStore((s) => s.canvasFocusNonce);
+  const canvasGeometryDragging = useCanvasStore(
+    (s) => s.canvasGeometryDragging,
+  );
   const setCanvasGeometryDragging = useCanvasStore(
     (s) => s.setCanvasGeometryDragging,
   );
@@ -1008,6 +1018,9 @@ function FlowCanvasInner({
             : null;
           groupResizeDetachedRef.current = true;
         }
+        if (!useCanvasStore.getState().canvasGeometryDragging) {
+          setCanvasGeometryDragging(true);
+        }
       }
 
       const activeGroupResizeId = groupResizeIdRef.current;
@@ -1052,6 +1065,33 @@ function FlowCanvasInner({
           );
           if (rfAfterChange !== rfBeforeChange) {
             setRfNodes(rfAfterChange);
+            const resized = rfAfterChange.find((n) => n.id === activeGroupResizeId);
+            const internalsKey = `group-resize:${resized?.position.x ?? 0}:${resized?.position.y ?? 0}:${resized?.width ?? 0}x${resized?.height ?? 0}`;
+            const refreshInternals = updateNodeInternalsRef.current;
+            scheduleUpdateNodeInternals(
+              activeGroupResizeId,
+              internalsKey,
+              refreshInternals,
+            );
+            for (const childId of groupResizeFrozenRef.current.keys()) {
+              scheduleUpdateNodeInternals(
+                childId,
+                internalsKey,
+                refreshInternals,
+              );
+            }
+            for (const edge of rfEdgesRef.current) {
+              scheduleUpdateNodeInternals(
+                edge.source,
+                internalsKey,
+                refreshInternals,
+              );
+              scheduleUpdateNodeInternals(
+                edge.target,
+                internalsKey,
+                refreshInternals,
+              );
+            }
           }
           appliedRfChanges = true;
         }
@@ -1988,8 +2028,12 @@ function FlowCanvasInner({
     return ids;
   }, [rfNodes, isNodeDragging, rfEdges.length, libtvCanvas]);
 
+  /** LibTV / 拖拽缩放：关闭边 culling。nodeLookup 不同步时 culling 会整图藏线 */
   const onlyRenderVisible =
-    forceOnlyRenderVisible || libtvCanvas || rfNodes.length >= 8;
+    !libtvCanvas &&
+    !canvasGeometryDragging &&
+    !isNodeDragging &&
+    (forceOnlyRenderVisible || rfNodes.length >= 8);
 
   const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();

@@ -18,7 +18,7 @@ export type SubtitleBurnInStyle = {
 export const DEFAULT_SUBTITLE_STYLE: SubtitleBurnInStyle = {
   fontKey: "heiti",
   sizeKey: "large",
-  fontSize: 14,
+  fontSize: 12,
 };
 
 export const SUBTITLE_FONT_SIZE_MIN = 6;
