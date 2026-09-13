@@ -18,12 +18,13 @@ export async function POST(req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "file 必填" }, { status: 400 });
   }
   const buf = Buffer.from(await file.arrayBuffer());
+  const rawLabel = form.get("label");
   const project = await uploadDetailPageSuiteReference({
     userId: auth.userId,
     projectId: id,
     buf,
     contentType: file.type || "image/jpeg",
-    label: typeof form.get("label") === "string" ? form.get("label") : undefined,
+    label: typeof rawLabel === "string" ? rawLabel : undefined,
   });
   if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
   return NextResponse.json({ project });

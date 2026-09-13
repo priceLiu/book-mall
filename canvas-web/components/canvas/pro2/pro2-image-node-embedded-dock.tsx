@@ -165,6 +165,13 @@ export function Pro2ImageNodeEmbeddedDock({
     window.dispatchEvent(new CustomEvent("canvas:open-pro2-style-library"));
   }, [nodeId, setPro2StyleLibImageNodeId]);
 
+  const onStopGeneration = useLibtvDockGenerationStop(
+    d.pro2ControllerNodeId ?? storeNode?.id,
+    mediaRole === "frame" && d.pro2RowKey
+      ? { rowKey: d.pro2RowKey, mediaKind: "frameImage" }
+      : undefined,
+  );
+
   if (!storeNode) return null;
 
   const styleRef = d.dockStyleRef;
@@ -175,13 +182,6 @@ export function Pro2ImageNodeEmbeddedDock({
   const canRegenerate =
     mediaRole === "frame" &&
     Boolean(d.pro2ControllerNodeId && d.pro2RowKey && dockInput.trim());
-
-  const onStopGeneration = useLibtvDockGenerationStop(
-    d.pro2ControllerNodeId ?? storeNode?.id,
-    mediaRole === "frame" && d.pro2RowKey
-      ? { rowKey: d.pro2RowKey, mediaKind: "frameImage" }
-      : undefined,
-  );
 
   return (
     <Pro2EmbeddedInputDock

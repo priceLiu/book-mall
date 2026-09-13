@@ -25,6 +25,34 @@ export type ImageLayerBbox = {
   absolute?: [number, number, number, number];
 };
 
+function asBboxQuad(raw?: number[]): [number, number, number, number] | undefined {
+  if (!raw || raw.length < 4) return undefined;
+  return [Number(raw[0]), Number(raw[1]), Number(raw[2]), Number(raw[3])];
+}
+
+function toSeedreamLayers(
+  layers: Array<{
+    url: string;
+    zIndex: number;
+    bbox?: { normalized?: number[]; absolute?: number[] };
+    name?: string;
+    isBackground: boolean;
+  }>,
+): SeedreamLayerItem[] {
+  return layers.map((layer) => ({
+    url: layer.url,
+    zIndex: layer.zIndex,
+    name: layer.name,
+    isBackground: layer.isBackground,
+    bbox: layer.bbox
+      ? {
+          normalized: asBboxQuad(layer.bbox.normalized),
+          absolute: asBboxQuad(layer.bbox.absolute),
+        }
+      : undefined,
+  }));
+}
+
 export type ImageLayerStackItem = {
   id: string;
   url: string;
@@ -183,7 +211,7 @@ async function callSeedreamLayerGenerations(opts: {
     clientPage: opts.clientPage,
   });
   if (layers?.length) {
-    return { layers, images, logId };
+    return { layers: toSeedreamLayers(layers), images, logId };
   }
   const persisted = await Promise.all(
     images.map((img) => persistVendorImage(opts.userId, img)),

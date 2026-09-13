@@ -99,40 +99,40 @@ export function parseSuite(raw: unknown): DetailPageSuiteState {
   if (!raw || typeof raw !== "object") return emptySuite();
   const o = raw as Record<string, unknown>;
   const modules = Array.isArray(o.modules)
-    ? o.modules
-        .map((item) => {
-          if (!item || typeof item !== "object") return null;
-          const m = item as Record<string, unknown>;
-          const module_id = String(m.module_id ?? "").trim();
-          if (!module_id) return null;
-          const max_num = Math.max(1, Math.round(Number(m.max_num) || 1));
-          const generate_count = Math.max(0, Math.round(Number(m.generate_count) || 0));
-          const selected = Array.isArray(m.selected_item_list)
-            ? m.selected_item_list.map((x) => String(x).trim()).filter(Boolean)
-            : [];
-          const pool = Array.isArray(m.candidate_pool)
-            ? m.candidate_pool.map((x) => String(x).trim()).filter(Boolean)
-            : [];
-          const slots = Array.isArray(m.slots)
-            ? m.slots
-                .map((s) => {
-                  if (!s || typeof s !== "object") return null;
-                  const slot = s as Record<string, unknown>;
-                  const item_label = String(slot.item_label ?? "").trim();
-                  if (!item_label) return null;
-                  return {
-                    item_key: String(slot.item_key ?? item_label),
-                    item_label,
-                    source: slot.source === "user" ? "user" : "template",
-                    positive_prompt: String(slot.positive_prompt ?? ""),
-                    imageUrl: typeof slot.imageUrl === "string" ? slot.imageUrl : undefined,
-                    assetId: typeof slot.assetId === "string" ? slot.assetId : undefined,
-                    promptEdited: slot.promptEdited === true,
-                  } satisfies DetailPageSuiteSlot;
-                })
-                .filter((x): x is DetailPageSuiteSlot => Boolean(x))
-            : [];
-          return {
+    ? o.modules.flatMap((item): DetailPageSuiteModuleState[] => {
+        if (!item || typeof item !== "object") return [];
+        const m = item as Record<string, unknown>;
+        const module_id = String(m.module_id ?? "").trim();
+        if (!module_id) return [];
+        const max_num = Math.max(1, Math.round(Number(m.max_num) || 1));
+        const generate_count = Math.max(0, Math.round(Number(m.generate_count) || 0));
+        const selected = Array.isArray(m.selected_item_list)
+          ? m.selected_item_list.map((x) => String(x).trim()).filter(Boolean)
+          : [];
+        const pool = Array.isArray(m.candidate_pool)
+          ? m.candidate_pool.map((x) => String(x).trim()).filter(Boolean)
+          : [];
+        const slots = Array.isArray(m.slots)
+          ? m.slots.flatMap((s): DetailPageSuiteSlot[] => {
+              if (!s || typeof s !== "object") return [];
+              const slot = s as Record<string, unknown>;
+              const item_label = String(slot.item_label ?? "").trim();
+              if (!item_label) return [];
+              return [
+                {
+                  item_key: String(slot.item_key ?? item_label),
+                  item_label,
+                  source: slot.source === "user" ? "user" : "template",
+                  positive_prompt: String(slot.positive_prompt ?? ""),
+                  imageUrl: typeof slot.imageUrl === "string" ? slot.imageUrl : undefined,
+                  assetId: typeof slot.assetId === "string" ? slot.assetId : undefined,
+                  promptEdited: slot.promptEdited === true,
+                },
+              ];
+            })
+          : [];
+        return [
+          {
             module_id,
             module_name: String(m.module_name ?? module_id),
             enable: m.enable !== false && generate_count > 0,
@@ -142,9 +142,9 @@ export function parseSuite(raw: unknown): DetailPageSuiteState {
             candidate_pool: pool,
             selected_item_list: selected,
             slots,
-          } satisfies DetailPageSuiteModuleState;
-        })
-        .filter((x): x is DetailPageSuiteModuleState => Boolean(x))
+          },
+        ];
+      })
     : [];
   return {
     templateId: typeof o.templateId === "string" ? o.templateId : undefined,

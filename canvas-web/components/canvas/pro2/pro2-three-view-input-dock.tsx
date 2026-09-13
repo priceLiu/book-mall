@@ -351,19 +351,6 @@ export function Pro2ThreeViewInputDock() {
     window.dispatchEvent(new CustomEvent("canvas:open-pro2-style-library"));
   }, [storeNode, setPro2StyleLibImageNodeId]);
 
-  if (suppressDock || !storeNode || !dockActive || !placement) return null;
-  if (
-    pro2ThreeViewNodeUsesEmbeddedDock(d, {
-      selected: true,
-      soleSelected: true,
-    })
-  ) {
-    return null;
-  }
-
-  const styleRef = d.dockStyleRef;
-  const canRegenerate = Boolean(dockInput.trim() && hasImageModel);
-
   const onStopGeneration = useLibtvDockGenerationStop(
     controllerId ?? storeNode?.id,
     controllerId && d.pro2RowKey
@@ -378,6 +365,19 @@ export function Pro2ThreeViewInputDock() {
         ? { taskId: settingsData.runtime.taskId.trim() }
         : undefined,
   );
+
+  if (suppressDock || !storeNode || !dockActive || !placement) return null;
+  if (
+    pro2ThreeViewNodeUsesEmbeddedDock(d, {
+      selected: true,
+      soleSelected: true,
+    })
+  ) {
+    return null;
+  }
+
+  const styleRef = d.dockStyleRef;
+  const canRegenerate = Boolean(dockInput.trim() && hasImageModel);
 
   return (
     <>

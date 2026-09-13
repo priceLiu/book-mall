@@ -268,14 +268,15 @@ export function Pro2FrameCellInputDock() {
     });
   }, [storeNode, activeFocus, row, nodes, updateNodeData, setNodeRuntime]);
 
+  const onStopGeneration = useLibtvDockGenerationStop(storeNode?.id, {
+    rowKey: activeFocus?.rowKey,
+    mediaKind: "frameImage",
+  });
+
   if (!storeNode || !row || !placement || !activeFocus) return null;
 
   const running = frameRowStatus(row) === "running";
   const prompt = row.prompt ?? "";
-  const onStopGeneration = useLibtvDockGenerationStop(storeNode.id, {
-    rowKey: activeFocus.rowKey,
-    mediaKind: "frameImage",
-  });
 
   return (
     <Pro2InputDockShell
