@@ -26,6 +26,7 @@
 | `` ```fashion-deliverable `` | [`fashion-deliverable-spec-v4.md`](./fashion-deliverable-spec-v4.md) | 服装口播故事版 |
 | `` ```pro-deliverable `` / fashion-v4 | [`pro-deliverable-spec-v1.md`](./pro-deliverable-spec-v1.md) | Pro Vertical |
 | **`ecom-video-workflow/v1` 信封** | [`video-workflow-template-spec.md`](./video-workflow-template-spec.md) | 穿搭视频及后续动作迁移模板 |
+| `` ```detail-page-suite `` | [`docs/ecom/详情页套图.md`](../../docs/ecom/详情页套图.md) | 详情页套图（每模块提示词 JSON） |
 
 ---
 
@@ -53,4 +54,5 @@
 
 | 日期 | 说明 |
 |------|------|
+| 2026-09-13 | 登记 `` ```detail-page-suite ``（详情页套图） |
 | 2026-09-04 | 初版：汇总现有围栏 + 指向 video-workflow 新入口 |

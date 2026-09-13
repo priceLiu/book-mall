@@ -30,7 +30,7 @@ export function EcomAssistantPanelHeader({
   trailing,
 }: Props) {
   return (
-    <div className="flex items-center justify-between gap-2 border-b border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] px-4 py-3">
+    <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] px-4 py-3">
       <div className="min-w-0">
         <p className="text-sm font-semibold text-[#1d1d1f]">{title}</p>
         {subtitle ? (

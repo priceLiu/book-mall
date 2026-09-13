@@ -25,6 +25,8 @@ export type EcomPlatformSpec = {
     min: number;
     max: number;
     ratio: EcomImageRatio;
+    /** 详情套图建议像素宽（淘宝 750 / 京东 790）；与 recommended 屏数无关 */
+    widthPx?: number;
   };
   /** 注入 Agent prompt 的平台特性描述 */
   note: string;
@@ -41,7 +43,7 @@ export const ECOM_PLATFORM_SPECS: EcomPlatformSpec[] = [
       ratio: "3:4",
       ratioOptions: ["3:4"],
     },
-    detailPage: { recommended: 8, min: 6, max: 10, ratio: "3:4" },
+    detailPage: { recommended: 8, min: 6, max: 10, ratio: "3:4", widthPx: 750 },
     note: "搜索流量为主，主图推荐 3:4 竖版（无线端列表更易占屏）；详情页承担完整说服链路，允许参数与质检模块。",
   },
   {
@@ -54,7 +56,7 @@ export const ECOM_PLATFORM_SPECS: EcomPlatformSpec[] = [
       ratio: "1:1",
       ratioOptions: ["1:1"],
     },
-    detailPage: { recommended: 10, min: 8, max: 12, ratio: "3:4" },
+    detailPage: { recommended: 10, min: 8, max: 12, ratio: "3:4", widthPx: 790 },
     note: "自营调性偏理性，首图须白底或浅底、无促销角标堆叠；详情页重视规格、服务与售后凭证。",
   },
   {
@@ -67,7 +69,7 @@ export const ECOM_PLATFORM_SPECS: EcomPlatformSpec[] = [
       ratio: "1:1",
       ratioOptions: ["1:1"],
     },
-    detailPage: { recommended: 8, min: 6, max: 10, ratio: "3:4" },
+    detailPage: { recommended: 8, min: 6, max: 10, ratio: "3:4", widthPx: 750 },
     note: "价格敏感人群，首图强调实惠与直观利益；详情页节奏要快，前 3 屏必须给出核心利益点。",
   },
   {
@@ -80,7 +82,7 @@ export const ECOM_PLATFORM_SPECS: EcomPlatformSpec[] = [
       ratio: "3:4",
       ratioOptions: ["3:4", "1:1"],
     },
-    detailPage: { recommended: 6, min: 5, max: 8, ratio: "3:4" },
+    detailPage: { recommended: 6, min: 5, max: 8, ratio: "3:4", widthPx: 750 },
     note: "内容推荐流量，竖版优先，视觉需与短视频调性一致；详情页宜短，重种草与信任。",
   },
   {
@@ -93,7 +95,7 @@ export const ECOM_PLATFORM_SPECS: EcomPlatformSpec[] = [
       ratio: "1:1",
       ratioOptions: ["1:1", "3:4"],
     },
-    detailPage: { recommended: 6, min: 5, max: 8, ratio: "3:4" },
+    detailPage: { recommended: 6, min: 5, max: 8, ratio: "3:4", widthPx: 750 },
     note: "老铁信任经济，强调真实使用场景与实拍感，避免过度精修的棚拍风。",
   },
   {
@@ -106,7 +108,7 @@ export const ECOM_PLATFORM_SPECS: EcomPlatformSpec[] = [
       ratio: "3:4",
       ratioOptions: ["3:4", "1:1"],
     },
-    detailPage: { recommended: 6, min: 4, max: 8, ratio: "3:4" },
+    detailPage: { recommended: 6, min: 4, max: 8, ratio: "3:4", widthPx: 750 },
     note: "笔记式浏览，图片即内容；生活方式与氛围感优先，慎用大字报促销风。",
   },
   {
@@ -119,7 +121,7 @@ export const ECOM_PLATFORM_SPECS: EcomPlatformSpec[] = [
       ratio: "3:4",
       ratioOptions: ["3:4", "1:1"],
     },
-    detailPage: { recommended: 6, min: 5, max: 8, ratio: "3:4" },
+    detailPage: { recommended: 6, min: 5, max: 8, ratio: "3:4", widthPx: 750 },
     note: "熟人与私域转化为主，突出品质背书与售后承诺，弱化夸张促销。",
   },
   {
@@ -132,7 +134,7 @@ export const ECOM_PLATFORM_SPECS: EcomPlatformSpec[] = [
       ratio: "1:1",
       ratioOptions: ["1:1"],
     },
-    detailPage: { recommended: 10, min: 8, max: 12, ratio: "3:4" },
+    detailPage: { recommended: 10, min: 8, max: 12, ratio: "3:4", widthPx: 750 },
     note: "面向批发买家，需给出规格矩阵、起订量、供货能力与物流方案，弱化情绪化种草。",
   },
   {
@@ -145,7 +147,7 @@ export const ECOM_PLATFORM_SPECS: EcomPlatformSpec[] = [
       ratio: "1:1",
       ratioOptions: ["1:1", "3:4"],
     },
-    detailPage: { recommended: 10, min: 8, max: 12, ratio: "3:4" },
+    detailPage: { recommended: 10, min: 8, max: 12, ratio: "3:4", widthPx: 750 },
     note: "特卖调性，突出品牌折扣与正品保障；详情页需完整尺码/材质/洗护信息。",
   },
   {
@@ -158,7 +160,7 @@ export const ECOM_PLATFORM_SPECS: EcomPlatformSpec[] = [
       ratio: "1:1",
       ratioOptions: ["1:1"],
     },
-    detailPage: { recommended: 6, min: 5, max: 7, ratio: "16:9" },
+    detailPage: { recommended: 6, min: 5, max: 7, ratio: "16:9", widthPx: 1464 },
     note: "首图须纯白底、产品占比 85% 以上、无文字与水印；详情按 A+ 模块横版排布，文案用英文。",
   },
   {
@@ -171,7 +173,7 @@ export const ECOM_PLATFORM_SPECS: EcomPlatformSpec[] = [
       ratio: "1:1",
       ratioOptions: ["1:1"],
     },
-    detailPage: { recommended: 6, min: 5, max: 8, ratio: "1:1" },
+    detailPage: { recommended: 6, min: 5, max: 8, ratio: "1:1", widthPx: 800 },
     note: "移动端小屏为主，文字要少且大；注意本地化语言与当地促销习惯。",
   },
   {
@@ -184,7 +186,7 @@ export const ECOM_PLATFORM_SPECS: EcomPlatformSpec[] = [
       ratio: "4:5",
       ratioOptions: ["4:5", "1:1", "3:4"],
     },
-    detailPage: { recommended: 8, min: 6, max: 10, ratio: "3:4" },
+    detailPage: { recommended: 8, min: 6, max: 10, ratio: "3:4", widthPx: 1080 },
     note: "无平台审核约束但需自建信任，强调品牌故事、评价与退换承诺。",
   },
 ];

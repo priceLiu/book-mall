@@ -153,7 +153,13 @@ export type EcomLibrarySection = {
 };
 
 /** model-tryon 成片仅在电商工具箱「试衣库」展示，不入成图与视频 */
-const IMAGE_MODULE_IDS = ["main-image", "detail-page", "hand-craft", "model-shot"] as const;
+const IMAGE_MODULE_IDS = [
+  "main-image",
+  "detail-page",
+  "detail-page-suite",
+  "hand-craft",
+  "model-shot",
+] as const;
 const VIDEO_MODULE_IDS = [
   "storyboard-micro-drama",
   "seed-video",
@@ -171,6 +177,7 @@ const BRAND_MODULE_IDS = ["ip", "poster", "vi", "promo", "ad"] as const;
 const MODULE_TITLES: Record<string, { title: string; kind: "image" | "video" | "brand" }> = {
   "main-image": { title: "电商主图", kind: "image" },
   "detail-page": { title: "电商详情页", kind: "image" },
+  "detail-page-suite": { title: "详情页套图", kind: "image" },
   "hand-craft": { title: "手伴创作", kind: "image" },
   "model-shot": { title: "服装模特图", kind: "image" },
   "model-tryon": { title: "模特试衣", kind: "image" },

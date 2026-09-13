@@ -422,6 +422,18 @@
 
 ---
 
+## 2026-09-13 — 详情页套图（EcomDetailPageSuiteTemplate / Project）
+
+- **迁移目录**：`prisma/migrations/20260913160000_ecom_detail_page_suite/`
+- **新表**：
+  - `EcomDetailPageSuiteTemplate`——按平台+类目的系统/用户模板（`modules` JSON）
+  - `EcomDetailPageSuiteProject`——用户套图项目（brief/references/chatHistory/suite/meta）
+- **种子**：`scripts/seed-detail-page-suite-templates.ts`（12 平台 × 3 类目）
+- **产品文档**：`docs/ecom/详情页套图.md`
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`
+
+---
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

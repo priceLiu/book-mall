@@ -71,7 +71,7 @@ export function EcomWorkspaceLayout({
       {hasAssistant ? (
         <aside
           className={cn(
-            "flex min-h-0 flex-col overflow-hidden border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] max-md:max-h-[min(52dvh,520px)] max-md:min-h-[240px] max-md:shrink-0 md:min-h-0 md:w-[380px] md:min-w-[380px] md:max-w-[380px] md:self-stretch md:border-l md:border-t-0",
+            "flex h-full min-h-0 max-h-full flex-col overflow-hidden border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] max-md:max-h-[min(52dvh,520px)] max-md:min-h-[240px] max-md:shrink-0 md:w-[380px] md:min-w-[380px] md:max-w-[380px] md:self-stretch md:border-l md:border-t-0 md:contain-[layout_size_style]",
             assistantCollapsed
               ? "hidden"
               : cn(
@@ -86,12 +86,20 @@ export function EcomWorkspaceLayout({
               {assistantHeader}
             </div>
           ) : null}
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-              {assistant}
-            </div>
+          <div
+            className={cn(
+              "grid min-h-0 min-w-0 flex-1 overflow-hidden",
+              assistantFooter
+                ? "grid-rows-[minmax(0,1fr)_auto]"
+                : "grid-rows-[minmax(0,1fr)]",
+            )}
+          >
+            <div className="flex h-full min-h-0 flex-col overflow-hidden">{assistant}</div>
             {assistantFooter ? (
-              <div className="shrink-0" data-ecom-assistant-bottom-dock>
+              <div
+                className="relative z-10 shrink-0 border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-composer-bg)]"
+                data-ecom-assistant-bottom-dock
+              >
                 {assistantFooter}
               </div>
             ) : null}

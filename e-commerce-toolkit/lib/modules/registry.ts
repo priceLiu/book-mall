@@ -47,6 +47,16 @@ export const ECOM_MODULES: EcomModuleDef[] = [
     tile: "dark",
   },
   {
+    id: "detail-page-suite",
+    title: "详情页套图",
+    tagline: "按平台模板出服装详情摄影套图",
+    href: "/ecom/detail-page-suite",
+    kind: "image",
+    toolKey: "ecom-toolkit__detail-page-suite",
+    action: "generate",
+    tile: "light",
+  },
+  {
     id: "hand-craft",
     title: "手伴创作",
     tagline: "线稿转潮玩盲盒 IP 全案",

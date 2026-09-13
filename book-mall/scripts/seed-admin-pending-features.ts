@@ -1246,6 +1246,14 @@ const SEED_ITEMS: {
     sortOrder: 750,
     listKind: "PENDING",
   },
+  {
+    title: "详情页套图",
+    description:
+      "全新产线：按平台模板出服装详情页摄影套图。七维采集 + 多图识图卖点 + 大模块/子维度 + LLM JSON 提示词 + 文生图。12 平台 × 3 类目系统模板，上限 44 张。见 docs/ecom/详情页套图.md",
+    docPath: "docs/ecom/详情页套图.md",
+    sortOrder: 760,
+    listKind: "PENDING",
+  },
 ];
 
 async function main() {

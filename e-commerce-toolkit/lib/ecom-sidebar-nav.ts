@@ -95,6 +95,7 @@ function dedupeNavLinks(items: EcomSidebarNavLink[]): EcomSidebarNavLink[] {
 function imageModuleIcon(id: string): LucideIcon {
   if (id === "product-creation") return LayoutGrid;
   if (id === "detail-page-creation") return ScrollText;
+  if (id === "detail-page-suite") return LayoutTemplate;
   if (id === "seed-video") return Video;
   if (id === "hand-craft") return Blocks;
   if (id === "media-decompose") return ScanSearch;

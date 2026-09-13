@@ -32,26 +32,31 @@ export function EcomAssistantCollapsibleLayout({
   className,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const collapseEnabled = Boolean(onCollapsedChange);
   const { tryExpand, handleAssistantBlur } = useEcomAssistantCollapseHandlers({
     collapsed,
     onCollapsedChange,
     collapseBlocked,
     rootRef,
   });
+  const showComposer = !collapsed && composer;
 
   return (
     <>
       <div
         ref={rootRef}
         className={cn(
-          "flex h-full min-h-0 flex-col bg-[var(--ecom-assistant-surface)]",
+          "grid h-full min-h-0 w-full overflow-hidden bg-[var(--ecom-assistant-surface)] overscroll-y-contain",
+          showComposer
+            ? "grid-rows-[auto_minmax(0,1fr)_auto]"
+            : "grid-rows-[auto_minmax(0,1fr)]",
           collapsed && "pointer-events-none invisible absolute h-0 w-0 overflow-hidden",
           className,
         )}
-        onBlur={handleAssistantBlur}
+        onBlur={collapseEnabled ? handleAssistantBlur : undefined}
       >
         {children}
-        {!collapsed ? composer : null}
+        {showComposer ? composer : null}
       </div>
       {collapsed ? (
         <EcomAssistantFloatingComposer

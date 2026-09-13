@@ -365,13 +365,13 @@ export function EcomProfileSidebar({
       if (entry.link.external) {
         window.open(entry.link.href, "_blank", "noopener,noreferrer");
       } else {
-        expandDetail();
+        if (collapsed) expandDetail();
         unlockEcomDocumentInteraction();
         window.location.assign(entry.link.href);
       }
       return;
     }
-    expandDetail();
+    if (collapsed) expandDetail();
   }
 
   function renderRailQuickLink(entry: RailEntry) {
@@ -417,7 +417,7 @@ export function EcomProfileSidebar({
     <RailTipContext.Provider value={railTipApi}>
       <aside
       className={cn(
-        "pointer-events-auto relative isolate z-[250] flex h-full max-h-full shrink-0 flex-row overflow-visible rounded-xl border border-zinc-800/80 bg-[#141416] text-zinc-100 shadow-lg transition-[width] duration-200 ease-out",
+        "pointer-events-auto relative isolate z-[250] flex h-full max-h-full shrink-0 flex-row overflow-hidden rounded-xl border border-zinc-800/80 bg-[#141416] text-zinc-100 shadow-lg",
         collapsed ? "w-16" : "w-[21rem]",
         className,
       )}
@@ -486,7 +486,7 @@ export function EcomProfileSidebar({
       {/* 右侧详情面板 */}
       <div
         className={cn(
-          "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden transition-[width,opacity] duration-200 ease-out",
+          "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden transition-[opacity] duration-150 ease-out",
           collapsed ? "w-0 opacity-0 pointer-events-none" : "w-[17rem] opacity-100",
         )}
       >

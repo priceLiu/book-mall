@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { EcomLoginPrompt } from "@/components/auth/ecom-login-prompt";
 import { BackgroundGenerationProvider } from "@/components/generation";
@@ -8,12 +8,12 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { ModelShotAssistantPanel } from "@/components/model-shot/model-shot-assistant-panel";
 import { ModelShotContentPanel } from "@/components/model-shot/model-shot-content-panel";
 import { ModelShotProgressRail } from "@/components/model-shot/model-shot-progress-rail";
+import { EcomAssistantComposerDock } from "@/components/layout/ecom-assistant-composer-dock";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { ProductCreationStudioSkeleton } from "@/components/product-design/product-creation-studio-skeleton";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-link-dialog";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
-import { isEcomMainBlankPointerTarget } from "@/lib/ecom-assistant-collapse";
 import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import {
@@ -64,7 +64,7 @@ export function ModelShotStudio() {
   const [needLogin, setNeedLogin] = useState(false);
   const [assistantStreaming, setAssistantStreaming] = useState(false);
   const [assistantWide, setAssistantWide] = useState(false);
-  const [assistantCollapsed, setAssistantCollapsed] = useState(false);
+  const [assistantDockComposer, setAssistantDockComposer] = useState<ReactNode | null>(null);
   const [generateToken, setGenerateToken] = useState(0);
   const [refGenBusyRole, setRefGenBusyRole] = useState<ModelShotReferenceRole | null>(null);
   const [imagePicker, setImagePicker] = useState<ImagePickerRequest | null>(null);
@@ -74,16 +74,6 @@ export function ModelShotStudio() {
   >(() => {});
   const chatModelsRef = useRef<StoryboardGatewayModel[]>([]);
   chatModelsRef.current = chatModels;
-
-  const handleMainBlankPointerDown = useCallback(
-    (e: React.PointerEvent<HTMLElement>) => {
-      if (imagePicker) return;
-      if (assistantCollapsed || assistantStreaming) return;
-      if (!isEcomMainBlankPointerTarget(e.target)) return;
-      setAssistantCollapsed(true);
-    },
-    [assistantCollapsed, assistantStreaming, imagePicker],
-  );
 
   const applyProject = useCallback((p: ModelShotProject) => {
     setProject(p);
@@ -403,8 +393,6 @@ export function ModelShotStudio() {
     <BackgroundGenerationProvider>
       <EcomWorkspaceLayout
         assistantWide={assistantWide}
-        assistantCollapsed={assistantCollapsed}
-        onMainBlankPointerDown={handleMainBlankPointerDown}
         progress={<ModelShotProgressRail project={project} />}
         assistant={
           <ModelShotAssistantPanel
@@ -414,14 +402,16 @@ export function ModelShotStudio() {
             chatModelKey={chatModelKey}
             composerWide={assistantWide}
             onComposerWideChange={setAssistantWide}
-            collapsed={assistantCollapsed}
-            onCollapsedChange={setAssistantCollapsed}
             onStreamingChange={setAssistantStreaming}
             onProjectChange={handleProjectChange}
             onRequestGeneratePoses={() => setGenerateToken((t) => t + 1)}
             refGenBusyRole={refGenBusyRole}
             onAlert={alert}
+            onDockComposerChange={setAssistantDockComposer}
           />
+        }
+        assistantFooter={
+          <EcomAssistantComposerDock>{assistantDockComposer}</EcomAssistantComposerDock>
         }
       >
         <ModelShotContentPanel

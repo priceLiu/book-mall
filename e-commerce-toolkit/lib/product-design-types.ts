@@ -15,6 +15,7 @@ export type EcomPlatformSpec = {
     min: number;
     max: number;
     ratio: EcomImageRatio;
+    widthPx?: number;
   };
   note: string;
 };

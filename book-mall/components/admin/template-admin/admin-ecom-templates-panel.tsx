@@ -20,8 +20,16 @@ import {
   SceneLibraryAdmin,
   StoryTheaterTopicAdmin,
 } from "@/components/admin/template-admin/admin-ecom-catalog-libraries";
+import { AdminEcomDetailPageSuitePanel } from "@/components/admin/template-admin/admin-ecom-detail-page-suite-panel";
 
-type EcomSub = "templates" | "models" | "poses" | "props" | "scenes" | "story-topics";
+type EcomSub =
+  | "templates"
+  | "models"
+  | "poses"
+  | "props"
+  | "scenes"
+  | "story-topics"
+  | "detail-page-suite";
 
 type TemplateRow = {
   id: string;
@@ -211,7 +219,8 @@ export function AdminEcomTemplatesPanel() {
     ecomParam === "poses" ||
     ecomParam === "props" ||
     ecomParam === "scenes" ||
-    ecomParam === "story-topics"
+    ecomParam === "story-topics" ||
+    ecomParam === "detail-page-suite"
       ? ecomParam
       : "templates";
 
@@ -229,6 +238,7 @@ export function AdminEcomTemplatesPanel() {
     { id: "props", label: "道具库" },
     { id: "scenes", label: "场景库" },
     { id: "story-topics", label: "故事主题库" },
+    { id: "detail-page-suite", label: "详情页套图" },
   ];
 
   return (
@@ -255,6 +265,8 @@ export function AdminEcomTemplatesPanel() {
         <PropLibraryAdmin />
       ) : sub === "scenes" ? (
         <SceneLibraryAdmin />
+      ) : sub === "detail-page-suite" ? (
+        <AdminEcomDetailPageSuitePanel />
       ) : (
         <StoryTheaterTopicAdmin />
       )}

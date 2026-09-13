@@ -6,7 +6,7 @@ export const ECOM_ASSISTANT_FLOATING_COMPOSER_SHELL_CLASS =
 
 /** 展开态 composer 底栏（折叠悬浮时省略顶部分割线，避免与蓝框叠层） */
 export const ECOM_ASSISTANT_COMPOSER_SHELL_BASE =
-  "shrink-0 bg-[var(--ecom-assistant-composer-bg)] p-4";
+  "shrink-0 bg-[var(--ecom-assistant-composer-bg)] px-4 pb-[max(1rem,calc(env(safe-area-inset-bottom,0px)+0.75rem))] pt-4 pr-14";
 
 /** 折叠悬浮 composer 内层（外框已有 padding，内层略收紧） */
 export const ECOM_ASSISTANT_COMPOSER_SHELL_COMPACT =

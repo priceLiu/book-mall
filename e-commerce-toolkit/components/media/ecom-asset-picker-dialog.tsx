@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 const GROUPS: Array<{ module: string; label: string }> = [
   { module: "main-image", label: "商品主图" },
   { module: "detail-page", label: "详情页" },
+  { module: "detail-page-suite", label: "详情页套图" },
   { module: "model-shot", label: "模特图" },
   { module: "storyboard-micro-drama", label: "分镜图" },
   { module: "hand-craft", label: "手伴创作" },

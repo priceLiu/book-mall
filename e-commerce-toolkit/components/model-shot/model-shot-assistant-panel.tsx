@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { EcomAssistantCollapsibleLayout } from "@/components/layout/ecom-assistant-collapsible-layout";
 import { EcomAssistantPanelHeader } from "@/components/layout/ecom-assistant-panel-header";
@@ -12,6 +12,7 @@ import {
   ECOM_ASSISTANT_BUBBLE_CLASS,
   ECOM_ASSISTANT_CHOICE_SHELL_CLASS,
   ECOM_ASSISTANT_COMPOSER_SHELL_BASE,
+  ECOM_ASSISTANT_COMPOSER_SHELL_COMPACT,
   ECOM_ASSISTANT_COMPOSER_SHELL_EXPANDED_BORDER,
   ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
   ECOM_ASSISTANT_USER_BUBBLE_CLASS,
@@ -78,8 +79,7 @@ type Props = {
   onRequestGeneratePoses?: () => void | Promise<void>;
   refGenBusyRole?: ModelShotReferenceRole | null;
   onAlert: (opts: { title: string; message: string; variant?: "error" }) => Promise<void>;
-  collapsed?: boolean;
-  onCollapsedChange?: (collapsed: boolean) => void;
+  onDockComposerChange?: (node: ReactNode | null) => void;
 };
 
 export function ModelShotAssistantPanel({
@@ -93,8 +93,7 @@ export function ModelShotAssistantPanel({
   onRequestGeneratePoses,
   refGenBusyRole = null,
   onAlert,
-  collapsed = false,
-  onCollapsedChange,
+  onDockComposerChange,
 }: Props) {
   const chatHistory = project.chatHistory;
   const projectId = project.id;
@@ -559,21 +558,18 @@ export function ModelShotAssistantPanel({
     setOptimisticSelected(null);
   }, [choiceStep?.title, project.id]);
 
-  const tryCollapse = useCallback(() => {
-    if (streaming) return;
-    onCollapsedChange?.(true);
-  }, [streaming, onCollapsedChange]);
-
-  const tryExpand = useCallback(() => {
-    onCollapsedChange?.(false);
-  }, [onCollapsedChange]);
-
-  const renderComposer = (compact: boolean) => (
+  const renderComposer = useCallback(
+    (compact: boolean) => (
     <div
       className={cn(
-        ECOM_ASSISTANT_COMPOSER_SHELL_BASE,
-        !compact && ECOM_ASSISTANT_COMPOSER_SHELL_EXPANDED_BORDER,
+        compact
+          ? ECOM_ASSISTANT_COMPOSER_SHELL_COMPACT
+          : onDockComposerChange
+            ? "shrink-0 bg-[var(--ecom-assistant-composer-bg)] px-4 py-2"
+            : ECOM_ASSISTANT_COMPOSER_SHELL_BASE,
+        !compact && !onDockComposerChange && ECOM_ASSISTANT_COMPOSER_SHELL_EXPANDED_BORDER,
       )}
+      data-ecom-model-shot-composer
     >
       <div className="flex items-end gap-2">
         <textarea
@@ -590,7 +586,7 @@ export function ModelShotAssistantPanel({
           onChange={(e) => setInput(e.target.value)}
           disabled={streaming || !hasGarmentReference(project.references)}
           onFocus={() => {
-            if (compact) tryExpand();
+            if (!compact) onComposerWideChange?.(true);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -606,60 +602,76 @@ export function ModelShotAssistantPanel({
         />
       </div>
     </div>
+    ),
+    [
+      composerWide,
+      input,
+      onComposerWideChange,
+      onDockComposerChange,
+      phase,
+      project.references,
+      sendText,
+      streaming,
+    ],
   );
+
+  useEffect(() => {
+    if (!onDockComposerChange) return;
+    onDockComposerChange(renderComposer(false));
+    return () => onDockComposerChange(null);
+  }, [onDockComposerChange, renderComposer]);
 
   return (
     <EcomAssistantCollapsibleLayout
-      collapsed={collapsed}
-      onCollapsedChange={onCollapsedChange}
+      collapsed={false}
       collapseBlocked={streaming}
       attentionBadge={showChoices}
-      composer={renderComposer(false)}
-      floatingComposer={renderComposer(true)}
+      composer={onDockComposerChange ? null : renderComposer(false)}
+      className="h-full min-h-0"
     >
       <EcomAssistantPanelHeader
         title="服装模特图助手"
         subtitle={headerSubtitle}
         composerWide={composerWide}
         onComposerWideChange={onComposerWideChange}
-        onCollapse={onCollapsedChange ? tryCollapse : undefined}
-        collapseDisabled={streaming}
       />
 
       <div
         ref={scrollRef}
-        className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-3"
+        className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-3 [overflow-anchor:none]"
       >
-        <div className="space-y-3">
-          {displayMessages.map((m) => {
-            const historical =
-              m.role === "user"
-                ? buildModelShotHistoricalChoiceBlock(m.content, project)
-                : null;
-            return (
-            <div key={m.id} className="space-y-2">
-              <div
-                className={cn(
-                  "flex w-full flex-col",
-                  m.role === "user" ? "items-end" : "items-start",
-                )}
-              >
-                <div
-                  className={cn(
-                    ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
-                    m.role === "user"
-                      ? ECOM_ASSISTANT_USER_BUBBLE_CLASS
-                      : ECOM_ASSISTANT_BUBBLE_CLASS,
-                  )}
-                >
-                  {m.role === "assistant" ? (
-                    <ModelShotAssistantMessageBody content={m.content} project={project} />
-                  ) : (
-                    <p className="whitespace-pre-wrap">{m.content}</p>
-                  )}
-                </div>
-              </div>
-              {historical ? (
+          <div className="space-y-3">
+            {displayMessages.map((m) => {
+              const historical =
+                m.role === "user"
+                  ? buildModelShotHistoricalChoiceBlock(m.content, project)
+                  : null;
+              return (
+              <div key={m.id} className="space-y-2">
+                {m.role === "assistant" || !historical ? (
+                  <div
+                    className={cn(
+                      "flex w-full flex-col",
+                      m.role === "user" ? "items-end" : "items-start",
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
+                        m.role === "user"
+                          ? ECOM_ASSISTANT_USER_BUBBLE_CLASS
+                          : ECOM_ASSISTANT_BUBBLE_CLASS,
+                      )}
+                    >
+                      {m.role === "assistant" ? (
+                        <ModelShotAssistantMessageBody content={m.content} project={project} />
+                      ) : (
+                        <p className="whitespace-pre-wrap">{m.content}</p>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+                {historical ? (
                 <div className="flex w-full flex-col items-start">
                   <div className={cn(ECOM_ASSISTANT_CHOICE_SHELL_CLASS, "w-full max-w-[95%]")}>
                     <SeedVideoAssistantChoiceCards
@@ -706,24 +718,24 @@ export function ModelShotAssistantPanel({
               </div>
             </div>
           ) : null}
-        </div>
-        {streaming ? (
-          <StoryboardTaskStatus
-            active
-            title="思考中"
-            detail="助手正在采集需求，完成后请在中栏确认姿势方案…"
-            className="mt-3"
-          />
-        ) : null}
-        {!streaming && refGenBusyRole && refGenBusyRole !== "garment" ? (
-          <StoryboardTaskStatus
-            active
-            sweep
-            title={`${REF_GEN_ROLE_LABEL[refGenBusyRole]} AI 生成中`}
-            detail="Gateway 图像任务进行中，完成后写入中栏对应素材槽位。"
-            className="mt-3"
-          />
-        ) : null}
+          </div>
+          {streaming ? (
+            <StoryboardTaskStatus
+              active
+              title="思考中"
+              detail="助手正在采集需求，完成后请在中栏确认姿势方案…"
+              className="mt-3"
+            />
+          ) : null}
+          {!streaming && refGenBusyRole && refGenBusyRole !== "garment" ? (
+            <StoryboardTaskStatus
+              active
+              sweep
+              title={`${REF_GEN_ROLE_LABEL[refGenBusyRole]} AI 生成中`}
+              detail="Gateway 图像任务进行中，完成后写入中栏对应素材槽位。"
+              className="mt-3"
+            />
+          ) : null}
       </div>
     </EcomAssistantCollapsibleLayout>
   );
