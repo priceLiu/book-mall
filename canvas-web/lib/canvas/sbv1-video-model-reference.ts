@@ -176,6 +176,34 @@ const DASHSCOPE_WAN30_VIDEO_MODEL_KEYS = new Set([
   "wan3.0-video-prime",
 ]);
 
+function isWan30AllInOneVideoModel(modelKey: string): boolean {
+  return DASHSCOPE_WAN30_VIDEO_MODEL_KEYS.has(modelKey.trim());
+}
+
+/**
+ * 多参考图（≥2）时默认推荐 omni / 参考生视频，而非首尾帧。
+ * 首尾帧语义是「过渡起止画面」；角色/场景身份参考须走 omni。
+ */
+function prefersOmniForMultiRef(
+  modelKey: string,
+  opts?: { multiShots?: boolean; providerId?: string },
+): boolean {
+  const k = modelKey.trim();
+  // 万相 2.7 KIE i2v：omni 仅 1 张，2 张应走首尾帧
+  if (k === "wan/2-7-image-to-video") return false;
+  if (minimaxH3VideoMode(k) === "fl2v") return false;
+
+  const caps = getSbv1VideoModelRefCaps(k, opts);
+  if (caps.refApi === "single_i2v" || caps.refApi === "motion_control") {
+    return false;
+  }
+  if (caps.refApi === "volcengine") return true;
+  if (caps.refApi === "kling_image_urls" && caps.maxRefsOmni >= 2) return true;
+  if (caps.refApi === "bailian_r2v_media" && caps.maxRefsOmni >= 2) return true;
+  if (KIE_MULTI_REF_KEYS.has(k)) return true;
+  return false;
+}
+
 export function isSbv1Wan30VideoModel(modelKey: string): boolean {
   return DASHSCOPE_WAN30_VIDEO_MODEL_KEYS.has(modelKey.trim());
 }
@@ -443,8 +471,8 @@ export function getSbv1VideoDockModeChips(
     return [
       chip("t2v"),
       chip("i2v"),
+      chip("omni", "参考生视频"),
       chip("first_last"),
-      chip("omni"),
     ];
   }
 
@@ -462,13 +490,17 @@ export function getSbv1VideoDockModeChips(
     if (!multi && caps.supportedModes.includes("first_last")) {
       out.push(chip("first_last"));
     }
-    out.push(chip("omni"));
+    out.push(chip("omni", "参考生视频"));
     if (multi) out.push(chip("multi_ref", "多镜头"));
     return out;
   }
 
   if (k === "kling/v3-turbo-image-to-video") {
-    return [chip("i2v"), chip("first_last"), chip("omni")];
+    return [
+      chip("i2v"),
+      chip("omni", "参考生视频"),
+      chip("first_last"),
+    ];
   }
 
   if (k === "wan/2-7-image-to-video") {
@@ -523,7 +555,7 @@ export function defaultSbv1DockInputModeForModel(
 
 /**
  * 按参考图数量推荐 Dock 模式（须在模型支持的 chip 内）。
- * 0 → 文生；1 → 图生；2 → 首尾帧；3+ → 全能参考 / 多图。
+ * 0 → 文生；1 → 图生；2+ → 参考生视频（万相 3.0 / R2V）或首尾帧（其它）。
  */
 export function suggestSbv1DockModeForRefCount(
   refLinkCount: number,
@@ -539,11 +571,49 @@ export function suggestSbv1DockModeForRefCount(
   const n = Math.max(0, Math.floor(refLinkCount));
   if (n === 0) return pick("t2v") ?? pick("i2v") ?? chips[0]!.id;
   if (n === 1) return pick("i2v") ?? pick("omni") ?? chips[0]!.id;
+  if (n >= 2 && prefersOmniForMultiRef(modelKey, opts)) {
+    return pick("omni") ?? pick("multi_ref") ?? pick("first_last") ?? chips[0]!.id;
+  }
   if (n === 2) return pick("first_last") ?? pick("omni") ?? chips[0]!.id;
   return pick("omni") ?? pick("multi_ref") ?? chips[0]!.id;
 }
 
-/** 参考图连线数量变化时同步 dockInputMode / referenceMode */
+/**
+ * 当前 Dock 模式是否与参考图数量不兼容（须自动纠正）。
+ * 不兼容时才同步；例如 omni + 2 张参考图合法，不得强制切首尾帧。
+ */
+export function isSbv1DockModeIncompatibleWithRefCount(
+  mode: Sbv1DockInputMode,
+  refLinkCount: number,
+  chips: Sbv1DockModeChip[],
+  modelKey?: string,
+): boolean {
+  const n = Math.max(0, Math.floor(refLinkCount));
+  const chipIds = new Set(chips.map((c) => c.id));
+  const k = modelKey?.trim() ?? "";
+
+  if (n === 0) {
+    if (mode === "t2v" || mode === "i2v") return false;
+    if (mode === "first_last" || mode === "multi_ref") return true;
+    return false;
+  }
+
+  if (mode === "t2v") {
+    // 万相 3.0 All-in-One：文生 + 参考图仍走 media reference_image
+    if (isWan30AllInOneVideoModel(k)) return false;
+    return n > 0;
+  }
+
+  if (mode === "i2v" && n > 1) return true;
+
+  if (mode === "first_last" && n > 2) return true;
+
+  if (mode === "multi_ref" && n < 3 && chipIds.has("omni")) return true;
+
+  return false;
+}
+
+/** 参考图连线数量变化时同步 dockInputMode / referenceMode（仅纠正不兼容组合） */
 export function buildSbv1DockModeRefSyncPatch(
   data: Pick<
     Sbv1VideoEngineNodeData,
@@ -558,20 +628,29 @@ export function buildSbv1DockModeRefSyncPatch(
     providerId: data.engine?.providerId,
     multiShots: data.engine?.params?.multi_shots === true,
   };
-  const suggested = suggestSbv1DockModeForRefCount(
-    refLinkCount,
-    modelKey,
-    chipOpts,
-  );
-  if (!suggested) return null;
-
   const chips = getSbv1VideoDockModeChips(modelKey, chipOpts);
   const current = resolveSbv1DockInputMode(
     data.referenceMode ?? "omni",
     data.dockInputMode,
     chips,
   );
-  if (current === suggested) return null;
+  if (
+    !isSbv1DockModeIncompatibleWithRefCount(
+      current,
+      refLinkCount,
+      chips,
+      modelKey,
+    )
+  ) {
+    return null;
+  }
+
+  const suggested = suggestSbv1DockModeForRefCount(
+    refLinkCount,
+    modelKey,
+    chipOpts,
+  );
+  if (!suggested || current === suggested) return null;
   return dockInputModeToPatch(suggested);
 }
 

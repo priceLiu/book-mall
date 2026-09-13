@@ -226,10 +226,9 @@ export function syncPro2MediaGroupZIndex(
       return { ...n, zIndex: z };
     }
     if (n.parentId && styledGroupIds.has(n.parentId)) {
-      const z =
-        activeGroupIds.has(n.parentId)
-          ? PRO2_MEDIA_GROUP_CHILD_Z_SELECTED
-          : PRO2_MEDIA_GROUP_CHILD_Z_BASE;
+      const z = activeGroupIds.has(n.parentId)
+        ? PRO2_MEDIA_GROUP_CHILD_Z_SELECTED
+        : PRO2_MEDIA_GROUP_CHILD_Z_BASE;
       if (n.zIndex === z) return n;
       changed = true;
       return { ...n, zIndex: z };

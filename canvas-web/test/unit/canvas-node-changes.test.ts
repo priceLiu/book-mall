@@ -7,6 +7,10 @@ import {
   extractNodeRemoveChanges,
   extractResizeCommitIds,
   extractSelectNodeChanges,
+  applyLibtvGroupResizeFrame,
+  buildGroupResizeFrozenAbs,
+  computeGroupCornerResize,
+  extractGroupResizeRfChanges,
   filterLibtvRfChangesBeforeApply,
   resolveActiveResizeCommitIds,
   shouldFilterDimensionResizeCommit,
@@ -215,6 +219,185 @@ describe("filterLibtvRfChangesBeforeApply", () => {
         isGroupResizeCommit: false,
       }),
     ).toEqual(dragging);
+  });
+
+  it("keeps group position during active group corner resize", () => {
+    const changes: NodeChange[] = [
+      {
+        type: "position",
+        id: "g1",
+        position: { x: 40, y: 32 },
+      },
+      {
+        type: "dimensions",
+        id: "g1",
+        resizing: true,
+        dimensions: { width: 420, height: 300 },
+      },
+    ];
+    expect(
+      filterLibtvRfChangesBeforeApply(changes, {
+        groupResizeUserActive: true,
+        isGroupResizeCommit: false,
+        activeGroupResizeId: "g1",
+      }),
+    ).toEqual(changes);
+  });
+});
+
+describe("computeGroupCornerResize", () => {
+  const start = { x: 100, y: 80, w: 200, h: 120 };
+
+  it("expands from bottom-right", () => {
+    expect(
+      computeGroupCornerResize("se", start, { x: 340, y: 240 }, 40, 40),
+    ).toEqual({ x: 100, y: 80, w: 240, h: 160 });
+  });
+
+  it("expands from top-left and moves origin", () => {
+    expect(
+      computeGroupCornerResize("nw", start, { x: 80, y: 60 }, 40, 40),
+    ).toEqual({ x: 80, y: 60, w: 220, h: 140 });
+  });
+});
+
+describe("applyLibtvGroupResizeFrame", () => {
+  it("left resize moves group origin and keeps children visually fixed", () => {
+    const rfBeforeChange: CanvasFlowNode[] = [
+      {
+        id: "g1",
+        type: "group",
+        position: { x: 100, y: 80 },
+        width: 400,
+        height: 300,
+        data: {},
+      },
+      {
+        id: "c1",
+        type: "story-pro2-image",
+        parentId: "g1",
+        position: { x: 28, y: 28 },
+        width: 200,
+        height: 150,
+        data: {},
+      },
+    ];
+    const frozen = buildGroupResizeFrozenAbs("g1", rfBeforeChange);
+    const rfChanges: NodeChange[] = [
+      { type: "position", id: "g1", position: { x: 60, y: 80 } },
+      {
+        type: "dimensions",
+        id: "g1",
+        resizing: true,
+        dimensions: { width: 440, height: 300 },
+      },
+    ];
+    const next = applyLibtvGroupResizeFrame(
+      rfBeforeChange,
+      rfChanges,
+      "g1",
+      frozen,
+    );
+    const group = next.find((n) => n.id === "g1");
+    const child = next.find((n) => n.id === "c1");
+    expect(group?.position).toEqual({ x: 60, y: 80 });
+    expect(group?.width).toBe(440);
+    // child abs was 128,80 → rel 68,28 after group x=60
+    expect(child?.position).toEqual({ x: 68, y: 28 });
+  });
+
+  it("ignores XYResizer child compensation echoes", () => {
+    const rfBeforeChange: CanvasFlowNode[] = [
+      {
+        id: "g1",
+        type: "group",
+        position: { x: 100, y: 80 },
+        width: 400,
+        height: 300,
+        data: {},
+      },
+      {
+        id: "c1",
+        type: "story-pro2-image",
+        parentId: "g1",
+        position: { x: 28, y: 28 },
+        width: 200,
+        height: 150,
+        data: {},
+      },
+    ];
+    const frozen = buildGroupResizeFrozenAbs("g1", rfBeforeChange);
+    const next = applyLibtvGroupResizeFrame(
+      rfBeforeChange,
+      [
+        { type: "position", id: "g1", position: { x: 60, y: 80 } },
+        {
+          type: "dimensions",
+          id: "g1",
+          resizing: true,
+          dimensions: { width: 440, height: 300 },
+        },
+        { type: "position", id: "c1", position: { x: 0, y: 0 } },
+      ],
+      "g1",
+      frozen,
+    );
+    expect(next.find((n) => n.id === "c1")?.position).toEqual({ x: 68, y: 28 });
+  });
+
+  it("keeps node identities when resize changes are empty", () => {
+    const rfBeforeChange: CanvasFlowNode[] = [
+      {
+        id: "g1",
+        type: "group",
+        position: { x: 100, y: 80 },
+        width: 400,
+        height: 300,
+        data: {},
+      },
+      {
+        id: "c1",
+        type: "story-pro2-image",
+        parentId: "g1",
+        extent: undefined,
+        position: { x: 28, y: 28 },
+        width: 200,
+        height: 150,
+        data: {},
+      },
+    ];
+    const frozen = buildGroupResizeFrozenAbs("g1", rfBeforeChange);
+    const next = applyLibtvGroupResizeFrame(
+      rfBeforeChange,
+      [],
+      "g1",
+      frozen,
+    );
+    expect(next).toBe(rfBeforeChange);
+  });
+});
+
+describe("extractGroupResizeRfChanges", () => {
+  it("includes group position and dimensions but not child echoes", () => {
+    const frozen = new Map([["c1", { x: 100, y: 80 }]]);
+    const changes: NodeChange[] = [
+      {
+        type: "position",
+        id: "g1",
+        position: { x: 40, y: 32 },
+      },
+      {
+        type: "dimensions",
+        id: "g1",
+        resizing: true,
+        dimensions: { width: 420, height: 300 },
+      },
+      { type: "position", id: "c1", position: { x: 60, y: 48 } },
+    ];
+    expect(extractGroupResizeRfChanges(changes, "g1", frozen)).toEqual([
+      changes[0],
+      changes[1],
+    ]);
   });
 });
 

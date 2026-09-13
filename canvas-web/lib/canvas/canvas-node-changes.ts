@@ -147,13 +147,36 @@ export function filterLibtvRfChangesBeforeApply<T extends NodeChange>(
   opts: {
     groupResizeUserActive: boolean;
     isGroupResizeCommit: boolean;
+    activeGroupResizeId?: string | null;
     resizeCommitIds?: string[];
   },
 ): T[] {
   const resizeCommitIds = new Set(opts.resizeCommitIds ?? []);
+  const groupResizingInBatch = new Set(
+    changes
+      .filter(
+        (c) =>
+          c.type === "dimensions" &&
+          "resizing" in c &&
+          c.resizing === true &&
+          "id" in c &&
+          typeof c.id === "string",
+      )
+      .map((c) => (c as { id: string }).id),
+  );
   return changes.filter((c) => {
     // 坐标落库走 onNodeDragStop · 组内选中常混 position dragging:false echo
     if (c.type === "position") {
+      if (
+        "id" in c &&
+        typeof c.id === "string" &&
+        ((opts.groupResizeUserActive &&
+          opts.activeGroupResizeId &&
+          c.id === opts.activeGroupResizeId) ||
+          groupResizingInBatch.has(c.id))
+      ) {
+        return true;
+      }
       return "dragging" in c && c.dragging === true;
     }
     if (c.type !== "dimensions") return true;
@@ -532,10 +555,97 @@ export function buildGroupResizeFrozenAbs(
   return frozen;
 }
 
+export function parseGroupResizeGeometryFromChanges(
+  rfChanges: NodeChange[],
+  groupId: string,
+  fallback: CanvasFlowNode,
+): { position: { x: number; y: number }; width: number; height: number } {
+  const style = fallback.style as { width?: number; height?: number } | undefined;
+  let position = fallback.position;
+  let width = Number(fallback.width ?? style?.width ?? 0);
+  let height = Number(fallback.height ?? style?.height ?? 0);
+  for (const c of rfChanges) {
+    if (!("id" in c) || c.id !== groupId) continue;
+    if (c.type === "position" && c.position) {
+      position = c.position;
+    }
+    if (c.type === "dimensions" && c.dimensions) {
+      if (c.dimensions.width != null) width = c.dimensions.width;
+      if (c.dimensions.height != null) height = c.dimensions.height;
+    }
+  }
+  return { position, width, height };
+}
+
 /**
  * LibTV 组框缩放单帧：只应用组框变更，子节点保持 parentId + 高 z-index，
  * 相对坐标钉回冻结绝对坐标（extent 暂解除，避免组框小于内容时被 RF 裁切隐藏）。
  */
+export type GroupCornerId = "nw" | "ne" | "sw" | "se";
+
+export type GroupCornerResizeBox = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
+/** LibTV 组框 · 拖角缩放几何（固定对边锚点，左/上缘同步改 origin） */
+export function computeGroupCornerResize(
+  corner: GroupCornerId,
+  start: GroupCornerResizeBox,
+  pointer: { x: number; y: number },
+  minWidth: number,
+  minHeight: number,
+): GroupCornerResizeBox {
+  const east = corner === "ne" || corner === "se";
+  const south = corner === "sw" || corner === "se";
+  const north = corner === "nw" || corner === "ne";
+  const west = corner === "nw" || corner === "sw";
+
+  let x = start.x;
+  let y = start.y;
+  let w = start.w;
+  let h = start.h;
+
+  if (east) {
+    w = Math.max(minWidth, pointer.x - start.x);
+  }
+  if (west) {
+    const right = start.x + start.w;
+    const nextX = Math.min(pointer.x, right - minWidth);
+    w = right - nextX;
+    x = nextX;
+  }
+  if (south) {
+    h = Math.max(minHeight, pointer.y - start.y);
+  }
+  if (north) {
+    const bottom = start.y + start.h;
+    const nextY = Math.min(pointer.y, bottom - minHeight);
+    h = bottom - nextY;
+    y = nextY;
+  }
+
+  return { x, y, w, h };
+}
+
+/** 组框缩放单帧 · 仅保留组节点 dimensions/position（左/上缘缩放须同步 position） */
+export function extractGroupResizeRfChanges(
+  changes: NodeChange[],
+  groupId: string,
+  frozen: GroupResizeFrozenAbs,
+): NodeChange[] {
+  return changes.filter((c) => {
+    if (!("id" in c) || typeof c.id !== "string") return false;
+    if (frozen.has(c.id)) return false;
+    if (c.id !== groupId) return false;
+    if (c.type === "dimensions") return "resizing" in c;
+    if (c.type === "position") return true;
+    return false;
+  });
+}
+
 export function applyLibtvGroupResizeFrame(
   rfBeforeChange: CanvasFlowNode[],
   rfChanges: NodeChange[],
@@ -545,25 +655,38 @@ export function applyLibtvGroupResizeFrame(
   const groupOnlyChanges = rfChanges.filter(
     (c) => !("id" in c && typeof c.id === "string" && frozen.has(c.id)),
   );
-  const next = applyNodeChanges(
+  if (groupOnlyChanges.length === 0) return rfBeforeChange;
+  const next = syncNodeDimensionsFromChanges(
+    applyNodeChanges(groupOnlyChanges, rfBeforeChange) as CanvasFlowNode[],
     groupOnlyChanges,
-    rfBeforeChange,
-  ) as CanvasFlowNode[];
+  );
   const group = next.find((n) => n.id === groupId);
   if (!group) return next;
-  return next.map((n) => {
+  let changed = next !== rfBeforeChange;
+  const pinned = next.map((n) => {
     const abs = frozen.get(n.id);
     if (!abs) return n;
+    const position = {
+      x: abs.x - group.position.x,
+      y: abs.y - group.position.y,
+    };
+    if (
+      n.parentId === groupId &&
+      n.extent === undefined &&
+      n.position.x === position.x &&
+      n.position.y === position.y
+    ) {
+      return n;
+    }
+    changed = true;
     return {
       ...n,
       parentId: groupId,
       extent: undefined,
-      position: {
-        x: abs.x - group.position.x,
-        y: abs.y - group.position.y,
-      },
+      position,
     };
   });
+  return changed ? pinned : rfBeforeChange;
 }
 
 export function augmentStoreChangesWithResizePositions(

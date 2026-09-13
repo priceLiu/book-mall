@@ -59,7 +59,7 @@ export function buildSbv1DockMentionables(
     const d = node.data as Sbv1ImageNodeData;
     byId.set(id, {
       id,
-      label: `图片 ${linkIndex}`,
+      label: d.label?.trim() || `图片 ${linkIndex}`,
       kind: "image",
       previewUrl: d.ossUrl ?? d.blobUrl,
     });

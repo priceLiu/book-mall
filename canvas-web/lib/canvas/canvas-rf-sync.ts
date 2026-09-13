@@ -166,6 +166,10 @@ export function mergeStoreNodesIntoRf(
       continue;
     }
     changed = true;
+    const storeStyle =
+      typeof sn.style === "object" && sn.style ? sn.style : {};
+    const rfStyle =
+      typeof rf.style === "object" && rf.style ? rf.style : {};
     next.push({
       ...rf,
       type: sn.type,
@@ -183,7 +187,13 @@ export function mergeStoreNodesIntoRf(
       zIndex,
       parentId: sn.parentId,
       extent: sn.extent,
-      style: sn.style,
+      style: preserveRfPositions
+        ? {
+            ...storeStyle,
+            width: width ?? rfStyle.width,
+            height: height ?? rfStyle.height,
+          }
+        : sn.style,
       dragHandle: sn.dragHandle,
     });
   }

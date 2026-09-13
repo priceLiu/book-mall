@@ -16,6 +16,7 @@ import {
   type MediaRenderJob,
   type MediaRenderScaleMode,
   cancelMediaRenderJob,
+  pollMediaRender,
   resolveMediaRenderDownloadUrl,
   retryMediaRenderUpload,
   submitMediaRender,
@@ -248,6 +249,18 @@ export function JianyingMediaRenderActions({
     return "自动成片 20 积分";
   }, [burnInSubtitles, subtitleMode]);
 
+  const resumeJobId = useCanvasStore(
+    useCallback(
+      (s) =>
+        (
+          s.nodes.find((n) => n.id === nodeId)?.data as
+            | { mediaRenderResumeJobId?: string | null }
+            | undefined
+        )?.mediaRenderResumeJobId?.trim() || null,
+      [nodeId],
+    ),
+  );
+
   const patchInFlight = useCallback(
     (patch: JianyingMediaRenderInFlight | null) => {
       updateNodeData(
@@ -258,6 +271,19 @@ export function JianyingMediaRenderActions({
     },
     [nodeId, updateNodeData],
   );
+
+  const persistResumeJobId = useCallback(
+    (jobId: string) => {
+      const id = jobId.trim();
+      if (!id || id === "pending") return;
+      updateNodeData(nodeId, { mediaRenderResumeJobId: id });
+    },
+    [nodeId, updateNodeData],
+  );
+
+  const clearResumeJobId = useCallback(() => {
+    updateNodeData(nodeId, { mediaRenderResumeJobId: null });
+  }, [nodeId, updateNodeData]);
 
   useEffect(() => {
     syncDismissedRef.current = syncDismissed;
@@ -355,6 +381,7 @@ export function JianyingMediaRenderActions({
           videoUrl: ossDownloadUrl,
           ...(posterUrl ? { posterUrl } : {}),
           mediaRenderInFlight: null,
+          mediaRenderResumeJobId: null,
           mediaFit: false,
           mediaFitKey: undefined,
           mediaRenderResult,
@@ -557,6 +584,7 @@ export function JianyingMediaRenderActions({
         const message = friendlyMediaRenderError(
           finalJob.errorMessage ?? "云端剪辑失败",
         );
+        clearResumeJobId();
         patchInFlight({
           jobId: finalJob.id,
           status: "FAILED",
@@ -578,7 +606,15 @@ export function JianyingMediaRenderActions({
       setUploadFailed(false);
       return { outcome: "succeeded" };
     },
-    [base, nodeId, patchInFlight, persistResult, spawnPreview, updateNodeData],
+    [
+      base,
+      clearResumeJobId,
+      nodeId,
+      patchInFlight,
+      persistResult,
+      spawnPreview,
+      updateNodeData,
+    ],
   );
 
   const runTrackedJob = useCallback(
@@ -606,6 +642,63 @@ export function JianyingMediaRenderActions({
     setProgress(null);
     setStepLabel(null);
   }, [inFlight, patchInFlight]);
+
+  /** 刷新后：mediaRenderInFlight 为会话态，用落盘 jobId 恢复轮询或写回成片 */
+  const resumedPersistedJobRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!base?.trim() || !resumeJobId) return;
+    if (persisted?.downloadUrl?.trim()) return;
+    if (isMediaRenderJobInflight(inFlight)) return;
+    if (resumedPersistedJobRef.current === resumeJobId) return;
+    if (isMediaRenderPollDismissed(nodeId, resumeJobId)) return;
+
+    resumedPersistedJobRef.current = resumeJobId;
+    let cancelled = false;
+
+    void pollMediaRender(base, resumeJobId)
+      .then(async (job) => {
+        if (cancelled || isMediaRenderPollDismissed(nodeId, job.id)) return;
+        if (job.status === "SUCCEEDED") {
+          const downloadUrl = resolveMediaRenderDownloadUrl(base, job);
+          if (downloadUrl) {
+            persistResult(
+              downloadUrl,
+              job.expiresAt,
+              job.posterUrl,
+              job.id,
+            );
+            return;
+          }
+        }
+        if (job.status === "FAILED" || job.status === "CANCELLED") {
+          clearResumeJobId();
+          if (job.errorMessage?.trim()) {
+            await showRenderError(friendlyMediaRenderError(job.errorMessage));
+          }
+          return;
+        }
+        applyJobProgress(job);
+        setBusy(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        resumedPersistedJobRef.current = null;
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    applyJobProgress,
+    base,
+    clearResumeJobId,
+    inFlight,
+    nodeId,
+    persistResult,
+    persisted?.downloadUrl,
+    resumeJobId,
+    showRenderError,
+  ]);
 
   useEffect(() => {
     if (!base || !isMediaRenderJobInflight(inFlight)) return;
@@ -792,6 +885,7 @@ export function JianyingMediaRenderActions({
       videoUrl: undefined,
       posterUrl: undefined,
       mediaRenderResult: null,
+      mediaRenderResumeJobId: null,
     });
     // 不在此处 refresh：BFF 代理会静默续签；introspect 在 DB 拥堵时可达 5～13s，会假死在「提交任务」
     // 会话态占位（已从落盘剥离）；仅用于节点扫光与 Dock 进度
@@ -886,6 +980,7 @@ export function JianyingMediaRenderActions({
       setSubmitting(false);
       if (isMediaRenderPollDismissed(nodeId, job.id)) return;
       // 立刻换成真实 jobId，避免一直停在 pending
+      persistResumeJobId(job.id);
       applyJobProgress(job);
       setStepLabel(renderStatusLabel(job));
       setProgress((prev) => Math.max(prev ?? 0, job.progress));
@@ -903,6 +998,7 @@ export function JianyingMediaRenderActions({
         e instanceof Error ? e.message : String(e),
       );
       patchInFlight(null);
+      clearResumeJobId();
       await showRenderError(message);
     } finally {
       submittingRef.current = false;

@@ -49,6 +49,7 @@ import {
   isCanvasDimensionCommitOnly,
   isResizeRelatedChange,
   extractSelectNodeChanges,
+  extractGroupResizeRfChanges,
   canvasNodesEqualIgnoringSelectionAndZ,
   filterLibtvRfChangesBeforeApply,
   filterStoreBoundNodeChanges,
@@ -1020,6 +1021,7 @@ function FlowCanvasInner({
         rfChanges = filterLibtvRfChangesBeforeApply(rfChanges, {
           groupResizeUserActive: groupResizeUserActiveRef.current,
           isGroupResizeCommit,
+          activeGroupResizeId: groupResizeIdRef.current,
           resizeCommitIds: resizeCommitIdsEarly,
         });
         if (
@@ -1036,14 +1038,23 @@ function FlowCanvasInner({
       let rfAfterChange = rfBeforeChange;
       let appliedRfChanges = false;
       if (activeGroupResizeId && groupResizeFrozenRef.current) {
-        rfAfterChange = applyLibtvGroupResizeFrame(
-          rfBeforeChange,
-          rfChanges,
+        const groupResizeRfChanges = extractGroupResizeRfChanges(
+          changes,
           activeGroupResizeId,
           groupResizeFrozenRef.current,
         );
-        setRfNodes(rfAfterChange);
-        appliedRfChanges = true;
+        if (groupResizeRfChanges.length > 0) {
+          rfAfterChange = applyLibtvGroupResizeFrame(
+            rfBeforeChange,
+            groupResizeRfChanges,
+            activeGroupResizeId,
+            groupResizeFrozenRef.current,
+          );
+          if (rfAfterChange !== rfBeforeChange) {
+            setRfNodes(rfAfterChange);
+          }
+          appliedRfChanges = true;
+        }
       }
       const applyRfChangesLocally = (
         batch: NodeChange<CanvasFlowNode>[],

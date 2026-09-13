@@ -89,8 +89,13 @@ export function buildCanvasVideoKieInput(args: {
     const res = resolution === "1080p" ? "1080p" : "720p";
     const lastUrl = args.lastFrameUrl?.trim() || null;
     let image_urls: string[] = [];
-    if (mainUrl && lastUrl) image_urls = [mainUrl, lastUrl];
-    else if (mainUrl) image_urls = [mainUrl];
+    if (mainUrl && lastUrl) {
+      image_urls = [mainUrl, lastUrl];
+    } else if (mainUrl && extraRefs.length > 0) {
+      image_urls = [mainUrl, ...extraRefs].slice(0, 2);
+    } else if (mainUrl) {
+      image_urls = [mainUrl];
+    }
     return {
       model: "kling/v3-turbo-image-to-video",
       input: {

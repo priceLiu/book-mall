@@ -2107,6 +2107,9 @@ export async function runVideoEngineNode(
       );
       const durationSec = Number(params.duration ?? data.durationSec ?? 5);
       const dockMode = String(data.dockInputMode ?? "").trim();
+      const wan30AllRefs = [kieMainFrame, ...kieReferenceImageUrls].filter(
+        Boolean,
+      );
       const wan30Media = isDashscopeWan30VideoModel(effectiveModelKey)
         ? dockMode === "first_last" || Boolean(kieLastFrame)
           ? buildDashscopeWan30Media({
@@ -2114,15 +2117,13 @@ export async function runVideoEngineNode(
               lastFrameUrl: kieLastFrame,
               referenceImageUrls: kieReferenceImageUrls,
             })
-          : dockMode === "i2v"
+          : dockMode === "i2v" && wan30AllRefs.length <= 1
             ? buildDashscopeWan30Media({
                 firstFrameUrl: kieMainFrame,
               })
             : buildDashscopeWan30Media({
                 firstFrameUrl: "",
-                referenceImageUrls: [kieMainFrame, ...kieReferenceImageUrls].filter(
-                  Boolean,
-                ),
+                referenceImageUrls: wan30AllRefs,
               })
         : undefined;
       dashscopeVideoBody = buildDashscopeSbv1T2vVideoBody({

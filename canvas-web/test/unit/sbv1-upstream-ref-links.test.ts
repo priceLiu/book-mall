@@ -94,6 +94,40 @@ describe("resolveSbv1UpstreamRefLinks", () => {
     expect(links).toHaveLength(1);
     expect(links[0]?.previewUrl).toBe("https://cdn.example/runtime.jpg");
   });
+
+  it("uses upstream image node label when renamed", () => {
+    const img1 = "i1";
+    const img2 = "i2";
+    const engineId = "v1";
+    const nodes: CanvasFlowNode[] = [
+      {
+        id: img1,
+        type: "sbv1-image",
+        position: { x: 0, y: 0 },
+        data: { label: "小蓝", ossUrl: "https://cdn.example/a.jpg" },
+      },
+      {
+        id: img2,
+        type: "sbv1-image",
+        position: { x: 0, y: 120 },
+        data: { label: "小红", ossUrl: "https://cdn.example/b.jpg" },
+      },
+      {
+        id: engineId,
+        type: "sbv1-video-engine",
+        position: { x: 200, y: 0 },
+        data: {},
+      },
+    ];
+    const edges: CanvasFlowEdge[] = [
+      { id: "e1", source: img1, target: engineId, targetHandle: "in_ref" },
+      { id: "e2", source: img2, target: engineId, targetHandle: "in_ref" },
+    ];
+    const links = resolveSbv1UpstreamRefLinks(engineId, nodes, edges);
+    expect(links).toHaveLength(2);
+    expect(links[0]?.label).toBe("小蓝");
+    expect(links[1]?.label).toBe("小红");
+  });
 });
 
 describe("resolveSbv1UpstreamMotionVideoLinks", () => {

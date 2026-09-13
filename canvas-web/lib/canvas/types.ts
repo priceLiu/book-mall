@@ -568,6 +568,8 @@ export type JianyingExportNodeData = {
   mediaRenderResult?: JianyingMediaRenderResult | null;
   /** 进行中的剪辑任务（Dock 隐藏后仍可恢复进度） */
   mediaRenderInFlight?: import("./media-render-in-flight").JianyingMediaRenderInFlight | null;
+  /** 落盘 jobId · 刷新后恢复轮询（mediaRenderInFlight 为会话态） */
+  mediaRenderResumeJobId?: string | null;
 };
 
 /** 2.0 · 自动成片（播放器 + 云端剪辑 Dock） */
@@ -580,6 +582,8 @@ export type JianyingAutoRenderNodeData = {
   mediaRenderResult?: JianyingMediaRenderResult | null;
   /** 进行中的剪辑任务（Dock 隐藏后仍可恢复进度） */
   mediaRenderInFlight?: import("./media-render-in-flight").JianyingMediaRenderInFlight | null;
+  /** 落盘 jobId · 刷新后恢复轮询（mediaRenderInFlight 为会话态） */
+  mediaRenderResumeJobId?: string | null;
   /** 入边视频源节点 id · 剪辑顺序（持久化用户调整） */
   clipOrderNodeIds?: string[];
   /** 入边音频源节点 id · 与视频按序号配对 */

@@ -120,7 +120,14 @@ export type DetailPageSuiteProject = {
   references: DetailPageSuiteReference[];
   chatHistory: DetailPageSuiteChatMessage[];
   suite: DetailPageSuiteState;
-  meta: { phase?: DetailPageSuitePhase; dimensionStep?: number; templateId?: string } | null;
+  meta: {
+    phase?: DetailPageSuitePhase;
+    dimensionStep?: number;
+    templateId?: string;
+    pendingImages?: Record<string, { startedAt: string; modelKey?: string }>;
+    pendingPromptModules?: Record<string, { startedAt: string }>;
+    promptSnapshots?: Record<string, { prompt: string; itemLabel: string; updatedAt: string }>;
+  } | null;
   createdAt: string;
   updatedAt: string;
 };

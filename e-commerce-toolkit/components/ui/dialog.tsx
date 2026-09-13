@@ -29,7 +29,7 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 /** 全站 Dialog 右上角关闭钮（与图片预览 lightbox 一致） */
 export const ECOM_DIALOG_CLOSE_BUTTON_CLASS = cn(
   "absolute right-4 top-4 z-20",
-  "flex h-8 w-8 items-center justify-center",
+  "flex size-8 shrink-0 items-center justify-center",
   "rounded-full border-0 bg-black/75 text-white opacity-100 backdrop-blur-sm",
   "shadow-md transition-colors",
   "hover:bg-black hover:opacity-100",

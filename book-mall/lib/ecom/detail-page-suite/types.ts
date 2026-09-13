@@ -134,11 +134,31 @@ export type DetailPageSuitePhase =
   | "images"
   | "done";
 
+export type DetailPageSuitePendingImageEntry = {
+  startedAt: string;
+  modelKey?: string;
+};
+
+export type DetailPageSuitePendingPromptEntry = {
+  startedAt: string;
+};
+
+export type DetailPageSuitePromptSnapshot = {
+  prompt: string;
+  itemLabel: string;
+  updatedAt: string;
+};
+
 export type DetailPageSuiteMeta = {
   phase?: DetailPageSuitePhase;
   dimensionStep?: number;
   templateId?: string;
-  pendingImages?: Array<{ moduleId: string; slotKey: string; logId?: string }>;
+  /** `${moduleId}::${slotKey}` → 出图进行中（刷新后可恢复 busy） */
+  pendingImages?: Record<string, DetailPageSuitePendingImageEntry>;
+  /** moduleId → 模块提示词 LLM 进行中 */
+  pendingPromptModules?: Record<string, DetailPageSuitePendingPromptEntry>;
+  /** `${moduleId}::${slotKey}` → 提示词备份（出图失败 / slots 失步时可恢复） */
+  promptSnapshots?: Record<string, DetailPageSuitePromptSnapshot>;
 };
 
 export type DetailPageSuiteProject = {

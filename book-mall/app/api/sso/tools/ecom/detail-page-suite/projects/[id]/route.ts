@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
+import { reconcileDetailPageSuiteProjectFromAssets } from "@/lib/ecom/detail-page-suite/asset-reconcile";
 import {
   deleteDetailPageSuiteProject,
   getDetailPageSuiteProject,
@@ -24,9 +25,20 @@ export async function GET(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
-  const project = await getDetailPageSuiteProject(auth.userId, id);
+  let project = await getDetailPageSuiteProject(auth.userId, id);
   if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
-  return NextResponse.json({ project });
+  const recovered = await reconcileDetailPageSuiteProjectFromAssets(auth.userId, project);
+  project = recovered.project;
+  return NextResponse.json({
+    project,
+    recovered:
+      recovered.recoveredImages > 0 || recovered.recoveredPrompts > 0
+        ? {
+            images: recovered.recoveredImages,
+            prompts: recovered.recoveredPrompts,
+          }
+        : undefined,
+  });
 }
 
 export async function PATCH(req: Request, ctx: Ctx) {

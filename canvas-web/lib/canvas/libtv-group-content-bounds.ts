@@ -11,9 +11,11 @@ function nodeMeasuredSize(n: CanvasFlowNode): { w: number; h: number } {
 }
 
 /** 与 pro2-media-group-layout.ts 保持一致 · 避免单测拉入 use client 模块 */
-const LIBTV_GROUP_PAD = 96;
-const LIBTV_GROUP_HEADER = 48;
-const LIBTV_GROUP_EXTRA = 84;
+const LIBTV_GROUP_PAD_X = 28;
+const LIBTV_GROUP_PAD_Y = 28;
+const LIBTV_GROUP_HEADER = 0;
+const LIBTV_GROUP_EXTRA_X = 0;
+const LIBTV_GROUP_EXTRA_Y = 0;
 
 export const LIBTV_GROUP_ABSOLUTE_MIN_WIDTH = 220;
 export const LIBTV_GROUP_ABSOLUTE_MIN_HEIGHT = 140;
@@ -42,8 +44,8 @@ export function computeLibtvGroupContentMinSize(
     };
   }
 
-  let maxRight = LIBTV_GROUP_PAD;
-  let maxBottom = LIBTV_GROUP_PAD + LIBTV_GROUP_HEADER;
+  let maxRight = LIBTV_GROUP_PAD_X;
+  let maxBottom = LIBTV_GROUP_PAD_Y + LIBTV_GROUP_HEADER;
 
   for (const child of children) {
     const { w, h } = nodeMeasuredSize(child);
@@ -63,11 +65,11 @@ export function computeLibtvGroupContentMinSize(
   return {
     minWidth: Math.max(
       LIBTV_GROUP_ABSOLUTE_MIN_WIDTH,
-      Math.ceil(maxRight + LIBTV_GROUP_PAD + LIBTV_GROUP_EXTRA),
+      Math.ceil(maxRight + LIBTV_GROUP_PAD_X + LIBTV_GROUP_EXTRA_X),
     ),
     minHeight: Math.max(
       LIBTV_GROUP_ABSOLUTE_MIN_HEIGHT,
-      Math.ceil(maxBottom + LIBTV_GROUP_PAD + LIBTV_GROUP_EXTRA),
+      Math.ceil(maxBottom + LIBTV_GROUP_PAD_Y + LIBTV_GROUP_EXTRA_Y),
     ),
   };
 }
@@ -127,10 +129,10 @@ export function computeGroupChildrenAbsBounds(
   }
   if (!Number.isFinite(left) || !Number.isFinite(top)) return null;
   return {
-    left: left - LIBTV_GROUP_PAD,
-    top: top - LIBTV_GROUP_PAD - LIBTV_GROUP_HEADER,
-    right: right + LIBTV_GROUP_PAD,
-    bottom: bottom + LIBTV_GROUP_PAD,
+    left: left - LIBTV_GROUP_PAD_X,
+    top: top - LIBTV_GROUP_PAD_Y - LIBTV_GROUP_HEADER,
+    right: right + LIBTV_GROUP_PAD_X,
+    bottom: bottom + LIBTV_GROUP_PAD_Y,
   };
 }
 

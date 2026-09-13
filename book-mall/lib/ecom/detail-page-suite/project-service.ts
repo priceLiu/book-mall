@@ -13,6 +13,7 @@ import {
   sanitizeChat,
   sanitizeReferences,
 } from "./parse";
+import { normalizeDetailPageSuiteProject, prepareDetailPageSuitePatch } from "./suite-persist";
 import {
   ECOM_DETAIL_PAGE_SUITE_MODULE,
   type DetailPageSuiteBrief,
@@ -114,7 +115,20 @@ export async function getDetailPageSuiteProject(
   const row = await prisma.ecomDetailPageSuiteProject.findFirst({
     where: { id, userId, module: ECOM_DETAIL_PAGE_SUITE_MODULE },
   });
-  return row ? rowToDto(row) : null;
+  if (!row) return null;
+  let project = rowToDto(row);
+  const healed = normalizeDetailPageSuiteProject(project);
+  if (healed.changed) {
+    const saved = await prisma.ecomDetailPageSuiteProject.update({
+      where: { id },
+      data: {
+        suite: healed.project.suite as Prisma.InputJsonValue,
+        meta: (healed.project.meta ?? null) as Prisma.InputJsonValue,
+      },
+    });
+    project = rowToDto(saved);
+  }
+  return project;
 }
 
 export async function updateDetailPageSuiteProject(
@@ -135,6 +149,14 @@ export async function updateDetailPageSuiteProject(
     where: { id, userId, module: ECOM_DETAIL_PAGE_SUITE_MODULE },
   });
   if (!existing) return null;
+  const existingProject = rowToDto(existing);
+  const normalizedPatch =
+    patch.suite !== undefined
+      ? prepareDetailPageSuitePatch(existingProject, {
+          suite: patch.suite,
+          meta: patch.meta !== undefined ? patch.meta : existingProject.meta,
+        })
+      : null;
   const row = await prisma.ecomDetailPageSuiteProject.update({
     where: { id },
     data: {
@@ -150,8 +172,16 @@ export async function updateDetailPageSuiteProject(
       ...(patch.chatHistory !== undefined
         ? { chatHistory: patch.chatHistory as Prisma.InputJsonValue }
         : {}),
-      ...(patch.suite !== undefined ? { suite: patch.suite as Prisma.InputJsonValue } : {}),
-      ...(patch.meta !== undefined ? { meta: patch.meta as Prisma.InputJsonValue } : {}),
+      ...(normalizedPatch?.suite !== undefined
+        ? { suite: normalizedPatch.suite as Prisma.InputJsonValue }
+        : patch.suite !== undefined
+          ? { suite: patch.suite as Prisma.InputJsonValue }
+          : {}),
+      ...(normalizedPatch?.meta !== undefined
+        ? { meta: normalizedPatch.meta as Prisma.InputJsonValue }
+        : patch.meta !== undefined
+          ? { meta: patch.meta as Prisma.InputJsonValue }
+          : {}),
     },
   });
   return rowToDto(row);

@@ -3,7 +3,9 @@
 import { useMemo, useRef, useState } from "react";
 import { Images, Plus, Sparkles, Trash2 } from "lucide-react";
 
+import { DetailPageSuiteAddSlotCard } from "@/components/detail-page-suite/detail-page-suite-add-slot-card";
 import { DetailPageSuiteSlotCard } from "@/components/detail-page-suite/detail-page-suite-slot-card";
+import { canAddCustomSuiteSlot } from "@/lib/detail-page-suite-add-custom-slot";
 import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
@@ -28,7 +30,15 @@ import type {
   DetailPageSuiteProject,
 } from "@/lib/detail-page-suite-types";
 import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
+import type { EcomImagePreviewItem } from "@/lib/media/ecom-image-preview";
 import { cn } from "@/lib/utils";
+
+export type DetailPageSuiteSlotImagePreviewPayload = {
+  src: string;
+  title: string;
+  items: EcomImagePreviewItem[];
+  initialIndex: number;
+};
 
 type Props = {
   project: DetailPageSuiteProject;
@@ -37,18 +47,22 @@ type Props = {
   uploadProgress?: number | null;
   uploadProgressLabel?: string;
   activeGenSlotKeys?: ReadonlySet<string>;
+  activePromptModuleIds?: ReadonlySet<string>;
+  activeRewriteSlotKeys?: ReadonlySet<string>;
   displayRatio?: EcomDetailPageRatio;
-  imageModelKey?: string;
+  /** 出图模型展示名（非「生成中」状态） */
+  imageModelLabel?: string;
   onUploadFiles: (files: File[]) => void;
   onAttachAssets: (assets: Array<{ id: string; ossUrl: string; title: string }>) => void;
   onRemoveRef: (id: string) => void;
   onPreview: (url: string) => void;
-  onPreviewPrompt?: (moduleId: string, slotKey: string, prompt: string, label: string) => void;
+  onPreviewSlotImage: (payload: DetailPageSuiteSlotImagePreviewPayload) => void;
+  onOpenPromptEdit?: (moduleId: string, slotKey: string, prompt: string, label: string) => void;
   onToggleModule: (moduleId: string, enable: boolean) => void;
   onChangeCount: (moduleId: string, n: number) => void;
   onToggleItem: (moduleId: string, item: string) => void;
   onRequestAddItem: (moduleId: string) => void;
-  onEditPrompt: (moduleId: string, slotKey: string, prompt: string) => void;
+  onRequestAddSlot: (moduleId: string) => void;
   onGenModulePrompts: (moduleId: string) => void;
   onToggleModuleImageSelect: (moduleId: string, selected: boolean) => void;
   onToggleSlotImageSelect: (moduleId: string, slotKey: string) => void;
@@ -71,17 +85,20 @@ export function DetailPageSuiteContentPanel({
   uploadProgress,
   uploadProgressLabel,
   activeGenSlotKeys,
+  activePromptModuleIds,
+  activeRewriteSlotKeys,
   displayRatio: displayRatioProp,
   onUploadFiles,
   onAttachAssets,
   onRemoveRef,
   onPreview,
-  onPreviewPrompt,
+  onPreviewSlotImage,
+  onOpenPromptEdit,
   onToggleModule,
   onChangeCount,
   onToggleItem,
   onRequestAddItem,
-  onEditPrompt,
+  onRequestAddSlot,
   onGenModulePrompts,
   onToggleModuleImageSelect,
   onToggleSlotImageSelect,
@@ -91,7 +108,7 @@ export function DetailPageSuiteContentPanel({
   onPickImageModel,
   onDisplayRatioChange,
   onActiveImageIndexChange,
-  imageModelKey,
+  imageModelLabel,
   onNewProject,
   loadProjectList,
   onOpenProject,
@@ -100,6 +117,8 @@ export function DetailPageSuiteContentPanel({
   const inputRef = useRef<HTMLInputElement>(null);
   const [assetOpen, setAssetOpen] = useState(false);
   const activeGen = activeGenSlotKeys ?? new Set<string>();
+  const activePromptModules = activePromptModuleIds ?? new Set<string>();
+  const activeRewrite = activeRewriteSlotKeys ?? new Set<string>();
 
   const displayRatio = useMemo(
     () =>
@@ -134,11 +153,16 @@ export function DetailPageSuiteContentPanel({
   }, [project.meta?.phase]);
 
   const genStatusLabel = useMemo(() => {
-    if (activeGen.size === 0) return null;
-    const labels = [...activeGen].slice(0, 4).map((k) => k.split("::")[1] ?? k);
-    const suffix = activeGen.size > 4 ? ` 等 ${activeGen.size} 张` : "";
-    return `${labels.join("、")}${suffix} 出图中`;
-  }, [activeGen]);
+    if (activeGen.size > 0) {
+      const labels = [...activeGen].slice(0, 4).map((k) => k.split("::")[1] ?? k);
+      const suffix = activeGen.size > 4 ? ` 等 ${activeGen.size} 张` : "";
+      return `${labels.join("、")}${suffix} 出图中`;
+    }
+    if (activePromptModules.size > 0) {
+      return `${activePromptModules.size} 个模块提示词生成中`;
+    }
+    return null;
+  }, [activeGen, activePromptModules]);
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white">
@@ -171,7 +195,7 @@ export function DetailPageSuiteContentPanel({
                 ) : (
                   detailPageRatioLabel(displayRatio, project.brief?.platformCode)
                 )}
-                {imageModelKey ? ` · 生图 ${imageModelKey}` : ""}
+                {imageModelLabel ? ` · 出图模型 ${imageModelLabel}` : ""}
               </p>
             </div>
             <EcomIconToolbar>
@@ -293,15 +317,18 @@ export function DetailPageSuiteContentPanel({
                   key={mod.module_id}
                   mod={mod}
                   displayRatio={displayRatio}
-                  llmBusy={llmBusy}
                   activeGen={activeGen}
+                  activePromptModules={activePromptModules}
+                  activeRewrite={activeRewrite}
                   onPreview={onPreview}
-                  onPreviewPrompt={onPreviewPrompt}
+                  onPreviewSlotImage={onPreviewSlotImage}
+                  onOpenPromptEdit={onOpenPromptEdit}
                   onToggleModule={onToggleModule}
                   onChangeCount={onChangeCount}
                   onToggleItem={onToggleItem}
                   onRequestAddItem={onRequestAddItem}
-                  onEditPrompt={onEditPrompt}
+                  onRequestAddSlot={onRequestAddSlot}
+                  suite={project.suite}
                   onGenModulePrompts={onGenModulePrompts}
                   onToggleModuleImageSelect={onToggleModuleImageSelect}
                   onToggleSlotImageSelect={onToggleSlotImageSelect}
@@ -324,15 +351,17 @@ export function DetailPageSuiteContentPanel({
 function ModuleBlock({
   mod,
   displayRatio,
-  llmBusy,
   activeGen,
+  activePromptModules,
+  activeRewrite,
   onPreview,
-  onPreviewPrompt,
+  onPreviewSlotImage,
+  onOpenPromptEdit,
   onToggleModule,
   onChangeCount,
   onToggleItem,
   onRequestAddItem,
-  onEditPrompt,
+  onRequestAddSlot,
   onGenModulePrompts,
   onToggleModuleImageSelect,
   onToggleSlotImageSelect,
@@ -340,18 +369,22 @@ function ModuleBlock({
   onRequestGenerateSlot,
   onRewriteSlot,
   onActiveImageIndexChange,
+  suite,
 }: {
   mod: DetailPageSuiteModuleState;
+  suite: DetailPageSuiteProject["suite"];
   displayRatio: EcomDetailPageRatio;
-  llmBusy?: boolean;
   activeGen: ReadonlySet<string>;
+  activePromptModules: ReadonlySet<string>;
+  activeRewrite: ReadonlySet<string>;
   onPreview: (url: string) => void;
-  onPreviewPrompt?: (moduleId: string, slotKey: string, prompt: string, label: string) => void;
+  onPreviewSlotImage: (payload: DetailPageSuiteSlotImagePreviewPayload) => void;
+  onOpenPromptEdit?: (moduleId: string, slotKey: string, prompt: string, label: string) => void;
   onToggleModule: Props["onToggleModule"];
   onChangeCount: Props["onChangeCount"];
   onToggleItem: Props["onToggleItem"];
   onRequestAddItem: Props["onRequestAddItem"];
-  onEditPrompt: Props["onEditPrompt"];
+  onRequestAddSlot: Props["onRequestAddSlot"];
   onGenModulePrompts: Props["onGenModulePrompts"];
   onToggleModuleImageSelect: Props["onToggleModuleImageSelect"];
   onToggleSlotImageSelect: Props["onToggleSlotImageSelect"];
@@ -366,8 +399,13 @@ function ModuleBlock({
   const selectedKeys = selectableSlots
     .filter((s) => s.selectedForImage !== false)
     .map((s) => composeSuiteSlotKey(mod.module_id, s.item_key));
+  const moduleGenKeys = selectedKeys.filter((k) => activeGen.has(k));
+  const moduleGenBusy = moduleGenKeys.length > 0;
   const pendingKeys = selectedKeys.filter((k) => !activeGen.has(k));
   const promptReadyCount = displaySlots.filter((s) => s.positive_prompt?.trim()).length;
+  const modulePromptBusy = activePromptModules.has(mod.module_id);
+  const addSlotCheck = canAddCustomSuiteSlot(suite, mod.module_id);
+  const canAddSlot = addSlotCheck.ok;
 
   return (
     <div className="rounded-xl border border-[#e8e8ed] p-4">
@@ -409,14 +447,14 @@ function ModuleBlock({
         </label>
         <EcomButtonSecondary
           size="sm"
-          disabled={llmBusy || !mod.enable}
+          disabled={modulePromptBusy || !mod.enable}
           onClick={() => onGenModulePrompts(mod.module_id)}
         >
-          生成本模块提示词
+          {modulePromptBusy ? "提示词生成中…" : "生成本模块提示词"}
         </EcomButtonSecondary>
         <EcomButtonPrimary
           size="sm"
-          disabled={!mod.enable || pendingKeys.length === 0}
+          disabled={!mod.enable || (pendingKeys.length === 0 && !moduleGenBusy)}
           onClick={() =>
             onRequestGenerateModule(
               mod.module_id,
@@ -424,10 +462,10 @@ function ModuleBlock({
             )
           }
         >
-          {pendingKeys.length > 0
-            ? `生成已选（${pendingKeys.length}）`
-            : activeGen.size > 0
-              ? "所选点位生成中"
+          {moduleGenBusy
+            ? `出图中（${moduleGenKeys.length}）`
+            : pendingKeys.length > 0
+              ? `生成已选（${pendingKeys.length}）`
               : "生成已选"}
         </EcomButtonPrimary>
       </div>
@@ -444,6 +482,16 @@ function ModuleBlock({
           {displaySlots.map((slot) => {
             const slotComposite = composeSuiteSlotKey(mod.module_id, slot.item_key);
             const hasPrompt = isSuiteSlotSelectable(slot);
+            const slotGenBusy = activeGen.has(slotComposite);
+            const slotRewriteBusy = activeRewrite.has(slotComposite);
+            const slotBusy = slotGenBusy || slotRewriteBusy || modulePromptBusy;
+            const busyLabel = slotGenBusy
+              ? "出图中…"
+              : slotRewriteBusy
+                ? "重写提示词…"
+                : modulePromptBusy
+                  ? "撰写提示词…"
+                  : undefined;
             return (
               <DetailPageSuiteSlotCard
                 key={`${mod.module_id}-${slot.item_key}-${slot.item_label}`}
@@ -453,21 +501,22 @@ function ModuleBlock({
                 selectable
                 selected={hasPrompt && slot.selectedForImage !== false}
                 onToggleSelect={
-                  hasPrompt
+                  hasPrompt && !slotBusy
                     ? () => onToggleSlotImageSelect(mod.module_id, slot.item_key)
                     : undefined
                 }
-                busy={activeGen.has(slotComposite)}
+                busy={slotBusy}
+                busyLabel={busyLabel}
                 onRegenerateImage={
-                  hasPrompt
+                  hasPrompt && !slotBusy
                     ? () => onRequestGenerateSlot(mod.module_id, slot.item_key)
                     : undefined
                 }
-                onPreviewImage={onPreview}
-                onPreviewPrompt={
-                  onPreviewPrompt && hasPrompt
+                onPreviewImage={onPreviewSlotImage}
+                onOpenPromptEdit={
+                  onOpenPromptEdit && hasPrompt && !slotBusy
                     ? () =>
-                        onPreviewPrompt(
+                        onOpenPromptEdit(
                           mod.module_id,
                           slot.item_key,
                           slot.positive_prompt,
@@ -475,13 +524,10 @@ function ModuleBlock({
                         )
                     : undefined
                 }
-                onEditPrompt={
-                  hasPrompt
-                    ? (prompt) => onEditPrompt(mod.module_id, slot.item_key, prompt)
-                    : undefined
-                }
                 onRewritePrompt={
-                  hasPrompt ? () => onRewriteSlot(mod.module_id, slot.item_key) : undefined
+                  hasPrompt && !slotBusy
+                    ? () => onRewriteSlot(mod.module_id, slot.item_key)
+                    : undefined
                 }
                 onActiveImageIndexChange={
                   onActiveImageIndexChange
@@ -491,6 +537,12 @@ function ModuleBlock({
               />
             );
           })}
+          <DetailPageSuiteAddSlotCard
+            displayRatio={displayRatio}
+            disabled={!canAddSlot || modulePromptBusy}
+            disabledReason={!canAddSlot && !addSlotCheck.ok ? addSlotCheck.reason : undefined}
+            onClick={() => onRequestAddSlot(mod.module_id)}
+          />
         </div>
       ) : mod.enable ? (
         <p className="mb-2 text-xs text-[#86868b]">请在下方配置子维度，或调整 N 张数。</p>

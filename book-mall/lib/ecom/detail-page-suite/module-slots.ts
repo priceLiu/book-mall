@@ -1,10 +1,7 @@
-import type {
-  DetailPageSuiteModuleState,
-  DetailPageSuiteSlot,
-} from "@/lib/detail-page-suite-types";
+import type { DetailPageSuitePromptSnapshot } from "./types";
+import type { DetailPageSuiteModuleState, DetailPageSuiteSlot } from "./types";
 
-type PromptSnapshot = { prompt: string; itemLabel: string; updatedAt: string };
-
+/** 子维度 label 模糊匹配（与 prompt-llm 校验一致） */
 export function detailPageSuiteLabelMatches(a: string, b: string): boolean {
   const sa = a.trim();
   const sb = b.trim();
@@ -24,8 +21,10 @@ function slotKeyForIndex(index: number, label: string): string {
   return slug ? `item_${slug}` : `item_${index + 1}`;
 }
 
-/** 将 selected_item_list 与已有 slots 合并，供中栏点位格展示（含未生成 prompt 的占位） */
-export function resolveModuleDisplaySlots(mod: DetailPageSuiteModuleState): DetailPageSuiteSlot[] {
+/** 与 e-commerce-toolkit `resolveModuleDisplaySlots` 保持一致：selected_item_list 与 slots 合并 */
+export function resolveModuleDisplaySlots(
+  mod: DetailPageSuiteModuleState,
+): DetailPageSuiteSlot[] {
   if (!mod.enable) return [];
 
   const selected = mod.selected_item_list.slice(0, Math.max(mod.generate_count, 0));
@@ -54,7 +53,6 @@ export function resolveModuleDisplaySlots(mod: DetailPageSuiteModuleState): Deta
   });
 }
 
-/** 持久化：让 slots 与当前子维度勾选对齐（保留已有 prompt / 图片） */
 export function syncModuleSlotsFromSelection(
   mod: DetailPageSuiteModuleState,
 ): DetailPageSuiteModuleState {
@@ -65,9 +63,13 @@ export function syncModuleSlotsFromSelection(
   };
 }
 
+/**
+ * 将 display / 孤儿 slot / meta 快照合并为应持久化的 slots 数组。
+ * 出图前、写库前调用，避免 prompt 因 selected_item_list 失步而丢失。
+ */
 export function materializeModuleSlots(
   mod: DetailPageSuiteModuleState,
-  snapshots: Record<string, PromptSnapshot> = {},
+  snapshots: Record<string, DetailPageSuitePromptSnapshot> = {},
 ): DetailPageSuiteSlot[] {
   const applySnapshots = (slot: DetailPageSuiteSlot): DetailPageSuiteSlot => {
     if (slot.positive_prompt?.trim()) return slot;
@@ -118,12 +120,6 @@ export function materializeModuleSlots(
   );
 
   return mergeModuleSlotsPreservingContent(baseSlots, [...filled, ...extras]);
-}
-
-export function syncSuiteModulesSlots(
-  modules: DetailPageSuiteModuleState[],
-): DetailPageSuiteModuleState[] {
-  return modules.map(syncModuleSlotsFromSelection);
 }
 
 /** 写回 slots 时保留已有 prompt / 图片，避免 merge 丢失 */

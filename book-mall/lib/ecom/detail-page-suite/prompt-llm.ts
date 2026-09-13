@@ -5,7 +5,15 @@ import { drainEcomGwChat } from "@/lib/ecom/ecom-product-design-vision";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
 import { ECOM_DEFAULT_VISION_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
 
+import { materializeModuleSlots, resolveModuleDisplaySlots } from "./module-slots";
+import { upsertPromptSnapshotsFromSuite } from "./prompt-snapshot";
+import { normalizeDetailPageSuiteState } from "./suite-persist";
 import { assertSuiteCounts } from "./parse";
+import {
+  clearDetailPageSuitePromptModulePending,
+  markDetailPageSuitePromptModulePending,
+  reconcileDetailPageSuitePendingMeta,
+} from "./pending-state";
 import { getDetailPageSuiteProject, updateDetailPageSuiteProject } from "./project-service";
 import {
   BLANK_PLATE_MODULE_IDS,
@@ -93,6 +101,9 @@ export async function generateModulePrompts(opts: {
     throw new Error(`${mod.module_name} 请先选满 ${mod.generate_count} 个子维度`);
   }
 
+  let metaWithPending = markDetailPageSuitePromptModulePending(project.meta, mod.module_id);
+  await updateDetailPageSuiteProject(opts.userId, opts.projectId, { meta: metaWithPending });
+
   const modelKey = opts.modelKey?.trim() || project.settings.chatModelKey || ECOM_DEFAULT_VISION_MODEL;
   const brief = project.brief ?? {};
   const lang = brief.outputLanguage ?? "中文";
@@ -151,12 +162,23 @@ export async function generateModulePrompts(opts: {
       });
       const modules = project.suite.modules.map((m) =>
         m.module_id === mod.module_id
-          ? { ...m, selected_item_list: selected, slots }
+          ? {
+              ...m,
+              selected_item_list: selected,
+              slots: materializeModuleSlots({ ...m, selected_item_list: selected, slots }),
+            }
           : m,
       );
+      const suite = normalizeDetailPageSuiteState({ ...project.suite, modules }, metaWithPending);
+      metaWithPending =
+        clearDetailPageSuitePromptModulePending(metaWithPending, mod.module_id) ?? { phase: "prompts" };
+      const metaWithSnapshots = upsertPromptSnapshotsFromSuite(
+        reconcileDetailPageSuitePendingMeta(suite, { ...metaWithPending, phase: "prompts" }),
+        suite,
+      );
       const updated = await updateDetailPageSuiteProject(opts.userId, opts.projectId, {
-        suite: { ...project.suite, modules },
-        meta: { ...(project.meta ?? {}), phase: "prompts" },
+        suite,
+        meta: metaWithSnapshots,
       });
       if (!updated) throw new Error("保存失败");
       return updated;
@@ -164,6 +186,10 @@ export async function generateModulePrompts(opts: {
       lastErr = e instanceof Error ? e.message : String(e);
     }
   }
+  metaWithPending = clearDetailPageSuitePromptModulePending(metaWithPending, mod.module_id) ?? metaWithPending;
+  await updateDetailPageSuiteProject(opts.userId, opts.projectId, {
+    meta: reconcileDetailPageSuitePendingMeta(project.suite, metaWithPending),
+  });
   throw new Error(lastErr);
 }
 
@@ -178,7 +204,7 @@ export async function rewriteSlotPrompt(opts: {
   if (!project) throw new Error("项目不存在");
   const mod = project.suite.modules.find((m) => m.module_id === opts.moduleId);
   if (!mod) throw new Error("模块不存在");
-  const slot = mod.slots.find((s) => s.item_key === opts.slotKey);
+  const slot = resolveModuleDisplaySlots(mod).find((s) => s.item_key === opts.slotKey);
   if (!slot) throw new Error("该条提示词不存在");
 
   const modelKey = opts.modelKey?.trim() || project.settings.chatModelKey || ECOM_DEFAULT_VISION_MODEL;
@@ -218,16 +244,21 @@ export async function rewriteSlotPrompt(opts: {
         m.module_id === mod.module_id
           ? {
               ...m,
-              slots: m.slots.map((s) =>
-                s.item_key === slot.item_key
-                  ? { ...s, positive_prompt: item.positive_prompt.trim(), promptEdited: false }
-                  : s,
-              ),
+              slots: materializeModuleSlots({
+                ...m,
+                slots: resolveModuleDisplaySlots(m).map((s) =>
+                  s.item_key === slot.item_key
+                    ? { ...s, positive_prompt: item.positive_prompt.trim(), promptEdited: false }
+                    : s,
+                ),
+              }),
             }
           : m,
       );
+      const suite = normalizeDetailPageSuiteState({ ...project.suite, modules }, project.meta);
       const updated = await updateDetailPageSuiteProject(opts.userId, opts.projectId, {
-        suite: { ...project.suite, modules },
+        suite,
+        meta: upsertPromptSnapshotsFromSuite(project.meta, suite),
       });
       if (!updated) throw new Error("保存失败");
       return updated;

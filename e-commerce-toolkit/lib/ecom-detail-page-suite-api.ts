@@ -61,9 +61,16 @@ export async function createDetailPageSuiteProject(opts?: { title?: string }) {
   return data.project as DetailPageSuiteProject;
 }
 
-export async function getDetailPageSuiteProject(id: string) {
+export async function getDetailPageSuiteProject(id: string): Promise<{
+  project: DetailPageSuiteProject;
+  recovered?: { images: number; prompts: number };
+}> {
   const data = await ecomBookFetch(`${BASE}/projects/${id}`);
-  return data.project as DetailPageSuiteProject;
+  const recovered = data.recovered as { images: number; prompts: number } | undefined;
+  return {
+    project: data.project as DetailPageSuiteProject,
+    ...(recovered && (recovered.images > 0 || recovered.prompts > 0) ? { recovered } : {}),
+  };
 }
 
 export async function updateDetailPageSuiteProject(

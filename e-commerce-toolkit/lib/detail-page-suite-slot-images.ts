@@ -1,3 +1,4 @@
+import type { EcomImagePreviewItem } from "@/lib/media/ecom-image-preview";
 import type {
   DetailPageSuiteSlot,
   DetailPageSuiteSlotImageVersion,
@@ -54,4 +55,18 @@ export function detailPageSuiteSlotHasImage(
   slot: Pick<DetailPageSuiteSlot, "imageUrl" | "assetId" | "imageHistory">,
 ): boolean {
   return resolveDetailPageSuiteSlotHistory(slot).length > 0;
+}
+
+/** 点位格预览：同格多版进右侧缩略条 */
+export function buildDetailPageSuiteSlotPreviewItems(
+  slot: Pick<DetailPageSuiteSlot, "item_label" | "imageUrl" | "assetId" | "imageHistory">,
+): EcomImagePreviewItem[] {
+  const history = resolveDetailPageSuiteSlotHistory(slot);
+  return history.map((v, i) => ({
+    src: v.url,
+    title:
+      history.length > 1
+        ? `${slot.item_label} · 第 ${i + 1}/${history.length} 版`
+        : slot.item_label,
+  }));
 }

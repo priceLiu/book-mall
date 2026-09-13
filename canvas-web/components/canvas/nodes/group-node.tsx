@@ -80,6 +80,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
   const canvasDraggingNodeId = useCanvasStore((s) => s.canvasDraggingNodeId);
+  const canvasGeometryDragging = useCanvasStore((s) => s.canvasGeometryDragging);
   const { alert } = useDialogs();
   const { setNodes: rfSetNodes } = useReactFlow();
 
@@ -119,8 +120,11 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   }, [canvasDraggingNodeId, storeNodes, id]);
   const groupBackgroundEmphasis =
     selected || groupVisualHovered || draggingChildInGroup;
+  const groupCornerResizing =
+    selected && canvasGeometryDragging && !canvasDraggingNodeId;
   const showSidePlus = Boolean(
     isLibtvMediaGroup &&
+      !groupCornerResizing &&
       (selected || groupVisualHovered || connectingFromNodeId),
   );
   const groupBorderWidth =

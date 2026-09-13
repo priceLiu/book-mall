@@ -53,6 +53,29 @@ describe("mediaRenderInFlight persist", () => {
     ).toBe("job_keep");
   });
 
+  it("persists mediaRenderResumeJobId for refresh resume", () => {
+    const graph: CanvasGraph = {
+      schemaVersion: 2,
+      nodes: [
+        {
+          id: "n1",
+          type: "jianying-auto-render-pro2",
+          position: { x: 0, y: 0 },
+          data: {
+            mediaRenderResumeJobId: "job_abc123",
+            label: "自动成片",
+          },
+        },
+      ],
+      edges: [],
+    };
+    const stripped = stripGraphForPersist(graph);
+    expect(stripped.nodes[0]!.data).toMatchObject({
+      mediaRenderResumeJobId: "job_abc123",
+      label: "自动成片",
+    });
+  });
+
   it("strips mediaRenderInFlight from persist graph", () => {
     const graph: CanvasGraph = {
       schemaVersion: 2,

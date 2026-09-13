@@ -4,6 +4,7 @@ import {
   buildSbv1DockModeRefSyncPatch,
   getSbv1VideoDockModeChips,
   getSbv1VideoModelRefCaps,
+  isSbv1DockModeIncompatibleWithRefCount,
   resolveDashscopeVideoModelForRefLinks,
   resolveSbv1VideoModelRefLinkBlock,
   resolveSbv1VideoModelRefRunWarning,
@@ -175,15 +176,19 @@ describe("sbv1-video-model-reference", () => {
     expect(getSbv1VideoDockModeChips("wan3.0-video").map((c) => c.id)).toEqual([
       "t2v",
       "i2v",
-      "first_last",
       "omni",
+      "first_last",
     ]);
+    expect(
+      getSbv1VideoDockModeChips("wan3.0-video").find((c) => c.id === "omni")
+        ?.label,
+    ).toBe("参考生视频");
   });
 
   it("suggestSbv1DockModeForRefCount maps ref count to Wan 3.0 modes", () => {
     expect(suggestSbv1DockModeForRefCount(0, "wan3.0-video")).toBe("t2v");
     expect(suggestSbv1DockModeForRefCount(1, "wan3.0-video")).toBe("i2v");
-    expect(suggestSbv1DockModeForRefCount(2, "wan3.0-video")).toBe("first_last");
+    expect(suggestSbv1DockModeForRefCount(2, "wan3.0-video")).toBe("omni");
     expect(suggestSbv1DockModeForRefCount(6, "wan3.0-video")).toBe("omni");
   });
 
@@ -198,5 +203,99 @@ describe("sbv1-video-model-reference", () => {
     );
     expect(patch?.dockInputMode).toBe("omni");
     expect(patch?.referenceMode).toBe("omni");
+  });
+
+  it("does not force first_last when HappyHorse R2V has 2 refs in omni mode", () => {
+    const chips = getSbv1VideoDockModeChips("happyhorse-1.1-r2v");
+    expect(
+      isSbv1DockModeIncompatibleWithRefCount("omni", 2, chips),
+    ).toBe(false);
+    const patch = buildSbv1DockModeRefSyncPatch(
+      {
+        engine: { providerId: "p", modelKey: "happyhorse-1.1-r2v", params: {} },
+        dockInputMode: "omni",
+        referenceMode: "omni",
+      },
+      2,
+    );
+    expect(patch).toBeNull();
+  });
+
+  it("wan3.0 keeps t2v when refs connected (All-in-One)", () => {
+    const patch = buildSbv1DockModeRefSyncPatch(
+      {
+        engine: { providerId: "p", modelKey: "wan3.0-video", params: {} },
+        dockInputMode: "t2v",
+        referenceMode: "omni",
+      },
+      2,
+    );
+    expect(patch).toBeNull();
+  });
+
+  it("wan3.0 auto-suggests omni when 2 refs and mode is i2v", () => {
+    const patch = buildSbv1DockModeRefSyncPatch(
+      {
+        engine: { providerId: "p", modelKey: "wan3.0-video", params: {} },
+        dockInputMode: "i2v",
+        referenceMode: "omni",
+      },
+      2,
+    );
+    expect(patch?.dockInputMode).toBe("omni");
+  });
+
+  it("still corrects t2v when refs connected on models with i2v chip", () => {
+    const patch = buildSbv1DockModeRefSyncPatch(
+      {
+        engine: { providerId: "p", modelKey: "kling-3.0/video", params: {} },
+        dockInputMode: "t2v",
+        referenceMode: "omni",
+      },
+      1,
+    );
+    expect(patch?.dockInputMode).toBe("i2v");
+  });
+
+  it("multi-ref models suggest omni (not first_last) at 2 refs", () => {
+    for (const modelKey of [
+      "doubao-seedance-2.0",
+      "kling-3.0/video",
+      "kling/v3-turbo-image-to-video",
+      "happyhorse-1.1-r2v",
+      "wan2.7-r2v",
+      "bytedance/seedance-2",
+    ]) {
+      expect(suggestSbv1DockModeForRefCount(2, modelKey)).toBe("omni");
+    }
+  });
+
+  it("wan/2-7-image-to-video still suggests first_last at 2 refs", () => {
+    expect(suggestSbv1DockModeForRefCount(2, "wan/2-7-image-to-video")).toBe(
+      "first_last",
+    );
+  });
+
+  it("does not override omni on Seedance when 2 refs connected", () => {
+    const patch = buildSbv1DockModeRefSyncPatch(
+      {
+        engine: {
+          providerId: "gateway:sbv1-volcengine",
+          modelKey: "doubao-seedance-2.0",
+          params: {},
+        },
+        dockInputMode: "omni",
+        referenceMode: "omni",
+      },
+      2,
+    );
+    expect(patch).toBeNull();
+  });
+
+  it("Kling 3.0 omni chip labeled 参考生视频", () => {
+    expect(
+      getSbv1VideoDockModeChips("kling-3.0/video").find((c) => c.id === "omni")
+        ?.label,
+    ).toBe("参考生视频");
   });
 });

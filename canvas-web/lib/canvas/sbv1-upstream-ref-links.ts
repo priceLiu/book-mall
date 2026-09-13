@@ -105,10 +105,12 @@ export function resolveSbv1UpstreamRefLinks(
     if (seen.has(source.id)) return;
     seen.add(source.id);
     index += 1;
+    const label =
+      (source.data as { label?: string }).label?.trim() || `图片 ${index}`;
     links.push({
       id: `sbv1-ref-${source.id}`,
       index,
-      label: `图片 ${index}`,
+      label,
       previewUrl: imageUrlFromRefNode(source),
       sourceNodeId: source.id,
       edgeId,

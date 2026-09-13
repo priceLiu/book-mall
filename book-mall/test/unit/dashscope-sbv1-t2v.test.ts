@@ -69,6 +69,20 @@ describe("wan3.0-video", () => {
       { type: "reference_image", url: "https://oss.example/product.png" },
     ]);
   });
+
+  it("omni path sends all refs as reference_image without first_frame", () => {
+    const media = buildDashscopeWan30Media({
+      firstFrameUrl: "",
+      referenceImageUrls: [
+        "https://oss.example/char-a.png",
+        "https://oss.example/char-b.png",
+      ],
+    });
+    expect(media).toEqual([
+      { type: "reference_image", url: "https://oss.example/char-a.png" },
+      { type: "reference_image", url: "https://oss.example/char-b.png" },
+    ]);
+  });
 });
 
 describe("resolveDashscopeT2vRefMismatchMessage", () => {

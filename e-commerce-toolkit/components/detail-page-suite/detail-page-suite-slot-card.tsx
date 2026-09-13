@@ -12,10 +12,12 @@ import {
   detailPageCardWidth,
 } from "@/lib/detail-page-suite-platform-ratio";
 import {
+  buildDetailPageSuiteSlotPreviewItems,
   clampDetailPageSuiteActiveImageIndex,
   resolveDetailPageSuiteActiveImageIndex,
   resolveDetailPageSuiteSlotHistory,
 } from "@/lib/detail-page-suite-slot-images";
+import type { EcomImagePreviewItem } from "@/lib/media/ecom-image-preview";
 import type { DetailPageSuiteSlot } from "@/lib/detail-page-suite-types";
 import { useSaveToCatalog } from "@/lib/use-save-to-catalog";
 import { cn } from "@/lib/utils";
@@ -30,9 +32,14 @@ type Props = {
   selected?: boolean;
   onToggleSelect?: () => void;
   onRegenerateImage?: () => void;
-  onPreviewImage?: (url: string) => void;
+  onPreviewImage?: (payload: {
+    src: string;
+    title: string;
+    items: EcomImagePreviewItem[];
+    initialIndex: number;
+  }) => void;
   onPreviewPrompt?: () => void;
-  onEditPrompt?: (prompt: string) => void;
+  onOpenPromptEdit?: () => void;
   onRewritePrompt?: () => void;
   onActiveImageIndexChange?: (index: number) => void;
 };
@@ -49,7 +56,7 @@ export function DetailPageSuiteSlotCard({
   onRegenerateImage,
   onPreviewImage,
   onPreviewPrompt,
-  onEditPrompt,
+  onOpenPromptEdit,
   onRewritePrompt,
   onActiveImageIndexChange,
 }: Props) {
@@ -91,7 +98,10 @@ export function DetailPageSuiteSlotCard({
     <article
       className={cn(
         "group relative isolate flex shrink-0 flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition",
-        selected ? "border-[var(--ecom-primary)] ring-2 ring-[#0071e3]/25" : "border-[#e8e8ed]",
+        busy && "ecom-media-generating-sweep border-[#0071e3]/40",
+        !busy && selected
+          ? "border-[var(--ecom-primary)] ring-2 ring-[#0071e3]/25"
+          : !busy && "border-[#e8e8ed]",
       )}
       style={{ width: cardWidth }}
       onClick={
@@ -155,47 +165,61 @@ export function DetailPageSuiteSlotCard({
               unoptimized
             />
           </>
-        ) : (
+        ) : hasPrompt && onOpenPromptEdit ? (
           <button
             type="button"
-            title={hasPrompt ? "生成此点位图" : "请先生成提示词"}
-            disabled={!onRegenerateImage || busy || !hasPrompt}
-            className="flex h-full w-full flex-col items-center justify-center gap-2 px-3 text-[#86868b] transition hover:bg-[#ebebed] disabled:cursor-default disabled:hover:bg-transparent"
+            title="点击编辑出图提示词"
+            disabled={busy}
+            className="flex h-full w-full flex-col items-stretch justify-between gap-2 px-3 py-3 text-left transition hover:bg-[#ebebed] disabled:cursor-default disabled:hover:bg-transparent"
             onClick={(e) => {
               e.stopPropagation();
-              onRegenerateImage?.();
+              onOpenPromptEdit();
             }}
           >
-            {hasPrompt ? (
-              <p className="line-clamp-6 w-full text-left text-[10px] leading-relaxed text-[#6e6e73]">
-                {slot.positive_prompt}
-              </p>
-            ) : (
-              <>
-                <ImageIcon className="h-8 w-8 opacity-40" />
-                <span className="text-xs">待生成提示词</span>
-              </>
-            )}
+            <p className="line-clamp-[9] w-full text-[10px] leading-relaxed text-[#424245]">
+              {slot.positive_prompt}
+            </p>
+            <span className="text-[10px] font-medium text-[#0071e3]">点击编辑提示词</span>
           </button>
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-3 text-[#86868b]">
+            <ImageIcon className="h-8 w-8 opacity-40" />
+            <span className="text-xs">待生成提示词</span>
+          </div>
         )}
+
+        {!displayUrl && onRegenerateImage && hasPrompt && !busy ? (
+          <button
+            type="button"
+            title="生成此点位图"
+            className="absolute bottom-2 right-2 z-10 rounded-full bg-[#0071e3] px-2.5 py-1 text-[10px] font-medium text-white shadow-sm transition hover:bg-[#0077ed]"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRegenerateImage();
+            }}
+          >
+            出图
+          </button>
+        ) : null}
 
         {busy ? (
           <EcomMediaGeneratingBusy
             label={busyLabel ?? "出图中…"}
+            background={displayUrl ? "overlay" : "light"}
             className="absolute inset-0 z-[2] h-full w-full"
           />
         ) : null}
 
         {hasMultiple && displayUrl && !busy ? (
-          <div className="pointer-events-none absolute inset-x-0 top-2 z-[3] flex justify-center opacity-0 transition group-hover/image:opacity-100">
-            <span className="rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-medium text-white">
+          <div className="pointer-events-none absolute right-1 top-1 z-[30]">
+            <span className="rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-medium leading-none text-white">
               {activeIndex + 1} / {history.length}
             </span>
           </div>
         ) : null}
 
         {hasMultiple && displayUrl && !busy ? (
-          <div className="absolute inset-0 z-[4] flex items-center justify-between px-1 opacity-0 transition group-hover/image:opacity-100">
+          <div className="absolute inset-0 z-[4] flex items-center justify-between px-0.5 opacity-0 transition group-hover/image:opacity-100">
             <button
               type="button"
               aria-label="上一张"
@@ -225,9 +249,21 @@ export function DetailPageSuiteSlotCard({
 
         {displayUrl && !busy ? (
           <StoryboardPanelImageHoverActions
-            onPreview={onPreviewImage ? () => onPreviewImage(displayUrl) : undefined}
+            onPreview={
+              onPreviewImage && displayUrl
+                ? () => {
+                    const items = buildDetailPageSuiteSlotPreviewItems(slot);
+                    onPreviewImage({
+                      src: displayUrl,
+                      title: slot.item_label,
+                      items,
+                      initialIndex: activeIndex,
+                    });
+                  }
+                : undefined
+            }
             onRegenerate={onRegenerateImage}
-            onPreviewPrompt={onPreviewPrompt}
+            onPreviewPrompt={onOpenPromptEdit ?? onPreviewPrompt}
             onSaveToCatalog={() =>
               saveToCatalog({
                 url: displayUrl,
@@ -242,25 +278,20 @@ export function DetailPageSuiteSlotCard({
 
       <div className="space-y-1 px-3 py-2">
         <div className="flex items-center justify-between gap-2">
-          <p className="truncate text-xs font-semibold text-[#1d1d1f]">{slot.item_label}</p>
+          <p className="truncate text-xs font-semibold text-[#1d1d1f]" title={slot.item_label}>
+            {slot.item_label}
+          </p>
           {history.length > 0 ? (
             <span className="shrink-0 text-[10px] text-[#86868b]">
               {history.length > 1 ? `${history.length} 版` : "已生成"}
             </span>
           ) : null}
         </div>
-        {onEditPrompt && hasPrompt && !displayUrl ? (
-          <textarea
-            className="min-h-[52px] w-full resize-none rounded border border-[#e8e8ed] px-2 py-1 text-[10px] leading-relaxed text-[#424245] outline-none focus:border-[#0071e3]"
-            value={slot.positive_prompt}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => onEditPrompt(e.target.value)}
-          />
-        ) : null}
         {hasPrompt && onRewritePrompt ? (
           <button
             type="button"
-            className="text-[10px] text-[#0071e3] hover:underline"
+            disabled={busy}
+            className="text-[10px] text-[#0071e3] hover:underline disabled:cursor-default disabled:text-[#86868b] disabled:no-underline"
             onClick={(e) => {
               e.stopPropagation();
               onRewritePrompt();
