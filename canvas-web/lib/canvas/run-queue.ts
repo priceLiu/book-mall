@@ -17,6 +17,7 @@ import { buildCanvasRunSnapshot } from "./canvas-run-snapshot";
 import { refreshSbv1UpstreamPortraitStatuses } from "./refresh-sbv1-upstream-portrait";
 import { resolveSbv1VideoEngineInputs, resolveSbv1VideoEngineEffectivePrompt } from "./resolve-sbv1-video-engine-inputs";
 import {
+  buildSbv1DockModeRefSyncPatch,
   dockInputModeToPatch,
   getSbv1VideoDockModeChips,
   resolveSbv1DockInputMode,
@@ -1533,13 +1534,27 @@ export function useCanvasRunner(
           const vdRun = runData as import("./sbv1-workspace-types").Sbv1VideoEngineNodeData;
           const mk = vdRun.engine?.modelKey?.trim() ?? "";
           if (mk) {
+            const imageRefCount = Math.max(
+              resolveSbv1UpstreamRefLinks(nodeId, latestNodes, latestEdges).length,
+              imageInputs.length,
+            );
+            const refModePatch = buildSbv1DockModeRefSyncPatch(
+              vdRun,
+              imageRefCount,
+            );
+            if (refModePatch) {
+              runData = { ...runData, ...refModePatch };
+              updateNodeData(nodeId, refModePatch);
+            }
             const chips = getSbv1VideoDockModeChips(mk, {
               providerId: vdRun.engine?.providerId,
               multiShots: vdRun.engine?.params?.multi_shots === true,
             });
             const mode = resolveSbv1DockInputMode(
-              vdRun.referenceMode ?? "omni",
-              vdRun.dockInputMode,
+              (runData as import("./sbv1-workspace-types").Sbv1VideoEngineNodeData)
+                .referenceMode ?? "omni",
+              (runData as import("./sbv1-workspace-types").Sbv1VideoEngineNodeData)
+                .dockInputMode,
               chips,
             );
             if (mode !== vdRun.dockInputMode) {

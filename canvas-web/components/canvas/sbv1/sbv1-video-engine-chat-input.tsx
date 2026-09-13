@@ -132,6 +132,11 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     () => [...motionVideoLinks, ...upstreamLinks],
     [motionVideoLinks, upstreamLinks],
   );
+  const imageRefCount = useMemo(() => {
+    const extraImages =
+      extraDockUpstreamLinks?.filter((l) => l.kind === "image").length ?? 0;
+    return Math.max(0, upstreamLinks.length + extraImages);
+  }, [upstreamLinks.length, extraDockUpstreamLinks]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const promptCommitRef = useRef<MentionsTextareaCommitHandle | null>(null);
@@ -227,11 +232,11 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
 
   useEffect(() => {
     if (isHdVideo) return;
-    const patch = buildDashscopeVideoModelRefSyncPatch(data, upstreamLinks.length);
+    const patch = buildDashscopeVideoModelRefSyncPatch(data, imageRefCount);
     if (patch) onPatch(patch);
   }, [
     isHdVideo,
-    upstreamLinks.length,
+    imageRefCount,
     data.engine?.modelKey,
     data.engine?.providerId,
     data.engine?.params,
@@ -241,11 +246,11 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
 
   useEffect(() => {
     if (isHdVideo) return;
-    const patch = buildSbv1DockModeRefSyncPatch(data, upstreamLinks.length);
+    const patch = buildSbv1DockModeRefSyncPatch(data, imageRefCount);
     if (patch) onPatch(patch);
   }, [
     isHdVideo,
-    upstreamLinks.length,
+    imageRefCount,
     data.engine?.modelKey,
     data.engine?.providerId,
     data.engine?.params?.multi_shots,
@@ -494,6 +499,13 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
             chips={dockChips}
             activeMode={activeDockMode}
             disabled={isGenerating}
+            disabledModeIds={
+              imageRefCount > 0
+                ? imageRefCount > 1
+                  ? (["t2v", "i2v"] as const)
+                  : (["t2v"] as const)
+                : undefined
+            }
             chipFontPx={modeChipFontPx}
             chipMinHeightPx={chipMinHeightPx}
             onSelect={(mode) => onPatch(dockInputModeToPatch(mode))}
@@ -544,7 +556,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
               data={data}
               disabled={isGenerating}
               onPatch={onPatch}
-              refLinkCount={upstreamLinks.length}
+              refLinkCount={imageRefCount}
               open={dockMenu === "model"}
               onOpenChange={(next) => setDockMenu(next ? "model" : null)}
             />

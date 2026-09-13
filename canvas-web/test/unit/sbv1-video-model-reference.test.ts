@@ -221,7 +221,7 @@ describe("sbv1-video-model-reference", () => {
     expect(patch).toBeNull();
   });
 
-  it("wan3.0 keeps t2v when refs connected (All-in-One)", () => {
+  it("wan3.0 leaves t2v when refs connected", () => {
     const patch = buildSbv1DockModeRefSyncPatch(
       {
         engine: { providerId: "p", modelKey: "wan3.0-video", params: {} },
@@ -230,7 +230,21 @@ describe("sbv1-video-model-reference", () => {
       },
       2,
     );
-    expect(patch).toBeNull();
+    expect(patch?.dockInputMode).toBe("omni");
+    expect(patch?.referenceMode).toBe("omni");
+  });
+
+  it("any model with refs is incompatible with t2v", () => {
+    const chips = getSbv1VideoDockModeChips("wan3.0-video");
+    expect(isSbv1DockModeIncompatibleWithRefCount("t2v", 1, chips, "wan3.0-video")).toBe(
+      true,
+    );
+    expect(isSbv1DockModeIncompatibleWithRefCount("t2v", 2, chips, "wan3.0-video")).toBe(
+      true,
+    );
+    expect(isSbv1DockModeIncompatibleWithRefCount("t2v", 0, chips, "wan3.0-video")).toBe(
+      false,
+    );
   });
 
   it("wan3.0 auto-suggests omni when 2 refs and mode is i2v", () => {

@@ -176,10 +176,6 @@ const DASHSCOPE_WAN30_VIDEO_MODEL_KEYS = new Set([
   "wan3.0-video-prime",
 ]);
 
-function isWan30AllInOneVideoModel(modelKey: string): boolean {
-  return DASHSCOPE_WAN30_VIDEO_MODEL_KEYS.has(modelKey.trim());
-}
-
 /**
  * 多参考图（≥2）时默认推荐 omni / 参考生视频，而非首尾帧。
  * 首尾帧语义是「过渡起止画面」；角色/场景身份参考须走 omni。
@@ -586,11 +582,10 @@ export function isSbv1DockModeIncompatibleWithRefCount(
   mode: Sbv1DockInputMode,
   refLinkCount: number,
   chips: Sbv1DockModeChip[],
-  modelKey?: string,
+  _modelKey?: string,
 ): boolean {
   const n = Math.max(0, Math.floor(refLinkCount));
   const chipIds = new Set(chips.map((c) => c.id));
-  const k = modelKey?.trim() ?? "";
 
   if (n === 0) {
     if (mode === "t2v" || mode === "i2v") return false;
@@ -599,8 +594,7 @@ export function isSbv1DockModeIncompatibleWithRefCount(
   }
 
   if (mode === "t2v") {
-    // 万相 3.0 All-in-One：文生 + 参考图仍走 media reference_image
-    if (isWan30AllInOneVideoModel(k)) return false;
+    // 有参考图就不是文生视频（万相 3.0 All-in-One 也不例外）
     return n > 0;
   }
 

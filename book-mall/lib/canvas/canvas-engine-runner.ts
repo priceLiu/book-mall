@@ -1816,8 +1816,14 @@ export async function runVideoEngineNode(
     isMinimaxCanvasVideoModelKey(modelKey) &&
     (modelKey.toLowerCase().includes("-t2v") ||
       modelKey.toLowerCase().includes("context-ir"));
+  const hasAttachedVideoRefs =
+    Boolean(mainFrameImageUrl) ||
+    referenceImageUrls.length > 0 ||
+    Boolean(lastFrameImageUrl) ||
+    portraitAssetRefs.length > 0;
   const isTextToVideoOnly =
-    isDashscopeT2v || isKlingT2v || isVolcengineT2v || isMinimaxT2v;
+    (isDashscopeT2v || isKlingT2v || isVolcengineT2v || isMinimaxT2v) &&
+    !hasAttachedVideoRefs;
   const motionVideoUrls = isMotionControl || isVideoOnlyV2v
     ? (Array.isArray(params.reference_video_urls)
         ? (params.reference_video_urls as unknown[])
@@ -1836,7 +1842,8 @@ export async function runVideoEngineNode(
     !isVideoOnlyV2v &&
     !isTextToVideoOnly &&
     !mainFrameImageUrl &&
-    portraitAssetRefs.length === 0
+    portraitAssetRefs.length === 0 &&
+    referenceImageUrls.length === 0
   ) {
     throw new CanvasProjectError(
       "INVALID_INPUT",

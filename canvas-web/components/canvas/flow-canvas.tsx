@@ -2590,7 +2590,7 @@ function FlowCanvasInner({
         selectionOnDrag
         panOnDrag={[1, 2]}
         panActivationKeyCode="Space"
-        selectionMode={SelectionMode.Partial}
+        selectionMode={SelectionMode.Full}
         multiSelectionKeyCode={["Meta", "Shift", "Control"]}
         // 删除键：选中 edge / node 后可删除（Mac 用 Backspace 也支持）
         deleteKeyCode={["Backspace", "Delete"]}

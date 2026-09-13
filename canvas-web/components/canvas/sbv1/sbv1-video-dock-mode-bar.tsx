@@ -9,6 +9,7 @@ export function Sbv1VideoDockModeBar({
   chips,
   activeMode,
   disabled,
+  disabledModeIds,
   onSelect,
   chipFontPx,
   chipMinHeightPx,
@@ -16,6 +17,8 @@ export function Sbv1VideoDockModeBar({
   chips: Sbv1DockModeChip[];
   activeMode: Sbv1DockInputMode;
   disabled?: boolean;
+  /** 有参考图时禁用文生视频等不兼容 chip */
+  disabledModeIds?: readonly Sbv1DockInputMode[];
   onSelect: (mode: Sbv1DockInputMode) => void;
   /** 屏上恒定字号（flow px · 已抵消 shell 缩放） */
   chipFontPx?: number;
@@ -28,11 +31,12 @@ export function Sbv1VideoDockModeBar({
     <div className="nodrag flex shrink-0 flex-wrap items-center gap-1.5 border-b border-white/[0.06] px-2 py-1.5">
       {chips.map((c) => {
         const active = c.id === activeMode;
+        const modeDisabled = disabled || Boolean(disabledModeIds?.includes(c.id));
         return (
           <button
             key={c.id}
             type="button"
-            disabled={disabled}
+            disabled={modeDisabled}
             style={{
               ...(chipFontPx != null ? { fontSize: chipFontPx } : {}),
               ...(chipMinHeightPx != null
@@ -45,7 +49,7 @@ export function Sbv1VideoDockModeBar({
               active
                 ? "border-white/35 bg-white/[0.08] text-white"
                 : "border-white/10 text-white/70 hover:border-white/20 hover:text-white/90",
-              disabled && "cursor-not-allowed opacity-50",
+              modeDisabled && "cursor-not-allowed opacity-50",
             )}
             onClick={() => onSelect(c.id)}
           >
