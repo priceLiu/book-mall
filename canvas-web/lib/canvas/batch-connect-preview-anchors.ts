@@ -26,6 +26,18 @@ function findNodeElement(nodeId: string): Element | null {
   return document.querySelector(`.react-flow__node[data-id="${nodeId}"]`);
 }
 
+/** 可见卡片壳（不含侧栏 +、浮动溢出）· 与框选视觉一致 */
+function findNodeVisualElement(nodeId: string): Element | null {
+  const el = findNodeElement(nodeId);
+  if (!el) return null;
+  return (
+    el.querySelector(".libtv-media-node-bg") ??
+    el.querySelector(".libtv-control-node-bg") ??
+    el.querySelector(".canvas-group-node") ??
+    el
+  );
+}
+
 /** 批量拖线 · 源点屏幕坐标（document client · 与 pointer clientX/Y 同系） */
 export function batchConnectSourceClientPoint(
   node: CanvasFlowNode,
@@ -98,10 +110,16 @@ export function batchConnectSelectionClientBox(
 } | null {
   const rects: DOMRect[] = [];
   for (const id of nodeIds) {
-    const el = findNodeElement(id);
+    const el = findNodeVisualElement(id);
     if (!el) continue;
     const r = el.getBoundingClientRect();
-    if (Number.isFinite(r.left) && Number.isFinite(r.top)) rects.push(r);
+    if (
+      Number.isFinite(r.left) &&
+      Number.isFinite(r.top) &&
+      (r.width > 0 || r.height > 0)
+    ) {
+      rects.push(r);
+    }
   }
   if (!rects.length) return null;
   const left = Math.min(...rects.map((r) => r.left));
@@ -170,16 +188,20 @@ export function batchConnectSelectionScreenBox(
     if (clientArea < 4 && flowArea >= 4) return flow;
   }
 
+  // DOM 可靠时以屏幕坐标为准；勿与 flow 数学框取并集（错误 flow 会把虚线框撑到整画布）
   if (client && flow) {
-    return {
-      left: Math.min(client.left, flow.left),
-      top: Math.min(client.top, flow.top),
-      right: Math.max(client.right, flow.right),
-      bottom: Math.max(client.bottom, flow.bottom),
-      midY: (Math.min(client.top, flow.top) + Math.max(client.bottom, flow.bottom)) / 2,
-      width: Math.max(client.right, flow.right) - Math.min(client.left, flow.left),
-      height: Math.max(client.bottom, flow.bottom) - Math.min(client.top, flow.top),
-    };
+    const clientArea = Math.max(
+      0,
+      (client.right - client.left) * (client.bottom - client.top),
+    );
+    if (clientArea >= 4) {
+      return {
+        ...client,
+        width: client.right - client.left,
+        height: client.bottom - client.top,
+      };
+    }
+    return flow;
   }
   if (client) {
     return {

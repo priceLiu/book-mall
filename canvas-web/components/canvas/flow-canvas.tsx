@@ -153,6 +153,7 @@ import { Pro2FrameCellInputDock } from "./pro2/pro2-frame-cell-input-dock";
 import { Pro2MediaGroupToolbar } from "./pro2/pro2-media-group-toolbar";
 import { Pro2SelectionToolbar } from "./pro2/pro2-selection-toolbar";
 import { Pro2SelectionBatchConnectLayer } from "./pro2/pro2-selection-batch-connect";
+import { LibtvMultiSelectionOutline } from "./libtv-multi-selection-outline";
 import { LibtvSideConnectLayer } from "./pro2/libtv-side-connect-layer";
 import { Pro2StarterInputDock } from "./pro2/pro2-starter-input-dock";
 import { Pro2PromptInputDock } from "./pro2/pro2-prompt-input-dock";
@@ -2400,7 +2401,7 @@ function FlowCanvasInner({
   return (
     <div
       ref={wrapRef}
-      className={`canvas-flow-wrap relative z-0 h-full w-full overscroll-none ${connectingFromNodeId ? "canvas-connecting" : ""}${sbv1Canvas ? " sbv1-canvas" : ""}`}
+      className={`canvas-flow-wrap relative z-0 h-full w-full overscroll-none ${connectingFromNodeId ? "canvas-connecting" : ""}${libtvCanvas ? " libtv-canvas" : ""}${sbv1Canvas ? " sbv1-canvas" : ""}`}
       onDrop={onDrop}
       onDragOver={onDragOver}
       onWheelCapture={onCanvasWheelCapture}
@@ -2620,6 +2621,7 @@ function FlowCanvasInner({
             <Pro2MediaGroupToolbar rfNodes={rfNodes} />
           </>
         ) : null}
+        {libtvCanvas ? <LibtvMultiSelectionOutline rfNodes={rfNodes} /> : null}
         {pro2FloatingInspector || sbv1Canvas ? (
           <Pro2SelectionBatchConnectLayer rfNodes={rfNodes} />
         ) : null}

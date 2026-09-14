@@ -80,9 +80,9 @@ export function computePro2MultiSelectionBbox(
           : typeof internal.height === "number" && internal.height > 0
             ? internal.height
             : fallback.h;
+      // 组内子节点 internal.position 为相对坐标 · 不可当作绝对坐标
       const pos =
         internal.internals?.positionAbsolute ??
-        internal.position ??
         pro2NodeAbsolutePosition(node, allNodes);
       boxes.push({ x: pos.x, y: pos.y, w, h });
       continue;

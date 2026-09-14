@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useReactFlow } from "@xyflow/react";
 import { Plus, Clapperboard, Download } from "lucide-react";
 
-import { useClientPortalMounted, useCanvasToolbarPopoverOpen } from "@/lib/canvas/use-modal-portal-effects";
+import { useClientPortalMounted } from "@/lib/canvas/use-modal-portal-effects";
 import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import { findBatchConnectSnapTarget } from "@/lib/canvas/libtv-connection-snap";
@@ -80,7 +80,6 @@ function Pro2SelectionBatchConnectLayerInner({
   const { flowToScreenPosition, screenToFlowPosition, getInternalNode } =
     useReactFlow();
   const marqueeSelecting = useCanvasMarqueeSelecting();
-  const toolbarPopoverOpen = useCanvasToolbarPopoverOpen();
   const storeNodes = useCanvasStore((s) => s.nodes);
   const addNode = useCanvasStore((s) => s.addNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
@@ -569,10 +568,6 @@ function Pro2SelectionBatchConnectLayerInner({
     return null;
   }
 
-  const boxLeft = layoutBox.left;
-  const boxTop = layoutBox.top;
-  const boxWidth = layoutBox.width;
-  const boxHeight = layoutBox.height;
   const plusLeft = layoutBox.right + 4;
   const plusTop = layoutBox.midY;
 
@@ -586,19 +581,6 @@ function Pro2SelectionBatchConnectLayerInner({
 
   return (
     <>
-      {!toolbarPopoverOpen ? (
-        <div
-          className="pointer-events-none fixed z-[1500] rounded-sm border-2 border-dashed border-white/40"
-          style={{
-            left: boxLeft,
-            top: boxTop,
-            width: boxWidth,
-            height: boxHeight,
-          }}
-          aria-hidden
-        />
-      ) : null}
-
       {showPreviewLines ? (
         <BatchConnectPreviewLines
           sources={eligibleSources}

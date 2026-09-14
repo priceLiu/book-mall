@@ -282,6 +282,13 @@ body > [data-canvas-toolbar-shell] {
   flex-shrink: 0;
 }
 
+/* LibTV / Pro2：多选虚线框改由 LibtvMultiSelectionOutline（DOM 包围盒）绘制 */
+.libtv-canvas .react-flow__nodesselection-rect,
+.libtv-canvas .react-flow__selection {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 /* 框选打组 / 顶栏弹层打开时：隐藏 RF 虚线框，避免盖住组名输入 */
 html[data-canvas-toolbar-popover-open] .react-flow__nodesselection-rect,
 html[data-canvas-toolbar-popover-open] .react-flow__selection {
