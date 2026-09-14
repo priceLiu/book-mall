@@ -2761,7 +2761,14 @@ function FlowCanvasInner({
             <Pro2MediaGroupToolbar rfNodes={rfNodes} />
           </>
         ) : null}
-        {libtvCanvas ? <LibtvMultiSelectionOutline rfNodes={rfNodes} /> : null}
+        {libtvCanvas ? (
+          <LibtvMultiSelectionOutline
+            rfNodes={rfNodes}
+            setRfNodes={setRfNodes}
+            onDragStart={onLibtvSelectionDragStart}
+            onDragStop={onLibtvSelectionDragStop}
+          />
+        ) : null}
         {pro2FloatingInspector || sbv1Canvas ? (
           <Pro2SelectionBatchConnectLayer rfNodes={rfNodes} />
         ) : null}

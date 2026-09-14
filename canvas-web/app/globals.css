@@ -282,16 +282,16 @@ body > [data-canvas-toolbar-shell] {
   flex-shrink: 0;
 }
 
-/* LibTV / Pro2：多选虚线框改由 LibtvMultiSelectionOutline（DOM 包围盒）绘制 */
-.libtv-canvas .react-flow__nodesselection-rect,
-.libtv-canvas .react-flow__selection {
+/* LibTV / Pro2：选中后的 RF 包围盒改由 LibtvMultiSelectionOutline 绘制并承接拖动。
+   RF nodesselection-rect 只藏、不接收指针（位置常偏，会挡住框选/拖不动）。
+   正在拖的框选线 .react-flow__selection 必须可见。 */
+.libtv-canvas .react-flow__nodesselection-rect {
   opacity: 0 !important;
   pointer-events: none !important;
 }
 
-/* 框选打组 / 顶栏弹层打开时：隐藏 RF 虚线框，避免盖住组名输入 */
-html[data-canvas-toolbar-popover-open] .react-flow__nodesselection-rect,
-html[data-canvas-toolbar-popover-open] .react-flow__selection {
+/* 框选打组 / 顶栏弹层打开时：隐藏 RF 选中包围盒，避免盖住组名输入 */
+html[data-canvas-toolbar-popover-open] .react-flow__nodesselection-rect {
   opacity: 0 !important;
   pointer-events: none !important;
 }
@@ -395,9 +395,9 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
     -4px 0 10px -3px rgba(120, 120, 128, 0.45),
     0 7px 16px -3px rgba(130, 130, 138, 0.5),
     4px 0 10px -3px rgba(120, 120, 128, 0.45);
-  /* 框选 / 多选外框 · 保留 React Flow 点线蓝，仅加粗到 2px */
-  --xy-selection-border: 2px dotted rgba(0, 89, 220, 0.8);
-  --xy-selection-background-color: rgba(0, 89, 220, 0.08);
+  /* 框选拖线 · 深色画布上 2px 几乎看不见，用 3px 亮蓝 */
+  --xy-selection-border: 3px dotted rgba(96, 165, 250, 0.95);
+  --xy-selection-background-color: rgba(59, 130, 246, 0.12);
 }
 
 .react-flow__edge .react-flow__edge-interaction {

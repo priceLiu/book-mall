@@ -180,7 +180,11 @@ LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 - 组移动 / 拉伸松手后须 `updateNodeInternals`（组 + 子节点）；store→RF merge 后走 `collectNodeInternalsRefreshIds`（含被移动父组的子节点）。
 - 从 store 全量重建 RF 时：`preserveRfMeasuredById` 再 `alignRfNodesMeasuredToBox`。
 - **框选命中真源**：`collectLibtvMarqueeNodeIds`（用户节点 width/height + parent 链）。LibTV **禁止** 把 RF `getNodesInside` 的结果当最终选中集。
-- 框选松手后须保持 `nodesSelectionActive`（RF `NodesSelection` 是「框完整组拖动」的拖层）。**禁止** 为修命中而长期关掉它（会导致框完拖不动）。覆盖层包围盒随我们纠正后的 `selected` 走。
+- RF `.react-flow__nodesselection-rect` 在 LibTV 上只藏、不接收指针（组移动/拉伸后包围盒常偏大，会挡住框选或拖不动）。**框选后整组拖动**走 `LibtvMultiSelectionOutline`（画在 `.react-flow__viewport` 内，`libtvSelectionFlowBox` + `applySelectionDragDelta`），松手复用 `onLibtvSelectionDragStop`。
+- **禁止** 用 `getInternalNode` / `getBoundingClientRect` 在拖动中定位虚线框（慢一帧 → 框与节点错位拖影）。也 **禁止** 把虚线框 portal 到 `document.body` 再跟节点位置。
+- 该虚线框 **禁止** 在 `canvasSelectionDragging` 时卸载（`useCanvasMarqueeSelecting` 含此项是为了藏顶栏/Dock，不是藏拖层）；否则 pointer capture 丢失，表现为「框完拖不动」。仅在正在拖空白框选（`userSelectionActive` / `canvasMarqueeSelecting`）时隐藏。
+- **提交云端**：框选相关必须同提交带上 `globals.css`（只藏 `nodesselection-rect`、**保留** `.react-flow__selection` 框选线）+ 可拖的 `LibtvMultiSelectionOutline`。只推 hit-test / measured 会在线上复现「框选看不见 / 框完拖不动」。
+- 框选松手后仍可保持 `nodesSelectionActive`（与 RF 内部选中态对齐），但 **不得** 依赖 RF 包围盒当拖层。
 - **禁止** 为「修框选」把纯测量 echo 的 width/height 写回节点；也 **禁止** 只冻一份 `measured` 却不在改尺寸后对齐。
 
 ## 7. Code Review 清单

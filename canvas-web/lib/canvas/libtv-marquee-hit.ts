@@ -99,3 +99,58 @@ export function applyLibtvMarqueeSelection<
   });
   return changed ? next : nodes;
 }
+
+/** 多选虚线框：只用用户 width/height + parent 链，不读 internals / DOMRect（拖动中这两项会慢一帧，造成拖影）。 */
+export function libtvSelectionFlowBox(
+  nodes: CanvasFlowNode[],
+  selectedIds?: Iterable<string>,
+): { x: number; y: number; w: number; h: number } | null {
+  const idSet = selectedIds ? new Set(selectedIds) : null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let count = 0;
+  for (const node of nodes) {
+    if (idSet ? !idSet.has(node.id) : !node.selected) continue;
+    if (node.hidden) continue;
+    const box = libtvMarqueeNodeBox(node, nodes);
+    if (!box) continue;
+    count += 1;
+    minX = Math.min(minX, box.x);
+    minY = Math.min(minY, box.y);
+    maxX = Math.max(maxX, box.x + box.w);
+    maxY = Math.max(maxY, box.y + box.h);
+  }
+  if (count < 2) return null;
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
+/**
+ * 多选整组拖动：父组已选中时不重复平移子节点（与 RF getDragItems 一致）。
+ */
+export function applySelectionDragDelta<
+  N extends {
+    id: string;
+    selected?: boolean;
+    parentId?: string;
+    type?: string;
+    position: { x: number; y: number };
+  },
+>(nodes: N[], dx: number, dy: number): N[] {
+  if (dx === 0 && dy === 0) return nodes;
+  const selectedIds = new Set(
+    nodes.filter((n) => n.selected).map((n) => n.id),
+  );
+  let changed = false;
+  const next = nodes.map((n) => {
+    if (!n.selected) return n;
+    if (n.parentId && selectedIds.has(n.parentId)) return n;
+    changed = true;
+    return {
+      ...n,
+      position: { x: n.position.x + dx, y: n.position.y + dy },
+    };
+  });
+  return changed ? next : nodes;
+}

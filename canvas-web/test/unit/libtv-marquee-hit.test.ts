@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyLibtvMarqueeSelection,
+  applySelectionDragDelta,
   collectLibtvMarqueeNodeIds,
   libtvMarqueeNodeBox,
+  libtvSelectionFlowBox,
   userSelectionToFlowRect,
 } from "@/lib/canvas/libtv-marquee-hit";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
@@ -149,5 +151,48 @@ describe("applyLibtvMarqueeSelection", () => {
     expect(next[0]!.selected).toBe(true);
     expect(next[1]!.selected).toBe(false);
     expect(next[1]).not.toBe(nodes[1]);
+  });
+});
+
+describe("libtvSelectionFlowBox", () => {
+  it("unions selected node boxes from user size, ignoring stale measured", () => {
+    const a = node("a", {
+      selected: true,
+      position: { x: 10, y: 20 },
+      width: 100,
+      height: 80,
+      measured: { width: 900, height: 700 },
+    });
+    const b = node("b", {
+      selected: true,
+      position: { x: 200, y: 60 },
+      width: 50,
+      height: 40,
+    });
+    const box = libtvSelectionFlowBox([a, b]);
+    expect(box).toEqual({ x: 10, y: 20, w: 240, h: 80 });
+  });
+});
+
+describe("applySelectionDragDelta", () => {
+  it("moves selected nodes and skips children whose parent is also selected", () => {
+    const group = node("g1", {
+      type: "group",
+      selected: true,
+      position: { x: 100, y: 80 },
+    });
+    const child = node("c1", {
+      parentId: "g1",
+      selected: true,
+      position: { x: 20, y: 10 },
+    });
+    const other = node("c2", {
+      selected: true,
+      position: { x: 400, y: 200 },
+    });
+    const next = applySelectionDragDelta([group, child, other], 15, -5);
+    expect(next[0]!.position).toEqual({ x: 115, y: 75 });
+    expect(next[1]!.position).toEqual({ x: 20, y: 10 });
+    expect(next[2]!.position).toEqual({ x: 415, y: 195 });
   });
 });
