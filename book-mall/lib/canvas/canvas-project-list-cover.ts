@@ -32,6 +32,26 @@ export const LIST_COVER_MEDIA_NODE_TYPES = new Set([
 
 export type ProjectListCoverKind = "image" | "video";
 
+/** 火山 TOS 等厂商临时链（签名约 24h），不能当列表持久封面 */
+export function isVendorEphemeralMediaUrl(url: string): boolean {
+  const raw = url.trim();
+  if (!raw.startsWith("http")) return false;
+  try {
+    const parsed = new URL(raw);
+    const host = parsed.hostname.toLowerCase();
+    if (host.includes("volces.com")) return true;
+    if (parsed.searchParams.has("X-Tos-Signature")) return true;
+    if (parsed.searchParams.has("X-Tos-Expires")) return true;
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+function isStableListCoverUrl(url: string): boolean {
+  return url.startsWith("http") && !isVendorEphemeralMediaUrl(url);
+}
+
 export type ProjectListCover = {
   coverUrl: string;
   coverKind: ProjectListCoverKind;
@@ -63,20 +83,35 @@ function persistableImageUrlFromNodeData(data: unknown): string {
   const runtime = readRuntime(d);
 
   const poster = runtime?.posterUrl?.trim();
-  if (poster?.startsWith("http") && !isProjectThumbnailVideoUrl(poster)) {
+  if (
+    poster &&
+    isStableListCoverUrl(poster) &&
+    !isProjectThumbnailVideoUrl(poster)
+  ) {
     return poster;
   }
 
   const direct = typeof d.ossUrl === "string" ? d.ossUrl.trim() : "";
-  if (direct.startsWith("http") && !isProjectThumbnailVideoUrl(direct)) return direct;
+  if (
+    isStableListCoverUrl(direct) &&
+    !isProjectThumbnailVideoUrl(direct)
+  ) {
+    return direct;
+  }
 
-  const fromRuntime = runtime?.ossUrl?.trim();
-  if (fromRuntime?.startsWith("http") && !isProjectThumbnailVideoUrl(fromRuntime)) {
+  const fromRuntime = runtime?.ossUrl?.trim() ?? "";
+  if (
+    isStableListCoverUrl(fromRuntime) &&
+    !isProjectThumbnailVideoUrl(fromRuntime)
+  ) {
     return fromRuntime;
   }
 
   const imageUrl = typeof d.imageUrl === "string" ? d.imageUrl.trim() : "";
-  if (imageUrl.startsWith("http") && !isProjectThumbnailVideoUrl(imageUrl)) {
+  if (
+    isStableListCoverUrl(imageUrl) &&
+    !isProjectThumbnailVideoUrl(imageUrl)
+  ) {
     return imageUrl;
   }
 
@@ -92,7 +127,9 @@ function persistableVideoFromNodeData(data: unknown): {
   const runtime = readRuntime(d);
   const poster = runtime?.posterUrl?.trim();
   const posterUrl =
-    poster?.startsWith("http") && !isProjectThumbnailVideoUrl(poster)
+    poster &&
+    isStableListCoverUrl(poster) &&
+    !isProjectThumbnailVideoUrl(poster)
       ? poster
       : undefined;
 
@@ -102,7 +139,7 @@ function persistableVideoFromNodeData(data: unknown): {
     typeof d.ossUrl === "string" ? d.ossUrl : "",
   ]
     .map((raw) => (typeof raw === "string" ? raw : "").trim())
-    .filter((url) => url.startsWith("http"));
+    .filter((url) => isStableListCoverUrl(url));
 
   const videoUrl =
     candidates.find((url) => isProjectThumbnailVideoUrl(url)) ?? candidates[0] ?? "";
@@ -195,19 +232,38 @@ function resolveProjectListCoverFromEntries(
 ): ProjectListCover {
   const videos = entries.filter((e) => e.kind === "video");
   const images = entries.filter((e) => e.kind === "image");
-  const latestVideo = videos.at(-1);
+  const latestStableVideo = videos
+    .filter((e) => isStableListCoverUrl(e.url))
+    .at(-1);
+  const latestVideo = latestStableVideo ?? null;
+  // 有稳定 OSS 成片就用它；不要被后面过期的厂商临时 mp4 盖掉
   if (latestVideo) {
     const poster = latestVideo.posterUrl?.trim();
+    const stablePoster =
+      poster && isStableListCoverUrl(poster) ? poster : undefined;
     return {
-      coverUrl: poster || latestVideo.url,
+      coverUrl: stablePoster || latestVideo.url,
       coverKind: "video",
-      posterUrl: poster || undefined,
+      posterUrl: stablePoster,
       hoverVideoUrl: latestVideo.url,
     };
   }
-  const latestImage = images.at(-1);
-  if (latestImage) {
-    return { coverUrl: latestImage.url, coverKind: "image" };
+  const latestStableImage = images
+    .filter((e) => isStableListCoverUrl(e.url))
+    .at(-1);
+  if (latestStableImage) {
+    return { coverUrl: latestStableImage.url, coverKind: "image" };
+  }
+  // 尚无 OSS：才用最新临时成片（刚生成、回传未完成）
+  const latestEphemeralVideo = videos.at(-1);
+  if (latestEphemeralVideo) {
+    const poster = latestEphemeralVideo.posterUrl?.trim();
+    return {
+      coverUrl: poster || latestEphemeralVideo.url,
+      coverKind: "video",
+      posterUrl: poster || undefined,
+      hoverVideoUrl: latestEphemeralVideo.url,
+    };
   }
 
   const fallback = canvasFallback

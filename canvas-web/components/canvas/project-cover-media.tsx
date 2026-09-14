@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  isMediaSrcLoaded,
+  markMediaSrcLoaded,
+} from "@/lib/canvas/loaded-media-src-cache";
 import { isProjectThumbnailVideoUrl } from "@/lib/canvas/project-thumbnail";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +20,7 @@ function CoverPlaceholder({
   hint?: string;
 }) {
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[var(--canvas-accent)]/10 to-[var(--canvas-surface-2)] text-[var(--canvas-muted)]">
+    <div className="absolute inset-0 z-[1] flex flex-col items-center justify-center bg-gradient-to-br from-[var(--canvas-accent)]/10 to-[var(--canvas-surface-2)] text-[var(--canvas-muted)]">
       <span className="text-3xl font-light text-white/25">
         {placeholderLetter?.slice(0, 1) || "画"}
       </span>
@@ -29,6 +33,23 @@ function withCoverRetryToken(url: string, retry: number): string {
   if (retry <= 0) return url;
   const sep = url.includes("?") ? "&" : "?";
   return `${url}${sep}_cover=${retry}`;
+}
+
+function syncImgIfComplete(
+  el: HTMLImageElement | null,
+  src: string,
+  onReady: () => void,
+) {
+  if (!el || !src) return;
+  if (el.complete && el.naturalWidth > 0) onReady();
+}
+
+function syncVideoIfReady(
+  el: HTMLVideoElement | null,
+  onReady: () => void,
+) {
+  if (!el) return;
+  if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) onReady();
 }
 
 /** 画布列表 / 历史记录封面：支持图片与视频，加载失败时显示占位而非浏览器坏图图标 */
@@ -46,20 +67,26 @@ export function ProjectCoverMedia({
   placeholderLetter?: string;
   eager?: boolean;
 }) {
+  const trimmed = url?.trim() ?? "";
   const [failed, setFailed] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(() => isMediaSrcLoaded(trimmed));
   const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     setFailed(false);
-    setLoaded(false);
     setRetry(0);
-  }, [url]);
+    setLoaded(isMediaSrcLoaded(trimmed));
+  }, [trimmed]);
 
   const mediaSrc = useMemo(
-    () => (url?.trim() ? withCoverRetryToken(url.trim(), retry) : ""),
-    [url, retry],
+    () => (trimmed ? withCoverRetryToken(trimmed, retry) : ""),
+    [trimmed, retry],
   );
+
+  const markReady = () => {
+    markMediaSrcLoaded(trimmed);
+    setLoaded(true);
+  };
 
   const onError = () => {
     if (retry < 1) {
@@ -79,6 +106,8 @@ export function ProjectCoverMedia({
     );
   }
 
+  const loadMode = eager || isMediaSrcLoaded(trimmed) ? "eager" : "lazy";
+
   if (isProjectThumbnailVideoUrl(mediaSrc)) {
     return (
       <div className="relative size-full">
@@ -87,13 +116,14 @@ export function ProjectCoverMedia({
         ) : null}
         <video
           key={mediaSrc}
+          ref={(el) => syncVideoIfReady(el, markReady)}
           src={mediaSrc}
-          className={cn(className, !loaded && "opacity-0")}
+          className={className}
           muted
           playsInline
-          preload={eager ? "auto" : "metadata"}
-          onLoadedData={() => setLoaded(true)}
-          onCanPlay={() => setLoaded(true)}
+          preload={loadMode === "eager" ? "auto" : "metadata"}
+          onLoadedData={markReady}
+          onCanPlay={markReady}
           onError={onError}
         />
       </div>
@@ -108,17 +138,13 @@ export function ProjectCoverMedia({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={mediaSrc}
+        ref={(el) => syncImgIfComplete(el, mediaSrc, markReady)}
         src={mediaSrc}
         alt={alt}
-        className={cn(
-          className,
-          "transition-opacity duration-200",
-          loaded ? "opacity-100" : "opacity-0",
-        )}
-        loading={eager ? "eager" : "lazy"}
+        className={cn(className, "relative z-0")}
+        loading={loadMode}
         decoding="async"
-        referrerPolicy="no-referrer"
-        onLoad={() => setLoaded(true)}
+        onLoad={markReady}
         onError={onError}
       />
     </div>

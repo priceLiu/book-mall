@@ -90,6 +90,68 @@ describe("resolveProjectListCoverForListRow", () => {
     expect(cover.coverVideoUrl).toBe("https://cdn.example/pro-video.mp4");
   });
 
+  it("prefers earlier OSS video over a later expired vendor ephemeral mp4", () => {
+    const cover = projectListCoverSummaryFields(
+      {
+        nodes: [
+          {
+            type: "sbv1-video-engine",
+            data: {
+              runtime: {
+                ossUrl: "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/canvas/node-video/a.mp4",
+                posterUrl:
+                  "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/canvas/node-image/a.jpg",
+              },
+            },
+          },
+          {
+            type: "sbv1-video-engine",
+            data: {
+              runtime: {
+                ephemeralUrl:
+                  "https://ark-acg-cn-beijing.tos-cn-beijing.volces.com/seedance/expired.mp4?X-Tos-Signature=dead&X-Tos-Expires=86400",
+              },
+            },
+          },
+        ],
+      },
+      { forDisplay: true },
+    );
+    expect(cover.coverMediaKind).toBe("video");
+    expect(cover.coverVideoUrl).toContain("aliyuncs.com");
+    expect(cover.coverPosterUrl).toContain("aliyuncs.com");
+  });
+
+  it("falls back to OSS storyboard when the only video is an expired vendor url", () => {
+    const cover = projectListCoverSummaryFields(
+      {
+        nodes: [
+          {
+            type: "story-pro2-image",
+            data: {
+              ossUrl:
+                "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/canvas/node-image/shot.png",
+            },
+          },
+          {
+            type: "sbv1-video-engine",
+            data: {
+              runtime: {
+                ossUrl:
+                  "https://ark-acg-cn-beijing.tos-cn-beijing.volces.com/seedance/expired.mp4?X-Tos-Signature=dead",
+                ephemeralUrl:
+                  "https://ark-acg-cn-beijing.tos-cn-beijing.volces.com/seedance/expired.mp4?X-Tos-Signature=dead",
+              },
+            },
+          },
+        ],
+      },
+      { forDisplay: true },
+    );
+    expect(cover.coverMediaKind).toBe("image");
+    expect(cover.thumbnailUrl).toContain("shot.png");
+  });
+
   it("uses ephemeral runtime url for list display when oss is missing", () => {
     const cover = projectListCoverSummaryFields(
       {

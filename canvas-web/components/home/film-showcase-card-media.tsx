@@ -5,6 +5,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CanvasBrandLoadingLogo } from "@/components/home/canvas-brand-loading-logo";
 import { PROJECT_COVER_MEDIA_FILL_CLASS } from "@/components/canvas/project-cover-media";
 import {
+  isMediaSrcLoaded,
+  markMediaSrcLoaded,
+} from "@/lib/canvas/loaded-media-src-cache";
+import {
   prefersHoverVideoEnlarge,
   useHoverVideoEnlarge,
 } from "@/components/home/hover-video-enlarge-preview";
@@ -34,7 +38,7 @@ function MediaPlaceholder({
   hint?: string;
 }) {
   return (
-    <div className="flex size-full flex-col items-center justify-center bg-gradient-to-br from-cyan-400/10 to-[var(--canvas-surface-2)] text-[var(--canvas-muted)]">
+    <div className="absolute inset-0 z-[2] flex size-full flex-col items-center justify-center bg-gradient-to-br from-cyan-400/10 to-[var(--canvas-surface-2)] text-[var(--canvas-muted)]">
       <span className="text-3xl font-light text-white/25">
         {letter?.slice(0, 1) || "影"}
       </span>
@@ -69,8 +73,12 @@ export function FilmShowcaseCardMedia({
   const [videoFailed, setVideoFailed] = useState(false);
   const [hovering, setHovering] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [staticVideoReady, setStaticVideoReady] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(() =>
+    isMediaSrcLoaded(posterUrl?.trim() || url?.trim()),
+  );
+  const [staticVideoReady, setStaticVideoReady] = useState(() =>
+    isMediaSrcLoaded(url?.trim()),
+  );
   const [posterRetry, setPosterRetry] = useState(0);
   const [videoRetry, setVideoRetry] = useState(0);
   const enlarge = useHoverVideoEnlarge();
@@ -98,9 +106,9 @@ export function FilmShowcaseCardMedia({
   useEffect(() => {
     setPosterFailed(false);
     setVideoFailed(false);
-    setImageLoaded(false);
+    setImageLoaded(isMediaSrcLoaded(poster || mediaUrl));
     setVideoReady(false);
-    setStaticVideoReady(false);
+    setStaticVideoReady(isMediaSrcLoaded(mediaUrl));
     setPosterRetry(0);
     setVideoRetry(0);
   }, [mediaUrl, poster, kind]);
@@ -202,17 +210,21 @@ export function FilmShowcaseCardMedia({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           key={playbackUrl}
+          ref={(el) => {
+            if (el?.complete && el.naturalWidth > 0) {
+              markMediaSrcLoaded(mediaUrl);
+              setImageLoaded(true);
+            }
+          }}
           src={playbackUrl}
           alt={alt}
-          className={cn(
-            PROJECT_COVER_MEDIA_FILL_CLASS,
-            "transition-opacity duration-200",
-            imageLoaded ? "opacity-100" : "opacity-0",
-          )}
-          loading={eager ? "eager" : "lazy"}
+          className={PROJECT_COVER_MEDIA_FILL_CLASS}
+          loading={eager || isMediaSrcLoaded(mediaUrl) ? "eager" : "lazy"}
           decoding="async"
-          referrerPolicy="no-referrer"
-          onLoad={() => setImageLoaded(true)}
+          onLoad={() => {
+            markMediaSrcLoaded(mediaUrl);
+            setImageLoaded(true);
+          }}
           onError={onVideoError}
         />
       </div>
@@ -244,12 +256,13 @@ export function FilmShowcaseCardMedia({
             PROJECT_COVER_MEDIA_FILL_CLASS,
             "pointer-events-none absolute inset-0 z-[1] transition-opacity duration-150",
             hovering && videoReady ? "opacity-0" : "opacity-100",
-            !imageLoaded && "opacity-0",
           )}
-          loading={eager ? "eager" : "lazy"}
+          loading={eager || isMediaSrcLoaded(poster) ? "eager" : "lazy"}
           decoding="async"
-          referrerPolicy="no-referrer"
-          onLoad={() => setImageLoaded(true)}
+          onLoad={() => {
+            if (poster) markMediaSrcLoaded(poster);
+            setImageLoaded(true);
+          }}
           onError={onPosterError}
         />
       ) : null}
@@ -259,11 +272,7 @@ export function FilmShowcaseCardMedia({
           ref={staticVideoRef}
           key={playbackUrl}
           src={playbackUrl}
-          className={cn(
-            PROJECT_COVER_MEDIA_FILL_CLASS,
-            "absolute inset-0 z-[1]",
-            !staticVideoReady && "opacity-0",
-          )}
+          className={cn(PROJECT_COVER_MEDIA_FILL_CLASS, "absolute inset-0 z-[1]")}
           muted
           playsInline
           preload="metadata"
