@@ -16,6 +16,7 @@ const VENDOR_LABEL: Record<string, string> = {
   minimax: "MiniMax",
   elevenlabs: "ElevenLabs",
   stepfun: "阶跃星辰",
+  fintech: "三方-Fintech",
   unknown: "未登记",
 };
 

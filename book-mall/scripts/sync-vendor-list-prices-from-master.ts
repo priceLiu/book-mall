@@ -4,6 +4,7 @@
  *   pnpm exec dotenv -e .env.local -- tsx scripts/sync-vendor-list-prices-from-master.ts
  *   pnpm exec dotenv -e .env.local -- tsx scripts/sync-vendor-list-prices-from-master.ts --period-key 20260724_20260822
  */
+import { inferVendorCodeFromModelKey } from "../lib/finance/infer-vendor-code";
 import { syncVendorListPricesFromBillLines } from "../lib/pricing/sync-vendor-list-cost-profile";
 import type { VendorBillLine } from "../lib/finance/reconciliation-v2/types";
 import { prisma } from "../lib/prisma";
@@ -47,8 +48,15 @@ async function main() {
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
 
+    const vendorFromJoin = row.joinKey?.split("|")[0]?.trim() ?? "";
+    const vendor =
+      row.importVendor?.trim() ||
+      vendorFromJoin ||
+      inferVendorCodeFromModelKey(row.modelKey);
+    if (!vendor || vendor === "unknown") continue;
+
     vendorLines.push({
-      vendor: row.importVendor ?? row.joinKey.split("|")[0] ?? "aliyun",
+      vendor,
       joinKey: row.joinKey ?? dedupeKey,
       month: row.periodMonth ?? "",
       period: {

@@ -33,6 +33,8 @@
     "pricing:import-ali-md-scoped": "dotenv -e .env.local -- tsx scripts/pricing-import-ali-md-scoped.ts",
     "pricing:fetch-kie-snapshot": "dotenv -e .env.local -- tsx scripts/fetch-kie-pricing-snapshot.ts",
     "pricing:import-kie-scoped": "dotenv -e .env.local -- tsx scripts/fetch-kie-pricing-snapshot.ts && dotenv -e .env.local -- tsx scripts/pricing-import-kie-scoped.ts && dotenv -e .env.local -- tsx scripts/publish-kie-credit-prices.ts",
+    "pricing:import-fintech-xlsx": "dotenv -e .env.local -- tsx scripts/import-fintech-pricing-xlsx.ts",
+    "pricing:cleanup-empty-vendor": "dotenv -e .env.local -- tsx scripts/cleanup-model-cost-empty-vendor.ts",
     "pricing:publish-kie-credits": "dotenv -e .env.local -- tsx scripts/publish-kie-credit-prices.ts",
     "pricing:audit-gateway-vs-kie": "dotenv -e .env.local -- tsx scripts/pricing-audit-gateway-vs-kie.ts",
     "pricing:audit-gateway-vs-ali": "dotenv -e .env.local -- tsx scripts/pricing-audit-gateway-vs-ali.ts",

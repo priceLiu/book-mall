@@ -198,3 +198,27 @@ settle 实扣 ≤ reservedPoints，差额自动归还到余额（`WalletPointsLe
 | `book-mall/app/(site)/pricing-disclosure/page.tsx` | 前台公示 |
 | `book-mall/app/(account)/account/pricing/page.tsx` | 个人中心价目 |
 | `book-mall/app/admin/finance/cloud-pricing/page.tsx` | 管理端在库价目 |
+| `book-mall/lib/pricing/fintech-pricing-xlsx.ts` | Fintech 报价单 xlsx 解析 → `ModelCostProfile` |
+| `book-mall/scripts/import-fintech-pricing-xlsx.ts` | 导入 RESELLER 渠道成本档 |
+| `book-mall/scripts/cleanup-model-cost-empty-vendor.ts` | 停用 vendor 为空的脏成本档 |
+
+### Fintech AI 第三方报价单（RESELLER 渠道）
+
+用于 finance-web **模型成本**页补充第三方代付价；写入 `vendor=fintech`（界面展示 **三方-Fintech**），备注保留 `云厂商=volcengine` 等底层路由信息。积分发布仍走 **积分定价**页公式。
+
+```bash
+cd book-mall
+# 预览
+pnpm pricing:import-fintech-xlsx -- doc/finance/samples/fintech-ai-报价单0818.xlsx --dry-run
+# 写入成本档（默认不重发积分）
+pnpm pricing:import-fintech-xlsx -- /path/to/报价单.xlsx --no-publish
+# 写入并尝试 publishModelCreditPrice（毛利护栏未过会跳过并告警）
+pnpm pricing:import-fintech-xlsx -- /path/to/报价单.xlsx
+```
+
+清理 vendor 为空的 active 成本档（历史 vendor list sync 脏数据）：
+
+```bash
+pnpm pricing:cleanup-empty-vendor          # 执行
+pnpm pricing:cleanup-empty-vendor --dry-run # 仅预览
+```

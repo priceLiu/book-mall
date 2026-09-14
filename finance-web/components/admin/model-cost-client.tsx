@@ -5,18 +5,36 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiFetch, financeApiPost } from "@/lib/finance-viewer";
 
-const CHANNELS = ["CHANNEL", "OWN", "RESELLER"] as const;
 const UNITS = ["PER_SEC", "PER_IMAGE", "PER_KTOKEN"] as const;
 const UNIT_LABEL: Record<string, string> = {
   PER_SEC: "元/秒",
   PER_IMAGE: "元/张",
   PER_KTOKEN: "元/千token",
 };
-const CHANNEL_LABEL: Record<string, string> = {
-  CHANNEL: "渠道折扣",
-  OWN: "厂商自有",
-  RESELLER: "代理转售",
+/** 厂商/渠道列统一展示（finance-web 独立部署，与 billing-vendor-label 对齐） */
+const COST_SOURCE_LABEL: Record<string, string> = {
+  fintech: "三方-Fintech",
+  aliyun: "阿里云",
+  tencent: "腾讯云",
+  volcengine: "火山引擎",
+  kie: "KIE",
+  deepseek: "DeepSeek",
+  zhipu: "智谱 AI",
+  moonshot: "Moonshot",
+  minimax: "MiniMax",
+  elevenlabs: "ElevenLabs",
+  topaz: "Topaz",
 };
+
+function formatCostSourceLabel(vendor: string): string {
+  const code = vendor.trim().toLowerCase();
+  if (!code) return "（缺失厂商）";
+  return COST_SOURCE_LABEL[code] ?? vendor;
+}
+
+function defaultChannelForVendor(vendor: string): string {
+  return vendor.trim().toLowerCase() === "fintech" ? "RESELLER" : "CHANNEL";
+}
 
 type CostRow = {
   id: string;
@@ -104,7 +122,6 @@ export function ModelCostClient() {
 
   const [filterVendor, setFilterVendor] = useState("");
   const [filterModel, setFilterModel] = useState("");
-  const [filterChannel, setFilterChannel] = useState("");
   const [filterMediaKind, setFilterMediaKind] = useState("");
   const [filterActive, setFilterActive] = useState<"all" | "active" | "inactive">("all");
 
@@ -134,9 +151,20 @@ export function ModelCostClient() {
   }, [reload]);
 
   const vendorOptions = useMemo(
-    () => Array.from(new Set(profiles.map((p) => p.vendor))).sort(),
+    () =>
+      Array.from(new Set(profiles.map((p) => p.vendor).filter((v) => v.trim())))
+        .sort(),
     [profiles],
   );
+
+  const editVendorOptions = useMemo(() => {
+    const known = new Set(Object.keys(COST_SOURCE_LABEL));
+    const extras = vendorOptions.filter((v) => !known.has(v.toLowerCase()));
+    return [
+      ...Object.entries(COST_SOURCE_LABEL),
+      ...extras.map((v) => [v, formatCostSourceLabel(v)] as const),
+    ];
+  }, [vendorOptions]);
 
   const mediaKindOptions = useMemo(
     () =>
@@ -154,12 +182,11 @@ export function ModelCostClient() {
       if (v && p.vendor.toLowerCase() !== v) return false;
       if (m && !p.canonicalModelKey.toLowerCase().includes(m)) return false;
       if (mk && p.mediaKindLabel !== mk) return false;
-      if (filterChannel && p.channel !== filterChannel) return false;
       if (filterActive === "active" && !p.active) return false;
       if (filterActive === "inactive" && p.active) return false;
       return true;
     });
-  }, [profiles, filterVendor, filterModel, filterChannel, filterMediaKind, filterActive]);
+  }, [profiles, filterVendor, filterModel, filterMediaKind, filterActive]);
 
   const mediaGroups = useMemo(() => {
     const map = new Map<string, CostRow[]>();
@@ -287,6 +314,8 @@ export function ModelCostClient() {
           {pricingConfig
             ? ` 锚定 ¥${pricingConfig.creditAnchorYuan}/积分 · 默认 M=${pricingConfig.defaultMarginM} · 视频 M=${pricingConfig.videoMarginM}。`
             : null}
+          {" "}
+          成本来源统一在「厂商/渠道」列展示（如 阿里云、火山引擎、三方-Fintech）；底层 channel 字段仅作内部归档。
         </p>
       </header>
 
@@ -327,16 +356,16 @@ export function ModelCostClient() {
                 </select>
               </label>
               <label className="text-sm">
-                <span className="text-[#8c8c8c]">厂商</span>
+                <span className="text-[#8c8c8c]">厂商/渠道</span>
                 <select
-                  className={`${inputCls} mt-1 min-w-[120px]`}
+                  className={`${inputCls} mt-1 min-w-[140px]`}
                   value={filterVendor}
                   onChange={(e) => setFilterVendor(e.target.value)}
                 >
                   <option value="">全部</option>
                   {vendorOptions.map((v) => (
                     <option key={v} value={v}>
-                      {v}
+                      {formatCostSourceLabel(v)}
                     </option>
                   ))}
                 </select>
@@ -349,21 +378,6 @@ export function ModelCostClient() {
                   value={filterModel}
                   onChange={(e) => setFilterModel(e.target.value)}
                 />
-              </label>
-              <label className="text-sm">
-                <span className="text-[#8c8c8c]">渠道</span>
-                <select
-                  className={`${inputCls} mt-1 min-w-[120px]`}
-                  value={filterChannel}
-                  onChange={(e) => setFilterChannel(e.target.value)}
-                >
-                  <option value="">全部</option>
-                  {CHANNELS.map((c) => (
-                    <option key={c} value={c}>
-                      {CHANNEL_LABEL[c]}
-                    </option>
-                  ))}
-                </select>
               </label>
               <label className="text-sm">
                 <span className="text-[#8c8c8c]">状态</span>
@@ -383,7 +397,6 @@ export function ModelCostClient() {
                 onClick={() => {
                   setFilterVendor("");
                   setFilterModel("");
-                  setFilterChannel("");
                   setFilterMediaKind("");
                   setFilterActive("all");
                 }}
@@ -438,9 +451,14 @@ export function ModelCostClient() {
                         ) : null}
                         {p.tierRaw ? <span className="ml-1 text-xs text-[#8c8c8c]">{p.tierRaw}</span> : null}
                       </td>
-                      <td className="px-3 py-2">
-                        {p.vendor}{" "}
-                        <span className="rounded bg-[#f0f0f0] px-1 text-xs">{CHANNEL_LABEL[p.channel] ?? p.channel}</span>
+                      <td className="px-3 py-2 font-medium">
+                        {p.vendor.trim() ? (
+                          formatCostSourceLabel(p.vendor)
+                        ) : (
+                          <span className="text-red-600" title="vendor 为空，请停用或补全厂商">
+                            （缺失厂商）
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-2">{UNIT_LABEL[p.unit] ?? p.unit}</td>
                       <td className="px-3 py-2 text-right">
@@ -491,8 +509,26 @@ export function ModelCostClient() {
           <h2 className="mb-3 text-sm font-medium">{editingId ? "编辑成本档" : "新增成本档"}</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm sm:col-span-2">
-              <span className="text-[#8c8c8c]">厂商</span>
-              <input className={inputCls} value={draft.vendor} onChange={(e) => setDraft({ ...draft, vendor: e.target.value })} />
+              <span className="text-[#8c8c8c]">厂商/渠道</span>
+              <select
+                className={inputCls}
+                value={draft.vendor}
+                onChange={(e) => {
+                  const vendor = e.target.value;
+                  setDraft({
+                    ...draft,
+                    vendor,
+                    channel: defaultChannelForVendor(vendor),
+                  });
+                }}
+              >
+                <option value="">请选择</option>
+                {editVendorOptions.map(([code, label]) => (
+                  <option key={code} value={code}>
+                    {label}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="text-sm sm:col-span-2">
               <span className="text-[#8c8c8c]">模型键</span>
@@ -509,16 +545,6 @@ export function ModelCostClient() {
                   </option>
                 ))}
               </datalist>
-            </label>
-            <label className="text-sm">
-              <span className="text-[#8c8c8c]">渠道</span>
-              <select className={inputCls} value={draft.channel} onChange={(e) => setDraft({ ...draft, channel: e.target.value })}>
-                {CHANNELS.map((c) => (
-                  <option key={c} value={c}>
-                    {CHANNEL_LABEL[c]}
-                  </option>
-                ))}
-              </select>
             </label>
             <label className="text-sm">
               <span className="text-[#8c8c8c]">单位</span>

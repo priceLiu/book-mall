@@ -128,6 +128,7 @@ async function upsertProfileFromPatch(
   p: ProfilePatch,
   opts: SyncVendorListCostOptions,
 ): Promise<"upserted" | "skipped"> {
+  if (!p.vendor.trim()) return "skipped";
   const existing = await resolveExistingProfile(p);
   if (!existing && opts.updateExistingOnly) return "skipped";
 
