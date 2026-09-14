@@ -173,6 +173,7 @@ export default defineConfig({
       "test/unit/deferred-text-commit-source.test.ts",
       "test/unit/task-pick-preferred.test.ts",
       "test/unit/canvas-rf-sync.test.ts",
+      "test/unit/libtv-marquee-hit.test.ts",
     ],
     environment: "node",
     globals: false,

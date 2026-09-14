@@ -41,6 +41,7 @@ export function syncNodeDimensionsFromChanges(
       ...n,
       width,
       height,
+      measured: { width, height },
       style: { ...style, width, height },
     } as CanvasFlowNode;
   });
@@ -49,6 +50,104 @@ export function syncNodeDimensionsFromChanges(
 /** 纯选中变更（不含坐标/尺寸） */
 export function isCanvasSelectionOnlyChange(changes: NodeChange[]): boolean {
   return changes.length > 0 && changes.every((c) => c.type === "select");
+}
+
+/**
+ * LibTV · RF 纯测量 echo（`dimensions` 且**不含** `resizing` 键）回写本地 RF 节点。
+ *
+ * 背景：LibTV 主管线会丢弃这类 echo（避免 ResizeObserver 与 store 互写 width/height），
+ * 导致用户节点永远没有 `measured`。此后任何节点对象克隆（选中、拖动帧、组缩放 commit…）
+ * 都会让 `adoptUserNodes` 重建内部节点时丢掉 `handleBounds`/`measured`，
+ * RF 框选 `getNodesInside` 会把这些节点当作「未测量」**无条件选中**（粘连/范围过大/失效）。
+ *
+ * 这里以 `setAttributes: false` 语义仅回写 `measured`（不动 width/height/style、不写 store），
+ * 让后续所有对象克隆都能保住框选所需的内部字段。
+ */
+export function applyLibtvRfMeasurementEchoes<
+  N extends { id: string; measured?: { width?: number; height?: number } },
+>(nodes: N[], changes: NodeChange[]): N[] {
+  const echoes: Array<{ id: string; width: number; height: number }> = [];
+  for (const c of changes) {
+    if (c.type !== "dimensions" || !("id" in c) || typeof c.id !== "string") {
+      continue;
+    }
+    if ("resizing" in c) continue; // 用户缩放帧走主管线
+    const w = c.dimensions?.width;
+    const h = c.dimensions?.height;
+    if (typeof w !== "number" || typeof h !== "number" || w <= 0 || h <= 0) {
+      continue;
+    }
+    echoes.push({ id: c.id, width: w, height: h });
+  }
+  if (echoes.length === 0) return nodes;
+
+  let next: N[] | null = null;
+  for (const echo of echoes) {
+    const idx = (next ?? nodes).findIndex((n) => n.id === echo.id);
+    if (idx < 0) continue;
+    const node = (next ?? nodes)[idx]!;
+    const m = node.measured;
+    if (m?.width === echo.width && m?.height === echo.height) continue;
+    if (!next) next = [...nodes];
+    // 仅写 measured；绝不写 width/height/style（setAttributes:false 语义）
+    next[idx] = {
+      ...node,
+      measured: { width: echo.width, height: echo.height },
+    };
+  }
+  return next ?? nodes;
+}
+
+function readNodeBoxSize(node: {
+  width?: number;
+  height?: number;
+  style?: unknown;
+}): { width: number; height: number } | null {
+  const style =
+    typeof node.style === "object" && node.style
+      ? (node.style as { width?: number; height?: number })
+      : undefined;
+  const width =
+    typeof node.width === "number" && node.width > 0
+      ? node.width
+      : typeof style?.width === "number" && style.width > 0
+        ? style.width
+        : undefined;
+  const height =
+    typeof node.height === "number" && node.height > 0
+      ? node.height
+      : typeof style?.height === "number" && style.height > 0
+        ? style.height
+        : undefined;
+  if (typeof width !== "number" || typeof height !== "number") return null;
+  return { width, height };
+}
+
+/**
+ * 显式 width/height 必须盖过陈旧 `measured`。
+ * RF 框选 `getNodesInside` 优先用 `measured`；组拉伸后若仍留着旧大框，
+ * 就会「范围过大 / 粘连」。无显式尺寸的节点保留 RO `measured`。
+ */
+export function alignRfNodesMeasuredToBox<
+  N extends {
+    width?: number;
+    height?: number;
+    style?: unknown;
+    measured?: { width?: number; height?: number };
+  },
+>(nodes: N[]): N[] {
+  let next: N[] | null = null;
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i]!;
+    const box = readNodeBoxSize(node);
+    if (!box) continue;
+    if (node.measured?.width === box.width && node.measured?.height === box.height) {
+      continue;
+    }
+    if (!next) next = [...nodes];
+    next[i] = { ...node, measured: { width: box.width, height: box.height } };
+  }
+  return next ?? nodes;
 }
 
 export function extractSelectNodeChanges(
@@ -686,7 +785,7 @@ export function applyLibtvGroupResizeFrame(
       position,
     };
   });
-  return changed ? pinned : rfBeforeChange;
+  return alignRfNodesMeasuredToBox(changed ? pinned : rfBeforeChange);
 }
 
 export function augmentStoreChangesWithResizePositions(

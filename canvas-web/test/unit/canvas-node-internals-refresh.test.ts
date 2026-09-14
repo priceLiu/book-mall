@@ -35,4 +35,25 @@ describe("collectNodeInternalsRefreshIds", () => {
       [],
     );
   });
+
+  it("includes children when a parent group moves", () => {
+    const group = {
+      id: "g1",
+      type: "group",
+      position: { x: 0, y: 0 },
+      width: 800,
+      height: 600,
+    };
+    const child = {
+      id: "c1",
+      type: "story-pro2-image",
+      parentId: "g1",
+      position: { x: 40, y: 40 },
+      width: 320,
+      height: 240,
+    };
+    const moved = [{ ...group, position: { x: 200, y: 80 } }, child];
+    const ids = collectNodeInternalsRefreshIds([group, child], moved, []);
+    expect(ids.sort()).toEqual(["c1", "g1"]);
+  });
 });

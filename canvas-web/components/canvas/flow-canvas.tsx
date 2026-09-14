@@ -54,6 +54,8 @@ import {
   canvasNodesEqualIgnoringSelectionAndZ,
   filterLibtvRfChangesBeforeApply,
   filterStoreBoundNodeChanges,
+  applyLibtvRfMeasurementEchoes,
+  alignRfNodesMeasuredToBox,
   selectChangesWouldChangeSelection,
   readGroupResizeGeometry,
   type GroupResizeFrozenAbs,
@@ -67,6 +69,10 @@ import {
   countLibtvSelectedNonGroupNodes,
   resolveLibtvFloatingDockSelection,
 } from "@/lib/canvas/libtv-floating-dock-selection";
+import {
+  applyLibtvMarqueeSelection,
+  collectLibtvMarqueeNodeIds,
+} from "@/lib/canvas/libtv-marquee-hit";
 import { cloneCanvasNodeData } from "@/lib/canvas/clone-node-data";
 import { remapClonedNodeData } from "@/lib/canvas/remap-cloned-graph-refs";
 import { isSbv1MediaGroup } from "@/lib/canvas/sbv1-media-group-meta";
@@ -106,6 +112,7 @@ import {
 import { commitLibtvRfNodeSelection } from "@/lib/canvas/select-libtv-node";
 import { useLibtvCanvasOverlayClickThrough } from "@/lib/canvas/use-libtv-canvas-overlay-click-through";
 import { scheduleUpdateNodeInternals } from "@/lib/canvas/use-schedule-update-node-internals";
+import { collectNodeInternalsRefreshIds } from "@/lib/canvas/canvas-node-internals-refresh";
 import { filterSpuriousRfEdgeRemoves } from "@/lib/canvas/canvas-edge-change-guard";
 import {
   applyLibtvEdgesLayerZ,
@@ -281,6 +288,15 @@ function FlowCanvasInner({
   const updateNodeInternals = useUpdateNodeInternals();
   const updateNodeInternalsRef = useRef(updateNodeInternals);
   updateNodeInternalsRef.current = updateNodeInternals;
+  const refreshRfInternalsAfterGeometry = useCallback(
+    (ids: Iterable<string>, key: string) => {
+      const refresh = updateNodeInternalsRef.current;
+      for (const id of ids) {
+        scheduleUpdateNodeInternals(id, key, refresh);
+      }
+    },
+    [],
+  );
   const initialFitDoneRef = useRef(false);
   const rfReadyRef = useRef(false);
   const viewportTimerRef = useRef<number | null>(null);
@@ -723,12 +739,23 @@ function FlowCanvasInner({
           deferStoreGraphSyncRef.current = false;
         }
         armStoreToRfSyncGuard();
-        setRfNodes((rf) =>
-          mergeStoreNodesIntoRf(rf, state.nodes, {
-            preserveRfSelection: true,
-            preserveRfPositions: useCanvasStore.getState().canvasGeometryDragging,
-          }),
+        const prevRf = getNodes() as CanvasFlowNode[];
+        const mergedRf = mergeStoreNodesIntoRf(prevRf, state.nodes, {
+          preserveRfSelection: true,
+          preserveRfPositions: useCanvasStore.getState().canvasGeometryDragging,
+        });
+        setRfNodes(mergedRf);
+        const internalsIds = collectNodeInternalsRefreshIds(
+          prevRf,
+          mergedRf,
+          state.edges,
         );
+        if (internalsIds.length > 0) {
+          refreshRfInternalsAfterGeometry(
+            internalsIds,
+            `store-sync:${internalsIds.join(",")}:${mergedRf.length}`,
+          );
+        }
       }
       const libtvNodes = hasLibtvMediaCanvasNodes(state.nodes);
       const edgesNeedResync =
@@ -745,7 +772,14 @@ function FlowCanvasInner({
       }
     });
     return unsub;
-  }, [armStoreToRfSyncGuard, resolveRfEdgesFromStore, setRfNodes, setRfEdges]);
+  }, [
+    armStoreToRfSyncGuard,
+    getNodes,
+    refreshRfInternalsAfterGeometry,
+    resolveRfEdgesFromStore,
+    setRfNodes,
+    setRfEdges,
+  ]);
 
   /** 撤销/重做后强制 RF 与 store 对齐（拖动中 defer 同步时 undo 可能不生效） */
   useEffect(() => {
@@ -765,6 +799,35 @@ function FlowCanvasInner({
     return () =>
       window.removeEventListener(CANVAS_GRAPH_UNDO_REDO_EVENT, onUndoRedo);
   }, [armStoreToRfSyncGuard, resolveRfEdgesFromStore, setRfNodes, setRfEdges]);
+
+  /**
+   * LibTV 框选：不用 RF getNodesInside（组移动/拉伸后 internals 会脏）。
+   * 按用户节点宽高 + parent 链重算命中。框选进行中不关 NodesSelection——
+   * 松手后要靠它拖整组选中（关掉会导致「框完拖不动」）。
+   */
+  useEffect(() => {
+    if (!libtvCanvas) return;
+    const unsub = rfStore.subscribe((state, prev) => {
+      if (
+        state.userSelectionRect === prev.userSelectionRect &&
+        state.userSelectionActive === prev.userSelectionActive
+      ) {
+        return;
+      }
+      if (!state.userSelectionActive || !state.userSelectionRect) return;
+      const current = getNodes() as CanvasFlowNode[];
+      const hits = collectLibtvMarqueeNodeIds(
+        current,
+        state.userSelectionRect,
+        state.transform as [number, number, number],
+      );
+      const next = applyLibtvMarqueeSelection(current, hits);
+      if (next !== current) {
+        setRfNodes(applyRfNodesMediaGroupZIndex(next));
+      }
+    });
+    return unsub;
+  }, [getNodes, libtvCanvas, rfStore, setRfNodes]);
 
   /** RF 本地选中（打组 / focusCanvasNode），不写 zustand */
   useEffect(() => {
@@ -871,7 +934,7 @@ function FlowCanvasInner({
         height,
         children,
       });
-      setRfNodes(
+      const next = alignRfNodesMeasuredToBox(
         rfNodeList.map((n) => {
           if (n.id === groupId) {
             return {
@@ -879,6 +942,7 @@ function FlowCanvasInner({
               position,
               width,
               height,
+              measured: { width, height },
               style: {
                 ...(typeof n.style === "object" && n.style ? n.style : {}),
                 width,
@@ -898,9 +962,14 @@ function FlowCanvasInner({
           return n;
         }),
       );
+      setRfNodes(next);
+      refreshRfInternalsAfterGeometry(
+        [groupId, ...children.map((c) => c.id)],
+        `group-commit:${groupId}:${position.x}:${position.y}:${width}x${height}`,
+      );
       return true;
     },
-    [setRfNodes],
+    [refreshRfInternalsAfterGeometry, setRfNodes],
   );
 
   /** RF 末帧无 resizing:false 时，pointerup 兜底提交；须曾出现 resizing:true */
@@ -990,7 +1059,37 @@ function FlowCanvasInner({
       }
 
       // 始终只更新本地 RF 状态 → 拖动每帧只重绘被拖节点，画面流畅
-      const rfBeforeChange = getNodes() as CanvasFlowNode[];
+      let rfBeforeChange = getNodes() as CanvasFlowNode[];
+      if (libtvCanvas) {
+        // 1) RO 纯测量 echo 写入 measured（无显式尺寸的节点）
+        // 2) 显式 width/height 必须盖过陈旧 measured（组拉伸后否则框选按旧大框命中）
+        const withMeasured = alignRfNodesMeasuredToBox(
+          applyLibtvRfMeasurementEchoes(rfBeforeChange, changes),
+        );
+        if (withMeasured !== rfBeforeChange) {
+          setRfNodes(withMeasured);
+          rfBeforeChange = withMeasured;
+        }
+        const rfSel = rfStore.getState();
+        if (rfSel.userSelectionActive && rfSel.userSelectionRect) {
+          const hits = collectLibtvMarqueeNodeIds(
+            rfBeforeChange,
+            rfSel.userSelectionRect,
+            rfSel.transform as [number, number, number],
+          );
+          const selectRewrite = rfBeforeChange
+            .filter((n) => Boolean(n.selected) !== hits.has(n.id))
+            .map((n) => ({
+              id: n.id,
+              type: "select" as const,
+              selected: hits.has(n.id),
+            }));
+          rfChanges = [
+            ...rfChanges.filter((c) => c.type !== "select"),
+            ...selectRewrite,
+          ];
+        }
+      }
       trackNonGroupNodeResizeSession(
         rfChanges,
         rfBeforeChange,
@@ -1110,11 +1209,16 @@ function FlowCanvasInner({
           return base;
         }
         const next = applyNodeChanges(batch, base) as CanvasFlowNode[];
-        // LibTV 纯选中：直接 setRfNodes，勿在 onNodesChange 内再调 onRfNodesChange（嵌套 Maximum update depth）
+        const aligned = libtvCanvas ? alignRfNodesMeasuredToBox(next) : next;
+        // LibTV：直接 setRfNodes，勿在 onNodesChange 内再调 onRfNodesChange（嵌套 Maximum update depth）
         if (libtvCanvas && batch.every((c) => c.type === "select")) {
-          const withZ = applyRfNodesMediaGroupZIndex(next);
+          const withZ = applyRfNodesMediaGroupZIndex(aligned);
           setRfNodes(withZ);
           return withZ;
+        }
+        if (libtvCanvas) {
+          setRfNodes(aligned);
+          return aligned;
         }
         onRfNodesChange(batch);
         return next;
@@ -1357,6 +1461,7 @@ function FlowCanvasInner({
       flushAutosaveAfterDrag,
       performGroupResizeCommit,
       clearGroupResizeSession,
+      rfStore,
       setRfNodes,
     ],
   );
@@ -1792,6 +1897,13 @@ function FlowCanvasInner({
           }
         }
         commitFlowPositionsFromRf();
+        const groupRf = getNodes() as CanvasFlowNode[];
+        refreshRfInternalsAfterGeometry(
+          groupRf
+            .filter((n) => n.id === node.id || n.parentId === node.id)
+            .map((n) => n.id),
+          `group-move:${node.id}:${groupRf.find((n) => n.id === node.id)?.position.x ?? 0}:${groupRf.find((n) => n.id === node.id)?.position.y ?? 0}`,
+        );
         setDragHoverGroup(null);
         finishDragSession();
         return;
@@ -1858,6 +1970,7 @@ function FlowCanvasInner({
       getZoom,
       libtvCanvas,
       reparentNode,
+      refreshRfInternalsAfterGeometry,
       restoreLiftedGroupChildrenExtent,
       setDragHoverGroup,
       setRfNodes,
@@ -1893,6 +2006,48 @@ function FlowCanvasInner({
     },
     [],
   );
+
+  const onLibtvSelectionDragStart = useCallback(() => {
+    deferStoreGraphSyncRef.current = true;
+    setCanvasGeometryDragging(true);
+    useCanvasStore.getState().setCanvasSelectionDragging(true);
+    setRfNodes((prev) => {
+      const selectedInGroup = prev.filter(
+        (n) => n.selected && n.parentId && n.type !== "group",
+      );
+      if (!selectedInGroup.length) return prev;
+      const liftIds = new Set(selectedInGroup.map((n) => n.id));
+      groupChildDragLiftRef.current = liftIds;
+      return prev.map((n) =>
+        liftIds.has(n.id) ? { ...n, extent: undefined } : n,
+      );
+    });
+  }, [setCanvasGeometryDragging, setRfNodes]);
+
+  const onLibtvSelectionDragStop = useCallback(() => {
+    restoreLiftedGroupChildrenExtent();
+    commitFlowPositionsFromRf();
+    deferStoreGraphSyncRef.current = false;
+    setCanvasGeometryDragging(false);
+    useCanvasStore.getState().setCanvasSelectionDragging(false);
+    flushAutosaveAfterDrag();
+  }, [
+    commitFlowPositionsFromRf,
+    flushAutosaveAfterDrag,
+    restoreLiftedGroupChildrenExtent,
+    setCanvasGeometryDragging,
+  ]);
+
+  const onLibtvSelectionEnd = useCallback(() => {
+    useCanvasStore.getState().setCanvasMarqueeSelecting(false);
+    ignoreNextPaneClickRef.current = true;
+    const hasSelected = (getNodes() as CanvasFlowNode[]).some((n) => n.selected);
+    // RF pointerup 会按脏 selectedNodeIds 再写一次；下一帧对齐到我们的选中集
+    requestAnimationFrame(() => {
+      rfStore.setState({ nodesSelectionActive: hasSelected });
+    });
+  }, [getNodes, rfStore]);
+
   const onConnectEnd = useCallback<OnConnectEnd>(
     (event, connectionState) => {
       const clientX =
@@ -2438,30 +2593,15 @@ function FlowCanvasInner({
           store.setLibtvFloatingDockSelection(null, null);
           store.setPro2FrameDockFocus(null);
         }}
-        onSelectionDragStart={() => {
-          useCanvasStore.getState().setCanvasSelectionDragging(true);
-          setRfNodes((prev) => {
-            const selectedInGroup = prev.filter(
-              (n) => n.selected && n.parentId && n.type !== "group",
-            );
-            if (!selectedInGroup.length) return prev;
-            const liftIds = new Set(selectedInGroup.map((n) => n.id));
-            groupChildDragLiftRef.current = liftIds;
-            return prev.map((n) =>
-              liftIds.has(n.id) ? { ...n, extent: undefined } : n,
-            );
-          });
-        }}
-        onSelectionDragStop={() => {
-          useCanvasStore.getState().setCanvasSelectionDragging(false);
-        }}
+        onSelectionDragStart={
+          libtvCanvas ? onLibtvSelectionDragStart : undefined
+        }
+        onSelectionDragStop={
+          libtvCanvas ? onLibtvSelectionDragStop : undefined
+        }
         onSelectionEnd={
-          pro2FloatingInspector
-            ? () => {
-                useCanvasStore.getState().setCanvasMarqueeSelecting(false);
-                // 框选松手后会紧跟一次 onPaneClick；忽略以免清空刚选中的节点
-                ignoreNextPaneClickRef.current = true;
-              }
+          libtvCanvas
+            ? onLibtvSelectionEnd
             : () => {
                 useCanvasStore.getState().setCanvasMarqueeSelecting(false);
               }

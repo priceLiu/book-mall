@@ -172,6 +172,17 @@ LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 
 若节点带 `dragHandle: '.canvas-node-drag-handle'` 但 DOM 无该类，则 **整节点无法拖动**。
 
+**框选命中缓存（`measured` / `handleBounds`）**：
+
+- RF 框选 `getNodesInside`：**无 `handleBounds` → 无条件选中**；有 `measured` 时**优先用 `measured` 当命中框**（不是 width/height）。
+- LibTV 主管线丢弃 RF 纯测量 echo，须经 `applyLibtvRfMeasurementEchoes` 回写 `measured`（`setAttributes:false`，不写 width/height/style）。
+- **显式 width/height 必须盖过陈旧 `measured`**（`alignRfNodesMeasuredToBox`）。组拉伸后若仍留着旧大框，框选就会范围过大 / 粘连。
+- 组移动 / 拉伸松手后须 `updateNodeInternals`（组 + 子节点）；store→RF merge 后走 `collectNodeInternalsRefreshIds`（含被移动父组的子节点）。
+- 从 store 全量重建 RF 时：`preserveRfMeasuredById` 再 `alignRfNodesMeasuredToBox`。
+- **框选命中真源**：`collectLibtvMarqueeNodeIds`（用户节点 width/height + parent 链）。LibTV **禁止** 把 RF `getNodesInside` 的结果当最终选中集。
+- 框选松手后须保持 `nodesSelectionActive`（RF `NodesSelection` 是「框完整组拖动」的拖层）。**禁止** 为修命中而长期关掉它（会导致框完拖不动）。覆盖层包围盒随我们纠正后的 `selected` 走。
+- **禁止** 为「修框选」把纯测量 echo 的 width/height 写回节点；也 **禁止** 只冻一份 `measured` 却不在改尺寸后对齐。
+
 ## 7. Code Review 清单
 
 - [ ] 新 LibTV 节点 type 已加入 `LIBTV_DRAG_ANYWHERE_NODE_TYPES`

@@ -1,6 +1,7 @@
 import type { CanvasFlowNode } from "./types";
 import { ensureNodeDragHandles } from "./normalize-graph-nodes";
 import { pickStoreToRfPosition } from "./canvas-rf-sync-position";
+import { alignRfNodesMeasuredToBox } from "./canvas-node-changes";
 import {
   isPro2StyledGroup,
   syncPro2MediaGroupZIndex,
@@ -95,6 +96,30 @@ function mergeZIndexFromStoreToRf(
   return sn.zIndex;
 }
 
+/**
+ * 从 store 全量重建 RF 节点时按 id 保留 `measured`。
+ * 用户节点携带 measured，adoptUserNodes 重建内部节点才会保留 handleBounds/measured；
+ * 否则 RF 框选 getNodesInside 会把节点当「未测量」无条件选中（粘连/范围过大）。
+ */
+function preserveRfMeasuredById(
+  nodes: CanvasFlowNode[],
+  rfNodes: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  const measuredById = new Map<string, { width?: number; height?: number }>();
+  for (const n of rfNodes) {
+    const m = n.measured as { width?: number; height?: number } | undefined;
+    if (typeof m?.width === "number" && typeof m?.height === "number") {
+      measuredById.set(n.id, m);
+    }
+  }
+  if (measuredById.size === 0) return nodes;
+  return nodes.map((n) => {
+    if (n.measured) return n;
+    const m = measuredById.get(n.id);
+    return m ? { ...n, measured: m } : n;
+  });
+}
+
 /** 仅更新 RF 本地选中（不写 zustand），供 focusCanvasNode / 打组后选中新组 */
 export const CANVAS_RF_SELECT_NODE_EVENT = "canvas:rf-select-node";
 /** React Flow 已挂载 · 浮动 Dock 可 portal 到 viewport */
@@ -126,7 +151,9 @@ export function mergeStoreNodesIntoRf(
   const preserveRfSelection = opts?.preserveRfSelection ?? false;
   const preserveRfPositions = opts?.preserveRfPositions ?? false;
   if (rfNodes.length !== storeNodes.length) {
-    const next = ensureNodeDragHandles(storeNodes);
+    const next = alignRfNodesMeasuredToBox(
+      preserveRfMeasuredById(ensureNodeDragHandles(storeNodes), rfNodes),
+    );
     return preserveRfSelection
       ? applyRfSelectionPreserved(next, rfNodes)
       : next;
@@ -139,7 +166,9 @@ export function mergeStoreNodesIntoRf(
   for (const rf of rfNodes) {
     const sn = storeById.get(rf.id);
     if (!sn) {
-      const rebuilt = ensureNodeDragHandles(storeNodes);
+      const rebuilt = alignRfNodesMeasuredToBox(
+        preserveRfMeasuredById(ensureNodeDragHandles(storeNodes), rfNodes),
+      );
       return preserveRfSelection
         ? applyRfSelectionPreserved(rebuilt, rfNodes)
         : rebuilt;
@@ -198,6 +227,6 @@ export function mergeStoreNodesIntoRf(
     });
   }
 
-  if (!changed) return rfNodes;
-  return next;
+  if (!changed) return alignRfNodesMeasuredToBox(rfNodes);
+  return alignRfNodesMeasuredToBox(next);
 }

@@ -26,6 +26,9 @@ export function collectNodeInternalsRefreshIds<
   }
   if (!changed.size) return [];
   const related = new Set(changed);
+  for (const n of next) {
+    if (n.parentId && changed.has(n.parentId)) related.add(n.id);
+  }
   for (const e of edges) {
     if (changed.has(e.source)) related.add(e.target);
     if (changed.has(e.target)) related.add(e.source);

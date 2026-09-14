@@ -8,6 +8,8 @@ import {
   extractResizeCommitIds,
   extractSelectNodeChanges,
   applyLibtvGroupResizeFrame,
+  applyLibtvRfMeasurementEchoes,
+  alignRfNodesMeasuredToBox,
   buildGroupResizeFrozenAbs,
   computeGroupCornerResize,
   extractGroupResizeRfChanges,
@@ -136,6 +138,119 @@ describe("isCanvasInteractiveGeometryInProgress", () => {
       },
     ];
     expect(isCanvasInteractiveGeometryInProgress(changes)).toBe(false);
+  });
+});
+
+describe("applyLibtvRfMeasurementEchoes", () => {
+  it("writes measured only (never width/height/style) for pure RF measurement echoes", () => {
+    const nodes = [
+      node("g1", {
+        type: "group",
+        width: 800,
+        height: 600,
+        style: { width: 800, height: 600 },
+      }),
+      node("c1", { parentId: "g1" }),
+    ];
+    const changes: NodeChange[] = [
+      {
+        type: "dimensions",
+        id: "c1",
+        dimensions: { width: 320, height: 240 },
+      },
+    ];
+    const next = applyLibtvRfMeasurementEchoes(nodes, changes);
+    expect(next).not.toBe(nodes);
+    const child = next.find((n) => n.id === "c1")!;
+    expect(child.measured).toEqual({ width: 320, height: 240 });
+    expect(child.width).toBeUndefined();
+    expect(child.style).toBeUndefined();
+    // 未涉及的节点保持引用
+    expect(next.find((n) => n.id === "g1")).toBe(nodes[0]);
+  });
+
+  it("keeps node references when measured already matches", () => {
+    const nodes = [
+      node("c1", { measured: { width: 320, height: 240 } }),
+    ];
+    const changes: NodeChange[] = [
+      {
+        type: "dimensions",
+        id: "c1",
+        dimensions: { width: 320, height: 240 },
+      },
+    ];
+    expect(applyLibtvRfMeasurementEchoes(nodes, changes)).toBe(nodes);
+  });
+
+  it("ignores user resize frames (resizing key), unknown ids and empty dimensions", () => {
+    const nodes = [node("c1")];
+    const changes: NodeChange[] = [
+      {
+        type: "dimensions",
+        id: "c1",
+        resizing: true,
+        dimensions: { width: 400, height: 300 },
+      },
+      {
+        type: "dimensions",
+        id: "ghost",
+        dimensions: { width: 100, height: 100 },
+      },
+      { type: "dimensions", id: "c1", dimensions: { width: 0, height: 0 } },
+      { type: "select", id: "c1", selected: true },
+    ];
+    expect(applyLibtvRfMeasurementEchoes(nodes, changes)).toBe(nodes);
+  });
+});
+
+describe("alignRfNodesMeasuredToBox", () => {
+  it("overwrites stale measured with explicit width/height (group resize leftover)", () => {
+    const nodes = [
+      node("g1", {
+        type: "group",
+        width: 500,
+        height: 400,
+        style: { width: 500, height: 400 },
+        measured: { width: 800, height: 600 },
+      }),
+    ];
+    const next = alignRfNodesMeasuredToBox(nodes);
+    expect(next).not.toBe(nodes);
+    expect(next[0]!.measured).toEqual({ width: 500, height: 400 });
+    expect(next[0]!.width).toBe(500);
+  });
+
+  it("stamps measured when width/height exist but measured is missing", () => {
+    const nodes = [
+      node("g1", {
+        type: "group",
+        width: 800,
+        height: 600,
+        style: { width: 800, height: 600 },
+      }),
+    ];
+    expect(alignRfNodesMeasuredToBox(nodes)[0]!.measured).toEqual({
+      width: 800,
+      height: 600,
+    });
+  });
+
+  it("keeps references when measured already matches the box", () => {
+    const nodes = [
+      node("g1", {
+        width: 320,
+        height: 240,
+        measured: { width: 320, height: 240 },
+      }),
+    ];
+    expect(alignRfNodesMeasuredToBox(nodes)).toBe(nodes);
+  });
+
+  it("does not invent a box for nodes without width/height", () => {
+    const nodes = [node("c1", { measured: { width: 320, height: 240 } })];
+    expect(alignRfNodesMeasuredToBox(nodes)).toBe(nodes);
+    expect(nodes[0]!.measured).toEqual({ width: 320, height: 240 });
   });
 });
 
@@ -345,7 +460,7 @@ describe("applyLibtvGroupResizeFrame", () => {
     expect(next.find((n) => n.id === "c1")?.position).toEqual({ x: 68, y: 28 });
   });
 
-  it("keeps node identities when resize changes are empty", () => {
+  it("keeps node identities when resize changes are empty and measured already matches", () => {
     const rfBeforeChange: CanvasFlowNode[] = [
       {
         id: "g1",
@@ -353,6 +468,7 @@ describe("applyLibtvGroupResizeFrame", () => {
         position: { x: 100, y: 80 },
         width: 400,
         height: 300,
+        measured: { width: 400, height: 300 },
         data: {},
       },
       {
@@ -363,6 +479,7 @@ describe("applyLibtvGroupResizeFrame", () => {
         position: { x: 28, y: 28 },
         width: 200,
         height: 150,
+        measured: { width: 200, height: 150 },
         data: {},
       },
     ];

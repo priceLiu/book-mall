@@ -92,6 +92,75 @@ describe("mergeStoreNodesIntoRf", () => {
     expect(merged[0]!.height).toBe(400);
   });
 
+  it("preserves measured by id when rebuilding from store (node added/removed)", () => {
+    const rfNodes: CanvasFlowNode[] = [
+      {
+        id: "g1",
+        type: "group",
+        position: { x: 0, y: 0 },
+        width: 800,
+        height: 600,
+        style: { width: 800, height: 600 },
+        data: {},
+        measured: { width: 800, height: 600 },
+      } as CanvasFlowNode,
+    ];
+    const storeNodes: CanvasFlowNode[] = [
+      // store 节点不带 measured；且新增了一个节点（长度不一致 → 全量重建分支）
+      {
+        id: "g1",
+        type: "group",
+        position: { x: 0, y: 0 },
+        width: 800,
+        height: 600,
+        style: { width: 800, height: 600 },
+        data: {},
+      } as CanvasFlowNode,
+      {
+        id: "c1",
+        type: "story-pro2-image",
+        parentId: "g1",
+        position: { x: 40, y: 40 },
+        data: {},
+      } as CanvasFlowNode,
+    ];
+    const merged = mergeStoreNodesIntoRf(rfNodes, storeNodes, {
+      preserveRfSelection: true,
+    });
+    expect(merged.find((n) => n.id === "g1")?.measured).toEqual({
+      width: 800,
+      height: 600,
+    });
+    expect(merged.find((n) => n.id === "c1")?.measured).toBeUndefined();
+  });
+
+  it("replaces stale measured when store group size changes", () => {
+    const storeNodes: CanvasFlowNode[] = [
+      {
+        id: "g1",
+        type: "group",
+        position: { x: 0, y: 0 },
+        width: 500,
+        height: 400,
+        style: { width: 500, height: 400 },
+        data: {},
+      } as CanvasFlowNode,
+    ];
+    const rfNodes: CanvasFlowNode[] = [
+      {
+        ...storeNodes[0]!,
+        width: 800,
+        height: 600,
+        style: { width: 800, height: 600 },
+        measured: { width: 800, height: 600 },
+      } as CanvasFlowNode,
+    ];
+    const merged = mergeStoreNodesIntoRf(rfNodes, storeNodes);
+    expect(merged[0]!.width).toBe(500);
+    expect(merged[0]!.height).toBe(400);
+    expect(merged[0]!.measured).toEqual({ width: 500, height: 400 });
+  });
+
   it("applies store aspect-preset size to selected LibTV image node", () => {
     const storeNodes: CanvasFlowNode[] = [
       {
