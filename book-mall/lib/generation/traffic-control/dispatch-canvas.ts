@@ -504,15 +504,38 @@ async function dispatchOneCanvasQueuedTask(
 
     const code =
       e instanceof CanvasProjectError ? e.code : "VIDEO_DISPATCH_FAILED";
+    const failMessage = msg.slice(0, 500);
+    const gatewayLogIdFromError =
+      e instanceof Error &&
+      "gatewayLogId" in e &&
+      typeof (e as Error & { gatewayLogId?: string }).gatewayLogId === "string"
+        ? (e as Error & { gatewayLogId?: string }).gatewayLogId!.trim()
+        : vendorJob?.logId?.trim() ?? "";
+    const basePayload = taskInputPayload(claimedTask ?? task);
     await prisma.canvasGenerationTask.update({
       where: { id: task.id },
       data: {
         status: "FAILED",
         failCode: code,
-        failMessage: msg.slice(0, 500),
+        failMessage,
         completedAt: new Date(),
+        ...(gatewayLogIdFromError
+          ? {
+              inputPayload: {
+                ...basePayload,
+                gatewayLogId: gatewayLogIdFromError,
+                gatewayKieSubmitClaimed: false,
+              } as Prisma.InputJsonValue,
+            }
+          : {}),
       },
     });
+    const { linkCanvasTaskGatewayLogOnFailure } = await import(
+      "@/lib/canvas/canvas-gateway-log-sync"
+    );
+    await linkCanvasTaskGatewayLogOnFailure(task.id, failMessage, code).catch(
+      () => undefined,
+    );
     return "failed";
   }
   } catch (e) {

@@ -5,9 +5,10 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { ModelOpsPresentationTab } from "@/components/admin/model-ops-presentation-tab";
 import { ModelOpsShelfTab } from "@/components/admin/model-ops-shelf-tab";
+import { ModelOpsSceneTemplatesTab } from "@/components/admin/model-ops-scene-templates-tab";
 import { financeApiFetch, financeApiPost } from "@/lib/finance-viewer";
 
-type OpsTab = "offerings" | "presentation" | "shelf";
+type OpsTab = "offerings" | "presentation" | "shelf" | "sceneTemplates";
 
 type CandidateRow = {
   id: string;
@@ -198,7 +199,7 @@ export function PlatformModelsClient() {
         <div>
           <h1 className="text-xl font-semibold">模型运营中心</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            商业上架、展示来源（sourceLabel）、按应用/场景分发（AppModelShelf）。
+            商业上架、展示来源（sourceLabel）、按应用/场景分发（AppModelShelf）、场景模板（规则层）。
           </p>
         </div>
         {opsTab === "offerings" ? (
@@ -218,6 +219,7 @@ export function PlatformModelsClient() {
             ["offerings", "商业上架"],
             ["presentation", "展示配置"],
             ["shelf", "应用分发"],
+            ["sceneTemplates", "场景模板"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -237,6 +239,7 @@ export function PlatformModelsClient() {
 
       {opsTab === "presentation" ? <ModelOpsPresentationTab /> : null}
       {opsTab === "shelf" ? <ModelOpsShelfTab /> : null}
+      {opsTab === "sceneTemplates" ? <ModelOpsSceneTemplatesTab /> : null}
 
       {opsTab === "offerings" ? (
         <>

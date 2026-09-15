@@ -62,15 +62,56 @@ function buildDockImageIndexById(
   return map;
 }
 
+function isWan30VideoModelKey(modelKey?: string): boolean {
+  const k = modelKey?.trim();
+  return k === "wan3.0-video" || k === "wan3.0-video-prime";
+}
+
 function dockImageRefToken(
   index: number,
   opts?: { forVideo?: boolean; modelKey?: string },
 ): string {
   if (opts?.forVideo) {
+    if (isWan30VideoModelKey(opts.modelKey)) return `图${index}`;
     if (opts.modelKey?.trim() === "wan2.7-r2v") return `图${index}`;
     return `[Image ${index}]`;
   }
   return `图${index}`;
+}
+
+function parseDockVideoRefIndex(link: Pro2DockUpstreamLink): number | null {
+  const m = /^视频\s*(\d+)$/i.exec(link.label.trim());
+  if (!m) return null;
+  const n = Number.parseInt(m[1] ?? "", 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function buildDockVideoIndexById(
+  prompt: string,
+  upstreamLinks: Pro2DockUpstreamLink[],
+): Map<string, number> {
+  const videoLinks = upstreamLinks.filter((l) => l.kind === "video");
+  const videoIds = new Set(videoLinks.map((l) => l.id));
+  const mentioned = parseReferencedIds(prompt).filter((id) => videoIds.has(id));
+  const map = new Map<string, number>();
+
+  if (mentioned.length > 0) {
+    mentioned.forEach((id, i) => map.set(id, i + 1));
+    return map;
+  }
+
+  let fallback = 0;
+  for (const link of videoLinks) {
+    const fromLabel = parseDockVideoRefIndex(link);
+    if (fromLabel != null) {
+      map.set(link.id, fromLabel);
+      fallback = Math.max(fallback, fromLabel);
+      continue;
+    }
+    fallback += 1;
+    map.set(link.id, fallback);
+  }
+  return map;
 }
 
 /** 生图/视频 Dock 提交前：剥掉 @ 图片 token，文本类 @ 展开为附加文案 */
@@ -123,11 +164,13 @@ export function resolveSbv1VideoEngineRunPrompt(
       sourceNodeId: "",
     });
   }
+  const imageUpstreamLinks = upstreamLinks.filter((l) => l.kind === "image");
   const imageIndexById = buildDockImageIndexById(
     prompt,
-    upstreamLinks,
+    imageUpstreamLinks,
     opts?.dockRefImages ?? [],
   );
+  const videoIndexById = buildDockVideoIndexById(prompt, upstreamLinks);
   let result = prompt;
 
   for (const id of mentioned) {
@@ -149,8 +192,17 @@ export function resolveSbv1VideoEngineRunPrompt(
     }
 
     if (link.kind === "video") {
-      // 成片经 in_motion_video 边传入；@ 仅作语义指代，去掉 token 保留周围文案
-      result = stripMentionTokensFromPrompt(result, [id]);
+      if (isWan30VideoModelKey(opts?.modelKey)) {
+        const idx = videoIndexById.get(id);
+        if (idx != null) {
+          result = replaceMentionTokenInPrompt(result, id, `视频${idx}`);
+        } else {
+          result = stripMentionTokensFromPrompt(result, [id]);
+        }
+      } else {
+        // 其它模型：成片经 in_motion_video 边传入；@ 仅作语义指代
+        result = stripMentionTokensFromPrompt(result, [id]);
+      }
       continue;
     }
 

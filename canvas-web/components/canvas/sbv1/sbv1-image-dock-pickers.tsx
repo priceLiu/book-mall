@@ -145,6 +145,7 @@ export function sbv1ImageSettingsTriggerLabel(
 export function Sbv1ImageDockModelPicker({
   data,
   allowedModelKeys,
+  sceneTemplateId,
   disabled,
   onPatch,
   open,
@@ -153,6 +154,7 @@ export function Sbv1ImageDockModelPicker({
 }: {
   data: Sbv1ImageNodeData;
   allowedModelKeys?: readonly string[];
+  sceneTemplateId?: string;
   disabled?: boolean;
   onPatch: (patch: Partial<Sbv1ImageNodeData>) => void;
   open?: boolean;
@@ -167,6 +169,7 @@ export function Sbv1ImageDockModelPicker({
       providerId={data.engine?.providerId ?? ""}
       modelKey={data.engine?.modelKey ?? ""}
       allowedModelKeys={allowedModelKeys ?? [...SBV1_IMAGE_MODEL_KEYS]}
+      sceneTemplateId={sceneTemplateId}
       externalProviders={providers}
       disabled={disabled}
       open={open}

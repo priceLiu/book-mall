@@ -20,6 +20,7 @@ import type {
 
 import { prisma } from "@/lib/prisma";
 import { promptArchiveFieldsForTask } from "@/lib/canvas/canvas-task-prompt-archive";
+import { linkCanvasTaskGatewayLogOnFailure } from "@/lib/canvas/canvas-gateway-log-sync";
 import { formatVideoEngineFailMessage } from "@/lib/story/kie-client";
 
 import {
@@ -30,7 +31,7 @@ import {
 import { CanvasProjectError } from "./canvas-project-service";
 import { resolveCanvasGatewayTtsExtras } from "./canvas-tts-run-params";
 import { assertStoryLlmVisionModel } from "./story-llm-vision-models";
-import { isLikelyVideoUrl } from "./media-url-kind";
+import { isLikelyReferenceImageUrl, isLikelyVideoUrl } from "./media-url-kind";
 import { scriptStudioMirrorPayload } from "./script-studio-parse-mirror";
 import type { CanvasTaskStoryScope } from "./canvas-story-scope";
 import {
@@ -120,6 +121,7 @@ import {
   isDashscopeWan30VideoModel,
   resolveDashscopeT2vRefMismatchMessage,
 } from "./dashscope-sbv1-t2v";
+import { normalizeWan30MediaImageUrls } from "./dashscope-wan30-media-normalize";
 import {
   buildDashscopeKlingV3VideoBody,
   isDashscopeKlingV3VideoGatewayModel,
@@ -1816,11 +1818,44 @@ export async function runVideoEngineNode(
     isMinimaxCanvasVideoModelKey(modelKey) &&
     (modelKey.toLowerCase().includes("-t2v") ||
       modelKey.toLowerCase().includes("context-ir"));
+  const wan30ReferenceVideoUrlsRaw = isDashscopeWan30VideoModel(modelKey)
+    ? (Array.isArray(params.reference_video_urls)
+        ? (params.reference_video_urls as unknown[])
+        : []
+      ).filter(
+        (u): u is string =>
+          typeof u === "string" && /^https?:\/\//.test(u.trim()),
+      )
+    : [];
+  const wan30ReferenceVideoUrls = wan30ReferenceVideoUrlsRaw.filter((u) =>
+    isLikelyVideoUrl(u),
+  );
+  if (
+    isDashscopeWan30VideoModel(modelKey) &&
+    wan30ReferenceVideoUrlsRaw.length > 0 &&
+    wan30ReferenceVideoUrls.length === 0
+  ) {
+    throw new CanvasProjectError(
+      "INVALID_INPUT",
+      "参考视频须为 mp4 成片 URL（node-video），不能是封面图。请等待上游视频节点生成完成后再试。",
+    );
+  }
+  const wan30ReferenceAudioUrls = isDashscopeWan30VideoModel(modelKey)
+    ? (Array.isArray(params.reference_audio_urls)
+        ? (params.reference_audio_urls as unknown[])
+        : []
+      ).filter(
+        (u): u is string =>
+          typeof u === "string" && /^https?:\/\//.test(u.trim()),
+      )
+    : [];
   const hasAttachedVideoRefs =
     Boolean(mainFrameImageUrl) ||
     referenceImageUrls.length > 0 ||
     Boolean(lastFrameImageUrl) ||
-    portraitAssetRefs.length > 0;
+    portraitAssetRefs.length > 0 ||
+    wan30ReferenceVideoUrls.length > 0 ||
+    wan30ReferenceAudioUrls.length > 0;
   const isTextToVideoOnly =
     (isDashscopeT2v || isKlingT2v || isVolcengineT2v || isMinimaxT2v) &&
     !hasAttachedVideoRefs;
@@ -1843,7 +1878,9 @@ export async function runVideoEngineNode(
     !isTextToVideoOnly &&
     !mainFrameImageUrl &&
     portraitAssetRefs.length === 0 &&
-    referenceImageUrls.length === 0
+    referenceImageUrls.length === 0 &&
+    wan30ReferenceVideoUrls.length === 0 &&
+    wan30ReferenceAudioUrls.length === 0
   ) {
     throw new CanvasProjectError(
       "INVALID_INPUT",
@@ -1983,7 +2020,9 @@ export async function runVideoEngineNode(
   let kieMainFrame = mainFrameImageUrl;
   let kieReferenceImageUrls = referenceImageUrls;
   let kieLastFrame = lastFrameImageUrl;
-  if (!isVolcengineVideo) {
+  /** 万相 3.0 走专用 JPEG 规范化；KIE 最短边 normalize 会先 sharp 解码，非 JPEG/PNG 会直接 500 */
+  const skipKieVideoRefNormalize = isDashscopeWan30VideoModel(modelKey);
+  if (!isVolcengineVideo && !skipKieVideoRefNormalize) {
     const needsNorm =
       isMotionControl ||
       Boolean(kieMainFrame) ||
@@ -2114,31 +2153,65 @@ export async function runVideoEngineNode(
       );
       const durationSec = Number(params.duration ?? data.durationSec ?? 5);
       const dockMode = String(data.dockInputMode ?? "").trim();
-      const wan30AllRefs = [kieMainFrame, ...kieReferenceImageUrls].filter(
-        Boolean,
+      const wan30MainFrame = isLikelyReferenceImageUrl(kieMainFrame)
+        ? kieMainFrame
+        : "";
+      const wan30RefImages = kieReferenceImageUrls.filter((u) =>
+        isLikelyReferenceImageUrl(u),
       );
-      const wan30Media = isDashscopeWan30VideoModel(effectiveModelKey)
-        ? dockMode === "first_last" || Boolean(kieLastFrame)
-          ? buildDashscopeWan30Media({
-              firstFrameUrl: kieMainFrame,
-              lastFrameUrl: kieLastFrame,
-              referenceImageUrls: kieReferenceImageUrls,
-            })
-          : dockMode === "i2v" && wan30AllRefs.length <= 1
-            ? buildDashscopeWan30Media({
-                firstFrameUrl: kieMainFrame,
-              })
-            : buildDashscopeWan30Media({
-                firstFrameUrl: "",
-                referenceImageUrls: wan30AllRefs,
-              })
+      const wan30AllRefs = [wan30MainFrame, ...wan30RefImages].filter(Boolean);
+      const wan30HasOmniMedia =
+        wan30ReferenceVideoUrls.length > 0 ||
+        wan30ReferenceAudioUrls.length > 0;
+      const wan30DockMode =
+        wan30HasOmniMedia || dockMode === "omni"
+          ? "omni"
+          : dockMode === "first_last" || Boolean(kieLastFrame)
+            ? "first_last"
+            : dockMode === "i2v" && wan30AllRefs.length <= 1
+              ? "i2v"
+              : "omni";
+      let wan30Media = isDashscopeWan30VideoModel(effectiveModelKey)
+        ? buildDashscopeWan30Media({
+            dockMode: wan30DockMode,
+            firstFrameUrl:
+              wan30DockMode === "omni" ? "" : wan30MainFrame,
+            lastFrameUrl: isLikelyReferenceImageUrl(kieLastFrame)
+              ? kieLastFrame
+              : "",
+            referenceImageUrls:
+              wan30DockMode === "omni" ? wan30AllRefs : wan30RefImages,
+            referenceVideoUrls: wan30ReferenceVideoUrls,
+            referenceAudioUrls: wan30ReferenceAudioUrls,
+          })
         : undefined;
+      if (wan30Media && wan30Media.length > 0) {
+        wan30Media = await normalizeWan30MediaImageUrls({
+          userId,
+          media: wan30Media,
+        });
+      }
+      const wan30HadRefAttempt =
+        wan30AllRefs.length > 0 ||
+        wan30ReferenceVideoUrlsRaw.length > 0 ||
+        wan30ReferenceAudioUrls.length > 0;
+      if (
+        isDashscopeWan30VideoModel(effectiveModelKey) &&
+        wan30HadRefAttempt &&
+        (!wan30Media || wan30Media.length === 0)
+      ) {
+        throw new Error(
+          "参考媒体无效：视频须为 mp4 成片（node-video），图片不能误用视频 OSS 链接。请确认上游节点已生成完成后再试。",
+        );
+      }
       dashscopeVideoBody = buildDashscopeSbv1T2vVideoBody({
         prompt: expandedPrompt,
         aspectRatio,
         resolution,
         durationSec,
         promptExtend: params.prompt_extend !== false,
+        generateAudio:
+          params.generate_audio !== false && params.generateAudio !== false,
         modelKey: effectiveModelKey,
         watermark: params.watermark === true,
         media: wan30Media,
@@ -2458,23 +2531,36 @@ export async function runVideoEngineNode(
     return { reused: false, task: updated };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    const failMessage = formatVideoEngineFailMessage(
+      "VIDEO_ENGINE_FAILED",
+      msg,
+      { providerKind: videoProviderKind },
+    ).slice(0, 500);
+    const gatewayLogIdFromError =
+      e instanceof Error &&
+      "gatewayLogId" in e &&
+      typeof (e as Error & { gatewayLogId?: string }).gatewayLogId === "string"
+        ? (e as Error & { gatewayLogId?: string }).gatewayLogId!.trim()
+        : "";
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: created.id },
       data: {
         status: "FAILED",
         failCode: "VIDEO_ENGINE_FAILED",
-        failMessage: formatVideoEngineFailMessage(
-          "VIDEO_ENGINE_FAILED",
-          msg,
-          { providerKind: videoProviderKind },
-        ).slice(0, 500),
+        failMessage,
         completedAt: new Date(),
         inputPayload: {
           ...submitPayloadBase,
           gatewayKieSubmitClaimed: false,
+          ...(gatewayLogIdFromError ? { gatewayLogId: gatewayLogIdFromError } : {}),
         } as Prisma.InputJsonValue,
       },
     });
+    await linkCanvasTaskGatewayLogOnFailure(
+      created.id,
+      failMessage,
+      "VIDEO_ENGINE_FAILED",
+    ).catch(() => undefined);
     return { reused: false, task: updated };
   }
 }

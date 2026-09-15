@@ -434,6 +434,18 @@
 
 ---
 
+## 2026-09-14 — 模型场景模板（SceneTemplate）
+
+- **迁移目录**：`prisma/migrations/20260914130000_scene_templates/`
+- **新表**：
+  - `SceneTemplate`——六类场景规则（text/t2i/i2i/t2v/i2v/v2v）；`rulesJson` 不含 vendor
+  - `SceneTemplateModel`——模板 ↔ `canonicalModelKey` 绑定（不含厂商）
+  - `ModelTemplateCatalogSnapshot`——版本化静态目录（含积分单价与 resolved 路由快照）
+- **产品文档**：`doc/product/24-model-scene-templates.md`
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`
+
+---
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

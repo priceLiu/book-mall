@@ -467,7 +467,7 @@ export function getSbv1VideoDockModeChips(
     return [
       chip("t2v"),
       chip("i2v"),
-      chip("omni", "参考生视频"),
+      chip("omni"),
       chip("first_last"),
     ];
   }

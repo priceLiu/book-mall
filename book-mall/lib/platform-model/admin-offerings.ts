@@ -269,6 +269,18 @@ export async function setPlatformOfferingActiveCandidate(input: {
     throw new Error("该候选当前毛利仍低于护栏，无法切换");
   }
 
+  const routeOk = await prisma.gatewayModelRoute.findFirst({
+    where: {
+      canonicalModelKey: candidate.canonicalModelKey,
+      modelKey: candidate.modelKey,
+      active: true,
+    },
+    select: { id: true },
+  });
+  if (!routeOk) {
+    throw new Error(`Gateway 未注册路由：${candidate.modelKey}`);
+  }
+
   await publishModelCreditPrice({
     canonicalModelKey: costKey,
     displayName: offering.displayName,

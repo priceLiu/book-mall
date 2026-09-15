@@ -56,16 +56,26 @@ export async function gatewayV1CreateTask(
     meta: opts.meta,
   });
   const text = await r.text();
-  if (!r.ok) {
-    throw new Error(
-      summarizeUpstreamFailMessage(text, r.status) || `Gateway createTask HTTP ${r.status}`,
-    );
-  }
-  let json: { code?: number; data?: { taskId?: string; logId?: string; providerKind?: string }; error?: string };
+  let json: {
+    code?: number;
+    data?: { taskId?: string; logId?: string; providerKind?: string };
+    error?: string;
+    logId?: string;
+  };
   try {
     json = JSON.parse(text) as typeof json;
   } catch {
-    throw new Error("Gateway createTask 响应非 JSON");
+    json = {};
+  }
+  if (!r.ok) {
+    const err = new Error(
+      summarizeUpstreamFailMessage(text, r.status) ||
+        json.error ||
+        `Gateway createTask HTTP ${r.status}`,
+    ) as Error & { gatewayLogId?: string };
+    const logId = json.logId?.trim() || json.data?.logId?.trim();
+    if (logId) err.gatewayLogId = logId;
+    throw err;
   }
   const taskId = json.data?.taskId;
   const logId = json.data?.logId;

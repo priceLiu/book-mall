@@ -1254,6 +1254,57 @@ const SEED_ITEMS: {
     sortOrder: 760,
     listKind: "PENDING",
   },
+  // —— 模型场景模板（与 QR/电商「内容模板」无关 · 见 24-model-scene-templates.md）——
+  {
+    title: "MT-100 模型场景模板 · 总规格",
+    description:
+      "六类场景模板（text/t2i/i2i/t2v/i2v/v2v）与厂商路由分离；静态目录含平台积分单价；余额/冻结动态。",
+    docPath: "book-mall/doc/product/24-model-scene-templates.md",
+    sortOrder: 800,
+    listKind: "PENDING",
+  },
+  {
+    title: "MT-101 Schema + 迁移",
+    description: "SceneTemplate / SceneTemplateModel / ModelTemplateCatalogSnapshot + apply-pending。",
+    docPath: "book-mall/doc/product/24-model-scene-templates.md",
+    sortOrder: 801,
+    listKind: "PENDING",
+  },
+  {
+    title: "MT-102 Finance 模板管理 Tab",
+    description: "平台模型页「场景模板」：启停、绑定 canonical、发布目录。",
+    docPath: "book-mall/doc/product/24-model-scene-templates.md",
+    sortOrder: 802,
+    listKind: "PENDING",
+  },
+  {
+    title: "MT-103 静态目录发布 API",
+    description: "publish → Snapshot；GET catalog 供子应用缓存。",
+    docPath: "book-mall/doc/product/24-model-scene-templates.md",
+    sortOrder: 803,
+    listKind: "PENDING",
+  },
+  {
+    title: "MT-104 Canvas / 电商 / QR 接静态包",
+    description: "选模按 templateId 过滤；估分 creditsPerUnit×units；invoke 用 resolved.modelKey。",
+    docPath: "book-mall/doc/product/24-model-scene-templates.md",
+    sortOrder: 804,
+    listKind: "PENDING",
+  },
+  {
+    title: "MT-105 上架门禁（成本/积分/Gateway）",
+    description: "绑定模板与 Offering ACTIVE 前校验路由+成本+已发布积分价。",
+    docPath: "book-mall/doc/product/24-model-scene-templates.md",
+    sortOrder: 805,
+    listKind: "PENDING",
+  },
+  {
+    title: "MT-106 种子绑定 + 全项目冒烟",
+    description: "从 model-ops-seed-config 映射绑定 + publish；三端选模/估分/Gateway 冒烟。",
+    docPath: "book-mall/doc/product/24-model-scene-templates.md",
+    sortOrder: 806,
+    listKind: "PENDING",
+  },
 ];
 
 async function main() {

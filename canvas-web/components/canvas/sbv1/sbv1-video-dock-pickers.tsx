@@ -7,6 +7,8 @@ import { hideKieVendorLabel } from "@/lib/canvas/gateway-model-role";
 import { GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID } from "@/lib/canvas/system-providers";
 import type { CanvasProviderModelDto } from "@/lib/canvas-providers-api";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
+import { useModelTemplateCatalog } from "@/lib/canvas/use-model-template-catalog";
+import { modelKeysForTemplate } from "@/lib/canvas/model-template-catalog";
 import {
   SBV1_ASPECT_RATIOS,
   SBV1_REFERENCE_MODES,
@@ -236,15 +238,24 @@ export function Sbv1VideoDockModelPicker({
   refLinkCount?: number;
 }) {
   const { providers } = useUserProviders();
+  const { catalog } = useModelTemplateCatalog();
   const { anchorRef, open: internalOpen, setOpen: setInternalOpen, rect } =
     useSbv1ToolbarAnchor(controlledOpen);
   const open = controlledOpen ?? internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;
   const { fontPx, minHeightPx, chevronPx } = useLibtvDockToolbarMetrics();
-  const models = useMemo(
-    () => collectSbv1DockVideoModels(providers),
-    [providers],
-  );
+  const models = useMemo(() => {
+    const all = collectSbv1DockVideoModels(providers);
+    const keys = [
+      ...modelKeysForTemplate(catalog, "i2v"),
+      ...modelKeysForTemplate(catalog, "t2v"),
+      ...modelKeysForTemplate(catalog, "v2v"),
+    ];
+    if (keys.length === 0) return all;
+    const set = new Set(keys.map((k) => k.toLowerCase()));
+    const filtered = all.filter((e) => set.has(e.model.modelKey.toLowerCase()));
+    return filtered.length > 0 ? filtered : all;
+  }, [providers, catalog]);
   const label = sbv1VideoModelTriggerLabel(data, providers);
   const selectedKey = data.engine?.modelKey?.trim() ?? "";
   const selectedProvider = normalizeSbv1EngineProviderId(data.engine?.providerId);

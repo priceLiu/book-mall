@@ -56,13 +56,19 @@ describe("getGatewayModelTypeLabels · LLM", () => {
 });
 
 describe("getGatewayModelTypeLabels · VIDEO", () => {
-  it("labels wan3.0-video as All-in-One 文生/图生/参考生", () => {
+  it("labels wan3.0-video with legacy R2V tags plus 全能参考", () => {
     expect(
       getGatewayModelTypeLabels({
         modelKey: "wan3.0-video",
         role: "VIDEO",
       }),
-    ).toEqual(["文生视频", "图生视频", "参考生视频", "多参考图"]);
+    ).toEqual([
+      "文生视频",
+      "图生视频",
+      "参考生视频",
+      "多参考图",
+      "全能参考",
+    ]);
   });
 });
 

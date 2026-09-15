@@ -2,6 +2,7 @@
  * 分镜视频 1.0 · DashScope 原生文生视频（wan / HappyHorse）
  */
 import { isDashscopeWan30VideoModelKey } from "@/lib/gateway/dashscope-client";
+import { isLikelyReferenceImageUrl } from "./media-url-kind";
 
 export const DASHSCOPE_SBV1_WAN_T2V_MODEL_KEYS = [
   "wan2.6-t2v",
@@ -104,26 +105,93 @@ function parseResolution(raw: string): "480P" | "720P" | "1080P" {
 }
 
 export type DashscopeWan30MediaItem = {
-  type: "first_frame" | "last_frame" | "reference_image";
+  type:
+    | "first_frame"
+    | "last_frame"
+    | "reference_image"
+    | "reference_video"
+    | "reference_audio";
   url: string;
 };
 
+export type DashscopeWan30DockMode = "first_last" | "i2v" | "omni";
+
+function dedupeMediaUrls(urls: readonly string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of urls ?? []) {
+    const url = raw.trim();
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+  }
+  return out;
+}
+
 export function buildDashscopeWan30Media(opts: {
+  dockMode?: DashscopeWan30DockMode;
   firstFrameUrl?: string;
   lastFrameUrl?: string;
   referenceImageUrls?: readonly string[];
+  referenceVideoUrls?: readonly string[];
+  referenceAudioUrls?: readonly string[];
 }): DashscopeWan30MediaItem[] {
   const first = opts.firstFrameUrl?.trim() ?? "";
   const last = opts.lastFrameUrl?.trim() ?? "";
-  const refs = (opts.referenceImageUrls ?? [])
-    .map((u) => u.trim())
-    .filter((u) => u.length > 0 && u !== first && u !== last);
+  const videos = dedupeMediaUrls(opts.referenceVideoUrls).slice(0, 5);
+  const audios = dedupeMediaUrls(opts.referenceAudioUrls).slice(0, 5);
+  const refs = dedupeMediaUrls(opts.referenceImageUrls).filter(
+    (u) => u !== first && u !== last && isLikelyReferenceImageUrl(u),
+  );
+  const firstImage =
+    first && isLikelyReferenceImageUrl(first) ? first : "";
+  const lastImage = last && isLikelyReferenceImageUrl(last) ? last : "";
+  const hasOmniMedia = videos.length > 0 || audios.length > 0;
+  const dockMode =
+    opts.dockMode ??
+    (hasOmniMedia
+      ? "omni"
+      : refs.length > 0
+        ? "first_last"
+        : firstImage
+          ? "i2v"
+          : "first_last");
+
+  // 参考生视频 / 全能参考：reference_*（可与视频/音频/多图组合，不可与 first/last 混传）
+  if (dockMode === "omni" || hasOmniMedia) {
+    const media: DashscopeWan30MediaItem[] = [];
+    for (const url of videos) {
+      media.push({ type: "reference_video", url });
+    }
+    /** omni · 全部 reference_image（勿拆 firstFrame，否则多图时首张会被误剔除） */
+    const omniImages =
+      dockMode === "omni" || hasOmniMedia
+        ? dedupeMediaUrls(opts.referenceImageUrls).filter((u) =>
+            isLikelyReferenceImageUrl(u),
+          )
+        : [];
+    const imageUrls =
+      omniImages.length > 0
+        ? omniImages
+        : refs.length > 0
+          ? refs
+          : firstImage
+            ? [firstImage]
+            : [];
+    for (const url of imageUrls.slice(0, 10)) {
+      media.push({ type: "reference_image", url });
+    }
+    for (const url of audios) {
+      media.push({ type: "reference_audio", url });
+    }
+    if (media.length > 0) return media;
+  }
 
   // 万相 3.0 API：first_frame 仅可与 last_frame 同用，不可与 reference_image 混传。
   if (refs.length > 0) {
     const seen = new Set<string>();
     const allRefs: string[] = [];
-    for (const url of [first, ...refs]) {
+    for (const url of [firstImage, ...refs]) {
       if (!url || seen.has(url)) continue;
       seen.add(url);
       allRefs.push(url);
@@ -135,9 +203,21 @@ export function buildDashscopeWan30Media(opts: {
   }
 
   const media: DashscopeWan30MediaItem[] = [];
-  if (first) media.push({ type: "first_frame", url: first });
-  if (last) media.push({ type: "last_frame", url: last });
+  if (firstImage) media.push({ type: "first_frame", url: firstImage });
+  if (lastImage) media.push({ type: "last_frame", url: lastImage });
   return media.slice(0, 10);
+}
+
+function parseWan30Ratio(
+  aspectRatio: string,
+  media: DashscopeWan30MediaItem[],
+): string {
+  const hasVideo = media.some((m) => m.type === "reference_video");
+  if (hasVideo) return "adaptive";
+  const t = aspectRatio.trim();
+  const allowed = ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"] as const;
+  if ((allowed as readonly string[]).includes(t)) return t;
+  return "16:9";
 }
 
 export function buildDashscopeWan30VideoBody(opts: {
@@ -147,6 +227,8 @@ export function buildDashscopeWan30VideoBody(opts: {
   durationSec: number;
   seed?: number;
   watermark?: boolean;
+  promptExtend?: boolean;
+  generateAudio?: boolean;
   media?: DashscopeWan30MediaItem[];
 }): { input: Record<string, unknown>; parameters: Record<string, unknown> } {
   const prompt = opts.prompt.trim();
@@ -157,10 +239,14 @@ export function buildDashscopeWan30VideoBody(opts: {
   const duration = Math.min(30, Math.max(2, Math.floor(opts.durationSec)));
   const parameters: Record<string, unknown> = {
     resolution: parseResolution(opts.resolution),
-    ratio: opts.aspectRatio.trim() || "16:9",
+    ratio: parseWan30Ratio(opts.aspectRatio, media),
     duration,
     watermark: opts.watermark === true,
+    prompt_extend: opts.promptExtend !== false,
   };
+  if (opts.generateAudio !== undefined) {
+    parameters.audio = opts.generateAudio;
+  }
   if (opts.seed != null && Number.isInteger(opts.seed)) {
     parameters.seed = opts.seed;
   }
@@ -234,6 +320,7 @@ export function buildDashscopeSbv1T2vVideoBody(opts: {
   resolution: string;
   durationSec: number;
   promptExtend?: boolean;
+  generateAudio?: boolean;
   modelKey?: string;
   seed?: number;
   watermark?: boolean;

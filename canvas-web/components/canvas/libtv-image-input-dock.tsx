@@ -1201,6 +1201,7 @@ function LibtvImageDockFooter({
           <Sbv1ImageDockModelPicker
             data={pickerData}
             allowedModelKeys={imageModelKeys}
+            sceneTemplateId="t2i"
             disabled={isRunning}
             open={dockMenu === "model"}
             onOpenChange={(next) => onDockMenuChange(next ? "model" : null)}

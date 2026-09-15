@@ -614,7 +614,7 @@ export async function POST(request: NextRequest) {
       });
       await finalizeRequestLog(log.id, finalizePayload).catch(() => undefined);
     }
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return NextResponse.json({ error: msg, logId: log.id }, { status: 502 });
   }
   } finally {
     if (storyTaskId) {

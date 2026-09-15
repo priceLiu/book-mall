@@ -58,6 +58,11 @@ import { formatStoryboardVideoModelTypeLabel } from "@/lib/storyboard-video-mode
 import { formatStoryboardModelRefCountLabel } from "@/lib/storyboard-model-ref-count";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import { cn } from "@/lib/utils";
+import {
+  ecomEstimateCredits,
+  ecomModelKeysForTemplate,
+  fetchEcomModelTemplateCatalog,
+} from "@/lib/model-template-catalog";
 
 /** 弹层默认尺寸（可被 `contentClassName` 覆盖） */
 export const STORYBOARD_MODEL_PICKER_DIALOG_CLASS =
@@ -72,6 +77,11 @@ type Props = {
   onChange: (key: string) => void;
   onConfirm: (modelKey: string) => void;
   confirming?: boolean;
+  /**
+   * 场景模板 id；未传时 image→t2i、video→i2v。
+   * 静态目录有绑定时按模板过滤；未发布则展示全部传入 models。
+   */
+  sceneTemplateId?: string;
   panelIndex?: number | null;
   videoTarget?: "panel" | "fullSheet";
   aspectRatio?: StoryboardVideoAspectRatio;
@@ -342,6 +352,7 @@ export function StoryboardModelPickerDialog({
   onChange,
   onConfirm,
   confirming,
+  sceneTemplateId,
   panelIndex,
   videoTarget = "fullSheet",
   aspectRatio = "9:16",
@@ -391,12 +402,15 @@ export function StoryboardModelPickerDialog({
         ? "选择生图模型并调整尺寸，用于生成分镜图。"
         : "");
   const footerLeftHint =
-    footerHint ??
-    (confirming || running
-      ? "任务进行中，请稍候…"
-      : selectionOnly
-        ? "参数在右栏编辑，生成请点右栏底部按钮。"
-        : "选好模型与参数后开始生成。");
+    (catalogCreditsHint != null
+      ? `约 ${catalogCreditsHint} 积分（平台价 · 静态目录）· `
+      : "") +
+    (footerHint ??
+      (confirming || running
+        ? "任务进行中，请稍候…"
+        : selectionOnly
+          ? "参数在右栏编辑，生成请点右栏底部按钮。"
+          : "选好模型与参数后开始生成。"));
   const showImageSize = mode === "image";
   const showFullDuration = mode === "video" && videoTarget === "fullSheet";
   const showPanelDuration = mode === "video" && videoTarget === "panel";
@@ -405,8 +419,45 @@ export function StoryboardModelPickerDialog({
   const [draftKey, setDraftKey] = useState(value);
   const [mediaFilter, setMediaFilter] = useState<StoryboardModelMediaFilter>("all");
   const [confirmBlockMessage, setConfirmBlockMessage] = useState<string | null>(null);
+  const [templateModelKeys, setTemplateModelKeys] = useState<string[] | null>(null);
+  const [catalogCreditsHint, setCatalogCreditsHint] = useState<number | null>(null);
   const wasOpenRef = useRef(false);
   const suppressBackdropCloseUntilRef = useRef(0);
+
+  const resolvedTemplateId =
+    sceneTemplateId?.trim() || (mode === "image" ? "t2i" : "i2v");
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void fetchEcomModelTemplateCatalog().then((catalog) => {
+      if (cancelled) return;
+      const keys = ecomModelKeysForTemplate(catalog, resolvedTemplateId);
+      setTemplateModelKeys(keys.length > 0 ? keys : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, resolvedTemplateId]);
+
+  useEffect(() => {
+    if (!open || !draftKey) {
+      setCatalogCreditsHint(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchEcomModelTemplateCatalog().then((catalog) => {
+      if (cancelled) return;
+      const units =
+        mode === "video"
+          ? Math.max(1, Math.round(durationSec || panelDurationSec || 10))
+          : 1;
+      setCatalogCreditsHint(ecomEstimateCredits(catalog, draftKey, units));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, draftKey, mode, durationSec, panelDurationSec]);
 
   useEffect(() => {
     if (open && !wasOpenRef.current) {
@@ -420,13 +471,17 @@ export function StoryboardModelPickerDialog({
     wasOpenRef.current = open;
   }, [open, value, nativeOverlay]);
 
-  const visibleModels = useMemo(
-    () =>
-      hideTypeFilter
-        ? models
-        : models.filter((m) => storyboardModelMatchesMediaFilter(m, mode, mediaFilter)),
-    [hideTypeFilter, models, mode, mediaFilter],
-  );
+  const visibleModels = useMemo(() => {
+    let list = hideTypeFilter
+      ? models
+      : models.filter((m) => storyboardModelMatchesMediaFilter(m, mode, mediaFilter));
+    if (templateModelKeys?.length) {
+      const set = new Set(templateModelKeys.map((k) => k.toLowerCase()));
+      const filtered = list.filter((m) => set.has(m.modelKey.toLowerCase()));
+      if (filtered.length > 0) list = filtered;
+    }
+    return list;
+  }, [hideTypeFilter, models, mode, mediaFilter, templateModelKeys]);
 
   useEffect(() => {
     if (!open || visibleModels.length === 0) return;

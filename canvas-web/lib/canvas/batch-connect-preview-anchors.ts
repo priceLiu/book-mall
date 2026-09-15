@@ -1,7 +1,7 @@
+import { libtvSelectionFlowBox } from "./libtv-marquee-hit";
 import { nodeBatchOutHandle } from "./pro2-batch-connect";
 import type { CanvasFlowNode } from "./types";
 import {
-  computePro2MultiSelectionBbox,
   pro2NodeAbsolutePosition,
   pro2NodeBoxSize,
 } from "./pro2-selection-bbox";
@@ -139,12 +139,16 @@ export type BatchConnectScreenBox = {
   height: number;
 };
 
-function screenBoxFromFlowBbox(
-  bbox: NonNullable<ReturnType<typeof computePro2MultiSelectionBbox>>,
+/** LibTV 多选 flow 框 → 屏幕包围盒（与 LibtvMultiSelectionOutline 同数据源） */
+export function libtvSelectionFlowBoxToScreenBox(
+  flowBox: { x: number; y: number; w: number; h: number },
   flowToScreenPosition: (p: { x: number; y: number }) => { x: number; y: number },
 ): BatchConnectScreenBox {
-  const tl = flowToScreenPosition({ x: bbox.x, y: bbox.y });
-  const br = flowToScreenPosition({ x: bbox.x2, y: bbox.y2 });
+  const tl = flowToScreenPosition({ x: flowBox.x, y: flowBox.y });
+  const br = flowToScreenPosition({
+    x: flowBox.x + flowBox.w,
+    y: flowBox.y + flowBox.h,
+  });
   const left = Math.min(tl.x, br.x);
   const top = Math.min(tl.y, br.y);
   const right = Math.max(tl.x, br.x);
@@ -160,55 +164,15 @@ function screenBoxFromFlowBbox(
   };
 }
 
-/** DOM 包围盒 + flow 数学回退/合并 · 缩小画布时 RF 可能未挂载 DOM */
+/** 框选批量 + / 磁吸 · 与蓝色虚线框同一套 libtvSelectionFlowBox */
 export function batchConnectSelectionScreenBox(
   nodeIds: string[],
   allNodes: CanvasFlowNode[],
   flowToScreenPosition: (p: { x: number; y: number }) => { x: number; y: number },
-  getInternalNode?: (id: string) => unknown,
+  _getInternalNode?: (id: string) => unknown,
 ): BatchConnectScreenBox | null {
   if (nodeIds.length < 2) return null;
-
-  const bbox = computePro2MultiSelectionBbox(
-    nodeIds,
-    allNodes,
-    getInternalNode ?? (() => undefined),
-  );
-  const flow = bbox ? screenBoxFromFlowBbox(bbox, flowToScreenPosition) : null;
-  const client = batchConnectSelectionClientBox(nodeIds);
-
-  /** 缩小画布时 DOM 矩形常不可靠 · 有 flow 包围盒则优先采用 */
-  if (flow && !client) return flow;
-  if (flow && client) {
-    const clientArea = Math.max(
-      0,
-      (client.right - client.left) * (client.bottom - client.top),
-    );
-    const flowArea = Math.max(0, flow.width * flow.height);
-    if (clientArea < 4 && flowArea >= 4) return flow;
-  }
-
-  // DOM 可靠时以屏幕坐标为准；勿与 flow 数学框取并集（错误 flow 会把虚线框撑到整画布）
-  if (client && flow) {
-    const clientArea = Math.max(
-      0,
-      (client.right - client.left) * (client.bottom - client.top),
-    );
-    if (clientArea >= 4) {
-      return {
-        ...client,
-        width: client.right - client.left,
-        height: client.bottom - client.top,
-      };
-    }
-    return flow;
-  }
-  if (client) {
-    return {
-      ...client,
-      width: client.right - client.left,
-      height: client.bottom - client.top,
-    };
-  }
-  return flow;
+  const flowBox = libtvSelectionFlowBox(allNodes, nodeIds);
+  if (!flowBox) return null;
+  return libtvSelectionFlowBoxToScreenBox(flowBox, flowToScreenPosition);
 }

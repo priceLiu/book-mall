@@ -2,12 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useReactFlow } from "@xyflow/react";
+import { useReactFlow, useStore } from "@xyflow/react";
 import { Plus, Clapperboard, Download } from "lucide-react";
 
+import { pointerBlocksSidePlusMagnet } from "@/lib/canvas/canvas-form-wheel";
 import { useClientPortalMounted } from "@/lib/canvas/use-modal-portal-effects";
 import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
+import {
+  computeBatchConnectMagnetFlowOffset,
+  LIBTV_NODE_SIDE_PLUS_LAYER_CLASS,
+  LIBTV_SIDE_PLUS_MAGNET_ACTIVATE_PX,
+  LIBTV_SIDE_PLUS_MAGNET_RELEASE_PX,
+  pointerNearBatchConnectMagnetEdge,
+} from "@/lib/canvas/libtv-node-chrome";
+import { libtvSelectionFlowBox } from "@/lib/canvas/libtv-marquee-hit";
 import { findBatchConnectSnapTarget } from "@/lib/canvas/libtv-connection-snap";
 import { batchConnectSourceClientPoint } from "@/lib/canvas/batch-connect-preview-anchors";
 import {
@@ -19,7 +28,7 @@ import {
   nodesEligibleForBatchOut,
   type BatchConnectMode,
 } from "@/lib/canvas/pro2-batch-connect";
-import { batchConnectSelectionScreenBox } from "@/lib/canvas/batch-connect-preview-anchors";
+import { libtvSelectionFlowBoxToScreenBox } from "@/lib/canvas/batch-connect-preview-anchors";
 import {
   pro2SelectedNonGroupIds,
 } from "@/lib/canvas/pro2-selection-bbox";
@@ -92,8 +101,19 @@ function Pro2SelectionBatchConnectLayerInner({
     [rfNodes],
   );
 
+  /** 与 LibtvMultiSelectionOutline 同一套选区 id / flow 框 */
+  const outlineSelectedIds = useMemo(
+    () => rfNodes.filter((n) => n.selected).map((n) => n.id),
+    [rfNodes],
+  );
+
+  const rfDom = useStore((s) => s.domNode);
+  const zoom = useStore((s) => s.transform[2]) || 1;
+  const viewportEl =
+    rfDom?.querySelector<HTMLElement>(".react-flow__viewport") ?? null;
+
   /** 多选期间始终订阅 viewport，缩小画布时 + 位置跟随 pan/zoom */
-  const viewport = useViewportTransformActive(selectedIds.length >= 2);
+  const viewport = useViewportTransformActive(outlineSelectedIds.length >= 2);
 
   const eligibleSources = useMemo(() => {
     const raw = nodesEligibleForBatchOut(storeNodes, selectedIds);
@@ -118,29 +138,27 @@ function Pro2SelectionBatchConnectLayerInner({
     return "";
   }, [batchMode]);
 
+  const flowBox = useMemo(() => {
+    if (outlineSelectedIds.length < 2) return null;
+    const pool = (rfNodes.length ? rfNodes : storeNodes) as CanvasFlowNode[];
+    return libtvSelectionFlowBox(pool, outlineSelectedIds);
+  }, [outlineSelectedIds, rfNodes, storeNodes]);
+
   const screenBox = useMemo(() => {
     void viewport;
-    const pool = (rfNodes.length ? rfNodes : storeNodes) as CanvasFlowNode[];
-    return batchConnectSelectionScreenBox(
-      selectedIds,
-      pool,
-      flowToScreenPosition,
-      getInternalNode,
-    );
-  }, [
-    selectedIds,
-    viewport,
-    rfNodes,
-    storeNodes,
-    flowToScreenPosition,
-    getInternalNode,
-  ]);
+    if (!flowBox) return null;
+    return libtvSelectionFlowBoxToScreenBox(flowBox, flowToScreenPosition);
+  }, [flowBox, viewport, flowToScreenPosition]);
 
-  const pinnedLayoutBoxRef = useRef<ReturnType<typeof batchConnectSelectionScreenBox>>(null);
+  const pinnedFlowBoxRef = useRef<typeof flowBox>(null);
 
   useEffect(() => {
-    if (screenBox) pinnedLayoutBoxRef.current = screenBox;
-  }, [screenBox]);
+    if (flowBox) pinnedFlowBoxRef.current = flowBox;
+  }, [flowBox]);
+
+  const [magnetOffset, setMagnetOffset] = useState({ x: 0, y: 0 });
+  const magnetActiveRef = useRef(false);
+  const frozenMagnetRef = useRef({ x: 0, y: 0 });
 
   const [dragging, setDragging] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(
@@ -152,7 +170,7 @@ function Pro2SelectionBatchConnectLayerInner({
   const [previewSourcePoints, setPreviewSourcePoints] = useState<
     { x: number; y: number }[]
   >([]);
-  const frozenScreenBoxRef = useRef<typeof screenBox>(null);
+  const frozenFlowBoxRef = useRef<typeof flowBox>(null);
   const gestureActiveRef = useRef(false);
   const gestureRef = useRef<{
     pointerId: number;
@@ -176,9 +194,21 @@ function Pro2SelectionBatchConnectLayerInner({
     });
   }, []);
 
+  /** 悬停磁吸 · 框选沿全高跟随（flow 坐标 · 与 viewport 内 + 同语义） */
+  const hoverMagnetOffsetForPointer = useCallback(
+    (clientX: number, clientY: number, box: NonNullable<typeof screenBox>) => {
+      return computeBatchConnectMagnetFlowOffset(
+        clientX,
+        clientY,
+        box,
+        "right",
+        zoom,
+      );
+    },
+    [zoom],
+  );
+
   const capturePreviewSourcePoints = useCallback(() => {
-    if (previewSourcesCapturedRef.current) return;
-    previewSourcesCapturedRef.current = true;
     const points = eligibleSources
       .map((node) =>
         batchConnectSourceClientPoint(
@@ -189,7 +219,9 @@ function Pro2SelectionBatchConnectLayerInner({
         ),
       )
       .filter((p): p is { x: number; y: number } => p != null);
+    previewSourcesCapturedRef.current = points.length >= 2;
     setPreviewSourcePoints(points);
+    return points;
   }, [eligibleSources, storeNodes, flowToScreenPosition, getInternalNode]);
 
   const openSpawnMenu = useCallback((anchor: { x: number; y: number }) => {
@@ -227,7 +259,8 @@ function Pro2SelectionBatchConnectLayerInner({
     pendingLineTargetRef.current = null;
     previewSourcesCapturedRef.current = false;
     gestureActiveRef.current = false;
-    frozenScreenBoxRef.current = null;
+    frozenFlowBoxRef.current = null;
+    frozenMagnetRef.current = { x: 0, y: 0 };
     setDragging(false);
     setMenuAnchor(null);
     menuOpenRef.current = false;
@@ -236,17 +269,111 @@ function Pro2SelectionBatchConnectLayerInner({
     gestureRef.current = null;
   }, []);
 
+  const closeMenuOnly = useCallback(() => {
+    setMenuAnchor(null);
+    menuOpenRef.current = false;
+  }, []);
+
   useEffect(() => {
+    if (gestureActiveRef.current || dragging || menuAnchor) return;
     if (canvasDraggingNodeId || canvasGeometryDragging) {
       clearPreview();
     }
-  }, [canvasDraggingNodeId, canvasGeometryDragging, clearPreview]);
+  }, [
+    canvasDraggingNodeId,
+    canvasGeometryDragging,
+    dragging,
+    menuAnchor,
+    clearPreview,
+  ]);
 
   useEffect(() => {
     if (selectedIds.length < 2) {
       clearPreview();
+      magnetActiveRef.current = false;
+      setMagnetOffset({ x: 0, y: 0 });
     }
   }, [selectedIds.length, clearPreview]);
+
+  const magnetFollowEnabled =
+    selectedIds.length >= 2 &&
+    eligibleSources.length >= 2 &&
+    Boolean(batchMode) &&
+    Boolean(screenBox) &&
+    !marqueeSelecting &&
+    !dragging &&
+    menuAnchor == null;
+
+  useEffect(() => {
+    if (!magnetFollowEnabled || !screenBox) {
+      magnetActiveRef.current = false;
+      setMagnetOffset({ x: 0, y: 0 });
+      return;
+    }
+
+    const rect = {
+      top: screenBox.top,
+      bottom: screenBox.bottom,
+      left: screenBox.left,
+      right: screenBox.right,
+      height: screenBox.height,
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (pointerBlocksSidePlusMagnet(e.clientX, e.clientY)) {
+        magnetActiveRef.current = false;
+        setMagnetOffset({ x: 0, y: 0 });
+        return;
+      }
+      const activate = pointerNearBatchConnectMagnetEdge(
+        e.clientX,
+        e.clientY,
+        rect,
+        "right",
+        LIBTV_SIDE_PLUS_MAGNET_ACTIVATE_PX,
+      );
+      const release = pointerNearBatchConnectMagnetEdge(
+        e.clientX,
+        e.clientY,
+        rect,
+        "right",
+        LIBTV_SIDE_PLUS_MAGNET_RELEASE_PX,
+      );
+      if (magnetActiveRef.current) {
+        if (!release) {
+          magnetActiveRef.current = false;
+          setMagnetOffset({ x: 0, y: 0 });
+          return;
+        }
+        setMagnetOffset(
+          hoverMagnetOffsetForPointer(e.clientX, e.clientY, screenBox),
+        );
+        return;
+      }
+      if (!activate) {
+        setMagnetOffset({ x: 0, y: 0 });
+        return;
+      }
+      magnetActiveRef.current = true;
+      setMagnetOffset(
+        hoverMagnetOffsetForPointer(e.clientX, e.clientY, screenBox),
+      );
+    };
+
+    const onPointerUp = () => {
+      magnetActiveRef.current = false;
+      setMagnetOffset({ x: 0, y: 0 });
+    };
+
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    window.addEventListener("pointerup", onPointerUp, { passive: true });
+    window.addEventListener("pointercancel", onPointerUp, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+    };
+  }, [magnetFollowEnabled, screenBox, hoverMagnetOffsetForPointer]);
 
   const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
 
@@ -452,16 +579,20 @@ function Pro2SelectionBatchConnectLayerInner({
 
   const gestureActive = dragging || menuAnchor != null;
   gestureActiveRef.current = gestureActive;
-  if (gestureActive && screenBox) {
-    frozenScreenBoxRef.current = screenBox;
+  if (gestureActive && flowBox) {
+    frozenFlowBoxRef.current = flowBox;
   } else if (!gestureActive) {
-    frozenScreenBoxRef.current = null;
+    frozenFlowBoxRef.current = null;
   }
 
-  const layoutBox =
-    gestureActive && frozenScreenBoxRef.current
-      ? frozenScreenBoxRef.current
-      : screenBox ?? pinnedLayoutBoxRef.current;
+  const layoutFlowBox =
+    gestureActive && frozenFlowBoxRef.current
+      ? frozenFlowBoxRef.current
+      : flowBox ?? pinnedFlowBoxRef.current;
+
+  /** 拖线 / 菜单期间冻结 +（同组侧 + 进入 RF 连线后不再磁吸） */
+  const activeMagnetOffset =
+    dragging || menuAnchor != null ? frozenMagnetRef.current : magnetOffset;
 
   const onPlusPointerDown = (e: React.PointerEvent) => {
     if (eligibleSources.length < 2 || !batchMode) return;
@@ -469,7 +600,10 @@ function Pro2SelectionBatchConnectLayerInner({
     e.stopPropagation();
 
     pointerCleanupRef.current?.();
-    closeMenu();
+    closeMenuOnly();
+
+    const plusEl = e.currentTarget as HTMLElement;
+    plusEl.setPointerCapture(e.pointerId);
 
     const pointerId = e.pointerId;
     const startX = e.clientX;
@@ -481,14 +615,15 @@ function Pro2SelectionBatchConnectLayerInner({
       y: startY,
       moved: false,
     };
-    previewSourcesCapturedRef.current = false;
-    setPreviewSourcePoints([]);
+    const startBox = flowBox ?? pinnedFlowBoxRef.current;
+    if (startBox) frozenFlowBoxRef.current = startBox;
+    const startOffset = { ...magnetOffset };
+    frozenMagnetRef.current = startOffset;
+    magnetActiveRef.current = false;
     gestureActiveRef.current = true;
+    capturePreviewSourcePoints();
     setDragging(true);
     scheduleLineTarget({ x: startX, y: startY });
-    window.requestAnimationFrame(() => {
-      capturePreviewSourcePoints();
-    });
 
     const onMove = (ev: PointerEvent) => {
       if (ev.pointerId !== pointerId) return;
@@ -506,6 +641,9 @@ function Pro2SelectionBatchConnectLayerInner({
 
     const onUp = (ev: PointerEvent) => {
       if (ev.pointerId !== pointerId) return;
+      if (plusEl.hasPointerCapture(pointerId)) {
+        plusEl.releasePointerCapture(pointerId);
+      }
       pointerCleanupRef.current?.();
       pointerCleanupRef.current = null;
       const moved = gestureRef.current?.moved ?? false;
@@ -526,6 +664,9 @@ function Pro2SelectionBatchConnectLayerInner({
     window.addEventListener("pointercancel", onUp, { capture: true });
 
     pointerCleanupRef.current = () => {
+      if (plusEl.hasPointerCapture(pointerId)) {
+        plusEl.releasePointerCapture(pointerId);
+      }
       window.removeEventListener("pointermove", onMove, { capture: true });
       window.removeEventListener("pointerup", onUp, { capture: true });
       window.removeEventListener("pointercancel", onUp, { capture: true });
@@ -559,17 +700,19 @@ function Pro2SelectionBatchConnectLayerInner({
   );
 
   if (
-    marqueeSelecting ||
+    (marqueeSelecting && !gestureActiveRef.current) ||
     selectedIds.length < 2 ||
     eligibleSources.length < 2 ||
     !batchMode ||
-    !layoutBox
+    !layoutFlowBox ||
+    !viewportEl
   ) {
     return null;
   }
 
-  const plusLeft = layoutBox.right + 4;
-  const plusTop = layoutBox.midY;
+  const plusAnchorX = layoutFlowBox.x + layoutFlowBox.w;
+  const plusAnchorY = layoutFlowBox.y + layoutFlowBox.h / 2;
+  const plusTransform = `translate(${plusAnchorX}px, ${plusAnchorY}px) translate(calc(-50% + ${-activeMagnetOffset.x}px), calc(-50% + ${activeMagnetOffset.y}px))`;
 
   const showPreviewLines =
     lineTarget && (dragging || menuAnchor) && previewSourcePoints.length >= 2;
@@ -579,52 +722,65 @@ function Pro2SelectionBatchConnectLayerInner({
       ? "批量连线 · 图生图 / 图生视频 / 拖到已有节点"
       : "批量连线 · 导出剪辑 / 拖到已有节点";
 
+  const plusButton = (
+    <button
+      type="button"
+      className={cn(
+        "pro2-node-side-plus-dot pro2-node-side-plus-dot--lg",
+        LIBTV_NODE_SIDE_PLUS_LAYER_CLASS,
+        "nopan nodrag nowheel flex items-center justify-center rounded-full",
+        "border border-white/25 bg-[#2a2a2e] shadow-[0_4px_16px_rgba(0,0,0,0.45)]",
+        "hover:border-violet-400/60 hover:bg-violet-500/25",
+        dragging && "border-violet-400/60 bg-violet-500/25",
+      )}
+      style={{
+        position: "absolute",
+        left: 0,
+        top: 0,
+        transform: plusTransform,
+      }}
+      title={plusTitle}
+      onPointerDown={onPlusPointerDown}
+    >
+      <Plus className="pointer-events-none size-10 text-white/90" strokeWidth={2.25} />
+    </button>
+  );
+
   return (
     <>
-      {showPreviewLines ? (
-        <BatchConnectPreviewLines
-          sources={eligibleSources}
-          allNodes={storeNodes}
-          cursor={lineTarget}
-          flowToScreenPosition={flowToScreenPosition}
-          getInternalNode={getInternalNode}
-          sourcePoints={previewSourcePoints}
-        />
-      ) : null}
+      {showPreviewLines
+        ? createPortal(
+            <BatchConnectPreviewLines
+              sources={eligibleSources}
+              allNodes={storeNodes}
+              cursor={lineTarget}
+              flowToScreenPosition={flowToScreenPosition}
+              getInternalNode={getInternalNode}
+              sourcePoints={previewSourcePoints}
+            />,
+            document.body,
+          )
+        : null}
 
-      <button
-        type="button"
-        className={cn(
-          "pointer-events-auto fixed z-[2110] flex size-11 items-center justify-center rounded-full",
-          "border border-white/25 bg-[#2a2a2e] shadow-[0_4px_16px_rgba(0,0,0,0.45)]",
-          "hover:border-violet-400/60 hover:bg-violet-500/25",
-          dragging && "border-violet-400/60 bg-violet-500/25",
-        )}
-        style={{
-          left: plusLeft,
-          top: plusTop,
-          transform: "translateY(-50%)",
-        }}
-        title={plusTitle}
-        onPointerDown={onPlusPointerDown}
-      >
-        <Plus className="size-6 text-white/90" strokeWidth={2.25} />
-      </button>
+      {createPortal(plusButton, viewportEl)}
 
-      {menuAnchor && spawnMenuItems.length > 0 ? (
-        <BatchConnectSpawnMenu
-          anchor={menuAnchor}
-          title={spawnMenuTitle}
-          items={spawnMenuItems}
-          onPick={onMenuPick}
-          onClose={closeMenu}
-        />
-      ) : null}
+      {menuAnchor && spawnMenuItems.length > 0
+        ? createPortal(
+            <BatchConnectSpawnMenu
+              anchor={menuAnchor}
+              title={spawnMenuTitle}
+              items={spawnMenuItems}
+              onPick={onMenuPick}
+              onClose={closeMenu}
+            />,
+            document.body,
+          )
+        : null}
     </>
   );
 }
 
-/** 框选批量连线 UI · portal 到 body，避免被 React Flow viewport transform 裁剪/坐标错乱 */
+/** 框选批量连线 UI · + 在 RF viewport（与虚线框同坐标系），预览线 / 菜单在 body */
 export function Pro2SelectionBatchConnectLayer({
   rfNodes,
 }: {
@@ -632,8 +788,5 @@ export function Pro2SelectionBatchConnectLayer({
 }) {
   const mounted = useClientPortalMounted();
   if (!mounted) return null;
-  return createPortal(
-    <Pro2SelectionBatchConnectLayerInner rfNodes={rfNodes} />,
-    document.body,
-  );
+  return <Pro2SelectionBatchConnectLayerInner rfNodes={rfNodes} />;
 }

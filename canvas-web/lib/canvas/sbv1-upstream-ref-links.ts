@@ -1,6 +1,7 @@
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import type { CanvasNodeRuntime, ImageEngineNodeData, ImageNodeData } from "./types";
 import {
+  isLikelyReferenceImageUrl,
   pickRuntimeImagePreviewUrl,
   pickRuntimeVideoUrl,
 } from "./task-media-url";
@@ -42,24 +43,24 @@ function imageUrlFromRefNode(node: CanvasFlowNode): string | undefined {
       runtime?: { ossUrl?: string; ephemeralUrl?: string };
       modelKey?: string;
     };
-    return (
+    const preview =
       pickRuntimeImagePreviewUrl(d.runtime, d.modelKey) ??
-      d.runtime?.ossUrl ??
       d.ossUrl ??
-      d.blobUrl
-    );
+      d.blobUrl;
+    if (preview && isLikelyReferenceImageUrl(preview)) return preview;
+    return undefined;
   }
   if (node.type === "image-engine" || node.type === "three-view-engine") {
     const d = node.data as unknown as ImageEngineNodeData & {
       ossUrl?: string;
       blobUrl?: string;
     };
-    return (
+    const preview =
       pickRuntimeImagePreviewUrl(d.runtime, d.modelKey) ??
-      d.runtime?.ossUrl ??
       d.ossUrl ??
-      d.blobUrl
-    );
+      d.blobUrl;
+    if (preview && isLikelyReferenceImageUrl(preview)) return preview;
+    return undefined;
   }
   return undefined;
 }

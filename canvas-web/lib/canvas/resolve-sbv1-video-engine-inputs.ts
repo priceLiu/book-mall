@@ -1,5 +1,9 @@
 import { parseReferencedIds } from "@/components/canvas/mentions/MentionsTextarea";
-import { pickRuntimeImagePreviewUrl } from "./task-media-url";
+import {
+  isLikelyReferenceImageUrl,
+  pickRuntimeImagePreviewUrl,
+  pickRuntimeVideoUrl,
+} from "./task-media-url";
 import {
   dedupePortraitAssetRefs,
   type PortraitAssetRefPayload,
@@ -18,6 +22,7 @@ import { resolveSbv1UpstreamAudioUrls } from "./sbv1-upstream-audio-links";
 import {
   getSbv1VideoDockModeChips,
   isDashscopeSbv1TextToVideoModel,
+  isSbv1Wan30VideoModel,
   resolveSbv1DockInputMode,
   sbv1VideoModelUsesPortraitLibrary,
 } from "./sbv1-video-model-reference";
@@ -75,10 +80,10 @@ function httpsOssFromImageNode(node: CanvasFlowNode): string | null {
     modelKey?: string;
     runtime?: { ossUrl?: string; ephemeralUrl?: string };
   };
-  const oss = String(d.ossUrl ?? "").trim();
-  if (/^https:\/\//.test(oss)) return oss;
   const fromRuntime = pickRuntimeImagePreviewUrl(d.runtime, d.modelKey ?? "");
-  if (fromRuntime && /^https:\/\//.test(fromRuntime)) return fromRuntime;
+  if (fromRuntime && isLikelyReferenceImageUrl(fromRuntime)) return fromRuntime;
+  const oss = String(d.ossUrl ?? "").trim();
+  if (/^https:\/\//.test(oss) && isLikelyReferenceImageUrl(oss)) return oss;
   const blob = String(d.blobUrl ?? "").trim();
   if (/^https:\/\//.test(blob)) return blob;
   return null;
@@ -131,30 +136,48 @@ function resolveUpstreamMediaSlot(
 function httpsVideoUrlFromNode(node: CanvasFlowNode): string | null {
   if (node.type !== "sbv1-video-engine") return null;
   const d = node.data as {
-    runtime?: { ossUrl?: string; ephemeralUrl?: string };
+    runtime?: { ossUrl?: string; ephemeralUrl?: string; posterUrl?: string };
   };
-  const url = String(
-    d.runtime?.ossUrl ?? d.runtime?.ephemeralUrl ?? "",
-  ).trim();
-  return /^https?:\/\//.test(url) ? url : null;
+  const url = pickRuntimeVideoUrl(d.runtime)?.trim();
+  return url && /^https?:\/\//.test(url) ? url : null;
 }
 
-/** 动作控制 · 驱动视频（连到 in_motion_video 的上游视频节点 OSS） */
+function edgeAcceptsWan30OmniVideoRef(
+  edge: CanvasFlowEdge,
+  engineNodeId: string,
+): boolean {
+  if (edge.target !== engineNodeId) return false;
+  return (
+    edge.targetHandle === "in_motion_video" ||
+    edge.targetHandle === "in_ref" ||
+    !edge.targetHandle
+  );
+}
+
+/** 上游视频 · in_motion_video；万相 3.0 全能参考亦允许 in_ref 直连视频节点 */
 function resolveMotionVideoInputs(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
   engineNodeId: string,
+  opts?: { wan30Omni?: boolean },
 ): string[] {
   const out: string[] = [];
   for (const e of edges) {
-    if (e.target !== engineNodeId) continue;
-    if (e.targetHandle !== "in_motion_video") continue;
+    if (opts?.wan30Omni) {
+      if (!edgeAcceptsWan30OmniVideoRef(e, engineNodeId)) continue;
+    } else if (e.target !== engineNodeId || e.targetHandle !== "in_motion_video") {
+      continue;
+    }
     const src = nodes.find((n) => n.id === e.source);
     if (!src) continue;
     const url = httpsVideoUrlFromNode(src);
     if (url) out.push(url);
   }
   return [...new Set(out)];
+}
+
+function filterReferenceImageUrls(urls: string[]): string[] {
+  return [...new Set(urls.filter((u) => isLikelyReferenceImageUrl(u.trim())))];
 }
 
 /** sbv1 视频引擎 · 合并 prompt / dockInput / Pro2 分镜脚本 */
@@ -266,7 +289,12 @@ export function resolveSbv1VideoEngineInputs(
   }
 
   const styleHttps = resolveNonSbv1ImageHttpsInputs(nodes, edges, engineNodeId);
-  const videoInputs = resolveMotionVideoInputs(nodes, edges, engineNodeId);
+  const wan30Omni =
+    isSbv1Wan30VideoModel(modelKey) &&
+    (referenceMode === "omni" || effectiveDockMode === "omni");
+  const videoInputs = resolveMotionVideoInputs(nodes, edges, engineNodeId, {
+    wan30Omni,
+  });
 
   if (isLipSyncPreset) {
     const lipImages: string[] = [];
@@ -351,10 +379,12 @@ export function resolveSbv1VideoEngineInputs(
 
     return {
       ok: true,
-      imageInputs: [...new Set([...imageInputs, ...styleHttps])],
+      imageInputs: filterReferenceImageUrls([
+        ...new Set([...imageInputs, ...styleHttps]),
+      ]),
       portraitAssetRefs: dedupePortraitAssetRefs(portraitAssetRefs),
       videoInputs,
-      audioInputs: [],
+      audioInputs: isSbv1Wan30VideoModel(modelKey) ? audioInputs.slice(0, 5) : [],
     };
   }
 
@@ -370,14 +400,17 @@ export function resolveSbv1VideoEngineInputs(
   }
 
   const dedupedAssets = dedupePortraitAssetRefs(portraitAssetRefs);
-  const dedupedImages = [...new Set([...imageInputs, ...styleHttps])];
+  const dedupedImages = filterReferenceImageUrls([
+    ...new Set([...imageInputs, ...styleHttps]),
+  ]);
 
   if (
     !prompt &&
     dedupedAssets.length === 0 &&
     dedupedImages.length === 0 &&
     !allowTextToVideo &&
-    !(isTopazHdVideo && videoInputs.length > 0)
+    !(isTopazHdVideo && videoInputs.length > 0) &&
+    !(isSbv1Wan30VideoModel(modelKey) && videoInputs.length > 0)
   ) {
     return {
       ok: false,
@@ -400,6 +433,6 @@ export function resolveSbv1VideoEngineInputs(
     imageInputs: dedupedImages,
     portraitAssetRefs: dedupedAssets,
     videoInputs,
-    audioInputs: [],
+    audioInputs: isSbv1Wan30VideoModel(modelKey) ? audioInputs.slice(0, 5) : [],
   };
 }

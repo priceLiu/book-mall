@@ -19,6 +19,7 @@ import {
 import {
   isDashscopeHappyhorseImageToVideoModel,
   isDashscopeSbv1TextToVideoModel,
+  isDashscopeWan30VideoModel,
 } from "./dashscope-sbv1-t2v";
 import { isTopazCanvasVideoModelKey } from "./providers/topaz";
 import { isMinimaxCanvasVideoModelKey } from "./providers/minimax-video";
@@ -239,18 +240,36 @@ export async function runSbv1VideoEngineNode(
     params.duration = durationSec > 0 ? durationSec : 4;
   } else {
     // omni
-    if (imageInputs.length === 0 && !hasPortraitRefs) {
+    const wan30VideoUrls = isDashscopeWan30VideoModel(modelKey)
+      ? (Array.isArray(params.reference_video_urls)
+          ? (params.reference_video_urls as unknown[])
+          : []
+        ).filter(
+          (u): u is string =>
+            typeof u === "string" && /^https?:\/\//.test(u.trim()),
+        )
+      : [];
+    if (
+      imageInputs.length === 0 &&
+      !hasPortraitRefs &&
+      !(isDashscopeWan30VideoModel(modelKey) && wan30VideoUrls.length > 0)
+    ) {
       throw new CanvasProjectError(
         "INVALID_INPUT",
-        "全能参考模式需要至少一张参考图",
+        "全能参考模式需要至少一张参考图或一段参考视频",
       );
     }
     if (imageInputs.length > 0) {
-      mainFrameImageUrl = imageInputs[0]!;
-      referenceImageUrls = imageInputs.slice(1);
+      if (isDashscopeWan30VideoModel(modelKey)) {
+        referenceImageUrls = [...imageInputs];
+        mainFrameImageUrl = "";
+      } else {
+        mainFrameImageUrl = imageInputs[0]!;
+        referenceImageUrls = imageInputs.slice(1);
+      }
     }
     forceReferenceMode =
-      hasPortraitRefs || referenceImageUrls.length > 0;
+      hasPortraitRefs || referenceImageUrls.length > 0 || imageInputs.length > 0;
   }
 
   params.aspect_ratio = aspectRatio;
@@ -291,14 +310,18 @@ export async function runSbv1VideoEngineNode(
     params.duration = durationSec > 0 ? durationSec : 5;
   }
 
-  if (isMotionControl) {
+  if (isMotionControl || isDashscopeWan30VideoModel(modelKey)) {
     const videoUrls = Array.isArray(params.reference_video_urls)
       ? (params.reference_video_urls as unknown[]).filter(
           (u): u is string =>
             typeof u === "string" && /^https?:\/\//.test(u.trim()),
         )
       : [];
-    params.reference_video_urls = videoUrls;
+    params.reference_video_urls = videoUrls.slice(0, 5);
+  }
+
+  if (isDashscopeWan30VideoModel(modelKey) && audioInputs.length > 0) {
+    params.reference_audio_urls = audioInputs.slice(0, 5);
   }
 
   const variantId = String(

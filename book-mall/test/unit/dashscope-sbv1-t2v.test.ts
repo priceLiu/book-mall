@@ -35,8 +35,28 @@ describe("wan3.0-video", () => {
     });
     expect(body.parameters.resolution).toBe("480P");
     expect(body.parameters.duration).toBe(30);
+    expect(body.parameters.prompt_extend).toBe(true);
     expect(body.input.prompt).toBe("test");
     expect(body.input.media).toBeUndefined();
+  });
+
+  it("builds wan3 omni body with prompt_extend, audio and adaptive ratio", () => {
+    const body = buildDashscopeSbv1T2vVideoBody({
+      prompt: "图1参考",
+      aspectRatio: "16:9",
+      resolution: "720P",
+      durationSec: 5,
+      promptExtend: false,
+      generateAudio: false,
+      modelKey: "wan3.0-video",
+      media: [
+        { type: "reference_video", url: "https://oss.example/ref.mp4" },
+        { type: "reference_image", url: "https://oss.example/a.jpg" },
+      ],
+    });
+    expect(body.parameters.prompt_extend).toBe(false);
+    expect(body.parameters.audio).toBe(false);
+    expect(body.parameters.ratio).toBe("adaptive");
   });
 
   it("allows reference images (All-in-One, no R2V mismatch)", () => {
@@ -70,6 +90,18 @@ describe("wan3.0-video", () => {
     ]);
   });
 
+  it("omni keeps both images when firstFrameUrl duplicates first ref", () => {
+    const media = buildDashscopeWan30Media({
+      dockMode: "omni",
+      firstFrameUrl: "https://oss.example/char-a.png",
+      referenceImageUrls: [
+        "https://oss.example/char-a.png",
+        "https://oss.example/char-b.png",
+      ],
+    });
+    expect(media.filter((m) => m.type === "reference_image")).toHaveLength(2);
+  });
+
   it("omni path sends all refs as reference_image without first_frame", () => {
     const media = buildDashscopeWan30Media({
       firstFrameUrl: "",
@@ -81,6 +113,49 @@ describe("wan3.0-video", () => {
     expect(media).toEqual([
       { type: "reference_image", url: "https://oss.example/char-a.png" },
       { type: "reference_image", url: "https://oss.example/char-b.png" },
+    ]);
+  });
+
+  it("omni path sends reference_video before reference_image", () => {
+    const media = buildDashscopeWan30Media({
+      dockMode: "omni",
+      referenceVideoUrls: ["https://oss.example/ref.mp4"],
+      referenceImageUrls: [
+        "https://oss.example/char-a.png",
+        "https://oss.example/char-b.png",
+      ],
+    });
+    expect(media).toEqual([
+      { type: "reference_video", url: "https://oss.example/ref.mp4" },
+      { type: "reference_image", url: "https://oss.example/char-a.png" },
+      { type: "reference_image", url: "https://oss.example/char-b.png" },
+    ]);
+  });
+
+  it("omni excludes video URLs from reference_image", () => {
+    const media = buildDashscopeWan30Media({
+      dockMode: "omni",
+      referenceVideoUrls: ["https://oss.example/ref.mp4"],
+      referenceImageUrls: [
+        "https://oss.example/node-video/abc123",
+        "https://oss.example/char-a.png",
+      ],
+    });
+    expect(media).toEqual([
+      { type: "reference_video", url: "https://oss.example/ref.mp4" },
+      { type: "reference_image", url: "https://oss.example/char-a.png" },
+    ]);
+  });
+
+  it("forces omni media types when reference video is attached in i2v mode", () => {
+    const media = buildDashscopeWan30Media({
+      dockMode: "i2v",
+      firstFrameUrl: "https://oss.example/first.png",
+      referenceVideoUrls: ["https://oss.example/ref.mp4"],
+    });
+    expect(media).toEqual([
+      { type: "reference_video", url: "https://oss.example/ref.mp4" },
+      { type: "reference_image", url: "https://oss.example/first.png" },
     ]);
   });
 });

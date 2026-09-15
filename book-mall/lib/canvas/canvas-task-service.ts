@@ -118,7 +118,10 @@ import {
   runCanvasDisplayReconcileWorker,
 } from "@/lib/canvas/canvas-video-display-recover";
 import { recoverCanvasKieImageFromGateway } from "@/lib/canvas/canvas-kie-image-recover";
-import { syncCanvasGatewayLogAfterMediaSuccess } from "@/lib/canvas/canvas-gateway-log-sync";
+import {
+  linkCanvasTaskGatewayLogOnFailure,
+  syncCanvasGatewayLogAfterMediaSuccess,
+} from "@/lib/canvas/canvas-gateway-log-sync";
 import {
   scheduleCanvasKieImageOssBackfill,
   scheduleCanvasVideoOssBackfill,
@@ -725,16 +728,22 @@ export async function applyCanvasDashscopeImagePollResult(
 
   const status = output.task_status ?? "";
   if (isDashscopeTaskFailed(status) || output.code) {
+    const failMessage = (output.message ?? "DashScope 任务失败").slice(0, 500);
     await prisma.canvasGenerationTask.update({
       where: { id: taskId },
       data: {
         status: "FAILED",
         failCode: output.code ?? "DASHSCOPE_IMAGE_FAILED",
-        failMessage: (output.message ?? "DashScope 图像任务失败").slice(0, 500),
+        failMessage,
         resultPayload: output as unknown as Prisma.InputJsonValue,
         completedAt: new Date(),
       },
     });
+    await linkCanvasTaskGatewayLogOnFailure(
+      taskId,
+      failMessage,
+      output.code ?? "DASHSCOPE_TASK_FAILED",
+    ).catch(() => undefined);
     return;
   }
 

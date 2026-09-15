@@ -237,6 +237,12 @@ export function libtvSidePlusScreenDiameter(
 /** 拖线松手 · 侧 + 额外吸附容差（flow · 含磁吸沿边偏移） */
 export const LIBTV_SIDE_PLUS_SNAP_PADDING_FLOW = 56;
 
+/** 侧 + 磁吸 · 与 pro2-node-side-plus 一致 */
+export const LIBTV_SIDE_PLUS_MAGNET_ACTIVATE_PX = 100;
+export const LIBTV_SIDE_PLUS_MAGNET_RELEASE_PX = 112;
+export const LIBTV_SIDE_PLUS_MAGNET_BORDER_INWARD_PX = 8;
+export const LIBTV_SIDE_PLUS_MAGNET_MAX_OFFSET_SCREEN_PX = 100;
+
 /** 侧 + 沿边跟随 / 连线吸附 · 限定在节点竖向中间 1/3（上下各留 1/3） */
 export function libtvSidePlusFollowVerticalBounds(boxHeight: number): {
   insetFromEdge: number;
@@ -268,6 +274,122 @@ export function pointerNearSidePlusMagnetEdge(
   }
   if (clientX > rect.right && clientX <= rect.right + thresholdPx) return true;
   return clientX >= rect.right - borderInwardPx && clientX <= rect.right;
+}
+
+/** 侧 + 磁吸 · 屏幕坐标偏移（portal 批量 + 与节点侧 + 圆点同语义） */
+export function computeSidePlusMagnetScreenOffset(
+  clientX: number,
+  clientY: number,
+  rect: Pick<DOMRect, "top" | "bottom" | "left" | "right" | "height">,
+  side: "left" | "right",
+): { x: number; y: number } {
+  const centerY = rect.top + rect.height / 2;
+  const { maxOffsetFromCenter } = libtvSidePlusFollowVerticalBounds(rect.height);
+  const screenDy = Math.max(
+    -maxOffsetFromCenter,
+    Math.min(maxOffsetFromCenter, clientY - centerY),
+  );
+  const rawScreenX =
+    side === "left" ? clientX - rect.left : rect.right - clientX;
+  const screenDx = Math.max(
+    -LIBTV_SIDE_PLUS_MAGNET_MAX_OFFSET_SCREEN_PX,
+    Math.min(LIBTV_SIDE_PLUS_MAGNET_MAX_OFFSET_SCREEN_PX, rawScreenX),
+  );
+  return { x: screenDx, y: screenDy };
+}
+
+/** 框选批量 + · 右/左缘全高可吸附（勿用单节点 middle-third，否则高选区几乎无法跟随） */
+export function pointerNearBatchConnectMagnetEdge(
+  clientX: number,
+  clientY: number,
+  rect: Pick<DOMRect, "top" | "bottom" | "left" | "right">,
+  side: "left" | "right",
+  thresholdPx: number,
+  borderInwardPx = LIBTV_SIDE_PLUS_MAGNET_BORDER_INWARD_PX,
+): boolean {
+  if (clientY < rect.top - thresholdPx || clientY > rect.bottom + thresholdPx) {
+    return false;
+  }
+  if (side === "left") {
+    if (clientX >= rect.left - thresholdPx && clientX < rect.left) return true;
+    return clientX >= rect.left && clientX <= rect.left + borderInwardPx;
+  }
+  if (clientX > rect.right && clientX <= rect.right + thresholdPx) return true;
+  return clientX >= rect.right - borderInwardPx && clientX <= rect.right;
+}
+
+/** 侧 + 磁吸 · 屏幕偏移 → flow（viewport 内 + 与 Pro2NodeSidePlus 同语义） */
+export function computeSidePlusMagnetFlowOffset(
+  clientX: number,
+  clientY: number,
+  rect: Pick<DOMRect, "top" | "bottom" | "left" | "right" | "height">,
+  side: "left" | "right",
+  zoom: number,
+): { x: number; y: number } {
+  const screen = computeSidePlusMagnetScreenOffset(clientX, clientY, rect, side);
+  const z = Math.max(zoom, 0.05);
+  return { x: screen.x / z, y: screen.y / z };
+}
+
+/** 框选批量 + · 沿选区右缘跟随指针 Y（拖线时与组侧 + 一致） */
+export function computeBatchConnectMagnetScreenOffset(
+  clientX: number,
+  clientY: number,
+  rect: Pick<DOMRect, "top" | "bottom" | "left" | "right" | "height">,
+  side: "left" | "right" = "right",
+): { x: number; y: number } {
+  const midY = rect.top + rect.height / 2;
+  const edgePadding = 28;
+  const minY = rect.top + edgePadding;
+  const maxY = rect.bottom - edgePadding;
+  const clampedY =
+    minY <= maxY ? Math.max(minY, Math.min(maxY, clientY)) : midY;
+  const screenDy = clampedY - midY;
+  const rawScreenX =
+    side === "left" ? clientX - rect.left : rect.right - clientX;
+  const screenDx = Math.max(
+    -LIBTV_SIDE_PLUS_MAGNET_MAX_OFFSET_SCREEN_PX,
+    Math.min(LIBTV_SIDE_PLUS_MAGNET_MAX_OFFSET_SCREEN_PX, rawScreenX),
+  );
+  return { x: screenDx, y: screenDy };
+}
+
+/** 框选批量 + · 屏幕偏移 → flow（viewport 内定位） */
+export function computeBatchConnectMagnetFlowOffset(
+  clientX: number,
+  clientY: number,
+  rect: Pick<DOMRect, "top" | "bottom" | "left" | "right" | "height">,
+  side: "left" | "right",
+  zoom: number,
+): { x: number; y: number } {
+  const screen = computeBatchConnectMagnetScreenOffset(
+    clientX,
+    clientY,
+    rect,
+    side,
+  );
+  const z = Math.max(zoom, 0.05);
+  return { x: screen.x / z, y: screen.y / z };
+}
+
+/** 选区 / 节点 client 矩形 → 侧 + 锚点屏幕坐标（right + 默认 4px 外扩） */
+export function sidePlusAnchorFromClientRect(
+  rect: Pick<DOMRect, "top" | "bottom" | "left" | "right" | "height">,
+  side: "left" | "right",
+  magnetOffset: { x: number; y: number },
+  outwardPx = 4,
+): { left: number; top: number } {
+  const midY = rect.top + rect.height / 2;
+  if (side === "left") {
+    return {
+      left: rect.left - outwardPx + magnetOffset.x,
+      top: midY + magnetOffset.y,
+    };
+  }
+  return {
+    left: rect.right + outwardPx - magnetOffset.x,
+    top: midY + magnetOffset.y,
+  };
 }
 
 export const LIBTV_NODE_HANDLE_CLASS =

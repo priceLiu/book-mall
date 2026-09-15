@@ -104,7 +104,7 @@ describe("resolveSbv1VideoEngineRunPrompt", () => {
     );
   });
 
-  it("strips video @ tokens (video passed via in_motion_video edge)", () => {
+  it("strips video @ tokens for non-wan3 models (video passed via in_motion_video edge)", () => {
     const withVideo: Pro2DockUpstreamLink[] = [
       {
         id: "sbv1-motion-v1",
@@ -120,6 +120,41 @@ describe("resolveSbv1VideoEngineRunPrompt", () => {
         withVideo,
       ),
     ).toBe("请去掉 右下角水印");
+  });
+
+  it("maps image/video @ to 图N/视频N for wan3.0-video", () => {
+    const withVideo: Pro2DockUpstreamLink[] = [
+      {
+        id: "sbv1-motion-v1",
+        kind: "video",
+        label: "视频 1",
+        previewUrl: "https://cdn.example/poster.jpg",
+        sourceNodeId: "v1",
+      },
+      {
+        id: "sbv1-ref-img1",
+        kind: "image",
+        label: "图片 1",
+        previewUrl: "https://cdn.example/a.png",
+        sourceNodeId: "img1",
+      },
+      {
+        id: "sbv1-ref-img2",
+        kind: "image",
+        label: "图片 2",
+        previewUrl: "https://cdn.example/b.png",
+        sourceNodeId: "img2",
+      },
+    ];
+    expect(
+      resolveSbv1VideoEngineRunPrompt(
+        "将 @<sbv1-motion-v1> 中的主体替换为 @<sbv1-ref-img1> 和 @<sbv1-ref-img2>，保留运镜与音频",
+        withVideo,
+        { modelKey: "wan3.0-video" },
+      ),
+    ).toBe(
+      "将 视频1 中的主体替换为 图1 和 图2，保留运镜与音频",
+    );
   });
 });
 

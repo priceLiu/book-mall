@@ -103,6 +103,23 @@ export async function resolveCanvasGatewaySubmitCollision(args: {
   return "in_flight";
 }
 
+/** 按 storyTaskId 找回 Gateway 日志（含 FAILED · 仅对账/运维，不用于 promote 重提交）。 */
+export async function findCanvasGatewayLogForAudit(
+  taskId: string,
+): Promise<CanvasLinkedGatewayLog | null> {
+  const log = await prisma.gatewayRequestLog.findFirst({
+    where: { storyTaskId: taskId },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, externalTaskId: true, status: true },
+  });
+  if (!log) return null;
+  return {
+    logId: log.id,
+    externalTaskId: log.externalTaskId?.trim() ?? null,
+    status: log.status,
+  };
+}
+
 /** 找 canvas 任务关联的 Gateway 日志（含仅有 logId、厂商 taskId 尚未写入的 RUNNING）。 */
 export async function findCanvasLinkedGatewayLog(
   taskId: string,
@@ -315,18 +332,18 @@ export async function backfillCanvasTaskGatewayLink(args: {
       gatewayLogId = orphan.logId;
       if (!kieTaskId) kieTaskId = orphan.externalTaskId;
     } else {
-      const log = await prisma.gatewayRequestLog.findFirst({
-        where: {
-          storyTaskId: args.taskId,
-          status: { not: "FAILED" },
-        },
-        orderBy: { createdAt: "desc" },
-        select: { id: true, externalTaskId: true },
-      });
-      if (log?.id) {
-        gatewayLogId = log.id;
-        const ext = log.externalTaskId?.trim();
+      const linked = await findCanvasLinkedGatewayLog(args.taskId);
+      if (linked?.logId) {
+        gatewayLogId = linked.logId;
+        const ext = linked.externalTaskId?.trim();
         if (ext && !kieTaskId) kieTaskId = ext;
+      } else {
+        const audit = await findCanvasGatewayLogForAudit(args.taskId);
+        if (audit?.logId) {
+          gatewayLogId = audit.logId;
+          const ext = audit.externalTaskId?.trim();
+          if (ext && !kieTaskId) kieTaskId = ext;
+        }
       }
     }
   }

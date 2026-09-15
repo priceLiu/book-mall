@@ -35,12 +35,20 @@ import {
   isAllowedDockModelKey,
   modelMatchesDockGatewayRole,
 } from "@/lib/canvas/libtv-dock-engine-models";
+import { useModelTemplateCatalog } from "@/lib/canvas/use-model-template-catalog";
+import { modelKeysForTemplate } from "@/lib/canvas/model-template-catalog";
 
 export type EnginePickerProps = {
   /** 过滤模型 role：LLM / IMAGE / VIDEO / MUSIC / TTS */
   role: GatewayModelRole;
   /** 仅展示这些 modelKey（三视图引擎白名单等） */
   allowedModelKeys?: string[];
+  /**
+   * 场景模板 id（text/t2i/i2i/t2v/i2v/v2v）。
+   * 若静态目录已发布，与 allowedModelKeys 取并集优先用模板 resolved.modelKey；
+   * 未发布时忽略，回退白名单 / 全量。
+   */
+  sceneTemplateId?: string;
   /** 须具备的能力（如 image_multi_ref / video_i2v） */
   requiredCapabilities?: StoryModelCapability[];
   /** 当前模型不兼容时的提示文案 */
@@ -96,6 +104,7 @@ const EMPTY_PARAMS = ENGINE_PICKER_EMPTY_PARAMS;
 export function EnginePicker({
   role,
   allowedModelKeys,
+  sceneTemplateId,
   requiredCapabilities,
   capabilityHint,
   providerId,
@@ -115,13 +124,20 @@ export function EnginePicker({
   const { providers: hookProviders, loading: hookLoading } = useUserProviders();
   const providers = externalProviders ?? hookProviders;
   const loading = externalProviders ? false : hookLoading;
+  const { catalog } = useModelTemplateCatalog();
   const [open, setOpen] = useState(false);
 
   // 调用方常以「内联数组字面量」传入这些 props（每次 render 新引用），
   // 若直接进 useMemo 依赖会导致 filtered/groups 每帧变更，进而让弹层 effect 反复 setDraft → 闪烁。
   // 改用「序列化 key」做依赖，按内容稳定。
   const SEP = "\u0001";
-  const allowedKey = (allowedModelKeys ?? []).join(SEP);
+  const templateKeys = sceneTemplateId
+    ? modelKeysForTemplate(catalog, sceneTemplateId)
+    : [];
+  /** 静态目录已发布且有绑定时优先模板；否则回退调用方白名单 */
+  const effectiveAllowed =
+    templateKeys.length > 0 ? templateKeys : (allowedModelKeys ?? []);
+  const allowedKey = effectiveAllowed.join(SEP);
   const providerIdsKey = (providerIds ?? []).join(SEP);
   const reqCapsKey = (requiredCapabilities ?? []).join(SEP);
 

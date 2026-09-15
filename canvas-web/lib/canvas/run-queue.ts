@@ -1530,7 +1530,8 @@ export function useCanvasRunner(
         }
         if (
           sbv1VideoResolved?.ok &&
-          sbv1VideoResolved.videoInputs.length > 0
+          (sbv1VideoResolved.videoInputs.length > 0 ||
+            sbv1VideoResolved.audioInputs.length > 0)
         ) {
           const eng = (runData.engine as Record<string, unknown> | undefined) ?? {};
           const prevParams =
@@ -1539,7 +1540,12 @@ export function useCanvasRunner(
             {};
           const mergedParams = {
             ...prevParams,
-            reference_video_urls: sbv1VideoResolved.videoInputs,
+            ...(sbv1VideoResolved.videoInputs.length > 0
+              ? { reference_video_urls: sbv1VideoResolved.videoInputs }
+              : {}),
+            ...(sbv1VideoResolved.audioInputs.length > 0
+              ? { reference_audio_urls: sbv1VideoResolved.audioInputs }
+              : {}),
           };
           runData = {
             ...runData,

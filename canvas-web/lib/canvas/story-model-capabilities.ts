@@ -207,7 +207,16 @@ export function storyCapabilityHint(
 
 /** 视频节点 Dock · 模型能力类型标签（文生视频 / 图生视频 …） */
 export function getSbv1VideoModelTypeLabels(modelKey: string): string[] {
-  const caps = new Set(getStoryModelCapabilities(modelKey));
+  const k = modelKey.trim();
+  if (k === "wan3.0-video" || k === "wan3.0-video-prime") {
+    const caps = new Set(getStoryModelCapabilities(k));
+    const base = VIDEO_CAPABILITY_ORDER.filter(
+      (c): c is keyof typeof VIDEO_CAPABILITY_LABELS =>
+        caps.has(c) && c in VIDEO_CAPABILITY_LABELS,
+    ).map((c) => VIDEO_CAPABILITY_LABELS[c]);
+    return base.includes("全能参考") ? base : [...base, "全能参考"];
+  }
+  const caps = new Set(getStoryModelCapabilities(k));
   return VIDEO_CAPABILITY_ORDER.filter(
     (c): c is keyof typeof VIDEO_CAPABILITY_LABELS =>
       caps.has(c) && c in VIDEO_CAPABILITY_LABELS,

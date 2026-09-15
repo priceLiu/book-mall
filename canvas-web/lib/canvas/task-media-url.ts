@@ -1,7 +1,7 @@
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import type { CanvasNodeRuntime } from "./types";
 
-const VIDEO_EXT = /\.mp4(\?|#|$)/i;
+const VIDEO_EXT = /\.(mp4|mov)(\?|#|$)/i;
 const MODEL_EXT = /\.(glb|gltf|obj|fbx|stl|usdz|mp4)(\?|#|$)/i;
 const RASTER_EXT = /\.(png|jpe?g|webp|gif|bmp|avif)(\?|#|$)/i;
 
@@ -18,8 +18,20 @@ export function isLikelyModelMediaUrl(url: string): boolean {
 export function isLikelyRasterImageUrl(url: string): boolean {
   const u = url.trim();
   if (!u) return false;
+  if (isLikelyVideoUrl(u)) return false;
   if (isLikelyModelMediaUrl(u)) return false;
   if (RASTER_EXT.test(u)) return true;
+  return u.includes("/node-image/");
+}
+
+/** 万相 / 百炼 reference_image · 明确排除视频/3D，其余 OSS 交给厂商校验 */
+export function isLikelyReferenceImageUrl(url: string): boolean {
+  const u = url.trim();
+  if (!u || !/^https?:\/\//.test(u)) return false;
+  if (isLikelyVideoUrl(u)) return false;
+  if (isLikelyModelMediaUrl(u)) return false;
+  if (RASTER_EXT.test(u)) return true;
+  if (u.includes("/node-image/")) return true;
   return true;
 }
 
@@ -30,9 +42,8 @@ export function pickTaskImagePreviewUrl(
   const oss = task.ossUrl?.trim();
   const ephem = task.ephemeralUrl?.trim();
 
-  if (oss && isLikelyRasterImageUrl(oss)) return oss;
-  if (ephem && isLikelyRasterImageUrl(ephem)) return ephem;
-  if (oss && !isLikelyModelMediaUrl(oss)) return oss;
+  if (oss && isLikelyReferenceImageUrl(oss)) return oss;
+  if (ephem && isLikelyReferenceImageUrl(ephem)) return ephem;
   return undefined;
 }
 

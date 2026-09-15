@@ -3762,6 +3762,66 @@ model PlatformMediaDefault {
   updatedAt           DateTime       @updatedAt
 }
 
+/// 场景模板启停状态（规则层，与厂商路由无关）
+enum SceneTemplateStatus {
+  ACTIVE
+  DEPRECATED
+}
+
+/// 模板内模型绑定状态
+enum SceneTemplateModelStatus {
+  ACTIVE
+  HIDDEN
+  DEPRECATED
+}
+
+/// 场景能力模板（text/t2i/i2i/t2v/i2v/v2v）——只存规则，不存 vendor
+model SceneTemplate {
+  id        String              @id
+  title     String
+  status    SceneTemplateStatus @default(ACTIVE)
+  sortOrder Int                 @default(0)
+  /// 纯规则 JSON：durationMin/Max、maxRefImages、paramSchema 等（禁止写 vendor/modelKey 真源）
+  rulesJson Json                @default("{}")
+
+  models SceneTemplateModel[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, sortOrder])
+}
+
+/// 模板 ↔ 逻辑模型绑定（仅 canonicalModelKey）
+model SceneTemplateModel {
+  id                 String                   @id @default(cuid())
+  templateId         String
+  template           SceneTemplate            @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  canonicalModelKey  String
+  status             SceneTemplateModelStatus @default(ACTIVE)
+  sortOrder          Int                      @default(0)
+  /// 可选覆盖模板规则（仍禁止 vendor）
+  rulesOverrideJson  Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([templateId, canonicalModelKey])
+  @@index([canonicalModelKey])
+  @@index([templateId, status, sortOrder])
+}
+
+/// 版本化静态选模目录（含平台积分单价 + Offering 路由解析快照）
+model ModelTemplateCatalogSnapshot {
+  id          String   @id @default(cuid())
+  version     String   @unique
+  publishedAt DateTime @default(now())
+  publishedBy String?
+  payloadJson Json
+
+  @@index([publishedAt])
+}
+
 /// 平台代付：每个 canonical 一行上架配置
 model AppModelOffering {
   id                      String                 @id @default(cuid())

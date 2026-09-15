@@ -182,7 +182,7 @@ describe("sbv1-video-model-reference", () => {
     expect(
       getSbv1VideoDockModeChips("wan3.0-video").find((c) => c.id === "omni")
         ?.label,
-    ).toBe("参考生视频");
+    ).toBe("全能参考");
   });
 
   it("suggestSbv1DockModeForRefCount maps ref count to Wan 3.0 modes", () => {

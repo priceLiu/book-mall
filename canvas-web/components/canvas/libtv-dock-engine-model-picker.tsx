@@ -16,6 +16,8 @@ import {
   Sbv1ToolbarDropdown,
   useSbv1ToolbarAnchor,
 } from "./sbv1/sbv1-toolbar-anchor-popover";
+import { useModelTemplateCatalog } from "@/lib/canvas/use-model-template-catalog";
+import { modelKeysForTemplate } from "@/lib/canvas/model-template-catalog";
 import {
   LIBTV_DOCK_MODEL_POPOVER_CLASS,
   LIBTV_DOCK_PICKER_CHECK_CLASS,
@@ -27,6 +29,8 @@ export type LibtvDockEngineModelPickerProps = {
   providerId: string;
   modelKey: string;
   allowedModelKeys?: readonly string[];
+  /** 场景模板：静态目录有绑定时优先用 resolved.modelKey */
+  sceneTemplateId?: string;
   providerIds?: readonly string[];
   requiredCapabilities?: StoryModelCapability[];
   externalProviders?: CanvasProviderDto[];
@@ -48,6 +52,7 @@ export function LibtvDockEngineModelPicker({
   providerId,
   modelKey,
   allowedModelKeys,
+  sceneTemplateId,
   providerIds,
   requiredCapabilities,
   externalProviders,
@@ -59,21 +64,30 @@ export function LibtvDockEngineModelPicker({
 }: LibtvDockEngineModelPickerProps) {
   const { providers: hookProviders } = useUserProviders();
   const providers = externalProviders ?? hookProviders;
+  const { catalog } = useModelTemplateCatalog();
   const { anchorRef, open: internalOpen, setOpen: setInternalOpen, rect } =
     useSbv1ToolbarAnchor(controlledOpen);
   const open = controlledOpen ?? internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;
   const { fontPx, minHeightPx, chevronPx } = useLibtvDockToolbarMetrics();
 
+  const effectiveAllowed = useMemo(() => {
+    if (sceneTemplateId) {
+      const keys = modelKeysForTemplate(catalog, sceneTemplateId);
+      if (keys.length > 0) return keys;
+    }
+    return allowedModelKeys;
+  }, [sceneTemplateId, catalog, allowedModelKeys]);
+
   const models = useMemo(
     () =>
       collectLibtvDockEngineModels(providers, {
         role,
-        allowedModelKeys,
+        allowedModelKeys: effectiveAllowed,
         providerIds,
         requiredCapabilities,
       }),
-    [providers, role, allowedModelKeys, providerIds, requiredCapabilities],
+    [providers, role, effectiveAllowed, providerIds, requiredCapabilities],
   );
 
   const label = resolveLibtvDockEngineModelDisplayName(modelKey, providers);

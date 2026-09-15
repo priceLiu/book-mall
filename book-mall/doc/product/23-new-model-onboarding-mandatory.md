@@ -115,8 +115,13 @@
   - [ ] 或已更新 `model-ops-seed-config.ts` 并执行 `pnpm gateway:seed-model-ops`
   - [ ] `GET .../gateway/models/registry?app=&sceneKey=` 返回该模型
 
+- [ ] **L5.5 场景模板 + 静态目录**（见 [24-model-scene-templates.md](./24-model-scene-templates.md)）
+  - [ ] 挂到对应 SceneTemplate（`text` / `t2i` / `i2i` / `t2v` / `i2v` / `v2v`）；**仅绑 canonical，不绑厂商**
+  - [ ] Finance「场景模板」发布静态目录；catalog 含平台 `creditsPerUnit` 与 resolved.modelKey 快照
+  - [ ] 子应用选模/估分优先吃静态包（余额与冻结仍动态）
+
 - [ ] **L6 业务接入**
-  - [ ] 子应用选模走 Gateway registry / `listModelsForApp`（**禁止**前端硬编码新模型卡片列表）
+  - [ ] 子应用选模走 Gateway registry / 场景模板静态目录（**禁止**前端硬编码新模型卡片列表）
   - [ ] Runner / createTask body 字段与厂商 API 对齐
   - [ ] `clientPage` / `clientSource` 符合各应用约定
 
