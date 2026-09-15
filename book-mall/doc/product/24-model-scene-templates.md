@@ -152,6 +152,9 @@ CDN / API 版本包 + 客户端缓存；启动或定时对 `version`。改价/�
 | canvas-web | 按 templateId 读静态包过滤；invoke 用 `resolved.modelKey` | `creditsPerUnit × units` |
 | e-commerce-toolkit | 同上 | 同上 |
 | quick-replica-web | 同上 | 同上 |
+| story-web | 模型页按 role→模板过滤；分镜视频弹层按 i2v/t2v/v2v 过滤 | 可后续接 catalog 估分 |
+| tool-web | 图生/文生/参考视频实验室按 mode→模板过滤 | 可后续接 catalog 估分 |
+| common-tools | Gateway 图像模型列表 + 静态下拉按 i2i/t2i 过滤 | 可后续接 catalog 估分 |
 
 **禁止**新模型只改前端白名单不上模板。
 
@@ -162,7 +165,7 @@ CDN / API 版本包 + 客户端缓存；启动或定时对 `version`。改价/�
 - [ ] Finance 可启停六类模板、绑定/解绑 canonical  
 - [ ] 缺成本或未发布积分价时绑定失败并提示  
 - [ ] 发布后 `catalog` API 返回 version + 模型含平台价与 resolved.modelKey  
-- [ ] Canvas / 电商 / QR 能选模并本地估分  
+- [ ] Canvas / 电商 / QR / Story / Tool / 常用工具能按模板过滤选模  
 - [ ] 生成仍走 Gateway，日志 `model` = resolved.modelKey  
 - [ ] 停用模板后重新发布，静态包不再包含该模板 ACTIVE 模型  
 

@@ -3,14 +3,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Loader2, X } from "lucide-react";
 import { ModalPortal } from "@/components/common/modal-portal";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
   STORY_VIDEO_MODEL_LIST,
   getStoryVideoModel,
+  type StoryVideoModelDescriptor,
 } from "@/lib/projects/video-models";
 import type {
   StoryVideoModelId,
   StoryVideoOptions,
 } from "@/lib/projects/api";
+import {
+  fetchStoryModelTemplateCatalog,
+  storyModelKeysForTemplates,
+} from "@/lib/model-template-catalog";
 import { cn } from "@/lib/utils";
 
 export type FrameVideoEditValue = {
@@ -56,6 +62,11 @@ export function FrameVideoEditModal({
   onSavePrompt,
   onSubmit,
 }: Props) {
+  const bookMallBase = useBookMallBaseUrl();
+  const [videoModelList, setVideoModelList] = useState<StoryVideoModelDescriptor[]>(
+    STORY_VIDEO_MODEL_LIST,
+  );
+
   const initialModel = useMemo(
     () => getStoryVideoModel(initialModelId),
     [initialModelId],
@@ -83,28 +94,52 @@ export function FrameVideoEditModal({
   const [hint, setHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const desc = STORY_VIDEO_MODEL_LIST.find((m) => m.id === modelId)!;
+  const desc =
+    videoModelList.find((m) => m.id === modelId) ??
+    STORY_VIDEO_MODEL_LIST.find((m) => m.id === modelId)!;
+
+  useEffect(() => {
+    if (!open || !bookMallBase) return;
+    let cancelled = false;
+    void fetchStoryModelTemplateCatalog(bookMallBase).then((catalog) => {
+      if (cancelled) return;
+      const allowed = storyModelKeysForTemplates(catalog, ["i2v", "t2v", "v2v"]);
+      if (allowed.size === 0) {
+        setVideoModelList(STORY_VIDEO_MODEL_LIST);
+        return;
+      }
+      const filtered = STORY_VIDEO_MODEL_LIST.filter((m) =>
+        allowed.has(m.id.toLowerCase()),
+      );
+      setVideoModelList(filtered.length > 0 ? filtered : STORY_VIDEO_MODEL_LIST);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, bookMallBase]);
 
   // open / 初始值变更时重置
   useEffect(() => {
     if (!open) return;
     setDraft(prompt);
     const m = getStoryVideoModel(initialModelId);
-    setModelId(m.id);
-    setResolution(m.defaults.resolution);
-    setDuration(m.defaults.duration);
-    setGenerateAudio(m.defaults.generateAudio ?? false);
-    setPromptExtend(m.defaults.promptExtend ?? true);
-    setWatermark(m.defaults.watermark ?? false);
+    const inList = videoModelList.some((x) => x.id === m.id);
+    const pick = inList ? m : videoModelList[0] ?? m;
+    setModelId(pick.id);
+    setResolution(pick.defaults.resolution);
+    setDuration(pick.defaults.duration);
+    setGenerateAudio(pick.defaults.generateAudio ?? false);
+    setPromptExtend(pick.defaults.promptExtend ?? true);
+    setWatermark(pick.defaults.watermark ?? false);
     setBusy(null);
     setHint(null);
     setError(null);
-  }, [open, prompt, initialModelId]);
+  }, [open, prompt, initialModelId, videoModelList]);
 
   // 切换模型时按新模型 defaults 重置参数
   const handleSelectModel = (id: StoryVideoModelId) => {
     if (id === modelId) return;
-    const m = STORY_VIDEO_MODEL_LIST.find((x) => x.id === id)!;
+    const m = videoModelList.find((x) => x.id === id)!;
     setModelId(id);
     setResolution(m.defaults.resolution);
     setDuration(m.defaults.duration);
@@ -215,7 +250,7 @@ export function FrameVideoEditModal({
           <div>
             <p className="mb-2 text-xs text-[var(--story-muted)]">视频模型</p>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {STORY_VIDEO_MODEL_LIST.map((m) => {
+              {videoModelList.map((m) => {
                 const selected = m.id === modelId;
                 const disabled = m.requiresImage && !hasFrameImage;
                 return (

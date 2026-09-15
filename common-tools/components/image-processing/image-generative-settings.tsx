@@ -8,6 +8,7 @@ import {
   GENERATIVE_IMAGE_COUNT_OPTIONS,
   GENERATIVE_MODEL_OPTIONS,
 } from "@/lib/image-processing-presets";
+import { useTemplateFilteredModelOptions } from "@/lib/use-template-filtered-model-options";
 import { cn } from "@/lib/utils";
 
 const ASPECT_OPTIONS = ["1:1", "16:9", "9:16", "4:5", "3:4", "4:3"] as const;
@@ -58,6 +59,10 @@ export function ImageGenerativeSettings({
   hideImageCount?: boolean;
   modelOptions?: ReadonlyArray<{ id: string; label: string }>;
 }) {
+  const filteredModelOptions = useTemplateFilteredModelOptions(modelOptions, [
+    "i2i",
+    "t2i",
+  ]);
   const strength = Number(params.strength ?? 0.5);
   const fieldCount =
     (hideModelSelect ? 0 : 1) + (hideImageCount ? 0 : 1) + 1;
@@ -82,7 +87,7 @@ export function ImageGenerativeSettings({
               onChange={(e) => onGenerativeModelChange(e.target.value)}
               className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
             >
-              {modelOptions.map((o) => (
+              {filteredModelOptions.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}
                 </option>

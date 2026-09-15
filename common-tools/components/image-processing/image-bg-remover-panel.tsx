@@ -16,6 +16,7 @@ import {
   BG_REMOVAL_MODEL_OPTIONS,
 } from "@/lib/image-processing-presets";
 import { ipTagSelectedClass, ipTagUnselectedClass } from "@/lib/image-processing-theme";
+import { useTemplateFilteredModelOptions } from "@/lib/use-template-filtered-model-options";
 import { cn } from "@/lib/utils";
 
 export function ImageBgRemoverPanel({
@@ -38,6 +39,9 @@ export function ImageBgRemoverPanel({
 }) {
   const [image, setImage] = useState<string | null>(null);
   const [bgMode, setBgMode] = useState("transparent");
+  const modelOptions = useTemplateFilteredModelOptions(BG_REMOVAL_MODEL_OPTIONS, [
+    "i2i",
+  ]);
   const [customColor, setCustomColor] = useState("#3b82f6");
   const [removalModel, setRemovalModel] = useState("qwen-image-edit-max");
   const [edgeQuality, setEdgeQuality] = useState("auto");
@@ -168,7 +172,7 @@ export function ImageBgRemoverPanel({
               onChange={(e) => setRemovalModel(e.target.value)}
               className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
             >
-              {BG_REMOVAL_MODEL_OPTIONS.map((o) => (
+              {modelOptions.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}
                 </option>

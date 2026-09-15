@@ -54,6 +54,12 @@ import {
   readRequiredPointsFromSettleJson,
 } from "@/lib/format-points-ui";
 import { dispatchPlatformCreditsBalanceRefresh } from "@/lib/platform-credits-balance-events";
+import {
+  fetchToolModelTemplateCatalog,
+  toolLabModeToTemplateIds,
+  toolModelKeysForTemplates,
+  type TemplateCatalog,
+} from "@/lib/model-template-catalog";
 import ttiStyles from "../../text-to-image/text-to-image-modal.module.css";
 import { TextToVideoWorkbench } from "./text-to-video-workbench";
 
@@ -435,6 +441,7 @@ export function ImageToVideoLabClient({
   const [platformVideoModels, setPlatformVideoModels] = useState<
     Array<{ modelKey: string; displayName: string; description: string }>
   >([]);
+  const [templateCatalog, setTemplateCatalog] = useState<TemplateCatalog | null>(null);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const modelPickerRef = useRef<HTMLDivElement>(null);
   const [generatingModelLabel, setGeneratingModelLabel] = useState("");
@@ -585,9 +592,20 @@ export function ImageToVideoLabClient({
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    void fetchToolModelTemplateCatalog().then((catalog) => {
+      if (!cancelled) setTemplateCatalog(catalog);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const labModelPickerList = useMemo(() => {
+    let list;
     if (platformVideoModels.length > 0 && modeTab === "i2v") {
-      return platformVideoModels.map((o) => {
+      list = platformVideoModels.map((o) => {
         const hit = IMAGE_TO_VIDEO_MODELS.find((m) => m.apiModel === o.modelKey);
         if (hit) {
           return { ...hit, title: o.displayName, description: o.description || hit.description };
@@ -600,11 +618,25 @@ export function ImageToVideoLabClient({
           icon: "✦",
         };
       });
+    } else if (modeTab === "t2v") {
+      list = TEXT_TO_VIDEO_MODELS;
+    } else if (modeTab === "ref") {
+      list = REFERENCE_TO_VIDEO_MODELS;
+    } else {
+      list = IMAGE_TO_VIDEO_MODELS;
     }
-    if (modeTab === "t2v") return TEXT_TO_VIDEO_MODELS;
-    if (modeTab === "ref") return REFERENCE_TO_VIDEO_MODELS;
-    return IMAGE_TO_VIDEO_MODELS;
-  }, [modeTab, platformVideoModels]);
+
+    const allowed = toolModelKeysForTemplates(
+      templateCatalog,
+      toolLabModeToTemplateIds(modeTab),
+    );
+    if (allowed.size === 0) return list;
+    const filtered = list.filter(
+      (m) =>
+        allowed.has(m.apiModel.toLowerCase()) || allowed.has(m.id.toLowerCase()),
+    );
+    return filtered.length > 0 ? filtered : list;
+  }, [modeTab, platformVideoModels, templateCatalog]);
 
   const visibleJobs = useMemo(() => {
     return jobs.filter(

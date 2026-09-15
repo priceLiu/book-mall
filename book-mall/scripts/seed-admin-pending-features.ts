@@ -1285,7 +1285,7 @@ const SEED_ITEMS: {
     listKind: "PENDING",
   },
   {
-    title: "MT-104 Canvas / 电商 / QR 接静态包",
+    title: "MT-104 Canvas / 电商 / QR / Story / Tool / 常用工具接静态包",
     description: "选模按 templateId 过滤；估分 creditsPerUnit×units；invoke 用 resolved.modelKey。",
     docPath: "book-mall/doc/product/24-model-scene-templates.md",
     sortOrder: 804,

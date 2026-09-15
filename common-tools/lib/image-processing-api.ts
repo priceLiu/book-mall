@@ -1,6 +1,11 @@
 "use client";
 
 import { bookFetch } from "@/lib/book-fetch";
+import {
+  commonToolsModelKeysForTemplates,
+  fetchCommonToolsModelTemplateCatalog,
+  filterModelsByTemplateKeys,
+} from "@/lib/model-template-catalog";
 
 export type ImageProcessingGatewayModel = {
   modelKey: string;
@@ -40,32 +45,40 @@ export type ImageProcessingMode =
   | "image-generator";
 
 export async function fetchImageProcessingModels() {
-  const data = await bookFetch(
-    "api/sso/tools/common-tools/image-processing/models",
-  );
-  return data as {
-    imageModels: ImageProcessingGatewayModel[];
-    paramProfiles: Record<string, ImageProcessingParamField[]>;
-    defaults: {
-      retouch: string;
-      editor: string;
-      enhancer: string;
-      outpaint: string;
-      restore?: string;
-      faceSwap?: string;
-      bgRemove?: string;
-      objectRemove?: string;
-      deblur?: string;
-      cameraAngle?: string;
-      poster?: string;
-      meme?: string;
-      avatar?: string;
-      gif?: string;
-      realistic?: string;
-      imageGenerator?: string;
-    };
-    modelGroups?: Record<string, string[]>;
-    platformOffering?: boolean;
+  const [data, catalog] = await Promise.all([
+    bookFetch("api/sso/tools/common-tools/image-processing/models") as Promise<{
+      imageModels: ImageProcessingGatewayModel[];
+      paramProfiles: Record<string, ImageProcessingParamField[]>;
+      defaults: {
+        retouch: string;
+        editor: string;
+        enhancer: string;
+        outpaint: string;
+        restore?: string;
+        faceSwap?: string;
+        bgRemove?: string;
+        objectRemove?: string;
+        deblur?: string;
+        cameraAngle?: string;
+        poster?: string;
+        meme?: string;
+        avatar?: string;
+        gif?: string;
+        realistic?: string;
+        imageGenerator?: string;
+      };
+      modelGroups?: Record<string, string[]>;
+      platformOffering?: boolean;
+    }>,
+    fetchCommonToolsModelTemplateCatalog(),
+  ]);
+
+  const i2iKeys = commonToolsModelKeysForTemplates(catalog, ["i2i", "t2i"]);
+  const imageModels = filterModelsByTemplateKeys(data.imageModels, i2iKeys);
+
+  return {
+    ...data,
+    imageModels,
   };
 }
 

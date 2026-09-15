@@ -22,6 +22,7 @@ import {
   T2I_MODEL_OPTIONS,
 } from "@/lib/image-processing-presets";
 import { ipStepNumberClass } from "@/lib/image-processing-theme";
+import { useTemplateFilteredModelOptions } from "@/lib/use-template-filtered-model-options";
 import { cn } from "@/lib/utils";
 
 const FEATURES = [
@@ -104,6 +105,7 @@ export function ImageGeneratorPanel({
 }) {
   const [prompt, setPrompt] = useState("");
   const [generativeModel, setGenerativeModel] = useState(defaultModel);
+  const modelOptions = useTemplateFilteredModelOptions(T2I_MODEL_OPTIONS, ["t2i"]);
   const [aspect, setAspect] = useState("1:1");
   const [styleId, setStyleId] = useState("none");
   const [imageCount, setImageCount] = useState("1");
@@ -173,7 +175,7 @@ export function ImageGeneratorPanel({
               onChange={(e) => setGenerativeModel(e.target.value)}
               className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
             >
-              {T2I_MODEL_OPTIONS.map((o) => (
+              {modelOptions.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}
                 </option>

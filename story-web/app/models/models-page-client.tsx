@@ -11,6 +11,12 @@ import {
   type StoryEngineModel,
   type StoryModelSelection,
 } from "@/lib/story-api";
+import {
+  fetchStoryModelTemplateCatalog,
+  filterByTemplateKeys,
+  storyModelKeysForTemplates,
+  storyRoleToTemplateIds,
+} from "@/lib/model-template-catalog";
 import { cn } from "@/lib/utils";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -37,12 +43,25 @@ export function ModelsPageClient() {
     let cancelled = false;
     (async () => {
       try {
-        const [engine, config] = await Promise.all([
+        const [engine, config, templateCatalog] = await Promise.all([
           fetchEngineModels(base),
           fetchModelConfig(base),
+          fetchStoryModelTemplateCatalog(base),
         ]);
         if (cancelled) return;
-        setCatalog(engine.models);
+        let models = engine.models;
+        if (templateCatalog) {
+          const byRoleFiltered: StoryEngineModel[] = [];
+          const roles = Array.from(new Set(models.map((m) => m.role)));
+          for (const role of roles) {
+            const ids = storyRoleToTemplateIds(role);
+            const allowed = storyModelKeysForTemplates(templateCatalog, ids);
+            const group = models.filter((m) => m.role === role);
+            byRoleFiltered.push(...filterByTemplateKeys(group, allowed));
+          }
+          if (byRoleFiltered.length > 0) models = byRoleFiltered;
+        }
+        setCatalog(models);
         setBillingPersona(engine.billingPersona);
         setSelections(config.selections);
       } catch (e) {
