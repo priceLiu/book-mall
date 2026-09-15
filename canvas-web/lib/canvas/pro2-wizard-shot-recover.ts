@@ -174,9 +174,9 @@ export async function recoverWizardShotDraftsFromTasks(
     wizardShotRunnerNodeId(scriptHubId, mediaKind, shotIndex),
   );
   const allTasks = nodeIds.length
-    ? ((await listCanvasProjectTasks(base, projectId, nodeIds)) as
-        | WizardShotTaskRecord[]
-        | null)
+    ? ((await listCanvasProjectTasks(base, projectId, nodeIds, {
+        recovery: true,
+      })) as WizardShotTaskRecord[] | null)
     : null;
   const tasksByNode = groupTasksByNodeId(allTasks ?? []);
 

@@ -1233,17 +1233,28 @@ export async function cancelCanvasGenerationTask(
  * 返回 `null` 表示后端读道「降级 / 超时」（DB 塞车或不可用），调用方应
  * **保留上一帧快照、不要覆盖**，避免画布因一次读失败而清空显示。
  */
+export type ListCanvasProjectTasksOptions = {
+  /** 查 6h 外终态任务（向导 preview 恢复）；须同时传 nodeIds */
+  recovery?: boolean;
+};
+
 export async function listCanvasProjectTasks(
   base: string,
   projectId: string,
   nodeIds?: string[],
+  options?: ListCanvasProjectTasksOptions,
 ): Promise<CanvasTaskRecord[] | null> {
   if (isCanvasProjectTasksForbidden(projectId)) {
     throw new Error("403 无权访问此画布项目");
   }
-  const q = nodeIds && nodeIds.length > 0
-    ? `?nodeIds=${encodeURIComponent(nodeIds.join(","))}`
-    : "";
+  const params = new URLSearchParams();
+  if (nodeIds && nodeIds.length > 0) {
+    params.set("nodeIds", nodeIds.join(","));
+  }
+  if (options?.recovery && nodeIds && nodeIds.length > 0) {
+    params.set("recovery", "1");
+  }
+  const q = params.size > 0 ? `?${params.toString()}` : "";
   const j = await call<{ tasks: CanvasTaskRecord[] | null; stale?: boolean }>(
     base,
     `/api/canvas/projects/${projectId}/tasks${q}`,

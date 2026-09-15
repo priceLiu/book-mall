@@ -24,6 +24,23 @@ export function isLikelyRasterImageUrl(url: string): boolean {
   return u.includes("/node-image/");
 }
 
+/** KIE / 火山等厂商临时链 · 会过期，不能作为向导资产长期 previewUrl */
+export function isUnstableTaskMediaUrl(url: string): boolean {
+  const raw = url.trim();
+  if (!raw.startsWith("http")) return true;
+  try {
+    const parsed = new URL(raw);
+    const host = parsed.hostname.toLowerCase();
+    if (host.includes("aiquickdraw.com")) return true;
+    if (host.includes("volces.com")) return true;
+    if (parsed.searchParams.has("X-Tos-Signature")) return true;
+    if (parsed.searchParams.has("X-Tos-Expires")) return true;
+  } catch {
+    return true;
+  }
+  return false;
+}
+
 /** 万相 / 百炼 reference_image · 明确排除视频/3D，其余 OSS 交给厂商校验 */
 export function isLikelyReferenceImageUrl(url: string): boolean {
   const u = url.trim();

@@ -17,6 +17,13 @@ describe("pro2-project-format", () => {
         "story-pro2-starter",
       ]),
     ).toBe(false);
+    // 列表仅 meta、不传 nodeTypes 时无法识别 script-hub-only 退役项（须查 nodes）
+    expect(
+      isRetiredLegacyPro2FromListHints({ edition: "pro2" }, null),
+    ).toBe(false);
+    expect(
+      isRetiredLegacyPro2FromListHints({}, ["story-pro2-script-hub"]),
+    ).toBe(true);
   });
 
   it("withPro2ScriptFormatV13Meta stamps create meta", () => {

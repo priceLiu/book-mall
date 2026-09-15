@@ -1,6 +1,5 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutTemplate } from "lucide-react";
 import {
@@ -171,23 +170,9 @@ import { Sbv1VideoEngineFloatingDock } from "./sbv1/sbv1-video-engine-floating-d
 import { JianyingAutoRenderFloatingDock } from "./pro2/jianying-auto-render-floating-dock";
 import { Pro2ThreeViewInputDock } from "./pro2/pro2-three-view-input-dock";
 import { Pro2TextNodeOutlineEditorHost } from "./pro2/pro2-text-node-outline-editor-host";
+import { Pro2ScriptInputDock } from "./pro2/pro2-script-input-dock";
+import { Pro2ScriptTableEditorHost } from "./pro2/pro2-script-table-editor-host";
 import { Director3dDeskEditorHost } from "./pro2/director-3d-desk-editor-host";
-
-const Pro2ScriptInputDock = dynamic(
-  () =>
-    import("./pro2/pro2-script-input-dock").then((m) => ({
-      default: m.Pro2ScriptInputDock,
-    })),
-  { ssr: false },
-);
-
-const Pro2ScriptTableEditorHost = dynamic(
-  () =>
-    import("./pro2/pro2-script-table-editor-host").then((m) => ({
-      default: m.Pro2ScriptTableEditorHost,
-    })),
-  { ssr: false },
-);
 import type {
   StoryProScriptHubNodeData,
   StoryProStarterNodeData,

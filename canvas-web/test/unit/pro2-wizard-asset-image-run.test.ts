@@ -127,4 +127,27 @@ describe("buildWizardAssetImageRunPayload", () => {
     } satisfies CanvasTaskRecord & { previewUrl: string });
     expect(url).toBe("https://cdn.example/generated.png");
   });
+
+  it("prefers OSS over vendor ephemeral when both exist", () => {
+    const url = pickWizardAssetTaskPreviewUrl({
+      id: "t1",
+      nodeId: "n1",
+      kind: "IMAGE",
+      status: "SUCCEEDED",
+      model: "nano-banana-pro",
+      ossUrl:
+        "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/canvas/node-image/p/a.png",
+      ephemeralUrl:
+        "https://tempfile.aiquickdraw.com/workers/images/image_dead.png",
+      textOutput: null,
+      failCode: null,
+      failMessage: null,
+      submittedAt: null,
+      completedAt: null,
+      kieTaskId: null,
+      createdAt: "",
+      updatedAt: "",
+    } satisfies CanvasTaskRecord);
+    expect(url).toContain("aliyuncs.com");
+  });
 });

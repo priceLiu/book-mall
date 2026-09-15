@@ -51,7 +51,8 @@ import {
   canvasSavePhaseLabel,
   type CanvasSavePhase,
 } from "@/lib/canvas/canvas-save-phase";
-import { flushCanvasGraphPersist } from "@/lib/canvas/canvas-graph-persist-bridge";
+import { flushCanvasGraphPersistBounded } from "@/lib/canvas/canvas-graph-persist-bridge";
+import { markRecentProjectsStale } from "@/lib/canvas/recent-projects-invalidate";
 import {
   CANVAS_IMAGE_UPLOADS_CHANGED,
   hasPendingCanvasImageUploads,
@@ -161,11 +162,31 @@ export function CanvasToolbar({
       if (leavingProject) return;
       setLeavingProject(true);
       try {
-        await waitForPendingCanvasImageUploads(60_000);
-        await flushPendingCanvasImageUploadPersist();
-        await flushCanvasGraphPersist(true);
-        router.push("/projects");
+        window.dispatchEvent(new CustomEvent("canvas:leave-project"));
+        await Promise.race([
+          (async () => {
+            await waitForPendingCanvasImageUploads(12_000);
+            await flushPendingCanvasImageUploadPersist().catch(() => undefined);
+            await flushCanvasGraphPersistBounded(10_000, true);
+          })(),
+          new Promise<void>((resolve) => {
+            window.setTimeout(resolve, 15_000);
+          }),
+        ]);
+      } catch {
+        /* 离开画布优先：保存超时/失败仍跳转列表 */
       } finally {
+        markRecentProjectsStale();
+        try {
+          router.push("/projects");
+          window.setTimeout(() => {
+            if (window.location.pathname.startsWith("/canvas/")) {
+              window.location.assign("/projects");
+            }
+          }, 800);
+        } catch {
+          window.location.assign("/projects");
+        }
         setLeavingProject(false);
       }
     },
@@ -290,9 +311,11 @@ export function CanvasToolbar({
         <Link
           href="/projects"
           onClick={(e) => void onBackToProjects(e)}
+          aria-label={leavingProject ? "正在离开画布" : "回到画布列表"}
+          title={leavingProject ? "正在离开画布…" : "回到画布列表"}
           className={cn(
             CANVAS_TOOLBAR_BTN_CLASS,
-            "hidden shrink-0 whitespace-nowrap sm:inline-flex",
+            "inline-flex shrink-0 whitespace-nowrap",
             (leavingProject || imageUploadPending) && "opacity-80",
           )}
         >
@@ -300,8 +323,10 @@ export function CanvasToolbar({
             <Loader2 className="size-3 animate-spin" />
           ) : (
             <ArrowLeft className="size-3" />
-          )}{" "}
-          {leavingProject ? "正在保存图片…" : "回到画布列表"}
+          )}
+          <span className="max-sm:sr-only">
+            {leavingProject ? "正在离开…" : "回到画布列表"}
+          </span>
         </Link>
         {inflightTaskCount > 0 ? (
           <span

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { pickRecoverableWizardAssetTask } from "@/lib/canvas/pro2-wizard-asset-recover";
+import {
+  pickRecoverableWizardAssetTask,
+  wizardAssetDraftNeedsRecovery,
+} from "@/lib/canvas/pro2-wizard-asset-recover";
 import type { WizardAssetTaskRecord } from "@/lib/canvas/pro2-wizard-asset-image-run";
 
 const NODE = "pro2-wiz-gen-hub-character-c1";
@@ -25,6 +28,53 @@ function task(
     ...partial,
   };
 }
+
+describe("wizardAssetDraftNeedsRecovery", () => {
+  it("recovers missing previewUrl", () => {
+    expect(
+      wizardAssetDraftNeedsRecovery({
+        kind: "character",
+        assetId: "c1",
+        generateStatus: "idle",
+      }),
+    ).toBe(true);
+  });
+
+  it("recovers expired vendor previewUrl", () => {
+    expect(
+      wizardAssetDraftNeedsRecovery({
+        kind: "scene",
+        assetId: "s1",
+        previewUrl:
+          "https://tempfile.aiquickdraw.com/workers/images/image_dead.png",
+        generateStatus: "idle",
+      }),
+    ).toBe(true);
+  });
+
+  it("skips stable OSS previewUrl", () => {
+    expect(
+      wizardAssetDraftNeedsRecovery({
+        kind: "character",
+        assetId: "c1",
+        previewUrl:
+          "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/canvas/node-image/p/a.png",
+        generateStatus: "idle",
+      }),
+    ).toBe(false);
+  });
+
+  it("skips while generateStatus is running", () => {
+    expect(
+      wizardAssetDraftNeedsRecovery({
+        kind: "prop",
+        assetId: "p1",
+        previewUrl: "https://tempfile.aiquickdraw.com/x.png",
+        generateStatus: "running",
+      }),
+    ).toBe(false);
+  });
+});
 
 describe("pickRecoverableWizardAssetTask", () => {
   it("prefers bound taskId when settled", () => {

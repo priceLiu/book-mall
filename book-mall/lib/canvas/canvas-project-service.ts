@@ -273,6 +273,38 @@ async function fetchCanvasNodesByProjectIds(
   return new Map(rows.map((r) => [r.id, r.nodes]));
 }
 
+/** 列表退役判定：仅聚合 nodes[].type，避免加载整图 */
+async function fetchCanvasNodeTypesByProjectIds(
+  userId: string,
+  ids: string[],
+): Promise<Map<string, string[]>> {
+  if (ids.length === 0) return new Map();
+  const rows = await prisma.$queryRaw<Array<{ id: string; nodeTypes: unknown }>>`
+    SELECT
+      cp.id,
+      COALESCE(
+        (
+          SELECT jsonb_agg(DISTINCT node->>'type')
+          FROM jsonb_array_elements(COALESCE(cp.canvas->'nodes', '[]'::jsonb)) AS node
+          WHERE node->>'type' IS NOT NULL
+        ),
+        '[]'::jsonb
+      ) AS "nodeTypes"
+    FROM "CanvasProject" cp
+    WHERE cp."userId" = ${userId}
+      AND cp."deletedAt" IS NULL
+      AND cp.id IN (${Prisma.join(ids)})
+  `;
+  return new Map(
+    rows.map((r) => [
+      r.id,
+      Array.isArray(r.nodeTypes)
+        ? r.nodeTypes.filter((t): t is string => typeof t === "string")
+        : [],
+    ]),
+  );
+}
+
 /** 节点/meta 无封面时，用最近成功任务的成片 URL 兜底 */
 async function fetchLatestTaskCoverByProjectIds(
   userId: string,
@@ -317,8 +349,11 @@ function rowNeedsTaskCoverFallback(
   return !fromNodes?.thumbnailUrl?.trim() && !fromNodes?.coverVideoUrl?.trim();
 }
 
-function isVisibleListRow(row: CanvasProjectListRow): boolean {
-  return !isRetiredLegacyPro2FromListHints(row.meta, null);
+function isVisibleListRow(
+  row: CanvasProjectListRow,
+  nodeTypes: Iterable<string> | null | undefined,
+): boolean {
+  return !isRetiredLegacyPro2FromListHints(row.meta, nodeTypes);
 }
 
 /** 列表页 · 分页 + 仅读 meta（不扫 nodes、不二次拉全量 canvas） */
@@ -367,7 +402,13 @@ export async function listCanvasProjectsForUser(
 
   const hasMore = rows.length > limit;
   const pageRows = hasMore ? rows.slice(0, limit) : rows;
-  const visibleRows = pageRows.filter(isVisibleListRow);
+  const nodeTypesByProjectId = await fetchCanvasNodeTypesByProjectIds(
+    userId,
+    pageRows.map((r) => r.id),
+  );
+  const visibleRows = pageRows.filter((row) =>
+    isVisibleListRow(row, nodeTypesByProjectId.get(row.id)),
+  );
   const nodesFallbackIds = visibleRows
     .filter(rowNeedsNodesCoverFallback)
     .map((r) => r.id);

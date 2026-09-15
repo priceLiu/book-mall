@@ -60,6 +60,10 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   const nodeIds = nodeIdsParam
     ? nodeIdsParam.split(",").map((s) => s.trim()).filter(Boolean)
     : undefined;
+  /** 向导历史 preview 恢复：须查 6h 外终态任务，仅允许带 nodeIds 的 scoped 读 */
+  const recovery =
+    url.searchParams.get("recovery") === "1" &&
+    Boolean(nodeIds && nodeIds.length > 0);
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -68,7 +72,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
         userId: guard.user.id,
         projectId,
         nodeIds,
-        lightweight: true,
+        lightweight: !recovery,
       }),
       new Promise<never>((_, reject) => {
         timer = setTimeout(
@@ -91,7 +95,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
           userId: guard.user.id,
           projectId,
           nodeIds,
-          lightweight: true,
+          lightweight: !recovery,
         });
       }
     }
@@ -110,7 +114,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
           userId: guard.user.id,
           projectId,
           nodeIds,
-          lightweight: true,
+          lightweight: !recovery,
         });
       }
     }
@@ -132,7 +136,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
           userId: guard.user.id,
           projectId,
           nodeIds,
-          lightweight: true,
+          lightweight: !recovery,
         });
       }
     }
