@@ -391,6 +391,14 @@ export function StoryboardModelPickerDialog({
   onVideoGenerateAudioChange,
   panelHasVoiceover = false,
 }: Props) {
+  const [draftKey, setDraftKey] = useState(value);
+  const [mediaFilter, setMediaFilter] = useState<StoryboardModelMediaFilter>("all");
+  const [confirmBlockMessage, setConfirmBlockMessage] = useState<string | null>(null);
+  const [templateModelKeys, setTemplateModelKeys] = useState<string[] | null>(null);
+  const [catalogCreditsHint, setCatalogCreditsHint] = useState<number | null>(null);
+  const wasOpenRef = useRef(false);
+  const suppressBackdropCloseUntilRef = useRef(0);
+
   const action =
     confirmLabel ??
     (selectionOnly ? "确定" : mode === "image" ? "开始生图" : "开始生成");
@@ -415,14 +423,6 @@ export function StoryboardModelPickerDialog({
   const showFullDuration = mode === "video" && videoTarget === "fullSheet";
   const showPanelDuration = mode === "video" && videoTarget === "panel";
   const showResolution = mode === "video";
-
-  const [draftKey, setDraftKey] = useState(value);
-  const [mediaFilter, setMediaFilter] = useState<StoryboardModelMediaFilter>("all");
-  const [confirmBlockMessage, setConfirmBlockMessage] = useState<string | null>(null);
-  const [templateModelKeys, setTemplateModelKeys] = useState<string[] | null>(null);
-  const [catalogCreditsHint, setCatalogCreditsHint] = useState<number | null>(null);
-  const wasOpenRef = useRef(false);
-  const suppressBackdropCloseUntilRef = useRef(0);
 
   const resolvedTemplateId =
     sceneTemplateId?.trim() || (mode === "image" ? "t2i" : "i2v");

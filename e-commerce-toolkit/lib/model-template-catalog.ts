@@ -28,12 +28,10 @@ export async function fetchEcomModelTemplateCatalog(
 ): Promise<EcomTemplateCatalog | null> {
   if (!force && memory && Date.now() - memory.at < CACHE_MS) return memory.catalog;
   try {
-    const res = await ecomBookFetch(
+    const data = (await ecomBookFetch(
       "api/sso/tools/gateway/model-templates/catalog",
       { cache: "no-store" },
-    );
-    if (!res.ok) return null;
-    const data = (await res.json()) as { catalog?: EcomTemplateCatalog };
+    )) as { catalog?: EcomTemplateCatalog };
     if (!data.catalog) return null;
     memory = { catalog: data.catalog, at: Date.now() };
     return data.catalog;
