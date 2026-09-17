@@ -1,6 +1,6 @@
 import type { SmsVerificationPurpose } from "@prisma/client";
 
-import { toE164Cn } from "@/lib/auth/phone";
+import { isMockSmsPhone, isTestPrefixPhone, toE164Cn } from "@/lib/auth/phone";
 import { buildTeamInviteUrl } from "@/lib/tenant/team-invite-link";
 import { getInviteByToken } from "@/lib/tenant/tenant-invite-service";
 import {
@@ -9,6 +9,13 @@ import {
   templateIdForPurpose,
   tencentSmsConfig,
 } from "@/lib/sms/sms-config";
+
+export type SmsSendResult = {
+  provider: "mock" | "tencent" | "skipped";
+  templateId?: string;
+  tencentCode?: string;
+  tencentMessage?: string;
+};
 
 function purposeLabel(purpose: SmsVerificationPurpose): string {
   switch (purpose) {
@@ -31,7 +38,7 @@ async function sendViaTencent(input: {
   phone: string;
   templateId: string;
   params: string[];
-}): Promise<void> {
+}): Promise<{ tencentCode: string; tencentMessage: string }> {
   const cfg = tencentSmsConfig();
   const tencentcloud = await import("tencentcloud-sdk-nodejs");
   const SmsClient = tencentcloud.sms.v20210111.Client;
@@ -51,19 +58,36 @@ async function sendViaTencent(input: {
 
   const status = resp.SendStatusSet?.[0];
   if (!status || status.Code !== "Ok") {
-    const msg = status ? `${status.Code}: ${status.Message}` : "无响应";
+    const code = status?.Code ?? "NO_RESPONSE";
+    const message = status?.Message ?? "无响应";
     console.error("[sms:tencent] 发送失败", {
       phone: input.phone,
       templateId: input.templateId,
       signName: cfg.signName,
       sdkAppId: cfg.sdkAppId,
-      code: status?.Code,
-      message: status?.Message,
+      code,
+      message,
     });
-    throw new Error(`短信发送失败: ${msg}`);
+    if (code === "FailedOperation.InsufficientBalanceInSmsPackage") {
+      throw new Error("SMS_PACKAGE_EMPTY");
+    }
+    throw new Error(`短信发送失败: ${code}: ${message}`);
   }
 
   console.info(`[sms:tencent] 发送成功 → ${input.phone} template=${input.templateId}`);
+  return {
+    tencentCode: status.Code ?? "Ok",
+    tencentMessage: status.Message ?? "",
+  };
+}
+
+function shouldMockSend(phone: string): boolean {
+  return (
+    smsProvider() === "mock" ||
+    !isTencentSmsConfigured() ||
+    isMockSmsPhone(phone) ||
+    isTestPrefixPhone(phone)
+  );
 }
 
 export async function sendSmsMessage(input: {
@@ -71,8 +95,8 @@ export async function sendSmsMessage(input: {
   purpose: SmsVerificationPurpose;
   code: string;
   inviteToken?: string;
-}): Promise<void> {
-  if (smsProvider() === "mock" || !isTencentSmsConfigured()) {
+}): Promise<SmsSendResult> {
+  if (shouldMockSend(input.phone)) {
     if (process.env.NODE_ENV !== "production") {
       const linkHint =
         input.purpose === "TEAM_INVITE" && input.inviteToken
@@ -82,13 +106,13 @@ export async function sendSmsMessage(input: {
         `[sms:mock] ${purposeLabel(input.purpose)} → ${input.phone} code=${input.code}${linkHint}`,
       );
     }
-    return;
+    return { provider: "mock" };
   }
 
   const templateId = templateIdForPurpose(input.purpose);
   if (!templateId) {
     console.warn(`[sms] 未配置模板 ${input.purpose}，跳过真实发送`);
-    return;
+    return { provider: "skipped" };
   }
 
   const params: string[] = [input.code];
@@ -98,5 +122,11 @@ export async function sendSmsMessage(input: {
     params.push(teamName, buildTeamInviteUrl(input.inviteToken, input.code));
   }
 
-  await sendViaTencent({ phone: input.phone, templateId, params });
+  const tencent = await sendViaTencent({ phone: input.phone, templateId, params });
+  return {
+    provider: "tencent",
+    templateId,
+    tencentCode: tencent.tencentCode,
+    tencentMessage: tencent.tencentMessage,
+  };
 }

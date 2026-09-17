@@ -52,6 +52,10 @@ export const LIBTV_MEDIA_AUTO_FIT_LONG_EDGE = 885;
 export const LIBTV_MEDIA_STAGE_LANDSCAPE_WIDTH = 630;
 export const LIBTV_MEDIA_STAGE_PORTRAIT_HEIGHT = 630;
 export const LIBTV_MEDIA_STAGE_SQUARE_EDGE = 354;
+/** 16:9 横版 stage 高度（宽固定为 LANDSCAPE_WIDTH） */
+export const LIBTV_MEDIA_STAGE_LANDSCAPE_16_9_HEIGHT = Math.round(
+  LIBTV_MEDIA_STAGE_LANDSCAPE_WIDTH * (9 / 16),
+);
 
 /** 用户在 Dock 选择比例后，系统按比例调整外框的放大倍数（相对 legacy 基准） */
 export const LIBTV_MEDIA_ASPECT_PRESET_SIZE_SCALE = 1;

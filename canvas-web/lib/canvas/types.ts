@@ -46,10 +46,10 @@ import {
   PRO2_TAG_NODE_WIDTH,
   PRO2_TEXT_NODE_HEIGHT,
   PRO2_TEXT_NODE_WIDTH,
-  PRO2_IMAGE_NODE_HEIGHT,
+  PRO2_IMAGE_NODE_16_9_HEIGHT,
+  PRO2_IMAGE_NODE_16_9_WIDTH,
   PRO2_CHARACTER_THREE_VIEW_HEIGHT,
   PRO2_CHARACTER_THREE_VIEW_WIDTH,
-  PRO2_IMAGE_NODE_WIDTH,
   PRO2_AUDIO_NODE_HEIGHT,
   PRO2_AUDIO_NODE_WIDTH,
   PRO2_SCRIPT_NODE_HEIGHT,
@@ -62,8 +62,8 @@ import {
   SBV1_DEFAULT_VIDEO_ENGINE_DATA,
 } from "./sbv1-workspace-types";
 import {
-  SBV1_IMAGE_NODE_HEIGHT,
-  SBV1_IMAGE_NODE_WIDTH,
+  SBV1_IMAGE_NODE_16_9_HEIGHT,
+  SBV1_IMAGE_NODE_16_9_WIDTH,
   SBV1_VIDEO_ENGINE_HEIGHT,
   SBV1_VIDEO_ENGINE_WIDTH,
 } from "./sbv1-node-chrome";
@@ -1022,8 +1022,8 @@ export const NODE_DEFAULT_SIZE: Record<
     height: PRO2_TAG_NODE_HEIGHT,
   },
   "story-pro2-image": {
-    width: PRO2_IMAGE_NODE_WIDTH,
-    height: PRO2_IMAGE_NODE_HEIGHT,
+    width: PRO2_IMAGE_NODE_16_9_WIDTH,
+    height: PRO2_IMAGE_NODE_16_9_HEIGHT,
   },
   "story-pro2-three-view": {
     width: PRO2_CHARACTER_THREE_VIEW_WIDTH,
@@ -1042,8 +1042,8 @@ export const NODE_DEFAULT_SIZE: Record<
     height: PRO2_CONTROL_CARD_HEIGHT,
   },
   "story-pro2-style-asset": {
-    width: PRO2_IMAGE_NODE_WIDTH,
-    height: PRO2_IMAGE_NODE_HEIGHT,
+    width: PRO2_IMAGE_NODE_16_9_WIDTH,
+    height: PRO2_IMAGE_NODE_16_9_HEIGHT,
   },
   "story-pro2-character": {
     width: PRO2_FRAME_BOARD_WIDTH,
@@ -1062,12 +1062,12 @@ export const NODE_DEFAULT_SIZE: Record<
     height: PRO2_COLUMN_CARD_HEIGHT,
   },
   "story-pro2-prop": {
-    width: PRO2_IMAGE_NODE_WIDTH,
-    height: PRO2_IMAGE_NODE_HEIGHT,
+    width: PRO2_IMAGE_NODE_16_9_WIDTH,
+    height: PRO2_IMAGE_NODE_16_9_HEIGHT,
   },
   "story-pro2-mood": {
-    width: PRO2_IMAGE_NODE_WIDTH,
-    height: PRO2_IMAGE_NODE_HEIGHT,
+    width: PRO2_IMAGE_NODE_16_9_WIDTH,
+    height: PRO2_IMAGE_NODE_16_9_HEIGHT,
   },
   "story-pro2-audio": {
     width: PRO2_AUDIO_NODE_WIDTH,
@@ -1082,8 +1082,8 @@ export const NODE_DEFAULT_SIZE: Record<
     height: SBV1_VIDEO_ENGINE_HEIGHT,
   },
   "sbv1-image": {
-    width: SBV1_IMAGE_NODE_WIDTH,
-    height: SBV1_IMAGE_NODE_HEIGHT,
+    width: SBV1_IMAGE_NODE_16_9_WIDTH,
+    height: SBV1_IMAGE_NODE_16_9_HEIGHT,
   },
   "sbv1-video-engine": {
     width: SBV1_VIDEO_ENGINE_WIDTH,

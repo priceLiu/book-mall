@@ -1046,14 +1046,19 @@ function FlowCanvasInner({
       // 始终只更新本地 RF 状态 → 拖动每帧只重绘被拖节点，画面流畅
       let rfBeforeChange = getNodes() as CanvasFlowNode[];
       if (libtvCanvas) {
-        // 1) RO 纯测量 echo 写入 measured（无显式尺寸的节点）
-        // 2) 显式 width/height 必须盖过陈旧 measured（组拉伸后否则框选按旧大框命中）
-        const withMeasured = alignRfNodesMeasuredToBox(
-          applyLibtvRfMeasurementEchoes(rfBeforeChange, changes),
-        );
-        if (withMeasured !== rfBeforeChange) {
-          setRfNodes(withMeasured);
-          rfBeforeChange = withMeasured;
+        // 拖动/缩放中跳过 RO echo 写回：与 applyNodeChanges 同帧 setRfNodes 会触发嵌套测量 ↔ 外框 measured 振荡
+        const geometryInProgress =
+          isCanvasInteractiveGeometryInProgress(changes);
+        if (!geometryInProgress) {
+          // 1) RO 纯测量 echo 写入 measured（无显式尺寸的节点）
+          // 2) 显式 width/height 必须盖过陈旧 measured（组拉伸后否则框选按旧大框命中）
+          const withMeasured = alignRfNodesMeasuredToBox(
+            applyLibtvRfMeasurementEchoes(rfBeforeChange, changes),
+          );
+          if (withMeasured !== rfBeforeChange) {
+            setRfNodes(withMeasured);
+            rfBeforeChange = withMeasured;
+          }
         }
         const rfSel = rfStore.getState();
         if (rfSel.userSelectionActive && rfSel.userSelectionRect) {

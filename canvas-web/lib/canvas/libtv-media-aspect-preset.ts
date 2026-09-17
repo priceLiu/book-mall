@@ -20,7 +20,10 @@ import {
   SBV1_VIDEO_ENGINE_MIN_WIDTH,
   SBV1_VIDEO_ENGINE_RESIZE_MIN_HEIGHT,
 } from "./sbv1-node-chrome";
-import type { Sbv1ImageAspectRatio } from "./sbv1-image-models";
+import {
+  SBV1_IMAGE_DOCK_DEFAULT_ASPECT,
+  type Sbv1ImageAspectRatio,
+} from "./sbv1-image-models";
 import type { Sbv1AspectRatio } from "./sbv1-workspace-types";
 import type { CanvasFlowNode } from "./types";
 import {
@@ -399,7 +402,13 @@ export function resolveEffectiveAspectRatioForPreset(
   ) {
     return "16:9";
   }
-  if (profile === "sbv1-video" || profile === "sbv1-image") return "4:3";
+  if (
+    profile === "pro2-image" ||
+    profile === "sbv1-video" ||
+    profile === "sbv1-image"
+  ) {
+    return SBV1_IMAGE_DOCK_DEFAULT_ASPECT;
+  }
   return "1:1";
 }
 
@@ -509,13 +518,6 @@ export function shouldSkipLibtvMediaAspectPresetForNaturalMedia(
       const rt = d.runtime?.status;
       if (!rt || rt === "done" || rt === "idle") return true;
     }
-  }
-
-  if (
-    d.ossUrl?.trim() &&
-    (role === "generic" || role === "prop" || role === "mood" || !role)
-  ) {
-    return true;
   }
 
   const rt = d.runtime?.status;

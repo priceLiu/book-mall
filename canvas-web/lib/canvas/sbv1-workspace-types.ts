@@ -60,14 +60,14 @@ export const SBV1_DEFAULT_IMAGE_NODE_DATA: Sbv1ImageNodeData = {
   label: "图片",
   dockInput: "",
   dockRefImages: [],
-  aspectRatio: "auto",
+  aspectRatio: "16:9",
   imageQuality: "standard",
   resolution: "2K",
   outputCount: 1,
   engine: {
     providerId: "",
     modelKey: "nano-banana-pro",
-    params: buildSbv1ImageEngineParams({}),
+    params: buildSbv1ImageEngineParams({ aspectRatio: "16:9" }),
   },
 };
 

@@ -40,10 +40,10 @@ describe("libtv-media-aspect-preset", () => {
       resolveEffectiveAspectRatioForPreset("auto", "pro2-frame-cell"),
     ).toBe("16:9");
     expect(resolveEffectiveAspectRatioForPreset("auto", "sbv1-video")).toBe(
-      "4:3",
+      "16:9",
     );
     expect(resolveEffectiveAspectRatioForPreset("auto", "pro2-image")).toBe(
-      "1:1",
+      "16:9",
     );
   });
 
@@ -242,6 +242,30 @@ describe("libtv-media-aspect-preset", () => {
           gridSplitFrameCrop: true,
           pro2HdFromGridSplit: true,
           aspectRatio: "16:9",
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps aspect preset for AI-generated ossUrl on generic image nodes", () => {
+    expect(
+      shouldSkipLibtvMediaAspectPresetForNaturalMedia({
+        type: "story-pro2-image",
+        data: {
+          pro2MediaRole: "generic",
+          aspectRatio: "16:9",
+          ossUrl: "https://cdn.example/img.png",
+          runtime: { status: "succeeded" },
+        },
+      }),
+    ).toBe(false);
+    expect(
+      shouldSkipLibtvMediaAspectPresetForNaturalMedia({
+        type: "sbv1-image",
+        data: {
+          aspectRatio: "auto",
+          ossUrl: "https://cdn.example/img.png",
+          runtime: { status: "succeeded" },
         },
       }),
     ).toBe(false);

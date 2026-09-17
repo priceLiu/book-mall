@@ -3,6 +3,7 @@
 import { parseToolsSessionPayload } from "@/lib/parse-tools-session-payload";
 import type { FetchToolsSessionResult } from "@/lib/tools-introspect";
 import {
+  getCachedToolsSession,
   setCachedToolsSession,
 } from "@/lib/tools-session-client-cache";
 
@@ -11,14 +12,28 @@ export type CanvasToolsSessionClientPayload = FetchToolsSessionResult;
 let inflightLite: Promise<CanvasToolsSessionClientPayload> | null = null;
 let inflightFull: Promise<CanvasToolsSessionClientPayload> | null = null;
 
+const INACTIVE_SESSION: CanvasToolsSessionClientPayload = {
+  hasCookie: false,
+  originConfigured: false,
+  introspectStatus: null,
+  introspect: null,
+  active: false,
+};
+
 async function fetchSession(url: string): Promise<CanvasToolsSessionClientPayload> {
-  const res = await fetch(url, { credentials: "include", cache: "no-store" });
-  const raw = await res.json().catch(() => null);
-  const parsed = parseToolsSessionPayload(raw);
-  if (parsed.active) {
-    setCachedToolsSession(parsed);
+  try {
+    const res = await fetch(url, { credentials: "include", cache: "no-store" });
+    const raw = await res.json().catch(() => null);
+    const parsed = parseToolsSessionPayload(raw);
+    if (parsed.active) {
+      setCachedToolsSession(parsed);
+    }
+    return parsed;
+  } catch {
+    // 续签后拉 session / 拖动中网络抖动：勿抛未捕获异常弹红屏
+    const cached = getCachedToolsSession();
+    return cached?.active ? cached : INACTIVE_SESSION;
   }
-  return parsed;
 }
 
 /** 心跳 / 路由切换：仅 JWT 过期判断，不阻塞在 introspect */

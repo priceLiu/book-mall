@@ -4,6 +4,10 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Clapperboard, Check, Download, Eye, RefreshCw, X } from "lucide-react";
 import {
+  LibtvMediaGeneratingState,
+  libtvGeneratingVariantForEdition,
+} from "@/components/canvas/libtv-media-generating-state";
+import {
   CANVAS_MEDIA_PREVIEW_LIGHTBOX_SHELL_CLASS,
   useClientPortalMounted,
   useModalBodyScrollLock,
@@ -15,10 +19,8 @@ import { STORY_MEDIA_COL_WIDTH } from "@/lib/canvas/story-ref-image";
 import { STORY_FRAME_ROW_STRIP_H } from "@/lib/canvas/story-column-layout";
 import { CanvasVideoPlayer } from "./canvas-video-player";
 import {
-  storyEditionGeneratingBorderClass,
   storyEditionIconBtnClass,
   storyEditionOverlayIconBtnClass,
-  storyEditionSpinClass,
   storyEditionVideoOverlayBtnClass,
   type StoryEdition,
 } from "@/lib/canvas/story-edition-chrome";
@@ -126,12 +128,7 @@ export function StoryColumnMediaPanel({
         }}
         onPointerLeave={videoPromptTip.scheduleHide}
       >
-        <div
-          className={cn(
-            "absolute inset-0 overflow-hidden rounded-md",
-            generating && storyEditionGeneratingBorderClass(edition),
-          )}
-        >
+        <div className="absolute inset-0 overflow-hidden rounded-md">
         {imageUrl && mediaActive ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -207,23 +204,24 @@ export function StoryColumnMediaPanel({
             —
           </span>
         ) : null}
+        {generating ? (
+          <LibtvMediaGeneratingState
+            variant={libtvGeneratingVariantForEdition(edition)}
+            className="z-20"
+            passNodeDrag
+          />
+        ) : (
         <div
           className={cn(
             "absolute inset-0 z-10 flex items-center justify-center gap-2 transition-opacity",
-            generating
-              ? "pointer-events-auto opacity-100 bg-black/45"
-              : hasVisual && !(isFrame && hasFrameImage)
+            hasVisual && !(isFrame && hasFrameImage)
+              ? "pointer-events-none opacity-0 group-hover/frame-prompt:pointer-events-auto group-hover/frame-prompt:opacity-100 group-hover/frame-prompt:bg-black/45"
+              : isFrame && hasFrameImage
                 ? "pointer-events-none opacity-0 group-hover/frame-prompt:pointer-events-auto group-hover/frame-prompt:opacity-100 group-hover/frame-prompt:bg-black/45"
-                : isFrame && hasFrameImage
-                  ? "pointer-events-none opacity-0 group-hover/frame-prompt:pointer-events-auto group-hover/frame-prompt:opacity-100 group-hover/frame-prompt:bg-black/45"
-                  : "pointer-events-auto opacity-100",
+                : "pointer-events-auto opacity-100",
           )}
         >
-          {generating ? (
-            <div className="relative z-30 flex flex-col items-center gap-1">
-              <RefreshCw className={storyEditionSpinClass(edition)} />
-            </div>
-          ) : isFrame && hasFrameImage ? (
+          {isFrame && hasFrameImage ? (
             <>
               <button
                 type="button"
@@ -337,6 +335,7 @@ export function StoryColumnMediaPanel({
             </button>
           )}
         </div>
+        )}
         </div>
       </div>
       {showVideoPromptPopover && videoPrompt?.trim() ? (

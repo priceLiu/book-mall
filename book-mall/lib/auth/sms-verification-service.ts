@@ -1,6 +1,6 @@
 import { randomInt } from "crypto";
 
-import type { SmsVerificationPurpose } from "@prisma/client";
+import type { SmsSendStatus, SmsVerificationPurpose } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 import {
@@ -15,6 +15,11 @@ import {
 } from "@/lib/auth/sms-bypass";
 import { prisma } from "@/lib/prisma";
 import { sendSmsMessage } from "@/lib/sms/send-sms";
+import {
+  type SmsLogChannel,
+  parseSmsSendError,
+  recordSmsSendLog,
+} from "@/lib/sms/sms-send-log";
 import { smsProvider } from "@/lib/sms/sms-config";
 import { consumeRateLimit, SMS_BURST_IP } from "@/lib/auth/auth-throttle";
 
@@ -52,25 +57,92 @@ export class SmsVerificationError extends Error {
   }
 }
 
-export async function issueSmsCode(input: {
-  phoneRaw: string;
-  purpose: SmsVerificationPurpose;
+type IssueSmsMeta = {
+  source?: string;
+  channel?: SmsLogChannel;
   sendIp?: string | null;
+  userAgent?: string | null;
   inviteToken?: string | null;
-}): Promise<{ code: string; mockCode?: string }> {
+};
+
+async function logSmsAttempt(
+  meta: IssueSmsMeta,
+  input: {
+    phone: string;
+    purpose: SmsVerificationPurpose;
+    code?: string | null;
+    status: SmsSendStatus;
+    provider?: string | null;
+    templateId?: string | null;
+    errorCode?: string | null;
+    errorMessage?: string | null;
+    detail?: Record<string, unknown> | null;
+    verificationId?: string | null;
+  },
+): Promise<void> {
+  await recordSmsSendLog({
+    phone: input.phone,
+    purpose: input.purpose,
+    code: input.code,
+    source: meta.source ?? "book-mall",
+    channel: meta.channel ?? "direct",
+    status: input.status,
+    provider: input.provider,
+    templateId: input.templateId,
+    sendIp: meta.sendIp,
+    userAgent: meta.userAgent,
+    inviteToken: meta.inviteToken,
+    errorCode: input.errorCode,
+    errorMessage: input.errorMessage,
+    detail: input.detail,
+    verificationId: input.verificationId,
+  });
+}
+
+function sendStatusFromProvider(provider: string): SmsSendStatus {
+  return provider === "mock" ? "MOCK" : "SUCCESS";
+}
+
+export async function issueSmsCode(
+  input: IssueSmsMeta & {
+    phoneRaw: string;
+    purpose: SmsVerificationPurpose;
+  },
+): Promise<{ code: string; mockCode?: string }> {
   const phone = normalizePhone(input.phoneRaw);
   if (!phone) throw new SmsVerificationError("手机号格式无效");
+
+  const meta: IssueSmsMeta = {
+    source: input.source,
+    channel: input.channel,
+    sendIp: input.sendIp,
+    userAgent: input.userAgent,
+    inviteToken: input.inviteToken,
+  };
 
   const now = new Date();
   const dayStart = startOfUtcDay(now);
 
   if (isTestPrefixPhone(phone)) {
     const code = generateInviteBypassCode();
-    await sendSmsMessage({
+    const sendResult = await sendSmsMessage({
       phone,
       purpose: input.purpose,
       code,
       inviteToken: input.inviteToken ?? undefined,
+    });
+    await logSmsAttempt(meta, {
+      phone,
+      purpose: input.purpose,
+      code,
+      status: sendStatusFromProvider(sendResult.provider),
+      provider: sendResult.provider,
+      templateId: sendResult.templateId,
+      detail: {
+        testPrefix: true,
+        tencentCode: sendResult.tencentCode,
+        tencentMessage: sendResult.tencentMessage,
+      },
     });
     return { code };
   }
@@ -84,14 +156,29 @@ export async function issueSmsCode(input: {
     orderBy: { createdAt: "desc" },
   });
   if (recent) {
-    throw new SmsRateLimitError("发送过于频繁，请 60 秒后再试");
+    const msg = "发送过于频繁，请 60 秒后再试";
+    await logSmsAttempt(meta, {
+      phone,
+      purpose: input.purpose,
+      status: "RATE_LIMITED",
+      errorMessage: msg,
+    });
+    throw new SmsRateLimitError(msg);
   }
 
   const phoneDayCount = await prisma.smsVerification.count({
     where: { phone, createdAt: { gte: dayStart } },
   });
   if (phoneDayCount >= MAX_DAILY_PER_PHONE) {
-    throw new SmsRateLimitError("该手机号今日验证码次数已达上限");
+    const msg = "该手机号今日验证码次数已达上限";
+    await logSmsAttempt(meta, {
+      phone,
+      purpose: input.purpose,
+      status: "RATE_LIMITED",
+      errorMessage: msg,
+      detail: { phoneDayCount },
+    });
+    throw new SmsRateLimitError(msg);
   }
 
   if (input.sendIp) {
@@ -99,10 +186,26 @@ export async function issueSmsCode(input: {
       where: { sendIp: input.sendIp, createdAt: { gte: dayStart } },
     });
     if (ipDayCount >= MAX_DAILY_PER_IP) {
-      throw new SmsRateLimitError("请求过于频繁，请稍后再试");
+      const msg = "请求过于频繁，请稍后再试";
+      await logSmsAttempt(meta, {
+        phone,
+        purpose: input.purpose,
+        status: "RATE_LIMITED",
+        errorMessage: msg,
+        detail: { ipDayCount, sendIp: input.sendIp },
+      });
+      throw new SmsRateLimitError(msg);
     }
     if (consumeRateLimit(`sms:ip:${input.sendIp}`, SMS_BURST_IP)) {
-      throw new SmsRateLimitError("请求过于频繁，请稍后再试");
+      const msg = "请求过于频繁，请稍后再试";
+      await logSmsAttempt(meta, {
+        phone,
+        purpose: input.purpose,
+        status: "RATE_LIMITED",
+        errorMessage: msg,
+        detail: { burstIp: input.sendIp },
+      });
+      throw new SmsRateLimitError(msg);
     }
   }
 
@@ -111,7 +214,7 @@ export async function issueSmsCode(input: {
   const codeHash = await bcrypt.hash(code, 10);
   const expiresAt = new Date(now.getTime() + codeTtlMs(input.purpose));
 
-  await prisma.smsVerification.create({
+  const row = await prisma.smsVerification.create({
     data: {
       phone,
       purpose: input.purpose,
@@ -122,12 +225,42 @@ export async function issueSmsCode(input: {
     },
   });
 
-  await sendSmsMessage({
-    phone,
-    purpose: input.purpose,
-    code,
-    inviteToken: input.inviteToken ?? undefined,
-  });
+  try {
+    const sendResult = await sendSmsMessage({
+      phone,
+      purpose: input.purpose,
+      code,
+      inviteToken: input.inviteToken ?? undefined,
+    });
+    await logSmsAttempt(meta, {
+      phone,
+      purpose: input.purpose,
+      code,
+      status: sendStatusFromProvider(sendResult.provider),
+      provider: sendResult.provider,
+      templateId: sendResult.templateId,
+      verificationId: row.id,
+      detail: {
+        tencentCode: sendResult.tencentCode,
+        tencentMessage: sendResult.tencentMessage,
+        smsProviderEnv: smsProvider(),
+      },
+    });
+  } catch (e) {
+    await prisma.smsVerification.delete({ where: { id: row.id } }).catch(() => {});
+    const parsed = parseSmsSendError(e);
+    await logSmsAttempt(meta, {
+      phone,
+      purpose: input.purpose,
+      code,
+      status: "FAILED",
+      provider: "tencent",
+      errorCode: parsed.errorCode,
+      errorMessage: parsed.errorMessage,
+      verificationId: row.id,
+    });
+    throw e;
+  }
 
   const result: { code: string; mockCode?: string } = { code };
   if (isMock && process.env.NODE_ENV !== "production") {
@@ -229,7 +362,6 @@ export async function verifySmsCode(input: {
   });
 
   if (!row) {
-    // 区分两种情况：消费过 vs 确实没有
     const consumed = await prisma.smsVerification.findFirst({
       where: {
         phone,

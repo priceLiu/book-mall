@@ -169,6 +169,25 @@ describe("applyLibtvRfMeasurementEchoes", () => {
     expect(next.find((n) => n.id === "g1")).toBe(nodes[0]);
   });
 
+  it("ignores RO echo for nodes with explicit width/height (avoid measured fight on drag)", () => {
+    const nodes = [
+      node("img1", {
+        width: 630,
+        height: 354,
+        style: { width: 630, height: 354 },
+        measured: { width: 630, height: 354 },
+      }),
+    ];
+    const changes: NodeChange[] = [
+      {
+        type: "dimensions",
+        id: "img1",
+        dimensions: { width: 354, height: 354 },
+      },
+    ];
+    expect(applyLibtvRfMeasurementEchoes(nodes, changes)).toBe(nodes);
+  });
+
   it("keeps node references when measured already matches", () => {
     const nodes = [
       node("c1", { measured: { width: 320, height: 240 } }),

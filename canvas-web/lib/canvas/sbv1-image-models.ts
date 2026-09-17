@@ -85,9 +85,25 @@ export const SBV1_IMAGE_ASPECT_RATIOS: {
 
 export const SBV1_IMAGE_OUTPUT_COUNTS = [1, 2, 3, 4] as const;
 
+/** Dock / 空态节点外框 · aspectRatio=auto 时的默认比例（与参数面板一致） */
+export const SBV1_IMAGE_DOCK_DEFAULT_ASPECT: Sbv1ImageAspectRatio = "16:9";
+
 export function sbv1ImageAspectRatioLabel(ratio: Sbv1ImageAspectRatio): string {
   const hit = SBV1_IMAGE_ASPECT_RATIOS.find((x) => x.value === ratio);
   return hit?.label ?? ratio;
+}
+
+/** 解析图片节点实际比例（auto → 16:9，并按模型白名单收敛） */
+export function resolveSbv1ImageEffectiveAspectRatio(
+  aspectRatio: Sbv1ImageAspectRatio | string | undefined,
+  modelKey?: string,
+): Sbv1ImageAspectRatio {
+  const raw = String(aspectRatio ?? "auto").trim() as Sbv1ImageAspectRatio;
+  const mk = modelKey?.trim() ?? "";
+  if (raw && raw !== "auto") {
+    return coerceSbv1ImageAspectForModel(mk, raw);
+  }
+  return coerceSbv1ImageAspectForModel(mk, SBV1_IMAGE_DOCK_DEFAULT_ASPECT);
 }
 
 export function sbv1ImageQualityLabel(q: Sbv1ImageQuality): string {
@@ -174,7 +190,7 @@ export function buildSbv1ImageEngineParams(data: {
   resolution?: Sbv1ImageResolution;
   outputCount?: number;
 }): Record<string, unknown> {
-  const aspectRatio = data.aspectRatio ?? "auto";
+  const aspectRatio = data.aspectRatio ?? SBV1_IMAGE_DOCK_DEFAULT_ASPECT;
   const resolution = data.resolution ?? "2K";
   const quality = data.imageQuality ?? "standard";
   const outputCount = Math.min(4, Math.max(1, data.outputCount ?? 1));
@@ -207,7 +223,7 @@ export function resolveSbv1ImageAspectForApi(
 ): string | undefined {
   const raw = aspectRatio ?? "auto";
   if (raw === "auto") {
-    return hasRefs ? undefined : "1:1";
+    return SBV1_IMAGE_DOCK_DEFAULT_ASPECT;
   }
   return raw;
 }

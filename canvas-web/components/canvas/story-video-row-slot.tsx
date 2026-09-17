@@ -1,7 +1,11 @@
 "use client";
 
 import { useRef } from "react";
-import { Download, Play, RefreshCw } from "lucide-react";
+import { Download, Lock, Play, RefreshCw } from "lucide-react";
+import {
+  LibtvMediaGeneratingState,
+  libtvGeneratingVariantForEdition,
+} from "@/components/canvas/libtv-media-generating-state";
 import { LazyViewportVideo } from "@/components/canvas/lazy-viewport-media";
 import { cn } from "@/lib/utils";
 import { STORY_VIDEO_SLOT } from "@/lib/canvas/story-column-layout";
@@ -16,12 +20,9 @@ import {
 import { StoryRowTitleBadge } from "@/components/canvas/story-row-prompt-field";
 import {
   storyEditionCornerRegenBtnClass,
-  storyEditionGeneratingBorderClass,
   storyEditionIconBtnClass,
-  storyEditionSpinClass,
   type StoryEdition,
 } from "@/lib/canvas/story-edition-chrome";
-import { Lock } from "lucide-react";
 import { StoryErrorLine } from "@/components/canvas/story-status-line";
 import { STORY_HINT_GOLD_CLASS } from "@/lib/canvas/story-column-sync";
 import { SaveVideoToLibraryButton } from "@/components/canvas/save-video-to-library-button";
@@ -83,11 +84,7 @@ export function StoryVideoRowSlot({
         onPointerLeave={tip.scheduleHide}
       >
         <div
-          className={cn(
-            STYLE_LIBRARY_MEDIA_FRAME,
-            "overflow-hidden",
-            generating && storyEditionGeneratingBorderClass(edition),
-          )}
+          className={cn(STYLE_LIBRARY_MEDIA_FRAME, "relative overflow-hidden")}
           style={{ height: STORY_VIDEO_SLOT.thumbHeight }}
         >
           <StoryRowTitleBadge
@@ -107,9 +104,11 @@ export function StoryVideoRowSlot({
           )}
 
           {generating ? (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/45">
-              <RefreshCw className={storyEditionSpinClass(edition, "lg")} />
-            </div>
+            <LibtvMediaGeneratingState
+              variant={libtvGeneratingVariantForEdition(edition)}
+              className="z-20"
+              passNodeDrag
+            />
           ) : !hasVideo ? (
             <div className="pointer-events-auto absolute inset-0 z-30 flex flex-col items-center justify-center gap-1.5 px-2">
               {videoBlockReason ? (

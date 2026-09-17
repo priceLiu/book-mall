@@ -1,13 +1,15 @@
 "use client";
 
 import { Download, Mic, Play, RefreshCw } from "lucide-react";
+import {
+  LibtvMediaGeneratingState,
+  libtvGeneratingVariantForEdition,
+} from "@/components/canvas/libtv-media-generating-state";
 import { cn } from "@/lib/utils";
 import { STORY_TTS_SLOT } from "@/lib/canvas/story-column-layout";
 import {
   storyEditionCornerRegenBtnClass,
-  storyEditionGeneratingBorderClass,
   storyEditionIconBtnClass,
-  storyEditionSpinClass,
   type StoryEdition,
 } from "@/lib/canvas/story-edition-chrome";
 import { StoryErrorLine } from "@/components/canvas/story-status-line";
@@ -58,10 +60,7 @@ export function StoryTtsRowSlot({
       </header>
 
       <div
-        className={cn(
-          "relative w-full shrink-0 overflow-hidden rounded-lg border border-white/10 bg-[#141414]",
-          generating && storyEditionGeneratingBorderClass(edition),
-        )}
+        className="relative w-full shrink-0 overflow-hidden rounded-lg border border-white/10 bg-[#141414]"
         style={{ height: STORY_TTS_SLOT.thumbHeight }}
       >
         {hasAudio ? (
@@ -82,9 +81,11 @@ export function StoryTtsRowSlot({
         </div>
 
         {generating ? (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/45">
-            <RefreshCw className={storyEditionSpinClass(edition, "sm")} />
-          </div>
+          <LibtvMediaGeneratingState
+            variant={libtvGeneratingVariantForEdition(edition)}
+            className="z-20"
+            passNodeDrag
+          />
         ) : !hasAudio ? (
           <div className="absolute inset-0 z-10 flex items-center justify-center">
             {blockReason ? (

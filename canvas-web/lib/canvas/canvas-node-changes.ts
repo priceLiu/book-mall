@@ -86,6 +86,8 @@ export function applyLibtvRfMeasurementEchoes<
     const idx = (next ?? nodes).findIndex((n) => n.id === echo.id);
     if (idx < 0) continue;
     const node = (next ?? nodes)[idx]!;
+    // 显式外框节点由 alignRfNodesMeasuredToBox 统一 measured；RO echo 常为 stage 内尺寸，与 width/height 打架 → 拖动死循环
+    if (readNodeBoxSize(node)) continue;
     const m = node.measured;
     if (m?.width === echo.width && m?.height === echo.height) continue;
     if (!next) next = [...nodes];

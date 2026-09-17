@@ -69,6 +69,9 @@ export async function POST(request: Request) {
       purpose: purpose as SmsVerificationPurpose,
       sendIp: clientIp(request),
       inviteToken,
+      source: "book-mall",
+      channel: "direct",
+      userAgent: request.headers.get("user-agent"),
     });
 
     return NextResponse.json({
@@ -84,6 +87,13 @@ export async function POST(request: Request) {
     }
     const dbResp = tryApiDbUnavailableResponse(e);
     if (dbResp) return dbResp;
+    if (e instanceof Error && e.message === "SMS_PACKAGE_EMPTY") {
+      console.error("[sms/send] 腾讯云短信套餐余额不足");
+      return NextResponse.json(
+        { error: "短信服务暂不可用，请稍后再试或联系客服" },
+        { status: 503 },
+      );
+    }
     console.error("[sms/send]", e);
     return NextResponse.json({ error: "发送失败，请稍后重试" }, { status: 500 });
   }

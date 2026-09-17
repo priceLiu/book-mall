@@ -17,6 +17,8 @@ import {
   shouldSkipLibtvMediaAspectPresetForNaturalMedia,
 } from "./libtv-media-aspect-preset";
 import {
+  SBV1_IMAGE_NODE_16_9_HEIGHT,
+  SBV1_IMAGE_NODE_16_9_WIDTH,
   SBV1_IMAGE_NODE_HEIGHT,
   SBV1_IMAGE_NODE_MIN_HEIGHT,
   SBV1_IMAGE_NODE_MIN_WIDTH,
@@ -28,6 +30,8 @@ import {
   SBV1_VIDEO_ENGINE_WIDTH,
 } from "./sbv1-node-chrome";
 import {
+  PRO2_IMAGE_NODE_16_9_HEIGHT,
+  PRO2_IMAGE_NODE_16_9_WIDTH,
   PRO2_IMAGE_NODE_HEIGHT,
   PRO2_IMAGE_NODE_MIN_HEIGHT,
   PRO2_IMAGE_NODE_MIN_WIDTH,
@@ -121,8 +125,17 @@ function factoryLibtvMediaNodeBox(node: Pick<CanvasFlowNode, "type">): LibtvMedi
   if (node.type === "sbv1-video-engine") {
     return { width: SBV1_VIDEO_ENGINE_WIDTH, height: SBV1_VIDEO_ENGINE_HEIGHT };
   }
-  if (node.type === "sbv1-image" || node.type === "story-pro2-image") {
-    return { width: SBV1_IMAGE_NODE_WIDTH, height: SBV1_IMAGE_NODE_HEIGHT };
+  if (node.type === "sbv1-image") {
+    return {
+      width: SBV1_IMAGE_NODE_16_9_WIDTH,
+      height: SBV1_IMAGE_NODE_16_9_HEIGHT,
+    };
+  }
+  if (node.type === "story-pro2-image") {
+    return {
+      width: PRO2_IMAGE_NODE_16_9_WIDTH,
+      height: PRO2_IMAGE_NODE_16_9_HEIGHT,
+    };
   }
   if (node.type === "story-pro2-audio") {
     return { width: PRO2_AUDIO_NODE_WIDTH, height: PRO2_AUDIO_NODE_HEIGHT };

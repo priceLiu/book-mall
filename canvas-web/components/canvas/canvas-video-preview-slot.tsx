@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Download, Play, RefreshCw } from "lucide-react";
+import { Download, Play } from "lucide-react";
+import { LibtvMediaGeneratingState } from "@/components/canvas/libtv-media-generating-state";
 
 import { SaveVideoToLibraryButton } from "@/components/canvas/save-video-to-library-button";
 import { LazyViewportImage, LazyViewportVideo } from "@/components/canvas/lazy-viewport-media";
@@ -44,7 +45,6 @@ export function CanvasVideoPreviewSlot({
     <div
       className={cn(
         "group relative min-h-0 w-full overflow-hidden rounded-lg border border-white/10 bg-[#1a1a1a]",
-        generating && "canvas-story-media-generating border-[#fb923c]/50",
         className,
       )}
     >
@@ -79,14 +79,12 @@ export function CanvasVideoPreviewSlot({
       ) : null}
 
       {generating ? (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/50">
-          <RefreshCw className="size-8 animate-spin text-[#fdba74]" />
-          {generatingLabel?.trim() ? (
-            <span className="text-[11px] font-medium text-[#fdba74]">
-              {generatingLabel}
-            </span>
-          ) : null}
-        </div>
+        <LibtvMediaGeneratingState
+          variant="cyan"
+          label={generatingLabel}
+          className="z-20"
+          passNodeDrag
+        />
       ) : null}
 
       {hasVideo && !generating && saveToLibrary ? (

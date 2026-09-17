@@ -40,6 +40,9 @@ export function resolveSbv1ImageReferenceUrls(input: {
 
 type Sbv1ImageQuality = "low" | "standard" | "high";
 type Sbv1ImageResolution = "1K" | "2K" | "4K";
+/** 与 canvas-web SBV1_IMAGE_DOCK_DEFAULT_ASPECT · Dock 默认展示一致 */
+const SBV1_IMAGE_DOCK_DEFAULT_ASPECT = "16:9";
+
 type Sbv1ImageAspectRatio =
   | "auto"
   | "1:1"
@@ -71,11 +74,8 @@ function buildEngineParams(data: Record<string, unknown>): Record<string, unknow
     output_format: fromEngine.output_format ?? "png",
   };
 
-  if (aspectRatio !== "auto") {
-    params.aspect_ratio = aspectRatio;
-  } else {
-    delete params.aspect_ratio;
-  }
+  params.aspect_ratio =
+    aspectRatio !== "auto" ? aspectRatio : SBV1_IMAGE_DOCK_DEFAULT_ASPECT;
 
   if (quality === "high") {
     params.quality = "high";
@@ -92,14 +92,18 @@ function buildEngineParams(data: Record<string, unknown>): Record<string, unknow
   return params;
 }
 
+/** 写入 Gateway createTask · auto 与 Dock 默认一致（图生图不再省略比例） */
+export function resolveSbv1ImageAspectForGatewayRun(
+  aspectRatio: Sbv1ImageAspectRatio | string,
+): string {
+  const raw = String(aspectRatio ?? "auto").trim();
+  return raw && raw !== "auto" ? raw : SBV1_IMAGE_DOCK_DEFAULT_ASPECT;
+}
+
 function resolveAspectForRun(
   aspectRatio: Sbv1ImageAspectRatio | string,
-  hasRefs: boolean,
 ): Record<string, unknown> {
-  if (aspectRatio === "auto") {
-    return hasRefs ? {} : { aspect_ratio: "1:1" };
-  }
-  return { aspect_ratio: aspectRatio };
+  return { aspect_ratio: resolveSbv1ImageAspectForGatewayRun(aspectRatio) };
 }
 
 export async function runSbv1ImageNode(
@@ -187,7 +191,7 @@ export async function runSbv1ImageNode(
   let params = buildEngineParams(data);
   params = {
     ...params,
-    ...resolveAspectForRun(aspectRatio, hasRefs),
+    ...resolveAspectForRun(aspectRatio),
   };
 
   return runImageEngineNode({

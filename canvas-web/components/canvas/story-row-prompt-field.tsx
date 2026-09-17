@@ -19,10 +19,11 @@ import {
 import { StoryErrorLine } from "@/components/canvas/story-status-line";
 import { RF_FORM_CONTROL, RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import type { StoryEdition } from "@/lib/canvas/story-edition-chrome";
+import { storyEditionActiveRefBorderClass } from "@/lib/canvas/story-edition-chrome";
 import {
-  storyEditionActiveRefBorderClass,
-  storyEditionGeneratingBorderClass,
-} from "@/lib/canvas/story-edition-chrome";
+  LibtvMediaGeneratingState,
+  libtvGeneratingVariantForEdition,
+} from "@/components/canvas/libtv-media-generating-state";
 import { StoryColumnMediaPanel } from "./story-column-media-panel";
 
 const SAVE_DEBOUNCE_MS = 600;
@@ -115,9 +116,15 @@ function StoryUpstreamImageColumn({
           "relative h-full w-full overflow-hidden rounded-md border border-white/10 bg-black/25",
           RF_NODE_SCROLL,
           active && storyEditionActiveRefBorderClass(edition),
-          generating && storyEditionGeneratingBorderClass(edition),
         )}
       >
+        {generating ? (
+          <LibtvMediaGeneratingState
+            variant={libtvGeneratingVariantForEdition(edition)}
+            className="z-30"
+            passNodeDrag
+          />
+        ) : null}
         {current ? (
           <div
             className={cn(

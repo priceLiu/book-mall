@@ -26,6 +26,7 @@ export async function forwardToBook(
     withServerSecret?: boolean;
     bearerToken?: string | null;
     clientRequest?: Request;
+    portalApp?: string;
   },
 ): Promise<
   | { ok: true; status: number; data: Record<string, unknown> }
@@ -50,6 +51,9 @@ export async function forwardToBook(
     headers.Authorization = `Bearer ${init.bearerToken.trim()}`;
   }
   applyPlatformClientIp(headers, init.clientRequest);
+  if (init.portalApp?.trim()) {
+    headers["x-portal-app"] = init.portalApp.trim();
+  }
   let res: Response;
   try {
     res = await fetch(`${origin}${path}`, {

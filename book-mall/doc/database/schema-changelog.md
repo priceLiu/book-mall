@@ -446,6 +446,15 @@
 
 ---
 
+## 2026-09-15 — 短信发送审计日志（SmsSendLog）
+
+- **迁移目录**：`prisma/migrations/20260915100000_sms_send_log/`
+- **新表**：`SmsSendLog`——手机号、用途、明文验证码、来源（`book-mall` / `portal:*`）、状态、腾讯云回执、IP、User-Agent 等
+- **管理后台**：`/admin/sms-logs`
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`
+
+---
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

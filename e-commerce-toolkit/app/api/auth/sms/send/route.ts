@@ -21,6 +21,7 @@ export async function POST(req: Request) {
     method: "POST",
     withServerSecret: true,
     clientRequest: req,
+    portalApp: "ecom",
     body: { phone: body?.phone, purpose },
   });
 

@@ -9,6 +9,7 @@ import {
   SBV1_IMAGE_RESOLUTIONS,
   buildSbv1ImageEngineParams,
   coerceSbv1ImageAspectForModel,
+  resolveSbv1ImageEffectiveAspectRatio,
   sbv1ImageAspectOptionsForModel,
   sbv1ImageAspectRatioLabel,
   sbv1ImageQualityLabel,
@@ -95,7 +96,9 @@ function patchImageSettings(
   const engineParams = next.engineParams ?? data.engine?.params ?? {};
   const aspectRatio = coerceSbv1ImageAspectForModel(
     modelKey,
-    next.aspectRatio ?? data.aspectRatio ?? "auto",
+    next.aspectRatio ??
+      data.aspectRatio ??
+      resolveSbv1ImageEffectiveAspectRatio(data.aspectRatio, modelKey),
   );
   onPatch(
     buildSbv1ImageEngineSettingsPatch({
@@ -128,7 +131,12 @@ export function sbv1ImageParamsTriggerLabel(data: Sbv1ImageNodeData): string {
   const quality =
     sbv1ImageQualityLabel(data.imageQuality ?? "standard") ?? "标准画质";
   const resolution = data.resolution ?? "2K";
-  const aspect = sbv1ImageAspectRatioLabel(data.aspectRatio ?? "auto");
+  const aspect = sbv1ImageAspectRatioLabel(
+    resolveSbv1ImageEffectiveAspectRatio(
+      data.aspectRatio,
+      data.engine?.modelKey,
+    ),
+  );
   const count = data.outputCount ?? 1;
   const format = readOutputFormat(data.engine?.params ?? {});
   return [aspect, resolution, quality, `${count}张`, format].join(" · ");
@@ -210,11 +218,9 @@ export function Sbv1ImageDockParamsPicker({
     () => readOutputFormat(data.engine?.params ?? {}),
     [data.engine?.params],
   );
-  const aspectValue = coerceSbv1ImageAspectForModel(
+  const aspectValue = resolveSbv1ImageEffectiveAspectRatio(
+    data.aspectRatio,
     modelKey,
-    data.aspectRatio && data.aspectRatio !== "auto"
-      ? data.aspectRatio
-      : "16:9",
   );
 
   return (

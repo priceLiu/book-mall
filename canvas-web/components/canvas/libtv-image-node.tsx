@@ -64,7 +64,10 @@ import {
   fitLibtvUploadedImageNaturalSize,
   useLibtvMediaAspectPresetSync,
 } from "@/lib/canvas/libtv-media-aspect-preset-apply";
-import { shouldSkipLibtvImageNodeNaturalSizeAutoFit } from "@/lib/canvas/libtv-media-aspect-preset";
+import {
+  shouldSkipLibtvImageNodeNaturalSizeAutoFit,
+  shouldSkipLibtvMediaAspectPresetForNaturalMedia,
+} from "@/lib/canvas/libtv-media-aspect-preset";
 import { LIBTV_MEDIA_FIT_VERSION } from "@/lib/canvas/libtv-node-chrome";
 import { PRO2_TEXT_NODE_TITLE_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { cn } from "@/lib/utils";
@@ -721,6 +724,12 @@ export function LibtvImageNode({
     return shouldSkipLibtvImageNodeNaturalSizeAutoFit(node, s.nodes);
   });
 
+  /** Dock 比例 preset 生效时禁止 AI 成片 natural 尺寸覆盖外框 */
+  const useAspectPresetBox = useCanvasStore((s) => {
+    const node = s.nodes.find((n) => n.id === id);
+    return node ? !shouldSkipLibtvMediaAspectPresetForNaturalMedia(node) : false;
+  });
+
   useLibtvMediaAspectPresetSync(
     id,
     (d as { aspectRatio?: string }).aspectRatio,
@@ -739,6 +748,7 @@ export function LibtvImageNode({
       !hasImage ||
       isCharacterThreeView ||
       skipNaturalSizeAutoFit ||
+      useAspectPresetBox ||
       Boolean(d.uploading) ||
       (isGenerating && !d.uploading),
   });
@@ -751,6 +761,7 @@ export function LibtvImageNode({
     if (!node || shouldSkipLibtvImageNodeNaturalSizeAutoFit(node, state.nodes)) {
       return;
     }
+    if (!shouldSkipLibtvMediaAspectPresetForNaturalMedia(node)) return;
     if (!isLibtvMediaNodeBoxStale(node, "sbv1-media")) return;
     const url = previewUrl?.trim();
     if (!url) return;
@@ -765,6 +776,9 @@ export function LibtvImageNode({
       const node = state.nodes.find((n) => n.id === id);
       if (!node) return;
       if (shouldSkipLibtvImageNodeNaturalSizeAutoFit(node, state.nodes)) {
+        return;
+      }
+      if (!shouldSkipLibtvMediaAspectPresetForNaturalMedia(node)) {
         return;
       }
       if (
@@ -1049,7 +1063,11 @@ export function LibtvImageNode({
     if (isCharacterThreeView) {
       if (isGenerating) {
         return (
-          <LibtvMediaGeneratingState variant={chrome.generating} cancelNodeId={id} />
+          <LibtvMediaGeneratingState
+            variant={chrome.generating}
+            cancelNodeId={id}
+            passNodeDrag
+          />
         );
       }
       if (hasImage) {
@@ -1102,7 +1120,11 @@ export function LibtvImageNode({
           />
         ) : null;
       return (
-        <LibtvMediaGeneratingState variant={chrome.generating} cancelNodeId={id}>
+        <LibtvMediaGeneratingState
+          variant={chrome.generating}
+          cancelNodeId={id}
+          passNodeDrag
+        >
           {cropPreview}
         </LibtvMediaGeneratingState>
       );

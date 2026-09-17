@@ -4226,6 +4226,39 @@ model SmsVerification {
   @@index([expiresAt])
 }
 
+enum SmsSendStatus {
+  SUCCESS
+  MOCK
+  FAILED
+  RATE_LIMITED
+}
+
+/// 短信发送审计日志（管理员后台可查；含明文验证码）
+model SmsSendLog {
+  id             String                 @id @default(cuid())
+  phone          String
+  purpose        SmsVerificationPurpose
+  code           String?
+  source         String
+  channel        String
+  status         SmsSendStatus
+  provider       String?
+  templateId     String?
+  sendIp         String?
+  userAgent      String?
+  inviteToken    String?
+  errorCode      String?
+  errorMessage   String?
+  detailJson     Json?
+  verificationId String?
+  createdAt      DateTime               @default(now())
+
+  @@index([createdAt])
+  @@index([phone, createdAt])
+  @@index([status, createdAt])
+  @@index([source, createdAt])
+}
+
 /// 资产可见域（跨工具统一）：个人私有 / 团队公共库
 enum AssetVisibility {
   PRIVATE // 仅本人可见（个人空间或团队内成员私有库）

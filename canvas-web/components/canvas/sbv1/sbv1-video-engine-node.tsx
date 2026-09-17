@@ -751,6 +751,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                 variant={isPro2VideoBoardCell ? "violet" : "cyan"}
                 tone={isBackground ? "background" : "active"}
                 cancelNodeId={id}
+                passNodeDrag
               >
                 {hasVideo ? (
                   posterUrl?.trim() ? (

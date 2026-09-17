@@ -56,6 +56,8 @@ Google 登录已下线；邮箱字段保留供历史订单/管理展示，**不�
 
 频控：同号 60s 冷却；同号 10 条/日；同 IP 30 条/日。
 
+**管理后台审计**：`/admin/sms-logs`（`SmsSendLog` 表）记录手机号、时间、来源（`book-mall` / `portal:canvas` 等）、明文验证码、腾讯云回执与失败原因。
+
 ### POST `/api/auth/register`
 
 ```json

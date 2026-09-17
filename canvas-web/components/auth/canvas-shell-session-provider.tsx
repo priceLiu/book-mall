@@ -73,11 +73,26 @@ export function CanvasShellSessionProvider({ children }: { children: ReactNode }
   );
 
   const refreshFull = useCallback(async () => {
-    const next = await fetchCanvasToolsSessionFull();
-    if (next.active) setCachedToolsSession(next);
-    setPayload(next);
-    setLoading(false);
-    return next;
+    try {
+      const next = await fetchCanvasToolsSessionFull();
+      if (next.active) setCachedToolsSession(next);
+      setPayload(next);
+      setLoading(false);
+      return next;
+    } catch {
+      const cached = getCachedToolsSession();
+      if (cached?.active) setPayload(cached);
+      setLoading(false);
+      return (
+        cached ?? {
+          active: false,
+          hasCookie: false,
+          originConfigured: false,
+          introspectStatus: null,
+          introspect: null,
+        }
+      );
+    }
   }, []);
 
   const refreshLite = useCallback(async () => {
@@ -107,13 +122,14 @@ export function CanvasShellSessionProvider({ children }: { children: ReactNode }
   }, [bootCached?.active, refreshFull]);
 
   useEffect(() => {
+    /** POST 续签成功后轻量拉取即可；避免拖动/心跳时 full introspect 失败弹红屏 */
     const onRefresh = () => {
-      void refreshFull();
+      void refreshLite().catch(() => {});
     };
     window.addEventListener("canvas:tools-session-refreshed", onRefresh);
     return () =>
       window.removeEventListener("canvas:tools-session-refreshed", onRefresh);
-  }, [refreshFull]);
+  }, [refreshLite]);
 
   const value = useMemo(
     () => ({

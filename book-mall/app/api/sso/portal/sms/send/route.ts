@@ -12,6 +12,7 @@ import { withApiDbGuard } from "@/lib/http/api-db-error";
 import { prisma } from "@/lib/prisma";
 import { toolsExchangeAuthorized } from "@/lib/sso-tools-env";
 import { portalClientIpFromRequest } from "@/lib/site-traffic/client-ip";
+import { portalSmsSourceFromRequest } from "@/lib/sms/sms-send-log";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,9 @@ export const POST = withApiDbGuard(async (request) => {
       phoneRaw: phone,
       purpose: purpose as SmsVerificationPurpose,
       sendIp: portalClientIpFromRequest(request),
+      source: portalSmsSourceFromRequest(request),
+      channel: "portal-bff",
+      userAgent: request.headers.get("user-agent"),
     });
 
     return NextResponse.json({
@@ -63,6 +67,13 @@ export const POST = withApiDbGuard(async (request) => {
     }
     if (e instanceof SmsVerificationError) {
       return NextResponse.json({ error: e.message }, { status: 400 });
+    }
+    if (e instanceof Error && e.message === "SMS_PACKAGE_EMPTY") {
+      console.error("[portal/sms/send] 腾讯云短信套餐余额不足");
+      return NextResponse.json(
+        { error: "短信服务暂不可用，请稍后再试或联系客服" },
+        { status: 503 },
+      );
     }
     console.error("[portal/sms/send]", e);
     return NextResponse.json({ error: "发送失败，请稍后重试" }, { status: 500 });
