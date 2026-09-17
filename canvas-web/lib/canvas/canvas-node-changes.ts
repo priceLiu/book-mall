@@ -64,7 +64,13 @@ export function isCanvasSelectionOnlyChange(changes: NodeChange[]): boolean {
  * 让后续所有对象克隆都能保住框选所需的内部字段。
  */
 export function applyLibtvRfMeasurementEchoes<
-  N extends { id: string; measured?: { width?: number; height?: number } },
+  N extends {
+    id: string;
+    width?: number;
+    height?: number;
+    style?: unknown;
+    measured?: { width?: number; height?: number };
+  },
 >(nodes: N[], changes: NodeChange[]): N[] {
   const echoes: Array<{ id: string; width: number; height: number }> = [];
   for (const c of changes) {
