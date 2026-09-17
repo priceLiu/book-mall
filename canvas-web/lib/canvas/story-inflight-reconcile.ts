@@ -706,7 +706,12 @@ export function reconcileStaleInflightRuntimes(
     }
 
     const pick = pickPreferredCanvasTask(nodeTasks, { localRuntime: rt });
-    if (pick && (pick.status === "SUCCEEDED" || pick.status === "FAILED")) {
+    if (
+      pick &&
+      (pick.status === "SUCCEEDED" ||
+        pick.status === "FAILED" ||
+        pick.status === "CANCELLED")
+    ) {
       if (isStoryWorkspaceNodeType(node.type ?? "")) {
         storyApplyTaskResult(
           node,

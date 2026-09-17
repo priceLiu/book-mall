@@ -268,7 +268,7 @@ export function libtvMediaProfileBoxLimits(profile: LibtvMediaAspectPresetProfil
   }
   if (profile === "pro2-video-cell") {
     return {
-      headerHeight: LIBTV_VIDEO_NODE_HEADER_HEIGHT,
+      headerHeight: PRO2_EXTERNAL_MEDIA_TITLE_CHROME_HEIGHT,
       minWidth: PRO2_FRAME_CELL_MIN_WIDTH,
       minHeight: PRO2_FRAME_CELL_MIN_HEIGHT,
     };

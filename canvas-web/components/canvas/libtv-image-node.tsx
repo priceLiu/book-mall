@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { usePointerImagePasteHost } from "@/lib/canvas/image-upload-handlers";
 import type { NodeProps } from "@xyflow/react";
@@ -27,17 +27,10 @@ import {
   LIBTV_NODE_SIDE_PLUS_SIZE,
   libtvNodeBorderStyle,
 } from "@/lib/canvas/libtv-node-chrome";
-import {
-  isSameSbv1MediaDataPatch,
-  sbv1ImagePatchFromTask,
-} from "@/lib/canvas/sbv1-image-task-apply";
-import {
-  pickActiveServerInflightTask,
-  shouldApplyCanvasTaskRuntimePatch,
-  shouldSkipStoryRowTaskApply,
-} from "@/lib/canvas/task-pick";
+import { pickActiveServerInflightTask } from "@/lib/canvas/task-pick";
 import { pickTaskImagePreviewUrl } from "@/lib/canvas/task-media-url";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
+import { useLibtvBoundTerminalTaskSync } from "@/lib/canvas/use-libtv-bound-terminal-task-sync";
 import type { CanvasEnginePick, CanvasNodeRuntime } from "@/lib/canvas/types";
 import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import type { Pro2ImageMediaRole } from "@/lib/canvas/story-pro2-workspace-types";
@@ -359,47 +352,18 @@ export function LibtvImageNode({
   const isInpaintGenerating = Boolean(
     d.libtvInpaintGenerating || d.libtvMagicEditGenerating,
   );
+  const boundTerminalTask = useLibtvBoundTerminalTaskSync({
+    nodeId: id,
+    taskHistory,
+    boundTaskId: d.runtime?.taskId,
+    mediaKind: "image",
+  });
+
   const isGenerating = isDirectorDeskShotLocalPreview
     ? false
-    : Boolean(inflightTask) || isLibtvMediaGenerating(d) || isInpaintGenerating;
-
-  useLayoutEffect(() => {
-    if (inflightTask) return;
-    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
-    const localRt = (node?.data as LibtvImageNodeData | undefined)?.runtime;
-    const boundId = localRt?.taskId?.trim();
-    if (!boundId) return;
-
-    const localSt = localRt?.status;
-    if (localSt !== "pending" && localSt !== "running") return;
-
-    const terminal = taskHistory.find(
-      (t) =>
-        t.id === boundId &&
-        (t.status === "SUCCEEDED" ||
-          t.status === "FAILED" ||
-          t.status === "CANCELLED"),
-    );
-    if (!terminal) return;
-    if (shouldSkipStoryRowTaskApply(localRt, terminal, id)) return;
-
-    const nodePatch = sbv1ImagePatchFromTask(
-      (node?.data ?? {}) as unknown as Sbv1ImageNodeData,
-      terminal,
-    );
-    if (!nodePatch) return;
-    const rtPatch = nodePatch.runtime as Partial<CanvasNodeRuntime> | undefined;
-    if (!rtPatch) return;
-    if (!shouldApplyCanvasTaskRuntimePatch(localRt, terminal, rtPatch, id)) {
-      return;
-    }
-    if (
-      isSameSbv1MediaDataPatch(node?.data as Record<string, unknown>, nodePatch)
-    ) {
-      return;
-    }
-    updateNodeData(id, nodePatch);
-  }, [taskHistory, id, updateNodeData, inflightTask]);
+    : (!boundTerminalTask && Boolean(inflightTask)) ||
+      (isLibtvMediaGenerating(d) && !boundTerminalTask) ||
+      isInpaintGenerating;
   const hasRuntimeError = d.runtime?.status === "error";
   const hasUploadError = Boolean(d.uploadError?.trim()) && !isGenerating;
   const hasError = hasRuntimeError || hasUploadError;

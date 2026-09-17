@@ -5,17 +5,15 @@ import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position, useNodes, useReactFlow } from "@xyflow/react";
 import {
+  GripVertical,
   ImageIcon,
-  Maximize2,
   Mic,
   Music,
   Play,
-  RefreshCw,
   Video,
 } from "lucide-react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { CANVAS_SEMANTIC_STATUS_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import {
   pickActiveServerInflightTask,
   shouldApplyCanvasTaskRuntimePatch,
@@ -54,6 +52,7 @@ import {
   shouldRestoreSbv1VideoRuntimeToDone,
 } from "@/lib/canvas/sbv1-image-task-apply";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
+import { useLibtvBoundTerminalTaskSync } from "@/lib/canvas/use-libtv-bound-terminal-task-sync";
 import { useVideoGeneratingWait } from "@/lib/canvas/use-video-generating-wait";
 import { cn } from "@/lib/utils";
 import { useLibtvIsNodeSoleSelected } from "@/lib/canvas/libtv-floating-dock-selection";
@@ -72,6 +71,8 @@ import { libtvVideoEngineNodeIsLinked } from "@/lib/canvas/pro2-thin-node-displa
 import { LibtvVideoNodeToolbar } from "../libtv-video-node-toolbar";
 import { LibtvNodeToolbarPortal } from "../libtv-node-toolbar-portal";
 import { LibtvEditableNodeTitle } from "../libtv-editable-node-title";
+import { PRO2_TEXT_NODE_TITLE_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
+import { canvasStoryEdition } from "@/lib/canvas/story-edition-isolation";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { Pro2NodeSidePlus } from "../pro2/pro2-node-side-plus";
 import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
@@ -278,6 +279,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   );
 
   const nodeEdition = isPro2VideoBoardCell ? "pro2" : "sbv1";
+  const useExternalMediaTitle =
+    isPro2VideoBoardCell || canvasStoryEdition(nodes) === "pro2";
   const defaultVideoTitle = isPro2VideoBoardCell
     ? "分镜视频"
     : SBV1_VIDEO_COMPOSE_LABEL;
@@ -301,50 +304,25 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     ],
   );
 
+  const boundTerminalTask = useLibtvBoundTerminalTaskSync({
+    nodeId: id,
+    taskHistory,
+    boundTaskId: d.runtime?.taskId ?? rowApplyTask?.id,
+    mediaKind: "video",
+  });
+
   const isGenerating =
-    Boolean(inflightTask) || isLibtvMediaGenerating(d);
+    (!boundTerminalTask && Boolean(inflightTask)) ||
+    (isLibtvMediaGenerating(d) && !boundTerminalTask);
 
   const waitSince =
     inflightTask?.submittedAt ?? inflightTask?.createdAt ?? null;
   const isPending = d.runtime?.status === "pending";
-  const { waitHint, isBackground } = useVideoGeneratingWait(
+  const { isBackground } = useVideoGeneratingWait(
     isGenerating,
     waitSince,
     isPending,
   );
-
-  useEffect(() => {
-    if (inflightTask) return;
-    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
-    const localRt = (node?.data as Sbv1VideoEngineNodeData | undefined)?.runtime;
-    const boundId = localRt?.taskId?.trim();
-    if (!boundId) return;
-
-    const localSt = localRt?.status;
-    if (localSt !== "pending" && localSt !== "running") return;
-
-    const terminal = taskHistory.find(
-      (t) =>
-        t.id === boundId &&
-        (t.status === "SUCCEEDED" ||
-          t.status === "FAILED" ||
-          t.status === "CANCELLED"),
-    );
-    if (!terminal) return;
-    if (shouldSkipStoryRowTaskApply(localRt, terminal, id)) return;
-
-    const nodePatch = sbv1VideoPatchFromTask(terminal);
-    if (!nodePatch) return;
-    const rtPatch = nodePatch.runtime as Partial<CanvasNodeRuntime> | undefined;
-    if (!rtPatch) return;
-    if (!shouldApplyCanvasTaskRuntimePatch(localRt, terminal, rtPatch, id)) {
-      return;
-    }
-    if (isSameSbv1MediaDataPatch(node?.data as Record<string, unknown>, nodePatch)) {
-      return;
-    }
-    updateNodeData(id, nodePatch);
-  }, [taskHistory, id, updateNodeData, inflightTask]);
 
   /** 分镜视频组格 · 任务在 video 列上，从列级任务写回子节点 runtime */
   useEffect(() => {
@@ -701,6 +679,21 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           </LibtvNodeToolbarPortal>
         ) : null}
 
+        {useExternalMediaTitle ? (
+          <div className={cn(PRO2_TEXT_NODE_TITLE_CLASS, "relative mb-1.5 shrink-0")}>
+            <GripVertical className="size-3.5 shrink-0 text-white/30" />
+            <Video className="size-3.5 shrink-0 text-violet-300" />
+            <LibtvEditableNodeTitle
+              nodeId={id}
+              defaultLabel={defaultVideoTitle}
+              textClassName="text-[11px] text-white"
+            />
+            {crewNodeShowsParticipatingBadge(id, nodes, graphMeta) ? (
+              <Pro2CrewTaskStatusBadge nodeId={id} />
+            ) : null}
+          </div>
+        ) : null}
+
         <div
           className={cn(
             SBV1_CARD_SHELL_CLASS,
@@ -713,37 +706,23 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
             edition: nodeEdition,
           })}
         >
+          {!useExternalMediaTitle ? (
             <div className="relative flex shrink-0 cursor-grab items-center justify-between gap-2 border-b border-white/10 px-3 py-2 active:cursor-grabbing">
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <Video className="size-3.5 shrink-0 text-white/70" />
-              <LibtvEditableNodeTitle
-                nodeId={id}
-                defaultLabel={defaultVideoTitle}
-                textClassName="text-xs font-medium text-white"
-              />
-            </div>
-            {crewNodeShowsParticipatingBadge(id, nodes, graphMeta) ? (
-              <Pro2CrewTaskStatusBadge nodeId={id} />
-            ) : null}
-            <div className="relative z-[1] flex shrink-0 items-center gap-1.5">
-              {hasVideo ? (
-                <button
-                  type="button"
-                  title="全屏预览"
-                  className="nodrag flex size-7 items-center justify-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white/80"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPreviewOpen(true);
-                  }}
-                >
-                  <Maximize2 className="size-3.5" />
-                </button>
-              ) : null}
-              {isGenerating ? (
-                <RefreshCw className={cn("size-3.5 animate-spin", CANVAS_SEMANTIC_STATUS_CLASS)} />
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <span className="nodrag flex shrink-0 items-center rounded-md">
+                  <Video className="size-3.5 shrink-0 text-white/70" />
+                </span>
+                <LibtvEditableNodeTitle
+                  nodeId={id}
+                  defaultLabel={defaultVideoTitle}
+                  textClassName="text-xs font-medium text-white"
+                />
+              </div>
+              {crewNodeShowsParticipatingBadge(id, nodes, graphMeta) ? (
+                <Pro2CrewTaskStatusBadge nodeId={id} />
               ) : null}
             </div>
-          </div>
+          ) : null}
 
           <div className={cn(SBV1_MEDIA_STAGE_CLASS, "relative")}>
             {isGenerating ? (
@@ -863,15 +842,6 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
             visible={errorBanner.visible}
             onDismiss={errorBanner.dismiss}
           />
-          {isGenerating && waitHint ? (
-            <p
-              className={`border-t border-white/10 px-3 py-1.5 font-mono text-[10px] leading-snug ${
-                isBackground ? "text-orange-300/80" : "text-white/45"
-              }`}
-            >
-              {waitHint}
-            </p>
-          ) : null}
         </div>
       </div>
       {previewOpen && videoUrl ? (

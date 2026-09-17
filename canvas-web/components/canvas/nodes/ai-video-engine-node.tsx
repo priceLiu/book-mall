@@ -10,7 +10,6 @@ import type { AiVideoEngineNodeData } from "@/lib/canvas/types";
 import {
   REF_VIDEO_MODEL_KEYS,
   REF_VIDEO_NODE_SIZE,
-  refVideoProviderKind,
 } from "@/lib/canvas/ref-video-models";
 import { collectRefImageUrlsFromGridNode } from "@/lib/canvas/ref-video-edges";
 import { directPredecessors } from "@/lib/canvas/topo";
@@ -18,7 +17,6 @@ import { pickDefaultRefVideoEngine } from "@/lib/canvas/system-providers";
 import { runtimePatchFromCanvasTask, isServerInflightTaskStatus } from "@/lib/canvas/task-pick";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
-import { useVideoGeneratingWait } from "@/lib/canvas/use-video-generating-wait";
 import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
 import {
   refVideoDurationFromParams,
@@ -104,18 +102,6 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
     }
     return history.find((t) => isServerInflightTaskStatus(t.status));
   }, [history, d.runtime?.taskId]);
-
-  const waitSince =
-    inflightTask?.submittedAt ?? inflightTask?.createdAt ?? null;
-  const isPending = d.runtime?.status === "pending";
-  const { waitHint, isBackground } = useVideoGeneratingWait(
-    showGenerating,
-    waitSince,
-    isPending,
-  );
-  const isBailian =
-    refVideoProviderKind(d.modelKey ?? "") === "BAILIAN_R2V";
-  const bailianTaskId = isBailian ? inflightTask?.kieTaskId : null;
 
   useEffect(() => {
     if (!isGenerating) setRunPending(false);
@@ -284,16 +270,6 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
             }
           />
 
-          {showGenerating && waitHint ? (
-            <p
-              className={`shrink-0 truncate px-0.5 font-mono text-[10px] leading-snug ${
-                isBackground ? "text-orange-300/80" : "text-white/45"
-              }`}
-            >
-              {waitHint}
-              {bailianTaskId ? ` / 百炼 ${bailianTaskId}` : null}
-            </p>
-          ) : null}
         </div>
 
         <div className="shrink-0 pt-2">

@@ -45,6 +45,42 @@ export function isServerInflightTaskStatus(status: string): boolean {
   );
 }
 
+export function isCanvasTerminalTaskStatus(status: string): boolean {
+  return (
+    status === "SUCCEEDED" ||
+    status === "FAILED" ||
+    status === "CANCELLED"
+  );
+}
+
+/** 本地已绑定 taskId 且服务端该任务已进入终态 */
+export function findBoundTerminalCanvasTask(
+  tasks: CanvasTaskRecord[],
+  boundTaskId?: string | null,
+): CanvasTaskRecord | undefined {
+  const boundId = boundTaskId?.trim();
+  if (!boundId) return undefined;
+  const bound = tasks.find((t) => t.id === boundId);
+  if (!bound || !isCanvasTerminalTaskStatus(bound.status)) return undefined;
+  return bound;
+}
+
+/** 本地 runtime 仍 inflight，但绑定任务已在任务列表终态 → 须写回节点 */
+export function shouldSyncBoundTerminalCanvasTask(
+  localRuntime: CanvasNodeRuntime | undefined,
+  boundTerminal: CanvasTaskRecord | undefined,
+): boolean {
+  if (!boundTerminal) return false;
+  const boundId = localRuntime?.taskId?.trim();
+  if (!boundId || boundId !== boundTerminal.id) return false;
+  const localSt = localRuntime?.status;
+  return (
+    localSt === "pending" ||
+    localSt === "running" ||
+    localSt === "queued"
+  );
+}
+
 /** 超过合理等待上限的进行中任务 · 勿再恢复 UI「生成中」（旧项目孤儿任务） */
 export const CANVAS_ABANDONED_INFLIGHT_MS = 6 * 60 * 60 * 1000;
 

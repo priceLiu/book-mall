@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import { restoreServerInflightNodeRuntimes } from "@/lib/canvas/restore-server-inflight-node-runtimes";
 import {
+  findBoundTerminalCanvasTask,
   hubHasServerInflightLlmTask,
   hubNodeLocalRuntimeForTaskPick,
   pickPreferredCanvasTask,
@@ -10,6 +11,7 @@ import {
   preferredTasksByNode,
   pickStoryRowApplyTask,
   shouldSkipStoryRowTaskApply,
+  shouldSyncBoundTerminalCanvasTask,
 } from "@/lib/canvas/task-pick";
 import { shouldRestoreSbv1VideoRuntimeToDone } from "@/lib/canvas/sbv1-image-task-apply";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
@@ -457,5 +459,38 @@ describe("shouldRestoreSbv1VideoRuntimeToDone", () => {
         boundTaskSucceeded: true,
       }),
     ).toBe(true);
+  });
+});
+
+describe("bound terminal task sync", () => {
+  it("finds bound FAILED task in history", () => {
+    const failed = task({
+      id: "fail-1",
+      status: "FAILED",
+      failCode: "INTERNAL",
+      failMessage: "Internal Error",
+    });
+    expect(findBoundTerminalCanvasTask([failed], "fail-1")?.id).toBe("fail-1");
+  });
+
+  it("should sync when local runtime still running but bound task failed", () => {
+    const failed = task({
+      id: "fail-1",
+      status: "FAILED",
+      failCode: "INTERNAL",
+      failMessage: "Internal Error",
+    });
+    expect(
+      shouldSyncBoundTerminalCanvasTask(
+        { status: "running", taskId: "fail-1" },
+        failed,
+      ),
+    ).toBe(true);
+    expect(
+      shouldSyncBoundTerminalCanvasTask(
+        { status: "error", taskId: "fail-1" },
+        failed,
+      ),
+    ).toBe(false);
   });
 });
