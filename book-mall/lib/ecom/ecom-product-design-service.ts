@@ -22,6 +22,8 @@ import {
   type ProductDesignReference,
   type ProductDesignSettings,
 } from "@/lib/ecom/ecom-product-design-types";
+import { normalizeProductDesignReferenceForStorage } from "@/lib/ecom/ecom-product-design-ref-upload-normalize";
+import { recoverProductDesignImagesFromAssets } from "@/lib/ecom/ecom-product-design-recover-slot-images";
 import { prisma } from "@/lib/prisma";
 
 function productDesignProjects() {
@@ -391,7 +393,23 @@ export async function getProductDesignProject(
     where: { id: projectId, userId },
   });
   if (!row) return null;
-  const normalized = await persistNormalizedSettingsIfNeeded(row);
+  let normalized = await persistNormalizedSettingsIfNeeded(row);
+  const design = parseProductDesign(normalized.design);
+  if (design) {
+    const recovered = await recoverProductDesignImagesFromAssets(
+      userId,
+      projectId,
+      design,
+    );
+    if (recovered) {
+      normalized = await productDesignProjects().update({
+        where: { id: projectId },
+        data: {
+          design: sanitizeAdCopyDeep(recovered).value as Prisma.InputJsonValue,
+        },
+      });
+    }
+  }
   return rowToDto(normalized);
 }
 
@@ -523,11 +541,13 @@ export async function addProductDesignReferenceUpload(
   const project = await getProductDesignProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
 
+  const stored = await normalizeProductDesignReferenceForStorage(opts.buf);
+
   const ossUrl = await uploadCanvasUserBuffer({
     userId,
-    ext: "png",
-    buf: opts.buf,
-    contentType: "image/png",
+    ext: stored.ext,
+    buf: stored.buf,
+    contentType: stored.contentType,
   });
 
   const ref: ProductDesignReference = {

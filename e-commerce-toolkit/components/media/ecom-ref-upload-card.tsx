@@ -60,6 +60,7 @@ type Props = {
   contentMinHeightClass?: string;
   /** 为 true 时不于内容区展示 emptyHint（提示由父级放在卡片外） */
   hideEmptyHint?: boolean;
+  maxImageBytes?: number;
 };
 
 const REF_THUMB_SIZE = 56;
@@ -156,12 +157,14 @@ export function EcomRefUploadCard({
   hideTitle = false,
   contentMinHeightClass = "min-h-[56px]",
   hideEmptyHint = false,
+  maxImageBytes,
 }: Props) {
   const { dragOver, focusZone, dropZoneProps } = useImageDropPaste({
     enabled: !busy && !generating,
     multiple,
     allowVideo,
     listenPaste,
+    maxImageBytes,
     onFiles: onUploadFiles,
   });
 

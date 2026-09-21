@@ -17,6 +17,7 @@ import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
 import { downloadMediaUrl, mediaDownloadFilename } from "@/lib/ecom-media-download";
 import {
   deleteGenerationRecord,
+  ECOM_GENERATION_RECORD_LIBRARY_PATH,
   generationRecordSourceLabel,
   listGenerationRecords,
   type EcomGenerationRecordItem,
@@ -38,25 +39,64 @@ function formatVersionLabel(item: EcomGenerationRecordItem): string {
   return `${source}${panel}${model ? ` · ${model}` : ""} · ${date}`;
 }
 
-export function EcomGenerationRecordPageHeader() {
+export type EcomGenerationRecordFilter = {
+  projectId?: string;
+  sourceModule?: string;
+  returnTo?: string;
+  projectTitle?: string;
+};
+
+function generationRecordFilterSourceLabel(sourceModule?: string): string | null {
+  const mod = sourceModule?.trim();
+  if (!mod) return null;
+  return generationRecordSourceLabel({ sourceModule: mod });
+}
+
+export function EcomGenerationRecordPageHeader({ filter }: { filter?: EcomGenerationRecordFilter }) {
+  const projectId = filter?.projectId?.trim();
+  const resolvedBack = filter?.returnTo?.trim() || "/library";
+  const sourceLabel = generationRecordFilterSourceLabel(filter?.sourceModule);
+  const projectTitle = filter?.projectTitle?.trim();
+
   return (
-    <header className="flex shrink-0 items-center gap-3 border-b border-[#e8e8ed] bg-white px-4 py-4 sm:px-6">
-      <Link
-        href="/library"
-        className="inline-flex size-9 items-center justify-center rounded-lg text-[#6e6e73] hover:bg-[#f5f5f7]"
-        aria-label="返回我的资产"
-      >
-        <ArrowLeft className="size-5" />
-      </Link>
-      <div>
-        <h1 className="text-lg font-semibold text-[#1d1d1f]">生成记录</h1>
-        <p className="text-xs text-[#6e6e73]">成功生成的图片与视频，按版本归档；未被工作流引用的可删除</p>
+    <header className="flex shrink-0 flex-col gap-2 border-b border-[#e8e8ed] bg-white px-4 py-4 sm:px-6">
+      <div className="flex items-center gap-3">
+        <Link
+          href={resolvedBack}
+          className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-[#6e6e73] hover:bg-[#f5f5f7]"
+          aria-label={filter?.returnTo ? "返回工作台" : "返回我的资产"}
+        >
+          <ArrowLeft className="size-5" />
+        </Link>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold text-[#1d1d1f]">生成记录</h1>
+          <p className="text-xs text-[#6e6e73]">
+            成功生成的图片与视频，按版本归档；未被工作流引用的可删除
+          </p>
+        </div>
+        {projectId ? (
+          <Link
+            href={ECOM_GENERATION_RECORD_LIBRARY_PATH}
+            className="shrink-0 text-xs font-medium text-[#0066cc] hover:underline"
+          >
+            查看全部
+          </Link>
+        ) : null}
       </div>
+      {projectId ? (
+        <p className="rounded-lg bg-[#f5f5f7] px-3 py-2 text-xs text-[#1d1d1f]">
+          当前筛选：
+          {sourceLabel ? `${sourceLabel} · ` : ""}
+          {projectTitle ? `「${projectTitle}」` : "本项目"}
+          <span className="text-[#86868b]">（仅显示本项目出图）</span>
+        </p>
+      ) : null}
     </header>
   );
 }
 
-export function EcomGenerationRecordPanel() {
+export function EcomGenerationRecordPanel({ filter }: { filter?: EcomGenerationRecordFilter }) {
+  const projectId = filter?.projectId?.trim();
   const { confirm, doubleConfirm, alert } = useDialogs();
   const [items, setItems] = useState<EcomGenerationRecordItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,13 +107,13 @@ export function EcomGenerationRecordPanel() {
     setLoading(true);
     setError(null);
     try {
-      setItems(await listGenerationRecords());
+      setItems(await listGenerationRecords(projectId ? { projectId } : undefined));
     } catch (e) {
       setError(e instanceof Error ? e.message : "加载失败");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
     void load();
@@ -141,9 +181,13 @@ export function EcomGenerationRecordPanel() {
         ) : items.length < 1 ? (
           <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-[#e8e8ed] bg-[#fafafa] px-6 py-16 text-center">
             <History className="size-10 text-[#86868b]" />
-            <p className="text-sm text-[#6e6e73]">暂无生成记录</p>
+            <p className="text-sm text-[#6e6e73]">
+              {projectId ? "本项目暂无生成记录" : "暂无生成记录"}
+            </p>
             <p className="max-w-md text-xs text-[#86868b]">
-              各模块生成成功后会自动写入此处；文生试衣成片同时写入试衣库。
+              {projectId
+                ? "在本项目工作台出图成功后，会写入此处。"
+                : "各模块生成成功后会自动写入此处；文生试衣成片同时写入试衣库。"}
             </p>
           </div>
         ) : (

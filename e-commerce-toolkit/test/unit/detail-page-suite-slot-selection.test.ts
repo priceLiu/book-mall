@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   composeSuiteSlotKey,
+  isSuiteSlotImageBatchSelectable,
   listSelectedSuiteSlotKeys,
   suiteModuleImageSelectionState,
+  suiteModuleSelectableSlots,
   toggleSuiteModuleImageSelection,
   toggleSuiteSlotImageSelection,
 } from "@/lib/detail-page-suite-slot-selection";
@@ -75,5 +77,26 @@ describe("detail-page-suite-slot-selection", () => {
     const next = toggleSuiteSlotImageSelection(mod, "b");
     const slotB = next.slots.find((s) => s.item_key === "b");
     expect(slotB?.selectedForImage).toBe(true);
+  });
+
+  it("keeps generated slots in batch image selection", () => {
+    const mod = baseProject().suite.modules[0]!;
+    const withImage = {
+      ...mod,
+      slots: mod.slots.map((s) =>
+        s.item_key === "a"
+          ? {
+              ...s,
+              imageUrl: "https://example.com/a.png",
+              imageHistory: [{ url: "https://example.com/a.png", createdAt: "2026-01-01T00:00:00.000Z" }],
+            }
+          : s,
+      ),
+    };
+    expect(suiteModuleSelectableSlots(withImage)).toHaveLength(2);
+    expect(isSuiteSlotImageBatchSelectable(withImage.slots[0]!)).toBe(true);
+    expect(listSelectedSuiteSlotKeys({ ...baseProject(), suite: { modules: [withImage] } })).toEqual([
+      "mod1::a",
+    ]);
   });
 });

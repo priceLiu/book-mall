@@ -7,9 +7,11 @@ export function detailPageSuiteLabelMatches(a: string, b: string): boolean {
   const sb = b.trim();
   if (!sa || !sb) return false;
   if (sa === sb) return true;
-  const n = Math.min(4, sa.length, sb.length);
-  if (n > 0 && sa.slice(0, n) === sb.slice(0, n)) return true;
-  return sa.includes(sb) || sb.includes(sa);
+  const shorter = sa.length <= sb.length ? sa : sb;
+  const longer = sa.length > sb.length ? sa : sb;
+  // 仅当较短串是较长串的前缀时才视为同一子维度（如「首屏」↔「首屏模特…」）
+  // 禁止「前 N 字相同」或双向 includes，避免「底图1 / 底图2」等同前缀条目被合并
+  return shorter.length >= 2 && longer.startsWith(shorter);
 }
 
 function slotKeyForIndex(index: number, label: string): string {
@@ -30,18 +32,37 @@ export function resolveModuleDisplaySlots(
   const selected = mod.selected_item_list.slice(0, Math.max(mod.generate_count, 0));
   if (selected.length === 0) return mod.slots;
 
+  const consumedKeys = new Set<string>();
+
   return selected.map((label, index) => {
-    const byLabel = mod.slots.find((s) => detailPageSuiteLabelMatches(s.item_label, label));
-    if (byLabel) return byLabel;
+    const byExactLabel = mod.slots.find(
+      (s) => !consumedKeys.has(s.item_key) && s.item_label.trim() === label.trim(),
+    );
+    if (byExactLabel) {
+      consumedKeys.add(byExactLabel.item_key);
+      return byExactLabel;
+    }
+
+    const byLabel = mod.slots.find(
+      (s) => !consumedKeys.has(s.item_key) && detailPageSuiteLabelMatches(s.item_label, label),
+    );
+    if (byLabel) {
+      consumedKeys.add(byLabel.item_key);
+      return byLabel;
+    }
 
     const byIndex = mod.slots[index];
-    if (byIndex && !selected.includes(byIndex.item_label)) {
+    if (byIndex && !consumedKeys.has(byIndex.item_key) && !selected.includes(byIndex.item_label)) {
+      consumedKeys.add(byIndex.item_key);
       return {
         ...byIndex,
         item_label: label,
       };
     }
-    if (byIndex?.item_label === label) return byIndex;
+    if (byIndex && !consumedKeys.has(byIndex.item_key) && byIndex.item_label === label) {
+      consumedKeys.add(byIndex.item_key);
+      return byIndex;
+    }
 
     return {
       item_key: slotKeyForIndex(index, label),
@@ -63,6 +84,21 @@ export function syncModuleSlotsFromSelection(
   };
 }
 
+function findPromptSnapshotForSlot(
+  snapshots: Record<string, DetailPageSuitePromptSnapshot>,
+  moduleId: string,
+  slot: DetailPageSuiteSlot,
+): DetailPageSuitePromptSnapshot | undefined {
+  const byKey = snapshots[`${moduleId}::${slot.item_key}`];
+  if (byKey?.prompt?.trim()) return byKey;
+  for (const [key, snap] of Object.entries(snapshots)) {
+    if (!key.startsWith(`${moduleId}::`)) continue;
+    if (!snap.prompt?.trim()) continue;
+    if (detailPageSuiteLabelMatches(snap.itemLabel, slot.item_label)) return snap;
+  }
+  return undefined;
+}
+
 /**
  * 将 display / 孤儿 slot / meta 快照合并为应持久化的 slots 数组。
  * 出图前、写库前调用，避免 prompt 因 selected_item_list 失步而丢失。
@@ -73,7 +109,7 @@ export function materializeModuleSlots(
 ): DetailPageSuiteSlot[] {
   const applySnapshots = (slot: DetailPageSuiteSlot): DetailPageSuiteSlot => {
     if (slot.positive_prompt?.trim()) return slot;
-    const backup = snapshots[`${mod.module_id}::${slot.item_key}`];
+    const backup = findPromptSnapshotForSlot(snapshots, mod.module_id, slot);
     if (!backup?.prompt?.trim()) return slot;
     return { ...slot, positive_prompt: backup.prompt.trim() };
   };

@@ -7,6 +7,7 @@ import {
   extractMediaFilesFromClipboard,
   extractMediaFilesFromDataTransfer,
   normalizePastedImageFile,
+  IMAGE_UPLOAD_MAX_BYTES,
   validateImageFile,
   validateImageOrVideoFile,
   type ImageUploadError,
@@ -22,6 +23,8 @@ type Options = {
   listenPaste?: boolean;
   /** 同时接受拖放 / 粘贴的视频文件（拆图拆视频） */
   allowVideo?: boolean;
+  /** 单张图片大小上限（默认 10MB，产品创作风格参考等可放宽） */
+  maxImageBytes?: number;
   onFiles: (files: File[], via?: "paste" | "drop") => void | Promise<void>;
   onError?: (title: string, message: string) => void;
 };
@@ -35,6 +38,7 @@ export function useImageDropPaste({
   multiple = false,
   listenPaste = true,
   allowVideo = false,
+  maxImageBytes = IMAGE_UPLOAD_MAX_BYTES,
   onFiles,
   onError,
 }: Options) {
@@ -57,7 +61,7 @@ export function useImageDropPaste({
       const accepted: File[] = [];
       const validate: (file: File) => ImageUploadError | null = allowVideo
         ? validateImageOrVideoFile
-        : validateImageFile;
+        : (file) => validateImageFile(file, maxImageBytes);
       for (const file of raw) {
         const candidate =
           allowVideo && file.type.startsWith("video/") ? file : normalizePastedImageFile(file);
@@ -71,7 +75,7 @@ export function useImageDropPaste({
       }
       if (accepted.length > 0) await onFilesRef.current(accepted, via);
     },
-    [allowVideo, enabled, multiple, onError],
+    [allowVideo, enabled, maxImageBytes, multiple, onError],
   );
 
   const isPasteTargetActive = useCallback(() => {

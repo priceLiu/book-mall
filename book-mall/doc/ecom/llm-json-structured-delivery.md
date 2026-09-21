@@ -27,6 +27,8 @@
 | `` ```pro-deliverable `` / fashion-v4 | [`pro-deliverable-spec-v1.md`](./pro-deliverable-spec-v1.md) | Pro Vertical |
 | **`ecom-video-workflow/v1` 信封** | [`video-workflow-template-spec.md`](./video-workflow-template-spec.md) | 穿搭视频及后续动作迁移模板 |
 | `` ```detail-page-suite `` | [`docs/ecom/详情页套图.md`](../../docs/ecom/详情页套图.md) | 详情页套图（每模块提示词 JSON） |
+| `` ```detail-page-suite-replica `` / `` ```detail-page-suite-replica-polish `` | [`docs/ecom/详情页套图复刻.md`](../../docs/ecom/详情页套图复刻.md) | 详情页套图复刻（Vision 拆解 + 润色 Prompt JSON） |
+| `` ```detail-page-suite-hit `` / `` ```detail-page-suite-hit-rewrite `` | [`docs/ecom/爆款详情页套图.md`](../../docs/ecom/爆款详情页套图.md) | 爆款详情页套图（结构/叙事/氛围范式 + 原创重写） |
 
 ---
 

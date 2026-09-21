@@ -11,10 +11,17 @@ import type {
   DetailPageSuiteProject,
   DetailPageSuiteTemplate,
 } from "@/lib/detail-page-suite-types";
+import { SUITE_PLATFORM_OPTIONS } from "@/lib/detail-page-suite-types";
 
 export const SUITE_PRODUCT_REF_ACK = "已上传产品图";
 export const SUITE_PRODUCT_REF_SKIP = "暂不上传，稍后补图";
-import { SUITE_PLATFORM_OPTIONS } from "@/lib/detail-page-suite-types";
+
+/** 至少一张有效 OSS 产品图（与 sanitizeReferences 一致） */
+export function hasDetailPageSuiteProductRefs(
+  project: Pick<DetailPageSuiteProject, "references">,
+): boolean {
+  return project.references.some((r) => r.ossUrl?.trim());
+}
 import type { SeedVideoAssistantChoice } from "@/lib/seed-video-workflow";
 
 export type SuiteHistoricalChoiceBlock = {
@@ -268,20 +275,8 @@ export function resolveSuiteLiveChoiceStep(opts: {
     };
   }
 
-  if (phase === "subdims") {
-    return {
-      title: "子维度",
-      subtitle: "手选 / 随机 / 自增后确认",
-      choices: cards(["随机抽取未满模块", "确认子维度"]),
-    };
-  }
-
-  if (phase === "prompts") {
-    return {
-      title: "提示词",
-      subtitle: "按开启模块生成 JSON 提示词，可改后再出图",
-      choices: cards(["生成全部提示词"]),
-    };
+  if (phase === "subdims" || phase === "prompts") {
+    return null;
   }
 
   if (phase === "images") {
@@ -292,6 +287,28 @@ export function resolveSuiteLiveChoiceStep(opts: {
     };
   }
 
+  return null;
+}
+
+/** 确认大模块后：子维度与提示词在中栏操作，助手仅展示指引 */
+export function resolveSuiteWorkspaceGuide(phase: DetailPageSuitePhase): {
+  title: string;
+  body: string;
+} | null {
+  if (phase === "subdims") {
+    return {
+      title: "中栏编排",
+      body:
+        "请在中间区为各模块设置张数 N、勾选子维度；可勾选单个/整模块/全选后批量生成提示词。无需在右侧再点「确认子维度」。",
+    };
+  }
+  if (phase === "prompts") {
+    return {
+      title: "提示词与出图",
+      body:
+        "提示词请在中栏勾选后生成；可单条重试或整模块生成。完成后点「进入出图」或继续在中栏出图；批量出图仍可用右侧「生成全部图片」。",
+    };
+  }
   return null;
 }
 
@@ -306,7 +323,38 @@ export function shouldDetailPageSuiteAutoAdvanceProductRef(
   project: DetailPageSuiteProject,
 ): boolean {
   const phase = project.meta?.phase ?? "product_ref";
-  return phase === "product_ref" && project.references.length > 0;
+  return phase === "product_ref" && hasDetailPageSuiteProductRefs(project);
+}
+
+/** 无产品图时去掉误写入的「已上传产品图」会话，避免卡片默认选中 */
+export function reconcileDetailPageSuiteProductRefState(
+  project: DetailPageSuiteProject,
+): Pick<DetailPageSuiteProject, "chatHistory"> | null {
+  const phase = project.meta?.phase ?? "product_ref";
+  if (phase !== "product_ref" || hasDetailPageSuiteProductRefs(project)) {
+    return null;
+  }
+  const hasStaleAck = project.chatHistory.some(
+    (m) => m.role === "user" && m.content.trim() === SUITE_PRODUCT_REF_ACK,
+  );
+  if (!hasStaleAck) return null;
+  const chatHistory = project.chatHistory.filter((m) => {
+    if (m.role === "user" && m.content.trim() === SUITE_PRODUCT_REF_ACK) {
+      return false;
+    }
+    if (m.role === "assistant" && m.content.includes("已检测到产品图")) {
+      return false;
+    }
+    if (
+      m.id.startsWith("user-auto-ref-") ||
+      m.id.startsWith("assistant-auto-ref-")
+    ) {
+      return false;
+    }
+    return true;
+  });
+  if (chatHistory.length === project.chatHistory.length) return null;
+  return { chatHistory };
 }
 
 /** 上传产品图后自动写入会话并进入七维（幂等） */
@@ -363,12 +411,13 @@ export function resolveSuiteAssistantSelectedMessage(
   const phase = project.meta?.phase ?? "product_ref";
 
   if (phase === "product_ref") {
-    if (project.references.length > 0) return SUITE_PRODUCT_REF_ACK;
+    const hasRefs = hasDetailPageSuiteProductRefs(project);
     for (let i = project.chatHistory.length - 1; i >= 0; i--) {
       const m = project.chatHistory[i];
       if (m?.role !== "user") continue;
       const t = m.content.trim();
-      if (t === SUITE_PRODUCT_REF_ACK || t === SUITE_PRODUCT_REF_SKIP) return t;
+      if (t === SUITE_PRODUCT_REF_SKIP) return t;
+      if (t === SUITE_PRODUCT_REF_ACK && hasRefs) return t;
     }
     return null;
   }
@@ -377,7 +426,7 @@ export function resolveSuiteAssistantSelectedMessage(
     phase,
     dimStep: project.meta?.dimensionStep ?? 0,
     templates: [],
-    hasProductRefs: project.references.length > 0,
+    hasProductRefs: hasDetailPageSuiteProductRefs(project),
     hasSellPoints: (project.brief?.sellPoints?.length ?? 0) > 0,
   });
   if (!live?.choices.length) return null;

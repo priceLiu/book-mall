@@ -49,6 +49,7 @@ export const UPSTREAM_BALANCE_MARKERS = [
   "account is in good standing",
   "insufficient balance",
   "insufficient_balance",
+  "arrearage",
   "arrears",
   "欠费",
   "余额不足",

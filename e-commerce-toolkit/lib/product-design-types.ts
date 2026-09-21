@@ -163,6 +163,14 @@ export type ImageGenPlanItem = {
   purpose?: string;
   prompt: string;
   copySnapshot?: Record<string, unknown>;
+  /** 详情长图按屏切分后的垫图 URL */
+  styleSliceOssUrl?: string;
+};
+
+export type ImageGenPlanStyleSliceMeta = {
+  sourceRefId: string;
+  sourceOssUrl: string;
+  sliceCount: number;
 };
 
 export type ImageGenPlan = {
@@ -171,6 +179,7 @@ export type ImageGenPlan = {
   status: "draft" | "confirmed";
   productContext?: ProductContext;
   sharedVisualBrief?: string;
+  styleSliceMeta?: ImageGenPlanStyleSliceMeta;
   items: ImageGenPlanItem[];
 };
 

@@ -36,6 +36,7 @@ import {
   buildSuiteHistoricalChoiceBlock,
   resolveSuiteAssistantSelectedMessage,
   resolveSuiteLiveChoiceStep,
+  resolveSuiteWorkspaceGuide,
 } from "@/lib/detail-page-suite-assistant-choice-ui";
 import type { DetailPageSuiteBusyStatus } from "@/lib/detail-page-suite-busy-status";
 import {
@@ -188,11 +189,13 @@ function useDetailPageSuiteAssistant(props: Props): AssistantContextValue {
         phase,
         dimStep,
         templates,
-        hasProductRefs: project.references.length > 0,
+        hasProductRefs: project.references.some((r) => r.ossUrl?.trim()),
         hasSellPoints: (project.brief?.sellPoints?.length ?? 0) > 0,
       }),
     [phase, dimStep, templates, project.references.length, project.brief?.sellPoints?.length],
   );
+
+  const workspaceGuide = useMemo(() => resolveSuiteWorkspaceGuide(phase), [phase]);
 
   const showChoices = !busy && Boolean(liveStep?.choices.length);
 
@@ -331,6 +334,7 @@ function useDetailPageSuiteAssistant(props: Props): AssistantContextValue {
     dimStep,
     dimensionMessageLabels,
     liveStep,
+    workspaceGuide,
     showChoices,
     scrollRef,
     optimisticSelected,
@@ -368,6 +372,7 @@ export function DetailPageSuiteAssistantPanel() {
     phase,
     dimensionMessageLabels,
     liveStep,
+    workspaceGuide,
     showChoices,
     scrollRef,
     selectedMessage,
@@ -450,6 +455,13 @@ export function DetailPageSuiteAssistantPanel() {
                 </div>
               );
             })}
+
+            {!showChoices && workspaceGuide ? (
+              <div className="rounded-2xl border border-[#0071e3]/25 bg-[#f0f6ff] p-4 shadow-sm">
+                <p className="text-sm font-semibold text-[#1d1d1f]">{workspaceGuide.title}</p>
+                <p className="mt-1 text-xs leading-relaxed text-[#6e6e73]">{workspaceGuide.body}</p>
+              </div>
+            ) : null}
 
             {showChoices && liveStep ? (
               <div className="flex flex-col items-start">

@@ -8,12 +8,13 @@ import {
 } from "@/lib/ecom/ecom-product-design-service";
 import {
   assertProductDesignRefUploadAllowed,
+  getProductDesignRefUploadMaxBytes,
 } from "@/lib/ecom/ecom-product-design-ref-rules";
 import type { ProductDesignReference } from "@/lib/ecom/ecom-product-design-types";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -35,10 +36,6 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!(file instanceof Blob)) {
     return NextResponse.json({ error: "缺少 file" }, { status: 400 });
   }
-  if (file.size > 30 * 1024 * 1024) {
-    return NextResponse.json({ error: "文件过大（最大 30MB）" }, { status: 413 });
-  }
-
   const label = String(form.get("label") ?? "产品图").slice(0, 40);
   const roleRaw = String(form.get("role") ?? "product");
   const role: ProductDesignReference["role"] =
@@ -49,6 +46,12 @@ export async function POST(req: Request, ctx: Ctx) {
     roleRaw === "model"
       ? roleRaw
       : "other";
+
+  const maxUploadBytes = getProductDesignRefUploadMaxBytes(role);
+  if (file.size > maxUploadBytes) {
+    const maxMb = Math.round(maxUploadBytes / (1024 * 1024));
+    return NextResponse.json({ error: `文件过大（最大 ${maxMb}MB）` }, { status: 413 });
+  }
 
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);

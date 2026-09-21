@@ -15,7 +15,7 @@ export type SemanticMentionRef = {
   role: string;
 };
 
-/** 上传 label 含「模特」则视为模特参考（仍存 main-style / detail-style） */
+/** 上传 label 含「模特」则视为模特参考（仍存 main-style / detail-style 时兼容） */
 export function isModelReferenceLabel(label: string | undefined | null): boolean {
   if (!label?.trim()) return false;
   return /模特|模卡|model/i.test(label);
@@ -27,39 +27,79 @@ export function buildSemanticMentionRefs(
 ): SemanticMentionRef[] {
   const styleRole = target === "main" ? "main-style" : "detail-style";
   const style = references.filter((r) => r.role === styleRole);
+  const models = references.filter((r) => r.role === "model");
   const product = references.filter((r) => r.role === "product");
 
-  let modelIdx = 0;
-  let styleIdx = 0;
+  let refFigIdx = 0;
+  let styleKindIdx = 0;
+  let modelKindIdx = 0;
   let productIdx = 0;
   let globalIndex = 0;
   const out: SemanticMentionRef[] = [];
 
-  for (const r of style) {
+  const pushRefFigure = (
+    r: ProductDesignReference,
+    kind: MentionTokenKind,
+    kindIndex: number,
+  ) => {
     globalIndex += 1;
+    refFigIdx += 1;
+    out.push({
+      index: globalIndex,
+      token: `@参考图${refFigIdx}`,
+      kind,
+      kindIndex,
+      url: r.ossUrl,
+      label: r.label,
+      role: r.role,
+    });
+  };
+
+  const pushModelRef = (r: ProductDesignReference, kindIndex: number) => {
+    globalIndex += 1;
+    refFigIdx += 1;
+    out.push({
+      index: globalIndex,
+      token: `@模特${kindIndex}`,
+      kind: "model",
+      kindIndex,
+      url: r.ossUrl,
+      label: r.label,
+      role: r.role,
+    });
+  };
+
+  const pushDetailStyleRef = (r: ProductDesignReference, kindIndex: number) => {
+    globalIndex += 1;
+    refFigIdx += 1;
+    out.push({
+      index: globalIndex,
+      token: `@详情页参考${kindIndex}`,
+      kind: "style",
+      kindIndex,
+      url: r.ossUrl,
+      label: r.label,
+      role: r.role,
+    });
+  };
+
+  for (const r of style) {
     if (isModelReferenceLabel(r.label)) {
-      modelIdx += 1;
-      out.push({
-        index: globalIndex,
-        token: `@模特${modelIdx}`,
-        kind: "model",
-        kindIndex: modelIdx,
-        url: r.ossUrl,
-        label: r.label,
-        role: r.role,
-      });
+      modelKindIdx += 1;
+      pushModelRef(r, modelKindIdx);
     } else {
-      styleIdx += 1;
-      out.push({
-        index: globalIndex,
-        token: `@参考图${styleIdx}`,
-        kind: "style",
-        kindIndex: styleIdx,
-        url: r.ossUrl,
-        label: r.label,
-        role: r.role,
-      });
+      styleKindIdx += 1;
+      if (target === "detail") {
+        pushDetailStyleRef(r, styleKindIdx);
+      } else {
+        pushRefFigure(r, "style", styleKindIdx);
+      }
     }
+  }
+
+  for (const r of models) {
+    modelKindIdx += 1;
+    pushModelRef(r, modelKindIdx);
   }
 
   for (const r of product) {
@@ -81,7 +121,7 @@ export function buildSemanticMentionRefs(
 
 /** 语义 token + 旧版 @图片N */
 export const SEMANTIC_REF_TOKEN_RE =
-  /@(?:人物[A-F\d]+|产品\d+|道具\d+|场景\d+|产品实拍\d+|参考图\d+|模特\d+|图片\d+)/g;
+  /@(?:人物[A-F\d]+|产品\d+|道具\d+|场景\d+|产品实拍\d+|详情页参考\d+|参考图\d+|模特\d+|图片\d+)/g;
 
 export function mentionTokenDisplay(token: string): string {
   return token.startsWith("@") ? token.slice(1) : token;

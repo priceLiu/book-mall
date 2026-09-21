@@ -13,6 +13,7 @@ type Props = {
   displayRatio: EcomDetailPageRatio;
   disabled?: boolean;
   disabledReason?: string;
+  hint?: string;
   onClick: () => void;
 };
 
@@ -21,6 +22,7 @@ export function DetailPageSuiteAddSlotCard({
   displayRatio,
   disabled,
   disabledReason,
+  hint = "点击输入提示词",
   onClick,
 }: Props) {
   const cardWidth = detailPageCardWidth(displayRatio);
@@ -52,7 +54,7 @@ export function DetailPageSuiteAddSlotCard({
         <span className="text-xs font-medium">新增点位</span>
       </div>
       <p className="px-3 py-2 text-center text-[10px] leading-relaxed text-[#86868b]">
-        点击输入提示词
+        {hint}
       </p>
     </button>
   );

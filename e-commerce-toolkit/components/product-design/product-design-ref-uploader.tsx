@@ -5,7 +5,11 @@ import { useRef, useState } from "react";
 import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
 import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
-import { getMaxRefsForRoleClient } from "@/lib/product-design-ref-rules";
+import {
+  getMaxRefsForRoleClient,
+  getProductDesignRefUploadMaxBytesClient,
+  PRODUCT_DESIGN_REF_STORE_MAX_BYTES,
+} from "@/lib/product-design-ref-rules";
 import type { ProductDesignReference, ProductDesignReferenceRole } from "@/lib/product-design-types";
 
 const ROLE_COPY: Record<
@@ -27,7 +31,7 @@ const ROLE_COPY: Record<
   "detail-style": {
     title: "详情页风格参考",
     emptyHint:
-      "可选：上传详情长图排版或信息密度参考。不上传时将沿用已出主图的视觉基准。",
+      "可选：上传详情长图排版或信息密度参考（单张最大 200MB，保存时自动压缩至 30MB 以内）。不上传时将沿用已出主图的视觉基准。",
     removeLabel: "删除详情参考",
   },
   scene: {
@@ -36,9 +40,9 @@ const ROLE_COPY: Record<
     removeLabel: "删除参考图",
   },
   model: {
-    title: "模特参考",
-    emptyHint: "上传模特参考图。",
-    removeLabel: "删除参考图",
+    title: "模特上传",
+    emptyHint: "可选：上传模特气质参考，或从模特库导入。",
+    removeLabel: "删除模特图",
   },
   other: {
     title: "参考图",
@@ -84,8 +88,15 @@ export function ProductDesignRefUploader({
   const [pickerOpen, setPickerOpen] = useState(false);
   const items = references.filter((r) => r.role === role);
   const maxCount = getMaxRefsForRoleClient(role, { visionModelKey, imageModelKey });
+  const maxUploadBytes = getProductDesignRefUploadMaxBytesClient(role);
   const atLimit = items.length >= maxCount;
   const copy = ROLE_COPY[role];
+  const storeMb = Math.round(PRODUCT_DESIGN_REF_STORE_MAX_BYTES / (1024 * 1024));
+  const uploadMb = Math.round(maxUploadBytes / (1024 * 1024));
+  const sizeHint =
+    maxUploadBytes > PRODUCT_DESIGN_REF_STORE_MAX_BYTES
+      ? `单张 ≤${uploadMb}MB，存 OSS ≤${storeMb}MB`
+      : `单张 ≤${uploadMb}MB`;
 
   const disabled = Boolean(busy) || atLimit;
 
@@ -113,7 +124,7 @@ export function ProductDesignRefUploader({
           )}
         </span>
         <span className="text-[10px] text-[#86868b]">
-          {items.length}/{maxCount} · {IMAGE_UPLOAD_DROP_HINT}
+          {items.length}/{maxCount} · {sizeHint} · {IMAGE_UPLOAD_DROP_HINT}
         </span>
       </div>
 
@@ -123,6 +134,7 @@ export function ProductDesignRefUploader({
         emptyHint={copy.emptyHint}
         busy={disabled}
         uploadProgress={uploadProgress}
+        maxImageBytes={maxUploadBytes}
         onUploadFiles={(files) => void handleFiles(files)}
         onOpenFilePicker={() => inputRef.current?.click()}
         onOpenAssetPicker={onAttachAssets && !atLimit ? () => setPickerOpen(true) : undefined}

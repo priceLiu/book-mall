@@ -3,6 +3,30 @@
 export const ECOM_GENERATION_RECORD_MODULE = "ecom-generation-record";
 export const ECOM_GENERATION_RECORD_LIBRARY_PATH = "/library/generation-records";
 
+export type GenerationRecordsLibraryQuery = {
+  projectId?: string;
+  sourceModule?: string;
+  /** 筛选视图顶栏「返回」目标（如爆款/复刻工作台） */
+  returnTo?: string;
+  projectTitle?: string;
+};
+
+export function buildGenerationRecordsLibraryPath(
+  query?: GenerationRecordsLibraryQuery,
+): string {
+  const projectId = query?.projectId?.trim();
+  if (!projectId) return ECOM_GENERATION_RECORD_LIBRARY_PATH;
+  const params = new URLSearchParams();
+  params.set("projectId", projectId);
+  const sourceModule = query?.sourceModule?.trim();
+  if (sourceModule) params.set("sourceModule", sourceModule);
+  const returnTo = query?.returnTo?.trim();
+  if (returnTo) params.set("returnTo", returnTo);
+  const projectTitle = query?.projectTitle?.trim();
+  if (projectTitle) params.set("projectTitle", projectTitle);
+  return `${ECOM_GENERATION_RECORD_LIBRARY_PATH}?${params.toString()}`;
+}
+
 export type EcomGenerationRecordMeta = {
   sourceModule?: string;
   sourceToolKey?: string;
@@ -41,8 +65,14 @@ async function bookFetch(path: string, init?: RequestInit) {
   return data;
 }
 
-export async function listGenerationRecords(): Promise<EcomGenerationRecordItem[]> {
-  const data = await bookFetch("api/sso/tools/ecom/generation-records");
+export async function listGenerationRecords(opts?: {
+  projectId?: string;
+}): Promise<EcomGenerationRecordItem[]> {
+  const projectId = opts?.projectId?.trim();
+  const suffix = projectId
+    ? `?projectId=${encodeURIComponent(projectId)}`
+    : "";
+  const data = await bookFetch(`api/sso/tools/ecom/generation-records${suffix}`);
   return (data.items as EcomGenerationRecordItem[]) ?? [];
 }
 
@@ -75,6 +105,9 @@ const SOURCE_MODULE_LABELS: Record<string, string> = {
   "model-shot": "模特大片",
   "outfit-video": "穿搭视频",
   "image-layer": "图片分层",
+  "detail-page-suite": "详情页套图",
+  "detail-page-suite-hit": "爆款详情页套图",
+  "detail-page-suite-replica": "详情页套图复刻",
 };
 
 export function generationRecordSourceLabel(meta: EcomGenerationRecordMeta | null): string {

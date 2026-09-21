@@ -122,6 +122,15 @@ function formatAiNewsDateKey(dateKey?: string): string {
   return `${Number(m[1])}年${Number(m[2])}月${Number(m[3])}日`;
 }
 
+function formatAiNewsPanelTitle(opts: {
+  newsDateKey?: string;
+  stale?: boolean;
+}): string {
+  const dateLabel = formatAiNewsDateKey(opts.newsDateKey);
+  if (opts.stale) return `AI 热闻（${dateLabel}）`;
+  return `今日 AI 热闻（${dateLabel}）`;
+}
+
 function truncateAiNewsMarkdown(text: string, maxItems: number): string {
   const lines = text.split("\n");
   const itemStarts: number[] = [];
@@ -171,7 +180,7 @@ function AssistantRichText({ text }: { text: string }) {
             (lineStartsWithEmoji(trimmed) && !/^\d+\./.test(trimmed)));
         const isNumbered = /^\d+\.\s/.test(trimmed);
         const isSubField =
-          /^(核心事实|热度依据|简要点评)[：:]/.test(trimmed) ||
+          /^(核心事实|热度依据|简要点评|出处|发表时间)[：:]/.test(trimmed) ||
           trimmed.startsWith("🔥今日头条");
         const isDisclaimer = trimmed.startsWith("*") && trimmed.endsWith("*");
         let cls = "pa-rich-line";
@@ -1152,15 +1161,19 @@ export function PlatformAssistant({
                         <div className="pa-news-block">
                           <div className="pa-news-block-title">
                             📰{" "}
-                            {m.newsStale
-                              ? `AI 热闻（${formatAiNewsDateKey(m.newsDateKey)}）`
-                              : "今日 AI 热闻"}
+                            {formatAiNewsPanelTitle({
+                              newsDateKey: m.newsDateKey,
+                              stale: m.newsStale,
+                            })}
                           </div>
                           <AssistantAiNewsBlock text={m.newsContent} />
                         </div>
                       ) : !isUser && !m.newsLoading && (m.appLinks?.length ?? 0) > 0 ? (
                         <div className="pa-news-block">
-                          <div className="pa-news-block-title">📰 今日 AI 热闻</div>
+                          <div className="pa-news-block-title">
+                            📰{" "}
+                            {formatAiNewsPanelTitle({ newsDateKey: m.newsDateKey })}
+                          </div>
                           <div className="pa-news-loading">
                             热闻正在准备中，稍后再开即可看到。
                           </div>

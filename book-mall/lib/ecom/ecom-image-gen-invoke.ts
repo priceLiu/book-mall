@@ -313,6 +313,7 @@ export async function generateEcomImage(opts: {
 export function isRefCapableEcomImageModel(modelKey: string): boolean {
   const key = modelKey.trim().toLowerCase();
   if (isStoryboardKieImageModel(key)) return true;
+  if (key.startsWith("gpt-image")) return true;
   if (isStoryboardKlingImageModel(key)) return true;
   if (isDashscopeMultimodalImageGenModel(key)) {
     return !isZImageTurboModel(key);

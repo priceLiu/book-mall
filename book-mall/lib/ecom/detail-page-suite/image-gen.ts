@@ -1,8 +1,16 @@
+import { formatEcomImageGenUserError } from "@/lib/ecom/ecom-image-processing-error";
 import { generateEcomImage } from "@/lib/ecom/ecom-image-gen-invoke";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
+import { resolveEcomImageGenConcurrency } from "@/lib/ecom/ecom-image-gen-concurrency";
+import { isDetailPageSuiteSizeChartDataLabel } from "./size-chart-constants";
+import {
+  resolveSizeChartTableForSlot,
+  uploadRenderedSizeChartPng,
+} from "./size-chart-image";
 import { getEcomPlatformSpec, type EcomImageRatio } from "@/lib/ecom/ecom-platform-spec";
 import { ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
 import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
+import { persistEcomGenerationRecord } from "@/lib/ecom/ecom-generation-record";
 import { prisma } from "@/lib/prisma";
 
 import {
@@ -10,6 +18,11 @@ import {
   mergeModuleSlotsPreservingContent,
   resolveModuleDisplaySlots,
 } from "./module-slots";
+import {
+  formatDetailPageSuiteImageGenFailureLine,
+  mergeDetailPageSuiteImageGenFailures,
+  type DetailPageSuiteImageGenFailuresMap,
+} from "./image-gen-failures";
 import {
   clearDetailPageSuiteImagesPending,
   markDetailPageSuiteImagesPending,
@@ -19,11 +32,33 @@ import {
   upsertDetailPageSuitePromptSnapshots,
   upsertPromptSnapshotsFromSuite,
 } from "./prompt-snapshot";
-import { getDetailPageSuiteProject, updateDetailPageSuiteProject } from "./project-service";
-import { normalizeDetailPageSuiteState } from "./suite-persist";
 import {
+  getDetailPageSuiteHitProject,
+  getDetailPageSuiteProject,
+  getDetailPageSuiteReplicaProject,
+  updateDetailPageSuiteHitProject,
+  updateDetailPageSuiteProject,
+  updateDetailPageSuiteReplicaProject,
+} from "./project-service";
+import { normalizeDetailPageSuiteState } from "./suite-persist";
+import { composeDetailPageSuiteVisiblePrompt } from "./brief-context";
+import {
+  appendDetailPageSuiteImageRefLegend,
+  detailPageSuiteSlotInvolvesModel,
+  resolveDetailPageSuiteImageRefPack,
+} from "./image-ref-pack";
+import {
+  buildHitDetailPageImagePrompt,
+  mergeHitDetailPageImageNegativePrompt,
+} from "@/lib/ecom/detail-page-suite-hit/hit-image-prompt";
+import {
+  BLANK_PLATE_MODULE_IDS,
   DETAIL_PAGE_SUITE_NEGATIVE_PROMPT,
+  ECOM_DETAIL_PAGE_SUITE_HIT_MODULE,
+  ECOM_DETAIL_PAGE_SUITE_HIT_TOOL_KEY,
   ECOM_DETAIL_PAGE_SUITE_MODULE,
+  ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE,
+  ECOM_DETAIL_PAGE_SUITE_REPLICA_TOOL_KEY,
   ECOM_DETAIL_PAGE_SUITE_TOOL_KEY,
   type DetailPageSuiteModuleState,
 } from "./types";
@@ -34,6 +69,8 @@ export type DetailPageSuiteImageTarget = {
   slotKey: string;
   itemLabel: string;
   prompt: string;
+  negativePrompt?: string;
+  slotCopy?: string;
 };
 
 /** 与前端 `resolveModuleDisplaySlots` + composite slotKeys 对齐，供出图与单测复用 */
@@ -50,6 +87,7 @@ export function collectDetailPageSuiteImageTargets(
     (opts.slotKeys ?? []).map((k) => k.trim()).filter(Boolean),
   );
   const targets: DetailPageSuiteImageTarget[] = [];
+  const seenComposites = new Set<string>();
   for (const m of modules) {
     if (opts.moduleId && m.module_id !== opts.moduleId) continue;
     if (!m.enable) continue;
@@ -59,16 +97,77 @@ export function collectDetailPageSuiteImageTargets(
       if (explicitKeys.size > 0 && !explicitKeys.has(composite)) continue;
       if (opts.onlySelected && slot.selectedForImage === false) continue;
       if (!slot.positive_prompt.trim()) continue;
+      if (seenComposites.has(composite)) continue;
+      seenComposites.add(composite);
       targets.push({
         moduleId: m.module_id,
         moduleName: m.module_name,
         slotKey: slot.item_key,
         itemLabel: slot.item_label,
         prompt: slot.positive_prompt,
+        negativePrompt: slot.negative_prompt?.trim() || undefined,
+        slotCopy: slot.slot_copy?.trim() || undefined,
       });
     }
   }
   return targets;
+}
+
+export function normalizeDetailPageSuiteImageGenSlotKeys(
+  slotKeys: string[] | undefined,
+): string[] | undefined {
+  if (!slotKeys?.length) return undefined;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of slotKeys) {
+    const k = raw.trim();
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(k);
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+async function persistDetailPageSuiteSlotGenerationRecord(opts: {
+  userId: string;
+  projectId: string;
+  ossUrl: string;
+  title: string;
+  prompt: string;
+  assetModule: string;
+  genToolKey: string;
+  moduleId: string;
+  slotKey: string;
+  modelKey: string;
+}): Promise<void> {
+  try {
+    await persistEcomGenerationRecord({
+      userId: opts.userId,
+      ossUrl: opts.ossUrl,
+      title: opts.title,
+      prompt: opts.prompt,
+      meta: {
+        sourceModule: opts.assetModule,
+        sourceToolKey: opts.genToolKey,
+        projectId: opts.projectId,
+        sourceResultId: `${opts.moduleId}::${opts.slotKey}`,
+        versionKey: `${opts.projectId}::${opts.moduleId}::${opts.slotKey}`,
+        modelKey: opts.modelKey,
+      },
+    });
+  } catch (e) {
+    console.warn("[detail-page-suite] generation record failed", {
+      projectId: opts.projectId,
+      slot: `${opts.moduleId}::${opts.slotKey}`,
+      message: e instanceof Error ? e.message : String(e),
+    });
+  }
+}
+
+function mergeSuiteNegativePrompt(slotNegative?: string): string {
+  const extra = slotNegative?.trim();
+  if (!extra) return DETAIL_PAGE_SUITE_NEGATIVE_PROMPT;
+  return `${DETAIL_PAGE_SUITE_NEGATIVE_PROMPT}，${extra}`;
 }
 
 export async function generateDetailPageSuiteImages(opts: {
@@ -82,10 +181,41 @@ export async function generateDetailPageSuiteImages(opts: {
   modelKey?: string;
   imageSize?: string;
   imageRatio?: "1:1" | "3:4" | "4:5" | "16:9";
+  /** 默认 detail-page-suite；复刻 / 爆款传对应 module */
+  projectModule?: string;
+  /** 爆款套图：出图时将 slot_copy 写入 prompt，并放宽「画面文字」负向 */
+  includeSlotCopyOnImage?: boolean;
 }) {
   await assertEcomToolkitGatewayAccess(opts.userId);
-  let project = await getDetailPageSuiteProject(opts.userId, opts.projectId);
+  const moduleKey = opts.projectModule?.trim() || ECOM_DETAIL_PAGE_SUITE_MODULE;
+  const isReplica = moduleKey === ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE;
+  const isHit = moduleKey === ECOM_DETAIL_PAGE_SUITE_HIT_MODULE;
+  let project = isHit
+    ? await getDetailPageSuiteHitProject(opts.userId, opts.projectId)
+    : isReplica
+      ? await getDetailPageSuiteReplicaProject(opts.userId, opts.projectId)
+      : await getDetailPageSuiteProject(opts.userId, opts.projectId);
   if (!project) throw new Error("项目不存在");
+  const updateProject = isHit
+    ? updateDetailPageSuiteHitProject
+    : isReplica
+      ? updateDetailPageSuiteReplicaProject
+      : updateDetailPageSuiteProject;
+  const assetModule = isHit
+    ? ECOM_DETAIL_PAGE_SUITE_HIT_MODULE
+    : isReplica
+      ? ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE
+      : ECOM_DETAIL_PAGE_SUITE_MODULE;
+  const genToolKey = isHit
+    ? ECOM_DETAIL_PAGE_SUITE_HIT_TOOL_KEY
+    : isReplica
+      ? ECOM_DETAIL_PAGE_SUITE_REPLICA_TOOL_KEY
+      : ECOM_DETAIL_PAGE_SUITE_TOOL_KEY;
+
+  const includeSlotCopyOnImage =
+    isHit &&
+    (opts.includeSlotCopyOnImage === true ||
+      project.settings.hitIncludeSlotCopyOnImage === true);
 
   const modelKey =
     opts.modelKey?.trim() ||
@@ -96,10 +226,40 @@ export async function generateDetailPageSuiteImages(opts: {
     project.settings.imageRatio ||
     spec.detailPage.ratio ||
     "3:4") as EcomImageRatio;
-  const refs = project.references.map((r) => r.ossUrl).filter(Boolean);
-  const targets = collectDetailPageSuiteImageTargets(project.suite.modules, opts);
+  const refPack = resolveDetailPageSuiteImageRefPack(project.references, modelKey);
+  const refs = refPack.urls;
+  const imageConcurrency = await resolveEcomImageGenConcurrency(opts.userId, project.settings);
+  const normalizedSlotKeys = normalizeDetailPageSuiteImageGenSlotKeys(opts.slotKeys);
+  if (isHit && !normalizedSlotKeys?.length) {
+    throw new Error("请勾选要出图的点位（缺少 slotKeys）");
+  }
+  const collectOpts = {
+    ...opts,
+    slotKeys: normalizedSlotKeys ?? opts.slotKeys,
+    onlySelected: normalizedSlotKeys?.length ? false : opts.onlySelected,
+  };
+  const targets = collectDetailPageSuiteImageTargets(project.suite.modules, collectOpts);
   if (targets.length === 0) {
     throw new Error("没有可生成的提示词，请先生成提示词或保存编辑后再出图");
+  }
+  console.info("[detail-page-suite] image gen batch", {
+    projectId: opts.projectId,
+    projectModule: moduleKey,
+    modelKey,
+    refProductCount: refPack.productCount,
+    refModelCount: refPack.modelCount,
+    refStyleFirst: refPack.styleFirst,
+    slotKeyCount: normalizedSlotKeys?.length ?? 0,
+    targetCount: targets.length,
+    targets: targets.map((t) => `${t.moduleId}::${t.slotKey}`),
+  });
+  if (normalizedSlotKeys?.length && targets.length !== normalizedSlotKeys.length) {
+    console.warn("[detail-page-suite] image gen slotKeys/targets mismatch", {
+      projectId: opts.projectId,
+      module: moduleKey,
+      requested: normalizedSlotKeys,
+      resolved: targets.map((t) => `${t.moduleId}::${t.slotKey}`),
+    });
   }
 
   const pendingKeys = targets.map((t) => `${t.moduleId}::${t.slotKey}`);
@@ -123,7 +283,7 @@ export async function generateDetailPageSuiteImages(opts: {
     metaWithPending,
   );
   metaWithPending = markDetailPageSuiteImagesPending(metaWithPending, pendingKeys, modelKey);
-  const preflightSaved = await updateDetailPageSuiteProject(opts.userId, opts.projectId, {
+  const preflightSaved = await updateProject(opts.userId, opts.projectId, {
     suite: preflightSuite,
     meta: metaWithPending,
   });
@@ -134,35 +294,80 @@ export async function generateDetailPageSuiteImages(opts: {
   }
 
   const failures: string[] = [];
+  const failureEntries: DetailPageSuiteImageGenFailuresMap = {};
+  const successKeys: string[] = [];
   const urlMap = new Map<string, string>();
   const assetMap = new Map<string, string>();
+  const failedAt = new Date().toISOString();
   try {
+  let sizeChartTableIndex = 0;
   await mapWithConcurrency(targets, async (t) => {
+    const key = `${t.moduleId}::${t.slotKey}`;
     try {
-      const url = await generateEcomImage({
-        userId: opts.userId,
-        modelKey,
-        prompt: t.prompt,
-        negativePrompt: DETAIL_PAGE_SUITE_NEGATIVE_PROMPT,
-        ratio,
-        imageSize: opts.imageSize || project.settings.imageSize,
-        refImageUrls: refs,
-        toolKey: `${ECOM_DETAIL_PAGE_SUITE_TOOL_KEY}__generate`,
-      });
-      const key = `${t.moduleId}::${t.slotKey}`;
+      const slotTitle = `${t.moduleName} · ${t.itemLabel}`.slice(0, 80);
+      let promptForRecord = t.prompt;
+      const url = isDetailPageSuiteSizeChartDataLabel(t.itemLabel)
+        ? await uploadRenderedSizeChartPng({
+            userId: opts.userId,
+            table: resolveSizeChartTableForSlot(
+              project.brief,
+              sizeChartTableIndex++,
+            ),
+          })
+        : await (async () => {
+            const involvesModel = detailPageSuiteSlotInvolvesModel({
+              moduleId: t.moduleId,
+              moduleName: t.moduleName,
+              itemLabel: t.itemLabel,
+            });
+            let prompt = composeDetailPageSuiteVisiblePrompt(
+              t.prompt,
+              project.brief,
+              t.itemLabel,
+              t.moduleId,
+            );
+            if (includeSlotCopyOnImage) {
+              prompt = buildHitDetailPageImagePrompt({
+                positivePrompt: prompt,
+                slotCopy: t.slotCopy,
+                includeSlotCopyOnImage: true,
+              });
+            }
+            if (refPack.urls.length > 0) {
+              prompt = appendDetailPageSuiteImageRefLegend(
+                prompt,
+                refPack,
+                involvesModel,
+              );
+            }
+            promptForRecord = prompt;
+            return generateEcomImage({
+              userId: opts.userId,
+              modelKey,
+              prompt,
+              negativePrompt: includeSlotCopyOnImage
+                ? mergeHitDetailPageImageNegativePrompt(t.negativePrompt, true)
+                : mergeSuiteNegativePrompt(t.negativePrompt),
+              ratio,
+              imageSize: opts.imageSize || project.settings.imageSize,
+              refImageUrls: BLANK_PLATE_MODULE_IDS.has(t.moduleId) ? [] : refs,
+              toolKey: `${genToolKey}__generate`,
+            });
+          })();
       urlMap.set(key, url);
+      successKeys.push(key);
       const asset = await prisma.ecomAsset.create({
         data: {
           userId: opts.userId,
-          module: ECOM_DETAIL_PAGE_SUITE_MODULE,
+          module: assetModule,
           kind: "image",
-          title: `${t.moduleName} · ${t.itemLabel}`.slice(0, 80),
-          prompt: t.prompt,
+          title: slotTitle,
+          prompt: promptForRecord,
           ossUrl: url,
           thumbnailUrl: url,
           meta: {
             projectId: opts.projectId,
-            source: "detail-page-suite",
+            source: assetModule,
             moduleId: t.moduleId,
             slotKey: t.slotKey,
             platform: spec.code,
@@ -171,12 +376,46 @@ export async function generateDetailPageSuiteImages(opts: {
         },
       });
       assetMap.set(key, asset.id);
+      await persistDetailPageSuiteSlotGenerationRecord({
+        userId: opts.userId,
+        projectId: opts.projectId,
+        ossUrl: url,
+        title: slotTitle,
+        prompt: promptForRecord,
+        assetModule,
+        genToolKey,
+        moduleId: t.moduleId,
+        slotKey: t.slotKey,
+        modelKey,
+      });
     } catch (e) {
+      const raw = e instanceof Error ? e.message : String(e);
+      const message = formatEcomImageGenUserError(e).message;
       failures.push(
-        `${t.moduleId}/${t.slotKey}: ${e instanceof Error ? e.message : String(e)}`,
+        formatDetailPageSuiteImageGenFailureLine(key, message, { itemLabel: t.itemLabel }),
       );
+      failureEntries[key] = { message, failedAt, modelKey };
+      console.error("[detail-page-suite] image gen failed", {
+        projectId: opts.projectId,
+        userId: opts.userId,
+        modelKey,
+        slotKey: key,
+        itemLabel: t.itemLabel,
+        message: raw,
+      });
     }
-  }, 2);
+  }, imageConcurrency);
+
+  if (failures.length > 0) {
+    console.error("[detail-page-suite] image gen batch summary", {
+      projectId: opts.projectId,
+      userId: opts.userId,
+      modelKey,
+      generated: urlMap.size,
+      failed: failures.length,
+      failures,
+    });
+  }
 
   const now = new Date().toISOString();
   const modules = project.suite.modules.map((m) => {
@@ -221,11 +460,16 @@ export async function generateDetailPageSuiteImages(opts: {
   metaWithPending =
     clearDetailPageSuiteImagesPending(metaWithPending, pendingKeys) ?? { phase: "images" };
   const resultSuite = { ...project.suite, modules };
+  const metaWithFailures = mergeDetailPageSuiteImageGenFailures(
+    { ...metaWithPending, phase: "images" },
+    failureEntries,
+    successKeys,
+  );
   const reconciledMeta = upsertPromptSnapshotsFromSuite(
-    reconcileDetailPageSuitePendingMeta(resultSuite, { ...metaWithPending, phase: "images" }),
+    reconcileDetailPageSuitePendingMeta(resultSuite, metaWithFailures),
     resultSuite,
   );
-  const updated = await updateDetailPageSuiteProject(opts.userId, opts.projectId, {
+  const updated = await updateProject(opts.userId, opts.projectId, {
     suite: resultSuite,
     settings: {
       ...project.settings,
@@ -243,7 +487,7 @@ export async function generateDetailPageSuiteImages(opts: {
   } catch (e) {
     metaWithPending = clearDetailPageSuiteImagesPending(metaWithPending, pendingKeys) ?? metaWithPending;
     const failureSuite = normalizeDetailPageSuiteState(project.suite, metaWithPending);
-    await updateDetailPageSuiteProject(opts.userId, opts.projectId, {
+    await updateProject(opts.userId, opts.projectId, {
       suite: failureSuite,
       meta: reconcileDetailPageSuitePendingMeta(failureSuite, metaWithPending),
     });

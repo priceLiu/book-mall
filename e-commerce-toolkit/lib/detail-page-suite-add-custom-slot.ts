@@ -1,10 +1,16 @@
 import { resolveModuleDisplaySlots } from "@/lib/detail-page-suite-module-slots";
+import {
+  DETAIL_PAGE_SUITE_SIZE_CHART_PROMPT_MARKER,
+  isDetailPageSuiteSizeChartDataLabel,
+} from "@/lib/detail-page-suite-size-chart";
 import type {
   DetailPageSuiteModuleState,
   DetailPageSuiteState,
 } from "@/lib/detail-page-suite-types";
 
-export const DETAIL_PAGE_SUITE_GLOBAL_MAX = 44;
+export const DETAIL_PAGE_SUITE_SIZE_MODULE_ID = "mod7_size_table";
+
+export const DETAIL_PAGE_SUITE_GLOBAL_MAX = 49;
 
 /** 从提示词首行截取卡片标题 */
 export function labelFromSuiteCustomPrompt(prompt: string, maxLen = 36): string {
@@ -94,6 +100,39 @@ export function addCustomPromptSlotToModule(
     ...mod,
     generate_count: mod.generate_count + 1,
     selected_item_list: [...mod.selected_item_list, item_label],
+    candidate_pool,
+    slots: [...existingSlots, newSlot],
+  };
+}
+
+/** 尺码参考模块：+ 新增一张默认尺码总表（程序化出图，非手填提示词） */
+export function addSizeChartDataSlotToModule(
+  mod: DetailPageSuiteModuleState,
+  itemLabel: string,
+): DetailPageSuiteModuleState {
+  if (mod.module_id !== DETAIL_PAGE_SUITE_SIZE_MODULE_ID) {
+    throw new Error("仅尺码参考模块支持此操作");
+  }
+  if (!isDetailPageSuiteSizeChartDataLabel(itemLabel)) {
+    throw new Error("无效的尺码表点位标签");
+  }
+  const item_key = `size_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+  const existingSlots = resolveModuleDisplaySlots(mod);
+  const newSlot = {
+    item_key,
+    item_label: itemLabel,
+    source: "template" as const,
+    positive_prompt: DETAIL_PAGE_SUITE_SIZE_CHART_PROMPT_MARKER,
+    promptEdited: false,
+    selectedForImage: true,
+  };
+  const candidate_pool = mod.candidate_pool.includes(itemLabel)
+    ? mod.candidate_pool
+    : [...mod.candidate_pool, itemLabel];
+  return {
+    ...mod,
+    generate_count: mod.generate_count + 1,
+    selected_item_list: [...mod.selected_item_list, itemLabel],
     candidate_pool,
     slots: [...existingSlots, newSlot],
   };

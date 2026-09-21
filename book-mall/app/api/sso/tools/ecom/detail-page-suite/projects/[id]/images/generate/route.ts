@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 
+import { reconcileDetailPageSuiteProjectFromAssets } from "@/lib/ecom/detail-page-suite/asset-reconcile";
 import { generateDetailPageSuiteImages } from "@/lib/ecom/detail-page-suite/image-gen";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+/** 多图 KIE / 万相串行；与 ecom BFF 600s 对齐 */
+export const maxDuration = 600;
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -40,11 +42,29 @@ export async function POST(req: Request, ctx: Ctx) {
       imageSize: typeof body.imageSize === "string" ? body.imageSize : undefined,
       imageRatio,
     });
-    return NextResponse.json(result);
-  } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "生图失败" },
-      { status: 400 },
+    const recovered = await reconcileDetailPageSuiteProjectFromAssets(
+      auth.userId,
+      result.project,
     );
+    if (result.failures.length > 0) {
+      console.error("[detail-page-suite] images/generate partial failure", {
+        projectId: id,
+        userId: auth.userId,
+        generated: result.generated,
+        failures: result.failures,
+      });
+    }
+    return NextResponse.json({
+      ...result,
+      project: recovered.project,
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "生图失败";
+    console.error("[detail-page-suite] images/generate error", {
+      projectId: id,
+      userId: auth.userId,
+      message,
+    });
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

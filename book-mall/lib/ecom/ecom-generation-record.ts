@@ -183,9 +183,31 @@ export async function deleteEcomGenerationRecord(
   await prisma.ecomAsset.delete({ where: { id: row.id } });
 }
 
-export async function listEcomGenerationRecords(userId: string, take = 500) {
+export type ListEcomGenerationRecordsOpts = {
+  take?: number;
+  /** meta.projectId 精确匹配 */
+  projectId?: string;
+};
+
+export async function listEcomGenerationRecords(
+  userId: string,
+  opts: ListEcomGenerationRecordsOpts = {},
+) {
+  const take = opts.take ?? 500;
+  const projectId = opts.projectId?.trim();
   return prisma.ecomAsset.findMany({
-    where: { userId, module: ECOM_GENERATION_RECORD_MODULE },
+    where: {
+      userId,
+      module: ECOM_GENERATION_RECORD_MODULE,
+      ...(projectId
+        ? {
+            meta: {
+              path: ["projectId"],
+              equals: projectId,
+            },
+          }
+        : {}),
+    },
     orderBy: { createdAt: "desc" },
     take,
   });

@@ -16,6 +16,37 @@ describe("detail-page-suite-pending (client)", () => {
     expect(listDetailPageSuitePendingImageKeys(meta)).toEqual(["mod1::item_a"]);
   });
 
+  it("reconcile drops pending when slot has new image after startedAt", () => {
+    const startedAt = "2026-09-13T10:00:00.000Z";
+    const meta = {
+      pendingImages: {
+        "mod1::item_a": { startedAt },
+      },
+    };
+    const suite = {
+      modules: [
+        {
+          module_id: "mod1",
+          enable: true,
+          generate_count: 1,
+          slots: [
+            {
+              item_key: "item_a",
+              item_label: "A",
+              positive_prompt: "p",
+              imageUrl: "https://cdn.example/a.png",
+              imageHistory: [
+                { url: "https://cdn.example/a.png", createdAt: "2026-09-13T10:00:01.000Z" },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const reconciled = reconcileDetailPageSuitePendingMeta(suite as never, meta);
+    expect(reconciled?.pendingImages).toBeUndefined();
+  });
+
   it("reconcile drops stale pending", () => {
     const meta = {
       pendingImages: {

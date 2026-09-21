@@ -135,7 +135,7 @@ export function gatewayRouteDisplayName(
 ): string {
   const mk = modelKey.trim();
   const labels: Record<string, string> = {
-    "gpt-image-2": "GPT Image 2 (KIE) T2I/I2I",
+    "gpt-image-2": "GPT Image 2.0 (KIE) T2I/I2I",
     "google/nano-banana": "NanoBanana Gemini 2.5 Flash T2I",
     "google/nano-banana-edit": "NanoBanana Gemini 2.5 Flash I2I",
     "4o-image": "4o Image T2I/I2I",

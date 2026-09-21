@@ -36,7 +36,7 @@
       "coverUrl": "https://static.aiquickdraw.com/tools/example/1767694885407_pObJoMcy.png",
       "providerLabel": "OpenAI",
       "taskTags": ["Text to Image", "Image to Image"],
-      "readme": "GPT Image 2 · 文生图 / 图生图（input_urls）。"
+      "readme": "GPT Image 2.0 · 文生图 / 图生图（input_urls，支持产品参考图）。"
     },
     "gpt-image-1": {
       "coverUrl": "https://static.aiquickdraw.com/tools/example/1767694885407_pObJoMcy.png",

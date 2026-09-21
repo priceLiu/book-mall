@@ -26,7 +26,7 @@ export function suiteBusyStatusForChoice(message: string): DetailPageSuiteBusySt
   if (trimmed === "生成全部提示词") {
     return {
       title: "生成提示词中",
-      detail: "LLM 正在为各模块子维度撰写出图提示词，约需 1–3 分钟…",
+      detail: "LLM 正在按模块逐批撰写出图提示词，进度见下方状态…",
       sweep: true,
     };
   }

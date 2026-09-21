@@ -20,6 +20,10 @@ import {
   type ProductDesignReference,
 } from "@/lib/ecom/ecom-product-design-types";
 import {
+  attachDetailStyleSlicesToPlan,
+  ensureDetailStyleSlicesOnPlan,
+} from "@/lib/ecom/ecom-product-design-detail-style-slices";
+import {
   getProductDesignProject,
   updateProductDesignProject,
 } from "@/lib/ecom/ecom-product-design-service";
@@ -105,7 +109,7 @@ function refLegendNote(
   if (refs.length === 0) return "";
   const lines = refLegendLines(refs, target);
   return [
-    "参考图清单（prompt 里请用 @产品实拍N / @参考图N / @模特N，或兼容旧 @图片N）：",
+    "参考图清单（prompt 里请用 @产品实拍N / @详情页参考N（详情风格）/ @参考图N / @模特N，或兼容旧 @图片N）：",
     ...lines,
     "硬性要求：每条 prompt 都必须把商品锁定到 @产品实拍1（或对应商品实拍 token），明确写出商品的颜色/版型/材质以其为准；严禁把风格/模特参考里的商品当成本次商品。",
   ].join("\n");
@@ -437,15 +441,32 @@ export async function decomposeImageGenPlan(opts: {
 
   const designPatch = designPatchFromPlan(plan, baseDesign, target);
 
+  let finalPlan = plan;
+  if (target === "detail" && styleRefs[0]) {
+    finalPlan = await attachDetailStyleSlicesToPlan({
+      userId: opts.userId,
+      projectId: opts.projectId,
+      plan,
+      primaryStyleRef: styleRefs[0]!,
+    });
+    designPatch.imageGenPlans = {
+      ...(designPatch.imageGenPlans ?? {}),
+      detail: finalPlan,
+    };
+  }
+
   const updated = await updateProductDesignProject(opts.userId, opts.projectId, {
     designPatch,
     settings: {
       visionModelKey: modelKey,
-      ...countSettingsFromPlan(plan, target),
+      ...countSettingsFromPlan(finalPlan, target),
     },
   });
 
-  return { plan, project: updated ?? { ...project, design: mergeProductDesign(baseDesign, designPatch) } };
+  return {
+    plan: finalPlan,
+    project: updated ?? { ...project, design: mergeProductDesign(baseDesign, designPatch) },
+  };
 }
 
 export async function deriveImageGenPlan(opts: {
@@ -612,9 +633,17 @@ export async function patchImageGenPlan(opts: {
     settings: countSettingsFromPlan(plan, opts.target),
   });
 
+  if (opts.target === "detail") {
+    await ensureDetailStyleSlicesOnPlan({
+      userId: opts.userId,
+      projectId: opts.projectId,
+    });
+  }
+
   const updated = await getProductDesignProject(opts.userId, opts.projectId);
   if (!updated) throw new Error("项目不存在");
-  return { plan, project: updated };
+  const savedPlan = updated.design?.imageGenPlans?.[opts.target] ?? plan;
+  return { plan: savedPlan, project: updated };
 }
 
 export async function confirmImageGenPlan(opts: {

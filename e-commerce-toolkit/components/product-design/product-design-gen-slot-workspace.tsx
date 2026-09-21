@@ -166,25 +166,30 @@ export function ProductDesignGenSlotWorkspace({
       : null;
 
   const saveRows = useCallback(
-    async (nextRows: GenSlotRow[]) => {
+    async (nextRows: GenSlotRow[], opts?: { quiet?: boolean }) => {
       const items: ImageGenPlanItem[] = nextRows.map((row, i) => ({
         index: i + 1,
         title: row.title.trim() || `${label} ${i + 1}`,
         purpose: row.purpose?.trim() || undefined,
         prompt: row.prompt,
       }));
-      setBusy("正在保存…");
+      if (!opts?.quiet) setBusy("正在保存…");
       try {
         await patchProductDesignImagePlan(project.id, { target, items });
-        await onProjectChange();
+        if (opts?.quiet) {
+          void onProjectChange();
+        } else {
+          await onProjectChange();
+        }
       } catch (e) {
         await alert({
           title: "保存失败",
           message: e instanceof Error ? e.message : "未知错误",
           variant: "error",
         });
+        throw e;
       } finally {
-        setBusy(null);
+        if (!opts?.quiet) setBusy(null);
       }
     },
     [alert, label, onProjectChange, project.id, target],
@@ -251,7 +256,7 @@ export function ProductDesignGenSlotWorkspace({
       });
       return;
     }
-    await saveRows(current);
+    await saveRows(current, { quiet: true });
     if (isGenerateAll) setGenerateAllActive(true);
     try {
       await onGenerate(indexes);
@@ -270,7 +275,7 @@ export function ProductDesignGenSlotWorkspace({
       });
       return;
     }
-    await saveRows(rowsRef.current);
+    await saveRows(rowsRef.current, { quiet: true });
     await onGenerate([index]);
   };
 
@@ -398,7 +403,7 @@ export function ProductDesignGenSlotWorkspace({
         </div>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         {rows.map((row) => {
           const generating = cardGeneratingFor(row.index);
           const rowLocked = generating || generateAllActive;

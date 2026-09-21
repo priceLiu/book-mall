@@ -429,9 +429,9 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   },
   {
     modelKey: "gpt-image-2",
-    displayName: "GPT Image 2 (KIE)",
+    displayName: "GPT Image 2.0",
     role: "IMAGE",
-    description: "OpenAI GPT Image 2 · 海报 / 排版；有参考图时走图生图。",
+    description: "GPT Image 2.0 · 海报 / 排版；有参考图时走图生图。",
     paramsSchema: [
       ...STD_IMAGE_ASPECT_SCHEMA,
       {

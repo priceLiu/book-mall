@@ -69,6 +69,8 @@ function slotHasImageAfter(
   if (slot.imageUrl?.trim()) {
     const history = slot.imageHistory ?? [];
     if (history.length === 0) return true;
+    const last = history[history.length - 1];
+    if (last?.url?.trim() && last.createdAt >= sinceIso) return true;
     return history.some((h) => h.createdAt >= sinceIso && h.url?.trim());
   }
   return false;
@@ -92,7 +94,9 @@ export function reconcileDetailPageSuitePendingMeta(
     const moduleId = key.slice(0, idx);
     const slotKey = key.slice(idx + 2);
     const mod = suite.modules.find((m) => m.module_id === moduleId);
-    const stale = now - Date.parse(entry.startedAt) > STALE_IMAGE_MS;
+    const started = Date.parse(entry.startedAt);
+    const stale =
+      !Number.isFinite(started) || now - started > STALE_IMAGE_MS;
     if (!mod || stale || slotHasImageAfter(mod, slotKey, entry.startedAt)) {
       delete pendingImages[key];
     }
@@ -100,7 +104,9 @@ export function reconcileDetailPageSuitePendingMeta(
 
   for (const [moduleId, entry] of Object.entries(pendingPromptModules)) {
     const mod = suite.modules.find((m) => m.module_id === moduleId);
-    const stale = now - Date.parse(entry.startedAt) > STALE_PROMPT_MS;
+    const started = Date.parse(entry.startedAt);
+    const stale =
+      !Number.isFinite(started) || now - started > STALE_PROMPT_MS;
     if (!mod || stale) {
       delete pendingPromptModules[moduleId];
       continue;

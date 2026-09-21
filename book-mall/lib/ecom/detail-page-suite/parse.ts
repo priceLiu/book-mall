@@ -1,3 +1,4 @@
+import { moduleStateFromTemplateDef } from "./module-init";
 import {
   ECOM_DETAIL_PAGE_SUITE_GLOBAL_MAX,
   type DetailPageSuiteBrief,
@@ -44,10 +45,13 @@ export function sanitizeReferences(raw: unknown): DetailPageSuiteReference[] {
       const o = item as Record<string, unknown>;
       const ossUrl = String(o.ossUrl ?? "").trim();
       if (!ossUrl) return null;
+      const rawRole = String(o.role ?? "product").trim();
+      const role =
+        rawRole === "reference_suite" || rawRole === "model" ? rawRole : ("product" as const);
       return {
         id: String(o.id ?? ossUrl),
-        label: String(o.label ?? "产品图"),
-        role: "product" as const,
+        label: String(o.label ?? (role === "reference_suite" ? "参考套图" : "产品图")),
+        role,
         ossUrl,
       };
     })
@@ -81,17 +85,7 @@ export function suiteFromTemplate(template: DetailPageSuiteTemplateDto): DetailP
   return {
     templateId: template.id,
     templateSnapshot: template,
-    modules: template.modules.map((m) => ({
-      module_id: m.module_id,
-      module_name: m.module_name,
-      enable: true,
-      generate_count: m.max_num,
-      max_num: m.max_num,
-      select_mode: "manual",
-      candidate_pool: [...m.candidate_pool],
-      selected_item_list: [...m.candidate_pool].slice(0, m.max_num),
-      slots: [],
-    })),
+    modules: template.modules.map((m) => moduleStateFromTemplateDef(m)),
   };
 }
 
@@ -124,6 +118,10 @@ export function parseSuite(raw: unknown): DetailPageSuiteState {
                   item_label,
                   source: slot.source === "user" ? "user" : "template",
                   positive_prompt: String(slot.positive_prompt ?? ""),
+                  negative_prompt:
+                    typeof slot.negative_prompt === "string"
+                      ? slot.negative_prompt
+                      : undefined,
                   imageUrl: typeof slot.imageUrl === "string" ? slot.imageUrl : undefined,
                   assetId: typeof slot.assetId === "string" ? slot.assetId : undefined,
                   promptEdited: slot.promptEdited === true,
@@ -158,7 +156,44 @@ export function parseSuite(raw: unknown): DetailPageSuiteState {
 
 export function parseBrief(raw: unknown): DetailPageSuiteBrief | null {
   if (!raw || typeof raw !== "object") return null;
-  return raw as DetailPageSuiteBrief;
+  const o = raw as Record<string, unknown>;
+  const sizeChartRaw = o.sizeChart;
+  let sizeChart: DetailPageSuiteBrief["sizeChart"];
+  if (sizeChartRaw && typeof sizeChartRaw === "object" && !Array.isArray(sizeChartRaw)) {
+    const sc = sizeChartRaw as Record<string, unknown>;
+    const tables = Array.isArray(sc.tables)
+      ? sc.tables
+          .map((t) => {
+            if (!t || typeof t !== "object") return null;
+            const row = t as Record<string, unknown>;
+            const headers = Array.isArray(row.headers)
+              ? row.headers.map((h) => String(h).trim()).filter(Boolean)
+              : [];
+            const rows = Array.isArray(row.rows)
+              ? row.rows
+                  .map((r) =>
+                    Array.isArray(r) ? r.map((c) => String(c).trim()) : [],
+                  )
+                  .filter((r) => r.length > 0)
+              : [];
+            if (headers.length === 0 || rows.length === 0) return null;
+            return {
+              title: typeof row.title === "string" ? row.title.trim() : undefined,
+              headers,
+              rows,
+              isDemo: row.isDemo === true,
+            };
+          })
+          .filter(Boolean)
+      : [];
+    sizeChart = {
+      ...(typeof sc.fitNote === "string" && sc.fitNote.trim()
+        ? { fitNote: sc.fitNote.trim() }
+        : {}),
+      ...(tables.length > 0 ? { tables: tables as NonNullable<DetailPageSuiteBrief["sizeChart"]>["tables"] } : {}),
+    };
+  }
+  return { ...(o as DetailPageSuiteBrief), ...(sizeChart ? { sizeChart } : {}) };
 }
 
 export function parseSettings(raw: unknown): DetailPageSuiteSettings {

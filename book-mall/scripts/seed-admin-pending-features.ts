@@ -1254,6 +1254,22 @@ const SEED_ITEMS: {
     sortOrder: 760,
     listKind: "PENDING",
   },
+  {
+    title: "详情页套图复刻",
+    description:
+      "参考详情长图 Vision 拆解 + 12 模块框架润色出图。上传参考套图/产品/可选模特 + 卖点识图，两阶段 JSON，复用套图出图与 mod7 尺码表。见 docs/ecom/详情页套图复刻.md",
+    docPath: "docs/ecom/详情页套图复刻.md",
+    sortOrder: 765,
+    listKind: "PENDING",
+  },
+  {
+    title: "爆款详情页套图",
+    description:
+      "竞品长图只学结构/叙事/氛围，不复用原文原图；用户上传自有新品后原创重写文案并出图。卡位可增删排序改数量。见 docs/ecom/爆款详情页套图.md",
+    docPath: "docs/ecom/爆款详情页套图.md",
+    sortOrder: 766,
+    listKind: "PENDING",
+  },
   // —— 模型场景模板（与 QR/电商「内容模板」无关 · 见 24-model-scene-templates.md）——
   {
     title: "MT-100 模型场景模板 · 总规格",

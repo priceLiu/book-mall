@@ -105,6 +105,14 @@ export const imageGenPlanItemSchema = z.object({
   purpose: z.string().optional(),
   prompt: z.string().min(1),
   copySnapshot: z.record(z.unknown()).optional(),
+  /** 详情长图按屏切分后的 OSS 地址（出图垫图用，非整页长图） */
+  styleSliceOssUrl: z.string().url().optional(),
+});
+
+export const imageGenPlanStyleSliceMetaSchema = z.object({
+  sourceRefId: z.string().min(1),
+  sourceOssUrl: z.string().url(),
+  sliceCount: z.number().int().positive(),
 });
 
 export const imageGenPlanSchema = z.object({
@@ -113,6 +121,7 @@ export const imageGenPlanSchema = z.object({
   status: z.enum(["draft", "confirmed"]),
   productContext: productContextSchema.optional(),
   sharedVisualBrief: z.string().optional(),
+  styleSliceMeta: imageGenPlanStyleSliceMetaSchema.optional(),
   items: z.array(imageGenPlanItemSchema).min(1),
 });
 

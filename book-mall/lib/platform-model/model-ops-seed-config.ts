@@ -242,6 +242,7 @@ export const ECOM_SCENE_MODEL_KEYS = {
     "wan2.6-image",
     "kling-3.0-image",
     "nano-banana-pro",
+    "gpt-image-2",
   ],
   "ecom-media-decompose-chat": [...ECOM_VIDEO_UNDERSTANDING_CHAT_MODEL_KEYS],
   "ecom-film-pull-chat": [...ECOM_VIDEO_UNDERSTANDING_CHAT_MODEL_KEYS],

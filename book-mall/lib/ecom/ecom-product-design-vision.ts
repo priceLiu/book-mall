@@ -12,6 +12,7 @@ import {
 import {
   getVisionMaxInputImages,
   orderRefsForModel,
+  productDesignStyleLikeReferences,
 } from "@/lib/ecom/ecom-product-design-ref-rules";
 import {
   getProductDesignProject,
@@ -73,6 +74,7 @@ export async function drainEcomGwChat(
     modelKey: string;
     messages: CanvasChatMessage[];
     clientPage?: string;
+    params?: Record<string, unknown>;
   },
 ): Promise<string> {
   const gw = await ecomGwChatStream(userId, opts);
@@ -141,8 +143,7 @@ export function refsForVisionAnalysis(
   modelKey: string,
 ): ProductDesignReference[] {
   const product = filterProductDesignReferencesByRole(references, ["product"]);
-  const styleRole = target === "main" ? "main-style" : "detail-style";
-  const style = filterProductDesignReferencesByRole(references, [styleRole]);
+  const style = productDesignStyleLikeReferences(references, target);
   return orderRefsForModel(product, style, getVisionMaxInputImages(modelKey)).ordered;
 }
 

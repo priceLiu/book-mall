@@ -18,6 +18,7 @@ import {
   resolveDetailPageSuiteSlotHistory,
 } from "@/lib/detail-page-suite-slot-images";
 import type { EcomImagePreviewItem } from "@/lib/media/ecom-image-preview";
+import { isDetailPageSuiteSizeChartPromptMarker } from "@/lib/detail-page-suite-size-chart";
 import type { DetailPageSuiteSlot } from "@/lib/detail-page-suite-types";
 import { useSaveToCatalog } from "@/lib/use-save-to-catalog";
 import { cn } from "@/lib/utils";
@@ -31,7 +32,6 @@ type Props = {
   selectable?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
-  onRegenerateImage?: () => void;
   onPreviewImage?: (payload: {
     src: string;
     title: string;
@@ -40,8 +40,10 @@ type Props = {
   }) => void;
   onPreviewPrompt?: () => void;
   onOpenPromptEdit?: () => void;
-  onRewritePrompt?: () => void;
   onActiveImageIndexChange?: (index: number) => void;
+  imageGenError?: string;
+  /** 爆款：始终展示模块文案占位 */
+  slotCopyMode?: "hit";
 };
 
 export function DetailPageSuiteSlotCard({
@@ -53,12 +55,12 @@ export function DetailPageSuiteSlotCard({
   selectable = false,
   selected = false,
   onToggleSelect,
-  onRegenerateImage,
   onPreviewImage,
   onPreviewPrompt,
   onOpenPromptEdit,
-  onRewritePrompt,
   onActiveImageIndexChange,
+  imageGenError,
+  slotCopyMode,
 }: Props) {
   const saveToCatalog = useSaveToCatalog();
   const history = useMemo(() => resolveDetailPageSuiteSlotHistory(slot), [slot]);
@@ -81,7 +83,9 @@ export function DetailPageSuiteSlotCard({
   const displayUrl = activeImage?.url ?? null;
   const hasMultiple = history.length > 1;
   const cardWidth = detailPageCardWidth(displayRatio);
-  const hasPrompt = Boolean(slot.positive_prompt?.trim());
+  const hasPrompt =
+    Boolean(slot.positive_prompt?.trim()) ||
+    isDetailPageSuiteSizeChartPromptMarker(slot.positive_prompt);
 
   const shiftActive = useCallback(
     (delta: number) => {
@@ -125,15 +129,15 @@ export function DetailPageSuiteSlotCard({
           <label
             className={cn(
               "absolute left-2 top-2 z-20 flex items-center gap-1 rounded-md bg-white/90 px-1.5 py-0.5 shadow-sm",
-              hasPrompt ? "cursor-pointer" : "cursor-not-allowed opacity-60",
+              busy ? "cursor-not-allowed opacity-60" : "cursor-pointer",
             )}
             onClick={(e) => e.stopPropagation()}
-            title={hasPrompt ? "勾选参与出图" : "请先生成提示词"}
+            title="勾选参与批量操作"
           >
             <input
               type="checkbox"
-              checked={hasPrompt ? selected : false}
-              disabled={!hasPrompt}
+              checked={selected}
+              disabled={busy}
               onChange={onToggleSelect}
               aria-label={`选择 ${slot.item_label}`}
               className="h-3.5 w-3.5 accent-[var(--ecom-primary)]"
@@ -168,39 +172,30 @@ export function DetailPageSuiteSlotCard({
         ) : hasPrompt && onOpenPromptEdit ? (
           <button
             type="button"
-            title="点击编辑出图提示词"
+            title={
+              isDetailPageSuiteSizeChartPromptMarker(slot.positive_prompt)
+                ? "点击编辑尺码参数"
+                : "点击编辑出图提示词"
+            }
             disabled={busy}
-            className="flex h-full w-full flex-col items-stretch justify-between gap-2 px-3 py-3 text-left transition hover:bg-[#ebebed] disabled:cursor-default disabled:hover:bg-transparent"
+            className="flex h-full w-full items-stretch px-3 py-3 text-left transition hover:bg-[#ebebed] disabled:cursor-default disabled:hover:bg-transparent"
             onClick={(e) => {
               e.stopPropagation();
               onOpenPromptEdit();
             }}
           >
-            <p className="line-clamp-[9] w-full text-[10px] leading-relaxed text-[#424245]">
-              {slot.positive_prompt}
+            <p className="line-clamp-[10] w-full text-[10px] leading-relaxed text-[#424245]">
+              {isDetailPageSuiteSizeChartPromptMarker(slot.positive_prompt)
+                ? "系统尺码表 · 已就绪，点击编辑尺码数据后生图"
+                : slot.positive_prompt}
             </p>
-            <span className="text-[10px] font-medium text-[#0071e3]">点击编辑提示词</span>
           </button>
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-3 text-[#86868b]">
             <ImageIcon className="h-8 w-8 opacity-40" />
-            <span className="text-xs">待生成提示词</span>
+            <span className="text-xs">{busy ? "提示词生成中…" : "待生成提示词"}</span>
           </div>
         )}
-
-        {!displayUrl && onRegenerateImage && hasPrompt && !busy ? (
-          <button
-            type="button"
-            title="生成此点位图"
-            className="absolute bottom-2 right-2 z-10 rounded-full bg-[#0071e3] px-2.5 py-1 text-[10px] font-medium text-white shadow-sm transition hover:bg-[#0077ed]"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRegenerateImage();
-            }}
-          >
-            出图
-          </button>
-        ) : null}
 
         {busy ? (
           <EcomMediaGeneratingBusy
@@ -262,7 +257,6 @@ export function DetailPageSuiteSlotCard({
                   }
                 : undefined
             }
-            onRegenerate={onRegenerateImage}
             onPreviewPrompt={onOpenPromptEdit ?? onPreviewPrompt}
             onSaveToCatalog={() =>
               saveToCatalog({
@@ -285,20 +279,30 @@ export function DetailPageSuiteSlotCard({
             <span className="shrink-0 text-[10px] text-[#86868b]">
               {history.length > 1 ? `${history.length} 版` : "已生成"}
             </span>
+          ) : imageGenError ? (
+            <span className="shrink-0 text-[10px] text-[#ff3b30]">出图失败</span>
           ) : null}
         </div>
-        {hasPrompt && onRewritePrompt ? (
-          <button
-            type="button"
-            disabled={busy}
-            className="text-[10px] text-[#0071e3] hover:underline disabled:cursor-default disabled:text-[#86868b] disabled:no-underline"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRewritePrompt();
-            }}
+        {slotCopyMode === "hit" ? (
+          <p
+            className="line-clamp-3 text-[10px] leading-relaxed text-[#424245]"
+            title={slot.slot_copy?.trim() || undefined}
           >
-            AI 重写本条
-          </button>
+            <span className="text-[#86868b]">模块文案：</span>
+            {slot.slot_copy?.trim() || "（未填写，可点格子编辑）"}
+          </p>
+        ) : slot.slot_copy?.trim() ? (
+          <p className="line-clamp-3 text-[10px] leading-relaxed text-[#424245]" title={slot.slot_copy}>
+            {slot.slot_copy}
+          </p>
+        ) : null}
+        {imageGenError ? (
+          <p
+            className="line-clamp-2 text-[10px] leading-relaxed text-[#ff3b30]"
+            title={imageGenError}
+          >
+            {imageGenError}
+          </p>
         ) : null}
       </div>
     </article>

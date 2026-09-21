@@ -31,6 +31,7 @@ import {
   ECOM_SLOT_HOVER_ACTIONS_ROW_CLASS,
   ECOM_SLOT_HOVER_OVERLAY_CLASS,
 } from "@/components/media/ecom-media-library-tile";
+import { ProductDesignModelRefUploader } from "@/components/product-design/product-design-model-ref-uploader";
 import { ProductDesignRefUploader } from "@/components/product-design/product-design-ref-uploader";
 import { ProductDesignGenSlotWorkspace } from "@/components/product-design/product-design-gen-slot-workspace";
 import { fetchAssetById } from "@/lib/ecom-api";
@@ -50,8 +51,7 @@ import {
   type DetailWorkflowPath,
   resolveActiveTrack,
   isStepInTrack,
-  defaultMainImageRefPrompt,
-  defaultDetailPageRefPrompt,
+  resolveProductDesignIntentPrompt,
   appendMainImageSlots,
   PRODUCT_DESIGN_MAIN_IMAGE_SLOTS_MAX,
   isFastDetailPath,
@@ -168,6 +168,11 @@ type Props = {
     assets: Array<{ id: string; ossUrl: string; title: string }>,
     role: ProductDesignReferenceRole,
   ) => Promise<void>;
+  onAttachModelFromLibrary?: (entry: {
+    id: string;
+    name: string;
+    ossUrl: string;
+  }) => Promise<void>;
   refBusy?: boolean;
   uploadingRole?: ProductDesignReferenceRole | null;
   uploadProgress?: number | null;
@@ -232,6 +237,7 @@ export function ProductDesignContentPanel({
   onRefUpload,
   onRefRemove,
   onAttachAssets,
+  onAttachModelFromLibrary,
   refBusy,
   uploadingRole = null,
   uploadProgress = null,
@@ -282,10 +288,14 @@ export function ProductDesignContentPanel({
   useEffect(() => {
     if (genPipeline?.step !== "image-model") setImagePickerSubmitting(false);
   }, [genPipeline?.step]);
-  const [generatingTarget, setGeneratingTarget] = useState<{
+  type GeneratingBatch = {
+    id: number;
     target: "main" | "detail";
-    indexes?: number[];
-  } | null>(null);
+    indexes: number[];
+  };
+  const genBatchIdRef = useRef(0);
+  const generatingBatchesRef = useRef<GeneratingBatch[]>([]);
+  const [generatingBatches, setGeneratingBatches] = useState<GeneratingBatch[]>([]);
   const [mainGenMode, setMainGenMode] = useState<
     "copy" | "reference-decompose" | "reference-prompt" | "reference"
   >(
@@ -319,49 +329,40 @@ export function ProductDesignContentPanel({
     }
   }, []);
 
-  const startGenPoll = useCallback(
-    (target: "main" | "detail", indexes?: number[]) => {
+  useEffect(() => {
+    generatingBatchesRef.current = generatingBatches;
+  }, [generatingBatches]);
+
+  const syncGenPoll = useCallback(() => {
+    if (generatingBatchesRef.current.length === 0) {
       stopGenPoll();
-      genPollRef.current = setInterval(() => {
-        void getProductDesignProject(project.id)
-          .then((refreshed) => {
-            void onProjectChange();
+      return;
+    }
+    if (genPollRef.current) return;
+    genPollRef.current = setInterval(() => {
+      void getProductDesignProject(project.id)
+        .then((refreshed) => {
+          void onProjectChange();
+          const batches = generatingBatchesRef.current;
+          if (batches.length === 0) {
+            stopGenPoll();
+            return;
+          }
+          const allDone = batches.every((batch) => {
             const items =
-              target === "main"
+              batch.target === "main"
                 ? refreshed.design?.mainImages
                 : refreshed.design?.detailPages;
-            if (!items?.length) return;
-            const pending = (indexes?.length ? indexes : items.map((i) => i.index)).filter(
-              (idx) => !items.find((i) => i.index === idx)?.imageUrl,
+            if (!items?.length) return false;
+            return batch.indexes.every((idx) =>
+              Boolean(items.find((i) => i.index === idx)?.imageUrl),
             );
-            if (pending.length === 0) stopGenPoll();
-          })
-          .catch(() => undefined);
-      }, 2500);
-    },
-    [onProjectChange, project.id, stopGenPoll],
-  );
-
-  useEffect(() => {
-    if (generatingTarget || project.status !== "generating") return;
-    for (const target of ["main", "detail"] as const) {
-      const items =
-        target === "main" ? project.design?.mainImages : project.design?.detailPages;
-      if (!items?.length) continue;
-      const pending = items.filter((i) => !i.imageUrl).map((i) => i.index);
-      if (pending.length === 0) continue;
-      setGeneratingTarget({ target, indexes: pending });
-      startGenPoll(target, pending);
-      break;
-    }
-  }, [
-    generatingTarget,
-    project.design?.detailPages,
-    project.design?.mainImages,
-    project.id,
-    project.status,
-    startGenPoll,
-  ]);
+          });
+          if (allDone) stopGenPoll();
+        })
+        .catch(() => undefined);
+    }, 2500);
+  }, [onProjectChange, project.id, stopGenPoll]);
 
   const [draftVisionKey, setDraftVisionKey] = useState(visionModelKey);
   const [draftModelKey, setDraftModelKey] = useState(imageModelKey);
@@ -723,13 +724,23 @@ export function ProductDesignContentPanel({
         wantedIndexes.includes(i.index) ? Boolean(i.imageUrl) : false,
       ).length;
 
-      setGeneratingTarget({ target, indexes: wantedIndexes });
+      const batchId = ++genBatchIdRef.current;
+      const batch: GeneratingBatch = {
+        id: batchId,
+        target,
+        indexes: wantedIndexes,
+      };
+      setGeneratingBatches((prev) => {
+        const next = [...prev, batch];
+        generatingBatchesRef.current = next;
+        return next;
+      });
       setBusy(
         wantedIndexes.length === 1
           ? `${label}第 ${wantedIndexes[0]} 张生成中`
           : `${label}生成中（0/${wantedIndexes.length}）`,
       );
-      startGenPoll(target, wantedIndexes);
+      syncGenPoll();
 
       const failures: Array<{ index: number; message: string }> = [];
       let generated = 0;
@@ -789,8 +800,13 @@ export function ProductDesignContentPanel({
         }
       }
 
-      setBusy(null);
-      setGeneratingTarget(null);
+      setGeneratingBatches((prev) => {
+        const next = prev.filter((b) => b.id !== batchId);
+        generatingBatchesRef.current = next;
+        if (next.length === 0) setBusy(null);
+        return next;
+      });
+      syncGenPoll();
     },
     [
       design?.mainImages,
@@ -801,19 +817,22 @@ export function ProductDesignContentPanel({
       imageSize,
       onProjectChange,
       alert,
-      startGenPoll,
+      syncGenPoll,
       stopGenPoll,
     ],
   );
 
   const cardGeneratingFor = useCallback(
-    (target: "main" | "detail", index: number) => {
-      if (!generatingTarget || generatingTarget.target !== target) return false;
-      if (!generatingTarget.indexes?.length) return true;
-      return generatingTarget.indexes.includes(index);
-    },
-    [generatingTarget],
+    (target: "main" | "detail", index: number) =>
+      generatingBatches.some(
+        (b) =>
+          b.target === target &&
+          (b.indexes.length === 0 || b.indexes.includes(index)),
+      ),
+    [generatingBatches],
   );
+
+  const hasActiveImageGen = generatingBatches.length > 0;
 
   const openMainSlotPreview = useCallback(
     (index: number) => {
@@ -860,23 +879,7 @@ export function ProductDesignContentPanel({
   );
 
   const startGeneratePipeline = useCallback(
-    async (target: "main" | "detail", indexes?: number[]) => {
-      if (
-        target === "main" &&
-        mainGenMode === "reference-prompt" &&
-        mainCustomPrompt.trim()
-      ) {
-        await saveMainGenSettings(mainGenMode, mainCustomPrompt);
-      }
-      if (
-        target === "detail" &&
-        project.settings.detailPageGenMode === "reference-prompt" &&
-        detailCustomPrompt.trim()
-      ) {
-        await updateProductDesignProject(project.id, {
-          settings: { detailPageCustomPrompt: detailCustomPrompt.trim() },
-        });
-      }
+    (target: "main" | "detail", indexes?: number[]) => {
       setGenPipeline({
         target,
         indexes,
@@ -886,6 +889,22 @@ export function ProductDesignContentPanel({
         draftSummary: "",
         draftPrompt: "",
       });
+      if (
+        target === "main" &&
+        mainGenMode === "reference-prompt" &&
+        mainCustomPrompt.trim()
+      ) {
+        void saveMainGenSettings(mainGenMode, mainCustomPrompt);
+      }
+      if (
+        target === "detail" &&
+        project.settings.detailPageGenMode === "reference-prompt" &&
+        detailCustomPrompt.trim()
+      ) {
+        void updateProductDesignProject(project.id, {
+          settings: { detailPageCustomPrompt: detailCustomPrompt.trim() },
+        }).catch(() => undefined);
+      }
     },
     [
       mainGenMode,
@@ -893,6 +912,7 @@ export function ProductDesignContentPanel({
       saveMainGenSettings,
       visionModelKey,
       detailCustomPrompt,
+      project.id,
       project.settings.detailPageGenMode,
     ],
   );
@@ -1112,6 +1132,27 @@ export function ProductDesignContentPanel({
     specs[0] ??
     null;
 
+  const mainProjectForIntentPrompt = useMemo(
+    () =>
+      fastMainSpec != null ? { ...project, platform: fastMainSpec.code } : project,
+    [project, fastMainSpec],
+  );
+
+  const mainIntentPromptDisplay = useMemo(
+    () =>
+      resolveProductDesignIntentPrompt(
+        mainProjectForIntentPrompt,
+        mainCustomPrompt,
+        "main",
+      ),
+    [mainProjectForIntentPrompt, mainCustomPrompt],
+  );
+
+  const detailIntentPromptDisplay = useMemo(
+    () => resolveProductDesignIntentPrompt(project, detailCustomPrompt, "detail"),
+    [project, detailCustomPrompt],
+  );
+
   const confirmFastMainSetup = useCallback(async () => {
     if (!fastMainSpec) {
       await alert({
@@ -1123,16 +1164,11 @@ export function ProductDesignContentPanel({
     }
     const detailCount =
       project.settings.detailPageCount ?? fastMainSpec.detailPage.recommended;
-    const prompt =
-      mainCustomPrompt.trim() ||
-      defaultMainImageRefPrompt({
-        ...project,
-        platform: fastMainSpec.code,
-        settings: {
-          ...project.settings,
-          mainImageGenMode: "reference-prompt",
-        },
-      });
+    const prompt = resolveProductDesignIntentPrompt(
+      { ...project, platform: fastMainSpec.code },
+      mainCustomPrompt,
+      "main",
+    );
     setBusy("正在初始化…");
     try {
       await updateProductDesignProject(project.id, {
@@ -1163,15 +1199,11 @@ export function ProductDesignContentPanel({
   const confirmFastDetailSetup = useCallback(async () => {
     const detailSpec = spec ?? specs[0];
     if (!detailSpec) return;
-    const prompt =
-      detailCustomPrompt.trim() ||
-      defaultDetailPageRefPrompt({
-        ...project,
-        settings: {
-          ...project.settings,
-          detailPageGenMode: "reference-prompt",
-        },
-      });
+    const prompt = resolveProductDesignIntentPrompt(
+      project,
+      detailCustomPrompt,
+      "detail",
+    );
     setBusy("正在初始化…");
     try {
       await updateProductDesignProject(project.id, {
@@ -1198,13 +1230,20 @@ export function ProductDesignContentPanel({
     await startAnalyzeForPlan({
       target: "main",
       decomposeSource: mainCustomPrompt.trim() ? "reference-intent" : "reference-decompose",
-      intentPrompt: mainCustomPrompt.trim() || undefined,
+      intentPrompt: mainCustomPrompt.trim()
+        ? resolveProductDesignIntentPrompt(
+            mainProjectForIntentPrompt,
+            mainCustomPrompt,
+            "main",
+          )
+        : undefined,
     });
   }, [
     project,
     confirmFastMainSetup,
     startAnalyzeForPlan,
     mainCustomPrompt,
+    mainProjectForIntentPrompt,
   ]);
 
   const requestDetailPlanAnalyze = useCallback(async () => {
@@ -1214,7 +1253,9 @@ export function ProductDesignContentPanel({
     await startAnalyzeForPlan({
       target: "detail",
       decomposeSource: detailCustomPrompt.trim() ? "reference-intent" : "reference-decompose",
-      intentPrompt: detailCustomPrompt.trim() || undefined,
+      intentPrompt: detailCustomPrompt.trim()
+        ? resolveProductDesignIntentPrompt(project, detailCustomPrompt, "detail")
+        : undefined,
     });
   }, [
     project,
@@ -1463,7 +1504,7 @@ export function ProductDesignContentPanel({
             <EcomIconButton
               label="重新解析"
               icon={RefreshCw}
-              disabled={streaming || (Boolean(busy) && !generatingTarget)}
+              disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
               onClick={() => void handleResync()}
             />
             <EcomIconButton
@@ -1518,7 +1559,11 @@ export function ProductDesignContentPanel({
             onUpload={onRefUpload}
             onRemove={onRefRemove}
             onAttachAssets={onAttachAssets}
-            busy={Boolean(refBusy) && uploadingRole !== "product"}
+            busy={
+              Boolean(refBusy) &&
+              uploadingRole !== "product" &&
+              uploadingRole !== "model"
+            }
             uploadProgress={
               uploadingRole === (detailTrack ? "detail-style" : "main-style")
                 ? uploadProgress
@@ -1526,10 +1571,28 @@ export function ProductDesignContentPanel({
             }
           />
         </div>
+        {detailTrack ? (
+          <div className="mt-3">
+            <ProductDesignModelRefUploader
+              references={project.references}
+              visionModelKey={visionModelKey}
+              imageModelKey={imageModelKey}
+              onUpload={onRefUpload}
+              onRemove={onRefRemove}
+              onAttachModelFromLibrary={onAttachModelFromLibrary}
+              busy={
+                Boolean(refBusy) &&
+                uploadingRole !== "product" &&
+                uploadingRole !== "detail-style"
+              }
+              uploadProgress={uploadingRole === "model" ? uploadProgress : null}
+            />
+          </div>
+        ) : null}
       </section>
 
       <StoryboardTaskStatus
-        active={Boolean(busy)}
+        active={Boolean(busy) && genPipeline?.step !== "analyzing"}
         title={busy ?? ""}
         className="mt-3"
         surface="chrome"
@@ -1550,7 +1613,7 @@ export function ProductDesignContentPanel({
                 <button
                   key={s.code}
                   type="button"
-                  disabled={streaming || (Boolean(busy) && !generatingTarget)}
+                  disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
                   className={cn(
                     "rounded-lg border px-3 py-1.5 text-[11px] transition-colors",
                     project.platform === s.code
@@ -1569,17 +1632,7 @@ export function ProductDesignContentPanel({
                   2. Prompt（可 @ 参考图）
                 </p>
                 <ProductDesignPromptMentionTextarea
-                  value={
-                    mainCustomPrompt.trim() ||
-                    defaultMainImageRefPrompt({
-                      ...project,
-                      platform: fastMainSpec.code,
-                      settings: {
-                        ...project.settings,
-                        mainImageGenMode: "reference-prompt",
-                      },
-                    })
-                  }
+                  value={mainIntentPromptDisplay}
                   referenceImages={promptMentionRefs}
                   disabled={Boolean(busy)}
                   onChange={setMainCustomPrompt}
@@ -1591,7 +1644,7 @@ export function ProductDesignContentPanel({
                 <EcomButtonPrimary
                   size="sm"
                   type="button"
-                  disabled={streaming || (Boolean(busy) && !generatingTarget)}
+                  disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
                   onClick={() => void handleFastMainAnalyze()}
                 >
                   分析
@@ -1609,7 +1662,7 @@ export function ProductDesignContentPanel({
             target="main"
             ratio={project.resolved.mainImageRatio}
             title="主图 · Prompt 与出图"
-            disabled={streaming || (Boolean(busy) && !generatingTarget)}
+            disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
             mode="decompose"
             onProjectChange={onProjectChange}
             onRequestAnalyze={() => void requestMainPlanAnalyze()}
@@ -1638,18 +1691,9 @@ export function ProductDesignContentPanel({
                     意图 Prompt（可 @ 参考图）
                   </p>
                   <ProductDesignPromptMentionTextarea
-                    value={
-                      mainCustomPrompt.trim() ||
-                      defaultMainImageRefPrompt({
-                        ...project,
-                        settings: {
-                          ...project.settings,
-                          mainImageGenMode: "reference-prompt",
-                        },
-                      })
-                    }
+                    value={mainIntentPromptDisplay}
                     referenceImages={promptMentionRefs}
-                    disabled={streaming || (Boolean(busy) && !generatingTarget)}
+                    disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
                     onChange={setMainCustomPrompt}
                   />
                 </div>
@@ -1673,12 +1717,9 @@ export function ProductDesignContentPanel({
               意图 Prompt（可选，可 @ 参考图）
             </p>
             <ProductDesignPromptMentionTextarea
-              value={
-                detailCustomPrompt.trim() ||
-                defaultDetailPageRefPrompt(project)
-              }
+              value={detailIntentPromptDisplay}
               referenceImages={detailPromptMentionRefs}
-              disabled={streaming || (Boolean(busy) && !generatingTarget)}
+              disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
               onChange={setDetailCustomPrompt}
               minHeightClass="min-h-[7rem]"
             />
@@ -1686,7 +1727,7 @@ export function ProductDesignContentPanel({
               <EcomButtonPrimary
                 size="sm"
                 type="button"
-                disabled={streaming || (Boolean(busy) && !generatingTarget)}
+                disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
                 onClick={() => void handleFastDetailAnalyze()}
               >
                 分析
@@ -1703,7 +1744,7 @@ export function ProductDesignContentPanel({
             target="detail"
             ratio={project.resolved.detailPageRatio}
             title="详情页 · Prompt 与出图"
-            disabled={streaming || (Boolean(busy) && !generatingTarget)}
+            disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
             mode="decompose"
             onProjectChange={onProjectChange}
             onRequestAnalyze={() => void requestDetailPlanAnalyze()}
@@ -1726,9 +1767,9 @@ export function ProductDesignContentPanel({
                       意图 Prompt（可选，可 @ 参考图）
                     </p>
                     <ProductDesignPromptMentionTextarea
-                      value={detailCustomPrompt.trim() || defaultDetailPageRefPrompt(project)}
+                      value={detailIntentPromptDisplay}
                       referenceImages={detailPromptMentionRefs}
-                      disabled={streaming || (Boolean(busy) && !generatingTarget)}
+                      disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
                       onChange={setDetailCustomPrompt}
                       minHeightClass="min-h-[7rem]"
                     />
@@ -1980,9 +2021,11 @@ export function ProductDesignContentPanel({
                     )}
                     onClick={() => {
                       setMainGenMode("reference-prompt");
-                      const next =
-                        mainCustomPrompt.trim() ||
-                        defaultMainImageRefPrompt(project);
+                      const next = resolveProductDesignIntentPrompt(
+                        project,
+                        mainCustomPrompt,
+                        "main",
+                      );
                       setMainCustomPrompt(next);
                       void saveMainGenSettings("reference-prompt", next);
                     }}
@@ -1993,7 +2036,7 @@ export function ProductDesignContentPanel({
                 {mainGenMode === "reference-prompt" ? (
                   <div className="space-y-2">
                     <ProductDesignPromptMentionTextarea
-                      value={mainCustomPrompt}
+                      value={mainIntentPromptDisplay}
                       referenceImages={promptMentionRefs}
                       disabled={Boolean(busy)}
                       onChange={setMainCustomPrompt}
@@ -2009,7 +2052,7 @@ export function ProductDesignContentPanel({
                 target="main"
                 ratio={project.resolved.mainImageRatio}
                 title="主图 · Prompt 与出图"
-                disabled={streaming || (Boolean(busy) && !generatingTarget)}
+                disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
                 mode="derive"
                 onProjectChange={onProjectChange}
                 onGenerate={(indexes) => void requestMainGenerate(indexes)}
@@ -2048,7 +2091,7 @@ export function ProductDesignContentPanel({
                 size="sm"
                 type="button"
                 className="mt-3"
-                disabled={streaming || (Boolean(busy) && !generatingTarget)}
+                disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
                 onClick={() => onContinueToDetailPages()}
               >
                 去做详情页
@@ -2078,7 +2121,7 @@ export function ProductDesignContentPanel({
                 target="detail"
                 ratio={project.resolved.detailPageRatio}
                 title="详情屏 · Prompt 与出图"
-                disabled={streaming || (Boolean(busy) && !generatingTarget)}
+                disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
                 mode="derive"
                 onProjectChange={onProjectChange}
                 onGenerate={(indexes) => void requestDetailGenerate(indexes)}
@@ -2106,18 +2149,33 @@ export function ProductDesignContentPanel({
       />
 
       <StoryboardTaskStatus
-        active={Boolean(generatingTarget)}
+        active={genPipeline?.step === "analyzing"}
+        title={
+          genPipeline?.purpose === "plan-decompose"
+            ? "视觉分析 · 拆解 Prompt"
+            : "视觉分析"
+        }
+        detail={
+          genPipeline?.purpose === "plan-decompose"
+            ? busy ??
+              "正在分析参考图并拆解为多条生图 Prompt，通常需 10～30 秒…"
+            : busy ?? "正在用视觉模型分析参考图，通常需 10～30 秒…"
+        }
+        surface="content"
+        sweep
+      />
+
+      <StoryboardTaskStatus
+        active={hasActiveImageGen}
         title="AI 出图中"
         detail={busy ?? "正在调用 Gateway 生图模型，请稍候…"}
         surface="content"
+        sweep
       />
 
       <StoryboardModelPickerDialog
-        open={
-          genPipeline?.step === "vision-model" || genPipeline?.step === "analyzing"
-        }
+        open={genPipeline?.step === "vision-model"}
         onOpenChange={(open) => {
-          if (!open && genPipeline?.step === "analyzing") return;
           if (!open) setGenPipeline(null);
         }}
         mode="image"
@@ -2132,9 +2190,6 @@ export function ProductDesignContentPanel({
         confirmLabel="开始分析"
         footerHint="选好模型后点击开始分析。"
         contentClassName={cn(PRODUCT_DESIGN_WIDE_DIALOG_CLASS, "gap-0 p-0")}
-        running={genPipeline?.step === "analyzing"}
-        runningTitle="分析中"
-        runningDetail={undefined}
         models={visionModels.length ? visionModels : imageModels}
         value={draftVisionKey}
         onChange={setDraftVisionKey}

@@ -390,7 +390,7 @@ export const CANVAS_BUILTIN_MODELS = [
   },
   {
     modelKey: "gpt-image-2",
-    displayName: "GPT Image 2",
+    displayName: "GPT Image 2.0",
     vendor: "openai",
     role: "IMAGE" as const,
     description: "GPT Image 2 · 海报 / 排版。",

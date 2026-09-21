@@ -157,6 +157,8 @@ const IMAGE_MODULE_IDS = [
   "main-image",
   "detail-page",
   "detail-page-suite",
+  "detail-page-suite-replica",
+  "detail-page-suite-hit",
   "hand-craft",
   "model-shot",
 ] as const;
@@ -178,6 +180,8 @@ const MODULE_TITLES: Record<string, { title: string; kind: "image" | "video" | "
   "main-image": { title: "电商主图", kind: "image" },
   "detail-page": { title: "电商详情页", kind: "image" },
   "detail-page-suite": { title: "详情页套图", kind: "image" },
+  "detail-page-suite-replica": { title: "详情页套图复刻", kind: "image" },
+  "detail-page-suite-hit": { title: "爆款详情页套图", kind: "image" },
   "hand-craft": { title: "手伴创作", kind: "image" },
   "model-shot": { title: "服装模特图", kind: "image" },
   "model-tryon": { title: "模特试衣", kind: "image" },

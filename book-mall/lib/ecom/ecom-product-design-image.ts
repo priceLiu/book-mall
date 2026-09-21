@@ -1,4 +1,6 @@
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
+import { ensureWan27MultiRefImageUrls } from "@/lib/ecom/ecom-dashscope-image-normalize";
+import { enrichProductDesignRefImageError } from "@/lib/ecom/ecom-product-design-ref-errors";
 import { generateEcomImage } from "@/lib/ecom/ecom-image-gen-invoke";
 import {
   getEcomPlatformSpec,
@@ -20,10 +22,15 @@ import {
   type ProductDesignMainImage,
   type ProductDesignReference,
 } from "@/lib/ecom/ecom-product-design-types";
+import { ensureDetailStyleSlicesOnPlan } from "@/lib/ecom/ecom-product-design-detail-style-slices";
 import {
   getImageGenMaxRefs,
   orderRefsForModel,
+  productDesignStyleLikeReferences,
+  refUrlsForDetailScreen,
+  referencesForDetailScreenLegend,
 } from "@/lib/ecom/ecom-product-design-ref-rules";
+import { resolveProductDesignStatusAfterGenBatch } from "@/lib/ecom/ecom-product-design-status";
 import { refLegendLines } from "@/lib/ecom/ecom-product-design-mention-tokens";
 import {
   getProductDesignProject,
@@ -146,8 +153,7 @@ function refUrlsFor(
   const product = filterProductDesignReferencesByRole(references, ["product"]).map(
     (r) => r.ossUrl,
   );
-  const styleRole = target === "main" ? "main-style" : "detail-style";
-  const style = filterProductDesignReferencesByRole(references, [styleRole]).map(
+  const style = productDesignStyleLikeReferences(references, target).map(
     (r) => r.ossUrl,
   );
   const packed = orderRefsForModel(product, style, getImageGenMaxRefs(modelKey));
@@ -263,7 +269,14 @@ export async function generateProductDesignImages(opts: {
   const design = project.design;
   if (!design) throw new Error("请先让助手产出文案，再生成图片");
 
-  const imageGenPlan: ImageGenPlan | undefined = design.imageGenPlans?.[opts.target];
+  let imageGenPlan: ImageGenPlan | undefined = design.imageGenPlans?.[opts.target];
+  if (opts.target === "detail") {
+    imageGenPlan =
+      (await ensureDetailStyleSlicesOnPlan({
+        userId: opts.userId,
+        projectId: opts.projectId,
+      })) ?? imageGenPlan;
+  }
 
   const spec = getEcomPlatformSpec(project.platform);
   const modelKey =
@@ -288,9 +301,26 @@ export async function generateProductDesignImages(opts: {
       : items;
   if (wanted.length === 0) throw new Error("找不到要生成的条目");
 
-  const refPack = refUrlsFor(project.references, opts.target, modelKey);
-  const refImageUrls = refPack.urls;
-  const baselineImageUrl = design.mainImages.find((m) => m.imageUrl)?.imageUrl;
+  const refPackMain =
+    opts.target === "main"
+      ? refUrlsFor(project.references, opts.target, modelKey)
+      : null;
+  let refImageUrlsMain =
+    refPackMain != null
+      ? await ensureWan27MultiRefImageUrls({
+          userId: opts.userId,
+          urls: refPackMain.urls,
+        })
+      : [];
+  const baselineRaw = design.mainImages.find((m) => m.imageUrl)?.imageUrl;
+  const baselineImageUrl = baselineRaw
+    ? (
+        await ensureWan27MultiRefImageUrls({
+          userId: opts.userId,
+          urls: [baselineRaw],
+        })
+      )[0]
+    : undefined;
 
   let mainImages = [...design.mainImages];
   let detailPages = [...design.detailPages];
@@ -322,7 +352,7 @@ export async function generateProductDesignImages(opts: {
     isMain: boolean,
     index: number,
     patch: Partial<ProductDesignMainImage | ProductDesignDetailPage>,
-    status: "generating" | "main_ready" | "completed",
+    status: "generating" | "main_ready" | "completed" | "draft",
   ) => {
     await withStateLock(async () => {
       const fresh = await getProductDesignProject(opts.userId, opts.projectId);
@@ -339,19 +369,11 @@ export async function generateProductDesignImages(opts: {
             ),
           };
       const merged = mergeProductDesign(fresh.design, designPatch);
-      const mainDone =
-        merged.mainImages.length > 0 && merged.mainImages.every((m) => m.imageUrl);
-      const detailDone =
-        merged.detailPages.length > 0 && merged.detailPages.every((d) => d.imageUrl);
       await updateProductDesignProject(opts.userId, opts.projectId, {
         designPatch,
         status:
           status === "generating"
-            ? mainDone && detailDone
-              ? "completed"
-              : mainDone
-                ? "main_ready"
-                : "generating"
+            ? resolveProductDesignStatusAfterGenBatch(merged)
             : status,
         settings: { imageModelKey: modelKey },
       });
@@ -376,6 +398,22 @@ export async function generateProductDesignImages(opts: {
       const slotItem = isMain
         ? (item as ProductDesignMainImage)
         : (item as ProductDesignDetailPage);
+
+      const styleSliceUrl = !isMain ? planItem?.styleSliceOssUrl?.trim() : undefined;
+      const refPack = isMain
+        ? refPackMain!
+        : refUrlsForDetailScreen(
+            project.references,
+            modelKey,
+            styleSliceUrl,
+          );
+      let refImageUrls = isMain
+        ? refImageUrlsMain
+        : await ensureWan27MultiRefImageUrls({
+            userId: opts.userId,
+            urls: refPack.urls,
+          });
+
       let prompt =
         slotItem.genPrompt?.trim() ||
         planItem?.prompt?.trim() ||
@@ -422,13 +460,21 @@ export async function generateProductDesignImages(opts: {
           ? refs.length
           : undefined;
 
+      const legendRefs = isMain
+        ? project.references
+        : referencesForDetailScreenLegend(
+            project.references,
+            target.index,
+            styleSliceUrl,
+          );
+
       prompt = appendRefLegend(prompt, {
         target: opts.target,
         productCount: refPack.productCount,
         styleCount: refPack.styleCount,
         styleFirst: refPack.styleFirst,
         baselineAt,
-        references: project.references,
+        references: legendRefs,
       });
 
       try {
@@ -489,9 +535,6 @@ export async function generateProductDesignImages(opts: {
           }
           generated += 1;
         });
-        const mainDone = mainImages.length > 0 && mainImages.every((m) => m.imageUrl);
-        const detailDone =
-          detailPages.length > 0 && detailPages.every((d) => d.imageUrl);
         await persistSlotImage(
           isMain,
           item.index,
@@ -500,13 +543,15 @@ export async function generateProductDesignImages(opts: {
             assetId: asset.id,
             genPrompt: prompt,
           },
-          mainDone && detailDone ? "completed" : mainDone ? "main_ready" : "generating",
+          resolveProductDesignStatusAfterGenBatch({ mainImages, detailPages }),
         );
       } catch (e) {
+        const raw = e instanceof Error ? e.message : "生成失败";
+        const message = enrichProductDesignRefImageError(project.references, raw);
         await withStateLock(async () => {
           failures.push({
             index: item.index,
-            message: e instanceof Error ? e.message : "生成失败",
+            message,
           });
         });
       }
@@ -514,19 +559,35 @@ export async function generateProductDesignImages(opts: {
     concurrency,
   );
 
-  const nextDesign: ProductDesign = { ...design, mainImages, detailPages };
-  const mainDone = mainImages.length > 0 && mainImages.every((m) => m.imageUrl);
-  const detailDone = detailPages.length > 0 && detailPages.every((d) => d.imageUrl);
-
-  await updateProductDesignProject(opts.userId, opts.projectId, {
-    design: nextDesign,
-    status: mainDone && detailDone ? "completed" : mainDone ? "main_ready" : "generating",
-    settings: { imageModelKey: modelKey },
+  await withStateLock(async () => {
+    const fresh = await getProductDesignProject(opts.userId, opts.projectId);
+    if (!fresh?.design) return;
+    const isMain = opts.target === "main";
+    const designPatch: Partial<ProductDesign> = isMain
+      ? {
+          mainImages: wanted
+            .map((w) => mainImages.find((m) => m.index === w.index))
+            .filter((m): m is ProductDesignMainImage => Boolean(m)),
+        }
+      : {
+          detailPages: wanted
+            .map((w) => detailPages.find((d) => d.index === w.index))
+            .filter((d): d is ProductDesignDetailPage => Boolean(d)),
+        };
+    const merged = mergeProductDesign(fresh.design, designPatch);
+    await updateProductDesignProject(opts.userId, opts.projectId, {
+      designPatch,
+      status: resolveProductDesignStatusAfterGenBatch(merged),
+      settings: { imageModelKey: modelKey },
+    });
   });
 
   if (generated === 0 && failures.length > 0) {
     throw new Error(failures[0]!.message);
   }
 
-  return { design: nextDesign, generated, failures };
+  const finalProject = await getProductDesignProject(opts.userId, opts.projectId);
+  const finalDesign = finalProject?.design ?? { ...design, mainImages, detailPages };
+
+  return { design: finalDesign, generated, failures };
 }

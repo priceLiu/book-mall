@@ -68,6 +68,14 @@ export function pickRandomJoke(): string {
   return JOKES[idx] ?? JOKES[0];
 }
 
+const CST_OFFSET_MS = 8 * 60 * 60 * 1000;
+
+/** 与热闻 dateKey 一致：中国标准时间下的「今天」年月日 */
+export function formatTodayCstLabel(now = new Date()): string {
+  const cst = new Date(now.getTime() + CST_OFFSET_MS);
+  return `${cst.getUTCFullYear()}年${cst.getUTCMonth() + 1}月${cst.getUTCDate()}日`;
+}
+
 /** @deprecated 保留导出供测试；问候语已改为随机笑话。 */
 export function buildDailyOpener(): string {
   return pickRandomJoke();
@@ -76,13 +84,17 @@ export function buildDailyOpener(): string {
 /** 组装完整欢迎语 + 平台应用入口卡片数据。 */
 export function buildAssistantGreeting(
   displayName: string | null | undefined,
+  now = new Date(),
 ): AssistantGreeting {
   const joke = pickRandomJoke();
+  const today = formatTodayCstLabel(now);
   const salutation = displayName?.trim()
     ? `${displayName.trim()}，您好！`
     : "您好！";
   const content = [
-    `${salutation}${joke}`,
+    `${salutation}`,
+    `今天是${today}。`,
+    joke,
     "",
     "我是 AI 小智。下方默认展示 3 条今日 AI 热闻，可点击展开查看全部；再下面是平台主要应用，点击可在新标签页打开：",
   ].join("\n");

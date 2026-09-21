@@ -16,8 +16,14 @@ import {
 import { DetailPageSuiteSlotPromptEditDialog } from "@/components/detail-page-suite/detail-page-suite-slot-prompt-edit-dialog";
 import {
   addCustomPromptSlotToModule,
+  addSizeChartDataSlotToModule,
   canAddCustomSuiteSlot,
+  DETAIL_PAGE_SUITE_SIZE_MODULE_ID,
 } from "@/lib/detail-page-suite-add-custom-slot";
+import {
+  appendDefaultSizeChartTableToBrief,
+  ensureSizeChartBriefTableCount,
+} from "@/lib/detail-page-suite-size-chart";
 import { DetailPageSuiteProgressRail } from "@/components/detail-page-suite/detail-page-suite-progress-rail";
 import { BackgroundGenerationProvider, useBackgroundGeneration } from "@/components/generation";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
@@ -34,6 +40,11 @@ import {
 } from "@/components/ui/dialog";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
+import { formatEcomImageGenUserMessage } from "@/lib/ecom-image-gen-user-error";
+import {
+  ECOM_GENERATION_STANDARD_CONCURRENCY,
+  mapWithConcurrencySettled,
+} from "@/lib/ecom-generation-concurrency";
 import type { DetailPageSuiteBusyStatus } from "@/lib/detail-page-suite-busy-status";
 import {
   suiteBusyStatusForChoice,
@@ -46,6 +57,7 @@ import {
 } from "@/lib/detail-page-suite-platform-ratio";
 import {
   buildDetailPageSuiteProductRefAutoAdvance,
+  reconcileDetailPageSuiteProductRefState,
   SUITE_PRODUCT_REF_ACK,
 } from "@/lib/detail-page-suite-assistant-choice-ui";
 import {
@@ -55,6 +67,13 @@ import {
   syncModuleSlotsFromSelection,
   syncSuiteModulesSlots,
 } from "@/lib/detail-page-suite-module-slots";
+import {
+  listDetailPageSuitePromptGenTargets,
+  listModuleSelectedSlotKeys,
+  pruneDetailPageSuitePromptSelection,
+  resolveDetailPageSuiteBusyPromptKeys,
+  resolveDetailPageSuiteBusySlotKeys,
+} from "@/lib/detail-page-suite-prompt-selection";
 import { readDetailPageSuitePromptSnapshots } from "@/lib/detail-page-suite-prompt-snapshots";
 import {
   detailPageSuiteHasPendingWork,
@@ -63,11 +82,23 @@ import {
   reconcileDetailPageSuitePendingMeta,
 } from "@/lib/detail-page-suite-pending";
 import {
+  mergeDetailPageSuiteProjectPreservingLocalPrompts,
+  mergeDetailPageSuiteSlotPromptFromProject,
+} from "@/lib/detail-page-suite-project-merge";
+import { composeDetailPageSuiteVisiblePrompt } from "@/lib/detail-page-suite-prompt-compose";
+import {
+  isDetailPageSuiteSizeChartDataLabel,
+  partitionDetailPageSuiteImageGenKeys,
+  resolveSizeChartTableForSlot,
+  resolveSizeChartTableIndexForLabel,
+  upsertSizeChartTableInBrief,
+} from "@/lib/detail-page-suite-size-chart";
+import { DetailPageSuiteSizeChartEditDialog } from "@/components/detail-page-suite/detail-page-suite-size-chart-edit-dialog";
+import { migrateDetailPageSuiteProjectClient } from "@/lib/detail-page-suite-suite-migrate";
+import {
   composeSuiteSlotKey,
   ensureSlotsDefaultSelected,
-  listSelectedSuiteSlotKeys,
-  toggleSuiteModuleImageSelection,
-  toggleSuiteSlotImageSelection,
+  parseSuiteSlotKey,
 } from "@/lib/detail-page-suite-slot-selection";
 import {
   platformCodeFromLabel,
@@ -112,21 +143,32 @@ type ImagePickerRequest = {
   settingsOnly?: boolean;
 };
 
+function defaultGenerateCountForModule(moduleId: string, maxNum: number): number {
+  if (moduleId === "mod7_size_table") return Math.min(1, maxNum);
+  return maxNum;
+}
+
 function suiteFromTemplate(template: DetailPageSuiteTemplate) {
   return {
     templateId: template.id,
     templateSnapshot: template,
-    modules: template.modules.map((m) => ({
-      module_id: m.module_id,
-      module_name: m.module_name,
-      enable: true,
-      generate_count: m.max_num,
-      max_num: m.max_num,
-      select_mode: "manual" as const,
-      candidate_pool: [...m.candidate_pool],
-      selected_item_list: [...m.candidate_pool].slice(0, m.max_num),
-      slots: [],
-    })).map(syncModuleSlotsFromSelection),
+    modules: template.modules
+      .map((m) => {
+        const generate_count = defaultGenerateCountForModule(m.module_id, m.max_num);
+        const pool = [...m.candidate_pool];
+        return {
+          module_id: m.module_id,
+          module_name: m.module_name,
+          enable: true,
+          generate_count,
+          max_num: m.max_num,
+          select_mode: "manual" as const,
+          candidate_pool: pool,
+          selected_item_list: pool.slice(0, generate_count),
+          slots: [],
+        };
+      })
+      .map(syncModuleSlotsFromSelection),
   };
 }
 
@@ -141,12 +183,31 @@ function defaultImageSizeForRatio(modelKey: string, ratio: EcomDetailPageRatio):
   );
 }
 
+function suiteSlotHasImage(
+  project: DetailPageSuiteProject,
+  compositeKey: string,
+): boolean {
+  const parsed = parseSuiteSlotKey(compositeKey);
+  if (!parsed) return false;
+  const mod = project.suite.modules.find((m) => m.module_id === parsed.moduleId);
+  const slot = mod
+    ? resolveModuleDisplaySlots(mod).find((s) => s.item_key === parsed.slotKey)
+    : undefined;
+  return Boolean(slot?.imageUrl?.trim());
+}
+
+const SUITE_IMAGE_RECOVERY_POLL_MS = 4000;
+const SUITE_IMAGE_RECOVERY_MAX_MS = 120_000;
+
 function DetailPageSuiteStudioInner() {
   const { alert, confirm, doubleConfirm, toast } = useDialogs();
   const backgroundGen = useBackgroundGeneration();
   const [project, setProject] = useState<DetailPageSuiteProject | null>(null);
   const [templates, setTemplates] = useState<DetailPageSuiteTemplate[]>([]);
   const [imageModels, setImageModels] = useState<StoryboardGatewayModel[]>([]);
+  const [promptGenConcurrencyLimit, setPromptGenConcurrencyLimit] = useState(
+    ECOM_GENERATION_STANDARD_CONCURRENCY,
+  );
   const [imageModelKey, setImageModelKey] = useState("wan2.7-image");
   const [imageSize, setImageSize] = useState(() =>
     defaultImageSizeForRatio("wan2.7-image", "3:4"),
@@ -161,6 +222,10 @@ function DetailPageSuiteStudioInner() {
   const [activePromptModuleIds, setActivePromptModuleIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [activePromptSlotKeys, setActivePromptSlotKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [promptSelectionKeys, setPromptSelectionKeys] = useState<Set<string>>(() => new Set());
   const [activeRewriteSlotKeys, setActiveRewriteSlotKeys] = useState<Set<string>>(
     () => new Set(),
   );
@@ -178,6 +243,12 @@ function DetailPageSuiteStudioInner() {
     prompt: string;
   } | null>(null);
   const [promptEditSaving, setPromptEditSaving] = useState(false);
+  const [sizeChartEdit, setSizeChartEdit] = useState<{
+    moduleId: string;
+    slotKey: string;
+    label: string;
+  } | null>(null);
+  const [sizeChartEditSaving, setSizeChartEditSaving] = useState(false);
   const [addItemDialog, setAddItemDialog] = useState<{ moduleId: string; value: string } | null>(
     null,
   );
@@ -188,6 +259,11 @@ function DetailPageSuiteStudioInner() {
   const [uploading, setUploading] = useState(false);
   const productRefAutoAdvanceKeyRef = useRef<string | null>(null);
   const projectRef = useRef<DetailPageSuiteProject | null>(null);
+  /** 客户端 images/generate 进行中；避免 poll / settings persist 覆盖刚写回的出图结果 */
+  const imageGenInFlightRef = useRef<Set<string>>(new Set());
+  const promptSlotInFlightRef = useRef<Set<string>>(new Set());
+  /** 串行合并各 slot 写回，避免并发完成时互相覆盖；合并后再清 busy */
+  const promptSlotMergeQueueRef = useRef(Promise.resolve());
 
   const syncImageSettingsFromProject = useCallback((p: DetailPageSuiteProject) => {
     const ratio = resolveDetailPageDisplayRatio(p.brief?.platformCode, p.settings.imageRatio);
@@ -205,11 +281,29 @@ function DetailPageSuiteStudioInner() {
 
   const applyProject = useCallback(
     (p: DetailPageSuiteProject) => {
+      p = migrateDetailPageSuiteProjectClient(p);
       const meta = reconcileDetailPageSuitePendingMeta(p.suite, p.meta);
-      const synced: DetailPageSuiteProject = meta !== p.meta ? { ...p, meta } : p;
+      let synced: DetailPageSuiteProject = meta !== p.meta ? { ...p, meta } : p;
+      if (meta !== p.meta) {
+        void updateDetailPageSuiteProject(synced.id, { meta: synced.meta }).catch(() => {
+          /* 展示层已修正 stale pending */
+        });
+      }
+      const refChatPatch = reconcileDetailPageSuiteProductRefState(synced);
+      if (refChatPatch) {
+        synced = { ...synced, ...refChatPatch };
+        void updateDetailPageSuiteProject(synced.id, refChatPatch).catch(() => {
+          /* 展示层已修正；落库失败下次加载再试 */
+        });
+      }
       projectRef.current = synced;
       setProject(synced);
-      setActiveGenSlotKeys(new Set(listDetailPageSuitePendingImageKeys(synced.meta)));
+      const pendingGen = new Set<string>();
+      for (const k of listDetailPageSuitePendingImageKeys(synced.meta)) {
+        if (!suiteSlotHasImage(synced, k)) pendingGen.add(k);
+      }
+      for (const k of imageGenInFlightRef.current) pendingGen.add(k);
+      setActiveGenSlotKeys(pendingGen);
       setActivePromptModuleIds(new Set(listDetailPageSuitePendingPromptModuleIds(synced.meta)));
       sessionStorage.setItem(PROJECT_STORAGE_KEY, synced.id);
       syncImageSettingsFromProject(synced);
@@ -217,10 +311,39 @@ function DetailPageSuiteStudioInner() {
     [syncImageSettingsFromProject],
   );
 
+  const applyProjectSlotPrompt = useCallback(
+    (incoming: DetailPageSuiteProject, moduleId: string, slotKey: string) => {
+      const current = projectRef.current;
+      if (!current) {
+        applyProject(incoming);
+        return;
+      }
+      const merged = mergeDetailPageSuiteSlotPromptFromProject(
+        current,
+        incoming,
+        moduleId,
+        slotKey,
+      );
+      applyProject(merged ?? incoming);
+    },
+    [applyProject],
+  );
+
   const loadProjectById = useCallback(
     async (id: string, opts?: { announceRecovery?: boolean }) => {
       const { project: loaded, recovered } = await getDetailPageSuiteProject(id);
-      applyProject(loaded);
+      const current = projectRef.current;
+      if (
+        promptSlotInFlightRef.current.size > 0 &&
+        current?.id === id
+      ) {
+        return loaded;
+      }
+      const toApply =
+        current?.id === id
+          ? mergeDetailPageSuiteProjectPreservingLocalPrompts(current, loaded)
+          : loaded;
+      applyProject(toApply);
       if (
         opts?.announceRecovery !== false &&
         recovered &&
@@ -245,10 +368,55 @@ function DetailPageSuiteStudioInner() {
       const current = projectRef.current;
       if (!current) return;
       const next = await updateDetailPageSuiteProject(current.id, patch);
+      // 出图进行中写 settings/meta 可落库，但不要用旧 suite 快照覆盖刚写回的 imageUrl
+      if (imageGenInFlightRef.current.size > 0 && patch.suite) {
+        return current;
+      }
       applyProject(next);
       return next;
     },
     [applyProject],
+  );
+
+  const syncActiveGenSlotKeysFromProject = useCallback(
+    (p: DetailPageSuiteProject, keys: string[]) => {
+      const pending = new Set(listDetailPageSuitePendingImageKeys(p.meta));
+      setActiveGenSlotKeys((prev) => {
+        const next = new Set(prev);
+        for (const key of keys) {
+          if (suiteSlotHasImage(p, key)) next.delete(key);
+          else if (pending.has(key) || imageGenInFlightRef.current.has(key)) next.add(key);
+          else next.delete(key);
+        }
+        for (const key of next) {
+          if (suiteSlotHasImage(p, key) && !imageGenInFlightRef.current.has(key)) {
+            next.delete(key);
+          }
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  const recoverSuiteSlotImages = useCallback(
+    async (projectId: string, keys: string[]) => {
+      if (keys.length === 0) return null;
+      const deadline = Date.now() + SUITE_IMAGE_RECOVERY_MAX_MS;
+      let latest: DetailPageSuiteProject | null = null;
+      while (Date.now() < deadline) {
+        const missing = keys.filter((key) => !latest || !suiteSlotHasImage(latest, key));
+        if (missing.length === 0) break;
+        await new Promise((resolve) => window.setTimeout(resolve, SUITE_IMAGE_RECOVERY_POLL_MS));
+        try {
+          latest = await loadProjectById(projectId, { announceRecovery: true });
+        } catch {
+          /* 继续轮询 */
+        }
+      }
+      return latest;
+    },
+    [loadProjectById],
   );
 
   const maybeAdvanceProductRef = useCallback(
@@ -270,11 +438,25 @@ function DetailPageSuiteStudioInner() {
   }, [project?.id]);
 
   useEffect(() => {
+    if (!project) return;
+    setPromptSelectionKeys((prev) => {
+      const pruned = pruneDetailPageSuitePromptSelection(project, prev);
+      return pruned.size === prev.size ? prev : pruned;
+    });
+  }, [project]);
+
+  useEffect(() => {
     if (!project?.id) return;
     if (!detailPageSuiteHasPendingWork(project.meta)) return;
     let cancelled = false;
     const refresh = async () => {
       if (cancelled) return;
+      if (
+        imageGenInFlightRef.current.size > 0 ||
+        promptSlotInFlightRef.current.size > 0
+      ) {
+        return;
+      }
       try {
         await loadProjectById(project.id, { announceRecovery: false });
       } catch {
@@ -302,9 +484,29 @@ function DetailPageSuiteStudioInner() {
     });
   }, []);
 
-  const beginPromptModule = useCallback((moduleId: string) => {
-    setActivePromptModuleIds((prev) => new Set([...prev, moduleId]));
+  const clearPromptSelectionForModule = useCallback((moduleId: string) => {
+    const mod = projectRef.current?.suite.modules.find((m) => m.module_id === moduleId);
+    if (!mod) return;
+    const keys = resolveModuleDisplaySlots(mod).map((s) =>
+      composeSuiteSlotKey(moduleId, s.item_key),
+    );
+    setPromptSelectionKeys((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const k of keys) {
+        if (next.delete(k)) changed = true;
+      }
+      return changed ? next : prev;
+    });
   }, []);
+
+  const beginPromptModule = useCallback(
+    (moduleId: string) => {
+      setActivePromptModuleIds((prev) => new Set([...prev, moduleId]));
+      clearPromptSelectionForModule(moduleId);
+    },
+    [clearPromptSelectionForModule],
+  );
 
   const endPromptModule = useCallback((moduleId: string) => {
     setActivePromptModuleIds((prev) => {
@@ -313,6 +515,62 @@ function DetailPageSuiteStudioInner() {
       return next;
     });
   }, []);
+
+  const beginPromptSlot = useCallback((key: string) => {
+    setActivePromptSlotKeys((prev) => new Set([...prev, key]));
+    setPromptSelectionKeys((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  }, []);
+
+  const endPromptSlot = useCallback((key: string) => {
+    setActivePromptSlotKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  }, []);
+
+  const enqueuePromptSlotApply = useCallback(
+    (
+      incoming: DetailPageSuiteProject,
+      moduleId: string,
+      slotKey: string,
+      composite: string,
+    ) => {
+      const task = promptSlotMergeQueueRef.current.then(() => {
+        applyProjectSlotPrompt(incoming, moduleId, slotKey);
+        promptSlotInFlightRef.current.delete(composite);
+        endPromptSlot(composite);
+      });
+      promptSlotMergeQueueRef.current = task.catch(() => undefined);
+      return task;
+    },
+    [applyProjectSlotPrompt, endPromptSlot],
+  );
+
+  const clearPendingImagesForKeys = useCallback(
+    async (keys: string[]) => {
+      if (!project?.meta?.pendingImages || keys.length === 0) return;
+      const pending = { ...project.meta.pendingImages };
+      let changed = false;
+      for (const k of keys) {
+        if (pending[k]) {
+          delete pending[k];
+          changed = true;
+        }
+      }
+      if (!changed) return;
+      const meta = { ...(project.meta ?? {}) };
+      if (Object.keys(pending).length > 0) meta.pendingImages = pending;
+      else delete meta.pendingImages;
+      await persist({ meta });
+    },
+    [persist, project],
+  );
 
   const beginRewriteSlot = useCallback((key: string) => {
     setActiveRewriteSlotKeys((prev) => new Set([...prev, key]));
@@ -335,12 +593,23 @@ function DetailPageSuiteStudioInner() {
       imageRatio: EcomDetailPageRatio;
     }) => {
       if (!project || opts.slotKeys.length === 0) return;
-      let keys: string[] = [];
+      let keys: string[] = opts.slotKeys;
+      let forceRetry = false;
       setActiveGenSlotKeys((prev) => {
-        keys = opts.slotKeys.filter((k) => !prev.has(k));
+        const blocked = keys.filter((k) => prev.has(k));
+        if (blocked.length === keys.length) {
+          forceRetry = true;
+          const next = new Set(prev);
+          for (const k of keys) next.delete(k);
+          return new Set([...next, ...keys]);
+        }
+        keys = keys.filter((k) => !prev.has(k));
         if (keys.length === 0) return prev;
         return new Set([...prev, ...keys]);
       });
+      if (forceRetry) {
+        await clearPendingImagesForKeys(opts.slotKeys);
+      }
       if (keys.length === 0) {
         toast({
           title: "所选点位均在生成中",
@@ -348,6 +617,12 @@ function DetailPageSuiteStudioInner() {
         });
         return;
       }
+      setPromptSelectionKeys((prev) => {
+        const next = new Set(prev);
+        for (const k of keys) next.delete(k);
+        return next;
+      });
+      for (const k of keys) imageGenInFlightRef.current.add(k);
       const useDock = keys.length >= 3;
       const taskId = `dps-img-${Date.now()}`;
       if (useDock) {
@@ -361,6 +636,7 @@ function DetailPageSuiteStudioInner() {
         });
       }
 
+      let latestProject: DetailPageSuiteProject | null = null;
       try {
         const result = await generateDetailPageSuiteImages(project.id, {
           moduleId: opts.moduleId,
@@ -370,30 +646,252 @@ function DetailPageSuiteStudioInner() {
           imageRatio: opts.imageRatio,
         });
         applyProject(result.project);
+        latestProject = result.project;
         if (useDock) backgroundGen.dismissTask(taskId);
-        if (result.failures.length) {
+
+        const stillMissingAfterWrite = keys.filter(
+          (key) => !suiteSlotHasImage(result.project, key),
+        );
+        if (stillMissingAfterWrite.length > 0) {
+          latestProject = await loadProjectById(project.id, { announceRecovery: true });
+          const stillMissing = keys.filter((key) => !suiteSlotHasImage(latestProject!, key));
+          if (stillMissing.length > 0) {
+            const recovered = await recoverSuiteSlotImages(project.id, stillMissing);
+            if (recovered) latestProject = recovered;
+          }
+        }
+
+        const syncedCount = keys.filter((key) => suiteSlotHasImage(latestProject!, key)).length;
+        const missingAfterSync = keys.filter((key) => !suiteSlotHasImage(latestProject!, key));
+        const failureLines =
+          result.failures.length > 0
+            ? result.failures
+            : missingAfterSync.length > 0
+              ? missingAfterSync.map(
+                  (key) =>
+                    `${key}: 出图未写回，请查看点位下方失败原因或 book-mall / Gateway 终端日志`,
+                )
+              : [];
+        if (failureLines.length > 0) {
+          console.error("[detail-page-suite] image gen failures", {
+            projectId: project.id,
+            keys,
+            failures: failureLines,
+          });
           await alert({
-            title: `完成 ${result.generated} 张，失败 ${result.failures.length}`,
-            message: result.failures.slice(0, 5).join("\n"),
+            title: `完成 ${syncedCount} 张，失败 ${failureLines.length}`,
+            message: failureLines
+              .slice(0, 8)
+              .map((line) => {
+                const idx = line.indexOf(": ");
+                if (idx <= 0) return formatEcomImageGenUserMessage(line);
+                return `${line.slice(0, idx)}: ${formatEcomImageGenUserMessage(line.slice(idx + 2))}`;
+              })
+              .join("\n"),
             variant: "error",
           });
-        } else if (result.generated > 0) {
-          toast({ variant: "success", title: `已生成 ${result.generated} 张` });
+        } else if (syncedCount > 0) {
+          toast({ variant: "success", title: `已生成 ${syncedCount} 张` });
+        } else {
+          await alert({
+            title: "出图未写回",
+            message: "Gateway 可能仍在处理，请稍候刷新或到「我的资产」查看。",
+            variant: "error",
+          });
         }
       } catch (e) {
         if (useDock) {
           backgroundGen.failTask(taskId, e instanceof Error ? e.message : "生图失败");
         }
-        await alert({
-          title: "生图失败",
-          message: e instanceof Error ? e.message : String(e),
-          variant: "error",
-        });
+        try {
+          latestProject = await loadProjectById(project.id, { announceRecovery: true });
+          const stillMissing = keys.filter((key) => !suiteSlotHasImage(latestProject!, key));
+          if (stillMissing.length > 0) {
+            const recovered = await recoverSuiteSlotImages(project.id, stillMissing);
+            if (recovered) latestProject = recovered;
+          }
+        } catch {
+          /* 回落到错误提示 */
+        }
+        const syncedFromAssets =
+          latestProject != null &&
+          keys.some((key) => suiteSlotHasImage(latestProject!, key));
+        if (syncedFromAssets) {
+          toast({
+            variant: "success",
+            title: "出图已写回",
+            message: "Gateway 已完成，界面已从资产库同步。",
+          });
+        } else {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error("[detail-page-suite] image gen request failed", {
+            projectId: project.id,
+            keys,
+            message: msg,
+          });
+          await alert({
+            title: "生图失败",
+            message: `${msg}\n\n点位：${keys.slice(0, 6).join("、")}${keys.length > 6 ? " 等" : ""}`,
+            variant: "error",
+          });
+        }
       } finally {
-        endSlotGen(keys);
+        for (const k of keys) imageGenInFlightRef.current.delete(k);
+        if (latestProject) {
+          syncActiveGenSlotKeysFromProject(latestProject, keys);
+        } else {
+          endSlotGen(keys);
+        }
       }
     },
-    [alert, applyProject, backgroundGen, endSlotGen, project, toast],
+    [
+      alert,
+      applyProject,
+      backgroundGen,
+      clearPendingImagesForKeys,
+      endSlotGen,
+      loadProjectById,
+      project,
+      recoverSuiteSlotImages,
+      syncActiveGenSlotKeysFromProject,
+      toast,
+    ],
+  );
+
+  const runModuleSelectedPromptGen = useCallback(
+    async (moduleId: string) => {
+      if (!project) return;
+      const mod = project.suite.modules.find((m) => m.module_id === moduleId);
+      if (!mod) return;
+      const busyKeys = resolveDetailPageSuiteBusySlotKeys(
+        project,
+        activePromptModuleIds,
+        activePromptSlotKeys,
+        activeGenSlotKeys,
+        activeRewriteSlotKeys,
+      );
+      const selectedKeys = listModuleSelectedSlotKeys(mod, promptSelectionKeys, {
+        excludeKeys: busyKeys,
+      });
+      if (selectedKeys.length === 0) {
+        toast({
+          title: "请先勾选点位",
+          message: "勾选要生成或重新生成提示词的子维度。",
+          variant: "error",
+        });
+        return;
+      }
+      const slotKeys = selectedKeys
+        .map((k) => parseSuiteSlotKey(k)?.slotKey)
+        .filter(Boolean) as string[];
+      const toRun = slotKeys.filter((slotKey) => {
+        const composite = composeSuiteSlotKey(moduleId, slotKey);
+        if (promptSlotInFlightRef.current.has(composite)) return false;
+        promptSlotInFlightRef.current.add(composite);
+        beginPromptSlot(composite);
+        return true;
+      });
+      const skippedInFlight = slotKeys.length - toRun.length;
+      let results: PromiseSettledResult<{ composite: string; project: DetailPageSuiteProject }>[] =
+        [];
+      try {
+        results = await mapWithConcurrencySettled(
+          toRun,
+          async (slotKey) => {
+            const composite = composeSuiteSlotKey(moduleId, slotKey);
+            try {
+              const latest = await generateDetailPageSuitePrompts(project.id, {
+                moduleId,
+                slotKey,
+              });
+              await enqueuePromptSlotApply(latest, moduleId, slotKey, composite);
+              return { composite, project: latest };
+            } catch (e) {
+              promptSlotInFlightRef.current.delete(composite);
+              endPromptSlot(composite);
+              throw e;
+            }
+          },
+          promptGenConcurrencyLimit,
+        );
+        await promptSlotMergeQueueRef.current;
+      } catch {
+        for (const slotKey of toRun) {
+          const composite = composeSuiteSlotKey(moduleId, slotKey);
+          promptSlotInFlightRef.current.delete(composite);
+          endPromptSlot(composite);
+        }
+        throw new Error("批量生成提示词失败");
+      }
+
+      const succeeded = results.filter(
+        (r): r is PromiseFulfilledResult<{ composite: string; project: DetailPageSuiteProject }> =>
+          r.status === "fulfilled",
+      );
+      const failed = results.filter(
+        (r): r is PromiseRejectedResult => r.status === "rejected",
+      );
+      if (succeeded.length > 0) {
+        setPromptSelectionKeys((prev) => {
+          const next = new Set(prev);
+          for (const r of succeeded) {
+            next.delete(r.value.composite);
+          }
+          return next;
+        });
+        const current = projectRef.current ?? project;
+        const phase = current.meta?.phase ?? "subdims";
+        if (phase === "subdims") {
+          const nextMeta = { ...(current.meta ?? {}), phase: "prompts" as const };
+          applyProject({ ...current, meta: nextMeta });
+          void persist({ meta: nextMeta });
+        }
+      }
+      const skippedNote =
+        skippedInFlight > 0 ? `（${skippedInFlight} 个点位已在生成中，已跳过）` : "";
+      if (failed.length === 0 && toRun.length > 0) {
+        toast({
+          variant: "success",
+          title: `已生成 ${succeeded.length} 条提示词${skippedNote}`,
+        });
+      } else if (succeeded.length > 0) {
+        await alert({
+          title: `完成 ${succeeded.length} 条，失败 ${failed.length}${skippedNote}`,
+          message: failed
+            .slice(0, 3)
+            .map((r) => String(r.reason))
+            .join("\n"),
+          variant: "error",
+        });
+      } else if (toRun.length === 0 && skippedInFlight > 0) {
+        toast({
+          title: "所选点位均在生成中",
+          message: "请稍候完成后再试。",
+        });
+      } else {
+        await alert({
+          title: "生成失败",
+          message: failed[0] ? String(failed[0].reason) : "请稍后重试",
+          variant: "error",
+        });
+      }
+    },
+    [
+      activeGenSlotKeys,
+      activePromptModuleIds,
+      activePromptSlotKeys,
+      activeRewriteSlotKeys,
+      alert,
+      applyProject,
+      beginPromptSlot,
+      enqueuePromptSlotApply,
+      endPromptSlot,
+      project,
+      persist,
+      promptGenConcurrencyLimit,
+      promptSelectionKeys,
+      toast,
+    ],
   );
 
   const requestImagePicker = useCallback((req: ImagePickerRequest) => {
@@ -402,6 +900,90 @@ function DetailPageSuiteStudioInner() {
     }
     setImagePicker(req);
   }, []);
+
+  const enqueueSuiteImageGenerate = useCallback(
+    (req: { moduleId?: string; slotKeys: string[] }) => {
+      if (!project || req.slotKeys.length === 0) return;
+      const { programmaticKeys, modelKeys } = partitionDetailPageSuiteImageGenKeys(
+        project,
+        req.slotKeys,
+      );
+      const base = {
+        moduleId: req.moduleId,
+        modelKey: imageModelKey,
+        imageSize,
+        imageRatio: displayRatio,
+      };
+      if (programmaticKeys.length > 0) {
+        void startImageGenerate({ ...base, slotKeys: programmaticKeys });
+      }
+      if (modelKeys.length > 0) {
+        requestImagePicker({ moduleId: req.moduleId, slotKeys: modelKeys });
+      }
+    },
+    [
+      displayRatio,
+      imageModelKey,
+      imageSize,
+      project,
+      requestImagePicker,
+      startImageGenerate,
+    ],
+  );
+
+  const runModuleSelectedImageGen = useCallback(
+    (moduleId: string) => {
+      if (!project) return;
+      const mod = project.suite.modules.find((m) => m.module_id === moduleId);
+      if (!mod) return;
+      const busyKeys = resolveDetailPageSuiteBusySlotKeys(
+        project,
+        activePromptModuleIds,
+        activePromptSlotKeys,
+        activeGenSlotKeys,
+        activeRewriteSlotKeys,
+      );
+      const selectedKeys = listModuleSelectedSlotKeys(mod, promptSelectionKeys, {
+        excludeKeys: busyKeys,
+      });
+      if (selectedKeys.length === 0) {
+        toast({
+          title: "请先勾选点位",
+          variant: "error",
+        });
+        return;
+      }
+      const keys = listModuleSelectedSlotKeys(mod, promptSelectionKeys, {
+        excludeKeys: busyKeys,
+        requirePrompt: true,
+      });
+      if (keys.length === 0) {
+        toast({
+          title: "尚无提示词",
+          message: "所选点位还没有提示词，请先生成提示词再出图。",
+          variant: "error",
+        });
+        return;
+      }
+      if (keys.length < selectedKeys.length) {
+        toast({
+          title: `将出图 ${keys.length} 张`,
+          message: `已跳过 ${selectedKeys.length - keys.length} 个无提示词的勾选点位。`,
+        });
+      }
+      enqueueSuiteImageGenerate({ moduleId, slotKeys: keys });
+    },
+    [
+      activeGenSlotKeys,
+      activePromptModuleIds,
+      activePromptSlotKeys,
+      activeRewriteSlotKeys,
+      enqueueSuiteImageGenerate,
+      project,
+      promptSelectionKeys,
+      toast,
+    ],
+  );
 
   const loadProjectByIdRef = useRef(loadProjectById);
   loadProjectByIdRef.current = loadProjectById;
@@ -413,6 +995,7 @@ function DetailPageSuiteStudioInner() {
         const models = await fetchDetailPageSuiteModels();
         if (cancelled) return;
         setImageModels(models.imageModels);
+        setPromptGenConcurrencyLimit(models.promptGenConcurrencyLimit);
         const saved = sessionStorage.getItem(PROJECT_STORAGE_KEY);
         if (saved) {
           try {
@@ -560,7 +1143,10 @@ function DetailPageSuiteStudioInner() {
         let history = appendChat(project.chatHistory, "user", message);
 
         if (phase === "product_ref") {
-          if (message === SUITE_PRODUCT_REF_ACK && project.references.length === 0) {
+          if (
+            message === SUITE_PRODUCT_REF_ACK &&
+            !project.references.some((r) => r.ossUrl?.trim())
+          ) {
             await alert({
               title: "请先上传产品图",
               message: "在中栏产品图区上传至少一张，或选择「暂不上传，稍后补图」。",
@@ -712,7 +1298,11 @@ function DetailPageSuiteStudioInner() {
               await alert({ title: "请至少开启 1 个模块", message: "全部可关，但提交前须保留一张。", variant: "error" });
               return;
             }
-            history = appendChat(history, "assistant", "请为开启模块勾选子维度，或随机抽取。");
+            history = appendChat(
+              history,
+              "assistant",
+              "已确认大模块。请在中栏配置子维度、勾选并生成提示词；出图仍可在助手区批量操作。",
+            );
             await persist({
               chatHistory: history,
               meta: { ...(project.meta ?? {}), phase: "subdims" },
@@ -721,58 +1311,21 @@ function DetailPageSuiteStudioInner() {
           }
         }
 
-        if (phase === "subdims") {
-          if (message === "随机抽取未满模块") {
-            const modules = project.suite.modules.map((m) => {
-              if (!m.enable) return m;
-              const n = m.generate_count;
-              const pool = [...m.candidate_pool];
-              const picked: string[] = [];
-              while (picked.length < n && pool.length) {
-                const i = Math.floor(Math.random() * pool.length);
-                picked.push(pool.splice(i, 1)[0]!);
-              }
-              return { ...m, select_mode: "random" as const, selected_item_list: picked };
-            });
-            history = appendChat(history, "assistant", "已随机抽取，可继续改勾选后确认。");
-            await persist({ suite: { ...project.suite, modules }, chatHistory: history });
-            return;
-          }
-          if (message === "确认子维度") {
-            history = appendChat(history, "assistant", "可以生成提示词了。");
-            await persist({
-              chatHistory: history,
-              meta: { ...(project.meta ?? {}), phase: "prompts" },
-            });
-            return;
-          }
-        }
-
-        if (message === "生成全部提示词") {
-          const next = await generateDetailPageSuitePrompts(project.id);
-          const modules = next.suite.modules.map((m) => ({
-            ...m,
-            slots: ensureSlotsDefaultSelected(m.slots),
-          }));
-          const after = appendChat(
-            appendChat(next.chatHistory, "user", message),
-            "assistant",
-            "提示词已生成，可在中间区修改后出图。",
-          );
-          applyProject(
-            await updateDetailPageSuiteProject(next.id, {
-              suite: { ...next.suite, modules },
-              chatHistory: after,
-              meta: { ...(next.meta ?? {}), phase: "images" },
-            }),
-          );
-          toast({ variant: "success", title: "提示词已生成" });
-          return;
-        }
-
         if (message === "生成全部图片") {
-          const keys = listSelectedSuiteSlotKeys(project);
-          if (keys.length === 0) {
+          const keys: string[] = [];
+          for (const mod of project.suite.modules) {
+            if (!mod.enable) continue;
+            keys.push(
+              ...listModuleSelectedSlotKeys(mod, promptSelectionKeys, { requirePrompt: true }),
+            );
+          }
+          const slotKeys =
+            keys.length > 0
+              ? keys
+              : listDetailPageSuitePromptGenTargets(project)
+                  .filter((t) => t.hasPrompt)
+                  .map((t) => t.key);
+          if (slotKeys.length === 0) {
             await alert({
               title: "没有可出图的点位",
               message: "请先生成提示词，并勾选要出图的子维度。",
@@ -780,7 +1333,7 @@ function DetailPageSuiteStudioInner() {
             });
             return;
           }
-          requestImagePicker({ slotKeys: keys });
+          enqueueSuiteImageGenerate({ slotKeys });
         }
       } catch (e) {
         if (isEcomUnauthorizedError(e)) setNeedLogin(true);
@@ -789,7 +1342,7 @@ function DetailPageSuiteStudioInner() {
         setLlmBusyStatus(null);
       }
     },
-    [alert, applyProject, persist, project, requestImagePicker, templates, toast],
+    [alert, applyProject, enqueueSuiteImageGenerate, persist, project, promptSelectionKeys, templates, toast],
   );
 
   const runProductRefUpload = useCallback(
@@ -915,7 +1468,38 @@ function DetailPageSuiteStudioInner() {
             uploadProgressLabel={uploadProgressLabel}
             activeGenSlotKeys={activeGenSlotKeys}
             activePromptModuleIds={activePromptModuleIds}
+            activePromptSlotKeys={activePromptSlotKeys}
             activeRewriteSlotKeys={activeRewriteSlotKeys}
+            promptSelectionKeys={promptSelectionKeys}
+            onTogglePromptSelection={(key) => {
+              setPromptSelectionKeys((prev) => {
+                const next = new Set(prev);
+                if (next.has(key)) next.delete(key);
+                else next.add(key);
+                return next;
+              });
+            }}
+            onToggleModulePromptSelection={(moduleId, selected) => {
+              const mod = project.suite.modules.find((m) => m.module_id === moduleId);
+              if (!mod) return;
+              const keys = resolveModuleDisplaySlots(mod).map((s) =>
+                composeSuiteSlotKey(moduleId, s.item_key),
+              );
+              setPromptSelectionKeys((prev) => {
+                const next = new Set(prev);
+                for (const k of keys) {
+                  if (selected) next.add(k);
+                  else next.delete(k);
+                }
+                return next;
+              });
+            }}
+            onToggleAllPromptSelection={(selected) => {
+              const keys = listDetailPageSuitePromptGenTargets(project).map((t) => t.key);
+              setPromptSelectionKeys(selected ? new Set(keys) : new Set());
+            }}
+            onGenerateModulePrompts={(moduleId) => void runModuleSelectedPromptGen(moduleId)}
+            onGenerateModuleImages={(moduleId) => runModuleSelectedImageGen(moduleId)}
             displayRatio={displayRatio}
             imageModelLabel={imageModelLabel}
             onNewProject={() => void handleNew()}
@@ -945,11 +1529,21 @@ function DetailPageSuiteStudioInner() {
             onPreview={setPreviewUrl}
             onPreviewSlotImage={setSlotImagePreview}
             onOpenPromptEdit={(moduleId, slotKey, promptText, label) => {
+              if (isDetailPageSuiteSizeChartDataLabel(label)) {
+                setSizeChartEdit({ moduleId, slotKey, label });
+                return;
+              }
+              const brief = project.brief ?? {};
               setPromptEdit({
                 moduleId,
                 slotKey,
                 label,
-                prompt: promptText,
+                prompt: composeDetailPageSuiteVisiblePrompt(
+                  promptText,
+                  brief,
+                  label,
+                  moduleId,
+                ),
               });
             }}
             onToggleModule={(moduleId, enable) => {
@@ -996,87 +1590,48 @@ function DetailPageSuiteStudioInner() {
                 void alert({ title: "无法新增点位", message: check.reason, variant: "error" });
                 return;
               }
-              setAddSlotDialog({ moduleId });
-            }}
-            onToggleModuleImageSelect={(moduleId, selected) => {
-              const modules = project.suite.modules.map((m) =>
-                m.module_id === moduleId ? toggleSuiteModuleImageSelection(m, selected) : m,
-              );
-              void persist({ suite: { ...project.suite, modules } });
-            }}
-            onToggleSlotImageSelect={(moduleId, slotKey) => {
-              const modules = project.suite.modules.map((m) =>
-                m.module_id === moduleId ? toggleSuiteSlotImageSelection(m, slotKey) : m,
-              );
-              void persist({ suite: { ...project.suite, modules } });
-            }}
-            onGenModulePrompts={(moduleId) => {
-              void (async () => {
-                beginPromptModule(moduleId);
-                try {
-                  const next = await generateDetailPageSuitePrompts(project.id, { moduleId });
-                  const modules = next.suite.modules.map((m) =>
-                    m.module_id === moduleId
-                      ? { ...m, slots: ensureSlotsDefaultSelected(m.slots) }
-                      : m,
-                  );
-                  applyProject(
-                    await updateDetailPageSuiteProject(next.id, {
-                      suite: { ...next.suite, modules },
-                    }),
-                  );
-                  toast({ variant: "success", title: "本模块提示词已生成" });
-                } catch (e) {
-                  await alert({
-                    title: "生成失败",
-                    message: e instanceof Error ? e.message : String(e),
-                    variant: "error",
-                  });
-                } finally {
-                  endPromptModule(moduleId);
-                }
-              })();
-            }}
-            onRequestGenerateModule={(moduleId, slotKeys) => {
-              const mod = project.suite.modules.find((m) => m.module_id === moduleId);
-              const keys =
-                slotKeys ??
-                (mod
-                  ? resolveModuleDisplaySlots(mod)
-                      .filter((s) => s.positive_prompt?.trim() && s.selectedForImage !== false)
-                      .map((s) => composeSuiteSlotKey(moduleId, s.item_key))
-                  : []);
-              if (keys.length === 0) {
-                toast({ title: "请先勾选有提示词的子维度", variant: "error" });
+              if (moduleId === DETAIL_PAGE_SUITE_SIZE_MODULE_ID) {
+                void (async () => {
+                  try {
+                    const mod = project.suite.modules.find((m) => m.module_id === moduleId);
+                    const existingDataSlots =
+                      mod == null
+                        ? 0
+                        : resolveModuleDisplaySlots(mod).filter((s) =>
+                            isDetailPageSuiteSizeChartDataLabel(s.item_label),
+                          ).length;
+                    const briefBase = ensureSizeChartBriefTableCount(
+                      project.brief,
+                      existingDataSlots,
+                    );
+                    const { brief, label } = appendDefaultSizeChartTableToBrief(briefBase);
+                    const modules = syncSuiteModulesSlots(
+                      project.suite.modules.map((m) =>
+                        m.module_id === moduleId
+                          ? addSizeChartDataSlotToModule(m, label)
+                          : m,
+                      ),
+                    );
+                    await persist({
+                      brief,
+                      suite: { ...project.suite, modules },
+                    });
+                    toast({
+                      variant: "success",
+                      title: "已新增尺码表",
+                      message: "已带入默认表数据，点击卡片可编辑后生图。",
+                    });
+                  } catch (e) {
+                    await alert({
+                      title: "新增失败",
+                      message: e instanceof Error ? e.message : String(e),
+                      variant: "error",
+                    });
+                  }
+                })();
                 return;
               }
-              requestImagePicker({ moduleId, slotKeys: keys });
-            }}
-            onRequestGenerateSlot={(moduleId, slotKey) => {
-              requestImagePicker({
-                moduleId,
-                slotKeys: [composeSuiteSlotKey(moduleId, slotKey)],
-              });
-            }}
-            onRewriteSlot={(moduleId, slotKey) => {
-              void (async () => {
-                const composite = composeSuiteSlotKey(moduleId, slotKey);
-                beginRewriteSlot(composite);
-                try {
-                  applyProject(
-                    await generateDetailPageSuitePrompts(project.id, { moduleId, slotKey }),
-                  );
-                  toast({ variant: "success", title: "本条已重写" });
-                } catch (e) {
-                  await alert({
-                    title: "重写失败",
-                    message: e instanceof Error ? e.message : String(e),
-                    variant: "error",
-                  });
-                } finally {
-                  endRewriteSlot(composite);
-                }
-              })();
+              setAddSlotDialog({ moduleId });
             }}
             onPickImageModel={() => requestImagePicker({ settingsOnly: true })}
             onDisplayRatioChange={(ratio) => {
@@ -1129,16 +1684,15 @@ function DetailPageSuiteStudioInner() {
             const req = imagePicker;
             setImagePicker(null);
             setImageModelKey(modelKey);
-            void persist({
-              settings: {
-                ...project.settings,
-                imageModelKey: modelKey,
-                imageSize,
-                imageRatio: displayRatio,
-              },
-            });
             if (req.settingsOnly) {
-              toast({ variant: "success", title: "生图设置已保存" });
+              void persist({
+                settings: {
+                  ...project.settings,
+                  imageModelKey: modelKey,
+                  imageSize,
+                  imageRatio: displayRatio,
+                },
+              }).then(() => toast({ variant: "success", title: "生图设置已保存" }));
               return;
             }
             const slotKeys = req.slotKeys ?? [];
@@ -1179,10 +1733,45 @@ function DetailPageSuiteStudioInner() {
         />
       ) : null}
 
+      {sizeChartEdit && project ? (
+        <DetailPageSuiteSizeChartEditDialog
+          open
+          title={sizeChartEdit.label}
+          table={resolveSizeChartTableForSlot(
+            project.brief,
+            resolveSizeChartTableIndexForLabel(sizeChartEdit.label),
+          )}
+          saving={sizeChartEditSaving}
+          onOpenChange={(open) => {
+            if (!open) setSizeChartEdit(null);
+          }}
+          onSave={async (table) => {
+            setSizeChartEditSaving(true);
+            try {
+              const tableIndex = resolveSizeChartTableIndexForLabel(sizeChartEdit.label);
+              const brief = upsertSizeChartTableInBrief(project.brief, tableIndex, table);
+              await persist({ brief });
+              applyProject({ ...project, brief });
+              setSizeChartEdit(null);
+              toast({ variant: "success", title: "尺码参数已保存" });
+            } catch (e) {
+              await alert({
+                title: "保存失败",
+                message: e instanceof Error ? e.message : String(e),
+                variant: "error",
+              });
+            } finally {
+              setSizeChartEditSaving(false);
+            }
+          }}
+        />
+      ) : null}
+
       {promptEdit && project ? (
         <DetailPageSuiteSlotPromptEditDialog
           open
           title={promptEdit.label}
+          shootingRequirement={promptEdit.label}
           prompt={promptEdit.prompt}
           saving={promptEditSaving}
           rewriteBusy={activeRewriteSlotKeys.has(
@@ -1224,20 +1813,31 @@ function DetailPageSuiteStudioInner() {
             const { moduleId, slotKey } = promptEdit;
             void (async () => {
               const composite = composeSuiteSlotKey(moduleId, slotKey);
+              if (activeRewriteSlotKeys.has(composite)) return;
               beginRewriteSlot(composite);
               try {
                 const next = await generateDetailPageSuitePrompts(project.id, {
                   moduleId,
                   slotKey,
                 });
-                applyProject(next);
+                applyProjectSlotPrompt(next, moduleId, slotKey);
                 const mod = next.suite.modules.find((m) => m.module_id === moduleId);
                 const slot = mod
                   ? resolveModuleDisplaySlots(mod).find((s) => s.item_key === slotKey)
                   : undefined;
                 if (slot?.positive_prompt) {
                   setPromptEdit((prev) =>
-                    prev ? { ...prev, prompt: slot.positive_prompt } : prev,
+                    prev
+                      ? {
+                          ...prev,
+                          prompt: composeDetailPageSuiteVisiblePrompt(
+                            slot.positive_prompt,
+                            next.brief ?? {},
+                            slot.item_label,
+                            moduleId,
+                          ),
+                        }
+                      : prev,
                   );
                 }
                 toast({ variant: "success", title: "本条已重写" });

@@ -62,7 +62,10 @@ export async function ecomBookFetch(path: string, init?: RequestInit) {
         ? `: ${data.detail.trim()}`
         : "";
     const combined = `${err}${detail}`;
-    throw new Error(formatEcomTransportError(new Error(combined)));
+    if (res.status === 502 && data.error === "upstream_fetch_failed") {
+      throw new Error(formatEcomTransportError(new Error(combined)));
+    }
+    throw new Error(combined);
   }
   return data;
 }

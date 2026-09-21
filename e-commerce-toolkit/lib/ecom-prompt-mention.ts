@@ -163,6 +163,34 @@ function resolveBadgeItem(
   return refs.find((r) => r.token === fullToken);
 }
 
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * 将正文里未带 @ 的语义代号（如 参考图2）补成 @ 引用，便于与顶栏参考资产绑定。
+ * 已带 @ 或不在当前 refs 列表中的片段不改动。
+ */
+export function bindPlainMentionAliasesInPrompt(
+  value: string,
+  refs: EcomPromptImageRef[],
+): string {
+  if (!value.trim() || refs.length === 0) return value;
+
+  const displays = [
+    ...new Set(
+      refs.map((r) => mentionTokenDisplay(r.token)).filter((d) => d.length > 0),
+    ),
+  ].sort((a, b) => b.length - a.length);
+
+  let out = value;
+  for (const display of displays) {
+    const re = new RegExp(`(?<![@])${escapeRegExp(display)}(?![0-9])`, "g");
+    out = out.replace(re, `@${display}`);
+  }
+  return out;
+}
+
 /** 从 Prompt 存储串提取全部 @ 引用 token（含 @图片N / 语义 token） */
 export function collectMentionTokensFromPrompt(value: string): Set<string> {
   const tokens = new Set<string>();

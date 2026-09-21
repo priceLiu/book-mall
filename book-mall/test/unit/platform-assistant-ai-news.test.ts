@@ -15,6 +15,9 @@ describe("ai news service", () => {
     expect(prompt).toContain("10 条");
     expect(prompt).toContain("【资本与行业动态】");
     expect(prompt).toContain("由 AI 整理");
+    expect(prompt).toContain("出处");
+    expect(prompt).toContain("发表时间");
+    expect(prompt).toContain("2026年8月21日 AI 热闻");
   });
 
   it("uses CST date key", () => {

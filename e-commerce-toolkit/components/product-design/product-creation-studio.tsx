@@ -15,6 +15,7 @@ import { ProductCreationStudioSkeleton } from "@/components/product-design/produ
 import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-link-dialog";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
+import { getMaxRefsForRoleClient } from "@/lib/product-design-ref-rules";
 import {
   createProductDesignProject,
   fetchPlatformSpecs,
@@ -36,7 +37,6 @@ import type {
   ProductDesignReferenceRole,
   ProductDesignStrategyImport,
 } from "@/lib/product-design-types";
-import { getMaxRefsForRoleClient } from "@/lib/product-design-ref-rules";
 import type { DetailWorkflowPath, ProductDesignStepId } from "@/lib/product-design-workflow";
 import {
   DETAIL_INTERACTIVE_CHOICE,
@@ -499,6 +499,48 @@ export function ProductCreationStudio({ module }: StudioProps) {
     }
   }
 
+  async function handleAttachModelFromLibrary(entry: {
+    id: string;
+    name: string;
+    ossUrl: string;
+  }) {
+    if (!project) return;
+    setRefBusy(true);
+    try {
+      const maxCount = getMaxRefsForRoleClient("model", {
+        visionModelKey: project.settings?.visionModelKey,
+        imageModelKey: project.settings?.imageModelKey,
+      });
+      const existing = project.references.filter((r) => r.role === "model");
+      if (existing.length >= maxCount) {
+        await alert({
+          title: "已达上限",
+          message: `模特参考最多 ${maxCount} 张`,
+          variant: "error",
+        });
+        return;
+      }
+      const added: ProductDesignReference = {
+        id: `ref-model-${entry.id.slice(-8)}`,
+        label: entry.name.slice(0, 40) || "模特图",
+        role: "model",
+        ossUrl: entry.ossUrl,
+      };
+      await updateProductDesignProject(project.id, {
+        references: [...project.references, added],
+      });
+      await reload(project.id);
+    } catch (e) {
+      await alert({
+        title: "导入失败",
+        message: e instanceof Error ? e.message : "无法从模特库添加",
+        variant: "error",
+      });
+    } finally {
+      setRefBusy(false);
+    }
+  }
+
   async function handleAttachAssets(
     assets: Array<{ id: string; ossUrl: string; title: string }>,
     role: ProductDesignReferenceRole,
@@ -683,6 +725,7 @@ export function ProductCreationStudio({ module }: StudioProps) {
         onRefUpload={handleRefUpload}
         onRefRemove={handleRefRemove}
         onAttachAssets={handleAttachAssets}
+        onAttachModelFromLibrary={handleAttachModelFromLibrary}
         refBusy={refBusy}
         uploadingRole={uploadingRole}
         uploadProgress={uploadProgress}

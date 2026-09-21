@@ -1,3 +1,4 @@
+import { resolveModuleDisplaySlots } from "./module-slots";
 import type {
   DetailPageSuiteMeta,
   DetailPageSuiteModuleState,
@@ -65,7 +66,7 @@ export function collectPromptSnapshotEntriesFromModules(
 ): Array<{ moduleId: string; slotKey: string; itemLabel: string; prompt: string }> {
   const out: Array<{ moduleId: string; slotKey: string; itemLabel: string; prompt: string }> = [];
   for (const mod of modules) {
-    for (const slot of mod.slots) {
+    for (const slot of resolveModuleDisplaySlots(mod)) {
       const prompt = slot.positive_prompt?.trim();
       if (!prompt) continue;
       out.push({

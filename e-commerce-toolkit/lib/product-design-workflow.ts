@@ -7,6 +7,7 @@ import type {
   ProductDesignMainImage,
   ProductDesignProject,
 } from "@/lib/product-design-types";
+import { bindPlainMentionAliasesInPrompt } from "@/lib/ecom-prompt-mention";
 import { buildProductDesignPromptMentionRefs } from "@/lib/product-design-mention-refs";
 import { hasProductRef } from "@/lib/product-design-ref-rules";
 import { hasBuyingReasonBriefContent } from "@/lib/product-design-buying-reason-parse";
@@ -280,15 +281,35 @@ export function bootstrapFastDetailDesignPatch(detailCount: number): Partial<Pro
 
 export function defaultDetailPageRefPrompt(project: ProductDesignProject): string {
   const refs = buildProductDesignPromptMentionRefs(project, "detail");
-  const styleRefs = refs.filter((r) => r.role === "detail-style");
+  const layoutRefs = refs.filter((r) => r.kind === "style");
+  const modelRefs = refs.filter((r) => r.kind === "model");
   const productRefs = refs.filter((r) => r.role === "product");
-  const styleTags = styleRefs.map((r) => r.token).join("");
-  const productTags = productRefs.map((r) => r.token).join("");
   const count = project.resolved.detailPageCount;
-  if (styleRefs.length === 0) {
-    return `我的商品是${productTags || "@产品实拍1"}，请参考${project.platform}平台详情页规范，生成 ${count} 屏连贯的详情页海报（每屏一屏一主题），保持商品款式一致。`;
-  }
-  return `详情页整体风格参考${styleTags}，请学习其版式、模块节奏与视觉层次；商品为${productTags}。请生成 ${count} 屏风格一致的详情页各屏海报。`;
+
+  const layoutTag = layoutRefs[0]?.token ?? "@详情页参考1";
+  const modelTags =
+    modelRefs.length > 0
+      ? modelRefs.map((r) => r.token).join(" ")
+      : "@模特1 @模特2";
+  const productTag = productRefs[0]?.token ?? "@产品实拍1";
+
+  return `${modelTags} 是我的模特，${productTag} 是我的商品。${layoutTag} 是我想参考的商品详情页的编排(拼图)，帮我拆解成多个单张图的生成，给出生成规划，注意参考每张图的生成比例，如果需要图文并茂，也需要仔细规划，请学习其版式、模块节奏与视觉层次。按 ${layoutTag} 生成 ${count} 屏的详情页各屏海报。`;
+}
+
+/** 展示/提交用：空则默认模板；否则把纯代号补成 @ 引用以与顶栏对齐 */
+export function resolveProductDesignIntentPrompt(
+  project: ProductDesignProject,
+  customPrompt: string | undefined | null,
+  target: "main" | "detail",
+): string {
+  const refs = buildProductDesignPromptMentionRefs(project, target);
+  const trimmed = customPrompt?.trim() ?? "";
+  const fallback =
+    target === "detail"
+      ? defaultDetailPageRefPrompt(project)
+      : defaultMainImageRefPrompt(project);
+  if (!trimmed) return fallback;
+  return bindPlainMentionAliasesInPrompt(trimmed, refs);
 }
 
 export function resolveProductDesignStepStates(

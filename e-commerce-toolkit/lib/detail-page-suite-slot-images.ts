@@ -1,5 +1,10 @@
+import {
+  resolveModuleDisplaySlots,
+  resolveReplicaModuleDisplaySlots,
+} from "@/lib/detail-page-suite-module-slots";
 import type { EcomImagePreviewItem } from "@/lib/media/ecom-image-preview";
 import type {
+  DetailPageSuiteProject,
   DetailPageSuiteSlot,
   DetailPageSuiteSlotImageVersion,
 } from "@/lib/detail-page-suite-types";
@@ -69,4 +74,32 @@ export function buildDetailPageSuiteSlotPreviewItems(
         ? `${slot.item_label} · 第 ${i + 1}/${history.length} 版`
         : slot.item_label,
   }));
+}
+
+/** 全页已出图：预览右栏缩略图（对齐模特服装图详情屏画廊） */
+export function buildDetailPageSuiteProjectPreviewItems(
+  project: DetailPageSuiteProject,
+  opts?: { replicaMode?: boolean; includeDisabledModules?: boolean },
+): EcomImagePreviewItem[] {
+  const replicaMode = opts?.replicaMode === true;
+  const items: EcomImagePreviewItem[] = [];
+  for (const mod of project.suite.modules) {
+    if (!replicaMode && !opts?.includeDisabledModules && !mod.enable) continue;
+    const gridSlots = replicaMode
+      ? resolveReplicaModuleDisplaySlots(mod)
+      : resolveModuleDisplaySlots(mod);
+    for (const slot of gridSlots) {
+      const history = resolveDetailPageSuiteSlotHistory(slot);
+      history.forEach((v, i) => {
+        items.push({
+          src: v.url,
+          title:
+            history.length > 1
+              ? `${mod.module_name} · ${slot.item_label} · 第 ${i + 1}/${history.length} 版`
+              : `${mod.module_name} · ${slot.item_label}`,
+        });
+      });
+    }
+  }
+  return items;
 }

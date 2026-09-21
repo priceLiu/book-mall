@@ -15,12 +15,22 @@ export function parseSuiteSlotKey(key: string): { moduleId: string; slotKey: str
   return { moduleId: key.slice(0, idx), slotKey: key.slice(idx + 2) };
 }
 
+import { isDetailPageSuiteSizeChartPromptMarker } from "@/lib/detail-page-suite-size-chart";
+
 export function isSuiteSlotSelectable(slot: DetailPageSuiteSlot): boolean {
-  return Boolean(slot.positive_prompt?.trim());
+  return (
+    Boolean(slot.positive_prompt?.trim()) ||
+    isDetailPageSuiteSizeChartPromptMarker(slot.positive_prompt)
+  );
+}
+
+/** 有提示词即可参与批量出图勾选（含已出图、可多次追加新版本） */
+export function isSuiteSlotImageBatchSelectable(slot: DetailPageSuiteSlot): boolean {
+  return isSuiteSlotSelectable(slot);
 }
 
 export function suiteModuleSelectableSlots(mod: DetailPageSuiteModuleState): DetailPageSuiteSlot[] {
-  return resolveModuleDisplaySlots(mod).filter(isSuiteSlotSelectable);
+  return resolveModuleDisplaySlots(mod).filter(isSuiteSlotImageBatchSelectable);
 }
 
 export type SuiteModuleSelectionState = "none" | "partial" | "all";
@@ -41,7 +51,7 @@ export function toggleSuiteModuleImageSelection(
   selected: boolean,
 ): DetailPageSuiteModuleState {
   const slots = resolveModuleDisplaySlots(mod).map((s) =>
-    isSuiteSlotSelectable(s) ? { ...s, selectedForImage: selected } : s,
+    isSuiteSlotImageBatchSelectable(s) ? { ...s, selectedForImage: selected } : s,
   );
   return { ...mod, slots };
 }
@@ -51,7 +61,7 @@ export function toggleSuiteSlotImageSelection(
   slotKey: string,
 ): DetailPageSuiteModuleState {
   const slots = resolveModuleDisplaySlots(mod).map((s) =>
-    s.item_key === slotKey && isSuiteSlotSelectable(s)
+    s.item_key === slotKey && isSuiteSlotImageBatchSelectable(s)
       ? { ...s, selectedForImage: s.selectedForImage === false }
       : s,
   );
@@ -63,7 +73,7 @@ export function listSelectedSuiteSlotKeys(project: DetailPageSuiteProject): stri
   for (const mod of project.suite.modules) {
     if (!mod.enable) continue;
     for (const slot of resolveModuleDisplaySlots(mod)) {
-      if (!isSuiteSlotSelectable(slot)) continue;
+      if (!isSuiteSlotImageBatchSelectable(slot)) continue;
       if (slot.selectedForImage === false) continue;
       keys.push(composeSuiteSlotKey(mod.module_id, slot.item_key));
     }
@@ -75,7 +85,7 @@ export function ensureSlotsDefaultSelected(
   slots: DetailPageSuiteSlot[],
 ): DetailPageSuiteSlot[] {
   return slots.map((s) =>
-    isSuiteSlotSelectable(s) && s.selectedForImage === undefined
+    isSuiteSlotImageBatchSelectable(s) && s.selectedForImage === undefined
       ? { ...s, selectedForImage: true }
       : s,
   );

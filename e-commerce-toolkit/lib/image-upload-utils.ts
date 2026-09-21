@@ -24,13 +24,17 @@ export const IMAGE_OR_VIDEO_UPLOAD_ACCEPT = `${IMAGE_UPLOAD_ACCEPT},video/mp4,vi
 
 export type ImageUploadError = { title: string; message: string };
 
-export function validateImageFile(file: File): ImageUploadError | null {
+export function validateImageFile(
+  file: File,
+  maxBytes: number = IMAGE_UPLOAD_MAX_BYTES,
+): ImageUploadError | null {
   const normalized = normalizePastedImageFile(file);
   if (!IMAGE_UPLOAD_MIME_TYPES.has(normalized.type)) {
     return { title: "格式不支持", message: "请上传 JPG、PNG 或 WebP 图片" };
   }
-  if (normalized.size > IMAGE_UPLOAD_MAX_BYTES) {
-    return { title: "文件过大", message: "图片最大 10MB" };
+  if (normalized.size > maxBytes) {
+    const maxMb = Math.round(maxBytes / (1024 * 1024));
+    return { title: "文件过大", message: `图片最大 ${maxMb}MB` };
   }
   return null;
 }

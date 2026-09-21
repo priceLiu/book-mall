@@ -10,14 +10,21 @@ function mod(
   return { module_id, module_name, required, max_num, candidate_pool };
 }
 
-/** 12 模块合计 44（细节 10） */
+import {
+  DETAIL_PAGE_SUITE_SIZE_CHART_DATA_LABEL,
+  DETAIL_PAGE_SUITE_SIZE_CHART_LINE_ART_LABEL,
+  DETAIL_PAGE_SUITE_SIZE_CHART_MAX_NUM,
+  DETAIL_PAGE_SUITE_SIZE_CHART_MODEL_COMPARE_LABEL,
+} from "./size-chart-constants";
+
+/** 12 模块合计 49（细节 10；尺码参考 max 6 default 1） */
 export const OUTDOOR_JACKET_MODULES: DetailPageSuiteModuleDef[] = [
   mod("mod1_banner", "首屏主视觉海报", 1, [
     "首屏模特全身氛围感穿搭，产品主体突出，宽幅详情长图",
   ]),
   mod("mod2_highlight", "产品核心亮点汇总", 2, [
-    "卖点汇总版式底图1，大面积留白，适合叠加文字",
-    "卖点汇总版式底图2，分区卡片式留白，适合多卖点排版",
+    "卖点汇总主视觉，模特穿着本产品，一侧大面积留白供叠加卖点文案",
+    "卖点汇总分区构图，产品主体与多卡片留白区域同框，便于排版多条卖点",
   ]),
   mod("mod3_model_show", "模特上身整体穿搭展示", 6, [
     "正面全身站姿，完整展示外套整体版型",
@@ -49,8 +56,10 @@ export const OUTDOOR_JACKET_MODULES: DetailPageSuiteModuleDef[] = [
     "侧面版型展示，模特侧面，展示衣身立体剪裁",
     "版型线条参考底图，干净背景预留标注线条",
   ]),
-  mod("mod7_size_table", "尺码表", 1, [
-    "尺码表空白底图，浅纯色干净背景，预留表格区域",
+  mod("mod7_size_table", "尺码参考模块", DETAIL_PAGE_SUITE_SIZE_CHART_MAX_NUM, [
+    DETAIL_PAGE_SUITE_SIZE_CHART_DATA_LABEL,
+    DETAIL_PAGE_SUITE_SIZE_CHART_LINE_ART_LABEL,
+    DETAIL_PAGE_SUITE_SIZE_CHART_MODEL_COMPARE_LABEL,
   ]),
   mod("mod8_scene", "场景穿搭场景图", 5, [
     "山林户外环境穿搭，自然山野背景",
@@ -87,8 +96,8 @@ export const BUSINESS_SHIRT_MODULES: DetailPageSuiteModuleDef[] = [
     "首屏模特全身商务穿搭，衬衫主体突出，宽幅详情长图",
   ]),
   mod("mod2_highlight", "产品核心亮点汇总", 2, [
-    "卖点汇总版式底图1，大面积留白，适合叠加文字",
-    "卖点汇总版式底图2，分区卡片式留白，适合多卖点排版",
+    "卖点汇总主视觉，模特穿着本产品，一侧大面积留白供叠加卖点文案",
+    "卖点汇总分区构图，产品主体与多卡片留白区域同框，便于排版多条卖点",
   ]),
   mod("mod3_model_show", "模特上身整体穿搭展示", 6, [
     "正面全身站姿，完整展示衬衫上身版型",
@@ -120,8 +129,10 @@ export const BUSINESS_SHIRT_MODULES: DetailPageSuiteModuleDef[] = [
     "侧面版型展示，模特侧面，展示衣身立体收腰剪裁",
     "版型线条参考底图，干净背景预留标注线条",
   ]),
-  mod("mod7_size_table", "尺码表", 1, [
-    "尺码表空白底图，浅纯色干净背景，预留表格区域",
+  mod("mod7_size_table", "尺码参考模块", DETAIL_PAGE_SUITE_SIZE_CHART_MAX_NUM, [
+    DETAIL_PAGE_SUITE_SIZE_CHART_DATA_LABEL,
+    DETAIL_PAGE_SUITE_SIZE_CHART_LINE_ART_LABEL,
+    DETAIL_PAGE_SUITE_SIZE_CHART_MODEL_COMPARE_LABEL,
   ]),
   mod("mod8_scene", "场景穿搭场景图", 5, [
     "办公室工位商务穿搭，简约办公室内背景",
@@ -158,8 +169,8 @@ export const CASUAL_TEE_MODULES: DetailPageSuiteModuleDef[] = [
     "首屏模特全身休闲穿搭，T恤主体突出，宽幅详情长图",
   ]),
   mod("mod2_highlight", "产品核心亮点汇总", 2, [
-    "卖点汇总版式底图1，大面积留白，适合叠加文字",
-    "卖点汇总版式底图2，分区卡片式留白，适合多卖点排版",
+    "卖点汇总主视觉，模特穿着本产品，一侧大面积留白供叠加卖点文案",
+    "卖点汇总分区构图，产品主体与多卡片留白区域同框，便于排版多条卖点",
   ]),
   mod("mod3_model_show", "模特上身整体穿搭展示", 6, [
     "正面全身站姿，完整展示T恤上身版型与下摆",
@@ -191,8 +202,10 @@ export const CASUAL_TEE_MODULES: DetailPageSuiteModuleDef[] = [
     "侧面版型展示，模特侧面，展示衣身宽松度",
     "版型线条参考底图，干净背景预留标注线条",
   ]),
-  mod("mod7_size_table", "尺码表", 1, [
-    "尺码表空白底图，浅纯色干净背景，预留表格区域",
+  mod("mod7_size_table", "尺码参考模块", DETAIL_PAGE_SUITE_SIZE_CHART_MAX_NUM, [
+    DETAIL_PAGE_SUITE_SIZE_CHART_DATA_LABEL,
+    DETAIL_PAGE_SUITE_SIZE_CHART_LINE_ART_LABEL,
+    DETAIL_PAGE_SUITE_SIZE_CHART_MODEL_COMPARE_LABEL,
   ]),
   mod("mod8_scene", "场景穿搭场景图", 5, [
     "城市街道日常休闲穿搭",

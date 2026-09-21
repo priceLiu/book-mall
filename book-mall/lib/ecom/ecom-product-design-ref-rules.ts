@@ -8,11 +8,23 @@ import {
   isEcomStoryboardImageEditModel,
 } from "@/lib/ecom/ecom-storyboard-image-edit";
 import { isStoryLlmVisionModel } from "@/lib/canvas/story-llm-vision-models";
-import type { ProductDesignReferenceRole } from "@/lib/ecom/ecom-product-design-types";
+import {
+  filterProductDesignReferencesByRole,
+  type ProductDesignReference,
+  type ProductDesignReferenceRole,
+} from "@/lib/ecom/ecom-product-design-types";
 
-/** 风格参考上传上限（与视觉/生图 API 上限解耦；出图时按模型截断） */
+/** 风格参考张数上限（与视觉/生图 API 上限解耦；出图时按模型截断） */
 export const PRODUCT_DESIGN_STYLE_REF_UPLOAD_MAX = 9;
+export const PRODUCT_DESIGN_MODEL_REF_UPLOAD_MAX = 9;
 export const PRODUCT_DESIGN_PRODUCT_REF_UPLOAD_MAX = 3;
+
+export {
+  getProductDesignRefUploadMaxBytes,
+  PRODUCT_DESIGN_REF_STORE_MAX_BYTES,
+  PRODUCT_DESIGN_REF_UPLOAD_MAX_BYTES_DEFAULT,
+  PRODUCT_DESIGN_STYLE_REF_UPLOAD_MAX_BYTES,
+} from "./ecom-product-design-ref-upload-normalize";
 
 export function getVisionMaxInputImages(modelKey: string): number {
   const key = modelKey.trim();
@@ -73,6 +85,72 @@ export function orderRefsForModel<T>(
   };
 }
 
+/** 风格 + 模特参考（送入模型时与 product 一起排序） */
+export function productDesignStyleLikeReferences(
+  references: ProductDesignReference[],
+  target: "main" | "detail",
+): ProductDesignReference[] {
+  const styleRole = target === "main" ? "main-style" : "detail-style";
+  return [
+    ...filterProductDesignReferencesByRole(references, [styleRole]),
+    ...filterProductDesignReferencesByRole(references, ["model"]),
+  ];
+}
+
+/**
+ * 详情屏出图：用当前屏切片替代整页 detail-style，保留模特等其它风格参考。
+ */
+export function refUrlsForDetailScreen(
+  references: ProductDesignReference[],
+  modelKey: string,
+  styleSliceUrl?: string,
+): {
+  urls: string[];
+  productCount: number;
+  styleCount: number;
+  styleFirst: boolean;
+} {
+  const product = filterProductDesignReferencesByRole(references, ["product"]).map(
+    (r) => r.ossUrl,
+  );
+  const models = filterProductDesignReferencesByRole(references, ["model"]).map(
+    (r) => r.ossUrl,
+  );
+  const styleUrls = styleSliceUrl
+    ? [styleSliceUrl, ...models]
+    : productDesignStyleLikeReferences(references, "detail").map((r) => r.ossUrl);
+  const packed = orderRefsForModel(product, styleUrls, getImageGenMaxRefs(modelKey));
+  return {
+    urls: packed.ordered,
+    productCount: packed.productCount,
+    styleCount: packed.styleCount,
+    styleFirst: packed.styleFirst,
+  };
+}
+
+export function referencesForDetailScreenLegend(
+  references: ProductDesignReference[],
+  screenIndex: number,
+  styleSliceUrl?: string,
+): ProductDesignReference[] {
+  if (!styleSliceUrl?.trim()) return references;
+  let replacedDetailStyle = false;
+  return references.flatMap((r) => {
+    if (r.role === "detail-style") {
+      if (replacedDetailStyle) return [];
+      replacedDetailStyle = true;
+      return [
+        {
+          ...r,
+          ossUrl: styleSliceUrl,
+          label: `${r.label}（第 ${screenIndex} 屏切片）`,
+        },
+      ];
+    }
+    return [r];
+  });
+}
+
 export function getMaxRefsForRole(
   role: ProductDesignReferenceRole,
   opts?: { visionModelKey?: string; imageModelKey?: string },
@@ -81,6 +159,7 @@ export function getMaxRefsForRole(
   if (role === "main-style" || role === "detail-style") {
     return STYLE_ROLE_MAX;
   }
+  if (role === "model") return PRODUCT_DESIGN_MODEL_REF_UPLOAD_MAX;
   return 6;
 }
 
@@ -90,7 +169,7 @@ export function getMaxRefsForRoleAtInvoke(
   opts?: { visionModelKey?: string; imageModelKey?: string },
 ): number {
   if (role === "product") return PRODUCT_DESIGN_PRODUCT_REF_UPLOAD_MAX;
-  if (role === "main-style" || role === "detail-style") {
+  if (role === "main-style" || role === "detail-style" || role === "model") {
     const visionMax = opts?.visionModelKey
       ? getVisionMaxInputImages(opts.visionModelKey)
       : STYLE_ROLE_MAX;

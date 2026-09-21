@@ -9,7 +9,8 @@ import {
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+/** 单模块 LLM 生成；批量由前端按 moduleId 分批调用 */
+export const maxDuration = 600;
 
 type Ctx = { params: Promise<{ id: string }> };
 

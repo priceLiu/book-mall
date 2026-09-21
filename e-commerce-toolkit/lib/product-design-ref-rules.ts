@@ -8,9 +8,23 @@ export type ProductDesignRefRole =
   | "model"
   | "other";
 
-/** 风格参考上传上限（出图/分析时按模型能力截断） */
+/** 风格参考张数上限（出图/分析时按模型能力截断） */
 export const PRODUCT_DESIGN_STYLE_REF_UPLOAD_MAX = 9;
+export const PRODUCT_DESIGN_MODEL_REF_UPLOAD_MAX = 9;
 export const PRODUCT_DESIGN_PRODUCT_REF_UPLOAD_MAX = 3;
+
+export const PRODUCT_DESIGN_REF_UPLOAD_MAX_BYTES_DEFAULT = 30 * 1024 * 1024;
+export const PRODUCT_DESIGN_STYLE_REF_UPLOAD_MAX_BYTES = 200 * 1024 * 1024;
+export const PRODUCT_DESIGN_REF_STORE_MAX_BYTES = 30 * 1024 * 1024;
+
+export function getProductDesignRefUploadMaxBytesClient(
+  role: ProductDesignRefRole,
+): number {
+  if (role === "main-style" || role === "detail-style") {
+    return PRODUCT_DESIGN_STYLE_REF_UPLOAD_MAX_BYTES;
+  }
+  return PRODUCT_DESIGN_REF_UPLOAD_MAX_BYTES_DEFAULT;
+}
 
 export function getVisionMaxInputImagesClient(modelKey: string): number {
   const key = modelKey.trim();
@@ -41,6 +55,7 @@ export function getMaxRefsForRoleClient(
   if (role === "main-style" || role === "detail-style") {
     return PRODUCT_DESIGN_STYLE_REF_UPLOAD_MAX;
   }
+  if (role === "model") return PRODUCT_DESIGN_MODEL_REF_UPLOAD_MAX;
   return 6;
 }
 
@@ -50,7 +65,7 @@ export function getMaxRefsForRoleAtInvokeClient(
   opts?: { visionModelKey?: string; imageModelKey?: string },
 ): number {
   if (role === "product") return PRODUCT_DESIGN_PRODUCT_REF_UPLOAD_MAX;
-  if (role === "main-style" || role === "detail-style") {
+  if (role === "main-style" || role === "detail-style" || role === "model") {
     const visionMax = opts?.visionModelKey
       ? getVisionMaxInputImagesClient(opts.visionModelKey)
       : PRODUCT_DESIGN_STYLE_REF_UPLOAD_MAX;

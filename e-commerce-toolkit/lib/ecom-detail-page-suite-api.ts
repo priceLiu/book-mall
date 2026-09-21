@@ -14,12 +14,23 @@ export async function fetchDetailPageSuiteModels(): Promise<{
   chatModels: StoryboardGatewayModel[];
   imageModels: StoryboardGatewayModel[];
   defaults: { chat: string; image: string };
+  imageGenConcurrencyLimit: number;
+  promptGenConcurrencyLimit: number;
 }> {
   const data = await ecomBookFetch(`${BASE}/models`);
+  const standard = 2;
   return {
     chatModels: (data.chatModels as StoryboardGatewayModel[]) ?? [],
     imageModels: (data.imageModels as StoryboardGatewayModel[]) ?? [],
     defaults: (data.defaults as { chat: string; image: string }) ?? { chat: "", image: "" },
+    imageGenConcurrencyLimit:
+      typeof data.imageGenConcurrencyLimit === "number"
+        ? data.imageGenConcurrencyLimit
+        : standard,
+    promptGenConcurrencyLimit:
+      typeof data.promptGenConcurrencyLimit === "number"
+        ? data.promptGenConcurrencyLimit
+        : standard,
   };
 }
 

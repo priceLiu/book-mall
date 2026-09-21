@@ -13,7 +13,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
 
-  const items = await listEcomGenerationRecords(auth.userId);
+  const url = new URL(req.url);
+  const projectId = url.searchParams.get("projectId")?.trim() || undefined;
+  const items = await listEcomGenerationRecords(auth.userId, { projectId });
   return NextResponse.json({
     items: items.map((row) => ({
       id: row.id,

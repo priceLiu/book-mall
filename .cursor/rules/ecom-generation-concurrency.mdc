@@ -1,0 +1,33 @@
+---
+description: 电商工具批量出图/写提示词并发须按套餐解析，标准默认 2
+globs: book-mall/lib/ecom/**,e-commerce-toolkit/**,book-mall/app/api/sso/tools/ecom/**
+alwaysApply: false
+---
+
+# 电商 · 生成并发（套餐 / 标准默认）
+
+权威文档：`book-mall/doc/tech/ecom-generation-concurrency-spec.md`
+
+## 必须
+
+| 场景 | 做法 |
+|------|------|
+| 批量 **出图** | `resolveEcomImageGenConcurrency(userId, settings)` + `mapWithConcurrency(..., limit)` |
+| 批量 **写提示词** | `resolveEcomPromptGenConcurrency(userId)`；前端并行数 ≤ API 下发的 limit |
+| models/boot API | 返回 `imageGenConcurrencyLimit` / `promptGenConcurrencyLimit`（标准 **2**，套餐可更高，cap **5**） |
+| 并发写库 | `prepareDetailPageSuitePatch` merge；禁止多请求裸覆盖 `suite.slots` |
+
+## 禁止
+
+- 业务代码硬编码 `mapWithConcurrency(..., 4)` 等 magic number 作为 **账户并发上限**
+- 在 UI 提供用户自选「并发数」下拉（并发由套餐/账户解析，非页面配置）
+- 为「防丢数据」把批量写提示词 **改回全串行** 而不做服务端 merge + snapshot 恢复
+
+## 标准 vs 套餐
+
+- **无会员加速 / 无团队并发加成** → 使用 `ECOM_IMAGE_GEN_DEFAULT_CONCURRENCY` / `ECOM_PROMPT_GEN_DEFAULT_CONCURRENCY`（**2**）
+- **有套餐** → `resolveVideoRiskLimits` 的 `maxConcurrency`，再 `min(..., ECOM_*_MAX_CONCURRENCY)`（**5**）
+
+## Code Review
+
+PR 在电商工具新增批量 Gateway/LLM 调用时，未走上述 resolver → **驳回**。

@@ -26,9 +26,10 @@ export function buildProductDesignPromptMentionRefs(
 export function mentionRefRoleLabel(role: string, kind?: MentionTokenKind): string {
   if (kind === "model") return "模特";
   if (kind === "product") return "产品实拍";
+  if (role === "detail-style" && kind === "style") return "详情页参考";
   if (kind === "style") return "参考图";
   if (role === "product") return "产品实拍";
   if (role === "main-style") return "主图风格";
-  if (role === "detail-style") return "详情风格";
+  if (role === "detail-style") return "详情页参考";
   return "参考图";
 }

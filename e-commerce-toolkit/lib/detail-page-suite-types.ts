@@ -24,6 +24,18 @@ export type DetailPageSuiteSellpoint = {
   source: "user" | "vision" | "ai";
 };
 
+export type DetailPageSuiteSizeChartTable = {
+  title?: string;
+  headers: string[];
+  rows: string[][];
+  isDemo?: boolean;
+};
+
+export type DetailPageSuiteSizeChartState = {
+  tables?: DetailPageSuiteSizeChartTable[];
+  fitNote?: string;
+};
+
 export type DetailPageSuiteBrief = {
   genderCategory?: string;
   styleCategory?: string;
@@ -36,12 +48,15 @@ export type DetailPageSuiteBrief = {
   productDesc?: string;
   sellPoints?: DetailPageSuiteSellpoint[];
   sellpointsLocked?: boolean;
+  sizeChart?: DetailPageSuiteSizeChartState;
 };
+
+export type DetailPageSuiteReferenceRole = "product" | "reference_suite" | "model";
 
 export type DetailPageSuiteReference = {
   id: string;
   label: string;
-  role: "product";
+  role: DetailPageSuiteReferenceRole;
   ossUrl: string;
 };
 
@@ -61,8 +76,10 @@ export type DetailPageSuiteSlotImageVersion = {
 export type DetailPageSuiteSlot = {
   item_key: string;
   item_label: string;
+  slot_copy?: string;
   source: "template" | "user";
   positive_prompt: string;
+  negative_prompt?: string;
   imageUrl?: string;
   assetId?: string;
   /** 同格多次生成的历史；最早在前，最新在后 */
@@ -114,6 +131,7 @@ export type DetailPageSuiteProject = {
     visionModelKey?: string;
     imageModelKey?: string;
     imageSize?: string;
+    hitIncludeSlotCopyOnImage?: boolean;
     /** 展示/出图比例，默认跟平台 detailPage.ratio */
     imageRatio?: "1:1" | "3:4" | "4:5" | "16:9";
   };
@@ -122,11 +140,80 @@ export type DetailPageSuiteProject = {
   suite: DetailPageSuiteState;
   meta: {
     phase?: DetailPageSuitePhase;
+    replicaPhaseA?: unknown;
+    replicaInventory?: unknown;
+    replicaSegmentMapping?: Record<
+      string,
+      { module_id: string | null; source: "auto" | "manual"; confidence?: "high" | "low" }
+    >;
+    replicaStatus?:
+      | "idle"
+      | "decomposing"
+      | "decomposed"
+      | "polishing"
+      | "ready"
+      | "error";
+    replicaProgress?: {
+      step: "vision" | "classify" | "polish" | "merge";
+      title: string;
+      detail?: string;
+      doneModules?: number;
+      totalModules?: number;
+      updatedAt?: string;
+    };
+    replicaError?: string;
+    replicaWarning?: string;
+    hitTemplate?: unknown;
+    hitTemplateSnapshot?: unknown;
+    hitCopyParadigm?: unknown;
+    hitMarketInsight?: unknown;
+    hitStatus?:
+      | "idle"
+      | "decomposing"
+      | "decomposed"
+      | "polishing"
+      | "ready"
+      | "error";
+    hitProgress?: {
+      step: "vision" | "classify" | "polish" | "merge";
+      title: string;
+      detail?: string;
+      percent?: number;
+      doneModules?: number;
+      totalModules?: number;
+      updatedAt?: string;
+    };
+    hitVisionSellpoint?: {
+      status: "idle" | "running" | "done" | "error";
+      progress?: {
+        percent: number;
+        title: string;
+        detail?: string;
+        updatedAt?: string;
+      };
+      error?: string;
+    };
+    replicaVisionSellpoint?: {
+      status: "idle" | "running" | "done" | "error";
+      progress?: {
+        percent: number;
+        title: string;
+        detail?: string;
+        updatedAt?: string;
+      };
+      error?: string;
+    };
+    hitError?: string;
+    hitWarning?: string;
     dimensionStep?: number;
     templateId?: string;
     pendingImages?: Record<string, { startedAt: string; modelKey?: string }>;
     pendingPromptModules?: Record<string, { startedAt: string }>;
     promptSnapshots?: Record<string, { prompt: string; itemLabel: string; updatedAt: string }>;
+    imageGenFailures?: Record<
+      string,
+      { message: string; failedAt: string; modelKey?: string }
+    >;
   } | null;
   createdAt: string;
   updatedAt: string;
