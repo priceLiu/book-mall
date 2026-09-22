@@ -1374,6 +1374,7 @@ function DetailPageSuiteHitStudioInner() {
       {sizeChartEdit && project ? (
         <DetailPageSuiteSizeChartEditDialog
           open
+          title={sizeChartEdit.label}
           table={resolveSizeChartTableForSlot(
             project.brief,
             resolveSizeChartTableIndexForLabel(sizeChartEdit.label),

@@ -103,6 +103,9 @@ type Props = {
   loadProjectList?: () => Promise<EcomProjectListItem[]>;
   onOpenProject?: (id: string) => void | Promise<void>;
   onDeleteProject?: () => void | Promise<void>;
+  /** 复刻 / 爆款：顶栏「素材打包导出」 */
+  onExportPack?: () => void | Promise<void>;
+  exportPackBusy?: boolean;
   /** 详情页套图复刻 / 爆款：隐藏顶栏上传/卖点，下区出图格子 */
   variant?: "default" | "replica" | "hit";
   /** 复刻页顶栏由 Studio 固定在滚动区外时设为 true */
