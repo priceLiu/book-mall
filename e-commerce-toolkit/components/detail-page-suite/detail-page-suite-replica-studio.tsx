@@ -291,7 +291,7 @@ function DetailPageSuiteReplicaStudioInner() {
     isReplicaDecomposeInFlight(project?.meta ?? null) ||
     (decomposeDockRunning && !backgroundGen.isTaskMinimized(decomposeDockTaskId));
   const decomposeProgressCopy = replicaDecomposeStatusCopy(project?.meta ?? null);
-  const visionSellpointJob = readReplicaVisionSellpointJob(project?.meta ?? undefined);
+  const visionSellpointJob = readReplicaVisionSellpointJob(project?.meta ?? null);
   const showVisionSellpointProgress =
     visionBusy || isVisionSellpointJobRunning(visionSellpointJob);
 

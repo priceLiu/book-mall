@@ -81,6 +81,7 @@ type AssistantContextValue = {
   dimStep: number;
   dimensionMessageLabels: ReturnType<typeof buildSuiteDimensionMessageLabels>;
   liveStep: ReturnType<typeof resolveSuiteLiveChoiceStep>;
+  workspaceGuide: ReturnType<typeof resolveSuiteWorkspaceGuide>;
   showChoices: boolean;
   scrollRef: React.RefObject<HTMLDivElement>;
   optimisticSelected: string | null;
