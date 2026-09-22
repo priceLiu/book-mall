@@ -136,6 +136,9 @@ export function materializeModuleSlots(
     return {
       ...slot,
       positive_prompt: orphan.positive_prompt,
+      slot_copy: orphan.slot_copy?.trim() || slot.slot_copy,
+      slot_copy_ai: orphan.slot_copy_ai?.trim() || slot.slot_copy_ai,
+      burn_copy_in_image: orphan.burn_copy_in_image ?? slot.burn_copy_in_image,
       promptEdited: orphan.promptEdited,
       imageUrl: orphan.imageUrl ?? slot.imageUrl,
       assetId: orphan.assetId ?? slot.assetId,
@@ -172,6 +175,9 @@ export function mergeModuleSlotsPreservingContent(
       ...prev,
       ...slot,
       positive_prompt: slot.positive_prompt?.trim() || prev.positive_prompt || "",
+      slot_copy: slot.slot_copy?.trim() || prev.slot_copy,
+      slot_copy_ai: slot.slot_copy_ai?.trim() || prev.slot_copy_ai,
+      burn_copy_in_image: slot.burn_copy_in_image ?? prev.burn_copy_in_image,
       imageUrl: slot.imageUrl?.trim() || prev.imageUrl,
       assetId: slot.assetId ?? prev.assetId,
       imageHistory:

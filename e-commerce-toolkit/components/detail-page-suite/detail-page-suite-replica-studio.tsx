@@ -51,6 +51,7 @@ import {
   detailPageSuiteProjectSlotHasImage,
   listDetailPageSuitePromptGenTargets,
   pruneDetailPageSuitePromptSelection,
+  detailPageSuitePromptSelectionAfterImageGenSubmit,
   resolveDetailPageSuiteBusyImageGenExcludeKeys,
   resolveDetailPageSuiteImageGenSlotKeys,
 } from "@/lib/detail-page-suite-prompt-selection";
@@ -931,6 +932,9 @@ function DetailPageSuiteReplicaStudioInner() {
       });
       return;
     }
+    setPromptSelectionKeys((prev) =>
+      detailPageSuitePromptSelectionAfterImageGenSubmit(prev, keys),
+    );
     setActiveGenSlotKeys((prev) => new Set([...prev, ...keys]));
     setImageModelKey(effectiveModelKey);
     try {

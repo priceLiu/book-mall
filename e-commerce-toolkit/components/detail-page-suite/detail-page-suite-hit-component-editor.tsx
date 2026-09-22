@@ -6,6 +6,7 @@ import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-but
 import { DetailPageSuiteHitParadigmPanel } from "@/components/detail-page-suite/detail-page-suite-hit-paradigm-panel";
 import {
   onHitComponentTypeChange,
+  sanitizeHitComponent,
   sanitizeHitTemplateDraft,
 } from "@/lib/detail-page-suite-hit-template-client";
 import {
@@ -13,8 +14,7 @@ import {
   HIT_COMPONENT_TYPES,
   HIT_LAYOUT_LABELS,
   HIT_LAYOUTS,
-  HIT_REPEATABLE_TYPES,
-  maxRepeatForHitType,
+  HIT_REPEAT_COUNT_MAX,
   type HitComponent,
   type HitComponentType,
   type HitLayout,
@@ -41,13 +41,12 @@ function moveItem<T>(list: T[], index: number, dir: -1 | 1): T[] {
 }
 
 function defaultComponent(type: HitComponentType): HitComponent {
-  const editable = HIT_REPEATABLE_TYPES.has(type);
   return {
     id: `hit_${type}_${Date.now().toString(36)}`,
     type,
     layout: type === "spec_table" ? "table" : type === "full_banner" ? "full_image" : "image_text_top_bottom",
-    repeat_count: editable ? 3 : 1,
-    user_editable_count: editable,
+    repeat_count: 1,
+    user_editable_count: true,
     text_slot: {
       max_char: type === "full_banner" ? 16 : 36,
       text_type: type === "full_banner" ? "banner钩子" : "卖点利益",
@@ -138,8 +137,8 @@ export function DetailPageSuiteHitComponentEditor({
 
       <ul className="space-y-2">
         {template.component_list.map((comp, index) => {
-          const max = maxRepeatForHitType(comp.type);
-          const editableCount = comp.user_editable_count ?? HIT_REPEATABLE_TYPES.has(comp.type);
+          const max = HIT_REPEAT_COUNT_MAX;
+          const editableCount = comp.user_editable_count !== false;
           return (
             <li
               key={comp.id}
@@ -155,8 +154,8 @@ export function DetailPageSuiteHitComponentEditor({
                     const type = e.target.value as HitComponentType;
                     patchComponent(index, {
                       type,
-                      user_editable_count: HIT_REPEATABLE_TYPES.has(type),
-                      repeat_count: Math.min(comp.repeat_count, maxRepeatForHitType(type)),
+                      user_editable_count: true,
+                      repeat_count: sanitizeHitComponent({ ...comp, type }).repeat_count,
                     });
                   }}
                 >

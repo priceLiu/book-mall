@@ -71,6 +71,8 @@ export type DetailPageSuiteImageTarget = {
   prompt: string;
   negativePrompt?: string;
   slotCopy?: string;
+  /** 爆款：本格出图是否烧录 slotCopy */
+  burnCopyInImage?: boolean;
 };
 
 /** 与前端 `resolveModuleDisplaySlots` + composite slotKeys 对齐，供出图与单测复用 */
@@ -107,6 +109,7 @@ export function collectDetailPageSuiteImageTargets(
         prompt: slot.positive_prompt,
         negativePrompt: slot.negative_prompt?.trim() || undefined,
         slotCopy: slot.slot_copy?.trim() || undefined,
+        burnCopyInImage: slot.burn_copy_in_image === true,
       });
     }
   }
@@ -183,7 +186,7 @@ export async function generateDetailPageSuiteImages(opts: {
   imageRatio?: "1:1" | "3:4" | "4:5" | "16:9";
   /** 默认 detail-page-suite；复刻 / 爆款传对应 module */
   projectModule?: string;
-  /** 爆款套图：出图时将 slot_copy 写入 prompt，并放宽「画面文字」负向 */
+  /** @deprecated 改用各卡位 burn_copy_in_image；仅作旧项目迁移兜底 */
   includeSlotCopyOnImage?: boolean;
 }) {
   await assertEcomToolkitGatewayAccess(opts.userId);
@@ -212,7 +215,7 @@ export async function generateDetailPageSuiteImages(opts: {
       ? ECOM_DETAIL_PAGE_SUITE_REPLICA_TOOL_KEY
       : ECOM_DETAIL_PAGE_SUITE_TOOL_KEY;
 
-  const includeSlotCopyOnImage =
+  const legacyGlobalBurnCopy =
     isHit &&
     (opts.includeSlotCopyOnImage === true ||
       project.settings.hitIncludeSlotCopyOnImage === true);
@@ -320,13 +323,19 @@ export async function generateDetailPageSuiteImages(opts: {
               moduleName: t.moduleName,
               itemLabel: t.itemLabel,
             });
+            const burnCopyInImage =
+              isHit &&
+              Boolean(t.slotCopy?.trim()) &&
+              (t.burnCopyInImage === true ||
+                (legacyGlobalBurnCopy && t.burnCopyInImage !== false));
             let prompt = composeDetailPageSuiteVisiblePrompt(
               t.prompt,
               project.brief,
               t.itemLabel,
               t.moduleId,
+              burnCopyInImage ? { omitSellpointsInPrefix: true } : undefined,
             );
-            if (includeSlotCopyOnImage) {
+            if (burnCopyInImage) {
               prompt = buildHitDetailPageImagePrompt({
                 positivePrompt: prompt,
                 slotCopy: t.slotCopy,
@@ -345,7 +354,7 @@ export async function generateDetailPageSuiteImages(opts: {
               userId: opts.userId,
               modelKey,
               prompt,
-              negativePrompt: includeSlotCopyOnImage
+              negativePrompt: burnCopyInImage
                 ? mergeHitDetailPageImageNegativePrompt(t.negativePrompt, true)
                 : mergeSuiteNegativePrompt(t.negativePrompt),
               ratio,

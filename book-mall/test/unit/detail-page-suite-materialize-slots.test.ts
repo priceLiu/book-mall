@@ -56,6 +56,31 @@ describe("resolveModuleDisplaySlots", () => {
 });
 
 describe("materializeModuleSlots", () => {
+  it("recovers orphan slot_copy when display label differs but index matches", () => {
+    const mod: DetailPageSuiteModuleState = {
+      module_id: "hit_feature_card_1",
+      module_name: "卖点",
+      enable: true,
+      generate_count: 1,
+      max_num: 3,
+      select_mode: "manual",
+      candidate_pool: ["新标题"],
+      selected_item_list: ["新标题"],
+      slots: [
+        {
+          item_key: "f1",
+          item_label: "旧标题",
+          source: "template",
+          positive_prompt: "长提示词内容",
+          slot_copy: "原创卖点文案",
+          slot_copy_ai: "原创卖点文案",
+        },
+      ],
+    };
+    const slots = materializeModuleSlots(mod);
+    expect(slots.some((s) => s.slot_copy === "原创卖点文案")).toBe(true);
+  });
+
   it("recovers orphan prompt when selected label differs but index matches", () => {
     const mod: DetailPageSuiteModuleState = {
       module_id: "mod2_highlight",

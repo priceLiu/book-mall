@@ -160,6 +160,13 @@ export async function rewriteDetailPageSuiteHit(
   });
 }
 
+export async function rewriteDetailPageSuiteHitSlot(
+  projectId: string,
+  body: { moduleId: string; slotKey: string; chatModelKey?: string },
+) {
+  return postHitJson(`projects/${projectId}/hit/rewrite-slot`, body);
+}
+
 export async function saveDetailPageSuiteHitTemplate(
   projectId: string,
   template: unknown,

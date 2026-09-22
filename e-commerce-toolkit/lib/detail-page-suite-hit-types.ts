@@ -48,10 +48,10 @@ export const HIT_REPEATABLE_TYPES = new Set<HitComponentType>([
   "scene_image",
 ]);
 
-export function maxRepeatForHitType(type: HitComponentType): number {
-  if (type === "feature_card") return 6;
-  if (type === "detail_closeup" || type === "scene_image") return 8;
-  return 4;
+export const HIT_REPEAT_COUNT_MAX = 99;
+
+export function maxRepeatForHitType(_type: HitComponentType): number {
+  return HIT_REPEAT_COUNT_MAX;
 }
 
 export type HitComponent = {

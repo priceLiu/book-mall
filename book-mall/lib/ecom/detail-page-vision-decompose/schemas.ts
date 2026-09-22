@@ -225,12 +225,61 @@ export function collectDecomposeTruncateWarnings(
   return warnings;
 }
 
-export function extractFenceJson(text: string, fenceName: string): unknown {
-  const fence = new RegExp("```" + fenceName + "\\s*([\\s\\S]*?)```", "i");
-  const m = text.match(fence);
-  const raw = (m?.[1] ?? text).trim();
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** 从首个 `{` 起按括号深度截取完整 JSON 对象（避免 lastIndexOf 截断嵌套 JSON） */
+export function extractFirstBalancedJsonObject(raw: string): string {
   const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
-  if (start < 0 || end <= start) throw new Error("大模型未返回有效 JSON");
-  return JSON.parse(raw.slice(start, end + 1)) as unknown;
+  if (start < 0) throw new Error("大模型未返回有效 JSON");
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < raw.length; i++) {
+    const ch = raw[i]!;
+    if (inString) {
+      if (escape) escape = false;
+      else if (ch === "\\") escape = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === "{") depth += 1;
+    else if (ch === "}") {
+      depth -= 1;
+      if (depth === 0) return raw.slice(start, i + 1);
+    }
+  }
+  throw new Error("大模型未返回有效 JSON");
+}
+
+export function extractFenceJson(text: string, fenceName: string): unknown {
+  const trimmed = text.trim();
+  const bodies: string[] = [];
+  const fenceRe = new RegExp("```" + escapeRegExp(fenceName) + "\\s*([\\s\\S]*?)```", "i");
+  const fenceMatch = trimmed.match(fenceRe);
+  if (fenceMatch?.[1]?.trim()) bodies.push(fenceMatch[1].trim());
+  const jsonFence = trimmed.match(/```json\s*([\s\S]*?)```/i);
+  if (jsonFence?.[1]?.trim()) bodies.push(jsonFence[1].trim());
+  const anyFence = trimmed.match(/```[^\n`]*\n([\s\S]*?)```/);
+  if (anyFence?.[1]?.trim()) bodies.push(anyFence[1].trim());
+  bodies.push(trimmed);
+
+  let lastErr: Error | null = null;
+  for (const body of bodies) {
+    try {
+      const slice = extractFirstBalancedJsonObject(body);
+      return JSON.parse(slice) as unknown;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      lastErr = new Error(
+        msg.includes("JSON") ? msg : `大模型未返回有效 JSON：${msg.slice(0, 120)}`,
+      );
+    }
+  }
+  throw lastErr ?? new Error("大模型未返回有效 JSON");
 }

@@ -31,7 +31,12 @@ const nextConfig = {
     "@private/publisher-client",
     "@private/platform-assistant",
   ],
-  webpack: (config) => {
+  webpack: (config, { dev }) => {
+    // 爆款等工作台 chunk 较大，dev 首次编译慢时避免 ChunkLoadError (timeout)
+    if (dev) {
+      config.output = config.output ?? {};
+      config.output.chunkLoadTimeout = 300_000;
+    }
     config.resolve.alias["@private/federated-portal-logout"] = resolveShared(
       "federated-portal-logout",
     );

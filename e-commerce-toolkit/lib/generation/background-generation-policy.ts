@@ -17,11 +17,16 @@ export const BACKGROUND_DOCK_SUCCESS_FLASH_MS = 2_000;
 export const BACKGROUND_DOCK_EXIT_ANIM_MS = 320;
 
 export function isBackgroundDockTaskVisible(
-  task: { status: "running" | "succeeded" | "failed"; startedAt: string },
+  task: {
+    status: "running" | "succeeded" | "failed";
+    startedAt: string;
+    showInDockFromStart?: boolean;
+  },
   nowMs: number = Date.now(),
 ): boolean {
   if (task.status === "succeeded" || task.status === "failed") return true;
   if (task.status === "running") {
+    if (task.showInDockFromStart) return true;
     const started = new Date(task.startedAt).getTime();
     if (Number.isNaN(started)) return false;
     return nowMs - started >= BACKGROUND_DOCK_LONG_TASK_MS;

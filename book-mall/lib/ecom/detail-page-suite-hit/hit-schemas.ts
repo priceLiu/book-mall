@@ -12,6 +12,7 @@ import {
   HIT_LAYOUT_ALIASES,
   HIT_TYPE_ALIASES,
 } from "./hit-template-defaults";
+import { hitSlotCopyRequired } from "./hit-slot-copy-rules";
 
 export { extractFenceJson };
 
@@ -59,16 +60,18 @@ export const HIT_LAYOUT_LABELS: Record<HitLayout, string> = {
   table: "表格布局",
 };
 
+/** @deprecated 数量不再按类型限制；保留供旧 UI 引用 */
 export const HIT_REPEATABLE_TYPES = new Set<HitComponentType>([
   "feature_card",
   "detail_closeup",
   "scene_image",
 ]);
 
-export function maxRepeatForType(type: HitComponentType): number {
-  if (type === "feature_card") return 6;
-  if (type === "detail_closeup" || type === "scene_image") return 8;
-  return 4;
+/** 与 zod HitComponentSchema.repeat_count max 一致；拆解结果原样保留，仅防异常超大值 */
+export const HIT_REPEAT_COUNT_MAX = 99;
+
+export function maxRepeatForType(_type: HitComponentType): number {
+  return HIT_REPEAT_COUNT_MAX;
 }
 
 const HitTextSlotSchema = z.object({
@@ -148,11 +151,9 @@ function slugType(type: string, index: number): string {
   return `hit_${type}_${index + 1}`;
 }
 
-function clampRepeat(type: HitComponentType, raw: number | undefined): number {
-  if (!HIT_REPEATABLE_TYPES.has(type)) return 1;
-  const max = maxRepeatForType(type);
-  const n = raw && Number.isFinite(raw) ? Math.round(raw) : 3;
-  return Math.min(max, Math.max(1, n));
+function clampRepeat(_type: HitComponentType, raw: number | undefined): number {
+  const n = raw && Number.isFinite(raw) ? Math.round(raw) : 1;
+  return Math.min(HIT_REPEAT_COUNT_MAX, Math.max(1, n));
 }
 
 export function formatHitTemplateValidationError(err: z.ZodError): string {
@@ -462,16 +463,7 @@ export function normalizeHitTemplateDetailed(raw: unknown): NormalizeHitTemplate
     }
     used.add(id);
 
-    const rawRepeat = c.repeat_count;
     const repeat_count = clampRepeat(c.type, c.repeat_count);
-    if (rawRepeat != null && rawRepeat !== repeat_count) {
-      warnings.push(
-        `${HIT_COMPONENT_LABELS[c.type]} repeat_count ${rawRepeat} 已截断为 ${repeat_count}`,
-      );
-    }
-    if (!HIT_REPEATABLE_TYPES.has(c.type) && repeat_count > 1) {
-      warnings.push(`${HIT_COMPONENT_LABELS[c.type]} 不可重复，已改为 1 张`);
-    }
 
     const layoutDefault = HIT_DEFAULT_LAYOUT[c.type] as HitLayout;
     let layout = c.layout;
@@ -480,7 +472,7 @@ export function normalizeHitTemplateDetailed(raw: unknown): NormalizeHitTemplate
       warnings.push("参数规格模块排版已规范为 table");
     }
 
-    const userEditable = c.user_editable_count ?? HIT_REPEATABLE_TYPES.has(c.type);
+    const userEditable = c.user_editable_count ?? true;
     const text_slot = coerceTextSlot(c.text_slot, c.type);
     const image_slot = coerceImageSlot(c.image_slot, c.type);
 
@@ -488,7 +480,7 @@ export function normalizeHitTemplateDetailed(raw: unknown): NormalizeHitTemplate
       ...c,
       id,
       layout: layout ?? layoutDefault,
-      repeat_count: HIT_REPEATABLE_TYPES.has(c.type) ? repeat_count : 1,
+      repeat_count,
       user_editable_count: userEditable,
       note: c.note?.trim() || undefined,
       text_slot,
@@ -590,7 +582,11 @@ function coerceHitRewriteRaw(raw: unknown): unknown {
           return {
             item_key: coerceOptionalString(row.item_key) ?? `item_${idx + 1}`,
             item_label: coerceOptionalString(row.item_label) ?? `卡位 ${idx + 1}`,
-            slot_copy: coerceOptionalString(row.slot_copy),
+            slot_copy:
+              coerceOptionalString(row.slot_copy) ??
+              coerceOptionalString(row.copy) ??
+              coerceOptionalString(row.module_copy) ??
+              coerceOptionalString(row.text),
             positive_prompt: coerceOptionalString(row.positive_prompt) ?? "",
             negative_prompt: coerceOptionalString(row.negative_prompt),
           };
@@ -600,9 +596,16 @@ function coerceHitRewriteRaw(raw: unknown): unknown {
   };
 }
 
+export type HitRewriteExpectedComponent = {
+  id: string;
+  repeat_count: number;
+  type: HitComponentType;
+  layout: HitLayout;
+};
+
 export function normalizeHitRewrite(
   raw: unknown,
-  expected: Array<{ id: string; repeat_count: number }>,
+  expected: Array<HitRewriteExpectedComponent>,
 ): HitRewrite {
   const parsed = HitRewriteSchema.parse(coerceHitRewriteRaw(raw));
   if (
@@ -611,11 +614,12 @@ export function normalizeHitRewrite(
   ) {
     throw new Error(`不支持的 rewrite schemaVersion: ${parsed.schemaVersion}`);
   }
-  const expectedById = new Map(expected.map((e) => [e.id, e.repeat_count]));
+  const expectedById = new Map(expected.map((e) => [e.id, e]));
   const seen = new Set<string>();
   const components = [];
-  for (const id of expected.map((e) => e.id)) {
-    const want = expectedById.get(id) ?? 1;
+  for (const exp of expected) {
+    const id = exp.id;
+    const want = exp.repeat_count;
     const c = parsed.components.find((x) => x.component_id === id);
     if (!c) {
       throw new Error(`重写缺少组件 ${id}，请重试`);
@@ -632,6 +636,17 @@ export function normalizeHitRewrite(
       throw new Error(
         `${id} 应返回 ${want} 条 items，实际 ${items.length} 条，请重试生成`,
       );
+    }
+    const copyRequired = hitSlotCopyRequired(exp);
+    if (copyRequired) {
+      for (let i = 0; i < items.length; i++) {
+        const copy = items[i]?.slot_copy?.trim();
+        if (!copy || copy.length < 2) {
+          throw new Error(
+            `${id} 第 ${i + 1} 条缺少模块文案 slot_copy，请重试生成`,
+          );
+        }
+      }
     }
     components.push({ ...c, items });
   }

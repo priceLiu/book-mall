@@ -24,15 +24,27 @@ describe("buildHitDetailPageImagePrompt", () => {
       includeSlotCopyOnImage: true,
     });
     expect(out).toContain("场景：棚拍");
-    expect(out).toContain("暖到心里");
+    expect(out).toContain("「暖到心里」");
+    expect(out).toContain("不得把上述句子渲染成画面上的文字");
+  });
+
+  it("truncates overly long burn-in copy", () => {
+    const long = "a".repeat(60);
+    const out = buildHitDetailPageImagePrompt({
+      positivePrompt: "场景",
+      slotCopy: long,
+      includeSlotCopyOnImage: true,
+    });
+    expect(out).toContain(`「${"a".repeat(48)}」`);
   });
 });
 
 describe("mergeHitDetailPageImageNegativePrompt", () => {
-  it("drops 文字 ban when burning copy", () => {
+  it("relaxes plain-text ban when burning copy", () => {
     const neg = mergeHitDetailPageImageNegativePrompt(undefined, true);
-    expect(neg).not.toMatch(/文字/);
+    expect(neg).not.toContain("文字，");
     expect(neg).toContain("乱码");
+    expect(neg).toContain("长段落");
   });
 
   it("keeps default negative when not burning copy", () => {

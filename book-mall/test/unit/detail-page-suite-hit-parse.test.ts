@@ -28,16 +28,18 @@ describe("detail-page-suite-hit parse", () => {
     expect(t.component_list[1]?.user_editable_count).toBe(true);
   });
 
-  it("clamps oversized repeat_count from LLM instead of failing parse", () => {
+  it("preserves repeat_count from LLM (only caps at schema max 99)", () => {
     const t = normalizeHitTemplate({
       template_name: "长详情",
       component_list: [
         { type: "detail_closeup", layout: "full_image", repeat_count: 15 },
         { type: "feature_card", layout: "image_text_top_bottom", repeat_count: 9 },
+        { type: "spec_table", layout: "table", repeat_count: 4 },
       ],
     });
-    expect(t.component_list[0]?.repeat_count).toBe(8);
-    expect(t.component_list[1]?.repeat_count).toBe(6);
+    expect(t.component_list[0]?.repeat_count).toBe(15);
+    expect(t.component_list[1]?.repeat_count).toBe(9);
+    expect(t.component_list[2]?.repeat_count).toBe(4);
   });
 
   it("rejects empty component list", () => {
@@ -67,7 +69,14 @@ describe("detail-page-suite-hit parse", () => {
           },
         ],
       },
-      [{ id: "hit_full_banner_1", repeat_count: 1 }],
+      [
+        {
+          id: "hit_full_banner_1",
+          repeat_count: 1,
+          type: "full_banner",
+          layout: "full_image",
+        },
+      ],
     );
     expect(rewrite.components[0]?.items[0]?.item_label).toBe("首屏");
     expect(() =>
@@ -86,7 +95,14 @@ describe("detail-page-suite-hit parse", () => {
             },
           ],
         },
-        [{ id: "hit_full_banner_1", repeat_count: 1 }],
+        [
+          {
+            id: "hit_full_banner_1",
+            repeat_count: 1,
+            type: "full_banner",
+            layout: "full_image",
+          },
+        ],
       ),
     ).toThrow(/未知组件|缺少组件/);
   });
@@ -116,14 +132,14 @@ describe("detail-page-suite-hit parse", () => {
     expect(template.global_style?.clarity_texture).toBe("高清通透");
   });
 
-  it("coerces Chinese type aliases and clamps repeat_count with warnings", () => {
+  it("coerces Chinese type aliases and keeps repeat_count", () => {
     const { template, warnings } = normalizeHitTemplateDetailed({
       template_name: "别名测试",
       component_list: [{ type: "卖点", layout: "上图下文", repeat_count: 12 }],
     });
     expect(template.component_list[0]?.type).toBe("feature_card");
     expect(template.component_list[0]?.layout).toBe("image_text_top_bottom");
-    expect(template.component_list[0]?.repeat_count).toBe(6);
-    expect(warnings.some((w) => w.includes("截断"))).toBe(true);
+    expect(template.component_list[0]?.repeat_count).toBe(12);
+    expect(warnings.some((w) => w.includes("截断"))).toBe(false);
   });
 });

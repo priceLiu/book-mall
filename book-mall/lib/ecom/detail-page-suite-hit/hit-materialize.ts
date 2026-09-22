@@ -6,11 +6,10 @@ import type {
   DetailPageSuiteState,
 } from "@/lib/ecom/detail-page-suite/types";
 import { ensureDetailPageSuiteSizeChartModuleAtEnd } from "@/lib/ecom/detail-page-suite/ensure-size-chart-module-at-end";
-import { ECOM_DETAIL_PAGE_SUITE_GLOBAL_MAX } from "@/lib/ecom/detail-page-suite/types";
+import { HIT_REPEAT_COUNT_MAX } from "./hit-schemas";
 
 import {
   HIT_COMPONENT_LABELS,
-  maxRepeatForType,
   type HitComponent,
   type HitRewrite,
   type NormalizedHitTemplate,
@@ -33,6 +32,9 @@ function emptySlot(comp: HitComponent, index: number, existing?: DetailPageSuite
     source: existing?.source ?? "template",
     positive_prompt: existing?.positive_prompt ?? "",
     negative_prompt: existing?.negative_prompt,
+    slot_copy: existing?.slot_copy,
+    slot_copy_ai: existing?.slot_copy_ai,
+    burn_copy_in_image: existing?.burn_copy_in_image,
     imageUrl: existing?.imageUrl,
     assetId: existing?.assetId,
     imageHistory: existing?.imageHistory,
@@ -46,8 +48,8 @@ function moduleFromComponent(
   comp: HitComponent,
   existing?: DetailPageSuiteModuleState,
 ): DetailPageSuiteModuleState {
-  const maxNum = maxRepeatForType(comp.type);
-  const count = Math.min(maxNum, Math.max(1, comp.repeat_count));
+  const maxNum = HIT_REPEAT_COUNT_MAX;
+  const count = Math.min(HIT_REPEAT_COUNT_MAX, Math.max(1, comp.repeat_count));
   const prevSlots = existing?.slots ?? [];
   const slots = Array.from({ length: count }, (_, i) => emptySlot(comp, i, prevSlots[i]));
   return {
@@ -68,25 +70,7 @@ export function materializeHitTemplateToSuite(
   existing?: DetailPageSuiteState | null,
 ): DetailPageSuiteState {
   const prev = new Map((existing?.modules ?? []).map((m) => [m.module_id, m]));
-  let modules = template.component_list.map((c) => moduleFromComponent(c, prev.get(c.id)));
-  let total = modules.filter((m) => m.enable).reduce((n, m) => n + m.generate_count, 0);
-  if (total > ECOM_DETAIL_PAGE_SUITE_GLOBAL_MAX) {
-    modules = modules.map((m) => {
-      if (total <= ECOM_DETAIL_PAGE_SUITE_GLOBAL_MAX || !m.enable || m.generate_count <= 1) {
-        return m;
-      }
-      const cut = Math.min(m.generate_count - 1, total - ECOM_DETAIL_PAGE_SUITE_GLOBAL_MAX);
-      total -= cut;
-      const generate_count = m.generate_count - cut;
-      return {
-        ...m,
-        generate_count,
-        slots: m.slots.slice(0, generate_count),
-        selected_item_list: m.selected_item_list.slice(0, generate_count),
-        candidate_pool: m.candidate_pool.slice(0, generate_count),
-      };
-    });
-  }
+  const modules = template.component_list.map((c) => moduleFromComponent(c, prev.get(c.id)));
   const withSize = ensureDetailPageSuiteSizeChartModuleAtEnd({ modules, templateSnapshot: null });
   return withSize.suite;
 }
@@ -114,9 +98,12 @@ export function applyHitRewriteToSuite(opts: {
         ...slot,
         item_key: item.item_key.trim() || slot.item_key || randomUUID().slice(0, 8),
         item_label: item.item_label.trim() || slot.item_label,
-        ...(slot_copy ? { slot_copy } : {}),
+        ...(slot_copy
+          ? { slot_copy, slot_copy_ai: slot_copy }
+          : { slot_copy: undefined, slot_copy_ai: undefined }),
         positive_prompt: item.positive_prompt.trim(),
         negative_prompt: item.negative_prompt?.trim() || slot.negative_prompt,
+        burn_copy_in_image: slot.burn_copy_in_image ?? false,
         selectedForImage: false,
       };
     });

@@ -68,4 +68,4 @@ export const HIT_LAYOUT_ALIASES: Record<string, string> = {
 };
 
 export const HIT_REPEAT_LIMITS_COPY =
-  "repeat_count 上限：feature_card≤6，detail_closeup/scene_image≤8，其它≤4；不可重复模块须为 1。";
+  "repeat_count 须如实反映长图中该类型连续块/卡位数量（每种 type 1～99）；用户可在工作台自行增删，服务端不再按类型截断。";

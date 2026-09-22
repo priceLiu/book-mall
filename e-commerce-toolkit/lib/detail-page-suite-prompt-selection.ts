@@ -1,4 +1,7 @@
-import { resolveModuleDisplaySlots } from "@/lib/detail-page-suite-module-slots";
+import {
+  materializeModuleSlots,
+  resolveModuleDisplaySlots,
+} from "@/lib/detail-page-suite-module-slots";
 import { detailPageSuiteSlotHasImage } from "@/lib/detail-page-suite-slot-images";
 import { listDetailPageSuitePendingImageKeys } from "@/lib/detail-page-suite-pending";
 import {
@@ -162,10 +165,25 @@ export function detailPageSuiteProjectSlotHasImage(
   const parsed = parseSuiteSlotKey(compositeKey);
   if (!parsed) return false;
   const mod = project.suite.modules.find((m) => m.module_id === parsed.moduleId);
-  const slot = mod
-    ? resolveModuleDisplaySlots(mod).find((s) => s.item_key === parsed.slotKey)
-    : undefined;
-  return Boolean(slot?.imageUrl?.trim());
+  if (!mod) return false;
+  const normalized = {
+    ...mod,
+    slots: materializeModuleSlots(mod),
+  };
+  const slot = resolveModuleDisplaySlots(normalized).find(
+    (s) => s.item_key === parsed.slotKey,
+  );
+  return slot ? detailPageSuiteSlotHasImage(slot) : false;
+}
+
+/** 出图提交后取消勾选，避免下次「生图」重复提交已完成点位（对齐详情页套图工作台） */
+export function detailPageSuitePromptSelectionAfterImageGenSubmit(
+  selected: ReadonlySet<string>,
+  submittedKeys: readonly string[],
+): Set<string> {
+  const next = new Set(selected);
+  for (const k of submittedKeys) next.delete(k);
+  return next;
 }
 
 /** 已在出图中（客户端 activeGen + meta.pendingImages 且无成图）的点位，不再重复提交 */

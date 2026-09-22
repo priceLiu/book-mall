@@ -1,6 +1,7 @@
 import { materializeModuleSlots, mergeModuleSlotsPreservingContent } from "./module-slots";
 import { ensureDetailPageSuiteSizeChartModuleAtEnd } from "./ensure-size-chart-module-at-end";
 import { ensureBriefSizeChartDefaults } from "./size-chart-image";
+import { migrateHitSuiteSlotCopyFields } from "@/lib/ecom/detail-page-suite-hit/hit-suite-migrate";
 import { migrateDetailPageSuiteProject } from "./suite-migrate";
 import {
   ECOM_DETAIL_PAGE_SUITE_HIT_MODULE,
@@ -37,6 +38,8 @@ export function normalizeDetailPageSuiteProject(
 ): { project: DetailPageSuiteProject; changed: boolean } {
   const migrated = migrateDetailPageSuiteProject(project);
   project = migrated.project;
+  const hitCopyMigrated = migrateHitSuiteSlotCopyFields(project);
+  project = hitCopyMigrated.project;
   let suite = project.suite;
   let brief = project.brief;
   if (
@@ -64,7 +67,8 @@ export function normalizeDetailPageSuiteProject(
       project.module === ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE) &&
     (JSON.stringify(suite.modules) !== JSON.stringify(project.suite.modules) ||
       JSON.stringify(brief) !== JSON.stringify(project.brief ?? null));
-  const changed = migrated.changed || normalizedChanged || workbenchChanged;
+  const changed =
+    migrated.changed || hitCopyMigrated.changed || normalizedChanged || workbenchChanged;
   return {
     project: changed ? { ...project, suite, meta, brief } : project,
     changed,

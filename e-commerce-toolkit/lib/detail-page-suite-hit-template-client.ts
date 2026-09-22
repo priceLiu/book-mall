@@ -1,22 +1,21 @@
 import {
-  HIT_REPEATABLE_TYPES,
+  HIT_REPEAT_COUNT_MAX,
   maxRepeatForHitType,
   type HitComponent,
   type HitComponentType,
   type HitTemplate,
 } from "@/lib/detail-page-suite-hit-types";
 
-/** 与 book-mall hit-schemas 规范化对齐，供 UI 编辑即时约束 */
+function clampRepeatCount(n: number): number {
+  return Math.min(HIT_REPEAT_COUNT_MAX, Math.max(1, Math.round(n)));
+}
+
+/** 与 book-mall hit-schemas 对齐：仅 clamp 1～99，不按类型截断 */
 export function sanitizeHitComponent(comp: HitComponent): HitComponent {
-  const type = comp.type;
-  const editable = HIT_REPEATABLE_TYPES.has(type);
-  const repeat_count = editable
-    ? Math.min(maxRepeatForHitType(type), Math.max(1, comp.repeat_count))
-    : 1;
   return {
     ...comp,
-    repeat_count,
-    user_editable_count: editable,
+    repeat_count: clampRepeatCount(comp.repeat_count),
+    user_editable_count: comp.user_editable_count ?? true,
   };
 }
 
@@ -35,6 +34,7 @@ export function onHitComponentTypeChange(
   return sanitizeHitComponent({
     ...comp,
     type: nextType,
-    repeat_count: HIT_REPEATABLE_TYPES.has(nextType) ? comp.repeat_count : 1,
   });
 }
+
+export { maxRepeatForHitType, HIT_REPEAT_COUNT_MAX };

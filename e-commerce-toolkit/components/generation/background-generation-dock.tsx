@@ -240,12 +240,16 @@ export function BackgroundGenerationDock({
                 ? "生成失败"
                 : resolveBackgroundGenerationLabel(startedMs, now);
           const progress =
-            task.status === "running" && task.expectedDurationMs
-              ? estimateBackgroundGenerationProgress(
-                  startedMs,
-                  task.expectedDurationMs,
-                  now,
-                )
+            task.status === "running"
+              ? typeof task.progressPercent === "number"
+                ? Math.min(0.99, Math.max(0.04, task.progressPercent))
+                : task.expectedDurationMs
+                  ? estimateBackgroundGenerationProgress(
+                      startedMs,
+                      task.expectedDurationMs,
+                      now,
+                    )
+                  : 0.08
               : task.status === "succeeded"
                 ? 1
                 : 0;
@@ -302,6 +306,16 @@ export function BackgroundGenerationDock({
                       )}
                     >
                       {task.hint}
+                    </div>
+                  ) : null}
+                  {task.progressDetail?.trim() ? (
+                    <div
+                      className={cn(
+                        "mt-0.5 line-clamp-2 text-[11px] leading-snug",
+                        variant === "light" ? "text-[#515154]" : "text-zinc-300",
+                      )}
+                    >
+                      {task.progressDetail.trim()}
                     </div>
                   ) : null}
                   <div

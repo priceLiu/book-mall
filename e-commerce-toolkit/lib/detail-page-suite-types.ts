@@ -77,6 +77,8 @@ export type DetailPageSuiteSlot = {
   item_key: string;
   item_label: string;
   slot_copy?: string;
+  slot_copy_ai?: string;
+  burn_copy_in_image?: boolean;
   source: "template" | "user";
   positive_prompt: string;
   negative_prompt?: string;

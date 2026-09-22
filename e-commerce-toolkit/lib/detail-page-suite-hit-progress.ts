@@ -1,19 +1,21 @@
 import type { DetailPageSuiteProject } from "@/lib/detail-page-suite-types";
 
 export function isHitDecomposeInFlight(
-  meta: DetailPageSuiteProject["meta"],
+  meta: DetailPageSuiteProject["meta"] | null,
 ): boolean {
   const s = meta?.hitStatus;
   return s === "decomposing" || s === "polishing";
 }
 
-export function hitJobProgressPercent(meta: DetailPageSuiteProject["meta"]): number | null {
+export function hitJobProgressPercent(
+  meta: DetailPageSuiteProject["meta"] | null,
+): number | null {
   const p = meta?.hitProgress?.percent;
   return typeof p === "number" ? Math.min(100, Math.max(0, p)) : null;
 }
 
 export function hitDecomposeStatusCopy(
-  meta: DetailPageSuiteProject["meta"],
+  meta: DetailPageSuiteProject["meta"] | null,
 ): { title: string; detail: string } | null {
   if (!isHitDecomposeInFlight(meta)) return null;
   const p = meta?.hitProgress;

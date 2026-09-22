@@ -121,6 +121,10 @@ export type DetailPageSuiteSlot = {
   item_label: string;
   /** 爆款套图：分配到卡位的原创详情文案（非竞品原文） */
   slot_copy?: string;
+  /** 爆款套图：最近一次 AI 生成的文案基准（恢复 AI 版） */
+  slot_copy_ai?: string;
+  /** 爆款套图：出图时将 slot_copy 烧录进画面 */
+  burn_copy_in_image?: boolean;
   source: "template" | "user";
   positive_prompt: string;
   negative_prompt?: string;

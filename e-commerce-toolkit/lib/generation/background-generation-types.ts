@@ -1,7 +1,7 @@
 export type BackgroundGenerationTaskStatus = "running" | "succeeded" | "failed";
 
 export type BackgroundGenerationPollResult =
-  | { status: "running" }
+  | { status: "running"; progressPercent?: number; detail?: string }
   | { status: "succeeded" }
   | { status: "failed"; error?: string };
 
@@ -16,6 +16,11 @@ export type BackgroundGenerationTask = {
   error?: string;
   /** true = 仅 Dock 展示，前台 inline busy 关闭 */
   minimized: boolean;
+  /** 爆款拆解/重写等：提交后立即在右下角 Dock 展示（不等 10 分钟） */
+  showInDockFromStart?: boolean;
+  /** 0～1，轮询写入；有值时 Dock 优先展示 */
+  progressPercent?: number;
+  progressDetail?: string;
   poll: () => Promise<BackgroundGenerationPollResult>;
   onSucceeded?: () => void | Promise<void>;
   onFailed?: () => void | Promise<void>;

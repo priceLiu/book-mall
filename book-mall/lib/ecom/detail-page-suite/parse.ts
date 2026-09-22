@@ -112,10 +112,37 @@ export function parseSuite(raw: unknown): DetailPageSuiteState {
               const slot = s as Record<string, unknown>;
               const item_label = String(slot.item_label ?? "").trim();
               if (!item_label) return [];
+              const imageHistory = Array.isArray(slot.imageHistory)
+                ? slot.imageHistory.flatMap((v): DetailPageSuiteSlot["imageHistory"] => {
+                    if (!v || typeof v !== "object") return [];
+                    const row = v as Record<string, unknown>;
+                    const url = typeof row.url === "string" ? row.url.trim() : "";
+                    if (!url) return [];
+                    return [
+                      {
+                        url,
+                        assetId: typeof row.assetId === "string" ? row.assetId : undefined,
+                        createdAt:
+                          typeof row.createdAt === "string"
+                            ? row.createdAt
+                            : new Date().toISOString(),
+                      },
+                    ];
+                  })
+                : undefined;
+              const slot_copy =
+                typeof slot.slot_copy === "string" ? slot.slot_copy.trim() : undefined;
+              const slot_copy_ai =
+                typeof slot.slot_copy_ai === "string" ? slot.slot_copy_ai.trim() : undefined;
               return [
                 {
                   item_key: String(slot.item_key ?? item_label),
                   item_label,
+                  ...(slot_copy ? { slot_copy } : {}),
+                  ...(slot_copy_ai ? { slot_copy_ai } : {}),
+                  ...(slot.burn_copy_in_image === true
+                    ? { burn_copy_in_image: true }
+                    : {}),
                   source: slot.source === "user" ? "user" : "template",
                   positive_prompt: String(slot.positive_prompt ?? ""),
                   negative_prompt:
@@ -124,6 +151,12 @@ export function parseSuite(raw: unknown): DetailPageSuiteState {
                       : undefined,
                   imageUrl: typeof slot.imageUrl === "string" ? slot.imageUrl : undefined,
                   assetId: typeof slot.assetId === "string" ? slot.assetId : undefined,
+                  ...(imageHistory?.length ? { imageHistory } : {}),
+                  activeImageIndex:
+                    typeof slot.activeImageIndex === "number"
+                      ? slot.activeImageIndex
+                      : undefined,
+                  selectedForImage: slot.selectedForImage === true,
                   promptEdited: slot.promptEdited === true,
                 },
               ];

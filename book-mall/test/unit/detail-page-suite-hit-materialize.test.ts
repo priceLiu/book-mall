@@ -90,6 +90,7 @@ describe("detail-page-suite-hit materialize", () => {
     expect(warning).toBeUndefined();
     expect(next.modules[0]?.slots[0]?.item_label).toBe("首屏钩子");
     expect(next.modules[0]?.slots[0]?.slot_copy).toBe("暖到心里");
+    expect(next.modules[0]?.slots[0]?.slot_copy_ai).toBe("暖到心里");
     expect(next.modules[1]?.slots).toHaveLength(3);
     expect(next.modules[1]?.slots[1]?.positive_prompt).toContain("卖点卡2");
   });

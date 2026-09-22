@@ -1,9 +1,9 @@
-import { DetailPageSuiteHitStudio } from "@/components/detail-page-suite/detail-page-suite-hit-studio";
+import { DetailPageSuiteHitPageContent } from "./detail-page-suite-hit-page-content";
 
 export const metadata = {
   title: "爆款详情页套图",
 };
 
 export default function DetailPageSuiteHitPage() {
-  return <DetailPageSuiteHitStudio />;
+  return <DetailPageSuiteHitPageContent />;
 }

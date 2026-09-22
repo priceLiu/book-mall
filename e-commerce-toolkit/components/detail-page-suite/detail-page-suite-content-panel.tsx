@@ -22,6 +22,7 @@ import {
   type EcomDetailPageRatio,
 } from "@/lib/detail-page-suite-platform-ratio";
 import {
+  materializeModuleSlots,
   resolveModuleDisplaySlots,
   resolveReplicaModuleDisplaySlots,
 } from "@/lib/detail-page-suite-module-slots";
@@ -88,9 +89,9 @@ type Props = {
     prompt: string,
     label: string,
     slotCopy?: string,
+    slotCopyAi?: string,
+    burnCopyInImage?: boolean,
   ) => void;
-  hitIncludeSlotCopyOnImage?: boolean;
-  onHitIncludeSlotCopyOnImageChange?: (value: boolean) => void;
   onToggleModule: (moduleId: string, enable: boolean) => void;
   onChangeCount: (moduleId: string, n: number) => void;
   onToggleItem: (moduleId: string, item: string) => void;
@@ -344,8 +345,6 @@ export function DetailPageSuiteContentPanel({
   onDeleteProject,
   variant = "default",
   hideHeader = false,
-  hitIncludeSlotCopyOnImage = false,
-  onHitIncludeSlotCopyOnImageChange,
 }: Props) {
   const isHit = variant === "hit";
   const isWorkbench = variant === "replica" || isHit;
@@ -573,19 +572,6 @@ export function DetailPageSuiteContentPanel({
                   操作。多条可并行提交。提示词 {promptReadyCount}/{promptTargets.length}。
                 </p>
               ) : null}
-              {isHit && onHitIncludeSlotCopyOnImageChange ? (
-                <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-3 py-2 text-xs text-[#424245]">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5"
-                    checked={hitIncludeSlotCopyOnImage}
-                    onChange={(e) => onHitIncludeSlotCopyOnImageChange(e.target.checked)}
-                  />
-                  <span>
-                    出图时将各点位「模块文案」一并渲染进画面（默认仅出图不含字；无文案的点位仍只按提示词出图）
-                  </span>
-                </label>
-              ) : null}
               {project.suite.modules.map((mod) => (
                 <ModuleBlock
                   key={mod.module_id}
@@ -685,11 +671,11 @@ function ModuleBlock({
   onActiveImageIndexChange?: Props["onActiveImageIndexChange"];
   imageGenFailures: ReturnType<typeof readDetailPageSuiteImageGenFailures>;
 }) {
-  const gridSlots = useMemo(
-    () =>
-      replicaMode ? resolveReplicaModuleDisplaySlots(mod) : resolveModuleDisplaySlots(mod),
-    [mod, replicaMode],
-  );
+  const gridSlots = useMemo(() => {
+    if (replicaMode) return resolveReplicaModuleDisplaySlots(mod);
+    const modForGrid = isHit ? { ...mod, slots: materializeModuleSlots(mod) } : mod;
+    return resolveModuleDisplaySlots(modForGrid);
+  }, [mod, replicaMode, isHit]);
   const showReplicaSlotGrid = replicaMode;
   const modulePickState = modulePromptSelectionState(mod, promptSelection, {
     excludeKeys: busySlotKeys,
@@ -839,6 +825,8 @@ function ModuleBlock({
                           slot.positive_prompt,
                           slot.item_label,
                           slot.slot_copy,
+                          slot.slot_copy_ai,
+                          slot.burn_copy_in_image,
                         )
                     : undefined
                 }

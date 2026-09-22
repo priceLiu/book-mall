@@ -32,6 +32,14 @@ import {
 } from "./hit-paradigm-format";
 import { HIT_REPEAT_LIMITS_COPY } from "./hit-template-defaults";
 
+function isRetriableHitLlmError(e: unknown): boolean {
+  if (isGatewayOrTransportError(e)) return true;
+  const msg = e instanceof Error ? e.message : String(e);
+  return /未返回有效 JSON|Unexpected token|JSON|校验失败|schemaVersion|围栏|重写|范式|SyntaxError/.test(
+    msg,
+  );
+}
+
 function isGatewayOrTransportError(e: unknown): boolean {
   if (e instanceof z.ZodError) return false;
   const msg = e instanceof Error ? e.message : String(e);
@@ -87,7 +95,7 @@ function buildDecomposeSystem(): string {
 规则：
 1. component_list 必须按长图从上到下顺序；建议 4～18 条，同类连续块合并为一条。
 2. ${HIT_REPEAT_LIMITS_COPY}
-3. 仅 feature_card、detail_closeup、scene_image 可 user_editable_count=true；其余 repeat_count=1。
+3. user_editable_count 默认 true；同类连续多块须合并为一条 component 并写准 repeat_count。
 4. type/layout 必须使用上述枚举字面量，禁止自造字段名。
 5. 不输出坐标、不输出原文、不输出原图内容。`;
 }
@@ -180,7 +188,7 @@ export async function runHitParadigmDecompose(opts: {
       if (e instanceof z.ZodError) {
         lastErr = new Error(formatHitTemplateValidationError(e));
       }
-      if (!isGatewayOrTransportError(e)) throw lastErr;
+      if (!isRetriableHitLlmError(e)) throw lastErr;
     }
   }
   throw lastErr ?? new Error("爆款范式拆解失败");
@@ -247,7 +255,9 @@ export async function runHitRewrite(opts: {
         json,
         opts.template.component_list.map((c) => ({
           id: c.id,
-          repeat_count: c.repeat_count,
+          repeat_count: Math.max(1, c.repeat_count ?? 1),
+          type: c.type,
+          layout: c.layout,
         })),
       );
     } catch (e) {
@@ -255,7 +265,7 @@ export async function runHitRewrite(opts: {
       if (e instanceof z.ZodError) {
         lastErr = new Error(e.issues[0] ? `重写校验失败：${e.issues[0].message}` : "重写校验失败");
       }
-      if (!isGatewayOrTransportError(e)) throw lastErr;
+      if (!isRetriableHitLlmError(e)) throw lastErr;
     }
   }
   throw lastErr ?? new Error("原创文案重写失败");

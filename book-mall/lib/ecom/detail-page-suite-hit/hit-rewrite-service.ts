@@ -6,7 +6,9 @@ import type { DetailPageSuiteMeta } from "@/lib/ecom/detail-page-suite/types";
 
 import { HitDecomposeAlreadyRunningError, getHitTemplateFromProject } from "./hit-decompose-service";
 import { runHitRewrite } from "./hit-llm";
+import { runHitRewriteSingleSlot } from "./hit-rewrite-slot";
 import { applyHitRewriteToSuite, materializeHitTemplateToSuite } from "./hit-materialize";
+import { isHitSuiteModuleExcludedFromCopyRewrite } from "./hit-slot-copy-rules";
 import { formatHitTemplateWarnings, normalizeHitTemplateDetailed } from "./hit-schemas";
 
 /** 仅进度心跳：任务已结束（ready 等）时不得再写 meta，避免覆盖终态 */
@@ -273,6 +275,67 @@ export async function applyHitTemplateEdit(opts: {
       hitMarketInsight: template.market_insight ?? project.meta?.hitMarketInsight,
       hitWarning: templateWarning ?? project.meta?.hitWarning,
     },
+  });
+  if (!updated) throw new Error("保存失败");
+  return updated;
+}
+
+export async function rewriteHitSingleSlot(opts: {
+  userId: string;
+  projectId: string;
+  moduleId: string;
+  slotKey: string;
+  chatModelKey?: string;
+}) {
+  const project = await getDetailPageSuiteHitProject(opts.userId, opts.projectId);
+  if (!project) throw new Error("项目不存在");
+  if (isHitSuiteModuleExcludedFromCopyRewrite(opts.moduleId)) {
+    throw new Error("尺码参考模块不支持 AI 文案重写");
+  }
+  const template = getHitTemplateFromProject(project);
+  if (!template) throw new Error("请先完成竞品长图拆解");
+
+  const mod = project.suite.modules.find((m) => m.module_id === opts.moduleId);
+  if (!mod) throw new Error("模块不存在");
+  const slotIndex = mod.slots.findIndex((s) => s.item_key === opts.slotKey);
+  if (slotIndex < 0) throw new Error("点位不存在");
+  const slot = mod.slots[slotIndex]!;
+
+  const item = await runHitRewriteSingleSlot({
+    userId: opts.userId,
+    projectId: opts.projectId,
+    template,
+    brief: project.brief,
+    componentId: opts.moduleId,
+    slotIndex,
+    itemKey: slot.item_key,
+    itemLabel: slot.item_label,
+    chatModelKey: opts.chatModelKey,
+  });
+
+  const slot_copy = item.slot_copy?.trim();
+  const modules = project.suite.modules.map((m) => {
+    if (m.module_id !== opts.moduleId) return m;
+    return {
+      ...m,
+      slots: m.slots.map((s) => {
+        if (s.item_key !== opts.slotKey) return s;
+        return {
+          ...s,
+          item_label: item.item_label.trim() || s.item_label,
+          positive_prompt: item.positive_prompt.trim(),
+          negative_prompt: item.negative_prompt?.trim() || s.negative_prompt,
+          ...(slot_copy
+            ? { slot_copy, slot_copy_ai: slot_copy }
+            : { slot_copy: undefined, slot_copy_ai: undefined }),
+          promptEdited: false,
+        };
+      }),
+    };
+  });
+
+  const updated = await updateDetailPageSuiteHitProject(opts.userId, opts.projectId, {
+    suite: { ...project.suite, modules },
   });
   if (!updated) throw new Error("保存失败");
   return updated;

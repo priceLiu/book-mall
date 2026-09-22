@@ -286,10 +286,18 @@ export function DetailPageSuiteSlotCard({
         {slotCopyMode === "hit" ? (
           <p
             className="line-clamp-3 text-[10px] leading-relaxed text-[#424245]"
-            title={slot.slot_copy?.trim() || undefined}
+            title={
+              slot.slot_copy?.trim() || slot.slot_copy_ai?.trim() || undefined
+            }
           >
             <span className="text-[#86868b]">模块文案：</span>
-            {slot.slot_copy?.trim() || "（未填写，可点格子编辑）"}
+            {slot.slot_copy?.trim() ||
+              slot.slot_copy_ai?.trim() ||
+              "（未填写，可点格子编辑）"}
+            {slot.burn_copy_in_image &&
+            (slot.slot_copy?.trim() || slot.slot_copy_ai?.trim()) ? (
+              <span className="ml-1 text-[#0066cc]">· 出图含字</span>
+            ) : null}
           </p>
         ) : slot.slot_copy?.trim() ? (
           <p className="line-clamp-3 text-[10px] leading-relaxed text-[#424245]" title={slot.slot_copy}>

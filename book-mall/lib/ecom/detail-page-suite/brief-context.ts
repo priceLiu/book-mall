@@ -85,7 +85,7 @@ export function buildDetailPageSuiteBlankPlateBody(itemLabel: string): string {
 /** 出图 global prefix：从 brief 七维构建，拼在 slot 提示词前 */
 export function buildDetailPageSuiteImageGlobalPrefix(
   brief: DetailPageSuiteBrief | null | undefined,
-  opts?: { moduleId?: string },
+  opts?: { moduleId?: string; /** 烧字出图时省略卖点句，避免模型把卖点渲染成画面段落 */ omitSellpoints?: boolean },
 ): string {
   const b = brief ?? {};
   if (detailPageSuiteModuleIsBlankPlate(opts?.moduleId)) {
@@ -113,9 +113,11 @@ export function buildDetailPageSuiteImageGlobalPrefix(
     parts.push("同一位成年男性模特");
   }
   parts.push("服装款式颜色与产品参考图完全一致");
-  const sellpointText = (b.sellPoints ?? []).map((s) => s.text.trim()).filter(Boolean).join("，");
-  if (sellpointText) {
-    parts.push(`突出卖点：${sellpointText}`);
+  if (!opts?.omitSellpoints) {
+    const sellpointText = (b.sellPoints ?? []).map((s) => s.text.trim()).filter(Boolean).join("，");
+    if (sellpointText) {
+      parts.push(`突出卖点：${sellpointText}`);
+    }
   }
   return parts.filter(Boolean).join("；");
 }
@@ -153,9 +155,13 @@ export function composeDetailPageSuiteVisiblePrompt(
   brief: DetailPageSuiteBrief | null | undefined,
   itemLabel?: string,
   moduleId?: string,
+  opts?: { omitSellpointsInPrefix?: boolean },
 ): string {
   const body = stripDetailPageSuitePromptEnvelope(llmBody);
-  const globalPrefix = buildDetailPageSuiteImageGlobalPrefix(brief, { moduleId }).trim();
+  const globalPrefix = buildDetailPageSuiteImageGlobalPrefix(brief, {
+    moduleId,
+    omitSellpoints: opts?.omitSellpointsInPrefix,
+  }).trim();
   const shootingReq = buildDetailPageSuiteShootingRequirement(itemLabel);
   const globalBlock =
     globalPrefix && !hasDetailPageSuiteGlobalPrefixBlock(body) ? globalPrefix : "";

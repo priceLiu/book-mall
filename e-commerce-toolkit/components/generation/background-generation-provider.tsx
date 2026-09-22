@@ -183,7 +183,29 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
         for (const task of running) {
           try {
             const result = await task.poll();
-            if (result.status === "running") continue;
+            if (result.status === "running") {
+              if (
+                result.progressPercent != null ||
+                result.detail != null
+              ) {
+                setTasks((prev) =>
+                  prev.map((t) =>
+                    t.id === task.id
+                      ? {
+                          ...t,
+                          ...(result.progressPercent != null
+                            ? { progressPercent: result.progressPercent }
+                            : {}),
+                          ...(result.detail != null
+                            ? { progressDetail: result.detail }
+                            : {}),
+                        }
+                      : t,
+                  ),
+                );
+              }
+              continue;
+            }
             if (result.status === "succeeded") {
               await task.onSucceeded?.();
               setTasks((prev) =>
