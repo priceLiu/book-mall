@@ -30,6 +30,7 @@ const nextConfig = {
     "@private/media-render-subtitle-style",
     "@private/publisher-client",
     "@private/platform-assistant",
+    "@private/ecom-copy-overlay",
   ],
   webpack: (config, { dev }) => {
     // 爆款等工作台 chunk 较大，dev 首次编译慢时避免 ChunkLoadError (timeout)
@@ -52,6 +53,7 @@ const nextConfig = {
     config.resolve.alias["@private/media-render-subtitle-style"] = resolveShared(
       "media-render-subtitle-style",
     );
+    config.resolve.alias["@private/ecom-copy-overlay"] = resolveShared("ecom-copy-overlay");
     return config;
   },
   images: {

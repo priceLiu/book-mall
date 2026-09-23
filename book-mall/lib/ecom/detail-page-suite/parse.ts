@@ -12,6 +12,7 @@ import {
   type DetailPageSuiteState,
   type DetailPageSuiteTemplateDto,
 } from "./types";
+import { parseDetailPageSuiteCopyOverlay } from "./slot-copy-overlay-types";
 
 export function parseModulesJson(raw: unknown): DetailPageSuiteModuleDef[] {
   if (!Array.isArray(raw)) return [];
@@ -126,6 +127,12 @@ export function parseSuite(raw: unknown): DetailPageSuiteState {
                           typeof row.createdAt === "string"
                             ? row.createdAt
                             : new Date().toISOString(),
+                        ...(typeof row.exportTargetId === "string"
+                          ? { exportTargetId: row.exportTargetId }
+                          : {}),
+                        ...(typeof row.platformLabel === "string"
+                          ? { platformLabel: row.platformLabel }
+                          : {}),
                       },
                     ];
                   })
@@ -143,6 +150,10 @@ export function parseSuite(raw: unknown): DetailPageSuiteState {
                   ...(slot.burn_copy_in_image === true
                     ? { burn_copy_in_image: true }
                     : {}),
+                  ...(() => {
+                    const copy_overlay = parseDetailPageSuiteCopyOverlay(slot.copy_overlay);
+                    return copy_overlay ? { copy_overlay } : {};
+                  })(),
                   source: slot.source === "user" ? "user" : "template",
                   positive_prompt: String(slot.positive_prompt ?? ""),
                   negative_prompt:

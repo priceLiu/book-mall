@@ -30,6 +30,7 @@ const nextConfig = {
     "@private/federated-portal-nav",
     "@private/media-render-subtitle-style",
     "@private/platform-assistant",
+    "@private/ecom-copy-overlay",
   ],
   webpack: (config) => {
     config.resolve.alias["@private/federated-portal-logout"] = resolveShared(
@@ -44,6 +45,7 @@ const nextConfig = {
     config.resolve.alias["@private/platform-assistant"] = resolveShared(
       "platform-assistant",
     );
+    config.resolve.alias["@private/ecom-copy-overlay"] = resolveShared("ecom-copy-overlay");
     return config;
   },
   images: {

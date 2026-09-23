@@ -58,6 +58,9 @@ export async function POST(req: Request, ctx: Ctx) {
           ? body.imageRatio
           : undefined,
       includeSlotCopyOnImage: body.includeSlotCopyOnImage === true,
+      activeExportTargetIds: Array.isArray(body.activeExportTargetIds)
+        ? body.activeExportTargetIds.map((x) => String(x).trim()).filter(Boolean)
+        : undefined,
     });
     if (result.failures.length > 0) {
       console.error("[detail-page-suite-hit] images/generate partial failure", {

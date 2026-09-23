@@ -169,6 +169,7 @@ export function materializeModuleSlots(
       slot_copy: orphan.slot_copy?.trim() || slot.slot_copy,
       slot_copy_ai: orphan.slot_copy_ai?.trim() || slot.slot_copy_ai,
       burn_copy_in_image: orphan.burn_copy_in_image ?? slot.burn_copy_in_image,
+      copy_overlay: orphan.copy_overlay ?? slot.copy_overlay,
       promptEdited: orphan.promptEdited,
       imageUrl: orphan.imageUrl ?? slot.imageUrl,
       assetId: orphan.assetId ?? slot.assetId,
@@ -214,6 +215,7 @@ export function mergeModuleSlotsPreservingContent(
       slot_copy: slot.slot_copy?.trim() || prev.slot_copy,
       slot_copy_ai: slot.slot_copy_ai?.trim() || prev.slot_copy_ai,
       burn_copy_in_image: slot.burn_copy_in_image ?? prev.burn_copy_in_image,
+      copy_overlay: slot.copy_overlay ?? prev.copy_overlay,
       imageUrl: slot.imageUrl?.trim() || prev.imageUrl,
       assetId: slot.assetId ?? prev.assetId,
       imageHistory:

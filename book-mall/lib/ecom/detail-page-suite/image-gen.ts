@@ -8,6 +8,11 @@ import {
   uploadRenderedSizeChartPng,
 } from "./size-chart-image";
 import { getEcomPlatformSpec, type EcomImageRatio } from "@/lib/ecom/ecom-platform-spec";
+import {
+  imageSizeForExportTarget,
+  ratioForExportTarget,
+  resolveActiveExportTargets,
+} from "./export-targets";
 import { ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
 import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
 import { persistEcomGenerationRecord } from "@/lib/ecom/ecom-generation-record";
@@ -60,6 +65,7 @@ import {
   ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE,
   ECOM_DETAIL_PAGE_SUITE_REPLICA_TOOL_KEY,
   ECOM_DETAIL_PAGE_SUITE_TOOL_KEY,
+  type DetailPageSuiteExportTarget,
   type DetailPageSuiteModuleState,
 } from "./types";
 
@@ -184,6 +190,8 @@ export async function generateDetailPageSuiteImages(opts: {
   modelKey?: string;
   imageSize?: string;
   imageRatio?: "1:1" | "3:4" | "4:5" | "16:9";
+  /** 爆款多平台：覆盖 settings.activeExportTargetIds */
+  activeExportTargetIds?: string[];
   /** 默认 detail-page-suite；复刻 / 爆款传对应 module */
   projectModule?: string;
   /** @deprecated 改用各卡位 burn_copy_in_image；仅作旧项目迁移兜底 */
@@ -225,10 +233,30 @@ export async function generateDetailPageSuiteImages(opts: {
     project.settings.imageModelKey ||
     ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL;
   const spec = getEcomPlatformSpec(project.brief?.platformCode);
-  const ratio = (opts.imageRatio ||
+  const defaultRatio = (opts.imageRatio ||
     project.settings.imageRatio ||
     spec.detailPage.ratio ||
     "3:4") as EcomImageRatio;
+  const exportTargets: DetailPageSuiteExportTarget[] = isHit
+    ? (() => {
+        const settings =
+          opts.activeExportTargetIds?.length
+            ? {
+                ...project.settings,
+                activeExportTargetIds: opts.activeExportTargetIds,
+              }
+            : project.settings;
+        return resolveActiveExportTargets(settings, project.brief?.platformCode);
+      })()
+    : [
+        {
+          id: "default",
+          platformCode: spec.code,
+          label: spec.label,
+          ratio: defaultRatio,
+          widthPx: spec.detailPage.widthPx ?? 750,
+        },
+      ];
   const refPack = resolveDetailPageSuiteImageRefPack(project.references, modelKey);
   const refs = refPack.urls;
   const imageConcurrency = await resolveEcomImageGenConcurrency(opts.userId, project.settings);
@@ -254,7 +282,9 @@ export async function generateDetailPageSuiteImages(opts: {
     refStyleFirst: refPack.styleFirst,
     slotKeyCount: normalizedSlotKeys?.length ?? 0,
     targetCount: targets.length,
+    exportTargetCount: exportTargets.length,
     targets: targets.map((t) => `${t.moduleId}::${t.slotKey}`),
+    exportTargets: exportTargets.map((e) => e.label),
   });
   if (normalizedSlotKeys?.length && targets.length !== normalizedSlotKeys.length) {
     console.warn("[detail-page-suite] image gen slotKeys/targets mismatch", {
@@ -299,15 +329,50 @@ export async function generateDetailPageSuiteImages(opts: {
   const failures: string[] = [];
   const failureEntries: DetailPageSuiteImageGenFailuresMap = {};
   const successKeys: string[] = [];
-  const urlMap = new Map<string, string>();
-  const assetMap = new Map<string, string>();
+  type SlotGenVersion = {
+    url: string;
+    assetId?: string;
+    exportTargetId?: string;
+    platformLabel?: string;
+  };
+  const urlMap = new Map<string, SlotGenVersion[]>();
   const failedAt = new Date().toISOString();
+
+  type ImageGenWorkItem = { target: DetailPageSuiteImageTarget; exportTarget: DetailPageSuiteExportTarget };
+  const workItems: ImageGenWorkItem[] = [];
+  for (const t of targets) {
+    if (isDetailPageSuiteSizeChartDataLabel(t.itemLabel)) {
+      workItems.push({
+        target: t,
+        exportTarget: exportTargets[0] ?? {
+          id: "default",
+          platformCode: spec.code,
+          label: spec.label,
+          ratio: defaultRatio,
+          widthPx: spec.detailPage.widthPx ?? 750,
+        },
+      });
+      continue;
+    }
+    for (const et of exportTargets) {
+      workItems.push({ target: t, exportTarget: et });
+    }
+  }
+
   try {
   let sizeChartTableIndex = 0;
-  await mapWithConcurrency(targets, async (t) => {
+  await mapWithConcurrency(workItems, async ({ target: t, exportTarget: et }) => {
     const key = `${t.moduleId}::${t.slotKey}`;
+    const ratio = ratioForExportTarget(et);
+    const perTargetImageSize =
+      imageSizeForExportTarget(et) || opts.imageSize || project.settings.imageSize;
+    const failLabel = exportTargets.length > 1 ? `${key} · ${et.label}` : key;
     try {
-      const slotTitle = `${t.moduleName} · ${t.itemLabel}`.slice(0, 80);
+      const slotTitle =
+        `${t.moduleName} · ${t.itemLabel}${exportTargets.length > 1 ? ` · ${et.label}` : ""}`.slice(
+          0,
+          80,
+        );
       let promptForRecord = t.prompt;
       const url = isDetailPageSuiteSizeChartDataLabel(t.itemLabel)
         ? await uploadRenderedSizeChartPng({
@@ -358,13 +423,11 @@ export async function generateDetailPageSuiteImages(opts: {
                 ? mergeHitDetailPageImageNegativePrompt(t.negativePrompt, true)
                 : mergeSuiteNegativePrompt(t.negativePrompt),
               ratio,
-              imageSize: opts.imageSize || project.settings.imageSize,
+              imageSize: perTargetImageSize,
               refImageUrls: BLANK_PLATE_MODULE_IDS.has(t.moduleId) ? [] : refs,
               toolKey: `${genToolKey}__generate`,
             });
           })();
-      urlMap.set(key, url);
-      successKeys.push(key);
       const asset = await prisma.ecomAsset.create({
         data: {
           userId: opts.userId,
@@ -379,12 +442,21 @@ export async function generateDetailPageSuiteImages(opts: {
             source: assetModule,
             moduleId: t.moduleId,
             slotKey: t.slotKey,
-            platform: spec.code,
+            platform: et.platformCode,
+            exportTargetId: et.id,
             modelKey,
           },
         },
       });
-      assetMap.set(key, asset.id);
+      const list = urlMap.get(key) ?? [];
+      list.push({
+        url,
+        assetId: asset.id,
+        exportTargetId: et.id,
+        platformLabel: et.label,
+      });
+      urlMap.set(key, list);
+      if (!successKeys.includes(key)) successKeys.push(key);
       await persistDetailPageSuiteSlotGenerationRecord({
         userId: opts.userId,
         projectId: opts.projectId,
@@ -401,14 +473,14 @@ export async function generateDetailPageSuiteImages(opts: {
       const raw = e instanceof Error ? e.message : String(e);
       const message = formatEcomImageGenUserError(e).message;
       failures.push(
-        formatDetailPageSuiteImageGenFailureLine(key, message, { itemLabel: t.itemLabel }),
+        formatDetailPageSuiteImageGenFailureLine(failLabel, message, { itemLabel: t.itemLabel }),
       );
-      failureEntries[key] = { message, failedAt, modelKey };
+      failureEntries[failLabel] = { message, failedAt, modelKey };
       console.error("[detail-page-suite] image gen failed", {
         projectId: opts.projectId,
         userId: opts.userId,
         modelKey,
-        slotKey: key,
+        slotKey: failLabel,
         itemLabel: t.itemLabel,
         message: raw,
       });
@@ -420,7 +492,7 @@ export async function generateDetailPageSuiteImages(opts: {
       projectId: opts.projectId,
       userId: opts.userId,
       modelKey,
-      generated: urlMap.size,
+      generated: [...urlMap.values()].reduce((n, v) => n + v.length, 0),
       failed: failures.length,
       failures,
     });
@@ -435,9 +507,8 @@ export async function generateDetailPageSuiteImages(opts: {
         base,
         base.map((s) => {
         const key = `${m.module_id}::${s.item_key}`;
-        const url = urlMap.get(key);
-        const assetId = assetMap.get(key);
-        if (!url) return s;
+        const additions = urlMap.get(key);
+        if (!additions?.length) return s;
         const prevHistory =
           Array.isArray(s.imageHistory) && s.imageHistory.length > 0
             ? s.imageHistory.filter((v) => v.url?.trim())
@@ -452,13 +523,20 @@ export async function generateDetailPageSuiteImages(opts: {
               : [];
         const imageHistory = [
           ...prevHistory,
-          { url, assetId: assetId ?? s.assetId, createdAt: now },
+          ...additions.map((add) => ({
+            url: add.url,
+            assetId: add.assetId ?? s.assetId,
+            createdAt: now,
+            ...(add.exportTargetId ? { exportTargetId: add.exportTargetId } : {}),
+            ...(add.platformLabel ? { platformLabel: add.platformLabel } : {}),
+          })),
         ];
+        const last = additions[additions.length - 1]!;
         const activeImageIndex = imageHistory.length - 1;
         return {
           ...s,
-          imageUrl: url,
-          assetId: assetId ?? s.assetId,
+          imageUrl: last.url,
+          assetId: last.assetId ?? s.assetId,
           imageHistory,
           activeImageIndex,
         };
@@ -483,7 +561,7 @@ export async function generateDetailPageSuiteImages(opts: {
     settings: {
       ...project.settings,
       imageModelKey: modelKey,
-      imageRatio: ratio,
+      imageRatio: defaultRatio,
       ...(opts.imageSize || project.settings.imageSize
         ? { imageSize: opts.imageSize || project.settings.imageSize }
         : {}),
@@ -492,7 +570,8 @@ export async function generateDetailPageSuiteImages(opts: {
     status: "ready",
   });
   if (!updated) throw new Error("保存失败");
-  return { project: updated, generated: urlMap.size, failures };
+  const generated = [...urlMap.values()].reduce((n, v) => n + v.length, 0);
+  return { project: updated, generated, failures };
   } catch (e) {
     metaWithPending = clearDetailPageSuiteImagesPending(metaWithPending, pendingKeys) ?? metaWithPending;
     const failureSuite = normalizeDetailPageSuiteState(project.suite, metaWithPending);

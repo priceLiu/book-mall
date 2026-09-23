@@ -277,7 +277,11 @@ export function DetailPageSuiteSlotCard({
           </p>
           {history.length > 0 ? (
             <span className="shrink-0 text-[10px] text-[#86868b]">
-              {history.length > 1 ? `${history.length} 版` : "已生成"}
+              {history.length > 1
+                ? `${history.length} 版${activeImage?.platformLabel ? ` · ${activeImage.platformLabel}` : ""}`
+                : activeImage?.platformLabel
+                  ? activeImage.platformLabel
+                  : "已生成"}
             </span>
           ) : imageGenError ? (
             <span className="shrink-0 text-[10px] text-[#ff3b30]">出图失败</span>
@@ -294,9 +298,11 @@ export function DetailPageSuiteSlotCard({
             {slot.slot_copy?.trim() ||
               slot.slot_copy_ai?.trim() ||
               "（未填写，可点格子编辑）"}
-            {slot.burn_copy_in_image &&
-            (slot.slot_copy?.trim() || slot.slot_copy_ai?.trim()) ? (
-              <span className="ml-1 text-[#0066cc]">· 出图含字</span>
+            {slot.copy_overlay?.layers?.some((l) => l.text?.trim()) ? (
+              <span className="ml-1 text-[#0066cc]">· 已排版</span>
+            ) : slot.burn_copy_in_image &&
+              (slot.slot_copy?.trim() || slot.slot_copy_ai?.trim()) ? (
+              <span className="ml-1 text-[#86868b]">· AI 烧字</span>
             ) : null}
           </p>
         ) : slot.slot_copy?.trim() ? (

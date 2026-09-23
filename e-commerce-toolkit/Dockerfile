@@ -11,6 +11,7 @@ COPY docker-shared/federated-portal-nav /shared/federated-portal-nav
 COPY docker-shared/media-render-subtitle-style /shared/media-render-subtitle-style
 COPY docker-shared/platform-assistant /shared/platform-assistant
 COPY docker-shared/publisher-client /shared/publisher-client
+COPY docker-shared/ecom-copy-overlay /shared/ecom-copy-overlay
 
 FROM with-shared AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./

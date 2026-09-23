@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@private/ecom-copy-overlay": "file:../shared/ecom-copy-overlay",
     "@private/federated-portal-logout": "file:../shared/federated-portal-logout",
     "@private/federated-portal-nav": "file:../shared/federated-portal-nav",
     "@private/media-render-subtitle-style": "file:../shared/media-render-subtitle-style",

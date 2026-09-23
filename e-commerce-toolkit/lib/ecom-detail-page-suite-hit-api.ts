@@ -2,6 +2,7 @@
 
 import { throwIfUnauthorized } from "@/lib/ecom-auth";
 import { ecomBookFetch, formatEcomTransportError } from "@/lib/ecom-book-fetch";
+import type { DetailPageSuiteCopyOverlay } from "@/lib/detail-page-suite-copy-overlay";
 import type { DetailPageSuiteProject } from "@/lib/detail-page-suite-types";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 
@@ -178,6 +179,38 @@ export async function resetDetailPageSuiteHitTemplate(projectId: string) {
   return postHitJson(`projects/${projectId}/hit/template`, { reset: true });
 }
 
+/** 通用烧字合成（详情页 / 画布共用） */
+export async function composeEcomCopyOverlay(body: {
+  baseImageUrl: string;
+  overlay: DetailPageSuiteCopyOverlay;
+  syncText?: string;
+  exportWidthPx?: number;
+}) {
+  return ecomBookFetch("api/sso/tools/ecom/copy-overlay/compose", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }) as Promise<{ url: string; overlay: DetailPageSuiteCopyOverlay }>;
+}
+
+export async function composeDetailPageSuiteHitSlot(
+  projectId: string,
+  body: {
+    moduleId: string;
+    slotKey: string;
+    baseImageUrl: string;
+    overlay: DetailPageSuiteCopyOverlay;
+    slotCopy?: string;
+  },
+) {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/compose-slot`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return data as { url: string; project: DetailPageSuiteProject };
+}
+
 export async function generateDetailPageSuiteHitImages(
   projectId: string,
   body: {
@@ -189,6 +222,7 @@ export async function generateDetailPageSuiteHitImages(
     imageSize?: string;
     imageRatio?: "1:1" | "3:4" | "4:5" | "16:9";
     includeSlotCopyOnImage?: boolean;
+    activeExportTargetIds?: string[];
   },
 ) {
   return ecomBookFetch(`${BASE}/projects/${projectId}/images/generate`, {

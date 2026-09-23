@@ -71,6 +71,29 @@ export function ecomRatioToDefaultImageSize(ratio: EcomDetailPageRatio): string 
   }
 }
 
+/** 详情页排版/导出默认宽（与 book-mall ecom-platform-spec widthPx 对齐） */
+const PLATFORM_DETAIL_WIDTH_PX: Record<string, number> = {
+  "taobao-tmall": 750,
+  jd: 790,
+  pdd: 750,
+  douyin: 750,
+  kuaishou: 750,
+  xiaohongshu: 750,
+  "wechat-channels": 750,
+  "1688": 750,
+  vip: 750,
+  amazon: 1464,
+  "shopee-lazada": 800,
+  independent: 1080,
+};
+
+export function resolveDetailPageExportWidthPx(platformCode?: string | null): number {
+  if (platformCode && PLATFORM_DETAIL_WIDTH_PX[platformCode]) {
+    return PLATFORM_DETAIL_WIDTH_PX[platformCode]!;
+  }
+  return 750;
+}
+
 export function detailPageRatioLabel(ratio: EcomDetailPageRatio, platformCode?: string): string {
   const platform = platformCode ? PLATFORM_DETAIL_RATIO[platformCode] : undefined;
   if (platform && platform === ratio) {

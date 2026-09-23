@@ -14,6 +14,7 @@ const nextConfig = {
     "@private/federated-portal-nav",
     "@private/media-render-subtitle-style",
     "@private/platform-assistant",
+    "@private/ecom-copy-overlay",
   ],
   images: {
     remotePatterns: [

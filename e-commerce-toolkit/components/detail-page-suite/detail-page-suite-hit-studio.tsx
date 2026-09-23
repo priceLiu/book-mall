@@ -11,6 +11,7 @@ import {
   type DetailPageSuiteSlotImagePreviewPayload,
 } from "@/components/detail-page-suite/detail-page-suite-content-panel";
 import { DetailPageSuiteSizeChartEditDialog } from "@/components/detail-page-suite/detail-page-suite-size-chart-edit-dialog";
+import { DetailPageSuiteExportTargetsBar } from "@/components/detail-page-suite/detail-page-suite-export-targets-bar";
 import { DetailPageSuiteSlotPromptEditDialog } from "@/components/detail-page-suite/detail-page-suite-slot-prompt-edit-dialog";
 import {
   BackgroundGenerationProvider,
@@ -61,6 +62,7 @@ import {
   type HitTemplate,
 } from "@/lib/detail-page-suite-hit-types";
 import {
+  composeDetailPageSuiteHitSlot,
   createDetailPageSuiteHitProject,
   decomposeDetailPageSuiteHit,
   deleteDetailPageSuiteHitProject,
@@ -77,6 +79,19 @@ import {
   uploadDetailPageSuiteHitRef,
   visionDetailPageSuiteHitSellpoints,
 } from "@/lib/ecom-detail-page-suite-hit-api";
+import type { EcomCopyOverlay } from "@private/ecom-copy-overlay";
+import {
+  ensureExportTargets,
+  resolveActiveExportTargetIds,
+} from "@/lib/detail-page-suite-export-targets";
+import {
+  resolveDetailPageDisplayRatio,
+  resolveDetailPageExportWidthPx,
+} from "@/lib/detail-page-suite-platform-ratio";
+import {
+  resolveDetailPageSuiteActiveImageIndex,
+  resolveDetailPageSuiteSlotHistory,
+} from "@/lib/detail-page-suite-slot-images";
 import {
   DETAIL_PAGE_SUITE_HIT_DECOMPOSE_EXPECTED_MS,
   detailPageSuiteHitDecomposeTaskId,
@@ -179,8 +194,11 @@ function DetailPageSuiteHitStudioInner() {
     slotCopy?: string;
     slotCopyAi?: string;
     burnCopyInImage?: boolean;
+    baseImageUrl?: string | null;
+    copyOverlay?: EcomCopyOverlay | null;
   } | null>(null);
   const [slotRewriteBusy, setSlotRewriteBusy] = useState(false);
+  const [slotComposeBusy, setSlotComposeBusy] = useState(false);
   const [addSlotDialog, setAddSlotDialog] = useState<{ moduleId: string } | null>(null);
   const [addSlotSaving, setAddSlotSaving] = useState(false);
   const [sellpointDraft, setSellpointDraft] = useState("");
@@ -1008,10 +1026,15 @@ function DetailPageSuiteHitStudioInner() {
     setImageModelKey(effectiveModelKey);
     try {
       await persistImageModelSettings(effectiveModelKey);
+      const activeExportTargetIds = resolveActiveExportTargetIds(
+        project.settings,
+        project.brief?.platformCode,
+      );
       const result = await generateDetailPageSuiteHitImages(project.id, {
         moduleId,
         slotKeys: keys,
         modelKey: effectiveModelKey,
+        activeExportTargetIds,
       });
       setProject(result.project);
       syncActiveGenFromProject(result.project);
@@ -1263,6 +1286,24 @@ function DetailPageSuiteHitStudioInner() {
             </>
           ) : null}
 
+          <DetailPageSuiteExportTargetsBar
+            settings={project.settings}
+            briefPlatformCode={project.brief?.platformCode}
+            disabled={hitBusy || uploadBusy}
+            onChange={(patch) => {
+              void (async () => {
+                const updated = await updateDetailPageSuiteHitProject(project.id, {
+                  settings: {
+                    ...project.settings,
+                    exportTargets: patch.exportTargets,
+                    activeExportTargetIds: patch.activeExportTargetIds,
+                  },
+                });
+                setProject(updated);
+              })();
+            }}
+          />
+
           <DetailPageSuiteContentPanel
             variant="hit"
             hideHeader
@@ -1307,6 +1348,12 @@ function DetailPageSuiteHitStudioInner() {
                 setSizeChartEdit({ moduleId, slotKey, label });
                 return;
               }
+              if (!project) return;
+              const mod = project.suite.modules.find((m) => m.module_id === moduleId);
+              const slot = mod?.slots.find((s) => s.item_key === slotKey);
+              const history = slot ? resolveDetailPageSuiteSlotHistory(slot) : [];
+              const activeIdx = slot ? resolveDetailPageSuiteActiveImageIndex(slot) : 0;
+              const baseImageUrl = history[activeIdx]?.url?.trim() || null;
               setPromptEdit({
                 moduleId,
                 slotKey,
@@ -1315,6 +1362,8 @@ function DetailPageSuiteHitStudioInner() {
                 slotCopy,
                 slotCopyAi,
                 burnCopyInImage,
+                baseImageUrl,
+                copyOverlay: slot?.copy_overlay ?? null,
               });
             }}
             onToggleModule={() => {}}
@@ -1478,8 +1527,23 @@ function DetailPageSuiteHitStudioInner() {
         prompt={promptEdit?.prompt ?? ""}
         slotCopy={promptEdit?.slotCopy ?? ""}
         slotCopyAi={promptEdit?.slotCopyAi ?? ""}
-        burnCopyInImage={promptEdit?.burnCopyInImage === true}
         showSlotCopyField
+        baseImageUrl={promptEdit?.baseImageUrl ?? null}
+        copyOverlay={promptEdit?.copyOverlay ?? null}
+        exportWidthPx={
+          project
+            ? (ensureExportTargets(project.settings, project.brief?.platformCode).find((t) =>
+                resolveActiveExportTargetIds(project.settings, project.brief?.platformCode).includes(
+                  t.id,
+                ),
+              )?.widthPx ?? resolveDetailPageExportWidthPx(project.brief?.platformCode))
+            : 750
+        }
+        displayRatio={resolveDetailPageDisplayRatio(
+          project?.brief?.platformCode,
+          project?.settings.imageRatio,
+        )}
+        composing={slotComposeBusy}
         rewriteBusy={slotRewriteBusy}
         onRewrite={() => {
           void (async () => {
@@ -1496,12 +1560,16 @@ function DetailPageSuiteHitStudioInner() {
               const mod = updated.suite.modules.find((m) => m.module_id === promptEdit.moduleId);
               const slot = mod?.slots.find((s) => s.item_key === promptEdit.slotKey);
               if (slot) {
+                const history = resolveDetailPageSuiteSlotHistory(slot);
+                const activeIdx = resolveDetailPageSuiteActiveImageIndex(slot);
                 setPromptEdit({
                   ...promptEdit,
                   prompt: slot.positive_prompt,
                   slotCopy: slot.slot_copy,
                   slotCopyAi: slot.slot_copy_ai,
                   burnCopyInImage: slot.burn_copy_in_image,
+                  baseImageUrl: history[activeIdx]?.url?.trim() || promptEdit.baseImageUrl,
+                  copyOverlay: slot.copy_overlay ?? null,
                 });
               }
               toast({ title: "已更新本条文案与提示词" });
@@ -1518,6 +1586,60 @@ function DetailPageSuiteHitStudioInner() {
         }}
         onOpenChange={(open) => {
           if (!open) setPromptEdit(null);
+        }}
+        onCompose={async (prompt, extras) => {
+          if (!promptEdit || !project) return;
+          const baseUrl = promptEdit.baseImageUrl?.trim();
+          if (!baseUrl || !extras.copyOverlay) {
+            await alert({
+              title: "无法合成",
+              message: "请先出无字底图并填写模块文案",
+              variant: "error",
+            });
+            return;
+          }
+          setSlotComposeBusy(true);
+          try {
+            const modules = project.suite.modules.map((m) => {
+              if (m.module_id !== promptEdit.moduleId) return m;
+              const slotIndex = m.slots.findIndex((s) => s.item_key === promptEdit.slotKey);
+              if (slotIndex < 0) return m;
+              const slots = [...m.slots];
+              const s = slots[slotIndex]!;
+              const copy = extras.slotCopy?.trim();
+              slots[slotIndex] = {
+                ...s,
+                positive_prompt: prompt,
+                promptEdited: true,
+                slot_copy: copy || undefined,
+                slot_copy_ai: copy ? s.slot_copy_ai ?? copy : s.slot_copy_ai,
+                copy_overlay: extras.copyOverlay,
+                burn_copy_in_image: false,
+              };
+              return { ...m, slots };
+            });
+            await updateDetailPageSuiteHitProject(project.id, {
+              suite: { ...project.suite, modules },
+            });
+            const result = await composeDetailPageSuiteHitSlot(project.id, {
+              moduleId: promptEdit.moduleId,
+              slotKey: promptEdit.slotKey,
+              baseImageUrl: baseUrl,
+              overlay: extras.copyOverlay,
+              slotCopy: extras.slotCopy,
+            });
+            setProject(result.project);
+            setPromptEdit(null);
+            toast({ variant: "success", title: "已合成并保存新版" });
+          } catch (e) {
+            await alert({
+              title: "合成失败",
+              message: e instanceof Error ? e.message : "未知错误",
+              variant: "error",
+            });
+          } finally {
+            setSlotComposeBusy(false);
+          }
         }}
         onSave={async (prompt, extras) => {
           if (!promptEdit || !project) return;
@@ -1538,7 +1660,8 @@ function DetailPageSuiteHitStudioInner() {
                 ...next,
                 slot_copy: copy || undefined,
                 slot_copy_ai: copy ? s.slot_copy_ai ?? copy : s.slot_copy_ai,
-                burn_copy_in_image: extras.burnCopyInImage === true && Boolean(copy),
+                copy_overlay: extras.copyOverlay ?? s.copy_overlay,
+                burn_copy_in_image: false,
               };
             } else {
               slots[slotIndex] = next;

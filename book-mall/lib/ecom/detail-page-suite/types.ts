@@ -1,3 +1,5 @@
+import type { DetailPageSuiteCopyOverlay } from "./slot-copy-overlay-types";
+
 export const ECOM_DETAIL_PAGE_SUITE_TOOL_KEY = "ecom-toolkit__detail-page-suite";
 export const ECOM_DETAIL_PAGE_SUITE_REPLICA_TOOL_KEY =
   "ecom-toolkit__detail-page-suite-replica";
@@ -114,6 +116,18 @@ export type DetailPageSuiteSlotImageVersion = {
   url: string;
   assetId?: string;
   createdAt: string;
+  /** 多平台出图：对应 settings.exportTargets[].id */
+  exportTargetId?: string;
+  platformLabel?: string;
+};
+
+export type DetailPageSuiteExportTarget = {
+  id: string;
+  platformCode: string;
+  label: string;
+  ratio: "1:1" | "3:4" | "4:5" | "16:9";
+  widthPx: number;
+  customHeightPx?: number;
 };
 
 export type DetailPageSuiteSlot = {
@@ -125,6 +139,8 @@ export type DetailPageSuiteSlot = {
   slot_copy_ai?: string;
   /** 爆款套图：出图时将 slot_copy 烧录进画面 */
   burn_copy_in_image?: boolean;
+  /** 爆款套图：程序合成排版的文字层（非 AI 烧字） */
+  copy_overlay?: DetailPageSuiteCopyOverlay;
   source: "template" | "user";
   positive_prompt: string;
   negative_prompt?: string;
@@ -162,6 +178,10 @@ export type DetailPageSuiteSettings = {
   imageRatio?: "1:1" | "3:4" | "4:5" | "16:9";
   /** 爆款套图：出图时把 slot_copy 一并写入生图 prompt */
   hitIncludeSlotCopyOnImage?: boolean;
+  /** 可出图的平台规格列表（含自定义宽） */
+  exportTargets?: DetailPageSuiteExportTarget[];
+  /** 当前勾选参与批量出图的 exportTargets.id */
+  activeExportTargetIds?: string[];
 };
 
 export type DetailPageSuitePhase =

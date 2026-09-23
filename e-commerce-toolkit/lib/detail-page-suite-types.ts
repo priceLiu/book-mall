@@ -71,6 +71,17 @@ export type DetailPageSuiteSlotImageVersion = {
   url: string;
   assetId?: string;
   createdAt: string;
+  exportTargetId?: string;
+  platformLabel?: string;
+};
+
+export type DetailPageSuiteExportTarget = {
+  id: string;
+  platformCode: string;
+  label: string;
+  ratio: "1:1" | "3:4" | "4:5" | "16:9";
+  widthPx: number;
+  customHeightPx?: number;
 };
 
 export type DetailPageSuiteSlot = {
@@ -79,6 +90,7 @@ export type DetailPageSuiteSlot = {
   slot_copy?: string;
   slot_copy_ai?: string;
   burn_copy_in_image?: boolean;
+  copy_overlay?: import("@/lib/detail-page-suite-copy-overlay").DetailPageSuiteCopyOverlay;
   source: "template" | "user";
   positive_prompt: string;
   negative_prompt?: string;
@@ -136,6 +148,8 @@ export type DetailPageSuiteProject = {
     hitIncludeSlotCopyOnImage?: boolean;
     /** 展示/出图比例，默认跟平台 detailPage.ratio */
     imageRatio?: "1:1" | "3:4" | "4:5" | "16:9";
+    exportTargets?: DetailPageSuiteExportTarget[];
+    activeExportTargetIds?: string[];
   };
   references: DetailPageSuiteReference[];
   chatHistory: DetailPageSuiteChatMessage[];

@@ -23,6 +23,9 @@ importers:
       '@prisma/client':
         specifier: ^6.3.1
         version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
+      '@private/ecom-copy-overlay':
+        specifier: file:../shared/ecom-copy-overlay
+        version: file:../shared/ecom-copy-overlay(next@14.2.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
       '@private/federated-portal-nav':
         specifier: file:../shared/federated-portal-nav
         version: file:../shared/federated-portal-nav(react@18.3.1)
@@ -744,6 +747,12 @@ packages:
 
   '@prisma/get-platform@6.19.3':
     resolution: {integrity: sha512-xFj1VcJ1N3MKooOQAGO0W5tsd0W2QzIvW7DD7c/8H14Zmp4jseeWAITm+w2LLoLrlhoHdPPh0NMZ8mfL6puoHA==}
+
+  '@private/ecom-copy-overlay@file:../shared/ecom-copy-overlay':
+    resolution: {directory: ../shared/ecom-copy-overlay, type: directory}
+    peerDependencies:
+      next: '>=14'
+      react: ^18
 
   '@private/federated-portal-nav@file:../shared/federated-portal-nav':
     resolution: {directory: ../shared/federated-portal-nav, type: directory}
@@ -5295,6 +5304,11 @@ snapshots:
   '@prisma/get-platform@6.19.3':
     dependencies:
       '@prisma/debug': 6.19.3
+
+  '@private/ecom-copy-overlay@file:../shared/ecom-copy-overlay(next@14.2.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      next: 14.2.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react: 18.3.1
 
   '@private/federated-portal-nav@file:../shared/federated-portal-nav(react@18.3.1)':
     dependencies:
