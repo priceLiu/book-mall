@@ -123,6 +123,18 @@ export type DetailPageSuiteState = {
   modules: DetailPageSuiteModuleState[];
 };
 
+export type DetailPageSuiteSettings = {
+  chatModelKey?: string;
+  visionModelKey?: string;
+  imageModelKey?: string;
+  imageSize?: string;
+  hitIncludeSlotCopyOnImage?: boolean;
+  /** 展示/出图比例，默认跟平台 detailPage.ratio */
+  imageRatio?: "1:1" | "3:4" | "4:5" | "16:9";
+  exportTargets?: DetailPageSuiteExportTarget[];
+  activeExportTargetIds?: string[];
+};
+
 export type DetailPageSuitePhase =
   | "product_ref"
   | "dimensions"
@@ -140,17 +152,7 @@ export type DetailPageSuiteProject = {
   module: string;
   status: string;
   brief: DetailPageSuiteBrief | null;
-  settings: {
-    chatModelKey?: string;
-    visionModelKey?: string;
-    imageModelKey?: string;
-    imageSize?: string;
-    hitIncludeSlotCopyOnImage?: boolean;
-    /** 展示/出图比例，默认跟平台 detailPage.ratio */
-    imageRatio?: "1:1" | "3:4" | "4:5" | "16:9";
-    exportTargets?: DetailPageSuiteExportTarget[];
-    activeExportTargetIds?: string[];
-  };
+  settings: DetailPageSuiteSettings;
   references: DetailPageSuiteReference[];
   chatHistory: DetailPageSuiteChatMessage[];
   suite: DetailPageSuiteState;
