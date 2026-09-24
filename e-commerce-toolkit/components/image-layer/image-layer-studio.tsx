@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { BackgroundReplaceResultDialog } from "@/components/background-replace/background-replace-result-dialog";
 import { EcomLoginPrompt } from "@/components/auth/ecom-login-prompt";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
@@ -33,9 +34,15 @@ import {
   eraseImageLayerRegion,
   getImageLayerProject,
   listImageLayerProjectSummaries,
+  saveImageLayerResult,
   saveImageLayerWorkspace,
   uploadImageLayerSource,
 } from "@/lib/ecom-image-layer-api";
+import { replaceEcomBackground } from "@/lib/ecom-background-replace-api";
+import {
+  DEFAULT_BACKGROUND_REPLACE_FORM,
+  type BackgroundReplaceFormState,
+} from "@/lib/background-replace-types";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import { ensureEcomSessionFresh } from "@/lib/ecom-silent-sso";
@@ -54,6 +61,7 @@ import {
   resolveLocalEditSelectionPayload,
 } from "@/lib/image-layer-local-edit-payload";
 import { IMAGE_LAYER_MAX_BBOXES } from "@/lib/image-layer-constants";
+import type { ImageLayerSaveItem } from "@/lib/image-layer-save-items";
 import { resolvePendingBboxes } from "@/lib/image-layer-pending-bboxes";
 import {
   IMAGE_LAYER_RETOUCH_MODEL_KEYS,
@@ -74,6 +82,7 @@ const DECOMPOSE_TASK_ID = "image-layer-decompose";
 const EDIT_TASK_ID = "image-layer-edit";
 const RETOUCH_TASK_ID = "image-layer-retouch";
 const ERASE_TASK_ID = "image-layer-erase";
+const BG_REPLACE_TASK_ID = "image-layer-bg-replace";
 const PROJECT_STORAGE_KEY = "ecom-image-layer-active-project";
 const AUTO_SAVE_MS = 900;
 
@@ -145,6 +154,12 @@ function ImageLayerStudioInner() {
   >({});
   const [retouchBusy, setRetouchBusy] = useState(false);
   const [eraseBusy, setEraseBusy] = useState(false);
+  const [bgReplaceBusy, setBgReplaceBusy] = useState(false);
+  const [bgReplaceForm, setBgReplaceForm] = useState<BackgroundReplaceFormState>(
+    DEFAULT_BACKGROUND_REPLACE_FORM,
+  );
+  const [bgReplaceCandidates, setBgReplaceCandidates] = useState<string[]>([]);
+  const [bgReplacePickOpen, setBgReplacePickOpen] = useState(false);
   const [pendingBboxes, setPendingBboxes] = useState<
     Array<[number, number, number, number]>
   >([]);
@@ -431,7 +446,14 @@ function ImageLayerStudioInner() {
   );
 
   const applyFlatEditResult = useCallback(
-    async (editedUrl: string) => {
+    async (
+      editedUrl: string,
+      opts?: { compareFromUrl?: string; toolMode?: ImageLayerCanvasToolMode },
+    ) => {
+      const nextOriginal = opts?.compareFromUrl?.trim() || originalImageUrl;
+      if (opts?.compareFromUrl?.trim()) {
+        setOriginalImageUrl(nextOriginal);
+      }
       setStack(null);
       setSelectedLayerId(null);
       setEditEntries([]);
@@ -441,7 +463,7 @@ function ImageLayerStudioInner() {
         revokeBlobPreview(prev);
         return editedUrl;
       });
-      setCanvasToolMode("decompose-bbox");
+      setCanvasToolMode(opts?.toolMode ?? "decompose-bbox");
       canvasRef.current?.clearMask();
       const img = new Image();
       img.onload = () =>
@@ -452,7 +474,7 @@ function ImageLayerStudioInner() {
         try {
           const updated = await saveImageLayerWorkspace(project.id, {
             sourceImageUrl: editedUrl,
-            originalImageUrl,
+            originalImageUrl: nextOriginal,
             stack: null,
             pendingBboxes: [],
             canvasDims: canvasDims,
@@ -568,40 +590,68 @@ function ImageLayerStudioInner() {
     [alert, ensureSessionForUpload, project?.id, toast],
   );
 
-  const resolveOssSourceUrl = useCallback(async (): Promise<string> => {
-    if (sourceUrl?.trim()) return sourceUrl.trim();
-    throw new Error("请先上传图片");
-  }, [sourceUrl]);
+  /** 把即将拆层的整图提到左边，保证「原图」就是这次拆的图 */
+  const promoteAsDecomposeSource = useCallback(
+    async (url: string, opts?: { persist?: boolean; clearStack?: boolean }) => {
+      const next = url.trim();
+      if (!next) return;
+      setOriginalImageUrl(next);
+      setSourceUrl(next);
+      setSourcePreviewUrl((prev) => {
+        revokeBlobPreview(prev);
+        return next;
+      });
+      if (opts?.clearStack) {
+        setStack(null);
+        setSelectedLayerId(null);
+        setEditEntries([]);
+        setPendingBboxes([]);
+        setCanvasToolMode("decompose-bbox");
+        canvasRef.current?.clearMask();
+      }
+      if (opts?.persist && project?.id) {
+        skipAutoSaveRef.current = true;
+        try {
+          const updated = await saveImageLayerWorkspace(project.id, {
+            sourceImageUrl: next,
+            originalImageUrl: next,
+            stack: opts.clearStack ? null : stack,
+            pendingBboxes: opts.clearStack ? [] : pendingBboxes,
+            selectedLayerId: opts.clearStack ? null : selectedLayerId,
+            editEntries: opts.clearStack ? [] : editEntries,
+          });
+          setProject(updated);
+        } finally {
+          skipAutoSaveRef.current = false;
+        }
+      }
+    },
+    [editEntries, pendingBboxes, project?.id, selectedLayerId, stack],
+  );
 
-  const runDecompose = useCallback(async () => {
-    if (!sourcePreviewUrl && !sourceUrl) {
+  const executeDecompose = useCallback(async (): Promise<ImageLayerStack | null> => {
+    const decomposeUrl =
+      sourceUrl?.trim() || stack?.sourceImageUrl?.trim() || "";
+    if (!decomposeUrl) {
       await alert({
         title: "请先上传图片",
         message: "选择 png/jpeg 成品图后，点击「AI 图层分离」。",
         variant: "error",
       });
-      return;
+      return null;
     }
-    if (!(await ensureSessionForAi())) return;
-    if (!project?.id) return;
-
-    if (
-      !(await confirm({
-        title: "确认 AI 图层分离？",
-        message:
-          "将调用 Seedream 拆分图层（消耗算力）。完成后「局部重绘 / 擦除」将暂时不可用，需保存图片或点击「取消分层」后恢复。是否继续？",
-      }))
-    ) {
-      return;
-    }
+    if (!project?.id) return null;
 
     setDecomposeBusy(true);
     setBusyLabel("AI 图层分离中…");
     setNeedLogin(false);
 
     const taskId = DECOMPOSE_TASK_ID;
+    const prevStack = stack;
 
     try {
+      await promoteAsDecomposeSource(decomposeUrl, { clearStack: true });
+
       backgroundGen.registerTask({
         id: taskId,
         label: "AI 图层分离",
@@ -611,9 +661,8 @@ function ImageLayerStudioInner() {
         poll: async () => ({ status: "running" as const }),
       });
 
-      const ossUrl = await resolveOssSourceUrl();
       const result = await decomposeImageLayers({
-        sourceImageUrl: ossUrl,
+        sourceImageUrl: decomposeUrl,
         projectId: project.id,
         ...(pendingBboxes.length ? { bboxes: pendingBboxes } : {}),
       });
@@ -621,12 +670,7 @@ function ImageLayerStudioInner() {
       const updated = await getImageLayerProject(project.id);
       setProject(updated);
       backgroundGen.dismissTask(taskId);
-      await toast({
-        variant: "success",
-        title: "图层分离完成",
-        message:
-          "底图已补全被拆物体，房间场景应保持原样。若不准可用框选再拆一次。",
-      });
+      return result;
     } catch (e) {
       backgroundGen.failTask(
         taskId,
@@ -634,13 +678,15 @@ function ImageLayerStudioInner() {
       );
       if (isEcomUnauthorizedError(e)) {
         setNeedLogin(true);
-        return;
+        return null;
       }
+      if (prevStack) setStack(prevStack);
       await alert({
         title: "图层分离失败",
         message: e instanceof Error ? e.message : "请稍后重试",
         variant: "error",
       });
+      return null;
     } finally {
       setDecomposeBusy(false);
       setBusyLabel(null);
@@ -649,15 +695,33 @@ function ImageLayerStudioInner() {
     alert,
     applyStack,
     backgroundGen,
-    confirm,
-    ensureSessionForAi,
     pendingBboxes,
     project?.id,
-    resolveOssSourceUrl,
-    sourcePreviewUrl,
+    promoteAsDecomposeSource,
     sourceUrl,
-    toast,
+    stack,
   ]);
+
+  const runDecompose = useCallback(async () => {
+    if (!(await ensureSessionForAi())) return;
+    if (
+      !(await confirm({
+        title: stack ? "用当前整图重新拆分？" : "确认 AI 图层分离？",
+        message: stack
+          ? "左侧会换成当前这张整图作为拆层原图，然后重新拆分（消耗算力）。"
+          : "将拆分当前整图。左侧会显示这张原图，完成后可对照图层结果。",
+      }))
+    ) {
+      return;
+    }
+    const result = await executeDecompose();
+    if (!result) return;
+    await toast({
+      variant: "success",
+      title: "图层分离完成",
+      message: "左侧为本次拆层原图，右侧为图层结果。",
+    });
+  }, [confirm, ensureSessionForAi, executeDecompose, stack, toast]);
 
   const handleSelectLayer = useCallback(
     (id: string | null) => {
@@ -786,7 +850,7 @@ function ImageLayerStudioInner() {
       await toast({
         variant: "success",
         title: "图层修改完成",
-        message: `已处理 ${jobs.length} 层，当前为整图。需要分层请再点「AI 图层分离」。`,
+        message: `已处理 ${jobs.length} 层，当前为整图。可点「保存图片」入库，或再点「AI 图层分离」。`,
       });
     } catch (e) {
       backgroundGen.failTask(taskId, e instanceof Error ? e.message : "改层失败");
@@ -858,11 +922,11 @@ function ImageLayerStudioInner() {
 
   const handleToolModeChange = useCallback(
     (mode: ImageLayerCanvasToolMode) => {
-      if (stack && (mode === "retouch" || mode === "erase")) {
+      if (stack && (mode === "retouch" || mode === "erase" || mode === "bg-replace")) {
         void toast({
           variant: "error",
           title: "分层进行中",
-          message: "请先保存图片或点击「取消分层」，再使用重绘/擦除。",
+          message: "请先保存图片或点击「取消分层」，再使用换背景 / 重绘 / 擦除。",
         });
         return;
       }
@@ -873,6 +937,108 @@ function ImageLayerStudioInner() {
     },
     [stack, toast],
   );
+
+  const uploadBgReplaceImage = useCallback(
+    async (file: File): Promise<string> => {
+      const { ossUrl } = await uploadImageLayerSource(file);
+      return ossUrl;
+    },
+    [],
+  );
+
+  const resolveBgReplaceBaseUrl = useCallback(async (): Promise<string> => {
+    const source = httpSourceUrl();
+    if (!source) {
+      throw new Error(
+        sourcePreviewUrl
+          ? "原图还在上传到云端，请稍后再换背景"
+          : "请先上传图片",
+      );
+    }
+    return source;
+  }, [httpSourceUrl, sourcePreviewUrl]);
+
+  const applyBgReplaceResult = useCallback(
+    async (url: string) => {
+      const before = sourceUrl?.trim() || httpSourceUrl();
+      await applyFlatEditResult(url, {
+        compareFromUrl: before || undefined,
+        toolMode: "bg-replace",
+      });
+      setBgReplacePickOpen(false);
+      setBgReplaceCandidates([]);
+      await toast({
+        variant: "success",
+        title: "已换背景",
+        message: "右边是新场景，左边是换之前的图。",
+      });
+    },
+    [applyFlatEditResult, httpSourceUrl, sourceUrl, toast],
+  );
+
+  const runBackgroundReplace = useCallback(async () => {
+    if (!(await ensureSessionForAi())) return;
+    setBgReplaceBusy(true);
+    setBusyLabel("换背景中…");
+    setNeedLogin(false);
+    const taskId = BG_REPLACE_TASK_ID;
+    try {
+      const baseImageUrl = await resolveBgReplaceBaseUrl();
+      backgroundGen.registerTask({
+        id: taskId,
+        label: "换背景",
+        hint: "万相背景生成 · 可能需 1～2 分钟",
+        startedAt: new Date().toISOString(),
+        expectedDurationMs: 120_000,
+        poll: async () => ({ status: "running" as const }),
+      });
+      const result = await replaceEcomBackground({
+        baseImageUrl,
+        form: bgReplaceForm,
+        sourceModule: "image-layer",
+        projectId: project?.id,
+        clientPage: "ecom/image-layer",
+      });
+      backgroundGen.dismissTask(taskId);
+      if (result.imageUrls.length === 1) {
+        await applyBgReplaceResult(result.imageUrls[0]!);
+        return;
+      }
+      setBgReplaceCandidates(result.imageUrls);
+      setBgReplacePickOpen(true);
+      await toast({
+        variant: "success",
+        title: `已生成 ${result.imageUrls.length} 张`,
+        message: "请选择一张应用到中栏。",
+      });
+    } catch (e) {
+      backgroundGen.failTask(
+        taskId,
+        e instanceof Error ? e.message : "换背景失败",
+      );
+      if (isEcomUnauthorizedError(e)) {
+        setNeedLogin(true);
+        return;
+      }
+      await alert({
+        title: "换背景失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    } finally {
+      setBgReplaceBusy(false);
+      setBusyLabel(null);
+    }
+  }, [
+    alert,
+    applyBgReplaceResult,
+    backgroundGen,
+    bgReplaceForm,
+    ensureSessionForAi,
+    project?.id,
+    resolveBgReplaceBaseUrl,
+    toast,
+  ]);
 
   const handleClearSelection = useCallback(() => {
     canvasRef.current?.clearMask();
@@ -943,7 +1109,7 @@ function ImageLayerStudioInner() {
       await toast({
         variant: "success",
         title: "重绘完成",
-        message: "已更新底图，可重新框选拆分",
+        message: "已更新底图。可点「保存图片」入库，或再框选拆分。",
       });
     } catch (e) {
       backgroundGen.failTask(taskId, e instanceof Error ? e.message : "重绘失败");
@@ -1023,7 +1189,7 @@ function ImageLayerStudioInner() {
       await toast({
         variant: "success",
         title: "擦除补全完成",
-        message: "已更新底图，可重新框选拆分",
+        message: "已更新底图。可点「保存图片」入库，或再框选拆分。",
       });
     } catch (e) {
       backgroundGen.failTask(taskId, e instanceof Error ? e.message : "擦除补全失败");
@@ -1166,6 +1332,45 @@ function ImageLayerStudioInner() {
     }
   }, [alert, persistWorkspace, project?.id, toast]);
 
+  const [saveLibraryBusy, setSaveLibraryBusy] = useState(false);
+
+  const handleSaveToLibrary = useCallback(
+    async (item: ImageLayerSaveItem) => {
+      if (!project?.id) throw new Error("请先打开项目");
+      if (item.url.startsWith("blob:")) {
+        throw new Error("图片还在上传，请稍后再保存");
+      }
+      setSaveLibraryBusy(true);
+      try {
+        const result = await saveImageLayerResult({
+          projectId: project.id,
+          ossUrl: item.url,
+          title: item.libraryTitle ?? item.label,
+        });
+        if (item.id === "flat") {
+          await promoteAsDecomposeSource(item.url, { persist: true, clearStack: true });
+        }
+        await toast({
+          variant: "success",
+          title: result.created ? "已保存到我的资产" : "资产库已有此图",
+          message:
+            item.id === "flat"
+              ? "已放到左侧作为原图，可再点「AI 图层分离」。"
+              : "可在「我的资产 · 图片分层」查看。",
+        });
+      } catch (e) {
+        if (isEcomUnauthorizedError(e)) {
+          setNeedLogin(true);
+          throw e;
+        }
+        throw e instanceof Error ? e : new Error("保存失败");
+      } finally {
+        setSaveLibraryBusy(false);
+      }
+    },
+    [project?.id, promoteAsDecomposeSource, toast],
+  );
+
   const handleCancelLayerSession = useCallback(async () => {
     if (!stack) return;
     if (
@@ -1230,7 +1435,8 @@ function ImageLayerStudioInner() {
 
   const loadProjectList = useCallback(() => listImageLayerProjectSummaries(), []);
 
-  const aiBusy = decomposeBusy || editBusy || retouchBusy || eraseBusy;
+  const aiBusy =
+    decomposeBusy || editBusy || retouchBusy || eraseBusy || bgReplaceBusy;
   const exportBusy = exportPreviewBusy || exportDownloadBusy;
   const anyBusy = uploadBusy || aiBusy || saveBusy || exportBusy;
 
@@ -1240,7 +1446,8 @@ function ImageLayerStudioInner() {
       (task.id === DECOMPOSE_TASK_ID ||
         task.id === EDIT_TASK_ID ||
         task.id === RETOUCH_TASK_ID ||
-        task.id === ERASE_TASK_ID),
+        task.id === ERASE_TASK_ID ||
+        task.id === BG_REPLACE_TASK_ID),
   );
 
   const generatingLabel =
@@ -1255,7 +1462,9 @@ function ImageLayerStudioInner() {
             ? "局部重绘中…"
             : eraseBusy
               ? "图像擦除补全中…"
-              : "生成中…");
+              : bgReplaceBusy
+                ? "换背景中…"
+                : "生成中…");
 
   const generatingProgress: number | null | undefined = anyBusy
     ? uploadBusy
@@ -1437,9 +1646,11 @@ function ImageLayerStudioInner() {
                     ? retouchModel
                     : eraseBusy
                       ? "图像擦除补全"
-                      : uploadBusy
-                        ? "正在上传原图至 OSS"
-                        : undefined
+                      : bgReplaceBusy
+                        ? "万相背景生成 · 可能需 1～2 分钟"
+                        : uploadBusy
+                          ? "正在上传原图至 OSS"
+                          : undefined
             }
             selectionSubTool={selectionSubTool}
             brushSize={brushSize}
@@ -1474,6 +1685,13 @@ function ImageLayerStudioInner() {
             onPromptChange={handleEditPromptChange}
             onSubmitAllEdits={() => void runEditAll()}
             onRemoveEditEntry={handleRemoveEditEntry}
+            bgReplaceForm={bgReplaceForm}
+            bgReplaceBusy={bgReplaceBusy}
+            bgReplaceHasBase={Boolean(sourceUrl || stack)}
+            bgReplaceSubjectHint="只换右边当前图，不改左边对照。成功后左边变成换之前的图。"
+            onBgReplaceFormChange={setBgReplaceForm}
+            onUploadBgReplaceImage={uploadBgReplaceImage}
+            onBgReplaceSubmit={() => void runBackgroundReplace()}
           />
         }
         assistantHeader={
@@ -1490,6 +1708,12 @@ function ImageLayerStudioInner() {
               <div className="flex min-h-0 flex-1 overflow-hidden px-3 py-3">
                 <ImageLayerCompareStage
                   originalUrl={originalImageUrl ?? sourcePreviewUrl}
+                  originalLabel={
+                    canvasToolMode === "bg-replace" ? "换背景前" : "拆层原图"
+                  }
+                  resultLabel={
+                    canvasToolMode === "bg-replace" ? "当前图（换背景后）" : "操作 / 结果"
+                  }
                   className="h-full w-full"
                 >
                   <ImageLayerCanvas
@@ -1499,7 +1723,9 @@ function ImageLayerStudioInner() {
                     layers={stack?.layers ?? []}
                     selectedLayerId={selectedLayerId}
                     toolMode={
-                      stack && canvasToolMode === "decompose-bbox"
+                      stack &&
+                      (canvasToolMode === "decompose-bbox" ||
+                        canvasToolMode === "bg-replace")
                         ? "layer-view"
                         : canvasToolMode
                     }
@@ -1559,10 +1785,26 @@ function ImageLayerStudioInner() {
       <ImageLayerSaveDialog
         open={saveDialogOpen}
         sourceUrl={sourceUrl}
+        originalImageUrl={originalImageUrl}
         stack={stack}
         saveWorkspaceBusy={saveBusy}
+        saveLibraryBusy={saveLibraryBusy}
         onOpenChange={setSaveDialogOpen}
         onSaveWorkspace={handleSaveWorkspace}
+        onSaveToLibrary={handleSaveToLibrary}
+      />
+      <BackgroundReplaceResultDialog
+        open={bgReplacePickOpen}
+        imageUrls={bgReplaceCandidates}
+        onCancel={() => {
+          setBgReplacePickOpen(false);
+          void toast({
+            variant: "success",
+            title: "结果已写入生成记录",
+            message: "可稍后在生成记录中选用。",
+          });
+        }}
+        onPick={(url) => void applyBgReplaceResult(url)}
       />
     </>
   );

@@ -124,6 +124,23 @@ export async function deleteImageLayerProject(id: string): Promise<void> {
   await ecomBookFetch(`${BASE}/projects/${id}`, { method: "DELETE" });
 }
 
+export async function saveImageLayerResult(opts: {
+  projectId: string;
+  ossUrl: string;
+  title?: string;
+  prompt?: string;
+}): Promise<{ assetId: string; created: boolean }> {
+  const data = await ecomBookFetch(`${BASE}/save-result`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts),
+  });
+  return {
+    assetId: typeof data.assetId === "string" ? data.assetId : "",
+    created: Boolean(data.created),
+  };
+}
+
 /** 百炼 image-erase-completion · 图像擦除补全（非分层后的图层擦除） */
 export async function eraseImageLayerRegion(opts: {
   sourceImageUrl: string;

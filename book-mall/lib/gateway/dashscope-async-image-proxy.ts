@@ -1,4 +1,5 @@
 import {
+  dashscopeCreateBackgroundGenerationTask,
   dashscopeCreateImage2ImageTask,
   dashscopeCreateOutPaintingTask,
   dashscopeExtractAllTaskImageUrls,
@@ -29,6 +30,7 @@ function sleep(ms: number) {
 export async function dashscopePollTaskUntilDone(opts: {
   apiKey: string;
   taskId: string;
+  baseUrl?: string | null;
   maxWaitMs?: number;
   pollIntervalMs?: number;
 }): Promise<
@@ -42,6 +44,7 @@ export async function dashscopePollTaskUntilDone(opts: {
     const polled = await dashscopeGetTask({
       apiKey: opts.apiKey,
       taskId: opts.taskId,
+      baseUrl: opts.baseUrl,
     });
     if (!polled.ok) return { ok: false, error: polled.error };
 
@@ -107,5 +110,29 @@ export async function dashscopeImage2ImageGenerate(opts: {
   return dashscopePollTaskUntilDone({
     apiKey: opts.apiKey,
     taskId: created.taskId,
+  });
+}
+
+export async function dashscopeBackgroundGenerationGenerate(opts: {
+  apiKey: string;
+  baseUrl?: string | null;
+  input: Record<string, unknown>;
+  parameters?: Record<string, unknown>;
+}): Promise<
+  | { ok: true; imageUrls: string[]; usage?: unknown }
+  | { ok: false; error: string }
+> {
+  const created = await dashscopeCreateBackgroundGenerationTask({
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
+    input: opts.input,
+    parameters: opts.parameters,
+  });
+  if (!created.ok) return created;
+  return dashscopePollTaskUntilDone({
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
+    taskId: created.taskId,
+    maxWaitMs: 180_000,
   });
 }

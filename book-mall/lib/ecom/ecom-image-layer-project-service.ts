@@ -185,6 +185,55 @@ export async function appendEcomImageLayerGeneration(
   return rowToDto(updated);
 }
 
+/** 把当前结果图写入「我的资产 · 图片分层」，并记一条生成记录 */
+export async function saveImageLayerResultToLibrary(
+  userId: string,
+  projectId: string,
+  opts: { ossUrl: string; title?: string; prompt?: string | null },
+): Promise<{ assetId: string; created: boolean }> {
+  const existing = await getOwnedRow(userId, projectId);
+  if (!existing) throw new Error("项目不存在");
+
+  const ossUrl = opts.ossUrl.trim();
+  if (!ossUrl) throw new Error("缺少结果图");
+  const title = opts.title?.trim() || "图片分层结果";
+
+  const dup = await prisma.ecomAsset.findFirst({
+    where: { userId, module: ECOM_IMAGE_LAYER_MODULE, ossUrl },
+    select: { id: true },
+  });
+  if (dup) {
+    return { assetId: dup.id, created: false };
+  }
+
+  const asset = await prisma.ecomAsset.create({
+    data: {
+      userId,
+      module: ECOM_IMAGE_LAYER_MODULE,
+      kind: "image",
+      title: title.slice(0, 120),
+      prompt: opts.prompt?.trim() || null,
+      ossUrl,
+      thumbnailUrl: ossUrl,
+      meta: {
+        sourceModule: ECOM_IMAGE_LAYER_MODULE,
+        sourceToolKey: ECOM_IMAGE_LAYER_TOOL_KEY,
+        projectId,
+        projectName: existing.title?.trim() || "图片分层",
+      },
+    },
+  });
+
+  await appendEcomImageLayerGeneration(userId, projectId, {
+    kind: "edit",
+    title,
+    prompt: opts.prompt ?? null,
+    ossUrl,
+  });
+
+  return { assetId: asset.id, created: true };
+}
+
 export function workspaceFromStack(
   stack: ImageLayerStack,
   extras?: Partial<ImageLayerWorkspace>,

@@ -70,6 +70,7 @@ export async function POST(req: Request) {
         projectId,
         workspaceFromStack(stack, {
           sourceImageUrl: stack.sourceImageUrl ?? sourceImageUrl,
+          originalImageUrl: sourceImageUrl,
           pendingBboxes: [],
           pendingBbox: null,
         }),

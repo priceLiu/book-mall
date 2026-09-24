@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Cpu, Layers } from "lucide-react";
 
+import { BackgroundReplacePanel } from "@/components/background-replace/background-replace-panel";
 import { ImageLayerAssistantFooter } from "@/components/image-layer/image-layer-assistant-footer";
 import {
   ImageLayerEditPanel,
@@ -11,6 +12,7 @@ import {
 import { ImageLayerSelectionTools } from "@/components/image-layer/image-layer-selection-tools";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
+import type { BackgroundReplaceFormState } from "@/lib/background-replace-types";
 import type { ImageProcessingParamField } from "@/lib/ecom-image-processing-api";
 import {
   isWan27RetouchModel,
@@ -166,6 +168,13 @@ type Props = {
   onPromptChange: (layerId: string, value: string) => void;
   onSubmitAllEdits: () => void;
   onRemoveEditEntry: (layerId: string) => void;
+  bgReplaceForm: BackgroundReplaceFormState;
+  bgReplaceBusy: boolean;
+  bgReplaceHasBase: boolean;
+  bgReplaceSubjectHint?: string;
+  onBgReplaceFormChange: (next: BackgroundReplaceFormState) => void;
+  onUploadBgReplaceImage: (file: File) => Promise<string>;
+  onBgReplaceSubmit: () => void;
 };
 
 export function ImageLayerAssistantPanel({
@@ -206,6 +215,13 @@ export function ImageLayerAssistantPanel({
   onPromptChange,
   onSubmitAllEdits,
   onRemoveEditEntry,
+  bgReplaceForm,
+  bgReplaceBusy,
+  bgReplaceHasBase,
+  bgReplaceSubjectHint,
+  onBgReplaceFormChange,
+  onUploadBgReplaceImage,
+  onBgReplaceSubmit,
 }: Props) {
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
 
@@ -220,6 +236,34 @@ export function ImageLayerAssistantPanel({
   const retouchUsesBbox =
     toolMode === "retouch" && isWan27RetouchModel(retouchModel);
   const effectiveSelectionSubTool = retouchUsesBbox ? "bbox" : selectionSubTool;
+
+  if (toolMode === "bg-replace") {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--ecom-assistant-bg)]">
+        <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-3">
+          {busy ? (
+            <StoryboardTaskStatus
+              active
+              surface="content"
+              sweep
+              title={busyTitle ?? "换背景中…"}
+              detail={busyDetail}
+              className="mx-0 mb-3"
+            />
+          ) : null}
+          <BackgroundReplacePanel
+            form={bgReplaceForm}
+            busy={busy || bgReplaceBusy}
+            hasBase={bgReplaceHasBase}
+            subjectHint={bgReplaceSubjectHint}
+            onChange={onBgReplaceFormChange}
+            onUploadRefImage={onUploadBgReplaceImage}
+            onSubmit={onBgReplaceSubmit}
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (toolMode === "layer-view" && hasStack) {
     return (
@@ -340,7 +384,7 @@ export function ImageLayerAssistantPanel({
 
           {toolMode === "layer-view" && !hasStack ? (
             <div className="rounded-lg border border-dashed border-[#e5e7eb] bg-[#fafafa] p-3 text-sm text-[#9ca3af]">
-              使用顶栏选择重绘、擦除或框选拆分工具。
+              使用顶栏选择换背景、擦除、重绘或图片分层。每个功能独立使用。
             </div>
           ) : null}
 

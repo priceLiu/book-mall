@@ -161,6 +161,7 @@ const IMAGE_MODULE_IDS = [
   "detail-page-suite-hit",
   "hand-craft",
   "model-shot",
+  "image-layer",
 ] as const;
 const VIDEO_MODULE_IDS = [
   "storyboard-micro-drama",
@@ -184,6 +185,7 @@ const MODULE_TITLES: Record<string, { title: string; kind: "image" | "video" | "
   "detail-page-suite-hit": { title: "爆款详情页套图", kind: "image" },
   "hand-craft": { title: "手伴创作", kind: "image" },
   "model-shot": { title: "服装模特图", kind: "image" },
+  "image-layer": { title: "图片分层", kind: "image" },
   "model-tryon": { title: "模特试衣", kind: "image" },
   "storyboard-micro-drama": { title: "电商口播故事版", kind: "video" },
   "seed-video": { title: "图片生种草视频", kind: "video" },

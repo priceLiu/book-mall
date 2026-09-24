@@ -5,6 +5,7 @@ import {
   Eraser,
   Eye,
   History,
+  Images,
   Layers,
   LayoutGrid,
   Paintbrush,
@@ -107,11 +108,11 @@ export function ImageLayerToolbar({
             {projectTitle?.trim() || "图片分层"}
           </h2>
           <p className="text-[11px] text-[#6e6e73]">
-            重绘 / 擦除 / 框选拆层 → 预览导出
+            换背景 / 擦除 / 重绘 / 拆层
           </p>
         </div>
         <EcomIconToolbar className={cn(anyBusy && "pointer-events-none opacity-70")}>
-          <EcomIconToolbarGroup label="项目">
+          <EcomIconToolbarGroup label="新建">
             {onNewProject ? (
               <EcomIconButton
                 label="新建项目"
@@ -120,27 +121,42 @@ export function ImageLayerToolbar({
                 onClick={() => void onNewProject()}
               />
             ) : null}
-            {onSave ? (
-              <EcomIconButton
-                label="保存图片"
-                icon={Save}
-                busy={saveBusy}
-                disabled={!canSave || anyBusy || saveBusy}
-                onClick={() => void onSave()}
-              />
-            ) : null}
+          </EcomIconToolbarGroup>
+
+          <ToolbarDivider />
+
+          <EcomIconToolbarGroup label="换背景">
             <EcomIconButton
-              label="删除全部"
-              icon={Trash2}
-              variant="destructive"
-              disabled={anyBusy || (!hasPreview && !hasStack)}
-              onClick={onReset}
+              label="换背景"
+              icon={Images}
+              variant={toolMode === "bg-replace" ? "accent" : "default"}
+              disabled={!canLocalEdit}
+              onClick={() => setMode("bg-replace")}
             />
           </EcomIconToolbarGroup>
 
           <ToolbarDivider />
 
-          <EcomIconToolbarGroup label="编辑">
+          <EcomIconToolbarGroup label="擦除重绘">
+            <EcomIconButton
+              label="擦除"
+              icon={Eraser}
+              variant={toolMode === "erase" ? "accent" : "default"}
+              disabled={!canLocalEdit}
+              onClick={() => setMode("erase")}
+            />
+            <EcomIconButton
+              label="局部重绘"
+              icon={Paintbrush}
+              variant={toolMode === "retouch" ? "accent" : "default"}
+              disabled={!canLocalEdit}
+              onClick={() => setMode("retouch")}
+            />
+          </EcomIconToolbarGroup>
+
+          <ToolbarDivider />
+
+          <EcomIconToolbarGroup label="图片分层">
             {hasStack ? (
               <EcomIconButton
                 label="图层编辑"
@@ -150,33 +166,6 @@ export function ImageLayerToolbar({
                 onClick={() => setMode("layer-view")}
               />
             ) : null}
-            <EcomIconButton
-              label="局部重绘"
-              icon={Paintbrush}
-              variant={toolMode === "retouch" ? "accent" : "default"}
-              disabled={!canLocalEdit}
-              onClick={() => setMode("retouch")}
-            />
-            <EcomIconButton
-              label="擦除"
-              icon={Eraser}
-              variant={toolMode === "erase" ? "accent" : "default"}
-              disabled={!canLocalEdit}
-              onClick={() => setMode("erase")}
-            />
-            {hasStack && onCancelLayerSession ? (
-              <EcomIconButton
-                label="取消分层"
-                icon={UndoLayerIcon}
-                disabled={anyBusy || decomposeBusy}
-                onClick={() => void onCancelLayerSession()}
-              />
-            ) : null}
-          </EcomIconToolbarGroup>
-
-          <ToolbarDivider />
-
-          <EcomIconToolbarGroup label="拆分">
             <EcomIconButton
               label={
                 pendingBboxCount > 0
@@ -193,7 +182,7 @@ export function ImageLayerToolbar({
               icon={Layers}
               variant="accent"
               busy={decomposeBusy}
-              disabled={decomposeBusy || !hasPreview || anyBusy || hasStack}
+              disabled={decomposeBusy || !hasPreview || anyBusy}
               onClick={() => void onDecompose()}
             />
             <EcomIconButton
@@ -208,11 +197,14 @@ export function ImageLayerToolbar({
               disabled={!canDecomposeBbox || !hasBboxes || toolMode !== "decompose-bbox"}
               onClick={onClearBboxes}
             />
-          </EcomIconToolbarGroup>
-
-          <ToolbarDivider />
-
-          <EcomIconToolbarGroup label="交付">
+            {hasStack && onCancelLayerSession ? (
+              <EcomIconButton
+                label="取消分层"
+                icon={UndoLayerIcon}
+                disabled={anyBusy || decomposeBusy}
+                onClick={() => void onCancelLayerSession()}
+              />
+            ) : null}
             <EcomIconButton
               label="预览成品"
               icon={Eye}
@@ -225,6 +217,27 @@ export function ImageLayerToolbar({
               icon={Download}
               disabled={!hasStack || anyBusy}
               onClick={onExport}
+            />
+          </EcomIconToolbarGroup>
+
+          <ToolbarDivider />
+
+          <EcomIconToolbarGroup label="项目">
+            {onSave ? (
+              <EcomIconButton
+                label="保存图片"
+                icon={Save}
+                busy={saveBusy}
+                disabled={!canSave || anyBusy || saveBusy}
+                onClick={() => void onSave()}
+              />
+            ) : null}
+            <EcomIconButton
+              label="删除全部"
+              icon={Trash2}
+              variant="destructive"
+              disabled={anyBusy || (!hasPreview && !hasStack)}
+              onClick={onReset}
             />
             {loadProjectList && onSelectProject ? (
               <EcomProjectListButton

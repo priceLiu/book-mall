@@ -72,6 +72,50 @@ export async function exportLayerStackPng(opts: {
   return blob;
 }
 
+/** 只合成物体层为透明底 PNG，供万相换背景 base_image_url */
+export async function exportObjectLayersRgbaPng(opts: {
+  layers: ImageLayerStackItem[];
+  width: number;
+  height: number;
+  displayScale?: number;
+}): Promise<Blob> {
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(opts.width));
+  canvas.height = Math.max(1, Math.round(opts.height));
+  const ctx = canvas.getContext("2d", { alpha: true });
+  if (!ctx) throw new Error("无法创建 Canvas");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const scale = opts.displayScale && opts.displayScale > 0 ? opts.displayScale : 1;
+  const ordered = [...opts.layers].sort((a, b) => a.zIndex - b.zIndex);
+
+  for (const layer of ordered) {
+    if (layer.isBackground) continue;
+    const img = await loadImage(layer.url);
+    const placement = resolveLayerDrawPlacement({
+      layer,
+      naturalWidth: img.naturalWidth,
+      naturalHeight: img.naturalHeight,
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height,
+      displayScale: scale,
+    });
+    ctx.drawImage(
+      img,
+      placement.x,
+      placement.y,
+      placement.width,
+      placement.height,
+    );
+  }
+
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/png"),
+  );
+  if (!blob) throw new Error("合成主体层失败");
+  return blob;
+}
+
 export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

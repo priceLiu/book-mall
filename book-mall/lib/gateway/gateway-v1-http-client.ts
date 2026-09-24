@@ -357,6 +357,23 @@ export async function gatewayV1ImageOutPainting(
   return parseGatewayImageUrlsResponse(r, "image-out-painting");
 }
 
+export async function gatewayV1BackgroundGeneration(
+  opts: GatewayV1RequestOpts & {
+    body: {
+      input: Record<string, unknown>;
+      parameters?: Record<string, unknown>;
+    };
+  },
+): Promise<{ imageUrls: string[]; logId: string }> {
+  const r = await gatewayV1Fetch(opts.apiKeyId, "bailian/background-generation", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts.body),
+    meta: opts.meta,
+  });
+  return parseGatewayImageUrlsResponse(r, "background-generation");
+}
+
 export async function gatewayV1Image2ImageAsync(
   opts: GatewayV1RequestOpts & {
     body: {

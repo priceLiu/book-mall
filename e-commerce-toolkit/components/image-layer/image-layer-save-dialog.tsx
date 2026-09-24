@@ -5,86 +5,47 @@ import { useState } from "react";
 
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomDialogCloseButton } from "@/components/ui/dialog";
+import { imageLayerComposeImageSrc } from "@/lib/image-layer-compose-image-src";
 import { downloadImageLayerUrl } from "@/lib/image-layer-download";
+import {
+  buildSaveItems,
+  type ImageLayerSaveItem,
+} from "@/lib/image-layer-save-items";
 import type { ImageLayerStack } from "@/lib/image-layer-types";
 
-type SaveItem = {
-  id: string;
-  label: string;
-  url: string;
-  filename: string;
-};
-
-function buildSaveItems(
-  sourceUrl: string | null,
-  stack: ImageLayerStack | null,
-): SaveItem[] {
-  const stamp = Date.now();
-  const items: SaveItem[] = [];
-
-  const flatUrl = sourceUrl?.trim() || stack?.sourceImageUrl?.trim() || null;
-  if (flatUrl && !stack) {
-    items.push({
-      id: "flat",
-      label: "当前图片（重绘/擦除后）",
-      url: flatUrl,
-      filename: `image-layer-flat-${stamp}.png`,
-    });
-  }
-
-  if (stack) {
-    const origin = stack.sourceImageUrl?.trim();
-    if (origin && origin !== stack.background.url) {
-      items.push({
-        id: "origin",
-        label: "拆分前原图",
-        url: origin,
-        filename: `image-layer-source-${stamp}.png`,
-      });
-    }
-    items.push({
-      id: "bg",
-      label: stack.background.name?.trim() || "底图层",
-      url: stack.background.url,
-      filename: `image-layer-background-${stamp}.png`,
-    });
-    stack.layers.forEach((layer, index) => {
-      items.push({
-        id: layer.id,
-        label: layer.name?.trim() || `物体层 ${index + 1}`,
-        url: layer.url,
-        filename: `image-layer-object-${index + 1}-${stamp}.png`,
-      });
-    });
-  }
-
-  return items;
-}
+export type { ImageLayerSaveItem };
 
 export function ImageLayerSaveDialog({
   open,
   sourceUrl,
+  originalImageUrl,
   stack,
   saveWorkspaceBusy,
+  saveLibraryBusy,
   onOpenChange,
   onSaveWorkspace,
+  onSaveToLibrary,
 }: {
   open: boolean;
   sourceUrl: string | null;
+  originalImageUrl?: string | null;
   stack: ImageLayerStack | null;
   saveWorkspaceBusy?: boolean;
+  saveLibraryBusy?: boolean;
   onOpenChange: (open: boolean) => void;
   onSaveWorkspace: () => Promise<void>;
+  onSaveToLibrary?: (item: ImageLayerSaveItem) => Promise<void>;
 }) {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (!open) return null;
 
-  const items = buildSaveItems(sourceUrl, stack);
-  const anyBusy = saveWorkspaceBusy || downloadingId !== null;
+  const items = buildSaveItems(sourceUrl, stack, originalImageUrl);
+  const resultItem = items.find((item) => item.id === "flat") ?? null;
+  const anyBusy = Boolean(saveWorkspaceBusy || saveLibraryBusy || downloadingId);
 
-  async function downloadOne(item: SaveItem) {
+  async function downloadOne(item: ImageLayerSaveItem) {
     setError(null);
     setDownloadingId(item.id);
     try {
@@ -130,11 +91,20 @@ export function ImageLayerSaveDialog({
             保存图片
           </h2>
           <p className="mt-1 text-[12px] leading-relaxed text-[#6e6e73]">
-            可分别下载分层后的各图层，或重绘/擦除后的单图；也可同步工作区到云端。
+            改层 / 重绘 / 擦除后的新图可下载，或保存到「我的资产 · 图片分层」。
           </p>
         </div>
 
         <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          {resultItem ? (
+            <div className="mb-4 overflow-hidden rounded-xl border border-[#e5e7eb] bg-[#f5f5f7]">
+              <img
+                src={imageLayerComposeImageSrc(resultItem.url)}
+                alt="当前结果图"
+                className="mx-auto max-h-52 object-contain"
+              />
+            </div>
+          ) : null}
           {items.length === 0 ? (
             <p className="text-sm text-[#9ca3af]">暂无可下载的图片，请先上传或完成处理。</p>
           ) : (
@@ -176,7 +146,7 @@ export function ImageLayerSaveDialog({
               全部下载
             </EcomButtonSecondary>
           ) : null}
-          <EcomButtonPrimary
+          <EcomButtonSecondary
             type="button"
             disabled={anyBusy}
             onClick={() => void onSaveWorkspace().then(() => onOpenChange(false))}
@@ -187,7 +157,27 @@ export function ImageLayerSaveDialog({
               <Save className="mr-1.5 h-4 w-4" />
             )}
             同步工作区
-          </EcomButtonPrimary>
+          </EcomButtonSecondary>
+          {resultItem && onSaveToLibrary ? (
+            <EcomButtonPrimary
+              type="button"
+              disabled={anyBusy}
+              onClick={() =>
+                void onSaveToLibrary(resultItem)
+                  .then(() => onOpenChange(false))
+                  .catch((e: unknown) => {
+                    setError(e instanceof Error ? e.message : "保存失败");
+                  })
+              }
+            >
+              {saveLibraryBusy ? (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-1.5 h-4 w-4" />
+              )}
+              保存到我的资产
+            </EcomButtonPrimary>
+          ) : null}
         </div>
       </div>
     </div>

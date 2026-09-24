@@ -33,6 +33,28 @@ describe("formatEcomImageProcessingUserError", () => {
     expect(out.message).toContain("选区或底图数据不完整");
   });
 
+  it("maps Wanx long-edge rejection away from raw English", () => {
+    const out = formatEcomImageProcessingUserError(
+      new Error(
+        "Baseimage resolution (1808,2384), the longer image size should less 2048 pixels",
+      ),
+    );
+    expect(out.status).toBe(400);
+    expect(out.message).toContain("2048");
+    expect(out.message).not.toContain("Baseimage");
+  });
+
+  it("maps Wanx RGB-mode rejection to a Chinese RGBA hint", () => {
+    const out = formatEcomImageProcessingUserError(
+      new Error(
+        "Baseimage requireRGBA format, but is RGB, modeconcept see https://pillow.readthedocs.io",
+      ),
+    );
+    expect(out.status).toBe(400);
+    expect(out.message).toContain("透明底 PNG");
+    expect(out.message).not.toContain("pillow");
+  });
+
   it("passes through gateway key errors with 402", () => {
     const out = formatEcomImageProcessingUserError(
       new Error("Gateway Key 未绑定火山方舟凭证"),

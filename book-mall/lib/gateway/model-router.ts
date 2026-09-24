@@ -284,7 +284,8 @@ export function routeGatewayModel(model: string): RoutedModel {
     m === "image-out-painting" ||
     m === "image-erase-completion" ||
     m === "wanx-x-painting" ||
-    m === "wan2.5-i2i-preview"
+    m === "wan2.5-i2i-preview" ||
+    m === "wanx-background-generation-v2"
   ) {
     return { providerKind: "BAILIAN", requestKind: "IMAGE" };
   }

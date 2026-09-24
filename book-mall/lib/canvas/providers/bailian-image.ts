@@ -94,6 +94,38 @@ export const BAILIAN_IMAGE_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     defaultParams: { resolution: "2K" },
   },
   {
+    modelKey: "wanx-background-generation-v2",
+    displayName: "万相 · 换背景",
+    role: "IMAGE",
+    description:
+      "万相背景生成 · 透明底主体换场景；文本 / 参考图 / 边缘引导。model_version 默认 v3。",
+    paramsSchema: [
+      {
+        key: "model_version",
+        label: "版本",
+        type: "select",
+        options: [
+          { value: "v3", label: "v3 效果更好" },
+          { value: "v2", label: "v2 更快" },
+        ],
+        defaultValue: "v3",
+      },
+      {
+        key: "n",
+        label: "张数",
+        type: "select",
+        options: [
+          { value: "1", label: "1" },
+          { value: "2", label: "2" },
+          { value: "3", label: "3" },
+          { value: "4", label: "4" },
+        ],
+        defaultValue: "1",
+      },
+    ],
+    defaultParams: { model_version: "v3", n: 1 },
+  },
+  {
     modelKey: "kling-3.0-image",
     displayName: "可灵 3.0 · 图生图",
     role: "IMAGE",

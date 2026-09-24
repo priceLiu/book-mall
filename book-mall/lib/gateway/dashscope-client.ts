@@ -61,6 +61,9 @@ export const S2V_DETECT_URL =
 export const S2V_DETECT_PATH = "/api/v1/services/aigc/image2video/face-detect/";
 const IMAGE_PROCESS_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/vision/image-process/process";
+export const BACKGROUND_GENERATION_PATH =
+  "/api/v1/services/aigc/background-generation/generation";
+export const WANX_BACKGROUND_GENERATION_MODEL = "wanx-background-generation-v2";
 const TASK_URL_BASE = "https://dashscope.aliyuncs.com/api/v1/tasks";
 
 const DASHSCOPE_DEFAULT_ROOT = "https://dashscope.aliyuncs.com";
@@ -1025,6 +1028,10 @@ export function dashscopeExtractAllTaskImageUrls(
   const results = output.results;
   if (Array.isArray(results)) {
     for (const item of results) {
+      if (typeof item === "string" && item.trim()) {
+        urls.push(upgradeAliyunHttpToHttps(item.trim()));
+        continue;
+      }
       if (!item || typeof item !== "object") continue;
       const r = item as Record<string, unknown>;
       const u =
@@ -1032,7 +1039,9 @@ export function dashscopeExtractAllTaskImageUrls(
           ? r.url.trim()
           : typeof r.image_url === "string"
             ? r.image_url.trim()
-            : "";
+            : typeof r.png_url === "string"
+              ? r.png_url.trim()
+              : "";
       if (u) urls.push(upgradeAliyunHttpToHttps(u));
     }
   }
@@ -1102,6 +1111,24 @@ export async function dashscopeCreateImage2ImageTask(opts: {
     url: IMAGE2IMAGE_SYNTHESIS_URL,
     body: {
       model,
+      input: opts.input,
+      parameters: opts.parameters ?? {},
+    },
+  });
+}
+
+export async function dashscopeCreateBackgroundGenerationTask(opts: {
+  apiKey: string;
+  baseUrl?: string | null;
+  input: Record<string, unknown>;
+  parameters?: Record<string, unknown>;
+}): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
+  const root = resolveDashscopeApiRoot(opts.baseUrl);
+  return dashscopeCreateAsyncTask({
+    apiKey: opts.apiKey,
+    url: `${root}${BACKGROUND_GENERATION_PATH}`,
+    body: {
+      model: WANX_BACKGROUND_GENERATION_MODEL,
       input: opts.input,
       parameters: opts.parameters ?? {},
     },

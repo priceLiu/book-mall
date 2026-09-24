@@ -84,6 +84,24 @@ export function formatEcomImageProcessingUserError(error: unknown): {
     };
   }
 
+  if (
+    /longer image size should less|Baseimage resolution|base image resolution/i.test(
+      raw,
+    )
+  ) {
+    return {
+      message: "主体图最长边须小于 2048 像素，请换一张图后重试。",
+      status: 400,
+    };
+  }
+
+  if (/RGBA format|require RGBA|mode is RGB|modeconcept/i.test(raw)) {
+    return {
+      message: "主体图须为透明底 PNG（RGBA）。请上传已抠好的主体图后重试。",
+      status: 400,
+    };
+  }
+
   if (/image resolution is invalid|largest length of image|smallest length of image/i.test(raw)) {
     return {
       message:
