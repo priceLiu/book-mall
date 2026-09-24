@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { persistEcomGenerationRecord } from "@/lib/ecom/ecom-generation-record";
 import { runEcomBackgroundReplace } from "@/lib/ecom/ecom-background-replace-service";
 import type { BackgroundReplaceEdgeItem } from "@/lib/ecom/ecom-background-replace";
+import { resolveBackgroundReplaceModel } from "@/lib/ecom/ecom-background-replace";
 import { formatEcomImageProcessingUserError } from "@/lib/ecom/ecom-image-processing-error";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
@@ -25,6 +26,13 @@ function parseEdges(raw: unknown): BackgroundReplaceEdgeItem[] | undefined {
     out.push({ url, prompt });
   }
   return out.length ? out : undefined;
+}
+
+function parseBbox(raw: unknown): [number, number, number, number] | undefined {
+  if (!Array.isArray(raw) || raw.length < 4) return undefined;
+  const nums = raw.slice(0, 4).map((n) => Number(n));
+  if (nums.some((n) => !Number.isFinite(n))) return undefined;
+  return [nums[0]!, nums[1]!, nums[2]!, nums[3]!];
 }
 
 export async function POST(req: Request) {
@@ -61,6 +69,10 @@ export async function POST(req: Request) {
       clientPage,
       input: {
         baseImageUrl,
+        modelKey:
+          typeof body.modelKey === "string"
+            ? resolveBackgroundReplaceModel(body.modelKey)
+            : undefined,
         refPrompt: typeof body.refPrompt === "string" ? body.refPrompt : undefined,
         refImageUrl: typeof body.refImageUrl === "string" ? body.refImageUrl : undefined,
         negRefPrompt: typeof body.negRefPrompt === "string" ? body.negRefPrompt : undefined,
@@ -72,6 +84,8 @@ export async function POST(req: Request) {
           typeof body.noiseLevel === "number" ? body.noiseLevel : undefined,
         refPromptWeight:
           typeof body.refPromptWeight === "number" ? body.refPromptWeight : undefined,
+        bbox: parseBbox(body.bbox),
+        subjectAlreadyCutout: body.subjectAlreadyCutout === true,
       },
     });
 
@@ -90,7 +104,7 @@ export async function POST(req: Request) {
             sourceModule,
             sourceToolKey: "ecom-toolkit__background-replace",
             projectId,
-            modelKey: "wanx-background-generation-v2",
+            modelKey: result.modelKey,
           },
         }).catch(() => undefined),
       ),
@@ -99,6 +113,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       imageUrls: result.imageUrls,
       logId: result.logId,
+      modelKey: result.modelKey,
       creditsCharged: result.creditsCharged ?? undefined,
     });
   } catch (e) {

@@ -41,7 +41,7 @@ export function validateDecomposeBboxes(
   }
 }
 
-function bboxTag(b: [number, number, number, number]): string {
+export function bboxTag(b: [number, number, number, number]): string {
   const t = normalizeBboxTuple(b);
   return `<bbox>${t[0]} ${t[1]} ${t[2]} ${t[3]}</bbox>`;
 }

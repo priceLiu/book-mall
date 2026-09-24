@@ -2,8 +2,12 @@ import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
   buildBackgroundReplaceRequest,
+  buildSeedreamBackgroundReplacePrompt,
   hasMeaningfulTransparency,
+  isWanxBackgroundReplaceModel,
   knockOutFakeBackdrop,
+  resolveBackgroundReplaceModel,
+  SEEDREAM_BACKGROUND_REPLACE_MODEL,
   toRgbaPngBuffer,
   WANX_BACKGROUND_GENERATION_MODEL,
   type BackgroundReplaceInput,
@@ -13,12 +17,20 @@ import {
   GatewayRequiredError,
   resolveGatewayAuthForBookUser,
 } from "@/lib/gateway/book-gateway-link";
+import { ecomGwVolcengineImageEdit } from "@/lib/gateway/ecom-tool-gateway-client";
 import { gatewayV1BackgroundGeneration } from "@/lib/gateway/gateway-v1-http-client";
 import { gatewayV1ClientMetaForBookUser } from "@/lib/gateway/gateway-log-meta-for-user";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 import { pickCredentialForKind } from "@/lib/gateway/proxy-common";
 import { ensurePublicImageUrl } from "@/lib/image-local-edit/image-url";
 import { prisma } from "@/lib/prisma";
+
+export type BackgroundReplaceResult = {
+  imageUrls: string[];
+  logId: string;
+  creditsCharged?: number | null;
+  modelKey: string;
+};
 
 async function rehostResultUrl(userId: string, url: string): Promise<string> {
   const res = await fetch(url);
@@ -34,6 +46,24 @@ async function rehostResultUrl(userId: string, url: string): Promise<string> {
     buf,
     contentType: ext === "jpg" ? "image/jpeg" : "image/png",
   });
+}
+
+async function persistVendorImage(
+  userId: string,
+  image: { url?: string; b64?: string },
+): Promise<string> {
+  if (image.b64?.trim()) {
+    const buf = Buffer.from(image.b64.trim(), "base64");
+    return uploadCanvasUserBuffer({
+      userId,
+      ext: "png",
+      buf,
+      contentType: "image/png",
+    });
+  }
+  const url = image.url?.trim();
+  if (!url) throw new Error("厂商未返回图像 URL");
+  return rehostResultUrl(userId, url);
 }
 
 async function publicize(userId: string, url?: string): Promise<string | undefined> {
@@ -53,11 +83,24 @@ async function downloadImageBuffer(url: string): Promise<Buffer> {
   return buf;
 }
 
+async function creditsForLog(logId: string): Promise<number | null> {
+  if (!logId) return null;
+  const log = await prisma.gatewayRequestLog.findUnique({
+    where: { id: logId },
+    select: { creditsCharged: true },
+  });
+  return log?.creditsCharged == null ? null : Number(log.creditsCharged);
+}
+
 /**
- * 万相只在透明区域画新场景。这里在换背景内部准备主体，不走拆层。
- * 生图抠图常把透明画成白底或棋盘格；必须打成真 alpha 再交给万相。
+ * 万相第一步：抠出真透明主体。不走拆层。
+ * 生图抠图常把透明画成白底或棋盘格，这里再打成真 alpha。
  */
-async function publicizeBaseAsRgbaPng(userId: string, url: string): Promise<string> {
+export async function prepareWanxSubjectCutout(
+  userId: string,
+  url: string,
+): Promise<string> {
+  await assertEcomToolkitGatewayAccess(userId);
   const reachable = await ensurePublicImageUrl(userId, url);
   let buf = await toRgbaPngBuffer(await downloadImageBuffer(reachable));
   if (!(await hasMeaningfulTransparency(buf))) {
@@ -84,12 +127,12 @@ async function publicizeBaseAsRgbaPng(userId: string, url: string): Promise<stri
   });
 }
 
-export async function runEcomBackgroundReplace(opts: {
+/** 万相第二步：透明底主体换场景。入参必须已是 RGBA。 */
+export async function runWanxBackgroundGeneration(opts: {
   userId: string;
   input: BackgroundReplaceInput;
   clientPage?: string;
-}): Promise<{ imageUrls: string[]; logId: string; creditsCharged?: number | null }> {
-  await assertEcomToolkitGatewayAccess(opts.userId);
+}): Promise<BackgroundReplaceResult> {
   const auth = await resolveGatewayAuthForBookUser(opts.userId);
   if (!auth) {
     throw new GatewayRequiredError("请先在 Book 个人中心关联 Gateway API Key");
@@ -99,10 +142,7 @@ export async function runEcomBackgroundReplace(opts: {
     throw new GatewayRequiredError("Gateway Key 未绑定百炼 / DashScope 凭证");
   }
 
-  const baseImageUrl = await publicizeBaseAsRgbaPng(
-    opts.userId,
-    opts.input.baseImageUrl,
-  );
+  const baseImageUrl = opts.input.baseImageUrl.trim();
   if (!baseImageUrl) throw new Error("主体图不可用");
   const refImageUrl = await publicize(opts.userId, opts.input.refImageUrl);
   const foregroundEdges = await Promise.all(
@@ -137,13 +177,74 @@ export async function runEcomBackgroundReplace(opts: {
   const imageUrls = await Promise.all(
     gatewayResult.imageUrls.map((u) => rehostResultUrl(opts.userId, u)),
   );
-  const log = await prisma.gatewayRequestLog.findUnique({
-    where: { id: gatewayResult.logId },
-    select: { creditsCharged: true },
-  });
   return {
     imageUrls,
     logId: gatewayResult.logId,
-    creditsCharged: log?.creditsCharged == null ? null : Number(log.creditsCharged),
+    creditsCharged: await creditsForLog(gatewayResult.logId),
+    modelKey: WANX_BACKGROUND_GENERATION_MODEL,
   };
+}
+
+async function runSeedreamBackgroundReplace(opts: {
+  userId: string;
+  input: BackgroundReplaceInput;
+  clientPage?: string;
+}): Promise<BackgroundReplaceResult> {
+  const image = await ensurePublicImageUrl(opts.userId, opts.input.baseImageUrl);
+  const prompt = buildSeedreamBackgroundReplacePrompt({
+    scene: opts.input.refPrompt ?? "",
+    bbox: opts.input.bbox,
+  });
+  const { images, logId } = await ecomGwVolcengineImageEdit(opts.userId, {
+    model: SEEDREAM_BACKGROUND_REPLACE_MODEL,
+    prompt,
+    image,
+    parameters: {
+      size: "2K",
+      output_format: "png",
+      watermark: false,
+    },
+    clientPage: opts.clientPage ?? "ecom/background-replace",
+  });
+  const first = images[0];
+  if (!first) throw new Error("Seedream 未返回换背景结果");
+  const ossUrl = await persistVendorImage(opts.userId, first);
+  return {
+    imageUrls: [ossUrl],
+    logId,
+    creditsCharged: await creditsForLog(logId),
+    modelKey: SEEDREAM_BACKGROUND_REPLACE_MODEL,
+  };
+}
+
+export async function runEcomBackgroundReplace(opts: {
+  userId: string;
+  input: BackgroundReplaceInput;
+  clientPage?: string;
+}): Promise<BackgroundReplaceResult> {
+  await assertEcomToolkitGatewayAccess(opts.userId);
+  const modelKey = resolveBackgroundReplaceModel(opts.input.modelKey);
+
+  if (!isWanxBackgroundReplaceModel(modelKey)) {
+    return runSeedreamBackgroundReplace({
+      userId: opts.userId,
+      input: opts.input,
+      clientPage: opts.clientPage,
+    });
+  }
+
+  const cutoutUrl = opts.input.subjectAlreadyCutout
+    ? opts.input.baseImageUrl.trim()
+    : await prepareWanxSubjectCutout(opts.userId, opts.input.baseImageUrl);
+  if (!cutoutUrl) throw new Error("主体图不可用");
+
+  return runWanxBackgroundGeneration({
+    userId: opts.userId,
+    clientPage: opts.clientPage,
+    input: {
+      ...opts.input,
+      baseImageUrl: cutoutUrl,
+      subjectAlreadyCutout: true,
+    },
+  });
 }

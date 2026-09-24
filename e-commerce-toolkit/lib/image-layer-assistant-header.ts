@@ -8,7 +8,8 @@ export function resolveImageLayerAssistantHeader(
     case "bg-replace":
       return {
         title: "换背景",
-        description: "只改右边当前图；成功后左边是换之前，右边是新场景",
+        description:
+          "默认火山 Seedream 5.0 Pro：可框选或只写场景。选万相则先抠图再换景",
       };
     case "retouch":
       return {

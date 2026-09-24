@@ -6,7 +6,8 @@ import {
 } from "@/lib/background-replace-types";
 
 describe("canSubmitBackgroundReplace", () => {
-  it("needs a subject and either prompt or guide image", () => {
+  it("defaults to Seedream and requires a scene prompt", () => {
+    expect(DEFAULT_BACKGROUND_REPLACE_FORM.modelKey).toBe("doubao-seedream-5-0-pro");
     expect(canSubmitBackgroundReplace(DEFAULT_BACKGROUND_REPLACE_FORM, true)).toBe(
       false,
     );
@@ -22,10 +23,14 @@ describe("canSubmitBackgroundReplace", () => {
         true,
       ),
     ).toBe(true);
+  });
+
+  it("lets Wanx submit with only a guide image", () => {
     expect(
       canSubmitBackgroundReplace(
         {
           ...DEFAULT_BACKGROUND_REPLACE_FORM,
+          modelKey: "wanx-background-generation-v2",
           refImageUrl: "https://example.com/style.jpg",
         },
         true,

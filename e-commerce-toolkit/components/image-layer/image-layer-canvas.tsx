@@ -254,10 +254,11 @@ export const ImageLayerCanvas = forwardRef<ImageLayerCanvasHandle, Props>(
     const useMaskCanvas =
       toolMode === "decompose-bbox" ||
       toolMode === "retouch" ||
-      toolMode === "erase";
+      toolMode === "erase" ||
+      toolMode === "bg-replace";
 
     const maskMode =
-      toolMode === "decompose-bbox"
+      toolMode === "decompose-bbox" || toolMode === "bg-replace"
         ? "bbox"
         : toolMode === "erase"
           ? selectionSubTool === "bbox"

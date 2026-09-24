@@ -13,6 +13,7 @@ import { ImageLayerSelectionTools } from "@/components/image-layer/image-layer-s
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import type { BackgroundReplaceFormState } from "@/lib/background-replace-types";
+import { isWanxBackgroundReplaceModel } from "@/lib/background-replace-types";
 import type { ImageProcessingParamField } from "@/lib/ecom-image-processing-api";
 import {
   isWan27RetouchModel,
@@ -172,6 +173,10 @@ type Props = {
   bgReplaceBusy: boolean;
   bgReplaceHasBase: boolean;
   bgReplaceSubjectHint?: string;
+  bgReplaceModels: StoryboardGatewayModel[];
+  bgReplaceModelsLoading: boolean;
+  bgReplaceModelsError?: string | null;
+  onReloadBgReplaceModels: () => void;
   onBgReplaceFormChange: (next: BackgroundReplaceFormState) => void;
   onUploadBgReplaceImage: (file: File) => Promise<string>;
   onBgReplaceSubmit: () => void;
@@ -219,11 +224,16 @@ export function ImageLayerAssistantPanel({
   bgReplaceBusy,
   bgReplaceHasBase,
   bgReplaceSubjectHint,
+  bgReplaceModels,
+  bgReplaceModelsLoading,
+  bgReplaceModelsError,
+  onReloadBgReplaceModels,
   onBgReplaceFormChange,
   onUploadBgReplaceImage,
   onBgReplaceSubmit,
 }: Props) {
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const [bgReplacePickerOpen, setBgReplacePickerOpen] = useState(false);
 
   const currentRetouchModel = useMemo(
     () => retouchModels.find((m) => m.modelKey === retouchModel),
@@ -238,6 +248,9 @@ export function ImageLayerAssistantPanel({
   const effectiveSelectionSubTool = retouchUsesBbox ? "bbox" : selectionSubTool;
 
   if (toolMode === "bg-replace") {
+    const currentBgModel = bgReplaceModels.find(
+      (m) => m.modelKey === bgReplaceForm.modelKey,
+    );
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--ecom-assistant-bg)]">
         <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-3">
@@ -255,12 +268,39 @@ export function ImageLayerAssistantPanel({
             form={bgReplaceForm}
             busy={busy || bgReplaceBusy}
             hasBase={bgReplaceHasBase}
-            subjectHint={bgReplaceSubjectHint}
+            subjectHint={
+              bgReplaceSubjectHint ??
+              (isWanxBackgroundReplaceModel(bgReplaceForm.modelKey)
+                ? "万相会先抠出人物，再在透明区画新场景。"
+                : "可先框选背景再写场景（更稳），也可以只写场景描述。")
+            }
+            modelDisplayName={currentBgModel?.displayName}
+            onPickModel={() => setBgReplacePickerOpen(true)}
             onChange={onBgReplaceFormChange}
             onUploadRefImage={onUploadBgReplaceImage}
             onSubmit={onBgReplaceSubmit}
           />
         </div>
+        <StoryboardModelPickerDialog
+          open={bgReplacePickerOpen}
+          onOpenChange={setBgReplacePickerOpen}
+          mode="image"
+          selectionOnly
+          dialogTitle="选择换背景模型"
+          models={bgReplaceModels}
+          modelsLoading={bgReplaceModelsLoading}
+          modelsEmptyHint={bgReplaceModelsError ?? undefined}
+          onRetryLoadModels={onReloadBgReplaceModels}
+          value={bgReplaceForm.modelKey}
+          onChange={(modelKey) =>
+            onBgReplaceFormChange({ ...bgReplaceForm, modelKey })
+          }
+          hideTypeFilter
+          onConfirm={(modelKey) => {
+            onBgReplaceFormChange({ ...bgReplaceForm, modelKey });
+            setBgReplacePickerOpen(false);
+          }}
+        />
       </div>
     );
   }

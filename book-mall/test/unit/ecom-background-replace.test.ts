@@ -4,12 +4,53 @@ import { describe, expect, it } from "vitest";
 import {
   BACKGROUND_REPLACE_EDGE_MAX,
   buildBackgroundReplaceRequest,
+  buildSeedreamBackgroundReplacePrompt,
   detectFakeBackdropKind,
   hasMeaningfulTransparency,
   knockOutFakeBackdrop,
   knockOutNearWhiteBackdrop,
+  resolveBackgroundReplaceModel,
   toRgbaPngBuffer,
 } from "@/lib/ecom/ecom-background-replace";
+
+describe("resolveBackgroundReplaceModel", () => {
+  it("defaults to Seedream 5.0 Pro", () => {
+    expect(resolveBackgroundReplaceModel()).toBe("doubao-seedream-5-0-pro");
+    expect(resolveBackgroundReplaceModel("doubao-seedream-5-0-pro-260628")).toBe(
+      "doubao-seedream-5-0-pro",
+    );
+  });
+
+  it("accepts Wanx background generation", () => {
+    expect(resolveBackgroundReplaceModel("wanx-background-generation-v2")).toBe(
+      "wanx-background-generation-v2",
+    );
+  });
+
+  it("rejects other models", () => {
+    expect(() => resolveBackgroundReplaceModel("qwen-image-edit")).toThrow(/仅支持/);
+  });
+});
+
+describe("buildSeedreamBackgroundReplacePrompt", () => {
+  it("uses a keep-subject prompt when there is no bbox", () => {
+    expect(buildSeedreamBackgroundReplacePrompt({ scene: "大理洱海边" })).toContain(
+      "背景换成大理洱海边",
+    );
+    expect(buildSeedreamBackgroundReplacePrompt({ scene: "大理洱海边" })).not.toContain(
+      "<bbox>",
+    );
+  });
+
+  it("embeds an official bbox tag when a region is selected", () => {
+    const prompt = buildSeedreamBackgroundReplacePrompt({
+      scene: "大理石海边",
+      bbox: [20, 10, 980, 900],
+    });
+    expect(prompt).toContain("<bbox>20 10 980 900</bbox>");
+    expect(prompt).toContain("区域替换成大理石海边");
+  });
+});
 
 describe("buildBackgroundReplaceRequest", () => {
   it("requires a base image and prompt or ref image", () => {

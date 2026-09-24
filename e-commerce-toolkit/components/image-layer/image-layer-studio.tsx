@@ -38,9 +38,14 @@ import {
   saveImageLayerWorkspace,
   uploadImageLayerSource,
 } from "@/lib/ecom-image-layer-api";
-import { replaceEcomBackground } from "@/lib/ecom-background-replace-api";
+import {
+  cutoutEcomBackgroundSubject,
+  fetchBackgroundReplaceModels,
+  replaceEcomBackground,
+} from "@/lib/ecom-background-replace-api";
 import {
   DEFAULT_BACKGROUND_REPLACE_FORM,
+  isWanxBackgroundReplaceModel,
   type BackgroundReplaceFormState,
 } from "@/lib/background-replace-types";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
@@ -160,6 +165,11 @@ function ImageLayerStudioInner() {
   );
   const [bgReplaceCandidates, setBgReplaceCandidates] = useState<string[]>([]);
   const [bgReplacePickOpen, setBgReplacePickOpen] = useState(false);
+  const [bgReplaceModels, setBgReplaceModels] = useState<StoryboardGatewayModel[]>([]);
+  const [bgReplaceModelsLoading, setBgReplaceModelsLoading] = useState(true);
+  const [bgReplaceModelsError, setBgReplaceModelsError] = useState<string | null>(
+    null,
+  );
   const [pendingBboxes, setPendingBboxes] = useState<
     Array<[number, number, number, number]>
   >([]);
@@ -285,12 +295,19 @@ function ImageLayerStudioInner() {
   }, [alert, applyProject, needLogin, sessionChecked]);
 
   useEffect(() => {
-    if (!uploadBusy && !decomposeBusy && !editBusy && !retouchBusy && !eraseBusy) {
+    if (
+      !uploadBusy &&
+      !decomposeBusy &&
+      !editBusy &&
+      !retouchBusy &&
+      !eraseBusy &&
+      !bgReplaceBusy
+    ) {
       return;
     }
     const id = window.setInterval(() => setProgressNow(Date.now()), 500);
     return () => window.clearInterval(id);
-  }, [decomposeBusy, editBusy, eraseBusy, retouchBusy, uploadBusy]);
+  }, [bgReplaceBusy, decomposeBusy, editBusy, eraseBusy, retouchBusy, uploadBusy]);
 
   const loadRetouchModels = useCallback(async () => {
     setRetouchModelsLoading(true);
@@ -329,10 +346,38 @@ function ImageLayerStudioInner() {
     }
   }, []);
 
+  const loadBgReplaceModels = useCallback(async () => {
+    setBgReplaceModelsLoading(true);
+    setBgReplaceModelsError(null);
+    try {
+      const data = await fetchBackgroundReplaceModels();
+      setBgReplaceModels(data.imageModels);
+      const preferred = DEFAULT_BACKGROUND_REPLACE_FORM.modelKey;
+      if (data.imageModels.some((m) => m.modelKey === preferred)) {
+        setBgReplaceForm((prev) => ({ ...prev, modelKey: preferred }));
+      } else if (
+        data.defaultModel &&
+        data.imageModels.some((m) => m.modelKey === data.defaultModel)
+      ) {
+        setBgReplaceForm((prev) => ({ ...prev, modelKey: data.defaultModel }));
+      } else if (data.imageModels[0]?.modelKey) {
+        setBgReplaceForm((prev) => ({
+          ...prev,
+          modelKey: data.imageModels[0]!.modelKey,
+        }));
+      }
+    } catch (e) {
+      setBgReplaceModelsError(e instanceof Error ? e.message : "模型加载失败");
+    } finally {
+      setBgReplaceModelsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!sessionChecked || needLogin) return;
     void loadRetouchModels();
-  }, [loadRetouchModels, needLogin, sessionChecked]);
+    void loadBgReplaceModels();
+  }, [loadBgReplaceModels, loadRetouchModels, needLogin, sessionChecked]);
 
   const buildSnapshot = useCallback(
     (): ImageLayerWorkspace =>
@@ -979,22 +1024,42 @@ function ImageLayerStudioInner() {
   const runBackgroundReplace = useCallback(async () => {
     if (!(await ensureSessionForAi())) return;
     setBgReplaceBusy(true);
-    setBusyLabel("换背景中…");
     setNeedLogin(false);
     const taskId = BG_REPLACE_TASK_ID;
+    const wanx = isWanxBackgroundReplaceModel(bgReplaceForm.modelKey);
     try {
       const baseImageUrl = await resolveBgReplaceBaseUrl();
+      const bbox = canvasRef.current?.getBbox() ?? undefined;
       backgroundGen.registerTask({
         id: taskId,
         label: "换背景",
-        hint: "万相背景生成 · 可能需 1～2 分钟",
+        hint: wanx
+          ? "万相：先抠图，再换场景"
+          : bbox
+            ? "Seedream 5.0 Pro · 框选换景"
+            : "Seedream 5.0 Pro · 提示词换景",
         startedAt: new Date().toISOString(),
-        expectedDurationMs: 120_000,
+        expectedDurationMs: wanx ? 150_000 : 90_000,
         poll: async () => ({ status: "running" as const }),
       });
+
+      let resultBaseUrl = baseImageUrl;
+      if (wanx) {
+        setBusyLabel("抠图中…");
+        const cut = await cutoutEcomBackgroundSubject({
+          sourceImageUrl: baseImageUrl,
+        });
+        resultBaseUrl = cut.cutoutUrl;
+        setBusyLabel("万相换背景中…");
+      } else {
+        setBusyLabel(bbox ? "框选换背景中…" : "换背景中…");
+      }
+
       const result = await replaceEcomBackground({
-        baseImageUrl,
+        baseImageUrl: resultBaseUrl,
         form: bgReplaceForm,
+        bbox: wanx ? undefined : bbox,
+        subjectAlreadyCutout: wanx,
         sourceModule: "image-layer",
         projectId: project?.id,
         clientPage: "ecom/image-layer",
@@ -1647,7 +1712,9 @@ function ImageLayerStudioInner() {
                     : eraseBusy
                       ? "图像擦除补全"
                       : bgReplaceBusy
-                        ? "万相背景生成 · 可能需 1～2 分钟"
+                        ? isWanxBackgroundReplaceModel(bgReplaceForm.modelKey)
+                          ? "万相：先抠图，再换场景"
+                          : "Seedream 5.0 Pro · 换背景"
                         : uploadBusy
                           ? "正在上传原图至 OSS"
                           : undefined
@@ -1688,7 +1755,15 @@ function ImageLayerStudioInner() {
             bgReplaceForm={bgReplaceForm}
             bgReplaceBusy={bgReplaceBusy}
             bgReplaceHasBase={Boolean(sourceUrl || stack)}
-            bgReplaceSubjectHint="只换右边当前图，不改左边对照。成功后左边变成换之前的图。"
+            bgReplaceSubjectHint={
+              isWanxBackgroundReplaceModel(bgReplaceForm.modelKey)
+                ? "只换右边当前图。万相会先抠图，再在透明区画新场景。"
+                : "只换右边当前图。可先框选背景再写场景（更稳），也可以只写场景描述。"
+            }
+            bgReplaceModels={bgReplaceModels}
+            bgReplaceModelsLoading={bgReplaceModelsLoading}
+            bgReplaceModelsError={bgReplaceModelsError}
+            onReloadBgReplaceModels={() => void loadBgReplaceModels()}
             onBgReplaceFormChange={setBgReplaceForm}
             onUploadBgReplaceImage={uploadBgReplaceImage}
             onBgReplaceSubmit={() => void runBackgroundReplace()}
@@ -1723,11 +1798,12 @@ function ImageLayerStudioInner() {
                     layers={stack?.layers ?? []}
                     selectedLayerId={selectedLayerId}
                     toolMode={
-                      stack &&
-                      (canvasToolMode === "decompose-bbox" ||
-                        canvasToolMode === "bg-replace")
+                      stack && canvasToolMode === "decompose-bbox"
                         ? "layer-view"
-                        : canvasToolMode
+                        : canvasToolMode === "bg-replace" &&
+                            isWanxBackgroundReplaceModel(bgReplaceForm.modelKey)
+                          ? "layer-view"
+                          : canvasToolMode
                     }
                     selectionSubTool={selectionSubTool}
                     retouchUsesBbox={retouchUsesBbox}

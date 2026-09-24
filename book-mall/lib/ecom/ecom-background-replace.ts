@@ -1,7 +1,52 @@
 import sharp from "sharp";
 
-/** 百炼万相 · 图像背景生成（换场景）。模特换装 / 图片分层共用。 */
+import { bboxTag } from "@/lib/ecom/ecom-image-layer-prompt";
+
+/** 百炼万相 · 图像背景生成（换场景）。须先抠出真透明主体。 */
 export const WANX_BACKGROUND_GENERATION_MODEL = "wanx-background-generation-v2";
+/** 火山 Seedream 5.0 Pro · 原图整图换景（可框选或纯提示词）。 */
+export const SEEDREAM_BACKGROUND_REPLACE_MODEL = "doubao-seedream-5-0-pro";
+
+export const BACKGROUND_REPLACE_MODEL_KEYS = [
+  SEEDREAM_BACKGROUND_REPLACE_MODEL,
+  WANX_BACKGROUND_GENERATION_MODEL,
+] as const;
+
+export type BackgroundReplaceModelKey =
+  (typeof BACKGROUND_REPLACE_MODEL_KEYS)[number];
+
+export function isWanxBackgroundReplaceModel(modelKey: string): boolean {
+  return modelKey.trim() === WANX_BACKGROUND_GENERATION_MODEL;
+}
+
+export function isSeedreamBackgroundReplaceModel(modelKey: string): boolean {
+  const k = modelKey.trim().toLowerCase();
+  return (
+    k === SEEDREAM_BACKGROUND_REPLACE_MODEL ||
+    k === "doubao-seedream-5-0-pro-260628"
+  );
+}
+
+export function resolveBackgroundReplaceModel(
+  modelKey?: string,
+): BackgroundReplaceModelKey {
+  const k = modelKey?.trim() || SEEDREAM_BACKGROUND_REPLACE_MODEL;
+  if (isWanxBackgroundReplaceModel(k)) return WANX_BACKGROUND_GENERATION_MODEL;
+  if (isSeedreamBackgroundReplaceModel(k)) return SEEDREAM_BACKGROUND_REPLACE_MODEL;
+  throw new Error("换背景仅支持火山 Seedream 5.0 Pro 或万相背景生成");
+}
+
+export function buildSeedreamBackgroundReplacePrompt(opts: {
+  scene: string;
+  bbox?: [number, number, number, number];
+}): string {
+  const scene = opts.scene.trim();
+  if (!scene) throw new Error("请填写场景描述");
+  if (opts.bbox) {
+    return `把图 1 ${bboxTag(opts.bbox)} 区域替换成${scene}，模特人物与服装完全保持不变，光影与场景统一`;
+  }
+  return `保留人物与服装完全不变，背景换成${scene}，光影与场景统一，不要改变模特姿态和五官`;
+}
 
 /**
  * 万相官方：base 须 RGBA，且 longest side **小于** 2048
@@ -283,6 +328,7 @@ export type BackgroundReplaceEdgeItem = {
 
 export type BackgroundReplaceInput = {
   baseImageUrl: string;
+  modelKey?: string;
   refPrompt?: string;
   refImageUrl?: string;
   negRefPrompt?: string;
@@ -292,6 +338,9 @@ export type BackgroundReplaceInput = {
   modelVersion?: "v2" | "v3";
   noiseLevel?: number;
   refPromptWeight?: number;
+  bbox?: [number, number, number, number];
+  /** 万相第二步：入参已是抠好的透明底，跳过抠图。 */
+  subjectAlreadyCutout?: boolean;
 };
 
 export function buildBackgroundReplaceRequest(input: BackgroundReplaceInput): {

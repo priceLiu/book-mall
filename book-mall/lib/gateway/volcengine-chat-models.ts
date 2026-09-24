@@ -168,7 +168,8 @@ export const VOLCENGINE_IMAGE_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     modelKey: "doubao-seedream-5-0-pro",
     displayName: "Doubao Seedream 5.0 Pro",
     role: "IMAGE",
-    description: "火山方舟 · 旗舰文生图/图生图（上游 doubao-seedream-5-0-pro-260628）",
+    description:
+      "火山方舟 · 旗舰文生图/图生图/交互编辑（可框选或纯提示词换背景，上游 doubao-seedream-5-0-pro-260628）",
     paramsSchema: [],
     defaultParams: {},
   },

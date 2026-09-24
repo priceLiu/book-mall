@@ -1,10 +1,11 @@
 "use client";
 
-import { ImagePlus, Loader2, Plus, Trash2 } from "lucide-react";
+import { Cpu, ImagePlus, Loader2, Plus, Trash2 } from "lucide-react";
 
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
   canSubmitBackgroundReplace,
+  isWanxBackgroundReplaceModel,
   type BackgroundReplaceEdgeDraft,
   type BackgroundReplaceFormState,
 } from "@/lib/background-replace-types";
@@ -15,6 +16,8 @@ type Props = {
   busy: boolean;
   hasBase: boolean;
   subjectHint?: string;
+  modelDisplayName?: string;
+  onPickModel: () => void;
   onChange: (next: BackgroundReplaceFormState) => void;
   onUploadRefImage: (file: File) => Promise<string>;
   onSubmit: () => void;
@@ -102,17 +105,42 @@ export function BackgroundReplacePanel({
   busy,
   hasBase,
   subjectHint,
+  modelDisplayName,
+  onPickModel,
   onChange,
   onUploadRefImage,
   onSubmit,
 }: Props) {
   const canSubmit = canSubmitBackgroundReplace(form, hasBase);
+  const wanx = isWanxBackgroundReplaceModel(form.modelKey);
 
   return (
     <div className="space-y-3">
       <p className="text-xs leading-relaxed text-[#6b7280]">
-        {subjectHint ?? "对当前图片换场景。填写场景描述或上传引导图。"}
+        {subjectHint ??
+          (wanx
+            ? "万相会先抠出人物，再在透明区画新场景。"
+            : "可先框选背景再写场景（更稳），也可以只写场景描述。")}
       </p>
+
+      <button
+        type="button"
+        disabled={busy}
+        onClick={onPickModel}
+        className={cn(
+          "flex w-full items-center gap-2 rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-left",
+          "transition hover:border-[#2563eb]/40 hover:bg-[#f0f6ff]/50",
+          busy && "opacity-60",
+        )}
+      >
+        <Cpu className="h-4 w-4 shrink-0 text-[#2563eb]" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-medium text-[#6b7280]">换背景模型</p>
+          <p className="truncate text-sm font-medium text-[#111827]">
+            {modelDisplayName ?? form.modelKey}
+          </p>
+        </div>
+      </button>
 
       <label className="block text-sm">
         <span className="mb-1 block text-xs font-medium text-[#374151]">场景描述</span>
@@ -126,6 +154,7 @@ export function BackgroundReplacePanel({
         />
       </label>
 
+      {wanx ? (
       <div>
         <p className="mb-1 text-xs font-medium text-[#374151]">引导图（可选）</p>
         <label
@@ -158,7 +187,9 @@ export function BackgroundReplacePanel({
           />
         ) : null}
       </div>
+      ) : null}
 
+      {wanx ? (
       <label className="block text-sm">
         <span className="mb-1 block text-xs font-medium text-[#374151]">负向提示（可选）</span>
         <input
@@ -169,97 +200,106 @@ export function BackgroundReplacePanel({
           className="w-full rounded-lg border border-[#e5e7eb] px-3 py-2 text-sm"
         />
       </label>
-
-      <div className="grid grid-cols-2 gap-2">
-        <label className="block text-xs">
-          <span className="mb-1 block font-medium text-[#374151]">模型版本</span>
-          <select
-            disabled={busy}
-            value={form.modelVersion}
-            onChange={(e) =>
-              onChange({ ...form, modelVersion: e.target.value === "v2" ? "v2" : "v3" })
-            }
-            className="w-full rounded-lg border border-[#e5e7eb] px-2 py-1.5"
-          >
-            <option value="v3">v3 效果更好</option>
-            <option value="v2">v2 更快</option>
-          </select>
-        </label>
-        <label className="block text-xs">
-          <span className="mb-1 block font-medium text-[#374151]">生成张数</span>
-          <select
-            disabled={busy}
-            value={String(form.n)}
-            onChange={(e) => onChange({ ...form, n: Number(e.target.value) })}
-            className="w-full rounded-lg border border-[#e5e7eb] px-2 py-1.5"
-          >
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-          </select>
-        </label>
-      </div>
-
-      {form.refImageUrl ? (
-        <label className="block text-xs">
-          <span className="mb-1 block font-medium text-[#374151]">
-            引导图随机度 {form.noiseLevel}
-          </span>
-          <input
-            type="range"
-            min={0}
-            max={999}
-            disabled={busy}
-            value={form.noiseLevel}
-            onChange={(e) => onChange({ ...form, noiseLevel: Number(e.target.value) })}
-            className="w-full"
-          />
-        </label>
       ) : null}
 
-      {form.refPrompt.trim() && form.refImageUrl ? (
-        <label className="block text-xs">
-          <span className="mb-1 block font-medium text-[#374151]">
-            文本权重 {form.refPromptWeight.toFixed(2)}
-          </span>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            disabled={busy}
-            value={form.refPromptWeight}
-            onChange={(e) => onChange({ ...form, refPromptWeight: Number(e.target.value) })}
-            className="w-full"
-          />
-        </label>
-      ) : null}
+      {wanx ? (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block text-xs">
+              <span className="mb-1 block font-medium text-[#374151]">模型版本</span>
+              <select
+                disabled={busy}
+                value={form.modelVersion}
+                onChange={(e) =>
+                  onChange({ ...form, modelVersion: e.target.value === "v2" ? "v2" : "v3" })
+                }
+                className="w-full rounded-lg border border-[#e5e7eb] px-2 py-1.5"
+              >
+                <option value="v3">v3 效果更好</option>
+                <option value="v2">v2 更快</option>
+              </select>
+            </label>
+            <label className="block text-xs">
+              <span className="mb-1 block font-medium text-[#374151]">生成张数</span>
+              <select
+                disabled={busy}
+                value={String(form.n)}
+                onChange={(e) => onChange({ ...form, n: Number(e.target.value) })}
+                className="w-full rounded-lg border border-[#e5e7eb] px-2 py-1.5"
+              >
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+              </select>
+            </label>
+          </div>
 
-      <details className="rounded-lg border border-[#e5e7eb] bg-[#fafafa] px-3 py-2">
-        <summary className="cursor-pointer text-xs font-medium text-[#374151]">
-          高级 · 边缘引导元素
-        </summary>
-        <p className="mt-2 text-[11px] text-[#9ca3af]">
-          须为透明底边缘图（HED），前景+背景合计最多 10 张。
-        </p>
-        <div className="mt-2 space-y-3">
-          <EdgeList
-            label="前景边缘"
-            items={form.foregroundEdges}
-            disabled={busy}
-            onChange={(foregroundEdges) => onChange({ ...form, foregroundEdges })}
-            onUpload={onUploadRefImage}
-          />
-          <EdgeList
-            label="背景边缘"
-            items={form.backgroundEdges}
-            disabled={busy}
-            onChange={(backgroundEdges) => onChange({ ...form, backgroundEdges })}
-            onUpload={onUploadRefImage}
-          />
-        </div>
-      </details>
+          {form.refImageUrl ? (
+            <label className="block text-xs">
+              <span className="mb-1 block font-medium text-[#374151]">
+                引导图随机度 {form.noiseLevel}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={999}
+                disabled={busy}
+                value={form.noiseLevel}
+                onChange={(e) =>
+                  onChange({ ...form, noiseLevel: Number(e.target.value) })
+                }
+                className="w-full"
+              />
+            </label>
+          ) : null}
+
+          {form.refPrompt.trim() && form.refImageUrl ? (
+            <label className="block text-xs">
+              <span className="mb-1 block font-medium text-[#374151]">
+                文本权重 {form.refPromptWeight.toFixed(2)}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                disabled={busy}
+                value={form.refPromptWeight}
+                onChange={(e) =>
+                  onChange({ ...form, refPromptWeight: Number(e.target.value) })
+                }
+                className="w-full"
+              />
+            </label>
+          ) : null}
+
+          <details className="rounded-lg border border-[#e5e7eb] bg-[#fafafa] px-3 py-2">
+            <summary className="cursor-pointer text-xs font-medium text-[#374151]">
+              高级 · 边缘引导元素
+            </summary>
+            <p className="mt-2 text-[11px] text-[#9ca3af]">
+              须为透明底边缘图（HED），前景+背景合计最多 10 张。
+            </p>
+            <div className="mt-2 space-y-3">
+              <EdgeList
+                label="前景边缘"
+                items={form.foregroundEdges}
+                disabled={busy}
+                onChange={(foregroundEdges) => onChange({ ...form, foregroundEdges })}
+                onUpload={onUploadRefImage}
+              />
+              <EdgeList
+                label="背景边缘"
+                items={form.backgroundEdges}
+                disabled={busy}
+                onChange={(backgroundEdges) => onChange({ ...form, backgroundEdges })}
+                onUpload={onUploadRefImage}
+              />
+            </div>
+          </details>
+        </>
+      ) : null}
 
       <div className="sticky bottom-0 border-t border-[#e5e7eb] bg-white pt-3">
         <EcomButtonPrimary
