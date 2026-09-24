@@ -3,13 +3,19 @@ import { describe, expect, it } from "vitest";
 import { resolveRetouchModelForSelection } from "@/lib/image-local-edit/resolve-retouch-model";
 
 describe("resolveRetouchModelForSelection", () => {
-  it("routes qwen + mask to wanx-x-painting", () => {
+  it("keeps qwen when a painted or bbox-converted mask is present", () => {
+    expect(
+      resolveRetouchModelForSelection({
+        model: "qwen-image-edit",
+        selection: { kind: "mask", maskDataUrl: "data:image/png;base64,abc" },
+      }),
+    ).toBe("qwen-image-edit");
     expect(
       resolveRetouchModelForSelection({
         model: "qwen-image-edit-max",
         selection: { kind: "mask", maskDataUrl: "data:image/png;base64,abc" },
       }),
-    ).toBe("wanx-x-painting");
+    ).toBe("qwen-image-edit-max");
   });
 
   it("routes canvas wan2.7 + brush mask to wanx-x-painting", () => {

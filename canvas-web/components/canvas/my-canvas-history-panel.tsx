@@ -139,7 +139,7 @@ export function MyCanvasHistoryPanel({
     const ok = await doubleConfirm({
       first: {
         title: "恢复此历史版本？",
-        message: `将用「${item.label}」（${new Date(item.createdAt).toLocaleString("zh-CN")}）覆盖当前画布。`,
+        message: `将用「${item.label}」（${new Date(item.createdAt).toLocaleString("zh-CN")}）覆盖并保存到当前这一张画布（项目 ID 不变）。不会在「我的画布」里新建副本；若要另存一份请用列表「复制」。`,
         confirmLabel: "继续",
         danger: true,
       },

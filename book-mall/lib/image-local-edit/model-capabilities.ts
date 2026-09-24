@@ -26,8 +26,8 @@ export function assertLocalEditSelection(
 ): void {
   const mode = getLocalEditSelectionMode(modelKey);
   if (mode === "mask") {
-    if (selection?.kind !== "mask") {
-      throw new Error(`${ECOM_WANX_PAINTING_MODEL_KEY} 局部重绘需要涂抹蒙版`);
+    if (selection?.kind !== "mask" && selection?.kind !== "bbox") {
+      throw new Error(`${ECOM_WANX_PAINTING_MODEL_KEY} 局部重绘需要涂抹蒙版或框选区域`);
     }
   }
   if (mode === "bbox") {

@@ -8,6 +8,7 @@ import { pickCredentialForKind } from "@/lib/gateway/proxy-common";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 import { GatewayRequiredError } from "@/lib/gateway/book-gateway-link";
 import {
+  buildEraseCompletionParameters,
   IMAGE_ERASE_COMPLETION_MODEL,
   IMAGE_OUTPAINT_MODEL,
 } from "./constants";
@@ -35,10 +36,9 @@ export async function invokeCanvasImageErase(opts: {
   if (!pickCredentialForKind(auth.credentials, "BAILIAN")) {
     throw new GatewayRequiredError("Gateway Key 未绑定百炼 / DashScope 凭证");
   }
-  const parameters: Record<string, unknown> = {
-    dilate_flag: true,
-    fast_mode: opts.fastMode !== false,
-  };
+  const parameters = buildEraseCompletionParameters({
+    fastMode: opts.fastMode,
+  });
   return gatewayV1Image2ImageAsync({
     apiKeyId: auth.id,
     body: {

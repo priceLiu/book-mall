@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  AUTO_DECOMPOSE_PROMPT,
   buildBatchEditPrompt,
   buildDecomposePrompt,
   normalizeBboxTuple,
@@ -12,10 +13,16 @@ describe("ecom-image-layer-prompt", () => {
     expect(normalizeBboxTuple([500, 400, 100, 200])).toEqual([100, 200, 500, 400]);
   });
 
+  it("AUTO_DECOMPOSE_PROMPT asks to inpaint holes and keep the scene", () => {
+    expect(AUTO_DECOMPOSE_PROMPT).toContain("对图片做完整图层语义分离");
+    expect(AUTO_DECOMPOSE_PROMPT).toContain("从底图移除");
+    expect(AUTO_DECOMPOSE_PROMPT).toContain("房间环境保持不变");
+  });
+
   it("buildDecomposePrompt single bbox", () => {
     const p = buildDecomposePrompt([[10, 20, 90, 80]]);
-    expect(p).toContain("需分离的区域坐标为");
-    expect(p).toContain("<bbox>10 20 90 80</bbox>");
+    expect(p).toContain("需分离的区域坐标为 <bbox>10 20 90 80</bbox>");
+    expect(p).toContain("从底图移除");
   });
 
   it("buildDecomposePrompt multi bbox uses region prefix per box", () => {

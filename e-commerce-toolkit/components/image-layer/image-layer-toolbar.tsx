@@ -9,8 +9,8 @@ import {
   LayoutGrid,
   Paintbrush,
   Plus,
-  RotateCcw,
   Save,
+  Trash2,
   Undo2 as UndoLayerIcon,
   SquareDashed,
   Undo2,
@@ -129,6 +129,13 @@ export function ImageLayerToolbar({
                 onClick={() => void onSave()}
               />
             ) : null}
+            <EcomIconButton
+              label="删除全部"
+              icon={Trash2}
+              variant="destructive"
+              disabled={anyBusy || (!hasPreview && !hasStack)}
+              onClick={onReset}
+            />
           </EcomIconToolbarGroup>
 
           <ToolbarDivider />
@@ -218,12 +225,6 @@ export function ImageLayerToolbar({
               icon={Download}
               disabled={!hasStack || anyBusy}
               onClick={onExport}
-            />
-            <EcomIconButton
-              label="重置"
-              icon={RotateCcw}
-              disabled={anyBusy || (!hasPreview && !hasStack)}
-              onClick={onReset}
             />
             {loadProjectList && onSelectProject ? (
               <EcomProjectListButton

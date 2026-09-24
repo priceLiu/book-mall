@@ -156,7 +156,13 @@ export function ImageLayerSelectionTools({
 
       {!compact && toolMode === "erase" && selectionSubTool === "bbox" ? (
         <p className="text-xs text-[#6b7280]">
-          拖动框选需要擦除的区域；其余画面保持不变。
+          框选需要擦除的区域；其余画面保持不变，将自动补全背景。
+        </p>
+      ) : null}
+
+      {!compact && toolMode === "erase" && selectionSubTool === "brush" ? (
+        <p className="text-xs text-[#6b7280]">
+          涂抹需要擦除的区域；其余画面保持不变，将自动补全背景。
         </p>
       ) : null}
 

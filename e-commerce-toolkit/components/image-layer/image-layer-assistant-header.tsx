@@ -14,8 +14,8 @@ export function resolveImageLayerAssistantHeader(
       };
     case "erase":
       return {
-        title: "擦除",
-        description: "画布标记选区 → 选模型与参数 → 生成（自动补全背景）",
+        title: "图像擦除补全",
+        description: "涂抹或框选要去掉的区域 → 开始擦除（自动补全背景，无需选模型）",
       };
     case "decompose-bbox":
       return {
@@ -26,7 +26,7 @@ export function resolveImageLayerAssistantHeader(
       if (hasStack) {
         return {
           title: "图片分层",
-          description: "点击图层编辑卡片 → 填写描述 → 底部一次提交",
+          description: "点击图层编辑卡片 → 填写描述 → 底部一次提交；改完回到整图",
         };
       }
       return {

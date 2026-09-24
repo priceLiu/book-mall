@@ -127,6 +127,7 @@ export function MediaHoverBox({
 }: MediaHoverBoxProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const [stageShortSide, setStageShortSide] = useState(160);
   const overlayBtnClass =
     previewIconSize === "lg" ? OVERLAY_ICON_BTN_LG : OVERLAY_ICON_BTN;
@@ -136,6 +137,10 @@ export function MediaHoverBox({
     () => resolveCanvasMediaPreviewChrome(stageShortSide),
     [stageShortSide],
   );
+  useEffect(() => {
+    setImageLoadFailed(false);
+  }, [src, posterUrl]);
+
   const alreadyLoaded = isMediaSrcLoaded(src);
   /** 视频默认 lazy；仅已加载过的 src 或纯图片生成态 eager，避免开画布时并发拉满 mp4 */
   const eagerMedia =
@@ -230,7 +235,7 @@ export function MediaHoverBox({
           setDragOver(false);
         }}
       >
-        {src && mediaReady ? (
+        {src && mediaReady && !imageLoadFailed ? (
           kind === "video" && posterUrl?.trim() ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -239,6 +244,10 @@ export function MediaHoverBox({
               loading={eagerMedia ? "eager" : "lazy"}
               decoding="async"
               onLoad={markLoaded}
+              onError={() => {
+                onImageError?.();
+                setImageLoadFailed(true);
+              }}
               className={
                 naturalSize
                   ? "block w-full"
@@ -270,7 +279,10 @@ export function MediaHoverBox({
               loading={eagerMedia ? "eager" : "lazy"}
               decoding="async"
               onLoad={markLoaded}
-              onError={() => onImageError?.()}
+              onError={() => {
+                onImageError?.();
+                setImageLoadFailed(true);
+              }}
               className={
                 naturalSize
                   ? "block h-auto w-full object-contain"
@@ -280,6 +292,12 @@ export function MediaHoverBox({
               }
               draggable={false}
             />
+          )
+        ) : src && imageLoadFailed ? (
+          placeholder ?? (
+            <div className="flex size-full flex-col items-center justify-center bg-white/[0.03] text-[11px] text-white/40">
+              媒体已失效
+            </div>
           )
         ) : src ? (
           <div className="size-full animate-pulse bg-white/[0.04]" aria-hidden />

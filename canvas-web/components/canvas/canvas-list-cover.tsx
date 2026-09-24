@@ -85,6 +85,7 @@ export function CanvasListCover({
             disableEnlargePreview={disableEnlargePreview}
             calm={calm}
             eager={eager}
+            muteHoverPlayback
           />
         ) : coverUrl ? (
           <ProjectCoverMedia

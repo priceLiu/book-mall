@@ -1,6 +1,7 @@
 /**
  * 与 canvas-web/lib/canvas/project-thumbnail.ts 保持逻辑一致（列表/历史读时回填缩略图）。
  */
+import { canvasOssUrlBelongsToProject } from "@/lib/canvas/canvas-oss-url-project";
 
 const IMAGE_THUMBNAIL_NODE_TYPES = new Set([
   "sbv1-image",
@@ -67,13 +68,29 @@ function pickFromNodes(
   nodes: Array<{ type?: string; data?: unknown }>,
   nodeTypes: Set<string>,
   pickUrl: (data: unknown) => string,
+  projectId?: string,
 ): string {
-  for (const n of nodes) {
-    if (!n.type || !nodeTypes.has(n.type)) continue;
-    const url = pickUrl(n.data);
-    if (url) return url;
+  const tryPass = (preferOwnProject: boolean) => {
+    for (const n of nodes) {
+      if (!n.type || !nodeTypes.has(n.type)) continue;
+      const url = pickUrl(n.data);
+      if (!url) continue;
+      if (
+        preferOwnProject &&
+        projectId &&
+        !canvasOssUrlBelongsToProject(url, projectId)
+      ) {
+        continue;
+      }
+      return url;
+    }
+    return "";
+  };
+  if (projectId) {
+    const own = tryPass(true);
+    if (own) return own;
   }
-  return "";
+  return tryPass(false);
 }
 
 /** 视频节点：优先取成片 URL（非 poster） */
@@ -107,7 +124,10 @@ function displayVideoUrlFromNodeData(data: unknown): string {
   return "";
 }
 
-export function pickProjectThumbnailUrl(canvas: unknown): string {
+export function pickProjectThumbnailUrl(
+  canvas: unknown,
+  projectId?: string,
+): string {
   if (!canvas || typeof canvas !== "object") return "";
   const nodes = (canvas as { nodes?: unknown[] }).nodes;
   if (!Array.isArray(nodes)) return "";
@@ -118,12 +138,25 @@ export function pickProjectThumbnailUrl(canvas: unknown): string {
   }>;
 
   return (
-    pickFromNodes(reversed, IMAGE_THUMBNAIL_NODE_TYPES, displayMediaUrlFromNodeData) ||
-    pickFromNodes(reversed, VIDEO_THUMBNAIL_NODE_TYPES, displayMediaUrlFromNodeData)
+    pickFromNodes(
+      reversed,
+      IMAGE_THUMBNAIL_NODE_TYPES,
+      displayMediaUrlFromNodeData,
+      projectId,
+    ) ||
+    pickFromNodes(
+      reversed,
+      VIDEO_THUMBNAIL_NODE_TYPES,
+      displayMediaUrlFromNodeData,
+      projectId,
+    )
   );
 }
 
-export function pickPersistableProjectThumbnailUrl(canvas: unknown): string {
+export function pickPersistableProjectThumbnailUrl(
+  canvas: unknown,
+  projectId?: string,
+): string {
   if (!canvas || typeof canvas !== "object") return "";
   const nodes = (canvas as { nodes?: unknown[] }).nodes;
   if (!Array.isArray(nodes)) return "";
@@ -134,13 +167,26 @@ export function pickPersistableProjectThumbnailUrl(canvas: unknown): string {
   }>;
 
   return (
-    pickFromNodes(reversed, IMAGE_THUMBNAIL_NODE_TYPES, persistableMediaUrlFromNodeData) ||
-    pickFromNodes(reversed, VIDEO_THUMBNAIL_NODE_TYPES, persistableMediaUrlFromNodeData)
+    pickFromNodes(
+      reversed,
+      IMAGE_THUMBNAIL_NODE_TYPES,
+      persistableMediaUrlFromNodeData,
+      projectId,
+    ) ||
+    pickFromNodes(
+      reversed,
+      VIDEO_THUMBNAIL_NODE_TYPES,
+      persistableMediaUrlFromNodeData,
+      projectId,
+    )
   );
 }
 
 /** 列表封面：优先最近一条成片，无成片再回退分镜图 */
-export function pickProjectThumbnailUrlPreferVideo(canvas: unknown): string {
+export function pickProjectThumbnailUrlPreferVideo(
+  canvas: unknown,
+  projectId?: string,
+): string {
   if (!canvas || typeof canvas !== "object") return "";
   const nodes = (canvas as { nodes?: unknown[] }).nodes;
   if (!Array.isArray(nodes)) return "";
@@ -151,13 +197,31 @@ export function pickProjectThumbnailUrlPreferVideo(canvas: unknown): string {
   }>;
 
   return (
-    pickFromNodes(reversed, VIDEO_THUMBNAIL_NODE_TYPES, displayVideoUrlFromNodeData) ||
-    pickFromNodes(reversed, VIDEO_THUMBNAIL_NODE_TYPES, displayMediaUrlFromNodeData) ||
-    pickFromNodes(reversed, IMAGE_THUMBNAIL_NODE_TYPES, displayMediaUrlFromNodeData)
+    pickFromNodes(
+      reversed,
+      VIDEO_THUMBNAIL_NODE_TYPES,
+      displayVideoUrlFromNodeData,
+      projectId,
+    ) ||
+    pickFromNodes(
+      reversed,
+      VIDEO_THUMBNAIL_NODE_TYPES,
+      displayMediaUrlFromNodeData,
+      projectId,
+    ) ||
+    pickFromNodes(
+      reversed,
+      IMAGE_THUMBNAIL_NODE_TYPES,
+      displayMediaUrlFromNodeData,
+      projectId,
+    )
   );
 }
 
-export function pickPersistableProjectThumbnailUrlPreferVideo(canvas: unknown): string {
+export function pickPersistableProjectThumbnailUrlPreferVideo(
+  canvas: unknown,
+  projectId?: string,
+): string {
   if (!canvas || typeof canvas !== "object") return "";
   const nodes = (canvas as { nodes?: unknown[] }).nodes;
   if (!Array.isArray(nodes)) return "";
@@ -168,9 +232,24 @@ export function pickPersistableProjectThumbnailUrlPreferVideo(canvas: unknown): 
   }>;
 
   return (
-    pickFromNodes(reversed, VIDEO_THUMBNAIL_NODE_TYPES, persistableVideoUrlFromNodeData) ||
-    pickFromNodes(reversed, VIDEO_THUMBNAIL_NODE_TYPES, persistableMediaUrlFromNodeData) ||
-    pickFromNodes(reversed, IMAGE_THUMBNAIL_NODE_TYPES, persistableMediaUrlFromNodeData)
+    pickFromNodes(
+      reversed,
+      VIDEO_THUMBNAIL_NODE_TYPES,
+      persistableVideoUrlFromNodeData,
+      projectId,
+    ) ||
+    pickFromNodes(
+      reversed,
+      VIDEO_THUMBNAIL_NODE_TYPES,
+      persistableMediaUrlFromNodeData,
+      projectId,
+    ) ||
+    pickFromNodes(
+      reversed,
+      IMAGE_THUMBNAIL_NODE_TYPES,
+      persistableMediaUrlFromNodeData,
+      projectId,
+    )
   );
 }
 

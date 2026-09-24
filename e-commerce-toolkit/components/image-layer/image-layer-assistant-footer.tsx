@@ -55,7 +55,7 @@ export function ImageLayerAssistantFooter({
           ) : (
             <Eraser className="mr-1.5 h-4 w-4" />
           )}
-        开始擦除
+        开始擦除补全
       </EcomButtonPrimary>
     );
   }

@@ -9,7 +9,8 @@ import type { LocalEditSelection } from "./types";
 
 /**
  * 画布重绘 / 常用工具 AI 修图 · 统一模型路由。
- * 涂抹蒙版须走万相局部重绘（mask_image_url）；千问编辑无原生蒙版字段。
+ * 千问把蒙版当第二张参考图，不再改打 wanx-x-painting。
+ * 万相 2.7 只吃 bbox；笔刷蒙版才回退到万相局部重绘。
  */
 export function resolveRetouchModelForSelection(opts: {
   model: string;
@@ -19,8 +20,10 @@ export function resolveRetouchModelForSelection(opts: {
   const selection = opts.selection;
 
   if (selection?.kind === "mask") {
-    if (isWanxPaintingModelKey(model)) return model;
-    if (isQwenEditModelKey(model) || isWan27LocalEditModel(model)) {
+    if (isWanxPaintingModelKey(model) || isQwenEditModelKey(model)) {
+      return model;
+    }
+    if (isWan27LocalEditModel(model)) {
       return ECOM_WANX_PAINTING_MODEL_KEY;
     }
     return ECOM_WANX_PAINTING_MODEL_KEY;

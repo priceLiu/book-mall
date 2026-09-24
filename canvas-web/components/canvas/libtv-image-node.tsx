@@ -247,12 +247,14 @@ export function LibtvImageNode({
   const [livenessOpen, setLivenessOpen] = useState(false);
   const [preferBlobPreview, setPreferBlobPreview] = useState(false);
   const [preferEphemeralPreview, setPreferEphemeralPreview] = useState(false);
+  const [previewLoadBroken, setPreviewLoadBroken] = useState(false);
   const projectId = useCanvasStore((s) => s.projectId) ?? undefined;
 
   const d = data as unknown as LibtvImageNodeData;
   useEffect(() => {
     setPreferBlobPreview(false);
     setPreferEphemeralPreview(false);
+    setPreviewLoadBroken(false);
   }, [d.ossUrl, d.blobUrl, d.uploading, d.runtime?.ephemeralUrl]);
 
   const { history: taskHistory } = useNodeTaskHistory(id);
@@ -316,7 +318,9 @@ export function LibtvImageNode({
     }
     if (libtvMediaPreviewCanFallbackToBlob(d)) {
       setPreferBlobPreview(true);
+      return;
     }
+    setPreviewLoadBroken(true);
   }, [d, preferEphemeralPreview]);
   const saveAsAsset = useSaveNodeAsAsset();
   const saveToCatalog = useSaveToCatalog();
@@ -1115,6 +1119,15 @@ export function LibtvImageNode({
       );
     }
     if (hasImage) {
+      if (previewLoadBroken && previewUrl) {
+        return (
+          <Pro2MediaNodeErrorState
+            icon={AlertTriangle}
+            title="图片无法加载"
+            message="链接可能已过期或文件已删除。请重新生成，或从历史记录 / 生成记录中恢复。"
+          />
+        );
+      }
       if (gridSplit && previewUrl) {
         return (
           <LibtvImageGridSplitStage

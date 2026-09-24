@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 
 import type { ImageLayerStackItem } from "@/lib/image-layer-types";
 
-/** 与画布 CSS（max-w-full + h-auto）一致：统一按画布宽度等比缩放 */
+/** 与画布 CSS（max-w-full + h-auto）一致：整图层按画布宽度等比缩放 */
 export function computeLayerDrawSize(
   naturalWidth: number,
   naturalHeight: number,
@@ -21,7 +21,7 @@ export type LayerDrawPlacement = {
   y: number;
   width: number;
   height: number;
-  /** full-frame：与底图同宽对齐；bbox-crop：按 bbox 贴回 */
+  /** full-frame：与底图同宽；bbox-crop：按框贴回，避免小图被拉满画布 */
   mode: "full-frame" | "bbox-crop";
 };
 
@@ -37,7 +37,7 @@ function normalizedBboxRect(
   return { x: x1, y: y1, width: Math.max(1, x2 - x1), height: Math.max(1, y2 - y1) };
 }
 
-/** 判断物体层 PNG 是否为 bbox 裁剪块（而非整图透明层） */
+/** 物体层 PNG 明显小于画布时，是裁切块，不能按整图拉满 */
 export function isBboxCropLayer(
   naturalWidth: number,
   naturalHeight: number,
@@ -69,15 +69,27 @@ export function resolveLayerDrawPlacement(opts: {
   } = opts;
   const userDx = (layer.offsetX ?? 0) * displayScale;
   const userDy = (layer.offsetY ?? 0) * displayScale;
-
   const bbox = layer.bbox?.normalized;
-  if (!layer.isBackground && bbox) {
-    const rect = normalizedBboxRect(bbox, canvasWidth, canvasHeight);
+
+  if (
+    !layer.isBackground &&
+    isBboxCropLayer(naturalWidth, naturalHeight, canvasWidth, canvasHeight)
+  ) {
+    if (bbox) {
+      const rect = normalizedBboxRect(bbox, canvasWidth, canvasHeight);
+      return {
+        x: rect.x + userDx,
+        y: rect.y + userDy,
+        width: rect.width,
+        height: rect.height,
+        mode: "bbox-crop",
+      };
+    }
     return {
-      x: rect.x + userDx,
-      y: rect.y + userDy,
-      width: rect.width,
-      height: rect.height,
+      x: userDx,
+      y: userDy,
+      width: naturalWidth,
+      height: naturalHeight,
       mode: "bbox-crop",
     };
   }
@@ -96,7 +108,7 @@ export function resolveLayerDrawPlacement(opts: {
   };
 }
 
-/** 物体层在画布上的初始 display 偏移（bbox 裁剪块才需要，整图层为 0） */
+/** 物体层初始 display 偏移：裁切块才需要按 bbox 落位 */
 export function initialDisplayOffsetForLayer(
   layer: ImageLayerStackItem,
   displayWidth: number,
@@ -120,7 +132,7 @@ export function initialDisplayOffsetForLayer(
   };
 }
 
-/** 画布 DOM 上物体层的定位（整图层 vs bbox 裁剪块） */
+/** 画布 DOM：整图层铺满；裁切块按 bbox 百分比贴回 */
 export function getLayerCanvasStyle(
   layer: ImageLayerStackItem,
   naturalWidth: number,
@@ -134,17 +146,34 @@ export function getLayerCanvasStyle(
   style: CSSProperties;
 } {
   const bbox = layer.bbox?.normalized;
-  if (!layer.isBackground && bbox) {
-    return {
-      className: "absolute select-none object-contain",
-      style: {
-        left: `${(bbox[0] / 1000) * 100}%`,
-        top: `${(bbox[1] / 1000) * 100}%`,
-        width: `${((bbox[2] - bbox[0]) / 1000) * 100}%`,
-        height: `${((bbox[3] - bbox[1]) / 1000) * 100}%`,
-        transform: `translate(${offsetX}px, ${offsetY}px)`,
-      },
-    };
+  if (
+    !layer.isBackground &&
+    isBboxCropLayer(naturalWidth, naturalHeight, canvasWidth, canvasHeight)
+  ) {
+    if (bbox) {
+      return {
+        className: "absolute select-none object-contain",
+        style: {
+          left: `${(bbox[0] / 1000) * 100}%`,
+          top: `${(bbox[1] / 1000) * 100}%`,
+          width: `${((bbox[2] - bbox[0]) / 1000) * 100}%`,
+          height: `${((bbox[3] - bbox[1]) / 1000) * 100}%`,
+          transform: `translate(${offsetX}px, ${offsetY}px)`,
+        },
+      };
+    }
+    if (canvasWidth > 0 && canvasHeight > 0) {
+      return {
+        className: "absolute select-none object-contain",
+        style: {
+          left: 0,
+          top: 0,
+          width: `${(naturalWidth / canvasWidth) * 100}%`,
+          height: `${(naturalHeight / canvasHeight) * 100}%`,
+          transform: `translate(${offsetX}px, ${offsetY}px)`,
+        },
+      };
+    }
   }
 
   return {

@@ -93,8 +93,6 @@ function ParamFields({
   );
 }
 
-type LocalEditKind = "retouch" | "erase";
-
 function LocalEditModelButton({
   label,
   modelKey,
@@ -148,11 +146,9 @@ type Props = {
   retouchParamFields: ImageProcessingParamField[];
   retouchPrompt: string;
   retouchBusy: boolean;
-  eraseModel: string;
-  eraseParams: Record<string, unknown>;
-  eraseParamFields: ImageProcessingParamField[];
   eraseBusy: boolean;
   editEntries: ImageLayerEditEntryView[];
+  selectedLayerId?: string | null;
   editingLayerId?: string | null;
   editSubmitCount: number;
   onSelectionSubToolChange: (tool: ImageLayerSelectionSubTool) => void;
@@ -164,10 +160,9 @@ type Props = {
   onRetouchParamsChange: (name: string, value: unknown) => void;
   onRetouchPromptChange: (value: string) => void;
   onRetouchSubmit: () => void;
-  onEraseModelChange: (modelKey: string) => void;
   onEraseSubmit: () => void;
-  onEraseParamsChange: (name: string, value: unknown) => void;
   onReloadRetouchModels: () => void;
+  onSelectLayer?: (layerId: string) => void;
   onPromptChange: (layerId: string, value: string) => void;
   onSubmitAllEdits: () => void;
   onRemoveEditEntry: (layerId: string) => void;
@@ -191,11 +186,9 @@ export function ImageLayerAssistantPanel({
   retouchParamFields,
   retouchPrompt,
   retouchBusy,
-  eraseModel,
-  eraseParams,
-  eraseParamFields,
   eraseBusy,
   editEntries,
+  selectedLayerId,
   editingLayerId,
   editSubmitCount,
   onSelectionSubToolChange,
@@ -207,51 +200,37 @@ export function ImageLayerAssistantPanel({
   onRetouchParamsChange,
   onRetouchPromptChange,
   onRetouchSubmit,
-  onEraseModelChange,
-  onEraseParamsChange,
   onEraseSubmit,
   onReloadRetouchModels,
+  onSelectLayer,
   onPromptChange,
   onSubmitAllEdits,
   onRemoveEditEntry,
 }: Props) {
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
-  const [modelPickerTarget, setModelPickerTarget] = useState<LocalEditKind>("retouch");
 
   const currentRetouchModel = useMemo(
     () => retouchModels.find((m) => m.modelKey === retouchModel),
     [retouchModel, retouchModels],
   );
-  const currentEraseModel = useMemo(
-    () => retouchModels.find((m) => m.modelKey === eraseModel),
-    [eraseModel, retouchModels],
-  );
-
-  const activeLocalModel = modelPickerTarget === "retouch" ? retouchModel : eraseModel;
-
-  const openModelPicker = (target: LocalEditKind) => {
-    setModelPickerTarget(target);
-    setModelPickerOpen(true);
-  };
 
   const showSelectionTools =
     toolMode === "retouch" || toolMode === "erase" || toolMode === "decompose-bbox";
 
-  const localEditModelKey = toolMode === "erase" ? eraseModel : retouchModel;
-  const effectiveSelectionSubTool =
-    (toolMode === "retouch" || toolMode === "erase") &&
-    isWan27RetouchModel(localEditModelKey)
-      ? "bbox"
-      : selectionSubTool;
+  const retouchUsesBbox =
+    toolMode === "retouch" && isWan27RetouchModel(retouchModel);
+  const effectiveSelectionSubTool = retouchUsesBbox ? "bbox" : selectionSubTool;
 
   if (toolMode === "layer-view" && hasStack) {
     return (
       <ImageLayerEditPanel
         entries={editEntries}
+        selectedLayerId={selectedLayerId}
         busy={busy}
         editingLayerId={editingLayerId}
         busyTitle={busyTitle}
         busyDetail={busyDetail}
+        onSelectLayer={onSelectLayer}
         onPromptChange={onPromptChange}
         onSubmitAll={onSubmitAllEdits}
         submitCount={editSubmitCount}
@@ -304,9 +283,7 @@ export function ImageLayerAssistantPanel({
               pendingBboxCount={pendingBboxCount}
               busy={busy}
               compact={isLocalEdit}
-              hideBrushToggle={
-                isLocalEdit && isWan27RetouchModel(localEditModelKey)
-              }
+              hideBrushToggle={retouchUsesBbox}
               onSelectionSubToolChange={onSelectionSubToolChange}
               onBrushSizeChange={onBrushSizeChange}
               onToggleTransparentMask={onToggleTransparentMask}
@@ -322,7 +299,7 @@ export function ImageLayerAssistantPanel({
                 modelKey={retouchModel}
                 displayName={currentRetouchModel?.displayName}
                 busy={busy}
-                onClick={() => openModelPicker("retouch")}
+                onClick={() => setModelPickerOpen(true)}
               />
               {retouchParamFields.length > 0 ? (
                 <ParamFields
@@ -349,23 +326,9 @@ export function ImageLayerAssistantPanel({
           ) : null}
 
           {toolMode === "erase" ? (
-            <>
-              <LocalEditModelButton
-                label="擦除模型"
-                modelKey={eraseModel}
-                displayName={currentEraseModel?.displayName}
-                busy={busy}
-                onClick={() => openModelPicker("erase")}
-              />
-              {eraseParamFields.length > 0 ? (
-                <ParamFields
-                  fields={eraseParamFields}
-                  values={eraseParams}
-                  onChange={onEraseParamsChange}
-                  disabled={busy}
-                />
-              ) : null}
-            </>
+            <p className="text-xs leading-5 text-[#6b7280]">
+              涂抹或框选要去掉的区域。将调用百炼「图像擦除补全」，自动填补背景；无需选择模型。
+            </p>
           ) : null}
 
           {toolMode === "decompose-bbox" ? (
@@ -390,22 +353,16 @@ export function ImageLayerAssistantPanel({
         onOpenChange={setModelPickerOpen}
         mode="image"
         selectionOnly
-        dialogTitle={modelPickerTarget === "retouch" ? "选择重绘模型" : "选择擦除模型"}
+        dialogTitle="选择重绘模型"
         models={retouchModels}
         modelsLoading={retouchModelsLoading}
         modelsEmptyHint={retouchModelsError ?? undefined}
         onRetryLoadModels={onReloadRetouchModels}
-        value={activeLocalModel}
-        onChange={
-          modelPickerTarget === "retouch" ? onRetouchModelChange : onEraseModelChange
-        }
+        value={retouchModel}
+        onChange={onRetouchModelChange}
         hideTypeFilter
         onConfirm={(modelKey) => {
-          if (modelPickerTarget === "retouch") {
-            onRetouchModelChange(modelKey);
-          } else {
-            onEraseModelChange(modelKey);
-          }
+          onRetouchModelChange(modelKey);
           setModelPickerOpen(false);
         }}
       />

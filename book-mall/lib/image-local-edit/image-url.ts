@@ -3,9 +3,10 @@ import { createOssClientFrom, ossGetBuffer, readOssEnv } from "@/lib/oss-client"
 
 function parseDataUrl(dataUrl: string): { buf: Buffer; contentType: string; ext: string } {
   const m = /^data:([^;]+);base64,([\s\S]+)$/.exec(dataUrl.trim());
-  if (!m) throw new Error("无效的图片 data URL");
+  const b64 = m?.[2]?.replace(/\s/g, "");
+  if (!m || !b64) throw new Error("无效的图片 data URL");
   const contentType = m[1] || "image/png";
-  const buf = Buffer.from(m[2], "base64");
+  const buf = Buffer.from(b64, "base64");
   const ext = contentType.includes("jpeg")
     ? "jpg"
     : contentType.includes("webp")

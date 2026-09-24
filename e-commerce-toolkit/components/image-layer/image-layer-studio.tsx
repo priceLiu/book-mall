@@ -12,6 +12,7 @@ import {
   ImageLayerCanvas,
   type ImageLayerCanvasHandle,
 } from "@/components/image-layer/image-layer-canvas";
+import { ImageLayerCompareStage } from "@/components/image-layer/image-layer-compare-stage";
 import { ImageLayerAssistantPanel } from "@/components/image-layer/image-layer-assistant-panel";
 import { ImageLayerAssistantHeader } from "@/components/image-layer/image-layer-assistant-header";
 import type { ImageLayerEditEntryView } from "@/components/image-layer/image-layer-edit-panel";
@@ -29,6 +30,7 @@ import {
   createImageLayerProject,
   decomposeImageLayers,
   editImageLayer,
+  eraseImageLayerRegion,
   getImageLayerProject,
   listImageLayerProjectSummaries,
   saveImageLayerWorkspace,
@@ -43,14 +45,19 @@ import {
   downloadBlob,
   exportLayerStackPng,
 } from "@/lib/image-layer-export";
-import { IMAGE_LAYER_ERASE_PROMPT } from "@/lib/image-layer-local-edit-constants";
 import { attachPendingBboxesToStack } from "@/lib/image-layer-attach-bboxes";
+import { IMAGE_LAYER_ERASE_MODEL_KEY } from "@/lib/image-layer-local-edit-constants";
+import {
+  missingEraseSelectionMessage,
+  missingLocalEditSelectionMessage,
+  resolveEraseSelectionPayload,
+  resolveLocalEditSelectionPayload,
+} from "@/lib/image-layer-local-edit-payload";
 import { IMAGE_LAYER_MAX_BBOXES } from "@/lib/image-layer-constants";
 import { resolvePendingBboxes } from "@/lib/image-layer-pending-bboxes";
 import {
   IMAGE_LAYER_RETOUCH_MODEL_KEYS,
   isWan27RetouchModel,
-  isWanxPaintingRetouchModel,
   type ImageLayerCanvasToolMode,
   type ImageLayerSelectionSubTool,
 } from "@/lib/image-layer-tool-mode";
@@ -84,6 +91,7 @@ function findLayerInStack(
 
 function buildWorkspaceSnapshot(args: {
   sourceUrl: string | null;
+  originalImageUrl: string | null;
   stack: ImageLayerStack | null;
   pendingBboxes: Array<[number, number, number, number]>;
   canvasDims: { w: number; h: number };
@@ -93,6 +101,7 @@ function buildWorkspaceSnapshot(args: {
 }): ImageLayerWorkspace {
   return {
     sourceImageUrl: args.sourceUrl ?? args.stack?.sourceImageUrl ?? null,
+    originalImageUrl: args.originalImageUrl ?? args.sourceUrl ?? args.stack?.sourceImageUrl ?? null,
     stack: args.stack,
     pendingBboxes: args.pendingBboxes,
     canvasDims: args.canvasDims,
@@ -115,6 +124,7 @@ function ImageLayerStudioInner() {
   const [saveBusy, setSaveBusy] = useState(false);
 
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
+  const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
   const [sourcePreviewUrl, setSourcePreviewUrl] = useState<string | null>(null);
   const [stack, setStack] = useState<ImageLayerStack | null>(null);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
@@ -124,11 +134,9 @@ function ImageLayerStudioInner() {
     useState<ImageLayerSelectionSubTool>("brush");
   const [brushSize, setBrushSize] = useState(24);
   const [showTransparentMask, setShowTransparentMask] = useState(true);
-  const [retouchModel, setRetouchModel] = useState("qwen-image-edit-max");
+  const [retouchModel, setRetouchModel] = useState("qwen-image-edit");
   const [retouchParams, setRetouchParams] = useState<Record<string, unknown>>({});
   const [retouchPrompt, setRetouchPrompt] = useState("");
-  const [eraseModel, setEraseModel] = useState("qwen-image-edit");
-  const [eraseParams, setEraseParams] = useState<Record<string, unknown>>({});
   const [retouchModels, setRetouchModels] = useState<StoryboardGatewayModel[]>([]);
   const [retouchModelsLoading, setRetouchModelsLoading] = useState(true);
   const [retouchModelsError, setRetouchModelsError] = useState<string | null>(null);
@@ -167,6 +175,7 @@ function ImageLayerStudioInner() {
       return nextSource;
     });
     setSourceUrl(nextSource);
+    setOriginalImageUrl(ws.originalImageUrl?.trim() || nextSource);
     setStack(ws.stack ?? null);
     setPendingBboxes(resolvePendingBboxes(ws));
     setSelectedLayerId(ws.selectedLayerId ?? null);
@@ -289,16 +298,15 @@ function ImageLayerStudioInner() {
           }),
         );
       setRetouchModels(filtered);
+      const preferred = "qwen-image-edit";
       const defaultKey = data.defaults?.retouch?.trim();
-      if (defaultKey && filtered.some((m) => m.modelKey === defaultKey)) {
+      if (filtered.some((m) => m.modelKey === preferred)) {
+        setRetouchModel(preferred);
+      } else if (defaultKey && filtered.some((m) => m.modelKey === defaultKey)) {
         setRetouchModel(defaultKey);
       } else if (filtered[0]?.modelKey) {
         setRetouchModel(filtered[0].modelKey);
       }
-      const eraseDefault =
-        filtered.find((m) => m.modelKey === "qwen-image-edit")?.modelKey ??
-        filtered[0]?.modelKey;
-      if (eraseDefault) setEraseModel(eraseDefault);
     } catch (e) {
       setRetouchModelsError(e instanceof Error ? e.message : "模型加载失败");
     } finally {
@@ -315,6 +323,7 @@ function ImageLayerStudioInner() {
     (): ImageLayerWorkspace =>
       buildWorkspaceSnapshot({
         sourceUrl,
+        originalImageUrl,
         stack,
         pendingBboxes,
         canvasDims,
@@ -322,7 +331,16 @@ function ImageLayerStudioInner() {
         selectedLayerId,
         editEntries,
       }),
-    [canvasDims, displayDims, editEntries, pendingBboxes, selectedLayerId, sourceUrl, stack],
+    [
+      canvasDims,
+      displayDims,
+      editEntries,
+      originalImageUrl,
+      pendingBboxes,
+      selectedLayerId,
+      sourceUrl,
+      stack,
+    ],
   );
 
   const persistWorkspace = useCallback(
@@ -350,6 +368,7 @@ function ImageLayerStudioInner() {
     canvasDims,
     displayDims,
     editEntries,
+    originalImageUrl,
     pendingBboxes,
     persistWorkspace,
     project?.id,
@@ -384,10 +403,11 @@ function ImageLayerStudioInner() {
 
   const editEntryViews = useMemo((): ImageLayerEditEntryView[] => {
     if (!stack) return [];
-    return editEntries.flatMap((entry) => {
-      const layer = findLayerInStack(stack, entry.layerId);
-      return layer ? [{ layer, prompt: entry.prompt }] : [];
-    });
+    const promptById = new Map(editEntries.map((e) => [e.layerId, e.prompt]));
+    return [stack.background, ...stack.layers].map((layer) => ({
+      layer,
+      prompt: promptById.get(layer.id) ?? "",
+    }));
   }, [editEntries, stack]);
 
   const applyStack = useCallback(
@@ -432,6 +452,7 @@ function ImageLayerStudioInner() {
         try {
           const updated = await saveImageLayerWorkspace(project.id, {
             sourceImageUrl: editedUrl,
+            originalImageUrl,
             stack: null,
             pendingBboxes: [],
             canvasDims: canvasDims,
@@ -444,7 +465,7 @@ function ImageLayerStudioInner() {
         }
       }
     },
-    [canvasDims, project?.id],
+    [canvasDims, originalImageUrl, project?.id],
   );
 
   const clearSourceState = useCallback(async () => {
@@ -453,6 +474,7 @@ function ImageLayerStudioInner() {
       return null;
     });
     setSourceUrl(null);
+    setOriginalImageUrl(null);
     setStack(null);
     setSelectedLayerId(null);
     setPendingBboxes([]);
@@ -465,6 +487,7 @@ function ImageLayerStudioInner() {
       try {
         const updated = await saveImageLayerWorkspace(project.id, {
           sourceImageUrl: null,
+          originalImageUrl: null,
           stack: null,
           pendingBboxes: [],
           canvasDims: { w: 1024, h: 1024 },
@@ -497,12 +520,14 @@ function ImageLayerStudioInner() {
       setPendingBboxes([]);
       setCanvasToolMode("decompose-bbox");
       setSourceUrl(null);
+      setOriginalImageUrl(null);
 
       const preview = URL.createObjectURL(file);
       setSourcePreviewUrl((prev) => {
         revokeBlobPreview(prev);
         return preview;
       });
+      setOriginalImageUrl(preview);
       const img = new Image();
       img.onload = () => setCanvasDims({ w: img.naturalWidth, h: img.naturalHeight });
       img.src = preview;
@@ -513,6 +538,7 @@ function ImageLayerStudioInner() {
       try {
         const { ossUrl } = await uploadImageLayerSource(file, project.id);
         setSourceUrl(ossUrl);
+        setOriginalImageUrl(ossUrl);
         setSourcePreviewUrl((prev) => {
           if (prev === preview) revokeBlobPreview(preview);
           return ossUrl;
@@ -599,7 +625,7 @@ function ImageLayerStudioInner() {
         variant: "success",
         title: "图层分离完成",
         message:
-          "正常情况底图应已补全被拆出的人物/物体。若仍看到重复主体，请重置后用「绘制拆分框」框住主体再拆分。",
+          "底图已补全被拆物体，房间场景应保持原样。若不准可用框选再拆一次。",
       });
     } catch (e) {
       backgroundGen.failTask(
@@ -648,9 +674,12 @@ function ImageLayerStudioInner() {
   );
 
   const handleEditPromptChange = useCallback((layerId: string, value: string) => {
-    setEditEntries((prev) =>
-      prev.map((e) => (e.layerId === layerId ? { ...e, prompt: value } : e)),
-    );
+    setEditEntries((prev) => {
+      if (prev.some((e) => e.layerId === layerId)) {
+        return prev.map((e) => (e.layerId === layerId ? { ...e, prompt: value } : e));
+      }
+      return [...prev, { layerId, prompt: value }];
+    });
   }, []);
 
   const handleRemoveEditEntry = useCallback((layerId: string) => {
@@ -732,42 +761,32 @@ function ImageLayerStudioInner() {
       return;
     }
 
-    const redecomposeBboxes = [...stack.layers]
-      .sort((a, b) => a.zIndex - b.zIndex)
-      .flatMap((layer) => {
-        const bbox = layer.bbox?.normalized;
-        return bbox ? [bbox] : [];
-      });
-
     try {
       backgroundGen.registerTask({
         id: taskId,
         label: "AI 批量修改图层",
-        hint: `共 ${jobs.length} 层 · 一次改层后重拆`,
+        hint: `共 ${jobs.length} 层 · 改完回到整图`,
         startedAt: new Date().toISOString(),
         expectedDurationMs: 180_000,
         poll: async () => ({ status: "running" as const }),
       });
 
       setEditingLayerId(jobs[0]?.layerId ?? null);
-      setBusyLabel(`AI 修改 ${jobs.length} 层并重拆…`);
+      setBusyLabel(`AI 修改 ${jobs.length} 层…`);
 
       const result = await editImageLayer({
         compositeImageUrl,
         edits: jobs.map((j) => ({ bbox: j.bbox, prompt: j.prompt })),
-        ...(redecomposeBboxes.length ? { redecomposeBboxes } : {}),
         projectId: project.id,
       });
-      applyStack(result);
+      await applyFlatEditResult(result.imageUrl);
 
       setEditEntries([]);
-      const updated = await getImageLayerProject(project.id);
-      setProject(updated);
       backgroundGen.dismissTask(taskId);
       await toast({
         variant: "success",
-        title: "全部图层修改完成",
-        message: `已处理 ${jobs.length} 层并重拆`,
+        title: "图层修改完成",
+        message: `已处理 ${jobs.length} 层，当前为整图。需要分层请再点「AI 图层分离」。`,
       });
     } catch (e) {
       backgroundGen.failTask(taskId, e instanceof Error ? e.message : "改层失败");
@@ -786,7 +805,7 @@ function ImageLayerStudioInner() {
     }
   }, [
     alert,
-    applyStack,
+    applyFlatEditResult,
     backgroundGen,
     editEntries,
     ensureSessionForAi,
@@ -810,10 +829,8 @@ function ImageLayerStudioInner() {
   }, [sourcePreviewUrl, sourceUrl, stack]);
 
   const retouchParamFields = paramProfiles[retouchModel] ?? [];
-  const eraseParamFields = paramProfiles[eraseModel] ?? [];
-  const activeLocalEditModel =
-    canvasToolMode === "erase" ? eraseModel : retouchModel;
-  const retouchUsesBbox = isWan27RetouchModel(activeLocalEditModel);
+  const retouchUsesBbox =
+    canvasToolMode === "retouch" && isWan27RetouchModel(retouchModel);
 
   const buildRetouchParameters = useCallback(() => {
     const out: Record<string, unknown> = { ...retouchParams };
@@ -831,21 +848,13 @@ function ImageLayerStudioInner() {
     }
   }, []);
 
-  const handleEraseModelChange = useCallback((modelKey: string) => {
-    setEraseModel(modelKey);
-    setEraseParams({});
-    if (isWan27RetouchModel(modelKey)) {
-      setSelectionSubTool("bbox");
-    }
-  }, []);
-
-  const buildEraseParameters = useCallback(() => {
-    const out: Record<string, unknown> = { ...eraseParams };
-    if (out.seed === undefined || out.seed === "") delete out.seed;
-    if (out.size === "") delete out.size;
-    if (out.n) out.n = Number(out.n);
-    return out;
-  }, [eraseParams]);
+  const httpSourceUrl = useCallback(() => {
+    const oss = sourceUrl?.trim() ?? "";
+    if (oss.startsWith("http://") || oss.startsWith("https://")) return oss;
+    const flat = flatEditImageUrl.trim();
+    if (flat.startsWith("http://") || flat.startsWith("https://")) return flat;
+    return "";
+  }, [flatEditImageUrl, sourceUrl]);
 
   const handleToolModeChange = useCallback(
     (mode: ImageLayerCanvasToolMode) => {
@@ -871,8 +880,15 @@ function ImageLayerStudioInner() {
   }, []);
 
   const runRetouch = useCallback(async () => {
-    if (!flatEditImageUrl) {
-      await alert({ title: "请先上传图片", message: "需要底图才能重绘", variant: "error" });
+    const source = httpSourceUrl();
+    if (!source) {
+      await alert({
+        title: "请先上传图片",
+        message: sourcePreviewUrl
+          ? "原图还在上传到云端，请稍后再重绘"
+          : "需要底图才能重绘",
+        variant: "error",
+      });
       return;
     }
     if (!retouchPrompt.trim()) {
@@ -885,23 +901,15 @@ function ImageLayerStudioInner() {
     }
     if (!(await ensureSessionForAi())) return;
 
-    const mask = canvasRef.current?.getMaskDataUrl() ?? undefined;
-    const bbox = canvasRef.current?.getBbox() ?? undefined;
-
-    if (isWanxPaintingRetouchModel(retouchModel) && !mask) {
-      await alert({
-        title: "请涂抹区域",
-        message: "万相局部重绘需要笔刷蒙版",
-        variant: "error",
-      });
-      return;
-    }
-    if (retouchUsesBbox && !bbox) {
-      await alert({
-        title: "请框选区域",
-        message: "万相 2.7 Pro 局部重绘需要框选区域",
-        variant: "error",
-      });
+    const selection = resolveLocalEditSelectionPayload({
+      model: retouchModel,
+      mask: canvasRef.current?.getMaskDataUrl() ?? undefined,
+      bbox: canvasRef.current?.getBbox() ?? undefined,
+      natural: canvasRef.current?.getNaturalSize(),
+    });
+    if (!selection.maskImageDataUrl && !selection.bbox) {
+      const missing = missingLocalEditSelectionMessage(retouchModel);
+      await alert({ ...missing, variant: "error" });
       return;
     }
 
@@ -922,9 +930,9 @@ function ImageLayerStudioInner() {
         mode: "retouch",
         model: retouchModel,
         prompt: retouchPrompt.trim(),
-        sourceImageDataUrl: flatEditImageUrl,
-        maskImageDataUrl: mask,
-        bbox,
+        sourceImageDataUrl: source,
+        maskImageDataUrl: selection.maskImageDataUrl,
+        bbox: selection.bbox,
         parameters: buildRetouchParameters(),
       });
       const editedUrl = res.imageUrls[0];
@@ -958,88 +966,73 @@ function ImageLayerStudioInner() {
     backgroundGen,
     buildRetouchParameters,
     ensureSessionForAi,
-    flatEditImageUrl,
+    httpSourceUrl,
     retouchModel,
     retouchPrompt,
-    retouchUsesBbox,
+    sourcePreviewUrl,
     toast,
   ]);
 
   const runErase = useCallback(async () => {
-    if (!flatEditImageUrl) {
-      await alert({ title: "请先上传图片", message: "需要底图才能擦除", variant: "error" });
+    const source = httpSourceUrl();
+    if (!source) {
+      await alert({
+        title: "请先上传图片",
+        message: sourcePreviewUrl
+          ? "原图还在上传到云端，请稍后再擦除"
+          : "需要底图才能擦除",
+        variant: "error",
+      });
       return;
     }
     if (!(await ensureSessionForAi())) return;
 
-    const mask = canvasRef.current?.getMaskDataUrl() ?? undefined;
-    const bbox = canvasRef.current?.getBbox() ?? undefined;
-
-    if (isWanxPaintingRetouchModel(eraseModel) && !mask) {
-      await alert({
-        title: "请涂抹区域",
-        message: "万相局部擦除需要笔刷蒙版",
-        variant: "error",
-      });
-      return;
-    }
-    if (isWan27RetouchModel(eraseModel) && !bbox) {
-      await alert({
-        title: "请框选区域",
-        message: "万相 2.7 Pro 擦除需要框选区域",
-        variant: "error",
-      });
-      return;
-    }
-    if (!mask && !bbox) {
-      await alert({
-        title: "请标记区域",
-        message: "用笔刷涂抹或框选需要擦除的区域",
-        variant: "error",
-      });
+    const selection = resolveEraseSelectionPayload({
+      mask: canvasRef.current?.getMaskDataUrl() ?? undefined,
+      bbox: canvasRef.current?.getBbox() ?? undefined,
+      natural: canvasRef.current?.getNaturalSize(),
+    });
+    if (!selection.maskDataUrl) {
+      await alert({ ...missingEraseSelectionMessage(), variant: "error" });
       return;
     }
 
     setEraseBusy(true);
-    setBusyLabel("图像擦除中…");
+    setBusyLabel("图像擦除补全中…");
     const taskId = ERASE_TASK_ID;
     try {
       backgroundGen.registerTask({
         id: taskId,
-        label: "图像擦除",
-        hint: eraseModel,
+        label: "图像擦除补全",
+        hint: IMAGE_LAYER_ERASE_MODEL_KEY,
         startedAt: new Date().toISOString(),
         expectedDurationMs: 90_000,
         poll: async () => ({ status: "running" as const }),
       });
 
-      const res = await submitImageProcessingEdit({
-        mode: "retouch",
-        model: eraseModel,
-        prompt: IMAGE_LAYER_ERASE_PROMPT,
-        sourceImageDataUrl: flatEditImageUrl,
-        maskImageDataUrl: mask,
-        bbox,
-        parameters: buildEraseParameters(),
+      const res = await eraseImageLayerRegion({
+        sourceImageUrl: source,
+        maskDataUrl: selection.maskDataUrl,
+        projectId: project?.id,
       });
-      const editedUrl = res.imageUrls[0];
+      const editedUrl = res.imageUrl;
       if (!editedUrl) throw new Error("未获得擦除结果");
 
       await applyFlatEditResult(editedUrl);
       backgroundGen.dismissTask(taskId);
       await toast({
         variant: "success",
-        title: "擦除完成",
+        title: "擦除补全完成",
         message: "已更新底图，可重新框选拆分",
       });
     } catch (e) {
-      backgroundGen.failTask(taskId, e instanceof Error ? e.message : "擦除失败");
+      backgroundGen.failTask(taskId, e instanceof Error ? e.message : "擦除补全失败");
       if (isEcomUnauthorizedError(e)) {
         setNeedLogin(true);
         return;
       }
       await alert({
-        title: "擦除失败",
+        title: "擦除补全失败",
         message: e instanceof Error ? e.message : "请稍后重试",
         variant: "error",
       });
@@ -1051,10 +1044,10 @@ function ImageLayerStudioInner() {
     alert,
     applyFlatEditResult,
     backgroundGen,
-    buildEraseParameters,
     ensureSessionForAi,
-    eraseModel,
-    flatEditImageUrl,
+    httpSourceUrl,
+    project?.id,
+    sourcePreviewUrl,
     toast,
   ]);
 
@@ -1261,7 +1254,7 @@ function ImageLayerStudioInner() {
           : retouchBusy
             ? "局部重绘中…"
             : eraseBusy
-              ? "图像擦除中…"
+              ? "图像擦除补全中…"
               : "生成中…");
 
   const generatingProgress: number | null | undefined = anyBusy
@@ -1276,26 +1269,92 @@ function ImageLayerStudioInner() {
         : null
     : undefined;
 
-  const handleRemoveSource = useCallback(async () => {
+  const handleClearWorkingResult = useCallback(async () => {
+    if (anyBusy) return;
+    if (!sourcePreviewUrl && !sourceUrl && !stack) return;
+
+    const origin = originalImageUrl?.trim() || sourceUrl?.trim() || null;
+    if (!origin) {
+      await clearSourceState();
+      await toast({ variant: "success", title: "已清除", message: "可重新上传图片" });
+      return;
+    }
+
+    const ok = await confirm({
+      title: "清除操作结果？",
+      message: "仅清除右侧当前图与图层，左侧原图保留。可重新擦除、重绘或拆层。",
+    });
+    if (!ok) return;
+
+    setStack(null);
+    setSelectedLayerId(null);
+    setEditEntries([]);
+    setPendingBboxes([]);
+    setSourceUrl(origin.startsWith("blob:") ? sourceUrl : origin);
+    setSourcePreviewUrl((prev) => {
+      if (prev && prev !== origin) revokeBlobPreview(prev);
+      return origin;
+    });
+    setCanvasToolMode("decompose-bbox");
+    canvasRef.current?.clearMask();
+    const img = new Image();
+    img.onload = () => setCanvasDims({ w: img.naturalWidth, h: img.naturalHeight });
+    img.src = origin;
+    if (project?.id) {
+      skipAutoSaveRef.current = true;
+      try {
+        const updated = await saveImageLayerWorkspace(project.id, {
+          sourceImageUrl: origin.startsWith("blob:") ? sourceUrl : origin,
+          originalImageUrl: origin.startsWith("blob:") ? originalImageUrl : origin,
+          stack: null,
+          pendingBboxes: [],
+          canvasDims,
+          selectedLayerId: null,
+          editEntries: [],
+        });
+        setProject(updated);
+      } finally {
+        skipAutoSaveRef.current = false;
+      }
+    }
+    await toast({
+      variant: "success",
+      title: "已清除操作结果",
+      message: "右侧已恢复为原图，可重新操作",
+    });
+  }, [
+    anyBusy,
+    canvasDims,
+    clearSourceState,
+    confirm,
+    originalImageUrl,
+    project?.id,
+    sourcePreviewUrl,
+    sourceUrl,
+    stack,
+    toast,
+  ]);
+
+  const handleRemoveAll = useCallback(async () => {
     if (anyBusy) return;
     if (!sourcePreviewUrl && !sourceUrl) return;
 
     const ok = stack
       ? await doubleConfirm({
-          title: "删除图片",
-          message: "将移除当前图片及所有已拆分图层。",
-          secondTitle: "确认删除",
-          secondMessage: "此操作不可恢复，已拆分的图层将一并清除。",
-          confirmLabel: "删除",
+          title: "删除全部",
+          message: "将移除左侧原图、右侧操作图及所有已拆分图层。",
+          secondTitle: "确认删除全部",
+          secondMessage: "此操作不可恢复，当前工作区中的原图、操作图与图层将被清除。",
+          confirmLabel: "删除全部",
         })
       : await confirm({
-          title: "删除图片",
-          message: "移除当前图片并返回上传区？",
+          title: "删除全部",
+          message: "移除原图与操作图并返回上传区？",
         });
     if (!ok) return;
 
     await clearSourceState();
-    await toast({ variant: "success", title: "已删除", message: "可重新上传图片" });
+    await toast({ variant: "success", title: "已删除全部", message: "可重新上传图片" });
   }, [
     anyBusy,
     clearSourceState,
@@ -1306,26 +1365,6 @@ function ImageLayerStudioInner() {
     stack,
     toast,
   ]);
-
-  const handleReset = useCallback(async () => {
-    if (anyBusy) return;
-    if (!sourcePreviewUrl && !stack) return;
-
-    const ok = stack
-      ? await doubleConfirm({
-          title: "重置工作区",
-          message: "将清空当前图片、图层与编辑状态。",
-          secondTitle: "确认重置",
-          secondMessage: "此操作不可恢复。",
-          confirmLabel: "重置",
-        })
-      : await confirm({
-          title: "重置工作区",
-          message: "清空当前图片并返回上传区？",
-        });
-    if (!ok) return;
-    await clearSourceState();
-  }, [anyBusy, clearSourceState, confirm, doubleConfirm, sourcePreviewUrl, stack]);
 
   const handleUploadError = useCallback(
     (title: string, message: string) => {
@@ -1358,7 +1397,7 @@ function ImageLayerStudioInner() {
       onCancelLayerSession={() => void handleCancelLayerSession()}
       onNewProject={() => void handleNewProject()}
       onSelectProject={handleSelectProject}
-      onReset={() => void handleReset()}
+      onReset={() => void handleRemoveAll()}
       previewBusy={exportPreviewBusy}
       onPreviewExport={() => void handlePreviewExport()}
       onExport={() => void handleExport()}
@@ -1381,6 +1420,7 @@ function ImageLayerStudioInner() {
     <>
       <div className="h-full min-h-0">
       <EcomWorkspaceLayout
+        assistantClassName="md:w-[480px] md:min-w-[480px] md:max-w-[480px]"
         assistant={
           <ImageLayerAssistantPanel
             toolMode={canvasToolMode}
@@ -1392,11 +1432,11 @@ function ImageLayerStudioInner() {
               decomposeBusy
                 ? "Seedream 5.0 Pro · 可能需 1～2 分钟"
                 : editBusy
-                  ? "一次改层后重拆"
+                  ? "改层后回到整图"
                   : retouchBusy
                     ? retouchModel
                     : eraseBusy
-                      ? eraseModel
+                      ? "图像擦除补全"
                       : uploadBusy
                         ? "正在上传原图至 OSS"
                         : undefined
@@ -1413,11 +1453,9 @@ function ImageLayerStudioInner() {
             retouchParamFields={retouchParamFields}
             retouchPrompt={retouchPrompt}
             retouchBusy={retouchBusy}
-            eraseModel={eraseModel}
-            eraseParams={eraseParams}
-            eraseParamFields={eraseParamFields}
             eraseBusy={eraseBusy}
             editEntries={editEntryViews}
+            selectedLayerId={selectedLayerId}
             editSubmitCount={editSubmitCount}
             onSelectionSubToolChange={setSelectionSubTool}
             onBrushSizeChange={setBrushSize}
@@ -1430,12 +1468,9 @@ function ImageLayerStudioInner() {
             }
             onRetouchPromptChange={setRetouchPrompt}
             onRetouchSubmit={() => void runRetouch()}
-            onEraseModelChange={handleEraseModelChange}
             onEraseSubmit={() => void runErase()}
-            onEraseParamsChange={(name, value) =>
-              setEraseParams((prev) => ({ ...prev, [name]: value }))
-            }
             onReloadRetouchModels={() => void loadRetouchModels()}
+            onSelectLayer={(id) => handleSelectLayer(id)}
             onPromptChange={handleEditPromptChange}
             onSubmitAllEdits={() => void runEditAll()}
             onRemoveEditEntry={handleRemoveEditEntry}
@@ -1452,45 +1487,49 @@ function ImageLayerStudioInner() {
           {sourcePreviewUrl ? (
             <>
               <div className="shrink-0">{toolbar}</div>
-              <div className="ecom-scrollbar-overlay min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain pb-[max(12rem,env(safe-area-inset-bottom,0px))] [overflow-anchor:none]">
-                <ImageLayerCanvas
-                  ref={canvasRef}
-                  sourcePreviewUrl={sourcePreviewUrl}
-                  background={stack?.background ?? null}
-                  layers={stack?.layers ?? []}
-                  selectedLayerId={selectedLayerId}
-                  toolMode={
-                    stack && canvasToolMode === "decompose-bbox"
-                      ? "layer-view"
-                      : canvasToolMode
-                  }
-                  selectionSubTool={selectionSubTool}
-                  retouchUsesBbox={retouchUsesBbox}
-                  brushSize={brushSize}
-                  showTransparentMask={showTransparentMask}
-                  generating={anyBusy}
-                  generatingLabel={generatingLabel}
-                  generatingProgress={generatingProgress}
-                  removeDisabled={anyBusy}
-                  onRemoveSource={() => void handleRemoveSource()}
-                  onSelectLayer={(id) => {
-                    handleSelectLayer(id);
-                    if (id && stack) setCanvasToolMode("layer-view");
-                  }}
-                  onLayerMove={handleLayerMove}
-                  pendingBboxes={pendingBboxes}
-                  onBboxesDrawn={setPendingBboxes}
-                  onBboxLimitReached={() => {
-                    void toast({
-                      variant: "error",
-                      title: `最多 ${IMAGE_LAYER_MAX_BBOXES} 个拆分框`,
-                      message: "请先删除多余框或减少框选数量后再分拆。",
-                    });
-                  }}
-                  onDisplayDimsChange={setDisplayDims}
-                  className="w-full px-4 pb-8 pt-2"
-                />
-                <div className="h-32 shrink-0" aria-hidden />
+              <div className="flex min-h-0 flex-1 overflow-hidden px-3 py-3">
+                <ImageLayerCompareStage
+                  originalUrl={originalImageUrl ?? sourcePreviewUrl}
+                  className="h-full w-full"
+                >
+                  <ImageLayerCanvas
+                    ref={canvasRef}
+                    sourcePreviewUrl={sourcePreviewUrl}
+                    background={stack?.background ?? null}
+                    layers={stack?.layers ?? []}
+                    selectedLayerId={selectedLayerId}
+                    toolMode={
+                      stack && canvasToolMode === "decompose-bbox"
+                        ? "layer-view"
+                        : canvasToolMode
+                    }
+                    selectionSubTool={selectionSubTool}
+                    retouchUsesBbox={retouchUsesBbox}
+                    brushSize={brushSize}
+                    showTransparentMask={showTransparentMask}
+                    generating={anyBusy}
+                    generatingLabel={generatingLabel}
+                    generatingProgress={generatingProgress}
+                    removeDisabled={anyBusy}
+                    onRemoveSource={() => void handleClearWorkingResult()}
+                    onSelectLayer={(id) => {
+                      handleSelectLayer(id);
+                      if (id && stack) setCanvasToolMode("layer-view");
+                    }}
+                    onLayerMove={handleLayerMove}
+                    pendingBboxes={pendingBboxes}
+                    onBboxesDrawn={setPendingBboxes}
+                    onBboxLimitReached={() => {
+                      void toast({
+                        variant: "error",
+                        title: `最多 ${IMAGE_LAYER_MAX_BBOXES} 个拆分框`,
+                        message: "请先删除多余框或减少框选数量后再分拆。",
+                      });
+                    }}
+                    onDisplayDimsChange={setDisplayDims}
+                    className="h-full w-full"
+                  />
+                </ImageLayerCompareStage>
               </div>
             </>
           ) : (

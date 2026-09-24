@@ -29,6 +29,8 @@ export type ImageLayerEditEntry = {
 
 export type ImageLayerWorkspace = {
   sourceImageUrl?: string | null;
+  /** 首次上传的原图，擦除/重绘后仍保留给中栏对照 */
+  originalImageUrl?: string | null;
   stack?: ImageLayerStack | null;
   /** @deprecated 使用 pendingBboxes */
   pendingBbox?: [number, number, number, number] | null;

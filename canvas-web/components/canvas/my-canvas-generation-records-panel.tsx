@@ -468,7 +468,7 @@ export function MyCanvasGenerationRecordsPanel({
       const ok = await doubleConfirm({
         first: {
           title: "恢复此生成时的画布？",
-          message: `将用 ${new Date(item.createdAt).toLocaleString("zh-CN")} 的快照覆盖当前画布（含节点、提示词与连线）。`,
+          message: `将用 ${new Date(item.createdAt).toLocaleString("zh-CN")} 的快照覆盖并保存到当前画布（含节点、提示词与连线）。不会新建画布项目；另存请用「我的画布」里的「复制」。`,
           confirmLabel: "继续",
           danger: true,
         },

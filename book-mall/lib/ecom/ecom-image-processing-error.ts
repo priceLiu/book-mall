@@ -3,6 +3,8 @@ import {
   classifyGatewaySubmitError,
   isContentPolicySubmitMessage,
   isUpstreamBalanceMessage,
+  isUpstreamFreeQuotaMessage,
+  UPSTREAM_FREE_QUOTA_USER_ZH,
 } from "@/lib/gateway/gateway-submit-error-policy";
 
 const CONTENT_POLICY_USER_ZH =
@@ -29,6 +31,10 @@ export function formatEcomImageProcessingUserError(error: unknown): {
 
   if (isContentPolicySubmitMessage(raw)) {
     return { message: CONTENT_POLICY_USER_ZH, status: 400 };
+  }
+
+  if (isUpstreamFreeQuotaMessage(raw)) {
+    return { message: UPSTREAM_FREE_QUOTA_USER_ZH, status: 402 };
   }
 
   if (isUpstreamBalanceMessage(raw)) {
@@ -65,6 +71,17 @@ export function formatEcomImageProcessingUserError(error: unknown): {
 
   if (raw.includes("Gateway")) {
     return { message: raw, status: 402 };
+  }
+
+  if (
+    /Received undefined|first argument must be of type string or an instance of Buffer/i.test(
+      raw,
+    )
+  ) {
+    return {
+      message: "选区或底图数据不完整，请重新框选/涂抹后再试",
+      status: 400,
+    };
   }
 
   if (/image resolution is invalid|largest length of image|smallest length of image/i.test(raw)) {

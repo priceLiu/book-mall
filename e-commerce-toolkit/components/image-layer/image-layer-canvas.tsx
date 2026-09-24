@@ -1,7 +1,14 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
-import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 
 import {
   ImageMaskCanvas,
@@ -80,7 +87,29 @@ export const ImageLayerCanvas = forwardRef<ImageLayerCanvasHandle, Props>(
     },
     ref,
   ) {
+    const paneRef = useRef<HTMLDivElement>(null);
+    const previewImgRef = useRef<HTMLImageElement>(null);
+    const [paneBox, setPaneBox] = useState<{ w: number; h: number } | null>(null);
     const maskRef = useRef<ImageMaskCanvasHandle>(null);
+
+    useEffect(() => {
+      const el = paneRef.current;
+      if (!el) return;
+      const update = () => {
+        const w = Math.max(0, Math.floor(el.clientWidth));
+        const h = Math.max(0, Math.floor(el.clientHeight));
+        setPaneBox((prev) => (prev && prev.w === w && prev.h === h ? prev : { w, h }));
+      };
+      update();
+      const ro = new ResizeObserver(update);
+      ro.observe(el);
+      return () => ro.disconnect();
+    }, []);
+
+    const fitStyle =
+      paneBox && paneBox.w > 0 && paneBox.h > 0
+        ? { maxWidth: paneBox.w, maxHeight: paneBox.h }
+        : undefined;
     const dragRef = useRef<{
       id: string;
       startX: number;
@@ -106,6 +135,11 @@ export const ImageLayerCanvas = forwardRef<ImageLayerCanvasHandle, Props>(
       },
       [onDisplayDimsChange],
     );
+
+    useEffect(() => {
+      const img = previewImgRef.current;
+      if (img && img.clientWidth > 0) reportDisplayDims(img);
+    }, [paneBox, reportDisplayDims]);
 
     const syncBboxesToParent = useCallback(() => {
       const natural = maskRef.current?.getNaturalSize();
@@ -194,8 +228,8 @@ export const ImageLayerCanvas = forwardRef<ImageLayerCanvasHandle, Props>(
         <button
           type="button"
           className="absolute right-2 top-2 z-30 flex h-8 w-8 items-center justify-center rounded-lg border border-[#ff3b30]/30 bg-white/95 text-[#ff3b30] shadow-sm transition hover:border-[#ff3b30] hover:bg-[#fff5f5]"
-          title="删除图片"
-          aria-label="删除图片"
+          title="清除操作结果"
+          aria-label="清除操作结果"
           onClick={(e) => {
             e.stopPropagation();
             onRemoveSource();
@@ -222,61 +256,81 @@ export const ImageLayerCanvas = forwardRef<ImageLayerCanvasHandle, Props>(
       toolMode === "retouch" ||
       toolMode === "erase";
 
-    if (useMaskCanvas) {
-      const maskMode =
-        toolMode === "decompose-bbox"
-          ? "bbox"
-          : toolMode === "erase"
-            ? selectionSubTool === "bbox"
-              ? "bbox"
-              : "mask"
-            : retouchUsesBbox || selectionSubTool === "bbox"
-              ? "bbox"
-              : "mask";
+    const maskMode =
+      toolMode === "decompose-bbox"
+        ? "bbox"
+        : toolMode === "erase"
+          ? selectionSubTool === "bbox"
+            ? "bbox"
+            : "mask"
+          : retouchUsesBbox || selectionSubTool === "bbox"
+            ? "bbox"
+            : "mask";
 
-      const bboxSelection =
-        toolMode === "decompose-bbox" ? "multi" : "single";
-
-      return (
-        <div className={cn("relative w-full min-w-0", className)}>
-          {removeButton}
-          <ImageMaskCanvas
-            key={`${flatImageUrl}-${toolMode}-${maskMode}-${bboxSelection}`}
-            ref={maskRef}
-            imageDataUrl={flatImageUrl}
-            brushSize={brushSize}
-            showTransparentMask={showTransparentMask}
-            maskTool={selectionSubTool === "eraser" ? "eraser" : "brush"}
-            mode={maskMode}
-            bboxSelection={bboxSelection}
-            maxBboxes={IMAGE_LAYER_MAX_BBOXES}
-            initialNormalizedBboxes={
-              toolMode === "decompose-bbox" && pendingBboxes.length
-                ? pendingBboxes
-                : undefined
-            }
-            onMaskChange={handleMaskChange}
-            onBboxLimitReached={onBboxLimitReached}
-            hideFooter
-            className="w-full"
-          />
-          {generatingOverlay}
-        </div>
-      );
-    }
+    const bboxSelection = toolMode === "decompose-bbox" ? "multi" : "single";
 
     return (
-      <div className={cn("relative w-full min-w-0 bg-[#f3f4f6] py-4", className)}>
+      <div
+        ref={paneRef}
+        className={cn(
+          "relative flex h-full min-h-0 min-w-0 w-full items-center justify-center overflow-hidden",
+          !useMaskCanvas && "bg-[#f3f4f6]",
+          className,
+        )}
+      >
+        {useMaskCanvas ? (
+          <>
+            {removeButton}
+            <ImageMaskCanvas
+              key={`${flatImageUrl}-${toolMode}-${maskMode}-${bboxSelection}`}
+              ref={maskRef}
+              imageDataUrl={flatImageUrl}
+              brushSize={brushSize}
+              showTransparentMask={showTransparentMask}
+              maskTool={selectionSubTool === "eraser" ? "eraser" : "brush"}
+              mode={maskMode}
+              bboxSelection={bboxSelection}
+              maxBboxes={IMAGE_LAYER_MAX_BBOXES}
+              initialNormalizedBboxes={
+                toolMode === "decompose-bbox" && pendingBboxes.length
+                  ? pendingBboxes
+                  : undefined
+              }
+              onMaskChange={handleMaskChange}
+              onBboxLimitReached={onBboxLimitReached}
+              hideFooter
+              maxCssSize={paneBox}
+              className="h-full w-full"
+            />
+            {generatingOverlay}
+          </>
+        ) : (
         <div
-          className="relative mx-auto w-fit max-w-full"
-          onPointerDown={() => onSelectLayer(null)}
+          className="relative max-h-full max-w-full"
+          style={fitStyle}
+          onPointerDown={() => {
+            if (background && showLayers) {
+              onSelectLayer(background.id);
+              return;
+            }
+            onSelectLayer(null);
+          }}
         >
-          <div className="relative inline-block max-w-full rounded-xl shadow-md">
+          <div
+            className={cn(
+              "relative inline-block max-h-full max-w-full rounded-xl shadow-md",
+              showLayers &&
+                selectedLayerId === background?.id &&
+                "ring-2 ring-[#2563eb] ring-offset-1",
+            )}
+          >
             {removeButton}
             <img
+              ref={previewImgRef}
               src={flatImageUrl}
               alt="底图"
-              className="block h-auto max-w-full select-none"
+              className="block h-auto w-auto max-h-full max-w-full select-none object-contain"
+              style={fitStyle}
               draggable={false}
               onLoad={(e) => {
                 const img = e.currentTarget;
@@ -336,6 +390,7 @@ export const ImageLayerCanvas = forwardRef<ImageLayerCanvasHandle, Props>(
             {generatingOverlay}
           </div>
         </div>
+        )}
       </div>
     );
   },

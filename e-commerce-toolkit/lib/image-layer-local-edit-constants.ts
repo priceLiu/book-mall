@@ -1,3 +1,2 @@
-/** 对齐 canvas-web `libtv-erase-session` · 擦除固定 prompt */
-export const IMAGE_LAYER_ERASE_PROMPT =
-  "擦除选区内的人物或物体，自然补全背景，保持画面其余部分不变。";
+/** 百炼 · 图像擦除补全（与 canvas-web / Gateway 同一模型，不是分层后的图层擦除） */
+export const IMAGE_LAYER_ERASE_MODEL_KEY = "image-erase-completion";

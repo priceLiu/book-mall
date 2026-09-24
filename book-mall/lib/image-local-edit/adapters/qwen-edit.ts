@@ -1,5 +1,7 @@
+import { bboxToMaskPngDataUrl } from "../bbox-to-mask";
 import { ensurePublicImageUrl } from "../image-url";
 import { invokeQwenLocalEdit } from "../gateway-invoke";
+import { readImagePixelSize } from "../normalize-inpaint-mask";
 import type { LocalEditClientApp, LocalEditSelection } from "../types";
 
 function buildQwenLocalEditPrompt(prompt: string, hasMask: boolean): string {
@@ -42,6 +44,13 @@ export async function runQwenLocalEditAdapter(opts: {
   let maskUrl: string | undefined;
   if (opts.selection?.kind === "mask") {
     maskUrl = await ensurePublicImageUrl(opts.userId, opts.selection.maskDataUrl);
+  } else if (opts.selection?.kind === "bbox") {
+    const sourceInput = opts.sourceImageUrls[0]!;
+    const { width, height } = await readImagePixelSize(sourceInput);
+    maskUrl = await ensurePublicImageUrl(
+      opts.userId,
+      bboxToMaskPngDataUrl(opts.selection.bbox, width, height),
+    );
   }
   const content = buildQwenContent({
     imageUrls,

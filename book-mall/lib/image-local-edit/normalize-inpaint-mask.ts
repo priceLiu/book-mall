@@ -2,8 +2,9 @@ import sharp from "sharp";
 
 function parseDataUrl(dataUrl: string): Buffer {
   const m = /^data:[^;]+;base64,([\s\S]+)$/.exec(dataUrl.trim());
-  if (!m) throw new Error("无效蒙版 data URL");
-  return Buffer.from(m[2], "base64");
+  const b64 = m?.[1]?.replace(/\s/g, "");
+  if (!b64) throw new Error("无效蒙版 data URL");
+  return Buffer.from(b64, "base64");
 }
 
 async function readImageBuffer(image: string): Promise<Buffer> {
@@ -15,7 +16,11 @@ async function readImageBuffer(image: string): Promise<Buffer> {
     redirect: "follow",
   });
   if (!res.ok) throw new Error(`读取蒙版失败 HTTP ${res.status}`);
-  return Buffer.from(await res.arrayBuffer());
+  const bytes = await res.arrayBuffer();
+  if (!bytes || bytes.byteLength === 0) {
+    throw new Error("读取图片失败：空内容");
+  }
+  return Buffer.from(bytes);
 }
 
 /** 万相局部重绘：蒙版须与底图同分辨率，白色=重绘区；二值化软边笔刷 */

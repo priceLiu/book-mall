@@ -25,6 +25,8 @@ type Props = {
   assistantCollapsed?: boolean;
   /** 点击中栏空白时触发（由 studio 决定是否折叠） */
   onMainBlankPointerDown?: (e: React.PointerEvent<HTMLElement>) => void;
+  /** 覆盖助手栏宽度（如图片分层加宽） */
+  assistantClassName?: string;
 };
 
 /**
@@ -42,6 +44,7 @@ export function EcomWorkspaceLayout({
   assistantWide = false,
   assistantCollapsed = false,
   onMainBlankPointerDown,
+  assistantClassName,
 }: Props) {
   const hasAssistant = Boolean(assistant) && !fullWidth;
   const floatingPortalRef = useRef<HTMLDivElement>(null);
@@ -78,6 +81,7 @@ export function EcomWorkspaceLayout({
                   "w-full",
                   assistantWide && "md:w-1/2 md:min-w-0 md:max-w-[50%]",
                 ),
+            assistantClassName,
           )}
           data-ecom-assistant-root
         >

@@ -7,6 +7,7 @@ import { PortalNav } from "@/components/portal-nav";
 import { CanvasShellAuthSlot } from "@/components/layout/canvas-shell-auth-slot";
 import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 import { useCanvasAdmin } from "@/components/home/use-canvas-admin";
+import { CanvasEditorNavGuard } from "@/components/layout/canvas-editor-nav-guard";
 import { CANVAS_NAV_ITEMS, CANVAS_SITE_BRAND_NAME } from "@/lib/site-config";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +23,12 @@ export function CanvasShell({
   const isAdmin = useCanvasAdmin();
 
   if (isCanvasEditor) {
-    return <>{children}</>;
+    return (
+      <>
+        <CanvasEditorNavGuard />
+        {children}
+      </>
+    );
   }
 
   return (

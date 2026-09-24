@@ -41,6 +41,8 @@ import {
   type CanvasDeltaPatch,
 } from "@/lib/canvas/canvas-delta-merge";
 import { mergePersistedMediaIntoCanvasGraph } from "@/lib/canvas/canvas-persist-merge";
+import { assertCanvasNodeCountNotSuspiciouslyDropped } from "@/lib/canvas/canvas-node-count-guard";
+import { isCanvasThumbnailUrlForProject } from "@/lib/canvas/canvas-oss-url-project";
 import { extractManagedOssObjectKey } from "@/lib/oss-delete-object";
 import { readOssEnv } from "@/lib/oss-client";
 
@@ -103,6 +105,7 @@ function isTrustworthyStoredThumbnail(url: string): boolean {
 }
 
 function resolveThumbnailUrl(p: {
+  id: string;
   thumbnailUrl: string;
   canvas: unknown;
 }): string {
@@ -114,13 +117,17 @@ function resolveThumbnailUrl(p: {
   const pickDisplay = preferVideo
     ? pickProjectThumbnailUrlPreferVideo
     : pickProjectThumbnailUrl;
-  const persistable = pickPersistable(p.canvas);
+  const persistable = pickPersistable(p.canvas, p.id);
+  const storedOkForProject =
+    stored &&
+    isTrustworthyStoredThumbnail(stored) &&
+    isCanvasThumbnailUrlForProject(stored, p.id);
 
-  if (persistable && (!stored || !isTrustworthyStoredThumbnail(stored))) {
+  if (persistable && (!stored || !storedOkForProject)) {
     return persistable;
   }
-  if (stored) return stored;
-  return pickDisplay(p.canvas);
+  if (storedOkForProject) return stored;
+  return pickDisplay(p.canvas, p.id);
 }
 
 export function duplicateProjectName(sourceName: string): string {
@@ -159,12 +166,14 @@ function toSummary(p: {
     p.canvas && typeof p.canvas === "object"
       ? (p.canvas as { meta?: unknown })
       : null;
-  const sbv1Cover = projectListCoverSummaryFields(p.canvas);
+  const sbv1Cover = projectListCoverSummaryFields(p.canvas, {
+    projectId: p.id,
+  });
   return {
     id: p.id,
     name: p.name,
     description: p.description,
-    thumbnailUrl: sbv1Cover.thumbnailUrl ?? resolveThumbnailUrl(p),
+    thumbnailUrl: sbv1Cover.thumbnailUrl ?? resolveThumbnailUrl({ ...p }),
     edition: canvasProjectEditionFromGraph(p.canvas),
     coverMediaKind: sbv1Cover.coverMediaKind,
     coverVideoUrl: sbv1Cover.coverVideoUrl,
@@ -233,6 +242,7 @@ function listRowToSummary(
 ): CanvasProjectSummary {
   const storedThumb = row.thumbnailUrl?.trim() ?? "";
   const listCover = resolveProjectListCoverForListRow({
+    projectId: row.id,
     meta: row.meta,
     nodes: nodesFallback,
     storedThumbnailUrl: storedThumb,
@@ -513,6 +523,7 @@ export async function updateCanvasProjectForUser(
     canvas?: unknown;
     canvasDelta?: CanvasDeltaPatch;
     thumbnailUrl?: string;
+    allowSuspiciousNodeCountDrop?: boolean;
   },
 ): Promise<CanvasProjectDetail> {
   await assertAccessibleCanvasProject(userId, projectId);
@@ -544,23 +555,35 @@ export async function updateCanvasProjectForUser(
       "canvas and canvasDelta are mutually exclusive",
     );
   }
+  let mergedCanvasForGuard: unknown | undefined;
   if (patch.canvasDelta !== undefined) {
     assertCanvasDeltaBaseUpdatedAt(patch.canvasDelta.baseUpdatedAt, p.updatedAt);
-    const mergedCanvas = embedListCoverInCanvas(
+    mergedCanvasForGuard = embedListCoverInCanvas(
       mergePersistedMediaIntoCanvasGraph(
         applyCanvasDelta(p.canvas, patch.canvasDelta),
         p.canvas,
       ),
     );
-    data.canvas = mergedCanvas as Prisma.InputJsonValue;
+    data.canvas = mergedCanvasForGuard as Prisma.InputJsonValue;
   } else if (patch.canvas !== undefined) {
     if (!patch.canvas || typeof patch.canvas !== "object") {
       throw new CanvasProjectError("INVALID_INPUT", "canvas must be object");
     }
-    const mergedCanvas = embedListCoverInCanvas(
+    mergedCanvasForGuard = embedListCoverInCanvas(
       mergePersistedMediaIntoCanvasGraph(patch.canvas, p.canvas),
     );
-    data.canvas = mergedCanvas as Prisma.InputJsonValue;
+    data.canvas = mergedCanvasForGuard as Prisma.InputJsonValue;
+  }
+
+  if (mergedCanvasForGuard !== undefined) {
+    const guard = assertCanvasNodeCountNotSuspiciouslyDropped({
+      previousCanvas: p.canvas,
+      nextCanvas: mergedCanvasForGuard,
+      allowSuspiciousNodeCountDrop: patch.allowSuspiciousNodeCountDrop,
+    });
+    if (!guard.ok) {
+      throw new CanvasProjectError("INVALID_INPUT", guard.message, 400);
+    }
   }
 
   const updated = await prisma.canvasProject.update({

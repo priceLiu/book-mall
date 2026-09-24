@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { LayoutTemplate } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
@@ -10,7 +17,6 @@ import {
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { CanvasGlobalAssetLibraryRoot } from "@/components/global-asset-library/canvas-global-asset-library-root";
 import { handleCanvasWheel } from "@/lib/canvas/canvas-form-wheel";
-import { installCanvasEditorPageNavGuards } from "@/lib/canvas/canvas-block-browser-nav";
 import { defaultCanvasProjectName } from "@/lib/canvas/default-project-name";
 import { registerCanvasNotifier } from "@/lib/canvas/canvas-notify";
 import {
@@ -328,6 +334,8 @@ function Inner({ projectId }: { projectId: string }) {
   const [nameDraft, setNameDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const canvasRouteReady =
+    !loading && project !== null && project.id === projectId;
   const inflightTaskCount = useCanvasInflightTaskCount();
   const mediaRenderActive = useCanvasStore((s) =>
     hasAnyMediaRenderInFlight(s.nodes),
@@ -336,14 +344,22 @@ function Inner({ projectId }: { projectId: string }) {
   const mediaRenderActiveRef = useRef(mediaRenderActive);
   inflightTaskCountRef.current = inflightTaskCount;
   mediaRenderActiveRef.current = mediaRenderActive;
-  const taskSyncEnabled = !loading && !mediaRenderActive;
+  const taskSyncEnabled = canvasRouteReady && !mediaRenderActive;
   useCanvasTaskEventStream(base, projectId, taskSyncEnabled);
   useCanvasTaskSse(base, projectId, inflightTaskCount, taskSyncEnabled);
 
+  useLayoutEffect(() => {
+    if (!base?.trim()) return;
+    canvasReadyRef.current = false;
+    setProject(null);
+    setLoading(true);
+    setLoadError(null);
+  }, [projectId, base]);
+
   useEffect(() => {
-    if (!base?.trim() || loading) return;
+    if (!base?.trim() || !canvasRouteReady) return;
     prefetchUserProviders(base);
-  }, [base, loading]);
+  }, [base, canvasRouteReady]);
 
   useEffect(() => {
     if (!base?.trim() || loading || !isStoryPro2Canvas || !hasPro2ScriptHub) {
@@ -413,8 +429,6 @@ function Inner({ projectId }: { projectId: string }) {
     return () =>
       document.removeEventListener("wheel", onWheel, { capture: true });
   }, []);
-
-  useEffect(() => installCanvasEditorPageNavGuards(), []);
 
   useEffect(() => {
     const open = () => {
@@ -605,7 +619,8 @@ function Inner({ projectId }: { projectId: string }) {
   autosaveBaseRef.current = base;
 
   useEffect(() => {
-    if (!project || !base || loading) return;
+    // URL 已切到 projectId，但 project 仍是上一张画布时禁止 autosave（否则会把 A 的图 PATCH 到 B）
+    if (!project || !base || !canvasRouteReady) return;
 
     const syncLastPersistedSnapshot = () => {
       lastPersistedSnapshotRef.current = readCanvasPersistSnapshot(
@@ -640,6 +655,7 @@ function Inner({ projectId }: { projectId: string }) {
         networkRetryCount?: number;
         /** 离开页等：冷却期内仍尝试落盘 */
         bypassCooldown?: boolean;
+        allowSuspiciousNodeCountDrop?: boolean;
       } = {},
     ) => {
       let writeHistory = opts.writeHistory ?? false;
@@ -694,6 +710,12 @@ function Inner({ projectId }: { projectId: string }) {
       const proj = autosaveProjectRef.current;
       const bookBase = autosaveBaseRef.current;
       if (!proj || !bookBase || !canvasReadyRef.current) return;
+      if (proj.id !== projectId) return;
+      const storeProjectId = useCanvasStore.getState().projectId;
+      if (storeProjectId !== projectId) {
+        autosavePendingRef.current = true;
+        return;
+      }
       if (!force && Date.now() < canvasHydratingUntilRef.current) return;
       // 硬失败冷却期内：跳过一切自动/强制落盘（含任务完成后 flush），避免死循环
       if (
@@ -714,7 +736,7 @@ function Inner({ projectId }: { projectId: string }) {
       const currentSnap = readCanvasPersistSnapshot(snapshot);
       const persisted = lastPersistedSnapshotRef.current;
       const graph = buildCanvasPersistGraph(snapshot.toGraph);
-      const thumb = pickPersistableProjectThumbnailUrl(graph);
+      const thumb = pickPersistableProjectThumbnailUrl(graph, projectId);
       const thumbChanged = Boolean(thumb && thumb !== proj.thumbnailUrl);
 
       // strip 后内容与视口无变化 → 跳过 PATCH（仅 revision / transient 字段变了）
@@ -765,7 +787,7 @@ function Inner({ projectId }: { projectId: string }) {
         const snapshot = useCanvasStore.getState();
         const revisionAtSnapshot = snapshot.graphRevision;
         const graph = buildCanvasPersistGraph(snapshot.toGraph);
-        const thumb = pickPersistableProjectThumbnailUrl(graph);
+        const thumb = pickPersistableProjectThumbnailUrl(graph, projectId);
         const persistedSnap = lastPersistedSnapshotRef.current;
         const lastGraph = persistedSnap
           ? parsePersistedCanvasGraph(persistedSnap.graph)
@@ -776,6 +798,7 @@ function Inner({ projectId }: { projectId: string }) {
           canvasDelta?: import("@/lib/canvas/canvas-persist-delta").CanvasDeltaPatch;
           thumbnailUrl?: string;
           historySnapshot?: { source: "autosave"; thumbnailUrl?: string };
+          allowSuspiciousNodeCountDrop?: boolean;
         };
 
         let patch: AutosavePatch;
@@ -815,6 +838,9 @@ function Inner({ projectId }: { projectId: string }) {
         }
         if (thumb && thumb !== proj.thumbnailUrl) {
           patch.thumbnailUrl = thumb;
+        }
+        if (opts.allowSuspiciousNodeCountDrop) {
+          patch.allowSuspiciousNodeCountDrop = true;
         }
         setPhase(patch.canvasDelta ? "patch_delta" : "patch_full");
         const patchAbort = new AbortController();
@@ -915,6 +941,33 @@ function Inner({ projectId }: { projectId: string }) {
             ...opts,
             networkRetryCount: networkRetryCount + 1,
           });
+          return;
+        }
+        if (
+          !opts.allowSuspiciousNodeCountDrop &&
+          errMsg.includes("CANVAS_NODE_COUNT_COLLAPSE")
+        ) {
+          const ok = await dialogs.doubleConfirm({
+            first: {
+              title: "节点数骤降 · 仍要保存？",
+              message:
+                "本次保存会让画布节点数相对服务器版本少很多。若你正在恢复历史或有意清空，可以继续；否则请取消并检查是否开错了画布。",
+              confirmLabel: "继续",
+              danger: true,
+            },
+            second: {
+              title: "再次确认",
+              message: "确认覆盖当前服务器上的画布内容。",
+              confirmLabel: "确认保存",
+              danger: true,
+            },
+          });
+          if (ok) {
+            await runAutosave(force, {
+              ...opts,
+              allowSuspiciousNodeCountDrop: true,
+            });
+          }
           return;
         }
         if (saveGen === saveGenerationRef.current) {
@@ -1183,7 +1236,7 @@ function Inner({ projectId }: { projectId: string }) {
         autosaveReconnectTimerRef.current = null;
       }
     };
-  }, [project, base, projectId, loading]);
+  }, [project, base, projectId, canvasRouteReady, dialogs]);
 
   /** 生成/剪辑结束后补跑被推迟的 autosave */
   useEffect(() => {
@@ -1244,7 +1297,7 @@ function Inner({ projectId }: { projectId: string }) {
         queueMicrotask(() => resolve());
       });
       const graph = buildCanvasPersistGraph(toGraph);
-      const thumb = pickPersistableProjectThumbnailUrl(graph);
+      const thumb = pickPersistableProjectThumbnailUrl(graph, projectId);
       savePhaseRef.current = "history_thumb";
       setSavePhase("history_thumb");
       const shot = await captureCanvasViewportSnapshotUrl(base);
@@ -1336,12 +1389,30 @@ function Inner({ projectId }: { projectId: string }) {
       await new Promise<void>((resolve) => {
         requestAnimationFrame(() => resolve());
       });
-      syncLastPersistedSnapshotRef.current?.();
-      setLastSavedAt(new Date());
       setSaveError(null);
+      // 须立即 PATCH：若误标为已持久化，刷新后会回到旧图，且易被误以为要用「复制」补救
+      await runAutosaveRef.current(true, {
+        writeHistory: true,
+        bypassCooldown: true,
+        allowSuspiciousNodeCountDrop: true,
+      });
+      await Promise.race([
+        waitForAutosaveIdle(),
+        new Promise<void>((resolve) => {
+          window.setTimeout(resolve, 12_000);
+        }),
+      ]);
+      if (isCanvasDirtyRef.current?.()) {
+        await dialogs.alert({
+          title: "版本已加载，但保存未完成",
+          message:
+            "请点工具栏「保存」或稍候自动保存后再刷新。恢复是覆盖当前画布，不会在「我的画布」里新建副本（与列表「复制」不同）。",
+          variant: "warning",
+        });
+      }
       await exitImmersive();
     },
-    [exitImmersive, hydrate, projectId],
+    [dialogs, exitImmersive, hydrate, projectId],
   );
 
   // 生成记录 · 恢复画布 / 定位节点（?restoreHistory=&focusNode=）
@@ -1575,8 +1646,22 @@ function Inner({ projectId }: { projectId: string }) {
   }, [dialogs, hydrate, manualSave, projectId]);
 
   let body: React.ReactNode;
-  if (loading) {
-    body = <CanvasEditorRouteLoading label="加载画布…" />;
+  if (!canvasRouteReady) {
+    body = loadError ? (
+      <div className="fixed inset-0 z-[200] flex h-[100dvh] flex-col items-center justify-center gap-3 bg-[var(--canvas-bg)] px-6 text-center text-sm text-red-200">
+        <p>
+          无法加载画布：
+          {loadError && /\b404\b/.test(loadError)
+            ? "旧版 2.0 剧本项目已停用（须新建项目使用 JSON-only 剧本），或项目不存在。纯生图/未用剧本的 2.0 项目不受影响。"
+            : (loadError ?? "未知错误")}
+        </p>
+        <a href="/projects" className="underline">
+          回到画布列表
+        </a>
+      </div>
+    ) : (
+      <CanvasEditorRouteLoading label="加载画布…" />
+    );
   } else if (loadError || !project) {
     const retiredHint =
       loadError && /\b404\b/.test(loadError)

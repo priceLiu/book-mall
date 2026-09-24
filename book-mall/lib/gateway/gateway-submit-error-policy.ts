@@ -55,6 +55,16 @@ export const UPSTREAM_BALANCE_MARKERS = [
   "余额不足",
 ] as const;
 
+/** 百炼 / DashScope 免费额度用尽（与账户欠费不同） */
+export const UPSTREAM_FREE_QUOTA_MARKERS = [
+  "free allocated quota exceeded",
+  "freefallocatedquotaexceeded",
+  "allocated quota exceeded",
+  "freequotaexceeded",
+  "免费额度",
+  "免费配额",
+] as const;
+
 export const TRANSIENT_SUBMIT_MARKERS = [
   "econnreset",
   "econnrefused",
@@ -120,6 +130,17 @@ export function isUpstreamBalanceMessage(message?: string | null): boolean {
   if (!blob) return false;
   return UPSTREAM_BALANCE_MARKERS.some((m) => blob.includes(m));
 }
+
+export function isUpstreamFreeQuotaMessage(message?: string | null): boolean {
+  const blob = normalizeBlob(message ?? "").replace(/[\s._-]+/g, "");
+  if (!blob) return false;
+  return UPSTREAM_FREE_QUOTA_MARKERS.some((m) =>
+    blob.includes(m.replace(/[\s._-]+/g, "")),
+  );
+}
+
+export const UPSTREAM_FREE_QUOTA_USER_ZH =
+  "该模型的厂商免费额度已用完。请在阿里云百炼控制台开通付费或提高额度，或在擦除/重绘里换用其它已绑定模型。";
 
 function isInvalidInputMessage(message: string, httpStatus?: number): boolean {
   if (httpStatus === 400 && !isContentPolicySubmitMessage(message)) {
@@ -279,6 +300,16 @@ export function classifyGatewaySubmitError(error: unknown): ClassifiedGatewaySub
   const message = error instanceof Error ? error.message : String(error);
   const vendorRequestId = extractVendorRequestId(message);
 
+  if (isUpstreamFreeQuotaMessage(message)) {
+    return {
+      class: "NON_RETRYABLE",
+      failCode: "UPSTREAM_FREE_QUOTA_EXCEEDED",
+      message,
+      vendorRequestId,
+      retryable: false,
+      userHintZh: UPSTREAM_FREE_QUOTA_USER_ZH,
+    };
+  }
   if (isUpstreamBalanceMessage(message)) {
     return {
       class: "NON_RETRYABLE",

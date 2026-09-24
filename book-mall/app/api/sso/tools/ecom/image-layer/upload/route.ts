@@ -44,6 +44,7 @@ export async function POST(req: Request) {
     if (projectId) {
       await saveEcomImageLayerWorkspace(auth.userId, projectId, {
         sourceImageUrl: result.ossUrl,
+        originalImageUrl: result.ossUrl,
         stack: null,
         pendingBboxes: [],
         pendingBbox: null,

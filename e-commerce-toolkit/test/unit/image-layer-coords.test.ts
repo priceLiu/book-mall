@@ -19,7 +19,9 @@ describe("image-layer-coords", () => {
   });
 
   it("buildDecomposePrompt auto", () => {
-    expect(buildDecomposePrompt([])).toContain("完整图层语义分离");
+    expect(buildDecomposePrompt([])).toContain("对图片做完整图层语义分离");
+    expect(buildDecomposePrompt([])).toContain("从底图移除");
+    expect(buildDecomposePrompt([])).toContain("房间环境保持不变");
   });
 
   it("buildDecomposePrompt multi bbox", () => {

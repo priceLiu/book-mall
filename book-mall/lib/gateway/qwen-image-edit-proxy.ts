@@ -103,7 +103,7 @@ function buildMultimodalImageParameters(
 
   if (p?.negative_prompt?.trim()) parameters.negative_prompt = p.negative_prompt.trim();
   if (p?.prompt_extend !== undefined) parameters.prompt_extend = p.prompt_extend;
-  if (p?.watermark !== undefined) parameters.watermark = p.watermark;
+  parameters.watermark = p?.watermark === true;
   if (p?.seed !== undefined && Number.isFinite(p.seed)) parameters.seed = p.seed;
   if (p?.n !== undefined && p.n >= 1) parameters.n = Math.min(6, Math.floor(p.n));
   if (p?.size?.trim()) parameters.size = p.size.trim();

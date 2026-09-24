@@ -62,14 +62,16 @@ function bboxTag(b: [number, number, number, number]): string {
 export function buildDecomposePrompt(
   bboxes: Array<[number, number, number, number]>,
 ): string {
+  const hint =
+    "已分离的人物和物体须从底图移除，空位按原图场景、光影与桌面自然补全；房间环境保持不变，禁止换成空白、纯色或新背景。";
   if (bboxes.length === 0) {
-    return "将图片进行精确图层分离，对图片做完整图层语义分离。";
+    return `将图片进行精确图层分离，对图片做完整图层语义分离。${hint}`;
   }
   if (bboxes.length === 1) {
-    return `将图片进行精确图层分离，需分离的区域坐标为 ${bboxTag(bboxes[0]!)}。`;
+    return `将图片进行精确图层分离，需分离的区域坐标为 ${bboxTag(bboxes[0]!)}。${hint}`;
   }
   const parts = bboxes.map((b, i) => `区域${i + 1}${bboxTag(b)}`);
-  return `将图片进行精确图层分离，需分离的${parts.join("、")}。`;
+  return `将图片进行精确图层分离，需分离的${parts.join("、")}。${hint}`;
 }
 
 export function buildEditPrompt(

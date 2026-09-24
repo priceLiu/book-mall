@@ -19,6 +19,8 @@ export const ECOM_IMAGE_LAYER_MODEL = "doubao-seedream-5-0-pro";
 export const ECOM_IMAGE_LAYER_TOOL_KEY = "ecom-toolkit__image-layer";
 /** 与 Seedream 物体层上限一致 */
 export const ECOM_IMAGE_LAYER_MAX_BBOXES = 16;
+/** 交互编辑不能用 size=auto（仅 layer_decomposition 允许） */
+export const ECOM_IMAGE_LAYER_EDIT_SIZE = "2K";
 
 export type ImageLayerBbox = {
   normalized?: [number, number, number, number];
@@ -206,6 +208,7 @@ async function callSeedreamLayerGenerations(opts: {
     parameters: {
       size: opts.size,
       layer_decomposition: true,
+      watermark: false,
       ...(opts.outputFormat ? { output_format: opts.outputFormat } : {}),
     },
     clientPage: opts.clientPage,
@@ -316,17 +319,19 @@ export type ImageLayerEditJob = {
   prompt: string;
 };
 
+export type ImageLayerEditResult = {
+  imageUrl: string;
+  logId?: string;
+};
+
 /**
- * 批量改层：一次交互编辑（多 bbox prompt）→ 一次重拆（优先沿用原框坐标）。
+ * 批量改层（策略 B）：一次交互编辑，返回整图；清空图层，不再自动重拆。
  */
 export async function editImageLayerRegions(opts: {
   userId: string;
   compositeImageUrl: string;
   edits: ImageLayerEditJob[];
-  /** 重拆时沿用的框选坐标（与初次拆分一致时成功率更高） */
-  redecomposeBboxes?: Array<[number, number, number, number]>;
-  size?: string;
-}): Promise<ImageLayerStack> {
+}): Promise<ImageLayerEditResult> {
   await assertEcomToolkitGatewayAccess(opts.userId);
   if (opts.edits.length === 0) {
     throw new Error("缺少编辑区域");
@@ -351,31 +356,16 @@ export async function editImageLayerRegions(opts: {
     model: ECOM_IMAGE_LAYER_MODEL,
     prompt: editPrompt,
     image: publicUrl,
-    parameters: { size: "auto", output_format: "png" },
+    parameters: {
+      size: ECOM_IMAGE_LAYER_EDIT_SIZE,
+      output_format: "png",
+      watermark: false,
+    },
     clientPage: "ecom/image-layer/edit",
   });
 
   const editedUrl = await persistVendorImage(opts.userId, images[0] ?? {}, "png");
-
-  let stack: ImageLayerStack;
-  try {
-    stack = await decomposeImageLayer({
-      userId: opts.userId,
-      sourceImageUrl: editedUrl,
-      bboxes: opts.redecomposeBboxes,
-      size: opts.size?.trim() || "auto",
-    });
-  } catch (e) {
-    const raw = e instanceof Error ? e.message : "图层重拆失败";
-    throw new Error(
-      mapSeedreamLayerDecomposeError(raw, {
-        bboxCount: opts.redecomposeBboxes?.length ?? 0,
-        afterEdit: true,
-      }),
-    );
-  }
-
-  return { ...stack, logId: editLogId || stack.logId };
+  return { imageUrl: editedUrl, ...(editLogId ? { logId: editLogId } : {}) };
 }
 
 /** @deprecated 请用 editImageLayerRegions；保留单区域签名供兼容 */
@@ -384,14 +374,10 @@ export async function editImageLayerRegion(opts: {
   compositeImageUrl: string;
   bbox: [number, number, number, number];
   prompt: string;
-  redecomposeBboxes?: Array<[number, number, number, number]>;
-  size?: string;
-}): Promise<ImageLayerStack> {
+}): Promise<ImageLayerEditResult> {
   return editImageLayerRegions({
     userId: opts.userId,
     compositeImageUrl: opts.compositeImageUrl,
     edits: [{ bbox: opts.bbox, prompt: opts.prompt }],
-    redecomposeBboxes: opts.redecomposeBboxes,
-    size: opts.size,
   });
 }

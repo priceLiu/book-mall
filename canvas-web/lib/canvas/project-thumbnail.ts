@@ -1,5 +1,21 @@
 import type { CanvasGraph } from "./types";
 
+/** 与 book-mall canvas-oss-url-project 保持一致 */
+function canvasOssUrlBelongsToProject(url: string, projectId: string): boolean {
+  const pid = projectId.trim();
+  if (!pid) return true;
+  const u = url.trim();
+  if (!u.startsWith("http")) return false;
+  return (
+    u.includes(`/node-image/${pid}/`) ||
+    u.includes(`/node-image/${pid}?`) ||
+    u.includes(`/node-video/${pid}/`) ||
+    u.includes(`/node-video/${pid}?`) ||
+    u.endsWith(`/node-image/${pid}`) ||
+    u.endsWith(`/node-video/${pid}`)
+  );
+}
+
 const IMAGE_THUMBNAIL_NODE_TYPES = new Set([
   "sbv1-image",
   "story-pro2-image",
@@ -67,13 +83,29 @@ function pickFromNodes(
   nodes: Array<{ type?: string; data?: unknown }>,
   nodeTypes: Set<string>,
   pickUrl: (data: unknown) => string,
+  projectId?: string,
 ): string {
-  for (const n of nodes) {
-    if (!n.type || !nodeTypes.has(n.type)) continue;
-    const url = pickUrl(n.data);
-    if (url) return url;
+  const tryPass = (preferOwnProject: boolean) => {
+    for (const n of nodes) {
+      if (!n.type || !nodeTypes.has(n.type)) continue;
+      const url = pickUrl(n.data);
+      if (!url) continue;
+      if (
+        preferOwnProject &&
+        projectId &&
+        !canvasOssUrlBelongsToProject(url, projectId)
+      ) {
+        continue;
+      }
+      return url;
+    }
+    return "";
+  };
+  if (projectId) {
+    const own = tryPass(true);
+    if (own) return own;
   }
-  return "";
+  return tryPass(false);
 }
 
 /** 视频节点：优先取成片 URL（非 poster） */
@@ -111,45 +143,107 @@ function displayVideoUrlFromNodeData(data: unknown): string {
  * 从画布图里挑最近一条图片或视频作为项目缩略图（按节点顺序，后添加优先）。
  * 含 ephemeral 兜底，供列表即时展示。
  */
-export function pickProjectThumbnailUrl(graph: CanvasGraph): string {
+export function pickProjectThumbnailUrl(
+  graph: CanvasGraph,
+  projectId?: string,
+): string {
   const nodes = [...(graph.nodes ?? [])].reverse();
 
   return (
-    pickFromNodes(nodes, IMAGE_THUMBNAIL_NODE_TYPES, displayMediaUrlFromNodeData) ||
-    pickFromNodes(nodes, VIDEO_THUMBNAIL_NODE_TYPES, displayMediaUrlFromNodeData)
+    pickFromNodes(
+      nodes,
+      IMAGE_THUMBNAIL_NODE_TYPES,
+      displayMediaUrlFromNodeData,
+      projectId,
+    ) ||
+    pickFromNodes(
+      nodes,
+      VIDEO_THUMBNAIL_NODE_TYPES,
+      displayMediaUrlFromNodeData,
+      projectId,
+    )
   );
 }
 
 /**
  * 写入 DB 的封面：只用 OSS 等稳定 URL，避免 ephemeral 过期后列表坏图。
  */
-export function pickPersistableProjectThumbnailUrl(graph: CanvasGraph): string {
+export function pickPersistableProjectThumbnailUrl(
+  graph: CanvasGraph,
+  projectId?: string,
+): string {
   const nodes = [...(graph.nodes ?? [])].reverse();
 
   return (
-    pickFromNodes(nodes, IMAGE_THUMBNAIL_NODE_TYPES, persistableMediaUrlFromNodeData) ||
-    pickFromNodes(nodes, VIDEO_THUMBNAIL_NODE_TYPES, persistableMediaUrlFromNodeData)
+    pickFromNodes(
+      nodes,
+      IMAGE_THUMBNAIL_NODE_TYPES,
+      persistableMediaUrlFromNodeData,
+      projectId,
+    ) ||
+    pickFromNodes(
+      nodes,
+      VIDEO_THUMBNAIL_NODE_TYPES,
+      persistableMediaUrlFromNodeData,
+      projectId,
+    )
   );
 }
 
 /** 列表封面：优先最近一条成片，无成片再回退分镜图 */
-export function pickProjectThumbnailUrlPreferVideo(graph: CanvasGraph): string {
+export function pickProjectThumbnailUrlPreferVideo(
+  graph: CanvasGraph,
+  projectId?: string,
+): string {
   const nodes = [...(graph.nodes ?? [])].reverse();
 
   return (
-    pickFromNodes(nodes, VIDEO_THUMBNAIL_NODE_TYPES, displayVideoUrlFromNodeData) ||
-    pickFromNodes(nodes, VIDEO_THUMBNAIL_NODE_TYPES, displayMediaUrlFromNodeData) ||
-    pickFromNodes(nodes, IMAGE_THUMBNAIL_NODE_TYPES, displayMediaUrlFromNodeData)
+    pickFromNodes(
+      nodes,
+      VIDEO_THUMBNAIL_NODE_TYPES,
+      displayVideoUrlFromNodeData,
+      projectId,
+    ) ||
+    pickFromNodes(
+      nodes,
+      VIDEO_THUMBNAIL_NODE_TYPES,
+      displayMediaUrlFromNodeData,
+      projectId,
+    ) ||
+    pickFromNodes(
+      nodes,
+      IMAGE_THUMBNAIL_NODE_TYPES,
+      displayMediaUrlFromNodeData,
+      projectId,
+    )
   );
 }
 
-export function pickPersistableProjectThumbnailUrlPreferVideo(graph: CanvasGraph): string {
+export function pickPersistableProjectThumbnailUrlPreferVideo(
+  graph: CanvasGraph,
+  projectId?: string,
+): string {
   const nodes = [...(graph.nodes ?? [])].reverse();
 
   return (
-    pickFromNodes(nodes, VIDEO_THUMBNAIL_NODE_TYPES, persistableVideoUrlFromNodeData) ||
-    pickFromNodes(nodes, VIDEO_THUMBNAIL_NODE_TYPES, persistableMediaUrlFromNodeData) ||
-    pickFromNodes(nodes, IMAGE_THUMBNAIL_NODE_TYPES, persistableMediaUrlFromNodeData)
+    pickFromNodes(
+      nodes,
+      VIDEO_THUMBNAIL_NODE_TYPES,
+      persistableVideoUrlFromNodeData,
+      projectId,
+    ) ||
+    pickFromNodes(
+      nodes,
+      VIDEO_THUMBNAIL_NODE_TYPES,
+      persistableMediaUrlFromNodeData,
+      projectId,
+    ) ||
+    pickFromNodes(
+      nodes,
+      IMAGE_THUMBNAIL_NODE_TYPES,
+      persistableMediaUrlFromNodeData,
+      projectId,
+    )
   );
 }
 

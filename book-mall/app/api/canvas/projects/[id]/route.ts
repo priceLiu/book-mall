@@ -76,6 +76,8 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
         typeof body.body.thumbnailUrl === "string"
           ? body.body.thumbnailUrl
           : undefined,
+      allowSuspiciousNodeCountDrop:
+        body.body.allowSuspiciousNodeCountDrop === true,
     });
 
     const hs = body.body.historySnapshot;

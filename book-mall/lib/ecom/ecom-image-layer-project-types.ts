@@ -39,6 +39,8 @@ const editEntrySchema = z.object({
 
 export const imageLayerWorkspaceSchema = z.object({
   sourceImageUrl: z.string().nullable().optional(),
+  /** 首次上传的原图，擦除/重绘后仍保留给中栏对照 */
+  originalImageUrl: z.string().nullable().optional(),
   stack: stackSchema.nullable().optional(),
   pendingBbox: bboxSchema.nullable().optional(),
   pendingBboxes: z.array(bboxSchema).max(16).optional(),

@@ -14,6 +14,11 @@ describe("image-local-edit model-capabilities", () => {
   it("routes wanx to required mask", () => {
     expect(getLocalEditSelectionMode("wanx-x-painting")).toBe("mask");
     expect(() => assertLocalEditSelection("wanx-x-painting")).toThrow(/蒙版/);
+    expect(() =>
+      assertLocalEditSelection("wanx-x-painting", {
+        kind: "bbox",
+      }),
+    ).not.toThrow();
   });
 
   it("routes wan2.7 to bbox", () => {

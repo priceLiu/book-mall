@@ -1,5 +1,9 @@
+/** 底图补洞，场景/光影不变（不要整张换成白底或新房间） */
+export const DECOMPOSE_BACKGROUND_HINT =
+  "已分离的人物和物体须从底图移除，空位按原图场景、光影与桌面自然补全；房间环境保持不变，禁止换成空白、纯色或新背景。";
+
 export const AUTO_DECOMPOSE_PROMPT =
-  "将图片进行精确图层分离，对图片做完整图层语义分离。";
+  `将图片进行精确图层分离，对图片做完整图层语义分离。${DECOMPOSE_BACKGROUND_HINT}`;
 
 /** 0～999 归一化 bbox 在 999 刻度下的最小宽高（约 1% 画幅） */
 export const DECOMPOSE_BBOX_MIN_SPAN = 10;
@@ -52,11 +56,11 @@ export function buildDecomposePrompt(
   if (bboxes.length === 0) return AUTO_DECOMPOSE_PROMPT;
 
   if (bboxes.length === 1) {
-    return `将图片进行精确图层分离，需分离的区域坐标为 ${bboxTag(bboxes[0]!)}。`;
+    return `将图片进行精确图层分离，需分离的区域坐标为 ${bboxTag(bboxes[0]!)}。${DECOMPOSE_BACKGROUND_HINT}`;
   }
 
   const parts = bboxes.map((b, i) => `区域${i + 1}${bboxTag(b)}`);
-  return `将图片进行精确图层分离，需分离的${parts.join("、")}。`;
+  return `将图片进行精确图层分离，需分离的${parts.join("、")}。${DECOMPOSE_BACKGROUND_HINT}`;
 }
 
 export function buildEditPrompt(

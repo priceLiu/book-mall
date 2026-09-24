@@ -2,7 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Loader2, Copy, Plus, Trash2, X, Star, Clapperboard, Send } from "lucide-react";
+import {
+  Loader2,
+  Copy,
+  Plus,
+  Trash2,
+  X,
+  Star,
+  Clapperboard,
+  Send,
+  Search,
+} from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
   CanvasCreditsToastHost,
@@ -1168,24 +1178,62 @@ function ProjectsSection({
   openingProjectId: string | null;
   onOpeningProject: (id: string | null) => void;
 }) {
+  const [titleQuery, setTitleQuery] = useState("");
+  const queryNorm = titleQuery.trim().toLowerCase();
+  const filteredProjects = useMemo(() => {
+    if (!queryNorm) return projects;
+    return projects.filter((p) => {
+      const name = (p.name ?? "").toLowerCase();
+      const desc = (p.description ?? "").toLowerCase();
+      return name.includes(queryNorm) || desc.includes(queryNorm);
+    });
+  }, [projects, queryNorm]);
+
+  const countLabel =
+    queryNorm && filteredProjects.length !== projects.length
+      ? `${filteredProjects.length} / ${projects.length} 张`
+      : `${projects.length} 张`;
+
   return (
     <section>
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-xl font-medium text-white">{title}</h2>
-            <span
-              className={`rounded-full border px-2 py-0.5 text-[10px] ${canvasEditionBadgeClass(edition)}`}
-            >
-              {canvasEditionLabel(edition)}
-            </span>
-            <span className="text-xs text-[var(--canvas-muted)]">{projects.length} 张</span>
-          </div>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-2">
+          <h2 className="text-xl font-medium text-white">{title}</h2>
+          <span
+            className={`rounded-full border px-2 py-0.5 text-[10px] ${canvasEditionBadgeClass(edition)}`}
+          >
+            {canvasEditionLabel(edition)}
+          </span>
+          <span className="text-xs text-[var(--canvas-muted)]">{countLabel}</span>
         </div>
+        <label className="relative mx-auto w-full min-w-0 max-w-md flex-1 sm:px-2">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[var(--canvas-muted)] sm:left-5"
+            aria-hidden
+          />
+          <input
+            type="search"
+            value={titleQuery}
+            onChange={(e) => setTitleQuery(e.target.value)}
+            placeholder="搜索画布标题…"
+            aria-label={`${title} · 按标题筛选`}
+            className="w-full rounded-lg border border-white/10 bg-black/25 py-2 pl-9 pr-8 text-sm text-white placeholder:text-white/35 focus:border-[var(--canvas-accent)]/50 focus:outline-none sm:pl-11"
+          />
+          {titleQuery ? (
+            <button
+              type="button"
+              onClick={() => setTitleQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--canvas-muted)] hover:text-white"
+              aria-label="清空搜索"
+            >
+              <X className="size-3.5" />
+            </button>
+          ) : null}
+        </label>
         <button
           type="button"
           onClick={onCreate}
-          className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-white hover:border-white/30"
+          className="shrink-0 self-end rounded-full border border-white/15 px-3 py-1.5 text-xs text-white hover:border-white/30 sm:self-center"
         >
           <Plus className="mr-1 inline size-3" />
           新建
@@ -1198,9 +1246,18 @@ function ProjectsSection({
             ? "此分区项目可能在下方，继续向下滚动加载更多。"
             : "此分区暂无画布。"}
         </div>
+      ) : filteredProjects.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-[var(--canvas-border)] bg-[var(--canvas-surface)]/60 px-6 py-10 text-center text-sm text-[var(--canvas-muted)]">
+          没有标题匹配「{titleQuery.trim()}」的画布。
+          {mayLoadMore ? (
+            <span className="mt-1 block text-xs text-white/40">
+              未加载的项目不会出现在搜索结果中，可向下滚动加载更多后再搜。
+            </span>
+          ) : null}
+        </div>
       ) : (
         <ul className={CANVAS_LIST_GRID_CLASS}>
-          {projects.map((p, index) => (
+          {filteredProjects.map((p, index) => (
             <li
               key={p.id}
               className="@container group relative rounded-2xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-4 transition hover:border-[var(--canvas-accent)]/40"

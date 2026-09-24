@@ -149,9 +149,7 @@ export function installCanvasHistoryPopstateTrap(): () => void {
     if (!isCanvasNavBlockActive() || cancelPopstate) return;
     cancelPopstate = true;
     try {
-      // 立即抵消 back/forward，避免 Next 路由随 popstate 切走编辑页
-      window.history.go(1);
-    } catch {
+      // 重新压栈当前 URL，避免 go(1) 在无 forward 条目时仍被 App Router 带走
       pushTrap();
     } finally {
       window.queueMicrotask(() => {

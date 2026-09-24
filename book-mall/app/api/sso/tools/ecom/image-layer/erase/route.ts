@@ -5,6 +5,7 @@ import {
   appendEcomImageLayerGeneration,
   saveEcomImageLayerWorkspace,
 } from "@/lib/ecom/ecom-image-layer-project-service";
+import { formatEcomImageProcessingUserError } from "@/lib/ecom/ecom-image-processing-error";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,13 @@ export async function POST(req: Request) {
     typeof body.sourceImageUrl === "string" ? body.sourceImageUrl.trim() : "";
   const maskDataUrl =
     typeof body.maskDataUrl === "string" ? body.maskDataUrl.trim() : "";
+  let bbox: [number, number, number, number] | undefined;
+  if (Array.isArray(body.bbox) && body.bbox.length === 4) {
+    const nums = body.bbox.map((v) => Number(v));
+    if (nums.every((n) => Number.isFinite(n))) {
+      bbox = nums as [number, number, number, number];
+    }
+  }
   const projectId =
     typeof body.projectId === "string" && body.projectId.trim()
       ? body.projectId.trim()
@@ -33,15 +41,16 @@ export async function POST(req: Request) {
   if (!sourceImageUrl) {
     return NextResponse.json({ error: "缺少 sourceImageUrl" }, { status: 400 });
   }
-  if (!maskDataUrl) {
-    return NextResponse.json({ error: "缺少 maskDataUrl" }, { status: 400 });
+  if (!maskDataUrl && !bbox) {
+    return NextResponse.json({ error: "请涂抹或框选需要擦除的区域" }, { status: 400 });
   }
 
   try {
     const result = await runCanvasImageErase({
       userId: auth.userId,
       sourceImageUrl,
-      maskDataUrl,
+      maskDataUrl: maskDataUrl || undefined,
+      bbox,
       clientPage: "ecom/image-layer/erase",
     });
     const editedUrl = result.imageUrls[0];
@@ -72,7 +81,7 @@ export async function POST(req: Request) {
       creditsCharged: result.creditsCharged ?? undefined,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "擦除失败";
-    return NextResponse.json({ error: msg }, { status: 502 });
+    const { message, status } = formatEcomImageProcessingUserError(e);
+    return NextResponse.json({ error: message }, { status: status >= 400 ? status : 502 });
   }
 }

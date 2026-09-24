@@ -1,6 +1,7 @@
 /**
  * 画布项目列表封面：成片悬停播放 + 分镜图/成片角标（sbv1 / Pro2 等共用）。
  */
+import { isCanvasThumbnailUrlForProject } from "@/lib/canvas/canvas-oss-url-project";
 import {
   isProjectThumbnailVideoUrl,
   pickPersistableProjectThumbnailUrl,
@@ -229,6 +230,7 @@ export function collectProjectListCoverEntries(
 function resolveProjectListCoverFromEntries(
   entries: ListCoverEntry[],
   canvasFallback?: unknown,
+  projectId?: string,
 ): ProjectListCover {
   const videos = entries.filter((e) => e.kind === "video");
   const images = entries.filter((e) => e.kind === "image");
@@ -267,7 +269,7 @@ function resolveProjectListCoverFromEntries(
   }
 
   const fallback = canvasFallback
-    ? pickPersistableProjectThumbnailUrl(canvasFallback).trim()
+    ? pickPersistableProjectThumbnailUrl(canvasFallback, projectId).trim()
     : "";
   if (!fallback) return { coverUrl: "", coverKind: "image" };
   if (isProjectThumbnailVideoUrl(fallback)) {
@@ -281,18 +283,26 @@ function resolveProjectListCoverFromEntries(
 }
 
 /** 列表封面：优先最近成片（悬停播放），否则最近分镜图（仅持久化 URL） */
-export function resolveProjectListCover(canvas: unknown): ProjectListCover {
+export function resolveProjectListCover(
+  canvas: unknown,
+  projectId?: string,
+): ProjectListCover {
   return resolveProjectListCoverFromEntries(
     collectProjectListCoverEntries(canvas),
     canvas,
+    projectId,
   );
 }
 
 /** 列表 API 展示：含 ephemeralUrl 兜底 */
-export function resolveProjectListCoverForDisplay(canvas: unknown): ProjectListCover {
+export function resolveProjectListCoverForDisplay(
+  canvas: unknown,
+  projectId?: string,
+): ProjectListCover {
   return resolveProjectListCoverFromEntries(
     collectProjectListCoverEntries(canvas, { forDisplay: true }),
     canvas,
+    projectId,
   );
 }
 
@@ -318,7 +328,7 @@ function coverSummaryFromProjectListCover(cover: ProjectListCover): {
 
 export function projectListCoverSummaryFields(
   canvas: unknown,
-  opts?: ListCoverCollectOptions,
+  opts?: ListCoverCollectOptions & { projectId?: string },
 ): {
   thumbnailUrl?: string;
   coverMediaKind?: ProjectListCoverKind;
@@ -326,8 +336,8 @@ export function projectListCoverSummaryFields(
   coverPosterUrl?: string;
 } {
   const cover = opts?.forDisplay
-    ? resolveProjectListCoverForDisplay(canvas)
-    : resolveProjectListCover(canvas);
+    ? resolveProjectListCoverForDisplay(canvas, opts.projectId)
+    : resolveProjectListCover(canvas, opts.projectId);
   return coverSummaryFromProjectListCover(cover);
 }
 
@@ -377,15 +387,24 @@ export type ResolvedListCover = MetaListCover & {
  * thumbnailUrl 字段亦作兜底（历史仅存视频 URL 的项目）。
  */
 export function resolveProjectListCoverForListRow(args: {
+  projectId?: string;
   meta: unknown;
   nodes?: unknown;
   storedThumbnailUrl?: string;
   taskCover?: ResolvedListCover;
 }): ResolvedListCover {
   const fromMeta = readListCoverFromMeta(args.meta);
-  const stored = args.storedThumbnailUrl?.trim() ?? "";
+  const storedRaw = args.storedThumbnailUrl?.trim() ?? "";
+  const pid = args.projectId?.trim() ?? "";
+  const stored =
+    pid && storedRaw && !isCanvasThumbnailUrlForProject(storedRaw, pid)
+      ? ""
+      : storedRaw;
   const fromNodes = args.nodes
-    ? projectListCoverSummaryFields({ nodes: args.nodes }, { forDisplay: true })
+    ? projectListCoverSummaryFields(
+        { nodes: args.nodes },
+        { forDisplay: true, projectId: pid || undefined },
+      )
     : null;
 
   // 节点 runtime.ossUrl 为实时来源；meta.listCover 仅为保存时缓存，可能滞后或含失效 URL。

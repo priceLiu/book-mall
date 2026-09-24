@@ -28,6 +28,8 @@ type Props = {
   disableEnlargePreview?: boolean;
   /** 首屏网格等：跳过 IO 等待，直接加载媒体 */
   eager?: boolean;
+  /** 列表悬停预览：只播画面，不解除 muted（默认 false = 首页案例可开声） */
+  muteHoverPlayback?: boolean;
 };
 
 function MediaPlaceholder({
@@ -68,6 +70,7 @@ export function FilmShowcaseCardMedia({
   calm = false,
   disableEnlargePreview = false,
   eager = false,
+  muteHoverPlayback = false,
 }: Props) {
   const [posterFailed, setPosterFailed] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
@@ -122,9 +125,13 @@ export function FilmShowcaseCardMedia({
     if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
       setVideoReady(true);
     }
-    makeVideoAudible(el);
+    if (muteHoverPlayback) {
+      muteVideo(el);
+    } else {
+      makeVideoAudible(el);
+    }
     void el.play().catch(() => undefined);
-  }, [hovering, shouldMountHoverVideo, kind, showMedia]);
+  }, [hovering, shouldMountHoverVideo, kind, showMedia, muteHoverPlayback]);
 
   const onEnter = useCallback(() => {
     setHovering(true);

@@ -7,8 +7,10 @@ import {
   useImperativeHandle,
   useRef,
   useState,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Eraser, Grid3x3, X } from "lucide-react";
+import { pointerEventToCanvasBitmap } from "@/lib/image-mask-canvas-coords";
 import {
   checkerboardPattern,
   MASK_OVERLAY_SOLID,
@@ -46,6 +48,8 @@ type Props = {
   onBboxLimitReached?: () => void;
   /** 隐藏画布下方撤销/清除按钮（操作区在侧栏时） */
   hideFooter?: boolean;
+  /** 限制显示尺寸（按父级可见区域等比适配，不撑满列宽） */
+  maxCssSize?: { w: number; h: number } | null;
   className?: string;
 };
 
@@ -204,22 +208,36 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
       onMaskChange,
       onBboxLimitReached,
       hideFooter = false,
+      maxCssSize,
       className,
     },
     ref,
   ) {
+    const wrapRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
     const displayCanvasRef = useRef<HTMLCanvasElement>(null);
     const maskCanvasRef = useRef<HTMLCanvasElement>(null);
-    const [drawing, setDrawing] = useState(false);
+    const drawingRef = useRef(false);
     const lastPointRef = useRef<Point | null>(null);
     const [dims, setDims] = useState({ w: 0, h: 0 });
     const rectStart = useRef<{ x: number; y: number } | null>(null);
     const [bboxDisplay, setBboxDisplay] = useState<DisplayRect | null>(null);
+    const draftBboxRef = useRef<DisplayRect | null>(null);
     const [committedBboxes, setCommittedBboxes] = useState<DisplayRect[]>([]);
     const committedBboxesRef = useRef<DisplayRect[]>([]);
     committedBboxesRef.current = committedBboxes;
     const hydratedFromInitialRef = useRef<string | null>(null);
+
+    const setDraftBbox = useCallback((rect: DisplayRect | null) => {
+      draftBboxRef.current = rect;
+      setBboxDisplay(rect);
+    }, []);
+
+    const pointFromPointer = useCallback((e: { clientX: number; clientY: number }) => {
+      const display = displayCanvasRef.current;
+      if (!display || display.width <= 0 || display.height <= 0) return null;
+      return pointerEventToCanvasBitmap(e, display);
+    }, []);
 
     const displayToNatural = useCallback(
       (rect: DisplayRect): [number, number, number, number] | null => {
@@ -304,6 +322,7 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
       committedBboxesRef.current = [];
       hydratedFromInitialRef.current = null;
       lastPointRef.current = null;
+      draftBboxRef.current = null;
       setBboxDisplay(null);
       setCommittedBboxes([]);
       onMaskChange?.(false);
@@ -336,6 +355,7 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
       clearBboxes: () => {
         committedBboxesRef.current = [];
         hydratedFromInitialRef.current = null;
+        draftBboxRef.current = null;
         setCommittedBboxes([]);
         setBboxDisplay(null);
         const display = displayCanvasRef.current;
@@ -344,6 +364,7 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
       },
       undoLastBbox: () => {
         if (bboxSelection !== "multi") {
+          draftBboxRef.current = null;
           setBboxDisplay(null);
           const display = displayCanvasRef.current;
           display?.getContext("2d")?.clearRect(0, 0, display.width, display.height);
@@ -360,24 +381,65 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
     }), [bboxDisplay, bboxSelection, clearMask, displayToNatural, onMaskChange, redrawBboxes]);
 
     const syncCanvasSize = useCallback(() => {
+      const wrap = wrapRef.current;
       const img = imageRef.current;
       const display = displayCanvasRef.current;
       const mask = maskCanvasRef.current;
-      if (!img || !display || !mask || !img.naturalWidth) return;
-      const w = img.clientWidth;
-      const h = img.clientHeight;
+      if (!wrap || !img || !display || !mask || !img.naturalWidth) return;
+      const w = Math.max(1, Math.round(wrap.clientWidth));
+      const h = Math.max(1, Math.round(wrap.clientHeight));
       if (w <= 0 || h <= 0) return;
-      display.width = w;
-      display.height = h;
-      mask.width = img.naturalWidth;
-      mask.height = img.naturalHeight;
+
+      const naturalChanged =
+        mask.width !== img.naturalWidth || mask.height !== img.naturalHeight;
+      const displayChanged = display.width !== w || display.height !== h;
+      if (!naturalChanged && !displayChanged) return;
+
+      if (displayChanged && display.width > 0 && display.height > 0) {
+        const sx = w / display.width;
+        const sy = h / display.height;
+        const scaleRect = (rect: DisplayRect): DisplayRect => ({
+          x1: rect.x1 * sx,
+          y1: rect.y1 * sy,
+          x2: rect.x2 * sx,
+          y2: rect.y2 * sy,
+        });
+        if (draftBboxRef.current) {
+          draftBboxRef.current = scaleRect(draftBboxRef.current);
+        }
+        if (rectStart.current) {
+          rectStart.current = {
+            x: rectStart.current.x * sx,
+            y: rectStart.current.y * sy,
+          };
+        }
+        const nextCommitted = committedBboxesRef.current.map(scaleRect);
+        committedBboxesRef.current = nextCommitted;
+        setCommittedBboxes(nextCommitted);
+        setBboxDisplay(draftBboxRef.current);
+      }
+
+      if (naturalChanged) {
+        mask.width = img.naturalWidth;
+        mask.height = img.naturalHeight;
+      }
+      if (displayChanged) {
+        display.width = w;
+        display.height = h;
+      }
       setDims({ w, h });
     }, []);
 
     useEffect(() => {
       syncCanvasSize();
+      const wrap = wrapRef.current;
+      const ro = wrap ? new ResizeObserver(() => syncCanvasSize()) : null;
+      if (wrap) ro?.observe(wrap);
       window.addEventListener("resize", syncCanvasSize);
-      return () => window.removeEventListener("resize", syncCanvasSize);
+      return () => {
+        ro?.disconnect();
+        window.removeEventListener("resize", syncCanvasSize);
+      };
     }, [imageDataUrl, syncCanvasSize]);
 
     useEffect(() => {
@@ -441,13 +503,15 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
       (clientX: number, clientY: number, isStart: boolean) => {
         const display = displayCanvasRef.current;
         const mask = maskCanvasRef.current;
-        if (!display || !mask) return;
-        const rect = display.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) return;
-        const x = clientX - rect.left;
-        const y = clientY - rect.top;
-        const scaleX = mask.width / rect.width;
-        const scaleY = mask.height / rect.height;
+        if (!display || !mask || display.width <= 0 || display.height <= 0) return;
+        const mapped = pointerEventToCanvasBitmap(
+          { clientX, clientY },
+          display,
+        );
+        const x = mapped.x;
+        const y = mapped.y;
+        const scaleX = mask.width / display.width;
+        const scaleY = mask.height / display.height;
 
         const dctx = display.getContext("2d");
         const mctx = mask.getContext("2d");
@@ -482,16 +546,16 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
     );
 
     const endStroke = useCallback(() => {
-      setDrawing(false);
       lastPointRef.current = null;
     }, []);
 
     const commitDraftBbox = useCallback(() => {
-      if (!bboxDisplay || !isValidDisplayRect(bboxDisplay)) {
-        setBboxDisplay(null);
+      const draft = draftBboxRef.current;
+      if (!draft || !isValidDisplayRect(draft)) {
+        setDraftBbox(null);
         return;
       }
-      const normalized = normalizeDisplayRect(bboxDisplay);
+      const normalized = normalizeDisplayRect(draft);
       if (bboxSelection === "multi") {
         setCommittedBboxes((prev) => {
           if (prev.length >= maxBboxes) {
@@ -504,29 +568,95 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
           onMaskChange?.(next.length > 0);
           return next;
         });
-        setBboxDisplay(null);
+        setDraftBbox(null);
       } else {
-        setBboxDisplay(normalized);
+        setDraftBbox(normalized);
         onMaskChange?.(true);
       }
-    }, [bboxDisplay, bboxSelection, maxBboxes, onBboxLimitReached, onMaskChange, redrawBboxes]);
+    }, [bboxSelection, maxBboxes, onBboxLimitReached, onMaskChange, redrawBboxes, setDraftBbox]);
+
+    const applyBboxPointer = useCallback(
+      (e: { clientX: number; clientY: number }, isStart: boolean) => {
+        const point = pointFromPointer(e);
+        if (!point) return;
+        if (isStart) {
+          rectStart.current = point;
+          setDraftBbox({ x1: point.x, y1: point.y, x2: point.x, y2: point.y });
+          return;
+        }
+        const start = rectStart.current;
+        if (!start) return;
+        const draft = { x1: start.x, y1: start.y, x2: point.x, y2: point.y };
+        setDraftBbox(draft);
+        if (bboxSelection === "single") {
+          onMaskChange?.(isValidDisplayRect(draft));
+        }
+      },
+      [bboxSelection, onMaskChange, pointFromPointer, setDraftBbox],
+    );
+
+    const finishPointer = useCallback(
+      (e: ReactPointerEvent<HTMLCanvasElement>) => {
+        if (!drawingRef.current) return;
+        drawingRef.current = false;
+        if (mode === "bbox") {
+          applyBboxPointer(e, false);
+          commitDraftBbox();
+        } else {
+          endStroke();
+        }
+        rectStart.current = null;
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {
+          /* already released */
+        }
+      },
+      [applyBboxPointer, commitDraftBbox, endStroke, mode],
+    );
+
+    const contain = Boolean(maxCssSize && maxCssSize.w > 0 && maxCssSize.h > 0);
+    const containStyle = contain
+      ? {
+          maxWidth: maxCssSize!.w,
+          maxHeight: maxCssSize!.h,
+        }
+      : undefined;
 
     return (
-      <div className={cn("w-full", className)}>
-        <div className="relative w-full rounded-xl border border-[#e5e5ea] bg-[#fafafa]">
+      <div
+        className={cn(
+          contain
+            ? "flex h-full min-h-0 min-w-0 w-full items-center justify-center"
+            : "w-full",
+          className,
+        )}
+      >
+        <div
+          ref={wrapRef}
+          className={cn(
+            "relative touch-none overflow-hidden rounded-xl border border-[#e5e5ea] bg-[#fafafa]",
+            contain ? "max-h-full max-w-full" : "w-full",
+          )}
+          style={containStyle}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             ref={imageRef}
             src={imageDataUrl}
             alt="待修图"
-            className="block h-auto w-full select-none rounded-xl"
+            className={cn(
+              "block select-none",
+              contain ? "h-auto w-auto max-h-full max-w-full object-contain" : "h-auto w-full",
+            )}
+            style={containStyle}
             draggable={false}
             onLoad={syncCanvasSize}
           />
           <canvas
             ref={displayCanvasRef}
             className={cn(
-              "absolute inset-0 h-full w-full touch-none rounded-xl",
+              "absolute inset-0 h-full w-full touch-none",
               mode === "mask" && maskTool === "eraser"
                 ? "cursor-cell"
                 : "cursor-crosshair",
@@ -534,63 +664,24 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
             onPointerDown={(e) => {
               e.preventDefault();
               e.currentTarget.setPointerCapture(e.pointerId);
-              setDrawing(true);
-              const display = displayCanvasRef.current;
-              if (!display) return;
-              const rect = display.getBoundingClientRect();
-              const x = e.clientX - rect.left;
-              const y = e.clientY - rect.top;
+              drawingRef.current = true;
               if (mode === "bbox") {
-                rectStart.current = { x, y };
-                setBboxDisplay({ x1: x, y1: y, x2: x, y2: y });
+                applyBboxPointer(e, true);
                 return;
               }
               paintAt(e.clientX, e.clientY, true);
             }}
             onPointerMove={(e) => {
-              if (!drawing) return;
+              if (!drawingRef.current) return;
               e.preventDefault();
               if (mode === "bbox") {
-                const display = displayCanvasRef.current;
-                const start = rectStart.current;
-                if (!display || !start) return;
-                const rect = display.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                const draft = { x1: start.x, y1: start.y, x2: x, y2: y };
-                setBboxDisplay(draft);
-                if (bboxSelection === "single") {
-                  onMaskChange?.(isValidDisplayRect(draft));
-                }
+                applyBboxPointer(e, false);
                 return;
               }
               paintAt(e.clientX, e.clientY, false);
             }}
-            onPointerUp={(e) => {
-              if (drawing && mode === "bbox") {
-                commitDraftBbox();
-              } else if (drawing && mode === "mask") {
-                endStroke();
-              } else {
-                setDrawing(false);
-              }
-              rectStart.current = null;
-              try {
-                e.currentTarget.releasePointerCapture(e.pointerId);
-              } catch {
-                /* already released */
-              }
-            }}
-            onPointerLeave={() => {
-              if (drawing && mode === "bbox") {
-                commitDraftBbox();
-              } else if (drawing && mode === "mask") {
-                endStroke();
-              } else {
-                setDrawing(false);
-              }
-              rectStart.current = null;
-            }}
+            onPointerUp={finishPointer}
+            onPointerCancel={finishPointer}
           />
           <canvas ref={maskCanvasRef} className="hidden" aria-hidden />
         </div>

@@ -53,18 +53,19 @@ export type ImageLayerEditInput = {
 export async function editImageLayer(opts: {
   compositeImageUrl: string;
   edits: ImageLayerEditInput[];
-  redecomposeBboxes?: Array<[number, number, number, number]>;
-  size?: string;
   projectId?: string;
-}): Promise<ImageLayerStack> {
+}): Promise<{ imageUrl: string; logId?: string }> {
   const data = await ecomBookFetch(`${BASE}/edit`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(opts),
   });
-  const stack = data.stack as ImageLayerStack | undefined;
-  if (!stack?.background?.url) throw new Error("图层编辑未返回有效结果");
-  return stack;
+  const imageUrl = typeof data.imageUrl === "string" ? data.imageUrl.trim() : "";
+  if (!imageUrl) throw new Error("图层编辑未返回有效结果");
+  return {
+    imageUrl,
+    ...(typeof data.logId === "string" ? { logId: data.logId } : {}),
+  };
 }
 
 export async function listImageLayerProjectSummaries(): Promise<EcomProjectListItem[]> {
@@ -123,9 +124,11 @@ export async function deleteImageLayerProject(id: string): Promise<void> {
   await ecomBookFetch(`${BASE}/projects/${id}`, { method: "DELETE" });
 }
 
+/** 百炼 image-erase-completion · 图像擦除补全（非分层后的图层擦除） */
 export async function eraseImageLayerRegion(opts: {
   sourceImageUrl: string;
-  maskDataUrl: string;
+  maskDataUrl?: string;
+  bbox?: [number, number, number, number];
   projectId?: string;
 }): Promise<{ imageUrl: string; logId?: string }> {
   const data = await ecomBookFetch(`${BASE}/erase`, {

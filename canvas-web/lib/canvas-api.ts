@@ -164,6 +164,9 @@ export function formatCanvasApiError(raw: string): string {
   if (t.includes("save_timeout")) {
     return "主站保存响应超时（非浏览器网络断开）。多半是任务轮询占满连接，请稍后重试。";
   }
+  if (t.includes("CANVAS_NODE_COUNT_COLLAPSE")) {
+    return "保存被拒绝：节点数相对当前版本骤降过多（防止误把别的画布盖到本项目）。若确为恢复历史或清空，请按提示确认后重试。";
+  }
   if (/operation was aborted|The user aborted|AbortError/i.test(t)) {
     return "主站保存请求已取消（超时保护，非网络断开）。请稍后重试。";
   }
@@ -839,6 +842,8 @@ export async function patchCanvasProject(
     canvasDelta?: import("@/lib/canvas/canvas-persist-delta").CanvasDeltaPatch;
     thumbnailUrl?: string;
     historySnapshot?: CanvasProjectHistorySnapshotRequest;
+    /** 恢复历史等经用户确认的大幅缩图保存 */
+    allowSuspiciousNodeCountDrop?: boolean;
   },
   opts?: { signal?: AbortSignal },
 ): Promise<{

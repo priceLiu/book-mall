@@ -4,7 +4,6 @@ import { editImageLayerRegions } from "@/lib/ecom/ecom-image-layer-service";
 import {
   appendEcomImageLayerGeneration,
   saveEcomImageLayerWorkspace,
-  workspaceFromStack,
 } from "@/lib/ecom/ecom-image-layer-project-service";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
@@ -16,13 +15,6 @@ function parseBbox(raw: unknown): [number, number, number, number] | null {
   const nums = raw.slice(0, 4).map((v) => Number(v));
   if (nums.some((n) => !Number.isFinite(n))) return null;
   return [nums[0]!, nums[1]!, nums[2]!, nums[3]!];
-}
-
-function parseBboxList(raw: unknown): Array<[number, number, number, number]> {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item) => parseBbox(item))
-    .filter((b): b is [number, number, number, number] => b !== null);
 }
 
 function parseEdits(
@@ -60,8 +52,6 @@ export async function POST(req: Request) {
   const compositeImageUrl =
     typeof body.compositeImageUrl === "string" ? body.compositeImageUrl.trim() : "";
   const edits = parseEdits(body);
-  const redecomposeBboxes = parseBboxList(body.redecomposeBboxes);
-  const size = typeof body.size === "string" ? body.size.trim() : undefined;
   const projectId =
     typeof body.projectId === "string" && body.projectId.trim()
       ? body.projectId.trim()
@@ -75,19 +65,20 @@ export async function POST(req: Request) {
   }
 
   try {
-    const stack = await editImageLayerRegions({
+    const result = await editImageLayerRegions({
       userId: auth.userId,
       compositeImageUrl,
       edits,
-      ...(redecomposeBboxes.length ? { redecomposeBboxes } : {}),
-      size,
     });
     if (projectId) {
-      await saveEcomImageLayerWorkspace(
-        auth.userId,
-        projectId,
-        workspaceFromStack(stack, { sourceImageUrl: stack.sourceImageUrl ?? compositeImageUrl }),
-      );
+      await saveEcomImageLayerWorkspace(auth.userId, projectId, {
+        sourceImageUrl: result.imageUrl,
+        stack: null,
+        pendingBboxes: [],
+        pendingBbox: null,
+        selectedLayerId: null,
+        editEntries: [],
+      });
       const promptSummary =
         edits.length === 1
           ? edits[0]!.prompt
@@ -96,11 +87,11 @@ export async function POST(req: Request) {
         kind: "edit",
         title: edits.length > 1 ? "AI 批量修改图层" : "AI 修改本层",
         prompt: promptSummary,
-        ossUrl: stack.background.url,
-        logId: stack.logId ?? null,
+        ossUrl: result.imageUrl,
+        logId: result.logId ?? null,
       });
     }
-    return NextResponse.json({ stack });
+    return NextResponse.json({ imageUrl: result.imageUrl, logId: result.logId });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "图层编辑失败";
     return NextResponse.json({ error: msg }, { status: 502 });
