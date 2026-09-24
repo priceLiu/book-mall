@@ -10,6 +10,7 @@ import type { EcomProjectModule } from "@/lib/product-design-types";
 import { createSeedVideoProject } from "@/lib/ecom-seed-video-api";
 import { createStoryboardProject } from "@/lib/ecom-storyboard-api";
 import type { EcomWorkflowDraftKind } from "@/lib/ecom-workflow-drafts-api";
+import { writeEcomLastProjectId } from "@/lib/ecom-last-project";
 
 export const STORYBOARD_DRAFT_STORAGE_KEY = "ecom-storyboard-active-project";
 export const SEED_VIDEO_DRAFT_STORAGE_KEY = "ecom-seed-video-active-project";
@@ -66,7 +67,7 @@ export function openWorkflowDraft(
   projectId: string,
 ): void {
   if (typeof window !== "undefined") {
-    sessionStorage.setItem(workflowDraftStorageKey(kind), projectId);
+    writeEcomLastProjectId(workflowDraftStorageKey(kind), projectId);
   }
   router.push(workflowDraftStudioPath(kind));
 }

@@ -23,6 +23,7 @@ import { VtonRefWorkbench } from "@/components/vton/vton-ref-workbench";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
 import { formatEcomImageGenUserMessage } from "@/lib/ecom-image-gen-user-error";
+import { resumeOrCreateEcomProject, writeEcomLastProjectId } from "@/lib/ecom-last-project";
 import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import {
   attachModelTryonRefs,
@@ -101,9 +102,7 @@ export function ModelTryonStudio() {
 
   const applyProject = useCallback((p: ModelTryonProject) => {
     setProject(p);
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem(PROJECT_STORAGE_KEY, p.id);
-    }
+    writeEcomLastProjectId(PROJECT_STORAGE_KEY, p.id);
   }, []);
 
   const tryonRefine = useVtonTryonRefine({
@@ -241,11 +240,13 @@ export function ModelTryonStudio() {
     (async () => {
       setLoading(true);
       try {
-        const stored =
-          typeof window !== "undefined" ? sessionStorage.getItem(PROJECT_STORAGE_KEY) : null;
-        const p = stored
-          ? await getModelTryonProject(stored)
-          : await createModelTryonProject();
+        const { project: p } = await resumeOrCreateEcomProject({
+          storageKey: PROJECT_STORAGE_KEY,
+          getById: getModelTryonProject,
+          listRecentIds: async () =>
+            (await listModelTryonProjectSummaries()).map((item) => item.id),
+          create: () => createModelTryonProject(),
+        });
         if (!cancelled) applyProject(p);
       } catch (e) {
         if (isEcomUnauthorizedError(e)) {

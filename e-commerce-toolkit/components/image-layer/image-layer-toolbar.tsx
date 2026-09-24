@@ -17,12 +17,9 @@ import {
   Undo2,
   XCircle,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { EcomIconButton } from "@/components/ui/ecom-icon-button";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
-import { ECOM_GENERATION_RECORD_LIBRARY_PATH } from "@/lib/ecom-generation-record-api";
 import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 import type { ImageLayerCanvasToolMode } from "@/lib/image-layer-tool-mode";
 import { cn } from "@/lib/utils";
@@ -58,6 +55,8 @@ type Props = {
   onNewProject?: () => void;
   onSelectProject?: (id: string) => void | Promise<void>;
   onReset: () => void;
+  onOpenHistory?: () => void;
+  historyCount?: number;
   previewBusy?: boolean;
   onPreviewExport: () => void;
   onExport: () => void;
@@ -85,11 +84,12 @@ export function ImageLayerToolbar({
   onNewProject,
   onSelectProject,
   onReset,
+  onOpenHistory,
+  historyCount = 0,
   previewBusy,
   onPreviewExport,
   onExport,
 }: Props) {
-  const router = useRouter();
   const canUseTools = hasPreview && !anyBusy;
   const canDecomposeBbox = canUseTools && !hasStack;
   const canLocalEdit = canUseTools && !layerSessionLocked;
@@ -105,10 +105,10 @@ export function ImageLayerToolbar({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <h2 className="truncate text-sm font-semibold text-[#1d1d1f]">
-            {projectTitle?.trim() || "图片分层"}
+            {projectTitle?.trim() || "图片处理"}
           </h2>
           <p className="text-[11px] text-[#6e6e73]">
-            换背景 / 擦除 / 重绘 / 拆层
+            背景与主体 / 擦除 / 重绘 / 拆层
           </p>
         </div>
         <EcomIconToolbar className={cn(anyBusy && "pointer-events-none opacity-70")}>
@@ -125,9 +125,9 @@ export function ImageLayerToolbar({
 
           <ToolbarDivider />
 
-          <EcomIconToolbarGroup label="换背景">
+          <EcomIconToolbarGroup label="背景与主体">
             <EcomIconButton
-              label="换背景"
+              label="背景与主体"
               icon={Images}
               variant={toolMode === "bg-replace" ? "accent" : "default"}
               disabled={!canLocalEdit}
@@ -156,7 +156,7 @@ export function ImageLayerToolbar({
 
           <ToolbarDivider />
 
-          <EcomIconToolbarGroup label="图片分层">
+          <EcomIconToolbarGroup label="图片处理">
             {hasStack ? (
               <EcomIconButton
                 label="图层编辑"
@@ -245,16 +245,18 @@ export function ImageLayerToolbar({
                 currentProjectId={currentProjectId}
                 loadProjects={loadProjectList}
                 onSelectProject={onSelectProject}
-                title="图片分层 · 项目列表"
-                emptyHint="还没有保存过的图片分层项目。"
+                title="图片处理 · 项目列表"
+                emptyHint="还没有保存过的图片处理项目。"
               />
             ) : null}
-            <EcomIconButton
-              label="生成记录"
-              icon={History}
-              disabled={anyBusy}
-              onClick={() => router.push(ECOM_GENERATION_RECORD_LIBRARY_PATH)}
-            />
+            {onOpenHistory ? (
+              <EcomIconButton
+                label={historyCount > 0 ? `处理历史（${historyCount}）` : "处理历史"}
+                icon={History}
+                disabled={anyBusy}
+                onClick={onOpenHistory}
+              />
+            ) : null}
           </EcomIconToolbarGroup>
         </EcomIconToolbar>
       </div>

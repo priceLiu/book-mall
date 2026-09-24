@@ -40,6 +40,11 @@ import {
 } from "@/components/ui/dialog";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
+import {
+  clearEcomLastProjectId,
+  readEcomLastProjectId,
+  writeEcomLastProjectId,
+} from "@/lib/ecom-last-project";
 import { formatEcomImageGenUserMessage } from "@/lib/ecom-image-gen-user-error";
 import {
   ECOM_GENERATION_STANDARD_CONCURRENCY,
@@ -305,7 +310,7 @@ function DetailPageSuiteStudioInner() {
       for (const k of imageGenInFlightRef.current) pendingGen.add(k);
       setActiveGenSlotKeys(pendingGen);
       setActivePromptModuleIds(new Set(listDetailPageSuitePendingPromptModuleIds(synced.meta)));
-      sessionStorage.setItem(PROJECT_STORAGE_KEY, synced.id);
+      writeEcomLastProjectId(PROJECT_STORAGE_KEY, synced.id);
       syncImageSettingsFromProject(synced);
     },
     [syncImageSettingsFromProject],
@@ -996,7 +1001,7 @@ function DetailPageSuiteStudioInner() {
         if (cancelled) return;
         setImageModels(models.imageModels);
         setPromptGenConcurrencyLimit(models.promptGenConcurrencyLimit);
-        const saved = sessionStorage.getItem(PROJECT_STORAGE_KEY);
+        const saved = readEcomLastProjectId(PROJECT_STORAGE_KEY);
         if (saved) {
           try {
             const loaded = await loadProjectByIdRef.current(saved);
@@ -1115,7 +1120,7 @@ function DetailPageSuiteStudioInner() {
     }
     try {
       await deleteDetailPageSuiteProject(project.id);
-      sessionStorage.removeItem(PROJECT_STORAGE_KEY);
+      clearEcomLastProjectId(PROJECT_STORAGE_KEY);
       const summaries = await listDetailPageSuiteSummaries();
       if (summaries[0]) {
         await loadProjectById(summaries[0].id);

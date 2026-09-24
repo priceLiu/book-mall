@@ -11,6 +11,7 @@ import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
+import { resumeOrCreateEcomProject, writeEcomLastProjectId } from "@/lib/ecom-last-project";
 import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import {
   streamFilmPullAnalyze,
@@ -95,7 +96,7 @@ function FilmPullStudioInner() {
   const applyProject = useCallback((p: FilmPullProject) => {
     setProject(p);
     setStreamText(p.analyzeResult?.rawText ?? "");
-    if (typeof window !== "undefined") sessionStorage.setItem(PROJECT_STORAGE_KEY, p.id);
+    writeEcomLastProjectId(PROJECT_STORAGE_KEY, p.id);
     if (p.settings.chatModelKey) setChatModelKey(p.settings.chatModelKey);
   }, []);
 
@@ -146,11 +147,13 @@ function FilmPullStudioInner() {
 
     (async () => {
       try {
-        const savedId =
-          typeof window !== "undefined" ? sessionStorage.getItem(PROJECT_STORAGE_KEY) : null;
-        const p = savedId
-          ? await getFilmPullProject(savedId)
-          : await createFilmPullProject({ title: "专业拉片" });
+        const { project: p } = await resumeOrCreateEcomProject({
+          storageKey: PROJECT_STORAGE_KEY,
+          getById: getFilmPullProject,
+          listRecentIds: async () =>
+            (await listFilmPullProjectSummaries()).map((item) => item.id),
+          create: () => createFilmPullProject({ title: "专业拉片" }),
+        });
         if (!cancelled) applyProject(p);
       } catch (e) {
         if (isEcomUnauthorizedError(e)) setNeedLogin(true);

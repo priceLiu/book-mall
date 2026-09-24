@@ -34,7 +34,7 @@ export function BackgroundReplaceResultDialog({
         <EcomDialogCloseButton onClick={onCancel} />
         <div className="border-b border-[#e8e8ed] px-5 py-4 pr-12">
           <h2 id="bg-replace-pick-title" className="text-base font-semibold text-[#1d1d1f]">
-            选择换背景结果
+            选择生成结果
           </h2>
           <p className="mt-1 text-[12px] leading-relaxed text-[#6e6e73]">
             本次生成了 {imageUrls.length} 张。点选一张应用到中栏；其余可在生成记录查看。

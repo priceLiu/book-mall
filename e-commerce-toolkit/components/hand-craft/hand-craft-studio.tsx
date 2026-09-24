@@ -26,6 +26,11 @@ import {
   updateHandCraftProject,
   uploadHandCraftSketch,
 } from "@/lib/ecom-hand-craft-api";
+import {
+  clearEcomLastProjectId,
+  readEcomLastProjectId,
+  writeEcomLastProjectId,
+} from "@/lib/ecom-last-project";
 import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import type { HandCraftProject, HandCraftStepId } from "@/lib/hand-craft-types";
 import { inferCurrentStepId } from "@/lib/hand-craft-workflow";
@@ -77,9 +82,7 @@ export function HandCraftStudio() {
   const applyProject = useCallback((p: HandCraftProject) => {
     setProject(p);
     setCurrentStepId(inferCurrentStepId(p));
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem(PROJECT_STORAGE_KEY, p.id);
-    }
+    writeEcomLastProjectId(PROJECT_STORAGE_KEY, p.id);
     if (p.settings.chatModelKey) setChatModelKey(p.settings.chatModelKey);
     if (p.settings.imageModelKey) setImageModelKey(p.settings.imageModelKey);
   }, []);
@@ -118,10 +121,7 @@ export function HandCraftStudio() {
 
     (async () => {
       try {
-        const savedId =
-          typeof window !== "undefined"
-            ? sessionStorage.getItem(PROJECT_STORAGE_KEY)
-            : null;
+        const savedId = readEcomLastProjectId(PROJECT_STORAGE_KEY);
 
         let initial: HandCraftProject | undefined;
         let projectId: string | null = null;
@@ -257,9 +257,7 @@ export function HandCraftStudio() {
     setLoading(true);
     try {
       await deleteHandCraftProject(project.id);
-      if (typeof window !== "undefined") {
-        sessionStorage.removeItem(PROJECT_STORAGE_KEY);
-      }
+      clearEcomLastProjectId(PROJECT_STORAGE_KEY);
       const summaries = await listHandCraftProjectSummaries();
       if (summaries[0]) {
         await reload(summaries[0].id);

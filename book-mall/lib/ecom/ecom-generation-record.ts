@@ -20,6 +20,7 @@ export type EcomGenerationRecordMeta = {
   versionKey?: string;
   modelKey?: string;
   panelIndex?: number;
+  firstOrigin?: string;
 };
 
 export type PersistEcomGenerationRecordInput = {

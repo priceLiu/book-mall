@@ -25,6 +25,11 @@ import {
   updateSeedVideoProject,
   uploadSeedVideoRef,
 } from "@/lib/ecom-seed-video-api";
+import {
+  clearEcomLastProjectId,
+  readEcomLastProjectId,
+  writeEcomLastProjectId,
+} from "@/lib/ecom-last-project";
 import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
@@ -90,9 +95,7 @@ export function SeedVideoStudio() {
     activeProjectIdRef.current = p.id;
     setProject(p);
     setPlanningPrompt(resolveSeedVideoPlanningPrompt(p));
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem(PROJECT_STORAGE_KEY, p.id);
-    }
+    writeEcomLastProjectId(PROJECT_STORAGE_KEY, p.id);
     if (p.settings.chatModelKey) setChatModelKey(p.settings.chatModelKey);
     if (p.settings.videoModelKey) setVideoModelKey(p.settings.videoModelKey);
   }, []);
@@ -186,10 +189,7 @@ export function SeedVideoStudio() {
 
     (async () => {
       try {
-        const savedId =
-          typeof window !== "undefined"
-            ? sessionStorage.getItem(PROJECT_STORAGE_KEY)
-            : null;
+        const savedId = readEcomLastProjectId(PROJECT_STORAGE_KEY);
 
         let projectId: string | null = null;
         let initial: SeedVideoProject | undefined;
@@ -266,9 +266,7 @@ export function SeedVideoStudio() {
     const generation = loadGenerationRef.current;
     setEmpty(false);
     try {
-      if (typeof window !== "undefined") {
-        sessionStorage.removeItem(PROJECT_STORAGE_KEY);
-      }
+      clearEcomLastProjectId(PROJECT_STORAGE_KEY);
       activeProjectIdRef.current = null;
       const def = getSeedVideoSkillDefinition(skillKey);
       const created = await createSeedVideoProject({

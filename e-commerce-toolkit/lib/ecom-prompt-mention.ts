@@ -1,4 +1,5 @@
 import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
+import { cropNormalizedBboxPreview } from "@/lib/normalized-bbox-crop";
 import {
   findMentionRefByLegacyIndex,
   findMentionRefByToken,
@@ -22,6 +23,8 @@ export type EcomPromptImageRef = {
   kindIndex?: number;
   label: string;
   role: "product" | "main-style" | "detail-style" | string;
+  /** 0～999 框选；缩略图对准该区域（换背景「图1框选 / 图2框选」） */
+  cropBbox?: [number, number, number, number];
 };
 
 export const ECOM_IMAGE_REF_BADGE_ATTR = "data-ecom-image-ref";
@@ -66,13 +69,33 @@ export function createEcomImageRefBadge(
   badge.style.verticalAlign = "middle";
 
   if (!tokenOnly && item?.url?.trim()) {
+    const src = buildEcomOssThumbUrl(item.url.trim());
     const img = document.createElement("img");
-    img.src = buildEcomOssThumbUrl(item.url.trim());
+    img.src = src;
     img.alt = "";
     img.draggable = false;
-    img.referrerPolicy = "no-referrer";
-    img.className = "h-4 w-4 shrink-0 rounded-[4px] object-cover";
-    badge.appendChild(img);
+    if (!src.startsWith("blob:") && !src.startsWith("data:")) {
+      img.referrerPolicy = "no-referrer";
+    }
+    if (item.cropBbox) {
+      const wrap = document.createElement("span");
+      wrap.className = "relative h-4 w-4 shrink-0 overflow-hidden rounded-[4px] bg-[#f5f5f7]";
+      img.className = "h-full w-full object-cover opacity-40";
+      wrap.appendChild(img);
+      badge.appendChild(wrap);
+      void cropNormalizedBboxPreview(item.url.trim(), item.cropBbox, 64)
+        .then((cropUrl) => {
+          img.src = cropUrl;
+          img.className = "h-full w-full object-cover";
+          img.removeAttribute("referrerpolicy");
+        })
+        .catch(() => {
+          img.className = "h-full w-full object-cover";
+        });
+    } else {
+      img.className = "h-4 w-4 shrink-0 rounded-[4px] object-cover";
+      badge.appendChild(img);
+    }
   }
 
   const label = document.createElement("span");

@@ -37,10 +37,20 @@ const editEntrySchema = z.object({
   prompt: z.string(),
 });
 
+const savedImageSchema = z.object({
+  url: z.string(),
+  title: z.string().optional(),
+  at: z.string().optional(),
+  source: z.enum(["library", "auto"]).optional(),
+});
+
 export const imageLayerWorkspaceSchema = z.object({
   sourceImageUrl: z.string().nullable().optional(),
   /** 首次上传的原图，擦除/重绘后仍保留给中栏对照 */
   originalImageUrl: z.string().nullable().optional(),
+  savedImages: z.array(savedImageSchema).max(40).optional(),
+  savedImageIndex: z.number().int().min(0).optional(),
+  firstOrigin: z.string().optional(),
   stack: stackSchema.nullable().optional(),
   pendingBbox: bboxSchema.nullable().optional(),
   pendingBboxes: z.array(bboxSchema).max(16).optional(),
@@ -49,18 +59,48 @@ export const imageLayerWorkspaceSchema = z.object({
   selectedLayerId: z.string().nullable().optional(),
   editPrompt: z.string().optional(),
   editEntries: z.array(editEntrySchema).optional(),
+  toolMode: z
+    .enum(["layer-view", "bg-replace", "retouch", "erase", "decompose-bbox"])
+    .optional(),
+  bgReplace: z
+    .object({
+      refPrompt: z.string().optional(),
+      refImageUrl: z.string().optional(),
+      refBbox: bboxSchema.nullable().optional(),
+    })
+    .optional(),
 });
 
 export type ImageLayerWorkspace = z.infer<typeof imageLayerWorkspaceSchema>;
 
+export const IMAGE_LAYER_GENERATION_KINDS = [
+  "upload",
+  "decompose",
+  "edit",
+  "export",
+  "bg-replace",
+  "retouch",
+] as const;
+
+export type ImageLayerGenerationKind = (typeof IMAGE_LAYER_GENERATION_KINDS)[number];
+
+export type ImageLayerGenerationRef = {
+  url: string;
+  label?: string;
+};
+
 export type ImageLayerProjectGeneration = {
   id: string;
-  kind: "upload" | "decompose" | "edit" | "export";
+  kind: ImageLayerGenerationKind;
   at: string;
   title: string;
   prompt?: string | null;
   ossUrl: string;
   logId?: string | null;
+  modelKey?: string | null;
+  compareFromUrl?: string | null;
+  refImages?: ImageLayerGenerationRef[];
+  workspace?: ImageLayerWorkspace;
 };
 
 export type ImageLayerProjectDto = {
@@ -87,6 +127,23 @@ export function sanitizeImageLayerWorkspace(raw: unknown): ImageLayerWorkspace {
   return {};
 }
 
+export function sanitizeImageLayerGenerationRefs(raw: unknown): ImageLayerGenerationRef[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ImageLayerGenerationRef[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const url = typeof (row as { url?: unknown }).url === "string"
+      ? (row as { url: string }).url.trim()
+      : "";
+    if (!url) continue;
+    const labelRaw = (row as { label?: unknown }).label;
+    const label = typeof labelRaw === "string" ? labelRaw.trim() : "";
+    out.push(label ? { url, label } : { url });
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
 export function sanitizeImageLayerGenerations(raw: unknown): ImageLayerProjectGeneration[] {
   if (!Array.isArray(raw)) return [];
   const out: ImageLayerProjectGeneration[] = [];
@@ -99,9 +156,20 @@ export function sanitizeImageLayerGenerations(raw: unknown): ImageLayerProjectGe
     const at = typeof r.at === "string" ? r.at : "";
     const title = typeof r.title === "string" ? r.title : "";
     if (!id || !ossUrl || !at || !title) continue;
-    if (kind !== "upload" && kind !== "decompose" && kind !== "edit" && kind !== "export") {
+    if (
+      kind !== "upload" &&
+      kind !== "decompose" &&
+      kind !== "edit" &&
+      kind !== "export" &&
+      kind !== "bg-replace" &&
+      kind !== "retouch"
+    ) {
       continue;
     }
+    const ws = sanitizeImageLayerWorkspace(r.workspace);
+    const refs = sanitizeImageLayerGenerationRefs(r.refImages);
+    const compareFromUrl =
+      typeof r.compareFromUrl === "string" ? r.compareFromUrl.trim() : "";
     out.push({
       id,
       kind,
@@ -110,6 +178,10 @@ export function sanitizeImageLayerGenerations(raw: unknown): ImageLayerProjectGe
       ossUrl,
       prompt: typeof r.prompt === "string" ? r.prompt : null,
       logId: typeof r.logId === "string" ? r.logId : null,
+      modelKey: typeof r.modelKey === "string" ? r.modelKey : null,
+      ...(compareFromUrl ? { compareFromUrl } : {}),
+      ...(refs.length ? { refImages: refs } : {}),
+      ...(Object.keys(ws).length ? { workspace: ws } : {}),
     });
   }
   return out.slice(0, 80);

@@ -85,6 +85,7 @@ export async function POST(req: Request) {
         refPromptWeight:
           typeof body.refPromptWeight === "number" ? body.refPromptWeight : undefined,
         bbox: parseBbox(body.bbox),
+        refBbox: parseBbox(body.refBbox),
         subjectAlreadyCutout: body.subjectAlreadyCutout === true,
       },
     });

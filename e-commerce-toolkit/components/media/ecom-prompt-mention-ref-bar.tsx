@@ -1,5 +1,6 @@
 "use client";
 
+import { NormalizedBboxCropImg } from "@/components/media/normalized-bbox-crop-img";
 import type { EcomPromptImageRef } from "@/lib/ecom-prompt-mention";
 import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
 import { mentionTokenDisplay } from "@/lib/product-design-mention-tokens";
@@ -40,13 +41,22 @@ export function EcomPromptMentionRefBar({
           const alias = mentionTokenDisplay(ref.token);
           const inner = (
             <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={buildEcomOssThumbUrl(ref.url)}
-                alt={ref.label}
-                className="h-10 w-10 shrink-0 rounded-md border border-[#e8e8ed] object-cover"
-                referrerPolicy="no-referrer"
-              />
+              {ref.cropBbox ? (
+                <NormalizedBboxCropImg
+                  url={ref.url}
+                  bbox={ref.cropBbox}
+                  alt={ref.label}
+                  className="h-10 w-10 shrink-0 rounded-md border border-[#e8e8ed]"
+                />
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={buildEcomOssThumbUrl(ref.url)}
+                  alt={ref.label}
+                  className="h-10 w-10 shrink-0 rounded-md border border-[#e8e8ed] object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              )}
               <span className="min-w-0 pr-1">
                 <span className="block font-mono text-[10px] font-medium text-[#0071e3]">{ref.token}</span>
                 <span className="block truncate text-[9px] text-[#86868b]">代号 {alias}</span>

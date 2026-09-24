@@ -127,6 +127,27 @@ export function ImageLayerSelectionTools({
         </div>
       ) : null}
 
+      {toolMode === "bg-replace" ? (
+        <div className="space-y-2">
+          <p className="text-xs text-[#6b7280]">
+            在右侧画布框选要换的区域（可选）。不框选则按整图提示词换景。
+          </p>
+          <p className="text-xs font-medium text-[#374151]">
+            {pendingBboxCount > 0 ? "已框选 1 个区域" : "未框选"}
+          </p>
+          <EcomIconToolbar>
+            <EcomIconToolbarGroup label="框选">
+              <EcomIconButton
+                label="清除框选"
+                icon={XCircle}
+                disabled={busy || pendingBboxCount === 0}
+                onClick={onClearSelection}
+              />
+            </EcomIconToolbarGroup>
+          </EcomIconToolbar>
+        </div>
+      ) : null}
+
       {toolMode === "decompose-bbox" ? (
         <div className="space-y-2">
           <p className="text-xs text-[#6b7280]">

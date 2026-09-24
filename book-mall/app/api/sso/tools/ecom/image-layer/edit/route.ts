@@ -89,6 +89,7 @@ export async function POST(req: Request) {
         prompt: promptSummary,
         ossUrl: result.imageUrl,
         logId: result.logId ?? null,
+        compareFromUrl: compositeImageUrl,
       });
     }
     return NextResponse.json({ imageUrl: result.imageUrl, logId: result.logId });

@@ -82,6 +82,7 @@ export async function POST(req: Request) {
         prompt: buildDecomposePrompt(bboxes ?? []),
         ossUrl: previewUrl,
         logId: stack.logId ?? null,
+        compareFromUrl: sourceImageUrl,
       });
     }
     return NextResponse.json({ stack });

@@ -49,6 +49,7 @@ import {
 } from "@/lib/storyboard-video-params";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import {
+  applyStoryboardPickerTemplateFilter,
   formatStoryboardImageModelTypeLabel,
   storyboardModelFilterTabsForMode,
   storyboardModelMatchesMediaFilter,
@@ -108,7 +109,7 @@ type Props = {
   modelsEmptyHint?: string;
   /** 无模型时点击重试 */
   onRetryLoadModels?: () => void | Promise<void>;
-  /** 隐藏文生图/图生视频类型筛选（视觉理解 LLM 等纯选型场景） */
+  /** 隐藏类型筛选，并跳过分镜 t2i/i2v 模板过滤（换背景等专用清单） */
   hideTypeFilter?: boolean;
   /** 仅选模型：隐藏弹层内参数区，确认钮为「确定」而非「开始生图」 */
   selectionOnly?: boolean;
@@ -472,15 +473,14 @@ export function StoryboardModelPickerDialog({
   }, [open, value, nativeOverlay]);
 
   const visibleModels = useMemo(() => {
-    let list = hideTypeFilter
+    const typed = hideTypeFilter
       ? models
       : models.filter((m) => storyboardModelMatchesMediaFilter(m, mode, mediaFilter));
-    if (templateModelKeys?.length) {
-      const set = new Set(templateModelKeys.map((k) => k.toLowerCase()));
-      const filtered = list.filter((m) => set.has(m.modelKey.toLowerCase()));
-      if (filtered.length > 0) list = filtered;
-    }
-    return list;
+    return applyStoryboardPickerTemplateFilter(
+      typed,
+      templateModelKeys,
+      hideTypeFilter,
+    );
   }, [hideTypeFilter, models, mode, mediaFilter, templateModelKeys]);
 
   useEffect(() => {

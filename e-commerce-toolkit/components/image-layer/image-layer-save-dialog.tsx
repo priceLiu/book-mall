@@ -91,7 +91,7 @@ export function ImageLayerSaveDialog({
             保存图片
           </h2>
           <p className="mt-1 text-[12px] leading-relaxed text-[#6e6e73]">
-            改层 / 重绘 / 擦除后的新图可下载，或保存到「我的资产 · 图片分层」。
+            改层 / 重绘 / 擦除后的新图可下载，或保存到「我的资产 · 图片处理」。
           </p>
         </div>
 

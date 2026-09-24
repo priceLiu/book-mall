@@ -33,6 +33,7 @@ import {
   updateStoryboardProject,
   uploadStoryboardRef,
 } from "@/lib/ecom-storyboard-api";
+import { readEcomLastProjectId, writeEcomLastProjectId } from "@/lib/ecom-last-project";
 import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
 import {
@@ -138,9 +139,7 @@ export function StoryboardStudio() {
 
   const applyProject = useCallback((p: StoryboardProject) => {
     setProject(p);
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem(PROJECT_STORAGE_KEY, p.id);
-    }
+    writeEcomLastProjectId(PROJECT_STORAGE_KEY, p.id);
     const videoModelKey =
       (p.meta?.workflow?.videoModelKey as string | undefined) ??
       (typeof p.settings?.videoModelKey === "string" ? p.settings.videoModelKey : undefined) ??
@@ -244,11 +243,7 @@ export function StoryboardStudio() {
           typeof window !== "undefined"
             ? new URLSearchParams(window.location.search).get("projectId")?.trim()
             : null;
-        const savedId =
-          urlProjectId ||
-          (typeof window !== "undefined"
-            ? sessionStorage.getItem(PROJECT_STORAGE_KEY)
-            : null);
+        const savedId = urlProjectId || readEcomLastProjectId(PROJECT_STORAGE_KEY);
 
         const boot = await fetchStoryboardBoot(savedId);
         if (cancelled) return;

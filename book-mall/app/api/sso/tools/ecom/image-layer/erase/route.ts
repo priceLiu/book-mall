@@ -72,6 +72,7 @@ export async function POST(req: Request) {
         prompt: "擦除选区并补全背景",
         ossUrl: editedUrl,
         logId: result.logId ?? null,
+        compareFromUrl: sourceImageUrl,
       });
     }
 

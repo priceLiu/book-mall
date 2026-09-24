@@ -23,6 +23,7 @@ import {
   syncProductDesign,
   updateProductDesignProject,
 } from "@/lib/ecom-product-design-api";
+import { writeEcomLastProjectId } from "@/lib/ecom-last-project";
 import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
 import {
@@ -1355,7 +1356,7 @@ export function ProductDesignContentPanel({
         title,
         role: "product",
       });
-      sessionStorage.setItem(STORYBOARD_PROJECT_STORAGE_KEY, projectId);
+      writeEcomLastProjectId(STORYBOARD_PROJECT_STORAGE_KEY, projectId);
       router.push("/ecom/storyboard/micro-drama");
     } catch (e) {
       await alert({

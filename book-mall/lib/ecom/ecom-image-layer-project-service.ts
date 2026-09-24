@@ -15,6 +15,7 @@ import {
   type ImageLayerWorkspace,
 } from "@/lib/ecom/ecom-image-layer-project-types";
 import { persistEcomGenerationRecord } from "@/lib/ecom/ecom-generation-record";
+import { firstWriteOrigin } from "@/lib/ecom/ecom-first-origin";
 import type { ImageLayerStack } from "@/lib/ecom/ecom-image-layer-service";
 import { prisma } from "@/lib/prisma";
 
@@ -67,7 +68,7 @@ export async function createEcomImageLayerProject(
     data: {
       userId,
       module: ECOM_IMAGE_LAYER_MODULE,
-      title: opts?.title?.trim() || "图片分层",
+      title: opts?.title?.trim() || "图片处理",
       workspace: {} as Prisma.InputJsonValue,
       generations: [] as Prisma.InputJsonValue,
     },
@@ -150,6 +151,7 @@ export async function appendEcomImageLayerGeneration(
   if (!existing) throw new Error("项目不存在");
 
   const prev = sanitizeImageLayerGenerations(existing.generations);
+  const workspace = sanitizeImageLayerWorkspace(existing.workspace);
   const row: ImageLayerProjectGeneration = {
     id: entry.id ?? randomUUID(),
     at: entry.at ?? new Date().toISOString(),
@@ -158,6 +160,10 @@ export async function appendEcomImageLayerGeneration(
     ossUrl: entry.ossUrl,
     prompt: entry.prompt ?? null,
     logId: entry.logId ?? null,
+    modelKey: entry.modelKey ?? null,
+    compareFromUrl: entry.compareFromUrl ?? null,
+    ...(entry.refImages?.length ? { refImages: entry.refImages } : {}),
+    ...(Object.keys(workspace).length ? { workspace } : {}),
   };
   const next = [row, ...prev.filter((g) => g.id !== row.id)].slice(0, 80);
 
@@ -178,14 +184,15 @@ export async function appendEcomImageLayerGeneration(
       sourceToolKey: ECOM_IMAGE_LAYER_TOOL_KEY,
       projectId,
       sourceResultId: row.id,
-      modelKey: ECOM_IMAGE_LAYER_MODEL,
+      modelKey: row.modelKey ?? ECOM_IMAGE_LAYER_MODEL,
+      firstOrigin: sanitizeImageLayerWorkspace(existing.workspace).firstOrigin,
     },
   }).catch(() => undefined);
 
   return rowToDto(updated);
 }
 
-/** 把当前结果图写入「我的资产 · 图片分层」，并记一条生成记录 */
+/** 把当前结果图写入「我的资产 · 图片处理」，并记一条生成记录 */
 export async function saveImageLayerResultToLibrary(
   userId: string,
   projectId: string,
@@ -196,7 +203,30 @@ export async function saveImageLayerResultToLibrary(
 
   const ossUrl = opts.ossUrl.trim();
   if (!ossUrl) throw new Error("缺少结果图");
-  const title = opts.title?.trim() || "图片分层结果";
+  const title = opts.title?.trim() || "图片处理结果";
+  const workspace = sanitizeImageLayerWorkspace(existing.workspace);
+  const savedImages = [
+    ...(workspace.savedImages ?? []),
+  ];
+  if (!savedImages.some((row) => row.url === ossUrl)) {
+    savedImages.push({
+      url: ossUrl,
+      title,
+      at: new Date().toISOString(),
+      source: "library",
+    });
+  }
+  const savedImageIndex = Math.max(
+    0,
+    savedImages.findIndex((row) => row.url === ossUrl),
+  );
+  await updateEcomImageLayerProject(userId, projectId, {
+    workspace: {
+      ...workspace,
+      savedImages: savedImages.slice(-40),
+      savedImageIndex,
+    },
+  });
 
   const dup = await prisma.ecomAsset.findFirst({
     where: { userId, module: ECOM_IMAGE_LAYER_MODULE, ossUrl },
@@ -206,6 +236,7 @@ export async function saveImageLayerResultToLibrary(
     return { assetId: dup.id, created: false };
   }
 
+  const firstOrigin = firstWriteOrigin(workspace.firstOrigin, "ecom") ?? "ecom";
   const asset = await prisma.ecomAsset.create({
     data: {
       userId,
@@ -219,7 +250,8 @@ export async function saveImageLayerResultToLibrary(
         sourceModule: ECOM_IMAGE_LAYER_MODULE,
         sourceToolKey: ECOM_IMAGE_LAYER_TOOL_KEY,
         projectId,
-        projectName: existing.title?.trim() || "图片分层",
+        projectName: existing.title?.trim() || "图片处理",
+        firstOrigin,
       },
     },
   });

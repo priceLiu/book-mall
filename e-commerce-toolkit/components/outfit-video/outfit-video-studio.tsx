@@ -20,6 +20,7 @@ import {
 } from "@/lib/vton-look-selection";
 import { EcomVideoPreviewDialog } from "@/components/media/ecom-video-preview-dialog";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
+import { resumeOrCreateEcomProject, writeEcomLastProjectId } from "@/lib/ecom-last-project";
 import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
 import {
   applyOutfitSceneFusionToAll,
@@ -189,9 +190,7 @@ function OutfitVideoStudioInner() {
 
   const applyProject = useCallback((p: OutfitVideoProject) => {
     setProject(p);
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem(PROJECT_STORAGE_KEY, p.id);
-    }
+    writeEcomLastProjectId(PROJECT_STORAGE_KEY, p.id);
   }, []);
 
   useEffect(() => {
@@ -362,11 +361,13 @@ function OutfitVideoStudioInner() {
 
     (async () => {
       try {
-        const savedId =
-          typeof window !== "undefined" ? sessionStorage.getItem(PROJECT_STORAGE_KEY) : null;
-        const p = savedId
-          ? await getOutfitVideoProject(savedId)
-          : await createOutfitVideoProject({ title: "穿搭视频" });
+        const { project: p } = await resumeOrCreateEcomProject({
+          storageKey: PROJECT_STORAGE_KEY,
+          getById: getOutfitVideoProject,
+          listRecentIds: async () =>
+            (await listOutfitVideoProjectSummaries()).map((item) => item.id),
+          create: () => createOutfitVideoProject({ title: "穿搭视频" }),
+        });
         if (!cancelled) applyProject(p);
       } catch (e) {
         if (isEcomUnauthorizedError(e)) setNeedLogin(true);

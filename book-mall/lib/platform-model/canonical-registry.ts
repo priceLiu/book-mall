@@ -820,6 +820,27 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     ]),
   },
   {
+    canonicalModelKey: "wanx-background-generation-v2",
+    displayName: "万相 · 换背景",
+    description:
+      "百炼 wanx-background-generation-v2 · 透明底主体换场景；文本 / 参考图 / 边缘引导",
+    mediaKind: "TEXT_TO_IMAGE",
+    role: "IMAGE",
+    requestKind: "IMAGE",
+    appTags: [...VISUAL_APPS],
+    sortOrder: 39.5,
+    primaryVendor: "aliyun",
+    billingKind: "PER_IMAGE",
+    unitLabel: "元/张",
+    routes: dedupeRoutes([
+      {
+        vendor: "aliyun",
+        modelKey: "wanx-background-generation-v2",
+        providerKind: "BAILIAN",
+      },
+    ]),
+  },
+  {
     canonicalModelKey: "wan2.5-i2i-preview",
     displayName: "Wan 2.5 Image Edit",
     description: "百炼 wan2.5-i2i-preview · 单图/多图融合编辑",

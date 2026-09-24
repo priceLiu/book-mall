@@ -11,11 +11,13 @@ const BASE = "api/sso/tools/ecom/image-layer";
 
 export async function uploadImageLayerSource(
   file: File,
-  projectId?: string,
+  opts?: { projectId?: string; firstOrigin?: string },
 ): Promise<{ ossUrl: string }> {
   const form = new FormData();
   form.set("file", file);
-  if (projectId?.trim()) form.set("projectId", projectId.trim());
+  const projectId = opts?.projectId?.trim();
+  if (projectId) form.set("projectId", projectId);
+  if (opts?.firstOrigin?.trim()) form.set("firstOrigin", opts.firstOrigin.trim());
 
   const res = await fetch(`/api/book-mall/${BASE}/upload`, {
     method: "POST",
@@ -73,7 +75,7 @@ export async function listImageLayerProjectSummaries(): Promise<EcomProjectListI
   const items = (data.items as ImageLayerProject[]) ?? [];
   return items.map((p) => ({
     id: p.id,
-    title: p.title?.trim() || "图片分层",
+    title: p.title?.trim() || "图片处理",
     updatedAt: p.updatedAt,
     subtitle: p.workspace?.stack ? `已拆分 ${p.workspace.stack.layers.length} 层` : null,
     thumbnailUrl: p.workspace?.sourceImageUrl ?? p.workspace?.stack?.background?.url ?? null,
@@ -122,6 +124,34 @@ export async function updateImageLayerProject(
 
 export async function deleteImageLayerProject(id: string): Promise<void> {
   await ecomBookFetch(`${BASE}/projects/${id}`, { method: "DELETE" });
+}
+
+export async function appendImageLayerGeneration(opts: {
+  projectId: string;
+  kind: ImageLayerProject["generations"][number]["kind"];
+  title: string;
+  ossUrl: string;
+  prompt?: string | null;
+  logId?: string | null;
+  modelKey?: string | null;
+  compareFromUrl?: string | null;
+  refImages?: Array<{ url: string; label?: string }>;
+}): Promise<ImageLayerProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${opts.projectId}/generations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      kind: opts.kind,
+      title: opts.title,
+      ossUrl: opts.ossUrl,
+      prompt: opts.prompt ?? null,
+      logId: opts.logId ?? null,
+      modelKey: opts.modelKey ?? null,
+      compareFromUrl: opts.compareFromUrl ?? null,
+      refImages: opts.refImages ?? [],
+    }),
+  });
+  return data.project as ImageLayerProject;
 }
 
 export async function saveImageLayerResult(opts: {

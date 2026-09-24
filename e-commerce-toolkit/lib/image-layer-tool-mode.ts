@@ -1,4 +1,4 @@
-/** 图片分层 · 画布工具模式（顶栏切换，互斥） */
+/** 图片处理 · 画布工具模式（顶栏切换，互斥） */
 export type ImageLayerCanvasToolMode =
   | "layer-view"
   | "bg-replace"

@@ -23,6 +23,7 @@ import {
   updateMediaDecomposeProject,
   uploadMediaDecomposeFile,
 } from "@/lib/ecom-media-decompose-api";
+import { resumeOrCreateEcomProject, writeEcomLastProjectId } from "@/lib/ecom-last-project";
 import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import { fetchSeedVideoModels, getSeedVideoProject } from "@/lib/ecom-seed-video-api";
 import {
@@ -64,9 +65,7 @@ export function MediaDecomposeStudio() {
 
   const applyProject = useCallback((p: MediaDecomposeProject) => {
     setProject(p);
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem(PROJECT_STORAGE_KEY, p.id);
-    }
+    writeEcomLastProjectId(PROJECT_STORAGE_KEY, p.id);
     setStreamText(p.result?.rawText ?? "");
   }, []);
 
@@ -120,18 +119,13 @@ export function MediaDecomposeStudio() {
 
     (async () => {
       try {
-        const savedId =
-          typeof window !== "undefined" ? sessionStorage.getItem(PROJECT_STORAGE_KEY) : null;
-        let p: MediaDecomposeProject;
-        if (savedId) {
-          try {
-            p = await getMediaDecomposeProject(savedId);
-          } catch {
-            p = await createMediaDecomposeProject();
-          }
-        } else {
-          p = await createMediaDecomposeProject();
-        }
+        const { project: p } = await resumeOrCreateEcomProject({
+          storageKey: PROJECT_STORAGE_KEY,
+          getById: getMediaDecomposeProject,
+          listRecentIds: async () =>
+            (await listMediaDecomposeProjectSummaries()).map((item) => item.id),
+          create: () => createMediaDecomposeProject(),
+        });
         if (!cancelled) {
           applyProject(p);
           setLoading(false);

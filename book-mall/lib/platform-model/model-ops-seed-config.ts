@@ -189,8 +189,10 @@ export const ECOM_SCENE_MODEL_KEYS = {
     "qwen-image-edit",
     "qwen-image-edit-max",
     "wanx-x-painting",
+    "wanx-background-generation-v2",
     "image-out-painting",
     "doubao-seedream-5-0-lite",
+    "doubao-seedream-5-0-pro",
   ],
   "ecom-storyboard-chat": [
     "qwen3.8-max",

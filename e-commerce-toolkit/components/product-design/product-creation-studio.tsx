@@ -27,6 +27,7 @@ import {
   updateProductDesignProject,
   uploadProductDesignRef,
 } from "@/lib/ecom-product-design-api";
+import { readEcomLastProjectId, writeEcomLastProjectId } from "@/lib/ecom-last-project";
 import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import type {
   EcomPlatformSpec,
@@ -125,9 +126,7 @@ export function ProductCreationStudio({ module }: StudioProps) {
   const applyProject = useCallback(
     (p: ProductDesignProject) => {
       setProject(p);
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem(projectStorageKey(module), p.id);
-      }
+      writeEcomLastProjectId(projectStorageKey(module), p.id);
       if (p.settings.chatModelKey) setChatModelKey(p.settings.chatModelKey);
       if (p.settings.visionModelKey) setVisionModelKey(p.settings.visionModelKey);
       if (p.settings.imageModelKey) setImageModelKey(p.settings.imageModelKey);
@@ -188,10 +187,7 @@ export function ProductCreationStudio({ module }: StudioProps) {
 
     (async () => {
       try {
-        const savedId =
-          typeof window !== "undefined"
-            ? sessionStorage.getItem(projectStorageKey(module))
-            : null;
+        const savedId = readEcomLastProjectId(projectStorageKey(module));
 
         let projectId: string | null = null;
         let initial: ProductDesignProject | undefined;
@@ -377,9 +373,7 @@ export function ProductCreationStudio({ module }: StudioProps) {
           mainImagesAsStyleRefs: true,
         },
       });
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem(projectStorageKey("detail-page"), created.id);
-      }
+      writeEcomLastProjectId(projectStorageKey("detail-page"), created.id);
       router.push(ENTRY_COPY["detail-page"].path);
     } catch (e) {
       setLoading(false);

@@ -161,7 +161,7 @@ export const ImageLayerCanvas = forwardRef<ImageLayerCanvasHandle, Props>(
 
     const handleMaskChange = useCallback(
       (has: boolean) => {
-        if (toolMode === "decompose-bbox") {
+        if (toolMode === "decompose-bbox" || toolMode === "bg-replace") {
           syncBboxesToParent();
         } else {
           onHasMaskChange?.(has);
@@ -293,7 +293,8 @@ export const ImageLayerCanvas = forwardRef<ImageLayerCanvasHandle, Props>(
               bboxSelection={bboxSelection}
               maxBboxes={IMAGE_LAYER_MAX_BBOXES}
               initialNormalizedBboxes={
-                toolMode === "decompose-bbox" && pendingBboxes.length
+                (toolMode === "decompose-bbox" || toolMode === "bg-replace") &&
+                pendingBboxes.length
                   ? pendingBboxes
                   : undefined
               }

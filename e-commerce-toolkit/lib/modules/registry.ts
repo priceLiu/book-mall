@@ -88,8 +88,8 @@ export const ECOM_MODULES: EcomModuleDef[] = [
   },
   {
     id: "image-layer",
-    title: "图片分层",
-    tagline: "AI 拆层 · 逐层改 · 合成导出",
+    title: "图片处理",
+    tagline: "背景与主体 · 擦除重绘 · AI 拆层",
     href: "/ecom/image-layer",
     kind: "image",
     toolKey: "ecom-toolkit__image-layer",

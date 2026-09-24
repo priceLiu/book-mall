@@ -1,12 +1,18 @@
 "use client";
 
-import { Cpu, ImagePlus, Loader2, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo } from "react";
+import { ImagePlus, Loader2, X } from "lucide-react";
 
-import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { RefImageBboxPicker } from "@/components/background-replace/ref-image-bbox-picker";
+import { ProductDesignPromptMentionTextarea } from "@/components/product-design/product-design-prompt-mention-textarea";
+import { EcomButtonPrimary } from "@/components/ui/ecom-button";
+import {
+  BACKGROUND_REPLACE_DUAL_BBOX_EXAMPLE,
+  BACKGROUND_REPLACE_SUBJECT_BBOX_EXAMPLE,
+  buildBackgroundReplaceMentionRefs,
+} from "@/lib/background-replace-mentions";
 import {
   canSubmitBackgroundReplace,
-  isWanxBackgroundReplaceModel,
-  type BackgroundReplaceEdgeDraft,
   type BackgroundReplaceFormState,
 } from "@/lib/background-replace-types";
 import { cn } from "@/lib/utils";
@@ -16,88 +22,27 @@ type Props = {
   busy: boolean;
   hasBase: boolean;
   subjectHint?: string;
-  modelDisplayName?: string;
-  onPickModel: () => void;
+  subjectImageUrl?: string;
+  subjectBbox?: [number, number, number, number] | null;
   onChange: (next: BackgroundReplaceFormState) => void;
   onUploadRefImage: (file: File) => Promise<string>;
   onSubmit: () => void;
 };
 
-function EdgeList({
-  label,
-  items,
-  disabled,
-  onChange,
-  onUpload,
-}: {
-  label: string;
-  items: BackgroundReplaceEdgeDraft[];
-  disabled: boolean;
-  onChange: (next: BackgroundReplaceEdgeDraft[]) => void;
-  onUpload: (file: File) => Promise<string>;
-}) {
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-[#374151]">{label}</p>
-        <EcomButtonSecondary
-          type="button"
-          size="sm"
-          disabled={disabled || items.length >= 10}
-          onClick={() => onChange([...items, { url: "", prompt: "" }])}
-        >
-          <Plus className="h-3.5 w-3.5" />
-          添加
-        </EcomButtonSecondary>
-      </div>
-      {items.map((item, index) => (
-        <div key={`${label}-${index}`} className="rounded-lg border border-[#e5e7eb] p-2">
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <label className="text-[11px] text-[#6b7280]">
-              边缘图
-              <input
-                type="file"
-                accept="image/png"
-                disabled={disabled}
-                className="mt-1 block w-full text-xs"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  void onUpload(file).then((url) => {
-                    const next = [...items];
-                    next[index] = { ...item, url };
-                    onChange(next);
-                  });
-                }}
-              />
-            </label>
-            <button
-              type="button"
-              className="text-[#ff3b30]"
-              disabled={disabled}
-              onClick={() => onChange(items.filter((_, i) => i !== index))}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          {item.url ? (
-            <p className="truncate text-[11px] text-[#6b7280]">{item.url}</p>
-          ) : null}
-          <input
-            className="mt-1 w-full rounded-md border border-[#e5e7eb] px-2 py-1 text-xs"
-            placeholder="对应 prompt，可空"
-            disabled={disabled}
-            value={item.prompt}
-            onChange={(e) => {
-              const next = [...items];
-              next[index] = { ...item, prompt: e.target.value };
-              onChange(next);
-            }}
-          />
-        </div>
-      ))}
-    </div>
-  );
+function bboxHint(opts: {
+  hasSubjectBbox: boolean;
+  hasRefBbox: boolean;
+}): string {
+  if (opts.hasSubjectBbox && opts.hasRefBbox) {
+    return `已框选图 1、图 2 主体。场景描述即官方编辑指令，可输入 @ 引用框选：${BACKGROUND_REPLACE_DUAL_BBOX_EXAMPLE}。`;
+  }
+  if (opts.hasSubjectBbox) {
+    return `已框选图 1 主体。输入 @ 引用该框，例如：${BACKGROUND_REPLACE_SUBJECT_BBOX_EXAMPLE}。`;
+  }
+  if (opts.hasRefBbox) {
+    return "已框选图 2 区域。输入 @ 引用该框，例如：将图 1 的主体放到 @图2框选 位置。";
+  }
+  return "未框选：按整图提示词换景。可在右侧画布拖出框。";
 }
 
 export function BackgroundReplacePanel({
@@ -105,58 +50,88 @@ export function BackgroundReplacePanel({
   busy,
   hasBase,
   subjectHint,
-  modelDisplayName,
-  onPickModel,
+  subjectImageUrl,
+  subjectBbox = null,
   onChange,
   onUploadRefImage,
   onSubmit,
 }: Props) {
   const canSubmit = canSubmitBackgroundReplace(form, hasBase);
-  const wanx = isWanxBackgroundReplaceModel(form.modelKey);
+  const hasSubjectBbox = Boolean(subjectBbox);
+  const hasRefBbox = Boolean(form.refBbox);
+  const mentionRefs = useMemo(
+    () =>
+      buildBackgroundReplaceMentionRefs({
+        subjectImageUrl,
+        subjectBbox,
+        refImageUrl: form.refImageUrl,
+        refBbox: form.refBbox,
+      }),
+    [form.refBbox, form.refImageUrl, subjectBbox, subjectImageUrl],
+  );
+
+  useEffect(() => {
+    if (!subjectBbox || !form.refBbox) return;
+    if (form.refPrompt.trim()) return;
+    onChange({ ...form, refPrompt: BACKGROUND_REPLACE_DUAL_BBOX_EXAMPLE });
+  }, [form, onChange, subjectBbox]);
+  const scenePlaceholder =
+    hasSubjectBbox && hasRefBbox
+      ? BACKGROUND_REPLACE_DUAL_BBOX_EXAMPLE
+      : hasSubjectBbox
+        ? BACKGROUND_REPLACE_SUBJECT_BBOX_EXAMPLE
+        : "例如：咖啡馆暖光、大理石桌面（有参考图时可空）";
 
   return (
     <div className="space-y-3">
       <p className="text-xs leading-relaxed text-[#6b7280]">
         {subjectHint ??
-          (wanx
-            ? "万相会先抠出人物，再在透明区画新场景。"
-            : "可先框选背景再写场景（更稳），也可以只写场景描述。")}
+          "火山 Seedream 5.0 Pro：可在右侧框选再换，也可只写场景；上传参考图则按图 1 + 图 2 编辑。"}
+      </p>
+      <p className="rounded-lg bg-[#f0f6ff] px-2.5 py-1.5 text-[11px] leading-5 text-[#374151]">
+        {bboxHint({ hasSubjectBbox, hasRefBbox })}
       </p>
 
-      <button
-        type="button"
-        disabled={busy}
-        onClick={onPickModel}
-        className={cn(
-          "flex w-full items-center gap-2 rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-left",
-          "transition hover:border-[#2563eb]/40 hover:bg-[#f0f6ff]/50",
-          busy && "opacity-60",
-        )}
-      >
-        <Cpu className="h-4 w-4 shrink-0 text-[#2563eb]" />
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-medium text-[#6b7280]">换背景模型</p>
-          <p className="truncate text-sm font-medium text-[#111827]">
-            {modelDisplayName ?? form.modelKey}
-          </p>
-        </div>
-      </button>
-
-      <label className="block text-sm">
+      <div className="block text-sm">
         <span className="mb-1 block text-xs font-medium text-[#374151]">场景描述</span>
-        <textarea
-          rows={3}
-          disabled={busy}
-          value={form.refPrompt}
-          placeholder="例如：咖啡馆暖光、大理石桌面"
-          onChange={(e) => onChange({ ...form, refPrompt: e.target.value })}
-          className="w-full resize-none rounded-lg border border-[#e5e7eb] px-3 py-2 text-sm"
-        />
-      </label>
+        {mentionRefs.length > 0 ? (
+          <ProductDesignPromptMentionTextarea
+            value={form.refPrompt}
+            disabled={busy}
+            referenceImages={mentionRefs}
+            onChange={(refPrompt) => onChange({ ...form, refPrompt })}
+            minHeightClass="min-h-[5.5rem]"
+            mentionBadgeVariant="thumbnail"
+            showTopRefBar
+            refBarHint="点缩略图或输入 @ 插入框选"
+          />
+        ) : (
+          <textarea
+            rows={3}
+            disabled={busy}
+            value={form.refPrompt}
+            placeholder={scenePlaceholder}
+            onChange={(e) => onChange({ ...form, refPrompt: e.target.value })}
+            className="w-full resize-none rounded-lg border border-[#e5e7eb] px-3 py-2 text-sm"
+          />
+        )}
+      </div>
 
-      {wanx ? (
       <div>
-        <p className="mb-1 text-xs font-medium text-[#374151]">引导图（可选）</p>
+        <div className="mb-1 flex items-center justify-between">
+          <p className="text-xs font-medium text-[#374151]">参考图（图 2，可选）</p>
+          {form.refImageUrl ? (
+            <button
+              type="button"
+              disabled={busy}
+              className="inline-flex items-center gap-1 text-[11px] text-[#ff3b30] disabled:opacity-50"
+              onClick={() => onChange({ ...form, refImageUrl: "", refBbox: null })}
+            >
+              <X className="h-3 w-3" />
+              移除
+            </button>
+          ) : null}
+        </div>
         <label
           className={cn(
             "flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[#d2d2d7] px-3 py-2 text-xs text-[#6b7280]",
@@ -164,7 +139,7 @@ export function BackgroundReplacePanel({
           )}
         >
           <ImagePlus className="h-4 w-4" />
-          {form.refImageUrl ? "已选引导图，点击更换" : "上传风格参考图"}
+          {form.refImageUrl ? "已选参考图，点击更换" : "上传场景 / 构图参考"}
           <input
             type="file"
             accept="image/png,image/jpeg,image/webp"
@@ -174,132 +149,22 @@ export function BackgroundReplacePanel({
               const file = e.target.files?.[0];
               if (!file) return;
               void onUploadRefImage(file).then((url) =>
-                onChange({ ...form, refImageUrl: url }),
+                onChange({ ...form, refImageUrl: url, refBbox: null }),
               );
             }}
           />
         </label>
         {form.refImageUrl ? (
-          <img
-            src={form.refImageUrl}
-            alt=""
-            className="mt-2 max-h-28 rounded-lg border border-[#e5e7eb] object-contain"
-          />
+          <div className="mt-2">
+            <RefImageBboxPicker
+              url={form.refImageUrl}
+              bbox={form.refBbox}
+              disabled={busy}
+              onChange={(refBbox) => onChange({ ...form, refBbox })}
+            />
+          </div>
         ) : null}
       </div>
-      ) : null}
-
-      {wanx ? (
-      <label className="block text-sm">
-        <span className="mb-1 block text-xs font-medium text-[#374151]">负向提示（可选）</span>
-        <input
-          disabled={busy}
-          value={form.negRefPrompt}
-          placeholder="低质量、模糊、变形"
-          onChange={(e) => onChange({ ...form, negRefPrompt: e.target.value })}
-          className="w-full rounded-lg border border-[#e5e7eb] px-3 py-2 text-sm"
-        />
-      </label>
-      ) : null}
-
-      {wanx ? (
-        <>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="block text-xs">
-              <span className="mb-1 block font-medium text-[#374151]">模型版本</span>
-              <select
-                disabled={busy}
-                value={form.modelVersion}
-                onChange={(e) =>
-                  onChange({ ...form, modelVersion: e.target.value === "v2" ? "v2" : "v3" })
-                }
-                className="w-full rounded-lg border border-[#e5e7eb] px-2 py-1.5"
-              >
-                <option value="v3">v3 效果更好</option>
-                <option value="v2">v2 更快</option>
-              </select>
-            </label>
-            <label className="block text-xs">
-              <span className="mb-1 block font-medium text-[#374151]">生成张数</span>
-              <select
-                disabled={busy}
-                value={String(form.n)}
-                onChange={(e) => onChange({ ...form, n: Number(e.target.value) })}
-                className="w-full rounded-lg border border-[#e5e7eb] px-2 py-1.5"
-              >
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-              </select>
-            </label>
-          </div>
-
-          {form.refImageUrl ? (
-            <label className="block text-xs">
-              <span className="mb-1 block font-medium text-[#374151]">
-                引导图随机度 {form.noiseLevel}
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={999}
-                disabled={busy}
-                value={form.noiseLevel}
-                onChange={(e) =>
-                  onChange({ ...form, noiseLevel: Number(e.target.value) })
-                }
-                className="w-full"
-              />
-            </label>
-          ) : null}
-
-          {form.refPrompt.trim() && form.refImageUrl ? (
-            <label className="block text-xs">
-              <span className="mb-1 block font-medium text-[#374151]">
-                文本权重 {form.refPromptWeight.toFixed(2)}
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                disabled={busy}
-                value={form.refPromptWeight}
-                onChange={(e) =>
-                  onChange({ ...form, refPromptWeight: Number(e.target.value) })
-                }
-                className="w-full"
-              />
-            </label>
-          ) : null}
-
-          <details className="rounded-lg border border-[#e5e7eb] bg-[#fafafa] px-3 py-2">
-            <summary className="cursor-pointer text-xs font-medium text-[#374151]">
-              高级 · 边缘引导元素
-            </summary>
-            <p className="mt-2 text-[11px] text-[#9ca3af]">
-              须为透明底边缘图（HED），前景+背景合计最多 10 张。
-            </p>
-            <div className="mt-2 space-y-3">
-              <EdgeList
-                label="前景边缘"
-                items={form.foregroundEdges}
-                disabled={busy}
-                onChange={(foregroundEdges) => onChange({ ...form, foregroundEdges })}
-                onUpload={onUploadRefImage}
-              />
-              <EdgeList
-                label="背景边缘"
-                items={form.backgroundEdges}
-                disabled={busy}
-                onChange={(backgroundEdges) => onChange({ ...form, backgroundEdges })}
-                onUpload={onUploadRefImage}
-              />
-            </div>
-          </details>
-        </>
-      ) : null}
 
       <div className="sticky bottom-0 border-t border-[#e5e7eb] bg-white pt-3">
         <EcomButtonPrimary
@@ -310,7 +175,7 @@ export function BackgroundReplacePanel({
           onClick={onSubmit}
         >
           {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
-          开始换背景
+          生成
         </EcomButtonPrimary>
       </div>
     </div>

@@ -12,6 +12,7 @@ import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 
 import { EcomPromptMentionRefBar } from "@/components/media/ecom-prompt-mention-ref-bar";
+import { NormalizedBboxCropImg } from "@/components/media/normalized-bbox-crop-img";
 import {
   buildPromptEditableFragment,
   createEcomImageRefMentionNode,
@@ -161,6 +162,7 @@ export function ProductDesignPromptMentionTextarea({
     label: string;
     left: number;
     top: number;
+    cropBbox?: [number, number, number, number];
   } | null>(null);
   const hoverPreviewRef = useRef<HTMLDivElement>(null);
 
@@ -370,6 +372,7 @@ export function ProductDesignPromptMentionTextarea({
         label: item.label || item.token,
         left,
         top: Math.max(12, Math.min(top, window.innerHeight - width * 0.75 - 12)),
+        cropBbox: item.cropBbox,
       });
     };
 
@@ -484,8 +487,16 @@ export function ProductDesignPromptMentionTextarea({
                   onClick={() => insertImageRef(item.index)}
                 >
                   <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-[#f5f5f7]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={item.url} alt="" className="h-full w-full object-cover" />
+                    {item.cropBbox ? (
+                      <NormalizedBboxCropImg
+                        url={item.url}
+                        bbox={item.cropBbox}
+                        className="h-full w-full"
+                      />
+                    ) : (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={item.url} alt="" className="h-full w-full object-cover" />
+                    )}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium text-[#1d1d1f]">
@@ -519,13 +530,21 @@ export function ProductDesignPromptMentionTextarea({
               className="inline-flex items-center gap-1 rounded-lg border border-[#e8e8ed] bg-white px-1.5 py-0.5 text-[10px] text-[#6e6e73] hover:border-[#0071e3]/35 hover:bg-[#f0f6ff] disabled:opacity-50"
               onClick={() => insertAtCursor(`${item.token} `)}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={buildEcomOssThumbUrl(item.url)}
-                alt=""
-                className="h-4 w-4 rounded object-cover"
-                referrerPolicy="no-referrer"
-              />
+              {item.cropBbox ? (
+                <NormalizedBboxCropImg
+                  url={item.url}
+                  bbox={item.cropBbox}
+                  className="h-4 w-4 rounded"
+                />
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={buildEcomOssThumbUrl(item.url)}
+                  alt=""
+                  className="h-4 w-4 rounded object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              )}
               {item.token.replace(/^@/, "")}
             </button>
           ))}
@@ -579,13 +598,23 @@ export function ProductDesignPromptMentionTextarea({
                 zIndex: HOVER_PREVIEW_Z,
               }}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={hoverPreview.url}
-                alt={hoverPreview.label}
-                className="aspect-[3/4] w-full object-cover"
-                referrerPolicy="no-referrer"
-              />
+              {hoverPreview.cropBbox ? (
+                <NormalizedBboxCropImg
+                  url={hoverPreview.url}
+                  bbox={hoverPreview.cropBbox}
+                  alt={hoverPreview.label}
+                  fit="aspect"
+                  className="w-full max-h-[min(50dvh,20rem)]"
+                />
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={hoverPreview.url}
+                  alt={hoverPreview.label}
+                  className="aspect-[3/4] w-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              )}
               <p className="truncate px-2 py-1.5 text-[11px] text-[#6e6e73]">{hoverPreview.label}</p>
             </div>,
             document.body,

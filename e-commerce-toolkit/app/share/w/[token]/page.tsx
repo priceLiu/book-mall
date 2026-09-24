@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { writeEcomLastProjectId } from "@/lib/ecom-last-project";
+
 function getBookMallBase(): string {
   return (
     process.env.NEXT_PUBLIC_BOOK_MALL_URL?.replace(/\/$/, "") ||
@@ -15,35 +17,35 @@ function persistClaimedProjectId(redirectPath: string, projectId: string) {
   try {
     const url = new URL(redirectPath, window.location.origin);
     if (url.pathname.includes("/model-shot")) {
-      sessionStorage.setItem("ecom-model-shot-active-project", projectId);
+      writeEcomLastProjectId("ecom-model-shot-active-project", projectId);
       return;
     }
     if (url.pathname.includes("/hand-craft")) {
-      sessionStorage.setItem("ecom-hand-craft-active-project", projectId);
+      writeEcomLastProjectId("ecom-hand-craft-active-project", projectId);
       return;
     }
     if (url.pathname.includes("/seed-video")) {
-      sessionStorage.setItem("ecom-seed-video-active-project", projectId);
+      writeEcomLastProjectId("ecom-seed-video-active-project", projectId);
       return;
     }
     if (url.pathname.includes("/media-decompose")) {
-      sessionStorage.setItem("ecom-media-decompose-active-project", projectId);
+      writeEcomLastProjectId("ecom-media-decompose-active-project", projectId);
       return;
     }
     if (url.pathname.includes("/film-pull")) {
-      sessionStorage.setItem("ecom-film-pull-active-project", projectId);
+      writeEcomLastProjectId("ecom-film-pull-active-project", projectId);
       return;
     }
     if (url.pathname.includes("/detail-page-creation")) {
-      sessionStorage.setItem("ecom-product-design-active-project:detail-page", projectId);
+      writeEcomLastProjectId("ecom-product-design-active-project:detail-page", projectId);
       return;
     }
     if (url.pathname.includes("/product-creation")) {
-      sessionStorage.setItem("ecom-product-design-active-project:main-image", projectId);
+      writeEcomLastProjectId("ecom-product-design-active-project:main-image", projectId);
       return;
     }
     if (url.pathname.includes("/storyboard/")) {
-      sessionStorage.setItem("ecom-storyboard-active-project", projectId);
+      writeEcomLastProjectId("ecom-storyboard-active-project", projectId);
     }
   } catch {
     /* ignore malformed redirect */

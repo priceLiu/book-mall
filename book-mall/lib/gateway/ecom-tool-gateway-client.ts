@@ -599,7 +599,7 @@ export async function ecomGwVolcengineImageEdit(
   opts: {
     model: string;
     prompt: string;
-    image?: string;
+    image?: string | string[];
     parameters?: Record<string, unknown>;
     clientPage?: string;
   },

@@ -104,7 +104,7 @@ const SOURCE_MODULE_LABELS: Record<string, string> = {
   "seed-video": "种草视频",
   "model-shot": "模特大片",
   "outfit-video": "穿搭视频",
-  "image-layer": "图片分层",
+  "image-layer": "图片处理",
   "detail-page-suite": "详情页套图",
   "detail-page-suite-hit": "爆款详情页套图",
   "detail-page-suite-replica": "详情页套图复刻",

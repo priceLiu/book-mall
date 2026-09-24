@@ -23,7 +23,7 @@ export function buildSaveItems(
       label: stack ? "当前整图（改层 / 重绘结果）" : "当前结果图",
       url: flatUrl,
       filename: `image-layer-result-${stamp}.png`,
-      libraryTitle: "图片分层结果",
+      libraryTitle: "图片处理结果",
     });
   }
 

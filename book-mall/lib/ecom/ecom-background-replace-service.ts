@@ -3,13 +3,15 @@ import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
   buildBackgroundReplaceRequest,
   buildSeedreamBackgroundReplacePrompt,
+  fillTransparentHolesFromNeighbors,
   hasMeaningfulTransparency,
-  isWanxBackgroundReplaceModel,
   knockOutFakeBackdrop,
   resolveBackgroundReplaceModel,
+  sealWanxBackgroundResult,
   SEEDREAM_BACKGROUND_REPLACE_MODEL,
   toRgbaPngBuffer,
   WANX_BACKGROUND_GENERATION_MODEL,
+  WANX_CUTOUT_MIN_ALPHA_RATIO,
   type BackgroundReplaceInput,
 } from "@/lib/ecom/ecom-background-replace";
 import { ecomImageProcessingBgRemove } from "@/lib/ecom/ecom-image-processing";
@@ -103,7 +105,7 @@ export async function prepareWanxSubjectCutout(
   await assertEcomToolkitGatewayAccess(userId);
   const reachable = await ensurePublicImageUrl(userId, url);
   let buf = await toRgbaPngBuffer(await downloadImageBuffer(reachable));
-  if (!(await hasMeaningfulTransparency(buf))) {
+  if (!(await hasMeaningfulTransparency(buf, WANX_CUTOUT_MIN_ALPHA_RATIO))) {
     const cut = await ecomImageProcessingBgRemove({
       userId,
       sourceImageDataUrl: reachable,
@@ -113,11 +115,11 @@ export async function prepareWanxSubjectCutout(
     if (!cutUrl) throw new Error("未能抠出主体，换背景中止");
     buf = await toRgbaPngBuffer(await downloadImageBuffer(cutUrl));
   }
-  if (!(await hasMeaningfulTransparency(buf))) {
-    buf = await knockOutFakeBackdrop(buf);
-  }
-  if (!(await hasMeaningfulTransparency(buf))) {
-    throw new Error("主体图没有透明区域，万相无法换背景。请换一张主体更清晰的图后重试。");
+  buf = await knockOutFakeBackdrop(buf);
+  if (!(await hasMeaningfulTransparency(buf, WANX_CUTOUT_MIN_ALPHA_RATIO))) {
+    throw new Error(
+      "主体图没有足够的透明区域，万相无法换背景。请换一张主体更清晰的图后重试。",
+    );
   }
   return uploadCanvasUserBuffer({
     userId,
@@ -166,17 +168,54 @@ export async function runWanxBackgroundGeneration(opts: {
     backgroundEdges: backgroundEdges.filter((e) => e.url),
   });
 
+  const meta = await gatewayV1ClientMetaForBookUser("ECOM", opts.userId, {
+    clientPage: opts.clientPage ?? "ecom/background-replace",
+  });
   const gatewayResult = await gatewayV1BackgroundGeneration({
     apiKeyId: auth.id,
     body: { input: request.input, parameters: request.parameters },
-    meta: await gatewayV1ClientMetaForBookUser("ECOM", opts.userId, {
-      clientPage: opts.clientPage ?? "ecom/background-replace",
-    }),
+    meta,
   });
 
-  const imageUrls = await Promise.all(
-    gatewayResult.imageUrls.map((u) => rehostResultUrl(opts.userId, u)),
-  );
+  const imageUrls: string[] = [];
+  for (const url of gatewayResult.imageUrls) {
+    let buf = await downloadImageBuffer(url);
+    let sealed = await sealWanxBackgroundResult(buf);
+    if (sealed.needsSecondPass) {
+      const holeUrl = await uploadCanvasUserBuffer({
+        userId: opts.userId,
+        ext: "png",
+        buf: sealed.buf,
+        contentType: "image/png",
+      });
+      const second = await gatewayV1BackgroundGeneration({
+        apiKeyId: auth.id,
+        body: {
+          input: { ...request.input, base_image_url: holeUrl },
+          parameters: request.parameters,
+        },
+        meta,
+      });
+      const secondUrl = second.imageUrls[0] ?? url;
+      buf = await downloadImageBuffer(secondUrl);
+      sealed = await sealWanxBackgroundResult(buf);
+      if (sealed.needsSecondPass) {
+        sealed = {
+          buf: await fillTransparentHolesFromNeighbors(sealed.buf),
+          needsSecondPass: false,
+        };
+      }
+    }
+    imageUrls.push(
+      await uploadCanvasUserBuffer({
+        userId: opts.userId,
+        ext: "png",
+        buf: sealed.buf,
+        contentType: "image/png",
+      }),
+    );
+  }
+
   return {
     imageUrls,
     logId: gatewayResult.logId,
@@ -191,14 +230,19 @@ async function runSeedreamBackgroundReplace(opts: {
   clientPage?: string;
 }): Promise<BackgroundReplaceResult> {
   const image = await ensurePublicImageUrl(opts.userId, opts.input.baseImageUrl);
+  const refImage = opts.input.refImageUrl?.trim()
+    ? await ensurePublicImageUrl(opts.userId, opts.input.refImageUrl)
+    : "";
   const prompt = buildSeedreamBackgroundReplacePrompt({
     scene: opts.input.refPrompt ?? "",
     bbox: opts.input.bbox,
+    hasRefImage: Boolean(refImage),
+    refBbox: opts.input.refBbox,
   });
   const { images, logId } = await ecomGwVolcengineImageEdit(opts.userId, {
     model: SEEDREAM_BACKGROUND_REPLACE_MODEL,
     prompt,
-    image,
+    image: refImage ? [image, refImage] : image,
     parameters: {
       size: "2K",
       output_format: "png",
@@ -223,28 +267,10 @@ export async function runEcomBackgroundReplace(opts: {
   clientPage?: string;
 }): Promise<BackgroundReplaceResult> {
   await assertEcomToolkitGatewayAccess(opts.userId);
-  const modelKey = resolveBackgroundReplaceModel(opts.input.modelKey);
-
-  if (!isWanxBackgroundReplaceModel(modelKey)) {
-    return runSeedreamBackgroundReplace({
-      userId: opts.userId,
-      input: opts.input,
-      clientPage: opts.clientPage,
-    });
-  }
-
-  const cutoutUrl = opts.input.subjectAlreadyCutout
-    ? opts.input.baseImageUrl.trim()
-    : await prepareWanxSubjectCutout(opts.userId, opts.input.baseImageUrl);
-  if (!cutoutUrl) throw new Error("主体图不可用");
-
-  return runWanxBackgroundGeneration({
+  resolveBackgroundReplaceModel(opts.input.modelKey);
+  return runSeedreamBackgroundReplace({
     userId: opts.userId,
+    input: opts.input,
     clientPage: opts.clientPage,
-    input: {
-      ...opts.input,
-      baseImageUrl: cutoutUrl,
-      subjectAlreadyCutout: true,
-    },
   });
 }

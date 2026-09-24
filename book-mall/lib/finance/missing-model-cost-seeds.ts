@@ -75,6 +75,7 @@ export const MISSING_MODEL_COST_SEEDS: ModelCostSeedRow[] = [
   // —— CORE · TEXT_TO_IMAGE ——
   { canonicalModelKey: "aitryon-refiner", vendor: "aliyun", unit: "PER_IMAGE", listCostYuan: 0.3, discountRate: ALI },
   { canonicalModelKey: "doubao-seedream-5-0-pro", vendor: "volcengine", unit: "PER_IMAGE", listCostYuan: 0.35, discountRate: VOLC },
+  { canonicalModelKey: "wanx-background-generation-v2", vendor: "aliyun", unit: "PER_IMAGE", listCostYuan: 0.2, discountRate: ALI, note: "百炼背景生成按张" },
   { canonicalModelKey: "portrait-virtual", vendor: "volcengine", unit: "PER_IMAGE", listCostYuan: 0.05, discountRate: VOLC, note: "Assets API 按次" },
   { canonicalModelKey: "portrait-real", vendor: "volcengine", unit: "PER_IMAGE", listCostYuan: 0.08, discountRate: VOLC },
 

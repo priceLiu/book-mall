@@ -7,9 +7,9 @@ export function resolveImageLayerAssistantHeader(
   switch (toolMode) {
     case "bg-replace":
       return {
-        title: "换背景",
+        title: "背景与主体",
         description:
-          "默认火山 Seedream 5.0 Pro：可框选或只写场景。选万相则先抠图再换景",
+          "火山 Seedream 5.0 Pro：右侧框选、提示词或图 2 参考，三种玩法可组合",
       };
     case "retouch":
       return {
@@ -23,21 +23,21 @@ export function resolveImageLayerAssistantHeader(
       };
     case "decompose-bbox":
       return {
-        title: "图片分层",
+        title: "图片处理",
         description: "框选拆分区域（无需提示词）→ 顶栏「拆层」",
       };
     case "layer-view":
       if (hasStack) {
         return {
-          title: "图片分层",
+          title: "图片处理",
           description: "点击图层编辑卡片 → 填写描述 → 底部一次提交；改完回到整图",
         };
       }
       return {
-        title: "图片分层",
+        title: "图片处理",
         description: "上传图片后可框选拆分，或切换局部重绘 / 擦除",
       };
     default:
-      return { title: "图片分层", description: "" };
+      return { title: "图片处理", description: "" };
   }
 }

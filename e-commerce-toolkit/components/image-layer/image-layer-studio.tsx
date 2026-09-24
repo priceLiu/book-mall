@@ -18,6 +18,7 @@ import { ImageLayerAssistantPanel } from "@/components/image-layer/image-layer-a
 import { ImageLayerAssistantHeader } from "@/components/image-layer/image-layer-assistant-header";
 import type { ImageLayerEditEntryView } from "@/components/image-layer/image-layer-edit-panel";
 import { ImageLayerExportPreviewDialog } from "@/components/image-layer/image-layer-export-preview-dialog";
+import { ImageLayerHistoryDialog } from "@/components/image-layer/image-layer-history-dialog";
 import { ImageLayerSaveDialog } from "@/components/image-layer/image-layer-save-dialog";
 import { ImageLayerToolbar } from "@/components/image-layer/image-layer-toolbar";
 import { ImageLayerUploadZone } from "@/components/image-layer/image-layer-upload-zone";
@@ -28,6 +29,7 @@ import {
   type ImageProcessingParamField,
 } from "@/lib/ecom-image-processing-api";
 import {
+  appendImageLayerGeneration,
   createImageLayerProject,
   decomposeImageLayers,
   editImageLayer,
@@ -38,16 +40,18 @@ import {
   saveImageLayerWorkspace,
   uploadImageLayerSource,
 } from "@/lib/ecom-image-layer-api";
-import {
-  cutoutEcomBackgroundSubject,
-  fetchBackgroundReplaceModels,
-  replaceEcomBackground,
-} from "@/lib/ecom-background-replace-api";
+import { listAssets } from "@/lib/ecom-api";
+import { replaceEcomBackground } from "@/lib/ecom-background-replace-api";
 import {
   DEFAULT_BACKGROUND_REPLACE_FORM,
-  isWanxBackgroundReplaceModel,
   type BackgroundReplaceFormState,
 } from "@/lib/background-replace-types";
+import { inferEcomFirstOriginFromUpload } from "@/lib/ecom-first-origin";
+import {
+  resumeOrCreateEcomProject,
+  writeEcomLastProjectId,
+} from "@/lib/ecom-last-project";
+import { normalizedBbox } from "@/lib/image-layer-coords";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import { ensureEcomSessionFresh } from "@/lib/ecom-silent-sso";
@@ -75,12 +79,17 @@ import {
   type ImageLayerSelectionSubTool,
 } from "@/lib/image-layer-tool-mode";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
-import type {
-  ImageLayerEditEntry,
-  ImageLayerProject,
-  ImageLayerStack,
-  ImageLayerStackItem,
-  ImageLayerWorkspace,
+import { buildDailyLeftSessionImages } from "@/lib/image-layer-daily-session";
+import {
+  appendSavedSessionImage,
+  explicitSavedSessionImages,
+  type ImageLayerEditEntry,
+  type ImageLayerProject,
+  type ImageLayerProjectGeneration,
+  type ImageLayerSavedImage,
+  type ImageLayerStack,
+  type ImageLayerStackItem,
+  type ImageLayerWorkspace,
 } from "@/lib/image-layer-types";
 
 const DECOMPOSE_TASK_ID = "image-layer-decompose";
@@ -89,6 +98,7 @@ const RETOUCH_TASK_ID = "image-layer-retouch";
 const ERASE_TASK_ID = "image-layer-erase";
 const BG_REPLACE_TASK_ID = "image-layer-bg-replace";
 const PROJECT_STORAGE_KEY = "ecom-image-layer-active-project";
+const IMAGE_LAYER_ASSET_MODULE = "image-layer";
 const AUTO_SAVE_MS = 900;
 
 function revokeBlobPreview(url: string | null) {
@@ -112,6 +122,11 @@ function buildWorkspaceSnapshot(args: {
   displayDims: { w: number; h: number } | null;
   selectedLayerId: string | null;
   editEntries: ImageLayerEditEntry[];
+  savedImages: ImageLayerSavedImage[];
+  savedImageIndex: number;
+  firstOrigin?: string;
+  toolMode: ImageLayerCanvasToolMode;
+  bgReplace: BackgroundReplaceFormState;
 }): ImageLayerWorkspace {
   return {
     sourceImageUrl: args.sourceUrl ?? args.stack?.sourceImageUrl ?? null,
@@ -122,6 +137,15 @@ function buildWorkspaceSnapshot(args: {
     ...(args.displayDims ? { displayDims: args.displayDims } : {}),
     selectedLayerId: args.selectedLayerId,
     editEntries: args.editEntries,
+    savedImages: args.savedImages,
+    savedImageIndex: args.savedImageIndex,
+    ...(args.firstOrigin ? { firstOrigin: args.firstOrigin } : {}),
+    toolMode: args.toolMode,
+    bgReplace: {
+      refPrompt: args.bgReplace.refPrompt,
+      refImageUrl: args.bgReplace.refImageUrl,
+      refBbox: args.bgReplace.refBbox,
+    },
   };
 }
 
@@ -165,11 +189,10 @@ function ImageLayerStudioInner() {
   );
   const [bgReplaceCandidates, setBgReplaceCandidates] = useState<string[]>([]);
   const [bgReplacePickOpen, setBgReplacePickOpen] = useState(false);
-  const [bgReplaceModels, setBgReplaceModels] = useState<StoryboardGatewayModel[]>([]);
-  const [bgReplaceModelsLoading, setBgReplaceModelsLoading] = useState(true);
-  const [bgReplaceModelsError, setBgReplaceModelsError] = useState<string | null>(
-    null,
-  );
+  const [savedImages, setSavedImages] = useState<ImageLayerSavedImage[]>([]);
+  const [librarySaved, setLibrarySaved] = useState<ImageLayerSavedImage[]>([]);
+  const [savedImageIndex, setSavedImageIndex] = useState(0);
+  const [firstOrigin, setFirstOrigin] = useState<string | undefined>();
   const [pendingBboxes, setPendingBboxes] = useState<
     Array<[number, number, number, number]>
   >([]);
@@ -189,6 +212,8 @@ function ImageLayerStudioInner() {
   const [exportPreviewBusy, setExportPreviewBusy] = useState(false);
   const [exportDownloadBusy, setExportDownloadBusy] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [restoringHistoryId, setRestoringHistoryId] = useState<string | null>(null);
 
   const hydrateFromProject = useCallback((p: ImageLayerProject) => {
     skipAutoSaveRef.current = true;
@@ -201,6 +226,18 @@ function ImageLayerStudioInner() {
     });
     setSourceUrl(nextSource);
     setOriginalImageUrl(ws.originalImageUrl?.trim() || nextSource);
+    const restoredSaved = explicitSavedSessionImages(ws.savedImages, [
+      nextSource,
+      ws.originalImageUrl,
+    ]);
+    setSavedImages(restoredSaved);
+    setSavedImageIndex(
+      Math.min(
+        Math.max(0, ws.savedImageIndex ?? 0),
+        Math.max(0, restoredSaved.length - 1),
+      ),
+    );
+    setFirstOrigin(ws.firstOrigin);
     setStack(ws.stack ?? null);
     setPendingBboxes(resolvePendingBboxes(ws));
     setSelectedLayerId(ws.selectedLayerId ?? null);
@@ -212,7 +249,25 @@ function ImageLayerStudioInner() {
       setEditEntries([]);
     }
     setDisplayDims(ws.displayDims ?? null);
-    setCanvasToolMode(ws.stack ? "layer-view" : "decompose-bbox");
+    if (
+      ws.toolMode === "bg-replace" ||
+      ws.toolMode === "retouch" ||
+      ws.toolMode === "erase" ||
+      ws.toolMode === "decompose-bbox" ||
+      ws.toolMode === "layer-view"
+    ) {
+      setCanvasToolMode(ws.toolMode);
+    } else {
+      setCanvasToolMode(ws.stack ? "layer-view" : "decompose-bbox");
+    }
+    if (ws.bgReplace) {
+      setBgReplaceForm((prev) => ({
+        ...prev,
+        refPrompt: ws.bgReplace?.refPrompt ?? prev.refPrompt,
+        refImageUrl: ws.bgReplace?.refImageUrl ?? "",
+        refBbox: ws.bgReplace?.refBbox ?? null,
+      }));
+    }
 
     if (ws.canvasDims?.w && ws.canvasDims?.h) {
       setCanvasDims(ws.canvasDims);
@@ -226,7 +281,7 @@ function ImageLayerStudioInner() {
 
     setProject(p);
     if (typeof window !== "undefined") {
-      sessionStorage.setItem(PROJECT_STORAGE_KEY, p.id);
+      writeEcomLastProjectId(PROJECT_STORAGE_KEY, p.id);
     }
     window.setTimeout(() => {
       skipAutoSaveRef.current = false;
@@ -258,18 +313,13 @@ function ImageLayerStudioInner() {
     let cancelled = false;
     (async () => {
       try {
-        const savedId =
-          typeof window !== "undefined" ? sessionStorage.getItem(PROJECT_STORAGE_KEY) : null;
-        let p: ImageLayerProject;
-        if (savedId) {
-          try {
-            p = await getImageLayerProject(savedId);
-          } catch {
-            p = await createImageLayerProject();
-          }
-        } else {
-          p = await createImageLayerProject();
-        }
+        const { project: p } = await resumeOrCreateEcomProject({
+          storageKey: PROJECT_STORAGE_KEY,
+          getById: getImageLayerProject,
+          listRecentIds: async () =>
+            (await listImageLayerProjectSummaries()).map((item) => item.id),
+          create: () => createImageLayerProject(),
+        });
         if (!cancelled) {
           applyProject(p);
           setProjectLoading(false);
@@ -280,7 +330,7 @@ function ImageLayerStudioInner() {
           else {
             await alert({
               title: "加载失败",
-              message: e instanceof Error ? e.message : "无法打开图片分层工作台",
+              message: e instanceof Error ? e.message : "无法打开图片处理工作台",
               variant: "error",
             });
           }
@@ -346,38 +396,29 @@ function ImageLayerStudioInner() {
     }
   }, []);
 
-  const loadBgReplaceModels = useCallback(async () => {
-    setBgReplaceModelsLoading(true);
-    setBgReplaceModelsError(null);
-    try {
-      const data = await fetchBackgroundReplaceModels();
-      setBgReplaceModels(data.imageModels);
-      const preferred = DEFAULT_BACKGROUND_REPLACE_FORM.modelKey;
-      if (data.imageModels.some((m) => m.modelKey === preferred)) {
-        setBgReplaceForm((prev) => ({ ...prev, modelKey: preferred }));
-      } else if (
-        data.defaultModel &&
-        data.imageModels.some((m) => m.modelKey === data.defaultModel)
-      ) {
-        setBgReplaceForm((prev) => ({ ...prev, modelKey: data.defaultModel }));
-      } else if (data.imageModels[0]?.modelKey) {
-        setBgReplaceForm((prev) => ({
-          ...prev,
-          modelKey: data.imageModels[0]!.modelKey,
-        }));
-      }
-    } catch (e) {
-      setBgReplaceModelsError(e instanceof Error ? e.message : "模型加载失败");
-    } finally {
-      setBgReplaceModelsLoading(false);
-    }
+  useEffect(() => {
+    if (!sessionChecked || needLogin) return;
+    void loadRetouchModels();
+  }, [loadRetouchModels, needLogin, sessionChecked]);
+
+  const loadLibrarySaved = useCallback(async () => {
+    const items = await listAssets(IMAGE_LAYER_ASSET_MODULE);
+    setLibrarySaved(
+      items
+        .filter((asset) => asset.ossUrl.trim())
+        .map((asset) => ({
+          url: asset.ossUrl.trim(),
+          title: asset.title?.trim() || "已保存",
+          at: asset.createdAt,
+          source: "library" as const,
+        })),
+    );
   }, []);
 
   useEffect(() => {
     if (!sessionChecked || needLogin) return;
-    void loadRetouchModels();
-    void loadBgReplaceModels();
-  }, [loadBgReplaceModels, loadRetouchModels, needLogin, sessionChecked]);
+    void loadLibrarySaved().catch(() => setLibrarySaved([]));
+  }, [loadLibrarySaved, needLogin, project?.id, sessionChecked]);
 
   const buildSnapshot = useCallback(
     (): ImageLayerWorkspace =>
@@ -390,13 +431,23 @@ function ImageLayerStudioInner() {
         displayDims,
         selectedLayerId,
         editEntries,
+        savedImages,
+        savedImageIndex,
+        firstOrigin,
+        toolMode: canvasToolMode,
+        bgReplace: bgReplaceForm,
       }),
     [
+      bgReplaceForm,
       canvasDims,
+      canvasToolMode,
       displayDims,
       editEntries,
+      firstOrigin,
       originalImageUrl,
       pendingBboxes,
+      savedImageIndex,
+      savedImages,
       selectedLayerId,
       sourceUrl,
       stack,
@@ -413,6 +464,22 @@ function ImageLayerStudioInner() {
     },
     [buildSnapshot, project?.id],
   );
+
+  useEffect(() => {
+    const flush = () => {
+      if (!project?.id || skipAutoSaveRef.current) return;
+      void persistWorkspace().catch(() => undefined);
+    };
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onHidden);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onHidden);
+    };
+  }, [persistWorkspace, project?.id]);
 
   useEffect(() => {
     if (!project?.id || skipAutoSaveRef.current) return;
@@ -432,9 +499,14 @@ function ImageLayerStudioInner() {
     pendingBboxes,
     persistWorkspace,
     project?.id,
+    savedImageIndex,
+    savedImages,
+    firstOrigin,
     selectedLayerId,
     sourceUrl,
     stack,
+    canvasToolMode,
+    bgReplaceForm,
   ]);
 
   const ensureSessionForAi = useCallback(async (): Promise<boolean> => {
@@ -569,7 +641,7 @@ function ImageLayerStudioInner() {
   }, [project?.id]);
 
   const handleUploadFiles = useCallback(
-    async (files: FileList | File[]) => {
+    async (files: FileList | File[], via?: "paste" | "drop") => {
       const file = Array.from(files)[0];
       if (!file || !project?.id) return;
       if (!file.type.includes("jpeg") && !file.type.includes("png")) {
@@ -603,7 +675,12 @@ function ImageLayerStudioInner() {
       setBusyLabel("上传至 OSS…");
       setNeedLogin(false);
       try {
-        const { ossUrl } = await uploadImageLayerSource(file, project.id);
+        const origin = inferEcomFirstOriginFromUpload(via);
+        const { ossUrl } = await uploadImageLayerSource(file, {
+          projectId: project.id,
+          firstOrigin: origin,
+        });
+        setFirstOrigin((prev) => prev ?? origin);
         setSourceUrl(ossUrl);
         setOriginalImageUrl(ossUrl);
         setSourcePreviewUrl((prev) => {
@@ -614,8 +691,8 @@ function ImageLayerStudioInner() {
         setProject(updated);
         await toast({
           variant: "success",
-          title: "图片已保存",
-          message: "刷新页面后仍可继续编辑",
+          title: "图片已上传",
+          message: "刷新页面后仍可继续编辑。点「保存图片」才会进入左侧已保存翻页。",
         });
       } catch (e) {
         if (isEcomUnauthorizedError(e)) {
@@ -971,11 +1048,14 @@ function ImageLayerStudioInner() {
         void toast({
           variant: "error",
           title: "分层进行中",
-          message: "请先保存图片或点击「取消分层」，再使用换背景 / 重绘 / 擦除。",
+          message: "请先保存图片或点击「取消分层」，再使用背景与主体 / 重绘 / 擦除。",
         });
         return;
       }
       setCanvasToolMode(mode);
+      if (mode === "bg-replace") {
+        setSelectionSubTool("bbox");
+      }
       if (mode !== "decompose-bbox") {
         canvasRef.current?.clearMask();
       }
@@ -985,7 +1065,9 @@ function ImageLayerStudioInner() {
 
   const uploadBgReplaceImage = useCallback(
     async (file: File): Promise<string> => {
-      const { ossUrl } = await uploadImageLayerSource(file);
+      const { ossUrl } = await uploadImageLayerSource(file, {
+        firstOrigin: "user-upload",
+      });
       return ossUrl;
     },
     [],
@@ -996,7 +1078,7 @@ function ImageLayerStudioInner() {
     if (!source) {
       throw new Error(
         sourcePreviewUrl
-          ? "原图还在上传到云端，请稍后再换背景"
+          ? "原图还在上传到云端，请稍后再生成"
           : "请先上传图片",
       );
     }
@@ -1010,15 +1092,33 @@ function ImageLayerStudioInner() {
         compareFromUrl: before || undefined,
         toolMode: "bg-replace",
       });
+      if (project?.id) {
+        const updated = await appendImageLayerGeneration({
+          projectId: project.id,
+          kind: "bg-replace",
+          title: "背景与主体",
+          ossUrl: url,
+          prompt: bgReplaceForm.refPrompt.trim() || null,
+          modelKey: bgReplaceForm.modelKey,
+          compareFromUrl: before || null,
+          refImages: [
+            ...(before ? [{ url: before, label: "图1" }] : []),
+            ...(bgReplaceForm.refImageUrl.trim()
+              ? [{ url: bgReplaceForm.refImageUrl.trim(), label: "图2参考" }]
+              : []),
+          ],
+        });
+        setProject(updated);
+      }
       setBgReplacePickOpen(false);
       setBgReplaceCandidates([]);
       await toast({
         variant: "success",
-        title: "已换背景",
-        message: "右边是新场景，左边是换之前的图。",
+        title: "已生成",
+        message: "右边是新场景，左边是生成前的图。",
       });
     },
-    [applyFlatEditResult, httpSourceUrl, sourceUrl, toast],
+    [applyFlatEditResult, bgReplaceForm.modelKey, bgReplaceForm.refPrompt, httpSourceUrl, project?.id, sourceUrl, toast],
   );
 
   const runBackgroundReplace = useCallback(async () => {
@@ -1026,40 +1126,44 @@ function ImageLayerStudioInner() {
     setBgReplaceBusy(true);
     setNeedLogin(false);
     const taskId = BG_REPLACE_TASK_ID;
-    const wanx = isWanxBackgroundReplaceModel(bgReplaceForm.modelKey);
     try {
       const baseImageUrl = await resolveBgReplaceBaseUrl();
-      const bbox = canvasRef.current?.getBbox() ?? undefined;
+      const natural = canvasRef.current?.getNaturalSize();
+      const pxBbox = canvasRef.current?.getBbox() ?? undefined;
+      const bbox =
+        pendingBboxes[0] ??
+        (pxBbox && natural && natural.w > 0 && natural.h > 0
+          ? normalizedBbox(
+              pxBbox[0],
+              pxBbox[1],
+              pxBbox[2],
+              pxBbox[3],
+              natural.w,
+              natural.h,
+            )
+          : undefined);
+      const hasRef = Boolean(bgReplaceForm.refImageUrl.trim());
       backgroundGen.registerTask({
         id: taskId,
-        label: "换背景",
-        hint: wanx
-          ? "万相：先抠图，再换场景"
+        label: "背景与主体",
+        hint: hasRef
+          ? bbox
+            ? "Seedream 5.0 Pro · 图1框选 + 图2参考"
+            : "Seedream 5.0 Pro · 图1 + 图2参考"
           : bbox
             ? "Seedream 5.0 Pro · 框选换景"
             : "Seedream 5.0 Pro · 提示词换景",
         startedAt: new Date().toISOString(),
-        expectedDurationMs: wanx ? 150_000 : 90_000,
+        expectedDurationMs: 90_000,
         poll: async () => ({ status: "running" as const }),
       });
 
-      let resultBaseUrl = baseImageUrl;
-      if (wanx) {
-        setBusyLabel("抠图中…");
-        const cut = await cutoutEcomBackgroundSubject({
-          sourceImageUrl: baseImageUrl,
-        });
-        resultBaseUrl = cut.cutoutUrl;
-        setBusyLabel("万相换背景中…");
-      } else {
-        setBusyLabel(bbox ? "框选换背景中…" : "换背景中…");
-      }
+      setBusyLabel(bbox ? "框选生成中…" : "生成中…");
 
       const result = await replaceEcomBackground({
-        baseImageUrl: resultBaseUrl,
+        baseImageUrl,
         form: bgReplaceForm,
-        bbox: wanx ? undefined : bbox,
-        subjectAlreadyCutout: wanx,
+        bbox,
         sourceModule: "image-layer",
         projectId: project?.id,
         clientPage: "ecom/image-layer",
@@ -1079,14 +1183,14 @@ function ImageLayerStudioInner() {
     } catch (e) {
       backgroundGen.failTask(
         taskId,
-        e instanceof Error ? e.message : "换背景失败",
+        e instanceof Error ? e.message : "生成失败",
       );
       if (isEcomUnauthorizedError(e)) {
         setNeedLogin(true);
         return;
       }
       await alert({
-        title: "换背景失败",
+        title: "生成失败",
         message: e instanceof Error ? e.message : "请稍后重试",
         variant: "error",
       });
@@ -1100,6 +1204,7 @@ function ImageLayerStudioInner() {
     backgroundGen,
     bgReplaceForm,
     ensureSessionForAi,
+    pendingBboxes,
     project?.id,
     resolveBgReplaceBaseUrl,
     toast,
@@ -1170,6 +1275,18 @@ function ImageLayerStudioInner() {
       if (!editedUrl) throw new Error("未获得重绘结果");
 
       await applyFlatEditResult(editedUrl);
+      if (project?.id) {
+        const updated = await appendImageLayerGeneration({
+          projectId: project.id,
+          kind: "retouch",
+          title: "局部重绘",
+          ossUrl: editedUrl,
+          prompt: retouchPrompt.trim() || null,
+          modelKey: retouchModel,
+          compareFromUrl: source,
+        });
+        setProject(updated);
+      }
       backgroundGen.dismissTask(taskId);
       await toast({
         variant: "success",
@@ -1198,6 +1315,7 @@ function ImageLayerStudioInner() {
     buildRetouchParameters,
     ensureSessionForAi,
     httpSourceUrl,
+    project?.id,
     retouchModel,
     retouchPrompt,
     sourcePreviewUrl,
@@ -1412,16 +1530,34 @@ function ImageLayerStudioInner() {
           ossUrl: item.url,
           title: item.libraryTitle ?? item.label,
         });
+        const nextSaved = appendSavedSessionImage(savedImages, {
+          url: item.url,
+          title: item.libraryTitle ?? item.label,
+          at: new Date().toISOString(),
+          source: "library",
+        });
+        const nextIndex = Math.max(
+          0,
+          nextSaved.findIndex((row) => row.url === item.url),
+        );
+        setSavedImages(nextSaved);
+        setSavedImageIndex(nextIndex);
         if (item.id === "flat") {
           await promoteAsDecomposeSource(item.url, { persist: true, clearStack: true });
         }
+        await persistWorkspace({
+          ...buildSnapshot(),
+          savedImages: nextSaved,
+          savedImageIndex: nextIndex,
+        });
+        await loadLibrarySaved().catch(() => undefined);
         await toast({
           variant: "success",
           title: result.created ? "已保存到我的资产" : "资产库已有此图",
           message:
             item.id === "flat"
-              ? "已放到左侧作为原图，可再点「AI 图层分离」。"
-              : "可在「我的资产 · 图片分层」查看。",
+              ? "已放到左侧已保存列表。悬停左边图可用两侧箭头翻看，右边当前图不变。"
+              : "可在「我的资产 · 图片处理」查看。",
         });
       } catch (e) {
         if (isEcomUnauthorizedError(e)) {
@@ -1433,8 +1569,111 @@ function ImageLayerStudioInner() {
         setSaveLibraryBusy(false);
       }
     },
-    [project?.id, promoteAsDecomposeSource, toast],
+    [buildSnapshot, loadLibrarySaved, persistWorkspace, project?.id, promoteAsDecomposeSource, savedImages, toast],
   );
+
+  const restoreHistoryItem = useCallback(
+    async (item: ImageLayerProjectGeneration) => {
+      if (!project) return;
+      setRestoringHistoryId(item.id);
+      try {
+        if (item.workspace && (item.workspace.stack || item.workspace.sourceImageUrl)) {
+          hydrateFromProject({
+            ...project,
+            workspace: {
+              ...item.workspace,
+              sourceImageUrl: item.ossUrl || item.workspace.sourceImageUrl,
+              originalImageUrl:
+                item.compareFromUrl ||
+                item.workspace.originalImageUrl ||
+                item.workspace.sourceImageUrl,
+            },
+          });
+        } else {
+          setStack(null);
+          setSelectedLayerId(null);
+          setPendingBboxes([]);
+          setEditEntries([]);
+          setSourceUrl(item.ossUrl);
+          setOriginalImageUrl(item.ossUrl);
+          setSourcePreviewUrl((prev) => {
+            revokeBlobPreview(prev);
+            return item.ossUrl;
+          });
+          const img = new Image();
+          img.onload = () =>
+            setCanvasDims({ w: img.naturalWidth, h: img.naturalHeight });
+          img.src = item.ossUrl;
+        }
+        setHistoryOpen(false);
+        await toast({
+          variant: "success",
+          title: "已恢复历史",
+          message: `已打开「${item.title}」，可继续编辑。`,
+        });
+      } finally {
+        setRestoringHistoryId(null);
+      }
+    },
+    [hydrateFromProject, project, toast],
+  );
+
+  const sessionSaved = useMemo(() => {
+    const daily = buildDailyLeftSessionImages([
+      ...librarySaved,
+      ...explicitSavedSessionImages(savedImages, []),
+    ]);
+    if (daily.length > 0) return daily;
+    const fallback = originalImageUrl?.trim() || sourcePreviewUrl?.trim() || "";
+    if (!fallback || fallback.startsWith("blob:")) return [];
+    return [{ url: fallback, title: "原图" }];
+  }, [librarySaved, originalImageUrl, savedImages, sourcePreviewUrl]);
+  const sessionIndex = Math.min(
+    Math.max(0, savedImageIndex),
+    Math.max(0, sessionSaved.length - 1),
+  );
+
+  useEffect(() => {
+    const url = originalImageUrl?.trim();
+    if (!url || sessionSaved.length === 0) return;
+    const idx = sessionSaved.findIndex((row) => row.url === url);
+    if (idx >= 0) setSavedImageIndex(idx);
+  }, [librarySaved.length]);
+
+  const loadSavedSessionImage = useCallback(
+    (index: number) => {
+      const item = sessionSaved[index];
+      if (!item) return;
+      setSavedImageIndex(index);
+      setOriginalImageUrl(item.url);
+    },
+    [sessionSaved],
+  );
+
+  const leftCompareUrl =
+    originalImageUrl?.trim() ||
+    sessionSaved[sessionIndex]?.url?.trim() ||
+    sourcePreviewUrl?.trim() ||
+    "";
+
+  const sendLeftToEditor = useCallback(async () => {
+    const url = leftCompareUrl;
+    if (!url || url.startsWith("blob:")) {
+      await toast({
+        variant: "error",
+        title: "还不能放到编辑区",
+        message: "左边图片还在上传，请稍后再试。",
+      });
+      return;
+    }
+    if (url === sourceUrl && !stack) return;
+    await applyFlatEditResult(url);
+    await toast({
+      variant: "success",
+      title: "已放到编辑区",
+      message: "右边可继续框选、重绘或生成。",
+    });
+  }, [applyFlatEditResult, leftCompareUrl, sourceUrl, stack, toast]);
 
   const handleCancelLayerSession = useCallback(async () => {
     if (!stack) return;
@@ -1528,7 +1767,7 @@ function ImageLayerStudioInner() {
             : eraseBusy
               ? "图像擦除补全中…"
               : bgReplaceBusy
-                ? "换背景中…"
+                ? "生成中…"
                 : "生成中…");
 
   const generatingProgress: number | null | undefined = anyBusy
@@ -1585,6 +1824,12 @@ function ImageLayerStudioInner() {
           canvasDims,
           selectedLayerId: null,
           editEntries: [],
+          toolMode: "decompose-bbox",
+          bgReplace: {
+            refPrompt: bgReplaceForm.refPrompt,
+            refImageUrl: bgReplaceForm.refImageUrl,
+            refBbox: bgReplaceForm.refBbox,
+          },
         });
         setProject(updated);
       } finally {
@@ -1598,6 +1843,9 @@ function ImageLayerStudioInner() {
     });
   }, [
     anyBusy,
+    bgReplaceForm.refBbox,
+    bgReplaceForm.refImageUrl,
+    bgReplaceForm.refPrompt,
     canvasDims,
     clearSourceState,
     confirm,
@@ -1672,6 +1920,8 @@ function ImageLayerStudioInner() {
       onNewProject={() => void handleNewProject()}
       onSelectProject={handleSelectProject}
       onReset={() => void handleRemoveAll()}
+      onOpenHistory={() => setHistoryOpen(true)}
+      historyCount={project?.generations.length ?? 0}
       previewBusy={exportPreviewBusy}
       onPreviewExport={() => void handlePreviewExport()}
       onExport={() => void handleExport()}
@@ -1712,9 +1962,7 @@ function ImageLayerStudioInner() {
                     : eraseBusy
                       ? "图像擦除补全"
                       : bgReplaceBusy
-                        ? isWanxBackgroundReplaceModel(bgReplaceForm.modelKey)
-                          ? "万相：先抠图，再换场景"
-                          : "Seedream 5.0 Pro · 换背景"
+                        ? "Seedream 5.0 Pro · 背景与主体"
                         : uploadBusy
                           ? "正在上传原图至 OSS"
                           : undefined
@@ -1755,15 +2003,9 @@ function ImageLayerStudioInner() {
             bgReplaceForm={bgReplaceForm}
             bgReplaceBusy={bgReplaceBusy}
             bgReplaceHasBase={Boolean(sourceUrl || stack)}
-            bgReplaceSubjectHint={
-              isWanxBackgroundReplaceModel(bgReplaceForm.modelKey)
-                ? "只换右边当前图。万相会先抠图，再在透明区画新场景。"
-                : "只换右边当前图。可先框选背景再写场景（更稳），也可以只写场景描述。"
-            }
-            bgReplaceModels={bgReplaceModels}
-            bgReplaceModelsLoading={bgReplaceModelsLoading}
-            bgReplaceModelsError={bgReplaceModelsError}
-            onReloadBgReplaceModels={() => void loadBgReplaceModels()}
+            bgReplaceSubjectHint="只换右边当前图。可在右侧框选主体，也可只写场景或上传图 2 参考。"
+            bgReplaceSubjectImageUrl={flatEditImageUrl}
+            bgReplaceSubjectBbox={pendingBboxes[0] ?? null}
             onBgReplaceFormChange={setBgReplaceForm}
             onUploadBgReplaceImage={uploadBgReplaceImage}
             onBgReplaceSubmit={() => void runBackgroundReplace()}
@@ -1782,13 +2024,34 @@ function ImageLayerStudioInner() {
               <div className="shrink-0">{toolbar}</div>
               <div className="flex min-h-0 flex-1 overflow-hidden px-3 py-3">
                 <ImageLayerCompareStage
-                  originalUrl={originalImageUrl ?? sourcePreviewUrl}
+                  originalUrl={
+                    originalImageUrl ??
+                    sessionSaved[sessionIndex]?.url ??
+                    sourcePreviewUrl
+                  }
                   originalLabel={
-                    canvasToolMode === "bg-replace" ? "换背景前" : "拆层原图"
+                    canvasToolMode === "bg-replace" ? "生成前 / 已保存" : "已保存 / 原图"
                   }
                   resultLabel={
-                    canvasToolMode === "bg-replace" ? "当前图（换背景后）" : "操作 / 结果"
+                    canvasToolMode === "bg-replace" ? "当前图（生成后）" : "操作 / 结果"
                   }
+                  sessionCount={sessionSaved.length}
+                  sessionIndex={sessionIndex}
+                  onSessionPrev={() =>
+                    loadSavedSessionImage(
+                      (sessionIndex - 1 + sessionSaved.length) % sessionSaved.length,
+                    )
+                  }
+                  onSessionNext={() =>
+                    loadSavedSessionImage((sessionIndex + 1) % sessionSaved.length)
+                  }
+                  canSendToEditor={Boolean(leftCompareUrl)}
+                  sendToEditorDisabled={
+                    anyBusy ||
+                    leftCompareUrl.startsWith("blob:") ||
+                    (leftCompareUrl === (sourceUrl ?? "") && !stack)
+                  }
+                  onSendToEditor={() => void sendLeftToEditor()}
                   className="h-full w-full"
                 >
                   <ImageLayerCanvas
@@ -1800,10 +2063,7 @@ function ImageLayerStudioInner() {
                     toolMode={
                       stack && canvasToolMode === "decompose-bbox"
                         ? "layer-view"
-                        : canvasToolMode === "bg-replace" &&
-                            isWanxBackgroundReplaceModel(bgReplaceForm.modelKey)
-                          ? "layer-view"
-                          : canvasToolMode
+                        : canvasToolMode
                     }
                     selectionSubTool={selectionSubTool}
                     retouchUsesBbox={retouchUsesBbox}
@@ -1840,7 +2100,7 @@ function ImageLayerStudioInner() {
               <div className="flex min-h-0 flex-1 flex-col px-4 pb-6 pt-2 sm:px-6 sm:pb-8">
                 <ImageLayerUploadZone
                   busy={anyBusy}
-                  onUploadFiles={(files) => void handleUploadFiles(files)}
+                  onUploadFiles={(files, via) => void handleUploadFiles(files, via)}
                   onError={handleUploadError}
                   className="min-h-0 flex-1"
                 />
@@ -1857,6 +2117,14 @@ function ImageLayerStudioInner() {
         previewUrl={exportPreviewUrl}
         onOpenChange={setExportPreviewOpen}
         onExport={() => void handleExportDownload()}
+      />
+      <ImageLayerHistoryDialog
+        open={historyOpen}
+        items={project?.generations ?? []}
+        currentUrl={sourceUrl}
+        restoringId={restoringHistoryId}
+        onOpenChange={setHistoryOpen}
+        onRestore={restoreHistoryItem}
       />
       <ImageLayerSaveDialog
         open={saveDialogOpen}

@@ -6,10 +6,12 @@ import {
   buildBackgroundReplaceRequest,
   buildSeedreamBackgroundReplacePrompt,
   detectFakeBackdropKind,
+  fillTransparentHolesFromNeighbors,
   hasMeaningfulTransparency,
   knockOutFakeBackdrop,
   knockOutNearWhiteBackdrop,
   resolveBackgroundReplaceModel,
+  sealWanxBackgroundResult,
   toRgbaPngBuffer,
 } from "@/lib/ecom/ecom-background-replace";
 
@@ -21,9 +23,9 @@ describe("resolveBackgroundReplaceModel", () => {
     );
   });
 
-  it("accepts Wanx background generation", () => {
+  it("maps legacy Wanx keys to Seedream", () => {
     expect(resolveBackgroundReplaceModel("wanx-background-generation-v2")).toBe(
-      "wanx-background-generation-v2",
+      "doubao-seedream-5-0-pro",
     );
   });
 
@@ -49,6 +51,55 @@ describe("buildSeedreamBackgroundReplacePrompt", () => {
     });
     expect(prompt).toContain("<bbox>20 10 980 900</bbox>");
     expect(prompt).toContain("区域替换成大理石海边");
+  });
+
+  it("uses 图 1 + 图 2 wording when a reference image is present", () => {
+    const prompt = buildSeedreamBackgroundReplacePrompt({
+      hasRefImage: true,
+      bbox: [10, 20, 400, 800],
+      refBbox: [100, 100, 500, 600],
+    });
+    expect(prompt).toBe(
+      "将图 1 <bbox>10 20 400 800</bbox> 的主体放到图 2 <bbox>100 100 500 600</bbox> 位置",
+    );
+  });
+
+  it("allows reference image without a scene prompt", () => {
+    expect(
+      buildSeedreamBackgroundReplacePrompt({ hasRefImage: true }),
+    ).toContain("图 2 的场景");
+  });
+
+  it("expands official 图1框选 / 图2框选 chips into bbox tags", () => {
+    const prompt = buildSeedreamBackgroundReplacePrompt({
+      scene: "将 @图1框选 的主体放到 @图2框选 位置",
+      bbox: [179, 283, 796, 986],
+      refBbox: [118, 331, 933, 871],
+      hasRefImage: true,
+    });
+    expect(prompt).toBe(
+      "将 图 1 <bbox>179 283 796 986</bbox> 的主体放到 图 2 <bbox>118 331 933 871</bbox> 位置",
+    );
+  });
+
+  it("still expands legacy @图片1 / @图片2 tokens", () => {
+    const prompt = buildSeedreamBackgroundReplacePrompt({
+      scene: "把 @图片1 的主体放到 @图片2 位置",
+      bbox: [179, 283, 796, 986],
+      refBbox: [118, 331, 933, 871],
+      hasRefImage: true,
+    });
+    expect(prompt).toContain("图 1 <bbox>179 283 796 986</bbox>");
+    expect(prompt).toContain("图 2 <bbox>118 331 933 871</bbox>");
+  });
+
+  it("rejects @图2框选 without a reference box", () => {
+    expect(() =>
+      buildSeedreamBackgroundReplacePrompt({
+        scene: "将图 1 主体放到 @图2框选 位置",
+        hasRefImage: true,
+      }),
+    ).toThrow(/@图2框选/);
   });
 });
 
@@ -246,6 +297,64 @@ describe("toRgbaPngBuffer", () => {
     expect(at(16, 18)).toBeGreaterThan(200);
   });
 
+  it("punches a maroon mosaic backdrop that qwen paints instead of alpha", async () => {
+    const cell = 4;
+    const width = 32;
+    const height = 32;
+    const raw = Buffer.alloc(width * height * 4);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const i = (y * width + x) * 4;
+        const light = (Math.floor(x / cell) + Math.floor(y / cell)) % 2 === 0;
+        raw[i] = light ? 252 : 92;
+        raw[i + 1] = light ? 251 : 42;
+        raw[i + 2] = light ? 251 : 48;
+        raw[i + 3] = 255;
+      }
+    }
+    for (let y = 6; y < 12; y += 1) {
+      for (let x = 10; x < 22; x += 1) {
+        const i = (y * width + x) * 4;
+        raw[i] = 37;
+        raw[i + 1] = 95;
+        raw[i + 2] = 69;
+        raw[i + 3] = 255;
+      }
+    }
+    for (let y = 12; y < 24; y += 1) {
+      for (let x = 10; x < 22; x += 1) {
+        const i = (y * width + x) * 4;
+        raw[i] = 250;
+        raw[i + 1] = 250;
+        raw[i + 2] = 248;
+        raw[i + 3] = 255;
+      }
+    }
+    const png = await sharp(raw, {
+      raw: { width, height, channels: 4 },
+    })
+      .png()
+      .toBuffer();
+    const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true });
+    expect(
+      detectFakeBackdropKind(data, info.width ?? 0, info.height ?? 0, info.channels ?? 4),
+    ).toBe("mosaic");
+
+    const out = await knockOutFakeBackdrop(png);
+    expect(await hasMeaningfulTransparency(out, 0.12)).toBe(true);
+    const punched = await sharp(out).ensureAlpha().raw().toBuffer({
+      resolveWithObject: true,
+    });
+    const at = (x: number, y: number) => {
+      const i = (y * punched.info.width! + x) * (punched.info.channels ?? 4);
+      return punched.data[i + 3] ?? 0;
+    };
+    expect(at(0, 0)).toBeLessThan(10);
+    expect(at(3, 1)).toBeLessThan(10);
+    expect(at(16, 8)).toBeGreaterThan(200);
+    expect(at(16, 18)).toBeGreaterThan(200);
+  });
+
   it("knocks out a white backdrop when all four corners are white", async () => {
     const png = await sharp({
       create: {
@@ -275,5 +384,58 @@ describe("toRgbaPngBuffer", () => {
       .toBuffer();
     const out = await knockOutNearWhiteBackdrop(png);
     expect(await hasMeaningfulTransparency(out)).toBe(true);
+  });
+});
+
+describe("sealWanxBackgroundResult", () => {
+  it("drops alpha when holes still hold scene RGB", async () => {
+    const raw = Buffer.alloc(8 * 8 * 4, 255);
+    for (let i = 0; i < raw.length; i += 4) {
+      raw[i] = 30;
+      raw[i + 1] = 80;
+      raw[i + 2] = 120;
+      raw[i + 3] = 0;
+    }
+    for (let y = 2; y < 6; y += 1) {
+      for (let x = 2; x < 6; x += 1) {
+        const i = (y * 8 + x) * 4;
+        raw[i] = 20;
+        raw[i + 1] = 140;
+        raw[i + 2] = 60;
+        raw[i + 3] = 255;
+      }
+    }
+    const png = await sharp(raw, { raw: { width: 8, height: 8, channels: 4 } })
+      .png()
+      .toBuffer();
+    const sealed = await sealWanxBackgroundResult(png);
+    expect(sealed.needsSecondPass).toBe(false);
+    expect(await hasMeaningfulTransparency(sealed.buf)).toBe(false);
+  });
+
+  it("asks for a second pass when holes are empty, then neighbor-fill seals them", async () => {
+    const raw = Buffer.alloc(16 * 16 * 4, 255);
+    for (let y = 0; y < 16; y += 1) {
+      for (let x = 0; x < 16; x += 1) {
+        const i = (y * 16 + x) * 4;
+        const hole = x < 6 && y < 10;
+        raw[i] = hole ? 0 : 40;
+        raw[i + 1] = hole ? 0 : 90;
+        raw[i + 2] = hole ? 0 : 70;
+        raw[i + 3] = hole ? 0 : 255;
+      }
+    }
+    const png = await sharp(raw, { raw: { width: 16, height: 16, channels: 4 } })
+      .png()
+      .toBuffer();
+    const sealed = await sealWanxBackgroundResult(png);
+    expect(sealed.needsSecondPass).toBe(true);
+    const filled = await fillTransparentHolesFromNeighbors(sealed.buf);
+    expect(await hasMeaningfulTransparency(filled)).toBe(false);
+    const { data } = await sharp(filled).ensureAlpha().raw().toBuffer({
+      resolveWithObject: true,
+    });
+    expect(data[0]).toBeGreaterThan(10);
+    expect(data[3]).toBeGreaterThan(200);
   });
 });

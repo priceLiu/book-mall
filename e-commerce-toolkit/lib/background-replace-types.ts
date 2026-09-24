@@ -1,21 +1,21 @@
-/** 换背景表单（图片分层 / 模特换装共用） */
+/** 换背景表单（图片处理 / 模特换装共用） */
+
 export type BackgroundReplaceEdgeDraft = {
   url: string;
   prompt: string;
 };
 
 export const BACKGROUND_REPLACE_SEEDREAM_MODEL = "doubao-seedream-5-0-pro";
-export const BACKGROUND_REPLACE_WANX_MODEL = "wanx-background-generation-v2";
 
 export const BACKGROUND_REPLACE_MODEL_KEYS = [
   BACKGROUND_REPLACE_SEEDREAM_MODEL,
-  BACKGROUND_REPLACE_WANX_MODEL,
 ] as const;
 
 export type BackgroundReplaceFormState = {
   modelKey: string;
   refPrompt: string;
   refImageUrl: string;
+  refBbox: [number, number, number, number] | null;
   negRefPrompt: string;
   modelVersion: "v2" | "v3";
   n: number;
@@ -29,6 +29,7 @@ export const DEFAULT_BACKGROUND_REPLACE_FORM: BackgroundReplaceFormState = {
   modelKey: BACKGROUND_REPLACE_SEEDREAM_MODEL,
   refPrompt: "",
   refImageUrl: "",
+  refBbox: null,
   negRefPrompt: "",
   modelVersion: "v3",
   n: 1,
@@ -37,10 +38,6 @@ export const DEFAULT_BACKGROUND_REPLACE_FORM: BackgroundReplaceFormState = {
   foregroundEdges: [],
   backgroundEdges: [],
 };
-
-export function isWanxBackgroundReplaceModel(modelKey: string): boolean {
-  return modelKey.trim() === BACKGROUND_REPLACE_WANX_MODEL;
-}
 
 export function isSeedreamBackgroundReplaceModel(modelKey: string): boolean {
   const k = modelKey.trim();
@@ -55,8 +52,5 @@ export function canSubmitBackgroundReplace(
   hasBase: boolean,
 ): boolean {
   if (!hasBase) return false;
-  if (isWanxBackgroundReplaceModel(form.modelKey)) {
-    return Boolean(form.refPrompt.trim() || form.refImageUrl.trim());
-  }
-  return Boolean(form.refPrompt.trim());
+  return Boolean(form.refPrompt.trim() || form.refImageUrl.trim());
 }

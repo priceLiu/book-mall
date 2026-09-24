@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 
 import {
+  firstWriteOrigin,
+  inferEcomFirstOriginFromUpload,
+  parseEcomFirstOrigin,
+} from "@/lib/ecom/ecom-first-origin";
+import {
   appendEcomImageLayerGeneration,
+  getEcomImageLayerProject,
   saveEcomImageLayerWorkspace,
 } from "@/lib/ecom/ecom-image-layer-project-service";
 import { uploadImageLayerSource } from "@/lib/ecom/ecom-image-layer-service";
@@ -41,18 +47,25 @@ export async function POST(req: Request) {
     const projectIdRaw = form.get("projectId");
     const projectId =
       typeof projectIdRaw === "string" && projectIdRaw.trim() ? projectIdRaw.trim() : undefined;
+    const incomingOrigin =
+      parseEcomFirstOrigin(form.get("firstOrigin")) ?? inferEcomFirstOriginFromUpload();
     if (projectId) {
+      const existing = await getEcomImageLayerProject(auth.userId, projectId);
+      const firstOrigin =
+        firstWriteOrigin(existing?.workspace.firstOrigin, incomingOrigin) ?? incomingOrigin;
       await saveEcomImageLayerWorkspace(auth.userId, projectId, {
         sourceImageUrl: result.ossUrl,
         originalImageUrl: result.ossUrl,
         stack: null,
         pendingBboxes: [],
         pendingBbox: null,
+        firstOrigin,
       });
       await appendEcomImageLayerGeneration(auth.userId, projectId, {
         kind: "upload",
         title: "上传原图",
         ossUrl: result.ossUrl,
+        compareFromUrl: result.ossUrl,
       });
     }
 

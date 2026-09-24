@@ -31,5 +31,7 @@ export function mentionRefRoleLabel(role: string, kind?: MentionTokenKind): stri
   if (role === "product") return "产品实拍";
   if (role === "main-style") return "主图风格";
   if (role === "detail-style") return "详情页参考";
+  if (role === "subject-bbox") return "图1框选";
+  if (role === "ref-bbox") return "图2框选";
   return "参考图";
 }

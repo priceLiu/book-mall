@@ -25,6 +25,11 @@ import {
   saveModelShotDeliverableSnapshot,
   updateModelShotProject,
 } from "@/lib/ecom-model-shot-api";
+import {
+  clearEcomLastProjectId,
+  readEcomLastProjectId,
+  writeEcomLastProjectId,
+} from "@/lib/ecom-last-project";
 import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import type { ModelShotProject, ModelShotReferenceRole } from "@/lib/model-shot-types";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
@@ -77,9 +82,7 @@ export function ModelShotStudio() {
 
   const applyProject = useCallback((p: ModelShotProject) => {
     setProject(p);
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem(PROJECT_STORAGE_KEY, p.id);
-    }
+    writeEcomLastProjectId(PROJECT_STORAGE_KEY, p.id);
     if (p.settings.imageModelKey) setImageModelKey(p.settings.imageModelKey);
     setChatModelKey((prev) =>
       pickBoundStoryboardModelKey(
@@ -150,8 +153,7 @@ export function ModelShotStudio() {
 
     (async () => {
       try {
-        const savedId =
-          typeof window !== "undefined" ? sessionStorage.getItem(PROJECT_STORAGE_KEY) : null;
+        const savedId = readEcomLastProjectId(PROJECT_STORAGE_KEY);
         const urlProjectId =
           typeof window !== "undefined"
             ? new URLSearchParams(window.location.search).get("projectId")?.trim() || null
@@ -292,9 +294,7 @@ export function ModelShotStudio() {
     setLoading(true);
     try {
       await deleteModelShotProject(project.id);
-      if (typeof window !== "undefined") {
-        sessionStorage.removeItem(PROJECT_STORAGE_KEY);
-      }
+      clearEcomLastProjectId(PROJECT_STORAGE_KEY);
       const summaries = await listModelShotProjectSummaries();
       if (summaries[0]) {
         await reload(summaries[0].id);

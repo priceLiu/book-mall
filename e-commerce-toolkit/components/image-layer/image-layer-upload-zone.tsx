@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   busy?: boolean;
-  onUploadFiles: (files: File[]) => void | Promise<void>;
+  onUploadFiles: (files: File[], via?: "paste" | "drop") => void | Promise<void>;
   onError?: (title: string, message: string) => void;
   className?: string;
 };
@@ -25,7 +25,7 @@ export function ImageLayerUploadZone({
   const { dragOver, pasteReady, focusZone, dropZoneProps } = useImageDropPaste({
     enabled: !busy,
     multiple: false,
-    onFiles: (files) => onUploadFiles(files),
+    onFiles: (files, via) => onUploadFiles(files, via),
     onError,
   });
 

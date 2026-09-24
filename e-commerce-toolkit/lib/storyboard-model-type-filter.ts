@@ -65,6 +65,21 @@ function isStoryboardVideoI2vModel(modelKey: string): boolean {
   );
 }
 
+/**
+ * 分镜模板目录过滤。专用选型（hideTypeFilter）必须跳过：
+ * 否则 t2i 货架含 Seedream 时会把万相换背景滤掉。
+ */
+export function applyStoryboardPickerTemplateFilter<T extends { modelKey: string }>(
+  models: T[],
+  templateModelKeys: string[] | null,
+  skipTemplateFilter: boolean,
+): T[] {
+  if (skipTemplateFilter || !templateModelKeys?.length) return models;
+  const set = new Set(templateModelKeys.map((k) => k.toLowerCase()));
+  const filtered = models.filter((m) => set.has(m.modelKey.toLowerCase()));
+  return filtered.length > 0 ? filtered : models;
+}
+
 export function storyboardModelMatchesMediaFilter(
   model: { modelKey: string; role?: string },
   mode: "image" | "video",

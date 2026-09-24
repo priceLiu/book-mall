@@ -62,6 +62,7 @@ export async function replaceEcomBackground(opts: {
       foregroundEdges: opts.form.foregroundEdges.filter((e) => e.url.trim()),
       backgroundEdges: opts.form.backgroundEdges.filter((e) => e.url.trim()),
       bbox: opts.bbox,
+      refBbox: opts.form.refBbox ?? undefined,
       subjectAlreadyCutout: opts.subjectAlreadyCutout === true,
       sourceModule: opts.sourceModule,
       projectId: opts.projectId,

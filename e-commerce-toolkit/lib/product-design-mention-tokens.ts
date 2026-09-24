@@ -119,9 +119,9 @@ export function buildSemanticMentionRefs(
   return out;
 }
 
-/** 语义 token + 旧版 @图片N */
+/** 语义 token + 旧版 @图片N + 换背景框选主体 */
 export const SEMANTIC_REF_TOKEN_RE =
-  /@(?:人物[A-F\d]+|产品\d+|道具\d+|场景\d+|产品实拍\d+|详情页参考\d+|参考图\d+|模特\d+|图片\d+)/g;
+  /@(?:人物[A-F\d]+|产品\d+|道具\d+|场景\d+|产品实拍\d+|详情页参考\d+|参考图\d+|模特\d+|图[12]框选|图片\d+)/g;
 
 export function mentionTokenDisplay(token: string): string {
   return token.startsWith("@") ? token.slice(1) : token;

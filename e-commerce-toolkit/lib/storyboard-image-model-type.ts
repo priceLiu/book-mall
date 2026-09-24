@@ -32,6 +32,7 @@ const EXPLICIT: Record<string, StoryboardImageModelCapability[]> = {
   "z-image-turbo": ["image_t2i"],
   "kling-3.0-image": ["image_t2i", "image_multi_ref"],
   "nano-banana-pro": ["image_t2i", "image_multi_ref"],
+  "wanx-background-generation-v2": ["image_edit"],
 };
 
 function inferImageCapabilities(modelKey: string): StoryboardImageModelCapability[] {

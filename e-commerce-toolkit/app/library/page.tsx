@@ -37,6 +37,7 @@ import {
   pinAssetToAiSpace,
   type EcomAsset,
 } from "@/lib/ecom-api";
+import { writeEcomLastProjectId } from "@/lib/ecom-last-project";
 import { reuseProductDesignProject } from "@/lib/ecom-product-design-api";
 import { reuseHandCraftProject } from "@/lib/ecom-hand-craft-api";
 import { reuseMediaDecomposeProject } from "@/lib/ecom-media-decompose-api";
@@ -596,7 +597,7 @@ export default function LibraryPage() {
     setReuseBusy(`sv:${projectId}`);
     try {
       if (typeof window !== "undefined") {
-        sessionStorage.setItem(SEED_VIDEO_STORAGE_KEY, projectId);
+        writeEcomLastProjectId(SEED_VIDEO_STORAGE_KEY, projectId);
       }
       router.push("/ecom/seed-video");
     } finally {
@@ -610,7 +611,7 @@ export default function LibraryPage() {
     try {
       const project = await reuseSeedVideoProject(bundle.projectId, bundle.savedAt);
       if (typeof window !== "undefined") {
-        sessionStorage.setItem(SEED_VIDEO_STORAGE_KEY, project.id);
+        writeEcomLastProjectId(SEED_VIDEO_STORAGE_KEY, project.id);
       }
       router.push("/ecom/seed-video");
     } catch (e) {
@@ -630,7 +631,7 @@ export default function LibraryPage() {
     try {
       const project = await reuseMediaDecomposeProject(bundle.projectId, bundle.savedAt);
       if (typeof window !== "undefined") {
-        sessionStorage.setItem(MEDIA_DECOMPOSE_STORAGE_KEY, project.id);
+        writeEcomLastProjectId(MEDIA_DECOMPOSE_STORAGE_KEY, project.id);
       }
       router.push("/ecom/media-decompose");
     } catch (e) {
@@ -650,7 +651,7 @@ export default function LibraryPage() {
     try {
       const project = await reuseModelShotProject(bundle.projectId, bundle.savedAt);
       if (typeof window !== "undefined") {
-        sessionStorage.setItem(MODEL_SHOT_STORAGE_KEY, project.id);
+        writeEcomLastProjectId(MODEL_SHOT_STORAGE_KEY, project.id);
       }
       router.push("/ecom/model-shot");
     } catch (e) {
@@ -684,7 +685,7 @@ export default function LibraryPage() {
     setReuseBusy(`sb-open:${projectId}`);
     try {
       if (typeof window !== "undefined") {
-        sessionStorage.setItem(STORYBOARD_STORAGE_KEY, projectId);
+        writeEcomLastProjectId(STORYBOARD_STORAGE_KEY, projectId);
       }
       router.push("/ecom/storyboard/micro-drama");
     } finally {
@@ -698,7 +699,7 @@ export default function LibraryPage() {
     try {
       const project = await reuseStoryboardProject(bundle.projectId, bundle.savedAt);
       if (typeof window !== "undefined") {
-        sessionStorage.setItem(STORYBOARD_STORAGE_KEY, project.id);
+        writeEcomLastProjectId(STORYBOARD_STORAGE_KEY, project.id);
       }
       router.push("/ecom/storyboard/micro-drama");
     } catch (e) {
@@ -718,7 +719,7 @@ export default function LibraryPage() {
     try {
       const project = await reuseHandCraftProject(bundle.projectId, bundle.savedAt);
       if (typeof window !== "undefined") {
-        sessionStorage.setItem(HAND_CRAFT_STORAGE_KEY, project.id);
+        writeEcomLastProjectId(HAND_CRAFT_STORAGE_KEY, project.id);
       }
       router.push("/ecom/hand-craft");
     } catch (e) {
@@ -739,7 +740,7 @@ export default function LibraryPage() {
       const project = await reuseProductDesignProject(bundle.projectId, bundle.savedAt);
       const targetModule = (project.module === "detail-page" ? "detail-page" : "main-image") as EcomProjectModule;
       if (typeof window !== "undefined") {
-        sessionStorage.setItem(productDesignStorageKey(targetModule), project.id);
+        writeEcomLastProjectId(productDesignStorageKey(targetModule), project.id);
       }
       router.push(productDesignStudioPath(targetModule));
     } catch (e) {
