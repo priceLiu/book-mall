@@ -78,6 +78,7 @@ export const STORY_PRO2_DIALOGUE_COLUMN_RULES = `- **唯一合法格式**：角�
   - 正例：沈昭昭（疲惫）："又要加班……"
   - 正例（内心OS）：沈昭昭（内心OS，疲惫）："又要加班……"
   - 正例（无情绪括号也可）：沈昭昭："又要加班……"
+  - 正例（同一人物多版本 · 先版本后情绪）：沈昭昭（现代）（疲惫）："又要加班……"
   - 正例（多句连写）：萧景珩（温和）："姑娘小心。"沈知意（羞赧）："谢公子。"
   - 正例（群杂）：百姓甲（议论）："她要退婚？"
 - **引号硬性**：台词必须用 ASCII 直引号 \`"..."\` 或直角引号 \`「...»\` 包住；**禁止**弯引号 “…” / ‘…’ / 『…』
@@ -493,6 +494,10 @@ export const STORY_PRO2_PACK_OUTPUT_RULES = `【制作包硬性约束 · JSON-on
 5a. **场景绑定**：每镜 **sceneId 唯一对应当镜主场景**；剧本有多场景时 **禁止** 全片共用同一 sceneId。lighting 首句须含该镜 scenes[].**name** 或 environmentTimeMood 中的 **时代+时段** 关键词（如「深夜」「白日」「黄昏」），且与同镜 sceneId 一致；场景切换后 sceneId 必须变更。
 5b. **imagePrompt 字面量硬性（scenes / characters / props 每条）**：imagePrompt 字符串内必须同时出现「构图规范」与「[视觉风格：…]」两段字面量；缺任一即失败。场景=四视角规范，角色=四视图规范，道具=六视图规范；禁止只写名称/氛围省略这两段。
 5c. **对白⇔characterIds 成对（逐镜 · 高频失败项）**：凡 dialogue 非「—」，**同一镜** 必须写 \`"characterIds": ["char-xxx"]\`（xxx 为对白说话人在 characters[] 中的 id）；写台词却缺/空 characterIds 即失败。无对白镜：dialogue 写「—」，characterIds 可 []。
+5d. **同一人物多版本（穿越 / 前后世 / 不同时代造型）**：characters[] 须拆成独立条目，name 用「本名（版本）」格式（如「沈昭昭（现代）」「沈昭昭（盛唐）」，括号内为时代/身份/造型限定词），**禁止**两个版本同名。
+   - **版本按角色本镜实际形态选，不按场景时代推断**：穿越剧里刚穿到盛唐、仍是现代装束与样貌的，在盛唐场景也写「沈昭昭（现代）」；换上唐装定型后才写「沈昭昭（盛唐）」；同镜两个版本同框（梦境/对视/回忆）则两个都写。
+   - 每镜 characterIds **必须列全本镜画面出场的所有角色版本**（不只对白说话人），与正文写的版本逐一对应。
+   - sceneDescription / lighting / cameraMove / dialogue 说话人 **每处**都写该版本完整 name（对白写作 \`沈昭昭（现代）（疲惫）："…"\`）；**禁止**只写本名「沈昭昭」或「现代沈昭昭」这类改写——系统不会替你猜版本。
 6. characters[] 须 description · clothing · traits（≥3 项）；imagePrompt 须含四视图构图规范 + [视觉风格：…]（见 docs/画布提示词.md）。
 7. scenes[] / props[] 的 imagePrompt 须含对应构图规范 + [视觉风格：…]（props[].imagePrompt 不得省略）。
 8. 「对白」撰写规范：
@@ -514,8 +519,8 @@ export const STORY_PRO2_PARSE_SELF_CHECK_RULES = `【提交前自检 · 输出 J
 4. **镜数时长**：creative 须完整 **12–18 镜**，各镜 durationSec **10–15**，合计 **175–185** 秒
 5. **sceneId**：每镜必填；多场景剧本禁止全片同一 sceneId`;
 
-/** 首轮最后读到的硬性三门 · 放在 prompt 最末尾（recency） */
-export const STORY_PRO2_FIRST_ATTEMPT_HARD_GATES = `【首轮硬性三门 · 缺任一条即 PRO2_SCRIPT_JSON_INVALID · 输出前最后核对】
+/** 首轮最后读到的硬性四门 · 放在 prompt 最末尾（recency） */
+export const STORY_PRO2_FIRST_ATTEMPT_HARD_GATES = `【首轮硬性四门 · 缺任一条即 PRO2_SCRIPT_JSON_INVALID · 输出前最后核对】
 ① **对白 ⇔ characterIds 成对**（逐镜）
    - dialogue 含角色台词 ⇒ 同镜必须写 characterIds: ["characters[].id"]
    - 从对白「角色名（情绪）："台词"」反查 characters[].name → id
@@ -527,7 +532,12 @@ export const STORY_PRO2_FIRST_ATTEMPT_HARD_GATES = `【首轮硬性三门 · 缺
    ✓ 见 JSON 示例 scenes[].imagePrompt / props[].imagePrompt 写法
 ③ **完整 12–18 镜**（creative）
    - 示例仅 3 镜示意字段；实际须输出完整 12–18 镜，合计 175–185 秒
-   ✗ 只交 2～3 镜样例即停`;
+   ✗ 只交 2～3 镜样例即停
+④ **同一人物多版本写全**（剧本有穿越 / 前后世 / 多造型时）
+   - characters[].name 为「本名（版本）」且互不相同
+   - 每镜正文与对白只写带版本的完整 name；characterIds 列全本镜出场版本
+   - 版本按角色本镜形态选（穿越初到古代仍是现代装束 ⇒ 写（现代）），不按场景推断
+   ✗ 镜 3 写「沈昭昭抬头」未注明版本 / 画面有「沈昭昭（现代）」但 characterIds 缺该 id`;
 
 /** Pass1 导演表字段金标准 · 源：docs/画布提示词.md · docs/大模型剧本提示词.md §五 */
 export const PRO2_CANVAS_PASS1_SHOT_FIELD_GUIDE = `# Pass1 导演表字段（v2 · 每镜必填 · ${STORY_PRO2_PACK_V8_MARKER}）

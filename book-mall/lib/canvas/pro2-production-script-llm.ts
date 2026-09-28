@@ -12,9 +12,11 @@ import { findPro2UnwantedEnglishFields } from "./pro2-chinese-prompt-normalize";
 import { STORY_PRO2_DIALOGUE_COLUMN_RULES, STORY_PRO2_FIRST_ATTEMPT_HARD_GATES, STORY_PRO2_JSON_FIELD_RULES, STORY_PRO2_PACK_LANGUAGE_RULES } from "./data/pro2-production-pack-standard";
 import type { Pro2ProductionScriptPatch } from "./data/pro2-production-script-schema";
 import {
+  listPro2CharacterVersionIssues,
   listPro2FullPackPatchIssues,
   listPro2SemanticPatchIssues,
   listShotPromptsPass2Issues,
+  resolvePro2ScriptSource,
 } from "./data/pro2-production-script-schema";
 
 const PRO2_HUB_SECTIONS = new Set([
@@ -52,6 +54,10 @@ export type Pro2StructuredLlmValidation = {
 export function validatePro2ProductionScriptLlmOutput(
   text: string,
   storyScope?: CanvasTaskStoryScope | null,
+  opts?: {
+    /** 同一人物多版本须逐镜写明；末轮关闭，避免整包因此失败 */
+    enforceCharacterVersions?: boolean;
+  },
 ): Pro2StructuredLlmValidation {
   const trimmed = text.trim();
   if (!trimmed) {
@@ -98,6 +104,19 @@ export function validatePro2ProductionScriptLlmOutput(
       ok: false,
       error: `JSON step=${patchRaw.step} 与当前段 llmSection=${section} 不匹配`,
     };
+  }
+  if (
+    opts?.enforceCharacterVersions &&
+    (patchRaw.step === "full_pack" || patchRaw.step === "storyboard") &&
+    resolvePro2ScriptSource(patchRaw.patch.meta) !== "film_pull"
+  ) {
+    const versionIssues = listPro2CharacterVersionIssues(patchRaw.patch);
+    if (versionIssues.length) {
+      return {
+        ok: false,
+        error: versionIssues.slice(0, 4).join("；"),
+      };
+    }
   }
   if (section === "shot_prompts" && patchRaw.step === "shot_prompts") {
     const polishMode = storyScope?.polishMode ?? "both";
@@ -162,6 +181,7 @@ export function buildPro2StructuredRetryUserMessage(
     "9. 每镜须含 sceneId（引用 scenes[].id）；画面出现道具时 propIds 不得空",
     "9a. **场景绑定（硬性）**：scenes[]≥2 时禁止全片同一 sceneId；每镜 lighting 首句须含该镜 scenes[].name（canonical name），且 sceneId 须随场景切换而变更",
     "10. sceneDescription 中角色/场景/道具名称须与辞典 canonical name 一致",
+    "10a. **同一人物多版本（穿越等）**：name 须为「本名（版本）」且互不相同；版本按角色本镜实际形态选（穿越初到古代仍现代装束 ⇒（现代）），不按场景推断；每镜 characterIds 列全出场版本；正文与对白说话人每处写完整 name，禁止只写本名",
     "11. director 档禁止 shots[].analysis；industrial 档每镜必填 analysis",
     "12. 禁止尾逗号与 // 注释",
   ].join("\n");

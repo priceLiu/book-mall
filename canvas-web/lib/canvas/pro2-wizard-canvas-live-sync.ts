@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * 剧本创作（生产向导 draft）⇄ 已放入画布的节点 · 实时双向同步
+ * 剧本创作（生产向导 draft）⇄ 已载入画布的节点 · 实时双向同步
  *
  * - 媒体：画布节点出图/出视频（OSS 稳定链）→ 向导 draft + Hub 行表；
  *   向导出图 → Hub 行表 → 画布节点（由 mount*PreviewToHub 负责）。
  * - 提示词：节点 Dock ⇄ 向导 draft.prompt，按「哪一侧自上次同步后变化」决定方向，
- *   @ 引用在 @<wiz-*> 与 @<ref-*> 之间转换。
+ *   @ 引用在 @<wiz-*> 与 @<ref-*>（分镜图）/ @<sbv1-ref-*>（分镜视频）之间转换。
  */
 import type { Pro2ProductionScript } from "./data/pro2-production-script-schema";
 import {
@@ -21,6 +21,12 @@ import {
   type Pro2WizardShotMediaKind,
 } from "./pro2-production-wizard-shot-drafts";
 import { isPro2DockInputPinned } from "./pro2-dock-input-pin";
+import {
+  buildWizardVideoAssetIndex,
+  pushWizardVideoPromptToCell,
+  videoDockToWizardPrompt,
+  writeVideoCellDockPrompt,
+} from "./pro2-video-cell-wizard-prompt";
 import { patchProductionWizardAssetDraft } from "./pro2-wizard-asset-draft-patch";
 import { patchProductionWizardShotDraft } from "./pro2-wizard-shot-draft-patch";
 import {
@@ -315,27 +321,17 @@ function writeCanvasPrompt(
     return;
   }
 
-  if (opts.writeNode) {
-    updateNodeData(link.nodeId, { dockInput: text, prompt: text });
-  }
-  const col = link.controllerId
-    ? nodes.find((n) => n.id === link.controllerId)
-    : undefined;
-  const colRows = patchRowsPrompt(
-    (col?.data as { rows?: StoryProVideoRow[] } | undefined)?.rows,
-    rowKey,
-    "videoPrompt",
-    text,
-  );
-  if (col && colRows) updateNodeData(col.id, { rows: colRows });
   const hub = readHub(link.hubId);
-  const hubRows = patchRowsPrompt(
-    hub?.data.scriptStudioVideoRows,
-    rowKey,
-    "videoPrompt",
-    text,
-  );
-  if (hubRows) updateNodeData(link.hubId, { scriptStudioVideoRows: hubRows });
+  if (!hub) return;
+  writeVideoCellDockPrompt({
+    scriptHubId: link.hubId,
+    cellId: link.nodeId,
+    shotIndex: link.shotIndex!,
+    dockText: text,
+    index: buildWizardVideoAssetIndex(nodes, link.hubId, hub.data),
+    writeNode: opts.writeNode,
+    reconcileEdges: opts.writeNode,
+  });
 }
 
 function syncLinkPrompt(
@@ -360,12 +356,22 @@ function syncLinkPrompt(
     entry.node = nodeText;
     entry.wiz = wiz;
     if (!nodeText.trim()) return;
-    const asWiz = convertDockRefsToWizardMentionTokens(
-      nodeText,
-      script,
-      link.hubId,
-      sceneRows,
-    );
+    const asWiz =
+      link.kind === "video"
+        ? videoDockToWizardPrompt(
+            nodeText,
+            buildWizardVideoAssetIndex(
+              useCanvasStore.getState().nodes,
+              link.hubId,
+              hub.data,
+            ),
+          )
+        : convertDockRefsToWizardMentionTokens(
+            nodeText,
+            script,
+            link.hubId,
+            sceneRows,
+          );
     if (asWiz !== wiz) {
       patchDraft(link, { prompt: asWiz });
       entry.wiz = asWiz;
@@ -377,6 +383,16 @@ function syncLinkPrompt(
   if (wiz !== entry.wiz) {
     entry.wiz = wiz;
     if (!wiz.trim()) return;
+    if (link.kind === "video") {
+      const written = pushWizardVideoPromptToCell({
+        scriptHubId: link.hubId,
+        cellId: link.nodeId,
+        shotIndex: link.shotIndex!,
+        wizardPrompt: wiz,
+      });
+      if (written !== null) entry.node = written;
+      return;
+    }
     const asDock = convertWizardMentionTokensToDockRefs(
       wiz,
       script,

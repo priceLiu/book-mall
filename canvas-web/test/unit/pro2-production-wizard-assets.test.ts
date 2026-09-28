@@ -86,6 +86,15 @@ describe("entity highlight matchers", () => {
     ).toBe("金銮殿");
   });
 
+  it("longestEntityAliasInText ignores bracket qualifiers and never eats brackets", () => {
+    expect(
+      longestEntityAliasInText("沈昭昭（现代）", "对白：沈昭昭（内心OS，疲惫）"),
+    ).toBe("沈昭昭");
+    expect(
+      longestEntityAliasInText("沈昭昭（现代）", "现代深夜办公室，灯光昏暗"),
+    ).toBeNull();
+  });
+
   it("buildEntityHighlightMatchers includes scene and prop terms", () => {
     const matchers = buildEntityHighlightMatchers(script);
     const terms = matchers.map((m) => m.term);

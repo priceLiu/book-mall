@@ -362,7 +362,7 @@ export function Pro2ProductionWizardShell({
     if (hubId) {
       onClose();
       showCanvasBlockingProgress({
-        title: "正在放入画布",
+        title: "正在载入画布",
         message: "正在整理节点与连线，请稍候…",
       });
       void (async () => {
@@ -388,7 +388,7 @@ export function Pro2ProductionWizardShell({
               window.requestAnimationFrame(emitFocus);
             });
           }
-          // 生成任务进行中时普通 autosave 会延后；放入画布须强制落盘，刷新后保持原状态
+          // 生成任务进行中时普通 autosave 会延后；载入画布须强制落盘，刷新后保持原状态
           showCanvasBlockingProgress({
             title: "正在保存画布",
             message: "节点已放入，正在保存，请稍候…",
@@ -401,17 +401,17 @@ export function Pro2ProductionWizardShell({
           if (isCanvasGraphDirty()) {
             canvasNotify({
               title: "画布尚未保存完成",
-              message: "节点已放入画布，但保存还未完成，系统会继续自动保存。请稍后再刷新页面。",
+              message: "节点已载入画布，但保存还未完成，系统会继续自动保存。请稍后再刷新页面。",
             });
           } else {
-            showCanvasSuccessToast("已放入画布并保存");
+            showCanvasSuccessToast("已载入画布并保存");
           }
         } catch (error) {
           hideCanvasBlockingProgress();
           const message =
-            error instanceof Error ? error.message : "放入画布失败，请重试";
+            error instanceof Error ? error.message : "载入画布失败，请重试";
           canvasNotify({
-            title: "放入画布失败",
+            title: "载入画布失败",
             message,
             variant: "error",
           });
@@ -501,7 +501,7 @@ export function Pro2ProductionWizardShell({
             className="ml-4 rounded-lg border border-white/15 px-4 py-1.5 text-sm hover:bg-white/5"
             onClick={onMountToCanvas}
           >
-            放入画布
+            载入画布
           </button>
           <button
             type="button"
@@ -601,7 +601,7 @@ export function Pro2ProductionWizardShell({
         ) : (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <p className="mb-3 shrink-0 text-sm text-zinc-400">
-              逐镜生成分镜图与分镜视频。完成后点「放入画布」一次性挂载到画布。
+              逐镜生成分镜图与分镜视频。完成后点「载入画布」一次性挂载到画布。
             </p>
             <Pro2ProductionWizardShotStep
               script={script!}

@@ -1339,6 +1339,7 @@ async function executeStoryLlmEngineTask(
         pro2Validation = validatePro2ProductionScriptLlmOutput(
           outputText,
           storyScope,
+          { enforceCharacterVersions: attempt < PRO2_STRUCTURED_LLM_MAX_ATTEMPTS },
         );
         if (pro2Validation.ok) {
           outputText = ensurePro2ProductionScriptFence(outputText);

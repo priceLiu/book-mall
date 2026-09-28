@@ -14,6 +14,7 @@ import {
   wizardMentionId,
 } from "@/lib/canvas/pro2-shot-entity-reconcile";
 import type { Pro2ProductionScript } from "@/lib/canvas/data/pro2-production-script-schema";
+import { listPro2ShotDialogueIssues } from "@/lib/canvas/data/pro2-production-script-schema";
 
 const script: Pro2ProductionScript = {
   characters: [{ id: "c1", name: "现代沈昭昭", role: "女主" }],
@@ -289,5 +290,101 @@ describe("formatWizardMentionsForDisplay", () => {
     expect(formatWizardMentionsForDisplay(raw, script)).toBe(
       "现代沈昭昭 在 现代办公室",
     );
+  });
+});
+
+describe("character versions (same person, multiple eras)", () => {
+  const versionScript: Pro2ProductionScript = {
+    characters: [
+      { id: "tang", name: "沈昭昭（盛唐）", role: "女主" },
+      { id: "modern", name: "沈昭昭（现代）", role: "女主" },
+    ],
+    scenes: [
+      { id: "office", name: "现代深夜办公室", environmentTimeMood: "现代，深夜" },
+      { id: "palace", name: "盛唐金銮殿", environmentTimeMood: "盛唐，白日" },
+    ],
+    props: [],
+    shots: [
+      {
+        index: 1,
+        sceneId: "office",
+        sceneDescription: "沈昭昭伏案加班",
+        lighting: "现代深夜办公室，冷蓝光影",
+        dialogue: "沈昭昭（内心OS，疲惫）：\"又……加班……\"",
+        durationSec: 10,
+      },
+      {
+        index: 2,
+        sceneId: "palace",
+        sceneDescription: "沈昭昭跪在殿前",
+        lighting: "盛唐金銮殿，暖金光",
+        dialogue: "—",
+        durationSec: 10,
+      },
+    ],
+  } as unknown as Pro2ProductionScript;
+
+  it("keeps only the version matching the shot scene", () => {
+    const [s1, s2] = versionScript.shots!;
+    expect(reconcileShotEntityLinks(s1!, versionScript).characterIds).toEqual([
+      "modern",
+    ]);
+    expect(reconcileShotEntityLinks(s2!, versionScript).characterIds).toEqual([
+      "tang",
+    ]);
+  });
+
+  it("time travel: Pass1 characterIds wins over the scene era", () => {
+    const shot = {
+      ...versionScript.shots![1]!,
+      characterIds: ["modern"],
+      sceneDescription: "沈昭昭穿着现代衬衫跌进金銮殿",
+    };
+    const { shot: hydrated } = hydrateShotEntityMentionsForEdit(shot, versionScript);
+    expect(hydrated.characterIds).toEqual(["modern"]);
+    expect(hydrated.sceneDescription).toBe(
+      "@<wiz-char-modern>穿着现代衬衫跌进@<wiz-scene-palace>",
+    );
+  });
+
+  it("explicit @ mention is respected even if it disagrees with the scene", () => {
+    const shot = {
+      ...versionScript.shots![0]!,
+      videoPrompt: "@<wiz-char-tang> 出现在办公室",
+    };
+    expect(reconcileShotEntityLinks(shot, versionScript).characterIds).toEqual([
+      "tang",
+    ]);
+  });
+
+  it("ambiguous: both versions kept and bare name stays plain text", () => {
+    const shot = {
+      ...versionScript.shots![0]!,
+      characterIds: ["tang", "modern"],
+    };
+    const { shot: hydrated } = hydrateShotEntityMentionsForEdit(shot, versionScript);
+    expect(hydrated.characterIds?.sort()).toEqual(["modern", "tang"]);
+    expect(hydrated.sceneDescription).toBe("沈昭昭伏案加班");
+  });
+
+  it("keeps both versions when full names are written explicitly", () => {
+    const shot = {
+      ...versionScript.shots![0]!,
+      sceneDescription: "沈昭昭（现代）梦见沈昭昭（盛唐）",
+    };
+    expect(
+      reconcileShotEntityLinks(shot, versionScript).characterIds?.sort(),
+    ).toEqual(["modern", "tang"]);
+  });
+
+  it("parses versioned dialogue speaker and accepts the format", () => {
+    const shot = {
+      ...versionScript.shots![1]!,
+      dialogue: "沈昭昭（现代）（疲惫）：\"又要加班……\"",
+    };
+    expect(inferCharacterIdsFromDialogue(shot, versionScript)).toEqual(["modern"]);
+    expect(
+      listPro2ShotDialogueIssues([shot] as Parameters<typeof listPro2ShotDialogueIssues>[0]),
+    ).toEqual([]);
   });
 });

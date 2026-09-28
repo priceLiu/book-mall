@@ -170,7 +170,13 @@ function textIncludesEntityTerm(text: string, term: string): boolean {
   return t.length >= 2 && text.includes(t);
 }
 
-/** 资产全名未出现时，取在正文里能匹配的最长子串（如 盛唐金銮殿 → 金銮殿） */
+const ENTITY_ALIAS_QUALIFIER_RE = /[（(【\[][^）)】\]]*[）)】\]]/g;
+const ENTITY_ALIAS_BREAK_RE = /[\s（）()【】\[\]·•／/|、，,。：:；;！!？?“”"'‘’《》<>-]+/;
+
+/**
+ * 资产全名未出现时，取在正文里能匹配的最长子串（如 盛唐金銮殿 → 金銮殿）。
+ * 括号内限定词（沈昭昭（现代））不参与，子串不跨括号 / 标点，避免吞掉正文里的「（」。
+ */
 export function longestEntityAliasInText(
   entityName: string,
   corpus: string,
@@ -178,10 +184,17 @@ export function longestEntityAliasInText(
   const name = entityName.trim();
   if (!name || !corpus) return null;
   if (corpus.includes(name)) return name;
-  for (let len = name.length - 1; len >= 2; len--) {
-    for (let start = 0; start <= name.length - len; start++) {
-      const sub = name.slice(start, start + len);
-      if (corpus.includes(sub)) return sub;
+  const segments = name
+    .replace(ENTITY_ALIAS_QUALIFIER_RE, " ")
+    .split(ENTITY_ALIAS_BREAK_RE)
+    .filter((s) => s.length >= 2);
+  const maxLen = Math.max(0, ...segments.map((s) => s.length));
+  for (let len = maxLen; len >= 2; len--) {
+    for (const seg of segments) {
+      for (let start = 0; start <= seg.length - len; start++) {
+        const sub = seg.slice(start, start + len);
+        if (corpus.includes(sub)) return sub;
+      }
     }
   }
   return null;

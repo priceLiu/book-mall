@@ -2,7 +2,7 @@
  * 剧本可视化 · 生产向导 v2（见 docs/剧本可视化功能.md）
  *
  * - sync：仅写 Hub 内嵌 rows / productionWizardMode（不生画布节点）
- * - mount：用户点「放入画布」后再 spawn 列节点（不含旧「场景设计」列）
+ * - mount：用户点「载入画布」后再 spawn 列节点（不含旧「场景设计」列）
  */
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import type {
@@ -145,7 +145,7 @@ export function syncProductionScaffoldDataToHubFromStore(
 }
 
 /**
- * 用户点「放入画布」· spawn 列节点并同步 rows。
+ * 用户点「载入画布」· spawn 列节点并同步 rows。
  * 不 spawn 旧「场景设计」列（story-pro2-scene）；场景行仅挂 Hub.sceneRows。
  */
 export function mountProductionScaffoldToCanvas(

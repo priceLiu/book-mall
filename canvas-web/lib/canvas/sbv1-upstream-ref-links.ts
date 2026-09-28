@@ -18,7 +18,8 @@ export type Sbv1UpstreamRefLink = {
 /**
  * 可作为 sbv1-video-engine 参考图上游的 LibTV 图片节点。
  * 与 分镜视频 1.0 对齐：除 sbv1-image 外，影视专业 2.0 的图片节点
- * （story-pro2-image，含组内分镜图 role=frame；story-pro2-three-view）同样可被 @ 引用与生成。
+ * （story-pro2-image，含组内分镜图 role=frame；story-pro2-three-view；道具卡 story-pro2-prop）
+ * 同样可被 @ 引用与生成。
  */
 export function isSbv1VideoEngineRefImageNode(
   node: Pick<CanvasFlowNode, "type"> | undefined,
@@ -28,17 +29,13 @@ export function isSbv1VideoEngineRefImageNode(
     node.type === "sbv1-image" ||
     node.type === "story-pro2-image" ||
     node.type === "story-pro2-three-view" ||
+    node.type === "story-pro2-prop" ||
     node.type === "story-pro2-3d-desk"
   );
 }
 
 function imageUrlFromRefNode(node: CanvasFlowNode): string | undefined {
-  if (
-    node.type === "sbv1-image" ||
-    node.type === "story-pro2-image" ||
-    node.type === "story-pro2-three-view" ||
-    node.type === "story-pro2-3d-desk"
-  ) {
+  if (isSbv1VideoEngineRefImageNode(node)) {
     const d = node.data as unknown as ImageNodeData & {
       runtime?: { ossUrl?: string; ephemeralUrl?: string };
       modelKey?: string;

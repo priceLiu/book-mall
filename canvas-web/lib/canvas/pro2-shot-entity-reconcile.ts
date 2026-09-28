@@ -30,7 +30,7 @@ const WIZ_PROP_PREFIX = "wiz-prop-";
 const STORE_TOKEN_RE = /@<([^>\s]+)>/g;
 
 const DIALOGUE_SPEAKER_RE =
-  /^([^（(：:\n]+)(?:内心OS)?(?:[（(][^）)]*[）)])?\s*[：:]/u;
+  /^([^（(：:\n]+)(?:内心OS)?(?:[（(][^）)]*[）)]){0,2}\s*[：:]/u;
 
 type TextRange = { start: number; end: number };
 
@@ -79,7 +79,15 @@ function buildHydrationTerms(
     if (alias) push(alias, entity);
   }
 
-  return terms.sort((a, b) => b.term.length - a.term.length);
+  // 同一词对应多个实体（如同人物两个版本都在场时的本名）→ 有歧义，保留纯文本不猜
+  const owners = new Map<string, Set<string>>();
+  for (const t of terms) {
+    const key = `${t.entity.kind}:${t.entity.id}`;
+    owners.set(t.term, (owners.get(t.term) ?? new Set()).add(key));
+  }
+  return terms
+    .filter((t) => (owners.get(t.term)?.size ?? 0) < 2)
+    .sort((a, b) => b.term.length - a.term.length);
 }
 
 /** 正文纯文本 → @<wiz-*> token（编辑弹层打开时自动关联） */
@@ -230,10 +238,18 @@ export function inferCharacterIdsFromDialogue(
   const dialogue = shot.dialogue?.trim() ?? "";
   if (!dialogue || dialogue === "—") return [];
   const characters = script.characters ?? [];
+  const versioned = characters
+    .filter((c) => characterVersionQualifiers(c.name).length > 0)
+    .sort((a, b) => b.name.length - a.name.length);
   const ids: string[] = [];
   for (const line of dialogue.split(/\n/u)) {
     const t = line.trim();
     if (!t || t === "—") continue;
+    const fullHit = versioned.find((c) => t.startsWith(c.name));
+    if (fullHit) {
+      ids.push(fullHit.id);
+      continue;
+    }
     const m = t.match(DIALOGUE_SPEAKER_RE);
     const speaker = (m?.[1] ?? "").trim();
     if (!speaker) continue;
@@ -395,6 +411,95 @@ export type ReconcileShotEntityOptions = {
   propDisplayText?: string;
 };
 
+const CHARACTER_VERSION_QUALIFIER_RE = /[（(【\[]([^）)】\]]+)[）)】\]]/g;
+
+/** 沈昭昭（现代） → 沈昭昭 */
+export function characterBaseName(name: string): string {
+  return name.replace(CHARACTER_VERSION_QUALIFIER_RE, "").trim();
+}
+
+/** 沈昭昭（现代） → ["现代"] */
+export function characterVersionQualifiers(name: string): string[] {
+  const out: string[] = [];
+  for (const m of name.matchAll(CHARACTER_VERSION_QUALIFIER_RE)) {
+    for (const part of (m[1] ?? "").split(/[·•／/|、，,\s]+/)) {
+      const t = part.trim();
+      if (t) out.push(t);
+    }
+  }
+  return out;
+}
+
+function shotCharacterVersionContext(
+  shot: Pro2ProductionScriptShot,
+  script: Pro2ProductionScript,
+  sceneId: string | undefined,
+): string {
+  const scene = sceneId
+    ? script.scenes?.find((s) => s.id === sceneId)
+    : undefined;
+  return [
+    scene?.name,
+    scene?.environmentTimeMood,
+    scene?.description,
+    shot.lighting,
+    shot.sceneDescription,
+    shot.cameraMove,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/**
+ * 同一人物多版本（沈昭昭（现代）/ 沈昭昭（盛唐））同时被模糊关联时的取舍。
+ * 剧本明确信息优先且不看场景（穿越剧里盛唐场景可能出现现代版）：
+ *   1. 正文写了带版本全名 / @ 引用 → 只保留这些
+ *   2. Pass1 characterIds 指定的版本 → 只保留这些
+ *   3. 均无：场景语境里仅一个版本的限定词命中才采用，否则全部保留（不猜）
+ */
+export function resolveCharacterVersionsForShot(
+  characterIds: string[],
+  opts: {
+    plainFullNameIds: string[];
+    mentionIds: string[];
+    shot: Pro2ProductionScriptShot;
+    script: Pro2ProductionScript;
+    sceneId: string | undefined;
+  },
+): string[] {
+  const characters = opts.script.characters ?? [];
+  const byId = new Map(characters.map((c) => [c.id, c]));
+  const groups = new Map<string, string[]>();
+  for (const id of characterIds) {
+    const c = byId.get(id);
+    if (!c) continue;
+    const base = characterBaseName(c.name);
+    if (!base) continue;
+    groups.set(base, [...(groups.get(base) ?? []), id]);
+  }
+
+  const drop = new Set<string>();
+  const context = shotCharacterVersionContext(opts.shot, opts.script, opts.sceneId);
+  const pass1 = opts.shot.characterIds ?? [];
+  for (const ids of groups.values()) {
+    if (ids.length < 2) continue;
+    let keep = ids.filter(
+      (id) => opts.plainFullNameIds.includes(id) || opts.mentionIds.includes(id),
+    );
+    if (!keep.length) keep = ids.filter((id) => pass1.includes(id));
+    if (!keep.length) {
+      const hits = ids.filter((id) =>
+        characterVersionQualifiers(byId.get(id)!.name).some((q) =>
+          context.includes(q),
+        ),
+      );
+      keep = hits.length === 1 ? hits : ids;
+    }
+    for (const id of ids) if (!keep.includes(id)) drop.add(id);
+  }
+  return characterIds.filter((id) => !drop.has(id));
+}
+
 /** 合并本镜 entity links：已有 ID > @ > 道具列 > 正文 infer > 对白 */
 export function reconcileShotEntityLinks(
   shot: Pro2ProductionScriptShot,
@@ -409,18 +514,35 @@ export function reconcileShotEntityLinks(
     ? resolvePropIdsFromDisplayText(options.propDisplayText, script)
     : [];
 
-  const characterIds = uniq([
-    ...(shot.characterIds ?? []),
-    ...fromMentions.characterIds,
-    ...fromDialogue,
-    ...fromInfer.characterIds,
-  ]);
-
   const sceneId = pickSceneId(
     shot.sceneId,
     fromMentions.sceneIds,
     shot,
     script,
+  );
+
+  const plainFullNameIds = (script.characters ?? [])
+    .filter(
+      (c) =>
+        characterVersionQualifiers(c.name).length > 0 &&
+        corpus.includes(c.name),
+    )
+    .map((c) => c.id);
+
+  const characterIds = resolveCharacterVersionsForShot(
+    uniq([
+      ...(shot.characterIds ?? []),
+      ...fromMentions.characterIds,
+      ...fromDialogue,
+      ...fromInfer.characterIds,
+    ]),
+    {
+      plainFullNameIds,
+      mentionIds: fromMentions.characterIds,
+      shot,
+      script,
+      sceneId,
+    },
   );
 
   const propIds = normalizePropIdsAgainstCatalog(

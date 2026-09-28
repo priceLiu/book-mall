@@ -4,6 +4,7 @@ import { wizardShotDraftKey } from "@/lib/canvas/pro2-production-wizard-shot-dra
 import { wizardAssetDraftKey } from "@/lib/canvas/pro2-production-wizard-assets";
 import { storyProSceneRowKey } from "@/lib/canvas/story-pro-scene-asset-catalog";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { applyWizardVideoPromptsToCells } from "@/lib/canvas/pro2-video-cell-wizard-prompt";
 
 const HUB = "hub-1";
 const FRAME_COL = "frame-col";
@@ -18,9 +19,38 @@ function seed(opts: {
   videoPrompt?: string;
   framePrompt?: string;
   shotDrafts?: Record<string, unknown>;
+  withAssetNodes?: boolean;
 }) {
+  const assetNodes = opts.withAssetNodes
+    ? [
+        {
+          id: "char-node",
+          type: "story-pro2-three-view",
+          position: { x: 0, y: 0 },
+          data: { pro2HubNodeId: HUB, pro2RowKey: "c1" },
+        },
+        {
+          id: "scene-node",
+          type: "story-pro2-image",
+          position: { x: 0, y: 0 },
+          data: {
+            pro2HubNodeId: HUB,
+            pro2MediaRole: "scene",
+            pro2RowKey: storyProSceneRowKey(HUB, "书房"),
+          },
+        },
+        {
+          id: "prop-node",
+          type: "story-pro2-prop",
+          position: { x: 0, y: 0 },
+          data: { hubNodeId: HUB, scriptStudioSourceRowKey: "p1" },
+        },
+      ]
+    : [];
   useCanvasStore.setState({
+    edges: [],
     nodes: [
+      ...assetNodes,
       {
         id: HUB,
         type: "story-pro2-script-hub",
@@ -28,7 +58,10 @@ function seed(opts: {
         data: {
           productionScript: {
             characters: [{ id: "c1", name: "沈昭昭" }],
-            scenes: [],
+            scenes: opts.withAssetNodes
+              ? [{ id: "s1", name: "书房", environmentTimeMood: "", imagePrompt: "" }]
+              : [],
+            props: opts.withAssetNodes ? [{ id: "p1", name: "现代电脑" }] : [],
             shots: [{ index: 1 }],
           },
           scriptStudioFrameRows: [{ key: "1", frameIndex: 1, prompt: "" }],
@@ -162,12 +195,127 @@ describe("pro2 wizard ⇄ canvas live sync", () => {
       prompt?: string;
       dockInput?: string;
     };
-    expect(cell.prompt).toBe("@<ref-char-c1> 转身");
-    expect(cell.dockInput).toBe("@<ref-char-c1> 转身");
+    // 画布无该角色节点 → 退化为纯文本名称
+    expect(cell.prompt).toBe("@沈昭昭 转身");
+    expect(cell.dockInput).toBe("@沈昭昭 转身");
     const col = nodes.find((n) => n.id === VIDEO_COL)!.data as {
       rows: { key: string; videoPrompt?: string }[];
     };
-    expect(col.rows[0]?.videoPrompt).toBe("@<ref-char-c1> 转身");
+    expect(col.rows[0]?.videoPrompt).toBe("@沈昭昭 转身");
+  });
+
+  it("maps wizard video refs to upstream sbv1 refs and wires asset edges", () => {
+    seed({ videoPrompt: "旧提示词", withAssetNodes: true });
+    useCanvasStore.setState({
+      edges: [
+        {
+          id: "e-frame-video",
+          source: "frame-cell",
+          target: "video-cell",
+          sourceHandle: "image",
+          targetHandle: "in_ref",
+        },
+        {
+          id: "e-asset-video-stale",
+          source: "prop-node",
+          target: "video-cell",
+          sourceHandle: "image",
+          targetHandle: "in_ref",
+        },
+      ],
+    });
+    pass(media, prompt);
+    const hub = useCanvasStore.getState().nodes.find((n) => n.id === HUB)!;
+    patchNode(HUB, {
+      productionWizardShotDrafts: {
+        ...(hub.data as { productionWizardShotDrafts?: object }).productionWizardShotDrafts,
+        [wizardShotDraftKey("video", 1)]: {
+          mediaKind: "video",
+          shotIndex: 1,
+          prompt: "运镜：推近\n画面：@<wiz-char-c1> 走进 @<wiz-scene-s1>",
+        },
+      },
+    });
+    pass(media, prompt);
+    const { nodes, edges } = useCanvasStore.getState();
+    const cell = nodes.find((n) => n.id === "video-cell")!.data as { prompt?: string };
+    expect(cell.prompt).toBe(
+      "运镜：推近\n画面：@<sbv1-ref-char-node> 走进 @<sbv1-ref-scene-node>",
+    );
+    const into = edges.filter((e) => e.target === "video-cell").map((e) => e.source);
+    expect(into[0]).toBe("frame-cell");
+    expect(into).toContain("char-node");
+    expect(into).toContain("scene-node");
+    expect(into).not.toContain("prop-node");
+  });
+
+  it("maps canvas video Dock refs back to wizard tokens", () => {
+    seed({ videoPrompt: "旧提示词", withAssetNodes: true });
+    pass(media, prompt);
+    patchNode("video-cell", {
+      prompt: "@<sbv1-ref-prop-node> 放在桌上",
+      dockInput: "@<sbv1-ref-prop-node> 放在桌上",
+    });
+    pass(media, prompt);
+    expect(shotDraft("video", 1)?.prompt).toBe("@<wiz-prop-p1> 放在桌上");
+  });
+
+  it("mount hydrates plain-text names like the wizard studio does", () => {
+    seed({ videoPrompt: "分镜图提示词", withAssetNodes: true });
+    const hub = useCanvasStore.getState().nodes.find((n) => n.id === HUB)!;
+    const script = (hub.data as { productionScript: Record<string, unknown> })
+      .productionScript;
+    patchNode(HUB, {
+      productionScript: {
+        ...script,
+        shots: [{ index: 1, characterIds: ["c1"], propIds: ["p1"] }],
+      },
+      productionWizardShotDrafts: {
+        [wizardShotDraftKey("video", 1)]: {
+          mediaKind: "video",
+          shotIndex: 1,
+          prompt: "画面：沈昭昭抬头，看向现代电脑",
+        },
+      },
+    });
+    useCanvasStore.setState({ edges: [] });
+    applyWizardVideoPromptsToCells(HUB);
+    const { nodes, edges } = useCanvasStore.getState();
+    const dock = (nodes.find((n) => n.id === "video-cell")!.data as {
+      dockInput?: string;
+    }).dockInput!;
+    expect(dock).toContain("@<sbv1-ref-char-node>抬头");
+    expect(dock).toContain("@<sbv1-ref-prop-node>");
+    expect(dock).not.toContain("沈昭昭");
+    const into = edges.filter((e) => e.target === "video-cell").map((e) => e.source);
+    expect(into.sort()).toEqual(["char-node", "prop-node"]);
+  });
+
+  it("mount applies wizard video prompts including props", () => {
+    seed({ videoPrompt: "分镜图提示词", withAssetNodes: true });
+    patchNode(HUB, {
+      productionWizardShotDrafts: {
+        [wizardShotDraftKey("video", 1)]: {
+          mediaKind: "video",
+          shotIndex: 1,
+          prompt: "@<wiz-char-c1> 打开 @<wiz-prop-p1>",
+        },
+      },
+    });
+    useCanvasStore.setState({ edges: [] });
+    applyWizardVideoPromptsToCells(HUB);
+    const { nodes, edges } = useCanvasStore.getState();
+    const cell = nodes.find((n) => n.id === "video-cell")!.data as {
+      prompt?: string;
+      dockInput?: string;
+    };
+    expect(cell.dockInput).toBe("@<sbv1-ref-char-node> 打开 @<sbv1-ref-prop-node>");
+    const hubRows = (nodes.find((n) => n.id === HUB)!.data as {
+      scriptStudioVideoRows: { videoPrompt?: string }[];
+    }).scriptStudioVideoRows;
+    expect(hubRows[0]?.videoPrompt).toBe(cell.dockInput);
+    const into = edges.filter((e) => e.target === "video-cell").map((e) => e.source);
+    expect(into.sort()).toEqual(["char-node", "prop-node"]);
   });
 
   it("pushes a canvas scene image into the wizard asset draft and hub sceneRows", () => {

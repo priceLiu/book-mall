@@ -83,6 +83,7 @@ function buildShotPromptPolishSystemPrompt(mode: ShotPromptPolishMode): string {
   const frameBlock = `## 分镜图 frameImagePrompt
 单段中文，顺序：景别→场景→角色→动作→道具→光影→镜头→氛围→[视觉风格：…]。不得输出英文段落。
 出现角色/场景/道具时须使用资产辞典 **canonical name**（与 Pass1 sceneId/characterIds/propIds 一致）；保存后系统会自动转为 @ 引用。
+同一人物有多个版本（如「沈昭昭（现代）」「沈昭昭（盛唐）」）时，只写本镜 characterIds 对应版本的完整 name，禁止写本名或「现代沈昭昭」这类改写。
 
 金标准范例（结构须对齐，内容须依本镜改写）：
 ${PRO2_PASS2_FRAME_IMAGE_GOLDEN}`;
@@ -90,6 +91,7 @@ ${PRO2_PASS2_FRAME_IMAGE_GOLDEN}`;
   const videoBlock = `## 分镜视频 videoPrompt
 中文多段模板，须含章节：出场角色、背景场景、参考图使用规则、前一镜（若有）、分段描述、输出约束、视觉风格。全文中文。
 出场角色/背景场景等须使用资产辞典 **canonical name**；保存后系统会自动转为 @ 引用。
+同一人物有多个版本时，只写本镜 characterIds 对应版本的完整 name（如「沈昭昭（现代）」），含对白说话人。
 
 ${STORY_PRO2_VIDEO_PROMPT_RULES}
 

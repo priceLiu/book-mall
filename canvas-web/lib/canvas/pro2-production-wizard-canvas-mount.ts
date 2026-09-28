@@ -1,5 +1,5 @@
 /**
- * 生产向导 ·「放入画布」后挂载视觉组（三视图 / 分镜图 / 道具媒体卡）
+ * 生产向导 ·「载入画布」后挂载视觉组（三视图 / 分镜图 / 道具媒体卡）
  */
 import {
   findPro2CharacterColumnForHub,
@@ -19,6 +19,7 @@ import {
   finalizePro2VideoRowsForCanvasMount,
 } from "./pro2-production-wizard-frame-mount";
 import { spawnScriptStudioMediaCardsFromWorkspace } from "./script-studio-media-spawn";
+import { applyWizardVideoPromptsToCells } from "./pro2-video-cell-wizard-prompt";
 import { pickRuntimeImagePreviewUrl } from "./task-media-url";
 import { sceneRowKeysEquivalent } from "./story-pro-scene-asset-catalog";
 import { ensurePro2HubToMediaGroupChildEdges } from "./pro2-hub-media-group-edge";
@@ -562,58 +563,6 @@ function ensureAssetToFrameEdges(
   return nextEdges;
 }
 
-function ensureAssetToVideoEdges(
-  nodes: CanvasFlowNode[],
-  edges: CanvasFlowEdge[],
-  videoColumnId: string | undefined,
-  frameRows: StoryProFrameRow[],
-  characterRows: StoryProCharacterRow[],
-  sceneRows: StoryProSceneRow[],
-): CanvasFlowEdge[] {
-  if (!videoColumnId) return edges;
-  const videoByRowKey = new Map<string, CanvasFlowNode>();
-  for (const node of nodes) {
-    if (node.type !== "sbv1-video-engine") continue;
-    const d = node.data as { pro2ControllerNodeId?: string; pro2RowKey?: string };
-    if (d.pro2ControllerNodeId !== videoColumnId) continue;
-    const rowKey = d.pro2RowKey?.trim();
-    if (rowKey) videoByRowKey.set(rowKey, node);
-  }
-
-  const frameSources = collectFrameAssetSources(
-    nodes,
-    frameRows,
-    characterRows,
-    sceneRows,
-  );
-  const nextEdges = [...edges];
-  for (const [rowKey, sourceIds] of frameSources) {
-    const videoNode = videoByRowKey.get(rowKey);
-    if (!videoNode) continue;
-    for (const sourceId of sourceIds) {
-      const sourceNode = nodes.find((n) => n.id === sourceId);
-      if (!sourceNode) continue;
-      const exists = nextEdges.some(
-        (e) =>
-          e.source === sourceId &&
-          e.target === videoNode.id &&
-          (e.targetHandle === "in_ref" ||
-            e.targetHandle === "in_image" ||
-            e.targetHandle == null),
-      );
-      if (exists) continue;
-      nextEdges.push({
-        id: `e-asset-video-${sourceId.slice(-6)}-${videoNode.id.slice(-6)}`,
-        source: sourceId,
-        target: videoNode.id,
-        sourceHandle: sourceHandleForAssetNode(sourceNode),
-        targetHandle: "in_ref",
-      });
-    }
-  }
-  return nextEdges;
-}
-
 function layoutWizardGroupsParallel(
   nodes: CanvasFlowNode[],
   scriptHubId: string,
@@ -889,17 +838,7 @@ export function mountProductionVisualGroupsFromStore(scriptHubId: string): void 
       sceneRows,
     ),
   );
-  store = useCanvasStore.getState();
-  store.setEdges((prev) =>
-    ensureAssetToVideoEdges(
-      store.nodes,
-      prev,
-      videoColumnId,
-      frameRows,
-      characterRows,
-      sceneRows,
-    ),
-  );
+  applyWizardVideoPromptsToCells(scriptHubId);
 
   store = useCanvasStore.getState();
   store.setNodes((prev) => layoutWizardGroupsParallel(prev, scriptHubId));

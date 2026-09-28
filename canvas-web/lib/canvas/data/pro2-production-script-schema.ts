@@ -690,7 +690,7 @@ const PRO2_DIALOGUE_OPEN_Q = `["“「『]`;
 const PRO2_DIALOGUE_CLOSE_Q = `["”」』]`;
 
 const PRO2_DIALOGUE_FORMAT_LENIENT_RE = new RegExp(
-  `^(?:[^（(：:\\n]+(?:[（(][^）)]+[）)])?\\s*[：:]\\s*${PRO2_DIALOGUE_OPEN_Q}[^"“”「」『』]+${PRO2_DIALOGUE_CLOSE_Q}\\s*)+$`,
+  `^(?:[^（(：:\\n]+(?:[（(][^）)]+[）)]){0,2}\\s*[：:]\\s*${PRO2_DIALOGUE_OPEN_Q}[^"“”「」『』]+${PRO2_DIALOGUE_CLOSE_Q}\\s*)+$`,
   "u",
 );
 
@@ -958,6 +958,71 @@ export function listPro2ShotEntityLinkIssues(
     }
   }
 
+  return issues;
+}
+
+const PRO2_CHARACTER_VERSION_QUALIFIER_RE = /[（(【\[][^）)】\]]+[）)】\]]/g;
+
+/**
+ * 同一人物多版本（穿越 / 前后世 / 多造型）· 命名互异 + 逐镜写明版本 + characterIds 列全。
+ * 版本由剧本明确给出，系统不按场景猜（穿越剧盛唐场景可能是现代版）。
+ * 仅用于 LLM 返回后的重试校验，不挂 schema（避免旧输出重解析失败）。
+ */
+export function listPro2CharacterVersionIssues(
+  patch: Pro2ProductionScriptPatchBody,
+): string[] {
+  const characters = patch.characters ?? [];
+  const groups = new Map<string, { id: string; name: string }[]>();
+  for (const c of characters) {
+    const name = c.name?.trim() ?? "";
+    const base = name.replace(PRO2_CHARACTER_VERSION_QUALIFIER_RE, "").trim();
+    if (base.length < 2) continue;
+    groups.set(base, [...(groups.get(base) ?? []), { id: c.id, name }]);
+  }
+  const multi = [...groups.entries()].filter(([, v]) => v.length >= 2);
+  if (!multi.length) return [];
+
+  const issues: string[] = [];
+  for (const [base, versions] of multi) {
+    const names = versions.map((v) => v.name);
+    if (names.includes(base) || new Set(names).size !== names.length) {
+      issues.push(
+        `角色「${base}」有 ${versions.length} 个版本，name 须写成「${base}（版本）」且互不相同（如 ${base}（现代）/ ${base}（盛唐））`,
+      );
+    }
+  }
+
+  for (const shot of patch.shots ?? []) {
+    const text = [
+      shot.sceneDescription,
+      shot.lighting,
+      shot.cameraMove,
+      shot.dialogue,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    if (!text.trim()) continue;
+    const ids = shot.characterIds ?? [];
+    for (const [base, versions] of multi) {
+      const byLength = [...versions].sort((a, b) => b.name.length - a.name.length);
+      let rest = text;
+      for (const v of byLength) rest = rest.split(v.name).join("");
+      if (rest.includes(base)) {
+        issues.push(
+          `镜 ${shot.index} 出现「${base}」但未写明版本：须每处写完整 name（${versions
+            .map((v) => v.name)
+            .join(" / ")}），按角色本镜形态选版本，不按场景推断`,
+        );
+      }
+      for (const v of versions) {
+        if (text.includes(v.name) && !ids.includes(v.id)) {
+          issues.push(
+            `镜 ${shot.index} 画面出现「${v.name}」但 characterIds 未包含 ${v.id}`,
+          );
+        }
+      }
+    }
+  }
   return issues;
 }
 

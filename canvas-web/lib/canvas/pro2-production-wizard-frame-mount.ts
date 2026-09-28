@@ -1,5 +1,5 @@
 /**
- * 生产向导 · 放入画布前 · 分镜 row prompt / @ / ref 接线
+ * 生产向导 · 载入画布前 · 分镜 row prompt / @ / ref 接线
  */
 import type { Pro2ProductionScript } from "./data/pro2-production-script-schema";
 import {

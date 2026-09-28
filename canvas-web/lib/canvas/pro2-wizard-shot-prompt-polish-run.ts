@@ -68,7 +68,7 @@ export type RunPro2WizardShotPromptPolishResult =
   | { ok: true; frameImagePrompt?: string; videoPrompt?: string }
   | { ok: false; error: string };
 
-/** 润色成功 · 写回 Hub productionScript + scriptStudioFrameRows（重开弹层 / 放入画布可读） */
+/** 润色成功 · 写回 Hub productionScript + scriptStudioFrameRows（重开弹层 / 载入画布可读） */
 export function persistWizardShotPromptsToHub(args: {
   scriptHubId: string;
   hubData: StoryProScriptHubNodeData;
