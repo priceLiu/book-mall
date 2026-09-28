@@ -961,6 +961,15 @@ function FlowCanvasInner({
   /** RF 末帧无 resizing:false 时，pointerup 兜底提交；须曾出现 resizing:true */
   useEffect(() => {
     const onPointerUp = () => {
+      // 松手后不可能仍在拖动；RF 选区拖动等路径不回调 onNodeDragStop，残留 id 会让该节点 Dock / 顶栏一直 hidden
+      requestAnimationFrame(() => {
+        if (
+          !isNodeDraggingRef.current &&
+          useCanvasStore.getState().canvasDraggingNodeId
+        ) {
+          setCanvasDraggingNodeId(null);
+        }
+      });
       if (groupResizeUserActiveRef.current) {
         const groupId = groupResizeIdRef.current;
         if (!groupId || !groupResizeFrozenRef.current) {
@@ -2044,6 +2053,7 @@ function FlowCanvasInner({
     commitFlowPositionsFromRf();
     deferStoreGraphSyncRef.current = false;
     setCanvasGeometryDragging(false);
+    setCanvasDraggingNodeId(null);
     useCanvasStore.getState().setCanvasSelectionDragging(false);
     flushAutosaveAfterDrag();
   }, [
@@ -2051,6 +2061,7 @@ function FlowCanvasInner({
     flushAutosaveAfterDrag,
     restoreLiftedGroupChildrenExtent,
     setCanvasGeometryDragging,
+    setCanvasDraggingNodeId,
   ]);
 
   const onLibtvSelectionEnd = useCallback(() => {

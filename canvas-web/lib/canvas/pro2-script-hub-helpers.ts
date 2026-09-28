@@ -87,7 +87,10 @@ import {
 } from "./pro2-scene-batch-image";
 import { pro2ThinNodeIsLinked } from "./pro2-thin-node-display-state";
 import { ensurePro2FrameImageGroup } from "./pro2-spawn-frame-image-group";
-import { ensurePro2VideoBoardGroup } from "./pro2-spawn-video-board-group";
+import {
+  ensurePro2VideoBoardGroup,
+  repairPro2FrameImageSourceHandles,
+} from "./pro2-spawn-video-board-group";
 import { pickDefaultPro2VideoEngine } from "./pro2-video-batch-video";
 import { resolveStoryFrameImageUrl } from "./story-frame-gate";
 import { ensurePro2CharacterImageGroup } from "./pro2-spawn-character-image-group";
@@ -1191,7 +1194,7 @@ export function kickoffPro2VideoBoardFromFrameGroup(
 
   store = getStore();
   store.setEdges((prev) => {
-    let next = prev;
+    let next = repairPro2FrameImageSourceHandles(prev, store.nodes);
     const videos = store.nodes.filter(
       (n) =>
         n.type === "sbv1-video-engine" &&
@@ -1225,7 +1228,7 @@ export function kickoffPro2VideoBoardFromFrameGroup(
           id: `e-${frameImg.id}-${video.id}-ref`,
           source: frameImg.id,
           target: video.id,
-          sourceHandle: "out_image",
+          sourceHandle: "image",
           targetHandle: "in_ref",
         },
       ];

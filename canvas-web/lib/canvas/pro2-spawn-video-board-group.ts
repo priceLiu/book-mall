@@ -220,7 +220,7 @@ export function wirePro2VideoBoardRefEdges(
   frameColumnId: string,
 ): void {
   setEdges((prev) => {
-    let next = prev;
+    let next = repairPro2FrameImageSourceHandles(prev, nodes);
     const videos = nodes.filter(
       (n) =>
         n.type === "sbv1-video-engine" &&
@@ -254,13 +254,29 @@ export function wirePro2VideoBoardRefEdges(
           id: `e-${frameImg.id}-${video.id}-ref`,
           source: frameImg.id,
           target: video.id,
-          sourceHandle: "out_image",
+          sourceHandle: "image",
           targetHandle: "in_ref",
         },
       ];
     }
     return next;
   });
+}
+
+/** `story-pro2-image` 出边 Handle 仅有 `image`；旧数据写成 `out_image` 时 RF 不渲染该连线 */
+export function repairPro2FrameImageSourceHandles(
+  edges: CanvasFlowEdge[],
+  nodes: CanvasFlowNode[],
+): CanvasFlowEdge[] {
+  let changed = false;
+  const next = edges.map((e) => {
+    if (e.sourceHandle !== "out_image") return e;
+    const source = nodes.find((n) => n.id === e.source);
+    if (source?.type !== "story-pro2-image") return e;
+    changed = true;
+    return { ...e, sourceHandle: "image" };
+  });
+  return changed ? next : edges;
 }
 
 const PRO2_VISUAL_COLUMN_ANCHOR_SIZE = 1;
