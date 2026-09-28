@@ -300,11 +300,13 @@ export function computeLibtvMediaAspectPresetSize(
   profile: LibtvMediaAspectPresetProfile,
 ): { width: number; height: number } {
   const { w, h } = parseAspectRatioToNumbers(aspectRatio);
-  const limits = libtvMediaProfileBoxLimits(profile);
+  // 分镜视频格与分镜图格（three-view profile）同一套外框
+  const sizeProfile = profile === "pro2-video-cell" ? "three-view" : profile;
+  const limits = libtvMediaProfileBoxLimits(sizeProfile);
   return computeLibtvMediaBoxFromAspect({
     aspectW: w,
     aspectH: h,
-    profile,
+    profile: sizeProfile,
     ...limits,
   });
 }

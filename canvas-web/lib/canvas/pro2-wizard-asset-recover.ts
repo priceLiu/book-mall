@@ -18,7 +18,10 @@ import type {
   Pro2WizardAssetKind,
 } from "@/lib/canvas/pro2-production-wizard-assets";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
-import { isUnstableTaskMediaUrl } from "@/lib/canvas/task-media-url";
+import {
+  isTaskMediaUrlMarkedBroken,
+  isUnstableTaskMediaUrl,
+} from "@/lib/canvas/task-media-url";
 import { useCanvasStore } from "@/lib/canvas/store";
 
 function taskCompletedAtMs(task: WizardAssetTaskRecord): number {
@@ -48,7 +51,9 @@ export function pickRecoverableWizardAssetTask(
 ): WizardAssetTaskRecord | undefined {
   if (taskId?.trim()) {
     const bound = tasks.find((t) => t.id === taskId.trim());
-    if (bound && pickWizardAssetTaskPreviewUrl(bound)) return bound;
+    if (bound?.status === "SUCCEEDED" && pickWizardAssetTaskPreviewUrl(bound)) {
+      return bound;
+    }
     const polled = pickWizardAssetPollTask(tasks, taskId.trim(), nodeId);
     if (polled && pickWizardAssetTaskPreviewUrl(polled)) return polled;
   }
@@ -71,7 +76,7 @@ export function wizardAssetDraftNeedsRecovery(
   if (draft.generateStatus === "running") return false;
   const url = draft.previewUrl?.trim();
   if (!url) return true;
-  return isUnstableTaskMediaUrl(url);
+  return isUnstableTaskMediaUrl(url) || isTaskMediaUrlMarkedBroken(url);
 }
 
 function previewUrlShouldUpgrade(
@@ -83,6 +88,8 @@ function previewUrlShouldUpgrade(
   if (!nxt) return false;
   if (!cur) return true;
   if (cur === nxt) return false;
+  if (isTaskMediaUrlMarkedBroken(nxt)) return false;
+  if (isTaskMediaUrlMarkedBroken(cur)) return true;
   if (isUnstableTaskMediaUrl(cur) && !isUnstableTaskMediaUrl(nxt)) return true;
   return false;
 }

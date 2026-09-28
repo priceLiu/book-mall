@@ -22,7 +22,16 @@ import { mountProductionScaffoldToCanvasFromStore, syncProductionScaffoldDataToH
 import { CANVAS_RF_FOCUS_NODE_SET_EVENT } from "@/lib/canvas/canvas-rf-sync";
 import { listProductionWizardFocusNodeIdsFromStore } from "@/lib/canvas/pro2-production-wizard-canvas-mount";
 import { canvasNotify } from "@/lib/canvas/canvas-notify";
-import { showCanvasBlockingProgress } from "@/lib/canvas/canvas-blocking-progress";
+import {
+  hideCanvasBlockingProgress,
+  showCanvasBlockingProgress,
+} from "@/lib/canvas/canvas-blocking-progress";
+import {
+  flushCanvasGraphPersistBounded,
+  isCanvasGraphDirty,
+} from "@/lib/canvas/canvas-graph-persist-bridge";
+
+const MOUNT_PERSIST_MAX_WAIT_MS = 20_000;
 import { showCanvasSuccessToast } from "@/components/canvas/canvas-credits-toast-host";
 import { applyProductionScriptDirectToHub } from "@/lib/canvas/pro2-production-script-apply";
 import { reconcileProductionScriptEntityLinks } from "@/lib/canvas/pro2-shot-entity-reconcile";
@@ -352,7 +361,7 @@ export function Pro2ProductionWizardShell({
   const onMountToCanvas = useCallback(() => {
     if (hubId) {
       onClose();
-      const hideProgress = showCanvasBlockingProgress({
+      showCanvasBlockingProgress({
         title: "正在放入画布",
         message: "正在整理节点与连线，请稍候…",
       });
@@ -379,10 +388,26 @@ export function Pro2ProductionWizardShell({
               window.requestAnimationFrame(emitFocus);
             });
           }
-          hideProgress();
-          showCanvasSuccessToast("已放入画布");
+          // 生成任务进行中时普通 autosave 会延后；放入画布须强制落盘，刷新后保持原状态
+          showCanvasBlockingProgress({
+            title: "正在保存画布",
+            message: "节点已放入，正在保存，请稍候…",
+          });
+          if (useCanvasStore.getState().canvasGeometryDragging) {
+            useCanvasStore.getState().setCanvasGeometryDragging(false);
+          }
+          await flushCanvasGraphPersistBounded(MOUNT_PERSIST_MAX_WAIT_MS, true);
+          hideCanvasBlockingProgress();
+          if (isCanvasGraphDirty()) {
+            canvasNotify({
+              title: "画布尚未保存完成",
+              message: "节点已放入画布，但保存还未完成，系统会继续自动保存。请稍后再刷新页面。",
+            });
+          } else {
+            showCanvasSuccessToast("已放入画布并保存");
+          }
         } catch (error) {
-          hideProgress();
+          hideCanvasBlockingProgress();
           const message =
             error instanceof Error ? error.message : "放入画布失败，请重试";
           canvasNotify({

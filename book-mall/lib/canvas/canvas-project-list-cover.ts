@@ -337,7 +337,7 @@ export function projectListCoverSummaryFields(
 } {
   const cover = opts?.forDisplay
     ? resolveProjectListCoverForDisplay(canvas, opts.projectId)
-    : resolveProjectListCover(canvas, opts.projectId);
+    : resolveProjectListCover(canvas, opts?.projectId);
   return coverSummaryFromProjectListCover(cover);
 }
 

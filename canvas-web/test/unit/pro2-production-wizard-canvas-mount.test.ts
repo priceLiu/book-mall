@@ -25,6 +25,7 @@ vi.mock("@/lib/canvas/pro2-spawn-frame-image-group", () => ({
 
 vi.mock("@/lib/canvas/pro2-spawn-video-board-group", () => ({
   ensurePro2VideoBoardGroup: vi.fn(),
+  wirePro2VideoBoardRefEdges: vi.fn(),
 }));
 
 vi.mock("@/lib/canvas/script-studio-media-spawn", () => ({

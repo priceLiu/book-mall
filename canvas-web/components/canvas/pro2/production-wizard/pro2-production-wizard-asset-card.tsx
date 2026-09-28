@@ -9,6 +9,8 @@ import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { enqueueWizardAssetGenerate } from "@/lib/canvas/pro2-wizard-asset-generate-queue";
 import { patchProductionWizardAssetDraft } from "@/lib/canvas/pro2-wizard-asset-draft-patch";
+import { useWizardJobProgressStatus } from "@/lib/canvas/pro2-wizard-asset-progress";
+import { markTaskMediaUrlBroken } from "@/lib/canvas/task-media-url";
 import type { Pro2ProductionWizardAssetDraft } from "@/lib/canvas/pro2-production-wizard-assets";
 import {
   resolveWizardAssetMentionPreviewCandidates,
@@ -168,8 +170,12 @@ export const Pro2ProductionWizardAssetCard = memo(function Pro2ProductionWizardA
     setPreviewIndex(0);
   }, [previewCandidatesKey]);
   const previewUrl = previewCandidates[previewIndex];
+  const progressStatus = useWizardJobProgressStatus(
+    wizardAssetDraftKey(kind, assetId),
+  );
   const generateStatus = draft?.generateStatus ?? "idle";
-  const isGenerating = generateStatus === "running";
+  const isGenerating =
+    generateStatus === "running" || progressStatus === "running";
 
   const defaultEngine = useMemo(() => {
     const pick =
@@ -284,6 +290,10 @@ export const Pro2ProductionWizardAssetCard = memo(function Pro2ProductionWizardA
                   : undefined
               }
               onImageError={() => {
+                if (previewIndex + 1 >= previewCandidates.length) {
+                  for (const u of previewCandidates) markTaskMediaUrlBroken(u);
+                  return;
+                }
                 setPreviewIndex((idx) =>
                   idx + 1 < previewCandidates.length ? idx + 1 : idx,
                 );

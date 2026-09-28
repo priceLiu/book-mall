@@ -123,8 +123,8 @@ export function pro2MediaChildSize(node: {
     };
   }
   if (node.pro2MediaRole === "video") {
-    // 分镜视频格 · 出厂默认 4:3；用户选比例后由 resolveLibtvMediaNodeBoxSize 接管
-    return computeLibtvMediaAspectPresetSize("4:3", "pro2-video-cell");
+    // 与分镜图格同尺寸；有同镜分镜图时由 resolveLibtvMediaNodeBoxSize 直接取其外框
+    return computeLibtvMediaAspectPresetSize("16:9", "pro2-video-cell");
   }
   return { width: PRO2_IMAGE_NODE_WIDTH, height: PRO2_IMAGE_NODE_HEIGHT };
 }

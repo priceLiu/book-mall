@@ -2,9 +2,26 @@ import { describe, expect, it } from "vitest";
 
 import {
   coverSummaryFromLatestTask,
+  embedListCoverInCanvas,
   projectListCoverSummaryFields,
   resolveProjectListCoverForListRow,
 } from "@/lib/canvas/canvas-project-list-cover";
+
+describe("embedListCoverInCanvas", () => {
+  it("does not throw when called without options (canvas save path)", () => {
+    const out = embedListCoverInCanvas({
+      nodes: [
+        {
+          type: "story-pro2-image",
+          data: { ossUrl: "https://cdn.example/frame.png" },
+        },
+      ],
+    }) as { meta?: { listCover?: { thumbnailUrl?: string } } };
+    expect(out.meta?.listCover?.thumbnailUrl).toBe(
+      "https://cdn.example/frame.png",
+    );
+  });
+});
 
 describe("resolveProjectListCoverForListRow", () => {
   it("uses meta.listCover when hover video is present", () => {

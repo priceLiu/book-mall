@@ -169,6 +169,42 @@ function pro2AudioTrackBoxNeedsMigrate(node: CanvasFlowNode): boolean {
   );
 }
 
+/** 分镜视频格与同镜分镜图格同尺寸（视频由分镜图生成，组 / 节点外框须一致） */
+function findPro2VideoCellPairedFrame(
+  node: CanvasFlowNode,
+  allNodes: CanvasFlowNode[],
+): CanvasFlowNode | null {
+  if (node.type !== "sbv1-video-engine") return null;
+  const d = node.data as {
+    pro2MediaRole?: string;
+    pro2RowKey?: string;
+    pro2ControllerNodeId?: string;
+  };
+  const rowKey = d.pro2RowKey?.trim();
+  const videoColumnId = d.pro2ControllerNodeId?.trim();
+  if (d.pro2MediaRole !== "video" || !rowKey || !videoColumnId) return null;
+  const videoColumn = allNodes.find((n) => n.id === videoColumnId);
+  const frameColumnId = (
+    videoColumn?.data as { frameColumnId?: string } | undefined
+  )?.frameColumnId?.trim();
+  if (!frameColumnId) return null;
+  return (
+    allNodes.find((n) => {
+      if (n.type !== "story-pro2-image") return false;
+      const fd = n.data as {
+        pro2MediaRole?: string;
+        pro2RowKey?: string;
+        pro2ControllerNodeId?: string;
+      };
+      return (
+        fd.pro2MediaRole === "frame" &&
+        fd.pro2ControllerNodeId === frameColumnId &&
+        fd.pro2RowKey === rowKey
+      );
+    }) ?? null
+  );
+}
+
 /**
  * LibTV 媒体节点外框 · 唯一真源（比例 preset / 媒体自适配 / 出厂默认）。
  * 组布局、hydrate 迁移、Dock 改比例、auto-fit 均须走此函数，禁止各读 node.width 分叉。
@@ -177,6 +213,11 @@ export function resolveLibtvMediaNodeBoxSize(
   node: CanvasFlowNode,
   allNodes?: CanvasFlowNode[],
 ): LibtvMediaNodeSize {
+  const pairedFrame = allNodes
+    ? findPro2VideoCellPairedFrame(node, allNodes)
+    : null;
+  if (pairedFrame) return resolveLibtvMediaNodeBoxSize(pairedFrame, allNodes);
+
   const data = node.data as {
     pro2MediaRole?: string;
     gridSplitFrameCrop?: boolean;

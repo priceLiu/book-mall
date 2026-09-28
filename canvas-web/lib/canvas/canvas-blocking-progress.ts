@@ -12,14 +12,13 @@ type CanvasBlockingProgressState = {
 export const useCanvasBlockingProgressStore =
   create<CanvasBlockingProgressState>(() => ({ progress: null }));
 
-/** 全屏阻断式进度层（不可关闭）；返回的函数用于结束 */
+/** 全屏阻断式进度层（不可关闭）；再次调用即更新文案，结束须 hideCanvasBlockingProgress */
 export function showCanvasBlockingProgress(
   progress: CanvasBlockingProgress,
-): () => void {
+): void {
   useCanvasBlockingProgressStore.setState({ progress });
-  return () => {
-    if (useCanvasBlockingProgressStore.getState().progress === progress) {
-      useCanvasBlockingProgressStore.setState({ progress: null });
-    }
-  };
+}
+
+export function hideCanvasBlockingProgress(): void {
+  useCanvasBlockingProgressStore.setState({ progress: null });
 }

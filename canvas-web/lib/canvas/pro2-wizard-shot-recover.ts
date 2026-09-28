@@ -37,7 +37,9 @@ export function pickRecoverableWizardShotTask(
 ): WizardShotTaskRecord | undefined {
   if (taskId?.trim()) {
     const bound = tasks.find((t) => t.id === taskId.trim());
-    if (bound && pickWizardShotTaskPreviewUrl(bound)) return bound;
+    if (bound?.status === "SUCCEEDED" && pickWizardShotTaskPreviewUrl(bound)) {
+      return bound;
+    }
     const polled = pickWizardShotPollTask(tasks, taskId.trim(), nodeId);
     if (polled && pickWizardShotTaskPreviewUrl(polled)) return polled;
   }

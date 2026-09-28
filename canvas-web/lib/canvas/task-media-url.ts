@@ -35,10 +35,35 @@ export function isUnstableTaskMediaUrl(url: string): boolean {
     if (host.includes("volces.com")) return true;
     if (parsed.searchParams.has("X-Tos-Signature")) return true;
     if (parsed.searchParams.has("X-Tos-Expires")) return true;
+    for (const key of parsed.searchParams.keys()) {
+      const k = key.toLowerCase();
+      if (
+        k === "expires" ||
+        k === "x-oss-expires" ||
+        k === "x-oss-signature" ||
+        k === "x-amz-expires" ||
+        k === "x-amz-signature"
+      ) {
+        return true;
+      }
+    }
   } catch {
     return true;
   }
   return false;
+}
+
+const brokenTaskMediaUrls = new Set<string>();
+
+/** 本会话内浏览器已确认加载失败（重试耗尽）的预览链 · 供向导 recovery 换链 */
+export function markTaskMediaUrlBroken(url: string | undefined): void {
+  const u = url?.trim();
+  if (u) brokenTaskMediaUrls.add(u);
+}
+
+export function isTaskMediaUrlMarkedBroken(url: string | undefined): boolean {
+  const u = url?.trim();
+  return Boolean(u && brokenTaskMediaUrls.has(u));
 }
 
 /** 万相 / 百炼 reference_image · 明确排除视频/3D，其余 OSS 交给厂商校验 */
