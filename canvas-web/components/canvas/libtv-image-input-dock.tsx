@@ -24,7 +24,10 @@ import {
   pro2DockUpstreamLinksForChips,
 } from "@/lib/canvas/pro2-dock-upstream-links";
 import { pro2DockRefImageCatalog } from "@/lib/canvas/pro2-dock-ref-catalog";
-import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
+import {
+  dockActiveRefIdsFromPrompt,
+  listDockImageMentionRunIssues,
+} from "@/lib/canvas/dock-mention-ref-urls";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import { pickDefaultSbv1ImageEngine, resolveDockImageEnginePick } from "@/lib/canvas/sbv1-image-models";
 import {
@@ -862,6 +865,21 @@ function LibtvImageInputDockBody({
         title: "画布未就绪",
         message: "请刷新页面后重试。",
         variant: "error",
+      });
+      return;
+    }
+
+    const dockRefImages = latestData.dockRefImages ?? [];
+    const mentionIssues = listDockImageMentionRunIssues(
+      prompt,
+      latestUpstreamLinks,
+      dockRefImages,
+    );
+    if (mentionIssues.length) {
+      await alert({
+        title: "参考图未就绪",
+        message: mentionIssues[0]!,
+        variant: "warning",
       });
       return;
     }

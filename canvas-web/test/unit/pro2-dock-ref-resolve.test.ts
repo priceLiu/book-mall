@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { resolveDockRefsForRun, resolveDockImageUrlsForRun } from "@/lib/canvas/pro2-dock-ref-catalog";
 import type { Pro2DockUpstreamLink } from "@/lib/canvas/pro2-dock-upstream-links";
+import {
+  dockMentionRefUrlsForPrompt,
+  listDockImageMentionRunIssues,
+} from "@/lib/canvas/dock-mention-ref-urls";
+import { pro2DockMentionRefCatalog } from "@/lib/canvas/pro2-dock-ref-catalog";
 
 const upstream: Pro2DockUpstreamLink[] = [
   {
@@ -87,5 +92,56 @@ describe("resolveDockImageUrlsForRun", () => {
         "角色 @<up-img-a> 与 @<up-img-b>",
       ),
     ).toEqual(["blob:http://localhost/balu", "https://cdn.example/xida.png"]);
+  });
+});
+
+describe("dockMentionRefUrlsForPrompt", () => {
+  it("does not fall back to full catalog when @ image id has no url", () => {
+    const catalog = pro2DockMentionRefCatalog(
+      [
+        {
+          id: "up-img-a",
+          kind: "image",
+          label: "巴鲁",
+          previewUrl: "https://cdn.example/a.png",
+          sourceNodeId: "n1",
+        },
+        {
+          id: "up-img-b",
+          kind: "image",
+          label: "希达",
+          previewUrl: undefined,
+          sourceNodeId: "n2",
+        },
+      ],
+      [],
+    );
+    expect(
+      dockMentionRefUrlsForPrompt(
+        "男孩 @<up-img-b> 与 @<up-img-a>",
+        catalog,
+      ),
+    ).toEqual(["https://cdn.example/a.png"]);
+  });
+});
+
+describe("listDockImageMentionRunIssues", () => {
+  it("reports missing url for @ image mention", () => {
+    const links: Pro2DockUpstreamLink[] = [
+      {
+        id: "up-img-b",
+        kind: "image",
+        label: "希达",
+        previewUrl: undefined,
+        sourceNodeId: "n2",
+      },
+    ];
+    const issues = listDockImageMentionRunIssues(
+      "角色 @<up-img-b>",
+      links,
+      [],
+    );
+    expect(issues[0]).toMatch(/希达/);
+    expect(issues[0]).toMatch(/尚未就绪/);
   });
 });

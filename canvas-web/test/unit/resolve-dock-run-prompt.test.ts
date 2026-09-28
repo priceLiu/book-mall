@@ -6,6 +6,7 @@ import {
 } from "@/lib/canvas/resolve-dock-run-prompt";
 import { resolveSbv1VideoModelRefRunWarning } from "@/lib/canvas/sbv1-video-model-reference";
 import type { Pro2DockUpstreamLink } from "@/lib/canvas/pro2-dock-upstream-links";
+import { resolveDockImageUrlsForRun } from "@/lib/canvas/pro2-dock-ref-catalog";
 
 const links: Pro2DockUpstreamLink[] = [
   {
@@ -202,6 +203,17 @@ describe("resolveSbv1ImageEngineRunPrompt", () => {
         [{ id: "paste-style", label: "图片 3", url: "https://cdn.example/s.png" }],
       ),
     ).toBe("风格参考 图1");
+  });
+
+  it("keeps image_input order aligned with 图N tokens (same @ order as URLs)", () => {
+    const prompt = "女孩 @<img-girl> 与男孩 @<img-boy>";
+    const urls = resolveDockImageUrlsForRun(upstream, [], prompt);
+    const runPrompt = resolveSbv1ImageEngineRunPrompt(prompt, upstream);
+    expect(runPrompt).toBe("女孩 图1 与男孩 图2");
+    expect(urls).toEqual([
+      "https://cdn.example/girl.png",
+      "https://cdn.example/boy.png",
+    ]);
   });
 });
 

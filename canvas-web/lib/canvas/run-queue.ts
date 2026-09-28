@@ -40,6 +40,11 @@ import {
 import { findStyleAssetLinkedToImage } from "./pro2-style-asset-connect";
 import { pro2DockMentionRefCatalog, resolveDockImageUrlsForRun } from "./pro2-dock-ref-catalog";
 import {
+  dockActiveRefIdsFromPrompt,
+  isDockImageRefMentionId,
+  listDockImageMentionRunIssues,
+} from "./dock-mention-ref-urls";
+import {
   resolveDockRunPrompt,
   resolveSbv1ImageEngineRunPrompt,
   resolveSbv1VideoEngineRunPrompt,
@@ -505,6 +510,20 @@ function mentionCatalogForNode(
   return [];
 }
 
+function dockPromptHasImageRefMentions(
+  prompt: string,
+  links: ReturnType<typeof resolvePro2DockUpstreamLinks>,
+  dockRefImages: StoryRefImage[],
+): boolean {
+  const catalogIds = new Set(
+    pro2DockMentionRefCatalog(links, dockRefImages).map((c) => c.id),
+  );
+  for (const id of dockActiveRefIdsFromPrompt(prompt)) {
+    if (isDockImageRefMentionId(id, catalogIds)) return true;
+  }
+  return false;
+}
+
 function resolveImageInputs(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
@@ -559,12 +578,18 @@ function resolveImageInputs(
   const dockRefImages = (
     (node.data as { dockRefImages?: StoryRefImage[] }).dockRefImages ?? []
   ) as StoryRefImage[];
-  const fromDock = resolveDockImageUrlsForRun(links, dockRefImages, prompt).filter(
+  const mentionUrls = resolveDockImageUrlsForRun(links, dockRefImages, prompt);
+  const runnableFromDock = mentionUrls.filter(
     (u) =>
       typeof u === "string" &&
-      (u.startsWith("blob:") || /^https?:\/\//.test(u.trim())),
+      (u.startsWith("blob:") ||
+        u.startsWith("data:") ||
+        /^https?:\/\//.test(u.trim())),
   );
-  if (fromDock.length > 0) return fromDock;
+  if (dockPromptHasImageRefMentions(prompt, links, dockRefImages)) {
+    return runnableFromDock;
+  }
+  if (runnableFromDock.length > 0) return runnableFromDock;
   return raw;
 }
 
@@ -611,7 +636,10 @@ function applySbv1ImageDockRunResolution(
     dockRefImages,
     dockPrompt,
   );
-  if (mentionOrdered.length > 0) {
+  if (
+    dockPromptHasImageRefMentions(dockPrompt, links, dockRefImages) ||
+    mentionOrdered.length > 0
+  ) {
     return { runData: nextRunData, imageInputs: mentionOrdered };
   }
   return { runData: nextRunData, imageInputs };
@@ -1743,6 +1771,60 @@ export function useCanvasRunner(
               e instanceof Error
                 ? e.message
                 : "参考图上传 OSS 失败，无法发起图生图",
+            );
+            return;
+          }
+        }
+
+        if (
+          node.type === "sbv1-image" ||
+          node.type === "story-pro2-image" ||
+          node.type === "story-pro2-three-view"
+        ) {
+          const latestForRefs = useCanvasStore.getState();
+          const nodeForRefs =
+            latestForRefs.nodes.find((n) => n.id === nodeId) ?? node;
+          const dockPrompt = String(
+            (runData as { dockInput?: string }).dockInput ?? "",
+          );
+          const links = resolvePro2DockUpstreamLinks(
+            nodeId,
+            nodeForRefs.type ?? node.type ?? "",
+            latestForRefs.nodes,
+            latestForRefs.edges,
+          );
+          const dockRefImages = (
+            (runData as { dockRefImages?: StoryRefImage[] }).dockRefImages ??
+            []
+          ) as StoryRefImage[];
+          const mentionIssues = listDockImageMentionRunIssues(
+            dockPrompt,
+            links,
+            dockRefImages,
+          );
+          if (mentionIssues.length) {
+            abortSequential(job, mentionIssues[0]!);
+            return;
+          }
+          const expectedUrls = resolveDockImageUrlsForRun(
+            links,
+            dockRefImages,
+            dockPrompt,
+          ).filter(
+            (u) =>
+              typeof u === "string" &&
+              (u.startsWith("blob:") ||
+                u.startsWith("data:") ||
+                /^https?:\/\//.test(u.trim())),
+          );
+          if (
+            dockPromptHasImageRefMentions(dockPrompt, links, dockRefImages) &&
+            expectedUrls.length > 0 &&
+            imageInputs.length === 0
+          ) {
+            abortSequential(
+              job,
+              "参考图未能提交到模型（URL 无效或上传失败），请检查上游出图或重新 @ 引用后再试",
             );
             return;
           }
