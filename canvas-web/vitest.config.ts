@@ -83,6 +83,7 @@ export default defineConfig({
       "test/unit/pro2-wizard-asset-draft-patch.test.ts",
       "test/unit/pro2-wizard-asset-mount.test.ts",
       "test/unit/pro2-wizard-asset-recover.test.ts",
+      "test/unit/pro2-wizard-canvas-live-sync.test.ts",
       "test/unit/pro2-wizard-canvas-image-picks.test.ts",
       "test/unit/pro2-shot-entity-reconcile.test.ts",
       "test/unit/pro2-shot-prompt-polish.test.ts",

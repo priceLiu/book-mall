@@ -12,6 +12,7 @@ import {
   isCommonToolsPublicBrowsePath,
 } from "@/lib/silent-sso";
 import { PortalNav } from "@/components/portal-nav";
+import { CommonToolsCreditsBalanceChip } from "@/components/billing/credits-balance-chip";
 import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 import { setRuntimeBookOrigin } from "@/lib/auth";
 import { buildLoginUrl } from "@/lib/portal-auth-links";
@@ -85,6 +86,7 @@ export function AppShell({
               常用工具
             </Link>
             <div className="flex items-center gap-3 text-sm sm:hidden">
+              {user ? <CommonToolsCreditsBalanceChip /> : null}
               <PlatformTopupNavLink
                 bookOrigin={bookOrigin}
                 className="text-[#0071e3] hover:underline"
@@ -102,6 +104,7 @@ export function AppShell({
           </div>
           <PortalNav current="common-tools" />
           <div className="hidden items-center gap-3 text-sm sm:flex">
+            {user ? <CommonToolsCreditsBalanceChip /> : null}
             <PlatformTopupNavLink
               bookOrigin={bookOrigin}
               className="text-[#0071e3] hover:underline"

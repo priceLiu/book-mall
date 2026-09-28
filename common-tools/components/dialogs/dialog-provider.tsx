@@ -4,9 +4,13 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
+import { COMMON_TOOLS_CREDITS_SETTLEMENT_EVENT } from "@/lib/credits-settlement-watch";
+import { dispatchCommonToolsCreditsBalanceRefresh } from "@/lib/credits-balance-events";
+import { formatCreditsDisplay } from "@/lib/format-credits-display";
 import {
   Dialog,
   DialogContent,
@@ -73,6 +77,39 @@ type ModalState =
 
 export function DialogProvider({ children }: { children: React.ReactNode }) {
   const [modal, setModal] = useState<ModalState>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  useEffect(() => {
+    const seen = new Set<string>();
+    const onSettlement = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        logId?: string;
+        phase?: string;
+        credits?: number;
+      }>).detail;
+      if (!detail?.logId || !detail.phase) return;
+      dispatchCommonToolsCreditsBalanceRefresh();
+      const key = `${detail.logId}:${detail.phase}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const credits = typeof detail.credits === "number" ? detail.credits : 0;
+      if (detail.phase === "frozen" && credits > 0) {
+        setNotice(`已冻结 ${formatCreditsDisplay(credits)} 积分`);
+      } else if ((detail.phase === "settled" || detail.phase === "consumed") && credits > 0) {
+        setNotice(`本次消耗 ${formatCreditsDisplay(credits)} 积分`);
+      } else if (detail.phase === "released" && credits > 0) {
+        setNotice(`生成未完成，已释放冻结的 ${formatCreditsDisplay(credits)} 积分`);
+      }
+    };
+    window.addEventListener(COMMON_TOOLS_CREDITS_SETTLEMENT_EVENT, onSettlement);
+    return () => window.removeEventListener(COMMON_TOOLS_CREDITS_SETTLEMENT_EVENT, onSettlement);
+  }, []);
 
   const confirm = useCallback((opts: ConfirmOpts) => {
     return new Promise<boolean>((resolve) => {
@@ -130,6 +167,14 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
   return (
     <DialogContext.Provider value={value}>
       {children}
+      {notice ? (
+        <div
+          className="pointer-events-none fixed bottom-4 right-4 z-[400] max-w-[min(100vw-2rem,22rem)] rounded-xl border border-[#e8e8ed] bg-white px-4 py-3 text-sm font-medium text-[#1d1d1f] shadow-lg"
+          role="status"
+        >
+          {notice}
+        </div>
+      ) : null}
 
       <Dialog
         open={modal?.kind === "confirm"}

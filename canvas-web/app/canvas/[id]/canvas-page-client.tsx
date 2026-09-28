@@ -53,6 +53,7 @@ import { NodePalette } from "@/components/canvas/node-palette";
 import { CanvasToolbarShellPortal } from "@/components/canvas/canvas-toolbar-shell-portal";
 import { CanvasToolbar } from "@/components/canvas/toolbar";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { installPro2WizardCanvasLiveSync } from "@/lib/canvas/pro2-wizard-canvas-live-sync";
 import { useCanvasGraphSnapshot } from "@/lib/canvas/canvas-store-hooks";
 import {
   CanvasRunnerHost,
@@ -368,6 +369,11 @@ function Inner({ projectId }: { projectId: string }) {
     }
     void warmPro2TemplateCache(base).catch(() => {});
   }, [base, loading, isStoryPro2Canvas, hasPro2ScriptHub]);
+
+  useEffect(() => {
+    if (loading || !hasPro2ScriptHub) return;
+    return installPro2WizardCanvasLiveSync();
+  }, [projectId, loading, hasPro2ScriptHub]);
 
   const [saving, setSaving] = useState(false);
   const [savePhase, setSavePhase] = useState<CanvasSavePhase>("idle");

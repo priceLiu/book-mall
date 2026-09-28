@@ -11,6 +11,7 @@ import {
   Zap,
 } from "lucide-react";
 
+import { CommonToolsGenerateCreditsBeside } from "@/components/billing/generate-credits-beside";
 import { ImageSingleUpload } from "@/components/image-processing/image-single-upload";
 import {
   submitImageProcessingEdit,
@@ -184,7 +185,7 @@ export function ImageRestorePanel({
         ) : null}
 
         <div className="mt-6 flex flex-col gap-3 border-t border-[#e5e5ea] pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-xs text-[#6e6e73]">每张图片约 500–1000 积分</span>
+          <CommonToolsGenerateCreditsBeside modelKey={model} imageCount={1} />
           <CtaButton disabled={submitting} onClick={() => void onSubmit()} className="w-full sm:w-auto sm:min-w-[140px]">
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
             恢复图像

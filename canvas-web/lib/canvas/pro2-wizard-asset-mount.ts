@@ -23,6 +23,7 @@ import {
   storyProSceneRowKey,
 } from "@/lib/canvas/story-pro-scene-asset-catalog";
 import { syncStoryProColumnRows } from "@/lib/canvas/story-pro-column-sync";
+import { omitPinnedDockInput } from "@/lib/canvas/pro2-dock-input-pin";
 import type {
   StoryProCharacterRow,
   StoryProPropRow,
@@ -283,12 +284,15 @@ function syncMountedCanvasNodes(
     if (n.type !== "story-pro2-prop") continue;
     const d = n.data as { scriptStudioSourceRowKey?: string };
     if (d.scriptStudioSourceRowKey !== assetId) continue;
-    updateNodeData(n.id, {
-      runtime: row.runtime,
-      label: row.name?.trim() || "道具",
-      dockInput: row.prompt?.trim() || row.description?.trim() || "",
-      pro2RowKey: row.key,
-    });
+    updateNodeData(
+      n.id,
+      omitPinnedDockInput(n, {
+        runtime: row.runtime,
+        label: row.name?.trim() || "道具",
+        dockInput: row.prompt?.trim() || row.description?.trim() || "",
+        pro2RowKey: row.key,
+      }),
+    );
   }
 }
 

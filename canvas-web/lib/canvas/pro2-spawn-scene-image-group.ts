@@ -17,6 +17,7 @@ import { optimisticLibtvMediaRunStart } from "./libtv-image-node-run";
 import { useCanvasStore } from "./store";
 import { pro2BatchImageToImageNodePatch } from "./pro2-three-view-engine";
 import { pickRuntimeImagePreviewUrl } from "./task-media-url";
+import { omitPinnedDockInput } from "./pro2-dock-input-pin";
 import { busEnqueueStoryRunsSequential } from "./canvas-run-bus";
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import { GROUP_COLOR_PRESETS } from "./types";
@@ -502,7 +503,10 @@ export function ensurePro2SceneImageGroup(
     if (existing) {
       usedChildIds.add(existing.id);
       args.updateNodeData(existing.id, {
-        ...sceneImagePatchForRow(row, args.hubNodeId, args.nodes),
+        ...omitPinnedDockInput(
+          existing,
+          sceneImagePatchForRow(row, args.hubNodeId, args.nodes),
+        ),
         ...enginePatch,
         pro2HubNodeId: args.hubNodeId,
         pro2ControllerNodeId: controllerId,
@@ -647,15 +651,18 @@ export function syncPro2SceneImagesFromRows(
       d.runtime?.status === "pending" ||
       d.runtime?.status === "running";
     if (nodeInflight) {
-      updateNodeData(img.id, {
-        label: row.name?.trim() || "场景",
-        dockInput: sceneImagePatchForRow(row, controllerId, nodes).dockInput as string,
-        pro2RowKey: row.key,
-      });
+      updateNodeData(
+        img.id,
+        omitPinnedDockInput(img, {
+          label: row.name?.trim() || "场景",
+          dockInput: sceneImagePatchForRow(row, controllerId, nodes).dockInput as string,
+          pro2RowKey: row.key,
+        }),
+      );
       continue;
     }
     updateNodeData(img.id, {
-      ...sceneImagePatchForRow(row, controllerId, nodes),
+      ...omitPinnedDockInput(img, sceneImagePatchForRow(row, controllerId, nodes)),
       ...enginePatch,
     });
   }

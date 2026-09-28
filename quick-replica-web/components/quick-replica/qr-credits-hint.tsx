@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCreditsDisplay } from "@/lib/format-credits-display";
 import type { QrCreditsPreview } from "@/lib/qr-credits-preview";
 
 type Props = {
@@ -8,7 +9,7 @@ type Props = {
   className?: string;
 };
 
-/** 产生钮旁积分预估（平台代付 · 约 N 积分）。 */
+/** 产生钮旁积分预估，文案与画布一致：≈ N积分。 */
 export function QrCreditsHint({ preview, loading = false, className = "" }: Props) {
   if (loading) {
     return (
@@ -37,7 +38,9 @@ export function QrCreditsHint({ preview, loading = false, className = "" }: Prop
       title={title}
       aria-live="polite"
     >
-      {preview.label}
+      {preview.estimatedCredits != null && preview.estimatedCredits > 0
+        ? `≈ ${formatCreditsDisplay(preview.estimatedCredits)}积分`
+        : preview.label}
     </p>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { throwIfUnauthorized } from "@/lib/auth";
+import { noteCommonToolsBookResponseForCredits } from "@/lib/credits-settlement-watch";
 import { refreshToolsSessionClient } from "@/lib/tools-session-client";
 
 function rawBookFetch(path: string, init?: RequestInit) {
@@ -39,6 +40,7 @@ export async function bookFetch(path: string, init?: RequestInit) {
     /* */
   }
   throwIfUnauthorized(res, data);
+  noteCommonToolsBookResponseForCredits(path, init?.method, data);
   if (!res.ok) {
     const err =
       typeof data.error === "string" ? data.error : `请求失败 (${res.status})`;

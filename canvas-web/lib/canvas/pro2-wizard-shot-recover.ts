@@ -22,6 +22,10 @@ import {
 } from "@/lib/canvas/pro2-wizard-shot-media-run";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { useCanvasStore } from "@/lib/canvas/store";
+import {
+  isTaskMediaUrlMarkedBroken,
+  isUnstableTaskMediaUrl,
+} from "@/lib/canvas/task-media-url";
 
 function taskCompletedAtMs(task: WizardShotTaskRecord): number {
   const raw = task.completedAt ?? task.updatedAt ?? task.createdAt;
@@ -269,6 +273,18 @@ export async function recoverWizardShotDraftsFromTasks(
         });
         recovered += 1;
       }
+      continue;
+    }
+
+    const currentUrl = draft?.previewUrl?.trim();
+    const currentUsable =
+      Boolean(currentUrl) &&
+      !isUnstableTaskMediaUrl(currentUrl!) &&
+      !isTaskMediaUrlMarkedBroken(currentUrl);
+    if (
+      currentUsable &&
+      (task.id !== draft?.taskId?.trim() || currentUrl === result.previewUrl)
+    ) {
       continue;
     }
 

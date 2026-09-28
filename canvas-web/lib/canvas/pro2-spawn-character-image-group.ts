@@ -19,6 +19,7 @@ import {
   ensurePro2HubToMediaGroupChildEdges,
 } from "./pro2-hub-media-group-edge";
 import { pickRuntimeImagePreviewUrl } from "./task-media-url";
+import { omitPinnedDockInput } from "./pro2-dock-input-pin";
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import { GROUP_COLOR_PRESETS } from "./types";
 import {
@@ -436,7 +437,7 @@ export function ensurePro2CharacterImageGroup(
 
     if (existing) {
       args.updateNodeData(existing.id, {
-        ...buildCharacterImageNodeDataPatch(row, patchOpts),
+        ...omitPinnedDockInput(existing, buildCharacterImageNodeDataPatch(row, patchOpts)),
         pro2HubNodeId: args.hubNodeId,
         pro2ControllerNodeId: args.characterColumnId,
         pro2GroupId: groupId,
@@ -564,7 +565,7 @@ export function syncPro2CharacterImagesFromRows(
       img.id,
       opts?.inflightOnly
         ? buildCharacterImageNodeInflightPatch(row)
-        : buildCharacterImageNodeDataPatch(row, patchOpts),
+        : omitPinnedDockInput(img, buildCharacterImageNodeDataPatch(row, patchOpts)),
     );
   }
 }

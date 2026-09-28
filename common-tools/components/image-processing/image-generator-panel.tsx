@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 
+import { CommonToolsGenerateCreditsBeside } from "@/components/billing/generate-credits-beside";
 import { ImageSingleUpload } from "@/components/image-processing/image-single-upload";
 import { submitImageProcessingEdit } from "@/lib/image-processing-api";
 import {
@@ -293,7 +294,11 @@ export function ImageGeneratorPanel({
           </div>
         ) : null}
 
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <CommonToolsGenerateCreditsBeside
+            modelKey={generativeModel}
+            imageCount={Math.max(1, Number(imageCount) || 1)}
+          />
           <CtaButton disabled={submitting} onClick={onSubmit} className="flex-1">
             {submitting ? (
               <span className="inline-flex items-center justify-center gap-2">

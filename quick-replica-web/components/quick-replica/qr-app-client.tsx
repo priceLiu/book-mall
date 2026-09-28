@@ -23,6 +23,7 @@ import { QrTemplateGallery } from "@/components/quick-replica/qr-template-galler
 import { QrAudioRightPanel, type QrAudioRightTab } from "@/components/quick-replica/qr-audio-right-panel";
 import { QrWorldBrowsePanel } from "@/components/quick-replica/qr-world-browse-panel";
 import { QrTemplatePreviewModal } from "@/components/quick-replica/qr-template-preview-modal";
+import { QrCreditsBalanceChip } from "@/components/quick-replica/qr-credits-balance-chip";
 import { QrToast } from "@/components/quick-replica/qr-toast";
 import {
   QrWorkspacePanel,
@@ -47,7 +48,14 @@ import {
   runQrGenerateJob,
   watchQrGenerateJob,
 } from "@/lib/run-qr-generate-job";
+import { formatCreditsDisplay } from "@/lib/format-credits-display";
 import { fetchQrPlatform, formatQrPlatformError } from "@/lib/qr-platform-fetch";
+import {
+  QR_CREDITS_SETTLEMENT_EVENT,
+  dispatchQrCreditsBalanceRefresh,
+  scheduleQrCreditsSettlementWatch,
+  type QrCreditsSettlementDetail,
+} from "@/lib/qr-credits-settlement-watch";
 import { fetchQrAudioCatalog } from "@/lib/qr-audio-catalog-client";
 import { PortalNav } from "@/components/portal-nav";
 import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
@@ -142,6 +150,31 @@ export function QrAppClient({
 
   const bookAccountUrl = getBookAccountUrl();
   const bookOrigin = getMainSiteOrigin();
+
+  useEffect(() => {
+    const seen = new Set<string>();
+    const onSettlement = (event: Event) => {
+      const detail = (event as CustomEvent<QrCreditsSettlementDetail>).detail;
+      if (!detail?.logId || !detail.phase) return;
+      dispatchQrCreditsBalanceRefresh();
+      const key = `${detail.logId}:${detail.phase}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const amount = formatCreditsDisplay(detail.credits);
+      if (detail.phase === "frozen" && detail.credits > 0) {
+        setCopyToast(`已冻结 ${amount} 积分`);
+      } else if (
+        (detail.phase === "settled" || detail.phase === "consumed") &&
+        detail.credits > 0
+      ) {
+        setCopyToast(`本次消耗 ${amount} 积分`);
+      } else if (detail.phase === "released" && detail.credits > 0) {
+        setCopyToast(`生成未完成，已释放冻结的 ${amount} 积分`);
+      }
+    };
+    window.addEventListener(QR_CREDITS_SETTLEMENT_EVENT, onSettlement);
+    return () => window.removeEventListener(QR_CREDITS_SETTLEMENT_EVENT, onSettlement);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -845,6 +878,7 @@ export function QrAppClient({
       });
       setFocusedGenerateId(sessionId);
       if (args.phase !== "generating") return;
+      scheduleQrCreditsSettlementWatch([args.logId]);
       void watchQrGenerateJob(args.logId).then((job) => {
         const phase: QrGenerateModalPhase =
           job.status === "SUCCEEDED" && job.outputUrl ? "success" : "failed";
@@ -1009,6 +1043,7 @@ export function QrAppClient({
         </div>
 
         <div className="ml-auto flex min-w-0 items-center gap-2 overflow-x-auto sm:gap-3">
+          <QrCreditsBalanceChip />
           {bookOrigin ? (
             <PlatformTopupNavLink
               bookOrigin={bookOrigin}
@@ -1247,7 +1282,11 @@ export function QrAppClient({
         onClose={() => setShareTemplate(null)}
       />
 
-      <QrToast message={copyToast} onDismiss={dismissCopyToast} />
+      <QrToast
+        message={copyToast}
+        onDismiss={dismissCopyToast}
+        durationMs={copyToast?.includes("积分") ? 6000 : 2400}
+      />
     </div>
   );
 }

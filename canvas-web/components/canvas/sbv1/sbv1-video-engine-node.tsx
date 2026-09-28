@@ -223,7 +223,10 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     latestSucceeded?.ossUrl ??
     undefined;
 
+  const runtimeOssUrl =
+    d.runtime?.status === "done" ? d.runtime.ossUrl?.trim() || undefined : undefined;
   const videoUrl =
+    (isPro2VideoBoardCell ? runtimeOssUrl : undefined) ??
     succeededMediaUrl ??
     pro2VideoBoardRowMediaUrl({ runtime: d.runtime, task: rowDisplayTask }) ??
     pro2VideoBoardRowMediaUrl({ runtime: rowRuntime, task: rowDisplayTask }) ??

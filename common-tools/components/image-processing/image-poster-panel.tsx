@@ -12,6 +12,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import { CommonToolsGenerateCreditsBeside } from "@/components/billing/generate-credits-beside";
 import {
   buildGenerativeSubmitParams,
   ImageGenerativeSettings,
@@ -270,7 +271,10 @@ export function ImagePosterPanel({
         />
 
         <div className="mt-6 flex flex-col gap-3 border-t border-[#e5e5ea] pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-xs text-[#6e6e73]">每张海报约 500–5000 积分</span>
+          <CommonToolsGenerateCreditsBeside
+            modelKey={generativeModel}
+            imageCount={Math.max(1, Number(imageCount) || 1)}
+          />
           <CtaButton disabled={submitting} onClick={() => void onSubmit()} className="w-full sm:w-auto">
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             生成海报

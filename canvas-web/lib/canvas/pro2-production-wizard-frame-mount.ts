@@ -49,6 +49,34 @@ export function convertWizardMentionTokensToDockRefs(
   return out;
 }
 
+/** 画布 Dock @<ref-char/ref-scene-*> → 向导 @<wiz-*>（convertWizardMentionTokensToDockRefs 的逆） */
+export function convertDockRefsToWizardMentionTokens(
+  text: string,
+  script: Pro2ProductionScript | undefined,
+  scriptHubId: string,
+  sceneRows: StoryProSceneRow[],
+): string {
+  if (!text.trim() || !script) return text;
+  let out = text;
+  for (const c of script.characters ?? []) {
+    const token = storyRefMentionToken(`ref-char-${c.id}`);
+    if (out.includes(token)) {
+      out = out.split(token).join(`@<${WIZ_CHAR_PREFIX}${c.id}>`);
+    }
+  }
+  for (const s of script.scenes ?? []) {
+    const sceneKey =
+      sceneRows.find((r) => r.name === s.name)?.key ??
+      (scriptHubId.trim()
+        ? storyProSceneRowKey(scriptHubId, s.name)
+        : s.id);
+    const token = storyRefMentionToken(`ref-scene-${sceneKey}`);
+    if (!out.includes(token)) continue;
+    out = out.split(token).join(`@<${WIZ_SCENE_PREFIX}${s.id}>`);
+  }
+  return out;
+}
+
 /** mount 前 · Pass1/Pass2 prompt + 上游资产 @ + refImages */
 export function finalizePro2FrameRowsForCanvasMount(args: {
   frameRows: StoryProFrameRow[];

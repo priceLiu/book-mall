@@ -15,6 +15,7 @@ import {
   Sun,
 } from "lucide-react";
 
+import { CommonToolsGenerateCreditsBeside } from "@/components/billing/generate-credits-beside";
 import {
   buildGenerativeSubmitParams,
   ImageGenerativeSettings,
@@ -239,7 +240,11 @@ export function ImageRealisticPanel({
           modelOptions={T2I_MODEL_OPTIONS}
         />
 
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <CommonToolsGenerateCreditsBeside
+            modelKey={generativeModel}
+            imageCount={Math.max(1, Number(imageCount) || 1)}
+          />
           <CtaButton disabled={submitting} onClick={onSubmit} className="flex-1">
             {submitting ? (
               <span className="inline-flex items-center justify-center gap-2">

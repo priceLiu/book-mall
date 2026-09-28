@@ -1,4 +1,5 @@
 import { fetchQrPlatform, formatQrPlatformError } from "@/lib/qr-platform-fetch";
+import { scheduleQrCreditsSettlementWatch } from "@/lib/qr-credits-settlement-watch";
 import type { QrGenerateJobResult } from "@/components/quick-replica/qr-workspace-panel";
 
 const POLL_INTERVAL_MS = 3000;
@@ -90,8 +91,9 @@ export async function runQrGenerateJob(
       error: formatQrPlatformError(body.error) || `创建任务失败（${createRes.status}）`,
     };
   }
-  const created = (await createRes.json()) as { logId: string };
-  const logId = created.logId;
+  const created = (await createRes.json()) as { logId?: string };
+  const logId = created.logId?.trim() ?? "";
+  if (logId) scheduleQrCreditsSettlementWatch([logId]);
   return watchQrGenerateJob(logId);
 }
 

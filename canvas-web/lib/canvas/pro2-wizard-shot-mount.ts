@@ -17,7 +17,14 @@ import type {
   StoryProVideoRow,
 } from "@/lib/canvas/story-pro-workspace-types";
 import { useCanvasStore } from "@/lib/canvas/store";
-import type { CanvasNodeRuntime } from "@/lib/canvas/types";
+import type { CanvasFlowNode, CanvasNodeRuntime } from "@/lib/canvas/types";
+import { convertWizardMentionTokensToDockRefs } from "@/lib/canvas/pro2-production-wizard-frame-mount";
+import { syncPro2FrameImagesFromRows } from "@/lib/canvas/pro2-spawn-frame-image-group";
+import { syncPro2VideoBoardFromRows } from "@/lib/canvas/pro2-spawn-video-board-group";
+import {
+  isAnyStoryFrameColumnType,
+  isAnyStoryVideoColumnType,
+} from "@/lib/canvas/story-workspace-resolver";
 
 function runtimeFromPreviewUrl(
   previewUrl: string,
@@ -74,13 +81,21 @@ export function buildWizardShotMountHubPatch(
   const rowKey = shotRowKey(shotIndex);
   const runtime = runtimeFromPreviewUrl(url, taskId);
   const { frameRows, videoRows } = ensureHubFrameVideoRows(hubData, scriptHubId);
+  const dockPrompt = draftPrompt?.trim()
+    ? convertWizardMentionTokensToDockRefs(
+        draftPrompt.trim(),
+        hubData.productionScript,
+        scriptHubId,
+        hubData.sceneRows ?? [],
+      )
+    : "";
 
   if (mediaKind === "frame") {
     if (!frameRows.some((r) => r.key === rowKey)) return null;
     let nextRows = applyFrameRowRuntime(frameRows, rowKey, runtime);
-    if (draftPrompt?.trim()) {
+    if (dockPrompt) {
       nextRows = nextRows.map((r) =>
-        r.key === rowKey ? { ...r, prompt: draftPrompt.trim() } : r,
+        r.key === rowKey ? { ...r, prompt: dockPrompt } : r,
       );
     }
     nextRows = nextRows.map((r) =>
@@ -102,9 +117,9 @@ export function buildWizardShotMountHubPatch(
 
   if (!videoRows.some((r) => r.key === rowKey)) return null;
   let nextVideoRows = applyVideoRowRuntime(videoRows, rowKey, "video", runtime);
-  if (draftPrompt?.trim()) {
+  if (dockPrompt) {
     nextVideoRows = nextVideoRows.map((r) =>
-      r.key === rowKey ? { ...r, videoPrompt: draftPrompt.trim() } : r,
+      r.key === rowKey ? { ...r, videoPrompt: dockPrompt } : r,
     );
   }
   return { scriptStudioVideoRows: nextVideoRows };
@@ -203,26 +218,61 @@ export function mountWizardShotPreviewToHub(
 
   const rowKey = shotRowKey(shotIndex);
   const ws = (hubData.workspaceIds ?? {}) as { frameColumnId?: string; videoColumnId?: string };
+  const frameColumnId = resolveHubColumnId(
+    nodes,
+    scriptHubId,
+    ws.frameColumnId,
+    isAnyStoryFrameColumnType,
+  );
+  const videoColumnId = resolveHubColumnId(
+    nodes,
+    scriptHubId,
+    ws.videoColumnId,
+    isAnyStoryVideoColumnType,
+  );
 
-  if (mountPatch.scriptStudioFrameRows && ws.frameColumnId) {
-    const col = nodes.find((n) => n.id === ws.frameColumnId);
-    if (col) {
-      updateNodeData(ws.frameColumnId, {
-        rows: mountPatch.scriptStudioFrameRows,
-        hubNodeId: scriptHubId,
-      });
+  if (mountPatch.scriptStudioFrameRows && frameColumnId) {
+    updateNodeData(frameColumnId, {
+      rows: mountPatch.scriptStudioFrameRows,
+      hubNodeId: scriptHubId,
+    });
+    const live = useCanvasStore.getState();
+    syncPro2FrameImagesFromRows(
+      live.nodes,
+      frameColumnId,
+      mountPatch.scriptStudioFrameRows.filter((r) => r.key === rowKey),
+      live.updateNodeData,
+    );
+  }
+  if (mountPatch.scriptStudioVideoRows && videoColumnId) {
+    updateNodeData(videoColumnId, {
+      rows: mountPatch.scriptStudioVideoRows,
+      hubNodeId: scriptHubId,
+      frameColumnId,
+    });
+    if (mediaKind === "video") {
+      const live = useCanvasStore.getState();
+      syncPro2VideoBoardFromRows(
+        live.nodes,
+        videoColumnId,
+        mountPatch.scriptStudioVideoRows.filter((r) => r.key === rowKey),
+        live.updateNodeData,
+        live.edges,
+      );
     }
   }
-  if (mountPatch.scriptStudioVideoRows && ws.videoColumnId) {
-    const col = nodes.find((n) => n.id === ws.videoColumnId);
-    if (col) {
-      updateNodeData(ws.videoColumnId, {
-        rows: mountPatch.scriptStudioVideoRows,
-        hubNodeId: scriptHubId,
-        frameColumnId: ws.frameColumnId,
-      });
-    }
-  }
+}
 
-  void rowKey;
+function resolveHubColumnId(
+  nodes: CanvasFlowNode[],
+  scriptHubId: string,
+  preferredId: string | undefined,
+  isColumnType: (type: string) => boolean,
+): string | undefined {
+  if (preferredId && nodes.some((n) => n.id === preferredId)) return preferredId;
+  return nodes.find(
+    (n) =>
+      isColumnType(n.type ?? "") &&
+      (n.data as { hubNodeId?: string }).hubNodeId === scriptHubId,
+  )?.id;
 }
