@@ -29,11 +29,11 @@ export function pro2MediaGridGap(_cellWidth?: number): number {
 export function pro2MediaGridGapY(): number {
   return PRO2_MEDIA_GRID_GAP_Y;
 }
-/** 组名在框外，组内不再预留标题行 */
-export const PRO2_MEDIA_GROUP_HEADER = 0;
+/** 组名在框外 · 仅作顶边额外留白（顶边 = PAD_Y + HEADER） */
+export const PRO2_MEDIA_GROUP_HEADER = 10;
 /** 四边统一内边距（对齐右侧视觉空隙） */
-export const PRO2_MEDIA_GROUP_PAD_X = 28;
-export const PRO2_MEDIA_GROUP_PAD_Y = 28;
+export const PRO2_MEDIA_GROUP_PAD_X = 70;
+export const PRO2_MEDIA_GROUP_PAD_Y = 70;
 /** @deprecated 兼容旧调用 · 等同 PAD_X */
 export const PRO2_MEDIA_GROUP_PAD = PRO2_MEDIA_GROUP_PAD_X;
 /** 四边已对称，不再额外加右/下空白 */
