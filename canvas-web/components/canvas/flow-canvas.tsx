@@ -103,6 +103,7 @@ import {
 } from "@/lib/canvas/spawn-project-asset-on-canvas";
 import { ensureNodeDragHandles } from "@/lib/canvas/normalize-graph-nodes";
 import {
+  CANVAS_RF_FOCUS_NODE_SET_EVENT,
   CANVAS_RF_SELECT_NODE_EVENT,
   applyRfNodesMediaGroupZIndex,
   CANVAS_RF_VIEWPORT_READY_EVENT,
@@ -1566,6 +1567,30 @@ function FlowCanvasInner({
     });
     return () => window.cancelAnimationFrame(t);
   }, [canvasFocusNonce, canvasFocusNodeId, fitView]);
+
+  useEffect(() => {
+    const onFocusNodeSet = (event: Event) => {
+      const raw = (
+        event as CustomEvent<{ nodeIds?: string[] }>
+      ).detail?.nodeIds;
+      const ids = (raw ?? [])
+        .map((id) => id?.trim())
+        .filter((id): id is string => Boolean(id));
+      if (!ids.length) return;
+      void fitView({
+        nodes: ids.map((id) => ({ id })),
+        padding: 0.2,
+        duration: 320,
+        maxZoom: 1.05,
+      });
+    };
+    window.addEventListener(CANVAS_RF_FOCUS_NODE_SET_EVENT, onFocusNodeSet);
+    return () =>
+      window.removeEventListener(
+        CANVAS_RF_FOCUS_NODE_SET_EVENT,
+        onFocusNodeSet,
+      );
+  }, [fitView]);
 
   /** 上传一个图片 File，并在指定位置创建 image 节点。返回新节点 id。 */
   const ingestImageFile = useCallback(

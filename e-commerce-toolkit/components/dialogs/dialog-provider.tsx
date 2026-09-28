@@ -24,6 +24,9 @@ import {
   type ToastOpts,
 } from "@/components/dialogs/ecom-toast";
 import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
+import { dispatchEcomCreditsBalanceRefresh } from "@/lib/ecom-credits-balance-events";
+import { ECOM_CREDITS_SETTLEMENT_EVENT } from "@/lib/ecom-credits-settlement-watch";
+import { formatCreditsDisplay } from "@/lib/format-credits-display";
 
 type ConfirmOpts = {
   title: string;
@@ -82,6 +85,39 @@ type ModalState =
 export function DialogProvider({ children }: { children: React.ReactNode }) {
   const [modal, setModal] = useState<ModalState>(null);
   const { toasts, toast, dismiss } = useEcomToastQueue();
+
+  useEffect(() => {
+    const seen = new Set<string>();
+    const onSettlement = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        logId?: string;
+        phase?: string;
+        credits?: number;
+      }>).detail;
+      if (!detail?.logId || !detail.phase) return;
+      dispatchEcomCreditsBalanceRefresh();
+      const key = `${detail.logId}:${detail.phase}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const credits = typeof detail.credits === "number" ? detail.credits : 0;
+      if (detail.phase === "frozen" && credits > 0) {
+        toast({
+          title: `已冻结 ${formatCreditsDisplay(credits)} 积分`,
+        });
+      } else if ((detail.phase === "settled" || detail.phase === "consumed") && credits > 0) {
+        toast({
+          title: `本次消耗 ${formatCreditsDisplay(credits)} 积分`,
+          variant: "success",
+        });
+      } else if (detail.phase === "released" && credits > 0) {
+        toast({
+          title: `生成未完成，已释放冻结的 ${formatCreditsDisplay(credits)} 积分`,
+        });
+      }
+    };
+    window.addEventListener(ECOM_CREDITS_SETTLEMENT_EVENT, onSettlement);
+    return () => window.removeEventListener(ECOM_CREDITS_SETTLEMENT_EVENT, onSettlement);
+  }, [toast]);
 
   const confirm = useCallback((opts: ConfirmOpts) => {
     return new Promise<boolean>((resolve) => {

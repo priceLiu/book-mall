@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { saveImageLayerResultToLibrary } from "@/lib/ecom/ecom-image-layer-project-service";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+    return ecomJson({ error: "无效 JSON" }, { status: 400 });
   }
 
   const projectId =
@@ -23,10 +23,10 @@ export async function POST(req: Request) {
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : undefined;
 
   if (!projectId) {
-    return NextResponse.json({ error: "缺少 projectId" }, { status: 400 });
+    return ecomJson({ error: "缺少 projectId" }, { status: 400 });
   }
   if (!ossUrl) {
-    return NextResponse.json({ error: "缺少 ossUrl" }, { status: 400 });
+    return ecomJson({ error: "缺少 ossUrl" }, { status: 400 });
   }
 
   try {
@@ -35,10 +35,10 @@ export async function POST(req: Request) {
       title,
       prompt: prompt ?? null,
     });
-    return NextResponse.json(result);
+    return ecomJson(result);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "保存失败";
     const status = msg === "项目不存在" ? 404 : 502;
-    return NextResponse.json({ error: msg }, { status });
+    return ecomJson({ error: msg }, { status });
   }
 }

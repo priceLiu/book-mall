@@ -29,6 +29,7 @@ import {
   mergeWizardMentionRefImages,
   missingWizardAssetMentionsConfirmCopy,
 } from "@/lib/canvas/pro2-wizard-mention-ref-urls";
+import { toWizardMentionHubPreviewSource } from "@/lib/canvas/pro2-wizard-asset-preview-url";
 import { PRO2_FRAME_IMAGE_MODEL_KEYS } from "@/lib/canvas/pro2-frame-batch-image";
 import {
   pro2BatchImageAsSbv1Settings,
@@ -145,11 +146,15 @@ export function Pro2ProductionWizardShotStudioModal({
   const [dockMenu, setDockMenu] = useState<"model" | "params" | null>(null);
   const initRef = useRef(false);
 
-  const assetDrafts = useCanvasStore((s) => {
+  const hubNodeData = useCanvasStore((s) => {
     const hub = s.nodes.find((n) => n.id === scriptHubId);
-    return (hub?.data as StoryProScriptHubNodeData | undefined)
-      ?.productionWizardAssetDrafts;
+    return (hub?.data as StoryProScriptHubNodeData | undefined) ?? null;
   });
+  const assetDrafts = hubNodeData?.productionWizardAssetDrafts;
+  const hubPreview = useMemo(
+    () => toWizardMentionHubPreviewSource(scriptHubId, hubNodeData),
+    [scriptHubId, hubNodeData],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -171,7 +176,11 @@ export function Pro2ProductionWizardShotStudioModal({
       const manualRefs = initialRefImages.filter(
         (r) => !isWizardAssetMentionId(r.id),
       );
-      const catalog = buildWizardMentionRefCatalog(assetDrafts, prepared.refImages);
+      const catalog = buildWizardMentionRefCatalog(
+        assetDrafts,
+        prepared.refImages,
+        hubPreview,
+      );
       setPrompt(prepared.prompt);
       setRefImages(
         mergeWizardMentionRefImages(
@@ -214,8 +223,15 @@ export function Pro2ProductionWizardShotStudioModal({
   useModalEscapeClose(onClose, { active: open });
 
   const mentionables = useMemo(
-    () => buildWizardAssetMentionables(script, refImages, undefined, assetDrafts),
-    [script, refImages, assetDrafts],
+    () =>
+      buildWizardAssetMentionables(
+        script,
+        refImages,
+        undefined,
+        assetDrafts,
+        hubPreview,
+      ),
+    [script, refImages, assetDrafts, hubPreview],
   );
 
   const handlePromptChange = useCallback(
@@ -223,11 +239,11 @@ export function Pro2ProductionWizardShotStudioModal({
       setPrompt(value);
       if (!script) return;
       setRefImages((prev) => {
-        const catalog = buildWizardMentionRefCatalog(assetDrafts, prev);
+        const catalog = buildWizardMentionRefCatalog(assetDrafts, prev, hubPreview);
         return mergeWizardMentionRefImages(value, catalog, prev);
       });
     },
-    [script, assetDrafts],
+    [script, assetDrafts, hubPreview],
   );
 
   const batchImage = useMemo(

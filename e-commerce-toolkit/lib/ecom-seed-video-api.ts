@@ -2,6 +2,7 @@
 
 import { EcomUnauthorizedError } from "@/lib/ecom-auth";
 import { ecomBookFetch } from "@/lib/ecom-book-fetch";
+import { noteEcomStreamResponseForCredits } from "@/lib/ecom-credits-settlement-watch";
 import type { SeedVideoSkillKey } from "@/lib/seed-video-skills";
 import type {
   SeedVideoChatMessage,
@@ -191,6 +192,10 @@ export async function streamSeedVideoChat(opts: {
     }
     throw new Error(err);
   }
+  noteEcomStreamResponseForCredits(
+    `${BASE}/projects/${opts.projectId}/assistant/chat`,
+    res,
+  );
   const reader = res.body?.getReader();
   if (!reader) throw new Error("无响应流");
   const decoder = new TextDecoder();

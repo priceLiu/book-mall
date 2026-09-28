@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-credits-beside";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +20,7 @@ type Props = {
   defaultPrompt?: string;
   busy?: boolean;
   hasSeedSketch?: boolean;
+  modelKey?: string;
   onConfirm: (prompt: string) => void | Promise<void>;
 };
 
@@ -29,6 +31,7 @@ export function HandCraftSketchGenerateDialog({
   defaultPrompt = HAND_CRAFT_SKETCH_GEN_DEFAULT_PROMPT,
   busy,
   hasSeedSketch,
+  modelKey = "wan2.7-image",
   onConfirm,
 }: Props) {
   const [draft, setDraft] = useState(defaultPrompt);
@@ -57,7 +60,8 @@ export function HandCraftSketchGenerateDialog({
           placeholder="描述期望的线稿风格与角色…"
           onChange={(e) => setDraft(e.target.value)}
         />
-        <DialogFooter>
+        <DialogFooter className="items-center sm:justify-between">
+          <EcomGenerateCreditsBeside modelKey={modelKey} imageCount={1} enabled={open} />
           <EcomDialogPrimaryButton
             disabled={busy || !draft.trim()}
             onClick={() => void onConfirm(draft.trim())}

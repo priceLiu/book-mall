@@ -370,7 +370,8 @@ function isPro2MediaGroupChild(n: CanvasFlowNode): boolean {
   return (
     n.type === "story-pro2-image" ||
     n.type === "story-pro2-three-view" ||
-    n.type === "sbv1-image"
+    n.type === "sbv1-image" ||
+    n.type === "story-pro2-prop"
   );
 }
 
@@ -397,9 +398,16 @@ function isMediaGroupChildForRelayout(
       n.parentId === group.id
     );
   }
+  if (kind === "prop-board" && n.type === "story-pro2-prop") {
+    return true;
+  }
   if (!isPro2MediaGroupChild(n)) return false;
   if (n.type === "sbv1-image") return true;
-  return n.type === "story-pro2-image" || n.type === "story-pro2-three-view";
+  return (
+    n.type === "story-pro2-image" ||
+    n.type === "story-pro2-three-view" ||
+    n.type === "story-pro2-prop"
+  );
 }
 
 /** 布局版本：hydrate 仅对更低版本做一次组内网格迁移，不覆盖已保存坐标 */

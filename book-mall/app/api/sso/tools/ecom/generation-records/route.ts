@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 import {
   deleteEcomGenerationRecord,
@@ -10,13 +10,13 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
 
   const url = new URL(req.url);
   const projectId = url.searchParams.get("projectId")?.trim() || undefined;
   const items = await listEcomGenerationRecords(auth.userId, { projectId });
-  return NextResponse.json({
+  return ecomJson({
     items: items.map((row) => ({
       id: row.id,
       module: row.module,
@@ -34,21 +34,21 @@ export async function GET(req: Request) {
 export async function DELETE(req: Request) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
 
   const url = new URL(req.url);
   const id = url.searchParams.get("id")?.trim();
   if (!id) {
-    return NextResponse.json({ error: "缺少 id" }, { status: 400 });
+    return ecomJson({ error: "缺少 id" }, { status: 400 });
   }
 
   try {
     await deleteEcomGenerationRecord(auth.userId, id);
-    return NextResponse.json({ ok: true });
+    return ecomJson({ ok: true });
   } catch (e) {
     const message = e instanceof Error ? e.message : "删除失败";
     const status = message.includes("未找到") ? 404 : 400;
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

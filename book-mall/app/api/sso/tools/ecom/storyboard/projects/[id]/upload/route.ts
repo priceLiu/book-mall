@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { addStoryboardReferenceUpload } from "@/lib/ecom/ecom-storyboard-service";
@@ -13,7 +13,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id } = await ctx.params;
 
@@ -21,12 +21,12 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     form = await req.formData();
   } catch {
-    return NextResponse.json({ error: "无效表单" }, { status: 400 });
+    return ecomJson({ error: "无效表单" }, { status: 400 });
   }
 
   const file = form.get("file");
   if (!(file instanceof Blob)) {
-    return NextResponse.json({ error: "缺少 file" }, { status: 400 });
+    return ecomJson({ error: "缺少 file" }, { status: 400 });
   }
 
   const label = String(form.get("label") ?? "参考图").slice(0, 40);
@@ -37,7 +37,7 @@ export async function POST(req: Request, ctx: Ctx) {
       : "other";
 
   if (file.size > 30 * 1024 * 1024) {
-    return NextResponse.json({ error: "文件过大（最大 30MB）" }, { status: 413 });
+    return ecomJson({ error: "文件过大（最大 30MB）" }, { status: 413 });
   }
 
   try {
@@ -48,9 +48,9 @@ export async function POST(req: Request, ctx: Ctx) {
       role,
       buf,
     });
-    return NextResponse.json({ reference: ref });
+    return ecomJson({ reference: ref });
   } catch (e) {
     const message = e instanceof Error ? e.message : "上传失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

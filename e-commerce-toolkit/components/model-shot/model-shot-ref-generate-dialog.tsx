@@ -4,6 +4,7 @@ import { Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-credits-beside";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomDialogCloseButton } from "@/components/ui/dialog";
 import {
@@ -299,7 +300,8 @@ export function ModelShotRefGenerateDialog({
                 onChange={(e) => setDraft(e.target.value)}
               />
             </div>
-            <div className="flex justify-end border-t border-[#e5e5ea] px-5 py-4">
+            <div className="flex items-center justify-end gap-3 border-t border-[#e5e5ea] px-5 py-4">
+              <EcomGenerateCreditsBeside modelKey={draftModelKey} imageCount={1} enabled={open} />
               <EcomButtonPrimary
                 type="button"
                 disabled={busy || !draft.trim() || !draftModelKey.trim()}

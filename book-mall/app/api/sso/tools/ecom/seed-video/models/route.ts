@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { isStoryLlmVisionModel } from "@/lib/canvas/story-llm-vision-models";
 import { getUserBillingPersona } from "@/lib/billing/billing-persona";
@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
 
   const persona = await getUserBillingPersona(auth.userId);
@@ -50,7 +50,7 @@ export async function GET(req: Request) {
     visionChatModels[0]?.modelKey ??
     ECOM_SEED_VIDEO_DEFAULT_CHAT_MODEL;
 
-  return NextResponse.json({
+  return ecomJson({
     chatModels: visionChatModels,
     videoModels: videoRows,
     platformOffering: persona === "PLATFORM_CREDIT",

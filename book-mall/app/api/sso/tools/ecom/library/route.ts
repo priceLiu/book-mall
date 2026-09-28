@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { listEcomLibrarySections } from "@/lib/ecom/ecom-library-service";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
@@ -25,9 +25,9 @@ export async function GET(req: Request) {
         s.mediaDecomposeBundles.length,
       0,
     );
-    return NextResponse.json({ sections, totalAssets, totalBundles });
+    return ecomJson({ sections, totalAssets, totalBundles });
   } catch (e) {
     const message = e instanceof Error ? e.message : "加载失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

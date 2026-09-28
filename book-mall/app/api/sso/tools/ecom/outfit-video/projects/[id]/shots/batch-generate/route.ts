@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { batchGenerateEcomOutfitVideoShots } from "@/lib/ecom/ecom-outfit-video-service";
@@ -13,7 +13,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   let body: {
@@ -25,7 +25,7 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     body = (await req.json()) as typeof body;
   } catch {
-    return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+    return ecomJson({ error: "无效 JSON" }, { status: 400 });
   }
 
   const indices = Array.isArray(body.indices)
@@ -35,7 +35,7 @@ export async function POST(req: Request, ctx: Ctx) {
         .filter((n) => n >= 1)
     : [];
   if (indices.length === 0) {
-    return NextResponse.json({ error: "请选择至少一个镜号" }, { status: 400 });
+    return ecomJson({ error: "请选择至少一个镜号" }, { status: 400 });
   }
 
   const mock = typeof body.mock === "boolean" ? body.mock : isOutfitVideoMockAllowed();
@@ -58,9 +58,9 @@ export async function POST(req: Request, ctx: Ctx) {
       videoModelKey,
       scenePrompts,
     });
-    return NextResponse.json({ project, mock });
+    return ecomJson({ project, mock });
   } catch (e) {
     const message = e instanceof Error ? e.message : "批量生成失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

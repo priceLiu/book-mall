@@ -1906,6 +1906,21 @@ export function SeedVideoContentPanel({
         onVideoGenerateAudioChange={setPickerVideoGenerateAudio}
         panelHasVoiceover={pickerPanelHasVoiceover}
         aspectRatio={project.settings.aspectRatio ?? "9:16"}
+        previewCount={
+          pickerTarget === "fullSheet" || pickerPanelIndex != null
+            ? 1
+            : Math.max(
+                1,
+                pickerSelectedShotIndices.length || localShots.length,
+              )
+        }
+        previewCount={
+          pickerTarget === "fullSheet" || pickerPanelIndex != null
+            ? 1
+            : pickerSelectedShotIndices.length > 0
+              ? pickerSelectedShotIndices.length
+              : Math.max(1, localShots.length)
+        }
       />
 
       <SeedVideoSaveDialog

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { uploadDetailPageSuiteReplicaReference } from "@/lib/ecom/detail-page-suite/project-service";
 import type { DetailPageSuiteReferenceRole } from "@/lib/ecom/detail-page-suite/types";
@@ -17,12 +17,12 @@ function parseRole(raw: FormDataEntryValue | null): DetailPageSuiteReferenceRole
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
   const form = await req.formData();
   const file = form.get("file");
   if (!file || !(file instanceof File)) {
-    return NextResponse.json({ error: "file 必填" }, { status: 400 });
+    return ecomJson({ error: "file 必填" }, { status: 400 });
   }
   const buf = Buffer.from(await file.arrayBuffer());
   const rawLabel = form.get("label");
@@ -35,6 +35,6 @@ export async function POST(req: Request, ctx: Ctx) {
     label: typeof rawLabel === "string" ? rawLabel : undefined,
     role,
   });
-  if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
-  return NextResponse.json({ project });
+  if (!project) return ecomJson({ error: "项目不存在" }, { status: 404 });
+  return ecomJson({ project });
 }

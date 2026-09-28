@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
@@ -17,7 +17,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   try {
@@ -36,34 +36,34 @@ export async function POST(req: Request, ctx: Ctx) {
     const result = await renderEcomOutfitVideo(auth.userId, id, {
       sceneIndexes: sceneIndexes?.length ? sceneIndexes : undefined,
     });
-    return NextResponse.json(result);
+    return ecomJson(result);
   } catch (e) {
     if (e instanceof MediaRenderUnavailableError) {
-      return NextResponse.json({ error: e.message }, { status: 503 });
+      return ecomJson({ error: e.message }, { status: 503 });
     }
     const message = e instanceof Error ? e.message : "合成失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }
 
 export async function GET(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   const project = await getEcomOutfitVideoProject(auth.userId, id);
   const jobId =
     typeof project?.meta?.renderJobId === "string" ? project.meta.renderJobId.trim() : "";
-  if (!jobId) return NextResponse.json({ status: "idle" });
+  if (!jobId) return ecomJson({ status: "idle" });
 
   const job = await getMediaRenderJobForUser(jobId, auth.userId);
-  if (!job) return NextResponse.json({ status: "idle" });
+  if (!job) return ecomJson({ status: "idle" });
 
   if (job.status === "SUCCEEDED" && job.downloadUrl) {
     await syncEcomOutfitVideoRenderResult(auth.userId, id);
   }
 
-  return NextResponse.json({
+  return ecomJson({
     status: job.status.toLowerCase(),
     jobId,
     progress: job.progress,

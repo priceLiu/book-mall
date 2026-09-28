@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { runCanvasImageErase } from "@/lib/canvas-image-edit/run-canvas-image-erase";
 import {
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+    return ecomJson({ error: "无效 JSON" }, { status: 400 });
   }
 
   const sourceImageUrl =
@@ -39,10 +39,10 @@ export async function POST(req: Request) {
       : undefined;
 
   if (!sourceImageUrl) {
-    return NextResponse.json({ error: "缺少 sourceImageUrl" }, { status: 400 });
+    return ecomJson({ error: "缺少 sourceImageUrl" }, { status: 400 });
   }
   if (!maskDataUrl && !bbox) {
-    return NextResponse.json({ error: "请涂抹或框选需要擦除的区域" }, { status: 400 });
+    return ecomJson({ error: "请涂抹或框选需要擦除的区域" }, { status: 400 });
   }
 
   try {
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
     });
     const editedUrl = result.imageUrls[0];
     if (!editedUrl) {
-      return NextResponse.json({ error: "擦除未返回有效图像" }, { status: 502 });
+      return ecomJson({ error: "擦除未返回有效图像" }, { status: 502 });
     }
 
     if (projectId) {
@@ -76,13 +76,13 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json({
+    return ecomJson({
       imageUrl: editedUrl,
       logId: result.logId,
       creditsCharged: result.creditsCharged ?? undefined,
     });
   } catch (e) {
     const { message, status } = formatEcomImageProcessingUserError(e);
-    return NextResponse.json({ error: message }, { status: status >= 400 ? status : 502 });
+    return ecomJson({ error: message }, { status: status >= 400 ? status : 502 });
   }
 }

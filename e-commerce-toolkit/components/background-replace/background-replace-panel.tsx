@@ -3,6 +3,7 @@
 import { useEffect, useMemo } from "react";
 import { ImagePlus, Loader2, X } from "lucide-react";
 
+import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-credits-beside";
 import { RefImageBboxPicker } from "@/components/background-replace/ref-image-bbox-picker";
 import { ProductDesignPromptMentionTextarea } from "@/components/product-design/product-design-prompt-mention-textarea";
 import { EcomButtonPrimary } from "@/components/ui/ecom-button";
@@ -166,7 +167,13 @@ export function BackgroundReplacePanel({
         ) : null}
       </div>
 
-      <div className="sticky bottom-0 border-t border-[#e5e7eb] bg-white pt-3">
+      <div className="sticky bottom-0 flex items-center gap-3 border-t border-[#e5e7eb] bg-white pt-3">
+        <EcomGenerateCreditsBeside
+          modelKey={form.modelKey}
+          imageCount={Math.max(1, form.n || 1)}
+          className="shrink-0"
+        />
+        <div className="min-w-0 flex-1">
         <EcomButtonPrimary
           type="button"
           fullWidth
@@ -177,6 +184,7 @@ export function BackgroundReplacePanel({
           {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
           生成
         </EcomButtonPrimary>
+        </div>
       </div>
     </div>
   );

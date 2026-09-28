@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { ecomGenerateSeedVideoTts } from "@/lib/ecom/ecom-seed-video-tts";
@@ -12,7 +12,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id: projectId } = await ctx.params;
 
   let body: Record<string, unknown> = {};
@@ -40,9 +40,9 @@ export async function POST(req: Request, ctx: Ctx) {
           : undefined,
       modelKey: typeof body.modelKey === "string" ? body.modelKey : undefined,
     });
-    return NextResponse.json(result);
+    return ecomJson(result);
   } catch (e) {
     const message = e instanceof Error ? e.message : "TTS 失败";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return ecomJson({ error: message }, { status: 502 });
   }
 }

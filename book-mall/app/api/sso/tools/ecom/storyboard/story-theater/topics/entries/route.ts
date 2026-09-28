@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
@@ -16,7 +16,7 @@ function parseVertical(raw: unknown): StoryTheaterVertical | null {
 
 export async function POST(req: Request) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const body = (await req.json()) as Record<string, unknown>;
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       ? body.tags.filter((t): t is string => typeof t === "string" && t.trim().length > 0).map((t) => t.trim())
       : undefined;
     if (!vertical || !title || !storyCore || !storyType) {
-      return NextResponse.json(
+      return ecomJson(
         { error: "vertical、title、storyCore、storyType 必填" },
         { status: 400 },
       );
@@ -40,9 +40,9 @@ export async function POST(req: Request) {
       storyType,
       tags,
     });
-    return NextResponse.json({ entry });
+    return ecomJson({ entry });
   } catch (e) {
     const message = e instanceof Error ? e.message : "创建失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

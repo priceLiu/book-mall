@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { isFilmPullMockAllowed } from "@/lib/ecom/ecom-film-pull-mock";
@@ -12,18 +12,18 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   if (!isFilmPullMockAllowed()) {
-    return NextResponse.json({ error: "Mock 未启用" }, { status: 403 });
+    return ecomJson({ error: "Mock 未启用" }, { status: 403 });
   }
   const { id } = await ctx.params;
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const productionPlan = await applyFilmPullProductionAssemble(auth.userId, id);
     const project = await getEcomFilmPullProject(auth.userId, id);
-    return NextResponse.json({ productionPlan, project });
+    return ecomJson({ productionPlan, project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Mock 组装失败";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return ecomJson({ error: message }, { status: 502 });
   }
 }

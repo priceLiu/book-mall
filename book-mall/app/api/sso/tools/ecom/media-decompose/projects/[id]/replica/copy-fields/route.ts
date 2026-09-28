@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { saveReplicaCopyFields } from "@/lib/ecom/ecom-media-decompose-replica";
@@ -12,21 +12,21 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function PATCH(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   let body: { productBrief?: unknown; sellingPoints?: unknown } = {};
   try {
     body = (await req.json()) as typeof body;
   } catch {
-    return NextResponse.json({ error: "无效请求体" }, { status: 400 });
+    return ecomJson({ error: "无效请求体" }, { status: 400 });
   }
 
   const productBrief = typeof body.productBrief === "string" ? body.productBrief : undefined;
   const sellingPoints = typeof body.sellingPoints === "string" ? body.sellingPoints : undefined;
 
   if (productBrief === undefined && sellingPoints === undefined) {
-    return NextResponse.json({ error: "无更新字段" }, { status: 400 });
+    return ecomJson({ error: "无更新字段" }, { status: 400 });
   }
 
   try {
@@ -35,15 +35,15 @@ export async function PATCH(req: Request, ctx: Ctx) {
       productBrief,
       sellingPoints,
     });
-    return NextResponse.json(result);
+    return ecomJson(result);
   } catch (e) {
     if (e instanceof PlatformEntitlementError) {
-      return NextResponse.json({ error: e.message }, { status: e.httpStatus });
+      return ecomJson({ error: e.message }, { status: e.httpStatus });
     }
     if (e instanceof GatewayRequiredError) {
-      return NextResponse.json({ error: e.message }, { status: 502 });
+      return ecomJson({ error: e.message }, { status: 502 });
     }
     const message = e instanceof Error ? e.message : "保存失败";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return ecomJson({ error: message }, { status: 400 });
   }
 }

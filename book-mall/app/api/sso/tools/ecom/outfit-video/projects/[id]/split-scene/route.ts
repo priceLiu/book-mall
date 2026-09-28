@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { splitEcomOutfitVideoScenes } from "@/lib/ecom/ecom-outfit-video-service";
@@ -15,7 +15,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   let mock = isOutfitVideoMockAllowed();
@@ -43,10 +43,10 @@ export async function POST(req: Request, ctx: Ctx) {
       splitModelKey,
       forceResplit,
     });
-    return NextResponse.json({ project, envelope, mock });
+    return ecomJson({ project, envelope, mock });
   } catch (e) {
     if (e instanceof MediaRenderUnavailableError) {
-      return NextResponse.json({ error: e.message }, { status: 503 });
+      return ecomJson({ error: e.message }, { status: 503 });
     }
     const message = e instanceof Error ? e.message : "拆镜失败";
     const status = message.includes("不存在")
@@ -56,6 +56,6 @@ export async function POST(req: Request, ctx: Ctx) {
         : message.includes("拆镜正在进行中")
           ? 409
           : 500;
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

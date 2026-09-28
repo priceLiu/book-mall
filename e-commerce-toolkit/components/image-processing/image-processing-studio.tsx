@@ -12,6 +12,7 @@ import {
   Wand2,
 } from "lucide-react";
 
+import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-credits-beside";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
   ImageEnhancerGuideSections,
@@ -900,7 +901,7 @@ export function ImageProcessingStudio() {
                 ) : null}
 
                 <div className="mt-6 flex flex-col gap-3 border-t border-[#e5e5ea] pt-4 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="text-xs text-[#6e6e73]">经 Gateway 调用百炼图像编辑</span>
+                  <EcomGenerateCreditsBeside modelKey={retouchModel} imageCount={1} />
                   <ImageProcessingCtaButton
                     disabled={submitting}
                     onClick={() => void onRetouchSubmit()}
@@ -1058,7 +1059,7 @@ export function ImageProcessingStudio() {
                 ) : null}
 
                 <div className="mt-6 flex flex-col gap-3 border-t border-[#e5e5ea] pt-4 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="text-xs text-[#6e6e73]">上传图片即可查看处理结果</span>
+                  <EcomGenerateCreditsBeside modelKey={enhancerModel} imageCount={1} />
                   <ImageProcessingCtaButton
                     disabled={submitting}
                     onClick={() => void onEnhancerSubmit()}
@@ -1210,7 +1211,7 @@ export function ImageProcessingStudio() {
                 ) : null}
 
                 <div className="mt-6 flex flex-col gap-3 border-t border-[#e5e5ea] pt-4 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="text-xs text-[#6e6e73]">上传图片即可查看扩图结果</span>
+                  <EcomGenerateCreditsBeside modelKey={outpaintModel} imageCount={1} />
                   <ImageProcessingCtaButton
                     disabled={submitting}
                     onClick={() => void onOutpaintSubmit()}
@@ -1506,7 +1507,8 @@ export function ImageProcessingStudio() {
                   </div>
                 ) : null}
 
-                <div className="mt-6 flex justify-stretch border-t border-[#e5e5ea] bg-white pt-4 sm:justify-end">
+                <div className="mt-6 flex flex-col items-center gap-3 border-t border-[#e5e5ea] bg-white pt-4 sm:flex-row sm:justify-end">
+                  <EcomGenerateCreditsBeside modelKey={editorModel} imageCount={1} />
                   <ImageProcessingCtaButton
                     variant="blue"
                     disabled={submitting}

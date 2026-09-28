@@ -603,6 +603,7 @@ export function HandCraftContentPanel({
             : undefined
         }
         confirming={Boolean(generating)}
+        previewCount={Math.max(1, pendingGen?.indexes.length ?? 1)}
         onConfirm={(modelKey) => {
           const req = pendingGen;
           if (!req) return;

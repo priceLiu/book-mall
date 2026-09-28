@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 
+import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-credits-beside";
 import { ImageSingleUpload } from "@/components/image-processing/image-single-upload";
 import { submitImageProcessingEdit } from "@/lib/ecom-image-processing-api";
 import {
@@ -291,8 +292,12 @@ export function ImageGeneratorPanel({
           </div>
         ) : null}
 
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-          <CtaButton disabled={submitting} onClick={onSubmit} className="flex-1">
+        <div className="mt-4 flex flex-col items-center gap-3 sm:flex-row sm:justify-end">
+          <EcomGenerateCreditsBeside
+            modelKey={generativeModel}
+            imageCount={Math.max(1, Number(imageCount) || 1)}
+          />
+          <CtaButton disabled={submitting} onClick={onSubmit} className="w-full sm:w-auto sm:min-w-[160px]">
             {submitting ? (
               <span className="inline-flex items-center justify-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />

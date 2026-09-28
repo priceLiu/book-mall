@@ -1,6 +1,7 @@
 "use client";
 
 import { throwIfUnauthorized } from "@/lib/ecom-auth";
+import { noteEcomBookResponseForCredits } from "@/lib/ecom-credits-settlement-watch";
 import { refreshEcomToolsSessionClient } from "@/lib/ecom-tools-session-client";
 
 function rawEcomBookFetch(path: string, init?: RequestInit) {
@@ -54,6 +55,7 @@ export async function ecomBookFetch(path: string, init?: RequestInit) {
     /* */
   }
   throwIfUnauthorized(res, data);
+  noteEcomBookResponseForCredits(path, init?.method, data);
   if (!res.ok) {
     const err =
       typeof data.error === "string" ? data.error : `请求失败 (${res.status})`;

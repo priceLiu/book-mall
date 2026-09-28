@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { exportDetailPageSuiteProjectZip } from "@/lib/ecom/detail-page-suite/export-pack";
 import { ECOM_DETAIL_PAGE_SUITE_HIT_MODULE } from "@/lib/ecom/detail-page-suite/types";
@@ -12,7 +13,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   try {
@@ -32,6 +33,6 @@ export async function GET(req: Request, ctx: Ctx) {
   } catch (e) {
     const message = e instanceof Error ? e.message : "导出失败";
     const status = message === "项目不存在" ? 404 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

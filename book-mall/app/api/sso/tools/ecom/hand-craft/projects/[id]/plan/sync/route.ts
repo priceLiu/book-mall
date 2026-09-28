@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { parseHandCraftAssistantOutput } from "@/lib/ecom/ecom-hand-craft-markdown-parse";
 import {
@@ -21,7 +21,7 @@ type Ctx = { params: Promise<{ id: string }> };
  */
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   let body: { markdown?: unknown } = {};
@@ -32,19 +32,19 @@ export async function POST(req: Request, ctx: Ctx) {
   }
 
   const existing = await getEcomHandCraftProject(auth.userId, id);
-  if (!existing) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
+  if (!existing) return ecomJson({ error: "项目不存在" }, { status: 404 });
 
   const markdown =
     typeof body.markdown === "string" && body.markdown.trim()
       ? body.markdown
       : (existing.meta?.lastAssistantRaw ?? "");
   if (!markdown.trim()) {
-    return NextResponse.json({ project: existing });
+    return ecomJson({ project: existing });
   }
 
   try {
     const { stepId, overrides } = parseHandCraftAssistantOutput(markdown);
-    if (!stepId) return NextResponse.json({ project: existing });
+    if (!stepId) return ecomJson({ project: existing });
 
     let project = await updateEcomHandCraftProject(auth.userId, id, {
       meta: { workflow: { currentStepId: stepId } },
@@ -52,9 +52,9 @@ export async function POST(req: Request, ctx: Ctx) {
     if (overrides.length > 0) {
       project = await patchHandCraftSlotPrompts(auth.userId, id, stepId, overrides);
     }
-    return NextResponse.json({ project, stepId, overrides: overrides.length });
+    return ecomJson({ project, stepId, overrides: overrides.length });
   } catch (e) {
     const message = e instanceof Error ? e.message : "同步失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

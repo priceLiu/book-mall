@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { getTemplateGalleryCategorySummary } from "@/lib/ecom/ecom-template-gallery-service";
@@ -13,9 +13,9 @@ export async function GET(req: Request) {
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const categories = await getTemplateGalleryCategorySummary();
-    return NextResponse.json({ categories });
+    return ecomJson({ categories });
   } catch (e) {
     const message = e instanceof Error ? e.message : "加载失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

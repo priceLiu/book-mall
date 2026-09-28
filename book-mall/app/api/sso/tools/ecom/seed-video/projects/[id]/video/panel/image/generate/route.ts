@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { getEcomSeedVideoProject } from "@/lib/ecom/ecom-seed-video-service";
@@ -13,7 +13,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id: projectId } = await ctx.params;
 
   let body: Record<string, unknown> = {};
@@ -28,7 +28,7 @@ export async function POST(req: Request, ctx: Ctx) {
   });
   const shots = project?.plan?.shots ?? [];
   if (shots.length === 0) {
-    return NextResponse.json({ error: "请先完成镜头表策划" }, { status: 400 });
+    return ecomJson({ error: "请先完成镜头表策划" }, { status: 400 });
   }
 
   const shotIndex =
@@ -36,7 +36,7 @@ export async function POST(req: Request, ctx: Ctx) {
       ? Math.trunc(body.shotIndex)
       : NaN;
   if (!Number.isFinite(shotIndex)) {
-    return NextResponse.json({ error: "缺少 shotIndex" }, { status: 400 });
+    return ecomJson({ error: "缺少 shotIndex" }, { status: 400 });
   }
 
   const modelKey =
@@ -64,9 +64,9 @@ export async function POST(req: Request, ctx: Ctx) {
     const fresh = await getEcomSeedVideoProject(auth.userId, projectId, {
       resumePending: false,
     });
-    return NextResponse.json({ ...result, project: fresh });
+    return ecomJson({ ...result, project: fresh });
   } catch (e) {
     const message = e instanceof Error ? e.message : "生成失败";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return ecomJson({ error: message }, { status: 502 });
   }
 }

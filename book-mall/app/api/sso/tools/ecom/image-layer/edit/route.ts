@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { editImageLayerRegions } from "@/lib/ecom/ecom-image-layer-service";
 import {
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+    return ecomJson({ error: "无效 JSON" }, { status: 400 });
   }
 
   const compositeImageUrl =
@@ -58,10 +58,10 @@ export async function POST(req: Request) {
       : undefined;
 
   if (!compositeImageUrl) {
-    return NextResponse.json({ error: "缺少 compositeImageUrl" }, { status: 400 });
+    return ecomJson({ error: "缺少 compositeImageUrl" }, { status: 400 });
   }
   if (edits.length === 0) {
-    return NextResponse.json({ error: "缺少有效 edits（bbox + prompt）" }, { status: 400 });
+    return ecomJson({ error: "缺少有效 edits（bbox + prompt）" }, { status: 400 });
   }
 
   try {
@@ -92,9 +92,9 @@ export async function POST(req: Request) {
         compareFromUrl: compositeImageUrl,
       });
     }
-    return NextResponse.json({ imageUrl: result.imageUrl, logId: result.logId });
+    return ecomJson({ imageUrl: result.imageUrl, logId: result.logId });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "图层编辑失败";
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return ecomJson({ error: msg }, { status: 502 });
   }
 }

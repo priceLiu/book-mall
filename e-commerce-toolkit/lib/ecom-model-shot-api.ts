@@ -2,6 +2,10 @@
 
 import { EcomUnauthorizedError } from "@/lib/ecom-auth";
 import { ecomBookFetch } from "@/lib/ecom-book-fetch";
+import {
+  noteEcomBookResponseForCredits,
+  noteEcomStreamResponseForCredits,
+} from "@/lib/ecom-credits-settlement-watch";
 import type {
   ModelShotChatMessage,
   ModelShotModelsPayload,
@@ -240,7 +244,17 @@ export async function generateModelShotReference(
     const j = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(j.error ?? `生成失败 (${res.status})`);
   }
-  return (await res.json()) as { project: ModelShotProject };
+  const data = (await res.json()) as {
+    project: ModelShotProject;
+    logId?: string;
+    logIds?: string[];
+  };
+  noteEcomBookResponseForCredits(
+    `${BASE}/projects/${projectId}/refs/generate`,
+    "POST",
+    data as unknown as Record<string, unknown>,
+  );
+  return data;
 }
 
 export async function streamModelShotChat(opts: {
@@ -270,6 +284,10 @@ export async function streamModelShotChat(opts: {
     }
     throw new Error(err);
   }
+  noteEcomStreamResponseForCredits(
+    `${BASE}/projects/${opts.projectId}/assistant/chat`,
+    res,
+  );
   const reader = res.body?.getReader();
   if (!reader) throw new Error("无响应流");
   const decoder = new TextDecoder();

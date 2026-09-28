@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
@@ -17,7 +17,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
   let body: Record<string, unknown> = {};
   try {
@@ -41,17 +41,17 @@ export async function POST(req: Request, ctx: Ctx) {
       void runHitVisionSellpointPipeline(runOpts).catch((e) => {
         console.error("[hit-vision-sellpoints] background pipeline failed", id, e);
       });
-      return NextResponse.json({ project, accepted: true, async: true });
+      return ecomJson({ project, accepted: true, async: true });
     }
 
     const project = await visionSellpointsForHitProjectSync(runOpts);
-    return NextResponse.json({ project, accepted: true, async: false });
+    return ecomJson({ project, accepted: true, async: false });
   } catch (e) {
     if (e instanceof HitVisionSellpointAlreadyRunningError) {
       const project = await getDetailPageSuiteHitProject(auth.userId, id);
-      return NextResponse.json({ error: e.message, project }, { status: 409 });
+      return ecomJson({ error: e.message, project }, { status: 409 });
     }
-    return NextResponse.json(
+    return ecomJson(
       { error: e instanceof Error ? e.message : "识图失败" },
       { status: 500 },
     );

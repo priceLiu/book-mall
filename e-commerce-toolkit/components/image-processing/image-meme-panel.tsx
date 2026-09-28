@@ -11,6 +11,7 @@ import {
   Wand2,
 } from "lucide-react";
 
+import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-credits-beside";
 import {
   buildGenerativeSubmitParams,
   ImageGenerativeSettings,
@@ -255,7 +256,10 @@ export function ImageMemePanel({
         />
 
         <div className="mt-6 flex flex-col gap-3 border-t border-[#e5e5ea] pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-xs text-[#6e6e73]">每张约 500–1000 积分</span>
+          <EcomGenerateCreditsBeside
+            modelKey={generativeModel}
+            imageCount={Math.max(1, Number(imageCount) || 1)}
+          />
           <CtaButton disabled={submitting} onClick={() => void onSubmit()} className="w-full sm:w-auto">
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Smile className="h-4 w-4" />}
             生成表情包

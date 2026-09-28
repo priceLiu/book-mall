@@ -5,6 +5,7 @@ import { Check, ChevronLeft, ChevronRight, Loader2, Star } from "lucide-react";
 
 import { EcomImagePreviewHost, useEcomImagePreview } from "@/components/media";
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
+import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-credits-beside";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { VtonResultImageHoverActions } from "@/components/vton/vton-result-image-hover-actions";
 import { downloadRemoteImageUrl } from "@/lib/ecom-download-url";
@@ -397,6 +398,11 @@ export function VtonResultsGrid({
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <EcomGenerateCreditsBeside
+              modelKey="aitryon-plus"
+              imageCount={selectedTryonCount > 0 ? selectedTryonCount : looks.length}
+              enabled={looks.length > 0 && !running}
+            />
             {running && onStopBatchTryon ? (
               <EcomButtonSecondary
                 type="button"

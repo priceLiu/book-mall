@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomGatewayLogHeaders, ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
@@ -34,7 +34,7 @@ function buildVideoUserContent(
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id: projectId } = await ctx.params;
 
   let body: { prompt?: unknown; modelKey?: unknown } = {};
@@ -84,6 +84,7 @@ export async function POST(req: Request, ctx: Ctx) {
 
     return new Response(readable, {
       headers: {
+        ...ecomGatewayLogHeaders(),
         "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-store, no-transform",
         Connection: "keep-alive",
@@ -96,7 +97,7 @@ export async function POST(req: Request, ctx: Ctx) {
     }
     if (e instanceof FilmPullAnalyzeCanceledError) {
       const project = await getEcomFilmPullProject(auth.userId, projectId);
-      return NextResponse.json({ error: e.message, project }, { status: 499 });
+      return ecomJson({ error: e.message, project }, { status: 499 });
     }
     const message = e instanceof Error ? e.message : "拉片失败";
     let project = await getEcomFilmPullProject(auth.userId, projectId);
@@ -108,6 +109,6 @@ export async function POST(req: Request, ctx: Ctx) {
         completedAt: new Date().toISOString(),
       });
     }
-    return NextResponse.json({ error: message, project }, { status: 502 });
+    return ecomJson({ error: message, project }, { status: 502 });
   }
 }

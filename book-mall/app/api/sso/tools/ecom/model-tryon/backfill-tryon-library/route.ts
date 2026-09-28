@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 import {
   backfillTextTryonResultsToTryonLibrary,
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
 
   let body: { allTime?: boolean } = {};
@@ -27,5 +27,5 @@ export async function POST(req: Request) {
     until: bounds?.end,
   });
 
-  return NextResponse.json({ ok: true, ...result });
+  return ecomJson({ ok: true, ...result });
 }

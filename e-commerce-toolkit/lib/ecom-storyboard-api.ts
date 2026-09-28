@@ -2,6 +2,10 @@
 
 import { EcomUnauthorizedError } from "@/lib/ecom-auth";
 import { ecomBookFetch } from "@/lib/ecom-book-fetch";
+import {
+  noteEcomBookResponseForCredits,
+  noteEcomStreamResponseForCredits,
+} from "@/lib/ecom-credits-settlement-watch";
 import type {
   StoryboardChatMessage,
   StoryboardGatewayModel,
@@ -326,6 +330,10 @@ export async function streamStoryboardChat(opts: {
       }
       throw new Error(err);
     }
+    noteEcomStreamResponseForCredits(
+      `api/sso/tools/ecom/storyboard/projects/${opts.projectId}/assistant/chat`,
+      res,
+    );
     if (!res.body) throw new Error("无响应流");
 
     const reader = res.body.getReader();
@@ -461,6 +469,11 @@ export async function generateStoryboardSheetImage(
       typeof data.error === "string" ? data.error : `请求失败 (${res.status})`;
     throw new Error(err);
   }
+  noteEcomBookResponseForCredits(
+    `api/sso/tools/ecom/storyboard/projects/${projectId}/sheet/image/generate`,
+    "POST",
+    data,
+  );
   return {
     sheet: data.sheet as StoryboardSheet,
     references: Array.isArray(data.references)

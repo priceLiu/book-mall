@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { reconcileDetailPageSuiteProjectFromAssets } from "@/lib/ecom/detail-page-suite/asset-reconcile";
@@ -23,13 +23,13 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
   let project = await getDetailPageSuiteProject(auth.userId, id);
-  if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
+  if (!project) return ecomJson({ error: "项目不存在" }, { status: 404 });
   const recovered = await reconcileDetailPageSuiteProjectFromAssets(auth.userId, project);
   project = recovered.project;
-  return NextResponse.json({
+  return ecomJson({
     project,
     recovered:
       recovered.recoveredImages > 0 || recovered.recoveredPrompts > 0
@@ -43,13 +43,13 @@ export async function GET(req: Request, ctx: Ctx) {
 
 export async function PATCH(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+    return ecomJson({ error: "invalid_json" }, { status: 400 });
   }
   const project = await updateDetailPageSuiteProject(auth.userId, id, {
     ...(typeof body.title === "string" ? { title: body.title } : {}),
@@ -65,20 +65,20 @@ export async function PATCH(req: Request, ctx: Ctx) {
     ...(body.suite !== undefined ? { suite: body.suite as DetailPageSuiteState } : {}),
     ...(body.meta !== undefined ? { meta: body.meta as DetailPageSuiteMeta | null } : {}),
   });
-  if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
-  return NextResponse.json({ project });
+  if (!project) return ecomJson({ error: "项目不存在" }, { status: 404 });
+  return ecomJson({ project });
 }
 
 export async function DELETE(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : "无权限" }, { status: 403 });
+    return ecomJson({ error: e instanceof Error ? e.message : "无权限" }, { status: 403 });
   }
   const ok = await deleteDetailPageSuiteProject(auth.userId, id);
-  if (!ok) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
-  return NextResponse.json({ ok: true });
+  if (!ok) return ecomJson({ error: "项目不存在" }, { status: 404 });
+  return ecomJson({ ok: true });
 }

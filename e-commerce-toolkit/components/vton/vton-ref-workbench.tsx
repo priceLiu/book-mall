@@ -16,6 +16,7 @@ import { appendLookDraft, VtonLookComposer } from "@/components/vton/vton-look-c
 import { VtonResultsGrid } from "@/components/vton/vton-results-grid";
 import { VtonTextTryonPanel } from "@/components/vton/vton-text-tryon-panel";
 import { VtonTryonProgressStrip } from "@/components/vton/vton-tryon-progress-strip";
+import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-credits-beside";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
@@ -769,7 +770,10 @@ export function VtonRefWorkbench({
         </p>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {canTryon ? (
+          <EcomGenerateCreditsBeside modelKey="aitryon-plus" imageCount={1} />
+        ) : null}
         {canTryon ? (
           <EcomButtonPrimary
             type="button"
@@ -878,6 +882,7 @@ export function VtonRefWorkbench({
               {!builtinModelPipeline && expandOpen ? (
                 <VtonExpandFullBodyDialog
                   fusionDisplayName={fusionDisplayName}
+                  fusionModelKey={fusionModelKey}
                   prompt={expandPrompt}
                   onPromptChange={setExpandPrompt}
                   busy={busy}
@@ -943,6 +948,7 @@ function GarmentSlot({
 
 function VtonExpandFullBodyDialog({
   fusionDisplayName,
+  fusionModelKey,
   prompt,
   onPromptChange,
   busy,
@@ -950,6 +956,7 @@ function VtonExpandFullBodyDialog({
   onConfirm,
 }: {
   fusionDisplayName: string;
+  fusionModelKey: string;
   prompt: string;
   onPromptChange: (v: string) => void;
   busy?: boolean;
@@ -978,7 +985,8 @@ function VtonExpandFullBodyDialog({
           onChange={(e) => onPromptChange(e.target.value)}
           disabled={busy}
         />
-        <div className="mt-4 flex justify-end gap-2">
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <EcomGenerateCreditsBeside modelKey={fusionModelKey} imageCount={1} />
           <EcomButtonSecondary type="button" size="sm" disabled={busy} onClick={onClose}>
             取消
           </EcomButtonSecondary>

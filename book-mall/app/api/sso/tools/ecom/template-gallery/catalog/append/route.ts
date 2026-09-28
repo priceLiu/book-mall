@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import {
   appendTemplateGalleryEntries,
@@ -21,19 +21,19 @@ export async function POST(req: Request) {
 
   const elig = await getToolsSsoEligibility(auth.userId);
   if (!elig.isAdmin) {
-    return NextResponse.json({ error: "需要管理员权限" }, { status: 403 });
+    return ecomJson({ error: "需要管理员权限" }, { status: 403 });
   }
 
   let body: AppendBody;
   try {
     body = (await req.json()) as AppendBody;
   } catch {
-    return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+    return ecomJson({ error: "无效 JSON" }, { status: 400 });
   }
 
   const entries = body.entries ?? [];
   if (entries.length === 0) {
-    return NextResponse.json({ error: "entries 不能为空" }, { status: 400 });
+    return ecomJson({ error: "entries 不能为空" }, { status: 400 });
   }
 
   try {
@@ -41,9 +41,9 @@ export async function POST(req: Request) {
       await upsertTemplateGalleryEntry(entry);
     }
     const catalog = appendTemplateGalleryEntries(entries);
-    return NextResponse.json({ ok: true, total: catalog.templates.length });
+    return ecomJson({ ok: true, total: catalog.templates.length });
   } catch (e) {
     const message = e instanceof Error ? e.message : "写入失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

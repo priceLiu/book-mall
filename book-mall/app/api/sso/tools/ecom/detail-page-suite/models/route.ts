@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { isStoryLlmVisionModel } from "@/lib/canvas/story-llm-vision-models";
 import { getUserBillingPersona } from "@/lib/billing/billing-persona";
@@ -44,7 +44,7 @@ function mergePreferredImageModels(
 
 export async function GET(req: Request) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
 
   const rawPersona = await getUserBillingPersona(auth.userId);
   const persona = rawPersona === "PLATFORM_CREDIT" ? "PLATFORM_CREDIT" : "BYOK";
@@ -99,7 +99,7 @@ export async function GET(req: Request) {
     resolveEcomPromptGenConcurrency(auth.userId),
   ]);
 
-  return NextResponse.json({
+  return ecomJson({
     chatModels: chatList,
     imageModels: imageList,
     defaults: {

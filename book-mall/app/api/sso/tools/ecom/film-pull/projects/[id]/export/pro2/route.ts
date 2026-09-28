@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import {
   filmPullAnalyzeToPro2ProductionScript,
@@ -15,7 +15,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
   let body: { title?: unknown; preferRenderScript?: unknown } = {};
   try {
@@ -27,7 +27,7 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const project = await getEcomFilmPullProject(auth.userId, id);
-    if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
+    if (!project) return ecomJson({ error: "项目不存在" }, { status: 404 });
 
     const title = typeof body.title === "string" ? body.title : project.title ?? undefined;
     const preferRender = body.preferRenderScript !== false;
@@ -59,12 +59,12 @@ export async function POST(req: Request, ctx: Ctx) {
         { title },
       );
     } else {
-      return NextResponse.json({ error: "请先完成拉片" }, { status: 400 });
+      return ecomJson({ error: "请先完成拉片" }, { status: 400 });
     }
 
-    return NextResponse.json({ productionScript, projectId: id });
+    return ecomJson({ productionScript, projectId: id });
   } catch (e) {
     const message = e instanceof Error ? e.message : "导出失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

@@ -1252,20 +1252,49 @@ export async function listCanvasProjectTasks(
   if (isCanvasProjectTasksForbidden(projectId)) {
     throw new Error("403 无权访问此画布项目");
   }
-  const params = new URLSearchParams();
-  if (nodeIds && nodeIds.length > 0) {
-    params.set("nodeIds", nodeIds.join(","));
+  const fetchByNodeIds = async (
+    batchNodeIds?: string[],
+  ): Promise<CanvasTaskRecord[] | null> => {
+    const params = new URLSearchParams();
+    if (batchNodeIds && batchNodeIds.length > 0) {
+      params.set("nodeIds", batchNodeIds.join(","));
+    }
+    if (options?.recovery && batchNodeIds && batchNodeIds.length > 0) {
+      params.set("recovery", "1");
+    }
+    const q = params.size > 0 ? `?${params.toString()}` : "";
+    const j = await call<{ tasks: CanvasTaskRecord[] | null; stale?: boolean }>(
+      base,
+      `/api/canvas/projects/${projectId}/tasks${q}`,
+    );
+    if (j.stale || j.tasks == null) return null;
+    return j.tasks;
+  };
+
+  if (!nodeIds || nodeIds.length === 0) {
+    return fetchByNodeIds();
   }
-  if (options?.recovery && nodeIds && nodeIds.length > 0) {
-    params.set("recovery", "1");
-  }
-  const q = params.size > 0 ? `?${params.toString()}` : "";
-  const j = await call<{ tasks: CanvasTaskRecord[] | null; stale?: boolean }>(
-    base,
-    `/api/canvas/projects/${projectId}/tasks${q}`,
+
+  const uniqueNodeIds = Array.from(
+    new Set(nodeIds.map((id) => id.trim()).filter(Boolean)),
   );
-  if (j.stale || j.tasks == null) return null;
-  return j.tasks;
+  if (uniqueNodeIds.length === 0) {
+    return fetchByNodeIds();
+  }
+
+  const MAX_NODE_IDS_PER_REQUEST = 80;
+  if (uniqueNodeIds.length <= MAX_NODE_IDS_PER_REQUEST) {
+    return fetchByNodeIds(uniqueNodeIds);
+  }
+
+  const merged: CanvasTaskRecord[] = [];
+  for (let i = 0; i < uniqueNodeIds.length; i += MAX_NODE_IDS_PER_REQUEST) {
+    const chunk = uniqueNodeIds.slice(i, i + MAX_NODE_IDS_PER_REQUEST);
+    const tasks = await fetchByNodeIds(chunk);
+    if (tasks == null) return null;
+    merged.push(...tasks);
+  }
+  return merged;
 }
 
 export type CanvasBackgroundVideoTaskRow = {

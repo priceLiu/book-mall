@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { reuseMediaDecomposeLibraryItem } from "@/lib/ecom/ecom-media-decompose-reuse";
@@ -11,7 +11,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id: projectId } = await ctx.params;
 
@@ -26,13 +26,13 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const project = await reuseMediaDecomposeLibraryItem(auth.userId, projectId, savedAt);
-    return NextResponse.json({ project });
+    return ecomJson({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "复用失败";
     const status =
       message === "项目不存在" || message === "找不到该版本的保存记录"
         ? 404
         : 500;
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

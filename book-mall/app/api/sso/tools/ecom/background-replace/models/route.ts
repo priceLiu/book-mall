@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { loadBackgroundReplaceModels } from "@/lib/ecom/ecom-background-replace-models";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
@@ -11,9 +11,9 @@ export async function GET(req: Request) {
 
   try {
     const data = await loadBackgroundReplaceModels(auth.userId);
-    return NextResponse.json(data);
+    return ecomJson(data);
   } catch (e) {
     const message = e instanceof Error ? e.message : "加载换背景模型失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

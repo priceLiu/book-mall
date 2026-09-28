@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import {
   attachEcomModelTryonRefs,
@@ -23,7 +23,7 @@ function isUploadRole(v: unknown): v is UploadRole {
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   const contentType = req.headers.get("content-type") ?? "";
@@ -33,17 +33,17 @@ export async function POST(req: Request, ctx: Ctx) {
     const roleRaw = form.get("role");
     const role = isUploadRole(roleRaw) ? roleRaw : null;
     if (!(file instanceof File) || !role) {
-      return NextResponse.json(
+      return ecomJson(
         { error: "请上传图片并指定 role=model|clothing|topGarment|bottomGarment" },
         { status: 400 },
       );
     }
     try {
       const project = await uploadEcomModelTryonRefImage(auth.userId, id, role, file);
-      return NextResponse.json({ project });
+      return ecomJson({ project });
     } catch (e) {
       const message = e instanceof Error ? e.message : "上传失败";
-      return NextResponse.json({ error: message }, { status: 400 });
+      return ecomJson({ error: message }, { status: 400 });
     }
   }
 
@@ -51,7 +51,7 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+    return ecomJson({ error: "无效 JSON" }, { status: 400 });
   }
 
   const patch: Partial<WorkflowRefs> = {};
@@ -74,9 +74,9 @@ export async function POST(req: Request, ctx: Ctx) {
 
   try {
     const project = await attachEcomModelTryonRefs(auth.userId, id, patch);
-    return NextResponse.json({ project });
+    return ecomJson({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "绑定参考失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

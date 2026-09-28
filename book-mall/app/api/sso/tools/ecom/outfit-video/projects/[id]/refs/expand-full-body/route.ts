@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { expandEcomOutfitVideoModelFullBody } from "@/lib/ecom/ecom-outfit-video-service";
 import { formatEcomImageGenUserError } from "@/lib/ecom/ecom-image-processing-error";
@@ -12,7 +12,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   let body: Record<string, unknown> = {};
@@ -30,9 +30,9 @@ export async function POST(req: Request, ctx: Ctx) {
       prompt,
       modelKey,
     });
-    return NextResponse.json({ project });
+    return ecomJson({ project });
   } catch (e) {
     const { message, status } = formatEcomImageGenUserError(e);
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

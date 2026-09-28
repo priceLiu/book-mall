@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { ecomGenerateFilmPullProductionImage } from "@/lib/ecom/ecom-film-pull-production-image";
@@ -12,11 +12,11 @@ type Ctx = { params: Promise<{ id: string; shotNo: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id, shotNo: shotNoRaw } = await ctx.params;
   const shotNo = Number.parseInt(shotNoRaw, 10);
   if (!Number.isFinite(shotNo) || shotNo < 1) {
-    return NextResponse.json({ error: "无效镜号" }, { status: 400 });
+    return ecomJson({ error: "无效镜号" }, { status: 400 });
   }
 
   let body: Record<string, unknown> = {};
@@ -29,7 +29,7 @@ export async function POST(req: Request, ctx: Ctx) {
   const modelKey =
     typeof body.modelKey === "string" && body.modelKey.trim() ? body.modelKey.trim() : "";
   if (!modelKey) {
-    return NextResponse.json({ error: "请选择生图模型" }, { status: 400 });
+    return ecomJson({ error: "请选择生图模型" }, { status: 400 });
   }
 
   try {
@@ -42,9 +42,9 @@ export async function POST(req: Request, ctx: Ctx) {
       imageSize: typeof body.imageSize === "string" ? body.imageSize : undefined,
     });
     const project = await getEcomFilmPullProject(auth.userId, id);
-    return NextResponse.json({ ...result, project });
+    return ecomJson({ ...result, project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "生图失败";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return ecomJson({ error: message }, { status: 502 });
   }
 }

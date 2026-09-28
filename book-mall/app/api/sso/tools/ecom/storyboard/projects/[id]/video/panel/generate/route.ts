@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { getEcomStoryboardProject } from "@/lib/ecom/ecom-storyboard-service";
@@ -14,7 +14,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id: projectId } = await ctx.params;
 
@@ -29,7 +29,7 @@ export async function POST(req: Request, ctx: Ctx) {
     resumePendingVideos: false,
   });
   if (!project?.sheet) {
-    return NextResponse.json({ error: "请先生成分镜脚本" }, { status: 400 });
+    return ecomJson({ error: "请先生成分镜脚本" }, { status: 400 });
   }
 
   const panelIndex =
@@ -37,7 +37,7 @@ export async function POST(req: Request, ctx: Ctx) {
       ? Math.trunc(body.panelIndex)
       : NaN;
   if (!Number.isFinite(panelIndex)) {
-    return NextResponse.json({ error: "缺少 panelIndex" }, { status: 400 });
+    return ecomJson({ error: "缺少 panelIndex" }, { status: 400 });
   }
 
   const aspectRatio =
@@ -80,10 +80,10 @@ export async function POST(req: Request, ctx: Ctx) {
             : project.sheet.overview.productHighlight,
       },
     });
-    return NextResponse.json(result);
+    return ecomJson(result);
   } catch (e) {
     const message = e instanceof Error ? e.message : "分镜视频生成失败";
     const status = message.includes("余额") ? 402 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

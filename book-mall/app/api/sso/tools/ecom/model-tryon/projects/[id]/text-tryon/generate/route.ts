@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { generateEcomVtonTextTryonImage } from "@/lib/ecom/ecom-vton-text-tryon";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
@@ -11,7 +11,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   let body: Record<string, unknown> = {};
@@ -33,9 +33,9 @@ export async function POST(req: Request, ctx: Ctx) {
       modelKey: typeof body.modelKey === "string" ? body.modelKey : undefined,
       ratio,
     });
-    return NextResponse.json({ project });
+    return ecomJson({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "生成失败";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return ecomJson({ error: message }, { status: 400 });
   }
 }

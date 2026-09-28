@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
@@ -19,16 +19,16 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
   const project = await getEcomHandCraftProject(auth.userId, id);
-  if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
-  return NextResponse.json({ project });
+  if (!project) return ecomJson({ error: "项目不存在" }, { status: 404 });
+  return ecomJson({ project });
 }
 
 export async function PATCH(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   let body: {
@@ -41,7 +41,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   try {
     body = (await req.json()) as typeof body;
   } catch {
-    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+    return ecomJson({ error: "invalid_json" }, { status: 400 });
   }
 
   try {
@@ -62,22 +62,22 @@ export async function PATCH(req: Request, ctx: Ctx) {
           ? (body.meta as HandCraftMeta)
           : undefined,
     });
-    return NextResponse.json({ project });
+    return ecomJson({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "保存失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }
 
 export async function DELETE(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
   try {
     await deleteEcomHandCraftProject(auth.userId, id);
-    return NextResponse.json({ ok: true });
+    return ecomJson({ ok: true });
   } catch (e) {
     const message = e instanceof Error ? e.message : "删除失败";
-    return NextResponse.json({ error: message }, { status: 404 });
+    return ecomJson({ error: message }, { status: 404 });
   }
 }

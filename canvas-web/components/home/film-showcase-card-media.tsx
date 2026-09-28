@@ -50,7 +50,7 @@ function MediaPlaceholder({
 }
 
 function inactiveHint(kind: "image" | "video", failed: boolean, hasUrl: boolean) {
-  if (hasUrl && failed) return "媒体已失效";
+  if (hasUrl && failed) return "暂无图片";
   return kind === "video" ? "暂无成片" : "暂无预览";
 }
 

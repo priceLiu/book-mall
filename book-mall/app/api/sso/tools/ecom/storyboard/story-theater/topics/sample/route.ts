@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import {
   sampleStoryTheaterTopics,
@@ -16,12 +16,12 @@ function parseVertical(raw: string | null): StoryTheaterVertical | null {
 export async function GET(req: Request) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const url = new URL(req.url);
   const vertical = parseVertical(url.searchParams.get("vertical"));
   if (!vertical) {
-    return NextResponse.json({ error: "vertical 必填" }, { status: 400 });
+    return ecomJson({ error: "vertical 必填" }, { status: 400 });
   }
   const countRaw = url.searchParams.get("count");
   const count = countRaw ? Number.parseInt(countRaw, 10) : 5;
@@ -33,9 +33,9 @@ export async function GET(req: Request) {
       count: Number.isFinite(count) ? Math.min(Math.max(count, 1), 10) : 5,
       excludeIds: exclude,
     });
-    return NextResponse.json({ topics });
+    return ecomJson({ topics });
   } catch (e) {
     const message = e instanceof Error ? e.message : "加载失败";
-    return NextResponse.json({ error: message, topics: [] }, { status: 500 });
+    return ecomJson({ error: message, topics: [] }, { status: 500 });
   }
 }

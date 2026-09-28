@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { resumePendingSeedVideoPanelShots } from "@/lib/ecom/ecom-seed-video-panel-resume";
@@ -15,7 +15,7 @@ type Ctx = { params: Promise<{ id: string }> };
 /** 单独续查 pending 镜头任务，避免 GET 项目时 resume 占满 dev 单 worker、阻塞 panel/generate */
 export async function POST(_req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(_req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id: projectId } = await ctx.params;
 
   try {
@@ -24,7 +24,7 @@ export async function POST(_req: Request, ctx: Ctx) {
       resumePending: false,
     });
     if (!project) {
-      return NextResponse.json({ error: "项目不存在" }, { status: 404 });
+      return ecomJson({ error: "项目不存在" }, { status: 404 });
     }
 
     const resumed = await resumePendingSeedVideoPanelShots({
@@ -48,9 +48,9 @@ export async function POST(_req: Request, ctx: Ctx) {
     const fresh = await getEcomSeedVideoProject(auth.userId, projectId, {
       resumePending: false,
     });
-    return NextResponse.json({ project: fresh });
+    return ecomJson({ project: fresh });
   } catch (e) {
     const message = e instanceof Error ? e.message : "续查失败";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return ecomJson({ error: message }, { status: 502 });
   }
 }

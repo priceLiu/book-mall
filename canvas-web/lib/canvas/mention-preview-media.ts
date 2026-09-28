@@ -43,5 +43,8 @@ export function createMentionPreviewThumbEl(
   img.className = MENTION_THUMB_MEDIA_CLASS;
   img.style.width = `${sizePx}px`;
   img.style.height = `${sizePx}px`;
+  img.addEventListener("error", () => {
+    img.style.display = "none";
+  });
   return img;
 }

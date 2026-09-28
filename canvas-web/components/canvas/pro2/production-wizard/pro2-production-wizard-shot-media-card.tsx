@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Film, ImageIcon, Sparkles } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { LibtvMediaGeneratingState } from "@/components/canvas/libtv-media-generating-state";
@@ -8,10 +8,12 @@ import { MediaHoverBox } from "@/components/canvas/media-hover-box";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { buildWizardAssetMentionables } from "@/lib/canvas/pro2-production-wizard-assets";
+import { toWizardMentionHubPreviewSource } from "@/lib/canvas/pro2-wizard-asset-preview-url";
 import { useWizardJobProgressStatus } from "@/lib/canvas/pro2-wizard-asset-progress";
 import { wizardAssetDraftsShallowEqual } from "@/lib/canvas/pro2-wizard-asset-draft-patch";
 import { enqueueWizardShotGenerate } from "@/lib/canvas/pro2-wizard-shot-generate-queue";
 import { patchProductionWizardShotDraft } from "@/lib/canvas/pro2-wizard-shot-draft-patch";
+import { isUnstableTaskMediaUrl } from "@/lib/canvas/task-media-url";
 import type { Pro2ProductionWizardShotDraft } from "@/lib/canvas/pro2-production-wizard-shot-drafts";
 import {
   defaultWizardShotPrompt,
@@ -51,6 +53,44 @@ function draftVisualEqual(
   );
 }
 
+function pickRuntimePreviewUrl(
+  runtime:
+    | {
+        ossUrl?: string;
+        ephemeralUrl?: string;
+      }
+    | undefined,
+): string | undefined {
+  const oss = runtime?.ossUrl?.trim();
+  if (oss && /^https?:\/\//i.test(oss)) return oss;
+  const ephemeral = runtime?.ephemeralUrl?.trim();
+  if (ephemeral && /^https?:\/\//i.test(ephemeral)) return ephemeral;
+  return undefined;
+}
+
+function pickBestPreviewUrl(
+  ...urls: Array<string | undefined>
+): string | undefined {
+  const candidates = urls
+    .map((x) => x?.trim())
+    .filter((x): x is string => Boolean(x && /^https?:\/\//i.test(x)));
+  if (!candidates.length) return undefined;
+  const stable = candidates.find((x) => !isUnstableTaskMediaUrl(x));
+  return stable ?? candidates[0];
+}
+
+function buildPreviewCandidates(
+  ...urls: Array<string | undefined>
+): string[] {
+  const deduped = urls
+    .map((x) => x?.trim())
+    .filter((x): x is string => Boolean(x && /^https?:\/\//i.test(x)))
+    .filter((x, idx, arr) => arr.indexOf(x) === idx);
+  const stable = deduped.filter((x) => !isUnstableTaskMediaUrl(x));
+  const unstable = deduped.filter((x) => isUnstableTaskMediaUrl(x));
+  return [...stable, ...unstable];
+}
+
 export const Pro2ProductionWizardShotMediaCard = memo(
   function Pro2ProductionWizardShotMediaCard({
     mediaKind,
@@ -77,18 +117,60 @@ export const Pro2ProductionWizardShotMediaCard = memo(
 
     const prompt = draft?.prompt?.trim() || defaultPrompt;
     const refImages = draft?.refImages ?? [];
-    const assetDrafts = useCanvasStore((s) => {
+    const hubNodeData = useCanvasStore((s) => {
       const hub = s.nodes.find((n) => n.id === scriptHubId);
-      return (
-        (hub?.data as StoryProScriptHubNodeData | undefined)
-          ?.productionWizardAssetDrafts ?? {}
-      );
-    }, wizardAssetDraftsShallowEqual);
-    const mentionables = useMemo(
-      () => buildWizardAssetMentionables(script, refImages, undefined, assetDrafts),
-      [script, refImages, assetDrafts],
+      return (hub?.data as StoryProScriptHubNodeData | undefined) ?? null;
+    });
+    const assetDrafts = hubNodeData?.productionWizardAssetDrafts ?? {};
+    const hubPreview = useMemo(
+      () => toWizardMentionHubPreviewSource(scriptHubId, hubNodeData),
+      [scriptHubId, hubNodeData],
     );
-    const previewUrl = draft?.previewUrl;
+    const mentionables = useMemo(
+      () =>
+        buildWizardAssetMentionables(
+          script,
+          refImages,
+          undefined,
+          assetDrafts,
+          hubPreview,
+        ),
+      [script, refImages, assetDrafts, hubPreview],
+    );
+    const previewCandidates = useMemo(() => {
+      const rowKey = String(shotIndex);
+      const frameRow = hubNodeData?.scriptStudioFrameRows?.find(
+        (row) => row.key === rowKey,
+      );
+      const videoRow = hubNodeData?.scriptStudioVideoRows?.find(
+        (row) => row.key === rowKey,
+      );
+      if (mediaKind === "frame") {
+        return buildPreviewCandidates(
+          pickRuntimePreviewUrl(frameRow?.runtime),
+          draft?.previewUrl,
+        );
+      }
+      return buildPreviewCandidates(
+        pickRuntimePreviewUrl(videoRow?.videoRuntime),
+        videoRow?.frameImageUrl,
+        draft?.previewUrl,
+      );
+    }, [
+      draft?.previewUrl,
+      hubNodeData?.scriptStudioFrameRows,
+      hubNodeData?.scriptStudioVideoRows,
+      mediaKind,
+      shotIndex,
+    ]);
+    const [previewIndex, setPreviewIndex] = useState(0);
+    const previewCandidatesKey = previewCandidates.join("|");
+    useEffect(() => {
+      setPreviewIndex(0);
+    }, [previewCandidatesKey]);
+    const previewUrl =
+      previewCandidates[previewIndex] ??
+      pickBestPreviewUrl(draft?.previewUrl);
     const jobId = wizardShotDraftKey(mediaKind, shotIndex);
     const progressStatus = useWizardJobProgressStatus(jobId);
     const liveGenerateStatus = useCanvasStore((s) => {
@@ -225,6 +307,11 @@ export const Pro2ProductionWizardShotMediaCard = memo(
                 prompt={prompt}
                 promptMentionables={mentionables}
                 className={cn("size-full", isGenerating && "opacity-50")}
+                onImageError={() => {
+                  setPreviewIndex((idx) =>
+                    idx + 1 < previewCandidates.length ? idx + 1 : idx,
+                  );
+                }}
               />
             ) : !isGenerating ? (
               <div className="flex size-full flex-col items-center justify-center gap-2 px-3 text-center text-white/25">

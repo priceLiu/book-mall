@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { getEcomMediaDecomposeProject } from "@/lib/ecom/ecom-media-decompose-service";
@@ -13,7 +13,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id: projectId } = await ctx.params;
 
@@ -25,7 +25,7 @@ export async function POST(req: Request, ctx: Ctx) {
   }
   const workName = typeof body.workName === "string" ? body.workName.trim() : "";
   if (!workName) {
-    return NextResponse.json({ error: "请填写作品名" }, { status: 400 });
+    return ecomJson({ error: "请填写作品名" }, { status: 400 });
   }
 
   try {
@@ -36,11 +36,11 @@ export async function POST(req: Request, ctx: Ctx) {
       workName,
     });
     const refreshed = await getEcomMediaDecomposeProject(auth.userId, projectId);
-    return NextResponse.json({ snapshot, project: refreshed });
+    return ecomJson({ snapshot, project: refreshed });
   } catch (e) {
     const message = e instanceof Error ? e.message : "保存失败";
     const status =
       message === "项目不存在" ? 404 : message.includes("请先") ? 400 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

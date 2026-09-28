@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import {
   importTemplateGalleryItem,
@@ -18,14 +18,14 @@ export async function POST(req: Request) {
 
   const elig = await getToolsSsoEligibility(auth.userId);
   if (!elig.isAdmin) {
-    return NextResponse.json({ error: "需要管理员权限" }, { status: 403 });
+    return ecomJson({ error: "需要管理员权限" }, { status: 403 });
   }
 
   let body: Partial<TemplateGalleryUploadInput>;
   try {
     body = (await req.json()) as Partial<TemplateGalleryUploadInput>;
   } catch {
-    return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+    return ecomJson({ error: "无效 JSON" }, { status: 400 });
   }
 
   const category = body.category?.trim();
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   const mediaKind = body.mediaKind === "video" ? "video" : "image";
 
   if (!category || !id || !sourceUrl) {
-    return NextResponse.json(
+    return ecomJson(
       { error: "缺少 category / id / sourceUrl" },
       { status: 400 },
     );
@@ -55,11 +55,11 @@ export async function POST(req: Request) {
   });
 
   if (result.status === "failed") {
-    return NextResponse.json(
+    return ecomJson(
       { status: "failed", error: result.error },
       { status: 502 },
     );
   }
 
-  return NextResponse.json(result);
+  return ecomJson(result);
 }

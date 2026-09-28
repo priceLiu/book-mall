@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
@@ -15,14 +15,14 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   let form: FormData;
   try {
     form = await req.formData();
   } catch {
-    return NextResponse.json({ error: "无效表单" }, { status: 400 });
+    return ecomJson({ error: "无效表单" }, { status: 400 });
   }
 
   const slotId = String(form.get("slotId") ?? "").trim();
@@ -30,10 +30,10 @@ export async function POST(req: Request, ctx: Ctx) {
 
   const file = form.get("file");
   if (!(file instanceof Blob)) {
-    return NextResponse.json({ error: "缺少 file" }, { status: 400 });
+    return ecomJson({ error: "缺少 file" }, { status: 400 });
   }
   if (file.size > 30 * 1024 * 1024) {
-    return NextResponse.json({ error: "文件过大（最大 30MB）" }, { status: 413 });
+    return ecomJson({ error: "文件过大（最大 30MB）" }, { status: 413 });
   }
 
   try {
@@ -48,11 +48,11 @@ export async function POST(req: Request, ctx: Ctx) {
         slotId,
         buf,
       );
-      return NextResponse.json({ project, seedVideo, reference });
+      return ecomJson({ project, seedVideo, reference });
     }
 
     if (roleRaw !== "model" && roleRaw !== "product") {
-      return NextResponse.json(
+      return ecomJson(
         { error: "须提供 slotId，或 role 为 model / product（兼容旧版）" },
         { status: 400 },
       );
@@ -64,10 +64,10 @@ export async function POST(req: Request, ctx: Ctx) {
       roleRaw,
       buf,
     );
-    return NextResponse.json({ project, seedVideo, reference });
+    return ecomJson({ project, seedVideo, reference });
   } catch (e) {
     const message = e instanceof Error ? e.message : "上传失败";
     const status = message.includes("请先") || message.includes("缺少") || message.includes("无效") ? 400 : 502;
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

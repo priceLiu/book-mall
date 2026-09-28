@@ -218,6 +218,12 @@ export function Pro2ProductionWizardAssetStudioModal({
       ?.productionWizardAssetDrafts;
   }, [nodes, scriptHubId]);
 
+  const hubPreview = useMemo(() => {
+    const hub = nodes.find((n) => n.id === scriptHubId);
+    const hubData = (hub?.data as StoryProScriptHubNodeData | undefined) ?? null;
+    return hubData ? { scriptHubId, hubData } : undefined;
+  }, [nodes, scriptHubId]);
+
   const mentionables = useMemo(
     () =>
       buildWizardAssetMentionables(
@@ -225,8 +231,9 @@ export function Pro2ProductionWizardAssetStudioModal({
         refImages,
         { kind, assetId },
         assetDrafts,
+        hubPreview,
       ),
-    [script, refImages, kind, assetId, assetDrafts],
+    [script, refImages, kind, assetId, assetDrafts, hubPreview],
   );
 
   const batchImage = useMemo(

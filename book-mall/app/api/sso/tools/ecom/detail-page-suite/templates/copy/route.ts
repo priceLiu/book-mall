@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import type { DetailPageSuiteModuleDef } from "@/lib/ecom/detail-page-suite/types";
@@ -9,15 +9,15 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   let body: Record<string, unknown> = {};
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return ecomJson({ error: "Invalid JSON" }, { status: 400 });
   }
   if (typeof body.sourceId !== "string") {
-    return NextResponse.json({ error: "sourceId 必填" }, { status: 400 });
+    return ecomJson({ error: "sourceId 必填" }, { status: 400 });
   }
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
@@ -28,9 +28,9 @@ export async function POST(req: Request) {
       templateName: typeof body.templateName === "string" ? body.templateName : undefined,
       modules: Array.isArray(body.modules) ? (body.modules as DetailPageSuiteModuleDef[]) : undefined,
     });
-    return NextResponse.json({ item });
+    return ecomJson({ item });
   } catch (e) {
-    return NextResponse.json(
+    return ecomJson(
       { error: e instanceof Error ? e.message : "复制失败" },
       { status: 400 },
     );

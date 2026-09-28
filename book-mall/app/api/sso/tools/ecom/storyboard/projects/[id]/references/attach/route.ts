@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { ensureStoryboardRefImageForWan27 } from "@/lib/ecom/ecom-storyboard-ref-image";
@@ -21,7 +21,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id } = await ctx.params;
 
@@ -33,7 +33,7 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     body = (await req.json()) as typeof body;
   } catch {
-    return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+    return ecomJson({ error: "无效 JSON" }, { status: 400 });
   }
 
   const roleRaw = typeof body.role === "string" ? body.role : "product";
@@ -45,7 +45,7 @@ export async function POST(req: Request, ctx: Ctx) {
   if (body.modelEntry && typeof body.modelEntry === "object" && role === "character") {
     const entry = body.modelEntry as { id?: string; name?: string; ossUrl?: string };
     if (!entry.id || !entry.ossUrl) {
-      return NextResponse.json({ error: "modelEntry 无效" }, { status: 400 });
+      return ecomJson({ error: "modelEntry 无效" }, { status: 400 });
     }
     try {
       await assertEcomToolkitGatewayAccess(auth.userId);
@@ -55,12 +55,12 @@ export async function POST(req: Request, ctx: Ctx) {
         ossUrl: entry.ossUrl,
       });
       if (!project) {
-        return NextResponse.json({ error: "项目不存在" }, { status: 404 });
+        return ecomJson({ error: "项目不存在" }, { status: 404 });
       }
-      return NextResponse.json({ project });
+      return ecomJson({ project });
     } catch (e) {
       const message = e instanceof Error ? e.message : "挂载失败";
-      return NextResponse.json({ error: message }, { status: 500 });
+      return ecomJson({ error: message }, { status: 500 });
     }
   }
 
@@ -68,14 +68,14 @@ export async function POST(req: Request, ctx: Ctx) {
     ? [...new Set(body.assetIds.filter((v): v is string => typeof v === "string" && !!v.trim()))]
     : [];
   if (assetIds.length === 0) {
-    return NextResponse.json({ error: "请至少选择一张资产图" }, { status: 400 });
+    return ecomJson({ error: "请至少选择一张资产图" }, { status: 400 });
   }
 
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const project = await getEcomStoryboardProject(auth.userId, id);
     if (!project) {
-      return NextResponse.json({ error: "项目不存在" }, { status: 404 });
+      return ecomJson({ error: "项目不存在" }, { status: 404 });
     }
 
     const assets = await prisma.ecomAsset.findMany({
@@ -83,7 +83,7 @@ export async function POST(req: Request, ctx: Ctx) {
       select: { id: true, title: true, ossUrl: true },
     });
     if (assets.length === 0) {
-      return NextResponse.json({ error: "找不到所选资产" }, { status: 404 });
+      return ecomJson({ error: "找不到所选资产" }, { status: 404 });
     }
 
     const added: StoryboardReference[] = [];
@@ -102,7 +102,7 @@ export async function POST(req: Request, ctx: Ctx) {
       });
     }
     if (added.length === 0) {
-      return NextResponse.json({ error: "所选资产不可用" }, { status: 400 });
+      return ecomJson({ error: "所选资产不可用" }, { status: 400 });
     }
 
     const updated = await updateEcomStoryboardProject(auth.userId, id, {
@@ -111,9 +111,9 @@ export async function POST(req: Request, ctx: Ctx) {
           ? [...project.references.filter((r) => r.role !== role), ...added]
           : [...project.references, ...added],
     });
-    return NextResponse.json({ project: updated, added });
+    return ecomJson({ project: updated, added });
   } catch (e) {
     const message = e instanceof Error ? e.message : "挂载失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

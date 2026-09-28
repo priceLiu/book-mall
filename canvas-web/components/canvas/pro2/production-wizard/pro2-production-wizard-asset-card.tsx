@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { ImageIcon, Sparkles } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { LibtvMediaGeneratingState } from "@/components/canvas/libtv-media-generating-state";
@@ -10,6 +10,11 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import { enqueueWizardAssetGenerate } from "@/lib/canvas/pro2-wizard-asset-generate-queue";
 import { patchProductionWizardAssetDraft } from "@/lib/canvas/pro2-wizard-asset-draft-patch";
 import type { Pro2ProductionWizardAssetDraft } from "@/lib/canvas/pro2-production-wizard-assets";
+import {
+  resolveWizardAssetMentionPreviewCandidates,
+  toWizardMentionHubPreviewSource,
+} from "@/lib/canvas/pro2-wizard-asset-preview-url";
+import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import {
   defaultWizardAssetPrompt,
   WIZARD_ASSET_PLACEHOLDER,
@@ -76,6 +81,11 @@ export const Pro2ProductionWizardAssetCard = memo(function Pro2ProductionWizardA
   const projectId = useCanvasStore((s) => s.projectId) ?? "";
   const { providers } = useUserProviders();
   const [studioOpen, setStudioOpen] = useState(false);
+  const hubNodeData = useCanvasStore((s) => {
+    const hub = s.nodes.find((n) => n.id === scriptHubId);
+    return (hub?.data as StoryProScriptHubNodeData | undefined) ?? null;
+  });
+  const nodes = useCanvasStore((s) => s.nodes);
 
   const assetSource = useMemo(
     () => resolveAssetSource(kind, assetId, script),
@@ -97,7 +107,64 @@ export const Pro2ProductionWizardAssetCard = memo(function Pro2ProductionWizardA
 
   const prompt = draft?.prompt?.trim() || defaultPrompt;
   const refImages = draft?.refImages ?? [];
-  const previewUrl = draft?.previewUrl;
+  const hubPreview = useMemo(
+    () => toWizardMentionHubPreviewSource(scriptHubId, hubNodeData),
+    [scriptHubId, hubNodeData],
+  );
+  const previewCandidates = useMemo(() => {
+    const resolved = resolveWizardAssetMentionPreviewCandidates(
+      kind,
+      assetId,
+      hubNodeData?.productionWizardAssetDrafts,
+      hubPreview,
+    );
+    const nodeCandidates: string[] = [];
+    if (kind === "character") {
+      for (const n of nodes) {
+        if (n.type !== "story-pro2-three-view") continue;
+        const d = n.data as {
+          pro2RowKey?: string;
+          ossUrl?: string;
+          runtime?: { ossUrl?: string; ephemeralUrl?: string };
+        };
+        if (d.pro2RowKey !== assetId) continue;
+        for (const u of [d.ossUrl, d.runtime?.ossUrl, d.runtime?.ephemeralUrl]) {
+          const t = u?.trim();
+          if (t?.startsWith("http") && !nodeCandidates.includes(t)) {
+            nodeCandidates.push(t);
+          }
+        }
+      }
+    } else if (kind === "prop") {
+      for (const n of nodes) {
+        if (n.type !== "story-pro2-prop") continue;
+        const d = n.data as {
+          scriptStudioSourceRowKey?: string;
+          ossUrl?: string;
+          runtime?: { ossUrl?: string; ephemeralUrl?: string };
+        };
+        if (d.scriptStudioSourceRowKey !== assetId) continue;
+        for (const u of [d.ossUrl, d.runtime?.ossUrl, d.runtime?.ephemeralUrl]) {
+          const t = u?.trim();
+          if (t?.startsWith("http") && !nodeCandidates.includes(t)) {
+            nodeCandidates.push(t);
+          }
+        }
+      }
+    }
+    for (const c of nodeCandidates) {
+      if (!resolved.includes(c)) resolved.unshift(c);
+    }
+    const fallback = draft?.previewUrl?.trim();
+    if (fallback && !resolved.includes(fallback)) resolved.push(fallback);
+    return resolved;
+  }, [assetId, draft?.previewUrl, hubNodeData, hubPreview, kind, nodes]);
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const previewCandidatesKey = previewCandidates.join("|");
+  useEffect(() => {
+    setPreviewIndex(0);
+  }, [previewCandidatesKey]);
+  const previewUrl = previewCandidates[previewIndex];
   const generateStatus = draft?.generateStatus ?? "idle";
   const isGenerating = generateStatus === "running";
 
@@ -208,6 +275,11 @@ export const Pro2ProductionWizardAssetCard = memo(function Pro2ProductionWizardA
               previewChrome="ecom"
               prompt={prompt}
               className="size-full"
+              onImageError={() => {
+                setPreviewIndex((idx) =>
+                  idx + 1 < previewCandidates.length ? idx + 1 : idx,
+                );
+              }}
             />
           ) : (
             <div className="flex size-full flex-col items-center justify-center gap-2 px-3 text-center text-white/25">

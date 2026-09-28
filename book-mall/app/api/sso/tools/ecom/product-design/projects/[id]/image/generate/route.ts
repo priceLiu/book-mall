@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import type { EcomImageRatio } from "@/lib/ecom/ecom-platform-spec";
 import {
@@ -19,7 +19,7 @@ const RATIOS: EcomImageRatio[] = ["1:1", "3:4", "4:5", "16:9"];
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id } = await ctx.params;
 
@@ -27,7 +27,7 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+    return ecomJson({ error: "无效 JSON" }, { status: 400 });
   }
 
   const target: ProductDesignImageTarget = body.target === "detail" ? "detail" : "main";
@@ -58,7 +58,7 @@ export async function POST(req: Request, ctx: Ctx) {
       concurrency,
     });
     const project = await getProductDesignProject(auth.userId, id);
-    return NextResponse.json({
+    return ecomJson({
       project,
       generated: result.generated,
       failures: result.failures,
@@ -66,6 +66,6 @@ export async function POST(req: Request, ctx: Ctx) {
   } catch (e) {
     const message = e instanceof Error ? e.message : "生成失败";
     const status = message.includes("不存在") ? 404 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

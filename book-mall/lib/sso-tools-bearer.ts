@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { beginEcomGatewayLogCapture } from "@/lib/ecom/ecom-gateway-log-capture";
 import { requireToolsJwtSecret } from "@/lib/sso-tools-env";
 import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
 
@@ -6,6 +7,7 @@ import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
 export function verifyToolsBearer(req: Request):
   | { ok: true; userId: string; preferredTenantId?: string }
   | { ok: false; res: NextResponse } {
+  beginEcomGatewayLogCapture();
   let jwtSecret: string;
   try {
     jwtSecret = requireToolsJwtSecret();

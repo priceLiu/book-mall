@@ -1674,6 +1674,7 @@ function DetailPageSuiteStudioInner() {
           dialogTitle={pickerDialogTitle}
           dialogDescription={`展示比例 ${displayRatio}；出图前请确认模型与尺寸参数。`}
           confirmLabel={imagePicker.settingsOnly ? "保存设置" : "开始生图"}
+          previewCount={Math.max(1, imagePicker.slotKeys?.length ?? 1)}
           models={imageModels}
           value={imageModelKey}
           onChange={setImageModelKey}

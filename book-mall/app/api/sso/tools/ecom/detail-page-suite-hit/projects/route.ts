@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
@@ -12,18 +12,18 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const url = new URL(req.url);
     if (url.searchParams.get("summary") === "1") {
       const items = await listDetailPageSuiteHitSummaries(auth.userId);
-      return NextResponse.json({ items });
+      return ecomJson({ items });
     }
     const items = await listDetailPageSuiteHitProjects(auth.userId);
-    return NextResponse.json({ items });
+    return ecomJson({ items });
   } catch (e) {
-    return NextResponse.json(
+    return ecomJson(
       { error: e instanceof Error ? e.message : "加载失败" },
       { status: 500 },
     );
@@ -32,7 +32,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   let body: Record<string, unknown> = {};
   try {
     body = (await req.json()) as Record<string, unknown>;
@@ -43,9 +43,9 @@ export async function POST(req: Request) {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const title = typeof body.title === "string" ? body.title : undefined;
     const project = await createDetailPageSuiteHitProject(auth.userId, { title });
-    return NextResponse.json({ project });
+    return ecomJson({ project });
   } catch (e) {
-    return NextResponse.json(
+    return ecomJson(
       { error: e instanceof Error ? e.message : "创建失败" },
       { status: 500 },
     );

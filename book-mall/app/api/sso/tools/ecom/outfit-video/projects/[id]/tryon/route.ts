@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { runEcomOutfitVideoTryonPreview } from "@/lib/ecom/ecom-outfit-video-service";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
@@ -11,12 +11,12 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(_req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(_req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   try {
     const project = await runEcomOutfitVideoTryonPreview(auth.userId, id);
-    return NextResponse.json({ project });
+    return ecomJson({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "AI 试衣失败";
     const status =
@@ -25,6 +25,6 @@ export async function POST(_req: Request, ctx: Ctx) {
       message.includes("已锁定")
         ? 400
         : 500;
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

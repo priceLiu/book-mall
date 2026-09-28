@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { isHandCraftStepId } from "@/lib/ecom/ecom-hand-craft-steps";
 import {
@@ -13,23 +13,23 @@ type Ctx = { params: Promise<{ id: string; stepId: string }> };
 
 export async function PATCH(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id, stepId } = await ctx.params;
   if (!isHandCraftStepId(stepId)) {
-    return NextResponse.json({ error: "未知步骤" }, { status: 400 });
+    return ecomJson({ error: "未知步骤" }, { status: 400 });
   }
 
   let body: { items?: unknown; reset?: unknown };
   try {
     body = (await req.json()) as typeof body;
   } catch {
-    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+    return ecomJson({ error: "invalid_json" }, { status: 400 });
   }
 
   try {
     if (body.reset === true) {
       const project = await resetHandCraftStepSlots(auth.userId, id, stepId);
-      return NextResponse.json({ project });
+      return ecomJson({ project });
     }
 
     const items = Array.isArray(body.items)
@@ -48,13 +48,13 @@ export async function PATCH(req: Request, ctx: Ctx) {
         })
       : [];
     if (items.length === 0) {
-      return NextResponse.json({ error: "缺少 items" }, { status: 400 });
+      return ecomJson({ error: "缺少 items" }, { status: 400 });
     }
 
     const project = await patchHandCraftSlotPrompts(auth.userId, id, stepId, items);
-    return NextResponse.json({ project });
+    return ecomJson({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "保存失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

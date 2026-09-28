@@ -101,7 +101,7 @@ export function ProjectCoverMedia({
     return (
       <CoverPlaceholder
         placeholderLetter={placeholderLetter}
-        hint={mediaSrc && failed ? "封面已失效" : "等待出图"}
+        hint={mediaSrc && failed ? "暂无封面" : "等待出图"}
       />
     );
   }

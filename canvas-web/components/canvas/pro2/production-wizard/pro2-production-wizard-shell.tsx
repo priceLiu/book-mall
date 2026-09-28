@@ -19,6 +19,9 @@ import { remountAllWizardShotDraftsToHub } from "@/lib/canvas/pro2-wizard-shot-m
 import { recoverWizardShotDraftsFromTasks } from "@/lib/canvas/pro2-wizard-shot-recover";
 import type { WizardShotInflightResumeTarget } from "@/lib/canvas/pro2-wizard-shot-recover";
 import { mountProductionScaffoldToCanvasFromStore, syncProductionScaffoldDataToHubFromStore } from "@/lib/canvas/hydrate-production-scaffold";
+import { CANVAS_RF_FOCUS_NODE_SET_EVENT } from "@/lib/canvas/canvas-rf-sync";
+import { listProductionWizardFocusNodeIdsFromStore } from "@/lib/canvas/pro2-production-wizard-canvas-mount";
+import { canvasNotify } from "@/lib/canvas/canvas-notify";
 import { applyProductionScriptDirectToHub } from "@/lib/canvas/pro2-production-script-apply";
 import { reconcileProductionScriptEntityLinks } from "@/lib/canvas/pro2-shot-entity-reconcile";
 import { isPro2ProductionWizardHub } from "@/lib/canvas/pro2-production-wizard";
@@ -185,66 +188,73 @@ export function Pro2ProductionWizardShell({
 
   const recoverAndResumeWizardJobs = useCallback(async () => {
     if (!base?.trim() || !projectId.trim()) return;
-    await recoverWizardAssetDraftsFromTasks(scriptHubId, base, projectId);
-    const { inflight } = await recoverWizardShotDraftsFromTasks(
-      scriptHubId,
-      base,
-      projectId,
-    );
-    const hub = useCanvasStore
-      .getState()
-      .nodes.find((n) => n.id === scriptHubId);
-    const data = (hub?.data ?? hubDataProp) as StoryProScriptHubNodeData;
-    const assetDrafts = data.productionWizardAssetDrafts ?? {};
-    const shotDraftsMap = data.productionWizardShotDrafts ?? {};
+    try {
+      await recoverWizardAssetDraftsFromTasks(scriptHubId, base, projectId);
+      const { inflight } = await recoverWizardShotDraftsFromTasks(
+        scriptHubId,
+        base,
+        projectId,
+      );
+      const hub = useCanvasStore
+        .getState()
+        .nodes.find((n) => n.id === scriptHubId);
+      const data = (hub?.data ?? hubDataProp) as StoryProScriptHubNodeData;
+      const assetDrafts = data.productionWizardAssetDrafts ?? {};
+      const shotDraftsMap = data.productionWizardShotDrafts ?? {};
 
-    if (script) {
-      for (const [key, draft] of Object.entries(assetDrafts)) {
-        if (draft.generateStatus !== "running" || !draft.taskId?.trim()) {
-          continue;
-        }
-        const resumeKey = `${key}:${draft.taskId}`;
-        if (resumedTasksRef.current.has(resumeKey)) continue;
-        resumedTasksRef.current.add(resumeKey);
-        const parsed = parseWizardAssetDraftKey(key);
-        if (!parsed) continue;
-        const { kind, assetId } = parsed;
-        const label =
-          kind === "character"
-            ? script.characters?.find((c) => c.id === assetId)?.name
-            : kind === "scene"
-              ? script.scenes?.find((s) => s.id === assetId)?.name
-              : script.props?.find((p) => p.id === assetId)?.name;
-        if (!label?.trim()) continue;
-        resumeWizardAssetGenerate({
-          label,
-          scriptHubId,
-          kind,
-          assetId,
-          base,
-          projectId,
-          settings: {
-            engine: {
-              providerId: draft.providerId ?? "",
-              modelKey: draft.modelKey ?? "",
-              params: draft.params ?? {},
+      if (script) {
+        for (const [key, draft] of Object.entries(assetDrafts)) {
+          if (draft.generateStatus !== "running" || !draft.taskId?.trim()) {
+            continue;
+          }
+          const resumeKey = `${key}:${draft.taskId}`;
+          if (resumedTasksRef.current.has(resumeKey)) continue;
+          resumedTasksRef.current.add(resumeKey);
+          const parsed = parseWizardAssetDraftKey(key);
+          if (!parsed) continue;
+          const { kind, assetId } = parsed;
+          const label =
+            kind === "character"
+              ? script.characters?.find((c) => c.id === assetId)?.name
+              : kind === "scene"
+                ? script.scenes?.find((s) => s.id === assetId)?.name
+                : script.props?.find((p) => p.id === assetId)?.name;
+          if (!label?.trim()) continue;
+          resumeWizardAssetGenerate({
+            label,
+            scriptHubId,
+            kind,
+            assetId,
+            base,
+            projectId,
+            settings: {
+              engine: {
+                providerId: draft.providerId ?? "",
+                modelKey: draft.modelKey ?? "",
+                params: draft.params ?? {},
+              },
+              aspectRatio: "16:9",
+              imageQuality: "standard",
+              resolution: "2K",
+              outputCount: 1,
             },
-            aspectRatio: "16:9",
-            imageQuality: "standard",
-            resolution: "2K",
-            outputCount: 1,
-          },
-          prompt: draft.prompt ?? "",
-          refImages: draft.refImages ?? [],
-          script,
-          taskId: draft.taskId,
-        });
+            prompt: draft.prompt ?? "",
+            refImages: draft.refImages ?? [],
+            script,
+            taskId: draft.taskId,
+          });
+        }
       }
-    }
 
-    resumeWizardShotInflightJobs(inflight, shotDraftsMap);
-    remountAllWizardAssetDraftsToHub(scriptHubId);
-    remountAllWizardShotDraftsToHub(scriptHubId);
+      resumeWizardShotInflightJobs(inflight, shotDraftsMap);
+      remountAllWizardAssetDraftsToHub(scriptHubId);
+      remountAllWizardShotDraftsToHub(scriptHubId);
+    } catch (error) {
+      console.warn(
+        "[pro2-production-wizard] recover from tasks failed",
+        error,
+      );
+    }
   }, [
     base,
     hubDataProp,
@@ -339,16 +349,38 @@ export function Pro2ProductionWizardShell({
 
   const onMountToCanvas = useCallback(() => {
     if (hubId) {
+      onClose();
+      canvasNotify({
+        title: "正在放入画布",
+        message: "正在整理节点与连线，请稍候…",
+      });
       void (async () => {
-        await recoverAndResumeWizardJobs();
-        syncProductionScaffoldDataToHubFromStore(hubId);
-        mountProductionScaffoldToCanvasFromStore(hubId);
-        window.dispatchEvent(
-          new CustomEvent("canvas:focus-node", {
-            detail: { nodeId: hubId },
-          }),
-        );
-        onClose();
+        try {
+          await recoverAndResumeWizardJobs();
+          syncProductionScaffoldDataToHubFromStore(hubId);
+          mountProductionScaffoldToCanvasFromStore(hubId);
+          const focusNodeIds = listProductionWizardFocusNodeIdsFromStore(hubId);
+          if (focusNodeIds.length > 0) {
+            window.dispatchEvent(
+              new CustomEvent(CANVAS_RF_FOCUS_NODE_SET_EVENT, {
+                detail: { nodeIds: focusNodeIds },
+              }),
+            );
+          }
+          window.dispatchEvent(
+            new CustomEvent("canvas:focus-node", {
+              detail: { nodeId: hubId },
+            }),
+          );
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "放入画布失败，请重试";
+          canvasNotify({
+            title: "放入画布失败",
+            message,
+            variant: "error",
+          });
+        }
       })();
       return;
     }

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { persistProductDesignWorkflowSnapshot } from "@/lib/ecom/ecom-product-design-snapshot";
@@ -12,7 +12,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id: projectId } = await ctx.params;
 
@@ -24,7 +24,7 @@ export async function POST(req: Request, ctx: Ctx) {
   }
   const productName = typeof body.productName === "string" ? body.productName.trim() : "";
   if (!productName) {
-    return NextResponse.json({ error: "请填写产品名" }, { status: 400 });
+    return ecomJson({ error: "请填写产品名" }, { status: 400 });
   }
 
   try {
@@ -34,11 +34,11 @@ export async function POST(req: Request, ctx: Ctx) {
       projectId,
       productName,
     });
-    return NextResponse.json({ snapshot });
+    return ecomJson({ snapshot });
   } catch (e) {
     const message = e instanceof Error ? e.message : "保存失败";
     const status =
       message === "项目不存在" ? 404 : message.includes("请先") ? 400 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

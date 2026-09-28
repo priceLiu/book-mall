@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import {
   imageGenPlanItemSchema,
@@ -14,7 +14,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function PATCH(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id } = await ctx.params;
 
@@ -22,7 +22,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+    return ecomJson({ error: "无效 JSON" }, { status: 400 });
   }
 
   const target = body.target === "detail" ? "detail" : "main";
@@ -31,7 +31,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   if (body.productContext && typeof body.productContext === "object") {
     const parsed = productContextSchema.safeParse(body.productContext);
     if (!parsed.success) {
-      return NextResponse.json({ error: "productContext 格式不正确" }, { status: 400 });
+      return ecomJson({ error: "productContext 格式不正确" }, { status: 400 });
     }
     productContext = parsed.data;
   }
@@ -42,7 +42,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     for (const row of body.items) {
       const parsed = imageGenPlanItemSchema.safeParse(row);
       if (!parsed.success) {
-        return NextResponse.json({ error: "items 格式不正确" }, { status: 400 });
+        return ecomJson({ error: "items 格式不正确" }, { status: 400 });
       }
       items.push(parsed.data);
     }
@@ -60,9 +60,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
       sharedVisualBrief,
       items,
     });
-    return NextResponse.json({ plan: result.plan, project: result.project });
+    return ecomJson({ plan: result.plan, project: result.project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "更新失败";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return ecomJson({ error: message }, { status: 400 });
   }
 }

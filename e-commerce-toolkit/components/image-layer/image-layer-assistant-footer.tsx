@@ -2,7 +2,9 @@
 
 import { Eraser, Layers, Loader2, Paintbrush } from "lucide-react";
 
+import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-credits-beside";
 import { EcomButtonPrimary } from "@/components/ui/ecom-button";
+import { IMAGE_LAYER_ERASE_MODEL_KEY } from "@/lib/image-layer-local-edit-constants";
 import type { ImageLayerCanvasToolMode } from "@/lib/image-layer-tool-mode";
 
 export function ImageLayerAssistantFooter({
@@ -11,6 +13,7 @@ export function ImageLayerAssistantFooter({
   retouchBusy,
   eraseBusy,
   retouchPrompt,
+  retouchModelKey,
   onRetouchSubmit,
   onEraseSubmit,
 }: {
@@ -19,11 +22,15 @@ export function ImageLayerAssistantFooter({
   retouchBusy: boolean;
   eraseBusy: boolean;
   retouchPrompt: string;
+  retouchModelKey?: string;
   onRetouchSubmit: () => void;
   onEraseSubmit: () => void;
 }) {
-  if (toolMode === "retouch") {
-    return (
+  const creditsModel =
+    toolMode === "erase" ? IMAGE_LAYER_ERASE_MODEL_KEY : retouchModelKey;
+  if (toolMode === "retouch" || toolMode === "erase") {
+    const button =
+      toolMode === "retouch" ? (
       <EcomButtonPrimary
         type="button"
         fullWidth
@@ -38,11 +45,7 @@ export function ImageLayerAssistantFooter({
           )}
         开始重绘
       </EcomButtonPrimary>
-    );
-  }
-
-  if (toolMode === "erase") {
-    return (
+      ) : (
       <EcomButtonPrimary
         type="button"
         fullWidth
@@ -57,6 +60,12 @@ export function ImageLayerAssistantFooter({
           )}
         开始擦除补全
       </EcomButtonPrimary>
+      );
+    return (
+      <div className="flex items-center gap-3">
+        <EcomGenerateCreditsBeside modelKey={creditsModel} imageCount={1} />
+        <div className="min-w-0 flex-1">{button}</div>
+      </div>
     );
   }
 

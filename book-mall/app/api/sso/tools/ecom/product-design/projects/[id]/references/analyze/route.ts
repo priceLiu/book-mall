@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
@@ -16,7 +16,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id } = await ctx.params;
 
@@ -24,7 +24,7 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     body = (await req.json()) as typeof body;
   } catch {
-    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+    return ecomJson({ error: "invalid_json" }, { status: 400 });
   }
 
   const target = body.target === "detail" ? "detail" : "main";
@@ -46,12 +46,12 @@ export async function POST(req: Request, ctx: Ctx) {
       analysisMode,
     });
     const project = await getProductDesignProject(auth.userId, id);
-    return NextResponse.json({
+    return ecomJson({
       entry: result.entry,
       project,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "分析失败";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return ecomJson({ error: message }, { status: 400 });
   }
 }

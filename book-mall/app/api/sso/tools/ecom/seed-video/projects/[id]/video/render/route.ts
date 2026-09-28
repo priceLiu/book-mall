@@ -1,5 +1,5 @@
 import { MediaRenderSourceApp } from "@prisma/client";
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 import type { Prisma } from "@prisma/client";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
@@ -21,13 +21,13 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id: projectId } = await ctx.params;
 
   const project = await getEcomSeedVideoProject(auth.userId, projectId);
   const shots = project?.plan?.shots ?? [];
   if (shots.length === 0) {
-    return NextResponse.json({ error: "请先完成镜头表并生成各镜视频" }, { status: 400 });
+    return ecomJson({ error: "请先完成镜头表并生成各镜视频" }, { status: 400 });
   }
 
   let profile = parseRenderProfile(null);
@@ -51,18 +51,18 @@ export async function POST(req: Request, ctx: Ctx) {
     : shots;
 
   if (indexFilter && targetShots.length === 0) {
-    return NextResponse.json({ error: "所选镜头不存在或已被删除" }, { status: 400 });
+    return ecomJson({ error: "所选镜头不存在或已被删除" }, { status: 400 });
   }
 
   const missingVideo = targetShots.filter((s) => !s.videoUrl?.trim());
   if (missingVideo.length > 0) {
-    return NextResponse.json({ error: "请先为所选镜头生成镜头视频后再合成" }, { status: 400 });
+    return ecomJson({ error: "请先为所选镜头生成镜头视频后再合成" }, { status: 400 });
   }
   const missingTts = targetShots.filter(
     (s) => s.videoUrl?.trim() && s.voiceover?.trim() && !s.ttsUrl?.trim(),
   );
   if (missingTts.length > 0) {
-    return NextResponse.json(
+    return ecomJson(
       { error: "所选镜头中有口播尚未 TTS，请先批量 TTS 后再合成" },
       { status: 400 },
     );
@@ -74,7 +74,7 @@ export async function POST(req: Request, ctx: Ctx) {
       shotIndexes: indexFilter ? [...indexFilter] : undefined,
     });
     if (timeline.clips.length < 1) {
-      return NextResponse.json({ error: "请至少生成 1 个镜头视频后再合成" }, { status: 400 });
+      return ecomJson({ error: "请至少生成 1 个镜头视频后再合成" }, { status: 400 });
     }
 
     const job = await createMediaRenderJob({
@@ -96,27 +96,27 @@ export async function POST(req: Request, ctx: Ctx) {
       status: "rendering",
     });
 
-    return NextResponse.json({ jobId: job.id, expiresAt: job.expiresAt.toISOString() });
+    return ecomJson({ jobId: job.id, expiresAt: job.expiresAt.toISOString() });
   } catch (e) {
     if (e instanceof MediaRenderUnavailableError) {
-      return NextResponse.json({ error: e.message }, { status: 503 });
+      return ecomJson({ error: e.message }, { status: 503 });
     }
     const message = e instanceof Error ? e.message : "合成失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }
 
 export async function GET(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id: projectId } = await ctx.params;
 
   const project = await getEcomSeedVideoProject(auth.userId, projectId);
   const jobId = project?.plan?.render?.jobId;
-  if (!jobId) return NextResponse.json({ status: "idle" });
+  if (!jobId) return ecomJson({ status: "idle" });
 
   const job = await getMediaRenderJobForUser(auth.userId, jobId);
-  if (!job) return NextResponse.json({ status: "idle" });
+  if (!job) return ecomJson({ status: "idle" });
 
   if (job.status === "SUCCEEDED" && job.downloadUrl) {
     await updateEcomSeedVideoProject(auth.userId, projectId, {
@@ -131,7 +131,7 @@ export async function GET(req: Request, ctx: Ctx) {
     });
   }
 
-  return NextResponse.json({
+  return ecomJson({
     status: job.status.toLowerCase(),
     jobId,
     progress: job.progress,

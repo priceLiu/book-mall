@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { generateEcomOutfitVideoShot } from "@/lib/ecom/ecom-outfit-video-service";
@@ -13,11 +13,11 @@ type Ctx = { params: Promise<{ id: string; index: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id, index: indexRaw } = await ctx.params;
   const sceneIndex = Number.parseInt(indexRaw, 10);
   if (!Number.isFinite(sceneIndex) || sceneIndex < 1) {
-    return NextResponse.json({ error: "无效镜号" }, { status: 400 });
+    return ecomJson({ error: "无效镜号" }, { status: 400 });
   }
 
   let mock = isOutfitVideoMockAllowed();
@@ -39,9 +39,9 @@ export async function POST(req: Request, ctx: Ctx) {
       mock,
       videoModelKey,
     });
-    return NextResponse.json({ project, envelope, mock });
+    return ecomJson({ project, envelope, mock });
   } catch (e) {
     const message = e instanceof Error ? e.message : "生成失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

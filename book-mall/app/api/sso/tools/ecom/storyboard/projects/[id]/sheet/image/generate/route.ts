@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { ecomGenerateStoryboardSheetImage } from "@/lib/ecom/ecom-storyboard-image";
@@ -16,7 +16,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id: projectId } = await ctx.params;
 
@@ -29,12 +29,12 @@ export async function POST(req: Request, ctx: Ctx) {
 
   let project = await getEcomStoryboardProject(auth.userId, projectId);
   if (!project) {
-    return NextResponse.json({ error: "项目不存在" }, { status: 404 });
+    return ecomJson({ error: "项目不存在" }, { status: 404 });
   }
   if (!project.sheet) {
     const synced = await syncEcomStoryboardSheetFromMeta(auth.userId, projectId);
     if (!synced.sheet) {
-      return NextResponse.json(
+      return ecomJson(
         { error: "无法从交付内容解析结构化分镜，请让助手重新输出完整分镜表" },
         { status: 400 },
       );
@@ -42,7 +42,7 @@ export async function POST(req: Request, ctx: Ctx) {
     project = await getEcomStoryboardProject(auth.userId, projectId);
   }
   if (!project?.sheet) {
-    return NextResponse.json({ error: "请先生成分镜故事版" }, { status: 400 });
+    return ecomJson({ error: "请先生成分镜故事版" }, { status: 400 });
   }
 
   const wf = project.meta?.workflow ?? {};
@@ -90,10 +90,11 @@ export async function POST(req: Request, ctx: Ctx) {
       panelIndex,
     });
 
-    return NextResponse.json({
+    return ecomJson({
       sheet: result.sheet,
       references: result.references,
       chargePoints: result.chargePoints,
+      logIds: result.logIds,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "分镜图生成失败";
@@ -103,6 +104,6 @@ export async function POST(req: Request, ctx: Ctx) {
         : message.includes("余额")
           ? 402
           : 500;
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

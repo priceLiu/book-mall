@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { reuseStoryboardLibraryItem } from "@/lib/ecom/ecom-storyboard-reuse";
@@ -12,7 +12,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id: projectId } = await ctx.params;
 
@@ -27,10 +27,10 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const project = await reuseStoryboardLibraryItem(auth.userId, projectId, savedAt);
-    return NextResponse.json({ project });
+    return ecomJson({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "复用失败";
     const status = message.includes("不存在") || message.includes("找不到") ? 404 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

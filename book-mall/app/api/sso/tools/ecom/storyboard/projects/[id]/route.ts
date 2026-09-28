@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
@@ -19,29 +19,29 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function GET(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id } = await ctx.params;
   const project = await getEcomStoryboardProject(auth.userId, id, {
     stripSnapshotHistory: true,
   });
   if (!project) {
-    return NextResponse.json({ error: "未找到" }, { status: 404 });
+    return ecomJson({ error: "未找到" }, { status: 404 });
   }
-  return NextResponse.json({ project });
+  return ecomJson({ project });
 }
 
 export async function PATCH(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id } = await ctx.params;
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+    return ecomJson({ error: "无效 JSON" }, { status: 400 });
   }
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
@@ -67,24 +67,24 @@ export async function PATCH(req: Request, ctx: Ctx) {
       patch.meta = body.meta as Record<string, unknown>;
     }
     const project = await updateEcomStoryboardProject(auth.userId, id, patch);
-    return NextResponse.json({ project });
+    return ecomJson({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "更新失败";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return ecomJson({ error: message }, { status: 400 });
   }
 }
 
 export async function DELETE(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id } = await ctx.params;
   try {
     await deleteEcomStoryboardProject(auth.userId, id);
-    return NextResponse.json({ ok: true });
+    return ecomJson({ ok: true });
   } catch (e) {
     const message = e instanceof Error ? e.message : "删除失败";
-    return NextResponse.json({ error: message }, { status: 404 });
+    return ecomJson({ error: message }, { status: 404 });
   }
 }

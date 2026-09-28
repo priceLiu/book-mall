@@ -42,6 +42,8 @@ import {
 import { useImageZoomPan } from "@/lib/media/use-image-zoom-pan";
 import type { MentionableItem } from "@/components/canvas/mentions/MentionsTextarea";
 import { WizardPromptReadonly } from "@/components/canvas/mentions/wizard-prompt-readonly";
+import { CanvasBrandLoadingLogo } from "@/components/home/canvas-brand-loading-logo";
+import { cn } from "@/lib/utils";
 import {
   readElementShortSide,
   resolveCanvasMediaPreviewChrome,
@@ -128,7 +130,9 @@ export function MediaHoverBox({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const [stageShortSide, setStageShortSide] = useState(160);
+  const rasterSrcRef = useRef("");
   const overlayBtnClass =
     previewIconSize === "lg" ? OVERLAY_ICON_BTN_LG : OVERLAY_ICON_BTN;
   const overlayIconClass =
@@ -137,9 +141,16 @@ export function MediaHoverBox({
     () => resolveCanvasMediaPreviewChrome(stageShortSide),
     [stageShortSide],
   );
+  const kind =
+    mediaKind ?? (src && isVideoMediaUrl(src) ? "video" : "image");
+  const rasterDisplaySrc =
+    kind === "video" && posterUrl?.trim() ? posterUrl.trim() : src?.trim() ?? "";
+  rasterSrcRef.current = rasterDisplaySrc;
+
   useEffect(() => {
     setImageLoadFailed(false);
-  }, [src, posterUrl]);
+    setImageLoaded(isMediaSrcLoaded(rasterDisplaySrc));
+  }, [rasterDisplaySrc]);
 
   const alreadyLoaded = isMediaSrcLoaded(src);
   /** 视频默认 lazy；仅已加载过的 src 或纯图片生成态 eager，避免开画布时并发拉满 mp4 */
@@ -165,7 +176,8 @@ export function MediaHoverBox({
 
   const markLoaded = useCallback(
     (e?: SyntheticEvent<HTMLImageElement>) => {
-      markMediaSrcLoaded(src);
+      markMediaSrcLoaded(rasterDisplaySrc || src);
+      setImageLoaded(true);
       const el = e?.currentTarget;
       if (el && onNaturalSize) {
         const w = el.naturalWidth || 0;
@@ -173,10 +185,42 @@ export function MediaHoverBox({
         if (w >= 1 && h >= 1) onNaturalSize({ w, h });
       }
     },
-    [src, onNaturalSize],
+    [onNaturalSize, rasterDisplaySrc, src],
   );
-  const kind =
-    mediaKind ?? (src && isVideoMediaUrl(src) ? "video" : "image");
+
+  const onRasterError = useCallback(
+    (e: SyntheticEvent<HTMLImageElement>) => {
+      const failedUrl = e.currentTarget.currentSrc || e.currentTarget.src;
+      if (failedUrl && rasterSrcRef.current && !failedUrl.includes(rasterSrcRef.current.split("?")[0] ?? "")) {
+        return;
+      }
+      onImageError?.();
+      setImageLoadFailed(true);
+    },
+    [onImageError],
+  );
+
+  const rasterFitClass =
+    naturalSize
+      ? fit === "cover"
+        ? "block h-auto w-full object-cover"
+        : "block h-auto w-full object-contain"
+      : fit === "cover"
+        ? "h-full w-full object-cover object-center"
+        : "h-full w-full object-contain object-center";
+
+  const usesRasterImage =
+    kind === "image" || (kind === "video" && Boolean(posterUrl?.trim()));
+  const showRasterLoading =
+    usesRasterImage &&
+    Boolean(src) &&
+    (!mediaReady || (mediaReady && !imageLoaded && !imageLoadFailed));
+  const showRasterFailed =
+    usesRasterImage && Boolean(src) && mediaReady && imageLoadFailed;
+  const mountRasterImage =
+    usesRasterImage && Boolean(src) && mediaReady && !imageLoadFailed;
+  const mountVideoOnly =
+    kind === "video" && !posterUrl?.trim() && Boolean(src) && mediaReady;
   const previewActionLabel = kind === "video" ? "播放" : "预览";
   const PreviewOverlayIcon = kind === "video" ? Play : Eye;
   const canPreview = !!src;
@@ -235,75 +279,45 @@ export function MediaHoverBox({
           setDragOver(false);
         }}
       >
-        {src && mediaReady && !imageLoadFailed ? (
-          kind === "video" && posterUrl?.trim() ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={posterUrl}
-              alt={alt}
-              loading={eagerMedia ? "eager" : "lazy"}
-              decoding="async"
-              onLoad={markLoaded}
-              onError={() => {
-                onImageError?.();
-                setImageLoadFailed(true);
-              }}
-              className={
-                naturalSize
-                  ? "block w-full"
-                  : fit === "cover"
-                    ? "h-full w-full object-cover object-center"
-                    : "h-full w-full object-contain object-center"
-              }
-              draggable={false}
-            />
-          ) : kind === "video" ? (
-            <video
-              src={src}
-              className={
-                naturalSize
-                  ? "block w-full"
-                  : fit === "cover"
-                    ? "h-full w-full object-cover object-center"
-                    : "h-full w-full object-contain object-center"
-              }
-              muted
-              playsInline
-              preload="metadata"
-            />
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={src}
-              alt={alt}
-              loading={eagerMedia ? "eager" : "lazy"}
-              decoding="async"
-              onLoad={markLoaded}
-              onError={() => {
-                onImageError?.();
-                setImageLoadFailed(true);
-              }}
-              className={
-                naturalSize
-                  ? "block h-auto w-full object-contain"
-                  : fit === "cover"
-                    ? "h-full w-full object-cover object-center"
-                    : "h-full w-full object-contain object-center"
-              }
-              draggable={false}
-            />
-          )
-        ) : src && imageLoadFailed ? (
-          placeholder ?? (
-            <div className="flex size-full flex-col items-center justify-center bg-white/[0.03] text-[11px] text-white/40">
-              媒体已失效
-            </div>
-          )
-        ) : src ? (
-          <div className="size-full animate-pulse bg-white/[0.04]" aria-hidden />
-        ) : (
-          placeholder
-        )}
+        {showRasterLoading ? (
+          <div className="absolute inset-0 z-[1] flex items-center justify-center bg-black/35">
+            <CanvasBrandLoadingLogo size="sm" />
+          </div>
+        ) : null}
+
+        {mountRasterImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={rasterDisplaySrc}
+            alt={alt}
+            loading={eagerMedia ? "eager" : "lazy"}
+            decoding="async"
+            onLoad={markLoaded}
+            onError={onRasterError}
+            className={cn(rasterFitClass, !imageLoaded && "opacity-0")}
+            draggable={false}
+          />
+        ) : null}
+
+        {mountVideoOnly ? (
+          <video
+            src={src}
+            className={rasterFitClass}
+            muted
+            playsInline
+            preload="metadata"
+          />
+        ) : null}
+
+        {showRasterFailed
+          ? placeholder ?? (
+              <div className="flex size-full flex-col items-center justify-center bg-white/[0.03] text-[11px] text-white/40">
+                暂无图片
+              </div>
+            )
+          : null}
+
+        {!src ? placeholder : null}
 
         {(showUpload || canPreview) && src ? (
           <div

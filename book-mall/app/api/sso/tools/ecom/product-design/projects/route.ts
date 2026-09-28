@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
@@ -23,10 +23,10 @@ export async function GET(req: Request) {
     const items = await listProductDesignProjectSummaries(auth.userId, projectModule, {
       detailed: params.get("detailed") === "1",
     });
-    return NextResponse.json({ items });
+    return ecomJson({ items });
   } catch (e) {
     const message = e instanceof Error ? e.message : "加载失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }
 
@@ -47,7 +47,7 @@ function parseStrategyImport(raw: unknown): ProductDesignStrategyImport | undefi
 export async function POST(req: Request) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   let body: Record<string, unknown> = {};
   try {
@@ -67,9 +67,9 @@ export async function POST(req: Request) {
           : undefined,
       importFrom: parseStrategyImport(body.importFrom),
     });
-    return NextResponse.json({ project });
+    return ecomJson({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "创建失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

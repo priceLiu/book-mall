@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import {
   isStoryLlmVideoUnderstandingModel,
@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
 
   const persona = await getUserBillingPersona(auth.userId);
 
@@ -71,7 +71,7 @@ export async function GET(req: Request) {
     videoRows[0]?.modelKey ??
     ECOM_FILM_PULL_DEFAULT_VIDEO_MODEL;
 
-  return NextResponse.json({
+  return ecomJson({
     chatModels: chatRows,
     videoModels: videoRows,
     platformOffering: persona === "PLATFORM_CREDIT",

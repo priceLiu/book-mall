@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { generateReplicaVoiceoverDraft } from "@/lib/ecom/ecom-media-decompose-replica";
@@ -31,7 +31,7 @@ function mapReplicaRouteError(e: unknown, fallback: string): { message: string; 
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   let body: { productBrief?: unknown; sellingPoints?: unknown; modelKey?: unknown } = {};
@@ -52,9 +52,9 @@ export async function POST(req: Request, ctx: Ctx) {
       sellingPoints,
       modelKey,
     });
-    return NextResponse.json(result);
+    return ecomJson(result);
   } catch (e) {
     const { message, status } = mapReplicaRouteError(e, "口播生成失败");
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

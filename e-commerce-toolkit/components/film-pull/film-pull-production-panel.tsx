@@ -312,6 +312,7 @@ export function FilmPullProductionPanel({
         dialogTitle={picker.kind === "image" ? "选择生图模型" : "选择生视频模型"}
         dialogDescription="确认后将开始生成。"
         confirmLabel="开始生成"
+        previewCount={picker.kind === "batch-video" ? Math.max(1, plan.shots.length) : 1}
         models={pickerModels}
         modelsLoading={modelsLoading}
         onRetryLoadModels={onRefreshModels}

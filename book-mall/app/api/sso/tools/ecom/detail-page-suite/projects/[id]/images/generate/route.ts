@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { reconcileDetailPageSuiteProjectFromAssets } from "@/lib/ecom/detail-page-suite/asset-reconcile";
 import { generateDetailPageSuiteImages } from "@/lib/ecom/detail-page-suite/image-gen";
@@ -12,7 +12,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
   let body: Record<string, unknown> = {};
   try {
@@ -54,7 +54,7 @@ export async function POST(req: Request, ctx: Ctx) {
         failures: result.failures,
       });
     }
-    return NextResponse.json({
+    return ecomJson({
       ...result,
       project: recovered.project,
     });
@@ -65,6 +65,6 @@ export async function POST(req: Request, ctx: Ctx) {
       userId: auth.userId,
       message,
     });
-    return NextResponse.json({ error: message }, { status: 400 });
+    return ecomJson({ error: message }, { status: 400 });
   }
 }

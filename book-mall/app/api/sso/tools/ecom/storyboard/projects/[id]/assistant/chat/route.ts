@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomGatewayLogHeaders, ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
@@ -68,7 +68,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id: projectId } = await ctx.params;
 
@@ -79,7 +79,7 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     body = (await req.json()) as typeof body;
   } catch {
-    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+    return ecomJson({ error: "invalid_json" }, { status: 400 });
   }
 
   let turns: { role: "user" | "assistant"; content: string }[];
@@ -87,16 +87,16 @@ export async function POST(req: Request, ctx: Ctx) {
     turns = sanitizeClientChatTurns(body.messages);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "invalid_messages";
-    return NextResponse.json({ error: msg }, { status: 400 });
+    return ecomJson({ error: msg }, { status: 400 });
   }
 
   if (!turns.length || turns[turns.length - 1]!.role !== "user") {
-    return NextResponse.json({ error: "最后一条消息须为用户提问" }, { status: 400 });
+    return ecomJson({ error: "最后一条消息须为用户提问" }, { status: 400 });
   }
 
   const project = await getEcomStoryboardProject(auth.userId, projectId);
   if (!project) {
-    return NextResponse.json({ error: "项目不存在" }, { status: 404 });
+    return ecomJson({ error: "项目不存在" }, { status: 404 });
   }
 
   const modelKey =
@@ -115,7 +115,7 @@ export async function POST(req: Request, ctx: Ctx) {
   const isLegacyGeneric =
     !isFashion && !isProVertical && isLegacyGenericStoryboardMeta(existingMeta);
   if (isLegacyGeneric) {
-    return NextResponse.json(
+    return ecomJson(
       { error: "旧版通用故事版已停用，请新建电商专业版项目继续" },
       { status: 410 },
     );
@@ -172,7 +172,7 @@ export async function POST(req: Request, ctx: Ctx) {
     !isProVerticalWorkflow(existingMeta) &&
     (lastUserTurn.includes("fashion-step:") || lastUserTurn.includes("pro-step:"))
   ) {
-    return NextResponse.json({ error: "请先在助手区选择品类大类" }, { status: 400 });
+    return ecomJson({ error: "请先在助手区选择品类大类" }, { status: 400 });
   }
   if (prevFashionDeliverable && fashionPromptPhase !== "sellpoints" && fashionPromptPhase !== "general") {
     systemPrompt += buildFashionDeliverableContextBlock(
@@ -573,6 +573,7 @@ export async function POST(req: Request, ctx: Ctx) {
 
     return new Response(readable, {
       headers: {
+        ...ecomGatewayLogHeaders(),
         "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-store, no-transform",
         Connection: "keep-alive",
@@ -581,6 +582,6 @@ export async function POST(req: Request, ctx: Ctx) {
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "助手请求失败";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return ecomJson({ error: message }, { status: 502 });
   }
 }

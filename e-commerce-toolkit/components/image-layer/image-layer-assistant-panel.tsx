@@ -319,6 +319,7 @@ export function ImageLayerAssistantPanel({
         retouchBusy={retouchBusy}
         eraseBusy={eraseBusy}
         retouchPrompt={retouchPrompt}
+        retouchModelKey={retouchModel}
         onRetouchSubmit={onRetouchSubmit}
         onEraseSubmit={onEraseSubmit}
       />

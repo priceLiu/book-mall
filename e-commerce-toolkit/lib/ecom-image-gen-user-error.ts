@@ -3,6 +3,10 @@ export function formatEcomImageGenUserMessage(raw: string): string {
   const blob = raw.trim().toLowerCase();
   if (!blob) return "生图失败，请稍后重试";
 
+  if (raw.includes("积分不足") || blob.includes("insufficient credits")) {
+    return raw.length > 280 ? `${raw.slice(0, 280)}…` : raw;
+  }
+
   if (
     blob.includes("filtered out") ||
     blob.includes("violated go") ||

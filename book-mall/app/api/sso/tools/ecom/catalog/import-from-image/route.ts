@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import {
   importCatalogFromImage,
@@ -32,19 +32,19 @@ function readScope(raw: unknown): EcomCatalogScope | undefined {
 
 export async function POST(req: Request) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
 
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return ecomJson({ error: "Invalid JSON" }, { status: 400 });
   }
 
   const catalogKind = readCatalogKind(body.catalogKind);
   const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
   if (!catalogKind || !imageUrl) {
-    return NextResponse.json(
+    return ecomJson(
       { error: "catalogKind 与 imageUrl 必填" },
       { status: 400 },
     );
@@ -55,10 +55,10 @@ export async function POST(req: Request) {
 
   const scope = readScope(body.scope);
   if (scope === "platform" && !isPlatformAdmin) {
-    return NextResponse.json({ error: "仅平台管理员可设为全平台" }, { status: 403 });
+    return ecomJson({ error: "仅平台管理员可设为全平台" }, { status: 403 });
   }
   if (scope === "team") {
-    return NextResponse.json({ error: "团队可见暂未开放" }, { status: 501 });
+    return ecomJson({ error: "团队可见暂未开放" }, { status: 501 });
   }
 
   try {
@@ -90,7 +90,7 @@ export async function POST(req: Request) {
 
     const result = await importCatalogFromImage(input);
     if (!result.ok) {
-      return NextResponse.json(
+      return ecomJson(
         {
           error: "该图片已在库中",
           existingId: result.existingId,
@@ -99,9 +99,9 @@ export async function POST(req: Request) {
         { status: 409 },
       );
     }
-    return NextResponse.json(result, { status: 201 });
+    return ecomJson(result, { status: 201 });
   } catch (e) {
     const message = e instanceof Error ? e.message : "入库失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

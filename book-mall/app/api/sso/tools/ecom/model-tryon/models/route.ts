@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { mergeOutfitFusionGatewayModels, OUTFIT_DEFAULT_FUSION_MODEL } from "@/lib/ecom/ecom-outfit-video-fusion-models";
 import {
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
 
   const persona = await getUserBillingPersona(auth.userId);
   const boundKinds = await resolveEcomGatewayBoundKindsForModelPicker(auth.userId);
@@ -73,7 +73,7 @@ export async function GET(req: Request) {
     textTryonModels[0]?.modelKey ??
     VTON_DEFAULT_TEXT_TRYON_MODEL;
 
-  return NextResponse.json({
+  return ecomJson({
     imageModels,
     fusionModels,
     textTryonModels,

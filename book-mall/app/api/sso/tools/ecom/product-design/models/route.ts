@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { isStoryLlmVisionModel } from "@/lib/canvas/story-llm-vision-models";
 import { getUserBillingPersona } from "@/lib/billing/billing-persona";
@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
 
   const rawPersona = await getUserBillingPersona(auth.userId);
@@ -47,7 +47,7 @@ export async function GET(req: Request) {
   const visionModels = chatRows.filter((m) => isStoryLlmVisionModel(m.modelKey));
   const imageGenConcurrencyLimit = await resolveEcomImageGenConcurrency(auth.userId, {});
 
-  return NextResponse.json({
+  return ecomJson({
     chatModels: chatRows,
     visionModels,
     imageModels: registryRowsToEcomModels(imageModels),

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import {
   firstWriteOrigin,
@@ -24,12 +24,12 @@ export async function POST(req: Request) {
   try {
     form = await req.formData();
   } catch {
-    return NextResponse.json({ error: "无效表单" }, { status: 400 });
+    return ecomJson({ error: "无效表单" }, { status: 400 });
   }
 
   const file = form.get("file");
   if (!(file instanceof Blob)) {
-    return NextResponse.json({ error: "缺少 file" }, { status: 400 });
+    return ecomJson({ error: "缺少 file" }, { status: 400 });
   }
 
   try {
@@ -69,9 +69,9 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json(result);
+    return ecomJson(result);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "上传失败";
-    return NextResponse.json({ error: msg }, { status: 400 });
+    return ecomJson({ error: msg }, { status: 400 });
   }
 }

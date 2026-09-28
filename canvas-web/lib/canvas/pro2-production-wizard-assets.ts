@@ -9,6 +9,10 @@ type Pro2ScriptProp = NonNullable<Pro2ProductionScript["props"]>[number];
 import type { StoryRefImage } from "@/lib/canvas/story-ref-image";
 import { storyRefMentionToken } from "@/lib/canvas/story-ref-image";
 import { resolvePropIdsFromDisplayText, reconcileShotEntityLinks } from "@/lib/canvas/pro2-shot-entity-reconcile";
+import {
+  resolveWizardAssetMentionPreviewUrl,
+  type WizardMentionHubPreviewSource,
+} from "@/lib/canvas/pro2-wizard-asset-preview-url";
 
 export type Pro2WizardAssetKind = "character" | "scene" | "prop";
 
@@ -312,11 +316,10 @@ export function buildWizardAssetMentionables(
   refImages: StoryRefImage[],
   exclude?: { kind: Pro2WizardAssetKind; assetId: string },
   assetDrafts?: Record<string, Pro2ProductionWizardAssetDraft>,
+  hubPreview?: WizardMentionHubPreviewSource,
 ): MentionableItem[] {
-  const previewFor = (kind: Pro2WizardAssetKind, assetId: string) => {
-    const url = assetDrafts?.[wizardAssetDraftKey(kind, assetId)]?.previewUrl?.trim();
-    return url && /^https?:\/\//i.test(url) ? url : undefined;
-  };
+  const previewFor = (kind: Pro2WizardAssetKind, assetId: string) =>
+    resolveWizardAssetMentionPreviewUrl(kind, assetId, assetDrafts, hubPreview);
 
   const items: MentionableItem[] = [];
   for (const c of script?.characters ?? []) {

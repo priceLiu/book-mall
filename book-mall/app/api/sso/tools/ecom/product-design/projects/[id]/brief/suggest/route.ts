@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { suggestProductDesignBrief } from "@/lib/ecom/ecom-product-design-brief-suggest";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
@@ -13,7 +13,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id } = await ctx.params;
 
@@ -33,7 +33,7 @@ export async function POST(req: Request, ctx: Ctx) {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const project = await getProductDesignProject(auth.userId, id);
     if (!project) {
-      return NextResponse.json({ error: "项目不存在" }, { status: 404 });
+      return ecomJson({ error: "项目不存在" }, { status: 404 });
     }
     const result = await suggestProductDesignBrief({
       userId: auth.userId,
@@ -41,12 +41,12 @@ export async function POST(req: Request, ctx: Ctx) {
       modelKey,
     });
     const updated = await getProductDesignProject(auth.userId, id);
-    return NextResponse.json({
+    return ecomJson({
       suggestions: result.suggestions,
       project: updated,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "推断失败";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return ecomJson({ error: message }, { status: 400 });
   }
 }

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { getEcomStoryboardProject } from "@/lib/ecom/ecom-storyboard-service";
@@ -14,7 +14,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id: projectId } = await ctx.params;
 
@@ -27,14 +27,14 @@ export async function POST(req: Request, ctx: Ctx) {
 
   const project = await getEcomStoryboardProject(auth.userId, projectId);
   if (!project?.sheet) {
-    return NextResponse.json({ error: "请先生成分镜故事版" }, { status: 400 });
+    return ecomJson({ error: "请先生成分镜故事版" }, { status: 400 });
   }
   const panels = project.sheet.panels ?? [];
   const readyPanels = panels.filter(
     (p) => p.imageUrl?.trim() && /^https?:\/\//.test(p.imageUrl.trim()),
   );
   if (readyPanels.length < panels.length) {
-    return NextResponse.json({ error: "请先生成全部分镜图" }, { status: 400 });
+    return ecomJson({ error: "请先生成全部分镜图" }, { status: 400 });
   }
 
   const durationSec =
@@ -93,7 +93,7 @@ export async function POST(req: Request, ctx: Ctx) {
       },
     });
 
-    return NextResponse.json({
+    return ecomJson({
       status: "running",
       taskId: result.taskId,
       logId: result.logId,
@@ -103,6 +103,6 @@ export async function POST(req: Request, ctx: Ctx) {
   } catch (e) {
     const message = e instanceof Error ? e.message : "视频生成失败";
     const status = message.includes("余额") ? 402 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

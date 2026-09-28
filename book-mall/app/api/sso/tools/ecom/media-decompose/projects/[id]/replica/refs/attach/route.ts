@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
@@ -28,14 +28,14 @@ function mapAttachError(e: unknown, fallback: string): { message: string; status
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+    return ecomJson({ error: "invalid_json" }, { status: 400 });
   }
 
   try {
@@ -51,12 +51,12 @@ export async function POST(req: Request, ctx: Ctx) {
           slotId,
           assetIds,
         );
-        return NextResponse.json({ project, seedVideo, reference, addedCount: 1 });
+        return ecomJson({ project, seedVideo, reference, addedCount: 1 });
       }
       const roleRaw = body.role;
       const role = roleRaw === "model" || roleRaw === "product" ? roleRaw : null;
       if (!role) {
-        return NextResponse.json({ error: "role 须为 model 或 product，或提供 slotId" }, { status: 400 });
+        return ecomJson({ error: "role 须为 model 或 product，或提供 slotId" }, { status: 400 });
       }
       const { project, seedVideo, addedCount } = await attachReplicaRefsFromAssets(
         auth.userId,
@@ -64,13 +64,13 @@ export async function POST(req: Request, ctx: Ctx) {
         role,
         assetIds,
       );
-      return NextResponse.json({ project, seedVideo, addedCount });
+      return ecomJson({ project, seedVideo, addedCount });
     }
 
     if (body.modelEntry && typeof body.modelEntry === "object") {
       const entry = body.modelEntry as { id?: string; name?: string; ossUrl?: string };
       if (!entry.id || !entry.ossUrl) {
-        return NextResponse.json({ error: "modelEntry 无效" }, { status: 400 });
+        return ecomJson({ error: "modelEntry 无效" }, { status: 400 });
       }
       const slotId = typeof body.slotId === "string" ? body.slotId.trim() : "";
       if (slotId) {
@@ -84,7 +84,7 @@ export async function POST(req: Request, ctx: Ctx) {
             ossUrl: entry.ossUrl,
           },
         );
-        return NextResponse.json({ project, seedVideo, reference });
+        return ecomJson({ project, seedVideo, reference });
       }
       const { project, seedVideo, reference } = await attachReplicaModelFromLibrary(
         auth.userId,
@@ -95,12 +95,12 @@ export async function POST(req: Request, ctx: Ctx) {
           ossUrl: entry.ossUrl,
         },
       );
-      return NextResponse.json({ project, seedVideo, reference });
+      return ecomJson({ project, seedVideo, reference });
     }
 
-    return NextResponse.json({ error: "请求体无效" }, { status: 400 });
+    return ecomJson({ error: "请求体无效" }, { status: 400 });
   } catch (e) {
     const { message, status } = mapAttachError(e, "导入失败");
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

@@ -8,23 +8,33 @@ import {
 import { ensurePro2FrameImageGroup } from "./pro2-spawn-frame-image-group";
 import { ensurePro2VideoBoardGroup } from "./pro2-spawn-video-board-group";
 import {
+  ensurePro2SceneImageGroup,
+  syncPro2SceneImagesFromRows,
+} from "./pro2-spawn-scene-image-group";
+import {
   finalizePro2FrameRowsForCanvasMount,
   finalizePro2VideoRowsForCanvasMount,
 } from "./pro2-production-wizard-frame-mount";
 import { spawnScriptStudioMediaCardsFromWorkspace } from "./script-studio-media-spawn";
 import { pickRuntimeImagePreviewUrl } from "./task-media-url";
+import { sceneRowKeysEquivalent } from "./story-pro-scene-asset-catalog";
+import { ensurePro2HubToMediaGroupChildEdges } from "./pro2-hub-media-group-edge";
+import { relayoutPro2MediaGroup } from "./pro2-media-group-layout";
 import type {
   StoryProCharacterRow,
   StoryProFrameRow,
   StoryProPropRow,
   StoryProVideoRow,
+  StoryProSceneRow,
   StoryProScriptHubNodeData,
 } from "./story-pro-workspace-types";
+import type { StoryRefImage } from "./story-ref-image";
 import type { StoryPro2WorkspaceIds } from "./story-pro2-workspace-types";
 import { findStarterByHubId } from "./story-workspace-resolver";
 import { useCanvasStore } from "./store";
-import type { CanvasFlowNode } from "./types";
+import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { shouldHydratePro2ProductionScaffold } from "./pro2-production-wizard";
+import { GROUP_COLOR_PRESETS } from "./types";
 
 type Pro2MediaGroupKind = "character-board" | "frame-board";
 
@@ -228,6 +238,425 @@ function syncPropMediaRuntimeFromHub(
   }
 }
 
+function propGroupLabel(scriptHubId: string, nodes: CanvasFlowNode[]): string {
+  const hubs = nodes.filter((n) => n.type === "story-pro2-script-hub");
+  const idx = hubs.findIndex((h) => h.id === scriptHubId);
+  return `道具图 · 脚本 ${idx >= 0 ? idx + 1 : 1}`;
+}
+
+function ensurePro2PropMediaGroup(scriptHubId: string): string | null {
+  let store = useCanvasStore.getState();
+  const propNodes = store.nodes.filter(
+    (n) =>
+      n.type === "story-pro2-prop" &&
+      (n.data as { hubNodeId?: string }).hubNodeId === scriptHubId,
+  );
+  if (!propNodes.length) return null;
+
+  let group = store.nodes.find(
+    (n) =>
+      n.type === "group" &&
+      (n.data as { pro2Kind?: string }).pro2Kind === "prop-board" &&
+      (n.data as { pro2HubNodeId?: string }).pro2HubNodeId === scriptHubId,
+  );
+
+  let groupId = group?.id;
+  if (!groupId) {
+    groupId =
+      store.createGroupContaining(
+        propNodes.map((n) => n.id),
+        {
+          label: propGroupLabel(scriptHubId, store.nodes),
+          color: GROUP_COLOR_PRESETS[4] ?? GROUP_COLOR_PRESETS[3]!,
+        },
+      ) ?? null;
+    if (!groupId) return null;
+  }
+
+  store.updateNodeData(groupId, {
+    pro2Kind: "prop-board",
+    pro2HubNodeId: scriptHubId,
+    pro2ControllerNodeId: scriptHubId,
+    label: propGroupLabel(scriptHubId, store.nodes),
+  });
+
+  store = useCanvasStore.getState();
+  group = store.nodes.find((n) => n.id === groupId);
+  const groupPos = group?.position ?? { x: 0, y: 0 };
+  const propNodeIds = new Set(propNodes.map((n) => n.id));
+  store.setNodes((prev) =>
+    prev.map((n) => {
+      if (!propNodeIds.has(n.id)) return n;
+      if (n.parentId === groupId) {
+        return {
+          ...n,
+          data: { ...n.data, pro2GroupId: groupId },
+        };
+      }
+      return {
+        ...n,
+        parentId: groupId ?? undefined,
+        extent: "parent",
+        position: {
+          x: n.position.x - groupPos.x,
+          y: n.position.y - groupPos.y,
+        },
+        data: { ...n.data, pro2GroupId: groupId },
+      };
+    }),
+  );
+
+  relayoutPro2MediaGroup(store.setNodes, groupId, { resetOrigin: true });
+  store = useCanvasStore.getState();
+  const childIds = store.nodes
+    .filter((n) => n.parentId === groupId && n.type === "story-pro2-prop")
+    .map((n) => n.id);
+  store.setEdges((prev) => {
+    let next = ensureHubToPropCardEdges(prev, scriptHubId, childIds);
+    ensurePro2HubToMediaGroupChildEdges(
+      (fn) => {
+        next = fn(next);
+      },
+      scriptHubId,
+      groupId!,
+      childIds,
+    );
+    return next;
+  });
+  return groupId;
+}
+
+function ensureHubToPropCardEdges(
+  edges: CanvasFlowEdge[],
+  hubNodeId: string,
+  propNodeIds: string[],
+): CanvasFlowEdge[] {
+  let next = edges;
+  for (const nodeId of propNodeIds) {
+    if (!nodeId?.trim()) continue;
+    const exists = next.some(
+      (e) =>
+        e.source === hubNodeId &&
+        e.target === nodeId &&
+        (e.targetHandle === "in_image" ||
+          e.targetHandle === "in_text" ||
+          e.targetHandle == null),
+    );
+    if (exists) continue;
+    next = [
+      ...next,
+      {
+        id: `e-hub-prop-${hubNodeId.slice(-6)}-${nodeId.slice(-6)}`,
+        source: hubNodeId,
+        target: nodeId,
+        sourceHandle: "text",
+        targetHandle: "in_image",
+      },
+    ];
+  }
+  return next;
+}
+
+function collectRefKeysByPrefix(
+  refs: StoryRefImage[] | undefined,
+  prefix: string,
+): string[] {
+  const out: string[] = [];
+  for (const ref of refs ?? []) {
+    const id = ref.id?.trim();
+    if (!id?.startsWith(prefix)) continue;
+    const key = id.slice(prefix.length).trim();
+    if (key && !out.includes(key)) out.push(key);
+  }
+  return out;
+}
+
+function sourceHandleForAssetNode(node: CanvasFlowNode): string {
+  if (node.type === "story-pro2-three-view") return "image";
+  if (node.type === "story-pro2-prop") return "image";
+  if (node.type === "story-pro2-image") return "image";
+  return "image";
+}
+
+type FrameAssetSources = Map<string, Set<string>>;
+
+function collectFrameAssetSources(
+  nodes: CanvasFlowNode[],
+  frameRows: StoryProFrameRow[],
+  characterRows: StoryProCharacterRow[],
+  sceneRows: StoryProSceneRow[],
+): FrameAssetSources {
+  const frameByRowKey = new Map<string, CanvasFlowNode>();
+  const characterByKey = new Map<string, CanvasFlowNode>();
+  const sceneByKey = new Map<string, CanvasFlowNode>();
+  const propByKey = new Map<string, CanvasFlowNode>();
+
+  for (const node of nodes) {
+    if (
+      node.type === "story-pro2-image" &&
+      (node.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId ===
+        frameColumnId
+    ) {
+      const rowKey = (
+        node.data as { pro2RowKey?: string }
+      ).pro2RowKey?.trim();
+      if (rowKey) frameByRowKey.set(rowKey, node);
+      continue;
+    }
+
+    if (node.type === "story-pro2-three-view") {
+      const key = (node.data as { pro2RowKey?: string }).pro2RowKey?.trim();
+      if (key) characterByKey.set(key, node);
+      continue;
+    }
+
+    if (
+      node.type === "story-pro2-image" &&
+      (node.data as { pro2MediaRole?: string }).pro2MediaRole === "scene"
+    ) {
+      const key = (node.data as { pro2RowKey?: string }).pro2RowKey?.trim();
+      if (key) sceneByKey.set(key, node);
+      continue;
+    }
+
+    if (node.type === "story-pro2-prop") {
+      const key = (
+        node.data as { scriptStudioSourceRowKey?: string }
+      ).scriptStudioSourceRowKey?.trim();
+      if (key) propByKey.set(key, node);
+    }
+  }
+
+  const sceneNameByKey = new Map(sceneRows.map((row) => [row.key, row.name]));
+  const byRow = new Map<string, Set<string>>();
+  for (const row of frameRows) {
+    if (!frameByRowKey.has(row.key)) continue;
+
+    const charKeys = new Set<string>([
+      ...(row.characterRefIds ?? []),
+      ...collectRefKeysByPrefix(row.refImages, "ref-char-"),
+    ]);
+    const sceneKeys = new Set<string>([
+      ...collectRefKeysByPrefix(row.refImages, "ref-scene-"),
+    ]);
+    if (row.sceneRefId?.trim()) {
+      for (const s of sceneRows) {
+        if (
+          sceneRowKeysEquivalent(s.key, row.sceneRefId) ||
+          s.name === row.sceneRefId
+        ) {
+          sceneKeys.add(s.key);
+        }
+      }
+    }
+    const propKeys = new Set<string>([
+      ...(row.propRefIds ?? []),
+      ...collectRefKeysByPrefix(row.refImages, "ref-prop-"),
+    ]);
+
+    const sources = new Set<string>();
+    for (const key of charKeys) {
+      const source = characterByKey.get(key);
+      if (source) sources.add(source.id);
+    }
+    for (const key of sceneKeys) {
+      const source = sceneByKey.get(key);
+      if (source) {
+        sources.add(source.id);
+        continue;
+      }
+      const byName = sceneNameByKey.get(key);
+      if (!byName) continue;
+      for (const [sceneKey, sceneNode] of sceneByKey) {
+        if (sceneNameByKey.get(sceneKey) === byName) sources.add(sceneNode.id);
+      }
+    }
+    for (const key of propKeys) {
+      const source = propByKey.get(key);
+      if (source) sources.add(source.id);
+    }
+    byRow.set(row.key, sources);
+  }
+  return byRow;
+}
+
+function ensureAssetToFrameEdges(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  frameColumnId: string | undefined,
+  frameRows: StoryProFrameRow[],
+  characterRows: StoryProCharacterRow[],
+  sceneRows: StoryProSceneRow[],
+): CanvasFlowEdge[] {
+  if (!frameColumnId) return edges;
+  const frameByRowKey = new Map<string, CanvasFlowNode>();
+  for (const node of nodes) {
+    if (
+      node.type === "story-pro2-image" &&
+      (node.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId ===
+        frameColumnId
+    ) {
+      const rowKey = (
+        node.data as { pro2RowKey?: string }
+      ).pro2RowKey?.trim();
+      if (rowKey) frameByRowKey.set(rowKey, node);
+    }
+  }
+  const frameSources = collectFrameAssetSources(
+    nodes,
+    frameRows,
+    characterRows,
+    sceneRows,
+  );
+  const nextEdges = [...edges];
+  for (const [rowKey, sourceIds] of frameSources) {
+    const frameNode = frameByRowKey.get(rowKey);
+    if (!frameNode) continue;
+
+    for (const sourceId of sourceIds) {
+      const sourceNode = nodes.find((n) => n.id === sourceId);
+      if (!sourceNode) continue;
+      const exists = nextEdges.some(
+        (e) =>
+          e.source === sourceId &&
+          e.target === frameNode.id &&
+          (e.targetHandle === "in_image" ||
+            e.targetHandle === "in_ref" ||
+            e.targetHandle == null),
+      );
+      if (exists) continue;
+      nextEdges.push({
+        id: `e-asset-frame-${sourceId.slice(-6)}-${frameNode.id.slice(-6)}`,
+        source: sourceId,
+        target: frameNode.id,
+        sourceHandle: sourceHandleForAssetNode(sourceNode),
+        targetHandle: "in_image",
+      });
+    }
+  }
+  return nextEdges;
+}
+
+function ensureAssetToVideoEdges(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  videoColumnId: string | undefined,
+  frameRows: StoryProFrameRow[],
+  characterRows: StoryProCharacterRow[],
+  sceneRows: StoryProSceneRow[],
+): CanvasFlowEdge[] {
+  if (!videoColumnId) return edges;
+  const videoByRowKey = new Map<string, CanvasFlowNode>();
+  for (const node of nodes) {
+    if (node.type !== "sbv1-video-engine") continue;
+    const d = node.data as { pro2ControllerNodeId?: string; pro2RowKey?: string };
+    if (d.pro2ControllerNodeId !== videoColumnId) continue;
+    const rowKey = d.pro2RowKey?.trim();
+    if (rowKey) videoByRowKey.set(rowKey, node);
+  }
+
+  const frameSources = collectFrameAssetSources(
+    nodes,
+    frameRows,
+    characterRows,
+    sceneRows,
+  );
+  const nextEdges = [...edges];
+  for (const [rowKey, sourceIds] of frameSources) {
+    const videoNode = videoByRowKey.get(rowKey);
+    if (!videoNode) continue;
+    for (const sourceId of sourceIds) {
+      const sourceNode = nodes.find((n) => n.id === sourceId);
+      if (!sourceNode) continue;
+      const exists = nextEdges.some(
+        (e) =>
+          e.source === sourceId &&
+          e.target === videoNode.id &&
+          (e.targetHandle === "in_ref" ||
+            e.targetHandle === "in_image" ||
+            e.targetHandle == null),
+      );
+      if (exists) continue;
+      nextEdges.push({
+        id: `e-asset-video-${sourceId.slice(-6)}-${videoNode.id.slice(-6)}`,
+        source: sourceId,
+        target: videoNode.id,
+        sourceHandle: sourceHandleForAssetNode(sourceNode),
+        targetHandle: "in_ref",
+      });
+    }
+  }
+  return nextEdges;
+}
+
+function layoutWizardGroupsParallel(
+  nodes: CanvasFlowNode[],
+  scriptHubId: string,
+): CanvasFlowNode[] {
+  const hub = nodes.find((n) => n.id === scriptHubId);
+  if (!hub) return nodes;
+  const groups = nodes.filter(
+    (n) =>
+      n.type === "group" &&
+      (n.data as { pro2HubNodeId?: string }).pro2HubNodeId === scriptHubId,
+  );
+  if (!groups.length) return nodes;
+
+  const byKind = new Map<string, CanvasFlowNode>();
+  for (const g of groups) {
+    const kind = (g.data as { pro2Kind?: string }).pro2Kind?.trim();
+    if (!kind) continue;
+    byKind.set(kind, g);
+  }
+  const characterGroup = byKind.get("character-board");
+  const sceneGroup = byKind.get("scene-board");
+  const propGroup = byKind.get("prop-board");
+  const frameGroup = byKind.get("frame-board");
+  const videoGroup = byKind.get("video-board");
+
+  const hubW = hub.width ?? 640;
+  const gap = 72;
+  const topY = hub.position.y + 28;
+  let xCursor = hub.position.x + hubW + 100;
+  const patch = new Map<string, { x: number; y: number }>();
+
+  const placeGroup = (group: CanvasFlowNode | undefined) => {
+    if (!group) return;
+    patch.set(group.id, { x: xCursor, y: topY });
+    const w = group.width ?? 820;
+    xCursor += w + gap;
+  };
+
+  placeGroup(characterGroup);
+  placeGroup(sceneGroup);
+  placeGroup(propGroup);
+
+  const assetBottom = Math.max(
+    topY + (characterGroup?.height ?? 0),
+    topY + (sceneGroup?.height ?? 0),
+    topY + (propGroup?.height ?? 0),
+  );
+  void assetBottom;
+  const lowerY = topY;
+  if (frameGroup) {
+    patch.set(frameGroup.id, { x: xCursor, y: lowerY });
+    xCursor += (frameGroup.width ?? 980) + gap;
+  }
+  if (videoGroup) {
+    patch.set(videoGroup.id, {
+      x: xCursor,
+      y: lowerY,
+    });
+  }
+
+  if (!patch.size) return nodes;
+  return nodes.map((n) => {
+    const p = patch.get(n.id);
+    if (!p) return n;
+    return { ...n, position: p };
+  });
+}
+
 /** mount 列节点后 · spawn/绑定三视图组、分镜图组、道具媒体卡 */
 export function mountProductionVisualGroupsFromStore(scriptHubId: string): void {
   let store = useCanvasStore.getState();
@@ -328,6 +757,29 @@ export function mountProductionVisualGroupsFromStore(scriptHubId: string): void 
   }
 
   store = useCanvasStore.getState();
+  const sceneGroupId = ensurePro2SceneImageGroup({
+    hubNodeId: scriptHubId,
+    rows: sceneRows,
+    starterNodeId: starter?.id,
+    legacySceneColumnId: ws?.sceneColumnId,
+    nodes: store.nodes,
+    edges: store.edges,
+    addNode: store.addNode,
+    addNodeInGroup: store.addNodeInGroup,
+    createGroupContaining: store.createGroupContaining,
+    updateNodeData: store.updateNodeData,
+    setNodes: store.setNodes,
+    setEdges: store.setEdges,
+  });
+  void sceneGroupId;
+  store = useCanvasStore.getState();
+  syncPro2SceneImagesFromRows(
+    store.nodes,
+    scriptHubId,
+    sceneRows,
+    store.updateNodeData,
+  );
+  store = useCanvasStore.getState();
 
   if (frameColumnId) {
     const col = store.nodes.find((n) => n.id === frameColumnId);
@@ -377,5 +829,84 @@ export function mountProductionVisualGroupsFromStore(scriptHubId: string): void 
     kinds: ["prop"],
   });
 
-  syncPropMediaRuntimeFromHub(hubData.scriptStudioPropRows ?? []);
+  store = useCanvasStore.getState();
+  ensurePro2PropMediaGroup(scriptHubId);
+  store = useCanvasStore.getState();
+  syncPropMediaRuntimeFromHub(
+    ((store.nodes.find((n) => n.id === scriptHubId)?.data as StoryProScriptHubNodeData)
+      ?.scriptStudioPropRows ?? hubData.scriptStudioPropRows) ?? [],
+  );
+
+  store = useCanvasStore.getState();
+  const propNodeIds = store.nodes
+    .filter(
+      (n) =>
+        n.type === "story-pro2-prop" &&
+        (n.data as { hubNodeId?: string }).hubNodeId === scriptHubId,
+    )
+    .map((n) => n.id);
+  store.setEdges((prev) => ensureHubToPropCardEdges(prev, scriptHubId, propNodeIds));
+  store = useCanvasStore.getState();
+  store.setEdges((prev) =>
+    ensureAssetToFrameEdges(
+      store.nodes,
+      prev,
+      frameColumnId,
+      frameRows,
+      characterRows,
+      sceneRows,
+    ),
+  );
+  store = useCanvasStore.getState();
+  store.setEdges((prev) =>
+    ensureAssetToVideoEdges(
+      store.nodes,
+      prev,
+      videoColumnId,
+      frameRows,
+      characterRows,
+      sceneRows,
+    ),
+  );
+
+  store = useCanvasStore.getState();
+  store.setNodes((prev) => layoutWizardGroupsParallel(prev, scriptHubId));
+}
+
+export function listProductionWizardFocusNodeIdsFromStore(
+  scriptHubId: string,
+): string[] {
+  const { nodes } = useCanvasStore.getState();
+  const out: string[] = [];
+  const push = (id: string | undefined) => {
+    const t = id?.trim();
+    if (!t || out.includes(t)) return;
+    if (!nodes.some((n) => n.id === t)) return;
+    out.push(t);
+  };
+
+  push(scriptHubId);
+  for (const n of nodes) {
+    if (n.type !== "group") continue;
+    const d = n.data as { pro2HubNodeId?: string; pro2Kind?: string };
+    if (d.pro2HubNodeId !== scriptHubId) continue;
+    if (
+      d.pro2Kind === "character-board" ||
+      d.pro2Kind === "scene-board" ||
+      d.pro2Kind === "prop-board" ||
+      d.pro2Kind === "frame-board" ||
+      d.pro2Kind === "video-board"
+    ) {
+      push(n.id);
+    }
+  }
+
+  if (out.length <= 1) {
+    for (const n of nodes) {
+      const d = n.data as { hubNodeId?: string };
+      if (d.hubNodeId === scriptHubId) push(n.id);
+    }
+  }
+
+  return out;
 }

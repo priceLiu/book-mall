@@ -2265,6 +2265,7 @@ export function ProductDesignContentPanel({
 
       <StoryboardModelPickerDialog
         open={genPipeline?.step === "image-model"}
+        previewCount={Math.max(1, genPipeline?.indexes?.length ?? 1)}
         onOpenChange={(open) => {
           if (!open) setGenPipeline(null);
         }}

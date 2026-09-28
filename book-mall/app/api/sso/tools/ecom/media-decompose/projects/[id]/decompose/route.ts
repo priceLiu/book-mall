@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomGatewayLogHeaders, ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import type { CanvasChatContentPart } from "@/lib/canvas/providers/types";
 import {
@@ -61,25 +61,25 @@ function buildMediaGwUserContent(
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id: projectId } = await ctx.params;
 
   let body: { prompt?: unknown; modelKey?: unknown };
   try {
     body = (await req.json()) as typeof body;
   } catch {
-    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+    return ecomJson({ error: "invalid_json" }, { status: 400 });
   }
 
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
   if (!prompt) {
-    return NextResponse.json({ error: "请填写拆解指令" }, { status: 400 });
+    return ecomJson({ error: "请填写拆解指令" }, { status: 400 });
   }
 
   const project = await getEcomMediaDecomposeProject(auth.userId, projectId);
-  if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
+  if (!project) return ecomJson({ error: "项目不存在" }, { status: 404 });
   if (!project.media?.ossUrl) {
-    return NextResponse.json({ error: "请先上传或粘贴素材" }, { status: 400 });
+    return ecomJson({ error: "请先上传或粘贴素材" }, { status: 400 });
   }
 
   let modelKey =
@@ -218,6 +218,7 @@ export async function POST(req: Request, ctx: Ctx) {
 
     return new Response(readable, {
       headers: {
+        ...ecomGatewayLogHeaders(),
         "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-store, no-transform",
         Connection: "keep-alive",
@@ -226,6 +227,6 @@ export async function POST(req: Request, ctx: Ctx) {
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "拆解请求失败";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return ecomJson({ error: message }, { status: 502 });
   }
 }

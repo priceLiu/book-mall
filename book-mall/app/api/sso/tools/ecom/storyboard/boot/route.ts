@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { getEcomStoryboardProject } from "@/lib/ecom/ecom-storyboard-service";
 import { loadEcomStoryboardGatewayModels } from "@/lib/ecom/ecom-storyboard-models-loader";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
 
   const projectId = new URL(req.url).searchParams.get("projectId")?.trim() || null;
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
       : Promise.resolve(null),
   ]);
 
-  const res = NextResponse.json({ ...models, project });
+  const res = ecomJson({ ...models, project });
   res.headers.set("Cache-Control", "private, max-age=0, stale-while-revalidate=120");
   return res;
 }

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { buildDecomposePrompt } from "@/lib/ecom/ecom-image-layer-prompt";
 import {
@@ -35,19 +35,19 @@ export async function POST(req: Request) {
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+    return ecomJson({ error: "无效 JSON" }, { status: 400 });
   }
 
   const sourceImageUrl =
     typeof body.sourceImageUrl === "string" ? body.sourceImageUrl.trim() : "";
   if (!sourceImageUrl) {
-    return NextResponse.json({ error: "缺少 sourceImageUrl" }, { status: 400 });
+    return ecomJson({ error: "缺少 sourceImageUrl" }, { status: 400 });
   }
 
   const size = typeof body.size === "string" ? body.size.trim() : undefined;
   const bboxes = parseBboxes(body.bboxes);
   if (bboxes && bboxes.length > ECOM_IMAGE_LAYER_MAX_BBOXES) {
-    return NextResponse.json(
+    return ecomJson(
       { error: `最多 ${ECOM_IMAGE_LAYER_MAX_BBOXES} 个拆分框` },
       { status: 400 },
     );
@@ -85,9 +85,9 @@ export async function POST(req: Request) {
         compareFromUrl: sourceImageUrl,
       });
     }
-    return NextResponse.json({ stack });
+    return ecomJson({ stack });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "图层拆分失败";
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return ecomJson({ error: msg }, { status: 502 });
   }
 }

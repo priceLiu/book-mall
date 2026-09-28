@@ -122,6 +122,8 @@ function preserveRfMeasuredById(
 
 /** 仅更新 RF 本地选中（不写 zustand），供 focusCanvasNode / 打组后选中新组 */
 export const CANVAS_RF_SELECT_NODE_EVENT = "canvas:rf-select-node";
+/** 定位到一组节点并 fitView（不写 store，仅 RF 视口行为） */
+export const CANVAS_RF_FOCUS_NODE_SET_EVENT = "canvas:rf-focus-node-set";
 /** React Flow 已挂载 · 浮动 Dock 可 portal 到 viewport */
 export const CANVAS_RF_VIEWPORT_READY_EVENT = "canvas:rf-viewport-ready";
 

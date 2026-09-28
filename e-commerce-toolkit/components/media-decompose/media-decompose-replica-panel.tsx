@@ -1267,6 +1267,7 @@ export function MediaDecomposeReplicaPanel({
         onOpenChange={setPickerOpen}
         mode="video"
         videoTarget="panel"
+        previewCount={Math.max(1, pickerSelected.length)}
         models={filteredModels.length ? filteredModels : videoModels}
         value={videoModelKey}
         onChange={(key) => {

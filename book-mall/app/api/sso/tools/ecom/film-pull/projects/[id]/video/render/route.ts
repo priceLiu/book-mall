@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { ecomRenderFilmPullFinalVideo } from "@/lib/ecom/ecom-film-pull-video";
@@ -12,7 +12,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   try {
@@ -22,9 +22,9 @@ export async function POST(req: Request, ctx: Ctx) {
       projectId: id,
     });
     const project = await getEcomFilmPullProject(auth.userId, id);
-    return NextResponse.json({ ...result, project });
+    return ecomJson({ ...result, project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "合成失败";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return ecomJson({ error: message }, { status: 502 });
   }
 }

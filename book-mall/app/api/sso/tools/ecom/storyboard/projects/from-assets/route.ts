@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { ensureStoryboardRefImageForWan27 } from "@/lib/ecom/ecom-storyboard-ref-image";
@@ -18,21 +18,21 @@ export const maxDuration = 120;
 export async function POST(req: Request) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
 
   let body: { assetIds?: unknown; title?: unknown; role?: unknown };
   try {
     body = (await req.json()) as typeof body;
   } catch {
-    return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+    return ecomJson({ error: "无效 JSON" }, { status: 400 });
   }
 
   const assetIds = Array.isArray(body.assetIds)
     ? [...new Set(body.assetIds.filter((v): v is string => typeof v === "string" && !!v.trim()))]
     : [];
   if (assetIds.length === 0) {
-    return NextResponse.json({ error: "请至少选择一张图片" }, { status: 400 });
+    return ecomJson({ error: "请至少选择一张图片" }, { status: 400 });
   }
 
   const roleRaw = typeof body.role === "string" ? body.role : "product";
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       select: { id: true, title: true, ossUrl: true },
     });
     if (assets.length === 0) {
-      return NextResponse.json({ error: "找不到所选图片" }, { status: 404 });
+      return ecomJson({ error: "找不到所选图片" }, { status: 404 });
     }
 
     const references: StoryboardReference[] = [];
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
       });
     }
     if (references.length === 0) {
-      return NextResponse.json({ error: "所选图片不可用" }, { status: 400 });
+      return ecomJson({ error: "所选图片不可用" }, { status: 400 });
     }
 
     const created = await createEcomStoryboardProject(auth.userId, { title });
@@ -80,9 +80,9 @@ export async function POST(req: Request) {
       meta: { fromProductCreation: true },
     });
 
-    return NextResponse.json({ project });
+    return ecomJson({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "创建失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

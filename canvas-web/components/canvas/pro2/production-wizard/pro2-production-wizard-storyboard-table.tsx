@@ -64,12 +64,16 @@ function HighlightedCell({
   rowKey,
   plainClassName,
   script,
+  scriptHubId,
+  hubData,
 }: {
   text: string;
   matchers: EntityHighlightMatcher[];
   rowKey: string;
   plainClassName?: string;
   script?: Pro2ProductionScript;
+  scriptHubId: string;
+  hubData: StoryProScriptHubNodeData;
 }) {
   if (!text.trim()) {
     return <span className="text-zinc-600">—</span>;
@@ -79,7 +83,13 @@ function HighlightedCell({
     return (
       <WizardPromptReadonly
         value={text}
-        mentionables={buildWizardAssetMentionables(script, [])}
+        mentionables={buildWizardAssetMentionables(
+          script,
+          [],
+          undefined,
+          hubData.productionWizardAssetDrafts,
+          { scriptHubId, hubData },
+        )}
         className={cn("text-[12px] text-zinc-300", plainClassName)}
       />
     );
@@ -225,6 +235,8 @@ export function Pro2ProductionWizardStoryboardTable({
                         matchers={rowMatchers}
                         rowKey={`${rowKey}-scene`}
                         script={script}
+                        scriptHubId={scriptHubId}
+                        hubData={hubData}
                       />
                     </td>
                     <td className={TD}>{cellText(shot.shotSize)}</td>
@@ -235,6 +247,8 @@ export function Pro2ProductionWizardStoryboardTable({
                           matchers={rowMatchers}
                           rowKey={`${rowKey}-lighting`}
                           script={script}
+                          scriptHubId={scriptHubId}
+                          hubData={hubData}
                         />
                       </td>
                     ) : null}
@@ -244,6 +258,8 @@ export function Pro2ProductionWizardStoryboardTable({
                         matchers={rowMatchers}
                         rowKey={`${rowKey}-camera`}
                         script={script}
+                        scriptHubId={scriptHubId}
+                        hubData={hubData}
                       />
                     </td>
                     {useV2 ? (
@@ -266,6 +282,8 @@ export function Pro2ProductionWizardStoryboardTable({
                         matchers={rowMatchers}
                         rowKey={`${rowKey}-dialogue`}
                         script={script}
+                        scriptHubId={scriptHubId}
+                        hubData={hubData}
                       />
                     </td>
                     {useV2 ? (

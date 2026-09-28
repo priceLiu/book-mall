@@ -46,6 +46,7 @@ import {
   type DashscopeParsingOutput,
   type DashscopeTaskOutput,
 } from "@/lib/gateway/dashscope-client";
+import { noteEcomGatewayLogId } from "@/lib/ecom/ecom-gateway-log-capture";
 import { resolveEcomGatewayAuthForUser } from "@/lib/ecom/ecom-gateway-auth";
 import {
   ecomPollBailianR2vInProcess,
@@ -57,6 +58,11 @@ import {
 import type { CanvasChatMessage } from "@/lib/canvas/providers/types";
 
 const CLIENT_SOURCE: GatewayClientSource = "E_COMMERCE";
+
+function captureEcomLog<T extends { logId: string }>(value: T): T {
+  noteEcomGatewayLogId(value.logId);
+  return value;
+}
 
 async function requireEcomGatewayAuth(bookUserId: string) {
   const auth = await resolveEcomGatewayAuthForUser(bookUserId);
@@ -82,7 +88,7 @@ async function ecomGwCreateTaskInProcess(
       body,
       logMeta: gatewayV1ClientMeta("E_COMMERCE", { clientPage, bookUserId }),
     });
-    return { taskId: created.taskId, logId: created.logId };
+    return captureEcomLog({ taskId: created.taskId, logId: created.logId });
   } catch (e) {
     if (e instanceof GatewayV1EcomAsyncJobError) {
       throw new GatewayRequiredError(e.message);
@@ -104,7 +110,7 @@ export async function ecomGwPrepareVideoJobLog(
       body,
       logMeta: gatewayV1ClientMeta("E_COMMERCE", { clientPage, bookUserId }),
     });
-    return { logId: prepared.logId, prepared };
+    return captureEcomLog({ logId: prepared.logId, prepared });
   } catch (e) {
     if (e instanceof GatewayV1EcomAsyncJobError) {
       throw new GatewayRequiredError(e.message);
@@ -125,7 +131,7 @@ export async function ecomGwSubmitPreparedVideoJob(
       prepared,
       body,
     });
-    return { taskId: created.taskId, logId: created.logId };
+    return captureEcomLog({ taskId: created.taskId, logId: created.logId });
   } catch (e) {
     if (e instanceof GatewayV1EcomAsyncJobError) {
       throw new GatewayRequiredError(e.message);
@@ -255,7 +261,7 @@ export async function ecomGwCreateDashscopeJob(
     body,
     meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage, bookUserId }),
   });
-  return { taskId: created.taskId, logId: created.logId };
+  return captureEcomLog({ taskId: created.taskId, logId: created.logId });
 }
 
 export function ecomExtractMediaUrl(output: DashscopeTaskOutput): string | null {
@@ -334,7 +340,7 @@ export async function ecomGwChatComplete(
       typeof choice?.message?.content === "string"
         ? choice.message.content
         : result.text;
-    return { text: text.trim(), logId: result.logId };
+    return captureEcomLog({ text: text.trim(), logId: result.logId });
   } catch (e) {
     if (e instanceof GatewayV1ChatError) {
       throw new GatewayRequiredError(e.message);
@@ -350,7 +356,7 @@ export async function ecomGwAsrTranscribe(
 ): Promise<{ segments: Array<{ startMs: number; endMs: number; text: string }>; logId: string }> {
   const auth = await requireEcomGatewayAuth(bookUserId);
   try {
-    return await runGatewayV1AsrTranscribe({
+    return captureEcomLog(await runGatewayV1AsrTranscribe({
       auth,
       fileUrl: opts.fileUrl,
       model: opts.modelKey,
@@ -358,7 +364,7 @@ export async function ecomGwAsrTranscribe(
         clientPage: opts.clientPage,
         bookUserId,
       }),
-    });
+    }));
   } catch (e) {
     if (e instanceof GatewayV1AsrError) {
       throw new Error(e.message);
@@ -406,11 +412,11 @@ export async function ecomGwChatStream(
         bookUserId,
       }),
     });
-    return {
+    return captureEcomLog({
       logId: result.logId,
       status: result.status,
       body: result.body,
-    };
+    });
   } catch (e) {
     if (e instanceof GatewayV1ChatError) {
       throw new GatewayRequiredError(e.message);
@@ -580,7 +586,7 @@ export async function ecomGwQwenImageEdit(
   if (!pickCredentialForKind(auth.credentials, "BAILIAN")) {
     throw new GatewayRequiredError("Gateway Key 未绑定百炼 / DashScope 凭证");
   }
-  return gatewayV1QwenImageEdit({
+  return captureEcomLog(await gatewayV1QwenImageEdit({
     apiKeyId: auth.id,
     body: {
       model,
@@ -591,7 +597,7 @@ export async function ecomGwQwenImageEdit(
       clientPage: opts.clientPage,
       bookUserId,
     }),
-  });
+  }));
 }
 
 export async function ecomGwVolcengineImageEdit(
@@ -620,7 +626,7 @@ export async function ecomGwVolcengineImageEdit(
   if (!pickCredentialForKind(auth.credentials, "VOLCENGINE")) {
     throw new GatewayRequiredError("Gateway Key 未绑定火山方舟凭证");
   }
-  return gatewayV1VolcengineImageGenerations({
+  return captureEcomLog(await gatewayV1VolcengineImageGenerations({
     apiKeyId: auth.id,
     body: {
       model,
@@ -632,7 +638,7 @@ export async function ecomGwVolcengineImageEdit(
       clientPage: opts.clientPage,
       bookUserId,
     }),
-  });
+  }));
 }
 
 export async function ecomGwImageOutPainting(
@@ -648,7 +654,7 @@ export async function ecomGwImageOutPainting(
   if (!pickCredentialForKind(auth.credentials, "BAILIAN")) {
     throw new GatewayRequiredError("Gateway Key 未绑定百炼 / DashScope 凭证");
   }
-  return gatewayV1ImageOutPainting({
+  return captureEcomLog(await gatewayV1ImageOutPainting({
     apiKeyId: auth.id,
     body: {
       imageUrl: opts.imageUrl,
@@ -658,7 +664,7 @@ export async function ecomGwImageOutPainting(
       clientPage: opts.clientPage,
       bookUserId,
     }),
-  });
+  }));
 }
 
 export async function ecomGwImage2ImageAsync(
@@ -676,7 +682,7 @@ export async function ecomGwImage2ImageAsync(
   if (!pickCredentialForKind(auth.credentials, "BAILIAN")) {
     throw new GatewayRequiredError("Gateway Key 未绑定百炼 / DashScope 凭证");
   }
-  return gatewayV1Image2ImageAsync({
+  return captureEcomLog(await gatewayV1Image2ImageAsync({
     apiKeyId: auth.id,
     body: {
       model,
@@ -687,7 +693,7 @@ export async function ecomGwImage2ImageAsync(
       clientPage: opts.clientPage,
       bookUserId,
     }),
-  });
+  }));
 }
 
 /** 电商 · 百炼 AI 试衣图片分割（同步，经 Gateway） */
@@ -722,8 +728,8 @@ export async function ecomGwImageParsing(
     }),
   });
 
-  return {
+  return captureEcomLog({
     output: result.output as DashscopeParsingOutput,
     logId: result.logId,
-  };
+  });
 }

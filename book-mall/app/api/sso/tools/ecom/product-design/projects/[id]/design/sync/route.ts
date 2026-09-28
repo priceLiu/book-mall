@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
@@ -43,7 +43,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id } = await ctx.params;
 
@@ -58,7 +58,7 @@ export async function POST(req: Request, ctx: Ctx) {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const project = await getProductDesignProject(auth.userId, id);
     if (!project) {
-      return NextResponse.json({ error: "项目不存在" }, { status: 404 });
+      return ecomJson({ error: "项目不存在" }, { status: 404 });
     }
 
     const fallbackRaw =
@@ -90,7 +90,7 @@ export async function POST(req: Request, ctx: Ctx) {
       mdMainImages.length === 0 &&
       mdDetailOutline.length === 0
     ) {
-      return NextResponse.json(
+      return ecomJson(
         { error: "未能从助手回复中解析出设计稿，请让助手重新输出对应步骤" },
         { status: 422 },
       );
@@ -168,7 +168,7 @@ export async function POST(req: Request, ctx: Ctx) {
       !designPatch.mainImages?.length &&
       !designPatch.detailOutline?.length
     ) {
-      return NextResponse.json(
+      return ecomJson(
         { error: "未能解析出可同步的结构化内容，请让助手重新输出对应步骤" },
         { status: 422 },
       );
@@ -191,9 +191,9 @@ export async function POST(req: Request, ctx: Ctx) {
     }
 
     const updated = await updateProductDesignProject(auth.userId, id, { designPatch });
-    return NextResponse.json({ project: updated });
+    return ecomJson({ project: updated });
   } catch (e) {
     const message = e instanceof Error ? e.message : "解析失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

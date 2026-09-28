@@ -13,4 +13,8 @@ describe("formatEcomImageGenUserMessage", () => {
     });
     expect(formatEcomImageGenUserMessage(raw)).toContain("欠费");
   });
+
+  it("keeps platform credit shortage instead of vendor arrears", () => {
+    expect(formatEcomImageGenUserMessage("积分不足：余额 12，需要 80")).toContain("积分不足");
+  });
 });

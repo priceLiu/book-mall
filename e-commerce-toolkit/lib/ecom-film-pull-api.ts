@@ -2,6 +2,7 @@
 
 import { EcomUnauthorizedError } from "@/lib/ecom-auth";
 import { ecomBookFetch } from "@/lib/ecom-book-fetch";
+import { noteEcomStreamResponseForCredits } from "@/lib/ecom-credits-settlement-watch";
 import type { FilmPullProject } from "@/lib/film-pull-types";
 import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
@@ -223,6 +224,10 @@ export async function streamFilmPullAnalyze(
     };
     throw new Error(data.error ?? `拉片失败 (${res.status})`);
   }
+  noteEcomStreamResponseForCredits(
+    `${BASE}/projects/${projectId}/analyze`,
+    res,
+  );
   if (!res.body) throw new Error("无响应体");
 
   const reader = res.body.getReader();

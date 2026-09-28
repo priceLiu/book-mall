@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { generateHandCraftStepImages } from "@/lib/ecom/ecom-hand-craft-image";
 import { getEcomHandCraftProject } from "@/lib/ecom/ecom-hand-craft-service";
@@ -13,10 +13,10 @@ type Ctx = { params: Promise<{ id: string; stepId: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id, stepId } = await ctx.params;
   if (!isHandCraftStepId(stepId)) {
-    return NextResponse.json({ error: "未知步骤" }, { status: 400 });
+    return ecomJson({ error: "未知步骤" }, { status: 400 });
   }
 
   let body: {
@@ -50,9 +50,9 @@ export async function POST(req: Request, ctx: Ctx) {
         typeof body.imageSize === "string" ? body.imageSize : undefined,
     });
     const project = await getEcomHandCraftProject(auth.userId, id);
-    return NextResponse.json({ ...result, project });
+    return ecomJson({ ...result, project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "生成失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

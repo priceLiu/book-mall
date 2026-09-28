@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const body = (await req.json()) as Record<string, unknown>;
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     const baseDescription =
       typeof body.baseDescription === "string" ? body.baseDescription.trim() : "";
     if (!category || !title || !baseDescription) {
-      return NextResponse.json(
+      return ecomJson(
         { error: "category、title、baseDescription 必填" },
         { status: 400 },
       );
@@ -39,9 +39,9 @@ export async function POST(req: Request) {
       sceneTags,
       tags: { genders, sceneTags },
     });
-    return NextResponse.json({ entry });
+    return ecomJson({ entry });
   } catch (e) {
     const message = e instanceof Error ? e.message : "创建失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

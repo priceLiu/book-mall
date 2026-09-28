@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import {
   getEcomModelShotProject,
@@ -19,7 +19,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   const form = await req.formData();
@@ -30,7 +30,7 @@ export async function POST(req: Request, ctx: Ctx) {
       ? roleRaw
       : null;
   if (!file || !(file instanceof File) || !role) {
-    return NextResponse.json({ error: "file 与 role 必填" }, { status: 400 });
+    return ecomJson({ error: "file 与 role 必填" }, { status: 400 });
   }
 
   const buf = Buffer.from(await file.arrayBuffer());
@@ -47,32 +47,32 @@ export async function POST(req: Request, ctx: Ctx) {
     description:
       typeof form.get("description") === "string" ? form.get("description") as string : undefined,
   });
-  if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
-  return NextResponse.json({ project });
+  if (!project) return ecomJson({ error: "项目不存在" }, { status: 404 });
+  return ecomJson({ project });
 }
 
 export async function PATCH(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+    return ecomJson({ error: "invalid_json" }, { status: 400 });
   }
 
   const project = await getEcomModelShotProject(auth.userId, id);
-  if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
+  if (!project) return ecomJson({ error: "项目不存在" }, { status: 404 });
 
   const index = typeof body.index === "number" ? body.index : null;
   if (!index) {
-    return NextResponse.json({ error: "index 必填" }, { status: 400 });
+    return ecomJson({ error: "index 必填" }, { status: 400 });
   }
 
   const target = project.plan.items.find((item) => item.index === index);
   if (!target) {
-    return NextResponse.json({ error: "姿势条目不存在" }, { status: 404 });
+    return ecomJson({ error: "姿势条目不存在" }, { status: 404 });
   }
 
   if (typeof body.activeImageIndex === "number") {
@@ -83,7 +83,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     const updated = await updateEcomModelShotProject(auth.userId, id, {
       plan: { ...project.plan, items },
     });
-    return NextResponse.json({ project: updated });
+    return ecomJson({ project: updated });
   }
 
   const hasStructuredPatch =
@@ -108,11 +108,11 @@ export async function PATCH(req: Request, ctx: Ctx) {
     const updated = await updateEcomModelShotProject(auth.userId, id, {
       plan: { ...project.plan, items },
     });
-    return NextResponse.json({ project: updated });
+    return ecomJson({ project: updated });
   }
 
   if (!hasStructuredPatch) {
-    return NextResponse.json({ error: "请提供 prompt 或姿势/场景/道具字段" }, { status: 400 });
+    return ecomJson({ error: "请提供 prompt 或姿势/场景/道具字段" }, { status: 400 });
   }
 
   const sceneCatalogId =
@@ -187,5 +187,5 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const updated = await updateEcomModelShotProject(auth.userId, id, {
     plan: { ...project.plan, items },
   });
-  return NextResponse.json({ project: updated });
+  return ecomJson({ project: updated });
 }

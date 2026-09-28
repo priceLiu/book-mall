@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import {
   createEcomImageLayerProject,
@@ -13,10 +13,10 @@ export async function GET(req: Request) {
   if (!auth.ok) return auth.res;
   try {
     const items = await listEcomImageLayerProjects(auth.userId);
-    return NextResponse.json({ items });
+    return ecomJson({ items });
   } catch (e) {
     const message = e instanceof Error ? e.message : "加载失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }
 
@@ -32,9 +32,9 @@ export async function POST(req: Request) {
   try {
     const title = typeof body.title === "string" ? body.title : undefined;
     const project = await createEcomImageLayerProject(auth.userId, { title });
-    return NextResponse.json({ project });
+    return ecomJson({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "创建失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

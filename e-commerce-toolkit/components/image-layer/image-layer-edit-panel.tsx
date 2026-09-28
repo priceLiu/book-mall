@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 
+import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-credits-beside";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { EcomButtonPrimary } from "@/components/ui/ecom-button";
 import type { ImageLayerStackItem } from "@/lib/image-layer-types";
@@ -159,6 +160,13 @@ export function ImageLayerEditPanel({
 
       {entries.length > 0 ? (
         <div className="shrink-0 border-t border-[#e5e7eb] bg-white p-4">
+          <div className="mb-2 flex justify-end">
+            <EcomGenerateCreditsBeside
+              modelKey="doubao-seedream-5-0-pro"
+              imageCount={1}
+              enabled={submitCount > 0 && !busy}
+            />
+          </div>
           <EcomButtonPrimary
             type="button"
             className="w-full"

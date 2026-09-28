@@ -2,6 +2,7 @@
 
 import { throwIfUnauthorized } from "@/lib/ecom-auth";
 import { ecomBookFetch, formatEcomTransportError } from "@/lib/ecom-book-fetch";
+import { noteEcomBookResponseForCredits } from "@/lib/ecom-credits-settlement-watch";
 import type { DetailPageSuiteProject } from "@/lib/detail-page-suite-types";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 
@@ -120,6 +121,11 @@ export async function visionDetailPageSuiteReplicaSellpoints(
     /* */
   }
   throwIfUnauthorized(res, data);
+  noteEcomBookResponseForCredits(
+    `${BASE}/projects/${projectId}/vision/sellpoints`,
+    "POST",
+    data,
+  );
   if (res.status === 409 && data.project) {
     throw new DetailPageSuiteReplicaVisionSellpointInFlightError(
       data.project as DetailPageSuiteProject,
@@ -169,6 +175,11 @@ export async function decomposeDetailPageSuiteReplica(
     /* */
   }
   throwIfUnauthorized(res, data);
+  noteEcomBookResponseForCredits(
+    `${BASE}/projects/${projectId}/replica/decompose`,
+    "POST",
+    data,
+  );
   if (res.status === 409 && data.project) {
     throw new DetailPageSuiteReplicaDecomposeInFlightError(
       data.project as DetailPageSuiteProject,
@@ -225,6 +236,11 @@ export async function generateDetailPageSuiteReplicaPrompts(
     /* */
   }
   throwIfUnauthorized(res, data);
+  noteEcomBookResponseForCredits(
+    `${BASE}/projects/${projectId}/replica/prompts/generate`,
+    "POST",
+    data,
+  );
   if (res.status === 409 && data.project) {
     throw new DetailPageSuiteReplicaDecomposeInFlightError(
       data.project as DetailPageSuiteProject,

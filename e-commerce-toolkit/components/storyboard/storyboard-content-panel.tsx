@@ -373,6 +373,7 @@ export function StoryboardContentPanel({
   const [pickerMode, setPickerMode] = useState<"image" | "video">("image");
   const [pendingPanelIndex, setPendingPanelIndex] = useState<number | null>(null);
   const [pendingVideoTarget, setPendingVideoTarget] = useState<"panel" | "fullSheet">("fullSheet");
+  const [pickerPreviewCount, setPickerPreviewCount] = useState(1);
   const [sheetPreviewOpen, setSheetPreviewOpen] = useState(false);
   const [deliverableReviewOpen, setDeliverableReviewOpen] = useState(false);
   const [snapshotBusy, setSnapshotBusy] = useState(false);
@@ -594,6 +595,15 @@ export function StoryboardContentPanel({
     pendingBatchPanelsRef.current =
       batchIndexes && batchIndexes.length > 0 ? batchIndexes : null;
     fashionImagePickerIntentRef.current = intent;
+    const imageCount =
+      intent === "character"
+        ? 1
+        : batchIndexes && batchIndexes.length > 0
+          ? batchIndexes.length
+          : typeof panelIndex === "number"
+            ? 1
+            : Math.max(1, project.sheet?.panels.length ?? 1);
+    setPickerPreviewCount(imageCount);
     setPickerOpen(true);
   }
 
@@ -967,6 +977,10 @@ export function StoryboardContentPanel({
         setPanelDurationSec(Math.max(2, Math.round(panel?.durationHintSec ?? 3)));
       }
     }
+    const videoCount = opts.fullSheet
+      ? 1
+      : (pendingBatchVideoPanelsRef.current?.length ?? 1);
+    setPickerPreviewCount(Math.max(1, videoCount));
     setPickerOpen(true);
   }
 
@@ -3099,6 +3113,7 @@ export function StoryboardContentPanel({
         value={pickerMode === "image" ? imageModel : videoModel}
         panelIndex={pendingPanelIndex}
         videoTarget={pendingVideoTarget}
+        previewCount={pickerPreviewCount}
         aspectRatio={pickerMode === "video" ? videoAspectRatio : aspectRatio}
         onAspectRatioChange={(v) => {
           if (pickerMode === "video") onVideoAspectChange?.(v);

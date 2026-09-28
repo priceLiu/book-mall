@@ -233,6 +233,7 @@ export function OutfitVideoWorkspace({
   const [splitPickerOpen, setSplitPickerOpen] = useState(false);
   const [splitDraftModelKey, setSplitDraftModelKey] = useState(splitModelKey);
   const [videoPickerOpen, setVideoPickerOpen] = useState(false);
+  const [videoPickerCount, setVideoPickerCount] = useState(1);
   const [pickerPanelDurationSec, setPickerPanelDurationSec] = useState(8);
 
   useEffect(() => {
@@ -295,6 +296,7 @@ export function OutfitVideoWorkspace({
   function openGeneratePicker(indices: number[]) {
     const unique = [...new Set(indices)].sort((a, b) => a - b);
     pendingGenerateRef.current = unique;
+    setVideoPickerCount(Math.max(1, unique.length));
     if (unique.length > 0) {
       const firstShot = project.sceneList.find((s) => s.index === unique[0]);
       setPickerPanelDurationSec(firstShot?.durationSec ?? 8);
@@ -570,6 +572,7 @@ export function OutfitVideoWorkspace({
         value={videoModelKey}
         onChange={onVideoModelChange}
         onConfirm={(modelKey) => void onVideoPickerConfirm(modelKey)}
+        previewCount={videoPickerCount}
         modelsLoading={modelsLoading}
         aspectRatio="9:16"
         panelDurationSec={pickerPanelDurationSec}

@@ -11,6 +11,7 @@ import {
   Users,
 } from "lucide-react";
 
+import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-credits-beside";
 import {
   submitImageProcessingEdit,
   type ImageProcessingGatewayModel,
@@ -294,7 +295,7 @@ export function ImageFaceSwapPanel({
         ) : null}
 
         <div className="mt-6 flex flex-col gap-3 border-t border-[#e5e5ea] pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-xs text-[#6e6e73]">经 Gateway 调用图像编辑模型完成换脸</span>
+          <EcomGenerateCreditsBeside modelKey={model} imageCount={1} />
           <CtaButton disabled={submitting} onClick={() => void onSubmit()} className="w-full sm:w-auto sm:min-w-[120px]">
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
             交换脸

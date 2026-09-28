@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Loader2, Palette, Scissors } from "lucide-react";
 
+import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-credits-beside";
 import {
   buildGenerativeSubmitParams,
   ImageGenerativeSettings,
@@ -224,7 +225,10 @@ export function ImageBgRemoverPanel({
         />
 
         <div className="mt-6 flex flex-col gap-3 border-t border-[#e5e5ea] pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-xs text-[#6e6e73]">经 Gateway 调用，结果保存到「我的资产」</span>
+          <EcomGenerateCreditsBeside
+            modelKey={removalModel}
+            imageCount={Math.max(1, Number(imageCount) || 1)}
+          />
           <CtaButton disabled={submitting} onClick={() => void onSubmit()} className="w-full sm:w-auto">
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Scissors className="h-4 w-4" />}
             移除背景

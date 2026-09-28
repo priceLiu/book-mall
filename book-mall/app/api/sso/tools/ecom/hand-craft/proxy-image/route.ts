@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import {
   assertHandCraftComposeImageUrl,
@@ -12,11 +13,11 @@ export const maxDuration = 60;
 /** 拼版离屏 DOM 经同域代理加载 OSS 成图，避免 html2canvas CORS 抓成灰块 */
 export async function GET(req: Request) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
 
   const url = new URL(req.url).searchParams.get("url")?.trim();
   if (!url) {
-    return NextResponse.json({ error: "缺少 url" }, { status: 400 });
+    return ecomJson({ error: "缺少 url" }, { status: 400 });
   }
 
   try {
@@ -37,6 +38,6 @@ export async function GET(req: Request) {
       message === "FORBIDDEN_OSS_HOST"
         ? 403
         : 502;
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

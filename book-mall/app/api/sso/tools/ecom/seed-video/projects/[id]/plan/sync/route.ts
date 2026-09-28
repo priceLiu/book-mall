@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
@@ -74,18 +74,18 @@ function parseStylePreset(text: string): SeedVideoStylePreset | null {
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   let body: { markdown?: string; userChoice?: string; confirmSync?: boolean } = {};
   try {
     body = (await req.json()) as typeof body;
   } catch {
-    return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+    return ecomJson({ error: "无效 JSON" }, { status: 400 });
   }
 
   const project = await getEcomSeedVideoProject(auth.userId, id);
-  if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
+  if (!project) return ecomJson({ error: "项目不存在" }, { status: 404 });
 
   const userChoice = typeof body.userChoice === "string" ? body.userChoice.trim() : "";
   const confirmSync =
@@ -124,7 +124,7 @@ export async function POST(req: Request, ctx: Ctx) {
   }
 
   if (!markdown) {
-    return NextResponse.json({ error: "缺少可解析的助手内容" }, { status: 400 });
+    return ecomJson({ error: "缺少可解析的助手内容" }, { status: 400 });
   }
 
   try {
@@ -137,7 +137,7 @@ export async function POST(req: Request, ctx: Ctx) {
     const shots = bindShotRefIds(shotsRaw, refMap);
 
     if (confirmSync && shots.length === 0 && !directVideo) {
-      return NextResponse.json(
+      return ecomJson(
         { error: "未在策划内容中解析到逐镜参数表或成片参数，请让助手重新输出后再确认" },
         { status: 400 },
       );
@@ -151,7 +151,7 @@ export async function POST(req: Request, ctx: Ctx) {
       Boolean((project.meta?.workflow as { stylePreset?: string } | undefined)?.stylePreset) ||
       project.chatHistory.some((m) => m.role === "user" && /^A方案：|^B方案：/.test(m.content.trim()));
     if (confirmSync && shots.length > 0 && effectiveMode === "fine" && !hasStyle) {
-      return NextResponse.json(
+      return ecomJson(
         { error: "方案②须先完成成片风格（A/B）点选，再同步逐镜参数表" },
         { status: 400 },
       );
@@ -197,7 +197,7 @@ export async function POST(req: Request, ctx: Ctx) {
     }
 
     if (confirmSync && shots.length === 0 && !planPatch.directVideo) {
-      return NextResponse.json(
+      return ecomJson(
         { error: "未在策划内容中解析到逐镜参数表或成片参数，请让助手重新输出后再确认" },
         { status: 400 },
       );
@@ -258,9 +258,9 @@ export async function POST(req: Request, ctx: Ctx) {
           : project.status,
     });
 
-    return NextResponse.json({ project: updated });
+    return ecomJson({ project: updated });
   } catch (e) {
     const message = e instanceof Error ? e.message : "同步失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

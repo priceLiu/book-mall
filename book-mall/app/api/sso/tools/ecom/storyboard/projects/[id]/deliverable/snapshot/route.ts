@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { resolveStoryboardLibraryDeliverableSnapshot } from "@/lib/ecom/ecom-storyboard-library-deliverable";
@@ -14,7 +14,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function GET(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id: projectId } = await ctx.params;
   const savedAt = new URL(req.url).searchParams.get("savedAt")?.trim() || undefined;
@@ -29,12 +29,12 @@ export async function GET(req: Request, ctx: Ctx) {
       fallbackTitle: title,
     });
     if (!snapshot) {
-      return NextResponse.json({ error: "暂无分镜内容" }, { status: 404 });
+      return ecomJson({ error: "暂无分镜内容" }, { status: 404 });
     }
-    return NextResponse.json({ snapshot });
+    return ecomJson({ snapshot });
   } catch (e) {
     const message = e instanceof Error ? e.message : "加载失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }
 
@@ -42,7 +42,7 @@ export async function GET(req: Request, ctx: Ctx) {
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id: projectId } = await ctx.params;
 
@@ -55,7 +55,7 @@ export async function POST(req: Request, ctx: Ctx) {
 
   const project = await getEcomStoryboardProject(auth.userId, projectId);
   if (!project?.sheet) {
-    return NextResponse.json({ error: "请先生成分镜内容" }, { status: 400 });
+    return ecomJson({ error: "请先生成分镜内容" }, { status: 400 });
   }
 
   try {
@@ -75,13 +75,13 @@ export async function POST(req: Request, ctx: Ctx) {
     });
 
     if (!snapshot) {
-      return NextResponse.json({ error: "快照保存失败" }, { status: 500 });
+      return ecomJson({ error: "快照保存失败" }, { status: 500 });
     }
 
     const refreshed = await getEcomStoryboardProject(auth.userId, projectId);
-    return NextResponse.json({ snapshot, project: refreshed });
+    return ecomJson({ snapshot, project: refreshed });
   } catch (e) {
     const message = e instanceof Error ? e.message : "快照保存失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

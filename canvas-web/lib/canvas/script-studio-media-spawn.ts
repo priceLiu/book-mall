@@ -75,6 +75,7 @@ export function spawnScriptStudioMediaCardsFromWorkspace(args: {
   const visualPack = resolveHubVisualStylePackFromHubData(hubData);
   const baseX = (hub.position?.x ?? 400) + 420;
   const baseY = hub.position?.y ?? 120;
+  const nodeIdSet = new Set(args.nodes.map((n) => n.id));
 
   let spawned = 0;
   let skipped = 0;
@@ -84,9 +85,18 @@ export function spawnScriptStudioMediaCardsFromWorkspace(args: {
     const rows = hubRows(hubData, kind);
     const existing = existingMediaNodeIds(args.nodes, kind);
     const nextRows = [...rows];
+    let rowsPatched = false;
 
-    for (const row of rows) {
-      if (existing.has(row.key) || row.mediaNodeId) {
+    for (let idx = 0; idx < rows.length; idx++) {
+      const row = rows[idx]!;
+      const staleMediaNodeId =
+        row.mediaNodeId && !nodeIdSet.has(row.mediaNodeId);
+      if (staleMediaNodeId) {
+        nextRows[idx] = { ...nextRows[idx], mediaNodeId: undefined };
+        rowsPatched = true;
+      }
+      const blockedByMediaNodeId = row.mediaNodeId && !staleMediaNodeId;
+      if (existing.has(row.key) || blockedByMediaNodeId) {
         skipped += 1;
         continue;
       }
@@ -112,18 +122,19 @@ export function spawnScriptStudioMediaCardsFromWorkspace(args: {
       );
       yCursor += size.height + 24;
 
-      const idx = nextRows.findIndex((r) => r.key === row.key);
-      if (idx >= 0) {
-        nextRows[idx] = { ...nextRows[idx], mediaNodeId: nodeId };
+      const hitIndex = nextRows.findIndex((r) => r.key === row.key);
+      if (hitIndex >= 0) {
+        nextRows[hitIndex] = { ...nextRows[hitIndex], mediaNodeId: nodeId };
+        rowsPatched = true;
       }
       spawned += 1;
     }
 
-    if (kind === "prop" && nextRows.length) {
+    if (kind === "prop" && nextRows.length && rowsPatched) {
       args.updateNodeData(hub.id, { scriptStudioPropRows: nextRows });
-    } else if (kind === "mood" && nextRows.length) {
+    } else if (kind === "mood" && nextRows.length && rowsPatched) {
       args.updateNodeData(hub.id, { scriptStudioMoodRows: nextRows });
-    } else if (kind === "audio" && nextRows.length) {
+    } else if (kind === "audio" && nextRows.length && rowsPatched) {
       args.updateNodeData(hub.id, { scriptStudioAudioRows: nextRows });
     }
   }

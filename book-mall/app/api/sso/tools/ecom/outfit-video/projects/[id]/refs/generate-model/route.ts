@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { generateEcomOutfitVideoModel } from "@/lib/ecom/ecom-outfit-video-service";
 import { formatEcomImageGenUserError } from "@/lib/ecom/ecom-image-processing-error";
@@ -12,7 +12,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
   let body: Record<string, unknown> = {};
@@ -25,14 +25,14 @@ export async function POST(req: Request, ctx: Ctx) {
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
   const modelKey = typeof body.modelKey === "string" ? body.modelKey.trim() : undefined;
   if (!prompt) {
-    return NextResponse.json({ error: "请填写 Prompt" }, { status: 400 });
+    return ecomJson({ error: "请填写 Prompt" }, { status: 400 });
   }
 
   try {
     const project = await generateEcomOutfitVideoModel(auth.userId, id, { prompt, modelKey });
-    return NextResponse.json({ project });
+    return ecomJson({ project });
   } catch (e) {
     const { message, status } = formatEcomImageGenUserError(e);
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

@@ -17,6 +17,7 @@ import {
   DialogTitle,
   EcomDialogCloseButton,
 } from "@/components/ui/dialog";
+import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-credits-beside";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
   STORYBOARD_VIDEO_RESOLUTION_OPTIONS,
@@ -60,7 +61,6 @@ import { formatStoryboardModelRefCountLabel } from "@/lib/storyboard-model-ref-c
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import { cn } from "@/lib/utils";
 import {
-  ecomEstimateCredits,
   ecomModelKeysForTemplate,
   fetchEcomModelTemplateCatalog,
 } from "@/lib/model-template-catalog";
@@ -113,6 +113,8 @@ type Props = {
   hideTypeFilter?: boolean;
   /** 仅选模型：隐藏弹层内参数区，确认钮为「确定」而非「开始生图」 */
   selectionOnly?: boolean;
+  /** 本次确认会生成的张数或镜头数，用于积分预估（默认 1） */
+  previewCount?: number;
   /**
    * 使用 createPortal + 自定义 overlay，不经 Radix Dialog。
    * 素材区粘贴热区与 Radix 焦点陷阱冲突时启用（如服装模特图）。
@@ -371,6 +373,7 @@ export function StoryboardModelPickerDialog({
   onRetryLoadModels,
   hideTypeFilter = false,
   selectionOnly = false,
+  previewCount = 1,
   contentClassName,
   nativeOverlay = false,
   running = false,
@@ -396,7 +399,6 @@ export function StoryboardModelPickerDialog({
   const [mediaFilter, setMediaFilter] = useState<StoryboardModelMediaFilter>("all");
   const [confirmBlockMessage, setConfirmBlockMessage] = useState<string | null>(null);
   const [templateModelKeys, setTemplateModelKeys] = useState<string[] | null>(null);
-  const [catalogCreditsHint, setCatalogCreditsHint] = useState<number | null>(null);
   const wasOpenRef = useRef(false);
   const suppressBackdropCloseUntilRef = useRef(0);
 
@@ -411,15 +413,25 @@ export function StoryboardModelPickerDialog({
         ? "选择生图模型并调整尺寸，用于生成分镜图。"
         : "");
   const footerLeftHint =
-    (catalogCreditsHint != null
-      ? `约 ${catalogCreditsHint} 积分（平台价 · 静态目录）· `
-      : "") +
-    (footerHint ??
-      (confirming || running
-        ? "任务进行中，请稍候…"
-        : selectionOnly
-          ? "参数在右栏编辑，生成请点右栏底部按钮。"
-          : "选好模型与参数后开始生成。"));
+    footerHint ??
+    (confirming || running
+      ? "任务进行中，请稍候…"
+      : selectionOnly
+        ? "参数在右栏编辑，生成请点右栏底部按钮。"
+        : "选好模型与参数后开始生成。");
+  const billableCount = Math.max(1, Math.round(previewCount || 1));
+  const showCreditsPreview = !selectionOnly && /生成|生图|分析/.test(action);
+  const videoPreviewSec =
+    mode === "video"
+      ? Math.max(
+          1,
+          Math.round((videoTarget === "panel" ? panelDurationSec : durationSec) || 5) *
+            billableCount,
+        )
+      : undefined;
+  const imagePreviewCount = mode === "image" ? billableCount : undefined;
+  const imagePreviewResolution =
+    mode === "image" && /^\d+\s*[kK]$/.test(imageSize.trim()) ? imageSize.trim() : undefined;
   const showImageSize = mode === "image";
   const showFullDuration = mode === "video" && videoTarget === "fullSheet";
   const showPanelDuration = mode === "video" && videoTarget === "panel";
@@ -440,25 +452,6 @@ export function StoryboardModelPickerDialog({
       cancelled = true;
     };
   }, [open, resolvedTemplateId]);
-
-  useEffect(() => {
-    if (!open || !draftKey) {
-      setCatalogCreditsHint(null);
-      return;
-    }
-    let cancelled = false;
-    void fetchEcomModelTemplateCatalog().then((catalog) => {
-      if (cancelled) return;
-      const units =
-        mode === "video"
-          ? Math.max(1, Math.round(durationSec || panelDurationSec || 10))
-          : 1;
-      setCatalogCreditsHint(ecomEstimateCredits(catalog, draftKey, units));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, draftKey, mode, durationSec, panelDurationSec]);
 
   useEffect(() => {
     if (open && !wasOpenRef.current) {
@@ -1039,10 +1032,21 @@ export function StoryboardModelPickerDialog({
     </div>
   );
 
+  const creditsBeside = showCreditsPreview ? (
+    <EcomGenerateCreditsBeside
+      modelKey={draftKey}
+      enabled={open}
+      imageCount={imagePreviewCount}
+      durationSec={videoPreviewSec}
+      resolution={imagePreviewResolution}
+    />
+  ) : null;
+
   const footer = (
       <div className="flex shrink-0 items-center justify-between border-t border-[#f0f0f2] px-5 py-3">
       <span className="text-[11px] text-[#86868b]">{footerLeftHint}</span>
       <div className="flex items-center gap-2">
+        {creditsBeside}
         {!running ? (
           <EcomButtonPrimary
             type="button"
@@ -1111,6 +1115,7 @@ export function StoryboardModelPickerDialog({
         <DialogFooter className="shrink-0 items-center justify-between border-t border-[#f0f0f2] px-5 py-3 sm:justify-between">
           <span className="text-[11px] text-[#86868b]">{footerLeftHint}</span>
           <div className="flex items-center gap-2">
+            {creditsBeside}
             {!running ? (
               <EcomButtonPrimary type="button" size="sm" onClick={handleConfirm} disabled={confirming || !canConfirm}>
                 {confirming ? "生成中…" : action}

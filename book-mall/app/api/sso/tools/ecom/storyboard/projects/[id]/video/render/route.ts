@@ -1,5 +1,5 @@
 import { MediaRenderSourceApp } from "@prisma/client";
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 import type { Prisma } from "@prisma/client";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
@@ -25,13 +25,13 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id: projectId } = await ctx.params;
 
   const project = await getEcomStoryboardProject(auth.userId, projectId);
   if (!project?.sheet) {
-    return NextResponse.json({ error: "请先生成分镜脚本" }, { status: 400 });
+    return ecomJson({ error: "请先生成分镜脚本" }, { status: 400 });
   }
 
   let profile = parseRenderProfile(null);
@@ -69,7 +69,7 @@ export async function POST(req: Request, ctx: Ctx) {
       );
     }
     if (timeline.clips.length < 2) {
-      return NextResponse.json(
+      return ecomJson(
         { error: "请至少为 2 个镜头生成分镜视频后再合并" },
         { status: 400 },
       );
@@ -105,10 +105,10 @@ export async function POST(req: Request, ctx: Ctx) {
     });
 
     const dto = await getMediaRenderJobForUser(job.id, auth.userId);
-    return NextResponse.json({ job: dto });
+    return ecomJson({ job: dto });
   } catch (e) {
     if (e instanceof MediaRenderUnavailableError) {
-      return NextResponse.json(
+      return ecomJson(
         { error: e.code, message: e.userMessage },
         { status: 503 },
       );
@@ -117,6 +117,6 @@ export async function POST(req: Request, ctx: Ctx) {
     const status = /不能超过|至少需要|须为 HTTPS|过长|2 个镜头/.test(message)
       ? 400
       : 500;
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

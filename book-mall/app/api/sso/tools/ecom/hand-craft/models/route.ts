@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { getUserBillingPersona } from "@/lib/billing/billing-persona";
 import { resolveEcomGatewayAuthForUser } from "@/lib/ecom/ecom-gateway-auth";
@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
 
   const rawPersona = await getUserBillingPersona(auth.userId);
@@ -53,7 +53,7 @@ export async function GET(req: Request) {
   const refCapableImageModels = refCapable.length > 0 ? refCapable : allImageModels;
   const imageGenConcurrencyLimit = await resolveEcomImageGenConcurrency(auth.userId, {});
 
-  return NextResponse.json({
+  return ecomJson({
     chatModels: registryRowsToEcomModels(chatModels),
     imageModels: refCapableImageModels,
     platformOffering: persona === "PLATFORM_CREDIT",

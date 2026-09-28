@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import {
   ecomImageProcessingAvatar,
@@ -57,14 +57,14 @@ function parseImageList(body: Record<string, unknown>): string[] {
 export async function handleImageProcessingEditPost(req: Request) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
 
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+    return ecomJson({ error: "无效 JSON" }, { status: 400 });
   }
 
   const mode = typeof body.mode === "string" ? body.mode.trim() : "";
@@ -93,13 +93,13 @@ export async function handleImageProcessingEditPost(req: Request) {
         }
       }
       if (!RETOUCH_MODELS.has(model)) {
-        return NextResponse.json({ error: "无效修图模型" }, { status: 400 });
+        return ecomJson({ error: "无效修图模型" }, { status: 400 });
       }
       if (!sourceImageDataUrl) {
-        return NextResponse.json({ error: "请上传图片" }, { status: 400 });
+        return ecomJson({ error: "请上传图片" }, { status: 400 });
       }
       if (!prompt) {
-        return NextResponse.json({ error: "prompt 必填" }, { status: 400 });
+        return ecomJson({ error: "prompt 必填" }, { status: 400 });
       }
       const result = await ecomImageProcessingRetouch({
         userId: auth.userId,
@@ -110,7 +110,7 @@ export async function handleImageProcessingEditPost(req: Request) {
         bbox,
         parameters,
       });
-      return NextResponse.json({
+      return ecomJson({
         assets: result.results.map((r) => r.asset),
         imageUrls: result.results.map((r) => r.ossUrl),
         logId: result.logId,
@@ -127,10 +127,10 @@ export async function handleImageProcessingEditPost(req: Request) {
       const enhancerStyle =
         typeof body.enhancerStyle === "string" ? body.enhancerStyle.trim() : "standard";
       if (!isQwenEditModelKey(model)) {
-        return NextResponse.json({ error: "无效增强模型" }, { status: 400 });
+        return ecomJson({ error: "无效增强模型" }, { status: 400 });
       }
       if (!sourceImageDataUrl) {
-        return NextResponse.json({ error: "请上传图片" }, { status: 400 });
+        return ecomJson({ error: "请上传图片" }, { status: 400 });
       }
       const result = await ecomImageProcessingEnhancer({
         userId: auth.userId,
@@ -140,7 +140,7 @@ export async function handleImageProcessingEditPost(req: Request) {
         sourceImageDataUrl,
         parameters,
       });
-      return NextResponse.json({
+      return ecomJson({
         assets: result.results.map((r) => r.asset),
         imageUrls: result.results.map((r) => r.ossUrl),
         logId: result.logId,
@@ -158,7 +158,7 @@ export async function handleImageProcessingEditPost(req: Request) {
           ? body.sourceImageDataUrl.trim()
           : "";
       if (!sourceImageDataUrl) {
-        return NextResponse.json({ error: "请上传图片" }, { status: 400 });
+        return ecomJson({ error: "请上传图片" }, { status: 400 });
       }
       const result = await ecomImageProcessingOutpaint({
         userId: auth.userId,
@@ -167,7 +167,7 @@ export async function handleImageProcessingEditPost(req: Request) {
         sourceImageDataUrl,
         parameters,
       });
-      return NextResponse.json({
+      return ecomJson({
         assets: result.results.map((r) => r.asset),
         imageUrls: result.results.map((r) => r.ossUrl),
         logId: result.logId,
@@ -182,10 +182,10 @@ export async function handleImageProcessingEditPost(req: Request) {
           ? body.sourceImageDataUrl.trim()
           : "";
       if (!RESTORE_FACE_SWAP_MODELS.has(model)) {
-        return NextResponse.json({ error: "无效修复模型" }, { status: 400 });
+        return ecomJson({ error: "无效修复模型" }, { status: 400 });
       }
       if (!sourceImageDataUrl) {
-        return NextResponse.json({ error: "请上传图片" }, { status: 400 });
+        return ecomJson({ error: "请上传图片" }, { status: 400 });
       }
       const result = await ecomImageProcessingRestore({
         userId: auth.userId,
@@ -199,7 +199,7 @@ export async function handleImageProcessingEditPost(req: Request) {
             : "1",
         parameters,
       });
-      return NextResponse.json({
+      return ecomJson({
         assets: result.results.map((r) => r.asset),
         imageUrls: result.results.map((r) => r.ossUrl),
         logId: result.logId,
@@ -218,10 +218,10 @@ export async function handleImageProcessingEditPost(req: Request) {
           ? body.targetImageDataUrl.trim()
           : "";
       if (!RESTORE_FACE_SWAP_MODELS.has(model)) {
-        return NextResponse.json({ error: "无效换脸模型" }, { status: 400 });
+        return ecomJson({ error: "无效换脸模型" }, { status: 400 });
       }
       if (!sourceFaceDataUrl || !targetImageDataUrl) {
-        return NextResponse.json({ error: "请上传源脸与目标图" }, { status: 400 });
+        return ecomJson({ error: "请上传源脸与目标图" }, { status: 400 });
       }
       const result = await ecomImageProcessingFaceSwap({
         userId: auth.userId,
@@ -238,7 +238,7 @@ export async function handleImageProcessingEditPost(req: Request) {
           typeof body.algorithm === "string" ? body.algorithm.trim() : "standard",
         parameters,
       });
-      return NextResponse.json({
+      return ecomJson({
         assets: result.results.map((r) => r.asset),
         imageUrls: result.results.map((r) => r.ossUrl),
         logId: result.logId,
@@ -253,7 +253,7 @@ export async function handleImageProcessingEditPost(req: Request) {
           : ECOM_SEEDREAM_EDITOR_MODEL_KEY;
       const images = parseImageList(body);
       if (!prompt) {
-        return NextResponse.json({ error: "prompt 必填" }, { status: 400 });
+        return ecomJson({ error: "prompt 必填" }, { status: 400 });
       }
       const result = await ecomImageProcessingEditor({
         userId: auth.userId,
@@ -262,7 +262,7 @@ export async function handleImageProcessingEditPost(req: Request) {
         parameters,
         model,
       });
-      return NextResponse.json({
+      return ecomJson({
         assets: result.results.map((r) => r.asset),
         imageUrls: result.results.map((r) => r.ossUrl),
         logId: result.logId,
@@ -276,7 +276,7 @@ export async function handleImageProcessingEditPost(req: Request) {
           ? body.sourceImageDataUrl.trim()
           : "";
       if (!sourceImageDataUrl) {
-        return NextResponse.json({ error: "请上传图片" }, { status: 400 });
+        return ecomJson({ error: "请上传图片" }, { status: 400 });
       }
       const styleFromParams =
         parameters?.styleImageDataUrl &&
@@ -303,7 +303,7 @@ export async function handleImageProcessingEditPost(req: Request) {
         styleImageDataUrl: styleFromParams,
         parameters,
       });
-      return NextResponse.json({
+      return ecomJson({
         assets: result.results.map((r) => r.asset),
         imageUrls: result.results.map((r) => r.ossUrl),
         logId: result.logId,
@@ -320,10 +320,10 @@ export async function handleImageProcessingEditPost(req: Request) {
           ? body.sourceImageDataUrl.trim()
           : "";
       if (!sourceImageDataUrl) {
-        return NextResponse.json({ error: "请上传图片" }, { status: 400 });
+        return ecomJson({ error: "请上传图片" }, { status: 400 });
       }
       if (!prompt) {
-        return NextResponse.json({ error: "prompt 必填" }, { status: 400 });
+        return ecomJson({ error: "prompt 必填" }, { status: 400 });
       }
       const styleFromParams =
         parameters?.styleImageDataUrl &&
@@ -348,7 +348,7 @@ export async function handleImageProcessingEditPost(req: Request) {
         styleImageDataUrl: styleFromParams,
         parameters,
       });
-      return NextResponse.json({
+      return ecomJson({
         assets: result.results.map((r) => r.asset),
         imageUrls: result.results.map((r) => r.ossUrl),
         logId: result.logId,
@@ -362,7 +362,7 @@ export async function handleImageProcessingEditPost(req: Request) {
           ? body.sourceImageDataUrl.trim()
           : "";
       if (!sourceImageDataUrl) {
-        return NextResponse.json({ error: "请上传图片" }, { status: 400 });
+        return ecomJson({ error: "请上传图片" }, { status: 400 });
       }
       const styleFromParams =
         parameters?.styleImageDataUrl &&
@@ -388,7 +388,7 @@ export async function handleImageProcessingEditPost(req: Request) {
         styleImageDataUrl: styleFromParams,
         parameters,
       });
-      return NextResponse.json({
+      return ecomJson({
         assets: result.results.map((r) => r.asset),
         imageUrls: result.results.map((r) => r.ossUrl),
         logId: result.logId,
@@ -402,7 +402,7 @@ export async function handleImageProcessingEditPost(req: Request) {
           ? body.sourceImageDataUrl.trim()
           : "";
       if (!sourceImageDataUrl) {
-        return NextResponse.json({ error: "请上传图片" }, { status: 400 });
+        return ecomJson({ error: "请上传图片" }, { status: 400 });
       }
       const styleFromParams =
         parameters?.styleImageDataUrl &&
@@ -430,7 +430,7 @@ export async function handleImageProcessingEditPost(req: Request) {
         styleImageDataUrl: styleFromParams,
         parameters,
       });
-      return NextResponse.json({
+      return ecomJson({
         assets: result.results.map((r) => r.asset),
         imageUrls: result.results.map((r) => r.ossUrl),
         logId: result.logId,
@@ -444,7 +444,7 @@ export async function handleImageProcessingEditPost(req: Request) {
           ? body.sceneDescription.trim()
           : prompt;
       if (!sceneDescription) {
-        return NextResponse.json({ error: "请填写场景描述" }, { status: 400 });
+        return ecomJson({ error: "请填写场景描述" }, { status: 400 });
       }
       const styleFromParams =
         parameters?.styleImageDataUrl &&
@@ -475,7 +475,7 @@ export async function handleImageProcessingEditPost(req: Request) {
         styleImageDataUrl: styleFromParams,
         parameters,
       });
-      return NextResponse.json({
+      return ecomJson({
         assets: result.results.map((r) => r.asset),
         imageUrls: result.results.map((r) => r.ossUrl),
         logId: result.logId,
@@ -489,7 +489,7 @@ export async function handleImageProcessingEditPost(req: Request) {
           ? body.sceneDescription.trim()
           : prompt;
       if (!sceneDescription) {
-        return NextResponse.json({ error: "请描述场景" }, { status: 400 });
+        return ecomJson({ error: "请描述场景" }, { status: 400 });
       }
       const styleFromParams =
         parameters?.styleImageDataUrl &&
@@ -515,7 +515,7 @@ export async function handleImageProcessingEditPost(req: Request) {
         styleImageDataUrl: styleFromParams,
         parameters,
       });
-      return NextResponse.json({
+      return ecomJson({
         assets: result.results.map((r) => r.asset),
         imageUrls: result.results.map((r) => r.ossUrl),
         logId: result.logId,
@@ -529,7 +529,7 @@ export async function handleImageProcessingEditPost(req: Request) {
           ? body.characterDescription.trim()
           : prompt;
       if (!characterDescription) {
-        return NextResponse.json({ error: "请描述角色" }, { status: 400 });
+        return ecomJson({ error: "请描述角色" }, { status: 400 });
       }
       const styleFromParams =
         parameters?.styleImageDataUrl &&
@@ -554,7 +554,7 @@ export async function handleImageProcessingEditPost(req: Request) {
         styleImageDataUrl: styleFromParams,
         parameters,
       });
-      return NextResponse.json({
+      return ecomJson({
         assets: result.results.map((r) => r.asset),
         imageUrls: result.results.map((r) => r.ossUrl),
         logId: result.logId,
@@ -568,7 +568,7 @@ export async function handleImageProcessingEditPost(req: Request) {
           ? body.animationDescription.trim()
           : prompt;
       if (!animationDescription) {
-        return NextResponse.json({ error: "请描述动画" }, { status: 400 });
+        return ecomJson({ error: "请描述动画" }, { status: 400 });
       }
       const styleFromParams =
         parameters?.styleImageDataUrl &&
@@ -596,7 +596,7 @@ export async function handleImageProcessingEditPost(req: Request) {
         styleImageDataUrl: styleFromParams,
         parameters,
       });
-      return NextResponse.json({
+      return ecomJson({
         assets: result.results.map((r) => r.asset),
         imageUrls: result.results.map((r) => r.ossUrl),
         logId: result.logId,
@@ -610,7 +610,7 @@ export async function handleImageProcessingEditPost(req: Request) {
           ? body.sceneDescription.trim()
           : prompt;
       if (!sceneDescription) {
-        return NextResponse.json({ error: "请描述场景或主题" }, { status: 400 });
+        return ecomJson({ error: "请描述场景或主题" }, { status: 400 });
       }
       const styleFromParams =
         parameters?.styleImageDataUrl &&
@@ -633,7 +633,7 @@ export async function handleImageProcessingEditPost(req: Request) {
         styleImageDataUrl: styleFromParams,
         parameters,
       });
-      return NextResponse.json({
+      return ecomJson({
         assets: result.results.map((r) => r.asset),
         imageUrls: result.results.map((r) => r.ossUrl),
         logId: result.logId,
@@ -645,7 +645,7 @@ export async function handleImageProcessingEditPost(req: Request) {
       const userPrompt =
         typeof body.prompt === "string" ? body.prompt.trim() : prompt;
       if (!userPrompt) {
-        return NextResponse.json({ error: "请描述你的图片" }, { status: 400 });
+        return ecomJson({ error: "请描述你的图片" }, { status: 400 });
       }
       const styleFromParams =
         parameters?.styleImageDataUrl &&
@@ -673,7 +673,7 @@ export async function handleImageProcessingEditPost(req: Request) {
         styleImageDataUrl: styleFromParams,
         parameters,
       });
-      return NextResponse.json({
+      return ecomJson({
         assets: result.results.map((r) => r.asset),
         imageUrls: result.results.map((r) => r.ossUrl),
         logId: result.logId,
@@ -681,12 +681,12 @@ export async function handleImageProcessingEditPost(req: Request) {
       });
     }
 
-    return NextResponse.json({
+    return ecomJson({
       error:
         "mode 须为 retouch、editor、enhancer、outpaint、restore、face-swap、bg-remove、object-remove、deblur、camera-angle、poster、meme、avatar、gif、realistic 或 image-generator",
     }, { status: 400 });
   } catch (e) {
     const { message, status } = formatEcomImageProcessingUserError(e);
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

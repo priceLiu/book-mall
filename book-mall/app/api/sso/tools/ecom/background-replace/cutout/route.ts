@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { prepareWanxSubjectCutout } from "@/lib/ecom/ecom-background-replace-service";
 import { formatEcomImageProcessingUserError } from "@/lib/ecom/ecom-image-processing-error";
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+    return ecomJson({ error: "无效 JSON" }, { status: 400 });
   }
 
   const sourceImageUrl =
@@ -25,14 +25,14 @@ export async function POST(req: Request) {
         ? body.baseImageUrl.trim()
         : "";
   if (!sourceImageUrl) {
-    return NextResponse.json({ error: "缺少主体图 sourceImageUrl" }, { status: 400 });
+    return ecomJson({ error: "缺少主体图 sourceImageUrl" }, { status: 400 });
   }
 
   try {
     const cutoutUrl = await prepareWanxSubjectCutout(auth.userId, sourceImageUrl);
-    return NextResponse.json({ cutoutUrl });
+    return ecomJson({ cutoutUrl });
   } catch (e) {
     const { message, status } = formatEcomImageProcessingUserError(e);
-    return NextResponse.json({ error: message }, { status: status >= 400 ? status : 502 });
+    return ecomJson({ error: message }, { status: status >= 400 ? status : 502 });
   }
 }

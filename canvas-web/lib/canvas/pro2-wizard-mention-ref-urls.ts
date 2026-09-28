@@ -7,6 +7,10 @@ import {
   type Pro2WizardAssetKind,
 } from "@/lib/canvas/pro2-production-wizard-assets";
 import { wizardMentionId } from "@/lib/canvas/pro2-shot-entity-reconcile";
+import {
+  resolveWizardAssetMentionPreviewUrl,
+  type WizardMentionHubPreviewSource,
+} from "@/lib/canvas/pro2-wizard-asset-preview-url";
 import type { StoryRefImage } from "@/lib/canvas/story-ref-image";
 import { WIZARD_MENTION_PROMPT_RE } from "@/lib/canvas/wizard-mention-chrome";
 
@@ -55,6 +59,7 @@ export function parseWizardMentionRefIdsInOrder(prompt: string): string[] {
 export function buildWizardMentionRefCatalog(
   assetDrafts: Record<string, Pro2ProductionWizardAssetDraft> | undefined,
   refImages: StoryRefImage[],
+  hubPreview?: WizardMentionHubPreviewSource,
 ): WizardMentionRefCatalogItem[] {
   const catalog: WizardMentionRefCatalogItem[] = [];
   const seenIds = new Set<string>();
@@ -62,8 +67,13 @@ export function buildWizardMentionRefCatalog(
   for (const [key, draft] of Object.entries(assetDrafts ?? {})) {
     const parsed = parseWizardAssetDraftKey(key);
     if (!parsed) continue;
-    const url = draft.previewUrl?.trim();
-    if (!url || !/^https?:\/\//i.test(url)) continue;
+    const url = resolveWizardAssetMentionPreviewUrl(
+      parsed.kind,
+      parsed.assetId,
+      assetDrafts,
+      hubPreview,
+    );
+    if (!url) continue;
     const id = wizardMentionId(parsed.kind, parsed.assetId);
     if (seenIds.has(id)) continue;
     seenIds.add(id);

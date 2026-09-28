@@ -4,9 +4,12 @@ import { Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-credits-beside";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomDialogCloseButton } from "@/components/ui/dialog";
 import { VTON_MODEL_DEFAULT_PROMPT } from "@/lib/vton-model-prompts";
+
+const VTON_FOUR_VIEW_MODEL_KEY = "wan2.7-image-pro";
 
 type Props = {
   open: boolean;
@@ -55,7 +58,12 @@ export function VtonFourViewGenerateDialog({ open, onClose, busy, onConfirm }: P
           />
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-[#e8e8ed] px-5 py-4">
+        <div className="flex items-center justify-end gap-2 border-t border-[#e8e8ed] px-5 py-4">
+          <EcomGenerateCreditsBeside
+            modelKey={VTON_FOUR_VIEW_MODEL_KEY}
+            imageCount={1}
+            enabled={open}
+          />
           <EcomButtonSecondary type="button" size="sm" disabled={busy} onClick={onClose}>
             取消
           </EcomButtonSecondary>

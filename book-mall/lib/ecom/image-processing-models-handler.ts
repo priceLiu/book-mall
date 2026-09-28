@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { getUserBillingPersona } from "@/lib/billing/billing-persona";
 import { resolveEcomGatewayAuthForUser } from "@/lib/ecom/ecom-gateway-auth";
@@ -22,7 +22,7 @@ const ALLOWED = new Set<string>(ECOM_IMAGE_PROCESSING_MODEL_KEYS);
 export async function handleImageProcessingModelsGet(req: Request) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
 
   const persona = await getUserBillingPersona(auth.userId);
@@ -44,7 +44,7 @@ export async function handleImageProcessingModelsGet(req: Request) {
     ALLOWED.has(m.modelKey),
   );
 
-  return NextResponse.json({
+  return ecomJson({
     imageModels: filtered,
     platformOffering: persona === "PLATFORM_CREDIT",
     paramProfiles: {

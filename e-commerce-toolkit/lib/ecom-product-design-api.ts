@@ -2,6 +2,10 @@
 
 import { EcomUnauthorizedError } from "@/lib/ecom-auth";
 import { ecomBookFetch } from "@/lib/ecom-book-fetch";
+import {
+  noteEcomBookResponseForCredits,
+  noteEcomStreamResponseForCredits,
+} from "@/lib/ecom-credits-settlement-watch";
 import type {
   EcomImageRatio,
   EcomPlatformSpec,
@@ -303,6 +307,11 @@ export async function generateProductDesignImages(
   } catch {
     /* 非 JSON 响应 */
   }
+  noteEcomBookResponseForCredits(
+    `${BASE}/projects/${projectId}/image/generate`,
+    "POST",
+    data,
+  );
   if (!res.ok) {
     const code = typeof data.error === "string" ? data.error : "";
     const detail = typeof data.detail === "string" ? data.detail : "";
@@ -383,6 +392,10 @@ export async function streamProductDesignChat(opts: {
     }
     throw new Error(err);
   }
+  noteEcomStreamResponseForCredits(
+    `${BASE}/projects/${opts.projectId}/assistant/chat`,
+    res,
+  );
   if (!res.body) throw new Error("无响应流");
 
   const reader = res.body.getReader();

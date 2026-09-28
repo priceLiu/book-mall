@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { generateStoryboardReferenceImage } from "@/lib/ecom/ecom-storyboard-ref-gen";
 import type { StoryboardRefGenerateRole } from "@/lib/ecom/ecom-storyboard-ref-gen";
@@ -12,7 +12,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id: projectId } = await ctx.params;
 
   let body: Record<string, unknown> = {};
@@ -31,10 +31,10 @@ export async function POST(req: Request, ctx: Ctx) {
   const modelKey = typeof body.modelKey === "string" ? body.modelKey.trim() : undefined;
 
   if (!role) {
-    return NextResponse.json({ error: "role 须为 character / scene" }, { status: 400 });
+    return ecomJson({ error: "role 须为 character / scene" }, { status: 400 });
   }
   if (!prompt) {
-    return NextResponse.json({ error: "请填写 Prompt" }, { status: 400 });
+    return ecomJson({ error: "请填写 Prompt" }, { status: 400 });
   }
 
   try {
@@ -45,7 +45,7 @@ export async function POST(req: Request, ctx: Ctx) {
       prompt,
       modelKey,
     });
-    return NextResponse.json(result);
+    return ecomJson(result);
   } catch (e) {
     const message = e instanceof Error ? e.message : "生成失败";
     const status =
@@ -56,6 +56,6 @@ export async function POST(req: Request, ctx: Ctx) {
             message.includes("请先上传")
           ? 400
           : 500;
-    return NextResponse.json({ error: message }, { status });
+    return ecomJson({ error: message }, { status });
   }
 }

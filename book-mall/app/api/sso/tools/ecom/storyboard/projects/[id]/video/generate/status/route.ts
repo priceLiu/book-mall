@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { getEcomStoryboardProject } from "@/lib/ecom/ecom-storyboard-service";
@@ -14,13 +14,13 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function GET(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
+    return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const { id: projectId } = await ctx.params;
 
   const project = await getEcomStoryboardProject(auth.userId, projectId);
   if (!project?.sheet) {
-    return NextResponse.json({ error: "请先生成分镜故事版" }, { status: 400 });
+    return ecomJson({ error: "请先生成分镜故事版" }, { status: 400 });
   }
 
   try {
@@ -30,9 +30,9 @@ export async function GET(req: Request, ctx: Ctx) {
       projectId,
       sheet: project.sheet,
     });
-    return NextResponse.json(result);
+    return ecomJson(result);
   } catch (e) {
     const message = e instanceof Error ? e.message : "视频轮询失败";
-    return NextResponse.json({ error: message, status: "failed" }, { status: 500 });
+    return ecomJson({ error: message, status: "failed" }, { status: 500 });
   }
 }

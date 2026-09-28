@@ -1,5 +1,7 @@
 "use client";
 
+import { noteEcomBookResponseForCredits } from "@/lib/ecom-credits-settlement-watch";
+
 export type EcomBillingMode = "BYOK_SERVICE_FEE" | "PLATFORM_METERED";
 
 export type EcomAsset = {
@@ -45,6 +47,7 @@ async function bookFetch(path: string, init?: RequestInit) {
         : `请求失败 (${res.status})`;
     throw new Error(err);
   }
+  noteEcomBookResponseForCredits(path, init?.method, data);
   return data;
 }
 

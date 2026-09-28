@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { assignReplicaSegmentModule } from "@/lib/ecom/detail-page-suite-replica/replica-segment-mapping-service";
@@ -10,7 +10,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
   let body: Record<string, unknown> = {};
   try {
@@ -26,10 +26,10 @@ export async function POST(req: Request, ctx: Ctx) {
         ? body.moduleId
         : undefined;
   if (!itemKey.trim()) {
-    return NextResponse.json({ error: "缺少 itemKey" }, { status: 400 });
+    return ecomJson({ error: "缺少 itemKey" }, { status: 400 });
   }
   if (moduleId === undefined) {
-    return NextResponse.json({ error: "缺少 moduleId（可为 null）" }, { status: 400 });
+    return ecomJson({ error: "缺少 moduleId（可为 null）" }, { status: 400 });
   }
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
@@ -39,9 +39,9 @@ export async function POST(req: Request, ctx: Ctx) {
       itemKey,
       moduleId,
     });
-    return NextResponse.json({ project });
+    return ecomJson({ project });
   } catch (e) {
-    return NextResponse.json(
+    return ecomJson(
       { error: e instanceof Error ? e.message : "保存归类失败" },
       { status: 500 },
     );

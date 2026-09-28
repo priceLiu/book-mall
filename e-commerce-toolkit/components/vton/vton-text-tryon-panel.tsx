@@ -8,6 +8,7 @@ import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dial
 import { EcomImagePreviewHost, useEcomImagePreview } from "@/components/media";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
 import { ProductDesignPromptMentionTextarea } from "@/components/product-design/product-design-prompt-mention-textarea";
+import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-credits-beside";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { VtonResultImageHoverActions } from "@/components/vton/vton-result-image-hover-actions";
@@ -290,6 +291,7 @@ export function VtonTextTryonPanel({
               <span className="max-w-[140px] truncate">{modelDisplay}</span>
               <span className="text-[10px] text-[#86868b]">{modelTypeLabel}</span>
             </button>
+            <EcomGenerateCreditsBeside modelKey={modelKey} imageCount={1} />
             <EcomButtonPrimary
               size="sm"
               type="button"

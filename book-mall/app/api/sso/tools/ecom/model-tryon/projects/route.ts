@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import {
   createEcomModelTryonProject,
@@ -11,14 +11,14 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const items = await listEcomModelTryonProjects(auth.userId);
-  return NextResponse.json({ items });
+  return ecomJson({ items });
 }
 
 export async function POST(req: Request) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
 
   let body: Record<string, unknown> = {};
   try {
@@ -30,9 +30,9 @@ export async function POST(req: Request) {
 
   try {
     const project = await createEcomModelTryonProject(auth.userId, { title });
-    return NextResponse.json({ project });
+    return ecomJson({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "创建项目失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

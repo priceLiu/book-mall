@@ -15,6 +15,7 @@ import {
   buildWizardAssetMentionables,
   type Pro2ProductionScriptShot,
 } from "@/lib/canvas/pro2-production-wizard-assets";
+import { toWizardMentionHubPreviewSource } from "@/lib/canvas/pro2-wizard-asset-preview-url";
 import {
   hydrateShotEntityMentionsForEdit,
 } from "@/lib/canvas/pro2-shot-entity-reconcile";
@@ -133,9 +134,14 @@ export function Pro2ProductionWizardShotEditModal({
   useModalBodyScrollLock(open);
   useModalEscapeClose(onClose, { active: open });
 
+  const assetDrafts = hubData.productionWizardAssetDrafts;
+  const hubPreview = useMemo(
+    () => toWizardMentionHubPreviewSource(scriptHubId, hubData),
+    [scriptHubId, hubData],
+  );
   const mentionables = useMemo(
-    () => buildWizardAssetMentionables(script, []),
-    [script],
+    () => buildWizardAssetMentionables(script, [], undefined, assetDrafts, hubPreview),
+    [script, assetDrafts, hubPreview],
   );
   const propMentionables = useMemo(
     () => mentionables.filter((m) => m.kind === "prop"),

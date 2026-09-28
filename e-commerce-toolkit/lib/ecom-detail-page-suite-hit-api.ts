@@ -2,6 +2,7 @@
 
 import { throwIfUnauthorized } from "@/lib/ecom-auth";
 import { ecomBookFetch, formatEcomTransportError } from "@/lib/ecom-book-fetch";
+import { noteEcomBookResponseForCredits } from "@/lib/ecom-credits-settlement-watch";
 import type { DetailPageSuiteCopyOverlay } from "@/lib/detail-page-suite-copy-overlay";
 import type { DetailPageSuiteProject } from "@/lib/detail-page-suite-types";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
@@ -128,6 +129,7 @@ async function postHitJson(path: string, body: Record<string, unknown>) {
     /* */
   }
   throwIfUnauthorized(res, data);
+  noteEcomBookResponseForCredits(`${BASE}/${path}`, "POST", data);
   if (res.status === 409 && data.project) {
     throw new DetailPageSuiteHitInFlightError(data.project as DetailPageSuiteProject);
   }

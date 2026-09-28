@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
@@ -16,7 +16,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
   let body: Record<string, unknown> = {};
   try {
@@ -50,9 +50,9 @@ export async function POST(req: Request, ctx: Ctx) {
               projectId: id,
               modelKey,
             });
-    return NextResponse.json({ project });
+    return ecomJson({ project });
   } catch (e) {
-    return NextResponse.json(
+    return ecomJson(
       { error: e instanceof Error ? e.message : "生成提示词失败" },
       { status: 400 },
     );

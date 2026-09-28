@@ -28,6 +28,9 @@ export function formatEcomImageProcessingUserError(error: unknown): {
   }
 
   const raw = error instanceof Error ? error.message.trim() : String(error).trim();
+  if (raw.includes("积分不足")) {
+    return { message: raw, status: 402 };
+  }
 
   if (isContentPolicySubmitMessage(raw)) {
     return { message: CONTENT_POLICY_USER_ZH, status: 400 };

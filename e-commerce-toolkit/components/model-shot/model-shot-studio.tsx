@@ -457,6 +457,13 @@ export function ModelShotStudio() {
           dialogTitle={imagePickerDialogTitle}
           dialogDescription="仅列出支持参考图的 IMAGE 模型；参考顺序：服装 → 模特 → 场景。"
           footerHint="选好模型与参数后开始生成；长耗时任务可在右下角 Dock 查看。"
+          previewCount={
+            imagePicker.batchIndexes && imagePicker.batchIndexes.length > 0
+              ? imagePicker.batchIndexes.length
+              : imagePicker.poseIndex != null
+                ? 1
+                : Math.max(1, project.plan.items.length)
+          }
           models={imageModels}
           modelsLoading={modelsLoading}
           modelsEmptyHint={modelsLoadError ?? undefined}

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { readPoseLibraryCatalogForUser } from "@/lib/ecom/ecom-pose-library-service";
@@ -12,9 +12,9 @@ export async function GET(req: Request) {
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const catalog = await readPoseLibraryCatalogForUser(auth.userId);
-    return NextResponse.json(catalog);
+    return ecomJson(catalog);
   } catch (e) {
     const message = e instanceof Error ? e.message : "加载失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return ecomJson({ error: message }, { status: 500 });
   }
 }

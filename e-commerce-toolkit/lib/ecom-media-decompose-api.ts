@@ -2,6 +2,7 @@
 
 import { EcomUnauthorizedError } from "@/lib/ecom-auth";
 import { ecomBookFetch } from "@/lib/ecom-book-fetch";
+import { noteEcomStreamResponseForCredits } from "@/lib/ecom-credits-settlement-watch";
 import type {
   MediaDecomposeChatModel,
   MediaDecomposeProject,
@@ -139,6 +140,10 @@ export async function streamMediaDecompose(
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(data.error ?? `拆解失败 (${res.status})`);
   }
+  noteEcomStreamResponseForCredits(
+    `${BASE}/projects/${projectId}/decompose`,
+    res,
+  );
   if (!res.body) throw new Error("无响应体");
 
   const reader = res.body.getReader();

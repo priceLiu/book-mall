@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { persistEcomGenerationRecord } from "@/lib/ecom/ecom-generation-record";
 import { runEcomBackgroundReplace } from "@/lib/ecom/ecom-background-replace-service";
@@ -43,13 +43,13 @@ export async function POST(req: Request) {
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+    return ecomJson({ error: "无效 JSON" }, { status: 400 });
   }
 
   const baseImageUrl =
     typeof body.baseImageUrl === "string" ? body.baseImageUrl.trim() : "";
   if (!baseImageUrl) {
-    return NextResponse.json({ error: "缺少主体图 baseImageUrl" }, { status: 400 });
+    return ecomJson({ error: "缺少主体图 baseImageUrl" }, { status: 400 });
   }
 
   const sourceModule =
@@ -111,7 +111,7 @@ export async function POST(req: Request) {
       ),
     );
 
-    return NextResponse.json({
+    return ecomJson({
       imageUrls: result.imageUrls,
       logId: result.logId,
       modelKey: result.modelKey,
@@ -119,6 +119,6 @@ export async function POST(req: Request) {
     });
   } catch (e) {
     const { message, status } = formatEcomImageProcessingUserError(e);
-    return NextResponse.json({ error: message }, { status: status >= 400 ? status : 502 });
+    return ecomJson({ error: message }, { status: status >= 400 ? status : 502 });
   }
 }

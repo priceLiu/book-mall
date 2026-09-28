@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { ECOM_SEED_VIDEO_DEFAULT_VIDEO_MODEL } from "@/lib/ecom/ecom-seed-video-types";
@@ -17,7 +17,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id: projectId } = await ctx.params;
 
   let body: Record<string, unknown> = {};
@@ -28,7 +28,7 @@ export async function POST(req: Request, ctx: Ctx) {
   }
 
   const project = await getEcomSeedVideoProject(auth.userId, projectId);
-  if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
+  if (!project) return ecomJson({ error: "项目不存在" }, { status: 404 });
 
   let directVideo = project.plan?.directVideo;
   if (!directVideo?.globalPrompt?.trim()) {
@@ -43,7 +43,7 @@ export async function POST(req: Request, ctx: Ctx) {
     }
   }
   if (!directVideo?.globalPrompt?.trim()) {
-    return NextResponse.json({ error: "请先完成脚本与视频 Prompt 策划" }, { status: 400 });
+    return ecomJson({ error: "请先完成脚本与视频 Prompt 策划" }, { status: 400 });
   }
 
   const modelKey =
@@ -69,16 +69,16 @@ export async function POST(req: Request, ctx: Ctx) {
         typeof body.durationSec === "number" ? Math.trunc(body.durationSec) : undefined,
       ratio: typeof body.ratio === "string" ? body.ratio : undefined,
     });
-    return NextResponse.json(result);
+    return ecomJson(result);
   } catch (e) {
     const message = e instanceof Error ? e.message : "提交失败";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return ecomJson({ error: message }, { status: 502 });
   }
 }
 
 export async function GET(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id: projectId } = await ctx.params;
 
   try {
@@ -87,9 +87,9 @@ export async function GET(req: Request, ctx: Ctx) {
       userId: auth.userId,
       projectId,
     });
-    return NextResponse.json(result);
+    return ecomJson(result);
   } catch (e) {
     const message = e instanceof Error ? e.message : "轮询失败";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return ecomJson({ error: message }, { status: 502 });
   }
 }

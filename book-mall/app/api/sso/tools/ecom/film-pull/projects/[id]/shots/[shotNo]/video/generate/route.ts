@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { ecomGenerateFilmPullShot } from "@/lib/ecom/ecom-film-pull-video";
@@ -13,11 +13,11 @@ type Ctx = { params: Promise<{ id: string; shotNo: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id, shotNo: shotNoRaw } = await ctx.params;
   const shotNo = Number.parseInt(shotNoRaw, 10);
   if (!Number.isFinite(shotNo) || shotNo < 1) {
-    return NextResponse.json({ error: "无效镜号" }, { status: 400 });
+    return ecomJson({ error: "无效镜号" }, { status: 400 });
   }
 
   let body: Record<string, unknown> = {};
@@ -46,9 +46,9 @@ export async function POST(req: Request, ctx: Ctx) {
           : undefined,
     });
     const refreshed = await getEcomFilmPullProject(auth.userId, id);
-    return NextResponse.json({ ...result, project: refreshed });
+    return ecomJson({ ...result, project: refreshed });
   } catch (e) {
     const message = e instanceof Error ? e.message : "生成失败";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return ecomJson({ error: message }, { status: 502 });
   }
 }

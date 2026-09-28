@@ -166,7 +166,7 @@ async function generateOneImage(opts: {
   refImg?: string;
   refMode?: "repaint" | "refonly";
   refStrength?: number;
-}): Promise<{ ossUrl: string; chargePoints: number | null; taskId: string }> {
+}): Promise<{ ossUrl: string; chargePoints: number | null; taskId: string; logId: string }> {
   if (isStoryboardKieImageModel(opts.modelKey)) {
     return generateOneKieImage(opts);
   }
@@ -189,7 +189,7 @@ async function generateOneMultimodalSyncImage(opts: {
   prompt: string;
   imageSize: EcomStoryboardWanxSize;
   refImg?: string;
-}): Promise<{ ossUrl: string; chargePoints: number | null; taskId: string }> {
+}): Promise<{ ossUrl: string; chargePoints: number | null; taskId: string; logId: string }> {
   const workspaceId = randomUUID().slice(0, 8);
   const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
   const refs =
@@ -220,7 +220,7 @@ async function generateOneMultimodalSyncImage(opts: {
   });
   const vendorUrl = await pollWanxImage(opts.userId, taskId, logId);
   const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
-  return { ossUrl, chargePoints: null, taskId };
+  return { ossUrl, chargePoints: null, taskId, logId };
 }
 
 async function generateOneWan27Image(opts: {
@@ -230,7 +230,7 @@ async function generateOneWan27Image(opts: {
   prompt: string;
   imageSize: EcomStoryboardWanxSize;
   refImg?: string;
-}): Promise<{ ossUrl: string; chargePoints: number | null; taskId: string }> {
+}): Promise<{ ossUrl: string; chargePoints: number | null; taskId: string; logId: string }> {
   const apiModel = resolveStoryboardDashscopeModel(opts.modelKey);
   const wan26 = isWan26ImageModel(apiModel) || isWan26ImageModel(opts.modelKey);
   const workspaceId = randomUUID().slice(0, 8);
@@ -262,7 +262,7 @@ async function generateOneWan27Image(opts: {
   });
   const vendorUrl = await pollWanxImage(opts.userId, taskId, logId);
   const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
-  return { ossUrl, chargePoints: null, taskId };
+  return { ossUrl, chargePoints: null, taskId, logId };
 }
 
 async function generateOneKlingImage(opts: {
@@ -273,7 +273,7 @@ async function generateOneKlingImage(opts: {
   action: string;
   meta: Prisma.InputJsonValue;
   aspectRatio: "16:9" | "9:16";
-}): Promise<{ ossUrl: string; chargePoints: number | null; taskId: string }> {
+}): Promise<{ ossUrl: string; chargePoints: number | null; taskId: string; logId: string }> {
   const apiModel = resolveStoryboardKlingModel(opts.modelKey);
   const resolution = resolveKlingV3Resolution();
   const workspaceId = randomUUID().slice(0, 8);
@@ -292,7 +292,7 @@ async function generateOneKlingImage(opts: {
   const vendorUrl = await pollWanxImage(opts.userId, taskId, logId);
   const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
 
-  return { ossUrl, chargePoints: null, taskId };
+  return { ossUrl, chargePoints: null, taskId, logId };
 }
 
 async function generateOneKieImage(opts: {
@@ -303,7 +303,7 @@ async function generateOneKieImage(opts: {
   action: string;
   meta: Prisma.InputJsonValue;
   aspectRatio: "16:9" | "9:16";
-}): Promise<{ ossUrl: string; chargePoints: number | null; taskId: string }> {
+}): Promise<{ ossUrl: string; chargePoints: number | null; taskId: string; logId: string }> {
   const apiModel = resolveStoryboardKieModel(opts.modelKey);
   const workspaceId = randomUUID().slice(0, 8);
   const taskKey = `ecom-sb-img:${opts.projectId}:${workspaceId}`;
@@ -330,7 +330,7 @@ async function generateOneKieImage(opts: {
   const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
 
 
-  return { ossUrl, chargePoints: null, taskId };
+  return { ossUrl, chargePoints: null, taskId, logId };
 }
 
 async function generateOneWanxImage(opts: {
@@ -344,7 +344,7 @@ async function generateOneWanxImage(opts: {
   refImg?: string;
   refMode?: "repaint" | "refonly";
   refStrength?: number;
-}): Promise<{ ossUrl: string; chargePoints: number | null; taskId: string }> {
+}): Promise<{ ossUrl: string; chargePoints: number | null; taskId: string; logId: string }> {
   const workspaceId = randomUUID().slice(0, 8);
   const taskKey = `ecom-sb-img:${opts.projectId}:${workspaceId}`;
   const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
@@ -366,7 +366,7 @@ async function generateOneWanxImage(opts: {
   const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
 
 
-  return { ossUrl, chargePoints: null, taskId };
+  return { ossUrl, chargePoints: null, taskId, logId };
 }
 
 /** 单镜头分镜图：千问/Z-Image 同步 multimodal-generation */
@@ -379,7 +379,7 @@ async function generatePanelImageWithMultimodalSync(opts: {
   wan27Size: string;
   panelIndex: number;
   refImageUrls: string[];
-}): Promise<{ ossUrl: string; chargePoints: number | null }> {
+}): Promise<{ ossUrl: string; chargePoints: number | null; logId: string }> {
   const refImageUrls =
     !isZImageTurboModel(opts.modelKey) && opts.refImageUrls.length > 0
       ? await ensureStoryboardRefImagesForWan27({
@@ -415,7 +415,7 @@ async function generatePanelImageWithMultimodalSync(opts: {
   });
   const vendorUrl = await pollWanxImage(opts.userId, taskId, logId);
   const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
-  return { ossUrl, chargePoints: null };
+  return { ossUrl, chargePoints: null, logId };
 }
 
 /** 单镜头分镜图：wan2.7 多图参考（产品 + 角色 + 场景一次传入） */
@@ -428,7 +428,7 @@ async function generatePanelImageWithRefs(opts: {
   wan27Size: string;
   panelIndex: number;
   refImageUrls: string[];
-}): Promise<{ ossUrl: string; chargePoints: number | null }> {
+}): Promise<{ ossUrl: string; chargePoints: number | null; logId: string }> {
   const apiModel = resolveStoryboardDashscopeModel(opts.modelKey);
   const wan26 = isWan26ImageModel(apiModel) || isWan26ImageModel(opts.modelKey);
   const refImageUrls = await ensureStoryboardRefImagesForWan27({
@@ -477,7 +477,7 @@ async function generatePanelImageWithRefs(opts: {
   const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
 
 
-  return { ossUrl, chargePoints: null };
+  return { ossUrl, chargePoints: null, logId };
 }
 
 /** 单镜头分镜图：可灵 3.0 Omni 多图参考（百炼 messages） */
@@ -490,7 +490,7 @@ async function generatePanelImageWithKling(opts: {
   aspectRatio: "16:9" | "9:16";
   panelIndex: number;
   refImageUrls: string[];
-}): Promise<{ ossUrl: string; chargePoints: number | null }> {
+}): Promise<{ ossUrl: string; chargePoints: number | null; logId: string }> {
   const apiModel = resolveStoryboardKlingModel(opts.modelKey);
   const resolution = resolveKlingV3Resolution();
   const refImageUrls = await ensureStoryboardRefImagesForWan27({
@@ -536,7 +536,7 @@ async function generatePanelImageWithKling(opts: {
   const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
 
 
-  return { ossUrl, chargePoints: null };
+  return { ossUrl, chargePoints: null, logId };
 }
 
 /** 单镜头分镜图：KIE nano-banana-pro 多图参考（image_input） */
@@ -549,7 +549,7 @@ async function generatePanelImageWithKie(opts: {
   aspectRatio: "16:9" | "9:16";
   panelIndex: number;
   refImageUrls: string[];
-}): Promise<{ ossUrl: string; chargePoints: number | null }> {
+}): Promise<{ ossUrl: string; chargePoints: number | null; logId: string }> {
   const apiModel = resolveStoryboardKieModel(opts.modelKey);
   const refImageUrls = await ensureStoryboardRefImagesForWan27({
     userId: opts.userId,
@@ -596,7 +596,7 @@ async function generatePanelImageWithKie(opts: {
   const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
 
 
-  return { ossUrl, chargePoints: null };
+  return { ossUrl, chargePoints: null, logId };
 }
 
 export async function ecomGenerateStoryboardSheetImage(opts: {
@@ -616,6 +616,7 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
   references: StoryboardReference[];
   sheet: StoryboardSheet;
   chargePoints: number | null;
+  logIds: string[];
 }> {
   await assertEcomToolkitGatewayAccess(opts.userId);
   requireStoryboardProductRef(opts.references);
@@ -675,6 +676,8 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
       wf.fashionCharacterMode === "ai" ||
       wf.proCharacterMode === "ai");
 
+  const logIds: string[] = [];
+
   try {
     if (shouldAutoGenCharacter) {
       const charPrompt = buildCharacterRefPrompt(sheet, promptCtx);
@@ -690,6 +693,7 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
         refImg: productRef.ossUrl.trim(),
         meta: { projectId: opts.projectId, kind: "character_ref" } as Prisma.InputJsonValue,
       });
+      if (charResult.logId) logIds.push(charResult.logId);
 
       const bufRes = await fetch(charResult.ossUrl);
       const buf = Buffer.from(await bufRes.arrayBuffer());
@@ -705,7 +709,7 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
       if (!references.some((r) => r.role === "character")) {
         throw new Error("角色参考图生成失败，请检查脚本中的角色描述，或改用手动上传角色图");
       }
-      return { references, sheet, chargePoints: null };
+      return { references, sheet, chargePoints: null, logIds };
     }
 
     const { refImageUrls, productRefUrls } = resolveStoryboardImageGenRefs(references);
@@ -782,6 +786,7 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
                     panelIndex: panel.index,
                     refImageUrls: panelRefUrls,
                   });
+          if (imgResult.logId) logIds.push(imgResult.logId);
 
           const panelTitle = `${sheet.overview.title} · 镜头${panel.index}`.slice(0, 80);
           await prisma.ecomAsset.create({
@@ -889,5 +894,6 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
     references,
     sheet: updatedSheet,
     chargePoints: null,
+    logIds,
   };
 }

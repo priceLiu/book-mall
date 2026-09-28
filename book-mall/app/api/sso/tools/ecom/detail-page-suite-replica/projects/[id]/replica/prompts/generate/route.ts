@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { ReplicaDecomposeAlreadyRunningError } from "@/lib/ecom/detail-page-suite-replica/replica-decompose-service";
@@ -13,7 +13,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
-  if (!auth.ok) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
   let body: Record<string, unknown> = {};
   try {
@@ -34,13 +34,13 @@ export async function POST(req: Request, ctx: Ctx) {
       moduleIds,
       chatModelKey: typeof body.chatModelKey === "string" ? body.chatModelKey : undefined,
     });
-    return NextResponse.json({ project });
+    return ecomJson({ project });
   } catch (e) {
     if (e instanceof ReplicaDecomposeAlreadyRunningError) {
       const project = await getDetailPageSuiteReplicaProject(auth.userId, id);
-      return NextResponse.json({ error: e.message, project }, { status: 409 });
+      return ecomJson({ error: e.message, project }, { status: 409 });
     }
-    return NextResponse.json(
+    return ecomJson(
       { error: e instanceof Error ? e.message : "生成 Prompt 失败" },
       { status: 500 },
     );
