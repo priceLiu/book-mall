@@ -22,6 +22,8 @@ import { mountProductionScaffoldToCanvasFromStore, syncProductionScaffoldDataToH
 import { CANVAS_RF_FOCUS_NODE_SET_EVENT } from "@/lib/canvas/canvas-rf-sync";
 import { listProductionWizardFocusNodeIdsFromStore } from "@/lib/canvas/pro2-production-wizard-canvas-mount";
 import { canvasNotify } from "@/lib/canvas/canvas-notify";
+import { showCanvasBlockingProgress } from "@/lib/canvas/canvas-blocking-progress";
+import { showCanvasSuccessToast } from "@/components/canvas/canvas-credits-toast-host";
 import { applyProductionScriptDirectToHub } from "@/lib/canvas/pro2-production-script-apply";
 import { reconcileProductionScriptEntityLinks } from "@/lib/canvas/pro2-shot-entity-reconcile";
 import { isPro2ProductionWizardHub } from "@/lib/canvas/pro2-production-wizard";
@@ -350,29 +352,37 @@ export function Pro2ProductionWizardShell({
   const onMountToCanvas = useCallback(() => {
     if (hubId) {
       onClose();
-      canvasNotify({
+      const hideProgress = showCanvasBlockingProgress({
         title: "正在放入画布",
         message: "正在整理节点与连线，请稍候…",
       });
       void (async () => {
         try {
           await recoverAndResumeWizardJobs();
+          await new Promise<void>((resolve) =>
+            window.requestAnimationFrame(() =>
+              window.requestAnimationFrame(() => resolve()),
+            ),
+          );
           syncProductionScaffoldDataToHubFromStore(hubId);
           mountProductionScaffoldToCanvasFromStore(hubId);
           const focusNodeIds = listProductionWizardFocusNodeIdsFromStore(hubId);
           if (focusNodeIds.length > 0) {
-            window.dispatchEvent(
-              new CustomEvent(CANVAS_RF_FOCUS_NODE_SET_EVENT, {
-                detail: { nodeIds: focusNodeIds },
-              }),
-            );
+            const emitFocus = () =>
+              window.dispatchEvent(
+                new CustomEvent(CANVAS_RF_FOCUS_NODE_SET_EVENT, {
+                  detail: { nodeIds: focusNodeIds },
+                }),
+              );
+            emitFocus();
+            window.requestAnimationFrame(() => {
+              window.requestAnimationFrame(emitFocus);
+            });
           }
-          window.dispatchEvent(
-            new CustomEvent("canvas:focus-node", {
-              detail: { nodeId: hubId },
-            }),
-          );
+          hideProgress();
+          showCanvasSuccessToast("已放入画布");
         } catch (error) {
+          hideProgress();
           const message =
             error instanceof Error ? error.message : "放入画布失败，请重试";
           canvasNotify({

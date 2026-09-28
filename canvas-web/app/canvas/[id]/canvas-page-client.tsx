@@ -19,6 +19,7 @@ import { CanvasGlobalAssetLibraryRoot } from "@/components/global-asset-library/
 import { handleCanvasWheel } from "@/lib/canvas/canvas-form-wheel";
 import { defaultCanvasProjectName } from "@/lib/canvas/default-project-name";
 import { registerCanvasNotifier } from "@/lib/canvas/canvas-notify";
+import { CanvasBlockingProgressHost } from "@/components/canvas/canvas-blocking-progress-host";
 import {
   canvasGraphRedo,
   canvasGraphUndo,
@@ -1853,6 +1854,7 @@ function Inner({ projectId }: { projectId: string }) {
         projectTitle={project.name}
         onClose={() => setWorkflowShareOpen(false)}
       />
+      <CanvasBlockingProgressHost />
       <div className="relative z-0 flex min-h-0 min-w-0 w-full max-w-full flex-1 overflow-hidden isolate">
         {isStoryProCanvas && project ? (
           <ScriptWritingAssistantPanel

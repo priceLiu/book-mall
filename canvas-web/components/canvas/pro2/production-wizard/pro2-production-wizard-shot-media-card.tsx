@@ -5,6 +5,7 @@ import { Film, ImageIcon, Sparkles } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { LibtvMediaGeneratingState } from "@/components/canvas/libtv-media-generating-state";
 import { MediaHoverBox } from "@/components/canvas/media-hover-box";
+import { WIZARD_PREVIEW_RETRY_DELAYS_MS } from "./pro2-production-wizard-asset-card";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { buildWizardAssetMentionables } from "@/lib/canvas/pro2-production-wizard-assets";
@@ -307,6 +308,11 @@ export const Pro2ProductionWizardShotMediaCard = memo(
                 prompt={prompt}
                 promptMentionables={mentionables}
                 className={cn("size-full", isGenerating && "opacity-50")}
+                errorRetryDelaysMs={
+                  previewIndex + 1 >= previewCandidates.length
+                    ? WIZARD_PREVIEW_RETRY_DELAYS_MS
+                    : undefined
+                }
                 onImageError={() => {
                   setPreviewIndex((idx) =>
                     idx + 1 < previewCandidates.length ? idx + 1 : idx,

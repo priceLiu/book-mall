@@ -131,7 +131,8 @@ export function Pro2InputDockShell({
     <LibtvInputDockUiContext.Provider value={dockUi}>
       <div
         className={cn(
-          "pro2-input-dock pointer-events-none absolute z-[1000]",
+          // 须高于选中媒体组子节点 zIndex（pro2-media-group-meta · 1201），否则组内下一行格子会盖住 Dock
+          "pro2-input-dock pointer-events-none absolute z-[1300]",
           RF_NO_WHEEL,
           dockClassName,
         )}

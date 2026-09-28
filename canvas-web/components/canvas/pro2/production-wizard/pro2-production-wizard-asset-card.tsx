@@ -40,6 +40,9 @@ export type Pro2ProductionWizardAssetCardProps = {
   draft?: Pro2ProductionWizardAssetDraft;
 };
 
+/** 刚出图时 OSS 转存未完成会短暂 404，末位候选按退避重试 */
+export const WIZARD_PREVIEW_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000] as const;
+
 function draftVisualEqual(
   a: Pro2ProductionWizardAssetDraft | undefined,
   b: Pro2ProductionWizardAssetDraft | undefined,
@@ -275,6 +278,11 @@ export const Pro2ProductionWizardAssetCard = memo(function Pro2ProductionWizardA
               previewChrome="ecom"
               prompt={prompt}
               className="size-full"
+              errorRetryDelaysMs={
+                previewIndex + 1 >= previewCandidates.length
+                  ? WIZARD_PREVIEW_RETRY_DELAYS_MS
+                  : undefined
+              }
               onImageError={() => {
                 setPreviewIndex((idx) =>
                   idx + 1 < previewCandidates.length ? idx + 1 : idx,

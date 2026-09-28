@@ -92,11 +92,22 @@ export type MediaHoverBoxProps = {
   previewChrome?: "canvas" | "ecom";
   /** LibTV 图片节点：预览改在标题栏 Eye，Stage 不显示居中 Eye */
   hidePreviewOverlay?: boolean;
-  /** 图片 src 加载失败（供 OSS → blob 回退） */
+  /** 图片 src 加载失败（供 OSS → blob 回退）；配置重试时在重试耗尽后才触发 */
   onImageError?: () => void;
+  /** 加载失败后按延迟重试（期间保持加载态），全部失败才显示「暂无图片」 */
+  errorRetryDelaysMs?: readonly number[];
   /** 图片/封面加载完成后回传 natural 尺寸（供节点外框自适配） */
   onNaturalSize?: (size: { w: number; h: number }) => void;
 };
+
+/** 签名 URL 追加参数会使签名失效，只能原样重载 */
+function withRetryParam(url: string, attempt: number): string {
+  if (attempt <= 0 || !/^https?:\/\//i.test(url)) return url;
+  if (/[?&](signature|x-tos-|x-oss-|x-amz-|expires=|ossaccesskeyid)/i.test(url)) {
+    return url;
+  }
+  return `${url}${url.includes("?") ? "&" : "?"}_r=${attempt}`;
+}
 
 /** 悬停 overlay · 仅图标（无黑底药丸、无文案）— 见 design.md §15.2 */
 const OVERLAY_ICON_BTN =
@@ -125,11 +136,12 @@ export function MediaHoverBox({
   previewChrome = "canvas",
   hidePreviewOverlay = false,
   onImageError,
+  errorRetryDelaysMs,
   onNaturalSize,
 }: MediaHoverBoxProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [imageLoadFailed, setImageLoadFailed] = useState(false);
+  const [failedRasterSrc, setFailedRasterSrc] = useState("");
   const [imageLoaded, setImageLoaded] = useState(false);
   const [stageShortSide, setStageShortSide] = useState(160);
   const rasterSrcRef = useRef("");
@@ -146,10 +158,21 @@ export function MediaHoverBox({
   const rasterDisplaySrc =
     kind === "video" && posterUrl?.trim() ? posterUrl.trim() : src?.trim() ?? "";
   rasterSrcRef.current = rasterDisplaySrc;
+  const imageLoadFailed =
+    Boolean(failedRasterSrc) && failedRasterSrc === rasterDisplaySrc;
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryDelaysRef = useRef(errorRetryDelaysMs);
+  retryDelaysRef.current = errorRetryDelaysMs;
+  const imgSrc = withRetryParam(rasterDisplaySrc, retryAttempt);
 
   useEffect(() => {
-    setImageLoadFailed(false);
     setImageLoaded(isMediaSrcLoaded(rasterDisplaySrc));
+    setRetryAttempt(0);
+    return () => {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    };
   }, [rasterDisplaySrc]);
 
   const alreadyLoaded = isMediaSrcLoaded(src);
@@ -194,10 +217,19 @@ export function MediaHoverBox({
       if (failedUrl && rasterSrcRef.current && !failedUrl.includes(rasterSrcRef.current.split("?")[0] ?? "")) {
         return;
       }
+      const delay = retryDelaysRef.current?.[retryAttempt];
+      if (delay !== undefined) {
+        if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = setTimeout(() => {
+          retryTimerRef.current = null;
+          setRetryAttempt((n) => n + 1);
+        }, delay);
+        return;
+      }
       onImageError?.();
-      setImageLoadFailed(true);
+      setFailedRasterSrc(rasterSrcRef.current);
     },
-    [onImageError],
+    [onImageError, retryAttempt],
   );
 
   const rasterFitClass =
@@ -288,7 +320,8 @@ export function MediaHoverBox({
         {mountRasterImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={rasterDisplaySrc}
+            key={retryAttempt}
+            src={imgSrc}
             alt={alt}
             loading={eagerMedia ? "eager" : "lazy"}
             decoding="async"

@@ -6,7 +6,10 @@ import {
   ensurePro2CharacterImageGroup,
 } from "./pro2-spawn-character-image-group";
 import { ensurePro2FrameImageGroup } from "./pro2-spawn-frame-image-group";
-import { ensurePro2VideoBoardGroup } from "./pro2-spawn-video-board-group";
+import {
+  ensurePro2VideoBoardGroup,
+  wirePro2VideoBoardRefEdges,
+} from "./pro2-spawn-video-board-group";
 import {
   ensurePro2SceneImageGroup,
   syncPro2SceneImagesFromRows,
@@ -269,7 +272,7 @@ function ensurePro2PropMediaGroup(scriptHubId: string): string | null {
           label: propGroupLabel(scriptHubId, store.nodes),
           color: GROUP_COLOR_PRESETS[4] ?? GROUP_COLOR_PRESETS[3]!,
         },
-      ) ?? null;
+      ) ?? undefined;
     if (!groupId) return null;
   }
 
@@ -386,24 +389,11 @@ function collectFrameAssetSources(
   characterRows: StoryProCharacterRow[],
   sceneRows: StoryProSceneRow[],
 ): FrameAssetSources {
-  const frameByRowKey = new Map<string, CanvasFlowNode>();
   const characterByKey = new Map<string, CanvasFlowNode>();
   const sceneByKey = new Map<string, CanvasFlowNode>();
   const propByKey = new Map<string, CanvasFlowNode>();
 
   for (const node of nodes) {
-    if (
-      node.type === "story-pro2-image" &&
-      (node.data as { pro2ControllerNodeId?: string }).pro2ControllerNodeId ===
-        frameColumnId
-    ) {
-      const rowKey = (
-        node.data as { pro2RowKey?: string }
-      ).pro2RowKey?.trim();
-      if (rowKey) frameByRowKey.set(rowKey, node);
-      continue;
-    }
-
     if (node.type === "story-pro2-three-view") {
       const key = (node.data as { pro2RowKey?: string }).pro2RowKey?.trim();
       if (key) characterByKey.set(key, node);
@@ -428,10 +418,34 @@ function collectFrameAssetSources(
   }
 
   const sceneNameByKey = new Map(sceneRows.map((row) => [row.key, row.name]));
+  const sourceByUrl = new Map<string, string>();
+  const sourceByName = new Map<string, string[]>();
+  const assetNodes = [
+    ...characterByKey.values(),
+    ...sceneByKey.values(),
+    ...propByKey.values(),
+  ];
+  for (const node of assetNodes) {
+    const d = node.data as {
+      label?: string;
+      runtime?: { ossUrl?: string; ephemeralUrl?: string };
+      ossUrl?: string;
+    };
+    const label = d.label?.trim();
+    if (label) {
+      const list = sourceByName.get(label) ?? [];
+      if (!list.includes(node.id)) list.push(node.id);
+      sourceByName.set(label, list);
+    }
+    const urls = [d.ossUrl, d.runtime?.ossUrl, d.runtime?.ephemeralUrl];
+    for (const raw of urls) {
+      const url = raw?.trim();
+      if (url?.startsWith("http")) sourceByUrl.set(url, node.id);
+    }
+  }
+
   const byRow = new Map<string, Set<string>>();
   for (const row of frameRows) {
-    if (!frameByRowKey.has(row.key)) continue;
-
     const charKeys = new Set<string>([
       ...(row.characterRefIds ?? []),
       ...collectRefKeysByPrefix(row.refImages, "ref-char-"),
@@ -474,6 +488,17 @@ function collectFrameAssetSources(
     for (const key of propKeys) {
       const source = propByKey.get(key);
       if (source) sources.add(source.id);
+    }
+    for (const ref of row.refImages ?? []) {
+      const refUrl = ref.url?.trim();
+      if (refUrl) {
+        const byUrl = sourceByUrl.get(refUrl);
+        if (byUrl) sources.add(byUrl);
+      }
+      const refLabel = ref.label?.trim();
+      if (refLabel) {
+        for (const id of sourceByName.get(refLabel) ?? []) sources.add(id);
+      }
     }
     byRow.set(row.key, sources);
   }
@@ -816,6 +841,13 @@ export function mountProductionVisualGroupsFromStore(scriptHubId: string): void 
       setNodes: store.setNodes,
       setEdges: store.setEdges,
     });
+    store = useCanvasStore.getState();
+    wirePro2VideoBoardRefEdges(
+      store.setEdges,
+      store.nodes,
+      videoColumnId,
+      frameColumnId,
+    );
   }
 
   removeErroneousProductionPropColumn(scriptHubId, ws?.propColumnId);
