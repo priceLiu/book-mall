@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-/** 去掉易混淆 I O 0 1 */
+/** 随机后缀字母表（去掉易混淆 I O 0 1）。前缀如 ECOM 可含 O，解析时勿用本表卡死整码。 */
 export const SHARE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 export const REFERRAL_CODE_LENGTH = 8;

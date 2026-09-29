@@ -18,6 +18,7 @@ describe("share-code-alphabet", () => {
   it("rejects invalid charset", () => {
     expect(isValidShareCodeCharset("RK12IO34")).toBe(false);
     expect(isValidShareCodeCharset("RK23AB3H")).toBe(true);
+    expect(isValidShareCodeCharset("ECOM4Q4P3M")).toBe(false);
   });
 
   it("buildShareCodePageUrl", () => {

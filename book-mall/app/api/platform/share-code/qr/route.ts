@@ -6,7 +6,6 @@ import { resolveBookMallOrigin } from "@/lib/platform-traffic/book-mall-origin";
 import {
   buildShareCodePageUrl,
   normalizeShareCode,
-  resolveShareCode,
 } from "@/lib/share/share-code-service";
 
 export const dynamic = "force-dynamic";
@@ -16,11 +15,6 @@ export async function GET(request: NextRequest) {
   const code = normalizeShareCode(raw);
   if (!code) {
     return NextResponse.json({ error: "缺少 code" }, { status: 400 });
-  }
-
-  const resolved = await resolveShareCode(code);
-  if (!resolved.ok) {
-    return NextResponse.json({ error: resolved.message }, { status: 404 });
   }
 
   const origin =

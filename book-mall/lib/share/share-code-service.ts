@@ -11,7 +11,6 @@ import {
   REFERRAL_CODE_LENGTH,
   REFERRAL_SUFFIX_LENGTH,
   SHARE_CODE_INVALID_MESSAGE,
-  WORKFLOW_CODE_LENGTH,
   WORKFLOW_SUFFIX_LENGTH,
 } from "./share-code-alphabet";
 import {
@@ -81,33 +80,38 @@ export async function generateWorkflowShareShortCode(
 
 export async function resolveShareCode(raw: string): Promise<ShareCodeResolveResult> {
   const code = normalizeShareCode(raw);
-  if (!code || !isValidShareCodeCharset(code)) {
+  if (!code) {
     return { ok: false, message: SHARE_CODE_INVALID_MESSAGE };
   }
 
   const prefixRow = await findEnabledPrefixForCode(code);
 
-  if (prefixRow?.kind === "WORKFLOW") {
-    if (code.length !== WORKFLOW_CODE_LENGTH) {
-      return { ok: false, message: SHARE_CODE_INVALID_MESSAGE };
-    }
+  /**
+   * 工作流前缀可能含字母表刻意去掉的字（如 ECOM 的 O）。
+   * 以库内 shortCode 为准，不因 charset / 固定 10 位拒掉已生成的码。
+   */
+  if (prefixRow?.kind === "WORKFLOW" || !isValidShareCodeCharset(code)) {
     const link = await prisma.workflowShareLink.findUnique({
       where: { shortCode: code },
       include: { sharer: { select: { name: true } } },
     });
-    if (!link) return { ok: false, message: SHARE_CODE_INVALID_MESSAGE };
-    const meta = await getWorkflowSharePublicMeta(link.token);
-    if (!meta || !meta.enabled) {
+    if (link) {
+      const meta = await getWorkflowSharePublicMeta(link.token);
+      if (!meta || !meta.enabled) {
+        return { ok: false, message: SHARE_CODE_INVALID_MESSAGE };
+      }
+      return {
+        ok: true,
+        kind: "WORKFLOW",
+        code,
+        title: meta.title,
+        sharerName: meta.sharerName,
+        app: meta.app,
+      };
+    }
+    if (prefixRow?.kind === "WORKFLOW") {
       return { ok: false, message: SHARE_CODE_INVALID_MESSAGE };
     }
-    return {
-      ok: true,
-      kind: "WORKFLOW",
-      code,
-      title: meta.title,
-      sharerName: meta.sharerName,
-      app: meta.app,
-    };
   }
 
   if (prefixRow?.kind === "REFERRAL" && code.length === REFERRAL_CODE_LENGTH) {

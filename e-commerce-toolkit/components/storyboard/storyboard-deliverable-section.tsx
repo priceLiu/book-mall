@@ -98,7 +98,7 @@ export function StoryboardDeliverableSection({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#e8e8ed] bg-[#fafafa] px-4 py-3">
         <p className="text-xs text-[#6e6e73]">
           {fullSheetOnly
-            ? `一键成片 ${durationSec}s · 故事版宫格与分镜脚本一并提交视频模型`
+            ? `一键成片 ${durationSec}s · 各镜分镜图与分镜脚本一并提交视频模型`
             : `整图成片 ${durationSec}s · 已生成 ${panelVideoCount} 镜单镜视频${canMergePanels ? " · 可合并" : ""}`}
         </p>
         <EcomIconToolbar>

@@ -7,14 +7,6 @@ import { EcomButtonPrimary } from "@/components/ui/ecom-button";
 import { EcomDialogCloseButton } from "@/components/ui/dialog";
 import { EcomWechatShareIcon } from "@/components/ui/ecom-wechat-share-icon";
 
-function bookMallOriginFromShareUrl(shareUrl: string): string | null {
-  try {
-    return new URL(shareUrl).origin;
-  } catch {
-    return null;
-  }
-}
-
 export function WorkflowShareLinkDialog({
   projectId,
   projectTitle,
@@ -82,10 +74,9 @@ export function WorkflowShareLinkDialog({
     setTimeout(() => setCopiedField(null), 2000);
   }
 
-  const qrUrl =
-    shortCode && shareUrl
-      ? `${bookMallOriginFromShareUrl(shareUrl)}/api/platform/share-code/qr?code=${encodeURIComponent(shortCode)}`
-      : null;
+  const qrUrl = shortCode
+    ? `/api/book-mall/api/platform/share-code/qr?code=${encodeURIComponent(shortCode)}`
+    : null;
 
   if (!open) return null;
 

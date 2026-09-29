@@ -5,7 +5,6 @@ import {
 } from "@/lib/ecom/ecom-storyboard-scene-prompt";
 import {
   bailianR2vMaxRefs,
-  isHappyhorseBailianR2vModel,
   isWan27BailianR2vModel,
 } from "@/lib/canvas/bailian-r2v-body";
 import type {
@@ -77,6 +76,10 @@ function bailianSlotRefPhrase(
   modelKey: string,
 ): string {
   const tag = bailianRefTag(index, modelKey);
+  if (slot.role === "panel") {
+    const shot = slot.panelIndex ?? index;
+    return `${tag}为镜头${shot}分镜原图，该镜构图、景别、人物姿态与场面须与${tag}一致`;
+  }
   if (slot.role === "full_sheet") {
     return `${tag}为分镜画面宫格（各镜头图横向/网格拼接，无文字表格），仅提供镜头顺序、景别与节奏参考；不得采用其中的产品包装、人物相貌或场景背景`;
   }
@@ -116,9 +119,16 @@ function buildBailianStoryboardGridVideoPrompt(
   const highlight =
     sheet.overview.productHighlight?.trim() ||
     brief?.productHighlight?.trim();
+  const bindPanels = rules.strategy === "bailian_happyhorse_panels";
   const shotScript = sheet.panels
     .map((p, i) => {
       const parts = [`${i + 1}. ${p.shotType}`];
+      const panelIdx = slots.findIndex(
+        (s) => s.role === "panel" && s.panelIndex === p.index,
+      );
+      if (panelIdx >= 0) {
+        parts.push(`构图场面须与${bailianRefTag(panelIdx + 1, modelKey)}一致`);
+      }
       if (sceneTag) {
         const local = p.scenePrompt?.trim() || p.scene?.trim();
         parts.push(
@@ -143,11 +153,10 @@ function buildBailianStoryboardGridVideoPrompt(
     })
     .join(" ");
   const duration = sheet.totalDurationHintSec ?? 15;
-  const identityFirst = isHappyhorseBailianR2vModel(modelKey);
   const lines = [
     `参考：${refDesc}。`,
-    identityFirst
-      ? "重要：产品/角色/场景参考图的优先级高于分镜故事板；故事板仅作节奏与构图，不得覆盖身份参考。"
+    bindPanels
+      ? "重要：各镜头须按对应分镜参考图的构图、景别、人物姿态与场面推进；产品包装与人物五官以身份参考图为准，不得改 SKU 或换人。"
       : "重要：产品包装以产品参考图为准，场景环境以场景参考图为准；分镜故事板仅作节奏与构图，不得覆盖身份参考。",
     `标题：${sheet.overview.title}。`,
     sheet.overview.logline?.trim()
@@ -172,7 +181,8 @@ export function buildEcomStoryboardVideoPrompt(
   },
 ): string {
   if (
-    opts?.refRules?.strategy === "bailian_storyboard_grid" &&
+    (opts?.refRules?.strategy === "bailian_storyboard_grid" ||
+      opts?.refRules?.strategy === "bailian_happyhorse_panels") &&
     opts.refSlots?.length
   ) {
     return buildBailianStoryboardGridVideoPrompt(

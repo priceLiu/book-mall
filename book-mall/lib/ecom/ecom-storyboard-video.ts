@@ -70,6 +70,7 @@ import { ensureGatewayLogSucceededAfterVendorUrl } from "@/lib/gateway/gateway-l
 import { updateEcomStoryboardProject } from "@/lib/ecom/ecom-storyboard-service";
 import { requireStoryboardProductRef } from "@/lib/ecom/ecom-storyboard-refs";
 import {
+  getStoryboardVideoInvokeRules,
   resolveStoryboardPanelVideoRefPlan,
   resolveStoryboardVideoRefPlan,
 } from "@/lib/ecom/ecom-storyboard-video-ref-rules";
@@ -313,7 +314,7 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
   userId: string;
   projectId: string;
   sheet: StoryboardSheet;
-  /** 已废弃：成片故事板由服务端从 panel.imageUrl 实时拼接宫格 */
+  /** 已废弃：wan2.7 成片仍由服务端从 panel.imageUrl 拼接宫格；HappyHorse 直接传各镜原图 */
   sheetPngUrl?: string;
   references: StoryboardReference[];
   durationSec?: number;
@@ -342,11 +343,16 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
 
   const videoAspect: "16:9" | "9:16" =
     opts.aspectRatio === "16:9" ? "16:9" : "9:16";
-  const panelGridUrl = await composeStoryboardPanelGridPng({
-    userId: opts.userId,
-    panelUrls: panelImages.map((p) => p.url),
-    aspectRatio: videoAspect,
-  });
+  const modelKey = resolveStoryboardVideoModel(opts.modelKey);
+  const fullVideoRules = getStoryboardVideoInvokeRules(modelKey);
+  const panelGridUrl =
+    fullVideoRules.strategy === "bailian_happyhorse_panels"
+      ? (panelImages[0]?.url ?? "")
+      : await composeStoryboardPanelGridPng({
+          userId: opts.userId,
+          panelUrls: panelImages.map((p) => p.url),
+          aspectRatio: videoAspect,
+        });
 
   const existing = await prisma.ecomStoryboardProject.findFirst({
     where: { id: opts.projectId, userId: opts.userId },
@@ -367,7 +373,6 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
   }
 
   const workspaceId = randomUUID().slice(0, 8);
-  const modelKey = resolveStoryboardVideoModel(opts.modelKey);
   const provider = resolveStoryboardVideoProvider(modelKey);
   const refPlan = resolveStoryboardVideoRefPlan({
     modelKey,

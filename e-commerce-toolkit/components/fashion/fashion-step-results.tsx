@@ -337,7 +337,7 @@ export function FashionStepResults({
             <StepSection title="一键成片">
               {videoSlot ?? (
                 <span className="text-sm text-[#86868b]">
-                  故事版 6 镜分镜图就绪后，在此整图提交视频模型生成成片。
+                  故事版分镜图就绪后，在此提交各镜原图与脚本生成成片。
                 </span>
               )}
             </StepSection>

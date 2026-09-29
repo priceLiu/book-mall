@@ -6,7 +6,6 @@
  */
 import {
   bailianR2vMaxRefs,
-  isHappyhorseBailianR2vModel,
   isWan26BailianR2vModel,
   isWan27BailianR2vModel,
 } from "@/lib/canvas/bailian-r2v-body";
@@ -41,8 +40,10 @@ export type StoryboardVideoRefPackStrategy =
   | "kie_flat_rich"
   /** 可灵 3.0：首帧故事版 + kling_elements（产品/角色/场景），不走本模块拼 flat 数组 */
   | "kling_first_frame_elements"
-  /** 百炼 wan2.7 / HappyHorse：单张多宫格故事板 + 产品/角色/场景，不重复送各镜头分镜 */
+  /** 百炼 wan2.7：单张多宫格故事板 + 产品/角色/场景，不重复送各镜头分镜 */
   | "bailian_storyboard_grid"
+  /** HappyHorse R2V：各镜头分镜原图按序传入（最多 9），余量再补产品/角色/场景 */
+  | "bailian_happyhorse_panels"
   /** 百炼万相 2.6 multi：仅分镜镜头图（shot_type=multi），不送整版故事版 */
   | "bailian_multi_shot_panels"
   /** MiniMax H3 R2V/S2V：reference_* 角色，故事版 + 身份参考 */
@@ -190,12 +191,12 @@ export function getStoryboardVideoInvokeRules(modelKey: string): StoryboardVideo
     return {
       modelKey: key,
       provider: "bailian",
-      strategy: "bailian_storyboard_grid",
+      strategy: "bailian_happyhorse_panels",
       maxTotalImages: bailianR2vMaxRefs(key),
-      supportsFullSheet: true,
+      supportsFullSheet: false,
       hasFirstFrameRole: false,
       strategyNote:
-        "HappyHorse R2V：产品/角色/场景参考前置（[Image 1] 起），故事板置后仅作构图节奏；不重复送各镜头单图。",
+        "HappyHorse R2V：各镜头分镜原图按镜号顺序传入，余量再补产品/角色/场景；不送压缩宫格，避免成片对不上分镜。",
     };
   }
 
@@ -353,6 +354,26 @@ export function resolveStoryboardVideoRefPlan(opts: {
       break;
     }
 
+    case "bailian_happyhorse_panels": {
+      const identitiesOrdered = identitySlotsPrioritized(opts.references);
+      const reserveIdentity = identitiesOrdered.some((s) => s.role === "product") ? 1 : 0;
+      const panelCap = Math.max(0, cap - reserveIdentity);
+      for (const p of panelSlots(panels).slice(0, panelCap)) {
+        if (!pushSlot(slots, cap, p)) break;
+      }
+      for (const id of identitiesOrdered) {
+        if (!pushSlot(slots, cap, id)) break;
+      }
+      if (!slots.some((s) => s.role === "panel") && isHttpUrl(sheetUrl)) {
+        pushSlot(slots, cap, {
+          role: "full_sheet",
+          url: sheetUrl,
+          label: "分镜画面宫格（各镜头图拼接）",
+        });
+      }
+      break;
+    }
+
     case "bailian_storyboard_grid": {
       const identitiesOrdered = identitySlotsPrioritized(opts.references);
       const sheetSlot: StoryboardVideoRefSlot = {
@@ -360,21 +381,11 @@ export function resolveStoryboardVideoRefPlan(opts: {
         url: sheetUrl,
         label: "分镜画面宫格（各镜头图拼接，仅构图节奏）",
       };
-      // HappyHorse：身份参考前置，避免故事板宫格里的产品外观覆盖 [Image 1] 产品参考
-      if (isHappyhorseBailianR2vModel(opts.modelKey)) {
-        for (const id of identitiesOrdered) {
-          if (!pushSlot(slots, cap, id)) break;
-        }
-        if (rules.supportsFullSheet && sheetUrl) {
-          pushSlot(slots, cap, sheetSlot);
-        }
-      } else {
-        if (rules.supportsFullSheet && sheetUrl) {
-          pushSlot(slots, cap, sheetSlot);
-        }
-        for (const id of identitiesOrdered) {
-          if (!pushSlot(slots, cap, id)) break;
-        }
+      if (rules.supportsFullSheet && sheetUrl) {
+        pushSlot(slots, cap, sheetSlot);
+      }
+      for (const id of identitiesOrdered) {
+        if (!pushSlot(slots, cap, id)) break;
       }
       break;
     }
