@@ -17,14 +17,9 @@ export function usePruneStaleDockMentions(opts: {
 }): void {
   const { nodeId, prompt, mentionables, field, updateNodeData } = opts;
 
-  const validMentionIdsKey = useMemo(
-    () => mentionables.map((m) => m.id).join("\u0001"),
-    [mentionables],
-  );
-
   const validIds = useMemo(
     () => mentionables.map((m) => m.id),
-    [validMentionIdsKey],
+    [mentionables],
   );
 
   useEffect(() => {

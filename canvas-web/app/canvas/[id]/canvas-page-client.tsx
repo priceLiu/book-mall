@@ -619,9 +619,19 @@ function Inner({ projectId }: { projectId: string }) {
   const historyWrittenRevisionRef = useRef<number | null>(null);
   const autosaveProjectRef = useRef(project);
   const autosaveBaseRef = useRef(base);
-  const runAutosaveRef = useRef<(force?: boolean) => Promise<void>>(
-    async () => {},
-  );
+  const runAutosaveRef = useRef<
+    (
+      force?: boolean,
+      opts?: {
+        writeHistory?: boolean;
+        conflictRetry?: boolean;
+        authRetry?: boolean;
+        networkRetryCount?: number;
+        bypassCooldown?: boolean;
+        allowSuspiciousNodeCountDrop?: boolean;
+      },
+    ) => Promise<void>
+  >(async () => {});
   autosaveProjectRef.current = project;
   autosaveBaseRef.current = base;
 
