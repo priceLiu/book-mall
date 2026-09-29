@@ -5,12 +5,13 @@ WORKDIR /app
 # CloudBase 目标目录是 canvas-web/，构建上下文进不去仓库根的 shared/。
 # package.json 的 file:../shared/* 在镜像里解析为 /shared/*，故把快照拷到该路径。
 # 刷新快照（改 shared/ 后、发版前）：
-#   cp -R ../shared/federated-portal-nav ../shared/platform-assistant docker-shared/
+#   cp -R ../shared/federated-portal-nav ../shared/platform-assistant ../shared/ecom-copy-overlay docker-shared/
 FROM base AS with-shared
 COPY docker-shared/federated-portal-logout /shared/federated-portal-logout
 COPY docker-shared/federated-portal-nav /shared/federated-portal-nav
 COPY docker-shared/media-render-subtitle-style /shared/media-render-subtitle-style
 COPY docker-shared/platform-assistant /shared/platform-assistant
+COPY docker-shared/ecom-copy-overlay /shared/ecom-copy-overlay
 
 FROM with-shared AS deps
 # pnpm-workspace.yaml 含 allowBuilds: unrs-resolver；不拷会触发 ERR_PNPM_IGNORED_BUILDS
