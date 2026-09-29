@@ -115,13 +115,15 @@ export function HandCraftRefUploader({
         />
       ) : null}
 
-      <HandCraftSketchGenerateDialog
-        open={genDialogOpen}
-        onOpenChange={setGenDialogOpen}
-        busy={sketchGenBusy}
-        hasSeedSketch={references.length > 0}
-        onConfirm={handleGenerate}
-      />
+      {genDialogOpen ? (
+        <HandCraftSketchGenerateDialog
+          open
+          onOpenChange={setGenDialogOpen}
+          busy={sketchGenBusy}
+          hasSeedSketch={references.length > 0}
+          onConfirm={handleGenerate}
+        />
+      ) : null}
     </div>
   );
 }

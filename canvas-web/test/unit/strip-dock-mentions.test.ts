@@ -29,6 +29,11 @@ describe("stripStaleMentionTokensFromPrompt", () => {
       "hello world @<keep>",
     );
   });
+
+  it("keeps script/sync ids even when not in mentionables catalog", () => {
+    const prompt = "角色 @<ref-char-c1> @<sbv1-ref-node1>";
+    expect(stripStaleMentionTokensFromPrompt(prompt, [])).toBe(prompt);
+  });
 });
 
 describe("mentionIdsForRemovedCanvasNode", () => {

@@ -223,21 +223,16 @@ export async function listProjectsForUser(
   return rows.map(serializeProjectListItem);
 }
 
-export async function getProjectDetail(
-  userId: string,
-  projectId: string,
-): Promise<StoryProjectDetailDto> {
-  const project = await prisma.storyProject.findFirst({
-    where: { id: projectId, userId, deletedAt: null },
-    include: {
-      characters: { orderBy: { sortOrder: "asc" } },
-      frames: { orderBy: { index: "asc" } },
-    },
-  });
-  if (!project) {
-    throw new StoryProjectError("NOT_FOUND", "project not found", 404);
-  }
+type StoryProjectWithRelations = Prisma.StoryProjectGetPayload<{
+  include: {
+    characters: true;
+    frames: true;
+  };
+}>;
 
+async function buildProjectDetailDto(
+  project: StoryProjectWithRelations,
+): Promise<StoryProjectDetailDto> {
   // 拉每个 character / frame 当前指向的 task 状态（若有）
   const taskIds = [
     project.coverTaskId,
@@ -294,6 +289,50 @@ export async function getProjectDetail(
     ),
     pendingTasks: pendingTasks.map(serializePendingTask),
   };
+}
+
+const projectDetailInclude = {
+  characters: { orderBy: { sortOrder: "asc" as const } },
+  frames: { orderBy: { index: "asc" as const } },
+};
+
+/** 本人项目 · 团队公开项目 · 门户 discover 展示项 */
+export async function getProjectDetailForViewer(
+  userId: string,
+  projectId: string,
+): Promise<StoryProjectDetailDto> {
+  let project = await prisma.storyProject.findFirst({
+    where: { id: projectId, userId, deletedAt: null },
+    include: projectDetailInclude,
+  });
+  if (!project) {
+    project = await prisma.storyProject.findFirst({
+      where: {
+        id: projectId,
+        deletedAt: null,
+        visibility: "TEAM_PUBLIC",
+      },
+      include: projectDetailInclude,
+    });
+  }
+  if (project) {
+    return buildProjectDetailDto(project);
+  }
+
+  const { getDiscoverShowcaseProjectDetail } = await import(
+    "./story-discover-service"
+  );
+  const showcase = await getDiscoverShowcaseProjectDetail(projectId);
+  if (showcase) return showcase;
+
+  throw new StoryProjectError("NOT_FOUND", "project not found", 404);
+}
+
+export async function getProjectDetail(
+  userId: string,
+  projectId: string,
+): Promise<StoryProjectDetailDto> {
+  return getProjectDetailForViewer(userId, projectId);
 }
 
 // —— Mutations ——

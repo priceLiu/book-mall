@@ -230,20 +230,41 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
       syncMentionBadgeLabels(root, mentionables);
     }, [mentionables]);
 
-    /** 外部 value / mentionables 变化时重建 DOM（聚焦中不动，避免破坏光标） */
+    /** 外部 value 变化时重建 DOM（聚焦中不动，避免破坏光标） */
     useEffect(() => {
       const root = editorRef.current;
       if (!root) return;
       if (focusedRef.current) return;
-      if (value === lastValueRef.current) {
-        // 仅 mentionables 元数据可能变化（标签/缩略图）——重建以刷新徽标
-      }
+      if (value === lastValueRef.current) return;
       root.replaceChildren(
         buildEditableFragment(value, mentionablesRef.current, mentionEdition),
       );
       lastValueRef.current = value;
       setIsEmpty(value.length === 0);
-    }, [value, mentionables, mentionEdition]);
+    }, [value, mentionEdition]);
+
+    /** mention 缩略图 URL 等新出现时需要刷新徽标（value 未变时） */
+    useEffect(() => {
+      const root = editorRef.current;
+      if (!root || focusedRef.current) return;
+      if (value !== lastValueRef.current) return;
+      const byId = new Map(mentionables.map((m) => [m.id, m] as const));
+      let needsRebuild = false;
+      for (const el of root.querySelectorAll(`[${MENTION_BADGE_ATTR}]`)) {
+        const id = el.getAttribute(MENTION_BADGE_ATTR);
+        if (!id) continue;
+        const item = byId.get(id);
+        const hasThumb = Boolean(el.querySelector("img,video"));
+        if (item?.previewUrl && !hasThumb) {
+          needsRebuild = true;
+          break;
+        }
+      }
+      if (!needsRebuild) return;
+      root.replaceChildren(
+        buildEditableFragment(value, mentionablesRef.current, mentionEdition),
+      );
+    }, [mentionables, mentionEdition, value]);
 
     const setEditorRef = useCallback(
       (el: HTMLDivElement | null) => {

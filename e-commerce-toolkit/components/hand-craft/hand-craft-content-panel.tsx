@@ -573,67 +573,67 @@ export function HandCraftContentPanel({
         surface="content"
       />
 
-      <StoryboardModelPickerDialog
-        open={Boolean(pendingGen)}
-        onOpenChange={(open) => {
-          if (!open) setPendingGen(null);
-        }}
-        mode="image"
-        dialogTitle={
-          pendingGen
-            ? `生成 ${pendingGen.indexes.length} 张 · ${handCraftStep(pendingGen.stepId).label}`
-            : undefined
-        }
-        dialogDescription="仅列出支持参考图的生图模型：本模块要靠主形象参考图锁定五官与配饰。"
-        footerHint="选好模型后开始出图。"
-        models={imageModels}
-        modelsLoading={modelsLoading}
-        modelsEmptyHint={
-          modelsLoadError ??
-          "暂无支持参考图的生图模型。平台代付用户请联系管理员在 Gateway 上架 IMAGE 模型；自付用户请先在 Gateway 绑定厂商凭证。"
-        }
-        onRetryLoadModels={onRefreshModels}
-        value={draftModelKey}
-        onChange={setDraftModelKey}
-        imageSize={imageSize}
-        onImageSizeChange={setImageSize}
-        lockedImageSizeLabel={
-          pendingGen
-            ? `${handCraftStep(pendingGen.stepId).ratio}（由本步版式决定）`
-            : undefined
-        }
-        confirming={Boolean(generating)}
-        previewCount={Math.max(1, pendingGen?.indexes.length ?? 1)}
-        onConfirm={(modelKey) => {
-          const req = pendingGen;
-          if (!req) return;
-          setPendingGen(null);
-          onImageModelChange(modelKey);
-          void runGenerate(req.stepId, req.indexes, modelKey, imageSize);
-        }}
-      />
+      {pendingGen ? (
+        <StoryboardModelPickerDialog
+          open
+          nativeOverlay
+          onOpenChange={(open) => {
+            if (!open) setPendingGen(null);
+          }}
+          mode="image"
+          dialogTitle={`生成 ${pendingGen.indexes.length} 张 · ${handCraftStep(pendingGen.stepId).label}`}
+          dialogDescription="仅列出支持参考图的生图模型：本模块要靠主形象参考图锁定五官与配饰。"
+          footerHint="选好模型后开始出图。"
+          models={imageModels}
+          modelsLoading={modelsLoading}
+          modelsEmptyHint={
+            modelsLoadError ??
+            "暂无支持参考图的生图模型。平台代付用户请联系管理员在 Gateway 上架 IMAGE 模型；自付用户请先在 Gateway 绑定厂商凭证。"
+          }
+          onRetryLoadModels={onRefreshModels}
+          value={draftModelKey}
+          onChange={setDraftModelKey}
+          imageSize={imageSize}
+          onImageSizeChange={setImageSize}
+          lockedImageSizeLabel={`${handCraftStep(pendingGen.stepId).ratio}（由本步版式决定）`}
+          confirming={Boolean(generating)}
+          previewCount={Math.max(1, pendingGen.indexes.length)}
+          onConfirm={(modelKey) => {
+            const req = pendingGen;
+            setPendingGen(null);
+            onImageModelChange(modelKey);
+            void runGenerate(req.stepId, req.indexes, modelKey, imageSize);
+          }}
+        />
+      ) : null}
 
       <EcomImagePreviewHost
         preview={composeImagePreview}
         onClose={closeComposeImagePreview}
+        nativeOverlay
       />
 
-      <ProductDesignGalleryPreviewDialog
-        items={galleryPreview?.items ?? []}
-        initialIndex={galleryPreview?.initialIndex ?? 0}
-        open={Boolean(galleryPreview?.items.length)}
-        onOpenChange={(open) => {
-          if (!open) setGalleryPreview(null);
-        }}
-      />
+      {galleryPreview?.items.length ? (
+        <ProductDesignGalleryPreviewDialog
+          items={galleryPreview.items}
+          initialIndex={galleryPreview.initialIndex}
+          open
+          nativeOverlay
+          onOpenChange={(open) => {
+            if (!open) setGalleryPreview(null);
+          }}
+        />
+      ) : null}
 
-      <HandCraftSaveDialog
-        open={saveDialogOpen}
-        onOpenChange={setSaveDialogOpen}
-        defaultIpName={defaultSaveIpName}
-        busy={Boolean(busy)}
-        onConfirm={handleSaveWorkflow}
-      />
+      {saveDialogOpen ? (
+        <HandCraftSaveDialog
+          open
+          onOpenChange={setSaveDialogOpen}
+          defaultIpName={defaultSaveIpName}
+          busy={Boolean(busy)}
+          onConfirm={handleSaveWorkflow}
+        />
+      ) : null}
     </div>
   );
 }

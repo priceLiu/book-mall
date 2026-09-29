@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import type { MentionableItem } from "@/components/canvas/mentions/MentionsTextarea";
 import {
   stripStaleMentionTokensFromPrompt,
@@ -17,13 +17,20 @@ export function usePruneStaleDockMentions(opts: {
 }): void {
   const { nodeId, prompt, mentionables, field, updateNodeData } = opts;
 
+  const validMentionIdsKey = useMemo(
+    () => mentionables.map((m) => m.id).join("\u0001"),
+    [mentionables],
+  );
+
+  const validIds = useMemo(
+    () => mentionables.map((m) => m.id),
+    [validMentionIdsKey],
+  );
+
   useEffect(() => {
     if (!nodeId || !prompt.includes("@<")) return;
-    const next = stripStaleMentionTokensFromPrompt(
-      prompt,
-      mentionables.map((m) => m.id),
-    );
+    const next = stripStaleMentionTokensFromPrompt(prompt, validIds);
     if (next === prompt) return;
     updateNodeData(nodeId, { [field]: next });
-  }, [nodeId, prompt, mentionables, field, updateNodeData]);
+  }, [nodeId, prompt, validIds, field, updateNodeData]);
 }

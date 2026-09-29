@@ -21,11 +21,14 @@ export function ProductDesignGalleryPreviewDialog({
   initialIndex = 0,
   open,
   onOpenChange,
+  nativeOverlay = false,
 }: {
   items: ProductDesignGalleryPreviewItem[];
   initialIndex?: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** 与其它 Radix Dialog 同页时设为 true，避免 Presence 循环 */
+  nativeOverlay?: boolean;
 }) {
   const mapped = useMemo(
     () => mapPreviewItemsFromEntries(items.map((i) => ({ url: i.url, title: i.title }))),
@@ -42,6 +45,7 @@ export function ProductDesignGalleryPreviewDialog({
       items={mapped.length > 1 ? mapped : undefined}
       initialIndex={initialIndex}
       open={open}
+      nativeOverlay={nativeOverlay}
       onOpenChange={onOpenChange}
     />
   );

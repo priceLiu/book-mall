@@ -36,16 +36,18 @@ export function EcomProjectListButton({
         disabled={disabled}
         onClick={() => setOpen(true)}
       />
-      <EcomProjectListDialog
-        open={open}
-        onOpenChange={setOpen}
-        title={title}
-        description={description}
-        emptyHint={emptyHint}
-        currentProjectId={currentProjectId}
-        loadProjects={loadProjects}
-        onSelectProject={onSelectProject}
-      />
+      {open ? (
+        <EcomProjectListDialog
+          open
+          onOpenChange={setOpen}
+          title={title}
+          description={description}
+          emptyHint={emptyHint}
+          currentProjectId={currentProjectId}
+          loadProjects={loadProjects}
+          onSelectProject={onSelectProject}
+        />
+      ) : null}
     </>
   );
 }

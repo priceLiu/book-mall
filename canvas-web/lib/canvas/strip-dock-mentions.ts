@@ -45,6 +45,32 @@ export function removeDockRefFromState<T extends { id: string }>(
   };
 }
 
+/** 剧本/向导/上游连线 id · 允许暂不在 mentionables 列表（避免与 live sync 互相改写 prompt） */
+export function isPreservedDockMentionId(id: string): boolean {
+  return (
+    id.startsWith("wiz-") ||
+    id.startsWith("ref-char-") ||
+    id.startsWith("ref-scene-") ||
+    id.startsWith("ref-prop-") ||
+    id.startsWith("ref-asset-") ||
+    id.startsWith("ref-scene-asset-") ||
+    id.startsWith("sbv1-ref-") ||
+    id.startsWith("up-img-") ||
+    id.startsWith("up-style-") ||
+    id.startsWith("up-video-") ||
+    id.startsWith("up-text-") ||
+    id.startsWith("up-outline-") ||
+    id.startsWith("up-script-") ||
+    id.startsWith("up-tag-") ||
+    id.startsWith("sbv1-text-") ||
+    id.startsWith("sbv1-motion-") ||
+    id.startsWith("asset:") ||
+    id.startsWith("hd-ref-") ||
+    id.startsWith("paste") ||
+    id.startsWith("ref-")
+  );
+}
+
 /** 按当前 mentionables 目录剔除 prompt 里已失效的 @ */
 export function stripStaleMentionTokensFromPrompt(
   prompt: string,
@@ -52,7 +78,9 @@ export function stripStaleMentionTokensFromPrompt(
 ): string {
   if (!prompt.includes("@<")) return prompt;
   const valid = new Set(validRefIds);
-  const stale = parseReferencedIds(prompt).filter((id) => !valid.has(id));
+  const stale = parseReferencedIds(prompt).filter(
+    (id) => !valid.has(id) && !isPreservedDockMentionId(id),
+  );
   if (!stale.length) return prompt;
   return stripMentionTokensFromPrompt(prompt, stale);
 }

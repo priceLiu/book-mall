@@ -2,8 +2,15 @@ import { prisma } from "@/lib/prisma";
 import { getStoryWebOrigin } from "@/lib/app-web-origins";
 import {
   serializeProjectListItem,
+  type StoryProjectDetailDto,
   type StoryProjectListDto,
 } from "@/lib/story/story-project-service";
+
+const DISCOVER_SHOWCASE_ID_PREFIX = "discover:";
+
+export function isDiscoverShowcaseProjectId(id: string): boolean {
+  return id.startsWith(DISCOVER_SHOWCASE_ID_PREFIX);
+}
 
 export type StoryDiscoverListDto = StoryProjectListDto & {
   /** 门户卡片悬停预览（精选兜底项；DB 公开项暂无则省略） */
@@ -198,6 +205,26 @@ export async function listStoryDiscoverProjectsPage(
 export async function listStoryDiscoverProjects(): Promise<StoryProjectListDto[]> {
   const page = await listStoryDiscoverProjectsPage(0, 120);
   return page.projects;
+}
+
+/** 门户精品漫剧卡片 · 只读工作台详情（无 DB 行） */
+export async function getDiscoverShowcaseProjectDetail(
+  projectId: string,
+): Promise<StoryProjectDetailDto | null> {
+  if (!isDiscoverShowcaseProjectId(projectId)) return null;
+  const catalog = await buildFullDiscoverCatalog();
+  const item = catalog.find((p) => p.id === projectId);
+  if (!item) return null;
+  const { previewVideoUrl: _preview, ...listFields } = item;
+  return {
+    ...listFields,
+    coverTaskStatus: null,
+    coverTaskFailCode: null,
+    coverTaskFailMessage: null,
+    characters: [],
+    frames: [],
+    pendingTasks: [],
+  };
 }
 
 export { buildShowcaseFallbackProjects as storyDiscoverShowcaseFallback };

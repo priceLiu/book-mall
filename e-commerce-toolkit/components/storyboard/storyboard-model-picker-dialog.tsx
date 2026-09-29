@@ -510,11 +510,12 @@ export function StoryboardModelPickerDialog({
   const showPanelVoiceoverAudio =
     mode === "video" && videoTarget === "panel" && panelHasVoiceover;
   useEffect(() => {
-    if (mode !== "image" || !onImageSizeChange) return;
+    if (!open || mode !== "image" || !onImageSizeChange) return;
     if (klingImageAspectOnly) return;
     const opts = currentImageSizeOptions;
+    if (opts.length === 0) return;
     if (!opts.some((o) => o.value === imageSize)) {
-      onImageSizeChange(
+      const next =
         defaultImageSizeForModel(
           draftKey,
           (lockedRatioHint === "16:9" ||
@@ -527,10 +528,11 @@ export function StoryboardModelPickerDialog({
               ? "16:9"
               : "9:16") as "16:9" | "9:16" | "3:4" | "4:5" | "1:1",
           { lockedRatio: hasLockedRatio },
-        ),
-      );
+        ) ?? opts[0]?.value;
+      if (next && next !== imageSize) onImageSizeChange(next);
     }
   }, [
+    open,
     mode,
     draftKey,
     currentImageSizeOptions,
@@ -543,13 +545,20 @@ export function StoryboardModelPickerDialog({
   ]);
 
   useEffect(() => {
-    if (mode !== "video" || !onVideoResolutionChange) return;
+    if (!open || mode !== "video" || !onVideoResolutionChange) return;
     if (!currentVideoResolutionOptions.some((o) => o.value === videoResolution)) {
-      onVideoResolutionChange(
-        (currentVideoResolutionOptions[0]?.value ?? "1080p") as StoryboardVideoResolution,
-      );
+      const next =
+        (currentVideoResolutionOptions[0]?.value ?? "1080p") as StoryboardVideoResolution;
+      if (next !== videoResolution) onVideoResolutionChange(next);
     }
-  }, [mode, draftKey, currentVideoResolutionOptions, videoResolution, onVideoResolutionChange]);
+  }, [
+    open,
+    mode,
+    draftKey,
+    currentVideoResolutionOptions,
+    videoResolution,
+    onVideoResolutionChange,
+  ]);
 
   const showAspect = mode === "video" && !isBailianR2v;
   const showR2vRatio = mode === "video" && isBailianR2v;
@@ -586,7 +595,7 @@ export function StoryboardModelPickerDialog({
   }, [mode, showFullDuration, showPanelDuration, durationSec, panelDurationSec, draftKey]);
 
   useEffect(() => {
-    if (mode !== "video") return;
+    if (!open || mode !== "video") return;
     if (showFullDuration && onDurationChange) {
       const clamped = Math.min(fullDurationMax, Math.max(fullDurationMin, durationSec));
       if (clamped !== durationSec) onDurationChange(clamped);
@@ -596,6 +605,7 @@ export function StoryboardModelPickerDialog({
       if (clamped !== panelDurationSec) onPanelDurationChange(clamped);
     }
   }, [
+    open,
     mode,
     draftKey,
     durationSec,
@@ -1103,6 +1113,7 @@ export function StoryboardModelPickerDialog({
       <DialogContent
         className={panelClassName}
         onCloseAutoFocus={(e) => e.preventDefault()}
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader className="shrink-0 border-b border-[#f0f0f2] px-5 py-4">
           <DialogTitle className="flex items-center gap-2 text-[15px]">

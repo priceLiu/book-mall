@@ -56,9 +56,10 @@ export function ProjectCard({
   const cover = project.coverImageUrl || project.styleFallbackUrl;
   const previewSrc =
     project.previewVideoUrl ?? resolveDiscoverPreviewVideoUrl(listIndex);
+  const projectPath = `/project/${encodeURIComponent(project.id)}`;
   const href = guestBrowse
-    ? storyLoginHref(`/project/${project.id}`, bookOrigin)
-    : `/project/${project.id}`;
+    ? storyLoginHref(projectPath, bookOrigin)
+    : projectPath;
 
   useEffect(() => {
     const node = containerRef.current;
@@ -123,7 +124,7 @@ export function ProjectCard({
         {hoverPreview && inView ? (
           <video
             ref={videoRef}
-            className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100"
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100"
             muted
             loop
             playsInline
@@ -142,7 +143,7 @@ export function ProjectCard({
                 : "(max-width: 768px) 100vw, 320px"
             }
             className={cn(
-              "object-cover transition duration-500 group-hover:scale-[1.02]",
+              "pointer-events-none object-cover transition duration-500 group-hover:scale-[1.02]",
               hoverPreview && "group-hover:opacity-0 group-focus-visible:opacity-0",
             )}
             unoptimized

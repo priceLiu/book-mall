@@ -9,5 +9,6 @@ export async function generateMetadata({ params }: Props) {
 }
 
 export default function ProjectWorkspacePage({ params }: Props) {
-  return <ProjectPageClient projectId={params.id} />;
+  const projectId = decodeURIComponent(params.id);
+  return <ProjectPageClient projectId={projectId} />;
 }
