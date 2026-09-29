@@ -6,6 +6,7 @@ import {
 } from "./sbv1-upstream-ref-links";
 import type { Sbv1UpstreamTextLink } from "./sbv1-upstream-text-links";
 import { sbv1TextLinksToDockUpstream } from "./sbv1-upstream-text-links";
+import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 import type { CanvasFlowNode } from "./types";
 
 function previewUrlForLink(

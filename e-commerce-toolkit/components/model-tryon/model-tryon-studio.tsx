@@ -928,7 +928,7 @@ export function ModelTryonStudio() {
                   message: formatEcomImageGenUserMessage(job.error ?? "生成失败"),
                   variant: "error",
                 });
-              } else if (job?.status !== "failed") {
+              } else if (job?.status === "done") {
                 await toast({
                   title: "全身图已生成",
                   message: "已加入待试衣，可直接批量试衣。",
