@@ -42,29 +42,29 @@ const FASHION_CORE = `【角色】
 - garmentFocus / productFocus 须与当镜 sellpointIds 语义一致。
 
 【台词 / 配音 · 基于卖点设计】
-每镜 dialogue（或 audio_voice）须根据当镜 sellpointIds 对应的卖点文案来设计，可写画外旁白、主角口播或内心独白，按剧情选用。
+每镜 dialogue 须根据当镜 sellpointIds 对应的卖点文案来设计，可写画外旁白、主角口播或内心独白，按剧情选用。
 - layer=core 的卖点：优先在本镜 dialogue 中自然带出（口语化、不背参数表）。
 - layer=visual 的卖点：dialogue 可轻点或留空，但须在 sellpointIds 中绑定并在镜头/动作中展示。
 - 6–8 镜中至少 4 镜应有非空 dialogue；仅纯动作特写镜可留空。
 用户可在中栏分镜表自行修改；禁止全片 dialogue 留空或 sellpointIds 与上方卖点表脱节。
 
 【硬性规则】
-- 总时长 30–45s，6–8 镜，单镜最少 2s
+- 总时长 30–45s，每版 panels 长度必须是 6、7 或 8
+- index 从 1 连续编号到该版镜数（6 镜则 1–6，8 镜则 1–8）
+- 单镜最少 2s
 - 前 3–7s 先演痛点，禁止一上来直接展示服装
 - T5 情绪共鸣型：同一 story_core，可强化旁白/口播节奏与微表情，禁止改 story_core 主线
 
 【五套固定角度】
 ${T_VERSION_RULES}
 
-【字段映射】输出 panels 时使用：
+【panels 字段 · 必须用下列键名，禁止 shot_desc / audio_voice / model_action 等别名】
 - index, shotScale, durationSec, cameraMove
-- shot_desc → sceneDesc
-- model_action → modelAction
-- audio_voice / dialogue → dialogue（口播或旁白，同义；须呼应 sellpointIds）
-- emotion → toneTexture
-- subtitle → subtitle（可选）
-- sellpointIds → 必填，引用已定稿卖点 id 数组
-同时生成 scenePrompt / imagePrompt / videoPrompt（≥20 字）与 garmentFocus / productFocus
+- sceneDesc, scenePrompt, imagePrompt, videoPrompt（后三者各 ≥20 字）
+- modelAction, garmentFocus
+- dialogue（口播或旁白；须呼应 sellpointIds）
+- toneTexture, subtitle（可选）
+- sellpointIds：必填，引用已定稿卖点 id 数组
 
 【输出 JSON】须含 storyTheaterVersions（T1–T5 各一套）+ selectedStoryTopic 回传 + coverageChecklist（必填）。
 禁止 Markdown 表与额外解释文字。`;
@@ -79,9 +79,14 @@ const DIGITAL_3C_CORE = FASHION_CORE.replace(/服装/g, "数码产品")
   .replace(/穿上本款服装/g, "使用本款数码产品")
   .replace(/穿搭/g, "使用场景");
 
-const STORY_THEATER_JSON_SHAPE = `{
-  "schemaVersion": "fashion-v4 或 pro-v1",
-  "vertical": "fashion_apparel | bags | digital_3c",
+function storyTheaterJsonShape(vertical: ProVerticalId | "fashion_apparel"): string {
+  const schemaVersion = vertical === "fashion_apparel" ? "fashion-v4" : "pro-v1";
+  const verticalLiteral =
+    vertical === "bags" ? "bags" : vertical === "digital_3c" ? "digital_3c" : "fashion_apparel";
+  const focusKey = vertical === "fashion_apparel" ? "garmentFocus" : "productFocus";
+  return `{
+  "schemaVersion": "${schemaVersion}",
+  "vertical": "${verticalLiteral}",
   "selectedStoryTopic": { "id": "...", "title": "...", "storyCore": "...", "storyType": "..." },
   "storyTheaterVersions": {
     "T1": {
@@ -99,7 +104,7 @@ const STORY_THEATER_JSON_SHAPE = `{
           "imagePrompt": "...",
           "videoPrompt": "...",
           "modelAction": "...",
-          "garmentFocus": "...",
+          "${focusKey}": "...",
           "dialogue": "（基于 sellpointIds 设计的口播/旁白）",
           "toneTexture": "...",
           "sellpointIds": ["S01"]
@@ -107,15 +112,16 @@ const STORY_THEATER_JSON_SHAPE = `{
       ],
       "totalDurationSec": 35
     },
-    "T2": { "...": "同上结构，6-8 镜" },
-    "T3": { "...": "..." },
-    "T4": { "...": "..." },
-    "T5": { "...": "..." }
+    "T2": { "id": "T2", "title": "...", "panels": ["同上，6～8 镜，index 1 起连续"] },
+    "T3": { "id": "T3", "title": "...", "panels": ["同上"] },
+    "T4": { "id": "T4", "title": "...", "panels": ["同上"] },
+    "T5": { "id": "T5", "title": "...", "panels": ["同上"] }
   },
   "coverageChecklist": [
     { "sellpointId": "S01", "sellpointText": "...", "layer": "core", "panelIndexes": [1, 3], "covered": true }
   ]
 }`;
+}
 
 function formatDimensions(dimensions: Record<string, string | undefined>): string {
   return Object.entries(dimensions)
@@ -164,7 +170,7 @@ export function buildStoryTheaterSystemPrompt(
     core,
     ctxBlock,
     "【JSON 结构参考】",
-    STORY_THEATER_JSON_SHAPE,
+    storyTheaterJsonShape(vertical),
     "触发消息含 story-theater-generate 时，只输出上述 JSON，不要 prose。",
   ].join("\n\n");
 }

@@ -314,6 +314,8 @@ export type CanvasNodeRuntime = {
   failMessage?: string;
   /** 用户已关闭底部错误条的任务 id · 轮询勿再写回同一条失败 */
   dismissedFailTaskId?: string;
+  /** 本地媒体处理（去原音 / 分离音轨等），无 Gateway taskId */
+  localJobKind?: "video-track-split";
 };
 
 // —— 各节点 data 形状 ——

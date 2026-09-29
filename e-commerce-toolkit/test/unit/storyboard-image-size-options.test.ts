@@ -28,4 +28,11 @@ describe("storyboard image size · 9:16", () => {
       "1080*1920",
     );
   });
+
+  it("lists all wan2.7 ratios when filter ratio is omitted", () => {
+    const all = imageSizeOptionsForModel("wan2.7-image-pro");
+    const unfiltered = filterImageSizeOptionsByEcomRatio(all);
+    expect(unfiltered).toHaveLength(all.length);
+    expect(new Set(all.map((o) => aspectRatioForImageSize(o.value))).size).toBeGreaterThan(1);
+  });
 });

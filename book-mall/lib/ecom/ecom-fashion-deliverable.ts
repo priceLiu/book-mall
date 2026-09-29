@@ -81,14 +81,8 @@ export const fashionVoiceoverSchema = z.object({
 });
 
 export const fashionPanelRowSchema = z.object({
-  index: z.union([
-    z.literal(1),
-    z.literal(2),
-    z.literal(3),
-    z.literal(4),
-    z.literal(5),
-    z.literal(6),
-  ]),
+  /** 标准分镜 1–6；故事剧场 6–8 镜时可为 7/8 */
+  index: z.number().int().min(1).max(8),
   shotScale: z.string().min(1),
   durationSec: z.number().positive(),
   cameraMove: z.string().min(1),
@@ -208,7 +202,8 @@ function coerceFashionPanels(raw: unknown): unknown {
   return raw.map((panel, idx) => {
     if (!panel || typeof panel !== "object") return panel;
     const p = panel as Record<string, unknown>;
-    const index = typeof p.index === "number" ? p.index : idx + 1;
+    const rawIndex = typeof p.index === "number" ? p.index : idx + 1;
+    const index = Math.min(8, Math.max(1, Math.round(rawIndex)));
     const sceneDesc =
       typeof p.sceneDesc === "string" && p.sceneDesc.trim()
         ? p.sceneDesc.trim()
@@ -621,33 +616,90 @@ function coerceStoryboardVersionsInPatch(parsed: Record<string, unknown>): void 
   parsed.storyboardVersions = coerceStoryboardVersions(parsed.storyboardVersions);
 }
 
+function extractBalancedJsonObject(text: string, start: number): string | null {
+  if (text[start] !== "{") return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+/** 从截断 JSON 中捞出已闭合的 T1–T5 对象 */
+export function salvageStoryTheaterVersionsFromText(
+  text: string,
+): Record<string, unknown> | null {
+  const next: Record<string, unknown> = {};
+  for (const key of ["T1", "T2", "T3", "T4", "T5"]) {
+    const re = new RegExp(`"${key}"\\s*:\\s*\\{`);
+    const m = re.exec(text);
+    if (!m) continue;
+    const braceAt = text.indexOf("{", m.index + m[0].length - 1);
+    if (braceAt < 0) continue;
+    const raw = extractBalancedJsonObject(text, braceAt);
+    if (!raw) continue;
+    try {
+      next[key] = JSON.parse(raw);
+    } catch {
+      /* 该版未闭合，跳过 */
+    }
+  }
+  return Object.keys(next).length > 0 ? next : null;
+}
+
+function coerceStoryTheaterVersionsInPatch(parsed: Record<string, unknown>): void {
+  if (parsed.storyTheaterVersions == null) return;
+  parsed.storyTheaterVersions = coerceStoryTheaterVersions(parsed.storyTheaterVersions);
+}
+
 function tryParseFashionPhasePatch(
   jsonRaw: string,
   phaseHint?: FashionLlmPhase,
 ): Partial<FashionDeliverable> | null {
+  let parsed: Record<string, unknown> | null = null;
   try {
-    const parsed = JSON.parse(jsonRaw) as Record<string, unknown>;
-    if (
-      parsed.vertical != null &&
-      parsed.vertical !== "fashion_apparel"
-    ) {
-      return null;
-    }
-    if (
-      parsed.schemaVersion != null &&
-      parsed.schemaVersion !== FASHION_SCHEMA_VERSION
-    ) {
-      return null;
-    }
-    coerceStoryboardVersionsInPatch(parsed);
-    const phase = phaseHint ?? detectFashionPhaseFromPayload(parsed);
-    if (!phase) return null;
-    const result = schemaForFashionPhase(phase).safeParse(parsed);
-    if (!result.success) return null;
-    return pickFashionPhaseMergePatch(result.data as Partial<FashionDeliverable>, phase);
+    parsed = JSON.parse(jsonRaw) as Record<string, unknown>;
   } catch {
+    const salvaged = salvageStoryTheaterVersionsFromText(jsonRaw);
+    if (!salvaged) return null;
+    parsed = { storyTheaterVersions: salvaged };
+  }
+  if (parsed.vertical != null && parsed.vertical !== "fashion_apparel") {
     return null;
   }
+  if (parsed.schemaVersion != null && parsed.schemaVersion !== FASHION_SCHEMA_VERSION) {
+    return null;
+  }
+  coerceStoryboardVersionsInPatch(parsed);
+  coerceStoryTheaterVersionsInPatch(parsed);
+  const phase = phaseHint ?? detectFashionPhaseFromPayload(parsed);
+  if (!phase) return null;
+  const result = schemaForFashionPhase(phase).safeParse(parsed);
+  if (!result.success) return null;
+  return pickFashionPhaseMergePatch(result.data as Partial<FashionDeliverable>, phase);
 }
 
 export function extractFashionDeliverable(
@@ -658,16 +710,21 @@ export function extractFashionDeliverable(
   for (const fence of [/```fashion-deliverable\s*([\s\S]*?)```/i]) {
     const m = trimmed.match(fence);
     if (m?.[1]) {
-      const parsed = tryParseFashionPhasePatch(m[1].trim(), phaseHint);
+      const raw = m[1].trim();
+      const parsed = tryParseFashionPhasePatch(raw, phaseHint);
       if (parsed) return parsed;
+      if (isCompleteJsonObject(raw)) return null;
     }
   }
   const generic = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (generic?.[1]) {
-    const parsed = tryParseFashionPhasePatch(generic[1].trim(), phaseHint);
+    const raw = generic[1].trim();
+    const parsed = tryParseFashionPhasePatch(raw, phaseHint);
     if (parsed) return parsed;
+    if (isCompleteJsonObject(raw)) return null;
   }
   const markers = [
+    /\{\s*"storyTheaterVersions"\s*:/,
     /\{\s*"storyboardVersions"\s*:/,
     /\{\s*"schemaVersion"\s*:\s*"fashion-v4"/,
     /\{\s*"vertical"\s*:\s*"fashion_apparel"/,
@@ -683,10 +740,29 @@ export function extractFashionDeliverable(
     const slice = trimmed.slice(jsonStart, end + 1);
     const parsed = tryParseFashionPhasePatch(slice, phaseHint);
     if (parsed) return parsed;
-    if (phaseHint) return null;
-    return tryParseFashionCandidate(slice);
+    if (isCompleteJsonObject(slice)) {
+      if (phaseHint) return null;
+      return tryParseFashionCandidate(slice);
+    }
+  }
+  const salvaged = salvageStoryTheaterVersionsFromText(trimmed);
+  if (salvaged) {
+    const fromSalvage = tryParseFashionPhasePatch(
+      JSON.stringify({ storyTheaterVersions: salvaged }),
+      phaseHint === "story_theater" || !phaseHint ? "story_theater" : phaseHint,
+    );
+    if (fromSalvage) return fromSalvage;
   }
   return null;
+}
+
+function isCompleteJsonObject(text: string): boolean {
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function isFashionDeliverable(raw: unknown): raw is FashionDeliverable {

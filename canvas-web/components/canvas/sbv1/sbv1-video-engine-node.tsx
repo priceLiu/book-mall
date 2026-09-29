@@ -85,6 +85,11 @@ import {
   useLibtvRuntimeErrorAlert,
   libtvRuntimeErrorAlertTitle,
 } from "@/lib/canvas/libtv-runtime-error-alert";
+import {
+  libtvVideoTrackSplitSourceReady,
+  runLibtvVideoTrackSplit,
+  type LibtvVideoTrackSplitMode,
+} from "@/lib/canvas/libtv-video-track-split-run";
 import { isMislabeledVendorSuccessError } from "@/lib/canvas/friendly-task-error";
 import { isCanvasNodeRunSessionActive } from "@/lib/canvas/canvas-run-session";
 import {
@@ -122,6 +127,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const duplicateNode = useCanvasStore((s) => s.duplicateNode);
+  const projectId = useCanvasStore((s) => s.projectId);
+  const [trackSplitBusy, setTrackSplitBusy] = useState(false);
   const d = data as unknown as Sbv1VideoEngineNodeData & {
     crewTaskId?: string;
     crewTaskLabel?: string;
@@ -559,6 +566,47 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     }
   }, [duplicateNode, id, rfSetNodes]);
 
+  const trackSplitSourceUrl = useMemo(
+    () => libtvVideoTrackSplitSourceReady({ runtime: d.runtime ?? rowRuntime }),
+    [d.runtime, rowRuntime],
+  );
+
+  const onTrackSplitPick = useCallback(
+    (mode: LibtvVideoTrackSplitMode) => {
+      if (!trackSplitSourceUrl || trackSplitBusy || isPro2VideoBoardCell) return;
+      setTrackSplitBusy(true);
+      void runLibtvVideoTrackSplit({
+        mode,
+        sourceNodeId: id,
+        sourceVideoUrl: trackSplitSourceUrl,
+        projectId,
+        store: spawnStore,
+        updateNodeData: (nodeId, patch) => updateNodeData(nodeId, patch),
+      })
+        .catch(async (e) => {
+          const message = e instanceof Error ? e.message : "处理失败";
+          await alert({
+            title: mode === "strip-audio" ? "去原音失败" : "音频分离失败",
+            message,
+            variant: "error",
+          });
+        })
+        .finally(() => {
+          setTrackSplitBusy(false);
+        });
+    },
+    [
+      alert,
+      id,
+      isPro2VideoBoardCell,
+      projectId,
+      spawnStore,
+      trackSplitBusy,
+      trackSplitSourceUrl,
+      updateNodeData,
+    ],
+  );
+
   const isLinked = useMemo(
     () => libtvVideoEngineNodeIsLinked(id, edges),
     [edges, id],
@@ -666,6 +714,11 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
             <LibtvVideoNodeToolbar
               passNodeDrag
               previewUrl={videoUrl}
+              trackSplitSourceUrl={trackSplitSourceUrl}
+              trackSplitBusy={trackSplitBusy}
+              onTrackSplitPick={
+                isPro2VideoBoardCell ? undefined : onTrackSplitPick
+              }
               onExpandPreview={() => setPreviewOpen(true)}
               onSaveAsAsset={
                 hasVideo

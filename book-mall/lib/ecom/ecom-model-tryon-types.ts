@@ -12,6 +12,8 @@ export type ModelTryonSettings = {
   modelImageSize?: string;
   /** 文生试衣 · 图片编辑模型 */
   textTryonModelKey?: string;
+  /** 文生试衣 · 出图像素尺寸 */
+  textTryonImageSize?: string;
 };
 
 export type ModelTryonProjectDto = {

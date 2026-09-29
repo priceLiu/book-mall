@@ -5,6 +5,10 @@ import {
   finalizeModelGenerationsMeta,
   sanitizeModelGenerations,
 } from "@/lib/ecom/ecom-vton/model-generations";
+import {
+  sanitizeVtonModelPipelineJob,
+  sanitizeVtonTextTryonJob,
+} from "@/lib/ecom/ecom-vton/async-job";
 import type {
   VtonGarmentItem,
   VtonLockedLook,
@@ -80,7 +84,7 @@ function sanitizeTextTryonRef(raw: unknown): VtonTextTryonRef | null {
   };
 }
 
-const TEXT_TRYON_RATIOS = new Set(["1:1", "3:4", "4:5", "16:9"]);
+const TEXT_TRYON_RATIOS = new Set(["1:1", "3:4", "4:5", "16:9", "9:16"]);
 
 export function parseVtonTextTryonResult(raw: unknown): VtonTextTryonResult | null {
   if (!raw || typeof raw !== "object") return null;
@@ -299,6 +303,8 @@ export function sanitizeVtonProjectMeta(raw: unknown): VtonProjectMeta {
     typeof o.textTryonPrompt === "string" ? o.textTryonPrompt : undefined;
 
   const textTryonDemoSuppressed = o.textTryonDemoSuppressed === true ? true : undefined;
+  const textTryonJob = sanitizeVtonTextTryonJob(o.textTryonJob);
+  const modelPipelineJob = sanitizeVtonModelPipelineJob(o.modelPipelineJob);
 
   const base: VtonProjectMeta = {
     garmentPool,
@@ -318,6 +324,8 @@ export function sanitizeVtonProjectMeta(raw: unknown): VtonProjectMeta {
     ...(textTryonPrompt !== undefined ? { textTryonPrompt } : {}),
     ...(textTryonResults.length ? { textTryonResults } : {}),
     ...(textTryonDemoSuppressed ? { textTryonDemoSuppressed } : {}),
+    ...(textTryonJob ? { textTryonJob } : {}),
+    ...(modelPipelineJob ? { modelPipelineJob } : {}),
   };
 
   return modelGenerations.length ? finalizeModelGenerationsMeta(base) : base;
@@ -359,6 +367,9 @@ export function mergeVtonMeta(
     textTryonPrompt:
       patch.textTryonPrompt !== undefined ? patch.textTryonPrompt : base.textTryonPrompt,
     textTryonResults: patch.textTryonResults ?? base.textTryonResults,
+    textTryonJob: patch.textTryonJob !== undefined ? patch.textTryonJob : base.textTryonJob,
+    modelPipelineJob:
+      patch.modelPipelineJob !== undefined ? patch.modelPipelineJob : base.modelPipelineJob,
   };
   return merged.modelGenerations?.length
     ? finalizeModelGenerationsMeta(merged)

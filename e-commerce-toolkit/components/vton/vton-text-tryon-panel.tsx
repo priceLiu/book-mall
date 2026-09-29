@@ -15,14 +15,12 @@ import { VtonResultImageHoverActions } from "@/components/vton/vton-result-image
 import {
   VTON_RESULT_LABEL_CLASS,
   VTON_RESULTS_GRID_CLASS,
+  VtonDynamicAspectFrame,
   VtonTryonGeneratingSlot,
-  VtonTryonResultAspectFrame,
   vtonTryonResultShellClass,
 } from "@/components/vton/vton-results-grid";
-import {
-  coerceVtonModelImageSize,
-  type VtonModelImageSize,
-} from "@/lib/vton-image-quality";
+import { aspectRatioForImageSize } from "@/lib/storyboard-image-size-options";
+import type { VtonModelImageSize } from "@/lib/vton-image-quality";
 import { downloadRemoteImageUrl } from "@/lib/ecom-download-url";
 import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
 import { openVtonFittingRoomInNewTab } from "@/lib/vton-fitting-room-link";
@@ -39,7 +37,7 @@ import type { VtonTextTryonRef, VtonTextTryonResult } from "@/lib/vton-types";
 function VtonTextTryonResultCell({
   result,
   label,
-  modelImageSize,
+  fallbackRatio,
   tileDisabled,
   previewItems,
   onPreview,
@@ -49,7 +47,7 @@ function VtonTextTryonResultCell({
 }: {
   result: VtonTextTryonResult;
   label: string;
-  modelImageSize: VtonModelImageSize;
+  fallbackRatio: string;
   tileDisabled: boolean;
   previewItems: Array<{ src: string; title: string; thumbSrc: string }>;
   onPreview: (src: string, title: string, items: typeof previewItems) => void;
@@ -64,14 +62,21 @@ function VtonTextTryonResultCell({
   return (
     <div className="flex min-w-0 flex-col">
       <div className={vtonTryonResultShellClass()}>
-        <VtonTryonResultAspectFrame modelImageSize={modelImageSize} className="group/image">
+        <VtonDynamicAspectFrame
+          width={result.width}
+          height={result.height}
+          ratio={result.ratio}
+          fallbackRatio={fallbackRatio}
+          className="group/image"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={displayUrl}
             alt={label}
-            className="h-full w-full object-contain object-center"
+            className="h-full w-full cursor-zoom-in object-contain object-center"
             draggable={false}
             referrerPolicy="no-referrer"
+            onClick={() => onPreview(displayUrl, label, previewItems)}
           />
           <VtonResultImageHoverActions
             disabled={tileDisabled}
@@ -93,7 +98,7 @@ function VtonTextTryonResultCell({
             onOpenFittingRoom={openVtonFittingRoomInNewTab}
             onRegenerate={!tileDisabled ? () => void onGenerate() : undefined}
           />
-        </VtonTryonResultAspectFrame>
+        </VtonDynamicAspectFrame>
       </div>
       <p className={VTON_RESULT_LABEL_CLASS} title={result.modelKey}>
         {result.modelKey}
@@ -121,6 +126,9 @@ type Props = {
   onGenerate: () => Promise<void>;
   onClearEditor: () => Promise<void>;
   onSaveResultToAssets?: (ossUrl: string, title: string) => Promise<void>;
+  /** 文生试衣出图像素尺寸（弹层列出模型全部比例） */
+  imageSize?: string;
+  onImageSizeChange?: (imageSize: string) => void;
   /** 与需穿衣试衣结果同比例（模特底图 modelImageSize） */
   modelImageSize?: VtonModelImageSize;
   /** 参考图上传进度 0–100；null 为不确定进度 */
@@ -148,12 +156,16 @@ export function VtonTextTryonPanel({
   onGenerate,
   onClearEditor,
   onSaveResultToAssets,
-  modelImageSize: modelImageSizeProp,
+  imageSize,
+  onImageSizeChange,
+  modelImageSize: _modelImageSizeProp,
   uploadProgress = null,
   uploadProgressLabel,
   uploading = false,
 }: Props) {
-  const modelImageSize = coerceVtonModelImageSize(modelImageSizeProp);
+  const selectedRatio = imageSize?.trim()
+    ? aspectRatioForImageSize(imageSize)
+    : "3:4";
   const inputRef = useRef<HTMLInputElement>(null);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [draftModelKey, setDraftModelKey] = useState(modelKey);
@@ -353,7 +365,10 @@ export function VtonTextTryonPanel({
               {generating ? (
                 <div className="flex min-w-0 flex-col">
                   <div className={vtonTryonResultShellClass({ running: true })}>
-                    <VtonTryonGeneratingSlot modelImageSize={modelImageSize} label="生成中" />
+                    <VtonTryonGeneratingSlot
+                      ratio={selectedRatio}
+                      label="生成中"
+                    />
                   </div>
                   <p className={VTON_RESULT_LABEL_CLASS}>生成中…</p>
                 </div>
@@ -365,7 +380,7 @@ export function VtonTextTryonPanel({
                     key={result.id}
                     result={result}
                     label={label}
-                    modelImageSize={modelImageSize}
+                    fallbackRatio={selectedRatio}
                     tileDisabled={tileDisabled}
                     previewItems={previewItems}
                     onPreview={openPreview}
@@ -398,6 +413,9 @@ export function VtonTextTryonPanel({
         }}
         modelsLoading={modelsLoading}
         hideTypeFilter
+        showAllImageSizes
+        imageSize={imageSize}
+        onImageSizeChange={onImageSizeChange}
       />
 
       {onAttachAssets ? (

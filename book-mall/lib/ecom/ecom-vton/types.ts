@@ -55,7 +55,7 @@ export type VtonTextTryonResult = {
   modelKey: string;
   createdAt: string;
   /** 出图比例（如 3:4）；与 width/height 一并写入，便于结果格按成片比例展示 */
-  ratio?: "1:1" | "3:4" | "4:5" | "16:9";
+  ratio?: "1:1" | "3:4" | "4:5" | "16:9" | "9:16";
   width?: number;
   height?: number;
 };
@@ -171,6 +171,36 @@ export type VtonProjectMeta = {
   textTryonResults?: VtonTextTryonResult[];
   /** 用户点击「清空编辑区」后为 true，不再自动注入内置示例 */
   textTryonDemoSuppressed?: boolean;
+  /** 文生试衣 · 进行中/最近一次生成任务（刷新后可续跑） */
+  textTryonJob?: VtonTextTryonJob | null;
+  /** 生模特 / 头像扩全身 · 进行中/最近一次任务 */
+  modelPipelineJob?: VtonModelPipelineJob | null;
+};
+
+export type VtonAsyncJobStatus = "running" | "done" | "failed";
+
+export type VtonTextTryonJob = {
+  jobId: string;
+  status: VtonAsyncJobStatus;
+  startedAt: string;
+  updatedAt: string;
+  prompt: string;
+  modelKey: string;
+  imageSize?: string;
+  error?: string;
+};
+
+export type VtonModelPipelineJobKind = "generating-model" | "expanding-full-body";
+
+export type VtonModelPipelineJob = {
+  jobId: string;
+  status: VtonAsyncJobStatus;
+  kind: VtonModelPipelineJobKind;
+  startedAt: string;
+  updatedAt: string;
+  prompt?: string;
+  imageSize?: string;
+  error?: string;
 };
 
 /** 电商工具箱 · 我的模特库 module */

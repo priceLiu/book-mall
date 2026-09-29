@@ -130,7 +130,8 @@ export function ossPublicUrlForKey(cfg: OssEnvConfig, key: string): string {
   return `https://${cfg.bucket}.${cfg.region}.aliyuncs.com/${key}`;
 }
 
-const RETRYABLE = /ResponseError|timeout|ECONNRESET|ETIMEDOUT|socket disconnected/i;
+const RETRYABLE =
+  /ResponseError|timeout|ECONNRESET|ETIMEDOUT|socket disconnected|secure TLS/i;
 
 /** OSS 读写重试（指数退避） */
 export async function withOssRetry<T>(

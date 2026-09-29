@@ -105,7 +105,7 @@ export function buildCartesianLookDrafts(opts: {
   return patchVtonLookDrafts(opts.metaRaw, looks);
 }
 
-export async function runVtonProjectBatchTryon(opts: {
+export type VtonBatchTryonRunOpts = {
   userId: string;
   projectId: string;
   consumerToolKey: string;
@@ -114,21 +114,29 @@ export async function runVtonProjectBatchTryon(opts: {
   looks?: VtonLookSpec[];
   persistMeta: (meta: VtonProjectMeta) => Promise<void>;
   loadMeta: () => Promise<VtonProjectMeta>;
-}): Promise<VtonProjectMeta> {
+};
+
+export async function beginVtonProjectBatchTryon(
+  opts: VtonBatchTryonRunOpts,
+): Promise<{
+  workingMeta: VtonProjectMeta;
+  targetLooks: VtonLookSpec[];
+  garmentPool: VtonGarmentItem[];
+  mergedResults: ReturnType<typeof buildVtonBatchResultsForRun>;
+}> {
   const meta = sanitizeVtonProjectMeta(opts.metaRaw);
   const allLooks = meta.lookDrafts ?? [];
   const targetLooks = opts.looks?.length ? opts.looks : allLooks;
   if (targetLooks.length < 1) throw new Error("请至少选择 1 套搭配");
   const garmentPool = [...(meta.garmentPool ?? [])];
-  let garmentPoolParsedDuringRun = false;
 
-  let mergedResults = buildVtonBatchResultsForRun({
+  const mergedResults = buildVtonBatchResultsForRun({
     allLooks,
     targetLooks,
     previousResults: meta.tryonBatch?.results,
   });
 
-  let workingMeta = mergeVtonMeta(meta, {
+  const workingMeta = mergeVtonMeta(meta, {
     tryonBatchCancelBatchId: null,
     tryonBatch: {
       batchId: randomUUID(),
@@ -142,7 +150,15 @@ export async function runVtonProjectBatchTryon(opts: {
     tryonProgress: { phase: "submitting", label: "批量试衣开始…", updatedAt: new Date().toISOString() },
   });
   await opts.persistMeta(workingMeta);
+  return { workingMeta, targetLooks, garmentPool, mergedResults };
+}
 
+export async function finishVtonProjectBatchTryon(
+  opts: VtonBatchTryonRunOpts,
+  started: Awaited<ReturnType<typeof beginVtonProjectBatchTryon>>,
+): Promise<VtonProjectMeta> {
+  let { workingMeta, targetLooks, garmentPool, mergedResults } = started;
+  let garmentPoolParsedDuringRun = false;
   const activeBatchId = workingMeta.tryonBatch!.batchId;
 
   const batch = await runEcomVtonTryOnBatch({
@@ -199,6 +215,13 @@ export async function runVtonProjectBatchTryon(opts: {
   });
   await opts.persistMeta(workingMeta);
   return workingMeta;
+}
+
+export async function runVtonProjectBatchTryon(
+  opts: VtonBatchTryonRunOpts,
+): Promise<VtonProjectMeta> {
+  const started = await beginVtonProjectBatchTryon(opts);
+  return finishVtonProjectBatchTryon(opts, started);
 }
 
 export function cancelVtonProjectBatchTryon(metaRaw: unknown): VtonProjectMeta {

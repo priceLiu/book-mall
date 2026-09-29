@@ -58,16 +58,18 @@ function coerceFashionPanels(raw: unknown): FashionPanelRow[] {
       if (!p || typeof p !== "object") return null;
       const panel = p as Record<string, unknown>;
       const index = typeof panel.index === "number" ? panel.index : i + 1;
-      const sceneDesc = String(panel.sceneDesc ?? "");
-      const modelAction = String(panel.modelAction ?? "");
-      const garmentFocus = String(panel.garmentFocus ?? "");
-      const cameraMove = String(panel.cameraMove ?? "固定");
+      const sceneDesc = String(
+        panel.sceneDesc ?? panel.shot_desc ?? panel.scene ?? "",
+      );
+      const modelAction = String(panel.modelAction ?? panel.action ?? "");
+      const garmentFocus = String(panel.garmentFocus ?? panel.productFocus ?? "");
+      const cameraMove = String(panel.cameraMove ?? panel.camera ?? "固定");
       const scenePrompt = deriveScenePrompt(
         sceneDesc,
         typeof panel.scenePrompt === "string" ? panel.scenePrompt : undefined,
       );
       return {
-        index: Math.min(6, Math.max(1, index)) as FashionPanelRow["index"],
+        index: Math.min(8, Math.max(1, index)) as FashionPanelRow["index"],
         shotScale: String(panel.shotScale ?? "中景"),
         durationSec: typeof panel.durationSec === "number" ? panel.durationSec : 4,
         cameraMove,
@@ -75,8 +77,18 @@ function coerceFashionPanels(raw: unknown): FashionPanelRow[] {
         scenePrompt,
         modelAction,
         garmentFocus,
-        dialogue: typeof panel.dialogue === "string" ? panel.dialogue : undefined,
-        toneTexture: typeof panel.toneTexture === "string" ? panel.toneTexture : undefined,
+        dialogue:
+          typeof panel.dialogue === "string"
+            ? panel.dialogue
+            : typeof panel.audio_voice === "string"
+              ? panel.audio_voice
+              : undefined,
+        toneTexture:
+          typeof panel.toneTexture === "string"
+            ? panel.toneTexture
+            : typeof panel.emotion === "string"
+              ? panel.emotion
+              : undefined,
         sellpointIds: Array.isArray(panel.sellpointIds)
           ? panel.sellpointIds.map(String)
           : [],
@@ -265,12 +277,72 @@ function validateFashionPhasePatch(
   }
 }
 
+function extractBalancedJsonObject(text: string, start: number): string | null {
+  if (text[start] !== "{") return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+export function salvageStoryTheaterVersionsFromText(
+  text: string,
+): Record<string, unknown> | null {
+  const next: Record<string, unknown> = {};
+  for (const key of ["T1", "T2", "T3", "T4", "T5"]) {
+    const re = new RegExp(`"${key}"\\s*:\\s*\\{`);
+    const m = re.exec(text);
+    if (!m) continue;
+    const braceAt = text.indexOf("{", m.index + m[0].length - 1);
+    if (braceAt < 0) continue;
+    const raw = extractBalancedJsonObject(text, braceAt);
+    if (!raw) continue;
+    try {
+      next[key] = JSON.parse(raw);
+    } catch {
+      /* skip incomplete version */
+    }
+  }
+  return Object.keys(next).length > 0 ? next : null;
+}
+
 function tryParseFashionPhasePatch(
   jsonRaw: string,
   phaseHint?: FashionLlmPhase,
 ): Partial<FashionDeliverable> | null {
   try {
-    const parsed = JSON.parse(jsonRaw) as Record<string, unknown>;
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(jsonRaw) as Record<string, unknown>;
+    } catch {
+      const salvaged = salvageStoryTheaterVersionsFromText(jsonRaw);
+      if (!salvaged) return null;
+      parsed = { storyTheaterVersions: salvaged };
+    }
     if (parsed.vertical != null && parsed.vertical !== "fashion_apparel") return null;
     if (parsed.schemaVersion != null && parsed.schemaVersion !== "fashion-v4") return null;
     const phase = phaseHint ?? detectFashionPhaseFromPayload(parsed);
@@ -361,8 +433,10 @@ export function extractFashionDeliverableFromText(
   for (const re of [FASHION_FENCE_RE, GENERIC_FENCE_RE]) {
     const m = trimmed.match(re);
     if (m?.[1]) {
-      const parsed = tryParseFashionPhasePatch(m[1].trim(), phaseHint);
+      const raw = m[1].trim();
+      const parsed = tryParseFashionPhasePatch(raw, phaseHint);
       if (parsed) return parsed;
+      if (isCompleteJsonObject(raw)) return null;
     }
   }
   const markers = [
@@ -382,14 +456,33 @@ export function extractFashionDeliverableFromText(
     const slice = trimmed.slice(jsonStart, end + 1);
     const parsed = tryParseFashionPhasePatch(slice, phaseHint);
     if (parsed) return parsed;
-    if (phaseHint) return null;
-    try {
-      return coerceFashionDeliverableLoose(JSON.parse(slice));
-    } catch {
-      return null;
+    if (isCompleteJsonObject(slice)) {
+      if (phaseHint) return null;
+      try {
+        return coerceFashionDeliverableLoose(JSON.parse(slice));
+      } catch {
+        return null;
+      }
     }
   }
+  const salvaged = salvageStoryTheaterVersionsFromText(trimmed);
+  if (salvaged) {
+    const fromSalvage = tryParseFashionPhasePatch(
+      JSON.stringify({ storyTheaterVersions: salvaged }),
+      phaseHint === "story_theater" || !phaseHint ? "story_theater" : phaseHint,
+    );
+    if (fromSalvage) return fromSalvage;
+  }
   return null;
+}
+
+function isCompleteJsonObject(text: string): boolean {
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function stripFashionDeliverableFence(text: string): string {

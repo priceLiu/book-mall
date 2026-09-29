@@ -7,6 +7,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ProductMegaMenuContent } from "@/components/layout/product-mega-menu";
 import { buildBookPortalNavItems, BOOK_PORTAL_EXTERNAL_LINK_PROPS, marketingHomeSectionUrl } from "@/lib/portal-nav";
+import { navigateMarketingHomeSection } from "@/lib/marketing-home-nav";
 import {
   Sheet,
   SheetContent,
@@ -127,27 +128,9 @@ export function NavbarShell({
 
       if (item.url.startsWith("#")) {
         setHash(item.url);
-        const sectionId = item.url.slice(1);
-
-        if (pathname !== "/") {
-          window.open(
-            marketingHomeSectionUrl(window.location.origin, item.url),
-            "_blank",
-            "noopener,noreferrer",
-          );
-          return;
-        }
-
-        if (pathname === "/") {
-          void router.push(`/${item.url}`, { scroll: false });
-          requestAnimationFrame(() => {
-            document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" });
-          });
-          return;
-        }
-
-        void router.push(`/${item.url}`);
-        router.refresh();
+        navigateMarketingHomeSection(item.url, pathname, {
+          openInNewTab: pathname !== "/",
+        });
         return;
       }
 
@@ -221,7 +204,7 @@ export function NavbarShell({
                         {label}
                       </a>
                     ) : (
-                      <Link href={href.startsWith("#") ? `/${href}` : href}>{label}</Link>
+                      <Link href={href}>{label}</Link>
                     )}
                   </Button>
                 ))}

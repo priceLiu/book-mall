@@ -78,6 +78,7 @@ import { isFashionDeliverable } from "@/lib/fashion-types";
 import {
   FASHION_OUTPUT_SCRIPT,
   FASHION_OUTPUT_VIDEO,
+  FASHION_RELOAD_STORY_TOPICS,
   FASHION_WELCOME,
   getFashionPhase,
   buildFashionProductRefAutoAdvance,
@@ -106,6 +107,8 @@ import {
   isAwaitingStoryTopicPick,
   isAwaitingStoryTheaterPick,
   isAwaitingStoryTheaterConfirm,
+  isAwaitingStoryTheaterVersionsPending,
+  hasStoryTheaterGenerationFailed,
   isAwaitingFashionCustomDimensionInput,
   isAwaitingFashionOutputMode,
   isAwaitingFashionSellpoints,
@@ -241,6 +244,8 @@ export function FashionAssistantPanel({
   >(null);
   const [pendingChoice, setPendingChoice] = useState<string | null>(null);
   const [storyTopicSamples, setStoryTopicSamples] = useState<StoryTheaterTopicSample[]>([]);
+  const [storyTopicFetchNonce, setStoryTopicFetchNonce] = useState(0);
+  const [storyTopicFetchFailed, setStoryTopicFetchFailed] = useState(false);
   const [busyStatus, setBusyStatus] = useState<{ title: string; detail: string } | null>(null);
   const [refAutoAdvancing, setRefAutoAdvancing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -269,6 +274,8 @@ export function FashionAssistantPanel({
     setInput("");
     productAutoAckRef.current = null;
     storyTopicFetchRef.current = false;
+    setStoryTopicFetchFailed(false);
+    setStoryTopicFetchNonce(0);
   }, [projectId]);
 
   useEffect(() => {
@@ -563,9 +570,13 @@ export function FashionAssistantPanel({
       storyTopicFetchRef.current = false;
       return;
     }
-    if (savedStoryTopicCandidates > 0) return;
+    if (savedStoryTopicCandidates > 0) {
+      setStoryTopicFetchFailed(false);
+      return;
+    }
     if (storyTopicFetchRef.current) return;
     storyTopicFetchRef.current = true;
+    setStoryTopicFetchFailed(false);
 
     const v = vertical ?? "fashion_apparel";
     let cancelled = false;
@@ -574,12 +585,15 @@ export function FashionAssistantPanel({
         if (cancelled) return;
         if (topics.length === 0) {
           storyTopicFetchRef.current = false;
+          setStoryTopicFetchFailed(true);
           return;
         }
         setStoryTopicSamples(topics);
+        setStoryTopicFetchFailed(false);
         const d = resolveProVerticalDeliverable(project);
         if (!d) {
           storyTopicFetchRef.current = false;
+          setStoryTopicFetchFailed(true);
           return;
         }
         if (d.storyTopicCandidates?.length) return;
@@ -597,6 +611,7 @@ export function FashionAssistantPanel({
         if (!cancelled) {
           setStoryTopicSamples([]);
           storyTopicFetchRef.current = false;
+          setStoryTopicFetchFailed(true);
         }
       });
     return () => {
@@ -610,6 +625,7 @@ export function FashionAssistantPanel({
     projectId,
     project.meta,
     project,
+    storyTopicFetchNonce,
   ]);
 
   const awaitingCategoryPick =
@@ -620,6 +636,14 @@ export function FashionAssistantPanel({
   const awaitingStoryTheaterPick = isAwaitingStoryTheaterPick(effectiveProject);
   const awaitingStoryTheaterConfirm = isAwaitingStoryTheaterConfirm(effectiveProject);
   const awaitingStoryTopicPick = isAwaitingStoryTopicPick(effectiveProject);
+  const pendingStoryTheaterGen = isAwaitingStoryTheaterVersionsPending(effectiveProject);
+  const storyTheaterGenFailed = hasStoryTheaterGenerationFailed(effectiveProject);
+  const showStoryTopicLoading =
+    awaitingStoryTopicPick &&
+    savedStoryTopicCandidates === 0 &&
+    !storyTopicFetchFailed &&
+    !isBusy;
+  const visibleChoices = showStoryTopicLoading ? [] : choices;
   const canReviseDimensions = isFashionDimensionRevisionAllowed(effectiveProject);
 
   const displayMessages = useMemo(
@@ -738,10 +762,10 @@ export function FashionAssistantPanel({
               llmTrigger.includes("story-theater")
                 ? "模型返回了故事版内容但 JSON 未完整解析"
                 : llmTrigger.includes("storyboards") &&
-              (parsed?.storyboardVersions ||
-                (parsedPro && listProStoryboardVersionKeys(parsedPro).length > 0))
-                ? "模型返回了分镜内容但 JSON 未完整解析"
-                : "模型已回复但未写入预期数据";
+                  (parsed?.storyboardVersions ||
+                    (parsedPro && listProStoryboardVersionKeys(parsedPro).length > 0))
+                  ? "模型返回了分镜内容但 JSON 未完整解析"
+                  : "模型已回复但未写入预期数据";
             throw new Error(
               llmTrigger.includes("story-theater")
                 ? `${hint}。请点「重新生成故事版」重试；若多次失败请更换 Gateway 聊天模型。`
@@ -780,6 +804,14 @@ export function FashionAssistantPanel({
           title: "品类即将上线",
           message: `「${category.label}」专业流程正在接入中，请先选择服装或包包继续。`,
         });
+        return;
+      }
+
+      if (message.trim() === FASHION_RELOAD_STORY_TOPICS) {
+        storyTopicFetchRef.current = false;
+        setStoryTopicFetchFailed(false);
+        setStoryTopicSamples([]);
+        setStoryTopicFetchNonce((n) => n + 1);
         return;
       }
 
@@ -1149,7 +1181,13 @@ export function FashionAssistantPanel({
   const pendingSellpointGen = isAwaitingFashionSellpointGeneration(effectiveProject);
   const pendingVoiceoverGen = isAwaitingFashionVoiceoverPending(effectiveProject);
   const sellpointChoiceSubtitle = awaitingStoryTopicPick
-    ? "请点选下方故事主题（5 选 1）"
+    ? storyTopicFetchFailed
+      ? "故事主题未加载完成，请重新加载后点选"
+      : "请点选下方故事主题（5 选 1）"
+    : pendingStoryTheaterGen
+      ? storyTheaterGenFailed
+        ? "上次故事版生成未完成或失败，请重新生成 T1–T5"
+        : "主题已选定，请生成 T1–T5 剧情分镜"
     : awaitingStoryTheaterPick
       ? "已生成 T1–T5 故事版，请点选一套继续"
     : awaitingStoryTheaterConfirm
@@ -1193,7 +1231,7 @@ export function FashionAssistantPanel({
   const needsAttention =
     Boolean(pendingChoice) ||
     refAutoAdvancing ||
-    (!legacyReadonly && !isBusy && !streaming && choices.length > 0);
+    (!legacyReadonly && !isBusy && !streaming && visibleChoices.length > 0);
 
   const composerSection = (
     <div
@@ -1601,7 +1639,7 @@ export function FashionAssistantPanel({
           </div>
         ) : null}
 
-        {!legacyReadonly && awaitingStoryTopicPick && choices.length === 0 && !isBusy ? (
+        {!legacyReadonly && showStoryTopicLoading ? (
           <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
             <div className="rounded-2xl border border-[#0071e3]/25 bg-[#f0f6ff] p-4 shadow-sm">
               <p className="text-sm font-semibold text-[#1d1d1f]">选择故事主题</p>
@@ -1612,7 +1650,7 @@ export function FashionAssistantPanel({
           </div>
         ) : null}
 
-        {!legacyReadonly && choices.length > 0 && !isBusy && !showSearchDimensionSelect ? (
+        {!legacyReadonly && visibleChoices.length > 0 && !isBusy && !showSearchDimensionSelect ? (
           <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
             <SeedVideoAssistantChoiceCards
               title={
@@ -1621,7 +1659,13 @@ export function FashionAssistantPanel({
                   : isAwaitingSellpointModePick(effectiveProject)
                     ? "选择卖点录入方式"
                   : awaitingStoryTopicPick
-                    ? "选择故事主题"
+                    ? storyTopicFetchFailed
+                      ? "重新加载故事主题"
+                      : "选择故事主题"
+                  : pendingStoryTheaterGen
+                    ? storyTheaterGenFailed
+                      ? "重新生成故事版"
+                      : "生成故事版"
                   : pendingSellpointGen
                     ? "重新生成卖点"
                   : pendingVoiceoverGen
@@ -1655,7 +1699,7 @@ export function FashionAssistantPanel({
                   ? "选定后系统将自动切换专业流程，并引导七维参数采集"
                   : sellpointChoiceSubtitle
               }
-              choices={choices.map((c) => ({
+              choices={visibleChoices.map((c) => ({
                 id: c.id,
                 label: c.title,
                 title: c.title,

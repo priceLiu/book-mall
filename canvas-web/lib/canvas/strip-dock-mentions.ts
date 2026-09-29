@@ -45,7 +45,7 @@ export function removeDockRefFromState<T extends { id: string }>(
   };
 }
 
-/** 剧本/向导/上游连线 id · 允许暂不在 mentionables 列表（避免与 live sync 互相改写 prompt） */
+/** 剧本/向导资产 id · 允许暂不在 mentionables（与 live sync 的 @<wiz-*> / @<ref-char-*> 对齐） */
 export function isPreservedDockMentionId(id: string): boolean {
   return (
     id.startsWith("wiz-") ||
@@ -54,20 +54,9 @@ export function isPreservedDockMentionId(id: string): boolean {
     id.startsWith("ref-prop-") ||
     id.startsWith("ref-asset-") ||
     id.startsWith("ref-scene-asset-") ||
-    id.startsWith("sbv1-ref-") ||
-    id.startsWith("up-img-") ||
-    id.startsWith("up-style-") ||
-    id.startsWith("up-video-") ||
-    id.startsWith("up-text-") ||
-    id.startsWith("up-outline-") ||
-    id.startsWith("up-script-") ||
-    id.startsWith("up-tag-") ||
-    id.startsWith("sbv1-text-") ||
-    id.startsWith("sbv1-motion-") ||
     id.startsWith("asset:") ||
     id.startsWith("hd-ref-") ||
-    id.startsWith("paste") ||
-    id.startsWith("ref-")
+    id.startsWith("paste")
   );
 }
 

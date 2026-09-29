@@ -49,6 +49,7 @@ function attachRefreshedToolsCookie(
 
 const PORTAL_PUBLIC_UPSTREAM_TIMEOUT_MS = 30_000;
 const DEFAULT_UPSTREAM_TIMEOUT_MS = 180_000;
+const VIDEO_TRACK_SPLIT_UPSTREAM_TIMEOUT_MS = 300_000;
 
 async function fetchUpstream(
   request: NextRequest,
@@ -94,7 +95,9 @@ async function proxyToBookMall(
   );
   const upstreamTimeoutMs = isPortalPublicRead
     ? PORTAL_PUBLIC_UPSTREAM_TIMEOUT_MS
-    : DEFAULT_UPSTREAM_TIMEOUT_MS;
+    : path.includes("video-track-split")
+      ? VIDEO_TRACK_SPLIT_UPSTREAM_TIMEOUT_MS
+      : DEFAULT_UPSTREAM_TIMEOUT_MS;
 
   const body =
     request.method === "GET" || request.method === "HEAD"

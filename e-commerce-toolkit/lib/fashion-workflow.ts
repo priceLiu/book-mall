@@ -100,7 +100,9 @@ export const FASHION_REGENERATE_SELLPOINTS = "重新生成卖点";
 export const FASHION_GENERATE_VOICEOVERS = "生成口播文案";
 export const FASHION_REGENERATE_VOICEOVERS = "重新生成口播文案";
 export const FASHION_REGENERATE_STORYBOARDS = "重新生成分镜";
+export const FASHION_GENERATE_STORY_THEATER = "生成故事版";
 export const FASHION_REGENERATE_STORY_THEATER = "重新生成故事版";
+export const FASHION_RELOAD_STORY_TOPICS = "重新加载故事主题";
 export const FASHION_GENERATE_STORYBOARDS_LABEL = "生成 A–E 分镜方案";
 export const FASHION_CONFIRM_STORYBOARD = "确认分镜，生成运营包";
 export const FASHION_REGENERATE_OPS = "重新生成运营包";
@@ -161,10 +163,16 @@ export function fashionBusyStatusForUserMessage(
       detail: "AI 正在根据所选主题输出 T1–T5 剧情分镜，请稍候…",
     };
   }
-  if (trimmed === FASHION_REGENERATE_STORY_THEATER) {
+  if (trimmed === FASHION_REGENERATE_STORY_THEATER || trimmed === FASHION_GENERATE_STORY_THEATER) {
     return {
-      title: "正在重新生成故事版",
-      detail: "AI 正在重新输出 T1–T5 剧情分镜，请稍候…",
+      title: trimmed === FASHION_REGENERATE_STORY_THEATER ? "正在重新生成故事版" : "正在生成故事版",
+      detail: "AI 正在输出 T1–T5 剧情分镜，请稍候…",
+    };
+  }
+  if (trimmed === FASHION_RELOAD_STORY_TOPICS) {
+    return {
+      title: "正在加载故事主题",
+      detail: "正在从选题库重新拉取 5 个故事主题…",
     };
   }
   if (trimmed.startsWith("选择口播")) {
@@ -266,7 +274,7 @@ export function fashionBusyStatusForLlmTrigger(trigger: string): FashionBusyStat
 
 /** 内部 LLM 步骤 · 流式总时长上限 */
 export function fashionLlmStreamTimeoutMs(trigger: string): number {
-  if (trigger.includes("story-theater")) return 8 * 60_000;
+  if (trigger.includes("story-theater")) return 12 * 60_000;
   if (trigger.includes("storyboards")) return 12 * 60_000;
   if (trigger.includes("ops")) return 8 * 60_000;
   if (trigger.includes("voiceovers")) return 6 * 60_000;
@@ -275,6 +283,7 @@ export function fashionLlmStreamTimeoutMs(trigger: string): number {
 
 /** 流式无新内容超过该时长则判定卡住 */
 export function fashionLlmStreamIdleTimeoutMs(trigger: string): number {
+  if (trigger.includes("story-theater")) return 4 * 60_000;
   if (trigger.includes("storyboards")) return 3 * 60_000;
   return 2 * 60_000;
 }
@@ -774,8 +783,15 @@ export function buildFashionWorkflowChoiceMessageLabels(
       labels.set(m.id, { label: "卖点生成", detail: "重新生成卖点" });
       continue;
     }
-    if (trimmed === FASHION_REGENERATE_STORY_THEATER) {
-      labels.set(m.id, { label: "故事版", detail: "重新生成故事版" });
+    if (trimmed === FASHION_REGENERATE_STORY_THEATER || trimmed === FASHION_GENERATE_STORY_THEATER) {
+      labels.set(m.id, {
+        label: "故事版",
+        detail: trimmed === FASHION_REGENERATE_STORY_THEATER ? "重新生成故事版" : "生成故事版",
+      });
+      continue;
+    }
+    if (trimmed === FASHION_RELOAD_STORY_TOPICS) {
+      labels.set(m.id, { label: "故事主题", detail: "重新加载故事主题" });
       continue;
     }
     const storyTopic = parseStoryTopicChoice(trimmed);
@@ -2250,19 +2266,18 @@ export function hasStoryTheaterGenerationFailed(project: StoryboardProject): boo
     if (
       t.startsWith("选择故事主题：") ||
       t === FASHION_REGENERATE_STORY_THEATER ||
+      t === FASHION_GENERATE_STORY_THEATER ||
       t === FASHION_AI_STORY_THEATER ||
       t === PRO_AI_STORY_THEATER
     ) {
       lastRequestIdx = i;
     }
   }
-  if (lastRequestIdx < 0) return false;
+  if (lastRequestIdx < 0) return Boolean(workflowDeliverable(project)?.selectedStoryTopic);
 
-  let sawAssistantAfter = false;
   for (let i = lastRequestIdx + 1; i < project.chatHistory.length; i++) {
     const msg = project.chatHistory[i];
     if (msg?.role !== "assistant") continue;
-    sawAssistantAfter = true;
     const content = msg.content;
     if (
       content.includes("故事版生成未完成") ||
@@ -2277,7 +2292,7 @@ export function hasStoryTheaterGenerationFailed(project: StoryboardProject): boo
       return false;
     }
   }
-  return sawAssistantAfter;
+  return true;
 }
 
 export function isAwaitingStoryTheaterVersionsGeneration(project: StoryboardProject): boolean {
@@ -2668,13 +2683,17 @@ export function inferFashionChoices(project: StoryboardProject): FashionChoice[]
     ];
   }
 
-  if (isAwaitingStoryTheaterVersionsGeneration(project)) {
+  if (isAwaitingStoryTheaterVersionsPending(project)) {
+    const retry = hasStoryTheaterGenerationFailed(project);
+    const title = retry ? FASHION_REGENERATE_STORY_THEATER : FASHION_GENERATE_STORY_THEATER;
     return [
       {
-        id: "regen-story-theater",
-        title: FASHION_REGENERATE_STORY_THEATER,
-        description: "上次故事版生成未完成或失败，点此重新生成 T1–T5 剧情分镜",
-        message: FASHION_REGENERATE_STORY_THEATER,
+        id: retry ? "regen-story-theater" : "gen-story-theater",
+        title,
+        description: retry
+          ? "上次故事版生成未完成或失败，点此重新生成 T1–T5 剧情分镜"
+          : "主题已选定，点此生成 T1–T5 剧情分镜",
+        message: title,
         recommended: true,
       },
     ];
@@ -2683,7 +2702,15 @@ export function inferFashionChoices(project: StoryboardProject): FashionChoice[]
   if (isAwaitingStoryTopicPick(project)) {
     const candidates = workflowDeliverable(project)?.storyTopicCandidates ?? [];
     if (candidates.length > 0) return buildStoryTopicChoices(candidates);
-    return [];
+    return [
+      {
+        id: "reload-story-topics",
+        title: FASHION_RELOAD_STORY_TOPICS,
+        description: "选题库加载失败或尚未完成，点此重新拉取 5 个故事主题",
+        message: FASHION_RELOAD_STORY_TOPICS,
+        recommended: true,
+      },
+    ];
   }
 
   if (isAwaitingSellpointModePick(project)) {
@@ -3224,7 +3251,7 @@ export function fashionWorkflowPatchForChoice(
   }
 
   if (
-    message === FASHION_REGENERATE_STORY_THEATER &&
+    (message === FASHION_REGENERATE_STORY_THEATER || message === FASHION_GENERATE_STORY_THEATER) &&
     deliverable?.selectedStoryTopic &&
     isStoryTheaterDeliverable(deliverable)
   ) {
@@ -3636,7 +3663,15 @@ export function fashionAssistantPlaceholder(project: StoryboardProject): string 
     return "请选择产出方式：分镜脚本标准线，或故事剧场线";
   }
   if (isAwaitingStoryTopicPick(project)) {
-    return "请点选下方故事主题（5 选 1）";
+    const candidates = workflowDeliverable(project)?.storyTopicCandidates ?? [];
+    return candidates.length > 0
+      ? "请点选下方故事主题（5 选 1）"
+      : "故事主题未加载完成，请点「重新加载故事主题」";
+  }
+  if (isAwaitingStoryTheaterVersionsPending(project)) {
+    return hasStoryTheaterGenerationFailed(project)
+      ? "故事版生成未完成，请点「重新生成故事版」"
+      : "主题已选定，请点「生成故事版」";
   }
   if (isAwaitingStoryTheaterPick(project)) {
     const count = listStoryTheaterVersionKeys(workflowDeliverable(project)).length;

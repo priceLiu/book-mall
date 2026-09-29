@@ -15,7 +15,8 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { PRODUCTION_BRAND_PORTAL_ORIGIN } from "@/lib/production-origin";
 import { cn } from "@/lib/utils";
-import { buildBookPortalNavItems, BOOK_PORTAL_EXTERNAL_LINK_PROPS, marketingHomeSectionUrl } from "@/lib/portal-nav";
+import { buildBookPortalNavItems, BOOK_PORTAL_EXTERNAL_LINK_PROPS } from "@/lib/portal-nav";
+import { navigateMarketingHomeSection } from "@/lib/marketing-home-nav";
 import { ToggleTheme } from "@/components/layout/toogle-theme";
 import { Button } from "@/components/ui/button";
 import {
@@ -109,21 +110,9 @@ export function SiteHomeNav({
   const navigate = (href: string) => {
     setOpen(false);
     if (href.startsWith("#")) {
-      const openMarketingInNewTab = isAccount || pathname !== "/";
-      if (openMarketingInNewTab) {
-        window.open(
-          marketingHomeSectionUrl(window.location.origin, href),
-          "_blank",
-          "noopener,noreferrer",
-        );
-        return;
-      }
-      if (pathname === "/") {
-        document.getElementById(href.slice(1))?.scrollIntoView({ behavior: "smooth" });
-        window.history.replaceState(null, "", href);
-        return;
-      }
-      router.push(`/${href}`);
+      navigateMarketingHomeSection(href, pathname, {
+        openInNewTab: isAccount || pathname !== "/",
+      });
       return;
     }
     router.push(href);

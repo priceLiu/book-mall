@@ -91,3 +91,42 @@ describe("fashion deliverable parse · phase patch contract", () => {
     expect(merged.storyboardVersions?.A?.panels).toHaveLength(6);
   });
 });
+
+describe("fashion deliverable parse · story theater contract", () => {
+  const theaterPanel = (index: number) => ({
+    ...panel(Math.min(6, index) as 1 | 2 | 3 | 4 | 5 | 6),
+    index,
+  });
+
+  it("accepts 8-panel T1 when schemaVersion / vertical match the contract", () => {
+    const payload = {
+      schemaVersion: "fashion-v4",
+      vertical: "fashion_apparel",
+      storyTheaterVersions: {
+        T1: {
+          id: "T1",
+          title: "T1 痛点开场",
+          panels: [1, 2, 3, 4, 5, 6, 7, 8].map(theaterPanel),
+        },
+      },
+    };
+    const patch = extractFashionDeliverableFromText(
+      `\`\`\`json\n${JSON.stringify(payload)}\n\`\`\``,
+      "story_theater",
+    );
+    expect(patch?.storyTheaterVersions?.T1?.panels).toHaveLength(8);
+    expect(patch?.storyTheaterVersions?.T1?.panels?.[7]?.index).toBe(8);
+  });
+
+  it("salvages complete T1 from truncated JSON", () => {
+    const t1 = {
+      id: "T1",
+      title: "T1 痛点开场",
+      panels: [1, 2, 3, 4, 5, 6].map((i) => theaterPanel(i)),
+    };
+    const truncated = `{"storyTheaterVersions":{"T1":${JSON.stringify(t1)},"T5":{"id":"T5","title":"cut`;
+    const patch = extractFashionDeliverableFromText(truncated, "story_theater");
+    expect(patch?.storyTheaterVersions?.T1?.title).toBe("T1 痛点开场");
+    expect(patch?.storyTheaterVersions?.T1?.panels).toHaveLength(6);
+  });
+});

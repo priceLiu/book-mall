@@ -101,7 +101,7 @@ export type VtonTextTryonResult = {
   prompt: string;
   modelKey: string;
   createdAt: string;
-  ratio?: "1:1" | "3:4" | "4:5" | "16:9";
+  ratio?: "1:1" | "3:4" | "4:5" | "16:9" | "9:16";
   width?: number;
   height?: number;
 };
@@ -121,6 +121,34 @@ export type VtonProjectMeta = {
   textTryonRefs?: VtonTextTryonRef[];
   textTryonPrompt?: string;
   textTryonResults?: VtonTextTryonResult[];
+  textTryonJob?: VtonTextTryonJob | null;
+  modelPipelineJob?: VtonModelPipelineJob | null;
+};
+
+export type VtonAsyncJobStatus = "running" | "done" | "failed";
+
+export type VtonTextTryonJob = {
+  jobId: string;
+  status: VtonAsyncJobStatus;
+  startedAt: string;
+  updatedAt: string;
+  prompt: string;
+  modelKey: string;
+  imageSize?: string;
+  error?: string;
+};
+
+export type VtonModelPipelineJobKind = "generating-model" | "expanding-full-body";
+
+export type VtonModelPipelineJob = {
+  jobId: string;
+  status: VtonAsyncJobStatus;
+  kind: VtonModelPipelineJobKind;
+  startedAt: string;
+  updatedAt: string;
+  prompt?: string;
+  imageSize?: string;
+  error?: string;
 };
 
 export const ECOM_VTON_MODEL_ASSET_MODULE = "model-tryon-model";
@@ -176,6 +204,57 @@ export function parseVtonProjectMeta(raw: unknown): VtonProjectMeta {
     textTryonResults: Array.isArray(o.textTryonResults)
       ? (o.textTryonResults as VtonTextTryonResult[])
       : undefined,
+    textTryonJob: parseVtonTextTryonJob(o.textTryonJob),
+    modelPipelineJob: parseVtonModelPipelineJob(o.modelPipelineJob),
+  };
+}
+
+function parseVtonAsyncJobStatus(raw: unknown): VtonAsyncJobStatus | null {
+  return raw === "running" || raw === "done" || raw === "failed" ? raw : null;
+}
+
+function parseVtonTextTryonJob(raw: unknown): VtonTextTryonJob | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const jobId = typeof o.jobId === "string" ? o.jobId.trim() : "";
+  const status = parseVtonAsyncJobStatus(o.status);
+  const startedAt = typeof o.startedAt === "string" ? o.startedAt : "";
+  const modelKey = typeof o.modelKey === "string" ? o.modelKey.trim() : "";
+  if (!jobId || !status || !startedAt || !modelKey) return undefined;
+  return {
+    jobId,
+    status,
+    startedAt,
+    updatedAt: typeof o.updatedAt === "string" ? o.updatedAt : startedAt,
+    prompt: typeof o.prompt === "string" ? o.prompt : "",
+    modelKey,
+    ...(typeof o.imageSize === "string" && o.imageSize.trim()
+      ? { imageSize: o.imageSize.trim() }
+      : {}),
+    ...(typeof o.error === "string" && o.error.trim() ? { error: o.error.trim() } : {}),
+  };
+}
+
+function parseVtonModelPipelineJob(raw: unknown): VtonModelPipelineJob | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const jobId = typeof o.jobId === "string" ? o.jobId.trim() : "";
+  const status = parseVtonAsyncJobStatus(o.status);
+  const kind =
+    o.kind === "generating-model" || o.kind === "expanding-full-body" ? o.kind : null;
+  const startedAt = typeof o.startedAt === "string" ? o.startedAt : "";
+  if (!jobId || !status || !kind || !startedAt) return undefined;
+  return {
+    jobId,
+    status,
+    kind,
+    startedAt,
+    updatedAt: typeof o.updatedAt === "string" ? o.updatedAt : startedAt,
+    ...(typeof o.prompt === "string" ? { prompt: o.prompt } : {}),
+    ...(typeof o.imageSize === "string" && o.imageSize.trim()
+      ? { imageSize: o.imageSize.trim() }
+      : {}),
+    ...(typeof o.error === "string" && o.error.trim() ? { error: o.error.trim() } : {}),
   };
 }
 

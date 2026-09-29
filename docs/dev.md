@@ -110,6 +110,7 @@ poll-loop 子进程已在 `package.json` 设 `PRISMA_CONNECTION_LIMIT=1`（3 个
 | canvas 同页多次 `/api/tools-session` | 已合并：`CanvasShellSessionProvider` + `?lite=1` 心跳 + inflight 去重 |
 | 我的画布 SSR 后重复拉列表 | SSR `initialPage` 首屏展示，2.5s 后再后台 revalidate |
 | 电商分镜冷启动 models + project 并发 | 走 `storyboard/boot` 合并 API；models 缓存 stale-while-revalidate |
+| 电商工具箱整页无样式（链接挤一团、侧栏像纯 HTML） | 多为 `/_next/static/css/app/layout.css` **404**（`.next` 与 dev 编译不同步或 EMFILE）。停 `dev:all` → `rm -rf e-commerce-toolkit/.next` → 再启；浏览器硬刷新。仍复现：`ulimit -n 10240` 或 `WATCHPACK_POLLING=true`（`dev:all` 已默认） |
 
 **连接池饱和时的产品行为（2026-08）**：Prisma 重试耗尽 → 统一 `DbUnavailableError`；RSC 有 `app/error.tsx` + account 布局降级；SSO/auth API → 503 `SYSTEM_BUSY`（非 500 红屏）。
 

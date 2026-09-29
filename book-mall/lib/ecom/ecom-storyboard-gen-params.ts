@@ -109,10 +109,27 @@ export function resolveWanxImageSize(opts: {
   return aspectRatio === "16:9" ? "1280*720" : "720*1280";
 }
 
+/** 由像素尺寸反推电商生图比例（含 9:16） */
+export function ecomRatioFromPixelSize(
+  size?: string,
+): EcomImageRatio | "9:16" {
+  const raw = size?.trim() ?? "";
+  if (!raw.includes("*")) return "3:4";
+  const [w, h] = raw.split("*").map(Number);
+  if (!w || !h) return "3:4";
+  const r = w / h;
+  if (Math.abs(r - 1) < 0.05) return "1:1";
+  if (Math.abs(r - 16 / 9) < 0.08) return "16:9";
+  if (Math.abs(r - 9 / 16) < 0.08) return "9:16";
+  if (Math.abs(r - 3 / 4) < 0.05) return "3:4";
+  if (Math.abs(r - 4 / 5) < 0.05) return "4:5";
+  return r < 1 ? "3:4" : "16:9";
+}
+
 /** 统一生图链路：模型 + 比例 + 可选像素尺寸 → 下发厂商 size */
 export function resolveEcomGeneratePixelSize(opts: {
   modelKey: string;
-  ratio: EcomImageRatio;
+  ratio: EcomImageRatio | "9:16";
   imageSize?: string;
 }): string {
   const raw = opts.imageSize?.trim();

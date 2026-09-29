@@ -6,7 +6,9 @@ import {
   FASHION_CUSTOM_DIMENSION_CHOICE,
   FASHION_LOCK_SELLPOINTS,
   FASHION_REGENERATE_SELLPOINTS,
+  FASHION_GENERATE_STORY_THEATER,
   FASHION_REGENERATE_STORY_THEATER,
+  FASHION_RELOAD_STORY_TOPICS,
   FASHION_USER_SELLPOINTS_CHOICE,
   buildFashionStoryboardPickChoices,
   buildProductionModeChoices,
@@ -172,6 +174,10 @@ function workflowHistoricalTitle(
     return "卖点录入";
   }
   if (trimmed === FASHION_REGENERATE_SELLPOINTS) return "卖点生成";
+  if (trimmed === FASHION_REGENERATE_STORY_THEATER || trimmed === FASHION_GENERATE_STORY_THEATER) {
+    return "故事版";
+  }
+  if (trimmed === FASHION_RELOAD_STORY_TOPICS) return "故事主题";
   if (parseStoryTopicChoice(trimmed)) return "故事主题";
   if (trimmed === PRODUCTION_MODE_SCRIPT || trimmed === PRODUCTION_MODE_STORY) return "产出模式";
   if (parseStoryTheaterVersionChoice(trimmed)) return "故事版";
@@ -214,13 +220,28 @@ function inferHistoricalChoiceCards(
     ];
   }
 
-  if (trimmed === FASHION_REGENERATE_STORY_THEATER) {
+  if (trimmed === FASHION_REGENERATE_STORY_THEATER || trimmed === FASHION_GENERATE_STORY_THEATER) {
     return [
       mapFashionChoice({
-        id: "regen-story-theater",
-        title: FASHION_REGENERATE_STORY_THEATER,
-        description: "上次故事版生成未完成或失败，点此重新生成 T1–T5 剧情分镜",
-        message: FASHION_REGENERATE_STORY_THEATER,
+        id: trimmed === FASHION_REGENERATE_STORY_THEATER ? "regen-story-theater" : "gen-story-theater",
+        title: trimmed,
+        description:
+          trimmed === FASHION_REGENERATE_STORY_THEATER
+            ? "上次故事版生成未完成或失败，点此重新生成 T1–T5 剧情分镜"
+            : "主题已选定，点此生成 T1–T5 剧情分镜",
+        message: trimmed,
+        recommended: true,
+      }),
+    ];
+  }
+
+  if (trimmed === FASHION_RELOAD_STORY_TOPICS) {
+    return [
+      mapFashionChoice({
+        id: "reload-story-topics",
+        title: FASHION_RELOAD_STORY_TOPICS,
+        description: "选题库加载失败或尚未完成，点此重新拉取 5 个故事主题",
+        message: FASHION_RELOAD_STORY_TOPICS,
         recommended: true,
       }),
     ];

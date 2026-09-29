@@ -151,6 +151,8 @@ type Props = {
     onGenerate: () => Promise<void>;
     onClearEditor: () => Promise<void>;
     onSaveResultToAssets?: (ossUrl: string, title: string) => Promise<void>;
+    imageSize?: string;
+    onImageSizeChange?: (imageSize: string) => void;
     modelImageSize?: VtonModelImageSize;
     uploading?: boolean;
     uploadProgress?: number | null;
@@ -476,6 +478,8 @@ export function VtonRefWorkbench({
           onGenerate={textTryonWorkflow.onGenerate}
           onClearEditor={textTryonWorkflow.onClearEditor}
           onSaveResultToAssets={textTryonWorkflow.onSaveResultToAssets}
+          imageSize={textTryonWorkflow.imageSize}
+          onImageSizeChange={textTryonWorkflow.onImageSizeChange}
           modelImageSize={textTryonWorkflow.modelImageSize}
           uploading={textTryonWorkflow.uploading}
           uploadProgress={textTryonWorkflow.uploadProgress}

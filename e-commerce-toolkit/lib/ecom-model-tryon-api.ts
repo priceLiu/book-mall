@@ -20,6 +20,8 @@ export type ModelTryonSettings = {
   modelImageSize?: string;
   /** 文生试衣 · 图片编辑模型 */
   textTryonModelKey?: string;
+  /** 文生试衣 · 出图像素尺寸（含全部比例） */
+  textTryonImageSize?: string;
   /** 试衣精修 · 模特性别（aitryon-refiner 必填） */
   tryonRefinerGender?: VtonTryonRefinerGender;
 };
@@ -433,7 +435,7 @@ export async function clearModelTryonTextTryonEditor(
 
 export async function generateModelTryonTextTryonImage(
   projectId: string,
-  opts?: { prompt?: string; modelKey?: string; ratio?: "3:4" | "4:5" | "1:1" },
+  opts?: { prompt?: string; modelKey?: string; imageSize?: string; ratio?: "3:4" | "4:5" | "1:1" | "9:16" | "16:9" },
 ): Promise<ModelTryonProject> {
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/text-tryon/generate`, {
     method: "POST",

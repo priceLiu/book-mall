@@ -2,6 +2,7 @@ import type { ProDeliverable, ProPanelRow, ProVersionKey, ProVerticalId, StoryTh
 import { isProDeliverable } from "@/lib/pro-vertical/types";
 import { isProVerticalId } from "@/lib/pro-vertical/registry";
 import type { StoryTheaterVersionKey } from "@/lib/story-theater-types";
+import { salvageStoryTheaterVersionsFromText } from "@/lib/fashion-deliverable-parse";
 
 const PRO_FENCE_RE = /```pro-deliverable\s*([\s\S]*?)```/i;
 const FASHION_FENCE_RE = /```fashion-deliverable\s*([\s\S]*?)```/i;
@@ -34,7 +35,7 @@ function coerceProPanels(raw: unknown, vertical: ProVerticalId): ProPanelRow[] {
     .map((p, i) => {
       if (!p || typeof p !== "object") return null;
       const panel = p as Record<string, unknown>;
-      const index = Math.min(6, Math.max(1, typeof panel.index === "number" ? panel.index : i + 1));
+      const index = Math.min(8, Math.max(1, typeof panel.index === "number" ? panel.index : i + 1));
       const sceneDesc = String(panel.sceneDesc ?? "—");
       const modelAction = String(panel.modelAction ?? sceneDesc);
       const productFocus = String(
@@ -217,7 +218,14 @@ function tryParseProPhasePatch(
   phaseHint?: ProLlmPhase,
 ): Partial<ProDeliverable> | null {
   try {
-    const parsed = JSON.parse(jsonRaw) as Record<string, unknown>;
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(jsonRaw) as Record<string, unknown>;
+    } catch {
+      const salvaged = salvageStoryTheaterVersionsFromText(jsonRaw);
+      if (!salvaged) return null;
+      parsed = { storyTheaterVersions: salvaged };
+    }
     const rawVertical = typeof parsed.vertical === "string" ? parsed.vertical : undefined;
     if (rawVertical != null && isProVerticalId(rawVertical) && rawVertical !== vertical) {
       return null;
@@ -248,11 +256,14 @@ export function extractProDeliverableFromText(
   for (const re of [PRO_FENCE_RE, FASHION_FENCE_RE, GENERIC_FENCE_RE]) {
     const m = trimmed.match(re);
     if (m?.[1]) {
-      const parsed = tryParseProPhasePatch(m[1].trim(), vertical ?? "bags", phaseHint);
+      const raw = m[1].trim();
+      const parsed = tryParseProPhasePatch(raw, vertical ?? "bags", phaseHint);
       if (parsed) return parsed;
+      if (isCompleteJsonObject(raw)) return null;
     }
   }
   const markers = [
+    /\{\s*"storyTheaterVersions"\s*:/,
     /\{\s*"storyboardVersions"\s*:/,
     /\{\s*"schemaVersion"\s*:\s*"pro-v1"/,
     /\{\s*"vertical"\s*:\s*"(?:bags|digital_3c)"/,
@@ -265,9 +276,29 @@ export function extractProDeliverableFromText(
   if (jsonStart < 0) jsonStart = trimmed.indexOf("{");
   const end = trimmed.lastIndexOf("}");
   if (jsonStart >= 0 && end > jsonStart) {
-    return tryParseProPhasePatch(trimmed.slice(jsonStart, end + 1), vertical ?? "bags", phaseHint);
+    const slice = trimmed.slice(jsonStart, end + 1);
+    const parsed = tryParseProPhasePatch(slice, vertical ?? "bags", phaseHint);
+    if (parsed) return parsed;
+    if (isCompleteJsonObject(slice)) return null;
+  }
+  const salvaged = salvageStoryTheaterVersionsFromText(trimmed);
+  if (salvaged) {
+    return tryParseProPhasePatch(
+      JSON.stringify({ storyTheaterVersions: salvaged }),
+      vertical ?? "bags",
+      phaseHint === "story_theater" || !phaseHint ? "story_theater" : phaseHint,
+    );
   }
   return null;
+}
+
+function isCompleteJsonObject(text: string): boolean {
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function stripProDeliverableFence(text: string): string {

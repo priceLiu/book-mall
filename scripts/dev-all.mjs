@@ -146,6 +146,11 @@ const child = spawn(concurrentlyBin, args, {
     CI: process.env.CI ?? "1",
     /** 本地 dev 勿连 registry.npmjs.org 查 Next 版本（弱网/超时会刷 TypeError: fetch failed） */
     NEXT_TELEMETRY_DISABLED: process.env.NEXT_TELEMETRY_DISABLED ?? "1",
+    /**
+     * 多 Next 子站并行时 macOS 易 EMFILE → layout.css 404、页面无 Tailwind。
+     * 设 WATCHPACK_POLLING=false 可恢复原生 watch（需提高 ulimit -n）。
+     */
+    WATCHPACK_POLLING: process.env.WATCHPACK_POLLING ?? "true",
   },
 });
 

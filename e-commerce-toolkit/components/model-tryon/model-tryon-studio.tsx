@@ -14,7 +14,12 @@ import {
   isEcomTransportDisconnectError,
   runVtonBatchTryonWithPoll,
   vtonBatchTryonFailureMessage,
+  waitForVtonBatchPoll,
 } from "@/lib/vton-batch-tryon-run";
+import {
+  isVtonAsyncJobRunning,
+  runVtonJobWithPoll,
+} from "@/lib/vton-async-job";
 import {
   shouldClearVtonLookSelectionAfterBatch,
   useVtonLookSelectionSync,
@@ -68,6 +73,7 @@ import {
 import type { ModelTryonProject } from "@/lib/ecom-model-tryon-api";
 import { mergeVtonTryonProgressWithBatch, parseVtonTryonProgress } from "@/lib/vton-tryon-progress";
 import { buildFullSetAssetPatch } from "@/lib/vton-full-set-garment";
+import { defaultImageSizeForModel } from "@/lib/storyboard-image-size-options";
 import { coerceVtonModelImageSize, type VtonModelImageSize } from "@/lib/vton-image-quality";
 import type { VtonGarmentKind, VtonLookSpec } from "@/lib/vton-types";
 import { useVtonTryonRefine } from "@/lib/use-vton-tryon-refine";
@@ -99,11 +105,149 @@ export function ModelTryonStudio() {
   const [textTryonUploadLabel, setTextTryonUploadLabel] = useState("正在上传…");
   const tryonPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const batchAbortRef = useRef<AbortController | null>(null);
+  const resumedProjectIdRef = useRef<string | null>(null);
 
   const applyProject = useCallback((p: ModelTryonProject) => {
     setProject(p);
     writeEcomLastProjectId(PROJECT_STORAGE_KEY, p.id);
   }, []);
+
+  const resumeInFlightJobs = useCallback(
+    async (p: ModelTryonProject) => {
+      const tasks: Array<Promise<void>> = [];
+
+      if (isVtonAsyncJobRunning(p.meta?.textTryonJob)) {
+        setTextTryonGenerating(true);
+        tasks.push(
+          runVtonJobWithPoll({
+            startJob: async () => p,
+            fetchProject: () => getModelTryonProject(p.id),
+            isRunning: (next) => isVtonAsyncJobRunning(next.meta?.textTryonJob),
+            applyProject,
+          })
+            .then(async ({ project: final }) => {
+              const job = final.meta?.textTryonJob;
+              if (job?.status === "failed") {
+                await alert({
+                  title: "生成失败",
+                  message: formatEcomImageGenUserMessage(job.error ?? "文本试衣失败"),
+                  variant: "error",
+                });
+              } else if (job?.status === "done") {
+                await toast({
+                  title: "生成完成",
+                  message: "试衣图已加入结果区，并自动保存到试衣库",
+                  variant: "success",
+                });
+              }
+            })
+            .catch(async (e) => {
+              if (e instanceof DOMException && e.name === "AbortError") return;
+              await alert({
+                title: "生成失败",
+                message: formatEcomImageGenUserMessage(formatEcomTransportError(e)),
+                variant: "error",
+              });
+            })
+            .finally(() => setTextTryonGenerating(false)),
+        );
+      }
+
+      if (isVtonAsyncJobRunning(p.meta?.modelPipelineJob) && p.meta?.modelPipelineJob) {
+        const kind = p.meta.modelPipelineJob.kind;
+        setModelPipelineBusy(kind);
+        setRefBusy(true);
+        tasks.push(
+          runVtonJobWithPoll({
+            startJob: async () => p,
+            fetchProject: () => getModelTryonProject(p.id),
+            isRunning: (next) => isVtonAsyncJobRunning(next.meta?.modelPipelineJob),
+            applyProject,
+          })
+            .then(async ({ project: final }) => {
+              const job = final.meta?.modelPipelineJob;
+              if (job?.status === "failed") {
+                await alert({
+                  title: kind === "expanding-full-body" ? "生成全身图失败" : "生成全身模特失败",
+                  message: formatEcomImageGenUserMessage(job.error ?? "生成失败"),
+                  variant: "error",
+                });
+              } else if (job?.status === "done" && kind === "expanding-full-body") {
+                await toast({
+                  title: "全身图已生成",
+                  message: "已加入待试衣，可直接批量试衣。",
+                  variant: "success",
+                });
+              }
+            })
+            .catch(async (e) => {
+              if (e instanceof DOMException && e.name === "AbortError") return;
+              await alert({
+                title: kind === "expanding-full-body" ? "生成全身图失败" : "生成全身模特失败",
+                message: formatEcomImageGenUserMessage(formatEcomTransportError(e)),
+                variant: "error",
+              });
+            })
+            .finally(() => {
+              setRefBusy(false);
+              setModelPipelineBusy(null);
+            }),
+        );
+      }
+
+      if (p.meta?.tryonBatch?.status === "running") {
+        setTryonBusy(true);
+        setRunningLookIds(
+          (p.meta.tryonBatch.results ?? [])
+            .filter((row) => row.status === "running" || row.status === "pending")
+            .map((row) => row.lookId),
+        );
+        tasks.push(
+          waitForVtonBatchPoll({
+            fetchProject: () => getModelTryonProject(p.id),
+            readBatch: (next) => next.meta?.tryonBatch,
+            applyProject,
+          })
+            .then(async (final) => {
+              const batch = final.meta?.tryonBatch;
+              if (batch?.status === "cancelled") {
+                await toast({
+                  title: "已停止",
+                  message: batch.label ?? "批量试衣已停止，已完成的结果已保留",
+                });
+                return;
+              }
+              if (batch?.status === "done") {
+                await toast({
+                  title: "批量试衣完成",
+                  message: "可在结果墙锁定参考",
+                  variant: "success",
+                });
+                return;
+              }
+              if (batch?.status === "failed") {
+                await alert({
+                  title: "批量试衣失败",
+                  message: batch.label ?? "部分试衣失败，可逐套重试",
+                  variant: "error",
+                });
+              }
+            })
+            .catch(async (e) => {
+              if (e instanceof DOMException && e.name === "AbortError") return;
+              await alert({ title: "批量试衣", message: formatEcomTransportError(e), variant: "error" });
+            })
+            .finally(() => {
+              setTryonBusy(false);
+              setRunningLookIds([]);
+            }),
+        );
+      }
+
+      await Promise.all(tasks);
+    },
+    [applyProject, alert, toast],
+  );
 
   const tryonRefine = useVtonTryonRefine({
     defaultGender: project?.settings?.tryonRefinerGender,
@@ -268,6 +412,13 @@ export function ModelTryonStudio() {
     };
   }, [applyProject]);
 
+  useEffect(() => {
+    if (!project || loading) return;
+    if (resumedProjectIdRef.current === project.id) return;
+    resumedProjectIdRef.current = project.id;
+    void resumeInFlightJobs(project);
+  }, [project, loading, resumeInFlightJobs]);
+
   async function handleNewProject() {
     if (!project) return;
     await runEcomNewProjectWithSavePrompt({
@@ -296,14 +447,18 @@ export function ModelTryonStudio() {
         }
       },
       onProceed: async () => {
-        applyProject(await createModelTryonProject());
+        const next = await createModelTryonProject();
+        resumedProjectIdRef.current = null;
+        applyProject(next);
         setSelectedResultIds([]);
       },
     });
   }
 
   async function handleOpenProject(id: string) {
-    applyProject(await getModelTryonProject(id));
+    const next = await getModelTryonProject(id);
+    resumedProjectIdRef.current = null;
+    applyProject(next);
     setSelectedResultIds([]);
   }
 
@@ -454,6 +609,7 @@ export function ModelTryonStudio() {
     garmentMode?: OutfitGarmentMode;
     modelImageSize?: VtonModelImageSize;
     textTryonModelKey?: string;
+    textTryonImageSize?: string;
   }) {
     if (!project) return;
     const next = await updateModelTryonProject(project.id, {
@@ -501,7 +657,10 @@ export function ModelTryonStudio() {
     project.settings.textTryonModelKey ??
     textTryonModels.find((m) => m.credentialBound)?.modelKey ??
     textTryonModels[0]?.modelKey ??
-    "wan2.7-image-pro";
+    "";
+  const textTryonImageSize =
+    project.settings.textTryonImageSize?.trim() ||
+    defaultImageSizeForModel(textTryonModelKey || "wan2.7-image-pro", "3:4");
 
   return (
     <EcomWorkspaceLayout fullWidth contentClassName="overflow-y-auto">
@@ -553,8 +712,13 @@ export function ModelTryonStudio() {
           outfitRefMode={outfitRefMode}
           garmentMode={garmentMode}
           busy={refBusy}
-          modelPipelineBusy={modelPipelineBusy}
-          tryonBusy={tryonBusy}
+          modelPipelineBusy={
+            modelPipelineBusy ??
+            (isVtonAsyncJobRunning(project.meta?.modelPipelineJob)
+              ? project.meta?.modelPipelineJob?.kind ?? null
+              : null)
+          }
+          tryonBusy={tryonBusy || project.meta?.tryonBatch?.status === "running"}
           tryonProgress={tryonProgress}
           builtinModelPipeline
           vtonMeta={vtonMeta}
@@ -714,12 +878,24 @@ export function ModelTryonStudio() {
             setRefBusy(true);
             setModelPipelineBusy("generating-model");
             try {
-              applyProject(
-                await generateModelTryonModel(project.id, {
-                  ...opts,
-                  imageSize: opts?.imageSize ?? modelImageSize,
-                }),
-              );
+              const { project: final } = await runVtonJobWithPoll({
+                startJob: () =>
+                  generateModelTryonModel(project.id, {
+                    ...opts,
+                    imageSize: opts?.imageSize ?? modelImageSize,
+                  }),
+                fetchProject: () => getModelTryonProject(project.id),
+                isRunning: (next) => isVtonAsyncJobRunning(next.meta?.modelPipelineJob),
+                applyProject,
+              });
+              const job = final.meta?.modelPipelineJob;
+              if (job?.status === "failed") {
+                await alert({
+                  title: "生成全身模特失败",
+                  message: formatEcomImageGenUserMessage(job.error ?? "生成失败"),
+                  variant: "error",
+                });
+              }
             } catch (e) {
               await alert({
                 title: "生成全身模特失败",
@@ -735,17 +911,30 @@ export function ModelTryonStudio() {
             setRefBusy(true);
             setModelPipelineBusy("expanding-full-body");
             try {
-              applyProject(
-                await expandModelTryonFullBody(project.id, {
-                  ...opts,
-                  imageSize: opts?.imageSize ?? modelImageSize,
-                }),
-              );
-              await toast({
-                title: "全身图已生成",
-                message: "已加入待试衣，可直接批量试衣。",
-                variant: "success",
+              const { project: final } = await runVtonJobWithPoll({
+                startJob: () =>
+                  expandModelTryonFullBody(project.id, {
+                    ...opts,
+                    imageSize: opts?.imageSize ?? modelImageSize,
+                  }),
+                fetchProject: () => getModelTryonProject(project.id),
+                isRunning: (next) => isVtonAsyncJobRunning(next.meta?.modelPipelineJob),
+                applyProject,
               });
+              const job = final.meta?.modelPipelineJob;
+              if (job?.status === "failed") {
+                await alert({
+                  title: "生成全身图失败",
+                  message: formatEcomImageGenUserMessage(job.error ?? "生成失败"),
+                  variant: "error",
+                });
+              } else if (job?.status !== "failed") {
+                await toast({
+                  title: "全身图已生成",
+                  message: "已加入待试衣，可直接批量试衣。",
+                  variant: "success",
+                });
+              }
             } catch (e) {
               await alert({
                 title: "生成全身图失败",
@@ -771,7 +960,12 @@ export function ModelTryonStudio() {
                   modelKey: textTryonModelKey,
                   models: textTryonModels,
                   modelsLoading: textTryonModelsLoading,
-                  generating: textTryonGenerating,
+                  generating:
+                    textTryonGenerating || isVtonAsyncJobRunning(project.meta?.textTryonJob),
+                  imageSize: textTryonImageSize,
+                  onImageSizeChange: (imageSize) => {
+                    void patchSettings({ textTryonImageSize: imageSize });
+                  },
                   modelImageSize,
                   uploading: textTryonUploading,
                   uploadProgress: textTryonUploadProgress,
@@ -852,17 +1046,31 @@ export function ModelTryonStudio() {
                     if (!project) return;
                     setTextTryonGenerating(true);
                     try {
-                      applyProject(
-                        await generateModelTryonTextTryonImage(project.id, {
-                          prompt: textTryonPromptDraft,
-                          modelKey: textTryonModelKey,
-                        }),
-                      );
-                      await toast({
-                        title: "生成完成",
-                        message: "试衣图已加入结果区，并自动保存到试衣库",
-                        variant: "success",
+                      const { project: final } = await runVtonJobWithPoll({
+                        startJob: () =>
+                          generateModelTryonTextTryonImage(project.id, {
+                            prompt: textTryonPromptDraft,
+                            modelKey: textTryonModelKey,
+                            imageSize: textTryonImageSize,
+                          }),
+                        fetchProject: () => getModelTryonProject(project.id),
+                        isRunning: (next) => isVtonAsyncJobRunning(next.meta?.textTryonJob),
+                        applyProject,
                       });
+                      const job = final.meta?.textTryonJob;
+                      if (job?.status === "failed") {
+                        await alert({
+                          title: "生成失败",
+                          message: formatEcomImageGenUserMessage(job.error ?? "文本试衣失败"),
+                          variant: "error",
+                        });
+                      } else {
+                        await toast({
+                          title: "生成完成",
+                          message: "试衣图已加入结果区，并自动保存到试衣库",
+                          variant: "success",
+                        });
+                      }
                     } catch (e) {
                       await alert({
                         title: "生成失败",

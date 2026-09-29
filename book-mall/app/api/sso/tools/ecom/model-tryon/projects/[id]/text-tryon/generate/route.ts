@@ -1,6 +1,6 @@
 import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
-import { generateEcomVtonTextTryonImage } from "@/lib/ecom/ecom-vton-text-tryon";
+import { startEcomVtonTextTryonImage } from "@/lib/ecom/ecom-vton-text-tryon";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const runtime = "nodejs";
@@ -23,14 +23,23 @@ export async function POST(req: Request, ctx: Ctx) {
 
   const ratioRaw = typeof body.ratio === "string" ? body.ratio.trim() : "";
   const ratio =
-    ratioRaw === "4:5" || ratioRaw === "1:1" || ratioRaw === "3:4"
+    ratioRaw === "4:5" ||
+    ratioRaw === "1:1" ||
+    ratioRaw === "3:4" ||
+    ratioRaw === "9:16" ||
+    ratioRaw === "16:9"
       ? ratioRaw
+      : undefined;
+  const imageSize =
+    typeof body.imageSize === "string" && body.imageSize.trim()
+      ? body.imageSize.trim()
       : undefined;
 
   try {
-    const project = await generateEcomVtonTextTryonImage(auth.userId, id, {
+    const project = await startEcomVtonTextTryonImage(auth.userId, id, {
       prompt: typeof body.prompt === "string" ? body.prompt : undefined,
       modelKey: typeof body.modelKey === "string" ? body.modelKey : undefined,
+      imageSize,
       ratio,
     });
     return ecomJson({ project });

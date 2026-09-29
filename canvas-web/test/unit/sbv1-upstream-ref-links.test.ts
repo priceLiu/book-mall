@@ -219,7 +219,6 @@ describe("buildSbv1VideoEngineDockMentionables", () => {
       [],
       [],
       undefined,
-      undefined,
       motion,
     );
     expect(items).toHaveLength(1);

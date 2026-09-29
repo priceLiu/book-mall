@@ -1,6 +1,6 @@
 import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
-import { expandEcomModelTryonModelFullBody } from "@/lib/ecom/ecom-model-tryon-service";
+import { startEcomModelTryonExpandFullBody } from "@/lib/ecom/ecom-model-tryon-service";
 import { formatEcomImageGenUserError } from "@/lib/ecom/ecom-image-processing-error";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
@@ -26,7 +26,7 @@ export async function POST(req: Request, ctx: Ctx) {
   const imageSize = typeof body.imageSize === "string" ? body.imageSize.trim() : undefined;
 
   try {
-    const project = await expandEcomModelTryonModelFullBody(auth.userId, id, {
+    const project = await startEcomModelTryonExpandFullBody(auth.userId, id, {
       prompt,
       imageSize,
     });

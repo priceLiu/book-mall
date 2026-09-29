@@ -70,7 +70,8 @@ type FashionVoiceover = {
 
 ```typescript
 type FashionPanelRow = {
-  index: 1|2|3|4|5|6;
+  /** 标准分镜 1–6；故事剧场每版 6–8 镜时 index 为 1–N */
+  index: 1|2|3|4|5|6|7|8;
   shotScale: string;
   durationSec: number;   // 3–7，0.5 精度
   cameraMove: string;    // 第七章枚举
@@ -105,6 +106,7 @@ type FashionPanelRow = {
 | `fashion-step:sellpoints-polish` | 卖点润色（用户已录入） | sellpoints |
 | `fashion-step:voiceovers-generate` | 6 套口播 | voiceovers |
 | `fashion-step:storyboards-generate` | A–E 五套 | storyboardVersions, coverageChecklist |
+| `fashion-step:story-theater-generate` | 故事剧场 T1–T5 | storyTheaterVersions, selectedStoryTopic, coverageChecklist |
 | `fashion-step:ops-generate` | 运营包 | opsPack |
 
 ### 7.1 分阶段 Patch（LLM 输出约束）
@@ -116,9 +118,12 @@ type FashionPanelRow = {
 | `fashion-step:sellpoints-generate` | `sellpoints` |
 | `fashion-step:voiceovers-generate` | `voiceovers` |
 | `fashion-step:storyboards-generate` | `storyboardVersions`, `coverageChecklist` |
+| `fashion-step:story-theater-generate` | `storyTheaterVersions`, `selectedStoryTopic`, `coverageChecklist` |
 | `fashion-step:ops-generate` | `opsPack` |
 
 分镜阶段 `storyboardVersions` 中 **每个出现的版本必须 6 镜**（`panels.length === 6`）；解析失败即视为本阶段未完成，须重试。
+
+故事剧场阶段 `storyTheaterVersions` 中每个 T 版 **panels 长度必须是 6、7 或 8**，`index` 从 1 连续到该版镜数；字段键名必须与 schema 一致（`sceneDesc` / `modelAction` / `dialogue` 等），禁止别名。
 
 服务端：`extractFashionDeliverable(text, phase)` → Zod phase schema 校验 → `pickFashionPhaseMergePatch` → `mergeFashionDeliverablePatch`。
 

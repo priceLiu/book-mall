@@ -13,6 +13,7 @@ import {
   pickFashionPhaseMergePatch,
   resolveFashionDeliverableForProject,
 } from "@/lib/ecom/ecom-fashion-deliverable";
+import { buildStoryTheaterSystemPrompt } from "@/lib/ecom/ecom-story-theater-prompts";
 import type { StoryboardSheet } from "@/lib/ecom/ecom-storyboard-types";
 import { renderFashionDeliverableMarkdown } from "@/lib/ecom/ecom-fashion-deliverable-render";
 
@@ -524,5 +525,93 @@ ${JSON.stringify({
     expect(resolved?.selectedVersion).toBe("C");
     expect(resolved?.storyboardLocked).toBe(true);
     expect(fashionVersionToSheet(resolved!)?.panels.length).toBeGreaterThan(0);
+  });
+});
+
+describe("extractFashionDeliverable · story theater", () => {
+  const theaterPanel = (index: number) => ({
+    ...PANEL_FIXTURE(Math.min(6, index)),
+    index,
+  });
+
+  const t1Eight = {
+    id: "T1",
+    title: "T1 痛点开场",
+    summary: "先演烦恼再换装",
+    panels: [1, 2, 3, 4, 5, 6, 7, 8].map(theaterPanel),
+    totalDurationSec: 36,
+  };
+
+  it("accepts 8-panel T1 (story theater allows 6–8 shots)", () => {
+    const fenced = `\`\`\`json
+${JSON.stringify({
+  schemaVersion: "fashion-v4",
+  vertical: "fashion_apparel",
+  storyTheaterVersions: { T1: t1Eight },
+})}
+\`\`\``;
+    const parsed = extractFashionDeliverable(fenced, "story_theater");
+    expect(parsed?.storyTheaterVersions?.T1?.panels).toHaveLength(8);
+    expect(parsed?.storyTheaterVersions?.T1?.panels?.[7]?.index).toBe(8);
+  });
+
+  it("rejects union-string schemaVersion that is not the contract literal", () => {
+    const fenced = `\`\`\`json
+${JSON.stringify({
+  schemaVersion: "fashion-v4 或 pro-v1",
+  vertical: "fashion_apparel",
+  storyTheaterVersions: { T1: t1Eight },
+})}
+\`\`\``;
+    expect(extractFashionDeliverable(fenced, "story_theater")).toBeNull();
+  });
+
+  it("salvages complete T1–T2 from truncated T5 JSON", () => {
+    const t2 = { ...t1Eight, id: "T2", title: "T2 卖点放大" };
+    const truncated = `{"storyTheaterVersions":{"T1":${JSON.stringify(t1Eight)},"T2":${JSON.stringify(t2)},"T5":{"id":"T5","title":"未写完","panels":[{"index":1,"shotScale":"中景"`;
+    const parsed = extractFashionDeliverable(truncated, "story_theater");
+    expect(parsed?.storyTheaterVersions?.T1?.panels).toHaveLength(8);
+    expect(parsed?.storyTheaterVersions?.T2?.title).toBe("T2 卖点放大");
+    expect(parsed?.storyTheaterVersions?.T5).toBeUndefined();
+  });
+
+  it("prompt contract uses exact schemaVersion / vertical and forbids field aliases", () => {
+    const prompt = buildStoryTheaterSystemPrompt("fashion_apparel", {
+      productName: "裙",
+      dimensions: {},
+      sellpoints: [{ id: "S01", text: "垂坠" }],
+      selectedTopicTitle: "临时约会",
+      selectedStoryCore: "来不及搭配",
+    });
+    expect(prompt).toContain('"schemaVersion": "fashion-v4"');
+    expect(prompt).toContain('"vertical": "fashion_apparel"');
+    expect(prompt).not.toContain("fashion-v4 或 pro-v1");
+    expect(prompt).toContain("禁止 shot_desc");
+    expect(prompt).toContain("index 从 1 连续编号");
+  });
+
+  it("coerces shot_desc / audio_voice aliases before persist", () => {
+    const aliasPanel = {
+      index: 1,
+      shot_desc: "清晨通勤街角展示垂坠裙摆与腰线剪裁",
+      audio_voice: "这件终于把腰线收住了",
+      sellpointIds: ["S01"],
+    };
+    const payload = {
+      storyTheaterVersions: {
+        T1: {
+          id: "T1",
+          title: "T1",
+          panels: Array.from({ length: 6 }, (_, i) => ({
+            ...aliasPanel,
+            index: i + 1,
+          })),
+        },
+      },
+    };
+    const parsed = extractFashionDeliverable(JSON.stringify(payload), "story_theater");
+    expect(parsed?.storyTheaterVersions?.T1?.panels).toHaveLength(6);
+    expect(parsed?.storyTheaterVersions?.T1?.panels?.[0]?.sceneDesc).toContain("通勤");
+    expect(parsed?.storyTheaterVersions?.T1?.panels?.[0]?.dialogue).toContain("腰线");
   });
 });

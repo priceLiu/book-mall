@@ -56,6 +56,9 @@ import {
   PRO2_SCRIPT_HUB_ORPHAN_RECONCILE_GRACE_MS,
   shouldDeferLibtvOrphanReconcile,
 } from "./canvas-run-session";
+import {
+  isLibtvLocalMediaJobRuntime,
+} from "./libtv-local-media-job";
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import { isStoryWorkspaceNodeType } from "./types";
 
@@ -633,6 +636,7 @@ export function reconcileStaleInflightRuntimes(
 
     const rt = (node.data as { runtime?: CanvasNodeRuntime }).runtime;
     if (!rt || !isInflightStatus(rt.status)) continue;
+    if (isLibtvLocalMediaJobRuntime(rt)) continue;
 
     const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
     const inflight = nodeTasks.some(

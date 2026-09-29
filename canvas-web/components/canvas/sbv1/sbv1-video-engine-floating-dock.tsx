@@ -136,7 +136,6 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
         upstreamTextLinks,
         pro2BoardDockLinks,
         nodes,
-        undefined,
         motionVideoLinks,
       ),
     [

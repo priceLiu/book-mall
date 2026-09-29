@@ -292,9 +292,16 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
 
   usePruneStaleDockMentions({
     nodeId,
-    prompt: storedPrompt,
+    prompt: String(data.prompt ?? ""),
     mentionables,
     field: "prompt",
+    updateNodeData,
+  });
+  usePruneStaleDockMentions({
+    nodeId,
+    prompt: String(data.dockInput ?? ""),
+    mentionables,
+    field: "dockInput",
     updateNodeData,
   });
 

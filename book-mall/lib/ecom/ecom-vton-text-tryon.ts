@@ -2,8 +2,10 @@ import { randomUUID } from "crypto";
 
 import { assertEcomStoryboardImageEditRefs } from "@/lib/ecom/ecom-storyboard-image-edit";
 import { generateEcomImage } from "@/lib/ecom/ecom-image-gen-invoke";
-import type { EcomImageRatio } from "@/lib/ecom/ecom-platform-spec";
-import { resolveEcomGeneratePixelSize } from "@/lib/ecom/ecom-storyboard-gen-params";
+import {
+  ecomRatioFromPixelSize,
+  resolveEcomGeneratePixelSize,
+} from "@/lib/ecom/ecom-storyboard-gen-params";
 import {
   getEcomModelTryonProject,
   saveEcomModelTryonResultToAssets,
@@ -18,7 +20,12 @@ import {
 } from "@/lib/ecom/ecom-vton-text-tryon-models";
 import { ecomStoryboardImageEditMaxRefs } from "@/lib/ecom/ecom-storyboard-image-edit";
 import { mergeVtonMeta, sanitizeVtonProjectMeta } from "@/lib/ecom/ecom-vton/meta";
-import type { VtonTextTryonRef } from "@/lib/ecom/ecom-vton/types";
+import {
+  enqueueDetached,
+  isVtonAsyncJobRunning,
+  vtonAsyncJobNow,
+} from "@/lib/ecom/ecom-vton/async-job";
+import type { VtonTextTryonJob, VtonTextTryonRef } from "@/lib/ecom/ecom-vton/types";
 import { resolveMediaDecomposeUpload } from "@/lib/ecom/ecom-media-decompose-media";
 import { persistEcomGenerationRecord } from "@/lib/ecom/ecom-generation-record";
 import { ECOM_MODEL_TRYON_MODULE } from "@/lib/ecom/ecom-model-tryon-types";
@@ -164,14 +171,17 @@ export async function clearEcomVtonTextTryonEditor(
   });
 }
 
-export async function generateEcomVtonTextTryonImage(
-  userId: string,
-  projectId: string,
-  opts?: { prompt?: string; modelKey?: string; ratio?: "3:4" | "4:5" | "1:1" },
-): Promise<ModelTryonProjectDto> {
-  const project = await getEcomModelTryonProject(userId, projectId);
-  if (!project) throw new Error("项目不存在");
+type TextTryonGenerateOpts = {
+  prompt?: string;
+  modelKey?: string;
+  imageSize?: string;
+  ratio?: "3:4" | "4:5" | "1:1" | "9:16" | "16:9";
+};
 
+function resolveTextTryonGenerateInput(
+  project: ModelTryonProjectDto,
+  opts?: TextTryonGenerateOpts,
+) {
   const meta = sanitizeVtonProjectMeta(project.meta);
   const refs = meta.textTryonRefs ?? [];
   if (refs.length < 1) {
@@ -192,68 +202,186 @@ export async function generateEcomVtonTextTryonImage(
   const refImageUrls = resolveTextTryonRefUrls(refs, prompt, maxRefs);
   assertEcomStoryboardImageEditRefs(modelKey, refImageUrls.length);
 
-  const ratio: EcomImageRatio = opts?.ratio ?? "3:4";
-  const pixelSize = resolveEcomGeneratePixelSize({ modelKey, ratio });
-  const { width, height } = parseEcomPixelSize(pixelSize);
-  const ossUrl = await generateEcomImage({
-    userId,
-    modelKey,
-    prompt,
-    ratio,
-    refImageUrls,
-    toolKey: `${ECOM_MODEL_TRYON_TOOL_KEY}__text-tryon`,
+  const imageSize =
+    opts?.imageSize?.trim() || project.settings.textTryonImageSize?.trim();
+  const ratio = opts?.ratio ?? ecomRatioFromPixelSize(imageSize);
+  const pixelSize = resolveEcomGeneratePixelSize({ modelKey, ratio, imageSize });
+
+  return { meta, prompt, modelKey, imageSize, ratio, pixelSize, refImageUrls };
+}
+
+async function persistTextTryonJob(
+  userId: string,
+  projectId: string,
+  job: VtonTextTryonJob,
+): Promise<ModelTryonProjectDto> {
+  const latest = await getEcomModelTryonProject(userId, projectId);
+  if (!latest) throw new Error("项目不存在");
+  return updateEcomModelTryonProject(userId, projectId, {
+    meta: mergeVtonMeta(latest.meta, { textTryonJob: job }),
   });
+}
 
-  const createdAt = new Date().toISOString();
-  const result = {
-    id: randomUUID(),
-    ossUrl,
-    prompt,
-    modelKey,
-    createdAt,
-    ratio,
-    width,
-    height,
-  };
-
-  const autoTitle = `文生试衣 ${new Date(createdAt).toLocaleString("zh-CN")}`;
+async function runEcomVtonTextTryonImageJob(
+  userId: string,
+  projectId: string,
+  job: VtonTextTryonJob,
+  opts?: TextTryonGenerateOpts,
+): Promise<void> {
   try {
-    await saveEcomModelTryonResultToAssets(userId, projectId, {
-      ossUrl,
-      title: autoTitle,
-    });
-  } catch (e) {
-    console.warn("[vton-text-tryon] auto-save to tryon library failed:", e);
-  }
-
-  try {
-    await persistEcomGenerationRecord({
+    const project = await getEcomModelTryonProject(userId, projectId);
+    if (!project) throw new Error("项目不存在");
+    const { meta, prompt, modelKey, imageSize, ratio, pixelSize, refImageUrls } =
+      resolveTextTryonGenerateInput(project, {
+        prompt: opts?.prompt ?? job.prompt,
+        modelKey: opts?.modelKey ?? job.modelKey,
+        imageSize: opts?.imageSize ?? job.imageSize,
+        ratio: opts?.ratio,
+      });
+    const { width, height } = parseEcomPixelSize(pixelSize);
+    const ossUrl = await generateEcomImage({
       userId,
-      ossUrl,
-      title: autoTitle,
+      modelKey,
       prompt,
-      meta: {
-        sourceModule: ECOM_MODEL_TRYON_MODULE,
-        sourceToolKey: `${ECOM_MODEL_TRYON_TOOL_KEY}__text-tryon`,
-        projectId,
-        sourceResultId: result.id,
-        versionKey: `${projectId}:${result.id}`,
-        modelKey,
+      ratio,
+      imageSize: pixelSize,
+      // 文生试衣必有参考图；不传则 wan2.7 丢掉 size，厂商默认横版 16:9
+      wan27KeepPixelSizeWithRefs: true,
+      refImageUrls,
+      toolKey: `${ECOM_MODEL_TRYON_TOOL_KEY}__text-tryon`,
+    });
+
+    const createdAt = new Date().toISOString();
+    const result = {
+      id: randomUUID(),
+      ossUrl,
+      prompt,
+      modelKey,
+      createdAt,
+      ratio,
+      width,
+      height,
+    };
+
+    const autoTitle = `文生试衣 ${new Date(createdAt).toLocaleString("zh-CN")}`;
+    try {
+      await saveEcomModelTryonResultToAssets(userId, projectId, {
+        ossUrl,
+        title: autoTitle,
+      });
+    } catch (e) {
+      console.warn("[vton-text-tryon] auto-save to tryon library failed:", e);
+    }
+
+    try {
+      await persistEcomGenerationRecord({
+        userId,
+        ossUrl,
+        title: autoTitle,
+        prompt,
+        meta: {
+          sourceModule: ECOM_MODEL_TRYON_MODULE,
+          sourceToolKey: `${ECOM_MODEL_TRYON_TOOL_KEY}__text-tryon`,
+          projectId,
+          sourceResultId: result.id,
+          versionKey: `${projectId}:${result.id}`,
+          modelKey,
+        },
+      });
+    } catch (e) {
+      console.warn("[vton-text-tryon] auto-save to generation record failed:", e);
+    }
+
+    const latest = await getEcomModelTryonProject(userId, projectId);
+    if (!latest) throw new Error("项目不存在");
+    const latestMeta = sanitizeVtonProjectMeta(latest.meta);
+    if (latestMeta.textTryonJob?.jobId !== job.jobId) return;
+
+    await updateEcomModelTryonProject(userId, projectId, {
+      meta: mergeVtonMeta(latestMeta, {
+        textTryonPrompt: prompt,
+        textTryonResults: [result, ...(latestMeta.textTryonResults ?? [])],
+        textTryonJob: {
+          ...job,
+          status: "done",
+          updatedAt: vtonAsyncJobNow(),
+          prompt,
+          modelKey,
+          imageSize,
+        },
+      }),
+      settings: {
+        ...latest.settings,
+        textTryonModelKey: modelKey,
+        ...(imageSize ? { textTryonImageSize: imageSize } : {}),
       },
     });
   } catch (e) {
-    console.warn("[vton-text-tryon] auto-save to generation record failed:", e);
+    const message = e instanceof Error ? e.message : "生成失败";
+    try {
+      const latest = await getEcomModelTryonProject(userId, projectId);
+      if (!latest) return;
+      const latestMeta = sanitizeVtonProjectMeta(latest.meta);
+      if (latestMeta.textTryonJob?.jobId !== job.jobId) return;
+      await persistTextTryonJob(userId, projectId, {
+        ...job,
+        status: "failed",
+        updatedAt: vtonAsyncJobNow(),
+        error: message,
+      });
+    } catch (persistErr) {
+      console.error("[vton-text-tryon] persist failed job:", persistErr);
+    }
+  }
+}
+
+/** 落库 running 后立即返回；生图在后台继续，刷新后可轮询 */
+export async function startEcomVtonTextTryonImage(
+  userId: string,
+  projectId: string,
+  opts?: TextTryonGenerateOpts,
+): Promise<ModelTryonProjectDto> {
+  const project = await getEcomModelTryonProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+
+  const { meta, prompt, modelKey, imageSize } = resolveTextTryonGenerateInput(project, opts);
+  if (isVtonAsyncJobRunning(meta.textTryonJob)) {
+    return project;
   }
 
-  const prevResults = meta.textTryonResults ?? [];
-  return updateEcomModelTryonProject(userId, projectId, {
+  const now = vtonAsyncJobNow();
+  const job: VtonTextTryonJob = {
+    jobId: randomUUID(),
+    status: "running",
+    startedAt: now,
+    updatedAt: now,
+    prompt,
+    modelKey,
+    ...(imageSize ? { imageSize } : {}),
+  };
+
+  const started = await updateEcomModelTryonProject(userId, projectId, {
     meta: mergeVtonMeta(meta, {
       textTryonPrompt: prompt,
-      textTryonResults: [result, ...prevResults],
+      textTryonJob: job,
     }),
     settings: {
       ...project.settings,
       textTryonModelKey: modelKey,
+      ...(imageSize ? { textTryonImageSize: imageSize } : {}),
     },
   });
+
+  enqueueDetached("vton-text-tryon", () =>
+    runEcomVtonTextTryonImageJob(userId, projectId, job, opts),
+  );
+  return started;
+}
+
+export async function generateEcomVtonTextTryonImage(
+  userId: string,
+  projectId: string,
+  opts?: TextTryonGenerateOpts,
+): Promise<ModelTryonProjectDto> {
+  return startEcomVtonTextTryonImage(userId, projectId, opts);
 }

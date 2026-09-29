@@ -12,7 +12,17 @@ import {
   effectiveProductionMode,
   isStoryTheaterProductionMode,
 } from "@/lib/story-theater-types";
-import { inferFashionPhaseFromState } from "@/lib/fashion-workflow";
+import {
+  FASHION_GENERATE_STORY_THEATER,
+  FASHION_REGENERATE_STORY_THEATER,
+  FASHION_RELOAD_STORY_TOPICS,
+  fashionLlmStreamIdleTimeoutMs,
+  fashionLlmStreamTimeoutMs,
+  fashionWorkflowPatchForChoice,
+  inferFashionChoices,
+  inferFashionPhaseFromState,
+  isAwaitingStoryTheaterVersionsPending,
+} from "@/lib/fashion-workflow";
 import type { StoryboardProject } from "@/lib/storyboard-types";
 
 describe("story-theater-workflow", () => {
@@ -26,6 +36,14 @@ describe("story-theater-workflow", () => {
   it("defaults legacy productionMode to standard_script", () => {
     expect(effectiveProductionMode(null)).toBe("standard_script");
     expect(isStoryTheaterProductionMode("story_theater")).toBe(true);
+  });
+
+  it("gives story-theater a longer idle and total stream budget than default chat", () => {
+    expect(fashionLlmStreamIdleTimeoutMs("fashion-step:story-theater-generate")).toBe(
+      4 * 60_000,
+    );
+    expect(fashionLlmStreamTimeoutMs("fashion-step:story-theater-generate")).toBe(12 * 60_000);
+    expect(fashionLlmStreamIdleTimeoutMs("fashion-step:sellpoints-generate")).toBe(2 * 60_000);
   });
 
   it("lists story theater version keys with panels", () => {
@@ -82,5 +100,104 @@ describe("inferFashionPhaseFromState · story theater", () => {
       sellpointsLocked: true,
     });
     expect(inferFashionPhaseFromState(project)).toBe("story_topic_pick");
+  });
+});
+
+describe("inferFashionChoices · story theater stuck recovery", () => {
+  const topic = {
+    id: "t1",
+    title: "周末出游纠结穿搭不好搭配",
+    storyCore: "出门前反复换衣",
+    storyType: "场景适配",
+  };
+
+  function storyLineProject(
+    deliverable: Record<string, unknown>,
+    chatHistory: StoryboardProject["chatHistory"] = [],
+  ): StoryboardProject {
+    return {
+      id: "p1",
+      title: "test",
+      status: "draft",
+      chatHistory,
+      references: [{ id: "r1", role: "product", url: "https://x/y.png", label: "产品" }],
+      meta: {
+        workflow: {
+          vertical: "fashion_apparel",
+          fashionPhase: "story_topic_pick",
+        },
+        deliverable: {
+          schemaVersion: "fashion-v4",
+          vertical: "fashion_apparel",
+          productName: "裙",
+          productionMode: "story_theater",
+          sellpoints: [{ id: "S01", text: "显瘦", layer: "core", source: "ai" }],
+          sellpointsLocked: true,
+          ...deliverable,
+        },
+      },
+    };
+  }
+
+  it("offers regenerate when topic is selected but T1–T5 never arrived", () => {
+    const project = storyLineProject(
+      {
+        selectedStoryTopic: topic,
+        storyTopicCandidates: [topic],
+        storyTheaterVersions: {},
+      },
+      [
+        {
+          id: "u1",
+          role: "user",
+          content: storyTopicChoiceLabel(topic.title),
+          createdAt: "",
+        },
+      ],
+    );
+    expect(isAwaitingStoryTheaterVersionsPending(project)).toBe(true);
+    const choices = inferFashionChoices(project);
+    expect(choices.some((c) => c.message === FASHION_REGENERATE_STORY_THEATER)).toBe(true);
+  });
+
+  it("offers generate when topic is selected without a prior request", () => {
+    const project = storyLineProject({
+      selectedStoryTopic: topic,
+      storyTopicCandidates: [topic],
+      storyTheaterVersions: {},
+    });
+    const choices = inferFashionChoices(project);
+    expect(
+      choices.some(
+        (c) =>
+          c.message === FASHION_GENERATE_STORY_THEATER ||
+          c.message === FASHION_REGENERATE_STORY_THEATER,
+      ),
+    ).toBe(true);
+  });
+
+  it("offers reload when awaiting topic pick but candidates are empty", () => {
+    const project = storyLineProject({
+      selectedStoryTopic: null,
+      storyTopicCandidates: [],
+    });
+    const choices = inferFashionChoices(project);
+    expect(choices.some((c) => c.message === FASHION_RELOAD_STORY_TOPICS)).toBe(true);
+  });
+
+  it("generate and regenerate story theater both trigger LLM while keeping the selected topic", () => {
+    const project = storyLineProject({
+      selectedStoryTopic: topic,
+      storyTopicCandidates: [topic],
+      storyTheaterVersions: {},
+    });
+    for (const message of [FASHION_GENERATE_STORY_THEATER, FASHION_REGENERATE_STORY_THEATER]) {
+      const patch = fashionWorkflowPatchForChoice(project, message);
+      expect(patch).not.toBeNull();
+      expect(patch).toHaveProperty("llmTrigger");
+      expect((patch as { deliverable: { selectedStoryTopic?: { title: string } } }).deliverable.selectedStoryTopic?.title).toBe(
+        topic.title,
+      );
+    }
   });
 });

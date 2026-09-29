@@ -6,6 +6,7 @@ import { parseStoryboardSheet } from "./ecom-storyboard-types";
 import type { StoryboardChatMessage } from "./ecom-storyboard-types";
 import {
   extractFashionDeliverable,
+  salvageStoryTheaterVersionsFromText,
   mergeFashionDeliverablePatch,
   type FashionDeliverable,
   type FashionVersionKey,
@@ -47,14 +48,8 @@ export const proVoiceoverSchema = z.object({
 });
 
 export const proPanelRowSchema = z.object({
-  index: z.union([
-    z.literal(1),
-    z.literal(2),
-    z.literal(3),
-    z.literal(4),
-    z.literal(5),
-    z.literal(6),
-  ]),
+  /** 标准分镜 1–6；故事剧场 6–8 镜时可为 7/8 */
+  index: z.number().int().min(1).max(8),
   shotScale: z.string().min(1),
   durationSec: z.number().positive(),
   cameraMove: z.string().min(1),
@@ -166,7 +161,8 @@ function coerceProPanels(raw: unknown, vertical: ProVerticalId): unknown {
   return raw.map((panel, idx) => {
     if (!panel || typeof panel !== "object") return panel;
     const p = panel as Record<string, unknown>;
-    const index = typeof p.index === "number" ? p.index : idx + 1;
+    const rawIndex = typeof p.index === "number" ? p.index : idx + 1;
+    const index = Math.min(8, Math.max(1, Math.round(rawIndex)));
     const sceneDesc =
       typeof p.sceneDesc === "string" && p.sceneDesc.trim()
         ? p.sceneDesc.trim()
@@ -407,33 +403,53 @@ function coerceStoryboardVersionsInPatch(
   }
 }
 
+function coerceStoryTheaterVersionsInPatch(
+  parsed: Record<string, unknown>,
+  vertical: ProVerticalId,
+): void {
+  if (!parsed.storyTheaterVersions || typeof parsed.storyTheaterVersions !== "object") return;
+  const obj = parsed.storyTheaterVersions as Record<string, unknown>;
+  const next: Record<string, unknown> = {};
+  for (const key of ["T1", "T2", "T3", "T4", "T5"]) {
+    const version = obj[key];
+    if (!version || typeof version !== "object") continue;
+    const v = version as Record<string, unknown>;
+    next[key] = { ...v, id: key, panels: coerceProPanels(v.panels, vertical) };
+  }
+  parsed.storyTheaterVersions = next;
+}
+
 function tryParseProPhasePatch(
   jsonRaw: string,
   vertical: ProVerticalId,
   phaseHint?: ProLlmPhase,
 ): Partial<ProDeliverable> | null {
+  let parsed: Record<string, unknown> | null = null;
   try {
-    const parsed = JSON.parse(jsonRaw) as Record<string, unknown>;
-    const rawVertical = typeof parsed.vertical === "string" ? parsed.vertical : undefined;
-    if (rawVertical != null && isProVerticalId(rawVertical) && rawVertical !== vertical) {
-      return null;
-    }
-    if (
-      parsed.schemaVersion != null &&
-      parsed.schemaVersion !== PRO_SCHEMA_VERSION &&
-      parsed.schemaVersion !== "fashion-v4"
-    ) {
-      return null;
-    }
-    coerceStoryboardVersionsInPatch(parsed, vertical);
-    const phase = phaseHint ?? detectProPhaseFromPayload(parsed);
-    if (!phase) return null;
-    const result = schemaForProPhase(phase).safeParse(parsed);
-    if (!result.success) return null;
-    return pickProPhaseMergePatch(result.data as Partial<ProDeliverable>, phase);
+    parsed = JSON.parse(jsonRaw) as Record<string, unknown>;
   } catch {
+    const salvaged = salvageStoryTheaterVersionsFromText(jsonRaw);
+    if (!salvaged) return null;
+    parsed = { storyTheaterVersions: salvaged };
+  }
+  const rawVertical = typeof parsed.vertical === "string" ? parsed.vertical : undefined;
+  if (rawVertical != null && isProVerticalId(rawVertical) && rawVertical !== vertical) {
     return null;
   }
+  if (
+    parsed.schemaVersion != null &&
+    parsed.schemaVersion !== PRO_SCHEMA_VERSION &&
+    parsed.schemaVersion !== "fashion-v4"
+  ) {
+    return null;
+  }
+  coerceStoryboardVersionsInPatch(parsed, vertical);
+  coerceStoryTheaterVersionsInPatch(parsed, vertical);
+  const phase = phaseHint ?? detectProPhaseFromPayload(parsed);
+  if (!phase) return null;
+  const result = schemaForProPhase(phase).safeParse(parsed);
+  if (!result.success) return null;
+  return pickProPhaseMergePatch(result.data as Partial<ProDeliverable>, phase);
 }
 
 export function stripProDeliverableFence(text: string): string {
@@ -459,16 +475,21 @@ export function extractProDeliverable(
   for (const fence of [/```pro-deliverable\s*([\s\S]*?)```/i, /```fashion-deliverable\s*([\s\S]*?)```/i]) {
     const m = trimmed.match(fence);
     if (m?.[1]) {
-      const parsed = tryParseProPhasePatch(m[1].trim(), vertical, phaseHint);
+      const raw = m[1].trim();
+      const parsed = tryParseProPhasePatch(raw, vertical, phaseHint);
       if (parsed) return parsed;
+      if (isCompleteJsonObject(raw)) return null;
     }
   }
   const generic = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (generic?.[1]) {
-    const parsed = tryParseProPhasePatch(generic[1].trim(), vertical, phaseHint);
+    const raw = generic[1].trim();
+    const parsed = tryParseProPhasePatch(raw, vertical, phaseHint);
     if (parsed) return parsed;
+    if (isCompleteJsonObject(raw)) return null;
   }
   const markers = [
+    /\{\s*"storyTheaterVersions"\s*:/,
     /\{\s*"storyboardVersions"\s*:/,
     /\{\s*"schemaVersion"\s*:\s*"pro-v1"/,
     /\{\s*"vertical"\s*:\s*"(?:bags|digital_3c)"/,
@@ -481,9 +502,29 @@ export function extractProDeliverable(
   if (jsonStart < 0) jsonStart = trimmed.indexOf("{");
   const end = trimmed.lastIndexOf("}");
   if (jsonStart >= 0 && end > jsonStart) {
-    return tryParseProPhasePatch(trimmed.slice(jsonStart, end + 1), vertical, phaseHint);
+    const slice = trimmed.slice(jsonStart, end + 1);
+    const parsed = tryParseProPhasePatch(slice, vertical, phaseHint);
+    if (parsed) return parsed;
+    if (isCompleteJsonObject(slice)) return null;
+  }
+  const salvaged = salvageStoryTheaterVersionsFromText(trimmed);
+  if (salvaged) {
+    return tryParseProPhasePatch(
+      JSON.stringify({ storyTheaterVersions: salvaged }),
+      vertical,
+      phaseHint === "story_theater" || !phaseHint ? "story_theater" : phaseHint,
+    );
   }
   return null;
+}
+
+function isCompleteJsonObject(text: string): boolean {
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function listProStoryboardVersionKeys(

@@ -25,7 +25,7 @@ export type FashionVoiceover = {
 };
 
 export type FashionPanelRow = {
-  index: 1 | 2 | 3 | 4 | 5 | 6;
+  index: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
   shotScale: string;
   durationSec: number;
   cameraMove: string;

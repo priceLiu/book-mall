@@ -1,14 +1,11 @@
 import type { MentionableItem } from "@/components/canvas/mentions/MentionsTextarea";
-import { parseReferencedIds } from "@/components/canvas/mentions/MentionsTextarea";
 import type { Pro2DockUpstreamLink } from "./pro2-dock-upstream-links";
 import { buildPro2DockMentionables } from "./pro2-dock-mentionables";
 import {
-  isSbv1VideoEngineRefImageNode,
   type Sbv1UpstreamRefLink,
 } from "./sbv1-upstream-ref-links";
 import type { Sbv1UpstreamTextLink } from "./sbv1-upstream-text-links";
 import { sbv1TextLinksToDockUpstream } from "./sbv1-upstream-text-links";
-import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 import type { CanvasFlowNode } from "./types";
 
 function previewUrlForLink(
@@ -23,7 +20,6 @@ function previewUrlForLink(
 export function buildSbv1DockMentionables(
   upstreamLinks: Sbv1UpstreamRefLink[],
   nodes?: CanvasFlowNode[],
-  prompt?: string,
 ): MentionableItem[] {
   const byId = new Map<string, MentionableItem>();
 
@@ -33,35 +29,6 @@ export function buildSbv1DockMentionables(
       label: link.label,
       kind: "image" as const,
       previewUrl: previewUrlForLink(link, nodes),
-    });
-  }
-
-  for (const id of parseReferencedIds(prompt ?? "")) {
-    if (byId.has(id)) continue;
-    const link = upstreamLinks.find((l) => l.id === id);
-    if (link) {
-      byId.set(id, {
-        id: link.id,
-        label: link.label,
-        kind: "image",
-        previewUrl: previewUrlForLink(link, nodes),
-      });
-      continue;
-    }
-    const nodeId = id.startsWith("sbv1-ref-") ? id.slice("sbv1-ref-".length) : "";
-    const node = nodes?.find(
-      (n) => n.id === nodeId && isSbv1VideoEngineRefImageNode(n),
-    );
-    if (!node) continue;
-    const linkIndex =
-      upstreamLinks.findIndex((l) => l.id === id) + 1 ||
-      upstreamLinks.length + 1;
-    const d = node.data as Sbv1ImageNodeData;
-    byId.set(id, {
-      id,
-      label: d.label?.trim() || `图片 ${linkIndex}`,
-      kind: "image",
-      previewUrl: d.ossUrl ?? d.blobUrl,
     });
   }
 
@@ -122,7 +89,6 @@ export function buildSbv1VideoEngineDockMentionables(
   upstreamTextLinks: Sbv1UpstreamTextLink[],
   extraLinks: Pro2DockUpstreamLink[] = [],
   nodes?: CanvasFlowNode[],
-  prompt?: string,
   motionVideoLinks: Sbv1UpstreamRefLink[] = [],
 ): MentionableItem[] {
   const upstream = buildSbv1VideoEngineDockUpstreamLinks(
@@ -132,7 +98,7 @@ export function buildSbv1VideoEngineDockMentionables(
     motionVideoLinks,
   );
   const items = buildPro2DockMentionables(upstream);
-  const imageExtras = buildSbv1DockMentionables(upstreamRefLinks, nodes, prompt);
+  const imageExtras = buildSbv1DockMentionables(upstreamRefLinks, nodes);
   const seen = new Set(items.map((i) => i.id));
   for (const item of imageExtras) {
     if (seen.has(item.id)) continue;

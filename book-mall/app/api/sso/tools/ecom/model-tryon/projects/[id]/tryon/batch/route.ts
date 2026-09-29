@@ -1,6 +1,6 @@
 import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
-import { runEcomModelTryonBatch } from "@/lib/ecom/ecom-model-tryon-service";
+import { startEcomModelTryonBatch } from "@/lib/ecom/ecom-model-tryon-service";
 import type { VtonLookSpec } from "@/lib/ecom/ecom-vton/types";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
@@ -24,7 +24,7 @@ export async function POST(req: Request, ctx: Ctx) {
   }
 
   try {
-    const project = await runEcomModelTryonBatch(auth.userId, id, {
+    const project = await startEcomModelTryonBatch(auth.userId, id, {
       looks: body.looks,
     });
     return ecomJson({ project });

@@ -89,6 +89,11 @@ type Props = {
   onAspectRatioChange?: (v: StoryboardVideoAspectRatio) => void;
   imageSize?: string;
   onImageSizeChange?: (v: string) => void;
+  /**
+   * 不按分镜/成片画幅过滤尺寸（文生试衣等自由出图）。
+   * 为 true 时列出当前模型全部比例与分辨率。
+   */
+  showAllImageSizes?: boolean;
   /** 尺寸由平台规则决定时（电商产品创作），以只读行替代尺寸下拉 */
   lockedImageSizeLabel?: string;
   /** 只读参数行标题，默认「输出比例」 */
@@ -362,6 +367,7 @@ export function StoryboardModelPickerDialog({
   onAspectRatioChange,
   imageSize = "720*1280",
   onImageSizeChange,
+  showAllImageSizes = false,
   lockedImageSizeLabel,
   lockedFieldLabel = "输出比例",
   dialogTitle,
@@ -492,13 +498,16 @@ export function StoryboardModelPickerDialog({
   const klingImageAspectOnly =
     mode === "image" && imagePickerUsesAspectRatioOnly(draftKey, { lockedRatio: hasLockedRatio });
   const currentImageSizeOptions = useMemo(
-    () =>
-      filterImageSizeOptionsByEcomRatio(
-        imageSizeOptionsForModel(draftKey, { lockedRatio: hasLockedRatio }),
+    () => {
+      const all = imageSizeOptionsForModel(draftKey, { lockedRatio: hasLockedRatio });
+      if (showAllImageSizes) return all;
+      return filterImageSizeOptionsByEcomRatio(
+        all,
         lockedRatioHint ||
           (aspectRatio === "16:9" || aspectRatio === "9:16" ? aspectRatio : undefined),
-      ),
-    [draftKey, lockedRatioHint, hasLockedRatio, aspectRatio],
+      );
+    },
+    [draftKey, lockedRatioHint, hasLockedRatio, aspectRatio, showAllImageSizes],
   );
   const currentVideoResolutionOptions = useMemo(
     () => videoResolutionOptionsForModel(draftKey),
@@ -518,15 +527,17 @@ export function StoryboardModelPickerDialog({
       const next =
         defaultImageSizeForModel(
           draftKey,
-          (lockedRatioHint === "16:9" ||
-          lockedRatioHint === "9:16" ||
-          lockedRatioHint === "3:4" ||
-          lockedRatioHint === "4:5" ||
-          lockedRatioHint === "1:1"
-            ? lockedRatioHint
-            : aspectRatio === "16:9"
-              ? "16:9"
-              : "9:16") as "16:9" | "9:16" | "3:4" | "4:5" | "1:1",
+          (showAllImageSizes
+            ? "3:4"
+            : lockedRatioHint === "16:9" ||
+                lockedRatioHint === "9:16" ||
+                lockedRatioHint === "3:4" ||
+                lockedRatioHint === "4:5" ||
+                lockedRatioHint === "1:1"
+              ? lockedRatioHint
+              : aspectRatio === "16:9"
+                ? "16:9"
+                : "9:16") as "16:9" | "9:16" | "3:4" | "4:5" | "1:1",
           { lockedRatio: hasLockedRatio },
         ) ?? opts[0]?.value;
       if (next && next !== imageSize) onImageSizeChange(next);
@@ -542,6 +553,7 @@ export function StoryboardModelPickerDialog({
     aspectRatio,
     lockedRatioHint,
     hasLockedRatio,
+    showAllImageSizes,
   ]);
 
   useEffect(() => {

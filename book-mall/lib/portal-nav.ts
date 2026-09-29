@@ -28,7 +28,7 @@ export function marketingHomeSectionUrl(
 ): string {
   const base = origin.replace(/\/$/, "");
   const fragment = hash.startsWith("#") ? hash : `#${hash}`;
-  return `${base}/${fragment}`;
+  return `${base}${fragment}`;
 }
 
 export function resolveBookOrigin(): string | null {

@@ -302,6 +302,15 @@ export async function streamStoryboardChat(opts: {
     }
   }, 5000);
 
+  const timeoutMessage = (receivedChars: number) => {
+    const idleSec = Math.round(idleTimeoutMs / 1000);
+    const maxSec = Math.round(maxDurationMs / 1000);
+    return receivedChars > 0
+      ? `助手流式响应超时（${receivedChars} 字已接收）。请点「重新生成故事版」重试；若多次失败请换 Gateway 聊天模型。`
+      : `助手流式响应超时（${idleSec}s 无新内容或总时长超过 ${maxSec}s）。请稍后重试。`;
+  };
+
+  let full = "";
   try {
     const res = await fetch(
       `/api/book-mall/api/sso/tools/ecom/storyboard/projects/${opts.projectId}/assistant/chat`,
@@ -338,7 +347,6 @@ export async function streamStoryboardChat(opts: {
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
-    let full = "";
     try {
       while (true) {
         const { done, value } = await reader.read();
@@ -351,22 +359,24 @@ export async function streamStoryboardChat(opts: {
     } catch (readError) {
       const msg = readError instanceof Error ? readError.message : String(readError);
       if (readError instanceof Error && readError.name === "AbortError") {
-        const idleSec = Math.round(idleTimeoutMs / 1000);
-        const maxSec = Math.round(maxDurationMs / 1000);
-        throw new Error(
-          full.trim().length > 0
-            ? `助手流式响应超时（${full.length} 字已接收）。请点「重新生成分镜」重试；若多次失败请换 Gateway 聊天模型或缩短口播脚本。`
-            : `助手流式响应超时（${idleSec}s 无新内容或总时长超过 ${maxSec}s）。请稍后重试。`,
-        );
+        if (full.trim().length > 0) return full;
+        throw new Error(timeoutMessage(0));
       }
       if (/network error|failed to fetch|load failed|aborted|abort/i.test(msg)) {
+        if (full.trim().length > 0) return full;
         throw new Error(
-          "助手流式连接中断（可能是生成内容过长或服务超时）。请稍后重试「重新生成分镜」；若仍失败请检查 Gateway 聊天模型是否可用。",
+          "助手流式连接中断（可能是生成内容过长或服务超时）。请稍后重试「重新生成故事版」；若仍失败请检查 Gateway 聊天模型是否可用。",
         );
       }
       throw readError instanceof Error ? readError : new Error(msg);
     }
     return full;
+  } catch (fetchError) {
+    if (fetchError instanceof Error && fetchError.name === "AbortError") {
+      if (full.trim().length > 0) return full;
+      throw new Error(timeoutMessage(0));
+    }
+    throw fetchError;
   } finally {
     clearTimeout(maxTimer);
     clearInterval(idleTimer);

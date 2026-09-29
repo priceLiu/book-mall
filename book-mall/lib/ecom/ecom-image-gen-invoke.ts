@@ -38,7 +38,8 @@ import {
  */
 
 /** 可灵只接受三种比例，取数值上最接近的一档 */
-function toKlingAspect(ratio: EcomImageRatio): "16:9" | "9:16" | "1:1" {
+function toKlingAspect(ratio: EcomImageRatio | "9:16"): "16:9" | "9:16" | "1:1" {
+  if (ratio === "9:16") return "9:16";
   const value = { "1:1": 1, "3:4": 0.75, "4:5": 0.8, "16:9": 16 / 9 }[ratio];
   const candidates: Array<{ key: "16:9" | "9:16" | "1:1"; value: number }> = [
     { key: "16:9", value: 16 / 9 },
@@ -123,7 +124,7 @@ async function generateMultimodalSyncImage(opts: {
   prompt: string;
   negativePrompt?: string;
   promptExtend?: boolean;
-  ratio: EcomImageRatio;
+  ratio: EcomImageRatio | "9:16";
   imageSize?: string;
   refImageUrls: string[];
   toolKey: string;
@@ -175,7 +176,7 @@ export async function generateEcomImage(opts: {
   negativePrompt?: string;
   /** 关闭时可避免厂商扩写覆盖精细 Prompt（如头像扩全身） */
   promptExtend?: boolean;
-  ratio: EcomImageRatio;
+  ratio: EcomImageRatio | "9:16";
   /** 像素 size（如 1080*1440）或 KIE 档位 2K/4K */
   imageSize?: string;
   /** wan2.7 有参考图时仍下发竖向 pixel size（头像扩全身等） */

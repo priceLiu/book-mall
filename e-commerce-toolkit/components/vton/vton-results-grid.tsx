@@ -492,8 +492,9 @@ export function VtonResultsGrid({
                         <img
                           src={displayUrl!}
                           alt={label}
-                          className="h-full w-full object-contain object-top"
+                          className="h-full w-full cursor-zoom-in object-contain object-top"
                           draggable={false}
+                          onClick={() => openPreview(displayUrl!, label, previewItems)}
                         />
                         {cellRefining ? (
                           <EcomMediaGeneratingBusy label="精修中" className="z-[2]" />

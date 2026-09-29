@@ -18,6 +18,7 @@ type Props = {
   onRegenerate?: () => void;
   onRefine?: () => void;
   onOpenFittingRoom?: () => void;
+  /** 仅锁定重新生成 / 精修；预览、下载、入库对已完成成图始终可用 */
   disabled?: boolean;
 };
 
@@ -47,9 +48,11 @@ export function VtonResultImageHoverActions({
     return null;
   }
 
-  const btnClass = cn(
+  const viewBtnClass = cn(ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS, "pointer-events-auto");
+  const mutateBtnClass = cn(
     ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS,
-    disabled && "pointer-events-none opacity-50",
+    "pointer-events-auto",
+    disabled && "opacity-50",
   );
 
   return (
@@ -61,8 +64,8 @@ export function VtonResultImageHoverActions({
             type="button"
             title="预览"
             aria-label="预览"
-            className={cn(btnClass, "pointer-events-auto")}
-            disabled={disabled}
+            className={viewBtnClass}
+            disabled={false}
             onClick={(e) => {
               stopClick(e);
               onPreview();
@@ -76,8 +79,7 @@ export function VtonResultImageHoverActions({
             type="button"
             title="下载"
             aria-label="下载"
-            className={cn(btnClass, "pointer-events-auto")}
-            disabled={disabled}
+            className={viewBtnClass}
             onClick={(e) => {
               stopClick(e);
               onDownload();
@@ -91,8 +93,7 @@ export function VtonResultImageHoverActions({
             type="button"
             title="保存到试衣库"
             aria-label="保存到试衣库"
-            className={cn(btnClass, "pointer-events-auto")}
-            disabled={disabled}
+            className={viewBtnClass}
             onClick={(e) => {
               stopClick(e);
               onSaveToAssets();
@@ -106,8 +107,7 @@ export function VtonResultImageHoverActions({
             type="button"
             title="保存到库"
             aria-label="保存到库"
-            className={cn(btnClass, "pointer-events-auto")}
-            disabled={disabled}
+            className={viewBtnClass}
             onClick={(e) => {
               stopClick(e);
               onSaveToCatalog();
@@ -121,7 +121,7 @@ export function VtonResultImageHoverActions({
             type="button"
             title="重新生成"
             aria-label="重新生成"
-            className={cn(btnClass, "pointer-events-auto")}
+            className={mutateBtnClass}
             disabled={disabled}
             onClick={(e) => {
               stopClick(e);
@@ -136,7 +136,7 @@ export function VtonResultImageHoverActions({
             type="button"
             title="精修"
             aria-label="精修"
-            className={cn(btnClass, "pointer-events-auto")}
+            className={mutateBtnClass}
             disabled={disabled}
             onClick={(e) => {
               stopClick(e);
@@ -151,8 +151,7 @@ export function VtonResultImageHoverActions({
             type="button"
             title="试衣库"
             aria-label="试衣库"
-            className={cn(btnClass, "pointer-events-auto")}
-            disabled={disabled}
+            className={viewBtnClass}
             onClick={(e) => {
               stopClick(e);
               onOpenFittingRoom();

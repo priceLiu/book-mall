@@ -30,9 +30,17 @@ describe("stripStaleMentionTokensFromPrompt", () => {
     );
   });
 
-  it("keeps script/sync ids even when not in mentionables catalog", () => {
+  it("keeps wizard/script ids even when not in mentionables catalog", () => {
     const prompt = "角色 @<ref-char-c1> @<sbv1-ref-node1>";
-    expect(stripStaleMentionTokensFromPrompt(prompt, [])).toBe(prompt);
+    expect(stripStaleMentionTokensFromPrompt(prompt, [])).toBe(
+      "角色 @<ref-char-c1>",
+    );
+  });
+
+  it("strips disconnected upstream sbv1-ref when not in catalog", () => {
+    expect(
+      stripStaleMentionTokensFromPrompt("动 @<sbv1-ref-n1>", []),
+    ).toBe("动");
   });
 });
 
