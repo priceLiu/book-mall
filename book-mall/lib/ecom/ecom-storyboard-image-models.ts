@@ -3,6 +3,7 @@ import {
   WAN26_IMAGE_MODEL,
   WAN27_IMAGE_MODEL,
 } from "@/lib/gateway/dashscope-client";
+import { isKieGptImageModelKey } from "@/lib/canvas/providers/kie";
 
 /** 阿里 DashScope 万相多图 messages 参考（经 Gateway） */
 export const STORYBOARD_DASHSCOPE_IMAGE_MODELS = [
@@ -23,7 +24,7 @@ export const STORYBOARD_MULTIMODAL_SYNC_IMAGE_MODELS = [
 export const STORYBOARD_KLING_IMAGE_MODELS = ["kling-3.0-image"] as const;
 
 /** KIE 多图 image_input 参考（经 Gateway） */
-export const STORYBOARD_KIE_IMAGE_MODELS = ["nano-banana-pro"] as const;
+export const STORYBOARD_KIE_IMAGE_MODELS = ["nano-banana-pro", "gpt-image-2"] as const;
 
 export const STORYBOARD_IMAGE_MODELS = [
   ...STORYBOARD_DASHSCOPE_IMAGE_MODELS,
@@ -68,9 +69,11 @@ export function resolveStoryboardKlingModel(modelKey?: string): string {
 }
 
 export function resolveStoryboardKieModel(modelKey?: string): string {
-  const k = modelKey?.trim().toLowerCase() ?? "";
+  const raw = modelKey?.trim() ?? "";
+  const k = raw.toLowerCase();
+  if (isKieGptImageModelKey(k)) return raw;
   if (k === "nano-banana" || k === "nanobanana") return "nano-banana-pro";
-  if ((STORYBOARD_KIE_IMAGE_MODELS as readonly string[]).includes(k as never)) {
+  if ((STORYBOARD_KIE_IMAGE_MODELS as readonly string[]).includes(k)) {
     return k;
   }
   return "nano-banana-pro";
@@ -88,7 +91,7 @@ export function isStoryboardKlingImageModel(modelKey: string): boolean {
 
 export function isStoryboardKieImageModel(modelKey: string): boolean {
   const k = modelKey.trim().toLowerCase();
-  return k.includes("nano-banana") || k === "nanobanana";
+  return k.includes("nano-banana") || k === "nanobanana" || isKieGptImageModelKey(k);
 }
 
 /** 分镜生图须传入参考图；纯文生图模型不可用 */

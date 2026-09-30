@@ -37,6 +37,16 @@ export const ECOM_MODULES: EcomModuleDef[] = [
     tile: "light",
   },
   {
+    id: "product-image-set",
+    title: "AI 商品套图",
+    tagline: "白底/卖点/场景套图 + 可选上架文案",
+    href: "/ecom/product-image-set",
+    kind: "image",
+    toolKey: "ecom-toolkit__product-image-set",
+    action: "generate",
+    tile: "light",
+  },
+  {
     id: "detail-page-creation",
     title: "电商产品详情页创作",
     tagline: "详情页架构 + 分屏文案与配图",

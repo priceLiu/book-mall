@@ -126,6 +126,7 @@ model User {
   ecomProductDesignProjects        EcomProductDesignProject[]
   ecomSeedVideoProjects            EcomSeedVideoProject[]
   ecomHandCraftProjects            EcomHandCraftProject[]
+  ecomProductImageSetProjects      EcomProductImageSetProject[]
   ecomModelShotProjects            EcomModelShotProject[]
   ecomMediaDecomposeProjects       EcomMediaDecomposeProject[]
   ecomImageLayerProjects           EcomImageLayerProject[]
@@ -767,6 +768,53 @@ model EcomHandCraftProject {
   meta        Json?
 
   /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
+}
+
+/// 电商工具箱 · AI 商品套图（白底/卖点/场景/其他 + 可选上架文案）
+/// 电商工具箱 · 统一预置风格库（卖点版式 / 爆款风格；运营在 Book 模板管理维护缩略图与名称）
+model EcomStylePresetEntry {
+  id           String    @id
+  kind         String
+  verticals    Json      @default("[]")
+  title        String
+  subtitle     String?
+  layoutPrompt String?   @db.Text
+  visualPrompt String?   @db.Text
+  palette      Json?
+  thumbUrl     String?
+  referenceUrl String?
+  sortOrder    Int       @default(0)
+  enabled      Boolean   @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([kind, enabled, deletedAt])
+  @@index([sortOrder])
+}
+
+model EcomProductImageSetProject {
+  id         String  @id @default(cuid())
+  userId     String
+  title      String?
+  module     String  @default("product-image-set")
+  status     String  @default("draft")
+  settings   Json?
+  references Json?
+  output     Json?
+  meta       Json?
+
   tenantId    String?
   ownerUserId String?
   visibility  AssetVisibility @default(PRIVATE)

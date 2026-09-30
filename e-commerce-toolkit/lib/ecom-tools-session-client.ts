@@ -1,10 +1,13 @@
 "use client";
 
+import type { EcomShellUser } from "@/lib/ecom-session.server";
+
 export type EcomToolsSessionClientInfo = {
   hasCookie: boolean;
   active: boolean;
   tokenExpiresAt?: number | null;
   introspect?: unknown;
+  shellUser?: EcomShellUser | null;
 };
 
 let inflightLite: Promise<EcomToolsSessionClientInfo> | null = null;
@@ -18,13 +21,21 @@ async function fetchSession(url: string): Promise<EcomToolsSessionClientInfo> {
     active?: boolean;
     tokenExpiresAt?: number | null;
     introspect?: unknown;
+    shellUser?: EcomShellUser | null;
   };
+  const shellUser =
+    data.shellUser &&
+    typeof data.shellUser === "object" &&
+    typeof data.shellUser.name === "string"
+      ? data.shellUser
+      : null;
   return {
     hasCookie: Boolean(data.hasCookie),
     active: Boolean(data.active),
     tokenExpiresAt:
       typeof data.tokenExpiresAt === "number" ? data.tokenExpiresAt : null,
     introspect: data.introspect,
+    shellUser,
   };
 }
 

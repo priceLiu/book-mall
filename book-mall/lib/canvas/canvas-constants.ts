@@ -283,6 +283,18 @@ export function buildEcomTextTryonDemoOssKey(
   return `ecom/text-tryon-demo/${slot}.${safeExt}`;
 }
 
+/** 电商工具箱 · 预置风格库（卖点版式缩略图 / 参考图） */
+export function buildEcomStylePresetOssKey(id: string, ext: string): string {
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeExt = ext.replace(/^\./, "").toLowerCase() || "webp";
+  return `ecom/style-presets/${safeId}.${safeExt}`;
+}
+
+export function buildEcomStylePresetThumbOssKey(id: string): string {
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `ecom/style-presets/${safeId}-thumb.webp`;
+}
+
 /** 电商工具箱 · 模板区案例图（固定 key，按 category 分子目录） */
 export function buildEcomTemplateGalleryOssKey(
   category: string,

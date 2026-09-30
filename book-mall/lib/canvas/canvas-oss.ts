@@ -19,6 +19,8 @@ import {
   buildEcomPoseLibraryOssKey,
   buildEcomSceneLibraryOssKey,
   buildEcomTextTryonDemoOssKey,
+  buildEcomStylePresetOssKey,
+  buildEcomStylePresetThumbOssKey,
   buildEcomTemplateGalleryOssKey,
   buildEcomTemplateGallerySlotOssKey,
   buildEcomTemplateGalleryThumbOssKey,
@@ -29,6 +31,7 @@ import {
   extractVideoFirstFrameJpeg,
   remuxMp4Faststart,
 } from "./video-poster-ffmpeg";
+import { buildEcomGalleryThumbWebp } from "@/lib/ecom/ecom-gallery-thumb";
 
 const MAX_IMAGE_BYTES = 30 * 1024 * 1024; // 30MB
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200MB
@@ -478,6 +481,35 @@ export function ossPublicUrlForKeyFromEnv(key: string): string {
   const base = process.env.OSS_PUBLIC_URL_BASE?.trim().replace(/\/$/, "");
   if (base) return `${base}/${key}`;
   return `https://${cfgRaw.bucket}.${cfgRaw.region}.aliyuncs.com/${key}`;
+}
+
+/** 电商工具箱 · 预置风格库版式图（原图 + 列表缩略 WebP） */
+export async function uploadEcomStylePresetAssets(args: {
+  id: string;
+  buf: Buffer;
+  contentType: string;
+  ext: string;
+}): Promise<{ url: string; thumbUrl: string }> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const key = buildEcomStylePresetOssKey(args.id, args.ext);
+  const url = await uploadBufferToOss({
+    cfg: cfgRaw,
+    key,
+    buf: args.buf,
+    contentType: args.contentType,
+  });
+  const thumbBuf = await buildEcomGalleryThumbWebp(args.buf);
+  const thumbKey = buildEcomStylePresetThumbOssKey(args.id);
+  const thumbUrl = await uploadBufferToOss({
+    cfg: cfgRaw,
+    key: thumbKey,
+    buf: thumbBuf,
+    contentType: "image/webp",
+  });
+  return { url, thumbUrl };
 }
 
 /** 电商工具箱 · 模板区案例图（固定 OSS key）。 */

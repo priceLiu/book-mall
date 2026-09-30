@@ -86,6 +86,7 @@
     "canvas:sync-style-library": "tsx scripts/fetch-style-library-from-html.ts && dotenv -e .env.local -- tsx scripts/upload-style-library-images.ts",
     "canvas:upload-style-library": "dotenv -e .env.local -- tsx scripts/upload-style-library-images.ts",
     "ecom:seed-catalog": "dotenv -e .env.local -- tsx scripts/seed-ecom-catalog-from-json.ts",
+    "ecom:seed-style-preset-posters": "dotenv -e .env.local -- tsx scripts/seed-ecom-style-preset-posters.ts",
     "ecom:import-model-library": "dotenv -e .env.local -- tsx scripts/import-ecom-model-library.ts",
     "ecom:import-pose-library-md": "dotenv -e .env.local -- tsx scripts/import-ecom-pose-library-md.ts",
     "ecom:import-template-gallery": "dotenv -e .env.local -- tsx scripts/import-ecom-template-gallery.ts",

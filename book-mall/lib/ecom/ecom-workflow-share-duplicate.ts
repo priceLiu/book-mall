@@ -9,6 +9,8 @@ import { ECOM_MEDIA_DECOMPOSE_MODULE } from "@/lib/ecom/ecom-media-decompose-typ
 import { createEcomModelShotProject } from "@/lib/ecom/ecom-model-shot-service";
 import { ECOM_MODEL_SHOT_MODULE } from "@/lib/ecom/ecom-model-shot-types";
 import { createProductDesignProject } from "@/lib/ecom/ecom-product-design-service";
+import { createProductImageSetProject } from "@/lib/ecom/product-image-set/project-service";
+import { ECOM_PRODUCT_IMAGE_SET_MODULE } from "@/lib/ecom/product-image-set/types";
 import { createEcomSeedVideoProject } from "@/lib/ecom/ecom-seed-video-service";
 import { createEcomStoryboardProject } from "@/lib/ecom/ecom-storyboard-service";
 import { ECOM_STORYBOARD_MODULE } from "@/lib/ecom/ecom-storyboard-types";
@@ -22,6 +24,7 @@ export const ECOM_WORKFLOW_SHARE_RESOURCE = {
   seedVideo: "ecom_seed_video_project",
   mediaDecompose: "ecom_media_decompose_project",
   filmPull: "ecom_film_pull_project",
+  productImageSet: "ecom_product_image_set_project",
 } as const;
 
 function shareTitle(base: string | null | undefined, fallback: string): string {
@@ -46,6 +49,8 @@ export function ecomWorkflowShareRedirectPath(
       return `/ecom/media-decompose?projectId=${q}`;
     case ECOM_WORKFLOW_SHARE_RESOURCE.filmPull:
       return `/ecom/film-pull?projectId=${q}`;
+    case ECOM_WORKFLOW_SHARE_RESOURCE.productImageSet:
+      return `/ecom/product-image-set?projectId=${q}`;
     case ECOM_WORKFLOW_SHARE_RESOURCE.storyboard:
     default:
       return `/ecom/storyboard/micro-drama?projectId=${q}`;
@@ -87,6 +92,8 @@ export function ecomWorkflowShareSessionStorageKey(resourceType: string): string
       return "ecom-film-pull-active-project";
     case ECOM_WORKFLOW_SHARE_RESOURCE.productDesign:
       return "ecom-product-design-active-project:main-image";
+    case ECOM_WORKFLOW_SHARE_RESOURCE.productImageSet:
+      return "ecom-product-image-set-active-project";
     default:
       return null;
   }
@@ -111,6 +118,8 @@ export async function duplicateEcomWorkflowForShareClaim(input: {
       return duplicateMediaDecompose(input);
     case ECOM_WORKFLOW_SHARE_RESOURCE.filmPull:
       return duplicateFilmPull(input);
+    case ECOM_WORKFLOW_SHARE_RESOURCE.productImageSet:
+      return duplicateProductImageSet(input);
     case ECOM_WORKFLOW_SHARE_RESOURCE.storyboard:
     default:
       return duplicateStoryboard(input);
@@ -318,6 +327,36 @@ async function duplicateFilmPull(input: {
       refMatch: source.refMatch ?? Prisma.JsonNull,
       productionPlan: source.productionPlan ?? Prisma.JsonNull,
       chatHistory: source.chatHistory ?? Prisma.JsonNull,
+      meta: source.meta ?? Prisma.JsonNull,
+      status: source.status,
+    },
+  });
+  return created.id;
+}
+
+async function duplicateProductImageSet(input: {
+  sourceProjectId: string;
+  sharerUserId: string;
+  claimerUserId: string;
+}): Promise<string> {
+  const source = await prisma.ecomProductImageSetProject.findFirst({
+    where: {
+      id: input.sourceProjectId,
+      userId: input.sharerUserId,
+      module: ECOM_PRODUCT_IMAGE_SET_MODULE,
+    },
+  });
+  if (!source) throw new Error("商品套图项目不存在或无权分享");
+
+  const created = await createProductImageSetProject(input.claimerUserId, {
+    title: shareTitle(source.title, "AI 商品套图"),
+  });
+  await prisma.ecomProductImageSetProject.update({
+    where: { id: created.id },
+    data: {
+      references: source.references ?? [],
+      settings: source.settings ?? {},
+      output: source.output ?? { slots: [] },
       meta: source.meta ?? Prisma.JsonNull,
       status: source.status,
     },

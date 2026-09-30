@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { fetchEcomToolsSessionWithIntrospect } from "@/lib/ecom-tools-introspect";
+import { ecomShellUserFromToolsToken } from "@/lib/ecom-session.server";
 import { readJwtExpSec, isToolsJwtExpired } from "@/lib/tools-jwt-exp";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 import {
@@ -26,16 +27,19 @@ export async function GET(request: NextRequest) {
       active: false,
       introspect: null,
       tokenExpiresAt,
+      shellUser: null,
     });
   }
 
   // 心跳 / 路由切换：只读 JWT 过期，避免每次菜单点击都等 introspect（常 10s+）
   if (lite) {
+    const active = !isToolsJwtExpired(token);
     return NextResponse.json({
       hasCookie: true,
-      active: !isToolsJwtExpired(token),
+      active,
       introspect: null,
       tokenExpiresAt,
+      shellUser: active ? ecomShellUserFromToolsToken(token) : null,
     });
   }
 

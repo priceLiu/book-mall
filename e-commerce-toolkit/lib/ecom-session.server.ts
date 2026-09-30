@@ -13,8 +13,9 @@ export type EcomShellUser = {
  * 壳层用户信息：从 tools_token JWT 本地解码，避免每次路由切换都阻塞在 introspect（常 10s+）。
  * 计费 / 生成准入仍由各 API 与客户端 tools-session 心跳负责。
  */
-export async function getEcomShellUser(): Promise<EcomShellUser | null> {
-  const token = cookies().get("tools_token")?.value;
+export function ecomShellUserFromToolsToken(
+  token: string | null | undefined,
+): EcomShellUser | null {
   const profile = decodeToolsTokenProfile(token);
   if (!profile) return null;
 
@@ -24,4 +25,9 @@ export async function getEcomShellUser(): Promise<EcomShellUser | null> {
     phone: profile.phone,
     avatarUrl: profile.avatarUrl,
   };
+}
+
+export async function getEcomShellUser(): Promise<EcomShellUser | null> {
+  const token = cookies().get("tools_token")?.value;
+  return ecomShellUserFromToolsToken(token);
 }

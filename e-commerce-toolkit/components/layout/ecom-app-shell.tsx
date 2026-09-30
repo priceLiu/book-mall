@@ -12,6 +12,7 @@ import {
   clearEcomSsoReenterAttempts,
   ensureEcomSessionFresh,
 } from "@/lib/ecom-silent-sso";
+import { fetchEcomToolsSessionLite } from "@/lib/ecom-tools-session-client";
 import { isEcomNavPersistentPath } from "@/lib/ecom-browse-hub-paths";
 import { isEcomPublicBrowsePath } from "@/lib/ecom-public-paths";
 import { setEcomRuntimeBookOrigin } from "@/lib/ecom-runtime-config";
@@ -38,6 +39,27 @@ export function EcomAppShell({
   const isPublicBrowse = isEcomPublicBrowsePath(pathname);
   const isBrowseHub = isEcomNavPersistentPath(pathname);
   const [navCollapsed, setNavCollapsed] = React.useState(false);
+  const [shellUser, setShellUser] = React.useState<EcomShellUser | null>(user);
+
+  React.useEffect(() => {
+    setShellUser(user);
+  }, [user]);
+
+  const syncShellUserFromClientSession = React.useCallback(() => {
+    void fetchEcomToolsSessionLite()
+      .then((session) => {
+        if (session.shellUser) {
+          setShellUser(session.shellUser);
+          return;
+        }
+        if (!session.active) setShellUser(null);
+      })
+      .catch(() => {});
+  }, []);
+
+  React.useEffect(() => {
+    if (!user) syncShellUserFromClientSession();
+  }, [user, syncShellUserFromClientSession]);
 
   React.useEffect(() => {
     setEcomRuntimeBookOrigin(bookOrigin);
@@ -65,7 +87,7 @@ export function EcomAppShell({
 
   // 冷启动 / 硬刷新：续签过期 token 或整页 re-enter（与 tool-web 一致，不用 iframe）
   React.useEffect(() => {
-    if (user) {
+    if (user || shellUser) {
       clearEcomSsoReenterAttempts();
       coldStartAttemptedRef.current = false;
       return;
@@ -74,20 +96,21 @@ export function EcomAppShell({
     if (coldStartAttemptedRef.current) return;
     coldStartAttemptedRef.current = true;
     attemptEcomColdStartSso({ bookOrigin, pathname });
-  }, [user, bookOrigin, pathname, isPublicBrowse]);
+  }, [user, shellUser, bookOrigin, pathname, isPublicBrowse]);
 
   React.useEffect(() => {
     const onRefreshed = () => {
       clearEcomSsoReenterAttempts();
       dispatchEcomCreditsBalanceRefresh();
+      syncShellUserFromClientSession();
     };
     window.addEventListener("ecom:tools-session-refreshed", onRefreshed);
     return () =>
       window.removeEventListener("ecom:tools-session-refreshed", onRefreshed);
-  }, []);
+  }, [syncShellUserFromClientSession]);
 
   // 已登录时定时静默续期；失败时不踢到登录页，下一轮心跳再试
-  const loggedIn = Boolean(user);
+  const loggedIn = Boolean(shellUser);
   React.useEffect(() => {
     if (!loggedIn) return;
     const tick = () => {
@@ -127,7 +150,7 @@ export function EcomAppShell({
     if (!navCollapsed) setCollapsed(true);
   }, [navCollapsed, setCollapsed]);
 
-  if (!user && isPublicBrowse) {
+  if (!shellUser && isPublicBrowse) {
     return <>{children}</>;
   }
 
@@ -140,7 +163,7 @@ export function EcomAppShell({
         )}
       >
         <EcomProfileSidebar
-          user={user}
+          user={shellUser}
           bookOrigin={bookOrigin}
           collapsed={navCollapsed}
           onCollapsedChange={setCollapsed}

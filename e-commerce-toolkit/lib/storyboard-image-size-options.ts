@@ -99,7 +99,8 @@ export function isStoryboardKieImageModel(modelKey: string): boolean {
     k.includes("nano-banana") ||
     k.includes("seedream") ||
     k.includes("kie/") ||
-    k === "nano-banana-pro"
+    k === "nano-banana-pro" ||
+    k.startsWith("gpt-image")
   );
 }
 

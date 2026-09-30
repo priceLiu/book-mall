@@ -7,6 +7,7 @@ export const ECOM_WORKFLOW_SHARE_RESOURCE = {
   seedVideo: "ecom_seed_video_project",
   mediaDecompose: "ecom_media_decompose_project",
   filmPull: "ecom_film_pull_project",
+  productImageSet: "ecom_product_image_set_project",
 } as const;
 
 export type EcomWorkflowShareResourceType =
@@ -27,6 +28,8 @@ export const ECOM_WORKFLOW_SHARE_DESCRIPTION: Record<EcomWorkflowShareResourceTy
     "分享 10 位码或主站链接；好友领取副本后可继续查看拆解结果与一键复刻。",
   [ECOM_WORKFLOW_SHARE_RESOURCE.filmPull]:
     "分享 10 位码或主站链接；好友领取副本后可继续编辑拉片结果与制作脚本。",
+  [ECOM_WORKFLOW_SHARE_RESOURCE.productImageSet]:
+    "分享 10 位码或主站链接；好友领取副本后可继续编辑套图结构与槽位出图。",
 };
 
 export function ecomWorkflowShareSessionStorageKey(resourceType: EcomWorkflowShareResourceType): string | null {
@@ -45,6 +48,8 @@ export function ecomWorkflowShareSessionStorageKey(resourceType: EcomWorkflowSha
       return "ecom-film-pull-active-project";
     case ECOM_WORKFLOW_SHARE_RESOURCE.productDesign:
       return "ecom-product-design-active-project:main-image";
+    case ECOM_WORKFLOW_SHARE_RESOURCE.productImageSet:
+      return "ecom-product-image-set-active-project";
     default:
       return null;
   }
