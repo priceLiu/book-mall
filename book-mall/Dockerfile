@@ -11,11 +11,13 @@ WORKDIR /app
 # CloudBase 目标目录是 book-mall/，构建上下文进不去仓库根的 shared/。
 # package.json 的 file:../shared/* 在镜像里解析为 /shared/*，故把快照拷到该路径。
 # 刷新快照（改 shared/ 后、发版前）：
-#   cp -R ../shared/federated-portal-nav ../shared/platform-assistant docker-shared/
+#   node scripts/sync-docker-shared.mjs
+#   或：cp -R ../shared/federated-portal-nav ../shared/platform-assistant ../shared/ecom-copy-overlay docker-shared/
 FROM base AS with-shared
 COPY docker-shared/federated-portal-nav /shared/federated-portal-nav
 COPY docker-shared/media-render-subtitle-style /shared/media-render-subtitle-style
 COPY docker-shared/platform-assistant /shared/platform-assistant
+COPY docker-shared/ecom-copy-overlay /shared/ecom-copy-overlay
 
 FROM with-shared AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
