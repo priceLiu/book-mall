@@ -9,8 +9,8 @@ import {
   LayoutGrid,
   Loader2,
   Maximize2,
-  Pencil,
   RotateCw,
+  Save,
   Scan,
   ScanFace,
   Sparkles,
@@ -24,11 +24,6 @@ import {
   guessMediaDownloadFilename,
 } from "@/lib/canvas/download-media-url";
 import { computeLibtvNodeToolbarTransformScale } from "@/lib/canvas/libtv-node-toolbar-scale";
-import {
-  LIBTV_IMAGE_DIRECT_EDIT_MENU,
-  LIBTV_IMAGE_EDIT_WORKFLOW_MENU,
-  type LibtvImageEditMenuId,
-} from "@/lib/canvas/libtv-image-toolbar-edit";
 import {
   LIBTV_IMAGE_MAGIC_MENU,
   type LibtvImageMagicMenuId,
@@ -90,13 +85,11 @@ export type Pro2ImageNodeToolbarProps = {
   passNodeDrag?: boolean;
   /** 精简模式：仅预览 / 下载 / 复制（视频合成节点） */
   minimal?: boolean;
-  /** Pro2 图片节点 ·「编辑」菜单 */
-  onEditPick?: (menuId: LibtvImageEditMenuId) => void;
   /** Pro2 图片节点 · 宫格切分（列 × 行） */
   onGridSplitPick?: (cols: number, rows: number) => void;
   /** Pro2 图片节点 ·「魔术」菜单 */
   onMagicPick?: (menuId: LibtvImageMagicMenuId) => void;
-  /** 是否展示编辑 / 宫格切分（Pro2 有图节点） */
+  /** 是否展示魔术 / 宫格切分（Pro2 有图节点） */
   pro2ImageTools?: boolean;
   /** 一键反推提示词（Qwen3.8 Max · 自动建文本节点并生成） */
   onReversePrompt?: () => void;
@@ -117,7 +110,6 @@ export function Pro2ImageNodeToolbar({
   style,
   passNodeDrag = false,
   minimal = false,
-  onEditPick,
   onGridSplitPick,
   onMagicPick,
   pro2ImageTools = false,
@@ -127,12 +119,16 @@ export function Pro2ImageNodeToolbar({
   const { alert } = useDialogs();
   const [downloading, setDownloading] = useState(false);
   const dropdowns = usePro2ToolbarExclusiveDropdowns([
-    "edit",
+    "save",
     "magic",
     "grid",
   ] as const);
   const [customGridCols, setCustomGridCols] = useState("3");
   const [customGridRows, setCustomGridRows] = useState("3");
+
+  const hasSaveMenu = Boolean(
+    onImportPortrait || onSaveAsAsset || onSaveToCatalog,
+  );
 
   const soon = async (label: string) => {
     await alert({
@@ -156,8 +152,51 @@ export function Pro2ImageNodeToolbar({
     }
   };
 
+  const saveDropdownMenu = hasSaveMenu ? (
+    <Pro2ToolbarDropdownMenu
+      open={dropdowns.isOpen("save")}
+      setOpen={(v) => (v ? dropdowns.toggle("save") : dropdowns.close())}
+      rect={dropdowns.isOpen("save") ? dropdowns.rect : null}
+      minWidth={220}
+    >
+      {onImportPortrait ? (
+        <Pro2ToolbarDropdownItem
+          icon={ScanFace}
+          label={portraitActive ? "已入库" : "私域人像入库"}
+          disabled={!previewUrl || portraitImporting}
+          onClick={() => {
+            dropdowns.close();
+            onImportPortrait();
+          }}
+        />
+      ) : null}
+      {onSaveAsAsset ? (
+        <Pro2ToolbarDropdownItem
+          icon={BookmarkPlus}
+          label="保存为资产"
+          onClick={() => {
+            dropdowns.close();
+            onSaveAsAsset();
+          }}
+        />
+      ) : null}
+      {onSaveToCatalog ? (
+        <Pro2ToolbarDropdownItem
+          icon={Archive}
+          label="保存到库"
+          disabled={!previewUrl}
+          onClick={() => {
+            dropdowns.close();
+            onSaveToCatalog();
+          }}
+        />
+      ) : null}
+    </Pro2ToolbarDropdownMenu>
+  ) : null;
+
   if (minimal) {
     return (
+      <>
       <ToolbarShell
         passNodeDrag={passNodeDrag}
         className={className}
@@ -199,23 +238,20 @@ export function Pro2ImageNodeToolbar({
             <Copy className="size-5" />
           </button>
         ) : null}
-        {onSaveAsAsset ? (
-          <button type="button" className={ICON_BTN} title="保存为资产" onClick={onSaveAsAsset}>
-            <BookmarkPlus className="size-5" />
-          </button>
-        ) : null}
-        {onSaveToCatalog ? (
+        {hasSaveMenu ? (
           <button
             type="button"
+            ref={dropdowns.bindAnchor("save")}
             className={ICON_BTN}
-            title="保存到全局资产库"
-            disabled={!previewUrl}
-            onClick={onSaveToCatalog}
+            title="保存"
+            onClick={() => dropdowns.toggle("save")}
           >
-            <Archive className="size-5" />
+            <Save className="size-5" />
           </button>
         ) : null}
       </ToolbarShell>
+      {saveDropdownMenu}
+      </>
     );
   }
 
@@ -268,17 +304,6 @@ export function Pro2ImageNodeToolbar({
 
             <button
               type="button"
-              ref={dropdowns.bindAnchor("edit")}
-              className={TOOL_BTN}
-              disabled={!onEditPick}
-              onClick={() => dropdowns.toggle("edit")}
-            >
-              <Pencil className="size-3.5" />
-              <span>编辑</span>
-              <ChevronDown className="size-3 opacity-50" />
-            </button>
-            <button
-              type="button"
               ref={dropdowns.bindAnchor("magic")}
               className={TOOL_BTN}
               disabled={!onMagicPick}
@@ -304,44 +329,23 @@ export function Pro2ImageNodeToolbar({
 
         <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
 
-      {onImportPortrait ? (
+      {hasSaveMenu ? (
         <button
           type="button"
-          className={TOOL_BTN}
-          disabled={!previewUrl || portraitImporting}
-          title={
-            portraitActive
-              ? "已入库 · 生视频将引用 asset://"
-              : "写入火山私域人像库"
-          }
-          onClick={onImportPortrait}
+          ref={dropdowns.bindAnchor("save")}
+          className={cn(
+            TOOL_BTN,
+            portraitImporting && "pointer-events-none opacity-80",
+          )}
+          onClick={() => dropdowns.toggle("save")}
         >
           {portraitImporting ? (
             <Loader2 className="size-3.5 animate-spin" />
           ) : (
-            <ScanFace className="size-3.5" />
+            <Save className="size-3.5" />
           )}
-          <span>{portraitActive ? "已入库" : "私域人像入库"}</span>
-        </button>
-      ) : null}
-
-      {onSaveAsAsset ? (
-        <button type="button" className={TOOL_BTN} onClick={onSaveAsAsset}>
-          <BookmarkPlus className="size-3.5" />
-          <span>保存为资产</span>
-        </button>
-      ) : null}
-
-      {onSaveToCatalog ? (
-        <button
-          type="button"
-          className={TOOL_BTN}
-          title="保存到全局资产库（姿势/服装/模特头像/全身模特）"
-          disabled={!previewUrl}
-          onClick={onSaveToCatalog}
-        >
-          <Archive className="size-3.5" />
-          <span>保存到库</span>
+          <span>保存</span>
+          <ChevronDown className="size-3 opacity-50" />
         </button>
       ) : null}
 
@@ -387,41 +391,10 @@ export function Pro2ImageNodeToolbar({
       ) : null}
       </ToolbarShell>
 
+      {saveDropdownMenu}
+
       {pro2ImageTools ? (
         <>
-          <Pro2ToolbarDropdownMenu
-            open={dropdowns.isOpen("edit")}
-            setOpen={(v) => (v ? dropdowns.toggle("edit") : dropdowns.close())}
-            rect={dropdowns.isOpen("edit") ? dropdowns.rect : null}
-            minWidth={240}
-          >
-            <div className="max-h-[min(420px,60vh)] overflow-y-auto">
-              {LIBTV_IMAGE_DIRECT_EDIT_MENU.map((item) => (
-                <Pro2ToolbarDropdownItem
-                  key={item.id}
-                  icon={item.icon}
-                  label={item.label}
-                  onClick={() => {
-                    dropdowns.close();
-                    onEditPick?.(item.id);
-                  }}
-                />
-              ))}
-              <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
-              {LIBTV_IMAGE_EDIT_WORKFLOW_MENU.map((item) => (
-                <Pro2ToolbarDropdownItem
-                  key={item.id}
-                  icon={item.icon}
-                  label={item.label}
-                  onClick={() => {
-                    dropdowns.close();
-                    onEditPick?.(item.id);
-                  }}
-                />
-              ))}
-            </div>
-          </Pro2ToolbarDropdownMenu>
-
           <Pro2ToolbarDropdownMenu
             open={dropdowns.isOpen("magic")}
             setOpen={(v) => (v ? dropdowns.toggle("magic") : dropdowns.close())}

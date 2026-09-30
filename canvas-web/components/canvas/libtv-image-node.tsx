@@ -104,10 +104,6 @@ import {
   type LibtvImageGridSplitState,
 } from "@/lib/canvas/libtv-image-grid-split";
 import {
-  spawnLibtvImageEditTarget,
-  type LibtvImageEditMenuId,
-} from "@/lib/canvas/libtv-image-toolbar-edit";
-import {
   startLibtvMagicEditFromMenu,
   type LibtvImageMagicMenuId,
 } from "@/lib/canvas/libtv-image-toolbar-magic";
@@ -869,19 +865,6 @@ export function LibtvImageNode({
     updateNodeData(id, { gridSplit: undefined });
   }, [id, updateNodeData]);
 
-  const onEditPick = useCallback(
-    (menuId: LibtvImageEditMenuId) => {
-      if (edition !== "pro2") return;
-      spawnLibtvImageEditTarget(id, menuId, {
-        nodes,
-        addNode,
-        setNodes,
-        setEdges,
-      });
-    },
-    [edition, id, nodes, addNode, setNodes, setEdges],
-  );
-
   const onMagicPick = useCallback(
     (menuId: LibtvImageMagicMenuId) => {
       if (edition !== "pro2") return;
@@ -1344,7 +1327,6 @@ export function LibtvImageNode({
               passNodeDrag
               previewUrl={previewUrl}
               pro2ImageTools={pro2ImageToolbarExtras}
-              onEditPick={pro2ImageToolbarExtras ? onEditPick : undefined}
               onMagicPick={pro2ImageToolbarExtras ? onMagicPick : undefined}
               onGridSplitPick={
                 pro2ImageToolbarExtras ? onGridSplitPick : undefined
