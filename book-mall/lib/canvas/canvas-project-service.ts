@@ -746,6 +746,7 @@ export async function duplicatePortalFeaturedProjectForUser(
   const canvas = cloneCanvasGraphForDuplicate(source.canvas);
   const thumbnailUrl =
     resolveThumbnailUrl({
+      id: source.id,
       thumbnailUrl: source.thumbnailUrl,
       canvas: source.canvas,
     }) || "";
@@ -788,6 +789,7 @@ export async function duplicatePortalCaseProjectForUser(
   const canvas = cloneCanvasGraphForDuplicate(source.canvas);
   const thumbnailUrl =
     resolveThumbnailUrl({
+      id: source.id,
       thumbnailUrl: source.thumbnailUrl,
       canvas: source.canvas,
     }) || "";
@@ -826,6 +828,7 @@ export async function duplicatePortalFilmShowcaseProjectForUser(
   const canvas = cloneCanvasGraphForDuplicate(source.canvas);
   const thumbnailUrl =
     resolveThumbnailUrl({
+      id: source.id,
       thumbnailUrl: source.thumbnailUrl,
       canvas: source.canvas,
     }) || "";

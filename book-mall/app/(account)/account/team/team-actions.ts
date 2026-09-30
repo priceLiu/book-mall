@@ -127,7 +127,7 @@ export async function createTeamAction(formData: FormData): Promise<ActionResult
 
   // 发放共享积分池（首期；后续每 31 天由 credits/monthly-reset 刷新）
   const creditPeriodEnd = subscriptionCreditPeriodEnd(now);
-  const grants = resolvePlanCreditGrants(plan, quote.totalSeats);
+  const grants = resolvePlanCreditGrants(plan, quote.totalSeats, quote.perSeatCredits);
   await grantCredits({
     ref: { ownerType: "TENANT", ownerId: tenant.id },
     credits: grants.credits,

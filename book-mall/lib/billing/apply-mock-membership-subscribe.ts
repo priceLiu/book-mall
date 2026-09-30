@@ -11,7 +11,10 @@ import {
   extendMembershipPaidUntil,
   membershipPaidUntilFromPurchase,
 } from "@/lib/billing/membership-service-period";
-import { resolvePlanCreditGrants } from "@/lib/billing/plan-credit-grants";
+import {
+  resolvePlanCreditGrants,
+  shouldDeferRenewalGrant,
+} from "@/lib/billing/plan-credit-grants";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
 import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
 import { createTeamTenant } from "@/lib/tenant/tenant-service";
@@ -53,6 +56,7 @@ export async function applyMockMembershipSubscribe(input: {
 
     let tenantId = existingTeam?.tenantId;
     let tenantPaidUntil: Date;
+    let tenantPaidUntilBefore: Date | null = null;
     if (!tenantId) {
       const tenant = await createTeamTenant({
         ownerUserId: input.userId,
@@ -85,6 +89,7 @@ export async function applyMockMembershipSubscribe(input: {
         where: { id: tenantId },
         select: { currentPeriodEnd: true },
       });
+      tenantPaidUntilBefore = tenant?.currentPeriodEnd ?? null;
       tenantPaidUntil = extendMembershipPaidUntil(tenant?.currentPeriodEnd, plan.interval, now);
       await prisma.tenant.update({
         where: { id: tenantId },
@@ -92,44 +97,82 @@ export async function applyMockMembershipSubscribe(input: {
       });
     }
 
-    const grants = resolvePlanCreditGrants(plan, quote.totalSeats);
-    await grantCredits({
-      ref: { ownerType: "TENANT", ownerId: tenantId },
-      credits: grants.credits,
-      monthlyGrantCredits: grants.monthlyGrantCredits,
-      pricePerCreditYuan:
-        quote.perSeatCredits > 0 ? quote.totalPriceYuan / quote.monthlyCreditsPool : null,
-      planId: plan.id,
-      currentPeriodEnd: creditPeriodEnd,
-      idempotencyKey: orderId,
-      description: `团队会员开通（${plan.tier} × ${quote.totalSeats} 席）`,
+    const grants = resolvePlanCreditGrants(plan, quote.totalSeats, quote.perSeatCredits);
+    const pricePerCreditYuan =
+      quote.perSeatCredits > 0 ? quote.totalPriceYuan / quote.monthlyCreditsPool : null;
+    const teamAcc = await prisma.creditAccount.findUnique({
+      where: { ownerType_ownerId: { ownerType: "TENANT", ownerId: tenantId } },
+      select: { planId: true, currentPeriodEnd: true },
     });
+    const deferTeam = shouldDeferRenewalGrant({
+      accountPlanId: teamAcc?.planId,
+      planId: plan.id,
+      paidUntilBefore: tenantPaidUntilBefore,
+      creditPeriodEnd: teamAcc?.currentPeriodEnd,
+      now,
+    });
+    if (deferTeam) {
+      await prisma.creditAccount.update({
+        where: { ownerType_ownerId: { ownerType: "TENANT", ownerId: tenantId } },
+        data: { monthlyGrantCredits: grants.monthlyGrantCredits, pricePerCreditYuan },
+      });
+    } else {
+      await grantCredits({
+        ref: { ownerType: "TENANT", ownerId: tenantId },
+        credits: grants.credits,
+        monthlyGrantCredits: grants.monthlyGrantCredits,
+        pricePerCreditYuan,
+        planId: plan.id,
+        currentPeriodEnd: creditPeriodEnd,
+        idempotencyKey: orderId,
+        description: `团队会员开通（${plan.tier} × ${quote.totalSeats} 席）`,
+      });
+    }
 
     return { orderId, planId: plan.id, tenantId, family: "TEAM" as const };
   }
 
   const grants = resolvePlanCreditGrants(plan, 1);
+  const pricePerCreditYuan =
+    Number(plan.monthlyCredits) > 0 ? Number(plan.priceYuan) / Number(plan.monthlyCredits) : null;
   const existingAcc = await prisma.creditAccount.findUnique({
     where: { ownerType_ownerId: { ownerType: "USER", ownerId: input.userId } },
-    select: { membershipPaidUntil: true },
+    select: { membershipPaidUntil: true, planId: true, currentPeriodEnd: true },
   });
   const membershipPaidUntil = extendMembershipPaidUntil(
     existingAcc?.membershipPaidUntil,
     plan.interval,
     now,
   );
-  await grantCredits({
-    ref: { ownerType: "USER", ownerId: input.userId },
-    credits: grants.credits,
-    monthlyGrantCredits: grants.monthlyGrantCredits,
-    pricePerCreditYuan:
-      Number(plan.monthlyCredits) > 0 ? Number(plan.priceYuan) / Number(plan.monthlyCredits) : null,
+  const deferPersonal = shouldDeferRenewalGrant({
+    accountPlanId: existingAcc?.planId,
     planId: plan.id,
-    currentPeriodEnd: creditPeriodEnd,
-    membershipPaidUntil,
-    idempotencyKey: orderId,
-    description: `个人会员开通（${plan.tier}）`,
+    paidUntilBefore: existingAcc?.membershipPaidUntil,
+    creditPeriodEnd: existingAcc?.currentPeriodEnd,
+    now,
   });
+  if (deferPersonal) {
+    await prisma.creditAccount.update({
+      where: { ownerType_ownerId: { ownerType: "USER", ownerId: input.userId } },
+      data: {
+        monthlyGrantCredits: grants.monthlyGrantCredits,
+        pricePerCreditYuan,
+        membershipPaidUntil,
+      },
+    });
+  } else {
+    await grantCredits({
+      ref: { ownerType: "USER", ownerId: input.userId },
+      credits: grants.credits,
+      monthlyGrantCredits: grants.monthlyGrantCredits,
+      pricePerCreditYuan,
+      planId: plan.id,
+      currentPeriodEnd: creditPeriodEnd,
+      membershipPaidUntil,
+      idempotencyKey: orderId,
+      description: `个人会员开通（${plan.tier}）`,
+    });
+  }
 
   return { orderId, planId: plan.id, family: "PERSONAL" as const };
 }
