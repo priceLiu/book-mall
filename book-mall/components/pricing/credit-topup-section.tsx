@@ -61,8 +61,12 @@ function PackGrid({
             </p>
             <p className="mt-1 min-h-[2.5rem] text-xs text-muted-foreground">
               {pack.id === "pack-light"
-                ? "轻量积分包，积分永不过期，可叠加月付"
-                : "\u00a0"}
+                ? "入门加购，积分永不过期，可叠加月付"
+                : pack.id === "pack-standard"
+                  ? "中档加购，单价低于轻量包"
+                  : pack.id === "pack-plus"
+                    ? "大额加购，单价最低且不低于至尊会员"
+                    : "\u00a0"}
             </p>
             <Button
               type="button"

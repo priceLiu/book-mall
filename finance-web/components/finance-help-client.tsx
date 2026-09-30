@@ -78,6 +78,9 @@ export function FinanceHelpClient() {
               上游成本：<Link href="/admin/model-cost" className="text-[#1890ff] hover:underline">模型成本</Link>
             </li>
             <li>
+              档位毛利：<Link href="/admin/margin-projection" className="text-[#1890ff] hover:underline">毛利测算</Link>（个人/团队 4 档 × 月/年 + 积分包 × GPT Image 2.0 / Wan 3.0 / HH 1.1）
+            </li>
+            <li>
               测算验算：<Link href="/admin/scenario-lab" className="text-[#1890ff] hover:underline">Scenario Lab</Link>（30 模型 × 15s）
             </li>
             <li>
@@ -114,7 +117,8 @@ export function FinanceHelpClient() {
               ["/admin/plan-change", "调价审批", "运营提交 → 财务复核 → 超管终审"],
               ["/admin/model-cost", "模型成本", "厂商挂牌价与渠道折扣（仅财务）"],
               ["/admin/credit-pricing", "积分报价", "发布各模型对外积分价"],
-              ["/admin/membership-plans", "会员套餐", "五档套餐与席位带"],
+              ["/admin/membership-plans", "会员套餐", "四档套餐与席位带"],
+              ["/admin/margin-projection", "毛利测算", "个人/团队档位 × GPT Image 2.0 / Wan 3.0 / HH 1.1"],
               ["/admin/reconciliation", "对账总账", "平台底表 + 厂商 CSV/Excel 对账"],
               ["/admin/reconciliation/payments", "用户支付明细", "微信 Checkout 与积分流水"],
               ["/admin/billing/users", "用户明细", "31 列费用明细（含成本/M）"],

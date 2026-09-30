@@ -15,15 +15,15 @@ export const SCENARIO_LAB_USAGE_SECONDS = 15;
 const PERSONAL_ADVANCED = {
   scenarioKey: "personal-advanced-month",
   scenarioLabel: "个人高级版（月付）",
-  priceYuan: 299,
-  monthlyCredits: 6500,
+  priceYuan: 699,
+  monthlyCredits: 12050,
 };
 
 const TEAM_ADVANCED_4_SEATS = {
   scenarioKey: "team-advanced-4-seats",
   scenarioLabel: "团队高级版（4 席）",
   priceYuan: 1199,
-  monthlyCredits: 33300,
+  monthlyCredits: 20670,
   seats: 4,
 };
 

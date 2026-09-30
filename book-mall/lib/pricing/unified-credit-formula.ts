@@ -142,17 +142,16 @@ export interface CreditAcquisitionSku {
 
 /** App 个人月付订阅（现网 seed 月费；积分量可随调价变更） */
 export const SUBSCRIPTION_MONTH_SKUS: CreditAcquisitionSku[] = [
-  { id: "personal-标准", label: "标准版月付", channel: "SUBSCRIPTION", priceYuan: 69, credits: 1000, tier: "标准版" },
-  { id: "personal-进阶", label: "进阶版月付", channel: "SUBSCRIPTION", priceYuan: 149, credits: 3000, tier: "进阶版" },
-  { id: "personal-高级", label: "高级版月付", channel: "SUBSCRIPTION", priceYuan: 299, credits: 6500, tier: "高级版" },
-  { id: "personal-豪华", label: "豪华版月付", channel: "SUBSCRIPTION", priceYuan: 599, credits: 14000, tier: "豪华版" },
+  { id: "personal-标准", label: "标准版月付", channel: "SUBSCRIPTION", priceYuan: 69, credits: 860, tier: "标准版" },
+  { id: "personal-进阶", label: "进阶版月付", channel: "SUBSCRIPTION", priceYuan: 269, credits: 3730, tier: "进阶版" },
+  { id: "personal-高级", label: "高级版月付", channel: "SUBSCRIPTION", priceYuan: 699, credits: 12050, tier: "高级版" },
   { id: "personal-至尊", label: "至尊版月付", channel: "SUBSCRIPTION", priceYuan: 1199, credits: 30000, tier: "至尊版" },
 ];
 
 export const APP_TOPUP_SKUS: CreditAcquisitionSku[] = [
-  { id: "pack-light", label: "轻量包", channel: "TOPUP", priceYuan: 62, credits: 1500 },
-  { id: "pack-standard", label: "标准包", channel: "TOPUP", priceYuan: 160, credits: 4000 },
-  { id: "pack-plus", label: "加量包", channel: "TOPUP", priceYuan: 304, credits: 8000 },
+  { id: "pack-light", label: "轻量包", channel: "TOPUP", priceYuan: 80, credits: 1000 },
+  { id: "pack-standard", label: "标准包", channel: "TOPUP", priceYuan: 163, credits: 2500 },
+  { id: "pack-plus", label: "加量包", channel: "TOPUP", priceYuan: 300, credits: 6000 },
 ];
 
 export const API_TOPUP_SKUS: CreditAcquisitionSku[] = [

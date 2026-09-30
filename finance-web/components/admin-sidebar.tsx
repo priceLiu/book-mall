@@ -187,6 +187,13 @@ const NAV_GROUPS: NavGroup[] = [
         show: (v) => canViewFinanceCost(v.user.role),
       },
       {
+        href: "/admin/margin-projection",
+        label: "毛利测算",
+        icon: Calculator,
+        prefix: "/admin/margin-projection",
+        show: (v) => canViewFinanceCost(v.user.role),
+      },
+      {
         href: "/admin/scenario-lab",
         label: "Scenario Lab",
         icon: Beaker,

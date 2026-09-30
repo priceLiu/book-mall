@@ -24,7 +24,7 @@ describe("unified credit formula v2 — Seedance 年框", () => {
     expect(row.baseMarginRate).toBeCloseTo(1 - 1 / 1.5, 2);
   });
 
-  it("订阅五档 + API 充值在 Seedance 15s 上毛利 ≥ 22%", () => {
+  it("订阅四档 + API 充值在 Seedance 15s 上毛利 ≥ 22%", () => {
     const sim = buildUnifiedFormulaSimulation(config);
     for (const row of [...sim.subscriptionSkus, ...sim.topupSkus, ...sim.apiSkus]) {
       expect(row.marginOk).toBe(true);
@@ -42,13 +42,13 @@ describe("unified credit formula v2 — Seedance 年框", () => {
   });
 });
 
-describe("personal-tier-margins — 五档月付", () => {
+describe("personal-tier-margins — 四档月付", () => {
   const config = { ...FALLBACK_PRICING_CONFIG, videoMinMarginGuard: 0.22 };
   const sim = buildUnifiedFormulaSimulation(config);
 
-  it("五档 ppc 递减、扣分相同、月内条数随 ppc 变化", () => {
+  it("四档 ppc 递减、扣分相同、月内条数随 ppc 变化", () => {
     const rows = sim.subscriptionSkus;
-    expect(rows.length).toBe(5);
+    expect(rows.length).toBe(4);
     for (let i = 1; i < rows.length; i++) {
       expect(rows[i].pricePerCreditYuan).toBeLessThan(rows[i - 1].pricePerCreditYuan);
     }
@@ -60,9 +60,9 @@ describe("personal-tier-margins — 五档月付", () => {
     }
   });
 
-  it("标准版 ppc ≈ 0.069", () => {
+  it("标准版 ppc ≈ 0.08", () => {
     const std = sim.subscriptionSkus.find((r) => r.skuId === "personal-标准");
-    expect(std?.pricePerCreditYuan).toBeCloseTo(0.069, 3);
+    expect(std?.pricePerCreditYuan).toBeCloseTo(0.08, 3);
   });
 });
 
@@ -71,11 +71,10 @@ describe("team-seat-margins — 团队每席 ppc", () => {
   const anchorCharge = 750;
 
   const TEAM_SEAT_SKUS = [
-    { tier: "标准版", priceYuan: 199, credits: 4600 },
-    { tier: "进阶版", priceYuan: 689, credits: 17400 },
-    { tier: "高级版", priceYuan: 1199, credits: 33300 },
-    { tier: "豪华版", priceYuan: 1699, credits: 51500 },
-    { tier: "至尊版", priceYuan: 1999, credits: 66600 },
+    { tier: "标准版", priceYuan: 199, credits: 2490 },
+    { tier: "进阶版", priceYuan: 689, credits: 9570 },
+    { tier: "高级版", priceYuan: 1199, credits: 20670 },
+    { tier: "至尊版", priceYuan: 1999, credits: 50000 },
   ];
 
   it("每席 ppc 递减、扣分与锚定一致", () => {

@@ -312,7 +312,7 @@ export function PricingPageClient({
                 interval={interval}
                 periodLabel={periodLabel}
                 anchorYuan={anchorYuan}
-                featured={isTeam ? i === 1 : i === Math.min(2, visible.length - 1)}
+                featured={i === 1 || i === 2}
                 models={models}
                 annualSavingPct={annualSavingPct}
               />
@@ -511,8 +511,10 @@ function PlanCard({
   const perPeriodCredits = resolveMembershipPeriodCredits(rawCredits, interval);
   const poolCreditsPerPeriod = isTeam ? perPeriodCredits * quote.seats : perPeriodCredits;
   const ppcPriceYuan = isTeam ? quote.perSeatPriceYuan : headlinePrice;
+  // 分子分母须同一周期：月付=月价/月积分；年付=年价/年积分（库内 YEAR.monthlyCredits 已是 12 期合计）
+  const ppcCredits = isTeam ? quote.perSeatCredits : plan.monthlyCredits;
   const yuanPerCredit =
-    perPeriodCredits > 0 ? Math.round((ppcPriceYuan / perPeriodCredits) * 1000) / 1000 : anchorYuan;
+    ppcCredits > 0 ? Math.round((ppcPriceYuan / ppcCredits) * 1000) / 1000 : anchorYuan;
   const creditEstimate = computePricingHighlightEstimate(perPeriodCredits, models);
 
   const desc = (isTeam ? TEAM_DESC : PERSONAL_DESC)[index] ?? "";

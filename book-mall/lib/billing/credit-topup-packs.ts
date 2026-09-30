@@ -1,5 +1,5 @@
 /**
- * 积分加油包（加量包）— 三档，锚定 ¥0.03/积分。
+ * 积分加油包 — 三档整数积分，ppc 拉开且不低于至尊 0.04。
  */
 import { DEFAULT_CREDIT_ANCHOR_YUAN } from "@/lib/pricing/credit-pricing-formulas";
 
@@ -19,23 +19,23 @@ export interface CreditTopupPack {
 export const CREDIT_TOPUP_PACKS: CreditTopupPack[] = [
   {
     id: "pack-light",
-    credits: 1500,
-    priceYuan: 62,
+    credits: 1000,
+    priceYuan: 80,
     label: "轻量积分包",
   },
   {
     id: "pack-standard",
-    credits: 4000,
-    priceYuan: 160,
+    credits: 2500,
+    priceYuan: 163,
     label: "标准包",
-    promo: "省10%",
+    promo: "更划算",
   },
   {
     id: "pack-plus",
-    credits: 8000,
-    priceYuan: 304,
+    credits: 6000,
+    priceYuan: 300,
     label: "加量包",
-    promo: "省15%",
+    promo: "单价最低",
   },
 ];
 

@@ -18,10 +18,9 @@ const VIDEO_MODEL: ModelCostBasis = {
 };
 
 const TIERS: TierPricing[] = [
-  { tier: "标准版", priceYuan: 69, monthlyCredits: 1000 },
-  { tier: "进阶版", priceYuan: 149, monthlyCredits: 3000 },
-  { tier: "高级版", priceYuan: 299, monthlyCredits: 6500 },
-  { tier: "豪华版", priceYuan: 599, monthlyCredits: 14000 },
+  { tier: "标准版", priceYuan: 69, monthlyCredits: 860 },
+  { tier: "进阶版", priceYuan: 269, monthlyCredits: 3730 },
+  { tier: "高级版", priceYuan: 699, monthlyCredits: 12050 },
   { tier: "至尊版", priceYuan: 1199, monthlyCredits: 30000 },
 ];
 
@@ -34,8 +33,8 @@ describe("simulatePlanChange — 六维测算（M=1.0 贵视频）", () => {
 
   it("各档扣分（贴成本）", () => {
     const byTier = new Map(report.rows.map((r) => [r.tier, r.creditsPerGen]));
-    expect(byTier.get("标准版")).toBe(176);
-    expect(byTier.get("高级版")).toBe(264);
+    expect(byTier.get("标准版")).toBe(151.43);
+    expect(byTier.get("高级版")).toBe(209.45);
     expect(byTier.get("至尊版")).toBe(304);
   });
 
@@ -65,7 +64,7 @@ describe("simulateRevenue — 营收模拟", () => {
         { tier: "至尊版", subscribers: 10 },
       ],
     });
-    expect(rev.totalRevenueYuan).toBeCloseTo(299 * 100 + 1199 * 10, 2);
+    expect(rev.totalRevenueYuan).toBeCloseTo(699 * 100 + 1199 * 10, 2);
     expect(rev.blendedMargin).toBeGreaterThanOrEqual(0);
   });
 });
@@ -88,10 +87,9 @@ describe("reverseBreakEven — 模式 B（保本线核验）", () => {
       model: VIDEO_MODEL,
       tiers: TIERS,
       currentCreditsByTier: [
-        { tier: "标准版", creditsPerGen: 176 },
-        { tier: "进阶版", creditsPerGen: 245 },
-        { tier: "高级版", creditsPerGen: 264 },
-        { tier: "豪华版", creditsPerGen: 284 },
+        { tier: "标准版", creditsPerGen: 152 },
+        { tier: "进阶版", creditsPerGen: 169 },
+        { tier: "高级版", creditsPerGen: 210 },
         { tier: "至尊版", creditsPerGen: 304 },
       ],
     });

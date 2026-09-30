@@ -3,7 +3,7 @@
  *
  * 幂等：全部 upsert。可重复执行。
  *  - PlatformPricingConfig（锚定 0.03 / M=1.5 / 护栏 0.22 / 视频 15s）
- *  - MembershipPlan + TeamSeatTier（个人/团队 × 月/年 × 五档；算法2 g=60%）
+ *  - MembershipPlan + TeamSeatTier（个人/团队 × 月/年 × 四档；豪华下架）
  *  - ModelCostProfile（示例成本档）→ publishModelCreditPrice 生成首版报价快照
  *
  * 套餐金额为首版占位（与图1–4 一致的结构：个人/团队、月/年、五档、席位带），
@@ -23,9 +23,13 @@ import {
   publishModelCreditPrice,
 } from "@/lib/pricing/credit-pricing-engine";
 import {
-  RETIRED_TEAM_TIERS,
-  TEAM_MIN_INCLUDED_SEATS,
-} from "@/lib/billing/team-membership-config";
+  PERSONAL_MONTH_CREDITS,
+  PERSONAL_MONTH_PRICES,
+  RETIRED_MEMBERSHIP_TIERS,
+  TEAM_SEAT_MONTH_CREDITS,
+  yearCreditsFromMonth,
+} from "@/lib/billing/membership-credit-ladder";
+import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
 
 /** 逐档「每积分单价」= 套餐价 ÷ (含席位数 × 月积分)；个人 includedSeats=1。 */
 function derivePricePerCredit(priceYuan: number, monthlyCredits: number, includedSeats: number): number {
@@ -33,8 +37,6 @@ function derivePricePerCredit(priceYuan: number, monthlyCredits: number, include
   if (denom <= 0) return 0;
   return Math.round((priceYuan / denom) * 1e6) / 1e6;
 }
-
-const TIERS = ["标准版", "进阶版", "高级版", "豪华版", "至尊版"] as const;
 
 interface PlanSeed {
   tier: string;
@@ -46,40 +48,36 @@ interface PlanSeed {
   includedSeats: number;
 }
 
-// 个人 · 月付（锚定 ¥0.03；积分 ≈ 价 ÷ ppc，会员利润主要来自模型渠道差价）
+// 个人 · 月付（进阶 269 / 高级 699；ppc 0.08→0.04）
 const PERSONAL_MONTH: PlanSeed[] = [
-  { tier: "标准版", sortOrder: 1, priceYuan: 69, originalYuan: 99, monthlyCredits: 1000, includedSeats: 1 },
-  { tier: "进阶版", sortOrder: 2, priceYuan: 149, originalYuan: 219, monthlyCredits: 3000, includedSeats: 1 },
-  { tier: "高级版", sortOrder: 3, priceYuan: 299, originalYuan: 449, monthlyCredits: 6500, includedSeats: 1 },
-  { tier: "豪华版", sortOrder: 4, priceYuan: 599, originalYuan: 899, monthlyCredits: 14000, includedSeats: 1 },
-  { tier: "至尊版", sortOrder: 5, priceYuan: 1199, originalYuan: 1799, monthlyCredits: 30000, includedSeats: 1 },
+  { tier: "标准版", sortOrder: 1, priceYuan: PERSONAL_MONTH_PRICES.标准版, originalYuan: 99, monthlyCredits: PERSONAL_MONTH_CREDITS.标准版, includedSeats: 1 },
+  { tier: "进阶版", sortOrder: 2, priceYuan: PERSONAL_MONTH_PRICES.进阶版, originalYuan: 399, monthlyCredits: PERSONAL_MONTH_CREDITS.进阶版, includedSeats: 1 },
+  { tier: "高级版", sortOrder: 3, priceYuan: PERSONAL_MONTH_PRICES.高级版, originalYuan: 1049, monthlyCredits: PERSONAL_MONTH_CREDITS.高级版, includedSeats: 1 },
+  { tier: "至尊版", sortOrder: 4, priceYuan: PERSONAL_MONTH_PRICES.至尊版, originalYuan: 1799, monthlyCredits: PERSONAL_MONTH_CREDITS.至尊版, includedSeats: 1 },
 ];
 
 // 个人 · 年付（约 10 个月价；积分 = 月额 × 12）
 const PERSONAL_YEAR: PlanSeed[] = [
-  { tier: "标准版", sortOrder: 1, priceYuan: 690, originalYuan: 990, promoLabel: "年付立省2个月", monthlyCredits: 12000, includedSeats: 1 },
-  { tier: "进阶版", sortOrder: 2, priceYuan: 1490, originalYuan: 2190, promoLabel: "年付立省2个月", monthlyCredits: 36000, includedSeats: 1 },
-  { tier: "高级版", sortOrder: 3, priceYuan: 2990, originalYuan: 4490, promoLabel: "年付立省2个月", monthlyCredits: 78000, includedSeats: 1 },
-  { tier: "豪华版", sortOrder: 4, priceYuan: 5990, originalYuan: 8990, promoLabel: "年付立省2个月", monthlyCredits: 168000, includedSeats: 1 },
-  { tier: "至尊版", sortOrder: 5, priceYuan: 11990, originalYuan: 17990, promoLabel: "年付立省2个月", monthlyCredits: 360000, includedSeats: 1 },
+  { tier: "标准版", sortOrder: 1, priceYuan: PERSONAL_MONTH_PRICES.标准版 * 10, originalYuan: 990, promoLabel: "年付立省2个月", monthlyCredits: yearCreditsFromMonth(PERSONAL_MONTH_CREDITS.标准版), includedSeats: 1 },
+  { tier: "进阶版", sortOrder: 2, priceYuan: PERSONAL_MONTH_PRICES.进阶版 * 10, originalYuan: 3990, promoLabel: "年付立省2个月", monthlyCredits: yearCreditsFromMonth(PERSONAL_MONTH_CREDITS.进阶版), includedSeats: 1 },
+  { tier: "高级版", sortOrder: 3, priceYuan: PERSONAL_MONTH_PRICES.高级版 * 10, originalYuan: 10490, promoLabel: "年付立省2个月", monthlyCredits: yearCreditsFromMonth(PERSONAL_MONTH_CREDITS.高级版), includedSeats: 1 },
+  { tier: "至尊版", sortOrder: 4, priceYuan: PERSONAL_MONTH_PRICES.至尊版 * 10, originalYuan: 17990, promoLabel: "年付立省2个月", monthlyCredits: yearCreditsFromMonth(PERSONAL_MONTH_CREDITS.至尊版), includedSeats: 1 },
 ];
 
-// 团队 · 月付（按席计价：起订 3 席；标准版 ¥199 起，五档至 ¥1999/席）
+// 团队 · 月付（每席价不变；每席积分与个人同档 ppc）
 const TEAM_MONTH: PlanSeed[] = [
-  { tier: "标准版", sortOrder: 1, priceYuan: 597, originalYuan: 837, monthlyCredits: 4600, includedSeats: TEAM_MIN_INCLUDED_SEATS },
-  { tier: "进阶版", sortOrder: 2, priceYuan: 2067, originalYuan: 2799, monthlyCredits: 17400, includedSeats: TEAM_MIN_INCLUDED_SEATS },
-  { tier: "高级版", sortOrder: 3, priceYuan: 3597, originalYuan: 4797, monthlyCredits: 33300, includedSeats: TEAM_MIN_INCLUDED_SEATS },
-  { tier: "豪华版", sortOrder: 4, priceYuan: 5097, originalYuan: 6597, monthlyCredits: 51500, includedSeats: TEAM_MIN_INCLUDED_SEATS },
-  { tier: "至尊版", sortOrder: 5, priceYuan: 5997, originalYuan: 7997, monthlyCredits: 66600, includedSeats: TEAM_MIN_INCLUDED_SEATS },
+  { tier: "标准版", sortOrder: 1, priceYuan: 597, originalYuan: 837, monthlyCredits: TEAM_SEAT_MONTH_CREDITS.标准版, includedSeats: TEAM_MIN_INCLUDED_SEATS },
+  { tier: "进阶版", sortOrder: 2, priceYuan: 2067, originalYuan: 2799, monthlyCredits: TEAM_SEAT_MONTH_CREDITS.进阶版, includedSeats: TEAM_MIN_INCLUDED_SEATS },
+  { tier: "高级版", sortOrder: 3, priceYuan: 3597, originalYuan: 4797, monthlyCredits: TEAM_SEAT_MONTH_CREDITS.高级版, includedSeats: TEAM_MIN_INCLUDED_SEATS },
+  { tier: "至尊版", sortOrder: 4, priceYuan: 5997, originalYuan: 7997, monthlyCredits: TEAM_SEAT_MONTH_CREDITS.至尊版, includedSeats: TEAM_MIN_INCLUDED_SEATS },
 ];
 
 // 团队 · 年付（每席价 ×10 个月；priceYuan = 每席年价 × 3）
 const TEAM_YEAR: PlanSeed[] = [
-  { tier: "标准版", sortOrder: 1, priceYuan: 5970, originalYuan: 8370, promoLabel: "年付立省2个月", monthlyCredits: 55200, includedSeats: TEAM_MIN_INCLUDED_SEATS },
-  { tier: "进阶版", sortOrder: 2, priceYuan: 20670, originalYuan: 27990, promoLabel: "年付立省2个月", monthlyCredits: 208800, includedSeats: TEAM_MIN_INCLUDED_SEATS },
-  { tier: "高级版", sortOrder: 3, priceYuan: 35970, originalYuan: 47970, promoLabel: "年付立省2个月", monthlyCredits: 399600, includedSeats: TEAM_MIN_INCLUDED_SEATS },
-  { tier: "豪华版", sortOrder: 4, priceYuan: 50970, originalYuan: 65970, promoLabel: "年付立省2个月", monthlyCredits: 618000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
-  { tier: "至尊版", sortOrder: 5, priceYuan: 59970, originalYuan: 79970, promoLabel: "年付立省2个月", monthlyCredits: 799200, includedSeats: TEAM_MIN_INCLUDED_SEATS },
+  { tier: "标准版", sortOrder: 1, priceYuan: 5970, originalYuan: 8370, promoLabel: "年付立省2个月", monthlyCredits: yearCreditsFromMonth(TEAM_SEAT_MONTH_CREDITS.标准版), includedSeats: TEAM_MIN_INCLUDED_SEATS },
+  { tier: "进阶版", sortOrder: 2, priceYuan: 20670, originalYuan: 27990, promoLabel: "年付立省2个月", monthlyCredits: yearCreditsFromMonth(TEAM_SEAT_MONTH_CREDITS.进阶版), includedSeats: TEAM_MIN_INCLUDED_SEATS },
+  { tier: "高级版", sortOrder: 3, priceYuan: 35970, originalYuan: 47970, promoLabel: "年付立省2个月", monthlyCredits: yearCreditsFromMonth(TEAM_SEAT_MONTH_CREDITS.高级版), includedSeats: TEAM_MIN_INCLUDED_SEATS },
+  { tier: "至尊版", sortOrder: 4, priceYuan: 59970, originalYuan: 79970, promoLabel: "年付立省2个月", monthlyCredits: yearCreditsFromMonth(TEAM_SEAT_MONTH_CREDITS.至尊版), includedSeats: TEAM_MIN_INCLUDED_SEATS },
 ];
 
 // 团队席位带（人数越多每席单价越低）— perSeatPrice 取月口径，年付折算 ×10；每席积分恒定（= 该档每席积分）
@@ -91,11 +89,10 @@ interface SeatTierSeed {
   sortOrder: number;
 }
 const SEAT_TIERS_BY_TIER: Record<string, SeatTierSeed[]> = {
-  标准版: [{ seatMin: 3, seatMax: null, perSeatPriceMonthYuan: 199, perSeatCredits: 4600, sortOrder: 1 }],
-  进阶版: [{ seatMin: 3, seatMax: null, perSeatPriceMonthYuan: 689, perSeatCredits: 17400, sortOrder: 1 }],
-  高级版: [{ seatMin: 3, seatMax: null, perSeatPriceMonthYuan: 1199, perSeatCredits: 33300, sortOrder: 1 }],
-  豪华版: [{ seatMin: 3, seatMax: null, perSeatPriceMonthYuan: 1699, perSeatCredits: 51500, sortOrder: 1 }],
-  至尊版: [{ seatMin: 3, seatMax: null, perSeatPriceMonthYuan: 1999, perSeatCredits: 66600, sortOrder: 1 }],
+  标准版: [{ seatMin: 3, seatMax: null, perSeatPriceMonthYuan: 199, perSeatCredits: TEAM_SEAT_MONTH_CREDITS.标准版, sortOrder: 1 }],
+  进阶版: [{ seatMin: 3, seatMax: null, perSeatPriceMonthYuan: 689, perSeatCredits: TEAM_SEAT_MONTH_CREDITS.进阶版, sortOrder: 1 }],
+  高级版: [{ seatMin: 3, seatMax: null, perSeatPriceMonthYuan: 1199, perSeatCredits: TEAM_SEAT_MONTH_CREDITS.高级版, sortOrder: 1 }],
+  至尊版: [{ seatMin: 3, seatMax: null, perSeatPriceMonthYuan: 1999, perSeatCredits: TEAM_SEAT_MONTH_CREDITS.至尊版, sortOrder: 1 }],
 };
 
 // 示例模型成本档（占位，落库后由 /admin/finance/model-cost 维护）
@@ -202,7 +199,7 @@ export async function seedUnifiedCreditBilling(publishedBy = "seed"): Promise<Se
   await seedPlans("TEAM", "MONTH", TEAM_MONTH, true);
   await seedPlans("TEAM", "YEAR", TEAM_YEAR, true);
   await prisma.membershipPlan.updateMany({
-    where: { family: "TEAM", tier: { in: [...RETIRED_TEAM_TIERS] } },
+    where: { tier: { in: [...RETIRED_MEMBERSHIP_TIERS] } },
     data: { active: false },
   });
   const plansCount = PERSONAL_MONTH.length * 2 + TEAM_MONTH.length * 2;

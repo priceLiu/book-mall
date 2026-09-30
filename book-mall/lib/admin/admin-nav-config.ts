@@ -81,6 +81,7 @@ export function buildAdminNavGroups(financeWebOrigin: string | null): AdminNavGr
         fin(o, "/admin/model-cost", "模型成本与折扣", "/admin/finance/model-cost"),
         fin(o, "/admin/credit-pricing", "积分报价计算器", "/admin/finance/credit-pricing"),
         fin(o, "/admin/membership-plans", "工具会员套餐与席位", "/admin/finance/membership-plans"),
+        { label: "毛利测算", href: "/admin/finance/margin-projection" },
         fin(o, "/admin/plan-change", "调价测算与审批", "/admin/finance/plan-change"),
         fin(o, "/admin/pnl-alerts", "盈亏预警中心", "/admin/finance/pnl-alerts"),
         fin(o, "/admin/pnl-report", "P&L 报表", "/admin/finance/pnl-report"),

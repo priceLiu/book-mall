@@ -69,7 +69,7 @@ describe("pricing-highlight-estimate", () => {
     expect(est.maxImages).toBe(1000);
   });
 
-  it("个人五档月付：按低价锚定可生成条数递增", () => {
+  it("个人四档月付：按低价锚定可生成条数递增", () => {
     const counts = SUBSCRIPTION_MONTH_SKUS.map(
       (sku) => computePricingHighlightEstimate(sku.credits, CATALOG_MODELS).maxVideos15s,
     );
