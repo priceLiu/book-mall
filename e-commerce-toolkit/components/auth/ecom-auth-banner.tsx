@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { buildEcomLoginUrl } from "@/lib/ecom-auth";
@@ -10,24 +11,32 @@ type Props = {
 };
 
 export function EcomAuthBanner({ returnPath }: Props) {
+  const pathname = usePathname();
   const [sessionActive, setSessionActive] = useState<boolean | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void fetchEcomToolsSessionLite()
-      .then((d) => {
-        if (!cancelled) setSessionActive(Boolean(d.active));
-      })
-      .catch(() => {
-        if (!cancelled) setSessionActive(false);
-      });
+    const load = () => {
+      void fetchEcomToolsSessionLite()
+        .then((d) => {
+          if (!cancelled) setSessionActive(Boolean(d.active));
+        })
+        .catch(() => {
+          if (!cancelled) setSessionActive(false);
+        });
+    };
+    load();
+    const onRefreshed = () => load();
+    window.addEventListener("ecom:tools-session-refreshed", onRefreshed);
     return () => {
       cancelled = true;
+      window.removeEventListener("ecom:tools-session-refreshed", onRefreshed);
     };
   }, []);
 
   const path =
     returnPath ??
+    pathname ??
     (typeof window !== "undefined" ? window.location.pathname : "/");
   const loginUrl = buildEcomLoginUrl(path);
 

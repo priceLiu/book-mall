@@ -30,7 +30,16 @@ import {
 } from "./canvas-constants";
 import { CanvasProjectError } from "./canvas-project-service";
 import { resolveCanvasGatewayTtsExtras } from "./canvas-tts-run-params";
-import { assertStoryLlmVisionModel } from "./story-llm-vision-models";
+import {
+  assertStoryLlmVisionModel,
+  STORY_LLM_DEFAULT_VISION_MODEL,
+} from "./story-llm-vision-models";
+import { GATEWAY_BAILIAN_PROVIDER_ID } from "./canvas-gateway-providers";
+import {
+  extractMediaDecomposePatch,
+  formatMediaDecomposeCanvasTextOutput,
+} from "@/lib/ecom/ecom-media-decompose-structured";
+import { runMediaDecomposeGateway } from "@/lib/ecom/run-media-decompose-gateway";
 import { isLikelyReferenceImageUrl, isLikelyVideoUrl } from "./media-url-kind";
 import { scriptStudioMirrorPayload } from "./script-studio-parse-mirror";
 import type { CanvasTaskStoryScope } from "./canvas-story-scope";
@@ -1735,6 +1744,222 @@ export async function runStoryLlmEngineNode(
   }
 
   return executeStoryLlmEngineTask(created.id, execCtx);
+}
+
+type CanvasMediaDecomposeExecCtx = {
+  userId: string;
+  projectId: string;
+  nodeId: string;
+  media: { kind: "image" | "video"; ossUrl: string };
+  userPrompt: string;
+  modelKey: string;
+  providerId: string;
+  clientPage: string;
+};
+
+async function executeCanvasMediaDecomposeTask(
+  taskId: string,
+  ctx: CanvasMediaDecomposeExecCtx,
+): Promise<RunEngineNodeResult> {
+  const existing = await prisma.canvasGenerationTask.findUnique({
+    where: { id: taskId },
+    select: { status: true, resultPayload: true },
+  });
+  if (!existing || existing.status !== "SUBMITTED") {
+    const done = await prisma.canvasGenerationTask.findUnique({
+      where: { id: taskId },
+    });
+    if (done) {
+      return {
+        reused: done.status === "SUCCEEDED",
+        task: done,
+      };
+    }
+    throw new CanvasProjectError(
+      "NOT_FOUND",
+      "拆解任务不存在或已结束",
+      404,
+    );
+  }
+
+  const prevPayload =
+    (existing.resultPayload as Record<string, unknown> | null) ?? {};
+  if (prevPayload.mediaDecomposeExecuteClaimed === true) {
+    const done = await prisma.canvasGenerationTask.findUnique({
+      where: { id: taskId },
+    });
+    if (done) return { reused: done.status === "SUCCEEDED", task: done };
+  }
+  await prisma.canvasGenerationTask.update({
+    where: { id: taskId },
+    data: {
+      resultPayload: {
+        ...prevPayload,
+        mediaDecomposeExecuteClaimed: true,
+      } as Prisma.InputJsonValue,
+    },
+  });
+
+  try {
+    const result = await runMediaDecomposeGateway({
+      userId: ctx.userId,
+      media: ctx.media,
+      modelKey: ctx.modelKey,
+      userPrompt: ctx.userPrompt,
+      clientPage: ctx.clientPage,
+    });
+
+    const output = formatMediaDecomposeCanvasTextOutput({
+      fullText: result.fullText,
+      structured: result.structured,
+    }).trim();
+    if (!output) {
+      const failed = await prisma.canvasGenerationTask.update({
+        where: { id: taskId },
+        data: {
+          status: "FAILED",
+          failCode: "MEDIA_DECOMPOSE_EMPTY",
+          failMessage:
+            result.parseError ??
+            "拆解返回空内容，请重试或更换素材。",
+          completedAt: new Date(),
+        },
+      });
+      return { reused: false, task: failed };
+    }
+
+    const updated = await prisma.canvasGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "SUCCEEDED",
+        textOutput: output,
+        resultPayload: {
+          mediaDecompose: {
+            parseError: result.parseError,
+            hasStructured: Boolean(result.structured),
+            gatewayLogId: result.gatewayLogId,
+          },
+        } as Prisma.InputJsonValue,
+        completedAt: new Date(),
+      },
+    });
+    return { reused: false, task: updated };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const failed = await prisma.canvasGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "FAILED",
+        failCode: "MEDIA_DECOMPOSE_FAILED",
+        failMessage: msg.slice(0, 500),
+        completedAt: new Date(),
+      },
+    });
+    return { reused: false, task: failed };
+  }
+}
+
+/** Pro2 反推 preset · 拆图拆视频 Gateway；结果 `textOutput` 为 media-decompose fence（选项 A） */
+export async function runStoryProMediaDecomposeGeneralText(
+  args: RunEngineNodeArgs,
+  media: { kind: "image" | "video"; ossUrl: string },
+  userPrompt: string,
+): Promise<RunEngineNodeResult> {
+  const { userId, projectId, nodeId } = args;
+  const modelKey = STORY_LLM_DEFAULT_VISION_MODEL;
+  const providerId = GATEWAY_BAILIAN_PROVIDER_ID;
+  const clientPage =
+    args.clientPage?.trim() ||
+    `canvas/${projectId}/story-pro/media-decompose`;
+
+  await shouldCanvasUseGateway(userId, providerId, modelKey);
+
+  const inputHash = computeInputHash({
+    modelKey,
+    prompt: userPrompt.trim() || `media-decompose:${media.kind}`,
+    imageUrls: [media.ossUrl],
+    params: { pipeline: "media-decompose" },
+    providerId,
+  });
+
+  if (!args.forceFresh) {
+    const reusable = await findReusableSucceededTask({
+      projectId,
+      nodeId,
+      inputHash,
+      useGateway: true,
+    });
+    if (reusable) {
+      const legacyOut = (reusable.textOutput ?? "").trim();
+      if (legacyOut) {
+        const display = formatMediaDecomposeCanvasTextOutput({
+          fullText: legacyOut,
+          structured: extractMediaDecomposePatch(legacyOut),
+        }).trim();
+        if (display && display !== legacyOut) {
+          const upgraded = await prisma.canvasGenerationTask.update({
+            where: { id: reusable.id },
+            data: { textOutput: display },
+          });
+          return { reused: true, task: upgraded };
+        }
+      }
+      return { reused: true, task: reusable };
+    }
+  }
+
+  await ensureProjectInflightCapacity(projectId);
+  await ensureUserInflightCapacity(userId);
+
+  const created = await createStoryScopedCanvasTask({
+    projectId,
+    nodeId,
+    storyScope: args.storyScope ?? { mediaKind: "generalText" },
+    skipInflightScopeConflict: shouldSkipInflightScopeConflictForRun(args),
+    initialStatus: "SUBMITTED",
+    data: {
+      kind: "TEXT",
+      model: modelKey,
+      providerId: null,
+      inputHash,
+      inputPayload: {
+        kind: "story-outline-engine",
+        pipeline: "media-decompose",
+        mediaKind: media.kind,
+        mediaUrl: media.ossUrl,
+        prompt: userPrompt.trim(),
+        providerId,
+        modelKey,
+        ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+      } as Prisma.InputJsonValue,
+      submittedAt: new Date(),
+    },
+  });
+
+  const execCtx: CanvasMediaDecomposeExecCtx = {
+    userId,
+    projectId,
+    nodeId,
+    media,
+    userPrompt,
+    modelKey,
+    providerId,
+    clientPage,
+  };
+
+  if (args.executeAsync !== false) {
+    setImmediate(() => {
+      void executeCanvasMediaDecomposeTask(created.id, execCtx).catch((e) => {
+        console.error("[canvas/media-decompose] async execute failed", {
+          taskId: created.id,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      });
+    });
+    return { reused: false, task: created };
+  }
+
+  return executeCanvasMediaDecomposeTask(created.id, execCtx);
 }
 
 /** 视频引擎 —— KIE 图生视频，异步 poll。 */

@@ -86,6 +86,11 @@ import {
   libtvRuntimeErrorAlertTitle,
 } from "@/lib/canvas/libtv-runtime-error-alert";
 import {
+  libtvMediaReversePromptFailureMessage,
+  runLibtvMediaReversePromptFromNode,
+} from "@/lib/canvas/libtv-media-reverse-prompt";
+import { useUserProviders } from "@/lib/canvas/use-user-providers";
+import {
   libtvVideoTrackSplitSourceReady,
   runLibtvVideoTrackSplit,
   type LibtvVideoTrackSplitMode,
@@ -129,6 +134,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const duplicateNode = useCanvasStore((s) => s.duplicateNode);
   const projectId = useCanvasStore((s) => s.projectId);
   const [trackSplitBusy, setTrackSplitBusy] = useState(false);
+  const [reversePromptBusy, setReversePromptBusy] = useState(false);
+  const { providers } = useUserProviders();
   const d = data as unknown as Sbv1VideoEngineNodeData & {
     crewTaskId?: string;
     crewTaskLabel?: string;
@@ -571,6 +578,40 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     [d.runtime, rowRuntime],
   );
 
+  const onReversePrompt = useCallback(() => {
+    if (reversePromptBusy || !hasVideo || isPro2VideoBoardCell) return;
+    setReversePromptBusy(true);
+    try {
+      const result = runLibtvMediaReversePromptFromNode(id, {
+        nodes,
+        addNode,
+        setNodes,
+        setEdges,
+        updateNodeData,
+      }, providers);
+      if (!result.ok) {
+        const { title, message } = libtvMediaReversePromptFailureMessage(
+          result.reason,
+        );
+        void alert({ title, message, variant: "warning" });
+      }
+    } finally {
+      setReversePromptBusy(false);
+    }
+  }, [
+    reversePromptBusy,
+    hasVideo,
+    isPro2VideoBoardCell,
+    id,
+    nodes,
+    addNode,
+    setNodes,
+    setEdges,
+    updateNodeData,
+    providers,
+    alert,
+  ]);
+
   const onTrackSplitPick = useCallback(
     (mode: LibtvVideoTrackSplitMode) => {
       if (!trackSplitSourceUrl || trackSplitBusy || isPro2VideoBoardCell) return;
@@ -731,6 +772,10 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                   : undefined
               }
               onDuplicateNode={onDuplicateNode}
+              onReversePrompt={
+                hasVideo && !isPro2VideoBoardCell ? onReversePrompt : undefined
+              }
+              reversePromptBusy={reversePromptBusy}
             />
           </LibtvNodeToolbarPortal>
         ) : null}

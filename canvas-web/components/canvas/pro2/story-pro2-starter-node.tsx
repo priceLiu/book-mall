@@ -45,6 +45,7 @@ import {
 } from "@/lib/canvas/pro2-add-node-menu";
 import { MarkdownView } from "@/components/canvas/markdown-view";
 import type { StoryPro2StarterNodeData } from "@/lib/canvas/story-pro2-workspace-types";
+import { mediaDecomposeTextForCanvasNode } from "@/lib/canvas/media-decompose-display-text";
 import { resolvePro2TextPurpose } from "@/lib/canvas/pro2-text-purpose";
 import {
   isPlainLibtvTextContent,
@@ -65,7 +66,7 @@ import {
   attachPro2StarterShortcutPreset,
   type Pro2ShortcutPresetId,
 } from "@/lib/canvas/pro2-spawn-shortcut-presets";
-import { promoteEmbeddedPackFromOutline } from "@/lib/canvas/story-hub-runtime";
+import { buildPro2ScriptHubDataFromStarterOutline } from "@/lib/canvas/pro2-script-hub-from-starter";
 import { selectPro2NodeAfterSpawn } from "@/lib/canvas/pro2-spawn-select";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { cn } from "@/lib/utils";
@@ -165,7 +166,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
     resolvePro2TextPurpose(d, { nodeId: id, nodes, edges }) === "general";
   const displayMd = useMemo(() => {
     if (uploadedMd) return uploadedMd;
-    if (hasOutline) return outlineMd;
+    if (hasOutline) return mediaDecomposeTextForCanvasNode(outlineMd);
     return d.themeInput?.trim() ?? "";
   }, [uploadedMd, hasOutline, outlineMd, d.themeInput]);
 
@@ -258,21 +259,16 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
       if (nodeType === "story-pro2-script-hub") {
         const outline =
           d.generatedOutlineMd?.trim() ?? d.uploadedScriptMd?.trim() ?? "";
-        const promoted = promoteEmbeddedPackFromOutline(outline, "", "", "");
         spawnPro2ScriptHubFromSource({
           sourceId: id,
           sourceHandle: "text",
           position: { x: self.position.x + w + gap, y: self.position.y },
-          hubData: {
-            outlineMd: promoted.outlineMd,
-            characterMd: promoted.characterMd,
-            sceneMd: promoted.sceneMd,
-            storyboardMd: promoted.storyboardMd,
+          hubData: buildPro2ScriptHubDataFromStarterOutline(outline, {
             providerId: d.providerId ?? "",
             modelKey: d.modelKey ?? "",
             params: { ...STORY_PRO_LLM_PARAMS_DEFAULT, ...(d.params ?? {}) },
             referencedNodeIds: outline ? [id] : [],
-          },
+          }),
           nodes,
           edges,
           updateNodeData,

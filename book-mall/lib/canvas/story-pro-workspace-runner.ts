@@ -6,6 +6,7 @@ import {
   runImageEngineNode,
   runKieAudioEngineNode,
   runStoryLlmEngineNode,
+  runStoryProMediaDecomposeGeneralText,
   runTtsEngineNode,
   runVideoEngineNode,
   type RunEngineNodeArgs,
@@ -37,6 +38,7 @@ import { isPro2GeneralTextNode, isPro2StoryOutlineTextNode } from "./pro2-text-p
 import { composeStoryProGeneralTextUserPrompt } from "./pro2-general-text-prompt";
 import { assertStoryLlmVisionModel } from "./story-llm-vision-models";
 import { isLikelyVideoUrl } from "./media-url-kind";
+import { resolveMediaDecomposeDefaultUserPrompt } from "@/lib/ecom/run-media-decompose-gateway";
 
 function proClientPage(projectId: string): string {
   return `canvas/${projectId}/story-pro`;
@@ -176,18 +178,6 @@ export async function runStoryProStarterThemeOutline(
 const STORY_PRO2_GENERAL_TEXT_SYSTEM =
   "你是专业内容创作助手。严格按用户消息中的指令完成任务，直接输出结果正文，不要多余解释或寒暄。";
 
-const STORY_PRO2_IMAGE_TO_PROMPT_SYSTEM =
-  "你是专业视觉提示词工程师。根据用户附带的参考图片，反推一份可直接用于 AI 生图的详细中文提示词。只输出提示词正文，不要解释或寒暄。";
-
-const STORY_PRO2_IMAGE_TO_PROMPT_USER =
-  "请根据所附图片反推一份详细的生图提示词。";
-
-const STORY_PRO2_VIDEO_TO_PROMPT_SYSTEM =
-  "你是专业视频提示词工程师。根据用户附带的参考视频，反推一份可用于 AI 生视频/分镜的详细中文提示词（含画面、运镜、节奏）。只输出提示词正文，不要解释或寒暄。";
-
-const STORY_PRO2_VIDEO_TO_PROMPT_USER =
-  "请根据所附视频反推一份详细的视频/分镜提示词。";
-
 /** 2.0 文本节点 · general 模式：按 Dock 提示词调用 LLM，结果写入节点卡片 */
 export async function runStoryProStarterGeneralText(
   args: RunEngineNodeArgs,
@@ -213,17 +203,35 @@ export async function runStoryProStarterGeneralText(
     textInputs: upstreamText,
   });
   const preset = String(data.pro2PresetKind ?? "").trim();
-  if (!prompt && preset === "image-to-prompt" && imageUrls.length > 0) {
-    prompt = STORY_PRO2_IMAGE_TO_PROMPT_USER;
+
+  if (preset === "image-to-prompt" && imageUrls.length > 0) {
+    const userPrompt = resolveMediaDecomposeDefaultUserPrompt(
+      "image",
+      prompt || themeInput,
+    );
+    return runStoryProMediaDecomposeGeneralText(
+      args,
+      { kind: "image", ossUrl: imageUrls[0]! },
+      userPrompt,
+    );
   }
-  if (!prompt && preset === "video-to-prompt" && videoUrls.length > 0) {
-    prompt = STORY_PRO2_VIDEO_TO_PROMPT_USER;
+  if (preset === "video-to-prompt" && videoUrls.length > 0) {
+    const userPrompt = resolveMediaDecomposeDefaultUserPrompt(
+      "video",
+      prompt || themeInput,
+    );
+    return runStoryProMediaDecomposeGeneralText(
+      args,
+      { kind: "video", ossUrl: videoUrls[0]! },
+      userPrompt,
+    );
   }
+
   if (!prompt && imageUrls.length === 0 && videoUrls.length === 0) {
     throw new Error("请先填写提示词内容，或链接并上传参考图片/视频");
   }
 
-  const modelKey = String(data.modelKey ?? args.node.modelKey ?? "").trim();
+  let modelKey = String(data.modelKey ?? args.node.modelKey ?? "").trim();
   if (imageUrls.length > 0 || videoUrls.length > 0) {
     assertStoryLlmVisionModel(
       modelKey,
@@ -237,12 +245,7 @@ export async function runStoryProStarterGeneralText(
       : typeof data.systemPrompt === "string"
         ? data.systemPrompt
         : ""
-    ).trim() ||
-    (preset === "video-to-prompt" && videoUrls.length > 0
-      ? STORY_PRO2_VIDEO_TO_PROMPT_SYSTEM
-      : preset === "image-to-prompt" && imageUrls.length > 0
-        ? STORY_PRO2_IMAGE_TO_PROMPT_SYSTEM
-        : STORY_PRO2_GENERAL_TEXT_SYSTEM);
+    ).trim() || STORY_PRO2_GENERAL_TEXT_SYSTEM;
 
   const node: CanvasRunNodeInput = {
     ...args.node,
@@ -251,6 +254,7 @@ export async function runStoryProStarterGeneralText(
     textInputs: [],
     data: {
       ...data,
+      modelKey,
       prompt,
       systemPrompt: customSystem,
     },

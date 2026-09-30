@@ -13,6 +13,7 @@ import {
   RotateCw,
   Scan,
   ScanFace,
+  Sparkles,
   Wand2,
 } from "lucide-react";
 import { useState } from "react";
@@ -97,6 +98,9 @@ export type Pro2ImageNodeToolbarProps = {
   onMagicPick?: (menuId: LibtvImageMagicMenuId) => void;
   /** 是否展示编辑 / 宫格切分（Pro2 有图节点） */
   pro2ImageTools?: boolean;
+  /** 一键反推提示词（Qwen3.8 Max · 自动建文本节点并生成） */
+  onReversePrompt?: () => void;
+  reversePromptBusy?: boolean;
 };
 
 /** 有图图片节点 · 顶部浮动工具条（LibTV 图 2） */
@@ -117,6 +121,8 @@ export function Pro2ImageNodeToolbar({
   onGridSplitPick,
   onMagicPick,
   pro2ImageTools = false,
+  onReversePrompt,
+  reversePromptBusy = false,
 }: Pro2ImageNodeToolbarProps) {
   const { alert } = useDialogs();
   const [downloading, setDownloading] = useState(false);
@@ -232,6 +238,29 @@ export function Pro2ImageNodeToolbar({
           <RotateCw className="size-3.5" />
           <span>多角度</span>
         </button>
+
+        {onReversePrompt ? (
+          <>
+            <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
+            <button
+              type="button"
+              className={cn(
+                TOOL_BTN,
+                reversePromptBusy && "pointer-events-none opacity-80",
+              )}
+              disabled={!previewUrl || reversePromptBusy}
+              title="反推提示词 · Qwen3.8 Max"
+              onClick={onReversePrompt}
+            >
+              {reversePromptBusy ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="size-3.5" />
+              )}
+              <span>反推提示词</span>
+            </button>
+          </>
+        ) : null}
 
         {pro2ImageTools ? (
           <>

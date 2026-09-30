@@ -114,6 +114,8 @@ import { resolveHitBottomTask } from "@/lib/detail-page-suite-hit-bottom-task";
 import { isVisionSellpointJobRunning, readHitVisionSellpointJob } from "@/lib/detail-page-suite-vision-sellpoint-progress";
 import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
 import { resumeOrCreateEcomProject, writeEcomLastProjectId } from "@/lib/ecom-last-project";
+import { ensureEcomSessionFresh } from "@/lib/ecom-silent-sso";
+import { fetchEcomToolsSessionLite } from "@/lib/ecom-tools-session-client";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 
@@ -142,6 +144,7 @@ const StoryboardModelPickerDialog = dynamic(
 );
 
 const STORAGE_KEY = "ecom-detail-page-suite-hit-active-project";
+const HIT_RETURN_PATH = "/ecom/detail-page-suite-hit";
 const HIT_MODEL_REF_MAX = 6;
 
 type HitUploadRole = "reference_suite" | "product" | "model";
@@ -163,6 +166,8 @@ function DetailPageSuiteHitStudioInner() {
   const backgroundGen = useBackgroundGeneration();
   const [project, setProject] = useState<DetailPageSuiteProject | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionChecked, setSessionChecked] = useState(false);
+  const [loadGeneration, setLoadGeneration] = useState(0);
   const [needLogin, setNeedLogin] = useState(false);
   const [decomposing, setDecomposing] = useState(false);
   const [visionBusy, setVisionBusy] = useState(false);
@@ -279,7 +284,43 @@ function DetailPageSuiteHitStudioInner() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
+      try {
+        let session = await fetchEcomToolsSessionLite();
+        if (cancelled) return;
+        if (!session.active) {
+          const ok = await ensureEcomSessionFresh(120, {
+            returnPath: HIT_RETURN_PATH,
+            redirectOnFailure: false,
+          });
+          if (!ok) {
+            setNeedLogin(true);
+            setLoading(false);
+            return;
+          }
+          session = await fetchEcomToolsSessionLite();
+        }
+        if (!session.active) {
+          setNeedLogin(true);
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) setNeedLogin(true);
+      } finally {
+        if (!cancelled) setSessionChecked(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!sessionChecked || needLogin) return;
+
+    let cancelled = false;
+    setLoading(true);
+    void (async () => {
       try {
         const models = await fetchDetailPageSuiteHitModels();
         if (cancelled) return;
@@ -316,7 +357,14 @@ function DetailPageSuiteHitStudioInner() {
     return () => {
       cancelled = true;
     };
-  }, [alert, loadProject, applyHitProject]);
+  }, [alert, applyHitProject, loadGeneration, needLogin, sessionChecked]);
+
+  useEffect(() => {
+    if (!sessionChecked || needLogin || project) return;
+    const onRefreshed = () => setLoadGeneration((n) => n + 1);
+    window.addEventListener("ecom:tools-session-refreshed", onRefreshed);
+    return () => window.removeEventListener("ecom:tools-session-refreshed", onRefreshed);
+  }, [needLogin, project, sessionChecked]);
 
   const stopVisionSellpointPoll = useCallback(() => {
     if (visionPollRef.current) {
@@ -1061,8 +1109,24 @@ function DetailPageSuiteHitStudioInner() {
     }
   }
 
-  if (needLogin) return <EcomLoginPrompt />;
-  if (loading || !project) return <ProductCreationStudioSkeleton />;
+  if (needLogin) return <EcomLoginPrompt returnPath={HIT_RETURN_PATH} />;
+  if (loading) return <ProductCreationStudioSkeleton />;
+  if (!project) {
+    return (
+      <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-3 px-6 text-center">
+        <p className="text-sm text-[#515154]">未能打开工作台项目，请确认已登录并重试。</p>
+        <EcomButtonPrimary
+          type="button"
+          onClick={() => {
+            setLoading(true);
+            setLoadGeneration((n) => n + 1);
+          }}
+        >
+          重试加载
+        </EcomButtonPrimary>
+      </div>
+    );
+  }
 
   function uploadCardProgress(role: HitUploadRole) {
     const active = uploadingRole === role;

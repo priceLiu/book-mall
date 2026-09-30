@@ -154,6 +154,10 @@ import {
   ImageCropFrameDock,
   ImageExpandFrameDock,
 } from "@/components/canvas/inpaint/image-magic-edit-frame-dock";
+import {
+  libtvMediaReversePromptFailureMessage,
+  runLibtvMediaReversePromptFromNode,
+} from "@/lib/canvas/libtv-media-reverse-prompt";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 
 export type LibtvImageNodeEdition = "pro2" | "sbv1";
@@ -243,6 +247,7 @@ export function LibtvImageNode({
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
   const inputRef = useRef<HTMLInputElement>(null);
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
+  const [reversePromptBusy, setReversePromptBusy] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [livenessOpen, setLivenessOpen] = useState(false);
   const [preferBlobPreview, setPreferBlobPreview] = useState(false);
@@ -883,6 +888,39 @@ export function LibtvImageNode({
     [edition, id, nodes, addNode, setNodes, setEdges, providers],
   );
 
+  const onReversePrompt = useCallback(() => {
+    if (reversePromptBusy || !hasImage) return;
+    setReversePromptBusy(true);
+    try {
+      const result = runLibtvMediaReversePromptFromNode(id, {
+        nodes,
+        addNode,
+        setNodes,
+        setEdges,
+        updateNodeData,
+      }, providers);
+      if (!result.ok) {
+        const { title, message } = libtvMediaReversePromptFailureMessage(
+          result.reason,
+        );
+        void alert({ title, message, variant: "warning" });
+      }
+    } finally {
+      setReversePromptBusy(false);
+    }
+  }, [
+    reversePromptBusy,
+    hasImage,
+    id,
+    nodes,
+    addNode,
+    setNodes,
+    setEdges,
+    updateNodeData,
+    providers,
+    alert,
+  ]);
+
   const onGridSplitPick = useCallback(
     (cols: number, rows: number) => {
       if (edition !== "pro2" || !hasImage) return;
@@ -1327,6 +1365,8 @@ export function LibtvImageNode({
               portraitImporting={portraitImporting}
               portraitActive={portraitActive}
               onDuplicateNode={onDuplicateNode}
+              onReversePrompt={hasImage ? onReversePrompt : undefined}
+              reversePromptBusy={reversePromptBusy}
             />
           </LibtvNodeToolbarPortal>
         ) : null}

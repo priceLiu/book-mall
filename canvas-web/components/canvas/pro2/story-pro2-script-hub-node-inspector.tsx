@@ -46,7 +46,7 @@ import { ProNodeShell } from "../nodes/../pro-node-shell";
 import { NodeStatusBadge } from "../node-shell";
 import { StoryProGuidePanel } from "../story-pro-guide-panel";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
-import { pickDefaultStoryLlmEngine } from "@/lib/canvas/system-providers";
+import { pickDefaultStoryScriptHubLlmEngine } from "@/lib/canvas/system-providers";
 import { StoryHubNodePreviewPane } from "../story-hub-node-preview-pane";
 import { StoryScriptHubModal } from "../story-script-hub-modal";
 import {
@@ -122,7 +122,7 @@ export function StoryPro2ScriptHubInspector({ id, data, selected }: NodeProps) {
 
   useEffect(() => {
     if (d.providerId?.trim() && d.modelKey?.trim()) return;
-    const pick = pickDefaultStoryLlmEngine(providers);
+    const pick = pickDefaultStoryScriptHubLlmEngine(providers);
     if (!pick) return;
     updateNodeData(id, {
       providerId: pick.providerId,

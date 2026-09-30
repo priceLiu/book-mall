@@ -8,6 +8,7 @@ import {
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { resolvePro2TextPurpose } from "@/lib/canvas/pro2-text-purpose";
 import { isPlainLibtvTextContent } from "@/lib/canvas/libtv-plain-text-display";
+import { mediaDecomposeTextForCanvasNode } from "@/lib/canvas/media-decompose-display-text";
 import {
   pushStoryRevision,
   type StoryTextRevision,
@@ -40,11 +41,12 @@ export function Pro2TextNodeOutlineEditorHost() {
   );
   const isGeneral = textPurpose === "general";
   const uploadedMd = d.uploadedScriptMd?.trim() ?? "";
-  const outlineMd =
+  const outlineMd = mediaDecomposeTextForCanvasNode(
     d.generatedOutlineMd?.trim() ||
-    uploadedMd ||
-    (isGeneral ? d.themeInput?.trim() : "") ||
-    "";
+      uploadedMd ||
+      (isGeneral ? d.themeInput?.trim() : "") ||
+      "",
+  );
 
   const nodeLabel = useMemo(() => {
     if (!node) return "故事大纲";

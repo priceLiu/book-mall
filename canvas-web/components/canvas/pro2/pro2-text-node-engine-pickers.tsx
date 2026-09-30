@@ -40,6 +40,7 @@ import {
   GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
   pickDefaultStoryLlmEngine,
   pickDefaultStoryVisionLlmEngine,
+  pickStoryQwen38MaxLlmEngine,
 } from "@/lib/canvas/system-providers";
 import { STORY_LLM_MODEL_KEYS, STORY_PRO_VIDEO_MODEL_KEYS } from "@/lib/canvas/types";
 import {
@@ -47,6 +48,7 @@ import {
 } from "@/lib/canvas/pro2-video-batch-video";
 import {
   isStoryLlmVisionModel,
+  STORY_LLM_DEFAULT_VISION_MODEL,
   STORY_LLM_VISION_MODEL_KEYS,
   STORY_LLM_VIDEO_UNDERSTANDING_MODEL_KEYS,
 } from "@/lib/canvas/story-llm-vision-models";
@@ -73,6 +75,9 @@ function rolePickerConfig(
   if (role === "LLM") {
     if (preset === "text-to-music") {
       return { allowedModelKeys: [...PRO2_SUNO_MODEL_KEYS] };
+    }
+    if (preset === "image-to-prompt" || preset === "video-to-prompt") {
+      return { allowedModelKeys: [STORY_LLM_DEFAULT_VISION_MODEL] };
     }
     const llmKeys =
       needsVision && preset === "video-to-prompt"
@@ -115,9 +120,13 @@ function defaultPickForRole(
       if (!pick) return null;
       return { ...pick, params: pick.params ?? {} };
     }
-    const pick = needsVision
-      ? pickDefaultStoryVisionLlmEngine(providers)
-      : pickDefaultStoryLlmEngine(providers);
+    const reversePreset = String(data?.pro2PresetKind ?? "").trim();
+    const pick =
+      reversePreset === "image-to-prompt" || reversePreset === "video-to-prompt"
+        ? pickStoryQwen38MaxLlmEngine(providers)
+        : needsVision
+          ? pickDefaultStoryVisionLlmEngine(providers)
+          : pickDefaultStoryLlmEngine(providers);
     if (!pick) return null;
     const model = resolveLibtvDockEngineModel(
       providers,

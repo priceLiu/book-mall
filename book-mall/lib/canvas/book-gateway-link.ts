@@ -1,6 +1,7 @@
 /** Canvas 兼容层 → @/lib/gateway/book-gateway-link */
 export {
   getGatewayLinkStatusForUser,
+  getGatewayLinkStatusForCanvasClient,
   unlinkGatewayApiKeyForUser,
   resolveGatewayAuthForBookUser,
   type GatewayLinkStatusDto,

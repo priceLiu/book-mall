@@ -5,7 +5,7 @@ import {
   jsonHeaders,
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
-import { getGatewayLinkStatusForUser } from "@/lib/canvas/book-gateway-link";
+import { getGatewayLinkStatusForCanvasClient } from "@/lib/canvas/book-gateway-link";
 
 export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request);
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   const guard = await requireSessionUser(request);
   if (!guard.ok) return guard.response;
   try {
-    const gatewayLink = await getGatewayLinkStatusForUser(guard.user.id);
+    const gatewayLink = await getGatewayLinkStatusForCanvasClient(guard.user.id);
     return NextResponse.json(gatewayLink, { headers: jsonHeaders(request) });
   } catch (err) {
     return canvasErrorToResponse(request, err);

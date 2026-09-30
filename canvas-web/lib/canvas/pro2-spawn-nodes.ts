@@ -18,6 +18,8 @@ import { SBV1_DEFAULT_IMAGE_NODE_DATA } from "./sbv1-workspace-types";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
 import { findStoryPro2ScriptHubForStarter } from "./spawn-story-pro2-workspace";
+import { GATEWAY_DEEPSEEK_PROVIDER_ID } from "./system-providers";
+import { STORY_SCRIPT_HUB_DEFAULT_MODEL_KEY } from "./story-prompts";
 
 import { buildPro2StarterNodeData } from "./pro2-starter-node-data";
 export { buildPro2StarterNodeData } from "./pro2-starter-node-data";
@@ -51,8 +53,8 @@ export function buildPro2ScriptHubNodeData(
     characterMd: "",
     sceneMd: "",
     storyboardMd: "",
-    providerId: "",
-    modelKey: "",
+    providerId: GATEWAY_DEEPSEEK_PROVIDER_ID,
+    modelKey: STORY_SCRIPT_HUB_DEFAULT_MODEL_KEY,
     params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
     outlineSystemPrompt: STORY_PRO2_HUB_LLM_SYSTEM,
     promptOutline: STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,

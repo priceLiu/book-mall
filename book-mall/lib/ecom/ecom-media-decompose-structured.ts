@@ -857,6 +857,58 @@ export function resolveMediaDecomposeParseError(fullText: string): string | null
   return "回复末尾缺少 ```media-decompose JSON 围栏。";
 }
 
+/** 画布反推文本节点 · 与电商 ResultPanel 一致的要点列表（非 JSON 围栏） */
+export function formatMediaDecomposeCanvasTextOutput(args: {
+  fullText: string;
+  structured: MediaDecomposePatch | null;
+}): string {
+  const { fullText, structured } = args;
+  if (structured?.mediaType === "image") {
+    return formatImageDecomposeCanvasText(structured);
+  }
+  if (structured?.mediaType === "video" && structured.storyboardTable.length > 0) {
+    return formatVideoDecomposeMarkdown(structured);
+  }
+  const stripped = stripMediaDecomposeFence(fullText).trim();
+  if (stripped.length >= 40 && !stripped.startsWith("{")) {
+    return stripped;
+  }
+  const display = toMediaDecomposeDisplayContent(fullText);
+  const trimmed = display.trim();
+  if (trimmed && !/```media-decompose/i.test(trimmed) && !trimmed.startsWith("{")) {
+    return trimmed;
+  }
+  return stripped || fullText.trim();
+}
+
+function formatImageDecomposeCanvasText(
+  patch: Extract<MediaDecomposePatch, { mediaType: "image" }>,
+): string {
+  const e = patch.elements;
+  const l = e.lighting;
+  const lines: string[] = [
+    `- **主体**：${e.subject}`,
+    `- **姿态**：${e.subjectPose}`,
+    `- **场景**：${e.sceneEnvironment}`,
+    `- **透视**：${e.spatialPerspective}`,
+    `- **构图**：${e.composition}`,
+    `- **等效焦距**：${e.equivalentFocalLength}`,
+    `- **拍摄角度**：${e.shootingAngle}`,
+    `- **布光**：主 ${l.keyLight}；辅 ${l.fillLight}；轮廓 ${l.rimLight}；环境 ${l.ambientLight}；方向 ${l.direction}；${l.hardSoft}；色温 ${l.colorTemperature}`,
+    `- **材质**：${e.materialTexture}`,
+    `- **色彩**：${e.colorSystem}`,
+    `- **氛围**：${e.atmosphere}`,
+    `- **细节**：${e.detailNotes}`,
+  ];
+  if (patch.positivePrompt.trim()) {
+    lines.push("", `- **正向生图 Prompt**：${patch.positivePrompt.trim()}`);
+  }
+  if (patch.negativePrompt.trim()) {
+    lines.push("", `- **反向负面 Prompt**：${patch.negativePrompt.trim()}`);
+  }
+  return lines.join("\n").trim();
+}
+
 export function toMediaDecomposeDisplayContent(
   fullText: string,
   options?: { streaming?: boolean },

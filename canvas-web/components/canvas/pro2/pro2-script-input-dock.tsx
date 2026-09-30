@@ -33,7 +33,7 @@ import {
 } from "@/lib/canvas/pro2-script-category-doc";
 import { applyPro2ScriptCategoryFromHub } from "@/lib/canvas/spawn-pro2-script-category-from-hub";
 import type { Pro2ScriptCategoryId } from "@/lib/canvas/pro2-script-category-presets";
-import { pickDefaultStoryLlmEngine } from "@/lib/canvas/system-providers";
+import { pickDefaultStoryScriptHubLlmEngine } from "@/lib/canvas/system-providers";
 import { STORY_LLM_MODEL_KEYS } from "@/lib/canvas/types";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
@@ -191,7 +191,7 @@ export function Pro2ScriptInputDock() {
 
   useEffect(() => {
     if (!storeNode || d.providerId) return;
-    const pick = pickDefaultStoryLlmEngine(providers);
+    const pick = pickDefaultStoryScriptHubLlmEngine(providers);
     if (!pick) return;
     updateNodeData(storeNode.id, {
       providerId: pick.providerId,

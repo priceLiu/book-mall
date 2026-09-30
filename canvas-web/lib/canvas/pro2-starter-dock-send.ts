@@ -1,7 +1,8 @@
 import { pickRuntimeImagePreviewUrl, pickRuntimeVideoUrl, isLikelyVideoUrl } from "./task-media-url";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 
-function upstreamHttpsImageUrl(node: CanvasFlowNode): string | null {
+/** 节点媒体是否已有可传给反推 LLM 的 HTTPS URL（OSS / 公网） */
+export function libtvNodeHttpsMediaUrlForLlm(node: CanvasFlowNode): string | null {
   if (
     node.type === "story-pro2-image" ||
     node.type === "story-pro2-three-view" ||
@@ -46,7 +47,7 @@ export function pro2StarterHasUpstreamLlmImage(
     if (e.target !== nodeId) continue;
     const src = nodes.find((n) => n.id === e.source);
     if (!src) continue;
-    if (upstreamHttpsImageUrl(src)) return true;
+    if (libtvNodeHttpsMediaUrlForLlm(src)) return true;
   }
   return false;
 }

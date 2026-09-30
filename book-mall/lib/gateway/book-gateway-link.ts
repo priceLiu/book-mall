@@ -100,6 +100,24 @@ export async function getGatewayLinkStatusForUser(
   };
 }
 
+/** Canvas 客户端展示：与 `/nodes/.../run` 一致，平台代付先确保托管 sk-gw 再读 linked */
+export async function getGatewayLinkStatusForCanvasClient(
+  userId: string,
+): Promise<GatewayLinkStatusDto> {
+  const persona = await getUserBillingPersona(userId);
+  if (persona === "PLATFORM_CREDIT") {
+    try {
+      await ensurePlatformManagedKeyForUser(userId);
+    } catch (e) {
+      console.warn(
+        "[getGatewayLinkStatusForCanvasClient] platform key ensure failed",
+        e,
+      );
+    }
+  }
+  return getGatewayLinkStatusForUser(userId);
+}
+
 export async function linkGatewayApiKeyForUser(
   userId: string,
   rawSkGw: string,

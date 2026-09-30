@@ -14,7 +14,9 @@ import {
   STORY_PRO_VIDEO_VOLCENGINE_MODEL_KEYS,
   STORY_TTS_MODEL_KEYS,
 } from "./types";
+import { STORY_SCRIPT_HUB_DEFAULT_MODEL_KEY } from "./story-prompts";
 import {
+  STORY_LLM_DEFAULT_VISION_MODEL,
   STORY_LLM_VISION_MODEL_KEYS,
 } from "./story-llm-vision-models";
 
@@ -103,6 +105,39 @@ function findLlmOnProvider(
   return { providerId: provider.id, modelKey: m.modelKey };
 }
 
+/** 反推提示词 · 固定 Qwen3.8 Max（与电商拆图拆视频默认一致） */
+export function pickStoryQwen38MaxLlmEngine(
+  providers: CanvasProviderDto[],
+): { providerId: string; modelKey: string } {
+  const key = STORY_LLM_DEFAULT_VISION_MODEL;
+  for (const provider of activeCanvasProviders(providers)) {
+    const pick = findLlmOnProvider(
+      provider,
+      key,
+      STORY_LLM_VISION_ALLOWED,
+    );
+    if (pick) return pick;
+  }
+  for (const provider of activeCanvasProviders(providers)) {
+    const loose = provider.models.find(
+      (x) => x.role === "LLM" && x.modelKey === key,
+    );
+    if (loose) {
+      return { providerId: provider.id, modelKey: key };
+    }
+  }
+  const bailian =
+    findProviderByKind(providers, "ALI_BAILIAN") ??
+    activeCanvasProviders(providers).find(
+      (p) => p.id === GATEWAY_BAILIAN_PROVIDER_ID && p.active,
+    );
+  if (bailian) {
+    return { providerId: bailian.id, modelKey: key };
+  }
+  // 画布 Provider 列表未上架该模型时仍走 Gateway 百炼路由（run 侧 assert + model-router）
+  return { providerId: GATEWAY_BAILIAN_PROVIDER_ID, modelKey: key };
+}
+
 /** 图片/视频反推 · 多模态 LLM（Doubao Seed 2.0 / Gemini / GPT-5.5） */
 export function pickDefaultStoryVisionLlmEngine(
   providers: CanvasProviderDto[],
@@ -115,6 +150,34 @@ export function pickDefaultStoryVisionLlmEngine(
     }
   }
   return null;
+}
+
+/** 剧本节点默认：DeepSeek V4 Flash（与 book-mall DEEPSEEK_STORY_DEFAULT_MODEL_KEY 一致） */
+export function pickDefaultStoryScriptHubLlmEngine(
+  providers: CanvasProviderDto[],
+): { providerId: string; modelKey: string } {
+  const key = STORY_SCRIPT_HUB_DEFAULT_MODEL_KEY;
+  const deepseek = findDeepSeekProvider(providers);
+  if (deepseek) {
+    const pick = findLlmOnProvider(deepseek, key);
+    if (pick) return pick;
+  }
+  for (const provider of activeCanvasProviders(providers)) {
+    const pick = findLlmOnProvider(provider, key);
+    if (pick) return pick;
+  }
+  for (const provider of activeCanvasProviders(providers)) {
+    const loose = provider.models.find(
+      (x) => x.role === "LLM" && x.modelKey === key,
+    );
+    if (loose) {
+      return { providerId: provider.id, modelKey: key };
+    }
+  }
+  if (deepseek) {
+    return { providerId: deepseek.id, modelKey: key };
+  }
+  return { providerId: GATEWAY_DEEPSEEK_PROVIDER_ID, modelKey: key };
 }
 
 /** 漫剧 Story LLM 默认：Gateway KIE · gemini-3-flash-preview，其次 Gateway / 用户 DeepSeek。 */

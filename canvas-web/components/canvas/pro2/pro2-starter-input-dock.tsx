@@ -112,6 +112,9 @@ function Pro2StarterInputDockBody({
     [storeNode, d, nodes, edges],
   );
   const isStoryOutlineMode = textPurpose === "story-outline";
+  const isFixedReversePreset =
+    String(d.pro2PresetKind ?? "") === "image-to-prompt" ||
+    String(d.pro2PresetKind ?? "") === "video-to-prompt";
   const themeInput = d.themeInput ?? "";
   const isGenerating = isPro2StarterTextGenerating(d);
   const onStopGeneration = useLibtvDockGenerationStop(storeNode?.id);
@@ -439,17 +442,27 @@ function Pro2StarterInputDockBody({
       footer={
         <>
           <Pro2DockToolbar>
-            <Pro2TextNodeEnginePickers
-              nodeId={storeNode.id}
-              data={d}
-              nodes={nodes}
-              edges={edges}
-              providers={providers}
-              disabled={isGenerating}
-              updateNodeData={updateNodeData}
-              triggerFontPx={dockTextFontPx}
-              sectionFontPx={sendIconPx}
-            />
+            {isFixedReversePreset ? (
+              <span
+                className="nodrag shrink-0 rounded-md px-2 py-1 text-white/45"
+                style={{ fontSize: dockTextFontPx }}
+                title="反推提示词固定使用 Qwen3.8 Max"
+              >
+                Qwen3.8 Max · 反推
+              </span>
+            ) : (
+              <Pro2TextNodeEnginePickers
+                nodeId={storeNode.id}
+                data={d}
+                nodes={nodes}
+                edges={edges}
+                providers={providers}
+                disabled={isGenerating}
+                updateNodeData={updateNodeData}
+                triggerFontPx={dockTextFontPx}
+                sectionFontPx={sendIconPx}
+              />
+            )}
             <div
               className="flex shrink-0 items-center gap-1"
               style={{ fontSize: dockTextFontPx }}

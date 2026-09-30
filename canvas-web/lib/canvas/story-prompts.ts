@@ -262,6 +262,9 @@ export const STORY_LLM_MODEL_KEYS = [
   "qwen-max",
 ] as const;
 
+/** 剧本节点（story-pro2-script-hub）Dock 默认 LLM */
+export const STORY_SCRIPT_HUB_DEFAULT_MODEL_KEY = "deepseek-v4-flash";
+
 export const STORY_VIDEO_MODEL_KEYS = [
   "kling-2.6/image-to-video",
   "kling/v3-turbo-image-to-video",

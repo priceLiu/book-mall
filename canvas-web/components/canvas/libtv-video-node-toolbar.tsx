@@ -12,6 +12,7 @@ import {
   Loader2,
   Maximize2,
   Scan,
+  Sparkles,
   Type,
   VolumeX,
 } from "lucide-react";
@@ -48,6 +49,8 @@ export function LibtvVideoNodeToolbar({
   onExpandPreview,
   onSaveAsAsset,
   onDuplicateNode,
+  onReversePrompt,
+  reversePromptBusy = false,
   className,
   style,
   passNodeDrag = false,
@@ -60,6 +63,8 @@ export function LibtvVideoNodeToolbar({
   onExpandPreview?: () => void;
   onSaveAsAsset?: () => void;
   onDuplicateNode?: () => void;
+  onReversePrompt?: () => void;
+  reversePromptBusy?: boolean;
   className?: string;
   style?: React.CSSProperties;
   passNodeDrag?: boolean;
@@ -147,10 +152,30 @@ export function LibtvVideoNodeToolbar({
           <Scan className="size-3.5" />
           <span>高清</span>
         </button>
-        <button type="button" className={TOOL_BTN} onClick={() => void soon("解析")}>
-          <Scan className="size-3.5" />
-          <span>解析</span>
-        </button>
+        {onReversePrompt ? (
+          <button
+            type="button"
+            className={cn(
+              TOOL_BTN,
+              reversePromptBusy && "pointer-events-none opacity-80",
+            )}
+            disabled={!previewUrl || reversePromptBusy}
+            title="反推提示词 · Qwen3.8 Max"
+            onClick={onReversePrompt}
+          >
+            {reversePromptBusy ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="size-3.5" />
+            )}
+            <span>反推提示词</span>
+          </button>
+        ) : (
+          <button type="button" className={TOOL_BTN} onClick={() => void soon("解析")}>
+            <Scan className="size-3.5" />
+            <span>解析</span>
+          </button>
+        )}
         <button
           type="button"
           className={TOOL_BTN}

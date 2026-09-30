@@ -17,6 +17,7 @@ import {
   PRO2_FIXTURE_FULL_PACK,
   fixtureWithFence,
 } from "../fixtures/pro2-production-script-fixture";
+import { buildPro2ScriptHubDataFromStarterOutline } from "@/lib/canvas/pro2-script-hub-from-starter";
 
 describe("pro2-production-script flow", () => {
   it("applyHubSectionFromTask JSON path → crew bulletin tasks", () => {
@@ -249,5 +250,16 @@ describe("pro2-production-script flow", () => {
     const patch = trySyncResolvedProductionScriptToHub(hub);
     expect(patch?.productionScript?.shots?.[0]?.propIds).toEqual(["prop-book"]);
     expect(patch?.productionScript?.shots?.[0]?.sfxNote).toMatch(/人群议论/);
+  });
+
+  it("buildPro2ScriptHubDataFromStarterOutline parses full-pack JSON into tabs", () => {
+    const rawJson = fixtureWithFence(PRO2_FIXTURE_FULL_PACK);
+    const hub = buildPro2ScriptHubDataFromStarterOutline(rawJson, {
+      providerId: "p",
+      modelKey: "m",
+    }) as StoryProScriptHubNodeData;
+    expect(hub.productionScript?.characters?.[0]?.name).toBe("沈知意");
+    expect((hub.storyboardMd ?? "").trim().length).toBeGreaterThan(0);
+    expect(hub.outlineMd).not.toContain('"schemaVersion"');
   });
 });

@@ -36,6 +36,7 @@ import {
 import { applyScriptStudioThemeOutlineResult } from "./script-studio-run-apply";
 import { pickTaskResultMediaUrl } from "./task-media-url";
 import { shouldSkipStoryRowTaskApply } from "./task-pick";
+import { mediaDecomposeTextForCanvasNode } from "./media-decompose-display-text";
 import {
   clearCanvasNodeRunSession,
   isCanvasNodeRunSessionActive,
@@ -632,10 +633,19 @@ export function storyApplyTaskResult(
     if (shouldSkipStoryRowTaskApply(prevRt, task, node.id)) return;
     const patch: Record<string, unknown> = { themeOutlineRuntime: runtime };
     if (task.status === "SUCCEEDED" && task.textOutput?.trim()) {
+      const nodeData = (node.data ?? {}) as Record<string, unknown>;
+      const preset = String(nodeData.pro2PresetKind ?? "").trim();
+      const displayText = mediaDecomposeTextForCanvasNode(task.textOutput);
+      const outlineMd =
+        preset === "image-to-prompt" ||
+        preset === "video-to-prompt" ||
+        /```media-decompose/i.test(task.textOutput)
+          ? displayText
+          : task.textOutput.trim();
       if (isPromptTextNode) {
-        patch.generatedText = task.textOutput.trim();
+        patch.generatedText = outlineMd;
       } else if (isStarterTextNode) {
-        patch.generatedOutlineMd = task.textOutput.trim();
+        patch.generatedOutlineMd = outlineMd;
         if (isOutlineTextNode) {
           patch.pipelineStage = "llm_done";
           patch.starterMode = "generate";

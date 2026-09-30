@@ -5,7 +5,7 @@ import {
   jsonHeaders,
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
-import { getGatewayLinkStatusForUser } from "@/lib/canvas/book-gateway-link";
+import { getGatewayLinkStatusForCanvasClient } from "@/lib/canvas/book-gateway-link";
 import { listCanvasProvidersForUser } from "@/lib/canvas/canvas-gateway-providers";
 import { CanvasProjectError } from "@/lib/canvas/canvas-project-service";
 
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
         : undefined;
     const [gatewayProviders, gatewayLink] = await Promise.all([
       listCanvasProvidersForUser(guard.user.id, { skipEnsure: true, sceneKey, role }),
-      getGatewayLinkStatusForUser(guard.user.id),
+      getGatewayLinkStatusForCanvasClient(guard.user.id),
     ]);
     return NextResponse.json(
       { providers: gatewayProviders, gatewayLink },
