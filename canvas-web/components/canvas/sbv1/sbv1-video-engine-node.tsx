@@ -95,6 +95,8 @@ import {
   runLibtvVideoTrackSplit,
   type LibtvVideoTrackSplitMode,
 } from "@/lib/canvas/libtv-video-track-split-run";
+import { libtvVideoEditSourceReady } from "@/lib/canvas/libtv-video-edit-client";
+import { runLibtvVideoFrameExtract } from "@/lib/canvas/libtv-video-frame-extract-run";
 import { isMislabeledVendorSuccessError } from "@/lib/canvas/friendly-task-error";
 import { isCanvasNodeRunSessionActive } from "@/lib/canvas/canvas-run-session";
 import {
@@ -578,6 +580,13 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     [d.runtime, rowRuntime],
   );
 
+  const videoEditSourceUrl = useMemo(
+    () => libtvVideoEditSourceReady({ runtime: d.runtime ?? rowRuntime }),
+    [d.runtime, rowRuntime],
+  );
+
+  const [frameExtractBusy, setFrameExtractBusy] = useState(false);
+
   const onReversePrompt = useCallback(() => {
     if (reversePromptBusy || !hasVideo || isPro2VideoBoardCell) return;
     setReversePromptBusy(true);
@@ -645,6 +654,61 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
       trackSplitBusy,
       trackSplitSourceUrl,
       updateNodeData,
+    ],
+  );
+
+  const onOpenTrimEditor = useCallback(() => {
+    if (!videoEditSourceUrl || frameExtractBusy || isPro2VideoBoardCell) return;
+    updateNodeData(id, {
+      videoEditSession: { open: true, mode: "trim-clip" },
+    });
+  }, [
+    videoEditSourceUrl,
+    frameExtractBusy,
+    isPro2VideoBoardCell,
+    id,
+    updateNodeData,
+  ]);
+
+  const onFrameExtractPick = useCallback(
+    (pick: "first" | "last" | "custom") => {
+      if (!videoEditSourceUrl || frameExtractBusy || isPro2VideoBoardCell) return;
+      if (pick === "custom") {
+        updateNodeData(id, {
+          videoEditSession: { open: true, mode: "pick-frame" },
+        });
+        return;
+      }
+      setFrameExtractBusy(true);
+      void runLibtvVideoFrameExtract({
+        mode: pick,
+        sourceNodeId: id,
+        sourceVideoUrl: videoEditSourceUrl,
+        projectId,
+        store: spawnStore,
+        updateNodeData: (nodeId, patch) => updateNodeData(nodeId, patch),
+      })
+        .catch(async (e) => {
+          const message = e instanceof Error ? e.message : "截帧失败";
+          await alert({
+            title: pick === "first" ? "首帧导出失败" : "尾帧导出失败",
+            message,
+            variant: "error",
+          });
+        })
+        .finally(() => {
+          setFrameExtractBusy(false);
+        });
+    },
+    [
+      alert,
+      frameExtractBusy,
+      id,
+      isPro2VideoBoardCell,
+      projectId,
+      spawnStore,
+      updateNodeData,
+      videoEditSourceUrl,
     ],
   );
 
@@ -757,8 +821,16 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
               previewUrl={videoUrl}
               trackSplitSourceUrl={trackSplitSourceUrl}
               trackSplitBusy={trackSplitBusy}
+              videoEditSourceUrl={videoEditSourceUrl}
+              frameExtractBusy={frameExtractBusy}
               onTrackSplitPick={
                 isPro2VideoBoardCell ? undefined : onTrackSplitPick
+              }
+              onFrameExtractPick={
+                isPro2VideoBoardCell ? undefined : onFrameExtractPick
+              }
+              onOpenTrimEditor={
+                isPro2VideoBoardCell ? undefined : onOpenTrimEditor
               }
               onExpandPreview={() => setPreviewOpen(true)}
               onSaveAsAsset={

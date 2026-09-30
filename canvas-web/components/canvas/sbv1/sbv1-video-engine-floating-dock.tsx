@@ -52,12 +52,33 @@ export function Sbv1VideoEngineFloatingDock() {
     ),
   );
 
+  const clipEditorOpen = useCanvasStore(
+    useCallback(
+      (s) => {
+        if (!dockNodeId) return false;
+        const d = s.nodes.find((n) => n.id === dockNodeId)?.data as
+          | Sbv1VideoEngineNodeData
+          | undefined;
+        return Boolean(d?.videoEditSession?.open);
+      },
+      [dockNodeId],
+    ),
+  );
+
   const { placement, hidden } = useLibtvFloatingDock(
     nodeExists ? dockNodeId : null,
     SBV1_VIDEO_DOCK_PLACEMENT_OPTS,
   );
 
-  if (suppressDock || !dockNodeId || !nodeExists || !placement) return null;
+  if (
+    suppressDock ||
+    clipEditorOpen ||
+    !dockNodeId ||
+    !nodeExists ||
+    !placement
+  ) {
+    return null;
+  }
 
   return (
     <Sbv1VideoEngineFloatingDockBody

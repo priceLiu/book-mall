@@ -36,12 +36,15 @@ const GAP = 48;
 const JIANYING_EXPORT_PRO2_WIDTH = 400;
 
 export function buildSbv1ImageNodeData(
-  overrides?: Record<string, unknown>,
+  overrides?: Record<string, unknown> & { omitLabel?: boolean },
 ): Record<string, unknown> {
-  return {
+  const { omitLabel, ...rest } = overrides ?? {};
+  const data: Record<string, unknown> = {
     ...cloneCanvasNodeData(SBV1_DEFAULT_IMAGE_NODE_DATA),
-    ...cloneCanvasNodeData(overrides),
+    ...cloneCanvasNodeData(rest),
   };
+  if (omitLabel) delete data.label;
+  return data;
 }
 
 export function buildSbv1VideoEngineNodeData(
@@ -153,6 +156,8 @@ export function spawnSbv1NeighborFromNode(
     menuItemId?: string;
     /** 松手位置（屏幕坐标）· 优先于邻居偏移 */
     atScreen?: { x: number; y: number };
+    /** 图片节点 · 不写 `data.label`，标题走「图片 N」 */
+    omitImageLabel?: boolean;
   },
 ): string {
   const { nodes, edges, addNode, setNodes, setEdges } = store;
@@ -235,16 +240,19 @@ export function spawnSbv1NeighborFromNode(
 
   if (nodeType === "sbv1-image") {
     const label =
-      options?.spawnMode === "txt2img"
-        ? "文生图"
-        : options?.spawnMode === "img2img"
-          ? "图生图"
-          : "图片";
+      options?.omitImageLabel
+        ? undefined
+        : options?.spawnMode === "txt2img"
+          ? "文生图"
+          : options?.spawnMode === "img2img"
+            ? "图生图"
+            : "图片";
     const newId = addNode(
       "sbv1-image",
       { x, y },
       buildSbv1ImageNodeData({
-        label,
+        ...(label ? { label } : {}),
+        omitLabel: options?.omitImageLabel,
         imageMode: options?.spawnMode,
       }),
     );

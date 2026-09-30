@@ -9,6 +9,7 @@ import {
   Copy,
   Crop,
   Download,
+  Film,
   Loader2,
   Maximize2,
   Scan,
@@ -40,12 +41,16 @@ import { cn } from "@/lib/utils";
 const TOOL_BTN = PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS;
 const ICON_BTN = PRO2_IMAGE_NODE_TOOLBAR_ICON_BTN_CLASS;
 
-/** 视频合成节点 · 顶部浮动工具条（图 5 · 后续接入 + 保留复制） */
+/** 视频合成节点 · 顶部浮动工具条 */
 export function LibtvVideoNodeToolbar({
   previewUrl,
   trackSplitSourceUrl,
   trackSplitBusy,
+  videoEditSourceUrl,
+  frameExtractBusy,
   onTrackSplitPick,
+  onFrameExtractPick,
+  onOpenTrimEditor,
   onExpandPreview,
   onSaveAsAsset,
   onDuplicateNode,
@@ -56,10 +61,14 @@ export function LibtvVideoNodeToolbar({
   passNodeDrag = false,
 }: {
   previewUrl?: string;
-  /** OSS/HTTPS 成片 · 去原音 / 分离音轨 */
   trackSplitSourceUrl?: string;
   trackSplitBusy?: boolean;
+  /** OSS/HTTPS 成片 · 截帧 / 裁剪 */
+  videoEditSourceUrl?: string;
+  frameExtractBusy?: boolean;
   onTrackSplitPick?: (mode: LibtvVideoTrackSplitMode) => void;
+  onFrameExtractPick?: (mode: "first" | "last" | "custom") => void;
+  onOpenTrimEditor?: () => void;
   onExpandPreview?: () => void;
   onSaveAsAsset?: () => void;
   onDuplicateNode?: () => void;
@@ -72,6 +81,7 @@ export function LibtvVideoNodeToolbar({
   const { alert } = useDialogs();
   const [downloading, setDownloading] = useState(false);
   const audioMenu = usePro2ToolbarDropdownAnchor();
+  const frameMenu = usePro2ToolbarDropdownAnchor();
   const zoom = useStore((s) => s.transform[2]);
   const portaled = useLibtvToolbarPortaled();
   const toolbarScale = portaled
@@ -81,7 +91,8 @@ export function LibtvVideoNodeToolbar({
   useEffect(() => {
     if (typeof document === "undefined") return;
     const root = document.documentElement;
-    if (audioMenu.open) {
+    const open = audioMenu.open || frameMenu.open;
+    if (open) {
       root.setAttribute("data-canvas-toolbar-popover-open", "1");
     } else {
       root.removeAttribute("data-canvas-toolbar-popover-open");
@@ -89,7 +100,7 @@ export function LibtvVideoNodeToolbar({
     return () => {
       root.removeAttribute("data-canvas-toolbar-popover-open");
     };
-  }, [audioMenu.open]);
+  }, [audioMenu.open, frameMenu.open]);
 
   const soon = async (label: string) => {
     await alert({
@@ -116,10 +127,32 @@ export function LibtvVideoNodeToolbar({
     trackSplitSourceUrl && onTrackSplitPick && !trackSplitBusy,
   );
 
+  const frameEnabled = Boolean(
+    videoEditSourceUrl && onFrameExtractPick && !frameExtractBusy,
+  );
+
+  const trimEnabled = Boolean(
+    videoEditSourceUrl && onOpenTrimEditor && !frameExtractBusy,
+  );
+
   const pickTrackSplit = (mode: LibtvVideoTrackSplitMode) => {
     audioMenu.setOpen(false);
     if (!trackSplitEnabled || !onTrackSplitPick) return;
     onTrackSplitPick(mode);
+  };
+
+  const pickFrame = (mode: "first" | "last" | "custom") => {
+    frameMenu.setOpen(false);
+    if (!onFrameExtractPick) return;
+    onFrameExtractPick(mode);
+  };
+
+  const onCropClick = () => {
+    if (trimEnabled && onOpenTrimEditor) {
+      onOpenTrimEditor();
+      return;
+    }
+    void soon("裁剪");
   };
 
   return (
@@ -144,9 +177,41 @@ export function LibtvVideoNodeToolbar({
               }
         }
       >
-        <button type="button" className={TOOL_BTN} onClick={() => void soon("裁剪")}>
+        <button
+          type="button"
+          className={cn(TOOL_BTN, !trimEnabled && "opacity-50")}
+          disabled={!trimEnabled}
+          title={trimEnabled ? "裁剪视频片段" : "请先生成或上传成片"}
+          onClick={onCropClick}
+        >
           <Crop className="size-3.5" />
           <span>裁剪</span>
+        </button>
+        <button
+          ref={frameMenu.anchorRef}
+          type="button"
+          className={cn(
+            TOOL_BTN,
+            frameMenu.open && "bg-white/[0.08]",
+            !frameEnabled && "opacity-50",
+          )}
+          disabled={!videoEditSourceUrl || frameExtractBusy}
+          title={
+            !videoEditSourceUrl
+              ? "请先生成或上传成片"
+              : frameExtractBusy
+                ? "处理中…"
+                : undefined
+          }
+          onClick={() => frameMenu.setOpen(!frameMenu.open)}
+        >
+          {frameExtractBusy ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <Film className="size-3.5" />
+          )}
+          <span>截帧</span>
+          <ChevronDown className="size-3 opacity-50" />
         </button>
         <button type="button" className={TOOL_BTN} onClick={() => void soon("高清")}>
           <Scan className="size-3.5" />
@@ -260,6 +325,32 @@ export function LibtvVideoNodeToolbar({
           </button>
         ) : null}
       </div>
+
+      <Pro2ToolbarDropdownMenu
+        open={frameMenu.open}
+        setOpen={frameMenu.setOpen}
+        rect={frameMenu.rect}
+        minWidth={200}
+      >
+        <Pro2ToolbarDropdownItem
+          icon={Film}
+          label="首帧"
+          disabled={!frameEnabled}
+          onClick={() => pickFrame("first")}
+        />
+        <Pro2ToolbarDropdownItem
+          icon={Film}
+          label="尾帧"
+          disabled={!frameEnabled}
+          onClick={() => pickFrame("last")}
+        />
+        <Pro2ToolbarDropdownItem
+          icon={Film}
+          label="自定义帧…"
+          disabled={!frameEnabled}
+          onClick={() => pickFrame("custom")}
+        />
+      </Pro2ToolbarDropdownMenu>
 
       <Pro2ToolbarDropdownMenu
         open={audioMenu.open}

@@ -73,6 +73,7 @@ import { Pro2ImageGridSplitToolbar } from "./pro2/pro2-image-grid-split-toolbar"
 import { LibtvImageGridSplitStage } from "./libtv-image-grid-split-stage";
 import { LibtvNodeToolbarPortal } from "./libtv-node-toolbar-portal";
 import { LibtvEditableNodeTitle } from "./libtv-editable-node-title";
+import { libtvImageNodeDisplayLabel } from "@/lib/canvas/libtv-image-node-title";
 import {
   Pro2MediaNodeEmptyState,
   Pro2MediaNodeErrorState,
@@ -801,10 +802,16 @@ export function LibtvImageNode({
     return `图片 ${idx >= 0 ? idx + 1 : ""}`.trim();
   }, [nodes, id, isCharacterThreeView, rfNodeType]);
 
-  const nodeLabel = useMemo(() => {
-    if (d.label?.trim()) return d.label.trim();
-    return defaultNodeLabel;
-  }, [d.label, defaultNodeLabel]);
+  const nodeLabel = useMemo(
+    () => libtvImageNodeDisplayLabel(d.label, defaultNodeLabel),
+    [d.label, defaultNodeLabel],
+  );
+
+  const resolveImageTitleDisplay = useCallback(
+    (stored: string, fallback: string) =>
+      libtvImageNodeDisplayLabel(stored, fallback),
+    [],
+  );
 
   const onPick = useCallback(() => inputRef.current?.click(), []);
 
@@ -1493,6 +1500,7 @@ export function LibtvImageNode({
               nodeId={id}
               defaultLabel={defaultNodeLabel}
               textClassName="text-[11px] text-white"
+              resolveDisplayLabel={resolveImageTitleDisplay}
             />
             {crewNodeShowsParticipatingBadge(id, nodes, graphMeta) ? (
               <Pro2CrewTaskStatusBadge nodeId={id} />
@@ -1543,6 +1551,7 @@ export function LibtvImageNode({
                   nodeId={id}
                   defaultLabel={defaultNodeLabel}
                   textClassName="text-xs font-medium text-white"
+                  resolveDisplayLabel={resolveImageTitleDisplay}
                 />
               </div>
               {crewNodeShowsParticipatingBadge(id, nodes, graphMeta) ? (

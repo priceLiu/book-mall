@@ -59,6 +59,15 @@ export function libtvRuntimeErrorAlertTitle(
 ): string {
   const code = failCode?.trim();
   const msg = message ?? "";
+  if (code === "VIDEO_FRAME_EXTRACT" || /截帧失败/.test(msg)) {
+    return "截帧失败";
+  }
+  if (code === "VIDEO_TRIM" || /裁剪失败|裁剪片段/.test(msg)) {
+    return "视频裁剪失败";
+  }
+  if (code === "VIDEO_TRACK_SPLIT") {
+    return "视频处理失败";
+  }
   if (
     code === "INSUFFICIENT_CREDITS" ||
     msg.includes("积分不足") ||
@@ -77,6 +86,7 @@ export function libtvRuntimeErrorAlertTitle(
     kind === "image" ||
     /生图|图片生成|参考图|image generation/i.test(msg)
   ) {
+    if (/截帧/.test(msg)) return "截帧失败";
     return "图片生成失败";
   }
   if (

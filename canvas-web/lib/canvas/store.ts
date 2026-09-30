@@ -1289,9 +1289,16 @@ export const useCanvasStore = create<CanvasState>()(
         let nodes = all.map((n) => {
           if (n.id !== id) return n;
           const base = (n.data ?? {}) as Record<string, unknown>;
+          const data = { ...structuredClone(base), ...patch };
+          if (
+            Object.prototype.hasOwnProperty.call(patch, "label") &&
+            patch.label === undefined
+          ) {
+            delete data.label;
+          }
           return {
             ...n,
-            data: { ...structuredClone(base), ...patch },
+            data,
           };
         });
         if (patch.rows !== undefined) {

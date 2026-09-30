@@ -6,9 +6,9 @@ import { promisify } from "util";
 
 const execFileAsync = promisify(execFile);
 
-/** 从本地 mp4 截取第一帧 JPEG；失败返回 null（不阻断入库）。 */
-export async function extractVideoFirstFrameJpegFromPath(
+async function extractVideoFrameJpegFromPathAt(
   filePath: string,
+  seekArgs: string[],
 ): Promise<Buffer | null> {
   let dir: string | null = null;
   try {
@@ -21,6 +21,7 @@ export async function extractVideoFirstFrameJpegFromPath(
         "-loglevel",
         "error",
         "-y",
+        ...seekArgs,
         "-i",
         filePath,
         "-frames:v",
@@ -40,6 +41,84 @@ export async function extractVideoFirstFrameJpegFromPath(
       await rm(dir, { recursive: true, force: true }).catch(() => undefined);
     }
   }
+}
+
+/** 从本地 mp4 截取第一帧 JPEG；失败返回 null（不阻断入库）。 */
+export async function extractVideoFirstFrameJpegFromPath(
+  filePath: string,
+): Promise<Buffer | null> {
+  return extractVideoFrameJpegFromPathAt(filePath, []);
+}
+
+/** 指定时刻（秒）截帧 · 输入侧 fast seek（`-ss` 在 `-i` 前）。 */
+export async function extractVideoFrameJpegAtSecFromPath(
+  filePath: string,
+  atSec: number,
+): Promise<Buffer | null> {
+  const t = Math.max(0, atSec);
+  if (t <= 1e-6) return extractVideoFirstFrameJpegFromPath(filePath);
+  return extractVideoFrameJpegFromPathAt(filePath, ["-ss", String(t)]);
+}
+
+/** 指定时刻 · 输出侧 seek（`-i` 后再 `-ss`，更准，适合尾帧）。 */
+export async function extractVideoFrameJpegAccurateAtSecFromPath(
+  filePath: string,
+  atSec: number,
+): Promise<Buffer | null> {
+  const t = Math.max(0, atSec);
+  if (t <= 1e-6) return extractVideoFirstFrameJpegFromPath(filePath);
+  let dir: string | null = null;
+  try {
+    dir = await mkdtemp(join(tmpdir(), "canvas-vposter-acc-"));
+    const output = join(dir, "frame.jpg");
+    await execFileAsync(
+      "ffmpeg",
+      [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        filePath,
+        "-ss",
+        String(t),
+        "-frames:v",
+        "1",
+        "-q:v",
+        "4",
+        output,
+      ],
+      { timeout: 120_000 },
+    );
+    const frame = await readFile(output);
+    return frame.byteLength > 0 ? frame : null;
+  } catch {
+    return null;
+  } finally {
+    if (dir) {
+      await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+    }
+  }
+}
+
+/** 尾帧：优先 duration 精确 seek，再回退 sseof（部分 mp4 仅 sseof 会失败）。 */
+export async function extractVideoLastFrameJpegFromPath(
+  filePath: string,
+  durationSec?: number | null,
+): Promise<Buffer | null> {
+  const epsilon = 0.05;
+  if (durationSec != null && Number.isFinite(durationSec) && durationSec > epsilon) {
+    const at = Math.max(0, durationSec - epsilon);
+    const accurate = await extractVideoFrameJpegAccurateAtSecFromPath(filePath, at);
+    if (accurate) return accurate;
+    const fast = await extractVideoFrameJpegAtSecFromPath(filePath, at);
+    if (fast) return fast;
+  }
+  for (const tail of ["-0.08", "-0.25", "-1"]) {
+    const buf = await extractVideoFrameJpegFromPathAt(filePath, ["-sseof", tail]);
+    if (buf) return buf;
+  }
+  return null;
 }
 
 /** 将 moov atom 移到文件头（faststart），输出到新路径；失败返回 false。 */

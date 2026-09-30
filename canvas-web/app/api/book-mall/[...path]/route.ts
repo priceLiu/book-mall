@@ -95,7 +95,10 @@ async function proxyToBookMall(
   );
   const upstreamTimeoutMs = isPortalPublicRead
     ? PORTAL_PUBLIC_UPSTREAM_TIMEOUT_MS
-    : path.includes("video-track-split")
+    : path.includes("video-track-split") ||
+        path.includes("video-frame-extract") ||
+        path.includes("video-trim") ||
+        path.includes("video-filmstrip")
       ? VIDEO_TRACK_SPLIT_UPSTREAM_TIMEOUT_MS
       : DEFAULT_UPSTREAM_TIMEOUT_MS;
 

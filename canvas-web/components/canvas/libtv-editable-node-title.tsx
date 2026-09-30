@@ -12,12 +12,15 @@ export function LibtvEditableNodeTitle({
   className,
   textClassName,
   children,
+  resolveDisplayLabel,
 }: {
   nodeId: string;
   defaultLabel: string;
   className?: string;
   textClassName?: string;
   children?: ReactNode;
+  /** 例如图片节点 · 占位「首帧/图片」展示为 defaultLabel */
+  resolveDisplayLabel?: (stored: string, defaultLabel: string) => string;
 }) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const storedLabel = useCanvasStore(
@@ -36,7 +39,9 @@ export function LibtvEditableNodeTitle({
       [nodeId],
     ),
   );
-  const displayLabel = storedLabel || defaultLabel;
+  const displayLabel = resolveDisplayLabel
+    ? resolveDisplayLabel(storedLabel, defaultLabel)
+    : storedLabel || defaultLabel;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(displayLabel);
   const inputRef = useRef<HTMLInputElement | null>(null);
