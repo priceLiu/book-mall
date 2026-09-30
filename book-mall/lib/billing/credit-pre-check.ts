@@ -9,6 +9,7 @@ import {
 import { computeChargeCredits } from "./gateway-credit-settlement";
 import { isUnifiedCreditBillingActive } from "./unified-credit-flag";
 import { resolveBillingCanonicalKey, resolveCostSnapshot } from "@/lib/gateway/credit-billing-guard";
+import { parseVideoPricingHints } from "@/lib/gateway/log-pricing-hints";
 import { computeUnifiedChargeCredits, videoBillableSeconds } from "@/lib/pricing/credit-pricing-formulas";
 import { resolveTeamBillingFallbackTenantId } from "./resolve-team-billing-fallback";
 import { isPlatformOperationalApiKey } from "@/lib/gateway/platform-operational-api-key";
@@ -76,7 +77,9 @@ export async function assertCreditsBeforeGenerate(input: {
   let minNeeded = 1;
 
   if (canonical) {
-    const costSnap = await resolveCostSnapshot(canonical).catch(() => null);
+    const costSnap = await resolveCostSnapshot(canonical, {
+      tierRaw: isVideo ? parseVideoPricingHints(input.inputSummary).tierRaw : undefined,
+    }).catch(() => null);
     if (costSnap) {
       if (isVideo) {
         const units = videoBillableSeconds(null);

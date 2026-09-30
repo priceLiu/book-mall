@@ -131,7 +131,9 @@ export async function computeExpectedVideoCreditsForLog(
       inputSummary: log.inputSummary,
     }).catch(() => null));
   if (!canonical) return null;
-  const costSnap = await resolveCostSnapshot(canonical);
+  const costSnap = await resolveCostSnapshot(canonical, {
+    tierRaw: parseVideoPricingHints(log.inputSummary).tierRaw,
+  });
   if (!costSnap) return null;
   const accountSnap = await getAccountCreditBalances(target.ref);
   const durationSec = resolveVideoDurationSec(log as GatewayRequestLog, metrics ?? {});
@@ -607,14 +609,14 @@ export async function reserveVideoCreditsForLog(log: GatewayRequestLog): Promise
       inputSummary: log.inputSummary,
     }).catch(() => null));
   if (!canonical) return 0;
-  const costSnap = await resolveCostSnapshot(canonical);
+  const hints = parseVideoPricingHints(log.inputSummary);
+  const costSnap = await resolveCostSnapshot(canonical, { tierRaw: hints.tierRaw });
   if (!costSnap) return 0;
 
   const target = await resolveLogBillingTarget(log);
   if (!target) return 0;
 
   const accountSnap = await getAccountCreditBalances(target.ref);
-  const hints = parseVideoPricingHints(log.inputSummary);
   const { credits } = computeVideoChargeCredits({
     snapshot: costSnap,
     durationSec: hints.durationSec,

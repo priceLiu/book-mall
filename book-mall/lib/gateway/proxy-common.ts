@@ -376,7 +376,9 @@ export async function finalizeRequestLog(
       });
     }
     if (canonicalModelKey) {
-      costSnapshot = await resolveCostSnapshot(canonicalModelKey);
+      costSnapshot = await resolveCostSnapshot(canonicalModelKey, {
+        tierRaw: patch.pricingTierRaw ?? videoHints.tierRaw ?? log.pricingTierRaw,
+      });
       if (costSnapshot) {
         costSnapshotYuan = costSnapshot.netCostYuan;
         marginSnapshot = costSnapshot.marginRate;

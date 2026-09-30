@@ -119,13 +119,18 @@ export function buildDashscopeCreateTaskInputForLog(
     };
   }
   const contentImageUrls = extractDashscopeContentImageUrls(ds.content);
+  const parameters =
+    ds.parameters && typeof ds.parameters === "object" && !Array.isArray(ds.parameters)
+      ? (ds.parameters as Record<string, unknown>)
+      : undefined;
   return {
     jobKind: ds.jobKind,
     prompt: ds.prompt,
     content: ds.content,
     ...(contentImageUrls.length > 0 ? { imageUrls: contentImageUrls } : {}),
-    size: ds.size,
-    n: ds.n,
+    ...(parameters ? { parameters } : {}),
+    size: ds.size ?? parameters?.size,
+    n: ds.n ?? parameters?.n,
     aspectRatio: ds.aspectRatio,
     resolution: ds.resolution,
     contentOrder: ds.contentOrder,

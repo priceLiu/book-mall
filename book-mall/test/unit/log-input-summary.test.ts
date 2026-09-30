@@ -4,6 +4,7 @@ import {
   buildDashscopeCreateTaskInputForLog,
   buildGatewayInputSummary,
 } from "@/lib/gateway/log-input-summary";
+import { resolveBillableImageCountFromLog } from "@/lib/gateway/log-billing-metrics";
 
 describe("buildDashscopeCreateTaskInputForLog", () => {
   it("expands videoBody into log input (wan3.0 prompt + media + parameters)", () => {
@@ -67,5 +68,21 @@ describe("buildDashscopeCreateTaskInputForLog", () => {
       resolution: undefined,
       contentOrder: undefined,
     });
+  });
+
+  it("lifts multimodal parameters.n / size so billing counts every output image", () => {
+    const input = buildDashscopeCreateTaskInputForLog({
+      jobKind: "multimodal-image-sync",
+      content: [{ text: "prompt" }],
+      parameters: { size: "1536*1536", n: 4, prompt_extend: true },
+    });
+    expect(input.n).toBe(4);
+    expect(input.size).toBe("1536*1536");
+    expect(
+      resolveBillableImageCountFromLog({
+        requestKind: "IMAGE",
+        inputSummary: buildGatewayInputSummary("qwen-image-3.0-pro", input),
+      }),
+    ).toBe(4);
   });
 });

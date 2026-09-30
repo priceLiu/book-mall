@@ -22,6 +22,7 @@ import { refreshCreditPriceIfStale } from "@/lib/pricing/credit-pricing-engine";
 import {
   findModelCreditPrice,
   pickActiveCostProfile,
+  tierRawFromResolution,
 } from "@/lib/pricing/model-credit-price-store";
 
 /** providerKind → 财务口径 vendor（与 ModelCatalog.vendor / ModelCostProfile.vendor 对齐） */
@@ -181,16 +182,21 @@ export async function resolveCostSnapshot(
   });
   if (profiles.length === 0) return null;
 
-  const chosen = pickActiveCostProfile(profiles);
+  const hintedTier = (
+    opts?.tierRaw?.trim() || tierRawFromResolution(opts?.resolution) || ""
+  ).toUpperCase();
+  const tierProfiles = hintedTier
+    ? profiles.filter((p) => (p.tierRaw ?? "").trim().toUpperCase() === hintedTier)
+    : [];
+  const chosen = pickActiveCostProfile(tierProfiles.length > 0 ? tierProfiles : profiles);
   if (!chosen) return null;
 
-  const price =
-    (await findModelCreditPrice({
-      canonicalModelKey,
-      tierRaw: opts?.tierRaw ?? chosen.tierRaw,
-      resolution: opts?.resolution,
-    })) ??
-    (await findModelCreditPrice({ canonicalModelKey, tierRaw: chosen.tierRaw }));
+  let price = null as Awaited<ReturnType<typeof findModelCreditPrice>>;
+  if (hintedTier) {
+    const tiered = await findModelCreditPrice({ canonicalModelKey, tierRaw: hintedTier });
+    if (tiered && tiered.tierRaw.trim().toUpperCase() === hintedTier) price = tiered;
+  }
+  price ??= await findModelCreditPrice({ canonicalModelKey, tierRaw: chosen.tierRaw });
   const anchor = DEFAULT_CREDIT_ANCHOR_YUAN;
   const creditsPerUnit = price?.creditsPerUnit != null ? num(price.creditsPerUnit) : null;
   const marginRate =
