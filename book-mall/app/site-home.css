@@ -1460,8 +1460,20 @@
   margin-top: 0.4rem;
 }
 
+[data-site-home] .site-pricing-plans-shell {
+  width: 100%;
+  max-width: min(1400px, 96vw);
+  margin-inline: auto;
+  padding-inline: clamp(1rem, 3vw, 2rem);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1.5rem, 3vw, 2.25rem);
+}
+
 [data-site-home] .site-pricing-section-head {
   margin-top: clamp(1.5rem, 4vw, 2rem);
+  margin-bottom: 0;
   text-align: center;
 }
 
@@ -1730,14 +1742,6 @@
   color: #000000;
 }
 
-[data-site-home] .site-pricing-plans-shell {
-  width: 100%;
-  max-width: min(1400px, 96vw);
-  margin-inline: auto;
-  padding-inline: clamp(1rem, 3vw, 2rem);
-  box-sizing: border-box;
-}
-
 [data-site-home] .site-pricing-plans-band {
   width: 100%;
   max-width: none;
@@ -1752,6 +1756,8 @@
   width: 100%;
   gap: clamp(0.75rem, 1.2vw, 1.25rem);
   padding-inline: 0;
+  /* 「最受欢迎」药丸骑在顶边，预留上半空间避免与上方说明重叠 */
+  padding-top: 1.125rem;
   grid-template-columns: minmax(0, 1fr);
 }
 
