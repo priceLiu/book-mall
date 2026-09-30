@@ -14,6 +14,7 @@ export const GATEWAY_FULL_NAV: DashboardNavItem[] = [
   { href: "/dashboard/models", label: "模型管理" },
   { href: "/dashboard/keys", label: "API密钥" },
   { href: "/dashboard/playground", label: "API调试" },
+  { href: "/dashboard/examples", label: "调用示例" },
   { href: "/dashboard/docs", label: "接入文档" },
 ];
 

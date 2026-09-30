@@ -364,6 +364,9 @@ export function OperationGuideContent() {
         <a href={bookSso} className="gw-btn-secondary">
           Book 账号登录
         </a>
+        <Link href="/dashboard/examples" className="text-[var(--gw-accent)] hover:underline">
+          模型调用示例 →
+        </Link>
         <Link href="/dashboard/docs" className="text-[var(--gw-accent)] hover:underline">
           开发者接入文档 →
         </Link>

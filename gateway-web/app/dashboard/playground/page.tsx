@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 
 const MODELS = [
+  { value: "qwen3.8-max", label: "Qwen 3.0 · qwen3.8-max" },
   { value: "deepseek-chat", label: "DeepSeek Chat" },
   { value: "gemini-3-flash", label: "KIE Gemini Flash" },
   { value: "qwen-plus", label: "百炼 Qwen Plus" },
@@ -13,7 +14,7 @@ const STORAGE_KEY = "gateway_playground_api_key";
 
 export default function PlaygroundPage() {
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("deepseek-chat");
+  const [model, setModel] = useState("qwen3.8-max");
   const [message, setMessage] = useState("你好，请用一句话介绍你自己。");
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState("");
@@ -71,7 +72,11 @@ export default function PlaygroundPage() {
         <h1 className="text-2xl font-semibold text-[var(--gw-ink)]">API 调试</h1>
         <p className="mt-1 text-sm text-[var(--gw-muted)]">
           在界面里粘贴 <code className="text-[var(--gw-ink)]/80">sk-gw-...</code>{" "}
-          即可试调用，无需命令行。发送后可在{" "}
+          即可试调用，无需命令行。生图 / 生视频 curl 见{" "}
+          <Link href="/dashboard/examples" className="text-[var(--gw-accent)] hover:underline">
+            调用示例
+          </Link>
+          。发送后可在{" "}
           <Link href="/dashboard/logs" className="text-[var(--gw-accent)] hover:underline">
             日志
           </Link>{" "}

@@ -12,7 +12,7 @@ export default function DashboardDocsPage() {
   -H 'Authorization: Bearer sk-gw-你的密钥' \\
   -H 'Content-Type: application/json' \\
   -d '{
-    "model": "deepseek-chat",
+    "model": "qwen3.8-max",
     "messages": [{"role": "user", "content": "你好"}]
   }'`;
 
@@ -20,14 +20,18 @@ export default function DashboardDocsPage() {
   -H 'Authorization: Bearer sk-gw-你的密钥' \\
   -H 'Content-Type: application/json' \\
   -d '{
-    "model": "kie-video",
-    "input": {"prompt": "一只猫在跑步"}
+    "model": "gpt-image-2-text-to-image",
+    "gatewayModelKey": "gpt-image-2",
+    "input": {
+      "prompt": "一只猫坐在窗台",
+      "aspect_ratio": "1:1",
+      "resolution": "2K"
+    }
   }'`;
 
-  const recordInfoCurl = `curl -X POST '${apiBase}/jobs/recordInfo' \\
+  const recordInfoCurl = `curl -G '${apiBase}/jobs/recordInfo' \\
   -H 'Authorization: Bearer sk-gw-你的密钥' \\
-  -H 'Content-Type: application/json' \\
-  -d '{"taskId": "外部任务ID"}'`;
+  --data-urlencode 'taskId=外部任务ID'`;
 
   return (
     <div className="space-y-6">
@@ -36,8 +40,12 @@ export default function DashboardDocsPage() {
         <p className="mt-1 text-sm text-[var(--gw-muted)]">
           对外 Base URL：<code className="text-[var(--gw-ink)]/90">{apiBase}</code>
           {" · "}
+          <Link href="/dashboard/examples" className="text-[var(--gw-accent)] hover:underline">
+            模型调用示例（GPT Image / Seedance / Wan / Qwen）
+          </Link>
+          {" · "}
           <Link href="/dashboard/playground" className="text-[var(--gw-accent)] hover:underline">
-            在界面里调试（无需 curl）
+            在界面里调试
           </Link>
         </p>
       </div>
@@ -45,7 +53,8 @@ export default function DashboardDocsPage() {
       <section className="gw-card space-y-3">
         <h2>Chat Completions</h2>
         <p className="text-sm text-[var(--gw-muted)]">
-          OpenAI 兼容对话接口，需在控制台创建 API 密钥并配置对应厂商凭证。
+          OpenAI 兼容对话。model 用 Gateway 登记的 modelKey（如 qwen3.8-max、deepseek-chat）。
+          需绑定对应厂商凭证。
         </p>
         <pre className="overflow-x-auto rounded-lg bg-black/40 p-4 text-xs leading-relaxed text-[var(--gw-ink)]/90">
           {chatCurl}
@@ -55,7 +64,11 @@ export default function DashboardDocsPage() {
       <section className="gw-card space-y-3">
         <h2>Jobs · createTask</h2>
         <p className="text-sm text-[var(--gw-muted)]">
-          异步任务创建（视频/图片等），返回 taskId 后轮询 recordInfo。
+          异步生图 / 生视频。返回 data.taskId 后轮询 recordInfo。完整入参见{" "}
+          <Link href="/dashboard/examples" className="text-[var(--gw-accent)] hover:underline">
+            调用示例
+          </Link>
+          。
         </p>
         <pre className="overflow-x-auto rounded-lg bg-black/40 p-4 text-xs leading-relaxed text-[var(--gw-ink)]/90">
           {createTaskCurl}
@@ -64,6 +77,9 @@ export default function DashboardDocsPage() {
 
       <section className="gw-card space-y-3">
         <h2>Jobs · recordInfo</h2>
+        <p className="text-sm text-[var(--gw-muted)]">
+          GET 查询（也可用 POST，JSON {"{ taskId }"}）。
+        </p>
         <pre className="overflow-x-auto rounded-lg bg-black/40 p-4 text-xs leading-relaxed text-[var(--gw-ink)]/90">
           {recordInfoCurl}
         </pre>

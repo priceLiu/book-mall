@@ -220,3 +220,32 @@ describe("resolveDeepseekChatCompletionsBody", () => {
     expect(body.reasoning_effort).toBeUndefined();
   });
 });
+
+describe("routeGatewayModel · 对外 API 示例模型", () => {
+  it("GPT Image 2.0 / Seedance 2.0 / Wan 3.0 / Qwen 3.0 均可路由", () => {
+    expect(routeGatewayModel("gpt-image-2-text-to-image")).toEqual({
+      providerKind: "KIE",
+      requestKind: "IMAGE",
+    });
+    expect(routeGatewayModel("gpt-image-2")).toEqual({
+      providerKind: "KIE",
+      requestKind: "IMAGE",
+    });
+    expect(routeGatewayModel("doubao-seedance-2.0")).toEqual({
+      providerKind: "VOLCENGINE",
+      requestKind: "VIDEO",
+    });
+    expect(routeGatewayModel("wan3.0-video")).toEqual({
+      providerKind: "DASHSCOPE",
+      requestKind: "VIDEO",
+    });
+    expect(routeGatewayModel("qwen3.8-max")).toEqual({
+      providerKind: "BAILIAN",
+      requestKind: "CHAT",
+    });
+  });
+
+  it("文档占位 kie-video 不是合法模型", () => {
+    expect(() => routeGatewayModel("kie-video")).toThrow(/未知 Gateway 模型/);
+  });
+});

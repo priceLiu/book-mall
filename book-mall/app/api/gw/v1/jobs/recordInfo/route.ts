@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
   isGatewayAuthResponse,
   requireGatewayV1Auth,
@@ -57,6 +57,25 @@ import {
 import { syncDashscopePollToGatewayLog } from "@/lib/gateway/gateway-v1-dashscope-poll-sync";
 
 export const dynamic = "force-dynamic";
+
+/** POST 与 GET 等价：body 传 { taskId, logId? }，方便 SDK / curl -d */
+export async function POST(request: NextRequest) {
+  let body: Record<string, unknown>;
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+  const taskId = String(body.taskId ?? body.task_id ?? "").trim();
+  const logId = String(body.logId ?? body.log_id ?? "").trim();
+  if (!taskId) {
+    return NextResponse.json({ error: "taskId required" }, { status: 400 });
+  }
+  const url = request.nextUrl.clone();
+  url.searchParams.set("taskId", taskId);
+  if (logId) url.searchParams.set("logId", logId);
+  return GET(new NextRequest(url, { method: "GET", headers: request.headers }));
+}
 
 export async function GET(request: NextRequest) {
   const authOrResp = await requireGatewayV1Auth(request);
