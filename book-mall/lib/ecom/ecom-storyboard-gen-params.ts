@@ -156,6 +156,9 @@ export function resolveEcomGeneratePixelSize(opts: {
   if (/wan2\.[67]-image/i.test(opts.modelKey)) {
     return resolveWan27ImageSize({ aspectRatio, imageSize: raw });
   }
+  if (opts.ratio === "9:16") {
+    return "810*1440";
+  }
   return ecomRatioToImageSize(opts.ratio);
 }
 

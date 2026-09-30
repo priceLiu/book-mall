@@ -47,10 +47,12 @@ export async function runQwenLocalEditAdapter(opts: {
   } else if (opts.selection?.kind === "bbox") {
     const sourceInput = opts.sourceImageUrls[0]!;
     const { width, height } = await readImagePixelSize(sourceInput);
-    maskUrl = await ensurePublicImageUrl(
-      opts.userId,
-      bboxToMaskPngDataUrl(opts.selection.bbox, width, height),
+    const maskDataUrl = await bboxToMaskPngDataUrl(
+      opts.selection.bbox,
+      width,
+      height,
     );
+    maskUrl = await ensurePublicImageUrl(opts.userId, maskDataUrl);
   }
   const content = buildQwenContent({
     imageUrls,

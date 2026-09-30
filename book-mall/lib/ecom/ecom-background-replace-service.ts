@@ -168,7 +168,7 @@ export async function runWanxBackgroundGeneration(opts: {
     backgroundEdges: backgroundEdges.filter((e) => e.url),
   });
 
-  const meta = await gatewayV1ClientMetaForBookUser("ECOM", opts.userId, {
+  const meta = await gatewayV1ClientMetaForBookUser("E_COMMERCE", opts.userId, {
     clientPage: opts.clientPage ?? "ecom/background-replace",
   });
   const gatewayResult = await gatewayV1BackgroundGeneration({

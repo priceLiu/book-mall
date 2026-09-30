@@ -19,9 +19,15 @@ export function buildInitialHitSuite(): DetailPageSuiteState {
   return { modules: [], templateSnapshot: null };
 }
 
+function hitRepeatCount(comp: HitComponent): number {
+  const raw = comp.repeat_count;
+  const n = raw != null && Number.isFinite(raw) ? Math.round(raw) : 1;
+  return Math.min(HIT_REPEAT_COUNT_MAX, Math.max(1, n));
+}
+
 function slotLabel(comp: HitComponent, index: number): string {
   const base = HIT_COMPONENT_LABELS[comp.type];
-  if (comp.repeat_count <= 1) return base;
+  if (hitRepeatCount(comp) <= 1) return base;
   return `${base} ${index + 1}`;
 }
 
@@ -49,7 +55,7 @@ function moduleFromComponent(
   existing?: DetailPageSuiteModuleState,
 ): DetailPageSuiteModuleState {
   const maxNum = HIT_REPEAT_COUNT_MAX;
-  const count = Math.min(HIT_REPEAT_COUNT_MAX, Math.max(1, comp.repeat_count));
+  const count = hitRepeatCount(comp);
   const prevSlots = existing?.slots ?? [];
   const slots = Array.from({ length: count }, (_, i) => emptySlot(comp, i, prevSlots[i]));
   return {

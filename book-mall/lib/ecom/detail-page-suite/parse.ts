@@ -9,6 +9,7 @@ import {
   type DetailPageSuiteReference,
   type DetailPageSuiteSettings,
   type DetailPageSuiteSlot,
+  type DetailPageSuiteSlotImageVersion,
   type DetailPageSuiteState,
   type DetailPageSuiteTemplateDto,
 } from "./types";
@@ -114,7 +115,7 @@ export function parseSuite(raw: unknown): DetailPageSuiteState {
               const item_label = String(slot.item_label ?? "").trim();
               if (!item_label) return [];
               const imageHistory = Array.isArray(slot.imageHistory)
-                ? slot.imageHistory.flatMap((v): DetailPageSuiteSlot["imageHistory"] => {
+                ? slot.imageHistory.flatMap((v): DetailPageSuiteSlotImageVersion[] => {
                     if (!v || typeof v !== "object") return [];
                     const row = v as Record<string, unknown>;
                     const url = typeof row.url === "string" ? row.url.trim() : "";
@@ -156,19 +157,17 @@ export function parseSuite(raw: unknown): DetailPageSuiteState {
                   })(),
                   source: slot.source === "user" ? "user" : "template",
                   positive_prompt: String(slot.positive_prompt ?? ""),
-                  negative_prompt:
-                    typeof slot.negative_prompt === "string"
-                      ? slot.negative_prompt
-                      : undefined,
-                  imageUrl: typeof slot.imageUrl === "string" ? slot.imageUrl : undefined,
-                  assetId: typeof slot.assetId === "string" ? slot.assetId : undefined,
+                  ...(typeof slot.negative_prompt === "string"
+                    ? { negative_prompt: slot.negative_prompt }
+                    : {}),
+                  ...(typeof slot.imageUrl === "string" ? { imageUrl: slot.imageUrl } : {}),
+                  ...(typeof slot.assetId === "string" ? { assetId: slot.assetId } : {}),
                   ...(imageHistory?.length ? { imageHistory } : {}),
-                  activeImageIndex:
-                    typeof slot.activeImageIndex === "number"
-                      ? slot.activeImageIndex
-                      : undefined,
-                  selectedForImage: slot.selectedForImage === true,
-                  promptEdited: slot.promptEdited === true,
+                  ...(typeof slot.activeImageIndex === "number"
+                    ? { activeImageIndex: slot.activeImageIndex }
+                    : {}),
+                  ...(slot.selectedForImage === true ? { selectedForImage: true } : {}),
+                  ...(slot.promptEdited === true ? { promptEdited: true } : {}),
                 },
               ];
             })
