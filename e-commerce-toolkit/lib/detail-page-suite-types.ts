@@ -24,6 +24,8 @@ export type DetailPageSuiteSellpoint = {
   source: "user" | "vision" | "ai";
 };
 
+import type { EcomSellpointFivePart } from "@/lib/ecom-sellpoint-five-part";
+
 export type DetailPageSuiteSizeChartTable = {
   title?: string;
   headers: string[];
@@ -47,6 +49,7 @@ export type DetailPageSuiteBrief = {
   outputLanguage?: string;
   productDesc?: string;
   sellPoints?: DetailPageSuiteSellpoint[];
+  sellpointFivePart?: EcomSellpointFivePart;
   sellpointsLocked?: boolean;
   sizeChart?: DetailPageSuiteSizeChartState;
 };

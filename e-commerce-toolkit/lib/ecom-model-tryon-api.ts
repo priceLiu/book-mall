@@ -16,8 +16,18 @@ import { parseVtonProjectMeta } from "@/lib/vton-types";
 export type ModelTryonSettings = {
   outfitRefMode?: OutfitRefMode;
   garmentMode?: OutfitGarmentMode;
-  /** wan2.7 全身生图像素尺寸（720P / 1080P / 2K） */
+  /** 全身生图 / 扩全身 · 像素尺寸（720P / 1080P / 2K） */
   modelImageSize?: string;
+  modelGenRatio?: string;
+  modelGenModelKey?: string;
+  modelBodyPreset?: string;
+  modelAgeGroup?: string;
+  modelFeatureDetail?: string;
+  modelHeightCm?: string;
+  modelWeightKg?: string;
+  modelBustCm?: string;
+  modelWaistCm?: string;
+  modelHipsCm?: string;
   /** 文生试衣 · 图片编辑模型 */
   textTryonModelKey?: string;
   /** 文生试衣 · 出图像素尺寸（含全部比例） */
@@ -258,9 +268,24 @@ export async function unlockModelTryonLockedLook(
   return parseProject(data.project as ModelTryonProject);
 }
 
+export type VtonModelPipelineRequest = {
+  prompt?: string;
+  imageSize?: string;
+  modelKey?: string;
+  ratio?: "1:1" | "3:4" | "4:5" | "16:9" | "9:16";
+  bodyPreset?: string;
+  ageGroup?: string;
+  featureDetail?: string;
+  heightCm?: string;
+  weightKg?: string;
+  bustCm?: string;
+  waistCm?: string;
+  hipsCm?: string;
+};
+
 export async function generateModelTryonModel(
   projectId: string,
-  opts?: { prompt?: string; imageSize?: string },
+  opts?: VtonModelPipelineRequest,
 ): Promise<ModelTryonProject> {
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/refs/generate-model`, {
     method: "POST",
@@ -272,7 +297,7 @@ export async function generateModelTryonModel(
 
 export async function expandModelTryonFullBody(
   projectId: string,
-  opts?: { prompt?: string; imageSize?: string },
+  opts?: VtonModelPipelineRequest,
 ): Promise<ModelTryonProject> {
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/refs/expand-full-body`, {
     method: "POST",
@@ -395,6 +420,29 @@ export async function attachModelTryonTextTryonRef(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ossUrl, label }),
+  });
+  return parseProject(data.project as ModelTryonProject);
+}
+
+export async function attachModelTryonTextTryonSceneRef(
+  projectId: string,
+  opts: {
+    label?: string;
+    scenePrompt: string;
+    sceneLibraryEntryId?: string;
+    ossUrl?: string;
+  },
+): Promise<ModelTryonProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/text-tryon/refs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      kind: opts.ossUrl?.trim() ? "image" : "scene-text",
+      label: opts.label,
+      scenePrompt: opts.scenePrompt,
+      sceneLibraryEntryId: opts.sceneLibraryEntryId,
+      ossUrl: opts.ossUrl?.trim() || undefined,
+    }),
   });
   return parseProject(data.project as ModelTryonProject);
 }

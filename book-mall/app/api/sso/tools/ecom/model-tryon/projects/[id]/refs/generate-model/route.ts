@@ -1,6 +1,7 @@
 import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { startEcomModelTryonModel } from "@/lib/ecom/ecom-model-tryon-service";
+import { parseVtonModelPipelineRequest } from "@/lib/ecom/ecom-vton-model-pipeline-opts";
 import { formatEcomImageGenUserError } from "@/lib/ecom/ecom-image-processing-error";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
@@ -22,11 +23,10 @@ export async function POST(req: Request, ctx: Ctx) {
     /* optional body */
   }
 
-  const prompt = typeof body.prompt === "string" ? body.prompt.trim() : undefined;
-  const imageSize = typeof body.imageSize === "string" ? body.imageSize.trim() : undefined;
+  const pipeline = parseVtonModelPipelineRequest(body);
 
   try {
-    const project = await startEcomModelTryonModel(auth.userId, id, { prompt, imageSize });
+    const project = await startEcomModelTryonModel(auth.userId, id, pipeline);
     return ecomJson({ project });
   } catch (e) {
     const { message, status } = formatEcomImageGenUserError(e);

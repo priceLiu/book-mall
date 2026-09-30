@@ -12,6 +12,7 @@ import {
   ECOM_ASSISTANT_CONTROL_ICON_CLASS,
 } from "@/components/layout/ecom-assistant-icon-button";
 import { EcomAssistantSendButton } from "@/components/layout/ecom-assistant-send-button";
+import { EcomSellpointFivePartHint } from "@/components/media/ecom-sellpoint-five-part-hint";
 import {
   ECOM_ASSISTANT_BUBBLE_CLASS,
   ECOM_ASSISTANT_CHOICE_SHELL_CLASS,
@@ -1213,7 +1214,7 @@ export function FashionAssistantPanel({
     : pendingSellpointGen
       ? "上次 AI 卖点生成未完成或失败，请重新生成或改用手动输入"
     : isAwaitingUserSellpointInput(effectiveProject)
-      ? "在下方输入卖点（换行/分号分隔），或在左侧表格添加"
+      ? "在下方按五段式输入卖点，或在左侧表格添加"
     : deliverable?.sellpoints?.length && !deliverable.sellpointsLocked
       ? "可选 AI 润色，或直接确认卖点定稿"
     : isDimensionCollecting && currentDimStepDef
@@ -1233,6 +1234,9 @@ export function FashionAssistantPanel({
     refAutoAdvancing ||
     (!legacyReadonly && !isBusy && !streaming && visibleChoices.length > 0);
 
+  const showSellpointFivePartHint =
+    !legacyReadonly && isAwaitingUserSellpointInput(effectiveProject) && !isBusy;
+
   const composerSection = (
     <div
       className={cn(
@@ -1240,6 +1244,11 @@ export function FashionAssistantPanel({
         ECOM_ASSISTANT_COMPOSER_SHELL_EXPANDED_BORDER,
       )}
     >
+      {showSellpointFivePartHint ? (
+        <div className="mb-2">
+          <EcomSellpointFivePartHint className="flex gap-2 rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-[11px] leading-relaxed text-[#515154]" />
+        </div>
+      ) : null}
       <div className="flex items-end gap-2">
         <textarea
           value={input}
@@ -1279,6 +1288,11 @@ export function FashionAssistantPanel({
 
   const floatingComposerSection = (
     <div className={ECOM_ASSISTANT_COMPOSER_SHELL_COMPACT}>
+      {showSellpointFivePartHint ? (
+        <div className="mb-2">
+          <EcomSellpointFivePartHint className="flex gap-2 rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-[11px] leading-relaxed text-[#515154]" />
+        </div>
+      ) : null}
       <div className="flex items-end gap-2">
         <textarea
           value={input}
@@ -1631,9 +1645,12 @@ export function FashionAssistantPanel({
         {showSellpointUserInputHint ? (
           <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
             <div className="rounded-2xl border border-[#e8e8ed] bg-white p-4 shadow-sm">
-              <p className="text-sm font-semibold text-[#1d1d1f]">填写您的卖点</p>
-              <p className="mt-1 text-xs text-[#6e6e73]">
-                在下方输入框发送（换行或分号分隔），或在左侧「卖点清单」点「添加卖点」。完成后可选 AI 润色，或直接确认定稿。
+              <p className="text-sm font-semibold text-[#1d1d1f]">填写您的卖点（五段式）</p>
+              <div className="mt-2">
+                <EcomSellpointFivePartHint className="flex gap-2 rounded-lg border-0 bg-[#f5f5f7] px-0 py-0 text-[11px]" />
+              </div>
+              <p className="mt-2 text-xs text-[#6e6e73]">
+                在下方输入框发送完整五段式内容，或在左侧「卖点清单」点「添加卖点」。完成后可选 AI 润色，或直接确认定稿。
               </p>
             </div>
           </div>

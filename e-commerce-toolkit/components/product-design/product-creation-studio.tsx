@@ -42,8 +42,7 @@ import type { DetailWorkflowPath, ProductDesignStepId } from "@/lib/product-desi
 import {
   DETAIL_INTERACTIVE_CHOICE,
   DETAIL_REF_PROMPT_WORKFLOW_CHOICE,
-  INTERACTIVE_WORKFLOW_CHOICE,
-  MAIN_REF_PROMPT_WORKFLOW_CHOICE,
+  PRODUCT_DESIGN_MAIN_STYLE_UPLOAD_ACK,
 } from "@/lib/product-design-workflow";
 import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
@@ -456,26 +455,33 @@ export function ProductCreationStudio({ module }: StudioProps) {
           },
         });
       } else if (opts.role === "main-style") {
-        const now = new Date().toISOString();
-        const ts = Date.now();
-        const nextHistory: ProductDesignChatMessage[] = [
-          ...(project.chatHistory.length ? project.chatHistory : []),
-          {
-            id: `user-${ts}`,
-            role: "user",
-            content: "已上传主图风格参考",
-            createdAt: now,
-          },
-          {
-            id: `assistant-${ts + 1}`,
-            role: "assistant",
-            content: `已上传主图风格参考。请点选下方主图制作方式：\n· ${INTERACTIVE_WORKFLOW_CHOICE}\n· ${MAIN_REF_PROMPT_WORKFLOW_CHOICE}`,
-            createdAt: now,
-          },
-        ];
+        const awaitingWorkflowChoice =
+          project.meta?.setupPhase === "workflow-choice" && !project.meta?.mainWorkflowPath;
+        const chatPatch = awaitingWorkflowChoice
+          ? {}
+          : (() => {
+              const now = new Date().toISOString();
+              const ts = Date.now();
+              const nextHistory: ProductDesignChatMessage[] = [
+                ...(project.chatHistory.length ? project.chatHistory : []),
+                {
+                  id: `user-${ts}`,
+                  role: "user",
+                  content: PRODUCT_DESIGN_MAIN_STYLE_UPLOAD_ACK,
+                  createdAt: now,
+                },
+                {
+                  id: `assistant-${ts + 1}`,
+                  role: "assistant",
+                  content: `${PRODUCT_DESIGN_MAIN_STYLE_UPLOAD_ACK}。请点选下方主图制作方式。`,
+                  createdAt: now,
+                },
+              ];
+              return { chatHistory: nextHistory };
+            })();
         await updateProductDesignProject(project.id, {
           meta: { setupPhase: "workflow-choice", styleRefDone: true },
-          chatHistory: nextHistory,
+          ...chatPatch,
         });
       }
       await reload(project.id);

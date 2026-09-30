@@ -116,7 +116,7 @@ export async function runHitVisionSellpointPipeline(opts: {
       ).catch(() => undefined);
     }, 1800);
 
-    const sellPoints = await extractSellpointsFromProductImages({
+    const result = await extractSellpointsFromProductImages({
       userId: opts.userId,
       projectId: opts.projectId,
       toolKey: ECOM_DETAIL_PAGE_SUITE_HIT_TOOL_KEY,
@@ -137,13 +137,18 @@ export async function runHitVisionSellpointPipeline(opts: {
       opts.projectId,
       88,
       "整理卖点条目",
-      `共 ${sellPoints.length} 条`,
+      `已写入五段式卖点`,
     );
 
     const latest = await getDetailPageSuiteHitProject(opts.userId, opts.projectId);
     if (!latest) throw new Error("项目不存在");
     const updated = await updateDetailPageSuiteHitProject(opts.userId, opts.projectId, {
-      brief: { ...(latest.brief ?? {}), sellPoints, sellpointsLocked: false },
+      brief: {
+        ...(latest.brief ?? {}),
+        sellPoints: result.sellPoints,
+        sellpointFivePart: result.sellpointFivePart,
+        sellpointsLocked: false,
+      },
       meta: {
         ...(latest.meta ?? {}),
         hitVisionSellpoint: {
@@ -151,7 +156,7 @@ export async function runHitVisionSellpointPipeline(opts: {
           progress: {
             percent: 100,
             title: "识图完成",
-            detail: `已写入 ${sellPoints.length} 条卖点`,
+            detail: `已写入 ${result.sellPoints.length} 条核心卖点`,
             updatedAt: new Date().toISOString(),
           },
         },

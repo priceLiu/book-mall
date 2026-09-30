@@ -1,4 +1,5 @@
 import type { DetailPageSuiteCopyOverlay } from "./slot-copy-overlay-types";
+import type { EcomSellpointFivePart } from "@/lib/ecom/ecom-sellpoint-five-part";
 
 export const ECOM_DETAIL_PAGE_SUITE_TOOL_KEY = "ecom-toolkit__detail-page-suite";
 export const ECOM_DETAIL_PAGE_SUITE_REPLICA_TOOL_KEY =
@@ -92,6 +93,7 @@ export type DetailPageSuiteBrief = {
   outputLanguage?: string;
   productDesc?: string;
   sellPoints?: DetailPageSuiteSellpoint[];
+  sellpointFivePart?: EcomSellpointFivePart;
   sellpointsLocked?: boolean;
   sizeChart?: DetailPageSuiteSizeChartState;
 };

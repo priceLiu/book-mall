@@ -2,6 +2,7 @@ import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import {
   attachEcomVtonTextTryonRef,
+  attachEcomVtonTextTryonSceneRef,
   removeEcomVtonTextTryonRef,
   uploadEcomVtonTextTryonRef,
 } from "@/lib/ecom/ecom-vton-text-tryon";
@@ -39,11 +40,27 @@ export async function POST(req: Request, ctx: Ctx) {
   } catch {
     return ecomJson({ error: "无效 JSON" }, { status: 400 });
   }
+  const kind = body.kind === "scene-text" ? "scene-text" : "image";
   const ossUrl = typeof body.ossUrl === "string" ? body.ossUrl.trim() : "";
-  if (!ossUrl) {
-    return ecomJson({ error: "缺少 ossUrl" }, { status: 400 });
-  }
+  const scenePrompt =
+    typeof body.scenePrompt === "string" ? body.scenePrompt.trim() : "";
+
   try {
+    if (kind === "scene-text" || scenePrompt) {
+      const project = await attachEcomVtonTextTryonSceneRef(auth.userId, id, {
+        label: typeof body.label === "string" ? body.label : undefined,
+        scenePrompt,
+        sceneLibraryEntryId:
+          typeof body.sceneLibraryEntryId === "string"
+            ? body.sceneLibraryEntryId
+            : undefined,
+        ossUrl: ossUrl || undefined,
+      });
+      return ecomJson({ project });
+    }
+    if (!ossUrl) {
+      return ecomJson({ error: "缺少 ossUrl" }, { status: 400 });
+    }
     const project = await attachEcomVtonTextTryonRef(
       auth.userId,
       id,

@@ -5,6 +5,9 @@ import { randomUUID } from "crypto";
 
 import type { EcomCatalogScope } from "@/lib/ecom/ecom-catalog-scope";
 import { assertUserCatalogEditable } from "@/lib/ecom/ecom-catalog-lock";
+import {
+  resolveEcomSceneLibraryDisplayImageUrl,
+} from "@/lib/ecom/ecom-scene-library-display";
 import { tagsForArchetype, type SceneArchetype } from "@/lib/ecom/model-shot/scene-pose-rules";
 import { prisma } from "@/lib/prisma";
 
@@ -12,6 +15,11 @@ export type EcomSceneLibraryEntry = {
   id: string;
   name: string;
   visualPrompt: string;
+  ossUrl?: string | null;
+  thumbUrl?: string | null;
+  sourceImageKey?: string | null;
+  /** API 聚合字段：展示用缩略图（含平台默认图） */
+  displayImageUrl?: string;
   tags?: Record<string, unknown>;
   scope?: EcomCatalogScope;
   userId?: string | null;
@@ -52,6 +60,9 @@ function rowToEntry(row: {
   id: string;
   name: string;
   visualPrompt: string;
+  ossUrl: string | null;
+  thumbUrl: string | null;
+  sourceImageKey: string | null;
   tags: unknown;
   scope: string;
   userId: string | null;
@@ -59,10 +70,13 @@ function rowToEntry(row: {
   enabled: boolean;
   sortOrder: number;
 }): EcomSceneLibraryEntry {
-  return {
+  const base: EcomSceneLibraryEntry = {
     id: row.id,
     name: row.name,
     visualPrompt: row.visualPrompt,
+    ossUrl: row.ossUrl,
+    thumbUrl: row.thumbUrl,
+    sourceImageKey: row.sourceImageKey,
     tags:
       row.tags && typeof row.tags === "object" && !Array.isArray(row.tags)
         ? (row.tags as Record<string, unknown>)
@@ -73,6 +87,25 @@ function rowToEntry(row: {
     enabled: row.enabled,
     sortOrder: row.sortOrder,
   };
+  return enrichSceneEntryForClient(base);
+}
+
+function enrichSceneEntryForClient(entry: EcomSceneLibraryEntry): EcomSceneLibraryEntry {
+  return {
+    ...entry,
+    displayImageUrl: resolveEcomSceneLibraryDisplayImageUrl(entry),
+  };
+}
+
+function enrichSceneCatalog(catalog: EcomSceneLibraryCatalog): EcomSceneLibraryCatalog {
+  const mapList = (list: EcomSceneLibraryEntry[] | undefined) =>
+    (list ?? []).map((e) =>
+      e.displayImageUrl ? e : enrichSceneEntryForClient(e),
+    );
+  const platform = mapList(catalog.platform);
+  const user = mapList(catalog.user);
+  const scenes = mapList(catalog.scenes.length ? catalog.scenes : [...platform, ...user]);
+  return { scenes, platform, user };
 }
 
 export async function listPlatformSceneEntriesFromDb(): Promise<EcomSceneLibraryEntry[]> {
@@ -119,16 +152,22 @@ export async function readSceneLibraryCatalogForUser(
   const platformDb = await listPlatformSceneEntriesFromDb();
   const userDb = await listUserSceneEntriesFromDb(userId);
   if (platformDb.length > 0 || userDb.length > 0) {
-    return { scenes: [...platformDb, ...userDb], platform: platformDb, user: userDb };
+    return enrichSceneCatalog({
+      scenes: [...platformDb, ...userDb],
+      platform: platformDb,
+      user: userDb,
+    });
   }
   const json = readSceneLibraryCatalogJson();
-  return { ...json, user: userDb };
+  return enrichSceneCatalog({ ...json, user: userDb });
 }
 
 export async function readSceneLibraryCatalogLive(): Promise<EcomSceneLibraryCatalog> {
   const platform = await listPlatformSceneEntriesFromDb();
-  if (platform.length > 0) return { scenes: platform, platform, user: [] };
-  return readSceneLibraryCatalogJson();
+  if (platform.length > 0) {
+    return enrichSceneCatalog({ scenes: platform, platform, user: [] });
+  }
+  return enrichSceneCatalog(readSceneLibraryCatalogJson());
 }
 
 export async function upsertSceneLibraryEntry(
@@ -137,6 +176,9 @@ export async function upsertSceneLibraryEntry(
   const data = {
     name: entry.name,
     visualPrompt: entry.visualPrompt,
+    ossUrl: entry.ossUrl ?? null,
+    thumbUrl: entry.thumbUrl ?? null,
+    sourceImageKey: entry.sourceImageKey ?? null,
     tags: entry.tags ? (entry.tags as Prisma.InputJsonValue) : undefined,
     scope: entry.scope ?? "platform",
     userId: entry.userId ?? null,

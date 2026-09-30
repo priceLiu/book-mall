@@ -88,11 +88,16 @@ export type VtonModelGeneration = {
   confirmedAt?: string;
 };
 
+export type VtonTextTryonRefKind = "image" | "scene-text";
+
 export type VtonTextTryonRef = {
   id: string;
-  ossUrl: string;
-  label?: string;
   createdAt: string;
+  label?: string;
+  kind?: VtonTextTryonRefKind;
+  ossUrl?: string;
+  scenePrompt?: string;
+  sceneLibraryEntryId?: string;
 };
 
 export type VtonTextTryonResult = {
@@ -187,14 +192,38 @@ export function parseVtonProjectMeta(raw: unknown): VtonProjectMeta {
           if (!row || typeof row !== "object") return [];
           const r = row as Record<string, unknown>;
           const id = typeof r.id === "string" ? r.id.trim() : "";
-          const ossUrl = typeof r.ossUrl === "string" ? r.ossUrl.trim() : "";
           const createdAt = typeof r.createdAt === "string" ? r.createdAt : "";
-          if (!id || !ossUrl || !createdAt) return [];
+          if (!id || !createdAt) return [];
+          const kind =
+            r.kind === "scene-text" || r.kind === "image" ? r.kind : undefined;
+          const ossUrl = typeof r.ossUrl === "string" ? r.ossUrl.trim() : "";
+          const scenePrompt =
+            typeof r.scenePrompt === "string" ? r.scenePrompt.trim() : "";
+          const isScene =
+            kind === "scene-text" || (Boolean(scenePrompt) && !ossUrl);
+          if (isScene) {
+            if (!scenePrompt) return [];
+            return [
+              {
+                id,
+                createdAt,
+                kind: "scene-text",
+                label: typeof r.label === "string" ? r.label : undefined,
+                scenePrompt,
+                sceneLibraryEntryId:
+                  typeof r.sceneLibraryEntryId === "string"
+                    ? r.sceneLibraryEntryId
+                    : undefined,
+              },
+            ];
+          }
+          if (!ossUrl) return [];
           return [
             {
               id,
               ossUrl,
               createdAt,
+              kind: "image",
               label: typeof r.label === "string" ? r.label : undefined,
             },
           ];

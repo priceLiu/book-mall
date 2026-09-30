@@ -18,6 +18,8 @@ export async function expandVtonModelFullBody(opts: {
   portraitUrl: string;
   prompt?: string;
   imageSize?: string;
+  modelKey?: string;
+  ratio?: "1:1" | "3:4" | "4:5" | "16:9" | "9:16";
   toolKeySuffix?: string;
   /** 已知取景类型时可跳过 VLM 检测 */
   shotType?: VtonModelBodyShotType;
@@ -55,13 +57,16 @@ export async function expandVtonModelFullBody(opts: {
     ? `${ECOM_VTON_TOOL_KEY}__${opts.toolKeySuffix}`
     : `${ECOM_VTON_TOOL_KEY}__${ECOM_VTON_EXPAND_FULL_BODY_ACTION}`;
 
+  const modelKey = opts.modelKey?.trim() || ECOM_VTON_MODEL_GEN_MODEL;
+  const ratio = opts.ratio ?? "3:4";
+
   return generateEcomImage({
     userId: opts.userId,
-    modelKey: ECOM_VTON_MODEL_GEN_MODEL,
+    modelKey,
     prompt,
     negativePrompt: VTon_FULL_BODY_EXPAND_NEGATIVE_ZH,
     promptExtend: false,
-    ratio: "3:4",
+    ratio,
     imageSize: opts.imageSize?.trim() || "720*960",
     wan27KeepPixelSizeWithRefs: true,
     refImageUrls: [refUrl],

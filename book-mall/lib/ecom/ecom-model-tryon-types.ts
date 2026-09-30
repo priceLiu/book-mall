@@ -8,8 +8,20 @@ export const MODEL_TRYON_V1_TEMPLATE_ID = "model-tryon-v1";
 export type ModelTryonSettings = {
   outfitRefMode?: VtonRefMode;
   garmentMode?: VtonGarmentMode;
-  /** wan2.7 全身生图像素尺寸（720P / 1080P / 2K） */
+  /** 全身生图 / 扩全身 · 像素尺寸或 1K/2K 档位 */
   modelImageSize?: string;
+  /** 全身生图 / 扩全身 · 出图比例 */
+  modelGenRatio?: string;
+  /** 全身生图 / 扩全身 · Gateway 图片模型 */
+  modelGenModelKey?: string;
+  modelBodyPreset?: string;
+  modelAgeGroup?: string;
+  modelFeatureDetail?: string;
+  modelHeightCm?: string;
+  modelWeightKg?: string;
+  modelBustCm?: string;
+  modelWaistCm?: string;
+  modelHipsCm?: string;
   /** 文生试衣 · 图片编辑模型 */
   textTryonModelKey?: string;
   /** 文生试衣 · 出图像素尺寸 */

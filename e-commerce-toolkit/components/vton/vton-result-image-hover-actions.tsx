@@ -1,6 +1,15 @@
 "use client";
 
-import { Archive, Download, Eye, RefreshCw, Save, Shirt, Sparkles } from "lucide-react";
+import {
+  Archive,
+  Download,
+  Eye,
+  FileText,
+  RefreshCw,
+  Save,
+  Shirt,
+  Sparkles,
+} from "lucide-react";
 
 import {
   ECOM_MEDIA_TILE_ACTION_ICON_CLASS,
@@ -13,6 +22,7 @@ import { cn } from "@/lib/utils";
 type Props = {
   onPreview?: () => void;
   onDownload?: () => void;
+  onPreviewPrompt?: () => void;
   onSaveToAssets?: () => void;
   onSaveToCatalog?: () => void;
   onRegenerate?: () => void;
@@ -29,6 +39,7 @@ function stopClick(e: React.MouseEvent) {
 export function VtonResultImageHoverActions({
   onPreview,
   onDownload,
+  onPreviewPrompt,
   onSaveToAssets,
   onSaveToCatalog,
   onRegenerate,
@@ -39,6 +50,7 @@ export function VtonResultImageHoverActions({
   if (
     !onPreview &&
     !onDownload &&
+    !onPreviewPrompt &&
     !onSaveToAssets &&
     !onSaveToCatalog &&
     !onRegenerate &&
@@ -86,6 +98,20 @@ export function VtonResultImageHoverActions({
             }}
           >
             <Download className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
+          </button>
+        ) : null}
+        {onPreviewPrompt ? (
+          <button
+            type="button"
+            title="提示词预览"
+            aria-label="提示词预览"
+            className={viewBtnClass}
+            onClick={(e) => {
+              stopClick(e);
+              onPreviewPrompt();
+            }}
+          >
+            <FileText className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
           </button>
         ) : null}
         {onSaveToAssets ? (

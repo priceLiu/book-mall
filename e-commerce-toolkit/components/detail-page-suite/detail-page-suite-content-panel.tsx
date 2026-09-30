@@ -16,6 +16,7 @@ import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-st
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomIconButton, EcomIconButtonLink } from "@/components/ui/ecom-icon-button";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
+import { formatDetailPageSuiteSellpointDraft } from "@/lib/ecom-sellpoint-five-part";
 import {
   detailPageRatioLabel,
   resolveDetailPageDisplayRatio,
@@ -535,14 +536,12 @@ export function DetailPageSuiteContentPanel({
           </section>
           ) : null}
 
-          {!isWorkbench && project.brief?.sellPoints?.length ? (
+          {!isWorkbench && (project.brief?.sellPoints?.length || project.brief?.sellpointFivePart) ? (
             <section className="mb-6">
-              <h2 className="mb-2 text-sm font-semibold">卖点清单</h2>
-              <ul className="list-disc pl-5 text-sm text-[#424245]">
-                {project.brief.sellPoints.map((s) => (
-                  <li key={s.id}>{s.text}</li>
-                ))}
-              </ul>
+              <h2 className="mb-2 text-sm font-semibold">卖点（五段式）</h2>
+              <pre className="whitespace-pre-wrap rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] px-3 py-2 font-sans text-sm leading-relaxed text-[#424245]">
+                {formatDetailPageSuiteSellpointDraft(project.brief)}
+              </pre>
             </section>
           ) : null}
 

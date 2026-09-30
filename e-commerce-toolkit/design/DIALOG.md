@@ -59,3 +59,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 - `window.alert` / `window.confirm`
 - 手写 `fixed inset-0` 弹层（须走 `Dialog` 或 `useDialogs`）
 - 弹出层主按钮用黑色填充（须品牌蓝）
+
+## 自定义 Portal 弹层（模特库 / 场景库等）
+
+须 **点击遮罩空白处关闭** + **Esc 关闭**，与 `EcomFullScreenOverlay` 一致：
+
+- 工具：`components/ui/ecom-modal-layer.ts` → `ecomModalBackdropMouseDown` · `useEcomModalEscape`
+- 或直接使用 `EcomFullScreenOverlay`（已内置）

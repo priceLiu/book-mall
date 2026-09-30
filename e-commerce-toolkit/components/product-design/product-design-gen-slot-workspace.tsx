@@ -23,6 +23,7 @@ import {
 } from "@/components/media/ecom-media-library-tile";
 import { ProductDesignPromptDialog } from "@/components/product-design/product-design-prompt-dialog";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { buildProductDesignPromptMentionRefs } from "@/lib/product-design-mention-refs";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
   deriveProductDesignImagePlan,
@@ -164,6 +165,10 @@ export function ProductDesignGenSlotWorkspace({
     promptDialogIndex != null
       ? rows.find((r) => r.index === promptDialogIndex) ?? null
       : null;
+  const promptMentionRefs = useMemo(
+    () => buildProductDesignPromptMentionRefs(project, target),
+    [project, target],
+  );
 
   const saveRows = useCallback(
     async (nextRows: GenSlotRow[], opts?: { quiet?: boolean }) => {
@@ -523,6 +528,7 @@ export function ProductDesignGenSlotWorkspace({
           }
           title={`编辑 ${label} #${promptDialogRow.index} Prompt`}
           subtitle={promptDialogRow.title}
+          referenceImages={promptMentionRefs}
         />
       ) : null}
     </section>

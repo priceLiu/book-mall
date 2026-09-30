@@ -12,6 +12,7 @@ import { EcomImagePreviewHost, useEcomImagePreview } from "@/components/media";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { fetchEcomSceneLibraryCatalog } from "@/lib/ecom-scene-library-api";
+import { sceneToCatalogPickerEntry } from "@/lib/ecom-scene-library/picker";
 import type { EcomSceneLibraryEntry } from "@/lib/ecom-scene-library/types";
 import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
 import type {
@@ -40,16 +41,6 @@ type Props = {
   onPickSceneLibraryPreset: (preset: OutfitSceneLibraryPreset) => Promise<void>;
   onRemoveSceneRef: () => Promise<void>;
 };
-
-function sceneToPickerEntry(entry: EcomSceneLibraryEntry): CatalogPickerEntry {
-  return {
-    id: entry.id,
-    name: entry.name,
-    subtitle: entry.visualPrompt,
-    scope: entry.scope,
-    lockedAt: entry.lockedAt,
-  };
-}
 
 export function OutfitModelRefsPanel({
   gallery,
@@ -116,7 +107,7 @@ export function OutfitModelRefsPanel({
     : [];
 
   const sceneCatalogEntries = useMemo(
-    () => sceneCatalog.map(sceneToPickerEntry),
+    () => sceneCatalog.map(sceneToCatalogPickerEntry),
     [sceneCatalog],
   );
 

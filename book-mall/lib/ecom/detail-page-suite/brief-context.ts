@@ -1,4 +1,5 @@
 import { BLANK_PLATE_MODULE_IDS, type DetailPageSuiteBrief } from "./types";
+import { buildSellpointContextForLlm } from "@/lib/ecom/ecom-sellpoint-five-part";
 
 export function detailPageSuiteModuleIsBlankPlate(moduleId: string | undefined): boolean {
   return Boolean(moduleId?.trim() && BLANK_PLATE_MODULE_IDS.has(moduleId.trim()));
@@ -22,7 +23,7 @@ export function buildDetailPageSuiteBriefContextLines(
   brief: DetailPageSuiteBrief | null | undefined,
 ): string[] {
   const b = brief ?? {};
-  const sellpointText = (b.sellPoints ?? []).map((s) => s.text.trim()).filter(Boolean).join("，");
+  const sellpointText = buildSellpointContextForLlm(b);
   return [
     line("商品描述", b.productDesc),
     line("商品卖点", sellpointText || undefined),
@@ -114,7 +115,7 @@ export function buildDetailPageSuiteImageGlobalPrefix(
   }
   parts.push("服装款式颜色与产品参考图完全一致");
   if (!opts?.omitSellpoints) {
-    const sellpointText = (b.sellPoints ?? []).map((s) => s.text.trim()).filter(Boolean).join("，");
+    const sellpointText = buildSellpointContextForLlm(b);
     if (sellpointText) {
       parts.push(`突出卖点：${sellpointText}`);
     }

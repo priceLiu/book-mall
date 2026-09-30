@@ -7,6 +7,10 @@ import { createPortal } from "react-dom";
 import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-credits-beside";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomDialogCloseButton } from "@/components/ui/dialog";
+import {
+  ecomModalBackdropMouseDown,
+  useEcomModalEscape,
+} from "@/components/ui/ecom-modal-layer";
 import { VTON_MODEL_DEFAULT_PROMPT } from "@/lib/vton-model-prompts";
 
 const VTON_FOUR_VIEW_MODEL_KEY = "wan2.7-image-pro";
@@ -26,10 +30,18 @@ export function VtonFourViewGenerateDialog({ open, onClose, busy, onConfirm }: P
     setDraft(VTON_MODEL_DEFAULT_PROMPT);
   }, [open]);
 
+  useEcomModalEscape(open, onClose, { disabled: busy });
+
   if (!open || typeof document === "undefined") return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/45 p-4">
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/45 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="vton-four-view-gen-title"
+      onMouseDown={ecomModalBackdropMouseDown(onClose, { disabled: busy })}
+    >
       <div
         className="flex max-h-[min(88vh,720px)] w-full max-w-lg flex-col rounded-2xl border border-[#e8e8ed] bg-white shadow-xl"
         role="dialog"

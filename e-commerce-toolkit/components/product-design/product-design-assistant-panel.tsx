@@ -6,10 +6,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EcomAssistantCollapsibleLayout } from "@/components/layout/ecom-assistant-collapsible-layout";
 import { EcomAssistantPanelHeader } from "@/components/layout/ecom-assistant-panel-header";
 import { EcomAssistantSendButton } from "@/components/layout/ecom-assistant-send-button";
+import { SeedVideoAssistantChoiceCards } from "@/components/seed-video/seed-video-assistant-choice-cards";
 import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-markdown-block";
-import { STORYBOARD_ASSISTANT_CHOICE_CLASS } from "@/components/storyboard/storyboard-assistant-choices";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
-import { EcomButtonPrimary } from "@/components/ui/ecom-button";
 import {
   streamProductDesignChat,
   syncProductDesign,
@@ -19,7 +18,6 @@ import {
 } from "@/lib/ecom-product-design-api";
 import {
   buildProductDesignNextStepCommand,
-  choicePrompt,
   CONFIRM_BRIEF_MULTI_CHOICE,
   CONFIRM_TRUST_BADGE_CHOICE,
   CUSTOM_INPUT_CHOICE,
@@ -45,6 +43,7 @@ import {
   parseMarketingPlanChoice,
   parsePlatformChoice,
   productDesignAssistantAnchorId,
+  PRODUCT_DESIGN_MAIN_STYLE_UPLOAD_ACK,
   resolveProductDesignStepStates,
   stepsForTrack,
   PRODUCT_DESIGN_STEPS,
@@ -65,6 +64,13 @@ import {
 } from "@/lib/product-design-workflow";
 import { resolveMarketingPlansForDisplay } from "@/lib/product-design-marketing-parse";
 import { toAssistantChatContent } from "@/lib/product-design-assistant-display";
+import {
+  buildProductDesignHistoricalChoiceBlock,
+  buildProductDesignArchivedAssistantChoiceBlock,
+  inferProductDesignAssistantChoiceCards,
+  resolveProductDesignAssistantChoiceStep,
+  resolveProductDesignAssistantSelectedMessage,
+} from "@/lib/product-design-assistant-choice-ui";
 import type {
   EcomPlatformSpec,
   ProductDesignBrief,
@@ -76,6 +82,7 @@ import {
   ECOM_ASSISTANT_BUBBLE_CLASS,
   ECOM_ASSISTANT_CHOICE_SHELL_CLASS,
   ECOM_ASSISTANT_COMPOSER_SHELL_BASE,
+  ECOM_ASSISTANT_COMPOSER_SHELL_COMPACT,
   ECOM_ASSISTANT_COMPOSER_SHELL_EXPANDED_BORDER,
   ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
   ECOM_ASSISTANT_USER_BUBBLE_CLASS,
@@ -222,6 +229,7 @@ export function ProductDesignAssistantPanel({
   const [streamText, setStreamText] = useState("");
   const [optimisticPatch, setOptimisticPatch] = useState<OptimisticProjectPatch | null>(null);
   const [choiceBusy, setChoiceBusy] = useState(false);
+  const [optimisticSelected, setOptimisticSelected] = useState<string | null>(null);
   const [briefSuggesting, setBriefSuggesting] = useState(false);
   const [briefMultiDraft, setBriefMultiDraft] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -320,7 +328,6 @@ export function ProductDesignAssistantPanel({
     streaming || choiceBusy || briefInferBusy
       ? []
       : inferAssistantChoices(effectiveProject, specs);
-  const prompt = choicePrompt(effectiveProject, specs);
   const pendingBriefField = nextBriefField(effectiveProject.brief);
 
   const appendLocal = useCallback(
@@ -753,6 +760,7 @@ export function ProductDesignAssistantPanel({
 
   async function handleChoice(text: string) {
     if (choiceBusy) return;
+    setOptimisticSelected(text);
     setChoiceBusy(true);
     try {
       await handleChoiceInner(text);
@@ -817,6 +825,26 @@ export function ProductDesignAssistantPanel({
   const showChoiceBlock =
     (choices.length > 0 || briefInferBusy) && !streaming && !choiceBusy;
 
+  const choiceCards = useMemo(
+    () => inferProductDesignAssistantChoiceCards(effectiveProject, specs),
+    [effectiveProject, specs],
+  );
+  const choiceStep = useMemo(
+    () => resolveProductDesignAssistantChoiceStep(effectiveProject, specs),
+    [effectiveProject, specs],
+  );
+  const selectedChoiceMessage = useMemo(
+    () =>
+      optimisticSelected ??
+      resolveProductDesignAssistantSelectedMessage(effectiveProject, specs, messages),
+    [effectiveProject, messages, optimisticSelected, specs],
+  );
+  const showChoiceCards = showChoiceBlock && choiceCards.length > 0 && !briefInferBusy;
+
+  useEffect(() => {
+    setOptimisticSelected(null);
+  }, [choiceStep?.title, projectId]);
+
   const assistantStepAnchorIndex = useMemo(() => {
     const last = new Map<ProductDesignStepId, number>();
     displayMessages.forEach((m, i) => {
@@ -865,8 +893,8 @@ export function ProductDesignAssistantPanel({
           className="min-h-[2.5rem] flex-1 resize-y rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm leading-relaxed text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
           rows={compact ? 1 : 3}
           placeholder={
-            showChoiceBlock && choices.length > 0
-              ? "也可输入补充说明；点选上方选项可继续下一步…"
+            showChoiceCards
+              ? "也可输入补充说明；点选上方选项卡片…"
               : "补充说明或让我修改某一步…"
           }
           value={input}
@@ -897,7 +925,7 @@ export function ProductDesignAssistantPanel({
       collapsed={collapsed}
       onCollapsedChange={onCollapsedChange}
       collapseBlocked={inputDisabled}
-      attentionBadge={showChoiceBlock && choices.length > 0}
+      attentionBadge={showChoiceCards}
       composer={renderComposer(false)}
       floatingComposer={renderComposer(true)}
     >
@@ -911,7 +939,7 @@ export function ProductDesignAssistantPanel({
       />
       <div
         ref={scrollRef}
-        className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-3"
+        className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-3 [overflow-anchor:none]"
       >
         <div className="space-y-3">
           {displayMessages.map((m, index) => {
@@ -924,89 +952,125 @@ export function ProductDesignAssistantPanel({
               stepAnchor && assistantStepAnchorIndex.get(stepAnchor) === index
                 ? productDesignAssistantAnchorId(stepAnchor)
                 : undefined;
+            const historical =
+              m.role === "user"
+                ? buildProductDesignHistoricalChoiceBlock(m.content, effectiveProject, specs)
+                : null;
+            const archivedAssistant =
+              m.role === "assistant"
+                ? buildProductDesignArchivedAssistantChoiceBlock(
+                    m.content,
+                    displayMessages,
+                    index,
+                  )
+                : null;
+            const showMessageBubble =
+              (m.role === "assistant" && !archivedAssistant) ||
+              (m.role === "user" &&
+                !historical &&
+                m.content.trim() !== PRODUCT_DESIGN_MAIN_STYLE_UPLOAD_ACK);
             return (
-              <div
-                key={m.id}
-                id={anchorId}
-                className={cn(
-                  "flex w-full flex-col",
-                  m.role === "user" ? "items-end" : "items-start",
-                )}
-              >
-                <div
-                  className={cn(
-                    ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
-                    m.role === "user"
-                      ? ECOM_ASSISTANT_USER_BUBBLE_CLASS
-                      : ECOM_ASSISTANT_BUBBLE_CLASS,
-                  )}
-                >
-                  {m.role === "assistant" ? (
-                    <StoryboardMarkdownBlock markdown={body} />
-                  ) : (
-                    <p className="whitespace-pre-wrap">{body}</p>
-                  )}
-                </div>
+              <div key={m.id} id={anchorId} className="space-y-2">
+                {showMessageBubble ? (
+                  <div
+                    className={cn(
+                      "flex w-full flex-col",
+                      m.role === "user" ? "items-end" : "items-start",
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
+                        m.role === "user"
+                          ? ECOM_ASSISTANT_USER_BUBBLE_CLASS
+                          : ECOM_ASSISTANT_BUBBLE_CLASS,
+                      )}
+                    >
+                      {m.role === "assistant" ? (
+                        <StoryboardMarkdownBlock markdown={body} />
+                      ) : (
+                        <p className="whitespace-pre-wrap">{body}</p>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+                {archivedAssistant ? (
+                  <div className="flex w-full flex-col items-start">
+                    <div className={cn(ECOM_ASSISTANT_CHOICE_SHELL_CLASS, "w-full max-w-[95%]")}>
+                      <SeedVideoAssistantChoiceCards
+                        title={archivedAssistant.title}
+                        subtitle={archivedAssistant.subtitle}
+                        choices={archivedAssistant.cards}
+                        selectedMessage={null}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+                {historical ? (
+                  <div className="flex w-full flex-col items-start">
+                    <div className={cn(ECOM_ASSISTANT_CHOICE_SHELL_CLASS, "w-full max-w-[95%]")}>
+                      <SeedVideoAssistantChoiceCards
+                        title={historical.title}
+                        subtitle="本次点选记录（只读）"
+                        choices={historical.cards}
+                        selectedMessage={historical.selectedMessage}
+                      />
+                    </div>
+                  </div>
+                ) : null}
               </div>
             );
           })}
-          {showChoiceBlock ? (
+          {briefInferBusy ? (
             <div className="flex flex-col items-start">
               <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
-                {briefInferBusy ? (
-                  <div className="space-y-2">
-                    <p className="text-[11px] text-[#6e6e73]">
-                      正在根据产品图推断{pendingBriefField?.label ?? "候选项"}…
-                    </p>
-                    <div
-                      className="ecom-upload-progress ecom-upload-progress-indeterminate"
-                      role="progressbar"
-                      aria-valuetext="推断中"
-                    >
-                      <span />
-                    </div>
-                    <p className="text-[10px] text-[#86868b]">
-                      视觉模型分析中，通常需 10～30 秒；完成后会展示可点选候选项。
-                    </p>
+                <div className="space-y-2">
+                  <p className="text-[11px] text-[#6e6e73]">
+                    正在根据产品图推断{pendingBriefField?.label ?? "候选项"}…
+                  </p>
+                  <div
+                    className="ecom-upload-progress ecom-upload-progress-indeterminate"
+                    role="progressbar"
+                    aria-valuetext="推断中"
+                  >
+                    <span />
                   </div>
-                ) : (
-                  <>
-                    <p className="mb-2 text-[11px] text-[#6e6e73]">{prompt}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {choices.map((c) =>
-                        c === NEXT_STEP_CHOICE ||
-                        c === CONFIRM_BRIEF_MULTI_CHOICE ||
-                        c === CONFIRM_TRUST_BADGE_CHOICE ? (
-                          <EcomButtonPrimary
-                            key={c}
-                            size="sm"
-                            type="button"
-                            disabled={streaming || choiceBusy}
-                            className="!max-w-none shrink-0"
-                            onClick={() => void handleChoice(c)}
-                          >
-                            {c}
-                          </EcomButtonPrimary>
-                        ) : (
-                          <button
-                            key={c}
-                            type="button"
-                            disabled={streaming || choiceBusy}
-                            className={cn(
-                              STORYBOARD_ASSISTANT_CHOICE_CLASS,
-                              pendingBriefField?.multiSelect &&
-                                briefMultiDraft.includes(c) &&
-                                "border-[var(--ecom-chrome-accent)] bg-[var(--ecom-content-selected-bg)]",
-                            )}
-                            onClick={() => void handleChoice(c)}
-                          >
-                            {c}
-                          </button>
-                        ),
-                      )}
+                  <p className="text-[10px] text-[#86868b]">
+                    视觉模型分析中，通常需 10～30 秒；完成后会展示可点选候选项。
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {showChoiceCards && choiceStep ? (
+            <div className="flex flex-col items-start">
+              <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
+                <div className="rounded-2xl border border-[#0071e3]/25 bg-[#f0f6ff] p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-[#1d1d1f]">{choiceStep.title}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-[#6e6e73]">
+                        {choiceStep.subtitle}
+                      </p>
+                      <p className="mt-2 text-[11px] text-[#86868b]">
+                        请选择（无需输入）：点选后将写入会话并同步中栏。
+                      </p>
                     </div>
-                  </>
-                )}
+                    <span className="shrink-0 rounded-full bg-white px-2.5 py-0.5 text-[10px] font-medium text-[#0071e3]">
+                      {choiceStep.progress}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <SeedVideoAssistantChoiceCards
+                    title="可选方案"
+                    subtitle="选中项会高亮显示；确认后进入下一步"
+                    choices={choiceCards}
+                    selectedMessage={selectedChoiceMessage}
+                    disabled={streaming || choiceBusy}
+                    onSelect={(message) => void handleChoice(message)}
+                  />
+                </div>
               </div>
             </div>
           ) : null}

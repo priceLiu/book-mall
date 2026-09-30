@@ -4539,6 +4539,9 @@ model EcomSceneLibraryEntry {
   id           String    @id
   name         String
   visualPrompt String    @db.Text
+  ossUrl       String?
+  thumbUrl     String?
+  sourceImageKey String?
   tags         Json?
   scope        String    @default("platform")
   userId       String?

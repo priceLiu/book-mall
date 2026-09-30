@@ -111,6 +111,8 @@ import {
   isHitDecomposeInFlight,
 } from "@/lib/detail-page-suite-hit-progress";
 import { resolveHitBottomTask } from "@/lib/detail-page-suite-hit-bottom-task";
+import { formatDetailPageSuiteSellpointDraft, briefPatchFromSellpointDraft, ECOM_SELLPOINT_FIVE_PART_PLACEHOLDER } from "@/lib/ecom-sellpoint-five-part";
+import { EcomSellpointFivePartHint } from "@/components/media/ecom-sellpoint-five-part-hint";
 import { isVisionSellpointJobRunning, readHitVisionSellpointJob } from "@/lib/detail-page-suite-vision-sellpoint-progress";
 import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
 import { resumeOrCreateEcomProject, writeEcomLastProjectId } from "@/lib/ecom-last-project";
@@ -150,7 +152,7 @@ const HIT_MODEL_REF_MAX = 6;
 type HitUploadRole = "reference_suite" | "product" | "model";
 
 function savedSellpointsText(project: DetailPageSuiteProject): string {
-  return project.brief?.sellPoints?.map((s) => s.text).join("\n") ?? "";
+  return formatDetailPageSuiteSellpointDraft(project.brief);
 }
 
 function isSellpointDraftDirty(project: DetailPageSuiteProject, draft: string): boolean {
@@ -802,17 +804,9 @@ function DetailPageSuiteHitStudioInner() {
 
   async function saveSellpointsFromDraft() {
     if (!project) return;
-    const lines = sellpointDraft
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean);
-    const sellPoints = lines.map((text, i) => ({
-      id: project.brief?.sellPoints?.[i]?.id ?? `sp-${i}`,
-      text,
-      source: "user" as const,
-    }));
+    const patch = briefPatchFromSellpointDraft(sellpointDraft, project.brief);
     const updated = await updateDetailPageSuiteHitProject(project.id, {
-      brief: { ...(project.brief ?? {}), sellPoints },
+      brief: { ...(project.brief ?? {}), ...patch },
     });
     setProject(updated);
   }
@@ -1291,13 +1285,14 @@ function DetailPageSuiteHitStudioInner() {
             </div>
             <div className="mb-3">
               <label className="mb-1 block text-sm font-medium text-[#1d1d1f]">
-                新品核心卖点（每行一条）
+                新品卖点（五段式）
               </label>
+              <EcomSellpointFivePartHint />
               <textarea
-                className="min-h-[88px] w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm"
+                className="min-h-[160px] w-full rounded-lg border border-[#d2d2d7] px-3 py-2 font-mono text-sm leading-relaxed"
                 value={sellpointDraft}
                 onChange={(e) => setSellpointDraft(e.target.value)}
-                placeholder="手填新品卖点，或点击下方识图。文案将以此为主体原创重写。"
+                placeholder={ECOM_SELLPOINT_FIVE_PART_PLACEHOLDER}
               />
               <div className="mt-2 flex flex-wrap gap-2">
                 <EcomButtonSecondary

@@ -37,6 +37,18 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     ...existing,
     name: typeof body.name === "string" ? body.name : existing.name,
     visualPrompt: typeof body.visualPrompt === "string" ? body.visualPrompt : existing.visualPrompt,
+    ossUrl:
+      body.clearPreview === true
+        ? null
+        : typeof body.ossUrl === "string"
+          ? body.ossUrl
+          : existing.ossUrl,
+    thumbUrl:
+      body.clearPreview === true
+        ? null
+        : typeof body.thumbUrl === "string"
+          ? body.thumbUrl
+          : existing.thumbUrl,
     tags,
     enabled: typeof body.enabled === "boolean" ? body.enabled : existing.enabled,
     sortOrder: typeof body.sortOrder === "number" ? body.sortOrder : existing.sortOrder,

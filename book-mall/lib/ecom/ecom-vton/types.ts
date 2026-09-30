@@ -41,11 +41,18 @@ export type VtonModelGenerationBodyCheck = {
 export type VtonGarmentMode = "two_piece" | "one_piece";
 export type VtonRefMode = "already_dressed" | "need_tryon" | "text_to_tryon";
 
+export type VtonTextTryonRefKind = "image" | "scene-text";
+
 export type VtonTextTryonRef = {
   id: string;
-  ossUrl: string;
-  label?: string;
   createdAt: string;
+  label?: string;
+  kind?: VtonTextTryonRefKind;
+  /** 图片参考（服装 / 模特 / 场景参考图） */
+  ossUrl?: string;
+  /** 场景库 · 纯文字场景描述 */
+  scenePrompt?: string;
+  sceneLibraryEntryId?: string;
 };
 
 export type VtonTextTryonResult = {
@@ -200,6 +207,8 @@ export type VtonModelPipelineJob = {
   updatedAt: string;
   prompt?: string;
   imageSize?: string;
+  modelKey?: string;
+  ratio?: string;
   error?: string;
 };
 

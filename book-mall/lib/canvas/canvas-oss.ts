@@ -17,6 +17,7 @@ import {
   buildStyleLibraryOssKey,
   buildEcomModelLibraryOssKey,
   buildEcomPoseLibraryOssKey,
+  buildEcomSceneLibraryOssKey,
   buildEcomTextTryonDemoOssKey,
   buildEcomTemplateGalleryOssKey,
   buildEcomTemplateGallerySlotOssKey,
@@ -389,6 +390,26 @@ export async function uploadEcomPoseLibraryPreview(args: {
     throw new Error(cfgRaw.error);
   }
   const key = buildEcomPoseLibraryOssKey(args.id, args.ext);
+  return uploadBufferToOss({
+    cfg: cfgRaw,
+    key,
+    buf: args.buf,
+    contentType: args.contentType,
+  });
+}
+
+/** 电商工具箱 · 场景库参考图（固定 OSS key）。 */
+export async function uploadEcomSceneLibraryPreview(args: {
+  id: string;
+  buf: Buffer;
+  contentType: string;
+  ext: string;
+}): Promise<string> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const key = buildEcomSceneLibraryOssKey(args.id, args.ext);
   return uploadBufferToOss({
     cfg: cfgRaw,
     key,

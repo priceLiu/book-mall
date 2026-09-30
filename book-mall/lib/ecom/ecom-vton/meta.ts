@@ -73,14 +73,42 @@ function sanitizeTextTryonRef(raw: unknown): VtonTextTryonRef | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
   const id = typeof o.id === "string" ? o.id.trim() : "";
-  const ossUrl = typeof o.ossUrl === "string" ? o.ossUrl.trim() : "";
   const createdAt = typeof o.createdAt === "string" ? o.createdAt : "";
-  if (!id || !ossUrl || !createdAt) return null;
+  if (!id || !createdAt) return null;
+
+  const kindRaw = o.kind;
+  const kind =
+    kindRaw === "scene-text" || kindRaw === "image"
+      ? kindRaw
+      : undefined;
+  const ossUrl = typeof o.ossUrl === "string" ? o.ossUrl.trim() : "";
+  const scenePrompt =
+    typeof o.scenePrompt === "string" ? o.scenePrompt.trim() : "";
+
+  const isScene =
+    kind === "scene-text" || (Boolean(scenePrompt) && !ossUrl);
+  if (isScene) {
+    if (!scenePrompt) return null;
+    return {
+      id,
+      createdAt,
+      kind: "scene-text",
+      label: typeof o.label === "string" ? o.label : undefined,
+      scenePrompt,
+      sceneLibraryEntryId:
+        typeof o.sceneLibraryEntryId === "string"
+          ? o.sceneLibraryEntryId.trim()
+          : undefined,
+    };
+  }
+
+  if (!ossUrl) return null;
   return {
     id,
     ossUrl,
-    label: typeof o.label === "string" ? o.label : undefined,
     createdAt,
+    kind: "image",
+    label: typeof o.label === "string" ? o.label : undefined,
   };
 }
 

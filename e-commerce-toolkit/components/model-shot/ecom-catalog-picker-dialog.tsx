@@ -4,13 +4,20 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { EcomDialogCloseButton } from "@/components/ui/dialog";
+import {
+  ecomModalBackdropMouseDown,
+  useEcomModalEscape,
+} from "@/components/ui/ecom-modal-layer";
 import { cn } from "@/lib/utils";
 
 export type CatalogPickerEntry = {
   id: string;
   name: string;
   subtitle: string;
+  /** 试衣/生图引用用的真实参考图（不含平台默认占位） */
   imageUrl?: string | null;
+  /** 列表缩略图（可含平台默认图） */
+  previewImageUrl?: string | null;
   scope?: "platform" | "user";
   lockedAt?: string | null;
 };
@@ -43,13 +50,27 @@ export function EcomCatalogPickerDialog({
     if (!open) setBusyId(null);
   }, [open]);
 
+  useEcomModalEscape(open, () => onOpenChange(false), {
+    disabled: busyId != null,
+  });
+
   if (!open || typeof document === "undefined") return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ecom-catalog-picker-title"
+      onMouseDown={ecomModalBackdropMouseDown(() => onOpenChange(false), {
+        disabled: busyId != null,
+      })}
+    >
       <div className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-[#e5e5ea] bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-[#e5e5ea] px-4 py-3">
-          <h2 className="text-sm font-semibold text-[#1d1d1f]">{title}</h2>
+          <h2 id="ecom-catalog-picker-title" className="text-sm font-semibold text-[#1d1d1f]">
+            {title}
+          </h2>
           <EcomDialogCloseButton onClick={() => onOpenChange(false)} />
         </div>
         <div className="flex-1 space-y-4 overflow-y-auto p-4">
@@ -129,10 +150,10 @@ function CatalogPickerRow({
         busy && "opacity-60",
       )}
     >
-      {entry.imageUrl ? (
+      {entry.previewImageUrl ?? entry.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={entry.imageUrl}
+          src={(entry.previewImageUrl ?? entry.imageUrl)!}
           alt=""
           className="size-14 shrink-0 rounded-lg object-cover"
         />

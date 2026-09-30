@@ -8,6 +8,10 @@ import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-cr
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomDialogCloseButton } from "@/components/ui/dialog";
 import {
+  ecomModalBackdropMouseDown,
+  useEcomModalEscape,
+} from "@/components/ui/ecom-modal-layer";
+import {
   listModelShotPropPresets,
   listModelShotScenePresets,
   propPresetToImagePrompt,
@@ -204,6 +208,8 @@ export function ModelShotRefGenerateDialog({
     );
   }, [effectiveImageModels, modelKey]);
 
+  useEcomModalEscape(open, onClose, { disabled: busy });
+
   if (!open || typeof document === "undefined") return null;
 
   const selectedName =
@@ -217,9 +223,7 @@ export function ModelShotRefGenerateDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="model-shot-ref-gen-title"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !busy) onClose();
-      }}
+      onMouseDown={ecomModalBackdropMouseDown(onClose, { disabled: busy })}
     >
       <div className="relative flex max-h-[85vh] w-full max-w-3xl flex-col rounded-2xl bg-white shadow-2xl">
         <EcomDialogCloseButton disabled={busy} onClick={onClose} />

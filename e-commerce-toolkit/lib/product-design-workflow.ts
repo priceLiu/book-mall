@@ -619,6 +619,8 @@ export const REVISE_CHOICE = "修改当前步";
 export const CUSTOM_INPUT_CHOICE = "自己输入";
 export const INTERACTIVE_WORKFLOW_CHOICE = "主图 · 助手流程（Step by step）";
 export const MAIN_REF_PROMPT_WORKFLOW_CHOICE = "主图 · 参考图 + Prompt";
+/** 中栏上传主图风格参考后写入 chat 的用户 ack（助手区不单独展示气泡） */
+export const PRODUCT_DESIGN_MAIN_STYLE_UPLOAD_ACK = "已上传主图风格参考";
 export const DETAIL_INTERACTIVE_CHOICE = "详情页 · 助手流程（Step by step）";
 export const DETAIL_REF_PROMPT_WORKFLOW_CHOICE = "详情页 · 参考图 + Prompt";
 /** 信息采集多选字段的主操作（与流水线「下一步」文案一致） */

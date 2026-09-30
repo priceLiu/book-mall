@@ -238,6 +238,24 @@ export function buildEcomPoseLibraryThumbOssKey(id: string): string {
   return `ecom/pose-library/${safeId}-thumb.webp`;
 }
 
+/** 电商工具箱 · 场景库参考图（固定 key） */
+export function buildEcomSceneLibraryOssKey(id: string, ext: string): string {
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeExt = ext.replace(/^\./, "").toLowerCase() || "webp";
+  return `ecom/scene-library/${safeId}.${safeExt}`;
+}
+
+/** 电商工具箱 · 场景库列表缩略图 */
+export function buildEcomSceneLibraryThumbOssKey(id: string): string {
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `ecom/scene-library/${safeId}-thumb.webp`;
+}
+
+/** 场景库 · 无自定义图时的平台默认参考图（部署前可 seed 上传至 OSS） */
+export function buildEcomSceneLibraryPlatformDefaultOssKey(): string {
+  return "ecom/scene-library/_platform/default-studio.webp";
+}
+
 /** 电商工具箱 · 模特库列表缩略图 */
 export function buildEcomModelLibraryThumbOssKey(id: string): string {
   const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_");

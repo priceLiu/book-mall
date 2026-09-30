@@ -126,6 +126,7 @@ import {
   visionDetailPageSuiteSellpoints,
 } from "@/lib/ecom-detail-page-suite-api";
 import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
+import { briefPatchFromSellpointDraft } from "@/lib/ecom-sellpoint-five-part";
 import {
   FASHION_DIMENSION_STEPS,
   type FashionDimensionKey,
@@ -1228,25 +1229,25 @@ function DetailPageSuiteStudioInner() {
             const after = appendChat(
               appendChat(next.chatHistory, "user", message),
               "assistant",
-              `已从产品图识别 ${next.brief?.sellPoints?.length ?? 0} 条卖点，可继续手填或确认。`,
+              next.brief?.sellpointFivePart
+                ? "已从产品图识别五段式卖点，可继续手填或确认。"
+                : `已从产品图识别 ${next.brief?.sellPoints?.length ?? 0} 条卖点，可继续手填或确认。`,
             );
             applyProject(await updateDetailPageSuiteProject(next.id, { chatHistory: after }));
             return;
           }
           if (message.startsWith("手填卖点")) {
-            const lines = message
-              .split("\n")
-              .slice(1)
-              .map((t) => t.trim())
-              .filter(Boolean);
-            const sellPoints = lines.map((text, i) => ({
-              id: `sp-${Date.now()}-${i}`,
-              text,
-              source: "user" as const,
-            }));
-            history = appendChat(history, "assistant", `已收入 ${sellPoints.length} 条手填卖点。请确认清单。`);
+            const body = message.slice("手填卖点".length).replace(/^\n/, "");
+            const patch = briefPatchFromSellpointDraft(body, project.brief);
+            history = appendChat(
+              history,
+              "assistant",
+              patch.sellpointFivePart
+                ? "已收入五段式手填卖点。请确认清单。"
+                : `已收入 ${patch.sellPoints.length} 条手填卖点。请确认清单。`,
+            );
             await persist({
-              brief: { ...(project.brief ?? {}), sellPoints, sellpointsLocked: false },
+              brief: { ...(project.brief ?? {}), ...patch, sellpointsLocked: false },
               chatHistory: history,
             });
             return;

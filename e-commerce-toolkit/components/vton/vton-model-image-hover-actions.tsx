@@ -92,7 +92,7 @@ export function VtonModelImageHoverActions({
             type="button"
             title="从本项目移除"
             aria-label="从本项目移除"
-            className={cn(btnClass, "pointer-events-auto text-red-100 hover:bg-red-600/80")}
+            className={cn(btnClass, "pointer-events-auto text-red-600 hover:bg-red-600 hover:text-white")}
             disabled={disabled}
             onClick={(e) => {
               stopClick(e);

@@ -25,6 +25,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
     if (typeof body.archetype === "string" && isSceneArchetype(body.archetype)) {
       patch.archetype = body.archetype;
     }
+    if (body.clearPreview === true) {
+      patch.ossUrl = null;
+      patch.thumbUrl = null;
+    }
     const entry = await updateUserSceneEntry(auth.userId, id, patch);
     return ecomJson({ entry });
   } catch (e) {

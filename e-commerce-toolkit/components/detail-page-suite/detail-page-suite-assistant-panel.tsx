@@ -39,6 +39,7 @@ import {
   resolveSuiteWorkspaceGuide,
 } from "@/lib/detail-page-suite-assistant-choice-ui";
 import type { DetailPageSuiteBusyStatus } from "@/lib/detail-page-suite-busy-status";
+import { EcomSellpointFivePartHint } from "@/components/media/ecom-sellpoint-five-part-hint";
 import {
   FASHION_DIMENSION_STEPS,
   fashionDimensionPrompt,
@@ -121,12 +122,12 @@ function composerPlaceholder(
     return "请点选上方卡片继续七维采集";
   }
   if (phase === "sellpoints") {
-    if ((project.brief?.sellPoints?.length ?? 0) > 0) {
-      return "可继续补充卖点（每行一条），或点「确认卖点清单」";
+    if ((project.brief?.sellPoints?.length ?? 0) > 0 || project.brief?.sellpointFivePart) {
+      return "可继续补充五段式卖点，或点「确认卖点清单」";
     }
     return project.references.length
-      ? "手填卖点（每行一条），或点「AI识图抽卖点」"
-      : "手填卖点（每行一条）；上传产品图后可识图";
+      ? "手填五段式卖点，或点「AI识图抽卖点」"
+      : "手填五段式卖点；上传产品图后可识图";
   }
   if (phase === "modules") {
     return "输入自定义大模块名称后发送，或点「确认模块配置」";
@@ -271,6 +272,11 @@ function useDetailPageSuiteAssistant(props: Props): AssistantContextValue {
           )}
           data-ecom-suite-composer
         >
+          {phase === "sellpoints" && inputEnabled ? (
+            <div className="mb-2">
+              <EcomSellpointFivePartHint className="flex gap-2 rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-[11px] leading-relaxed text-[#515154]" />
+            </div>
+          ) : null}
           <div className="flex items-end gap-2">
             <textarea
               className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
@@ -314,6 +320,7 @@ function useDetailPageSuiteAssistant(props: Props): AssistantContextValue {
       onComposerWideChange,
       collapsed,
       onOpenImageModel,
+      phase,
       placeholder,
       tryExpand,
     ],

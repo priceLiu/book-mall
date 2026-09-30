@@ -8,7 +8,7 @@ import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generatin
 import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-credits-beside";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { VtonResultImageHoverActions } from "@/components/vton/vton-result-image-hover-actions";
-import { downloadRemoteImageUrl } from "@/lib/ecom-download-url";
+import { downloadMediaUrl } from "@/lib/ecom-media-download";
 import { openVtonFittingRoomInNewTab } from "@/lib/vton-fitting-room-link";
 import {
   coerceVtonModelImageSize,
@@ -378,9 +378,9 @@ export function VtonResultsGrid({
     });
   }, []);
 
-  async function handleDownload(url: string, title: string) {
+  function handleDownload(url: string, title: string) {
     const safe = title.replace(/[^\w\u4e00-\u9fff-]+/g, "_").slice(0, 40) || "tryon";
-    await downloadRemoteImageUrl(url, `${safe}.jpg`);
+    void downloadMediaUrl(url, `${safe}.jpg`);
   }
 
   return (

@@ -7,7 +7,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
 import { useImageDropPaste } from "@/hooks/use-image-drop-paste";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
-import { VtonImageQualityPicker } from "@/components/vton/vton-image-quality-picker";
+import { VtonAiModelGenerateHelp } from "@/components/vton/vton-ai-model-generate-help";
 import { VtonModelGenerationBadgeStack } from "@/components/vton/vton-model-generation-badge";
 import { VtonModelImageHoverActions } from "@/components/vton/vton-model-image-hover-actions";
 import { IMAGE_UPLOAD_ACCEPT, IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
@@ -24,7 +24,6 @@ import {
   resolvePreviewModelGeneration,
   sortModelGenerationsNewestFirst,
 } from "@/lib/vton-model-generations";
-import type { VtonModelImageSize } from "@/lib/vton-image-quality";
 import type {
   VtonModelGeneration,
   VtonModelPipelineBusy,
@@ -39,8 +38,8 @@ type Props = {
   onUploadModels: (files: File[]) => Promise<void>;
   onOpenAssetPicker?: () => void;
   onOpenModelLibrary: () => void;
-  onGenerateModel: () => void;
-  onExpandFullBody: () => void;
+  onOpenGenerateDialog: () => void;
+  onOpenExpandDialog: () => void;
   onSelectPreview: (generationId: string) => void | Promise<void>;
   onConfirmGeneration: (generationId: string) => void | Promise<void>;
   onSelectTryonGeneration: (generationId: string) => void | Promise<void>;
@@ -51,8 +50,6 @@ type Props = {
   onPreviewTryon: (ossUrl: string, title: string) => void;
   onSaveToMyModels: (ossUrl: string, title: string) => void | Promise<void>;
   onDeleteGeneration: (generationId: string) => void | Promise<void>;
-  modelImageSize: VtonModelImageSize;
-  onModelImageSizeChange: (size: VtonModelImageSize) => void;
 };
 
 /** 左/右栏固定同宽，缩略图 3:4 槽位（列表内 px 避免边框被 scroll 裁切） */
@@ -71,8 +68,8 @@ export function VtonModelWorkbenchPanel({
   onUploadModels,
   onOpenAssetPicker,
   onOpenModelLibrary,
-  onGenerateModel,
-  onExpandFullBody,
+  onOpenGenerateDialog,
+  onOpenExpandDialog,
   onSelectPreview,
   onConfirmGeneration,
   onSelectTryonGeneration,
@@ -81,8 +78,6 @@ export function VtonModelWorkbenchPanel({
   onPreviewTryon,
   onSaveToMyModels,
   onDeleteGeneration,
-  modelImageSize,
-  onModelImageSizeChange,
 }: Props) {
   const { alert } = useDialogs();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -217,28 +212,33 @@ export function VtonModelWorkbenchPanel({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs font-medium text-[#6e6e73]">模特全身照</span>
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-[#6e6e73]">
+          模特全身照
+          <VtonAiModelGenerateHelp />
+        </span>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
-          <EcomButtonSecondary
-            size="sm"
-            type="button"
-            disabled={busy || refsLocked}
-            className={headerBtnClass}
-            onClick={onGenerateModel}
-          >
-            {modelGenerating ? (
-              <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
-            ) : (
-              <Sparkles className="h-3 w-3 shrink-0" />
-            )}
-            {modelGenerating ? "生成中…" : "AI 生模特"}
-          </EcomButtonSecondary>
+          <span className="inline-flex items-center gap-0.5">
+            <EcomButtonSecondary
+              size="sm"
+              type="button"
+              disabled={busy || refsLocked}
+              className={headerBtnClass}
+              onClick={onOpenGenerateDialog}
+            >
+              {modelGenerating ? (
+                <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+              ) : (
+                <Sparkles className="h-3 w-3 shrink-0" />
+              )}
+              {modelGenerating ? "生成中…" : "AI 生模特"}
+            </EcomButtonSecondary>
+          </span>
           <EcomButtonSecondary
             size="sm"
             type="button"
             disabled={thumbSelectLocked || !displayLeftSelection?.ossUrl}
             className={headerBtnClass}
-            onClick={onExpandFullBody}
+            onClick={onOpenExpandDialog}
           >
             {modelExpanding ? (
               <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
@@ -282,14 +282,6 @@ export function VtonModelWorkbenchPanel({
             上传
           </EcomButtonSecondary>
         </div>
-      </div>
-
-      <div className="flex justify-center">
-        <VtonImageQualityPicker
-          value={modelImageSize}
-          onChange={onModelImageSizeChange}
-          disabled={busy || refsLocked || modelGenerating || modelExpanding}
-        />
       </div>
 
       <input

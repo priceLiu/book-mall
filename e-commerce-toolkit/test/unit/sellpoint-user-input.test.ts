@@ -46,6 +46,7 @@ function sellpointsPhaseProject(): StoryboardProject {
         storyboardLocked: false,
         coverageChecklist: [],
         outputMode: null,
+        productionMode: "standard_script",
       },
     },
   } as StoryboardProject;
@@ -57,6 +58,20 @@ describe("sellpoint user input", () => {
     expect(parsed).toHaveLength(3);
     expect(parsed[0]?.source).toBe("user");
     expect(parsed[0]?.id).toBe("S01");
+  });
+
+  it("parses five-part sellpoint document into layered entries", () => {
+    const doc = `1、商品名称：测试耳机
+2、核心卖点：
+卖点A
+卖点B
+3、适用人群：玩家
+4、使用场景：开黑、听歌
+5、规格参数：
+颜色：黑`;
+    const parsed = parseUserSellpointText(doc);
+    expect(parsed.filter((s) => s.layer === "core")).toHaveLength(2);
+    expect(parsed.some((s) => s.text.includes("颜色"))).toBe(true);
   });
 
   it("mode pick offers user vs ai paths", () => {

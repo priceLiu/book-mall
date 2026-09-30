@@ -1,5 +1,7 @@
 "use client";
 
+import { BookOpen } from "lucide-react";
+
 import { NormalizedBboxCropImg } from "@/components/media/normalized-bbox-crop-img";
 import type { EcomPromptImageRef } from "@/lib/ecom-prompt-mention";
 import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
@@ -39,9 +41,17 @@ export function EcomPromptMentionRefBar({
       <div className="flex flex-wrap gap-2">
         {refs.map((ref) => {
           const alias = mentionTokenDisplay(ref.token);
+          const hasImage = Boolean(ref.url?.trim());
           const inner = (
             <>
-              {ref.cropBbox ? (
+              {!hasImage ? (
+                <span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#e8e8ed] bg-[#f0f6ff] text-[#0071e3]"
+                  title={ref.label}
+                >
+                  <BookOpen className="h-4 w-4" />
+                </span>
+              ) : ref.cropBbox ? (
                 <NormalizedBboxCropImg
                   url={ref.url}
                   bbox={ref.cropBbox}
@@ -63,7 +73,7 @@ export function EcomPromptMentionRefBar({
               </span>
             </>
           );
-          if (onPreviewImage) {
+          if (onPreviewImage && hasImage) {
             return (
               <button
                 key={ref.token}

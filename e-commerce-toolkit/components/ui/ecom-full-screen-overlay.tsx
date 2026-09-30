@@ -4,6 +4,10 @@ import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { EcomDialogCloseButton } from "@/components/ui/dialog";
+import {
+  ecomModalBackdropMouseDown,
+  useEcomModalEscape,
+} from "@/components/ui/ecom-modal-layer";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -36,19 +40,16 @@ export function EcomFullScreenOverlay({
   panelClassName,
   closeOnBackdrop = true,
 }: Props) {
+  useEcomModalEscape(open, onClose, { disabled: !closeOnBackdrop });
+
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = prev;
-      document.removeEventListener("keydown", onKey);
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open || typeof document === "undefined") return null;
 
@@ -62,9 +63,7 @@ export function EcomFullScreenOverlay({
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? "ecom-fullscreen-overlay-title" : undefined}
-      onMouseDown={(event) => {
-        if (closeOnBackdrop && event.target === event.currentTarget) onClose();
-      }}
+      onMouseDown={ecomModalBackdropMouseDown(onClose, { disabled: !closeOnBackdrop })}
     >
       <div
         className={cn(

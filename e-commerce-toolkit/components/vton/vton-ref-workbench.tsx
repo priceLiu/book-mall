@@ -9,7 +9,12 @@ import { EcomImagePreviewHost, useEcomImagePreview } from "@/components/media";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
 import { EcomModelLibraryPickerDialog } from "@/components/model-shot/ecom-model-library-picker-dialog";
 import { ModelShotRefGenerateDialog } from "@/components/model-shot/model-shot-ref-generate-dialog";
-import { VtonFourViewGenerateDialog } from "@/components/vton/vton-four-view-generate-dialog";
+import { VtonAiModelGenerateHelp } from "@/components/vton/vton-ai-model-generate-help";
+import {
+  VtonModelPipelineDialog,
+  type VtonModelPipelineDialogMode,
+  type VtonModelPipelineInitial,
+} from "@/components/vton/vton-model-pipeline-dialog";
 import { VtonModelWorkbenchPanel } from "@/components/vton/vton-model-workbench-panel";
 import { VtonGarmentPoolPanel } from "@/components/vton/vton-garment-pool-panel";
 import { appendLookDraft, VtonLookComposer } from "@/components/vton/vton-look-composer";
@@ -18,6 +23,10 @@ import { VtonTextTryonPanel } from "@/components/vton/vton-text-tryon-panel";
 import { VtonTryonProgressStrip } from "@/components/vton/vton-tryon-progress-strip";
 import { EcomGenerateCreditsBeside } from "@/components/billing/ecom-generate-credits-beside";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import {
+  ecomModalBackdropMouseDown,
+  useEcomModalEscape,
+} from "@/components/ui/ecom-modal-layer";
 import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import type { OutfitGarmentMode, OutfitRefMode } from "@/lib/video-workflow/templates/outfit-v1/ui-config";
@@ -45,6 +54,7 @@ import {
   sortModelGenerationsNewestFirst,
 } from "@/lib/vton-model-generations";
 import { filterAvailableGarmentPool } from "@/lib/vton-garment-pool";
+import type { VtonModelPipelineRequest } from "@/lib/ecom-model-tryon-api";
 import {
   coerceVtonModelImageSize,
   type VtonModelImageSize,
@@ -98,8 +108,9 @@ type Props = {
   modelPipelineBusy?: VtonModelPipelineBusy | null;
   tryonBusy?: boolean;
   tryonProgress?: VtonTryonProgress | null;
-  /** 模特试衣 · 系统内置生模特/扩全身，不展示模型选择器 */
+  /** 模特试衣 · 系统内置生模特/扩全身（统一参数弹层） */
   builtinModelPipeline?: boolean;
+  modelPipelineInitial?: VtonModelPipelineInitial;
   vtonMeta?: VtonProjectMeta;
   onSelectPreviewModelGeneration?: (generationId: string) => Promise<void>;
   onConfirmModelGeneration?: (generationId: string) => Promise<void>;
@@ -123,8 +134,8 @@ type Props = {
   onAttachModelFromAssets?: (
     assets: Array<{ id: string; ossUrl: string; title: string }>,
   ) => Promise<void>;
-  onGenerateModel: (opts?: { prompt?: string; imageSize?: string }) => Promise<void>;
-  onExpandFullBody: (opts?: { prompt?: string; imageSize?: string }) => Promise<void>;
+  onGenerateModel: (opts?: VtonModelPipelineRequest) => Promise<void>;
+  onExpandFullBody: (opts?: VtonModelPipelineRequest) => Promise<void>;
   modelImageSize?: VtonModelImageSize;
   onModelImageSizeChange?: (size: VtonModelImageSize) => void;
   onTryon: () => Promise<void>;
@@ -148,6 +159,9 @@ type Props = {
     onRemoveRef: (refId: string) => Promise<void>;
     onAttachAssets?: (assets: Array<{ id: string; ossUrl: string; title: string }>) => Promise<void>;
     onAttachFromModelLibrary?: (ossUrl: string, label?: string) => Promise<void>;
+    onPickSceneLibraryEntry?: (
+      entry: import("@/components/model-shot/ecom-catalog-picker-dialog").CatalogPickerEntry,
+    ) => Promise<void>;
     onGenerate: () => Promise<void>;
     onClearEditor: () => Promise<void>;
     onSaveResultToAssets?: (ossUrl: string, title: string) => Promise<void>;
@@ -180,6 +194,7 @@ export function VtonRefWorkbench({
   tryonBusy,
   tryonProgress,
   builtinModelPipeline = false,
+  modelPipelineInitial,
   vtonMeta,
   onSelectPreviewModelGeneration,
   onConfirmModelGeneration,
@@ -216,7 +231,8 @@ export function VtonRefWorkbench({
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [assetPickerOpen, setAssetPickerOpen] = useState(false);
   const [genModelOpen, setGenModelOpen] = useState(false);
-  const [fourViewGenOpen, setFourViewGenOpen] = useState(false);
+  const [pipelineDialogMode, setPipelineDialogMode] =
+    useState<VtonModelPipelineDialogMode | null>(null);
   const [expandOpen, setExpandOpen] = useState(false);
   const [expandPrompt, setExpandPrompt] = useState("");
   const [genModelKey, setGenModelKey] = useState(imageModelKey);
@@ -364,7 +380,7 @@ export function VtonRefWorkbench({
           className={modelHeaderBtnClass}
           onClick={() => {
             if (builtinModelPipeline) {
-              setFourViewGenOpen(true);
+              setPipelineDialogMode("generate");
               return;
             }
             setGenModelOpen(true);
@@ -377,6 +393,7 @@ export function VtonRefWorkbench({
           )}
           {modelGenerating ? "生成中…" : "AI 生模特"}
         </EcomButtonSecondary>
+        {builtinModelPipeline ? <VtonAiModelGenerateHelp className="-ml-0.5" /> : null}
         <EcomButtonSecondary
           size="sm"
           type="button"
@@ -384,7 +401,7 @@ export function VtonRefWorkbench({
           className={modelHeaderBtnClass}
           onClick={() => {
             if (builtinModelPipeline) {
-              void onExpandFullBody({ imageSize: effectiveModelImageSize });
+              setPipelineDialogMode("expand");
               return;
             }
             setExpandOpen(true);
@@ -475,6 +492,7 @@ export function VtonRefWorkbench({
           onRemoveRef={textTryonWorkflow.onRemoveRef}
           onAttachAssets={textTryonWorkflow.onAttachAssets}
           onAttachFromModelLibrary={textTryonWorkflow.onAttachFromModelLibrary}
+          onPickSceneLibraryEntry={textTryonWorkflow.onPickSceneLibraryEntry}
           onGenerate={textTryonWorkflow.onGenerate}
           onClearEditor={textTryonWorkflow.onClearEditor}
           onSaveResultToAssets={textTryonWorkflow.onSaveResultToAssets}
@@ -566,10 +584,8 @@ export function VtonRefWorkbench({
               onAttachModelFromAssets ? () => setAssetPickerOpen(true) : undefined
             }
             onOpenModelLibrary={() => setLibraryOpen(true)}
-            onGenerateModel={() => setFourViewGenOpen(true)}
-            onExpandFullBody={() =>
-              void onExpandFullBody({ imageSize: effectiveModelImageSize })
-            }
+            onOpenGenerateDialog={() => setPipelineDialogMode("generate")}
+            onOpenExpandDialog={() => setPipelineDialogMode("expand")}
             onSelectPreview={(id) => void onSelectPreviewModelGeneration?.(id)}
             onConfirmGeneration={(id) => void onConfirmModelGeneration?.(id)}
             onSelectTryonGeneration={(id) => void onSelectTryonModelGeneration?.(id)}
@@ -578,8 +594,6 @@ export function VtonRefWorkbench({
             onPreviewTryon={(src, title) => openModelTryonPreview(src, title)}
             onSaveToMyModels={(ossUrl, title) => void onSaveModelToMyModels?.(ossUrl, title)}
             onDeleteGeneration={(id) => void onDeleteModelGeneration?.(id)}
-            modelImageSize={effectiveModelImageSize}
-            onModelImageSizeChange={(size) => onModelImageSizeChange?.(size)}
           />
         ) : (
           <div className="space-y-2">
@@ -851,20 +865,27 @@ export function VtonRefWorkbench({
                   }}
                 />
               ) : null}
-              {builtinModelPipeline ? (
-                <VtonFourViewGenerateDialog
-                  open={fourViewGenOpen}
-                  onClose={() => setFourViewGenOpen(false)}
+              {builtinModelPipeline && pipelineDialogMode ? (
+                <VtonModelPipelineDialog
+                  open
+                  mode={pipelineDialogMode}
+                  onClose={() => setPipelineDialogMode(null)}
                   busy={busy}
-                  onConfirm={async (opts) => {
-                    setFourViewGenOpen(false);
-                    await onGenerateModel({
-                      prompt: opts.prompt,
-                      imageSize: effectiveModelImageSize,
-                    });
+                  imageModels={imageModels}
+                  defaultModelKey={imageModelKey}
+                  modelsLoading={modelsLoading}
+                  initial={modelPipelineInitial}
+                  onConfirm={async (dialogMode, opts) => {
+                    setPipelineDialogMode(null);
+                    if (dialogMode === "generate") {
+                      await onGenerateModel(opts);
+                    } else {
+                      await onExpandFullBody(opts);
+                    }
                   }}
                 />
-              ) : (
+              ) : null}
+              {!builtinModelPipeline ? (
                 <ModelShotRefGenerateDialog
                   open={genModelOpen}
                   onClose={() => setGenModelOpen(false)}
@@ -882,7 +903,7 @@ export function VtonRefWorkbench({
                     });
                   }}
                 />
-              )}
+              ) : null}
               {!builtinModelPipeline && expandOpen ? (
                 <VtonExpandFullBodyDialog
                   fusionDisplayName={fusionDisplayName}
@@ -967,15 +988,18 @@ function VtonExpandFullBodyDialog({
   onClose: () => void;
   onConfirm: () => void | Promise<void>;
 }) {
+  useEcomModalEscape(true, onClose, { disabled: busy });
+
   if (typeof document === "undefined") return null;
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4">
-      <div
-        className="w-full max-w-md rounded-2xl border border-[#e8e8ed] bg-white p-5 shadow-xl"
-        role="dialog"
-        aria-modal
-        aria-labelledby="vton-expand-title"
-      >
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="vton-expand-title"
+      onMouseDown={ecomModalBackdropMouseDown(onClose, { disabled: busy })}
+    >
+      <div className="w-full max-w-md rounded-2xl border border-[#e8e8ed] bg-white p-5 shadow-xl">
         <h3 id="vton-expand-title" className="text-sm font-semibold text-[#1d1d1f]">
           生成全身图
         </h3>

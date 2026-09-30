@@ -15,6 +15,7 @@ import type { EcomPoseLibraryEntry } from "@/lib/ecom-pose-library/types";
 import { fetchEcomPropLibraryCatalog } from "@/lib/ecom-prop-library-api";
 import type { EcomPropLibraryEntry } from "@/lib/ecom-prop-library/types";
 import { fetchEcomSceneLibraryCatalog } from "@/lib/ecom-scene-library-api";
+import { sceneToCatalogPickerEntry } from "@/lib/ecom-scene-library/picker";
 import type { EcomSceneLibraryEntry } from "@/lib/ecom-scene-library/types";
 import type { ModelShotPlan, ModelShotPoseItem } from "@/lib/model-shot-types";
 
@@ -94,16 +95,6 @@ function poseToPickerEntry(entry: EcomPoseLibraryEntry): CatalogPickerEntry {
   };
 }
 
-function sceneToPickerEntry(entry: EcomSceneLibraryEntry): CatalogPickerEntry {
-  return {
-    id: entry.id,
-    name: entry.name,
-    subtitle: entry.visualPrompt,
-    scope: entry.scope,
-    lockedAt: entry.lockedAt,
-  };
-}
-
 function propToPickerEntry(entry: EcomPropLibraryEntry): CatalogPickerEntry {
   return {
     id: entry.id,
@@ -151,7 +142,7 @@ export function ModelShotPosePlanTable({
   );
 
   const pickerEntries = useMemo((): CatalogPickerEntry[] => {
-    if (pickerKind === "scene") return sceneCatalog.map(sceneToPickerEntry);
+    if (pickerKind === "scene") return sceneCatalog.map(sceneToCatalogPickerEntry);
     if (pickerKind === "prop") return propCatalog.map(propToPickerEntry);
     if (pickerKind === "pose") {
       return sortPosesWithImageFirst(filteredPoseCatalog).map(poseToPickerEntry);

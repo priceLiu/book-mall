@@ -15,6 +15,10 @@ import type { ModelTryonProjectDto } from "@/lib/ecom/ecom-model-tryon-types";
 import { ECOM_MODEL_TRYON_TOOL_KEY } from "@/lib/ecom/ecom-model-tryon-types";
 import { parseMentionedImageIndices } from "@/lib/ecom/ecom-seed-video-mention";
 import {
+  expandVtonTextTryonPromptSceneTokens,
+  vtonTextTryonImageRefs,
+} from "@/lib/ecom/ecom-vton-text-tryon-scene-prompt";
+import {
   resolveVtonTextTryonModelKey,
   VTON_TEXT_TRYON_MODEL_KEYS,
 } from "@/lib/ecom/ecom-vton-text-tryon-models";
@@ -45,16 +49,17 @@ export function resolveTextTryonRefUrls(
   prompt: string,
   max: number,
 ): string[] {
+  const images = vtonTextTryonImageRefs(refs);
   const mentioned = parseMentionedImageIndices(prompt);
   if (mentioned.length > 0) {
     return mentioned
-      .map((n) => refs[n - 1]?.ossUrl)
+      .map((n) => images[n - 1]?.ossUrl)
       .filter((u): u is string => Boolean(u?.trim()))
       .slice(0, max);
   }
-  return refs
+  return images
     .map((r) => r.ossUrl)
-    .filter((u) => u.trim())
+    .filter((u): u is string => Boolean(u?.trim()))
     .slice(0, max);
 }
 
@@ -71,10 +76,12 @@ async function appendTextTryonRef(
   const refs = meta.textTryonRefs ?? [];
 
   const nextIndex = refs.length + 1;
+  const imageCount = refs.filter((r) => r.ossUrl?.trim()).length;
   const entry: VtonTextTryonRef = {
     id: randomUUID(),
+    kind: "image",
     ossUrl: ossUrl.trim(),
-    label: label?.trim() || `图片${nextIndex}`,
+    label: label?.trim() || `图片${imageCount + 1}`,
     createdAt: new Date().toISOString(),
   };
 
@@ -113,6 +120,49 @@ export async function attachEcomVtonTextTryonRef(
 ): Promise<ModelTryonProjectDto> {
   if (!ossUrl.trim()) throw new Error("缺少图片地址");
   return appendTextTryonRef(userId, projectId, ossUrl, label);
+}
+
+export async function attachEcomVtonTextTryonSceneRef(
+  userId: string,
+  projectId: string,
+  opts: {
+    label?: string;
+    scenePrompt: string;
+    sceneLibraryEntryId?: string;
+    ossUrl?: string;
+  },
+): Promise<ModelTryonProjectDto> {
+  const imageUrl = opts.ossUrl?.trim();
+  if (imageUrl) {
+    return appendTextTryonRef(userId, projectId, imageUrl, opts.label ?? "场景参考图");
+  }
+
+  const scenePrompt = opts.scenePrompt.trim();
+  if (!scenePrompt) throw new Error("缺少场景描述");
+
+  const project = await getEcomModelTryonProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+
+  const meta = sanitizeVtonProjectMeta(project.meta);
+  const refs = meta.textTryonRefs ?? [];
+  const sceneCount = refs.filter(
+    (r) => r.kind === "scene-text" || (r.scenePrompt?.trim() && !r.ossUrl?.trim()),
+  ).length;
+
+  const entry: VtonTextTryonRef = {
+    id: randomUUID(),
+    kind: "scene-text",
+    createdAt: new Date().toISOString(),
+    label: opts.label?.trim() || `场景${sceneCount + 1}`,
+    scenePrompt,
+    sceneLibraryEntryId: opts.sceneLibraryEntryId?.trim() || undefined,
+  };
+
+  return updateEcomModelTryonProject(userId, projectId, {
+    meta: mergeVtonMeta(meta, {
+      textTryonRefs: [...refs, entry],
+    }),
+  });
 }
 
 export async function removeEcomVtonTextTryonRef(
@@ -184,12 +234,14 @@ function resolveTextTryonGenerateInput(
 ) {
   const meta = sanitizeVtonProjectMeta(project.meta);
   const refs = meta.textTryonRefs ?? [];
-  if (refs.length < 1) {
+  const imageRefs = vtonTextTryonImageRefs(refs);
+  if (imageRefs.length < 1) {
     throw new Error("请先上传至少 1 张参考图（模特 / 服装 / 配饰）");
   }
 
-  const prompt = (opts?.prompt ?? meta.textTryonPrompt ?? "").trim();
-  if (!prompt) throw new Error("请填写 Prompt，并用 @图片N 引用参考图");
+  const editorPrompt = (opts?.prompt ?? meta.textTryonPrompt ?? "").trim();
+  if (!editorPrompt) throw new Error("请填写 Prompt，并用 @图片N / @场景N 引用参考");
+  const prompt = expandVtonTextTryonPromptSceneTokens(editorPrompt, refs);
 
   const modelKey = resolveVtonTextTryonModelKey(
     opts?.modelKey ?? project.settings.textTryonModelKey,
@@ -207,7 +259,16 @@ function resolveTextTryonGenerateInput(
   const ratio = opts?.ratio ?? ecomRatioFromPixelSize(imageSize);
   const pixelSize = resolveEcomGeneratePixelSize({ modelKey, ratio, imageSize });
 
-  return { meta, prompt, modelKey, imageSize, ratio, pixelSize, refImageUrls };
+  return {
+    meta,
+    prompt,
+    editorPrompt,
+    modelKey,
+    imageSize,
+    ratio,
+    pixelSize,
+    refImageUrls,
+  };
 }
 
 async function persistTextTryonJob(
@@ -231,7 +292,7 @@ async function runEcomVtonTextTryonImageJob(
   try {
     const project = await getEcomModelTryonProject(userId, projectId);
     if (!project) throw new Error("项目不存在");
-    const { meta, prompt, modelKey, imageSize, ratio, pixelSize, refImageUrls } =
+    const { meta, prompt, editorPrompt, modelKey, imageSize, ratio, pixelSize, refImageUrls } =
       resolveTextTryonGenerateInput(project, {
         prompt: opts?.prompt ?? job.prompt,
         modelKey: opts?.modelKey ?? job.modelKey,
@@ -255,7 +316,7 @@ async function runEcomVtonTextTryonImageJob(
     const result = {
       id: randomUUID(),
       ossUrl,
-      prompt,
+      prompt: editorPrompt,
       modelKey,
       createdAt,
       ratio,
@@ -278,7 +339,7 @@ async function runEcomVtonTextTryonImageJob(
         userId,
         ossUrl,
         title: autoTitle,
-        prompt,
+        prompt: editorPrompt,
         meta: {
           sourceModule: ECOM_MODEL_TRYON_MODULE,
           sourceToolKey: `${ECOM_MODEL_TRYON_TOOL_KEY}__text-tryon`,
@@ -299,13 +360,13 @@ async function runEcomVtonTextTryonImageJob(
 
     await updateEcomModelTryonProject(userId, projectId, {
       meta: mergeVtonMeta(latestMeta, {
-        textTryonPrompt: prompt,
+        textTryonPrompt: editorPrompt,
         textTryonResults: [result, ...(latestMeta.textTryonResults ?? [])],
         textTryonJob: {
           ...job,
           status: "done",
           updatedAt: vtonAsyncJobNow(),
-          prompt,
+          prompt: editorPrompt,
           modelKey,
           imageSize,
         },
@@ -344,7 +405,10 @@ export async function startEcomVtonTextTryonImage(
   const project = await getEcomModelTryonProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
 
-  const { meta, prompt, modelKey, imageSize } = resolveTextTryonGenerateInput(project, opts);
+  const { meta, editorPrompt, modelKey, imageSize } = resolveTextTryonGenerateInput(
+    project,
+    opts,
+  );
   if (isVtonAsyncJobRunning(meta.textTryonJob)) {
     return project;
   }
@@ -355,14 +419,14 @@ export async function startEcomVtonTextTryonImage(
     status: "running",
     startedAt: now,
     updatedAt: now,
-    prompt,
+    prompt: editorPrompt,
     modelKey,
     ...(imageSize ? { imageSize } : {}),
   };
 
   const started = await updateEcomModelTryonProject(userId, projectId, {
     meta: mergeVtonMeta(meta, {
-      textTryonPrompt: prompt,
+      textTryonPrompt: editorPrompt,
       textTryonJob: job,
     }),
     settings: {

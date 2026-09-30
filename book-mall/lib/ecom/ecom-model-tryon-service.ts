@@ -22,6 +22,15 @@ import {
 import { generateVtonModelImage } from "@/lib/ecom/ecom-vton/model-generate";
 import { expandVtonModelFullBody } from "@/lib/ecom/ecom-vton/model-full-body";
 import {
+  mergeVtonModelPipelineRequest,
+  parseVtonModelPipelineRequest,
+  resolveVtonModelExpandPrompt,
+  resolveVtonModelGeneratePrompt,
+  resolveVtonModelPipelineModelKey,
+  vtonModelPipelineFromSettings,
+  type VtonModelPipelineRequestOpts,
+} from "@/lib/ecom/ecom-vton-model-pipeline-opts";
+import {
   buildCartesianLookDrafts,
   importVtonLockedLooksFromMeta,
   lockVtonTryonResults,
@@ -107,8 +116,51 @@ const VTON_MODEL_IMAGE_SIZE_VALUES = ["720*960", "1080*1440", "1536*2048"] as co
 
 function sanitizeModelImageSize(raw: unknown): string {
   const v = typeof raw === "string" ? raw.trim() : "";
+  if (!v) return "720*960";
+  if (/^\d+\*\d+$/.test(v)) return v;
+  if (/^(1k|2k|4k|2K|4K|1K)$/i.test(v)) return v;
   if ((VTON_MODEL_IMAGE_SIZE_VALUES as readonly string[]).includes(v)) return v;
   return "720*960";
+}
+
+function sanitizeOptionalString(raw: unknown): string | undefined {
+  const v = typeof raw === "string" ? raw.trim() : "";
+  return v || undefined;
+}
+
+function settingsPatchFromPipeline(opts: VtonModelPipelineRequestOpts): ModelTryonSettings {
+  const m = opts.metrics;
+  return {
+    modelImageSize: sanitizeModelImageSize(opts.imageSize),
+    modelGenRatio: opts.ratio,
+    modelGenModelKey: sanitizeOptionalString(opts.modelKey),
+    modelBodyPreset: sanitizeOptionalString(opts.bodyPreset),
+    modelAgeGroup: sanitizeOptionalString(opts.ageGroup),
+    modelFeatureDetail: sanitizeOptionalString(opts.featureDetail),
+    modelHeightCm: sanitizeOptionalString(m?.heightCm),
+    modelWeightKg: sanitizeOptionalString(m?.weightKg),
+    modelBustCm: sanitizeOptionalString(m?.bustCm),
+    modelWaistCm: sanitizeOptionalString(m?.waistCm),
+    modelHipsCm: sanitizeOptionalString(m?.hipsCm),
+  };
+}
+
+function resolvePipelineForJob(
+  settings: ModelTryonSettings,
+  job: VtonModelPipelineJob,
+  opts?: VtonModelPipelineRequestOpts,
+): VtonModelPipelineRequestOpts {
+  const fromSettings = vtonModelPipelineFromSettings(settings);
+  const fromJob: VtonModelPipelineRequestOpts = {
+    prompt: job.prompt,
+    imageSize: job.imageSize,
+    modelKey: job.modelKey,
+    ratio: job.ratio as VtonModelPipelineRequestOpts["ratio"],
+  };
+  return mergeVtonModelPipelineRequest(
+    mergeVtonModelPipelineRequest(fromSettings, fromJob),
+    opts,
+  );
 }
 
 function sanitizeSettings(raw: unknown): ModelTryonSettings {
@@ -130,6 +182,16 @@ function sanitizeSettings(raw: unknown): ModelTryonSettings {
         ? resolveVtonTextTryonModelKey(o.textTryonModelKey)
         : resolveVtonTextTryonModelKey(undefined),
     textTryonImageSize: sanitizeTextTryonImageSize(o.textTryonImageSize),
+    modelGenRatio: sanitizeOptionalString(o.modelGenRatio),
+    modelGenModelKey: sanitizeOptionalString(o.modelGenModelKey),
+    modelBodyPreset: sanitizeOptionalString(o.modelBodyPreset),
+    modelAgeGroup: sanitizeOptionalString(o.modelAgeGroup),
+    modelFeatureDetail: sanitizeOptionalString(o.modelFeatureDetail),
+    modelHeightCm: sanitizeOptionalString(o.modelHeightCm),
+    modelWeightKg: sanitizeOptionalString(o.modelWeightKg),
+    modelBustCm: sanitizeOptionalString(o.modelBustCm),
+    modelWaistCm: sanitizeOptionalString(o.modelWaistCm),
+    modelHipsCm: sanitizeOptionalString(o.modelHipsCm),
   };
 }
 
@@ -495,19 +557,22 @@ async function runEcomModelTryonModelJob(
   userId: string,
   projectId: string,
   job: VtonModelPipelineJob,
-  opts?: { prompt?: string; imageSize?: string },
+  opts?: VtonModelPipelineRequestOpts,
 ): Promise<void> {
   try {
     const project = await getEcomModelTryonProject(userId, projectId);
     if (!project) throw new Error("项目不存在");
     const settings = sanitizeSettings(project.settings);
-    const imageSize = sanitizeModelImageSize(
-      opts?.imageSize ?? job.imageSize ?? settings.modelImageSize,
-    );
+    const pipeline = resolvePipelineForJob(settings, job, opts);
+    const imageSize = sanitizeModelImageSize(pipeline.imageSize ?? settings.modelImageSize);
+    const prompt = resolveVtonModelGeneratePrompt(pipeline);
+    const modelKey = resolveVtonModelPipelineModelKey(pipeline);
     const ossUrl = await generateVtonModelImage({
       userId,
-      prompt: opts?.prompt ?? job.prompt,
+      prompt,
       imageSize,
+      modelKey,
+      ratio: pipeline.ratio,
       toolKeySuffix: "model-tryon__model-generate",
     });
     const latest = await getEcomModelTryonProject(userId, projectId);
@@ -547,15 +612,14 @@ async function runEcomModelTryonExpandJob(
   userId: string,
   projectId: string,
   job: VtonModelPipelineJob,
-  opts?: { prompt?: string; imageSize?: string },
+  opts?: VtonModelPipelineRequestOpts,
 ): Promise<void> {
   try {
     const project = await getEcomModelTryonProject(userId, projectId);
     if (!project) throw new Error("项目不存在");
     const settings = sanitizeSettings(project.settings);
-    const imageSize = sanitizeModelImageSize(
-      opts?.imageSize ?? job.imageSize ?? settings.modelImageSize,
-    );
+    const pipeline = resolvePipelineForJob(settings, job, opts);
+    const imageSize = sanitizeModelImageSize(pipeline.imageSize ?? settings.modelImageSize);
     let meta = ensureModelGenerationsFromRefs(
       sanitizeVtonProjectMeta(project.meta),
       project.references,
@@ -565,11 +629,15 @@ async function runEcomModelTryonExpandJob(
       preview?.ossUrl?.trim() ?? project.references.model?.ossUrl?.trim();
     if (!portraitUrl) throw new Error("请先上传或选择模特图");
 
+    const prompt = resolveVtonModelExpandPrompt(pipeline);
+    const modelKey = resolveVtonModelPipelineModelKey(pipeline);
     const ossUrl = await expandVtonModelFullBody({
       userId,
       portraitUrl,
-      prompt: opts?.prompt ?? job.prompt,
+      prompt,
       imageSize,
+      modelKey,
+      ratio: pipeline.ratio,
       shotType: preview?.bodyCheck?.shotType,
       toolKeySuffix: "model-tryon__expand-full-body",
     });
@@ -614,7 +682,7 @@ async function runEcomModelTryonExpandJob(
 export async function startEcomModelTryonModel(
   userId: string,
   projectId: string,
-  opts?: { prompt?: string; imageSize?: string },
+  opts?: VtonModelPipelineRequestOpts,
 ): Promise<ModelTryonProjectDto> {
   const project = await getEcomModelTryonProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
@@ -622,7 +690,12 @@ export async function startEcomModelTryonModel(
   if (isVtonAsyncJobRunning(meta.modelPipelineJob)) return project;
 
   const settings = sanitizeSettings(project.settings);
-  const imageSize = sanitizeModelImageSize(opts?.imageSize ?? settings.modelImageSize);
+  const pipeline = mergeVtonModelPipelineRequest(
+    vtonModelPipelineFromSettings(settings),
+    opts,
+  );
+  const imageSize = sanitizeModelImageSize(pipeline.imageSize ?? settings.modelImageSize);
+  pipeline.imageSize = imageSize;
   const now = vtonAsyncJobNow();
   const job: VtonModelPipelineJob = {
     jobId: randomUUID(),
@@ -630,15 +703,17 @@ export async function startEcomModelTryonModel(
     kind: "generating-model",
     startedAt: now,
     updatedAt: now,
-    prompt: opts?.prompt,
+    prompt: pipeline.prompt,
     imageSize,
+    modelKey: resolveVtonModelPipelineModelKey(pipeline),
+    ratio: pipeline.ratio,
   };
   const started = await updateEcomModelTryonProject(userId, projectId, {
     meta: mergeVtonMeta(meta, { modelPipelineJob: job }),
-    settings: { ...settings, modelImageSize: imageSize },
+    settings: { ...settings, ...settingsPatchFromPipeline(pipeline) },
   });
   enqueueDetached("vton-model-generate", () =>
-    runEcomModelTryonModelJob(userId, projectId, job, opts),
+    runEcomModelTryonModelJob(userId, projectId, job, pipeline),
   );
   return started;
 }
@@ -646,13 +721,18 @@ export async function startEcomModelTryonModel(
 export async function startEcomModelTryonExpandFullBody(
   userId: string,
   projectId: string,
-  opts?: { prompt?: string; imageSize?: string },
+  opts?: VtonModelPipelineRequestOpts,
 ): Promise<ModelTryonProjectDto> {
   const project = await getEcomModelTryonProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
 
   const settings = sanitizeSettings(project.settings);
-  const imageSize = sanitizeModelImageSize(opts?.imageSize ?? settings.modelImageSize);
+  const pipeline = mergeVtonModelPipelineRequest(
+    vtonModelPipelineFromSettings(settings),
+    opts,
+  );
+  const imageSize = sanitizeModelImageSize(pipeline.imageSize ?? settings.modelImageSize);
+  pipeline.imageSize = imageSize;
   let meta = ensureModelGenerationsFromRefs(
     sanitizeVtonProjectMeta(project.meta),
     project.references,
@@ -670,15 +750,17 @@ export async function startEcomModelTryonExpandFullBody(
     kind: "expanding-full-body",
     startedAt: now,
     updatedAt: now,
-    prompt: opts?.prompt,
+    prompt: pipeline.prompt,
     imageSize,
+    modelKey: resolveVtonModelPipelineModelKey(pipeline),
+    ratio: pipeline.ratio,
   };
   const started = await updateEcomModelTryonProject(userId, projectId, {
     meta: mergeVtonMeta(meta, { modelPipelineJob: job }),
-    settings: { ...settings, modelImageSize: imageSize },
+    settings: { ...settings, ...settingsPatchFromPipeline(pipeline) },
   });
   enqueueDetached("vton-expand-full-body", () =>
-    runEcomModelTryonExpandJob(userId, projectId, job, opts),
+    runEcomModelTryonExpandJob(userId, projectId, job, pipeline),
   );
   return started;
 }
@@ -686,7 +768,7 @@ export async function startEcomModelTryonExpandFullBody(
 export async function generateEcomModelTryonModel(
   userId: string,
   projectId: string,
-  opts?: { prompt?: string; imageSize?: string },
+  opts?: VtonModelPipelineRequestOpts,
 ): Promise<ModelTryonProjectDto> {
   return startEcomModelTryonModel(userId, projectId, opts);
 }
@@ -694,7 +776,7 @@ export async function generateEcomModelTryonModel(
 export async function expandEcomModelTryonModelFullBody(
   userId: string,
   projectId: string,
-  opts?: { prompt?: string; imageSize?: string },
+  opts?: VtonModelPipelineRequestOpts,
 ): Promise<ModelTryonProjectDto> {
   return startEcomModelTryonExpandFullBody(userId, projectId, opts);
 }

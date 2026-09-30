@@ -6,6 +6,10 @@ import { createPortal } from "react-dom";
 
 import { EcomScrollLoadFooter } from "@/components/media/ecom-scroll-load-footer";
 import { EcomDialogCloseButton } from "@/components/ui/dialog";
+import {
+  ecomModalBackdropMouseDown,
+  useEcomModalEscape,
+} from "@/components/ui/ecom-modal-layer";
 import { fetchEcomModelLibraryCatalog } from "@/lib/ecom-model-library-api";
 import { listEcomModelLibraryEntries } from "@/lib/ecom-model-library/catalog";
 import { sortModelLibraryForDisplay } from "@/lib/ecom-model-library/display-order";
@@ -99,6 +103,8 @@ export function EcomModelLibraryPickerDialog({
     [closeOnPick, onOpenChange, onPick],
   );
 
+  useEcomModalEscape(open, () => onOpenChange(false), { disabled: busyId != null });
+
   if (!open || typeof document === "undefined") return null;
 
   return createPortal(
@@ -107,9 +113,9 @@ export function EcomModelLibraryPickerDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="model-library-picker-title"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onOpenChange(false);
-      }}
+      onMouseDown={ecomModalBackdropMouseDown(() => onOpenChange(false), {
+        disabled: busyId != null,
+      })}
     >
       <div className="relative flex max-h-[85vh] w-full max-w-3xl flex-col rounded-2xl bg-white shadow-2xl">
         <EcomDialogCloseButton onClick={() => onOpenChange(false)} />

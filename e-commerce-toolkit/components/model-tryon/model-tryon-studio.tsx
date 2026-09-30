@@ -24,6 +24,7 @@ import {
   shouldClearVtonLookSelectionAfterBatch,
   useVtonLookSelectionSync,
 } from "@/lib/vton-look-selection";
+import type { VtonModelPipelineInitial } from "@/components/vton/vton-model-pipeline-dialog";
 import { VtonRefWorkbench } from "@/components/vton/vton-ref-workbench";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
@@ -33,6 +34,7 @@ import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-pro
 import {
   attachModelTryonRefs,
   attachModelTryonTextTryonRef,
+  attachModelTryonTextTryonSceneRef,
   batchModelTryon,
   cancelModelTryonBatch,
   buildModelTryonCartesianLooks,
@@ -64,12 +66,18 @@ import {
   uploadModelTryonRefImage,
   uploadModelTryonTextTryonRef,
 } from "@/lib/ecom-model-tryon-api";
+import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import {
   bindTextTryonPromptRefTokens,
   normalizeVtonTextTryonPrompt,
   VTON_TEXT_TRYON_DEFAULT_PROMPT,
 } from "@/lib/vton-text-tryon-default-prompt";
+import {
+  appendVtonTextTryonSceneToken,
+  vtonTextTryonSceneRefs,
+} from "@/lib/vton-text-tryon-scene-ref";
+import type { CatalogPickerEntry } from "@/components/model-shot/ecom-catalog-picker-dialog";
 import type { ModelTryonProject } from "@/lib/ecom-model-tryon-api";
 import { mergeVtonTryonProgressWithBatch, parseVtonTryonProgress } from "@/lib/vton-tryon-progress";
 import { buildFullSetAssetPatch } from "@/lib/vton-full-set-garment";
@@ -97,7 +105,9 @@ export function ModelTryonStudio() {
     "uploading" | "importing-model" | "generating-model" | "expanding-full-body" | null
   >(null);
   const [textTryonModels, setTextTryonModels] = useState<StoryboardGatewayModel[]>([]);
-  const [textTryonModelsLoading, setTextTryonModelsLoading] = useState(true);
+  const [imageModels, setImageModels] = useState<StoryboardGatewayModel[]>([]);
+  const [imageModelKey, setImageModelKey] = useState("");
+  const [gatewayModelsLoading, setGatewayModelsLoading] = useState(true);
   const [textTryonGenerating, setTextTryonGenerating] = useState(false);
   const [textTryonPromptDraft, setTextTryonPromptDraft] = useState("");
   const [textTryonUploading, setTextTryonUploading] = useState(false);
@@ -360,13 +370,22 @@ export function ModelTryonStudio() {
     let cancelled = false;
     void fetchModelTryonModels()
       .then((data) => {
-        if (!cancelled) setTextTryonModels(data.textTryonModels ?? []);
+        if (cancelled) return;
+        const imgs = data.imageModels ?? [];
+        setTextTryonModels(data.textTryonModels ?? []);
+        setImageModels(imgs);
+        setImageModelKey(
+          pickBoundStoryboardModelKey(imgs, data.defaults?.image?.trim() ?? ""),
+        );
       })
       .catch(() => {
-        if (!cancelled) setTextTryonModels([]);
+        if (!cancelled) {
+          setTextTryonModels([]);
+          setImageModels([]);
+        }
       })
       .finally(() => {
-        if (!cancelled) setTextTryonModelsLoading(false);
+        if (!cancelled) setGatewayModelsLoading(false);
       });
     return () => {
       cancelled = true;
@@ -629,6 +648,25 @@ export function ModelTryonStudio() {
     );
   }
 
+  const modelPipelineInitial = useMemo((): VtonModelPipelineInitial => {
+    const s = project?.settings;
+    if (!s) return {};
+    const resolved = s.modelGenModelKey?.trim() || imageModelKey;
+    return {
+      imageSize: s.modelImageSize,
+      modelKey: resolved,
+      ratio: s.modelGenRatio,
+      bodyPreset: s.modelBodyPreset,
+      ageGroup: s.modelAgeGroup,
+      featureDetail: s.modelFeatureDetail,
+      heightCm: s.modelHeightCm,
+      weightKg: s.modelWeightKg,
+      bustCm: s.modelBustCm,
+      waistCm: s.modelWaistCm,
+      hipsCm: s.modelHipsCm,
+    };
+  }, [project?.settings, imageModelKey]);
+
   if (needLogin) {
     return (
       <EcomWorkspaceLayout fullWidth>
@@ -651,6 +689,8 @@ export function ModelTryonStudio() {
   const outfitRefMode = project.settings.outfitRefMode ?? "need_tryon";
   const garmentMode = project.settings.garmentMode ?? "two_piece";
   const modelImageSize = coerceVtonModelImageSize(project.settings.modelImageSize);
+  const resolvedImageModelKey =
+    project.settings.modelGenModelKey?.trim() || imageModelKey;
   const useBatch = outfitRefMode === "need_tryon";
   const isTextToTryon = outfitRefMode === "text_to_tryon";
   const textTryonModelKey =
@@ -721,6 +761,10 @@ export function ModelTryonStudio() {
           tryonBusy={tryonBusy || project.meta?.tryonBatch?.status === "running"}
           tryonProgress={tryonProgress}
           builtinModelPipeline
+          modelPipelineInitial={modelPipelineInitial}
+          imageModels={imageModels}
+          imageModelKey={resolvedImageModelKey}
+          modelsLoading={gatewayModelsLoading}
           vtonMeta={vtonMeta}
           onSelectPreviewModelGeneration={async (generationId) => {
             if (!project) return;
@@ -959,7 +1003,7 @@ export function ModelTryonStudio() {
                   results: project.meta?.textTryonResults ?? [],
                   modelKey: textTryonModelKey,
                   models: textTryonModels,
-                  modelsLoading: textTryonModelsLoading,
+                  modelsLoading: gatewayModelsLoading,
                   generating:
                     textTryonGenerating || isVtonAsyncJobRunning(project.meta?.textTryonJob),
                   imageSize: textTryonImageSize,
@@ -1040,6 +1084,52 @@ export function ModelTryonStudio() {
                         message: formatEcomTransportError(e),
                         variant: "error",
                       });
+                    }
+                  },
+                  onPickSceneLibraryEntry: async (entry: CatalogPickerEntry) => {
+                    if (!project) return;
+                    const scene = entry.subtitle?.trim();
+                    const imageUrl = entry.imageUrl?.trim();
+                    if (!scene && !imageUrl) {
+                      await alert({
+                        title: "无效场景",
+                        message: "该条目缺少场景描述或参考图。",
+                        variant: "error",
+                      });
+                      return;
+                    }
+                    setRefBusy(true);
+                    try {
+                      let next = await attachModelTryonTextTryonSceneRef(project.id, {
+                        label: entry.name,
+                        scenePrompt: scene || entry.name,
+                        sceneLibraryEntryId: entry.id,
+                        ossUrl: imageUrl || undefined,
+                      });
+                      if (!imageUrl) {
+                        const sceneCount = vtonTextTryonSceneRefs(
+                          next.meta?.textTryonRefs ?? [],
+                        ).length;
+                        const withToken = appendVtonTextTryonSceneToken(
+                          textTryonPromptDraft,
+                          sceneCount,
+                        );
+                        setTextTryonPromptDraft(withToken);
+                        next = await patchModelTryonTextTryonEditor(next.id, {
+                          prompt: withToken,
+                        });
+                        applyProject(next);
+                      } else {
+                        await applyTextTryonProjectWithPromptSync(next);
+                      }
+                    } catch (e) {
+                      await alert({
+                        title: "选择场景失败",
+                        message: formatEcomTransportError(e),
+                        variant: "error",
+                      });
+                    } finally {
+                      setRefBusy(false);
                     }
                   },
                   onGenerate: async () => {

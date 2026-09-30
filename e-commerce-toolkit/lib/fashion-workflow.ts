@@ -39,7 +39,7 @@ import {
   extractFashionDeliverableFromText,
   mergeFashionDeliverableState,
 } from "@/lib/fashion-deliverable-parse";
-import { parseUserSellpointText } from "@/lib/sellpoint-user-input";
+import { parseUserSellpointInput } from "@/lib/sellpoint-user-input";
 import type {
   FashionDeliverable,
   FashionPanelRow,
@@ -3318,7 +3318,7 @@ export function fashionWorkflowPatchForChoice(
         sellpointInputMode: "user",
       },
       assistantReply:
-        "请在下方输入框填写卖点（换行或分号分隔），或在左侧「卖点清单」表格点「添加卖点」。完成后可选「AI润色卖点」，或直接「确认卖点清单」。",
+        "请在下方输入框按五段式填写卖点（商品名称、核心卖点、适用人群、使用场景、规格参数），或在左侧「卖点清单」表格点「添加卖点」。完成后可选「AI润色卖点」，或直接「确认卖点清单」。",
     };
   }
 
@@ -3349,7 +3349,8 @@ export function fashionWorkflowPatchForChoice(
     isAwaitingFashionSellpoints(project) &&
     !isSellpointWorkflowMessage(message)
   ) {
-    const parsed = parseUserSellpointText(message);
+    const { sellpoints: parsed, productName: parsedProductName, fivePart } =
+      parseUserSellpointInput(message);
     if (!parsed.length || (deliverable?.sellpoints?.length ?? 0) > 0) return null;
     const verticalId = getProjectVertical(project) ?? "fashion_apparel";
     const schema = deliverableSchemaForProject(project);
@@ -3359,6 +3360,7 @@ export function fashionWorkflowPatchForChoice(
         schemaVersion: schema,
         vertical: verticalId,
         productName:
+          parsedProductName ??
           wf.productName ??
           deliverable?.productName ??
           project.title ??
@@ -3380,7 +3382,9 @@ export function fashionWorkflowPatchForChoice(
         sellpointInputMode: "user",
         ...(usesProPhase(project) ? { proSellpointsEdited: true } : { fashionSellpointsEdited: true }),
       },
-      assistantReply: `已收录 ${parsed.length} 条卖点。可在左侧表格继续编辑；需要 AI 润色请点「AI润色卖点」，或直接「确认卖点清单」进入口播。`,
+      assistantReply: fivePart
+        ? `已收录五段式卖点（${parsed.length} 条）。可在左侧表格继续编辑；需要 AI 润色请点「AI润色卖点」，或直接「确认卖点清单」进入口播。`
+        : `已收录 ${parsed.length} 条卖点。可在左侧表格继续编辑；需要 AI 润色请点「AI润色卖点」，或直接「确认卖点清单」进入口播。`,
     };
   }
 
@@ -3631,7 +3635,7 @@ export function fashionAssistantPlaceholder(project: StoryboardProject): string 
     return "请选择：我来输入卖点，或 AI自动生成卖点";
   }
   if (isAwaitingUserSellpointInput(project)) {
-    return "输入卖点（换行/分号分隔），或在左侧表格添加";
+    return "按五段式输入卖点（商品名称、核心卖点、适用人群、使用场景、规格参数）";
   }
   if (isAwaitingFashionSellpointGeneration(project)) {
     return "卖点生成未完成，请点「重新生成卖点」，或改为「我来输入卖点」";

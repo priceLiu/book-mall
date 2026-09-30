@@ -69,6 +69,7 @@ import {
   shouldSkipBrief,
 } from "@/lib/product-design-workflow";
 import { buildProductDesignPromptMentionRefs } from "@/lib/product-design-mention-refs";
+import { PRODUCT_DESIGN_PROMPT_MENTION_FIELD_PROPS } from "@/lib/product-design-prompt-mention-ui";
 import { ProductDesignPromptMentionTextarea } from "@/components/product-design/product-design-prompt-mention-textarea";
 import { getMaxRefsForRoleAtInvokeClient, hasProductRef, PRODUCT_DESIGN_STYLE_REF_UPLOAD_MAX } from "@/lib/product-design-ref-rules";
 import { ProductDesignGalleryPreviewDialog, type ProductDesignGalleryPreviewItem } from "@/components/product-design/product-design-gallery-preview-dialog";
@@ -1637,6 +1638,7 @@ export function ProductDesignContentPanel({
                   referenceImages={promptMentionRefs}
                   disabled={Boolean(busy)}
                   onChange={setMainCustomPrompt}
+                  {...PRODUCT_DESIGN_PROMPT_MENTION_FIELD_PROPS}
                 />
               </>
             ) : null}
@@ -1696,6 +1698,7 @@ export function ProductDesignContentPanel({
                     referenceImages={promptMentionRefs}
                     disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
                     onChange={setMainCustomPrompt}
+                    {...PRODUCT_DESIGN_PROMPT_MENTION_FIELD_PROPS}
                   />
                 </div>
               ) : null
@@ -1723,6 +1726,7 @@ export function ProductDesignContentPanel({
               disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
               onChange={setDetailCustomPrompt}
               minHeightClass="min-h-[7rem]"
+              {...PRODUCT_DESIGN_PROMPT_MENTION_FIELD_PROPS}
             />
             <div className="mt-4 flex flex-wrap gap-2">
               <EcomButtonPrimary
@@ -1773,6 +1777,7 @@ export function ProductDesignContentPanel({
                       disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
                       onChange={setDetailCustomPrompt}
                       minHeightClass="min-h-[7rem]"
+                      {...PRODUCT_DESIGN_PROMPT_MENTION_FIELD_PROPS}
                     />
                   </div>
                 ) : null}
@@ -2044,6 +2049,7 @@ export function ProductDesignContentPanel({
                       onBlur={() =>
                         void saveMainGenSettings(mainGenMode, mainCustomPrompt)
                       }
+                      {...PRODUCT_DESIGN_PROMPT_MENTION_FIELD_PROPS}
                     />
                   </div>
                 ) : null}

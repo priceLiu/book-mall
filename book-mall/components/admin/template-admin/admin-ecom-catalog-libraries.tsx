@@ -33,6 +33,9 @@ type SceneRow = {
   id: string;
   name: string;
   visualPrompt: string;
+  ossUrl?: string | null;
+  thumbUrl?: string | null;
+  displayImageUrl?: string;
   tags?: Record<string, unknown>;
   enabled?: boolean;
   sortOrder?: number;
@@ -362,6 +365,7 @@ export function SceneLibraryAdmin() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<SceneRow | null>(null);
+  const [pendingPreviewFile, setPendingPreviewFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -399,7 +403,21 @@ export function SceneLibraryAdmin() {
       );
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? "保存失败");
+      const entryId = form.id?.trim();
+      if (pendingPreviewFile && entryId) {
+        const previewForm = new FormData();
+        previewForm.append("file", pendingPreviewFile);
+        const previewRes = await fetch(
+          `/api/admin/ecom/scene-library/models/${encodeURIComponent(entryId)}/preview`,
+          { method: "POST", body: previewForm },
+        );
+        if (!previewRes.ok) {
+          const pj = (await previewRes.json().catch(() => ({}))) as { error?: string };
+          throw new Error(pj.error ?? "参考图上传失败");
+        }
+      }
       setForm(null);
+      setPendingPreviewFile(null);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "保存失败");
@@ -409,11 +427,12 @@ export function SceneLibraryAdmin() {
   }
 
   return (
-    <CatalogListShell title="场景库" loading={loading} error={error} onAdd={() => setForm({ id: "", name: "", visualPrompt: "", tags: { archetype: "studio" }, sortOrder: 0, enabled: true })}>
+    <CatalogListShell title="场景库" loading={loading} error={error} onAdd={() => { setForm({ id: "", name: "", visualPrompt: "", tags: { archetype: "studio" }, sortOrder: 0, enabled: true }); setPendingPreviewFile(null); }}>
       <div className="overflow-x-auto rounded border">
         <table className="min-w-[720px] w-full text-left text-xs">
           <thead className="bg-[#1d1d1f] text-white">
             <tr>
+              <th className="px-2 py-2 align-top">预览</th>
               <th className="px-2 py-2 align-top">ID</th>
               <th className="px-2 py-2 align-top">名称</th>
               <th className="px-2 py-2 align-top">类型</th>
@@ -424,12 +443,24 @@ export function SceneLibraryAdmin() {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-t align-top">
+                <td className="px-2 py-2">
+                  {r.displayImageUrl || r.thumbUrl || r.ossUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={r.displayImageUrl || r.thumbUrl || r.ossUrl || ""}
+                      alt=""
+                      className="size-12 rounded object-cover"
+                    />
+                  ) : (
+                    "—"
+                  )}
+                </td>
                 <td className="px-2 py-2">{r.id}</td>
                 <td className="px-2 py-2">{r.name}</td>
                 <td className="px-2 py-2">{sceneArchetypeFromTags(r.tags)}</td>
                 <td className="max-w-md px-2 py-2 text-muted-foreground">{r.visualPrompt}</td>
                 <td className="px-2 py-2">
-                  <button type="button" className="text-[#0969da]" onClick={() => setForm(r)}>编辑</button>
+                  <button type="button" className="text-[#0969da]" onClick={() => { setForm(r); setPendingPreviewFile(null); }}>编辑</button>
                 </td>
               </tr>
             ))}
@@ -454,9 +485,18 @@ export function SceneLibraryAdmin() {
                 ))}
               </select>
               <textarea className="min-h-[80px] w-full rounded border px-2 py-1" placeholder="visualPrompt" value={form.visualPrompt} onChange={(e) => setForm({ ...form, visualPrompt: e.target.value })} />
+              <label className="block">
+                参考图
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="mt-1 block w-full text-[11px]"
+                  onChange={(e) => setPendingPreviewFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
             </div>
             <div className="mt-3 flex justify-end gap-2">
-              <button type="button" className="rounded border px-3 py-1" onClick={() => setForm(null)}>取消</button>
+              <button type="button" className="rounded border px-3 py-1" onClick={() => { setForm(null); setPendingPreviewFile(null); }}>取消</button>
               <button type="button" className="rounded bg-[#0969da] px-3 py-1 text-white" disabled={saving} onClick={() => void save()}>保存</button>
             </div>
           </div>

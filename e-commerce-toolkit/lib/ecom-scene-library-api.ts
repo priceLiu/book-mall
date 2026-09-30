@@ -35,9 +35,36 @@ export async function createEcomSceneLibraryEntry(input: {
   return data.entry;
 }
 
+export async function uploadEcomSceneLibraryPreview(
+  id: string,
+  file: File,
+): Promise<EcomSceneLibraryEntry> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(
+    `/api/book-mall/api/sso/tools/ecom/scene-library/entries/${encodeURIComponent(id)}/preview`,
+    {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    },
+  );
+  if (!res.ok) {
+    const j = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(j.error ?? "上传失败");
+  }
+  const data = (await res.json()) as { entry: EcomSceneLibraryEntry };
+  return data.entry;
+}
+
 export async function updateEcomSceneLibraryEntry(
   id: string,
-  patch: Partial<{ name: string; visualPrompt: string; archetype: string }>,
+  patch: Partial<{
+    name: string;
+    visualPrompt: string;
+    archetype: string;
+    clearPreview: boolean;
+  }>,
 ): Promise<EcomSceneLibraryEntry> {
   const res = await fetch(`/api/book-mall/api/sso/tools/ecom/scene-library/entries/${id}`, {
     method: "PATCH",

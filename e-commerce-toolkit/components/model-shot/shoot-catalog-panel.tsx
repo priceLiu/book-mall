@@ -45,7 +45,9 @@ import {
   deleteEcomSceneLibraryEntry,
   fetchEcomSceneLibraryCatalog,
   updateEcomSceneLibraryEntry,
+  uploadEcomSceneLibraryPreview,
 } from "@/lib/ecom-scene-library-api";
+import { resolveSceneLibraryCardImageUrl } from "@/lib/ecom-scene-library/display";
 import type { EcomSceneLibraryEntry } from "@/lib/ecom-scene-library/types";
 import { cn } from "@/lib/utils";
 import { mapPreviewItemsFromEntries } from "@/lib/media/ecom-image-preview";
@@ -80,6 +82,76 @@ function CatalogSection({
 }
 
 const POSE_CATEGORIES = ["A", "B", "C", "D", "E", "H", "I", "J", "K", "L", "M"];
+
+function SceneCatalogCard({
+  entry,
+  readonly,
+  onEdit,
+  onRemove,
+  onPreviewImage,
+}: {
+  entry: EcomSceneLibraryEntry;
+  readonly?: boolean;
+  onEdit?: () => void;
+  onRemove?: () => void;
+  onPreviewImage?: (src: string, title: string) => void;
+}) {
+  const imageUrl = resolveSceneLibraryCardImageUrl(entry);
+  const archetypeLabel =
+    ECOM_SCENE_ARCHETYPE_OPTIONS.find(
+      (o) => o.value === resolveSceneArchetypeFromTags(entry.tags),
+    )?.label ?? "—";
+  return (
+    <li className="flex flex-col overflow-hidden rounded-xl border border-[#e5e5ea] bg-white">
+      <div className="relative aspect-[4/3] w-full bg-[#f5f5f7]">
+        <EcomMediaLibraryTile
+          kind="image"
+          src={imageUrl}
+          alt={entry.name}
+          aspectClass="aspect-[4/3]"
+          className="h-full w-full rounded-none"
+          onPreview={() => onPreviewImage?.(imageUrl, entry.name)}
+        />
+        <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
+          {archetypeLabel}
+        </span>
+      </div>
+      <div className="flex flex-1 flex-col gap-1 p-2">
+        <p className="line-clamp-1 text-xs font-medium text-[#1d1d1f]">
+          {entry.name}
+          {!readonly ? <LockedBadge lockedAt={entry.lockedAt} /> : null}
+        </p>
+        <p className="line-clamp-2 text-[10px] leading-relaxed text-[#6e6e73]">
+          {entry.visualPrompt?.trim() || "—"}
+        </p>
+        {!readonly && (onEdit || onRemove) ? (
+          <div className="mt-auto flex gap-2 pt-1">
+            {onEdit ? (
+              <button
+                type="button"
+                className="text-[10px] text-[#0071e3] disabled:opacity-40"
+                disabled={!!entry.lockedAt}
+                onClick={onEdit}
+              >
+                编辑
+              </button>
+            ) : null}
+            {onRemove ? (
+              <button
+                type="button"
+                className="text-[10px] text-red-600 disabled:opacity-40"
+                disabled={!!entry.lockedAt}
+                onClick={onRemove}
+              >
+                删除
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </li>
+  );
+}
 
 function PoseCatalogCard({
   entry,
@@ -197,6 +269,8 @@ export function ShootCatalogPanel() {
     name: string;
     visualPrompt: string;
     archetype: string;
+    previewUrl?: string | null;
+    pendingPreviewFile?: File | null;
   } | null>(null);
   const [propForm, setPropForm] = useState<{ id?: string; name: string; visualDescription: string } | null>(
     null,
@@ -274,11 +348,34 @@ export function ShootCatalogPanel() {
     [poses.platform, poses.user],
   );
 
+  const scenePreviewItems = useMemo(
+    () =>
+      mapPreviewItemsFromEntries(
+        [...scenes.platform, ...scenes.user].map((s) => ({
+          url: resolveSceneLibraryCardImageUrl(s),
+          title: s.name?.trim() || "场景参考图",
+        })),
+      ),
+    [scenes.platform, scenes.user],
+  );
+
+  const catalogPreviewItems = useMemo(
+    () => [...scenePreviewItems, ...posePreviewItems],
+    [scenePreviewItems, posePreviewItems],
+  );
+
+  const openCatalogImagePreview = useCallback(
+    (src: string, title: string) => {
+      openPreview(src, title, catalogPreviewItems);
+    },
+    [openPreview, catalogPreviewItems],
+  );
+
   const openPoseImagePreview = useCallback(
     (src: string, title: string) => {
-      openPreview(src, title, posePreviewItems);
+      openPreview(src, title, catalogPreviewItems);
     },
-    [openPreview, posePreviewItems],
+    [openPreview, catalogPreviewItems],
   );
 
   async function saveScene() {
@@ -288,6 +385,7 @@ export function ShootCatalogPanel() {
     }
     setSaving(true);
     try {
+      let entryId = sceneForm.id;
       if (sceneForm.id) {
         await updateEcomSceneLibraryEntry(sceneForm.id, {
           name: sceneForm.name.trim(),
@@ -295,11 +393,15 @@ export function ShootCatalogPanel() {
           archetype: sceneForm.archetype,
         });
       } else {
-        await createEcomSceneLibraryEntry({
+        const created = await createEcomSceneLibraryEntry({
           name: sceneForm.name.trim(),
           visualPrompt: sceneForm.visualPrompt.trim(),
           archetype: sceneForm.archetype,
         });
+        entryId = created.id;
+      }
+      if (sceneForm.pendingPreviewFile && entryId) {
+        await uploadEcomSceneLibraryPreview(entryId, sceneForm.pendingPreviewFile);
       }
       setSceneForm(null);
       await reload();
@@ -476,38 +578,33 @@ export function ShootCatalogPanel() {
 
       {tab === "scene" ? (
         <div className="space-y-6">
+          <p className="text-xs text-[#86868b]">
+            无自定义参考图时展示平台默认场景图；编辑「我的场景」可上传替换参考图。
+          </p>
           <CatalogSection title="系统推荐（只读）">
-            <div className="overflow-x-auto rounded-xl border border-[#e5e5ea]">
-              <table className="min-w-[640px] w-full text-left text-xs">
-                <thead>
-                  <tr className="bg-[#1d1d1f] text-white">
-                    <th className="px-3 py-2">名称</th>
-                    <th className="px-3 py-2">类型</th>
-                    <th className="px-3 py-2">visualPrompt</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scenes.platform.map((s) => (
-                    <tr key={s.id} className="border-t border-[#e5e5ea]">
-                      <td className="px-3 py-2 text-[#1d1d1f]">{s.name}</td>
-                      <td className="px-3 py-2 text-[#424245]">
-                        {ECOM_SCENE_ARCHETYPE_OPTIONS.find(
-                          (o) => o.value === resolveSceneArchetypeFromTags(s.tags),
-                        )?.label ?? "—"}
-                      </td>
-                      <td className="max-w-md px-3 py-2 text-[#6e6e73]">{s.visualPrompt}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {scenes.platform.length === 0 ? (
+              <p className="text-xs text-[#86868b]">暂无系统场景。</p>
+            ) : (
+              <ul className={ECOM_LIBRARY_MEDIA_GRID_CLASS}>
+                {scenes.platform.map((s) => (
+                  <SceneCatalogCard
+                    key={s.id}
+                    entry={s}
+                    readonly
+                    onPreviewImage={openCatalogImagePreview}
+                  />
+                ))}
+              </ul>
+            )}
           </CatalogSection>
 
           <CatalogSection title="我的场景">
             <div className="mb-2 flex justify-end">
               <EcomButtonSecondary
                 type="button"
-                onClick={() => setSceneForm({ name: "", visualPrompt: "", archetype: "studio" })}
+                onClick={() =>
+                  setSceneForm({ name: "", visualPrompt: "", archetype: "studio", previewUrl: null })
+                }
               >
                 新建场景
               </EcomButtonSecondary>
@@ -515,60 +612,25 @@ export function ShootCatalogPanel() {
             {scenes.user.length === 0 ? (
               <p className="text-xs text-[#86868b]">暂无自建场景。新建后可在姿势表与助手中点选。</p>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-[#e5e5ea]">
-                <table className="min-w-[640px] w-full text-left text-xs">
-                  <thead>
-                    <tr className="bg-[#1d1d1f] text-white">
-                      <th className="px-3 py-2">名称</th>
-                      <th className="px-3 py-2">类型</th>
-                      <th className="px-3 py-2">visualPrompt</th>
-                      <th className="px-3 py-2">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {scenes.user.map((s) => (
-                      <tr key={s.id} className="border-t border-[#e5e5ea]">
-                        <td className="px-3 py-2">
-                          {s.name}
-                          <LockedBadge lockedAt={s.lockedAt} />
-                        </td>
-                        <td className="px-3 py-2">
-                          {ECOM_SCENE_ARCHETYPE_OPTIONS.find(
-                            (o) => o.value === resolveSceneArchetypeFromTags(s.tags),
-                          )?.label ?? "—"}
-                        </td>
-                        <td className="max-w-md px-3 py-2 text-[#6e6e73]">{s.visualPrompt}</td>
-                        <td className="px-3 py-2">
-                          <button
-                            type="button"
-                            className="mr-2 text-[#0071e3] disabled:opacity-40"
-                            disabled={!!s.lockedAt}
-                            title={s.lockedAt ? "已锁定" : undefined}
-                            onClick={() =>
-                              setSceneForm({
-                                id: s.id,
-                                name: s.name,
-                                visualPrompt: s.visualPrompt,
-                                archetype: resolveSceneArchetypeFromTags(s.tags) || "studio",
-                              })
-                            }
-                          >
-                            编辑
-                          </button>
-                          <button
-                            type="button"
-                            className="text-red-600 disabled:opacity-40"
-                            disabled={!!s.lockedAt}
-                            onClick={() => void removeUserScene(s)}
-                          >
-                            删除
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ul className={ECOM_LIBRARY_MEDIA_GRID_CLASS}>
+                {scenes.user.map((s) => (
+                  <SceneCatalogCard
+                    key={s.id}
+                    entry={s}
+                    onPreviewImage={openCatalogImagePreview}
+                    onEdit={() =>
+                      setSceneForm({
+                        id: s.id,
+                        name: s.name,
+                        visualPrompt: s.visualPrompt,
+                        archetype: resolveSceneArchetypeFromTags(s.tags) || "studio",
+                        previewUrl: s.thumbUrl || s.ossUrl || resolveSceneLibraryCardImageUrl(s),
+                      })
+                    }
+                    onRemove={() => void removeUserScene(s)}
+                  />
+                ))}
+              </ul>
             )}
           </CatalogSection>
         </div>
@@ -775,6 +837,62 @@ export function ShootCatalogPanel() {
               onChange={(e) => setSceneForm({ ...sceneForm, visualPrompt: e.target.value })}
             />
           </label>
+          <div className="space-y-2 text-xs">
+            <span className="text-[#86868b]">参考图（可选，保存后上传）</span>
+            <div className="flex items-start gap-3">
+              {sceneForm.previewUrl || sceneForm.pendingPreviewFile ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={
+                    sceneForm.pendingPreviewFile
+                      ? URL.createObjectURL(sceneForm.pendingPreviewFile)
+                      : sceneForm.previewUrl!
+                  }
+                  alt=""
+                  className="size-20 rounded-lg object-cover"
+                />
+              ) : (
+                <div className="flex size-20 items-center justify-center rounded-lg bg-[#f5f5f7] text-[10px] text-[#86868b]">
+                  默认图
+                </div>
+              )}
+              <div className="flex flex-col gap-2">
+                <label className="cursor-pointer text-[#0071e3]">
+                  选择图片
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setSceneForm({
+                        ...sceneForm,
+                        pendingPreviewFile: file,
+                        previewUrl: null,
+                      });
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                {sceneForm.id && (sceneForm.previewUrl || sceneForm.pendingPreviewFile) ? (
+                  <button
+                    type="button"
+                    className="text-left text-[10px] text-red-600"
+                    onClick={() =>
+                      setSceneForm({
+                        ...sceneForm,
+                        previewUrl: null,
+                        pendingPreviewFile: null,
+                      })
+                    }
+                  >
+                    清除待上传
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </div>
           <div className="mt-4 flex justify-end gap-2">
             <EcomButtonSecondary type="button" onClick={() => setSceneForm(null)}>
               取消
@@ -909,7 +1027,7 @@ export function ShootCatalogPanel() {
 
       <EcomImagePreviewHost
         preview={preview}
-        galleryItems={posePreviewItems}
+        galleryItems={catalogPreviewItems}
         onClose={closePreview}
       />
     </div>

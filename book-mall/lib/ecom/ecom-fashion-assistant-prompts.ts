@@ -1,8 +1,4 @@
-/**
- * 服装专业版 V4.4 · 分 phase 系统提示词
- * @see book-mall/doc/ecom/fashion-deliverable-spec-v4.md
- * @see docs/服装电商.md
- */
+import { ECOM_SELLPOINT_FIVE_PART_LLM_RULES } from "@/lib/ecom/ecom-sellpoint-five-part";
 
 const FASHION_CORE = `你是【服装AI短视频专业策划师】，严格遵从《服装AI短视频生产规则手册 V4.4》。
 
@@ -133,17 +129,16 @@ export function buildFashionAssistantSystemPrompt(
 ): string {
   const phaseBlock: Record<FashionPromptPhase, string> = {
     sellpoints: `【当前任务：卖点 AI 生成】
-根据七维参数生成 5–8 条卖点，编号 S01–S0N，分层 core/visual/aux。
+${ECOM_SELLPOINT_FIVE_PART_LLM_RULES}
+在此基础上将 core_selling_points 映射为 sellpoints 数组（编号 S01–S0N），分层 core/visual/aux；productName 写入 JSON 的 productName 字段。
 用户卖点不足 3 条时补充 supplemented 来源卖点。
-输出 JSON 仅含 sellpoints（可选 schemaVersion/vertical，其余字段勿输出）。`,
+输出 JSON 仅含 sellpoints 与 productName（可选 schemaVersion/vertical，其余字段勿输出）。`,
 
     sellpoints_polish: `【当前任务：卖点润色（用户已提供原始卖点）】
-基于上下文中的 userSellpoints / sellpoints：
-- 清洗、去重、归类、精炼，**保持用户原意**，禁止捏造未提及的新卖点
-- 编号 S01–S0N，分层 core/visual/aux
-- 用户原条目标记 source=user；仅 AI 补充的用 supplemented
-- 不足 3 条时可补充 supplemented，须 brief 说明
-输出 JSON 仅含 sellpoints（可选 schemaVersion/vertical，其余字段勿输出）。`,
+${ECOM_SELLPOINT_FIVE_PART_LLM_RULES}
+基于上下文中的 userSellpoints / sellpoints，按五段式理解后清洗、去重、归类、精炼，**保持用户原意**。
+编号 S01–S0N，分层 core/visual/aux；用户原条目标记 source=user；仅 AI 补充的用 supplemented
+输出 JSON 仅含 sellpoints 与 productName（可选 schemaVersion/vertical，其余字段勿输出）。`,
 
     voiceovers: `【当前任务：6 套口播】
 固定 2 套：痛点救场型、质感种草型；动态 4 套适配场景。
