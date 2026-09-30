@@ -1,4 +1,5 @@
-import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
+import { isLibtvLocalMediaJobRuntime } from "./libtv-local-media-job";
+import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import { resolvePro2StarterDockLinkLabel } from "./pro2-dock-upstream-links";
 import type { StoryProStarterNodeData } from "./story-pro-workspace-types";
 
@@ -69,12 +70,14 @@ export function pro2StarterHasContent(data: {
   );
 }
 
-/** 文本节点 LLM 生成中（故事大纲 / general 提示词共用 themeOutlineRuntime） */
+/** 文本节点 LLM 生成中（故事大纲 / general 提示词）或本地媒体任务（如提取字幕） */
 export function isPro2StarterTextGenerating(data: {
   themeOutlineRuntime?: { status?: string };
+  runtime?: CanvasNodeRuntime | null;
 }): boolean {
   const st = data.themeOutlineRuntime?.status;
-  return st === "pending" || st === "running";
+  if (st === "pending" || st === "running") return true;
+  return isLibtvLocalMediaJobRuntime(data.runtime);
 }
 
 export function pro2StarterLinkedMessage(

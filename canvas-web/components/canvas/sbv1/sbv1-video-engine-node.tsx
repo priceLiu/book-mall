@@ -97,6 +97,7 @@ import {
 } from "@/lib/canvas/libtv-video-track-split-run";
 import { libtvVideoEditSourceReady } from "@/lib/canvas/libtv-video-edit-client";
 import { runLibtvVideoFrameExtract } from "@/lib/canvas/libtv-video-frame-extract-run";
+import { runLibtvVideoSubtitleExtract } from "@/lib/canvas/libtv-video-subtitle-extract-run";
 import { isMislabeledVendorSuccessError } from "@/lib/canvas/friendly-task-error";
 import { isCanvasNodeRunSessionActive } from "@/lib/canvas/canvas-run-session";
 import {
@@ -586,6 +587,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   );
 
   const [frameExtractBusy, setFrameExtractBusy] = useState(false);
+  const [subtitleExtractBusy, setSubtitleExtractBusy] = useState(false);
 
   const onReversePrompt = useCallback(() => {
     if (reversePromptBusy || !hasVideo || isPro2VideoBoardCell) return;
@@ -711,6 +713,46 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
       videoEditSourceUrl,
     ],
   );
+
+  const onExtractSubtitles = useCallback(() => {
+    if (
+      !videoEditSourceUrl ||
+      subtitleExtractBusy ||
+      frameExtractBusy ||
+      isPro2VideoBoardCell
+    ) {
+      return;
+    }
+    setSubtitleExtractBusy(true);
+    void runLibtvVideoSubtitleExtract({
+      sourceNodeId: id,
+      sourceVideoUrl: videoEditSourceUrl,
+      projectId,
+      store: spawnStore,
+      updateNodeData: (nodeId, patch) => updateNodeData(nodeId, patch),
+    })
+      .catch(async (e) => {
+        const message = e instanceof Error ? e.message : "提取字幕失败";
+        await alert({
+          title: libtvRuntimeErrorAlertTitle("VIDEO_SUBTITLE_EXTRACT", message),
+          message,
+          variant: "error",
+        });
+      })
+      .finally(() => {
+        setSubtitleExtractBusy(false);
+      });
+  }, [
+    alert,
+    frameExtractBusy,
+    id,
+    isPro2VideoBoardCell,
+    projectId,
+    spawnStore,
+    subtitleExtractBusy,
+    updateNodeData,
+    videoEditSourceUrl,
+  ]);
 
   const isLinked = useMemo(
     () => libtvVideoEngineNodeIsLinked(id, edges),
@@ -848,6 +890,10 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                 hasVideo && !isPro2VideoBoardCell ? onReversePrompt : undefined
               }
               reversePromptBusy={reversePromptBusy}
+              onExtractSubtitles={
+                isPro2VideoBoardCell ? undefined : onExtractSubtitles
+              }
+              subtitleExtractBusy={subtitleExtractBusy}
             />
           </LibtvNodeToolbarPortal>
         ) : null}

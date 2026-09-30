@@ -9,9 +9,13 @@ import {
   Paintbrush,
   ScanFace,
   Sparkles,
+  Stamp,
 } from "lucide-react";
+import { busEnqueueStoryRun } from "./canvas-run-bus";
+import { buildPro2ImageEditNodeData } from "./canvas-image-edit-models";
 import { buildPro2ImageNodeData } from "./pro2-spawn-nodes";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
+import { spawnPro2ImageNeighbor } from "./libtv-pro2-image-neighbor-spawn";
 import { PRO2_IMAGE_NODE_WIDTH } from "./story-pro2-node-chrome";
 import { startLibtvInpaintSession } from "./libtv-inpaint-session";
 import { startLibtvEraseSession } from "./libtv-erase-session";
@@ -24,6 +28,7 @@ const GAP = 48;
 
 export type LibtvImageMagicMenuId =
   | "hd-upscale"
+  | "remove-full-watermark"
   | "source-expand"
   | "inpaint-redraw"
   | "erase"
@@ -38,6 +43,7 @@ export type LibtvImageMagicMenuItem = {
 
 export const LIBTV_IMAGE_MAGIC_MENU: LibtvImageMagicMenuItem[] = [
   { id: "hd-upscale", label: "高清", icon: Sparkles },
+  { id: "remove-full-watermark", label: "去全图水印", icon: Stamp },
   { id: "source-expand", label: "扩图", icon: Expand },
   { id: "inpaint-redraw", label: "重绘", icon: Paintbrush },
   { id: "erase", label: "擦除", icon: Eraser },
@@ -58,6 +64,8 @@ export type LibtvImageMagicSpawnStore = {
 
 function magicTargetData(menuId: LibtvImageMagicMenuId): Record<string, unknown> {
   switch (menuId) {
+    case "remove-full-watermark":
+      throw new Error("remove-full-watermark uses spawnRemoveFullWatermarkTarget");
     case "hd-upscale":
       return buildPro2ImageNodeData({
         label: "高清",
@@ -140,6 +148,32 @@ export function startLibtvInpaintFromMagic(
   startLibtvInpaintSession(sourceNodeId, store.setNodes, providers);
 }
 
+function spawnRemoveFullWatermarkTarget(
+  sourceNodeId: string,
+  store: LibtvImageMagicSpawnStore,
+): string {
+  const anchor = store.nodes.find((n) => n.id === sourceNodeId);
+  if (!anchor) return "";
+
+  const dockInput = `去除 @<up-img-${sourceNodeId}> 全图的水印`;
+
+  return spawnPro2ImageNeighbor({
+    sourceNodeId,
+    resultLabel: "去全图水印",
+    nodes: store.nodes,
+    addNode: store.addNode,
+    setNodes: store.setNodes,
+    setEdges: store.setEdges,
+    sourceHandle: "image",
+    copyAnchorDimensions: true,
+    imageNodeData: buildPro2ImageEditNodeData({
+      modelKey: "wan2.7-image-pro",
+      label: "去全图水印",
+      dockInput,
+    }),
+  });
+}
+
 export function startLibtvMagicEditFromMenu(
   sourceNodeId: string,
   menuId: LibtvImageMagicMenuId,
@@ -147,6 +181,13 @@ export function startLibtvMagicEditFromMenu(
   providers: CanvasProviderDto[],
 ): void {
   switch (menuId) {
+    case "remove-full-watermark": {
+      const newId = spawnRemoveFullWatermarkTarget(sourceNodeId, store);
+      if (newId) {
+        busEnqueueStoryRun({ nodeId: newId, forceFresh: true });
+      }
+      return;
+    }
     case "inpaint-redraw":
       startLibtvInpaintFromMagic(sourceNodeId, store, providers);
       return;

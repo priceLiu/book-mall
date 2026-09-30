@@ -6,11 +6,14 @@ export const LIBTV_LOCAL_MEDIA_JOB_VIDEO_TRACK_SPLIT =
 export const LIBTV_LOCAL_MEDIA_JOB_VIDEO_FRAME_EXTRACT =
   "video-frame-extract" as const;
 export const LIBTV_LOCAL_MEDIA_JOB_VIDEO_TRIM = "video-trim" as const;
+export const LIBTV_LOCAL_MEDIA_JOB_VIDEO_SUBTITLE_EXTRACT =
+  "video-subtitle-extract" as const;
 
 export type LibtvLocalMediaJobKind =
   | typeof LIBTV_LOCAL_MEDIA_JOB_VIDEO_TRACK_SPLIT
   | typeof LIBTV_LOCAL_MEDIA_JOB_VIDEO_FRAME_EXTRACT
-  | typeof LIBTV_LOCAL_MEDIA_JOB_VIDEO_TRIM;
+  | typeof LIBTV_LOCAL_MEDIA_JOB_VIDEO_TRIM
+  | typeof LIBTV_LOCAL_MEDIA_JOB_VIDEO_SUBTITLE_EXTRACT;
 
 export function libtvLocalMediaJobRunningRuntime(
   kind: LibtvLocalMediaJobKind = LIBTV_LOCAL_MEDIA_JOB_VIDEO_TRACK_SPLIT,
@@ -28,7 +31,8 @@ export function isLibtvLocalMediaJobRuntime(
   if (
     k !== LIBTV_LOCAL_MEDIA_JOB_VIDEO_TRACK_SPLIT &&
     k !== LIBTV_LOCAL_MEDIA_JOB_VIDEO_FRAME_EXTRACT &&
-    k !== LIBTV_LOCAL_MEDIA_JOB_VIDEO_TRIM
+    k !== LIBTV_LOCAL_MEDIA_JOB_VIDEO_TRIM &&
+    k !== LIBTV_LOCAL_MEDIA_JOB_VIDEO_SUBTITLE_EXTRACT
   ) {
     return false;
   }

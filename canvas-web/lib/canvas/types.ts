@@ -318,7 +318,8 @@ export type CanvasNodeRuntime = {
   localJobKind?:
     | "video-track-split"
     | "video-frame-extract"
-    | "video-trim";
+    | "video-trim"
+    | "video-subtitle-extract";
 };
 
 // —— 各节点 data 形状 ——

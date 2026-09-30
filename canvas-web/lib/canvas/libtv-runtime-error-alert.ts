@@ -68,6 +68,9 @@ export function libtvRuntimeErrorAlertTitle(
   if (code === "VIDEO_TRACK_SPLIT") {
     return "视频处理失败";
   }
+  if (code === "VIDEO_SUBTITLE_EXTRACT" || /提取字幕失败/.test(msg)) {
+    return "提取字幕失败";
+  }
   if (
     code === "INSUFFICIENT_CREDITS" ||
     msg.includes("积分不足") ||

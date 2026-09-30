@@ -95,6 +95,45 @@ export async function postVideoFrameExtract(opts: {
   };
 }
 
+export async function postVideoSubtitleExtract(opts: {
+  sourceVideoUrl: string;
+  projectId?: string | null;
+}): Promise<{
+  srt: string;
+  segments: Array<{ startMs: number; endMs: number; text: string }>;
+  noSpeech?: boolean;
+}> {
+  const res = await fetch(
+    "/api/book-mall/api/platform/v1/video-subtitle-extract",
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceVideoUrl: opts.sourceVideoUrl,
+        projectId: opts.projectId ?? undefined,
+      }),
+    },
+  );
+  const data = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    message?: string;
+    srt?: string;
+    segments?: Array<{ startMs: number; endMs: number; text: string }>;
+    noSpeech?: boolean;
+  };
+  if (!res.ok) {
+    throw new Error(
+      formatLibtvVideoEditClientError(data.message ?? data.error, res.status),
+    );
+  }
+  return {
+    srt: typeof data.srt === "string" ? data.srt : "",
+    segments: Array.isArray(data.segments) ? data.segments : [],
+    noSpeech: data.noSpeech,
+  };
+}
+
 export async function postVideoTrim(opts: {
   sourceVideoUrl: string;
   projectId?: string | null;

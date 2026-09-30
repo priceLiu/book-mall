@@ -56,6 +56,8 @@ export function LibtvVideoNodeToolbar({
   onDuplicateNode,
   onReversePrompt,
   reversePromptBusy = false,
+  onExtractSubtitles,
+  subtitleExtractBusy = false,
   className,
   style,
   passNodeDrag = false,
@@ -74,6 +76,8 @@ export function LibtvVideoNodeToolbar({
   onDuplicateNode?: () => void;
   onReversePrompt?: () => void;
   reversePromptBusy?: boolean;
+  onExtractSubtitles?: () => void;
+  subtitleExtractBusy?: boolean;
   className?: string;
   style?: React.CSSProperties;
   passNodeDrag?: boolean;
@@ -235,20 +239,38 @@ export function LibtvVideoNodeToolbar({
             )}
             <span>反推提示词</span>
           </button>
-        ) : (
-          <button type="button" className={TOOL_BTN} onClick={() => void soon("解析")}>
-            <Scan className="size-3.5" />
-            <span>解析</span>
+        ) : null}
+        {onExtractSubtitles ? (
+          <button
+            type="button"
+            className={cn(
+              TOOL_BTN,
+              subtitleExtractBusy && "pointer-events-none opacity-80",
+            )}
+            disabled={!videoEditSourceUrl || subtitleExtractBusy}
+            title={
+              !videoEditSourceUrl
+                ? "请先生成或上传成片"
+                : "Gateway ASR · 带时间轴 SRT"
+            }
+            onClick={onExtractSubtitles}
+          >
+            {subtitleExtractBusy ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Type className="size-3.5" />
+            )}
+            <span>提取字幕</span>
           </button>
-        )}
+        ) : null}
         <button
           type="button"
           className={TOOL_BTN}
-          onClick={() => void soon("智能去字幕")}
+          disabled
+          title="即将推出"
         >
-          <Type className="size-3.5" />
-          <span>智能去字幕</span>
-          <ChevronDown className="size-3 opacity-50" />
+          <Type className="size-3.5 opacity-40" />
+          <span className="text-white/45">智能去字幕</span>
         </button>
         <button
           ref={audioMenu.anchorRef}
