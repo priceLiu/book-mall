@@ -273,7 +273,7 @@ export function PricingPageClient({
         ) : null}
       </div>
 
-      <div className="site-pricing-body">
+      <div className="site-pricing-plans-shell">
         <section className="site-pricing-section-head">
           <h2 className="site-pricing-section-title">订阅套餐</h2>
           <p className="site-pricing-section-hint">自动续订，包月可随时取消</p>
@@ -281,48 +281,48 @@ export function PricingPageClient({
             会员积分每 31 天发放一期，当期未使用积分不结转至下期（年付按{periodLabel}计费，积分仍按 31 天周期刷新）
           </p>
         </section>
-      </div>
 
-      <div
-        className={cn(
-          "site-pricing-plans-band",
-          isTeam ? "site-pricing-plans-grid--team" : "site-pricing-plans-grid--personal",
-        )}
-      >
         <div
           className={cn(
-            "site-pricing-plans-grid",
+            "site-pricing-plans-band",
             isTeam ? "site-pricing-plans-grid--team" : "site-pricing-plans-grid--personal",
           )}
         >
-          {visible.map((p, i) => {
-            const yearPrice = yearPriceByTier.get(p.tier);
-            const annualSavingPct =
-              interval === "MONTH" && yearPrice && p.priceYuan > 0
-                ? Math.round((1 - yearPrice / (p.priceYuan * 12)) * 100)
-                : null;
-            return (
-              <PlanCard
-                key={p.id}
-                plan={p}
-                index={i}
-                isTeam={isTeam}
-                isLoggedIn={isLoggedIn}
-                billingPersona={billingPersona}
-                interval={interval}
-                periodLabel={periodLabel}
-                anchorYuan={anchorYuan}
-                featured={i === 1 || i === 2}
-                models={models}
-                annualSavingPct={annualSavingPct}
-              />
-            );
-          })}
-          {visible.length === 0 ? (
-            <div className="col-span-full rounded-2xl border border-dashed border-border py-12 text-center text-muted-foreground">
-              该组合套餐即将上线
-            </div>
-          ) : null}
+          <div
+            className={cn(
+              "site-pricing-plans-grid",
+              isTeam ? "site-pricing-plans-grid--team" : "site-pricing-plans-grid--personal",
+            )}
+          >
+            {visible.map((p, i) => {
+              const yearPrice = yearPriceByTier.get(p.tier);
+              const annualSavingPct =
+                interval === "MONTH" && yearPrice && p.priceYuan > 0
+                  ? Math.round((1 - yearPrice / (p.priceYuan * 12)) * 100)
+                  : null;
+              return (
+                <PlanCard
+                  key={p.id}
+                  plan={p}
+                  index={i}
+                  isTeam={isTeam}
+                  isLoggedIn={isLoggedIn}
+                  billingPersona={billingPersona}
+                  interval={interval}
+                  periodLabel={periodLabel}
+                  anchorYuan={anchorYuan}
+                  featured={i === 1 || i === 2}
+                  models={models}
+                  annualSavingPct={annualSavingPct}
+                />
+              );
+            })}
+            {visible.length === 0 ? (
+              <div className="col-span-full rounded-2xl border border-dashed border-border py-12 text-center text-muted-foreground">
+                该组合套餐即将上线
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
