@@ -83,6 +83,6 @@ describe("applyReplicaPolishToSuite partial", () => {
     const mod1 = next.modules.find((m) => m.module_id === "mod1_banner");
     const mod2 = next.modules.find((m) => m.module_id === "mod2_highlight");
     expect(mod1?.slots.length).toBe(1);
-    expect(mod2?.enable).toBe(false);
+    expect(mod2).toEqual(suite.modules.find((m) => m.module_id === "mod2_highlight"));
   });
 });

@@ -49,7 +49,7 @@ const MOCK_IMAGE_REPLICA_ASSET_CATALOG: ReplicaAssetCatalog = {
   characters: [
     {
       label: "人物A",
-      description: "年轻女性模特，休闲穿搭，自然站立",
+      description: "约25岁年轻女性模特，黑色齐肩短发，淡妆，站画面中央偏左，重心落右脚，自然侧身看镜头",
       roleInShot: "主体",
     },
   ],

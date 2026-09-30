@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/platform-error-log", () => ({
   recordPlatformError: vi.fn(),
 }));
+vi.mock("@/lib/admin/logging-fuse-config-service", () => ({
+  resolveVendorDirectBlockHostsAsync: vi.fn().mockResolvedValue([]),
+}));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     platformConfig: {
@@ -72,8 +75,7 @@ describe("vendor-egress-audit", () => {
       apiKey: "sk-secret-value",
       caller: "OpenAiCompatGateway.chat",
     });
-    await flush();
-    expect(mockedRecord).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(mockedRecord).toHaveBeenCalledTimes(1));
     const arg = mockedRecord.mock.calls[0]![0]!;
     expect(["VENDOR_DIRECT_EGRESS", "VENDOR_DIRECT_BLOCKED"]).toContain(arg.code);
     expect(arg.source).toBe("SYSTEM");

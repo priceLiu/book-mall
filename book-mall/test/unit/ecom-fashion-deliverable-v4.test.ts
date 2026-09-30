@@ -362,7 +362,7 @@ ${JSON.stringify({
     expect(inferFashionPhaseFromDeliverable(withPrematureOps)).toBe("storyboard_confirm");
   });
 
-  it("output_mode only after storyboardLocked and ops pack", () => {
+  it("goes straight to produce after storyboardLocked and ops pack", () => {
     const ready = mergeFashionDeliverablePatch(
       { ...V4_FIXTURE, outputMode: null, storyboardLocked: false },
       {
@@ -370,7 +370,7 @@ ${JSON.stringify({
         opsPack: { titles: ["标题1"] },
       },
     );
-    expect(inferFashionPhaseFromDeliverable(ready)).toBe("output_mode");
+    expect(inferFashionPhaseFromDeliverable(ready)).toBe("produce");
   });
 
   it("resolve does not restore outputMode without explicit path choice in chat", () => {

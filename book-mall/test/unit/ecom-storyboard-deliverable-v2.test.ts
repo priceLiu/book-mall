@@ -52,6 +52,9 @@ const V2_FIXTURE = {
           sellpointTags: [],
           imagePrompt:
             "竖版9:16，写实UGC。户外街头小雨，女生抱臂焦急，无产品露出。禁止画面文字。",
+          scenePrompt: "竖版9:16，户外城市街头，天色阴沉突降小雨，湿润路面反光，无人物。",
+          videoPromptEn:
+            "Vertical 9:16 realistic UGC, light rain on a city street, a young woman hugs her arms anxiously, static camera.",
         },
         {
           index: 2,
@@ -68,6 +71,9 @@ const V2_FIXTURE = {
           sellpointTags: ["sp1"],
           imagePrompt:
             "竖版9:16，写实UGC。女生穿灰紫冲锋衣拉拉链，以参考图1为准。本镜卖点：袖口水珠滚落。禁止画面文字。",
+          scenePrompt: "竖版9:16，雨中城市街边人行道，路灯与湿润石砖，背景虚化，无人物。",
+          videoPromptEn:
+            "Vertical 9:16 realistic UGC, she zips up a grey-purple rain jacket, raindrops roll off the sleeve cuff, static camera.",
         },
       ],
       totalDurationHintSec: 8,
