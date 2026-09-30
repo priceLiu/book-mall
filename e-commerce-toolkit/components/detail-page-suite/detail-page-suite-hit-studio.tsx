@@ -113,6 +113,7 @@ import {
 import { resolveHitBottomTask } from "@/lib/detail-page-suite-hit-bottom-task";
 import { isVisionSellpointJobRunning, readHitVisionSellpointJob } from "@/lib/detail-page-suite-vision-sellpoint-progress";
 import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
+import { resumeOrCreateEcomProject, writeEcomLastProjectId } from "@/lib/ecom-last-project";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 
@@ -260,7 +261,7 @@ function DetailPageSuiteHitStudioInner() {
     (p: DetailPageSuiteProject) => {
       setProject(p);
       setSellpointDraft(savedSellpointsText(p));
-      localStorage.setItem(STORAGE_KEY, p.id);
+      writeEcomLastProjectId(STORAGE_KEY, p.id);
       setPromptSelectionKeys((prev) => pruneDetailPageSuitePromptSelection(p, prev));
       syncActiveGenFromProject(p);
       syncImageModelFromProject(p);
@@ -288,22 +289,23 @@ function DetailPageSuiteHitStudioInner() {
         setImageModelKey(
           pickBoundStoryboardModelKey(models.imageModels, models.defaults.image),
         );
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          await loadProject(saved);
-        } else {
-          const created = await createDetailPageSuiteHitProject();
-          if (!cancelled) {
-            applyHitProject(created);
-            setPromptSelectionKeys(new Set());
-          }
+        const { project: p, created } = await resumeOrCreateEcomProject({
+          storageKey: STORAGE_KEY,
+          getById: getDetailPageSuiteHitProject,
+          listRecentIds: async () =>
+            (await listDetailPageSuiteHitSummaries()).map((item) => item.id),
+          create: () => createDetailPageSuiteHitProject(),
+        });
+        if (!cancelled) {
+          applyHitProject(p);
+          if (created) setPromptSelectionKeys(new Set());
         }
       } catch (e) {
         if (isEcomUnauthorizedError(e)) setNeedLogin(true);
         else {
           await alert({
             title: "加载失败",
-            message: e instanceof Error ? e.message : "未知错误",
+            message: formatEcomTransportError(e),
             variant: "error",
           });
         }

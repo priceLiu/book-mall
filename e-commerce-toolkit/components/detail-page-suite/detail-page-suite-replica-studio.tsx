@@ -90,6 +90,7 @@ import {
   visionSellpointProgressPercent,
 } from "@/lib/detail-page-suite-vision-sellpoint-progress";
 import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
+import { resumeOrCreateEcomProject, writeEcomLastProjectId } from "@/lib/ecom-last-project";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 
@@ -320,7 +321,7 @@ function DetailPageSuiteReplicaStudioInner() {
   const applyReplicaProject = useCallback((p: DetailPageSuiteProject) => {
     setProject(p);
     setSellpointDraft(savedSellpointsText(p));
-    localStorage.setItem(STORAGE_KEY, p.id);
+    writeEcomLastProjectId(STORAGE_KEY, p.id);
     setPromptSelectionKeys((prev) => pruneDetailPageSuitePromptSelection(p, prev));
     syncImageModelFromProject(p);
     syncActiveGenFromProject(p);
@@ -346,22 +347,23 @@ function DetailPageSuiteReplicaStudioInner() {
         setImageModelKey(
           pickBoundStoryboardModelKey(models.imageModels, models.defaults.image),
         );
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          await loadProject(saved);
-        } else {
-          const created = await createDetailPageSuiteReplicaProject();
-          if (!cancelled) {
-            applyReplicaProject(created);
-            setPromptSelectionKeys(new Set());
-          }
+        const { project: p, created } = await resumeOrCreateEcomProject({
+          storageKey: STORAGE_KEY,
+          getById: getDetailPageSuiteReplicaProject,
+          listRecentIds: async () =>
+            (await listDetailPageSuiteReplicaSummaries()).map((item) => item.id),
+          create: () => createDetailPageSuiteReplicaProject(),
+        });
+        if (!cancelled) {
+          applyReplicaProject(p);
+          if (created) setPromptSelectionKeys(new Set());
         }
       } catch (e) {
         if (isEcomUnauthorizedError(e)) setNeedLogin(true);
         else {
           await alert({
             title: "加载失败",
-            message: e instanceof Error ? e.message : "未知错误",
+            message: formatEcomTransportError(e),
             variant: "error",
           });
         }
