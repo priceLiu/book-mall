@@ -170,7 +170,7 @@ async function runBailianR2vGenerate(opts: {
   const modelKey = resolveStoryboardVideoModel(opts.modelKey);
   const provider = resolveStoryboardVideoProvider(modelKey);
   if (provider !== "bailian") {
-    throw new Error(`穿搭视频暂不支持模型 ${modelKey}，请选用动作迁移类模型`);
+    throw new Error(`穿搭动作迁移暂不支持模型 ${modelKey}，请选用动作迁移类模型`);
   }
 
   const { body } = opts;

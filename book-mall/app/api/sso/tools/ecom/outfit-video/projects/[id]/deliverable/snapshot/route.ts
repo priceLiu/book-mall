@@ -29,7 +29,7 @@ export async function POST(req: Request, ctx: Ctx) {
     if (!project) return ecomJson({ error: "项目不存在" }, { status: 404 });
 
     const title = buildOutfitVideoDeliverableSnapshotTitle(
-      workName || project.title || "穿搭视频",
+      workName || project.title || "穿搭动作迁移",
     );
     const snapshot = await saveOutfitVideoDeliverableSnapshot(auth.userId, id, title);
     return ecomJson({ snapshot, title });

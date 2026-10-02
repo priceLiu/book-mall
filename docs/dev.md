@@ -43,7 +43,7 @@ pnpm dev:all:stagger                # mall 先就绪，其余子站间隔 3s 错
 | common-tools（常用工具） | 3010 | http://localhost:3010 |
 | publisher-web（一键发布） | 3011 | http://localhost:3011 |
 
-### 电商工具箱 · 穿搭视频 Studio
+### 电商工具箱 · 穿搭动作迁移 Studio
 
 - 路由：**http://localhost:3007/ecom/outfit-video**（旧 `/ecom/video/outfit` 301 重定向）
 - Platform API：`book-mall/app/api/sso/tools/ecom/outfit-video/*`

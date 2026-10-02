@@ -38,6 +38,10 @@ export type DetailPageSuiteSizeChartState = {
   fitNote?: string;
 };
 
+export type DetailPageSuiteSpecChartState = {
+  tables?: DetailPageSuiteSizeChartTable[];
+};
+
 export type DetailPageSuiteBrief = {
   genderCategory?: string;
   styleCategory?: string;
@@ -46,12 +50,18 @@ export type DetailPageSuiteBrief = {
   customScene?: string;
   platform?: string;
   platformCode?: string;
+  /** 目标国家/区域（与商品套图 settings.market 同一套 value） */
+  marketCode?: string;
+  market?: string;
   outputLanguage?: string;
+  /** 图 1 · 普通/高级 A+ 或通用比例 */
+  detailTemplateId?: string;
   productDesc?: string;
   sellPoints?: DetailPageSuiteSellpoint[];
   sellpointFivePart?: EcomSellpointFivePart;
   sellpointsLocked?: boolean;
   sizeChart?: DetailPageSuiteSizeChartState;
+  specChart?: DetailPageSuiteSpecChartState;
 };
 
 export type DetailPageSuiteReferenceRole = "product" | "reference_suite" | "model";
@@ -133,7 +143,7 @@ export type DetailPageSuiteSettings = {
   imageSize?: string;
   hitIncludeSlotCopyOnImage?: boolean;
   /** 展示/出图比例，默认跟平台 detailPage.ratio */
-  imageRatio?: "1:1" | "3:4" | "4:5" | "16:9";
+  imageRatio?: "1:1" | "3:4" | "4:5" | "9:16" | "16:9";
   exportTargets?: DetailPageSuiteExportTarget[];
   activeExportTargetIds?: string[];
 };

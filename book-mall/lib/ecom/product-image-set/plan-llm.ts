@@ -7,6 +7,7 @@ import {
   getStylePresetByIdLive,
   resolveStylePresetsLive,
 } from "@/lib/ecom/ecom-style-preset";
+import { productImageSetPlatformLabel } from "@/lib/ecom/ecom-generation-settings-catalog";
 import { ECOM_DEFAULT_VISION_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
 
 import {
@@ -71,12 +72,7 @@ async function buildSellpointLayoutContext(project: ProductImageSetProject): Pro
 }
 
 function platformLabel(code: string | undefined): string {
-  const map: Record<string, string> = {
-    amazon: "亚马逊",
-    taobao: "淘宝",
-    jd: "京东",
-  };
-  return map[code ?? ""] ?? code ?? "电商平台";
+  return productImageSetPlatformLabel(code);
 }
 
 async function buildStyleContext(project: ProductImageSetProject): Promise<string> {

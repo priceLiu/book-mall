@@ -366,7 +366,7 @@ function OutfitVideoStudioInner() {
           getById: getOutfitVideoProject,
           listRecentIds: async () =>
             (await listOutfitVideoProjectSummaries()).map((item) => item.id),
-          create: () => createOutfitVideoProject({ title: "穿搭视频" }),
+          create: () => createOutfitVideoProject({ title: "穿搭动作迁移" }),
         });
         if (!cancelled) applyProject(p);
       } catch (e) {
@@ -392,7 +392,7 @@ function OutfitVideoStudioInner() {
     const items = await listOutfitVideoProjectSummaries();
     return items.map((item) => ({
       id: item.id,
-      title: item.title?.trim() || "穿搭视频",
+      title: item.title?.trim() || "穿搭动作迁移",
       updatedAt: item.updatedAt,
       subtitle: item.phase,
     }));
@@ -523,7 +523,7 @@ function OutfitVideoStudioInner() {
 
       backgroundGen.registerTask({
         id: taskId,
-        label: "穿搭视频 · 拆镜",
+        label: "穿搭动作迁移 · 拆镜",
         startedAt: existing?.startedAt ?? new Date().toISOString(),
         expectedDurationMs: 180_000,
         minimized: false,
@@ -1535,7 +1535,7 @@ function OutfitVideoStudioInner() {
 
     backgroundGen.registerTask({
       id: taskId,
-      label: `穿搭视频 · 生成 ${indices.length} 镜`,
+      label: `穿搭动作迁移 · 生成 ${indices.length} 镜`,
       startedAt: new Date().toISOString(),
       expectedDurationMs: GENERATE_EXPECTED_MS * indices.length,
       minimized: false,
@@ -1658,7 +1658,7 @@ function OutfitVideoStudioInner() {
 
     backgroundGen.registerTask({
       id: taskId,
-      label: "穿搭视频 · 合成成片",
+      label: "穿搭动作迁移 · 合成成片",
       startedAt: new Date().toISOString(),
       expectedDurationMs: 5 * 60 * 1000,
       minimized: true,
@@ -1723,7 +1723,7 @@ function OutfitVideoStudioInner() {
 
   async function handleSaveSnapshot() {
     if (!project) return;
-    const defaultName = project.title?.trim() || "穿搭视频";
+    const defaultName = project.title?.trim() || "穿搭动作迁移";
     if (
       !(await confirm({
         title: "保存作品",
@@ -1758,11 +1758,11 @@ function OutfitVideoStudioInner() {
     const hasWork = outfitVideoHasSaveableWork(project);
     const needsSavePrompt =
       hasWork && isOutfitVideoDirtySinceDeliverableSave(project);
-    const defaultName = project.title?.trim() || "穿搭视频";
+    const defaultName = project.title?.trim() || "穿搭动作迁移";
     await runEcomNewProjectWithSavePrompt({
       confirm,
       hasWorkToSave: needsSavePrompt,
-      message: "当前穿搭视频有未保存的改动。是否先保存到「我的资产」？",
+      message: "当前穿搭动作迁移项目有未保存的改动。是否先保存到「我的资产」？",
       save: async () => {
         const { title, snapshot } = await saveOutfitVideoDeliverableSnapshot(project.id, defaultName);
         if (snapshot) {
@@ -1774,7 +1774,7 @@ function OutfitVideoStudioInner() {
       },
       onProceed: async () => {
         try {
-          applyProject(await createOutfitVideoProject({ title: "穿搭视频" }));
+          applyProject(await createOutfitVideoProject({ title: "穿搭动作迁移" }));
         } catch (e) {
           await alert({ title: "新建失败", message: formatEcomTransportError(e), variant: "error" });
         }

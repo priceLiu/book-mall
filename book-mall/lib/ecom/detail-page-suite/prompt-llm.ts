@@ -14,7 +14,11 @@ import {
   markDetailPageSuitePromptModulePending,
   reconcileDetailPageSuitePendingMeta,
 } from "./pending-state";
-import { getDetailPageSuiteProject, updateDetailPageSuiteProject } from "./project-service";
+import {
+  buildAplusDetailPageSystemPrompt,
+  isAplusBlankPlateModule,
+} from "@/lib/ecom/detail-page-aplus/aplus-prompt-system";
+import { loadDetailPageSuiteForOps } from "./project-access";
 import {
   buildDetailPageSuiteBriefContextBlock,
   buildDetailPageSuiteGenderModelRule,
@@ -28,13 +32,27 @@ import {
   buildModuleSlotsForSelected,
   partitionSizeModuleSelected,
 } from "./size-chart-prompt";
-import { isDetailPageSuiteSizeChartDataLabel } from "./size-chart-constants";
+import {
+  isDetailPageSuiteSizeChartDataLabel,
+  isDetailPageSuiteSizeChartModuleId,
+} from "./size-chart-constants";
+import { ensureBriefSpecChartDefaults } from "./spec-table-image";
+import {
+  buildSpecModuleSlotForLabel,
+  buildSpecModuleSlotsForSelected,
+  partitionSpecModuleSelected,
+} from "./spec-table-prompt";
+import {
+  isDetailPageSuiteSpecChartDataLabel,
+  isDetailPageSuiteSpecChartModuleId,
+} from "./spec-table-constants";
 import {
   BLANK_PLATE_MODULE_IDS,
   DETAIL_PAGE_SUITE_FENCE,
   DETAIL_PAGE_SUITE_SCHEMA_VERSION,
   ECOM_DETAIL_PAGE_SUITE_TOOL_KEY,
   type DetailPageSuiteBrief,
+  type DetailPageSuiteProject,
   type DetailPageSuiteSlot,
 } from "./types";
 
@@ -126,9 +144,18 @@ export async function generateModulePrompts(opts: {
   projectId: string;
   moduleId: string;
   modelKey?: string;
-}): Promise<NonNullable<Awaited<ReturnType<typeof getDetailPageSuiteProject>>>> {
-  const project = await getDetailPageSuiteProject(opts.userId, opts.projectId);
-  if (!project) throw new Error("项目不存在");
+  projectModule?: string;
+}): Promise<DetailPageSuiteProject> {
+  const access = await loadDetailPageSuiteForOps(
+    opts.userId,
+    opts.projectId,
+    opts.projectModule,
+  );
+  if (!access) throw new Error("项目不存在");
+  let project = access.project;
+  const updateDetailPageSuiteProject = access.update;
+  const promptToolKey = access.toolKey;
+  const isAplus = access.isAplus;
   const countErr = assertSuiteCounts(project.suite);
   if (countErr) throw new Error(countErr);
 
@@ -149,7 +176,12 @@ export async function generateModulePrompts(opts: {
   await updateDetailPageSuiteProject(opts.userId, opts.projectId, { meta: metaWithPending });
 
   let brief = ensureBriefSizeChartDefaults(project.brief ?? {});
-  const { llm: llmLabels } = partitionSizeModuleSelected(selected);
+  brief = ensureBriefSpecChartDefaults(brief);
+  const { llm: llmLabels } = isDetailPageSuiteSpecChartModuleId(mod.module_id)
+    ? partitionSpecModuleSelected(selected)
+    : isDetailPageSuiteSizeChartModuleId(mod.module_id)
+      ? partitionSizeModuleSelected(selected)
+      : { programmatic: [], llm: selected };
 
   const finishWithSlots = async (slots: DetailPageSuiteSlot[]) => {
     const modules = project.suite.modules.map((m) =>
@@ -178,7 +210,9 @@ export async function generateModulePrompts(opts: {
   };
 
   if (llmLabels.length === 0) {
-    const slots = buildModuleSlotsForSelected(mod, selected, brief, new Map());
+    const slots = isDetailPageSuiteSpecChartModuleId(mod.module_id)
+      ? buildSpecModuleSlotsForSelected(mod, selected, brief, new Map())
+      : buildModuleSlotsForSelected(mod, selected, brief, new Map());
     return finishWithSlots(slots);
   }
 
@@ -189,12 +223,18 @@ export async function generateModulePrompts(opts: {
     moduleName: mod.module_name,
     selectedLabels: llmLabels,
   });
-  const system = buildSystemPrompt({
-    moduleName: mod.module_name,
-    blankPlate: BLANK_PLATE_MODULE_IDS.has(mod.module_id),
-    lang,
-    genderModelRule: buildDetailPageSuiteGenderModelRule(brief.genderCategory, involvesModel),
-  });
+  const system = isAplus
+    ? buildAplusDetailPageSystemPrompt({
+        moduleName: mod.module_name,
+        blankPlate: isAplusBlankPlateModule(mod.module_id),
+        lang,
+      })
+    : buildSystemPrompt({
+        moduleName: mod.module_name,
+        blankPlate: BLANK_PLATE_MODULE_IDS.has(mod.module_id),
+        lang,
+        genderModelRule: buildDetailPageSuiteGenderModelRule(brief.genderCategory, involvesModel),
+      });
   const user = buildPromptLlmUserMessage({
     brief,
     lang,
@@ -213,7 +253,7 @@ export async function generateModulePrompts(opts: {
           { role: "system", content: system },
           { role: "user", content: user },
         ] as CanvasChatMessage[],
-        clientPage: ecomClientPage(opts.userId, opts.projectId, `${ECOM_DETAIL_PAGE_SUITE_TOOL_KEY}__chat`),
+        clientPage: ecomClientPage(opts.userId, opts.projectId, `${promptToolKey}__chat`),
       });
       const parsed = ModulePromptSchema.parse(extractFenceJson(text));
       if (parsed.items.length !== llmLabels.length) {
@@ -227,7 +267,9 @@ export async function generateModulePrompts(opts: {
           positive_prompt: item.positive_prompt,
         });
       });
-      const slots = buildModuleSlotsForSelected(mod, selected, brief, llmMap);
+      const slots = isDetailPageSuiteSpecChartModuleId(mod.module_id)
+        ? buildSpecModuleSlotsForSelected(mod, selected, brief, llmMap)
+        : buildModuleSlotsForSelected(mod, selected, brief, llmMap);
       return finishWithSlots(slots);
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e);
@@ -246,9 +288,18 @@ export async function rewriteSlotPrompt(opts: {
   moduleId: string;
   slotKey: string;
   modelKey?: string;
-}): Promise<NonNullable<Awaited<ReturnType<typeof getDetailPageSuiteProject>>>> {
-  const project = await getDetailPageSuiteProject(opts.userId, opts.projectId);
-  if (!project) throw new Error("项目不存在");
+  projectModule?: string;
+}): Promise<DetailPageSuiteProject> {
+  const access = await loadDetailPageSuiteForOps(
+    opts.userId,
+    opts.projectId,
+    opts.projectModule,
+  );
+  if (!access) throw new Error("项目不存在");
+  const project = access.project;
+  const updateDetailPageSuiteProject = access.update;
+  const promptToolKey = access.toolKey;
+  const isAplus = access.isAplus;
   const mod = project.suite.modules.find((m) => m.module_id === opts.moduleId);
   if (!mod) throw new Error("模块不存在");
   const slot = resolveModuleDisplaySlots(mod).find((s) => s.item_key === opts.slotKey);
@@ -280,6 +331,32 @@ export async function rewriteSlotPrompt(opts: {
     return updated;
   }
 
+  if (isDetailPageSuiteSpecChartDataLabel(slot.item_label)) {
+    const brief = ensureBriefSpecChartDefaults(project.brief ?? {});
+    const nextSlot = buildSpecModuleSlotForLabel(mod, slot.item_label, 0, brief);
+    const modules = project.suite.modules.map((m) =>
+      m.module_id === mod.module_id
+        ? {
+            ...m,
+            slots: materializeModuleSlots({
+              ...m,
+              slots: resolveModuleDisplaySlots(m).map((s) =>
+                s.item_key === slot.item_key ? { ...s, ...nextSlot } : s,
+              ),
+            }),
+          }
+        : m,
+    );
+    const suite = normalizeDetailPageSuiteState({ ...project.suite, modules }, project.meta);
+    const updated = await updateDetailPageSuiteProject(opts.userId, opts.projectId, {
+      suite,
+      brief,
+      meta: upsertPromptSnapshotsFromSuite(project.meta, suite),
+    });
+    if (!updated) throw new Error("保存失败");
+    return updated;
+  }
+
   const modelKey = opts.modelKey?.trim() || project.settings.chatModelKey || ECOM_DEFAULT_VISION_MODEL;
   const brief = project.brief ?? {};
   const lang = brief.outputLanguage ?? "中文";
@@ -288,12 +365,18 @@ export async function rewriteSlotPrompt(opts: {
     moduleName: mod.module_name,
     selectedLabels: [slot.item_label],
   });
-  const system = buildSystemPrompt({
-    moduleName: mod.module_name,
-    blankPlate: BLANK_PLATE_MODULE_IDS.has(mod.module_id),
-    lang,
-    genderModelRule: buildDetailPageSuiteGenderModelRule(brief.genderCategory, involvesModel),
-  });
+  const system = isAplus
+    ? buildAplusDetailPageSystemPrompt({
+        moduleName: mod.module_name,
+        blankPlate: isAplusBlankPlateModule(mod.module_id),
+        lang,
+      })
+    : buildSystemPrompt({
+        moduleName: mod.module_name,
+        blankPlate: BLANK_PLATE_MODULE_IDS.has(mod.module_id),
+        lang,
+        genderModelRule: buildDetailPageSuiteGenderModelRule(brief.genderCategory, involvesModel),
+      });
   const user = buildPromptLlmUserMessage({
     brief,
     lang,
@@ -314,7 +397,7 @@ export async function rewriteSlotPrompt(opts: {
           { role: "system", content: system },
           { role: "user", content: user },
         ] as CanvasChatMessage[],
-        clientPage: ecomClientPage(opts.userId, opts.projectId, `${ECOM_DETAIL_PAGE_SUITE_TOOL_KEY}__chat`),
+        clientPage: ecomClientPage(opts.userId, opts.projectId, `${promptToolKey}__chat`),
       });
       const parsed = ModulePromptSchema.parse(extractFenceJson(text));
       const item = parsed.items[0];
@@ -362,16 +445,22 @@ export async function generateAllEnabledPrompts(opts: {
   userId: string;
   projectId: string;
   modelKey?: string;
+  projectModule?: string;
 }) {
-  const project = await getDetailPageSuiteProject(opts.userId, opts.projectId);
-  if (!project) throw new Error("项目不存在");
-  let latest = project;
-  for (const m of project.suite.modules.filter((x) => x.enable && x.generate_count > 0)) {
+  const access = await loadDetailPageSuiteForOps(
+    opts.userId,
+    opts.projectId,
+    opts.projectModule,
+  );
+  if (!access) throw new Error("项目不存在");
+  let latest = access.project;
+  for (const m of latest.suite.modules.filter((x) => x.enable && x.generate_count > 0)) {
     latest = await generateModulePrompts({
       userId: opts.userId,
       projectId: opts.projectId,
       moduleId: m.module_id,
       modelKey: opts.modelKey,
+      projectModule: opts.projectModule,
     });
   }
   return latest;

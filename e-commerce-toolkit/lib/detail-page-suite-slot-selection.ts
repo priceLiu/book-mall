@@ -16,11 +16,13 @@ export function parseSuiteSlotKey(key: string): { moduleId: string; slotKey: str
 }
 
 import { isDetailPageSuiteSizeChartPromptMarker } from "@/lib/detail-page-suite-size-chart";
+import { isDetailPageSuiteSpecChartPromptMarker } from "@/lib/detail-page-suite-spec-table";
 
 export function isSuiteSlotSelectable(slot: DetailPageSuiteSlot): boolean {
   return (
     Boolean(slot.positive_prompt?.trim()) ||
-    isDetailPageSuiteSizeChartPromptMarker(slot.positive_prompt)
+    isDetailPageSuiteSizeChartPromptMarker(slot.positive_prompt) ||
+    isDetailPageSuiteSpecChartPromptMarker(slot.positive_prompt)
   );
 }
 

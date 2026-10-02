@@ -322,7 +322,7 @@ export function OutfitVideoWorkspace({
     <header className="z-20 shrink-0 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-[#1d1d1f]">穿搭视频</h2>
+          <h2 className="text-sm font-semibold text-[#1d1d1f]">穿搭动作迁移</h2>
           <p className="text-[11px] text-[#6e6e73]">
             上传参考视频，拆镜后锁定穿搭参考，逐镜动作迁移并合成竖屏成片。
           </p>
@@ -340,8 +340,8 @@ export function OutfitVideoWorkspace({
               currentProjectId={project.id}
               loadProjects={loadProjectList}
               onSelectProject={(id) => void onOpenProject(id)}
-              title="穿搭视频 · 项目列表"
-              emptyHint="还没有保存过的穿搭视频项目。"
+              title="穿搭动作迁移 · 项目列表"
+              emptyHint="还没有保存过的穿搭动作迁移项目。"
             />
           </EcomIconToolbarGroup>
           <EcomIconToolbarGroup label="工作流">

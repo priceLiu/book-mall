@@ -1,4 +1,5 @@
 import { resolveModuleDisplaySlots } from "@/lib/detail-page-suite-module-slots";
+import { isProgrammaticSpecChartRenderSlot } from "@/lib/detail-page-suite-spec-table";
 import { parseSuiteSlotKey } from "@/lib/detail-page-suite-slot-selection";
 import type {
   DetailPageSuiteBrief,
@@ -51,8 +52,12 @@ export function partitionDetailPageSuiteImageGenKeys(
     const slot = mod
       ? resolveModuleDisplaySlots(mod).find((s) => s.item_key === parsed.slotKey)
       : undefined;
-    if (slot && isProgrammaticSizeChartRenderSlot(slot)) programmaticKeys.push(key);
-    else modelKeys.push(key);
+    if (
+      slot &&
+      (isProgrammaticSizeChartRenderSlot(slot) || isProgrammaticSpecChartRenderSlot(slot))
+    ) {
+      programmaticKeys.push(key);
+    } else modelKeys.push(key);
   }
   return { programmaticKeys, modelKeys };
 }

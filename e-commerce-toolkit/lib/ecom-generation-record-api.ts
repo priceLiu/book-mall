@@ -103,7 +103,7 @@ const SOURCE_MODULE_LABELS: Record<string, string> = {
   "storyboard-micro-drama": "电商口播故事版",
   "seed-video": "种草视频",
   "model-shot": "模特大片",
-  "outfit-video": "穿搭视频",
+  "outfit-video": "穿搭动作迁移",
   "image-layer": "图片处理",
   "detail-page-suite": "详情页套图",
   "detail-page-suite-hit": "爆款详情页套图",

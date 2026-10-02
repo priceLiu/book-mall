@@ -15,7 +15,7 @@ export type VideoTemplateEngine = {
 
 const OUTFIT_V1_ENGINE: VideoTemplateEngine = {
   templateId: OUTFIT_V1_TEMPLATE_ID,
-  displayName: "穿搭视频",
+  displayName: "穿搭动作迁移",
   moduleId: "video-outfit",
   parseEnvelope: parseOutfitV1Envelope,
   validatePayload: (action, payload) => parseOutfitPayload(action, payload) != null,

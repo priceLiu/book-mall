@@ -3,12 +3,25 @@ import {
   DETAIL_PAGE_SUITE_SIZE_CHART_PROMPT_MARKER,
   isDetailPageSuiteSizeChartDataLabel,
 } from "@/lib/detail-page-suite-size-chart";
+import {
+  DETAIL_PAGE_SUITE_SPEC_CHART_PROMPT_MARKER,
+  isDetailPageSuiteSpecChartDataLabel,
+  isDetailPageSuiteSpecChartModuleId,
+} from "@/lib/detail-page-suite-spec-table";
 import type {
   DetailPageSuiteModuleState,
   DetailPageSuiteState,
 } from "@/lib/detail-page-suite-types";
 
 export const DETAIL_PAGE_SUITE_SIZE_MODULE_ID = "mod7_size_table";
+export const AI_DETAIL_PAGE_SIZE_MODULE_ID = "aplus_size_capacity";
+
+export function isDetailPageSuiteSizeChartModuleId(moduleId: string): boolean {
+  return (
+    moduleId === DETAIL_PAGE_SUITE_SIZE_MODULE_ID ||
+    moduleId === AI_DETAIL_PAGE_SIZE_MODULE_ID
+  );
+}
 
 export const DETAIL_PAGE_SUITE_GLOBAL_MAX = 49;
 
@@ -110,7 +123,7 @@ export function addSizeChartDataSlotToModule(
   mod: DetailPageSuiteModuleState,
   itemLabel: string,
 ): DetailPageSuiteModuleState {
-  if (mod.module_id !== DETAIL_PAGE_SUITE_SIZE_MODULE_ID) {
+  if (!isDetailPageSuiteSizeChartModuleId(mod.module_id)) {
     throw new Error("仅尺码参考模块支持此操作");
   }
   if (!isDetailPageSuiteSizeChartDataLabel(itemLabel)) {
@@ -123,6 +136,39 @@ export function addSizeChartDataSlotToModule(
     item_label: itemLabel,
     source: "template" as const,
     positive_prompt: DETAIL_PAGE_SUITE_SIZE_CHART_PROMPT_MARKER,
+    promptEdited: false,
+    selectedForImage: true,
+  };
+  const candidate_pool = mod.candidate_pool.includes(itemLabel)
+    ? mod.candidate_pool
+    : [...mod.candidate_pool, itemLabel];
+  return {
+    ...mod,
+    generate_count: mod.generate_count + 1,
+    selected_item_list: [...mod.selected_item_list, itemLabel],
+    candidate_pool,
+    slots: [...existingSlots, newSlot],
+  };
+}
+
+/** 规格/参数表模块：+ 新增一张默认参数总表（程序化出图） */
+export function addSpecChartDataSlotToModule(
+  mod: DetailPageSuiteModuleState,
+  itemLabel: string,
+): DetailPageSuiteModuleState {
+  if (!isDetailPageSuiteSpecChartModuleId(mod.module_id)) {
+    throw new Error("仅规格/参数表模块支持此操作");
+  }
+  if (!isDetailPageSuiteSpecChartDataLabel(itemLabel)) {
+    throw new Error("无效的参数表点位标签");
+  }
+  const item_key = `spec_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+  const existingSlots = resolveModuleDisplaySlots(mod);
+  const newSlot = {
+    item_key,
+    item_label: itemLabel,
+    source: "template" as const,
+    positive_prompt: DETAIL_PAGE_SUITE_SPEC_CHART_PROMPT_MARKER,
     promptEdited: false,
     selectedForImage: true,
   };

@@ -3,7 +3,10 @@ import type {
   DetailPageSuiteSlot,
 } from "@/lib/detail-page-suite-types";
 
-import { DETAIL_PAGE_SUITE_SIZE_MODULE_ID } from "@/lib/detail-page-suite-add-custom-slot";
+import {
+  isDetailPageSuiteSizeChartModuleId,
+} from "@/lib/detail-page-suite-add-custom-slot";
+import { isDetailPageSuiteSpecChartModuleId } from "@/lib/detail-page-suite-spec-table";
 
 type PromptSnapshot = { prompt: string; itemLabel: string; updatedAt: string };
 
@@ -18,7 +21,8 @@ export function detailPageSuiteLabelMatches(a: string, b: string): boolean {
 }
 
 export function defaultDetailPageSuiteGenerateCount(moduleId: string, maxNum: number): number {
-  if (moduleId === DETAIL_PAGE_SUITE_SIZE_MODULE_ID) return Math.min(1, maxNum);
+  if (isDetailPageSuiteSizeChartModuleId(moduleId)) return Math.min(1, maxNum);
+  if (isDetailPageSuiteSpecChartModuleId(moduleId)) return Math.min(1, maxNum);
   return maxNum;
 }
 

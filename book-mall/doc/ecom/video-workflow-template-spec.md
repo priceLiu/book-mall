@@ -1,6 +1,6 @@
 # 电商短视频工作流 · 模板与 JSON 契约（权威）
 
-> **状态**：首期模板 `outfit-v1`（穿搭视频）  
+> **状态**：首期模板 `outfit-v1`（穿搭动作迁移）  
 > **代码 SSOT**：`book-mall/lib/ecom/video-workflow/`  
 > **客户端镜像**：`e-commerce-toolkit/lib/video-workflow/`（解析/types 须与 book-mall 一致）  
 > **业务 PRD**：[`docs/穿搭视频.md`](../../../docs/穿搭视频.md)  

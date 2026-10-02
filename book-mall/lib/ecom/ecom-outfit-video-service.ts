@@ -346,7 +346,7 @@ export async function createEcomOutfitVideoProject(
       userId,
       module: ECOM_OUTFIT_VIDEO_MODULE,
       templateId: OUTFIT_V1_TEMPLATE_ID,
-      title: opts?.title?.trim() || "穿搭视频",
+      title: opts?.title?.trim() || "穿搭动作迁移",
       phase: "upload",
       settings: {
         videoModelKey: OUTFIT_V1_DEFAULT_VIDEO_MODEL,
@@ -415,7 +415,7 @@ export async function updateEcomOutfitVideoProject(
   if (!existing) throw new Error("项目不存在");
 
   const data: Prisma.EcomVideoWorkflowProjectUpdateInput = {};
-  if (typeof patch.title === "string") data.title = patch.title.trim() || "穿搭视频";
+  if (typeof patch.title === "string") data.title = patch.title.trim() || "穿搭动作迁移";
   if (patch.settings) {
     data.settings = {
       ...sanitizeSettings(existing.settings),
@@ -479,7 +479,7 @@ export async function uploadEcomOutfitVideoReference(
     contentType: file.type,
     fileName: file.name,
   });
-  if (uploaded.kind !== "video") throw new Error("穿搭视频仅支持上传参考视频");
+  if (uploaded.kind !== "video") throw new Error("穿搭动作迁移仅支持上传参考视频");
 
   const refs = applyOutfitReferenceVideo(
     existing,
@@ -504,7 +504,7 @@ export async function setEcomOutfitVideoReferenceFromUrl(
   if (!existing) throw new Error("项目不存在");
 
   const { kind, ossUrl } = await resolveMediaDecomposeFromUrl({ userId, url });
-  if (kind !== "video") throw new Error("穿搭视频仅支持视频链接");
+  if (kind !== "video") throw new Error("穿搭动作迁移仅支持视频链接");
 
   const refs = applyOutfitReferenceVideo(existing, ossUrl, "链接视频");
 
@@ -533,7 +533,7 @@ export async function attachEcomOutfitVideoReferenceFromAsset(
   const ossUrl = asset.ossUrl.trim();
   const kind =
     asset.kind === "video" || inferKindFromOssUrl(ossUrl) === "video" ? "video" : "image";
-  if (kind !== "video") throw new Error("穿搭视频仅支持视频资产");
+  if (kind !== "video") throw new Error("穿搭动作迁移仅支持视频资产");
 
   const refs = applyOutfitReferenceVideo(
     existing,
@@ -1526,7 +1526,7 @@ export async function renderEcomOutfitVideo(
   const job = await createMediaRenderJob({
     userId,
     sourceApp: MediaRenderSourceApp.ecom,
-    sourceRef: { projectId, title: project.title ?? "穿搭视频" },
+    sourceRef: { projectId, title: project.title ?? "穿搭动作迁移" },
     timeline,
     profile: {
       ...profile,

@@ -2,9 +2,10 @@ import { z } from "zod";
 
 import type { EcomImageRatio } from "@/lib/ecom/ecom-platform-spec";
 import {
-  PRO_OUTPUT_LANGUAGES,
-  PRO_PLATFORMS,
-} from "@/lib/ecom/ecom-style-preset/platform-enums";
+  ECOM_COUNTRY_OPTIONS,
+  ECOM_LANGUAGE_OPTIONS,
+  ECOM_PLATFORM_OPTIONS,
+} from "@/lib/ecom/ecom-generation-settings-catalog";
 
 export const ECOM_PRODUCT_IMAGE_SET_MODULE = "product-image-set";
 export const ECOM_PRODUCT_IMAGE_SET_TOOL_KEY = "ecom-toolkit__product-image-set";
@@ -137,26 +138,13 @@ export function totalStructureCount(s: ProductImageSetStructureCounts): number {
 }
 
 export function productImageSetMarketOptions(): { value: string; label: string }[] {
-  return [
-    { value: "us", label: "美国" },
-    { value: "uk", label: "英国" },
-    { value: "de", label: "德国" },
-    { value: "jp", label: "日本" },
-  ];
+  return [...ECOM_COUNTRY_OPTIONS];
 }
 
 export function productImageSetPlatformOptions(): { value: string; label: string }[] {
-  return PRO_PLATFORMS.map((p) => ({
-    value:
-      p === "亚马逊"
-        ? "amazon"
-        : p === "TikTok Shop"
-          ? "tiktok-shop"
-          : p.toLowerCase().replace(/\s+/g, "-"),
-    label: p,
-  }));
+  return [...ECOM_PLATFORM_OPTIONS];
 }
 
 export function productImageSetLanguageOptions(): { value: string; label: string }[] {
-  return PRO_OUTPUT_LANGUAGES.map((l) => ({ value: l, label: l }));
+  return [...ECOM_LANGUAGE_OPTIONS];
 }

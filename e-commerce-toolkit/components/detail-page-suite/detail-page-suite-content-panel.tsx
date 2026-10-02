@@ -7,8 +7,13 @@ import { DetailPageSuiteAddSlotCard } from "@/components/detail-page-suite/detai
 import { DetailPageSuiteSlotCard } from "@/components/detail-page-suite/detail-page-suite-slot-card";
 import {
   canAddCustomSuiteSlot,
-  DETAIL_PAGE_SUITE_SIZE_MODULE_ID,
+  isDetailPageSuiteSizeChartModuleId,
 } from "@/lib/detail-page-suite-add-custom-slot";
+import {
+  isDetailPageSuiteSpecChartDataLabel,
+  isDetailPageSuiteSpecChartModuleId,
+  isDetailPageSuiteTableDataModuleId,
+} from "@/lib/detail-page-suite-spec-table";
 import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
@@ -109,7 +114,7 @@ type Props = {
   onExportPack?: () => void | Promise<void>;
   exportPackBusy?: boolean;
   /** 详情页套图复刻 / 爆款：隐藏顶栏上传/卖点，下区出图格子 */
-  variant?: "default" | "replica" | "hit";
+  variant?: "default" | "replica" | "hit" | "aplus";
   /** 复刻页顶栏由 Studio 固定在滚动区外时设为 true */
   hideHeader?: boolean;
 };
@@ -149,7 +154,8 @@ export function DetailPageSuiteWorkbenchChrome({
 }: DetailPageSuiteWorkbenchChromeProps) {
   const isReplica = variant === "replica";
   const isHit = variant === "hit";
-  const isWorkbench = isReplica || isHit;
+  const isAplus = variant === "aplus";
+  const isWorkbench = isReplica || isHit || isAplus;
   const phase = project.meta?.phase ?? "product_ref";
   const phaseLabel = useMemo(() => {
     const hit = (
@@ -188,17 +194,21 @@ export function DetailPageSuiteWorkbenchChrome({
       projectId: project.id,
       sourceModule: isHit
         ? "detail-page-suite-hit"
-        : isReplica
-          ? "detail-page-suite-replica"
-          : undefined,
+        : isAplus
+          ? "ai-detail-page"
+          : isReplica
+            ? "detail-page-suite-replica"
+            : undefined,
       returnTo: isHit
         ? "/ecom/detail-page-suite-hit"
-        : isReplica
-          ? "/ecom/detail-page-suite-replica"
-          : undefined,
+        : isAplus
+          ? "/ecom/ai-detail-page"
+          : isReplica
+            ? "/ecom/detail-page-suite-replica"
+            : undefined,
       projectTitle: project.title?.trim() || undefined,
     });
-  }, [isHit, isReplica, isWorkbench, project.id, project.title]);
+  }, [isAplus, isHit, isReplica, isWorkbench, project.id, project.title]);
 
   return (
     <header className="shrink-0 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
@@ -206,7 +216,13 @@ export function DetailPageSuiteWorkbenchChrome({
         <div>
           <h2 className="text-sm font-semibold text-[#1d1d1f]">
             {project.title?.trim() ||
-              (isHit ? "爆款详情页套图" : isReplica ? "详情页套图复刻" : "详情页套图")}
+              (isHit
+                ? "爆款详情页套图"
+                : isAplus
+                  ? "AI 详情页"
+                  : isReplica
+                    ? "详情页套图复刻"
+                    : "详情页套图")}
           </h2>
           <p className="text-[11px] text-[#6e6e73]">
             阶段：{isWorkbench ? "出图" : phaseLabel}
@@ -251,16 +267,20 @@ export function DetailPageSuiteWorkbenchChrome({
                 title={
                   isHit
                     ? "爆款详情页套图 · 项目列表"
-                    : isReplica
-                      ? "详情页套图复刻 · 项目列表"
-                      : "详情页套图 · 项目列表"
+                    : isAplus
+                      ? "AI 详情页 · 项目列表"
+                      : isReplica
+                        ? "详情页套图复刻 · 项目列表"
+                        : "详情页套图 · 项目列表"
                 }
                 emptyHint={
                   isHit
                     ? "还没有保存过的爆款详情页套图项目。"
-                    : isReplica
-                      ? "还没有保存过的详情页套图复刻项目。"
-                      : "还没有保存过的详情页套图项目。"
+                    : isAplus
+                      ? "还没有保存过的 AI 详情页项目。"
+                      : isReplica
+                        ? "还没有保存过的详情页套图复刻项目。"
+                        : "还没有保存过的详情页套图项目。"
                 }
                 disabled={llmBusy}
               />
@@ -348,7 +368,8 @@ export function DetailPageSuiteContentPanel({
   hideHeader = false,
 }: Props) {
   const isHit = variant === "hit";
-  const isWorkbench = variant === "replica" || isHit;
+  const isAplus = variant === "aplus";
+  const isWorkbench = variant === "replica" || isHit || isAplus;
   const inputRef = useRef<HTMLInputElement>(null);
   const [assetOpen, setAssetOpen] = useState(false);
   const activeGen = activeGenSlotKeys ?? new Set<string>();
@@ -600,7 +621,7 @@ export function DetailPageSuiteContentPanel({
                   onActiveImageIndexChange={onActiveImageIndexChange}
                   imageGenFailures={readDetailPageSuiteImageGenFailures(project.meta)}
                   replicaMode={isWorkbench}
-                  isHit={isHit}
+                  isHit={isHit || isAplus}
                 />
               ))}
             </section>
@@ -690,7 +711,8 @@ function ModuleBlock({
   const modulePromptBusy = activePromptModules.has(mod.module_id);
   const addSlotCheck = canAddCustomSuiteSlot(suite, mod.module_id);
   const canAddSlot = addSlotCheck.ok;
-  const isSizeChartModule = mod.module_id === DETAIL_PAGE_SUITE_SIZE_MODULE_ID;
+  const isSizeChartModule = isDetailPageSuiteTableDataModuleId(mod.module_id);
+  const isSpecChartModule = isDetailPageSuiteSpecChartModuleId(mod.module_id);
 
   return (
     <div className="rounded-xl border border-[#e8e8ed] p-4">
@@ -763,7 +785,9 @@ function ModuleBlock({
         <p className="mb-3 text-[11px] text-[#86868b]">
           已选 {selectedSlotCount}/{gridSlots.length} 个点位
           {isSizeChartModule ? (
-            " · 尺码表编辑后勾选生图；线稿/对比图需先有提示词"
+            isSpecChartModule
+              ? " · 参数表编辑后勾选生图；包装/合规图需先有提示词"
+              : " · 尺码表编辑后勾选生图；线稿/对比图需先有提示词"
           ) : (
             <>
               {" "}
@@ -789,13 +813,17 @@ function ModuleBlock({
             const busyLabel = slotGenBusy
               ? isDetailPageSuiteSizeChartDataLabel(slot.item_label)
                 ? "生成尺码表…"
-                : undefined
+                : isDetailPageSuiteSpecChartDataLabel(slot.item_label)
+                  ? "生成参数表…"
+                  : undefined
               : slotRewriteBusy
                 ? "重写提示词…"
                 : slotPromptBusy
                   ? isDetailPageSuiteSizeChartDataLabel(slot.item_label)
                     ? "准备尺码表…"
-                    : "撰写提示词…"
+                    : isDetailPageSuiteSpecChartDataLabel(slot.item_label)
+                      ? "准备参数表…"
+                      : "撰写提示词…"
                   : undefined;
             return (
               <DetailPageSuiteSlotCard
@@ -848,9 +876,11 @@ function ModuleBlock({
             disabled={!canAddSlot || modulePromptBusy}
             disabledReason={!canAddSlot && !addSlotCheck.ok ? addSlotCheck.reason : undefined}
             hint={
-              mod.module_id === "mod7_size_table"
-                ? "点击新增默认尺码表"
-                : "点击输入提示词"
+              isSpecChartModule
+                ? "点击新增默认参数表"
+                : isDetailPageSuiteSizeChartModuleId(mod.module_id)
+                  ? "点击新增默认尺码表"
+                  : "点击输入提示词"
             }
             onClick={() => onRequestAddSlot(mod.module_id)}
           />

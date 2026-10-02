@@ -7,6 +7,11 @@ import {
   resolveSizeChartTableForSlot,
   uploadRenderedSizeChartPng,
 } from "./size-chart-image";
+import { isDetailPageSuiteSpecChartDataLabel } from "./spec-table-constants";
+import {
+  resolveSpecChartTableForSlot,
+  uploadRenderedSpecChartPng,
+} from "./spec-table-image";
 import { getEcomPlatformSpec, type EcomImageRatio } from "@/lib/ecom/ecom-platform-spec";
 import {
   imageSizeForExportTarget,
@@ -38,9 +43,11 @@ import {
   upsertPromptSnapshotsFromSuite,
 } from "./prompt-snapshot";
 import {
+  getDetailPageSuiteAplusProject,
   getDetailPageSuiteHitProject,
   getDetailPageSuiteProject,
   getDetailPageSuiteReplicaProject,
+  updateDetailPageSuiteAplusProject,
   updateDetailPageSuiteHitProject,
   updateDetailPageSuiteProject,
   updateDetailPageSuiteReplicaProject,
@@ -59,6 +66,8 @@ import {
 import {
   BLANK_PLATE_MODULE_IDS,
   DETAIL_PAGE_SUITE_NEGATIVE_PROMPT,
+  ECOM_AI_DETAIL_PAGE_MODULE,
+  ECOM_AI_DETAIL_PAGE_TOOL_KEY,
   ECOM_DETAIL_PAGE_SUITE_HIT_MODULE,
   ECOM_DETAIL_PAGE_SUITE_HIT_TOOL_KEY,
   ECOM_DETAIL_PAGE_SUITE_MODULE,
@@ -189,7 +198,7 @@ export async function generateDetailPageSuiteImages(opts: {
   onlySelected?: boolean;
   modelKey?: string;
   imageSize?: string;
-  imageRatio?: "1:1" | "3:4" | "4:5" | "16:9";
+  imageRatio?: "1:1" | "3:4" | "4:5" | "9:16" | "16:9";
   /** 爆款多平台：覆盖 settings.activeExportTargetIds */
   activeExportTargetIds?: string[];
   /** 默认 detail-page-suite；复刻 / 爆款传对应 module */
@@ -201,27 +210,36 @@ export async function generateDetailPageSuiteImages(opts: {
   const moduleKey = opts.projectModule?.trim() || ECOM_DETAIL_PAGE_SUITE_MODULE;
   const isReplica = moduleKey === ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE;
   const isHit = moduleKey === ECOM_DETAIL_PAGE_SUITE_HIT_MODULE;
+  const isAplus = moduleKey === ECOM_AI_DETAIL_PAGE_MODULE;
   let project = isHit
     ? await getDetailPageSuiteHitProject(opts.userId, opts.projectId)
-    : isReplica
-      ? await getDetailPageSuiteReplicaProject(opts.userId, opts.projectId)
-      : await getDetailPageSuiteProject(opts.userId, opts.projectId);
+    : isAplus
+      ? await getDetailPageSuiteAplusProject(opts.userId, opts.projectId)
+      : isReplica
+        ? await getDetailPageSuiteReplicaProject(opts.userId, opts.projectId)
+        : await getDetailPageSuiteProject(opts.userId, opts.projectId);
   if (!project) throw new Error("项目不存在");
   const updateProject = isHit
     ? updateDetailPageSuiteHitProject
-    : isReplica
-      ? updateDetailPageSuiteReplicaProject
-      : updateDetailPageSuiteProject;
+    : isAplus
+      ? updateDetailPageSuiteAplusProject
+      : isReplica
+        ? updateDetailPageSuiteReplicaProject
+        : updateDetailPageSuiteProject;
   const assetModule = isHit
     ? ECOM_DETAIL_PAGE_SUITE_HIT_MODULE
-    : isReplica
-      ? ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE
-      : ECOM_DETAIL_PAGE_SUITE_MODULE;
+    : isAplus
+      ? ECOM_AI_DETAIL_PAGE_MODULE
+      : isReplica
+        ? ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE
+        : ECOM_DETAIL_PAGE_SUITE_MODULE;
   const genToolKey = isHit
     ? ECOM_DETAIL_PAGE_SUITE_HIT_TOOL_KEY
-    : isReplica
-      ? ECOM_DETAIL_PAGE_SUITE_REPLICA_TOOL_KEY
-      : ECOM_DETAIL_PAGE_SUITE_TOOL_KEY;
+    : isAplus
+      ? ECOM_AI_DETAIL_PAGE_TOOL_KEY
+      : isReplica
+        ? ECOM_DETAIL_PAGE_SUITE_REPLICA_TOOL_KEY
+        : ECOM_DETAIL_PAGE_SUITE_TOOL_KEY;
 
   const legacyGlobalBurnCopy =
     isHit &&
@@ -341,7 +359,10 @@ export async function generateDetailPageSuiteImages(opts: {
   type ImageGenWorkItem = { target: DetailPageSuiteImageTarget; exportTarget: DetailPageSuiteExportTarget };
   const workItems: ImageGenWorkItem[] = [];
   for (const t of targets) {
-    if (isDetailPageSuiteSizeChartDataLabel(t.itemLabel)) {
+    if (
+      isDetailPageSuiteSizeChartDataLabel(t.itemLabel) ||
+      isDetailPageSuiteSpecChartDataLabel(t.itemLabel)
+    ) {
       workItems.push({
         target: t,
         exportTarget: exportTargets[0] ?? {
@@ -361,6 +382,7 @@ export async function generateDetailPageSuiteImages(opts: {
 
   try {
   let sizeChartTableIndex = 0;
+  let specChartTableIndex = 0;
   await mapWithConcurrency(workItems, async ({ target: t, exportTarget: et }) => {
     const key = `${t.moduleId}::${t.slotKey}`;
     const ratio = ratioForExportTarget(et);
@@ -382,7 +404,15 @@ export async function generateDetailPageSuiteImages(opts: {
               sizeChartTableIndex++,
             ),
           })
-        : await (async () => {
+        : isDetailPageSuiteSpecChartDataLabel(t.itemLabel)
+          ? await uploadRenderedSpecChartPng({
+              userId: opts.userId,
+              table: resolveSpecChartTableForSlot(
+                project.brief,
+                specChartTableIndex++,
+              ),
+            })
+          : await (async () => {
             const involvesModel = detailPageSuiteSlotInvolvesModel({
               moduleId: t.moduleId,
               moduleName: t.moduleName,

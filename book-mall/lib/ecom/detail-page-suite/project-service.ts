@@ -14,6 +14,7 @@ import {
   sanitizeReferences,
 } from "./parse";
 import { normalizeDetailPageSuiteProject, prepareDetailPageSuitePatch } from "./suite-persist";
+import { buildInitialAplusSuite } from "@/lib/ecom/detail-page-aplus/aplus-suite-init";
 import { buildInitialHitSuite } from "@/lib/ecom/detail-page-suite-hit/hit-materialize";
 import {
   buildInitialReplicaSuite,
@@ -21,6 +22,7 @@ import {
 } from "@/lib/ecom/detail-page-suite-replica/replica-materialize";
 
 import {
+  ECOM_AI_DETAIL_PAGE_MODULE,
   ECOM_DETAIL_PAGE_SUITE_HIT_MODULE,
   ECOM_DETAIL_PAGE_SUITE_MODULE,
   ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE,
@@ -610,4 +612,180 @@ export async function uploadDetailPageSuiteHitReference(opts: {
     ];
   }
   return updateDetailPageSuiteHitProject(opts.userId, opts.projectId, { references: refs });
+}
+
+export async function listDetailPageSuiteAplusProjects(
+  userId: string,
+): Promise<DetailPageSuiteProject[]> {
+  const rows = await prisma.ecomDetailPageSuiteProject.findMany({
+    where: { userId, module: ECOM_AI_DETAIL_PAGE_MODULE },
+    orderBy: { updatedAt: "desc" },
+    take: 50,
+  });
+  return rows.map(rowToDto);
+}
+
+export async function listDetailPageSuiteAplusSummaries(userId: string) {
+  const rows = await prisma.ecomDetailPageSuiteProject.findMany({
+    where: { userId, module: ECOM_AI_DETAIL_PAGE_MODULE },
+    orderBy: { updatedAt: "desc" },
+    take: 50,
+    select: { id: true, title: true, updatedAt: true, references: true, suite: true },
+  });
+  return rows.map((row) => {
+    const refs = sanitizeReferences(row.references);
+    const suite = parseSuite(row.suite);
+    const thumb =
+      suite.modules
+        .flatMap((m) => m.slots)
+        .map((s) => {
+          if (s.imageUrl?.trim()) return s.imageUrl;
+          const hist = s.imageHistory;
+          if (!hist?.length) return null;
+          const last = hist[hist.length - 1];
+          return typeof last === "string" ? last : (last?.url ?? null);
+        })
+        .find(Boolean) ??
+      refs.find((r) => r.role === "product")?.ossUrl ??
+      refs[0]?.ossUrl ??
+      null;
+    return {
+      id: row.id,
+      title: row.title,
+      updatedAt: row.updatedAt.toISOString(),
+      thumbnailUrl: thumb,
+    };
+  });
+}
+
+export async function createDetailPageSuiteAplusProject(
+  userId: string,
+  opts?: { title?: string },
+): Promise<DetailPageSuiteProject> {
+  const row = await prisma.ecomDetailPageSuiteProject.create({
+    data: {
+      userId,
+      module: ECOM_AI_DETAIL_PAGE_MODULE,
+      title: opts?.title?.trim().slice(0, 120) || "AI 详情页",
+      references: [] as Prisma.InputJsonValue,
+      chatHistory: [] as Prisma.InputJsonValue,
+      suite: buildInitialAplusSuite() as unknown as Prisma.InputJsonValue,
+      meta: { phase: "product_ref" } as Prisma.InputJsonValue,
+      settings: {
+        platformCode: "amazon",
+        outputLanguage: "英文",
+      } as Prisma.InputJsonValue,
+    },
+  });
+  return rowToDto(row);
+}
+
+export async function getDetailPageSuiteAplusProject(
+  userId: string,
+  id: string,
+): Promise<DetailPageSuiteProject | null> {
+  const row = await prisma.ecomDetailPageSuiteProject.findFirst({
+    where: { id, userId, module: ECOM_AI_DETAIL_PAGE_MODULE },
+  });
+  if (!row) return null;
+  return loadDetailPageSuiteProjectNormalized(row);
+}
+
+export async function updateDetailPageSuiteAplusProject(
+  userId: string,
+  id: string,
+  patch: Parameters<typeof updateDetailPageSuiteProject>[2],
+): Promise<DetailPageSuiteProject | null> {
+  const existing = await prisma.ecomDetailPageSuiteProject.findFirst({
+    where: { id, userId, module: ECOM_AI_DETAIL_PAGE_MODULE },
+  });
+  if (!existing) return null;
+  const existingProject = rowToDto(existing);
+  const normalizedPatch =
+    patch.suite !== undefined
+      ? prepareDetailPageSuitePatch(existingProject, {
+          suite: patch.suite,
+          meta: patch.meta !== undefined ? patch.meta : existingProject.meta,
+        })
+      : null;
+  const row = await prisma.ecomDetailPageSuiteProject.update({
+    where: { id },
+    data: {
+      ...(patch.title !== undefined ? { title: patch.title.slice(0, 120) } : {}),
+      ...(patch.status !== undefined ? { status: patch.status } : {}),
+      ...(patch.brief !== undefined ? { brief: patch.brief as Prisma.InputJsonValue } : {}),
+      ...(patch.settings !== undefined
+        ? { settings: patch.settings as Prisma.InputJsonValue }
+        : {}),
+      ...(patch.references !== undefined
+        ? { references: patch.references as Prisma.InputJsonValue }
+        : {}),
+      ...(patch.chatHistory !== undefined
+        ? { chatHistory: patch.chatHistory as Prisma.InputJsonValue }
+        : {}),
+      ...(normalizedPatch?.suite !== undefined
+        ? { suite: normalizedPatch.suite as Prisma.InputJsonValue }
+        : patch.suite !== undefined
+          ? { suite: patch.suite as Prisma.InputJsonValue }
+          : {}),
+      ...(normalizedPatch?.meta !== undefined
+        ? { meta: normalizedPatch.meta as Prisma.InputJsonValue }
+        : patch.meta !== undefined
+          ? { meta: patch.meta as Prisma.InputJsonValue }
+          : {}),
+    },
+  });
+  return rowToDto(row);
+}
+
+export async function deleteDetailPageSuiteAplusProject(
+  userId: string,
+  id: string,
+): Promise<boolean> {
+  const row = await prisma.ecomDetailPageSuiteProject.findFirst({
+    where: { id, userId, module: ECOM_AI_DETAIL_PAGE_MODULE },
+  });
+  if (!row) return false;
+  await prisma.ecomDetailPageSuiteProject.delete({ where: { id } });
+  return true;
+}
+
+export async function uploadDetailPageSuiteAplusReference(opts: {
+  userId: string;
+  projectId: string;
+  buf: Buffer;
+  contentType: string;
+  label?: string;
+  role: DetailPageSuiteReferenceRole;
+}): Promise<DetailPageSuiteProject | null> {
+  const { normalizeDetailPageSuiteReferenceForStorage } = await import(
+    "./ref-upload-normalize"
+  );
+  const stored = await normalizeDetailPageSuiteReferenceForStorage(opts.buf);
+  const ossUrl = await uploadCanvasUserBuffer({
+    userId: opts.userId,
+    ext: stored.ext,
+    buf: stored.buf,
+    contentType: stored.contentType,
+  });
+  const project = await getDetailPageSuiteAplusProject(opts.userId, opts.projectId);
+  if (!project) return null;
+  const role = opts.role;
+  const sameRole = project.references.filter((r) => r.role === role);
+  const limit = REPLICA_ROLE_LIMITS[role];
+  const newRef: DetailPageSuiteReference = {
+    id: randomUUID(),
+    label:
+      opts.label?.trim() ||
+      (role === "model"
+        ? `模特图 ${sameRole.length + 1}`
+        : `产品图 ${sameRole.length + 1}`),
+    role,
+    ossUrl,
+  };
+  const refs = [
+    ...project.references.filter((r) => r.role !== role),
+    ...[...sameRole, newRef].slice(-limit),
+  ];
+  return updateDetailPageSuiteAplusProject(opts.userId, opts.projectId, { references: refs });
 }

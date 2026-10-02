@@ -22,7 +22,7 @@ type ThreadProps = {
 
 export function OutfitVideoBottomDockThread({ mode }: ThreadProps) {
   return (
-    <section className="space-y-3" aria-label="穿搭视频引导">
+    <section className="space-y-3" aria-label="穿搭动作迁移引导">
       <div className="flex w-full justify-start">
         <div className={cn(ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE, ECOM_ASSISTANT_BUBBLE_CLASS)}>
           <p className="whitespace-pre-wrap leading-relaxed">{outfitBottomDockWelcome(mode)}</p>

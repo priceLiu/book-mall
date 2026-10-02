@@ -1,6 +1,6 @@
 /** 详情页套图 · 平台默认展示/出图比例（与 book-mall ecom-platform-spec 对齐） */
 
-export type EcomDetailPageRatio = "1:1" | "3:4" | "4:5" | "16:9";
+export type EcomDetailPageRatio = "1:1" | "3:4" | "4:5" | "9:16" | "16:9";
 
 const PLATFORM_DETAIL_RATIO: Record<string, EcomDetailPageRatio> = {
   "taobao-tmall": "3:4",
@@ -25,6 +25,7 @@ export function resolveDetailPageDisplayRatio(
     override === "1:1" ||
     override === "3:4" ||
     override === "4:5" ||
+    override === "9:16" ||
     override === "16:9"
   ) {
     return override;
@@ -39,6 +40,8 @@ export function detailPageAspectClass(ratio: EcomDetailPageRatio): string {
   switch (ratio) {
     case "16:9":
       return "aspect-[16/9]";
+    case "9:16":
+      return "aspect-[9/16]";
     case "1:1":
       return "aspect-square";
     case "4:5":
@@ -66,6 +69,8 @@ export function ecomRatioToDefaultImageSize(ratio: EcomDetailPageRatio): string 
       return "1152*1440";
     case "16:9":
       return "1440*810";
+    case "9:16":
+      return "810*1440";
     default:
       return "1080*1440";
   }

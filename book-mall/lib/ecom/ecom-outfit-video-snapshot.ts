@@ -16,7 +16,7 @@ export type OutfitVideoDeliverableSnapshot = {
 };
 
 function sanitizeTitleSegment(name: string): string {
-  return name.replace(/[^\w\u4e00-\u9fff.-]+/g, "_").slice(0, 80) || "穿搭视频";
+  return name.replace(/[^\w\u4e00-\u9fff.-]+/g, "_").slice(0, 80) || "穿搭动作迁移";
 }
 
 function formatSnapshotTimestamp(d = new Date()): string {
@@ -28,7 +28,7 @@ function formatSnapshotTimestamp(d = new Date()): string {
 }
 
 export function buildOutfitVideoDeliverableSnapshotTitle(workName: string): string {
-  const base = sanitizeTitleSegment(workName.trim() || "穿搭视频");
+  const base = sanitizeTitleSegment(workName.trim() || "穿搭动作迁移");
   return `${base}_${formatSnapshotTimestamp()}`;
 }
 

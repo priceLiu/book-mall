@@ -76,7 +76,7 @@ ${OUTFIT_SPLIT_JSON_CONTRACT}
 
 ## 运行时上下文
 
-- 工作流：**穿搭视频**（outfit-v1）· FFmpeg 物理切镜后的 **逐镜视觉 enrich**
+- 工作流：**穿搭动作迁移**（outfit-v1）· FFmpeg 物理切镜后的 **逐镜视觉 enrich**
 - User 消息含 **每镜关键帧截图** + 时间轴；请对照截图标注对应镜号字段
 - 逐镜生成 Prompt 由用户在前端编辑；运镜/动作字段不参与生成 Prompt 拼接`;
 }
@@ -91,7 +91,7 @@ ${OUTFIT_SPLIT_JSON_CONTRACT}
 
 ## 运行时上下文
 
-- 工作流：**穿搭视频**（outfit-v1）· FFmpeg 物理切镜后的 **逐镜视觉 enrich**
+- 工作流：**穿搭动作迁移**（outfit-v1）· FFmpeg 物理切镜后的 **逐镜视觉 enrich**
 - User 消息含 **每镜关键帧截图** + 时间轴；请对照截图标注对应镜号字段
 - 逐镜生成 Prompt 由用户在前端编辑；运镜/动作字段不参与生成 Prompt 拼接`;
 }

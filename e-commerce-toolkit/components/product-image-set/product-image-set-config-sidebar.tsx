@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-import { EcomSellpointFivePartHint } from "@/components/media/ecom-sellpoint-five-part-hint";
+import { EcomSellpointSectionTitle } from "@/components/media/ecom-sellpoint-five-part-help-trigger";
 import { ProductImageSetLayoutPickerDialog } from "@/components/product-image-set/product-image-set-layout-picker-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
@@ -29,13 +29,13 @@ import {
   productImageSetGenerateBusyDetail,
   productImageSetPlanBusyDetail,
 } from "@/lib/product-image-set-busy";
+import { EcomGenerationSettingsSection } from "@/components/ecom-generation-settings/ecom-generation-settings-section";
 import {
-  LANGUAGE_OPTIONS,
-  MARKET_OPTIONS,
-  PLATFORM_OPTIONS,
-  RATIO_OPTIONS,
-  totalStructureCount,
-} from "@/lib/product-image-set-types";
+  normalizeEcomCountryValue,
+  normalizeEcomLanguageValue,
+  normalizeEcomPlatformValue,
+} from "@/lib/ecom-generation-settings/constants";
+import { RATIO_OPTIONS, totalStructureCount } from "@/lib/product-image-set-types";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import { cn } from "@/lib/utils";
 
@@ -193,77 +193,42 @@ export function ProductImageSetConfigSidebar({
         </div>
 
         <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          <section className="mb-3 rounded-xl border border-[#e8e8ed] bg-white">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between px-3 py-2.5"
-              onClick={() => setSettingsOpen((o) => !o)}
+          <EcomGenerationSettingsSection
+            disabled={disabled || Boolean(busy)}
+            defaultOpen={settingsOpen}
+            value={{
+              platform: normalizeEcomPlatformValue(project.settings.platform),
+              country: normalizeEcomCountryValue(project.settings.market),
+              language: normalizeEcomLanguageValue(project.settings.language),
+            }}
+            onChange={(patch) => {
+              const settings: Partial<ProductImageSetProject["settings"]> = {};
+              if (patch.platform !== undefined) settings.platform = patch.platform;
+              if (patch.country !== undefined) settings.market = patch.country;
+              if (patch.language !== undefined) settings.language = patch.language;
+              if (Object.keys(settings).length > 0) void persist({ settings });
+            }}
+          />
+          <section className="mb-3 rounded-xl border border-[#e8e8ed] bg-white px-3 py-3">
+            <p className="mb-2 text-xs font-semibold">出图比例</p>
+            <select
+              className="w-full rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-2 py-1.5 text-[11px]"
+              value={project.settings.imageRatio ?? "1:1"}
+              disabled={disabled || Boolean(busy)}
+              onChange={(e) =>
+                void persist({
+                  settings: {
+                    imageRatio: e.target.value as ProductImageSetProject["settings"]["imageRatio"],
+                  },
+                })
+              }
             >
-              <span className="text-xs font-semibold">生成设置</span>
-              {settingsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-            {settingsOpen ? (
-              <div className="grid grid-cols-2 gap-2 border-t border-[#e8e8ed] px-3 py-3">
-                <select
-                  className="rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-2 py-1.5 text-[11px]"
-                  value={project.settings.platform ?? "amazon"}
-                  disabled={disabled || Boolean(busy)}
-                  onChange={(e) =>
-                    void persist({ settings: { platform: e.target.value } })
-                  }
-                >
-                  {PLATFORM_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className="rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-2 py-1.5 text-[11px]"
-                  value={project.settings.market ?? "us"}
-                  disabled={disabled || Boolean(busy)}
-                  onChange={(e) => void persist({ settings: { market: e.target.value } })}
-                >
-                  {MARKET_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className="rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-2 py-1.5 text-[11px]"
-                  value={project.settings.language ?? "英文"}
-                  disabled={disabled || Boolean(busy)}
-                  onChange={(e) =>
-                    void persist({ settings: { language: e.target.value } })
-                  }
-                >
-                  {LANGUAGE_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className="rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-2 py-1.5 text-[11px]"
-                  value={project.settings.imageRatio ?? "1:1"}
-                  disabled={disabled || Boolean(busy)}
-                  onChange={(e) =>
-                    void persist({
-                      settings: {
-                        imageRatio: e.target.value as ProductImageSetProject["settings"]["imageRatio"],
-                      },
-                    })
-                  }
-                >
-                  {RATIO_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
+              {RATIO_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
           </section>
 
           <section
@@ -273,7 +238,9 @@ export function ProductImageSetConfigSidebar({
             )}
           >
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-semibold">商品卖点 &amp; 要求</span>
+              <EcomSellpointSectionTitle>
+                <span className="text-xs font-semibold">商品卖点 &amp; 要求</span>
+              </EcomSellpointSectionTitle>
               <EcomButtonSecondary
                 size="sm"
                 type="button"
@@ -303,7 +270,6 @@ export function ProductImageSetConfigSidebar({
                 className="mb-2"
               />
             ) : null}
-            <EcomSellpointFivePartHint />
             <textarea
               className={cn(
                 "mt-2 min-h-[120px] w-full rounded-lg border border-[#e8e8ed] px-2 py-2 font-mono text-[11px]",

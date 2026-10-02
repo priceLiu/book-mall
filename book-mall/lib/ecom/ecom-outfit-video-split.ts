@@ -451,7 +451,7 @@ export async function splitOutfitReferenceVideoPhysical(opts: {
 
     const totalDurationSec = await ffprobeDurationSec(inputPath);
     if (totalDurationSec < 1) {
-      throw new Error("参考视频过短，请上传至少 1 秒的穿搭视频");
+      throw new Error("参考视频过短，请上传至少 1 秒的参考视频");
     }
     if (totalDurationSec > 120) {
       throw new Error("参考视频过长，请先裁剪至 120 秒以内");

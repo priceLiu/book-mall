@@ -236,7 +236,46 @@ export function parseBrief(raw: unknown): DetailPageSuiteBrief | null {
       ...(tables.length > 0 ? { tables: tables as NonNullable<DetailPageSuiteBrief["sizeChart"]>["tables"] } : {}),
     };
   }
-  return { ...(o as DetailPageSuiteBrief), ...(sizeChart ? { sizeChart } : {}) };
+  const specChartRaw = o.specChart;
+  let specChart: DetailPageSuiteBrief["specChart"];
+  if (specChartRaw && typeof specChartRaw === "object" && !Array.isArray(specChartRaw)) {
+    const sc = specChartRaw as Record<string, unknown>;
+    const tables = Array.isArray(sc.tables)
+      ? sc.tables
+          .map((t) => {
+            if (!t || typeof t !== "object") return null;
+            const row = t as Record<string, unknown>;
+            const headers = Array.isArray(row.headers)
+              ? row.headers.map((h) => String(h).trim()).filter(Boolean)
+              : [];
+            const rows = Array.isArray(row.rows)
+              ? row.rows
+                  .map((r) =>
+                    Array.isArray(r) ? r.map((c) => String(c).trim()) : [],
+                  )
+                  .filter((r) => r.length > 0)
+              : [];
+            if (headers.length === 0 || rows.length === 0) return null;
+            return {
+              title: typeof row.title === "string" ? row.title.trim() : undefined,
+              headers,
+              rows,
+              isDemo: row.isDemo === true,
+            };
+          })
+          .filter(Boolean)
+      : [];
+    specChart = {
+      ...(tables.length > 0
+        ? { tables: tables as NonNullable<DetailPageSuiteBrief["specChart"]>["tables"] }
+        : {}),
+    };
+  }
+  return {
+    ...(o as DetailPageSuiteBrief),
+    ...(sizeChart ? { sizeChart } : {}),
+    ...(specChart ? { specChart } : {}),
+  };
 }
 
 export function parseSettings(raw: unknown): DetailPageSuiteSettings {

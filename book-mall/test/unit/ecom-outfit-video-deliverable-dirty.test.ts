@@ -27,7 +27,7 @@ const baseProject = {
   meta: {
     deliverableSnapshot: {
       savedAt: "2026-01-01T00:00:00.000Z",
-      title: "穿搭视频_20260101",
+      title: "穿搭动作迁移_20260101",
       templateId: "outfit-v1",
       phase: "generate_shots",
       references: {

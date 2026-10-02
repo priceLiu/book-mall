@@ -21,6 +21,8 @@ type Props = {
   title: string;
   table: DetailPageSuiteSizeChartTable;
   saving?: boolean;
+  /** 尺码表 vs 商品参数表（共用编辑 UI） */
+  tableKind?: "size" | "spec";
   onSave: (table: DetailPageSuiteSizeChartTable) => void | Promise<void>;
 };
 
@@ -30,8 +32,10 @@ export function DetailPageSuiteSizeChartEditDialog({
   title,
   table,
   saving = false,
+  tableKind = "size",
   onSave,
 }: Props) {
+  const isSpec = tableKind === "spec";
   const [draft, setDraft] = useState(() => cloneSizeChartTable(table));
 
   useEffect(() => {
@@ -70,7 +74,9 @@ export function DetailPageSuiteSizeChartEditDialog({
           <DialogTitle className="leading-snug">{title}</DialogTitle>
         </DialogHeader>
         <p className="text-xs leading-relaxed text-[#86868b]">
-          系统将按下方数据直接生成尺码表图片（不经大模型）。演示数据仅作预览，上架前请替换为本款真实尺码。
+          {isSpec
+            ? "系统将按下方数据直接生成参数表图片（不经大模型）。演示数据仅作预览，上架前请替换为本款真实规格参数。"
+            : "系统将按下方数据直接生成尺码表图片（不经大模型）。演示数据仅作预览，上架前请替换为本款真实尺码。"}
         </p>
         <label className="block text-sm text-[#6e6e73]">
           表标题
@@ -122,7 +128,7 @@ export function DetailPageSuiteSizeChartEditDialog({
           </table>
         </div>
         <EcomButtonSecondary type="button" size="sm" onClick={addRow}>
-          增加尺码行
+          {isSpec ? "增加参数行" : "增加尺码行"}
         </EcomButtonSecondary>
         <DialogFooter className="gap-2 sm:justify-end">
           <EcomButtonSecondary

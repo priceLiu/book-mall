@@ -5,7 +5,9 @@ export const ECOM_DETAIL_PAGE_SUITE_TOOL_KEY = "ecom-toolkit__detail-page-suite"
 export const ECOM_DETAIL_PAGE_SUITE_REPLICA_TOOL_KEY =
   "ecom-toolkit__detail-page-suite-replica";
 export const ECOM_DETAIL_PAGE_SUITE_HIT_TOOL_KEY = "ecom-toolkit__detail-page-suite-hit";
+export const ECOM_AI_DETAIL_PAGE_TOOL_KEY = "ecom-toolkit__ai-detail-page";
 export const ECOM_DETAIL_PAGE_SUITE_MODULE = "detail-page-suite";
+export const ECOM_AI_DETAIL_PAGE_MODULE = "ai-detail-page";
 export const ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE = "detail-page-suite-replica";
 export const ECOM_DETAIL_PAGE_SUITE_HIT_MODULE = "detail-page-suite-hit";
 export const DETAIL_PAGE_SUITE_HIT_FENCE = "detail-page-suite-hit";
@@ -82,6 +84,10 @@ export type DetailPageSuiteSizeChartState = {
   fitNote?: string;
 };
 
+export type DetailPageSuiteSpecChartState = {
+  tables?: DetailPageSuiteSizeChartTable[];
+};
+
 export type DetailPageSuiteBrief = {
   genderCategory?: string;
   styleCategory?: string;
@@ -90,12 +96,16 @@ export type DetailPageSuiteBrief = {
   customScene?: string;
   platform?: string;
   platformCode?: string;
+  marketCode?: string;
+  market?: string;
   outputLanguage?: string;
+  detailTemplateId?: string;
   productDesc?: string;
   sellPoints?: DetailPageSuiteSellpoint[];
   sellpointFivePart?: EcomSellpointFivePart;
   sellpointsLocked?: boolean;
   sizeChart?: DetailPageSuiteSizeChartState;
+  specChart?: DetailPageSuiteSpecChartState;
 };
 
 export type DetailPageSuiteReferenceRole = "product" | "reference_suite" | "model";
@@ -177,7 +187,7 @@ export type DetailPageSuiteSettings = {
   visionModelKey?: string;
   imageModelKey?: string;
   imageSize?: string;
-  imageRatio?: "1:1" | "3:4" | "4:5" | "16:9";
+  imageRatio?: "1:1" | "3:4" | "4:5" | "9:16" | "16:9";
   /** 爆款套图：出图时把 slot_copy 一并写入生图 prompt */
   hitIncludeSlotCopyOnImage?: boolean;
   /** 可出图的平台规格列表（含自定义宽） */

@@ -13,7 +13,7 @@ export type EcomModuleDef = {
 
 export const VIDEO_PRESETS = [
   { slug: "motion", title: "视频动作", action: "motion" },
-  { slug: "outfit", title: "穿搭视频", action: "outfit" },
+  { slug: "outfit", title: "穿搭动作迁移", action: "outfit" },
   { slug: "dance-swap", title: "卡点跳舞换装", action: "dance-swap" },
   { slug: "camera", title: "视频运镜", action: "camera" },
   { slug: "digital-human", title: "数字人", action: "digital-human" },
@@ -43,6 +43,16 @@ export const ECOM_MODULES: EcomModuleDef[] = [
     href: "/ecom/product-image-set",
     kind: "image",
     toolKey: "ecom-toolkit__product-image-set",
+    action: "generate",
+    tile: "light",
+  },
+  {
+    id: "ai-detail-page",
+    title: "AI 详情页",
+    tagline: "A+ 模块配置 · 点位 Prompt · 多版出图",
+    href: "/ecom/ai-detail-page",
+    kind: "image",
+    toolKey: "ecom-toolkit__ai-detail-page",
     action: "generate",
     tile: "light",
   },

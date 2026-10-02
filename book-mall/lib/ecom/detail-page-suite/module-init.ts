@@ -1,15 +1,22 @@
 import type { DetailPageSuiteModuleDef, DetailPageSuiteModuleState } from "./types";
 import {
   DETAIL_PAGE_SUITE_SIZE_CHART_DEFAULT_COUNT,
-  DETAIL_PAGE_SUITE_SIZE_MODULE_ID,
+  isDetailPageSuiteSizeChartModuleId,
 } from "./size-chart-constants";
+import {
+  DETAIL_PAGE_SUITE_SPEC_CHART_DEFAULT_COUNT,
+  isDetailPageSuiteSpecChartModuleId,
+} from "./spec-table-constants";
 
 export function defaultGenerateCountForModule(
   moduleId: string,
   maxNum: number,
 ): number {
-  if (moduleId === DETAIL_PAGE_SUITE_SIZE_MODULE_ID) {
+  if (isDetailPageSuiteSizeChartModuleId(moduleId)) {
     return Math.min(DETAIL_PAGE_SUITE_SIZE_CHART_DEFAULT_COUNT, maxNum);
+  }
+  if (isDetailPageSuiteSpecChartModuleId(moduleId)) {
+    return Math.min(DETAIL_PAGE_SUITE_SPEC_CHART_DEFAULT_COUNT, maxNum);
   }
   return maxNum;
 }

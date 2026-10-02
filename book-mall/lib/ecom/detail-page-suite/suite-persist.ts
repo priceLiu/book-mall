@@ -1,9 +1,12 @@
 import { materializeModuleSlots, mergeModuleSlotsPreservingContent } from "./module-slots";
 import { ensureDetailPageSuiteSizeChartModuleAtEnd } from "./ensure-size-chart-module-at-end";
 import { ensureBriefSizeChartDefaults } from "./size-chart-image";
+import { ensureBriefSpecChartDefaults } from "./spec-table-image";
 import { migrateHitSuiteSlotCopyFields } from "@/lib/ecom/detail-page-suite-hit/hit-suite-migrate";
+import { ensureAplusSuiteMatchesCatalog } from "@/lib/ecom/detail-page-aplus/aplus-suite-init";
 import { migrateDetailPageSuiteProject } from "./suite-migrate";
 import {
+  ECOM_AI_DETAIL_PAGE_MODULE,
   ECOM_DETAIL_PAGE_SUITE_HIT_MODULE,
   ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE,
 } from "./types";
@@ -42,6 +45,16 @@ export function normalizeDetailPageSuiteProject(
   project = hitCopyMigrated.project;
   let suite = project.suite;
   let brief = project.brief;
+  if (project.module === ECOM_AI_DETAIL_PAGE_MODULE) {
+    const ensured = ensureAplusSuiteMatchesCatalog(suite);
+    if (ensured.changed) suite = ensured.suite;
+    let briefNext = ensureBriefSizeChartDefaults(brief);
+    briefNext = ensureBriefSpecChartDefaults(briefNext);
+    if (JSON.stringify(briefNext) !== JSON.stringify(brief ?? null)) {
+      brief = briefNext;
+      project = { ...project, brief: briefNext };
+    }
+  }
   if (
     project.module === ECOM_DETAIL_PAGE_SUITE_HIT_MODULE ||
     project.module === ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE
@@ -63,7 +76,8 @@ export function normalizeDetailPageSuiteProject(
   const prevMetaJson = JSON.stringify(project.meta ?? null);
   const normalizedChanged = slotsJson !== prevJson || metaJson !== prevMetaJson;
   const workbenchChanged =
-    (project.module === ECOM_DETAIL_PAGE_SUITE_HIT_MODULE ||
+    (project.module === ECOM_AI_DETAIL_PAGE_MODULE ||
+      project.module === ECOM_DETAIL_PAGE_SUITE_HIT_MODULE ||
       project.module === ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE) &&
     (JSON.stringify(suite.modules) !== JSON.stringify(project.suite.modules) ||
       JSON.stringify(brief) !== JSON.stringify(project.brief ?? null));

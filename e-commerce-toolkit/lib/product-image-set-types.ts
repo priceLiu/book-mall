@@ -91,30 +91,16 @@ export function totalStructureCount(s: ProductImageSetStructureCounts): number {
   return s.whiteBg + s.sellpoint + s.scene + s.other;
 }
 
-export const PLATFORM_OPTIONS = [
-  { value: "amazon", label: "亚马逊" },
-  { value: "taobao", label: "淘宝" },
-  { value: "jd", label: "京东" },
-  { value: "tiktok-shop", label: "TikTok Shop" },
-  { value: "shopee", label: "Shopee" },
-];
-
-export const MARKET_OPTIONS = [
-  { value: "us", label: "美国" },
-  { value: "uk", label: "英国" },
-  { value: "de", label: "德国" },
-  { value: "jp", label: "日本" },
-];
-
-export const LANGUAGE_OPTIONS = [
-  { value: "中文", label: "中文" },
-  { value: "英文", label: "英文" },
-  { value: "西班牙语", label: "西班牙语" },
-  { value: "葡萄牙语", label: "葡萄牙语" },
-];
+export {
+  ECOM_COUNTRY_OPTIONS as MARKET_OPTIONS,
+  ECOM_LANGUAGE_OPTIONS as LANGUAGE_OPTIONS,
+  ECOM_PLATFORM_OPTIONS as PLATFORM_OPTIONS,
+} from "@/lib/ecom-generation-settings/constants";
 
 export const RATIO_OPTIONS: { value: EcomImageRatio; label: string }[] = [
   { value: "1:1", label: "1:1" },
   { value: "3:4", label: "3:4" },
   { value: "4:5", label: "4:5" },
+  { value: "16:9", label: "16:9" },
+  { value: "9:16", label: "9:16" },
 ];

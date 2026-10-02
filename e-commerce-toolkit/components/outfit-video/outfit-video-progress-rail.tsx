@@ -32,7 +32,7 @@ export function OutfitVideoProgressRail({ phase }: Props) {
   const effectivePhase = phase === "edit_scenes" ? "edit_scenes" : phase;
 
   return (
-    <nav className={ECOM_PROGRESS_RAIL_SHELL} aria-label="穿搭视频进度">
+    <nav className={ECOM_PROGRESS_RAIL_SHELL} aria-label="穿搭动作迁移进度">
       {OUTFIT_V1_PROGRESS_STEPS.map((step) => {
         const state = stepVisual(effectivePhase, step.id);
         return (
