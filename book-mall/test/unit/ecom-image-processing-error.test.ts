@@ -62,4 +62,11 @@ describe("formatEcomImageProcessingUserError", () => {
     expect(out.status).toBe(402);
     expect(out.message).toContain("Gateway Key");
   });
+
+  it("maps upstream_fetch_failed to connection hint", () => {
+    const out = formatEcomImageProcessingUserError(new Error("upstream_fetch_failed"));
+    expect(out.status).toBe(502);
+    expect(out.message).toContain("连接中断");
+    expect(out.message).not.toBe("upstream_fetch_failed");
+  });
 });

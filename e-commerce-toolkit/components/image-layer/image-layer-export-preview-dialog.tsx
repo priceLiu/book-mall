@@ -2,6 +2,7 @@
 
 import { Download, Loader2 } from "lucide-react";
 
+import { EcomZoomableInlineImage } from "@/components/media/ecom-zoomable-inline-image";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomDialogCloseButton } from "@/components/ui/dialog";
 
@@ -58,11 +59,11 @@ export function ImageLayerExportPreviewDialog({
               正在合成预览…
             </div>
           ) : previewUrl ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
+            <EcomZoomableInlineImage
               src={previewUrl}
               alt="成品预览"
-              className="mx-auto block h-auto max-w-full rounded-lg shadow-md"
+              className="rounded-lg shadow-md"
+              viewportClassName="min-h-[280px] bg-[#f3f4f6]"
             />
           ) : (
             <div className="flex min-h-[280px] items-center justify-center text-sm text-[#9ca3af]">

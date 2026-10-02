@@ -98,7 +98,7 @@ export const ECOM_MODULES: EcomModuleDef[] = [
   },
   {
     id: "hand-craft",
-    title: "手伴创作",
+    title: "手办创作",
     tagline: "线稿转潮玩盲盒 IP 全案",
     href: "/ecom/hand-craft",
     kind: "image",

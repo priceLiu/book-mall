@@ -19,10 +19,13 @@ import {
   ECOM_HAND_CRAFT_TOOL_KEY,
   type HandCraftSlot,
 } from "@/lib/ecom/ecom-hand-craft-types";
+import { formatEcomImageGenUserError } from "@/lib/ecom/ecom-image-processing-error";
 import { generateEcomImage } from "@/lib/ecom/ecom-image-gen-invoke";
 import { resolveEcomImageGenConcurrency } from "@/lib/ecom/ecom-image-gen-concurrency";
 import { getImageGenMaxRefs } from "@/lib/ecom/ecom-product-design-ref-rules";
 import { ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
+import { finalizeIpWorkflowStepAfterBatch } from "@/lib/ecom/ecom-ip-workflow-step-gen-finalize";
+import { withEcomIpWorkflowStepGenerationLock } from "@/lib/ecom/ecom-ip-workflow-step-gen-lock";
 import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
 import { prisma } from "@/lib/prisma";
 
@@ -64,6 +67,21 @@ function assetTitleFor(step: HandCraftStepDef, slot: HandCraftSlot): string {
  * meta.workflow.heroLockedUrl，作为后续 9 步的一致性锚点。
  */
 export async function generateHandCraftStepImages(opts: {
+  userId: string;
+  projectId: string;
+  stepId: HandCraftStepId;
+  indexes?: number[];
+  modelKey?: string;
+  concurrency?: number;
+  imageSize?: string;
+}): Promise<GenerateHandCraftStepResult> {
+  return withEcomIpWorkflowStepGenerationLock(
+    `${opts.projectId}:${opts.stepId}`,
+    () => generateHandCraftStepImagesInner(opts),
+  );
+}
+
+async function generateHandCraftStepImagesInner(opts: {
   userId: string;
   projectId: string;
   stepId: HandCraftStepId;
@@ -123,6 +141,24 @@ export async function generateHandCraftStepImages(opts: {
   let slots = [...state.slots];
   const failures: GenerateHandCraftStepResult["failures"] = [];
   let generated = 0;
+  const wantedIndexes = wanted.map((s) => s.index);
+
+  const finalizeBatch = async () => {
+    await finalizeIpWorkflowStepAfterBatch({
+      slotsSnapshot: slots,
+      wantedIndexes,
+      generated,
+      failures,
+      readStepSlots: async () => {
+        const fresh = await getEcomHandCraftProject(opts.userId, opts.projectId);
+        if (!fresh) return slots;
+        return readHandCraftStepState(fresh.plan, opts.stepId).slots;
+      },
+      patchStep: async (patch) => {
+        await patchHandCraftStep(opts.userId, opts.projectId, opts.stepId, patch);
+      },
+    });
+  };
 
   // 逐张回写 plan：批量步骤有 12 槽，不能等全部结束再落库，否则中途失败全丢
   let writeLock = Promise.resolve();
@@ -140,6 +176,7 @@ export async function generateHandCraftStepImages(opts: {
     }
   };
 
+  try {
   await mapWithConcurrency(
     wanted,
     async (slot) => {
@@ -149,6 +186,7 @@ export async function generateHandCraftStepImages(opts: {
         slotPrompt: slot.prompt,
         refCount: refImageUrls.length,
         isHeroStep: step.id === "hero",
+        settings: project.settings,
       });
 
       try {
@@ -195,10 +233,11 @@ export async function generateHandCraftStepImages(opts: {
           });
         });
       } catch (e) {
+        const { message } = formatEcomImageGenUserError(e);
         await withWriteLock(async () => {
           failures.push({
             index: slot.index,
-            message: e instanceof Error ? e.message : "生成失败",
+            message,
           });
         });
       }
@@ -206,15 +245,17 @@ export async function generateHandCraftStepImages(opts: {
     concurrency,
   );
 
-  const allDone = slots.length > 0 && slots.every((s) => s.imageUrl);
-  await patchHandCraftStep(opts.userId, opts.projectId, opts.stepId, {
-    slots,
-    status: allDone ? "ready" : "pending",
-  });
+  await finalizeBatch();
+  const freshAfter = await getEcomHandCraftProject(opts.userId, opts.projectId);
+  const dbSlotsAfter = freshAfter
+    ? readHandCraftStepState(freshAfter.plan, opts.stepId).slots
+    : slots;
+  const allDone =
+    dbSlotsAfter.length > 0 && dbSlotsAfter.every((s) => Boolean(s.imageUrl?.trim()));
 
   // 第 1 步定稿即锁定全局基准形象
   if (step.id === "hero" && allDone) {
-    const heroUrl = slots[0]?.imageUrl;
+    const heroUrl = dbSlotsAfter[0]?.imageUrl;
     if (heroUrl) {
       await updateEcomHandCraftProject(opts.userId, opts.projectId, {
         meta: { workflow: { heroLockedUrl: heroUrl, currentStepId: "spec-kit" } },
@@ -222,9 +263,9 @@ export async function generateHandCraftStepImages(opts: {
     }
   }
 
-  if (generated === 0 && failures.length > 0) {
-    throw new Error(failures[0]!.message);
+  return { stepId: opts.stepId, slots: dbSlotsAfter, generated, failures };
+  } catch (e) {
+    await finalizeBatch().catch(() => undefined);
+    throw e;
   }
-
-  return { stepId: opts.stepId, slots, generated, failures };
 }

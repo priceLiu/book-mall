@@ -26,6 +26,7 @@ import {
 } from "@/lib/detail-page-suite-add-custom-slot";
 import {
   resolveModuleDisplaySlots,
+  syncModuleSlotsFromSelection,
   syncSuiteModulesSlots,
 } from "@/lib/detail-page-suite-module-slots";
 import {
@@ -47,11 +48,17 @@ import {
 } from "@/lib/detail-page-suite-spec-table";
 import {
   detailPageSuitePromptSelectionAfterImageGenSubmit,
+  detailPageSuiteProjectSlotHasImage,
   listDetailPageSuitePromptGenTargets,
   resolveDetailPageSuiteBusyImageGenExcludeKeys,
   resolveDetailPageSuiteImageGenSlotKeys,
 } from "@/lib/detail-page-suite-prompt-selection";
-import { listDetailPageSuitePendingImageKeys } from "@/lib/detail-page-suite-pending";
+import {
+  detailPageSuiteHasPendingWork,
+  listDetailPageSuitePendingImageKeys,
+  listDetailPageSuitePendingPromptModuleIds,
+  reconcileDetailPageSuitePendingMeta,
+} from "@/lib/detail-page-suite-pending";
 import { formatEcomImageGenUserMessage } from "@/lib/ecom-image-gen-user-error";
 import {
   createAiDetailPageProject,
@@ -61,9 +68,10 @@ import {
   generateAiDetailPagePrompts,
   getAiDetailPageProject,
   listAiDetailPageSummaries,
-  planAiDetailPageSlots,
+  planAndPromptsAiDetailPage,
   updateAiDetailPageProject,
   uploadAiDetailPageRef,
+  uploadAiDetailPageSlotPromptRef,
 } from "@/lib/ecom-ai-detail-page-api";
 import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
 import { resumeOrCreateEcomProject, writeEcomLastProjectId } from "@/lib/ecom-last-project";
@@ -114,7 +122,10 @@ export function AiDetailPageStudio() {
     slotKey: string;
     prompt: string;
     label: string;
+    promptRefUrls: string[];
   } | null>(null);
+  const [promptRewriteBusy, setPromptRewriteBusy] = useState(false);
+  const [promptRefUploadBusy, setPromptRefUploadBusy] = useState(false);
   const [tableDataEdit, setTableDataEdit] = useState<{
     kind: "size" | "spec";
     moduleId: string;
@@ -124,6 +135,9 @@ export function AiDetailPageStudio() {
   const [tableDataEditSaving, setTableDataEditSaving] = useState(false);
   const [loadGeneration, setLoadGeneration] = useState(0);
   const productFileInputRef = useRef<HTMLInputElement>(null);
+  const imageModelsRef = useRef<StoryboardGatewayModel[]>([]);
+  const chatModelsRef = useRef<StoryboardGatewayModel[]>([]);
+  const imageGenInFlightRef = useRef(false);
 
   const displayRatio = useMemo(
     () =>
@@ -138,17 +152,48 @@ export function AiDetailPageStudio() {
     [imageModels, imageModelKey],
   );
 
-  const syncActiveGenFromProject = useCallback((p: DetailPageSuiteProject) => {
-    const pending = listDetailPageSuitePendingImageKeys(p);
-    setActiveGenSlotKeys(new Set(pending));
+  const syncModelKeysFromProject = useCallback((p: DetailPageSuiteProject) => {
+    const savedImg = p.settings.imageModelKey?.trim();
+    if (savedImg) {
+      setImageModelKey(pickBoundStoryboardModelKey(imageModelsRef.current, savedImg));
+    }
+    const savedChat = p.settings.chatModelKey?.trim();
+    if (savedChat) {
+      setChatModelKey(pickBoundStoryboardModelKey(chatModelsRef.current, savedChat));
+    }
   }, []);
+
+  const syncActiveGenFromProject = useCallback((p: DetailPageSuiteProject) => {
+    const next = new Set<string>();
+    for (const key of listDetailPageSuitePendingImageKeys(p.meta)) {
+      if (!detailPageSuiteProjectSlotHasImage(p, key)) next.add(key);
+    }
+    setActiveGenSlotKeys(next);
+    setPrompting(listDetailPageSuitePendingPromptModuleIds(p.meta).length > 0);
+  }, []);
+
+  const applyLoadedProject = useCallback(
+    (p: DetailPageSuiteProject) => {
+      const meta = reconcileDetailPageSuitePendingMeta(p.suite, p.meta);
+      const synced = meta !== p.meta ? { ...p, meta } : p;
+      setProject(synced);
+      writeEcomLastProjectId(STORAGE_KEY, synced.id);
+      if (meta !== p.meta) {
+        void updateAiDetailPageProject(synced.id, { meta: synced.meta }).catch(() => {
+          /* 展示层已修正 stale pending */
+        });
+      }
+      syncModelKeysFromProject(synced);
+      syncActiveGenFromProject(synced);
+    },
+    [syncActiveGenFromProject, syncModelKeysFromProject],
+  );
 
   const reloadProject = useCallback(async () => {
     if (!project?.id) return;
     const fresh = await getAiDetailPageProject(project.id);
-    setProject(fresh);
-    syncActiveGenFromProject(fresh);
-  }, [project?.id, syncActiveGenFromProject]);
+    applyLoadedProject(fresh);
+  }, [applyLoadedProject, project?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -159,18 +204,10 @@ export function AiDetailPageStudio() {
         await ensureEcomSessionFresh();
         const models = await fetchAiDetailPageModels();
         if (cancelled) return;
+        imageModelsRef.current = models.imageModels;
+        chatModelsRef.current = models.chatModels;
         setImageModels(models.imageModels);
         setChatModels(models.chatModels);
-        const imgKey = pickBoundStoryboardModelKey(
-          models.imageModels,
-          models.defaults.image || DEFAULT_IMAGE_MODEL,
-        );
-        const chatKey = pickBoundStoryboardModelKey(
-          models.chatModels,
-          models.defaults.chat || models.chatModels[0]?.modelKey || "",
-        );
-        setImageModelKey(imgKey);
-        setChatModelKey(chatKey);
 
         const { project: loaded } = await resumeOrCreateEcomProject({
           storageKey: STORAGE_KEY,
@@ -182,9 +219,22 @@ export function AiDetailPageStudio() {
           },
         });
         if (cancelled) return;
-        setProject(loaded);
-        writeEcomLastProjectId(STORAGE_KEY, loaded.id);
-        syncActiveGenFromProject(loaded);
+        applyLoadedProject(loaded);
+        const imgDefault = pickBoundStoryboardModelKey(
+          models.imageModels,
+          loaded.settings.imageModelKey?.trim() ||
+            models.defaults.image ||
+            DEFAULT_IMAGE_MODEL,
+        );
+        const chatDefault = pickBoundStoryboardModelKey(
+          models.chatModels,
+          loaded.settings.chatModelKey?.trim() ||
+            models.defaults.chat ||
+            models.chatModels[0]?.modelKey ||
+            "",
+        );
+        setImageModelKey(imgDefault);
+        setChatModelKey(chatDefault);
       } catch (e) {
         if (isEcomUnauthorizedError(e)) {
           setNeedLogin(true);
@@ -202,14 +252,51 @@ export function AiDetailPageStudio() {
     return () => {
       cancelled = true;
     };
-  }, [alert, loadGeneration, syncActiveGenFromProject]);
+  }, [alert, applyLoadedProject, loadGeneration]);
 
-  async function persistImageModelSettings(modelKey: string) {
+  useEffect(() => {
+    if (!project?.id) return;
+    if (!detailPageSuiteHasPendingWork(project.meta)) return;
+    let cancelled = false;
+    const refresh = async () => {
+      if (cancelled || imageGenInFlightRef.current) return;
+      try {
+        const fresh = await getAiDetailPageProject(project.id);
+        if (!cancelled) applyLoadedProject(fresh);
+      } catch {
+        /* 轮询失败时保留当前快照 */
+      }
+    };
+    void refresh();
+    const id = window.setInterval(() => void refresh(), 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [
+    applyLoadedProject,
+    project?.id,
+    project?.meta?.pendingImages,
+    project?.meta?.pendingPromptModules,
+  ]);
+
+  async function persistWorkspaceModelSettings(patch: {
+    imageModelKey?: string;
+    chatModelKey?: string;
+  }) {
     if (!project) return;
     const updated = await updateAiDetailPageProject(project.id, {
-      settings: { ...project.settings, imageModelKey: modelKey },
+      settings: { ...project.settings, ...patch },
     });
     setProject(updated);
+  }
+
+  async function persistImageModelSettings(modelKey: string) {
+    await persistWorkspaceModelSettings({ imageModelKey: modelKey });
+  }
+
+  async function persistChatModelSettings(modelKey: string) {
+    await persistWorkspaceModelSettings({ chatModelKey: modelKey });
   }
 
   async function runImageGen(opts?: { moduleId?: string; slotKeys?: string[] }) {
@@ -244,6 +331,7 @@ export function AiDetailPageStudio() {
       detailPageSuitePromptSelectionAfterImageGenSubmit(prev, keys),
     );
     setActiveGenSlotKeys((prev) => new Set([...prev, ...keys]));
+    imageGenInFlightRef.current = true;
     try {
       await persistImageModelSettings(imageModelKey);
       const result = await generateAiDetailPageImages(project.id, {
@@ -253,8 +341,7 @@ export function AiDetailPageStudio() {
         imageRatio: displayRatio,
         imageSize: project.settings.imageSize,
       });
-      setProject(result.project);
-      syncActiveGenFromProject(result.project);
+      applyLoadedProject(result.project);
       if (result.failures.length > 0) {
         await alert({
           title: "部分出图失败",
@@ -271,6 +358,8 @@ export function AiDetailPageStudio() {
         message: formatEcomImageGenUserMessage(e instanceof Error ? e.message : "出图失败"),
         variant: "error",
       });
+    } finally {
+      imageGenInFlightRef.current = false;
     }
   }
 
@@ -297,21 +386,29 @@ export function AiDetailPageStudio() {
             imageModelKey={imageModelKey}
             onProjectChange={reloadProject}
             onOpenModelPicker={() => setModelPickerOpen(true)}
-            onRequestPlanSlots={() => {
+            onRequestPlanAndPrompts={() => {
               void (async () => {
                 setPlanning(true);
+                setPrompting(true);
                 try {
-                  const updated = await planAiDetailPageSlots(project.id);
-                  setProject(updated);
-                  toast({ title: "点位已生成", message: "可在中栏查看占位格并生成 Prompt。" });
+                  await persistChatModelSettings(chatModelKey);
+                  const updated = await planAndPromptsAiDetailPage(project.id, {
+                    modelKey: chatModelKey,
+                  });
+                  applyLoadedProject(updated);
+                  toast({
+                    title: "模块 Prompt 已生成",
+                    message: "可在中栏审词、上传本格参考图后出图。",
+                  });
                 } catch (e) {
                   await alert({
-                    title: "生成点位失败",
+                    title: "生成失败",
                     message: e instanceof Error ? e.message : "失败",
                     variant: "error",
                   });
                 } finally {
                   setPlanning(false);
+                  setPrompting(false);
                 }
               })();
             }}
@@ -319,11 +416,12 @@ export function AiDetailPageStudio() {
               void (async () => {
                 setPrompting(true);
                 try {
+                  await persistChatModelSettings(chatModelKey);
                   const updated = await generateAiDetailPagePrompts(project.id, {
                     modelKey: chatModelKey,
                   });
-                  setProject(updated);
-                  toast({ title: "Prompt 已生成" });
+                  applyLoadedProject(updated);
+                  toast({ title: "Prompt 已重新生成" });
                 } catch (e) {
                   await alert({
                     title: "生成 Prompt 失败",
@@ -361,8 +459,7 @@ export function AiDetailPageStudio() {
                 save: async () => {},
                 onProceed: async () => {
                   const created = await createAiDetailPageProject();
-                  setProject(created);
-                  writeEcomLastProjectId(STORAGE_KEY, created.id);
+                  applyLoadedProject(created);
                   setPromptSelectionKeys(new Set());
                 },
               });
@@ -378,9 +475,7 @@ export function AiDetailPageStudio() {
             }}
             onOpenProject={async (id) => {
               const p = await getAiDetailPageProject(id);
-              setProject(p);
-              writeEcomLastProjectId(STORAGE_KEY, id);
-              syncActiveGenFromProject(p);
+              applyLoadedProject(p);
               setPromptSelectionKeys(new Set());
             }}
             onDeleteProject={async () => {
@@ -403,8 +498,7 @@ export function AiDetailPageStudio() {
               }
               await deleteAiDetailPageProject(project.id);
               const created = await createAiDetailPageProject();
-              setProject(created);
-              writeEcomLastProjectId(STORAGE_KEY, created.id);
+              applyLoadedProject(created);
             }}
           />
 
@@ -478,11 +572,12 @@ export function AiDetailPageStudio() {
               void (async () => {
                 setPrompting(true);
                 try {
+                  await persistChatModelSettings(chatModelKey);
                   const updated = await generateAiDetailPagePrompts(project.id, {
                     moduleId,
                     modelKey: chatModelKey,
                   });
-                  setProject(updated);
+                  applyLoadedProject(updated);
                 } catch (e) {
                   await alert({
                     title: "生成 Prompt 失败",
@@ -511,11 +606,36 @@ export function AiDetailPageStudio() {
                 setTableDataEdit({ kind: "spec", moduleId, slotKey, label });
                 return;
               }
-              setPromptEdit({ moduleId, slotKey, prompt, label });
+              const mod = project.suite.modules.find((m) => m.module_id === moduleId);
+              const slot = mod?.slots.find((s) => s.item_key === slotKey);
+              setPromptEdit({
+                moduleId,
+                slotKey,
+                prompt,
+                label,
+                promptRefUrls: slot?.promptRefUrls ?? [],
+              });
             }}
             onToggleModule={() => {}}
             onChangeCount={() => {}}
-            onToggleItem={() => {}}
+            onToggleItem={(moduleId, item) => {
+              const modules = syncSuiteModulesSlots(
+                project.suite.modules.map((m) => {
+                  if (m.module_id !== moduleId) return m;
+                  const has = m.selected_item_list.includes(item);
+                  const selected = has
+                    ? m.selected_item_list.filter((x) => x !== item)
+                    : [...m.selected_item_list, item].slice(0, m.generate_count);
+                  return syncModuleSlotsFromSelection({ ...m, selected_item_list: selected });
+                }),
+              );
+              void (async () => {
+                const updated = await updateAiDetailPageProject(project.id, {
+                  suite: { ...project.suite, modules },
+                });
+                setProject(updated);
+              })();
+            }}
             onRequestAddItem={() => {}}
             onRequestAddSlot={(moduleId) => {
               void (async () => {
@@ -745,21 +865,59 @@ export function AiDetailPageStudio() {
             setProject(updated);
             setPromptEdit(null);
           }}
-          onRewrite={() => {
+          rewriteBusy={promptRewriteBusy}
+          promptRefUrls={promptEdit.promptRefUrls}
+          promptRefUploadBusy={promptRefUploadBusy}
+          onUploadPromptRef={(file) => {
             void (async () => {
-              const updated = await generateAiDetailPagePrompts(project.id, {
-                moduleId: promptEdit.moduleId,
-                slotKey: promptEdit.slotKey,
-                modelKey: chatModelKey,
-              });
-              setProject(updated);
-              const mod = updated.suite.modules.find((m) => m.module_id === promptEdit.moduleId);
-              const slot = mod?.slots.find((s) => s.item_key === promptEdit.slotKey);
-              if (slot) {
+              setPromptRefUploadBusy(true);
+              try {
+                const updated = await uploadAiDetailPageSlotPromptRef(
+                  project.id,
+                  promptEdit.moduleId,
+                  promptEdit.slotKey,
+                  file,
+                );
+                setProject(updated);
+                const mod = updated.suite.modules.find((m) => m.module_id === promptEdit.moduleId);
+                const slot = mod?.slots.find((s) => s.item_key === promptEdit.slotKey);
                 setPromptEdit({
                   ...promptEdit,
-                  prompt: slot.positive_prompt,
+                  promptRefUrls: slot?.promptRefUrls ?? [],
                 });
+              } catch (e) {
+                await alert({
+                  title: "上传参考图失败",
+                  message: e instanceof Error ? e.message : "失败",
+                  variant: "error",
+                });
+              } finally {
+                setPromptRefUploadBusy(false);
+              }
+            })();
+          }}
+          onRewrite={() => {
+            void (async () => {
+              setPromptRewriteBusy(true);
+              try {
+                await persistChatModelSettings(chatModelKey);
+                const updated = await generateAiDetailPagePrompts(project.id, {
+                  moduleId: promptEdit.moduleId,
+                  slotKey: promptEdit.slotKey,
+                  modelKey: chatModelKey,
+                });
+                applyLoadedProject(updated);
+                const mod = updated.suite.modules.find((m) => m.module_id === promptEdit.moduleId);
+                const slot = mod?.slots.find((s) => s.item_key === promptEdit.slotKey);
+                if (slot) {
+                  setPromptEdit({
+                    ...promptEdit,
+                    prompt: slot.positive_prompt,
+                    promptRefUrls: slot.promptRefUrls ?? [],
+                  });
+                }
+              } finally {
+                setPromptRewriteBusy(false);
               }
             })();
           }}

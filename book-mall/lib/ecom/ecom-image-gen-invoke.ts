@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
+import { fetchEcomVendorImageBuffer } from "@/lib/ecom/ecom-vendor-image-download";
 import { buildKieImageCreateArgs, isKieGptImageModelKey } from "@/lib/canvas/providers/kie";
 import type { EcomImageRatio } from "@/lib/ecom/ecom-platform-spec";
 import {
@@ -18,10 +19,11 @@ import {
   isStoryboardKieImageModel,
   isStoryboardKlingImageModel,
   isWan26ImageModel,
+  resolveKieEcomImageModelKey,
   resolveStoryboardDashscopeModel,
-  resolveStoryboardKieModel,
   resolveStoryboardKlingModel,
 } from "@/lib/ecom/ecom-storyboard-image-models";
+import { getImageGenMaxRefs } from "@/lib/ecom/ecom-product-design-ref-rules";
 import { ensureStoryboardRefImagesForWan27 } from "@/lib/ecom/ecom-storyboard-ref-image";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
 import {
@@ -96,18 +98,18 @@ async function pollKieImage(
 }
 
 async function downloadAndUpload(userId: string, imageUrl: string): Promise<string> {
-  let res: Response;
+  const vendor = imageUrl.trim();
   try {
-    res = await fetch(imageUrl);
+    const buf = await fetchEcomVendorImageBuffer(vendor);
+    return uploadCanvasUserBuffer({ userId, ext: "png", buf, contentType: "image/png" });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    throw new Error(
-      msg === "fetch failed" ? "下载生成图失败：网络中断，请重试" : `下载生成图失败：${msg}`,
-    );
+    // nano-banana-pro / KIE 等厂商 HTTPS 成图可先展示；OSS 转存失败时不丢图
+    if (/^https?:\/\//i.test(vendor)) {
+      console.error("[ecom] vendor image OSS transfer failed, using vendor URL", e);
+      return vendor;
+    }
+    throw e;
   }
-  if (!res.ok) throw new Error(`下载生成图失败 HTTP ${res.status}`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  return uploadCanvasUserBuffer({ userId, ext: "png", buf, contentType: "image/png" });
 }
 
 async function pollMultimodalSyncImage(
@@ -204,10 +206,19 @@ export async function generateEcomImage(opts: {
         : opts.imageSize?.trim() === "2K"
           ? "2K"
           : "2K";
+    const refUrls =
+      opts.refImageUrls.length > 0
+        ? await ensureStoryboardRefImagesForWan27({
+            userId: opts.userId,
+            urls: opts.refImageUrls
+              .filter((u) => /^https?:\/\//i.test(u.trim()))
+              .slice(0, Math.max(1, getImageGenMaxRefs(opts.modelKey))),
+          })
+        : [];
     const { model, input } = buildKieImageCreateArgs({
-      modelKey: resolveStoryboardKieModel(opts.modelKey),
+      modelKey: resolveKieEcomImageModelKey(opts.modelKey),
       prompt,
-      imageUrls: opts.refImageUrls.slice(0, 8),
+      imageUrls: refUrls,
       params: {
         aspect_ratio: opts.ratio,
         resolution: kieResolution,
@@ -313,6 +324,7 @@ export async function generateEcomImage(opts: {
  */
 export function isRefCapableEcomImageModel(modelKey: string): boolean {
   const key = modelKey.trim().toLowerCase();
+  if (key === "seedream-4.5" || key.startsWith("seedream-")) return true;
   if (isStoryboardKieImageModel(key)) return true;
   if (key.startsWith("gpt-image")) return true;
   if (isStoryboardKlingImageModel(key)) return true;

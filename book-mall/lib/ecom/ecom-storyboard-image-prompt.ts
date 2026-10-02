@@ -12,6 +12,7 @@ import {
   resolveScenePresetImageHint,
   resolveScenePresetLabel,
 } from "@/lib/ecom/ecom-storyboard-scene-presets";
+import { getProVerticalConfig, isProVerticalId } from "@/lib/ecom/pro-vertical/registry";
 
 /** 分镜静帧禁止渲染口播/对白为画面文字 */
 export const STORYBOARD_NO_DIALOGUE_IN_IMAGE =
@@ -305,21 +306,17 @@ export function buildStoryboardImagePromptContext(project: {
     }
   }
 
-  const fashionVertical =
-    wf?.vertical === "fashion_apparel" ||
-    deliverable?.vertical === "fashion_apparel";
-  const bagsVertical = wf?.vertical === "bags" || deliverable?.vertical === "bags";
-  const digital3cVertical =
-    wf?.vertical === "digital_3c" || deliverable?.vertical === "digital_3c";
+  const workflowVertical = wf?.vertical ?? deliverable?.vertical;
+  let productCategoryFromVertical: string | undefined;
+  if (workflowVertical && isProVerticalId(workflowVertical)) {
+    productCategoryFromVertical = getProVerticalConfig(workflowVertical).imagePromptCategory;
+  }
 
   return {
-    productCategory: fashionVertical
-      ? "fashion"
-      : bagsVertical
-        ? "bags"
-        : digital3cVertical
-          ? "digital_3c"
-          : (wf?.productCategory ?? params?.品类),
+    productCategory:
+      productCategoryFromVertical ??
+      wf?.productCategory ??
+      params?.品类,
     productName,
     productHighlight: productHighlight ?? productName,
     videoStyle: params?.视频风格?.trim(),

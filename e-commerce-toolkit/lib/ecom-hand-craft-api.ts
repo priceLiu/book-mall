@@ -1,7 +1,7 @@
 "use client";
 
 import { EcomUnauthorizedError } from "@/lib/ecom-auth";
-import { ecomBookFetch } from "@/lib/ecom-book-fetch";
+import { ecomBookFetch, formatEcomTransportError } from "@/lib/ecom-book-fetch";
 import {
   noteEcomBookResponseForCredits,
   noteEcomStreamResponseForCredits,
@@ -57,6 +57,20 @@ export async function createHandCraftProject(opts?: {
 export async function getHandCraftProject(id: string): Promise<HandCraftProject> {
   const data = await ecomBookFetch(`${BASE}/projects/${id}`);
   return data.project as HandCraftProject;
+}
+
+/** 从 EcomAsset 回填 plan 里缺失的槽位图（GET 项目时也会自动执行） */
+export async function syncHandCraftProjectPlan(id: string): Promise<{
+  project: HandCraftProject;
+  recoveredImages: number;
+}> {
+  const data = await ecomBookFetch(`${BASE}/projects/${id}/sync-plan`, {
+    method: "POST",
+  });
+  return {
+    project: data.project as HandCraftProject,
+    recoveredImages: Number(data.recoveredImages ?? 0),
+  };
 }
 
 export async function updateHandCraftProject(
@@ -218,24 +232,39 @@ export async function generateHandCraftStep(opts: {
   failures: Array<{ index: number; message: string }>;
   project: HandCraftProject;
 }> {
-  const res = await fetch(
-    `/api/book-mall/${BASE}/projects/${opts.projectId}/step/${opts.stepId}/generate`,
-    {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        indexes: opts.indexes,
-        modelKey: opts.modelKey,
-        concurrency: opts.concurrency,
-        imageSize: opts.imageSize,
-      }),
-    },
-  );
+  let res: Response;
+  try {
+    res = await fetch(
+      `/api/book-mall/${BASE}/projects/${opts.projectId}/step/${opts.stepId}/generate`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          indexes: opts.indexes,
+          modelKey: opts.modelKey,
+          concurrency: opts.concurrency,
+          imageSize: opts.imageSize,
+        }),
+      },
+    );
+  } catch (e) {
+    throw new Error(formatEcomTransportError(e));
+  }
   if (res.status === 401) throw new EcomUnauthorizedError("未登录");
   if (!res.ok) {
-    const j = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(j.error ?? `生成失败 (${res.status})`);
+    const j = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      detail?: string;
+    };
+    const err = typeof j.error === "string" ? j.error : `生成失败 (${res.status})`;
+    const detail =
+      typeof j.detail === "string" && j.detail.trim() ? `: ${j.detail.trim()}` : "";
+    const combined = `${err}${detail}`;
+    if (res.status === 502 && j.error === "upstream_fetch_failed") {
+      throw new Error(formatEcomTransportError(new Error(combined)));
+    }
+    throw new Error(combined);
   }
   return (await res.json()) as {
     generated: number;

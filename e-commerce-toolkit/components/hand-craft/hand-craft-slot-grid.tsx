@@ -17,8 +17,11 @@ import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-but
 import {
   patchHandCraftStepPrompts,
   resetHandCraftStepPrompts,
+  syncHandCraftProjectPlan,
 } from "@/lib/ecom-hand-craft-api";
 import type { HandCraftProject, HandCraftSlot } from "@/lib/hand-craft-types";
+import { handCraftSlotImageSrc } from "@/lib/hand-craft-compose-image-src";
+import { handCraftStyleAppendHint } from "@/lib/hand-craft-style-presets";
 import {
   missingRequirements,
   stepState,
@@ -35,11 +38,14 @@ type Props = {
   step: HandCraftStepMeta;
   disabled?: boolean;
   onProjectChange: () => void | Promise<void>;
-  /** 触发出图：indexes 为空表示生成本步全部 */
-  onGenerate: (indexes: number[]) => void | Promise<void>;
+  onApplyProject?: (project: HandCraftProject) => void | Promise<void>;
+  /** 触发出图；返回 true 表示已进入确认/模型选择流程 */
+  onGenerate: (indexes: number[]) => boolean | Promise<boolean>;
   slotGeneratingFor: (index: number) => boolean;
   onPreview?: (index: number) => void;
   onDownload?: (index: number) => void;
+  /** 从大图预览跳转编辑 Prompt 时由父级传入槽位序号 */
+  openPromptIndex?: number | null;
 };
 
 export function HandCraftSlotGrid({
@@ -47,12 +53,14 @@ export function HandCraftSlotGrid({
   step,
   disabled,
   onProjectChange,
+  onApplyProject,
   onGenerate,
   slotGeneratingFor,
   onPreview,
   onDownload,
+  openPromptIndex,
 }: Props) {
-  const { alert, confirm } = useDialogs();
+  const { alert, confirm, toast } = useDialogs();
   const state = stepState(project, step.id);
   const [rows, setRows] = useState<HandCraftSlot[]>(state.slots);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -64,8 +72,15 @@ export function HandCraftSlotGrid({
 
   useEffect(() => {
     setRows(stepState(project, step.id).slots);
-    setSelected(new Set());
   }, [project, step.id]);
+
+  useEffect(() => {
+    setSelected(new Set());
+  }, [project.id, step.id]);
+
+  useEffect(() => {
+    if (openPromptIndex != null) setPromptDialogIndex(openPromptIndex);
+  }, [openPromptIndex]);
 
   const blocked = missingRequirements(project, step.id);
   const done = rows.filter((r) => r.imageUrl).length;
@@ -99,6 +114,33 @@ export function HandCraftSlotGrid({
     [alert, onProjectChange, project.id, step.id],
   );
 
+  async function handleSyncPlanFromAssets() {
+    setBusy("正在从资产库同步成图…");
+    try {
+      const { project: synced, recoveredImages } = await syncHandCraftProjectPlan(
+        project.id,
+      );
+      if (onApplyProject) await onApplyProject(synced);
+      else await onProjectChange();
+      toast({
+        title: recoveredImages > 0 ? "已同步槽位成图" : "未发现可回填的成图",
+        message:
+          recoveredImages > 0
+            ? `本步已从「我的资产」补回 ${recoveredImages} 张。`
+            : "资产库中没有比当前 plan 更新的本项成图；若 Gateway 已成功，请稍后再试或单独重生成空槽。",
+        variant: recoveredImages > 0 ? "success" : "default",
+      });
+    } catch (e) {
+      await alert({
+        title: "同步失败",
+        message: e instanceof Error ? e.message : "未知错误",
+        variant: "error",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function handleResetPrompts() {
     const ok = await confirm({
       title: `恢复第 ${step.no} 步默认说明`,
@@ -131,15 +173,32 @@ export function HandCraftSlotGrid({
       return;
     }
     const isAll = selectedIndexes.length === 0;
-    const indexes = isAll
+    const raw = isAll
       ? rowsRef.current.length > 0
         ? rowsRef.current.map((r) => r.index)
         : Array.from({ length: step.count }, (_, i) => i + 1)
       : selectedIndexes;
-    if (indexes.length === 0) return;
+    const indexes = raw.filter((i) => !slotGeneratingFor(i));
+    if (indexes.length === 0) {
+      if (!isAll) {
+        await alert({
+          title: "无法生成",
+          message: "所选槽位已在出图中，请改选其它槽位或稍后再试。",
+          variant: "error",
+        });
+      }
+      return;
+    }
     if (isAll) setGenerateAllActive(true);
     try {
-      await onGenerate(indexes);
+      const started = await onGenerate(indexes);
+      if (started) {
+        setSelected((prev) => {
+          const next = new Set(prev);
+          for (const i of indexes) next.delete(i);
+          return next;
+        });
+      }
     } finally {
       setGenerateAllActive(false);
     }
@@ -166,6 +225,16 @@ export function HandCraftSlotGrid({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {done < (rows.length || step.count) ? (
+            <EcomButtonSecondary
+              size="sm"
+              type="button"
+              disabled={workspaceDisabled}
+              onClick={() => void handleSyncPlanFromAssets()}
+            >
+              同步已出图
+            </EcomButtonSecondary>
+          ) : null}
           <EcomButtonSecondary
             size="sm"
             type="button"
@@ -221,8 +290,8 @@ export function HandCraftSlotGrid({
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {rows.map((row) => {
-          const generating = slotGeneratingFor(row.index);
-          const rowLocked = generating || generateAllActive;
+          const slotPending = slotGeneratingFor(row.index) && !row.imageUrl;
+          const rowLocked = slotPending || (generateAllActive && !row.imageUrl);
           return (
             <article
               key={row.index}
@@ -256,8 +325,13 @@ export function HandCraftSlotGrid({
                 label={step.label}
                 index={row.index}
                 imageUrl={row.imageUrl}
-                generating={generating}
-                disabled={workspaceDisabled || rowLocked}
+                generating={slotPending}
+                disabled={workspaceDisabled}
+                regenerateDisabled={
+                  workspaceDisabled ||
+                  slotGeneratingFor(row.index) ||
+                  generateAllActive
+                }
                 onEditPrompt={() => setPromptDialogIndex(row.index)}
                 onGenerate={() => void onGenerate([row.index])}
                 onPreview={onPreview ? () => onPreview(row.index) : undefined}
@@ -289,9 +363,14 @@ export function HandCraftSlotGrid({
           }}
           value={promptDialogRow.prompt}
           onCommit={(prompt) => void commitPrompt(promptDialogRow.index, prompt)}
-          disabled={workspaceDisabled || slotGeneratingFor(promptDialogRow.index)}
-          title={`编辑 ${step.label} #${promptDialogRow.index} 画面说明`}
-          subtitle={`${promptDialogRow.title}｜只写本槽差异，基准风格串由系统自动拼接`}
+          disabled={
+            workspaceDisabled ||
+            (slotGeneratingFor(promptDialogRow.index) && !promptDialogRow.imageUrl)
+          }
+          nativeOverlay
+          title={`编辑 ${step.label} #${promptDialogRow.index} Prompt`}
+          subtitle={`${promptDialogRow.title}｜只写本槽差异部分`}
+          systemAppendHint={handCraftStyleAppendHint(project.settings ?? {})}
         />
       ) : null}
     </section>
@@ -305,6 +384,7 @@ function HandCraftSlotPreview({
   imageUrl,
   generating,
   disabled,
+  regenerateDisabled,
   onEditPrompt,
   onGenerate,
   onPreview,
@@ -316,12 +396,15 @@ function HandCraftSlotPreview({
   imageUrl?: string;
   generating?: boolean;
   disabled?: boolean;
+  regenerateDisabled?: boolean;
   onEditPrompt: () => void;
   onGenerate: () => void;
   onPreview?: () => void;
   onDownload?: () => void;
 }) {
-  const actionDisabled = Boolean(disabled) || Boolean(generating);
+  const actionDisabled = Boolean(disabled);
+  const regenDisabled = regenerateDisabled ?? (Boolean(disabled) || Boolean(generating));
+  const displaySrc = imageUrl ? handCraftSlotImageSrc(imageUrl) : undefined;
 
   return (
     <div
@@ -334,9 +417,9 @@ function HandCraftSlotPreview({
 
       {generating ? (
         <>
-          {imageUrl ? (
+          {displaySrc ? (
             <Image
-              src={imageUrl}
+              src={displaySrc}
               alt={`${label} ${index}`}
               fill
               className="object-cover"
@@ -346,10 +429,10 @@ function HandCraftSlotPreview({
           ) : null}
           <EcomMediaGeneratingBusy className="absolute inset-0" />
         </>
-      ) : imageUrl ? (
+      ) : displaySrc ? (
         <>
           <Image
-            src={imageUrl}
+            src={displaySrc}
             alt={`${label} ${index}`}
             fill
             className="object-cover"
@@ -372,7 +455,7 @@ function HandCraftSlotPreview({
             <button
               type="button"
               title="重新生成"
-              disabled={actionDisabled}
+              disabled={regenDisabled}
               className={cn(ECOM_SLOT_HOVER_ACTION_BTN_CLASS, "pointer-events-auto")}
               onClick={onGenerate}
             >
@@ -391,7 +474,7 @@ function HandCraftSlotPreview({
             ) : null}
             <button
               type="button"
-              title="编辑画面说明"
+              title="编辑 Prompt"
               disabled={actionDisabled}
               className={cn(ECOM_SLOT_HOVER_ACTION_BTN_CLASS, "pointer-events-auto")}
               onClick={onEditPrompt}
@@ -414,7 +497,7 @@ function HandCraftSlotPreview({
           <button
             type="button"
             title="生成"
-            disabled={actionDisabled}
+            disabled={regenDisabled}
             className={ECOM_SLOT_HOVER_ACTION_BTN_CLASS}
             onClick={onGenerate}
           >

@@ -3,7 +3,7 @@ import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 import { getUserBillingPersona } from "@/lib/billing/billing-persona";
 import { resolveEcomGatewayAuthForUser } from "@/lib/ecom/ecom-gateway-auth";
 import { resolveEcomImageGenConcurrency } from "@/lib/ecom/ecom-image-gen-concurrency";
-import { isRefCapableEcomImageModel } from "@/lib/ecom/ecom-image-gen-invoke";
+import { mergeIpWorkflowImageModels } from "@/lib/ecom/ecom-ip-workflow-image-models";
 import {
   ECOM_STORYBOARD_DEFAULT_CHAT_MODEL,
   ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL,
@@ -15,10 +15,8 @@ import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 export const dynamic = "force-dynamic";
 
 /**
- * 手伴创作只需文本 + 生图两类模型。
- *
- * 生图模型必须支持参考图：10 步一致性全靠「基准主形象作参考图」，
- * 纯文生图模型每步都会换脸，因此在选择器层就过滤掉。
+ * 手办创作：文本 + 生图模型；生图须支持参考图（基准主形象锁定）。
+ * 用户可在 StoryboardModelPickerDialog 自选；优先展示 wan / GPT Image 2 / Seedream / Kling / Nano Banana 系。
  */
 export async function GET(req: Request) {
   const auth = verifyToolsBearer(req);
@@ -36,7 +34,7 @@ export async function GET(req: Request) {
           (c) => c.providerKind,
         ) ?? [];
 
-  const [chatModels, imageModels] = await Promise.all([
+  const [chatModels, imageModels, allEcomImageModels] = await Promise.all([
     listModelsForApp({ appTag: "ecom", role: "LLM", persona, boundKinds }),
     listModelsForApp({
       appTag: "ecom",
@@ -45,13 +43,24 @@ export async function GET(req: Request) {
       persona,
       boundKinds,
     }),
+    listModelsForApp({
+      appTag: "ecom",
+      role: "IMAGE",
+      persona,
+      boundKinds,
+    }),
   ]);
 
-  const allImageModels = registryRowsToEcomModels(imageModels);
-  const refCapable = allImageModels.filter((m) => isRefCapableEcomImageModel(m.modelKey));
-  // 全部被过滤掉时宁可放开，也不要让工作台没有可选模型
-  const refCapableImageModels = refCapable.length > 0 ? refCapable : allImageModels;
+  const sceneImage = registryRowsToEcomModels(imageModels);
+  const fullPool = registryRowsToEcomModels(allEcomImageModels);
+  const refCapableImageModels = mergeIpWorkflowImageModels(sceneImage, fullPool);
   const imageGenConcurrencyLimit = await resolveEcomImageGenConcurrency(auth.userId, {});
+
+  const defaultImage =
+    refCapableImageModels.find((m) => m.modelKey === ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL)
+      ?.modelKey ??
+    refCapableImageModels[0]?.modelKey ??
+    ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL;
 
   return ecomJson({
     chatModels: registryRowsToEcomModels(chatModels),
@@ -60,8 +69,7 @@ export async function GET(req: Request) {
     imageGenConcurrencyLimit,
     defaults: {
       chat: ECOM_STORYBOARD_DEFAULT_CHAT_MODEL,
-      image:
-        refCapableImageModels[0]?.modelKey ?? ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL,
+      image: defaultImage,
     },
   });
 }

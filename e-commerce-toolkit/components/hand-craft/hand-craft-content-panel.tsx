@@ -20,6 +20,8 @@ import {
 } from "@/components/product-design/product-design-gallery-preview-dialog";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
+import { useEcomIpWorkflowStepImageGen } from "@/lib/use-ecom-ip-workflow-step-image-gen";
+import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomIconButton, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import {
@@ -27,6 +29,7 @@ import {
   generateHandCraftStep,
   getHandCraftProject,
   saveHandCraftWorkflow,
+  syncHandCraftProjectPlan,
 } from "@/lib/ecom-hand-craft-api";
 import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 import type { HandCraftProject, HandCraftStepId } from "@/lib/hand-craft-types";
@@ -71,11 +74,14 @@ type Props = {
   onOpenProject?: (id: string) => void | Promise<void>;
   onDeleteProject?: () => void | Promise<void>;
   onProjectChange: () => void | Promise<void>;
+  onApplyProject?: (project: HandCraftProject) => void | Promise<void>;
   streaming?: boolean;
   /** 助手点「确认生成第 N 步」时递增，携带目标步骤 */
   generateRequest?: { stepId: HandCraftStepId; token: number } | null;
   focusStepId?: HandCraftStepId | null;
   onShareWorkflow?: () => void;
+  /** 槽位出图 / 拼版进行中（用于助手隐藏「确认生成」卡片） */
+  onMediaBusyChange?: (busy: boolean) => void;
 };
 
 function defaultHandCraftImageSize(modelKey: string, ratio: string): string {
@@ -108,10 +114,12 @@ export function HandCraftContentPanel({
   onOpenProject,
   onDeleteProject,
   onProjectChange,
+  onApplyProject,
   streaming,
   generateRequest = null,
   focusStepId = null,
   onShareWorkflow,
+  onMediaBusyChange,
 }: Props) {
   const router = useRouter();
   const { alert, confirm, toast } = useDialogs();
@@ -125,22 +133,47 @@ export function HandCraftContentPanel({
     stepId: HandCraftStepId;
     indexes: number[];
   } | null>(null);
-  const [generating, setGenerating] = useState<{
-    stepId: HandCraftStepId;
-    indexes: number[];
-  } | null>(null);
   const [composeBusy, setComposeBusy] = useState(false);
+  const [composeBusyDetail, setComposeBusyDetail] = useState<string | null>(null);
+  const handleComposeBusy = useCallback((busy: boolean, detail?: string) => {
+    const nextDetail = busy
+      ? detail ?? "浏览器正在排版并抓图，请勿关闭页面…"
+      : null;
+    setComposeBusy((prev) => (prev === busy ? prev : busy));
+    setComposeBusyDetail((prev) => (prev === nextDetail ? prev : nextDetail));
+  }, []);
   const {
     preview: composeImagePreview,
     openPreview: openComposeImagePreview,
     closePreview: closeComposeImagePreview,
   } = useEcomImagePreview();
   const [galleryPreview, setGalleryPreview] = useState<{
+    stepId: HandCraftStepId;
+    slotIndex: number;
     items: ProductDesignGalleryPreviewItem[];
     initialIndex: number;
   } | null>(null);
+  const [promptFocus, setPromptFocus] = useState<{
+    stepId: HandCraftStepId;
+    index: number;
+  } | null>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  const genPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const {
+    hasActiveGenJobs,
+    runGenerate,
+    slotGeneratingFor: slotGeneratingForJob,
+  } = useEcomIpWorkflowStepImageGen({
+      project,
+      projectId: project.id,
+      listImageSteps: HAND_CRAFT_STEPS,
+      stepState,
+      fetchProject: getHandCraftProject,
+    generateStep: generateHandCraftStep,
+    onProjectChange,
+    applyProject: onApplyProject,
+    imageGenConcurrencyLimit,
+  });
 
   useEffect(() => setDraftModelKey(imageModelKey), [imageModelKey]);
   useEffect(() => {
@@ -148,13 +181,6 @@ export function HandCraftContentPanel({
     const ratio = handCraftStep(pendingGen.stepId).ratio;
     setImageSize(defaultHandCraftImageSize(draftModelKey || imageModelKey, ratio));
   }, [draftModelKey, imageModelKey, pendingGen]);
-
-  useEffect(
-    () => () => {
-      if (genPollRef.current) clearInterval(genPollRef.current);
-    },
-    [],
-  );
 
   useEffect(() => {
     if (!focusStepId) return;
@@ -164,119 +190,38 @@ export function HandCraftContentPanel({
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [focusStepId]);
 
-  const stopGenPoll = useCallback(() => {
-    if (genPollRef.current) {
-      clearInterval(genPollRef.current);
-      genPollRef.current = null;
-    }
-  }, []);
-
-  /** 出图期间 2.5s 轮询：单张成图即时上墙，不必等整批返回 */
-  const startGenPoll = useCallback(
-    (stepId: HandCraftStepId, indexes: number[]) => {
-      stopGenPoll();
-      genPollRef.current = setInterval(() => {
-        void getHandCraftProject(project.id)
-          .then((refreshed) => {
-            void onProjectChange();
-            const slots = stepState(refreshed, stepId).slots;
-            if (slots.length === 0) return;
-            const pending = indexes.filter(
-              (i) => !slots.find((s) => s.index === i)?.imageUrl,
-            );
-            if (pending.length === 0) stopGenPoll();
-          })
-          .catch(() => undefined);
-      }, 2500);
-    },
-    [onProjectChange, project.id, stopGenPoll],
-  );
+  useEffect(() => {
+    onMediaBusyChange?.(hasActiveGenJobs || composeBusy);
+  }, [hasActiveGenJobs, composeBusy, onMediaBusyChange]);
 
   useEffect(() => {
-    if (generating) return;
-    for (const step of HAND_CRAFT_STEPS) {
-      if (step.kind === "compose") continue;
-      const state = stepState(project, step.id);
-      if (state.status !== "generating") continue;
-      const pending = state.slots.filter((s) => !s.imageUrl).map((s) => s.index);
-      if (pending.length === 0) continue;
-      setGenerating({ stepId: step.id, indexes: pending });
-      setBusy(`${step.label} 生成中…`);
-      startGenPoll(step.id, pending);
-      break;
-    }
-  }, [generating, project, project.id, startGenPoll]);
+    setBusy(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅 project.id
+  }, [project.id]);
 
-  const runGenerate = useCallback(
-    async (
-      stepId: HandCraftStepId,
-      indexes: number[],
-      modelKey: string,
-      sizeOverride?: string,
-    ) => {
-      const meta = handCraftStep(stepId);
-      setGenerating({ stepId, indexes });
-      setBusy(
-        indexes.length === 1
-          ? `${meta.label} 第 ${indexes[0]} 张生成中`
-          : `${meta.label} 生成中（共 ${indexes.length} 张）`,
-      );
-      startGenPoll(stepId, indexes);
-
-      let generated = 0;
-      const failures: Array<{ index: number; message: string }> = [];
+  /** 打开/切换项目：从服务端拉最新 plan（含资产库回填），避免内存里空槽与服务端不一致 */
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
       try {
-        const result = await generateHandCraftStep({
-          projectId: project.id,
-          stepId,
-          indexes,
-          modelKey,
-          imageSize: sizeOverride ?? imageSize,
-          concurrency: Math.max(1, Math.min(5, imageGenConcurrencyLimit)),
-        });
-        generated = result.generated;
-        failures.push(...result.failures);
-      } catch (e) {
-        for (const index of indexes) {
-          failures.push({
-            index,
-            message: e instanceof Error ? e.message : "生成失败",
-          });
-        }
-      } finally {
-        stopGenPoll();
-        setGenerating(null);
-        setBusy(null);
-        await onProjectChange();
+        const { project: synced } = await syncHandCraftProjectPlan(project.id);
+        if (cancelled) return;
+        if (onApplyProject) await onApplyProject(synced);
+        else await onProjectChange();
+      } catch {
+        /* 网络失败时保留当前内存态 */
       }
-
-      if (failures.length > 0) {
-        await alert({
-          title:
-            generated > 0
-              ? `${generated} 张已生成，${failures.length} 张失败`
-              : `${meta.label}生成失败`,
-          message: failures.map((f) => `第 ${f.index} 张：${f.message}`).join("\n"),
-          variant: "error",
-        });
-      }
-    },
-    [
-      alert,
-      imageGenConcurrencyLimit,
-      imageSize,
-      onProjectChange,
-      project.id,
-      startGenPoll,
-      stopGenPoll,
-    ],
-  );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id, onApplyProject, onProjectChange]);
 
   const requestGenerate = useCallback(
-    async (stepId: HandCraftStepId, indexes: number[]) => {
+    async (stepId: HandCraftStepId, indexes: number[]): Promise<boolean> => {
       const meta = handCraftStep(stepId);
-      if (meta.kind === "compose") return;
-      if (indexes.length === 0) return;
+      if (meta.kind === "compose") return false;
+      if (indexes.length === 0) return false;
 
       const blocked = missingRequirements(project, stepId);
       if (blocked.length > 0) {
@@ -285,7 +230,7 @@ export function HandCraftContentPanel({
           message: `请先完成：${blocked.join("、")}`,
           variant: "error",
         });
-        return;
+        return false;
       }
       if (project.references.length === 0) {
         await alert({
@@ -293,14 +238,15 @@ export function HandCraftContentPanel({
           message: "本模块以手绘线稿为唯一原型，请先上传线稿再出图。",
           variant: "error",
         });
-        return;
+        return false;
       }
       const ok = await confirm({
         title: `生成 ${indexes.length} 张 · ${meta.label}`,
         message: `将按第 ${meta.no} 步槽位说明出图 ${indexes.length} 张，预计需要几分钟。是否继续？`,
       });
-      if (!ok) return;
+      if (!ok) return false;
       setPendingGen({ stepId, indexes });
+      return true;
     },
     [alert, confirm, project],
   );
@@ -327,11 +273,9 @@ export function HandCraftContentPanel({
   }, [generateRequest, project, requestGenerate]);
 
   const slotGeneratingFor = useCallback(
-    (stepId: HandCraftStepId, index: number) => {
-      if (!generating || generating.stepId !== stepId) return false;
-      return generating.indexes.includes(index);
-    },
-    [generating],
+    (stepId: HandCraftStepId, index: number) =>
+      slotGeneratingForJob(stepId, index, project),
+    [project, slotGeneratingForJob],
   );
 
   const openStepPreview = useCallback(
@@ -352,7 +296,7 @@ export function HandCraftContentPanel({
         0,
         items.findIndex((i) => i.url === at),
       );
-      setGalleryPreview({ items, initialIndex });
+      setGalleryPreview({ stepId, slotIndex: index, items, initialIndex });
     },
     [project],
   );
@@ -379,7 +323,7 @@ export function HandCraftContentPanel({
       setSaveDialogOpen(false);
       toast({
         title: "已保存到资产库",
-        message: `「${snapshot.title}」已保存。可在「我的资产 · 手伴创作」一键复用。`,
+        message: `「${snapshot.title}」已保存。可在「我的资产 · 手办创作」一键复用。`,
         variant: "success",
       });
     } catch (e) {
@@ -402,11 +346,17 @@ export function HandCraftContentPanel({
     [project],
   );
 
-  const defaultSaveIpName = project.title?.trim() || "手伴IP";
+  const defaultSaveIpName = useMemo(
+    () => project.title?.trim() || "手办IP",
+    [project.title],
+  );
   const canSave = project.references.length > 0 || progress > 0;
 
   const totalSlots = HAND_CRAFT_STEPS.reduce((acc, s) => acc + s.count, 0);
-  const disabledAll = Boolean(streaming) || Boolean(generating) || composeBusy || sketchGenBusy;
+  const disabledAll = Boolean(streaming) || composeBusy || sketchGenBusy;
+  /** 槽位区：不因其它步出图中而整页禁用；本步批量中由 stepBatchActive + 单槽状态控制 */
+  const slotWorkspaceDisabled =
+    Boolean(streaming) || composeBusy || sketchGenBusy;
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white">
@@ -418,12 +368,12 @@ export function HandCraftContentPanel({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-semibold text-[#1d1d1f]">
-                {project.title?.trim() || "手伴创作"}
+                {project.title?.trim() || "手办创作"}
               </h2>
               <p className="text-[11px] text-[#6e6e73]">
                 线稿转潮玩盲盒 IP 全案 · 10 步 · 已出 {progress}/{totalSlots} 张
                 {project.meta?.workflow?.heroLockedUrl ? " · 主形象已定稿" : ""}
-                {" · 成图自动入库「我的资产 · 手伴创作」"}
+                {" · 成图自动入库「我的资产 · 手办创作」"}
               </p>
             </div>
             <EcomIconToolbar>
@@ -442,8 +392,8 @@ export function HandCraftContentPanel({
                     currentProjectId={project.id}
                     loadProjects={loadProjectList}
                     onSelectProject={onOpenProject}
-                    title="手伴创作 · 项目列表"
-                    emptyHint="还没有保存过的手伴创作项目。"
+                    title="手办创作 · 项目列表"
+                    emptyHint="还没有保存过的手办创作项目。"
                   />
                 ) : null}
                 {onDeleteProject ? (
@@ -507,12 +457,14 @@ export function HandCraftContentPanel({
           </p>
         </section>
 
-        <StoryboardTaskStatus
-          active={Boolean(busy) || sketchGenBusy}
-          title={sketchGenBusy ? "AI 生成线稿中" : busy ?? ""}
-          className="mt-3"
-          surface="chrome"
-        />
+        {busy ? (
+          <StoryboardTaskStatus
+            active
+            title={busy}
+            className="mt-3"
+            surface="chrome"
+          />
+        ) : null}
 
         <div className="space-y-4 px-5 py-4">
           {HAND_CRAFT_STEPS.map((step) => (
@@ -533,17 +485,21 @@ export function HandCraftContentPanel({
                   composeRequest={
                     generateRequest?.stepId === step.id ? generateRequest : null
                   }
-                  onBusyChange={setComposeBusy}
+                  onBusyChange={handleComposeBusy}
                   onPreviewImage={(src, title) => openComposeImagePreview(src, title)}
                 />
               ) : (
                 <HandCraftSlotGrid
                   project={project}
                   step={step}
-                  disabled={disabledAll}
+                  disabled={slotWorkspaceDisabled}
                   onProjectChange={onProjectChange}
-                  onGenerate={(indexes) => void requestGenerate(step.id, indexes)}
+                  onApplyProject={onApplyProject}
+                  onGenerate={(indexes) => requestGenerate(step.id, indexes)}
                   slotGeneratingFor={(index) => slotGeneratingFor(step.id, index)}
+                  openPromptIndex={
+                    promptFocus?.stepId === step.id ? promptFocus.index : null
+                  }
                   onPreview={(index) => openStepPreview(step.id, index)}
                   onDownload={(index) => {
                     const slot = stepState(project, step.id).slots.find(
@@ -563,12 +519,11 @@ export function HandCraftContentPanel({
       </div>
 
       <StoryboardTaskStatus
-        active={Boolean(generating) || composeBusy}
-        title={composeBusy ? "拼版抓图中" : "AI 出图中"}
+        active={composeBusy}
+        title={composeBusyDetail?.includes("加载引用图") ? "拼版加载引用图" : "拼版抓图中"}
         detail={
-          composeBusy
-            ? "浏览器正在排版并抓图，请勿关闭页面…"
-            : busy ?? "正在调用 Gateway 生图模型，请稍候…"
+          composeBusyDetail ??
+          "浏览器正在排版并抓图，请勿关闭页面…"
         }
         surface="content"
       />
@@ -596,13 +551,14 @@ export function HandCraftContentPanel({
           imageSize={imageSize}
           onImageSizeChange={setImageSize}
           lockedImageSizeLabel={`${handCraftStep(pendingGen.stepId).ratio}（由本步版式决定）`}
-          confirming={Boolean(generating)}
+          confirming={false}
           previewCount={Math.max(1, pendingGen.indexes.length)}
           onConfirm={(modelKey) => {
             const req = pendingGen;
             setPendingGen(null);
             onImageModelChange(modelKey);
-            void runGenerate(req.stepId, req.indexes, modelKey, imageSize);
+            const meta = handCraftStep(req.stepId);
+            runGenerate(req.stepId, req.indexes, meta.label, modelKey, imageSize);
           }}
         />
       ) : null}
@@ -614,26 +570,41 @@ export function HandCraftContentPanel({
       />
 
       {galleryPreview?.items.length ? (
-        <ProductDesignGalleryPreviewDialog
-          items={galleryPreview.items}
-          initialIndex={galleryPreview.initialIndex}
-          open
-          nativeOverlay
-          onOpenChange={(open) => {
-            if (!open) setGalleryPreview(null);
-          }}
-        />
+        <>
+          <ProductDesignGalleryPreviewDialog
+            items={galleryPreview.items}
+            initialIndex={galleryPreview.initialIndex}
+            open
+            nativeOverlay
+            onOpenChange={(open) => {
+              if (!open) setGalleryPreview(null);
+            }}
+          />
+          <div className="pointer-events-none fixed inset-x-0 bottom-8 z-[120] flex justify-center">
+            <EcomButtonSecondary
+              type="button"
+              className="pointer-events-auto shadow-lg"
+              onClick={() => {
+                setPromptFocus({
+                  stepId: galleryPreview.stepId,
+                  index: galleryPreview.slotIndex,
+                });
+                setGalleryPreview(null);
+              }}
+            >
+              编辑 Prompt
+            </EcomButtonSecondary>
+          </div>
+        </>
       ) : null}
 
-      {saveDialogOpen ? (
-        <HandCraftSaveDialog
-          open
-          onOpenChange={setSaveDialogOpen}
-          defaultIpName={defaultSaveIpName}
-          busy={Boolean(busy)}
-          onConfirm={handleSaveWorkflow}
-        />
-      ) : null}
+      <HandCraftSaveDialog
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        defaultIpName={defaultSaveIpName}
+        busy={Boolean(busy)}
+        onConfirm={handleSaveWorkflow}
+      />
     </div>
   );
 }

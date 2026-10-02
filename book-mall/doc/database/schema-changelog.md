@@ -455,6 +455,14 @@
 
 ---
 
+## 2026-10-02 — 品牌 VI · 表情包项目表
+
+- **迁移目录**：`prisma/migrations/20261002120000_ecom_brand_vi_project/`
+- **新表**：`EcomBrandViProject`——与手办工作流同构 JSON 字段（`brief` / `plan` / `meta` 等），`module` 默认 `vi`
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`
+
+---
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

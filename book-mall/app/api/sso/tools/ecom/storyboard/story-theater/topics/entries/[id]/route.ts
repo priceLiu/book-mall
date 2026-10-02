@@ -4,18 +4,13 @@ import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
   deleteUserStoryTheaterTopic,
   updateUserStoryTheaterTopic,
-  type StoryTheaterVertical,
 } from "@/lib/ecom/ecom-story-theater-topic-service";
+import { parseStoryTheaterVertical } from "@/lib/ecom/story-theater-vertical-parse";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string }> };
-
-function parseVertical(raw: unknown): StoryTheaterVertical | undefined {
-  if (raw === "fashion_apparel" || raw === "bags" || raw === "digital_3c") return raw;
-  return undefined;
-}
 
 export async function PATCH(req: Request, ctx: Ctx) {
   const auth = verifyToolsBearer(req);
@@ -25,7 +20,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const body = (await req.json()) as Record<string, unknown>;
     const patch: Parameters<typeof updateUserStoryTheaterTopic>[2] = {};
-    const vertical = parseVertical(body.vertical);
+    const vertical = parseStoryTheaterVertical(
+      typeof body.vertical === "string" ? body.vertical : null,
+    );
     if (vertical) patch.vertical = vertical;
     if (typeof body.title === "string") patch.title = body.title.trim();
     if (typeof body.storyCore === "string") patch.storyCore = body.storyCore.trim();

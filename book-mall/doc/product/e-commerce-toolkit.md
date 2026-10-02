@@ -37,15 +37,17 @@
 - Canvas：Pro2 底栏预设「视频拉片」→ 拉片 → `POST export/pro2` 导入 Script Hub 制作包
 - toolKey：`ecom-toolkit__film-pull`；数据表 `EcomFilmPullProject`
 
-### 手伴创作（线稿 → 潮玩盲盒 IP 全案）
+### 手办创作（线稿 → 潮玩盲盒 IP 全案）
 
-> SOP 与助手话术真源：[`doc/手伴/skill.md`](../手伴/skill.md)（`ecom-hand-craft-prompts.ts` 运行时读取）
+> SOP 与助手话术真源：[`doc/手伴/skill.md`](../手伴/skill.md)（`ecom-hand-craft-prompts.ts` 运行时读取）  
+> 增量需求：[`doc/ecom/hand-craft-requirements-delta.md`](../ecom/hand-craft-requirements-delta.md)
 
-- 入口：`/ecom/hand-craft`；**营销**侧栏；四栏布局与交互对齐「产品主图」（进度轨 + 中间工作区 + 右侧助手）
-- 输入：**1～5 张手绘线稿**（第 1 张为主线稿）。换主线稿 = 重启流程，会清空 10 步产出
+- 入口：`/ecom/hand-craft`；**营销**侧栏；四栏布局与交互对齐「产品主图」（进度轨 + 中间工作区 + 右侧助手 · **卡片式点选**）
+- 输入：**1～3 张手绘线稿**（第 1 张为主线稿）。换主线稿或 **视觉风格** = 重启流程，会清空 10 步产出
+- **视觉风格**：潮玩 3D 手办（默认）/ Q 版潮玩 / 扁平 / 国潮 / 赛博 / 自定义（`settings.stylePresetId` + `styleCustomText`）
 - 一致性锁定（本模块质量命门，服务端强制拼装，不依赖助手话术）：
   1. 第 1 步定稿主形象写入 `meta.workflow.heroLockedUrl`，后续每步生图 **参考图第 1 张恒为它**
-  2. 每条 Prompt 固定拼接 `HAND_CRAFT_BASE_STYLE` 基准风格串
+  2. 每条 Prompt 拼接 **线稿一致性约束 + 动态风格串**（`ecom-hand-craft-style-presets.ts`）
   3. `models` 路由只返回 **支持参考图** 的图像模型（`isRefCapableEcomImageModel`）
 - 10 步（`lib/ecom/ecom-hand-craft-steps.ts` 为唯一模板表，前端 `lib/hand-craft-workflow.ts` 只镜像展示字段）：
 
@@ -64,8 +66,18 @@
 
 - 第 8–10 步 **不调生图模型**：版式由 `HandCraftSheetView` 用代码排版，浏览器 `html2canvas` 抓 PNG → `POST .../compose/[stepId]` → OSS + `EcomAsset`，与微剧故事版 `sheetPngUrl` 同一条链
 - 出图：`POST .../step/[stepId]/generate`（`indexes` / `modelKey` / `concurrency`），逐张回写 `plan`，前端 2.5s 轮询上墙；批量步（12 槽 / 9 槽）按 `imageGenConcurrency` 并发，单张失败不影响其余
-- 交付：成图自动入库「我的资产 · 手伴创作」；`GET .../export` 出 ZIP（每步一个目录 + 交付清单 + 助手对话）
+- 交付：成图自动入库「我的资产 · 手办创作」；`GET .../export` 出 ZIP（每步一个目录 + 交付清单 + 助手对话）
 - toolKey：`ecom-toolkit__hand-craft`（`generate` / `compose`）；数据表 `EcomHandCraftProject`
+
+### 品牌 VI · 表情包
+
+> 需求：[`doc/ecom/brand-vi-requirements.md`](../ecom/brand-vi-requirements.md) · Prompt/SOP：[`docs/品牌VI与表情包.md`](../../../docs/品牌VI与表情包.md)
+
+- 入口：`/brand/vi`；**营销**侧栏；Studio 壳层与手办创作一致（进度轨 + 中栏 + 助手卡片）
+- 输入：参考图 **或** 文字 brief（品牌名、角色描述）；**五档产出模式** 收缩可见步骤（基础 IP / 表情包 / VI / 文创 / 完整全案）
+- 8 步：`lib/ecom/ecom-brand-vi-steps.ts`（hero → turnaround → emoji → logo → merch → poster → vi-spec compose → portfolio compose）
+- 一致性：与手办相同三门闩（`heroLockedUrl`、动态风格 Prompt、ref-capable 模型）
+- toolKey：`ecom-toolkit__vi`；数据表 `EcomBrandViProject`
 
 ### 服装模特图（多姿势上身展示 · V2）
 

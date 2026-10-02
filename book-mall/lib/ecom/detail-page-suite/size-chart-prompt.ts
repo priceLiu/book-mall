@@ -9,6 +9,7 @@ import {
   isDetailPageSuiteSizeChartDataLabel,
 } from "./size-chart-constants";
 import { ensureBriefSizeChartDefaults } from "./size-chart-image";
+import { isAplusBlankPlateModule } from "@/lib/ecom/detail-page-aplus/aplus-prompt-system";
 import { BLANK_PLATE_MODULE_IDS } from "./types";
 import type {
   DetailPageSuiteBrief,
@@ -61,10 +62,18 @@ export function buildModuleSlotForLabel(
   if (isDetailPageSuiteSizeChartDataLabel(label)) {
     return buildProgrammaticSizeChartSlot(label, index, prev);
   }
+  if (prev?.promptEdited && prev.positive_prompt?.trim()) {
+    return {
+      ...prev,
+      item_label: label,
+      promptEdited: true,
+    };
+  }
   if (!llmItem?.positive_prompt?.trim()) {
     throw new Error(`「${label}」缺少提示词`);
   }
-  const blankPlate = BLANK_PLATE_MODULE_IDS.has(mod.module_id);
+  const blankPlate =
+    BLANK_PLATE_MODULE_IDS.has(mod.module_id) || isAplusBlankPlateModule(mod.module_id);
   const llmBody = blankPlate
     ? buildDetailPageSuiteBlankPlateBody(label)
     : stripDetailPageSuitePromptEnvelope(llmItem.positive_prompt.trim());

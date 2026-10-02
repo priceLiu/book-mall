@@ -5,6 +5,10 @@ import {
   assertHandCraftComposeImageUrl,
   fetchHandCraftComposeImageBuffer,
 } from "@/lib/ecom/ecom-hand-craft-image-proxy";
+import {
+  fetchEcomVendorImageBuffer,
+  isEcomVendorPreviewImageUrl,
+} from "@/lib/ecom/ecom-vendor-image-download";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
@@ -21,8 +25,19 @@ export async function GET(req: Request) {
   }
 
   try {
-    assertHandCraftComposeImageUrl(url, auth.userId);
-    const { buf, contentType } = await fetchHandCraftComposeImageBuffer(url);
+    let buf: Buffer;
+    let contentType = "image/png";
+    try {
+      assertHandCraftComposeImageUrl(url, auth.userId);
+      const fetched = await fetchHandCraftComposeImageBuffer(url);
+      buf = fetched.buf;
+      contentType = fetched.contentType;
+    } catch {
+      if (!isEcomVendorPreviewImageUrl(url)) {
+        throw new Error("FORBIDDEN_OSS_URL");
+      }
+      buf = await fetchEcomVendorImageBuffer(url);
+    }
     return new NextResponse(new Uint8Array(buf), {
       status: 200,
       headers: {

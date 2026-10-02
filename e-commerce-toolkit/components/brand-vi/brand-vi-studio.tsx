@@ -1,0 +1,566 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+
+import { EcomLoginPrompt } from "@/components/auth/ecom-login-prompt";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { BrandViAssistantPanel } from "@/components/brand-vi/brand-vi-assistant-panel";
+import { BrandViContentPanel } from "@/components/brand-vi/brand-vi-content-panel";
+import { BrandViProgressRail } from "@/components/brand-vi/brand-vi-progress-rail";
+import { BackgroundGenerationProvider } from "@/components/generation";
+import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
+import { useEcomStudioAssistantCollapse } from "@/lib/ecom-assistant-collapse";
+import { ProductCreationStudioSkeleton } from "@/components/product-design/product-creation-studio-skeleton";
+import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-link-dialog";
+import { EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
+import {
+  createBrandViProject,
+  deleteBrandViProject,
+  fetchBrandViModels,
+  generateBrandViSketch,
+  getBrandViProject,
+  listBrandViProjectSummaries,
+  removeBrandViSketch,
+  attachBrandViSketchesFromAssets,
+  saveBrandViWorkflow,
+  updateBrandViProject,
+  uploadBrandViSketch,
+} from "@/lib/ecom-brand-vi-api";
+import {
+  clearEcomLastProjectId,
+  readEcomLastProjectId,
+  writeEcomLastProjectId,
+} from "@/lib/ecom-last-project";
+import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
+import type { BrandViProject, BrandViStepId } from "@/lib/brand-vi-types";
+import { applyEcomIpWorkflowProjectSnapshot } from "@/lib/ecom-ip-workflow-image-gen-dock";
+import { inferCurrentStepId } from "@/lib/brand-vi-workflow";
+import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
+import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
+import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import {
+  ECOM_WORKFLOW_SHARE_DESCRIPTION,
+  ECOM_WORKFLOW_SHARE_RESOURCE,
+} from "@/lib/ecom-workflow-share";
+
+const PROJECT_STORAGE_KEY = "ecom-brand-vi-active-project";
+const ENTRY_PATH = "/brand/vi";
+
+export function BrandViStudio() {
+  const { alert, confirm, doubleConfirm, toast } = useDialogs();
+  const [project, setProject] = useState<BrandViProject | null>(null);
+  const [chatModels, setChatModels] = useState<StoryboardGatewayModel[]>([]);
+  const [imageModels, setImageModels] = useState<StoryboardGatewayModel[]>([]);
+  const [chatModelKey, setChatModelKey] = useState(ECOM_DEFAULT_CHAT_MODEL_KEY);
+  const [imageModelKey, setImageModelKey] = useState("wan2.7-image");
+  const [concurrencyLimit, setConcurrencyLimit] = useState(1);
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [modelsLoadError, setModelsLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [empty, setEmpty] = useState(false);
+  const [needLogin, setNeedLogin] = useState(false);
+  const [workflowShareOpen, setWorkflowShareOpen] = useState(false);
+  const [refBusy, setRefBusy] = useState(false);
+  const [sketchGenBusy, setSketchGenBusy] = useState(false);
+  const [workspaceMediaBusy, setWorkspaceMediaBusy] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [assistantStreaming, setAssistantStreaming] = useState(false);
+  const [assistantWide, setAssistantWide] = useState(false);
+  const { assistantCollapsed, setAssistantCollapsed, handleMainBlankPointerDown } =
+    useEcomStudioAssistantCollapse(assistantStreaming);
+  const [currentStepId, setCurrentStepId] = useState<BrandViStepId>("hero");
+  const [focusStepId, setFocusStepId] = useState<BrandViStepId | null>(null);
+  const [generateRequest, setGenerateRequest] = useState<{
+    stepId: BrandViStepId;
+    token: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!focusStepId) return;
+    const timer = window.setTimeout(() => setFocusStepId(null), 800);
+    return () => window.clearTimeout(timer);
+  }, [focusStepId]);
+
+  const applyProject = useCallback((p: BrandViProject) => {
+    setProject(p);
+    setCurrentStepId(inferCurrentStepId(p));
+    writeEcomLastProjectId(PROJECT_STORAGE_KEY, p.id);
+    if (p.settings.chatModelKey) setChatModelKey(p.settings.chatModelKey);
+    if (p.settings.imageModelKey) setImageModelKey(p.settings.imageModelKey);
+  }, []);
+
+  const reload = useCallback(
+    async (
+      id: string,
+      initial?: BrandViProject,
+      opts?: { preserveStep?: boolean },
+    ) => {
+      const p = initial ?? (await getBrandViProject(id));
+      setProject(p);
+      writeEcomLastProjectId(PROJECT_STORAGE_KEY, p.id);
+      if (p.settings.chatModelKey) setChatModelKey(p.settings.chatModelKey);
+      if (p.settings.imageModelKey) setImageModelKey(p.settings.imageModelKey);
+      if (!opts?.preserveStep) {
+        setCurrentStepId(inferCurrentStepId(p));
+      }
+    },
+    [],
+  );
+
+  const loadModels = useCallback(async () => {
+    setModelsLoading(true);
+    try {
+      const models = await fetchBrandViModels();
+      setChatModels(models.chatModels);
+      setImageModels(models.imageModels);
+      setConcurrencyLimit(models.imageGenConcurrencyLimit);
+      setChatModelKey((prev) => pickBoundStoryboardModelKey(models.chatModels, prev));
+      setImageModelKey((prev) => pickBoundStoryboardModelKey(models.imageModels, prev));
+      setModelsLoadError(
+        models.imageModels.length === 0
+          ? "Gateway 未返回支持参考图的生图模型，请检查凭证或平台 IMAGE 模型上架。"
+          : null,
+      );
+    } catch (e) {
+      setModelsLoadError(e instanceof Error ? e.message : "模型列表加载失败");
+    } finally {
+      setModelsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadModels();
+
+    (async () => {
+      try {
+        const savedId = readEcomLastProjectId(PROJECT_STORAGE_KEY);
+
+        let initial: BrandViProject | undefined;
+        let projectId: string | null = null;
+
+        if (savedId) {
+          try {
+            initial = await getBrandViProject(savedId);
+            projectId = initial.id;
+          } catch {
+            /* 会话里的 id 已失效，走列表 */
+          }
+        }
+        if (!projectId) {
+          const summaries = await listBrandViProjectSummaries();
+          projectId = summaries[0]?.id ?? null;
+        }
+        if (cancelled) return;
+        if (!projectId) {
+          setEmpty(true);
+          return;
+        }
+        await reload(projectId, initial);
+      } catch (e) {
+        if (cancelled) return;
+        if (isEcomUnauthorizedError(e)) {
+          setNeedLogin(true);
+        } else {
+          await alert({
+            title: "加载失败",
+            message: e instanceof Error ? e.message : "无法初始化工作台",
+            variant: "error",
+          });
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [alert, loadModels, reload]);
+
+  async function handleNewProject() {
+    const hasWork =
+      Boolean(project?.references?.length) ||
+      (project?.chatHistory?.length ?? 0) > 0 ||
+      Object.values(project?.plan?.steps ?? {}).some(
+        (step) => (step?.outputs?.length ?? 0) > 0 || (step?.slots?.length ?? 0) > 0,
+      );
+    const defaultName = project?.title?.trim() || "品牌 VI · 表情包";
+    await runEcomNewProjectWithSavePrompt({
+      confirm,
+      hasWorkToSave: Boolean(project && hasWork),
+      message: "当前项目尚未保存工作流。是否先保存到「我的资产」？",
+      save: async () => {
+        if (!project) return;
+        const snapshot = await saveBrandViWorkflow(project.id, defaultName);
+        toast({
+          title: "工作流已保存",
+          message: `「${snapshot.title}」已保存，可继续新建。`,
+          variant: "success",
+        });
+      },
+      onProceed: async () => {
+        setLoading(true);
+        setEmpty(false);
+        try {
+          const created = await createBrandViProject({ title: "品牌 VI · 表情包" });
+          await reload(created.id, created);
+        } catch (e) {
+          await alert({
+            title: "新建失败",
+            message: e instanceof Error ? e.message : "无法创建项目",
+            variant: "error",
+          });
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
+  }
+
+  const loadProjectList = useCallback(async () => {
+    const items = await listBrandViProjectSummaries();
+    return items.map((p) => ({
+      id: p.id,
+      title: p.title?.trim() || "品牌 VI · 表情包",
+      updatedAt: p.updatedAt,
+      thumbnailUrl: p.thumbnailUrl,
+    }));
+  }, []);
+
+  async function handleOpenProject(id: string) {
+    if (project?.id === id) return;
+    if (assistantStreaming) {
+      await alert({
+        title: "请稍候",
+        message: "请等待助手完成当前输出后再切换项目。",
+        variant: "error",
+      });
+      return;
+    }
+    setLoading(true);
+    try {
+      await reload(id);
+      setEmpty(false);
+      setAssistantWide(false);
+      setFocusStepId(null);
+      setGenerateRequest(null);
+    } catch (e) {
+      await alert({
+        title: "打开失败",
+        message: e instanceof Error ? e.message : "无法打开项目",
+        variant: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDeleteProject() {
+    if (!project) return;
+    const ok = await doubleConfirm({
+      title: "删除品牌 VI · 表情包项目",
+      message: `将删除「${project.title?.trim() || "品牌 VI · 表情包"}」的 8 步产出记录与会话。`,
+      secondTitle: "不可恢复",
+      secondMessage:
+        "删除后项目记录无法找回；已生成的图片仍保留在云端存储（OSS）与「我的资产」中。是否继续？",
+      confirmLabel: "删除",
+    });
+    if (!ok) return;
+    setLoading(true);
+    try {
+      await deleteBrandViProject(project.id);
+      clearEcomLastProjectId(PROJECT_STORAGE_KEY);
+      const summaries = await listBrandViProjectSummaries();
+      if (summaries[0]) {
+        await reload(summaries[0].id);
+      } else {
+        setProject(null);
+        setEmpty(true);
+      }
+    } catch (e) {
+      await alert({
+        title: "删除失败",
+        message: e instanceof Error ? e.message : "无法删除项目",
+        variant: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRefUpload(file: File) {
+    if (!project) return;
+    /** 换主参考图 = 重启流程，须先确认；追加参考图只是补参考 */
+    const isMainSketch = project.references.length === 0;
+    let resetFlow = false;
+    if (!isMainSketch) {
+      const state = project.plan?.steps ?? {};
+      const hasOutput = Object.values(state).some(
+        (s) => s?.slots?.some((slot) => slot.imageUrl) || s?.outputs?.length,
+      );
+      if (hasOutput) {
+        resetFlow = await confirm({
+          title: "更换主参考图？",
+          message:
+            "本项目已有成图。若这张参考图是新的主参考图，会重置 8 步产出与主形象锁定（已出图仍留在资产库）；如只是补充参考，请选「取消」后先删掉旧参考图。",
+          confirmLabel: "作为新主参考图并重置",
+        });
+        if (!resetFlow) return;
+      }
+    }
+
+    setRefBusy(true);
+    setUploadProgress(10);
+    const tick = window.setInterval(() => {
+      setUploadProgress((p) => (p != null && p < 88 ? p + 7 : p));
+    }, 180);
+    try {
+      const { project: next } = await uploadBrandViSketch(project.id, file, {
+        resetFlow,
+      });
+      setUploadProgress(100);
+      applyProject(next);
+    } catch (e) {
+      await alert({
+        title: "上传失败",
+        message: e instanceof Error ? e.message : "无法上传参考图",
+        variant: "error",
+      });
+    } finally {
+      window.clearInterval(tick);
+      setRefBusy(false);
+      window.setTimeout(() => setUploadProgress(null), 450);
+    }
+  }
+
+  async function handleAttachSketches(assetIds: string[]) {
+    if (!project || assetIds.length === 0) return;
+    setRefBusy(true);
+    try {
+      const next = await attachBrandViSketchesFromAssets(project.id, assetIds);
+      applyProject(next);
+    } catch (e) {
+      await alert({
+        title: "添加失败",
+        message: e instanceof Error ? e.message : "无法从资产添加参考图",
+        variant: "error",
+      });
+    } finally {
+      setRefBusy(false);
+    }
+  }
+
+  function projectHasGeneratedOutput(p: BrandViProject): boolean {
+    const state = p.plan?.steps ?? {};
+    return Object.values(state).some(
+      (s) => s?.slots?.some((slot) => slot.imageUrl) || (s?.outputs?.length ?? 0) > 0,
+    );
+  }
+
+  async function handleGenerateSketch(prompt: string) {
+    if (!project) return;
+
+    let resetFlow = false;
+    if (project.references.length > 0 && projectHasGeneratedOutput(project)) {
+      resetFlow = await confirm({
+        title: "重新生成主参考图？",
+        message:
+          "本项目已有成图。重新生成并替换第 1 张参考图会重置 8 步产出与主形象锁定（已出图仍留在资产库）。是否继续？",
+        confirmLabel: "重新生成并重置",
+      });
+      if (!resetFlow) return;
+    }
+
+    setSketchGenBusy(true);
+    setRefBusy(true);
+    try {
+      const { project: next } = await generateBrandViSketch(project.id, prompt, {
+        resetFlow,
+      });
+      applyProject(next);
+    } catch (e) {
+      await alert({
+        title: "生成参考图失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+      throw e;
+    } finally {
+      setSketchGenBusy(false);
+      setRefBusy(false);
+    }
+  }
+
+  async function handleRefRemove(refId: string) {
+    if (!project) return;
+    const ok = await doubleConfirm({
+      title: "删除参考图",
+      message: "确定从本项目移除这张参考图？",
+      secondTitle: "不可恢复",
+      secondMessage:
+        "删除后需重新上传；已上传文件仍保留在云端存储（OSS）。是否继续？",
+      confirmLabel: "删除",
+    });
+    if (!ok) return;
+    setRefBusy(true);
+    try {
+      await removeBrandViSketch(project.id, refId);
+      await reload(project.id);
+    } catch (e) {
+      await alert({
+        title: "删除失败",
+        message: e instanceof Error ? e.message : "无法删除参考图",
+        variant: "error",
+      });
+    } finally {
+      setRefBusy(false);
+    }
+  }
+
+  const changeCurrentStep = useCallback(
+    async (stepId: BrandViStepId) => {
+      setCurrentStepId(stepId);
+      setFocusStepId(stepId);
+      if (!project) return;
+      try {
+        const next = await updateBrandViProject(project.id, {
+          meta: { workflow: { currentStepId: stepId } },
+        });
+        setProject(next);
+      } catch {
+        /* 当前步只是引导态，写失败不阻塞操作 */
+      }
+    },
+    [project],
+  );
+
+  if (needLogin) {
+    return (
+      <EcomLoginPrompt
+        returnPath={ENTRY_PATH}
+        message="使用品牌 VI · 表情包需要登录。请点击下方按钮，经主站 Book 完成 SSO 后自动回到本页。"
+      />
+    );
+  }
+
+  if (loading && !project) {
+    return <ProductCreationStudioSkeleton />;
+  }
+
+  if (empty || !project) {
+    return (
+      <EcomWorkspaceLayout fullWidth>
+        <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6 py-16 text-center">
+          <h2 className="text-xl font-semibold text-[#1d1d1f]">品牌 VI · 表情包</h2>
+          <p className="max-w-md text-sm text-[#6e6e73]">
+            上传一张手绘参考图，分 8 步做出品牌 IP VI 与表情包：主形象、规范三件套、盲盒卡、周边样机、包装、表情包，直到小红书长图、拼版规范页与作品集。
+          </p>
+          <EcomButtonSecondary
+            type="button"
+            onClick={() => void handleNewProject()}
+            disabled={loading}
+          >
+            {loading ? "创建中…" : "开始创作"}
+          </EcomButtonSecondary>
+        </div>
+      </EcomWorkspaceLayout>
+    );
+  }
+
+  return (
+    <BackgroundGenerationProvider>
+    <>
+    <EcomWorkspaceLayout
+      assistantWide={assistantWide}
+      assistantCollapsed={assistantCollapsed}
+      onMainBlankPointerDown={handleMainBlankPointerDown}
+      progress={
+        <BrandViProgressRail
+          project={project}
+          currentStepId={currentStepId}
+          onStepClick={(id) => void changeCurrentStep(id)}
+        />
+      }
+      assistant={
+        <BrandViAssistantPanel
+          key={project.id}
+          project={project}
+          currentStepId={currentStepId}
+          chatModels={chatModels}
+          chatModelKey={chatModelKey}
+          composerWide={assistantWide}
+          onComposerWideChange={setAssistantWide}
+          collapsed={assistantCollapsed}
+          onCollapsedChange={setAssistantCollapsed}
+          onStreamingChange={setAssistantStreaming}
+          onProjectChange={async () => {
+            await reload(project.id, undefined, { preserveStep: true });
+          }}
+          onCurrentStepChange={changeCurrentStep}
+          onRequestGenerateStep={(stepId) =>
+            setGenerateRequest((prev) => ({
+              stepId,
+              token: (prev?.token ?? 0) + 1,
+            }))
+          }
+          onAlert={alert}
+          workspaceBusy={workspaceMediaBusy || sketchGenBusy || refBusy}
+        />
+      }
+    >
+      <BrandViContentPanel
+        project={project}
+        currentStepId={currentStepId}
+        imageModels={imageModels}
+        imageModelKey={imageModelKey}
+        onImageModelChange={(key) => {
+          setImageModelKey(key);
+          updateBrandViProject(project.id, {
+            settings: { imageModelKey: key },
+          }).catch(() => undefined);
+        }}
+        modelsLoading={modelsLoading}
+        modelsLoadError={modelsLoadError}
+        onRefreshModels={loadModels}
+        imageGenConcurrencyLimit={concurrencyLimit}
+        onRefUpload={handleRefUpload}
+        onRefRemove={handleRefRemove}
+        onAttachSketches={handleAttachSketches}
+        onGenerateSketch={handleGenerateSketch}
+        refBusy={refBusy}
+        sketchGenBusy={sketchGenBusy}
+        uploadProgress={uploadProgress}
+        onNewProject={() => void handleNewProject()}
+        loadProjectList={loadProjectList}
+        onOpenProject={(id) => void handleOpenProject(id)}
+        onDeleteProject={() => void handleDeleteProject()}
+        onProjectChange={async () => {
+          await reload(project.id, undefined, { preserveStep: true });
+        }}
+        onApplyProject={(p) => {
+          setProject((prev) => {
+            if (!prev || prev.id !== p.id) return p;
+            return applyEcomIpWorkflowProjectSnapshot(prev, p);
+          });
+        }}
+        onMediaBusyChange={setWorkspaceMediaBusy}
+        streaming={assistantStreaming}
+        generateRequest={generateRequest}
+        focusStepId={focusStepId}
+        onShareWorkflow={() => setWorkflowShareOpen(true)}
+      />
+    </EcomWorkspaceLayout>
+    <WorkflowShareLinkDialog
+      projectId={project.id}
+      projectTitle={project.title?.trim() || "品牌 VI · 表情包"}
+      open={workflowShareOpen}
+      onClose={() => setWorkflowShareOpen(false)}
+      resourceType={ECOM_WORKFLOW_SHARE_RESOURCE.brandVi}
+      description={ECOM_WORKFLOW_SHARE_DESCRIPTION[ECOM_WORKFLOW_SHARE_RESOURCE.brandVi]}
+    />
+    </>
+    </BackgroundGenerationProvider>
+  );
+}

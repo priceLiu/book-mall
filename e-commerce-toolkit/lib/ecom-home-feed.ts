@@ -34,7 +34,7 @@ export const ECOM_HOME_FEATURED_CARDS: EcomHomeFeaturedCard[] = [
   },
   {
     id: "hand-craft",
-    title: "手伴 IP 创作",
+    title: "手办 IP 创作",
     description: "线稿转潮玩盲盒 IP 全案",
     href: "/ecom/hand-craft",
     icon: Sparkles,

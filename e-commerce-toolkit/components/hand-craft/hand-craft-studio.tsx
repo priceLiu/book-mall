@@ -7,6 +7,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { HandCraftAssistantPanel } from "@/components/hand-craft/hand-craft-assistant-panel";
 import { HandCraftContentPanel } from "@/components/hand-craft/hand-craft-content-panel";
 import { HandCraftProgressRail } from "@/components/hand-craft/hand-craft-progress-rail";
+import { BackgroundGenerationProvider } from "@/components/generation";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { useEcomStudioAssistantCollapse } from "@/lib/ecom-assistant-collapse";
 import { ProductCreationStudioSkeleton } from "@/components/product-design/product-creation-studio-skeleton";
@@ -33,6 +34,7 @@ import {
 } from "@/lib/ecom-last-project";
 import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import type { HandCraftProject, HandCraftStepId } from "@/lib/hand-craft-types";
+import { applyEcomIpWorkflowProjectSnapshot } from "@/lib/ecom-ip-workflow-image-gen-dock";
 import { inferCurrentStepId } from "@/lib/hand-craft-workflow";
 import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
@@ -61,6 +63,7 @@ export function HandCraftStudio() {
   const [workflowShareOpen, setWorkflowShareOpen] = useState(false);
   const [refBusy, setRefBusy] = useState(false);
   const [sketchGenBusy, setSketchGenBusy] = useState(false);
+  const [workspaceMediaBusy, setWorkspaceMediaBusy] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [assistantStreaming, setAssistantStreaming] = useState(false);
   const [assistantWide, setAssistantWide] = useState(false);
@@ -88,10 +91,21 @@ export function HandCraftStudio() {
   }, []);
 
   const reload = useCallback(
-    async (id: string, initial?: HandCraftProject) => {
-      applyProject(initial ?? (await getHandCraftProject(id)));
+    async (
+      id: string,
+      initial?: HandCraftProject,
+      opts?: { preserveStep?: boolean },
+    ) => {
+      const p = initial ?? (await getHandCraftProject(id));
+      setProject(p);
+      writeEcomLastProjectId(PROJECT_STORAGE_KEY, p.id);
+      if (p.settings.chatModelKey) setChatModelKey(p.settings.chatModelKey);
+      if (p.settings.imageModelKey) setImageModelKey(p.settings.imageModelKey);
+      if (!opts?.preserveStep) {
+        setCurrentStepId(inferCurrentStepId(p));
+      }
     },
-    [applyProject],
+    [],
   );
 
   const loadModels = useCallback(async () => {
@@ -172,7 +186,7 @@ export function HandCraftStudio() {
       Object.values(project?.plan?.steps ?? {}).some(
         (step) => (step?.outputs?.length ?? 0) > 0 || (step?.slots?.length ?? 0) > 0,
       );
-    const defaultName = project?.title?.trim() || "手伴创作";
+    const defaultName = project?.title?.trim() || "手办创作";
     await runEcomNewProjectWithSavePrompt({
       confirm,
       hasWorkToSave: Boolean(project && hasWork),
@@ -190,7 +204,7 @@ export function HandCraftStudio() {
         setLoading(true);
         setEmpty(false);
         try {
-          const created = await createHandCraftProject({ title: "手伴创作" });
+          const created = await createHandCraftProject({ title: "手办创作" });
           await reload(created.id, created);
         } catch (e) {
           await alert({
@@ -209,7 +223,7 @@ export function HandCraftStudio() {
     const items = await listHandCraftProjectSummaries();
     return items.map((p) => ({
       id: p.id,
-      title: p.title?.trim() || "手伴创作",
+      title: p.title?.trim() || "手办创作",
       updatedAt: p.updatedAt,
       thumbnailUrl: p.thumbnailUrl,
     }));
@@ -246,8 +260,8 @@ export function HandCraftStudio() {
   async function handleDeleteProject() {
     if (!project) return;
     const ok = await doubleConfirm({
-      title: "删除手伴创作项目",
-      message: `将删除「${project.title?.trim() || "手伴创作"}」的 10 步产出记录与会话。`,
+      title: "删除手办创作项目",
+      message: `将删除「${project.title?.trim() || "手办创作"}」的 10 步产出记录与会话。`,
       secondTitle: "不可恢复",
       secondMessage:
         "删除后项目记录无法找回；已生成的图片仍保留在云端存储（OSS）与「我的资产」中。是否继续？",
@@ -426,7 +440,7 @@ export function HandCraftStudio() {
     return (
       <EcomLoginPrompt
         returnPath={ENTRY_PATH}
-        message="使用手伴创作需要登录。请点击下方按钮，经主站 Book 完成 SSO 后自动回到本页。"
+        message="使用手办创作需要登录。请点击下方按钮，经主站 Book 完成 SSO 后自动回到本页。"
       />
     );
   }
@@ -439,7 +453,7 @@ export function HandCraftStudio() {
     return (
       <EcomWorkspaceLayout fullWidth>
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-          <h2 className="text-xl font-semibold text-[#1d1d1f]">手伴创作</h2>
+          <h2 className="text-xl font-semibold text-[#1d1d1f]">手办创作</h2>
           <p className="max-w-md text-sm text-[#6e6e73]">
             上传一张手绘线稿，分 10 步做出潮玩盲盒 IP 全案：主形象、规范三件套、盲盒卡、周边样机、包装、表情包，直到小红书长图、12 页作品集与招商授权页。
           </p>
@@ -456,6 +470,7 @@ export function HandCraftStudio() {
   }
 
   return (
+    <BackgroundGenerationProvider>
     <>
     <EcomWorkspaceLayout
       assistantWide={assistantWide}
@@ -481,7 +496,7 @@ export function HandCraftStudio() {
           onCollapsedChange={setAssistantCollapsed}
           onStreamingChange={setAssistantStreaming}
           onProjectChange={async () => {
-            await reload(project.id);
+            await reload(project.id, undefined, { preserveStep: true });
           }}
           onCurrentStepChange={changeCurrentStep}
           onRequestGenerateStep={(stepId) =>
@@ -491,6 +506,7 @@ export function HandCraftStudio() {
             }))
           }
           onAlert={alert}
+          workspaceBusy={workspaceMediaBusy || sketchGenBusy || refBusy}
         />
       }
     >
@@ -521,22 +537,30 @@ export function HandCraftStudio() {
         onOpenProject={(id) => void handleOpenProject(id)}
         onDeleteProject={() => void handleDeleteProject()}
         onProjectChange={async () => {
-          await reload(project.id);
+          await reload(project.id, undefined, { preserveStep: true });
+        }}
+        onApplyProject={(p) => {
+          setProject((prev) => {
+            if (!prev || prev.id !== p.id) return p;
+            return applyEcomIpWorkflowProjectSnapshot(prev, p);
+          });
         }}
         streaming={assistantStreaming}
         generateRequest={generateRequest}
         focusStepId={focusStepId}
         onShareWorkflow={() => setWorkflowShareOpen(true)}
+        onMediaBusyChange={setWorkspaceMediaBusy}
       />
     </EcomWorkspaceLayout>
     <WorkflowShareLinkDialog
       projectId={project.id}
-      projectTitle={project.title?.trim() || "手伴创作"}
+      projectTitle={project.title?.trim() || "手办创作"}
       open={workflowShareOpen}
       onClose={() => setWorkflowShareOpen(false)}
       resourceType={ECOM_WORKFLOW_SHARE_RESOURCE.handCraft}
       description={ECOM_WORKFLOW_SHARE_DESCRIPTION[ECOM_WORKFLOW_SHARE_RESOURCE.handCraft]}
     />
     </>
+    </BackgroundGenerationProvider>
   );
 }

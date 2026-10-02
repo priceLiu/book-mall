@@ -73,6 +73,8 @@ export type HandCraftSettings = {
   imageModelKey?: string;
   /** 批量出图并发（1–5） */
   imageGenConcurrency?: number;
+  stylePresetId?: string;
+  styleCustomText?: string;
 };
 
 export type HandCraftMeta = {

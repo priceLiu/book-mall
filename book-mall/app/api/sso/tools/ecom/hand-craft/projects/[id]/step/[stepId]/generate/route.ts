@@ -7,7 +7,8 @@ import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+/** 与工具站 BFF 代理超时对齐；批量 KIE 轮询可能 >5min */
+export const maxDuration = 600;
 
 type Ctx = { params: Promise<{ id: string; stepId: string }> };
 

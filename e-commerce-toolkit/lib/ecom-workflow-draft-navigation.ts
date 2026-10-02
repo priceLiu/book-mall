@@ -2,6 +2,7 @@
 
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
+import { createBrandViProject } from "@/lib/ecom-brand-vi-api";
 import { createHandCraftProject } from "@/lib/ecom-hand-craft-api";
 import { createMediaDecomposeProject } from "@/lib/ecom-media-decompose-api";
 import { createModelShotProject } from "@/lib/ecom-model-shot-api";
@@ -16,6 +17,7 @@ export const STORYBOARD_DRAFT_STORAGE_KEY = "ecom-storyboard-active-project";
 export const SEED_VIDEO_DRAFT_STORAGE_KEY = "ecom-seed-video-active-project";
 export const MEDIA_DECOMPOSE_DRAFT_STORAGE_KEY = "ecom-media-decompose-active-project";
 export const HAND_CRAFT_DRAFT_STORAGE_KEY = "ecom-hand-craft-active-project";
+export const BRAND_VI_DRAFT_STORAGE_KEY = "ecom-brand-vi-active-project";
 
 export function productDesignDraftStorageKey(module: EcomProjectModule): string {
   return `ecom-product-design-active-project:${module === "detail-page" ? "detail-page" : "main-image"}`;
@@ -33,6 +35,8 @@ export function workflowDraftStudioPath(kind: EcomWorkflowDraftKind): string {
       return "/ecom/detail-page-creation";
     case "hand-craft":
       return "/ecom/hand-craft";
+    case "brand-vi":
+      return "/brand/vi";
     case "seed-video":
       return "/ecom/seed-video";
     case "media-decompose":
@@ -52,6 +56,8 @@ export function workflowDraftStorageKey(kind: EcomWorkflowDraftKind): string {
       return productDesignDraftStorageKey("detail-page");
     case "hand-craft":
       return HAND_CRAFT_DRAFT_STORAGE_KEY;
+    case "brand-vi":
+      return BRAND_VI_DRAFT_STORAGE_KEY;
     case "seed-video":
       return SEED_VIDEO_DRAFT_STORAGE_KEY;
     case "media-decompose":
@@ -101,6 +107,10 @@ export async function createWorkflowDraft(
       const project = await createHandCraftProject();
       return { projectId: project.id };
     }
+    case "brand-vi": {
+      const project = await createBrandViProject();
+      return { projectId: project.id };
+    }
     case "seed-video": {
       const project = await createSeedVideoProject();
       return { projectId: project.id };
@@ -143,6 +153,11 @@ export async function deleteWorkflowDraft(
     case "hand-craft":
       await import("@/lib/ecom-hand-craft-api").then((m) =>
         m.deleteHandCraftProject(projectId),
+      );
+      return;
+    case "brand-vi":
+      await import("@/lib/ecom-brand-vi-api").then((m) =>
+        m.deleteBrandViProject(projectId),
       );
       return;
     case "seed-video":

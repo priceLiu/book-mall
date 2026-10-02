@@ -4,6 +4,7 @@ import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
 import {
   getHandCraftStep,
   HAND_CRAFT_STEP_IDS,
+  isHandCraftStepId,
   requireHandCraftStep,
   type HandCraftStepDef,
   type HandCraftStepId,
@@ -23,6 +24,11 @@ import {
   type HandCraftSlot,
   type HandCraftStepState,
 } from "@/lib/ecom/ecom-hand-craft-types";
+import {
+  loadIpWorkflowProjectAssets,
+  reconcileIpWorkflowPlanFromAssets,
+} from "@/lib/ecom/ecom-ip-workflow-asset-reconcile";
+import { mergeIpWorkflowStepSlots } from "@/lib/ecom/ecom-ip-workflow-slot-merge";
 import { prisma } from "@/lib/prisma";
 
 export type EcomHandCraftProjectDto = {
@@ -115,7 +121,7 @@ export async function createEcomHandCraftProject(
   const row = await prisma.ecomHandCraftProject.create({
     data: {
       userId,
-      title: opts?.title?.trim().slice(0, 120) || "手伴创作",
+      title: opts?.title?.trim().slice(0, 120) || "手办创作",
       references: [] as Prisma.InputJsonValue,
       chatHistory: [] as Prisma.InputJsonValue,
       plan: { steps: {} } as Prisma.InputJsonValue,
@@ -126,14 +132,53 @@ export async function createEcomHandCraftProject(
   return rowToDto(row);
 }
 
+function handCraftSlotTemplateForReconcile(stepId: string, index: number) {
+  if (!isHandCraftStepId(stepId)) {
+    return { index, title: `#${index}`, prompt: "" };
+  }
+  const step = getHandCraftStep(stepId);
+  if (!step || step.kind !== "generate") {
+    return { index, title: `#${index}`, prompt: "" };
+  }
+  const tpl = step.slots.find((s) => s.index === index);
+  return tpl
+    ? { index: tpl.index, title: tpl.title, prompt: tpl.prompt }
+    : { index, title: `#${index}`, prompt: "" };
+}
+
+/** 从 EcomAsset 回填 plan 槽位（出图成功但 plan 未写入时） */
+export async function syncEcomHandCraftProjectPlanFromAssets(
+  userId: string,
+  projectId: string,
+): Promise<{ project: EcomHandCraftProjectDto | null; recoveredImages: number }> {
+  const row = await prisma.ecomHandCraftProject.findFirst({
+    where: { id: projectId, userId },
+  });
+  if (!row) return { project: null, recoveredImages: 0 };
+  let dto = rowToDto(row);
+  const byStepIndex = await loadIpWorkflowProjectAssets({
+    userId,
+    module: ECOM_HAND_CRAFT_MODULE,
+    projectId,
+    source: "hand-craft",
+  });
+  if (byStepIndex.size === 0) return { project: dto, recoveredImages: 0 };
+  const { plan, recoveredImages } = reconcileIpWorkflowPlanFromAssets({
+    plan: dto.plan,
+    byStepIndex,
+    resolveSlotTemplate: handCraftSlotTemplateForReconcile,
+  });
+  if (recoveredImages === 0) return { project: dto, recoveredImages: 0 };
+  dto = await updateEcomHandCraftProject(userId, projectId, { plan });
+  return { project: dto, recoveredImages };
+}
+
 export async function getEcomHandCraftProject(
   userId: string,
   projectId: string,
 ): Promise<EcomHandCraftProjectDto | null> {
-  const row = await prisma.ecomHandCraftProject.findFirst({
-    where: { id: projectId, userId },
-  });
-  return row ? rowToDto(row) : null;
+  const { project } = await syncEcomHandCraftProjectPlanFromAssets(userId, projectId);
+  return project;
 }
 
 export async function updateEcomHandCraftProject(
@@ -161,7 +206,25 @@ export async function updateEcomHandCraftProject(
   if (patch.brief !== undefined) data.brief = patch.brief as Prisma.InputJsonValue;
   if (patch.settings !== undefined) {
     const prev = (existing.settings as HandCraftSettings | null) ?? {};
-    data.settings = { ...prev, ...patch.settings } as Prisma.InputJsonValue;
+    const next = { ...prev, ...patch.settings };
+    const styleChanged =
+      (patch.settings.stylePresetId !== undefined &&
+        patch.settings.stylePresetId !== prev.stylePresetId) ||
+      (patch.settings.styleCustomText !== undefined &&
+        (patch.settings.styleCustomText ?? "").trim() !== (prev.styleCustomText ?? "").trim());
+    data.settings = next as Prisma.InputJsonValue;
+    if (styleChanged && patch.plan === undefined) {
+      data.plan = { steps: {} } as Prisma.InputJsonValue;
+      const prevMeta = (existing.meta as HandCraftMeta | null) ?? {};
+      data.meta = {
+        ...prevMeta,
+        workflow: {
+          ...(prevMeta.workflow ?? {}),
+          currentStepId: "hero",
+          heroLockedUrl: undefined,
+        },
+      } as unknown as Prisma.InputJsonValue;
+    }
   }
   if (patch.references !== undefined) {
     data.references = sanitizeHandCraftReferences(
@@ -335,6 +398,18 @@ export function readHandCraftStepState(
   return existing;
 }
 
+/** 出图逐张回写 plan 时走轻量读库，避免每张都 reconcile 资产拖慢 GET/轮询 */
+async function loadEcomHandCraftProjectForPatch(
+  userId: string,
+  projectId: string,
+): Promise<EcomHandCraftProjectDto | null> {
+  const row = await prisma.ecomHandCraftProject.findFirst({
+    where: { id: projectId, userId },
+  });
+  if (!row) return null;
+  return rowToDto(row);
+}
+
 /** 按步增量写：并发出图时逐张回写，不覆盖别的步骤 */
 export async function patchHandCraftStep(
   userId: string,
@@ -342,12 +417,17 @@ export async function patchHandCraftStep(
   stepId: HandCraftStepId,
   patch: Partial<Omit<HandCraftStepState, "stepId">>,
 ): Promise<EcomHandCraftProjectDto> {
-  const project = await getEcomHandCraftProject(userId, projectId);
+  const project = await loadEcomHandCraftProjectForPatch(userId, projectId);
   if (!project) throw new Error("项目不存在");
   const prev = readHandCraftStepState(project.plan, stepId);
+  const mergedSlots =
+    patch.slots !== undefined
+      ? mergeIpWorkflowStepSlots(prev.slots, patch.slots)
+      : undefined;
   const next: HandCraftStepState = {
     ...prev,
     ...patch,
+    ...(mergedSlots !== undefined ? { slots: mergedSlots } : {}),
     stepId,
     updatedAt: new Date().toISOString(),
   };

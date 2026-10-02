@@ -15,6 +15,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -22,6 +23,11 @@ import {
   type RefObject,
   type SyntheticEvent,
 } from "react";
+
+export type UseImageZoomPanOptions = {
+  /** 滚轮在此容器上也可缩放（预览暗底全屏区等），效果同右下角 +/- */
+  wheelHostRef?: RefObject<HTMLElement | null>;
+};
 
 export const IMAGE_ZOOM_MIN = 1;
 export const IMAGE_ZOOM_MAX = 6;
@@ -54,7 +60,7 @@ function panBounds(el: HTMLElement | null, zoom: number): Offset {
 }
 
 export type ImageZoomPanStageProps = {
-  ref: RefObject<HTMLDivElement>;
+  ref: RefObject<HTMLDivElement> | ((node: HTMLDivElement | null) => void);
   style: CSSProperties;
   onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => void;
@@ -77,8 +83,12 @@ export type ImageZoomPan = {
 /**
  * @param resetKey 变化时归位（通常传图片 src —— 换图不该沿用上一张的缩放）
  */
-export function useImageZoomPan(resetKey: string): ImageZoomPan {
-  const containerRef = useRef<HTMLDivElement>(null);
+export function useImageZoomPan(
+  resetKey: string,
+  options?: UseImageZoomPanOptions,
+): ImageZoomPan {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [stageReady, setStageReady] = useState(0);
   const [zoom, setZoom] = useState(IMAGE_ZOOM_MIN);
   const [offset, setOffset] = useState<Offset>({ x: 0, y: 0 });
   const [bounds, setBounds] = useState<Offset>({ x: 0, y: 0 });
@@ -128,12 +138,16 @@ export function useImageZoomPan(resetKey: string): ImageZoomPan {
     measure();
   }, [zoom, measure]);
 
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
+  const assignContainerRef = useCallback((node: HTMLDivElement | null) => {
+    containerRef.current = node;
+    if (node) setStageReady((n) => n + 1);
+  }, []);
+
+  useLayoutEffect(() => {
     // React 的 onWheel 是被动监听，无法 preventDefault，滚轮会穿透去滚背后的页面
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      e.stopPropagation();
       setZoom((z) =>
         clampImageZoom(
           z *
@@ -143,9 +157,21 @@ export function useImageZoomPan(resetKey: string): ImageZoomPan {
         ),
       );
     };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, []);
+    const targets = new Set<HTMLElement>();
+    const stage = containerRef.current;
+    const host = options?.wheelHostRef?.current;
+    if (stage) targets.add(stage);
+    if (host) targets.add(host);
+    if (targets.size === 0) return;
+    for (const el of targets) {
+      el.addEventListener("wheel", onWheel, { passive: false });
+    }
+    return () => {
+      for (const el of targets) {
+        el.removeEventListener("wheel", onWheel);
+      }
+    };
+  }, [resetKey, stageReady, options?.wheelHostRef]);
 
   const onPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
@@ -203,7 +229,7 @@ export function useImageZoomPan(resetKey: string): ImageZoomPan {
     zoomBy,
     reset,
     stageProps: {
-      ref: containerRef,
+      ref: assignContainerRef,
       style: {
         transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
         transformOrigin: "center center",

@@ -2,6 +2,8 @@ import { Prisma } from "@prisma/client";
 
 import { createEcomFilmPullProject } from "@/lib/ecom/ecom-film-pull-service";
 import { ECOM_FILM_PULL_MODULE } from "@/lib/ecom/ecom-film-pull-types";
+import { createEcomBrandViProject } from "@/lib/ecom/ecom-brand-vi-service";
+import { ECOM_BRAND_VI_MODULE } from "@/lib/ecom/ecom-brand-vi-types";
 import { createEcomHandCraftProject } from "@/lib/ecom/ecom-hand-craft-service";
 import { ECOM_HAND_CRAFT_MODULE } from "@/lib/ecom/ecom-hand-craft-types";
 import { createEcomMediaDecomposeProject } from "@/lib/ecom/ecom-media-decompose-service";
@@ -21,6 +23,7 @@ export const ECOM_WORKFLOW_SHARE_RESOURCE = {
   modelShot: "ecom_model_shot_project",
   productDesign: "ecom_product_design_project",
   handCraft: "ecom_hand_craft_project",
+  brandVi: "ecom_brand_vi_project",
   seedVideo: "ecom_seed_video_project",
   mediaDecompose: "ecom_media_decompose_project",
   filmPull: "ecom_film_pull_project",
@@ -43,6 +46,8 @@ export function ecomWorkflowShareRedirectPath(
       return `/ecom/product-creation?projectId=${q}`;
     case ECOM_WORKFLOW_SHARE_RESOURCE.handCraft:
       return `/ecom/hand-craft?projectId=${q}`;
+    case ECOM_WORKFLOW_SHARE_RESOURCE.brandVi:
+      return `/brand/vi?projectId=${q}`;
     case ECOM_WORKFLOW_SHARE_RESOURCE.seedVideo:
       return `/ecom/seed-video?projectId=${q}`;
     case ECOM_WORKFLOW_SHARE_RESOURCE.mediaDecompose:
@@ -84,6 +89,8 @@ export function ecomWorkflowShareSessionStorageKey(resourceType: string): string
       return "ecom-model-shot-active-project";
     case ECOM_WORKFLOW_SHARE_RESOURCE.handCraft:
       return "ecom-hand-craft-active-project";
+    case ECOM_WORKFLOW_SHARE_RESOURCE.brandVi:
+      return "ecom-brand-vi-active-project";
     case ECOM_WORKFLOW_SHARE_RESOURCE.seedVideo:
       return "ecom-seed-video-active-project";
     case ECOM_WORKFLOW_SHARE_RESOURCE.mediaDecompose:
@@ -112,6 +119,8 @@ export async function duplicateEcomWorkflowForShareClaim(input: {
       return duplicateProductDesign(input);
     case ECOM_WORKFLOW_SHARE_RESOURCE.handCraft:
       return duplicateHandCraft(input);
+    case ECOM_WORKFLOW_SHARE_RESOURCE.brandVi:
+      return duplicateBrandVi(input);
     case ECOM_WORKFLOW_SHARE_RESOURCE.seedVideo:
       return duplicateSeedVideo(input);
     case ECOM_WORKFLOW_SHARE_RESOURCE.mediaDecompose:
@@ -214,6 +223,34 @@ async function duplicateProductDesign(input: {
   return created.id;
 }
 
+async function duplicateBrandVi(input: {
+  sourceProjectId: string;
+  sharerUserId: string;
+  claimerUserId: string;
+}): Promise<string> {
+  const source = await prisma.ecomBrandViProject.findFirst({
+    where: { id: input.sourceProjectId, userId: input.sharerUserId, module: ECOM_BRAND_VI_MODULE },
+  });
+  if (!source) throw new Error("品牌 VI 项目不存在或无权分享");
+
+  const created = await createEcomBrandViProject(input.claimerUserId, {
+    title: shareTitle(source.title, "品牌 VI"),
+  });
+  await prisma.ecomBrandViProject.update({
+    where: { id: created.id },
+    data: {
+      references: source.references ?? [],
+      chatHistory: source.chatHistory ?? [],
+      settings: source.settings ?? {},
+      brief: source.brief ?? Prisma.JsonNull,
+      plan: source.plan ?? Prisma.JsonNull,
+      meta: source.meta ?? Prisma.JsonNull,
+      status: source.status,
+    },
+  });
+  return created.id;
+}
+
 async function duplicateHandCraft(input: {
   sourceProjectId: string;
   sharerUserId: string;
@@ -222,10 +259,10 @@ async function duplicateHandCraft(input: {
   const source = await prisma.ecomHandCraftProject.findFirst({
     where: { id: input.sourceProjectId, userId: input.sharerUserId, module: ECOM_HAND_CRAFT_MODULE },
   });
-  if (!source) throw new Error("手伴创作项目不存在或无权分享");
+  if (!source) throw new Error("手办创作项目不存在或无权分享");
 
   const created = await createEcomHandCraftProject(input.claimerUserId, {
-    title: shareTitle(source.title, "手伴创作"),
+    title: shareTitle(source.title, "手办创作"),
   });
   await prisma.ecomHandCraftProject.update({
     where: { id: created.id },

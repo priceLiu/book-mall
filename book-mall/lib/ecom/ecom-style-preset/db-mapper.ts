@@ -12,6 +12,12 @@ function parseVerticals(raw: unknown): EcomStylePresetVertical[] {
     "fashion_apparel",
     "bags",
     "digital_3c",
+    "footwear",
+    "jewelry",
+    "outdoor_gear",
+    "loungewear",
+    "kitchenware",
+    "baby_maternal",
     "generic",
   ]);
   return raw.filter((x): x is EcomStylePresetVertical => typeof x === "string" && allowed.has(x as EcomStylePresetVertical));

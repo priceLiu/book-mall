@@ -1,4 +1,9 @@
 import type { EcomImageRatio } from "@/lib/ecom/ecom-platform-spec";
+import {
+  HAND_CRAFT_LINEART_LOCK,
+  resolveHandCraftStyleFragment,
+} from "@/lib/ecom/ecom-hand-craft-style-presets";
+import type { HandCraftSettings } from "@/lib/ecom/ecom-hand-craft-types";
 
 /**
  * 手伴创作 · 10 步模板表（唯一事实源，文档见 doc/手伴/skill.md）
@@ -14,8 +19,9 @@ import type { EcomImageRatio } from "@/lib/ecom/ecom-platform-spec";
  * 每一条送给生图模型的 Prompt 都必须拼上它：10 步之间的五官一致性完全靠
  * 「第 1 步定稿主形象作参考图」+「本串」锁定，只写进助手话术是无效的。
  */
+/** @deprecated 使用 HAND_CRAFT_LINEART_LOCK + resolveHandCraftStyleFragment(settings) */
 export const HAND_CRAFT_BASE_STYLE =
-  "严格沿用本次线稿原生造型，100%保留卷发、星星发饰、波点裙、五官雀斑与体态，泡泡玛特潮玩3D手办，哑光细腻树脂材质，圆润软萌比例，干净红白主色调，柔和渐变光影，无杂色纯白背景，潮玩精致细节，统一IP五官特征不崩脸";
+  "严格沿用本次线稿原生造型，保留线稿核心特征，潮玩3D手办质感，统一IP五官特征不崩脸";
 
 /** 全程固定视觉基底（文档「通用纠错&灵活调整规则」第 4 条） */
 export const HAND_CRAFT_VISUAL_BASE = [
@@ -463,6 +469,7 @@ export const HAND_CRAFT_STEPS: HandCraftStepDef[] = [
     ratio: "3:4",
     slots: [],
     pages: LICENSING_PAGES,
+    /** 招商页版式只引用 hero / blindbox / merch，不依赖作品集（第 9 步） */
     requires: ["hero", "blindbox", "merch"],
   },
 ];
@@ -498,7 +505,9 @@ export function buildHandCraftSlotPrompt(opts: {
   refCount: number;
   /** hero 步的参考图是用户上传的线稿 */
   isHeroStep: boolean;
+  settings?: HandCraftSettings;
 }): string {
+  const styleFragment = resolveHandCraftStyleFragment(opts.settings);
   const lines: string[] = [
     `生成 ${opts.step.ratio} 比例的潮玩 IP 物料：${opts.step.label} · ${opts.slotTitle}`,
     "",
@@ -507,7 +516,9 @@ export function buildHandCraftSlotPrompt(opts: {
     "固定视觉基底：",
     ...HAND_CRAFT_VISUAL_BASE.map((r) => `- ${r}`),
     "",
-    `基准风格（硬性）：${HAND_CRAFT_BASE_STYLE}`,
+    `线稿/角色一致性（硬性）：${HAND_CRAFT_LINEART_LOCK}`,
+    "",
+    `视觉风格（硬性）：${styleFragment}`,
   ];
 
   if (opts.refCount > 0) {
@@ -519,7 +530,7 @@ export function buildHandCraftSlotPrompt(opts: {
       );
     } else {
       lines.push(
-        "- 参考图第 1 张为本系列基准主形象：五官、发型、卷发、星星发饰、雀斑与身体比例必须与之完全一致",
+        "- 参考图第 1 张为本系列基准主形象：五官、发型、核心配饰与身体比例必须与之完全一致",
         "- 不得改动基准形象的脸部特征与核心配饰，只按本槽指令更换姿态、穿搭或载体",
       );
       if (opts.refCount > 1) {

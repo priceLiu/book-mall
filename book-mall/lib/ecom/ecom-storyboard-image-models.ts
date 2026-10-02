@@ -89,9 +89,29 @@ export function isStoryboardKlingImageModel(modelKey: string): boolean {
   );
 }
 
+export function isKieSeedreamImageModelKey(modelKey: string): boolean {
+  const k = modelKey.trim().toLowerCase();
+  return k === "seedream-4.5" || k.startsWith("seedream/");
+}
+
 export function isStoryboardKieImageModel(modelKey: string): boolean {
   const k = modelKey.trim().toLowerCase();
-  return k.includes("nano-banana") || k === "nanobanana" || isKieGptImageModelKey(k);
+  return (
+    k.includes("nano-banana") ||
+    k === "nanobanana" ||
+    isKieGptImageModelKey(k) ||
+    isKieSeedreamImageModelKey(k)
+  );
+}
+
+/** KIE createTask 路由用：保留 seedream / gpt 等原始 modelKey */
+export function resolveKieEcomImageModelKey(modelKey: string): string {
+  const raw = modelKey.trim();
+  const k = raw.toLowerCase();
+  if (isKieSeedreamImageModelKey(k)) return raw;
+  if (isKieGptImageModelKey(k)) return raw;
+  if (k === "nano-banana-2") return raw;
+  return resolveStoryboardKieModel(raw);
 }
 
 /** 分镜生图须传入参考图；纯文生图模型不可用 */

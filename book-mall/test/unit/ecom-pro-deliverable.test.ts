@@ -188,3 +188,17 @@ describe("ecom-pro-deliverable · digital_3c", () => {
     expect(parsed?.vertical).toBeUndefined();
   });
 });
+
+describe("ecom-pro-deliverable · pro-v1 verticals (smoke)", () => {
+  it.each(["footwear", "kitchenware", "baby_maternal"] as const)(
+    "extracts sellpoints for %s",
+    (vertical) => {
+      const payload = {
+        sellpoints: [{ id: "S01", text: "测试卖点", layer: "core" as const, source: "ai" as const }],
+      };
+      const text = `\`\`\`pro-deliverable\n${JSON.stringify(payload)}\n\`\`\``;
+      const parsed = extractProDeliverable(text, vertical, "sellpoints");
+      expect(parsed?.sellpoints?.[0]?.text).toBe("测试卖点");
+    },
+  );
+});

@@ -185,7 +185,7 @@ const MODULE_TITLES: Record<string, { title: string; kind: "image" | "video" | "
   "detail-page-suite-replica": { title: "详情页套图复刻", kind: "image" },
   "detail-page-suite-hit": { title: "爆款详情页套图", kind: "image" },
   "ai-detail-page": { title: "AI 详情页", kind: "image" },
-  "hand-craft": { title: "手伴创作", kind: "image" },
+  "hand-craft": { title: "手办创作", kind: "image" },
   "model-shot": { title: "服装模特图", kind: "image" },
   "image-layer": { title: "图片处理", kind: "image" },
   "model-tryon": { title: "模特试衣", kind: "image" },

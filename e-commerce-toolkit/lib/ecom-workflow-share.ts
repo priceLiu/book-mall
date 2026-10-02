@@ -4,6 +4,7 @@ export const ECOM_WORKFLOW_SHARE_RESOURCE = {
   modelShot: "ecom_model_shot_project",
   productDesign: "ecom_product_design_project",
   handCraft: "ecom_hand_craft_project",
+  brandVi: "ecom_brand_vi_project",
   seedVideo: "ecom_seed_video_project",
   mediaDecompose: "ecom_media_decompose_project",
   filmPull: "ecom_film_pull_project",
@@ -22,6 +23,8 @@ export const ECOM_WORKFLOW_SHARE_DESCRIPTION: Record<EcomWorkflowShareResourceTy
     "分享 10 位码或主站链接；好友领取副本后可继续编辑主图/详情页方案并生成配图。",
   [ECOM_WORKFLOW_SHARE_RESOURCE.handCraft]:
     "分享 10 位码或主站链接；好友领取副本后可继续编辑线稿与 10 步 IP 全案。",
+  [ECOM_WORKFLOW_SHARE_RESOURCE.brandVi]:
+    "分享 10 位码或主站链接；好友领取副本后可继续编辑品牌 VI 与表情包工作流。",
   [ECOM_WORKFLOW_SHARE_RESOURCE.seedVideo]:
     "分享 10 位码或主站链接；好友领取副本后可继续编辑素材策划与成片流程。",
   [ECOM_WORKFLOW_SHARE_RESOURCE.mediaDecompose]:
@@ -40,6 +43,8 @@ export function ecomWorkflowShareSessionStorageKey(resourceType: EcomWorkflowSha
       return "ecom-model-shot-active-project";
     case ECOM_WORKFLOW_SHARE_RESOURCE.handCraft:
       return "ecom-hand-craft-active-project";
+    case ECOM_WORKFLOW_SHARE_RESOURCE.brandVi:
+      return "ecom-brand-vi-active-project";
     case ECOM_WORKFLOW_SHARE_RESOURCE.seedVideo:
       return "ecom-seed-video-active-project";
     case ECOM_WORKFLOW_SHARE_RESOURCE.mediaDecompose:

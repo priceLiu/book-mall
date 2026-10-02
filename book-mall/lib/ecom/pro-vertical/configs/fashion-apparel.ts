@@ -37,7 +37,7 @@ const FASHION_STYLE_CATEGORIES = [
 export const FASHION_APPAREL_CONFIG: ProVerticalConfig = {
   id: "fashion_apparel",
   label: "服装专业版",
-  projectTitle: "服装专业版",
+  projectTitle: "电商口播故事版",
   schemaVersion: "fashion-v4",
   legacySchemaVersion: "fashion-v4",
   panelFocusLabel: "服装展示重点",

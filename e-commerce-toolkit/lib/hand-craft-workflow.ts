@@ -146,9 +146,17 @@ export const HAND_CRAFT_STEPS: HandCraftStepMeta[] = [
     ratio: "3:4",
     count: 1,
     requires: ["hero", "blindbox", "merch"],
-    summary: "授权赛道 + 多场景角色效果，闭环全案",
+    summary: "授权赛道 + 多场景效果（仅需第 1、3、4 步，不必等作品集）",
   },
 ];
+
+/** 本步硬依赖是否齐备（与 compose / generate 按钮、服务端 missingRequirementLabels 对齐） */
+export function canStartHandCraftStep(
+  project: HandCraftProject,
+  stepId: HandCraftStepId,
+): boolean {
+  return missingRequirements(project, stepId).length === 0;
+}
 
 export function handCraftStep(id: HandCraftStepId): HandCraftStepMeta {
   const hit = HAND_CRAFT_STEPS.find((s) => s.id === id);
@@ -435,7 +443,11 @@ export function assistantChoices(
   const next = HAND_CRAFT_STEPS.find((s) => s.no === meta.no + 1);
 
   const out: string[] = [];
+  const nextCanStart = next != null && canStartHandCraftStep(project, next.id);
   if (ready && next) {
+    out.push(`进入第 ${next.no} 步：${next.label}`);
+  } else if (nextCanStart && next) {
+    // 下一步硬依赖已齐即可跳转（例如第 9 步作品集未完成也可进第 10 步）
     out.push(`进入第 ${next.no} 步：${next.label}`);
   } else {
     out.push(
@@ -483,4 +495,15 @@ export const HAND_CRAFT_WELCOME_MESSAGE = [
   "",
   "全程 1:1 保留线稿原生造型；第 1 步定稿的主形象会作为后续每一步的参考图，五官与配饰不会跑偏。",
   "先在中间工作区上传线稿，然后点下方按钮开始第 1 步。",
+].join("\n");
+
+/** 第 1 步主形象定稿后，助手仅作指引，具体操作在中栏完成 */
+export const HAND_CRAFT_POST_HERO_GUIDE_MESSAGE = [
+  "**主形象已定稿**",
+  "",
+  "后续请在**中间工作区**按步骤自行操作：勾选槽位 → 生成；需要拼版的步骤在对应区块点「拼版」。",
+  "",
+  "每一步出图都会自动带上已定稿的主形象作为参考图；成图会写入本项目并保存至「我的资产 · 手办创作」。",
+  "",
+  "右下角任务窗会显示出图进度；多步可同时排队，由系统按并发上限依次调用模型。",
 ].join("\n");

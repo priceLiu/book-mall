@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { ECOM_BRAND_VI_MODULE } from "@/lib/ecom/ecom-brand-vi-types";
 import { ECOM_HAND_CRAFT_MODULE } from "@/lib/ecom/ecom-hand-craft-types";
 import { ECOM_MEDIA_DECOMPOSE_MODULE } from "@/lib/ecom/ecom-media-decompose-types";
 import { ECOM_MODEL_SHOT_MODULE } from "@/lib/ecom/ecom-model-shot-types";
@@ -20,6 +21,7 @@ export type EcomWorkflowDraftKind =
   | "product-design-main"
   | "product-design-detail"
   | "hand-craft"
+  | "brand-vi"
   | "seed-video"
   | "media-decompose"
   | "model-shot";
@@ -184,6 +186,40 @@ async function listProductDesignDrafts(userId: string): Promise<EcomWorkflowDraf
   });
 }
 
+async function listBrandViDrafts(userId: string): Promise<EcomWorkflowDraftItem[]> {
+  const rows = await prisma.ecomBrandViProject.findMany({
+    where: { userId, module: ECOM_BRAND_VI_MODULE },
+    orderBy: { updatedAt: "desc" },
+    take: 50,
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      references: true,
+      meta: true,
+      plan: true,
+      updatedAt: true,
+    },
+  });
+  return rows.map((row) => {
+    const meta = row.meta as { workflow?: { currentStepId?: string } } | null;
+    const stepId = meta?.workflow?.currentStepId ?? "hero";
+    const plan = row.plan as { steps?: Record<string, unknown> } | null;
+    const stepCount = plan?.steps ? Object.keys(plan.steps).length : 0;
+    return {
+      kind: "brand-vi",
+      projectId: row.id,
+      title: row.title?.trim() || "品牌 VI",
+      featureLabel: "品牌 VI · 表情包",
+      domainLabel: "电商",
+      phaseLabel: `步骤 ${stepId}`,
+      summary: stepCount > 0 ? `${stepCount} 步已填写` : "进行中",
+      thumbnailUrl: firstRefUrl(row.references),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  });
+}
+
 async function listHandCraftDrafts(userId: string): Promise<EcomWorkflowDraftItem[]> {
   const rows = await prisma.ecomHandCraftProject.findMany({
     where: { userId, module: ECOM_HAND_CRAFT_MODULE },
@@ -207,8 +243,8 @@ async function listHandCraftDrafts(userId: string): Promise<EcomWorkflowDraftIte
     return {
       kind: "hand-craft",
       projectId: row.id,
-      title: row.title?.trim() || "手伴创作",
-      featureLabel: "手伴创作",
+      title: row.title?.trim() || "手办创作",
+      featureLabel: "手办创作",
       domainLabel: "电商",
       phaseLabel: `步骤 ${stepId}`,
       summary: stepCount > 0 ? `${stepCount} 步已填写` : "进行中",
@@ -337,11 +373,12 @@ async function listModelShotDrafts(userId: string): Promise<EcomWorkflowDraftIte
 export async function listEcomWorkflowDrafts(
   userId: string,
 ): Promise<EcomWorkflowDraftItem[]> {
-  const [storyboard, productDesign, handCraft, seedVideo, mediaDecompose, modelShot] =
+  const [storyboard, productDesign, handCraft, brandVi, seedVideo, mediaDecompose, modelShot] =
     await Promise.all([
       listStoryboardDrafts(userId),
       listProductDesignDrafts(userId),
       listHandCraftDrafts(userId),
+      listBrandViDrafts(userId),
       listSeedVideoDrafts(userId),
       listMediaDecomposeDrafts(userId),
       listModelShotDrafts(userId),
@@ -350,6 +387,7 @@ export async function listEcomWorkflowDrafts(
     ...storyboard,
     ...productDesign,
     ...handCraft,
+    ...brandVi,
     ...seedVideo,
     ...mediaDecompose,
     ...modelShot,

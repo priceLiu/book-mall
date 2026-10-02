@@ -367,9 +367,10 @@ export function DetailPageSuiteContentPanel({
   variant = "default",
   hideHeader = false,
 }: Props) {
+  const isReplica = variant === "replica";
   const isHit = variant === "hit";
   const isAplus = variant === "aplus";
-  const isWorkbench = variant === "replica" || isHit || isAplus;
+  const isWorkbench = isReplica || isHit || isAplus;
   const inputRef = useRef<HTMLInputElement>(null);
   const [assetOpen, setAssetOpen] = useState(false);
   const activeGen = activeGenSlotKeys ?? new Set<string>();
@@ -427,9 +428,9 @@ export function DetailPageSuiteContentPanel({
     () =>
       buildDetailPageSuiteProjectPreviewItems(project, {
         replicaMode: variant === "replica",
-        includeDisabledModules: isWorkbench,
+        includeDisabledModules: isReplica || isHit,
       }),
-    [project, variant, isWorkbench],
+    [project, variant, isHit, isReplica],
   );
 
   const handlePreviewSlotImage = useCallback(
@@ -592,7 +593,10 @@ export function DetailPageSuiteContentPanel({
                   操作。多条可并行提交。提示词 {promptReadyCount}/{promptTargets.length}。
                 </p>
               ) : null}
-              {project.suite.modules.map((mod) => (
+              {(isAplus
+                ? project.suite.modules.filter((m) => m.enable && m.generate_count > 0)
+                : project.suite.modules
+              ).map((mod) => (
                 <ModuleBlock
                   key={mod.module_id}
                   mod={mod}
@@ -620,7 +624,7 @@ export function DetailPageSuiteContentPanel({
                   onGenerateModuleImages={onGenerateModuleImages}
                   onActiveImageIndexChange={onActiveImageIndexChange}
                   imageGenFailures={readDetailPageSuiteImageGenFailures(project.meta)}
-                  replicaMode={isWorkbench}
+                  replicaMode={isReplica}
                   isHit={isHit || isAplus}
                 />
               ))}

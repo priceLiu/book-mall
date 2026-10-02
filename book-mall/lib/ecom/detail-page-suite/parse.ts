@@ -271,16 +271,52 @@ export function parseBrief(raw: unknown): DetailPageSuiteBrief | null {
         : {}),
     };
   }
+  const pv = o.productVertical;
+  const productVerticalSet = new Set([
+    "fashion_apparel",
+    "bags",
+    "digital_3c",
+    "footwear",
+    "jewelry",
+    "outdoor_gear",
+    "loungewear",
+    "kitchenware",
+    "baby_maternal",
+    "apparel",
+    "general",
+  ]);
+  const productVertical =
+    typeof pv === "string" && productVerticalSet.has(pv)
+      ? (pv as DetailPageSuiteBrief["productVertical"])
+      : undefined;
   return {
     ...(o as DetailPageSuiteBrief),
     ...(sizeChart ? { sizeChart } : {}),
     ...(specChart ? { specChart } : {}),
+    ...(productVertical ? { productVertical } : {}),
   };
 }
 
 export function parseSettings(raw: unknown): DetailPageSuiteSettings {
   if (!raw || typeof raw !== "object") return {};
-  return raw as DetailPageSuiteSettings;
+  const o = raw as Record<string, unknown>;
+  const base = { ...o } as DetailPageSuiteSettings;
+  const plannerRaw = o.aplusPromptPlanner;
+  if (plannerRaw && typeof plannerRaw === "object" && !Array.isArray(plannerRaw)) {
+    const p = plannerRaw as Record<string, unknown>;
+    const mode = p.mode === "custom" ? "custom" : "default";
+    base.aplusPromptPlanner = {
+      mode,
+      ...(typeof p.customSystemBody === "string"
+        ? { customSystemBody: p.customSystemBody.slice(0, 32_000) }
+        : {}),
+      ...(typeof p.customSystemFileUrl === "string" && p.customSystemFileUrl.trim()
+        ? { customSystemFileUrl: p.customSystemFileUrl.trim() }
+        : {}),
+      ...(typeof p.updatedAt === "string" ? { updatedAt: p.updatedAt } : {}),
+    };
+  }
+  return base;
 }
 
 export function parseMeta(raw: unknown): DetailPageSuiteMeta | null {

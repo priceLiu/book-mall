@@ -42,6 +42,17 @@ export type DetailPageSuiteSpecChartState = {
   tables?: DetailPageSuiteSizeChartTable[];
 };
 
+export type AplusProductVertical =
+  | "fashion_apparel"
+  | "bags"
+  | "digital_3c"
+  | "footwear"
+  | "jewelry"
+  | "outdoor_gear"
+  | "loungewear"
+  | "kitchenware"
+  | "baby_maternal";
+
 export type DetailPageSuiteBrief = {
   genderCategory?: string;
   styleCategory?: string;
@@ -62,6 +73,15 @@ export type DetailPageSuiteBrief = {
   sellpointsLocked?: boolean;
   sizeChart?: DetailPageSuiteSizeChartState;
   specChart?: DetailPageSuiteSpecChartState;
+  /** AI 详情页 · 产品品类（自动子维度） */
+  productVertical?: AplusProductVertical;
+};
+
+export type AplusPromptPlannerSettings = {
+  mode?: "default" | "custom";
+  customSystemBody?: string;
+  customSystemFileUrl?: string;
+  updatedAt?: string;
 };
 
 export type DetailPageSuiteReferenceRole = "product" | "reference_suite" | "model";
@@ -116,6 +136,9 @@ export type DetailPageSuiteSlot = {
   /** 是否勾选参与出图；默认 true（有 prompt 时） */
   selectedForImage?: boolean;
   promptEdited?: boolean;
+  /** AI 详情页 · 本格参考/场景图 */
+  promptRefUrls?: string[];
+  promptRefNote?: string;
 };
 
 export type DetailPageSuiteModuleState = {
@@ -146,6 +169,7 @@ export type DetailPageSuiteSettings = {
   imageRatio?: "1:1" | "3:4" | "4:5" | "9:16" | "16:9";
   exportTargets?: DetailPageSuiteExportTarget[];
   activeExportTargetIds?: string[];
+  aplusPromptPlanner?: AplusPromptPlannerSettings;
 };
 
 export type DetailPageSuitePhase =

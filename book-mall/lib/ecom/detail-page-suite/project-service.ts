@@ -677,7 +677,7 @@ export async function createDetailPageSuiteAplusProject(
       } as Prisma.InputJsonValue,
     },
   });
-  return rowToDto(row);
+  return loadDetailPageSuiteProjectNormalized(row);
 }
 
 export async function getDetailPageSuiteAplusProject(
@@ -788,4 +788,123 @@ export async function uploadDetailPageSuiteAplusReference(opts: {
     ...[...sameRole, newRef].slice(-limit),
   ];
   return updateDetailPageSuiteAplusProject(opts.userId, opts.projectId, { references: refs });
+}
+
+const APLUS_SLOT_PROMPT_REF_MAX = 3;
+const APLUS_PROMPT_PLANNER_MAX_CHARS = 120_000;
+
+export async function appendAplusSlotPromptRef(opts: {
+  userId: string;
+  projectId: string;
+  moduleId: string;
+  slotId: string;
+  buf: Buffer;
+  contentType: string;
+}): Promise<DetailPageSuiteProject | null> {
+  const { normalizeDetailPageSuiteReferenceForStorage } = await import(
+    "./ref-upload-normalize"
+  );
+  const stored = await normalizeDetailPageSuiteReferenceForStorage(opts.buf);
+  const ossUrl = await uploadCanvasUserBuffer({
+    userId: opts.userId,
+    ext: stored.ext,
+    buf: stored.buf,
+    contentType: stored.contentType,
+  });
+  const project = await getDetailPageSuiteAplusProject(opts.userId, opts.projectId);
+  if (!project) return null;
+  const { resolveModuleDisplaySlots } = await import("./module-slots");
+  let found = false;
+  const nextModules = project.suite.modules.map((mod) => {
+    if (mod.module_id !== opts.moduleId) return mod;
+    const display = resolveModuleDisplaySlots(mod);
+    const hasSlot =
+      mod.slots.some((s) => s.item_key === opts.slotId) ||
+      display.some((s) => s.item_key === opts.slotId);
+    if (!hasSlot) return mod;
+    found = true;
+    const nextSlots = mod.slots.map((s) =>
+      s.item_key === opts.slotId
+        ? {
+            ...s,
+            promptRefUrls: [...(s.promptRefUrls ?? []), ossUrl].slice(
+              -APLUS_SLOT_PROMPT_REF_MAX,
+            ),
+          }
+        : s,
+    );
+    if (!mod.slots.some((s) => s.item_key === opts.slotId)) {
+      const fromDisplay = display.find((s) => s.item_key === opts.slotId);
+      if (fromDisplay) {
+        nextSlots.push({
+          ...fromDisplay,
+          promptRefUrls: [ossUrl],
+        });
+      }
+    }
+    return { ...mod, slots: nextSlots };
+  });
+  if (!found) return null;
+  return updateDetailPageSuiteAplusProject(opts.userId, opts.projectId, {
+    suite: { ...project.suite, modules: nextModules },
+  });
+}
+
+export async function patchAplusPromptPlanner(opts: {
+  userId: string;
+  projectId: string;
+  customSystemBody?: string;
+  mode?: "default" | "custom";
+  customSystemFileUrl?: string | null;
+}): Promise<DetailPageSuiteProject | null> {
+  const project = await getDetailPageSuiteAplusProject(opts.userId, opts.projectId);
+  if (!project) return null;
+  const prev = project.settings.aplusPromptPlanner ?? {};
+  const customSystemBody =
+    opts.customSystemBody !== undefined ? opts.customSystemBody : prev.customSystemBody ?? "";
+  if (customSystemBody.length > APLUS_PROMPT_PLANNER_MAX_CHARS) {
+    throw new Error(
+      `策划 Prompt 正文过长（上限 ${APLUS_PROMPT_PLANNER_MAX_CHARS} 字）`,
+    );
+  }
+  const mode = opts.mode ?? prev.mode ?? "default";
+  const nextPlanner = {
+    mode,
+    ...(mode === "custom" && customSystemBody
+      ? { customSystemBody }
+      : {}),
+    ...(opts.customSystemFileUrl !== undefined
+      ? opts.customSystemFileUrl
+        ? { customSystemFileUrl: opts.customSystemFileUrl }
+        : {}
+      : mode === "custom" && prev.customSystemFileUrl
+        ? { customSystemFileUrl: prev.customSystemFileUrl }
+        : {}),
+    updatedAt: new Date().toISOString(),
+  };
+  return updateDetailPageSuiteAplusProject(opts.userId, opts.projectId, {
+    settings: {
+      ...project.settings,
+      aplusPromptPlanner: nextPlanner,
+    },
+  });
+}
+
+export async function uploadAplusPromptPlannerFile(opts: {
+  userId: string;
+  projectId: string;
+  buf: Buffer;
+  fileName: string;
+}): Promise<DetailPageSuiteProject | null> {
+  const text = opts.buf.toString("utf8");
+  const ext = opts.fileName.toLowerCase();
+  if (!ext.endsWith(".md") && !ext.endsWith(".txt")) {
+    throw new Error("仅支持 .md 或 .txt 文件");
+  }
+  return patchAplusPromptPlanner({
+    userId: opts.userId,
+    projectId: opts.projectId,
+    customSystemBody: text,
+    mode: "custom",
+  });
 }

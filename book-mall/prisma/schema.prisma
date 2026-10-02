@@ -126,6 +126,7 @@ model User {
   ecomProductDesignProjects        EcomProductDesignProject[]
   ecomSeedVideoProjects            EcomSeedVideoProject[]
   ecomHandCraftProjects            EcomHandCraftProject[]
+  ecomBrandViProjects              EcomBrandViProject[]
   ecomProductImageSetProjects      EcomProductImageSetProject[]
   ecomModelShotProjects            EcomModelShotProject[]
   ecomMediaDecomposeProjects       EcomMediaDecomposeProject[]
@@ -752,7 +753,34 @@ model EcomProductDesignProject {
   @@index([tenantId, visibility, updatedAt])
 }
 
-/// 电商工具箱 · 手伴创作项目（线稿 → 潮玩盲盒 IP 全案 10 步）
+/// 电商工具箱 · 品牌 VI · 表情包项目（八步 IP VI 工作流）
+model EcomBrandViProject {
+  id          String  @id @default(cuid())
+  userId      String
+  title       String?
+  module      String  @default("vi")
+  status      String  @default("draft")
+  brief       Json?
+  settings    Json?
+  references  Json?
+  chatHistory Json?
+  plan        Json?
+  meta        Json?
+
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
+}
+
+/// 电商工具箱 · 手办创作项目（线稿 → 潮玩盲盒 IP 全案 10 步）
 model EcomHandCraftProject {
   id          String  @id @default(cuid())
   userId      String

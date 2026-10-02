@@ -3,8 +3,10 @@ import { randomUUID } from "crypto";
 
 import type { EcomCatalogScope } from "@/lib/ecom/ecom-catalog-scope";
 import { prisma } from "@/lib/prisma";
+import { PRO_VERTICAL_IDS } from "@/lib/ecom/pro-vertical/registry";
 
-export type StoryTheaterVertical = "fashion_apparel" | "bags" | "digital_3c";
+export type { StoryTheaterVertical } from "@/lib/ecom/story-theater-vertical-parse";
+import type { StoryTheaterVertical } from "@/lib/ecom/story-theater-vertical-parse";
 
 export type EcomStoryTheaterTopicEntry = {
   id: string;
@@ -149,11 +151,7 @@ export type EcomStoryTheaterTopicCatalog = {
   user: EcomStoryTheaterTopicEntry[];
 };
 
-const STORY_THEATER_VERTICALS: StoryTheaterVertical[] = [
-  "fashion_apparel",
-  "bags",
-  "digital_3c",
-];
+const STORY_THEATER_VERTICALS: StoryTheaterVertical[] = [...PRO_VERTICAL_IDS];
 
 export async function listPlatformStoryTheaterTopicsAll(
   vertical?: StoryTheaterVertical,

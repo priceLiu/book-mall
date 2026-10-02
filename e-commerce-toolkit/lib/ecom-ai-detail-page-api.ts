@@ -99,6 +99,60 @@ export async function planAiDetailPageSlots(projectId: string) {
   return data.project as DetailPageSuiteProject;
 }
 
+export async function planAndPromptsAiDetailPage(
+  projectId: string,
+  opts?: { modelKey?: string },
+) {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/plan-and-prompts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts ?? {}),
+  });
+  return data.project as DetailPageSuiteProject;
+}
+
+export async function patchAiDetailPagePromptPlanner(
+  projectId: string,
+  patch: {
+    customSystemBody?: string;
+    mode?: "default" | "custom";
+  },
+) {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/prompt-planner/upload`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  return data.project as DetailPageSuiteProject;
+}
+
+export async function uploadAiDetailPagePromptPlannerFile(projectId: string, file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/prompt-planner/upload`, {
+    method: "POST",
+    body: form,
+  });
+  return data.project as DetailPageSuiteProject;
+}
+
+export async function uploadAiDetailPageSlotPromptRef(
+  projectId: string,
+  moduleId: string,
+  slotId: string,
+  file: File,
+) {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("moduleId", moduleId);
+  form.append("slotId", slotId);
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/slots/prompt-ref`, {
+    method: "POST",
+    body: form,
+  });
+  return data.project as DetailPageSuiteProject;
+}
+
 export async function generateAiDetailPagePrompts(
   projectId: string,
   opts?: { moduleId?: string; slotKey?: string; modelKey?: string },

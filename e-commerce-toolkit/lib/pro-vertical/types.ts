@@ -8,7 +8,16 @@ import type {
 
 export type { ProductionMode, StoryTheaterTopicRef, StoryTheaterVersionKey };
 
-export type ProVerticalId = "fashion_apparel" | "bags" | "digital_3c";
+export type ProVerticalId =
+  | "fashion_apparel"
+  | "bags"
+  | "digital_3c"
+  | "footwear"
+  | "jewelry"
+  | "outdoor_gear"
+  | "loungewear"
+  | "kitchenware"
+  | "baby_maternal";
 
 export type DimensionStepDef = {
   key: string;

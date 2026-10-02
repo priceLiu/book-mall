@@ -34,6 +34,7 @@ export function buildDetailPageSuiteBriefContextLines(
     line("自定义场景", b.customScene),
     line("发布平台", b.platform ?? b.platformCode),
     line("输出语言", b.outputLanguage ?? "中文"),
+    line("产品品类", b.productVertical),
   ].filter((x): x is string => Boolean(x));
 }
 
@@ -113,7 +114,18 @@ export function buildDetailPageSuiteImageGlobalPrefix(
   } else if (g === "男装") {
     parts.push("同一位成年男性模特");
   }
-  parts.push("服装款式颜色与产品参考图完全一致");
+  const apparel =
+    b.productVertical === "apparel" ||
+    b.productVertical === "fashion_apparel" ||
+    b.productVertical === "loungewear" ||
+    b.genderCategory === "女装" ||
+    b.genderCategory === "男装" ||
+    b.genderCategory === "裙装";
+  parts.push(
+    apparel
+      ? "服装款式颜色与产品参考图完全一致"
+      : "产品外观、颜色、结构与产品参考图完全一致",
+  );
   if (!opts?.omitSellpoints) {
     const sellpointText = buildSellpointContextForLlm(b);
     if (sellpointText) {

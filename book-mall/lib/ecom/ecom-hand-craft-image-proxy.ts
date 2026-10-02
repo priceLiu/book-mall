@@ -1,7 +1,7 @@
 import { assertCanvasUserUploadOssUrl } from "@/lib/canvas/canvas-user-oss-read";
 
 const MAX_BYTES = 30 * 1024 * 1024;
-const PROXY_MAX_CONCURRENT = 4;
+const PROXY_MAX_CONCURRENT = 10;
 
 let proxyInFlight = 0;
 const proxyWaiters: Array<() => void> = [];

@@ -38,6 +38,8 @@ export function useEcomAssistantCollapseHandlers(opts: {
       if (!root) return;
       const next = e.relatedTarget;
       if (next instanceof Node && root.contains(next)) return;
+      // 点选卡片、后台 refresh 重渲染等常出现 relatedTarget=null，不能当作「离开助手」
+      if (next == null) return;
       onCollapsedChange?.(true);
     },
     [collapsed, collapseBlocked, onCollapsedChange, rootRef],

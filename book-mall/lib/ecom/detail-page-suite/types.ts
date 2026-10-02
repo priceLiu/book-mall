@@ -106,6 +106,26 @@ export type DetailPageSuiteBrief = {
   sellpointsLocked?: boolean;
   sizeChart?: DetailPageSuiteSizeChartState;
   specChart?: DetailPageSuiteSpecChartState;
+  /** AI 详情页 · 产品品类（自动子维度规则） */
+  productVertical?:
+    | "fashion_apparel"
+    | "bags"
+    | "digital_3c"
+    | "footwear"
+    | "jewelry"
+    | "outdoor_gear"
+    | "loungewear"
+    | "kitchenware"
+    | "baby_maternal"
+    | "general"
+    | "apparel";
+};
+
+export type AplusPromptPlannerSettings = {
+  mode?: "default" | "custom";
+  customSystemBody?: string;
+  customSystemFileUrl?: string;
+  updatedAt?: string;
 };
 
 export type DetailPageSuiteReferenceRole = "product" | "reference_suite" | "model";
@@ -162,6 +182,9 @@ export type DetailPageSuiteSlot = {
   activeImageIndex?: number;
   selectedForImage?: boolean;
   promptEdited?: boolean;
+  /** AI 详情页 · 本格参考/场景图（写 Prompt / 可选出图） */
+  promptRefUrls?: string[];
+  promptRefNote?: string;
 };
 
 export type DetailPageSuiteModuleState = {
@@ -194,6 +217,8 @@ export type DetailPageSuiteSettings = {
   exportTargets?: DetailPageSuiteExportTarget[];
   /** 当前勾选参与批量出图的 exportTargets.id */
   activeExportTargetIds?: string[];
+  /** AI 详情页 · 16 模块写 Prompt 策划指令 */
+  aplusPromptPlanner?: AplusPromptPlannerSettings;
 };
 
 export type DetailPageSuitePhase =

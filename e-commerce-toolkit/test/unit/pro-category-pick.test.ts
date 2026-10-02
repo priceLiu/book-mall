@@ -33,7 +33,7 @@ function proDraftProject(hasProduct = false): StoryboardProject {
 }
 
 describe("pro category pick flow", () => {
-  it("shows five category choices after product upload without vertical", () => {
+  it("shows nine category choices after product upload without vertical", () => {
     const project = proDraftProject(true);
     expect(isAwaitingProCategoryPick(project)).toBe(true);
     const choices = inferFashionChoices(project);
@@ -52,5 +52,9 @@ describe("pro category pick flow", () => {
   it("parses category choice labels", () => {
     expect(parseProCategoryPick(proCategoryChoiceLabel("包包"))?.verticalId).toBe("bags");
     expect(parseProCategoryPick(proCategoryChoiceLabel("3C 数码"))?.verticalId).toBe("digital_3c");
+    expect(parseProCategoryPick(proCategoryChoiceLabel("鞋子"))?.verticalId).toBe("footwear");
+    expect(parseProCategoryPick(proCategoryChoiceLabel("厨房用品"))?.verticalId).toBe(
+      "kitchenware",
+    );
   });
 });

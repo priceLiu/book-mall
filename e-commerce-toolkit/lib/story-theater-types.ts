@@ -1,6 +1,9 @@
 /** 故事剧场模式 · 共享类型（toolkit + book-mall deliverable 对齐） */
 
-export type StoryTheaterVertical = "fashion_apparel" | "bags" | "digital_3c";
+import type { ProVerticalId } from "@/lib/pro-vertical/types";
+
+/** 与 Pro 九大类 vertical 对齐 */
+export type StoryTheaterVertical = ProVerticalId;
 
 export type ProductionMode = "standard_script" | "story_theater";
 
@@ -33,9 +36,7 @@ export function isStoryTheaterVersionKey(raw: string): raw is StoryTheaterVersio
   return raw === "T1" || raw === "T2" || raw === "T3" || raw === "T4" || raw === "T5";
 }
 
-export function resolveProductionMode(
-  raw: unknown,
-): ProductionMode | null {
+export function resolveProductionMode(raw: unknown): ProductionMode | null {
   if (raw === "standard_script" || raw === "story_theater") return raw;
   return null;
 }

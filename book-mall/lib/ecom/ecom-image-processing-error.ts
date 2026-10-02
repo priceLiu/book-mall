@@ -113,5 +113,25 @@ export function formatEcomImageProcessingUserError(error: unknown): {
     };
   }
 
+  if (
+    /upstream_fetch_failed|fetch failed|ECONNRESET|socket hang up|UND_ERR|failed to fetch/i.test(
+      raw,
+    )
+  ) {
+    return {
+      message:
+        "与主站或 Gateway 连接中断（upstream_fetch_failed）。请确认 book-mall 与 Gateway 已启动、MAIN_SITE_ORIGIN 配置正确后重试；批量出图可改为较小并发。",
+      status: 502,
+    };
+  }
+
+  if (/下载参考图失败|下载图片失败|引用图读取失败/i.test(raw)) {
+    return {
+      message:
+        "读取基准主形象或线稿失败（URL 不可达或已过期）。请重新生成并定稿第 1 步主形象，或重新上传线稿后再试。",
+      status: 400,
+    };
+  }
+
   return { message: raw || "处理失败", status: 500 };
 }

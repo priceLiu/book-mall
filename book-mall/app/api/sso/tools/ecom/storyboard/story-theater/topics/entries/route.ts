@@ -1,18 +1,11 @@
 import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
-import {
-  createUserStoryTheaterTopic,
-  type StoryTheaterVertical,
-} from "@/lib/ecom/ecom-story-theater-topic-service";
+import { createUserStoryTheaterTopic } from "@/lib/ecom/ecom-story-theater-topic-service";
+import { parseStoryTheaterVertical } from "@/lib/ecom/story-theater-vertical-parse";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
-
-function parseVertical(raw: unknown): StoryTheaterVertical | null {
-  if (raw === "fashion_apparel" || raw === "bags" || raw === "digital_3c") return raw;
-  return null;
-}
 
 export async function POST(req: Request) {
   const auth = verifyToolsBearer(req);
@@ -20,7 +13,9 @@ export async function POST(req: Request) {
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const body = (await req.json()) as Record<string, unknown>;
-    const vertical = parseVertical(body.vertical);
+    const vertical = parseStoryTheaterVertical(
+      typeof body.vertical === "string" ? body.vertical : null,
+    );
     const title = typeof body.title === "string" ? body.title.trim() : "";
     const storyCore = typeof body.storyCore === "string" ? body.storyCore.trim() : "";
     const storyType = typeof body.storyType === "string" ? body.storyType.trim() : "";

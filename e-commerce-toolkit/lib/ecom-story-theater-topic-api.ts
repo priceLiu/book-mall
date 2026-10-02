@@ -20,6 +20,12 @@ export const STORY_THEATER_VERTICAL_LABELS: Record<StoryTheaterVertical, string>
   fashion_apparel: "服装",
   bags: "包包",
   digital_3c: "3C 数码",
+  footwear: "鞋子",
+  jewelry: "珠宝",
+  outdoor_gear: "户外用品",
+  loungewear: "家居服",
+  kitchenware: "厨房用品",
+  baby_maternal: "母婴用品",
 };
 
 export const STORY_THEATER_STORY_TYPES = [

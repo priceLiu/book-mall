@@ -1,6 +1,15 @@
 /** Pro Vertical 专业版带货 · 配置类型 */
 
-export type ProVerticalId = "fashion_apparel" | "bags" | "digital_3c";
+export type ProVerticalId =
+  | "fashion_apparel"
+  | "bags"
+  | "digital_3c"
+  | "footwear"
+  | "jewelry"
+  | "outdoor_gear"
+  | "loungewear"
+  | "kitchenware"
+  | "baby_maternal";
 
 export type ProPhase =
   | "product_ref"

@@ -64,6 +64,8 @@ export type HandCraftSettings = {
   chatModelKey?: string;
   imageModelKey?: string;
   imageGenConcurrency?: number;
+  stylePresetId?: string;
+  styleCustomText?: string;
 };
 
 export type HandCraftProject = {

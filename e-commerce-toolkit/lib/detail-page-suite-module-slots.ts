@@ -62,12 +62,26 @@ function slotKeyForIndex(index: number, label: string): string {
   return slug ? `item_${slug}` : `item_${index + 1}`;
 }
 
+function fillSelectedItemsForDisplay(mod: DetailPageSuiteModuleState): string[] {
+  const count = Math.max(mod.generate_count, 0);
+  let selected = mod.selected_item_list.slice(0, count);
+  if (selected.length < count) {
+    const pool = mod.candidate_pool ?? [];
+    const extra = pool.filter((x) => !selected.includes(x));
+    selected = [...selected, ...extra].slice(0, count);
+  }
+  return selected;
+}
+
 /** 将 selected_item_list 与已有 slots 合并，供中栏点位格展示（含未生成 prompt 的占位） */
 export function resolveModuleDisplaySlots(mod: DetailPageSuiteModuleState): DetailPageSuiteSlot[] {
   if (!mod.enable) return [];
 
-  const selected = mod.selected_item_list.slice(0, Math.max(mod.generate_count, 0));
-  if (selected.length === 0) return mod.slots;
+  const count = Math.max(mod.generate_count, 0);
+  if (count === 0) return [];
+
+  const selected = fillSelectedItemsForDisplay(mod);
+  if (selected.length === 0) return mod.slots.slice(0, count);
 
   const consumedKeys = new Set<string>();
 

@@ -1,7 +1,8 @@
 import { z } from "zod";
 
-import type { CanvasChatMessage } from "@/lib/canvas/providers/types";
+import type { CanvasChatContentPart, CanvasChatMessage } from "@/lib/canvas/providers/types";
 import { drainEcomGwChat } from "@/lib/ecom/ecom-product-design-vision";
+import { getVisionMaxInputImages } from "@/lib/ecom/ecom-product-design-ref-rules";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
 import { ECOM_DEFAULT_VISION_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
 
@@ -15,9 +16,10 @@ import {
   reconcileDetailPageSuitePendingMeta,
 } from "./pending-state";
 import {
-  buildAplusDetailPageSystemPrompt,
-  isAplusBlankPlateModule,
-} from "@/lib/ecom/detail-page-aplus/aplus-prompt-system";
+  buildAplusModuleCatalogContextForLlm,
+  buildAplusPromptPlannerSystem,
+} from "@/lib/ecom/detail-page-aplus/aplus-prompt-planner-compose";
+import { isAplusBlankPlateModule } from "@/lib/ecom/detail-page-aplus/aplus-prompt-system";
 import { loadDetailPageSuiteForOps } from "./project-access";
 import {
   buildDetailPageSuiteBriefContextBlock,
@@ -124,10 +126,12 @@ function buildPromptLlmUserMessage(opts: {
   selected: string[];
   rewriteNote?: string;
   currentPrompt?: string;
+  includeAplusCatalog?: boolean;
 }): string {
   const briefBlock = buildDetailPageSuiteBriefContextBlock(opts.brief);
   const lines = [
     opts.rewriteNote,
+    opts.includeAplusCatalog ? buildAplusModuleCatalogContextForLlm() : "",
     briefBlock ? `【七维参数与商品信息】\n${briefBlock}` : "",
     `当前模块：${opts.moduleId} ${opts.moduleName}`,
     `N：${opts.generateCount}`,
@@ -216,6 +220,19 @@ export async function generateModulePrompts(opts: {
     return finishWithSlots(slots);
   }
 
+  const displaySlots = resolveModuleDisplaySlots(mod);
+  const llmToGenerate = llmLabels.filter((label) => {
+    const prev = displaySlots.find((s) => s.item_label.trim() === label.trim());
+    return !(prev?.promptEdited && prev.positive_prompt?.trim());
+  });
+
+  if (llmToGenerate.length === 0) {
+    const slots = isDetailPageSuiteSpecChartModuleId(mod.module_id)
+      ? buildSpecModuleSlotsForSelected(mod, selected, brief, new Map())
+      : buildModuleSlotsForSelected(mod, selected, brief, new Map());
+    return finishWithSlots(slots);
+  }
+
   const modelKey = opts.modelKey?.trim() || project.settings.chatModelKey || ECOM_DEFAULT_VISION_MODEL;
   const lang = brief.outputLanguage ?? "中文";
   const involvesModel = detailPageSuiteModuleInvolvesModel({
@@ -224,7 +241,9 @@ export async function generateModulePrompts(opts: {
     selectedLabels: llmLabels,
   });
   const system = isAplus
-    ? buildAplusDetailPageSystemPrompt({
+    ? buildAplusPromptPlannerSystem({
+        settings: project.settings,
+        moduleId: mod.module_id,
         moduleName: mod.module_name,
         blankPlate: isAplusBlankPlateModule(mod.module_id),
         lang,
@@ -240,8 +259,9 @@ export async function generateModulePrompts(opts: {
     lang,
     moduleId: mod.module_id,
     moduleName: mod.module_name,
-    generateCount: llmLabels.length,
-    selected: llmLabels,
+    generateCount: llmToGenerate.length,
+    selected: llmToGenerate,
+    includeAplusCatalog: isAplus,
   });
 
   let lastErr = "生成失败";
@@ -256,11 +276,11 @@ export async function generateModulePrompts(opts: {
         clientPage: ecomClientPage(opts.userId, opts.projectId, `${promptToolKey}__chat`),
       });
       const parsed = ModulePromptSchema.parse(extractFenceJson(text));
-      if (parsed.items.length !== llmLabels.length) {
-        throw new Error(`返回条数 ${parsed.items.length} 不等于 ${llmLabels.length}`);
+      if (parsed.items.length !== llmToGenerate.length) {
+        throw new Error(`返回条数 ${parsed.items.length} 不等于 ${llmToGenerate.length}`);
       }
       const llmMap = new Map<string, { item_key?: string; positive_prompt: string }>();
-      llmLabels.forEach((label, i) => {
+      llmToGenerate.forEach((label, i) => {
         const item = parsed.items[i]!;
         llmMap.set(label, {
           item_key: item.item_key,
@@ -366,7 +386,9 @@ export async function rewriteSlotPrompt(opts: {
     selectedLabels: [slot.item_label],
   });
   const system = isAplus
-    ? buildAplusDetailPageSystemPrompt({
+    ? buildAplusPromptPlannerSystem({
+        settings: project.settings,
+        moduleId: mod.module_id,
         moduleName: mod.module_name,
         blankPlate: isAplusBlankPlateModule(mod.module_id),
         lang,
@@ -377,7 +399,7 @@ export async function rewriteSlotPrompt(opts: {
         lang,
         genderModelRule: buildDetailPageSuiteGenderModelRule(brief.genderCategory, involvesModel),
       });
-  const user = buildPromptLlmUserMessage({
+  const userText = buildPromptLlmUserMessage({
     brief,
     lang,
     moduleId: mod.module_id,
@@ -386,7 +408,40 @@ export async function rewriteSlotPrompt(opts: {
     selected: [slot.item_label],
     rewriteNote: "只重写这一条子维度的提示词，禁止改拍摄主体。",
     currentPrompt: stripDetailPageSuitePromptEnvelope(slot.positive_prompt),
+    includeAplusCatalog: isAplus,
   });
+  const refUrls = (slot.promptRefUrls ?? []).map((u) => u.trim()).filter(Boolean);
+  const productUrls = project.references
+    .filter((r) => r.role === "product")
+    .map((r) => r.ossUrl.trim())
+    .filter(Boolean);
+  const maxImg = getVisionMaxInputImages(modelKey);
+  const sceneRefs = refUrls.slice(0, Math.max(0, maxImg - 1));
+  const productForVision = productUrls.slice(0, 1);
+  const visionUrls = [...productForVision, ...sceneRefs].slice(0, maxImg);
+  const userContent: string | CanvasChatContentPart[] =
+    visionUrls.length > 0
+      ? [
+          ...visionUrls.map((url) => ({
+            type: "image_url" as const,
+            image_url: { url },
+          })),
+          {
+            type: "text" as const,
+            text: [
+              userText,
+              sceneRefs.length > 0
+                ? "附图为产品参考与本格场景/构图参考，请据此重写 positive_prompt。"
+                : "",
+              slot.promptRefNote?.trim()
+                ? `用户说明：${slot.promptRefNote.trim()}`
+                : "",
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          },
+        ]
+      : userText;
 
   let lastErr = "重写失败";
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -395,7 +450,7 @@ export async function rewriteSlotPrompt(opts: {
         modelKey,
         messages: [
           { role: "system", content: system },
-          { role: "user", content: user },
+          { role: "user", content: userContent },
         ] as CanvasChatMessage[],
         clientPage: ecomClientPage(opts.userId, opts.projectId, `${promptToolKey}__chat`),
       });

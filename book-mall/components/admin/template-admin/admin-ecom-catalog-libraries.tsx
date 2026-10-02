@@ -7,6 +7,9 @@ import {
   confirmDestructiveTwice,
   CONFIRM_DELETE_LIBRARY_OSS_SECOND_ZH,
 } from "@/lib/confirm-destructive-twice";
+import { PRO_VERTICAL_IDS } from "@/lib/ecom/pro-vertical/registry";
+import type { StoryTheaterVertical } from "@/lib/ecom/story-theater-vertical-parse";
+import { STORY_THEATER_VERTICAL_LABELS } from "@/lib/ecom/story-theater-vertical-parse";
 
 type PoseRow = {
   id: string;
@@ -506,8 +509,6 @@ export function SceneLibraryAdmin() {
   );
 }
 
-type StoryTheaterVertical = "fashion_apparel" | "bags" | "digital_3c";
-
 type StoryTheaterTopicRow = {
   id: string;
   vertical: StoryTheaterVertical;
@@ -521,9 +522,10 @@ type StoryTheaterTopicRow = {
 
 const STORY_THEATER_VERTICAL_OPTIONS: Array<{ value: StoryTheaterVertical | "all"; label: string }> = [
   { value: "all", label: "全部垂类" },
-  { value: "fashion_apparel", label: "服装" },
-  { value: "bags", label: "包包" },
-  { value: "digital_3c", label: "3C数码" },
+  ...PRO_VERTICAL_IDS.map((value) => ({
+    value,
+    label: STORY_THEATER_VERTICAL_LABELS[value],
+  })),
 ];
 
 export function StoryTheaterTopicAdmin() {

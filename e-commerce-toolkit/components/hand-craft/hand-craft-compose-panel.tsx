@@ -28,6 +28,11 @@ import {
   handCraftSheetDomId,
   HAND_CRAFT_SHEET_WIDTH,
 } from "@/components/hand-craft/hand-craft-sheet-view";
+import {
+  composeHtml2CanvasScale,
+  preloadComposeSheetImages,
+  revokeComposeSheetBlobUrls,
+} from "@/lib/ecom-compose-image-preload";
 import { cn } from "@/lib/utils";
 
 const COMPOSE_ICON_BTN = cn(
@@ -47,7 +52,7 @@ type Props = {
   onPreviewImage?: (src: string, title: string) => void;
   /** 助手点「确认拼版」时递增，自动执行本步拼版 */
   composeRequest?: { stepId: HandCraftStepId; token: number } | null;
-  onBusyChange?: (busy: boolean) => void;
+  onBusyChange?: (busy: boolean, detail?: string) => void;
 };
 
 /**
@@ -70,8 +75,8 @@ export function HandCraftComposePanel({
   const blocked = missingRequirements(project, step.id);
   const [busyPage, setBusyPage] = useState<number | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
-  /** 抓图期间才把离屏版式挂进 DOM，避免常驻十几张大图拖慢工作区 */
-  const [mounted, setMounted] = useState(false);
+  /** 抓图期间只挂载当前页离屏版式（作品集 12 页不可一次全挂，否则 P01 会卡死） */
+  const [exportPageIndex, setExportPageIndex] = useState<number | null>(null);
 
   const outputByPage = useMemo(
     () => new Map(state.outputs.map((o) => [o.index, o])),
@@ -80,58 +85,63 @@ export function HandCraftComposePanel({
   const done = state.outputs.filter((o) => o.imageUrl).length;
   const locked = Boolean(disabled) || busyPage != null || blocked.length > 0;
 
-  const capturePage = useCallback(async (pageIndex: number): Promise<string> => {
-    const el = document.getElementById(handCraftSheetDomId(step.id, pageIndex));
-    if (!el) throw new Error("找不到拼版区域");
+  const reportBusyDetail = useCallback(
+    (detail: string) => {
+      onBusyChange?.(true, detail);
+    },
+    [onBusyChange],
+  );
 
-    const imgs = Array.from(el.querySelectorAll("img"));
-    await Promise.all(
-      imgs.map(
-        (img) =>
-          new Promise<void>((resolve, reject) => {
-            const label = img.alt || "成图";
-            let settled = false;
-            const finish = (fn: () => void) => {
-              if (settled) return;
-              settled = true;
-              fn();
-            };
-            if (img.complete && img.naturalHeight > 0) {
-              resolve();
-              return;
-            }
-            img.onload = () =>
-              finish(() =>
-                img.naturalHeight > 0
-                  ? resolve()
-                  : reject(new Error(`引用图未能加载：${label}`)),
-              );
-            img.onerror = () =>
-              finish(() => reject(new Error(`引用图加载失败：${label}（请稍后重试拼版）`)));
-            setTimeout(
-              () =>
-                finish(() =>
-                  img.naturalHeight > 0
-                    ? resolve()
-                    : reject(new Error(`引用图加载超时：${label}`)),
-                ),
-              12_000,
-            );
-          }),
-      ),
-    );
-    await new Promise((r) => setTimeout(r, 300));
+  const capturePage = useCallback(
+    async (pageIndex: number): Promise<string> => {
+      const el = document.getElementById(handCraftSheetDomId(step.id, pageIndex));
+      if (!el) throw new Error("找不到拼版区域");
 
-    const { default: html2canvas } = await import("html2canvas");
-    const canvas = await html2canvas(el, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: false,
-      backgroundColor: "#ffffff",
-      width: HAND_CRAFT_SHEET_WIDTH,
-      windowWidth: HAND_CRAFT_SHEET_WIDTH,
+      const { blobUrls, imageCount } = await preloadComposeSheetImages(el, {
+        onProgress: ({ done, total, label }) => {
+          reportBusyDetail(
+            total > 1
+              ? `加载引用图 ${done}/${total}（${label}）…`
+              : `加载引用图（${label}）…`,
+          );
+        },
+      });
+      try {
+        reportBusyDetail(
+          step.id === "xhs-long"
+            ? `正在抓取竖版长图（约 ${imageCount} 张引用，需 1～3 分钟，请勿关页）…`
+            : "浏览器正在排版抓图…",
+        );
+        await new Promise((r) => setTimeout(r, 300));
+
+        const scale = composeHtml2CanvasScale(step.id, imageCount);
+        const { default: html2canvas } = await import("html2canvas");
+        const canvas = await html2canvas(el, {
+          scale,
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: "#ffffff",
+          width: HAND_CRAFT_SHEET_WIDTH,
+          windowWidth: HAND_CRAFT_SHEET_WIDTH,
+        });
+        reportBusyDetail("正在上传拼版 PNG…");
+        return canvas.toDataURL("image/png");
+      } finally {
+        revokeComposeSheetBlobUrls(blobUrls);
+      }
+    },
+    [reportBusyDetail, step.id],
+  );
+
+  const waitForExportSheetMount = useCallback(async () => {
+    await new Promise<void>((r) => {
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => requestAnimationFrame(() => r())),
+      );
     });
-    return canvas.toDataURL("image/png");
+    await new Promise((r) =>
+      setTimeout(r, step.id === "portfolio" || step.id === "xhs-long" ? 120 : 40),
+    );
   }, [step.id]);
 
   const composePages = useCallback(
@@ -145,18 +155,22 @@ export function HandCraftComposePanel({
         });
         return;
       }
-      onBusyChange?.(true);
-      setMounted(true);
-      // 等离屏版式完成一次布局与图片挂载
-      await new Promise<void>((r) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => r()));
-      });
+      onBusyChange?.(
+        true,
+        step.id === "xhs-long"
+          ? "准备小红书长图拼版（引用前序约 20+ 张成图）…"
+          : step.id === "portfolio"
+            ? `准备 12 页作品集（逐页拼版，共 ${indexes.length} 页）…`
+            : "准备拼版…",
+      );
 
       const failures: string[] = [];
       try {
         for (const [i, pageIndex] of indexes.entries()) {
           setBusyPage(pageIndex);
           setProgress(`正在拼版第 ${pageIndex} 页（${i + 1}/${indexes.length}）…`);
+          setExportPageIndex(pageIndex);
+          await waitForExportSheetMount();
           try {
             const pngBase64 = await capturePage(pageIndex);
             await uploadHandCraftComposePng({
@@ -172,8 +186,8 @@ export function HandCraftComposePanel({
       } finally {
         setBusyPage(null);
         setProgress(null);
-        setMounted(false);
-        onBusyChange?.(false);
+        setExportPageIndex(null);
+        onBusyChange?.(false, undefined);
         await onProjectChange();
       }
 
@@ -185,7 +199,24 @@ export function HandCraftComposePanel({
         });
       }
     },
-    [alert, blocked, capturePage, onBusyChange, onProjectChange, project.id, step.id],
+    [
+      alert,
+      blocked,
+      capturePage,
+      onBusyChange,
+      onProjectChange,
+      project.id,
+      step.id,
+      waitForExportSheetMount,
+    ],
+  );
+
+  const exportPage = useMemo(
+    () =>
+      exportPageIndex != null
+        ? pages.find((p) => p.index === exportPageIndex)
+        : undefined,
+    [exportPageIndex, pages],
   );
 
   const composeTokenRef = useRef(composeRequest?.token ?? 0);
@@ -259,6 +290,11 @@ export function HandCraftComposePanel({
       {blocked.length > 0 ? (
         <p className="mb-3 rounded-lg border border-[#ffd8a8] bg-[#fff8f0] px-3 py-2 text-[11px] text-[#8a5a00]">
           本步要引用前序成图，尚缺：{blocked.join("、")}。补齐后按钮才会解锁。
+        </p>
+      ) : step.id === "licensing" ? (
+        <p className="mb-3 rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] px-3 py-2 text-[11px] text-[#6e6e73]">
+          本步仅依赖第 1、3、4 步成图，<strong className="font-semibold text-[#1d1d1f]">无需</strong>
+          等第 9 步作品集拼完。
         </p>
       ) : null}
 
@@ -408,21 +444,19 @@ export function HandCraftComposePanel({
       ) : null}
 
       {/* 离屏版式：宽度固定，位置移出视口，仅抓图期间挂载 */}
-      {mounted ? (
+      {exportPage ? (
         <div
           aria-hidden
           className="pointer-events-none fixed -left-[9999px] top-0 z-0"
           style={{ width: HAND_CRAFT_SHEET_WIDTH }}
         >
-          {pages.map((page) => (
-            <HandCraftSheetView
-              key={page.index}
-              project={project}
-              stepId={step.id}
-              page={page}
-              variant="export"
-            />
-          ))}
+          <HandCraftSheetView
+            key={exportPage.index}
+            project={project}
+            stepId={step.id}
+            page={exportPage}
+            variant="export"
+          />
         </div>
       ) : null}
     </section>

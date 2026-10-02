@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EcomAssistantCollapsibleLayout } from "@/components/layout/ecom-assistant-collapsible-layout";
 import { EcomAssistantPanelHeader } from "@/components/layout/ecom-assistant-panel-header";
 import { EcomAssistantSendButton } from "@/components/layout/ecom-assistant-send-button";
-import { STORYBOARD_ASSISTANT_CHOICE_CLASS } from "@/components/storyboard/storyboard-assistant-choices";
+import { SeedVideoAssistantChoiceCards } from "@/components/seed-video/seed-video-assistant-choice-cards";
 import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-markdown-block";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
@@ -29,9 +29,17 @@ import type {
   HandCraftStepId,
 } from "@/lib/hand-craft-types";
 import {
-  assistantChoices,
-  choicePrompt,
+  buildHandCraftHistoricalChoiceBlock,
+  buildHandCraftStepChoices,
+  buildHandCraftStyleChoices,
+  currentHandCraftStyleMessage,
+  isHandCraftStyleChoice,
+  resolveHandCraftStylePatchFromChoice,
+  shouldHideLiveHandCraftStepChoices,
+} from "@/lib/hand-craft-assistant-choice-ui";
+import {
   handCraftStep,
+  HAND_CRAFT_POST_HERO_GUIDE_MESSAGE,
   HAND_CRAFT_WELCOME_MESSAGE,
   isStepReady,
   missingRequirements,
@@ -62,10 +70,12 @@ type Props = {
   onAlert: (opts: { title: string; message: string; variant?: "error" }) => Promise<void>;
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
+  /** 中间栏出图 / 线稿 / 拼版进行中时隐藏分步确认卡片 */
+  workspaceBusy?: boolean;
 };
 
 /**
- * 手伴创作助手：按 doc/手伴/skill.md 的 10 步 SOP 逐步推进。
+ * 手办创作助手：按 doc/手办/skill.md 的 10 步 SOP 逐步推进。
  *
  * 每步只有三种去向：确认生成 / 微调本步 / 回上一步。生成动作交给中间工作区，
  * 助手只负责说明与产出槽位说明表（由 plan/sync 解析回写）。
@@ -84,6 +94,7 @@ export function HandCraftAssistantPanel({
   onAlert,
   collapsed = false,
   onCollapsedChange,
+  workspaceBusy = false,
 }: Props) {
   const chatHistory = project.chatHistory;
   const projectId = project.id;
@@ -93,12 +104,26 @@ export function HandCraftAssistantPanel({
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
+  const [choicePending, setChoicePending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
+  const choiceBusyRef = useRef(false);
+  const messageCountRef = useRef(0);
 
   useEffect(() => {
     if (streaming) return;
-    setMessages(chatHistory.length ? chatHistory : [WELCOME]);
+    const next = chatHistory.length ? chatHistory : [WELCOME];
+    setMessages((prev) => {
+      if (
+        prev.length === next.length &&
+        prev.every(
+          (m, i) => m.id === next[i]?.id && m.content === next[i]?.content,
+        )
+      ) {
+        return prev;
+      }
+      return next;
+    });
   }, [chatHistory, streaming]);
 
   useEffect(() => {
@@ -119,19 +144,36 @@ export function HandCraftAssistantPanel({
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || !stickToBottomRef.current) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: streaming ? "auto" : "smooth" });
+    const count = messages.length + (streaming ? 1 : 0);
+    const grew = count > messageCountRef.current;
+    messageCountRef.current = count;
+    if (!grew && !streaming) return;
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: streaming || grew ? "auto" : "smooth",
+    });
   }, [messages, streamText, streaming]);
 
   const sketchCount = project.references.length;
+  const heroGuideMode = Boolean(project.meta?.workflow?.heroLockedUrl?.trim());
 
   const sendText = useCallback(
     async (text: string, historyBase?: HandCraftChatMessage[]) => {
       const trimmed = text.trim();
       if (!trimmed || streaming) return;
+      if (
+        project.settings?.stylePresetId === "custom" &&
+        !isHandCraftStyleChoice(trimmed)
+      ) {
+        await updateHandCraftProject(projectId, {
+          settings: { styleCustomText: trimmed },
+        });
+        await onProjectChange();
+      }
       if (sketchCount === 0) {
         await onAlert({
           title: "请先上传线稿",
-          message: "手伴创作以你的手绘线稿为唯一原型，请先在中间工作区上传线稿。",
+          message: "手办创作以你的手绘线稿为唯一原型，请先在中间工作区上传线稿。",
           variant: "error",
         });
         return;
@@ -199,25 +241,71 @@ export function HandCraftAssistantPanel({
     async (userText: string, assistantText: string) => {
       const now = new Date().toISOString();
       const ts = Date.now();
-      const next: HandCraftChatMessage[] = [
-        ...messages.filter((m) => m.id !== "welcome" && !m.id.startsWith("err-")),
-        { id: `user-${ts}`, role: "user", content: userText, createdAt: now },
-        {
-          id: `assistant-${ts + 1}`,
-          role: "assistant",
-          content: assistantText,
-          createdAt: now,
-        },
-      ];
-      setMessages(next);
+      let next: HandCraftChatMessage[] = [];
+      setMessages((prev) => {
+        const base = prev.filter((m) => m.id !== "welcome" && !m.id.startsWith("err-"));
+        const prevUser = base.at(-2);
+        const prevAsst = base.at(-1);
+        if (
+          prevUser?.role === "user" &&
+          prevAsst?.role === "assistant" &&
+          prevUser.content.trim() === userText.trim() &&
+          prevAsst.content.trim() === assistantText.trim()
+        ) {
+          next = base;
+          return base;
+        }
+        next = [
+          ...base,
+          { id: `user-${ts}`, role: "user", content: userText, createdAt: now },
+          {
+            id: `assistant-${ts + 1}`,
+            role: "assistant",
+            content: assistantText,
+            createdAt: now,
+          },
+        ];
+        return next;
+      });
       await updateHandCraftProject(projectId, { chatHistory: next });
-      await onProjectChange();
+      void onProjectChange();
     },
-    [messages, onProjectChange, projectId],
+    [onProjectChange, projectId],
+  );
+
+  const applyStyleChoice = useCallback(
+    async (choice: string) => {
+      const patch = resolveHandCraftStylePatchFromChoice(choice);
+      if (!patch) return false;
+      await updateHandCraftProject(projectId, { settings: patch });
+      void onProjectChange();
+      if (patch.stylePresetId === "custom") {
+        await appendLocalTurn(
+          choice,
+          "已选自定义风格。请在下方输入框发送一段画风描述（例如：红白主色、哑光树脂、软萌比例），我会写入项目设置。",
+        );
+      } else {
+        await appendLocalTurn(
+          choice,
+          `视觉风格已设为「${choice.replace(/^风格·/, "")}」。更换风格会清空已定稿主形象与后续产出。`,
+        );
+      }
+      return true;
+    },
+    [appendLocalTurn, onProjectChange, projectId],
   );
 
   const handleChoice = useCallback(
     async (choice: string) => {
+      if (heroGuideMode) return;
+      if (choiceBusyRef.current || choicePending || streaming) return;
+      choiceBusyRef.current = true;
+      setChoicePending(true);
+      try {
+      if (isHandCraftStyleChoice(choice)) {
+        await applyStyleChoice(choice);
+        return;
+      }
       const target = stepIdFromChoice(choice) ?? currentStepId;
       const meta = handCraftStep(target);
 
@@ -255,15 +343,25 @@ export function HandCraftAssistantPanel({
       await sendText(
         `${choice}。请先说明本步要产出什么、共几张，再输出本步槽位说明表（序号｜标题｜画面说明）。`,
       );
+      } finally {
+        choiceBusyRef.current = false;
+        setChoicePending(false);
+        onCollapsedChange?.(false);
+      }
     },
     [
+      applyStyleChoice,
       appendLocalTurn,
+      choicePending,
       currentStepId,
+      heroGuideMode,
       onAlert,
+      onCollapsedChange,
       onCurrentStepChange,
       onRequestGenerateStep,
       project,
       sendText,
+      streaming,
     ],
   );
 
@@ -279,11 +377,25 @@ export function HandCraftAssistantPanel({
       ]
     : messages;
 
-  const choices = useMemo(
-    () => assistantChoices(project, currentStepId),
+  const stepChoices = useMemo(
+    () => buildHandCraftStepChoices(project, currentStepId),
     [project, currentStepId],
   );
-  const showChoices = !streaming && sketchCount > 0 && choices.length > 0;
+  const styleChoices = useMemo(() => buildHandCraftStyleChoices(), []);
+  const hideLiveStepChoices = useMemo(
+    () => shouldHideLiveHandCraftStepChoices(project, messages, currentStepId),
+    [project, messages, currentStepId],
+  );
+  const showStepChoices =
+    !heroGuideMode &&
+    !streaming &&
+    !workspaceBusy &&
+    sketchCount > 0 &&
+    stepChoices.length > 0 &&
+    !hideLiveStepChoices;
+  const showStyleChoices =
+    !heroGuideMode && !streaming && !workspaceBusy && sketchCount > 0;
+  const choiceCardsDisabled = streaming || choicePending;
   const modelName =
     chatModels.find((m) => m.modelKey === chatModelKey)?.displayName ?? "助手模型";
   const stepMeta = handCraftStep(currentStepId);
@@ -309,9 +421,11 @@ export function HandCraftAssistantPanel({
           className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
           rows={compact ? 1 : composerWide ? 4 : 2}
           placeholder={
-            sketchCount === 0
-              ? "请先在中间工作区上传手绘线稿…"
-              : "补充说明，例如「盲盒主题换成节日系列」…"
+            heroGuideMode
+              ? "可咨询步骤说明或 Prompt，出图请在中栏勾选槽位生成…"
+              : sketchCount === 0
+                ? "请先在中间工作区上传手绘线稿…"
+                : "补充说明，例如「盲盒主题换成节日系列」…"
           }
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -356,70 +470,107 @@ export function HandCraftAssistantPanel({
     <EcomAssistantCollapsibleLayout
       collapsed={collapsed}
       onCollapsedChange={onCollapsedChange}
-      collapseBlocked={streaming}
-      attentionBadge={showChoices}
+      collapseBlocked={streaming || choicePending}
+      collapseOnBlur={false}
+      attentionBadge={showStepChoices || showStyleChoices}
       composer={renderComposer(false)}
       floatingComposer={renderComposer(true)}
     >
-      <EcomAssistantPanelHeader
-        title="手伴创作助手"
-        subtitle={`第 ${stepMeta.no}/10 步 · ${stepMeta.label} · ${modelName}`}
-        composerWide={composerWide}
-        onComposerWideChange={onComposerWideChange}
-        onCollapse={onCollapsedChange ? tryCollapse : undefined}
-        collapseDisabled={streaming}
-      />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <EcomAssistantPanelHeader
+          title="手办创作助手"
+          subtitle={`第 ${stepMeta.no}/10 步 · ${stepMeta.label} · ${modelName}`}
+          composerWide={composerWide}
+          onComposerWideChange={onComposerWideChange}
+          onCollapse={onCollapsedChange ? tryCollapse : undefined}
+          collapseDisabled={streaming}
+        />
 
-      <div
-        ref={scrollRef}
-        className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-3"
-      >
-        <div className="space-y-3">
-          {displayMessages.map((m) => (
-            <div
-              key={m.id}
-              className={cn(
-                "flex w-full flex-col",
-                m.role === "user" ? "items-end" : "items-start",
-              )}
-            >
-              <div
-                className={cn(
-                  ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
-                  m.role === "user"
-                    ? ECOM_ASSISTANT_USER_BUBBLE_CLASS
-                    : ECOM_ASSISTANT_BUBBLE_CLASS,
-                )}
-              >
-                {m.role === "assistant" ? (
-                  <StoryboardMarkdownBlock
-                    markdown={m.content || (streaming && m.id === "streaming" ? "…" : "")}
-                  />
-                ) : (
-                  <p className="whitespace-pre-wrap">{m.content}</p>
-                )}
+        <div
+          ref={scrollRef}
+          className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-3"
+        >
+        <div className="space-y-3 pb-6">
+          {displayMessages.map((m, idx) => {
+            const historical =
+              m.role === "user"
+                ? buildHandCraftHistoricalChoiceBlock(project, m.content, idx)
+                : null;
+            const suppressHistoricalCard = Boolean(
+              historical &&
+                ((showStyleChoices && historical.title === "视觉风格") ||
+                  (showStepChoices && historical.title.includes("步操作"))),
+            );
+            const showBubble = m.role === "assistant" || !historical;
+            return (
+              <div key={m.id} className="flex w-full flex-col gap-2">
+                {showBubble ? (
+                  <div
+                    className={cn(
+                      "flex w-full flex-col",
+                      m.role === "user" ? "items-end" : "items-start",
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
+                        m.role === "user"
+                          ? ECOM_ASSISTANT_USER_BUBBLE_CLASS
+                          : ECOM_ASSISTANT_BUBBLE_CLASS,
+                      )}
+                    >
+                      {m.role === "assistant" ? (
+                        <StoryboardMarkdownBlock
+                          markdown={m.content || (streaming && m.id === "streaming" ? "…" : "")}
+                        />
+                      ) : (
+                        <p className="whitespace-pre-wrap">{m.content}</p>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+                {historical && !suppressHistoricalCard ? (
+                  <div
+                    className="flex w-full flex-col items-start"
+                    data-ecom-no-assistant-collapse
+                  >
+                    <div className={cn(ECOM_ASSISTANT_CHOICE_SHELL_CLASS, "w-full max-w-[95%]")}>
+                      <SeedVideoAssistantChoiceCards
+                        title={historical.title}
+                        subtitle="本次点选记录（只读）"
+                        choices={historical.cards}
+                        selectedMessage={historical.selectedMessage}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+          {showStyleChoices ? (
+            <div className="flex flex-col items-start" data-ecom-no-assistant-collapse>
+              <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
+                <SeedVideoAssistantChoiceCards
+                  title="视觉风格"
+                  subtitle="选定后应用于全流程 Prompt；更换会重置已定稿产出"
+                  choices={styleChoices}
+                  disabled={choiceCardsDisabled}
+                  selectedMessage={currentHandCraftStyleMessage(project)}
+                  onSelect={(message) => void handleChoice(message)}
+                />
               </div>
             </div>
-          ))}
-          {showChoices ? (
-            <div className="flex flex-col items-start">
+          ) : null}
+          {showStepChoices ? (
+            <div className="flex flex-col items-start" data-ecom-no-assistant-collapse>
               <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
-                <p className="mb-2 text-[11px] text-[#6e6e73]">
-                  {choicePrompt(currentStepId)}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {choices.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      disabled={streaming}
-                      className={STORYBOARD_ASSISTANT_CHOICE_CLASS}
-                      onClick={() => void handleChoice(c)}
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
+                <SeedVideoAssistantChoiceCards
+                  title={`第 ${stepMeta.no} 步 · ${stepMeta.label}`}
+                  subtitle="请选择下一步操作"
+                  choices={stepChoices}
+                  disabled={choiceCardsDisabled}
+                  onSelect={(message) => void handleChoice(message)}
+                />
                 {isStepReady(project, currentStepId) ? (
                   <p className="mt-2 text-[11px] text-[#6e6e73]">
                     第 {stepMeta.no} 步已出齐，可直接进入下一步。
@@ -427,6 +578,15 @@ export function HandCraftAssistantPanel({
                 ) : null}
               </div>
             </div>
+          ) : null}
+          {heroGuideMode ? (
+            <div className="mt-3 rounded-xl border border-[#e8e8ed] bg-[#f5f5f7] px-3 py-3">
+              <StoryboardMarkdownBlock markdown={HAND_CRAFT_POST_HERO_GUIDE_MESSAGE} />
+            </div>
+          ) : workspaceBusy && !streaming ? (
+            <p className="mt-3 text-[11px] leading-relaxed text-[#6e6e73]">
+              中间工作区正在出图或拼版；进度见右下角任务窗。
+            </p>
           ) : null}
         </div>
         {streaming ? (
@@ -437,6 +597,7 @@ export function HandCraftAssistantPanel({
             className="mt-3"
           />
         ) : null}
+        </div>
       </div>
     </EcomAssistantCollapsibleLayout>
   );

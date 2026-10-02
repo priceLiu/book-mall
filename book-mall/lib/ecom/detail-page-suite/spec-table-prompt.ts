@@ -61,6 +61,13 @@ export function buildSpecModuleSlotForLabel(
   if (isDetailPageSuiteSpecChartDataLabel(label)) {
     return buildProgrammaticSpecChartSlot(label, index, prev);
   }
+  if (prev?.promptEdited && prev.positive_prompt?.trim()) {
+    return {
+      ...prev,
+      item_label: label,
+      promptEdited: true,
+    };
+  }
   if (!llmItem?.positive_prompt?.trim()) {
     throw new Error(`「${label}」缺少提示词`);
   }

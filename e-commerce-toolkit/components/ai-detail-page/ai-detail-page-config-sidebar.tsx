@@ -23,14 +23,21 @@ import {
   type EcomDetailTemplateId,
 } from "@/lib/ecom-generation-settings/detail-template";
 import {
+  patchAiDetailPagePromptPlanner,
   updateAiDetailPageProject,
+  uploadAiDetailPagePromptPlannerFile,
   visionAiDetailPageSellpoints,
 } from "@/lib/ecom-ai-detail-page-api";
+import type { AplusProductVertical } from "@/lib/detail-page-suite-types";
 import {
   ECOM_SELLPOINT_FIVE_PART_PLACEHOLDER,
   briefPatchFromSellpointDraft,
   formatDetailPageSuiteSellpointDraft,
 } from "@/lib/ecom-sellpoint-five-part";
+import {
+  syncModuleSlotsFromSelection,
+  syncSuiteModulesSlots,
+} from "@/lib/detail-page-suite-module-slots";
 import type { DetailPageSuiteModuleState, DetailPageSuiteProject } from "@/lib/detail-page-suite-types";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import { cn } from "@/lib/utils";
@@ -45,9 +52,24 @@ type Props = {
   modelsLoading?: boolean;
   onProjectChange: () => void | Promise<void>;
   onOpenModelPicker: () => void;
-  onRequestPlanSlots: () => void;
-  onRequestPrompts: () => void;
+  onRequestPlanAndPrompts: () => void;
+  onRequestPrompts?: () => void;
 };
+
+const VERTICAL_OPTIONS: { value: AplusProductVertical; label: string }[] = [
+  { value: "fashion_apparel", label: "服装" },
+  { value: "bags", label: "包包" },
+  { value: "digital_3c", label: "3C 数码" },
+  { value: "footwear", label: "鞋子" },
+  { value: "jewelry", label: "珠宝" },
+  { value: "outdoor_gear", label: "户外用品" },
+  { value: "loungewear", label: "家居服" },
+  { value: "kitchenware", label: "厨房用品" },
+  { value: "baby_maternal", label: "母婴用品" },
+];
+
+const APLUS_JSON_CONTRACT_SUMMARY =
+  "平台强制：仅输出 detail-page-suite 围栏内 JSON；items 条数 = N；item_label 与 selected_item_list 原文一致；尺码/参数数据总表由系统出图，勿写入 items。";
 
 function Stepper({
   value,
@@ -101,12 +123,16 @@ export function AiDetailPageConfigSidebar({
   modelsLoading,
   onProjectChange,
   onOpenModelPicker,
-  onRequestPlanSlots,
+  onRequestPlanAndPrompts,
   onRequestPrompts,
 }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [modulesOpen, setModulesOpen] = useState(true);
+  const [plannerOpen, setPlannerOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [plannerDraft, setPlannerDraft] = useState(
+    () => project.settings.aplusPromptPlanner?.customSystemBody ?? "",
+  );
   const [sellpointDraft, setSellpointDraft] = useState(() =>
     formatDetailPageSuiteSellpointDraft(project.brief),
   );
@@ -115,7 +141,14 @@ export function AiDetailPageConfigSidebar({
     setSellpointDraft(formatDetailPageSuiteSellpointDraft(project.brief));
   }, [project.id, project.brief]);
 
+  useEffect(() => {
+    setPlannerDraft(project.settings.aplusPromptPlanner?.customSystemBody ?? "");
+  }, [project.id, project.settings.aplusPromptPlanner?.customSystemBody]);
+
   const total = useMemo(() => totalEnabledSlots(project.suite.modules), [project.suite.modules]);
+
+  const plannerMode = project.settings.aplusPromptPlanner?.mode ?? "default";
+  const plannerIsCustom = plannerMode === "custom";
 
   const persist = useCallback(
     async (patch: Parameters<typeof updateAiDetailPageProject>[1]) => {
@@ -127,8 +160,20 @@ export function AiDetailPageConfigSidebar({
 
   const patchModule = useCallback(
     (moduleId: string, patch: Partial<DetailPageSuiteModuleState>) => {
-      const modules = project.suite.modules.map((m) =>
-        m.module_id === moduleId ? { ...m, ...patch } : m,
+      const modules = syncSuiteModulesSlots(
+        project.suite.modules.map((m) => {
+          if (m.module_id !== moduleId) return m;
+          const next = { ...m, ...patch };
+          if (!next.enable || next.generate_count < 1) {
+            return syncModuleSlotsFromSelection({
+              ...next,
+              enable: false,
+              generate_count: 0,
+              selected_item_list: [],
+            });
+          }
+          return next;
+        }),
       );
       void persist({ suite: { ...project.suite, modules } });
     },
@@ -194,6 +239,37 @@ export function AiDetailPageConfigSidebar({
               });
             }}
           />
+
+          <section className="mb-3 rounded-xl border border-[#e8e8ed] bg-white px-3 py-3">
+            <p className="mb-2 text-xs font-semibold">产品品类</p>
+            <p className="mb-2 text-[10px] leading-relaxed text-[#86868b]">
+              用于自动匹配各模块子维度（生成 Prompt 时生效，无需手选子项）。
+            </p>
+            <select
+              className="w-full rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[11px]"
+              disabled={disabled || Boolean(busy)}
+              value={
+                (project.brief?.productVertical === "apparel" ||
+                project.brief?.productVertical === "general"
+                  ? "fashion_apparel"
+                  : project.brief?.productVertical) ?? "fashion_apparel"
+              }
+              onChange={(e) => {
+                void persist({
+                  brief: {
+                    ...(project.brief ?? {}),
+                    productVertical: e.target.value as AplusProductVertical,
+                  },
+                });
+              }}
+            >
+              {VERTICAL_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </section>
 
           <section
             className={cn(
@@ -270,13 +346,10 @@ export function AiDetailPageConfigSidebar({
                         onChange={(e) => {
                           const on = e.target.checked;
                           const count = on ? Math.max(1, mod.generate_count || 1) : 0;
-                          const selected = on
-                            ? mod.candidate_pool.slice(0, count)
-                            : [];
                           patchModule(mod.module_id, {
                             enable: on,
                             generate_count: count,
-                            selected_item_list: selected,
+                            selected_item_list: [],
                           });
                         }}
                       />
@@ -298,7 +371,7 @@ export function AiDetailPageConfigSidebar({
                           onChange={(n) => {
                             patchModule(mod.module_id, {
                               generate_count: n,
-                              selected_item_list: mod.candidate_pool.slice(0, n),
+                              selected_item_list: [],
                             });
                           }}
                         />
@@ -306,6 +379,122 @@ export function AiDetailPageConfigSidebar({
                     ) : null}
                   </div>
                 ))}
+              </div>
+            ) : null}
+          </section>
+
+          <section className="mb-3 rounded-xl border border-[#e8e8ed] bg-white">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-3 py-2.5"
+              onClick={() => setPlannerOpen((o) => !o)}
+            >
+              <span className="text-xs font-semibold">策划 Prompt（写词规则）</span>
+              {plannerOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            {plannerOpen ? (
+              <div className="space-y-2 border-t border-[#e8e8ed] px-3 py-3">
+                <div className="flex gap-3 text-[10px]">
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="radio"
+                      name="aplus-planner-mode"
+                      checked={!plannerIsCustom}
+                      disabled={disabled || Boolean(busy)}
+                      onChange={() => {
+                        void patchAiDetailPagePromptPlanner(project.id, {
+                          mode: "default",
+                          customSystemBody: "",
+                        }).then(() => onProjectChange());
+                      }}
+                    />
+                    使用默认
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="radio"
+                      name="aplus-planner-mode"
+                      checked={plannerIsCustom}
+                      disabled={disabled || Boolean(busy)}
+                      onChange={() => {
+                        void patchAiDetailPagePromptPlanner(project.id, { mode: "custom" }).then(
+                          () => onProjectChange(),
+                        );
+                      }}
+                    />
+                    自定义
+                  </label>
+                </div>
+                <p className="text-[10px] leading-relaxed text-[#86868b]">
+                  自定义时可粘贴或上传 .md / .txt；详见 docs/ecom/AI详情页提示词.md。
+                </p>
+                <div className="rounded-lg border border-dashed border-[#d2d2d7] bg-[#f5f5f7] px-2 py-2 text-[9px] leading-relaxed text-[#86868b]">
+                  {APLUS_JSON_CONTRACT_SUMMARY}
+                </div>
+                {plannerIsCustom ? (
+                  <p className="text-[9px] text-[#0071e3]">
+                    修改策划 Prompt 后，请重新点击「生成模块 Prompt」以应用到未手改的点位。
+                  </p>
+                ) : null}
+                <textarea
+                  className="min-h-[88px] w-full rounded-lg border border-[#e8e8ed] px-2 py-2 font-mono text-[10px] disabled:bg-[#f5f5f7]"
+                  placeholder="自定义正文：可粘贴整份策划 SOP…"
+                  value={plannerDraft}
+                  disabled={disabled || Boolean(busy) || !plannerIsCustom}
+                  onChange={(e) => setPlannerDraft(e.target.value)}
+                  onBlur={() => {
+                    if (!plannerIsCustom) return;
+                    void patchAiDetailPagePromptPlanner(project.id, {
+                      customSystemBody: plannerDraft,
+                      mode: "custom",
+                    }).then(() => onProjectChange());
+                  }}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <EcomButtonSecondary
+                    size="sm"
+                    type="button"
+                    className="h-7 px-2 text-[10px]"
+                    disabled={disabled || Boolean(busy)}
+                    onClick={() => {
+                      setPlannerDraft("");
+                      void patchAiDetailPagePromptPlanner(project.id, {
+                        customSystemBody: "",
+                        mode: "default",
+                      }).then(() => onProjectChange());
+                    }}
+                  >
+                    恢复默认
+                  </EcomButtonSecondary>
+                  <label
+                    className={cn(
+                      "inline-flex cursor-pointer items-center",
+                      (!plannerIsCustom || disabled || busy) && "pointer-events-none opacity-50",
+                    )}
+                  >
+                    <input
+                      type="file"
+                      accept=".md,.txt,text/plain,text/markdown"
+                      className="hidden"
+                      disabled={disabled || Boolean(busy) || !plannerIsCustom}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (!file) return;
+                        setBusy("上传策划");
+                        void uploadAiDetailPagePromptPlannerFile(project.id, file)
+                          .then((p) => {
+                            setPlannerDraft(p.settings.aplusPromptPlanner?.customSystemBody ?? "");
+                            return onProjectChange();
+                          })
+                          .finally(() => setBusy(null));
+                      }}
+                    />
+                    <span className="inline-flex h-7 items-center rounded-lg border border-[#e8e8ed] px-2 text-[10px]">
+                      上传文件
+                    </span>
+                  </label>
+                </div>
               </div>
             ) : null}
           </section>
@@ -332,21 +521,16 @@ export function AiDetailPageConfigSidebar({
         </div>
 
         <div className="shrink-0 border-t border-[var(--ecom-assistant-border)] p-4">
-          {planning ? (
+          {planning || prompting ? (
             <StoryboardTaskStatus
               active
               sweep
-              title="生成详情页点位"
-              detail="正在根据已选模块创建占位格…"
-              className="mx-0 mb-3"
-            />
-          ) : null}
-          {prompting ? (
-            <StoryboardTaskStatus
-              active
-              sweep
-              title="生成 Prompt"
-              detail="LLM 正在为各点位写提示词…"
+              title="生成模块 Prompt"
+              detail={
+                planning
+                  ? "自动子维度与点位…"
+                  : "LLM 正在为各点位写提示词（不出图）…"
+              }
               className="mx-0 mb-3"
             />
           ) : null}
@@ -355,26 +539,28 @@ export function AiDetailPageConfigSidebar({
             type="button"
             className="mb-2 w-full"
             disabled={disabled || planning || prompting || total === 0 || project.references.length === 0}
-            onClick={onRequestPlanSlots}
+            onClick={onRequestPlanAndPrompts}
           >
-            {planning ? (
+            {planning || prompting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                生成点位…
+                生成中…
               </>
             ) : (
-              `生成详情页点位（${total} 张）`
+              `生成模块 Prompt（${total} 张 · 不出图）`
             )}
           </EcomButtonPrimary>
-          <EcomButtonSecondary
-            size="sm"
-            type="button"
-            className="w-full"
-            disabled={disabled || planning || prompting || total === 0}
-            onClick={onRequestPrompts}
-          >
-            {prompting ? "生成 Prompt…" : "生成全部 Prompt"}
-          </EcomButtonSecondary>
+          {onRequestPrompts ? (
+            <EcomButtonSecondary
+              size="sm"
+              type="button"
+              className="w-full"
+              disabled={disabled || planning || prompting || total === 0}
+              onClick={onRequestPrompts}
+            >
+              {prompting ? "重新生成 Prompt…" : "仅重新生成全部 Prompt"}
+            </EcomButtonSecondary>
+          ) : null}
         </div>
       </div>
     </>

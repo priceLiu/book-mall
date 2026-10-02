@@ -20,6 +20,7 @@ import {
 import {
   getProVerticalConfig,
   isProVerticalId,
+  PRO_VERTICAL_ID_PATTERN,
   resolveWorkflowVertical,
 } from "@/lib/ecom/pro-vertical/registry";
 import type { ProVerticalId } from "@/lib/ecom/pro-vertical/types";
@@ -113,7 +114,17 @@ export const storyTheaterVersionSchema = z.object({
   totalDurationSec: z.number().positive().optional(),
 });
 
-export const proVerticalIdSchema = z.enum(["fashion_apparel", "bags", "digital_3c"]);
+export const proVerticalIdSchema = z.enum([
+  "fashion_apparel",
+  "bags",
+  "digital_3c",
+  "footwear",
+  "jewelry",
+  "outdoor_gear",
+  "loungewear",
+  "kitchenware",
+  "baby_maternal",
+]);
 
 export const proDeliverableSchema = z.object({
   schemaVersion: z.literal(PRO_SCHEMA_VERSION),
@@ -460,7 +471,9 @@ export function stripProDeliverableFence(text: string): string {
     .replace(/```[\s\S]*?```/g, "")
     .trim();
   const jsonStart = out.search(
-    /\{\s*"schemaVersion"\s*:\s*"(?:pro-v1|fashion-v4)"|\{\s*"vertical"\s*:\s*"(?:fashion_apparel|bags|digital_3c)"/,
+    new RegExp(
+      `\\{\\s*"schemaVersion"\\s*:\\s*"(?:pro-v1|fashion-v4)"|\\{\\s*"vertical"\\s*:\\s*"(?:${PRO_VERTICAL_ID_PATTERN})"`,
+    ),
   );
   if (jsonStart >= 0) out = out.slice(0, jsonStart).trim();
   return out.replace(/\n{3,}/g, "\n\n").trim();
@@ -492,7 +505,7 @@ export function extractProDeliverable(
     /\{\s*"storyTheaterVersions"\s*:/,
     /\{\s*"storyboardVersions"\s*:/,
     /\{\s*"schemaVersion"\s*:\s*"pro-v1"/,
-    /\{\s*"vertical"\s*:\s*"(?:bags|digital_3c)"/,
+    new RegExp(`\\{\\s*"vertical"\\s*:\\s*"(?:${PRO_VERTICAL_ID_PATTERN})"`),
   ];
   let jsonStart = -1;
   for (const re of markers) {
@@ -954,7 +967,7 @@ export function readUnifiedProDeliverable(
   if (wf.vertical === "fashion_apparel") {
     return readMetaFashionDeliverable(meta?.deliverable) ?? null;
   }
-  if (wf.vertical === "bags" || wf.vertical === "digital_3c") {
+  if (isProVerticalId(wf.vertical) && wf.vertical !== "fashion_apparel") {
     return normalizeToProDeliverable(meta?.deliverable) ?? null;
   }
   return null;

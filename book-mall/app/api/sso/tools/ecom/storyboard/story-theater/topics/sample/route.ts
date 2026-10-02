@@ -1,17 +1,10 @@
 import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
-import {
-  sampleStoryTheaterTopics,
-  type StoryTheaterVertical,
-} from "@/lib/ecom/ecom-story-theater-topic-service";
+import { sampleStoryTheaterTopics } from "@/lib/ecom/ecom-story-theater-topic-service";
+import { parseStoryTheaterVertical } from "@/lib/ecom/story-theater-vertical-parse";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
-
-function parseVertical(raw: string | null): StoryTheaterVertical | null {
-  if (raw === "fashion_apparel" || raw === "bags" || raw === "digital_3c") return raw;
-  return null;
-}
 
 export async function GET(req: Request) {
   const auth = verifyToolsBearer(req);
@@ -19,7 +12,7 @@ export async function GET(req: Request) {
     return ecomJson({ error: "未登录" }, { status: 401 });
   }
   const url = new URL(req.url);
-  const vertical = parseVertical(url.searchParams.get("vertical"));
+  const vertical = parseStoryTheaterVertical(url.searchParams.get("vertical"));
   if (!vertical) {
     return ecomJson({ error: "vertical 必填" }, { status: 400 });
   }

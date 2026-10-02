@@ -42,6 +42,10 @@ type Props = {
   ) => void | Promise<void>;
   onRewrite?: () => void;
   rewriteBusy?: boolean;
+  /** AI 详情页 · 本格参考/场景图 */
+  promptRefUrls?: string[];
+  promptRefUploadBusy?: boolean;
+  onUploadPromptRef?: (file: File) => void;
   slotCopy?: string;
   slotCopyAi?: string;
   showSlotCopyField?: boolean;
@@ -68,6 +72,9 @@ export function DetailPageSuiteSlotPromptEditDialog({
   onCompose,
   onRewrite,
   rewriteBusy = false,
+  promptRefUrls = [],
+  promptRefUploadBusy = false,
+  onUploadPromptRef,
   slotCopy = "",
   slotCopyAi = "",
   showSlotCopyField = false,
@@ -207,6 +214,42 @@ export function DetailPageSuiteSlotPromptEditDialog({
                   </p>
                 </div>
               ) : null}
+              {!isAdd && onUploadPromptRef ? (
+                <div className="space-y-2 rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-3 py-2">
+                  <p className="text-xs font-medium text-[#6e6e73]">本格参考 / 场景图</p>
+                  <p className="text-[10px] leading-relaxed text-[#86868b]">
+                    上传后可用于 AI 重写本条 Prompt（最多 3 张）。
+                  </p>
+                  {promptRefUrls.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {promptRefUrls.map((url) => (
+                        <img
+                          key={url}
+                          src={url}
+                          alt=""
+                          className="h-14 w-14 rounded-md border border-[#e8e8ed] object-cover"
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                  <label className="inline-flex cursor-pointer items-center">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={busy || promptRefUploadBusy}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) onUploadPromptRef(file);
+                      }}
+                    />
+                    <span className="inline-flex h-8 items-center rounded-lg border border-[#d2d2d7] bg-white px-3 text-xs">
+                      {promptRefUploadBusy ? "上传中…" : "上传参考图"}
+                    </span>
+                  </label>
+                </div>
+              ) : null}
               <label className="block text-sm text-[#6e6e73]">
                 {isAdd
                   ? "填写出图提示词，保存后新增 1 个点位格"
@@ -236,7 +279,7 @@ export function DetailPageSuiteSlotPromptEditDialog({
               disabled={busy || rewriteBusy}
               onClick={onRewrite}
             >
-              {rewriteBusy ? "AI 生成中…" : "AI 重写本条（文案+提示词）"}
+              {rewriteBusy ? "AI 生成中…" : onUploadPromptRef ? "AI 重写本条 Prompt" : "AI 重写本条（文案+提示词）"}
             </EcomButtonSecondary>
           ) : null}
           <EcomButtonSecondary

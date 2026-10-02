@@ -23,6 +23,7 @@ import {
   storyboardSheetSchema,
 } from "@/lib/ecom/ecom-storyboard-types";
 import { persistEcomGenerationRecord } from "@/lib/ecom/ecom-generation-record";
+import { fetchEcomVendorImageBuffer } from "@/lib/ecom/ecom-vendor-image-download";
 import {
   resolveKlingV3Resolution,
   resolveStoryboardWan27JobSize,
@@ -133,25 +134,22 @@ async function downloadAndUpload(
   imageUrl: string,
   ext = "png",
 ): Promise<string> {
-  let res: Response;
+  const vendor = imageUrl.trim();
   try {
-    res = await fetch(imageUrl);
+    const buf = await fetchEcomVendorImageBuffer(vendor);
+    return uploadCanvasUserBuffer({
+      userId,
+      ext,
+      buf,
+      contentType: "image/png",
+    });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    throw new Error(
-      msg === "fetch failed"
-        ? "下载生成图失败：网络中断，请重试"
-        : `下载生成图失败：${msg}`,
-    );
+    if (/^https?:\/\//i.test(vendor)) {
+      console.error("[ecom] vendor image OSS transfer failed, using vendor URL", e);
+      return vendor;
+    }
+    throw e;
   }
-  if (!res.ok) throw new Error(`下载生成图失败 HTTP ${res.status}`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  return uploadCanvasUserBuffer({
-    userId,
-    ext,
-    buf,
-    contentType: "image/png",
-  });
 }
 
 async function generateOneImage(opts: {

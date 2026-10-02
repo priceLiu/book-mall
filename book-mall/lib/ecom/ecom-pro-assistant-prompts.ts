@@ -112,6 +112,18 @@ function digital3cSellpointsExtra(): string {
 - 至少 1 条 core 卖点须直接体现 coreFunctionAttributes`;
 }
 
+function babyMaternalSellpointsExtra(): string {
+  return `
+- **合规**：禁止医疗/治疗/疗效宣称；禁止夸大安全认证
+- 卖点须突出材质安全、亲肤、防漏、易清洗等可验证表述`;
+}
+
+function jewelrySellpointsExtra(): string {
+  return `
+- **合规**：禁止夸大保值、投资回报率；禁止疗效/医疗相关表述
+- 卖点聚焦设计、工艺、佩戴场景与材质描述`;
+}
+
 function digital3cOpsExtra(): string {
   return `
 
@@ -131,7 +143,14 @@ export function buildProAssistantSystemPrompt(
 ): string {
   const config = getProVerticalConfig(vertical);
   const focusField = "productFocus";
-  const sellpointsExtra = vertical === "digital_3c" ? digital3cSellpointsExtra() : "";
+  const sellpointsExtra =
+    vertical === "digital_3c"
+      ? digital3cSellpointsExtra()
+      : vertical === "baby_maternal"
+        ? babyMaternalSellpointsExtra()
+        : vertical === "jewelry"
+          ? jewelrySellpointsExtra()
+          : "";
   const opsExtra = vertical === "digital_3c" ? digital3cOpsExtra() : "";
   const phaseBlock: Record<ProPromptPhase, string> = {
     sellpoints: `【当前任务：卖点 AI 生成】

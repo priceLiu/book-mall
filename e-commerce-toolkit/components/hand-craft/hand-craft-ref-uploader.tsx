@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 
 import { HandCraftSketchGenerateDialog } from "@/components/hand-craft/hand-craft-sketch-generate-dialog";
 import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
@@ -53,11 +53,11 @@ export function HandCraftRefUploader({
 
   async function handleGenerate(prompt: string) {
     if (!onGenerateSketch) return;
+    setGenDialogOpen(false);
     try {
       await onGenerateSketch(prompt);
-      setGenDialogOpen(false);
     } catch {
-      /* 错误由上层 alert */
+      /* 错误由上层 alert；进度见本卡片进度条与扫光 */
     }
   }
 
@@ -78,8 +78,14 @@ export function HandCraftRefUploader({
         items={references.map((r) => ({ id: r.id, ossUrl: r.ossUrl, label: r.label }))}
         emptyHint={`上传 1～${HAND_CRAFT_SKETCH_MAX} 张线稿（第 1 张为主线稿）。全程 1:1 保留线稿造型、发型、配饰与体态。${IMAGE_UPLOAD_DROP_HINT}`}
         removeLabel="删除线稿"
-        busy={disabled}
-        uploadProgress={uploadProgress}
+        busy={disabled || sketchGenBusy}
+        generating={sketchGenBusy}
+        generatingLabel="AI 生成线稿中…"
+        showUploadProgress={sketchGenBusy || typeof uploadProgress === "number"}
+        uploadProgress={sketchGenBusy ? null : uploadProgress}
+        uploadProgressLabel={
+          sketchGenBusy ? "AI 生成线稿中，请稍候…" : undefined
+        }
         inputRef={inputRef}
         onOpenFilePicker={() => inputRef.current?.click()}
         onOpenAssetPicker={
@@ -96,8 +102,17 @@ export function HandCraftRefUploader({
               className="h-7 px-2 text-[10px]"
               onClick={() => setGenDialogOpen(true)}
             >
-              <Sparkles className="h-3 w-3 shrink-0" />
-              生成线稿
+              {sketchGenBusy ? (
+                <>
+                  <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+                  生成中…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3 w-3 shrink-0" />
+                  生成线稿
+                </>
+              )}
             </EcomButtonSecondary>
           ) : null
         }
@@ -117,8 +132,9 @@ export function HandCraftRefUploader({
 
       {genDialogOpen ? (
         <HandCraftSketchGenerateDialog
-          open
+          open={genDialogOpen}
           onOpenChange={setGenDialogOpen}
+          nativeOverlay
           busy={sketchGenBusy}
           hasSeedSketch={references.length > 0}
           onConfirm={handleGenerate}

@@ -17,6 +17,8 @@ type Props = {
   composer: ReactNode;
   /** 折叠态悬浮 composer；省略则复用 composer（须为独立 JSX 树） */
   floatingComposer?: ReactNode;
+  /** 失焦自动折叠（点选卡片场景建议 false） */
+  collapseOnBlur?: boolean;
   className?: string;
 };
 
@@ -29,6 +31,7 @@ export function EcomAssistantCollapsibleLayout({
   children,
   composer,
   floatingComposer,
+  collapseOnBlur = true,
   className,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -53,7 +56,9 @@ export function EcomAssistantCollapsibleLayout({
           collapsed && "pointer-events-none invisible absolute h-0 w-0 overflow-hidden",
           className,
         )}
-        onBlur={collapseEnabled ? handleAssistantBlur : undefined}
+        onBlur={
+          collapseEnabled && collapseOnBlur ? handleAssistantBlur : undefined
+        }
       >
         {children}
         {showComposer ? composer : null}

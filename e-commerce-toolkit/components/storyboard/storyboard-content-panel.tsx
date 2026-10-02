@@ -44,6 +44,7 @@ import { StoryboardSaveDialog } from "@/components/storyboard/storyboard-save-di
 import { StoryboardStepResults } from "@/components/storyboard/storyboard-step-results";
 import { isProVerticalProject, buildFashionSellpointsSavePatch, buildFashionStoryboardPanelsSavePatch, buildStoryTheaterPanelsSavePatch, resolveProVerticalDeliverable, buildFashionProjectKeywords, isFashionProduceSetupReady, fashionCharacterMode, fashionSheetNeedsScriptResync, isCharacterRefRequired, getProjectVertical, isStoryTheaterDeliverable, isDirectVideoProduceReady } from "@/lib/fashion-workflow";
 import { getProVerticalConfig } from "@/lib/pro-vertical/registry";
+import { resolveStoryboardPageTitle } from "@/lib/pro-vertical/project-vertical";
 import type { FashionCharacterRefMode } from "@/components/fashion/fashion-storyboard-sheet-workspace";
 import type { FashionPanelRow, FashionSellpoint } from "@/lib/fashion-types";
 import { asStoryboardDeliverable } from "@/lib/storyboard-deliverable-parse";
@@ -2791,7 +2792,7 @@ export function StoryboardContentPanel({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-semibold text-[#1d1d1f]">
-                {project.title?.trim() || "电商口播故事版"}
+                {resolveStoryboardPageTitle(project)}
               </h2>
               <p className="text-[11px] text-[#6e6e73]">
                 带货短视频分镜 · {durationSec}秒 · {aspectRatio}

@@ -35,6 +35,12 @@ export function isProVerticalProject(project: StoryboardProject): boolean {
   return isProModeProject(project);
 }
 
+/** 工作台顶栏标题（与侧栏「电商口播故事版」一致，不按品类「××专业版」展示） */
+export function resolveStoryboardPageTitle(project: StoryboardProject): string {
+  if (isProModeProject(project)) return "电商口播故事版";
+  return project.title?.trim() || "电商口播故事版";
+}
+
 export function isBagsProject(project: StoryboardProject): boolean {
   return getProjectVertical(project) === "bags";
 }

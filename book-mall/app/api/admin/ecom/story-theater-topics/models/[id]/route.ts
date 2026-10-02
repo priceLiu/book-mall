@@ -5,17 +5,12 @@ import {
   deleteStoryTheaterTopic,
   getStoryTheaterTopicById,
   upsertStoryTheaterTopic,
-  type StoryTheaterVertical,
 } from "@/lib/ecom/ecom-story-theater-topic-service";
+import { parseStoryTheaterVertical } from "@/lib/ecom/story-theater-vertical-parse";
 
 export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ id: string }> };
-
-function parseVertical(raw: unknown): StoryTheaterVertical | null {
-  if (raw === "fashion_apparel" || raw === "bags" || raw === "digital_3c") return raw;
-  return null;
-}
 
 export async function PATCH(request: Request, ctx: RouteContext) {
   const auth = await requireFinanceAdminApi();
@@ -31,7 +26,9 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const vertical = parseVertical(body.vertical) ?? existing.vertical;
+  const vertical =
+    parseStoryTheaterVertical(typeof body.vertical === "string" ? body.vertical : null) ??
+    existing.vertical;
   const tags = Array.isArray(body.tags)
     ? body.tags.filter((t): t is string => typeof t === "string")
     : existing.tags;

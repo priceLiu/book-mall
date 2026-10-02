@@ -4,21 +4,16 @@ import { requireFinanceAdminApi } from "@/lib/admin/require-finance-admin-api";
 import {
   listAllStoryTheaterTopicsForAdmin,
   upsertStoryTheaterTopic,
-  type StoryTheaterVertical,
 } from "@/lib/ecom/ecom-story-theater-topic-service";
+import { parseStoryTheaterVertical } from "@/lib/ecom/story-theater-vertical-parse";
 
 export const dynamic = "force-dynamic";
-
-function parseVertical(raw: unknown): StoryTheaterVertical | null {
-  if (raw === "fashion_apparel" || raw === "bags" || raw === "digital_3c") return raw;
-  return null;
-}
 
 export async function GET(request: Request) {
   const auth = await requireFinanceAdminApi();
   if (!auth.ok) return auth.response;
   const url = new URL(request.url);
-  const vertical = parseVertical(url.searchParams.get("vertical"));
+  const vertical = parseStoryTheaterVertical(url.searchParams.get("vertical"));
   try {
     const topics = await listAllStoryTheaterTopicsForAdmin(vertical ?? undefined);
     return NextResponse.json({ topics });
@@ -41,7 +36,9 @@ export async function POST(request: Request) {
   const title = typeof body.title === "string" ? body.title.trim() : "";
   const storyCore = typeof body.storyCore === "string" ? body.storyCore.trim() : "";
   const storyType = typeof body.storyType === "string" ? body.storyType.trim() : "";
-  const vertical = parseVertical(body.vertical);
+  const vertical = parseStoryTheaterVertical(
+    typeof body.vertical === "string" ? body.vertical : null,
+  );
   if (!id || !title || !storyCore || !storyType || !vertical) {
     return NextResponse.json(
       { error: "id/title/storyCore/storyType/vertical 必填" },

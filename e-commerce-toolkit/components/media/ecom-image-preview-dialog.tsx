@@ -240,9 +240,12 @@ export function EcomImagePreviewDialog({
   }, [items, src, title, thumbSrc]);
 
   const [activeIndex, setActiveIndex] = useState(initialIndex);
+  const wheelHostRef = useRef<HTMLDivElement>(null);
   const showStrip = gallery.length > 1;
   const active = gallery[Math.min(Math.max(0, activeIndex), gallery.length - 1)]!;
-  const { zoom, zoomBy, reset, stageProps } = useImageZoomPan(active.src);
+  const { zoom, zoomBy, reset, stageProps } = useImageZoomPan(active.src, {
+    wheelHostRef,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -305,6 +308,7 @@ export function EcomImagePreviewDialog({
   const previewBody = (
     <>
       <div
+        ref={wheelHostRef}
         className={cn(
           "relative flex min-h-0 min-w-0 flex-1 items-center justify-center",
           showStrip ? "h-full" : "size-full",

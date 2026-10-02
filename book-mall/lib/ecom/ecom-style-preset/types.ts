@@ -6,6 +6,12 @@ export type EcomStylePresetVertical =
   | "fashion_apparel"
   | "bags"
   | "digital_3c"
+  | "footwear"
+  | "jewelry"
+  | "outdoor_gear"
+  | "loungewear"
+  | "kitchenware"
+  | "baby_maternal"
   | "generic";
 
 export type EcomStylePreset = {
