@@ -3,11 +3,15 @@
 import {
   EcomCopyOverlayCanvas,
   EcomCopyOverlayLayerControls,
+  EcomCopyOverlayLayersEditor,
+  overlayHasAnyCopy,
+  primarySlotCopyFromOverlay,
+  patchOverlayLayerText,
   resolveOverlayForEditor,
-  syncOverlayMainLayerText,
   type EcomCopyOverlay,
+  type EcomCopyOverlayCanvasHandle,
 } from "@private/ecom-copy-overlay";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
@@ -17,15 +21,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 const promptTextareaClass =
-  "mt-1 w-full min-h-[7rem] max-h-[min(16rem,28vh)] resize-y rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm leading-relaxed text-[#1d1d1f] outline-none focus:border-[#424245] focus:ring-0";
+  "mt-1.5 w-full min-h-[5.5rem] max-h-[min(12rem,22vh)] resize-y rounded-lg border border-[#d2d2d7] bg-[#fafafa] px-3 py-2 text-sm leading-relaxed text-[#1d1d1f] outline-none focus:border-[#0071e3] focus:bg-white focus:ring-1 focus:ring-[#0071e3]/20";
 
 export type EcomCopyLayoutStudioSaveExtras = {
   slotCopy?: string;
   copyOverlay?: EcomCopyOverlay;
   burnCopyInImage?: boolean;
 };
+
+export type EcomCopyLayoutStudioPreviewResult = {
+  previewUrl: string;
+};
+
+type WorkbenchView = "edit" | "preview";
 
 type Props = {
   open: boolean;
@@ -40,8 +51,18 @@ type Props = {
   aspectClassName?: string;
   saving?: boolean;
   composing?: boolean;
+  previewing?: boolean;
   rewriteBusy?: boolean;
   onSave: (imagePrompt: string, extras?: EcomCopyLayoutStudioSaveExtras) => void | Promise<void>;
+  onPreview?: (
+    imagePrompt: string,
+    extras: EcomCopyLayoutStudioSaveExtras,
+  ) => void | Promise<EcomCopyLayoutStudioPreviewResult | void>;
+  onConfirmCompose?: (
+    imagePrompt: string,
+    extras: EcomCopyLayoutStudioSaveExtras,
+    ctx: { previewUrl: string },
+  ) => void | Promise<void>;
   onCompose?: (
     imagePrompt: string,
     extras: EcomCopyLayoutStudioSaveExtras,
@@ -49,11 +70,78 @@ type Props = {
   onRewrite?: () => void;
   rewriteButtonLabel?: string;
   composeHint?: string;
-  /** 详情页套图：拍摄要求、本格参考图等 */
   rightColumnExtras?: ReactNode;
 };
 
-/** 程序排版 · 排版与出图（详情页套图 / 营销海报 / 画布共用壳层） */
+function InspectorSection({
+  title,
+  description,
+  children,
+  className,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={cn(
+        "rounded-xl border border-[#e8e8ed] bg-white p-4 shadow-sm",
+        className,
+      )}
+    >
+      <h3 className="text-sm font-semibold text-[#1d1d1f]">{title}</h3>
+      {description ? (
+        <p className="mt-0.5 text-xs leading-relaxed text-[#86868b]">{description}</p>
+      ) : null}
+      <div className="mt-3">{children}</div>
+    </section>
+  );
+}
+
+function WorkbenchToggle({
+  view,
+  onChange,
+  previewReady,
+}: {
+  view: WorkbenchView;
+  onChange: (v: WorkbenchView) => void;
+  previewReady: boolean;
+}) {
+  return (
+    <div className="inline-flex rounded-full border border-[#d2d2d7] bg-[#fafafa] p-0.5">
+      {(
+        [
+          { id: "edit" as const, label: "编辑排版" },
+          { id: "preview" as const, label: "合成预览" },
+        ] as const
+      ).map((tab) => {
+        const disabled = tab.id === "preview" && !previewReady;
+        const active = view === tab.id;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            disabled={disabled}
+            className={cn(
+              "rounded-full px-4 py-1.5 text-xs font-medium transition-colors",
+              active
+                ? "bg-white text-[#1d1d1f] shadow-sm"
+                : "text-[#6e6e73] hover:text-[#1d1d1f]",
+              disabled && "cursor-not-allowed opacity-40",
+            )}
+            onClick={() => onChange(tab.id)}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** 程序排版 · 全屏多文案块（详情页套图 / 营销海报） */
 export function EcomCopyLayoutStudioDialog({
   open,
   onOpenChange,
@@ -67,16 +155,18 @@ export function EcomCopyLayoutStudioDialog({
   aspectClassName = "aspect-[3/4]",
   saving = false,
   composing = false,
+  previewing = false,
   rewriteBusy = false,
   onSave,
+  onPreview,
+  onConfirmCompose,
   onCompose,
   onRewrite,
   rewriteButtonLabel = "AI 重写本条（文案+提示词）",
-  composeHint = "程序排版合成（与画布烧字共用引擎）；出图请用无字底图后再点「合成并保存新版」。",
+  composeHint,
   rightColumnExtras,
 }: Props) {
   const [promptDraft, setPromptDraft] = useState(imagePrompt);
-  const [copyDraft, setCopyDraft] = useState(slotCopy);
   const [overlay, setOverlay] = useState<EcomCopyOverlay>(() =>
     resolveOverlayForEditor({
       overlay: copyOverlay,
@@ -86,139 +176,283 @@ export function EcomCopyLayoutStudioDialog({
     }),
   );
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>("main");
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewStale, setPreviewStale] = useState(false);
+  const [localPreviewBusy, setLocalPreviewBusy] = useState(false);
+  const [workbenchView, setWorkbenchView] = useState<WorkbenchView>("edit");
+  const canvasRef = useRef<EcomCopyOverlayCanvasHandle>(null);
 
   const aiCopy = slotCopyAi.trim();
   const selectedLayer = overlay.layers.find((l) => l.id === selectedLayerId) ?? overlay.layers[0];
-  const busy = saving || composing;
+  const twoStepCompose = Boolean(onPreview);
+  const previewBusy = previewing || localPreviewBusy;
+  const busy = saving || composing || previewBusy;
+  const hint =
+    composeHint ??
+    (twoStepCompose
+      ? "生成预览核对成图，满意后保存并关闭。"
+      : "拖拽定位文案，保存后外层自动刷新。");
 
+  const wasOpenRef = useRef(false);
   useEffect(() => {
-    if (open) {
+    if (open && !wasOpenRef.current) {
+      const next = resolveOverlayForEditor({
+        overlay: copyOverlay,
+        text: slotCopy,
+        exportWidthPx,
+        baseImageUrl: baseImageUrl ?? undefined,
+      });
       setPromptDraft(imagePrompt);
-      setCopyDraft(slotCopy);
-      setOverlay(
-        resolveOverlayForEditor({
-          overlay: copyOverlay,
-          text: slotCopy,
-          exportWidthPx,
-          baseImageUrl: baseImageUrl ?? undefined,
-        }),
-      );
-      setSelectedLayerId("main");
+      setOverlay(next);
+      setSelectedLayerId(next.layers[0]?.id ?? "main");
+      setPreviewUrl(null);
+      setPreviewStale(false);
+      setWorkbenchView("edit");
     }
+    wasOpenRef.current = open;
   }, [open, imagePrompt, slotCopy, copyOverlay, exportWidthPx, baseImageUrl]);
-
-  useEffect(() => {
-    if (!open) return;
-    setOverlay((prev) => syncOverlayMainLayerText(prev, copyDraft));
-  }, [copyDraft, open]);
 
   const saveExtras = useMemo(
     (): EcomCopyLayoutStudioSaveExtras => ({
-      slotCopy: copyDraft.trim(),
+      slotCopy: primarySlotCopyFromOverlay(overlay),
       copyOverlay: overlay,
       burnCopyInImage: false,
     }),
-    [copyDraft, overlay],
+    [overlay],
   );
+
+  const markPreviewStale = () => {
+    if (previewUrl) setPreviewStale(true);
+  };
+
+  const handleOverlayChange = (next: EcomCopyOverlay) => {
+    markPreviewStale();
+    setOverlay(next);
+  };
+
+  const measureOverlayFromCanvas = async (): Promise<EcomCopyOverlay> => {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+    return canvasRef.current?.overlayWithMeasuredLayout() ?? overlay;
+  };
+
+  const handleGeneratePreview = async () => {
+    if (!onPreview || !baseImageUrl) return;
+    setLocalPreviewBusy(true);
+    try {
+      if (workbenchView === "preview") setWorkbenchView("edit");
+      const measured = await measureOverlayFromCanvas();
+      const extras: EcomCopyLayoutStudioSaveExtras = {
+        ...saveExtras,
+        copyOverlay: measured,
+      };
+      const result = await onPreview(promptDraft.trim(), extras);
+      if (result?.previewUrl) {
+        setPreviewUrl(result.previewUrl);
+        setOverlay(measured);
+        setPreviewStale(false);
+        setWorkbenchView("preview");
+      }
+    } finally {
+      setLocalPreviewBusy(false);
+    }
+  };
+
+  const handleConfirmCompose = async () => {
+    if (!previewUrl) return;
+    const handler = onConfirmCompose ?? onCompose;
+    if (!handler) return;
+    const measured = await measureOverlayFromCanvas();
+    const extras: EcomCopyLayoutStudioSaveExtras = {
+      ...saveExtras,
+      copyOverlay: measured,
+    };
+    if (onConfirmCompose) {
+      await onConfirmCompose(promptDraft.trim(), extras, { previewUrl });
+    } else {
+      await onCompose!(promptDraft.trim(), extras);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] max-w-5xl flex-col gap-0 overflow-hidden p-0">
-        <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-6 pt-6">
-          <DialogHeader className="pr-10">
-            <DialogTitle className="leading-snug">{title} · 排版与出图</DialogTitle>
-          </DialogHeader>
-          <div className="mt-4 flex min-h-0 flex-col gap-4 pb-2 lg:flex-row lg:items-start">
-            <div className="min-w-0 shrink-0 lg:w-[340px]">
-              <p className="mb-2 text-xs text-[#86868b]">
-                拖拽文字定位 · 导出宽 {overlay.exportWidthPx}px
-              </p>
+      <DialogContent className="fixed inset-0 left-0 top-0 z-[300] flex h-[100dvh] max-h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-white p-0 sm:rounded-none">
+        <DialogHeader className="relative shrink-0 border-b border-[#e8e8ed] px-5 py-3.5 pr-14">
+          <div className="min-w-0 max-w-[min(100%,280px)] sm:max-w-[36%]">
+            <DialogTitle className="text-base font-semibold leading-snug text-[#1d1d1f]">
+              {title}
+            </DialogTitle>
+            <p className="mt-0.5 text-xs text-[#86868b]">程序排版 · 导出 {overlay.exportWidthPx}px</p>
+          </div>
+          {twoStepCompose ? (
+            <div className="pointer-events-none absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 justify-center px-14">
+              <div className="pointer-events-auto">
+                <WorkbenchToggle
+                  view={workbenchView}
+                  onChange={setWorkbenchView}
+                  previewReady={Boolean(previewUrl)}
+                />
+              </div>
+            </div>
+          ) : null}
+        </DialogHeader>
+
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+          <div className="relative flex min-h-[min(52vh,520px)] min-w-0 flex-1 flex-col bg-[#f5f5f7] lg:min-h-0">
+            <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4 py-5 sm:px-8 sm:py-6">
               <EcomCopyOverlayCanvas
+                ref={canvasRef}
                 baseImageUrl={baseImageUrl}
                 aspectClassName={aspectClassName}
                 overlay={overlay}
-                onChange={setOverlay}
+                onChange={handleOverlayChange}
                 selectedLayerId={selectedLayerId}
                 onSelectLayer={setSelectedLayerId}
                 emptyHint="请先出无字底图，再在此拖拽排版"
-              />
-              <EcomCopyOverlayLayerControls
-                overlay={overlay}
-                selectedLayer={selectedLayer}
-                onChange={setOverlay}
-                className="mt-3"
+                fillWorkbench
+                maxPreviewWidthPx={1200}
+                frameClassName="shadow-2xl ring-1 ring-black/10"
+                composedPreviewUrl={
+                  workbenchView === "preview" && previewUrl ? previewUrl : null
+                }
               />
             </div>
-            <div className="min-w-0 flex-1 space-y-4">
-              <div className="space-y-2">
-                <label className="block text-sm text-[#6e6e73]">
-                  模块文案
-                  <textarea
-                    className="mt-1 min-h-[88px] max-h-[min(8rem,18vh)] w-full resize-y rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm leading-relaxed text-[#1d1d1f] outline-none focus:border-[#424245]"
-                    value={copyDraft}
-                    onChange={(e) => setCopyDraft(e.target.value)}
-                    placeholder={
-                      aiCopy ? undefined : "填写标题/卖点；可点「恢复 AI 文案」"
-                    }
-                  />
-                </label>
-                {aiCopy ? (
-                  <EcomButtonSecondary
-                    type="button"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => setCopyDraft(aiCopy)}
-                  >
-                    恢复 AI 文案
-                  </EcomButtonSecondary>
-                ) : null}
-                <p className="text-xs leading-relaxed text-[#86868b]">{composeHint}</p>
-              </div>
-              {rightColumnExtras}
-              <label className="block text-sm text-[#6e6e73]">
-                出图提示词（无字摄影画面）
+            <p className="shrink-0 pb-3 text-center text-[11px] text-[#86868b]">
+              {workbenchView === "edit"
+                ? "点选文案块 · 拖拽移动 · 拖角调整宽度"
+                : previewStale
+                  ? "排版已变更，请重新生成预览"
+                  : "合成预览（与保存成图一致）"}
+            </p>
+          </div>
+
+          <aside className="ecom-scrollbar-thin flex w-full shrink-0 flex-col border-t border-[#e8e8ed] bg-[#fafafa] lg:w-[min(400px,38vw)] lg:border-l lg:border-t-0">
+            <div className="flex-1 space-y-3 overflow-y-auto p-4">
+              <InspectorSection title="文案" description="选中块后在画布上拖拽定位">
+                <EcomCopyOverlayLayersEditor
+                  overlay={overlay}
+                  onChange={handleOverlayChange}
+                  selectedLayerId={selectedLayerId}
+                  onSelectLayerId={setSelectedLayerId}
+                  disabled={busy}
+                  layout="studio"
+                  aiCopyRestore={aiCopy || undefined}
+                  onRestoreAiCopy={
+                    aiCopy && selectedLayerId
+                      ? () => {
+                          markPreviewStale();
+                          setOverlay((prev) =>
+                            patchOverlayLayerText(prev, selectedLayerId, aiCopy),
+                          );
+                        }
+                      : undefined
+                  }
+                />
+              </InspectorSection>
+
+              <InspectorSection title="样式">
+                <EcomCopyOverlayLayerControls
+                  overlay={overlay}
+                  selectedLayer={selectedLayer}
+                  onChange={handleOverlayChange}
+                  variant="studio"
+                />
+              </InspectorSection>
+
+              {rightColumnExtras ? (
+                <InspectorSection title="更多">{rightColumnExtras}</InspectorSection>
+              ) : null}
+
+              <InspectorSection
+                title="无字底图提示词"
+                description="仅重出摄影底图时使用，改字不触发重新生图"
+              >
                 <textarea
                   className={promptTextareaClass}
                   value={promptDraft}
-                  onChange={(e) => setPromptDraft(e.target.value)}
+                  onChange={(e) => {
+                    markPreviewStale();
+                    setPromptDraft(e.target.value);
+                  }}
                   placeholder="中文生图描述…"
                 />
-              </label>
+              </InspectorSection>
             </div>
-          </div>
+          </aside>
         </div>
-        <DialogFooter className="shrink-0 flex-wrap gap-2 border-t border-[#e8e8ed] px-6 py-4 sm:justify-end">
-          {onRewrite ? (
-            <EcomButtonSecondary
-              type="button"
-              size="sm"
-              disabled={busy || rewriteBusy}
-              onClick={onRewrite}
-            >
-              {rewriteBusy ? "AI 生成中…" : rewriteButtonLabel}
+
+        <DialogFooter className="shrink-0 flex-col gap-3 border-t border-[#e8e8ed] bg-white px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-[#86868b] sm:max-w-[40%]">{hint}</p>
+          <div className="flex flex-wrap justify-end gap-2">
+            {onRewrite ? (
+              <EcomButtonSecondary
+                type="button"
+                size="sm"
+                disabled={busy || rewriteBusy}
+                onClick={onRewrite}
+              >
+                {rewriteBusy ? "AI 生成中…" : rewriteButtonLabel}
+              </EcomButtonSecondary>
+            ) : null}
+            <EcomButtonSecondary type="button" size="sm" disabled={busy} onClick={() => onOpenChange(false)}>
+              取消
             </EcomButtonSecondary>
-          ) : null}
-          <EcomButtonSecondary type="button" size="sm" disabled={busy} onClick={() => onOpenChange(false)}>
-            取消
-          </EcomButtonSecondary>
-          {onCompose ? (
-            <EcomButtonPrimary
-              type="button"
-              size="sm"
-              disabled={busy || !baseImageUrl || !copyDraft.trim()}
-              onClick={() => void onCompose(promptDraft.trim(), saveExtras)}
-            >
-              {composing ? "合成中…" : "合成并保存新版"}
-            </EcomButtonPrimary>
-          ) : null}
-          <EcomButtonPrimary
-            type="button"
-            size="sm"
-            disabled={busy || !promptDraft.trim()}
-            onClick={() => void onSave(promptDraft.trim(), saveExtras)}
-          >
-            {saving ? "保存中…" : "保存"}
-          </EcomButtonPrimary>
+            {twoStepCompose ? (
+              <>
+                <EcomButtonSecondary
+                  type="button"
+                  size="sm"
+                  disabled={busy || !promptDraft.trim()}
+                  onClick={() => void onSave(promptDraft.trim(), saveExtras)}
+                >
+                  {saving ? "保存中…" : "仅保存草稿"}
+                </EcomButtonSecondary>
+                <EcomButtonSecondary
+                  type="button"
+                  size="sm"
+                  disabled={busy || !baseImageUrl || !overlayHasAnyCopy(overlay)}
+                  onClick={() => void handleGeneratePreview()}
+                >
+                  {previewBusy ? "生成中…" : "生成预览"}
+                </EcomButtonSecondary>
+                <EcomButtonPrimary
+                  type="button"
+                  size="sm"
+                  disabled={
+                    busy ||
+                    !previewUrl ||
+                    previewStale ||
+                    !(onConfirmCompose ?? onCompose)
+                  }
+                  onClick={() => void handleConfirmCompose()}
+                >
+                  {composing ? "保存中…" : "保存并关闭"}
+                </EcomButtonPrimary>
+              </>
+            ) : (
+              <>
+                {onCompose ? (
+                  <EcomButtonPrimary
+                    type="button"
+                    size="sm"
+                    disabled={busy || !baseImageUrl || !overlayHasAnyCopy(overlay)}
+                    onClick={() => void onCompose(promptDraft.trim(), saveExtras)}
+                  >
+                    {composing ? "合成中…" : "合成并保存新版"}
+                  </EcomButtonPrimary>
+                ) : null}
+                <EcomButtonPrimary
+                  type="button"
+                  size="sm"
+                  disabled={busy || !promptDraft.trim()}
+                  onClick={() => void onSave(promptDraft.trim(), saveExtras)}
+                >
+                  {saving ? "保存中…" : "保存"}
+                </EcomButtonPrimary>
+              </>
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

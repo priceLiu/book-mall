@@ -93,9 +93,11 @@
 | render | burnCopyInImage, exportWidthPx, aspectRatio |
 | meta | sourceModule, composedAt, assetId |
 
-### 4.3 UI：排版与出图
+### 4.3 UI：全屏排版与出图
 
-对齐详情页套图弹层：左预览拖拽定位，右模块文案 + **出图提示词（无字摄影画面）**；**合成并保存新版** 走 `POST .../ecom/copy-overlay/compose` 或 poster 专用 compose（内部复用同一引擎）。
+**全屏弹层**（详情页套图 / 营销海报共用 `EcomCopyLayoutStudioDialog`）：左拖拽画布 + 选中块 **字重（粗体/常规）· 文字投影**；中栏多文案块列表与无字 **出图提示词**；右栏 **合成预览**。
+
+流程：**生成预览** → 核对右栏成图 → **保存并关闭**（写回项目并刷新外层列表/点位图）；可选 **仅保存草稿**（只存 overlay/文案，不合成）。预览走 `POST .../ecom/copy-overlay/compose`；确认保存走 poster compose 或套图 `compose-slot`（同一 SVG 烧字引擎）。
 
 ---
 
@@ -153,9 +155,26 @@
 
 ---
 
+## 10. 界面与持久化（现网）
+
+| 项 | 行为 |
+|----|------|
+| 布局 | **左操作 / 右预览**（`PosterStepSection` 分步卡片）；宽屏右侧 sticky；页面 **左对齐**（非居中窄栏） |
+| 生成态 | 「海报生成中…」在 **右侧「生成预览 · 排版与成图」** |
+| 项目恢复 | `localStorage` `ecom-poster-active-project` + 最近项目 id；刷新 → 上次项目 / 列表首项 / 新建 |
+| 自动保存 | 傻瓜路径、`brief.oneLineBrief` 等 **防抖 patch** 到 `EcomPosterProject` |
+| 参考图 | `ecom-poster-ref-resolve` 按路径 A/B/C/D 与专业模式过滤 refs，避免无关图传入生图 |
+| 生图路由 | 火山 **Seedream** 等经 `generateEcomImage` 专用分支 + `ensureCanvasVendorImageUrls`（避免误走万相导致 url error） |
+| 模块文案 | **多文案块**：「+ 添加文案块」→ 每块独立内容/位置/字号/颜色；左侧点选拖拽；块内 Enter 仍可换行；合成渲染全部 `layers` |
+
+**操作说明**：[`docs/电商品牌创作-使用说明.md`](./电商品牌创作-使用说明.md) §6。
+
+---
+
 ## 9. 变更记录
 
 | 日期 | 说明 |
 |------|------|
 | 2026-10-03 | 整版重写：电商单入口、傻瓜/专业、图字分离平台能力；废弃独立平台 V2 / 账号 VI 库 PRD |
 | 2026-10-03 | POST-001～018 落地：排版壳层收敛、专业三引擎+模型选择器+模板 catalog、export ZIP、clientPage=projectId |
+| 2026-10-03 | §10：左右栏 UI、项目 localStorage、ref 过滤与 Seedream 路由；统一使用说明链到 `电商品牌创作-使用说明.md` |

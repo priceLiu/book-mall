@@ -61,6 +61,9 @@ pnpm dev:all:stagger                # mall 先就绪，其余子站间隔 3s 错
 - Platform API：`book-mall/app/api/sso/tools/ecom/poster/*`（projects、auto-plan、generate、compose、batch-generate、export ZIP、festivals）
 - Gateway `clientPage`：`ecom/<userId>/<projectId>/ecom-toolkit__poster__generate`（生图经 `generateEcomImage` + `workspaceId=projectId`）
 - 程序排版：共用 `POST /api/sso/tools/ecom/copy-overlay/compose` 与 `@private/ecom-copy-overlay`
+- 若改 `shared/ecom-copy-overlay` 后页面 **500 / Cannot find module `./layer-ops`**：仓库根执行 `pnpm sync:ecom-copy-overlay`（`dev:all` 已自动跑），并 **重启 :3007**
+- 若 **Build Error · `docker-shared/global-asset-library/index.ts` 不存在**：真源在 `e-commerce-toolkit/docker-shared/global-asset-library/`；执行 `pnpm sync:global-asset-library` 同步到 canvas-web / book-mall，并重启 :3007
+- 若 **`/api/tools-session` 500 · `MODULE_NOT_FOUND`**（常伴随旧 `.next` 缓存）：仓库根执行 **`pnpm ecom:dev-reset`**，再重启 `:3007`
 - 产品 SSOT：`docs/AI 海报.md`
 
 ### 电商工具箱 · IP 母版 Studio
@@ -68,7 +71,8 @@ pnpm dev:all:stagger                # mall 先就绪，其余子站间隔 3s 错
 - 路由：**http://localhost:3007/brand/ip**（品牌侧栏 · 四步无解锁）
 - Platform API：`book-mall/app/api/sso/tools/ecom/ip-master/*`
 - 产品 SSOT：`book-mall/doc/ecom/ip-master-requirements.md`（真源 PRD：`docs/IP母版PRD.md`）
-- 下游：手办盲盒 SOP / 品牌VI表情包SOP 参考区「从 IP 母版载入」
+- **用户使用说明**：`docs/电商品牌创作-使用说明.md`（手办 / VI / 母版 / 海报）
+- 下游：手办 / 品牌 VI 参考区「从母版库导入」→ `/library?tab=ip-master-library`
 
 **手动验收（发布前）**
 

@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 
 import type { EcomCopyOverlay } from "./types";
-import { resolveOverlayForEditor, syncOverlayMainLayerText } from "./defaults";
+import { resolveOverlayForEditor } from "./defaults";
+import { primarySlotCopyFromOverlay } from "./layer-ops";
 
 export type UseEcomCopyOverlayEditorStateOpts = {
   open: boolean;
@@ -11,7 +12,6 @@ export type UseEcomCopyOverlayEditorStateOpts = {
   overlayProp?: EcomCopyOverlay | null;
   exportWidthPx: number;
   baseImageUrl?: string | null;
-  /** 可选：同步第二路文案（如出图 prompt） */
   initialPrompt?: string;
 };
 
@@ -19,7 +19,6 @@ export function useEcomCopyOverlayEditorState(opts: UseEcomCopyOverlayEditorStat
   const { open, initialText, overlayProp, exportWidthPx, baseImageUrl, initialPrompt = "" } =
     opts;
 
-  const [text, setText] = useState(initialText);
   const [prompt, setPrompt] = useState(initialPrompt);
   const [overlay, setOverlay] = useState<EcomCopyOverlay>(() =>
     resolveOverlayForEditor({
@@ -35,36 +34,27 @@ export function useEcomCopyOverlayEditorState(opts: UseEcomCopyOverlayEditorStat
 
   useEffect(() => {
     if (!open) return;
-    setText(initialText);
+    const next = resolveOverlayForEditor({
+      overlay: overlayProp,
+      text: initialText,
+      exportWidthPx,
+      baseImageUrl: baseImageUrl ?? undefined,
+    });
     setPrompt(initialPrompt);
-    setOverlay(
-      resolveOverlayForEditor({
-        overlay: overlayProp,
-        text: initialText,
-        exportWidthPx,
-        baseImageUrl: baseImageUrl ?? undefined,
-      }),
-    );
-    setSelectedLayerId("main");
+    setOverlay(next);
+    setSelectedLayerId(next.layers[0]?.id ?? "main");
   }, [open, initialText, initialPrompt, overlayProp, exportWidthPx, baseImageUrl]);
-
-  useEffect(() => {
-    if (!open) return;
-    setOverlay((prev) => syncOverlayMainLayerText(prev, text));
-  }, [text, open]);
 
   const layoutExtras = useMemo(
     () => ({
-      slotCopy: text.trim(),
+      slotCopy: primarySlotCopyFromOverlay(overlay),
       copyOverlay: overlay,
       burnCopyInImage: false as const,
     }),
-    [text, overlay],
+    [overlay],
   );
 
   return {
-    text,
-    setText,
     prompt,
     setPrompt,
     overlay,

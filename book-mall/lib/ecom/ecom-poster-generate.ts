@@ -4,7 +4,9 @@ import { buildCopyAwareImageGenPlan } from "@/lib/ecom/copy-layout/image-gen-cop
 import { generateEcomImage } from "@/lib/ecom/ecom-image-gen-invoke";
 import { buildMarketingPosterScenePrompt } from "@/lib/ecom/ecom-image-processing-presets";
 import { getPosterFestivalPack } from "@/lib/ecom/ecom-poster-festival-packs";
+import { ensureStoryboardRefImagesForWan27 } from "@/lib/ecom/ecom-storyboard-ref-image";
 import { getTemplateGalleryEntry } from "@/lib/ecom/ecom-template-gallery-service";
+import { resolvePosterGenerationRefUrls } from "@/lib/ecom/ecom-poster-ref-resolve";
 import {
   ECOM_POSTER_TOOL_KEY,
   exportWidthForAspect,
@@ -13,8 +15,8 @@ import {
   type PosterSettings,
 } from "@/lib/ecom/ecom-poster-types";
 
-function refUrls(refs: PosterReference[], roles: PosterReference["role"][]): string[] {
-  return refs.filter((r) => roles.includes(r.role)).map((r) => r.ossUrl.trim());
+function isHttpUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url.trim());
 }
 
 export async function generatePosterImages(opts: {
@@ -64,12 +66,19 @@ export async function generatePosterImages(opts: {
       entry.thumbUrl?.trim() ||
       entry.coverUrl?.trim() ||
       entry.mainImageUrl?.trim();
-    if (templateVisual) {
-      extraRefs.push(templateVisual);
+    if (templateVisual && isHttpUrl(templateVisual)) {
+      const [normalized] = await ensureStoryboardRefImagesForWan27({
+        userId: opts.userId,
+        urls: [templateVisual.trim()],
+      });
+      if (normalized) extraRefs.push(normalized);
     }
     scene = `参照电商详情模板「${entry.title ?? entry.id}」的版式与构图气质，重绘为新的营销海报摄影画面：${scene}`;
   } else if (proMode === "image-ref") {
-    const styleRefs = refUrls(opts.references, ["style", "scene", "brand"]);
+    const styleRefs = resolvePosterGenerationRefUrls({
+      plan: { ...opts.plan, tier: "pro", proMode: "image-ref" },
+      references: opts.references,
+    });
     if (styleRefs.length === 0) {
       throw new Error("图生模式请至少上传场景或风格参考");
     }
@@ -90,11 +99,13 @@ export async function generatePosterImages(opts: {
     slotCopy,
     burnCopyInImage: opts.plan.burnCopyInImage,
   });
-  const refs = [
-    ...extraRefs,
-    ...refUrls(opts.references, ["garment", "model", "scene", "brand", "product", "style"]),
-  ]
-    .filter((u, i, arr) => u && arr.indexOf(u) === i)
+  const roleRefs = resolvePosterGenerationRefUrls({
+    plan: opts.plan,
+    references: opts.references,
+  });
+  const refs = [...extraRefs, ...roleRefs]
+    .filter((u) => isHttpUrl(u))
+    .filter((u, i, arr) => arr.indexOf(u) === i)
     .slice(0, 5);
 
   const urls: string[] = [];

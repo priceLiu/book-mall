@@ -1,10 +1,26 @@
+import { normalizeCopyFontPresetId } from "./copy-fonts";
 import type { EcomCopyOverlay, EcomCopyOverlayLayer } from "./types";
 import { ECOM_COPY_OVERLAY_VERSION } from "./types";
+
+/** 统一换行符，仅去掉首尾空白；保留中间换行供排版与合成 */
+export function normalizeEcomCopyText(text: string): string {
+  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/^\s+|\s+$/g, "");
+}
+
+/** 打开排版编辑器时：优先 main 层已存文案（含多行），与 slotCopy 对齐 */
+export function resolveEditorCopyText(
+  slotCopy: string,
+  overlay?: EcomCopyOverlay | null,
+): string {
+  const main = overlay?.layers.find((l) => l.id === "main")?.text;
+  if (main?.trim()) return normalizeEcomCopyText(main);
+  return normalizeEcomCopyText(slotCopy);
+}
 
 export function defaultCopyOverlayLayer(text: string): EcomCopyOverlayLayer {
   return {
     id: "main",
-    text: text.trim(),
+    text: normalizeEcomCopyText(text),
     nx: 0.5,
     ny: 0.12,
     fontSize: 36,
@@ -18,7 +34,7 @@ export function defaultCopyOverlayLayer(text: string): EcomCopyOverlayLayer {
 }
 
 export function defaultCopyOverlay(text: string, exportWidthPx = 750): EcomCopyOverlay {
-  const layers = text.trim() ? [defaultCopyOverlayLayer(text)] : [];
+  const layers = normalizeEcomCopyText(text) ? [defaultCopyOverlayLayer(text)] : [];
   return {
     version: ECOM_COPY_OVERLAY_VERSION,
     exportWidthPx,
@@ -56,11 +72,53 @@ export function parseEcomCopyOverlay(raw: unknown): EcomCopyOverlay | undefined 
         fontSize: Math.max(12, Math.min(120, Math.round(Number(L.fontSize) || 32))),
         color: typeof L.color === "string" ? L.color : "#ffffff",
         fontWeight: L.fontWeight === "normal" ? "normal" : "bold",
+        fontFamily: normalizeCopyFontPresetId(L.fontFamily),
         textAlign:
           L.textAlign === "left" || L.textAlign === "right" ? L.textAlign : "center",
         maxWidthNorm: clamp01(Number(L.maxWidthNorm), 0.88),
         maxHeightNorm: clamp01(Number(L.maxHeightNorm), 0.55),
         writingMode: L.writingMode === "vertical" ? "vertical" : "horizontal",
+        ...(Number.isFinite(Number(L.shadowBlur))
+          ? { shadowBlur: Math.max(0, Math.min(48, Math.round(Number(L.shadowBlur)))) }
+          : {}),
+        ...(typeof L.shadowColor === "string" ? { shadowColor: L.shadowColor } : {}),
+        ...(Number.isFinite(Number(L.shadowOffsetX))
+          ? { shadowOffsetX: Math.round(Number(L.shadowOffsetX)) }
+          : {}),
+        ...(Number.isFinite(Number(L.shadowOffsetY))
+          ? { shadowOffsetY: Math.round(Number(L.shadowOffsetY)) }
+          : {}),
+        ...(Number.isFinite(Number(L.shadowOpacity))
+          ? {
+              shadowOpacity: Math.max(0, Math.min(1, Number(L.shadowOpacity))),
+            }
+          : {}),
+        ...(Number.isFinite(Number(L.glowBlur))
+          ? { glowBlur: Math.max(0, Math.min(48, Math.round(Number(L.glowBlur)))) }
+          : {}),
+        ...(typeof L.glowColor === "string" ? { glowColor: L.glowColor } : {}),
+        ...(Number.isFinite(Number(L.glowOpacity))
+          ? { glowOpacity: Math.max(0, Math.min(1, Number(L.glowOpacity))) }
+          : {}),
+        ...(Number.isFinite(Number(L.strokeWidth))
+          ? { strokeWidth: Math.max(0, Math.min(16, Math.round(Number(L.strokeWidth)))) }
+          : {}),
+        ...(typeof L.strokeColor === "string" ? { strokeColor: L.strokeColor } : {}),
+        ...(L.textBgEnabled === true ? { textBgEnabled: true } : {}),
+        ...(typeof L.textBgColor === "string" ? { textBgColor: L.textBgColor } : {}),
+        ...(Number.isFinite(Number(L.textBgOpacity))
+          ? { textBgOpacity: Math.max(0, Math.min(1, Number(L.textBgOpacity))) }
+          : {}),
+        ...(Number.isFinite(Number(L.textBgPaddingPx))
+          ? {
+              textBgPaddingPx: Math.max(0, Math.min(48, Math.round(Number(L.textBgPaddingPx)))),
+            }
+          : {}),
+        ...(Number.isFinite(Number(L.textBgRadiusPx))
+          ? {
+              textBgRadiusPx: Math.max(0, Math.min(32, Math.round(Number(L.textBgRadiusPx)))),
+            }
+          : {}),
       },
     ];
   });
@@ -71,7 +129,7 @@ export function syncOverlayMainLayerText(
   overlay: EcomCopyOverlay,
   text: string,
 ): EcomCopyOverlay {
-  const t = text.trim();
+  const t = normalizeEcomCopyText(text);
   if (!t && overlay.layers.length === 0) return overlay;
   const layers = [...overlay.layers];
   const mainIdx = layers.findIndex((l) => l.id === "main");
@@ -89,10 +147,25 @@ export function resolveOverlayForEditor(opts: {
   exportWidthPx: number;
   baseImageUrl?: string;
 }): EcomCopyOverlay {
-  const base = opts.overlay ?? defaultCopyOverlay(opts.text, opts.exportWidthPx);
-  let next = syncOverlayMainLayerText(base, opts.text);
-  if (opts.baseImageUrl?.trim()) {
-    next = { ...next, baseImageUrl: opts.baseImageUrl.trim() };
+  const exportWidthPx = opts.exportWidthPx;
+  const baseImageUrl = opts.baseImageUrl?.trim();
+
+  if (opts.overlay?.layers && opts.overlay.layers.length > 0) {
+    let next: EcomCopyOverlay = {
+      ...opts.overlay,
+      version: 1,
+      exportWidthPx,
+      layers: opts.overlay.layers.map((l) => ({ ...l })),
+    };
+    if (baseImageUrl) next = { ...next, baseImageUrl };
+    return next;
   }
-  return { ...next, exportWidthPx: opts.exportWidthPx };
+
+  let next = defaultCopyOverlay(opts.text, exportWidthPx);
+  next = syncOverlayMainLayerText(next, opts.text);
+  if (next.layers.length === 0) {
+    next = { ...next, layers: [defaultCopyOverlayLayer(opts.text)] };
+  }
+  if (baseImageUrl) next = { ...next, baseImageUrl };
+  return next;
 }

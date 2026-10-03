@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 
+import { ensureCanvasVendorImageUrls } from "@/lib/canvas/ensure-vendor-image-url";
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
 import { fetchEcomVendorImageBuffer } from "@/lib/ecom/ecom-vendor-image-download";
 import { buildKieImageCreateArgs, isKieGptImageModelKey } from "@/lib/canvas/providers/kie";
@@ -31,7 +32,12 @@ import {
   ecomGwCreateKieJob,
   ecomGwPollDashscope,
   ecomGwPollKie,
+  ecomGwVolcengineImageEdit,
 } from "@/lib/gateway/ecom-tool-gateway-client";
+import {
+  buildVolcengineSeedreamImageCall,
+  isVolcengineSeedreamImageModelKey,
+} from "@/lib/gateway/volcengine-chat-models";
 
 /**
  * 电商工具箱统一生图下发：按 modelKey 选厂商分支、轮询、把成图转存到自有 OSS。
@@ -198,6 +204,48 @@ export async function generateEcomImage(opts: {
   const workspaceId = opts.workspaceId?.trim() || randomUUID().slice(0, 8);
   const clientPage = ecomClientPage(opts.userId, workspaceId, opts.toolKey);
 
+  if (isVolcengineSeedreamImageModelKey(opts.modelKey)) {
+    const refUrls =
+      opts.refImageUrls.length > 0
+        ? await ensureCanvasVendorImageUrls(
+            opts.userId,
+            opts.refImageUrls.filter((u) => /^https?:\/\//i.test(u.trim())),
+          )
+        : [];
+    const resolutionRaw = opts.imageSize?.trim();
+    const resolution =
+      resolutionRaw === "4K" || resolutionRaw === "1K" || resolutionRaw === "2K"
+        ? resolutionRaw
+        : "2K";
+    const call = buildVolcengineSeedreamImageCall({
+      prompt,
+      imageUrls: refUrls,
+      params: { resolution, n: 1 },
+    });
+    const { images } = await ecomGwVolcengineImageEdit(opts.userId, {
+      model: opts.modelKey.trim(),
+      prompt: call.prompt,
+      image: call.image,
+      parameters: call.parameters,
+      clientPage,
+    });
+    const first = images[0];
+    const vendorUrl = first?.url?.trim() ?? "";
+    const b64 = first?.b64?.trim() ?? "";
+    if (!vendorUrl && !b64) {
+      throw new Error("火山 Seedream 未返回可用图像");
+    }
+    if (b64) {
+      return uploadCanvasUserBuffer({
+        userId: opts.userId,
+        ext: "png",
+        buf: Buffer.from(b64, "base64"),
+        contentType: "image/png",
+      });
+    }
+    return downloadAndUpload(opts.userId, vendorUrl);
+  }
+
   if (isDashscopeMultimodalImageGenModel(opts.modelKey)) {
     return generateMultimodalSyncImage(opts);
   }
@@ -327,6 +375,7 @@ export async function generateEcomImage(opts: {
  */
 export function isRefCapableEcomImageModel(modelKey: string): boolean {
   const key = modelKey.trim().toLowerCase();
+  if (isVolcengineSeedreamImageModelKey(key)) return true;
   if (key === "seedream-4.5" || key.startsWith("seedream-")) return true;
   if (isStoryboardKieImageModel(key)) return true;
   if (key.startsWith("gpt-image")) return true;

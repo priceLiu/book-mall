@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-import { EcomCopyLayoutStudioDialog } from "@/components/copy-layout/ecom-copy-layout-studio-dialog";
+import {
+  EcomCopyLayoutStudioDialog,
+  type EcomCopyLayoutStudioPreviewResult,
+  type EcomCopyLayoutStudioSaveExtras,
+} from "@/components/copy-layout/ecom-copy-layout-studio-dialog";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
   Dialog,
@@ -35,6 +39,15 @@ type Props = {
     prompt: string,
     extras: DetailPageSuiteSlotPromptSaveExtras,
   ) => void | Promise<void>;
+  onPreview?: (
+    prompt: string,
+    extras: DetailPageSuiteSlotPromptSaveExtras,
+  ) => void | Promise<EcomCopyLayoutStudioPreviewResult | void>;
+  onConfirmCompose?: (
+    prompt: string,
+    extras: DetailPageSuiteSlotPromptSaveExtras,
+    ctx: { previewUrl: string },
+  ) => void | Promise<void>;
   onRewrite?: () => void;
   rewriteBusy?: boolean;
   promptRefUrls?: string[];
@@ -64,6 +77,8 @@ export function DetailPageSuiteSlotPromptEditDialog({
   composing = false,
   onSave,
   onCompose,
+  onPreview,
+  onConfirmCompose,
   onRewrite,
   rewriteBusy = false,
   promptRefUrls = [],
@@ -156,9 +171,26 @@ export function DetailPageSuiteSlotPromptEditDialog({
         }
         rightColumnExtras={rightColumnExtras}
         onSave={(imagePrompt, extras) => void onSave(imagePrompt, extras)}
+        onPreview={
+          onPreview
+            ? (imagePrompt, extras) =>
+                void onPreview(imagePrompt, extras as DetailPageSuiteSlotPromptSaveExtras)
+            : undefined
+        }
+        onConfirmCompose={
+          onConfirmCompose
+            ? (imagePrompt, extras, ctx) =>
+                void onConfirmCompose(
+                  imagePrompt,
+                  extras as DetailPageSuiteSlotPromptSaveExtras,
+                  ctx,
+                )
+            : undefined
+        }
         onCompose={
-          onCompose
-            ? (imagePrompt, extras) => void onCompose(imagePrompt, extras)
+          onCompose && !onPreview
+            ? (imagePrompt, extras) =>
+                void onCompose(imagePrompt, extras as EcomCopyLayoutStudioSaveExtras)
             : undefined
         }
       />

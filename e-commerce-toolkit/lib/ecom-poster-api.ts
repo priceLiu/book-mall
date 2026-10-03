@@ -41,6 +41,8 @@ export async function patchPosterProject(
     plan: PosterPlan;
     references: PosterReference[];
     settings: Record<string, unknown>;
+    brief: Record<string, unknown> | null;
+    meta: Record<string, unknown> | null;
   }>,
 ): Promise<PosterProject> {
   const data = await ecomBookFetch(`${BASE}/projects/${id}`, {

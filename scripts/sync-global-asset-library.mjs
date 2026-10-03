@@ -5,7 +5,7 @@
  * 真源：e-commerce-toolkit/docker-shared/global-asset-library/
  * 副本：canvas-web、book-mall
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -26,6 +26,29 @@ const FILES = [
 ];
 
 const checkOnly = process.argv.includes("--check");
+
+function ensureSource() {
+  if (existsSync(join(SOURCE, "index.ts"))) return;
+  const fallbacks = [
+    join(ROOT, "book-mall/docker-shared/global-asset-library"),
+    join(ROOT, "canvas-web/docker-shared/global-asset-library"),
+  ];
+  for (const fb of fallbacks) {
+    if (!existsSync(join(fb, "index.ts"))) continue;
+    mkdirSync(SOURCE, { recursive: true });
+    cpSync(fb, SOURCE, { recursive: true });
+    console.warn(`[sync-global-asset-library] restored SOURCE from ${fb}`);
+    return;
+  }
+  console.error(
+    "[sync-global-asset-library] missing SOURCE. Restore with:\n" +
+      "  git checkout 6f2a3740 -- e-commerce-toolkit/docker-shared/global-asset-library/",
+  );
+  process.exit(1);
+}
+
+ensureSource();
+
 let drift = 0;
 let wrote = 0;
 

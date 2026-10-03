@@ -3,7 +3,9 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { resolveLayerFontCss } from "./copy-fonts";
 import { computeImageContainRect } from "./layout-coords";
+import { layerPreviewTextExtras, layerPreviewTextShadow } from "./text-effects";
 import type { EcomCopyOverlay, EcomCopyOverlayLayer } from "./types";
 
 export type EcomCopyOverlayCanvasProps = {
@@ -15,6 +17,10 @@ export type EcomCopyOverlayCanvasProps = {
   onSelectLayer: (id: string | null) => void;
   emptyHint?: string;
   maxPreviewWidthPx?: number;
+  /** 全屏工作台：按可用高度放大，不再固定 560px 小图 */
+  fillWorkbench?: boolean;
+  /** 外框样式（全屏工作台可加大阴影） */
+  frameClassName?: string;
 };
 
 type ResizeMode = "edge-e" | "edge-s" | "corner";
@@ -32,6 +38,8 @@ export function EcomCopyOverlayCanvas({
   onSelectLayer,
   emptyHint = "请先选择底图，再拖拽排版文字",
   maxPreviewWidthPx = 320,
+  fillWorkbench = false,
+  frameClassName = "",
 }: EcomCopyOverlayCanvasProps) {
   const frameRef = useRef<HTMLDivElement>(null);
   const [frameSize, setFrameSize] = useState({
@@ -179,33 +187,43 @@ export function EcomCopyOverlayCanvas({
 
   return (
     <div
-      className={`relative mx-auto w-full overflow-hidden rounded-lg border border-[#d2d2d7] bg-[#1d1d1f]/90 ${aspectClassName}`}
-      style={{ maxWidth: maxPreviewWidthPx }}
+      className={`relative mx-auto overflow-visible rounded-xl border border-[#d2d2d7] bg-[#1d1d1f]/90 ${aspectClassName} ${frameClassName} ${
+        fillWorkbench
+          ? "h-full max-h-full w-auto max-w-full"
+          : "w-full"
+      }`}
+      style={{
+        maxWidth: fillWorkbench ? maxPreviewWidthPx : maxPreviewWidthPx,
+        ...(fillWorkbench ? { height: "100%", maxHeight: "100%" } : {}),
+      }}
     >
-      <div ref={frameRef} className="absolute inset-0">
-        {baseImageUrl ? (
-          <Image
-            src={baseImageUrl}
-            alt=""
-            fill
-            unoptimized
-            className="object-contain"
-            sizes={`${maxPreviewWidthPx}px`}
-            onLoad={(e) => {
-              const img = e.currentTarget;
-              if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-                setImgNatural({ w: img.naturalWidth, h: img.naturalHeight });
-              }
-            }}
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center px-4 text-center text-xs text-[#86868b]">
-            {emptyHint}
-          </div>
-        )}
+      <div ref={frameRef} className="absolute inset-0 overflow-visible">
+        <div className="absolute inset-0 overflow-hidden rounded-[11px]">
+          {baseImageUrl ? (
+            <Image
+              src={baseImageUrl}
+              alt=""
+              fill
+              unoptimized
+              className="object-contain"
+              sizes={`${maxPreviewWidthPx}px`}
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                  setImgNatural({ w: img.naturalWidth, h: img.naturalHeight });
+                }
+              }}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center px-4 text-center text-xs text-[#86868b]">
+              {emptyHint}
+            </div>
+          )}
+        </div>
         {overlay.layers.map((layer) => {
-          if (!layer.text.trim()) return null;
+          const isEmpty = !layer.text.trim();
           const selected = selectedLayerId === layer.id;
+          if (isEmpty && !selected) return null;
           const align = layer.textAlign ?? "center";
           const vertical = layer.writingMode === "vertical";
           const fontPx = Math.max(10, layer.fontSize * scaleToExport);
@@ -219,37 +237,46 @@ export function EcomCopyOverlayCanvas({
               : align === "right"
                 ? "translate(-100%, 0)"
                 : undefined;
+          const textFx = layerPreviewTextExtras(layer, scaleToExport);
 
           return (
             <div
               key={layer.id}
-              className="absolute"
+              className="absolute max-w-full"
               style={{
                 left: anchorX,
                 top: anchorY,
-                width: vertical ? undefined : boxW,
-                maxWidth: vertical ? boxW : undefined,
+                maxWidth: boxW,
                 maxHeight: boxH,
                 transform,
               }}
             >
               <div
-                className={`relative inline-block max-w-full ${
-                  selected ? "outline outline-2 outline-[#0071e3]" : ""
+                className={`relative w-max max-w-full ${
+                  vertical ? "inline-block" : "inline-block"
+                } ${selected ? "outline outline-2 outline-[#0071e3] outline-offset-2" : ""} ${
+                  isEmpty ? "outline-dashed outline-white/50" : ""
                 }`}
                 style={{
                   cursor: "move",
-                  color: layer.color ?? "#ffffff",
+                  color: isEmpty ? "rgba(255,255,255,0.55)" : (layer.color ?? "#ffffff"),
+                  fontFamily: resolveLayerFontCss(layer),
                   fontWeight: layer.fontWeight === "normal" ? 400 : 700,
                   fontSize: fontPx,
                   lineHeight: 1.25,
                   textAlign: align,
-                  textShadow: "0 1px 3px rgba(0,0,0,0.45)",
+                  textShadow: layerPreviewTextShadow(layer, scaleToExport),
+                  WebkitTextStroke: textFx.WebkitTextStroke,
+                  backgroundColor: textFx.backgroundColor,
+                  padding: textFx.padding,
+                  borderRadius: textFx.borderRadius,
+                  boxDecorationBreak: textFx.boxDecorationBreak,
                   whiteSpace: vertical ? "normal" : "pre-wrap",
                   wordBreak: vertical ? "keep-all" : "break-word",
+                  overflowWrap: vertical ? "normal" : "anywhere",
                   writingMode: vertical ? "vertical-rl" : "horizontal-tb",
                   textOrientation: vertical ? "upright" : "mixed",
-                  width: vertical ? undefined : "100%",
+                  maxWidth: boxW,
                   maxHeight: boxH,
                 }}
                 onPointerDown={(e) => {
@@ -266,7 +293,7 @@ export function EcomCopyOverlayCanvas({
                   });
                 }}
               >
-                {layer.text}
+                {isEmpty ? "在此输入文案" : layer.text}
                 {selected ? (
                   <>
                     <div

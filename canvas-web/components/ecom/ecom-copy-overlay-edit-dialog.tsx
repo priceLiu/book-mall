@@ -5,6 +5,8 @@ import { useState } from "react";
 import {
   EcomCopyOverlayCanvas,
   EcomCopyOverlayLayerControls,
+  EcomCopyOverlayLayersEditor,
+  overlayHasAnyCopy,
   useEcomCopyOverlayEditorState,
   type EcomCopyOverlay,
 } from "@private/ecom-copy-overlay";
@@ -24,7 +26,7 @@ type Props = {
 };
 
 /**
- * 画布图片节点：与电商 EcomCopyLayoutStudioDialog 共用 overlay 编辑状态机 + book-mall 合成 API。
+ * 画布图片节点：与电商排版弹层共用多文案块编辑 + book-mall 合成 API。
  */
 export function EcomCopyOverlayEditDialog({
   open,
@@ -38,8 +40,6 @@ export function EcomCopyOverlayEditDialog({
   onComposed,
 }: Props) {
   const {
-    text,
-    setText,
     overlay,
     setOverlay,
     selectedLayerId,
@@ -55,9 +55,11 @@ export function EcomCopyOverlayEditDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  return open ? (
+  if (!open) return null;
+
+  return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-[#1c1c1e] text-white shadow-xl">
+      <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-[#1c1c1e] text-white shadow-xl">
         <div className="border-b border-white/10 px-4 py-3 text-sm font-semibold">{title}</div>
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 lg:flex-row">
           <div className="mx-auto w-full max-w-[320px] shrink-0">
@@ -77,14 +79,14 @@ export function EcomCopyOverlayEditDialog({
             />
           </div>
           <div className="min-w-0 flex-1 space-y-3">
-            <label className="block text-xs text-white/60">
-              文案
-              <textarea
-                className="mt-1 min-h-[120px] w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-              />
-            </label>
+            <EcomCopyOverlayLayersEditor
+              variant="dark"
+              overlay={overlay}
+              onChange={setOverlay}
+              selectedLayerId={selectedLayerId}
+              onSelectLayerId={setSelectedLayerId}
+              disabled={busy}
+            />
             {error ? <p className="text-xs text-red-400">{error}</p> : null}
           </div>
         </div>
@@ -100,7 +102,7 @@ export function EcomCopyOverlayEditDialog({
           <button
             type="button"
             className="rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-medium hover:bg-violet-500 disabled:opacity-50"
-            disabled={busy || !text.trim()}
+            disabled={busy || !overlayHasAnyCopy(overlay)}
             onClick={() => {
               void (async () => {
                 setBusy(true);
@@ -109,7 +111,6 @@ export function EcomCopyOverlayEditDialog({
                   const result = await composeEcomCopyOverlayViaBook({
                     baseImageUrl,
                     overlay,
-                    syncText: text,
                     exportWidthPx,
                   });
                   onComposed?.(result.url, result.overlay);
@@ -127,5 +128,5 @@ export function EcomCopyOverlayEditDialog({
         </div>
       </div>
     </div>
-  ) : null;
+  );
 }

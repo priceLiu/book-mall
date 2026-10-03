@@ -1,10 +1,21 @@
 "use client";
 
+import type React from "react";
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
+import { resolveLayerFontCss } from "./copy-fonts";
+import { overlayLineHeightPx } from "./copy-text-metrics";
 import { computeImageContainRect } from "./layout-coords";
+import { resolveLayerTextBg } from "./text-effects";
+import { overlayWorkbenchShellProps } from "./overlay-workbench-shell";
+import { layerPreviewCanvasFx } from "./text-effects";
 import type { EcomCopyOverlay, EcomCopyOverlayLayer } from "./types";
+
+export type EcomCopyOverlayCanvasHandle = {
+  /** 按当前 DOM 实测文字宽度，供合成与编辑对齐 */
+  overlayWithMeasuredLayout: () => EcomCopyOverlay;
+};
 
 export type EcomCopyOverlayCanvasProps = {
   baseImageUrl: string | null;
@@ -15,6 +26,12 @@ export type EcomCopyOverlayCanvasProps = {
   onSelectLayer: (id: string | null) => void;
   emptyHint?: string;
   maxPreviewWidthPx?: number;
+  /** 全屏工作台：按可用高度放大，不再固定 560px 小图 */
+  fillWorkbench?: boolean;
+  /** 外框样式（全屏工作台可加大阴影） */
+  frameClassName?: string;
+  /** 合成成图 URL：覆盖在画布上（与编辑框同尺寸，用于「合成预览」） */
+  composedPreviewUrl?: string | null;
 };
 
 type ResizeMode = "edge-e" | "edge-s" | "corner";
@@ -23,17 +40,28 @@ function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
 
-export function EcomCopyOverlayCanvas({
-  baseImageUrl,
-  aspectClassName = "aspect-[3/4]",
-  overlay,
-  onChange,
-  selectedLayerId,
-  onSelectLayer,
-  emptyHint = "请先选择底图，再拖拽排版文字",
-  maxPreviewWidthPx = 320,
-}: EcomCopyOverlayCanvasProps) {
+export const EcomCopyOverlayCanvas = forwardRef<
+  EcomCopyOverlayCanvasHandle,
+  EcomCopyOverlayCanvasProps
+>(function EcomCopyOverlayCanvas(
+  {
+    baseImageUrl,
+    aspectClassName = "aspect-[3/4]",
+    overlay,
+    onChange,
+    selectedLayerId,
+    onSelectLayer,
+    emptyHint = "请先选择底图，再拖拽排版文字",
+    maxPreviewWidthPx = 320,
+    fillWorkbench = false,
+    frameClassName = "",
+    composedPreviewUrl = null,
+  },
+  ref,
+) {
   const frameRef = useRef<HTMLDivElement>(null);
+  const layerTextMeasureRefs = useRef<Map<string, HTMLSpanElement>>(new Map());
+  const layerBoxMeasureRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [frameSize, setFrameSize] = useState({
     w: maxPreviewWidthPx,
     h: maxPreviewWidthPx * (4 / 3),
@@ -177,35 +205,92 @@ export function EcomCopyOverlayCanvas({
 
   const scaleToExport = content.w / Math.max(1, overlay.exportWidthPx);
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      overlayWithMeasuredLayout: () => {
+        const c = contentRef.current;
+        const cw = c.w;
+        const ch = c.h;
+        if (cw <= 0 || ch <= 0) return overlay;
+        const toExport = overlay.exportWidthPx / Math.max(1, cw);
+        const layers = overlay.layers.map((layer) => {
+          if (!layer.text.trim()) return layer;
+          const el = layerTextMeasureRefs.current.get(layer.id);
+          if (!el) return layer;
+          const textRect = el.getBoundingClientRect();
+          if (textRect.width <= 0 || textRect.height <= 0) return layer;
+          const next: EcomCopyOverlayLayer = {
+            ...layer,
+            layoutTextWidthNorm: Math.max(0.01, Math.min(1, textRect.width / cw)),
+            layoutTextHeightNorm: Math.max(0.01, Math.min(1, textRect.height / ch)),
+          };
+          const boxEl = layerBoxMeasureRefs.current.get(layer.id);
+          const boxRect = boxEl?.getBoundingClientRect();
+          if (boxRect && boxRect.width > 0 && boxRect.height > 0) {
+            next.layoutBoxWidthNorm = Math.max(0.01, Math.min(1, boxRect.width / cw));
+            next.layoutBoxHeightNorm = Math.max(0.01, Math.min(1, boxRect.height / ch));
+            next.layoutBoxWidthPx = Math.round(boxRect.width * toExport);
+            next.layoutBoxHeightPx = Math.round(boxRect.height * toExport);
+          }
+          return next;
+        });
+        return { ...overlay, layers };
+      },
+    }),
+    [overlay],
+  );
+
+  const shell = overlayWorkbenchShellProps({
+    aspectClassName,
+    fillWorkbench,
+    maxPreviewWidthPx,
+    frameClassName,
+    imageNatural: imgNatural,
+  });
+
   return (
-    <div
-      className={`relative mx-auto w-full overflow-hidden rounded-lg border border-[#d2d2d7] bg-[#1d1d1f]/90 ${aspectClassName}`}
-      style={{ maxWidth: maxPreviewWidthPx }}
-    >
-      <div ref={frameRef} className="absolute inset-0">
-        {baseImageUrl ? (
-          <Image
-            src={baseImageUrl}
-            alt=""
-            fill
-            unoptimized
-            className="object-contain"
-            sizes={`${maxPreviewWidthPx}px`}
-            onLoad={(e) => {
-              const img = e.currentTarget;
-              if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-                setImgNatural({ w: img.naturalWidth, h: img.naturalHeight });
-              }
-            }}
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center px-4 text-center text-xs text-[#86868b]">
-            {emptyHint}
-          </div>
-        )}
+    <div className={shell.className} style={shell.style}>
+      <div ref={frameRef} className="absolute inset-0 overflow-visible">
+        <div className="absolute inset-0 overflow-hidden rounded-[11px]">
+          {baseImageUrl ? (
+            <Image
+              src={baseImageUrl}
+              alt=""
+              fill
+              unoptimized
+              className="object-contain"
+              sizes={`${maxPreviewWidthPx}px`}
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                  setImgNatural({ w: img.naturalWidth, h: img.naturalHeight });
+                }
+              }}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center px-4 text-center text-xs text-[#86868b]">
+              {emptyHint}
+            </div>
+          )}
+          {composedPreviewUrl ? (
+            <div className="absolute inset-0 z-20 bg-[#1d1d1f]">
+              <Image
+                src={composedPreviewUrl}
+                alt="合成预览"
+                fill
+                unoptimized
+                className="object-contain"
+                sizes={`${maxPreviewWidthPx}px`}
+              />
+            </div>
+          ) : null}
+        </div>
         {overlay.layers.map((layer) => {
-          if (!layer.text.trim()) return null;
-          const selected = selectedLayerId === layer.id;
+          const isEmpty = !layer.text.trim();
+          const selected = selectedLayerId === layer.id && !composedPreviewUrl;
+          if (isEmpty && !selected) return null;
+          const previewHidden = Boolean(composedPreviewUrl);
           const align = layer.textAlign ?? "center";
           const vertical = layer.writingMode === "vertical";
           const fontPx = Math.max(10, layer.fontSize * scaleToExport);
@@ -219,40 +304,56 @@ export function EcomCopyOverlayCanvas({
               : align === "right"
                 ? "translate(-100%, 0)"
                 : undefined;
+          const fx = layerPreviewCanvasFx(layer, scaleToExport);
+          const textBgOn = Boolean(resolveLayerTextBg(layer));
+          const lineHeightUnitless = overlayLineHeightPx(layer) / Math.max(1, layer.fontSize);
+          const typography = {
+            fontFamily: resolveLayerFontCss(layer),
+            fontWeight: layer.fontWeight === "normal" ? 400 : 700,
+            fontSize: fontPx,
+            lineHeight: lineHeightUnitless,
+            textAlign: align as React.CSSProperties["textAlign"],
+            whiteSpace: (vertical ? "normal" : "pre-wrap") as React.CSSProperties["whiteSpace"],
+            wordBreak: (vertical ? "keep-all" : "break-word") as React.CSSProperties["wordBreak"],
+            overflowWrap: (vertical ? "normal" : "anywhere") as React.CSSProperties["overflowWrap"],
+            writingMode: (vertical ? "vertical-rl" : "horizontal-tb") as React.CSSProperties["writingMode"],
+            textOrientation: (vertical ? "upright" : "mixed") as React.CSSProperties["textOrientation"],
+          };
 
           return (
             <div
               key={layer.id}
-              className="absolute"
+              className={`absolute z-[2] max-w-full ${previewHidden ? "invisible pointer-events-none" : ""}`}
               style={{
                 left: anchorX,
                 top: anchorY,
-                width: vertical ? undefined : boxW,
-                maxWidth: vertical ? boxW : undefined,
+                maxWidth: boxW,
                 maxHeight: boxH,
                 transform,
               }}
             >
               <div
-                className={`relative inline-block max-w-full ${
-                  selected ? "outline outline-2 outline-[#0071e3]" : ""
-                }`}
+                ref={(el) => {
+                  if (el) layerBoxMeasureRefs.current.set(layer.id, el);
+                  else layerBoxMeasureRefs.current.delete(layer.id);
+                }}
+                className={`relative w-max max-w-full ${
+                  selected ? "outline outline-2 outline-[#0071e3] outline-offset-2" : ""
+                } ${isEmpty && !previewHidden ? "outline-dashed outline-white/50" : ""}`}
                 style={{
-                  cursor: "move",
-                  color: layer.color ?? "#ffffff",
-                  fontWeight: layer.fontWeight === "normal" ? 400 : 700,
-                  fontSize: fontPx,
-                  lineHeight: 1.25,
-                  textAlign: align,
-                  textShadow: "0 1px 3px rgba(0,0,0,0.45)",
-                  whiteSpace: vertical ? "normal" : "pre-wrap",
-                  wordBreak: vertical ? "keep-all" : "break-word",
-                  writingMode: vertical ? "vertical-rl" : "horizontal-tb",
-                  textOrientation: vertical ? "upright" : "mixed",
-                  width: vertical ? undefined : "100%",
+                  cursor: previewHidden ? "default" : "move",
+                  display: textBgOn ? "inline-flex" : "inline-block",
+                  alignItems: textBgOn ? "center" : undefined,
+                  maxWidth: boxW,
                   maxHeight: boxH,
+                  backgroundColor: fx.boxBackgroundColor,
+                  padding: fx.boxPadding,
+                  borderRadius: fx.boxRadius,
+                  WebkitBoxDecorationBreak: fx.boxPadding && !textBgOn ? "clone" : undefined,
+                  boxDecorationBreak: fx.boxPadding && !textBgOn ? "clone" : undefined,
                 }}
                 onPointerDown={(e) => {
+                  if (previewHidden) return;
                   if ((e.target as HTMLElement).dataset.overlayHandle) return;
                   e.stopPropagation();
                   onSelectLayer(layer.id);
@@ -266,7 +367,20 @@ export function EcomCopyOverlayCanvas({
                   });
                 }}
               >
-                {layer.text}
+                <span
+                  ref={(el) => {
+                    if (el) layerTextMeasureRefs.current.set(layer.id, el);
+                    else layerTextMeasureRefs.current.delete(layer.id);
+                  }}
+                  style={{
+                    ...typography,
+                    display: "inline-block",
+                    color: isEmpty ? "rgba(255,255,255,0.55)" : (layer.color ?? "#ffffff"),
+                    textShadow: fx.textShadow,
+                  }}
+                >
+                  {isEmpty ? "在此输入文案" : layer.text}
+                </span>
                 {selected ? (
                   <>
                     <div
@@ -298,9 +412,58 @@ export function EcomCopyOverlayCanvas({
           );
         })}
       </div>
-      <p className="pointer-events-none absolute bottom-1 left-0 right-0 text-center text-[9px] text-white/80 drop-shadow">
-        预览与合成对齐 · 拖边拉伸
-      </p>
+      {!composedPreviewUrl ? (
+        <p className="pointer-events-none absolute bottom-1 left-0 right-0 text-center text-[9px] text-white/80 drop-shadow">
+          预览与合成对齐 · 拖边拉伸
+        </p>
+      ) : null}
+    </div>
+  );
+});
+
+export type EcomCopyOverlayComposedPreviewProps = {
+  previewUrl: string;
+  aspectClassName?: string;
+  maxPreviewWidthPx?: number;
+  fillWorkbench?: boolean;
+  frameClassName?: string;
+};
+
+/** 与 EcomCopyOverlayCanvas 同尺寸外框，展示已合成 PNG */
+export function EcomCopyOverlayComposedPreview({
+  previewUrl,
+  aspectClassName = "aspect-[3/4]",
+  maxPreviewWidthPx = 320,
+  fillWorkbench = false,
+  frameClassName = "",
+}: EcomCopyOverlayComposedPreviewProps) {
+  const [imgNatural, setImgNatural] = useState<{ w: number; h: number } | null>(null);
+  const shell = overlayWorkbenchShellProps({
+    aspectClassName,
+    fillWorkbench,
+    maxPreviewWidthPx,
+    frameClassName,
+    imageNatural: imgNatural,
+  });
+
+  return (
+    <div className={shell.className} style={shell.style}>
+      <div className="absolute inset-0 overflow-hidden rounded-[11px]">
+        <Image
+          src={previewUrl}
+          alt="合成预览"
+          fill
+          unoptimized
+          className="object-cover"
+          sizes={`${maxPreviewWidthPx}px`}
+          onLoad={(e) => {
+            const img = e.currentTarget;
+            if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+              setImgNatural({ w: img.naturalWidth, h: img.naturalHeight });
+            }
+          }}
+        />
+      </div>
     </div>
   );
 }

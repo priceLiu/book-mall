@@ -27,9 +27,13 @@ export async function composeEcomCopyOverlayImage(opts: {
     parseEcomCopyOverlay(opts.overlay) ??
     ({ version: 1 as const, exportWidthPx: 750, layers: [] } satisfies EcomCopyOverlay);
   const exportWidthPx = opts.exportWidthPx ?? parsed.exportWidthPx ?? 750;
-  let overlay = opts.syncText?.trim()
-    ? syncOverlayMainLayerText(parsed, opts.syncText)
-    : parsed;
+  const multiBlock =
+    parsed.layers.filter((l) => l.text.trim()).length > 1 ||
+    parsed.layers.some((l) => l.id !== "main" && l.text.trim());
+  let overlay =
+    opts.syncText?.trim() && !multiBlock
+      ? syncOverlayMainLayerText(parsed, opts.syncText)
+      : parsed;
   overlay = { ...overlay, exportWidthPx, baseImageUrl: opts.baseImageUrl.trim() };
 
   if (!overlay.layers.some((l) => l.text.trim())) {

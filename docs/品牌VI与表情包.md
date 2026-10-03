@@ -1101,9 +1101,20 @@ IP招商授权落地页，主视觉放基准IP形象与品牌Logo，排版包含
 
 | 项 | 路径 |
 |----|------|
+| **用户使用说明** | [`docs/电商品牌创作-使用说明.md`](./电商品牌创作-使用说明.md) §5 |
 | 产品需求 SSOT | `book-mall/doc/ecom/brand-vi-requirements.md` |
+| 八步模板真源 | `book-mall/lib/ecom/ecom-brand-vi-steps.ts` |
 | 实施计划 | `book-mall/doc/plans/2026-10-brand-vi-hand-craft.md` |
 | 用户入口 | 电商工具箱 `/brand/vi`（营销 · 品牌 VI · 表情包） |
-| 助手 Skill | `book-mall/doc/ecom/brand-vi/skill.md` |
-| 管理后台任务 | `/admin/pending-features` · VI-101～VI-118（seed 脚本登记） |
+| 助手 Skill | `book-mall/doc/ecom/brand-vi/skill.md`（运行时与本文档对齐） |
+| 管理后台任务 | `/admin/pending-features` · VI-101～VI-120 |
 | 手办增量 | `book-mall/doc/ecom/hand-craft-requirements-delta.md` · HC-101～HC-108 |
+
+### 本文档（Skill 长文）vs 现网产品
+
+| Skill / 规划 | 现网 `/brand/vi` |
+|--------------|------------------|
+| 模块化 VI 全案、大量示例 Prompt 段落 | **8 步** + **5 种产出模式**；Prompt 由服务端按槽位拼装 |
+| 12 页 PDF、招商授权独立模块 | **无**；竖版 **1 张作品集拼版**（第 8 步）；招商页在手办第 10 步 |
+| 透明底 PNG、动态表情包、字体规范 | **后续迭代**（requirements §9） |
+| IP 母版 | **母版库导入** + Prompt 约束块（与手办相同） |

@@ -27,8 +27,23 @@ export function buildPosterAutoPlan(opts: {
   let slotCopy = festival?.defaultTitle ?? "限时特惠";
   let sceneDescription = opts.oneLineBrief?.trim() || "电商促销主视觉，产品清晰居中";
 
+  const briefNorm = opts.oneLineBrief?.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim() ?? "";
+  if (briefNorm.includes("\n")) {
+    const lines = briefNorm
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .slice(0, 4);
+    if (lines.length >= 2) {
+      slotCopy = lines.join("\n");
+    }
+  }
+
   if (opts.easyPath === "C") {
-    slotCopy = opts.oneLineBrief?.trim().slice(0, 40) || slotCopy;
+    slotCopy =
+      briefNorm.includes("\n")
+        ? slotCopy
+        : briefNorm.slice(0, 80) || slotCopy;
     sceneDescription = `围绕「${slotCopy}」的电商营销海报摄影场景`;
   } else if (opts.easyPath === "B") {
     sceneDescription =
@@ -41,7 +56,13 @@ export function buildPosterAutoPlan(opts: {
       scene ? "融合上传场景" : festival?.promptHint ?? "商业摄影场景",
     ].join("，");
   } else if (opts.easyPath === "D") {
-    slotCopy = festival?.defaultTitle ?? "品牌节日问候";
+    const title = festival?.defaultTitle ?? "品牌节日问候";
+    slotCopy =
+      briefNorm && !briefNorm.includes("\n")
+        ? `${title}\n${briefNorm.slice(0, 48)}`
+        : briefNorm.includes("\n")
+          ? slotCopy
+          : title;
     sceneDescription =
       "品牌节日创意海报，VI 延展氛围，" + (festival?.promptHint ?? "高端商业摄影");
     if (brand.length === 0 && !opts.useBrandRefs) {

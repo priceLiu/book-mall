@@ -63,6 +63,7 @@ import {
 } from "@/lib/detail-page-suite-hit-types";
 import {
   composeDetailPageSuiteHitSlot,
+  composeEcomCopyOverlay,
   createDetailPageSuiteHitProject,
   decomposeDetailPageSuiteHit,
   deleteDetailPageSuiteHitProject,
@@ -1648,12 +1649,48 @@ function DetailPageSuiteHitStudioInner() {
         onOpenChange={(open) => {
           if (!open) setPromptEdit(null);
         }}
-        onCompose={async (prompt, extras) => {
+        onPreview={async (prompt, extras) => {
+          try {
+            if (!promptEdit) return;
+            const baseUrl = promptEdit.baseImageUrl?.trim();
+            if (!baseUrl || !extras.copyOverlay) {
+              await alert({
+                title: "无法预览",
+                message: "请先出无字底图并填写模块文案",
+                variant: "error",
+              });
+              return;
+            }
+            const exportWidthPx =
+              project
+                ? (ensureExportTargets(project.settings, project.brief?.platformCode).find((t) =>
+                    resolveActiveExportTargetIds(
+                      project.settings,
+                      project.brief?.platformCode,
+                    ).includes(t.id),
+                  )?.widthPx ?? resolveDetailPageExportWidthPx(project.brief?.platformCode))
+                : 750;
+            const { url } = await composeEcomCopyOverlay({
+              baseImageUrl: baseUrl,
+              overlay: extras.copyOverlay,
+              exportWidthPx,
+              syncText: extras.slotCopy,
+            });
+            return { previewUrl: url };
+          } catch (e) {
+            await alert({
+              title: "预览失败",
+              message: e instanceof Error ? e.message : "未知错误",
+              variant: "error",
+            });
+          }
+        }}
+        onConfirmCompose={async (prompt, extras, _ctx) => {
           if (!promptEdit || !project) return;
           const baseUrl = promptEdit.baseImageUrl?.trim();
           if (!baseUrl || !extras.copyOverlay) {
             await alert({
-              title: "无法合成",
+              title: "无法保存",
               message: "请先出无字底图并填写模块文案",
               variant: "error",
             });
@@ -1691,10 +1728,10 @@ function DetailPageSuiteHitStudioInner() {
             });
             setProject(result.project);
             setPromptEdit(null);
-            toast({ variant: "success", title: "已合成并保存新版" });
+            toast({ variant: "success", title: "已合成并保存" });
           } catch (e) {
             await alert({
-              title: "合成失败",
+              title: "保存失败",
               message: e instanceof Error ? e.message : "未知错误",
               variant: "error",
             });
