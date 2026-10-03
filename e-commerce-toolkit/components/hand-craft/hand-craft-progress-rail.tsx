@@ -23,7 +23,7 @@ type Props = {
 
 export function HandCraftProgressRail({ project, currentStepId, onStepClick }: Props) {
   return (
-    <nav className={ECOM_PROGRESS_RAIL_SHELL} aria-label="手办创作 10 步进度（点击切换步骤）">
+    <nav className={ECOM_PROGRESS_RAIL_SHELL} aria-label="手办盲盒 SOP 10 步进度（点击切换步骤）">
       {HAND_CRAFT_STEPS.map((step) => {
         const state = stepVisual(project, step.id, currentStepId);
         const done = doneCount(project, step.id);

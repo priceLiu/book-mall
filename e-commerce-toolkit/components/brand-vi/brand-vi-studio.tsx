@@ -14,6 +14,7 @@ import { ProductCreationStudioSkeleton } from "@/components/product-design/produ
 import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-link-dialog";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
+import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
 import {
   createBrandViProject,
   deleteBrandViProject,
@@ -108,6 +109,20 @@ export function BrandViStudio() {
     [],
   );
 
+  const syncProjectFromServer = useCallback(async () => {
+    const id = project?.id;
+    if (!id) return;
+    try {
+      await reload(id, undefined, { preserveStep: true });
+    } catch (e) {
+      await alert({
+        title: "项目同步失败",
+        message: formatEcomTransportError(e),
+        variant: "error",
+      });
+    }
+  }, [alert, project?.id, reload]);
+
   const loadModels = useCallback(async () => {
     setModelsLoading(true);
     try {
@@ -186,7 +201,7 @@ export function BrandViStudio() {
       Object.values(project?.plan?.steps ?? {}).some(
         (step) => (step?.outputs?.length ?? 0) > 0 || (step?.slots?.length ?? 0) > 0,
       );
-    const defaultName = project?.title?.trim() || "品牌 VI · 表情包";
+    const defaultName = project?.title?.trim() || "品牌VI表情包SOP";
     await runEcomNewProjectWithSavePrompt({
       confirm,
       hasWorkToSave: Boolean(project && hasWork),
@@ -204,7 +219,7 @@ export function BrandViStudio() {
         setLoading(true);
         setEmpty(false);
         try {
-          const created = await createBrandViProject({ title: "品牌 VI · 表情包" });
+          const created = await createBrandViProject({ title: "品牌VI表情包SOP" });
           await reload(created.id, created);
         } catch (e) {
           await alert({
@@ -223,7 +238,7 @@ export function BrandViStudio() {
     const items = await listBrandViProjectSummaries();
     return items.map((p) => ({
       id: p.id,
-      title: p.title?.trim() || "品牌 VI · 表情包",
+      title: p.title?.trim() || "品牌VI表情包SOP",
       updatedAt: p.updatedAt,
       thumbnailUrl: p.thumbnailUrl,
     }));
@@ -260,8 +275,8 @@ export function BrandViStudio() {
   async function handleDeleteProject() {
     if (!project) return;
     const ok = await doubleConfirm({
-      title: "删除品牌 VI · 表情包项目",
-      message: `将删除「${project.title?.trim() || "品牌 VI · 表情包"}」的 8 步产出记录与会话。`,
+      title: "删除品牌VI表情包SOP项目",
+      message: `将删除「${project.title?.trim() || "品牌VI表情包SOP"}」的 8 步产出记录与会话。`,
       secondTitle: "不可恢复",
       secondMessage:
         "删除后项目记录无法找回；已生成的图片仍保留在云端存储（OSS）与「我的资产」中。是否继续？",
@@ -440,7 +455,7 @@ export function BrandViStudio() {
     return (
       <EcomLoginPrompt
         returnPath={ENTRY_PATH}
-        message="使用品牌 VI · 表情包需要登录。请点击下方按钮，经主站 Book 完成 SSO 后自动回到本页。"
+        message="使用品牌VI表情包SOP需要登录。请点击下方按钮，经主站 Book 完成 SSO 后自动回到本页。"
       />
     );
   }
@@ -453,7 +468,7 @@ export function BrandViStudio() {
     return (
       <EcomWorkspaceLayout fullWidth>
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-          <h2 className="text-xl font-semibold text-[#1d1d1f]">品牌 VI · 表情包</h2>
+          <h2 className="text-xl font-semibold text-[#1d1d1f]">品牌VI表情包SOP</h2>
           <p className="max-w-md text-sm text-[#6e6e73]">
             上传一张手绘参考图，分 8 步做出品牌 IP VI 与表情包：主形象、规范三件套、盲盒卡、周边样机、包装、表情包，直到小红书长图、拼版规范页与作品集。
           </p>
@@ -495,9 +510,7 @@ export function BrandViStudio() {
           collapsed={assistantCollapsed}
           onCollapsedChange={setAssistantCollapsed}
           onStreamingChange={setAssistantStreaming}
-          onProjectChange={async () => {
-            await reload(project.id, undefined, { preserveStep: true });
-          }}
+          onProjectChange={syncProjectFromServer}
           onCurrentStepChange={changeCurrentStep}
           onRequestGenerateStep={(stepId) =>
             setGenerateRequest((prev) => ({
@@ -536,9 +549,7 @@ export function BrandViStudio() {
         loadProjectList={loadProjectList}
         onOpenProject={(id) => void handleOpenProject(id)}
         onDeleteProject={() => void handleDeleteProject()}
-        onProjectChange={async () => {
-          await reload(project.id, undefined, { preserveStep: true });
-        }}
+        onProjectChange={syncProjectFromServer}
         onApplyProject={(p) => {
           setProject((prev) => {
             if (!prev || prev.id !== p.id) return p;
@@ -554,7 +565,7 @@ export function BrandViStudio() {
     </EcomWorkspaceLayout>
     <WorkflowShareLinkDialog
       projectId={project.id}
-      projectTitle={project.title?.trim() || "品牌 VI · 表情包"}
+      projectTitle={project.title?.trim() || "品牌VI表情包SOP"}
       open={workflowShareOpen}
       onClose={() => setWorkflowShareOpen(false)}
       resourceType={ECOM_WORKFLOW_SHARE_RESOURCE.brandVi}

@@ -234,7 +234,7 @@ async function duplicateBrandVi(input: {
   if (!source) throw new Error("品牌 VI 项目不存在或无权分享");
 
   const created = await createEcomBrandViProject(input.claimerUserId, {
-    title: shareTitle(source.title, "品牌 VI"),
+    title: shareTitle(source.title, "品牌VI表情包SOP"),
   });
   await prisma.ecomBrandViProject.update({
     where: { id: created.id },
@@ -262,7 +262,7 @@ async function duplicateHandCraft(input: {
   if (!source) throw new Error("手办创作项目不存在或无权分享");
 
   const created = await createEcomHandCraftProject(input.claimerUserId, {
-    title: shareTitle(source.title, "手办创作"),
+    title: shareTitle(source.title, "手办盲盒 SOP"),
   });
   await prisma.ecomHandCraftProject.update({
     where: { id: created.id },

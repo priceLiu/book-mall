@@ -506,6 +506,7 @@ export function buildHandCraftSlotPrompt(opts: {
   /** hero 步的参考图是用户上传的线稿 */
   isHeroStep: boolean;
   settings?: HandCraftSettings;
+  ipMasterAppend?: string;
 }): string {
   const styleFragment = resolveHandCraftStyleFragment(opts.settings);
   const lines: string[] = [
@@ -524,10 +525,17 @@ export function buildHandCraftSlotPrompt(opts: {
   if (opts.refCount > 0) {
     lines.push("", "参考图说明（硬性要求，优先级高于上文）：");
     if (opts.isHeroStep) {
-      lines.push(
-        "- 参考图为用户手绘线稿：须 1:1 保留线稿的造型、发型、配饰、服装与体态细节，不得随意改动原生结构",
-        "- 只把线稿转成 3D 手办质感，不新增、不删减线稿里的任何元素",
-      );
+      if (opts.settings?.referenceFromIpMaster) {
+        lines.push(
+          "- 参考图为 IP 母版已定稿基准立绘：须保留母版刚性锚点（脸型、头身比、标志性轮廓、五官排布），不得崩 IP",
+          "- 在本步指令范围内转 3D 手办质感，柔性项可按槽位说明变更",
+        );
+      } else {
+        lines.push(
+          "- 参考图为用户手绘线稿：须 1:1 保留线稿的造型、发型、配饰、服装与体态细节，不得随意改动原生结构",
+          "- 只把线稿转成 3D 手办质感，不新增、不删减线稿里的任何元素",
+        );
+      }
     } else {
       lines.push(
         "- 参考图第 1 张为本系列基准主形象：五官、发型、核心配饰与身体比例必须与之完全一致",
@@ -537,6 +545,10 @@ export function buildHandCraftSlotPrompt(opts: {
         lines.push("- 其余参考图为同系列已定稿物料，仅用于统一材质与配色，不改变角色本体");
       }
     }
+  }
+
+  if (opts.ipMasterAppend?.trim()) {
+    lines.push(opts.ipMasterAppend.trim());
   }
 
   return lines.join("\n");

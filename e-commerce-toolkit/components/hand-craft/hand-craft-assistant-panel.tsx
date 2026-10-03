@@ -173,7 +173,7 @@ export function HandCraftAssistantPanel({
       if (sketchCount === 0) {
         await onAlert({
           title: "请先上传线稿",
-          message: "手办创作以你的手绘线稿为唯一原型，请先在中间工作区上传线稿。",
+          message: "手办盲盒 SOP 以你的手绘线稿为唯一原型，请先在中间工作区上传线稿。",
           variant: "error",
         });
         return;
@@ -478,7 +478,7 @@ export function HandCraftAssistantPanel({
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <EcomAssistantPanelHeader
-          title="手办创作助手"
+          title="手办盲盒 SOP 助手"
           subtitle={`第 ${stepMeta.no}/10 步 · ${stepMeta.label} · ${modelName}`}
           composerWide={composerWide}
           onComposerWideChange={onComposerWideChange}

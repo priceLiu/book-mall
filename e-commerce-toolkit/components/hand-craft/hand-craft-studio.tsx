@@ -11,9 +11,9 @@ import { BackgroundGenerationProvider } from "@/components/generation";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { useEcomStudioAssistantCollapse } from "@/lib/ecom-assistant-collapse";
 import { ProductCreationStudioSkeleton } from "@/components/product-design/product-creation-studio-skeleton";
-import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-link-dialog";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
+import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
 import {
   createHandCraftProject,
   deleteHandCraftProject,
@@ -23,7 +23,6 @@ import {
   listHandCraftProjectSummaries,
   removeHandCraftSketch,
   attachHandCraftSketchesFromAssets,
-  saveHandCraftWorkflow,
   updateHandCraftProject,
   uploadHandCraftSketch,
 } from "@/lib/ecom-hand-craft-api";
@@ -32,23 +31,17 @@ import {
   readEcomLastProjectId,
   writeEcomLastProjectId,
 } from "@/lib/ecom-last-project";
-import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import type { HandCraftProject, HandCraftStepId } from "@/lib/hand-craft-types";
 import { applyEcomIpWorkflowProjectSnapshot } from "@/lib/ecom-ip-workflow-image-gen-dock";
 import { inferCurrentStepId } from "@/lib/hand-craft-workflow";
 import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
-import {
-  ECOM_WORKFLOW_SHARE_DESCRIPTION,
-  ECOM_WORKFLOW_SHARE_RESOURCE,
-} from "@/lib/ecom-workflow-share";
-
 const PROJECT_STORAGE_KEY = "ecom-hand-craft-active-project";
 const ENTRY_PATH = "/ecom/hand-craft";
 
 export function HandCraftStudio() {
-  const { alert, confirm, doubleConfirm, toast } = useDialogs();
+  const { alert, confirm, doubleConfirm } = useDialogs();
   const [project, setProject] = useState<HandCraftProject | null>(null);
   const [chatModels, setChatModels] = useState<StoryboardGatewayModel[]>([]);
   const [imageModels, setImageModels] = useState<StoryboardGatewayModel[]>([]);
@@ -60,7 +53,6 @@ export function HandCraftStudio() {
   const [loading, setLoading] = useState(true);
   const [empty, setEmpty] = useState(false);
   const [needLogin, setNeedLogin] = useState(false);
-  const [workflowShareOpen, setWorkflowShareOpen] = useState(false);
   const [refBusy, setRefBusy] = useState(false);
   const [sketchGenBusy, setSketchGenBusy] = useState(false);
   const [workspaceMediaBusy, setWorkspaceMediaBusy] = useState(false);
@@ -107,6 +99,20 @@ export function HandCraftStudio() {
     },
     [],
   );
+
+  const syncProjectFromServer = useCallback(async () => {
+    const id = project?.id;
+    if (!id) return;
+    try {
+      await reload(id, undefined, { preserveStep: true });
+    } catch (e) {
+      await alert({
+        title: "项目同步失败",
+        message: formatEcomTransportError(e),
+        variant: "error",
+      });
+    }
+  }, [alert, project?.id, reload]);
 
   const loadModels = useCallback(async () => {
     setModelsLoading(true);
@@ -186,44 +192,37 @@ export function HandCraftStudio() {
       Object.values(project?.plan?.steps ?? {}).some(
         (step) => (step?.outputs?.length ?? 0) > 0 || (step?.slots?.length ?? 0) > 0,
       );
-    const defaultName = project?.title?.trim() || "手办创作";
-    await runEcomNewProjectWithSavePrompt({
-      confirm,
-      hasWorkToSave: Boolean(project && hasWork),
-      message: "当前项目尚未保存工作流。是否先保存到「我的资产」？",
-      save: async () => {
-        if (!project) return;
-        const snapshot = await saveHandCraftWorkflow(project.id, defaultName);
-        toast({
-          title: "工作流已保存",
-          message: `「${snapshot.title}」已保存，可继续新建。`,
-          variant: "success",
-        });
-      },
-      onProceed: async () => {
-        setLoading(true);
-        setEmpty(false);
-        try {
-          const created = await createHandCraftProject({ title: "手办创作" });
-          await reload(created.id, created);
-        } catch (e) {
-          await alert({
-            title: "新建失败",
-            message: e instanceof Error ? e.message : "无法创建项目",
-            variant: "error",
-          });
-        } finally {
-          setLoading(false);
-        }
-      },
-    });
+    if (
+      hasWork &&
+      !(await confirm({
+        title: "新建项目",
+        message:
+          "新建将清空当前编辑。已生成的成图仍保留在「我的资产 · 手办盲盒 SOP」。是否继续？",
+      }))
+    ) {
+      return;
+    }
+    setLoading(true);
+    setEmpty(false);
+    try {
+      const created = await createHandCraftProject({ title: "手办盲盒 SOP" });
+      await reload(created.id, created);
+    } catch (e) {
+      await alert({
+        title: "新建失败",
+        message: e instanceof Error ? e.message : "无法创建项目",
+        variant: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
   }
 
   const loadProjectList = useCallback(async () => {
     const items = await listHandCraftProjectSummaries();
     return items.map((p) => ({
       id: p.id,
-      title: p.title?.trim() || "手办创作",
+      title: p.title?.trim() || "手办盲盒 SOP",
       updatedAt: p.updatedAt,
       thumbnailUrl: p.thumbnailUrl,
     }));
@@ -260,8 +259,8 @@ export function HandCraftStudio() {
   async function handleDeleteProject() {
     if (!project) return;
     const ok = await doubleConfirm({
-      title: "删除手办创作项目",
-      message: `将删除「${project.title?.trim() || "手办创作"}」的 10 步产出记录与会话。`,
+      title: "删除手办盲盒 SOP项目",
+      message: `将删除「${project.title?.trim() || "手办盲盒 SOP"}」的 10 步产出记录与会话。`,
       secondTitle: "不可恢复",
       secondMessage:
         "删除后项目记录无法找回；已生成的图片仍保留在云端存储（OSS）与「我的资产」中。是否继续？",
@@ -440,7 +439,7 @@ export function HandCraftStudio() {
     return (
       <EcomLoginPrompt
         returnPath={ENTRY_PATH}
-        message="使用手办创作需要登录。请点击下方按钮，经主站 Book 完成 SSO 后自动回到本页。"
+        message="使用手办盲盒 SOP需要登录。请点击下方按钮，经主站 Book 完成 SSO 后自动回到本页。"
       />
     );
   }
@@ -453,7 +452,7 @@ export function HandCraftStudio() {
     return (
       <EcomWorkspaceLayout fullWidth>
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-          <h2 className="text-xl font-semibold text-[#1d1d1f]">手办创作</h2>
+          <h2 className="text-xl font-semibold text-[#1d1d1f]">手办盲盒 SOP</h2>
           <p className="max-w-md text-sm text-[#6e6e73]">
             上传一张手绘线稿，分 10 步做出潮玩盲盒 IP 全案：主形象、规范三件套、盲盒卡、周边样机、包装、表情包，直到小红书长图、12 页作品集与招商授权页。
           </p>
@@ -495,9 +494,7 @@ export function HandCraftStudio() {
           collapsed={assistantCollapsed}
           onCollapsedChange={setAssistantCollapsed}
           onStreamingChange={setAssistantStreaming}
-          onProjectChange={async () => {
-            await reload(project.id, undefined, { preserveStep: true });
-          }}
+          onProjectChange={syncProjectFromServer}
           onCurrentStepChange={changeCurrentStep}
           onRequestGenerateStep={(stepId) =>
             setGenerateRequest((prev) => ({
@@ -536,9 +533,7 @@ export function HandCraftStudio() {
         loadProjectList={loadProjectList}
         onOpenProject={(id) => void handleOpenProject(id)}
         onDeleteProject={() => void handleDeleteProject()}
-        onProjectChange={async () => {
-          await reload(project.id, undefined, { preserveStep: true });
-        }}
+        onProjectChange={syncProjectFromServer}
         onApplyProject={(p) => {
           setProject((prev) => {
             if (!prev || prev.id !== p.id) return p;
@@ -548,18 +543,9 @@ export function HandCraftStudio() {
         streaming={assistantStreaming}
         generateRequest={generateRequest}
         focusStepId={focusStepId}
-        onShareWorkflow={() => setWorkflowShareOpen(true)}
         onMediaBusyChange={setWorkspaceMediaBusy}
       />
     </EcomWorkspaceLayout>
-    <WorkflowShareLinkDialog
-      projectId={project.id}
-      projectTitle={project.title?.trim() || "手办创作"}
-      open={workflowShareOpen}
-      onClose={() => setWorkflowShareOpen(false)}
-      resourceType={ECOM_WORKFLOW_SHARE_RESOURCE.handCraft}
-      description={ECOM_WORKFLOW_SHARE_DESCRIPTION[ECOM_WORKFLOW_SHARE_RESOURCE.handCraft]}
-    />
     </>
     </BackgroundGenerationProvider>
   );

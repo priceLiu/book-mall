@@ -66,6 +66,9 @@ export type HandCraftSettings = {
   imageGenConcurrency?: number;
   stylePresetId?: string;
   styleCustomText?: string;
+  ipMasterProjectId?: string;
+  ipMasterVersion?: string;
+  referenceFromIpMaster?: boolean;
 };
 
 export type HandCraftProject = {

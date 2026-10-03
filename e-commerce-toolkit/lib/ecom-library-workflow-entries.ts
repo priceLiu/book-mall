@@ -8,6 +8,7 @@ import type {
   EcomLibrarySeedVideoBundle,
   EcomLibraryStoryboardBundle,
 } from "@/lib/ecom-library-api";
+import { isReusableLibraryWorkflowEntryKind } from "@/lib/ecom-library-workflow-policy";
 
 export type LibraryWorkflowEntry =
   | {
@@ -153,7 +154,7 @@ function bundleEntriesFromSection(section: EcomLibrarySection): LibraryWorkflowE
       bundle,
     });
   }
-  for (const bundle of section.modelShotBundles) {
+  for (const bundle of section.modelShotBundles ?? []) {
     entries.push({
       kind: "model-shot",
       key: `ms:${bundle.projectId}:${bundle.savedAt}`,
@@ -168,9 +169,11 @@ function bundleEntriesFromSection(section: EcomLibrarySection): LibraryWorkflowE
   return entries;
 }
 
-/** 工作流 Tab：已保存 bundle（进行中项目见「我的工作流 · 暂存」） */
+/** 工作流 Tab：已保存且可复用的 bundle（进行中项目见「我的工作流 · 暂存」） */
 export function buildWorkflowTabEntries(section: EcomLibrarySection): LibraryWorkflowEntry[] {
-  const entries = bundleEntriesFromSection(section);
+  const entries = bundleEntriesFromSection(section).filter((e) =>
+    isReusableLibraryWorkflowEntryKind(e.kind),
+  );
   entries.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
   return entries;
 }

@@ -12,6 +12,7 @@ import {
   LayoutTemplate,
   Layers,
   Megaphone,
+  MessageSquareText,
   Package,
   Rocket,
   ScrollText,
@@ -19,6 +20,7 @@ import {
   Settings,
   Shirt,
   ShoppingBag,
+  Palette,
   UserCircle,
   Users,
   Sparkles,
@@ -46,11 +48,19 @@ export type EcomSidebarNavLink = {
   directOpen?: boolean;
 };
 
+/** 分组内小标题（如营销 · IP创作） */
+export type EcomSidebarNavSubheading = {
+  type: "subheading";
+  label: string;
+};
+
+export type EcomSidebarNavGroupChild = EcomSidebarNavLink | EcomSidebarNavSubheading;
+
 export type EcomSidebarNavGroup = {
   type: "group";
   label: string;
   icon: LucideIcon;
-  children: EcomSidebarNavLink[];
+  children: EcomSidebarNavGroupChild[];
 };
 
 export type EcomSidebarNavItem =
@@ -74,9 +84,13 @@ function bookAccountHref(bookOrigin: string, path: string): string {
 function group(
   label: string,
   icon: LucideIcon,
-  children: EcomSidebarNavLink[],
+  children: EcomSidebarNavGroupChild[],
 ): EcomSidebarNavGroup {
   return { type: "group", label, icon, children };
+}
+
+function subheading(label: string): EcomSidebarNavSubheading {
+  return { type: "subheading", label };
 }
 
 function sep(): { type: "separator" } {
@@ -121,6 +135,15 @@ function videoModuleIcon(id: string): LucideIcon {
 function brandModuleIcon(id: string): LucideIcon {
   if (id === "promo" || id === "ad") return Clapperboard;
   if (id === "poster") return Megaphone;
+  if (id === "vi") return Sparkles;
+  if (id === "ip") return Palette;
+  return Sparkles;
+}
+
+function ipCreationModuleIcon(id: string): LucideIcon {
+  if (id === "hand-craft") return Blocks;
+  if (id === "vi") return Sparkles;
+  if (id === "ip") return Palette;
   return Sparkles;
 }
 
@@ -197,28 +220,36 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
 
   const marketingOrder = [
     "storyboard-micro-drama",
-    "hand-craft",
     "image-layer",
-    "promo",
-    "ad",
     "seed-video",
     "video-hit-product",
     "video-digital-human",
-    "ip",
+    "promo",
+    "ad",
     "poster",
-    "vi",
   ] as const;
   const marketingMods = marketingOrder
     .map((id) => ECOM_MODULES.find((m) => m.id === id))
     .filter((m): m is (typeof ECOM_MODULES)[number] => Boolean(m));
 
-  const marketingChildren: EcomSidebarNavLink[] = marketingMods.map((m) =>
-    link(
-      m.title,
-      m.href,
-      m.href.startsWith("/brand/") ? brandModuleIcon(m.id) : videoModuleIcon(m.id),
+  const ipCreationIds = ["ip", "hand-craft", "vi"] as const;
+  const ipCreationMods = ipCreationIds
+    .map((id) => ECOM_MODULES.find((m) => m.id === id))
+    .filter((m): m is (typeof ECOM_MODULES)[number] => Boolean(m));
+
+  const marketingChildren: EcomSidebarNavGroupChild[] = [
+    ...marketingMods.map((m) =>
+      link(
+        m.title,
+        m.href,
+        m.href.startsWith("/brand/") ? brandModuleIcon(m.id) : videoModuleIcon(m.id),
+      ),
     ),
-  );
+    subheading("IP创作"),
+    ...ipCreationMods.map((m) =>
+      link(m.title, m.href, ipCreationModuleIcon(m.id)),
+    ),
+  ];
 
   return [
     link("个人中心", bookAccountHref(bookOrigin, "/account"), UserCircle, {
@@ -231,6 +262,7 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
     link("我的工作流", "/workflows/drafts", FolderKanban),
     group("我的资产", Package, [
       link("成图与视频", "/library", Package),
+      link("提示词库", "/library/prompts", MessageSquareText),
       link("试衣库", "/library/tryon", Shirt),
       link("姿势·场景·道具库", "/ecom/shoot-catalog", Sparkles),
       link("剧情故事", "/ecom/story-theater-catalog", ScrollText),

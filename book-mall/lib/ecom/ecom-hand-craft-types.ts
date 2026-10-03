@@ -75,6 +75,10 @@ export type HandCraftSettings = {
   imageGenConcurrency?: number;
   stylePresetId?: string;
   styleCustomText?: string;
+  ipMasterProjectId?: string;
+  ipMasterVersion?: string;
+  /** 参考图来自 IP 母版（非手绘线稿语义） */
+  referenceFromIpMaster?: boolean;
 };
 
 export type HandCraftMeta = {

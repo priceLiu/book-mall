@@ -96,7 +96,7 @@ export function BrandViSaveDialog({
             保存到资产库
           </h2>
           <p className="text-sm leading-relaxed text-[var(--ecom-muted)]">
-            将完整手伴工作流（参考图、8 步计划、会话与设置）镜像保存到「我的资产 · 品牌 VI · 表情包」。
+            将完整手伴工作流（参考图、8 步计划、会话与设置）镜像保存到「我的资产 · 品牌VI表情包SOP」。
             可在资产库一键复用：复制流程后换参考图即可再出图。
           </p>
         </div>

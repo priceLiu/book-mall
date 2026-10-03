@@ -22,7 +22,6 @@ import {
   fetchModelShotModels,
   getModelShotProject,
   listModelShotProjectSummaries,
-  saveModelShotDeliverableSnapshot,
   updateModelShotProject,
 } from "@/lib/ecom-model-shot-api";
 import {
@@ -30,7 +29,6 @@ import {
   readEcomLastProjectId,
   writeEcomLastProjectId,
 } from "@/lib/ecom-last-project";
-import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import type { ModelShotProject, ModelShotReferenceRole } from "@/lib/model-shot-types";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
@@ -215,33 +213,30 @@ export function ModelShotStudio() {
       Boolean(project?.references?.length) ||
       (project?.chatHistory?.length ?? 0) > 0 ||
       Boolean(project?.plan?.items?.length);
-    const defaultName = project?.title?.trim() || "服装模特图";
-    await runEcomNewProjectWithSavePrompt({
-      confirm,
-      hasWorkToSave: Boolean(project && hasWork),
-      message: "当前项目尚未保存工作流。是否先保存到「我的资产」？",
-      save: async () => {
-        if (!project) return;
-        await saveModelShotDeliverableSnapshot(project.id, defaultName);
-        toast({ title: "已保存", message: `「${defaultName}」已保存到资产库`, variant: "success" });
-      },
-      onProceed: async () => {
-        setLoading(true);
-        setEmpty(false);
-        try {
-          const created = await createModelShotProject({ title: "服装模特图" });
-          await reload(created.id, created);
-        } catch (e) {
-          await alert({
-            title: "新建失败",
-            message: e instanceof Error ? e.message : "无法创建项目",
-            variant: "error",
-          });
-        } finally {
-          setLoading(false);
-        }
-      },
-    });
+    if (
+      hasWork &&
+      !(await confirm({
+        title: "新建项目",
+        message:
+          "新建将清空当前编辑。已生成的成图仍保留在「我的资产 · 服装模特图」。是否继续？",
+      }))
+    ) {
+      return;
+    }
+    setLoading(true);
+    setEmpty(false);
+    try {
+      const created = await createModelShotProject({ title: "服装模特图" });
+      await reload(created.id, created);
+    } catch (e) {
+      await alert({
+        title: "新建失败",
+        message: e instanceof Error ? e.message : "无法创建项目",
+        variant: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
   }
 
   const loadProjectList = useCallback(async () => {

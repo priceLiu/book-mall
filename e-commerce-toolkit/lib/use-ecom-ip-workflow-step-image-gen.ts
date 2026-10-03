@@ -127,9 +127,9 @@ export function useEcomIpWorkflowStepImageGen<TStepId extends string, TProject>(
 
       await applyFreshProject(fresh);
     } catch {
-      if (seq === snapshotSeqRef.current) await onProjectChange();
+      /* 轮询拉项目失败时不二次 refetch，避免 setInterval 里未捕获异常 */
     }
-  }, [applyFreshProject, fetchProject, onProjectChange, projectId, stepState]);
+  }, [applyFreshProject, fetchProject, projectId, stepState]);
 
   const ensureGenPoll = useCallback(() => {
     if (genPollRef.current) return;
@@ -180,7 +180,11 @@ export function useEcomIpWorkflowStepImageGen<TStepId extends string, TProject>(
       const runtime = runtimeRef.current.get(job.jobId);
       const total = job.indexes.length;
 
-      await onProjectChange();
+      try {
+        await onProjectChange();
+      } catch {
+        /* 收尾 refetch 失败时保留当前内存态，避免 Next 红屏 */
+      }
       removeJob(job.jobId);
 
       if (outcome.status === "succeeded") {

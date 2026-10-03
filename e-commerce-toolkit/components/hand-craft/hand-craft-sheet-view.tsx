@@ -85,7 +85,7 @@ export function HandCraftSheetView({ project, stepId, page, variant = "export" }
             ORIGINAL IP TOY DESIGN
           </div>
           <h1 style={{ fontSize: 30, fontWeight: 800, margin: "6px 0 0" }}>
-            {project.title?.trim() || "手办创作"}
+            {project.title?.trim() || "手办盲盒 SOP"}
           </h1>
         </div>
         <div style={{ textAlign: "right", fontSize: 13, color: "#6e6e73" }}>
@@ -117,7 +117,7 @@ export function HandCraftSheetView({ project, stepId, page, variant = "export" }
           justifyContent: "space-between",
         }}
       >
-        <span>本页由手办创作工作台自动排版</span>
+        <span>本页由手办盲盒 SOP工作台自动排版</span>
         <span>© 原创 IP · 未经授权不得商用</span>
       </footer>
     </div>

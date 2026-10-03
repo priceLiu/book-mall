@@ -121,7 +121,7 @@ export async function createEcomBrandViProject(
   const row = await prisma.ecomBrandViProject.create({
     data: {
       userId,
-      title: opts?.title?.trim().slice(0, 120) || "品牌 VI",
+      title: opts?.title?.trim().slice(0, 120) || "品牌VI表情包SOP",
       references: [] as Prisma.InputJsonValue,
       chatHistory: [] as Prisma.InputJsonValue,
       plan: { steps: {} } as Prisma.InputJsonValue,

@@ -98,7 +98,7 @@ export const ECOM_MODULES: EcomModuleDef[] = [
   },
   {
     id: "hand-craft",
-    title: "手办创作",
+    title: "手办盲盒 SOP",
     tagline: "线稿转潮玩盲盒 IP 全案",
     href: "/ecom/hand-craft",
     kind: "image",
@@ -188,7 +188,7 @@ export const ECOM_MODULES: EcomModuleDef[] = [
   })),
   {
     id: "ip",
-    title: "IP 设计",
+    title: "IP 母版",
     tagline: "角色与吉祥物资产",
     href: "/brand/ip",
     kind: "image",
@@ -208,7 +208,7 @@ export const ECOM_MODULES: EcomModuleDef[] = [
   },
   {
     id: "vi",
-    title: "品牌 VI · 表情包",
+    title: "品牌VI表情包SOP",
     tagline: "套件化品牌素材",
     href: "/brand/vi",
     kind: "image",

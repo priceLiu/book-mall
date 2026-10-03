@@ -7,6 +7,7 @@ export type EcomWorkflowDraftKind =
   | "product-design-main"
   | "product-design-detail"
   | "hand-craft"
+  | "ip-master"
   | "brand-vi"
   | "seed-video"
   | "media-decompose"

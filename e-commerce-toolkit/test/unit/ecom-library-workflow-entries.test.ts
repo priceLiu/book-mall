@@ -19,6 +19,8 @@ function emptySection(overrides: Partial<EcomLibrarySection>): EcomLibrarySectio
     seedVideoBundles: [],
     handCraftBundles: [],
     mediaDecomposeBundles: [],
+    outfitVideoBundles: [],
+    modelShotBundles: [],
     ...overrides,
   };
 }
@@ -104,6 +106,51 @@ describe("buildWorkflowTabEntries", () => {
       ],
     });
     expect(buildWorkflowTabEntries(section)).toHaveLength(1);
+  });
+
+  it("excludes hand-craft and media-decompose bundles from workflow tab", () => {
+    const section = emptySection({
+      handCraftBundles: [
+        {
+          projectId: "hc1",
+          savedAt: "2026-08-30T07:00:00.000Z",
+          title: "手办",
+          stepCount: 10,
+          imageCount: 2,
+          hasSketch: true,
+          thumbnailUrl: null,
+          snapshot: { savedAt: "2026-08-30T07:00:00.000Z", title: "手办", plan: { steps: {} }, references: [], chatHistory: [] },
+        },
+      ],
+      mediaDecomposeBundles: [
+        {
+          projectId: "md1",
+          savedAt: "2026-08-30T07:00:00.000Z",
+          title: "拆解",
+          mediaKind: "video",
+          shotCount: 0,
+          hasReplica: false,
+          hasVideo: true,
+          thumbnailUrl: null,
+          snapshot: { savedAt: "2026-08-30T07:00:00.000Z", title: "拆解" },
+        },
+      ],
+      seedVideoBundles: [
+        {
+          projectId: "sv1",
+          savedAt: "2026-08-30T08:00:00.000Z",
+          title: "种草",
+          shotCount: 3,
+          productionMode: "direct",
+          hasVideo: true,
+          thumbnailUrl: null,
+          snapshot: { savedAt: "2026-08-30T08:00:00.000Z", title: "种草", finalVideoUrl: "https://example.com/v.mp4" },
+        },
+      ],
+    });
+    const entries = buildWorkflowTabEntries(section);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.kind).toBe("seed-video");
   });
 });
 

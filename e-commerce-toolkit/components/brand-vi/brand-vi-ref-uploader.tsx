@@ -16,6 +16,7 @@ type Props = {
   onRemove?: (id: string) => void | Promise<void>;
   onAttachAssets?: (assetIds: string[]) => Promise<void>;
   onGenerateSketch?: (prompt: string) => Promise<void>;
+  onLinkIpMaster?: () => void;
   busy?: boolean;
   sketchGenBusy?: boolean;
   uploadProgress?: number | null;
@@ -28,6 +29,7 @@ export function BrandViRefUploader({
   onRemove,
   onAttachAssets,
   onGenerateSketch,
+  onLinkIpMaster,
   busy,
   sketchGenBusy = false,
   uploadProgress = null,
@@ -94,7 +96,19 @@ export function BrandViRefUploader({
         onUploadFiles={(files) => void handleFiles(files)}
         onRemove={onRemove}
         toolbarPrefix={
-          onGenerateSketch ? (
+          <>
+          {onLinkIpMaster ? (
+            <EcomButtonSecondary
+              size="sm"
+              type="button"
+              disabled={Boolean(busy)}
+              className="h-7 px-2 text-[10px]"
+              onClick={onLinkIpMaster}
+            >
+              从 IP 母版载入
+            </EcomButtonSecondary>
+          ) : null}
+          {onGenerateSketch ? (
             <EcomButtonSecondary
               size="sm"
               type="button"
@@ -114,7 +128,8 @@ export function BrandViRefUploader({
                 </>
               )}
             </EcomButtonSecondary>
-          ) : null
+          ) : null}
+          </>
         }
       />
 

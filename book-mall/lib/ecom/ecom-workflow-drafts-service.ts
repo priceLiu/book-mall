@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ECOM_BRAND_VI_MODULE } from "@/lib/ecom/ecom-brand-vi-types";
 import { ECOM_HAND_CRAFT_MODULE } from "@/lib/ecom/ecom-hand-craft-types";
+import { ECOM_IP_MASTER_MODULE } from "@/lib/ecom/ecom-ip-master-types";
 import { ECOM_MEDIA_DECOMPOSE_MODULE } from "@/lib/ecom/ecom-media-decompose-types";
 import { ECOM_MODEL_SHOT_MODULE } from "@/lib/ecom/ecom-model-shot-types";
 import { parseModelShotPlan } from "@/lib/ecom/ecom-model-shot-types";
@@ -21,6 +22,7 @@ export type EcomWorkflowDraftKind =
   | "product-design-main"
   | "product-design-detail"
   | "hand-craft"
+  | "ip-master"
   | "brand-vi"
   | "seed-video"
   | "media-decompose"
@@ -209,11 +211,49 @@ async function listBrandViDrafts(userId: string): Promise<EcomWorkflowDraftItem[
     return {
       kind: "brand-vi",
       projectId: row.id,
-      title: row.title?.trim() || "品牌 VI",
-      featureLabel: "品牌 VI · 表情包",
+      title: row.title?.trim() || "品牌VI表情包SOP",
+      featureLabel: "品牌VI表情包SOP",
       domainLabel: "电商",
       phaseLabel: `步骤 ${stepId}`,
       summary: stepCount > 0 ? `${stepCount} 步已填写` : "进行中",
+      thumbnailUrl: firstRefUrl(row.references),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  });
+}
+
+async function listIpMasterDrafts(userId: string): Promise<EcomWorkflowDraftItem[]> {
+  const rows = await prisma.ecomIpMasterProject.findMany({
+    where: { userId, module: ECOM_IP_MASTER_MODULE },
+    orderBy: { updatedAt: "desc" },
+    take: 50,
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      references: true,
+      meta: true,
+      updatedAt: true,
+    },
+  });
+  return rows.map((row) => {
+    const meta = row.meta as {
+      workflow?: { currentStepId?: string; activeVersion?: string };
+      templateVersions?: unknown[];
+    } | null;
+    const stepId = meta?.workflow?.currentStepId ?? "input";
+    const versionCount = meta?.templateVersions?.length ?? 0;
+    return {
+      kind: "ip-master",
+      projectId: row.id,
+      title: row.title?.trim() || "IP 母版",
+      featureLabel: "IP 母版",
+      domainLabel: "电商",
+      phaseLabel: `步骤 ${stepId}`,
+      summary:
+        versionCount > 0
+          ? `${versionCount} 个模板版本 · ${meta?.workflow?.activeVersion ?? ""}`
+          : "进行中",
       thumbnailUrl: firstRefUrl(row.references),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -243,8 +283,8 @@ async function listHandCraftDrafts(userId: string): Promise<EcomWorkflowDraftIte
     return {
       kind: "hand-craft",
       projectId: row.id,
-      title: row.title?.trim() || "手办创作",
-      featureLabel: "手办创作",
+      title: row.title?.trim() || "手办盲盒 SOP",
+      featureLabel: "手办盲盒 SOP",
       domainLabel: "电商",
       phaseLabel: `步骤 ${stepId}`,
       summary: stepCount > 0 ? `${stepCount} 步已填写` : "进行中",
@@ -373,11 +413,12 @@ async function listModelShotDrafts(userId: string): Promise<EcomWorkflowDraftIte
 export async function listEcomWorkflowDrafts(
   userId: string,
 ): Promise<EcomWorkflowDraftItem[]> {
-  const [storyboard, productDesign, handCraft, brandVi, seedVideo, mediaDecompose, modelShot] =
+  const [storyboard, productDesign, handCraft, ipMaster, brandVi, seedVideo, mediaDecompose, modelShot] =
     await Promise.all([
       listStoryboardDrafts(userId),
       listProductDesignDrafts(userId),
       listHandCraftDrafts(userId),
+      listIpMasterDrafts(userId),
       listBrandViDrafts(userId),
       listSeedVideoDrafts(userId),
       listMediaDecomposeDrafts(userId),
@@ -387,6 +428,7 @@ export async function listEcomWorkflowDrafts(
     ...storyboard,
     ...productDesign,
     ...handCraft,
+    ...ipMaster,
     ...brandVi,
     ...seedVideo,
     ...mediaDecompose,

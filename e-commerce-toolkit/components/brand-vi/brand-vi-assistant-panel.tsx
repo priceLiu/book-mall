@@ -168,7 +168,7 @@ export function BrandViAssistantPanel({
       if (!canStartWorkflow) {
         await onAlert({
           title: "请先上传参考图",
-          message: "品牌 VI · 表情包以你的手绘参考图为唯一原型，请先在中间工作区上传参考图。",
+          message: "品牌VI表情包SOP 以你的手绘参考图为唯一原型，请先在中间工作区上传参考图。",
           variant: "error",
         });
         return;
@@ -473,7 +473,7 @@ export function BrandViAssistantPanel({
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <EcomAssistantPanelHeader
-          title="品牌 VI 助手"
+          title="品牌VI表情包SOP 助手"
           subtitle={`第 ${stepMeta.no}/8 步 · ${stepMeta.label} · ${modelName}`}
           composerWide={composerWide}
           onComposerWideChange={onComposerWideChange}

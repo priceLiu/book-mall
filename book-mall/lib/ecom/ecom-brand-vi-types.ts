@@ -92,6 +92,9 @@ export type BrandViSettings = {
   stylePresetId?: string;
   styleCustomText?: string;
   projectMode?: BrandViProjectMode;
+  ipMasterProjectId?: string;
+  ipMasterVersion?: string;
+  referenceFromIpMaster?: boolean;
 };
 
 export type BrandViMeta = {

@@ -39,21 +39,15 @@ import {
 } from "@/lib/ecom-api";
 import { writeEcomLastProjectId } from "@/lib/ecom-last-project";
 import { reuseProductDesignProject } from "@/lib/ecom-product-design-api";
-import { reuseHandCraftProject } from "@/lib/ecom-hand-craft-api";
-import { reuseMediaDecomposeProject } from "@/lib/ecom-media-decompose-api";
-import { reuseModelShotProject } from "@/lib/ecom-model-shot-api";
 import {
   listLibrarySections,
   type EcomLibraryAssetGroup,
-  type EcomLibraryHandCraftBundle,
-  type EcomLibraryMediaDecomposeBundle,
-  type EcomLibraryModelShotBundle,
   type EcomLibraryProductDesignBundle,
   type EcomLibrarySection,
-  type EcomLibraryOutfitVideoBundle,
   type EcomLibrarySeedVideoBundle,
   type EcomLibraryStoryboardBundle,
 } from "@/lib/ecom-library-api";
+import { isReusableLibraryWorkflowEntryKind } from "@/lib/ecom-library-workflow-policy";
 import { buildEcomOssThumbUrl } from "@/lib/ecom-oss-image-url";
 import { downloadMediaUrl, mediaDownloadFilename } from "@/lib/ecom-media-download";
 import { isStoryboardImageUrl, isStoryboardVideoUrl } from "@/lib/storyboard-media";
@@ -67,14 +61,8 @@ import { reuseStoryboardProject, fetchStoryboardLibraryDeliverable } from "@/lib
 import type { EcomProjectModule } from "@/lib/product-design-types";
 import type { StoryboardDeliverableSnapshot } from "@/lib/storyboard-types";
 
-const OUTFIT_VIDEO_STORAGE_KEY = "ecom-outfit-video-active-project";
-
 const STORYBOARD_STORAGE_KEY = "ecom-storyboard-active-project";
 const SEED_VIDEO_STORAGE_KEY = "ecom-seed-video-active-project";
-const MEDIA_DECOMPOSE_STORAGE_KEY = "ecom-media-decompose-active-project";
-const MODEL_SHOT_STORAGE_KEY = "ecom-model-shot-active-project";
-const HAND_CRAFT_STORAGE_KEY = "ecom-hand-craft-active-project";
-
 const DOMAIN_ORDER = ["电商", "视频", "品牌"] as const;
 
 type LibraryTab = "all" | "ecom" | "video" | "brand" | "workflows";
@@ -204,15 +192,6 @@ type LibraryProjectEntry =
       bundle: EcomLibraryProductDesignBundle;
     }
   | {
-      kind: "hand-craft";
-      key: string;
-      projectName: string;
-      thumbnailUrl: string | null;
-      meta: string;
-      sortKey: string;
-      bundle: EcomLibraryHandCraftBundle;
-    }
-  | {
       kind: "storyboard";
       key: string;
       projectName: string;
@@ -229,24 +208,6 @@ type LibraryProjectEntry =
       meta: string;
       sortKey: string;
       bundle: EcomLibrarySeedVideoBundle;
-    }
-  | {
-      kind: "media-decompose";
-      key: string;
-      projectName: string;
-      thumbnailUrl: string | null;
-      meta: string;
-      sortKey: string;
-      bundle: EcomLibraryMediaDecomposeBundle;
-    }
-  | {
-      kind: "outfit-video";
-      key: string;
-      projectName: string;
-      thumbnailUrl: string | null;
-      meta: string;
-      sortKey: string;
-      bundle: EcomLibraryOutfitVideoBundle;
     };
 
 function thumbnailFromAssetGroup(group: EcomLibraryAssetGroup): string | null {
@@ -297,8 +258,10 @@ function buildSectionProjectEntries(section: EcomLibrarySection): LibraryProject
   }
 
   for (const bundle of section.productDesignBundles) {
+    const kind = "product-design" as const;
+    if (!isReusableLibraryWorkflowEntryKind(kind)) continue;
     entries.push({
-      kind: "product-design",
+      kind,
       key: `pd:${bundle.projectId}:${bundle.savedAt}`,
       projectName: bundle.title,
       thumbnailUrl: bundle.thumbnailUrl,
@@ -307,20 +270,11 @@ function buildSectionProjectEntries(section: EcomLibrarySection): LibraryProject
       bundle,
     });
   }
-  for (const bundle of section.handCraftBundles) {
-    entries.push({
-      kind: "hand-craft",
-      key: `hc:${bundle.projectId}:${bundle.savedAt}`,
-      projectName: bundle.title,
-      thumbnailUrl: bundle.thumbnailUrl,
-      meta: `${bundle.stepCount} 步 · ${bundle.imageCount} 张成图${bundle.hasSketch ? " · 含线稿" : ""}`,
-      sortKey: bundle.savedAt,
-      bundle,
-    });
-  }
   for (const bundle of section.storyboardBundles) {
+    const kind = "storyboard" as const;
+    if (!isReusableLibraryWorkflowEntryKind(kind)) continue;
     entries.push({
-      kind: "storyboard",
+      kind,
       key: `sb:${bundle.projectId}:${bundle.savedAt}`,
       projectName: bundle.title,
       thumbnailUrl: bundle.thumbnailUrl,
@@ -330,34 +284,14 @@ function buildSectionProjectEntries(section: EcomLibrarySection): LibraryProject
     });
   }
   for (const bundle of section.seedVideoBundles) {
+    const kind = "seed-video" as const;
+    if (!isReusableLibraryWorkflowEntryKind(kind)) continue;
     entries.push({
-      kind: "seed-video",
+      kind,
       key: `sv:${bundle.projectId}:${bundle.savedAt}`,
       projectName: bundle.title,
       thumbnailUrl: bundle.thumbnailUrl,
       meta: `${bundle.shotCount > 0 ? `${bundle.shotCount} 镜 · ` : ""}${bundle.productionMode === "direct" ? "方案①" : bundle.productionMode === "fine" ? "方案②" : "种草视频"} · ${bundle.hasVideo ? "含成片" : "脚本/Prompt"}`,
-      sortKey: bundle.savedAt,
-      bundle,
-    });
-  }
-  for (const bundle of section.mediaDecomposeBundles) {
-    entries.push({
-      kind: "media-decompose",
-      key: `md:${bundle.projectId}:${bundle.savedAt}`,
-      projectName: bundle.title,
-      thumbnailUrl: bundle.thumbnailUrl,
-      meta: `${bundle.mediaKind === "video" ? "视频拆解" : bundle.mediaKind === "image" ? "图片拆解" : "拆图拆视频"} · ${bundle.hasReplica ? `${bundle.shotCount} 镜 · ` : ""}${bundle.hasVideo ? "含成片" : "拆解结果"}`,
-      sortKey: bundle.savedAt,
-      bundle,
-    });
-  }
-  for (const bundle of section.outfitVideoBundles ?? []) {
-    entries.push({
-      kind: "outfit-video",
-      key: `ov:${bundle.projectId}:${bundle.savedAt}`,
-      projectName: bundle.title,
-      thumbnailUrl: bundle.thumbnailUrl,
-      meta: `${bundle.shotCount > 0 ? `${bundle.shotCount} 镜 · ` : ""}${bundle.hasVideo ? "含成片" : "工作流快照"}`,
       sortKey: bundle.savedAt,
       bundle,
     });
@@ -577,10 +511,7 @@ export default function LibraryPage() {
               s.assets.length > 0 ||
               s.storyboardBundles.length > 0 ||
               s.productDesignBundles.length > 0 ||
-              s.seedVideoBundles.length > 0 ||
-              s.handCraftBundles.length > 0 ||
-              s.mediaDecomposeBundles.length > 0 ||
-              (s.outfitVideoBundles?.length ?? 0) > 0,
+              s.seedVideoBundles.length > 0,
           ),
       );
       setTotalAssets((n) => Math.max(0, n - 1));
@@ -614,46 +545,6 @@ export default function LibraryPage() {
         writeEcomLastProjectId(SEED_VIDEO_STORAGE_KEY, project.id);
       }
       router.push("/ecom/seed-video");
-    } catch (e) {
-      await alert({
-        title: "复用失败",
-        message: e instanceof Error ? e.message : "请稍后重试",
-        variant: "error",
-      });
-    } finally {
-      setReuseBusy(null);
-    }
-  }
-
-  async function onReuseMediaDecomposeBundle(bundle: EcomLibraryMediaDecomposeBundle) {
-    const key = `md:${bundle.projectId}:${bundle.savedAt}`;
-    setReuseBusy(key);
-    try {
-      const project = await reuseMediaDecomposeProject(bundle.projectId, bundle.savedAt);
-      if (typeof window !== "undefined") {
-        writeEcomLastProjectId(MEDIA_DECOMPOSE_STORAGE_KEY, project.id);
-      }
-      router.push("/ecom/media-decompose");
-    } catch (e) {
-      await alert({
-        title: "复用失败",
-        message: e instanceof Error ? e.message : "请稍后重试",
-        variant: "error",
-      });
-    } finally {
-      setReuseBusy(null);
-    }
-  }
-
-  async function onReuseModelShotBundle(bundle: EcomLibraryModelShotBundle) {
-    const key = `ms:${bundle.projectId}:${bundle.savedAt}`;
-    setReuseBusy(key);
-    try {
-      const project = await reuseModelShotProject(bundle.projectId, bundle.savedAt);
-      if (typeof window !== "undefined") {
-        writeEcomLastProjectId(MODEL_SHOT_STORAGE_KEY, project.id);
-      }
-      router.push("/ecom/model-shot");
     } catch (e) {
       await alert({
         title: "复用失败",
@@ -705,26 +596,6 @@ export default function LibraryPage() {
     } catch (e) {
       await alert({
         title: "复制打开失败",
-        message: e instanceof Error ? e.message : "请稍后重试",
-        variant: "error",
-      });
-    } finally {
-      setReuseBusy(null);
-    }
-  }
-
-  async function onReuseHandCraftBundle(bundle: EcomLibraryHandCraftBundle) {
-    const key = `hc:${bundle.projectId}:${bundle.savedAt}`;
-    setReuseBusy(key);
-    try {
-      const project = await reuseHandCraftProject(bundle.projectId, bundle.savedAt);
-      if (typeof window !== "undefined") {
-        writeEcomLastProjectId(HAND_CRAFT_STORAGE_KEY, project.id);
-      }
-      router.push("/ecom/hand-craft");
-    } catch (e) {
-      await alert({
-        title: "复用失败",
         message: e instanceof Error ? e.message : "请稍后重试",
         variant: "error",
       });
@@ -803,7 +674,7 @@ export default function LibraryPage() {
           ) : empty ? (
             <p className="mt-6 text-sm text-[#6e6e73]">
               {activeTab === "workflows"
-                ? "暂无已保存工作流。请在拆图拆视频 / 手办创作 / 主图创作 / 种草视频 / 电商口播故事版等工作台点「保存」后再来此处一键复用。"
+                ? "暂无已保存工作流。请在主图/详情页创作、种草视频或电商口播故事版工作台点「保存工作流」后，在此一键复用或复制打开。"
                 : "该分类暂无资产，去各模块生成后会出现在对应 Tab。"}
             </p>
           ) : activeTab === "workflows" ? (
@@ -832,9 +703,6 @@ export default function LibraryPage() {
                       }
                       onReuseProductDesignBundle={onReuseProductDesignBundle}
                       onReuseSeedVideoBundle={onReuseSeedVideoBundle}
-                      onReuseHandCraftBundle={onReuseHandCraftBundle}
-                      onReuseMediaDecomposeBundle={onReuseMediaDecomposeBundle}
-                      onReuseModelShotBundle={onReuseModelShotBundle}
                       onOpenSeedVideoProject={onOpenSeedVideoProject}
                     />
                   ))}
@@ -870,9 +738,6 @@ export default function LibraryPage() {
                         }
                         onReuseProductDesignBundle={onReuseProductDesignBundle}
                         onReuseSeedVideoBundle={onReuseSeedVideoBundle}
-                        onReuseHandCraftBundle={onReuseHandCraftBundle}
-                        onReuseMediaDecomposeBundle={onReuseMediaDecomposeBundle}
-                      onReuseModelShotBundle={onReuseModelShotBundle}
                         onOpenSeedVideoProject={onOpenSeedVideoProject}
                       />
                     );
@@ -940,9 +805,6 @@ function LibrarySectionBlock({
   onShareStoryboardProject,
   onReuseProductDesignBundle,
   onReuseSeedVideoBundle,
-  onReuseHandCraftBundle,
-  onReuseMediaDecomposeBundle,
-  onReuseModelShotBundle,
   onOpenSeedVideoProject,
 }: {
   section: EcomLibrarySection;
@@ -959,9 +821,6 @@ function LibrarySectionBlock({
   onShareStoryboardProject: (projectId: string, title: string) => void;
   onReuseProductDesignBundle: (bundle: EcomLibraryProductDesignBundle) => void;
   onReuseSeedVideoBundle: (bundle: EcomLibrarySeedVideoBundle) => void;
-  onReuseHandCraftBundle: (bundle: EcomLibraryHandCraftBundle) => void;
-  onReuseMediaDecomposeBundle: (bundle: EcomLibraryMediaDecomposeBundle) => void;
-  onReuseModelShotBundle: (bundle: EcomLibraryModelShotBundle) => void;
   onOpenSeedVideoProject: (projectId: string) => void;
 }) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
@@ -993,9 +852,6 @@ function LibrarySectionBlock({
             onShareStoryboardProject={onShareStoryboardProject}
             onReuseProductDesignBundle={onReuseProductDesignBundle}
             onReuseSeedVideoBundle={onReuseSeedVideoBundle}
-            onReuseHandCraftBundle={onReuseHandCraftBundle}
-            onReuseMediaDecomposeBundle={onReuseMediaDecomposeBundle}
-            onReuseModelShotBundle={onReuseModelShotBundle}
             onOpenSeedVideoProject={onOpenSeedVideoProject}
           />
         ))}
@@ -1021,9 +877,6 @@ function LibraryProjectListItem({
   onShareStoryboardProject,
   onReuseProductDesignBundle,
   onReuseSeedVideoBundle,
-  onReuseHandCraftBundle,
-  onReuseMediaDecomposeBundle,
-  onReuseModelShotBundle,
   onOpenSeedVideoProject,
 }: {
   entry: LibraryProjectEntry | LibraryWorkflowEntry;
@@ -1042,9 +895,6 @@ function LibraryProjectListItem({
   onShareStoryboardProject: (projectId: string, title: string) => void;
   onReuseProductDesignBundle: (bundle: EcomLibraryProductDesignBundle) => void;
   onReuseSeedVideoBundle: (bundle: EcomLibrarySeedVideoBundle) => void;
-  onReuseHandCraftBundle: (bundle: EcomLibraryHandCraftBundle) => void;
-  onReuseMediaDecomposeBundle: (bundle: EcomLibraryMediaDecomposeBundle) => void;
-  onReuseModelShotBundle: (bundle: EcomLibraryModelShotBundle) => void;
   onOpenSeedVideoProject: (projectId: string) => void;
 }) {
   const isVideoThumb = libraryThumbIsVideo(
@@ -1055,8 +905,6 @@ function LibraryProjectListItem({
         ? entry.bundle.hasVideo
         : entry.kind === "storyboard-draft"
           ? entry.hasVideo
-        : entry.kind === "media-decompose"
-          ? entry.bundle.hasVideo
           : entry.kind === "assets"
             ? entry.group.assets.length > 0 &&
               entry.group.assets.every((a) => a.kind === "video")
@@ -1136,9 +984,6 @@ function LibraryProjectListItem({
             onShareStoryboardProject={onShareStoryboardProject}
             onReuseProductDesignBundle={onReuseProductDesignBundle}
             onReuseSeedVideoBundle={onReuseSeedVideoBundle}
-            onReuseHandCraftBundle={onReuseHandCraftBundle}
-            onReuseMediaDecomposeBundle={onReuseMediaDecomposeBundle}
-            onReuseModelShotBundle={onReuseModelShotBundle}
             onOpenSeedVideoProject={onOpenSeedVideoProject}
           />
         </div>
@@ -1162,9 +1007,6 @@ function LibraryProjectExpandedContent({
   onShareStoryboardProject,
   onReuseProductDesignBundle,
   onReuseSeedVideoBundle,
-  onReuseHandCraftBundle,
-  onReuseMediaDecomposeBundle,
-  onReuseModelShotBundle,
   onOpenSeedVideoProject,
 }: {
   entry: LibraryProjectEntry | LibraryWorkflowEntry;
@@ -1181,9 +1023,6 @@ function LibraryProjectExpandedContent({
   onShareStoryboardProject: (projectId: string, title: string) => void;
   onReuseProductDesignBundle: (bundle: EcomLibraryProductDesignBundle) => void;
   onReuseSeedVideoBundle: (bundle: EcomLibrarySeedVideoBundle) => void;
-  onReuseHandCraftBundle: (bundle: EcomLibraryHandCraftBundle) => void;
-  onReuseMediaDecomposeBundle: (bundle: EcomLibraryMediaDecomposeBundle) => void;
-  onReuseModelShotBundle: (bundle: EcomLibraryModelShotBundle) => void;
   onOpenSeedVideoProject: (projectId: string) => void;
 }) {
   if (entry.kind === "assets") {
@@ -1270,40 +1109,6 @@ function LibraryProjectExpandedContent({
           className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#1d1d1f] bg-[#1d1d1f] px-3 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
           disabled={busy}
           onClick={() => onReuseProductDesignBundle(pdBundle)}
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          {busy ? "复用中…" : "一键复用"}
-        </button>
-      </div>
-    );
-  }
-
-  if (entry.kind === "hand-craft") {
-    const hcBundle = entry.bundle;
-    const busy = reuseBusy === `hc:${hcBundle.projectId}:${hcBundle.savedAt}`;
-    return (
-      <div className="space-y-3">
-        {thumb ? (
-          <div className="max-w-[140px]">
-            <EcomMediaLibraryTile
-              kind="image"
-              src={thumb}
-              alt={title}
-              onPreview={() => onPreviewImage(thumb, title)}
-              onDownload={() =>
-                void downloadMediaUrl(
-                  thumb,
-                  mediaDownloadFilename(title, "image", thumb),
-                )
-              }
-            />
-          </div>
-        ) : null}
-        <button
-          type="button"
-          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#1d1d1f] bg-[#1d1d1f] px-3 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
-          disabled={busy}
-          onClick={() => onReuseHandCraftBundle(hcBundle)}
         >
           <RotateCcw className="h-3.5 w-3.5" />
           {busy ? "复用中…" : "一键复用"}
@@ -1426,81 +1231,6 @@ function LibraryProjectExpandedContent({
           className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#1d1d1f] bg-[#1d1d1f] px-3 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
           disabled={busy}
           onClick={() => onReuseSeedVideoBundle(svBundle)}
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          {busy ? "复用中…" : "一键复用"}
-        </button>
-      </div>
-    );
-  }
-
-  if (entry.kind === "media-decompose") {
-    const mdBundle = entry.bundle;
-    const busy = reuseBusy === `md:${mdBundle.projectId}:${mdBundle.savedAt}`;
-    const previewSrc = thumb;
-    const previewIsVideo = libraryThumbIsVideo(thumb, mdBundle.hasVideo);
-    return (
-      <div className="space-y-3">
-      {previewSrc ? (
-        <div className="max-w-[140px]">
-          <EcomMediaLibraryTile
-            kind={previewIsVideo ? "video" : "image"}
-            src={previewSrc}
-            alt={title}
-            onPreview={() =>
-              previewIsVideo
-                ? onPreviewVideo(previewSrc, title)
-                : onPreviewImage(buildEcomOssThumbUrl(previewSrc), title)
-            }
-            onDownload={() =>
-              void downloadMediaUrl(
-                previewSrc,
-                mediaDownloadFilename(title, previewIsVideo ? "video" : "image", previewSrc),
-              )
-            }
-          />
-        </div>
-      ) : null}
-      <button
-        type="button"
-        className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#1d1d1f] bg-[#1d1d1f] px-3 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
-        disabled={busy}
-        onClick={() => onReuseMediaDecomposeBundle(mdBundle)}
-      >
-          <RotateCcw className="h-3.5 w-3.5" />
-          {busy ? "复用中…" : "一键复用"}
-        </button>
-      </div>
-    );
-  }
-
-  if (entry.kind === "model-shot") {
-    const msBundle = entry.bundle;
-    const busy = reuseBusy === `ms:${msBundle.projectId}:${msBundle.savedAt}`;
-    const previewSrc = thumb;
-    return (
-      <div className="space-y-3">
-        {previewSrc ? (
-          <div className="max-w-[140px]">
-            <EcomMediaLibraryTile
-              kind="image"
-              src={previewSrc}
-              alt={title}
-              onPreview={() => onPreviewImage(buildEcomOssThumbUrl(previewSrc), title)}
-              onDownload={() =>
-                void downloadMediaUrl(
-                  previewSrc,
-                  mediaDownloadFilename(title, "image", previewSrc),
-                )
-              }
-            />
-          </div>
-        ) : null}
-        <button
-          type="button"
-          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#1d1d1f] bg-[#1d1d1f] px-3 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
-          disabled={busy}
-          onClick={() => onReuseModelShotBundle(msBundle)}
         >
           <RotateCcw className="h-3.5 w-3.5" />
           {busy ? "复用中…" : "一键复用"}

@@ -8,6 +8,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { BrandViComposePanel } from "@/components/brand-vi/brand-vi-compose-panel";
 import { BrandViRefUploader } from "@/components/brand-vi/brand-vi-ref-uploader";
+import { IpMasterPickDialog } from "@/components/ip-master/ip-master-pick-dialog";
 import { BrandViSaveDialog } from "@/components/brand-vi/brand-vi-save-dialog";
 import { BrandViSlotGrid } from "@/components/brand-vi/brand-vi-slot-grid";
 import {
@@ -30,6 +31,7 @@ import {
   saveBrandViWorkflow,
   updateBrandViProject,
 } from "@/lib/ecom-brand-vi-api";
+import { linkIpMasterToBrandVi } from "@/lib/ecom-ip-master-api";
 import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 import type { BrandViProject, BrandViStepId } from "@/lib/brand-vi-types";
 import {
@@ -135,6 +137,8 @@ export function BrandViContentPanel({
   } | null>(null);
   const [composeBusy, setComposeBusy] = useState(false);
   const [composeBusyDetail, setComposeBusyDetail] = useState<string | null>(null);
+  const [ipPickOpen, setIpPickOpen] = useState(false);
+  const [ipLinkBusy, setIpLinkBusy] = useState(false);
   const handleComposeBusy = useCallback((busy: boolean, detail?: string) => {
     const nextDetail = busy
       ? detail ?? "浏览器正在排版并抓图，请勿关闭页面…"
@@ -299,7 +303,7 @@ export function BrandViContentPanel({
       setSaveDialogOpen(false);
       toast({
         title: "已保存到资产库",
-        message: `「${snapshot.title}」已保存。可在「我的资产 · 品牌 VI · 表情包」一键复用。`,
+        message: `「${snapshot.title}」已保存。可在「我的资产 · 品牌VI表情包SOP」一键复用。`,
         variant: "success",
       });
     } catch (e) {
@@ -349,12 +353,12 @@ export function BrandViContentPanel({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-semibold text-[#1d1d1f]">
-                {project.title?.trim() || "品牌 VI · 表情包"}
+                {project.title?.trim() || "品牌VI表情包SOP"}
               </h2>
               <p className="text-[11px] text-[#6e6e73]">
                 参考图转潮玩盲盒 IP 全案 · 8 步 · 已出 {progress}/{totalSlots} 张
                 {project.meta?.workflow?.heroLockedUrl ? " · 主形象已定稿" : ""}
-                {" · 成图自动入库「我的资产 · 品牌 VI · 表情包」"}
+                {" · 成图自动入库「我的资产 · 品牌VI表情包SOP」"}
               </p>
             </div>
             <EcomIconToolbar>
@@ -373,8 +377,8 @@ export function BrandViContentPanel({
                     currentProjectId={project.id}
                     loadProjects={loadProjectList}
                     onSelectProject={onOpenProject}
-                    title="品牌 VI · 表情包 · 项目列表"
-                    emptyHint="还没有保存过的品牌 VI · 表情包项目。"
+                    title="品牌VI表情包SOP · 项目列表"
+                    emptyHint="还没有保存过的品牌VI表情包SOP项目。"
                   />
                 ) : null}
                 {onDeleteProject ? (
@@ -428,6 +432,7 @@ export function BrandViContentPanel({
             onRemove={onRefRemove}
             onAttachAssets={onAttachSketches}
             onGenerateSketch={onGenerateSketch}
+            onLinkIpMaster={() => setIpPickOpen(true)}
             busy={Boolean(refBusy) || disabledAll}
             sketchGenBusy={sketchGenBusy}
             uploadProgress={uploadProgress}
@@ -494,6 +499,7 @@ export function BrandViContentPanel({
                   step={step}
                   disabled={disabledAll}
                   onProjectChange={onProjectChange}
+                  onApplyProject={onApplyProject}
                   composeRequest={
                     generateRequest?.stepId === step.id ? generateRequest : null
                   }
@@ -588,6 +594,43 @@ export function BrandViContentPanel({
           }}
         />
       ) : null}
+
+      <IpMasterPickDialog
+        open={ipPickOpen}
+        onOpenChange={setIpPickOpen}
+        busy={ipLinkBusy}
+        onConfirm={async ({ ipMasterProjectId, version }) => {
+          setIpLinkBusy(true);
+          try {
+            const hadOwnRefs = project.references.some(
+              (r) => !r.id.startsWith("ip-master-"),
+            );
+            const next = await linkIpMasterToBrandVi(
+              project.id,
+              ipMasterProjectId,
+              version,
+            );
+            if (onApplyProject) await onApplyProject(next);
+            else await onProjectChange();
+            setIpPickOpen(false);
+            toast({
+              title: "已载入 IP 母版",
+              message: hadOwnRefs
+                ? "基准图与 Prompt 约束已更新；若与自上传参考图并存，请以母版或参考图其一为准。"
+                : "基准图与 Prompt 约束已写入本项目。",
+              variant: "success",
+            });
+          } catch (e) {
+            await alert({
+              title: "载入失败",
+              message: e instanceof Error ? e.message : "无法链接 IP 母版",
+              variant: "error",
+            });
+          } finally {
+            setIpLinkBusy(false);
+          }
+        }}
+      />
 
       <BrandViSaveDialog
         open={saveDialogOpen}

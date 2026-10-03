@@ -23,7 +23,7 @@ type Props = {
 
 export function BrandViProgressRail({ project, currentStepId, onStepClick }: Props) {
   return (
-    <nav className={ECOM_PROGRESS_RAIL_SHELL} aria-label="品牌 VI · 表情包 8 步进度（点击切换步骤）">
+    <nav className={ECOM_PROGRESS_RAIL_SHELL} aria-label="品牌VI表情包SOP 8 步进度（点击切换步骤）">
       {brandViVisibleSteps(project).map((step) => {
         const state = stepVisual(project, step.id, currentStepId);
         const done = doneCount(project, step.id);

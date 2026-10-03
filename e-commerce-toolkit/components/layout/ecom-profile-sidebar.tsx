@@ -14,6 +14,7 @@ import type { EcomShellUser } from "@/lib/ecom-session.server";
 import {
   buildEcomSidebarNavItems,
   type EcomSidebarNavGroup,
+  type EcomSidebarNavGroupChild,
   type EcomSidebarNavItem,
   type EcomSidebarNavLink,
 } from "@/lib/ecom-sidebar-nav";
@@ -40,7 +41,9 @@ function linkIsActive(pathname: string, item: EcomSidebarNavLink): boolean {
 }
 
 function groupHasActiveChild(pathname: string, group: EcomSidebarNavGroup): boolean {
-  return group.children.some((c) => linkIsActive(pathname, c));
+  return group.children.some(
+    (c) => c.type !== "subheading" && linkIsActive(pathname, c),
+  );
 }
 
 function shouldUseNativeNav(event: React.MouseEvent<HTMLAnchorElement>): boolean {
@@ -330,7 +333,7 @@ export function EcomProfileSidebar({
         ? activeEntry.link.label
         : "导航";
 
-  const detailLinks: EcomSidebarNavLink[] =
+  const detailLinks: EcomSidebarNavGroupChild[] =
     activeEntry?.kind === "group"
       ? activeEntry.group.children
       : activeEntry?.kind === "link"
@@ -526,13 +529,22 @@ export function EcomProfileSidebar({
             role="navigation"
             aria-label={detailTitle}
           >
-            {detailLinks.map((link) => (
-              <DetailNavLink
-                key={link.href}
-                item={link}
-                active={linkIsActive(pathname, link)}
-              />
-            ))}
+            {detailLinks.map((entry) =>
+              entry.type === "subheading" ? (
+                <p
+                  key={`subheading:${entry.label}`}
+                  className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--ecom-chrome-text-muted)] first:pt-0"
+                >
+                  {entry.label}
+                </p>
+              ) : (
+                <DetailNavLink
+                  key={entry.href}
+                  item={entry}
+                  active={linkIsActive(pathname, entry)}
+                />
+              ),
+            )}
           </nav>
 
           {!user ? (

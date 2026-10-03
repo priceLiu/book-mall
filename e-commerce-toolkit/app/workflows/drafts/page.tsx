@@ -32,7 +32,7 @@ const NEW_DRAFT_OPTIONS: Array<{ kind: EcomWorkflowDraftKind; label: string }> =
   { kind: "storyboard", label: "电商口播故事版" },
   { kind: "product-design-main", label: "电商主图" },
   { kind: "product-design-detail", label: "电商详情页" },
-  { kind: "hand-craft", label: "手伴创作" },
+  { kind: "hand-craft", label: "手办盲盒 SOP" },
   { kind: "seed-video", label: "种草视频" },
   { kind: "media-decompose", label: "拆图拆视频" },
   { kind: "model-shot", label: "服装模特图" },
@@ -237,7 +237,7 @@ export default function WorkflowDraftsPage() {
             <p className="mt-2 text-xs leading-relaxed text-[#6e6e73]">
               在故事版、主图、种草视频等功能中开始创作后，进度会自动保留在此。
               <br />
-              点「保存工作流」后的可复用模板仍在
+              主图/详情页、种草视频、故事版等点「保存工作流」后的可复用模板仍在
               <Link href="/library" className="mx-1 text-[#0071e3] hover:underline">
                 我的资产 · 工作流
               </Link>

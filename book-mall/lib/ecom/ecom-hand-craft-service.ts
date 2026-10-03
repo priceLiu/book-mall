@@ -121,7 +121,7 @@ export async function createEcomHandCraftProject(
   const row = await prisma.ecomHandCraftProject.create({
     data: {
       userId,
-      title: opts?.title?.trim().slice(0, 120) || "手办创作",
+      title: opts?.title?.trim().slice(0, 120) || "手办盲盒 SOP",
       references: [] as Prisma.InputJsonValue,
       chatHistory: [] as Prisma.InputJsonValue,
       plan: { steps: {} } as Prisma.InputJsonValue,

@@ -69,6 +69,22 @@
 | VI-117 | 单元测试（风格/模式/步骤） |
 | VI-118 | 产品文档 §品牌 VI + schema-changelog |
 
-## 7. 非目标（后续迭代）
+## 7. 步骤依赖（拼版 / 助手）
+
+| 步 | stepId | 硬依赖（`requires`） |
+|----|--------|----------------------|
+| 7 | vi-spec | hero、logo、turnaround |
+| 8 | portfolio | hero、emoji、merch（**不含** vi-spec） |
+
+助手「进入第 N+1 步」：下一步 **硬依赖齐备** 即可跳转（VI-120），不要求当前步已完成。
+
+## 8. 增量任务
+
+| ID | 说明 |
+|----|------|
+| VI-119 | 拼版 upload 后立即 merge project 快照；空白 canvas 防护 |
+| VI-120 | `canStartBrandViStep` + 助手跳步 |
+
+## 9. 非目标（后续迭代）
 
 - 12 页 PDF 作品集、招商授权页、透明底 PNG 自动抠图、动态表情包

@@ -237,6 +237,14 @@ export function missingRequirements(project: BrandViProject, stepId: BrandViStep
     .map((id) => `第 ${brandViStep(id).no} 步 ${brandViStep(id).label}`);
 }
 
+/** 本步硬依赖是否齐备（与 compose / generate 按钮、助手跳步对齐） */
+export function canStartBrandViStep(
+  project: BrandViProject,
+  stepId: BrandViStepId,
+): boolean {
+  return missingRequirements(project, stepId).length === 0;
+}
+
 export function inferCurrentStepId(project: BrandViProject): BrandViStepId {
   const visible = brandViVisibleSteps(project);
   const fromMeta = project.meta?.workflow?.currentStepId;
@@ -271,7 +279,10 @@ export function assistantChoices(project: BrandViProject, currentStepId: BrandVi
   const next = idx >= 0 && idx < visible.length - 1 ? visible[idx + 1] : undefined;
 
   const out: string[] = [];
+  const nextCanStart = next != null && canStartBrandViStep(project, next.id);
   if (ready && next) {
+    out.push(`进入第 ${next.no} 步：${next.label}`);
+  } else if (nextCanStart && next) {
     out.push(`进入第 ${next.no} 步：${next.label}`);
   } else {
     out.push(
@@ -312,7 +323,7 @@ export function stepIdFromChoice(choice: string): BrandViStepId | null {
 }
 
 export const BRAND_VI_WELCOME_MESSAGE = [
-  "欢迎使用品牌 VI · 表情包工作台。",
+  "欢迎使用品牌VI表情包SOP工作台。",
   "",
   "请上传 1～3 张角色参考图，或填写品牌/角色文字描述；选择产出模式与视觉风格后，我会分步带你完成：",
   "",
@@ -326,7 +337,7 @@ export const BRAND_VI_POST_HERO_GUIDE_MESSAGE = [
   "",
   "后续请在**中间工作区**按步骤自行操作：勾选槽位 → 生成；需要拼版的步骤在对应区块点「拼版」。",
   "",
-  "每一步出图都会自动带上已定稿的基准形象作为参考图；成图会写入本项目并保存至「我的资产 · 品牌 VI」。",
+  "每一步出图都会自动带上已定稿的基准形象作为参考图；成图会写入本项目并保存至「我的资产 · 品牌VI表情包SOP」。",
   "",
   "右下角任务窗会显示出图进度；多步可同时排队，由系统按并发上限依次调用模型。",
 ].join("\n");

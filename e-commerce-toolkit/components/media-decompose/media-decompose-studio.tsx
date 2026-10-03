@@ -19,12 +19,10 @@ import {
   setMediaDecomposeFromUrl,
   startMediaDecomposeReplica,
   streamMediaDecompose,
-  saveMediaDecomposeDeliverableSnapshot,
   updateMediaDecomposeProject,
   uploadMediaDecomposeFile,
 } from "@/lib/ecom-media-decompose-api";
 import { resumeOrCreateEcomProject, writeEcomLastProjectId } from "@/lib/ecom-last-project";
-import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import { fetchSeedVideoModels, getSeedVideoProject } from "@/lib/ecom-seed-video-api";
 import {
   ECOM_MEDIA_DECOMPOSE_DEFAULT_VISION_MODEL,
@@ -241,29 +239,27 @@ export function MediaDecomposeStudio() {
       Boolean(project.media?.ossUrl) ||
       Boolean(project.result?.structured) ||
       Boolean(project.result?.rawText?.trim());
-    const defaultName = project.title?.trim() || "拆图拆视频";
-    await runEcomNewProjectWithSavePrompt({
-      confirm,
-      hasWorkToSave: hasWork,
-      message: "当前拆解项目尚未保存工作流。是否先保存到「我的资产」？",
-      save: async () => {
-        const { snapshot } = await saveMediaDecomposeDeliverableSnapshot(project.id, defaultName);
-        toast({ title: "已保存", message: snapshot.title, variant: "success" });
-      },
-      onProceed: async () => {
-        try {
-          const created = await createMediaDecomposeProject();
-          applyProject(created);
-          setStreamText("");
-        } catch (e) {
-          await alert({
-            title: "新建失败",
-            message: e instanceof Error ? e.message : "无法创建项目",
-            variant: "error",
-          });
-        }
-      },
-    });
+    if (
+      hasWork &&
+      !(await confirm({
+        title: "新建项目",
+        message:
+          "新建将清空当前编辑。拆解结果与成片仍保留在「我的资产 · 拆图拆视频」。是否继续？",
+      }))
+    ) {
+      return;
+    }
+    try {
+      const created = await createMediaDecomposeProject();
+      applyProject(created);
+      setStreamText("");
+    } catch (e) {
+      await alert({
+        title: "新建失败",
+        message: e instanceof Error ? e.message : "无法创建项目",
+        variant: "error",
+      });
+    }
   }
 
   async function handleOpenProject(id: string) {

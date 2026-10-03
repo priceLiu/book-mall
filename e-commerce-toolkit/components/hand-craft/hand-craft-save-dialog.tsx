@@ -96,7 +96,7 @@ export function HandCraftSaveDialog({
             保存到资产库
           </h2>
           <p className="text-sm leading-relaxed text-[var(--ecom-muted)]">
-            将完整手办工作流（线稿、10 步计划、会话与设置）镜像保存到「我的资产 · 手办创作」。
+            将完整手办工作流（线稿、10 步计划、会话与设置）镜像保存到「我的资产 · 手办盲盒 SOP」。
             可在资产库一键复用：复制流程后换线稿即可再出图。
           </p>
         </div>

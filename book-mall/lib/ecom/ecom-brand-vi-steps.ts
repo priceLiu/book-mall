@@ -293,6 +293,7 @@ export function buildBrandViSlotPrompt(opts: {
   refCount: number;
   isHeroStep: boolean;
   settings?: BrandViSettings;
+  ipMasterAppend?: string;
 }): string {
   const styleFragment = resolveBrandViStyleFragment(opts.settings);
   const lines: string[] = [
@@ -311,10 +312,17 @@ export function buildBrandViSlotPrompt(opts: {
   if (opts.refCount > 0) {
     lines.push("", "参考图说明（硬性要求，优先级高于上文）：");
     if (opts.isHeroStep) {
-      lines.push(
-        "- 参考图为用户角色参考：须保留参考图的造型、发型、配饰、服装与体态，不得随意改动原生结构",
-        "- 无参考图时按 brief 生成，定稿后即为全案唯一基准",
-      );
+      if (opts.settings?.referenceFromIpMaster) {
+        lines.push(
+          "- 参考图为 IP 母版已定稿基准：须保留母版刚性锚点，不得崩 IP",
+          "- 柔性项可按本槽指令变更",
+        );
+      } else {
+        lines.push(
+          "- 参考图为用户角色参考：须保留参考图的造型、发型、配饰、服装与体态，不得随意改动原生结构",
+          "- 无参考图时按 brief 生成，定稿后即为全案唯一基准",
+        );
+      }
     } else {
       lines.push(
         "- 参考图第 1 张为本系列基准主形象：五官、发型、核心配饰与身体比例必须与之完全一致",
@@ -324,6 +332,10 @@ export function buildBrandViSlotPrompt(opts: {
         lines.push("- 其余参考图为同系列已定稿物料，仅用于统一材质与配色，不改变角色本体");
       }
     }
+  }
+
+  if (opts.ipMasterAppend?.trim()) {
+    lines.push(opts.ipMasterAppend.trim());
   }
 
   return lines.join("\n");

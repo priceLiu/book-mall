@@ -1,14 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Download, Images, Plus, Save, Trash2 } from "lucide-react";
+import { Download, Images, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { HandCraftComposePanel } from "@/components/hand-craft/hand-craft-compose-panel";
 import { HandCraftRefUploader } from "@/components/hand-craft/hand-craft-ref-uploader";
-import { HandCraftSaveDialog } from "@/components/hand-craft/hand-craft-save-dialog";
+import { IpMasterPickDialog } from "@/components/ip-master/ip-master-pick-dialog";
 import { HandCraftSlotGrid } from "@/components/hand-craft/hand-craft-slot-grid";
 import {
   EcomImagePreviewHost,
@@ -22,15 +22,15 @@ import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { useEcomIpWorkflowStepImageGen } from "@/lib/use-ecom-ip-workflow-step-image-gen";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
-import { EcomIconButton, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomIconButton } from "@/components/ui/ecom-icon-button";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import {
   downloadHandCraftExportZip,
   generateHandCraftStep,
   getHandCraftProject,
-  saveHandCraftWorkflow,
   syncHandCraftProjectPlan,
 } from "@/lib/ecom-hand-craft-api";
+import { linkIpMasterToHandCraft } from "@/lib/ecom-ip-master-api";
 import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 import type { HandCraftProject, HandCraftStepId } from "@/lib/hand-craft-types";
 import {
@@ -79,7 +79,6 @@ type Props = {
   /** 助手点「确认生成第 N 步」时递增，携带目标步骤 */
   generateRequest?: { stepId: HandCraftStepId; token: number } | null;
   focusStepId?: HandCraftStepId | null;
-  onShareWorkflow?: () => void;
   /** 槽位出图 / 拼版进行中（用于助手隐藏「确认生成」卡片） */
   onMediaBusyChange?: (busy: boolean) => void;
 };
@@ -118,7 +117,6 @@ export function HandCraftContentPanel({
   streaming,
   generateRequest = null,
   focusStepId = null,
-  onShareWorkflow,
   onMediaBusyChange,
 }: Props) {
   const router = useRouter();
@@ -135,6 +133,8 @@ export function HandCraftContentPanel({
   } | null>(null);
   const [composeBusy, setComposeBusy] = useState(false);
   const [composeBusyDetail, setComposeBusyDetail] = useState<string | null>(null);
+  const [ipPickOpen, setIpPickOpen] = useState(false);
+  const [ipLinkBusy, setIpLinkBusy] = useState(false);
   const handleComposeBusy = useCallback((busy: boolean, detail?: string) => {
     const nextDetail = busy
       ? detail ?? "浏览器正在排版并抓图，请勿关闭页面…"
@@ -157,8 +157,6 @@ export function HandCraftContentPanel({
     stepId: HandCraftStepId;
     index: number;
   } | null>(null);
-  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-
   const {
     hasActiveGenJobs,
     runGenerate,
@@ -316,27 +314,6 @@ export function HandCraftContentPanel({
     }
   }
 
-  async function handleSaveWorkflow(ipName: string) {
-    setBusy("正在保存到资产库…");
-    try {
-      const snapshot = await saveHandCraftWorkflow(project.id, ipName);
-      setSaveDialogOpen(false);
-      toast({
-        title: "已保存到资产库",
-        message: `「${snapshot.title}」已保存。可在「我的资产 · 手办创作」一键复用。`,
-        variant: "success",
-      });
-    } catch (e) {
-      await alert({
-        title: "保存失败",
-        message: e instanceof Error ? e.message : "请稍后重试",
-        variant: "error",
-      });
-    } finally {
-      setBusy(null);
-    }
-  }
-
   const progress = useMemo(
     () =>
       HAND_CRAFT_STEPS.reduce(
@@ -346,11 +323,7 @@ export function HandCraftContentPanel({
     [project],
   );
 
-  const defaultSaveIpName = useMemo(
-    () => project.title?.trim() || "手办IP",
-    [project.title],
-  );
-  const canSave = project.references.length > 0 || progress > 0;
+  const canExport = project.references.length > 0 || progress > 0;
 
   const totalSlots = HAND_CRAFT_STEPS.reduce((acc, s) => acc + s.count, 0);
   const disabledAll = Boolean(streaming) || composeBusy || sketchGenBusy;
@@ -368,12 +341,12 @@ export function HandCraftContentPanel({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-semibold text-[#1d1d1f]">
-                {project.title?.trim() || "手办创作"}
+                {project.title?.trim() || "手办盲盒 SOP"}
               </h2>
               <p className="text-[11px] text-[#6e6e73]">
                 线稿转潮玩盲盒 IP 全案 · 10 步 · 已出 {progress}/{totalSlots} 张
                 {project.meta?.workflow?.heroLockedUrl ? " · 主形象已定稿" : ""}
-                {" · 成图自动入库「我的资产 · 手办创作」"}
+                {" · 成图自动入库「我的资产 · 手办盲盒 SOP」"}
               </p>
             </div>
             <EcomIconToolbar>
@@ -392,8 +365,8 @@ export function HandCraftContentPanel({
                     currentProjectId={project.id}
                     loadProjects={loadProjectList}
                     onSelectProject={onOpenProject}
-                    title="手办创作 · 项目列表"
-                    emptyHint="还没有保存过的手办创作项目。"
+                    title="手办盲盒 SOP · 项目列表"
+                    emptyHint="还没有保存过的手办盲盒 SOP项目。"
                   />
                 ) : null}
                 {onDeleteProject ? (
@@ -406,14 +379,6 @@ export function HandCraftContentPanel({
                   />
                 ) : null}
               </EcomIconToolbarGroup>
-              <EcomIconToolbarGroup label="工作流">
-                <EcomIconButton
-                  label="保存工作流"
-                  icon={Save}
-                  disabled={Boolean(busy) || !canSave || disabledAll}
-                  onClick={() => setSaveDialogOpen(true)}
-                />
-              </EcomIconToolbarGroup>
               <EcomIconToolbarGroup label="资产与交付">
                 <EcomIconButton
                   label="我的资产"
@@ -424,18 +389,10 @@ export function HandCraftContentPanel({
                 <EcomIconButton
                   label="导出交付包"
                   icon={Download}
-                  disabled={Boolean(busy) || progress === 0}
+                  disabled={Boolean(busy) || !canExport}
                   onClick={() => void handleExportZip()}
                 />
               </EcomIconToolbarGroup>
-              {onShareWorkflow ? (
-                <EcomIconToolbarGroup label="分享">
-                  <EcomShareIconButton
-                    disabled={Boolean(busy) || disabledAll}
-                    onClick={onShareWorkflow}
-                  />
-                </EcomIconToolbarGroup>
-              ) : null}
             </EcomIconToolbar>
           </div>
         </header>
@@ -447,6 +404,7 @@ export function HandCraftContentPanel({
             onRemove={onRefRemove}
             onAttachAssets={onAttachSketches}
             onGenerateSketch={onGenerateSketch}
+            onLinkIpMaster={() => setIpPickOpen(true)}
             busy={Boolean(refBusy) || disabledAll}
             sketchGenBusy={sketchGenBusy}
             uploadProgress={uploadProgress}
@@ -598,13 +556,43 @@ export function HandCraftContentPanel({
         </>
       ) : null}
 
-      <HandCraftSaveDialog
-        open={saveDialogOpen}
-        onOpenChange={setSaveDialogOpen}
-        defaultIpName={defaultSaveIpName}
-        busy={Boolean(busy)}
-        onConfirm={handleSaveWorkflow}
+      <IpMasterPickDialog
+        open={ipPickOpen}
+        onOpenChange={setIpPickOpen}
+        busy={ipLinkBusy}
+        onConfirm={async ({ ipMasterProjectId, version }) => {
+          setIpLinkBusy(true);
+          try {
+            const hadOwnRefs = project.references.some(
+              (r) => !r.id.startsWith("ip-master-"),
+            );
+            const next = await linkIpMasterToHandCraft(
+              project.id,
+              ipMasterProjectId,
+              version,
+            );
+            if (onApplyProject) await onApplyProject(next);
+            else await onProjectChange();
+            setIpPickOpen(false);
+            toast({
+              title: "已载入 IP 母版",
+              message: hadOwnRefs
+                ? "基准图与 Prompt 约束已更新；若与自上传线稿并存，请以母版或线稿其一为准。"
+                : "基准图与 Prompt 约束已写入本项目。",
+              variant: "success",
+            });
+          } catch (e) {
+            await alert({
+              title: "载入失败",
+              message: e instanceof Error ? e.message : "无法链接 IP 母版",
+              variant: "error",
+            });
+          } finally {
+            setIpLinkBusy(false);
+          }
+        }}
       />
+
     </div>
   );
 }

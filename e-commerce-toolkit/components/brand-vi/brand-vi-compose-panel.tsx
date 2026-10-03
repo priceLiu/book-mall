@@ -29,6 +29,7 @@ import {
   BRAND_VI_SHEET_WIDTH,
 } from "@/components/brand-vi/brand-vi-sheet-view";
 import {
+  composeCanvasMostlyBlank,
   composeHtml2CanvasScale,
   preloadComposeSheetImages,
   revokeComposeSheetBlobUrls,
@@ -49,6 +50,7 @@ type Props = {
   step: BrandViStepMeta;
   disabled?: boolean;
   onProjectChange: () => void | Promise<void>;
+  onApplyProject?: (project: BrandViProject) => void | Promise<void>;
   onPreviewImage?: (src: string, title: string) => void;
   /** 助手点「确认拼版」时递增，自动执行本步拼版 */
   composeRequest?: { stepId: BrandViStepId; token: number } | null;
@@ -65,11 +67,12 @@ export function BrandViComposePanel({
   step,
   disabled,
   onProjectChange,
+  onApplyProject,
   onPreviewImage,
   composeRequest = null,
   onBusyChange,
 }: Props) {
-  const { alert } = useDialogs();
+  const { alert, toast } = useDialogs();
   const pages = useMemo(() => sheetPagesFor(step.id), [step.id]);
   const state = stepState(project, step.id);
   const blocked = missingRequirements(project, step.id);
@@ -110,16 +113,38 @@ export function BrandViComposePanel({
         reportBusyDetail("浏览器正在排版抓图…");
         await new Promise((r) => setTimeout(r, 300));
 
+        let scrollHeight = Math.max(el.scrollHeight, el.offsetHeight, 1);
+        if (scrollHeight < 200 && step.id === "portfolio") {
+          await new Promise((r) => setTimeout(r, 400));
+          scrollHeight = Math.max(el.scrollHeight, el.offsetHeight, 1);
+        }
         const scale = composeHtml2CanvasScale(step.id, imageCount);
         const { default: html2canvas } = await import("html2canvas");
-        const canvas = await html2canvas(el, {
+        const html2canvasOpts = {
           scale,
           useCORS: true,
           allowTaint: false,
           backgroundColor: "#ffffff",
           width: BRAND_VI_SHEET_WIDTH,
+          height: scrollHeight,
           windowWidth: BRAND_VI_SHEET_WIDTH,
-        });
+          windowHeight: scrollHeight,
+          scrollX: 0,
+          scrollY: 0,
+        };
+        let canvas = await html2canvas(el, html2canvasOpts);
+        if (composeCanvasMostlyBlank(canvas)) {
+          await new Promise((r) => setTimeout(r, 400));
+          canvas = await html2canvas(el, html2canvasOpts);
+          if (composeCanvasMostlyBlank(canvas)) {
+            if (scrollHeight < 200) {
+              throw new Error(
+                "拼版区域未正确排版（高度过小），请刷新页面后重试；若仍失败请联系支持",
+              );
+            }
+            throw new Error("拼版抓图为空白，请确认前序成图已加载后重试");
+          }
+        }
         reportBusyDetail("正在上传拼版 PNG…");
         return canvas.toDataURL("image/png");
       } finally {
@@ -135,8 +160,10 @@ export function BrandViComposePanel({
         requestAnimationFrame(() => requestAnimationFrame(() => r())),
       );
     });
-    await new Promise((r) => setTimeout(r, 80));
-  }, []);
+    await new Promise((r) =>
+      setTimeout(r, step.id === "portfolio" || step.id === "vi-spec" ? 200 : 80),
+    );
+  }, [step.id]);
 
   const composePages = useCallback(
     async (indexes: number[]) => {
@@ -160,12 +187,13 @@ export function BrandViComposePanel({
           await waitForExportSheetMount();
           try {
             const pngBase64 = await capturePage(pageIndex);
-            await uploadBrandViComposePng({
+            const { project: fresh } = await uploadBrandViComposePng({
               projectId: project.id,
               stepId: step.id,
               pageIndex,
               pngBase64,
             });
+            if (onApplyProject) await onApplyProject(fresh);
           } catch (e) {
             failures.push(`第 ${pageIndex} 页：${e instanceof Error ? e.message : "未知错误"}`);
           }
@@ -184,16 +212,25 @@ export function BrandViComposePanel({
           message: failures.join("\n"),
           variant: "error",
         });
+      } else if (indexes.length > 0) {
+        void toast({
+          title: `${step.label} 拼版完成`,
+          message: `共 ${indexes.length} 页已上传并写入项目。`,
+          variant: "success",
+        });
       }
     },
     [
       alert,
       blocked,
       capturePage,
+      onApplyProject,
       onBusyChange,
       onProjectChange,
       project.id,
       step.id,
+      step.label,
+      toast,
       waitForExportSheetMount,
     ],
   );
@@ -429,8 +466,12 @@ export function BrandViComposePanel({
       {exportPage ? (
         <div
           aria-hidden
-          className="pointer-events-none fixed -left-[9999px] top-0 z-0"
-          style={{ width: BRAND_VI_SHEET_WIDTH }}
+          className="pointer-events-none fixed left-0 top-0 -z-10"
+          style={{
+            width: BRAND_VI_SHEET_WIDTH,
+            opacity: 0,
+            overflow: "visible",
+          }}
         >
           <BrandViSheetView
             key={exportPage.index}

@@ -24,6 +24,10 @@ import { generateEcomImage } from "@/lib/ecom/ecom-image-gen-invoke";
 import { resolveEcomImageGenConcurrency } from "@/lib/ecom/ecom-image-gen-concurrency";
 import { getImageGenMaxRefs } from "@/lib/ecom/ecom-product-design-ref-rules";
 import { ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
+import {
+  buildIpMasterConstraintBlock,
+} from "@/lib/ecom/ecom-ip-master-types";
+import { resolveIpMasterForDownstream } from "@/lib/ecom/ecom-ip-master-service";
 import { finalizeIpWorkflowStepAfterBatch } from "@/lib/ecom/ecom-ip-workflow-step-gen-finalize";
 import { withEcomIpWorkflowStepGenerationLock } from "@/lib/ecom/ecom-ip-workflow-step-gen-lock";
 import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
@@ -124,6 +128,17 @@ async function generateHandCraftStepImagesInner(opts: {
   if (wanted.length === 0) throw new Error("找不到要生成的槽位");
 
   const refImageUrls = resolveStepRefUrls({ project, step, modelKey });
+  let ipMasterAppend = "";
+  if (project.settings.ipMasterProjectId?.trim()) {
+    const resolved = await resolveIpMasterForDownstream(
+      opts.userId,
+      project.settings.ipMasterProjectId.trim(),
+      project.settings.ipMasterVersion,
+    );
+    if (resolved) {
+      ipMasterAppend = buildIpMasterConstraintBlock(resolved.markdown);
+    }
+  }
   const concurrency = await resolveEcomImageGenConcurrency(
     opts.userId,
     project.settings,
@@ -187,6 +202,7 @@ async function generateHandCraftStepImagesInner(opts: {
         refCount: refImageUrls.length,
         isHeroStep: step.id === "hero",
         settings: project.settings,
+        ipMasterAppend,
       });
 
       try {

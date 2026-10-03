@@ -7,7 +7,6 @@ import {
   Images,
   LayoutGrid,
   Plus,
-  Save,
   Trash2,
 } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -16,7 +15,6 @@ import { useBackgroundGeneration } from "@/components/generation";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { ModelShotPoseMediaStrip } from "@/components/model-shot/model-shot-pose-media-strip";
-import { ModelShotSaveDialog } from "@/components/model-shot/model-shot-save-dialog";
 import {
   ModelShotPosePlanTable,
   type PoseItemPatch,
@@ -40,7 +38,6 @@ import {
   getModelShotProject,
   downloadModelShotExportZip,
   patchModelShotPoseItem,
-  saveModelShotDeliverableSnapshot,
   updateModelShotProject,
   uploadModelShotReference,
 } from "@/lib/ecom-model-shot-api";
@@ -135,8 +132,6 @@ export function ModelShotContentPanel({
     title: string;
     prompt: string;
   } | null>(null);
-  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  const [saveBusy, setSaveBusy] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const imageGenInFlightCountRef = useRef(0);
   const imageGenWatchRef = useRef<number[]>([]);
@@ -746,31 +741,6 @@ export function ModelShotContentPanel({
     }
   }, [alert, project.id, toast]);
 
-  const handleSaveWorkflow = useCallback(
-    async (workName: string) => {
-      setSaveBusy(true);
-      try {
-        const { project: refreshed } = await saveModelShotDeliverableSnapshot(project.id, workName);
-        await onProjectChange(refreshed);
-        setSaveDialogOpen(false);
-        toast({
-          title: "已保存到资产库",
-          message: "可在「我的资产 → 服装模特图 → 工作流」一键复用。",
-          variant: "success",
-        });
-      } catch (e) {
-        await alert({
-          title: "保存失败",
-          message: e instanceof Error ? e.message : "请稍后重试",
-          variant: "error",
-        });
-      } finally {
-        setSaveBusy(false);
-      }
-    },
-    [alert, onProjectChange, project.id, toast],
-  );
-
   const handlePatchItem = useCallback(
     async (index: number, patch: PoseItemPatch) => {
       setBusy(true);
@@ -851,17 +821,8 @@ export function ModelShotContentPanel({
                   />
                 ) : null}
               </EcomIconToolbarGroup>
-              <EcomIconToolbarGroup label="工作流">
-                <EcomIconButtonLink label="暂存工作流" icon={Archive} href="/workflows/drafts" disabled={busy} />
-                <EcomIconButton
-                  label="保存工作流"
-                  icon={Save}
-                  busy={saveBusy}
-                  disabled={!canSave || saveBusy || busy}
-                  onClick={() => setSaveDialogOpen(true)}
-                />
-              </EcomIconToolbarGroup>
               <EcomIconToolbarGroup label="资产与库">
+                <EcomIconButtonLink label="暂存工作流" icon={Archive} href="/workflows/drafts" disabled={busy} />
                 <EcomIconButtonLink label="我的资产" icon={Images} href="/library" disabled={busy} />
                 <EcomIconButtonLink
                   label="姿势 · 场景 · 道具库"
@@ -1007,14 +968,6 @@ export function ModelShotContentPanel({
             document.body,
           )
         : null}
-
-      <ModelShotSaveDialog
-        open={saveDialogOpen}
-        onOpenChange={setSaveDialogOpen}
-        defaultWorkName={project.title?.trim() || "服装模特图"}
-        busy={saveBusy}
-        onConfirm={handleSaveWorkflow}
-      />
 
       <EcomImagePreviewHost
         preview={preview}

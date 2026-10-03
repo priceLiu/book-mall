@@ -18,7 +18,8 @@ function perImageTimeoutMs(imageCount: number): number {
 /** 小红书长图单页引用图多、画布极高，scale 2 时 html2canvas 常需数分钟 */
 export function composeHtml2CanvasScale(stepId: string, refImageCount: number): number {
   if (stepId === "xhs-long") return 1;
-  if (stepId === "portfolio" && refImageCount > 6) return 1.5;
+  /** 品牌 VI 第 8 步单页竖版汇总引用图多，scale>1 易超 canvas 上限或抓白 */
+  if (stepId === "portfolio") return 1;
   if (refImageCount > 12) return 1.5;
   return 2;
 }
@@ -211,4 +212,36 @@ export function revokeComposeSheetBlobUrls(blobUrls: string[]): void {
       /* ignore */
     }
   }
+}
+
+function sampleBandMostlyWhite(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  y0: number,
+): boolean {
+  const sampleW = Math.min(96, w);
+  const sampleH = Math.min(96, h);
+  const y = Math.max(0, Math.min(y0, h - sampleH));
+  const data = ctx.getImageData(0, y, sampleW, sampleH).data;
+  let nonWhite = 0;
+  const pixels = sampleW * sampleH;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i]!;
+    const g = data[i + 1]!;
+    const b = data[i + 2]!;
+    if (r < 250 || g < 250 || b < 250) nonWhite += 1;
+  }
+  return nonWhite / pixels < 0.002;
+}
+
+/** html2canvas 产出是否几乎全白（抓图失败时仍会上传空白 PNG） */
+export function composeCanvasMostlyBlank(canvas: HTMLCanvasElement): boolean {
+  const w = canvas.width;
+  const h = canvas.height;
+  if (w <= 0 || h <= 0) return true;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return true;
+  const bands = [0, Math.floor(h * 0.12), Math.floor(h * 0.35), Math.floor(h * 0.55)];
+  return bands.every((y) => sampleBandMostlyWhite(ctx, w, h, y));
 }
