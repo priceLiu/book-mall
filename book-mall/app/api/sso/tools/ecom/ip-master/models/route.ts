@@ -2,6 +2,7 @@ import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
 import { getUserBillingPersona } from "@/lib/billing/billing-persona";
 import { resolveEcomGatewayAuthForUser } from "@/lib/ecom/ecom-gateway-auth";
+import { STORY_LLM_DEFAULT_VISION_MODEL } from "@/lib/canvas/story-llm-vision-models";
 import {
   ECOM_STORYBOARD_DEFAULT_CHAT_MODEL,
   registryRowsToEcomModels,
@@ -31,8 +32,15 @@ export async function GET(req: Request) {
     boundKinds,
   });
 
+  const mapped = registryRowsToEcomModels(chatModels);
+  const visionDefault =
+    mapped.find((m) => m.modelKey === STORY_LLM_DEFAULT_VISION_MODEL)?.modelKey ??
+    mapped.find((m) => m.modelKey.includes("vl"))?.modelKey ??
+    STORY_LLM_DEFAULT_VISION_MODEL;
+
   return ecomJson({
-    chatModels: registryRowsToEcomModels(chatModels),
+    chatModels: mapped,
     defaultChatModelKey: ECOM_STORYBOARD_DEFAULT_CHAT_MODEL,
+    defaultVisionChatModelKey: visionDefault,
   });
 }

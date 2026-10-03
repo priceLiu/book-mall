@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { ECOM_BRAND_VI_MODULE } from "@/lib/ecom/ecom-brand-vi-types";
 import { ECOM_HAND_CRAFT_MODULE } from "@/lib/ecom/ecom-hand-craft-types";
 import { ECOM_IP_MASTER_MODULE } from "@/lib/ecom/ecom-ip-master-types";
+import { ECOM_POSTER_MODULE } from "@/lib/ecom/ecom-poster-types";
 import { ECOM_MEDIA_DECOMPOSE_MODULE } from "@/lib/ecom/ecom-media-decompose-types";
 import { ECOM_MODEL_SHOT_MODULE } from "@/lib/ecom/ecom-model-shot-types";
 import { parseModelShotPlan } from "@/lib/ecom/ecom-model-shot-types";
@@ -24,6 +25,7 @@ export type EcomWorkflowDraftKind =
   | "hand-craft"
   | "ip-master"
   | "brand-vi"
+  | "poster"
   | "seed-video"
   | "media-decompose"
   | "model-shot";
@@ -260,6 +262,37 @@ async function listIpMasterDrafts(userId: string): Promise<EcomWorkflowDraftItem
   });
 }
 
+async function listPosterDrafts(userId: string): Promise<EcomWorkflowDraftItem[]> {
+  const rows = await prisma.ecomPosterProject.findMany({
+    where: { userId, module: ECOM_POSTER_MODULE, status: { not: "archived" } },
+    orderBy: { updatedAt: "desc" },
+    take: 50,
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      references: true,
+      plan: true,
+      updatedAt: true,
+    },
+  });
+  return rows.map((row) => {
+    const plan = row.plan as { artifacts?: unknown[]; tier?: string; easyPath?: string } | null;
+    const artifactCount = plan?.artifacts?.length ?? 0;
+    return {
+      kind: "poster",
+      projectId: row.id,
+      title: row.title?.trim() || "营销海报",
+      featureLabel: "海报制作",
+      domainLabel: "电商",
+      phaseLabel: plan?.tier === "pro" ? "专业创作" : `傻瓜 · ${plan?.easyPath ?? "C"}`,
+      summary: artifactCount > 0 ? `${artifactCount} 张候选/成图` : "进行中",
+      thumbnailUrl: firstRefUrl(row.references),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  });
+}
+
 async function listHandCraftDrafts(userId: string): Promise<EcomWorkflowDraftItem[]> {
   const rows = await prisma.ecomHandCraftProject.findMany({
     where: { userId, module: ECOM_HAND_CRAFT_MODULE },
@@ -413,23 +446,34 @@ async function listModelShotDrafts(userId: string): Promise<EcomWorkflowDraftIte
 export async function listEcomWorkflowDrafts(
   userId: string,
 ): Promise<EcomWorkflowDraftItem[]> {
-  const [storyboard, productDesign, handCraft, ipMaster, brandVi, seedVideo, mediaDecompose, modelShot] =
-    await Promise.all([
-      listStoryboardDrafts(userId),
-      listProductDesignDrafts(userId),
-      listHandCraftDrafts(userId),
-      listIpMasterDrafts(userId),
-      listBrandViDrafts(userId),
-      listSeedVideoDrafts(userId),
-      listMediaDecomposeDrafts(userId),
-      listModelShotDrafts(userId),
-    ]);
+  const [
+    storyboard,
+    productDesign,
+    handCraft,
+    ipMaster,
+    brandVi,
+    poster,
+    seedVideo,
+    mediaDecompose,
+    modelShot,
+  ] = await Promise.all([
+    listStoryboardDrafts(userId),
+    listProductDesignDrafts(userId),
+    listHandCraftDrafts(userId),
+    listIpMasterDrafts(userId),
+    listBrandViDrafts(userId),
+    listPosterDrafts(userId),
+    listSeedVideoDrafts(userId),
+    listMediaDecomposeDrafts(userId),
+    listModelShotDrafts(userId),
+  ]);
   return [
     ...storyboard,
     ...productDesign,
     ...handCraft,
     ...ipMaster,
     ...brandVi,
+    ...poster,
     ...seedVideo,
     ...mediaDecompose,
     ...modelShot,

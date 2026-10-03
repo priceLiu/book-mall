@@ -1,4 +1,4 @@
-export type IpMasterStepId = "input" | "extract" | "review" | "versions";
+export type IpMasterStepId = "input" | "review" | "versions" | "extract";
 
 export type IpMasterChatMessage = {
   id: string;
@@ -16,6 +16,7 @@ export type IpMasterReference = {
 
 export type IpMasterTemplateVersion = {
   version: string;
+  label?: string;
   markdown: string;
   json?: Record<string, unknown>;
   source: "image" | "text" | "mixed";
@@ -31,6 +32,9 @@ export type IpMasterMeta = {
     currentStepId?: IpMasterStepId;
     activeVersion?: string;
     draftMarkdown?: string;
+    draftTemplate?: Record<string, unknown>;
+    draftImagePrompt?: { positive: string; negative?: string };
+    inputCommitted?: boolean;
   };
   templateVersions?: IpMasterTemplateVersion[];
 };
@@ -53,4 +57,5 @@ export type IpMasterProject = {
 export type IpMasterModelsPayload = {
   chatModels: import("@/lib/storyboard-types").StoryboardGatewayModel[];
   defaultChatModelKey: string;
+  defaultVisionChatModelKey?: string;
 };

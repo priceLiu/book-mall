@@ -55,6 +55,14 @@ pnpm dev:all:stagger                # mall 先就绪，其余子站间隔 3s 错
 - Platform API：`book-mall/app/api/sso/tools/ecom/image-layer/{upload,decompose,edit}`
 - 产品 SSOT：`docs/图片分层.md` · POC：`book-mall/scripts/poc-seedream-image-layer.ts`
 
+### 电商工具箱 · 营销海报制作
+
+- 路由：**http://localhost:3007/brand/poster**（品牌侧栏 · 傻瓜/专业 · 图字分离 · `StoryboardModelPickerDialog`）
+- Platform API：`book-mall/app/api/sso/tools/ecom/poster/*`（projects、auto-plan、generate、compose、batch-generate、export ZIP、festivals）
+- Gateway `clientPage`：`ecom/<userId>/<projectId>/ecom-toolkit__poster__generate`（生图经 `generateEcomImage` + `workspaceId=projectId`）
+- 程序排版：共用 `POST /api/sso/tools/ecom/copy-overlay/compose` 与 `@private/ecom-copy-overlay`
+- 产品 SSOT：`docs/AI 海报.md`
+
 ### 电商工具箱 · IP 母版 Studio
 
 - 路由：**http://localhost:3007/brand/ip**（品牌侧栏 · 四步无解锁）

@@ -2,6 +2,7 @@ import { ecomGatewayLogHeaders, ecomJson } from "@/lib/ecom/ecom-gateway-log-cap
 
 import type { CanvasChatContentPart } from "@/lib/canvas/providers/types";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
+import { parseIpMasterInputMode } from "@/lib/ecom/ecom-ip-master-input-presets";
 import { buildIpMasterSystemPrompt } from "@/lib/ecom/ecom-ip-master-prompts";
 import {
   getEcomIpMasterProject,
@@ -78,9 +79,13 @@ export async function POST(req: Request, ctx: Ctx) {
   const briefDesc =
     typeof project.brief?.description === "string" ? project.brief.description : "";
 
+  const inputMode = parseIpMasterInputMode(
+    (project.brief as { inputMode?: unknown } | null)?.inputMode,
+  );
   const systemPrompt = buildIpMasterSystemPrompt({
     benchmarkCount: project.references.length,
     hasBrief: Boolean(briefDesc.trim()),
+    inputMode,
     currentStepId: project.meta?.workflow?.currentStepId ?? "input",
     draftMarkdown:
       project.meta?.workflow?.draftMarkdown ?? activeTpl?.markdown ?? undefined,
@@ -89,7 +94,8 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const max = getVisionMaxInputImages(modelKey);
-    const refs = project.references.slice(0, max);
+    const refs =
+      inputMode === "2" ? [] : project.references.slice(0, max);
     const gw = await ecomGwChatStream(auth.userId, {
       modelKey,
       messages: [

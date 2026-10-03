@@ -7,6 +7,9 @@ export default function BrandModulePage({
 }: {
   params: { module: string };
 }) {
+  if (params.module === "poster") {
+    notFound();
+  }
   const mod = ECOM_MODULES.find((m) => m.href === `/brand/${params.module}`);
   if (!mod) notFound();
   return <GenerationWorkspace module={mod} />;

@@ -14,16 +14,15 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const { id } = await ctx.params;
 
-  let body: { markdown?: unknown; source?: unknown; json?: unknown };
+  let body: { template?: unknown; imagePrompt?: unknown; libraryLabel?: unknown; source?: unknown };
   try {
     body = (await req.json()) as typeof body;
   } catch {
     return ecomJson({ error: "invalid_json" }, { status: 400 });
   }
 
-  const markdown = typeof body.markdown === "string" ? body.markdown : "";
-  if (!markdown.trim()) {
-    return ecomJson({ error: "模板内容不能为空" }, { status: 400 });
+  if (!body.template || typeof body.template !== "object") {
+    return ecomJson({ error: "缺少 template JSON" }, { status: 400 });
   }
 
   const source =
@@ -31,15 +30,21 @@ export async function POST(req: Request, ctx: Ctx) {
       ? (body.source as IpMasterTemplateSource)
       : undefined;
 
+  const imagePrompt =
+    body.imagePrompt && typeof body.imagePrompt === "object"
+      ? (body.imagePrompt as { positive: string; negative?: string })
+      : undefined;
+
+  const libraryLabel =
+    typeof body.libraryLabel === "string" ? body.libraryLabel.trim() : undefined;
+
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const project = await saveIpMasterTemplateVersion(auth.userId, id, {
-      markdown,
+      template: body.template as Record<string, unknown>,
+      imagePrompt,
+      libraryLabel,
       source,
-      json:
-        body.json && typeof body.json === "object"
-          ? (body.json as Record<string, unknown>)
-          : undefined,
     });
     return ecomJson({ project });
   } catch (e) {

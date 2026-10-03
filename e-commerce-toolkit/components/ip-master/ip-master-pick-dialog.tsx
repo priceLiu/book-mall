@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
 
@@ -28,11 +28,17 @@ export function IpMasterPickDialog({ open, onOpenChange, busy, onConfirm }: Prop
       updatedAt: string;
       thumbnailUrl: string | null;
       activeVersion: string | null;
+      importable?: boolean;
     }>
   >([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [versions, setVersions] = useState<string[]>([]);
+  const [versions, setVersions] = useState<Array<{ version: string; label: string }>>([]);
   const [selectedVersion, setSelectedVersion] = useState<string | undefined>();
+
+  const importableItems = useMemo(
+    () => items.filter((i) => i.importable !== false && i.activeVersion),
+    [items],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -42,7 +48,8 @@ export function IpMasterPickDialog({ open, onOpenChange, busy, onConfirm }: Prop
       .then((list) => {
         if (cancelled) return;
         setItems(list);
-        setSelectedId(list[0]?.id ?? null);
+        const first = list.find((i) => i.importable !== false && i.activeVersion);
+        setSelectedId(first?.id ?? null);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -61,10 +68,13 @@ export function IpMasterPickDialog({ open, onOpenChange, busy, onConfirm }: Prop
     let cancelled = false;
     void getIpMasterProject(selectedId).then((p) => {
       if (cancelled) return;
-      const vs = (p.meta?.templateVersions ?? []).map((v) => v.version);
+      const vs = (p.meta?.templateVersions ?? []).map((v) => ({
+        version: v.version,
+        label: v.label?.trim() || v.version,
+      }));
       setVersions(vs);
       const active =
-        p.meta?.workflow?.activeVersion ?? vs[vs.length - 1] ?? undefined;
+        p.meta?.workflow?.activeVersion ?? vs[vs.length - 1]?.version ?? undefined;
       setSelectedVersion(active);
     });
     return () => {
@@ -77,6 +87,11 @@ export function IpMasterPickDialog({ open, onOpenChange, busy, onConfirm }: Prop
   const dismissOnBackdrop = (e: MouseEvent) => {
     if (e.target === e.currentTarget && !busy) onOpenChange(false);
   };
+
+  const canConfirm =
+    Boolean(selectedId) &&
+    Boolean(selectedVersion) &&
+    importableItems.some((i) => i.id === selectedId);
 
   return createPortal(
     <div
@@ -96,10 +111,10 @@ export function IpMasterPickDialog({ open, onOpenChange, busy, onConfirm }: Prop
         <div className="flex items-start justify-between gap-3 border-b border-[#e8e8ed] p-5">
           <div>
             <h2 id="ip-master-pick-title" className="text-lg font-semibold text-[#1d1d1f]">
-              从 IP 母版载入
+              从母版库导入
             </h2>
             <p className="mt-1 text-sm text-[#6e6e73]">
-              写入固定基准图，并在生图 Prompt 末尾追加母版约束。
+              仅展示已保存「基准图 + 结构化模板」的条目；导入后写入参考图并绑定 Prompt 约束。
             </p>
           </div>
           <EcomDialogCloseButton onClick={() => !busy && onOpenChange(false)} />
@@ -109,13 +124,13 @@ export function IpMasterPickDialog({ open, onOpenChange, busy, onConfirm }: Prop
             <div className="flex justify-center py-8 text-[#86868b]">
               <Loader2 className="h-6 w-6 animate-spin" />
             </div>
-          ) : items.length === 0 ? (
+          ) : importableItems.length === 0 ? (
             <p className="text-sm text-[#6e6e73]">
-              暂无 IP 母版项目。请先在「IP 母版」工作台创建并保存版本。
+              母版库暂无可导入条目。请在「IP 母版」上传基准图、生成结构化模板并保存进母版库。
             </p>
           ) : (
             <ul className="space-y-2">
-              {items.map((item) => {
+              {importableItems.map((item) => {
                 const selected = item.id === selectedId;
                 return (
                   <li key={item.id}>
@@ -164,16 +179,12 @@ export function IpMasterPickDialog({ open, onOpenChange, busy, onConfirm }: Prop
                 disabled={busy}
               >
                 {versions.map((v) => (
-                  <option key={v} value={v}>
-                    {v}
+                  <option key={v.version} value={v.version}>
+                    {v.label}
                   </option>
                 ))}
               </select>
             </div>
-          ) : selectedId ? (
-            <p className="mt-3 text-xs text-[#ff9500]">
-              所选项目尚无已保存版本，载入后仅同步基准图（若有）。
-            </p>
           ) : null}
         </div>
         <div className="flex justify-end gap-2 border-t border-[#e8e8ed] p-5">
@@ -186,13 +197,13 @@ export function IpMasterPickDialog({ open, onOpenChange, busy, onConfirm }: Prop
             取消
           </button>
           <EcomDialogPrimaryButton
-            disabled={busy || !selectedId}
+            disabled={busy || !canConfirm}
             onClick={() => {
-              if (!selectedId) return;
+              if (!selectedId || !canConfirm) return;
               void onConfirm({ ipMasterProjectId: selectedId, version: selectedVersion });
             }}
           >
-            {busy ? "载入中…" : "载入"}
+            {busy ? "导入中…" : "导入"}
           </EcomDialogPrimaryButton>
         </div>
       </div>

@@ -128,6 +128,7 @@ model User {
   ecomHandCraftProjects            EcomHandCraftProject[]
   ecomBrandViProjects              EcomBrandViProject[]
   ecomIpMasterProjects             EcomIpMasterProject[]
+  ecomPosterProjects               EcomPosterProject[]
   ecomProductImageSetProjects      EcomProductImageSetProject[]
   ecomModelShotProjects            EcomModelShotProject[]
   ecomMediaDecomposeProjects       EcomMediaDecomposeProject[]
@@ -797,6 +798,33 @@ model EcomHandCraftProject {
   meta        Json?
 
   /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
+}
+
+/// 电商工具箱 · 营销海报制作（傻瓜/专业 + 图字分离 artifact）
+model EcomPosterProject {
+  id          String  @id @default(cuid())
+  userId      String
+  title       String?
+  module      String  @default("poster")
+  status      String  @default("draft")
+  brief       Json?
+  settings    Json?
+  references  Json?
+  chatHistory Json?
+  plan        Json?
+  meta        Json?
+
   tenantId    String?
   ownerUserId String?
   visibility  AssetVisibility @default(PRIVATE)

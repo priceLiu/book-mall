@@ -15,7 +15,12 @@ export async function linkIpMasterToHandCraftProject(opts: {
     opts.ipMasterProjectId,
     opts.version,
   );
-  if (!resolved) throw new Error("IP 母版不存在或尚无已保存模板");
+  if (!resolved) {
+    throw new Error("母版库条目须含基准图与已保存的结构化模板版本");
+  }
+  if (resolved.references.length === 0) {
+    throw new Error("该母版缺少基准图，无法导入");
+  }
 
   const refs: HandCraftReference[] = resolved.references.map((r, i) => ({
     id: `ip-master-${Date.now()}-${i}`,
@@ -25,11 +30,11 @@ export async function linkIpMasterToHandCraftProject(opts: {
   }));
 
   return updateEcomHandCraftProject(opts.userId, opts.handCraftProjectId, {
-    references: refs.length > 0 ? refs : undefined,
+    references: refs,
     settings: {
       ipMasterProjectId: opts.ipMasterProjectId,
       ipMasterVersion: resolved.version,
-      referenceFromIpMaster: refs.length > 0,
+      referenceFromIpMaster: true,
     },
   });
 }
@@ -45,7 +50,12 @@ export async function linkIpMasterToBrandViProject(opts: {
     opts.ipMasterProjectId,
     opts.version,
   );
-  if (!resolved) throw new Error("IP 母版不存在或尚无已保存模板");
+  if (!resolved) {
+    throw new Error("母版库条目须含基准图与已保存的结构化模板版本");
+  }
+  if (resolved.references.length === 0) {
+    throw new Error("该母版缺少基准图，无法导入");
+  }
 
   const refs: BrandViReference[] = resolved.references.map((r, i) => ({
     id: `ip-master-${Date.now()}-${i}`,
@@ -55,11 +65,11 @@ export async function linkIpMasterToBrandViProject(opts: {
   }));
 
   return updateEcomBrandViProject(opts.userId, opts.brandViProjectId, {
-    references: refs.length > 0 ? refs : undefined,
+    references: refs,
     settings: {
       ipMasterProjectId: opts.ipMasterProjectId,
       ipMasterVersion: resolved.version,
-      referenceFromIpMaster: refs.length > 0,
+      referenceFromIpMaster: true,
     },
   });
 }

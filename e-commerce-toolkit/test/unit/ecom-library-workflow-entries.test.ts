@@ -21,6 +21,7 @@ function emptySection(overrides: Partial<EcomLibrarySection>): EcomLibrarySectio
     mediaDecomposeBundles: [],
     outfitVideoBundles: [],
     modelShotBundles: [],
+    ipMasterLibraryBundles: [],
     ...overrides,
   };
 }

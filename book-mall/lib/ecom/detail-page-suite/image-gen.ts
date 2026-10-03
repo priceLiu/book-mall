@@ -59,10 +59,7 @@ import {
   detailPageSuiteSlotInvolvesModel,
   resolveDetailPageSuiteImageRefPack,
 } from "./image-ref-pack";
-import {
-  buildHitDetailPageImagePrompt,
-  mergeHitDetailPageImageNegativePrompt,
-} from "@/lib/ecom/detail-page-suite-hit/hit-image-prompt";
+import { buildCopyAwareImageGenPlan } from "@/lib/ecom/copy-layout/image-gen-copy-policy";
 import {
   BLANK_PLATE_MODULE_IDS,
   DETAIL_PAGE_SUITE_NEGATIVE_PROMPT,
@@ -430,12 +427,17 @@ export async function generateDetailPageSuiteImages(opts: {
               t.moduleId,
               burnCopyInImage ? { omitSellpointsInPrefix: true } : undefined,
             );
-            if (burnCopyInImage) {
-              prompt = buildHitDetailPageImagePrompt({
-                positivePrompt: prompt,
+            let negativePrompt = mergeSuiteNegativePrompt(t.negativePrompt);
+            if (isHit && t.slotCopy?.trim()) {
+              const plan = buildCopyAwareImageGenPlan({
+                profile: "detail-hit",
+                basePositivePrompt: prompt,
                 slotCopy: t.slotCopy,
-                includeSlotCopyOnImage: true,
+                burnCopyInImage,
+                slotNegative: t.negativePrompt,
               });
+              prompt = plan.promptForModel;
+              negativePrompt = plan.negativePrompt;
             }
             if (refPack.urls.length > 0) {
               prompt = appendDetailPageSuiteImageRefLegend(
@@ -449,9 +451,7 @@ export async function generateDetailPageSuiteImages(opts: {
               userId: opts.userId,
               modelKey,
               prompt,
-              negativePrompt: burnCopyInImage
-                ? mergeHitDetailPageImageNegativePrompt(t.negativePrompt, true)
-                : mergeSuiteNegativePrompt(t.negativePrompt),
+              negativePrompt,
               ratio,
               imageSize: perTargetImageSize,
               refImageUrls: BLANK_PLATE_MODULE_IDS.has(t.moduleId) ? [] : refs,

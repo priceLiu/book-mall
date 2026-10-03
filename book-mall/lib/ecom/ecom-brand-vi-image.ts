@@ -25,7 +25,7 @@ import { resolveEcomImageGenConcurrency } from "@/lib/ecom/ecom-image-gen-concur
 import { getImageGenMaxRefs } from "@/lib/ecom/ecom-product-design-ref-rules";
 import { ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
 import { resolveIpMasterForDownstream } from "@/lib/ecom/ecom-ip-master-service";
-import { buildIpMasterConstraintBlock } from "@/lib/ecom/ecom-ip-master-types";
+import { buildIpMasterConstraintForDownstream } from "@/lib/ecom/ecom-ip-master-template-render";
 import { finalizeIpWorkflowStepAfterBatch } from "@/lib/ecom/ecom-ip-workflow-step-gen-finalize";
 import { withEcomIpWorkflowStepGenerationLock } from "@/lib/ecom/ecom-ip-workflow-step-gen-lock";
 import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
@@ -134,7 +134,10 @@ async function generateBrandViStepImagesInner(opts: {
       project.settings.ipMasterVersion,
     );
     if (resolved) {
-      ipMasterAppend = buildIpMasterConstraintBlock(resolved.markdown);
+      ipMasterAppend = buildIpMasterConstraintForDownstream({
+        template: resolved.template,
+        markdownFallback: resolved.markdown,
+      });
     }
   }
   const concurrency = await resolveEcomImageGenConcurrency(

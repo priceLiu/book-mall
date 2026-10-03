@@ -23,6 +23,7 @@ function loadSkillMd(): string {
 export function buildIpMasterSystemPrompt(opts: {
   benchmarkCount: number;
   hasBrief: boolean;
+  inputMode?: string;
   currentStepId: string | null;
   draftMarkdown?: string;
 }): string {
@@ -36,9 +37,11 @@ export function buildIpMasterSystemPrompt(opts: {
 ---
 
 ## 运行时上下文
+- 输入模式：${opts.inputMode ?? "3"}（1=仅图 2=仅文 3=图文推荐 4=文生基准图再解析）
 - 已上传基准图：${opts.benchmarkCount} 张
 - 已填写文字描述：${opts.hasBrief ? "是" : "否"}
 - 当前逻辑步：第 ${step.no} 步 ${step.label}
+- 模式 3：文字 BRIEF 优先级高于图片识图；模式 4：原始 BRIEF 最高，AI 基准图仅视觉载体
 - 草稿模板：${opts.draftMarkdown?.trim() ? "已有（用户可在中栏编辑）" : "尚无"}
 
 ## 界面规则

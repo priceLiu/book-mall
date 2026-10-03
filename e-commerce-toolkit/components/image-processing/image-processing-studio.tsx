@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ChevronDown,
   ChevronRight,
@@ -277,6 +278,7 @@ function HowToUse({ variant }: { variant: "retouch" | "editor" }) {
 }
 
 export function ImageProcessingStudio() {
+  const router = useRouter();
   const { alert: showAlert } = useDialogs();
   const [tagsExpanded, setTagsExpanded] = useState(false);
   const [activeTag, setActiveTag] = useState<ImageProcessingTagId>("ai-retouch");
@@ -345,6 +347,18 @@ export function ImageProcessingStudio() {
 
   const [submitting, setSubmitting] = useState(false);
   const [results, setResults] = useState<string[]>([]);
+
+  const selectTag = useCallback(
+    (tagId: ImageProcessingTagId) => {
+      if (tagId === "ai-poster-generator") {
+        router.push("/brand/poster");
+        return;
+      }
+      setActiveTag(tagId);
+      setResults([]);
+    },
+    [router],
+  );
 
   const panel =
     activeTag === "ai-image-editor"
@@ -725,10 +739,7 @@ export function ImageProcessingStudio() {
               <button
                 key={tag.id}
                 type="button"
-                onClick={() => {
-                  setActiveTag(tag.id);
-                  setResults([]);
-                }}
+                onClick={() => selectTag(tag.id)}
                 className={cn(
                   "rounded-full border px-2.5 py-1 text-xs transition-colors sm:px-3 sm:py-1.5 sm:text-sm",
                   activeTag === tag.id
@@ -757,10 +768,7 @@ export function ImageProcessingStudio() {
                 <button
                   key={`grid-${tag.id}`}
                   type="button"
-                  onClick={() => {
-                    setActiveTag(tag.id);
-                    setResults([]);
-                  }}
+                  onClick={() => selectTag(tag.id)}
                   className={cn(
                     "rounded-lg border px-3 py-2 text-center text-sm",
                     activeTag === tag.id

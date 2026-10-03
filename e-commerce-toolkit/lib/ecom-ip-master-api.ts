@@ -17,6 +17,10 @@ export async function fetchIpMasterModels(): Promise<IpMasterModelsPayload> {
   return {
     chatModels: (data.chatModels as IpMasterModelsPayload["chatModels"]) ?? [],
     defaultChatModelKey: String(data.defaultChatModelKey ?? ""),
+    defaultVisionChatModelKey:
+      typeof data.defaultVisionChatModelKey === "string"
+        ? data.defaultVisionChatModelKey
+        : undefined,
   };
 }
 
@@ -27,6 +31,7 @@ export async function listIpMasterProjectSummaries(): Promise<
     updatedAt: string;
     thumbnailUrl: string | null;
     activeVersion: string | null;
+    importable?: boolean;
   }>
 > {
   const data = await ecomBookFetch(`${BASE}/projects?summary=1`);
@@ -36,6 +41,7 @@ export async function listIpMasterProjectSummaries(): Promise<
     updatedAt: string;
     thumbnailUrl: string | null;
     activeVersion: string | null;
+    importable?: boolean;
   }>) ?? [];
 }
 
@@ -77,6 +83,21 @@ export async function deleteIpMasterProject(id: string): Promise<void> {
   await ecomBookFetch(`${BASE}/projects/${id}`, { method: "DELETE" });
 }
 
+export async function generateIpMasterBenchmark(
+  projectId: string,
+  opts?: {
+    modelKey?: string;
+    imagePrompt?: { positive: string; negative?: string };
+  },
+): Promise<IpMasterProject> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/refs/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts ?? {}),
+  });
+  return (data as { project: IpMasterProject }).project;
+}
+
 export async function uploadIpMasterBenchmark(
   projectId: string,
   file: File,
@@ -99,14 +120,48 @@ export async function uploadIpMasterBenchmark(
   return data.project;
 }
 
+export async function generateIpMasterTemplate(
+  projectId: string,
+  opts?: {
+    modelKey?: string;
+    regenerateTarget?: import("@/lib/ip-master-template-types").IpMasterRegenerateTarget;
+    draftTemplate?: Record<string, unknown>;
+    draftImagePrompt?: { positive: string; negative?: string };
+  },
+): Promise<{
+  project: IpMasterProject;
+  template: import("@/lib/ip-master-template-types").IpMasterTemplate;
+  imagePrompt: import("@/lib/ip-master-template-types").IpMasterImagePrompt;
+}> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/template/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts ?? {}),
+  });
+  return data as {
+    project: IpMasterProject;
+    template: import("@/lib/ip-master-template-types").IpMasterTemplate;
+    imagePrompt: import("@/lib/ip-master-template-types").IpMasterImagePrompt;
+  };
+}
+
 export async function saveIpMasterTemplate(
   projectId: string,
-  markdown: string,
+  template: import("@/lib/ip-master-template-types").IpMasterTemplate,
+  opts?: {
+    imagePrompt?: import("@/lib/ip-master-template-types").IpMasterImagePrompt;
+    libraryLabel?: string;
+  },
 ): Promise<IpMasterProject> {
+  const { imagePrompt: _omit, ...structured } = template;
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/template/save`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ markdown }),
+    body: JSON.stringify({
+      template: structured,
+      imagePrompt: opts?.imagePrompt ?? template.imagePrompt,
+      libraryLabel: opts?.libraryLabel,
+    }),
   });
   return data.project as IpMasterProject;
 }

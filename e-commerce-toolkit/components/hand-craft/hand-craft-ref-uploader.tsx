@@ -105,7 +105,7 @@ export function HandCraftRefUploader({
               className="h-7 px-2 text-[10px]"
               onClick={onLinkIpMaster}
             >
-              从 IP 母版载入
+              从母版库导入
             </EcomButtonSecondary>
           ) : null}
           {onGenerateSketch ? (

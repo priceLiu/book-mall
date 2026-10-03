@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 
 import { EcomLoginPrompt } from "@/components/auth/ecom-login-prompt";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { IpMasterAssistantPanel } from "@/components/ip-master/ip-master-assistant-panel";
 import { IpMasterContentPanel } from "@/components/ip-master/ip-master-content-panel";
 import { IpMasterProgressRail } from "@/components/ip-master/ip-master-progress-rail";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
@@ -12,12 +11,12 @@ import { ProductCreationStudioSkeleton } from "@/components/product-design/produ
 import { EcomButtonPrimary } from "@/components/ui/ecom-button";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
-import { useEcomStudioAssistantCollapse } from "@/lib/ecom-assistant-collapse";
-import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
 import {
   createIpMasterProject,
   deleteIpMasterProject,
   fetchIpMasterModels,
+  generateIpMasterBenchmark,
+  generateIpMasterTemplate,
   getIpMasterProject,
   listIpMasterProjectSummaries,
   saveIpMasterTemplate,
@@ -31,12 +30,24 @@ import {
   writeEcomLastProjectId,
 } from "@/lib/ecom-last-project";
 import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
-import type { IpMasterProject, IpMasterStepId } from "@/lib/ip-master-types";
 import {
-  activeTemplateMarkdown,
-  inferIpMasterCurrentStep,
-} from "@/lib/ip-master-workflow";
-import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
+  ipMasterProjectHasWork,
+  normalizeIpMasterBrief,
+  parseIpMasterInputMode,
+  validateIpMasterInputForExtract,
+  type IpMasterInputMode,
+} from "@/lib/ip-master-input-presets";
+import type {
+  IpMasterRegenerateTarget,
+  IpMasterTemplate,
+} from "@/lib/ip-master-template-types";
+import { readDraftTemplateFromProject } from "@/lib/ip-master-template-types";
+import type { IpMasterProject, IpMasterStepId } from "@/lib/ip-master-types";
+import { inferIpMasterCurrentStep } from "@/lib/ip-master-workflow";
+import {
+  isIpMasterVisionChatModel,
+  pickIpMasterTemplateChatModel,
+} from "@/lib/ip-master-template-chat-model";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 
 const PROJECT_STORAGE_KEY = "ecom-ip-master-active-project";
@@ -45,30 +56,24 @@ export function IpMasterStudio() {
   const { alert, confirm, doubleConfirm, toast } = useDialogs();
   const [project, setProject] = useState<IpMasterProject | null>(null);
   const [chatModels, setChatModels] = useState<StoryboardGatewayModel[]>([]);
-  const [chatModelKey, setChatModelKey] = useState(ECOM_DEFAULT_CHAT_MODEL_KEY);
+  const [chatModelKey, setChatModelKey] = useState("");
+  const [defaultVisionChatModelKey, setDefaultVisionChatModelKey] = useState("");
   const [modelsLoading, setModelsLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [empty, setEmpty] = useState(false);
   const [needLogin, setNeedLogin] = useState(false);
   const [refBusy, setRefBusy] = useState(false);
+  const [benchmarkGenBusy, setBenchmarkGenBusy] = useState(false);
+  const [templateGenBusy, setTemplateGenBusy] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [saveVersionBusy, setSaveVersionBusy] = useState(false);
-  const [assistantStreaming, setAssistantStreaming] = useState(false);
-  const [assistantWide, setAssistantWide] = useState(false);
-  const { assistantCollapsed, setAssistantCollapsed, handleMainBlankPointerDown } =
-    useEcomStudioAssistantCollapse(assistantStreaming);
   const [currentStepId, setCurrentStepId] = useState<IpMasterStepId>("input");
-  const [draftMarkdown, setDraftMarkdown] = useState("");
-  const [extractInject, setExtractInject] = useState<{ text: string; token: number } | null>(
-    null,
-  );
+  const [draftTemplate, setDraftTemplate] = useState<IpMasterTemplate | null>(null);
 
   const applyProject = useCallback((p: IpMasterProject) => {
     setProject(p);
     setCurrentStepId(inferIpMasterCurrentStep(p));
-    setDraftMarkdown(
-      p.meta?.workflow?.draftMarkdown?.trim() || activeTemplateMarkdown(p) || "",
-    );
+    setDraftTemplate(readDraftTemplateFromProject(p));
     writeEcomLastProjectId(PROJECT_STORAGE_KEY, p.id);
     if (p.settings.chatModelKey) setChatModelKey(p.settings.chatModelKey);
   }, []);
@@ -79,9 +84,7 @@ export function IpMasterStudio() {
       setProject(p);
       writeEcomLastProjectId(PROJECT_STORAGE_KEY, p.id);
       if (p.settings.chatModelKey) setChatModelKey(p.settings.chatModelKey);
-      setDraftMarkdown(
-        p.meta?.workflow?.draftMarkdown?.trim() || activeTemplateMarkdown(p) || "",
-      );
+      setDraftTemplate(readDraftTemplateFromProject(p));
       if (!opts?.preserveStep) {
         setCurrentStepId(inferIpMasterCurrentStep(p));
       }
@@ -89,63 +92,68 @@ export function IpMasterStudio() {
     [],
   );
 
-  const syncProjectFromServer = useCallback(async () => {
-    const id = project?.id;
-    if (!id) return;
-    try {
-      await reload(id, undefined, { preserveStep: true });
-    } catch (e) {
-      await alert({
-        title: "项目同步失败",
-        message: formatEcomTransportError(e),
-        variant: "error",
-      });
-    }
-  }, [alert, project?.id, reload]);
-
   const loadModels = useCallback(async () => {
     setModelsLoading(true);
     try {
       const models = await fetchIpMasterModels();
       setChatModels(models.chatModels);
+      setDefaultVisionChatModelKey(models.defaultVisionChatModelKey ?? "qwen3.8-max");
       setChatModelKey((prev) =>
-        pickBoundStoryboardModelKey(models.chatModels, prev || models.defaultChatModelKey),
+        pickIpMasterTemplateChatModel({
+          models: models.chatModels,
+          preferred: prev || models.defaultChatModelKey,
+          hasBenchmark: Boolean(project?.references.length),
+          defaultChatModelKey: models.defaultChatModelKey,
+          defaultVisionChatModelKey: models.defaultVisionChatModelKey,
+        }),
       );
     } finally {
       setModelsLoading(false);
     }
-  }, []);
+  }, [project?.references.length]);
+
+  useEffect(() => {
+    if (!project?.references.length || chatModels.length === 0) return;
+    if (isIpMasterVisionChatModel(chatModelKey)) return;
+    setChatModelKey(
+      pickIpMasterTemplateChatModel({
+        models: chatModels,
+        preferred: chatModelKey,
+        hasBenchmark: true,
+        defaultChatModelKey: "",
+        defaultVisionChatModelKey,
+      }),
+    );
+  }, [project?.references.length, chatModels, chatModelKey, defaultVisionChatModelKey]);
 
   useEffect(() => {
     let cancelled = false;
-    void loadModels();
-    (async () => {
+    void (async () => {
       try {
+        await loadModels();
         const savedId = readEcomLastProjectId(PROJECT_STORAGE_KEY);
         let initial: IpMasterProject | undefined;
-        let projectId: string | null = null;
         if (savedId) {
           try {
             initial = await getIpMasterProject(savedId);
-            projectId = initial.id;
           } catch {
-            /* stale */
+            clearEcomLastProjectId(PROJECT_STORAGE_KEY);
           }
         }
-        if (!projectId) {
+        if (cancelled) return;
+        if (initial) {
+          applyProject(initial);
+          setEmpty(false);
+        } else {
           const summaries = await listIpMasterProjectSummaries();
-          projectId = summaries[0]?.id ?? null;
+          if (summaries[0]) {
+            await reload(summaries[0].id);
+            setEmpty(false);
+          } else setEmpty(true);
         }
-        if (cancelled) return;
-        if (!projectId) {
-          setEmpty(true);
-          return;
-        }
-        await reload(projectId, initial);
       } catch (e) {
-        if (cancelled) return;
         if (isEcomUnauthorizedError(e)) setNeedLogin(true);
-        else {
+        else if (!cancelled) {
           await alert({
             title: "加载失败",
             message: formatEcomTransportError(e),
@@ -159,13 +167,10 @@ export function IpMasterStudio() {
     return () => {
       cancelled = true;
     };
-  }, [alert, loadModels, reload]);
+  }, [alert, applyProject, loadModels, reload]);
 
   async function handleNewProject() {
-    const hasWork =
-      Boolean(project?.references?.length) ||
-      Boolean(draftMarkdown.trim()) ||
-      (project?.meta?.templateVersions?.length ?? 0) > 0;
+    const hasWork = project ? ipMasterProjectHasWork(project, "") : false;
     await runEcomNewProjectWithSavePrompt({
       confirm,
       hasWorkToSave: Boolean(project && hasWork),
@@ -229,7 +234,7 @@ export function IpMasterStudio() {
   }, []);
 
   async function handleOpenProject(id: string) {
-    if (project?.id === id || assistantStreaming) return;
+    if (project?.id === id) return;
     setLoading(true);
     try {
       await reload(id);
@@ -300,43 +305,78 @@ export function IpMasterStudio() {
     }
   }
 
+  function draftPayloadForPersist(t: IpMasterTemplate) {
+    const { imagePrompt, ...structured } = t;
+    return {
+      draftTemplate: structured as unknown as Record<string, unknown>,
+      draftImagePrompt: imagePrompt,
+    };
+  }
+
   async function changeStep(stepId: IpMasterStepId) {
     setCurrentStepId(stepId);
-    if (!project) return;
+    if (!project || !draftTemplate) return;
+    const { draftTemplate: dt, draftImagePrompt } = draftPayloadForPersist(draftTemplate);
     await updateIpMasterProject(project.id, {
       meta: {
         ...(project.meta ?? {}),
         workflow: {
           ...(project.meta?.workflow ?? {}),
           currentStepId: stepId,
-          draftMarkdown,
+          draftTemplate: dt,
+          draftImagePrompt,
         },
       },
     }).catch(() => undefined);
   }
 
-  async function persistDraftMarkdown(md: string) {
-    setDraftMarkdown(md);
+  async function persistDraftTemplate(t: IpMasterTemplate) {
+    setDraftTemplate(t);
     if (!project) return;
+    const { draftTemplate: dt, draftImagePrompt } = draftPayloadForPersist(t);
     setProject({
       ...project,
       meta: {
         ...(project.meta ?? {}),
         workflow: {
           ...(project.meta?.workflow ?? {}),
-          draftMarkdown: md,
+          draftTemplate: dt,
+          draftImagePrompt,
         },
       },
     });
   }
 
-  async function handleSaveVersion() {
-    if (!project || !draftMarkdown.trim()) return;
+  async function handleSaveVersion(libraryLabel: string) {
+    if (!project || !draftTemplate) return;
+    if (project.references.length === 0) {
+      await alert({
+        title: "无法保存",
+        message: "母版库条目须同时包含基准图与结构化模板。请先上传或生成基准图。",
+        variant: "error",
+      });
+      return;
+    }
     setSaveVersionBusy(true);
     try {
-      const next = await saveIpMasterTemplate(project.id, draftMarkdown);
+      const tpl = {
+        ...draftTemplate,
+        ipMeta: {
+          ...draftTemplate.ipMeta,
+          ipId: project.id,
+          baseImageUrl: project.references[0]!.ossUrl,
+        },
+      };
+      const next = await saveIpMasterTemplate(project.id, tpl, {
+        imagePrompt: draftTemplate.imagePrompt,
+        libraryLabel,
+      });
       applyProject(next);
-      toast({ title: "版本已保存", message: "模板新版本已写入项目。", variant: "success" });
+      toast({
+        title: "已写入我的资产 · 母版库",
+        message: `「${libraryLabel}」已保存，可在「我的资产 → 母版库」查看；手办 / 品牌 VI 可从此导入。`,
+        variant: "success",
+      });
       setCurrentStepId("versions");
     } catch (e) {
       await alert({
@@ -361,18 +401,102 @@ export function IpMasterStudio() {
 
   async function handleBriefChange(text: string) {
     if (!project) return;
+    const inputMode = parseIpMasterInputMode(project.brief?.inputMode);
     const next = await updateIpMasterProject(project.id, {
-      brief: { ...(project.brief ?? {}), description: text },
+      brief: { ...(project.brief ?? {}), description: text, inputMode },
     });
     setProject(next);
   }
 
-  function handleRequestExtract() {
-    setCurrentStepId("extract");
-    setExtractInject((prev) => ({
-      text: "请根据当前基准图与 Brief，按 IP 母版 Skill 输出完整 Markdown 模板（可直接保存为版本）。",
-      token: (prev?.token ?? 0) + 1,
-    }));
+  async function handleInputModeChange(mode: IpMasterInputMode) {
+    if (!project) return;
+    const next = await updateIpMasterProject(project.id, {
+      brief: { ...(project.brief ?? {}), inputMode: mode },
+    });
+    setProject(next);
+  }
+
+  async function handleGenerateBenchmark() {
+    if (!project || !draftTemplate) return;
+    const positive = draftTemplate.imagePrompt?.positive?.trim();
+    if (!positive) {
+      await alert({
+        title: "无法生成",
+        message: "请先在审阅页填写或生成生图正向提示词。",
+        variant: "error",
+      });
+      return;
+    }
+    setBenchmarkGenBusy(true);
+    try {
+      const next = await generateIpMasterBenchmark(project.id, {
+        imagePrompt: draftTemplate.imagePrompt,
+      });
+      applyProject(next);
+      toast({ title: "基准立绘已生成", message: "已写入基准图槽位。", variant: "success" });
+    } catch (e) {
+      await alert({
+        title: "生成失败",
+        message: formatEcomTransportError(e),
+        variant: "error",
+      });
+    } finally {
+      setBenchmarkGenBusy(false);
+    }
+  }
+
+  async function runTemplateGenerate(regenerateTarget?: IpMasterRegenerateTarget) {
+    if (!project || !draftTemplate) return;
+    const mode = parseIpMasterInputMode(project.brief?.inputMode);
+    const briefText =
+      typeof project.brief?.description === "string" ? project.brief.description : "";
+    const err = validateIpMasterInputForExtract({
+      mode,
+      hasBenchmark: project.references.length > 0,
+      briefText,
+    });
+    if (err) {
+      void alert({ title: "无法生成", message: err, variant: "error" });
+      return;
+    }
+    const { draftTemplate: dt, draftImagePrompt } = draftPayloadForPersist(draftTemplate);
+    setTemplateGenBusy(true);
+    try {
+      const { project: next, template, imagePrompt } = await generateIpMasterTemplate(
+        project.id,
+        {
+          modelKey: chatModelKey || undefined,
+          regenerateTarget,
+          draftTemplate: regenerateTarget ? dt : undefined,
+          draftImagePrompt: regenerateTarget ? draftImagePrompt : undefined,
+        },
+      );
+      const merged = { ...template, imagePrompt };
+      applyProject(next);
+      setDraftTemplate(merged);
+      setCurrentStepId("review");
+      toast({
+        title: regenerateTarget ? "已重新生成" : "草稿已生成",
+        message: "请确认生图提示词与结构化字段，再生成基准图或保存入库。",
+        variant: "success",
+      });
+    } catch (e) {
+      await alert({
+        title: "生成失败",
+        message: formatEcomTransportError(e),
+        variant: "error",
+      });
+    } finally {
+      setTemplateGenBusy(false);
+    }
+  }
+
+  async function handleGenerateTemplate() {
+    await runTemplateGenerate(undefined);
+  }
+
+  async function handleRegenerateTemplate(target: IpMasterRegenerateTarget) {
+    await runTemplateGenerate(target);
   }
 
   if (needLogin) return <EcomLoginPrompt returnPath="/brand/ip" />;
@@ -382,7 +506,7 @@ export function IpMasterStudio() {
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6">
         <h1 className="text-xl font-semibold text-[#1d1d1f]">IP 母版</h1>
         <p className="max-w-md text-center text-sm text-[#6e6e73]">
-          建立固定基准图与 Markdown 模板版本，供手办盲盒 SOP 与品牌VI表情包SOP 载入。
+          傻瓜式输入 → 大模型生成结构化模板 → 保存基准图与模板进母版库，供手办 / 品牌 VI 导入。
         </p>
         <EcomButtonPrimary type="button" onClick={() => void handleStartFirst()}>
           开始第一个母版
@@ -390,42 +514,23 @@ export function IpMasterStudio() {
       </div>
     );
   }
-  if (!project) return <ProductCreationStudioSkeleton />;
+  if (!project || !draftTemplate) return <ProductCreationStudioSkeleton />;
 
   return (
     <EcomWorkspaceLayout
-      assistantWide={assistantWide}
-      assistantCollapsed={assistantCollapsed}
-      onMainBlankPointerDown={handleMainBlankPointerDown}
+      fullWidth
       progress={
         <IpMasterProgressRail
           currentStepId={currentStepId}
           onStepClick={(id) => void changeStep(id)}
         />
       }
-      assistant={
-        <IpMasterAssistantPanel
-          key={project.id}
-          project={project}
-          chatModels={chatModels}
-          chatModelKey={chatModelKey}
-          composerWide={assistantWide}
-          onComposerWideChange={setAssistantWide}
-          collapsed={assistantCollapsed}
-          onCollapsedChange={setAssistantCollapsed}
-          onStreamingChange={setAssistantStreaming}
-          onProjectChange={syncProjectFromServer}
-          onAssistantMarkdown={(md) => void persistDraftMarkdown(md)}
-          onAlert={alert}
-          injectUserMessage={extractInject}
-        />
-      }
     >
       <IpMasterContentPanel
         project={project}
         currentStepId={currentStepId}
-        draftMarkdown={draftMarkdown}
-        onDraftMarkdownChange={(md) => void persistDraftMarkdown(md)}
+        draftTemplate={draftTemplate}
+        onDraftTemplateChange={(t) => void persistDraftTemplate(t)}
         onStepChange={(id) => void changeStep(id)}
         onRefUpload={handleRefUpload}
         refBusy={refBusy}
@@ -437,9 +542,18 @@ export function IpMasterStudio() {
         loadProjectList={loadProjectList}
         onOpenProject={(id) => void handleOpenProject(id)}
         onDeleteProject={() => void handleDeleteProject()}
-        onRequestExtract={handleRequestExtract}
         onBriefChange={handleBriefChange}
-        streaming={assistantStreaming}
+        inputMode={parseIpMasterInputMode(project.brief?.inputMode)}
+        onInputModeChange={(mode) => void handleInputModeChange(mode)}
+        onGenerateBenchmark={handleGenerateBenchmark}
+        benchmarkGenBusy={benchmarkGenBusy}
+        onGenerateTemplate={() => void handleGenerateTemplate()}
+        onRegenerateTemplate={(t) => void handleRegenerateTemplate(t)}
+        templateGenBusy={templateGenBusy}
+        modelsLoading={modelsLoading}
+        chatModelKey={chatModelKey}
+        onChatModelKeyChange={setChatModelKey}
+        chatModels={chatModels}
       />
     </EcomWorkspaceLayout>
   );

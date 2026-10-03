@@ -1,13 +1,13 @@
 "use client";
 
+import { useState } from "react";
+
 import {
   EcomCopyOverlayCanvas,
   EcomCopyOverlayLayerControls,
-  resolveOverlayForEditor,
-  syncOverlayMainLayerText,
+  useEcomCopyOverlayEditorState,
   type EcomCopyOverlay,
 } from "@private/ecom-copy-overlay";
-import { useEffect, useState } from "react";
 
 import { composeEcomCopyOverlayViaBook } from "@/lib/ecom/copy-overlay-compose-api";
 
@@ -24,7 +24,7 @@ type Props = {
 };
 
 /**
- * 画布图片节点等场景：复用 @private/ecom-copy-overlay 编辑 + book-mall 合成 API。
+ * 画布图片节点：与电商 EcomCopyLayoutStudioDialog 共用 overlay 编辑状态机 + book-mall 合成 API。
  */
 export function EcomCopyOverlayEditDialog({
   open,
@@ -37,39 +37,23 @@ export function EcomCopyOverlayEditDialog({
   aspectClassName = "aspect-[3/4]",
   onComposed,
 }: Props) {
-  const [text, setText] = useState(initialText);
-  const [overlay, setOverlay] = useState<EcomCopyOverlay>(() =>
-    resolveOverlayForEditor({
-      overlay: overlayProp,
-      text: initialText,
-      exportWidthPx,
-      baseImageUrl,
-    }),
-  );
-  const [selectedLayerId, setSelectedLayerId] = useState<string | null>("main");
+  const {
+    text,
+    setText,
+    overlay,
+    setOverlay,
+    selectedLayerId,
+    setSelectedLayerId,
+    selectedLayer,
+  } = useEcomCopyOverlayEditorState({
+    open,
+    initialText,
+    overlayProp,
+    exportWidthPx,
+    baseImageUrl,
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const selectedLayer = overlay.layers.find((l) => l.id === selectedLayerId) ?? overlay.layers[0];
-
-  useEffect(() => {
-    if (!open) return;
-    setText(initialText);
-    setOverlay(
-      resolveOverlayForEditor({
-        overlay: overlayProp,
-        text: initialText,
-        exportWidthPx,
-        baseImageUrl,
-      }),
-    );
-    setError(null);
-  }, [open, initialText, overlayProp, exportWidthPx, baseImageUrl]);
-
-  useEffect(() => {
-    if (!open) return;
-    setOverlay((prev) => syncOverlayMainLayerText(prev, text));
-  }, [text, open]);
 
   return open ? (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4">

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronDown,
   ChevronRight,
@@ -45,6 +45,7 @@ import {
   type EcomLibraryProductDesignBundle,
   type EcomLibrarySection,
   type EcomLibrarySeedVideoBundle,
+  type EcomLibraryIpMasterBundle,
   type EcomLibraryStoryboardBundle,
 } from "@/lib/ecom-library-api";
 import { isReusableLibraryWorkflowEntryKind } from "@/lib/ecom-library-workflow-policy";
@@ -65,13 +66,26 @@ const STORYBOARD_STORAGE_KEY = "ecom-storyboard-active-project";
 const SEED_VIDEO_STORAGE_KEY = "ecom-seed-video-active-project";
 const DOMAIN_ORDER = ["电商", "视频", "品牌"] as const;
 
-type LibraryTab = "all" | "ecom" | "video" | "brand" | "workflows";
+type LibraryTab =
+  | "all"
+  | "ecom"
+  | "video"
+  | "brand"
+  | "ip-master-library"
+  | "workflows";
+
+const IP_MASTER_PROJECT_STORAGE_KEY = "ecom-ip-master-active-project";
 
 const LIBRARY_TABS: Array<{ id: LibraryTab; label: string; hint?: string }> = [
   { id: "all", label: "全部" },
   { id: "ecom", label: "电商" },
   { id: "video", label: "视频" },
   { id: "brand", label: "品牌" },
+  {
+    id: "ip-master-library",
+    label: "母版库",
+    hint: "基准图 + 结构化模板，供手办 / 品牌 VI 导入",
+  },
   {
     id: "workflows",
     label: "工作流",
@@ -133,6 +147,10 @@ function LibraryTabBar({
             我的工作流 · 暂存
           </Link>
           继续编辑。
+        </p>
+      ) : active === "ip-master-library" ? (
+        <p className="mt-2 text-[11px] text-[#6e6e73]">
+          在「IP 母版」审阅页保存的条目会出现在此；每条含基准图与结构化模板，可打开源项目继续编辑。
         </p>
       ) : (
         <p className="mt-2 text-[11px] text-[#6e6e73]">
@@ -208,6 +226,15 @@ type LibraryProjectEntry =
       meta: string;
       sortKey: string;
       bundle: EcomLibrarySeedVideoBundle;
+    }
+  | {
+      kind: "ip-master-library";
+      key: string;
+      projectName: string;
+      thumbnailUrl: string | null;
+      meta: string;
+      sortKey: string;
+      bundle: EcomLibraryIpMasterBundle;
     };
 
 function thumbnailFromAssetGroup(group: EcomLibraryAssetGroup): string | null {
@@ -297,6 +324,18 @@ function buildSectionProjectEntries(section: EcomLibrarySection): LibraryProject
     });
   }
 
+  for (const bundle of section.ipMasterLibraryBundles ?? []) {
+    entries.push({
+      kind: "ip-master-library",
+      key: `ipm:${bundle.projectId}:${bundle.version}`,
+      projectName: bundle.label,
+      thumbnailUrl: bundle.thumbnailUrl,
+      meta: `${bundle.version} · 基准图 + 结构化模板 · ${new Date(bundle.savedAt).toLocaleString("zh-CN")}`,
+      sortKey: bundle.savedAt,
+      bundle,
+    });
+  }
+
   entries.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
   return entries;
 }
@@ -343,6 +382,7 @@ function LibraryProjectThumb({
 
 export default function LibraryPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { doubleConfirm, alert } = useDialogs();
   const [sections, setSections] = useState<EcomLibrarySection[]>([]);
   const [totalAssets, setTotalAssets] = useState(0);
@@ -361,6 +401,13 @@ export default function LibraryPage() {
     projectId: string;
     title: string;
   } | null>(null);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "ip-master-library") {
+      setActiveTab("ip-master-library");
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     setLoadError(null);
@@ -382,6 +429,7 @@ export default function LibraryPage() {
       ecom: 0,
       video: 0,
       brand: 0,
+      "ip-master-library": 0,
       workflows: 0,
     };
     counts.workflows = countWorkflowTabEntries(sections);
@@ -390,15 +438,24 @@ export default function LibraryPage() {
       if (section.domainLabel === "电商") counts.ecom += mediaCount;
       if (section.domainLabel === "视频") counts.video += mediaCount;
       if (section.domainLabel === "品牌") counts.brand += mediaCount;
+      if (section.moduleId === "ip-master-library") {
+        counts["ip-master-library"] = section.ipMasterLibraryBundles?.length ?? 0;
+      }
     }
     return counts;
   }, [sections, totalAssets, totalBundles]);
 
   const filteredSectionsByDomain = useMemo(() => {
     if (activeTab === "workflows") return [];
+    if (activeTab === "ip-master-library") {
+      const section = sections.find((s) => s.moduleId === "ip-master-library");
+      if (!section || buildSectionProjectEntries(section).length === 0) return [];
+      return [{ domain: "品牌", sections: [section] }];
+    }
     const domainFilter = domainForTab(activeTab);
     const map = new Map<string, EcomLibrarySection[]>();
     for (const section of sections) {
+      if (section.moduleId === "ip-master-library") continue;
       if (domainFilter && section.domainLabel !== domainFilter) continue;
       const list = map.get(section.domainLabel) ?? [];
       list.push(section);
@@ -522,6 +579,11 @@ export default function LibraryPage() {
         variant: "error",
       });
     }
+  }
+
+  function onOpenIpMasterProject(projectId: string) {
+    writeEcomLastProjectId(IP_MASTER_PROJECT_STORAGE_KEY, projectId);
+    router.push("/brand/ip");
   }
 
   async function onOpenSeedVideoProject(projectId: string) {
@@ -675,7 +737,9 @@ export default function LibraryPage() {
             <p className="mt-6 text-sm text-[#6e6e73]">
               {activeTab === "workflows"
                 ? "暂无已保存工作流。请在主图/详情页创作、种草视频或电商口播故事版工作台点「保存工作流」后，在此一键复用或复制打开。"
-                : "该分类暂无资产，去各模块生成后会出现在对应 Tab。"}
+                : activeTab === "ip-master-library"
+                  ? "母版库暂无条目。请在「IP 母版」完成基准图与结构化模板后，点「保存进母版库」。"
+                  : "该分类暂无资产，去各模块生成后会出现在对应 Tab。"}
             </p>
           ) : activeTab === "workflows" ? (
             <div className="mt-6 space-y-10">
@@ -704,6 +768,7 @@ export default function LibraryPage() {
                       onReuseProductDesignBundle={onReuseProductDesignBundle}
                       onReuseSeedVideoBundle={onReuseSeedVideoBundle}
                       onOpenSeedVideoProject={onOpenSeedVideoProject}
+                      onOpenIpMasterProject={onOpenIpMasterProject}
                     />
                   ))}
                 </div>
@@ -713,7 +778,9 @@ export default function LibraryPage() {
             <div className="mt-6 space-y-10">
               {filteredSectionsByDomain.map(({ domain, sections: domainSections }) => (
                 <div key={domain} className="space-y-8">
-                  <h2 className="text-base font-semibold text-[#1d1d1f]">{domain}</h2>
+                  {activeTab !== "ip-master-library" ? (
+                    <h2 className="text-base font-semibold text-[#1d1d1f]">{domain}</h2>
+                  ) : null}
                   {domainSections.map((section) => {
                     const projectEntries = buildSectionProjectEntries(section);
                     if (projectEntries.length === 0) return null;
@@ -739,6 +806,7 @@ export default function LibraryPage() {
                         onReuseProductDesignBundle={onReuseProductDesignBundle}
                         onReuseSeedVideoBundle={onReuseSeedVideoBundle}
                         onOpenSeedVideoProject={onOpenSeedVideoProject}
+                        onOpenIpMasterProject={onOpenIpMasterProject}
                       />
                     );
                   })}
@@ -806,6 +874,7 @@ function LibrarySectionBlock({
   onReuseProductDesignBundle,
   onReuseSeedVideoBundle,
   onOpenSeedVideoProject,
+  onOpenIpMasterProject,
 }: {
   section: EcomLibrarySection;
   projectEntries: Array<LibraryProjectEntry | LibraryWorkflowEntry>;
@@ -822,6 +891,7 @@ function LibrarySectionBlock({
   onReuseProductDesignBundle: (bundle: EcomLibraryProductDesignBundle) => void;
   onReuseSeedVideoBundle: (bundle: EcomLibrarySeedVideoBundle) => void;
   onOpenSeedVideoProject: (projectId: string) => void;
+  onOpenIpMasterProject: (projectId: string) => void;
 }) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
@@ -853,6 +923,7 @@ function LibrarySectionBlock({
             onReuseProductDesignBundle={onReuseProductDesignBundle}
             onReuseSeedVideoBundle={onReuseSeedVideoBundle}
             onOpenSeedVideoProject={onOpenSeedVideoProject}
+            onOpenIpMasterProject={onOpenIpMasterProject}
           />
         ))}
       </ul>
@@ -878,6 +949,7 @@ function LibraryProjectListItem({
   onReuseProductDesignBundle,
   onReuseSeedVideoBundle,
   onOpenSeedVideoProject,
+  onOpenIpMasterProject,
 }: {
   entry: LibraryProjectEntry | LibraryWorkflowEntry;
   section: EcomLibrarySection;
@@ -896,6 +968,7 @@ function LibraryProjectListItem({
   onReuseProductDesignBundle: (bundle: EcomLibraryProductDesignBundle) => void;
   onReuseSeedVideoBundle: (bundle: EcomLibrarySeedVideoBundle) => void;
   onOpenSeedVideoProject: (projectId: string) => void;
+  onOpenIpMasterProject: (projectId: string) => void;
 }) {
   const isVideoThumb = libraryThumbIsVideo(
     entry.thumbnailUrl,
@@ -924,6 +997,11 @@ function LibraryProjectListItem({
           }
         : null;
 
+  const quickOpenIpMaster =
+    entry.kind === "ip-master-library"
+      ? { projectId: entry.bundle.projectId }
+      : null;
+
   return (
     <li className="overflow-hidden rounded-xl border border-[#e8e8ed] bg-white shadow-sm">
       <button
@@ -941,6 +1019,19 @@ function LibraryProjectListItem({
           <p className="truncate text-sm font-medium text-[#1d1d1f]">{entry.projectName}</p>
           <p className="truncate text-[11px] text-[#6e6e73]">{entry.meta}</p>
         </div>
+        {quickOpenIpMaster ? (
+          <button
+            type="button"
+            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-[#e8e8ed] bg-white px-2.5 text-[11px] font-medium text-[#1d1d1f] hover:bg-[#f5f5f7]"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenIpMasterProject(quickOpenIpMaster.projectId);
+            }}
+          >
+            <ExternalLink className="h-3 w-3" />
+            打开 IP 母版
+          </button>
+        ) : null}
         {quickOpenStoryboard ? (
           <button
             type="button"
@@ -985,6 +1076,7 @@ function LibraryProjectListItem({
             onReuseProductDesignBundle={onReuseProductDesignBundle}
             onReuseSeedVideoBundle={onReuseSeedVideoBundle}
             onOpenSeedVideoProject={onOpenSeedVideoProject}
+            onOpenIpMasterProject={onOpenIpMasterProject}
           />
         </div>
       ) : null}
@@ -1008,6 +1100,7 @@ function LibraryProjectExpandedContent({
   onReuseProductDesignBundle,
   onReuseSeedVideoBundle,
   onOpenSeedVideoProject,
+  onOpenIpMasterProject,
 }: {
   entry: LibraryProjectEntry | LibraryWorkflowEntry;
   section: EcomLibrarySection;
@@ -1024,6 +1117,7 @@ function LibraryProjectExpandedContent({
   onReuseProductDesignBundle: (bundle: EcomLibraryProductDesignBundle) => void;
   onReuseSeedVideoBundle: (bundle: EcomLibrarySeedVideoBundle) => void;
   onOpenSeedVideoProject: (projectId: string) => void;
+  onOpenIpMasterProject: (projectId: string) => void;
 }) {
   if (entry.kind === "assets") {
     const canContinue =
@@ -1234,6 +1328,42 @@ function LibraryProjectExpandedContent({
         >
           <RotateCcw className="h-3.5 w-3.5" />
           {busy ? "复用中…" : "一键复用"}
+        </button>
+      </div>
+    );
+  }
+
+  if (entry.kind === "ip-master-library") {
+    const bundle = entry.bundle;
+    const thumb = bundle.thumbnailUrl?.trim() ?? "";
+    return (
+      <div className="space-y-3">
+        {thumb ? (
+          <div className="max-w-[140px]">
+            <EcomMediaLibraryTile
+              kind="image"
+              src={thumb}
+              alt={title}
+              onPreview={() => onPreviewImage(buildEcomOssThumbUrl(thumb), title)}
+              onDownload={() =>
+                void downloadMediaUrl(
+                  thumb,
+                  mediaDownloadFilename(title, "image", thumb),
+                )
+              }
+            />
+          </div>
+        ) : null}
+        <p className="text-[11px] text-[#6e6e73]">
+          模板版本 {bundle.version} · 手办 / 品牌 VI 可通过「从母版库导入」选用本条目。
+        </p>
+        <button
+          type="button"
+          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#1d1d1f] bg-[#1d1d1f] px-3 text-xs font-medium text-white hover:bg-black"
+          onClick={() => onOpenIpMasterProject(bundle.projectId)}
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          打开 IP 母版项目
         </button>
       </div>
     );

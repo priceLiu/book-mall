@@ -463,6 +463,15 @@
 
 ---
 
+## 2026-10-03 — 营销海报制作项目表
+
+- **迁移目录**：`prisma/migrations/20261003120000_ecom_poster_project/`
+- **新表**：`EcomPosterProject`——与品牌 VI / IP 母版同构 JSON 字段；`plan` 存 `EcomCopyImageArtifact[]`、傻瓜路径与 autoPlan
+- **应用**：`pnpm db:apply-pending` + `pnpm db:generate`
+- **产品 SSOT**：`docs/AI 海报.md`
+
+---
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

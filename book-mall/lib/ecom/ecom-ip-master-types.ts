@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export const ECOM_IP_MASTER_TOOL_KEY = "ecom-toolkit__ip";
 export const ECOM_IP_MASTER_MODULE = "ip-master";
+/** 我的资产 · 母版库（基准图 + 结构化模板条目） */
+export const ECOM_IP_MASTER_LIBRARY_MODULE = "ip-master-library";
 
 export const IP_MASTER_BENCHMARK_MAX = 1;
 
@@ -23,6 +25,8 @@ export type IpMasterTemplateSource = "image" | "text" | "mixed";
 
 export type IpMasterTemplateVersion = {
   version: string;
+  /** 母版库条目显示名（用户可改；缺省为系统生成的「IP名 · 版本号」） */
+  label?: string;
   markdown: string;
   json?: Record<string, unknown>;
   source: IpMasterTemplateSource;
@@ -38,6 +42,9 @@ export type IpMasterMeta = {
     currentStepId?: string;
     activeVersion?: string;
     draftMarkdown?: string;
+    draftTemplate?: Record<string, unknown>;
+    draftImagePrompt?: { positive: string; negative?: string };
+    inputCommitted?: boolean;
   };
   templateVersions?: IpMasterTemplateVersion[];
   workflowSnapshot?: unknown;

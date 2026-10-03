@@ -249,6 +249,34 @@ export function buildCameraAnglePrompt(
   return extra ? `${base} Additional guidance: ${extra}` : base;
 }
 
+export const POSTER_ECOM_STYLE_IDS = [
+  "promo-sale",
+  "new-arrival",
+  "festival-mood",
+  "live-stream",
+  "guochao",
+  "minimal-promo",
+  "premium-brand",
+] as const;
+
+export type PosterEcomStyleId = (typeof POSTER_ECOM_STYLE_IDS)[number];
+
+const POSTER_ECOM_STYLE_HINTS: Record<string, string> = {
+  "promo-sale":
+    "E-commerce promotion poster photography, bold sale atmosphere, product hero, clean title safe area.",
+  "new-arrival":
+    "Fresh product launch poster, bright lifestyle or studio shot, minimalist headline space.",
+  "festival-mood":
+    "Seasonal festival commercial poster mood, decorative elements, saturated but clean composition.",
+  "live-stream":
+    "Live commerce preview poster, spotlight on product, vertical-friendly composition.",
+  guochao: "Guochao style commercial poster, modern Chinese aesthetic, product focus.",
+  "minimal-promo":
+    "Minimal e-commerce promo poster, white or soft gradient background, single product focus.",
+  "premium-brand":
+    "Premium brand campaign poster, refined lighting, luxury retail aesthetic.",
+};
+
 export const POSTER_STYLE_IDS = [
   "concert",
   "movie",
@@ -295,6 +323,29 @@ export function buildPosterPrompt(opts: {
       ? `Print aspect ratio / format: ${opts.printFormat.trim()}.`
       : "",
     "High resolution, sharp typography areas, balanced composition, no watermark.",
+  ].filter(Boolean);
+  return parts.join(" ");
+}
+
+/** 营销海报 Studio · 无字摄影场景 prompt（文案走程序排版） */
+export function buildMarketingPosterScenePrompt(opts: {
+  sceneDescription: string;
+  styleId: string;
+  festivalHint?: string;
+  aspectRatio?: string;
+  brandHint?: string;
+}): string {
+  const style =
+    POSTER_ECOM_STYLE_HINTS[opts.styleId] ??
+    POSTER_ECOM_STYLE_HINTS["promo-sale"];
+  const parts = [
+    "Professional e-commerce marketing poster photography, no readable text on image.",
+    style,
+    opts.festivalHint?.trim() ? `Campaign mood: ${opts.festivalHint.trim()}.` : "",
+    opts.brandHint?.trim() ? `Brand color mood reference: ${opts.brandHint.trim()}.` : "",
+    `Scene: ${opts.sceneDescription.trim()}.`,
+    opts.aspectRatio?.trim() ? `Aspect ratio ${opts.aspectRatio.trim()}.` : "",
+    "Leave clear safe area for headline overlay, sharp product details, commercial lighting.",
   ].filter(Boolean);
   return parts.join(" ");
 }

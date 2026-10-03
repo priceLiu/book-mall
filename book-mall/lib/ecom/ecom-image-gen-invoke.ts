@@ -130,8 +130,9 @@ async function generateMultimodalSyncImage(opts: {
   imageSize?: string;
   refImageUrls: string[];
   toolKey: string;
+  workspaceId?: string;
 }): Promise<string> {
-  const workspaceId = randomUUID().slice(0, 8);
+  const workspaceId = opts.workspaceId?.trim() || randomUUID().slice(0, 8);
   const clientPage = ecomClientPage(opts.userId, workspaceId, opts.toolKey);
   const refs =
     !isZImageTurboModel(opts.modelKey) && opts.refImageUrls.length > 0
@@ -186,13 +187,15 @@ export async function generateEcomImage(opts: {
   refImageUrls: string[];
   /** Gateway clientPage 里的计费 toolKey（含 action 后缀） */
   toolKey: string;
+  /** 稳定 workspaceId（如 projectId）；缺省为随机短 id */
+  workspaceId?: string;
 }): Promise<string> {
   const prompt = String(opts.prompt ?? "").trim();
   if (!prompt) {
     throw new Error("生图 Prompt 为空，请先完成视觉分析");
   }
   assertEcomStoryboardImageEditRefs(opts.modelKey, opts.refImageUrls.length);
-  const workspaceId = randomUUID().slice(0, 8);
+  const workspaceId = opts.workspaceId?.trim() || randomUUID().slice(0, 8);
   const clientPage = ecomClientPage(opts.userId, workspaceId, opts.toolKey);
 
   if (isDashscopeMultimodalImageGenModel(opts.modelKey)) {

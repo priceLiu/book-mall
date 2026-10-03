@@ -614,7 +614,7 @@ export function BrandViContentPanel({
             else await onProjectChange();
             setIpPickOpen(false);
             toast({
-              title: "已载入 IP 母版",
+              title: "已从母版库导入",
               message: hadOwnRefs
                 ? "基准图与 Prompt 约束已更新；若与自上传参考图并存，请以母版或参考图其一为准。"
                 : "基准图与 Prompt 约束已写入本项目。",

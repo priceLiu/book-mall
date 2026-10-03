@@ -2,6 +2,22 @@ import { Prisma } from "@prisma/client";
 
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
 import {
+  IP_MASTER_DEFAULT_BRIEF,
+  IP_MASTER_DEFAULT_INPUT_MODE,
+} from "@/lib/ecom/ecom-ip-master-input-presets";
+import {
+  isIpMasterTemplateLibraryReady,
+  parseIpMasterTemplateJson,
+} from "@/lib/ecom/ecom-ip-master-template-schema";
+import {
+  ipMasterTemplateToMarkdown,
+} from "@/lib/ecom/ecom-ip-master-template-render";
+import { persistIpMasterLibraryAsset } from "@/lib/ecom/ecom-ip-master-library-asset";
+import {
+  buildDefaultIpMasterLibraryLabel,
+  sanitizeIpMasterLibraryLabel,
+} from "@/lib/ecom/ecom-ip-master-library-label";
+import {
   bumpIpMasterVersion,
   ECOM_IP_MASTER_MODULE,
   getActiveIpMasterTemplate,
@@ -86,12 +102,19 @@ export async function listEcomIpMasterProjectSummaries(userId: string) {
   return rows.map((row) => {
     const meta = parseIpMasterMeta(row.meta);
     const active = getActiveIpMasterTemplate(meta);
+    const refs = sanitizeIpMasterReferences(row.references);
+    const tplJson = parseIpMasterTemplateJson(active?.json);
+    const importable = isIpMasterTemplateLibraryReady({
+      template: tplJson,
+      hasBenchmarkImage: refs.length > 0,
+    });
     return {
       id: row.id,
       title: row.title,
       updatedAt: row.updatedAt.toISOString(),
-      thumbnailUrl: sanitizeIpMasterReferences(row.references)[0]?.ossUrl ?? null,
+      thumbnailUrl: refs[0]?.ossUrl ?? null,
       activeVersion: active?.version ?? null,
+      importable,
     };
   });
 }
@@ -104,11 +127,17 @@ export async function createEcomIpMasterProject(
     data: {
       userId,
       title: opts?.title?.trim().slice(0, 120) || "IP 母版",
+      brief: {
+        description: IP_MASTER_DEFAULT_BRIEF,
+        inputMode: IP_MASTER_DEFAULT_INPUT_MODE,
+      } as Prisma.InputJsonValue,
       references: [] as Prisma.InputJsonValue,
       chatHistory: [] as Prisma.InputJsonValue,
       plan: { steps: {} } as Prisma.InputJsonValue,
       settings: {} as Prisma.InputJsonValue,
-      meta: { workflow: { currentStepId: "input" } } as Prisma.InputJsonValue,
+      meta: {
+        workflow: { currentStepId: "input", inputCommitted: false },
+      } as Prisma.InputJsonValue,
     },
   });
   return rowToDto(row);
@@ -211,6 +240,7 @@ export async function addIpMasterBenchmarkUpload(
   };
   await updateEcomIpMasterProject(userId, projectId, {
     references: [ref],
+    meta: { workflow: { inputCommitted: true } },
   });
   return ref;
 }
@@ -219,73 +249,152 @@ export async function saveIpMasterTemplateVersion(
   userId: string,
   projectId: string,
   opts: {
-    markdown: string;
+    template: Record<string, unknown>;
+    imagePrompt?: { positive: string; negative?: string };
+    libraryLabel?: string;
     source?: IpMasterTemplateSource;
-    json?: Record<string, unknown>;
     setActive?: boolean;
   },
 ): Promise<EcomIpMasterProjectDto> {
   const project = await getEcomIpMasterProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
 
+  if (project.references.length === 0) {
+    throw new Error("保存入库须先有基准图（上传或 AI 生成）");
+  }
+
+  const baseUrl = project.references[0]!.ossUrl;
+  const mergedRaw = {
+    ...opts.template,
+    imagePrompt:
+      opts.imagePrompt ??
+      opts.template.imagePrompt ??
+      project.meta?.workflow?.draftImagePrompt,
+  };
+  const parsed = parseIpMasterTemplateJson(mergedRaw);
+  if (!parsed) throw new Error("结构化模板 JSON 无效");
+  if (!parsed.imagePrompt?.positive?.trim()) {
+    throw new Error("保存入库须包含生图正向提示词");
+  }
+
+  const template = {
+    ...parsed,
+    ipMeta: {
+      ...parsed.ipMeta,
+      ipId: project.id,
+      baseImageUrl: baseUrl,
+      version: bumpIpMasterVersion(
+        (project.meta?.templateVersions ?? [])[
+          (project.meta?.templateVersions ?? []).length - 1
+        ]?.version,
+      ),
+      createTime: new Date().toISOString().slice(0, 10),
+    },
+  };
+
+  if (
+    !isIpMasterTemplateLibraryReady({
+      template,
+      hasBenchmarkImage: true,
+    })
+  ) {
+    throw new Error("模板须包含完整的刚性/柔性特征");
+  }
+
   const meta = project.meta ?? {};
   const versions = [...(meta.templateVersions ?? [])];
-  const prevVersion = versions[versions.length - 1]?.version;
-  const version = bumpIpMasterVersion(prevVersion);
-  const hasImage = project.references.length > 0;
+  const version = template.ipMeta.version;
   const hasText = Boolean(
     (project.brief as { description?: string } | null)?.description?.trim(),
   );
-  let source: IpMasterTemplateSource = opts.source ?? "text";
-  if (hasImage && hasText) source = "mixed";
-  else if (hasImage) source = "image";
+  let source: IpMasterTemplateSource = opts.source ?? "image";
+  if (hasText) source = "mixed";
 
+  const markdown = ipMasterTemplateToMarkdown(template);
+  const defaultLabel = buildDefaultIpMasterLibraryLabel(
+    project,
+    template.ipMeta.ipName ?? "",
+  );
+  const label = sanitizeIpMasterLibraryLabel(opts.libraryLabel ?? defaultLabel);
   const entry: IpMasterTemplateVersion = {
     version,
-    markdown: opts.markdown.trim().slice(0, 50_000),
-    json: opts.json,
+    label,
+    markdown,
+    json: template as unknown as Record<string, unknown>,
     source,
     createdAt: new Date().toISOString(),
   };
   versions.push(entry);
 
-  return updateEcomIpMasterProject(userId, projectId, {
+  const updated = await updateEcomIpMasterProject(userId, projectId, {
     status: "in_progress",
+    title: label.split("·")[0]?.trim().slice(0, 120) || template.ipMeta.ipName?.slice(0, 120) || project.title,
     meta: {
       ...meta,
       templateVersions: versions,
       workflow: {
         ...(meta.workflow ?? {}),
         activeVersion: opts.setActive !== false ? version : meta.workflow?.activeVersion,
-        draftMarkdown: entry.markdown,
+        draftMarkdown: markdown,
+        draftTemplate: template as unknown as Record<string, unknown>,
+        draftImagePrompt: template.imagePrompt,
         currentStepId: "versions",
       },
     },
   });
+
+  await persistIpMasterLibraryAsset({
+    userId,
+    projectId,
+    entry,
+    benchmarkUrl: baseUrl,
+    imagePromptPositive: template.imagePrompt?.positive,
+  });
+
+  return updated;
 }
 
-/** 供手办/VI 载入：返回基准图 + 当前版 Markdown */
+/** 供手办/VI 母版库导入：须基准图 + 结构化 JSON 版本 */
 export async function resolveIpMasterForDownstream(
   userId: string,
   ipMasterProjectId: string,
   version?: string,
 ): Promise<{
   references: IpMasterReference[];
+  template: import("@/lib/ecom/ecom-ip-master-template-schema").IpMasterTemplate;
   markdown: string;
   version: string;
 } | null> {
   const project = await getEcomIpMasterProject(userId, ipMasterProjectId);
   if (!project) return null;
+  if (project.references.length === 0) return null;
+
   const meta = project.meta;
   let tpl = getActiveIpMasterTemplate(meta);
   if (version?.trim()) {
     tpl =
       meta?.templateVersions?.find((v) => v.version === version.trim()) ?? tpl;
   }
-  if (!tpl?.markdown.trim()) return null;
+  if (!tpl) return null;
+
+  const template = parseIpMasterTemplateJson(tpl.json);
+  if (
+    !isIpMasterTemplateLibraryReady({
+      template,
+      hasBenchmarkImage: project.references.length > 0,
+    })
+  ) {
+    return null;
+  }
+
+  const markdown =
+    tpl.markdown?.trim() || (template ? ipMasterTemplateToMarkdown(template) : "");
+  if (!markdown.trim()) return null;
+
   return {
     references: project.references,
-    markdown: tpl.markdown,
+    template: template!,
+    markdown,
     version: tpl.version,
   };
 }

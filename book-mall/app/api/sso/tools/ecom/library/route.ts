@@ -20,7 +20,12 @@ export async function GET(req: Request) {
         n +
         s.storyboardBundles.length +
         s.productDesignBundles.length +
-        s.seedVideoBundles.length,
+        s.seedVideoBundles.length +
+        s.handCraftBundles.length +
+        s.mediaDecomposeBundles.length +
+        s.outfitVideoBundles.length +
+        s.modelShotBundles.length +
+        s.ipMasterLibraryBundles.length,
       0,
     );
     return ecomJson({ sections, totalAssets, totalBundles });

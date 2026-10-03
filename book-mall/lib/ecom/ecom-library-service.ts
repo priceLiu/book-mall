@@ -35,6 +35,16 @@ import {
   buildProjectNameLookup,
   resolveAssetProjectName,
 } from "@/lib/ecom/ecom-library-project-names";
+import {
+  ECOM_IP_MASTER_MODULE,
+  parseIpMasterMeta,
+  type IpMasterReference,
+  type IpMasterTemplateVersion,
+} from "@/lib/ecom/ecom-ip-master-types";
+import {
+  isIpMasterTemplateLibraryReady,
+  parseIpMasterTemplateJson,
+} from "@/lib/ecom/ecom-ip-master-template-schema";
 
 export type EcomLibraryAssetItem = {
   id: string;
@@ -136,6 +146,14 @@ export type EcomLibraryModelShotBundle = {
   snapshot: ModelShotDeliverableSnapshot;
 };
 
+export type EcomLibraryIpMasterBundle = {
+  projectId: string;
+  version: string;
+  label: string;
+  savedAt: string;
+  thumbnailUrl: string | null;
+};
+
 export type EcomLibrarySection = {
   moduleId: string;
   title: string;
@@ -150,6 +168,7 @@ export type EcomLibrarySection = {
   mediaDecomposeBundles: EcomLibraryMediaDecomposeBundle[];
   outfitVideoBundles: EcomLibraryOutfitVideoBundle[];
   modelShotBundles: EcomLibraryModelShotBundle[];
+  ipMasterLibraryBundles: EcomLibraryIpMasterBundle[];
 };
 
 /** model-tryon 成片仅在电商工具箱「试衣库」展示，不入成图与视频 */
@@ -199,6 +218,7 @@ const MODULE_TITLES: Record<string, { title: string; kind: "image" | "video" | "
   "video-digital-human": { title: "数字人", kind: "video" },
   "video-mirror-selfie": { title: "户外对镜自拍", kind: "video" },
   "video-hit-product": { title: "爆款服装带货", kind: "video" },
+  "ip-master-library": { title: "母版库", kind: "brand" },
   ip: { title: "IP 母版", kind: "brand" },
   poster: { title: "海报制作", kind: "brand" },
   vi: { title: "品牌VI表情包SOP", kind: "brand" },
@@ -239,6 +259,74 @@ function moduleIdFromAssetModule(module: string): string {
   if (module.startsWith("video-")) return module;
   if (module.startsWith("brand-")) return module.replace(/^brand-/, "");
   return module;
+}
+
+function parseIpMasterReferences(raw: unknown): IpMasterReference[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (r): r is IpMasterReference =>
+      Boolean(r) &&
+      typeof r === "object" &&
+      typeof (r as IpMasterReference).ossUrl === "string",
+  );
+}
+
+function ipMasterTemplateVersionToLibraryBundle(
+  projectId: string,
+  benchmarkUrl: string | null,
+  version: IpMasterTemplateVersion,
+): EcomLibraryIpMasterBundle | null {
+  const thumb = benchmarkUrl?.trim() || null;
+  if (!version.json || !thumb) return null;
+  const parsed = parseIpMasterTemplateJson(version.json);
+  if (!parsed) return null;
+  if (
+    !isIpMasterTemplateLibraryReady({
+      template: parsed,
+      hasBenchmarkImage: true,
+    })
+  ) {
+    return null;
+  }
+  return {
+    projectId,
+    version: version.version,
+    label: version.label?.trim() || version.version,
+    savedAt: version.createdAt,
+    thumbnailUrl: thumb,
+  };
+}
+
+function collectIpMasterLibraryBundlesFromProjects(
+  rows: Array<{ id: string; meta: unknown; references: unknown }>,
+): EcomLibraryIpMasterBundle[] {
+  const out: EcomLibraryIpMasterBundle[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const meta = parseIpMasterMeta(row.meta);
+    const refs = parseIpMasterReferences(row.references);
+    let benchmarkUrl = refs[0]?.ossUrl?.trim() || null;
+    if (!benchmarkUrl) {
+      for (const v of meta?.templateVersions ?? []) {
+        const json = v.json as { ipMeta?: { baseImageUrl?: string } } | undefined;
+        const url = json?.ipMeta?.baseImageUrl?.trim();
+        if (url) {
+          benchmarkUrl = url;
+          break;
+        }
+      }
+    }
+    for (const v of meta?.templateVersions ?? []) {
+      const bundle = ipMasterTemplateVersionToLibraryBundle(row.id, benchmarkUrl, v);
+      if (!bundle) continue;
+      const key = `${bundle.projectId}:${bundle.version}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(bundle);
+    }
+  }
+  out.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+  return out;
 }
 
 function collectProductDesignSnapshotsFromMeta(
@@ -630,8 +718,17 @@ async function enrichStoryboardRowSnapshots(
 export async function listEcomLibrarySections(userId: string): Promise<EcomLibrarySection[]> {
   await backfillEcomAssetProjectNamesForUser(userId);
 
-  const [assets, storyboardRows, productDesignRows, seedVideoRows, handCraftRows, mediaDecomposeRows, outfitVideoRows, modelShotRows] =
-    await Promise.all([
+  const [
+    assets,
+    storyboardRows,
+    productDesignRows,
+    seedVideoRows,
+    handCraftRows,
+    mediaDecomposeRows,
+    outfitVideoRows,
+    modelShotRows,
+    ipMasterRows,
+  ] = await Promise.all([
     prisma.ecomAsset.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
@@ -683,6 +780,12 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
       orderBy: { updatedAt: "desc" },
       take: 50,
       select: { id: true, meta: true, title: true },
+    }),
+    prisma.ecomIpMasterProject.findMany({
+      where: { userId, module: ECOM_IP_MASTER_MODULE },
+      orderBy: { updatedAt: "desc" },
+      take: 80,
+      select: { id: true, meta: true, references: true },
     }),
   ]);
 
@@ -818,9 +921,12 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
   }
   modelShotBundles.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
 
+  const ipMasterLibraryBundles = collectIpMasterLibraryBundlesFromProjects(ipMasterRows);
+
   const orderedIds = [
     ...IMAGE_MODULE_IDS,
     ...VIDEO_MODULE_IDS,
+    "ip-master-library",
     ...BRAND_MODULE_IDS,
   ] as string[];
 
@@ -828,7 +934,8 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
   for (const moduleId of orderedIds) {
     const meta = MODULE_TITLES[moduleId];
     if (!meta) continue;
-    const sectionAssets = assetsByModule.get(moduleId) ?? [];
+    const sectionAssets =
+      moduleId === "ip-master-library" ? [] : (assetsByModule.get(moduleId) ?? []);
     const sectionAssetGroups = groupAssetsByProject(sectionAssets);
     const sectionBundles =
       moduleId === "storyboard-micro-drama" ? bundles : [];
@@ -840,6 +947,8 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
     const sectionModelShotBundles = moduleId === "model-shot" ? modelShotBundles : [];
     const sectionProductDesignBundles = productDesignBundlesByModule.get(moduleId) ?? [];
     const sectionHandCraftBundles = moduleId === "hand-craft" ? handCraftBundles : [];
+    const sectionIpMasterLibraryBundles =
+      moduleId === "ip-master-library" ? ipMasterLibraryBundles : [];
     if (
       sectionAssets.length === 0 &&
       sectionBundles.length === 0 &&
@@ -848,7 +957,8 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
       sectionOutfitVideoBundles.length === 0 &&
       sectionModelShotBundles.length === 0 &&
       sectionProductDesignBundles.length === 0 &&
-      sectionHandCraftBundles.length === 0
+      sectionHandCraftBundles.length === 0 &&
+      sectionIpMasterLibraryBundles.length === 0
     ) {
       continue;
     }
@@ -866,6 +976,7 @@ export async function listEcomLibrarySections(userId: string): Promise<EcomLibra
       mediaDecomposeBundles: sectionMediaDecomposeBundles,
       outfitVideoBundles: sectionOutfitVideoBundles,
       modelShotBundles: sectionModelShotBundles,
+      ipMasterLibraryBundles: sectionIpMasterLibraryBundles,
     });
   }
 
