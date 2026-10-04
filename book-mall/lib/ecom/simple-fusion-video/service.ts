@@ -30,7 +30,14 @@ import { invokeEcomMultiRefImageFusion } from "./fusion";
 import { runSimpleFusionI2v } from "./i2v";
 import { resolveSimpleFusionFusionPromptForLook, resolveSimpleFusionPrompts } from "./prompts";
 import { recordSimpleFusionGeneration } from "./records";
-import { fromSimpleFusionLooks, resolveSimpleFusionBgmUrl } from "./render";
+import {
+  resolveComposeRenderProfile,
+  resolveComposeWorkbenchState,
+  workbenchToMediaTimeline,
+  type SimpleFusionComposeWorkbenchState,
+  newImportComposeClip,
+} from "./compose-workbench";
+import { resolveSimpleFusionBgmUrl } from "./render";
 import {
   saveSimpleFusionDeliverableSnapshot,
   type SimpleFusionDeliverableSnapshot,
@@ -720,43 +727,96 @@ export async function runSimpleFusionPipeline(
   }
 }
 
+export async function saveSimpleFusionComposeWorkbench(
+  userId: string,
+  projectId: string,
+  workbench: SimpleFusionComposeWorkbenchState,
+): Promise<SimpleFusionProjectDto> {
+  const project = await getSimpleFusionProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  return updateSimpleFusionProject(userId, projectId, {
+    meta: { ...project.meta, composeWorkbench: workbench },
+  });
+}
+
+export async function uploadSimpleFusionComposeClip(
+  userId: string,
+  projectId: string,
+  file: File,
+): Promise<SimpleFusionProjectDto> {
+  const project = await getSimpleFusionProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  if (project.module !== "video-dance-swap") {
+    throw new Error("仅卡点跳舞支持导入剪辑片段");
+  }
+
+  const buf = Buffer.from(await file.arrayBuffer());
+  const uploaded = await resolveMediaDecomposeUpload({
+    userId,
+    buf,
+    contentType: file.type,
+    fileName: file.name,
+  });
+  if (uploaded.kind !== "video") throw new Error("请上传视频文件");
+
+  const clip = newImportComposeClip({
+    videoUrl: uploaded.ossUrl,
+    label: file.name.replace(/\.[^.]+$/, "") || "导入片段",
+  });
+  const labels = new Map<string, string>();
+  const workbench = resolveComposeWorkbenchState(project, labels);
+  const next: SimpleFusionComposeWorkbenchState = {
+    ...workbench,
+    clips: [...workbench.clips, clip],
+    orderedClipIds: [...workbench.orderedClipIds, clip.id],
+  };
+
+  return updateSimpleFusionProject(userId, projectId, {
+    meta: { ...project.meta, composeWorkbench: next },
+  });
+}
+
 export async function renderSimpleFusionDanceVideo(
   userId: string,
   projectId: string,
+  opts?: {
+    workbench?: SimpleFusionComposeWorkbenchState;
+    replaceInFlight?: boolean;
+  },
 ): Promise<SimpleFusionProjectDto> {
   const { MediaRenderSourceApp } = await import("@prisma/client");
   const { createMediaRenderJob, enqueueMediaRenderJob } = await import(
     "@/lib/media/media-render-service"
   );
 
-  const project = await getSimpleFusionProject(userId, projectId);
+  let project = await getSimpleFusionProject(userId, projectId);
   if (!project) throw new Error("项目不存在");
-  const looks = project.meta?.looks ?? [];
-  const timeline = fromSimpleFusionLooks(looks);
-  const profile = parseRenderProfile(null);
-  const bgmUrl = resolveSimpleFusionBgmUrl(project.settings.bgmPresetId);
-  if (bgmUrl) {
-    profile.audio = { ...profile.audio, bgmUrl, mixTts: false, bgmVolume: 0.35 };
-  } else {
-    profile.audio = { ...profile.audio, mixTts: false };
+
+  const workbench =
+    opts?.workbench ??
+    resolveComposeWorkbenchState(project, new Map());
+  if (opts?.workbench) {
+    project = await saveSimpleFusionComposeWorkbench(userId, projectId, workbench);
   }
+
+  const timeline = workbenchToMediaTimeline(workbench);
+  const profile = resolveComposeRenderProfile(project.settings, workbench);
 
   const job = await createMediaRenderJob({
     userId,
     sourceApp: MediaRenderSourceApp.ecom,
     sourceRef: { projectId, title: project.title ?? "卡点跳舞换装" },
     timeline,
-    profile: {
-      ...profile,
-      subtitle: { ...profile.subtitle, mode: "none", burnIn: false },
-    },
+    profile,
+    replaceInFlight: opts?.replaceInFlight ?? true,
   });
   enqueueMediaRenderJob(job.id);
 
   return updateSimpleFusionProject(userId, projectId, {
     phase: "rendering",
     status: "processing",
-    meta: { ...project.meta, renderJobId: job.id },
+    composeResult: null,
+    meta: { ...project.meta, composeWorkbench: workbench, renderJobId: job.id },
   });
 }
 

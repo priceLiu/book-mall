@@ -1,6 +1,9 @@
 import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
-import { uploadSimpleFusionImage } from "@/lib/ecom/simple-fusion-video/service";
+import {
+  uploadSimpleFusionComposeClip,
+  uploadSimpleFusionImage,
+} from "@/lib/ecom/simple-fusion-video/service";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const runtime = "nodejs";
@@ -16,15 +19,22 @@ export async function POST(req: Request, ctx: Ctx) {
   const file = form.get("file");
   const slotRaw = form.get("slot");
   const slot =
-    slotRaw === "model" || slotRaw === "scene" || slotRaw === "garment" ? slotRaw : null;
+    slotRaw === "model" || slotRaw === "scene" || slotRaw === "garment"
+      ? slotRaw
+      : slotRaw === "compose-clip"
+        ? slotRaw
+        : null;
   if (!(file instanceof File) || !slot) {
-    return ecomJson({ error: "请上传图片并指定 slot" }, { status: 400 });
+    return ecomJson({ error: "请指定 slot（model / scene / garment / compose-clip）" }, { status: 400 });
   }
   const firstOrigin =
     typeof form.get("firstOrigin") === "string" ? String(form.get("firstOrigin")) : undefined;
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
-    const project = await uploadSimpleFusionImage(auth.userId, id, slot, file, firstOrigin);
+    const project =
+      slot === "compose-clip"
+        ? await uploadSimpleFusionComposeClip(auth.userId, id, file)
+        : await uploadSimpleFusionImage(auth.userId, id, slot, file, firstOrigin);
     return ecomJson({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "上传失败";

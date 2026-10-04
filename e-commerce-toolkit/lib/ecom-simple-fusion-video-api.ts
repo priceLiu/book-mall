@@ -39,6 +39,9 @@ export type SimpleFusionProject = {
       status?: string;
       failReason?: string;
     }>;
+    composeWorkbench?: import("@/lib/simple-fusion-compose-workbench").ComposeWorkbenchState;
+    renderJobId?: string;
+    renderFailReason?: string;
   } | null;
   createdAt: string;
   updatedAt: string;
@@ -131,6 +134,29 @@ export async function generateSimpleFusionModel(projectId: string, prompt: strin
     `${BASE}/projects/${encodeURIComponent(projectId)}/refs/generate-model`,
     { method: "POST", body: JSON.stringify({ prompt }) },
   );
+  return data.project as SimpleFusionProject;
+}
+
+export async function renderSimpleFusionCompose(
+  projectId: string,
+  composeWorkbench?: import("@/lib/simple-fusion-compose-workbench").ComposeWorkbenchState,
+) {
+  const data = await ecomBookFetch(`${BASE}/projects/${encodeURIComponent(projectId)}/render`, {
+    method: "POST",
+    body: JSON.stringify(composeWorkbench ? { composeWorkbench } : {}),
+  });
+  return data.project as SimpleFusionProject;
+}
+
+export async function uploadSimpleFusionComposeClip(projectId: string, file: File) {
+  const form = new FormData();
+  form.set("file", file);
+  form.set("slot", "compose-clip");
+  form.set("firstOrigin", "user-upload");
+  const data = await ecomBookFetch(`${BASE}/projects/${encodeURIComponent(projectId)}/media/upload`, {
+    method: "POST",
+    body: form,
+  });
   return data.project as SimpleFusionProject;
 }
 

@@ -1,5 +1,6 @@
 import type { WorkflowComposeResult } from "@/lib/ecom/video-workflow/shot-spine";
 
+import type { SimpleFusionComposeWorkbenchState } from "./compose-workbench";
 import type { SimpleFusionVariant } from "./constants";
 
 export type SimpleFusionRefImage = {
@@ -71,6 +72,8 @@ export type SimpleFusionProjectDto = {
     deliverableSnapshot?: unknown;
     deliverableSnapshotHistory?: unknown[];
     renderJobId?: string;
+    composeWorkbench?: SimpleFusionComposeWorkbenchState;
+    renderFailReason?: string;
     [key: string]: unknown;
   } | null;
   createdAt: string;

@@ -243,6 +243,57 @@ export function resolveMediaClipDurationSec(
   return 3;
 }
 
+/** 按源片入出点裁切本地文件（合并前） */
+async function trimLocalSourceClip(
+  inputPath: string,
+  outputPath: string,
+  startSec: number,
+  endSec: number,
+): Promise<void> {
+  const start = Math.max(0, startSec);
+  const end = Math.max(start + 0.05, endSec);
+  const dur = end - start;
+  await runFfmpeg([
+    "-y",
+    "-ss",
+    start.toFixed(3),
+    "-i",
+    inputPath,
+    "-t",
+    dur.toFixed(3),
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "23",
+    "-c:a",
+    "aac",
+    "-ar",
+    "44100",
+    "-ac",
+    "2",
+    "-b:a",
+    "128k",
+    outputPath,
+  ]);
+}
+
+export function effectiveClipSpanSec(
+  probedFullSec: number,
+  clip: { sourceStartSec?: number; sourceEndSec?: number; durationSec?: number },
+): number {
+  const start = clip.sourceStartSec ?? 0;
+  const end =
+    clip.sourceEndSec != null && clip.sourceEndSec > start
+      ? clip.sourceEndSec
+      : probedFullSec;
+  const span = end - start;
+  if (span > 0.05) return span;
+  if (clip.durationSec != null && clip.durationSec > 0) return clip.durationSec;
+  return probedFullSec;
+}
+
 function buildVoiceoverAudioFilter(durationSec: number): string {
   const dur = durationSec.toFixed(3);
   return `[1:a]aformat=sample_rates=44100:channel_layouts=stereo,apad=whole_dur=${dur},atrim=0:${dur},asetpts=PTS-STARTPTS[aout]`;
@@ -993,13 +1044,30 @@ export async function runFfmpegMediaRender(args: {
         rawPath,
         MEDIA_RENDER_MAX_SOURCE_BYTES_PER_CLIP,
       );
-      const probedSec = await ffprobeDurationSec(rawPath);
-      const durationSec = resolveMediaClipDurationSec(probedSec, clip.durationSec);
-      const size = await ffprobeVideoSize(rawPath);
+      let workPath = rawPath;
+      const trimStart = clip.sourceStartSec ?? 0;
+      const fullSec = await ffprobeDurationSec(workPath);
+      const trimEnd =
+        clip.sourceEndSec != null && clip.sourceEndSec > trimStart
+          ? Math.min(clip.sourceEndSec, fullSec)
+          : fullSec;
+      const needsTrim =
+        trimStart > 0.02 || (clip.sourceEndSec != null && trimEnd < fullSec - 0.02);
+      if (needsTrim && trimEnd - trimStart >= 0.05) {
+        const trimmedPath = join(tmp, `raw-trim-${i}.mp4`);
+        await trimLocalSourceClip(workPath, trimmedPath, trimStart, trimEnd);
+        workPath = trimmedPath;
+      }
+      const probedSec = await ffprobeDurationSec(workPath);
+      const durationSec = resolveMediaClipDurationSec(
+        probedSec,
+        effectiveClipSpanSec(fullSec, clip),
+      );
+      const size = await ffprobeVideoSize(workPath);
       sourceSizes.push(size);
       probed.push({
         order: clip.order,
-        localPath: rawPath,
+        localPath: workPath,
         durationSec,
         subtitle: clip.subtitle,
         audioUrl: clip.audioUrl,

@@ -12,6 +12,10 @@ export const mediaClipSchema = z.object({
   subtitle: z.string().optional(),
   /** 可选；缺省由 ffprobe 探测 */
   durationSec: z.number().positive().optional(),
+  /** 源视频入点（秒）；缺省 0 */
+  sourceStartSec: z.number().min(0).optional(),
+  /** 源视频出点（秒）；缺省为源片全长 */
+  sourceEndSec: z.number().positive().optional(),
 });
 
 export const renderTransitionSchema = z.discriminatedUnion("type", [

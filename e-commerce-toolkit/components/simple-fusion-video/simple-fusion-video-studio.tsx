@@ -53,6 +53,7 @@ import {
   SIMPLE_FUSION_DEFAULT_VIDEO_MODEL,
 } from "@/lib/simple-fusion-model-defaults";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
+import { SimpleFusionComposeWorkbench } from "@/components/simple-fusion-video/simple-fusion-compose-workbench";
 import {
   createSimpleFusionProject,
   generateSimpleFusionModel,
@@ -322,8 +323,6 @@ function SimpleFusionVideoStudioInner({
   const allClipsReady = simpleFusionAllClipsReady(previewSlots);
   const composeFinalGenerating =
     composeRenderPending || project?.phase === "rendering";
-  const canComposeDanceFinal =
-    copy.garmentMulti && allClipsReady && !composeFinalGenerating;
   const pipelineBusy =
     busy || project?.phase === "generating" || project?.phase === "rendering";
   const fusionMentionRefs = useMemo(
@@ -593,29 +592,6 @@ function SimpleFusionVideoStudioInner({
         next.delete(lookId);
         return next;
       });
-      setBusy(false);
-    }
-  }
-
-  async function runComposeFinal() {
-    if (!project) return;
-    setComposeRenderPending(true);
-    setBusy(true);
-    try {
-      const p = await runSimpleFusionGenerate(project.id, "render");
-      applyProject(p);
-      if (p.phase === "rendering") {
-        setComposeRenderPending(false);
-      }
-      toast({ title: "已开始合成卡点成片", variant: "success" });
-    } catch (e) {
-      setComposeRenderPending(false);
-      await alert({
-        title: "合成失败",
-        message: e instanceof Error ? e.message : "请稍后重试",
-        variant: "error",
-      });
-    } finally {
       setBusy(false);
     }
   }
@@ -1226,73 +1202,27 @@ function SimpleFusionVideoStudioInner({
             </div>
           </section>
 
-          {copy.garmentMulti ? (
-            <section className="mb-6 space-y-3 rounded-xl border border-[#e8e8ed] bg-white p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-semibold text-[#1d1d1f]">③ 卡点成片</h3>
-                  <p className="mt-1 text-[10px] text-[#86868b]">
-                    全部片段就绪后拼接并配乐；重新生成任一片段后需再次合成。
-                  </p>
-                </div>
-                <EcomButtonPrimary
-                  type="button"
-                  size="sm"
-                  disabled={busy || !canComposeDanceFinal}
-                  onClick={() => void runComposeFinal()}
-                >
-                  合成卡点成片
-                </EcomButtonPrimary>
-              </div>
-              {composeFinalGenerating ? (
-                <p className="text-xs text-[#6e6e73]">正在合成卡点成片，请稍候…</p>
-              ) : null}
-              <div className="max-w-[min(100%,20rem)] space-y-2">
-                <EcomVideoSlot
-                  src={finalVideoUrl}
-                  aspectRatio="9:16"
-                  layout="workspace"
-                  generating={composeFinalGenerating}
-                  generatingPosterUrl={
-                    previewSlots.find((s) => s.clipVideoUrl)?.clipVideoUrl ??
-                    previewSlots.find((s) => s.fusedImageUrl)?.fusedImageUrl
-                  }
-                  generatingLabel="合成中…"
-                  generatingBackground="black"
-                  emptyLabel={canComposeDanceFinal ? "待合成" : "成片"}
-                  onPreview={() =>
-                    finalVideoUrl &&
-                    !composeFinalGenerating &&
-                    setPreviewVideo({ src: finalVideoUrl, title: `${copy.title} · 成片` })
-                  }
-                />
-                {finalVideoUrl ? (
-                  <div className="flex flex-wrap gap-2">
-                    <EcomButtonSecondary
-                      type="button"
-                      size="sm"
-                      onClick={() =>
-                        setPreviewVideo({ src: finalVideoUrl, title: `${copy.title} · 成片` })
-                      }
-                    >
-                      预览成片
-                    </EcomButtonSecondary>
-                    <EcomButtonSecondary
-                      type="button"
-                      size="sm"
-                      onClick={() =>
-                        void downloadMediaUrl(
-                          finalVideoUrl,
-                          mediaDownloadFilename(`${copy.title}-成片`, "video", finalVideoUrl),
-                        )
-                      }
-                    >
-                      下载成片
-                    </EcomButtonSecondary>
-                  </div>
-                ) : null}
-              </div>
-            </section>
+          {copy.garmentMulti && project ? (
+            <SimpleFusionComposeWorkbench
+              project={project}
+              previewSlots={previewSlots}
+              finalVideoUrl={finalVideoUrl}
+              composeGenerating={composeFinalGenerating}
+              canEdit={allClipsReady && !busy}
+              onProject={applyProject}
+              onComposeStarted={() => setComposeRenderPending(true)}
+              onComposeFailed={() => setComposeRenderPending(false)}
+              onPreviewVideo={(src, title) => setPreviewVideo({ src, title })}
+              onDownloadFinal={
+                finalVideoUrl
+                  ? () =>
+                      void downloadMediaUrl(
+                        finalVideoUrl,
+                        mediaDownloadFilename(`${copy.title}-成片`, "video", finalVideoUrl),
+                      )
+                  : undefined
+              }
+            />
           ) : null}
         </div>
         </div>
