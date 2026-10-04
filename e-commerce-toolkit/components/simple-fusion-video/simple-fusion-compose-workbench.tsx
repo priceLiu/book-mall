@@ -499,6 +499,8 @@ export function SimpleFusionComposeWorkbench({
     resolveComposeWorkbenchFromProject(project, previewSlots),
   );
   const [miniOpen, setMiniOpen] = useState(false);
+  /** 每次打开迷你剪辑重置浮窗位置（避免拖动后 off-screen 且 miniOpen 仍为 true） */
+  const [miniPanelSession, setMiniPanelSession] = useState(0);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
 
   useEffect(() => {
@@ -652,7 +654,10 @@ export function SimpleFusionComposeWorkbench({
               type="button"
               size="sm"
               disabled={!canEdit || ordered.length < 1 || composeGenerating}
-              onClick={() => setMiniOpen(true)}
+              onClick={() => {
+                setMiniOpen(true);
+                setMiniPanelSession((s) => s + 1);
+              }}
             >
               简易剪辑
             </EcomButtonSecondary>
@@ -699,6 +704,7 @@ export function SimpleFusionComposeWorkbench({
       {miniOpen && !fullscreenOpen ? (
         <ModalPortal>
           <ComposeMiniTimelinePanel
+            key={miniPanelSession}
             projectId={project.id}
             ordered={ordered}
             workbench={workbench}
@@ -1755,39 +1761,50 @@ function ComposeMiniTimelinePanel({
     <div
       ref={panelRef}
       className={cn(
-        "pointer-events-auto fixed z-[300] relative flex max-h-[min(560px,72dvh)] flex-col overflow-hidden rounded-xl border border-[#3a3a3c] bg-[#141416]/95 text-white shadow-2xl backdrop-blur-md",
-        "cursor-grab select-none active:cursor-grabbing [&_[data-compose-sequence-track]]:cursor-default",
+        "pointer-events-auto fixed z-[300] flex max-h-[min(560px,72dvh)] flex-col overflow-hidden rounded-xl border border-[#3a3a3c] bg-[#141416]/95 text-white shadow-2xl backdrop-blur-md",
         panelPositionClass,
       )}
       style={panelPositionStyle}
       role="dialog"
       aria-label="简易剪辑时间线"
-      onPointerDown={startPanelDrag}
     >
       <button
         type="button"
         aria-label="关闭"
         title="关闭"
         className="absolute right-2 top-2 z-50 flex size-7 cursor-pointer items-center justify-center rounded-full bg-white text-[#1d1d1f] shadow-md ring-1 ring-black/10 transition hover:bg-[#f5f5f7]"
+        onPointerDown={(e) => e.stopPropagation()}
         onClick={onClose}
       >
         <X className="size-3.5" strokeWidth={2.5} />
       </button>
-      {!ready ? (
-        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-[#141416]/95">
-          <Loader2 className="size-6 animate-spin text-white/70" />
-          <p className="text-xs text-white/55">正在加载时间线…</p>
-        </div>
-      ) : null}
-      <div className="flex shrink-0 items-center border-b border-white/10 px-3 py-2 pr-6">
+      <div
+        className="relative z-40 flex shrink-0 cursor-grab select-none items-center border-b border-white/10 px-3 py-2 pr-6 active:cursor-grabbing"
+        data-compose-panel-drag-handle
+        onPointerDown={startPanelDrag}
+      >
         <div className="flex min-w-0 items-center gap-1.5">
           <GripVertical className="size-3.5 shrink-0 text-white/35" aria-hidden />
           <span className="truncate text-xs font-medium text-white/85">时间线 1</span>
           <span className="hidden text-[10px] text-white/35 sm:inline">
-            拖动窗体移动
+            拖动标题栏移动
           </span>
+          {!ready ? (
+            <span className="text-[10px] text-white/45">· 加载中…</span>
+          ) : null}
         </div>
       </div>
+      <div className="relative flex min-h-[200px] min-w-0 flex-1 flex-col">
+        {!ready ? (
+          <div
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-[#141416]/95"
+            aria-busy
+            aria-live="polite"
+          >
+            <Loader2 className="size-6 animate-spin text-white/70" />
+            <p className="text-xs text-white/55">正在加载时间线…</p>
+          </div>
+        ) : null}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-2 py-1.5">
         <div className="flex items-center gap-1">
           <button
@@ -1901,6 +1918,7 @@ function ComposeMiniTimelinePanel({
           splitDisabled={!canEdit || !playheadInSelected}
           deleteDisabled={!canEdit || !selectedId || ordered.length <= 1}
         />
+      </div>
       </div>
     </div>
   );
