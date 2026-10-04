@@ -148,7 +148,7 @@ function welcomeMessage(track: ProductionTrack): ProductDesignChatMessage {
   const scope =
     track === "detail"
       ? "本工作台只做 **产品详情页**。若已在「电商产品主图创作」做过同一款产品，可点顶部「从主图项目导入」带入 Step0–3 的策略层，不必重填。"
-      : "本工作台只做 **产品主图**。主图出齐后，中间工作区会出现入口，一键把策略层带去「电商产品详情页创作」。";
+      : "本工作台只做 **产品主图**。主图出齐后，中间工作区会出现入口，一键把策略层带去「详情长图分屏创作」。";
   return {
     id: "welcome",
     role: "assistant",

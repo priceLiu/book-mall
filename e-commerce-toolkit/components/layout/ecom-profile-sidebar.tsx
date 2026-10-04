@@ -4,8 +4,10 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BookOpen,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
   LogOut,
 } from "lucide-react";
 import { navigatePortalLogout } from "@private/federated-portal-logout";
@@ -22,6 +24,7 @@ import { EcomCreditsBalanceChip } from "@/components/layout/ecom-credits-balance
 import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 import { ecomPrimaryLinkClass } from "@/components/ui/ecom-button";
 import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
+import { feishuGuideUrlForPathname } from "@/lib/ecom-feishu-guide-urls";
 import { cn } from "@/lib/utils";
 
 const NAV_ACTIVE_SECTION_KEY = "ecom-nav-active-section";
@@ -154,44 +157,50 @@ function DetailNavLink({
   active: boolean;
 }) {
   const Icon = item.icon;
-  const className = cn(
-    "group flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+  const rowClass = cn(
+    "group flex items-center rounded-lg transition-colors",
     active
-      ? "bg-[var(--ecom-chrome-hover)] text-[var(--ecom-chrome-text)]"
-      : "text-[var(--ecom-chrome-text-muted)] hover:bg-[var(--ecom-chrome-hover)] hover:text-[var(--ecom-chrome-text)]",
+      ? "bg-[var(--ecom-chrome-hover)]"
+      : "hover:bg-[var(--ecom-chrome-hover)]",
+  );
+  const linkClass = cn(
+    "flex min-w-0 flex-1 items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+    active
+      ? "text-[var(--ecom-chrome-text)]"
+      : "text-[var(--ecom-chrome-text-muted)] group-hover:text-[var(--ecom-chrome-text)]",
   );
 
-  const inner = (
+  const linkInner = (
     <>
       <span className="mr-3 flex h-5 w-5 shrink-0 items-center justify-center opacity-90">
         <Icon className="h-full w-full" />
       </span>
-      <span className="truncate">{item.label}</span>
+      <span className="min-w-0 flex-1 truncate">{item.label}</span>
       <ChevronRight className="ml-auto h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-70" />
     </>
   );
 
-  if (item.external) {
-    return (
-      <a
-        href={item.href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={className}
-      >
-        {inner}
-      </a>
-    );
-  }
-
   return (
-    <a
-      href={item.href}
-      className={className}
-      onClick={(event) => navigateSidebarHref(event, item.href)}
-    >
-      {inner}
-    </a>
+    <div className={rowClass}>
+      {item.external ? (
+        <a
+          href={item.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={linkClass}
+        >
+          {linkInner}
+        </a>
+      ) : (
+        <a
+          href={item.href}
+          className={linkClass}
+          onClick={(event) => navigateSidebarHref(event, item.href)}
+        >
+          {linkInner}
+        </a>
+      )}
+    </div>
   );
 }
 
@@ -277,16 +286,27 @@ export function EcomProfileSidebar({
   const railQuickTop = React.useMemo(
     () =>
       railEntries.filter(
-        (e) => e.kind === "link" && e.link.directOpen && e.link.label === "个人中心",
+        (e) =>
+          e.kind === "link" &&
+          e.link.directOpen &&
+          e.link.label === "个人中心",
       ),
     [railEntries],
   );
   const railQuickBottom = React.useMemo(
     () =>
       railEntries.filter(
-        (e) => e.kind === "link" && e.link.directOpen && e.link.label === "计费与账户",
+        (e) =>
+          e.kind === "link" &&
+          e.link.directOpen &&
+          (e.link.label === "使用指南" || e.link.label === "计费与账户"),
       ),
     [railEntries],
+  );
+
+  const currentPageGuideUrl = React.useMemo(
+    () => feishuGuideUrlForPathname(pathname ?? ""),
+    [pathname],
   );
 
   const inferredId = React.useMemo(
@@ -383,9 +403,11 @@ export function EcomProfileSidebar({
     const tooltip =
       entry.link.label === "个人中心"
         ? "个人中心（新标签打开）"
-        : entry.link.label === "计费与账户"
-          ? "计费与账户（新标签打开）"
-          : entry.link.label;
+        : entry.link.label === "使用指南"
+          ? "使用指南（飞书知识库，新标签打开）"
+          : entry.link.label === "计费与账户"
+            ? "计费与账户（新标签打开）"
+            : entry.link.label;
     return (
       <RailExternalLink
         key={entry.id}
@@ -531,12 +553,14 @@ export function EcomProfileSidebar({
           >
             {detailLinks.map((entry) =>
               entry.type === "subheading" ? (
-                <p
+                <div
                   key={`subheading:${entry.label}`}
-                  className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--ecom-chrome-text-muted)] first:pt-0"
+                  className="px-3 pb-1 pt-3 first:pt-0"
                 >
-                  {entry.label}
-                </p>
+                  <p className="text-[11px] font-semibold tracking-wide text-[var(--ecom-chrome-text-muted)]">
+                    {entry.label}
+                  </p>
+                </div>
               ) : (
                 <DetailNavLink
                   key={entry.href}
@@ -546,6 +570,22 @@ export function EcomProfileSidebar({
               ),
             )}
           </nav>
+
+          {currentPageGuideUrl ? (
+            <div className="mt-3 shrink-0 border-t border-[var(--ecom-chrome-border-subtle)] pt-3">
+              <a
+                href={currentPageGuideUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--ecom-chrome-text-muted)] transition-colors hover:bg-[var(--ecom-chrome-hover)] hover:text-[var(--ecom-chrome-text)]"
+                title="当前工具使用指南（飞书，新标签打开）"
+              >
+                <BookOpen className="size-4 shrink-0 opacity-90" aria-hidden />
+                <span className="min-w-0 flex-1 truncate">使用指南</span>
+                <ExternalLink className="size-3.5 shrink-0 opacity-60" aria-hidden />
+              </a>
+            </div>
+          ) : null}
 
           {!user ? (
             <div className="mt-3 border-t border-[var(--ecom-chrome-border-subtle)] pt-3">

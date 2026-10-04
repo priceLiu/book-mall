@@ -20,8 +20,8 @@ export const ECOM_HOME_FEATURED_CARDS: EcomHomeFeaturedCard[] = [
   },
   {
     id: "detail-page-creation",
-    title: "电商详情页",
-    description: "详情页架构 + 分屏文案与配图",
+    title: "详情长图分屏创作",
+    description: "架构 + 分屏文案 · 助手 Step · 可接主图策略",
     href: "/ecom/detail-page-creation",
     icon: FileImage,
   },

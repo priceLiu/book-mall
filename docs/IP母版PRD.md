@@ -5,7 +5,7 @@
 | 产品名称 | IP 母版模板生成器（IP Master Template Generator） |
 | 文档版本 | V1.1 |
 | 状态 | **已上线**（Studio `/brand/ip` + 母版库；工程 SSOT `book-mall/doc/ecom/ip-master-requirements.md`） |
-| 使用说明 | [`docs/电商品牌创作-使用说明.md`](./电商品牌创作-使用说明.md) §3 |
+| 使用说明 | [`docs/电商品牌创作-使用说明.md`](./电商品牌创作-使用说明.md) §3（现网 **3 步**进度轨：输入·校对·版本） |
 | 关联系统 | 手办盲盒 SOP、品牌 VI + 表情包 SOP（下游读取方） |
 
 ---

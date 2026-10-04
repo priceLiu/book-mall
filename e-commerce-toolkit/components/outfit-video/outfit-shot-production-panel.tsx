@@ -595,12 +595,15 @@ export function OutfitShotProductionPanel({
         <div className="space-y-2 border-t border-[#e8e8ed] pt-4">
           <h3 className="text-sm font-semibold text-[#1d1d1f]">成片视频</h3>
           <p className="text-[11px] text-[#6e6e73]">逐镜合成已完成，可预览或保存到「我的资产」。</p>
-          <EcomVideoSlot
-            src={finalVideoUrl}
-            layout="gallery-workspace"
-            onPreview={() => onPreviewVideo?.(finalVideoUrl, "穿搭成片")}
-            playSize="lg"
-          />
+          <div className="max-w-[min(100%,20rem)]">
+            <EcomVideoSlot
+              src={finalVideoUrl}
+              layout="workspace"
+              aspectRatio="9:16"
+              onPreview={() => onPreviewVideo?.(finalVideoUrl, "穿搭成片")}
+              playSize="lg"
+            />
+          </div>
         </div>
       ) : null}
 

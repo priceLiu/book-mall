@@ -94,6 +94,7 @@ type Props = {
   disabled?: boolean;
   referenceImages: EcomPromptImageRef[];
   onChange: (value: string) => void;
+  onFocus?: () => void;
   onBlur?: () => void;
   className?: string;
   minHeightClass?: string;
@@ -116,6 +117,7 @@ export function ProductDesignPromptMentionTextarea({
   disabled,
   referenceImages,
   onChange,
+  onFocus,
   onBlur,
   className,
   minHeightClass = "min-h-[7rem]",
@@ -520,15 +522,65 @@ export function ProductDesignPromptMentionTextarea({
           <EcomPromptMentionRefBar refs={refBarImages} hint={refBarHint} />
         </div>
       ) : null}
+      {/* 编辑区须在快捷插入钮之前：外层 <label> 点击会激活第一个 labelable 子节点 */}
+      <div
+        ref={editorRef}
+        role="textbox"
+        aria-multiline="true"
+        contentEditable={!disabled}
+        suppressContentEditableWarning
+        spellCheck={false}
+        className={cn(
+          "w-full whitespace-pre-wrap break-words rounded-lg border border-[#e8e8ed] px-3 py-2 text-[12px] leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3]/25",
+          minHeightClass,
+          className,
+        )}
+        onInput={onInput}
+        onKeyDown={onKeyDown}
+        onFocus={() => {
+          focusedRef.current = true;
+          onFocus?.();
+        }}
+        onBlur={() => {
+          focusedRef.current = false;
+          closePopover();
+          const root = editorRef.current;
+          if (root) syncFromDom(serializePromptEditable(root));
+          onBlur?.();
+        }}
+      />
+      {isEmpty ? (
+        <p className="mt-1 text-[10px] text-[#86868b]">
+          {mentionBadgeVariant === "top-bar-bound"
+            ? "输入 @ 插入代号（如 人物A）；参考图见上方顶栏"
+            : "输入 @ 引用参考图，或点下方缩略图快速插入"}
+        </p>
+      ) : null}
       {!suppressInlineQuickInsert && referenceImages.length > 0 ? (
-        <div className="mb-2 flex flex-wrap gap-1.5">
+        <div className="mt-2 flex flex-wrap gap-1.5" aria-label="快捷插入引用">
           {referenceImages.map((item) => (
-            <button
-              key={item.index}
-              type="button"
-              disabled={disabled}
-              className="inline-flex items-center gap-1 rounded-lg border border-[#e8e8ed] bg-white px-1.5 py-0.5 text-[10px] text-[#6e6e73] hover:border-[#0071e3]/35 hover:bg-[#f0f6ff] disabled:opacity-50"
-              onClick={() => insertAtCursor(`${item.token} `)}
+            <span
+              key={item.token}
+              role="button"
+              tabIndex={disabled ? -1 : 0}
+              aria-disabled={disabled || undefined}
+              className={cn(
+                "inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[#e8e8ed] bg-white px-1.5 py-0.5 text-[10px] text-[#6e6e73] hover:border-[#0071e3]/35 hover:bg-[#f0f6ff]",
+                disabled && "pointer-events-none opacity-50",
+              )}
+              title={`插入 ${item.token}`}
+              onMouseDown={(e) => e.preventDefault()}
+              onKeyDown={(e) => {
+                if (disabled) return;
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  insertAtCursor(`${item.token} `);
+                }
+              }}
+              onClick={() => {
+                if (disabled) return;
+                insertAtCursor(`${item.token} `);
+              }}
             >
               {item.cropBbox ? (
                 <NormalizedBboxCropImg
@@ -546,41 +598,9 @@ export function ProductDesignPromptMentionTextarea({
                 />
               )}
               {item.token.replace(/^@/, "")}
-            </button>
+            </span>
           ))}
         </div>
-      ) : null}
-      <div
-        ref={editorRef}
-        role="textbox"
-        aria-multiline="true"
-        contentEditable={!disabled}
-        suppressContentEditableWarning
-        spellCheck={false}
-        className={cn(
-          "w-full whitespace-pre-wrap break-words rounded-lg border border-[#e8e8ed] px-3 py-2 text-[12px] leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3]/25",
-          minHeightClass,
-          className,
-        )}
-        onInput={onInput}
-        onKeyDown={onKeyDown}
-        onFocus={() => {
-          focusedRef.current = true;
-        }}
-        onBlur={() => {
-          focusedRef.current = false;
-          closePopover();
-          const root = editorRef.current;
-          if (root) syncFromDom(serializePromptEditable(root));
-          onBlur?.();
-        }}
-      />
-      {isEmpty ? (
-        <p className="mt-1 text-[10px] text-[#86868b]">
-          {mentionBadgeVariant === "top-bar-bound"
-            ? "输入 @ 插入代号（如 人物A）；参考图见上方顶栏"
-            : "输入 @ 引用参考图，或点上方缩略图快速插入"}
-        </p>
       ) : null}
       {typeof document !== "undefined" && pickerPanel
         ? createPortal(pickerPanel, document.body)

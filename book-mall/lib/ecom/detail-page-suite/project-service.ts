@@ -109,7 +109,7 @@ export async function createDetailPageSuiteProject(
   const row = await prisma.ecomDetailPageSuiteProject.create({
     data: {
       userId,
-      title: opts?.title?.trim().slice(0, 120) || "详情页套图",
+      title: opts?.title?.trim().slice(0, 120) || "服装详情套图（模板）",
       references: [] as Prisma.InputJsonValue,
       chatHistory: [] as Prisma.InputJsonValue,
       suite: emptySuite() as unknown as Prisma.InputJsonValue,
@@ -285,7 +285,7 @@ export async function createDetailPageSuiteReplicaProject(
     data: {
       userId,
       module: ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE,
-      title: opts?.title?.trim().slice(0, 120) || "详情页套图复刻",
+      title: opts?.title?.trim().slice(0, 120) || "参考详情 → 标准套图",
       references: [] as Prisma.InputJsonValue,
       chatHistory: [] as Prisma.InputJsonValue,
       suite: buildInitialReplicaSuite() as unknown as Prisma.InputJsonValue,
@@ -484,7 +484,7 @@ export async function createDetailPageSuiteHitProject(
     data: {
       userId,
       module: ECOM_DETAIL_PAGE_SUITE_HIT_MODULE,
-      title: opts?.title?.trim().slice(0, 120) || "爆款详情页套图",
+      title: opts?.title?.trim().slice(0, 120) || "学竞品结构 · 原创详情",
       references: [] as Prisma.InputJsonValue,
       chatHistory: [] as Prisma.InputJsonValue,
       suite: buildInitialHitSuite() as unknown as Prisma.InputJsonValue,
@@ -666,7 +666,7 @@ export async function createDetailPageSuiteAplusProject(
     data: {
       userId,
       module: ECOM_AI_DETAIL_PAGE_MODULE,
-      title: opts?.title?.trim().slice(0, 120) || "AI 详情页",
+      title: opts?.title?.trim().slice(0, 120) || "A+ 详情模块出图",
       references: [] as Prisma.InputJsonValue,
       chatHistory: [] as Prisma.InputJsonValue,
       suite: buildInitialAplusSuite() as unknown as Prisma.InputJsonValue,

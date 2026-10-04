@@ -6,6 +6,7 @@ import { Download, Images, Plus, Save } from "lucide-react";
 
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
+import { ECOM_WORKSPACE_RESULT_GRID_CLASS } from "@/lib/ecom-workspace-result-grid";
 import { ProductDesignPromptMentionTextarea } from "@/components/product-design/product-design-prompt-mention-textarea";
 import { SeedVideoComposeDialog } from "@/components/seed-video/seed-video-compose-dialog";
 import { SeedVideoRenderProgressPanel } from "@/components/seed-video/seed-video-render-progress-panel";
@@ -1699,12 +1700,13 @@ export function SeedVideoContentPanel({
           ) : null}
           <div className="pt-1">
             <p className="mb-2 text-xs font-medium text-[#6e6e73]">成片视频</p>
-            <div className="flex flex-wrap gap-3">
+            <div className={ECOM_WORKSPACE_RESULT_GRID_CLASS}>
               {directVideos.map((item, index) => (
                 <EcomVideoSlot
                   key={item.id}
                   src={item.videoUrl}
-                  layout="gallery-workspace"
+                  layout="workspace"
+                  aspectRatio="9:16"
                   onPreview={() =>
                     onPreviewVideo(
                       item.videoUrl,
@@ -1716,7 +1718,8 @@ export function SeedVideoContentPanel({
               ))}
               {isDirectGenerating ? (
                 <EcomVideoSlot
-                  layout="gallery-workspace"
+                  layout="workspace"
+                  aspectRatio="9:16"
                   generating
                   generatingPosterUrl={directPreviewBgUrl}
                   playSize="lg"
@@ -1724,7 +1727,8 @@ export function SeedVideoContentPanel({
               ) : null}
               {!isDirectGenerating && !hasDirectVideos ? (
                 <EcomVideoSlot
-                  layout="gallery-workspace"
+                  layout="workspace"
+                  aspectRatio="9:16"
                   emptyLabel="点击「视频生成」开始"
                   playSize="lg"
                 />

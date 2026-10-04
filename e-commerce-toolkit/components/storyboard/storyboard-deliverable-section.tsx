@@ -101,7 +101,7 @@ export function StoryboardDeliverableSection({
             ? `一键成片 ${durationSec}s · 各镜分镜图与分镜脚本一并提交视频模型`
             : `整图成片 ${durationSec}s · 已生成 ${panelVideoCount} 镜单镜视频${canMergePanels ? " · 可合并" : ""}`}
         </p>
-        <EcomIconToolbar>
+        <EcomIconToolbar feishuGuide={false}>
           <EcomIconToolbarGroup label="同步">
             <EcomIconButton label="刷新项目" icon={RefreshCw} onClick={onReloadProject} />
           </EcomIconToolbarGroup>

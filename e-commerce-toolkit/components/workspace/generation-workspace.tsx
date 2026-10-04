@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { EcomFeishuGuideToolbarChip } from "@/components/layout/ecom-workspace-guide-bar";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { useSaveToCatalog } from "@/lib/use-save-to-catalog";
 import {
@@ -193,8 +194,13 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
       <EcomWorkspaceLayout
         assistantHeader={
           <>
-            <h1 className="text-lg font-semibold text-[#1d1d1f]">{module.title}</h1>
-            <p className="mt-1 text-xs text-[#6e6e73]">{module.tagline}</p>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h1 className="text-lg font-semibold text-[#1d1d1f]">{module.title}</h1>
+                <p className="mt-1 text-xs text-[#6e6e73]">{module.tagline}</p>
+              </div>
+              <EcomFeishuGuideToolbarChip moduleId={module.id} />
+            </div>
             <p className="mt-2 text-xs text-[#86868b]">{billingHint}</p>
           </>
         }

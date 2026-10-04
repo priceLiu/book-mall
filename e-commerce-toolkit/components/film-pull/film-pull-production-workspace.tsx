@@ -173,7 +173,7 @@ export function FilmPullProductionWorkspace({
           </p>
         </div>
         {!showEmpty ? (
-          <EcomIconToolbar>
+          <EcomIconToolbar feishuGuide={false}>
             <EcomIconToolbarGroup label="脚本">
               <EcomIconButton
                 label="编辑脚本"

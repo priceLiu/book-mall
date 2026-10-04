@@ -175,7 +175,34 @@ ECOM_MEDIA_TILE_ACTION_ICON_CLASS   // h-4 w-4
 "relative h-14 w-14 overflow-hidden rounded-md border border-[#d2d2d7] bg-white"
 ```
 
-### 结果卡片（竖版分镜/视频）
+### 工作区成片网格（标杆：模特试衣 · 强制）
+
+**详情页点位格、分镜/拉片/穿搭表格内小格除外**，模块「生成结果」须：
+
+```tsx
+import {
+  ECOM_WORKSPACE_RESULT_GRID_CLASS,
+  ECOM_WORKSPACE_RESULT_LABEL_CLASS,
+  ecomWorkspaceResultShellClass,
+} from "@/lib/ecom-workspace-result-grid";
+import { EcomWorkspaceResultFrame } from "@/components/media/ecom-workspace-result-frame";
+import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
+
+<div className={ECOM_WORKSPACE_RESULT_GRID_CLASS}>
+  <div className="flex min-w-0 flex-col gap-2">
+    <div className={ecomWorkspaceResultShellClass({ running: generating })}>
+      <EcomWorkspaceResultFrame aspect="tryon-image">{/* 3:4 图 */}</EcomWorkspaceResultFrame>
+    </div>
+    <EcomVideoSlot layout="workspace" aspectRatio="9:16" … />
+    <p className={ECOM_WORKSPACE_RESULT_LABEL_CLASS}>标签</p>
+  </div>
+</div>
+```
+
+- 网格：2～5 列响应式（与 `VtonResultsGrid` 一致），**禁止**工作区主结果用 `112px` 窄格或 `EcomVideoSlot compact`
+- 生成中：`EcomMediaGeneratingBusy`（`background="light"`）
+
+### 结果卡片（分镜表 / 竖版镜头 · 仅表格内）
 
 ```tsx
 "relative overflow-hidden rounded-xl border border-[#e8e8ed] bg-[#f5f5f7]"

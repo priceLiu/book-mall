@@ -55,7 +55,7 @@ export function ImageLayerSelectionTools({
   return (
     <div className={cn(compact ? "space-y-2" : "space-y-3")}>
       {showSubToolToggle ? (
-        <EcomIconToolbar>
+        <EcomIconToolbar feishuGuide={false}>
           <EcomIconToolbarGroup label="选区工具">
             <EcomIconButton
               label="笔刷涂抹"
@@ -135,7 +135,7 @@ export function ImageLayerSelectionTools({
           <p className="text-xs font-medium text-[#374151]">
             {pendingBboxCount > 0 ? "已框选 1 个区域" : "未框选"}
           </p>
-          <EcomIconToolbar>
+          <EcomIconToolbar feishuGuide={false}>
             <EcomIconToolbarGroup label="框选">
               <EcomIconButton
                 label="清除框选"
@@ -156,7 +156,7 @@ export function ImageLayerSelectionTools({
           <p className="text-xs font-medium text-[#374151]">
             已框选 {pendingBboxCount} 个区域
           </p>
-          <EcomIconToolbar>
+          <EcomIconToolbar feishuGuide={false}>
             <EcomIconToolbarGroup label="框选">
               <EcomIconButton
                 label="撤销上一框"

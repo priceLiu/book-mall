@@ -1154,7 +1154,7 @@ function DetailPageSuiteHitStudioInner() {
       const items = await listDetailPageSuiteHitSummaries();
       return items.map((it) => ({
         id: it.id,
-        title: it.title?.trim() || "爆款详情页套图",
+        title: it.title?.trim() || "学竞品结构 · 原创详情",
         updatedAt: it.updatedAt,
         thumbnailUrl: it.thumbnailUrl,
       }));
@@ -1163,7 +1163,7 @@ function DetailPageSuiteHitStudioInner() {
     onDeleteProject: async () => {
       if (
         !(await doubleConfirm({
-          title: "删除当前爆款详情页套图项目？",
+          title: "删除当前「学竞品结构 · 原创详情」项目？",
           message: "将删除本项目在云端保存的配置。",
           secondTitle: "确认不可恢复删除？",
           secondMessage: "删除后无法恢复；已生成的图片仍保留在「我的资产」中。",

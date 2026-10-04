@@ -78,7 +78,7 @@ pnpm dev:all:stagger                # mall 先就绪，其余子站间隔 3s 错
 
 1. VI 第 7 步拼版成功后中栏立即出图（不依赖 refetch）。
 2. VI 第 8 步在 hero/emoji/merch 齐时助手可「进入第 8 步」（无需第 7 步 ready）。
-3. IP 母版：Brief + 助手解析 → 保存版本 → 工作流草稿列表可见 `ip-master`。
+3. IP 母版：四种输入模式 +「生成结构化模板」→ 校对 → 保存进母版库 / 工作流草稿 `ip-master`（Studio 无右侧助手，见 `docs/电商品牌创作-使用说明.md` §3）。
 4. 手办载入母版后 hero 生图请求体含母版约束块。
 
 ## 漫剧：带上 KIE 轮询

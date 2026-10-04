@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { buildPortalNavItems } from "@/components/portal-nav";
 import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
+import { ECOM_FEISHU_GUIDE_WIKI_HUB } from "@/lib/ecom-feishu-guide-urls";
 
 /** 窄屏：跨门户入口（原顶栏 Federated 菜单） */
 export function EcomMobileBar({ bookOrigin }: { bookOrigin: string }) {
@@ -29,6 +30,14 @@ export function EcomMobileBar({ bookOrigin }: { bookOrigin: string }) {
           <Link href="/library" className="text-xs text-[#6e6e73] hover:text-[#1d1d1f]">
             我的资产
           </Link>
+          <a
+            href={ECOM_FEISHU_GUIDE_WIKI_HUB}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-[#6e6e73] hover:text-[#1d1d1f]"
+          >
+            使用指南
+          </a>
         </div>
       </div>
       <div className="ecom-scrollbar-thin flex gap-3 overflow-x-auto border-t border-[#f0f0f2] px-4 py-2 text-xs text-[#6e6e73]">

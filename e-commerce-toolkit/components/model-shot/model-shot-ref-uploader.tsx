@@ -10,6 +10,7 @@ import { EcomModelLibraryPickerDialog } from "@/components/model-shot/ecom-model
 import { ModelShotRefGenerateDialog } from "@/components/model-shot/model-shot-ref-generate-dialog";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { useImageDropPaste } from "@/hooks/use-image-drop-paste";
+import { ECOM_REF_CARD_ACTION_BTN } from "@/lib/ecom-ref-upload-ui";
 import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
 import type { ModelShotReference, ModelShotReferenceRole } from "@/lib/model-shot-types";
 import { modelRefLabel } from "@/lib/model-shot-workflow";
@@ -375,7 +376,7 @@ export function ModelShotRefUploader({
                         size="sm"
                         type="button"
                         disabled={disabled}
-                        className="h-7 px-2 text-[10px]"
+                        className={ECOM_REF_CARD_ACTION_BTN}
                         onClick={() => {
                           onActiveRoleChange?.(role);
                           setModelPickerOpen(true);
@@ -390,7 +391,7 @@ export function ModelShotRefUploader({
                         size="sm"
                         type="button"
                         disabled={disabled}
-                        className="h-7 px-2 text-[10px]"
+                        className={ECOM_REF_CARD_ACTION_BTN}
                         onClick={() => {
                           onActiveRoleChange?.(role);
                           void onSkipScene();
@@ -404,7 +405,7 @@ export function ModelShotRefUploader({
                         size="sm"
                         type="button"
                         disabled={disabled}
-                        className="h-7 px-2 text-[10px]"
+                        className={ECOM_REF_CARD_ACTION_BTN}
                         onClick={() => {
                           onActiveRoleChange?.(role);
                           openGenDialog(refRole as Exclude<ModelShotReferenceRole, "garment">);

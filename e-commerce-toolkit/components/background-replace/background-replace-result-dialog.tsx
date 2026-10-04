@@ -1,7 +1,13 @@
 "use client";
 
+import { EcomWorkspaceResultFrame } from "@/components/media/ecom-workspace-result-frame";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomDialogCloseButton } from "@/components/ui/dialog";
+import {
+  ECOM_WORKSPACE_RESULT_GRID_CLASS,
+  ECOM_WORKSPACE_RESULT_LABEL_CLASS,
+  ecomWorkspaceResultShellClass,
+} from "@/lib/ecom-workspace-result-grid";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -40,19 +46,26 @@ export function BackgroundReplaceResultDialog({
             本次生成了 {imageUrls.length} 张。点选一张应用到中栏；其余可在生成记录查看。
           </p>
         </div>
-        <div className="ecom-scrollbar-thin grid min-h-[200px] grid-cols-2 gap-3 overflow-auto bg-[#f3f4f6] p-4 sm:grid-cols-2">
+        <div
+          className={cn(
+            "ecom-scrollbar-thin min-h-[200px] overflow-auto bg-[#f3f4f6] p-4",
+            ECOM_WORKSPACE_RESULT_GRID_CLASS,
+          )}
+        >
           {imageUrls.map((url, index) => (
             <button
               key={`${url}-${index}`}
               type="button"
               onClick={() => onPick(url)}
-              className={cn(
-                "overflow-hidden rounded-xl border border-[#e5e7eb] bg-white text-left shadow-sm",
-                "transition hover:border-[#2563eb] hover:shadow-md",
-              )}
+              className="min-w-0 text-left transition hover:opacity-95"
             >
-              <img src={url} alt={`结果 ${index + 1}`} className="aspect-square w-full object-contain" />
-              <p className="px-3 py-2 text-xs text-[#6b7280]">结果 {index + 1}</p>
+              <div className={cn(ecomWorkspaceResultShellClass(), "bg-white shadow-sm")}>
+                <EcomWorkspaceResultFrame aspect="tryon-image">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt={`结果 ${index + 1}`} className="size-full object-contain object-top" />
+                </EcomWorkspaceResultFrame>
+              </div>
+              <p className={ECOM_WORKSPACE_RESULT_LABEL_CLASS}>结果 {index + 1}</p>
             </button>
           ))}
         </div>

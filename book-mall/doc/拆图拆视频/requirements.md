@@ -1,5 +1,6 @@
 # 拆图拆视频 · 产品需求
 
+> **用户指南**（面向卖家）：[`docs/ecom/user-guides/使用指南-拆图拆视频.md`](../../../docs/ecom/user-guides/使用指南-拆图拆视频.md) · 与专业拉片对比 [`拆解与拉片工具怎么选.md`](../../../docs/ecom/user-guides/拆解与拉片工具怎么选.md)  
 > **JSON 契约**：同目录 [`table-format.md`](./table-format.md)  
 > **System Prompt 真源**：[`skill.md`](./skill.md)（`ecom-media-decompose-prompts.ts` 运行时读取）
 

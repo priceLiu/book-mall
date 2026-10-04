@@ -3,6 +3,9 @@ import { parseOutfitPayload } from "@/lib/ecom/video-workflow/templates/outfit-v
 import { parseOutfitV1Envelope } from "@/lib/ecom/video-workflow/templates/outfit-v1/parser";
 import { OUTFIT_V1_UI_CONFIG } from "@/lib/ecom/video-workflow/templates/outfit-v1/ui-config";
 import { OUTFIT_V1_TEMPLATE_ID } from "@/lib/ecom/video-workflow/templates/outfit-v1/constants";
+import { SIMPLE_FUSION_I2V_V1_TEMPLATE_ID } from "@/lib/ecom/video-workflow/templates/simple-fusion-i2v-v1/constants";
+import { parseSimpleFusionI2vEnvelope } from "@/lib/ecom/video-workflow/templates/simple-fusion-i2v-v1/parser";
+import { parseSimpleFusionPayload } from "@/lib/ecom/video-workflow/templates/simple-fusion-i2v-v1/schema";
 
 export type VideoTemplateEngine = {
   templateId: string;
@@ -22,8 +25,18 @@ const OUTFIT_V1_ENGINE: VideoTemplateEngine = {
   uiConfig: OUTFIT_V1_UI_CONFIG,
 };
 
+const SIMPLE_FUSION_I2V_V1_ENGINE: VideoTemplateEngine = {
+  templateId: SIMPLE_FUSION_I2V_V1_TEMPLATE_ID,
+  displayName: "简易融合短视频",
+  moduleId: "video-camera",
+  parseEnvelope: parseSimpleFusionI2vEnvelope,
+  validatePayload: (action, payload) => parseSimpleFusionPayload(action, payload) != null,
+  uiConfig: OUTFIT_V1_UI_CONFIG,
+};
+
 const REGISTRY = new Map<string, VideoTemplateEngine>([
   [OUTFIT_V1_TEMPLATE_ID, OUTFIT_V1_ENGINE],
+  [SIMPLE_FUSION_I2V_V1_TEMPLATE_ID, SIMPLE_FUSION_I2V_V1_ENGINE],
 ]);
 
 export function registerVideoTemplateEngine(engine: VideoTemplateEngine): void {

@@ -15,6 +15,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
+import { ECOM_WORKSPACE_RESULT_GRID_CLASS } from "@/lib/ecom-workspace-result-grid";
 import {
   ECOM_MEDIA_TILE_ACTION_ICON_CLASS,
   ECOM_SLOT_HOVER_ACTION_BTN_CLASS,
@@ -408,7 +409,7 @@ export function ProductDesignGenSlotWorkspace({
         </div>
       ) : null}
 
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+      <div className={ECOM_WORKSPACE_RESULT_GRID_CLASS}>
         {rows.map((row) => {
           const generating = cardGeneratingFor(row.index);
           const rowLocked = generating || generateAllActive;

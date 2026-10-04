@@ -228,7 +228,7 @@ export async function listProductDesignProjectSummaries(
 }
 
 function defaultProjectTitle(module: EcomProjectModule): string {
-  return module === ECOM_PROJECT_MODULE_DETAIL ? "电商产品详情页创作" : "电商产品主图创作";
+  return module === ECOM_PROJECT_MODULE_DETAIL ? "详情长图分屏创作" : "电商产品主图创作";
 }
 
 /** 建详情页项目时从主图项目搬运哪些内容 */

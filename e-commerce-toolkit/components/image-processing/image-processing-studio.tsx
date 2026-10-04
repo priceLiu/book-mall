@@ -37,7 +37,12 @@ import {
   MaskToolbar,
   type ImageMaskCanvasHandle,
 } from "@/components/image-processing/image-mask-canvas";
+import { EcomWorkspaceResultFrame } from "@/components/media/ecom-workspace-result-frame";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
+import {
+  ECOM_WORKSPACE_RESULT_GRID_CLASS,
+  ecomWorkspaceResultShellClass,
+} from "@/lib/ecom-workspace-result-grid";
 import {
   fetchImageProcessingModels,
   submitImageProcessingEdit,
@@ -1539,17 +1544,21 @@ export function ImageProcessingStudio() {
           {results.length > 0 ? (
             <section className="mt-6 rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:mt-8 sm:p-6">
               <h3 className="text-lg font-semibold text-[#1d1d1f]">生成结果</h3>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className={cn("mt-4", ECOM_WORKSPACE_RESULT_GRID_CLASS)}>
                 {results.map((url) => (
                   <a
                     key={url}
                     href={url}
                     target="_blank"
                     rel="noreferrer"
-                    className="block overflow-hidden rounded-xl border border-[#e5e5ea]"
+                    className="block min-w-0"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt="结果" className="h-auto w-full" />
+                    <div className={ecomWorkspaceResultShellClass()}>
+                      <EcomWorkspaceResultFrame aspect="tryon-image">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt="结果" className="size-full object-contain object-top" />
+                      </EcomWorkspaceResultFrame>
+                    </div>
                   </a>
                 ))}
               </div>

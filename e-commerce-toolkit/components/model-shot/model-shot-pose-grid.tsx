@@ -1,5 +1,11 @@
 "use client";
 
+import { EcomWorkspaceResultFrame } from "@/components/media/ecom-workspace-result-frame";
+import {
+  ECOM_WORKSPACE_RESULT_GRID_CLASS,
+  ECOM_WORKSPACE_RESULT_LABEL_CLASS,
+  ecomWorkspaceResultShellClass,
+} from "@/lib/ecom-workspace-result-grid";
 import type { ModelShotPoseItem } from "@/lib/model-shot-types";
 
 type Props = {
@@ -20,21 +26,25 @@ export function ModelShotPoseGrid({ items, onPreview }: Props) {
   return (
     <section className="space-y-3">
       <h3 className="text-sm font-semibold text-[#1d1d1f]">出图结果</h3>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      <div className={ECOM_WORKSPACE_RESULT_GRID_CLASS}>
         {ready.map((item) => (
           <button
             key={item.index}
             type="button"
-            className="overflow-hidden rounded-xl border border-[#e5e5ea] text-left"
+            className="min-w-0 text-left"
             onClick={() => onPreview?.(item.index)}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={item.imageUrl!}
-              alt={item.title ?? `姿势 ${item.index}`}
-              className="aspect-[3/4] w-full object-cover"
-            />
-            <p className="truncate px-2 py-1.5 text-xs text-[#424245]">
+            <div className={ecomWorkspaceResultShellClass()}>
+              <EcomWorkspaceResultFrame aspect="tryon-image">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={item.imageUrl!}
+                  alt={item.title ?? `姿势 ${item.index}`}
+                  className="size-full object-contain object-top"
+                />
+              </EcomWorkspaceResultFrame>
+            </div>
+            <p className={ECOM_WORKSPACE_RESULT_LABEL_CLASS}>
               {item.title ?? `姿势 ${item.index}`}
             </p>
           </button>

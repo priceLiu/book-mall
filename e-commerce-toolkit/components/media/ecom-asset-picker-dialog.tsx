@@ -21,8 +21,8 @@ import { cn } from "@/lib/utils";
 /** 可挑选的资产分组，与「我的资产」分组保持一致 */
 const GROUPS: Array<{ module: string; label: string }> = [
   { module: "main-image", label: "商品主图" },
-  { module: "detail-page", label: "详情页" },
-  { module: "detail-page-suite", label: "详情页套图" },
+  { module: "detail-page", label: "详情长图分屏创作" },
+  { module: "detail-page-suite", label: "服装详情套图（模板）" },
   { module: "model-shot", label: "模特图" },
   { module: "vi", label: "品牌 VI" },
   { module: "ip-master", label: "IP 母版" },

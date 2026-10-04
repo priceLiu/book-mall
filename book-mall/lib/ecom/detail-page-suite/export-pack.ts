@@ -89,10 +89,10 @@ export async function buildDetailPageSuiteExportZip(
   const labelSource =
     project.title?.trim() ||
     (project.module === ECOM_DETAIL_PAGE_SUITE_HIT_MODULE
-      ? "爆款详情页套图"
+      ? "学竞品结构 · 原创详情"
       : project.module === ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE
-        ? "详情页套图复刻"
-        : "详情页套图");
+        ? "参考详情 → 标准套图"
+        : "服装详情套图（模板）");
   const root = sanitizeZipSegment(labelSource);
   const exportFailures: string[] = [];
   const workbench =

@@ -1,0 +1,74 @@
+---
+description: 电商工具箱工作区媒体/Prompt/动效统一复用（标杆：AI详情模块出图、模特试衣）
+globs: e-commerce-toolkit/**/*
+alwaysApply: true
+---
+
+# 电商工具箱 · 工作区媒体与 Prompt 统一规范
+
+**标杆页面（实现前先读再抄，禁止另起一套 UI）：**
+
+| 能力 | 标杆组件 / 路径 |
+|------|------------------|
+| **AI 详情模块出图** | `components/ai-detail-page/ai-detail-page-studio.tsx` · `detail-page-suite-content-panel.tsx` |
+| **模特试衣** | `components/vton/vton-results-grid.tsx` · `components/model-tryon/model-tryon-studio.tsx` · `vton-ref-workbench.tsx` |
+
+权威分册：`e-commerce-toolkit/design/MEDIA.md` · `VIDEO.md` · `BUTTON.md` · `SYSTEM.md`。
+
+## 必须复用（禁止新做平行实现）
+
+### 参考图上传与展示
+
+- **卡片与进度**：`EcomRefUploadCard` + `lib/ecom-ref-upload-ui.ts`（`ECOM_REF_CARD_ACTION_BTN`、`useEcomRefUploadProgress`、`buildRefPreviewItems`）
+- **三卡布局（模特 / 服装 / 场景）**：对齐 `vton-ref-workbench.tsx` 或薄封装 `simple-fusion-ref-upload-section.tsx`（仅 props/文案差异）
+- **56px 缩略图槽**：`EcomRefImageThumb`；悬停预览走 `EcomImagePreviewHost` / `useEcomImagePreview`
+- **我的资产**：`EcomAssetPickerDialog`；模特库 / 场景库复用 `EcomModelLibraryPickerDialog`、`EcomCatalogPickerDialog`
+
+### Prompt 与 @ 引用
+
+- **正文**：`ProductDesignPromptMentionTextarea`
+- **顶栏已引用素材**：`EcomPromptMentionRefBar` + `PRODUCT_DESIGN_PROMPT_MENTION_FIELD_PROPS`（`lib/product-design-prompt-mention-ui.ts`）
+- **引用列表构建**：`lib/ecom-prompt-mention.ts` + 各模块 `*-mention-refs.ts`（语义 token：`@模特1` `@服装1` `@场景1` 等，见 `SEMANTIC_REF_TOKEN_RE`）
+- **禁止**裸 `<textarea>` 做可 @ 的生产 Prompt（助手内纯文本除外）
+- **禁止**用 `<label>` 包裹 `ProductDesignPromptMentionTextarea`（内含快捷插入 `<button>`，label 点击会误触发第一个钮并插入 @）；标题用 `<div>` + `<span>` 即可
+
+### 生图 / 生视频 / 一键成片
+
+- **模型选择**：唯一弹层 `StoryboardModelPickerDialog`（见 `ecom-model-picker.mdc`）；**禁止**静默默认模型直接开跑（须用户经弹层确认，可预填上次选择）
+- **生图中占位**：`EcomMediaGeneratingBusy`（`background="light"` 与详情/试衣一致）
+- **视频槽位**：`EcomVideoSlot`（工作区网格内用 `layout="workspace"` 满列宽 9:16；生成中 poster、`emptyLabel`）
+- **任务条（可选）**：长并行用 `StoryboardTaskStatus` + `BackgroundGenerationDock`（见 `docs/generation-background-dock.md`）
+
+### 结果网格与占位尺寸
+
+- **资产库级网格**（小方格）：`EcomMediaLibraryTile` + `ECOM_LIBRARY_MEDIA_GRID_CLASS`（`MEDIA.md` §网格密度）
+- **工作区成片网格**（**除详情页点位格、分镜表单元格外，一律用此标准**）：
+  - 容器：`ECOM_WORKSPACE_RESULT_GRID_CLASS`（`lib/ecom-workspace-result-grid.ts`）
+  - 静态图 / 融合图：`EcomWorkspaceResultFrame` + `ecomWorkspaceResultShellClass`（3:4，与试衣成片同比例）
+  - 竖屏视频：`EcomVideoSlot` · `layout="workspace"`
+  - 列标签：`ECOM_WORKSPACE_RESULT_LABEL_CLASS`
+- **豁免**：详情页套图点位格、分镜/拉片/穿搭逐镜 **表格内** 小预览、`ECOM_LIBRARY_MEDIA_GRID_CLASS` 资产库列表
+- **禁止**工作区成片使用 `112×200` 固定小格、`EcomVideoSlot` 的 `compact` 作主结果区
+- **空态文案**：短灰字 `#86868b`，与试衣卡片内「待上传」一致
+
+### 动效与反馈
+
+- **上传进度**：`useEcomRefUploadProgress` 绑在 `EcomRefUploadCard` 的 `uploadProgress` / `uploading`
+- **成功**：toast（`ecom-success-toast.mdc`）；**错误**：`useDialogs().alert`
+- **禁止** `window.alert` / `confirm`（`no-native-dialogs.mdc`）
+
+## 新增 / 改造模块 Checklist
+
+- [ ] 参考图区是否 `EcomRefUploadCard` + 共享 upload hook？
+- [ ] Prompt 是否 `ProductDesignPromptMentionTextarea` + 模块 `build*MentionRefs`？
+- [ ] 生成前是否 `StoryboardModelPickerDialog`（IMAGE / VIDEO 分步或分入口）？
+- [ ] 预览是否 `EcomImagePreviewDialog` / `EcomVideoPreviewDialog`？
+- [ ] 生成占位是否 `EcomMediaGeneratingBusy` / `EcomVideoSlot`？
+- [ ] 工作区成片是否 `ECOM_WORKSPACE_RESULT_GRID_CLASS` + `EcomWorkspaceResultFrame`？
+- [ ] 未复制一套新缩略图/上传条/模型卡片网格？
+
+## Code Review
+
+- 新业务页出现第二套上传卡片 DOM、Prompt @ 角标、或模型 `<select>` → **驳回**，改为上表组件
+- 工作区结果区手写 `w-[112px]` / `compact` 视频格 → **驳回**，改为模特试衣网格标准
+- 与标杆页行为不一致且无文档豁免 → **驳回**

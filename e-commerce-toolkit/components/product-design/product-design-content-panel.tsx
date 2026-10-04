@@ -1448,7 +1448,7 @@ export function ProductDesignContentPanel({
         <div>
           <h2 className="text-sm font-semibold text-[#1d1d1f]">
             {project.title ??
-              (activeTrack === "detail" ? "电商产品详情页创作" : "电商产品主图创作")}
+              (activeTrack === "detail" ? "详情长图分屏创作" : "电商产品主图创作")}
           </h2>
           <p className="text-[11px] text-[#6e6e73]">
             {spec

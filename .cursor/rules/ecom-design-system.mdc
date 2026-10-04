@@ -21,6 +21,7 @@ alwaysApply: false
 7. **弹窗**：`useDialogs()`；禁止 `window.alert/confirm`。成功/完成用 **toast**（`DIALOG.md` · `ecom-success-toast.mdc`），错误才 `alert`。
 8. **长耗时生成**：≥3min 须移交右下角 `BackgroundGenerationDock`（见 `docs/generation-background-dock.md`）。
 9. **生图/生视频模型选择**：唯一弹层 `StoryboardModelPickerDialog`（见 `ecom-model-picker.mdc`），禁止另写选择器。
+10. **工作区上传 / Prompt / 动效 / 格子**：须复用标杆（AI 详情模块出图、**模特试衣**），见 **`ecom-workspace-media-standard.mdc`**（`alwaysApply`）。
 
 ## Code Review
 

@@ -29,6 +29,10 @@ import {
   normalizeVtonTryonResultVersions,
   resolveVtonTryonActiveVersionIndex,
 } from "@/lib/vton-tryon-result-versions";
+import {
+  ECOM_WORKSPACE_RESULT_GRID_CLASS,
+  ECOM_WORKSPACE_RESULT_LABEL_CLASS,
+} from "@/lib/ecom-workspace-result-grid";
 import { cn } from "@/lib/utils";
 
 export type VtonBatchTryonMode = "selected" | "all";
@@ -72,12 +76,11 @@ function resultForLook(results: VtonTryonResult[], lookId: string): VtonTryonRes
   return results.find((r) => r.lookId === lookId) ?? null;
 }
 
-/** 试衣结果 · 最多 5 列（3:4 竖图格过窄时模特显怪），小屏自适应 */
-export const VTON_RESULTS_GRID_CLASS =
-  "grid grid-cols-2 items-start gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5";
+/** @deprecated 请用 `ECOM_WORKSPACE_RESULT_GRID_CLASS` */
+export const VTON_RESULTS_GRID_CLASS = ECOM_WORKSPACE_RESULT_GRID_CLASS;
 
-export const VTON_RESULT_LABEL_CLASS =
-  "mt-0.5 h-4 shrink-0 truncate px-1 text-[10px] leading-4 text-[#6e6e73]";
+/** @deprecated 请用 `ECOM_WORKSPACE_RESULT_LABEL_CLASS` */
+export const VTON_RESULT_LABEL_CLASS = ECOM_WORKSPACE_RESULT_LABEL_CLASS;
 
 function friendlyTryonFailReason(raw?: string): string {
   if (!raw?.trim()) return "失败";

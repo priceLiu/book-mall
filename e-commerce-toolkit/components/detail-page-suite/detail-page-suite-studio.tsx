@@ -1084,7 +1084,7 @@ function DetailPageSuiteStudioInner() {
     const items = await listDetailPageSuiteSummaries();
     return items.map((row) => ({
       id: row.id,
-      title: row.title?.trim() || "详情页套图",
+      title: row.title?.trim() || "服装详情套图（模板）",
       updatedAt: row.updatedAt,
       thumbnailUrl: row.thumbnailUrl,
     }));
@@ -1110,7 +1110,7 @@ function DetailPageSuiteStudioInner() {
     if (!project) return;
     if (
       !(await doubleConfirm({
-        title: `删除项目「${project.title?.trim() || "详情页套图"}」？`,
+        title: `删除项目「${project.title?.trim() || "服装详情套图（模板）"}」？`,
         message: "将删除本项目在云端保存的配置与聊天记录。",
         secondTitle: "确认不可恢复删除？",
         secondMessage: "删除后无法恢复；已生成的图片仍保留在「我的资产」中。",
@@ -1435,7 +1435,7 @@ function DetailPageSuiteStudioInner() {
   if (empty || !project) {
     return (
       <div className="flex h-full items-center justify-center">
-        <EcomButtonSecondary onClick={() => void handleNew()}>新建详情页套图</EcomButtonSecondary>
+        <EcomButtonSecondary onClick={() => void handleNew()}>新建服装详情套图</EcomButtonSecondary>
       </div>
     );
   }

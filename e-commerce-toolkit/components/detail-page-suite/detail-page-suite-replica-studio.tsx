@@ -1000,7 +1000,7 @@ function DetailPageSuiteReplicaStudioInner() {
       const items = await listDetailPageSuiteReplicaSummaries();
       return items.map((it) => ({
         id: it.id,
-        title: it.title?.trim() || "详情页套图复刻",
+        title: it.title?.trim() || "参考详情 → 标准套图",
         updatedAt: it.updatedAt,
         thumbnailUrl: it.thumbnailUrl,
       }));
@@ -1009,7 +1009,7 @@ function DetailPageSuiteReplicaStudioInner() {
     onDeleteProject: async () => {
       if (
         !(await doubleConfirm({
-          title: "删除当前详情页套图复刻项目？",
+          title: "删除当前「参考详情 → 标准套图」项目？",
           message: "将删除本项目在云端保存的配置。",
           secondTitle: "确认不可恢复删除？",
           secondMessage: "删除后无法恢复；已生成的图片仍保留在「我的资产」中。",

@@ -20,7 +20,8 @@
     "sync:docker-shared": "node scripts/sync-docker-shared.mjs",
     "sync:docker-shared:check": "node scripts/sync-docker-shared.mjs --check",
     "build:publisher-artifacts": "node scripts/build-publisher-download-artifacts.mjs",
-    "arch:diagram": "node scripts/render-architecture-diagram.mjs"
+    "arch:diagram": "node scripts/render-architecture-diagram.mjs",
+    "arch:diagram:zh": "node scripts/render-architecture-diagram.mjs --zh"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

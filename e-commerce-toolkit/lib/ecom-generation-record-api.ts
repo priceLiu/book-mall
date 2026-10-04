@@ -104,10 +104,14 @@ const SOURCE_MODULE_LABELS: Record<string, string> = {
   "seed-video": "种草视频",
   "model-shot": "模特大片",
   "outfit-video": "穿搭动作迁移",
+  "video-camera": "视频运镜",
+  "video-mirror-selfie": "户外对镜自拍",
+  "video-dance-swap": "卡点跳舞换装",
   "image-layer": "图片处理",
-  "detail-page-suite": "详情页套图",
-  "detail-page-suite-hit": "爆款详情页套图",
-  "detail-page-suite-replica": "详情页套图复刻",
+  "detail-page-suite": "服装详情套图（模板）",
+  "detail-page-suite-hit": "学竞品结构 · 原创详情",
+  "detail-page-suite-replica": "参考详情 → 标准套图",
+  "ai-detail-page": "A+ 详情模块出图",
 };
 
 export function generationRecordSourceLabel(meta: EcomGenerationRecordMeta | null): string {

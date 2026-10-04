@@ -29,12 +29,18 @@ import {
   Blocks,
   Boxes,
   History,
+  BookOpen,
 } from "lucide-react";
 import {
   buildPortalNavItems,
   type PortalKey,
 } from "@private/federated-portal-nav";
 import { ECOM_MODULES } from "@/lib/modules/registry";
+import {
+  ECOM_FEISHU_GUIDE_BY_NAV_SUBHEADING,
+  ECOM_FEISHU_GUIDE_WIKI_HUB,
+  feishuGuideUrlForModuleId,
+} from "@/lib/ecom-feishu-guide-urls";
 
 export type EcomSidebarNavLink = {
   type: "link";
@@ -46,12 +52,16 @@ export type EcomSidebarNavLink = {
   activeAlways?: boolean;
   /** 图标轨点击：仅跳转/外链，不切换右侧详情面板 */
   directOpen?: boolean;
+  /** 飞书使用指南（新标签打开，不改变主 href） */
+  guideHref?: string;
 };
 
 /** 分组内小标题（如营销 · IP创作） */
 export type EcomSidebarNavSubheading = {
   type: "subheading";
   label: string;
+  /** 「怎么选」等分组级指南 */
+  guideHref?: string;
 };
 
 export type EcomSidebarNavGroupChild = EcomSidebarNavLink | EcomSidebarNavSubheading;
@@ -72,7 +82,7 @@ function link(
   label: string,
   href: string,
   icon: LucideIcon,
-  opts?: { external?: boolean; directOpen?: boolean },
+  opts?: { external?: boolean; directOpen?: boolean; guideHref?: string },
 ): EcomSidebarNavLink {
   return { type: "link", label, href, icon, ...opts };
 }
@@ -90,21 +100,15 @@ function group(
 }
 
 function subheading(label: string): EcomSidebarNavSubheading {
-  return { type: "subheading", label };
+  return {
+    type: "subheading",
+    label,
+    guideHref: ECOM_FEISHU_GUIDE_BY_NAV_SUBHEADING[label],
+  };
 }
 
 function sep(): { type: "separator" } {
   return { type: "separator" };
-}
-
-/** 同一 href 只保留一项，避免 React key 冲突导致侧栏导航异常 */
-function dedupeNavLinks(items: EcomSidebarNavLink[]): EcomSidebarNavLink[] {
-  const seen = new Set<string>();
-  return items.filter((item) => {
-    if (seen.has(item.href)) return false;
-    seen.add(item.href);
-    return true;
-  });
 }
 
 function imageModuleIcon(id: string): LucideIcon {
@@ -154,6 +158,104 @@ const MARKETING_ECOM_VIDEO_IDS = new Set([
   "video-hit-product",
 ]);
 
+type EcomNavSectionLink =
+  | { kind: "module"; id: string }
+  | { kind: "link"; item: EcomSidebarNavLink };
+
+/** 「电商」分组内小标题与顺序（SSOT；勿再按 registry 数组顺序平铺） */
+const ECOM_NAV_SECTIONS: ReadonlyArray<{
+  subheading: string;
+  links: readonly EcomNavSectionLink[];
+}> = [
+  {
+    subheading: "主图与套图",
+    links: [
+      { kind: "module", id: "product-creation" },
+      { kind: "module", id: "product-image-set" },
+    ],
+  },
+  {
+    subheading: "详情页",
+    links: [
+      { kind: "module", id: "ai-detail-page" },
+      { kind: "module", id: "detail-page-creation" },
+      { kind: "module", id: "detail-page-suite" },
+      { kind: "module", id: "detail-page-suite-replica" },
+      { kind: "module", id: "detail-page-suite-hit" },
+    ],
+  },
+  {
+    subheading: "拆解与拉片",
+    links: [
+      { kind: "module", id: "media-decompose" },
+      { kind: "module", id: "film-pull" },
+    ],
+  },
+  {
+    subheading: "模特与修图",
+    links: [
+      { kind: "module", id: "image-layer" },
+      { kind: "module", id: "model-shot" },
+      { kind: "module", id: "model-tryon" },
+      {
+        kind: "link",
+        item: link("模特库", "/ecom/model-library", Users),
+      },
+      {
+        kind: "link",
+        item: link("模板区", "/ecom/template-gallery", LayoutTemplate),
+      },
+    ],
+  },
+];
+
+function moduleNavLink(id: string): EcomSidebarNavLink | null {
+  const m = ECOM_MODULES.find((x) => x.id === id);
+  if (!m) return null;
+  const guideHref = feishuGuideUrlForModuleId(id);
+  if (id === "film-pull") {
+    return link(m.title, m.href, Clapperboard, { guideHref });
+  }
+  const icon = m.kind === "video" ? videoModuleIcon(id) : imageModuleIcon(id);
+  return link(m.title, m.href, icon, { guideHref });
+}
+
+function buildEcomGroupChildren(): EcomSidebarNavGroupChild[] {
+  const children: EcomSidebarNavGroupChild[] = [];
+  for (const section of ECOM_NAV_SECTIONS) {
+    children.push(subheading(section.subheading));
+    for (const entry of section.links) {
+      if (entry.kind === "link") {
+        children.push(entry.item);
+        continue;
+      }
+      const navLink = moduleNavLink(entry.id);
+      if (navLink) children.push(navLink);
+    }
+  }
+
+  const videoMods = ECOM_MODULES.filter(
+    (m) =>
+      m.kind === "video" &&
+      m.href.startsWith("/ecom/") &&
+      m.id !== "seed-video" &&
+      m.id !== "film-pull" &&
+      !MARKETING_ECOM_VIDEO_IDS.has(m.id),
+  );
+  if (videoMods.length > 0) {
+    children.push(subheading("短视频"));
+    for (const m of videoMods) {
+      children.push(
+        link(m.title, m.href, videoModuleIcon(m.id), {
+          guideHref: feishuGuideUrlForModuleId(m.id),
+        }),
+      );
+    }
+  }
+
+  return children;
+}
+
 const PORTAL_ICONS: Record<PortalKey, LucideIcon> = {
   "common-tools": Wrench,
   canvas: LayoutGrid,
@@ -178,45 +280,7 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
       icon: PORTAL_ICONS[item.key],
       external: true,
     }));
-  const imageMods = ECOM_MODULES.filter(
-    (m) =>
-      m.kind === "image" &&
-      m.href.startsWith("/ecom/") &&
-      m.id !== "hand-craft" &&
-      m.id !== "media-decompose",
-  );
-  const videoMods = ECOM_MODULES.filter(
-    (m) =>
-      m.kind === "video" &&
-      m.href.startsWith("/ecom/") &&
-      m.id !== "seed-video" &&
-      !MARKETING_ECOM_VIDEO_IDS.has(m.id),
-  );
-
-  const mediaDecomposeMod = ECOM_MODULES.find((m) => m.id === "media-decompose");
-  const filmPullMod = ECOM_MODULES.find((m) => m.id === "film-pull");
-  const imageModLinks = imageMods.map((m) => link(m.title, m.href, imageModuleIcon(m.id)));
-  if (mediaDecomposeMod) {
-    const detailIdx = imageModLinks.findIndex((l) => l.href === "/ecom/detail-page-creation");
-    const insertAt = detailIdx >= 0 ? detailIdx + 1 : imageModLinks.length;
-    imageModLinks.splice(
-      insertAt,
-      0,
-      link(mediaDecomposeMod.title, mediaDecomposeMod.href, ScanSearch),
-    );
-  }
-  if (filmPullMod) {
-    const decomposeIdx = imageModLinks.findIndex((l) => l.href === "/ecom/media-decompose");
-    const insertAt = decomposeIdx >= 0 ? decomposeIdx + 1 : imageModLinks.length;
-    imageModLinks.splice(insertAt, 0, link(filmPullMod.title, filmPullMod.href, Clapperboard));
-  }
-
-  const ecomChildren: EcomSidebarNavLink[] = dedupeNavLinks([
-    ...imageModLinks,
-    link("模特库", "/ecom/model-library", Users),
-    link("模板区", "/ecom/template-gallery", LayoutTemplate),
-    ...videoMods.map((m) => link(m.title, m.href, videoModuleIcon(m.id))),
-  ]);
+  const ecomChildren = buildEcomGroupChildren();
 
   const marketingOrder = [
     "storyboard-micro-drama",
@@ -243,11 +307,14 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
         m.title,
         m.href,
         m.href.startsWith("/brand/") ? brandModuleIcon(m.id) : videoModuleIcon(m.id),
+        { guideHref: feishuGuideUrlForModuleId(m.id) },
       ),
     ),
     subheading("IP创作"),
     ...ipCreationMods.map((m) =>
-      link(m.title, m.href, ipCreationModuleIcon(m.id)),
+      link(m.title, m.href, ipCreationModuleIcon(m.id), {
+        guideHref: feishuGuideUrlForModuleId(m.id),
+      }),
     ),
   ];
 
@@ -270,6 +337,10 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
       link("生成记录", "/library/generation-records", History),
     ]),
     sep(),
+    link("使用指南", ECOM_FEISHU_GUIDE_WIKI_HUB, BookOpen, {
+      external: true,
+      directOpen: true,
+    }),
     link("计费与账户", bookAccountHref(bookOrigin, "/account/billing"), Settings, {
       external: true,
       directOpen: true,

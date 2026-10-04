@@ -468,7 +468,7 @@ export function AiDetailPageStudio() {
               const items = await listAiDetailPageSummaries();
               return items.map((it) => ({
                 id: it.id,
-                title: it.title?.trim() || "AI 详情页",
+                title: it.title?.trim() || "A+ 详情模块出图",
                 updatedAt: it.updatedAt,
                 thumbnailUrl: it.thumbnailUrl,
               }));
@@ -482,7 +482,7 @@ export function AiDetailPageStudio() {
               if (
                 !(await confirm({
                   title: "删除本项目？",
-                  message: "将删除工作台中的 AI 详情页项目记录。",
+                  message: "将删除工作台中的 A+ 详情模块出图项目记录。",
                 }))
               ) {
                 return;

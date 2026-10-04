@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>全站架构图</title>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, securityLevel: "loose", theme: "default", flowchart: { useMaxWidth: true, htmlLabels: true } });
+</script>
+<style>
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; margin: 0; padding: 24px; background: #fff; color: #1f2329; }
+  h1 { font-size: 20px; margin: 0 0 16px; }
+  .wrap { overflow-x: auto; }
+  .mermaid { text-align: center; }
+</style>
+</head>
+<body>
+  <h1>全站架构图（中文）</h1>
+  <div class="wrap">
+    <pre class="mermaid">
+flowchart TB
+  subgraph users ["用户浏览器"]
+    U[用户]
+  end
+
+  subgraph platform ["平台层 · 主站 book.ai-code8.com"]
+    BM["主站 book-mall<br/>登录 · 短信/验证码 · 收银台<br/>钱包 · 积分 · 平台 API · 数据库"]
+    GWAPI["Gateway API（/api/gw/v1/*）<br/>唯一厂商 HTTP 出口"]
+    DB[(PostgreSQL)]
+    OSS[(阿里云 OSS)]
+    BM --> GWAPI
+    BM --> DB
+    BM --> OSS
+  end
+
+  subgraph tools ["工具应用 · 独立 CloudBase 部署"]
+    TW["工具站"]
+    FW["财务控制台"]
+    SW["漫剧空间"]
+    CW["AI 画布"]
+    GWC["Gateway 控制台<br/>BYOK 凭证与模型"]
+    PO["提示词优化器"]
+    EC["电商工具箱<br/>主图 · 详情 · 口播 · 拉片 · 品牌"]
+    QR["快速复刻"]
+    DR["3D 导演台"]
+    CT["常用工具"]
+    PW["一键发布"]
+  end
+
+  subgraph bg ["异步 / 后台"]
+    SCF["生产：云函数 gateway-poll"]
+    POLL["本地：gateway-poll-loop"]
+  end
+
+  VEND["云厂商 AI 接口<br/>百炼 / 灵积 / KIE / 火山 / DeepSeek / 混元"]
+
+  U --> BM
+  U --> TW & FW & SW & CW & GWC & PO & EC & QR & DR & CT & PW
+
+  TW & CW & SW & PO & EC & QR & DR & CT & PW -->|"主站 SSO（tools_token）"| BM
+  TW & CW & SW & PO & EC & QR & CT -->|"准入 introspect / Gateway 代理"| BM
+  DR -.->|"iframe 内嵌 + 截图回传"| CW
+  BM -->|"内部 Gateway 客户端"| GWAPI
+  GWAPI -->|"BYOK 厂商凭证"| VEND
+
+  FW -->|"账单 API"| BM
+  GWC -->|"Gateway SSO · 管理 sk-gw"| BM
+
+  SCF -->|"任务状态轮询"| GWAPI
+  POLL -->|"轮询 Worker"| GWAPI
+    </pre>
+  </div>
+</body>
+</html>

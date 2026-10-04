@@ -17,7 +17,13 @@ export const ECOM_VIDEO_SLOT_WIDTH_9_16_COMPACT = 72;
 export const ECOM_VIDEO_SLOT_WIDTH_16_9 = 240;
 export const ECOM_VIDEO_SLOT_MAX_HEIGHT = 300;
 
-export type EcomVideoSlotLayout = "default" | "compact" | "gallery" | "gallery-workspace";
+export type EcomVideoSlotLayout =
+  | "default"
+  | "compact"
+  | "gallery"
+  | "gallery-workspace"
+  /** 模特试衣式工作区网格列内 · 9:16 满列宽 */
+  | "workspace";
 
 export function ecomVideoSlotStyle(
   aspectRatio: "9:16" | "16:9" = "9:16",
@@ -27,6 +33,13 @@ export function ecomVideoSlotStyle(
   maxHeight: number;
   aspectRatio: string;
 } {
+  if (layout === "workspace") {
+    return {
+      width: 0,
+      maxHeight: 0,
+      aspectRatio: aspectRatio === "16:9" ? "16 / 9" : "9 / 16",
+    };
+  }
   if (layout === "gallery" || layout === "gallery-workspace") {
     const width =
       layout === "gallery-workspace"
@@ -73,7 +86,11 @@ type Props = {
   onPreview?: () => void;
   generating?: boolean;
   generatingPosterUrl?: string;
+  generatingLabel?: string;
+  generatingBackground?: "overlay" | "black" | "light";
   emptyLabel?: string;
+  /** 无视频且非生成中时展示（如片段失败） */
+  errorMessage?: string | null;
   playSize?: "sm" | "md" | "lg";
   /** @deprecated 用 layout="compact" */
   compact?: boolean;
@@ -91,7 +108,10 @@ export function EcomVideoSlot({
   onPreview,
   generating = false,
   generatingPosterUrl,
+  generatingLabel,
+  generatingBackground,
   emptyLabel = "待生成",
+  errorMessage,
   playSize = "lg",
   compact = false,
   layout,
@@ -102,21 +122,28 @@ export function EcomVideoSlot({
   const resolvedLayout: EcomVideoSlotLayout =
     layout ?? (compact ? "compact" : "default");
   const slot = ecomVideoSlotStyle(aspectRatio, resolvedLayout);
+  const isWorkspaceFill = resolvedLayout === "workspace";
 
   return (
     <div
       className={cn(
-        "group/video relative shrink-0 overflow-hidden bg-black",
+        "group/video relative overflow-hidden bg-black",
+        isWorkspaceFill && "w-full shrink rounded-lg border border-[#e8e8ed]",
+        errorMessage?.trim() && !generating && !src?.trim() && "border-[#ff3b30]/40",
         resolvedLayout === "gallery" || resolvedLayout === "gallery-workspace"
           ? "rounded-lg border border-[#e8e8ed] bg-[#f5f5f7]"
           : undefined,
         className,
       )}
-      style={{
-        width: slot.width,
-        maxHeight: slot.maxHeight,
-        aspectRatio: slot.aspectRatio,
-      }}
+      style={
+        isWorkspaceFill
+          ? { aspectRatio: slot.aspectRatio }
+          : {
+              width: slot.width,
+              maxHeight: slot.maxHeight,
+              aspectRatio: slot.aspectRatio,
+            }
+      }
     >
       {generating ? (
         <>
@@ -128,7 +155,11 @@ export function EcomVideoSlot({
               className="absolute inset-0 size-full object-cover"
             />
           ) : null}
-          <EcomMediaGeneratingBusy className="absolute inset-0" />
+          <EcomMediaGeneratingBusy
+            className="absolute inset-0"
+            label={generatingLabel}
+            background={generatingBackground}
+          />
         </>
       ) : src?.trim() ? (
         <>
@@ -164,6 +195,10 @@ export function EcomVideoSlot({
             </div>
           ) : null}
         </>
+      ) : errorMessage?.trim() ? (
+        <div className="flex size-full items-center justify-center px-2 text-center text-[10px] leading-snug text-[#c0392b]">
+          {errorMessage}
+        </div>
       ) : (
         <div className="flex size-full items-center justify-center px-2 text-center text-[10px] text-[#86868b]">
           {emptyLabel}

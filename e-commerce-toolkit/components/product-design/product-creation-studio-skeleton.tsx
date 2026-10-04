@@ -20,7 +20,7 @@ export function ProductCreationStudioSkeleton() {
     >
       <div className="animate-pulse space-y-4 p-1">
         <div className="h-32 rounded-xl bg-[#e8e8ed]" />
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="aspect-square rounded-xl bg-[#f0f0f2]" />
           ))}

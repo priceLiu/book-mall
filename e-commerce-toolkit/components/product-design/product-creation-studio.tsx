@@ -68,11 +68,11 @@ const ENTRY_COPY: Record<
     newTitle: "电商产品主图创作",
   },
   "detail-page": {
-    title: "电商产品详情页创作",
+    title: "详情长图分屏创作",
     path: "/ecom/detail-page-creation",
     blurb:
-      "详情页架构 + 分屏文案与配图。可从已完成的主图项目导入策略，也可从头开始。",
-    newTitle: "电商产品详情页创作",
+      "架构 + 分屏文案 · 助手 Step · 可接主图策略。可从主图项目导入策略，也可从头开始。",
+    newTitle: "详情长图分屏创作",
   },
 };
 

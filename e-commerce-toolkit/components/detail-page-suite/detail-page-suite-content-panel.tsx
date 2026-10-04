@@ -217,12 +217,12 @@ export function DetailPageSuiteWorkbenchChrome({
           <h2 className="text-sm font-semibold text-[#1d1d1f]">
             {project.title?.trim() ||
               (isHit
-                ? "爆款详情页套图"
+                ? "学竞品结构 · 原创详情"
                 : isAplus
-                  ? "AI 详情页"
+                  ? "A+ 详情模块出图"
                   : isReplica
-                    ? "详情页套图复刻"
-                    : "详情页套图")}
+                    ? "参考详情 → 标准套图"
+                    : "服装详情套图（模板）")}
           </h2>
           <p className="text-[11px] text-[#6e6e73]">
             阶段：{isWorkbench ? "出图" : phaseLabel}
@@ -266,21 +266,21 @@ export function DetailPageSuiteWorkbenchChrome({
                 onSelectProject={onOpenProject}
                 title={
                   isHit
-                    ? "爆款详情页套图 · 项目列表"
+                    ? "学竞品结构 · 原创详情 · 项目列表"
                     : isAplus
-                      ? "AI 详情页 · 项目列表"
+                      ? "A+ 详情模块出图 · 项目列表"
                       : isReplica
-                        ? "详情页套图复刻 · 项目列表"
-                        : "详情页套图 · 项目列表"
+                        ? "参考详情 → 标准套图 · 项目列表"
+                        : "服装详情套图（模板） · 项目列表"
                 }
                 emptyHint={
                   isHit
-                    ? "还没有保存过的爆款详情页套图项目。"
+                    ? "还没有保存过的「学竞品结构 · 原创详情」项目。"
                     : isAplus
-                      ? "还没有保存过的 AI 详情页项目。"
+                      ? "还没有保存过的「A+ 详情模块出图」项目。"
                       : isReplica
-                        ? "还没有保存过的详情页套图复刻项目。"
-                        : "还没有保存过的详情页套图项目。"
+                        ? "还没有保存过的「参考详情 → 标准套图」项目。"
+                        : "还没有保存过的「服装详情套图（模板）」项目。"
                 }
                 disabled={llmBusy}
               />

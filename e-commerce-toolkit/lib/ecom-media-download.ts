@@ -47,9 +47,16 @@ export async function downloadMediaUrl(url: string, filename: string): Promise<v
   }
 }
 
-export function mediaDownloadFilename(title: string | null | undefined, kind: string, url: string): string {
+export function mediaDownloadFilename(
+  title: string | null | undefined,
+  kind: string,
+  url?: string | null,
+): string {
   const base = (title?.trim() || "asset").slice(0, 80);
-  const extFromUrl = url.match(/\.(jpe?g|png|webp|gif|mp4|webm)(\?|$)/i)?.[1]?.toLowerCase();
+  const extFromUrl = url
+    ?.trim()
+    .match(/\.(jpe?g|png|webp|gif|mp4|webm)(\?|$)/i)?.[1]
+    ?.toLowerCase();
   const ext =
     extFromUrl ??
     (kind === "video" ? "mp4" : "jpg");

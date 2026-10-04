@@ -1,7 +1,7 @@
 import { DetailPageSuiteHitPageContent } from "./detail-page-suite-hit-page-content";
 
 export const metadata = {
-  title: "爆款详情页套图",
+  title: "学竞品结构 · 原创详情",
 };
 
 export default function DetailPageSuiteHitPage() {

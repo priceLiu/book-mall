@@ -15,6 +15,7 @@ import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
 import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { EcomFeishuGuideToolbarChip } from "@/components/layout/ecom-workspace-guide-bar";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import { composeEcomCopyOverlay } from "@/lib/ecom-detail-page-suite-hit-api";
@@ -401,10 +402,15 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
     <EcomWorkspaceLayout fullWidth>
       <div className="ecom-scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
       <header className="mb-6 w-full max-w-none">
-        <h1 className="text-xl font-semibold text-[#1d1d1f]">海报制作</h1>
-        <p className="mt-1 text-sm text-[#6e6e73]">
-          四步出图：选路径 → 活动与尺寸 → 生成无字底图 → 排版加字
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h1 className="text-xl font-semibold text-[#1d1d1f]">海报制作</h1>
+            <p className="mt-1 text-sm text-[#6e6e73]">
+              四步出图：选路径 → 活动与尺寸 → 生成无字底图 → 排版加字
+            </p>
+          </div>
+          <EcomFeishuGuideToolbarChip moduleId="poster" />
+        </div>
         <div className="mt-4 inline-flex rounded-xl border border-[#e8e8ed] bg-[#f5f5f7] p-1">
           <button
             type="button"

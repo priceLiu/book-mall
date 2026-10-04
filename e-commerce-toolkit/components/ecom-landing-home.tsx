@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { EcomFeishuGuideLink } from "@/components/layout/ecom-feishu-guide-link";
 import { ECOM_HOME_FEATURED_CARDS } from "@/lib/ecom-home-feed";
+import { ECOM_FEISHU_GUIDE_WIKI_HUB } from "@/lib/ecom-feishu-guide-urls";
 
 const CARD_GRADIENTS = [
   "linear-gradient(135deg, rgba(0,113,227,0.28) 0%, rgba(15,23,42,0.92) 60%)",
@@ -25,6 +27,12 @@ export function EcomLandingHome() {
           <p className="max-w-2xl text-base text-white/60 sm:text-lg">
             浏览功能无需登录；开始生成主图、详情或成片时再登录即可。
           </p>
+          <EcomFeishuGuideLink
+            href={ECOM_FEISHU_GUIDE_WIKI_HUB}
+            variant="button"
+            label="使用指南（飞书知识库）"
+            className="border-white/15 bg-white/5 text-white/90 hover:bg-white/10"
+          />
         </section>
 
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

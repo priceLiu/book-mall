@@ -277,7 +277,37 @@ type WorkflowComposeResult = {
 
 ---
 
-## §5 扩展新模板（示例 `beat-sync-v1`）
+## §5 模板 `simple-fusion-i2v-v1`（运镜 / 对镜 / 卡点跳舞）
+
+| 项 | 值 |
+|----|-----|
+| `templateId` | `simple-fusion-i2v-v1` |
+| `module` | `video-camera` · `video-mirror-selfie` · `video-dance-swap` |
+| `settings.variant` | `camera` \| `mirror` \| `dance` |
+| `toolKey` | `ecom-toolkit__simple-fusion-video` |
+| 路由 | `/ecom/video/camera` · `/ecom/video/mirror-selfie` · `/ecom/video/dance-swap` |
+
+### 5.1 Prompt（用户可编辑）
+
+与 `outfit-v1` 逐镜运镜/动作只读不同，本模板 **融合 / 视频 / 负面** Prompt 均在 UI textarea 展示，系统按 variant 预填 PRD 默认文案；用户修改后持久化于 `meta.prompts`；空字段回退 `constants` 默认。提供「恢复系统默认」。
+
+### 5.2 项目真源
+
+- `references`：`model`、`scene`、`garments[]`（dance 2～6，其余 1）
+- `meta.looks[]`：`lookId`、`garmentRef`、`fusedImageUrl`、`clipVideoUrl`、`status`
+- `composeResult`：最终成片（dance 经 Media Render + 可选 `bgmUrl`）
+
+### 5.3 action
+
+| action | 说明 |
+|--------|------|
+| `fusion_complete` | 单 look 或多 look 融合完成 |
+| `clip_generate_complete` | 单段 i2v 完成 |
+| `compose_complete` | 跳舞拼接成片完成 |
+
+---
+
+## §6 扩展新模板（示例 `beat-sync-v1`）
 
 1. 在 `video-workflow/templates/beat-sync-v1/` 新增 `schema.ts` / `parser.ts` / `ui-config.ts` / `generation.ts`。
 2. 在 `registry.ts` 注册 `templateId: "beat-sync-v1"`。
@@ -296,7 +326,7 @@ type BeatSyncExtension = {
 
 ---
 
-## §6 LLM 交互约束（强制）
+## §7 LLM 交互约束（强制）
 
 1. **结构化数据只写在 JSON 内**；禁止 Markdown 分镜表、禁止围栏外字段。
 2. **新建/升级** 电商短视频工作流 checklist：
@@ -309,7 +339,7 @@ type BeatSyncExtension = {
 
 ---
 
-## §7 与旧契约对照
+## §8 与旧契约对照
 
 | 契约 | 围栏 | 适用场景 | 与 video-workflow 关系 |
 |------|------|----------|------------------------|
@@ -326,3 +356,4 @@ type BeatSyncExtension = {
 | 日期 | 说明 |
 |------|------|
 | 2026-09-04 | 初版：信封 v1、`outfit-v1` 全量契约、扩展指南 |
+| 2026-10-04 | §5 `simple-fusion-i2v-v1`（运镜/对镜/卡点跳舞） |

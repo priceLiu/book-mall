@@ -2,7 +2,7 @@ import { DetailPageSuiteStudio } from "@/components/detail-page-suite/detail-pag
 import { BackgroundGenerationProvider } from "@/components/generation";
 
 export const metadata = {
-  title: "详情页套图",
+  title: "服装详情套图（模板）",
 };
 
 export default function DetailPageSuitePage() {
