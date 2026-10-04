@@ -2470,45 +2470,34 @@ function ComposeEditorFullscreen({
             className={cn(
               COMPOSE_FS_SURFACE,
               COMPOSE_FS_RIGHT_W,
-              "flex min-h-0 flex-col",
+              "flex min-h-0 flex-col overflow-hidden",
             )}
           >
-            <div className="shrink-0 border-b border-white/10 px-3 py-2">
-              <p className="text-xs font-medium text-white/85">导出与音频</p>
-              <p className="text-[10px] text-white/40">修改后点顶部「导出」生效</p>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3">
             <SimpleFusionComposeRenderProfilePanel
+              className="min-h-0 flex-1"
+              layout="tabbed"
               profile={profile}
               disabled={!timelineReady}
               showBgmPresets
               onChange={(next) => setProfile(next)}
+              clipSubtitle={
+                selected
+                  ? {
+                      clipLabel: selected.label?.trim() || "未命名片段",
+                      value: selected.subtitle ?? "",
+                      onChange: (subtitle) => {
+                        onApplyWorkbench(
+                          (prev) =>
+                            updateComposeClip(prev, selected.id, {
+                              subtitle: subtitle || undefined,
+                            }),
+                          { persist: true },
+                        );
+                      },
+                    }
+                  : null
+              }
             />
-            {selected ? (
-              <div className="mt-4 space-y-1.5 border-t border-white/10 pt-4">
-                <p className="text-[11px] font-medium text-white/55">当前片段字幕</p>
-                <p className="text-[10px] text-white/35">
-                  {selected.label?.trim() || "未命名片段"} · script 烧录
-                </p>
-                <textarea
-                  className="h-20 w-full resize-none rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[11px] text-white placeholder:text-white/30"
-                  placeholder="该段台词（可选）"
-                  value={selected.subtitle ?? ""}
-                  disabled={!timelineReady}
-                  onChange={(e) => {
-                    const subtitle = e.target.value;
-                    onApplyWorkbench(
-                      (prev) =>
-                        updateComposeClip(prev, selected.id, {
-                          subtitle: subtitle || undefined,
-                        }),
-                      { persist: true },
-                    );
-                  }}
-                />
-              </div>
-            ) : null}
-            </div>
           </aside>
         </div>
 
