@@ -44,6 +44,10 @@ export type ComposeClipSubtitleEditor = {
   clipLabel: string;
   value: string;
   onChange: (subtitle: string) => void;
+  /** 多片段时在 Tab 内切换编辑对象 */
+  clipOptions?: { id: string; label: string }[];
+  selectedClipId?: string;
+  onSelectClip?: (clipId: string) => void;
 };
 
 type Props = {
@@ -325,24 +329,102 @@ export function SimpleFusionComposeRenderProfilePanel({
   const clipSubtitleBlock =
     layout === "tabbed" ? (
       clipSubtitle ? (
-        <div className="space-y-1.5 border-t border-white/10 pt-4">
-          <p className="text-[11px] font-medium text-white/55">当前片段台词</p>
-          <p className="text-[10px] text-white/35">
-            {clipSubtitle.clipLabel.trim() || "未命名片段"} · script 烧录
-          </p>
+        <div className="space-y-2">
+          <p className="text-[11px] font-medium text-white/70">片段台词</p>
+          {clipSubtitle.clipOptions && clipSubtitle.clipOptions.length > 1 ? (
+            <select
+              className={selectClass}
+              disabled={disabled}
+              value={clipSubtitle.selectedClipId ?? ""}
+              onChange={(e) => clipSubtitle.onSelectClip?.(e.target.value)}
+            >
+              {clipSubtitle.clipOptions.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label.trim() || "未命名片段"}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-[10px] text-white/35">
+              {clipSubtitle.clipLabel.trim() || "未命名片段"}
+            </p>
+          )}
           <textarea
-            className="h-20 w-full resize-none rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[11px] text-white placeholder:text-white/30"
-            placeholder="该段台词（可选）"
+            className="h-24 w-full resize-none rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[11px] text-white placeholder:text-white/30"
+            placeholder={
+              burnIn
+                ? "该段台词（导出时烧录到成片）"
+                : "该段台词（可选；开启下方烧录后写入成片）"
+            }
             value={clipSubtitle.value}
             disabled={disabled}
             onChange={(e) => clipSubtitle.onChange(e.target.value)}
           />
         </div>
       ) : (
-        <p className="border-t border-white/10 pt-4 text-[11px] text-white/40">
-          在时间线选中片段后，可在此编辑该段台词。
-        </p>
+        <p className="text-[11px] text-white/40">请先在时间线添加至少 1 段视频。</p>
       )
+    ) : null;
+
+  const tabbedBurnInSection =
+    layout === "tabbed" ? (
+      <div className="space-y-3 border-t border-white/10 pt-4">
+        <p className="text-[11px] font-medium text-white/70">成片字幕</p>
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-white/15 bg-white/[0.04] px-3 py-2.5 text-[12px] text-white/85">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4 shrink-0 rounded border-white/30 accent-[#0a84ff]"
+            checked={burnIn}
+            disabled={disabled}
+            onChange={(e) => {
+              const on = e.target.checked;
+              patch({
+                subtitle: {
+                  ...p.subtitle,
+                  burnIn: on,
+                  mode:
+                    on && (subtitleMode === "none" || !p.subtitle?.mode)
+                      ? "script"
+                      : p.subtitle?.mode ?? "script",
+                },
+              });
+            }}
+          />
+          <span className="leading-snug">
+            烧录字幕到成片
+            <span className="mt-0.5 block text-[10px] font-normal text-white/45">
+              默认不勾选；需要时在成片上显示字幕请勾选，下方字体与来源可先调好。
+            </span>
+          </span>
+        </label>
+        <SubtitleBurnInFields
+          variant="canvas-dark"
+          density="compact"
+          showPreview
+          previewSampleText="卡点成片"
+          disabled={disabled}
+          burnIn
+          burnInLocked
+          onBurnInChange={() => undefined}
+          subtitleMode={subtitleMode === "asr" ? "asr" : "script"}
+          showSubtitleMode
+          onSubtitleModeChange={(mode) =>
+            patch({
+              subtitle: {
+                ...p.subtitle,
+                mode,
+              },
+            })
+          }
+          style={style}
+          onStyleChange={(nextStyle) =>
+            patch({
+              subtitle: { ...p.subtitle, style: nextStyle },
+            })
+          }
+          burnInLabel="烧录字幕到成片"
+        />
+      </div>
     ) : null;
 
   if (layout === "flat") {
@@ -394,8 +476,8 @@ export function SimpleFusionComposeRenderProfilePanel({
         ) : null}
         {tab === "subtitle" ? (
           <div className="space-y-4">
-            {subtitleBurnIn}
             {clipSubtitleBlock}
+            {tabbedBurnInSection}
           </div>
         ) : null}
       </div>

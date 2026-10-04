@@ -2481,10 +2481,16 @@ function ComposeEditorFullscreen({
               showBgmPresets
               onChange={(next) => setProfile(next)}
               clipSubtitle={
-                selected
+                ordered.length > 0 && selected
                   ? {
                       clipLabel: selected.label?.trim() || "未命名片段",
                       value: selected.subtitle ?? "",
+                      selectedClipId: selected.id,
+                      clipOptions: ordered.map((c, i) => ({
+                        id: c.id,
+                        label: c.label?.trim() || `片段 ${i + 1}`,
+                      })),
+                      onSelectClip: setSelectedId,
                       onChange: (subtitle) => {
                         onApplyWorkbench(
                           (prev) =>
