@@ -1,36 +1,33 @@
 import { randomUUID } from "crypto";
 
-import type { MediaTimelineV1, RenderProfile } from "@/lib/media/timeline-types";
-import { parseRenderProfile } from "@/lib/media/timeline-types";
+import {
+  composeWorkbenchProfileToRenderProfile,
+  emptyPlatformComposeWorkbenchState,
+  parsePlatformComposeWorkbenchFromMeta,
+  platformWorkbenchToMediaTimeline,
+  type PlatformComposeWorkbenchClip,
+  type PlatformComposeWorkbenchState,
+} from "@/lib/media/platform-compose-workbench";
 
 import { resolveSimpleFusionBgmUrl } from "./render";
 import type { SimpleFusionLook, SimpleFusionProjectDto, SimpleFusionSettings } from "./types";
 
-export type SimpleFusionComposeWorkbenchClip = {
-  id: string;
-  videoUrl: string;
-  label?: string;
-  posterUrl?: string;
-  durationSec?: number;
-  /** 源片入点（秒），默认 0 */
-  sourceStartSec?: number;
-  /** 源片出点（秒），默认全长 */
-  sourceEndSec?: number;
-  lookId?: string;
+export type SimpleFusionComposeWorkbenchClip = Omit<
+  PlatformComposeWorkbenchClip,
+  "source"
+> & {
   source: "look" | "import";
 };
 
-export type SimpleFusionComposeWorkbenchState = {
-  orderedClipIds: string[];
+export type SimpleFusionComposeWorkbenchState = Omit<
+  PlatformComposeWorkbenchState,
+  "clips"
+> & {
   clips: SimpleFusionComposeWorkbenchClip[];
-  profile?: {
-    transition?: RenderProfile["transition"];
-    video?: RenderProfile["video"];
-  };
 };
 
 export function emptyComposeWorkbenchState(): SimpleFusionComposeWorkbenchState {
-  return { orderedClipIds: [], clips: [] };
+  return emptyPlatformComposeWorkbenchState() as SimpleFusionComposeWorkbenchState;
 }
 
 function clipMap(state: SimpleFusionComposeWorkbenchState): Map<string, SimpleFusionComposeWorkbenchClip> {
@@ -62,36 +59,16 @@ export function buildDefaultComposeClipsFromLooks(
 }
 
 export function parseComposeWorkbenchFromMeta(raw: unknown): SimpleFusionComposeWorkbenchState | null {
-  if (!raw || typeof raw !== "object") return null;
-  const m = raw as Record<string, unknown>;
-  const clipsRaw = m.clips;
-  const orderRaw = m.orderedClipIds;
-  if (!Array.isArray(clipsRaw) || !Array.isArray(orderRaw)) return null;
-  const clips: SimpleFusionComposeWorkbenchClip[] = [];
-  for (const item of clipsRaw) {
-    if (!item || typeof item !== "object") continue;
-    const c = item as Record<string, unknown>;
-    const videoUrl = typeof c.videoUrl === "string" ? c.videoUrl.trim() : "";
-    const id = typeof c.id === "string" ? c.id.trim() : "";
-    if (!id || !videoUrl) continue;
-    clips.push({
-      id,
-      videoUrl,
-      label: typeof c.label === "string" ? c.label : undefined,
-      posterUrl: typeof c.posterUrl === "string" ? c.posterUrl : undefined,
-      durationSec: typeof c.durationSec === "number" ? c.durationSec : undefined,
-      sourceStartSec: typeof c.sourceStartSec === "number" ? c.sourceStartSec : undefined,
-      sourceEndSec: typeof c.sourceEndSec === "number" ? c.sourceEndSec : undefined,
-      lookId: typeof c.lookId === "string" ? c.lookId : undefined,
+  const parsed = parsePlatformComposeWorkbenchFromMeta(raw);
+  if (!parsed) return null;
+  return {
+    orderedClipIds: parsed.orderedClipIds,
+    clips: parsed.clips.map((c) => ({
+      ...c,
       source: c.source === "import" ? "import" : "look",
-    });
-  }
-  const orderedClipIds = orderRaw.filter((x): x is string => typeof x === "string" && x.trim().length > 0);
-  const profile =
-    m.profile && typeof m.profile === "object"
-      ? (m.profile as SimpleFusionComposeWorkbenchState["profile"])
-      : undefined;
-  return { orderedClipIds, clips, profile };
+    })),
+    profile: parsed.profile,
+  };
 }
 
 /** 合并 persisted workbench 与最新 look 片段 URL */
@@ -153,46 +130,18 @@ export function resolveComposeWorkbenchState(
   };
 }
 
-export function workbenchToMediaTimeline(state: SimpleFusionComposeWorkbenchState): MediaTimelineV1 {
-  const map = clipMap(state);
-  const clips = state.orderedClipIds
-    .map((id, order) => {
-      const c = map.get(id);
-      if (!c?.videoUrl?.trim()) return null;
-      const start = c.sourceStartSec ?? 0;
-      const end = c.sourceEndSec;
-      const span =
-        end != null && end > start
-          ? end - start
-          : c.durationSec != null && c.durationSec > 0
-            ? c.durationSec
-            : undefined;
-      return {
-        order,
-        videoUrl: c.videoUrl.trim(),
-        ...(start > 0 ? { sourceStartSec: start } : {}),
-        ...(end != null && end > 0 ? { sourceEndSec: end } : {}),
-        ...(span != null && span > 0 ? { durationSec: span } : {}),
-      };
-    })
-    .filter((c): c is NonNullable<typeof c> => Boolean(c));
-  if (clips.length < 1) throw new Error("时间线至少需要 1 段视频");
-  return { version: 1, clips };
+export function workbenchToMediaTimeline(state: SimpleFusionComposeWorkbenchState) {
+  return platformWorkbenchToMediaTimeline(state);
 }
 
 export function resolveComposeRenderProfile(
   settings: SimpleFusionSettings,
   workbench?: SimpleFusionComposeWorkbenchState | null,
-): RenderProfile {
-  const base = parseRenderProfile(workbench?.profile ?? null);
-  const bgmUrl = resolveSimpleFusionBgmUrl(settings.bgmPresetId);
-  if (bgmUrl) {
-    base.audio = { ...base.audio, bgmUrl, mixTts: false, bgmVolume: 0.35 };
-  } else {
-    base.audio = { ...base.audio, mixTts: false };
-  }
-  base.subtitle = { ...base.subtitle, mode: "none", burnIn: false };
-  return base;
+) {
+  return composeWorkbenchProfileToRenderProfile(workbench?.profile, {
+    fallbackBgmPresetId: settings.bgmPresetId,
+    resolveBgmPresetUrl: resolveSimpleFusionBgmUrl,
+  });
 }
 
 export function newImportComposeClip(args: {

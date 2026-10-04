@@ -714,7 +714,19 @@ export type EcomMediaRenderProfileInput = {
   subtitle?: {
     mode?: "script" | "asr" | "none";
     burnIn?: boolean;
+    asrModelKey?: string;
     style?: import("@private/media-render-subtitle-style/subtitle-style-options").SubtitleBurnInStyle;
+  };
+  audio?: {
+    bgmUrl?: string;
+    bgmVolume?: number;
+    mixTts?: boolean;
+    /** 0–1，片段原声 / TTS 混入音量 */
+    dialogueVolume?: number;
+    /** 按成片时长截取 BGM（默认 true，有 BGM 时） */
+    bgmFitTimeline?: boolean;
+    /** 持久化 preset；合成时由 Book 解析为 bgmUrl（SFV 等） */
+    bgmPresetId?: string;
   };
   video?: { scaleMode?: "source" | "fit720p" | "fit1080p" };
 };

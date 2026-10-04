@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ModalPortal } from "@/components/common/modal-portal";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
+import { SimpleFusionComposeRenderProfilePanel } from "@/components/simple-fusion-video/simple-fusion-compose-render-profile-panel";
 import { SimpleFusionVideoSlotHoverActions } from "@/components/simple-fusion-video/simple-fusion-video-slot-hover-actions";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
@@ -52,6 +53,7 @@ import {
   resolveComposeWorkbenchFromProject,
   setComposeClipSourceRangeWithRipple,
   splitComposeClipAtSourceSec,
+  updateComposeClip,
   type ComposeWorkbenchClip,
   type ComposeWorkbenchState,
 } from "@/lib/simple-fusion-compose-workbench";
@@ -77,6 +79,13 @@ function formatTimeSec(sec: number): string {
   return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
 }
 
+/** 全屏剪辑台 · 左栏第二 Tab（按子应用/项目类型，后续接资产 API） */
+function resolveComposeProjectAssetLibraryLabel(module: string): string {
+  const m = module.trim().toLowerCase();
+  if (m.includes("canvas") || m.startsWith("story")) return "画布资产";
+  return "电商资产";
+}
+
 const FILMSTRIP_THUMB_PX = 72;
 const MIN_TRIM_SEC = 0.25;
 /** 成片轨道：每秒占用的像素宽度基准（与刻度尺、块宽一致） */
@@ -88,6 +97,18 @@ const COMPOSE_PANEL_DRAG_BLOCK =
   "button, input, select, textarea, a, [data-compose-sequence-track], [data-compose-trim-handle]";
 /** 迷你时间线浮窗：宽度为视口 2/3，默认底边距视口底部 1/3 高 */
 const MINI_COMPOSE_PANEL_WIDTH_CLASS = "w-[66.666vw] max-w-[calc(100vw-1rem)]";
+/** 全屏剪辑台：即梦式块布局（gap + 圆角 surface，底栏独立 workspace 块） */
+const COMPOSE_FS_WORKSPACE_INSET = "px-3 pb-3 pt-3";
+const COMPOSE_FS_BLOCK_GAP = "gap-3";
+const COMPOSE_FS_SURFACE =
+  "overflow-hidden rounded-xl bg-[#161616] text-white";
+const COMPOSE_FS_LEFT_W = "w-[360px] shrink-0 max-lg:w-[300px]";
+const COMPOSE_FS_RIGHT_W = "w-[360px] shrink-0 max-lg:w-[300px]";
+/** 底栏 workspace 固定高度（约 1 轨 + 预留空轨 + 工具条），仅横向滚动 */
+const COMPOSE_FS_TIMELINE_WORKSPACE_CLASS =
+  "flex h-[220px] max-h-[240px] min-h-[200px] shrink-0 flex-col overflow-hidden";
+const COMPOSE_FS_SCROLL_HIDE =
+  "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden overflow-y-hidden";
 
 function cloneWorkbenchState(s: ComposeWorkbenchState): ComposeWorkbenchState {
   return structuredClone(s);
@@ -542,6 +563,29 @@ export function SimpleFusionComposeWorkbench({
     setWorkbench(resolveComposeWorkbenchFromProject(project, previewSlots));
   }, [project.id, project.updatedAt, previewSlots]);
 
+  useEffect(() => {
+    const preset = project.settings.bgmPresetId?.trim();
+    if (!preset) return;
+    setWorkbench((prev) => {
+      if (prev.profile?.audio?.bgmPresetId || prev.profile?.audio?.bgmUrl) return prev;
+      return {
+        ...prev,
+        profile: {
+          ...DEFAULT_COMPOSE_PROFILE,
+          ...prev.profile,
+          audio: {
+            ...DEFAULT_COMPOSE_PROFILE.audio,
+            ...prev.profile?.audio,
+            bgmPresetId: preset,
+            mixTts: true,
+            dialogueVolume: 0.95,
+            bgmFitTimeline: true,
+          },
+        },
+      };
+    });
+  }, [project.id, project.settings.bgmPresetId]);
+
   const schedulePersist = useCallback(
     (next: ComposeWorkbenchState) => {
       if (persistTimer.current) clearTimeout(persistTimer.current);
@@ -734,6 +778,7 @@ export function SimpleFusionComposeWorkbench({
         <ModalPortal>
           <ComposeEditorFullscreen
             projectId={project.id}
+            projectModule={project.module}
             workbench={workbench}
             profile={profile}
             ordered={ordered}
@@ -983,6 +1028,11 @@ function ComposeSequenceTrack({
   filmstripThumbClassName = "w-8",
   portraitFilmstrip = false,
   playheadInsetInClipLane = false,
+  /** 轨道下方预留一行空轨（全屏底栏，播放头可贯穿） */
+  reserveExtraClipLane = false,
+  reserveLaneClassName = "h-14",
+  scrollContainerClassName,
+  rootClassName,
 }: {
   clips: ComposeWorkbenchClip[];
   selectedId: string | null;
@@ -1019,6 +1069,11 @@ function ComposeSequenceTrack({
   portraitFilmstrip?: boolean;
   /** 播放头只在片段轨道内且上下留白 */
   playheadInsetInClipLane?: boolean;
+  reserveExtraClipLane?: boolean;
+  reserveLaneClassName?: string;
+  /** 轨道横向滚动容器（全屏底栏隐藏原生滚动条） */
+  scrollContainerClassName?: string;
+  rootClassName?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
@@ -1159,9 +1214,9 @@ function ComposeSequenceTrack({
     "rounded-md p-2 text-white/75 hover:bg-white/10 disabled:opacity-35 disabled:pointer-events-none";
 
   return (
-    <div className="mb-3" data-compose-sequence-track>
+    <div className={cn("mb-3", rootClassName)} data-compose-sequence-track>
       {!hideToolbar ? (
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-0.5">
           {onUndo ? (
             <button
@@ -1253,7 +1308,10 @@ function ComposeSequenceTrack({
       ) : null}
       <div
         ref={scrollRef}
-        className="overflow-x-auto rounded-md border border-white/15 bg-[#0f0f0f]"
+        className={cn(
+          "min-h-0 overflow-x-auto rounded-md border border-white/15 bg-[#0f0f0f]",
+          scrollContainerClassName,
+        )}
       >
         <div className="relative" style={{ width: trackWidthPx }}>
           {!playheadInsetInClipLane ? (
@@ -1462,6 +1520,15 @@ function ComposeSequenceTrack({
                 </button>
               ) : null}
             </div>
+            {reserveExtraClipLane ? (
+              <div
+                className={cn(
+                  "border-t border-dashed border-white/10 bg-[#121212]/80",
+                  reserveLaneClassName,
+                )}
+                aria-hidden
+              />
+            ) : null}
           </div>
         </div>
       </div>
@@ -1926,6 +1993,7 @@ function ComposeMiniTimelinePanel({
 
 function ComposeEditorFullscreen({
   projectId,
+  projectModule,
   workbench,
   profile,
   ordered,
@@ -1940,6 +2008,7 @@ function ComposeEditorFullscreen({
   setProfile,
 }: {
   projectId: string;
+  projectModule: string;
   workbench: ComposeWorkbenchState;
   profile: NonNullable<ComposeWorkbenchState["profile"]>;
   ordered: ComposeWorkbenchClip[];
@@ -1958,7 +2027,11 @@ function ComposeEditorFullscreen({
 }) {
   const { alert, toast } = useDialogs();
   const [selectedId, setSelectedId] = useState<string | null>(ordered[0]?.id ?? null);
-  const [assetTab, setAssetTab] = useState<"project" | "import">("project");
+  const projectAssetLibraryLabel = resolveComposeProjectAssetLibraryLabel(projectModule);
+  const [assetLibraryTab, setAssetLibraryTab] = useState<"imported" | "project">("imported");
+  const [assetMediaFilter, setAssetMediaFilter] = useState<"all" | "image" | "video" | "audio">(
+    "all",
+  );
   const [playing, setPlaying] = useState(false);
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(6);
@@ -2205,229 +2278,286 @@ function ComposeEditorFullscreen({
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <aside className="flex w-[240px] shrink-0 flex-col border-r border-white/10 bg-[#141414]">
-          <div className="flex border-b border-white/10 text-[11px]">
-            <button
-              type="button"
-              className={cn(
-                "flex-1 px-3 py-2",
-                assetTab === "import" ? "font-medium text-white" : "text-white/45",
-              )}
-              onClick={() => setAssetTab("import")}
-            >
-              已导入
-            </button>
-            <button
-              type="button"
-              className={cn(
-                "flex-1 px-3 py-2",
-                assetTab === "project" ? "font-medium text-white" : "text-white/45",
-              )}
-              onClick={() => setAssetTab("project")}
-            >
-              项目片段
-            </button>
-          </div>
-          <div className="flex gap-1 border-b border-white/10 px-2 py-1.5 text-[10px] text-white/50">
-            <span className="rounded bg-white/10 px-2 py-0.5 text-white/80">全部</span>
-            <span className="px-2 py-0.5">视频</span>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-2">
-            {assetTab === "project" ? (
-              <AssetGrid
-                clips={ordered}
-                selectedId={selectedId}
-                onPick={setSelectedId}
-                showDuration
-              />
-            ) : (
-              <AssetGrid
-                clips={importedClips.length ? importedClips : ordered.filter((c) => c.source === "import")}
-                selectedId={selectedId}
-                onPick={setSelectedId}
-                showDuration
-              />
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col overflow-hidden bg-[#0d0d0d]",
+          COMPOSE_FS_WORKSPACE_INSET,
+          COMPOSE_FS_BLOCK_GAP,
+        )}
+      >
+        <div
+          className={cn("flex min-h-0 flex-1 overflow-hidden", COMPOSE_FS_BLOCK_GAP)}
+        >
+          <aside
+            className={cn(
+              COMPOSE_FS_SURFACE,
+              COMPOSE_FS_LEFT_W,
+              "flex min-h-0 flex-col",
             )}
-          </div>
-          <div className="border-t border-white/10 p-2">
-            <EcomButtonSecondary
-              type="button"
-              size="sm"
-              className="w-full gap-1 border-white/20 bg-white/5 text-white hover:bg-white/10"
-              onClick={onImportClick}
-            >
-              <Plus className="size-3.5" />
-              导入
-            </EcomButtonSecondary>
-          </div>
-        </aside>
+          >
+            <div className="flex border-b border-white/10 text-[11px]">
+              <button
+                type="button"
+                className={cn(
+                  "flex-1 px-2 py-2.5 transition",
+                  assetLibraryTab === "imported"
+                    ? "font-medium text-white"
+                    : "text-white/45 hover:text-white/70",
+                )}
+                onClick={() => setAssetLibraryTab("imported")}
+              >
+                已导入资产
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "flex-1 px-2 py-2.5 transition",
+                  assetLibraryTab === "project"
+                    ? "font-medium text-white"
+                    : "text-white/45 hover:text-white/70",
+                )}
+                onClick={() => setAssetLibraryTab("project")}
+              >
+                {projectAssetLibraryLabel}
+              </button>
+            </div>
+            <div className="flex items-center gap-1 border-b border-white/10 px-2 py-2 text-[10px]">
+              <div className="flex min-w-0 flex-1 gap-0.5 text-white/50">
+                {(
+                  [
+                    ["all", "全部"],
+                    ["image", "图片"],
+                    ["video", "视频"],
+                    ["audio", "音频"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    disabled={assetLibraryTab === "project"}
+                    className={cn(
+                      "rounded px-2 py-0.5 transition disabled:opacity-35",
+                      assetMediaFilter === key && assetLibraryTab === "imported"
+                        ? "bg-white/10 text-white/85"
+                        : "hover:text-white/70",
+                    )}
+                    onClick={() => setAssetMediaFilter(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="flex shrink-0 items-center gap-0.5 rounded-md border border-white/20 px-2 py-1 text-[10px] text-white/80 transition hover:bg-white/10"
+                onClick={onImportClick}
+              >
+                <Plus className="size-3" />
+                导入
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
+              {assetLibraryTab === "project" ? (
+                <div className="flex h-full min-h-[200px] flex-col items-center justify-center rounded-lg border border-dashed border-white/12 px-3 text-center">
+                  <p className="text-[11px] text-white/55">{projectAssetLibraryLabel}</p>
+                  <p className="mt-2 text-[10px] leading-relaxed text-white/35">
+                    即将接入：从本项目的生成结果 / 资产库拖入时间线。
+                  </p>
+                </div>
+              ) : assetMediaFilter !== "all" && assetMediaFilter !== "video" ? (
+                <div className="flex h-full min-h-[200px] items-center justify-center px-2 text-center text-[10px] text-white/35">
+                  当前仅支持导入视频；{assetMediaFilter === "image" ? "图片" : "音频"}筛选即将开放。
+                </div>
+              ) : importedClips.length > 0 ? (
+                <AssetGrid
+                  clips={importedClips}
+                  selectedId={selectedId}
+                  onPick={setSelectedId}
+                  showDuration
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="flex h-full min-h-[220px] w-full flex-col items-center justify-center rounded-lg border border-dashed border-white/12 px-3 text-center transition hover:border-white/25 hover:bg-white/[0.03]"
+                  onClick={onImportClick}
+                >
+                  <p className="text-[11px] text-white/45">将文件拖至此处添加</p>
+                  <p className="mt-1 text-[10px] text-white/30">或点击使用右上角「导入」</p>
+                </button>
+              )}
+            </div>
+          </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col bg-black">
-          <div className="flex min-h-0 flex-1 items-center justify-center p-4">
-            {selected?.videoUrl ? (
-              <video
-                ref={videoRef}
-                src={selected.videoUrl}
-                className="max-h-full max-w-[min(100%,22rem)] rounded-md shadow-lg"
-                playsInline
-                controls={false}
-                onEnded={() => setPlaying(false)}
-                onTimeUpdate={(e) => {
-                  if (!playing || !selectedId) return;
-                  const seg = programSegments.find((s) => s.clip.id === selectedId);
-                  if (!seg) return;
-                  const local =
-                    e.currentTarget.currentTime - composeClipSourceStart(selected!);
-                  setProgramPlayheadSec(
-                    Math.min(seg.programStart + local, seg.programStart + seg.span),
-                  );
+          <div
+            className={cn(
+              COMPOSE_FS_SURFACE,
+              "flex min-h-0 min-w-0 flex-1 flex-col bg-black",
+            )}
+          >
+            <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
+              {selected?.videoUrl ? (
+                <video
+                  ref={videoRef}
+                  src={selected.videoUrl}
+                  className="max-h-full max-w-full rounded-md shadow-lg"
+                  playsInline
+                  controls={false}
+                  onEnded={() => setPlaying(false)}
+                  onTimeUpdate={(e) => {
+                    if (!playing || !selectedId) return;
+                    const seg = programSegments.find((s) => s.clip.id === selectedId);
+                    if (!seg) return;
+                    const local =
+                      e.currentTarget.currentTime - composeClipSourceStart(selected!);
+                    setProgramPlayheadSec(
+                      Math.min(seg.programStart + local, seg.programStart + seg.span),
+                    );
+                  }}
+                />
+              ) : (
+                <p className="text-sm text-white/40">没有媒体可供预览</p>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center justify-center gap-3 border-t border-white/10 bg-[#141414] py-2.5">
+              <button
+                type="button"
+                className="rounded-full p-2 hover:bg-white/10"
+                onClick={() => {
+                  const idx = ordered.findIndex((c) => c.id === selectedId);
+                  if (idx > 0) setSelectedId(ordered[idx - 1]!.id);
                 }}
-              />
-            ) : (
-              <p className="text-sm text-white/40">选择或导入片段</p>
-            )}
+              >
+                <ChevronLeft className="size-5" />
+              </button>
+              <button
+                type="button"
+                className="flex size-10 items-center justify-center rounded-full bg-white/15 hover:bg-white/25"
+                onClick={() => {
+                  const v = videoRef.current;
+                  if (!v) return;
+                  if (playing) {
+                    v.pause();
+                    setPlaying(false);
+                  } else {
+                    if (playheadInSelected) v.currentTime = previewSourceSec;
+                    void v.play().then(() => setPlaying(true)).catch(() => undefined);
+                  }
+                }}
+              >
+                {playing ? (
+                  <Pause className="size-5" />
+                ) : (
+                  <Play className="ml-0.5 size-5 fill-white" />
+                )}
+              </button>
+              <button
+                type="button"
+                className="rounded-full p-2 hover:bg-white/10"
+                onClick={() => {
+                  const idx = ordered.findIndex((c) => c.id === selectedId);
+                  if (idx >= 0 && idx < ordered.length - 1) setSelectedId(ordered[idx + 1]!.id);
+                }}
+              >
+                <ChevronRight className="size-5" />
+              </button>
+              <span className="text-[11px] tabular-nums text-white/50">
+                {formatTimeSec(programPlayheadSec)} / {formatTimeSec(totalProgramSec)}
+              </span>
+            </div>
           </div>
-          <div className="flex shrink-0 items-center justify-center gap-3 border-t border-white/10 bg-[#141414] py-2">
-            <button
-              type="button"
-              className="rounded-full p-2 hover:bg-white/10"
-              onClick={() => {
-                const idx = ordered.findIndex((c) => c.id === selectedId);
-                if (idx > 0) setSelectedId(ordered[idx - 1]!.id);
-              }}
-            >
-              <ChevronLeft className="size-5" />
-            </button>
-            <button
-              type="button"
-              className="flex size-10 items-center justify-center rounded-full bg-white/15 hover:bg-white/25"
-              onClick={() => {
-                const v = videoRef.current;
-                if (!v) return;
-                if (playing) {
-                  v.pause();
-                  setPlaying(false);
-                } else {
-                  if (playheadInSelected) v.currentTime = previewSourceSec;
-                  void v.play().then(() => setPlaying(true)).catch(() => undefined);
-                }
-              }}
-            >
-              {playing ? <Pause className="size-5" /> : <Play className="ml-0.5 size-5 fill-white" />}
-            </button>
-            <button
-              type="button"
-              className="rounded-full p-2 hover:bg-white/10"
-              onClick={() => {
-                const idx = ordered.findIndex((c) => c.id === selectedId);
-                if (idx >= 0 && idx < ordered.length - 1) setSelectedId(ordered[idx + 1]!.id);
-              }}
-            >
-              <ChevronRight className="size-5" />
-            </button>
-            <span className="text-[11px] tabular-nums text-white/50">
-              {formatTimeSec(programPlayheadSec)} / {formatTimeSec(totalProgramSec)}
-            </span>
-          </div>
-        </div>
-      </div>
 
-      <div className="flex max-h-[38vh] min-h-[180px] shrink-0 flex-col overflow-y-auto border-t border-white/10 bg-[#1a1a1a] p-3">
-        <ComposeSequenceTrack
-          clips={ordered}
-          selectedId={selectedId}
-          disabled={!timelineReady}
-          trimStart={trimStart}
-          trimEnd={trimEnd}
-          filmstripByUrl={filmstripByUrl}
-          fullDurationByUrl={fullDurationByUrl}
-          programPlayheadSec={programPlayheadSec}
-          totalProgramSec={totalProgramSec}
-          onSelect={setSelectedId}
-          onReorder={(from, to) =>
-            applyWithUndo((prev) => moveComposeClip(prev, from, to), { persist: true })
-          }
-          onTrimStart={setTrimStart}
-          onTrimEnd={setTrimEnd}
-          onTrimCommit={commitClipRangeFromRefs}
-          onSplit={() => void splitAtPlayhead()}
-          onTrimLeft={() => void trimLeftAtPlayhead()}
-          onTrimRight={() => void trimRightAtPlayhead()}
-          onDelete={() => void deleteSelected()}
-          onUndo={undoEdit}
-          onProgramSeek={seekProgramTimeline}
-          onImportClick={onImportClick}
-          zoomable
-          splitDisabled={!selected?.videoUrl || !timelineReady || !playheadInSelected}
-          trimDisabled={!selected?.videoUrl || !timelineReady || !playheadInSelected}
-          deleteDisabled={!selectedId || ordered.length <= 1}
-          undoDisabled={undoDepth < 1}
-        />
-        <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-white/10 pt-2">
-          <label className="flex items-center gap-2 text-[11px] text-white/55">
-            转场
-            <select
-              className="rounded border border-white/20 bg-black/40 px-2 py-1 text-[11px]"
-              value={profile.transition?.type === "none" ? "none" : "xfade"}
-              onChange={(e) =>
-                setProfile({
-                  ...profile,
-                  transition:
-                    e.target.value === "none"
-                      ? { type: "none" }
-                      : {
-                          type: "xfade",
-                          durationSec:
-                            profile.transition?.type === "xfade"
-                              ? profile.transition.durationSec
-                              : 0.6,
-                        },
-                })
-              }
-            >
-              <option value="xfade">交叉淡化</option>
-              <option value="none">无</option>
-            </select>
-          </label>
-          {profile.transition?.type === "xfade" ? (
-            <label className="flex items-center gap-1 text-[11px] text-white/55">
-              {profile.transition.durationSec}s
-              <input
-                type="range"
-                min={0.2}
-                max={2}
-                step={0.1}
-                value={profile.transition.durationSec}
-                onChange={(e) =>
-                  setProfile({
-                    ...profile,
-                    transition: { type: "xfade", durationSec: Number(e.target.value) },
-                  })
-                }
-              />
-            </label>
-          ) : null}
-          <label className="flex items-center gap-2 text-[11px] text-white/55">
-            画质
-            <select
-              className="rounded border border-white/20 bg-black/40 px-2 py-1 text-[11px]"
-              value={profile.video?.scaleMode ?? "fit1080p"}
-              onChange={(e) =>
-                setProfile({
-                  ...profile,
-                  video: {
-                    scaleMode: e.target.value as "fit1080p" | "fit720p" | "source",
-                  },
-                })
-              }
-            >
-              <option value="fit1080p">1080P</option>
-              <option value="fit720p">720P</option>
-              <option value="source">原片</option>
-            </select>
-          </label>
+          <aside
+            className={cn(
+              COMPOSE_FS_SURFACE,
+              COMPOSE_FS_RIGHT_W,
+              "flex min-h-0 flex-col",
+            )}
+          >
+            <div className="shrink-0 border-b border-white/10 px-3 py-2">
+              <p className="text-xs font-medium text-white/85">导出与音频</p>
+              <p className="text-[10px] text-white/40">修改后点顶部「导出」生效</p>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3">
+            <SimpleFusionComposeRenderProfilePanel
+              profile={profile}
+              disabled={!timelineReady}
+              showBgmPresets
+              onChange={(next) => setProfile(next)}
+            />
+            {selected ? (
+              <div className="mt-4 space-y-1.5 border-t border-white/10 pt-4">
+                <p className="text-[11px] font-medium text-white/55">当前片段字幕</p>
+                <p className="text-[10px] text-white/35">
+                  {selected.label?.trim() || "未命名片段"} · script 烧录
+                </p>
+                <textarea
+                  className="h-20 w-full resize-none rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[11px] text-white placeholder:text-white/30"
+                  placeholder="该段台词（可选）"
+                  value={selected.subtitle ?? ""}
+                  disabled={!timelineReady}
+                  onChange={(e) => {
+                    const subtitle = e.target.value;
+                    onApplyWorkbench(
+                      (prev) =>
+                        updateComposeClip(prev, selected.id, {
+                          subtitle: subtitle || undefined,
+                        }),
+                      { persist: true },
+                    );
+                  }}
+                />
+              </div>
+            ) : null}
+            </div>
+          </aside>
         </div>
+
+        <section
+          aria-label="剪辑时间线"
+          className={cn(COMPOSE_FS_SURFACE, COMPOSE_FS_TIMELINE_WORKSPACE_CLASS)}
+        >
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pb-2 pt-2">
+            <ComposeSequenceTrack
+              clips={ordered}
+              selectedId={selectedId}
+              disabled={!timelineReady}
+              trimStart={trimStart}
+              trimEnd={trimEnd}
+              filmstripByUrl={filmstripByUrl}
+              fullDurationByUrl={fullDurationByUrl}
+              programPlayheadSec={programPlayheadSec}
+              totalProgramSec={totalProgramSec}
+              onSelect={setSelectedId}
+              onReorder={(from, to) =>
+                applyWithUndo((prev) => moveComposeClip(prev, from, to), { persist: true })
+              }
+              onTrimStart={setTrimStart}
+              onTrimEnd={setTrimEnd}
+              onTrimCommit={commitClipRangeFromRefs}
+              onSplit={() => void splitAtPlayhead()}
+              onTrimLeft={() => void trimLeftAtPlayhead()}
+              onTrimRight={() => void trimRightAtPlayhead()}
+              onDelete={() => void deleteSelected()}
+              onUndo={undoEdit}
+              onProgramSeek={seekProgramTimeline}
+              onImportClick={onImportClick}
+              zoomable
+              clipLaneClassName="h-[4.5rem]"
+              portraitFilmstrip
+              reserveExtraClipLane
+              reserveLaneClassName="h-14"
+              rootClassName="mb-0 flex h-full min-h-0 flex-col"
+              scrollContainerClassName={cn(
+                COMPOSE_FS_SCROLL_HIDE,
+                "min-h-0 flex-1 rounded-lg border-white/10 bg-[#121212]",
+              )}
+              splitDisabled={!selected?.videoUrl || !timelineReady || !playheadInSelected}
+              trimDisabled={!selected?.videoUrl || !timelineReady || !playheadInSelected}
+              deleteDisabled={!selectedId || ordered.length <= 1}
+              undoDisabled={undoDepth < 1}
+            />
+          </div>
+        </section>
       </div>
     </div>
   );
