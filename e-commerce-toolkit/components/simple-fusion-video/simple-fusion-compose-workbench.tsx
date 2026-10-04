@@ -937,6 +937,8 @@ function ComposeSequenceTrack({
   hideToolbar,
   clipLaneClassName = "h-[4.5rem]",
   filmstripThumbClassName = "w-8",
+  portraitFilmstrip = false,
+  playheadInsetInClipLane = false,
 }: {
   clips: ComposeWorkbenchClip[];
   selectedId: string | null;
@@ -969,6 +971,10 @@ function ComposeSequenceTrack({
   /** 片段缩略图轨道高度（迷你窗可传更高） */
   clipLaneClassName?: string;
   filmstripThumbClassName?: string;
+  /** 竖屏比例缩略图（迷你时间线，避免拉扁） */
+  portraitFilmstrip?: boolean;
+  /** 播放头只在片段轨道内且上下留白 */
+  playheadInsetInClipLane?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
@@ -1206,23 +1212,15 @@ function ComposeSequenceTrack({
         className="overflow-x-auto rounded-md border border-white/15 bg-[#0f0f0f]"
       >
         <div className="relative" style={{ width: trackWidthPx }}>
-          <div
-            ref={playheadLineRef}
-            className="pointer-events-none absolute inset-y-0 z-40"
-            style={{ left: playheadLeftPx }}
-          >
-            <div className="absolute -top-0.5 left-1/2 size-2 -translate-x-1/2 rotate-45 border border-white/90 bg-white shadow-sm" />
-            <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
-          </div>
-          {reorderInsertBefore != null ? (
+          {!playheadInsetInClipLane ? (
             <div
-              className="pointer-events-none absolute inset-y-0 z-[45] w-0.5 bg-[#0071e3] shadow-[0_0_8px_rgba(0,113,227,0.85)]"
-              style={{
-                left:
-                  trackLayout.segments[reorderInsertBefore]?.leftPx ??
-                  trackContentPx,
-              }}
-            />
+              ref={playheadLineRef}
+              className="pointer-events-none absolute inset-y-0 z-40"
+              style={{ left: playheadLeftPx }}
+            >
+              <div className="absolute -top-0.5 left-1/2 size-2 -translate-x-1/2 rotate-45 border border-white/90 bg-white shadow-sm" />
+              <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
+            </div>
           ) : null}
           <button
             ref={playheadHitRef}
@@ -1261,6 +1259,29 @@ function ComposeSequenceTrack({
           </div>
 
           <div className={cn("relative", clipLaneClassName)}>
+            {playheadInsetInClipLane ? (
+              <div
+                ref={playheadLineRef}
+                className="pointer-events-none absolute bottom-2.5 top-2 z-40 w-0"
+                style={{ left: playheadLeftPx }}
+              >
+                <div className="absolute -top-[11px] left-1/2 size-2 -translate-x-1/2 rotate-45 border border-white/90 bg-white shadow-sm" />
+                <div className="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 bg-white shadow-[0_0_10px_rgba(255,255,255,0.95)]" />
+              </div>
+            ) : null}
+            {reorderInsertBefore != null ? (
+              <div
+                className={cn(
+                  "pointer-events-none absolute z-[45] w-0.5 bg-[#0071e3] shadow-[0_0_8px_rgba(0,113,227,0.85)]",
+                  playheadInsetInClipLane ? "bottom-2.5 top-2" : "inset-y-0",
+                )}
+                style={{
+                  left:
+                    trackLayout.segments[reorderInsertBefore]?.leftPx ??
+                    trackContentPx,
+                }}
+              />
+            ) : null}
             <div className="flex h-full gap-px">
               {trackLayout.segments.map((seg, index) => {
                 const clip = seg.clip;
@@ -1285,36 +1306,75 @@ function ComposeSequenceTrack({
                     title={clip.label ?? "片段"}
                     onPointerDown={startClipReorderPointer(index, clip.id)}
                   >
-                    <div className="pointer-events-none flex h-full w-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "pointer-events-none flex h-full w-full overflow-hidden",
+                        portraitFilmstrip
+                          ? "items-center gap-px px-0.5 py-2"
+                          : "",
+                      )}
+                    >
                       {stripFrames.length > 0 ? (
-                        stripFrames.map((f, fi) => (
+                        stripFrames.map((f, fi) =>
+                          portraitFilmstrip ? (
+                            <div
+                              key={`${f.atSec}-${fi}`}
+                              className="h-full aspect-[9/16] shrink-0 overflow-hidden rounded-[1px] bg-black/40"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={f.thumbnailUrl}
+                                alt=""
+                                className="h-full w-full object-cover"
+                                draggable={false}
+                              />
+                            </div>
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              key={`${f.atSec}-${fi}`}
+                              src={f.thumbnailUrl}
+                              alt=""
+                              className={cn(
+                                "h-full shrink-0 object-cover",
+                                filmstripThumbClassName,
+                              )}
+                              draggable={false}
+                            />
+                          ),
+                        )
+                      ) : (
+                        portraitFilmstrip ? (
+                          <div className="mx-auto h-full aspect-[9/16] overflow-hidden">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={clip.posterUrl ?? clip.videoUrl}
+                              alt=""
+                              className="h-full w-full object-cover"
+                              draggable={false}
+                            />
+                          </div>
+                        ) : (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            key={`${f.atSec}-${fi}`}
-                            src={f.thumbnailUrl}
+                            src={clip.posterUrl ?? clip.videoUrl}
                             alt=""
-                            className={cn(
-                              "h-full shrink-0 object-cover",
-                              filmstripThumbClassName,
-                            )}
+                            className="h-full w-full object-cover"
                             draggable={false}
                           />
-                        ))
-                      ) : (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={clip.posterUrl ?? clip.videoUrl}
-                          alt=""
-                          className="h-full w-full object-cover"
-                          draggable={false}
-                        />
+                        )
                       )}
                     </div>
                     {isSel ? (
                       <>
                         <div
                           data-compose-trim-handle
-                          className="absolute left-0 top-0 z-20 h-full w-1.5 cursor-ew-resize bg-white shadow-md"
+                          className={cn(
+                            "absolute left-0 z-20 w-1.5 cursor-ew-resize bg-white shadow-md",
+                            portraitFilmstrip
+                              ? "bottom-2 top-2"
+                              : "top-0 h-full",
+                          )}
                           onPointerDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -1326,7 +1386,12 @@ function ComposeSequenceTrack({
                         />
                         <div
                           data-compose-trim-handle
-                          className="absolute right-0 top-0 z-20 h-full w-1.5 cursor-ew-resize bg-white shadow-md"
+                          className={cn(
+                            "absolute right-0 z-20 w-1.5 cursor-ew-resize bg-white shadow-md",
+                            portraitFilmstrip
+                              ? "bottom-2 top-2"
+                              : "top-0 h-full",
+                          )}
                           onPointerDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -1652,7 +1717,7 @@ function ComposeMiniTimelinePanel({
     <div
       ref={panelRef}
       className={cn(
-        "pointer-events-auto fixed z-[300] flex max-h-[min(560px,72dvh)] flex-col overflow-hidden rounded-xl border border-[#3a3a3c] bg-[#141416]/95 text-white shadow-2xl backdrop-blur-md",
+        "pointer-events-auto fixed z-[300] relative flex max-h-[min(560px,72dvh)] flex-col overflow-hidden rounded-xl border border-[#3a3a3c] bg-[#141416]/95 text-white shadow-2xl backdrop-blur-md",
         "cursor-grab select-none active:cursor-grabbing [&_[data-compose-sequence-track]]:cursor-default",
         panelPositionClass,
       )}
@@ -1661,13 +1726,22 @@ function ComposeMiniTimelinePanel({
       aria-label="简易剪辑时间线"
       onPointerDown={startPanelDrag}
     >
+      <button
+        type="button"
+        aria-label="关闭"
+        title="关闭"
+        className="absolute right-2 top-2 z-50 flex size-7 cursor-pointer items-center justify-center rounded-full bg-white text-[#1d1d1f] shadow-md ring-1 ring-black/10 transition hover:bg-[#f5f5f7]"
+        onClick={onClose}
+      >
+        <X className="size-3.5" strokeWidth={2.5} />
+      </button>
       {!ready ? (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-[#141416]/95">
           <Loader2 className="size-6 animate-spin text-white/70" />
           <p className="text-xs text-white/55">正在加载时间线…</p>
         </div>
       ) : null}
-      <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-3 py-2">
+      <div className="flex shrink-0 items-center border-b border-white/10 px-3 py-2 pr-6">
         <div className="flex min-w-0 items-center gap-1.5">
           <GripVertical className="size-3.5 shrink-0 text-white/35" aria-hidden />
           <span className="truncate text-xs font-medium text-white/85">时间线 1</span>
@@ -1675,13 +1749,6 @@ function ComposeMiniTimelinePanel({
             拖动窗体移动
           </span>
         </div>
-        <button
-          type="button"
-          className="shrink-0 rounded-md px-2 py-1 text-[11px] text-white/50 hover:bg-white/10 hover:text-white/80"
-          onClick={onClose}
-        >
-          收起
-        </button>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-2 py-1.5">
         <div className="flex items-center gap-1">
@@ -1791,8 +1858,8 @@ function ComposeMiniTimelinePanel({
           onImportClick={onImportClick}
           hideToolbar
           zoomable
-          clipLaneClassName="h-[7.5rem]"
-          filmstripThumbClassName="w-10"
+          clipLaneClassName="h-24"
+          portraitFilmstrip
           splitDisabled={!canEdit || !playheadInSelected}
           deleteDisabled={!canEdit || !selectedId || ordered.length <= 1}
         />
