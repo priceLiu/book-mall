@@ -23,7 +23,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ModalPortal } from "@/components/common/modal-portal";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
+import { SimpleFusionVideoSlotHoverActions } from "@/components/simple-fusion-video/simple-fusion-video-slot-hover-actions";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
+import {
+  ECOM_WORKSPACE_RESULT_COLUMN_CLASS,
+  ECOM_WORKSPACE_RESULT_GRID_CLASS,
+  ECOM_WORKSPACE_RESULT_LABEL_CLASS,
+} from "@/lib/ecom-workspace-result-grid";
 import {
   patchSimpleFusionProject,
   renderSimpleFusionCompose,
@@ -512,6 +518,24 @@ export function SimpleFusionComposeWorkbench({
   const filmstripActive = miniOpen || fullscreenOpen;
   const filmstrip = useComposeFilmstripLoader(project.id, ordered, filmstripActive);
 
+  const composeSlotPoster = useMemo(() => {
+    for (const c of ordered) {
+      const poster = c.posterUrl?.trim();
+      if (poster) return poster;
+      const video = c.videoUrl?.trim();
+      if (video) return video;
+    }
+    for (const s of previewSlots) {
+      const fused = s.fusedImageUrl?.trim();
+      if (fused) return fused;
+    }
+    return undefined;
+  }, [ordered, previewSlots]);
+
+  const finalComposeBusy = composeGenerating || exportBusy;
+  const showFinalVideoHover =
+    Boolean(finalVideoUrl.trim()) && !finalComposeBusy;
+
   useEffect(() => {
     setWorkbench(resolveComposeWorkbenchFromProject(project, previewSlots));
   }, [project.id, project.updatedAt, previewSlots]);
@@ -615,15 +639,11 @@ export function SimpleFusionComposeWorkbench({
             </p>
           </div>
 
-          {composeGenerating ? (
-            <p className="text-xs text-[#6e6e73]">正在合成卡点成片，请稍候…</p>
-          ) : null}
-
           <div className="flex flex-wrap gap-2">
             <EcomButtonPrimary
               type="button"
               size="sm"
-              disabled={!canEdit || ordered.length < 1 || exportBusy || composeGenerating}
+              disabled={!canEdit || ordered.length < 1 || finalComposeBusy}
               onClick={() => void runExport()}
             >
               {exportBusy ? "合成中…" : "自动合成"}
@@ -638,23 +658,41 @@ export function SimpleFusionComposeWorkbench({
             </EcomButtonSecondary>
           </div>
 
-          {finalVideoUrl && !composeGenerating ? (
-            <div className="flex flex-wrap gap-2 border-t border-[#e8e8ed] pt-3">
-              <EcomButtonSecondary
-                type="button"
-                size="sm"
-                onClick={() => onPreviewVideo(finalVideoUrl, "成片")}
+          <div className={ECOM_WORKSPACE_RESULT_GRID_CLASS}>
+            <div className={ECOM_WORKSPACE_RESULT_COLUMN_CLASS}>
+              <div
+                className={cn(
+                  "group/video relative",
+                  showFinalVideoHover && "group/video-hover",
+                )}
               >
-                预览成片
-              </EcomButtonSecondary>
-              {onDownloadFinal ? (
-                <EcomButtonSecondary type="button" size="sm" onClick={onDownloadFinal}>
-                  下载成片
-                </EcomButtonSecondary>
-              ) : null}
+                <EcomVideoSlot
+                  src={finalVideoUrl.trim() || undefined}
+                  aspectRatio="9:16"
+                  layout="workspace"
+                  generating={finalComposeBusy}
+                  generatingPosterUrl={composeSlotPoster}
+                  generatingLabel="合成卡点成片中…"
+                  generatingBackground="light"
+                  emptyLabel="待合成成片"
+                  onPreview={
+                    finalVideoUrl.trim()
+                      ? () => onPreviewVideo(finalVideoUrl.trim(), "成片")
+                      : undefined
+                  }
+                />
+                {showFinalVideoHover ? (
+                  <SimpleFusionVideoSlotHoverActions
+                    onPreview={() =>
+                      onPreviewVideo(finalVideoUrl.trim(), "成片")
+                    }
+                    onDownload={onDownloadFinal}
+                  />
+                ) : null}
+              </div>
+              <p className={ECOM_WORKSPACE_RESULT_LABEL_CLASS}>卡点成片</p>
             </div>
-          ) : null}
-
+          </div>
         </section>
       ) : null}
 
