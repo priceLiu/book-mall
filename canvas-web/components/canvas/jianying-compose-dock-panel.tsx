@@ -8,22 +8,22 @@ import {
   ComposeMiniTimelinePanel,
   ModalPortal,
   moveComposeClip,
+  orderedComposeAudioClips,
   orderedComposeClips,
-  updateComposeClip,
   useComposeDialogs,
   useComposeFilmstripLoader,
   DEFAULT_COMPOSE_PROFILE,
   type ComposeWorkbenchState,
 } from "@private/platform-compose-ui/editor";
-import type { ComposeWorkbenchClip } from "@private/platform-compose-ui/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { uploadCanvasVideo } from "@/lib/canvas-api";
 import type { JianyingLibtvConnectionSnapshot } from "@/lib/canvas/jianying-from-workspace";
-import { jianyingPairedUpstreamAudioUrlForVideoNode } from "@/lib/canvas/jianying-compose-workbench";
+import { useJianyingComposeMediaRender } from "@/lib/canvas/jianying-compose-media-render";
 import { fetchVideoFilmstrip } from "@/lib/canvas/libtv-video-edit-client";
+import type { JianyingAutoRenderNodeData } from "@/lib/canvas/types";
 
 type Props = {
   base: string;
@@ -31,7 +31,7 @@ type Props = {
   nodeId: string;
   workbench: ComposeWorkbenchState;
   snapshot: JianyingLibtvConnectionSnapshot;
-  upstreamLibraryClips?: ComposeWorkbenchClip[];
+  upstreamLibraryClips?: import("@private/platform-compose-ui/types").ComposeWorkbenchClip[];
   composeMiniOpenSeq?: number;
   onWorkbenchChange: (next: ComposeWorkbenchState) => void;
   disabled?: boolean;
@@ -56,10 +56,12 @@ function JianyingComposeDockPanelInner({
   const lastOpenSeqRef = useRef(0);
   const workbenchRef = useRef(workbench);
   workbenchRef.current = workbench;
-  const snapshotRef = useRef(snapshot);
-  snapshotRef.current = snapshot;
 
   const ordered = useMemo(() => orderedComposeClips(workbench), [workbench]);
+  const orderedAudio = useMemo(
+    () => orderedComposeAudioClips(workbench),
+    [workbench],
+  );
   const profile = workbench.profile ?? DEFAULT_COMPOSE_PROFILE;
   const filmstripActive = miniOpen || fullscreenOpen;
   const filmstrip = useComposeFilmstripLoader(
@@ -68,13 +70,39 @@ function JianyingComposeDockPanelInner({
     filmstripActive,
   );
 
+  const nodeMedia = useCanvasStore(
+    useCallback(
+      (s) => {
+        const d = s.nodes.find((n) => n.id === nodeId)?.data as
+          | JianyingAutoRenderNodeData
+          | undefined;
+        return {
+          mediaRenderResult: d?.mediaRenderResult ?? null,
+          videoUrl: d?.videoUrl ?? null,
+        };
+      },
+      [nodeId],
+    ),
+  );
+
+  const { composeBusy, canDownload, runCompose, runDownload } =
+    useJianyingComposeMediaRender({
+      nodeId,
+      base,
+      projectId,
+      mediaRenderResult: nodeMedia.mediaRenderResult,
+      videoUrl: nodeMedia.videoUrl,
+    });
+
   const applyWorkbench = useCallback(
     (
       updater: (prev: ComposeWorkbenchState) => ComposeWorkbenchState,
       opts?: { persist?: boolean },
     ) => {
       void opts;
-      onWorkbenchChange(updater(workbenchRef.current));
+      const next = updater(workbenchRef.current);
+      if (next === workbenchRef.current) return;
+      onWorkbenchChange(next);
     },
     [onWorkbenchChange],
   );
@@ -97,41 +125,6 @@ function JianyingComposeDockPanelInner({
     lastOpenSeqRef.current = composeMiniOpenSeq;
     tryOpenMini();
   }, [composeMiniOpenNodeId, composeMiniOpenSeq, nodeId, tryOpenMini]);
-
-  const attachUpstreamAudio = useCallback(
-    (clipId: string) => {
-      const snap = snapshotRef.current;
-      const url = jianyingPairedUpstreamAudioUrlForVideoNode(snap, clipId);
-      if (url) {
-        applyWorkbench((prev) => updateComposeClip(prev, clipId, { audioUrl: url }));
-        return;
-      }
-      const videoIndex = snap.orderNodeIds.indexOf(clipId);
-      const audioNodeId =
-        videoIndex >= 0 ? snap.audioOrderNodeIds[videoIndex] : undefined;
-      const audioOnly = audioNodeId
-        ? upstreamLibraryClips.find((c) => c.id === `upstream-audio-${audioNodeId}`)
-        : undefined;
-      const fallback = upstreamLibraryClips.find((c) => c.audioUrl?.trim());
-      const pick = audioOnly?.audioUrl?.trim()
-        ? audioOnly
-        : fallback?.audioUrl?.trim()
-          ? fallback
-          : undefined;
-      if (pick?.audioUrl?.trim()) {
-        applyWorkbench((prev) =>
-          updateComposeClip(prev, clipId, { audioUrl: pick.audioUrl!.trim() }),
-        );
-        return;
-      }
-      void alert({
-        title: "暂无连线配音",
-        message: "请确认 TTS 节点已生成音频并连到自动成片的 in_audio，或于全屏「连线资产」中选择音频。",
-        variant: "info",
-      });
-    },
-    [alert, applyWorkbench, upstreamLibraryClips],
-  );
 
   const importVideo = async (file: File) => {
     if (!projectId) {
@@ -182,30 +175,49 @@ function JianyingComposeDockPanelInner({
             loading={filmstrip.loading}
             filmstripByUrl={filmstrip.filmstripByUrl}
             fullDurationByUrl={filmstrip.fullDurationByUrl}
-            exportBusy={false}
+            exportBusy={composeBusy}
             canEdit={!disabled}
             onClose={() => setMiniOpen(false)}
             onApplyWorkbench={applyWorkbench}
             onReorder={moveClip}
-            onExport={() => {
-              void alert({
-                title: "云端合成",
-                message: "请点右上角全屏图标，在全屏剪辑台内使用「导出」提交云端合成。",
-                variant: "info",
-              });
+            onCompose={() => {
+              void (async () => {
+                try {
+                  onWorkbenchChange(workbenchRef.current);
+                  await runCompose(
+                    workbenchRef.current,
+                    filmstrip.fullDurationByUrl,
+                  );
+                  toast?.({ title: "成片已更新到自动成片节点", variant: "success" });
+                } catch (e) {
+                  await alert({
+                    title: "合成失败",
+                    message: e instanceof Error ? e.message : "请稍后重试",
+                    variant: "error",
+                  });
+                }
+              })();
+            }}
+            canDownload={canDownload}
+            onDownload={() => {
+              void (async () => {
+                try {
+                  await runDownload();
+                } catch (e) {
+                  await alert({
+                    title: "无法下载",
+                    message: e instanceof Error ? e.message : "请稍后重试",
+                    variant: "error",
+                  });
+                }
+              })();
             }}
             onOpenFullscreen={() => {
               setMiniOpen(false);
               setFullscreenOpen(true);
             }}
             onImportClick={() => importRef.current?.click()}
-            trackChrome={{ variant: "ecom-mini", showAudioAttach: true }}
-            onClipAudioAttach={(clipId) => attachUpstreamAudio(clipId)}
-            onClipAudioClear={(clipId) =>
-              applyWorkbench((prev) =>
-                updateComposeClip(prev, clipId, { audioUrl: undefined }),
-              )
-            }
+            trackChrome={{ variant: "ecom-mini", showAudioAttach: false }}
           />
         </ModalPortal>
       ) : null}
@@ -218,7 +230,7 @@ function JianyingComposeDockPanelInner({
             workbench={workbench}
             profile={profile}
             ordered={ordered}
-            exportBusy={false}
+            exportBusy={composeBusy}
             loading={filmstrip.loading}
             filmstripByUrl={filmstrip.filmstripByUrl}
             fullDurationByUrl={filmstrip.fullDurationByUrl}
@@ -227,24 +239,46 @@ function JianyingComposeDockPanelInner({
               setMiniOpen(true);
               setMiniPanelSession((s) => s + 1);
             }}
-            onExport={() => {
-              void alert({
-                title: "云端合成",
-                message: "请在本全屏页点击顶部「导出」提交云端合成。",
-                variant: "info",
-              });
+            onCompose={() => {
+              void (async () => {
+                try {
+                  onWorkbenchChange(workbenchRef.current);
+                  await runCompose(
+                    workbenchRef.current,
+                    filmstrip.fullDurationByUrl,
+                  );
+                  toast?.({ title: "成片已更新到自动成片节点", variant: "success" });
+                  setFullscreenOpen(false);
+                  setMiniOpen(true);
+                  setMiniPanelSession((s) => s + 1);
+                } catch (e) {
+                  await alert({
+                    title: "合成失败",
+                    message: e instanceof Error ? e.message : "请稍后重试",
+                    variant: "error",
+                  });
+                }
+              })();
+            }}
+            canDownload={canDownload}
+            onDownload={() => {
+              void (async () => {
+                try {
+                  await runDownload();
+                } catch (e) {
+                  await alert({
+                    title: "无法下载",
+                    message: e instanceof Error ? e.message : "请稍后重试",
+                    variant: "error",
+                  });
+                }
+              })();
             }}
             onImportClick={() => importRef.current?.click()}
             onApplyWorkbench={applyWorkbench}
             setProfile={(p) => applyWorkbench((prev) => ({ ...prev, profile: p }))}
-            trackChrome={{ variant: "fullscreen", zoomable: true, showAudioAttach: true }}
+            trackChrome={{ variant: "fullscreen", zoomable: true, showAudioAttach: false }}
             upstreamLibraryClips={upstreamLibraryClips}
-            onClipAudioAttach={(clipId) => attachUpstreamAudio(clipId)}
-            onClipAudioClear={(clipId) =>
-              applyWorkbench((prev) =>
-                updateComposeClip(prev, clipId, { audioUrl: undefined }),
-              )
-            }
           />
         </ModalPortal>
       ) : null}
@@ -270,22 +304,13 @@ export function JianyingComposeDockPanel(props: Props) {
     () => ({
       alert: dialogs.alert,
       toast: dialogs.toast,
-      confirm: dialogs.confirm,
-      prompt: dialogs.prompt,
     }),
-    [dialogs],
+    [dialogs.alert, dialogs.toast],
   );
 
   return (
     <ComposeDialogsProvider value={dialogApi}>
-      <ComposeFilmstripProvider
-        fetchFilmstrip={(args) =>
-          fetchVideoFilmstrip({
-            ...args,
-            projectId: props.projectId ?? undefined,
-          })
-        }
-      >
+      <ComposeFilmstripProvider fetchFilmstrip={fetchVideoFilmstrip}>
         <JianyingComposeDockPanelInner {...props} />
       </ComposeFilmstripProvider>
     </ComposeDialogsProvider>

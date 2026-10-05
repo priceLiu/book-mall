@@ -24,9 +24,15 @@ export {
 export { DEFAULT_COMPOSE_PROFILE } from "./default-compose-profile";
 export {
   appendImportedComposeClip,
+  composeDualTrackProgramDurationSec,
+  moveComposeAudioClip,
   moveComposeClip,
+  orderedComposeAudioClips,
   orderedComposeClips,
   removeComposeClip,
+  toggleComposeAudioClipPlaybackMuted,
+  toggleComposeClipSourceAudioMuted,
+  updateComposeAudioClip,
   updateComposeClip,
 } from "./editing";
 export type { ComposeWorkbenchState } from "./types";

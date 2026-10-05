@@ -28,9 +28,20 @@ export type PlatformComposeWorkbenchProfile = RenderProfile & {
   };
 };
 
+export type PlatformComposeWorkbenchAudioClip = Omit<
+  PlatformComposeWorkbenchClip,
+  "videoUrl"
+> & {
+  videoUrl?: string;
+  audioUrl: string;
+};
+
 export type PlatformComposeWorkbenchState = {
   orderedClipIds: string[];
   clips: PlatformComposeWorkbenchClip[];
+  /** 独立配音轨顺序（与视频轨按索引对齐混音，非强制 N↔N 配对） */
+  orderedAudioClipIds?: string[];
+  audioClips?: PlatformComposeWorkbenchAudioClip[];
   profile?: PlatformComposeWorkbenchProfile;
 };
 
@@ -91,7 +102,59 @@ export function parsePlatformComposeWorkbenchFromMeta(
     profile = parsePlatformComposeWorkbenchProfile(m.profile);
   }
 
-  return { orderedClipIds, clips, profile };
+  const audioClipsRaw = m.audioClips;
+  const audioOrderRaw = m.orderedAudioClipIds;
+  const audioClips: PlatformComposeWorkbenchAudioClip[] = [];
+  if (Array.isArray(audioClipsRaw)) {
+    for (const item of audioClipsRaw) {
+      if (!item || typeof item !== "object") continue;
+      const c = item as Record<string, unknown>;
+      const id = typeof c.id === "string" ? c.id.trim() : "";
+      const audioUrl = typeof c.audioUrl === "string" ? c.audioUrl.trim() : "";
+      if (!id || !audioUrl) continue;
+      const sourceRaw = c.source;
+      const source: PlatformComposeWorkbenchClip["source"] =
+        sourceRaw === "import"
+          ? "import"
+          : sourceRaw === "external"
+            ? "external"
+            : "look";
+      audioClips.push({
+        id,
+        audioUrl,
+        videoUrl: typeof c.videoUrl === "string" ? c.videoUrl.trim() : undefined,
+        programStartSec:
+          typeof c.programStartSec === "number" && c.programStartSec >= 0
+            ? c.programStartSec
+            : undefined,
+        pairedTimelineClipId:
+          typeof c.pairedTimelineClipId === "string"
+            ? c.pairedTimelineClipId.trim()
+            : undefined,
+        label: typeof c.label === "string" ? c.label : undefined,
+        posterUrl: typeof c.posterUrl === "string" ? c.posterUrl : undefined,
+        durationSec: typeof c.durationSec === "number" ? c.durationSec : undefined,
+        sourceStartSec: typeof c.sourceStartSec === "number" ? c.sourceStartSec : undefined,
+        sourceEndSec: typeof c.sourceEndSec === "number" ? c.sourceEndSec : undefined,
+        subtitle: typeof c.subtitle === "string" ? c.subtitle : undefined,
+        lookId: typeof c.lookId === "string" ? c.lookId : undefined,
+        source,
+      });
+    }
+  }
+  const orderedAudioClipIds = Array.isArray(audioOrderRaw)
+    ? audioOrderRaw.filter(
+        (x): x is string => typeof x === "string" && x.trim().length > 0,
+      )
+    : undefined;
+
+  return {
+    orderedClipIds,
+    clips,
+    ...(orderedAudioClipIds?.length ? { orderedAudioClipIds } : {}),
+    ...(audioClips.length ? { audioClips } : {}),
+    profile,
+  };
 }
 
 export function parsePlatformComposeWorkbenchProfile(
@@ -170,10 +233,23 @@ export function composeWorkbenchProfileToRenderProfile(
   return parseRenderProfile(next);
 }
 
+function orderedWorkbenchAudioClips(
+  state: PlatformComposeWorkbenchState,
+): PlatformComposeWorkbenchAudioClip[] {
+  const ids = state.orderedAudioClipIds ?? [];
+  const map = new Map((state.audioClips ?? []).map((c) => [c.id, c]));
+  return ids
+    .map((id) => map.get(id))
+    .filter((c): c is PlatformComposeWorkbenchAudioClip =>
+      Boolean(c?.audioUrl?.trim()),
+    );
+}
+
 export function platformWorkbenchToMediaTimeline(
   state: PlatformComposeWorkbenchState,
 ): MediaTimelineV1 {
   const map = clipMap(state);
+  const audioOrdered = orderedWorkbenchAudioClips(state);
   const clips = state.orderedClipIds
     .map((id, order) => {
       const c = map.get(id);
@@ -187,7 +263,9 @@ export function platformWorkbenchToMediaTimeline(
             ? c.durationSec
             : undefined;
       const subtitle = c.subtitle?.trim();
-      const audioUrl = c.audioUrl?.trim();
+      const perClipAudio = c.audioUrl?.trim();
+      const pairedAudio = audioOrdered[order]?.audioUrl?.trim();
+      const audioUrl = perClipAudio || pairedAudio;
       return {
         order,
         videoUrl: c.videoUrl.trim(),

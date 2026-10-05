@@ -606,22 +606,12 @@ export function collectJianyingLibtvConnectionSnapshot(
 
   const frames: JianyingFrameExport[] = clipSlots
     .filter((s) => s.hasVideo)
-    .map((s, i) => {
-      const pairedAudioId = audioOrderNodeIds[i];
-      const pairedAudioNode = pairedAudioId
-        ? audioById.get(pairedAudioId)
-        : undefined;
-      return {
-        frameIndex: i + 1,
-        sourceNodeId: s.sourceNodeId,
-        audioSourceNodeId: pairedAudioId,
-        videoUrl: s.videoUrl,
-        audioUrl: audioClipSlots[i]?.hasAudio ? audioClipSlots[i]?.audioUrl : undefined,
-        dialogue:
-          s.dialogue ??
-          (pairedAudioNode ? dialogueFromAudioNode(pairedAudioNode) : undefined),
-      };
-    });
+    .map((s, i) => ({
+      frameIndex: i + 1,
+      sourceNodeId: s.sourceNodeId,
+      videoUrl: s.videoUrl,
+      dialogue: s.dialogue,
+    }));
 
   return {
     connectedCount: clipSlots.length,

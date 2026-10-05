@@ -69,6 +69,10 @@ export function parseComposeWorkbenchFromMeta(raw: unknown): SimpleFusionCompose
       ...c,
       source: c.source === "import" ? "import" : "look",
     })),
+    ...(parsed.orderedAudioClipIds?.length
+      ? { orderedAudioClipIds: parsed.orderedAudioClipIds }
+      : {}),
+    ...(parsed.audioClips?.length ? { audioClips: parsed.audioClips } : {}),
     profile: parsed.profile,
   };
 }
@@ -134,6 +138,10 @@ export function resolveComposeWorkbenchState(
   return {
     orderedClipIds,
     clips,
+    ...(fromMeta.orderedAudioClipIds?.length
+      ? { orderedAudioClipIds: fromMeta.orderedAudioClipIds }
+      : {}),
+    ...(fromMeta.audioClips?.length ? { audioClips: fromMeta.audioClips } : {}),
     profile: fromMeta.profile,
   };
 }

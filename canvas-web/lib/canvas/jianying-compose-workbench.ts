@@ -1,12 +1,10 @@
 import type { JianyingSnapshotClip } from "@private/platform-compose-ui";
 
-import {
-  pairAudioSlotsToVideoOrder,
-  type JianyingLibtvConnectionSnapshot,
-} from "./jianying-from-workspace";
+import { audioSlotByNodeId, videoClipSlotByNodeId } from "./jianying-compose-slots";
+import type { JianyingLibtvConnectionSnapshot } from "./jianying-from-workspace";
 
-function resolvePairedAudioExportUrl(
-  slot: ReturnType<typeof pairAudioSlotsToVideoOrder>[number],
+function resolveAudioExportUrl(
+  slot: ReturnType<typeof audioSlotByNodeId>,
 ): string | undefined {
   if (!slot) return undefined;
   const exportUrl = slot.audioUrl?.trim();
@@ -16,42 +14,63 @@ function resolvePairedAudioExportUrl(
   return exportUrl || undefined;
 }
 
-/** 自动成片 · 按视频顺序对齐上游 TTS（与 export frames 规则一致） */
+/** TTS 重生成 · 同 OSS URL 覆盖时仍触发波形/时长刷新 */
+function audioMediaKeyForSlot(
+  slot: ReturnType<typeof audioSlotByNodeId>,
+  resolvedUrl: string,
+): string {
+  if (!slot) return resolvedUrl;
+  return [
+    resolvedUrl,
+    slot.previewUrl?.trim() ?? "",
+    slot.hasAudio ? "1" : "0",
+    slot.hasLocalPreview ? "1" : "0",
+  ].join("\0");
+}
+
+export type JianyingComposeSnapshotClips = {
+  videoClips: JianyingSnapshotClip[];
+  audioClips: JianyingSnapshotClip[];
+};
+
+/** 自动成片 · 视频轨 / 配音轨分离（按连线顺序，不自动配对） */
 export function jianyingSnapshotClipsForComposeWorkbench(
   snapshot: JianyingLibtvConnectionSnapshot,
-): JianyingSnapshotClip[] {
-  const pairedAudio = pairAudioSlotsToVideoOrder(
-    snapshot.orderNodeIds,
-    snapshot.audioOrderNodeIds,
-    snapshot.audioClipSlots,
-  );
-
-  return snapshot.clipSlots
-    .filter((s) => s.hasVideo && s.videoUrl?.trim())
-    .map((s) => {
-      const videoIndex = snapshot.orderNodeIds.indexOf(s.sourceNodeId);
-      const audioSlot = videoIndex >= 0 ? pairedAudio[videoIndex] : undefined;
-      return {
-        sourceNodeId: s.sourceNodeId,
-        videoUrl: s.videoUrl!.trim(),
-        posterUrl: s.posterUrl,
-        label: s.label,
-        dialogue: s.dialogue,
-        audioUrl: resolvePairedAudioExportUrl(audioSlot),
-      };
+): JianyingComposeSnapshotClips {
+  const videoClips: JianyingSnapshotClip[] = [];
+  for (const videoNodeId of snapshot.orderNodeIds) {
+    const video = videoClipSlotByNodeId(snapshot.clipSlots, videoNodeId);
+    if (!video?.hasVideo || !video.videoUrl?.trim()) continue;
+    videoClips.push({
+      sourceNodeId: videoNodeId,
+      videoUrl: video.videoUrl.trim(),
+      posterUrl: video.posterUrl,
+      label: video.label,
+      dialogue: video.dialogue,
     });
+  }
+
+  const audioClips: JianyingSnapshotClip[] = [];
+  for (const audioNodeId of snapshot.audioOrderNodeIds) {
+    const audioSlot = audioSlotByNodeId(snapshot.audioClipSlots, audioNodeId);
+    const audioUrl = resolveAudioExportUrl(audioSlot);
+    if (!audioUrl) continue;
+    audioClips.push({
+      sourceNodeId: audioNodeId,
+      videoUrl: "",
+      label: audioSlot?.label,
+      dialogue: audioSlot?.label,
+      audioUrl,
+      audioMediaKey: audioMediaKeyForSlot(audioSlot, audioUrl),
+    });
+  }
+
+  return { videoClips, audioClips };
 }
 
 export function jianyingPairedUpstreamAudioUrlForVideoNode(
-  snapshot: JianyingLibtvConnectionSnapshot,
-  videoSourceNodeId: string,
+  _snapshot: JianyingLibtvConnectionSnapshot,
+  _videoSourceNodeId: string,
 ): string | undefined {
-  const videoIndex = snapshot.orderNodeIds.indexOf(videoSourceNodeId);
-  if (videoIndex < 0) return undefined;
-  const paired = pairAudioSlotsToVideoOrder(
-    snapshot.orderNodeIds,
-    snapshot.audioOrderNodeIds,
-    snapshot.audioClipSlots,
-  );
-  return resolvePairedAudioExportUrl(paired[videoIndex]);
+  return undefined;
 }

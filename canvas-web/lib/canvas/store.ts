@@ -60,7 +60,10 @@ import { applyStoryColumnHeights, isStoryMediaColumnType } from "./story-column-
 import { canAddStoryNodeType } from "./story-edition-isolation";
 import { expandBatchSnapConnection } from "./pro2-batch-connect";
 import { normalizePro2PlusLeftConnection } from "./pro2-side-plus-connect";
-import { resolveLibtvSidePlusInTargetHandle } from "./libtv-side-plus-in-handle";
+import {
+  normalizeJianyingAutoRenderTargetHandle,
+  resolveLibtvSidePlusInTargetHandle,
+} from "./libtv-side-plus-in-handle";
 import {
   expandSbv1GroupOutMediaConnection,
   normalizeSbv1PlusLeftConnection,
@@ -1098,7 +1101,10 @@ export const useCanvasStore = create<CanvasState>()(
         const state = get();
         const normalized = normalizePro2PlusLeftConnection(
           normalizeSbv1PlusLeftConnection(
-            resolveLibtvSidePlusInTargetHandle(connection, state.nodes),
+            normalizeJianyingAutoRenderTargetHandle(
+              resolveLibtvSidePlusInTargetHandle(connection, state.nodes),
+              state.nodes,
+            ),
             state.nodes,
           ),
           state.nodes,

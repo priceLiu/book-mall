@@ -183,9 +183,9 @@ function SimpleFusionComposeWorkbenchInner({
     applyWorkbench((prev) => moveComposeClip(prev, from, to));
   };
 
-  const runExport = async () => {
+  const runCompose = async () => {
     if (ordered.length < 1) {
-      await alert({ title: "无法导出", message: "请至少保留 1 段视频", variant: "error" });
+      await alert({ title: "无法合成", message: "请至少保留 1 段视频", variant: "error" });
       return;
     }
     flushWorkbenchPersist();
@@ -206,6 +206,18 @@ function SimpleFusionComposeWorkbenchInner({
     } finally {
       setExportBusy(false);
     }
+  };
+
+  const runDownload = () => {
+    if (!finalVideoUrl.trim()) {
+      void alert({
+        title: "无法下载",
+        message: "请先完成云端合成，成片会显示在「卡点成片」格子上。",
+        variant: "info",
+      });
+      return;
+    }
+    onDownloadFinal?.();
   };
 
   const importVideo = async (file: File) => {
@@ -325,7 +337,7 @@ function SimpleFusionComposeWorkbenchInner({
               type="button"
               size="sm"
               disabled={!canEdit || ordered.length < 1 || finalComposeBusy}
-              onClick={() => void runExport()}
+              onClick={() => void runCompose()}
             >
               {exportBusy ? "合成中…" : "自动合成"}
             </EcomButtonPrimary>
@@ -411,7 +423,9 @@ function SimpleFusionComposeWorkbenchInner({
             }}
             onApplyWorkbench={applyWorkbench}
             onReorder={moveClip}
-            onExport={() => void runExport()}
+            onCompose={() => void runCompose()}
+            canDownload={Boolean(finalVideoUrl.trim())}
+            onDownload={() => runDownload()}
             onOpenFullscreen={() => {
               flushWorkbenchPersist();
               setMiniOpen(false);
@@ -446,7 +460,9 @@ function SimpleFusionComposeWorkbenchInner({
               setMiniOpen(true);
             }}
             onApplyWorkbench={applyWorkbench}
-            onExport={() => void runExport()}
+            onCompose={() => void runCompose()}
+            canDownload={Boolean(finalVideoUrl.trim())}
+            onDownload={() => runDownload()}
             onImportClick={() => importRef.current?.click()}
             setProfile={(p) =>
               applyWorkbench((prev) => ({ ...prev, profile: p }))

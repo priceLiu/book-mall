@@ -132,34 +132,29 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
         onPointerEnter={onPointerEnter}
         onPointerLeave={onPointerLeave}
       >
+        {/* 视频 / 配音仍分 in_video · in_audio，锚点共左缘中心一点，避免连线呈两簇 */}
         <Handle
           id="in_video"
           type="target"
           position={Position.Left}
           className={cn(
             SBV1_NODE_HANDLE_CLASS,
+            "pointer-events-none",
             showSidePlus
-              ? "pointer-events-none opacity-0"
+              ? "opacity-0"
               : selected
                 ? "opacity-100"
-                : "pointer-events-none opacity-0",
+                : "opacity-0",
           )}
-          style={{ top: "38%" }}
-          title="各镜视频"
+          style={{ top: "50%", transform: "translateY(-50%)" }}
+          title="各镜视频 / 配音"
         />
         <Handle
           id="in_audio"
           type="target"
           position={Position.Left}
-          className={cn(
-            SBV1_NODE_HANDLE_CLASS,
-            showSidePlus
-              ? "pointer-events-none opacity-0"
-              : selected
-                ? "opacity-100"
-                : "pointer-events-none opacity-0",
-          )}
-          style={{ top: "62%" }}
+          className={cn(SBV1_NODE_HANDLE_CLASS, "pointer-events-none opacity-0")}
+          style={{ top: "50%", transform: "translateY(-50%)" }}
           title="各镜配音"
         />
         <Pro2NodeSidePlus

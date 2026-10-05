@@ -9,8 +9,6 @@ import type {
 export function buildJianyingUpstreamComposeLibraryClips(
   clipSlots: JianyingLibtvClipSlot[],
   audioClipSlots: JianyingLibtvAudioClipSlot[],
-  orderNodeIds?: readonly string[],
-  audioOrderNodeIds?: readonly string[],
 ): ComposeWorkbenchClip[] {
   const out: ComposeWorkbenchClip[] = [];
 
@@ -42,18 +40,12 @@ export function buildJianyingUpstreamComposeLibraryClips(
   for (const a of audioClipSlots) {
     const audio = a.audioUrl?.trim() || a.previewUrl?.trim();
     if (!audio) continue;
-    const audioIndex = audioOrderNodeIds?.indexOf(a.sourceNodeId) ?? -1;
-    const pairedTimelineClipId =
-      audioIndex >= 0 && orderNodeIds?.[audioIndex]
-        ? orderNodeIds[audioIndex]
-        : undefined;
     out.push({
       id: `upstream-audio-${a.sourceNodeId}`,
       videoUrl: "",
       posterUrl: undefined,
       audioUrl: audio,
       label: a.label?.trim() || `配音 ${a.sequence}`,
-      pairedTimelineClipId,
       source: "external",
     });
   }

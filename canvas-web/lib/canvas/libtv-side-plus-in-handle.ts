@@ -1,4 +1,5 @@
 import type { Connection } from "@xyflow/react";
+import { pickBatchTargetHandle } from "./pro2-batch-connect";
 import type { CanvasFlowNode } from "./types";
 
 /** 侧栏 + 叠层 target handle · 供外部拖入吸附（可见 + 仍为 source） */
@@ -25,7 +26,10 @@ function inboundTargetForNodeType(
     return "in_ref";
   }
   if (targetType === "jianying-export-pro2") return "in_video";
-  if (targetType === "jianying-auto-render-pro2") return "in_video";
+  if (targetType === "jianying-auto-render-pro2") {
+    if (sourceNode?.type === "story-pro2-audio") return "in_audio";
+    return "in_video";
+  }
   if (
     targetType === "story-pro2-image" ||
     targetType === "story-pro2-three-view" ||
@@ -50,4 +54,23 @@ export function resolveLibtvSidePlusInTargetHandle(
     ...connection,
     targetHandle: inboundTargetForNodeType(targetNode.type, sourceNode),
   };
+}
+
+/** 自动成片左缘共点：按源节点类型纠正 targetHandle（避免叠 handle 时误挂 in_video） */
+export function normalizeJianyingAutoRenderTargetHandle(
+  connection: Connection,
+  nodes: CanvasFlowNode[],
+): Connection {
+  const targetNode = nodes.find((n) => n.id === connection.target);
+  if (targetNode?.type !== "jianying-auto-render-pro2") return connection;
+  const sourceNode = nodes.find((n) => n.id === connection.source);
+  if (!sourceNode) return connection;
+  const sourceHandle = connection.sourceHandle ?? "";
+  const picked = pickBatchTargetHandle(
+    targetNode,
+    sourceNode,
+    sourceHandle,
+  );
+  if (!picked) return connection;
+  return { ...connection, targetHandle: picked };
 }

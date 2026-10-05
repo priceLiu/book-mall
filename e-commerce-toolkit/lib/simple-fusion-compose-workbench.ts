@@ -39,6 +39,8 @@ export type ComposeWorkbenchClip = Omit<PlatformClip, "source"> & {
 export type ComposeWorkbenchState = Omit<PlatformState, "clips" | "profile"> & {
   clips: ComposeWorkbenchClip[];
   profile?: EcomMediaRenderProfileInput;
+  orderedAudioClipIds?: PlatformState["orderedAudioClipIds"];
+  audioClips?: PlatformState["audioClips"];
 };
 
 export const DEFAULT_COMPOSE_PROFILE: EcomMediaRenderProfileInput =
@@ -113,5 +115,13 @@ export function resolveComposeWorkbenchFromProject(
     return defaults;
   }
 
-  return { orderedClipIds, clips, profile: raw.profile };
+  return {
+    orderedClipIds,
+    clips,
+    ...(raw.orderedAudioClipIds?.length
+      ? { orderedAudioClipIds: raw.orderedAudioClipIds }
+      : {}),
+    ...(raw.audioClips?.length ? { audioClips: raw.audioClips } : {}),
+    profile: raw.profile,
+  };
 }

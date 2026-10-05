@@ -2,18 +2,20 @@
 
 import { useEffect, useRef } from "react";
 
-import { syntheticAudioPeaks } from "./compose-audio-peaks";
 import { cn } from "./cn";
 
 export function ComposeSegmentAudioWaveform({
   peaks,
   widthPx,
   label,
+  loading,
   className,
 }: {
   peaks?: number[];
   widthPx: number;
   label?: string;
+  /** 正在解码真实波形 */
+  loading?: boolean;
   className?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -37,18 +39,27 @@ export function ComposeSegmentAudioWaveform({
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
 
-    const bars = peaks?.length ? peaks : syntheticAudioPeaks(Math.min(64, Math.max(24, Math.floor(w / 3))));
-    const barCount = bars.length;
-    const barW = w / barCount;
-
     ctx.strokeStyle = "rgba(255,255,255,0.12)";
     ctx.beginPath();
     ctx.moveTo(0, h / 2);
     ctx.lineTo(w, h / 2);
     ctx.stroke();
 
+    const bars = peaks?.length ? peaks : [];
+    if (bars.length === 0) {
+      if (loading) {
+        ctx.fillStyle = "rgba(56, 189, 248, 0.25)";
+        ctx.fillRect(0, h / 2 - 1, w, 2);
+      }
+      return;
+    }
+
+    const barCount = bars.length;
+    const barW = w / barCount;
+
     for (let i = 0; i < barCount; i++) {
       const amp = bars[i] ?? 0;
+      if (amp < 0.001) continue;
       const barH = Math.max(2, amp * (h - 6));
       const x = i * barW;
       ctx.fillStyle = "rgba(56, 189, 248, 0.92)";
@@ -56,7 +67,7 @@ export function ComposeSegmentAudioWaveform({
       ctx.fillStyle = "rgba(147, 197, 253, 0.35)";
       ctx.fillRect(x + barW * 0.12, h / 2, barW * 0.76, barH / 2);
     }
-  }, [peaks, widthPx]);
+  }, [peaks, widthPx, loading]);
 
   return (
     <div className={cn("relative h-full w-full overflow-hidden", className)}>

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { jianyingSnapshotClipsForComposeWorkbench } from "@/lib/canvas/jianying-compose-workbench";
 import {
   collectJianyingFramesForExportNode,
   collectJianyingFramesFromLibtvVideos,
@@ -293,11 +294,12 @@ describe("collectJianyingFramesFromLibtvVideos", () => {
     const snap = collectJianyingLibtvConnectionSnapshot(exportId, nodes, edges);
     expect(snap.audioRenderedCount).toBe(1);
     expect(snap.audioClipSlots[0]?.hasLocalPreview).toBe(true);
-    expect(snap.frames[0]?.audioUrl).toBe("https://oss/a.mp3");
-    expect(snap.frames[0]?.dialogue).toBe("第一句对白");
+    expect(snap.frames[0]?.audioUrl).toBeUndefined();
+    const wb = jianyingSnapshotClipsForComposeWorkbench(snap);
+    expect(wb.audioClips[0]?.audioUrl).toBe("https://oss/a.mp3");
   });
 
-  it("pairs audio clips with video frames by sequence index", () => {
+  it("lists video and audio clips separately by connection order", () => {
     const exportId = "export-1";
     const nodes: CanvasFlowNode[] = [
       videoNode("v-a", 100, "https://oss/a.mp4"),
@@ -329,8 +331,67 @@ describe("collectJianyingFramesFromLibtvVideos", () => {
     expect(snap.audioConnectedCount).toBe(2);
     expect(snap.audioRenderedCount).toBe(2);
     expect(snap.frames).toHaveLength(2);
-    expect(snap.frames[0]?.audioUrl).toBe("https://oss/a.mp3");
-    expect(snap.frames[1]?.audioUrl).toBe("https://oss/b.mp3");
+    const wb = jianyingSnapshotClipsForComposeWorkbench(snap);
+    expect(wb.videoClips).toHaveLength(2);
+    expect(wb.audioClips.map((c) => c.audioUrl)).toEqual([
+      "https://oss/a.mp3",
+      "https://oss/b.mp3",
+    ]);
+  });
+
+  it("keeps all TTS on audio track when a middle upstream video connection is removed", () => {
+    const exportId = "export-1";
+    const nodes: CanvasFlowNode[] = [
+      videoNode("v-a", 100, "https://oss/a.mp4"),
+      videoNode("v-c", 300, "https://oss/c.mp4"),
+      {
+        id: "a-a",
+        type: "story-pro2-audio",
+        position: { x: 100, y: 120 },
+        data: { ossUrl: "https://oss/a.mp3" },
+      },
+      {
+        id: "a-b",
+        type: "story-pro2-audio",
+        position: { x: 200, y: 120 },
+        data: { ossUrl: "https://oss/b.mp3" },
+      },
+      {
+        id: "a-c",
+        type: "story-pro2-audio",
+        position: { x: 300, y: 120 },
+        data: { ossUrl: "https://oss/c.mp3" },
+      },
+      { id: exportId, type: "jianying-auto-render-pro2", position: { x: 400, y: 0 }, data: {} },
+    ];
+    const edges: CanvasFlowEdge[] = [
+      { id: "ev1", source: "v-a", target: exportId, targetHandle: "in_video" },
+      { id: "ev3", source: "v-c", target: exportId, targetHandle: "in_video" },
+      { id: "ea1", source: "a-a", target: exportId, targetHandle: "in_audio" },
+      { id: "ea2", source: "a-b", target: exportId, targetHandle: "in_audio" },
+      { id: "ea3", source: "a-c", target: exportId, targetHandle: "in_audio" },
+    ];
+
+    const snap = collectJianyingLibtvConnectionSnapshot(
+      exportId,
+      nodes,
+      edges,
+      ["v-a", "v-b", "v-c"],
+      ["a-a", "a-b", "a-c"],
+    );
+    expect(snap.orderNodeIds).toEqual(["v-a", "v-c"]);
+    expect(snap.audioOrderNodeIds).toEqual(["a-a", "a-b", "a-c"]);
+    expect(snap.frames).toHaveLength(2);
+    expect(snap.frames[0]?.audioUrl).toBeUndefined();
+
+    const { videoClips, audioClips } = jianyingSnapshotClipsForComposeWorkbench(snap);
+    expect(videoClips).toHaveLength(2);
+    expect(audioClips).toHaveLength(3);
+    expect(audioClips.map((c) => c.audioUrl)).toEqual([
+      "https://oss/a.mp3",
+      "https://oss/b.mp3",
+      "https://oss/c.mp3",
+    ]);
   });
 
   it("counts audio misconnected to in_video as配音", () => {
@@ -353,7 +414,10 @@ describe("collectJianyingFramesFromLibtvVideos", () => {
     const snap = collectJianyingLibtvConnectionSnapshot(exportId, nodes, edges);
     expect(snap.audioConnectedCount).toBe(1);
     expect(snap.audioClipSlots[0]?.label).toBe("第一句对白");
-    expect(snap.frames[0]?.audioUrl).toBe("https://oss/a.mp3");
+    expect(snap.frames[0]?.audioUrl).toBeUndefined();
+    expect(jianyingSnapshotClipsForComposeWorkbench(snap).audioClips[0]?.audioUrl).toBe(
+      "https://oss/a.mp3",
+    );
   });
 
   it("sorts by Y then X when no chain exists", () => {

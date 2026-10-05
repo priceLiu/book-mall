@@ -5,6 +5,7 @@ import {
   ArrowRightToLine,
   ChevronLeft,
   ChevronRight,
+  Clapperboard,
   Download,
   GripVertical,
   Maximize2,
@@ -16,6 +17,8 @@ import {
   SplitSquareHorizontal,
   Trash2,
   Undo2,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import {
@@ -33,16 +36,30 @@ import { useComposeDialogs } from "./compose-dialogs";
 import { DEFAULT_COMPOSE_PROFILE } from "./default-compose-profile";
 import {
   COMPOSE_MIN_CLIP_SEC,
+  composeClipDisplaySpanSec,
   composeClipSourceEnd,
   composeClipSourceStart,
+  buildAudioTimelinePlacements,
+  buildVideoProgramSegments,
+  composeDualTrackProgramDurationSec,
+  type ComposeDurationHints,
+  moveComposeAudioClip,
   moveComposeClip,
+  orderedComposeAudioClips,
   orderedComposeClips,
   removeComposeClip,
+  resolveComposeClipAtProgramSec,
+  resolveProgramAudioAtSec,
+  setComposeAudioProgramStart,
   setComposeClipSourceRangeWithRipple,
+  snapAudioProgramStartSec,
   splitComposeClipAtSourceSec,
+  toggleComposeAudioClipPlaybackMuted,
+  toggleComposeClipSourceAudioMuted,
   updateComposeClip,
 } from "./editing";
 import { useComposeAudioPeaksLoader } from "./compose-audio-peaks";
+import { ComposeMiniLoadingBreath } from "./compose-mini-loading-breath";
 import { ComposeSegmentAudioWaveform } from "./compose-audio-waveform";
 import {
   isAudioOnlyLibraryClip,
@@ -492,16 +509,12 @@ function ComposeClipFilmstripTimeline({
   );
 }
 
-function displayClipSpanSec(c: ComposeWorkbenchClip): number {
-  if (c.durationSec != null && c.durationSec > 0) return c.durationSec;
-  if (c.sourceEndSec != null) {
-    return Math.max(COMPOSE_MIN_CLIP_SEC, c.sourceEndSec - (c.sourceStartSec ?? 0));
-  }
-  return 5;
-}
-
-function clipTrackWidthPx(c: ComposeWorkbenchClip, pxPerSec: number): number {
-  return Math.max(56, displayClipSpanSec(c) * pxPerSec);
+function clipTrackWidthPx(
+  c: ComposeWorkbenchClip,
+  pxPerSec: number,
+  hints?: ComposeDurationHints,
+): number {
+  return Math.max(56, composeClipDisplaySpanSec(c, hints) * pxPerSec);
 }
 
 type ClipTrackLayoutSeg = {
@@ -515,12 +528,13 @@ type ClipTrackLayoutSeg = {
 function buildClipTrackLayout(
   clips: ComposeWorkbenchClip[],
   pxPerSec: number,
+  hints?: ComposeDurationHints,
 ): { segments: ClipTrackLayoutSeg[]; totalPx: number; totalSec: number } {
   let accSec = 0;
   let accPx = 0;
   const segments: ClipTrackLayoutSeg[] = clips.map((clip) => {
-    const span = displayClipSpanSec(clip);
-    const widthPx = clipTrackWidthPx(clip, pxPerSec);
+    const span = composeClipDisplaySpanSec(clip, hints);
+    const widthPx = clipTrackWidthPx(clip, pxPerSec, hints);
     const seg: ClipTrackLayoutSeg = {
       clip,
       programStart: accSec,
@@ -539,8 +553,9 @@ function programSecFromTrackPx(
   xInTrack: number,
   clips: ComposeWorkbenchClip[],
   pxPerSec: number,
+  hints?: ComposeDurationHints,
 ): number {
-  const { segments, totalPx, totalSec } = buildClipTrackLayout(clips, pxPerSec);
+  const { segments, totalPx, totalSec } = buildClipTrackLayout(clips, pxPerSec, hints);
   if (totalPx <= 0 || totalSec <= 0) return 0;
   const x = Math.max(0, Math.min(xInTrack, totalPx));
   for (let i = 0; i < segments.length; i++) {
@@ -559,8 +574,9 @@ function trackPxFromProgramSec(
   programSec: number,
   clips: ComposeWorkbenchClip[],
   pxPerSec: number,
+  hints?: ComposeDurationHints,
 ): number {
-  const { segments, totalSec, totalPx } = buildClipTrackLayout(clips, pxPerSec);
+  const { segments, totalSec, totalPx } = buildClipTrackLayout(clips, pxPerSec, hints);
   if (totalSec <= 0) return 0;
   const sec = Math.max(0, Math.min(programSec, totalSec));
   for (let i = 0; i < segments.length; i++) {
@@ -575,48 +591,25 @@ function trackPxFromProgramSec(
   return totalPx;
 }
 
-function buildProgramSegments(clips: ComposeWorkbenchClip[]) {
+function resolveClipAtProgramSec(
+  clips: ComposeWorkbenchClip[],
+  programSec: number,
+  hints?: ComposeDurationHints,
+) {
+  return resolveComposeClipAtProgramSec(clips, programSec, hints);
+}
+
+function buildProgramSegmentsFromClips(
+  clips: ComposeWorkbenchClip[],
+  hints?: ComposeDurationHints,
+) {
   let t = 0;
   return clips.map((clip) => {
-    const span = displayClipSpanSec(clip);
+    const span = composeClipDisplaySpanSec(clip, hints);
     const seg = { clip, programStart: t, span };
     t += span;
     return seg;
   });
-}
-
-function resolveClipAtProgramSec(
-  clips: ComposeWorkbenchClip[],
-  programSec: number,
-): {
-  clip: ComposeWorkbenchClip;
-  programStart: number;
-  span: number;
-  localInClip: number;
-  sourceSec: number;
-} | null {
-  const segments = buildProgramSegments(clips);
-  if (segments.length === 0) return null;
-  const total = segments.reduce((s, x) => s + x.span, 0);
-  const clamped = Math.max(0, Math.min(programSec, total));
-  let acc = 0;
-  for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i]!;
-    const isLast = i === segments.length - 1;
-    if (clamped <= acc + seg.span || isLast) {
-      const localInClip = Math.max(0, Math.min(clamped - acc, seg.span));
-      const srcStart = composeClipSourceStart(seg.clip);
-      return {
-        clip: seg.clip,
-        programStart: seg.programStart,
-        span: seg.span,
-        localInClip,
-        sourceSec: srcStart + localInClip,
-      };
-    }
-    acc += seg.span;
-  }
-  return null;
 }
 
 function isProgramPlayheadInSelectedClip(
@@ -649,6 +642,101 @@ function sourceSecAtProgramPlayheadInClip(
   return composeClipSourceStart(hit.clip) + hit.localInClip;
 }
 
+function clampPlaybackVolume(v: number | undefined): number {
+  if (v == null || !Number.isFinite(v)) return 1;
+  return Math.max(0, Math.min(1, v));
+}
+
+function applyVideoClipSourceAudio(
+  video: HTMLVideoElement,
+  clip: ComposeWorkbenchClip | undefined,
+) {
+  if (!clip) return;
+  video.volume = clampPlaybackVolume(clip.sourceAudioVolume);
+  video.muted = clip.sourceAudioMuted ?? false;
+}
+
+function applyAudioClipPlayback(
+  audio: HTMLAudioElement,
+  clip: ComposeWorkbenchClip | undefined,
+) {
+  if (!clip) return;
+  audio.volume = clampPlaybackVolume(clip.audioPlaybackVolume);
+  audio.muted = clip.audioPlaybackMuted ?? false;
+}
+
+function ComposeTimelineClipVolumeButton({
+  muted,
+  disabled,
+  label,
+  onToggle,
+  className,
+}: {
+  muted: boolean;
+  disabled?: boolean;
+  label: string;
+  onToggle: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      title={label}
+      aria-label={label}
+      className={cn(
+        "flex size-7 shrink-0 items-center justify-center rounded-md bg-[#252528]/95 text-white shadow-sm ring-1 ring-white/25 hover:bg-[#333] hover:text-white disabled:pointer-events-none disabled:opacity-30",
+        muted && "text-white/35 ring-white/12",
+        className,
+      )}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+    >
+      {muted ? (
+        <VolumeX className="size-4" aria-hidden strokeWidth={2} />
+      ) : (
+        <Volume2 className="size-4" aria-hidden strokeWidth={2} />
+      )}
+    </button>
+  );
+}
+
+function ComposeClipVolumeOverlay({
+  muted,
+  disabled,
+  label,
+  onToggle,
+}: {
+  muted: boolean;
+  disabled?: boolean;
+  label: string;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="pointer-events-none absolute inset-y-0 left-0 z-[25] flex w-9 items-center pl-0.5">
+      <ComposeTimelineClipVolumeButton
+        muted={muted}
+        disabled={disabled}
+        label={label}
+        onToggle={onToggle}
+        className="pointer-events-auto"
+      />
+    </div>
+  );
+}
+
+function composeAudioWaveformLoading(
+  audioUrl: string | undefined,
+  peaks: number[] | undefined,
+): boolean {
+  if (!audioUrl?.trim()) return false;
+  if (!peaks?.length) return true;
+  return !peaks.some((p) => p > 0.001);
+}
+
 function videoElementMatchesUrl(video: HTMLVideoElement, url: string): boolean {
   const u = url.trim();
   if (!u) return false;
@@ -661,44 +749,80 @@ function audioElementMatchesUrl(audio: HTMLAudioElement, url: string): boolean {
   return audio.currentSrc === u || audio.src === u || audio.src.includes(u);
 }
 
-/** 迷你窗 / 全屏 · 按 program 时间线跨段连续预览（视频 + 段配音） */
+/** 迷你窗 / 全屏 · 双轨 program 预览（视频轨 + 独立配音轨） */
 function useComposeProgramVideoPlayback({
   ordered,
+  audioOrdered,
   videoRef,
   audioRef,
   playing,
   setPlaying,
   programPlayheadSec,
   setProgramPlayheadSec,
+  totalProgramSec,
+  durationHints,
+  workbench,
 }: {
   ordered: ComposeWorkbenchClip[];
+  audioOrdered?: ComposeWorkbenchClip[];
   videoRef: RefObject<HTMLVideoElement | null>;
   audioRef?: RefObject<HTMLAudioElement | null>;
   playing: boolean;
   setPlaying: (v: boolean) => void;
   programPlayheadSec: number;
   setProgramPlayheadSec: React.Dispatch<React.SetStateAction<number>>;
+  totalProgramSec: number;
+  durationHints?: ComposeDurationHints;
+  workbench?: ComposeWorkbenchState | null;
 }) {
   const programPlayheadSecRef = useRef(programPlayheadSec);
   programPlayheadSecRef.current = programPlayheadSec;
+  const audioTrack = audioOrdered ?? [];
 
-  const playbackHit = useMemo(
-    () => resolveClipAtProgramSec(ordered, programPlayheadSec),
-    [ordered, programPlayheadSec],
+  const resolveAudioHitAt = useCallback(
+    (programSec: number) => {
+      if (workbench && audioTrack.length) {
+        return resolveProgramAudioAtSec(workbench, programSec, durationHints);
+      }
+      if (audioTrack.length) {
+        return resolveClipAtProgramSec(audioTrack, programSec, durationHints);
+      }
+      return resolveClipAtProgramSec(ordered, programSec, durationHints);
+    },
+    [workbench, audioTrack, ordered, durationHints],
   );
 
+  const playbackHit = useMemo(
+    () => resolveClipAtProgramSec(ordered, programPlayheadSec, durationHints),
+    [ordered, programPlayheadSec, durationHints],
+  );
+  const playbackAudioHit = useMemo(() => {
+    if (!audioTrack.length) return null;
+    if (workbench) {
+      return resolveProgramAudioAtSec(workbench, programPlayheadSec, durationHints);
+    }
+    return resolveClipAtProgramSec(audioTrack, programPlayheadSec, durationHints);
+  }, [audioTrack, programPlayheadSec, durationHints, workbench]);
+
   const playbackVideoUrl = playbackHit?.clip.videoUrl?.trim() ?? "";
-  const playbackAudioUrl = playbackHit?.clip.audioUrl?.trim() ?? "";
+  const playbackAudioUrl =
+    playbackAudioHit?.clip.audioUrl?.trim() ??
+    playbackHit?.clip.audioUrl?.trim() ??
+    "";
   const lastSyncedClipIdRef = useRef<string | null>(null);
   const lastSyncedAudioClipIdRef = useRef<string | null>(null);
   const orderedKey = ordered.map((c) => c.id).join("|");
 
   useEffect(() => {
-    const hit = resolveClipAtProgramSec(ordered, programPlayheadSecRef.current);
+    const hit = resolveClipAtProgramSec(
+      ordered,
+      programPlayheadSecRef.current,
+      durationHints,
+    );
     if (hit?.clip.id) {
       lastSyncedClipIdRef.current = null;
     }
-  }, [orderedKey, ordered]);
+  }, [orderedKey, ordered, durationHints]);
 
   useEffect(() => {
     if (!playing) {
@@ -708,7 +832,11 @@ function useComposeProgramVideoPlayback({
       return;
     }
     const v = videoRef.current;
-    const hit = resolveClipAtProgramSec(ordered, programPlayheadSecRef.current);
+    const hit = resolveClipAtProgramSec(
+      ordered,
+      programPlayheadSecRef.current,
+      durationHints,
+    );
     if (!v || !hit?.clip.videoUrl?.trim()) return;
 
     const clipId = hit.clip.id;
@@ -717,8 +845,13 @@ function useComposeProgramVideoPlayback({
       !videoElementMatchesUrl(v, hit.clip.videoUrl);
 
     const seekAndPlay = () => {
-      const fresh = resolveClipAtProgramSec(ordered, programPlayheadSecRef.current);
+      const fresh = resolveClipAtProgramSec(
+        ordered,
+        programPlayheadSecRef.current,
+        durationHints,
+      );
       if (!fresh) return;
+      applyVideoClipSourceAudio(v, fresh.clip);
       if (Math.abs(v.currentTime - fresh.sourceSec) > 0.12) {
         try {
           v.currentTime = fresh.sourceSec;
@@ -731,6 +864,7 @@ function useComposeProgramVideoPlayback({
 
     if (needsSwitch) {
       lastSyncedClipIdRef.current = clipId;
+      applyVideoClipSourceAudio(v, hit.clip);
       v.src = hit.clip.videoUrl;
       const onReady = () => {
         seekAndPlay();
@@ -741,12 +875,12 @@ function useComposeProgramVideoPlayback({
       return () => v.removeEventListener("loadeddata", onReady);
     }
     seekAndPlay();
-  }, [playing, playbackHit?.clip.id, playbackVideoUrl, ordered, videoRef]);
+  }, [playing, playbackHit?.clip.id, playbackVideoUrl, ordered, videoRef, durationHints]);
 
   useEffect(() => {
     if (!playing || !audioRef) return;
     const a = audioRef.current;
-    const hit = resolveClipAtProgramSec(ordered, programPlayheadSecRef.current);
+    const hit = resolveAudioHitAt(programPlayheadSecRef.current);
     const audioUrl = hit?.clip.audioUrl?.trim();
     if (!a || !hit || !audioUrl) {
       a?.pause();
@@ -759,9 +893,15 @@ function useComposeProgramVideoPlayback({
       !audioElementMatchesUrl(a, audioUrl);
 
     const seekAndPlayAudio = () => {
-      const fresh = resolveClipAtProgramSec(ordered, programPlayheadSecRef.current);
+      const fresh = resolveAudioHitAt(programPlayheadSecRef.current);
       if (!fresh?.clip.audioUrl?.trim()) return;
-      const target = Math.max(0, fresh.localInClip);
+      applyAudioClipPlayback(a, fresh.clip);
+      const fileDur =
+        durationHints?.audioDurationByUrl?.[fresh.clip.audioUrl.trim()];
+      let target = Math.max(0, fresh.sourceSec);
+      if (fileDur != null && fileDur > 0) {
+        target = Math.min(target, Math.max(0, fileDur - 0.02));
+      }
       if (Math.abs(a.currentTime - target) > 0.12) {
         try {
           a.currentTime = target;
@@ -774,6 +914,7 @@ function useComposeProgramVideoPlayback({
 
     if (needsSwitch) {
       lastSyncedAudioClipIdRef.current = clipId;
+      applyAudioClipPlayback(a, hit.clip);
       a.src = audioUrl;
       const onReady = () => {
         seekAndPlayAudio();
@@ -784,13 +925,108 @@ function useComposeProgramVideoPlayback({
       return () => a.removeEventListener("canplay", onReady);
     }
     seekAndPlayAudio();
-  }, [playing, playbackHit?.clip.id, playbackAudioUrl, ordered, audioRef]);
+  }, [
+    playing,
+    playbackAudioHit?.clip.id,
+    playbackAudioHit?.clip.audioPlaybackMuted,
+    playbackAudioHit?.clip.audioPlaybackVolume,
+    playbackAudioUrl,
+    ordered,
+    audioTrack,
+    audioRef,
+    durationHints,
+    resolveAudioHitAt,
+    workbench,
+  ]);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const hit = resolveClipAtProgramSec(
+      ordered,
+      programPlayheadSecRef.current,
+      durationHints,
+    );
+    if (hit) applyVideoClipSourceAudio(v, hit.clip);
+  }, [
+    playbackHit?.clip.id,
+    playbackHit?.clip.sourceAudioMuted,
+    playbackHit?.clip.sourceAudioVolume,
+    ordered,
+    durationHints,
+    videoRef,
+  ]);
+
+  useEffect(() => {
+    const a = audioRef?.current;
+    if (!a) return;
+    const hit = resolveAudioHitAt(programPlayheadSecRef.current);
+    if (hit?.clip.audioUrl?.trim()) applyAudioClipPlayback(a, hit.clip);
+  }, [
+    playbackAudioHit?.clip.id,
+    playbackAudioHit?.clip.audioPlaybackMuted,
+    playbackAudioHit?.clip.audioPlaybackVolume,
+    audioRef,
+    resolveAudioHitAt,
+  ]);
+
+  useEffect(() => {
+    if (!playing) return;
+    let raf = 0;
+    const tick = () => {
+      const videoHit = resolveClipAtProgramSec(
+        ordered,
+        programPlayheadSecRef.current,
+        durationHints,
+      );
+      if (videoHit) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      const a = audioRef?.current;
+      const audioHit = audioTrack.length
+        ? resolveAudioHitAt(programPlayheadSecRef.current)
+        : null;
+      if (a && audioHit && !a.paused) {
+        const local =
+          a.currentTime - composeClipSourceStart(audioHit.clip);
+        const next = Math.min(
+          audioHit.programStart + Math.max(0, local),
+          totalProgramSec,
+        );
+        programPlayheadSecRef.current = next;
+        setProgramPlayheadSec(next);
+        if (next >= totalProgramSec - 0.05) {
+          setPlaying(false);
+          a.pause();
+          return;
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [
+    playing,
+    ordered,
+    audioTrack,
+    audioRef,
+    setPlaying,
+    setProgramPlayheadSec,
+    totalProgramSec,
+    durationHints,
+    resolveAudioHitAt,
+  ]);
 
   const onProgramVideoTimeUpdate = useCallback(
     (e: SyntheticEvent<HTMLVideoElement>) => {
       if (!playing) return;
       const v = e.currentTarget;
-      const hit = resolveClipAtProgramSec(ordered, programPlayheadSecRef.current);
+      const hit = resolveClipAtProgramSec(
+        ordered,
+        programPlayheadSecRef.current,
+        durationHints,
+      );
       if (!hit) return;
 
       const srcStart = composeClipSourceStart(hit.clip);
@@ -807,6 +1043,15 @@ function useComposeProgramVideoPlayback({
           lastSyncedAudioClipIdRef.current = null;
           return;
         }
+        if (programPlayheadSecRef.current < totalProgramSec - 0.05) {
+          const nextProgram = hit.programStart + hit.span + 0.001;
+          programPlayheadSecRef.current = nextProgram;
+          setProgramPlayheadSec(nextProgram);
+          lastSyncedClipIdRef.current = null;
+          lastSyncedAudioClipIdRef.current = null;
+          v.pause();
+          return;
+        }
         programPlayheadSecRef.current = endProgram;
         setProgramPlayheadSec(endProgram);
         setPlaying(false);
@@ -815,23 +1060,19 @@ function useComposeProgramVideoPlayback({
         return;
       }
 
-      const a = audioRef?.current;
-      if (a && hit.clip.audioUrl?.trim() && !a.paused) {
-        const target = Math.max(0, local);
-        if (Math.abs(a.currentTime - target) > 0.25) {
-          try {
-            a.currentTime = target;
-          } catch {
-            /* ignore */
-          }
-        }
-      }
-
       const nextProgram = Math.min(hit.programStart + Math.max(0, local), endProgram);
       programPlayheadSecRef.current = nextProgram;
       setProgramPlayheadSec(nextProgram);
     },
-    [ordered, playing, setPlaying, setProgramPlayheadSec, audioRef],
+    [
+      ordered,
+      playing,
+      setPlaying,
+      setProgramPlayheadSec,
+      audioRef,
+      totalProgramSec,
+      durationHints,
+    ],
   );
 
   const toggleProgramPlay = useCallback(() => {
@@ -845,13 +1086,6 @@ function useComposeProgramVideoPlayback({
     }
     setPlaying(true);
   }, [playing, setPlaying, videoRef, audioRef]);
-
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    const hit = resolveClipAtProgramSec(ordered, programPlayheadSecRef.current);
-    v.muted = Boolean(playing && hit?.clip.audioUrl?.trim());
-  }, [playing, playbackHit?.clip.id, playbackAudioUrl, ordered, videoRef]);
 
   return {
     playbackVideoUrl,
@@ -884,7 +1118,13 @@ function clipFilmstripFrames(
 
 export function ComposeSequenceTrack({
   clips,
+  audioClips,
   selectedId,
+  selectedAudioId,
+  onSelectAudio,
+  onAudioReorder,
+  workbench,
+  onAudioProgramStartChange,
   disabled,
   trimStart,
   trimEnd,
@@ -922,12 +1162,26 @@ export function ComposeSequenceTrack({
   rootClassName,
   trackChrome,
   audioPeaksByUrl,
+  audioDurationByUrl,
   onClipAudioAttach,
   onClipAudioClear,
+  onVideoSourceAudioToggle,
+  onAudioClipPlaybackToggle,
+  videoLaneLoading,
 }: {
   clips: ComposeWorkbenchClip[];
+  /** 独立配音轨（与 clips 数量可不同） */
+  audioClips?: ComposeWorkbenchClip[];
   selectedId: string | null;
+  selectedAudioId?: string | null;
+  onSelectAudio?: (id: string) => void;
+  onAudioReorder?: (from: number, to: number) => void;
+  /** 双轨 · 绝对时间线定位（默认对齐视频段，可拖动） */
+  workbench?: ComposeWorkbenchState | null;
+  onAudioProgramStartChange?: (clipId: string, programStartSec: number) => void;
   disabled?: boolean;
+  /** 迷你窗：仅视频轨横向呼吸加载 */
+  videoLaneLoading?: boolean;
   trimStart: number;
   trimEnd: number;
   filmstripByUrl: Record<string, VideoFilmstripFrame[]>;
@@ -967,8 +1221,11 @@ export function ComposeSequenceTrack({
   rootClassName?: string;
   trackChrome?: ComposeTrackChrome;
   audioPeaksByUrl?: Record<string, number[]>;
+  audioDurationByUrl?: Record<string, number>;
   onClipAudioAttach?: (clipId: string) => void;
   onClipAudioClear?: (clipId: string) => void;
+  onVideoSourceAudioToggle?: (clipId: string) => void;
+  onAudioClipPlaybackToggle?: (clipId: string) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
@@ -981,17 +1238,70 @@ export function ComposeSequenceTrack({
   const showAudioAttach = trackChrome?.showAudioAttach ?? true;
   const pxPerSec =
     (pxPerSecBase ?? BASE_TIMELINE_PX_PER_SEC) * (chromeZoomable ? zoom : 1);
-  const trackLayout = useMemo(
-    () => buildClipTrackLayout(clips, pxPerSec),
-    [clips, pxPerSec],
+  const dualAudioTrack = (audioClips?.length ?? 0) > 0;
+  const audioLaneClips = dualAudioTrack ? audioClips! : clips;
+  const durationHints = useMemo(
+    (): ComposeDurationHints => ({
+      videoDurationByUrl: fullDurationByUrl,
+      audioDurationByUrl,
+    }),
+    [fullDurationByUrl, audioDurationByUrl],
   );
-  const trackContentPx = trackLayout.totalPx;
-  const trackWidthPx = Math.max(280, trackContentPx);
-  const playheadLeftPx = trackPxFromProgramSec(programPlayheadSec, clips, pxPerSec);
+  const trackLayout = useMemo(
+    () => buildClipTrackLayout(clips, pxPerSec, durationHints),
+    [clips, pxPerSec, durationHints],
+  );
+  const audioTrackLayout = useMemo(
+    () => buildClipTrackLayout(audioLaneClips, pxPerSec, durationHints),
+    [audioLaneClips, pxPerSec, durationHints],
+  );
+  const videoProgramSegs = useMemo(
+    () => (workbench ? buildVideoProgramSegments(workbench, durationHints) : []),
+    [workbench, durationHints],
+  );
+  const audioPlacements = useMemo(
+    () =>
+      workbench && dualAudioTrack
+        ? buildAudioTimelinePlacements(workbench, durationHints)
+        : [],
+    [workbench, dualAudioTrack, durationHints],
+  );
+  const absoluteAudioLane = dualAudioTrack && Boolean(workbench);
+  const linearTimelineSec = absoluteAudioLane
+    ? Math.max(
+        trackLayout.totalSec,
+        audioPlacements.reduce((m, p) => Math.max(m, p.programStart + p.span), 0),
+        totalProgramSec,
+      )
+    : trackLayout.totalSec;
+  const playheadClips =
+    trackLayout.totalSec >= audioTrackLayout.totalSec ? clips : audioLaneClips;
+  const trackContentPx = Math.max(
+    280,
+    absoluteAudioLane
+      ? linearTimelineSec * pxPerSec
+      : Math.max(
+          trackLayout.totalPx,
+          dualAudioTrack ? audioTrackLayout.totalPx : trackLayout.totalPx,
+        ),
+  );
+  const trackWidthPx = trackContentPx;
+  const playheadLeftPx = absoluteAudioLane
+    ? programPlayheadSec * pxPerSec
+    : trackPxFromProgramSec(
+        programPlayheadSec,
+        playheadClips,
+        pxPerSec,
+        durationHints,
+      );
 
   const playheadLineRef = useRef<HTMLDivElement>(null);
   const playheadHitRef = useRef<HTMLButtonElement>(null);
   const [reorderInsertBefore, setReorderInsertBefore] = useState<number | null>(null);
+  const [audioDragPreview, setAudioDragPreview] = useState<{
+    clipId: string;
+    programStartSec: number;
+  } | null>(null);
 
   const setPlayheadPx = useCallback(
     (px: number) => {
@@ -1027,6 +1337,46 @@ export function ComposeSequenceTrack({
     scrollEl.scrollTo({ left: targetLeft, behavior: "smooth" });
   }, [selectedId, trackLayout.segments]);
 
+  useEffect(() => {
+    if (!selectedAudioId) return;
+    const scrollEl = scrollRef.current;
+    if (!scrollEl) return;
+    let clipLeft: number | undefined;
+    let clipWidth: number | undefined;
+    if (absoluteAudioLane) {
+      const p = audioPlacements.find((x) => x.clip.id === selectedAudioId);
+      if (p) {
+        clipLeft = p.programStart * pxPerSec;
+        clipWidth = Math.max(56, p.span * pxPerSec);
+      }
+    } else {
+      const seg = audioTrackLayout.segments.find(
+        (s) => s.clip.id === selectedAudioId,
+      );
+      if (seg) {
+        clipLeft = seg.leftPx;
+        clipWidth = seg.widthPx;
+      }
+    }
+    if (clipLeft == null || clipWidth == null) return;
+    const pad = 32;
+    const clipRight = clipLeft + clipWidth;
+    const viewLeft = scrollEl.scrollLeft;
+    const viewRight = viewLeft + scrollEl.clientWidth;
+    if (clipLeft >= viewLeft + pad && clipRight <= viewRight - pad) return;
+    const targetLeft = Math.max(
+      0,
+      clipLeft - Math.max(0, scrollEl.clientWidth * 0.15),
+    );
+    scrollEl.scrollTo({ left: targetLeft, behavior: "smooth" });
+  }, [
+    selectedAudioId,
+    absoluteAudioLane,
+    audioPlacements,
+    audioTrackLayout.segments,
+    pxPerSec,
+  ]);
+
   const startPlayheadScrub = (e: React.PointerEvent) => {
     if (disabled) return;
     e.preventDefault();
@@ -1038,8 +1388,17 @@ export function ComposeSequenceTrack({
       if (!scrollEl || trackContentPx <= 0) return;
       const rect = scrollEl.getBoundingClientRect();
       const xInTrack = scrollEl.scrollLeft + (clientX - rect.left);
-      const sec = programSecFromTrackPx(xInTrack, clips, pxPerSec);
-      const px = trackPxFromProgramSec(sec, clips, pxPerSec);
+      const sec = absoluteAudioLane
+        ? Math.max(0, Math.min(xInTrack / pxPerSec, totalProgramSec))
+        : programSecFromTrackPx(
+            xInTrack,
+            playheadClips,
+            pxPerSec,
+            durationHints,
+          );
+      const px = absoluteAudioLane
+        ? sec * pxPerSec
+        : trackPxFromProgramSec(sec, playheadClips, pxPerSec, durationHints);
       setPlayheadPx(px);
       onProgramSeek(sec);
     };
@@ -1058,6 +1417,36 @@ export function ComposeSequenceTrack({
     window.addEventListener("pointerup", onUp);
   };
 
+  const startAudioPositionDrag =
+    (clipId: string, initialStartSec: number) => (e: React.PointerEvent) => {
+      if (disabled || !onAudioProgramStartChange || !workbench) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const scrollEl = scrollRef.current;
+      if (!scrollEl) return;
+      const rect = scrollEl.getBoundingClientRect();
+      const originX = e.clientX;
+      const originStart = initialStartSec;
+      let latest = originStart;
+      const onMove = (ev: PointerEvent) => {
+        const xInTrack = scrollEl.scrollLeft + (ev.clientX - rect.left);
+        const raw = Math.max(0, xInTrack / pxPerSec);
+        latest = snapAudioProgramStartSec(raw, videoProgramSegs, {
+          pxPerSec,
+          snapPx: 12,
+        });
+        setAudioDragPreview({ clipId, programStartSec: latest });
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        setAudioDragPreview(null);
+        onAudioProgramStartChange(clipId, latest);
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    };
+
   const insertIndexFromClientX = useCallback(
     (clientX: number) => {
       const scrollEl = scrollRef.current;
@@ -1074,6 +1463,22 @@ export function ComposeSequenceTrack({
     [clips.length, trackLayout.segments],
   );
 
+  const insertIndexFromClientXForLayout = useCallback(
+    (clientX: number, layout: typeof trackLayout) => {
+      const scrollEl = scrollRef.current;
+      if (!scrollEl || layout.segments.length === 0) return 0;
+      const rect = scrollEl.getBoundingClientRect();
+      const xInTrack = scrollEl.scrollLeft + (clientX - rect.left);
+      for (let i = 0; i < layout.segments.length; i++) {
+        const seg = layout.segments[i]!;
+        const mid = seg.leftPx + seg.widthPx / 2;
+        if (xInTrack < mid) return i;
+      }
+      return layout.segments.length;
+    },
+    [],
+  );
+
   const startClipReorderPointer = (index: number, clipId: string) => (e: React.PointerEvent) => {
     if (disabled) return;
     const target = e.target as HTMLElement;
@@ -1086,7 +1491,7 @@ export function ComposeSequenceTrack({
     const onMove = (ev: PointerEvent) => {
       if (Math.abs(ev.clientX - startX) > 5) dragging = true;
       if (!dragging) return;
-      insertBefore = insertIndexFromClientX(ev.clientX);
+      insertBefore = insertIndexFromClientXForLayout(ev.clientX, trackLayout);
       setReorderInsertBefore(insertBefore);
     };
     const onUp = () => {
@@ -1104,6 +1509,34 @@ export function ComposeSequenceTrack({
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   };
+
+  const startAudioClipReorderPointer =
+    (index: number, clipId: string) => (e: React.PointerEvent) => {
+      if (disabled || !onAudioReorder) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX;
+      let dragging = false;
+      let insertBefore = index;
+      const onMove = (ev: PointerEvent) => {
+        if (Math.abs(ev.clientX - startX) > 5) dragging = true;
+        if (!dragging) return;
+        insertBefore = insertIndexFromClientXForLayout(ev.clientX, audioTrackLayout);
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        if (dragging) {
+          let to = insertBefore;
+          if (to > index) to -= 1;
+          if (to !== index) onAudioReorder(index, to);
+        } else {
+          onSelectAudio?.(clipId);
+        }
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    };
 
   const startEdgeDrag = (side: "left" | "right", blockEl: HTMLDivElement) => {
     const span0 = Math.max(MIN_TRIM_SEC, trimEnd - trimStart);
@@ -1278,7 +1711,7 @@ export function ComposeSequenceTrack({
                   key={t}
                   className="pointer-events-none absolute top-0.5 -translate-x-1/2 text-[9px] tabular-nums text-white/35"
                   style={{
-                    left: trackPxFromProgramSec(t, clips, pxPerSec),
+                    left: trackPxFromProgramSec(t, clips, pxPerSec, durationHints),
                   }}
                 >
                   {formatTimeSec(t)}
@@ -1288,6 +1721,11 @@ export function ComposeSequenceTrack({
           </div>
 
           <div className={cn("relative", clipLaneClassName)}>
+            {videoLaneLoading ? (
+              <div className="absolute inset-0 z-[55] overflow-hidden">
+                <ComposeMiniLoadingBreath />
+              </div>
+            ) : null}
             {playheadInsetInClipLane ? (
               <div
                 ref={playheadLineRef}
@@ -1317,12 +1755,11 @@ export function ComposeSequenceTrack({
                 const widthPx = seg.widthPx;
                 const isSel = clip.id === selectedId;
                 const url = clip.videoUrl.trim();
+                const audioOnlySeg = !url && Boolean(clip.audioUrl?.trim());
                 const fullDur = fullDurationByUrl[url] ?? seg.span;
-                const stripFrames = clipFilmstripFrames(
-                  clip,
-                  filmstripByUrl[url],
-                  fullDur,
-                );
+                const stripFrames = url
+                  ? clipFilmstripFrames(clip, filmstripByUrl[url], fullDur)
+                  : [];
                 return (
                   <div
                     key={clip.id}
@@ -1339,15 +1776,31 @@ export function ComposeSequenceTrack({
                     title={clip.label ?? "片段"}
                     onPointerDown={startClipReorderPointer(index, clip.id)}
                   >
+                    {url && onVideoSourceAudioToggle ? (
+                      <ComposeClipVolumeOverlay
+                        muted={clip.sourceAudioMuted ?? false}
+                        disabled={disabled}
+                        label={
+                          clip.sourceAudioMuted
+                            ? "开启本段视频原声"
+                            : "静音本段视频原声"
+                        }
+                        onToggle={() => onVideoSourceAudioToggle(clip.id)}
+                      />
+                    ) : null}
                     <div
                       className={cn(
                         "pointer-events-none flex h-full w-full overflow-hidden",
                         portraitFilmstrip
-                          ? "items-center gap-px px-0.5 py-2"
-                          : "",
+                          ? "items-center gap-px px-0.5 py-2 pl-9"
+                          : "pl-9",
                       )}
                     >
-                      {stripFrames.length > 0 ? (
+                      {audioOnlySeg ? (
+                        <div className="flex h-full w-full items-center justify-center bg-[#12141a] px-1 text-[9px] text-white/40">
+                          TTS
+                        </div>
+                      ) : stripFrames.length > 0 ? (
                         stripFrames.map((f, fi) =>
                           portraitFilmstrip ? (
                             <div
@@ -1376,7 +1829,7 @@ export function ComposeSequenceTrack({
                             />
                           ),
                         )
-                      ) : (
+                      ) : url ? (
                         portraitFilmstrip ? (
                           <div className="mx-auto h-full aspect-[9/16] overflow-hidden">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1396,7 +1849,7 @@ export function ComposeSequenceTrack({
                             draggable={false}
                           />
                         )
-                      )}
+                      ) : null}
                     </div>
                     {isSel ? (
                       <>
@@ -1459,10 +1912,88 @@ export function ComposeSequenceTrack({
               !isMiniTrackChrome && "border-t border-white/10",
             )}
           >
+            {absoluteAudioLane ? (
+              <>
+                {trackLayout.segments.map((seg) => (
+                  <div
+                    key={`v-guide-${seg.clip.id}`}
+                    className="pointer-events-none absolute inset-y-0 z-[1] w-px bg-white/12"
+                    style={{ left: seg.leftPx }}
+                  />
+                ))}
+                <div
+                  className="relative h-full"
+                  style={{ width: trackContentPx, minWidth: trackContentPx }}
+                >
+                  {audioPlacements.map((p) => {
+                    const clip = p.clip;
+                    const isSel = clip.id === selectedAudioId;
+                    const audioUrl = clip.audioUrl?.trim();
+                    const peaks = audioUrl ? audioPeaksByUrl?.[audioUrl] : undefined;
+                    const startSec =
+                      audioDragPreview?.clipId === clip.id
+                        ? audioDragPreview.programStartSec
+                        : p.programStart;
+                    const widthPx = Math.max(56, p.span * pxPerSec);
+                    const leftPx = startSec * pxPerSec;
+                    return (
+                      <div
+                        key={`audio-${clip.id}`}
+                        style={{
+                          position: "absolute",
+                          left: leftPx,
+                          width: widthPx,
+                          height: "100%",
+                        }}
+                        className={cn(
+                          "relative overflow-hidden rounded-sm",
+                          isMiniTrackChrome
+                            ? isSel
+                              ? "z-10 ring-1 ring-white/50"
+                              : ""
+                            : isSel
+                              ? "z-10 border border-sky-400/70"
+                              : "border border-white/10",
+                          !disabled &&
+                            onAudioProgramStartChange &&
+                            "cursor-grab active:cursor-grabbing",
+                        )}
+                        title="拖动对齐视频片段"
+                        onPointerDown={startAudioPositionDrag(clip.id, startSec)}
+                        onClick={() => onSelectAudio?.(clip.id)}
+                      >
+                        {audioUrl && onAudioClipPlaybackToggle ? (
+                          <ComposeClipVolumeOverlay
+                            muted={clip.audioPlaybackMuted ?? false}
+                            disabled={disabled}
+                            label={
+                              clip.audioPlaybackMuted
+                                ? "开启本段配音"
+                                : "静音本段配音"
+                            }
+                            onToggle={() => onAudioClipPlaybackToggle(clip.id)}
+                          />
+                        ) : null}
+                        {audioUrl ? (
+                          <ComposeSegmentAudioWaveform
+                            peaks={peaks}
+                            widthPx={widthPx}
+                            label={clip.label?.trim() || undefined}
+                            loading={composeAudioWaveformLoading(audioUrl, peaks)}
+                          />
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
             <div className="flex h-full gap-px">
-              {trackLayout.segments.map((seg) => {
+              {audioTrackLayout.segments.map((seg, index) => {
                 const clip = seg.clip;
-                const isSel = clip.id === selectedId;
+                const isSel = dualAudioTrack
+                  ? clip.id === selectedAudioId
+                  : clip.id === selectedId;
                 const audioUrl = clip.audioUrl?.trim();
                 const peaks = audioUrl ? audioPeaksByUrl?.[audioUrl] : undefined;
                 return (
@@ -1478,18 +2009,46 @@ export function ComposeSequenceTrack({
                         : isSel
                           ? "border border-sky-400/70"
                           : "border border-white/10",
-                      !disabled && "cursor-pointer",
+                      !disabled &&
+                        (dualAudioTrack && onAudioReorder
+                          ? "cursor-grab active:cursor-grabbing"
+                          : "cursor-pointer"),
                     )}
-                    onClick={() => onSelect(clip.id)}
+                    onPointerDown={
+                      dualAudioTrack && onAudioReorder
+                        ? startAudioClipReorderPointer(index, clip.id)
+                        : undefined
+                    }
+                    onClick={() =>
+                      dualAudioTrack
+                        ? onSelectAudio?.(clip.id)
+                        : onSelect(clip.id)
+                    }
                   >
                     {audioUrl ? (
                       <>
+                        {onAudioClipPlaybackToggle ? (
+                          <ComposeClipVolumeOverlay
+                            muted={clip.audioPlaybackMuted ?? false}
+                            disabled={disabled}
+                            label={
+                              clip.audioPlaybackMuted
+                                ? "开启本段配音"
+                                : "静音本段配音"
+                            }
+                            onToggle={() => onAudioClipPlaybackToggle(clip.id)}
+                          />
+                        ) : null}
                         <ComposeSegmentAudioWaveform
                           peaks={peaks}
                           widthPx={seg.widthPx}
                           label={clip.label?.trim() || undefined}
+                          loading={composeAudioWaveformLoading(audioUrl, peaks)}
                         />
-                        {isSel && onClipAudioClear && !disabled ? (
+                        {isSel &&
+                        !dualAudioTrack &&
+                        onClipAudioClear &&
+                        !disabled ? (
                           <button
                             type="button"
                             title="清除段配音"
@@ -1503,7 +2062,11 @@ export function ComposeSequenceTrack({
                           </button>
                         ) : null}
                       </>
-                    ) : isSel && showAudioAttach && onClipAudioAttach && !disabled ? (
+                    ) : isSel &&
+                      !dualAudioTrack &&
+                      showAudioAttach &&
+                      onClipAudioAttach &&
+                      !disabled ? (
                       <div className="flex h-full w-full items-center justify-center bg-[#161616]/90 px-1">
                       <button
                         type="button"
@@ -1525,6 +2088,7 @@ export function ComposeSequenceTrack({
                 );
               })}
             </div>
+            )}
           </div>
           {reserveExtraClipLane ? (
             <div
@@ -1640,7 +2204,9 @@ export function ComposeMiniTimelinePanel({
   onClose,
   onApplyWorkbench,
   onReorder,
-  onExport,
+  onCompose,
+  onDownload,
+  canDownload = false,
   onOpenFullscreen,
   onImportClick,
   trackChrome,
@@ -1661,7 +2227,9 @@ export function ComposeMiniTimelinePanel({
     opts?: { persist?: boolean },
   ) => void;
   onReorder: (from: number, to: number) => void;
-  onExport: () => void;
+  onCompose: () => void;
+  onDownload?: () => void;
+  canDownload?: boolean;
   onOpenFullscreen: () => void;
   onImportClick: () => void;
   trackChrome?: ComposeTrackChrome;
@@ -1678,9 +2246,32 @@ export function ComposeMiniTimelinePanel({
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
+  const orderedAudio = useMemo(
+    () => orderedComposeAudioClips(workbench),
+    [workbench],
+  );
+  const [selectedAudioId, setSelectedAudioId] = useState<string | null>(
+    orderedAudio[0]?.id ?? null,
+  );
+
   const selected = ordered.find((c) => c.id === selectedId) ?? ordered[0];
   const selectedVideoUrl = selected?.videoUrl?.trim() ?? "";
-  const { audioPeaksByUrl } = useComposeAudioPeaksLoader(ordered, true);
+  const peaksClips = useMemo(
+    () => [...ordered, ...orderedAudio],
+    [ordered, orderedAudio],
+  );
+  const { audioPeaksByUrl, audioDurationByUrl } = useComposeAudioPeaksLoader(
+    peaksClips,
+    true,
+  );
+
+  const durationHints = useMemo(
+    (): ComposeDurationHints => ({
+      videoDurationByUrl: fullDurationByUrl,
+      audioDurationByUrl,
+    }),
+    [fullDurationByUrl, audioDurationByUrl],
+  );
 
   useEffect(() => {
     if (!selectedVideoUrl) return;
@@ -1688,18 +2279,29 @@ export function ComposeMiniTimelinePanel({
     if (dur) setDurationSec(dur);
   }, [selectedVideoUrl, fullDurationByUrl]);
 
-  const programSegments = useMemo(() => buildProgramSegments(ordered), [ordered]);
-  const totalProgramSec = programSegments.reduce((s, x) => s + x.span, 0) || 1;
+  const totalProgramSec = useMemo(
+    () => composeDualTrackProgramDurationSec(workbench, durationHints),
+    [workbench, durationHints],
+  );
+
+  const programSegments = useMemo(
+    () => buildProgramSegmentsFromClips(ordered, durationHints),
+    [ordered, durationHints],
+  );
 
   const { playbackVideoUrl, onProgramVideoTimeUpdate, toggleProgramPlay } =
     useComposeProgramVideoPlayback({
       ordered,
+      audioOrdered: orderedAudio,
       videoRef,
       audioRef,
       playing,
       setPlaying,
       programPlayheadSec,
       setProgramPlayheadSec,
+      totalProgramSec,
+      durationHints,
+      workbench,
     });
 
   const playheadForReorderRef = useRef(programPlayheadSec);
@@ -1745,15 +2347,26 @@ export function ComposeMiniTimelinePanel({
 
   useEffect(() => {
     if (playing) return;
-    const hit = resolveClipAtProgramSec(ordered, programPlayheadSec);
+    const hit =
+      orderedAudio.length > 0
+        ? resolveProgramAudioAtSec(workbench, programPlayheadSec, durationHints)
+        : resolveClipAtProgramSec(ordered, programPlayheadSec, durationHints);
     const a = audioRef.current;
     const audioUrl = hit?.clip.audioUrl?.trim();
-    if (!a || !audioUrl) return;
+    if (!a || !audioUrl) {
+      a?.pause();
+      return;
+    }
     if (!audioElementMatchesUrl(a, audioUrl)) {
       a.src = audioUrl;
       a.load();
     }
-    const target = hit ? Math.max(0, hit.localInClip) : 0;
+    const fileDur = audioDurationByUrl[audioUrl];
+    let target = hit ? Math.max(0, hit.sourceSec) : 0;
+    if (fileDur != null && fileDur > 0) {
+      target = Math.min(target, Math.max(0, fileDur - 0.02));
+    }
+    applyAudioClipPlayback(a, hit.clip);
     if (Math.abs(a.currentTime - target) > 0.12) {
       try {
         a.currentTime = target;
@@ -1761,14 +2374,21 @@ export function ComposeMiniTimelinePanel({
         /* ignore */
       }
     }
-  }, [ordered, programPlayheadSec, playing]);
+  }, [
+    ordered,
+    orderedAudio,
+    programPlayheadSec,
+    playing,
+    durationHints,
+    audioDurationByUrl,
+    workbench,
+  ]);
 
   const seekProgramTimeline = useCallback(
     (programSec: number) => {
-      const total = programSegments.reduce((s, x) => s + x.span, 0) || 1;
-      setProgramPlayheadSec(Math.max(0, Math.min(programSec, total)));
+      setProgramPlayheadSec(Math.max(0, Math.min(programSec, totalProgramSec)));
     },
-    [programSegments],
+    [totalProgramSec],
   );
 
   const splitAtPlayhead = async () => {
@@ -1916,16 +2536,6 @@ export function ComposeMiniTimelinePanel({
         </div>
       </div>
       <div className="relative flex min-h-[200px] min-w-0 flex-1 flex-col">
-        {!ready ? (
-          <div
-            className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-[#141416]/95"
-            aria-busy
-            aria-live="polite"
-          >
-            <Loader2 className="size-6 animate-spin text-white/70" />
-            <p className="text-xs text-white/55">正在加载时间线…</p>
-          </div>
-        ) : null}
       <div className="flex flex-wrap items-center justify-between gap-2 px-2 py-1.5">
         <div className="flex items-center gap-1">
           <button
@@ -1968,9 +2578,18 @@ export function ComposeMiniTimelinePanel({
           <button
             type="button"
             className="rounded-md p-1.5 text-white/70 hover:bg-white/10 disabled:opacity-40"
-            disabled={exportBusy || !canEdit}
-            title="导出合成"
-            onClick={onExport}
+            disabled={exportBusy || !canEdit || ordered.length < 1}
+            title="云端合成"
+            onClick={onCompose}
+          >
+            <Clapperboard className="size-4" />
+          </button>
+          <button
+            type="button"
+            className="rounded-md p-1.5 text-white/70 hover:bg-white/10 disabled:opacity-40"
+            disabled={!canDownload || exportBusy}
+            title="下载成片"
+            onClick={() => onDownload?.()}
           >
             <Download className="size-4" />
           </button>
@@ -1994,16 +2613,30 @@ export function ComposeMiniTimelinePanel({
         onTimeUpdate={onProgramVideoTimeUpdate}
       />
       <audio ref={audioRef} className="sr-only" preload="auto" playsInline />
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-0">
+      <div
+        className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-0"
+        aria-busy={!ready}
+        aria-live={!ready ? "polite" : undefined}
+      >
         <ComposeSequenceTrack
           clips={ordered}
+          audioClips={orderedAudio}
+          workbench={workbench}
           selectedId={selectedId}
+          selectedAudioId={selectedAudioId}
+          onSelectAudio={setSelectedAudioId}
+          onAudioProgramStartChange={(clipId, start) =>
+            onApplyWorkbench((prev) =>
+              setComposeAudioProgramStart(prev, clipId, start),
+            )
+          }
           disabled={!canEdit || !ready}
           trimStart={trimStart}
           trimEnd={trimEnd}
           filmstripByUrl={filmstripByUrl}
           fullDurationByUrl={fullDurationByUrl}
           audioPeaksByUrl={audioPeaksByUrl}
+          audioDurationByUrl={audioDurationByUrl}
           programPlayheadSec={programPlayheadSec}
           totalProgramSec={totalProgramSec}
           onSelect={setSelectedId}
@@ -2019,12 +2652,26 @@ export function ComposeMiniTimelinePanel({
           zoomable
           clipLaneClassName="h-24"
           portraitFilmstrip
+          videoLaneLoading={!ready}
           splitDisabled={!canEdit || !playheadInSelected}
           deleteDisabled={!canEdit || !selectedId || ordered.length <= 1}
           scrollContainerClassName="bg-transparent"
-          trackChrome={trackChrome ?? { variant: "ecom-mini", zoomable: true }}
+          trackChrome={{
+            ...(trackChrome ?? { variant: "ecom-mini", zoomable: true }),
+            showAudioAttach: orderedAudio.length === 0,
+          }}
           onClipAudioAttach={onClipAudioAttach}
           onClipAudioClear={onClipAudioClear}
+          onVideoSourceAudioToggle={(clipId) =>
+            onApplyWorkbench((prev) =>
+              toggleComposeClipSourceAudioMuted(prev, clipId),
+            )
+          }
+          onAudioClipPlaybackToggle={(clipId) =>
+            onApplyWorkbench((prev) =>
+              toggleComposeAudioClipPlaybackMuted(prev, clipId),
+            )
+          }
         />
       </div>
       </div>
@@ -2043,7 +2690,9 @@ export function ComposeEditorFullscreen({
   filmstripByUrl,
   fullDurationByUrl,
   onClose,
-  onExport,
+  onCompose,
+  onDownload,
+  canDownload = false,
   onImportClick,
   onApplyWorkbench,
   setProfile,
@@ -2063,7 +2712,9 @@ export function ComposeEditorFullscreen({
   filmstripByUrl: Record<string, VideoFilmstripFrame[]>;
   fullDurationByUrl: Record<string, number>;
   onClose: () => void;
-  onExport: () => void;
+  onCompose: () => void;
+  onDownload?: () => void;
+  canDownload?: boolean;
   onImportClick: () => void;
   onApplyWorkbench: (
     fn: (p: ComposeWorkbenchState) => ComposeWorkbenchState,
@@ -2094,12 +2745,31 @@ export function ComposeEditorFullscreen({
   const audioRef = useRef<HTMLAudioElement>(null);
   const undoStackRef = useRef<ComposeWorkbenchState[]>([]);
 
+  const orderedAudio = useMemo(
+    () => orderedComposeAudioClips(workbench),
+    [workbench],
+  );
+  const [selectedAudioId, setSelectedAudioId] = useState<string | null>(
+    orderedAudio[0]?.id ?? null,
+  );
+
   const selected = ordered.find((c) => c.id === selectedId) ?? ordered[0];
   const peaksSourceClips = useMemo(
-    () => [...ordered, ...(upstreamLibraryClips ?? [])],
-    [ordered, upstreamLibraryClips],
+    () => [...ordered, ...orderedAudio, ...(upstreamLibraryClips ?? [])],
+    [ordered, orderedAudio, upstreamLibraryClips],
   );
-  const { audioPeaksByUrl } = useComposeAudioPeaksLoader(peaksSourceClips, true);
+  const { audioPeaksByUrl, audioDurationByUrl } = useComposeAudioPeaksLoader(
+    peaksSourceClips,
+    true,
+  );
+  const durationHints = useMemo(
+    (): ComposeDurationHints => ({
+      videoDurationByUrl: fullDurationByUrl,
+      audioDurationByUrl,
+    }),
+    [fullDurationByUrl, audioDurationByUrl],
+  );
+
   const importedClips = ordered.filter((c) => c.source === "import");
   const projectLibraryClips = ordered.filter(
     (c) => c.source === "external" || c.source === "look",
@@ -2167,19 +2837,29 @@ export function ComposeEditorFullscreen({
     if (dur) setDurationSec(dur);
   }, [selectedVideoUrl, fullDurationByUrl]);
 
-  const programSegments = useMemo(() => buildProgramSegments(ordered), [ordered]);
-  const totalProgramSec =
-    programSegments.reduce((s, x) => s + x.span, 0) || 1;
+  const totalProgramSec = useMemo(
+    () => composeDualTrackProgramDurationSec(workbench, durationHints),
+    [workbench, durationHints],
+  );
+
+  const programSegments = useMemo(
+    () => buildProgramSegmentsFromClips(ordered, durationHints),
+    [ordered, durationHints],
+  );
 
   const { playbackVideoUrl, onProgramVideoTimeUpdate, toggleProgramPlay } =
     useComposeProgramVideoPlayback({
       ordered,
+      audioOrdered: orderedAudio,
       videoRef,
       audioRef,
       playing,
       setPlaying,
       programPlayheadSec,
       setProgramPlayheadSec,
+      totalProgramSec,
+      durationHints,
+      workbench,
     });
 
   const fsPlayheadForReorderRef = useRef(programPlayheadSec);
@@ -2240,10 +2920,9 @@ export function ComposeEditorFullscreen({
 
   const seekProgramTimeline = useCallback(
     (programSec: number) => {
-      const total = programSegments.reduce((s, x) => s + x.span, 0) || 1;
-      setProgramPlayheadSec(Math.max(0, Math.min(programSec, total)));
+      setProgramPlayheadSec(Math.max(0, Math.min(programSec, totalProgramSec)));
     },
-    [programSegments],
+    [totalProgramSec],
   );
 
   useEffect(() => {
@@ -2256,15 +2935,26 @@ export function ComposeEditorFullscreen({
 
   useEffect(() => {
     if (playing) return;
-    const hit = resolveClipAtProgramSec(ordered, programPlayheadSec);
+    const hit =
+      orderedAudio.length > 0
+        ? resolveProgramAudioAtSec(workbench, programPlayheadSec, durationHints)
+        : resolveClipAtProgramSec(ordered, programPlayheadSec, durationHints);
     const a = audioRef.current;
     const audioUrl = hit?.clip.audioUrl?.trim();
-    if (!a || !audioUrl) return;
+    if (!a || !audioUrl) {
+      a?.pause();
+      return;
+    }
     if (!audioElementMatchesUrl(a, audioUrl)) {
       a.src = audioUrl;
       a.load();
     }
-    const target = hit ? Math.max(0, hit.localInClip) : 0;
+    const fileDur = audioDurationByUrl[audioUrl];
+    let target = hit ? Math.max(0, hit.sourceSec) : 0;
+    if (fileDur != null && fileDur > 0) {
+      target = Math.min(target, Math.max(0, fileDur - 0.02));
+    }
+    applyAudioClipPlayback(a, hit.clip);
     if (Math.abs(a.currentTime - target) > 0.12) {
       try {
         a.currentTime = target;
@@ -2272,7 +2962,15 @@ export function ComposeEditorFullscreen({
         /* ignore */
       }
     }
-  }, [ordered, programPlayheadSec, playing]);
+  }, [
+    ordered,
+    orderedAudio,
+    programPlayheadSec,
+    playing,
+    durationHints,
+    audioDurationByUrl,
+    workbench,
+  ]);
 
   const focusTimelineClip = useCallback(
     (clipId: string) => {
@@ -2285,6 +2983,20 @@ export function ComposeEditorFullscreen({
       }
     },
     [ordered, programSegments],
+  );
+
+  const focusTimelineAudioClip = useCallback(
+    (audioClipId: string) => {
+      if (!orderedAudio.some((c) => c.id === audioClipId)) return;
+      setSelectedAudioId(audioClipId);
+      const placements = buildAudioTimelinePlacements(workbench, durationHints);
+      const placement = placements.find((p) => p.clip.id === audioClipId);
+      if (placement) {
+        setProgramPlayheadSec(placement.programStart + 0.001);
+        setPlaying(false);
+      }
+    },
+    [orderedAudio, workbench, durationHints],
   );
 
   const pickUpstreamLibraryClip = useCallback(
@@ -2301,21 +3013,36 @@ export function ComposeEditorFullscreen({
         return;
       }
       if (isAudioOnlyLibraryClip(lib)) {
+        const audioNodeMatch = lib.id.match(/^upstream-audio-(.+)$/);
+        const audioNodeId = audioNodeMatch?.[1];
+        if (audioNodeId) {
+          const onAudioTrack = orderedAudio.find((c) => c.id === audioNodeId);
+          if (onAudioTrack) {
+            focusTimelineAudioClip(onAudioTrack.id);
+            return;
+          }
+        }
+        if (orderedAudio.some((c) => c.id === libraryClipId)) {
+          focusTimelineAudioClip(libraryClipId);
+          return;
+        }
+        const audioUrl = lib.audioUrl?.trim();
+        if (audioUrl) {
+          const byAudio = orderedAudio.find(
+            (c) => c.audioUrl?.trim() === audioUrl,
+          );
+          if (byAudio) {
+            focusTimelineAudioClip(byAudio.id);
+            return;
+          }
+        }
         const pairedId = lib.pairedTimelineClipId?.trim();
         if (pairedId && ordered.some((c) => c.id === pairedId)) {
           focusTimelineClip(pairedId);
           return;
         }
-        const audioUrl = lib.audioUrl?.trim();
-        if (audioUrl) {
-          const byAudio = ordered.find((c) => c.audioUrl?.trim() === audioUrl);
-          if (byAudio) {
-            focusTimelineClip(byAudio.id);
-            return;
-          }
-        }
         toast?.({
-          title: "未找到对应时间线片段",
+          title: "未找到对应配音轨片段",
           variant: "info",
         });
         return;
@@ -2332,9 +3059,11 @@ export function ComposeEditorFullscreen({
       setSelectedId(libraryClipId);
     },
     [
+      focusTimelineAudioClip,
       focusTimelineClip,
       isCanvasModule,
       ordered,
+      orderedAudio,
       toast,
       upstreamLibraryClips,
       visibleImportedTabClips,
@@ -2468,11 +3197,23 @@ export function ComposeEditorFullscreen({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button"
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-[13px] font-medium text-white/90 hover:bg-white/15 disabled:opacity-40"
             disabled={exportBusy || ordered.length < 1}
-            onClick={onExport}
+            onClick={onCompose}
           >
-            {exportBusy ? "合成中…" : "导出"}
+            <Clapperboard className="size-4 shrink-0" />
+            {exportBusy ? "合成中…" : "合成"}
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#2A2A2A] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[#333] disabled:opacity-40"
+            disabled={!canDownload || exportBusy}
+            onClick={() => onDownload?.()}
+          >
+            <Download className="size-4 shrink-0" />
+            下载
           </button>
           <button
             type="button"
@@ -2744,13 +3485,24 @@ export function ComposeEditorFullscreen({
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pb-2 pt-2">
             <ComposeSequenceTrack
               clips={ordered}
+              audioClips={orderedAudio}
+              workbench={workbench}
               selectedId={selectedId}
+              selectedAudioId={selectedAudioId}
+              onSelectAudio={setSelectedAudioId}
+              onAudioProgramStartChange={(clipId, start) =>
+                applyWithUndo(
+                  (prev) => setComposeAudioProgramStart(prev, clipId, start),
+                  { persist: true },
+                )
+              }
               disabled={!timelineReady}
               trimStart={trimStart}
               trimEnd={trimEnd}
               filmstripByUrl={filmstripByUrl}
               fullDurationByUrl={fullDurationByUrl}
               audioPeaksByUrl={audioPeaksByUrl}
+              audioDurationByUrl={audioDurationByUrl}
               programPlayheadSec={programPlayheadSec}
               totalProgramSec={totalProgramSec}
               onSelect={setSelectedId}
@@ -2770,9 +3522,24 @@ export function ComposeEditorFullscreen({
               zoomable={trackChrome?.zoomable ?? true}
               clipLaneClassName="h-[4.5rem]"
               portraitFilmstrip
-              trackChrome={trackChrome ?? { variant: "fullscreen", zoomable: true }}
+              trackChrome={{
+                ...(trackChrome ?? { variant: "fullscreen", zoomable: true }),
+                showAudioAttach: orderedAudio.length === 0,
+              }}
               onClipAudioAttach={onClipAudioAttach}
               onClipAudioClear={onClipAudioClear}
+              onVideoSourceAudioToggle={(clipId) =>
+                applyWithUndo(
+                  (prev) => toggleComposeClipSourceAudioMuted(prev, clipId),
+                  { persist: true },
+                )
+              }
+              onAudioClipPlaybackToggle={(clipId) =>
+                applyWithUndo(
+                  (prev) => toggleComposeAudioClipPlaybackMuted(prev, clipId),
+                  { persist: true },
+                )
+              }
               rootClassName="mb-0 flex h-full min-h-0 flex-col"
               scrollContainerClassName={cn(
                 COMPOSE_FS_SCROLL_HIDE,
@@ -2852,7 +3619,7 @@ function AssetGrid({
             ) : null}
             {showDuration && !audioOnly ? (
               <span className="absolute bottom-1 left-1 rounded bg-black/75 px-1 text-[9px] tabular-nums text-white/90">
-                {formatTimeSec(displayClipSpanSec(c))}
+                {formatTimeSec(composeClipDisplaySpanSec(c))}
               </span>
             ) : audioOnly ? (
               <span className="absolute bottom-1 left-1 rounded bg-black/75 px-1 text-[9px] text-sky-200/90">

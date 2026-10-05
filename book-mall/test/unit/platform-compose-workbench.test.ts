@@ -61,6 +61,23 @@ describe("platform-compose-workbench", () => {
     expect(parsed?.profile?.subtitle.mode).toBe("asr");
   });
 
+  it("pairs dual-track audio by user order index", () => {
+    const tl = platformWorkbenchToMediaTimeline({
+      orderedClipIds: ["v1", "v2"],
+      clips: [
+        { id: "v1", videoUrl: "https://cdn.example/v1.mp4", source: "look" },
+        { id: "v2", videoUrl: "https://cdn.example/v2.mp4", source: "look" },
+      ],
+      orderedAudioClipIds: ["a2", "a1"],
+      audioClips: [
+        { id: "a1", audioUrl: "https://cdn.example/a1.mp3", source: "external" },
+        { id: "a2", audioUrl: "https://cdn.example/a2.mp3", source: "external" },
+      ],
+    });
+    expect(tl.clips[0]?.audioUrl).toBe("https://cdn.example/a2.mp3");
+    expect(tl.clips[1]?.audioUrl).toBe("https://cdn.example/a1.mp3");
+  });
+
   it("composeWorkbenchToRenderPayload uses fallback preset", () => {
     const { profile } = composeWorkbenchToRenderPayload(
       { orderedClipIds: ["x"], clips: [{ id: "x", videoUrl: "https://a/b.mp4", source: "look" }] },

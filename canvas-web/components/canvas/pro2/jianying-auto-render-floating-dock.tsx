@@ -77,13 +77,18 @@ const JianyingAutoRenderComposeOverlay = memo(function JianyingAutoRenderCompose
     [nodeId, nodes, edges, data?.clipOrderNodeIds, data?.audioOrderNodeIds],
   );
 
+  const composeSnapshotClips = useMemo(
+    () => jianyingSnapshotClipsForComposeWorkbench(snapshot),
+    [snapshot],
+  );
+
   const composeWorkbench = useMemo(
     () =>
       jianyingSnapshotToWorkbench(
-        jianyingSnapshotClipsForComposeWorkbench(snapshot),
+        composeSnapshotClips,
         data?.composeWorkbench ?? null,
       ),
-    [snapshot, data?.composeWorkbench],
+    [composeSnapshotClips, data?.composeWorkbench],
   );
 
   const composeMiniOpenSeq = useCanvasStore((s) => s.jianyingComposeMiniOpenSeq);
@@ -102,15 +107,8 @@ const JianyingAutoRenderComposeOverlay = memo(function JianyingAutoRenderCompose
       buildJianyingUpstreamComposeLibraryClips(
         snapshot.clipSlots,
         snapshot.audioClipSlots,
-        snapshot.orderNodeIds,
-        snapshot.audioOrderNodeIds,
       ),
-    [
-      snapshot.clipSlots,
-      snapshot.audioClipSlots,
-      snapshot.orderNodeIds,
-      snapshot.audioOrderNodeIds,
-    ],
+    [snapshot.clipSlots, snapshot.audioClipSlots],
   );
 
   const onComposeWorkbenchChange = useCallback(
@@ -129,10 +127,23 @@ const JianyingAutoRenderComposeOverlay = memo(function JianyingAutoRenderCompose
       data?.composeWorkbench,
     );
     if (!orderStale && !workbenchStale) return;
+    const snapVideoSet = new Set(snapshot.orderNodeIds);
+    const snapAudioSet = new Set(snapshot.audioOrderNodeIds);
+    const clipOrderNodeIds = [
+      ...composeWorkbench.orderedClipIds.filter((id) => snapVideoSet.has(id)),
+      ...snapshot.orderNodeIds.filter(
+        (id) => !composeWorkbench.orderedClipIds.includes(id),
+      ),
+    ];
+    const wbAudio = composeWorkbench.orderedAudioClipIds ?? [];
+    const audioOrderNodeIds = [
+      ...wbAudio.filter((id) => snapAudioSet.has(id)),
+      ...snapshot.audioOrderNodeIds.filter((id) => !wbAudio.includes(id)),
+    ];
     updateNodeData(nodeId, {
       composeWorkbench,
-      clipOrderNodeIds: [...snapshot.orderNodeIds],
-      audioOrderNodeIds: [...snapshot.audioOrderNodeIds],
+      clipOrderNodeIds,
+      audioOrderNodeIds,
     });
   }, [
     composeWorkbench,

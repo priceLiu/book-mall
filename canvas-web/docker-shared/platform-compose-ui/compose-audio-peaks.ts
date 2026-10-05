@@ -1,43 +1,34 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  audioAnalysisCacheKey,
+  getCachedAudioAnalysis,
+  setCachedAudioAnalysis,
+  type AudioAnalysisResult,
+} from "./compose-audio-analysis-cache";
 import type { ComposeWorkbenchClip } from "./types";
 
-const peaksCache = new Map<string, number[]>();
+export type { AudioAnalysisResult };
 
-function peaksCacheKey(url: string): string {
-  return url.trim();
+function barCountForDuration(durationSec: number): number {
+  return Math.max(16, Math.min(240, Math.round(durationSec * 24)));
 }
 
-/** 解码失败时的占位波形（稳定伪随机，便于识别「已连接」） */
-export function syntheticAudioPeaks(barCount: number, seed = 0): number[] {
-  const out: number[] = [];
-  let s = seed || 1;
-  for (let i = 0; i < barCount; i++) {
-    s = (s * 16807 + 0) % 2147483647;
-    const r = (s % 1000) / 1000;
-    const env = 0.35 + 0.65 * Math.sin((i / barCount) * Math.PI);
-    out.push(Math.min(1, 0.15 + r * 0.85 * env));
-  }
-  return out;
-}
+/** 解码失败：无假波形，仅静音占位 */
+export const SILENT_AUDIO_PEAKS: number[] = [];
 
-function seedFromUrl(url: string): number {
-  let h = 0;
-  for (let i = 0; i < url.length; i++) {
-    h = (h * 31 + url.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h) || 1;
-}
-
-export async function loadAudioPeaksForUrl(
+export async function loadAudioAnalysisForUrl(
   url: string,
-  barCount = 72,
-): Promise<number[]> {
-  const key = peaksCacheKey(url);
-  const cached = peaksCache.get(key);
-  if (cached) return cached;
+  opts?: { force?: boolean },
+): Promise<AudioAnalysisResult | null> {
+  const key = audioAnalysisCacheKey(url);
+  if (!key) return null;
+  if (!opts?.force) {
+    const cached = getCachedAudioAnalysis(url);
+    if (cached) return cached;
+  }
 
   try {
     const res = await fetch(url);
@@ -46,30 +37,60 @@ export async function loadAudioPeaksForUrl(
     const ctx = new AudioContext();
     try {
       const decoded = await ctx.decodeAudioData(buf.slice(0));
+      const durationSec = Math.max(0.05, decoded.duration);
+      const barCount = barCountForDuration(durationSec);
       const channel = decoded.getChannelData(0);
       const blockSize = Math.max(1, Math.floor(channel.length / barCount));
       const peaks: number[] = [];
       for (let i = 0; i < barCount; i++) {
-        let max = 0;
+        let sumSq = 0;
+        let count = 0;
         const start = i * blockSize;
         for (let j = 0; j < blockSize; j++) {
-          const v = Math.abs(channel[start + j] ?? 0);
-          if (v > max) max = v;
+          const v = channel[start + j] ?? 0;
+          sumSq += v * v;
+          count++;
         }
-        peaks.push(max);
+        const rms = count > 0 ? Math.sqrt(sumSq / count) : 0;
+        peaks.push(rms);
       }
-      const peakMax = Math.max(...peaks, 0.001);
-      const normalized = peaks.map((p) => p / peakMax);
-      peaksCache.set(key, normalized);
-      return normalized;
+      const peakMax = Math.max(...peaks, 0);
+      if (peakMax <= 0.00001) {
+        return null;
+      }
+      const normalized = peaks.map((p) => (p <= 0.00001 ? 0 : p / peakMax));
+      const result: AudioAnalysisResult = { peaks: normalized, durationSec };
+      setCachedAudioAnalysis(url, result);
+      return result;
     } finally {
       await ctx.close().catch(() => undefined);
     }
   } catch {
-    const fallback = syntheticAudioPeaks(barCount, seedFromUrl(url));
-    peaksCache.set(key, fallback);
-    return fallback;
+    return null;
   }
+}
+
+/** @deprecated 使用 loadAudioAnalysisForUrl */
+export async function loadAudioPeaksForUrl(
+  url: string,
+  barCount = 72,
+): Promise<number[]> {
+  void barCount;
+  const a = await loadAudioAnalysisForUrl(url);
+  return a?.peaks ?? SILENT_AUDIO_PEAKS;
+}
+
+function audioUrlsKey(clips: ComposeWorkbenchClip[]): string {
+  const parts = clips
+    .map((c) => {
+      const u = c.audioUrl?.trim();
+      if (!u) return "";
+      const mk = c.audioMediaKey?.trim() ?? u;
+      return `${c.id}\0${u}\0${mk}`;
+    })
+    .filter(Boolean)
+    .sort();
+  return parts.join("\n");
 }
 
 export function useComposeAudioPeaksLoader(
@@ -77,36 +98,51 @@ export function useComposeAudioPeaksLoader(
   active: boolean,
 ) {
   const [tick, setTick] = useState(0);
+  const urlsKey = useMemo(() => audioUrlsKey(clips), [clips]);
+  const lastUrlsKeyRef = useRef("");
 
   useEffect(() => {
-    if (!active) return;
+    if (!active || !urlsKey) return;
     const urls = [
       ...new Set(
-        clips.map((c) => c.audioUrl?.trim()).filter((u): u is string => Boolean(u)),
+        urlsKey
+          .split("\n")
+          .map((line) => line.split("\0")[1]?.trim())
+          .filter((u): u is string => Boolean(u)),
       ),
     ];
     if (urls.length === 0) return;
+    const mediaKeyChanged = lastUrlsKeyRef.current !== urlsKey;
+    lastUrlsKeyRef.current = urlsKey;
     let cancelled = false;
-    void Promise.all(urls.map((u) => loadAudioPeaksForUrl(u).catch(() => undefined))).finally(
-      () => {
-        if (!cancelled) setTick((n) => n + 1);
-      },
-    );
+    void Promise.all(
+      urls.map((u) =>
+        loadAudioAnalysisForUrl(u, {
+          force: mediaKeyChanged || !getCachedAudioAnalysis(u),
+        }).catch(() => null),
+      ),
+    ).finally(() => {
+      if (!cancelled) setTick((n) => n + 1);
+    });
     return () => {
       cancelled = true;
     };
-  }, [active, clips]);
+  }, [active, urlsKey]);
 
-  const audioPeaksByUrl = useMemo(() => {
-    const out: Record<string, number[]> = {};
+  const { audioPeaksByUrl, audioDurationByUrl } = useMemo(() => {
+    const peaksOut: Record<string, number[]> = {};
+    const durOut: Record<string, number> = {};
     for (const c of clips) {
       const u = c.audioUrl?.trim();
-      if (!u || out[u]) continue;
-      const hit = peaksCache.get(peaksCacheKey(u));
-      if (hit) out[u] = hit;
+      if (!u || peaksOut[u]) continue;
+      const hit = getCachedAudioAnalysis(u);
+      if (hit) {
+        peaksOut[u] = hit.peaks;
+        durOut[u] = hit.durationSec;
+      }
     }
-    return out;
+    return { audioPeaksByUrl: peaksOut, audioDurationByUrl: durOut };
   }, [clips, tick]);
 
-  return { audioPeaksByUrl };
+  return { audioPeaksByUrl, audioDurationByUrl };
 }
