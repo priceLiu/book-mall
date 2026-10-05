@@ -19,14 +19,20 @@ import type { ComposeWorkbenchClip } from "@private/platform-compose-ui/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { useCanvasStore } from "@/lib/canvas/store";
 import { uploadCanvasVideo } from "@/lib/canvas-api";
+import type { JianyingLibtvConnectionSnapshot } from "@/lib/canvas/jianying-from-workspace";
+import { jianyingPairedUpstreamAudioUrlForVideoNode } from "@/lib/canvas/jianying-compose-workbench";
 import { fetchVideoFilmstrip } from "@/lib/canvas/libtv-video-edit-client";
 
 type Props = {
   base: string;
   projectId: string | null;
+  nodeId: string;
   workbench: ComposeWorkbenchState;
+  snapshot: JianyingLibtvConnectionSnapshot;
   upstreamLibraryClips?: ComposeWorkbenchClip[];
+  composeMiniOpenSeq?: number;
   onWorkbenchChange: (next: ComposeWorkbenchState) => void;
   disabled?: boolean;
 };
@@ -34,8 +40,11 @@ type Props = {
 function JianyingComposeDockPanelInner({
   base,
   projectId,
+  nodeId,
   workbench,
+  snapshot,
   upstreamLibraryClips = [],
+  composeMiniOpenSeq = 0,
   onWorkbenchChange,
   disabled,
 }: Props) {
@@ -44,9 +53,11 @@ function JianyingComposeDockPanelInner({
   const [miniPanelSession, setMiniPanelSession] = useState(0);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
-  const openedOnceRef = useRef(false);
+  const lastOpenSeqRef = useRef(0);
   const workbenchRef = useRef(workbench);
   workbenchRef.current = workbench;
+  const snapshotRef = useRef(snapshot);
+  snapshotRef.current = snapshot;
 
   const ordered = useMemo(() => orderedComposeClips(workbench), [workbench]);
   const profile = workbench.profile ?? DEFAULT_COMPOSE_PROFILE;
@@ -68,12 +79,59 @@ function JianyingComposeDockPanelInner({
     [onWorkbenchChange],
   );
 
-  useEffect(() => {
-    if (disabled || ordered.length < 1 || openedOnceRef.current) return;
-    openedOnceRef.current = true;
+  const tryOpenMini = useCallback(() => {
+    if (disabled || ordered.length < 1) return;
     setMiniOpen(true);
-    setMiniPanelSession(1);
+    setMiniPanelSession((s) => s + 1);
   }, [disabled, ordered.length]);
+
+  const composeMiniOpenNodeId = useCanvasStore(
+    (s) => s.jianyingComposeMiniOpenNodeId,
+  );
+
+  useEffect(() => {
+    if (composeMiniOpenNodeId !== nodeId) return;
+    if (composeMiniOpenSeq < 1 || composeMiniOpenSeq === lastOpenSeqRef.current) {
+      return;
+    }
+    lastOpenSeqRef.current = composeMiniOpenSeq;
+    tryOpenMini();
+  }, [composeMiniOpenNodeId, composeMiniOpenSeq, nodeId, tryOpenMini]);
+
+  const attachUpstreamAudio = useCallback(
+    (clipId: string) => {
+      const snap = snapshotRef.current;
+      const url = jianyingPairedUpstreamAudioUrlForVideoNode(snap, clipId);
+      if (url) {
+        applyWorkbench((prev) => updateComposeClip(prev, clipId, { audioUrl: url }));
+        return;
+      }
+      const videoIndex = snap.orderNodeIds.indexOf(clipId);
+      const audioNodeId =
+        videoIndex >= 0 ? snap.audioOrderNodeIds[videoIndex] : undefined;
+      const audioOnly = audioNodeId
+        ? upstreamLibraryClips.find((c) => c.id === `upstream-audio-${audioNodeId}`)
+        : undefined;
+      const fallback = upstreamLibraryClips.find((c) => c.audioUrl?.trim());
+      const pick = audioOnly?.audioUrl?.trim()
+        ? audioOnly
+        : fallback?.audioUrl?.trim()
+          ? fallback
+          : undefined;
+      if (pick?.audioUrl?.trim()) {
+        applyWorkbench((prev) =>
+          updateComposeClip(prev, clipId, { audioUrl: pick.audioUrl!.trim() }),
+        );
+        return;
+      }
+      void alert({
+        title: "暂无连线配音",
+        message: "请确认 TTS 节点已生成音频并连到自动成片的 in_audio，或于全屏「连线资产」中选择音频。",
+        variant: "info",
+      });
+    },
+    [alert, applyWorkbench, upstreamLibraryClips],
+  );
 
   const importVideo = async (file: File) => {
     if (!projectId) {
@@ -142,6 +200,7 @@ function JianyingComposeDockPanelInner({
             }}
             onImportClick={() => importRef.current?.click()}
             trackChrome={{ variant: "ecom-mini", showAudioAttach: true }}
+            onClipAudioAttach={(clipId) => attachUpstreamAudio(clipId)}
             onClipAudioClear={(clipId) =>
               applyWorkbench((prev) =>
                 updateComposeClip(prev, clipId, { audioUrl: undefined }),
@@ -180,6 +239,7 @@ function JianyingComposeDockPanelInner({
             setProfile={(p) => applyWorkbench((prev) => ({ ...prev, profile: p }))}
             trackChrome={{ variant: "fullscreen", zoomable: true, showAudioAttach: true }}
             upstreamLibraryClips={upstreamLibraryClips}
+            onClipAudioAttach={(clipId) => attachUpstreamAudio(clipId)}
             onClipAudioClear={(clipId) =>
               applyWorkbench((prev) =>
                 updateComposeClip(prev, clipId, { audioUrl: undefined }),

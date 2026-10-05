@@ -2708,6 +2708,10 @@ function FlowCanvasInner({
                     node.id,
                     node.type ?? null,
                   );
+                } else if (node.type === "jianying-auto-render-pro2") {
+                  useCanvasStore
+                    .getState()
+                    .requestJianyingComposeMiniOpen(node.id);
                 }
                 // 单选由 RF onNodesChange 处理 · 勿二次 setRfNodes
               }

@@ -1,11 +1,16 @@
 "use client";
 
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useEffect, useMemo } from "react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { JianyingComposeDockPanel } from "@/components/canvas/jianying-compose-dock-panel";
-import { collectJianyingLibtvConnectionSnapshot } from "@/lib/canvas/jianying-from-workspace";
+import {
+  composeWorkbenchStructuralEquals,
+  libtvOrderNodeIdsEqual,
+} from "@/lib/canvas/jianying-compose-workbench-sync";
+import { jianyingSnapshotClipsForComposeWorkbench } from "@/lib/canvas/jianying-compose-workbench";
 import { buildJianyingUpstreamComposeLibraryClips } from "@/lib/canvas/jianying-compose-upstream-assets";
+import { collectJianyingLibtvConnectionSnapshot } from "@/lib/canvas/jianying-from-workspace";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { JianyingAutoRenderNodeData } from "@/lib/canvas/types";
 import {
@@ -27,13 +32,13 @@ export function JianyingAutoRenderFloatingDock() {
     ),
   );
 
-  const { hidden } = useLibtvFloatingDock(nodeExists ? dockNodeId : null, {
+  useLibtvFloatingDock(nodeExists ? dockNodeId : null, {
     minFlowWidth: 0,
     defaultNodeWidth: 720,
     defaultNodeHeight: 840,
   });
 
-  if (suppressDock || !dockNodeId || !nodeExists || hidden) return null;
+  if (suppressDock || !dockNodeId || !nodeExists) return null;
 
   return <JianyingAutoRenderComposeOverlay key={dockNodeId} nodeId={dockNodeId} />;
 }
@@ -75,28 +80,37 @@ const JianyingAutoRenderComposeOverlay = memo(function JianyingAutoRenderCompose
   const composeWorkbench = useMemo(
     () =>
       jianyingSnapshotToWorkbench(
-        snapshot.clipSlots
-          .filter((s) => s.hasVideo && s.videoUrl)
-          .map((s, i) => ({
-            sourceNodeId: s.sourceNodeId,
-            videoUrl: s.videoUrl!,
-            posterUrl: s.posterUrl,
-            label: s.label,
-            dialogue: s.dialogue,
-            audioUrl: snapshot.audioClipSlots[i]?.audioUrl,
-          })),
+        jianyingSnapshotClipsForComposeWorkbench(snapshot),
         data?.composeWorkbench ?? null,
       ),
     [snapshot, data?.composeWorkbench],
   );
+
+  const composeMiniOpenSeq = useCanvasStore((s) => s.jianyingComposeMiniOpenSeq);
+  const requestJianyingComposeMiniOpen = useCanvasStore(
+    (s) => s.requestJianyingComposeMiniOpen,
+  );
+
+  useEffect(() => {
+    if (snapshot.renderedCount >= 1) {
+      requestJianyingComposeMiniOpen(nodeId);
+    }
+  }, [nodeId, snapshot.renderedCount, requestJianyingComposeMiniOpen]);
 
   const upstreamLibraryClips = useMemo(
     () =>
       buildJianyingUpstreamComposeLibraryClips(
         snapshot.clipSlots,
         snapshot.audioClipSlots,
+        snapshot.orderNodeIds,
+        snapshot.audioOrderNodeIds,
       ),
-    [snapshot.clipSlots, snapshot.audioClipSlots],
+    [
+      snapshot.clipSlots,
+      snapshot.audioClipSlots,
+      snapshot.orderNodeIds,
+      snapshot.audioOrderNodeIds,
+    ],
   );
 
   const onComposeWorkbenchChange = useCallback(
@@ -106,14 +120,42 @@ const JianyingAutoRenderComposeOverlay = memo(function JianyingAutoRenderCompose
     [nodeId, updateNodeData],
   );
 
+  useEffect(() => {
+    const orderStale =
+      !libtvOrderNodeIdsEqual(data?.clipOrderNodeIds, snapshot.orderNodeIds) ||
+      !libtvOrderNodeIdsEqual(data?.audioOrderNodeIds, snapshot.audioOrderNodeIds);
+    const workbenchStale = !composeWorkbenchStructuralEquals(
+      composeWorkbench,
+      data?.composeWorkbench,
+    );
+    if (!orderStale && !workbenchStale) return;
+    updateNodeData(nodeId, {
+      composeWorkbench,
+      clipOrderNodeIds: [...snapshot.orderNodeIds],
+      audioOrderNodeIds: [...snapshot.audioOrderNodeIds],
+    });
+  }, [
+    composeWorkbench,
+    data?.audioOrderNodeIds,
+    data?.clipOrderNodeIds,
+    data?.composeWorkbench,
+    nodeId,
+    snapshot.audioOrderNodeIds,
+    snapshot.orderNodeIds,
+    updateNodeData,
+  ]);
+
   if (!base || snapshot.renderedCount < 1) return null;
 
   return (
     <JianyingComposeDockPanel
       base={base}
       projectId={projectId}
+      nodeId={nodeId}
       workbench={composeWorkbench}
+      snapshot={snapshot}
       upstreamLibraryClips={upstreamLibraryClips}
+      composeMiniOpenSeq={composeMiniOpenSeq}
       onWorkbenchChange={onComposeWorkbenchChange}
     />
   );

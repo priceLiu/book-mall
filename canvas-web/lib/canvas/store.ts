@@ -312,6 +312,9 @@ type CanvasState = {
   /** LibTV 浮动 Dock · 最近一次唯一选中节点（zoom 时 RF 选中态可能闪断，Dock 读此字段） */
   libtvFloatingDockNodeId: string | null;
   libtvFloatingDockNodeType: string | null;
+  /** 自动成片 · 请求打开迷你剪辑台（同节点再次点击也会递增） */
+  jianyingComposeMiniOpenSeq: number;
+  jianyingComposeMiniOpenNodeId: string | null;
   /** 用户正在操作输入坞：隐藏节点顶栏，避免遮挡 Dock */
   libtvInputDockFocused: boolean;
   /** 全局资产库弹层打开时隐藏 LibTV 节点顶栏 */
@@ -335,6 +338,7 @@ type CanvasState = {
     nodeId: string | null,
     nodeType: string | null,
   ) => void;
+  requestJianyingComposeMiniOpen: (nodeId: string) => void;
   setLibtvInputDockFocused: (focused: boolean) => void;
   setGlobalAssetLibraryOpen: (open: boolean) => void;
 
@@ -568,6 +572,8 @@ export const useCanvasStore = create<CanvasState>()(
       canvasMultiSelectActive: false,
       libtvFloatingDockNodeId: null,
       libtvFloatingDockNodeType: null,
+      jianyingComposeMiniOpenSeq: 0,
+      jianyingComposeMiniOpenNodeId: null,
       libtvInputDockFocused: false,
       globalAssetLibraryOpen: false,
       setConnectingFrom: (id, handleId = null) =>
@@ -627,6 +633,11 @@ export const useCanvasStore = create<CanvasState>()(
           libtvFloatingDockNodeType: nodeType,
         });
       },
+      requestJianyingComposeMiniOpen: (nodeId) =>
+        set((s) => ({
+          jianyingComposeMiniOpenNodeId: nodeId,
+          jianyingComposeMiniOpenSeq: s.jianyingComposeMiniOpenSeq + 1,
+        })),
       setLibtvInputDockFocused: (focused) =>
         set({ libtvInputDockFocused: focused }),
       setGlobalAssetLibraryOpen: (open) =>

@@ -14,6 +14,18 @@ export type JianyingSnapshotClip = {
   audioUrl?: string;
 };
 
+function mergeClipAudioFromSnapshot(
+  existing: ComposeWorkbenchClip,
+  fresh: ComposeWorkbenchClip,
+): string | undefined {
+  const fromSnapshot = fresh.audioUrl?.trim();
+  if (fromSnapshot) return fromSnapshot;
+  if (existing.source === "import") {
+    return existing.audioUrl?.trim() || undefined;
+  }
+  return undefined;
+}
+
 export function jianyingSnapshotToWorkbench(
   snapshotClips: JianyingSnapshotClip[],
   persisted?: ComposeWorkbenchState | null,
@@ -56,14 +68,12 @@ export function jianyingSnapshotToWorkbench(
         subtitle: existing.subtitle?.trim()
           ? existing.subtitle
           : fresh.subtitle ?? existing.subtitle,
-        audioUrl: existing.audioUrl?.trim()
-          ? existing.audioUrl
-          : fresh.audioUrl ?? existing.audioUrl,
+        audioUrl: mergeClipAudioFromSnapshot(existing, fresh),
       });
       orderedClipIds.push(id);
       continue;
     }
-    if (existing.videoUrl?.trim()) {
+    if (existing.source === "import" && existing.videoUrl?.trim()) {
       clips.push(existing);
       orderedClipIds.push(id);
     }

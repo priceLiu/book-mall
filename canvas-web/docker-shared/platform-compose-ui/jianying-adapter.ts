@@ -56,9 +56,10 @@ export function jianyingSnapshotToWorkbench(
         subtitle: existing.subtitle?.trim()
           ? existing.subtitle
           : fresh.subtitle ?? existing.subtitle,
-        audioUrl: existing.audioUrl?.trim()
-          ? existing.audioUrl
-          : fresh.audioUrl ?? existing.audioUrl,
+        audioUrl:
+          fresh.audioUrl?.trim() ||
+          existing.audioUrl?.trim() ||
+          undefined,
       });
       orderedClipIds.push(id);
       continue;

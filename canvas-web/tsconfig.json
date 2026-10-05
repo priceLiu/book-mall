@@ -19,7 +19,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@private/platform-compose-ui": ["../book-mall/platform-compose-ui/index.ts"],
+      "@private/platform-compose-ui/*": ["../book-mall/platform-compose-ui/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

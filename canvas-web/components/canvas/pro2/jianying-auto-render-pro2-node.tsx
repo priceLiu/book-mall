@@ -3,7 +3,7 @@
 import { useCallback, useState, type MouseEvent } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
-import { Clapperboard, Maximize2, Play } from "lucide-react";
+import { Clapperboard, Film, Maximize2, Play } from "lucide-react";
 
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import {
@@ -103,10 +103,20 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
     [id],
   );
 
+  const requestComposeMini = useCanvasStore((s) => s.requestJianyingComposeMiniOpen);
+
   const openPreview = useCallback((e: MouseEvent) => {
     e.stopPropagation();
     setPreviewOpen(true);
   }, []);
+
+  const openComposeMini = useCallback(
+    (e: MouseEvent) => {
+      e.stopPropagation();
+      requestComposeMini(id);
+    },
+    [id, requestComposeMini],
+  );
 
   const borderStyle = libtvNodeBorderStyle({
     selected: !!selected,
@@ -176,17 +186,30 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
               {title}
             </p>
             {hasVideo ? (
-              <button
-                type="button"
-                className={cn(
-                  RF_NO_DRAG,
-                  "flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white/80",
-                )}
-                onClick={openPreview}
-                title="全屏预览"
-              >
-                <Maximize2 className="size-3.5" />
-              </button>
+              <>
+                <button
+                  type="button"
+                  className={cn(
+                    RF_NO_DRAG,
+                    "flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white/80",
+                  )}
+                  onClick={openComposeMini}
+                  title="打开迷你剪辑台"
+                >
+                  <Film className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    RF_NO_DRAG,
+                    "flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white/80",
+                  )}
+                  onClick={openPreview}
+                  title="全屏预览"
+                >
+                  <Maximize2 className="size-3.5" />
+                </button>
+              </>
             ) : null}
           </div>
 

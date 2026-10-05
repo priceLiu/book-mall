@@ -42,6 +42,12 @@ import {
   splitComposeClipAtSourceSec,
   updateComposeClip,
 } from "./editing";
+import { useComposeAudioPeaksLoader } from "./compose-audio-peaks";
+import { ComposeSegmentAudioWaveform } from "./compose-audio-waveform";
+import {
+  isAudioOnlyLibraryClip,
+  libraryClipVisualUrl,
+} from "./compose-library-asset";
 import { useFetchVideoFilmstrip } from "./filmstrip-context";
 import { cn } from "./cn";
 import { ComposeRenderProfilePanel } from "./compose-render-profile-panel";
@@ -649,10 +655,17 @@ function videoElementMatchesUrl(video: HTMLVideoElement, url: string): boolean {
   return video.currentSrc === u || video.src === u || video.src.includes(u);
 }
 
-/** 迷你窗 / 全屏 · 按 program 时间线跨段连续预览 */
+function audioElementMatchesUrl(audio: HTMLAudioElement, url: string): boolean {
+  const u = url.trim();
+  if (!u) return false;
+  return audio.currentSrc === u || audio.src === u || audio.src.includes(u);
+}
+
+/** 迷你窗 / 全屏 · 按 program 时间线跨段连续预览（视频 + 段配音） */
 function useComposeProgramVideoPlayback({
   ordered,
   videoRef,
+  audioRef,
   playing,
   setPlaying,
   programPlayheadSec,
@@ -660,6 +673,7 @@ function useComposeProgramVideoPlayback({
 }: {
   ordered: ComposeWorkbenchClip[];
   videoRef: RefObject<HTMLVideoElement | null>;
+  audioRef?: RefObject<HTMLAudioElement | null>;
   playing: boolean;
   setPlaying: (v: boolean) => void;
   programPlayheadSec: number;
@@ -674,7 +688,9 @@ function useComposeProgramVideoPlayback({
   );
 
   const playbackVideoUrl = playbackHit?.clip.videoUrl?.trim() ?? "";
+  const playbackAudioUrl = playbackHit?.clip.audioUrl?.trim() ?? "";
   const lastSyncedClipIdRef = useRef<string | null>(null);
+  const lastSyncedAudioClipIdRef = useRef<string | null>(null);
   const orderedKey = ordered.map((c) => c.id).join("|");
 
   useEffect(() => {
@@ -687,6 +703,8 @@ function useComposeProgramVideoPlayback({
   useEffect(() => {
     if (!playing) {
       lastSyncedClipIdRef.current = null;
+      lastSyncedAudioClipIdRef.current = null;
+      audioRef?.current?.pause();
       return;
     }
     const v = videoRef.current;
@@ -725,6 +743,49 @@ function useComposeProgramVideoPlayback({
     seekAndPlay();
   }, [playing, playbackHit?.clip.id, playbackVideoUrl, ordered, videoRef]);
 
+  useEffect(() => {
+    if (!playing || !audioRef) return;
+    const a = audioRef.current;
+    const hit = resolveClipAtProgramSec(ordered, programPlayheadSecRef.current);
+    const audioUrl = hit?.clip.audioUrl?.trim();
+    if (!a || !hit || !audioUrl) {
+      a?.pause();
+      return;
+    }
+
+    const clipId = hit.clip.id;
+    const needsSwitch =
+      lastSyncedAudioClipIdRef.current !== clipId ||
+      !audioElementMatchesUrl(a, audioUrl);
+
+    const seekAndPlayAudio = () => {
+      const fresh = resolveClipAtProgramSec(ordered, programPlayheadSecRef.current);
+      if (!fresh?.clip.audioUrl?.trim()) return;
+      const target = Math.max(0, fresh.localInClip);
+      if (Math.abs(a.currentTime - target) > 0.12) {
+        try {
+          a.currentTime = target;
+        } catch {
+          /* ignore */
+        }
+      }
+      void a.play().catch(() => undefined);
+    };
+
+    if (needsSwitch) {
+      lastSyncedAudioClipIdRef.current = clipId;
+      a.src = audioUrl;
+      const onReady = () => {
+        seekAndPlayAudio();
+        a.removeEventListener("canplay", onReady);
+      };
+      a.addEventListener("canplay", onReady);
+      a.load();
+      return () => a.removeEventListener("canplay", onReady);
+    }
+    seekAndPlayAudio();
+  }, [playing, playbackHit?.clip.id, playbackAudioUrl, ordered, audioRef]);
+
   const onProgramVideoTimeUpdate = useCallback(
     (e: SyntheticEvent<HTMLVideoElement>) => {
       if (!playing) return;
@@ -743,20 +804,34 @@ function useComposeProgramVideoPlayback({
           programPlayheadSecRef.current = nextProgram;
           setProgramPlayheadSec(nextProgram);
           lastSyncedClipIdRef.current = null;
+          lastSyncedAudioClipIdRef.current = null;
           return;
         }
         programPlayheadSecRef.current = endProgram;
         setProgramPlayheadSec(endProgram);
         setPlaying(false);
         v.pause();
+        audioRef?.current?.pause();
         return;
+      }
+
+      const a = audioRef?.current;
+      if (a && hit.clip.audioUrl?.trim() && !a.paused) {
+        const target = Math.max(0, local);
+        if (Math.abs(a.currentTime - target) > 0.25) {
+          try {
+            a.currentTime = target;
+          } catch {
+            /* ignore */
+          }
+        }
       }
 
       const nextProgram = Math.min(hit.programStart + Math.max(0, local), endProgram);
       programPlayheadSecRef.current = nextProgram;
       setProgramPlayheadSec(nextProgram);
     },
-    [ordered, playing, setPlaying, setProgramPlayheadSec],
+    [ordered, playing, setPlaying, setProgramPlayheadSec, audioRef],
   );
 
   const toggleProgramPlay = useCallback(() => {
@@ -764,11 +839,19 @@ function useComposeProgramVideoPlayback({
     if (!v) return;
     if (playing) {
       v.pause();
+      audioRef?.current?.pause();
       setPlaying(false);
       return;
     }
     setPlaying(true);
-  }, [playing, setPlaying, videoRef]);
+  }, [playing, setPlaying, videoRef, audioRef]);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const hit = resolveClipAtProgramSec(ordered, programPlayheadSecRef.current);
+    v.muted = Boolean(playing && hit?.clip.audioUrl?.trim());
+  }, [playing, playbackHit?.clip.id, playbackAudioUrl, ordered, videoRef]);
 
   return {
     playbackVideoUrl,
@@ -838,6 +921,7 @@ export function ComposeSequenceTrack({
   scrollContainerClassName,
   rootClassName,
   trackChrome,
+  audioPeaksByUrl,
   onClipAudioAttach,
   onClipAudioClear,
 }: {
@@ -882,6 +966,7 @@ export function ComposeSequenceTrack({
   scrollContainerClassName?: string;
   rootClassName?: string;
   trackChrome?: ComposeTrackChrome;
+  audioPeaksByUrl?: Record<string, number[]>;
   onClipAudioAttach?: (clipId: string) => void;
   onClipAudioClear?: (clipId: string) => void;
 }) {
@@ -922,6 +1007,25 @@ export function ComposeSequenceTrack({
   useEffect(() => {
     setPlayheadPx(playheadLeftPx);
   }, [playheadLeftPx, setPlayheadPx]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    const scrollEl = scrollRef.current;
+    if (!scrollEl) return;
+    const seg = trackLayout.segments.find((s) => s.clip.id === selectedId);
+    if (!seg) return;
+    const pad = 32;
+    const clipLeft = seg.leftPx;
+    const clipRight = seg.leftPx + seg.widthPx;
+    const viewLeft = scrollEl.scrollLeft;
+    const viewRight = viewLeft + scrollEl.clientWidth;
+    if (clipLeft >= viewLeft + pad && clipRight <= viewRight - pad) return;
+    const targetLeft = Math.max(
+      0,
+      clipLeft - Math.max(0, scrollEl.clientWidth * 0.15),
+    );
+    scrollEl.scrollTo({ left: targetLeft, behavior: "smooth" });
+  }, [selectedId, trackLayout.segments]);
 
   const startPlayheadScrub = (e: React.PointerEvent) => {
     if (disabled) return;
@@ -1351,7 +1455,7 @@ export function ComposeSequenceTrack({
 
           <div
             className={cn(
-              "relative h-10 shrink-0 bg-[#101010]",
+              "relative h-11 shrink-0 bg-[#0a0c10]",
               !isMiniTrackChrome && "border-t border-white/10",
             )}
           >
@@ -1360,31 +1464,36 @@ export function ComposeSequenceTrack({
                 const clip = seg.clip;
                 const isSel = clip.id === selectedId;
                 const audioUrl = clip.audioUrl?.trim();
+                const peaks = audioUrl ? audioPeaksByUrl?.[audioUrl] : undefined;
                 return (
                   <div
                     key={`audio-${clip.id}`}
                     style={{ width: seg.widthPx, flexShrink: 0 }}
                     className={cn(
-                      "relative flex h-full items-center justify-center gap-1 overflow-hidden rounded-sm px-1",
+                      "relative flex h-full overflow-hidden rounded-sm",
                       isMiniTrackChrome
                         ? isSel
-                          ? "bg-white/10"
-                          : "bg-[#161616]/90"
+                          ? "ring-1 ring-white/50"
+                          : ""
                         : isSel
-                          ? "border border-white/60 bg-white/10"
-                          : "border border-white/10 bg-[#161616]",
+                          ? "border border-sky-400/70"
+                          : "border border-white/10",
                       !disabled && "cursor-pointer",
                     )}
                     onClick={() => onSelect(clip.id)}
                   >
                     {audioUrl ? (
                       <>
-                        <span className="truncate text-[10px] text-emerald-300/90">配音</span>
+                        <ComposeSegmentAudioWaveform
+                          peaks={peaks}
+                          widthPx={seg.widthPx}
+                          label={clip.label?.trim() || undefined}
+                        />
                         {isSel && onClipAudioClear && !disabled ? (
                           <button
                             type="button"
                             title="清除段配音"
-                            className="rounded px-1 text-[9px] text-white/45 hover:bg-white/10 hover:text-white/80"
+                            className="absolute right-0.5 top-0.5 z-10 rounded bg-black/55 px-1 text-[9px] text-white/70 hover:bg-black/75 hover:text-white"
                             onClick={(e) => {
                               e.stopPropagation();
                               onClipAudioClear(clip.id);
@@ -1395,6 +1504,7 @@ export function ComposeSequenceTrack({
                         ) : null}
                       </>
                     ) : isSel && showAudioAttach && onClipAudioAttach && !disabled ? (
+                      <div className="flex h-full w-full items-center justify-center bg-[#161616]/90 px-1">
                       <button
                         type="button"
                         className="text-[10px] text-white/85 hover:text-white hover:underline"
@@ -1405,8 +1515,11 @@ export function ComposeSequenceTrack({
                       >
                         + 配音
                       </button>
+                      </div>
                     ) : (
-                      <span className="text-[10px] text-white/20">—</span>
+                      <div className="flex h-full w-full items-center justify-center bg-[#161616]/60">
+                        <span className="text-[10px] text-white/20">—</span>
+                      </div>
                     )}
                   </div>
                 );
@@ -1563,9 +1676,11 @@ export function ComposeMiniTimelinePanel({
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(6);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   const selected = ordered.find((c) => c.id === selectedId) ?? ordered[0];
   const selectedVideoUrl = selected?.videoUrl?.trim() ?? "";
+  const { audioPeaksByUrl } = useComposeAudioPeaksLoader(ordered, true);
 
   useEffect(() => {
     if (!selectedVideoUrl) return;
@@ -1580,6 +1695,7 @@ export function ComposeMiniTimelinePanel({
     useComposeProgramVideoPlayback({
       ordered,
       videoRef,
+      audioRef,
       playing,
       setPlaying,
       programPlayheadSec,
@@ -1626,6 +1742,26 @@ export function ComposeMiniTimelinePanel({
       v.currentTime = previewSourceSec;
     }
   }, [previewSourceSec, playing, selected?.videoUrl]);
+
+  useEffect(() => {
+    if (playing) return;
+    const hit = resolveClipAtProgramSec(ordered, programPlayheadSec);
+    const a = audioRef.current;
+    const audioUrl = hit?.clip.audioUrl?.trim();
+    if (!a || !audioUrl) return;
+    if (!audioElementMatchesUrl(a, audioUrl)) {
+      a.src = audioUrl;
+      a.load();
+    }
+    const target = hit ? Math.max(0, hit.localInClip) : 0;
+    if (Math.abs(a.currentTime - target) > 0.12) {
+      try {
+        a.currentTime = target;
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [ordered, programPlayheadSec, playing]);
 
   const seekProgramTimeline = useCallback(
     (programSec: number) => {
@@ -1857,6 +1993,7 @@ export function ComposeMiniTimelinePanel({
         playsInline
         onTimeUpdate={onProgramVideoTimeUpdate}
       />
+      <audio ref={audioRef} className="sr-only" preload="auto" playsInline />
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-0">
         <ComposeSequenceTrack
           clips={ordered}
@@ -1866,6 +2003,7 @@ export function ComposeMiniTimelinePanel({
           trimEnd={trimEnd}
           filmstripByUrl={filmstripByUrl}
           fullDurationByUrl={fullDurationByUrl}
+          audioPeaksByUrl={audioPeaksByUrl}
           programPlayheadSec={programPlayheadSec}
           totalProgramSec={totalProgramSec}
           onSelect={setSelectedId}
@@ -1953,9 +2091,15 @@ export function ComposeEditorFullscreen({
   const [programPlayheadSec, setProgramPlayheadSec] = useState(0);
   const [undoDepth, setUndoDepth] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const undoStackRef = useRef<ComposeWorkbenchState[]>([]);
 
   const selected = ordered.find((c) => c.id === selectedId) ?? ordered[0];
+  const peaksSourceClips = useMemo(
+    () => [...ordered, ...(upstreamLibraryClips ?? [])],
+    [ordered, upstreamLibraryClips],
+  );
+  const { audioPeaksByUrl } = useComposeAudioPeaksLoader(peaksSourceClips, true);
   const importedClips = ordered.filter((c) => c.source === "import");
   const projectLibraryClips = ordered.filter(
     (c) => c.source === "external" || c.source === "look",
@@ -2031,6 +2175,7 @@ export function ComposeEditorFullscreen({
     useComposeProgramVideoPlayback({
       ordered,
       videoRef,
+      audioRef,
       playing,
       setPlaying,
       programPlayheadSec,
@@ -2109,6 +2254,93 @@ export function ComposeEditorFullscreen({
     }
   }, [previewSourceSec, playing, selected?.videoUrl]);
 
+  useEffect(() => {
+    if (playing) return;
+    const hit = resolveClipAtProgramSec(ordered, programPlayheadSec);
+    const a = audioRef.current;
+    const audioUrl = hit?.clip.audioUrl?.trim();
+    if (!a || !audioUrl) return;
+    if (!audioElementMatchesUrl(a, audioUrl)) {
+      a.src = audioUrl;
+      a.load();
+    }
+    const target = hit ? Math.max(0, hit.localInClip) : 0;
+    if (Math.abs(a.currentTime - target) > 0.12) {
+      try {
+        a.currentTime = target;
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [ordered, programPlayheadSec, playing]);
+
+  const focusTimelineClip = useCallback(
+    (clipId: string) => {
+      if (!ordered.some((c) => c.id === clipId)) return;
+      setSelectedId(clipId);
+      const seg = programSegments.find((s) => s.clip.id === clipId);
+      if (seg) {
+        setProgramPlayheadSec(seg.programStart + 0.001);
+        setPlaying(false);
+      }
+    },
+    [ordered, programSegments],
+  );
+
+  const pickUpstreamLibraryClip = useCallback(
+    (libraryClipId: string) => {
+      if (!isCanvasModule) {
+        setSelectedId(libraryClipId);
+        return;
+      }
+      const lib =
+        visibleImportedTabClips.find((c) => c.id === libraryClipId) ??
+        upstreamLibraryClips?.find((c) => c.id === libraryClipId);
+      if (!lib) {
+        setSelectedId(libraryClipId);
+        return;
+      }
+      if (isAudioOnlyLibraryClip(lib)) {
+        const pairedId = lib.pairedTimelineClipId?.trim();
+        if (pairedId && ordered.some((c) => c.id === pairedId)) {
+          focusTimelineClip(pairedId);
+          return;
+        }
+        const audioUrl = lib.audioUrl?.trim();
+        if (audioUrl) {
+          const byAudio = ordered.find((c) => c.audioUrl?.trim() === audioUrl);
+          if (byAudio) {
+            focusTimelineClip(byAudio.id);
+            return;
+          }
+        }
+        toast?.({
+          title: "未找到对应时间线片段",
+          variant: "info",
+        });
+        return;
+      }
+      const nodeMatch = lib.id.match(/^upstream-(?:video|image)-(.+)$/);
+      const nodeId = nodeMatch?.[1];
+      if (nodeId) {
+        const onTimeline = ordered.find((c) => c.id === nodeId);
+        if (onTimeline) {
+          focusTimelineClip(onTimeline.id);
+          return;
+        }
+      }
+      setSelectedId(libraryClipId);
+    },
+    [
+      focusTimelineClip,
+      isCanvasModule,
+      ordered,
+      toast,
+      upstreamLibraryClips,
+      visibleImportedTabClips,
+    ],
+  );
+
   const splitAtPlayhead = async () => {
     if (!selectedId || !selected?.videoUrl) return;
     const atSource = sourceSecAtProgramPlayheadInClip(
@@ -2136,9 +2368,8 @@ export function ComposeEditorFullscreen({
       orderIdx >= 0 ? next.orderedClipIds[orderIdx + 1] : next.orderedClipIds[1];
     const pickId = secondId ?? next.orderedClipIds[orderIdx] ?? next.orderedClipIds[0];
     if (pickId) setSelectedId(pickId);
-    toast({
-      title: "已分割为两段",
-      message: "轨道会出现两块，请分别选中并拖左右白边裁剪。",
+    toast?.({
+      title: "已分割为两段，请分别选中并拖白边裁剪",
       variant: "success",
     });
   };
@@ -2359,7 +2590,10 @@ export function ComposeEditorFullscreen({
                 <AssetGrid
                   clips={visibleImportedTabClips}
                   selectedId={selectedId}
-                  onPick={setSelectedId}
+                  onPick={
+                    isCanvasModule ? pickUpstreamLibraryClip : setSelectedId
+                  }
+                  audioPeaksByUrl={audioPeaksByUrl}
                   showDuration
                 />
               ) : (
@@ -2390,25 +2624,23 @@ export function ComposeEditorFullscreen({
             )}
           >
             <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
-              {selected?.videoUrl ? (
-                <video
-                  ref={videoRef}
-                  src={selected.videoUrl}
-                  className="max-h-full max-w-full rounded-md shadow-lg"
-                  playsInline
-                  controls={false}
-                  onEnded={() => setPlaying(false)}
-                  onTimeUpdate={(e) => {
-                    if (!playing || !selectedId) return;
-                    const seg = programSegments.find((s) => s.clip.id === selectedId);
-                    if (!seg) return;
-                    const local =
-                      e.currentTarget.currentTime - composeClipSourceStart(selected!);
-                    setProgramPlayheadSec(
-                      Math.min(seg.programStart + local, seg.programStart + seg.span),
-                    );
-                  }}
-                />
+              {previewVideoUrl ? (
+                <>
+                  <video
+                    ref={videoRef}
+                    src={previewVideoUrl}
+                    className="max-h-full max-w-full rounded-md shadow-lg"
+                    playsInline
+                    controls={false}
+                    onTimeUpdate={onProgramVideoTimeUpdate}
+                  />
+                  <audio
+                    ref={audioRef}
+                    className="sr-only"
+                    preload="auto"
+                    playsInline
+                  />
+                </>
               ) : (
                 <p className="text-sm text-white/40">没有媒体可供预览</p>
               )}
@@ -2426,18 +2658,9 @@ export function ComposeEditorFullscreen({
               </button>
               <button
                 type="button"
-                className="flex size-10 items-center justify-center rounded-full bg-white/15 hover:bg-white/25"
-                onClick={() => {
-                  const v = videoRef.current;
-                  if (!v) return;
-                  if (playing) {
-                    v.pause();
-                    setPlaying(false);
-                  } else {
-                    if (playheadInSelected) v.currentTime = previewSourceSec;
-                    void v.play().then(() => setPlaying(true)).catch(() => undefined);
-                  }
-                }}
+                className="flex size-10 items-center justify-center rounded-full bg-white/15 hover:bg-white/25 disabled:opacity-40"
+                disabled={!playbackVideoUrl && !selected?.videoUrl}
+                onClick={toggleProgramPlay}
               >
                 {playing ? (
                   <Pause className="size-5" />
@@ -2527,6 +2750,7 @@ export function ComposeEditorFullscreen({
               trimEnd={trimEnd}
               filmstripByUrl={filmstripByUrl}
               fullDurationByUrl={fullDurationByUrl}
+              audioPeaksByUrl={audioPeaksByUrl}
               programPlayheadSec={programPlayheadSec}
               totalProgramSec={totalProgramSec}
               onSelect={setSelectedId}
@@ -2572,53 +2796,72 @@ function AssetGrid({
   onPick,
   addedIds,
   showDuration,
+  audioPeaksByUrl,
 }: {
   clips: ComposeWorkbenchClip[];
   selectedId: string | null;
   onPick: (id: string) => void;
   addedIds?: Set<string>;
   showDuration?: boolean;
+  audioPeaksByUrl?: Record<string, number[]>;
 }) {
   if (clips.length === 0) {
     return <p className="text-[10px] text-white/35">暂无</p>;
   }
   return (
     <div className="grid grid-cols-3 gap-1">
-      {clips.map((c) => (
-        <button
-          key={c.id}
-          type="button"
-          className={cn(
-            "relative overflow-hidden rounded border text-left",
-            selectedId === c.id ? "border-[#0071e3]" : "border-white/15",
-          )}
-          onClick={() => onPick(c.id)}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {c.posterUrl?.trim() || c.videoUrl?.trim() ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={c.posterUrl ?? c.videoUrl}
-              alt=""
-              className="aspect-[9/16] w-full object-cover"
-            />
-          ) : (
-            <div className="flex aspect-[9/16] w-full items-center justify-center bg-[#222] text-[10px] text-white/55">
-              音频
-            </div>
-          )}
-          {addedIds?.has(c.id) ? (
-            <span className="absolute left-1 top-1 rounded bg-black/60 px-1 text-[8px] text-white/80">
-              已添加
-            </span>
-          ) : null}
-          {showDuration ? (
-            <span className="absolute bottom-1 left-1 rounded bg-black/75 px-1 text-[9px] tabular-nums text-white/90">
-              {formatTimeSec(displayClipSpanSec(c))}
-            </span>
-          ) : null}
-        </button>
-      ))}
+      {clips.map((c) => {
+        const audioOnly = isAudioOnlyLibraryClip(c);
+        const visualUrl = libraryClipVisualUrl(c);
+        const audioUrl = c.audioUrl?.trim();
+        return (
+          <button
+            key={c.id}
+            type="button"
+            className={cn(
+              "relative overflow-hidden rounded border text-left",
+              selectedId === c.id ? "border-[#0071e3]" : "border-white/15",
+            )}
+            title={c.label?.trim() || undefined}
+            onClick={() => onPick(c.id)}
+          >
+            {audioOnly ? (
+              <div className="relative aspect-[9/16] w-full bg-[#0a1628]">
+                <ComposeSegmentAudioWaveform
+                  peaks={audioUrl ? audioPeaksByUrl?.[audioUrl] : undefined}
+                  widthPx={72}
+                  label={c.label?.trim() || "配音"}
+                />
+              </div>
+            ) : visualUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={visualUrl}
+                alt=""
+                className="aspect-[9/16] w-full object-cover"
+              />
+            ) : (
+              <div className="flex aspect-[9/16] w-full items-center justify-center bg-[#222] text-[10px] text-white/55">
+                素材
+              </div>
+            )}
+            {addedIds?.has(c.id) ? (
+              <span className="absolute left-1 top-1 rounded bg-black/60 px-1 text-[8px] text-white/80">
+                已添加
+              </span>
+            ) : null}
+            {showDuration && !audioOnly ? (
+              <span className="absolute bottom-1 left-1 rounded bg-black/75 px-1 text-[9px] tabular-nums text-white/90">
+                {formatTimeSec(displayClipSpanSec(c))}
+              </span>
+            ) : audioOnly ? (
+              <span className="absolute bottom-1 left-1 rounded bg-black/75 px-1 text-[9px] text-sky-200/90">
+                TTS
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
     </div>
   );
 }

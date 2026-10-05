@@ -10,6 +10,8 @@ export type ComposeWorkbenchClip = {
   sourceEndSec?: number;
   subtitle?: string;
   audioUrl?: string;
+  /** 连线资产库 · 该配音对应时间线上的视频段 id（画布 upstream-audio） */
+  pairedTimelineClipId?: string;
   lookId?: string;
   source: "look" | "import" | "external";
 };
