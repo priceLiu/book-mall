@@ -28,6 +28,7 @@ const nextConfig = {
     "@private/federated-portal-logout",
     "@private/federated-portal-nav",
     "@private/media-render-subtitle-style",
+    "@private/platform-compose-ui",
     "@private/publisher-client",
     "@private/platform-assistant",
     "@private/ecom-copy-overlay",
@@ -52,6 +53,10 @@ const nextConfig = {
     );
     config.resolve.alias["@private/media-render-subtitle-style"] = resolveShared(
       "media-render-subtitle-style",
+    );
+    config.resolve.alias["@private/platform-compose-ui"] = path.join(
+      __dirname,
+      "../book-mall/platform-compose-ui",
     );
     config.resolve.alias["@private/ecom-copy-overlay"] = resolveShared("ecom-copy-overlay");
     return config;

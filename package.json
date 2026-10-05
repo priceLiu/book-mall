@@ -5,7 +5,7 @@
   "scripts": {
     "dev:preflight": "node scripts/dev-preflight.mjs",
     "dev:preflight:kill": "node scripts/dev-preflight.mjs --kill",
-    "dev:all": "CI=true pnpm install --prefer-offline && node scripts/sync-ecom-copy-overlay-deps.mjs && node scripts/sync-global-asset-library.mjs && node scripts/ensure-platform-assistant.mjs && pnpm dev:preflight && node scripts/dev-all.mjs",
+    "dev:all": "CI=true pnpm install --prefer-offline && node scripts/sync-ecom-copy-overlay-deps.mjs && node scripts/sync-global-asset-library.mjs && node scripts/sync-platform-compose-ui.mjs && node scripts/ensure-platform-assistant.mjs && pnpm dev:preflight && node scripts/dev-all.mjs",
     "dev:all:clean": "pnpm dev:preflight:kill && pnpm dev:all",
     "ensure:platform-assistant": "node scripts/ensure-platform-assistant.mjs",
     "build:prompt-vendor": "pnpm --dir prompt-optimizer-platform build:vendor",
@@ -16,6 +16,8 @@
     "sync:pro2-gu-feng-doc": "node scripts/sync-pro2-gu-feng-category-doc.mjs",
     "sync:ecom-copy-overlay": "node scripts/sync-ecom-copy-overlay-deps.mjs",
     "sync:global-asset-library": "node scripts/sync-global-asset-library.mjs",
+    "sync:platform-compose-ui": "node scripts/sync-platform-compose-ui.mjs",
+    "sync:platform-compose-ui:check": "node scripts/sync-platform-compose-ui.mjs --check",
     "ecom:dev-reset": "node scripts/ecom-toolkit-dev-reset.mjs",
     "sync:docker-shared": "node scripts/sync-docker-shared.mjs",
     "sync:docker-shared:check": "node scripts/sync-docker-shared.mjs --check",

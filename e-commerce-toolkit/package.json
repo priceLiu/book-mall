@@ -15,6 +15,7 @@
     "@private/federated-portal-logout": "file:../shared/federated-portal-logout",
     "@private/federated-portal-nav": "file:../shared/federated-portal-nav",
     "@private/media-render-subtitle-style": "file:../shared/media-render-subtitle-style",
+    "@private/platform-compose-ui": "file:../book-mall/platform-compose-ui",
     "@private/platform-assistant": "file:../shared/platform-assistant",
     "@private/publisher-client": "file:../shared/publisher-client",
     "@radix-ui/react-dialog": "^1.0.5",

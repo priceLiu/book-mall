@@ -3,14 +3,9 @@
 import { memo, useCallback, useMemo } from "react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { Pro2InputDockShell } from "@/components/canvas/pro2/pro2-input-dock-shell";
+import { JianyingComposeDockPanel } from "@/components/canvas/jianying-compose-dock-panel";
 import { collectJianyingLibtvConnectionSnapshot } from "@/lib/canvas/jianying-from-workspace";
-import {
-  JIANYING_AUTO_RENDER_DOCK_FLOW_H,
-  JIANYING_AUTO_RENDER_DOCK_FLOW_W,
-  JIANYING_AUTO_RENDER_DOCK_PLACEMENT_OPTS,
-  JIANYING_AUTO_RENDER_DOCK_SCREEN_W,
-} from "@/lib/canvas/jianying-auto-render-dock-placement";
+import { buildJianyingUpstreamComposeLibraryClips } from "@/lib/canvas/jianying-compose-upstream-assets";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { JianyingAutoRenderNodeData } from "@/lib/canvas/types";
 import {
@@ -18,9 +13,9 @@ import {
   useLibtvSoleSelectedNodeId,
 } from "@/lib/canvas/use-libtv-floating-dock";
 import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-dock-selection";
-import { JianyingMediaRenderActions } from "../jianying-media-render-actions";
+import { jianyingSnapshotToWorkbench } from "@private/platform-compose-ui";
 
-/** 2.0 · 自动成片浮动 Dock（800×600 · 恒定屏上尺寸） */
+/** 2.0 · 自动成片：仅平台迷你时间线浮窗（合成/下载仍走节点或全屏） */
 export function JianyingAutoRenderFloatingDock() {
   const suppressDock = useLibtvShouldSuppressFloatingDock();
   const dockNodeId = useLibtvSoleSelectedNodeId("jianying-auto-render-pro2");
@@ -32,31 +27,21 @@ export function JianyingAutoRenderFloatingDock() {
     ),
   );
 
-  const { placement, hidden } = useLibtvFloatingDock(
-    nodeExists ? dockNodeId : null,
-    JIANYING_AUTO_RENDER_DOCK_PLACEMENT_OPTS,
-  );
+  const { hidden } = useLibtvFloatingDock(nodeExists ? dockNodeId : null, {
+    minFlowWidth: 0,
+    defaultNodeWidth: 720,
+    defaultNodeHeight: 840,
+  });
 
-  if (suppressDock || !dockNodeId || !nodeExists || !placement) return null;
+  if (suppressDock || !dockNodeId || !nodeExists || hidden) return null;
 
-  return (
-    <JianyingAutoRenderFloatingDockBody
-      key={dockNodeId}
-      nodeId={dockNodeId}
-      placement={placement}
-      hidden={hidden}
-    />
-  );
+  return <JianyingAutoRenderComposeOverlay key={dockNodeId} nodeId={dockNodeId} />;
 }
 
-const JianyingAutoRenderFloatingDockBody = memo(function JianyingAutoRenderFloatingDockBody({
+const JianyingAutoRenderComposeOverlay = memo(function JianyingAutoRenderComposeOverlay({
   nodeId,
-  placement,
-  hidden,
 }: {
   nodeId: string;
-  placement: NonNullable<ReturnType<typeof useLibtvFloatingDock>["placement"]>;
-  hidden: boolean;
 }) {
   const base = useBookMallBaseUrl();
   const projectId = useCanvasStore((s) => s.projectId);
@@ -87,61 +72,49 @@ const JianyingAutoRenderFloatingDockBody = memo(function JianyingAutoRenderFloat
     [nodeId, nodes, edges, data?.clipOrderNodeIds, data?.audioOrderNodeIds],
   );
 
-  const exportFrames = useMemo(
+  const composeWorkbench = useMemo(
     () =>
-      snapshot.frames.map((f) => ({
-        ...f,
-        dialogue: f.dialogue ?? "",
-      })),
-    [snapshot.frames],
+      jianyingSnapshotToWorkbench(
+        snapshot.clipSlots
+          .filter((s) => s.hasVideo && s.videoUrl)
+          .map((s, i) => ({
+            sourceNodeId: s.sourceNodeId,
+            videoUrl: s.videoUrl!,
+            posterUrl: s.posterUrl,
+            label: s.label,
+            dialogue: s.dialogue,
+            audioUrl: snapshot.audioClipSlots[i]?.audioUrl,
+          })),
+        data?.composeWorkbench ?? null,
+      ),
+    [snapshot, data?.composeWorkbench],
   );
 
-  const onClipOrderChange = useCallback(
-    (orderNodeIds: string[]) => {
-      updateNodeData(nodeId, { clipOrderNodeIds: orderNodeIds });
+  const upstreamLibraryClips = useMemo(
+    () =>
+      buildJianyingUpstreamComposeLibraryClips(
+        snapshot.clipSlots,
+        snapshot.audioClipSlots,
+      ),
+    [snapshot.clipSlots, snapshot.audioClipSlots],
+  );
+
+  const onComposeWorkbenchChange = useCallback(
+    (next: typeof composeWorkbench) => {
+      updateNodeData(nodeId, { composeWorkbench: next });
     },
     [nodeId, updateNodeData],
   );
 
-  const onAudioOrderChange = useCallback(
-    (orderNodeIds: string[]) => {
-      updateNodeData(nodeId, { audioOrderNodeIds: orderNodeIds });
-    },
-    [nodeId, updateNodeData],
-  );
+  if (!base || snapshot.renderedCount < 1) return null;
 
   return (
-    <Pro2InputDockShell
-      flowAnchor={placement}
-      hidden={hidden}
-      hideExpand
-      anchorNodeId={nodeId}
-      flowSize={{
-        w: JIANYING_AUTO_RENDER_DOCK_FLOW_W,
-        h: JIANYING_AUTO_RENDER_DOCK_FLOW_H,
-      }}
-      screenWidth={JIANYING_AUTO_RENDER_DOCK_SCREEN_W}
-      dockClassName="jianying-auto-render-dock"
-    >
-      <JianyingMediaRenderActions
-        nodeId={nodeId}
-        base={base}
-        projectId={projectId}
-        frames={exportFrames}
-        clipSlots={snapshot.clipSlots}
-        clipOrderNodeIds={snapshot.orderNodeIds}
-        onClipOrderChange={onClipOrderChange}
-        audioClipSlots={snapshot.audioClipSlots}
-        audioOrderNodeIds={snapshot.audioOrderNodeIds}
-        onAudioOrderChange={onAudioOrderChange}
-        persisted={data?.mediaRenderResult}
-        inFlight={data?.mediaRenderInFlight}
-        spawnPreview={false}
-        layout="dock"
-        connectedCount={snapshot.connectedCount}
-        renderedCount={snapshot.renderedCount}
-        audioConnectedCount={snapshot.audioConnectedCount}
-      />
-    </Pro2InputDockShell>
+    <JianyingComposeDockPanel
+      base={base}
+      projectId={projectId}
+      workbench={composeWorkbench}
+      upstreamLibraryClips={upstreamLibraryClips}
+      onWorkbenchChange={onComposeWorkbenchChange}
+    />
   );
 });

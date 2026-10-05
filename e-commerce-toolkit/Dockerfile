@@ -12,6 +12,7 @@ COPY docker-shared/media-render-subtitle-style /shared/media-render-subtitle-sty
 COPY docker-shared/platform-assistant /shared/platform-assistant
 COPY docker-shared/publisher-client /shared/publisher-client
 COPY docker-shared/ecom-copy-overlay /shared/ecom-copy-overlay
+COPY docker-shared/platform-compose-ui /book-mall/platform-compose-ui
 
 FROM with-shared AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./

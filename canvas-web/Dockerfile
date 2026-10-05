@@ -12,6 +12,7 @@ COPY docker-shared/federated-portal-nav /shared/federated-portal-nav
 COPY docker-shared/media-render-subtitle-style /shared/media-render-subtitle-style
 COPY docker-shared/platform-assistant /shared/platform-assistant
 COPY docker-shared/ecom-copy-overlay /shared/ecom-copy-overlay
+COPY docker-shared/platform-compose-ui /book-mall/platform-compose-ui
 
 FROM with-shared AS deps
 # pnpm-workspace.yaml 含 allowBuilds: unrs-resolver；不拷会触发 ERR_PNPM_IGNORED_BUILDS

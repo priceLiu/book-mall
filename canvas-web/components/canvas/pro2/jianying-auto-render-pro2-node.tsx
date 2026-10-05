@@ -237,7 +237,7 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
               </div>
             ) : (
               <div className="flex h-full min-h-[400px] items-center justify-center px-4 text-center text-[12px] text-white/40">
-                接入视频与音频后，选中节点并在下方 Dock 点击「自动剪辑成片」
+                接入视频与音频后，选中节点打开迷你时间线；精细编辑与导出请用全屏
               </div>
             )}
           </div>

@@ -50,6 +50,8 @@ export function buildDefaultComposeClipsFromLooks(
       posterUrl: look.fusedImageUrl?.trim(),
       lookId: look.lookId,
       source: "look",
+      subtitle: look.voiceover?.trim() || undefined,
+      audioUrl: look.ttsUrl?.trim() || undefined,
     });
   }
   return {
@@ -103,6 +105,12 @@ export function resolveComposeWorkbenchState(
           videoUrl: fresh.videoUrl,
           posterUrl: fresh.posterUrl ?? existing.posterUrl,
           label: fresh.label ?? existing.label,
+          subtitle: existing.subtitle?.trim()
+            ? existing.subtitle
+            : fresh.subtitle ?? existing.subtitle,
+          audioUrl: existing.audioUrl?.trim()
+            ? existing.audioUrl
+            : fresh.audioUrl ?? existing.audioUrl,
         });
         orderedClipIds.push(id);
         continue;

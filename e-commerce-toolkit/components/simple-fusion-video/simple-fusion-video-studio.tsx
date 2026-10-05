@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cpu, Download, Images, Plus, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -53,7 +54,18 @@ import {
   SIMPLE_FUSION_DEFAULT_VIDEO_MODEL,
 } from "@/lib/simple-fusion-model-defaults";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
-import { SimpleFusionComposeWorkbench } from "@/components/simple-fusion-video/simple-fusion-compose-workbench";
+const SimpleFusionComposeWorkbench = dynamic(
+  () =>
+    import("@/components/simple-fusion-video/simple-fusion-compose-workbench").then(
+      (m) => m.SimpleFusionComposeWorkbench,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="text-[10px] text-[#86868b]">剪辑组件加载中…</p>
+    ),
+  },
+);
 import {
   createSimpleFusionProject,
   generateSimpleFusionModel,

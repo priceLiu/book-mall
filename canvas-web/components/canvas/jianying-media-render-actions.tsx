@@ -77,10 +77,12 @@ type Props = {
   inFlight?: JianyingMediaRenderInFlight | null;
   /** false = 成片留在当前节点，不另 spawn video-preview */
   spawnPreview?: boolean;
-  layout?: "default" | "dock";
+  layout?: "default" | "dock" | "compose-footer";
   connectedCount?: number;
   renderedCount?: number;
   audioConnectedCount?: number;
+  /** 平台剪辑台双轨（画布 Dock） */
+  composeTimelineSlot?: React.ReactNode;
 };
 
 const SCALE_OPTIONS: { value: MediaRenderScaleMode; label: string }[] = [
@@ -124,6 +126,7 @@ export function JianyingMediaRenderActions({
   connectedCount = 0,
   renderedCount = 0,
   audioConnectedCount = 0,
+  composeTimelineSlot = null,
 }: Props) {
   const dialogs = useDialogs();
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -1288,6 +1291,83 @@ export function JianyingMediaRenderActions({
     />
   );
 
+  if (layout === "compose-footer") {
+    return (
+      <div className="nodrag nowheel pointer-events-auto w-[min(720px,calc(100vw-2rem))] text-[13px] text-white/80">
+        <div className="rounded-xl border border-white/10 bg-[#16161a]/95 px-4 py-2.5 shadow-2xl backdrop-blur-md">
+          <div className="mb-2 flex items-center justify-between gap-2 border-b border-white/[0.06] pb-2">
+            <p className="text-[12px] text-white/55">
+              视频 {connectedCount} · 可剪辑 {renderedCount}
+              {audioConnectedCount > 0 ? ` · 音频 ${audioConnectedCount}` : ""}
+            </p>
+            <p className="text-[12px] font-medium text-white/90">云端自动剪辑成片</p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2">
+            <label className="flex items-center gap-2 text-[13px] text-white/70">
+              <span className="shrink-0">转场时长</span>
+              <input
+                type="number"
+                min={0.2}
+                max={2}
+                step={0.1}
+                value={transitionSec}
+                disabled={settingsLocked || transitionKind === "none"}
+                className="nodrag h-8 w-[68px] rounded-md border border-white/20 bg-black/30 px-2 text-[13px] text-white disabled:opacity-40"
+                onChange={(e) => setTransitionSec(Number(e.target.value) || 0.6)}
+              />
+              <span className="text-[12px] text-white/45">秒</span>
+            </label>
+            <label className="flex items-center gap-2 text-[13px] text-white/70">
+              <span className="shrink-0">转场效果</span>
+              <select
+                value={transitionKind}
+                disabled={settingsLocked}
+                className={dockFieldSelectClass}
+                onChange={(e) =>
+                  setTransitionKind(e.target.value as JianyingMediaRenderTransitionKind)
+                }
+              >
+                {TRANSITION_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-[13px] text-white/70">
+              <span className="shrink-0">输出画质</span>
+              <select
+                value={scaleMode}
+                disabled={settingsLocked}
+                className={dockFieldSelectClass}
+                onChange={(e) => setScaleMode(e.target.value as MediaRenderScaleMode)}
+              >
+                {SCALE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {outputControls}
+          <div className="mt-2 flex flex-col gap-2 border-t border-white/[0.06] pt-2">
+            {showProgress ? <div className="shrink-0">{progressBlock}</div> : null}
+            {!ffmpegBusy ? (
+              <div className="w-full shrink-0 text-center">{expiryHint}</div>
+            ) : null}
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {renderBtnRow}
+              {downloadBtn}
+              {retryUploadBtn}
+              {stopSyncBtn}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (isDock) {
     return (
       <div className="flex h-full min-h-0 flex-col text-[13px] text-white/80">
@@ -1321,26 +1401,32 @@ export function JianyingMediaRenderActions({
             ) : null}
           </div>
 
-          {clipSlots.length > 0 && onClipOrderChange ? (
-            <JianyingClipOrderStrip
-              slots={clipSlots}
-              orderNodeIds={clipOrderNodeIds}
-              pairedAudioByVideoIndex={pairedAudioForVideos}
-              disabled={settingsLocked}
-              onOrderChange={onClipOrderChange}
-              className="mt-1.5 shrink-0 border-b border-white/[0.06] pb-1.5"
-            />
-          ) : null}
+          {composeTimelineSlot ? (
+            composeTimelineSlot
+          ) : (
+            <>
+              {clipSlots.length > 0 && onClipOrderChange ? (
+                <JianyingClipOrderStrip
+                  slots={clipSlots}
+                  orderNodeIds={clipOrderNodeIds}
+                  pairedAudioByVideoIndex={pairedAudioForVideos}
+                  disabled={settingsLocked}
+                  onOrderChange={onClipOrderChange}
+                  className="mt-1.5 shrink-0 border-b border-white/[0.06] pb-1.5"
+                />
+              ) : null}
 
-          {audioClipSlots.length > 0 && onAudioOrderChange ? (
-            <JianyingAudioClipOrderStrip
-              slots={audioClipSlots}
-              orderNodeIds={audioOrderNodeIds}
-              disabled={settingsLocked}
-              onOrderChange={onAudioOrderChange}
-              className="mt-1.5 shrink-0 border-b border-white/[0.06] pb-1.5"
-            />
-          ) : null}
+              {audioClipSlots.length > 0 && onAudioOrderChange ? (
+                <JianyingAudioClipOrderStrip
+                  slots={audioClipSlots}
+                  orderNodeIds={audioOrderNodeIds}
+                  disabled={settingsLocked}
+                  onOrderChange={onAudioOrderChange}
+                  className="mt-1.5 shrink-0 border-b border-white/[0.06] pb-1.5"
+                />
+              ) : null}
+            </>
+          )}
         </div>
 
         <div className="nodrag shrink-0 border-t border-white/[0.06] bg-[#16161a] px-4 py-2">

@@ -10,6 +10,8 @@ const config: Config = {
     "../shared/federated-portal-nav/**/*.{js,ts,jsx,tsx}",
     "./docker-shared/federated-portal-nav/**/*.{js,ts,jsx,tsx}",
     "./docker-shared/global-asset-library/**/*.{js,ts,jsx,tsx}",
+    "../book-mall/platform-compose-ui/**/*.{js,ts,jsx,tsx}",
+    "./docker-shared/platform-compose-ui/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {

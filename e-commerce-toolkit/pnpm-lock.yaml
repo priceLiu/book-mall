@@ -23,6 +23,9 @@ importers:
       '@private/platform-assistant':
         specifier: file:../shared/platform-assistant
         version: file:../shared/platform-assistant(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@private/platform-compose-ui':
+        specifier: file:../book-mall/platform-compose-ui
+        version: file:../book-mall/platform-compose-ui(@private/media-render-subtitle-style@file:../shared/media-render-subtitle-style(react@18.3.1))(lucide-react@0.468.0(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@private/publisher-client':
         specifier: file:../shared/publisher-client
         version: file:../shared/publisher-client
@@ -263,6 +266,14 @@ packages:
   '@private/platform-assistant@file:../shared/platform-assistant':
     resolution: {directory: ../shared/platform-assistant, type: directory}
     peerDependencies:
+      react: ^18
+      react-dom: ^18
+
+  '@private/platform-compose-ui@file:../book-mall/platform-compose-ui':
+    resolution: {directory: ../book-mall/platform-compose-ui, type: directory}
+    peerDependencies:
+      '@private/media-render-subtitle-style': '*'
+      lucide-react: ^0.468.0
       react: ^18
       react-dom: ^18
 
@@ -2623,6 +2634,15 @@ snapshots:
     dependencies:
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
+
+  '@private/platform-compose-ui@file:../book-mall/platform-compose-ui(@private/media-render-subtitle-style@file:../shared/media-render-subtitle-style(react@18.3.1))(lucide-react@0.468.0(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      '@private/media-render-subtitle-style': file:../shared/media-render-subtitle-style(react@18.3.1)
+      clsx: 2.1.1
+      lucide-react: 0.468.0(react@18.3.1)
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+      tailwind-merge: 3.6.0
 
   '@private/publisher-client@file:../shared/publisher-client': {}
 

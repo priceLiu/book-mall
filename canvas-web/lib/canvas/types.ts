@@ -594,6 +594,8 @@ export type JianyingAutoRenderNodeData = {
   clipOrderNodeIds?: string[];
   /** 入边音频源节点 id · 与视频按序号配对 */
   audioOrderNodeIds?: string[];
+  /** 平台简易剪辑台 · 持久化 trim / 段配音 / profile */
+  composeWorkbench?: import("@private/platform-compose-ui/types").ComposeWorkbenchState;
   mediaFit?: boolean;
   mediaFitKey?: string;
 };

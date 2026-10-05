@@ -739,6 +739,98 @@ export async function saveSimpleFusionComposeWorkbench(
   });
 }
 
+function patchComposeClipAudio(
+  workbench: SimpleFusionComposeWorkbenchState,
+  clipId: string,
+  audioUrl: string | undefined,
+): SimpleFusionComposeWorkbenchState {
+  return {
+    ...workbench,
+    clips: workbench.clips.map((c) =>
+      c.id === clipId ? { ...c, audioUrl: audioUrl?.trim() || undefined } : c,
+    ),
+  };
+}
+
+export async function generateSimpleFusionComposeClipTts(
+  userId: string,
+  projectId: string,
+  clipId: string,
+  opts: { text?: string; voice?: string; modelKey?: string },
+): Promise<SimpleFusionProjectDto> {
+  const project = await getSimpleFusionProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+
+  const labels = new Map<string, string>();
+  const workbench = resolveComposeWorkbenchState(project, labels);
+  const clip = workbench.clips.find((c) => c.id === clipId);
+  if (!clip) throw new Error("片段不存在");
+
+  const text =
+    opts.text?.trim() ||
+    clip.subtitle?.trim() ||
+    clip.label?.trim() ||
+    "";
+  if (!text) throw new Error("请先填写字幕/口播文案");
+
+  const { generatePlatformTtsAudioUrl } = await import("@/lib/media/platform-tts-generate");
+  const audioUrl = await generatePlatformTtsAudioUrl({
+    userId,
+    text,
+    voice: opts.voice,
+    modelKey: opts.modelKey,
+  });
+
+  const next = patchComposeClipAudio(workbench, clipId, audioUrl);
+  return saveSimpleFusionComposeWorkbench(userId, projectId, next);
+}
+
+export async function uploadSimpleFusionComposeClipAudio(
+  userId: string,
+  projectId: string,
+  clipId: string,
+  file: File,
+): Promise<SimpleFusionProjectDto> {
+  const project = await getSimpleFusionProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+
+  const contentType = file.type || "audio/mpeg";
+  if (!contentType.startsWith("audio/") && !/\.(mp3|wav|m4a|aac|ogg)(\?|$)/i.test(file.name)) {
+    throw new Error("请上传音频文件");
+  }
+  const buf = Buffer.from(await file.arrayBuffer());
+  const { uploadCanvasUserBuffer } = await import("@/lib/canvas/canvas-oss");
+  const ext = file.name.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() || "mp3";
+  const ossUrl = await uploadCanvasUserBuffer({
+    userId,
+    buf,
+    contentType,
+    ext,
+  });
+
+  const labels = new Map<string, string>();
+  const workbench = resolveComposeWorkbenchState(project, labels);
+  if (!workbench.clips.some((c) => c.id === clipId)) {
+    throw new Error("片段不存在");
+  }
+
+  const next = patchComposeClipAudio(workbench, clipId, ossUrl);
+  return saveSimpleFusionComposeWorkbench(userId, projectId, next);
+}
+
+export async function clearSimpleFusionComposeClipAudio(
+  userId: string,
+  projectId: string,
+  clipId: string,
+): Promise<SimpleFusionProjectDto> {
+  const project = await getSimpleFusionProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+  const labels = new Map<string, string>();
+  const workbench = resolveComposeWorkbenchState(project, labels);
+  const next = patchComposeClipAudio(workbench, clipId, undefined);
+  return saveSimpleFusionComposeWorkbench(userId, projectId, next);
+}
+
 export async function uploadSimpleFusionComposeClip(
   userId: string,
   projectId: string,

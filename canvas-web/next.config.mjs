@@ -31,6 +31,7 @@ const nextConfig = {
     "@private/media-render-subtitle-style",
     "@private/platform-assistant",
     "@private/ecom-copy-overlay",
+    "@private/platform-compose-ui",
   ],
   webpack: (config) => {
     config.resolve.alias["@private/federated-portal-logout"] = resolveShared(
@@ -46,6 +47,10 @@ const nextConfig = {
       "platform-assistant",
     );
     config.resolve.alias["@private/ecom-copy-overlay"] = resolveShared("ecom-copy-overlay");
+    config.resolve.alias["@private/platform-compose-ui"] = path.join(
+      __dirname,
+      "../book-mall/platform-compose-ui",
+    );
     return config;
   },
   images: {

@@ -43,6 +43,10 @@ export type SimpleFusionLook = {
   garmentId: string;
   fusedImageUrl?: string;
   clipVideoUrl?: string;
+  /** 口播文案（③ 区或 look 级预填，合并进 clip.subtitle） */
+  voiceover?: string;
+  /** Look 级 TTS（合并进 clip.audioUrl，用户轨内编辑优先保留） */
+  ttsUrl?: string;
   status?: "pending" | "fusing" | "fusion_failed" | "fused" | "generating" | "success" | "failed";
   failReason?: string;
 };

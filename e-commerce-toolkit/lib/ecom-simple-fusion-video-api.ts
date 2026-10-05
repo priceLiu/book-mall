@@ -148,6 +148,43 @@ export async function renderSimpleFusionCompose(
   return data.project as SimpleFusionProject;
 }
 
+export async function generateSimpleFusionComposeClipTts(
+  projectId: string,
+  clipId: string,
+  opts?: { text?: string; voice?: string; modelKey?: string },
+) {
+  const data = await ecomBookFetch(
+    `${BASE}/projects/${encodeURIComponent(projectId)}/compose/clips/${encodeURIComponent(clipId)}/tts`,
+    {
+      method: "POST",
+      body: JSON.stringify(opts ?? {}),
+    },
+  );
+  return data.project as SimpleFusionProject;
+}
+
+export async function uploadSimpleFusionComposeClipAudio(
+  projectId: string,
+  clipId: string,
+  file: File,
+) {
+  const form = new FormData();
+  form.set("file", file);
+  const data = await ecomBookFetch(
+    `${BASE}/projects/${encodeURIComponent(projectId)}/compose/clips/${encodeURIComponent(clipId)}/audio`,
+    { method: "POST", body: form },
+  );
+  return data.project as SimpleFusionProject;
+}
+
+export async function clearSimpleFusionComposeClipAudio(projectId: string, clipId: string) {
+  const data = await ecomBookFetch(
+    `${BASE}/projects/${encodeURIComponent(projectId)}/compose/clips/${encodeURIComponent(clipId)}/audio`,
+    { method: "DELETE" },
+  );
+  return data.project as SimpleFusionProject;
+}
+
 export async function uploadSimpleFusionComposeClip(projectId: string, file: File) {
   const form = new FormData();
   form.set("file", file);

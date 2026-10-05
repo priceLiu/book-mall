@@ -26,6 +26,20 @@ pnpm dev:all:stagger                # mall 先就绪，其余子站间隔 3s 错
 
 **全站架构、端口、Gateway 密钥逻辑**：见 [全站架构图与配置表.md](./全站架构图与配置表.md)。
 
+### 平台简易剪辑台 UI 包
+
+**终端用户（线上）**：只打开浏览器使用电商 / 画布，**不需要**也**不能**在本机执行 `pnpm install`；剪辑台 JS 已打进各子站 Next **standalone** 镜像，TTS/合成走 Book API。
+
+| 角色 | 做什么 |
+|------|--------|
+| **用户** | 访问已部署站点即可 |
+| **CloudBase 构建** | 子目录 Dockerfile `COPY docker-shared/platform-compose-ui` → `/book-mall/platform-compose-ui`，构建阶段 `pnpm install --frozen-lockfile` + `next build`（在镜像里完成，与用户无关） |
+| **仓库开发** | Monorepo 本地 `file:../book-mall/platform-compose-ui`；`pnpm dev:all` 会自动 `sync:platform-compose-ui`；发版前可跑 `pnpm sync:platform-compose-ui:check` |
+
+- 源码：`book-mall/platform-compose-ui`（`@private/platform-compose-ui`）
+- **Tailwind**：`e-commerce-toolkit` / `canvas-web` 的 `tailwind.config.ts` 须 `content` 包含该包（否则剪辑浮层类名不进 CSS，只会看到遮罩）
+- 说明：[平台简易剪辑台.md](./平台简易剪辑台.md)
+
 ## 端口与服务
 
 | 工程 | 端口 | 地址 |
