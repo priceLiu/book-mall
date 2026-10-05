@@ -155,7 +155,6 @@ function ipCreationModuleIcon(id: string): LucideIcon {
 const MARKETING_ECOM_VIDEO_IDS = new Set([
   "storyboard-micro-drama",
   "video-digital-human",
-  "video-hit-product",
 ]);
 
 type EcomNavSectionLink =
@@ -286,7 +285,6 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
     "storyboard-micro-drama",
     "image-layer",
     "seed-video",
-    "video-hit-product",
     "video-digital-human",
     "promo",
     "ad",

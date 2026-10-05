@@ -1436,7 +1436,7 @@ export function SeedVideoContentPanel({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-semibold text-[#1d1d1f]">
-                {project.title ?? "图片生种草视频"}
+                {project.title ?? "服装种草视频"}
               </h2>
               <p className="text-[11px] text-[#6e6e73]">{displaySkillLabel} · 素材策划与成片</p>
             </div>

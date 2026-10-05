@@ -818,6 +818,59 @@ export async function uploadSimpleFusionComposeClipAudio(
   return saveSimpleFusionComposeWorkbench(userId, projectId, next);
 }
 
+function collectSimpleFusionAllowedComposeAudioUrls(
+  project: SimpleFusionProjectDto,
+): Set<string> {
+  const urls = new Set<string>();
+  for (const look of project.meta?.looks ?? []) {
+    const u = look.ttsUrl?.trim();
+    if (u) urls.add(u);
+  }
+  const wb = parseComposeWorkbenchFromMeta(project.meta?.composeWorkbench);
+  for (const c of wb?.clips ?? []) {
+    const u = c.audioUrl?.trim();
+    if (u) urls.add(u);
+  }
+  return urls;
+}
+
+/** 绑定本页已生成的 TTS（look.ttsUrl 等），不重新调用 TTS */
+export async function assignSimpleFusionComposeClipExistingAudio(
+  userId: string,
+  projectId: string,
+  clipId: string,
+  opts: { audioUrl: string; subtitle?: string },
+): Promise<SimpleFusionProjectDto> {
+  const project = await getSimpleFusionProject(userId, projectId);
+  if (!project) throw new Error("项目不存在");
+
+  const audioUrl = opts.audioUrl?.trim();
+  if (!audioUrl) throw new Error("缺少 audioUrl");
+
+  const allowed = collectSimpleFusionAllowedComposeAudioUrls(project);
+  if (!allowed.has(audioUrl)) {
+    throw new Error("该配音不在本项目已生成 TTS 列表中");
+  }
+
+  const labels = new Map<string, string>();
+  let workbench = resolveComposeWorkbenchState(project, labels);
+  if (!workbench.clips.some((c) => c.id === clipId)) {
+    throw new Error("片段不存在");
+  }
+
+  let next = patchComposeClipAudio(workbench, clipId, audioUrl);
+  const subtitle = opts.subtitle?.trim();
+  if (subtitle) {
+    next = {
+      ...next,
+      clips: next.clips.map((c) =>
+        c.id === clipId ? { ...c, subtitle } : c,
+      ),
+    };
+  }
+  return saveSimpleFusionComposeWorkbench(userId, projectId, next);
+}
+
 export async function clearSimpleFusionComposeClipAudio(
   userId: string,
   projectId: string,

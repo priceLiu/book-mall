@@ -531,6 +531,13 @@ export function formatCanvasTaskError(
   }
 
   if (
+    blob.includes("input image ratio") &&
+    (blob.includes("0.25") || blob.includes("4.00") || blob.includes("4.0"))
+  ) {
+    return "某张视频参考图过宽或过窄（高÷宽须在 0.25～4 之间）。HappyHorse / 万相 3.0 等百炼参考生视频均受此限。请对上游图片用「魔术→裁剪」改为 9:16 或 16:9，或去掉超宽 knolling/横条图；重启 book-mall 后重新生成会尝试自动规范化参考图。";
+  }
+
+  if (
     blob.includes("dimensions must be at least") ||
     blob.includes("300 pixels") ||
     (blob.includes("422") && blob.includes("image"))

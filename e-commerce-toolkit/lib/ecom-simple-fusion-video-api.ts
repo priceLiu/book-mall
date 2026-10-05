@@ -36,6 +36,8 @@ export type SimpleFusionProject = {
       garmentId: string;
       fusedImageUrl?: string;
       clipVideoUrl?: string;
+      voiceover?: string;
+      ttsUrl?: string;
       status?: string;
       failReason?: string;
     }>;
@@ -158,6 +160,22 @@ export async function generateSimpleFusionComposeClipTts(
     {
       method: "POST",
       body: JSON.stringify(opts ?? {}),
+    },
+  );
+  return data.project as SimpleFusionProject;
+}
+
+export async function assignSimpleFusionComposeClipExistingAudio(
+  projectId: string,
+  clipId: string,
+  opts: { audioUrl: string; subtitle?: string },
+) {
+  const data = await ecomBookFetch(
+    `${BASE}/projects/${encodeURIComponent(projectId)}/compose/clips/${encodeURIComponent(clipId)}/audio`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(opts),
     },
   );
   return data.project as SimpleFusionProject;

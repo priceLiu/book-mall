@@ -9,13 +9,25 @@ const lastScheduledKeyByNode = new Map<string, string>();
 let pendingFlush: PendingFlush | null = null;
 let flushRaf = 0;
 
+/** 每帧最多刷新一个节点：同帧连续 updateNodeInternals 会经 RF→zustand 打出 Maximum update depth */
 function flushScheduledNodeInternals() {
   flushRaf = 0;
-  const batch = pendingFlush;
-  pendingFlush = null;
-  if (!batch?.size) return;
-  for (const [nodeId, update] of batch) {
-    update(nodeId);
+  if (!pendingFlush?.size) {
+    pendingFlush = null;
+    return;
+  }
+  const next = pendingFlush.entries().next();
+  if (next.done) {
+    pendingFlush = null;
+    return;
+  }
+  const [nodeId, update] = next.value;
+  pendingFlush.delete(nodeId);
+  update(nodeId);
+  if (pendingFlush.size > 0) {
+    flushRaf = requestAnimationFrame(flushScheduledNodeInternals);
+  } else {
+    pendingFlush = null;
   }
 }
 
@@ -62,31 +74,45 @@ export function useScheduleUpdateNodeInternals(nodeId: string | null | undefined
   return schedule;
 }
 
-/** ResizeObserver → updateNodeInternals：忽略亚像素抖动，仅尺寸变化 ≥2px 时调度 */
+const RESIZE_MIN_DELTA_PX = 4;
+const RESIZE_MIN_INTERVAL_MS = 48;
+
+/** ResizeObserver → updateNodeInternals：忽略亚像素抖动；生成扫光等动效时建议 enabled=false */
 export function useObserveNodeInternalsResize(
   nodeId: string | null | undefined,
   elementRef: RefObject<HTMLElement | null>,
+  enabled = true,
 ) {
   const schedule = useScheduleUpdateNodeInternals(nodeId);
 
   useEffect(() => {
+    if (!enabled) return;
     const el = elementRef.current;
     if (!el || !nodeId) return;
 
     let lastW = 0;
     let lastH = 0;
     let roRaf = 0;
+    let lastScheduleAt = 0;
 
     const ro = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect;
       if (!rect) return;
       const w = Math.round(rect.width);
       const h = Math.round(rect.height);
-      if (Math.abs(w - lastW) < 2 && Math.abs(h - lastH) < 2) return;
+      if (
+        Math.abs(w - lastW) < RESIZE_MIN_DELTA_PX &&
+        Math.abs(h - lastH) < RESIZE_MIN_DELTA_PX
+      ) {
+        return;
+      }
       lastW = w;
       lastH = h;
       cancelAnimationFrame(roRaf);
       roRaf = requestAnimationFrame(() => {
+        const now = performance.now();
+        if (now - lastScheduleAt < RESIZE_MIN_INTERVAL_MS) return;
+        lastScheduleAt = now;
         schedule(`resize:${w}x${h}`);
       });
     });
@@ -96,5 +122,5 @@ export function useObserveNodeInternalsResize(
       ro.disconnect();
       cancelAnimationFrame(roRaf);
     };
-  }, [nodeId, elementRef, schedule]);
+  }, [nodeId, elementRef, schedule, enabled]);
 }

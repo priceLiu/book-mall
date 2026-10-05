@@ -328,7 +328,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
     previewTab,
   ]);
 
-  useObserveNodeInternalsResize(id, outerRef);
+  useObserveNodeInternalsResize(id, outerRef, !isGenerating);
 
   const onGenerateThreeView = useCallback(async () => {
     if (isGenerating) return;

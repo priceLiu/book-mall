@@ -12,6 +12,29 @@ import { createOssClientFrom, ossGetBuffer, readOssEnv } from "@/lib/oss-client"
 export const WAN30_REF_IMAGE_MIN_SIDE = 240;
 export const WAN30_REF_IMAGE_MAX_SIDE = 8000;
 export const WAN30_REF_IMAGE_MAX_BYTES = 20 * 1024 * 1024;
+/** 万相 3.0 参考图 · 高/宽（H/W）须在 [0.25, 4.0]（约 4:1 横图～1:4 竖图） */
+export const WAN30_REF_MIN_HW_RATIO = 0.25;
+export const WAN30_REF_MAX_HW_RATIO = 4;
+
+function clampWan30RefAspect(
+  targetW: number,
+  targetH: number,
+): { width: number; height: number } {
+  let w = Math.max(WAN30_REF_IMAGE_MIN_SIDE, targetW);
+  let h = Math.max(WAN30_REF_IMAGE_MIN_SIDE, targetH);
+  let ratio = h / w;
+  if (ratio < WAN30_REF_MIN_HW_RATIO) {
+    h = Math.ceil(w * WAN30_REF_MIN_HW_RATIO);
+  }
+  ratio = h / w;
+  if (ratio > WAN30_REF_MAX_HW_RATIO) {
+    w = Math.ceil(h / WAN30_REF_MAX_HW_RATIO);
+  }
+  return {
+    width: Math.max(WAN30_REF_IMAGE_MIN_SIDE, w),
+    height: Math.max(WAN30_REF_IMAGE_MIN_SIDE, h),
+  };
+}
 
 function tryParseManagedOssObjectKey(url: string): string | null {
   const cfg = readOssEnv();
@@ -123,7 +146,7 @@ export function resolveWan30ReferenceImageDimensions(
     targetW = Math.max(WAN30_REF_IMAGE_MIN_SIDE, Math.floor(targetW * shrink));
     targetH = Math.max(WAN30_REF_IMAGE_MIN_SIDE, Math.floor(targetH * shrink));
   }
-  return { width: targetW, height: targetH };
+  return clampWan30RefAspect(targetW, targetH);
 }
 
 async function encodeWan30Jpeg(buf: Buffer, w: number, h: number): Promise<Buffer> {

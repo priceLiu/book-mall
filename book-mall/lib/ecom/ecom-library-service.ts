@@ -209,7 +209,7 @@ const MODULE_TITLES: Record<string, { title: string; kind: "image" | "video" | "
   "image-layer": { title: "图片处理", kind: "image" },
   "model-tryon": { title: "模特试衣", kind: "image" },
   "storyboard-micro-drama": { title: "电商口播故事版", kind: "video" },
-  "seed-video": { title: "图片生种草视频", kind: "video" },
+  "seed-video": { title: "服装种草视频", kind: "video" },
   "media-decompose": { title: "拆图拆视频", kind: "video" },
   "video-motion": { title: "视频动作", kind: "video" },
   "video-outfit": { title: "穿搭动作迁移", kind: "video" },

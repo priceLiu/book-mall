@@ -130,7 +130,10 @@ import {
   isDashscopeWan30VideoModel,
   resolveDashscopeT2vRefMismatchMessage,
 } from "./dashscope-sbv1-t2v";
-import { normalizeWan30MediaImageUrls } from "./dashscope-wan30-media-normalize";
+import {
+  ensureWan30ReferenceImageUrls,
+  normalizeWan30MediaImageUrls,
+} from "./dashscope-wan30-media-normalize";
 import {
   buildDashscopeKlingV3VideoBody,
   isDashscopeKlingV3VideoGatewayModel,
@@ -3090,7 +3093,17 @@ export async function runRefVideoEngineNode(
   }
 
   const maxRef = isBailian ? 9 : 8;
-  const refs = referenceImageUrls.slice(0, maxRef);
+  let refs = referenceImageUrls.slice(0, maxRef);
+
+  if (isBailian) {
+    refs = await ensureWan30ReferenceImageUrls({ userId, urls: refs });
+    if (refs.length < 1) {
+      throw new CanvasProjectError(
+        "INVALID_INPUT",
+        "参考图无效或无法规范化，请确认上游图片已生成完成",
+      );
+    }
+  }
 
   await shouldCanvasUseGateway(userId, providerId, modelKey);
 

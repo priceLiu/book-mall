@@ -46,14 +46,21 @@ export type ComposeWorkbenchState = Omit<PlatformState, "clips" | "profile"> & {
 export const DEFAULT_COMPOSE_PROFILE: EcomMediaRenderProfileInput =
   PLATFORM_DEFAULT_COMPOSE_PROFILE;
 
+type SimpleFusionLookMeta = NonNullable<
+  NonNullable<SimpleFusionProject["meta"]>["looks"]
+>[number];
+
 export function buildDefaultComposeFromSlots(
   slots: SimpleFusionPreviewSlot[],
+  looks: SimpleFusionLookMeta[] = [],
 ): ComposeWorkbenchState {
+  const lookById = new Map(looks.map((l) => [l.lookId, l]));
   const clips: ComposeWorkbenchClip[] = [];
   for (const slot of slots) {
     const url = slot.clipVideoUrl?.trim();
     if (!url) continue;
     if (slot.status === "failed" || slot.status === "fusion_failed") continue;
+    const look = lookById.get(slot.key);
     clips.push({
       id: `look-${slot.key}`,
       videoUrl: url,
@@ -61,6 +68,8 @@ export function buildDefaultComposeFromSlots(
       posterUrl: slot.fusedImageUrl?.trim(),
       lookId: slot.key,
       source: "look",
+      subtitle: look?.voiceover?.trim() || undefined,
+      audioUrl: look?.ttsUrl?.trim() || undefined,
     });
   }
   return { orderedClipIds: clips.map((c) => c.id), clips };
@@ -70,7 +79,8 @@ export function resolveComposeWorkbenchFromProject(
   project: SimpleFusionProject,
   slots: SimpleFusionPreviewSlot[],
 ): ComposeWorkbenchState {
-  const defaults = buildDefaultComposeFromSlots(slots);
+  const looks = project.meta?.looks ?? [];
+  const defaults = buildDefaultComposeFromSlots(slots, looks);
   const raw = project.meta?.composeWorkbench as ComposeWorkbenchState | undefined;
   if (!raw?.orderedClipIds?.length || !raw.clips?.length) {
     return defaults;
@@ -95,6 +105,12 @@ export function resolveComposeWorkbenchFromProject(
           videoUrl: fresh.videoUrl,
           posterUrl: fresh.posterUrl ?? existing.posterUrl,
           label: fresh.label ?? existing.label,
+          subtitle: existing.subtitle?.trim()
+            ? existing.subtitle
+            : fresh.subtitle ?? existing.subtitle,
+          audioUrl: existing.audioUrl?.trim()
+            ? existing.audioUrl
+            : fresh.audioUrl ?? existing.audioUrl,
         });
         orderedClipIds.push(id);
         continue;

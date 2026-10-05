@@ -3,7 +3,6 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -193,7 +192,7 @@ export function Pro2NodeSidePlus({
    * 须 rAF 合并 + 去重：全画布多节点同步 updateNodeInternals 会经 RF→zustand 打出
    * Maximum update depth exceeded。
    */
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!nodeId) return;
     scheduleUpdateNodeInternals(
       `${size}|${canvasConnecting ? 1 : 0}`,

@@ -14,6 +14,7 @@ import {
 } from "@private/platform-compose-ui/editor";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { EcomComposeClipAudioPickDialog } from "@/components/ecom-compose/ecom-compose-clip-audio-pick-dialog";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
 import { SimpleFusionVideoSlotHoverActions } from "@/components/simple-fusion-video/simple-fusion-video-slot-hover-actions";
@@ -23,9 +24,10 @@ import {
   ECOM_WORKSPACE_RESULT_GRID_CLASS,
   ECOM_WORKSPACE_RESULT_LABEL_CLASS,
 } from "@/lib/ecom-workspace-result-grid";
+import { buildSimpleFusionComposeTtsOptions } from "@/lib/ecom-compose-tts-options";
 import {
+  assignSimpleFusionComposeClipExistingAudio,
   clearSimpleFusionComposeClipAudio,
-  generateSimpleFusionComposeClipTts,
   patchSimpleFusionProject,
   renderSimpleFusionCompose,
   uploadSimpleFusionComposeClip,
@@ -66,7 +68,7 @@ function SimpleFusionComposeWorkbenchInner({
   onComposeStarted,
   onComposeFailed,
 }: Props) {
-  const { alert, toast, prompt, confirm } = useComposeDialogs();
+  const { alert, toast } = useComposeDialogs();
   const [workbench, setWorkbench] = useState<ComposeWorkbenchState>(() =>
     resolveComposeWorkbenchFromProject(project, previewSlots),
   );
@@ -87,6 +89,9 @@ function SimpleFusionComposeWorkbenchInner({
   const importRef = useRef<HTMLInputElement>(null);
   const audioImportRef = useRef<HTMLInputElement>(null);
   const audioClipTargetRef = useRef<string | null>(null);
+  const [audioPickOpen, setAudioPickOpen] = useState(false);
+  const [audioPickClipId, setAudioPickClipId] = useState<string | null>(null);
+  const [audioPickBusy, setAudioPickBusy] = useState(false);
 
   const ordered = useMemo(() => orderedComposeClips(workbench), [workbench]);
   const profile = workbench.profile ?? DEFAULT_COMPOSE_PROFILE;
@@ -243,44 +248,50 @@ function SimpleFusionComposeWorkbenchInner({
     [],
   );
 
-  const handleClipAudioAttach = async (clipId: string) => {
+  const pageTtsOptions = useMemo(
+    () => buildSimpleFusionComposeTtsOptions(project, previewSlots, workbench.clips),
+    [project, previewSlots, workbench.clips],
+  );
+
+  const audioPickClip = useMemo(
+    () =>
+      audioPickClipId
+        ? workbench.clips.find((c) => c.id === audioPickClipId)
+        : undefined,
+    [audioPickClipId, workbench.clips],
+  );
+
+  const suggestedTtsOptionId = useMemo(() => {
+    if (!audioPickClipId) return undefined;
+    const clip = workbench.clips.find((c) => c.id === audioPickClipId);
+    if (clip?.lookId) return `look-${clip.lookId}`;
+    return pageTtsOptions.find((o) => o.suggestedClipId === audioPickClipId)?.id;
+  }, [audioPickClipId, pageTtsOptions, workbench.clips]);
+
+  const handleClipAudioAttach = (clipId: string) => {
     audioClipTargetRef.current = clipId;
-    if (confirm) {
-      const uploadLocal = await confirm({
-        title: "段配音",
-        message: "确定：本地上传音频；取消：按字幕文案生成 TTS。",
-      });
-      if (uploadLocal) {
-        audioImportRef.current?.click();
-        return;
-      }
-    }
-    const clip = workbench.clips.find((c) => c.id === clipId);
-    let text = clip?.subtitle?.trim() || "";
-    if (!text) {
-      if (!prompt) {
-        await alert({ title: "无法生成", message: "对话框未就绪", variant: "error" });
-        return;
-      }
-      const input = await prompt({
-        title: "生成 TTS",
-        label: "口播文案",
-        defaultValue: clip?.label?.trim(),
-      });
-      if (input === null) return;
-      text = input.trim();
-      if (!text) return;
-    }
+    setAudioPickClipId(clipId);
+    setAudioPickOpen(true);
+  };
+
+  const pickExistingTtsForClip = async (clipId: string, audioUrl: string, subtitle?: string) => {
+    setAudioPickBusy(true);
     try {
-      const p = await generateSimpleFusionComposeClipTts(project.id, clipId, { text });
+      const p = await assignSimpleFusionComposeClipExistingAudio(project.id, clipId, {
+        audioUrl,
+        subtitle,
+      });
       onProject(p);
-      toast?.({ title: "段配音已生成", variant: "success" });
+      toast?.({ title: "已绑定配音", variant: "success" });
+      setAudioPickOpen(false);
     } catch (e) {
       await alert({
-        title: "TTS 失败",
+        title: "绑定失败",
         message: e instanceof Error ? e.message : "请稍后重试",
         variant: "error",
       });
+    } finally {
+      setAudioPickBusy(false);
     }
   };
 
@@ -486,6 +497,31 @@ function SimpleFusionComposeWorkbenchInner({
           if (f) void importVideo(f);
         }}
       />
+      {audioPickOpen ? (
+        <ModalPortal>
+          <EcomComposeClipAudioPickDialog
+            open={audioPickOpen}
+            clipLabel={audioPickClip?.label}
+            options={pageTtsOptions}
+            suggestedOptionId={suggestedTtsOptionId}
+            busy={audioPickBusy}
+            onClose={() => {
+              if (audioPickBusy) return;
+              setAudioPickOpen(false);
+            }}
+            onUploadLocal={() => {
+              setAudioPickOpen(false);
+              audioImportRef.current?.click();
+            }}
+            onPickTts={(opt) => {
+              const clipId = audioPickClipId ?? audioClipTargetRef.current;
+              if (!clipId) return;
+              void pickExistingTtsForClip(clipId, opt.audioUrl, opt.voiceover);
+            }}
+          />
+        </ModalPortal>
+      ) : null}
+
       <input
         ref={audioImportRef}
         type="file"

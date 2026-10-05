@@ -35,7 +35,7 @@ export const SEED_VIDEO_SKILLS: Record<SeedVideoSkillKey, SeedVideoSkillDefiniti
     key: "seed-grass",
     label: "种草短视频",
     description: "生活方式种草、度假氛围、不费力高级感",
-    defaultTitle: "图片生种草视频",
+    defaultTitle: "服装种草视频",
     defaultPlanningPrompt:
       "@图片1 @图片2 帮我用这些素材生成 3 套种草短视频脚本（带口播），时长约 20 秒，给我选择确认。",
     scriptChoiceLabels: [

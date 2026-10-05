@@ -22,4 +22,10 @@ describe("resolveWan30ReferenceImageDimensions", () => {
     expect(width).toBe(720);
     expect(height).toBe(1280);
   });
+
+  it("raises height when H/W below 0.25 (ultra-wide ref)", () => {
+    const { width, height } = resolveWan30ReferenceImageDimensions(4000, 960);
+    expect(width).toBe(4000);
+    expect(height / width).toBeGreaterThanOrEqual(0.25);
+  });
 });

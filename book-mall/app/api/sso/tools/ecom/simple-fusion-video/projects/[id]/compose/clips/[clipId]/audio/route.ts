@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  assignSimpleFusionComposeClipExistingAudio,
   clearSimpleFusionComposeClipAudio,
   uploadSimpleFusionComposeClipAudio,
 } from "@/lib/ecom/simple-fusion-video/service";
@@ -17,6 +18,30 @@ export async function POST(
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
   const { id, clipId } = await ctx.params;
+
+  const contentType = req.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    const body = (await req.json().catch(() => null)) as {
+      audioUrl?: string;
+      subtitle?: string;
+    } | null;
+    const audioUrl = body?.audioUrl?.trim();
+    if (!audioUrl) {
+      return NextResponse.json({ error: "缺少 audioUrl" }, { status: 400 });
+    }
+    try {
+      const project = await assignSimpleFusionComposeClipExistingAudio(
+        auth.userId,
+        id,
+        clipId,
+        { audioUrl, subtitle: body?.subtitle },
+      );
+      return NextResponse.json({ project });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "绑定失败";
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+  }
 
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");

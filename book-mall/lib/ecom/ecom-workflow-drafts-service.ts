@@ -356,7 +356,7 @@ async function listSeedVideoDrafts(userId: string): Promise<EcomWorkflowDraftIte
         kind: "seed-video",
         projectId: row.id,
         title: row.title?.trim() || "种草视频",
-        featureLabel: "图片生种草视频",
+        featureLabel: "服装种草视频",
         domainLabel: "视频",
         phaseLabel: phase,
         summary: shotCount > 0 ? `${shotCount} 镜脚本` : "进行中",

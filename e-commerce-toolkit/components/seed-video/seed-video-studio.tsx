@@ -553,7 +553,7 @@ export function SeedVideoStudio() {
     return (
       <>
         <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
-          <h1 className="text-lg font-semibold text-[#1d1d1f]">图片生种草视频</h1>
+          <h1 className="text-lg font-semibold text-[#1d1d1f]">服装种草视频</h1>
           <p className="max-w-md text-sm text-[#6e6e73]">
             上传商品/穿搭素材，选择 Skill 策划脚本与镜头，支持方案①直接连贯成片或方案②逐镜 I2V + TTS +
             合成。

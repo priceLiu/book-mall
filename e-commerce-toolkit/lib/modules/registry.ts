@@ -18,7 +18,6 @@ export const VIDEO_PRESETS = [
   { slug: "camera", title: "视频运镜", action: "camera" },
   { slug: "digital-human", title: "数字人", action: "digital-human" },
   { slug: "mirror-selfie", title: "户外对镜自拍", action: "mirror-selfie" },
-  { slug: "hit-product", title: "爆款服装带货", action: "hit-product" },
 ] as const;
 
 export function ecomToolKey(module: string, action: string): string {
@@ -138,7 +137,7 @@ export const ECOM_MODULES: EcomModuleDef[] = [
   },
   {
     id: "seed-video",
-    title: "图片生种草视频",
+    title: "服装种草视频",
     tagline: "素材策划 + 30s 种草短视频成片",
     href: "/ecom/seed-video",
     kind: "video",
