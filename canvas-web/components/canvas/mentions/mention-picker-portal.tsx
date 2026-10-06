@@ -144,6 +144,9 @@ export function MentionPickerPortal({
   selectedIndex,
   headerTitle = "角色 · 拖标题栏移动 · ←→ Enter 插入",
   emptyHint,
+  sourceTabs,
+  sourceTab = "my",
+  onSourceTabChange,
   onSelect,
   onHoverIndex,
   onClose,
@@ -158,6 +161,10 @@ export function MentionPickerPortal({
   selectedIndex: number;
   headerTitle?: string;
   emptyHint: string;
+  /** Dock @ · 「我的 | 平台的」来源切换 */
+  sourceTabs?: boolean;
+  sourceTab?: "my" | "platform";
+  onSourceTabChange?: (tab: "my" | "platform") => void;
   onSelect: (item: MentionableItem) => void;
   onHoverIndex: (index: number) => void;
   onClose: () => void;
@@ -284,6 +291,33 @@ export function MentionPickerPortal({
           <X className="size-3.5" />
         </button>
       </div>
+      {sourceTabs ? (
+        <div className="flex gap-1 border-b border-white/10 px-2 py-1.5">
+          {(
+            [
+              ["my", "我的"],
+              ["platform", "平台的"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className={cn(
+                "rounded-md px-2.5 py-1 text-[10px] font-medium transition",
+                sourceTab === id
+                  ? "bg-violet-500/25 text-violet-100"
+                  : "text-white/50 hover:bg-white/8 hover:text-white/80",
+              )}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onSourceTabChange?.(id);
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
       <div className="overflow-x-auto p-2">
         {items.length ? (
           <div className="flex flex-nowrap gap-2">

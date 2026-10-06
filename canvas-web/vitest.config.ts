@@ -123,6 +123,7 @@ export default defineConfig({
       "test/unit/pro2-dock-ref-resolve.test.ts",
       "test/unit/pro2-dock-upstream-label.test.ts",
       "test/unit/resolve-dock-run-prompt.test.ts",
+      "test/unit/resolve-camera-shot-mentions.test.ts",
       "test/unit/libtv-dock-scale.test.ts",
       "test/unit/libtv-dock-engine-models.test.ts",
       "test/unit/libtv-voice-preview.test.ts",

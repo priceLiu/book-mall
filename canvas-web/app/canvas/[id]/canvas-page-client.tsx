@@ -51,6 +51,7 @@ import { useCanvasTaskSse } from "@/lib/canvas/use-canvas-task-sse";
 import { hasAnyMediaRenderInFlight } from "@/lib/canvas/media-render-in-flight";
 import { NodePalette } from "@/components/canvas/node-palette";
 import { CanvasToolbarShellPortal } from "@/components/canvas/canvas-toolbar-shell-portal";
+import { openPlatformAssetHub } from "@/components/canvas/platform-asset-hub/platform-asset-hub-host";
 import { CanvasToolbar } from "@/components/canvas/toolbar";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { installPro2WizardCanvasLiveSync } from "@/lib/canvas/pro2-wizard-canvas-live-sync";
@@ -1754,6 +1755,14 @@ function Inner({ projectId }: { projectId: string }) {
               closeAllToolbarPanels();
               setMyPromptHistoryOpen(true);
             }}
+            onOpenPlatformAssets={
+              isStoryPro2Canvas || isSbv1Canvas
+                ? () => {
+                    closeAllToolbarPanels();
+                    openPlatformAssetHub({ section: "catalog" });
+                  }
+                : undefined
+            }
             onOpenStyleLibrary={
               isStoryProCanvas
                 ? () => {

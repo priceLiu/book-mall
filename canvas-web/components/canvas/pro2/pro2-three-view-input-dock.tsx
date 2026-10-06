@@ -19,7 +19,7 @@ import {
   revertOptimisticLibtvMediaRunStart,
 } from "@/lib/canvas/libtv-image-node-run";
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
-import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
+import { usePro2DockMentionables } from "@/lib/canvas/use-pro2-dock-mentionables";
 import {
   resolvePro2DockUpstreamLinks,
   resolvePro2DockStyleFromUpstream,
@@ -163,10 +163,7 @@ export function Pro2ThreeViewInputDock() {
     d.dockStyleRef,
   );
 
-  const mentionables = useMemo(
-    () => buildPro2DockMentionables(upstreamLinks),
-    [upstreamLinks],
-  );
+  const mentionables = usePro2DockMentionables(upstreamLinks);
   const activeRefIds = useMemo(
     () => dockActiveRefIdsFromPrompt(dockInput),
     [dockInput],

@@ -12,6 +12,7 @@ import {
   PROJECT_ASSET_TAB_KINDS,
 } from "@/lib/canvas/project-asset-kind-map";
 import type { AssetVisibility, ProjectAssetKind } from "@/lib/canvas/project-asset-types";
+import { PROJECT_ASSET_SHARE_SCOPE_OPTIONS } from "@/lib/canvas/project-asset-share-scope";
 import { notifyProjectAssetsChanged } from "@/lib/canvas/use-project-assets";
 import { ProjectAssetMediaPreviewGrid } from "./project-asset-grid-card";
 
@@ -172,50 +173,31 @@ export function SaveProjectAssetDialog({
         </label>
 
         <fieldset className="mt-3 text-xs text-white/60">
-          <legend className="mb-1">保存范围</legend>
+          <legend className="mb-1">共享范围（我的资产 · 非平台官方库）</legend>
           <div className="space-y-1.5">
-            <label className="flex cursor-pointer items-start gap-1.5">
-              <input
-                type="radio"
-                className="mt-0.5"
-                checked={scope === "project"}
-                onChange={() => setScope("project")}
-              />
-              <span>
-                <span className="block text-white/85">本项目</span>
-                <span className="text-[10px] text-white/40">
-                  标记来源为当前画布；仍可在其他画布的项目资产面板中使用
-                </span>
-              </span>
-            </label>
-            <label className="flex cursor-pointer items-start gap-1.5">
-              <input
-                type="radio"
-                className="mt-0.5"
-                checked={scope === "user"}
-                onChange={() => setScope("user")}
-              />
-              <span>
-                <span className="block text-white/85">我的空间可用</span>
-                <span className="text-[10px] text-white/40">
-                  本人创建的所有画布均可插入，项目资产面板可见
-                </span>
-              </span>
-            </label>
-            {showTeamShare ? (
-              <label className="flex cursor-pointer items-start gap-1.5">
-                <input
-                  type="radio"
-                  className="mt-0.5"
-                  checked={scope === "library"}
-                  onChange={() => setScope("library")}
-                />
-                <span>
-                  <span className="block text-white/85">租户复用库</span>
-                  <span className="text-[10px] text-white/40">团队全员可见可用</span>
-                </span>
-              </label>
-            ) : null}
+            {PROJECT_ASSET_SHARE_SCOPE_OPTIONS.filter(
+              (o) => o.id !== "team" || showTeamShare,
+            ).map((opt) => {
+              const value =
+                opt.id === "team" ? ("library" as const) : opt.id;
+              return (
+                <label
+                  key={opt.id}
+                  className="flex cursor-pointer items-start gap-1.5"
+                >
+                  <input
+                    type="radio"
+                    className="mt-0.5"
+                    checked={scope === value}
+                    onChange={() => setScope(value)}
+                  />
+                  <span>
+                    <span className="block text-white/85">{opt.title}</span>
+                    <span className="text-[10px] text-white/40">{opt.hint}</span>
+                  </span>
+                </label>
+              );
+            })}
           </div>
         </fieldset>
 

@@ -13,7 +13,7 @@ import {
 } from "@/lib/canvas/use-libtv-floating-dock";
 import { useLibtvShouldSuppressFloatingDock } from "@/lib/canvas/libtv-floating-dock-selection";
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
-import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
+import { usePro2DockMentionables } from "@/lib/canvas/use-pro2-dock-mentionables";
 import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
 import {
   optimisticLibtvMediaRunStart,
@@ -155,10 +155,7 @@ export function LibtvAudioInputDock() {
     );
   }, [storeNode, nodes, edges]);
 
-  const mentionables = useMemo(
-    () => buildPro2DockMentionables(upstreamLinks),
-    [upstreamLinks],
-  );
+  const mentionables = usePro2DockMentionables(upstreamLinks);
 
   const effectiveText = useMemo(() => {
     if (!storeNode) return "";

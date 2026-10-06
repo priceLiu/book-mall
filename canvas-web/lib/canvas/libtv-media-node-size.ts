@@ -38,7 +38,7 @@ import {
   PRO2_IMAGE_NODE_WIDTH,
   PRO2_AUDIO_NODE_HEIGHT,
   PRO2_AUDIO_NODE_WIDTH,
-} from "./story-pro2-node-chrome";
+} from "./story-pro2-node-dimensions";
 import type { CanvasFlowNode } from "./types";
 import { groupHasSbv1VideoChildren } from "./sbv1-media-group-meta";
 

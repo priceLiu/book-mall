@@ -1,5 +1,6 @@
 "use client";
 
+import { openPlatformAssetHub } from "@/components/canvas/platform-asset-hub/platform-asset-hub-host";
 import { flowPositionAtScreenPoint, flowPositionAtViewportCenter } from "./viewport-placement";
 import {
   buildPro2ImageNodeData,
@@ -134,11 +135,22 @@ export async function handlePro2ToolbarAddNodePick(
     if (!ok) return;
   }
 
-  if (itemId === "style-library" || itemId === "style") {
-    if (options?.onOpenStyleLibrary) {
-      options.onOpenStyleLibrary();
+  if (
+    itemId === "style-library" ||
+    itemId === "style" ||
+    itemId === "platform-asset-hub" ||
+    itemId === "global-asset-library"
+  ) {
+    if (itemId === "style-library" || itemId === "style") {
+      openPlatformAssetHub({ section: "style" });
+    } else if (itemId === "global-asset-library") {
+      openPlatformAssetHub({
+        section: "catalog",
+        pickCatalog: true,
+        spawnAtScreen: options?.spawnAtScreen,
+      });
     } else {
-      window.dispatchEvent(new CustomEvent("canvas:open-pro2-style-library"));
+      openPlatformAssetHub({ section: "catalog" });
     }
     return;
   }

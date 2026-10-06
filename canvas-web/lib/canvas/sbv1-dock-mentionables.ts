@@ -1,6 +1,7 @@
 import type { MentionableItem } from "@/components/canvas/mentions/MentionsTextarea";
 import type { Pro2DockUpstreamLink } from "./pro2-dock-upstream-links";
 import { buildPro2DockMentionables } from "./pro2-dock-mentionables";
+import type { ProjectAssetRecord } from "./project-asset-types";
 import {
   type Sbv1UpstreamRefLink,
 } from "./sbv1-upstream-ref-links";
@@ -91,6 +92,7 @@ export function buildSbv1VideoEngineDockMentionables(
   extraLinks: Pro2DockUpstreamLink[] = [],
   nodes?: CanvasFlowNode[],
   motionVideoLinks: Sbv1UpstreamRefLink[] = [],
+  libraryAssets: ProjectAssetRecord[] = [],
 ): MentionableItem[] {
   const upstream = buildSbv1VideoEngineDockUpstreamLinks(
     upstreamRefLinks,
@@ -98,7 +100,7 @@ export function buildSbv1VideoEngineDockMentionables(
     extraLinks,
     motionVideoLinks,
   );
-  const items = buildPro2DockMentionables(upstream);
+  const items = buildPro2DockMentionables(upstream, [], libraryAssets);
   const imageExtras = buildSbv1DockMentionables(upstreamRefLinks, nodes);
   const seen = new Set(items.map((i) => i.id));
   for (const item of imageExtras) {

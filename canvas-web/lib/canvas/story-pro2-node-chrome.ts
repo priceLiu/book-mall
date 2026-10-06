@@ -8,19 +8,11 @@ import {
   LIBTV_INPUT_DOCK_DIVIDER,
   LIBTV_INPUT_DOCK_TEXTAREA_CLASS,
   LIBTV_NODE_BORDER_DEFAULT_COLOR,
-  LIBTV_MEDIA_STAGE_LANDSCAPE_16_9_HEIGHT,
-  LIBTV_MEDIA_STAGE_LANDSCAPE_WIDTH,
-  LIBTV_SQUARE_IMAGE_NODE_HEIGHT,
-  LIBTV_SQUARE_IMAGE_NODE_MIN_HEIGHT,
-  LIBTV_SQUARE_IMAGE_NODE_MIN_WIDTH,
-  LIBTV_SQUARE_IMAGE_NODE_WIDTH,
-  LIBTV_AUDIO_TRACK_NODE_HEIGHT,
-  LIBTV_AUDIO_TRACK_NODE_MIN_HEIGHT,
-  LIBTV_AUDIO_TRACK_NODE_MIN_WIDTH,
-  LIBTV_AUDIO_TRACK_NODE_WIDTH,
-  LIBTV_AUDIO_MINI_PLAYER_HEIGHT,
 } from "./libtv-node-chrome";
 import { CANVAS_SEMANTIC_TITLE_CLASS } from "./canvas-chrome-semantics";
+
+export * from "./story-pro2-node-dimensions";
+export * from "./story-pro2-dock-chrome";
 
 export const PRO2_NODE_ACCENT = "#9f8fef";
 export const PRO2_NODE_ACCENT_SOFT = "rgba(159, 143, 239, 0.1)";
@@ -38,86 +30,8 @@ export const PRO2_DOCK_SHELL_BG = LIBTV_INPUT_DOCK_BG;
 /** 输入坞内部分隔线 · 极浅灰 */
 export const PRO2_DOCK_DIVIDER = LIBTV_INPUT_DOCK_DIVIDER;
 
-/** 控制类薄卡（列摘要等） */
-export const PRO2_CONTROL_CARD_WIDTH = 360;
-export const PRO2_CONTROL_CARD_HEIGHT = 140;
-
-/** 2.0 · 3D 导演台控制卡（图 1） */
-export const PRO2_3D_DESK_NODE_WIDTH = 360;
-export const PRO2_3D_DESK_NODE_HEIGHT = 280;
-export const PRO2_3D_DESK_NODE_MIN_WIDTH = 300;
-export const PRO2_3D_DESK_NODE_MIN_HEIGHT = 240;
-
-/** 2.0 标签节点 · 可压成单行便签 */
-export const PRO2_TAG_NODE_MIN_WIDTH = 120;
-export const PRO2_TAG_NODE_MIN_HEIGHT = 54;
-export const PRO2_TAG_NODE_WIDTH = 440;
-export const PRO2_TAG_NODE_HEIGHT = 88;
-/** 2.0 文本节点（LibTV 卡片 · 默认 4:3 · 可拉伸） */
-export const PRO2_TEXT_NODE_WIDTH = 440;
-export const PRO2_TEXT_NODE_MIN_WIDTH = 320;
-/** 卡片主体默认高度（宽:高 = 4:3，不含上方「文本节点 N」标签行） */
-export const PRO2_TEXT_NODE_CARD_HEIGHT = Math.round((PRO2_TEXT_NODE_WIDTH * 3) / 4);
-export const PRO2_TEXT_NODE_MIN_HEIGHT =
-  Math.round((PRO2_TEXT_NODE_MIN_WIDTH * 3) / 4) + 28;
-/** React Flow 节点登记默认高度 ≈ 标签行 + 卡片 */
-export const PRO2_TEXT_NODE_HEIGHT = PRO2_TEXT_NODE_CARD_HEIGHT + 28;
-
 /** 2.0 故事剧本生成 / 脚本表格节点 */
 export const PRO2_SCRIPT_HUB_NODE_LABEL = "故事剧本生成";
-export const PRO2_SCRIPT_NODE_WIDTH = 728;
-export const PRO2_SCRIPT_NODE_MIN_WIDTH = 320;
-export const PRO2_SCRIPT_NODE_CARD_HEIGHT = 367;
-export const PRO2_SCRIPT_NODE_MIN_HEIGHT = 220;
-export const PRO2_SCRIPT_NODE_HEIGHT = PRO2_SCRIPT_NODE_CARD_HEIGHT + 28;
-
-/** 2.0 图片 / 风格素材节点（LibTV 方形媒体卡 · alias `LIBTV_SQUARE_IMAGE_NODE_*`） */
-export const PRO2_IMAGE_NODE_WIDTH = LIBTV_SQUARE_IMAGE_NODE_WIDTH;
-export const PRO2_IMAGE_NODE_HEIGHT = LIBTV_SQUARE_IMAGE_NODE_HEIGHT;
-export const PRO2_IMAGE_NODE_MIN_WIDTH = LIBTV_SQUARE_IMAGE_NODE_MIN_WIDTH;
-export const PRO2_IMAGE_NODE_MIN_HEIGHT = LIBTV_SQUARE_IMAGE_NODE_MIN_HEIGHT;
-/** @deprecated 与 PRO2_IMAGE_NODE_HEIGHT 相同（LibTV 图片卡无外挂标题行） */
-export const PRO2_IMAGE_NODE_CARD_HEIGHT = PRO2_IMAGE_NODE_HEIGHT;
-
-/** 2.0 音频节点（LibTV 横条音轨卡 · 标题栏 + 迷你播放器） */
-export const PRO2_AUDIO_NODE_CARD_HEIGHT = LIBTV_AUDIO_MINI_PLAYER_HEIGHT;
-export const PRO2_AUDIO_NODE_WIDTH = LIBTV_AUDIO_TRACK_NODE_WIDTH;
-export const PRO2_AUDIO_NODE_HEIGHT = LIBTV_AUDIO_TRACK_NODE_HEIGHT;
-export const PRO2_AUDIO_NODE_MIN_WIDTH = LIBTV_AUDIO_TRACK_NODE_MIN_WIDTH;
-export const PRO2_AUDIO_NODE_MIN_HEIGHT = LIBTV_AUDIO_TRACK_NODE_MIN_HEIGHT;
-
-/** 2.0 三视图角色节点（图 3 · 横向矩形 · contain 完整显示） */
-export const PRO2_CHARACTER_THREE_VIEW_WIDTH = 400;
-export const PRO2_CHARACTER_THREE_VIEW_HEIGHT = 280;
-export const PRO2_CHARACTER_THREE_VIEW_MIN_WIDTH = 320;
-export const PRO2_CHARACTER_THREE_VIEW_MIN_HEIGHT = 160;
-export const PRO2_CHARACTER_THREE_VIEW_CARD_HEIGHT = 252;
-
-/** 2.0 统一输入坞（16:6 · flow 基准尺寸 · 屏幕缩放见 libtv-dock-scale.ts） */
-import {
-  LIBTV_DOCK_EXPAND_FACTOR,
-  libtvDockFlowSize,
-} from "@/lib/canvas/libtv-dock-scale";
-
-export {
-  LIBTV_DOCK_EXPAND_FACTOR as PRO2_DOCK_EXPAND_FACTOR,
-  LIBTV_DOCK_FLOW_HEIGHT as PRO2_DOCK_HEIGHT,
-  LIBTV_DOCK_FLOW_WIDTH as PRO2_DOCK_WIDTH,
-  libtvDockFlowSize,
-} from "@/lib/canvas/libtv-dock-scale";
-
-const _baseDock = libtvDockFlowSize();
-/** 输入坞放大态：宽度不变，仅增高 prompt 区 */
-export const PRO2_DOCK_WIDTH_EXPANDED = _baseDock.w;
-export const PRO2_DOCK_HEIGHT_EXPANDED = Math.round(
-  _baseDock.h * LIBTV_DOCK_EXPAND_FACTOR,
-);
-
-/** 2.0 分镜图板节点（图 4 · 双列瀑布流） */
-export const PRO2_FRAME_BOARD_WIDTH = 520;
-export const PRO2_FRAME_BOARD_HEIGHT = 480;
-export const PRO2_FRAME_BOARD_MIN_WIDTH = 400;
-export const PRO2_FRAME_BOARD_MIN_HEIGHT = 320;
 
 /** 2.0 媒体组容器（分镜图 / 三视图 · 图 1） */
 export const PRO2_MEDIA_GROUP_BG = "#3C3C3C";
@@ -146,19 +60,6 @@ export const PRO2_MEDIA_NODE_TITLE_CLASS =
 /** 2.0 文本 / 脚本节点标题栏 · 整行宽 · 唯一拖动手柄 */
 export const PRO2_TEXT_NODE_TITLE_CLASS =
   "flex w-full min-h-[26px] shrink-0 cursor-grab items-center gap-1.5 px-1 text-[11px] text-white active:cursor-grabbing";
-
-/** Pro2 媒体节点 · 外置标题行占用（min-h 26 + mb-1.5）· 须与 `computeLibtvMediaBoxFromAspect` header 一致 */
-export const PRO2_EXTERNAL_MEDIA_TITLE_CHROME_HEIGHT = 32;
-
-/** 空态图片节点 · 默认 16:9（与 Dock 参数面板一致） */
-export const PRO2_IMAGE_NODE_16_9_WIDTH = LIBTV_MEDIA_STAGE_LANDSCAPE_WIDTH;
-export const PRO2_IMAGE_NODE_16_9_HEIGHT =
-  PRO2_EXTERNAL_MEDIA_TITLE_CHROME_HEIGHT +
-  LIBTV_MEDIA_STAGE_LANDSCAPE_16_9_HEIGHT;
-
-/** 列摘要薄卡 */
-export const PRO2_COLUMN_CARD_WIDTH = 320;
-export const PRO2_COLUMN_CARD_HEIGHT = 120;
 
 /** 2.0 文本 / 脚本 / 列摘要薄卡 */
 export const PRO2_CARD_SHELL_CLASS =

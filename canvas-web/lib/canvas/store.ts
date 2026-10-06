@@ -382,6 +382,10 @@ type CanvasState = {
   pro2StyleLibImageNodeId: string | null;
   setPro2StyleLibImageNodeId: (nodeId: string | null) => void;
 
+  /** 平台 Hub · 镜头描述等写入指定节点 Dock */
+  platformAssetDockNodeId: string | null;
+  setPlatformAssetDockNodeId: (nodeId: string | null) => void;
+
   /** 画布 graph.meta（生产门禁 / 关联剧本等） */
   graphMeta: CanvasGraph["meta"] | null;
 
@@ -683,6 +687,9 @@ export const useCanvasStore = create<CanvasState>()(
       pro2StyleLibImageNodeId: null,
       setPro2StyleLibImageNodeId: (nodeId) =>
         set({ pro2StyleLibImageNodeId: nodeId }),
+      platformAssetDockNodeId: null,
+      setPlatformAssetDockNodeId: (nodeId) =>
+        set({ platformAssetDockNodeId: nodeId }),
 
       graphMeta: null,
 

@@ -30,6 +30,9 @@ import {
   resolveCaretTextAnchor,
   scanMentionTriggerBeforeCursor,
 } from "@/lib/canvas/mention-editable-trigger";
+import { scanSlashCameraShotTriggerBeforeCursor } from "@/lib/canvas/mention-slash-camera-shot-trigger";
+import { filterCameraShotMentionables } from "@/lib/canvas/camera-shot-library/mentionables";
+import { isPlatformDockMentionId } from "@/lib/canvas/pro2-dock-mentionables";
 import { getMentionDragId, hasMentionDrag } from "@/lib/canvas/mention-drag";
 import {
   PRO2_DOCK_TEXTAREA_INSET_CLASS,
@@ -169,7 +172,13 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
     const dragRafRef = useRef<number | null>(null);
     const [popoverOpen, setPopoverOpen] = useState(false);
     const [popoverFilter, setPopoverFilter] = useState("");
+    const [popoverTriggerMode, setPopoverTriggerMode] = useState<"at" | "slash-camera">(
+      "at",
+    );
     const [popoverIndex, setPopoverIndex] = useState(0);
+    const [mentionSourceTab, setMentionSourceTab] = useState<"my" | "platform">(
+      "my",
+    );
     const [anchorTick, setAnchorTick] = useState(0);
     const [hoverPreview, setHoverPreview] = useState<{
       item: MentionableItem;
@@ -289,14 +298,33 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
     );
 
     // ---- @ 触发检测 ----
+    const mentionSourceSplit = libtvDock && popoverTriggerMode === "at";
+
     const filtered = useMemo(() => {
-      if (!popoverFilter) return mentionables;
+      if (popoverTriggerMode === "slash-camera") {
+        return filterCameraShotMentionables(popoverFilter);
+      }
+      let base = mentionables;
+      if (mentionSourceSplit) {
+        base = base.filter((m) =>
+          mentionSourceTab === "platform"
+            ? isPlatformDockMentionId(m.id)
+            : !isPlatformDockMentionId(m.id),
+        );
+      }
+      if (!popoverFilter) return base;
       const f = popoverFilter.toLowerCase();
-      return mentionables.filter(
+      return base.filter(
         (m) =>
           m.label.toLowerCase().includes(f) || m.id.toLowerCase().includes(f),
       );
-    }, [mentionables, popoverFilter]);
+    }, [
+      mentionables,
+      popoverFilter,
+      popoverTriggerMode,
+      mentionSourceSplit,
+      mentionSourceTab,
+    ]);
 
     useEffect(() => {
       if (popoverIndex >= filtered.length) setPopoverIndex(0);
@@ -321,6 +349,17 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
       if (!anchor) return closePopover();
 
       const textBefore = (anchor.node.textContent ?? "").slice(0, anchor.offset);
+      const slashHit = scanSlashCameraShotTriggerBeforeCursor(textBefore);
+      if (slashHit) {
+        triggerAnchorRef.current = { node: anchor.node, at: slashHit.at };
+        setPopoverTriggerMode("slash-camera");
+        setMentionSourceTab("platform");
+        setPopoverFilter(slashHit.filter);
+        setPopoverOpen(true);
+        setPopoverIndex(0);
+        setAnchorTick((t) => t + 1);
+        return;
+      }
       const hit = scanMentionTriggerBeforeCursor(
         textBefore,
         mentionablesRef.current,
@@ -328,6 +367,8 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
       if (!hit) return closePopover();
 
       triggerAnchorRef.current = { node: anchor.node, at: hit.at };
+      setPopoverTriggerMode("at");
+      setMentionSourceTab("my");
       setPopoverFilter(hit.filter);
       setPopoverOpen(true);
       setPopoverIndex(0);
@@ -796,6 +837,12 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
           selectedIndex={popoverIndex}
           headerTitle={mentionPickerTitle}
           emptyHint={mentionPickerEmptyHint}
+          sourceTabs={mentionSourceSplit}
+          sourceTab={mentionSourceTab}
+          onSourceTabChange={(tab) => {
+            setMentionSourceTab(tab);
+            setPopoverIndex(0);
+          }}
           onSelect={insertMention}
           onHoverIndex={setPopoverIndex}
           onClose={closePopover}

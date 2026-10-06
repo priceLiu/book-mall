@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, type ReactNode } from "react";
 
+import { PlatformAssetHubHost } from "@/components/canvas/platform-asset-hub/platform-asset-hub-host";
 import { GlobalAssetLibraryProvider } from "@/docker-shared/global-asset-library";
 import { createCanvasGlobalAssetLibraryApi } from "@/lib/global-asset-library-api";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -17,6 +18,7 @@ export function CanvasGlobalAssetLibraryRoot({ children }: { children: ReactNode
   return (
     <GlobalAssetLibraryProvider api={api} variant="dark" onOpenChange={onOpenChange}>
       {children}
+      <PlatformAssetHubHost />
     </GlobalAssetLibraryProvider>
   );
 }

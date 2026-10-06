@@ -275,12 +275,6 @@ export const PRO2_ASSET_LIB_SUBMENU: Pro2AddMenuSection[] = [
         badge: "NEW",
       },
       {
-        id: "style-library",
-        label: "风格库",
-        icon: LayoutGrid,
-        enabled: true,
-      },
-      {
         id: "fx-library",
         label: "特效库",
         icon: Sparkles,

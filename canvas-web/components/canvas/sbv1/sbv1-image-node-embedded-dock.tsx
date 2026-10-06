@@ -7,7 +7,7 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
 import { useLibtvDockGenerationStop } from "@/lib/canvas/use-libtv-dock-generation-stop";
-import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
+import { usePro2DockMentionables } from "@/lib/canvas/use-pro2-dock-mentionables";
 import {
   resolvePro2DockUpstreamLinks,
   resolvePro2DockStyleFromUpstream,
@@ -78,10 +78,7 @@ export function Sbv1ImageNodeEmbeddedDock({
     [upstreamLinks],
   );
 
-  const mentionables = useMemo(
-    () => buildPro2DockMentionables(upstreamLinks),
-    [upstreamLinks],
-  );
+  const mentionables = usePro2DockMentionables(upstreamLinks);
   const activeRefIds = useMemo(
     () => dockActiveRefIdsFromPrompt(dockInput),
     [dockInput],

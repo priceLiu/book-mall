@@ -16,7 +16,7 @@ import type { MentionsTextareaCommitHandle } from "@/components/canvas/mentions/
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { LibtvDockSendButton } from "@/components/canvas/libtv-dock-send-button";
 import { useLibtvDockGenerationStop } from "@/lib/canvas/use-libtv-dock-generation-stop";
-import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
+import { usePro2DockMentionables } from "@/lib/canvas/use-pro2-dock-mentionables";
 import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
@@ -216,10 +216,7 @@ function Pro2PromptInputDockBody({
     );
   }, [storeNode, nodes, edges]);
 
-  const mentionables = useMemo(
-    () => buildPro2DockMentionables(upstreamLinks),
-    [upstreamLinks],
-  );
+  const mentionables = usePro2DockMentionables(upstreamLinks);
   const activeRefIds = useMemo(
     () => dockActiveRefIdsFromPrompt(prompt),
     [prompt],

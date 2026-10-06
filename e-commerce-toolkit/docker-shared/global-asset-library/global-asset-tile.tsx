@@ -26,17 +26,20 @@ type Props = {
 function GlobalAssetPreviewLightbox({
   item,
   variant,
+  stackZIndex = 410,
   onClose,
 }: {
   item: GlobalAssetPickItem;
   variant: GlobalAssetLibraryVariant;
+  stackZIndex?: number;
   onClose: () => void;
 }) {
   const theme = globalAssetTheme(variant);
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[410] flex items-center justify-center bg-black/80 p-6"
+      className="fixed inset-0 flex items-center justify-center bg-black/80 p-6"
+      style={{ zIndex: stackZIndex }}
       role="dialog"
       aria-modal="true"
       aria-label={`预览 ${item.title}`}

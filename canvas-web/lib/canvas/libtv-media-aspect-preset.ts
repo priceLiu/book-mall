@@ -355,6 +355,8 @@ export function hasExplicitLibtvAspectRatioSelection(
   };
   const raw = d.aspectRatio?.trim();
   if (raw && raw !== "auto") return true;
+  // aspectRatio 为 auto 时 engine.params 仅为模型出厂默认，不算 Dock 显式选择
+  if (!raw || raw === "auto") return false;
   if (node.type === "sbv1-video-engine") {
     const fromParams = d.engine?.params?.aspect_ratio ?? d.engine?.params?.ratio;
     if (typeof fromParams === "string" && fromParams.trim()) return true;
@@ -513,6 +515,7 @@ export function shouldSkipLibtvMediaAspectPresetForNaturalMedia(
 
   /** Dock 已选比例 · 生成前/后均须走 preset，不被成片 natural 尺寸覆盖 */
   if (hasExplicitLibtvAspectRatioSelection(node)) return false;
+
   if (node.type === "sbv1-video-engine") {
     const mediaUrl =
       d.runtime?.ossUrl?.trim() || d.runtime?.ephemeralUrl?.trim();

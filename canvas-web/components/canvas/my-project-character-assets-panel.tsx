@@ -37,9 +37,9 @@ export function MyProjectCharacterAssetsPanel({
         <div className="flex items-center gap-2">
           <ProjectAssetsPanelIcon />
           <div>
-            <p className="text-sm font-medium">项目资产</p>
+            <p className="text-sm font-medium">我的资产</p>
             <p className="text-[10px] text-white/45">
-              角色、场景、分镜等媒体资产
+              保存后的资产 · 权限与范围由你设定
             </p>
           </div>
         </div>

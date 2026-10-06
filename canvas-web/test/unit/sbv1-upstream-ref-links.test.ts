@@ -221,9 +221,9 @@ describe("buildSbv1VideoEngineDockMentionables", () => {
       undefined,
       motion,
     );
-    expect(items).toHaveLength(1);
-    expect(items[0]?.kind).toBe("video");
-    expect(mentionPreviewShouldUseVideo(items[0]!)).toBe(true);
+    const motionItem = items.find((i) => i.id === "sbv1-motion-v-src");
+    expect(motionItem?.kind).toBe("video");
+    expect(mentionPreviewShouldUseVideo(motionItem!)).toBe(true);
   });
 });
 

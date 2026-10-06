@@ -2,8 +2,13 @@ import type { MentionableItem } from "@/components/canvas/mentions/MentionsTexta
 import type { Pro2DockUpstreamLink } from "./pro2-dock-upstream-links";
 import type { StoryRefImage } from "./story-ref-image";
 import type { ProjectAssetRecord } from "./project-asset-types";
+import { buildCameraShotMentionables } from "./camera-shot-library/mentionables";
 
-/** 输入坞 · 上游 chip + 粘贴参考图 + 租户库资产 → @ 列表 */
+export function isPlatformDockMentionId(id: string): boolean {
+  return id.startsWith("cam:");
+}
+
+/** 输入坞 · 上游 chip + 粘贴参考图 + 项目资产 + 平台镜头描述 → @ 列表 */
 export function buildPro2DockMentionables(
   upstreamLinks: Pro2DockUpstreamLink[],
   dockRefImages: StoryRefImage[] = [],
@@ -55,6 +60,12 @@ export function buildPro2DockMentionables(
       kind: "image",
       previewUrl: asset.thumbnailUrl || asset.refs[0]?.mediaUrl,
     });
+  }
+
+  for (const cam of buildCameraShotMentionables()) {
+    if (seen.has(cam.id)) continue;
+    seen.add(cam.id);
+    items.push(cam);
   }
 
   return items;

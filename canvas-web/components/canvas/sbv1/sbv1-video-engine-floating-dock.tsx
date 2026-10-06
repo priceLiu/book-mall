@@ -3,7 +3,7 @@
 import { memo, useCallback, useMemo } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { buildSbv1VideoEngineDockMentionables } from "@/lib/canvas/sbv1-dock-mentionables";
+import { useSbv1VideoEngineDockMentionables } from "@/lib/canvas/use-pro2-dock-mentionables";
 import { resolvePro2VideoBoardCellDockLinks } from "@/lib/canvas/pro2-video-board-dock-links";
 import { resolveSbv1VideoEngineInputs, resolveSbv1VideoEngineEffectivePrompt } from "@/lib/canvas/resolve-sbv1-video-engine-inputs";
 import { resolveSbv1UpstreamRefLinks, resolveSbv1UpstreamMotionVideoLinks } from "@/lib/canvas/sbv1-upstream-ref-links";
@@ -150,22 +150,12 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
     [nodeId, nodes, edges],
   );
 
-  const mentionables = useMemo(
-    () =>
-      buildSbv1VideoEngineDockMentionables(
-        upstreamLinks,
-        upstreamTextLinks,
-        pro2BoardDockLinks,
-        nodes,
-        motionVideoLinks,
-      ),
-    [
-      upstreamLinks,
-      upstreamTextLinks,
-      pro2BoardDockLinks,
-      nodes,
-      motionVideoLinks,
-    ],
+  const mentionables = useSbv1VideoEngineDockMentionables(
+    upstreamLinks,
+    upstreamTextLinks,
+    pro2BoardDockLinks,
+    nodes,
+    motionVideoLinks,
   );
 
   const dockUpstreamForChips = useMemo(() => {

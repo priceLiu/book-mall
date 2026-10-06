@@ -312,6 +312,16 @@ describe("libtv-media-aspect-preset", () => {
       shouldSkipLibtvMediaAspectPresetForNaturalMedia({
         type: "sbv1-video-engine",
         data: {
+          aspectRatio: "auto",
+          engine: { params: { ratio: "16:9", resolution: "720P" } },
+          runtime: { status: "done", ossUrl: "https://cdn.example/v.mp4" },
+        },
+      }),
+    ).toBe(true);
+    expect(
+      shouldSkipLibtvMediaAspectPresetForNaturalMedia({
+        type: "sbv1-video-engine",
+        data: {
           aspectRatio: "9:16",
           runtime: { status: "done", ossUrl: "https://cdn.example/v.mp4" },
         },
@@ -325,6 +335,6 @@ describe("libtv-media-aspect-preset", () => {
           runtime: { status: "idle", ossUrl: "https://cdn.example/v.mp4" },
         },
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 });

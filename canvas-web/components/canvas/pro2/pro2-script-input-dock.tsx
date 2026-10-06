@@ -14,7 +14,7 @@ import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-
 import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
 import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
-import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
+import { usePro2DockMentionables } from "@/lib/canvas/use-pro2-dock-mentionables";
 import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
@@ -115,10 +115,7 @@ export function Pro2ScriptInputDock() {
     );
   }, [storeNode, nodes, edges]);
 
-  const mentionables = useMemo(
-    () => buildPro2DockMentionables(upstreamLinks, dockRefImages),
-    [upstreamLinks, dockRefImages],
-  );
+  const mentionables = usePro2DockMentionables(upstreamLinks, dockRefImages);
   const activeRefIds = useMemo(
     () => dockActiveRefIdsFromPrompt(dockInput),
     [dockInput],

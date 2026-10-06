@@ -254,11 +254,6 @@ export function UnifiedProjectAssetsView({
               资产指南
             </Link>
           ) : null}
-          {!compact ? (
-            <Link href="/style-library" className={PRO_ASSETS_LINK_CLASS}>
-              风格库
-            </Link>
-          ) : null}
         </div>
 
         <div className="flex flex-wrap gap-1">
@@ -427,7 +422,7 @@ function ProjectAssetGridItem({
               ) : null}
               {!asset.sourceProjectId && asset.visibility === "PRIVATE" ? (
                 <span className="rounded bg-violet-500/20 px-1 py-0.5 text-[8px] text-violet-200">
-                  我的空间
+                  我的·全账号
                 </span>
               ) : null}
               {!asset.sourceProjectId && asset.visibility === "TEAM_PUBLIC" ? (

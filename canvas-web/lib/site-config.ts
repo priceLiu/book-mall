@@ -21,7 +21,7 @@ export const CANVAS_ADMIN_SUB_NAV: CanvasNavItem[] = [
 
 /** 「我的画布」内页居中子导航（原顶栏二级入口） */
 export const CANVAS_PROJECTS_SUB_NAV: CanvasNavItem[] = [
-  { href: "/assets", label: "项目资产" },
+  { href: "/assets", label: "我的资产" },
   { href: "/characters", label: "角色库" },
   { href: "/scripts", label: "脚本" },
   { href: "/storyboards", label: "分镜" },

@@ -197,8 +197,8 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { PRO2_TOOLBAR_ADD_MENU } from "@/lib/canvas/pro2-add-node-menu";
 import { handlePro2ToolbarAddNodePick } from "@/lib/canvas/pro2-add-node-pick";
 import { Pro2AddNodePopover } from "./pro2/pro2-add-node-popover";
+import { openPlatformAssetHub } from "@/components/canvas/platform-asset-hub/platform-asset-hub-host";
 import { useGlobalAssetLibrary } from "@/docker-shared/global-asset-library";
-import { spawnCanvasNodesFromGlobalAssetPick } from "@/lib/canvas/spawn-global-asset-pick";
 
 const PANE_ADD_DBL_CLICK_MS = 420;
 const PANE_ADD_DBL_CLICK_PX = 10;
@@ -616,20 +616,10 @@ function FlowCanvasInner({
       closePaneAddMenu();
 
       if (itemId === "global-asset-library") {
-        openGlobalAssetLibrary({
-          mode: "pick",
-          defaultTab: "catalog",
-          media: "image",
-          maxSelect: 9,
-          title: "平台资产库",
-          onPick: (items) => {
-            spawnCanvasNodesFromGlobalAssetPick(items, {
-              edition: sbv1Canvas ? "sbv1" : "pro2",
-              spawnAtScreen,
-              addNode,
-              setNodes,
-            });
-          },
+        openPlatformAssetHub({
+          section: "catalog",
+          pickCatalog: true,
+          spawnAtScreen,
         });
         return;
       }

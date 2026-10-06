@@ -16,7 +16,7 @@ import {
 } from "@/lib/canvas/use-libtv-floating-dock";
 import type { LibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
 import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
-import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
+import { usePro2DockMentionables } from "@/lib/canvas/use-pro2-dock-mentionables";
 import {
   resolvePro2DockUpstreamLinks,
   resolvePro2DockStyleFromUpstream,
@@ -516,10 +516,7 @@ function LibtvImageInputDockBody({
     dockStyleRef,
   );
 
-  const mentionables = useMemo(
-    () => buildPro2DockMentionables(upstreamLinks, dockRefImages),
-    [upstreamLinks, dockRefImages],
-  );
+  const mentionables = usePro2DockMentionables(upstreamLinks, dockRefImages);
   const activeRefIds = useMemo(
     () => dockActiveRefIdsFromPrompt(dockInput),
     [dockInput],

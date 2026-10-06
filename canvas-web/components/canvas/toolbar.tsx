@@ -86,6 +86,7 @@ export function CanvasToolbar({
   onOpenMyVideoLibrary,
   onOpenProjectCharacterAssets,
   onOpenPromptHistory,
+  onOpenPlatformAssets,
   onOpenStyleLibrary,
   onReflowStoryLayout,
   inflightTaskCount = 0,
@@ -117,7 +118,9 @@ export function CanvasToolbar({
   onOpenMyVideoLibrary?: () => void;
   onOpenProjectCharacterAssets?: () => void;
   onOpenPromptHistory?: () => void;
+  /** @deprecated 请用 onOpenPlatformAssets（section=style） */
   onOpenStyleLibrary?: () => void;
+  onOpenPlatformAssets?: () => void;
   onReflowStoryLayout?: () => void;
   inflightTaskCount?: number;
   immersive?: boolean;
@@ -485,23 +488,21 @@ export function CanvasToolbar({
 
         {onOpenProjectCharacterAssets ? (
           <CanvasToolbarIconButton
-            label="项目资产"
-            hint="查看本项目角色与场景资产库"
+            label="我的资产"
+            hint="保存后的项目资产 · 插入画布或团队共享"
             onClick={onOpenProjectCharacterAssets}
           >
             <UserRound className="size-3.5" />
           </CanvasToolbarIconButton>
         ) : null}
-        {onOpenStyleLibrary ? (
-          <button
-            type="button"
-            onClick={onOpenStyleLibrary}
-            className={CANVAS_TOOLBAR_BTN_CLASS}
-            title="浏览平台内置风格库并套用到风格定义节点"
+        {onOpenPlatformAssets ? (
+          <CanvasToolbarIconButton
+            label="平台资产库"
+            hint="平台官方：模特、风格、镜头描述、数字人等 · 选用不进我的资产"
+            onClick={onOpenPlatformAssets}
           >
-            <LayoutGrid className="size-3" />
-            风格库
-          </button>
+            <LayoutGrid className="size-3.5" />
+          </CanvasToolbarIconButton>
         ) : null}
         {onReflowStoryLayout ? (
           <button

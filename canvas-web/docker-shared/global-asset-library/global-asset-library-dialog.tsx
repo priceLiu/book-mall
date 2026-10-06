@@ -249,7 +249,8 @@ export function GlobalAssetLibraryDialog({
 
   if (!open || typeof document === "undefined") return null;
 
-  const title = options.title ?? "全局资产库";
+  const title = options.title ?? "平台";
+  const embedded = Boolean(options.embedded);
   const activeCount = tab === "catalog" ? counts[catalogKind] : allItems.length;
   const saveDialogOpen = Boolean(sourceImage?.url) && (isSaveOnlyFlow || saveOpen);
 
@@ -270,18 +271,16 @@ export function GlobalAssetLibraryDialog({
     );
   }
 
-  return (
-    <>
-      {showPicker
-        ? createPortal(
-        <div
-          className={`fixed inset-0 z-[300] flex items-center justify-center p-4 ${theme.overlay}`}
-          onClick={onClose}
-        >
+  const pickerInner = showPicker ? (
           <div
-            className={`${GALD_DIALOG_SHELL_CLASS} ${theme.shell}`}
+            className={
+              embedded
+                ? `flex min-h-0 flex-1 flex-col ${theme.shell}`
+                : `${GALD_DIALOG_SHELL_CLASS} ${theme.shell}`
+            }
             onClick={(e) => e.stopPropagation()}
           >
+            {!embedded ? (
             <div className={`flex shrink-0 items-center justify-between border-b px-4 py-2.5 ${theme.header}`}>
               <h2 className={`text-[14px] font-semibold ${theme.textPrimary}`}>{title}</h2>
               <div className="flex items-center gap-2">
@@ -304,6 +303,7 @@ export function GlobalAssetLibraryDialog({
                 </button>
               </div>
             </div>
+            ) : null}
 
             <div className={`flex shrink-0 items-center gap-2 border-b px-4 py-2 ${theme.filterBar}`}>
               <div className={`flex rounded-full p-0.5 ${theme.segmentedTrack}`}>
@@ -394,6 +394,7 @@ export function GlobalAssetLibraryDialog({
                               selectIndex={active ? selected.indexOf(item.id) + 1 : undefined}
                               scopeText={scopeLabel(item.scope)}
                               disabled={mode !== "pick"}
+                              previewLightboxZIndex={options.previewLightboxZIndex}
                               onSelect={() => mode === "pick" && toggle(item.id)}
                             />
                           </li>
@@ -455,9 +456,22 @@ export function GlobalAssetLibraryDialog({
               </div>
             ) : null}
           </div>
-        </div>,
-        document.body,
-        )
+  ) : null;
+
+  return (
+    <>
+      {pickerInner
+        ? embedded
+          ? pickerInner
+          : createPortal(
+              <div
+                className={`fixed inset-0 z-[300] flex items-center justify-center p-4 ${theme.overlay}`}
+                onClick={onClose}
+              >
+                {pickerInner}
+              </div>,
+              document.body,
+            )
         : null}
 
       {saveDialogOpen && sourceImage?.url ? (

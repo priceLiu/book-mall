@@ -373,6 +373,7 @@ export function StoryMediaPreviewModal({
   kind = "image",
   title,
   posterUrl,
+  stackZIndex = 2000,
   onClose,
 }: {
   url: string;
@@ -380,18 +381,21 @@ export function StoryMediaPreviewModal({
   title?: string;
   /** 视频封面 · 弹层播放器模糊铺底，加载期避免灰屏 */
   posterUrl?: string;
+  /** 须高于平台资产库 Hub（1190）等嵌套弹层 */
+  stackZIndex?: number;
   onClose: () => void;
 }) {
   const mounted = useClientPortalMounted();
-  useModalBodyScrollLock();
-  useModalEscapeClose(onClose);
+  useModalBodyScrollLock(Boolean(url.trim()));
+  useModalEscapeClose(onClose, { active: Boolean(url.trim()) });
   const { zoom, zoomBy, reset, stageProps } = useImageZoomPan(url);
 
-  if (!mounted) return null;
+  if (!mounted || !url.trim()) return null;
 
   return createPortal(
     <div
       className={CANVAS_MEDIA_PREVIEW_LIGHTBOX_SHELL_CLASS}
+      style={{ zIndex: stackZIndex }}
       onClick={onClose}
     >
       <div

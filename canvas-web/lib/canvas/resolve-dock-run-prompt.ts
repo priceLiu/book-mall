@@ -3,6 +3,10 @@ import type { StoryRefImage } from "./story-ref-image";
 import { parseReferencedIds } from "./dock-mention-parse";
 import { stripMentionTokensFromPrompt } from "./strip-dock-mentions";
 import { pro2DockRefImageCatalog } from "./pro2-dock-ref-catalog";
+import {
+  resolveCameraShotTokensInPrompt,
+  type CameraShotMentionOverrides,
+} from "./resolve-camera-shot-mentions";
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -118,6 +122,7 @@ function buildDockVideoIndexById(
 export function resolveDockRunPrompt(
   prompt: string,
   upstreamLinks: Pro2DockUpstreamLink[],
+  opts?: { cameraShotOverrides?: CameraShotMentionOverrides },
 ): { prompt: string; extraText: string[] } {
   const mentioned = parseReferencedIds(prompt);
   if (!mentioned.length) {
@@ -137,7 +142,11 @@ export function resolveDockRunPrompt(
     if (text) extraText.push(text);
   }
 
-  return { prompt: cleaned.replace(/\s{2,}/g, " ").trim(), extraText };
+  const withCamera = resolveCameraShotTokensInPrompt(
+    cleaned.replace(/\s{2,}/g, " ").trim(),
+    opts?.cameraShotOverrides,
+  );
+  return { prompt: withCamera, extraText };
 }
 
 /**
@@ -148,10 +157,16 @@ export function resolveDockRunPrompt(
 export function resolveSbv1VideoEngineRunPrompt(
   prompt: string,
   upstreamLinks: Pro2DockUpstreamLink[],
-  opts?: { modelKey?: string; dockRefImages?: StoryRefImage[] },
+  opts?: {
+    modelKey?: string;
+    dockRefImages?: StoryRefImage[];
+    cameraShotOverrides?: CameraShotMentionOverrides;
+  },
 ): string {
   const mentioned = parseReferencedIds(prompt);
-  if (!mentioned.length) return prompt.trim();
+  if (!mentioned.length) {
+    return resolveCameraShotTokensInPrompt(prompt.trim(), opts?.cameraShotOverrides);
+  }
 
   const byId = new Map(upstreamLinks.map((l) => [l.id, l] as const));
   for (const ref of opts?.dockRefImages ?? []) {
@@ -214,7 +229,10 @@ export function resolveSbv1VideoEngineRunPrompt(
     result = replaceMentionTokenInPrompt(result, id, text);
   }
 
-  return result.replace(/\s{2,}/g, " ").trim();
+  return resolveCameraShotTokensInPrompt(
+    result.replace(/\s{2,}/g, " ").trim(),
+    opts?.cameraShotOverrides,
+  );
 }
 
 /**
@@ -226,9 +244,12 @@ export function resolveSbv1ImageEngineRunPrompt(
   prompt: string,
   upstreamLinks: Pro2DockUpstreamLink[],
   dockRefImages: StoryRefImage[] = [],
+  cameraShotOverrides?: CameraShotMentionOverrides,
 ): string {
   const mentioned = parseReferencedIds(prompt);
-  if (!mentioned.length) return prompt.trim();
+  if (!mentioned.length) {
+    return resolveCameraShotTokensInPrompt(prompt.trim(), cameraShotOverrides);
+  }
 
   const byId = new Map(upstreamLinks.map((l) => [l.id, l] as const));
   for (const ref of dockRefImages) {
@@ -279,5 +300,8 @@ export function resolveSbv1ImageEngineRunPrompt(
     result = replaceMentionTokenInPrompt(result, id, text);
   }
 
-  return result.replace(/\s{2,}/g, " ").trim();
+  return resolveCameraShotTokensInPrompt(
+    result.replace(/\s{2,}/g, " ").trim(),
+    cameraShotOverrides,
+  );
 }

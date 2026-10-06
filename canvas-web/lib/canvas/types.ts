@@ -56,7 +56,7 @@ import {
   PRO2_SCRIPT_NODE_WIDTH,
   PRO2_FRAME_BOARD_HEIGHT,
   PRO2_FRAME_BOARD_WIDTH,
-} from "./story-pro2-node-chrome";
+} from "./story-pro2-node-dimensions";
 import {
   SBV1_DEFAULT_IMAGE_NODE_DATA,
   SBV1_DEFAULT_VIDEO_ENGINE_DATA,

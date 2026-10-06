@@ -37,6 +37,10 @@ export type OpenGlobalAssetLibraryOptions = {
   onPick?: (items: GlobalAssetPickItem[]) => void | Promise<void>;
   /** save 模式 · 入库成功后回调（用于画布节点打标等） */
   onCatalogSaved?: () => void;
+  /** 嵌入平台 Hub · 不单独 portal 遮罩 */
+  embedded?: boolean;
+  /** 素材放大预览 z-index（嵌入 Hub 时须高于 1190） */
+  previewLightboxZIndex?: number;
 };
 
 export type GlobalAssetLibraryApiClient = {

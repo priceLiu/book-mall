@@ -12,7 +12,7 @@ import { batchRunStoryRows } from "@/lib/canvas/batch-run-nodes";
 import { optimisticLibtvMediaRunStart } from "@/lib/canvas/libtv-image-node-run";
 import { findPro2FrameImageNodeForRow } from "@/lib/canvas/pro2-spawn-frame-image-group";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
-import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
+import { usePro2DockMentionables } from "@/lib/canvas/use-pro2-dock-mentionables";
 import {
   buildFrameBoardRefCatalog,
   syncPro2FrameRowUpstreamRefs,
@@ -194,10 +194,7 @@ export function Pro2FrameCellInputDock() {
 
   const refImages = row?.refImages ?? [];
 
-  const mentionables = useMemo(
-    () => buildPro2DockMentionables([], refCatalog),
-    [refCatalog],
-  );
+  const mentionables = usePro2DockMentionables([], refCatalog);
 
   const activeRefIds = useMemo(
     () => dockActiveRefIdsFromPrompt(row?.prompt ?? ""),
