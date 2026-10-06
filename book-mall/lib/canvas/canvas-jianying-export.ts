@@ -20,6 +20,9 @@ export type JianyingFrameInput = {
   audioSourceNodeId?: string | null;
   /** 秒；缺省 3 */
   durationSec?: number;
+  /** 源视频入点 / 出点（秒）· 节点剪辑切割后合成须带上 */
+  sourceStartSec?: number;
+  sourceEndSec?: number;
 };
 
 function padFrame(n: number): string {

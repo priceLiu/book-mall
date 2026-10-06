@@ -1806,6 +1806,11 @@ export function ComposeSequenceTrack({
               <div className="absolute inset-0 z-[55] overflow-hidden">
                 <ComposeMiniLoadingBreath
                   label={videoLaneLoadingLabel?.trim() || "正在生成时间线…"}
+                  labelClassName={
+                    trackChrome?.variant === "fullscreen"
+                      ? "text-white"
+                      : undefined
+                  }
                 />
               </div>
             ) : null}
@@ -2739,11 +2744,6 @@ export function ComposeMiniTimelinePanel({
           <span className="text-[11px] tabular-nums text-white/50">
             {formatTimeSec(programPlayheadSec)} / {formatTimeSec(totalProgramSec)}
           </span>
-          {exportBusy && composeStatusLine?.trim() ? (
-            <span className="max-w-[min(12rem,28vw)] truncate text-[10px] text-cyan-200/75">
-              {composeStatusLine.trim()}
-            </span>
-          ) : null}
         </div>
         <div className="flex items-center gap-1">
           <button
@@ -2878,6 +2878,9 @@ export function ComposeEditorFullscreen({
   upstreamLibraryClips,
   composeStatusLine,
   onSelectedIdChange,
+  composeActionTitle = "合成",
+  showDownloadButton = true,
+  brightChrome = false,
 }: {
   projectId: string;
   projectModule: string;
@@ -2886,6 +2889,10 @@ export function ComposeEditorFullscreen({
   ordered: ComposeWorkbenchClip[];
   exportBusy: boolean;
   composeStatusLine?: string | null;
+  composeActionTitle?: string;
+  showDownloadButton?: boolean;
+  /** 画布节点剪辑：侧栏 Tab / 进度文案用纯白 */
+  brightChrome?: boolean;
   loading: boolean;
   loadingLabel?: string | null;
   filmstripByUrl: Record<string, VideoFilmstripFrame[]>;
@@ -3400,51 +3407,65 @@ export function ComposeEditorFullscreen({
       {!timelineReady ? (
         <div className="absolute inset-0 z-[2100] flex flex-col items-center justify-end gap-3 bg-[#0d0d0d]/92 pb-16">
           <Loader2 className="size-8 animate-spin text-white/75" />
-          <p className="text-sm tabular-nums text-yellow-300/90">
+          <p
+            className={cn(
+              "text-sm tabular-nums",
+              brightChrome ? "text-white" : "text-yellow-300/90",
+            )}
+          >
             {loadingLabel?.trim() || "正在加载时间线与缩略图…"}
           </p>
         </div>
       ) : null}
-      <header className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-2">
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-white/90">时间线</span>
-          <span className="text-[11px] text-white/45">
-            {ordered.length} 段 · 云端 FFmpeg 合成
-          </span>
+      <header className="flex shrink-0 flex-col border-b border-white/10">
+        <div className="flex items-center justify-between gap-3 px-4 py-2">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <span className="text-sm font-medium text-white">时间线</span>
+            <span
+              className={cn(
+                "truncate text-[11px]",
+                brightChrome ? "text-white" : "text-white/45",
+              )}
+            >
+              {ordered.length} 段 ·{" "}
+              {brightChrome ? "按时间线生成剪辑" : "云端 FFmpeg 合成"}
+            </span>
+          </div>
+          <div className="flex min-w-0 shrink-0 items-center gap-2">
+            <button
+              type="button"
+              className="inline-flex max-w-[min(22rem,50vw)] items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-white/15 disabled:opacity-40"
+              disabled={exportBusy || ordered.length < 1}
+              onClick={onCompose}
+            >
+              <Clapperboard className="size-4 shrink-0" />
+              <span className="truncate">
+                {exportBusy
+                  ? composeStatusLine?.trim() || `${composeActionTitle}…`
+                  : composeActionTitle}
+              </span>
+            </button>
+            {showDownloadButton ? (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#2A2A2A] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[#333] disabled:opacity-40"
+                disabled={!canDownload || exportBusy}
+                onClick={() => onDownload?.()}
+              >
+                <Download className="size-4 shrink-0" />
+                下载
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="rounded-lg p-2 text-white hover:bg-white/10"
+              aria-label="关闭"
+              onClick={onClose}
+            >
+              <X className="size-5" />
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-[13px] font-medium text-white/90 hover:bg-white/15 disabled:opacity-40"
-            disabled={exportBusy || ordered.length < 1}
-            onClick={onCompose}
-          >
-            <Clapperboard className="size-4 shrink-0" />
-            {exportBusy ? composeStatusLine?.trim() || "合成中…" : "合成"}
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#2A2A2A] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[#333] disabled:opacity-40"
-            disabled={!canDownload || exportBusy}
-            onClick={() => onDownload?.()}
-          >
-            <Download className="size-4 shrink-0" />
-            下载
-          </button>
-          <button
-            type="button"
-            className="rounded-lg p-2 text-white/70 hover:bg-white/10"
-            aria-label="关闭"
-            onClick={onClose}
-          >
-            <X className="size-5" />
-          </button>
-        </div>
-        {exportBusy && composeStatusLine?.trim() ? (
-          <p className="border-t border-white/10 px-4 py-1.5 text-center text-[11px] text-white/50">
-            {composeStatusLine.trim()}
-          </p>
-        ) : null}
       </header>
 
       <div
@@ -3658,6 +3679,7 @@ export function ComposeEditorFullscreen({
               layout="tabbed"
               profile={profile}
               disabled={!timelineReady}
+              brightChrome={brightChrome}
               showBgmPresets
               bgmPresets={bgmPresets}
               onChange={(next) => setProfile(next)}

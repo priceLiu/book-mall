@@ -8,8 +8,6 @@ import {
   DEFAULT_COMPOSE_PROFILE,
   ModalPortal,
   useComposeDialogs,
-  composeClipSourceEnd,
-  composeClipSourceStart,
   moveComposeClip,
   orderedComposeClips,
   type ComposeWorkbenchState,
@@ -19,12 +17,13 @@ import {
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { exportLibtvComposeTrim } from "@/lib/canvas/libtv-video-compose-trim-export";
 import {
   fetchVideoFilmstrip,
   resolveLibtvVideoEditSourceUrl,
 } from "@/lib/canvas/libtv-video-edit-client";
-import { runLibtvVideoTrim } from "@/lib/canvas/libtv-video-trim-run";
 import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
@@ -53,6 +52,7 @@ function buildSingleClipWorkbench(
 
 function LibtvVideoComposeTrimPanelInner({ nodeId }: { nodeId: string }) {
   const { alert, toast } = useComposeDialogs();
+  const base = useBookMallBaseUrl();
   const projectId = useCanvasStore((s) => s.projectId);
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
@@ -92,6 +92,9 @@ function LibtvVideoComposeTrimPanelInner({ nodeId }: { nodeId: string }) {
   const [miniOpen, setMiniOpen] = useState(true);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
+  const [composeStatusLine, setComposeStatusLine] = useState<string | null>(
+    null,
+  );
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [workbench, setWorkbench] = useState<ComposeWorkbenchState>(() =>
     sourceVideoUrl
@@ -117,6 +120,9 @@ function LibtvVideoComposeTrimPanelInner({ nodeId }: { nodeId: string }) {
       ),
     );
   }, [sourceVideoUrl, nodeData?.label]);
+
+  const workbenchRef = useRef(workbench);
+  workbenchRef.current = workbench;
 
   const ordered = useMemo(() => orderedComposeClips(workbench), [workbench]);
   const filmstripActive = miniOpen || fullscreenOpen;
@@ -146,43 +152,19 @@ function LibtvVideoComposeTrimPanelInner({ nodeId }: { nodeId: string }) {
 
   const exportSelectedClip = useCallback(async () => {
     if (!sourceVideoUrl || exportBusy) return;
-    const targetId =
-      selectedClipId ?? workbench.orderedClipIds[0] ?? ordered[0]?.id ?? null;
-    const clip = targetId
-      ? (ordered.find((c) => c.id === targetId) ?? ordered[0])
-      : ordered[0];
-    if (!clip?.videoUrl?.trim()) {
-      await alert({
-        title: "无法生成",
-        message: "没有可剪辑的视频片段",
-        variant: "error",
-      });
-      return;
-    }
-    const full =
-      filmstrip.fullDurationByUrl[clip.videoUrl.trim()] ??
-      clip.durationSec ??
-      15;
-    const startSec = composeClipSourceStart(clip);
-    const endSec = composeClipSourceEnd(clip, full);
-    if (endSec - startSec < 0.2) {
-      await alert({
-        title: "片段过短",
-        message: "请拖选中段左右白边，保留足够长度后再生成。",
-        variant: "warning",
-      });
-      return;
-    }
     setExportBusy(true);
+    setComposeStatusLine(null);
     try {
-      await runLibtvVideoTrim({
+      await exportLibtvComposeTrim({
         sourceNodeId: nodeId,
-        sourceVideoUrl: clip.videoUrl.trim(),
         projectId,
-        startSec,
-        endSec,
+        base,
+        workbench: workbenchRef.current,
+        fullDurationByUrl: filmstrip.fullDurationByUrl,
+        selectedClipId,
         store,
         updateNodeData: (id, patch) => updateNodeData(id, patch),
+        onComposeProgress: setComposeStatusLine,
       });
       closeSession();
       if (toast) {
@@ -202,14 +184,15 @@ function LibtvVideoComposeTrimPanelInner({ nodeId }: { nodeId: string }) {
       });
     } finally {
       setExportBusy(false);
+      setComposeStatusLine(null);
     }
   }, [
     alert,
+    base,
     closeSession,
     exportBusy,
     filmstrip.fullDurationByUrl,
     nodeId,
-    ordered,
     projectId,
     sourceVideoUrl,
     store,
@@ -241,6 +224,7 @@ function LibtvVideoComposeTrimPanelInner({ nodeId }: { nodeId: string }) {
             filmstripByUrl={filmstrip.filmstripByUrl}
             fullDurationByUrl={filmstrip.fullDurationByUrl}
             exportBusy={exportBusy}
+            composeStatusLine={composeStatusLine}
             canEdit={!exportBusy}
             panelTitle="节点剪辑"
             composeActionTitle="生成剪辑片段"
@@ -276,6 +260,10 @@ function LibtvVideoComposeTrimPanelInner({ nodeId }: { nodeId: string }) {
             profile={workbench.profile ?? DEFAULT_COMPOSE_PROFILE}
             ordered={ordered}
             exportBusy={exportBusy}
+            composeStatusLine={composeStatusLine}
+            composeActionTitle="生成剪辑片段"
+            showDownloadButton={false}
+            brightChrome
             loading={filmstrip.loading}
             loadingLabel={filmstrip.loadingLabel}
             filmstripByUrl={filmstrip.filmstripByUrl}

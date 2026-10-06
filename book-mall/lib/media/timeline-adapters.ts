@@ -17,6 +17,12 @@ export function fromCanvasJianyingFrames(
       subtitle: f.dialogue?.trim() || undefined,
       durationSec:
         f.durationSec && f.durationSec > 0 ? f.durationSec : undefined,
+      ...(typeof f.sourceStartSec === "number" && f.sourceStartSec >= 0
+        ? { sourceStartSec: f.sourceStartSec }
+        : {}),
+      ...(typeof f.sourceEndSec === "number" && f.sourceEndSec > 0
+        ? { sourceEndSec: f.sourceEndSec }
+        : {}),
     }));
   return { version: 1, clips };
 }

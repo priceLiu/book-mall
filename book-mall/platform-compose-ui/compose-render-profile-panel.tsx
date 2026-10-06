@@ -60,6 +60,8 @@ type Props = {
   className?: string;
   layout?: "flat" | "tabbed";
   clipSubtitle?: ComposeClipSubtitleEditor | null;
+  /** 画布全屏剪辑：Tab / 提示用纯白 */
+  brightChrome?: boolean;
 };
 
 export function ComposeRenderProfilePanel({
@@ -71,6 +73,7 @@ export function ComposeRenderProfilePanel({
   className = "",
   layout = "flat",
   clipSubtitle = null,
+  brightChrome = false,
 }: Props) {
   const [tab, setTab] = useState<ComposeRenderProfileTab>("video");
 
@@ -452,7 +455,11 @@ export function ComposeRenderProfilePanel({
             key={id}
             type="button"
             className={`flex-1 px-2 py-2.5 transition ${
-              tab === id ? "font-medium text-white" : "text-white/45 hover:text-white/70"
+              tab === id
+                ? "font-medium text-white"
+                : brightChrome
+                  ? "text-white/90 hover:text-white"
+                  : "text-white/45 hover:text-white/70"
             }`}
             onClick={() => setTab(id)}
           >
@@ -460,8 +467,14 @@ export function ComposeRenderProfilePanel({
           </button>
         ))}
       </div>
-      <p className="shrink-0 border-b border-white/10 px-3 py-1.5 text-[10px] text-white/40">
-        修改后点顶部「导出」生效
+      <p
+        className={`shrink-0 border-b border-white/10 px-3 py-1.5 text-[10px] ${
+          brightChrome ? "text-white" : "text-white/40"
+        }`}
+      >
+        {brightChrome
+          ? "修改后点顶部「生成剪辑片段」生效"
+          : "修改后点顶部「导出」生效"}
       </p>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3">
         {tab === "video" ? (

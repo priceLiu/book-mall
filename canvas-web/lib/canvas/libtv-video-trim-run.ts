@@ -37,8 +37,8 @@ type TrimStore = {
   setEdges: (fn: (edges: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
 };
 
-/** 裁剪结果独立成片节点 · 不连 in_motion_video（避免误用上游全长作参考） */
-function spawnTrimmedVideoTarget(
+/** 剪辑结果独立成片节点 · 不连 in_motion_video（避免误用上游全长作参考） */
+export function spawnLibtvVideoEditResultNode(
   sourceNodeId: string,
   store: TrimStore,
 ): string {
@@ -118,7 +118,7 @@ export type RunLibtvVideoTrimOpts = {
 export async function runLibtvVideoTrim(
   opts: RunLibtvVideoTrimOpts,
 ): Promise<string> {
-  const targetId = spawnTrimmedVideoTarget(opts.sourceNodeId, opts.store);
+  const targetId = spawnLibtvVideoEditResultNode(opts.sourceNodeId, opts.store);
 
   try {
     const result = await postVideoTrim({
@@ -140,8 +140,6 @@ export async function runLibtvVideoTrim(
       label,
       ossUrl: result.videoUrl,
       trimClipMeta: {
-        startSec: result.startSec ?? opts.startSec,
-        endSec: result.endSec ?? opts.endSec,
         durationSec,
       },
       runtime: {

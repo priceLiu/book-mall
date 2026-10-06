@@ -1806,6 +1806,11 @@ export function ComposeSequenceTrack({
               <div className="absolute inset-0 z-[55] overflow-hidden">
                 <ComposeMiniLoadingBreath
                   label={videoLaneLoadingLabel?.trim() || "正在生成时间线…"}
+                  labelClassName={
+                    trackChrome?.variant === "fullscreen"
+                      ? "text-white"
+                      : undefined
+                  }
                 />
               </div>
             ) : null}
@@ -2326,6 +2331,10 @@ export function ComposeMiniTimelinePanel({
   onClipAudioAttach,
   onClipAudioClear,
   composeStatusLine,
+  panelTitle = "时间线 1",
+  composeActionTitle = "云端合成",
+  showDownloadButton = true,
+  onSelectedIdChange,
 }: {
   projectId: string;
   ordered: ComposeWorkbenchClip[];
@@ -2353,9 +2362,19 @@ export function ComposeMiniTimelinePanel({
   trackChrome?: ComposeTrackChrome;
   onClipAudioAttach?: (clipId: string) => void;
   onClipAudioClear?: (clipId: string) => void;
+  /** 迷你窗标题（如「节点剪辑」） */
+  panelTitle?: string;
+  /** 场记板按钮 tooltip */
+  composeActionTitle?: string;
+  showDownloadButton?: boolean;
+  onSelectedIdChange?: (clipId: string | null) => void;
 }) {
   const { alert } = useComposeDialogs();
   const [selectedId, setSelectedId] = useState<string | null>(ordered[0]?.id ?? null);
+
+  useEffect(() => {
+    onSelectedIdChange?.(selectedId);
+  }, [onSelectedIdChange, selectedId]);
   const [playing, setPlaying] = useState(false);
   const [programPlayheadSec, setProgramPlayheadSec] = useState(0);
   const [durationSec, setDurationSec] = useState(6);
@@ -2549,6 +2568,24 @@ export function ComposeMiniTimelinePanel({
     setSelectedId(ordered.find((c) => c.id !== selectedId)?.id ?? null);
   };
 
+  const commitClipRangeFromDrag = useCallback(
+    (start: number, end: number) => {
+      if (!selectedId || durationSec <= 0) return;
+      onApplyWorkbench(
+        (prev) =>
+          setComposeClipSourceRangeWithRipple(
+            prev,
+            selectedId,
+            start,
+            end,
+            durationSec,
+          ),
+        { persist: false },
+      );
+    },
+    [durationSec, onApplyWorkbench, selectedId],
+  );
+
   /** 缩略图失败时仍允许剪辑（仅 loading 期间遮罩） */
   const ready = !loading;
 
@@ -2651,7 +2688,9 @@ export function ComposeMiniTimelinePanel({
       >
         <div className="flex min-w-0 items-center gap-1.5">
           <GripVertical className="size-3.5 shrink-0 text-white/35" aria-hidden />
-          <span className="truncate text-xs font-medium text-white/85">时间线 1</span>
+          <span className="truncate text-xs font-medium text-white/85">
+            {panelTitle}
+          </span>
           <span className="hidden text-[10px] text-white/35 sm:inline">
             拖动标题栏移动
           </span>
@@ -2677,7 +2716,7 @@ export function ComposeMiniTimelinePanel({
             title={
               playheadInSelected
                 ? "在播放头处分割"
-                : "播放头需在选中片段内才可分割"
+                : "播放头需在选中片段内，且距头尾各至少 0.25 秒"
             }
             onClick={() => void splitAtPlayhead()}
           >
@@ -2705,22 +2744,18 @@ export function ComposeMiniTimelinePanel({
           <span className="text-[11px] tabular-nums text-white/50">
             {formatTimeSec(programPlayheadSec)} / {formatTimeSec(totalProgramSec)}
           </span>
-          {exportBusy && composeStatusLine?.trim() ? (
-            <span className="max-w-[min(12rem,28vw)] truncate text-[10px] text-cyan-200/75">
-              {composeStatusLine.trim()}
-            </span>
-          ) : null}
         </div>
         <div className="flex items-center gap-1">
           <button
             type="button"
             className="rounded-md p-1.5 text-white/70 hover:bg-white/10 disabled:opacity-40"
             disabled={exportBusy || !canEdit || ordered.length < 1}
-            title={composeStatusLine?.trim() || "云端合成"}
+            title={composeStatusLine?.trim() || composeActionTitle}
             onClick={onCompose}
           >
             <Clapperboard className="size-4" />
           </button>
+          {showDownloadButton ? (
           <button
             type="button"
             className="rounded-md p-1.5 text-white/70 hover:bg-white/10 disabled:opacity-40"
@@ -2730,6 +2765,7 @@ export function ComposeMiniTimelinePanel({
           >
             <Download className="size-4" />
           </button>
+          ) : null}
           <button
             type="button"
             className="rounded-md p-1.5 text-white/70 hover:bg-white/10 disabled:opacity-40"
@@ -2780,7 +2816,7 @@ export function ComposeMiniTimelinePanel({
           onReorder={onReorder}
           onTrimStart={setTrimStart}
           onTrimEnd={setTrimEnd}
-          onTrimCommit={() => undefined}
+          onTrimCommit={commitClipRangeFromDrag}
           onSplit={() => void splitAtPlayhead()}
           onDelete={() => void deleteSelected()}
           onProgramSeek={seekProgramTimeline}
@@ -2841,6 +2877,10 @@ export function ComposeEditorFullscreen({
   onClipAudioClear,
   upstreamLibraryClips,
   composeStatusLine,
+  onSelectedIdChange,
+  composeActionTitle = "合成",
+  showDownloadButton = true,
+  brightChrome = false,
 }: {
   projectId: string;
   projectModule: string;
@@ -2849,6 +2889,10 @@ export function ComposeEditorFullscreen({
   ordered: ComposeWorkbenchClip[];
   exportBusy: boolean;
   composeStatusLine?: string | null;
+  composeActionTitle?: string;
+  showDownloadButton?: boolean;
+  /** 画布节点剪辑：侧栏 Tab / 进度文案用纯白 */
+  brightChrome?: boolean;
   loading: boolean;
   loadingLabel?: string | null;
   filmstripByUrl: Record<string, VideoFilmstripFrame[]>;
@@ -2869,9 +2913,15 @@ export function ComposeEditorFullscreen({
   onClipAudioClear?: (clipId: string) => void;
   /** 画布：左侧「连线资产」列表（上游视频/图/音频，非仅 file import） */
   upstreamLibraryClips?: ComposeWorkbenchClip[];
+  onSelectedIdChange?: (clipId: string | null) => void;
 }) {
   const { alert, toast } = useComposeDialogs();
   const [selectedId, setSelectedId] = useState<string | null>(ordered[0]?.id ?? null);
+
+  useEffect(() => {
+    onSelectedIdChange?.(selectedId);
+  }, [onSelectedIdChange, selectedId]);
+
   const projectAssetLibraryLabel = resolveComposeProjectAssetLibraryLabel(projectModule);
   const [assetLibraryTab, setAssetLibraryTab] = useState<"imported" | "project">("imported");
   const [assetMediaFilter, setAssetMediaFilter] = useState<"all" | "image" | "video" | "audio">(
@@ -3357,51 +3407,65 @@ export function ComposeEditorFullscreen({
       {!timelineReady ? (
         <div className="absolute inset-0 z-[2100] flex flex-col items-center justify-end gap-3 bg-[#0d0d0d]/92 pb-16">
           <Loader2 className="size-8 animate-spin text-white/75" />
-          <p className="text-sm tabular-nums text-yellow-300/90">
+          <p
+            className={cn(
+              "text-sm tabular-nums",
+              brightChrome ? "text-white" : "text-yellow-300/90",
+            )}
+          >
             {loadingLabel?.trim() || "正在加载时间线与缩略图…"}
           </p>
         </div>
       ) : null}
-      <header className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-2">
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-white/90">时间线</span>
-          <span className="text-[11px] text-white/45">
-            {ordered.length} 段 · 云端 FFmpeg 合成
-          </span>
+      <header className="flex shrink-0 flex-col border-b border-white/10">
+        <div className="flex items-center justify-between gap-3 px-4 py-2">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <span className="text-sm font-medium text-white">时间线</span>
+            <span
+              className={cn(
+                "truncate text-[11px]",
+                brightChrome ? "text-white" : "text-white/45",
+              )}
+            >
+              {ordered.length} 段 ·{" "}
+              {brightChrome ? "按时间线生成剪辑" : "云端 FFmpeg 合成"}
+            </span>
+          </div>
+          <div className="flex min-w-0 shrink-0 items-center gap-2">
+            <button
+              type="button"
+              className="inline-flex max-w-[min(22rem,50vw)] items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-white/15 disabled:opacity-40"
+              disabled={exportBusy || ordered.length < 1}
+              onClick={onCompose}
+            >
+              <Clapperboard className="size-4 shrink-0" />
+              <span className="truncate">
+                {exportBusy
+                  ? composeStatusLine?.trim() || `${composeActionTitle}…`
+                  : composeActionTitle}
+              </span>
+            </button>
+            {showDownloadButton ? (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#2A2A2A] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[#333] disabled:opacity-40"
+                disabled={!canDownload || exportBusy}
+                onClick={() => onDownload?.()}
+              >
+                <Download className="size-4 shrink-0" />
+                下载
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="rounded-lg p-2 text-white hover:bg-white/10"
+              aria-label="关闭"
+              onClick={onClose}
+            >
+              <X className="size-5" />
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-[13px] font-medium text-white/90 hover:bg-white/15 disabled:opacity-40"
-            disabled={exportBusy || ordered.length < 1}
-            onClick={onCompose}
-          >
-            <Clapperboard className="size-4 shrink-0" />
-            {exportBusy ? composeStatusLine?.trim() || "合成中…" : "合成"}
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#2A2A2A] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[#333] disabled:opacity-40"
-            disabled={!canDownload || exportBusy}
-            onClick={() => onDownload?.()}
-          >
-            <Download className="size-4 shrink-0" />
-            下载
-          </button>
-          <button
-            type="button"
-            className="rounded-lg p-2 text-white/70 hover:bg-white/10"
-            aria-label="关闭"
-            onClick={onClose}
-          >
-            <X className="size-5" />
-          </button>
-        </div>
-        {exportBusy && composeStatusLine?.trim() ? (
-          <p className="border-t border-white/10 px-4 py-1.5 text-center text-[11px] text-white/50">
-            {composeStatusLine.trim()}
-          </p>
-        ) : null}
       </header>
 
       <div
@@ -3615,6 +3679,7 @@ export function ComposeEditorFullscreen({
               layout="tabbed"
               profile={profile}
               disabled={!timelineReady}
+              brightChrome={brightChrome}
               showBgmPresets
               bgmPresets={bgmPresets}
               onChange={(next) => setProfile(next)}

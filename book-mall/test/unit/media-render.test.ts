@@ -28,6 +28,31 @@ describe("media render adapters", () => {
     expect(tl.clips[1]?.subtitle).toBe("B");
   });
 
+  it("fromCanvasJianyingFrames preserves source in/out for node trim compose", () => {
+    const tl = fromCanvasJianyingFrames([
+      {
+        frameIndex: 1,
+        dialogue: "",
+        videoUrl: "https://cdn/same.mp4",
+        durationSec: 4,
+        sourceStartSec: 2,
+        sourceEndSec: 6,
+      },
+      {
+        frameIndex: 2,
+        dialogue: "",
+        videoUrl: "https://cdn/same.mp4",
+        durationSec: 3,
+        sourceStartSec: 10,
+        sourceEndSec: 13,
+      },
+    ]);
+    expect(tl.clips[0]?.sourceStartSec).toBe(2);
+    expect(tl.clips[0]?.sourceEndSec).toBe(6);
+    expect(tl.clips[1]?.sourceStartSec).toBe(10);
+    expect(tl.clips[1]?.sourceEndSec).toBe(13);
+  });
+
   it("fromEcomStoryboardSheet skips panels without video", () => {
     const sheet: StoryboardSheet = {
       overview: { title: "T", logline: "L" },
