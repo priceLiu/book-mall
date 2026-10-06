@@ -16,6 +16,10 @@ export function composeWorkbenchStructuralEquals(
     const other = byId.get(clip.id);
     if (!other) return false;
     if (clip.videoUrl.trim() !== other.videoUrl.trim()) return false;
+    if ((clip.sourceStartSec ?? 0) !== (other.sourceStartSec ?? 0)) return false;
+    if ((clip.sourceEndSec ?? undefined) !== (other.sourceEndSec ?? undefined)) {
+      return false;
+    }
   }
   const audioA = a.audioClips ?? [];
   const audioB = b.audioClips ?? [];
@@ -25,6 +29,10 @@ export function composeWorkbenchStructuralEquals(
     const other = audioById.get(clip.id);
     if (!other) return false;
     if ((clip.audioUrl?.trim() ?? "") !== (other.audioUrl?.trim() ?? "")) {
+      return false;
+    }
+    if ((clip.sourceStartSec ?? 0) !== (other.sourceStartSec ?? 0)) return false;
+    if ((clip.sourceEndSec ?? undefined) !== (other.sourceEndSec ?? undefined)) {
       return false;
     }
   }

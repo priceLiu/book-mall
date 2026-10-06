@@ -37,6 +37,7 @@ import { DEFAULT_COMPOSE_PROFILE } from "./default-compose-profile";
 import {
   COMPOSE_MIN_CLIP_SEC,
   composeClipDisplaySpanSec,
+  composeClipEffectiveSourceEnd,
   composeClipSourceEnd,
   composeClipSourceStart,
   buildAudioTimelinePlacements,
@@ -785,6 +786,52 @@ function programPreviewSourceSecAtPlayhead(
   return hit?.sourceSec ?? 0;
 }
 
+const COMPOSE_PROGRAM_CLIP_BOUNDARY_EPS = 0.001;
+
+type ComposeProgramClipHit = NonNullable<
+  ReturnType<typeof resolveClipAtProgramSec>
+>;
+
+function composeProgramClipSourceBounds(
+  hit: ComposeProgramClipHit,
+  durationHints?: ComposeDurationHints,
+): { srcStart: number; srcEnd: number; effectiveSrcEnd: number } {
+  const srcStart = composeClipSourceStart(hit.clip);
+  const videoUrl = hit.clip.videoUrl.trim();
+  const full =
+    durationHints?.videoDurationByUrl?.[videoUrl] ?? srcStart + hit.span;
+  const srcEnd = composeClipSourceEnd(hit.clip, full);
+  const effectiveSrcEnd = composeClipEffectiveSourceEnd(
+    hit.clip,
+    hit.span,
+    full,
+  );
+  return { srcStart, srcEnd, effectiveSrcEnd };
+}
+
+/** 将 `<video>` 对齐到 program 当前镜（同 URL 多段裁切靠 currentTime，不靠换 src） */
+function syncProgramVideoElementToHit(
+  video: HTMLVideoElement,
+  hit: ComposeProgramClipHit,
+  durationHints?: ComposeDurationHints,
+  opts?: { force?: boolean },
+): void {
+  applyVideoClipSourceAudio(video, hit.clip);
+  const { srcStart, effectiveSrcEnd } = composeProgramClipSourceBounds(
+    hit,
+    durationHints,
+  );
+  let target = Math.max(srcStart, hit.sourceSec);
+  target = Math.min(target, Math.max(srcStart, effectiveSrcEnd - 0.02));
+  if (opts?.force || Math.abs(video.currentTime - target) > 0.03) {
+    try {
+      video.currentTime = target;
+    } catch {
+      /* ignore seek while switching */
+    }
+  }
+}
+
 /** 暂停态 · 拖动播放头时同步 `<video>` 源内时间（换镜需等 loadeddata） */
 function useComposePausedProgramPreviewSeek(args: {
   videoRef: RefObject<HTMLVideoElement | null>;
@@ -843,7 +890,10 @@ function useComposeProgramVideoPlayback({
   workbench?: ComposeWorkbenchState | null;
 }) {
   const programPlayheadSecRef = useRef(programPlayheadSec);
-  programPlayheadSecRef.current = programPlayheadSec;
+  /** 播放中 playhead 以 ref + timeupdate 为准；禁止每帧用滞后 state 覆盖 ref */
+  useEffect(() => {
+    if (!playing) programPlayheadSecRef.current = programPlayheadSec;
+  }, [programPlayheadSec, playing]);
   const audioTrack = audioOrdered ?? [];
 
   const resolveAudioHitAt = useCallback(
@@ -878,18 +928,26 @@ function useComposeProgramVideoPlayback({
     "";
   const lastSyncedClipIdRef = useRef<string | null>(null);
   const lastSyncedAudioClipIdRef = useRef<string | null>(null);
+  const playheadUiSyncMsRef = useRef(0);
   const orderedKey = ordered.map((c) => c.id).join("|");
 
-  useEffect(() => {
-    const hit = resolveClipAtProgramSec(
-      ordered,
-      programPlayheadSecRef.current,
-      durationHints,
-    );
-    if (hit?.clip.id) {
-      lastSyncedClipIdRef.current = null;
-    }
-  }, [orderedKey, ordered, durationHints]);
+  const seekProgramVideoToPlayhead = useCallback(
+    (opts?: { forcePlay?: boolean }) => {
+      const v = videoRef.current;
+      if (!v) return;
+      const hit = resolveClipAtProgramSec(
+        ordered,
+        programPlayheadSecRef.current,
+        durationHints,
+      );
+      if (!hit?.clip.videoUrl?.trim()) return;
+      syncProgramVideoElementToHit(v, hit, durationHints);
+      if (opts?.forcePlay || playing) {
+        void v.play().catch(() => undefined);
+      }
+    },
+    [ordered, durationHints, videoRef, playing],
+  );
 
   useEffect(() => {
     if (!playing) {
@@ -907,42 +965,31 @@ function useComposeProgramVideoPlayback({
     if (!v || !hit?.clip.videoUrl?.trim()) return;
 
     const clipId = hit.clip.id;
-    const needsSwitch =
-      lastSyncedClipIdRef.current !== clipId ||
-      !videoElementMatchesUrl(v, hit.clip.videoUrl);
+    const url = hit.clip.videoUrl.trim();
 
-    const seekAndPlay = () => {
-      const fresh = resolveClipAtProgramSec(
-        ordered,
-        programPlayheadSecRef.current,
-        durationHints,
-      );
-      if (!fresh) return;
-      applyVideoClipSourceAudio(v, fresh.clip);
-      if (Math.abs(v.currentTime - fresh.sourceSec) > 0.12) {
-        try {
-          v.currentTime = fresh.sourceSec;
-        } catch {
-          /* ignore seek while switching */
-        }
-      }
-      void v.play().catch(() => undefined);
-    };
-
-    if (needsSwitch) {
-      lastSyncedClipIdRef.current = clipId;
-      applyVideoClipSourceAudio(v, hit.clip);
-      v.src = hit.clip.videoUrl;
-      const onReady = () => {
-        seekAndPlay();
-        v.removeEventListener("loadeddata", onReady);
-      };
-      v.addEventListener("loadeddata", onReady);
-      v.load();
-      return () => v.removeEventListener("loadeddata", onReady);
+    if (
+      lastSyncedClipIdRef.current === clipId &&
+      videoElementMatchesUrl(v, url)
+    ) {
+      if (v.paused) seekProgramVideoToPlayhead({ forcePlay: true });
+      return;
     }
-    seekAndPlay();
-  }, [playing, playbackHit?.clip.id, orderedKey, ordered, videoRef, durationHints]);
+
+    lastSyncedClipIdRef.current = clipId;
+    if (!videoElementMatchesUrl(v, url)) {
+      return;
+    }
+    seekProgramVideoToPlayhead({ forcePlay: true });
+  }, [
+    playing,
+    playbackHit?.clip.id,
+    playbackVideoUrl,
+    programPlayheadSec,
+    orderedKey,
+    durationHints,
+    videoRef,
+    seekProgramVideoToPlayhead,
+  ]);
 
   useEffect(() => {
     if (!playing || !audioRef) return;
@@ -955,20 +1002,21 @@ function useComposeProgramVideoPlayback({
     }
 
     const clipId = hit.clip.id;
-    const needsSwitch =
-      lastSyncedAudioClipIdRef.current !== clipId ||
-      !audioElementMatchesUrl(a, audioUrl);
+    const urlMatches = audioElementMatchesUrl(a, audioUrl);
 
     const seekAndPlayAudio = () => {
       const fresh = resolveAudioHitAt(programPlayheadSecRef.current);
       if (!fresh?.clip.audioUrl?.trim()) return;
       applyAudioClipPlayback(a, fresh.clip);
-      const fileDur =
-        durationHints?.audioDurationByUrl?.[fresh.clip.audioUrl.trim()];
-      let target = Math.max(0, fresh.sourceSec);
-      if (fileDur != null && fileDur > 0) {
-        target = Math.min(target, Math.max(0, fileDur - 0.02));
-      }
+      const audioUrl = fresh.clip.audioUrl.trim();
+      const fileDur = durationHints?.audioDurationByUrl?.[audioUrl];
+      const srcStart = composeClipSourceStart(fresh.clip);
+      const srcEnd = composeClipSourceEnd(
+        fresh.clip,
+        fileDur != null && fileDur > 0 ? fileDur : srcStart + fresh.span,
+      );
+      let target = Math.max(srcStart, fresh.sourceSec);
+      target = Math.min(target, Math.max(srcStart, srcEnd - 0.02));
       if (Math.abs(a.currentTime - target) > 0.12) {
         try {
           a.currentTime = target;
@@ -979,7 +1027,7 @@ function useComposeProgramVideoPlayback({
       void a.play().catch(() => undefined);
     };
 
-    if (needsSwitch) {
+    if (!urlMatches) {
       lastSyncedAudioClipIdRef.current = clipId;
       applyAudioClipPlayback(a, hit.clip);
       a.src = audioUrl;
@@ -990,6 +1038,9 @@ function useComposeProgramVideoPlayback({
       a.addEventListener("canplay", onReady);
       a.load();
       return () => a.removeEventListener("canplay", onReady);
+    }
+    if (lastSyncedAudioClipIdRef.current !== clipId) {
+      lastSyncedAudioClipIdRef.current = clipId;
     }
     seekAndPlayAudio();
   }, [
@@ -1085,6 +1136,57 @@ function useComposeProgramVideoPlayback({
     resolveAudioHitAt,
   ]);
 
+  const advanceProgramVideoPastClipEnd = useCallback(
+    (
+      v: HTMLVideoElement,
+      hit: ComposeProgramClipHit,
+    ): boolean => {
+      const endProgram = hit.programStart + hit.span;
+      const idx = ordered.findIndex((c) => c.id === hit.clip.id);
+      if (idx >= 0 && idx < ordered.length - 1) {
+        const nextProgram =
+          hit.programStart + hit.span + COMPOSE_PROGRAM_CLIP_BOUNDARY_EPS;
+        const nextHit = resolveClipAtProgramSec(
+          ordered,
+          nextProgram,
+          durationHints,
+        );
+        programPlayheadSecRef.current = nextProgram;
+        playheadUiSyncMsRef.current = 0;
+        setProgramPlayheadSec(nextProgram);
+        if (nextHit) {
+          syncProgramVideoElementToHit(v, nextHit, durationHints, {
+            force: true,
+          });
+          lastSyncedClipIdRef.current = nextHit.clip.id;
+          lastSyncedAudioClipIdRef.current = null;
+          const resume = () => {
+            void v.play().catch(() => undefined);
+          };
+          if (v.seeking) {
+            v.addEventListener("seeked", resume, { once: true });
+          } else {
+            resume();
+          }
+        }
+        return true;
+      }
+      programPlayheadSecRef.current = endProgram;
+      setProgramPlayheadSec(endProgram);
+      setPlaying(false);
+      v.pause();
+      audioRef?.current?.pause();
+      return true;
+    },
+    [
+      ordered,
+      durationHints,
+      setPlaying,
+      setProgramPlayheadSec,
+      audioRef,
+    ],
+  );
+
   const onProgramVideoTimeUpdate = useCallback(
     (e: SyntheticEvent<HTMLVideoElement>) => {
       if (!playing) return;
@@ -1096,49 +1198,159 @@ function useComposeProgramVideoPlayback({
       );
       if (!hit) return;
 
-      const srcStart = composeClipSourceStart(hit.clip);
-      const local = v.currentTime - srcStart;
+      const { srcStart, effectiveSrcEnd } = composeProgramClipSourceBounds(
+        hit,
+        durationHints,
+      );
       const endProgram = hit.programStart + hit.span;
+      const playbackCeil = Math.max(srcStart, effectiveSrcEnd - 0.02);
+      const clipChanged = lastSyncedClipIdRef.current !== hit.clip.id;
 
-      if (local >= hit.span - 0.06) {
-        const idx = ordered.findIndex((c) => c.id === hit.clip.id);
-        if (idx >= 0 && idx < ordered.length - 1) {
-          const nextProgram = hit.programStart + hit.span + 0.001;
-          programPlayheadSecRef.current = nextProgram;
-          setProgramPlayheadSec(nextProgram);
-          lastSyncedClipIdRef.current = null;
-          lastSyncedAudioClipIdRef.current = null;
-          return;
-        }
-        if (programPlayheadSecRef.current < totalProgramSec - 0.05) {
-          const nextProgram = hit.programStart + hit.span + 0.001;
-          programPlayheadSecRef.current = nextProgram;
-          setProgramPlayheadSec(nextProgram);
-          lastSyncedClipIdRef.current = null;
-          lastSyncedAudioClipIdRef.current = null;
-          v.pause();
-          return;
-        }
-        programPlayheadSecRef.current = endProgram;
-        setProgramPlayheadSec(endProgram);
-        setPlaying(false);
-        v.pause();
-        audioRef?.current?.pause();
-        return;
+      if (clipChanged) {
+        syncProgramVideoElementToHit(v, hit, durationHints, { force: true });
+        lastSyncedClipIdRef.current = hit.clip.id;
+        lastSyncedAudioClipIdRef.current = null;
+        playheadUiSyncMsRef.current = 0;
+        setProgramPlayheadSec(programPlayheadSecRef.current);
+      } else if (
+        v.currentTime < srcStart - 0.008 ||
+        v.currentTime > effectiveSrcEnd + 0.02
+      ) {
+        syncProgramVideoElementToHit(v, hit, durationHints, { force: true });
       }
 
-      const nextProgram = Math.min(hit.programStart + Math.max(0, local), endProgram);
+      const alreadyOnNextSegment =
+        programPlayheadSecRef.current >=
+        endProgram + COMPOSE_PROGRAM_CLIP_BOUNDARY_EPS * 0.5;
+
+      const atClipEnd =
+        v.currentTime >= effectiveSrcEnd - 0.04 ||
+        programPlayheadSecRef.current >= endProgram - 0.04;
+
+      if (atClipEnd && !alreadyOnNextSegment) {
+        if (advanceProgramVideoPastClipEnd(v, hit)) return;
+      }
+
+      if (v.currentTime > playbackCeil && !alreadyOnNextSegment) {
+        try {
+          v.currentTime = playbackCeil;
+        } catch {
+          /* ignore */
+        }
+      }
+
+      const sourceT = Math.min(
+        Math.max(v.currentTime, srcStart),
+        playbackCeil,
+      );
+      const local = Math.min(sourceT - srcStart, hit.span);
+      const nextProgram = Math.min(hit.programStart + local, endProgram);
       programPlayheadSecRef.current = nextProgram;
-      setProgramPlayheadSec(nextProgram);
+      const now = performance.now();
+      if (now - playheadUiSyncMsRef.current >= 80) {
+        playheadUiSyncMsRef.current = now;
+        setProgramPlayheadSec(nextProgram);
+      }
     },
     [
       ordered,
       playing,
-      setPlaying,
       setProgramPlayheadSec,
-      audioRef,
-      totalProgramSec,
       durationHints,
+      advanceProgramVideoPastClipEnd,
+    ],
+  );
+
+  useEffect(() => {
+    if (!playing) return;
+    let raf = 0;
+    const tick = () => {
+      const v = videoRef.current;
+      if (!v || v.paused) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      const hit = resolveClipAtProgramSec(
+        ordered,
+        programPlayheadSecRef.current,
+        durationHints,
+      );
+      if (!hit) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      const endProgram = hit.programStart + hit.span;
+      const { effectiveSrcEnd } = composeProgramClipSourceBounds(
+        hit,
+        durationHints,
+      );
+      const alreadyOnNextSegment =
+        programPlayheadSecRef.current >=
+        endProgram + COMPOSE_PROGRAM_CLIP_BOUNDARY_EPS * 0.5;
+      const atClipEnd =
+        v.currentTime >= effectiveSrcEnd - 0.04 ||
+        programPlayheadSecRef.current >= endProgram - 0.04;
+      if (atClipEnd && !alreadyOnNextSegment) {
+        advanceProgramVideoPastClipEnd(v, hit);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [
+    playing,
+    ordered,
+    durationHints,
+    videoRef,
+    advanceProgramVideoPastClipEnd,
+  ]);
+
+  const onProgramVideoLoadedData = useCallback(() => {
+    if (!playing) return;
+    seekProgramVideoToPlayhead({ forcePlay: true });
+  }, [playing, seekProgramVideoToPlayhead]);
+
+  const onProgramAudioTimeUpdate = useCallback(
+    (e: SyntheticEvent<HTMLAudioElement>) => {
+      if (!playing) return;
+      const a = e.currentTarget;
+      const hit = resolveAudioHitAt(programPlayheadSecRef.current);
+      if (!hit?.clip.audioUrl?.trim()) return;
+
+      const audioUrl = hit.clip.audioUrl.trim();
+      const srcStart = composeClipSourceStart(hit.clip);
+      const fileDur = durationHints?.audioDurationByUrl?.[audioUrl];
+      const srcEnd = composeClipSourceEnd(
+        hit.clip,
+        fileDur != null && fileDur > 0 ? fileDur : srcStart + hit.span,
+      );
+
+      if (a.currentTime > srcEnd - 0.02) {
+        try {
+          a.currentTime = Math.max(srcStart, srcEnd - 0.02);
+        } catch {
+          /* ignore */
+        }
+      }
+
+      const local = Math.min(
+        Math.max(0, a.currentTime - srcStart),
+        hit.span,
+      );
+      const endProgram = hit.programStart + hit.span;
+      const nextProgram = Math.min(hit.programStart + local, endProgram);
+      programPlayheadSecRef.current = nextProgram;
+      const now = performance.now();
+      if (now - playheadUiSyncMsRef.current >= 80) {
+        playheadUiSyncMsRef.current = now;
+        setProgramPlayheadSec(nextProgram);
+      }
+    },
+    [
+      playing,
+      resolveAudioHitAt,
+      durationHints,
+      setProgramPlayheadSec,
     ],
   );
 
@@ -1148,15 +1360,20 @@ function useComposeProgramVideoPlayback({
     if (playing) {
       v.pause();
       audioRef?.current?.pause();
+      setProgramPlayheadSec(programPlayheadSecRef.current);
       setPlaying(false);
       return;
     }
+    programPlayheadSecRef.current = programPlayheadSec;
+    playheadUiSyncMsRef.current = 0;
     setPlaying(true);
-  }, [playing, setPlaying, videoRef, audioRef]);
+  }, [playing, setPlaying, setProgramPlayheadSec, programPlayheadSec, videoRef, audioRef]);
 
   return {
     playbackVideoUrl,
     onProgramVideoTimeUpdate,
+    onProgramVideoLoadedData,
+    onProgramAudioTimeUpdate,
     toggleProgramPlay,
   };
 }
@@ -2426,8 +2643,13 @@ export function ComposeMiniTimelinePanel({
     [ordered, durationHints],
   );
 
-  const { playbackVideoUrl, onProgramVideoTimeUpdate, toggleProgramPlay } =
-    useComposeProgramVideoPlayback({
+  const {
+    playbackVideoUrl,
+    onProgramVideoTimeUpdate,
+    onProgramVideoLoadedData,
+    onProgramAudioTimeUpdate,
+    toggleProgramPlay,
+  } = useComposeProgramVideoPlayback({
       ordered,
       audioOrdered: orderedAudio,
       videoRef,
@@ -2480,6 +2702,9 @@ export function ComposeMiniTimelinePanel({
 
   const pausedPreviewVideoUrl =
     playbackVideoUrl || selected?.videoUrl?.trim() || "";
+  const programVideoSrc = playing
+    ? playbackVideoUrl || undefined
+    : pausedPreviewVideoUrl || undefined;
 
   useComposePausedProgramPreviewSeek({
     videoRef,
@@ -2780,12 +3005,19 @@ export function ComposeMiniTimelinePanel({
       </div>
       <video
         ref={videoRef}
-        src={playing ? undefined : pausedPreviewVideoUrl || undefined}
+        src={programVideoSrc}
         className="sr-only"
         playsInline
         onTimeUpdate={onProgramVideoTimeUpdate}
+        onLoadedData={onProgramVideoLoadedData}
       />
-      <audio ref={audioRef} className="sr-only" preload="auto" playsInline />
+      <audio
+        ref={audioRef}
+        className="sr-only"
+        preload="auto"
+        playsInline
+        onTimeUpdate={onProgramAudioTimeUpdate}
+      />
       <div
         className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-0"
         aria-busy={!ready}
@@ -3056,8 +3288,13 @@ export function ComposeEditorFullscreen({
     [ordered, durationHints],
   );
 
-  const { playbackVideoUrl, onProgramVideoTimeUpdate, toggleProgramPlay } =
-    useComposeProgramVideoPlayback({
+  const {
+    playbackVideoUrl,
+    onProgramVideoTimeUpdate,
+    onProgramVideoLoadedData,
+    onProgramAudioTimeUpdate,
+    toggleProgramPlay,
+  } = useComposeProgramVideoPlayback({
       ordered,
       audioOrdered: orderedAudio,
       videoRef,
@@ -3110,6 +3347,9 @@ export function ComposeEditorFullscreen({
 
   const pausedPreviewVideoUrl =
     playbackVideoUrl || selected?.videoUrl?.trim() || "";
+  const programVideoSrc = playing
+    ? playbackVideoUrl || undefined
+    : pausedPreviewVideoUrl || undefined;
 
   useComposePausedProgramPreviewSeek({
     videoRef,
@@ -3611,17 +3851,19 @@ export function ComposeEditorFullscreen({
                 <>
                   <video
                     ref={videoRef}
-                    src={playing ? undefined : pausedPreviewVideoUrl || undefined}
+                    src={programVideoSrc}
                     className="max-h-full max-w-full rounded-md shadow-lg"
                     playsInline
                     controls={false}
                     onTimeUpdate={onProgramVideoTimeUpdate}
+                    onLoadedData={onProgramVideoLoadedData}
                   />
                   <audio
                     ref={audioRef}
                     className="sr-only"
                     preload="auto"
                     playsInline
+                    onTimeUpdate={onProgramAudioTimeUpdate}
                   />
                 </>
               ) : (

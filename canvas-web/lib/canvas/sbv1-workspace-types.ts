@@ -1,3 +1,5 @@
+import type { ComposeWorkbenchState } from "@private/platform-compose-ui/types";
+
 import type {
   Sbv1ImageAspectRatio,
   Sbv1ImageQuality,
@@ -111,6 +113,16 @@ export type Sbv1VideoEngineNodeData = {
   filmPullProjectId?: string;
   filmPullScriptHubId?: string;
   videoEditSession?: Sbv1VideoEditSession;
+  /**
+   * @deprecated 使用 composeTrimWorkbenchDraft / composeTrimWorkbenchCommitted
+   */
+  composeTrimWorkbench?: ComposeWorkbenchState | null;
+  /** 全屏剪辑 · 当前编辑草稿（未合成前不影响迷你窗时间线） */
+  composeTrimWorkbenchDraft?: ComposeWorkbenchState | null;
+  /** 迷你窗时间线 · 与最后一次「生成剪辑片段」成功时一致 */
+  composeTrimWorkbenchCommitted?: ComposeWorkbenchState | null;
+  /** 最近一次「生成剪辑片段」产出的右侧结果节点 id */
+  lastComposeTrimResultNodeId?: string | null;
   /** 本地 ffmpeg 裁剪 · 入出点与实测时长 */
   trimClipMeta?: {
     startSec: number;

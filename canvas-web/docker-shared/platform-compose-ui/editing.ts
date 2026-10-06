@@ -17,6 +17,18 @@ export function composeClipSourceEnd(
   return clip.sourceEndSec ?? fullSourceSec;
 }
 
+/** 预览 / 播放 · 源内有效出点（与时间线 span 对齐，避免播进未入 timeline 的尾部） */
+export function composeClipEffectiveSourceEnd(
+  clip: ComposeWorkbenchClip,
+  programSpanSec: number,
+  fullSourceSec: number,
+): number {
+  const start = composeClipSourceStart(clip);
+  const nominalEnd = composeClipSourceEnd(clip, fullSourceSec);
+  const spanEnd = start + Math.max(COMPOSE_MIN_CLIP_SEC, programSpanSec);
+  return Math.min(nominalEnd, spanEnd);
+}
+
 export function composeClipSpanSec(
   clip: ComposeWorkbenchClip,
   fullSourceSec: number,
@@ -125,7 +137,8 @@ export function resolveComposeClipAtProgramSec(
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i]!;
     const isLast = i === segments.length - 1;
-    if (clamped <= acc + seg.span || isLast) {
+    // 段尾（clamped === acc + span）归入下一段，避免卡在上一段末帧
+    if (clamped < acc + seg.span || isLast) {
       const localInClip = Math.max(0, Math.min(clamped - acc, seg.span));
       const srcStart = composeClipSourceStart(seg.clip);
       return {

@@ -204,6 +204,9 @@ export type JianyingExportFrameFromWorkbench = {
   durationSec?: number;
   sourceStartSec?: number;
   sourceEndSec?: number;
+  audioSourceStartSec?: number;
+  audioSourceEndSec?: number;
+  audioDurationSec?: number;
 };
 
 function pickAudioForVideoSegment(
@@ -272,6 +275,14 @@ export function workbenchToJianyingExportFrames(
             hints,
           )
         : orderedComposeAudioClips(workbench)[i];
+    const audioFull =
+      pairedAudio?.audioUrl?.trim() &&
+      hints.audioDurationByUrl?.[pairedAudio.audioUrl.trim()];
+    const audioSpan =
+      pairedAudio && audioFull != null && audioFull > 0
+        ? composeClipSourceEnd(pairedAudio, audioFull) -
+          composeClipSourceStart(pairedAudio)
+        : undefined;
     return {
       frameIndex: i + 1,
       dialogue: clip.subtitle?.trim() ?? "",
@@ -281,6 +292,13 @@ export function workbenchToJianyingExportFrames(
       durationSec: span,
       sourceStartSec: clip.sourceStartSec,
       sourceEndSec: clip.sourceEndSec,
+      ...(pairedAudio?.sourceStartSec != null
+        ? { audioSourceStartSec: pairedAudio.sourceStartSec }
+        : {}),
+      ...(pairedAudio?.sourceEndSec != null
+        ? { audioSourceEndSec: pairedAudio.sourceEndSec }
+        : {}),
+      ...(audioSpan != null && audioSpan > 0 ? { audioDurationSec: audioSpan } : {}),
     };
   });
 }
