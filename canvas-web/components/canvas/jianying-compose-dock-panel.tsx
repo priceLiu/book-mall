@@ -15,6 +15,7 @@ import {
   DEFAULT_COMPOSE_PROFILE,
   type ComposeWorkbenchState,
 } from "@private/platform-compose-ui/editor";
+import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -22,6 +23,11 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import { uploadCanvasVideo } from "@/lib/canvas-api";
 import type { JianyingLibtvConnectionSnapshot } from "@/lib/canvas/jianying-from-workspace";
 import { useJianyingComposeMediaRender } from "@/lib/canvas/jianying-compose-media-render";
+import {
+  formatMediaRenderComposeStatusLine,
+  isMediaRenderJobInflight,
+} from "@/lib/canvas/media-render-in-flight";
+import { cn } from "@/lib/utils";
 import { fetchVideoFilmstrip } from "@/lib/canvas/libtv-video-edit-client";
 import type { JianyingAutoRenderNodeData } from "@/lib/canvas/types";
 
@@ -79,6 +85,7 @@ function JianyingComposeDockPanelInner({
         return {
           mediaRenderResult: d?.mediaRenderResult ?? null,
           videoUrl: d?.videoUrl ?? null,
+          mediaRenderInFlight: d?.mediaRenderInFlight ?? null,
         };
       },
       [nodeId],
@@ -93,6 +100,18 @@ function JianyingComposeDockPanelInner({
       mediaRenderResult: nodeMedia.mediaRenderResult,
       videoUrl: nodeMedia.videoUrl,
     });
+
+  const exportBusyEffective = useMemo(
+    () =>
+      composeBusy ||
+      isMediaRenderJobInflight(nodeMedia.mediaRenderInFlight),
+    [composeBusy, nodeMedia.mediaRenderInFlight],
+  );
+
+  const composeStatusLine = useMemo(
+    () => formatMediaRenderComposeStatusLine(nodeMedia.mediaRenderInFlight),
+    [nodeMedia.mediaRenderInFlight],
+  );
 
   const applyWorkbench = useCallback(
     (
@@ -173,9 +192,11 @@ function JianyingComposeDockPanelInner({
             ordered={ordered}
             workbench={workbench}
             loading={filmstrip.loading}
+            loadingLabel={filmstrip.loadingLabel}
             filmstripByUrl={filmstrip.filmstripByUrl}
             fullDurationByUrl={filmstrip.fullDurationByUrl}
-            exportBusy={composeBusy}
+            exportBusy={exportBusyEffective}
+            composeStatusLine={composeStatusLine}
             canEdit={!disabled}
             onClose={() => setMiniOpen(false)}
             onApplyWorkbench={applyWorkbench}
@@ -230,8 +251,10 @@ function JianyingComposeDockPanelInner({
             workbench={workbench}
             profile={profile}
             ordered={ordered}
-            exportBusy={composeBusy}
+            exportBusy={exportBusyEffective}
+            composeStatusLine={composeStatusLine}
             loading={filmstrip.loading}
+            loadingLabel={filmstrip.loadingLabel}
             filmstripByUrl={filmstrip.filmstripByUrl}
             fullDurationByUrl={filmstrip.fullDurationByUrl}
             onClose={() => {
@@ -280,6 +303,27 @@ function JianyingComposeDockPanelInner({
             trackChrome={{ variant: "fullscreen", zoomable: true, showAudioAttach: false }}
             upstreamLibraryClips={upstreamLibraryClips}
           />
+        </ModalPortal>
+      ) : null}
+
+      {exportBusyEffective && !miniOpen && !fullscreenOpen ? (
+        <ModalPortal>
+          <button
+            type="button"
+            className={cn(
+              "pointer-events-auto fixed bottom-20 right-4 z-[3195] flex max-w-[min(calc(100vw-2rem),20rem)] items-center gap-2 rounded-full border border-cyan-400/35 bg-[#141416]/96 px-3 py-2 text-left text-xs font-medium text-cyan-100 shadow-lg transition hover:border-cyan-400/50 hover:shadow-xl",
+            )}
+            onClick={() => {
+              setMiniOpen(true);
+              setMiniPanelSession((s) => s + 1);
+            }}
+            aria-label="打开剪辑台查看合成进度"
+          >
+            <Loader2 className="size-4 shrink-0 animate-spin text-cyan-300" />
+            <span className="truncate">
+              {composeStatusLine?.trim() || "云端合成中…"}
+            </span>
+          </button>
         </ModalPortal>
       ) : null}
 

@@ -41,7 +41,10 @@ export function useMediaRenderCancel(nodeId: string) {
       }
     }
     if (jobId) dismissMediaRenderPoll(nodeId, jobId);
-    updateNodeData(nodeId, { mediaRenderInFlight: null });
+    updateNodeData(nodeId, {
+      mediaRenderInFlight: null,
+      mediaRenderResumeJobId: null,
+    });
     window.dispatchEvent(
       new CustomEvent("canvas:media-render-cancelled", {
         detail: { nodeId, jobId },

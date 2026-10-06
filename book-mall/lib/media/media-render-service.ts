@@ -24,6 +24,7 @@ import {
   countActiveRenderJobs,
   findActiveMediaRenderJobForProject,
   supersedeInFlightMediaRenderJobsForProject,
+  tryReclaimStaleMediaRenderJob,
 } from "@/lib/media/media-render-concurrency";
 import {
   parseMediaTimelineV1,
@@ -379,6 +380,17 @@ export async function getMediaRenderJobForUser(
     },
   });
   if (!job) return null;
+
+  const reclaimed = await tryReclaimStaleMediaRenderJob({
+    id: job.id,
+    status: job.status,
+    progress: job.progress,
+    createdAt: job.createdAt,
+    skipWhenActivelyProcessing: isMediaRenderJobActivelyProcessing(job.id),
+  });
+  if (reclaimed) {
+    return getMediaRenderJobForUser(jobId, userId);
+  }
 
   maybeResumeOrphanedMediaRenderJob(job);
 

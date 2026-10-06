@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   clearStaleMediaRenderInFlightInNodes,
+  formatMediaRenderComposeStatusLine,
   isStaleMediaRenderInFlight,
 } from "@/lib/canvas/media-render-in-flight";
 import { stripGraphForPersist } from "@/lib/canvas/sanitize";
@@ -51,6 +52,32 @@ describe("mediaRenderInFlight persist", () => {
     expect(
       (nodes[1]!.data!.mediaRenderInFlight as { jobId: string }).jobId,
     ).toBe("job_keep");
+  });
+
+  it("keeps local ffmpeg trim running across persist", () => {
+    const graph: CanvasGraph = {
+      schemaVersion: 2,
+      nodes: [
+        {
+          id: "n_trim",
+          type: "sbv1-video-engine",
+          position: { x: 0, y: 0 },
+          data: {
+            label: "裁剪片段",
+            runtime: {
+              status: "running",
+              localJobKind: "video-trim",
+            },
+          },
+        },
+      ],
+      edges: [],
+    };
+    const stripped = stripGraphForPersist(graph);
+    expect(stripped.nodes[0]!.data!.runtime).toMatchObject({
+      status: "running",
+      localJobKind: "video-trim",
+    });
   });
 
   it("persists mediaRenderResumeJobId for refresh resume", () => {
@@ -168,5 +195,18 @@ describe("mediaRenderInFlight persist", () => {
     expect(
       (stripped.nodes[2]!.data as { runtime: { taskId?: string } }).runtime,
     ).not.toHaveProperty("taskId");
+  });
+});
+
+describe("formatMediaRenderComposeStatusLine", () => {
+  it("formats running job with label and percent", () => {
+    expect(
+      formatMediaRenderComposeStatusLine({
+        jobId: "job_1",
+        status: "RUNNING",
+        progress: 42.4,
+        progressLabel: "拼接分镜",
+      }),
+    ).toBe("42% · 拼接分镜");
   });
 });

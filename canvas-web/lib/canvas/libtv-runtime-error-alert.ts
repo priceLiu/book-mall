@@ -62,8 +62,8 @@ export function libtvRuntimeErrorAlertTitle(
   if (code === "VIDEO_FRAME_EXTRACT" || /截帧失败/.test(msg)) {
     return "截帧失败";
   }
-  if (code === "VIDEO_TRIM" || /裁剪失败|裁剪片段/.test(msg)) {
-    return "视频裁剪失败";
+  if (code === "VIDEO_TRIM" || /剪辑失败|剪辑片段|裁剪失败|裁剪片段/.test(msg)) {
+    return "视频剪辑失败";
   }
   if (code === "VIDEO_TRACK_SPLIT") {
     return "视频处理失败";

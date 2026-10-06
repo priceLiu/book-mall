@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { LibtvAudioVoiceCloneDialog } from "@/components/canvas/libtv-audio-voice-clone-dialog";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
 import { AlertTriangle, GripVertical, Music } from "lucide-react";
@@ -44,6 +46,10 @@ import {
 import type { LibtvAudioNodeData } from "@/lib/canvas/libtv-audio-task-apply";
 import { LibtvMiniAudioPlayer } from "./libtv-mini-audio-player";
 import { resolveLibtvAudioDisplayTitle } from "@/lib/canvas/libtv-audio-display-title";
+import {
+  libtvAudioVoiceCloneSourceReady,
+  runLibtvAudioVoiceClone,
+} from "@/lib/canvas/libtv-audio-voice-clone-run";
 import { LibtvEditableNodeTitle } from "./libtv-editable-node-title";
 
 export type LibtvAudioNodeProps = NodeProps & {
@@ -64,14 +70,30 @@ export function LibtvAudioNode({
   onSidePickLeft,
   onSidePickRight,
 }: LibtvAudioNodeProps) {
+  const { alert } = useDialogs();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
+  const addNode = useCanvasStore((s) => s.addNode);
+  const setNodes = useCanvasStore((s) => s.setNodes);
+  const setEdges = useCanvasStore((s) => s.setEdges);
+  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const graphMeta = useCanvasStore((s) => s.graphMeta);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const [preferBlobPreview, setPreferBlobPreview] = useState(false);
+  const [voiceCloneOpen, setVoiceCloneOpen] = useState(false);
+  const [voiceCloneBusy, setVoiceCloneBusy] = useState(false);
 
   const d = data as unknown as LibtvAudioNodeData;
+
+  const cloneReferenceUrl = useMemo(
+    () =>
+      libtvAudioVoiceCloneSourceReady({
+        ossUrl: d.ossUrl,
+        runtime: d.runtime,
+      }),
+    [d.ossUrl, d.runtime],
+  );
   useEffect(() => {
     setPreferBlobPreview(false);
   }, [d.ossUrl, d.blobUrl, d.uploading]);
@@ -138,6 +160,52 @@ export function LibtvAudioNode({
   const showToolbar = soleSelected && hasAudio && !isGenerating;
 
   const onDuplicateNode = useLibtvNodeDuplicate(id, "story-pro2-audio");
+
+  const defaultClonePrompt = useMemo(() => {
+    const upstreamLinks = resolvePro2DockUpstreamLinks(
+      id,
+      "story-pro2-audio",
+      nodes,
+      edges,
+    );
+    return mergeLibtvAudioRunText(
+      String(d.dockInput ?? ""),
+      upstreamLinks,
+      resolveLibtvAudioPredecessorTexts(nodes, edges, id),
+    );
+  }, [id, d.dockInput, nodes, edges]);
+
+  const cloneStore = useMemo(
+    () => ({ nodes, edges, addNode, setNodes, setEdges }),
+    [nodes, edges, addNode, setNodes, setEdges],
+  );
+
+  const onVoiceCloneSubmit = useCallback(
+    async (values: { title: string; prompt: string }) => {
+      if (!cloneReferenceUrl) return;
+      setVoiceCloneBusy(true);
+      try {
+        await runLibtvAudioVoiceClone({
+          sourceNodeId: id,
+          referenceAudioUrl: cloneReferenceUrl,
+          title: values.title,
+          prompt: values.prompt,
+          store: cloneStore,
+          updateNodeData,
+        });
+        setVoiceCloneOpen(false);
+      } catch (e) {
+        await alert({
+          title: "音色克隆失败",
+          message: e instanceof Error ? e.message : "请稍后重试",
+          variant: "error",
+        });
+      } finally {
+        setVoiceCloneBusy(false);
+      }
+    },
+    [cloneReferenceUrl, id, cloneStore, updateNodeData, alert],
+  );
 
   const playerShellClass = cn(
     "relative w-full shrink-0 overflow-hidden rounded-[12px]",
@@ -211,9 +279,24 @@ export function LibtvAudioNode({
             minimal
             previewUrl={previewUrl}
             onDuplicateNode={onDuplicateNode}
+            onVoiceClone={
+              cloneReferenceUrl ? () => setVoiceCloneOpen(true) : undefined
+            }
+            voiceCloneBusy={voiceCloneBusy}
           />
         </LibtvNodeToolbarPortal>
       ) : null}
+
+      <LibtvAudioVoiceCloneDialog
+        open={voiceCloneOpen}
+        busy={voiceCloneBusy}
+        sourceLabel={displayTitle || defaultNodeLabel}
+        defaultPrompt={defaultClonePrompt}
+        onClose={() => {
+          if (!voiceCloneBusy) setVoiceCloneOpen(false);
+        }}
+        onSubmit={onVoiceCloneSubmit}
+      />
 
       <div className={cn(PRO2_TEXT_NODE_TITLE_CLASS, "relative mb-1.5 shrink-0")}>
         <GripVertical className="size-3.5 shrink-0 text-white/30" />

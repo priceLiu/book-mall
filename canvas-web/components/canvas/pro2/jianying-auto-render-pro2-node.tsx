@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import { LazyViewportImage, LazyViewportVideo } from "../lazy-viewport-media";
 import { isMediaSrcLoaded } from "@/lib/canvas/loaded-media-src-cache";
 import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
+import { useJianyingAutoRenderMediaRenderResume } from "@/lib/canvas/jianying-auto-render-media-render-resume";
 import { useMediaRenderCancel } from "@/lib/canvas/use-media-render-cancel";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
@@ -63,6 +64,7 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
     renderInFlight &&
     (Boolean(d.mediaRenderInFlight?.progressLabel?.trim()) || !hasVideo);
   const title = d.label?.trim() || "自动成片";
+  useJianyingAutoRenderMediaRenderResume(id);
   const { requestCancel: requestMediaRenderCancel } = useMediaRenderCancel(id);
   const showSidePlus = Boolean(hovered || selected || connectingFromNodeId);
   const stageVideoFitClass = "object-contain";
@@ -215,6 +217,7 @@ export function JianyingAutoRenderPro2Node({ id, data, selected }: NodeProps) {
             {ffmpegPhase ? (
               <LibtvMediaGeneratingState
                 variant="cyan"
+                label={d.mediaRenderInFlight?.progressLabel?.trim() || undefined}
                 onCancel={() => void requestMediaRenderCancel()}
               />
             ) : hasVideo ? (

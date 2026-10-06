@@ -3,10 +3,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 
 import { persistCanvasBufferToOss } from "@/lib/canvas/canvas-oss";
-import {
-  extractVideoFirstFrameJpegFromPath,
-  remuxMp4FaststartFromPath,
-} from "@/lib/canvas/video-poster-ffmpeg";
+import { extractVideoFirstFrameJpegFromPath } from "@/lib/canvas/video-poster-ffmpeg";
 import {
   assertFfmpegForMediaRender,
   FFMPEG_USER_MESSAGE,
@@ -18,6 +15,10 @@ import {
   runCanvasVideoFfmpeg,
   userFacingCanvasVideoEditError,
 } from "./canvas-video-edit-shared";
+import {
+  assertTrimOutputDuration,
+  MIN_TRIM_LEN_SEC,
+} from "./canvas-video-trim-assert";
 
 export type CanvasVideoTrimResult = {
   videoUrl: string;
@@ -27,7 +28,36 @@ export type CanvasVideoTrimResult = {
   durationSec: number;
 };
 
-const MIN_TRIM_LEN_SEC = 0.2;
+/** 与电商 outfit clip 一致：重编码 + 输入侧 seek，避免 AI MP4 上 stream copy 裁切无效 */
+async function runTrimReencodeFfmpeg(
+  inputPath: string,
+  startSec: number,
+  clipLenSec: number,
+  outPath: string,
+): Promise<void> {
+  await runCanvasVideoFfmpeg([
+    "-y",
+    "-i",
+    inputPath,
+    "-ss",
+    String(Math.max(0, startSec)),
+    "-t",
+    String(Math.max(MIN_TRIM_LEN_SEC, clipLenSec)),
+    "-c:v",
+    "libx264",
+    "-preset",
+    "veryfast",
+    "-crf",
+    "20",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "128k",
+    "-movflags",
+    "+faststart",
+    outPath,
+  ]);
+}
 
 export async function runCanvasVideoTrim(opts: {
   userId: string;
@@ -53,56 +83,25 @@ export async function runCanvasVideoTrim(opts: {
     const inputPath = join(dir, "input.bin");
     await downloadCanvasSourceVideoToFile(trimmed, inputPath);
 
-    const durationSec = (await probeCanvasVideoDurationSec(inputPath)) ?? endSec;
+    const sourceDurationSec =
+      (await probeCanvasVideoDurationSec(inputPath)) ?? endSec;
     startSec = Math.max(0, startSec);
-    endSec = Math.min(durationSec, endSec);
+    endSec = Math.min(sourceDurationSec, endSec);
     if (endSec - startSec < MIN_TRIM_LEN_SEC) {
       throw new Error("裁剪片段过短，请拉大入出点间距");
     }
 
     const rawOut = join(dir, "clip.mp4");
-    const fastOut = join(dir, "clip-fast.mp4");
+    const clipLenSec = endSec - startSec;
 
-    try {
-      await runCanvasVideoFfmpeg([
-        "-y",
-        "-ss",
-        String(startSec),
-        "-to",
-        String(endSec),
-        "-i",
-        inputPath,
-        "-c",
-        "copy",
-        "-avoid_negative_ts",
-        "make_zero",
-        rawOut,
-      ]);
-    } catch {
-      await runCanvasVideoFfmpeg([
-        "-y",
-        "-ss",
-        String(startSec),
-        "-to",
-        String(endSec),
-        "-i",
-        inputPath,
-        "-c:v",
-        "libx264",
-        "-preset",
-        "fast",
-        "-crf",
-        "23",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "128k",
-        rawOut,
-      ]);
-    }
+    await runTrimReencodeFfmpeg(inputPath, startSec, clipLenSec, rawOut);
 
-    const usedFast = await remuxMp4FaststartFromPath(rawOut, fastOut);
-    const uploadPath = usedFast ? fastOut : rawOut;
+    const uploadPath = rawOut;
+    const probedOutDur = assertTrimOutputDuration(
+      await probeCanvasVideoDurationSec(uploadPath),
+      clipLenSec,
+      sourceDurationSec,
+    );
     const videoBuf = await readFile(uploadPath);
     if (!videoBuf.byteLength) throw new Error("裁剪未产生有效视频");
 
@@ -137,7 +136,7 @@ export async function runCanvasVideoTrim(opts: {
       posterUrl,
       startSec,
       endSec,
-      durationSec: endSec - startSec,
+      durationSec: probedOutDur,
     };
   } catch (e) {
     if (e instanceof Error && e.message === FFMPEG_USER_MESSAGE) throw e;

@@ -179,10 +179,10 @@ export function useJianyingComposeMediaRender(args: {
               subtitleMode:
                 profile.subtitle?.mode === "asr" ? "asr" : "script",
             },
-            mediaRenderResumeJobId: job.id,
           },
           { sessionOnly: true },
         );
+        updateNodeData(nodeId, { mediaRenderResumeJobId: job.id });
 
         const finalJob = await pollMediaRenderJobUntilDone({
           nodeId,

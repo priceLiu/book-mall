@@ -1,9 +1,12 @@
 "use client";
 
 import {
+  absoluteNodePosition,
+  nodeMeasuredSize,
+} from "./normalize-graph-nodes";
+import {
   buildSbv1VideoEngineNodeData,
   selectSbv1NodeAfterSpawn,
-  spawnSbv1NeighborFromNode,
 } from "./sbv1-spawn-nodes";
 import { SBV1_VIDEO_ENGINE_WIDTH } from "./sbv1-node-chrome";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
@@ -12,6 +15,9 @@ import {
   libtvLocalMediaJobRunningRuntime,
 } from "./libtv-local-media-job";
 import { postVideoTrim } from "./libtv-video-edit-client";
+import { requestCanvasGraphPersistFlush } from "./canvas-persist-request";
+
+const GAP = 48;
 
 type TrimStore = {
   nodes: CanvasFlowNode[];
@@ -31,6 +37,7 @@ type TrimStore = {
   setEdges: (fn: (edges: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
 };
 
+/** 裁剪结果独立成片节点 · 不连 in_motion_video（避免误用上游全长作参考） */
 function spawnTrimmedVideoTarget(
   sourceNodeId: string,
   store: TrimStore,
@@ -39,11 +46,24 @@ function spawnTrimmedVideoTarget(
   if (!anchor) throw new Error("源节点不存在");
 
   const anchorData = (anchor.data ?? {}) as Record<string, unknown>;
-  const newId = spawnSbv1NeighborFromNode(
-    sourceNodeId,
-    "right",
+  const abs = absoluteNodePosition(anchor, store.nodes);
+  const { w: selfW } = nodeMeasuredSize(anchor);
+  const x = abs.x + selfW + GAP;
+  const y = abs.y;
+
+  const newId = store.addNode(
     "sbv1-video-engine",
-    store,
+    { x, y },
+    buildSbv1VideoEngineNodeData({
+      label: "剪辑片段",
+      aspectRatio: anchorData.aspectRatio,
+      mediaAspectPreset: anchorData.mediaAspectPreset,
+      mediaNaturalW: anchorData.mediaNaturalW,
+      mediaNaturalH: anchorData.mediaNaturalH,
+      runtime: libtvLocalMediaJobRunningRuntime(
+        LIBTV_LOCAL_MEDIA_JOB_VIDEO_TRIM,
+      ),
+    }),
   );
   if (!newId) throw new Error("无法创建视频节点");
 
@@ -67,7 +87,7 @@ function spawnTrimmedVideoTarget(
         data: {
           ...(n.data as Record<string, unknown>),
           ...buildSbv1VideoEngineNodeData({
-            label: "裁剪片段",
+            label: "剪辑片段",
             aspectRatio: anchorData.aspectRatio,
             mediaAspectPreset: anchorData.mediaAspectPreset,
             mediaNaturalW: anchorData.mediaNaturalW,
@@ -108,8 +128,22 @@ export async function runLibtvVideoTrim(
       endSec: opts.endSec,
     });
 
+    const durationSec =
+      result.durationSec ??
+      Math.max(0, opts.endSec - opts.startSec);
+    const label =
+      durationSec > 0
+        ? `剪辑片段 · ${durationSec.toFixed(1)}s`
+        : "剪辑片段";
+
     opts.updateNodeData(targetId, {
-      label: "裁剪片段",
+      label,
+      ossUrl: result.videoUrl,
+      trimClipMeta: {
+        startSec: result.startSec ?? opts.startSec,
+        endSec: result.endSec ?? opts.endSec,
+        durationSec,
+      },
       runtime: {
         status: "done",
         ossUrl: result.videoUrl,
@@ -121,9 +155,10 @@ export async function runLibtvVideoTrim(
       },
     });
 
+    requestCanvasGraphPersistFlush({ immediate: true });
     return targetId;
   } catch (e) {
-    const message = e instanceof Error ? e.message : "裁剪失败";
+    const message = e instanceof Error ? e.message : "剪辑失败";
     opts.updateNodeData(targetId, {
       runtime: {
         status: "error",

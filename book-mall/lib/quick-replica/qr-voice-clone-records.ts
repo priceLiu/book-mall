@@ -61,6 +61,10 @@ function readVoiceCloneDraftFromLog(inputSummary: unknown): {
   };
 }
 
+function cloneCatalogLabel(title?: string, prompt?: string): string {
+  return trimLabel(title?.trim() || prompt?.trim() || "声音克隆", 24);
+}
+
 function resolveVoiceIdFromLog(inputSummary: unknown, resultSummary: unknown): string {
   const draft = readVoiceCloneDraftFromLog(inputSummary);
   const input = inputSummary as {
@@ -271,7 +275,7 @@ export async function listQrVoiceCloneCatalogEntries(
       row.thumbnailUrl,
     );
     const prompt = template.reference?.prompt?.text?.trim();
-    const label = trimLabel(prompt || template.title || "声音克隆", 24);
+    const label = cloneCatalogLabel(template.title, prompt);
     const clonedAt = template.output?.createdAt || template.createdAt;
 
     let voiceId = readCloneVoiceIdFromTemplate(template);
@@ -301,10 +305,7 @@ export async function listQrVoiceCloneCatalogEntries(
     entries.push({
       catalogId: `job-${row.id}`,
       voiceId,
-      label: trimLabel(
-        draft?.prompt || draft?.title || voiceId,
-        24,
-      ),
+      label: cloneCatalogLabel(draft?.title, draft?.prompt || voiceId),
       previewUrl: resolveLogPreviewUrl(
         row.resultSummary,
         row.id,

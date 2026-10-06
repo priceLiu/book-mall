@@ -16,10 +16,17 @@ import { runLibtvVideoFrameExtract } from "@/lib/canvas/libtv-video-frame-extrac
 import { runLibtvVideoTrim } from "@/lib/canvas/libtv-video-trim-run";
 import {
   fetchVideoFilmstrip,
-  libtvVideoEditSourceReady,
+  resolveLibtvVideoEditSourceUrl,
   type VideoFilmstripFrame,
 } from "@/lib/canvas/libtv-video-edit-client";
-import { formatClipTimeSec } from "@/lib/canvas/libtv-video-clip-editor-format";
+import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
+import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
+import {
+  clipSecFromTrackClientX,
+  formatClipTimeSec,
+  isClipRangeStillFullLength,
+} from "@/lib/canvas/libtv-video-clip-editor-format";
+import { RF_NO_DRAG, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
 
 const CLIP_EDITOR_FLOW = { w: 560, h: 220 } as const;
@@ -29,8 +36,8 @@ const FILMSTRIP_THUMB_PX = 72;
 
 function sessionOpen(
   session: Sbv1VideoEditSession | undefined,
-): session is { open: true; mode: "pick-frame" | "trim-clip" } {
-  return Boolean(session && session.open === true);
+): session is { open: true; mode: "pick-frame" } {
+  return Boolean(session?.open === true && session.mode === "pick-frame");
 }
 
 export function LibtvVideoClipEditorFloatingDock() {
@@ -104,18 +111,31 @@ const LibtvVideoClipEditorBody = memo(function LibtvVideoClipEditorBody({
   const setEdges = useCanvasStore((s) => s.setEdges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
-  const runtime = useCanvasStore(
+  const nodeData = useCanvasStore(
     useCallback(
       (s) =>
-        (s.nodes.find((n) => n.id === nodeId)?.data as Sbv1VideoEngineNodeData)
-          ?.runtime,
+        s.nodes.find((n) => n.id === nodeId)?.data as
+          | Sbv1VideoEngineNodeData
+          | undefined,
       [nodeId],
     ),
   );
 
+  const { succeeded } = useNodeTaskHistory(nodeId);
+  const latestSucceeded = succeeded[succeeded.length - 1];
+  const taskMediaUrl =
+    pickTaskResultMediaUrl(latestSucceeded ?? {}) ??
+    latestSucceeded?.ossUrl ??
+    undefined;
+
   const sourceVideoUrl = useMemo(
-    () => libtvVideoEditSourceReady({ runtime }),
-    [runtime],
+    () =>
+      resolveLibtvVideoEditSourceUrl({
+        ossUrl: nodeData?.ossUrl,
+        runtime: nodeData?.runtime,
+        fallbackTaskMediaUrl: taskMediaUrl,
+      }),
+    [nodeData?.ossUrl, nodeData?.runtime, taskMediaUrl],
   );
 
   const store = useMemo(
@@ -180,15 +200,8 @@ const LibtvVideoClipEditorBody = memo(function LibtvVideoClipEditorBody({
   }, [sourceVideoUrl, projectId]);
 
   const secFromClientX = useCallback(
-    (clientX: number): number => {
-      const el = stripRef.current;
-      if (!el || durationSec <= 0) return 0;
-      const scrollLeft = stripScrollRef.current?.scrollLeft ?? 0;
-      const rect = el.getBoundingClientRect();
-      const xOnTrack = clientX - rect.left + scrollLeft;
-      const ratio = Math.min(1, Math.max(0, xOnTrack / el.offsetWidth));
-      return ratio * durationSec;
-    },
+    (clientX: number): number =>
+      secFromPointerOnStrip(clientX, stripRef, stripScrollRef, durationSec),
     [durationSec],
   );
 
@@ -228,7 +241,16 @@ const LibtvVideoClipEditorBody = memo(function LibtvVideoClipEditorBody({
       } else {
         const start = Math.min(trimStart, trimEnd - MIN_TRIM_SEC);
         const end = Math.max(trimEnd, start + MIN_TRIM_SEC);
-        await runLibtvVideoTrim({
+        if (isClipRangeStillFullLength(start, end, durationSec)) {
+          await alert({
+            title: "还没有裁短",
+            message:
+              "两根白线还贴在整段两端，中间整段都会保留。左线往右拖、右线往左拖，线外面变暗后再生成。",
+            variant: "warning",
+          });
+          return;
+        }
+        const targetId = await runLibtvVideoTrim({
           sourceNodeId: nodeId,
           sourceVideoUrl,
           projectId,
@@ -237,7 +259,16 @@ const LibtvVideoClipEditorBody = memo(function LibtvVideoClipEditorBody({
           store,
           updateNodeData: (id, patch) => updateNodeData(id, patch),
         });
+        const targetLabel =
+          (useCanvasStore.getState().nodes.find((n) => n.id === targetId)?.data as
+            | Sbv1VideoEngineNodeData
+            | undefined)?.label ?? "裁剪片段";
         closeSession();
+        await alert({
+          title: "裁剪完成",
+          message: `已在源节点右侧生成「${targetLabel}」。请选中该节点预览；源节点仍为全长。`,
+          variant: "success",
+        });
       }
     } catch (e) {
       await alert({
@@ -272,7 +303,7 @@ const LibtvVideoClipEditorBody = memo(function LibtvVideoClipEditorBody({
       <span className="truncate text-[11px] tabular-nums text-white/40">
         {mode === "pick-frame"
           ? `定格 ${formatClipTimeSec(playheadSec)} / ${formatClipTimeSec(durationSec)}`
-          : `${formatClipTimeSec(trimStart)} – ${formatClipTimeSec(trimEnd)}（${formatClipTimeSec(Math.max(0, trimEnd - trimStart))}）`}
+          : `保留 ${formatClipTimeSec(trimStart)}–${formatClipTimeSec(trimEnd)}（${formatClipTimeSec(Math.max(0, trimEnd - trimStart))}）`}
       </span>
       <button
         type="button"
@@ -316,22 +347,57 @@ const LibtvVideoClipEditorBody = memo(function LibtvVideoClipEditorBody({
             <div className="rounded-lg border border-white/10 bg-black/40">
               <div
                 ref={stripScrollRef}
-                className="nodrag overflow-x-auto overflow-y-hidden [-ms-overflow-style:none] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20"
+                className={cn(
+                  "nodrag",
+                  mode === "trim-clip"
+                    ? "overflow-visible"
+                    : "overflow-x-auto overflow-y-hidden [-ms-overflow-style:none] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20",
+                )}
               >
                 <div
                   ref={stripRef}
-                  className="relative h-16 shrink-0 cursor-crosshair"
-                  style={{ width: stripTrackWidthPx }}
-                  onClick={onStripClick}
+                  className={cn(
+                    "relative shrink-0",
+                    mode === "trim-clip" ? "h-[84px]" : "h-16 cursor-crosshair",
+                  )}
+                  style={
+                    mode === "trim-clip"
+                      ? { width: "100%" }
+                      : { width: stripTrackWidthPx }
+                  }
+                  onClick={mode === "trim-clip" ? undefined : onStripClick}
                 >
-                  <div className="flex h-full">
+                  {mode === "trim-clip" ? (
+                    <div className="relative h-5 border-b border-white/10 bg-[#141414] text-[10px] tabular-nums text-white/35">
+                      <span className="absolute left-1 top-0.5">
+                        {formatClipTimeSec(0)}
+                      </span>
+                      <span className="absolute left-1/2 top-0.5 -translate-x-1/2">
+                        {formatClipTimeSec(durationSec / 2)}
+                      </span>
+                      <span className="absolute right-1 top-0.5">
+                        {formatClipTimeSec(durationSec)}
+                      </span>
+                    </div>
+                  ) : null}
+                  <div className={cn("relative", mode === "trim-clip" ? "h-16" : "h-full")}>
+                  <div className="flex h-full w-full">
                     {frames.map((f, i) => (
                       <button
                         key={`${f.atSec}-${i}`}
                         type="button"
-                        className="nodrag h-full shrink-0 overflow-hidden border-r border-white/5 p-0 last:border-r-0 hover:ring-1 hover:ring-inset hover:ring-violet-400/40"
-                        style={{ width: FILMSTRIP_THUMB_PX }}
-                        title={formatClipTimeSec(f.atSec)}
+                        className={cn(
+                          "nodrag h-full overflow-hidden border-r border-white/5 p-0 last:border-r-0",
+                          mode === "trim-clip"
+                            ? "pointer-events-none min-w-0 flex-1"
+                            : "shrink-0 hover:ring-1 hover:ring-inset hover:ring-violet-400/40",
+                        )}
+                        style={
+                          mode === "trim-clip"
+                            ? undefined
+                            : { width: FILMSTRIP_THUMB_PX }
+                        }
+                        title={mode === "trim-clip" ? undefined : formatClipTimeSec(f.atSec)}
                         onClick={(e) => onThumbClick(f.atSec, e)}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -344,35 +410,38 @@ const LibtvVideoClipEditorBody = memo(function LibtvVideoClipEditorBody({
                       </button>
                     ))}
                   </div>
+                  </div>
                   {mode === "trim-clip" ? (
                     <>
                       <div
-                        className="pointer-events-none absolute inset-y-0 left-0 bg-black/55"
+                        className="pointer-events-none absolute bottom-0 left-0 top-5 bg-black/60"
                         style={{ width: `${trimStartPct}%` }}
                       />
                       <div
-                        className="pointer-events-none absolute inset-y-0 right-0 bg-black/55"
+                        className="pointer-events-none absolute bottom-0 right-0 top-5 bg-black/60"
                         style={{ width: `${100 - trimEndPct}%` }}
                       />
                       <TrimHandle
-                        side="start"
+                        side="left"
                         pct={trimStartPct}
+                        secAtHandle={trimStart}
                         stripRef={stripRef}
                         stripScrollRef={stripScrollRef}
                         durationSec={durationSec}
                         other={trimEnd}
                         minGap={MIN_TRIM_SEC}
-                        onSec={(s) => setTrimStart(s)}
+                        onSec={setTrimStart}
                       />
                       <TrimHandle
-                        side="end"
+                        side="right"
                         pct={trimEndPct}
+                        secAtHandle={trimEnd}
                         stripRef={stripRef}
                         stripScrollRef={stripScrollRef}
                         durationSec={durationSec}
                         other={trimStart}
                         minGap={MIN_TRIM_SEC}
-                        onSec={(s) => setTrimEnd(s)}
+                        onSec={setTrimEnd}
                       />
                     </>
                   ) : (
@@ -389,8 +458,8 @@ const LibtvVideoClipEditorBody = memo(function LibtvVideoClipEditorBody({
             </div>
             <p className="text-[10px] leading-relaxed text-white/35">
               {mode === "pick-frame"
-                ? "黄线 = 要导出的那一帧（可点击或拖动时间条；缩略图过多可左右滑动）。选好后点「导出帧」。裁视频片段请用顶栏「裁剪」（两条紫线）。"
-                : "拖动左右紫线选择入出点，然后点「生成片段」"}
+                ? "黄线 = 要导出的那一帧（可点击或拖动时间条；缩略图过多可左右滑动）。选好后点「导出帧」。裁视频片段请用顶栏「剪辑」（与自动成片迷你窗相同）。"
+                : "拖左右两根白线：左线往右裁掉开头，右线往左裁掉结尾。线下方数字会跟着变，外面变暗即被裁掉。"}
             </p>
           </>
         )}
@@ -402,16 +471,18 @@ const LibtvVideoClipEditorBody = memo(function LibtvVideoClipEditorBody({
 function secFromPointerOnStrip(
   clientX: number,
   stripRef: React.RefObject<HTMLDivElement | null>,
-  stripScrollRef: React.RefObject<HTMLDivElement | null>,
+  _stripScrollRef: React.RefObject<HTMLDivElement | null>,
   durationSec: number,
 ): number {
   const el = stripRef.current;
-  if (!el || durationSec <= 0) return 0;
-  const scrollLeft = stripScrollRef.current?.scrollLeft ?? 0;
+  if (!el) return 0;
   const rect = el.getBoundingClientRect();
-  const xOnTrack = clientX - rect.left + scrollLeft;
-  const ratio = Math.min(1, Math.max(0, xOnTrack / el.offsetWidth));
-  return ratio * durationSec;
+  return clipSecFromTrackClientX(
+    clientX,
+    rect.left,
+    rect.width,
+    durationSec,
+  );
 }
 
 function PlayheadHandle({
@@ -461,9 +532,23 @@ function PlayheadHandle({
   );
 }
 
+function clampTrimHandleSec(
+  side: "left" | "right",
+  sec: number,
+  durationSec: number,
+  other: number,
+  minGap: number,
+): number {
+  if (side === "left") {
+    return Math.max(0, Math.min(sec, other - minGap));
+  }
+  return Math.min(durationSec, Math.max(sec, other + minGap));
+}
+
 function TrimHandle({
   side,
   pct,
+  secAtHandle,
   stripRef,
   stripScrollRef,
   durationSec,
@@ -471,8 +556,9 @@ function TrimHandle({
   minGap,
   onSec,
 }: {
-  side: "start" | "end";
+  side: "left" | "right";
   pct: number;
+  secAtHandle: number;
   stripRef: React.RefObject<HTMLDivElement | null>;
   stripScrollRef: React.RefObject<HTMLDivElement | null>;
   durationSec: number;
@@ -480,40 +566,72 @@ function TrimHandle({
   minGap: number;
   onSec: (sec: number) => void;
 }) {
-  const onPointerDown = (e: React.PointerEvent) => {
+  const durationRef = useRef(durationSec);
+  const otherRef = useRef(other);
+  durationRef.current = durationSec;
+  otherRef.current = other;
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    useCanvasStore.getState().setLibtvInputDockFocused(true);
+
     const move = (ev: PointerEvent) => {
-      let sec = secFromPointerOnStrip(
+      ev.preventDefault();
+      const raw = secFromPointerOnStrip(
         ev.clientX,
         stripRef,
         stripScrollRef,
-        durationSec,
+        durationRef.current,
       );
-      if (side === "start") {
-        sec = Math.min(sec, other - minGap);
-        sec = Math.max(0, sec);
-      } else {
-        sec = Math.max(sec, other + minGap);
-        sec = Math.min(durationSec, sec);
-      }
-      onSec(sec);
+      onSec(
+        clampTrimHandleSec(
+          side,
+          raw,
+          durationRef.current,
+          otherRef.current,
+          minGap,
+        ),
+      );
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
     };
-    window.addEventListener("pointermove", move);
+    window.addEventListener("pointermove", move, { passive: false });
     window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    move(e.nativeEvent);
   };
 
   return (
     <div
-      className="absolute top-0 z-10 flex h-full w-3 -translate-x-1/2 cursor-ew-resize items-center justify-center"
-      style={{ left: `${pct}%` }}
+      data-compose-trim-handle
+      data-libtv-dock-interactive=""
+      className={cn(
+        "absolute inset-y-0 z-40 flex w-10 -translate-x-1/2 cursor-ew-resize touch-none select-none items-stretch justify-center",
+        RF_NO_DRAG,
+        RF_NO_WHEEL,
+        "nopan",
+      )}
+      style={{ left: `${pct}%`, touchAction: "none" }}
       onPointerDown={onPointerDown}
+      onPointerDownCapture={(e) => {
+        e.stopPropagation();
+      }}
+      title={side === "left" ? "向右拖，裁掉左边" : "向左拖，裁掉右边"}
+      aria-label={
+        side === "left"
+          ? `入点 ${formatClipTimeSec(secAtHandle)}`
+          : `出点 ${formatClipTimeSec(secAtHandle)}`
+      }
     >
-      <div className="h-full w-1 rounded-full bg-violet-400 shadow-md" />
+      <div className="pointer-events-none absolute top-0.5 left-1/2 size-2 -translate-x-1/2 rotate-45 border border-white/90 bg-white shadow-sm" />
+      <div className="pointer-events-none absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.9),0_0_10px_rgba(255,255,255,0.95)]" />
+      <span className="pointer-events-none absolute bottom-0.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-black/75 px-1 py-px text-[9px] tabular-nums text-white/90">
+        {formatClipTimeSec(secAtHandle)}
+      </span>
     </div>
   );
 }

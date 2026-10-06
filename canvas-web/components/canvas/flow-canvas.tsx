@@ -169,6 +169,7 @@ import { LibtvImageInputDock } from "./libtv-image-input-dock";
 import { LibtvAudioInputDock } from "./libtv-audio-input-dock";
 import { Sbv1VideoEngineFloatingDock } from "./sbv1/sbv1-video-engine-floating-dock";
 import { LibtvVideoClipEditorFloatingDock } from "./libtv-video-clip-editor-dock";
+import { LibtvVideoComposeTrimPanel } from "./libtv-video-compose-trim-panel";
 import { JianyingAutoRenderFloatingDock } from "./pro2/jianying-auto-render-floating-dock";
 import { Pro2ThreeViewInputDock } from "./pro2/pro2-three-view-input-dock";
 import { Pro2TextNodeOutlineEditorHost } from "./pro2/pro2-text-node-outline-editor-host";
@@ -2833,6 +2834,7 @@ function FlowCanvasInner({
         <>
           <Sbv1VideoEngineFloatingDock />
           <LibtvVideoClipEditorFloatingDock />
+          <LibtvVideoComposeTrimPanel />
           <JianyingAutoRenderFloatingDock />
         </>
       ) : null}

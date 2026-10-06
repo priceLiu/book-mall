@@ -24,6 +24,8 @@ export {
 export { DEFAULT_COMPOSE_PROFILE } from "./default-compose-profile";
 export {
   appendImportedComposeClip,
+  composeClipSourceEnd,
+  composeClipSourceStart,
   composeDualTrackProgramDurationSec,
   moveComposeAudioClip,
   moveComposeClip,

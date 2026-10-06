@@ -143,6 +143,52 @@ export async function reclaimStaleMediaRenderJobsForUser(
   return result.count;
 }
 
+/** GET 轮询时回收单条僵死任务（与 reclaimStaleMediaRenderJobsForUser 规则一致） */
+export async function tryReclaimStaleMediaRenderJob(args: {
+  id: string;
+  status: MediaRenderJobStatus;
+  progress: number;
+  createdAt: Date;
+  skipWhenActivelyProcessing?: boolean;
+}): Promise<boolean> {
+  if (args.skipWhenActivelyProcessing) return false;
+
+  const now = new Date();
+  const ageMs = now.getTime() - args.createdAt.getTime();
+  const pendingCutoffMs = MEDIA_RENDER_STALE_PENDING_SEC * 1000;
+  const ffmpegCutoffMs = MEDIA_RENDER_JOB_TIMEOUT_SEC * 1000;
+  const uploadCutoffMs = MEDIA_RENDER_UPLOAD_STALE_SEC * 1000;
+
+  let shouldFail = false;
+  if (args.status === MediaRenderJobStatus.PENDING && ageMs > pendingCutoffMs) {
+    shouldFail = true;
+  } else if (
+    args.status === MediaRenderJobStatus.RUNNING &&
+    args.progress < 90 &&
+    ageMs > ffmpegCutoffMs
+  ) {
+    shouldFail = true;
+  } else if (
+    args.status === MediaRenderJobStatus.RUNNING &&
+    args.progress >= 90 &&
+    ageMs > uploadCutoffMs
+  ) {
+    shouldFail = true;
+  }
+  if (!shouldFail) return false;
+
+  await prisma.mediaRenderJob.update({
+    where: { id: args.id },
+    data: {
+      status: MediaRenderJobStatus.FAILED,
+      errorMessage: "任务超时或异常中断，已自动释放名额",
+      progressLabel: null,
+      completedAt: now,
+    },
+  });
+  return true;
+}
+
 export async function countActiveRenderJobs(
   userId: string,
   opts?: { reclaim?: boolean },

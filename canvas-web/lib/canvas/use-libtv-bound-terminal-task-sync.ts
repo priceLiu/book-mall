@@ -17,6 +17,7 @@ import {
   sbv1ImagePatchFromTask,
   sbv1VideoPatchFromTask,
 } from "@/lib/canvas/sbv1-image-task-apply";
+import { hasSbv1LocalVideoEditResult } from "@/lib/canvas/libtv-local-video-edit-result";
 
 type LibtvBoundTerminalMediaKind = "image" | "video";
 
@@ -53,8 +54,19 @@ export function useLibtvBoundTerminalTaskSync(args: {
     if (!boundTerminalTask) return;
 
     const node = useCanvasStore.getState().nodes.find((n) => n.id === nodeId);
-    const localRt = (node?.data as { runtime?: CanvasNodeRuntime } | undefined)
-      ?.runtime;
+    const nodeData = (node?.data ?? {}) as Record<string, unknown>;
+    if (
+      mediaKind === "video" &&
+      hasSbv1LocalVideoEditResult(
+        nodeData as {
+          label?: string;
+          trimClipMeta?: { durationSec?: number };
+        },
+      )
+    ) {
+      return;
+    }
+    const localRt = nodeData.runtime as CanvasNodeRuntime | undefined;
     if (!shouldSyncBoundTerminalCanvasTask(localRt, boundTerminalTask)) return;
     if (shouldSkipStoryRowTaskApply(localRt, boundTerminalTask, nodeId)) return;
 

@@ -10,10 +10,10 @@ import { GATEWAY_BAILIAN_PROVIDER_ID } from "./system-providers";
 
 export type Sbv1ReferenceMode = "omni" | "first_last" | "smart_multi";
 
-/** 视频节点下方 · 截帧 / 裁剪时间条（打开时隐藏生成 Dock） */
+/** 视频节点 · 截帧 Dock / 剪辑迷你窗（compose-trim，打开时隐藏生成 Dock） */
 export type Sbv1VideoEditSession =
   | { open: false }
-  | { open: true; mode: "pick-frame" | "trim-clip" };
+  | { open: true; mode: "pick-frame" | "compose-trim" };
 
 export type Sbv1DockInputMode = "t2v" | "i2v" | "first_last" | "omni" | "multi_ref";
 
@@ -111,6 +111,12 @@ export type Sbv1VideoEngineNodeData = {
   filmPullProjectId?: string;
   filmPullScriptHubId?: string;
   videoEditSession?: Sbv1VideoEditSession;
+  /** 本地 ffmpeg 裁剪 · 入出点与实测时长 */
+  trimClipMeta?: {
+    startSec: number;
+    endSec: number;
+    durationSec: number;
+  };
 };
 
 export const SBV1_DEFAULT_VIDEO_ENGINE_DATA: Sbv1VideoEngineNodeData = {

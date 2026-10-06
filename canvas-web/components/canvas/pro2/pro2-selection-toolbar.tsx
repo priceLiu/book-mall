@@ -5,7 +5,15 @@ import { createPortal } from "react-dom";
 import { useReactFlow } from "@xyflow/react";
 import { useClientPortalMounted } from "@/lib/canvas/use-modal-portal-effects";
 import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
-import { ChevronDown, Copy, FolderPlus, LayoutGrid, Loader2, BookmarkPlus } from "lucide-react";
+import {
+  ChevronDown,
+  Copy,
+  Download,
+  FolderPlus,
+  LayoutGrid,
+  Loader2,
+  BookmarkPlus,
+} from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { CANVAS_PRIMARY_BTN_SM_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
@@ -21,6 +29,10 @@ import { batchConnectSelectionScreenBox } from "@/lib/canvas/batch-connect-previ
 import { useCanvasMarqueeSelecting } from "@/lib/canvas/use-canvas-marquee-selecting";
 import { GROUP_COLOR_PRESETS } from "@/lib/canvas/types";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
+import {
+  collectSelectionMediaItems,
+  downloadSelectionMediaAsZip,
+} from "@/lib/canvas/selection-media-zip-download";
 import { cn } from "@/lib/utils";
 import {
   PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS,
@@ -70,6 +82,7 @@ export function Pro2SelectionToolbar({
 
   const storeNodes = useCanvasStore((s) => s.nodes);
   const [saving, setSaving] = useState(false);
+  const [zipBusy, setZipBusy] = useState(false);
   const [groupOpen, setGroupOpen] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [groupColor, setGroupColor] = useState<string>(GROUP_COLOR_PRESETS[2]);
@@ -117,6 +130,11 @@ export function Pro2SelectionToolbar({
   );
   const skippedCount = useMemo(
     () => selectedNodes.filter((n) => !isPro2ThreeView(n)).length,
+    [selectedNodes],
+  );
+
+  const selectionMediaItems = useMemo(
+    () => collectSelectionMediaItems(selectedNodes),
     [selectedNodes],
   );
 
@@ -252,6 +270,44 @@ export function Pro2SelectionToolbar({
     });
   };
 
+  const onDownloadZip = async () => {
+    if (!selectionMediaItems.length || zipBusy) {
+      if (!selectionMediaItems.length) {
+        await alert({
+          title: "没有可下载的媒体",
+          message: "请框选已生成图片或视频的节点后再打包下载。",
+          variant: "info",
+        });
+      }
+      return;
+    }
+    setZipBusy(true);
+    try {
+      const base = projectId
+        ? `canvas-${projectId.slice(0, 8)}-selection`
+        : "canvas-selection";
+      const { ok, failed } = await downloadSelectionMediaAsZip(
+        selectionMediaItems,
+        base,
+      );
+      if (failed > 0) {
+        await alert({
+          title: "部分文件未纳入压缩包",
+          message: `已成功打包 ${ok} 个文件，${failed} 个拉取失败（可能跨域或链接失效）。`,
+          variant: "warning",
+        });
+      }
+    } catch (e) {
+      await alert({
+        title: "打包下载失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    } finally {
+      setZipBusy(false);
+    }
+  };
+
   const onDuplicate = () => {
     const ids = [...selectedIdsRef.current];
     const newIds: string[] = [];
@@ -308,6 +364,20 @@ export function Pro2SelectionToolbar({
         />
         <LayoutGrid className="size-3.5 text-white/45 nodrag pointer-events-none" />
         <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
+        <button
+          type="button"
+          className={TOOL_BTN}
+          title="将框选内图片与视频打包为 ZIP 下载"
+          disabled={!selectionMediaItems.length || zipBusy}
+          onClick={() => void onDownloadZip()}
+        >
+          {zipBusy ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <Download className="size-3.5" />
+          )}
+          打包下载
+        </button>
         <button
           type="button"
           className={TOOL_BTN}

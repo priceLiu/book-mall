@@ -95,7 +95,8 @@ import {
   runLibtvVideoTrackSplit,
   type LibtvVideoTrackSplitMode,
 } from "@/lib/canvas/libtv-video-track-split-run";
-import { libtvVideoEditSourceReady } from "@/lib/canvas/libtv-video-edit-client";
+import { resolveLibtvVideoEditSourceUrl } from "@/lib/canvas/libtv-video-edit-client";
+import { pickSbv1LocalEditedVideoUrl } from "@/lib/canvas/libtv-local-video-edit-result";
 import { runLibtvVideoFrameExtract } from "@/lib/canvas/libtv-video-frame-extract-run";
 import { runLibtvVideoSubtitleExtract } from "@/lib/canvas/libtv-video-subtitle-extract-run";
 import { isMislabeledVendorSuccessError } from "@/lib/canvas/friendly-task-error";
@@ -242,8 +243,16 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
 
   const runtimeOssUrl =
     d.runtime?.status === "done" ? d.runtime.ossUrl?.trim() || undefined : undefined;
+  /** 本地裁剪/分离等 · 无 Gateway taskId，成片只在 runtime */
+  const localEditMediaUrl = pickSbv1LocalEditedVideoUrl({
+    ossUrl: d.ossUrl,
+    runtime: d.runtime,
+    label: d.label,
+    trimClipMeta: d.trimClipMeta,
+  });
   const videoUrl =
     (isPro2VideoBoardCell ? runtimeOssUrl : undefined) ??
+    localEditMediaUrl ??
     succeededMediaUrl ??
     pro2VideoBoardRowMediaUrl({ runtime: d.runtime, task: rowDisplayTask }) ??
     pro2VideoBoardRowMediaUrl({ runtime: rowRuntime, task: rowDisplayTask }) ??
@@ -581,9 +590,18 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     [d.runtime, rowRuntime],
   );
 
+  const latestTaskMediaUrl =
+    pickTaskResultMediaUrl(latestSucceeded ?? {}) ??
+    latestSucceeded?.ossUrl ??
+    undefined;
   const videoEditSourceUrl = useMemo(
-    () => libtvVideoEditSourceReady({ runtime: d.runtime ?? rowRuntime }),
-    [d.runtime, rowRuntime],
+    () =>
+      resolveLibtvVideoEditSourceUrl({
+        ossUrl: d.ossUrl,
+        runtime: d.runtime ?? rowRuntime,
+        fallbackTaskMediaUrl: latestTaskMediaUrl,
+      }),
+    [d.ossUrl, d.runtime, rowRuntime, latestTaskMediaUrl],
   );
 
   const [frameExtractBusy, setFrameExtractBusy] = useState(false);
@@ -662,7 +680,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const onOpenTrimEditor = useCallback(() => {
     if (!videoEditSourceUrl || frameExtractBusy || isPro2VideoBoardCell) return;
     updateNodeData(id, {
-      videoEditSession: { open: true, mode: "trim-clip" },
+      videoEditSession: { open: true, mode: "compose-trim" },
     });
   }, [
     videoEditSourceUrl,
@@ -962,6 +980,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                     />
                   ) : (
                     <LazyViewportVideo
+                      key={videoUrl ?? "empty"}
                       src={videoUrl ?? undefined}
                       poster={posterUrl}
                       eager={videoMediaEager}
@@ -984,6 +1003,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                   />
                 ) : (
                   <LazyViewportVideo
+                    key={videoUrl ?? "empty"}
                     src={videoUrl ?? undefined}
                     poster={posterUrl}
                     eager={videoMediaEager}

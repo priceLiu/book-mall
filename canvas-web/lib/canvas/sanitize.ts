@@ -43,8 +43,18 @@ function persistRuntimeObject(
   const status =
     typeof runtime.status === "string" ? runtime.status : "";
   const inflight = INFLIGHT_RUNTIME_STATUSES.has(status);
+  const localJobKind =
+    typeof runtime.localJobKind === "string"
+      ? runtime.localJobKind.trim()
+      : "";
+  const localMediaInflight =
+    inflight && localJobKind.startsWith("video-");
   if (inflight && keepBoundInflight && taskId) {
     runtime.taskId = taskId;
+    return runtime;
+  }
+  if (localMediaInflight) {
+    delete runtime.taskId;
     return runtime;
   }
   if (inflight) {

@@ -107,6 +107,25 @@ export function renderStatusLabel(job: MediaRenderJob | null): string {
   return "处理中…";
 }
 
+/** 迷你剪辑台 / 全屏合成钮 · `42% · 拼接视频` */
+export function formatMediaRenderComposeStatusLine(
+  inFlight: JianyingMediaRenderInFlight | null | undefined,
+): string | null {
+  if (!inFlight?.jobId?.trim()) return null;
+  if (inFlight.jobId === "pending") {
+    return inFlight.progressLabel?.trim() || "提交合成…";
+  }
+  if (inFlight.status === "FAILED") {
+    return inFlight.errorMessage?.trim() || "合成失败";
+  }
+  const pct = Math.max(0, Math.min(100, Math.round(inFlight.progress ?? 0)));
+  const label = inFlight.progressLabel?.trim();
+  if (label) return `${pct}% · ${label}`;
+  if (inFlight.status === "PENDING") return "排队中…";
+  if (pct > 0) return `合成中 ${pct}%`;
+  return "合成中…";
+}
+
 export function isMediaRenderJobInflight(
   inFlight: JianyingMediaRenderInFlight | null | undefined,
 ): boolean {

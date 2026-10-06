@@ -46,7 +46,7 @@ export function ComposeMiniLoadingBreath({
         aria-hidden
       />
 
-      <div className="relative z-10 flex h-full w-full items-center justify-center gap-2 px-3">
+      <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 flex max-w-[min(92%,20rem)] -translate-x-1/2 items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 shadow-md ring-1 ring-white/10">
         <Film className="size-4 shrink-0 text-yellow-300" strokeWidth={1.5} />
         <p className="truncate text-[11px] font-medium tabular-nums text-yellow-300">
           {label}

@@ -127,6 +127,7 @@ export default defineConfig({
       "test/unit/libtv-dock-engine-models.test.ts",
       "test/unit/libtv-voice-preview.test.ts",
       "test/unit/libtv-audio-run-text.test.ts",
+      "test/unit/libtv-audio-voice-clone-defaults.test.ts",
       "test/unit/libtv-floating-dock-selection.test.ts",
       "test/unit/pro2-selection-bbox.test.ts",
       "test/unit/batch-connect-selection-screen-box.test.ts",

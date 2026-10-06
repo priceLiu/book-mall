@@ -14,6 +14,7 @@ import {
   Scan,
   ScanFace,
   Sparkles,
+  UserRound,
   Wand2,
 } from "lucide-react";
 import { useState } from "react";
@@ -79,6 +80,9 @@ export type Pro2ImageNodeToolbarProps = {
   portraitActive?: boolean;
   /** 复制节点（含生成结果与 Dock 配置） */
   onDuplicateNode?: () => void;
+  /** 音频节点 · 音色克隆 */
+  onVoiceClone?: () => void;
+  voiceCloneBusy?: boolean;
   className?: string;
   style?: React.CSSProperties;
   /** sbv1：工具条空白区仍可拖节点，仅按钮 nodrag */
@@ -106,6 +110,8 @@ export function Pro2ImageNodeToolbar({
   portraitImporting = false,
   portraitActive = false,
   onDuplicateNode,
+  onVoiceClone,
+  voiceCloneBusy,
   className,
   style,
   passNodeDrag = false,
@@ -226,6 +232,22 @@ export function Pro2ImageNodeToolbar({
             ) : (
               <Download className="size-5" />
             )}
+          </button>
+        ) : null}
+        {onVoiceClone ? (
+          <button
+            type="button"
+            className={TOOL_BTN}
+            title="音色克隆"
+            disabled={voiceCloneBusy || !previewUrl}
+            onClick={onVoiceClone}
+          >
+            {voiceCloneBusy ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <UserRound className="size-4" />
+            )}
+            克隆
           </button>
         ) : null}
         {onDuplicateNode ? (

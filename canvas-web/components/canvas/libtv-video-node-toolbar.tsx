@@ -156,7 +156,7 @@ export function LibtvVideoNodeToolbar({
       onOpenTrimEditor();
       return;
     }
-    void soon("裁剪");
+    void soon("剪辑");
   };
 
   return (
@@ -185,11 +185,11 @@ export function LibtvVideoNodeToolbar({
           type="button"
           className={cn(TOOL_BTN, !trimEnabled && "opacity-50")}
           disabled={!trimEnabled}
-          title={trimEnabled ? "裁剪视频片段" : "请先生成或上传成片"}
+          title={trimEnabled ? "剪辑视频片段" : "请先生成或上传成片"}
           onClick={onCropClick}
         >
           <Crop className="size-3.5" />
-          <span>裁剪</span>
+          <span>剪辑</span>
         </button>
         <button
           ref={frameMenu.anchorRef}

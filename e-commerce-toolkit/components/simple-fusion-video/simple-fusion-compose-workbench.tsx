@@ -41,7 +41,20 @@ import {
   type ComposeWorkbenchState,
 } from "@/lib/simple-fusion-compose-workbench";
 import { SIMPLE_FUSION_BGM_PRESETS } from "@/lib/simple-fusion-default-prompts";
+import {
+  pollMediaRenderJob,
+  type MediaRenderJobDto,
+} from "@/lib/ecom-storyboard-api";
 import { cn } from "@/lib/utils";
+
+function formatComposeRenderStatus(job: MediaRenderJobDto): string {
+  const pct = Math.max(0, Math.min(100, Math.round(job.progress ?? 0)));
+  const label = job.progressLabel?.trim();
+  if (label) return `${pct}% · ${label}`;
+  if (job.status === "PENDING") return "排队中…";
+  if (job.status === "RUNNING") return `合成中 ${pct}%`;
+  return "合成中…";
+}
 
 type Props = {
   project: SimpleFusionProject;
@@ -85,6 +98,9 @@ function SimpleFusionComposeWorkbenchInner({
     };
   }, [fullscreenOpen]);
   const [exportBusy, setExportBusy] = useState(false);
+  const [renderJobStatus, setRenderJobStatus] = useState<MediaRenderJobDto | null>(
+    null,
+  );
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const audioImportRef = useRef<HTMLInputElement>(null);
@@ -115,6 +131,36 @@ function SimpleFusionComposeWorkbenchInner({
   const finalComposeBusy = composeGenerating || exportBusy;
   const showFinalVideoHover =
     Boolean(finalVideoUrl.trim()) && !finalComposeBusy;
+
+  const renderJobId = project.meta?.renderJobId?.trim() ?? "";
+
+  useEffect(() => {
+    if (!composeGenerating || !renderJobId) {
+      setRenderJobStatus(null);
+      return;
+    }
+    let cancelled = false;
+    const poll = () => {
+      void pollMediaRenderJob(renderJobId)
+        .then((job) => {
+          if (!cancelled) setRenderJobStatus(job);
+        })
+        .catch(() => undefined);
+    };
+    poll();
+    const t = setInterval(poll, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [composeGenerating, renderJobId]);
+
+  const composeStatusLine = useMemo(() => {
+    if (!finalComposeBusy) return null;
+    if (renderJobStatus) return formatComposeRenderStatus(renderJobStatus);
+    if (exportBusy) return "正在提交合成任务…";
+    return "云端合成中，请稍候…";
+  }, [exportBusy, finalComposeBusy, renderJobStatus]);
 
   useEffect(() => {
     setWorkbench(resolveComposeWorkbenchFromProject(project, previewSlots));
@@ -424,9 +470,11 @@ function SimpleFusionComposeWorkbenchInner({
             ordered={ordered}
             workbench={workbench}
             loading={filmstrip.loading}
+            loadingLabel={filmstrip.loadingLabel}
             filmstripByUrl={filmstrip.filmstripByUrl}
             fullDurationByUrl={filmstrip.fullDurationByUrl}
             exportBusy={exportBusy || composeGenerating}
+            composeStatusLine={composeStatusLine}
             canEdit={canEdit && !composeGenerating}
             onClose={() => {
               flushWorkbenchPersist();
@@ -462,7 +510,9 @@ function SimpleFusionComposeWorkbenchInner({
             profile={profile}
             ordered={ordered}
             exportBusy={exportBusy || composeGenerating}
+            composeStatusLine={composeStatusLine}
             loading={filmstrip.loading}
+            loadingLabel={filmstrip.loadingLabel}
             filmstripByUrl={filmstrip.filmstripByUrl}
             fullDurationByUrl={filmstrip.fullDurationByUrl}
             onClose={() => {

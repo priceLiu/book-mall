@@ -704,6 +704,7 @@ export type MediaRenderJobDto = {
   id: string;
   status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "EXPIRED";
   progress: number;
+  progressLabel?: string | null;
   downloadUrl: string | null;
   expiresAt: string;
   errorMessage: string | null;

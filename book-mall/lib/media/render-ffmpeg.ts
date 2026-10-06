@@ -24,6 +24,7 @@ import { persistMediaRenderLocalOutput } from "@/lib/media/media-render-local-ou
 import {
   MEDIA_RENDER_MAX_OUTPUT_DURATION_SEC,
   MEDIA_RENDER_MAX_SOURCE_BYTES_PER_CLIP,
+  MEDIA_RENDER_PER_CLIP_AUDIO_PREP_TIMEOUT_SEC,
 } from "@/lib/media/render-limits";
 import { FFMPEG_USER_MESSAGE } from "@/lib/media/ffmpeg-preflight";
 import {
@@ -36,6 +37,9 @@ import type {
   MediaTimelineV1,
   RenderProfile,
 } from "@/lib/media/timeline-types";
+
+const perClipAudioPrepTimeoutMs =
+  MEDIA_RENDER_PER_CLIP_AUDIO_PREP_TIMEOUT_SEC * 1000;
 
 /** 字幕基线与画中画小窗之间的留白 */
 const SUBTITLE_OVERLAY_GAP_PX = 16;
@@ -314,14 +318,57 @@ async function attachVoiceoverToNormalizedClip(args: {
   );
   try {
     const dur = durationSec.toFixed(3);
-    await runFfmpeg([
+    await runFfmpeg(
+      [
+        "-y",
+        "-i",
+        args.videoPath,
+        "-i",
+        audioPath,
+        "-filter_complex",
+        buildVoiceoverAudioFilter(durationSec),
+        "-map",
+        "0:v",
+        "-map",
+        "[aout]",
+        "-c:v",
+        "copy",
+        "-c:a",
+        "aac",
+        "-ar",
+        "44100",
+        "-ac",
+        "2",
+        "-b:a",
+        "128k",
+        "-shortest",
+        args.outPath,
+      ],
+      { timeoutMs: perClipAudioPrepTimeoutMs },
+    );
+  } finally {
+    await rm(audioPath, { force: true }).catch(() => undefined);
+  }
+}
+
+/** 无音轨镜头：按视频实际时长补静音轨（不截断视频） */
+async function attachSilentAudioToNormalizedClip(args: {
+  videoPath: string;
+  outPath: string;
+}): Promise<void> {
+  const durationSec = await ffprobeDurationSec(args.videoPath);
+  const dur = durationSec.toFixed(3);
+  await runFfmpeg(
+    [
       "-y",
       "-i",
       args.videoPath,
+      "-f",
+      "lavfi",
       "-i",
-      audioPath,
+      "anullsrc=r=44100:cl=stereo",
       "-filter_complex",
-      buildVoiceoverAudioFilter(durationSec),
+      `[1:a]atrim=0:${dur},asetpts=PTS-STARTPTS[aout]`,
       "-map",
       "0:v",
       "-map",
@@ -338,46 +385,9 @@ async function attachVoiceoverToNormalizedClip(args: {
       "128k",
       "-shortest",
       args.outPath,
-    ]);
-  } finally {
-    await rm(audioPath, { force: true }).catch(() => undefined);
-  }
-}
-
-/** 无音轨镜头：按视频实际时长补静音轨（不截断视频） */
-async function attachSilentAudioToNormalizedClip(args: {
-  videoPath: string;
-  outPath: string;
-}): Promise<void> {
-  const durationSec = await ffprobeDurationSec(args.videoPath);
-  const dur = durationSec.toFixed(3);
-  await runFfmpeg([
-    "-y",
-    "-i",
-    args.videoPath,
-    "-f",
-    "lavfi",
-    "-i",
-    "anullsrc=r=44100:cl=stereo",
-    "-filter_complex",
-    `[1:a]atrim=0:${dur},asetpts=PTS-STARTPTS[aout]`,
-    "-map",
-    "0:v",
-    "-map",
-    "[aout]",
-    "-c:v",
-    "copy",
-    "-c:a",
-    "aac",
-    "-ar",
-    "44100",
-    "-ac",
-    "2",
-    "-b:a",
-    "128k",
-    "-shortest",
-    args.outPath,
-  ]);
+    ],
+    { timeoutMs: perClipAudioPrepTimeoutMs },
+  );
 }
 
 /** 保留厂商原生音轨，统一为 xfade/concat 可混流的 AAC 立体声 */
@@ -385,22 +395,44 @@ async function remuxVideoWithNormalizedAudio(
   inputPath: string,
   outPath: string,
 ): Promise<void> {
-  await runFfmpeg([
-    "-y",
-    "-i",
-    inputPath,
-    "-c:v",
-    "copy",
-    "-c:a",
-    "aac",
-    "-ar",
-    "44100",
-    "-ac",
-    "2",
-    "-b:a",
-    "128k",
-    outPath,
-  ]);
+  await runFfmpeg(
+    [
+      "-y",
+      "-i",
+      inputPath,
+      "-map",
+      "0:v:0",
+      "-map",
+      "0:a:0?",
+      "-c:v",
+      "copy",
+      "-c:a",
+      "aac",
+      "-ar",
+      "44100",
+      "-ac",
+      "2",
+      "-b:a",
+      "128k",
+      outPath,
+    ],
+    { timeoutMs: perClipAudioPrepTimeoutMs },
+  );
+}
+
+/** 原生音轨 remux 失败/超时时：丢弃厂商轨，补静音（保证 concat 不中断） */
+async function remuxVideoWithNormalizedAudioOrSilent(
+  inputPath: string,
+  outPath: string,
+): Promise<void> {
+  try {
+    await remuxVideoWithNormalizedAudio(inputPath, outPath);
+  } catch {
+    await attachSilentAudioToNormalizedClip({
+      videoPath: inputPath,
+      outPath,
+    });
+  }
 }
 
 /** 合并前：每镜必有音轨；有 TTS 用 TTS，否则保留原生，再否则补静音 */
@@ -424,13 +456,20 @@ async function prepareClipsForMerge(args: {
         : `准备第 ${i + 1}/${args.normPaths.length} 镜音轨`,
     );
     if (args.mixTts && audioUrl) {
-      await attachVoiceoverToNormalizedClip({
-        videoPath: normPath,
-        audioUrl,
-        outPath,
-      });
+      try {
+        await attachVoiceoverToNormalizedClip({
+          videoPath: normPath,
+          audioUrl,
+          outPath,
+        });
+      } catch {
+        await attachSilentAudioToNormalizedClip({
+          videoPath: normPath,
+          outPath,
+        });
+      }
     } else if (await clipHasAudio(normPath)) {
-      await remuxVideoWithNormalizedAudio(normPath, outPath);
+      await remuxVideoWithNormalizedAudioOrSilent(normPath, outPath);
     } else {
       await attachSilentAudioToNormalizedClip({
         videoPath: normPath,

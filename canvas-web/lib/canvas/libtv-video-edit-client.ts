@@ -39,6 +39,7 @@ export async function fetchVideoFilmstrip(opts: {
       projectId: opts.projectId ?? undefined,
       frameCount: opts.frameCount,
     }),
+    signal: AbortSignal.timeout(180_000),
   });
   const data = (await res.json().catch(() => ({}))) as {
     error?: string;
@@ -139,7 +140,13 @@ export async function postVideoTrim(opts: {
   projectId?: string | null;
   startSec: number;
   endSec: number;
-}): Promise<{ videoUrl: string; posterUrl?: string }> {
+}): Promise<{
+  videoUrl: string;
+  posterUrl?: string;
+  startSec?: number;
+  endSec?: number;
+  durationSec?: number;
+}> {
   const res = await fetch("/api/book-mall/api/platform/v1/video-trim", {
     method: "POST",
     credentials: "include",
@@ -156,6 +163,9 @@ export async function postVideoTrim(opts: {
     message?: string;
     videoUrl?: string;
     posterUrl?: string;
+    startSec?: number;
+    endSec?: number;
+    durationSec?: number;
   };
   if (!res.ok) {
     throw new Error(
@@ -164,17 +174,50 @@ export async function postVideoTrim(opts: {
   }
   const videoUrl = data.videoUrl?.trim();
   if (!videoUrl) throw new Error("未获得裁剪视频");
-  return { videoUrl, posterUrl: data.posterUrl?.trim() || undefined };
+  return {
+    videoUrl,
+    posterUrl: data.posterUrl?.trim() || undefined,
+    startSec: Number.isFinite(Number(data.startSec))
+      ? Number(data.startSec)
+      : undefined,
+    endSec: Number.isFinite(Number(data.endSec))
+      ? Number(data.endSec)
+      : undefined,
+    durationSec: Number.isFinite(Number(data.durationSec))
+      ? Number(data.durationSec)
+      : undefined,
+  };
 }
 
-/** 源节点是否已有可处理的 OSS/HTTPS 成片 */
-export function libtvVideoEditSourceReady(data: {
-  runtime?: { ossUrl?: string; ephemeralUrl?: string };
-}): string | undefined {
-  const url =
-    data.runtime?.ossUrl?.trim() || data.runtime?.ephemeralUrl?.trim() || "";
+function normalizeLibtvVideoEditHttpsUrl(
+  raw: string | undefined,
+): string | undefined {
+  const url = raw?.trim() || "";
   if (!url || url.startsWith("blob:") || url.startsWith("data:")) {
     return undefined;
   }
   return url;
+}
+
+/** 源节点是否已有可处理的 OSS/HTTPS 成片（含节点 ossUrl 与任务成片回退） */
+export function resolveLibtvVideoEditSourceUrl(data: {
+  ossUrl?: string;
+  runtime?: { ossUrl?: string; ephemeralUrl?: string };
+  fallbackTaskMediaUrl?: string;
+}): string | undefined {
+  return (
+    normalizeLibtvVideoEditHttpsUrl(data.runtime?.ossUrl) ??
+    normalizeLibtvVideoEditHttpsUrl(data.runtime?.ephemeralUrl) ??
+    normalizeLibtvVideoEditHttpsUrl(data.ossUrl) ??
+    normalizeLibtvVideoEditHttpsUrl(data.fallbackTaskMediaUrl)
+  );
+}
+
+/** @deprecated 使用 resolveLibtvVideoEditSourceUrl */
+export function libtvVideoEditSourceReady(data: {
+  ossUrl?: string;
+  runtime?: { ossUrl?: string; ephemeralUrl?: string };
+  fallbackTaskMediaUrl?: string;
+}): string | undefined {
+  return resolveLibtvVideoEditSourceUrl(data);
 }

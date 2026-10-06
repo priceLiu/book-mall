@@ -99,7 +99,8 @@ async function proxyToBookMall(
         path.includes("video-frame-extract") ||
         path.includes("video-trim") ||
         path.includes("video-filmstrip") ||
-        path.includes("video-subtitle-extract")
+        path.includes("video-subtitle-extract") ||
+        path.includes("canvas/voice-clone")
       ? VIDEO_TRACK_SPLIT_UPSTREAM_TIMEOUT_MS
       : DEFAULT_UPSTREAM_TIMEOUT_MS;
 

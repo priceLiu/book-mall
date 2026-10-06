@@ -125,6 +125,7 @@ export function useComposeFilmstripLoader(
 ) {
   const fetchFilmstrip = useFetchVideoFilmstrip();
   const [loading, setLoading] = useState(false);
+  const [loadingLabel, setLoadingLabel] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -132,21 +133,34 @@ export function useComposeFilmstripLoader(
     const urls = [...new Set(clips.map((c) => c.videoUrl.trim()).filter(Boolean))];
     if (urls.length === 0) {
       setLoading(false);
+      setLoadingLabel(null);
       return;
     }
     let cancelled = false;
     setLoading(true);
-    void Promise.all(
-      urls.map((url) => loadComposeFilmstripCached(fetchFilmstrip, projectId, url).catch(() => undefined)),
-    ).finally(() => {
+    setLoadingLabel("准备时间线…");
+    void (async () => {
+      const total = urls.length;
+      for (let i = 0; i < total; i++) {
+        if (cancelled) return;
+        setLoadingLabel(`生成缩略图 ${i + 1}/${total}…`);
+        await loadComposeFilmstripCached(
+          fetchFilmstrip,
+          projectId,
+          urls[i]!,
+        ).catch(() => undefined);
+      }
       if (!cancelled) {
         setLoading(false);
+        setLoadingLabel(null);
         setTick((n) => n + 1);
       }
-    });
+    })();
     return () => {
       cancelled = true;
     };
+  // fetchFilmstrip 来自 Provider，引用稳定
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- projectId + clip urls 变化才重载
   }, [active, clips, projectId]);
 
   const { filmstripByUrl, fullDurationByUrl } = useMemo(() => {
@@ -164,7 +178,13 @@ export function useComposeFilmstripLoader(
     return { filmstripByUrl, fullDurationByUrl };
   }, [clips, projectId, tick]);
 
-  return { loading, filmstripByUrl, fullDurationByUrl, stripTick: tick };
+  return {
+    loading,
+    loadingLabel,
+    filmstripByUrl,
+    fullDurationByUrl,
+    stripTick: tick,
+  };
 }
 
 type FilmstripCacheEntry = { durationSec: number; frames: VideoFilmstripFrame[] };
@@ -616,13 +636,17 @@ function isProgramPlayheadInSelectedClip(
   clips: ComposeWorkbenchClip[],
   selectedId: string | null,
   programPlayheadSec: number,
+  hints?: ComposeDurationHints,
 ): boolean {
   if (!selectedId) return false;
-  const hit = resolveClipAtProgramSec(clips, programPlayheadSec);
-  if (!hit || hit.clip.id !== selectedId) return false;
+  const segments = buildProgramSegmentsFromClips(clips, hints);
+  const seg = segments.find((s) => s.clip.id === selectedId);
+  if (!seg) return false;
+  const local = programPlayheadSec - seg.programStart;
+  if (local < -0.02 || local > seg.span + 0.02) return false;
   return (
-    hit.localInClip >= COMPOSE_MIN_CLIP_SEC &&
-    hit.localInClip <= hit.span - COMPOSE_MIN_CLIP_SEC
+    local >= COMPOSE_MIN_CLIP_SEC &&
+    local <= seg.span - COMPOSE_MIN_CLIP_SEC
   );
 }
 
@@ -630,16 +654,19 @@ function sourceSecAtProgramPlayheadInClip(
   clips: ComposeWorkbenchClip[],
   clipId: string,
   programPlayheadSec: number,
+  hints?: ComposeDurationHints,
 ): number | null {
-  const hit = resolveClipAtProgramSec(clips, programPlayheadSec);
-  if (!hit || hit.clip.id !== clipId) return null;
+  const segments = buildProgramSegmentsFromClips(clips, hints);
+  const seg = segments.find((s) => s.clip.id === clipId);
+  if (!seg) return null;
+  const local = programPlayheadSec - seg.programStart;
   if (
-    hit.localInClip < COMPOSE_MIN_CLIP_SEC ||
-    hit.localInClip > hit.span - COMPOSE_MIN_CLIP_SEC
+    local < COMPOSE_MIN_CLIP_SEC ||
+    local > seg.span - COMPOSE_MIN_CLIP_SEC
   ) {
     return null;
   }
-  return composeClipSourceStart(hit.clip) + hit.localInClip;
+  return composeClipSourceStart(seg.clip) + local;
 }
 
 function clampPlaybackVolume(v: number | undefined): number {
@@ -747,6 +774,46 @@ function audioElementMatchesUrl(audio: HTMLAudioElement, url: string): boolean {
   const u = url.trim();
   if (!u) return false;
   return audio.currentSrc === u || audio.src === u || audio.src.includes(u);
+}
+
+function programPreviewSourceSecAtPlayhead(
+  ordered: ComposeWorkbenchClip[],
+  programPlayheadSec: number,
+  durationHints?: ComposeDurationHints,
+): number {
+  const hit = resolveClipAtProgramSec(ordered, programPlayheadSec, durationHints);
+  return hit?.sourceSec ?? 0;
+}
+
+/** 暂停态 · 拖动播放头时同步 `<video>` 源内时间（换镜需等 loadeddata） */
+function useComposePausedProgramPreviewSeek(args: {
+  videoRef: RefObject<HTMLVideoElement | null>;
+  playing: boolean;
+  previewSourceSec: number;
+  previewVideoUrl: string;
+}) {
+  const { videoRef, playing, previewSourceSec, previewVideoUrl } = args;
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || playing) return;
+    const target = previewSourceSec;
+    const seek = () => {
+      if (Math.abs(v.currentTime - target) > 0.12) {
+        try {
+          v.currentTime = target;
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+    seek();
+    v.addEventListener("loadeddata", seek);
+    v.addEventListener("loadedmetadata", seek);
+    return () => {
+      v.removeEventListener("loadeddata", seek);
+      v.removeEventListener("loadedmetadata", seek);
+    };
+  }, [videoRef, playing, previewSourceSec, previewVideoUrl]);
 }
 
 /** 迷你窗 / 全屏 · 双轨 program 预览（视频轨 + 独立配音轨） */
@@ -875,7 +942,7 @@ function useComposeProgramVideoPlayback({
       return () => v.removeEventListener("loadeddata", onReady);
     }
     seekAndPlay();
-  }, [playing, playbackHit?.clip.id, playbackVideoUrl, ordered, videoRef, durationHints]);
+  }, [playing, playbackHit?.clip.id, orderedKey, ordered, videoRef, durationHints]);
 
   useEffect(() => {
     if (!playing || !audioRef) return;
@@ -1116,6 +1183,18 @@ function clipFilmstripFrames(
   return out;
 }
 
+function composeFilmstripCoverUrl(
+  stripFrames: VideoFilmstripFrame[],
+  clip: ComposeWorkbenchClip,
+): string {
+  return (
+    stripFrames[stripFrames.length - 1]?.thumbnailUrl ??
+    clip.posterUrl?.trim() ??
+    clip.videoUrl.trim() ??
+    ""
+  );
+}
+
 export function ComposeSequenceTrack({
   clips,
   audioClips,
@@ -1168,6 +1247,7 @@ export function ComposeSequenceTrack({
   onVideoSourceAudioToggle,
   onAudioClipPlaybackToggle,
   videoLaneLoading,
+  videoLaneLoadingLabel,
 }: {
   clips: ComposeWorkbenchClip[];
   /** 独立配音轨（与 clips 数量可不同） */
@@ -1182,6 +1262,7 @@ export function ComposeSequenceTrack({
   disabled?: boolean;
   /** 迷你窗：仅视频轨横向呼吸加载 */
   videoLaneLoading?: boolean;
+  videoLaneLoadingLabel?: string | null;
   trimStart: number;
   trimEnd: number;
   filmstripByUrl: Record<string, VideoFilmstripFrame[]>;
@@ -1723,7 +1804,9 @@ export function ComposeSequenceTrack({
           <div className={cn("relative", clipLaneClassName)}>
             {videoLaneLoading ? (
               <div className="absolute inset-0 z-[55] overflow-hidden">
-                <ComposeMiniLoadingBreath />
+                <ComposeMiniLoadingBreath
+                  label={videoLaneLoadingLabel?.trim() || "正在生成时间线…"}
+                />
               </div>
             ) : null}
             {playheadInsetInClipLane ? (
@@ -1788,28 +1871,81 @@ export function ComposeSequenceTrack({
                         onToggle={() => onVideoSourceAudioToggle(clip.id)}
                       />
                     ) : null}
-                    <div
-                      className={cn(
-                        "pointer-events-none flex h-full w-full overflow-hidden",
-                        portraitFilmstrip
-                          ? "items-center gap-px px-0.5 py-2 pl-9"
-                          : "pl-9",
-                      )}
-                    >
-                      {audioOnlySeg ? (
-                        <div className="flex h-full w-full items-center justify-center bg-[#12141a] px-1 text-[9px] text-white/40">
-                          TTS
-                        </div>
-                      ) : stripFrames.length > 0 ? (
-                        stripFrames.map((f, fi) =>
-                          portraitFilmstrip ? (
-                            <div
-                              key={`${f.atSec}-${fi}`}
-                              className="h-full aspect-[9/16] shrink-0 overflow-hidden rounded-[1px] bg-black/40"
-                            >
+                    <div className="relative h-full w-full overflow-hidden">
+                      {(() => {
+                        const coverUrl = composeFilmstripCoverUrl(stripFrames, clip);
+                        return coverUrl && !audioOnlySeg ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={coverUrl}
+                            alt=""
+                            aria-hidden
+                            className="pointer-events-none absolute inset-0 h-full w-full scale-105 object-cover opacity-45 blur-[1px]"
+                            draggable={false}
+                          />
+                        ) : null;
+                      })()}
+                      <div
+                        className={cn(
+                          "relative z-[1] flex h-full w-full overflow-hidden",
+                          portraitFilmstrip
+                            ? "items-center gap-px px-0.5 py-2 pl-9"
+                            : "pl-9",
+                        )}
+                      >
+                        {audioOnlySeg ? (
+                          <div className="flex h-full w-full items-center justify-center bg-[#12141a] px-1 text-[9px] text-white/40">
+                            TTS
+                          </div>
+                        ) : stripFrames.length > 0 ? (
+                          <>
+                            {stripFrames.map((f, fi) =>
+                              portraitFilmstrip ? (
+                                <div
+                                  key={`${f.atSec}-${fi}`}
+                                  className="h-full aspect-[9/16] shrink-0 overflow-hidden rounded-[1px] bg-black/40"
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={f.thumbnailUrl}
+                                    alt=""
+                                    className="h-full w-full object-cover"
+                                    draggable={false}
+                                  />
+                                </div>
+                              ) : (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  key={`${f.atSec}-${fi}`}
+                                  src={f.thumbnailUrl}
+                                  alt=""
+                                  className={cn(
+                                    "h-full shrink-0 object-cover",
+                                    filmstripThumbClassName,
+                                  )}
+                                  draggable={false}
+                                />
+                              ),
+                            )}
+                            <div className="h-full min-w-0 flex-1 overflow-hidden">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
-                                src={f.thumbnailUrl}
+                                src={
+                                  stripFrames[stripFrames.length - 1]!.thumbnailUrl
+                                }
+                                alt=""
+                                aria-hidden
+                                className="h-full w-full object-cover object-left"
+                                draggable={false}
+                              />
+                            </div>
+                          </>
+                        ) : url ? (
+                          portraitFilmstrip ? (
+                            <div className="mx-auto h-full aspect-[9/16] overflow-hidden">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={clip.posterUrl ?? clip.videoUrl}
                                 alt=""
                                 className="h-full w-full object-cover"
                                 draggable={false}
@@ -1818,38 +1954,14 @@ export function ComposeSequenceTrack({
                           ) : (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
-                              key={`${f.atSec}-${fi}`}
-                              src={f.thumbnailUrl}
-                              alt=""
-                              className={cn(
-                                "h-full shrink-0 object-cover",
-                                filmstripThumbClassName,
-                              )}
-                              draggable={false}
-                            />
-                          ),
-                        )
-                      ) : url ? (
-                        portraitFilmstrip ? (
-                          <div className="mx-auto h-full aspect-[9/16] overflow-hidden">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
                               src={clip.posterUrl ?? clip.videoUrl}
                               alt=""
                               className="h-full w-full object-cover"
                               draggable={false}
                             />
-                          </div>
-                        ) : (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={clip.posterUrl ?? clip.videoUrl}
-                            alt=""
-                            className="h-full w-full object-cover"
-                            draggable={false}
-                          />
-                        )
-                      ) : null}
+                          )
+                        ) : null}
+                      </div>
                     </div>
                     {isSel ? (
                       <>
@@ -2197,6 +2309,7 @@ export function ComposeMiniTimelinePanel({
   ordered,
   workbench,
   loading,
+  loadingLabel = null,
   filmstripByUrl,
   fullDurationByUrl,
   exportBusy,
@@ -2212,14 +2325,23 @@ export function ComposeMiniTimelinePanel({
   trackChrome,
   onClipAudioAttach,
   onClipAudioClear,
+  composeStatusLine,
+  panelTitle = "时间线 1",
+  composeActionTitle = "云端合成",
+  showDownloadButton = true,
+  onSelectedIdChange,
 }: {
   projectId: string;
   ordered: ComposeWorkbenchClip[];
   workbench: ComposeWorkbenchState;
   loading: boolean;
+  /** 缩略图加载步骤，如 `生成缩略图 2/6…` */
+  loadingLabel?: string | null;
   filmstripByUrl: Record<string, VideoFilmstripFrame[]>;
   fullDurationByUrl: Record<string, number>;
   exportBusy: boolean;
+  /** 云端合成进度（如 `42% · 拼接视频`） */
+  composeStatusLine?: string | null;
   canEdit: boolean;
   onClose: () => void;
   onApplyWorkbench: (
@@ -2235,9 +2357,19 @@ export function ComposeMiniTimelinePanel({
   trackChrome?: ComposeTrackChrome;
   onClipAudioAttach?: (clipId: string) => void;
   onClipAudioClear?: (clipId: string) => void;
+  /** 迷你窗标题（如「节点剪辑」） */
+  panelTitle?: string;
+  /** 场记板按钮 tooltip */
+  composeActionTitle?: string;
+  showDownloadButton?: boolean;
+  onSelectedIdChange?: (clipId: string | null) => void;
 }) {
   const { alert } = useComposeDialogs();
   const [selectedId, setSelectedId] = useState<string | null>(ordered[0]?.id ?? null);
+
+  useEffect(() => {
+    onSelectedIdChange?.(selectedId);
+  }, [onSelectedIdChange, selectedId]);
   const [playing, setPlaying] = useState(false);
   const [programPlayheadSec, setProgramPlayheadSec] = useState(0);
   const [durationSec, setDurationSec] = useState(6);
@@ -2320,6 +2452,7 @@ export function ComposeMiniTimelinePanel({
     ordered,
     selectedId,
     programPlayheadSec,
+    durationHints,
   );
 
   useEffect(() => {
@@ -2330,20 +2463,25 @@ export function ComposeMiniTimelinePanel({
     setTrimEnd(end);
   }, [selected?.id, selected?.sourceStartSec, selected?.sourceEndSec, durationSec, selected]);
 
-  const previewSourceSec = useMemo(() => {
-    const hit = resolveClipAtProgramSec(ordered, programPlayheadSec);
-    if (hit && hit.clip.id === selectedId) return hit.sourceSec;
-    if (!selected) return 0;
-    return composeClipSourceStart(selected);
-  }, [ordered, programPlayheadSec, selected, selectedId]);
+  const previewSourceSec = useMemo(
+    () =>
+      programPreviewSourceSecAtPlayhead(
+        ordered,
+        programPlayheadSec,
+        durationHints,
+      ),
+    [ordered, programPlayheadSec, durationHints],
+  );
 
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v || playing) return;
-    if (Math.abs(v.currentTime - previewSourceSec) > 0.12) {
-      v.currentTime = previewSourceSec;
-    }
-  }, [previewSourceSec, playing, selected?.videoUrl]);
+  const pausedPreviewVideoUrl =
+    playbackVideoUrl || selected?.videoUrl?.trim() || "";
+
+  useComposePausedProgramPreviewSeek({
+    videoRef,
+    playing,
+    previewSourceSec,
+    previewVideoUrl: pausedPreviewVideoUrl,
+  });
 
   useEffect(() => {
     if (playing) return;
@@ -2397,11 +2535,12 @@ export function ComposeMiniTimelinePanel({
       ordered,
       selectedId,
       programPlayheadSec,
+      durationHints,
     );
     if (atSource == null) {
       await alert({
         title: "无法分割",
-        message: "请先把播放头移到当前选中片段中间再分割。",
+        message: "请先把播放头移到当前选中片段中间（前后至少各留 0.25 秒）再分割。",
         variant: "error",
       });
       return;
@@ -2423,6 +2562,24 @@ export function ComposeMiniTimelinePanel({
     onApplyWorkbench((prev) => removeComposeClip(prev, selectedId), { persist: true });
     setSelectedId(ordered.find((c) => c.id !== selectedId)?.id ?? null);
   };
+
+  const commitClipRangeFromDrag = useCallback(
+    (start: number, end: number) => {
+      if (!selectedId || durationSec <= 0) return;
+      onApplyWorkbench(
+        (prev) =>
+          setComposeClipSourceRangeWithRipple(
+            prev,
+            selectedId,
+            start,
+            end,
+            durationSec,
+          ),
+        { persist: false },
+      );
+    },
+    [durationSec, onApplyWorkbench, selectedId],
+  );
 
   /** 缩略图失败时仍允许剪辑（仅 loading 期间遮罩） */
   const ready = !loading;
@@ -2526,12 +2683,21 @@ export function ComposeMiniTimelinePanel({
       >
         <div className="flex min-w-0 items-center gap-1.5">
           <GripVertical className="size-3.5 shrink-0 text-white/35" aria-hidden />
-          <span className="truncate text-xs font-medium text-white/85">时间线 1</span>
+          <span className="truncate text-xs font-medium text-white/85">
+            {panelTitle}
+          </span>
           <span className="hidden text-[10px] text-white/35 sm:inline">
             拖动标题栏移动
           </span>
           {!ready ? (
-            <span className="text-[10px] text-white/45">· 加载中…</span>
+            <span className="max-w-[10rem] truncate text-[10px] text-yellow-300/85">
+              · {loadingLabel?.trim() || "加载中…"}
+            </span>
+          ) : null}
+          {exportBusy && composeStatusLine?.trim() ? (
+            <span className="min-w-0 truncate text-[10px] text-cyan-200/80">
+              · {composeStatusLine.trim()}
+            </span>
           ) : null}
         </div>
       </div>
@@ -2545,7 +2711,7 @@ export function ComposeMiniTimelinePanel({
             title={
               playheadInSelected
                 ? "在播放头处分割"
-                : "播放头需在选中片段内才可分割"
+                : "播放头需在选中片段内，且距头尾各至少 0.25 秒"
             }
             onClick={() => void splitAtPlayhead()}
           >
@@ -2573,17 +2739,23 @@ export function ComposeMiniTimelinePanel({
           <span className="text-[11px] tabular-nums text-white/50">
             {formatTimeSec(programPlayheadSec)} / {formatTimeSec(totalProgramSec)}
           </span>
+          {exportBusy && composeStatusLine?.trim() ? (
+            <span className="max-w-[min(12rem,28vw)] truncate text-[10px] text-cyan-200/75">
+              {composeStatusLine.trim()}
+            </span>
+          ) : null}
         </div>
         <div className="flex items-center gap-1">
           <button
             type="button"
             className="rounded-md p-1.5 text-white/70 hover:bg-white/10 disabled:opacity-40"
             disabled={exportBusy || !canEdit || ordered.length < 1}
-            title="云端合成"
+            title={composeStatusLine?.trim() || composeActionTitle}
             onClick={onCompose}
           >
             <Clapperboard className="size-4" />
           </button>
+          {showDownloadButton ? (
           <button
             type="button"
             className="rounded-md p-1.5 text-white/70 hover:bg-white/10 disabled:opacity-40"
@@ -2593,6 +2765,7 @@ export function ComposeMiniTimelinePanel({
           >
             <Download className="size-4" />
           </button>
+          ) : null}
           <button
             type="button"
             className="rounded-md p-1.5 text-white/70 hover:bg-white/10 disabled:opacity-40"
@@ -2607,7 +2780,7 @@ export function ComposeMiniTimelinePanel({
       </div>
       <video
         ref={videoRef}
-        src={playbackVideoUrl || selected?.videoUrl}
+        src={playing ? undefined : pausedPreviewVideoUrl || undefined}
         className="sr-only"
         playsInline
         onTimeUpdate={onProgramVideoTimeUpdate}
@@ -2643,7 +2816,7 @@ export function ComposeMiniTimelinePanel({
           onReorder={onReorder}
           onTrimStart={setTrimStart}
           onTrimEnd={setTrimEnd}
-          onTrimCommit={() => undefined}
+          onTrimCommit={commitClipRangeFromDrag}
           onSplit={() => void splitAtPlayhead()}
           onDelete={() => void deleteSelected()}
           onProgramSeek={seekProgramTimeline}
@@ -2653,6 +2826,7 @@ export function ComposeMiniTimelinePanel({
           clipLaneClassName="h-24"
           portraitFilmstrip
           videoLaneLoading={!ready}
+          videoLaneLoadingLabel={loadingLabel}
           splitDisabled={!canEdit || !playheadInSelected}
           deleteDisabled={!canEdit || !selectedId || ordered.length <= 1}
           scrollContainerClassName="bg-transparent"
@@ -2687,6 +2861,7 @@ export function ComposeEditorFullscreen({
   ordered,
   exportBusy,
   loading,
+  loadingLabel = null,
   filmstripByUrl,
   fullDurationByUrl,
   onClose,
@@ -2701,6 +2876,8 @@ export function ComposeEditorFullscreen({
   onClipAudioAttach,
   onClipAudioClear,
   upstreamLibraryClips,
+  composeStatusLine,
+  onSelectedIdChange,
 }: {
   projectId: string;
   projectModule: string;
@@ -2708,7 +2885,9 @@ export function ComposeEditorFullscreen({
   profile: NonNullable<ComposeWorkbenchState["profile"]>;
   ordered: ComposeWorkbenchClip[];
   exportBusy: boolean;
+  composeStatusLine?: string | null;
   loading: boolean;
+  loadingLabel?: string | null;
   filmstripByUrl: Record<string, VideoFilmstripFrame[]>;
   fullDurationByUrl: Record<string, number>;
   onClose: () => void;
@@ -2727,9 +2906,15 @@ export function ComposeEditorFullscreen({
   onClipAudioClear?: (clipId: string) => void;
   /** 画布：左侧「连线资产」列表（上游视频/图/音频，非仅 file import） */
   upstreamLibraryClips?: ComposeWorkbenchClip[];
+  onSelectedIdChange?: (clipId: string | null) => void;
 }) {
   const { alert, toast } = useComposeDialogs();
   const [selectedId, setSelectedId] = useState<string | null>(ordered[0]?.id ?? null);
+
+  useEffect(() => {
+    onSelectedIdChange?.(selectedId);
+  }, [onSelectedIdChange, selectedId]);
+
   const projectAssetLibraryLabel = resolveComposeProjectAssetLibraryLabel(projectModule);
   const [assetLibraryTab, setAssetLibraryTab] = useState<"imported" | "project">("imported");
   const [assetMediaFilter, setAssetMediaFilter] = useState<"all" | "image" | "video" | "audio">(
@@ -2895,6 +3080,7 @@ export function ComposeEditorFullscreen({
     ordered,
     selectedId,
     programPlayheadSec,
+    durationHints,
   );
 
   useEffect(() => {
@@ -2905,15 +3091,31 @@ export function ComposeEditorFullscreen({
     setTrimEnd(end);
   }, [selected?.id, selected?.sourceStartSec, selected?.sourceEndSec, durationSec, selected]);
 
-  const previewSourceSec = useMemo(() => {
-    const hit = resolveClipAtProgramSec(ordered, programPlayheadSec);
-    if (hit && hit.clip.id === selectedId) return hit.sourceSec;
-    if (!selected) return 0;
-    return composeClipSourceStart(selected);
-  }, [ordered, programPlayheadSec, selected, selectedId]);
+  const previewSourceSec = useMemo(
+    () =>
+      programPreviewSourceSecAtPlayhead(
+        ordered,
+        programPlayheadSec,
+        durationHints,
+      ),
+    [ordered, programPlayheadSec, durationHints],
+  );
 
-  const previewVideoUrl =
-    playing && playbackVideoUrl ? playbackVideoUrl : selected?.videoUrl;
+  const pausedPreviewVideoUrl =
+    playbackVideoUrl || selected?.videoUrl?.trim() || "";
+
+  useComposePausedProgramPreviewSeek({
+    videoRef,
+    playing,
+    previewSourceSec,
+    previewVideoUrl: pausedPreviewVideoUrl,
+  });
+
+  useEffect(() => {
+    if (playing) return;
+    const hit = resolveClipAtProgramSec(ordered, programPlayheadSec, durationHints);
+    if (hit?.clip.id) setSelectedId(hit.clip.id);
+  }, [programPlayheadSec, playing, ordered, durationHints]);
 
   const applyRangeToWorkbench = useCallback(
     (start: number, end: number, opts?: { recordUndo?: boolean }) => {
@@ -2941,14 +3143,6 @@ export function ComposeEditorFullscreen({
     },
     [totalProgramSec],
   );
-
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v || playing) return;
-    if (Math.abs(v.currentTime - previewSourceSec) > 0.15) {
-      v.currentTime = previewSourceSec;
-    }
-  }, [previewSourceSec, playing, selected?.videoUrl]);
 
   useEffect(() => {
     if (playing) return;
@@ -3093,6 +3287,7 @@ export function ComposeEditorFullscreen({
       ordered,
       selectedId,
       programPlayheadSec,
+      durationHints,
     );
     if (atSource == null) {
       await alert({
@@ -3126,6 +3321,7 @@ export function ComposeEditorFullscreen({
       ordered,
       selectedId,
       programPlayheadSec,
+      durationHints,
     );
     if (atSource == null) {
       await alert({
@@ -3149,6 +3345,7 @@ export function ComposeEditorFullscreen({
       ordered,
       selectedId,
       programPlayheadSec,
+      durationHints,
     );
     if (atSource == null) {
       await alert({
@@ -3201,9 +3398,11 @@ export function ComposeEditorFullscreen({
       onPointerDown={(e) => e.stopPropagation()}
     >
       {!timelineReady ? (
-        <div className="absolute inset-0 z-[2100] flex flex-col items-center justify-center gap-3 bg-[#0d0d0d]/92">
+        <div className="absolute inset-0 z-[2100] flex flex-col items-center justify-end gap-3 bg-[#0d0d0d]/92 pb-16">
           <Loader2 className="size-8 animate-spin text-white/75" />
-          <p className="text-sm text-white/55">正在加载时间线与缩略图…</p>
+          <p className="text-sm tabular-nums text-yellow-300/90">
+            {loadingLabel?.trim() || "正在加载时间线与缩略图…"}
+          </p>
         </div>
       ) : null}
       <header className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-2">
@@ -3221,7 +3420,7 @@ export function ComposeEditorFullscreen({
             onClick={onCompose}
           >
             <Clapperboard className="size-4 shrink-0" />
-            {exportBusy ? "合成中…" : "合成"}
+            {exportBusy ? composeStatusLine?.trim() || "合成中…" : "合成"}
           </button>
           <button
             type="button"
@@ -3241,6 +3440,11 @@ export function ComposeEditorFullscreen({
             <X className="size-5" />
           </button>
         </div>
+        {exportBusy && composeStatusLine?.trim() ? (
+          <p className="border-t border-white/10 px-4 py-1.5 text-center text-[11px] text-white/50">
+            {composeStatusLine.trim()}
+          </p>
+        ) : null}
       </header>
 
       <div
@@ -3382,11 +3586,11 @@ export function ComposeEditorFullscreen({
             )}
           >
             <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
-              {previewVideoUrl ? (
+              {pausedPreviewVideoUrl || playing ? (
                 <>
                   <video
                     ref={videoRef}
-                    src={previewVideoUrl}
+                    src={playing ? undefined : pausedPreviewVideoUrl || undefined}
                     className="max-h-full max-w-full rounded-md shadow-lg"
                     playsInline
                     controls={false}
