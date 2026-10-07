@@ -31,6 +31,7 @@ const APP_SHARED_MAP = {
     "media-render-subtitle-style",
     "platform-assistant",
     "publisher-client",
+    "ecom-copy-overlay",
   ],
   "tool-web": ["federated-portal-logout", "platform-assistant"],
   "finance-web": ["platform-assistant"],

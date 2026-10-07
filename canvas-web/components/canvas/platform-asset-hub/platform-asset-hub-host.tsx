@@ -44,8 +44,11 @@ export function PlatformAssetHubHost() {
     const onOpen = (e: Event) => {
       const detail = (e as CustomEvent<HubOpenDetail>).detail ?? {};
       setSection(detail.section ?? "catalog");
-      if (detail.pickCatalog && detail.spawnAtScreen) {
-        const spawnAtScreen = detail.spawnAtScreen;
+      if (detail.pickCatalog) {
+        const spawnAtScreen = detail.spawnAtScreen ?? {
+          x: typeof window !== "undefined" ? window.innerWidth / 2 : 400,
+          y: typeof window !== "undefined" ? window.innerHeight / 2 : 300,
+        };
         setCatalogPick({
           maxSelect: 9,
           onPick: (items) => {

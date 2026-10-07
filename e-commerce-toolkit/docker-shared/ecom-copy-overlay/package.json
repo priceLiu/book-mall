@@ -1,0 +1,19 @@
+{
+  "name": "@private/ecom-copy-overlay",
+  "version": "0.1.19",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./types": "./types.ts",
+    "./overlay-canvas": "./overlay-canvas.tsx",
+    "./overlay-layer-controls": "./overlay-layer-controls.tsx",
+    "./layout-coords": "./layout-coords.ts",
+    "./artifact": "./artifact.ts"
+  },
+  "peerDependencies": {
+    "react": "^18",
+    "next": ">=14"
+  }
+}

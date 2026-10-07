@@ -4,7 +4,7 @@ WORKDIR /app
 # CloudBase 目标目录是 e-commerce-toolkit/，构建上下文进不去仓库根的 shared/。
 # package.json 的 file:../shared/* 在镜像里解析为 /shared/*，故把快照拷到该路径。
 # 刷新快照（改 shared/ 后、发版前）：
-#   cp -R ../shared/federated-portal-logout ../shared/federated-portal-nav ../shared/platform-assistant ../shared/publisher-client docker-shared/
+#   node scripts/sync-docker-shared.mjs && node scripts/sync-platform-compose-ui.mjs
 FROM base AS with-shared
 COPY docker-shared/federated-portal-logout /shared/federated-portal-logout
 COPY docker-shared/federated-portal-nav /shared/federated-portal-nav

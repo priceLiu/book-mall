@@ -12,11 +12,11 @@ export async function GET(req: Request) {
   const auth = verifyToolsBearer(req);
   if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
   const url = new URL(req.url);
-  const module = url.searchParams.get("module")?.trim() ?? "";
-  if (!module) return ecomJson({ error: "缺少 module" }, { status: 400 });
+  const toolModule = url.searchParams.get("module")?.trim() ?? "";
+  if (!toolModule) return ecomJson({ error: "缺少 module" }, { status: 400 });
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
-    const items = await listSimpleFusionProjects(auth.userId, module);
+    const items = await listSimpleFusionProjects(auth.userId, toolModule);
     return ecomJson({ items });
   } catch (e) {
     const message = e instanceof Error ? e.message : "加载失败";
@@ -33,12 +33,15 @@ export async function POST(req: Request) {
   } catch {
     /* */
   }
-  const module = typeof body.module === "string" ? body.module.trim() : "";
-  if (!module) return ecomJson({ error: "缺少 module" }, { status: 400 });
+  const toolModule =
+    typeof body.module === "string" ? body.module.trim() : "";
+  if (!toolModule) return ecomJson({ error: "缺少 module" }, { status: 400 });
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
     const title = typeof body.title === "string" ? body.title : undefined;
-    const project = await createSimpleFusionProject(auth.userId, module, { title });
+    const project = await createSimpleFusionProject(auth.userId, toolModule, {
+      title,
+    });
     return ecomJson({ project });
   } catch (e) {
     const message = e instanceof Error ? e.message : "创建失败";
