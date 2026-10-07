@@ -9,7 +9,7 @@ import {
 } from "@/lib/canvas/canvas-project-access";
 import {
   canvasProjectEditionFromGraph,
-  canvasProjectEditionFromMeta,
+  canvasProjectEditionFromListHints,
   canvasProjectHasCollaboration,
   type CanvasProjectEdition,
 } from "@/lib/canvas/canvas-story-edition";
@@ -239,6 +239,7 @@ function listRowToSummary(
   row: CanvasProjectListRow,
   nodesFallback?: unknown,
   taskCover?: ResolvedListCover,
+  nodeTypes?: string[],
 ): CanvasProjectSummary {
   const storedThumb = row.thumbnailUrl?.trim() ?? "";
   const listCover = resolveProjectListCoverForListRow({
@@ -253,7 +254,7 @@ function listRowToSummary(
     name: row.name,
     description: row.description,
     thumbnailUrl: listCover.thumbnailUrl ?? storedThumb,
-    edition: canvasProjectEditionFromMeta(row.meta),
+    edition: canvasProjectEditionFromListHints(row.meta, nodeTypes),
     coverMediaKind: listCover.coverMediaKind,
     coverVideoUrl: listCover.coverVideoUrl,
     coverPosterUrl: listCover.coverPosterUrl,
@@ -438,6 +439,7 @@ export async function listCanvasProjectsForUser(
       row,
       nodesByProjectId.get(row.id),
       taskCoverByProjectId.get(row.id),
+      nodeTypesByProjectId.get(row.id),
     ),
   );
   const last = pageRows.at(-1);

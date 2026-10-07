@@ -18,7 +18,9 @@ function readCatalogKind(raw: unknown): GlobalAssetCatalogKind | null {
     raw === "pose" ||
     raw === "avatar" ||
     raw === "garment" ||
-    raw === "full-body"
+    raw === "full-body" ||
+    raw === "style" ||
+    raw === "scene"
   ) {
     return raw;
   }
@@ -26,7 +28,9 @@ function readCatalogKind(raw: unknown): GlobalAssetCatalogKind | null {
 }
 
 function readScope(raw: unknown): EcomCatalogScope | undefined {
-  if (raw === "platform" || raw === "user" || raw === "team") return raw;
+  if (raw === "platform" || raw === "user" || raw === "team" || raw === "project") {
+    return raw;
+  }
   return undefined;
 }
 
@@ -57,12 +61,16 @@ export async function POST(req: Request) {
   if (scope === "platform" && !isPlatformAdmin) {
     return ecomJson({ error: "仅平台管理员可设为全平台" }, { status: 403 });
   }
-  if (scope === "team") {
-    return ecomJson({ error: "团队可见暂未开放" }, { status: 501 });
-  }
+  const sourceModule =
+    typeof body.sourceModule === "string" ? body.sourceModule : undefined;
+  const canvasVisionImport =
+    sourceModule === "canvas" &&
+    (catalogKind === "style" || catalogKind === "scene");
 
   try {
-    await assertEcomToolkitGatewayAccess(auth.userId);
+    if (!canvasVisionImport) {
+      await assertEcomToolkitGatewayAccess(auth.userId);
+    }
 
     const input: CatalogImportFromImageInput = {
       catalogKind,
@@ -72,6 +80,9 @@ export async function POST(req: Request) {
       scope: scope ?? (isPlatformAdmin ? undefined : "user"),
       tenantId:
         typeof body.tenantId === "string" ? body.tenantId : undefined,
+      sourceProjectId:
+        typeof body.sourceProjectId === "string" ? body.sourceProjectId : undefined,
+      preferredTenantId: auth.preferredTenantId,
       name: typeof body.name === "string" ? body.name : undefined,
       gender: body.gender === "male" ? "male" : "female",
       savePrompt: body.savePrompt === true,
@@ -83,9 +94,12 @@ export async function POST(req: Request) {
       sceneTags: Array.isArray(body.sceneTags)
         ? body.sceneTags.filter((t): t is string => typeof t === "string")
         : undefined,
-      sourceModule: typeof body.sourceModule === "string" ? body.sourceModule : undefined,
+      sourceModule,
       sourceAssetId:
         typeof body.sourceAssetId === "string" ? body.sourceAssetId : undefined,
+      modelKey: typeof body.modelKey === "string" ? body.modelKey.trim() : undefined,
+      canvasProjectId:
+        typeof body.projectId === "string" ? body.projectId.trim() : undefined,
     };
 
     const result = await importCatalogFromImage(input);

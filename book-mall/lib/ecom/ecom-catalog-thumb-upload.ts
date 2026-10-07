@@ -4,17 +4,20 @@ import {
   buildEcomModelLibraryThumbOssKey,
   buildEcomPoseLibraryThumbOssKey,
   buildEcomSceneLibraryThumbOssKey,
+  buildStyleLibraryOssKey,
 } from "@/lib/canvas/canvas-constants";
 import { uploadEcomCatalogThumbWebp } from "@/lib/canvas/canvas-oss";
 import { buildEcomGalleryThumbWebp } from "@/lib/ecom/ecom-gallery-thumb";
 import type { GlobalAssetCatalogKind } from "@/lib/ecom/ecom-global-asset-catalog";
 
-export type CatalogThumbKind = GlobalAssetCatalogKind | "scene";
+export type CatalogThumbKind = GlobalAssetCatalogKind | "scene" | "style";
 
 export function buildCatalogThumbOssKey(catalogKind: CatalogThumbKind, id: string): string {
   switch (catalogKind) {
     case "scene":
       return buildEcomSceneLibraryThumbOssKey(id);
+    case "style":
+      return buildStyleLibraryOssKey(`${id}-thumb`, "webp");
     case "pose":
       return buildEcomPoseLibraryThumbOssKey(id);
     case "avatar":

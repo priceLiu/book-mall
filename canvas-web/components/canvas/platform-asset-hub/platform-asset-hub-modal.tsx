@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Clapperboard, LayoutGrid, Package, ScanFace, Sparkles, X } from "lucide-react";
 
 import { StyleLibraryGrid } from "@/components/canvas/style-library-grid";
 import { StoryMediaPreviewModal } from "@/components/canvas/story-column-media-panel";
-import { GlobalAssetLibraryDialog } from "@/docker-shared/global-asset-library/global-asset-library-dialog";
 import type { GlobalAssetLibraryApiClient } from "@/docker-shared/global-asset-library/types";
+import { PlatformCatalogPanel } from "./platform-catalog-panel";
 import {
   CANVAS_MODAL_BACKDROP_CLASS,
   useModalBodyScrollLock,
@@ -117,22 +117,6 @@ export function PlatformAssetHubModal({
     ],
   );
 
-  const catalogOptions = useMemo(
-    () => ({
-      mode: "pick" as const,
-      media: "image" as const,
-      maxSelect: catalogPick?.maxSelect ?? 9,
-      defaultTab: "catalog" as const,
-      embedded: true,
-      previewLightboxZIndex: HUB_PREVIEW_Z,
-      onPick: async (items) => {
-        await catalogPick?.onPick?.(items);
-        onClose();
-      },
-    }),
-    [catalogPick, onClose],
-  );
-
   if (!open || typeof document === "undefined") return null;
 
   return createPortal(
@@ -190,26 +174,22 @@ export function PlatformAssetHubModal({
             ))}
           </nav>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 pt-3">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-4 pt-2">
             {section === "catalog" ? (
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/10">
-                <GlobalAssetLibraryDialog
-                  open
-                  variant="dark"
-                  api={api}
-                  options={
-                    catalogPick
-                      ? catalogOptions
-                      : {
-                          mode: "browse",
-                          defaultTab: "catalog",
-                          embedded: true,
-                          previewLightboxZIndex: HUB_PREVIEW_Z,
-                        }
-                  }
-                  onClose={onClose}
-                />
-              </div>
+              <PlatformCatalogPanel
+                api={api}
+                previewLightboxZIndex={HUB_PREVIEW_Z}
+                maxSelect={catalogPick?.maxSelect ?? 9}
+                onPick={
+                  catalogPick
+                    ? async (items) => {
+                        await catalogPick.onPick(items);
+                        onClose();
+                      }
+                    : undefined
+                }
+                onCancel={catalogPick ? onClose : undefined}
+              />
             ) : null}
             {section === "style" ? (
               <StyleLibraryGrid

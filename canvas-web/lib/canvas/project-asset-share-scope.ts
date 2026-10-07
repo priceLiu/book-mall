@@ -22,7 +22,8 @@ export const PROJECT_ASSET_SHARE_SCOPE_OPTIONS: Array<{
   {
     id: "team",
     title: "团队",
-    hint: "租户内成员可见可用（TEAM_PUBLIC）；仍属于你的创造，不是平台供给。",
+    hint:
+      "租户内成员可见可用（TEAM_PUBLIC）；你自行开启即可，无需团队或平台管理员审批。仍属「我的」，不是平台官方库。",
   },
 ];
 

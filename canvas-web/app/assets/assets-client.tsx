@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { CanvasProjectLink } from "@/components/canvas/canvas-project-link";
 import { useCallback, useEffect, useState } from "react";
 import { ExternalLink, Layers } from "lucide-react";

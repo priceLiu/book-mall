@@ -8,11 +8,15 @@ export const STYLE_LIBRARY_MEDIA_FRAME =
   "relative w-full shrink-0 overflow-hidden bg-black/50";
 
 /** 与 OSS 预览源图一致（400×550，见 book-mall generate-style-library-placeholders） */
-export const STYLE_LIBRARY_PREVIEW_ASPECT = "aspect-[400/550]";
+export const STYLE_LIBRARY_PREVIEW_ASPECT_W = 400;
+export const STYLE_LIBRARY_PREVIEW_ASPECT_H = 550;
+export const STYLE_LIBRARY_PREVIEW_ASPECT = `aspect-[${STYLE_LIBRARY_PREVIEW_ASPECT_W}/${STYLE_LIBRARY_PREVIEW_ASPECT_H}]`;
 
 /** 预览图：由 img 自身 aspect 撑开高度（避免 absolute + 父级 aspect 在侧栏网格内塌陷） */
-export const STYLE_LIBRARY_PREVIEW_IMG_CLASS =
-  "block w-full aspect-[400/550] object-cover bg-black/40";
+export const STYLE_LIBRARY_PREVIEW_IMG_CLASS = cn(
+  "block w-full object-cover bg-black/40",
+  STYLE_LIBRARY_PREVIEW_ASPECT,
+);
 
 export function styleLibraryMediaHeightClass(opts?: {
   /** 画布分镜行与分镜列对齐（248px） */

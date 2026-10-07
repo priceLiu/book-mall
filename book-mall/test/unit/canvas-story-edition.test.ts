@@ -19,6 +19,12 @@ describe("canvasProjectEditionFromListHints", () => {
       canvasProjectEditionFromListHints(null, ["story-pro2-frame"]),
     ).toBe("pro2");
   });
+
+  it("detects sbv1 from node types when meta lacks edition", () => {
+    expect(
+      canvasProjectEditionFromListHints({}, ["sbv1-image", "sbv1-video-engine"]),
+    ).toBe("sbv1");
+  });
 });
 
 describe("canvasProjectHasCollaboration", () => {

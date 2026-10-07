@@ -7,9 +7,18 @@ import { listAvatarLibraryEntriesForViewer } from "@/lib/ecom/ecom-model-library
 import { listGarmentLibraryEntriesForViewer } from "@/lib/ecom/ecom-garment-library-service";
 import { listFullBodyModelsForViewer } from "@/lib/ecom/ecom-full-body-model-library-service";
 import { readPoseLibraryCatalogForUser } from "@/lib/ecom/ecom-pose-library-service";
+import { listSceneLibraryEntriesForViewer } from "@/lib/ecom/ecom-scene-library-service";
+import { listStyleLibraryEntriesForViewer } from "@/lib/ecom/ecom-style-library-service";
+import { buildCatalogViewerScopeOr } from "@/lib/ecom/ecom-catalog-viewer-scope";
 import { prisma } from "@/lib/prisma";
 
-export type GlobalAssetCatalogKind = "pose" | "avatar" | "garment" | "full-body";
+export type GlobalAssetCatalogKind =
+  | "pose"
+  | "avatar"
+  | "garment"
+  | "full-body"
+  | "style"
+  | "scene";
 
 export type GlobalAssetCatalogItem = {
   id: string;
@@ -34,10 +43,14 @@ export const GLOBAL_ASSET_POSE_PLACEHOLDER =
 export type GlobalAssetCatalogQuery = {
   userId: string;
   tenantId?: string | null;
+  /** 画布当前项目 · 用于 project 范围 catalog 可见性 */
+  projectId?: string | null;
   kind?: GlobalAssetCatalogKind | "all";
   gender?: string | null;
   keyword?: string | null;
   limit?: number;
+  /** 画布平台资产库 / 纯平台选用：不含 user·team 个人 catalog */
+  platformOnly?: boolean;
 };
 
 function matchesKeyword(item: GlobalAssetCatalogItem, keyword: string): boolean {
@@ -67,19 +80,10 @@ function sortAvatarCatalogItems(items: GlobalAssetCatalogItem[]): GlobalAssetCat
   });
 }
 
-function viewerScopeOr(userId: string, tenantId?: string | null) {
-  const orClauses: Array<Record<string, unknown>> = [
-    { scope: "platform" },
-    { scope: "user", userId },
-  ];
-  const tenant = tenantId?.trim();
-  if (tenant) orClauses.push({ scope: "team", tenantId: tenant });
-  return orClauses;
-}
-
 function scopeLabel(scope: EcomCatalogScope): string {
   if (scope === "platform") return "平台";
   if (scope === "team") return "团队";
+  if (scope === "project") return "本项目";
   return "我的";
 }
 
@@ -87,7 +91,14 @@ export function globalAssetCatalogItemScopeLabel(item: GlobalAssetCatalogItem): 
   return scopeLabel(item.scope);
 }
 
-const ALL_KINDS: GlobalAssetCatalogKind[] = ["full-body", "avatar", "garment", "pose"];
+const ALL_KINDS: GlobalAssetCatalogKind[] = [
+  "full-body",
+  "avatar",
+  "garment",
+  "pose",
+  "style",
+  "scene",
+];
 
 function matchesGender(item: GlobalAssetCatalogItem, gender: string): boolean {
   if (!item.gender) return true;
@@ -147,6 +158,7 @@ async function loadGarmentItems(
   const garments = await listGarmentLibraryEntriesForViewer({
     userId: query.userId,
     tenantId: query.tenantId,
+    projectId: query.projectId,
     limit,
   });
   return garments.map((g) => ({
@@ -165,12 +177,17 @@ async function loadFullBodyItems(
   query: GlobalAssetCatalogQuery,
   limit: number,
 ): Promise<GlobalAssetCatalogItem[]> {
-  const scopeOr = viewerScopeOr(query.userId, query.tenantId);
+  const scopeOr = buildCatalogViewerScopeOr({
+    userId: query.userId,
+    tenantId: query.tenantId,
+    projectId: query.projectId,
+  });
   const items: GlobalAssetCatalogItem[] = [];
 
   const bodies = await listFullBodyModelsForViewer({
     userId: query.userId,
     tenantId: query.tenantId,
+    projectId: query.projectId,
     limit: 240,
   });
   for (const b of bodies) {
@@ -210,7 +227,9 @@ async function loadFullBodyItems(
       title: m.name,
       ossUrl: m.ossUrl,
       thumbUrl: m.thumbUrl ?? m.ossUrl,
-      scope: (m.scope === "user" || m.scope === "team" ? m.scope : "platform") as EcomCatalogScope,
+      scope: (m.scope === "user" || m.scope === "team" || m.scope === "project"
+        ? m.scope
+        : "platform") as EcomCatalogScope,
       gender: m.gender,
     });
   }
@@ -242,11 +261,60 @@ async function loadFullBodyItems(
   return items.slice(0, limit);
 }
 
+async function loadStyleItems(
+  query: GlobalAssetCatalogQuery,
+  limit: number,
+): Promise<GlobalAssetCatalogItem[]> {
+  const styles = await listStyleLibraryEntriesForViewer({
+    userId: query.userId,
+    tenantId: query.tenantId,
+    projectId: query.projectId,
+    limit,
+  });
+  return styles
+    .filter((s) => s.ossUrl?.trim())
+    .map((s) => ({
+      id: s.id,
+      catalogKind: "style" as const,
+      title: s.name,
+      ossUrl: s.ossUrl!.trim(),
+      thumbUrl: s.thumbUrl ?? s.ossUrl ?? null,
+      scope: (s.scope ?? "user") as EcomCatalogScope,
+      description: s.stylePrompt,
+    }));
+}
+
+async function loadSceneItems(
+  query: GlobalAssetCatalogQuery,
+  limit: number,
+): Promise<GlobalAssetCatalogItem[]> {
+  const scenes = await listSceneLibraryEntriesForViewer({
+    userId: query.userId,
+    tenantId: query.tenantId,
+    projectId: query.projectId,
+    limit,
+  });
+  return scenes
+    .filter((s) => s.ossUrl?.trim() || s.displayImageUrl?.trim())
+    .map((s) => ({
+      id: s.id,
+      catalogKind: "scene" as const,
+      title: s.name,
+      ossUrl: (s.ossUrl ?? s.displayImageUrl)!.trim(),
+      thumbUrl: s.thumbUrl ?? s.ossUrl ?? s.displayImageUrl ?? null,
+      scope: (s.scope ?? "user") as EcomCatalogScope,
+      description: s.visualPrompt,
+    }));
+}
+
 function applyCatalogFilters(
   items: GlobalAssetCatalogItem[],
   query: GlobalAssetCatalogQuery,
 ): GlobalAssetCatalogItem[] {
   let filtered = items;
+  if (query.platformOnly) {
+    filtered = filtered.filter((i) => i.scope === "platform");
+  }
   const gender = query.gender?.trim();
   if (gender) {
     filtered = filtered.filter((i) => matchesGender(i, gender));
@@ -264,18 +332,23 @@ export async function listGlobalAssetCatalog(
   const requestedKind =
     query.kind && query.kind !== "all" ? query.kind : null;
 
-  const [poseRaw, avatarRaw, garmentRaw, fullBodyRaw] = await Promise.all([
-    loadPoseItems(query.userId),
-    loadAvatarItems(query),
-    loadGarmentItems(query, limit),
-    loadFullBodyItems(query, limit),
-  ]);
+  const [poseRaw, avatarRaw, garmentRaw, fullBodyRaw, styleRaw, sceneRaw] =
+    await Promise.all([
+      loadPoseItems(query.userId),
+      loadAvatarItems(query),
+      loadGarmentItems(query, limit),
+      loadFullBodyItems(query, limit),
+      loadStyleItems(query, limit),
+      loadSceneItems(query, limit),
+    ]);
 
   const byKind: Record<GlobalAssetCatalogKind, GlobalAssetCatalogItem[]> = {
     pose: applyCatalogFilters(poseRaw, query),
     avatar: applyCatalogFilters(avatarRaw, query),
     garment: applyCatalogFilters(garmentRaw, query),
     "full-body": applyCatalogFilters(fullBodyRaw, query),
+    style: applyCatalogFilters(styleRaw, query),
+    scene: applyCatalogFilters(sceneRaw, query),
   };
 
   const counts: Record<string, number> = {
@@ -283,6 +356,8 @@ export async function listGlobalAssetCatalog(
     avatar: byKind.avatar.length,
     garment: byKind.garment.length,
     "full-body": byKind["full-body"].length,
+    style: byKind.style.length,
+    scene: byKind.scene.length,
   };
 
   const merged = requestedKind

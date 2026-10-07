@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { randomUUID } from "crypto";
 
 import type { EcomCatalogScope } from "@/lib/ecom/ecom-catalog-scope";
+import { normalizeCatalogScope } from "@/lib/ecom/ecom-catalog-viewer-scope";
 import { assertUserCatalogEditable } from "@/lib/ecom/ecom-catalog-lock";
 import { normalizePoseSourceImageUrl } from "@/lib/ecom/ecom-pose-library-import-helpers";
 import {
@@ -28,6 +29,8 @@ export type EcomPoseLibraryEntry = {
   tags?: Record<string, unknown>;
   scope?: EcomCatalogScope;
   userId?: string | null;
+  tenantId?: string | null;
+  sourceProjectId?: string | null;
   lockedAt?: string | null;
   enabled?: boolean;
   sortOrder?: number;
@@ -88,8 +91,13 @@ function rowToEntry(row: {
       row.tags && typeof row.tags === "object" && !Array.isArray(row.tags)
         ? (row.tags as Record<string, unknown>)
         : undefined,
-    scope: row.scope === "user" ? "user" : "platform",
+    scope: normalizeCatalogScope(row.scope),
     userId: row.userId,
+    tenantId: "tenantId" in row ? (row as { tenantId?: string | null }).tenantId ?? null : null,
+    sourceProjectId:
+      "sourceProjectId" in row
+        ? (row as { sourceProjectId?: string | null }).sourceProjectId ?? null
+        : null,
     lockedAt: row.lockedAt?.toISOString() ?? null,
     enabled: row.enabled,
     sortOrder: row.sortOrder,
@@ -198,6 +206,8 @@ export async function upsertPoseLibraryEntry(
     tags: normalized.tags ? (normalized.tags as Prisma.InputJsonValue) : undefined,
     scope: normalized.scope ?? "platform",
     userId: normalized.userId ?? null,
+    tenantId: normalized.tenantId ?? null,
+    sourceProjectId: normalized.sourceProjectId ?? null,
     enabled: normalized.enabled ?? true,
     sortOrder: normalized.sortOrder ?? 0,
     deletedAt: null,

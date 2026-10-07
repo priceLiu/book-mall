@@ -21,7 +21,13 @@ const CHECK_ONLY = process.argv.includes("--check");
 /** 每个应用需要打包进 docker-shared 的 shared 子包列表 */
 const APP_SHARED_MAP = {
   "book-mall": ["federated-portal-nav", "media-render-subtitle-style", "platform-assistant", "ecom-copy-overlay"],
-  "canvas-web": ["federated-portal-logout", "federated-portal-nav", "media-render-subtitle-style", "platform-assistant"],
+  "canvas-web": [
+    "federated-portal-logout",
+    "federated-portal-nav",
+    "media-render-subtitle-style",
+    "platform-assistant",
+    "ecom-copy-overlay",
+  ],
   "story-web": ["federated-portal-nav", "platform-assistant"],
   "common-tools": ["federated-portal-logout", "federated-portal-nav", "platform-assistant"],
   "quick-replica-web": ["federated-portal-nav", "platform-assistant"],
@@ -36,6 +42,12 @@ const APP_SHARED_MAP = {
   "tool-web": ["federated-portal-logout", "platform-assistant"],
   "finance-web": ["platform-assistant"],
   "gateway-web": ["platform-assistant"],
+};
+
+/** 由其它 sync 脚本维护，勿在 sync-docker-shared 时删掉 */
+const DOCKER_SHARED_PRESERVE = {
+  "canvas-web": ["platform-compose-ui", "global-asset-library"],
+  "e-commerce-toolkit": ["platform-compose-ui", "global-asset-library"],
 };
 
 function listDirNames(path) {
@@ -53,7 +65,10 @@ for (const [app, sharedPkgs] of Object.entries(APP_SHARED_MAP)) {
   const targetRoot = join(ROOT, app, "docker-shared");
   const expected = [...sharedPkgs].sort();
   const actual = listDirNames(targetRoot);
-  const extra = actual.filter((name) => !expected.includes(name));
+  const preserve = new Set(DOCKER_SHARED_PRESERVE[app] ?? []);
+  const extra = actual.filter(
+    (name) => !expected.includes(name) && !preserve.has(name),
+  );
   const missing = expected.filter((name) => !actual.includes(name));
 
   if (extra.length || missing.length) {

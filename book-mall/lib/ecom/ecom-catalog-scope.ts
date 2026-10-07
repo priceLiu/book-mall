@@ -1,4 +1,4 @@
-export type EcomCatalogScope = "platform" | "user" | "team";
+export type EcomCatalogScope = "platform" | "user" | "team" | "project";
 
 export type EcomCatalogEntryBase = {
   id: string;

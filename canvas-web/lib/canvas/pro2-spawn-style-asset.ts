@@ -1,5 +1,6 @@
 "use client";
 
+import type { Connection } from "@xyflow/react";
 import type { StyleLibraryPreset } from "./style-library/catalog";
 import { styleLibraryPickerDefaults } from "./style-library/category-pickers";
 import type { StoryPro2StyleAssetNodeData } from "./story-pro2-workspace-types";
@@ -14,14 +15,77 @@ import {
   findStyleAssetLinkedToImage,
 } from "./pro2-style-asset-connect";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
+import { fitPro2StyleAssetNodeToPreviewImage } from "./pro2-style-asset-node-size";
 import {
-  PRO2_IMAGE_NODE_WIDTH,
   PRO2_SCRIPT_NODE_WIDTH,
+  PRO2_STYLE_ASSET_NODE_WIDTH,
 } from "./story-pro2-node-chrome";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { flowPositionAtViewportCenter } from "./viewport-placement";
 
 const SNAP_GAP = 48;
+
+/** 图片 Dock · @ 引用 + 风格库 stylePrompt（存储态 @<up-style-{nodeId}>） */
+export function buildPro2StyleRefDockInput(
+  styleNodeId: string,
+  stylePrompt?: string,
+): string {
+  const mention = `@<up-style-${styleNodeId}>`;
+  const body = stylePrompt?.trim();
+  if (body) {
+    return `参考 ${mention} ${body} 风格生成图`;
+  }
+  return `参考 ${mention} 风格生成图`;
+}
+
+export function readPro2StyleAssetPrompt(
+  styleNode: CanvasFlowNode | undefined,
+): string {
+  if (!styleNode || styleNode.type !== "story-pro2-style-asset") return "";
+  const d = styleNode.data as StoryPro2StyleAssetNodeData;
+  return d.stylePrompt?.trim() || d.styleAnchorZh?.trim() || "";
+}
+
+export function applyPro2StyleDockPromptToImageIfEmpty(
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+  getNodes: () => CanvasFlowNode[],
+  imageNodeId: string,
+  styleNodeId: string,
+): void {
+  const image = getNodes().find((n) => n.id === imageNodeId);
+  if (!image) return;
+  const dockInput = (image.data as { dockInput?: string }).dockInput?.trim();
+  if (dockInput) return;
+  const styleNode = getNodes().find((n) => n.id === styleNodeId);
+  updateNodeData(imageNodeId, {
+    dockInput: buildPro2StyleRefDockInput(
+      styleNodeId,
+      readPro2StyleAssetPrompt(styleNode),
+    ),
+  });
+}
+
+function ensurePro2StyleAssetToMediaEdge(
+  setEdges: (fn: (edges: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void,
+  styleNodeId: string,
+  mediaNodeId: string,
+  mediaType: string,
+): void {
+  const styleEdge =
+    mediaType === "sbv1-video-engine"
+      ? buildPro2StyleAssetToVideoEdge(styleNodeId, mediaNodeId)
+      : buildPro2StyleAssetToImageEdge(styleNodeId, mediaNodeId);
+  setEdges((prev) => {
+    if (
+      prev.some(
+        (e) => e.source === styleNodeId && e.target === mediaNodeId,
+      )
+    ) {
+      return prev;
+    }
+    return [...prev, styleEdge];
+  });
+}
 
 /** 侧栏 + 菜单 · 空白风格素材节点（待选风格库） */
 export function buildPro2EmptyStyleAssetNodeData(): StoryPro2StyleAssetNodeData {
@@ -108,6 +172,11 @@ export function spawnPro2StyleAssetFromPreset(args: {
     });
   }
 
+  const previewUrl = args.preset.imageUrl?.trim();
+  if (previewUrl) {
+    fitPro2StyleAssetNodeToPreviewImage(nodeId, previewUrl);
+  }
+
   return nodeId;
 }
 
@@ -140,6 +209,7 @@ export function spawnPro2StyleAssetLeftOfImageFromPreset(args: {
   if (!mediaNode || !DOCK_STYLE_MEDIA_TYPES.has(mediaNode.type ?? "")) {
     return "";
   }
+  const mediaType = mediaNode.type ?? "";
 
   const patch = buildPro2StyleAssetNodeData(args.preset) as unknown as Record<
     string,
@@ -153,12 +223,28 @@ export function spawnPro2StyleAssetLeftOfImageFromPreset(args: {
 
   if (existing) {
     args.updateNodeData(existing.id, patch);
+    ensurePro2StyleAssetToMediaEdge(
+      args.setEdges,
+      existing.id,
+      args.imageNodeId,
+      mediaType,
+    );
+    applyPro2StyleDockPromptToImageIfEmpty(
+      args.updateNodeData,
+      args.getNodes,
+      args.imageNodeId,
+      existing.id,
+    );
+    const previewUrl = args.preset.imageUrl?.trim();
+    if (previewUrl) {
+      fitPro2StyleAssetNodeToPreviewImage(existing.id, previewUrl);
+    }
     selectPro2NodeAfterSpawn(args.setNodes, existing.id);
     return existing.id;
   }
 
   const abs = absoluteNodePosition(mediaNode, nodes);
-  const styleW = PRO2_IMAGE_NODE_WIDTH;
+  const styleW = PRO2_STYLE_ASSET_NODE_WIDTH;
   const position = {
     x: abs.x - styleW - SNAP_GAP,
     y: abs.y,
@@ -167,23 +253,48 @@ export function spawnPro2StyleAssetLeftOfImageFromPreset(args: {
   const nodeId = args.addNode("story-pro2-style-asset", position, patch);
   if (!nodeId) return "";
 
-  const mediaType = mediaNode.type ?? "";
-  const styleEdge =
-    mediaType === "sbv1-video-engine"
-      ? buildPro2StyleAssetToVideoEdge(nodeId, args.imageNodeId)
-      : buildPro2StyleAssetToImageEdge(nodeId, args.imageNodeId);
-
-  args.setEdges((prev) => {
-    if (
-      prev.some(
-        (e) => e.source === nodeId && e.target === args.imageNodeId,
-      )
-    ) {
-      return prev;
-    }
-    return [...prev, styleEdge];
-  });
+  ensurePro2StyleAssetToMediaEdge(
+    args.setEdges,
+    nodeId,
+    args.imageNodeId,
+    mediaType,
+  );
+  applyPro2StyleDockPromptToImageIfEmpty(
+    args.updateNodeData,
+    args.getNodes,
+    args.imageNodeId,
+    nodeId,
+  );
+  const previewUrl = args.preset.imageUrl?.trim();
+  if (previewUrl) {
+    fitPro2StyleAssetNodeToPreviewImage(nodeId, previewUrl);
+  }
 
   selectPro2NodeAfterSpawn(args.setNodes, nodeId);
   return nodeId;
+}
+
+const STYLE_DOCK_IMAGE_TARGETS = new Set([
+  "story-pro2-image",
+  "story-pro2-three-view",
+  "sbv1-image",
+]);
+
+/** 手动画布连线 · 风格 → 图片时补 Dock 默认提示词 */
+export function applyPro2StyleAssetEdgeConnection(args: {
+  connection: Connection;
+  nodes: CanvasFlowNode[];
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void;
+  getNodes: () => CanvasFlowNode[];
+}): void {
+  const source = args.nodes.find((n) => n.id === args.connection.source);
+  const target = args.nodes.find((n) => n.id === args.connection.target);
+  if (source?.type !== "story-pro2-style-asset" || !target?.type) return;
+  if (!STYLE_DOCK_IMAGE_TARGETS.has(target.type)) return;
+  applyPro2StyleDockPromptToImageIfEmpty(
+    args.updateNodeData,
+    args.getNodes,
+    target.id,
+    source.id,
+  );
 }

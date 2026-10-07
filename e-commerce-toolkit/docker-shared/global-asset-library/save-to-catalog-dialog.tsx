@@ -10,6 +10,7 @@ import type {
   GlobalAssetCatalogScope,
   GlobalAssetLibraryApiClient,
   GlobalAssetLibraryVariant,
+  GlobalAssetSaveContext,
   GlobalAssetSourceImage,
 } from "./types";
 
@@ -20,7 +21,16 @@ const SAVE_CATALOG_OPTIONS: Array<{ id: GlobalAssetCatalogKind; label: string }>
   { id: "avatar", label: "模特头像库" },
   { id: "garment", label: "服装库" },
   { id: "full-body", label: "全身模特" },
+  { id: "style", label: "风格库" },
+  { id: "scene", label: "场景库" },
 ];
+
+const MODEL_CATALOG_KINDS = new Set<GlobalAssetCatalogKind>([
+  "pose",
+  "avatar",
+  "garment",
+  "full-body",
+]);
 
 function buildDefaultCatalogName(catalogKind: GlobalAssetCatalogKind): string {
   const label = SAVE_CATALOG_OPTIONS.find((o) => o.id === catalogKind)?.label ?? "素材";
@@ -34,6 +44,7 @@ type Props = {
   api: GlobalAssetLibraryApiClient;
   sourceImage: GlobalAssetSourceImage;
   defaultCatalog?: GlobalAssetCatalogKind;
+  saveContext?: GlobalAssetSaveContext;
   onClose: () => void;
   onSaved?: () => void;
 };
@@ -44,13 +55,15 @@ export function SaveToCatalogDialog({
   api,
   sourceImage,
   defaultCatalog = "pose",
+  saveContext,
   onClose,
   onSaved,
 }: Props) {
   const theme = globalAssetTheme(variant);
   const [catalogKind, setCatalogKind] = useState<GlobalAssetCatalogKind>(defaultCatalog);
   const [scope, setScope] = useState<GlobalAssetCatalogScope>("user");
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdminFromApi, setIsAdminFromApi] = useState(false);
+  const isAdmin = saveContext?.isPlatformAdmin === true || isAdminFromApi;
   const [savePrompt, setSavePrompt] = useState(Boolean(sourceImage.prompt?.trim()));
   const [promptText, setPromptText] = useState(sourceImage.prompt ?? "");
   const [category, setCategory] = useState("A");
@@ -73,7 +86,7 @@ export function SaveToCatalogDialog({
     setSavePrompt(Boolean(sourceImage.prompt?.trim()));
     setPromptText(sourceImage.prompt ?? "");
     setName(buildDefaultCatalogName(defaultCatalog));
-    void api.isPlatformAdmin?.().then(setIsAdmin);
+    void api.isPlatformAdmin?.().then(setIsAdminFromApi);
   }, [open, defaultCatalog, api, sourceImage.prompt]);
 
   useEffect(() => {
@@ -92,21 +105,38 @@ export function SaveToCatalogDialog({
     setDiscardOpen(true);
   }
 
+  function resolvedScope(): GlobalAssetCatalogScope {
+    if (isAdmin && scope === "platform") return "platform";
+    if (scope === "team" && saveContext?.allowTeamShare) return "team";
+    if (scope === "project" && saveContext?.allowProjectScope) return "project";
+    return "user";
+  }
+
   async function submit() {
     setBusy(true);
     setError(null);
     try {
+      const finalScope = resolvedScope();
       await api.importToCatalog({
         catalogKind,
         imageUrl: sourceImage.url,
-        scope: isAdmin && scope === "platform" ? "platform" : "user",
+        scope: finalScope,
         name: name.trim() || buildDefaultCatalogName(catalogKind),
-        gender,
+        gender: MODEL_CATALOG_KINDS.has(catalogKind) ? gender : undefined,
         savePrompt: catalogKind === "pose" ? savePrompt : undefined,
         prompt: catalogKind === "pose" && savePrompt ? promptText : undefined,
         category: catalogKind === "pose" ? category : undefined,
         sourceModule: sourceImage.sourceModule,
         sourceAssetId: sourceImage.sourceAssetId,
+        tenantId:
+          finalScope === "team" ? saveContext?.tenantId ?? undefined : undefined,
+        sourceProjectId:
+          finalScope === "project" ? saveContext?.projectId ?? undefined : undefined,
+        projectId: saveContext?.projectId,
+        modelKey:
+          catalogKind === "style" || catalogKind === "scene"
+            ? saveContext?.visionModelKey
+            : undefined,
       });
       savedRef.current = true;
       onSaved?.();
@@ -160,19 +190,31 @@ export function SaveToCatalogDialog({
           </div>
         </div>
 
-        {isAdmin ? (
-          <fieldset className={`mb-3 space-y-2 text-xs ${theme.textPrimary}`}>
-            <legend className={`mb-1 font-medium ${theme.textSecondary}`}>可见范围</legend>
+        <fieldset className={`mb-3 space-y-2 text-xs ${theme.textPrimary}`}>
+          <legend className={`mb-1 font-medium ${theme.textSecondary}`}>可见范围</legend>
+          <label className="flex items-center gap-2">
+            <input type="radio" checked={scope === "user"} onChange={() => setScope("user")} />
+            个人 · 全账号可用
+          </label>
+          {saveContext?.allowProjectScope ? (
             <label className="flex items-center gap-2">
-              <input type="radio" checked={scope === "user"} onChange={() => setScope("user")} />
-              个人 · 全站可用
+              <input type="radio" checked={scope === "project"} onChange={() => setScope("project")} />
+              仅当前画布项目
             </label>
+          ) : null}
+          {saveContext?.allowTeamShare ? (
+            <label className="flex items-center gap-2">
+              <input type="radio" checked={scope === "team"} onChange={() => setScope("team")} />
+              团队共享（画布内成员可见）
+            </label>
+          ) : null}
+          {isAdmin ? (
             <label className="flex items-center gap-2">
               <input type="radio" checked={scope === "platform"} onChange={() => setScope("platform")} />
-              全平台
+              全平台 · 平台库
             </label>
-          </fieldset>
-        ) : null}
+          ) : null}
+        </fieldset>
 
         <label className={`mb-3 block space-y-1 text-xs ${theme.textPrimary}`}>
           <span className="font-medium">名称</span>
@@ -187,23 +229,25 @@ export function SaveToCatalogDialog({
           />
         </label>
 
-        <div className={`mb-3 space-y-2 text-xs ${theme.textPrimary}`}>
-          <span className="font-medium">性别</span>
-          <div className="flex gap-2">
-            {(["female", "male"] as const).map((g) => (
-              <button
-                key={g}
-                type="button"
-                className={`flex-1 rounded-lg px-3 py-2 transition-colors ${
-                  gender === g ? theme.navActive : theme.navIdle
-                }`}
-                onClick={() => setGender(g)}
-              >
-                {g === "female" ? "女" : "男"}
-              </button>
-            ))}
+        {MODEL_CATALOG_KINDS.has(catalogKind) ? (
+          <div className={`mb-3 space-y-2 text-xs ${theme.textPrimary}`}>
+            <span className="font-medium">性别</span>
+            <div className="flex gap-2">
+              {(["female", "male"] as const).map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  className={`flex-1 rounded-lg px-3 py-2 transition-colors ${
+                    gender === g ? theme.navActive : theme.navIdle
+                  }`}
+                  onClick={() => setGender(g)}
+                >
+                  {g === "female" ? "女" : "男"}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         {catalogKind === "pose" ? (
           <>
@@ -262,7 +306,11 @@ export function SaveToCatalogDialog({
             disabled={busy}
             onClick={() => void submit()}
           >
-            {busy ? "保存中…" : "确认入库"}
+            {busy
+              ? catalogKind === "style" || catalogKind === "scene"
+                ? "分析并入库中…"
+                : "保存中…"
+              : "确认入库"}
           </button>
         </div>
 

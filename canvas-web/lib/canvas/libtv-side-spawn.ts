@@ -10,7 +10,10 @@ import {
   buildPro2ThreeViewNodeData,
   spawnPro2ScriptHubFromSource,
 } from "./pro2-spawn-nodes";
-import { buildPro2EmptyStyleAssetNodeData } from "./pro2-spawn-style-asset";
+import {
+  applyPro2StyleDockPromptToImageIfEmpty,
+  buildPro2EmptyStyleAssetNodeData,
+} from "./pro2-spawn-style-asset";
 import {
   buildPro2StyleAssetToImageEdge,
   buildPro2StyleAssetToVideoEdge,
@@ -22,6 +25,7 @@ import {
   PRO2_CHARACTER_THREE_VIEW_HEIGHT,
   PRO2_CHARACTER_THREE_VIEW_WIDTH,
   PRO2_IMAGE_NODE_WIDTH,
+  PRO2_STYLE_ASSET_NODE_WIDTH,
   PRO2_TEXT_NODE_MIN_WIDTH,
 } from "./story-pro2-node-chrome";
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
@@ -56,6 +60,9 @@ export type LibtvSideSpawnStore = {
 };
 
 function spawnWidth(nodeType: string, anchor: CanvasFlowNode): number {
+  if (anchor.type === "story-pro2-style-asset") {
+    return anchor.width ?? PRO2_STYLE_ASSET_NODE_WIDTH;
+  }
   if (nodeType === "sbv1-video-engine") return SBV1_VIDEO_ENGINE_WIDTH;
   if (nodeType === "story-pro2-three-view") return PRO2_CHARACTER_THREE_VIEW_WIDTH;
   if (nodeType === "story-pro2-starter" || nodeType === "story-pro2-prompt") {
@@ -169,6 +176,17 @@ export function spawnLibtvNeighborFromAnchor(
   if (nodeType === "story-pro2-image") {
     const newId = addNode("story-pro2-image", { x: position.x, y: position.y }, buildPro2ImageNodeData());
     if (!newId) return "";
+    if (anchor.type === "story-pro2-style-asset") {
+      pushEdge(setEdges, buildPro2StyleAssetToImageEdge(anchorId, newId));
+      applyPro2StyleDockPromptToImageIfEmpty(
+        (id, patch) => useCanvasStore.getState().updateNodeData(id, patch),
+        () => useCanvasStore.getState().nodes,
+        newId,
+        anchorId,
+      );
+      selectPro2NodeAfterSpawn(setNodes, newId);
+      return newId;
+    }
     const anchorIsText =
       anchor.type === "story-pro2-starter" ||
       anchor.type === "story-pro2-prompt" ||

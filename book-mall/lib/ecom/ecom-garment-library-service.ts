@@ -3,6 +3,10 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 
 import type { EcomCatalogScope } from "@/lib/ecom/ecom-catalog-scope";
+import {
+  buildCatalogViewerScopeOr,
+  normalizeCatalogScope,
+} from "@/lib/ecom/ecom-catalog-viewer-scope";
 
 export type EcomGarmentLibraryEntry = {
   id: string;
@@ -14,6 +18,7 @@ export type EcomGarmentLibraryEntry = {
   scope?: EcomCatalogScope;
   userId?: string | null;
   tenantId?: string | null;
+  sourceProjectId?: string | null;
   enabled?: boolean;
   sortOrder?: number;
 };
@@ -32,8 +37,7 @@ function rowToEntry(row: {
   sortOrder: number;
 }): EcomGarmentLibraryEntry {
   const gender = row.gender === "male" ? "male" : "female";
-  const scope =
-    row.scope === "user" || row.scope === "team" ? row.scope : "platform";
+  const scope = normalizeCatalogScope(row.scope);
   return {
     id: row.id,
     name: row.name,
@@ -52,6 +56,7 @@ function rowToEntry(row: {
 export async function listGarmentLibraryEntriesForViewer(args: {
   userId: string;
   tenantId?: string | null;
+  projectId?: string | null;
   gender?: string | null;
   limit?: number;
 }): Promise<EcomGarmentLibraryEntry[]> {
@@ -62,13 +67,11 @@ export async function listGarmentLibraryEntriesForViewer(args: {
       deletedAt: null,
       enabled: true,
       ...(genderFilter ? { gender: genderFilter } : {}),
-      OR: [
-        { scope: "platform" },
-        { scope: "user", userId: args.userId },
-        ...(args.tenantId
-          ? [{ scope: "team" as const, tenantId: args.tenantId }]
-          : []),
-      ],
+      OR: buildCatalogViewerScopeOr({
+        userId: args.userId,
+        tenantId: args.tenantId,
+        projectId: args.projectId,
+      }),
     },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     take: limit,
@@ -88,6 +91,7 @@ export async function upsertGarmentLibraryEntry(
     scope: entry.scope ?? "user",
     userId: entry.userId ?? null,
     tenantId: entry.tenantId ?? null,
+    sourceProjectId: entry.sourceProjectId ?? null,
     enabled: entry.enabled ?? true,
     sortOrder: entry.sortOrder ?? 0,
     deletedAt: null,
@@ -109,6 +113,7 @@ export async function createGarmentFromImport(args: {
   scope: EcomCatalogScope;
   userId: string;
   tenantId?: string | null;
+  sourceProjectId?: string | null;
 }): Promise<EcomGarmentLibraryEntry> {
   const id =
     args.scope === "platform"
@@ -124,6 +129,7 @@ export async function createGarmentFromImport(args: {
     scope: args.scope,
     userId: args.scope === "platform" ? null : args.userId,
     tenantId: args.scope === "team" ? args.tenantId ?? null : null,
+    sourceProjectId: args.scope === "project" ? args.sourceProjectId ?? null : null,
     enabled: true,
     sortOrder: Date.now() % 100000,
   });

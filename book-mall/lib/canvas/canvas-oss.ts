@@ -401,6 +401,26 @@ export async function uploadEcomPoseLibraryPreview(args: {
   });
 }
 
+/** 用户风格库参考图（与平台 style-library key 命名一致）。 */
+export async function uploadUserStyleLibraryPreview(args: {
+  id: string;
+  buf: Buffer;
+  contentType: string;
+  ext: string;
+}): Promise<string> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const key = buildStyleLibraryOssKey(args.id, args.ext);
+  return uploadBufferToOss({
+    cfg: cfgRaw,
+    key,
+    buf: args.buf,
+    contentType: args.contentType,
+  });
+}
+
 /** 电商工具箱 · 场景库参考图（固定 OSS key）。 */
 export async function uploadEcomSceneLibraryPreview(args: {
   id: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { Box } from "lucide-react";
 import { Handle, Position } from "@xyflow/react";
@@ -16,17 +16,21 @@ import {
   buildPro2GeneralTextNodeData,
   buildPro2ImageNodeData,
 } from "@/lib/canvas/pro2-spawn-nodes";
+import { fitPro2StyleAssetNodeToPreviewImage } from "@/lib/canvas/pro2-style-asset-node-size";
+import { applyPro2StyleDockPromptToImageIfEmpty } from "@/lib/canvas/pro2-spawn-style-asset";
 import { selectPro2NodeAfterSpawn } from "@/lib/canvas/pro2-spawn-select";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   PRO2_STYLE_ASSET_CARD_SHELL_CLASS,
-  PRO2_IMAGE_NODE_WIDTH,
+  PRO2_STYLE_ASSET_NODE_WIDTH,
   PRO2_NODE_HANDLE_CLASS,
   pro2NodeBorderColor,
 } from "@/lib/canvas/story-pro2-node-chrome";
 import type { StoryPro2StyleAssetNodeData } from "@/lib/canvas/story-pro2-workspace-types";
 import { RF_NODE_DRAG_HANDLE } from "@/lib/canvas/react-flow-classes";
 import {
+  LIBTV_CARD_DRAG_CLASS,
+  LIBTV_MEDIA_CARD_SHELL_CLASS,
   LIBTV_NODE_SIDE_PLUS_LAYER_CLASS,
   LIBTV_NODE_SIDE_PLUS_SIZE,
   libtvNodeBorderStyle,
@@ -47,6 +51,8 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
   const addNode = useCanvasStore((s) => s.addNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
+  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const getNodes = useCallback(() => useCanvasStore.getState().nodes, []);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
 
   const d = data as unknown as StoryPro2StyleAssetNodeData;
@@ -60,6 +66,11 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
   const previewUrl = d.imageUrl?.trim() ?? "";
   const headerLabel = d.label?.trim() || `素材-风格-${d.styleName || "未命名"}`;
 
+  useEffect(() => {
+    if (!previewUrl) return;
+    fitPro2StyleAssetNodeToPreviewImage(id, previewUrl);
+  }, [id, previewUrl]);
+
   const spawnNeighbor = useCallback(
     (
       side: "left" | "right",
@@ -68,7 +79,7 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
       const self = nodes.find((n) => n.id === id);
       if (!self) return;
       const gap = 48;
-      const w = self.width ?? PRO2_IMAGE_NODE_WIDTH;
+      const w = self.width ?? PRO2_STYLE_ASSET_NODE_WIDTH;
       const x =
         side === "left" ? self.position.x - w - gap : self.position.x + w + gap;
       const y = self.position.y;
@@ -106,9 +117,15 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
           targetHandle: "in_image",
         },
       ]);
+      applyPro2StyleDockPromptToImageIfEmpty(
+        updateNodeData,
+        getNodes,
+        newId,
+        id,
+      );
       selectPro2NodeAfterSpawn(setNodes, newId);
     },
-    [nodes, id, addNode, setNodes, setEdges],
+    [nodes, id, addNode, setNodes, setEdges, updateNodeData, getNodes],
   );
 
   const onSidePick = useCallback(
@@ -144,7 +161,10 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
 
   return (
     <div
-      className="relative flex h-full w-full min-h-0 min-w-0 cursor-grab flex-col active:cursor-grabbing"
+      className={cn(
+        "relative flex h-full w-full min-h-0 min-w-0 flex-col overflow-visible",
+        LIBTV_CARD_DRAG_CLASS,
+      )}
       data-pro2-style-asset={id}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
@@ -188,8 +208,14 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
       <div className="relative min-h-0 flex-1">
         <div
           className={cn(
-            PRO2_STYLE_ASSET_CARD_SHELL_CLASS,
-            "relative flex h-full min-h-0 flex-col overflow-hidden transition",
+            previewUrl
+              ? cn(
+                  LIBTV_MEDIA_CARD_SHELL_CLASS,
+                  LIBTV_CARD_DRAG_CLASS,
+                  "min-h-0 flex-1",
+                )
+              : PRO2_STYLE_ASSET_CARD_SHELL_CLASS,
+            "relative h-full min-h-0 w-full overflow-hidden transition",
           )}
           style={
             libtvNodeBorderStyle({
@@ -200,17 +226,15 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
           }
         >
           {previewUrl ? (
-            <div className="relative min-h-0 flex-1 p-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={previewUrl}
-                alt={d.styleName ?? "style"}
-                draggable={false}
-                className="h-full min-h-[200px] w-full rounded-lg object-cover"
-              />
-            </div>
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={previewUrl}
+              alt={d.styleName ?? "style"}
+              draggable={false}
+              className="block h-full w-full select-none object-cover"
+            />
           ) : (
-            <div className="flex h-full min-h-[200px] items-center justify-center text-[11px] text-white/35">
+            <div className="flex h-full min-h-[120px] items-center justify-center text-[11px] text-white/35">
               无预览图
             </div>
           )}

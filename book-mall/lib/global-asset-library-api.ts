@@ -26,6 +26,10 @@ export function createBookGlobalAssetLibraryApi(): GlobalAssetLibraryApiClient {
       if (query.gender) params.set("gender", query.gender);
       if (query.keyword) params.set("keyword", query.keyword);
       if (query.limit) params.set("limit", String(query.limit));
+      if (query.platformOnly) {
+        params.set("platformOnly", "1");
+        params.set("audience", "platform-hub");
+      }
       const data = await platformFetch(
         `/api/platform/v1/global-asset-library/catalog?${params.toString()}`,
       );

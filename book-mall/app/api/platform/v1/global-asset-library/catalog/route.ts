@@ -14,7 +14,9 @@ function readKind(raw: string | null): GlobalAssetCatalogKind | "all" {
     raw === "pose" ||
     raw === "avatar" ||
     raw === "garment" ||
-    raw === "full-body"
+    raw === "full-body" ||
+    raw === "style" ||
+    raw === "scene"
   ) {
     return raw;
   }
@@ -29,13 +31,20 @@ export async function GET(req: Request) {
   const limitRaw = Number(url.searchParams.get("limit"));
 
   try {
+    const audience = url.searchParams.get("audience");
+    const platformOnly =
+      url.searchParams.get("platformOnly") === "1" ||
+      audience === "platform-hub";
+
     const page = await listGlobalAssetCatalog({
       userId: auth.actor.userId,
       tenantId: url.searchParams.get("tenantId"),
+      projectId: url.searchParams.get("projectId"),
       kind: readKind(url.searchParams.get("kind")),
       gender: url.searchParams.get("gender"),
       keyword: url.searchParams.get("keyword"),
       limit: Number.isFinite(limitRaw) ? limitRaw : undefined,
+      platformOnly,
     });
     return NextResponse.json(page);
   } catch (e) {

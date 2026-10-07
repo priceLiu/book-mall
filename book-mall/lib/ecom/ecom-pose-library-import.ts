@@ -35,8 +35,9 @@ export type ImportPoseFromImageInput = {
   sourceAssetId?: string;
   adminUserId?: string;
   actorUserId: string;
-  scope?: "platform" | "user" | "team";
+  scope?: "platform" | "user" | "team" | "project";
   tenantId?: string | null;
+  sourceProjectId?: string | null;
 };
 
 export type ImportPoseFromImageResult =
@@ -139,7 +140,9 @@ export async function importPoseFromImage(
       importedAt: new Date().toISOString(),
     },
     scope,
-    userId: scope === "user" ? input.actorUserId : scope === "team" ? input.actorUserId : null,
+    userId: scope === "platform" ? null : input.actorUserId,
+    tenantId: scope === "team" ? input.tenantId ?? null : null,
+    sourceProjectId: scope === "project" ? input.sourceProjectId ?? null : null,
     enabled: true,
     sortOrder: Date.now() % 100000,
   });

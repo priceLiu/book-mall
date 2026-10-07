@@ -1,9 +1,14 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 
 import type { GlobalAssetCatalogKind } from "@/docker-shared/global-asset-library";
 import { useGlobalAssetLibrary } from "@/docker-shared/global-asset-library";
+import { buildCanvasGlobalAssetSaveContext } from "@/lib/canvas/global-asset-save-context";
+import { useCanvasStore } from "@/lib/canvas/store";
+import { pickStoryQwen38MaxLlmEngine } from "@/lib/canvas/system-providers";
+import { useUserProviders } from "@/lib/canvas/use-user-providers";
+import { useCanvasAdmin } from "@/components/home/use-canvas-admin";
 
 type SaveToCatalogArgs = {
   url: string;
@@ -16,12 +21,19 @@ type SaveToCatalogArgs = {
 
 export function useSaveToCatalog() {
   const { openGlobalAssetLibrary } = useGlobalAssetLibrary();
+  const projectId = useCanvasStore((s) => s.projectId);
+  const { providers } = useUserProviders();
+  const isPlatformAdmin = useCanvasAdmin();
+  const visionModelKey = useMemo(
+    () => pickStoryQwen38MaxLlmEngine(providers).modelKey,
+    [providers],
+  );
 
   return useCallback(
     ({
       url,
       prompt,
-      sourceModule,
+      sourceModule = "canvas",
       sourceAssetId,
       defaultCatalog = "garment",
       onCatalogSaved,
@@ -37,9 +49,14 @@ export function useSaveToCatalog() {
         },
         defaultTab: "catalog",
         defaultCatalog,
+        saveContext: buildCanvasGlobalAssetSaveContext(
+          projectId,
+          visionModelKey,
+          isPlatformAdmin,
+        ),
         onCatalogSaved,
       });
     },
-    [openGlobalAssetLibrary],
+    [openGlobalAssetLibrary, projectId, visionModelKey, isPlatformAdmin],
   );
 }

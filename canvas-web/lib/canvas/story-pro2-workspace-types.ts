@@ -100,6 +100,11 @@ export type StoryPro2StyleAssetNodeData = {
   mainStyle?: import("./story-pro-workspace-types").StoryProMainStyle;
   colorTone?: import("./story-pro-workspace-types").StoryProColorTone;
   renderQuality?: import("./story-pro-workspace-types").StoryProRenderQuality;
+  /** 预览图 natural fit 幂等键（URL + 尺寸） */
+  stylePreviewFitKey?: string;
+  mediaNaturalW?: number;
+  mediaNaturalH?: number;
+  manualSize?: boolean;
 };
 
 /** 2.0 标签节点 · 画布注释（TipTap HTML · 无 Dock · 仅展示） */

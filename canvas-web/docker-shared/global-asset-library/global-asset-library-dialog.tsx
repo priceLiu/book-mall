@@ -43,6 +43,7 @@ type Props = {
 function scopeLabel(scope?: string): string {
   if (scope === "platform") return "平台";
   if (scope === "team") return "团队";
+  if (scope === "project") return "本项目";
   return "我的";
 }
 
@@ -249,8 +250,8 @@ export function GlobalAssetLibraryDialog({
 
   if (!open || typeof document === "undefined") return null;
 
-  const embedded = Boolean(options.embedded);
-  const title = options.title ?? (embedded ? "平台素材" : "全局资产库");
+  const title = options.title ?? "全局资产库";
+  const activeCount = tab === "catalog" ? counts[catalogKind] : allItems.length;
   const saveDialogOpen = Boolean(sourceImage?.url) && (isSaveOnlyFlow || saveOpen);
 
   if (isSaveOnlyFlow && sourceImage?.url) {
@@ -261,6 +262,7 @@ export function GlobalAssetLibraryDialog({
         api={api}
         sourceImage={sourceImage}
         defaultCatalog={options.defaultCatalog ?? "pose"}
+        saveContext={options.saveContext}
         onClose={onClose}
         onSaved={() => {
           options.onCatalogSaved?.();
@@ -270,16 +272,18 @@ export function GlobalAssetLibraryDialog({
     );
   }
 
-  const pickerInner = showPicker ? (
+  return (
+    <>
+      {showPicker
+        ? createPortal(
+        <div
+          className={`fixed inset-0 z-[300] flex items-center justify-center p-4 ${theme.overlay}`}
+          onClick={onClose}
+        >
           <div
-            className={
-              embedded
-                ? `flex min-h-0 flex-1 flex-col ${theme.shell}`
-                : `${GALD_DIALOG_SHELL_CLASS} ${theme.shell}`
-            }
+            className={`${GALD_DIALOG_SHELL_CLASS} ${theme.shell}`}
             onClick={(e) => e.stopPropagation()}
           >
-            {!embedded ? (
             <div className={`flex shrink-0 items-center justify-between border-b px-4 py-2.5 ${theme.header}`}>
               <h2 className={`text-[14px] font-semibold ${theme.textPrimary}`}>{title}</h2>
               <div className="flex items-center gap-2">
@@ -302,7 +306,6 @@ export function GlobalAssetLibraryDialog({
                 </button>
               </div>
             </div>
-            ) : null}
 
             <div className={`flex shrink-0 items-center gap-2 border-b px-4 py-2 ${theme.filterBar}`}>
               <div className={`flex rounded-full p-0.5 ${theme.segmentedTrack}`}>
@@ -393,7 +396,6 @@ export function GlobalAssetLibraryDialog({
                               selectIndex={active ? selected.indexOf(item.id) + 1 : undefined}
                               scopeText={scopeLabel(item.scope)}
                               disabled={mode !== "pick"}
-                              previewLightboxZIndex={options.previewLightboxZIndex}
                               onSelect={() => mode === "pick" && toggle(item.id)}
                             />
                           </li>
@@ -455,22 +457,9 @@ export function GlobalAssetLibraryDialog({
               </div>
             ) : null}
           </div>
-  ) : null;
-
-  return (
-    <>
-      {pickerInner
-        ? embedded
-          ? pickerInner
-          : createPortal(
-              <div
-                className={`fixed inset-0 z-[300] flex items-center justify-center p-4 ${theme.overlay}`}
-                onClick={onClose}
-              >
-                {pickerInner}
-              </div>,
-              document.body,
-            )
+        </div>,
+        document.body,
+        )
         : null}
 
       {saveDialogOpen && sourceImage?.url ? (
@@ -480,6 +469,7 @@ export function GlobalAssetLibraryDialog({
           api={api}
           sourceImage={sourceImage}
           defaultCatalog={options.defaultCatalog ?? "pose"}
+          saveContext={options.saveContext}
           onClose={() => {
             setSaveOpen(false);
           }}

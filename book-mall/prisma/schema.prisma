@@ -4564,18 +4564,20 @@ model EcomModelLibraryEntry {
   age       String
   ossUrl    String
   thumbUrl  String?
-  scope     String    @default("platform")
-  userId    String?
-  tenantId  String?
-  sortOrder Int       @default(0)
-  enabled   Boolean   @default(true)
-  deletedAt DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  scope           String    @default("platform")
+  userId          String?
+  tenantId        String?
+  sourceProjectId String?
+  sortOrder       Int       @default(0)
+  enabled         Boolean   @default(true)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([gender, age, deletedAt])
   @@index([scope, userId, deletedAt])
   @@index([tenantId, deletedAt])
+  @@index([sourceProjectId, deletedAt])
 }
 
 /// 电商工具箱 · 服装库（系统 + 用户 + 团队）
@@ -4588,18 +4590,20 @@ model EcomGarmentLibraryEntry {
   garmentKind    String    @default("flat")
   sourceImageKey String?
   tags           Json?
-  scope          String    @default("platform")
-  userId         String?
-  tenantId       String?
-  enabled        Boolean   @default(true)
-  sortOrder      Int       @default(0)
-  deletedAt      DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  scope           String    @default("platform")
+  userId          String?
+  tenantId        String?
+  sourceProjectId String?
+  enabled         Boolean   @default(true)
+  sortOrder       Int       @default(0)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([gender, deletedAt])
   @@index([scope, userId, deletedAt])
   @@index([tenantId, deletedAt])
+  @@index([sourceProjectId, deletedAt])
 }
 
 /// 电商工具箱 · 全身模特库（从「我的模特」晋升或成图入库）
@@ -4611,18 +4615,20 @@ model EcomFullBodyModelEntry {
   thumbUrl      String?
   sourceAssetId String?
   sourceImageKey String?
-  scope         String    @default("user")
-  userId        String?
-  tenantId      String?
-  enabled       Boolean   @default(true)
-  sortOrder     Int       @default(0)
-  deletedAt     DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  scope           String    @default("user")
+  userId          String?
+  tenantId        String?
+  sourceProjectId String?
+  enabled         Boolean   @default(true)
+  sortOrder       Int       @default(0)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([gender, deletedAt])
   @@index([scope, userId, deletedAt])
   @@index([tenantId, deletedAt])
+  @@index([sourceProjectId, deletedAt])
 }
 
 model EcomPoseLibraryEntry {
@@ -4636,6 +4642,8 @@ model EcomPoseLibraryEntry {
   tags            Json?
   scope           String    @default("platform")
   userId          String?
+  tenantId        String?
+  sourceProjectId String?
   lockedAt        DateTime?
   enabled         Boolean   @default(true)
   sortOrder       Int       @default(0)
@@ -4646,6 +4654,8 @@ model EcomPoseLibraryEntry {
   @@index([category, deletedAt])
   @@index([scope, userId, deletedAt])
   @@index([sourceImageKey, deletedAt])
+  @@index([tenantId, deletedAt])
+  @@index([sourceProjectId, deletedAt])
 }
 
 model EcomPropLibraryEntry {
@@ -4668,24 +4678,54 @@ model EcomPropLibraryEntry {
 }
 
 model EcomSceneLibraryEntry {
-  id           String    @id
-  name         String
-  visualPrompt String    @db.Text
-  ossUrl       String?
-  thumbUrl     String?
-  sourceImageKey String?
-  tags         Json?
-  scope        String    @default("platform")
-  userId       String?
-  lockedAt     DateTime?
-  enabled      Boolean   @default(true)
-  sortOrder    Int       @default(0)
-  deletedAt    DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id              String    @id
+  name            String
+  visualPrompt    String    @db.Text
+  ossUrl          String?
+  thumbUrl        String?
+  sourceImageKey  String?
+  tags            Json?
+  scope           String    @default("platform")
+  userId          String?
+  tenantId        String?
+  sourceProjectId String?
+  lockedAt        DateTime?
+  enabled         Boolean   @default(true)
+  sortOrder       Int       @default(0)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([deletedAt])
   @@index([scope, userId, deletedAt])
+  @@index([tenantId, deletedAt])
+  @@index([sourceProjectId, deletedAt])
+}
+
+/// 用户/团队/项目 · 风格库（画布入库 + 视觉分析）
+model EcomStyleLibraryEntry {
+  id              String    @id
+  name            String
+  stylePrompt     String    @db.Text
+  ossUrl          String?
+  thumbUrl        String?
+  sourceImageKey  String?
+  tags            Json?
+  scope           String    @default("platform")
+  userId          String?
+  tenantId        String?
+  sourceProjectId String?
+  lockedAt        DateTime?
+  enabled         Boolean   @default(true)
+  sortOrder       Int       @default(0)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([deletedAt])
+  @@index([scope, userId, deletedAt])
+  @@index([tenantId, deletedAt])
+  @@index([sourceProjectId, deletedAt])
 }
 
 /// 电商故事版 · 故事剧场选题库（系统 + 用户；vertical 分服装/包包/3C）

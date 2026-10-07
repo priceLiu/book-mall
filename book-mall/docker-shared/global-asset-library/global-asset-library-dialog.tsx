@@ -43,6 +43,7 @@ type Props = {
 function scopeLabel(scope?: string): string {
   if (scope === "platform") return "平台";
   if (scope === "team") return "团队";
+  if (scope === "project") return "本项目";
   return "我的";
 }
 
@@ -261,6 +262,7 @@ export function GlobalAssetLibraryDialog({
         api={api}
         sourceImage={sourceImage}
         defaultCatalog={options.defaultCatalog ?? "pose"}
+        saveContext={options.saveContext}
         onClose={onClose}
         onSaved={() => {
           options.onCatalogSaved?.();
@@ -467,6 +469,7 @@ export function GlobalAssetLibraryDialog({
           api={api}
           sourceImage={sourceImage}
           defaultCatalog={options.defaultCatalog ?? "pose"}
+          saveContext={options.saveContext}
           onClose={() => {
             setSaveOpen(false);
           }}

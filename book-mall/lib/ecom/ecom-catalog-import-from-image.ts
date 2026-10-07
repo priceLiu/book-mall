@@ -14,6 +14,17 @@ import { buildPoseSourceImageKeyFromBuffer } from "@/lib/ecom/ecom-pose-library-
 import { importPoseFromImage } from "@/lib/ecom/ecom-pose-library-import";
 import type { EcomPoseGender } from "@/lib/ecom/ecom-pose-library-meta";
 import { upsertModelLibraryEntry } from "@/lib/ecom/ecom-model-library-service";
+import {
+  analyzeSceneImageForCatalog,
+  analyzeStyleImageForCatalog,
+} from "@/lib/ecom/ecom-catalog-visual-analysis";
+import { catalogScopePersistFields } from "@/lib/ecom/ecom-catalog-viewer-scope";
+import { createStyleFromImport } from "@/lib/ecom/ecom-style-library-service";
+import { upsertSceneLibraryEntry } from "@/lib/ecom/ecom-scene-library-service";
+import {
+  uploadEcomSceneLibraryPreview,
+  uploadUserStyleLibraryPreview,
+} from "@/lib/canvas/canvas-oss";
 import { prisma } from "@/lib/prisma";
 
 export type CatalogImportFromImageInput = {
@@ -23,6 +34,12 @@ export type CatalogImportFromImageInput = {
   isPlatformAdmin?: boolean;
   scope?: EcomCatalogScope;
   tenantId?: string | null;
+  sourceProjectId?: string | null;
+  preferredTenantId?: string | null;
+  /** 画布 Gateway 视觉 modelKey（与图片反推一致） */
+  modelKey?: string;
+  /** 当前画布 projectId（Gateway clientPage / 日志，与 scope 无关） */
+  canvasProjectId?: string;
   name?: string;
   gender?: "female" | "male";
   savePrompt?: boolean;
@@ -47,19 +64,40 @@ async function fetchImageBuffer(
   return { buf, contentType, ext };
 }
 
-function resolveScope(
-  input: CatalogImportFromImageInput,
-): EcomCatalogScope {
-  if (input.scope) {
-    if (input.scope === "platform" && !input.isPlatformAdmin) {
-      throw new Error("仅平台管理员可设为全平台");
-    }
-    if (input.scope === "team") {
-      throw new Error("团队可见暂未开放");
-    }
-    return input.scope;
+function assertCanvasScopedCatalog(input: CatalogImportFromImageInput, scope: EcomCatalogScope) {
+  if (scope !== "team" && scope !== "project") return;
+  if (input.sourceModule !== "canvas") {
+    throw new Error("团队/项目可见范围仅在画布中可选");
   }
-  return input.isPlatformAdmin ? "platform" : "user";
+  if (scope === "team") {
+    const tenant = input.tenantId?.trim();
+    if (!tenant) throw new Error("团队可见须指定 tenantId");
+    const preferred = input.preferredTenantId?.trim();
+    if (preferred && tenant !== preferred) {
+      throw new Error("tenantId 与当前团队空间不一致");
+    }
+  }
+  if (scope === "project" && !input.sourceProjectId?.trim()) {
+    throw new Error("项目可见须指定 sourceProjectId");
+  }
+}
+
+function resolveScope(input: CatalogImportFromImageInput): EcomCatalogScope {
+  const scope =
+    input.scope ?? (input.isPlatformAdmin ? "platform" : "user");
+  if (scope === "platform" && !input.isPlatformAdmin) {
+    throw new Error("仅平台管理员可设为全平台");
+  }
+  assertCanvasScopedCatalog(input, scope);
+  return scope;
+}
+
+function scopeFields(input: CatalogImportFromImageInput, scope: EcomCatalogScope) {
+  return catalogScopePersistFields(scope, {
+    actorUserId: input.actorUserId,
+    tenantId: input.tenantId,
+    sourceProjectId: input.sourceProjectId,
+  });
 }
 
 export async function importCatalogFromImage(input: CatalogImportFromImageInput) {
@@ -90,6 +128,7 @@ export async function importCatalogFromImage(input: CatalogImportFromImageInput)
       actorUserId: input.actorUserId,
       scope,
       tenantId: input.tenantId,
+      sourceProjectId: input.sourceProjectId,
     });
     if (!result.ok) {
       return {
@@ -129,9 +168,7 @@ export async function importCatalogFromImage(input: CatalogImportFromImageInput)
       where: { id },
       data: {
         thumbUrl,
-        scope,
-        userId: scope === "platform" ? null : input.actorUserId,
-        tenantId: scope === "team" ? input.tenantId ?? null : null,
+        ...scopeFields(input, scope),
         enabled: true,
       },
     });
@@ -159,6 +196,7 @@ export async function importCatalogFromImage(input: CatalogImportFromImageInput)
       scope,
       userId: input.actorUserId,
       tenantId: input.tenantId,
+      sourceProjectId: input.sourceProjectId,
     });
     return { ok: true as const, catalogKind: "garment" as const, entry };
   }
@@ -184,8 +222,79 @@ export async function importCatalogFromImage(input: CatalogImportFromImageInput)
       scope,
       userId: input.actorUserId,
       tenantId: input.tenantId,
+      sourceProjectId: input.sourceProjectId,
     });
     return { ok: true as const, catalogKind: "full-body" as const, entry };
+  }
+
+  if (input.catalogKind === "style") {
+    const analysis = await analyzeStyleImageForCatalog({
+      userId: input.actorUserId,
+      imageUrl: input.imageUrl,
+      modelKey: input.modelKey,
+      projectId: input.canvasProjectId ?? input.sourceProjectId,
+      sourceModule: input.sourceModule,
+    });
+    const id =
+      scope === "platform"
+        ? `style-${randomUUID().slice(0, 8)}`
+        : `user-style-${randomUUID()}`;
+    const ossUrl = await uploadUserStyleLibraryPreview({ id, buf, contentType, ext });
+    const thumbUrl = await generateAndUploadCatalogThumb({
+      catalogKind: "style",
+      id,
+      sourceBuf: buf,
+    });
+    const fields = scopeFields(input, scope);
+    const entry = await createStyleFromImport({
+      name: defaultName,
+      stylePrompt: analysis.stylePrompt,
+      ossUrl,
+      thumbUrl,
+      sourceImageKey: hashKey,
+      tags: analysis.tags,
+      scope: fields.scope,
+      userId: input.actorUserId,
+      tenantId: fields.tenantId,
+      sourceProjectId: fields.sourceProjectId,
+    });
+    return { ok: true as const, catalogKind: "style" as const, entry };
+  }
+
+  if (input.catalogKind === "scene") {
+    const analysis = await analyzeSceneImageForCatalog({
+      userId: input.actorUserId,
+      imageUrl: input.imageUrl,
+      modelKey: input.modelKey,
+      projectId: input.canvasProjectId ?? input.sourceProjectId,
+      sourceModule: input.sourceModule,
+    });
+    const id =
+      scope === "platform"
+        ? `scene-${randomUUID().slice(0, 8)}`
+        : `user-scene-${randomUUID()}`;
+    const ossUrl = await uploadEcomSceneLibraryPreview({ id, buf, contentType, ext });
+    const thumbUrl = await generateAndUploadCatalogThumb({
+      catalogKind: "scene",
+      id,
+      sourceBuf: buf,
+    });
+    const fields = scopeFields(input, scope);
+    const entry = await upsertSceneLibraryEntry({
+      id,
+      name: defaultName,
+      visualPrompt: analysis.visualPrompt,
+      ossUrl,
+      thumbUrl,
+      sourceImageKey: hashKey,
+      tags: analysis.tags,
+      scope: fields.scope,
+      userId: fields.userId ?? input.actorUserId,
+      tenantId: fields.tenantId,
+      sourceProjectId: fields.sourceProjectId,
+      sortOrder: Date.now() % 100000,
+    });
+    return { ok: true as const, catalogKind: "scene" as const, entry };
   }
 
   throw new Error("不支持的 catalogKind");

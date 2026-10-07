@@ -21,6 +21,7 @@ type Props = {
   scopeText: string;
   disabled?: boolean;
   onSelect?: () => void;
+  previewLightboxZIndex?: number;
 };
 
 function GlobalAssetPreviewLightbox({
@@ -83,6 +84,7 @@ export function GlobalAssetTile({
   scopeText,
   disabled,
   onSelect,
+  previewLightboxZIndex,
 }: Props) {
   const theme = globalAssetTheme(variant);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -122,9 +124,11 @@ export function GlobalAssetTile({
           )}
         </button>
 
-        <span className={`pointer-events-none absolute left-0.5 top-0.5 z-[2] rounded px-1 py-0.5 text-[9px] ${theme.pill}`}>
-          {scopeText}
-        </span>
+        {scopeText.trim() ? (
+          <span className={`pointer-events-none absolute left-0.5 top-0.5 z-[2] rounded px-1 py-0.5 text-[9px] ${theme.pill}`}>
+            {scopeText}
+          </span>
+        ) : null}
         {showPlatformBadge ? <GlobalAssetCatalogBadge /> : null}
         {active && selectIndex != null ? (
           <span className="pointer-events-none absolute right-0.5 top-0.5 z-[3] flex h-4 w-4 items-center justify-center rounded-full bg-[#22c55e] text-[9px] font-semibold text-white shadow-sm">
@@ -155,6 +159,7 @@ export function GlobalAssetTile({
         <GlobalAssetPreviewLightbox
           item={item}
           variant={variant}
+          stackZIndex={previewLightboxZIndex}
           onClose={() => setPreviewOpen(false)}
         />
       ) : null}

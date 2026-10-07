@@ -1,6 +1,8 @@
 "use client";
 
 import type { GlobalAssetLibraryApiClient } from "@/docker-shared/global-asset-library/types";
+import { adminFromToolsSessionPayload } from "@/lib/canvas/use-canvas-shell-session";
+import { fetchCanvasToolsSessionFull } from "@/lib/canvas-tools-session-fetch";
 
 async function bookFetch(path: string, init?: RequestInit) {
   const res = await fetch(`/api/book-mall/${path}`, {
@@ -26,6 +28,12 @@ export function createCanvasGlobalAssetLibraryApi(): GlobalAssetLibraryApiClient
       if (query.gender) params.set("gender", query.gender);
       if (query.keyword) params.set("keyword", query.keyword);
       if (query.limit) params.set("limit", String(query.limit));
+      if (query.platformOnly) {
+        params.set("platformOnly", "1");
+        params.set("audience", "platform-hub");
+      }
+      if (query.tenantId?.trim()) params.set("tenantId", query.tenantId.trim());
+      if (query.projectId?.trim()) params.set("projectId", query.projectId.trim());
       const data = await bookFetch(
         `api/platform/v1/global-asset-library/catalog?${params.toString()}`,
       );
@@ -89,9 +97,15 @@ export function createCanvasGlobalAssetLibraryApi(): GlobalAssetLibraryApiClient
     },
     async isPlatformAdmin() {
       try {
-        const data = await bookFetch("api/sso/tools/session");
-        const intro = data.introspect as Record<string, unknown> | undefined;
-        return intro?.tools_role === "admin" || intro?.tier === "admin";
+        const payload = await fetchCanvasToolsSessionFull().catch(() => null);
+        const fromTools = adminFromToolsSessionPayload(payload);
+        if (fromTools === true) return true;
+        if (fromTools === false) return false;
+        const data = (await bookFetch("api/canvas/viewer-session").catch(
+          () => ({}),
+        )) as { user?: { role?: string } | null };
+        const role = (data.user?.role ?? "").trim().toUpperCase();
+        return role === "ADMIN" || role === "SUPER_ADMIN";
       } catch {
         return false;
       }

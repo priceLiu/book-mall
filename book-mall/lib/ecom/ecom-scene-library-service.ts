@@ -4,6 +4,10 @@ import { resolve } from "node:path";
 import { randomUUID } from "crypto";
 
 import type { EcomCatalogScope } from "@/lib/ecom/ecom-catalog-scope";
+import {
+  buildCatalogViewerScopeOr,
+  normalizeCatalogScope,
+} from "@/lib/ecom/ecom-catalog-viewer-scope";
 import { assertUserCatalogEditable } from "@/lib/ecom/ecom-catalog-lock";
 import {
   resolveEcomSceneLibraryDisplayImageUrl,
@@ -23,6 +27,8 @@ export type EcomSceneLibraryEntry = {
   tags?: Record<string, unknown>;
   scope?: EcomCatalogScope;
   userId?: string | null;
+  tenantId?: string | null;
+  sourceProjectId?: string | null;
   lockedAt?: string | null;
   enabled?: boolean;
   sortOrder?: number;
@@ -66,6 +72,8 @@ function rowToEntry(row: {
   tags: unknown;
   scope: string;
   userId: string | null;
+  tenantId: string | null;
+  sourceProjectId: string | null;
   lockedAt: Date | null;
   enabled: boolean;
   sortOrder: number;
@@ -81,8 +89,10 @@ function rowToEntry(row: {
       row.tags && typeof row.tags === "object" && !Array.isArray(row.tags)
         ? (row.tags as Record<string, unknown>)
         : undefined,
-    scope: row.scope === "user" ? "user" : "platform",
+    scope: normalizeCatalogScope(row.scope),
     userId: row.userId,
+    tenantId: row.tenantId,
+    sourceProjectId: row.sourceProjectId,
     lockedAt: row.lockedAt?.toISOString() ?? null,
     enabled: row.enabled,
     sortOrder: row.sortOrder,
@@ -170,6 +180,35 @@ export async function readSceneLibraryCatalogLive(): Promise<EcomSceneLibraryCat
   return enrichSceneCatalog(readSceneLibraryCatalogJson());
 }
 
+export async function listSceneLibraryEntriesForViewer(args: {
+  userId: string;
+  tenantId?: string | null;
+  projectId?: string | null;
+  limit?: number;
+}): Promise<EcomSceneLibraryEntry[]> {
+  const limit = Math.min(Math.max(args.limit ?? 120, 1), 240);
+  const rows = await prisma.ecomSceneLibraryEntry.findMany({
+    where: {
+      deletedAt: null,
+      enabled: true,
+      OR: buildCatalogViewerScopeOr({
+        userId: args.userId,
+        tenantId: args.tenantId,
+        projectId: args.projectId,
+      }),
+    },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    take: limit,
+  });
+  return rows.map((row) =>
+    rowToEntry({
+      ...row,
+      tenantId: row.tenantId ?? null,
+      sourceProjectId: row.sourceProjectId ?? null,
+    }),
+  );
+}
+
 export async function upsertSceneLibraryEntry(
   entry: EcomSceneLibraryEntry,
 ): Promise<EcomSceneLibraryEntry> {
@@ -182,6 +221,8 @@ export async function upsertSceneLibraryEntry(
     tags: entry.tags ? (entry.tags as Prisma.InputJsonValue) : undefined,
     scope: entry.scope ?? "platform",
     userId: entry.userId ?? null,
+    tenantId: entry.tenantId ?? null,
+    sourceProjectId: entry.sourceProjectId ?? null,
     enabled: entry.enabled ?? true,
     sortOrder: entry.sortOrder ?? 0,
     deletedAt: null,

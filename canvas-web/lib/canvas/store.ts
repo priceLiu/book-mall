@@ -252,6 +252,7 @@ import {
   validateRefVideoConnection,
 } from "./ref-video-edges";
 import { validatePro2StyleAssetConnection } from "./pro2-style-asset-connect";
+import { applyPro2StyleAssetEdgeConnection } from "./pro2-spawn-style-asset";
 import {
   applyPro2StarterUnlinkAfterEdgeRemoval,
   collectPro2StarterUnlinkPatches,
@@ -1198,6 +1199,12 @@ export const useCanvasStore = create<CanvasState>()(
           connection: normalized,
           nodes: state.nodes,
           updateNodeData: (nodeId, patch) => get().updateNodeData(nodeId, patch),
+        });
+        applyPro2StyleAssetEdgeConnection({
+          connection: normalized,
+          nodes: state.nodes,
+          updateNodeData: (nodeId, patch) => get().updateNodeData(nodeId, patch),
+          getNodes: () => get().nodes,
         });
 
         const srcNode = state.nodes.find((n) => n.id === normalized.source);
