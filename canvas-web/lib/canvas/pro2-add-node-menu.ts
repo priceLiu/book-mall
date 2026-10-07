@@ -315,6 +315,14 @@ export const PRO2_ASSET_LIB_SUBMENU: Pro2AddMenuSection[] = [
   },
 ];
 
+/** 图片 / 三视图节点右侧 + · 无故事剧本、参考节点 */
+export const PRO2_IMAGE_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
+  {
+    title: "引用该节点生成",
+    items: NODE_ITEMS.filter((item) => item.id !== "script"),
+  },
+];
+
 /** 节点右侧 + · 引用该节点生成 */
 export const PRO2_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
   {

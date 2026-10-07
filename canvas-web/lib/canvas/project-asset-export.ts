@@ -11,6 +11,10 @@ import {
   pickAssetPromptFromNodeData,
   sanitizeNodeDataForAssetExport,
 } from "./project-asset-node-snapshot";
+import {
+  buildProjectAssetProvenance,
+  mergeAssetProvenanceIntoPayload,
+} from "./project-asset-provenance";
 
 export type ExportNodeContext = {
   projectId: string;
@@ -46,6 +50,7 @@ export type ExportProjectAssetDraft = {
     label?: string;
     mediaUrl: string;
     mimeType?: string | null;
+    meta?: Record<string, unknown> | null;
   }>;
 };
 
@@ -175,15 +180,49 @@ export function exportNodeToProjectAssetDraft(
   });
   if (prompt) payload.prompt = prompt;
 
+  const firstOrigin =
+    typeof d.firstOrigin === "string" ? d.firstOrigin.trim() : undefined;
+  const posterUrl =
+    str(d.posterUrl) ||
+    str(
+      d.runtime && typeof d.runtime === "object"
+        ? (d.runtime as { posterUrl?: string }).posterUrl
+        : "",
+    ) ||
+    undefined;
+
+  const provenance = buildProjectAssetProvenance({
+    kind,
+    prompt: prompt || str(payload.prompt) || str(payload.text) || "",
+    edition: ctx.edition,
+    projectId: ctx.projectId,
+    nodeId: ctx.nodeId,
+    nodeType: ctx.nodeType,
+    displayName: title,
+    primaryUrl: thumbnailUrl || undefined,
+    posterUrl,
+    firstOrigin,
+  });
+
+  const payloadWithMeta = mergeAssetProvenanceIntoPayload(payload, provenance);
+
   return {
     kind,
     displayName: title,
-    description: prompt || str(payload.markdown)?.slice(0, 200) || "",
+    description:
+      provenance.prompt || str(payload.markdown)?.slice(0, 200) || "",
     thumbnailUrl,
     sourceProjectId: ctx.projectId,
     sourceNodeId: ctx.nodeId,
     sourceEdition: ctx.edition,
-    payload,
-    refs,
+    payload: payloadWithMeta,
+    refs: refs.map((r) => ({
+      ...r,
+      meta: {
+        prompt: provenance.prompt || undefined,
+        mediaKind: provenance.media.kind,
+        slotKey: r.slotKey,
+      },
+    })),
   };
 }

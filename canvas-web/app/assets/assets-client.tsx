@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { CanvasProjectLink } from "@/components/canvas/canvas-project-link";
 import { useCallback, useEffect, useState } from "react";
 import { ExternalLink, Layers } from "lucide-react";
 
@@ -84,13 +84,13 @@ function Inner() {
           </select>
         </label>
         {selected ? (
-          <Link
-            href={`/canvas/${selected.id}`}
+          <CanvasProjectLink
+            projectId={selected.id}
             className="inline-flex items-center gap-1 rounded-md border border-cyan-400/30 px-3 py-2 text-[12px] text-cyan-100 hover:bg-cyan-500/10"
           >
             打开画布
             <ExternalLink className="size-3.5" />
-          </Link>
+          </CanvasProjectLink>
         ) : null}
       </div>
 

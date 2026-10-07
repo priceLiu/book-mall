@@ -19,8 +19,17 @@ import {
   PRO2_TEXT_NODE_MIN_WIDTH,
   PRO2_TEXT_NODE_WIDTH,
 } from "./story-pro2-node-chrome";
-import { SBV1_VIDEO_ENGINE_HEIGHT, SBV1_VIDEO_ENGINE_WIDTH } from "./sbv1-node-chrome";
-import { buildSbv1VideoEngineNodeData } from "./sbv1-spawn-nodes";
+import {
+  SBV1_IMAGE_NODE_HEIGHT,
+  SBV1_IMAGE_NODE_WIDTH,
+  SBV1_VIDEO_ENGINE_HEIGHT,
+  SBV1_VIDEO_ENGINE_WIDTH,
+} from "./sbv1-node-chrome";
+import {
+  buildSbv1ImageNodeData,
+  buildSbv1VideoEngineNodeData,
+  selectSbv1NodeAfterSpawn,
+} from "./sbv1-spawn-nodes";
 import { buildPro2AudioNodeData } from "./pro2-spawn-nodes";
 import {
   GATEWAY_MINIMAX_VIDEO_PROVIDER_ID,
@@ -425,6 +434,83 @@ export function spawnPro2ShortcutPreset(
     selectPro2NodeAfterSpawn(store.setNodes, textId);
   });
   return { groupId, focusNodeId: textId };
+}
+
+/** 空白画布快捷 · 图片 + 视频合成（图生视频） */
+export function spawnLibtvImageToVideoPreset(
+  store: SpawnStore,
+  edition: "pro2" | "sbv1",
+  anchor?: { x: number; y: number },
+): { groupId: string | null; focusNodeId: string } {
+  const preset: Pro2VideoShortcutPresetId = "image-ref-to-video";
+  const gap = 56;
+  const center = presetOrigin(anchor);
+  const imageW =
+    edition === "sbv1" ? SBV1_IMAGE_NODE_WIDTH : LIBTV_SQUARE_IMAGE_NODE_WIDTH;
+  const imageH =
+    edition === "sbv1" ? SBV1_IMAGE_NODE_HEIGHT : LIBTV_SQUARE_IMAGE_NODE_HEIGHT;
+  const videoW = SBV1_VIDEO_ENGINE_WIDTH;
+  const totalW = imageW + gap + videoW;
+  const maxH = Math.max(imageH, SBV1_VIDEO_ENGINE_HEIGHT);
+  const y = center.y - maxH / 2;
+  const imageType = edition === "sbv1" ? "sbv1-image" : "story-pro2-image";
+  const imageData =
+    edition === "sbv1"
+      ? buildSbv1ImageNodeData()
+      : buildPro2ImageNodeData({
+          label: "图片",
+          pro2PresetKind: preset,
+        });
+  const imageId = store.addNode(
+    imageType,
+    { x: center.x - totalW / 2, y: y + Math.max(0, (maxH - imageH) / 2) },
+    imageData,
+  );
+  const videoId = store.addNode(
+    "sbv1-video-engine",
+    {
+      x: center.x - totalW / 2 + imageW + gap,
+      y: y + Math.max(0, (maxH - SBV1_VIDEO_ENGINE_HEIGHT) / 2),
+    },
+    buildSbv1VideoEngineNodeData({
+      label: "视频",
+      pro2PresetKind: preset,
+    }),
+  );
+  if (!imageId || !videoId) {
+    return { groupId: null, focusNodeId: videoId || imageId };
+  }
+  store.setEdges((prev) => [
+    ...prev,
+    {
+      id: `e-${imageId}-${videoId}`,
+      source: imageId,
+      target: videoId,
+      sourceHandle: "image",
+      targetHandle: "in_ref",
+    },
+  ]);
+  const groupId = store.createGroupContaining([imageId, videoId], {
+    label: VIDEO_PRESET_LABEL[preset],
+    ...SHORTCUT_GROUP_OPTS,
+  });
+  queueMicrotask(() => {
+    relayoutShortcutPresetGroup(
+      store.setNodes,
+      groupId,
+      [
+        { id: imageId, width: imageW, height: imageH },
+        { id: videoId, width: videoW, height: SBV1_VIDEO_ENGINE_HEIGHT },
+      ],
+      gap,
+    );
+    if (edition === "sbv1") {
+      selectSbv1NodeAfterSpawn(store.setNodes, videoId);
+    } else {
+      selectPro2NodeAfterSpawn(store.setNodes, videoId);
+    }
+  });
+  return { groupId, focusNodeId: videoId };
 }
 
 type AttachStarterStore = Pick<

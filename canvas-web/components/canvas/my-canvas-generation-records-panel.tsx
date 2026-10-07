@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { CanvasProjectLink } from "@/components/canvas/canvas-project-link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -249,12 +249,12 @@ function RecordRow({
           {isOtherProject && targetProjectId ? (
             <p className="mt-1 text-[10px] text-white/35">
               位于其他画布 ·{" "}
-              <Link
-                href={`/canvas/${targetProjectId}`}
+              <CanvasProjectLink
+                projectId={targetProjectId}
                 className="text-white/75 hover:underline"
               >
                 打开画布
-              </Link>
+              </CanvasProjectLink>
             </p>
           ) : null}
         </div>

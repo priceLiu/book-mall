@@ -11,6 +11,7 @@ import {
 } from "./sbv1-add-node-menu";
 import {
   PRO2_IMAGE_LEFT_ADD_MENU,
+  PRO2_IMAGE_RIGHT_ADD_MENU,
   PRO2_RIGHT_ADD_MENU,
   PRO2_STARTER_LEFT_ADD_MENU,
   PRO2_STYLE_ASSET_RIGHT_MENU,
@@ -73,7 +74,7 @@ export function resolveLibtvSideConnectMenu(
     case "story-pro2-three-view":
       return side === "left"
         ? PRO2_IMAGE_LEFT_ADD_MENU
-        : PRO2_RIGHT_ADD_MENU;
+        : PRO2_IMAGE_RIGHT_ADD_MENU;
     case "story-pro2-style-asset":
       return side === "left"
         ? PRO2_IMAGE_LEFT_ADD_MENU

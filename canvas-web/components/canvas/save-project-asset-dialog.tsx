@@ -13,6 +13,12 @@ import {
 } from "@/lib/canvas/project-asset-kind-map";
 import type { AssetVisibility, ProjectAssetKind } from "@/lib/canvas/project-asset-types";
 import { PROJECT_ASSET_SHARE_SCOPE_OPTIONS } from "@/lib/canvas/project-asset-share-scope";
+import {
+  formatProjectAssetSourceLabel,
+  pickPromptFromAssetPayload,
+  readProjectAssetProvenance,
+} from "@/lib/canvas/project-asset-provenance";
+import { isProjectAssetVideoUrl } from "@/lib/canvas/project-asset-preview";
 import { notifyProjectAssetsChanged } from "@/lib/canvas/use-project-assets";
 import { ProjectAssetMediaPreviewGrid } from "./project-asset-grid-card";
 
@@ -20,6 +26,51 @@ const VISIBILITY_KEY = "canvas.projectAsset.visibility";
 const SCOPE_KEY = "canvas.projectAsset.scope";
 
 const SAVE_ASSET_OPEN_EVENT = "canvas:open-save-project-asset";
+
+function formatLocalDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function SaveAssetPrimaryPreview({
+  url,
+  label,
+  mimeType,
+}: {
+  url: string;
+  label: string;
+  mimeType?: string | null;
+}) {
+  const isVideo = isProjectAssetVideoUrl(url, mimeType);
+  return (
+    <div className="flex min-h-0 flex-1 items-center justify-center rounded-xl bg-black/45 p-3">
+      {isVideo ? (
+        <video
+          src={url}
+          className="max-h-[min(52vh,520px)] max-w-full object-contain"
+          controls
+          playsInline
+          preload="metadata"
+        />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element -- blob/OSS 预览
+        <img
+          src={url}
+          alt={label}
+          className="max-h-[min(52vh,520px)] max-w-full object-contain"
+          referrerPolicy="no-referrer"
+        />
+      )}
+    </div>
+  );
+}
 
 type SaveProjectAssetDialogProps = {
   open: boolean;
@@ -117,6 +168,16 @@ export function SaveProjectAssetDialog({
 
   if (!open || !draft) return null;
 
+  const provenance = readProjectAssetProvenance(draft.payload);
+  const promptPreview = pickPromptFromAssetPayload(draft.payload, draft.description);
+  const sourceLabel = formatProjectAssetSourceLabel(
+    provenance,
+    draft.sourceEdition,
+  );
+  const savedAtPreview = provenance?.savedAtClient
+    ? formatLocalDateTime(provenance.savedAtClient)
+    : formatLocalDateTime(new Date().toISOString());
+
   const previewItems = collectProjectAssetDraftPreviewItems({
     kind: draft.kind,
     displayName: draft.displayName,
@@ -138,13 +199,50 @@ export function SaveProjectAssetDialog({
     mimeType: item.mimeType,
   }));
 
+  const primaryPreviewUrl =
+    previewItems[0]?.url?.trim() ||
+    draft.thumbnailUrl?.trim() ||
+    draft.refs[0]?.mediaUrl?.trim() ||
+    "";
+
   const dialog = (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div
-        className="w-full max-w-md rounded-2xl border border-white/10 bg-[#1c1c1e] p-5 shadow-2xl"
+        className="flex max-h-[min(92vh,720px)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#1c1c1e] shadow-2xl md:flex-row"
         role="dialog"
         aria-modal
       >
+        <aside className="flex min-h-[200px] shrink-0 flex-col border-b border-white/10 bg-[#141414] md:w-[min(42%,380px)] md:border-b-0 md:border-r">
+          <div className="border-b border-white/10 px-4 py-3">
+            <p className="text-xs font-medium text-white/85">预览</p>
+            <p className="mt-0.5 text-[10px] text-white/45">
+              {PROJECT_ASSET_KIND_LABELS[kind]}
+            </p>
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col p-3">
+            {primaryPreviewUrl ? (
+              <SaveAssetPrimaryPreview
+                url={primaryPreviewUrl}
+                label={name || draft.displayName}
+                mimeType={previewItems[0]?.mimeType ?? draft.refs[0]?.mimeType}
+              />
+            ) : (
+              <p className="flex flex-1 items-center justify-center text-sm text-white/40">
+                暂无媒体预览
+              </p>
+            )}
+            {previewItems.length >= 2 ? (
+              <div className="mt-2 max-h-24 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black/30 p-1.5">
+                <ProjectAssetMediaPreviewGrid items={previewItems} />
+                <p className="mt-1 text-center text-[10px] text-white/40">
+                  组内 {previewItems.length} 项
+                </p>
+              </div>
+            ) : null}
+          </div>
+        </aside>
+
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-5">
         <h2 className="text-base font-semibold text-white">保存为资产</h2>
         <p className="mt-1 text-xs text-white/50">写入统一项目资产库，三版画布共用。</p>
 
@@ -223,18 +321,25 @@ export function SaveProjectAssetDialog({
           </fieldset>
         ) : null}
 
-        {previewItems.length > 0 ? (
-          <div className="mt-3 overflow-hidden rounded-lg border border-white/10 bg-black/30 p-2">
-            <div className="mx-auto aspect-square w-full max-w-[240px] overflow-hidden rounded-md bg-black/40">
-              <ProjectAssetMediaPreviewGrid items={previewItems} />
-            </div>
-            {previewItems.length >= 2 ? (
-              <p className="mt-1.5 text-center text-[10px] text-white/40">
-                组内 {previewItems.length} 项预览
-              </p>
-            ) : null}
+        <div className="mt-4 space-y-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-[11px]">
+          <div className="flex gap-2">
+            <span className="w-16 shrink-0 text-white/45">提示词</span>
+            <span className="min-w-0 flex-1 whitespace-pre-wrap text-white/80">
+              {promptPreview.trim() || "（无 · 可在节点 Dock 填写后再保存）"}
+            </span>
           </div>
-        ) : null}
+          <div className="flex gap-2">
+            <span className="w-16 shrink-0 text-white/45">来源</span>
+            <span className="min-w-0 flex-1 text-white/80">{sourceLabel}</span>
+          </div>
+          <div className="flex gap-2">
+            <span className="w-16 shrink-0 text-white/45">保存时间</span>
+            <span className="min-w-0 flex-1 text-white/80">
+              {savedAtPreview}
+              <span className="text-white/40"> · 确认后以服务器时间为准</span>
+            </span>
+          </div>
+        </div>
 
         <div className="mt-5 flex justify-end gap-2">
           <button
@@ -253,6 +358,7 @@ export function SaveProjectAssetDialog({
           >
             {busy ? "保存中…" : "确认保存"}
           </button>
+        </div>
         </div>
       </div>
     </div>

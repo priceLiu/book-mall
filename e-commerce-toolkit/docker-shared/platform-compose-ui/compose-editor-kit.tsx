@@ -1213,7 +1213,7 @@ function useComposeProgramVideoPlayback({
         playheadUiSyncMsRef.current = 0;
         setProgramPlayheadSec(programPlayheadSecRef.current);
       } else if (
-        v.currentTime < srcStart - 0.02 ||
+        v.currentTime < srcStart - 0.008 ||
         v.currentTime > effectiveSrcEnd + 0.02
       ) {
         syncProgramVideoElementToHit(v, hit, durationHints, { force: true });

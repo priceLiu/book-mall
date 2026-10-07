@@ -20,6 +20,7 @@ import {
   type PortalCaseProjectSummary,
   type PortalFeaturedProjectSummary,
 } from "@/lib/canvas-api";
+import { assignCanvasProjectLocation } from "@/lib/canvas/canvas-project-navigation";
 import {
   canvasListCoverPropsFromProject,
   canvasListCoverPropsFromTemplate,
@@ -186,7 +187,7 @@ export function PortalDiscoverySection() {
           name: `${tpl.name} 画布`,
           canvas: cloneGraphForNewProject(graph),
         });
-        window.location.href = `/canvas/${created.id}`;
+        assignCanvasProjectLocation(created.id);
       } catch (e) {
         setError(e instanceof Error ? e.message : "复制失败");
         setForkingId(null);
@@ -202,7 +203,7 @@ export function PortalDiscoverySection() {
       setError(null);
       try {
         const created = await duplicatePortalFeaturedProject(base, item.id);
-        window.location.href = `/canvas/${created.id}`;
+        assignCanvasProjectLocation(created.id);
       } catch (e) {
         setError(e instanceof Error ? e.message : "复制失败");
         setForkingId(null);
@@ -218,7 +219,7 @@ export function PortalDiscoverySection() {
       setError(null);
       try {
         const created = await duplicatePortalCaseProject(base, item.id);
-        window.location.href = `/canvas/${created.id}`;
+        assignCanvasProjectLocation(created.id);
       } catch (e) {
         setError(e instanceof Error ? e.message : "复制失败");
         setForkingId(null);
@@ -233,7 +234,7 @@ export function PortalDiscoverySection() {
 
       if (item.kind === "featured" && item.featuredProject) {
         if (own) {
-          window.location.href = `/canvas/${item.featuredProject.id}`;
+          assignCanvasProjectLocation(item.featuredProject.id);
           return;
         }
         setPreview({ kind: "featured", item: item.featuredProject });
@@ -242,7 +243,7 @@ export function PortalDiscoverySection() {
 
       if (item.kind === "case" && item.caseProject) {
         if (own) {
-          window.location.href = `/canvas/${item.caseProject.id}`;
+          assignCanvasProjectLocation(item.caseProject.id);
           return;
         }
         setPreview({ kind: "case", item: item.caseProject });

@@ -7,6 +7,7 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { CanvasListCover } from "@/components/canvas/canvas-list-cover";
 import { usePortalHome } from "@/components/home/portal-home-context";
 import { createPro2BlankCanvasProject } from "@/lib/canvas/create-pro2-blank-project";
+import { assignCanvasProjectLocation } from "@/lib/canvas/canvas-project-navigation";
 import {
   duplicatePortalFeaturedProject,
   type PortalFeaturedProjectSummary,
@@ -214,7 +215,7 @@ export function PortalHeroSection() {
     setError(null);
     try {
       const { id } = await createPro2BlankCanvasProject(base);
-      window.location.href = `/canvas/${id}`;
+      assignCanvasProjectLocation(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "创建失败");
       setStarting(false);
@@ -231,7 +232,7 @@ export function PortalHeroSection() {
       setError(null);
       try {
         const created = await duplicatePortalFeaturedProject(base, item.id);
-        window.location.href = `/canvas/${created.id}`;
+        assignCanvasProjectLocation(created.id);
       } catch (e) {
         setError(e instanceof Error ? e.message : "复制失败");
         setCopyingId(null);

@@ -170,6 +170,7 @@ import { LibtvAudioInputDock } from "./libtv-audio-input-dock";
 import { Sbv1VideoEngineFloatingDock } from "./sbv1/sbv1-video-engine-floating-dock";
 import { LibtvVideoClipEditorFloatingDock } from "./libtv-video-clip-editor-dock";
 import { LibtvVideoComposeTrimPanel } from "./libtv-video-compose-trim-panel";
+import { LibtvCanvasEmptyPaneHint } from "./libtv-canvas-empty-pane-hint";
 import { JianyingAutoRenderFloatingDock } from "./pro2/jianying-auto-render-floating-dock";
 import { Pro2ThreeViewInputDock } from "./pro2/pro2-three-view-input-dock";
 import { Pro2TextNodeOutlineEditorHost } from "./pro2/pro2-text-node-outline-editor-host";
@@ -196,6 +197,10 @@ import { CanvasSnapGuidesOverlay } from "./canvas-snap-guides-overlay";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { PRO2_TOOLBAR_ADD_MENU } from "@/lib/canvas/pro2-add-node-menu";
 import { handlePro2ToolbarAddNodePick } from "@/lib/canvas/pro2-add-node-pick";
+import {
+  runLibtvCanvasEmptyShortcut,
+  type LibtvCanvasEmptyShortcutId,
+} from "@/lib/canvas/libtv-canvas-empty-shortcuts";
 import { Pro2AddNodePopover } from "./pro2/pro2-add-node-popover";
 import { openPlatformAssetHub } from "@/components/canvas/platform-asset-hub/platform-asset-hub-host";
 import { useGlobalAssetLibrary } from "@/docker-shared/global-asset-library";
@@ -383,6 +388,7 @@ function FlowCanvasInner({
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
+  const createGroupContaining = useCanvasStore((s) => s.createGroupContaining);
   const openPro2TextOutlineEditor = useCanvasStore(
     (s) => s.openPro2TextOutlineEditor,
   );
@@ -552,6 +558,26 @@ function FlowCanvasInner({
       setPaneAddMenu(anchor);
     },
     [closePaneMenu, clearCanvasPaneSelection],
+  );
+
+  const onEmptyCanvasShortcut = useCallback(
+    (id: LibtvCanvasEmptyShortcutId) => {
+      void runLibtvCanvasEmptyShortcut(
+        id,
+        sbv1Canvas ? "sbv1" : "pro2",
+        { addNode, setNodes, setEdges, createGroupContaining },
+        { alert, confirm },
+      );
+    },
+    [
+      sbv1Canvas,
+      addNode,
+      setNodes,
+      setEdges,
+      createGroupContaining,
+      alert,
+      confirm,
+    ],
   );
 
   /** RF 无 onPaneDoubleClick；空白 pane 双击弹出添加节点菜单（同底部 Dock +） */
@@ -2797,6 +2823,9 @@ function FlowCanvasInner({
         <LibtvSideConnectLayer />
       </ReactFlow>
       </CanvasEdgeFocusProvider>
+      {(pro2FloatingInspector || sbv1Canvas) && storeNodes.length === 0 ? (
+        <LibtvCanvasEmptyPaneHint onShortcut={onEmptyCanvasShortcut} />
+      ) : null}
       {enableDragSnapGuides ? (
         <CanvasSnapGuidesOverlay guides={snapGuides} />
       ) : null}

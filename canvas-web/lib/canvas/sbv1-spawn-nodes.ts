@@ -618,6 +618,7 @@ export async function handleSbv1SideAddNodePick(
     itemId === "video" ||
     itemId === "video-engine" ||
     itemId === "video-compose" ||
+    itemId === "video-to-prompt" ||
     itemId === "export" ||
     itemId === "style-asset" ||
     (itemId === "image" && nodeType === "sbv1-image") ||

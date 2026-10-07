@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { exportNodeToProjectAssetDraft } from "@/lib/canvas/project-asset-export";
+import { readProjectAssetProvenance } from "@/lib/canvas/project-asset-provenance";
 import {
   collectProjectAssetMediaItems,
   mediaUrlFromNodeData,
@@ -122,16 +123,36 @@ describe("project-asset-export", () => {
       "CHARACTER",
     );
     expect(draft.thumbnailUrl).toBe("https://cdn.example.com/tv.png");
-    expect(draft.refs).toEqual([
-      {
-        slotKey: "three_view",
-        mediaUrl: "https://cdn.example.com/tv.png",
-      },
-    ]);
+    expect(draft.refs[0]).toMatchObject({
+      slotKey: "three_view",
+      mediaUrl: "https://cdn.example.com/tv.png",
+      meta: { mediaKind: "image", prompt: "少年剑客，黑发" },
+    });
     expect(draft.payload.nodeSnapshot).toMatchObject({
       label: "李诚",
       ossUrl: "https://cdn.example.com/tv.png",
       dockInput: "少年剑客，黑发",
     });
+  });
+
+  it("embeds assetProvenance for sbv1 pasted video", () => {
+    const draft = exportNodeToProjectAssetDraft({
+      projectId: "proj-2",
+      edition: "sbv1",
+      nodeId: "node-v",
+      nodeType: "sbv1-video-engine",
+      data: {
+        label: "成片",
+        prompt: "镜头推进",
+        runtime: {
+          status: "done",
+          ossUrl: "https://cdn.example.com/v.mp4",
+        },
+      },
+    });
+    expect(draft.kind).toBe("STORYBOARD_VIDEO");
+    const prov = readProjectAssetProvenance(draft.payload);
+    expect(prov?.media.kind).toBe("video");
+    expect(prov?.prompt).toContain("镜头推进");
   });
 });

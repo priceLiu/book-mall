@@ -26,6 +26,7 @@ import {
   enrichAssetMediaDisplay,
   resolveAssetMediaUrl,
 } from "./project-asset-media-resolve";
+import { stampProjectAssetProvenanceOnCreate } from "./project-asset-provenance";
 
 export class ProjectAssetError extends Error {
   constructor(
@@ -326,7 +327,7 @@ export async function createProjectAsset(
     throw new ProjectAssetError("INVALID_INPUT", "名称不能为空");
   }
 
-  const payload = input.payload ?? {};
+  const payload = stampProjectAssetProvenanceOnCreate(input.payload ?? {});
   assertPayloadSize(payload);
 
   const visibility = normalizeVisibility(ctx, input.visibility);

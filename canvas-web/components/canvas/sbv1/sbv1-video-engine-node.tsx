@@ -89,6 +89,7 @@ import {
   libtvMediaReversePromptFailureMessage,
   runLibtvMediaReversePromptFromNode,
 } from "@/lib/canvas/libtv-media-reverse-prompt";
+import { libtvNodeHttpsMediaUrlForLlm } from "@/lib/canvas/pro2-starter-dock-send";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import {
   libtvVideoTrackSplitSourceReady,
@@ -493,8 +494,221 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     [nodes, edges, addNode, addNodeInGroup, setNodes, setEdges],
   );
 
+  const onDuplicateNode = useCallback(() => {
+    const newId = duplicateNode(id, { preserveContent: true });
+    if (newId) {
+      selectLibtvNodeAfterDuplicate(rfSetNodes, newId, "sbv1-video-engine");
+    }
+  }, [duplicateNode, id, rfSetNodes]);
+
+  const trackSplitSourceUrl = useMemo(
+    () => libtvVideoTrackSplitSourceReady({ runtime: d.runtime ?? rowRuntime }),
+    [d.runtime, rowRuntime],
+  );
+
+  const latestTaskMediaUrl =
+    pickTaskResultMediaUrl(latestSucceeded ?? {}) ??
+    latestSucceeded?.ossUrl ??
+    undefined;
+  const videoEditSourceUrl = useMemo(
+    () =>
+      resolveLibtvVideoEditSourceUrl({
+        ossUrl: d.ossUrl,
+        runtime: d.runtime ?? rowRuntime,
+        fallbackTaskMediaUrl: latestTaskMediaUrl,
+      }),
+    [d.ossUrl, d.runtime, rowRuntime, latestTaskMediaUrl],
+  );
+
+  const [frameExtractBusy, setFrameExtractBusy] = useState(false);
+  const [subtitleExtractBusy, setSubtitleExtractBusy] = useState(false);
+
+  const onReversePrompt = useCallback(() => {
+    if (reversePromptBusy || !hasVideo) return;
+    setReversePromptBusy(true);
+    try {
+      if (
+        isPro2VideoBoardCell &&
+        videoUrl &&
+        /^https?:\/\//i.test(videoUrl) &&
+        !libtvNodeHttpsMediaUrlForLlm(
+          nodes.find((n) => n.id === id) ?? {
+            id,
+            type: "sbv1-video-engine",
+            position: { x: 0, y: 0 },
+            data: d,
+          },
+        )
+      ) {
+        updateNodeData(id, {
+          runtime: {
+            ...(d.runtime ?? {}),
+            status: "done",
+            ossUrl: videoUrl,
+          },
+        });
+      }
+      const liveNodes = useCanvasStore.getState().nodes;
+      const result = runLibtvMediaReversePromptFromNode(id, {
+        nodes: liveNodes,
+        addNode,
+        setNodes,
+        setEdges,
+        updateNodeData,
+      }, providers);
+      if (!result.ok) {
+        const { title, message } = libtvMediaReversePromptFailureMessage(
+          result.reason,
+        );
+        void alert({ title, message, variant: "warning" });
+      }
+    } finally {
+      setReversePromptBusy(false);
+    }
+  }, [
+    reversePromptBusy,
+    hasVideo,
+    isPro2VideoBoardCell,
+    videoUrl,
+    d,
+    id,
+    nodes,
+    addNode,
+    setNodes,
+    setEdges,
+    updateNodeData,
+    providers,
+    alert,
+  ]);
+
+  const onTrackSplitPick = useCallback(
+    (mode: LibtvVideoTrackSplitMode) => {
+      if (!trackSplitSourceUrl || trackSplitBusy) return;
+      setTrackSplitBusy(true);
+      void runLibtvVideoTrackSplit({
+        mode,
+        sourceNodeId: id,
+        sourceVideoUrl: trackSplitSourceUrl,
+        projectId,
+        store: spawnStore,
+        updateNodeData: (nodeId, patch) => updateNodeData(nodeId, patch),
+      })
+        .catch(async (e) => {
+          const message = e instanceof Error ? e.message : "处理失败";
+          await alert({
+            title: mode === "strip-audio" ? "去原音失败" : "音频分离失败",
+            message,
+            variant: "error",
+          });
+        })
+        .finally(() => {
+          setTrackSplitBusy(false);
+        });
+    },
+    [
+      alert,
+      id,
+      projectId,
+      spawnStore,
+      trackSplitBusy,
+      trackSplitSourceUrl,
+      updateNodeData,
+    ],
+  );
+
+  const onOpenTrimEditor = useCallback(() => {
+    if (!videoEditSourceUrl || frameExtractBusy) return;
+    updateNodeData(id, {
+      videoEditSession: { open: true, mode: "compose-trim" },
+    });
+  }, [
+    videoEditSourceUrl,
+    frameExtractBusy,
+    id,
+    updateNodeData,
+  ]);
+
+  const onFrameExtractPick = useCallback(
+    (pick: "first" | "last" | "custom") => {
+      if (!videoEditSourceUrl || frameExtractBusy) return;
+      if (pick === "custom") {
+        updateNodeData(id, {
+          videoEditSession: { open: true, mode: "pick-frame" },
+        });
+        return;
+      }
+      setFrameExtractBusy(true);
+      void runLibtvVideoFrameExtract({
+        mode: pick,
+        sourceNodeId: id,
+        sourceVideoUrl: videoEditSourceUrl,
+        projectId,
+        store: spawnStore,
+        updateNodeData: (nodeId, patch) => updateNodeData(nodeId, patch),
+      })
+        .catch(async (e) => {
+          const message = e instanceof Error ? e.message : "截帧失败";
+          await alert({
+            title: pick === "first" ? "首帧导出失败" : "尾帧导出失败",
+            message,
+            variant: "error",
+          });
+        })
+        .finally(() => {
+          setFrameExtractBusy(false);
+        });
+    },
+    [
+      alert,
+      frameExtractBusy,
+      id,
+      projectId,
+      spawnStore,
+      updateNodeData,
+      videoEditSourceUrl,
+    ],
+  );
+
+  const onExtractSubtitles = useCallback(() => {
+    if (!videoEditSourceUrl || subtitleExtractBusy || frameExtractBusy) {
+      return;
+    }
+    setSubtitleExtractBusy(true);
+    void runLibtvVideoSubtitleExtract({
+      sourceNodeId: id,
+      sourceVideoUrl: videoEditSourceUrl,
+      projectId,
+      store: spawnStore,
+      updateNodeData: (nodeId, patch) => updateNodeData(nodeId, patch),
+    })
+      .catch(async (e) => {
+        const message = e instanceof Error ? e.message : "提取字幕失败";
+        await alert({
+          title: libtvRuntimeErrorAlertTitle("VIDEO_SUBTITLE_EXTRACT", message),
+          message,
+          variant: "error",
+        });
+      })
+      .finally(() => {
+        setSubtitleExtractBusy(false);
+      });
+  }, [
+    alert,
+    frameExtractBusy,
+    id,
+    projectId,
+    spawnStore,
+    subtitleExtractBusy,
+    updateNodeData,
+    videoEditSourceUrl,
+  ]);
+
   const onSidePick = useCallback(
     (side: "left" | "right") => (itemId: string, nodeType?: string) => {
+      if (side === "right" && itemId === "video-to-prompt") {
+        onReversePrompt();
+        return;
+      }
       void handleSbv1SideAddNodePick(
         itemId,
         nodeType,
@@ -561,6 +775,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           if (
             side === "right" &&
             (itemId === "video" ||
+              itemId === "hd-video" ||
               itemId === "video-engine" ||
               itemId === "video-compose" ||
               nodeType === "sbv1-video-engine")
@@ -575,202 +790,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
         },
       );
     },
-    [id, spawnStore, alert],
+    [id, spawnStore, alert, onReversePrompt],
   );
-
-  const onDuplicateNode = useCallback(() => {
-    const newId = duplicateNode(id, { preserveContent: true });
-    if (newId) {
-      selectLibtvNodeAfterDuplicate(rfSetNodes, newId, "sbv1-video-engine");
-    }
-  }, [duplicateNode, id, rfSetNodes]);
-
-  const trackSplitSourceUrl = useMemo(
-    () => libtvVideoTrackSplitSourceReady({ runtime: d.runtime ?? rowRuntime }),
-    [d.runtime, rowRuntime],
-  );
-
-  const latestTaskMediaUrl =
-    pickTaskResultMediaUrl(latestSucceeded ?? {}) ??
-    latestSucceeded?.ossUrl ??
-    undefined;
-  const videoEditSourceUrl = useMemo(
-    () =>
-      resolveLibtvVideoEditSourceUrl({
-        ossUrl: d.ossUrl,
-        runtime: d.runtime ?? rowRuntime,
-        fallbackTaskMediaUrl: latestTaskMediaUrl,
-      }),
-    [d.ossUrl, d.runtime, rowRuntime, latestTaskMediaUrl],
-  );
-
-  const [frameExtractBusy, setFrameExtractBusy] = useState(false);
-  const [subtitleExtractBusy, setSubtitleExtractBusy] = useState(false);
-
-  const onReversePrompt = useCallback(() => {
-    if (reversePromptBusy || !hasVideo || isPro2VideoBoardCell) return;
-    setReversePromptBusy(true);
-    try {
-      const result = runLibtvMediaReversePromptFromNode(id, {
-        nodes,
-        addNode,
-        setNodes,
-        setEdges,
-        updateNodeData,
-      }, providers);
-      if (!result.ok) {
-        const { title, message } = libtvMediaReversePromptFailureMessage(
-          result.reason,
-        );
-        void alert({ title, message, variant: "warning" });
-      }
-    } finally {
-      setReversePromptBusy(false);
-    }
-  }, [
-    reversePromptBusy,
-    hasVideo,
-    isPro2VideoBoardCell,
-    id,
-    nodes,
-    addNode,
-    setNodes,
-    setEdges,
-    updateNodeData,
-    providers,
-    alert,
-  ]);
-
-  const onTrackSplitPick = useCallback(
-    (mode: LibtvVideoTrackSplitMode) => {
-      if (!trackSplitSourceUrl || trackSplitBusy || isPro2VideoBoardCell) return;
-      setTrackSplitBusy(true);
-      void runLibtvVideoTrackSplit({
-        mode,
-        sourceNodeId: id,
-        sourceVideoUrl: trackSplitSourceUrl,
-        projectId,
-        store: spawnStore,
-        updateNodeData: (nodeId, patch) => updateNodeData(nodeId, patch),
-      })
-        .catch(async (e) => {
-          const message = e instanceof Error ? e.message : "处理失败";
-          await alert({
-            title: mode === "strip-audio" ? "去原音失败" : "音频分离失败",
-            message,
-            variant: "error",
-          });
-        })
-        .finally(() => {
-          setTrackSplitBusy(false);
-        });
-    },
-    [
-      alert,
-      id,
-      isPro2VideoBoardCell,
-      projectId,
-      spawnStore,
-      trackSplitBusy,
-      trackSplitSourceUrl,
-      updateNodeData,
-    ],
-  );
-
-  const onOpenTrimEditor = useCallback(() => {
-    if (!videoEditSourceUrl || frameExtractBusy || isPro2VideoBoardCell) return;
-    updateNodeData(id, {
-      videoEditSession: { open: true, mode: "compose-trim" },
-    });
-  }, [
-    videoEditSourceUrl,
-    frameExtractBusy,
-    isPro2VideoBoardCell,
-    id,
-    updateNodeData,
-  ]);
-
-  const onFrameExtractPick = useCallback(
-    (pick: "first" | "last" | "custom") => {
-      if (!videoEditSourceUrl || frameExtractBusy || isPro2VideoBoardCell) return;
-      if (pick === "custom") {
-        updateNodeData(id, {
-          videoEditSession: { open: true, mode: "pick-frame" },
-        });
-        return;
-      }
-      setFrameExtractBusy(true);
-      void runLibtvVideoFrameExtract({
-        mode: pick,
-        sourceNodeId: id,
-        sourceVideoUrl: videoEditSourceUrl,
-        projectId,
-        store: spawnStore,
-        updateNodeData: (nodeId, patch) => updateNodeData(nodeId, patch),
-      })
-        .catch(async (e) => {
-          const message = e instanceof Error ? e.message : "截帧失败";
-          await alert({
-            title: pick === "first" ? "首帧导出失败" : "尾帧导出失败",
-            message,
-            variant: "error",
-          });
-        })
-        .finally(() => {
-          setFrameExtractBusy(false);
-        });
-    },
-    [
-      alert,
-      frameExtractBusy,
-      id,
-      isPro2VideoBoardCell,
-      projectId,
-      spawnStore,
-      updateNodeData,
-      videoEditSourceUrl,
-    ],
-  );
-
-  const onExtractSubtitles = useCallback(() => {
-    if (
-      !videoEditSourceUrl ||
-      subtitleExtractBusy ||
-      frameExtractBusy ||
-      isPro2VideoBoardCell
-    ) {
-      return;
-    }
-    setSubtitleExtractBusy(true);
-    void runLibtvVideoSubtitleExtract({
-      sourceNodeId: id,
-      sourceVideoUrl: videoEditSourceUrl,
-      projectId,
-      store: spawnStore,
-      updateNodeData: (nodeId, patch) => updateNodeData(nodeId, patch),
-    })
-      .catch(async (e) => {
-        const message = e instanceof Error ? e.message : "提取字幕失败";
-        await alert({
-          title: libtvRuntimeErrorAlertTitle("VIDEO_SUBTITLE_EXTRACT", message),
-          message,
-          variant: "error",
-        });
-      })
-      .finally(() => {
-        setSubtitleExtractBusy(false);
-      });
-  }, [
-    alert,
-    frameExtractBusy,
-    id,
-    isPro2VideoBoardCell,
-    projectId,
-    spawnStore,
-    subtitleExtractBusy,
-    updateNodeData,
-    videoEditSourceUrl,
-  ]);
 
   const isLinked = useMemo(
     () => libtvVideoEngineNodeIsLinked(id, edges),
@@ -883,15 +904,9 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
               trackSplitBusy={trackSplitBusy}
               videoEditSourceUrl={videoEditSourceUrl}
               frameExtractBusy={frameExtractBusy}
-              onTrackSplitPick={
-                isPro2VideoBoardCell ? undefined : onTrackSplitPick
-              }
-              onFrameExtractPick={
-                isPro2VideoBoardCell ? undefined : onFrameExtractPick
-              }
-              onOpenTrimEditor={
-                isPro2VideoBoardCell ? undefined : onOpenTrimEditor
-              }
+              onTrackSplitPick={onTrackSplitPick}
+              onFrameExtractPick={onFrameExtractPick}
+              onOpenTrimEditor={onOpenTrimEditor}
               onExpandPreview={() => setPreviewOpen(true)}
               onSaveAsAsset={
                 hasVideo
@@ -904,13 +919,9 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                   : undefined
               }
               onDuplicateNode={onDuplicateNode}
-              onReversePrompt={
-                hasVideo && !isPro2VideoBoardCell ? onReversePrompt : undefined
-              }
+              onReversePrompt={hasVideo ? onReversePrompt : undefined}
               reversePromptBusy={reversePromptBusy}
-              onExtractSubtitles={
-                isPro2VideoBoardCell ? undefined : onExtractSubtitles
-              }
+              onExtractSubtitles={onExtractSubtitles}
               subtitleExtractBusy={subtitleExtractBusy}
             />
           </LibtvNodeToolbarPortal>

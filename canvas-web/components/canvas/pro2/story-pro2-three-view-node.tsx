@@ -16,6 +16,7 @@ import {
 } from "@/lib/canvas/libtv-side-spawn";
 import {
   PRO2_IMAGE_LEFT_ADD_MENU,
+  PRO2_IMAGE_RIGHT_ADD_MENU,
   PRO2_RIGHT_ADD_MENU,
 } from "@/lib/canvas/pro2-add-node-menu";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -240,7 +241,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
           visible={showSidePlus}
           size={LIBTV_NODE_SIDE_PLUS_SIZE}
           className={LIBTV_NODE_SIDE_PLUS_LAYER_CLASS}
-          sections={PRO2_RIGHT_ADD_MENU}
+          sections={PRO2_IMAGE_RIGHT_ADD_MENU}
           onPick={onSidePick("right")}
         />
 

@@ -8,11 +8,13 @@ export function isPlatformDockMentionId(id: string): boolean {
   return id.startsWith("cam:");
 }
 
-/** 输入坞 · 上游 chip + 粘贴参考图 + 项目资产 + 平台镜头描述 → @ 列表 */
+/**
+ * @ 引用弹层：暂仅展示已连线的上游节点（资产 / 坞内参考图 / 平台镜头库后续再接）。
+ */
 export function buildPro2DockMentionables(
   upstreamLinks: Pro2DockUpstreamLink[],
-  dockRefImages: StoryRefImage[] = [],
-  libraryAssets: ProjectAssetRecord[] = [],
+  _dockRefImages: StoryRefImage[] = [],
+  _libraryAssets: ProjectAssetRecord[] = [],
 ): MentionableItem[] {
   const items: MentionableItem[] = [];
   const seen = new Set<string>();
@@ -38,6 +40,18 @@ export function buildPro2DockMentionables(
       });
     }
   }
+
+  return items;
+}
+
+/** 恢复资产 / 坞内参考 / 平台镜头 @ 时复用 */
+export function buildPro2DockMentionablesExtended(
+  upstreamLinks: Pro2DockUpstreamLink[],
+  dockRefImages: StoryRefImage[] = [],
+  libraryAssets: ProjectAssetRecord[] = [],
+): MentionableItem[] {
+  const items = buildPro2DockMentionables(upstreamLinks);
+  const seen = new Set(items.map((i) => i.id));
 
   for (const ref of dockRefImages) {
     if (!ref.id || seen.has(ref.id)) continue;

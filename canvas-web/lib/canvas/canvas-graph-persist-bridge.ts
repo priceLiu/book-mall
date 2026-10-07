@@ -13,10 +13,13 @@ export {
 type FlushFn = (force?: boolean) => Promise<void>;
 type DeltaPersistFn = (delta: CanvasDeltaPatch) => Promise<boolean>;
 type DirtyFn = () => boolean;
+/** 离开画布：若返回 true 表示已丢弃空白新建项目，无需再 flush */
+type LeaveProjectFn = () => Promise<boolean>;
 
 let flushFn: FlushFn | null = null;
 let deltaPersistFn: DeltaPersistFn | null = null;
 let dirtyFn: DirtyFn | null = null;
+let leaveProjectFn: LeaveProjectFn | null = null;
 
 export function registerCanvasGraphPersistFlush(fn: FlushFn | null): void {
   flushFn = fn;
@@ -24,6 +27,16 @@ export function registerCanvasGraphPersistFlush(fn: FlushFn | null): void {
 
 export function registerCanvasGraphDirtyCheck(fn: DirtyFn | null): void {
   dirtyFn = fn;
+}
+
+export function registerCanvasLeaveProject(fn: LeaveProjectFn | null): void {
+  leaveProjectFn = fn;
+}
+
+/** 工具栏「回到画布列表」等离开场景 */
+export async function runCanvasLeaveProject(): Promise<boolean> {
+  if (!leaveProjectFn) return false;
+  return leaveProjectFn();
 }
 
 export function isCanvasGraphDirty(): boolean {

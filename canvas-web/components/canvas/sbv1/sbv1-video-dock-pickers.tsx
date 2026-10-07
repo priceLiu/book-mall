@@ -246,6 +246,16 @@ export function Sbv1VideoDockModelPicker({
   const { fontPx, minHeightPx, chevronPx } = useLibtvDockToolbarMetrics();
   const models = useMemo(() => {
     const all = collectSbv1DockVideoModels(providers);
+    const nRefs = Math.max(0, Math.floor(refLinkCount));
+    if (nRefs > 0) {
+      return all.filter(
+        (e) =>
+          !resolveSbv1VideoModelRefLinkBlock({
+            modelKey: e.model.modelKey,
+            refLinkCount: nRefs,
+          }).blocked,
+      );
+    }
     const keys = [
       ...modelKeysForTemplate(catalog, "i2v"),
       ...modelKeysForTemplate(catalog, "t2v"),
@@ -255,7 +265,7 @@ export function Sbv1VideoDockModelPicker({
     const set = new Set(keys.map((k) => k.toLowerCase()));
     const filtered = all.filter((e) => set.has(e.model.modelKey.toLowerCase()));
     return filtered.length > 0 ? filtered : all;
-  }, [providers, catalog]);
+  }, [providers, catalog, refLinkCount]);
   const label = sbv1VideoModelTriggerLabel(data, providers);
   const selectedKey = data.engine?.modelKey?.trim() ?? "";
   const selectedProvider = normalizeSbv1EngineProviderId(data.engine?.providerId);

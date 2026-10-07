@@ -156,6 +156,12 @@ export const SBV1_VIDEO_ENGINE_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
         enabled: true,
         nodeType: "sbv1-video-engine",
       },
+      {
+        id: "video-to-prompt",
+        label: "反推提示词",
+        icon: Sparkles,
+        enabled: true,
+      },
     ],
   },
 ];

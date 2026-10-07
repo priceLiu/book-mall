@@ -148,6 +148,21 @@ describe("sbv1-video-model-reference", () => {
     expect(patch?.dockInputMode).toBe("omni");
   });
 
+  it("MiniMax H3 i2v stays selectable when refs connected", () => {
+    expect(
+      resolveSbv1VideoModelRefLinkBlock({
+        modelKey: "MiniMax/MiniMax-H3-i2v",
+        refLinkCount: 1,
+      }).blocked,
+    ).toBe(false);
+    expect(
+      resolveSbv1VideoModelRefLinkBlock({
+        modelKey: "MiniMax/MiniMax-H3-t2v",
+        refLinkCount: 1,
+      }).blocked,
+    ).toBe(true);
+  });
+
   it("resolveSbv1VideoModelRefLinkBlock disables T2V when refs connected", () => {
     expect(
       resolveSbv1VideoModelRefLinkBlock({

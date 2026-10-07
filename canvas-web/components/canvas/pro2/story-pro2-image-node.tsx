@@ -6,7 +6,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { handlePro2SideAddNodePick } from "@/lib/canvas/pro2-add-node-pick";
 import {
   PRO2_IMAGE_LEFT_ADD_MENU,
-  PRO2_RIGHT_ADD_MENU,
+  PRO2_IMAGE_RIGHT_ADD_MENU,
 } from "@/lib/canvas/pro2-add-node-menu";
 import {
   resolveLibtvSideSpawnNodeType,
@@ -58,7 +58,7 @@ export function StoryPro2ImageNode(props: NodeProps) {
       rfNodeType="story-pro2-image"
       saveAsAssetKind="story-pro2-image"
       leftMenuSections={PRO2_IMAGE_LEFT_ADD_MENU}
-      rightMenuSections={PRO2_RIGHT_ADD_MENU}
+      rightMenuSections={PRO2_IMAGE_RIGHT_ADD_MENU}
       onSidePickLeft={onSidePick("left")}
       onSidePickRight={onSidePick("right")}
       onSelectAfterDuplicate={(newId) => selectPro2NodeAfterSpawn(setNodes, newId)}

@@ -51,7 +51,10 @@ import {
   canvasSavePhaseLabel,
   type CanvasSavePhase,
 } from "@/lib/canvas/canvas-save-phase";
-import { flushCanvasGraphPersistBounded } from "@/lib/canvas/canvas-graph-persist-bridge";
+import {
+  flushCanvasGraphPersistBounded,
+  runCanvasLeaveProject,
+} from "@/lib/canvas/canvas-graph-persist-bridge";
 import { markRecentProjectsStale } from "@/lib/canvas/recent-projects-invalidate";
 import {
   CANVAS_IMAGE_UPLOADS_CHANGED,
@@ -165,9 +168,10 @@ export function CanvasToolbar({
       if (leavingProject) return;
       setLeavingProject(true);
       try {
-        window.dispatchEvent(new CustomEvent("canvas:leave-project"));
         await Promise.race([
           (async () => {
+            const discarded = await runCanvasLeaveProject();
+            if (discarded) return;
             await waitForPendingCanvasImageUploads(12_000);
             await flushPendingCanvasImageUploadPersist().catch(() => undefined);
             await flushCanvasGraphPersistBounded(10_000, true);
@@ -181,14 +185,14 @@ export function CanvasToolbar({
       } finally {
         markRecentProjectsStale();
         try {
-          router.push("/projects");
+          router.replace("/projects");
           window.setTimeout(() => {
             if (window.location.pathname.startsWith("/canvas/")) {
-              window.location.assign("/projects");
+              window.location.replace("/projects");
             }
           }, 800);
         } catch {
-          window.location.assign("/projects");
+          window.location.replace("/projects");
         }
         setLeavingProject(false);
       }

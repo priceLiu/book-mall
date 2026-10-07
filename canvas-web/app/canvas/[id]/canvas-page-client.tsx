@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -16,7 +17,13 @@ import {
 } from "@/components/auth/canvas-tools-session-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { CanvasGlobalAssetLibraryRoot } from "@/components/global-asset-library/canvas-global-asset-library-root";
+import {
+  CANVAS_HISTORY_LOCK_RESTORE_EVENT,
+  refreshCanvasHistoryPopstateTrap,
+  setCanvasEditorHistoryLock,
+} from "@/lib/canvas/canvas-block-browser-nav";
 import { handleCanvasWheel } from "@/lib/canvas/canvas-form-wheel";
+import { canvasProjectPath } from "@/lib/canvas/canvas-project-navigation";
 import { defaultCanvasProjectName } from "@/lib/canvas/default-project-name";
 import { registerCanvasNotifier } from "@/lib/canvas/canvas-notify";
 import { CanvasBlockingProgressHost } from "@/components/canvas/canvas-blocking-progress-host";
@@ -83,7 +90,9 @@ import type {
 } from "@/lib/canvas/types";
 import {
   clearCanvasProjectTasksForbidden,
+  deleteCanvasProject,
   getCanvasProjectCached,
+  invalidateCanvasProjectCache,
   seedCanvasProjectDetailCache,
   isCanvasApiConflictError,
   parseCanvasConflictUpdatedAt,
@@ -118,6 +127,11 @@ import type {
   StoryProStarterNodeData,
 } from "@/lib/canvas/story-pro-workspace-types";
 import { pickPersistableProjectThumbnailUrl } from "@/lib/canvas/project-thumbnail";
+import {
+  clearCanvasProjectDiscardIfStillEmptySession,
+  shouldDiscardEmptyNewCanvasOnLeave,
+} from "@/lib/canvas/canvas-discard-empty-new-session";
+import { invalidateCachedProjectsList } from "@/lib/canvas/projects-list-client-cache";
 import { markRecentProjectsStale } from "@/lib/canvas/recent-projects-invalidate";
 import {
   captureCanvasViewportSnapshotUrl,
@@ -139,7 +153,14 @@ import {
   CANVAS_AUTOSAVE_HISTORY_HEARTBEAT_MS,
   getCanvasAutosaveIntervalMs,
 } from "@/lib/canvas/canvas-autosave-settings";
-import { registerCanvasGraphPersistFlush, registerCanvasGraphDirtyCheck, registerCanvasDeltaPersist, registerCanvasProjectVersionSync, setCanvasSaveInFlight } from "@/lib/canvas/canvas-graph-persist-bridge";
+import {
+  registerCanvasGraphPersistFlush,
+  registerCanvasGraphDirtyCheck,
+  registerCanvasDeltaPersist,
+  registerCanvasLeaveProject,
+  registerCanvasProjectVersionSync,
+  setCanvasSaveInFlight,
+} from "@/lib/canvas/canvas-graph-persist-bridge";
 import { flushCanvasNodePositions } from "@/lib/canvas/canvas-commit-node-positions";
 import {
   canvasSavePhaseLabel,
@@ -186,6 +207,29 @@ function Inner({ projectId }: { projectId: string }) {
     loading: gatewayLinkLoading,
   } = useGatewayLinkStatus();
   const dialogs = useDialogs();
+  const router = useRouter();
+
+  useLayoutEffect(() => {
+    const path = canvasProjectPath(projectId);
+    setCanvasEditorHistoryLock(path);
+    refreshCanvasHistoryPopstateTrap();
+    if (typeof window !== "undefined") {
+      const next = path + window.location.search + window.location.hash;
+      window.history.replaceState(window.history.state, "", next);
+    }
+    return () => setCanvasEditorHistoryLock(null);
+  }, [projectId]);
+
+  useEffect(() => {
+    const onRestore = (event: Event) => {
+      const path = (event as CustomEvent<{ path: string }>).detail?.path;
+      if (!path || window.location.pathname === path) return;
+      router.replace(path);
+    };
+    window.addEventListener(CANVAS_HISTORY_LOCK_RESTORE_EVENT, onRestore);
+    return () =>
+      window.removeEventListener(CANVAS_HISTORY_LOCK_RESTORE_EVENT, onRestore);
+  }, [router]);
 
   useEffect(() => {
     const onBlocked = (ev: Event) => {
@@ -458,6 +502,11 @@ function Inner({ projectId }: { projectId: string }) {
 
   /** 加载完成时的节点数；用于阻止误把「有内容的画布」自动保存成空。 */
   const loadedNodeCountRef = useRef(0);
+  const initialProjectNameRef = useRef("");
+  const everHadGraphContentRef = useRef(false);
+  const projectDiscardedRef = useRef(false);
+  const nameDraftRef = useRef(nameDraft);
+  nameDraftRef.current = nameDraft;
   const canvasReadyRef = useRef(false);
   const generationRecordDeepLinkRef = useRef<string | null>(null);
   /** 上次成功 PATCH 返回的 project.updatedAt（canvasDelta 乐观锁） */
@@ -545,6 +594,9 @@ function Inner({ projectId }: { projectId: string }) {
         loadedNodeCountRef.current = Array.isArray(rawCanvas?.nodes)
           ? rawCanvas.nodes.length
           : 0;
+        initialProjectNameRef.current = p.name;
+        everHadGraphContentRef.current = loadedNodeCountRef.current > 0;
+        projectDiscardedRef.current = false;
         useCanvasStore.temporal.getState().pause();
         hydrate(projectId, p.canvas as never);
         useCanvasStore.temporal.getState().clear();
@@ -586,6 +638,17 @@ function Inner({ projectId }: { projectId: string }) {
       cancelled = true;
     };
   }, [base, projectId, hydrate]);
+
+  useEffect(() => {
+    if (!canvasRouteReady) return;
+    return useCanvasStore.subscribe((state) => {
+      if (state.projectId !== projectId) return;
+      if (state.nodes.length > 0 || state.edges.length > 0) {
+        everHadGraphContentRef.current = true;
+        clearCanvasProjectDiscardIfStillEmptySession(projectId);
+      }
+    });
+  }, [canvasRouteReady, projectId]);
 
   // Autosave on changes (debounced) — store 订阅，避免 nodes 变化触发整页重渲染
   const autosaveTimerRef = useRef<number | null>(null);
@@ -725,6 +788,7 @@ function Inner({ projectId }: { projectId: string }) {
           return;
         }
       }
+      if (projectDiscardedRef.current) return;
       const proj = autosaveProjectRef.current;
       const bookBase = autosaveBaseRef.current;
       if (!proj || !bookBase || !canvasReadyRef.current) return;
@@ -1167,10 +1231,49 @@ function Inner({ projectId }: { projectId: string }) {
     };
 
     const flushBeforeLeave = async () => {
+      if (projectDiscardedRef.current) return;
       await waitForPendingCanvasImageUploads(60_000);
       await flushPendingCanvasImageUploadPersist();
       await runAutosave(true, { bypassCooldown: true });
     };
+
+    const runLeaveProject = async (): Promise<boolean> => {
+      if (projectDiscardedRef.current) return true;
+      const store = useCanvasStore.getState();
+      if (
+        !shouldDiscardEmptyNewCanvasOnLeave({
+          projectId,
+          initialProjectName: initialProjectNameRef.current,
+          projectNameDraft: nameDraftRef.current,
+          nodeCount: store.nodes.length,
+          edgeCount: store.edges.length,
+          everHadGraphContent: everHadGraphContentRef.current,
+          imageUploadPending: hasPendingCanvasImageUploads(),
+          inflightTaskCount: inflightTaskCountRef.current,
+        })
+      ) {
+        await flushBeforeLeave();
+        return false;
+      }
+      const bookBase = autosaveBaseRef.current;
+      if (!bookBase) {
+        await flushBeforeLeave();
+        return false;
+      }
+      try {
+        await deleteCanvasProject(bookBase, projectId);
+        projectDiscardedRef.current = true;
+        clearCanvasProjectDiscardIfStillEmptySession(projectId);
+        invalidateCachedProjectsList();
+        invalidateCanvasProjectCache(bookBase, projectId);
+        markRecentProjectsStale();
+        return true;
+      } catch {
+        await flushBeforeLeave();
+        return false;
+      }
+    };
+    registerCanvasLeaveProject(runLeaveProject);
 
     const onPageHide = () => {
       void flushBeforeLeave();
@@ -1205,7 +1308,7 @@ function Inner({ projectId }: { projectId: string }) {
     };
 
     const onLeaveProject = () => {
-      void flushBeforeLeave();
+      void runLeaveProject();
     };
 
     restartAutosaveInterval();
@@ -1215,10 +1318,14 @@ function Inner({ projectId }: { projectId: string }) {
     window.addEventListener("canvas:leave-project", onLeaveProject);
 
     return () => {
-      void flushBeforeLeave().finally(() => {
+      void (projectDiscardedRef.current
+        ? Promise.resolve()
+        : flushBeforeLeave()
+      ).finally(() => {
         registerCanvasGraphPersistFlush(null);
         registerCanvasGraphDirtyCheck(null);
         registerCanvasDeltaPersist(null);
+        registerCanvasLeaveProject(null);
         registerCanvasProjectVersionSync(null);
       });
       unsub();
@@ -1912,23 +2019,6 @@ function Inner({ projectId }: { projectId: string }) {
             <LayoutTemplate className="size-3.5" />
             重排
           </button>
-        ) : null}
-        {nodes.length === 0 && !loading && isSbv1Project ? (
-          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6">
-            <div className="pointer-events-auto max-w-sm rounded-xl border border-white/10 bg-[var(--canvas-surface)]/95 px-5 py-4 text-center shadow-xl">
-              <p className="text-sm font-medium text-white">空白画布</p>
-              <p className="mt-2 text-xs leading-relaxed text-[var(--canvas-muted)]">
-                使用底部 Dock 添加图片、{SBV1_VIDEO_COMPOSE_LABEL}，或粘贴图片到画布。
-              </p>
-              <button
-                type="button"
-                className="mt-4 rounded-md border border-cyan-400/35 bg-cyan-500/10 px-4 py-2 text-xs font-medium text-cyan-100 hover:bg-cyan-500/20"
-                onClick={() => void restoreSbv1Template()}
-              >
-                恢复「分镜视频 1.0」模板
-              </button>
-            </div>
-          </div>
         ) : null}
         {nodes.length === 0 &&
         !loading &&

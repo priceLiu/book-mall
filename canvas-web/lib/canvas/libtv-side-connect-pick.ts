@@ -22,6 +22,10 @@ import { nodeBatchOutHandle } from "./pro2-batch-connect";
 import type { Pro2AddNodePickDialogs } from "./pro2-add-node-pick";
 import type { CanvasFlowNode } from "./types";
 import { useCanvasStore } from "./store";
+import {
+  libtvMediaReversePromptFailureMessage,
+  runLibtvMediaReversePromptFromNode,
+} from "./libtv-media-reverse-prompt";
 
 export type SideConnectPickContext = {
   fromNodeId: string;
@@ -128,6 +132,30 @@ export async function runLibtvSideConnectPick(
     anchorNode.type === "sbv1-video-engine" ||
     anchorNode.type === "sbv1-image"
   ) {
+    if (
+      anchorNode.type === "sbv1-video-engine" &&
+      itemId === "video-to-prompt"
+    ) {
+      const state = useCanvasStore.getState();
+      const result = runLibtvMediaReversePromptFromNode(
+        ctx.fromNodeId,
+        {
+          nodes: state.nodes,
+          addNode: state.addNode,
+          setNodes: state.setNodes,
+          setEdges: state.setEdges,
+          updateNodeData: state.updateNodeData,
+        },
+        [],
+      );
+      if (!result.ok) {
+        const { title, message } = libtvMediaReversePromptFailureMessage(
+          result.reason,
+        );
+        await dialogs.alert({ title, message, variant: "warning" });
+      }
+      return;
+    }
     await handleSbv1SideAddNodePick(
       itemId,
       nodeType,

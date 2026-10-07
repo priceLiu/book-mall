@@ -13,6 +13,7 @@ import {
   listPortalFeaturedProjects,
   type PortalFeaturedProjectSummary,
 } from "@/lib/canvas-api";
+import { assignCanvasProjectLocation } from "@/lib/canvas/canvas-project-navigation";
 
 export function FeaturedWorkflowsSection() {
   const base = useBookMallBaseUrl();
@@ -41,7 +42,7 @@ export function FeaturedWorkflowsSection() {
       setError(null);
       try {
         const created = await duplicatePortalFeaturedProject(base, item.id);
-        window.location.href = `/canvas/${created.id}`;
+        assignCanvasProjectLocation(created.id);
       } catch (e) {
         setError(e instanceof Error ? e.message : "复制失败");
         setCopyingId(null);

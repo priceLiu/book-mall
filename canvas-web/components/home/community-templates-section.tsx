@@ -16,6 +16,7 @@ import {
   listCanvasTemplates,
   type CanvasTemplateRecord,
 } from "@/lib/canvas-api";
+import { assignCanvasProjectLocation } from "@/lib/canvas/canvas-project-navigation";
 import { cloneGraphForNewProject } from "@/lib/canvas/clone";
 import { migrateGraphV1ToV2 } from "@/lib/canvas/migrate";
 import type { CanvasGraph } from "@/lib/canvas/types";
@@ -55,7 +56,7 @@ export function CommunityTemplatesSection() {
           name: `${tpl.name} 画布`,
           canvas: cloneGraphForNewProject(graph),
         });
-        window.location.href = `/canvas/${created.id}`;
+        assignCanvasProjectLocation(created.id);
       } catch (e) {
         setError(e instanceof Error ? e.message : "复制失败");
         setForkingId(null);

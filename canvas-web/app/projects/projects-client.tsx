@@ -51,6 +51,8 @@ import {
   loadCachedProjectsList,
   saveCachedProjectsList,
 } from "@/lib/canvas/projects-list-client-cache";
+import { markCanvasProjectDiscardIfStillEmpty } from "@/lib/canvas/canvas-discard-empty-new-session";
+import { assignCanvasProjectLocation } from "@/lib/canvas/canvas-project-navigation";
 import { mergeProjectsListRefresh } from "@/lib/canvas/projects-list-merge";
 import {
   consumeRecentProjectsStale,
@@ -409,7 +411,7 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
 
   const openPro2CreateDialog = useCallback(() => {
     setPickerEdition("pro2");
-    setPick({ kind: "builtin", id: STORY_PRO2_BUILTIN_TEMPLATE_ID });
+    setPick({ kind: "blank" });
     setName("");
     setScriptPackageChoice("skip");
     setScriptPackagePick(null);
@@ -434,7 +436,7 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
   const onOpenPicker = useCallback((edition: CanvasProjectEdition) => {
     setPickerEdition(edition);
     if (edition === "pro2") {
-      setPick({ kind: "builtin", id: STORY_PRO2_BUILTIN_TEMPLATE_ID });
+      setPick({ kind: "blank" });
     } else if (edition === "sbv1") {
       setPick({ kind: "builtin", id: SBV1_BUILTIN_TEMPLATE_ID });
     } else if (edition === "pro") {
@@ -592,9 +594,10 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
         name: finalName,
         canvas: graph,
       });
+      markCanvasProjectDiscardIfStillEmpty(created.id);
       invalidateCachedProjectsList();
       markRecentProjectsStale();
-      window.location.href = `/canvas/${created.id}`;
+      assignCanvasProjectLocation(created.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "创建失败");
     } finally {
@@ -642,7 +645,7 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
         invalidateCachedProjectsList();
         markRecentProjectsStale();
         await load();
-        window.location.href = `/canvas/${created.id}`;
+        assignCanvasProjectLocation(created.id);
       } catch (e) {
         setError(
           e instanceof Error

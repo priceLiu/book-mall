@@ -14,6 +14,7 @@ import {
   duplicatePortalFilmShowcaseProject,
   type PortalFilmShowcaseMedia,
 } from "@/lib/canvas-api";
+import { assignCanvasProjectLocation } from "@/lib/canvas/canvas-project-navigation";
 
 function ownerLabel(
   owner?: { id: string; name: string | null; email: string | null } | null,
@@ -67,7 +68,7 @@ export function PortalFilmCasesSection() {
       setError(null);
       try {
         const created = await duplicatePortalFilmShowcaseProject(base, item.sourceId);
-        window.location.href = `/canvas/${created.id}`;
+        assignCanvasProjectLocation(created.id);
       } catch (e) {
         setError(e instanceof Error ? e.message : "复制失败");
         setCopyingId(null);
@@ -79,7 +80,7 @@ export function PortalFilmCasesSection() {
   const openItem = useCallback(
     (item: PortalFilmShowcaseMedia) => {
       if (viewerUserId && item.owner?.id === viewerUserId) {
-        window.location.href = `/canvas/${item.sourceId}`;
+        assignCanvasProjectLocation(item.sourceId);
         return;
       }
       setPreview(item);

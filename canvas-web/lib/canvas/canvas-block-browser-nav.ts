@@ -1,4 +1,5 @@
 import { CANVAS_BLOCK_NAV_GESTURE_SELECTOR } from "@/lib/canvas/canvas-form-wheel";
+import { shouldRestoreCanvasHistoryLockOnPopstate } from "@/lib/canvas/canvas-project-navigation";
 
 /** 画布项目页打开时挂到 `<html>`，用于锁滚动 + 全页拦截鼠标侧键 */
 export const CANVAS_EDITOR_PAGE_HTML_ATTR = "data-canvas-editor-open";
@@ -96,6 +97,34 @@ const CANVAS_NAV_TRAP_STATE = { __canvasNavTrap: true as const };
 /** 初始压入多条 trap，避免 history 栈较浅时一次 back 就离开编辑页 */
 const CANVAS_NAV_TRAP_SEED_DEPTH = 3;
 
+/** 编辑页 popstate 与 App Router 不同步时，由 canvas-page-client replace 回锁定的 URL */
+export const CANVAS_HISTORY_LOCK_RESTORE_EVENT = "canvas:history-lock-restore";
+
+let canvasEditorHistoryLockPath: string | null = null;
+let reseedCanvasHistoryTraps: (() => void) | null = null;
+
+export function setCanvasEditorHistoryLock(path: string | null): void {
+  canvasEditorHistoryLockPath = path?.trim() || null;
+}
+
+export function getCanvasEditorHistoryLockPath(): string | null {
+  return canvasEditorHistoryLockPath;
+}
+
+/** 切换 projectId 或首次进入编辑页后重压 trap 栈 */
+export function refreshCanvasHistoryPopstateTrap(): void {
+  reseedCanvasHistoryTraps?.();
+}
+
+function dispatchCanvasHistoryLockRestore(lockedPath: string): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(CANVAS_HISTORY_LOCK_RESTORE_EVENT, {
+      detail: { path: lockedPath },
+    }),
+  );
+}
+
 function isEditableNavTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
   return Boolean(
@@ -128,39 +157,70 @@ export function installCanvasHistoryPopstateTrap(): () => void {
 
   let cancelPopstate = false;
 
-  const pushTrap = () => {
+  const pushTrap = (url?: string) => {
     if (!isCanvasNavBlockActive()) return;
+    const href = url ?? window.location.href;
     try {
-      window.history.pushState(CANVAS_NAV_TRAP_STATE, "", window.location.href);
+      window.history.pushState(CANVAS_NAV_TRAP_STATE, "", href);
     } catch {
       /* quota / sandbox */
     }
   };
 
   const seedTraps = () => {
+    const lock = canvasEditorHistoryLockPath;
     for (let i = 0; i < CANVAS_NAV_TRAP_SEED_DEPTH; i += 1) {
-      pushTrap();
+      pushTrap(lock ? lock : undefined);
     }
   };
 
   seedTraps();
+  reseedCanvasHistoryTraps = seedTraps;
 
   const onPopState = () => {
     if (!isCanvasNavBlockActive() || cancelPopstate) return;
+
+    const lockPath = canvasEditorHistoryLockPath;
+    const currentPath = window.location.pathname;
+
+    if (shouldRestoreCanvasHistoryLockOnPopstate(lockPath, currentPath)) {
+      const locked = lockPath!;
+      cancelPopstate = true;
+      try {
+        window.history.pushState(CANVAS_NAV_TRAP_STATE, "", locked);
+        dispatchCanvasHistoryLockRestore(locked);
+      } finally {
+        window.queueMicrotask(() => {
+          cancelPopstate = false;
+          if (isCanvasNavBlockActive()) pushTrap(locked);
+        });
+      }
+      return;
+    }
+
+    if (lockPath && currentPath !== lockPath) {
+      // 离开编辑页（如回到 /projects）：交给路由卸载 guard，不再压 trap
+      return;
+    }
+
     cancelPopstate = true;
     try {
-      // 重新压栈当前 URL，避免 go(1) 在无 forward 条目时仍被 App Router 带走
-      pushTrap();
+      pushTrap(lockPath ?? undefined);
     } finally {
       window.queueMicrotask(() => {
         cancelPopstate = false;
-        if (isCanvasNavBlockActive()) pushTrap();
+        if (isCanvasNavBlockActive()) pushTrap(lockPath ?? undefined);
       });
     }
   };
 
-  window.addEventListener("popstate", onPopState);
-  return () => window.removeEventListener("popstate", onPopState);
+  window.addEventListener("popstate", onPopState, { capture: true });
+  return () => {
+    window.removeEventListener("popstate", onPopState, { capture: true });
+    if (reseedCanvasHistoryTraps === seedTraps) {
+      reseedCanvasHistoryTraps = null;
+    }
+  };
 }
 
 /** 画布编辑页：仅锁 html 滚动（导航拦截由整站 Guard 负责）。 */

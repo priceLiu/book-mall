@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { CanvasProjectLink } from "@/components/canvas/canvas-project-link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CheckCircle2,
@@ -428,13 +428,13 @@ export function MyPromptHistoryPanel({
         <footer className={cn(CANVAS_PANEL_SHELL_FOOTER_CLASS, "text-[10px] text-white/40")}>
           提示词在每次点击生成时自动保存；成功与失败分别归档。
           {scope === "project" && effectiveProjectId ? (
-            <Link
-              href={`/canvas/${effectiveProjectId}`}
+            <CanvasProjectLink
+              projectId={effectiveProjectId}
               className="ml-1 text-white/75 hover:underline"
               onClick={onClose}
             >
               回到画布
-            </Link>
+            </CanvasProjectLink>
           ) : null}
         </footer>
     </CanvasToolbarSidePanelShell>

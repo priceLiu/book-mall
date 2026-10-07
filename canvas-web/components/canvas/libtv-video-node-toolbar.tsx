@@ -13,6 +13,7 @@ import {
   Loader2,
   Maximize2,
   Scan,
+  Save,
   Sparkles,
   Type,
   VolumeX,
@@ -86,6 +87,7 @@ export function LibtvVideoNodeToolbar({
   const [downloading, setDownloading] = useState(false);
   const audioMenu = usePro2ToolbarDropdownAnchor();
   const frameMenu = usePro2ToolbarDropdownAnchor();
+  const saveMenu = usePro2ToolbarDropdownAnchor();
   const zoom = useStore((s) => s.transform[2]);
   const portaled = useLibtvToolbarPortaled();
   const toolbarScale = portaled
@@ -304,12 +306,15 @@ export function LibtvVideoNodeToolbar({
         {onSaveAsAsset ? (
           <button
             type="button"
-            className={ICON_BTN}
-            title="保存为资产"
+            ref={saveMenu.anchorRef}
+            className={cn(TOOL_BTN, !previewUrl && "opacity-50")}
             disabled={!previewUrl}
-            onClick={onSaveAsAsset}
+            title="保存"
+            onClick={() => saveMenu.setOpen(!saveMenu.open)}
           >
-            <BookmarkPlus className="size-5" />
+            <Save className="size-3.5" />
+            <span>保存</span>
+            <ChevronDown className="size-3 opacity-50" />
           </button>
         ) : null}
         <button
@@ -393,6 +398,25 @@ export function LibtvVideoNodeToolbar({
           onClick={() => pickTrackSplit("extract-audio")}
         />
       </Pro2ToolbarDropdownMenu>
+
+      {onSaveAsAsset ? (
+        <Pro2ToolbarDropdownMenu
+          open={saveMenu.open}
+          setOpen={saveMenu.setOpen}
+          rect={saveMenu.rect}
+          minWidth={220}
+        >
+          <Pro2ToolbarDropdownItem
+            icon={BookmarkPlus}
+            label="保存为资产"
+            disabled={!previewUrl}
+            onClick={() => {
+              saveMenu.setOpen(false);
+              onSaveAsAsset();
+            }}
+          />
+        </Pro2ToolbarDropdownMenu>
+      ) : null}
     </>
   );
 }

@@ -21,7 +21,6 @@ type Props = {
   scopeText: string;
   disabled?: boolean;
   onSelect?: () => void;
-  previewLightboxZIndex?: number;
 };
 
 function GlobalAssetPreviewLightbox({
@@ -84,7 +83,6 @@ export function GlobalAssetTile({
   scopeText,
   disabled,
   onSelect,
-  previewLightboxZIndex,
 }: Props) {
   const theme = globalAssetTheme(variant);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -157,7 +155,6 @@ export function GlobalAssetTile({
         <GlobalAssetPreviewLightbox
           item={item}
           variant={variant}
-          stackZIndex={previewLightboxZIndex}
           onClose={() => setPreviewOpen(false)}
         />
       ) : null}

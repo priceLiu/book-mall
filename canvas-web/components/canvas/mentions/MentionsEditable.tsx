@@ -298,7 +298,8 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
     );
 
     // ---- @ 触发检测 ----
-    const mentionSourceSplit = libtvDock && popoverTriggerMode === "at";
+    /** 暂隐藏 Dock @「我的 | 平台的」分 tab，仅展示上游节点列表 */
+    const mentionSourceSplit = false;
 
     const filtered = useMemo(() => {
       if (popoverTriggerMode === "slash-camera") {
