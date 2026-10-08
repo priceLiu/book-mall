@@ -34,7 +34,7 @@ export type BrandViChatMessage = {
 export type BrandViReference = {
   id: string;
   label: string;
-  role: "reference";
+  role: "reference" | "sketch";
   ossUrl: string;
 };
 
@@ -167,10 +167,13 @@ export function sanitizeBrandViReferences(raw: unknown): BrandViReference[] {
     const r = item as Record<string, unknown>;
     const ossUrl = typeof r.ossUrl === "string" ? r.ossUrl.trim() : "";
     if (!/^https?:\/\//.test(ossUrl)) continue;
+    const roleRaw = r.role;
+    const role: BrandViReference["role"] =
+      roleRaw === "sketch" ? "sketch" : "reference";
     out.push({
       id: typeof r.id === "string" ? r.id : `ref-${out.length + 1}`,
       label: typeof r.label === "string" ? r.label.slice(0, 40) : `参考图${out.length + 1}`,
-      role: "reference",
+      role,
       ossUrl,
     });
   }

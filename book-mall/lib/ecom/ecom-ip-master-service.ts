@@ -328,7 +328,11 @@ export async function saveIpMasterTemplateVersion(
 
   const updated = await updateEcomIpMasterProject(userId, projectId, {
     status: "in_progress",
-    title: label.split("·")[0]?.trim().slice(0, 120) || template.ipMeta.ipName?.slice(0, 120) || project.title,
+    title:
+      label.split("·")[0]?.trim().slice(0, 120) ||
+      template.ipMeta.ipName?.slice(0, 120) ||
+      project.title?.slice(0, 120) ||
+      undefined,
     meta: {
       ...meta,
       templateVersions: versions,

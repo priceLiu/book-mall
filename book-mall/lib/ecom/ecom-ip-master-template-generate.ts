@@ -167,7 +167,11 @@ export async function generateIpMasterStructuredTemplate(opts: {
   const { text } = await ecomGwChatComplete(opts.userId, {
     modelKey,
     messages,
-    clientPage: ecomClientPage(`${ECOM_IP_MASTER_TOOL_KEY}__template-generate`),
+    clientPage: ecomClientPage(
+      opts.userId,
+      project.id,
+      `${ECOM_IP_MASTER_TOOL_KEY}__template-generate`,
+    ),
   });
 
   const raw = extractJsonObjectFromLlmText(text);

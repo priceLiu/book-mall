@@ -36,7 +36,7 @@ export type BrandViChatMessage = {
 export type BrandViReference = {
   id: string;
   label: string;
-  role: "reference";
+  role: "reference" | "sketch";
   ossUrl: string;
 };
 

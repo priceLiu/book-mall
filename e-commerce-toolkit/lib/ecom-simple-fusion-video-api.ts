@@ -15,14 +15,21 @@ export type SimpleFusionProject = {
     bgmPresetId?: string;
   };
   references: {
-    model?: { ossUrl: string; label?: string; source?: string };
+    model?: {
+      ossUrl: string;
+      label?: string;
+      source?: "upload" | "library" | "asset" | "text";
+      firstOrigin?: string;
+    };
     scene?: {
       ossUrl?: string;
       scenePrompt?: string;
       libraryEntryId?: string;
       libraryEntryName?: string;
+      source?: "upload" | "library" | "text" | "asset";
+      firstOrigin?: string;
     };
-    garments?: Array<{ id: string; ossUrl: string; label?: string }>;
+    garments?: Array<{ id: string; ossUrl: string; label?: string; firstOrigin?: string }>;
   };
   composeResult: { videoUrl: string; coverUrl?: string } | null;
   meta: {

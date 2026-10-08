@@ -5,7 +5,7 @@
  * 的平台选择文案，前端一律经 /product-design/platform-specs 拉取，勿在前端再写一份。
  */
 
-export type EcomImageRatio = "1:1" | "3:4" | "4:5" | "16:9";
+export type EcomImageRatio = "1:1" | "3:4" | "4:5" | "9:16" | "16:9";
 
 export type EcomPlatformSpec = {
   /** 稳定标识，落库用 */
@@ -289,6 +289,8 @@ export function ecomRatioToImageSize(ratio: EcomImageRatio): string {
       return "1152*1440";
     case "16:9":
       return "1440*810";
+    case "9:16":
+      return "810*1440";
     default:
       return "1440*1440";
   }
