@@ -54,10 +54,11 @@ const nextConfig = {
     config.resolve.alias["@private/media-render-subtitle-style"] = resolveShared(
       "media-render-subtitle-style",
     );
-    config.resolve.alias["@private/platform-compose-ui"] = path.join(
-      __dirname,
-      "../book-mall/platform-compose-ui",
-    );
+    config.resolve.alias["@private/platform-compose-ui"] = (() => {
+      const monorepo = path.join(__dirname, "../book-mall/platform-compose-ui");
+      if (fs.existsSync(monorepo)) return monorepo;
+      return path.join(__dirname, "docker-shared/platform-compose-ui");
+    })();
     config.resolve.alias["@private/ecom-copy-overlay"] = resolveShared("ecom-copy-overlay");
     return config;
   },

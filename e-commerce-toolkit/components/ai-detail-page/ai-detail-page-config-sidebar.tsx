@@ -248,12 +248,17 @@ export function AiDetailPageConfigSidebar({
             <select
               className="w-full rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[11px]"
               disabled={disabled || Boolean(busy)}
-              value={
-                (project.brief?.productVertical === "apparel" ||
-                project.brief?.productVertical === "general"
-                  ? "fashion_apparel"
-                  : project.brief?.productVertical) ?? "fashion_apparel"
-              }
+              value={(() => {
+                const raw = project.brief?.productVertical as
+                  | AplusProductVertical
+                  | "apparel"
+                  | "general"
+                  | undefined;
+                if (raw === "apparel" || raw === "general") {
+                  return "fashion_apparel";
+                }
+                return raw ?? "fashion_apparel";
+              })()}
               onChange={(e) => {
                 void persist({
                   brief: {

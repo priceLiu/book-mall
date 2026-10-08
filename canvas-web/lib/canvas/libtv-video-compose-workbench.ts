@@ -73,19 +73,18 @@ export function buildLibtvVideoTrimUpstreamSnapshot(args: {
     args.nodeId,
     args.nodes,
     args.edges,
-  )
-    .map((node) => {
-      const audioUrl = resolveLibtvAudioHttpsExportUrlFromNode(node)?.trim();
-      if (!audioUrl) return null;
-      return {
-        sourceNodeId: node.id,
-        videoUrl: "",
-        audioUrl,
-        audioMediaKey: audioUrl,
-        label: audioLabelFromNode(node),
-      } satisfies JianyingSnapshotClip;
-    })
-    .filter((c): c is JianyingSnapshotClip => Boolean(c));
+  ).flatMap((node) => {
+    const audioUrl = resolveLibtvAudioHttpsExportUrlFromNode(node)?.trim();
+    if (!audioUrl) return [];
+    const clip: JianyingSnapshotClip = {
+      sourceNodeId: node.id,
+      videoUrl: "",
+      audioUrl,
+      audioMediaKey: audioUrl,
+      label: audioLabelFromNode(node),
+    };
+    return [clip];
+  });
 
   return { videoClips, audioClips };
 }

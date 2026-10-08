@@ -275,9 +275,10 @@ export function workbenchToJianyingExportFrames(
             hints,
           )
         : orderedComposeAudioClips(workbench)[i];
-    const audioFull =
-      pairedAudio?.audioUrl?.trim() &&
-      hints.audioDurationByUrl?.[pairedAudio.audioUrl.trim()];
+    const pairedAudioUrl = pairedAudio?.audioUrl?.trim();
+    const audioFull = pairedAudioUrl
+      ? hints.audioDurationByUrl?.[pairedAudioUrl]
+      : undefined;
     const audioSpan =
       pairedAudio && audioFull != null && audioFull > 0
         ? composeClipSourceEnd(pairedAudio, audioFull) -

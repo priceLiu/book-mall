@@ -10,6 +10,7 @@ import {
 import {
   composeWorkbenchToRenderPayload,
   parsePlatformComposeWorkbenchFromMeta,
+  parsePlatformComposeWorkbenchProfile,
   type PlatformComposeWorkbenchState,
 } from "@/lib/media/platform-compose-workbench";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
@@ -48,11 +49,16 @@ export async function POST(req: Request) {
   let state: PlatformComposeWorkbenchState = parsed;
   const directBgm = body.bgmUrl?.trim();
   if (directBgm) {
+    const prev = parsePlatformComposeWorkbenchProfile(state.profile ?? {});
     state = {
       ...state,
       profile: {
-        ...state.profile,
-        audio: { ...state.profile?.audio, bgmUrl: directBgm },
+        ...prev,
+        audio: {
+          ...prev.audio,
+          bgmUrl: directBgm,
+          mixTts: prev.audio?.mixTts ?? true,
+        },
       },
     };
   }

@@ -6,5 +6,6 @@ export {
   jianyingSnapshotToWorkbench,
   workbenchToJianyingExportFrames,
   type JianyingSnapshotClip,
+  type JianyingComposeSnapshotInput,
   type JianyingExportFrameFromWorkbench,
 } from "./jianying-adapter";

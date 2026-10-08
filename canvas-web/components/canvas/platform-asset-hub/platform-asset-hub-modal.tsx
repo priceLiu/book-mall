@@ -202,7 +202,7 @@ export function PlatformAssetHubModal({
                 const withImage = items.filter(
                   (i) => !platformCatalogPromptFirst(i) && i.ossUrl?.trim(),
                 );
-                if (catalogPick && withImage.length > 0) {
+                if (catalogPick?.onPick && withImage.length > 0) {
                   await catalogPick.onPick(withImage);
                 }
                 onClose();

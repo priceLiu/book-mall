@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { DEFAULT_COMPOSE_PROFILE } from "@private/platform-compose-ui/default-compose-profile";
-import { workbenchToJianyingExportFrames } from "@private/platform-compose-ui/jianying-adapter";
+import { workbenchToJianyingExportFrames } from "@private/platform-compose-ui";
 import type { ComposeWorkbenchState } from "@private/platform-compose-ui/types";
 
 import type { JianyingMediaRenderResult } from "@/lib/canvas/types";
@@ -49,6 +49,21 @@ function workbenchToMediaRenderProfile(
       ...(p.subtitle?.style ? { style: p.subtitle.style } : {}),
     },
     video: { scaleMode: p.video?.scaleMode ?? "fit1080p" },
+  };
+}
+
+function composeInFlightTransition(workbench: ComposeWorkbenchState): {
+  transitionKind: "xfade" | "none";
+  transitionSec: number;
+} {
+  const p = workbench.profile ?? DEFAULT_COMPOSE_PROFILE;
+  if (p.transition?.type === "none") {
+    return { transitionKind: "none", transitionSec: 0 };
+  }
+  return {
+    transitionKind: "xfade",
+    transitionSec:
+      p.transition?.type === "xfade" ? p.transition.durationSec : 0.6,
   };
 }
 
@@ -125,8 +140,7 @@ export function useJianyingComposeMediaRender(args: {
             status: "PENDING",
             progress: 0,
             progressLabel: "提交合成…",
-            transitionKind: "xfade",
-            transitionSec: workbench.profile?.transition?.durationSec ?? 0.6,
+            ...composeInFlightTransition(workbench),
             scaleMode: workbench.profile?.video?.scaleMode ?? "fit1080p",
             mixDialogue: workbench.profile?.audio?.mixTts ?? true,
             burnInSubtitles: workbench.profile?.subtitle?.burnIn ?? false,
@@ -171,8 +185,7 @@ export function useJianyingComposeMediaRender(args: {
               status: "PENDING",
               progress: job.progress,
               progressLabel: renderStatusLabel(job),
-              transitionKind: "xfade",
-              transitionSec: workbench.profile?.transition?.durationSec ?? 0.6,
+              ...composeInFlightTransition(workbench),
               scaleMode: workbench.profile?.video?.scaleMode ?? "fit1080p",
               mixDialogue: mixTts,
               burnInSubtitles: profile.subtitle?.burnIn ?? false,
@@ -197,8 +210,7 @@ export function useJianyingComposeMediaRender(args: {
                   status: j.status === "PENDING" ? "PENDING" : "RUNNING",
                   progress: j.progress,
                   progressLabel: renderStatusLabel(j),
-                  transitionKind: "xfade",
-                  transitionSec: workbench.profile?.transition?.durationSec ?? 0.6,
+                  ...composeInFlightTransition(workbench),
                   scaleMode: workbench.profile?.video?.scaleMode ?? "fit1080p",
                   mixDialogue: mixTts,
                   burnInSubtitles: profile.subtitle?.burnIn ?? false,

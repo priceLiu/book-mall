@@ -1,3 +1,8 @@
+import type {
+  FetchProjectItemsQuery,
+  UnifiedAssetPickItem,
+} from "./unified-asset-library-types";
+
 export type GlobalAssetCatalogKind =
   | "pose"
   | "avatar"
@@ -106,6 +111,9 @@ export type GlobalAssetLibraryApiClient = {
     projectId?: string;
     modelKey?: string;
   }) => Promise<void>;
+  fetchProjectItems?: (
+    query: FetchProjectItemsQuery,
+  ) => Promise<{ items: UnifiedAssetPickItem[] }>;
   isPlatformAdmin?: () => Promise<boolean>;
 };
 

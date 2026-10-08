@@ -136,9 +136,21 @@ export type ProOpsPack = {
   sfxNotes?: string;
 };
 
+const PRO_V1_VERTICAL_IDS: ProVerticalId[] = [
+  "fashion_apparel",
+  "bags",
+  "digital_3c",
+  "footwear",
+  "jewelry",
+  "outdoor_gear",
+  "loungewear",
+  "kitchenware",
+  "baby_maternal",
+];
+
 export type ProDeliverable = {
   schemaVersion: "pro-v1" | "fashion-v4";
-  vertical: "fashion_apparel" | "bags" | "digital_3c";
+  vertical: ProVerticalId;
   productName: string;
   dimensions: Partial<Record<string, string>>;
   sellpoints: ProSellpoint[];
@@ -179,7 +191,11 @@ export type ProPhase =
 export function isProDeliverable(raw: unknown): raw is ProDeliverable {
   if (!raw || typeof raw !== "object") return false;
   const o = raw as Record<string, unknown>;
-  if (o.schemaVersion === "pro-v1" && (o.vertical === "bags" || o.vertical === "fashion_apparel" || o.vertical === "digital_3c"))
+  if (
+    o.schemaVersion === "pro-v1" &&
+    typeof o.vertical === "string" &&
+    PRO_V1_VERTICAL_IDS.includes(o.vertical as ProVerticalId)
+  )
     return true;
   return o.schemaVersion === "fashion-v4" && o.vertical === "fashion_apparel";
 }

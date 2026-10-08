@@ -46,8 +46,10 @@ const APP_SHARED_MAP = {
 
 /** 由其它 sync 脚本维护，勿在 sync-docker-shared 时删掉 */
 const DOCKER_SHARED_PRESERVE = {
+  "book-mall": ["global-asset-library"],
   "canvas-web": ["platform-compose-ui", "global-asset-library"],
   "e-commerce-toolkit": ["platform-compose-ui", "global-asset-library"],
+  "quick-replica-web": ["global-asset-library"],
 };
 
 function listDirNames(path) {

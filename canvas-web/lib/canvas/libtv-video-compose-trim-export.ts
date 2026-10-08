@@ -6,7 +6,7 @@ import {
   composeClipSourceStart,
   orderedComposeClips,
 } from "@private/platform-compose-ui/editor";
-import { workbenchToJianyingExportFrames } from "@private/platform-compose-ui/jianying-adapter";
+import { workbenchToJianyingExportFrames } from "@private/platform-compose-ui";
 import type { ComposeWorkbenchState } from "@private/platform-compose-ui/types";
 
 import {

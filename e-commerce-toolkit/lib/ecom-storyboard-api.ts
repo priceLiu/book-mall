@@ -13,6 +13,7 @@ import type {
   StoryboardReference,
   StoryboardSheet,
 } from "@/lib/storyboard-types";
+import type { ProVerticalId } from "@/lib/pro-vertical/types";
 
 const MODELS_CACHE_KEY = "ecom-storyboard-models-cache";
 const MODELS_CACHE_MS = 5 * 60 * 1000;
@@ -130,7 +131,7 @@ export type StoryTheaterTopicSample = {
 };
 
 export async function fetchStoryTheaterTopicSample(
-  vertical: "fashion_apparel" | "bags" | "digital_3c",
+  vertical: ProVerticalId,
   count = 5,
 ): Promise<StoryTheaterTopicSample[]> {
   const qs = new URLSearchParams({ vertical, count: String(count) });

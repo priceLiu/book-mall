@@ -1,4 +1,5 @@
 import type { FashionDeliverable, FashionPhase } from "@/lib/fashion-types";
+import type { ProVerticalId } from "@/lib/pro-vertical/types";
 
 export type StoryboardChatMessage = {
   id: string;
@@ -158,7 +159,7 @@ export type StoryboardProject = {
     deliverableMarkdown?: string;
     selectedSchemeIndex?: number;
     workflow?: {
-      vertical?: "fashion_apparel" | "bags" | "digital_3c";
+      vertical?: ProVerticalId;
       /** 电商专业版统一入口（品类在会话区选择） */
       proMode?: boolean;
       fashionPhase?: FashionPhase;

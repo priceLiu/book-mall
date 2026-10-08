@@ -89,7 +89,7 @@ export function ComposeRenderProfilePanel({
   const vocalVolume = p.audio?.dialogueVolume ?? 0.95;
   const bgmFitTimeline = p.audio?.bgmFitTimeline !== false;
 
-  const patch = (partial: EcomMediaRenderProfileInput) => {
+  const patch = (partial: Partial<ComposeRenderProfile>) => {
     onChange({
       ...p,
       ...partial,
@@ -318,7 +318,7 @@ export function ComposeRenderProfilePanel({
           subtitle: {
             ...p.subtitle,
             mode,
-            burnIn: mode === "none" ? false : burnIn,
+            burnIn,
           },
         })
       }

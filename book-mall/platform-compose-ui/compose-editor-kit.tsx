@@ -14,7 +14,7 @@ import {
   Play,
   Loader2,
   Plus,
-  SplitSquareHorizontal,
+  SquareSplitHorizontal,
   Trash2,
   Undo2,
   Volume2,
@@ -1888,7 +1888,7 @@ export function ComposeSequenceTrack({
             className={toolBtn}
             onClick={onSplit}
           >
-            <SplitSquareHorizontal className="size-4" />
+            <SquareSplitHorizontal className="size-4" />
           </button>
           {onTrimLeft ? (
             <button
@@ -2949,7 +2949,7 @@ export function ComposeMiniTimelinePanel({
             }
             onClick={() => void splitAtPlayhead()}
           >
-            <SplitSquareHorizontal className="size-4" />
+            <SquareSplitHorizontal className="size-4" />
           </button>
           <button
             type="button"

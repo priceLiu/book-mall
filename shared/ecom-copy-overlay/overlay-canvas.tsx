@@ -261,7 +261,7 @@ export const EcomCopyOverlayCanvas = forwardRef<
               unoptimized
               className="object-contain"
               sizes={`${maxPreviewWidthPx}px`}
-              onLoad={(e) => {
+              onLoad={(e: React.SyntheticEvent<HTMLImageElement>) => {
                 const img = e.currentTarget;
                 if (img.naturalWidth > 0 && img.naturalHeight > 0) {
                   setImgNatural({ w: img.naturalWidth, h: img.naturalHeight });
@@ -456,7 +456,7 @@ export function EcomCopyOverlayComposedPreview({
           unoptimized
           className="object-cover"
           sizes={`${maxPreviewWidthPx}px`}
-          onLoad={(e) => {
+          onLoad={(e: React.SyntheticEvent<HTMLImageElement>) => {
             const img = e.currentTarget;
             if (img.naturalWidth > 0 && img.naturalHeight > 0) {
               setImgNatural({ w: img.naturalWidth, h: img.naturalHeight });

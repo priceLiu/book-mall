@@ -107,6 +107,8 @@ export type Sbv1VideoEngineNodeData = {
   /** @deprecated 见 User.sbv1PortraitLivenessAt */
   realPersonLivenessAt?: string;
   runtime?: CanvasNodeRuntime;
+  /** 成片 OSS（与 runtime.ossUrl 冗余，兼容旧画布） */
+  ossUrl?: string;
   uploading?: boolean;
   /** 快捷预设 · 专业拉片 */
   pro2PresetKind?: string;

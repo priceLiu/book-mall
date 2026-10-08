@@ -58,6 +58,7 @@ import {
 } from "@/lib/detail-page-suite-prompt-selection";
 import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import type { DetailPageSuiteProject } from "@/lib/detail-page-suite-types";
+import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import {
   assignDetailPageSuiteReplicaSegmentModule,
   createDetailPageSuiteReplicaProject,

@@ -107,7 +107,10 @@ export function createCanvasGlobalAssetLibraryApi(): GlobalAssetLibraryApiClient
       const data = await bookFetch(`api/canvas/project-assets?${params.toString()}`);
       const q = query.keyword?.trim().toLowerCase() ?? "";
       const items: UnifiedAssetPickItem[] = [];
-      for (const raw of data.assets ?? []) {
+      const assets = Array.isArray(data.assets)
+        ? (data.assets as Array<Record<string, unknown>>)
+        : [];
+      for (const raw of assets) {
         const kind = String(raw.kind ?? "");
         if (query.media === "image" && kind === "STORYBOARD_VIDEO") continue;
         const name = String(raw.displayName ?? "未命名");

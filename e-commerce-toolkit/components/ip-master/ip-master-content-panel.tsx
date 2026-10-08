@@ -169,7 +169,7 @@ export function IpMasterContentPanel({
           </label>
         </div>
         <IpMasterTemplateGeneratingShell
-          generating={templateGenBusy}
+          generating={templateGenBusy ?? false}
           className="space-y-4"
           minHeightClass="min-h-[16rem]"
         >
@@ -245,7 +245,7 @@ export function IpMasterContentPanel({
           >
             {renderStepHeader(reviewStep)}
             <IpMasterTemplateGeneratingShell
-              generating={templateGenBusy}
+              generating={templateGenBusy ?? false}
               className="space-y-4 p-1"
               minHeightClass="min-h-[24rem]"
             >

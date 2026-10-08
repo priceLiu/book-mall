@@ -47,10 +47,11 @@ const nextConfig = {
       "platform-assistant",
     );
     config.resolve.alias["@private/ecom-copy-overlay"] = resolveShared("ecom-copy-overlay");
-    config.resolve.alias["@private/platform-compose-ui"] = path.join(
-      __dirname,
-      "../book-mall/platform-compose-ui",
-    );
+    config.resolve.alias["@private/platform-compose-ui"] = (() => {
+      const monorepo = path.join(__dirname, "../book-mall/platform-compose-ui");
+      if (fs.existsSync(monorepo)) return monorepo;
+      return path.join(__dirname, "docker-shared/platform-compose-ui");
+    })();
     return config;
   },
   images: {

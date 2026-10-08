@@ -6,6 +6,7 @@ import type {
   DetailPageSuiteProject,
   DetailPageSuiteTemplate,
 } from "@/lib/detail-page-suite-types";
+import type { EcomDetailPageRatio } from "@/lib/detail-page-suite-platform-ratio";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 
 const BASE = "api/sso/tools/ecom/detail-page-suite";
@@ -147,7 +148,7 @@ export async function generateDetailPageSuiteImages(
     onlySelected?: boolean;
     modelKey?: string;
     imageSize?: string;
-    imageRatio?: "1:1" | "3:4" | "4:5" | "16:9";
+    imageRatio?: EcomDetailPageRatio;
   },
 ) {
   const data = await ecomBookFetch(`${BASE}/projects/${projectId}/images/generate`, {

@@ -1,6 +1,6 @@
 import {
   ECOM_STYLE_PRESET_CATALOG,
-  listStylePresets as listStylePresetsFromSeed,
+  listStylePresetsFromSeed,
   matchesVerticalSeed,
   shuffleWithSeed,
 } from "./catalog-seed";

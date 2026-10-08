@@ -13,6 +13,7 @@ import {
   useComposeDialogs,
   useComposeFilmstripLoader,
   DEFAULT_COMPOSE_PROFILE,
+  type ComposeDialogsApi,
   type ComposeWorkbenchState,
 } from "@private/platform-compose-ui/editor";
 import { Loader2 } from "lucide-react";
@@ -344,12 +345,16 @@ function JianyingComposeDockPanelInner({
 
 export function JianyingComposeDockPanel(props: Props) {
   const dialogs = useDialogs();
-  const dialogApi = useMemo(
+  const dialogApi = useMemo<ComposeDialogsApi>(
     () => ({
-      alert: dialogs.alert,
-      toast: dialogs.toast,
+      alert: (opts) =>
+        dialogs.alert({
+          title: opts.title,
+          message: opts.message,
+          variant: opts.variant,
+        }),
     }),
-    [dialogs.alert, dialogs.toast],
+    [dialogs],
   );
 
   return (

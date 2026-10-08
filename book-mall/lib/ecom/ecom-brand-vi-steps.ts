@@ -15,6 +15,11 @@ export const BRAND_VI_VISUAL_BASE = [
   "极简纯白基底，无杂物、无水印、无平台 Logo",
 ];
 
+/** 导出 ZIP 等场景用的 Markdown 段落 */
+export const BRAND_VI_BASE_STYLE = BRAND_VI_VISUAL_BASE.map((r) => `- ${r}`).join(
+  "\n",
+);
+
 export const BRAND_VI_STEP_IDS = [
   "hero",
   "turnaround",

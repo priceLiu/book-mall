@@ -67,6 +67,7 @@ export async function updateBrandViProject(
     status: string;
     meta: BrandViProject["meta"];
     chatHistory: BrandViChatMessage[];
+    brief: BrandViProject["brief"];
   }>,
 ): Promise<BrandViProject> {
   const data = await ecomBookFetch(`${BASE}/projects/${id}`, {
