@@ -125,7 +125,7 @@ type IpWorkflowPlanLike = {
   >;
 };
 
-type IpWorkflowProjectLike = {
+export type IpWorkflowProjectLike = {
   updatedAt?: string;
   plan?: IpWorkflowPlanLike;
 };

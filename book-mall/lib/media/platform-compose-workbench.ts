@@ -34,6 +34,10 @@ export type PlatformComposeWorkbenchAudioClip = Omit<
 > & {
   videoUrl?: string;
   audioUrl: string;
+  /** 连线资产库 · 该配音对应时间线上的视频段 id */
+  pairedTimelineClipId?: string;
+  /** 独立配音轨 · 在时间线上的起始位置（秒）；缺省则与对应视频段左缘对齐 */
+  programStartSec?: number;
 };
 
 export type PlatformComposeWorkbenchState = {
@@ -176,7 +180,7 @@ export function parsePlatformComposeWorkbenchProfile(
   if (bgmPresetId) {
     return {
       ...base,
-      audio: { ...base.audio, bgmPresetId },
+      audio: { ...base.audio, mixTts: base.audio?.mixTts ?? true, bgmPresetId },
     };
   }
   return base;
@@ -190,7 +194,7 @@ export function composeWorkbenchProfileToRenderProfile(
     fallbackBgmPresetId?: string;
   },
 ): RenderProfile {
-  const parsed = profile
+  const parsed: PlatformComposeWorkbenchProfile = profile
     ? parsePlatformComposeWorkbenchProfile(profile)
     : { ...DEFAULT_RENDER_PROFILE };
 

@@ -180,8 +180,7 @@ export async function runSimpleFusionI2v(opts: {
   }
 
   if (provider === "dashscope" && isStoryboardKling30VideoModel(modelKey)) {
-    const klingAspect: "16:9" | "9:16" | "1:1" =
-      aspectRatio === "16:9" ? "16:9" : "9:16";
+    const klingAspect: "16:9" | "9:16" | "1:1" = aspectRatio;
     const { model, videoBody } = buildEcomStoryboardKling30DashscopeVideoJob({
       prompt,
       firstFrameUrl: panelFirstFrame,

@@ -7,11 +7,17 @@ import { SIMPLE_FUSION_I2V_V1_TEMPLATE_ID } from "@/lib/ecom/video-workflow/temp
 import { parseSimpleFusionI2vEnvelope } from "@/lib/ecom/video-workflow/templates/simple-fusion-i2v-v1/parser";
 import { parseSimpleFusionPayload } from "@/lib/ecom/video-workflow/templates/simple-fusion-i2v-v1/schema";
 
+export type VideoTemplateParseResult = {
+  ok: boolean;
+  error?: string;
+  [key: string]: unknown;
+};
+
 export type VideoTemplateEngine = {
   templateId: string;
   displayName: string;
   moduleId: string;
-  parseEnvelope: (envelope: WorkflowEnvelope) => ReturnType<typeof parseOutfitV1Envelope>;
+  parseEnvelope: (envelope: WorkflowEnvelope) => VideoTemplateParseResult;
   validatePayload: (action: string, payload: unknown) => boolean;
   uiConfig: typeof OUTFIT_V1_UI_CONFIG;
 };

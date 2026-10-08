@@ -1,3 +1,5 @@
+import { Prisma } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma";
 
 import type { SimpleFusionProjectDto } from "./types";
@@ -34,7 +36,7 @@ export async function saveSimpleFusionDeliverableSnapshot(
         ...prevMeta,
         deliverableSnapshot: snapshot,
         deliverableSnapshotHistory: nextHistory,
-      },
+      } as Prisma.InputJsonValue,
     },
   });
 }

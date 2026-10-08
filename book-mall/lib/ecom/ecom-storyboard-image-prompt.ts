@@ -309,7 +309,8 @@ export function buildStoryboardImagePromptContext(project: {
   const workflowVertical = wf?.vertical ?? deliverable?.vertical;
   let productCategoryFromVertical: string | undefined;
   if (workflowVertical && isProVerticalId(workflowVertical)) {
-    productCategoryFromVertical = getProVerticalConfig(workflowVertical).imagePromptCategory;
+    productCategoryFromVertical =
+      getProVerticalConfig(workflowVertical)?.imagePromptCategory ?? undefined;
   }
 
   return {

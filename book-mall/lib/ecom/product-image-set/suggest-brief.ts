@@ -8,21 +8,22 @@ import {
 } from "@/lib/ecom/product-image-set/types";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
 import { ECOM_DEFAULT_VISION_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
-import type { EcomStylePresetVertical } from "@/lib/ecom/ecom-style-preset";
-
 import {
   getProductImageSetProject,
   updateProductImageSetProject,
 } from "./project-service";
+import type { ProductImageSetMeta } from "./types";
 
 const VERTICAL_PROMPT = `根据产品图判断品类垂直，只输出 JSON：{"vertical":"fashion_apparel"|"bags"|"digital_3c"|"generic"}`;
+
+type InferredVertical = NonNullable<ProductImageSetMeta["inferredVertical"]>;
 
 async function inferVerticalFromImages(opts: {
   userId: string;
   projectId: string;
   urls: string[];
   modelKey: string;
-}): Promise<EcomStylePresetVertical> {
+}): Promise<InferredVertical> {
   if (opts.urls.length === 0) return "generic";
   try {
     const parts: CanvasChatContentPart[] = [

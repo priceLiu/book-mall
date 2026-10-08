@@ -15,6 +15,7 @@ import {
   pendingIpWorkflowSlotIndexes,
   withIpWorkflowStepGenerating,
   type IpWorkflowGenPollResult,
+  type IpWorkflowProjectLike,
   type IpWorkflowSlotLike,
 } from "@/lib/ecom-ip-workflow-image-gen-dock";
 
@@ -29,7 +30,10 @@ export type IpWorkflowGenJob<TStepId extends string = string> = {
 
 type StepGenFailure = { index: number; message: string };
 
-type UseEcomIpWorkflowStepImageGenOptions<TStepId extends string, TProject> = {
+type UseEcomIpWorkflowStepImageGenOptions<
+  TStepId extends string,
+  TProject extends IpWorkflowProjectLike,
+> = {
   project: TProject;
   projectId: string;
   /** 切换项目时用于恢复服务端 generating */
@@ -60,7 +64,10 @@ type JobRuntime = {
   fetchError: string | null;
 };
 
-export function useEcomIpWorkflowStepImageGen<TStepId extends string, TProject>(
+export function useEcomIpWorkflowStepImageGen<
+  TStepId extends string,
+  TProject extends IpWorkflowProjectLike,
+>(
   opts: UseEcomIpWorkflowStepImageGenOptions<TStepId, TProject>,
 ) {
   const {

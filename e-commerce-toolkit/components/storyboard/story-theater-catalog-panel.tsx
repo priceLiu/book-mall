@@ -219,7 +219,7 @@ export function StoryTheaterCatalogPanel() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-2 border-b border-[#e8e8ed] pb-3">
-        {(Object.keys(verticalLabels) as VerticalTab[]).map((v) => (
+        {(Object.keys(verticalLabels) as Array<keyof typeof verticalLabels>).map((v) => (
           <button
             key={v}
             type="button"

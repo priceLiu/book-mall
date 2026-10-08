@@ -36,6 +36,7 @@ import {
   workbenchToMediaTimeline,
   type SimpleFusionComposeWorkbenchState,
   newImportComposeClip,
+  parseComposeWorkbenchFromMeta,
 } from "./compose-workbench";
 import { resolveSimpleFusionBgmUrl } from "./render";
 import {
@@ -649,6 +650,8 @@ export async function runSimpleFusionPipeline(
     if (videoTargets.length === 0) {
       throw new Error("没有可用的融合图，请先完成静态融合");
     }
+    const panelDurationSec =
+      project?.settings.panelDurationSec ?? SIMPLE_FUSION_VIDEO_DURATION_SEC;
     await mapWithConcurrency(videoTargets, async (look) => {
       if (!look.fusedImageUrl?.trim()) return;
       look.status = "generating";
@@ -659,7 +662,7 @@ export async function runSimpleFusionPipeline(
           fusedImageUrl: look.fusedImageUrl,
           prompt: prompts.video,
           modelKey: videoModelKey,
-          durationSec: project.settings.panelDurationSec,
+          durationSec: panelDurationSec,
         });
         look.clipVideoUrl = videoUrl;
         look.status = "success";
