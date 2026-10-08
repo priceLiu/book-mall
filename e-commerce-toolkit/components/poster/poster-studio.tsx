@@ -55,6 +55,7 @@ import { downloadMediaUrl, mediaDownloadFilename } from "@/lib/ecom-media-downlo
 import { fetchStoryboardModels } from "@/lib/ecom-storyboard-api";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
 import { cn } from "@/lib/utils";
 
 const EASY_CARDS: Array<{ path: PosterEasyPath; title: string; desc: string }> = [
@@ -131,6 +132,9 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
   const [modelsLoading, setModelsLoading] = useState(true);
   const [modelsLoadError, setModelsLoadError] = useState<string | null>(null);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const refSlotInputRefs = useRef<
+    Partial<Record<PosterRefRole, HTMLInputElement | null>>
+  >({});
 
   const hydrateUiFromProject = useCallback((p: PosterProject) => {
     setTab(p.plan.tier === "pro" ? "pro" : "easy");
@@ -660,13 +664,23 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
                         ossUrl: r.ossUrl,
                         label: r.label ?? label,
                       }))}
+                      emptyHint={`上传${label}参考图。${IMAGE_UPLOAD_DROP_HINT}`}
                       hideTitle
+                      hideEmptyHint
                       multiple={false}
+                      inputRef={(el) => {
+                        refSlotInputRefs.current[role] = el;
+                      }}
+                      onOpenFilePicker={() => refSlotInputRefs.current[role]?.click()}
                       onUploadFiles={async (files) => {
                         const file = files[0];
                         if (!file) return;
-                      const { project: p } = await uploadPosterRef(project.id, file, role);
-                      applyProject(p);
+                        const { project: p } = await uploadPosterRef(
+                          project.id,
+                          file,
+                          role,
+                        );
+                        applyProject(p);
                       }}
                     />
                   </div>
@@ -874,9 +888,12 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
             if (!cur) return;
             artifacts[layoutArtifactIndex] = {
               ...cur,
-              copy: { ...cur.copy, slotCopy: extras.slotCopy ?? cur.copy.slotCopy },
+              copy: {
+                ...cur.copy,
+                slotCopy: extras?.slotCopy ?? cur.copy.slotCopy,
+              },
               image: { ...cur.image, imagePrompt: prompt },
-              layout: extras.copyOverlay ?? cur.layout,
+              layout: extras?.copyOverlay ?? cur.layout,
             };
             const updated = await patchPosterProject(project.id, {
               plan: { ...project.plan, artifacts },

@@ -12,6 +12,20 @@ function resolveShared(pkg) {
   return path.join(__dirname, "docker-shared", pkg);
 }
 
+/** 本地用 book-mall 真源；Docker 仅 COPY 了 compose-ui 到 ../book-mall 时须走 docker-shared（否则 clsx 等无法从 /app/node_modules 解析）。 */
+function resolvePlatformComposeUi() {
+  const dockerShared = path.join(__dirname, "docker-shared/platform-compose-ui");
+  const monorepoRoot = path.join(__dirname, "../book-mall");
+  const monorepo = path.join(monorepoRoot, "platform-compose-ui");
+  const fullBookMall =
+    fs.existsSync(path.join(monorepoRoot, "package.json")) &&
+    fs.existsSync(monorepo);
+  if (fullBookMall) return monorepo;
+  if (fs.existsSync(dockerShared)) return dockerShared;
+  if (fs.existsSync(monorepo)) return monorepo;
+  return dockerShared;
+}
+
 // 阿里云 OSS 公网域名（虚拟域名 + 自定义 CDN）。与 story-web 一致。
 function ossHostPatterns() {
   const raw = process.env.NEXT_PUBLIC_OSS_HOSTS?.trim();
@@ -47,11 +61,7 @@ const nextConfig = {
       "platform-assistant",
     );
     config.resolve.alias["@private/ecom-copy-overlay"] = resolveShared("ecom-copy-overlay");
-    config.resolve.alias["@private/platform-compose-ui"] = (() => {
-      const monorepo = path.join(__dirname, "../book-mall/platform-compose-ui");
-      if (fs.existsSync(monorepo)) return monorepo;
-      return path.join(__dirname, "docker-shared/platform-compose-ui");
-    })();
+    config.resolve.alias["@private/platform-compose-ui"] = resolvePlatformComposeUi();
     return config;
   },
   images: {

@@ -8,6 +8,7 @@ import {
 } from "@/lib/gateway/book-gateway-link";
 import { GatewayV1AsrError, runGatewayV1AsrTranscribe } from "@/lib/gateway/gateway-v1-asr-service";
 import { gatewayV1ClientMetaForBookUser } from "@/lib/gateway/gateway-log-meta-for-user";
+import { resolveCanvasProjectTeamTenantId } from "@/lib/gateway/resolve-canvas-project-team-tenant";
 import { isDashscopeAsrNoSpeechOutcome } from "@/lib/gateway/dashscope-client";
 import { buildAsrSubtitleSrtFromGlobalSegments } from "@/lib/media/asr-subtitle";
 import {
@@ -72,9 +73,12 @@ export async function runCanvasVideoSubtitleExtract(opts: {
       throw new Error("成片没有音轨，无法提取字幕");
     }
 
+    const preferredTenantId = opts.projectId
+      ? await resolveCanvasProjectTeamTenantId(opts.projectId)
+      : undefined;
     const logMeta = await gatewayV1ClientMetaForBookUser("CANVAS", opts.userId, {
-      projectId: opts.projectId,
       clientPage: "canvas-video-subtitle-extract",
+      preferredTenantId,
     });
 
     let segments: Array<{ startMs: number; endMs: number; text: string }> =

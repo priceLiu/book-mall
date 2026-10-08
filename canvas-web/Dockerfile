@@ -26,7 +26,8 @@ COPY --from=deps /app/package.json ./package.json
 COPY --from=deps /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY . .
-RUN mkdir -p public
+RUN mkdir -p public \
+  && ln -sf /app/node_modules /book-mall/node_modules
 ENV NEXT_TELEMETRY_DISABLED=1
 # .dockerignore 排除 .env.*；NEXT_PUBLIC_* 须在 build 阶段注入（运行时改无效）
 ARG NEXT_PUBLIC_BOOK_MALL_URL=https://book.ai-code8.com

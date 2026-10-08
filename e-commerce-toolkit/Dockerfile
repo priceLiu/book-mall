@@ -25,7 +25,8 @@ COPY --from=deps /app/package.json ./package.json
 COPY --from=deps /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY . .
-RUN mkdir -p public
+RUN mkdir -p public \
+  && ln -sf /app/node_modules /book-mall/node_modules
 ARG NEXT_PUBLIC_BOOK_MALL_URL=https://book.ai-code8.com
 ARG NEXT_PUBLIC_ECOMMERCE_WEB_ORIGIN=https://ecom.ai-code8.com
 ENV NEXT_PUBLIC_BOOK_MALL_URL=${NEXT_PUBLIC_BOOK_MALL_URL}
