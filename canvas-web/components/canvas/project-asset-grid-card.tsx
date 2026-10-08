@@ -1,7 +1,35 @@
 "use client";
 
+import { AudioLines, ImagePlus, ScrollText } from "lucide-react";
+
+import type { ProjectAssetKind } from "@/lib/canvas/project-asset-types";
 import { isProjectAssetVideoUrl } from "@/lib/canvas/project-asset-preview";
 import { cn } from "@/lib/utils";
+
+const HOVER_INSERT_BTN =
+  "pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow-md transition hover:scale-105 hover:bg-white";
+
+function ProjectAssetEmptyPreview({ assetKind }: { assetKind?: ProjectAssetKind }) {
+  if (assetKind === "AUDIO") {
+    return (
+      <div className="flex size-full flex-col items-center justify-center bg-black">
+        <AudioLines className="size-10 text-white/30" strokeWidth={1.5} aria-hidden />
+      </div>
+    );
+  }
+  if (assetKind === "SCRIPT_PACKAGE") {
+    return (
+      <div className="flex size-full flex-col items-center justify-center bg-black">
+        <ScrollText className="size-10 text-white/30" strokeWidth={1.5} aria-hidden />
+      </div>
+    );
+  }
+  return (
+    <div className="flex size-full flex-col items-center justify-center gap-1 bg-black px-2 text-center">
+      <span className="text-[10px] text-white/35">暂无预览</span>
+    </div>
+  );
+}
 
 export type ProjectAssetGridCardMedia = {
   id: string;
@@ -70,11 +98,13 @@ function SquareMediaTile({
 /** 正方形区域内的多图/单图预览（保存对话框、侧栏卡片共用） */
 export function ProjectAssetMediaPreviewGrid({
   items,
+  assetKind,
   onHoverItem,
   onLeaveItem,
   onPreviewItem,
 }: {
   items: ProjectAssetGridCardMedia[];
+  assetKind?: ProjectAssetKind;
   onHoverItem?: (
     item: ProjectAssetGridCardMedia,
     anchor: HTMLElement,
@@ -83,11 +113,7 @@ export function ProjectAssetMediaPreviewGrid({
   onPreviewItem?: (item: ProjectAssetGridCardMedia) => void;
 }) {
   if (items.length === 0) {
-    return (
-      <div className="flex size-full flex-col items-center justify-center gap-1 px-2 text-center">
-        <span className="text-[10px] text-white/40">暂无预览</span>
-      </div>
-    );
+    return <ProjectAssetEmptyPreview assetKind={assetKind} />;
   }
 
   if (items.length === 1) {
@@ -140,6 +166,7 @@ export function ProjectAssetMediaPreviewGrid({
 export function ProjectAssetGridCard({
   kindLabel,
   displayName,
+  assetKind,
   mediaItems,
   canInsert,
   insertBusy,
@@ -151,6 +178,7 @@ export function ProjectAssetGridCard({
 }: {
   kindLabel: string;
   displayName: string;
+  assetKind?: ProjectAssetKind;
   mediaItems: ProjectAssetGridCardMedia[];
   canInsert?: boolean;
   insertBusy?: boolean;
@@ -175,27 +203,33 @@ export function ProjectAssetGridCard({
         {cardTitle}
       </p>
 
-      <div className="relative mx-2 aspect-square overflow-hidden rounded-md bg-black/50">
+      <div className="group/media relative mx-2 mb-2 mt-1 aspect-square overflow-hidden rounded-md bg-black">
         <ProjectAssetMediaPreviewGrid
           items={mediaItems}
+          assetKind={assetKind}
           onHoverItem={onHoverMedia}
           onLeaveItem={onLeaveMedia}
           onPreviewItem={onPreviewMedia}
         />
+        {canInsert ? (
+          <div className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center bg-black/0 opacity-0 transition duration-150 group-hover/media:bg-black/45 group-hover/media:opacity-100">
+            <button
+              type="button"
+              className={HOVER_INSERT_BTN}
+              aria-label="插入画布"
+              title="插入画布"
+              disabled={insertBusy}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onInsert?.();
+              }}
+            >
+              <ImagePlus className="h-4 w-4" strokeWidth={2} />
+            </button>
+          </div>
+        ) : null}
       </div>
-
-      {canInsert ? (
-        <button
-          type="button"
-          className="mx-2 mb-1.5 mt-2 w-[calc(100%-1rem)] rounded-md border border-cyan-400/25 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-medium text-cyan-100 hover:bg-cyan-500/20 disabled:opacity-50"
-          disabled={insertBusy}
-          onClick={onInsert}
-        >
-          插入画布
-        </button>
-      ) : (
-        <div className="mb-1.5 mt-2 h-[30px]" aria-hidden />
-      )}
 
       {footerMeta ? (
         <div className="min-h-[22px] border-t border-white/5 px-2 pb-2 pt-1">

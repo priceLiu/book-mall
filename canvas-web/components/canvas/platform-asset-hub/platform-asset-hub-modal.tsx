@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+
+import type { GlobalAssetPickItem } from "@/docker-shared/global-asset-library/types";
+import { spawnCanvasNodesFromGlobalAssetPick } from "@/lib/canvas/spawn-global-asset-pick";
+import { detectCanvasEditionFromNodes } from "@/lib/canvas/spawn-project-asset-on-canvas";
+import { platformCatalogPreviewUrl, platformCatalogPromptFirst } from "./platform-catalog-item-utils";
 import { createPortal } from "react-dom";
 import { Clapperboard, LayoutGrid, Package, ScanFace, Sparkles, X } from "lucide-react";
 
@@ -73,6 +78,29 @@ export function PlatformAssetHubModal({
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const getNodes = useCallback(() => useCanvasStore.getState().nodes, []);
   const getEdges = useCallback(() => useCanvasStore.getState().edges, []);
+
+  const insertCatalogItem = useCallback(
+    (item: GlobalAssetPickItem) => {
+      if (platformCatalogPromptFirst(item)) return;
+      const edition =
+        detectCanvasEditionFromNodes(useCanvasStore.getState().nodes) === "sbv1"
+          ? "sbv1"
+          : "pro2";
+      spawnCanvasNodesFromGlobalAssetPick([item], {
+        edition,
+        addNode,
+        setNodes,
+      });
+      onClose();
+    },
+    [addNode, setNodes, onClose],
+  );
+
+  const previewCatalogItem = useCallback((item: GlobalAssetPickItem) => {
+    const url = platformCatalogPreviewUrl(item);
+    if (!url) return;
+    setPreview({ url, title: item.title });
+  }, []);
 
   useModalBodyScrollLock(open);
   useModalEscapeClose(onClose, { active: open });
@@ -183,12 +211,19 @@ export function PlatformAssetHubModal({
                 onPick={
                   catalogPick
                     ? async (items) => {
-                        await catalogPick.onPick(items);
+                        const withImage = items.filter(
+                          (i) => !platformCatalogPromptFirst(i) && i.ossUrl?.trim(),
+                        );
+                        if (withImage.length > 0) {
+                          await catalogPick.onPick(withImage);
+                        }
                         onClose();
                       }
                     : undefined
                 }
                 onCancel={catalogPick ? onClose : undefined}
+                onPreview={previewCatalogItem}
+                onInsert={insertCatalogItem}
               />
             ) : null}
             {section === "style" ? (

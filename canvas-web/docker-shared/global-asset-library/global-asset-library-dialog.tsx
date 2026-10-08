@@ -10,7 +10,8 @@ import {
   GALD_BODY_CLASS,
   GALD_CLOSE_BTN_CLASS,
   GALD_DIALOG_SHELL_CLASS,
-  GALD_GRID_CLASS,
+  GALD_MASONRY_CLASS,
+  GALD_MASONRY_ITEM_CLASS,
   GALD_PAGE_SIZE,
   globalAssetTheme,
 } from "./theme";
@@ -384,14 +385,18 @@ export function GlobalAssetLibraryDialog({
                   </p>
                 ) : (
                   <>
-                    <ul className={GALD_GRID_CLASS}>
+                    <ul className={GALD_MASONRY_CLASS}>
                       {visibleItems.map((item) => {
                         const active = selected.includes(item.id);
                         return (
-                          <li key={`${item.catalogKind ?? "works"}-${item.id}`}>
+                          <li
+                            key={`${item.catalogKind ?? "works"}-${item.id}`}
+                            className={GALD_MASONRY_ITEM_CLASS}
+                          >
                             <GlobalAssetTile
                               item={item}
                               variant={variant}
+                              layout={item.promptOnly ? "fixed" : "fluid"}
                               active={active}
                               selectIndex={active ? selected.indexOf(item.id) + 1 : undefined}
                               scopeText={scopeLabel(item.scope)}

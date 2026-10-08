@@ -154,23 +154,33 @@ export function SaveToCatalogDialog({
       onClick={requestClose}
     >
       <div
-        className={`relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border p-4 pt-10 shadow-xl ${theme.shell}`}
+        className={`relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border shadow-xl sm:flex-row ${theme.shell}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          type="button"
-          className={`absolute right-3 top-3 ${GALD_CLOSE_BTN_CLASS} ${theme.btnSecondary}`}
-          aria-label="关闭"
-          onClick={requestClose}
+        <div
+          className={`flex min-h-[200px] shrink-0 items-center justify-center border-b p-4 sm:min-h-0 sm:w-[40%] sm:max-w-[320px] sm:border-b-0 sm:border-r ${theme.border} ${
+            variant === "dark" ? "bg-black/30" : "bg-[#f5f5f7]"
+          }`}
         >
-          <X className="h-4 w-4" />
-        </button>
-
-        <h4 className={`mb-3 text-sm font-semibold ${theme.textPrimary}`}>保存到库</h4>
-        <div className={`mb-3 overflow-hidden rounded-lg border ${theme.border} bg-[#f5f5f7]`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={sourceImage.url} alt="" className="mx-auto max-h-48 object-contain" />
+          <img
+            src={sourceImage.url}
+            alt=""
+            className="max-h-[min(42vh,360px)] w-full object-contain sm:max-h-[min(78vh,520px)]"
+          />
         </div>
+
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-4 pt-10">
+          <button
+            type="button"
+            className={`absolute right-3 top-3 ${GALD_CLOSE_BTN_CLASS} ${theme.btnSecondary}`}
+            aria-label="关闭"
+            onClick={requestClose}
+          >
+            <X className="h-4 w-4" />
+          </button>
+
+          <h4 className={`mb-3 pr-8 text-sm font-semibold ${theme.textPrimary}`}>保存到库</h4>
 
         <div className={`mb-3 space-y-2 text-xs ${theme.textPrimary}`}>
           <span className="font-medium">目标库</span>
@@ -292,7 +302,7 @@ export function SaveToCatalogDialog({
         ) : null}
 
         {error ? <p className="mb-2 text-xs text-red-600">{error}</p> : null}
-        <div className="flex justify-end gap-2">
+        <div className="mt-auto flex justify-end gap-2 pt-2">
           <button
             type="button"
             className={`rounded-lg px-3 py-1.5 text-sm ${theme.btnSecondary}`}
@@ -312,6 +322,7 @@ export function SaveToCatalogDialog({
                 : "保存中…"
               : "确认入库"}
           </button>
+        </div>
         </div>
 
         {discardOpen ? (

@@ -1,7 +1,11 @@
 "use client";
 
+import { ImagePlus, ZoomIn } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+
+const STYLE_HOVER_ACTION_BTN =
+  "pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow-md transition hover:scale-105 hover:bg-white";
 import {
   STYLE_LIBRARY_CARD_FOOTER,
   STYLE_LIBRARY_CARD_SHELL,
@@ -230,24 +234,44 @@ function StyleLibraryCard({
           {preset.prompt}
         </div>
 
-        {onPreview && hasImage ? (
-          <button
-            type="button"
-            className="nodrag absolute right-2 top-2 z-10 rounded-md border border-white/20 bg-black/60 px-2 py-0.5 text-[10px] text-white/90 opacity-0 transition group-hover/card:opacity-100"
-            onClick={(e) => {
-              stop(e);
-              onPreview(preset);
-            }}
-          >
-            预览
-          </button>
+        {(onPreview && hasImage) || onSelect ? (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition duration-150 group-hover/card:bg-black/45 group-hover/card:opacity-100">
+            {onPreview && hasImage ? (
+              <button
+                type="button"
+                className={cn("nodrag", STYLE_HOVER_ACTION_BTN)}
+                aria-label="预览"
+                title="预览"
+                onClick={(e) => {
+                  stop(e);
+                  onPreview(preset);
+                }}
+              >
+                <ZoomIn className="h-4 w-4" strokeWidth={2} />
+              </button>
+            ) : null}
+            {onSelect ? (
+              <button
+                type="button"
+                className={cn("nodrag", STYLE_HOVER_ACTION_BTN)}
+                aria-label={selectLabel}
+                title={selectLabel}
+                onClick={(e) => {
+                  stop(e);
+                  onSelect(preset);
+                }}
+              >
+                <ImagePlus className="h-4 w-4" strokeWidth={2} />
+              </button>
+            ) : null}
+          </div>
         ) : null}
       </div>
 
       <div className={STYLE_LIBRARY_CARD_FOOTER}>
         <p className={STYLE_LIBRARY_CARD_TITLE}>{preset.name}</p>
         <p className={STYLE_LIBRARY_CARD_SUBTITLE}>{preset.category}</p>
-        {onSelect ? (
+        {onSelect && !calm ? (
           <p className="mt-2 text-[10px] font-medium text-cyan-300/80">
             点击{selectLabel}
           </p>

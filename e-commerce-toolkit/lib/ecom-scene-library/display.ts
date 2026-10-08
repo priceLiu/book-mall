@@ -8,8 +8,6 @@ export const ECOM_SCENE_LIBRARY_PLACEHOLDER_SVG =
   );
 
 export function resolveSceneLibraryCardImageUrl(entry: EcomSceneLibraryEntry): string {
-  const fromApi = entry.displayImageUrl?.trim();
-  if (fromApi) return fromApi;
   const own = entry.thumbUrl?.trim() || entry.ossUrl?.trim();
   if (own) return own;
   return ECOM_SCENE_LIBRARY_PLACEHOLDER_SVG;

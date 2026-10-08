@@ -28,7 +28,8 @@ import {
 } from "@/lib/canvas-api";
 import {
   PROJECT_ASSET_KIND_LABELS,
-  PROJECT_ASSET_TAB_KINDS,
+  PROJECT_ASSET_TAB_ROW1,
+  PROJECT_ASSET_TAB_ROW2,
 } from "@/lib/canvas/project-asset-kind-map";
 import type { ProjectAssetKind, ProjectAssetRecord } from "@/lib/canvas/project-asset-types";
 import { useProjectAssets } from "@/lib/canvas/use-project-assets";
@@ -238,31 +239,46 @@ export function UnifiedProjectAssetsView({
     }
   };
 
+  const tabChromeClass = cn(
+    "space-y-2",
+    compact
+      ? "sticky top-0 z-10 -mx-3 border-b border-white/10 bg-[var(--canvas-surface)] px-3 pb-2"
+      : "sticky top-0 z-10 -mx-1 border-b border-white/10 bg-cyan-950/95 px-1 pb-3 backdrop-blur-sm",
+  );
+
   return (
     <>
-      <div className={compact ? "space-y-3" : "space-y-4"}>
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            type="search"
-            placeholder="搜索资产…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className={cn("min-w-[140px] flex-1", CANVAS_PANEL_SHELL_SELECT_CLASS, "py-1.5 text-xs")}
-          />
-          {!compact ? (
-            <Link href="/guides/project-assets" className={PRO_ASSETS_LINK_CLASS}>
-              资产指南
-            </Link>
-          ) : null}
+      <div className={compact ? "flex min-h-0 flex-col" : "space-y-4"}>
+        <div className={tabChromeClass}>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="search"
+              placeholder="搜索资产…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className={cn("min-w-[140px] flex-1", CANVAS_PANEL_SHELL_SELECT_CLASS, "py-1.5 text-xs")}
+            />
+            {!compact ? (
+              <Link href="/guides/project-assets" className={PRO_ASSETS_LINK_CLASS}>
+                资产指南
+              </Link>
+            ) : null}
+          </div>
+
+          <div className="flex flex-wrap gap-1">
+            <TabBtn tab={tab} id="all" label="全部" onTab={setTab} />
+            {PROJECT_ASSET_TAB_ROW1.map((k) => (
+              <TabBtn key={k} tab={tab} id={k} label={PROJECT_ASSET_KIND_LABELS[k]} onTab={setTab} />
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {PROJECT_ASSET_TAB_ROW2.map((k) => (
+              <TabBtn key={k} tab={tab} id={k} label={PROJECT_ASSET_KIND_LABELS[k]} onTab={setTab} />
+            ))}
+          </div>
         </div>
 
-        <div className="flex flex-wrap gap-1">
-          <TabBtn tab={tab} id="all" label="全部" onTab={setTab} />
-          {PROJECT_ASSET_TAB_KINDS.map((k) => (
-            <TabBtn key={k} tab={tab} id={k} label={PROJECT_ASSET_KIND_LABELS[k]} onTab={setTab} />
-          ))}
-        </div>
-
+        <div className={compact ? "min-h-0 flex-1 pt-2" : "pt-1"}>
         {loading ? (
           <CanvasPanelShellLoading />
         ) : error ? (
@@ -282,7 +298,7 @@ export function UnifiedProjectAssetsView({
           <>
             {canvasInsertEnabled ? (
               <p className="text-[11px] text-cyan-200/70">
-                悬停卡片可放大预览；拖到画布空白处继续创作，或点「插入画布」。
+                悬停预览区可放大预览；拖到画布空白处继续创作，或悬停点插入图标。
               </p>
             ) : (
               <p className="text-[11px] text-white/40">
@@ -313,6 +329,7 @@ export function UnifiedProjectAssetsView({
             <div ref={loadMoreSentinelRef} className="h-1" aria-hidden />
           </>
         )}
+        </div>
       </div>
       {preview ? (
         <StoryMediaPreviewModal
@@ -396,6 +413,7 @@ function ProjectAssetGridItem({
       <ProjectAssetGridCard
         kindLabel={PROJECT_ASSET_KIND_LABELS[asset.kind]}
         displayName={asset.displayName}
+        assetKind={asset.kind}
         mediaItems={mediaItems}
         canInsert={canInsert}
         insertBusy={busyId === asset.id}

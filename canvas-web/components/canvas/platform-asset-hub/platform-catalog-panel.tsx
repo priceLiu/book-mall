@@ -3,7 +3,8 @@
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { GlobalAssetTile } from "@/docker-shared/global-asset-library/global-asset-tile";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { globalAssetCatalogCopyPromptText } from "@/docker-shared/global-asset-library/catalog-media-url";
 import { GALD_PAGE_SIZE } from "@/docker-shared/global-asset-library/theme";
 import type {
   GlobalAssetCatalogKind,
@@ -12,12 +13,24 @@ import type {
 } from "@/docker-shared/global-asset-library/types";
 import { cn } from "@/lib/utils";
 
+import { PlatformCatalogImageTile } from "./platform-catalog-image-tile";
+import { platformCatalogPromptFirst, platformCatalogPreviewUrl } from "./platform-catalog-item-utils";
+import { PlatformCatalogPromptCard } from "./platform-catalog-prompt-card";
+
 const CATALOG_NAV: Array<{ id: GlobalAssetCatalogKind; label: string }> = [
   { id: "full-body", label: "全身模特" },
   { id: "avatar", label: "模特头像" },
   { id: "garment", label: "服装库" },
   { id: "pose", label: "姿势库" },
+  { id: "scene", label: "场景库" },
 ];
+
+const GENDER_FILTER_KINDS = new Set<GlobalAssetCatalogKind>([
+  "full-body",
+  "avatar",
+  "garment",
+  "pose",
+]);
 
 export type PlatformCatalogPanelProps = {
   api: GlobalAssetLibraryApiClient;
@@ -25,15 +38,20 @@ export type PlatformCatalogPanelProps = {
   maxSelect?: number;
   onPick?: (items: GlobalAssetPickItem[]) => void | Promise<void>;
   onCancel?: () => void;
+  onPreview?: (item: GlobalAssetPickItem) => void;
+  onInsert?: (item: GlobalAssetPickItem) => void;
 };
 
 export function PlatformCatalogPanel({
   api,
-  previewLightboxZIndex = 2100,
+  previewLightboxZIndex: _previewLightboxZIndex = 2100,
   maxSelect = 9,
   onPick,
   onCancel,
+  onPreview,
+  onInsert,
 }: PlatformCatalogPanelProps) {
+  const { alert } = useDialogs();
   const pickMode = Boolean(onPick);
   const [catalogKind, setCatalogKind] = useState<GlobalAssetCatalogKind>("garment");
   const [gender, setGender] = useState("all");
@@ -89,6 +107,17 @@ export function PlatformCatalogPanel({
     () => allItems.slice(0, visibleCount),
     [allItems, visibleCount],
   );
+
+  const { promptItems, imageItems } = useMemo(() => {
+    const prompt: GlobalAssetPickItem[] = [];
+    const image: GlobalAssetPickItem[] = [];
+    for (const item of visibleItems) {
+      if (platformCatalogPromptFirst(item)) prompt.push(item);
+      else image.push(item);
+    }
+    return { promptItems: prompt, imageItems: image };
+  }, [visibleItems]);
+
   const hasMore = visibleCount < allItems.length;
 
   useEffect(() => {
@@ -134,6 +163,68 @@ export function PlatformCatalogPanel({
     }
   }
 
+  const copyPrompt = useCallback(
+    async (item: GlobalAssetPickItem) => {
+      const text = globalAssetCatalogCopyPromptText(item);
+      try {
+        await navigator.clipboard.writeText(text);
+        await alert({
+          variant: "success",
+          title: "已复制提示词",
+          message: `「${item.title}」已写入剪贴板。`,
+        });
+      } catch {
+        await alert({
+          variant: "error",
+          title: "复制失败",
+          message: "请手动选中卡片内文案复制。",
+        });
+      }
+    },
+    [alert],
+  );
+
+  const handlePreview = useCallback(
+    (item: GlobalAssetPickItem) => {
+      const url = platformCatalogPreviewUrl(item);
+      if (!url) return;
+      onPreview?.(item);
+    },
+    [onPreview],
+  );
+
+  const handleInsert = useCallback(
+    (item: GlobalAssetPickItem) => {
+      if (platformCatalogPromptFirst(item)) return;
+      onInsert?.(item);
+    },
+    [onInsert],
+  );
+
+  function renderItem(item: GlobalAssetPickItem, layout: "prompt" | "image") {
+    const active = selected.includes(item.id);
+    const selectIndex = active ? selected.indexOf(item.id) + 1 : undefined;
+    const common = {
+      item,
+      active,
+      selectIndex,
+      pickMode,
+      onSelect: () => toggle(item.id),
+      onCopyPrompt: () => void copyPrompt(item),
+    };
+
+    if (layout === "prompt") {
+      return <PlatformCatalogPromptCard {...common} />;
+    }
+    return (
+      <PlatformCatalogImageTile
+        {...common}
+        onPreview={() => handlePreview(item)}
+        onInsert={() => handleInsert(item)}
+      />
+    );
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <p className="text-[11px] text-white/45">
@@ -176,15 +267,17 @@ export function PlatformCatalogPanel({
           placeholder="搜索…"
           className="min-w-[160px] flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white"
         />
-        <select
-          className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white"
-          value={gender}
-          onChange={(e) => setGender(e.target.value)}
-        >
-          <option value="all">全部性别</option>
-          <option value="female">女</option>
-          <option value="male">男</option>
-        </select>
+        {GENDER_FILTER_KINDS.has(catalogKind) ? (
+          <select
+            className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white"
+            value={gender}
+            onChange={(e) => setGender(e.target.value)}
+          >
+            <option value="all">全部性别</option>
+            <option value="female">女</option>
+            <option value="male">男</option>
+          </select>
+        ) : null}
       </div>
 
       <div
@@ -213,29 +306,27 @@ export function PlatformCatalogPanel({
           </p>
         ) : (
           <>
-            <ul className="columns-2 gap-3 sm:columns-3 md:columns-4 xl:columns-5 [column-fill:_balance]">
-              {visibleItems.map((item) => {
-                const active = selected.includes(item.id);
-                return (
+            {promptItems.length > 0 ? (
+              <ul className="mb-3 grid auto-rows-min grid-cols-1 gap-2 sm:grid-cols-2">
+                {promptItems.map((item) => (
+                  <li key={`prompt-${item.catalogKind ?? "cat"}-${item.id}`}>
+                    {renderItem(item, "prompt")}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {imageItems.length > 0 ? (
+              <ul className="columns-2 gap-3 sm:columns-3 md:columns-4 xl:columns-5 [column-fill:_balance]">
+                {imageItems.map((item) => (
                   <li
-                    key={`${item.catalogKind ?? "cat"}-${item.id}`}
+                    key={`img-${item.catalogKind ?? "cat"}-${item.id}`}
                     className="mb-3 break-inside-avoid"
                   >
-                    <GlobalAssetTile
-                      item={item}
-                      variant="dark"
-                      layout="fluid"
-                      active={active}
-                      selectIndex={active ? selected.indexOf(item.id) + 1 : undefined}
-                      scopeText=""
-                      disabled={!pickMode}
-                      previewLightboxZIndex={previewLightboxZIndex}
-                      onSelect={() => toggle(item.id)}
-                    />
+                    {renderItem(item, "image")}
                   </li>
-                );
-              })}
-            </ul>
+                ))}
+              </ul>
+            ) : null}
             {hasMore ? (
               <div ref={loadMoreRef} className="py-3 text-center text-[10px] text-white/40">
                 向下滚动加载更多

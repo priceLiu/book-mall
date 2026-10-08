@@ -70,6 +70,8 @@ type Props = {
   aspectClass?: string;
   /** 关闭视口懒加载（极少场景） */
   disableLazy?: boolean;
+  /** 主图与 thumb 均失败时回退（如场景库系统占位） */
+  imageErrorFallback?: string;
   className?: string;
 };
 
@@ -92,6 +94,7 @@ export function EcomMediaLibraryTile({
   onSelect,
   aspectClass = "aspect-square",
   disableLazy = false,
+  imageErrorFallback,
   className,
 }: Props) {
   const thumb = thumbnailSrc ?? src;
@@ -121,8 +124,14 @@ export function EcomMediaLibraryTile({
   }, [thumbDisplaySrc, src, kind]);
 
   const onImageError = useCallback(() => {
-    if (resolvedSrc !== thumb) setResolvedSrc(thumb);
-  }, [resolvedSrc, thumb]);
+    if (resolvedSrc !== thumb) {
+      setResolvedSrc(thumb);
+      return;
+    }
+    if (imageErrorFallback && resolvedSrc !== imageErrorFallback) {
+      setResolvedSrc(imageErrorFallback);
+    }
+  }, [resolvedSrc, thumb, imageErrorFallback]);
 
   const shouldLoad = disableLazy || visible;
   const showSkeleton = !disableLazy && (!shouldLoad || !mediaLoaded);

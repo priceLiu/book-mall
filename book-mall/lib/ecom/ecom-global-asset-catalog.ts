@@ -7,7 +7,13 @@ import { listAvatarLibraryEntriesForViewer } from "@/lib/ecom/ecom-model-library
 import { listGarmentLibraryEntriesForViewer } from "@/lib/ecom/ecom-garment-library-service";
 import { listFullBodyModelsForViewer } from "@/lib/ecom/ecom-full-body-model-library-service";
 import { readPoseLibraryCatalogForUser } from "@/lib/ecom/ecom-pose-library-service";
-import { listSceneLibraryEntriesForViewer } from "@/lib/ecom/ecom-scene-library-service";
+import { sceneLibraryEntryHasOwnImage } from "@/lib/ecom/ecom-scene-library-display";
+import {
+  listSceneLibraryEntriesForViewer,
+  readSceneLibraryCatalogForUser,
+  readSceneLibraryCatalogLive,
+  type EcomSceneLibraryEntry,
+} from "@/lib/ecom/ecom-scene-library-service";
 import { listStyleLibraryEntriesForViewer } from "@/lib/ecom/ecom-style-library-service";
 import { buildCatalogViewerScopeOr } from "@/lib/ecom/ecom-catalog-viewer-scope";
 import { prisma } from "@/lib/prisma";
@@ -284,27 +290,48 @@ async function loadStyleItems(
     }));
 }
 
+function sceneEntryToCatalogItem(s: EcomSceneLibraryEntry): GlobalAssetCatalogItem {
+  const hasOwn = sceneLibraryEntryHasOwnImage(s);
+  return {
+    id: s.id,
+    catalogKind: "scene",
+    title: s.name,
+    ossUrl: hasOwn ? (s.thumbUrl?.trim() || s.ossUrl!.trim()) : "",
+    thumbUrl: hasOwn ? (s.thumbUrl ?? s.ossUrl ?? null) : null,
+    scope: (s.scope ?? "user") as EcomCatalogScope,
+    description: s.visualPrompt,
+    promptOnly: !hasOwn,
+  };
+}
+
 async function loadSceneItems(
   query: GlobalAssetCatalogQuery,
   limit: number,
 ): Promise<GlobalAssetCatalogItem[]> {
-  const scenes = await listSceneLibraryEntriesForViewer({
-    userId: query.userId,
-    tenantId: query.tenantId,
-    projectId: query.projectId,
-    limit,
-  });
-  return scenes
-    .filter((s) => s.ossUrl?.trim() || s.displayImageUrl?.trim())
-    .map((s) => ({
-      id: s.id,
-      catalogKind: "scene" as const,
-      title: s.name,
-      ossUrl: (s.ossUrl ?? s.displayImageUrl)!.trim(),
-      thumbUrl: s.thumbUrl ?? s.ossUrl ?? s.displayImageUrl ?? null,
-      scope: (s.scope ?? "user") as EcomCatalogScope,
-      description: s.visualPrompt,
-    }));
+  const merged: EcomSceneLibraryEntry[] = [];
+
+  if (query.platformOnly) {
+    const cat = await readSceneLibraryCatalogLive();
+    merged.push(...(cat.platform ?? cat.scenes));
+  } else {
+    const cat = await readSceneLibraryCatalogForUser(query.userId);
+    merged.push(...(cat.platform ?? []), ...(cat.user ?? []));
+    const seen = new Set(merged.map((s) => s.id));
+    const scoped = await listSceneLibraryEntriesForViewer({
+      userId: query.userId,
+      tenantId: query.tenantId,
+      projectId: query.projectId,
+      limit,
+    });
+    for (const row of scoped) {
+      if (!seen.has(row.id)) {
+        merged.push(row);
+        seen.add(row.id);
+      }
+    }
+  }
+
+  return merged.slice(0, limit).map((s) => sceneEntryToCatalogItem(s));
 }
 
 function applyCatalogFilters(

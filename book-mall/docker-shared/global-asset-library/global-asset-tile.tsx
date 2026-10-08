@@ -1,10 +1,12 @@
 "use client";
 
 import { ZoomIn, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import {
+  GLOBAL_ASSET_SCENE_CATALOG_PLACEHOLDER,
+  isSceneCatalogItem,
   resolveGlobalAssetPreviewUrl,
   resolveGlobalAssetThumbUrl,
 } from "./catalog-media-url";
@@ -22,6 +24,8 @@ type Props = {
   disabled?: boolean;
   onSelect?: () => void;
   previewLightboxZIndex?: number;
+  /** fixed：弹层 6 列定高；fluid：瀑布流内按图片自然比例 */
+  layout?: "fixed" | "fluid";
 };
 
 function GlobalAssetPreviewLightbox({
@@ -36,6 +40,11 @@ function GlobalAssetPreviewLightbox({
   onClose: () => void;
 }) {
   const theme = globalAssetTheme(variant);
+  const previewBase = resolveGlobalAssetPreviewUrl(item);
+  const [previewSrc, setPreviewSrc] = useState(previewBase);
+  useEffect(() => {
+    setPreviewSrc(previewBase);
+  }, [previewBase, item.id]);
 
   return createPortal(
     <div
@@ -60,9 +69,14 @@ function GlobalAssetPreviewLightbox({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={resolveGlobalAssetPreviewUrl(item)}
+          src={previewSrc}
           alt={item.title}
           className="max-h-[72vh] w-full object-contain bg-black/5"
+          onError={() => {
+            if (isSceneCatalogItem(item)) {
+              setPreviewSrc(GLOBAL_ASSET_SCENE_CATALOG_PLACEHOLDER);
+            }
+          }}
         />
         <div className={`border-t px-4 py-2.5 ${theme.header}`}>
           <p className={`text-sm font-medium ${theme.textPrimary}`}>{item.title}</p>
@@ -85,23 +99,40 @@ export function GlobalAssetTile({
   disabled,
   onSelect,
   previewLightboxZIndex,
+  layout = "fixed",
 }: Props) {
   const theme = globalAssetTheme(variant);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const thumbUrl = resolveGlobalAssetThumbUrl(item);
-  const canPreview = Boolean(resolveGlobalAssetPreviewUrl(item)) && !item.promptOnly;
+  const [thumbSrc, setThumbSrc] = useState(thumbUrl);
+  useEffect(() => {
+    setThumbSrc(resolveGlobalAssetThumbUrl(item));
+  }, [item.id, item.thumbUrl, item.ossUrl, item.catalogKind, item.promptOnly]);
+
+  const canPreview = Boolean(thumbSrc || resolveGlobalAssetPreviewUrl(item)) && !item.promptOnly;
   const showPlatformBadge = shouldShowCatalogPlatformBadge(item);
+  const fluid = layout === "fluid" && !item.promptOnly;
+
+  const shellClass = fluid
+    ? `group relative w-full overflow-hidden rounded-md border ${theme.border} ${theme.cardHover} ${
+        active ? theme.cardSelected : ""
+      }`
+    : `group relative ${GALD_TILE_CLASS} ${theme.border} ${theme.cardHover} ${
+        active ? theme.cardSelected : ""
+      }`;
 
   return (
     <>
-      <div className={`group relative ${GALD_TILE_CLASS} ${theme.border} ${theme.cardHover} ${
-        active ? theme.cardSelected : ""
-      }`}>
+      <div className={shellClass}>
         <button
           type="button"
           disabled={disabled}
-          className="absolute inset-0 h-full w-full disabled:cursor-default"
+          className={
+            fluid
+              ? "block w-full disabled:cursor-default"
+              : "absolute inset-0 h-full w-full disabled:cursor-default"
+          }
           onClick={onSelect}
           title={item.description ?? item.title}
         >
@@ -115,11 +146,16 @@ export function GlobalAssetTile({
           ) : (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
-              src={thumbUrl}
+              src={thumbSrc}
               alt={item.title}
-              className="h-full w-full object-cover"
+              className={fluid ? "block h-auto w-full" : "h-full w-full object-cover"}
               loading="lazy"
               decoding="async"
+              onError={() => {
+                if (isSceneCatalogItem(item)) {
+                  setThumbSrc(GLOBAL_ASSET_SCENE_CATALOG_PLACEHOLDER);
+                }
+              }}
             />
           )}
         </button>

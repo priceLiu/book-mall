@@ -7,10 +7,16 @@ export const GALD_DIALOG_SHELL_CLASS =
 /** 主内容区最小高度（加载中也占位） */
 export const GALD_BODY_CLASS = "flex min-h-0 flex-1 overflow-hidden";
 
-/** 素材网格 · 固定 6 列 */
+/** 素材网格 · 固定 6 列（仅纯提示词等固定高度卡片） */
 export const GALD_GRID_CLASS = "grid grid-cols-6 gap-2";
 
-/** 缩略图格 · 固定高度，避免 3:4 人像撑满 */
+/** 瀑布流 · 有图素材按原图比例自适应高度 */
+export const GALD_MASONRY_CLASS =
+  "columns-3 gap-2 sm:columns-4 md:columns-5 lg:columns-6 [column-fill:_balance]";
+
+export const GALD_MASONRY_ITEM_CLASS = "mb-2 break-inside-avoid";
+
+/** 缩略图格 · 固定高度（姿势纯提示词等） */
 export const GALD_TILE_CLASS = "relative h-[108px] w-full overflow-hidden rounded-md border";
 
 /** 首屏条数（约 3 行 × 6 列） */

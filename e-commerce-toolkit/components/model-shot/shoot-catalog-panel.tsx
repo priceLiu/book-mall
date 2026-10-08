@@ -47,7 +47,10 @@ import {
   updateEcomSceneLibraryEntry,
   uploadEcomSceneLibraryPreview,
 } from "@/lib/ecom-scene-library-api";
-import { resolveSceneLibraryCardImageUrl } from "@/lib/ecom-scene-library/display";
+import {
+  ECOM_SCENE_LIBRARY_PLACEHOLDER_SVG,
+  resolveSceneLibraryCardImageUrl,
+} from "@/lib/ecom-scene-library/display";
 import type { EcomSceneLibraryEntry } from "@/lib/ecom-scene-library/types";
 import { cn } from "@/lib/utils";
 import { mapPreviewItemsFromEntries } from "@/lib/media/ecom-image-preview";
@@ -110,6 +113,7 @@ function SceneCatalogCard({
           alt={entry.name}
           aspectClass="aspect-[4/3]"
           className="h-full w-full rounded-none"
+          imageErrorFallback={ECOM_SCENE_LIBRARY_PLACEHOLDER_SVG}
           onPreview={() => onPreviewImage?.(imageUrl, entry.name)}
         />
         <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">

@@ -118,6 +118,24 @@ function enrichSceneCatalog(catalog: EcomSceneLibraryCatalog): EcomSceneLibraryC
   return { scenes, platform, user };
 }
 
+/** JSON 预设与 DB 平台条目合并（同 id 以 DB 为准） */
+function mergePlatformSceneEntriesFromJsonAndDb(
+  platformDb: EcomSceneLibraryEntry[],
+): EcomSceneLibraryEntry[] {
+  const byId = new Map<string, EcomSceneLibraryEntry>();
+  for (const s of readSceneLibraryCatalogJson().scenes ?? []) {
+    byId.set(s.id, enrichSceneEntryForClient({ ...s, scope: "platform" }));
+  }
+  for (const s of platformDb) {
+    byId.set(s.id, s);
+  }
+  return [...byId.values()].sort(
+    (a, b) =>
+      (a.sortOrder ?? 0) - (b.sortOrder ?? 0) ||
+      a.name.localeCompare(b.name, "zh-CN"),
+  );
+}
+
 export async function listPlatformSceneEntriesFromDb(): Promise<EcomSceneLibraryEntry[]> {
   try {
     const rows = await prisma.ecomSceneLibraryEntry.findMany({
@@ -161,23 +179,19 @@ export async function readSceneLibraryCatalogForUser(
 ): Promise<EcomSceneLibraryCatalog> {
   const platformDb = await listPlatformSceneEntriesFromDb();
   const userDb = await listUserSceneEntriesFromDb(userId);
-  if (platformDb.length > 0 || userDb.length > 0) {
-    return enrichSceneCatalog({
-      scenes: [...platformDb, ...userDb],
-      platform: platformDb,
-      user: userDb,
-    });
-  }
-  const json = readSceneLibraryCatalogJson();
-  return enrichSceneCatalog({ ...json, user: userDb });
+  const platform = mergePlatformSceneEntriesFromJsonAndDb(platformDb);
+  const user = userDb;
+  return enrichSceneCatalog({
+    scenes: [...platform, ...user],
+    platform,
+    user,
+  });
 }
 
 export async function readSceneLibraryCatalogLive(): Promise<EcomSceneLibraryCatalog> {
-  const platform = await listPlatformSceneEntriesFromDb();
-  if (platform.length > 0) {
-    return enrichSceneCatalog({ scenes: platform, platform, user: [] });
-  }
-  return enrichSceneCatalog(readSceneLibraryCatalogJson());
+  const platformDb = await listPlatformSceneEntriesFromDb();
+  const platform = mergePlatformSceneEntriesFromJsonAndDb(platformDb);
+  return enrichSceneCatalog({ scenes: platform, platform, user: [] });
 }
 
 export async function listSceneLibraryEntriesForViewer(args: {

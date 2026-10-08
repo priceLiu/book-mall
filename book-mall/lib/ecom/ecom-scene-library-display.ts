@@ -23,13 +23,13 @@ export function resolveEcomSceneLibraryPlatformDefaultImageUrl(): string {
   return ECOM_SCENE_LIBRARY_PLACEHOLDER_SVG;
 }
 
-/** 列表/卡片展示用：自有图优先，否则平台默认图 */
+/** 列表/卡片展示用：自有图优先；无图或仅 OSS 占位键未上传时用 SVG 默认图（避免坏链） */
 export function resolveEcomSceneLibraryDisplayImageUrl(
   entry: EcomSceneLibraryImageFields,
 ): string {
   const own = entry.thumbUrl?.trim() || entry.ossUrl?.trim();
   if (own) return own;
-  return resolveEcomSceneLibraryPlatformDefaultImageUrl();
+  return ECOM_SCENE_LIBRARY_PLACEHOLDER_SVG;
 }
 
 export function sceneLibraryEntryHasOwnImage(entry: EcomSceneLibraryImageFields): boolean {

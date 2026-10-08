@@ -14,23 +14,33 @@ export const PROJECT_ASSET_KIND_LABELS: Record<ProjectAssetKind, string> = {
   STYLE: "风格",
   PROMPT: "提示词",
   GROUP_BUNDLE: "组资产",
-  SCRIPT_PACKAGE: "剧本包",
+  SCRIPT_PACKAGE: "脚本包",
 };
 
-export const PROJECT_ASSET_TAB_KINDS: ProjectAssetKind[] = [
+/** 我的资产 · Tab 第一行（「全部」在 UI 单独渲染） */
+export const PROJECT_ASSET_TAB_ROW1: ProjectAssetKind[] = [
   "CHARACTER",
-  "SCENE",
   "PROP",
-  "OUTLINE",
-  "STORYBOARD_SCRIPT",
+  "SCENE",
+  "STYLE",
   "AUDIO",
   "STORYBOARD_IMAGE",
   "STORYBOARD_VIDEO",
+  "OUTLINE",
+  "STORYBOARD_SCRIPT",
+];
+
+/** 我的资产 · Tab 第二行 */
+export const PROJECT_ASSET_TAB_ROW2: ProjectAssetKind[] = [
   "PRIVATE_PORTRAIT",
   "DIGITAL_HUMAN",
-  "STYLE",
   "GROUP_BUNDLE",
   "SCRIPT_PACKAGE",
+];
+
+export const PROJECT_ASSET_TAB_KINDS: ProjectAssetKind[] = [
+  ...PROJECT_ASSET_TAB_ROW1,
+  ...PROJECT_ASSET_TAB_ROW2,
 ];
 
 export function defaultKindForNodeType(nodeType: string): ProjectAssetKind {
