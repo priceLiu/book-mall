@@ -19,7 +19,8 @@ import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
 import { EcomLinearProgressLabel } from "@/components/media/ecom-linear-progress-label";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
-import { EcomModelLibraryPickerDialog } from "@/components/model-shot/ecom-model-library-picker-dialog";
+import { useAssetLibrary } from "@/docker-shared/global-asset-library";
+import { openEcomModelLibraryPick } from "@/lib/ecom-asset-library-pick";
 import { ProductCreationStudioSkeleton } from "@/components/product-design/product-creation-studio-skeleton";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
@@ -213,6 +214,7 @@ function defaultPromptModuleIds(modules: PhaseAModule[]): string[] {
 
 function DetailPageSuiteReplicaStudioInner() {
   const { alert, confirm, doubleConfirm, toast } = useDialogs();
+  const { openAssetLibrary } = useAssetLibrary();
   const backgroundGen = useBackgroundGeneration();
   const [project, setProject] = useState<DetailPageSuiteProject | null>(null);
   const [loading, setLoading] = useState(true);
@@ -265,8 +267,6 @@ function DetailPageSuiteReplicaStudioInner() {
   } | null>(null);
   const [sizeChartEditSaving, setSizeChartEditSaving] = useState(false);
   const [promptModuleIds, setPromptModuleIds] = useState<Set<string>>(() => new Set());
-  const [modelLibraryOpen, setModelLibraryOpen] = useState(false);
-
   const phaseA = useMemo(() => (project ? readPhaseA(project) : null), [project]);
   const inventorySegments = useMemo(
     () => (project ? readReplicaInventory(project) : null),
@@ -701,6 +701,13 @@ function DetailPageSuiteReplicaStudioInner() {
     }
   }
 
+  function openModelLibraryPick() {
+    openEcomModelLibraryPick(openAssetLibrary, {
+      closeOnPick: false,
+      onPick: (entry) => void handleAttachModelFromLibrary(entry),
+    });
+  }
+
   async function ensureSellpointsSavedBeforeAction(): Promise<boolean> {
     if (!project) return false;
     if (!isSellpointDraftDirty(project, sellpointDraft)) return true;
@@ -1119,7 +1126,7 @@ function DetailPageSuiteReplicaStudioInner() {
                     refsByRole.model.length >= REPLICA_MODEL_REF_MAX
                   }
                   className="h-7 gap-1 px-2 text-[10px]"
-                  onClick={() => setModelLibraryOpen(true)}
+                  onClick={() => openModelLibraryPick()}
                 >
                   <UserRound className="h-3 w-3 shrink-0" aria-hidden />
                   模特库导入
@@ -1472,13 +1479,6 @@ function DetailPageSuiteReplicaStudioInner() {
           />
         </div>
       </div>
-
-      <EcomModelLibraryPickerDialog
-        open={modelLibraryOpen}
-        onOpenChange={setModelLibraryOpen}
-        closeOnPick={false}
-        onPick={(entry) => handleAttachModelFromLibrary(entry)}
-      />
 
       <StoryboardModelPickerDialog
         open={imagePickerOpen}

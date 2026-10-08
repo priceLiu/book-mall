@@ -27,3 +27,31 @@ export function platformCatalogSaveTypeLabel(kind: GlobalAssetCatalogKind): stri
 export function catalogKindSupportsImageImport(kind: GlobalAssetCatalogKind): boolean {
   return PLATFORM_CATALOG_SAVE_TYPE_OPTIONS.find((o) => o.id === kind)?.imageImport ?? false;
 }
+
+/** 模特·素材 Hub 子区（不含场景；场景与风格 / 镜头 / 数字人同级） */
+/** 模特·素材 · 三级（服装已升为 Hub 二级 Tab） */
+const PLATFORM_HUB_MODEL_CATALOG_KINDS = new Set<GlobalAssetCatalogKind>([
+  "full-body",
+  "avatar",
+  "pose",
+]);
+
+export function platformHubModelCatalogNav(): Array<{
+  id: GlobalAssetCatalogKind;
+  label: string;
+}> {
+  return PLATFORM_CATALOG_SAVE_TYPE_OPTIONS.filter((o) =>
+    PLATFORM_HUB_MODEL_CATALOG_KINDS.has(o.id),
+  ).map((o) => ({ id: o.id, label: o.label }));
+}
+
+/** 选用侧栏 · 与保存类型对齐（含场景，与角色/道具等同级） */
+export function platformCatalogPickNav(): Array<{
+  id: GlobalAssetCatalogKind;
+  label: string;
+}> {
+  return PLATFORM_CATALOG_SAVE_TYPE_OPTIONS.filter((o) => o.imageImport).map((o) => ({
+    id: o.id,
+    label: o.label,
+  }));
+}

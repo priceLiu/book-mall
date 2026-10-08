@@ -7,7 +7,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
 import { EcomImagePreviewHost, useEcomImagePreview } from "@/components/media";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
-import { EcomModelLibraryPickerDialog } from "@/components/model-shot/ecom-model-library-picker-dialog";
+import { useAssetLibrary } from "@/docker-shared/global-asset-library";
+import { openEcomModelLibraryPick } from "@/lib/ecom-asset-library-pick";
 import { ModelShotRefGenerateDialog } from "@/components/model-shot/model-shot-ref-generate-dialog";
 import { VtonAiModelGenerateHelp } from "@/components/vton/vton-ai-model-generate-help";
 import {
@@ -228,7 +229,7 @@ export function VtonRefWorkbench({
 }: Props) {
   const effectiveModelImageSize = coerceVtonModelImageSize(modelImageSize);
 
-  const [libraryOpen, setLibraryOpen] = useState(false);
+  const { openAssetLibrary } = useAssetLibrary();
   const [assetPickerOpen, setAssetPickerOpen] = useState(false);
   const [genModelOpen, setGenModelOpen] = useState(false);
   const [pipelineDialogMode, setPipelineDialogMode] =
@@ -237,6 +238,15 @@ export function VtonRefWorkbench({
   const [expandPrompt, setExpandPrompt] = useState("");
   const [genModelKey, setGenModelKey] = useState(imageModelKey);
   const modelFileInputRef = useRef<HTMLInputElement>(null);
+
+  function openModelLibraryPick() {
+    openEcomModelLibraryPick(openAssetLibrary, {
+      closeOnPick: false,
+      onPick: async (entry) => {
+        await onPickModelFromLibrary(entry.ossUrl, entry.name);
+      },
+    });
+  }
 
   useEffect(() => {
     setGenModelKey(imageModelKey);
@@ -417,7 +427,7 @@ export function VtonRefWorkbench({
           type="button"
           disabled={busy || refsLocked || modelUploading}
           className={modelHeaderBtnClass}
-          onClick={() => setLibraryOpen(true)}
+          onClick={() => openModelLibraryPick()}
         >
           {modelPipelineBusy === "importing-model" ? (
             <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
@@ -583,7 +593,7 @@ export function VtonRefWorkbench({
             onOpenAssetPicker={
               onAttachModelFromAssets ? () => setAssetPickerOpen(true) : undefined
             }
-            onOpenModelLibrary={() => setLibraryOpen(true)}
+            onOpenModelLibrary={() => openModelLibraryPick()}
             onOpenGenerateDialog={() => setPipelineDialogMode("generate")}
             onOpenExpandDialog={() => setPipelineDialogMode("expand")}
             onSelectPreview={(id) => void onSelectPreviewModelGeneration?.(id)}
@@ -847,12 +857,6 @@ export function VtonRefWorkbench({
       {typeof document !== "undefined"
         ? createPortal(
             <>
-              <EcomModelLibraryPickerDialog
-                open={libraryOpen}
-                onOpenChange={setLibraryOpen}
-                closeOnPick={false}
-                onPick={(entry) => onPickModelFromLibrary(entry.ossUrl, entry.name)}
-              />
               {onAttachModelFromAssets ? (
                 <EcomAssetPickerDialog
                   open={assetPickerOpen}

@@ -1,6 +1,10 @@
 "use client";
 
 import type { GlobalAssetLibraryApiClient } from "@/docker-shared/global-asset-library/types";
+import type {
+  FetchProjectItemsQuery,
+  UnifiedAssetPickItem,
+} from "@/docker-shared/global-asset-library/unified-asset-library-types";
 import { adminFromToolsSessionPayload } from "@/lib/canvas/use-canvas-shell-session";
 import { fetchCanvasToolsSessionFull } from "@/lib/canvas-tools-session-fetch";
 
@@ -94,6 +98,38 @@ export function createCanvasGlobalAssetLibraryApi(): GlobalAssetLibraryApiClient
         method: "POST",
         body: JSON.stringify(body),
       });
+    },
+    async fetchProjectItems(query: FetchProjectItemsQuery) {
+      const pid = query.projectId?.trim();
+      if (!pid) return { items: [] as UnifiedAssetPickItem[] };
+      const params = new URLSearchParams({ projectId: pid });
+      if (query.kind?.trim()) params.set("kind", query.kind.trim());
+      const data = await bookFetch(`api/canvas/project-assets?${params.toString()}`);
+      const q = query.keyword?.trim().toLowerCase() ?? "";
+      const items: UnifiedAssetPickItem[] = [];
+      for (const raw of data.assets ?? []) {
+        const kind = String(raw.kind ?? "");
+        if (query.media === "image" && kind === "STORYBOARD_VIDEO") continue;
+        const name = String(raw.displayName ?? "未命名");
+        if (q && !name.toLowerCase().includes(q)) continue;
+        const refUrl = Array.isArray(raw.refs)
+          ? (raw.refs as Array<{ mediaUrl?: string }>)[0]?.mediaUrl?.trim()
+          : "";
+        const url = String(raw.thumbnailUrl ?? "").trim() || refUrl || "";
+        if (!url && kind !== "PROMPT") continue;
+        items.push({
+          id: String(raw.id ?? ""),
+          title: name,
+          ossUrl: url,
+          thumbUrl: url,
+          section: "project",
+          provenance: "projectAsset",
+          insertMode: "projectAssetInsert",
+          projectAssetKind: kind,
+          displayType: kind,
+        });
+      }
+      return { items: items.slice(0, query.limit ?? 240) };
     },
     async isPlatformAdmin() {
       try {

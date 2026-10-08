@@ -31,6 +31,7 @@ type Props = {
   onPick: (entry: CatalogPickerEntry) => void | Promise<void>;
 };
 
+/** @deprecated 请使用统一资产库 `openEcomCatalogKindPick` / `openEcomSceneCatalogPick` */
 export function EcomCatalogPickerDialog({
   open,
   title,

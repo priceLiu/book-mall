@@ -202,7 +202,7 @@ import {
   type LibtvCanvasEmptyShortcutId,
 } from "@/lib/canvas/libtv-canvas-empty-shortcuts";
 import { Pro2AddNodePopover } from "./pro2/pro2-add-node-popover";
-import { openPlatformAssetHub } from "@/components/canvas/platform-asset-hub/platform-asset-hub-host";
+import { openCanvasAssetLibrary } from "@/lib/canvas/open-canvas-asset-library";
 import { useGlobalAssetLibrary } from "@/docker-shared/global-asset-library";
 
 const PANE_ADD_DBL_CLICK_MS = 420;
@@ -498,7 +498,7 @@ function FlowCanvasInner({
     ]);
   }, [getViewport]);
   const { alert, confirm } = useDialogs();
-  const { openGlobalAssetLibrary } = useGlobalAssetLibrary();
+  const { openAssetLibrary } = useGlobalAssetLibrary();
   const [paneMenu, setPaneMenu] = useState<{ x: number; y: number } | null>(
     null,
   );
@@ -642,10 +642,11 @@ function FlowCanvasInner({
       closePaneAddMenu();
 
       if (itemId === "global-asset-library") {
-        openPlatformAssetHub({
-          section: "catalog",
-          pickCatalog: true,
+        openCanvasAssetLibrary({
+          projectId,
           spawnAtScreen,
+          baseUrl: base ?? "",
+          openAssetLibrary,
         });
         return;
       }
@@ -671,7 +672,9 @@ function FlowCanvasInner({
       confirm,
       sbv1Canvas,
       closePaneAddMenu,
-      openGlobalAssetLibrary,
+      base,
+      openAssetLibrary,
+      projectId,
     ],
   );
 

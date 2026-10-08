@@ -55,6 +55,8 @@ export type OpenGlobalAssetLibraryOptions = {
   media?: "image" | "video" | "all";
   maxSelect?: number;
   defaultTab?: GlobalAssetLibraryTab;
+  /** 统一资产库选用 · 默认 Tab（platform / shared / project） */
+  defaultSection?: import("./unified-asset-library-types").AssetLibrarySection;
   defaultCatalog?: GlobalAssetCatalogKind;
   sourceImage?: GlobalAssetSourceImage;
   title?: string;

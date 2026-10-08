@@ -29,11 +29,11 @@ import {
   ECOM_WORKSPACE_RESULT_LABEL_CLASS,
   ecomWorkspaceResultShellClass,
 } from "@/lib/ecom-workspace-result-grid";
-import { EcomModelLibraryPickerDialog } from "@/components/model-shot/ecom-model-library-picker-dialog";
+import { useAssetLibrary } from "@/docker-shared/global-asset-library";
 import {
-  EcomCatalogPickerDialog,
-  type CatalogPickerEntry,
-} from "@/components/model-shot/ecom-catalog-picker-dialog";
+  openEcomModelLibraryPick,
+  openEcomSceneCatalogPick,
+} from "@/lib/ecom-asset-library-pick";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
   Dialog,
@@ -78,9 +78,6 @@ import {
   type SimpleFusionProject,
 } from "@/lib/ecom-simple-fusion-video-api";
 import { resumeOrCreateEcomProject, writeEcomLastProjectId } from "@/lib/ecom-last-project";
-import { fetchEcomSceneLibraryCatalog } from "@/lib/ecom-scene-library-api";
-import { sceneToCatalogPickerEntry } from "@/lib/ecom-scene-library/picker";
-import type { EcomSceneLibraryEntry } from "@/lib/ecom-scene-library/types";
 import { PRODUCT_DESIGN_PROMPT_MENTION_FIELD_PROPS } from "@/lib/product-design-prompt-mention-ui";
 import {
   buildSimpleFusionMentionRefs,
@@ -148,6 +145,7 @@ function SimpleFusionVideoStudioInner({
 }) {
   const router = useRouter();
   const { alert, toast, confirm } = useDialogs();
+  const { openAssetLibrary } = useAssetLibrary();
   const [project, setProject] = useState<SimpleFusionProject | null>(null);
   const [loading, setLoading] = useState(true);
   const [needLogin, setNeedLogin] = useState(false);
@@ -166,10 +164,7 @@ function SimpleFusionVideoStudioInner({
   const [modelPrompt, setModelPrompt] = useState("");
   const [scenePrompt, setScenePrompt] = useState("");
 
-  const [modelLibraryOpen, setModelLibraryOpen] = useState(false);
-  const [sceneCatalogOpen, setSceneCatalogOpen] = useState(false);
   const [assetPicker, setAssetPicker] = useState<"model" | "scene" | "garment" | null>(null);
-  const [sceneCatalog, setSceneCatalog] = useState<EcomSceneLibraryEntry[]>([]);
   const [modelGenBusy, setModelGenBusy] = useState(false);
   const [aiDialogRole, setAiDialogRole] = useState<"model" | "scene" | null>(null);
   const [aiDialogDraft, setAiDialogDraft] = useState("");
@@ -347,28 +342,45 @@ function SimpleFusionVideoStudioInner({
   );
 
   const openSceneCatalog = useCallback(() => {
-    void fetchEcomSceneLibraryCatalog().then((c) => {
-      setSceneCatalog(
-        c.scenes.length ? c.scenes : [...(c.platform ?? []), ...(c.user ?? [])],
-      );
-      setSceneCatalogOpen(true);
+    if (!project) return;
+    openEcomSceneCatalogPick(openAssetLibrary, {
+      onPick: async (entry) => {
+        const p = await patchSimpleFusionProject(project.id, {
+          references: {
+            ...project.references,
+            scene: {
+              libraryEntryId: entry.id,
+              libraryEntryName: entry.name,
+              scenePrompt: entry.subtitle ?? undefined,
+              ...(entry.imageUrl?.trim()
+                ? { ossUrl: entry.imageUrl.trim(), source: "library" as const }
+                : {}),
+            },
+          },
+        });
+        applyProject(p);
+      },
     });
-  }, []);
+  }, [applyProject, openAssetLibrary, project]);
 
-  const scenePickerEntries = useMemo((): CatalogPickerEntry[] => {
-    const list = sceneCatalog.length
-      ? sceneCatalog
-      : [];
-    const filtered =
-      variant === "mirror"
-        ? list.filter(
-            (s) =>
-              SIMPLE_FUSION_MIRROR_KEYWORDS.some((k) => s.name.includes(k)) ||
-              s.name.includes("镜"),
-          )
-        : list;
-    return (filtered.length ? filtered : list).map(sceneToCatalogPickerEntry);
-  }, [sceneCatalog, variant]);
+  function openModelLibraryPick() {
+    if (!project) return;
+    openEcomModelLibraryPick(openAssetLibrary, {
+      onPick: async (entry) => {
+        const p = await patchSimpleFusionProject(project.id, {
+          references: {
+            ...project.references,
+            model: {
+              ossUrl: entry.ossUrl,
+              source: "library",
+              label: entry.name?.trim() || "模特库",
+            },
+          },
+        });
+        applyProject(p);
+      },
+    });
+  }
 
   async function persistPrompts(opts?: {
     fusionCustomized?: boolean;
@@ -700,46 +712,6 @@ function SimpleFusionVideoStudioInner({
         galleryItems={fusionPreviewItems}
         onClose={closePreview}
       />
-      <EcomModelLibraryPickerDialog
-        open={modelLibraryOpen}
-        onOpenChange={setModelLibraryOpen}
-        onPick={async (entry) => {
-          const p = await patchSimpleFusionProject(project.id, {
-            references: {
-              ...project.references,
-              model: {
-                ossUrl: entry.ossUrl,
-                source: "library",
-                label: entry.name?.trim() || "模特库",
-              },
-            },
-          });
-          applyProject(p);
-        }}
-      />
-      <EcomCatalogPickerDialog
-        open={sceneCatalogOpen}
-        onOpenChange={setSceneCatalogOpen}
-        title="场景库"
-        entries={scenePickerEntries}
-        loading={false}
-        onPick={async (entry) => {
-          const p = await patchSimpleFusionProject(project.id, {
-            references: {
-              ...project.references,
-                scene: {
-                libraryEntryId: entry.id,
-                libraryEntryName: entry.name,
-                scenePrompt: entry.subtitle,
-                ...(entry.imageUrl?.trim()
-                  ? { ossUrl: entry.imageUrl.trim(), source: "library" as const }
-                  : {}),
-              },
-            },
-          });
-          applyProject(p);
-        }}
-      />
       <EcomAssetPickerDialog
         open={assetPicker != null}
         onOpenChange={(open) => !open && setAssetPicker(null)}
@@ -876,7 +848,7 @@ function SimpleFusionVideoStudioInner({
             modelGenBusy={modelGenBusy}
             sceneTextOnly={Boolean(sceneTextOnly)}
             onProject={applyProject}
-            onOpenModelLibrary={() => setModelLibraryOpen(true)}
+            onOpenModelLibrary={() => openModelLibraryPick()}
             onOpenSceneCatalog={openSceneCatalog}
             onOpenAssetPicker={setAssetPicker}
             onOpenAiDialog={openAiDialog}

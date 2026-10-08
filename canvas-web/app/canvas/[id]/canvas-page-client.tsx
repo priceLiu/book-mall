@@ -58,8 +58,9 @@ import { useCanvasTaskSse } from "@/lib/canvas/use-canvas-task-sse";
 import { hasAnyMediaRenderInFlight } from "@/lib/canvas/media-render-in-flight";
 import { NodePalette } from "@/components/canvas/node-palette";
 import { CanvasToolbarShellPortal } from "@/components/canvas/canvas-toolbar-shell-portal";
-import { openPlatformAssetHub } from "@/components/canvas/platform-asset-hub/platform-asset-hub-host";
 import { CanvasToolbar } from "@/components/canvas/toolbar";
+import { useGlobalAssetLibrary } from "@/docker-shared/global-asset-library";
+import { openCanvasAssetLibrary } from "@/lib/canvas/open-canvas-asset-library";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { installPro2WizardCanvasLiveSync } from "@/lib/canvas/pro2-wizard-canvas-live-sync";
 import { useCanvasGraphSnapshot } from "@/lib/canvas/canvas-store-hooks";
@@ -201,6 +202,7 @@ function withCanvasProjectLoadTimeout<T>(promise: Promise<T>): Promise<T> {
 
 function Inner({ projectId }: { projectId: string }) {
   const base = useBookMallBaseUrl();
+  const { openAssetLibrary } = useGlobalAssetLibrary();
   const {
     confirmedUnlinked: gatewayLinkBlocked,
     accountUrl: gatewayAccountUrl,
@@ -1854,22 +1856,18 @@ function Inner({ projectId }: { projectId: string }) {
                   }
                 : undefined
             }
-            onOpenProjectCharacterAssets={() => {
+            onOpenAssetLibrary={() => {
               closeAllToolbarPanels();
-              setMyProjectCharacterAssetsOpen(true);
+              openCanvasAssetLibrary({
+                projectId,
+                baseUrl: base ?? "",
+                openAssetLibrary,
+              });
             }}
             onOpenPromptHistory={() => {
               closeAllToolbarPanels();
               setMyPromptHistoryOpen(true);
             }}
-            onOpenPlatformAssets={
-              isStoryPro2Canvas || isSbv1Canvas
-                ? () => {
-                    closeAllToolbarPanels();
-                    openPlatformAssetHub({ section: "catalog" });
-                  }
-                : undefined
-            }
             onOpenStyleLibrary={
               isStoryProCanvas
                 ? () => {

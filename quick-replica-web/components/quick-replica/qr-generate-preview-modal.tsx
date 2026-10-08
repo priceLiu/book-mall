@@ -18,6 +18,7 @@ import {
 } from "@/lib/qr-platform-fetch";
 import type { QrWorkspaceDraft } from "@/lib/qr-template-types";
 import { isQrTextToAudioKind } from "@/lib/qr-template-types";
+import { useSaveToCatalog } from "@/lib/use-save-to-catalog";
 
 export type QrGenerateModalPhase = "generating" | "success" | "failed";
 
@@ -69,6 +70,7 @@ export function QrGeneratePreviewModal({
   onMinimize,
   onSaved,
 }: Props) {
+  const saveToCatalog = useSaveToCatalog();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveAuthExpired, setSaveAuthExpired] = useState(false);
@@ -328,6 +330,24 @@ export function QrGeneratePreviewModal({
                     onClick={() => void handleSave()}
                   >
                     {saving ? "保存中…" : "保存为我的"}
+                  </button>
+                ) : null}
+                {succeeded && outputUrl && !isAudio && !isVideo ? (
+                  <button
+                    type="button"
+                    className="qr-btn-secondary"
+                    disabled={saving}
+                    onClick={() =>
+                      saveToCatalog({
+                        url: outputUrl,
+                        prompt: generateDraft?.prompt,
+                        sourceModule: "quick-replica",
+                        sourceAssetId: logId ?? undefined,
+                        defaultCatalog: "reference",
+                      })
+                    }
+                  >
+                    保存平台资产库
                   </button>
                 ) : null}
                 <button

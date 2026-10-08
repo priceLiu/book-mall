@@ -6,7 +6,8 @@ import { createPortal } from "react-dom";
 
 import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
-import { EcomModelLibraryPickerDialog } from "@/components/model-shot/ecom-model-library-picker-dialog";
+import { useAssetLibrary } from "@/docker-shared/global-asset-library";
+import { openEcomModelLibraryPick } from "@/lib/ecom-asset-library-pick";
 import { ModelShotRefGenerateDialog } from "@/components/model-shot/model-shot-ref-generate-dialog";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { useImageDropPaste } from "@/hooks/use-image-drop-paste";
@@ -87,8 +88,6 @@ function ModelShotRefOverlays({
   pickerRole,
   setPickerRole,
   onAttachAssets,
-  modelPickerOpen,
-  setModelPickerOpen,
   onAttachModelFromLibrary,
   genRole,
   closeGenFlow,
@@ -104,8 +103,6 @@ function ModelShotRefOverlays({
   pickerRole: ModelShotReferenceRole | null;
   setPickerRole: (role: ModelShotReferenceRole | null) => void;
   onAttachAssets?: (assetIds: string[], role: ModelShotReferenceRole) => Promise<void>;
-  modelPickerOpen: boolean;
-  setModelPickerOpen: (open: boolean) => void;
   onAttachModelFromLibrary?: (entry: {
     id: string;
     name: string;
@@ -145,17 +142,6 @@ function ModelShotRefOverlays({
                 role,
               );
             }
-          }}
-        />
-      ) : null}
-
-      {onAttachModelFromLibrary ? (
-        <EcomModelLibraryPickerDialog
-          open={modelPickerOpen}
-          onOpenChange={setModelPickerOpen}
-          onPick={async (entry) => {
-            await onAttachModelFromLibrary(entry);
-            setModelPickerOpen(false);
           }}
         />
       ) : null}
@@ -210,8 +196,8 @@ export function ModelShotRefUploader({
     scene: null,
     prop: null,
   });
+  const { openAssetLibrary } = useAssetLibrary();
   const [pickerRole, setPickerRole] = useState<ModelShotReferenceRole | null>(null);
-  const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [genRole, setGenRole] = useState<Exclude<ModelShotReferenceRole, "garment"> | null>(
     null,
   );
@@ -229,6 +215,19 @@ export function ModelShotRefUploader({
 
   function closeGenFlow() {
     setGenRole(null);
+  }
+
+  function openModelLibraryPick() {
+    if (!onAttachModelFromLibrary) return;
+    openEcomModelLibraryPick(openAssetLibrary, {
+      onPick: async (entry) => {
+        await onAttachModelFromLibrary({
+          id: entry.id,
+          name: entry.name,
+          ossUrl: entry.ossUrl,
+        });
+      },
+    });
   }
 
   const uploadFile = useCallback(
@@ -263,7 +262,7 @@ export function ModelShotRefUploader({
     dropZoneProps: sectionPasteProps,
     focusZone: focusSectionPaste,
   } = useImageDropPaste({
-    enabled: !busy && !genBusyRole && !genRole && !modelPickerOpen && !imageGenPickerOpen,
+    enabled: !busy && !genBusyRole && !genRole && !imageGenPickerOpen,
     multiple: false,
     listenPaste: true,
     onFiles: (files) => void handleFiles(files, activeRefRoleRef.current),
@@ -379,7 +378,7 @@ export function ModelShotRefUploader({
                         className={ECOM_REF_CARD_ACTION_BTN}
                         onClick={() => {
                           onActiveRoleChange?.(role);
-                          setModelPickerOpen(true);
+                          openModelLibraryPick();
                         }}
                       >
                         <UserRound className="h-3 w-3 shrink-0" />
@@ -432,8 +431,6 @@ export function ModelShotRefUploader({
         pickerRole={pickerRole}
         setPickerRole={setPickerRole}
         onAttachAssets={onAttachAssets}
-        modelPickerOpen={modelPickerOpen}
-        setModelPickerOpen={setModelPickerOpen}
         onAttachModelFromLibrary={onAttachModelFromLibrary}
         genRole={genRole}
         closeGenFlow={closeGenFlow}

@@ -7,7 +7,8 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
 import { ReplicaProductBriefCard, ReplicaSellingPointsCard, ReplicaVoiceoverDraftCard, ReplicaAssetPlanGrid } from "@/components/media-decompose/media-decompose-replica-thread-blocks";
-import { EcomModelLibraryPickerDialog } from "@/components/model-shot/ecom-model-library-picker-dialog";
+import { useAssetLibrary } from "@/docker-shared/global-asset-library";
+import { openEcomModelLibraryPick } from "@/lib/ecom-asset-library-pick";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
@@ -145,10 +146,10 @@ export function ReplicaSetupPanel({
   const [modelGenBusy, setModelGenBusy] = useState(false);
   const [modelPromptDraft, setModelPromptDraft] = useState("");
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
-  const [modelLibraryOpen, setModelLibraryOpen] = useState(false);
+  const { openAssetLibrary } = useAssetLibrary();
+  const modelLibrarySlotRef = useRef<ReplicaAssetPlanSlot | null>(null);
   const [assetPickerRole, setAssetPickerRole] = useState<ReplicaSetupRole | null>(null);
   const [assetPickerSlot, setAssetPickerSlot] = useState<ReplicaAssetPlanSlot | null>(null);
-  const [modelLibrarySlot, setModelLibrarySlot] = useState<ReplicaAssetPlanSlot | null>(null);
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null);
   const [slotImportState, setSlotImportState] = useState<{ slotId: string; via: ImportVia } | null>(
     null,
@@ -167,6 +168,31 @@ export function ReplicaSetupPanel({
     () => assetPlanSlots.find((s) => s.id === activeSlotId) ?? assetPlanSlots[0] ?? null,
     [assetPlanSlots, activeSlotId],
   );
+
+  function openModelLibraryPick(slot?: ReplicaAssetPlanSlot | null) {
+    if (!supportsModelLibrary) return;
+    modelLibrarySlotRef.current = slot ?? null;
+    openEcomModelLibraryPick(openAssetLibrary, {
+      onPick: async (entry) => {
+        const planSlot = modelLibrarySlotRef.current;
+        modelLibrarySlotRef.current = null;
+        if (planSlot) {
+          await handleSlotAttachModelFromLibrary(planSlot, {
+            id: entry.id,
+            name: entry.name,
+            ossUrl: entry.ossUrl,
+          });
+          return;
+        }
+        await handleAttachModelFromLibrary({
+          id: entry.id,
+          name: entry.name,
+          ossUrl: entry.ossUrl,
+        });
+      },
+    });
+  }
+
   const slotReferences: SeedVideoReference[] = allRefs.map((r) => ({
     id: r.id,
     ossUrl: r.ossUrl,
@@ -594,7 +620,6 @@ export function ReplicaSetupPanel({
       beginImportProgress("model", "library");
       await api.attachModelFromLibrary(entry);
       finishImportProgress();
-      setModelLibraryOpen(false);
     } catch (e) {
       failImportProgress();
       await onAlert({
@@ -829,8 +854,7 @@ export function ReplicaSetupPanel({
               supportsModelLibrary
                 ? (slot) => {
                     setActiveSlotId(slot.id);
-                    setModelLibrarySlot(slot);
-                    setModelLibraryOpen(true);
+                    openModelLibraryPick(slot);
                   }
                 : undefined
             }
@@ -909,7 +933,7 @@ export function ReplicaSetupPanel({
                       className={REF_TOOLBAR_BTN_CLASS}
                       onClick={() => {
                         setActiveRole("model");
-                        setModelLibraryOpen(true);
+                        openModelLibraryPick();
                       }}
                     >
                       <UserRound className="h-3 w-3 shrink-0" />
@@ -1095,32 +1119,6 @@ export function ReplicaSetupPanel({
               slot,
               assets.map((a) => a.id),
             );
-          }}
-        />
-      ) : null}
-
-      {supportsModelLibrary ? (
-        <EcomModelLibraryPickerDialog
-          open={modelLibraryOpen}
-          onOpenChange={(open) => {
-            setModelLibraryOpen(open);
-            if (!open) setModelLibrarySlot(null);
-          }}
-          onPick={async (entry) => {
-            if (modelLibrarySlot) {
-              await handleSlotAttachModelFromLibrary(modelLibrarySlot, {
-                id: entry.id,
-                name: entry.name,
-                ossUrl: entry.ossUrl,
-              });
-              setModelLibrarySlot(null);
-              return;
-            }
-            await handleAttachModelFromLibrary({
-              id: entry.id,
-              name: entry.name,
-              ossUrl: entry.ossUrl,
-            });
           }}
         />
       ) : null}

@@ -1,5 +1,12 @@
 export type PlatformAssetHubSection =
   | "catalog"
+  | "garment"
+  | "scene"
+  | "prop"
+  | "reference"
+  | "storyboard-image"
+  | "audio"
+  | "storyboard-video"
   | "style"
   | "camera-shot"
   | "digital-human";

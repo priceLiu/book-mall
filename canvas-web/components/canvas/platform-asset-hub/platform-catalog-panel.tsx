@@ -11,19 +11,18 @@ import type {
   GlobalAssetLibraryApiClient,
   GlobalAssetPickItem,
 } from "@/docker-shared/global-asset-library/types";
+import {
+  platformCatalogPickNav,
+  platformCatalogSaveTypeLabel,
+  platformHubModelCatalogNav,
+} from "@/docker-shared/global-asset-library/platform-catalog-save-types";
 import { cn } from "@/lib/utils";
 
 import { PlatformCatalogImageTile } from "./platform-catalog-image-tile";
 import { platformCatalogPromptFirst, platformCatalogPreviewUrl } from "./platform-catalog-item-utils";
 import { PlatformCatalogPromptCard } from "./platform-catalog-prompt-card";
 
-const CATALOG_NAV: Array<{ id: GlobalAssetCatalogKind; label: string }> = [
-  { id: "full-body", label: "全身模特" },
-  { id: "avatar", label: "模特头像" },
-  { id: "garment", label: "服装库" },
-  { id: "pose", label: "姿势库" },
-  { id: "scene", label: "场景库" },
-];
+export type PlatformCatalogPanelNav = "hub-model" | "fixed-kind" | "catalog-pick";
 
 const GENDER_FILTER_KINDS = new Set<GlobalAssetCatalogKind>([
   "full-body",
@@ -34,6 +33,11 @@ const GENDER_FILTER_KINDS = new Set<GlobalAssetCatalogKind>([
 
 export type PlatformCatalogPanelProps = {
   api: GlobalAssetLibraryApiClient;
+  /** hub-model：模特·素材三级；fixed-kind：单 catalog 二级 Tab */
+  catalogNav?: PlatformCatalogPanelNav;
+  fixedKind?: GlobalAssetCatalogKind;
+  /** 平台官方 catalog；false 时拉个人/团队条目（我的共用） */
+  platformOnly?: boolean;
   previewLightboxZIndex?: number;
   maxSelect?: number;
   onPick?: (items: GlobalAssetPickItem[]) => void | Promise<void>;
@@ -44,6 +48,9 @@ export type PlatformCatalogPanelProps = {
 
 export function PlatformCatalogPanel({
   api,
+  catalogNav = "hub-model",
+  fixedKind = "scene",
+  platformOnly = true,
   previewLightboxZIndex: _previewLightboxZIndex = 2100,
   maxSelect = 9,
   onPick,
@@ -53,7 +60,18 @@ export function PlatformCatalogPanel({
 }: PlatformCatalogPanelProps) {
   const { alert } = useDialogs();
   const pickMode = Boolean(onPick);
-  const [catalogKind, setCatalogKind] = useState<GlobalAssetCatalogKind>("garment");
+  const navItems = useMemo(() => {
+    if (catalogNav === "fixed-kind") return [];
+    if (catalogNav === "catalog-pick") return platformCatalogPickNav();
+    return platformHubModelCatalogNav();
+  }, [catalogNav]);
+  const lockedKind =
+    catalogNav === "fixed-kind"
+      ? fixedKind
+      : catalogNav === "catalog-pick"
+        ? "reference"
+        : "pose";
+  const [catalogKind, setCatalogKind] = useState<GlobalAssetCatalogKind>(lockedKind);
   const [gender, setGender] = useState("all");
   const [keywordInput, setKeywordInput] = useState("");
   const [keyword, setKeyword] = useState("");
@@ -67,6 +85,14 @@ export function PlatformCatalogPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const fetchGenRef = useRef(0);
+
+  useEffect(() => {
+    if (catalogNav === "fixed-kind") {
+      setCatalogKind(fixedKind);
+      return;
+    }
+    setCatalogKind(catalogNav === "catalog-pick" ? "reference" : "pose");
+  }, [catalogNav, fixedKind]);
 
   useEffect(() => {
     const t = window.setTimeout(() => setKeyword(keywordInput.trim()), 300);
@@ -85,10 +111,14 @@ export function PlatformCatalogPanel({
         gender: gender === "all" ? null : gender,
         keyword,
         limit: 240,
-        platformOnly: true,
+        platformOnly: platformOnly ? true : undefined,
+        projectId: undefined,
       });
       if (gen !== fetchGenRef.current) return;
-      setAllItems(page.items);
+      const items = platformOnly
+        ? page.items
+        : page.items.filter((i) => (i.scope ?? "platform") !== "platform");
+      setAllItems(items);
       setCounts(page.counts ?? {});
     } catch (e) {
       if (gen !== fetchGenRef.current) return;
@@ -97,7 +127,7 @@ export function PlatformCatalogPanel({
     } finally {
       if (gen === fetchGenRef.current) setLoading(false);
     }
-  }, [api, catalogKind, gender, keyword]);
+  }, [api, catalogKind, gender, keyword, platformOnly]);
 
   useEffect(() => {
     void fetchCatalog();
@@ -225,14 +255,20 @@ export function PlatformCatalogPanel({
     );
   }
 
+  const scopeLabel = platformOnly ? "平台官方" : "我的共用";
+  const intro =
+    catalogNav === "fixed-kind"
+      ? `${scopeLabel} · ${platformCatalogSaveTypeLabel(fixedKind)}`
+      : catalogNav === "catalog-pick"
+        ? `${scopeLabel} catalog · 类型与「保存平台资产库」一致`
+        : `${scopeLabel}模特与素材 · 姿势 / 头像 / 全身（服装见同级「服装」）`;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <p className="text-[11px] text-white/45">
-        平台官方模特与素材 · 选用后插入画布（仅 platform 库，不含个人 catalog）
-      </p>
+      <p className="text-[11px] text-white/45">{intro}</p>
 
       <div className="flex flex-wrap items-center gap-2">
-        {CATALOG_NAV.map((nav) => {
+        {navItems.map((nav) => {
           const active = catalogKind === nav.id;
           const count = counts[nav.id];
           return (
@@ -302,7 +338,7 @@ export function PlatformCatalogPanel({
           </div>
         ) : allItems.length === 0 ? (
           <p className="flex min-h-[240px] items-center justify-center text-center text-sm text-white/45">
-            {keyword ? "无匹配素材" : "暂无平台素材"}
+            {keyword ? "无匹配素材" : platformOnly ? "暂无平台素材" : "暂无我的共用素材"}
           </p>
         ) : (
           <>

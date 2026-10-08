@@ -1,11 +1,12 @@
 "use client";
 
 import { UserRound } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 
-import { EcomModelLibraryPickerDialog } from "@/components/model-shot/ecom-model-library-picker-dialog";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
+import { useAssetLibrary } from "@/docker-shared/global-asset-library";
+import { openEcomModelLibraryPick } from "@/lib/ecom-asset-library-pick";
 import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
 import {
   getMaxRefsForRoleClient,
@@ -45,7 +46,7 @@ export function ProductDesignModelRefUploader({
   className,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const { openAssetLibrary } = useAssetLibrary();
   const items = references.filter((r) => r.role === "model");
   const maxCount = getMaxRefsForRoleClient("model", { visionModelKey, imageModelKey });
   const maxUploadBytes = getProductDesignRefUploadMaxBytesClient("model");
@@ -65,6 +66,19 @@ export function ProductDesignModelRefUploader({
       remaining -= 1;
     }
     if (inputRef.current) inputRef.current.value = "";
+  }
+
+  function openModelLibraryPick() {
+    if (!onAttachModelFromLibrary) return;
+    openEcomModelLibraryPick(openAssetLibrary, {
+      onPick: async (entry) => {
+        await onAttachModelFromLibrary({
+          id: entry.id,
+          name: entry.name,
+          ossUrl: entry.ossUrl,
+        });
+      },
+    });
   }
 
   return (
@@ -98,7 +112,7 @@ export function ProductDesignModelRefUploader({
               type="button"
               disabled={disabled}
               className="h-7 gap-1 px-2 text-[10px]"
-              onClick={() => setModelPickerOpen(true)}
+              onClick={() => openModelLibraryPick()}
             >
               <UserRound className="h-3 w-3 shrink-0" aria-hidden />
               模特库导入
@@ -106,17 +120,6 @@ export function ProductDesignModelRefUploader({
           ) : undefined
         }
       />
-
-      {onAttachModelFromLibrary ? (
-        <EcomModelLibraryPickerDialog
-          open={modelPickerOpen}
-          onOpenChange={setModelPickerOpen}
-          onPick={async (entry) => {
-            await onAttachModelFromLibrary(entry);
-            setModelPickerOpen(false);
-          }}
-        />
-      ) : null}
     </div>
   );
 }

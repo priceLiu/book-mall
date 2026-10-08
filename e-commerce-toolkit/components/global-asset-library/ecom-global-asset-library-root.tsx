@@ -8,7 +8,7 @@ import { createEcomGlobalAssetLibraryApi } from "@/lib/global-asset-library-api"
 export function EcomGlobalAssetLibraryRoot({ children }: { children: ReactNode }) {
   const api = useMemo(() => createEcomGlobalAssetLibraryApi(), []);
   return (
-    <GlobalAssetLibraryProvider api={api} variant="light">
+    <GlobalAssetLibraryProvider api={api} variant="light" defaultApp="ecom">
       {children}
     </GlobalAssetLibraryProvider>
   );

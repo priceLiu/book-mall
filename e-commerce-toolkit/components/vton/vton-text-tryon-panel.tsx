@@ -3,11 +3,12 @@
 import { BookOpen, Cpu, Loader2, Trash2, UserRound } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import type { CatalogPickerEntry } from "@/components/model-shot/ecom-catalog-picker-dialog";
+import { useAssetLibrary } from "@/docker-shared/global-asset-library";
 import {
-  EcomCatalogPickerDialog,
-  type CatalogPickerEntry,
-} from "@/components/model-shot/ecom-catalog-picker-dialog";
-import { EcomModelLibraryPickerDialog } from "@/components/model-shot/ecom-model-library-picker-dialog";
+  openEcomModelLibraryPick,
+  openEcomSceneCatalogPick,
+} from "@/lib/ecom-asset-library-pick";
 import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
 import { EcomImagePreviewHost, useEcomImagePreview } from "@/components/media";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
@@ -36,9 +37,6 @@ import {
   normalizeVtonTextTryonPrompt,
   VTON_TEXT_TRYON_DEFAULT_PROMPT,
 } from "@/lib/vton-text-tryon-default-prompt";
-import { fetchEcomSceneLibraryCatalog } from "@/lib/ecom-scene-library-api";
-import { sceneToCatalogPickerEntry } from "@/lib/ecom-scene-library/picker";
-import type { EcomSceneLibraryEntry } from "@/lib/ecom-scene-library/types";
 import { buildVtonTextTryonMentionRefs } from "@/lib/vton-text-tryon-mention-refs";
 import { vtonTextTryonSceneRefs } from "@/lib/vton-text-tryon-scene-ref";
 import type { VtonTextTryonRef, VtonTextTryonResult } from "@/lib/vton-types";
@@ -184,10 +182,7 @@ export function VtonTextTryonPanel({
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [draftModelKey, setDraftModelKey] = useState(modelKey);
   const [assetPickerOpen, setAssetPickerOpen] = useState(false);
-  const [modelLibraryOpen, setModelLibraryOpen] = useState(false);
-  const [sceneCatalogOpen, setSceneCatalogOpen] = useState(false);
-  const [sceneCatalog, setSceneCatalog] = useState<EcomSceneLibraryEntry[]>([]);
-  const [sceneCatalogLoading, setSceneCatalogLoading] = useState(false);
+  const { openAssetLibrary } = useAssetLibrary();
   const [promptPreview, setPromptPreview] = useState<{
     title: string;
     prompt: string;
@@ -196,24 +191,6 @@ export function VtonTextTryonPanel({
   useEffect(() => {
     if (!modelPickerOpen) setDraftModelKey(modelKey);
   }, [modelKey, modelPickerOpen]);
-
-  useEffect(() => {
-    if (!sceneCatalogOpen || sceneCatalog.length > 0) return;
-    setSceneCatalogLoading(true);
-    void fetchEcomSceneLibraryCatalog()
-      .then((catalog) => {
-        const list = catalog.scenes.length
-          ? catalog.scenes
-          : [...(catalog.platform ?? []), ...(catalog.user ?? [])];
-        setSceneCatalog(list);
-      })
-      .finally(() => setSceneCatalogLoading(false));
-  }, [sceneCatalogOpen, sceneCatalog.length]);
-
-  const scenePickerEntries = useMemo(
-    (): CatalogPickerEntry[] => sceneCatalog.map(sceneToCatalogPickerEntry),
-    [sceneCatalog],
-  );
 
   const sceneTextRefs = useMemo(() => vtonTextTryonSceneRefs(refs), [refs]);
   const previewItems = useMemo(() => {
@@ -312,7 +289,16 @@ export function VtonTextTryonPanel({
                       type="button"
                       disabled={uploadDisabled}
                       className="h-7 px-2 text-[10px]"
-                      onClick={() => setModelLibraryOpen(true)}
+                      onClick={() => {
+                        if (!onAttachFromModelLibrary || uploadDisabled) return;
+                        openEcomModelLibraryPick(openAssetLibrary, {
+                          closeOnPick: false,
+                          onPick: async (entry) => {
+                            if (uploadDisabled) return;
+                            await onAttachFromModelLibrary(entry.ossUrl, entry.name);
+                          },
+                        });
+                      }}
                     >
                       <UserRound className="h-3 w-3 shrink-0" />
                       模特库
@@ -324,7 +310,19 @@ export function VtonTextTryonPanel({
                       type="button"
                       disabled={uploadDisabled}
                       className="h-7 px-2 text-[10px]"
-                      onClick={() => setSceneCatalogOpen(true)}
+                      onClick={() => {
+                        if (!onPickSceneLibraryEntry) return;
+                        openEcomSceneCatalogPick(openAssetLibrary, {
+                          onPick: async (entry) => {
+                            await onPickSceneLibraryEntry({
+                              id: entry.id,
+                              name: entry.name,
+                              subtitle: entry.subtitle ?? "",
+                              imageUrl: entry.imageUrl,
+                            });
+                          },
+                        });
+                      }}
                     >
                       <BookOpen className="h-3 w-3 shrink-0" />
                       场景库
@@ -519,28 +517,6 @@ export function VtonTextTryonPanel({
           onConfirm={async (assets) => {
             setAssetPickerOpen(false);
             if (assets.length) await onAttachAssets(assets);
-          }}
-        />
-      ) : null}
-
-      {onPickSceneLibraryEntry ? (
-        <EcomCatalogPickerDialog
-          open={sceneCatalogOpen}
-          title={sceneCatalogLoading ? "加载场景库…" : "选择场景"}
-          entries={scenePickerEntries}
-          onOpenChange={setSceneCatalogOpen}
-          onPick={(entry) => onPickSceneLibraryEntry(entry)}
-        />
-      ) : null}
-
-      {onAttachFromModelLibrary ? (
-        <EcomModelLibraryPickerDialog
-          open={modelLibraryOpen}
-          onOpenChange={setModelLibraryOpen}
-          closeOnPick={false}
-          onPick={async (entry) => {
-            if (uploadDisabled) return;
-            await onAttachFromModelLibrary(entry.ossUrl, entry.name);
           }}
         />
       ) : null}

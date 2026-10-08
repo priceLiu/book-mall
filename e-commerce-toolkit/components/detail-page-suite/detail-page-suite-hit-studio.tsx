@@ -24,6 +24,8 @@ import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
 import { ProductCreationStudioSkeleton } from "@/components/product-design/product-creation-studio-skeleton";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomLoginPrompt } from "@/components/auth/ecom-login-prompt";
+import { useAssetLibrary } from "@/docker-shared/global-asset-library";
+import { openEcomModelLibraryPick } from "@/lib/ecom-asset-library-pick";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import {
   addCustomPromptSlotToModule,
@@ -130,14 +132,6 @@ const DetailPageSuiteHitComponentEditor = dynamic(
   { ssr: false, loading: () => <div className="h-40 animate-pulse rounded-lg bg-[#f5f5f7]" /> },
 );
 
-const EcomModelLibraryPickerDialog = dynamic(
-  () =>
-    import("@/components/model-shot/ecom-model-library-picker-dialog").then(
-      (m) => m.EcomModelLibraryPickerDialog,
-    ),
-  { ssr: false },
-);
-
 const StoryboardModelPickerDialog = dynamic(
   () =>
     import("@/components/storyboard/storyboard-model-picker-dialog").then(
@@ -166,6 +160,7 @@ function allPromptTargetKeys(project: DetailPageSuiteProject): Set<string> {
 
 function DetailPageSuiteHitStudioInner() {
   const { alert, confirm, doubleConfirm, toast } = useDialogs();
+  const { openAssetLibrary } = useAssetLibrary();
   const backgroundGen = useBackgroundGeneration();
   const [project, setProject] = useState<DetailPageSuiteProject | null>(null);
   const [loading, setLoading] = useState(true);
@@ -217,7 +212,6 @@ function DetailPageSuiteHitStudioInner() {
   const decomposeLockRef = useRef(false);
   const rewriteLockRef = useRef(false);
   const [rewriting, setRewriting] = useState(false);
-  const [modelLibraryOpen, setModelLibraryOpen] = useState(false);
   const [exportPackBusy, setExportPackBusy] = useState(false);
   const [sizeChartEdit, setSizeChartEdit] = useState<{
     moduleId: string;
@@ -803,6 +797,13 @@ function DetailPageSuiteHitStudioInner() {
     }
   }
 
+  function openModelLibraryPick() {
+    openEcomModelLibraryPick(openAssetLibrary, {
+      closeOnPick: false,
+      onPick: (entry) => void handleAttachModelFromLibrary(entry),
+    });
+  }
+
   async function saveSellpointsFromDraft() {
     if (!project) return;
     const patch = briefPatchFromSellpointDraft(sellpointDraft, project.brief);
@@ -1276,7 +1277,7 @@ function DetailPageSuiteHitStudioInner() {
                       refsByRole.model.length >= HIT_MODEL_REF_MAX
                     }
                     className="h-7 gap-1 px-2 text-[10px]"
-                    onClick={() => setModelLibraryOpen(true)}
+                    onClick={() => openModelLibraryPick()}
                   >
                     <UserRound className="h-3 w-3 shrink-0" aria-hidden />
                     模特库导入
@@ -1499,13 +1500,6 @@ function DetailPageSuiteHitStudioInner() {
           progress={bottomTask.progress}
         />
       </div>
-
-      <EcomModelLibraryPickerDialog
-        open={modelLibraryOpen}
-        onOpenChange={setModelLibraryOpen}
-        closeOnPick={false}
-        onPick={(entry) => handleAttachModelFromLibrary(entry)}
-      />
 
       <StoryboardModelPickerDialog
         open={imagePickerOpen}

@@ -7,12 +7,12 @@ import { spawnCanvasNodesFromGlobalAssetPick } from "@/lib/canvas/spawn-global-a
 import { detectCanvasEditionFromNodes } from "@/lib/canvas/spawn-project-asset-on-canvas";
 import { platformCatalogPreviewUrl, platformCatalogPromptFirst } from "./platform-catalog-item-utils";
 import { createPortal } from "react-dom";
-import { Clapperboard, LayoutGrid, Package, ScanFace, Sparkles, X } from "lucide-react";
+import { LayoutGrid, X } from "lucide-react";
 
-import { StyleLibraryGrid } from "@/components/canvas/style-library-grid";
 import { StoryMediaPreviewModal } from "@/components/canvas/story-column-media-panel";
 import type { GlobalAssetLibraryApiClient } from "@/docker-shared/global-asset-library/types";
-import { PlatformCatalogPanel } from "./platform-catalog-panel";
+import { AssetLibraryHubSubContent } from "./asset-library-hub-sub-content";
+import { ASSET_LIBRARY_HUB_SUB_NAV } from "./platform-asset-hub-nav";
 import {
   CANVAS_MODAL_BACKDROP_CLASS,
   useModalBodyScrollLock,
@@ -25,8 +25,6 @@ import {
 } from "@/lib/canvas/pro2-spawn-style-asset";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { PlatformAssetHubSection } from "./platform-asset-hub-types";
-import { CameraShotLibraryPanel } from "./camera-shot-library-panel";
-import { DigitalHumanPlatformPanel } from "./digital-human-platform-panel";
 import type { CameraShotPreset } from "@/lib/canvas/camera-shot-library/catalog";
 import { cn } from "@/lib/utils";
 
@@ -35,17 +33,6 @@ const HUB_Z = 1190;
 const HUB_SHELL_CLASS =
   "nodrag flex h-[min(90vh,860px)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#141414] shadow-2xl";
 const HUB_PREVIEW_Z = 2100;
-
-const SECTIONS: Array<{
-  id: PlatformAssetHubSection;
-  label: string;
-  icon: typeof Package;
-}> = [
-  { id: "catalog", label: "模特·素材", icon: Package },
-  { id: "style", label: "风格", icon: Sparkles },
-  { id: "camera-shot", label: "镜头描述", icon: Clapperboard },
-  { id: "digital-human", label: "数字人", icon: ScanFace },
-];
 
 export type PlatformAssetHubModalProps = {
   open: boolean;
@@ -184,7 +171,7 @@ export function PlatformAssetHubModal({
           </header>
 
           <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-white/10 px-3 py-2">
-            {SECTIONS.map(({ id, label, icon: Icon }) => (
+            {ASSET_LIBRARY_HUB_SUB_NAV.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 type="button"
@@ -203,60 +190,38 @@ export function PlatformAssetHubModal({
           </nav>
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-4 pt-2">
-            {section === "catalog" ? (
-              <PlatformCatalogPanel
-                api={api}
-                previewLightboxZIndex={HUB_PREVIEW_Z}
-                maxSelect={catalogPick?.maxSelect ?? 9}
-                onPick={
-                  catalogPick
-                    ? async (items) => {
-                        const withImage = items.filter(
-                          (i) => !platformCatalogPromptFirst(i) && i.ossUrl?.trim(),
-                        );
-                        if (withImage.length > 0) {
-                          await catalogPick.onPick(withImage);
-                        }
-                        onClose();
-                      }
-                    : undefined
+            <AssetLibraryHubSubContent
+              sub={section}
+              platformOnly
+              catalogScope="platform"
+              api={api}
+              maxSelect={catalogPick?.maxSelect ?? 9}
+              catalogPickMode={Boolean(catalogPick)}
+              onClose={onClose}
+              onFinishCatalogPick={async (items, _section) => {
+                const withImage = items.filter(
+                  (i) => !platformCatalogPromptFirst(i) && i.ossUrl?.trim(),
+                );
+                if (catalogPick && withImage.length > 0) {
+                  await catalogPick.onPick(withImage);
                 }
-                onCancel={catalogPick ? onClose : undefined}
-                onPreview={previewCatalogItem}
-                onInsert={insertCatalogItem}
-              />
-            ) : null}
-            {section === "style" ? (
-              <StyleLibraryGrid
-                className="min-h-0 flex-1"
-                filterClassName="px-0 pt-0"
-                contentClassName="px-0 pb-1 pt-2"
-                selectLabel="插入画布"
-                onSelect={(p) => onStyleSelect(p)}
-                onPreview={(p) =>
-                  setPreview({ url: p.imageUrl, title: p.name })
-                }
-                fixedFilter
-                calmCards
-              />
-            ) : null}
-            {section === "camera-shot" ? (
-              <CameraShotLibraryPanel
-                onInsertToDock={
-                  onCameraShotInsertToDock
-                    ? (preset) => {
-                        onCameraShotInsertToDock(preset);
-                        onClose();
-                      }
-                    : undefined
-                }
-              />
-            ) : null}
-            {section === "digital-human" ? (
-              <div className="min-h-0 flex-1 overflow-y-auto">
-                <DigitalHumanPlatformPanel />
-              </div>
-            ) : null}
+                onClose();
+              }}
+              onPreviewCatalogItem={previewCatalogItem}
+              onInsertCatalogItem={insertCatalogItem}
+              onStyleSelect={onStyleSelect}
+              onStylePreview={(p) =>
+                setPreview({ url: p.imageUrl, title: p.name })
+              }
+              onCameraShotInsertToDock={
+                onCameraShotInsertToDock
+                  ? (preset) => {
+                      onCameraShotInsertToDock(preset);
+                      onClose();
+                    }
+                  : undefined
+              }
+            />
           </div>
         </div>
       </div>

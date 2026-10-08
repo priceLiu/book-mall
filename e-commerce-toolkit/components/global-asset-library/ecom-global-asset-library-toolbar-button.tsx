@@ -15,7 +15,7 @@ type Props = {
 
 /** Studio 顶栏 · 打开 GALD 选用素材 */
 export function EcomGlobalAssetLibraryToolbarButton({
-  title = "全局资产库",
+  title = "资产库",
   defaultCatalog = "full-body",
   maxSelect = 1,
   onPick,
@@ -29,7 +29,7 @@ export function EcomGlobalAssetLibraryToolbarButton({
       onClick={() => {
         openGlobalAssetLibrary({
           mode: "pick",
-          defaultTab: "catalog",
+          defaultSection: "shared",
           defaultCatalog,
           maxSelect,
           onPick,

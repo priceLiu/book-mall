@@ -3,17 +3,12 @@
 import { BookOpen, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  EcomCatalogPickerDialog,
-  type CatalogPickerEntry,
-} from "@/components/model-shot/ecom-catalog-picker-dialog";
+import { useAssetLibrary } from "@/docker-shared/global-asset-library";
+import { openEcomSceneCatalogPick } from "@/lib/ecom-asset-library-pick";
 import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
 import { EcomImagePreviewHost, useEcomImagePreview } from "@/components/media";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
-import { fetchEcomSceneLibraryCatalog } from "@/lib/ecom-scene-library-api";
-import { sceneToCatalogPickerEntry } from "@/lib/ecom-scene-library/picker";
-import type { EcomSceneLibraryEntry } from "@/lib/ecom-scene-library/types";
 import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
 import type {
   OutfitModelGalleryItem,
@@ -64,9 +59,7 @@ export function OutfitModelRefsPanel({
   const sceneInputRef = useRef<HTMLInputElement>(null);
   const [modelAssetPickerOpen, setModelAssetPickerOpen] = useState(false);
   const [sceneAssetPickerOpen, setSceneAssetPickerOpen] = useState(false);
-  const [sceneCatalogOpen, setSceneCatalogOpen] = useState(false);
-  const [sceneCatalog, setSceneCatalog] = useState<EcomSceneLibraryEntry[]>([]);
-  const [sceneCatalogLoading, setSceneCatalogLoading] = useState(false);
+  const { openAssetLibrary } = useAssetLibrary();
 
   const refsDisabled = Boolean(busy) || Boolean(refsLocked);
   const modelAtLimit = gallery.length >= OUTFIT_MODEL_GALLERY_MAX;
@@ -106,24 +99,6 @@ export function OutfitModelRefsPanel({
       ]
     : [];
 
-  const sceneCatalogEntries = useMemo(
-    () => sceneCatalog.map(sceneToCatalogPickerEntry),
-    [sceneCatalog],
-  );
-
-  useEffect(() => {
-    if (!sceneCatalogOpen || sceneCatalog.length > 0) return;
-    setSceneCatalogLoading(true);
-    void fetchEcomSceneLibraryCatalog()
-      .then((catalog) => {
-        const list = catalog.scenes.length
-          ? catalog.scenes
-          : [...(catalog.platform ?? []), ...(catalog.user ?? [])];
-        setSceneCatalog(list);
-      })
-      .finally(() => setSceneCatalogLoading(false));
-  }, [sceneCatalog.length, sceneCatalogOpen]);
-
   async function handleModelFiles(files: File[]) {
     if (!files.length || modelCardBusy) return;
     const remaining = OUTFIT_MODEL_GALLERY_MAX - gallery.length;
@@ -138,12 +113,15 @@ export function OutfitModelRefsPanel({
     if (sceneInputRef.current) sceneInputRef.current.value = "";
   }
 
-  async function handleSceneCatalogPick(entry: CatalogPickerEntry) {
-    const scene = sceneCatalog.find((s) => s.id === entry.id);
-    await onPickSceneLibraryPreset({
-      entryId: entry.id,
-      entryName: entry.name,
-      visualPromptFragment: scene?.visualPrompt ?? entry.subtitle,
+  function openSceneCatalogPick() {
+    openEcomSceneCatalogPick(openAssetLibrary, {
+      onPick: async (entry) => {
+        await onPickSceneLibraryPreset({
+          entryId: entry.id,
+          entryName: entry.name,
+          visualPromptFragment: entry.subtitle ?? "",
+        });
+      },
     });
   }
 
@@ -200,7 +178,7 @@ export function OutfitModelRefsPanel({
               type="button"
               disabled={sceneCardBusy}
               className="h-7 px-2 text-[10px]"
-              onClick={() => setSceneCatalogOpen(true)}
+              onClick={() => openSceneCatalogPick()}
             >
               <BookOpen className="h-3 w-3 shrink-0" />
               场景库
@@ -262,14 +240,6 @@ export function OutfitModelRefsPanel({
           setSceneAssetPickerOpen(false);
           if (assets.length && !refsDisabled) await onAttachSceneAsset(assets);
         }}
-      />
-
-      <EcomCatalogPickerDialog
-        open={sceneCatalogOpen}
-        title={sceneCatalogLoading ? "加载场景库…" : "选择场景"}
-        entries={sceneCatalogLoading ? [] : sceneCatalogEntries}
-        onOpenChange={setSceneCatalogOpen}
-        onPick={handleSceneCatalogPick}
       />
 
       <EcomImagePreviewHost preview={preview} galleryItems={galleryItems} onClose={closePreview} />

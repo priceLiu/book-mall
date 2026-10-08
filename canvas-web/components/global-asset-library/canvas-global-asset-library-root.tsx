@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, type ReactNode } from "react";
 
+import { CanvasUnifiedAssetLibraryModal } from "@/components/canvas/canvas-unified-asset-library-modal";
 import { PlatformAssetHubHost } from "@/components/canvas/platform-asset-hub/platform-asset-hub-host";
 import { GlobalAssetLibraryProvider } from "@/docker-shared/global-asset-library";
 import { createCanvasGlobalAssetLibraryApi } from "@/lib/global-asset-library-api";
@@ -16,7 +17,13 @@ export function CanvasGlobalAssetLibraryRoot({ children }: { children: ReactNode
   );
 
   return (
-    <GlobalAssetLibraryProvider api={api} variant="dark" onOpenChange={onOpenChange}>
+    <GlobalAssetLibraryProvider
+      api={api}
+      variant="dark"
+      defaultApp="canvas"
+      onOpenChange={onOpenChange}
+      UnifiedDialog={CanvasUnifiedAssetLibraryModal}
+    >
       {children}
       <PlatformAssetHubHost />
     </GlobalAssetLibraryProvider>

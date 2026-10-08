@@ -269,7 +269,7 @@ export const PRO2_ASSET_LIB_SUBMENU: Pro2AddMenuSection[] = [
     items: [
       {
         id: "global-asset-library",
-        label: "平台资产库",
+        label: "资产库",
         icon: Package,
         enabled: true,
         badge: "NEW",

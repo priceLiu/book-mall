@@ -1,6 +1,9 @@
 "use client";
 
 import type { GlobalAssetLibraryApiClient } from "@/docker-shared/global-asset-library/types";
+import type { FetchProjectItemsQuery } from "@/docker-shared/global-asset-library/unified-asset-library-types";
+import type { UnifiedAssetPickItem } from "@/docker-shared/global-asset-library/unified-asset-library-types";
+import { listAssets } from "@/lib/ecom-api";
 
 async function bookFetch(path: string, init?: RequestInit) {
   const res = await fetch(`/api/book-mall/${path}`, {
@@ -100,6 +103,38 @@ export function createEcomGlobalAssetLibraryApi(): GlobalAssetLibraryApiClient {
       } catch {
         return false;
       }
+    },
+    async fetchProjectItems(query: FetchProjectItemsQuery) {
+      const modules = [
+        ...(query.ecomModules ?? []),
+        ...(query.ecomModule?.trim() ? [query.ecomModule.trim()] : []),
+      ];
+      const uniqueModules = [...new Set(modules)];
+      const items: UnifiedAssetPickItem[] = [];
+      const q = query.keyword?.trim().toLowerCase() ?? "";
+      for (const ecomMod of uniqueModules.length ? uniqueModules : [undefined]) {
+        const assets = await listAssets(ecomMod);
+        for (const a of assets) {
+          if (query.media === "image" && a.kind === "video") continue;
+          if (query.media === "video" && a.kind !== "video") continue;
+          const title = a.title?.trim() || "未命名";
+          if (q && !title.toLowerCase().includes(q)) continue;
+          const url = a.ossUrl?.trim() || a.thumbnailUrl?.trim() || "";
+          if (!url) continue;
+          items.push({
+            id: a.id,
+            title,
+            ossUrl: url,
+            thumbUrl: a.thumbnailUrl ?? url,
+            section: "project",
+            provenance: "ecomAsset",
+            insertMode: "url",
+            ecomModule: a.module,
+            subtitle: a.module,
+          });
+        }
+      }
+      return { items: items.slice(0, query.limit ?? 240) };
     },
   };
 }

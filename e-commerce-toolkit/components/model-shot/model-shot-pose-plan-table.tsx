@@ -1,22 +1,12 @@
 "use client";
 
 import { BookOpen, Pencil } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
-import {
-  EcomCatalogPickerDialog,
-  type CatalogPickerEntry,
-} from "@/components/model-shot/ecom-catalog-picker-dialog";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
-import { EcomPoseLibraryFilterBar } from "@/components/model-shot/ecom-pose-library-filter-bar";
-import { fetchEcomPoseLibraryCatalog } from "@/lib/ecom-pose-library-api";
-import { filterPoseEntries, type EcomPoseGender } from "@/lib/ecom-pose-library/meta";
-import type { EcomPoseLibraryEntry } from "@/lib/ecom-pose-library/types";
-import { fetchEcomPropLibraryCatalog } from "@/lib/ecom-prop-library-api";
-import type { EcomPropLibraryEntry } from "@/lib/ecom-prop-library/types";
-import { fetchEcomSceneLibraryCatalog } from "@/lib/ecom-scene-library-api";
-import { sceneToCatalogPickerEntry } from "@/lib/ecom-scene-library/picker";
-import type { EcomSceneLibraryEntry } from "@/lib/ecom-scene-library/types";
+import { useAssetLibrary } from "@/docker-shared/global-asset-library";
+import { openEcomCatalogKindPick } from "@/lib/ecom-asset-library-pick";
+import type { GlobalAssetCatalogKind } from "@/docker-shared/global-asset-library/types";
 import type { ModelShotPlan, ModelShotPoseItem } from "@/lib/model-shot-types";
 
 export type PoseItemPatch = {
@@ -43,8 +33,6 @@ type Props = {
   canGeneratePoses?: boolean;
   confirmed?: boolean;
 };
-
-type PickerKind = "scene" | "prop" | "pose" | null;
 
 function displayPoseDescription(item: ModelShotPoseItem): string {
   if (item.poseDescription?.trim()) return item.poseDescription.trim();
@@ -75,36 +63,6 @@ function toDraft(item: ModelShotPoseItem): PoseItemPatch {
   };
 }
 
-function sortPosesWithImageFirst(entries: EcomPoseLibraryEntry[]): EcomPoseLibraryEntry[] {
-  return [...entries].sort((a, b) => {
-    const aHas = Boolean(a.ossUrl?.trim() || a.thumbUrl?.trim());
-    const bHas = Boolean(b.ossUrl?.trim() || b.thumbUrl?.trim());
-    if (aHas !== bHas) return aHas ? -1 : 1;
-    return (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.title.localeCompare(b.title, "zh-CN");
-  });
-}
-
-function poseToPickerEntry(entry: EcomPoseLibraryEntry): CatalogPickerEntry {
-  return {
-    id: entry.id,
-    name: entry.title,
-    subtitle: entry.baseDescription?.trim() || "—",
-    imageUrl: entry.thumbUrl || entry.ossUrl,
-    scope: entry.scope,
-    lockedAt: entry.lockedAt,
-  };
-}
-
-function propToPickerEntry(entry: EcomPropLibraryEntry): CatalogPickerEntry {
-  return {
-    id: entry.id,
-    name: entry.name,
-    subtitle: entry.visualDescription,
-    scope: entry.scope,
-    lockedAt: entry.lockedAt,
-  };
-}
-
 export function ModelShotPosePlanTable({
   plan,
   defaultSceneLabel,
@@ -121,83 +79,28 @@ export function ModelShotPosePlanTable({
     sceneText: "",
     propText: "",
   });
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerKind, setPickerKind] = useState<PickerKind>(null);
-  const [pickerTargetIndex, setPickerTargetIndex] = useState<number>(1);
-  const [applyToAll, setApplyToAll] = useState(false);
-  const [sceneCatalog, setSceneCatalog] = useState<EcomSceneLibraryEntry[]>([]);
-  const [propCatalog, setPropCatalog] = useState<EcomPropLibraryEntry[]>([]);
-  const [poseCatalog, setPoseCatalog] = useState<EcomPoseLibraryEntry[]>([]);
-  const [poseGenderFilter, setPoseGenderFilter] = useState<EcomPoseGender[]>([]);
-  const [poseSceneTagFilter, setPoseSceneTagFilter] = useState<string[]>([]);
-  const [catalogLoading, setCatalogLoading] = useState(false);
+  const { openAssetLibrary } = useAssetLibrary();
+  const pickerCtxRef = useRef<{
+    kind: "scene" | "prop" | "pose";
+    index: number;
+    all: boolean;
+  } | null>(null);
 
-  const filteredPoseCatalog = useMemo(
-    () =>
-      filterPoseEntries(poseCatalog, {
-        genders: poseGenderFilter,
-        sceneTags: poseSceneTagFilter,
-      }),
-    [poseCatalog, poseGenderFilter, poseSceneTagFilter],
-  );
-
-  const pickerEntries = useMemo((): CatalogPickerEntry[] => {
-    if (pickerKind === "scene") return sceneCatalog.map(sceneToCatalogPickerEntry);
-    if (pickerKind === "prop") return propCatalog.map(propToPickerEntry);
-    if (pickerKind === "pose") {
-      return sortPosesWithImageFirst(filteredPoseCatalog).map(poseToPickerEntry);
-    }
-    return [];
-  }, [pickerKind, sceneCatalog, propCatalog, filteredPoseCatalog]);
-
-  const openPicker = useCallback(
-    async (kind: "scene" | "prop" | "pose", index: number, all = false) => {
-      setPickerKind(kind);
-      setPickerTargetIndex(index);
-      setApplyToAll(all);
-      if (kind === "pose") {
-        setPoseGenderFilter([]);
-        setPoseSceneTagFilter([]);
-      }
-      setCatalogLoading(true);
-      setPickerOpen(true);
-      try {
-        if (kind === "scene") {
-          const catalog = await fetchEcomSceneLibraryCatalog();
-          const list = catalog.scenes.length
-            ? catalog.scenes
-            : [...(catalog.platform ?? []), ...(catalog.user ?? [])];
-          setSceneCatalog(list);
-        } else if (kind === "prop") {
-          const catalog = await fetchEcomPropLibraryCatalog();
-          const list = catalog.props.length
-            ? catalog.props
-            : [...(catalog.platform ?? []), ...(catalog.user ?? [])];
-          setPropCatalog(list);
-        } else {
-          const catalog = await fetchEcomPoseLibraryCatalog();
-          const list = catalog.poses.length
-            ? catalog.poses
-            : [...(catalog.platform ?? []), ...(catalog.user ?? [])];
-          setPoseCatalog(list);
-        }
-      } finally {
-        setCatalogLoading(false);
-      }
-    },
-    [],
-  );
-
-  const handlePickerPick = useCallback(
-    async (entry: CatalogPickerEntry) => {
-      if (!pickerKind) return;
-      const index = pickerTargetIndex;
+  const applyCatalogPick = useCallback(
+    async (entry: {
+      id: string;
+      name: string;
+      subtitle?: string | null;
+      imageUrl?: string | null;
+    }) => {
+      const ctx = pickerCtxRef.current;
+      if (!ctx) return;
+      const { kind, index, all } = ctx;
       const item = plan.items.find((i) => i.index === index) ?? plan.items[0];
       if (!item) return;
 
-      if (pickerKind === "scene") {
-        const scene = sceneCatalog.find((s) => s.id === entry.id);
-        const sceneText = scene?.visualPrompt ?? entry.subtitle;
+      if (kind === "scene") {
+        const sceneText = entry.subtitle?.trim() || "—";
         if (editIndex === index) {
           setDraft((prev) => ({
             ...prev,
@@ -210,11 +113,10 @@ export function ModelShotPosePlanTable({
           ...toDraft(item),
           sceneText,
           sceneCatalogId: entry.id,
-          applySceneToAll: applyToAll,
+          applySceneToAll: all,
         });
-      } else if (pickerKind === "prop") {
-        const prop = propCatalog.find((p) => p.id === entry.id);
-        const propText = prop?.visualDescription ?? entry.subtitle;
+      } else if (kind === "prop") {
+        const propText = entry.subtitle?.trim() || "无";
         if (editIndex === index) {
           setDraft((prev) => ({
             ...prev,
@@ -227,19 +129,17 @@ export function ModelShotPosePlanTable({
           ...toDraft(item),
           propText,
           propCatalogId: entry.id,
-          applyPropToAll: applyToAll,
+          applyPropToAll: all,
         });
       } else {
-        const pose = poseCatalog.find((p) => p.id === entry.id);
-        const poseDescription = pose?.baseDescription?.trim() || entry.subtitle;
-        const poseRefUrl = pose?.ossUrl?.trim() || pose?.thumbUrl?.trim() || null;
+        const poseDescription = entry.subtitle?.trim() || "—";
+        const poseRefUrl = entry.imageUrl?.trim() || null;
         const patch: PoseItemPatch = {
           ...toDraft(item),
           poseDescription,
           poseId: entry.id,
           poseRefUrl,
-          title: pose?.title ?? entry.name,
-          category: pose?.category,
+          title: entry.name,
         };
         if (editIndex === index) {
           setDraft(patch);
@@ -248,7 +148,31 @@ export function ModelShotPosePlanTable({
         await onPatchItem(index, patch);
       }
     },
-    [applyToAll, editIndex, onPatchItem, pickerKind, pickerTargetIndex, plan.items, poseCatalog, propCatalog, sceneCatalog],
+    [editIndex, onPatchItem, plan.items],
+  );
+
+  const openPicker = useCallback(
+    (kind: "scene" | "prop" | "pose", index: number, all = false) => {
+      pickerCtxRef.current = { kind, index, all };
+      const catalogKind: GlobalAssetCatalogKind =
+        kind === "scene" ? "scene" : kind === "prop" ? "prop" : "pose";
+      const title =
+        kind === "scene"
+          ? all
+            ? "选择场景 · 应用到全部"
+            : "选择场景"
+          : kind === "prop"
+            ? all
+              ? "选择道具 · 应用到全部"
+              : "选择道具"
+            : "从姿势库选择";
+      openEcomCatalogKindPick(openAssetLibrary, {
+        catalogKind,
+        title,
+        onPick: (entry) => void applyCatalogPick(entry),
+      });
+    },
+    [applyCatalogPick, openAssetLibrary],
   );
 
   if (plan.items.length === 0) {
@@ -488,35 +412,6 @@ export function ModelShotPosePlanTable({
         </table>
       </div>
 
-      <EcomCatalogPickerDialog
-        open={pickerOpen}
-        title={
-          catalogLoading
-            ? "加载词库…"
-            : pickerKind === "scene"
-              ? applyToAll
-                ? "选择场景 · 应用到全部"
-                : "选择场景"
-              : pickerKind === "prop"
-                ? applyToAll
-                  ? "选择道具 · 应用到全部"
-                  : "选择道具"
-                : "从姿势库选择"
-        }
-        entries={catalogLoading ? [] : pickerEntries}
-        headerContent={
-          pickerKind === "pose" && !catalogLoading ? (
-            <EcomPoseLibraryFilterBar
-              selectedGenders={poseGenderFilter}
-              selectedSceneTags={poseSceneTagFilter}
-              onGendersChange={setPoseGenderFilter}
-              onSceneTagsChange={setPoseSceneTagFilter}
-            />
-          ) : null
-        }
-        onOpenChange={setPickerOpen}
-        onPick={handlePickerPick}
-      />
     </section>
   );
 }

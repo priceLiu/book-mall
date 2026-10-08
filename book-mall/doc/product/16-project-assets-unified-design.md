@@ -23,6 +23,8 @@
 
 二者 **不** 共用表；跨项目复用参考图走 catalog，恢复节点/组走项目资产。详见 `docs/项目产资产.md`。
 
+**选用（2026-10）**：各应用 **保存** 仍走上述两入口；**选用** 统一为客户端 `UnifiedAssetLibraryDialog`（三 Tab：平台资产 / 我的共用 / 本项目），按应用注入「本项目」读源（画布 `ProjectAsset`、电商 `EcomAsset`、QuickReplica 用户模板），**不** 合并 PostgreSQL 表。契约见 `book-mall/doc/tech/unified-asset-library-pick.md`。
+
 ### 1.1 产品目标
 
 | # | 需求 | 设计回应 |

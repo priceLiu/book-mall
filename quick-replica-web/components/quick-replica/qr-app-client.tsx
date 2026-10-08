@@ -58,6 +58,7 @@ import {
 } from "@/lib/qr-credits-settlement-watch";
 import { fetchQrAudioCatalog } from "@/lib/qr-audio-catalog-client";
 import { PortalNav } from "@/components/portal-nav";
+import { UnifiedAssetLibraryRoot } from "@/components/unified-asset-library-root";
 import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 import { getBookAccountUrl, getMainSiteOrigin } from "@/lib/site-origin";
 import {
@@ -1008,6 +1009,7 @@ export function QrAppClient({
   })();
 
   return (
+    <UnifiedAssetLibraryRoot>
     <div className="flex h-dvh flex-col overflow-hidden" style={{ background: "var(--qr-bg-page)" }}>
       <header
         className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:px-4 sm:py-3"
@@ -1288,6 +1290,7 @@ export function QrAppClient({
         durationMs={copyToast?.includes("积分") ? 6000 : 2400}
       />
     </div>
+    </UnifiedAssetLibraryRoot>
   );
 }
 

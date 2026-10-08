@@ -38,6 +38,7 @@ type Props = {
   closeOnPick?: boolean;
 };
 
+/** @deprecated 请使用 `useAssetLibrary().openAssetLibrary` / `openEcomModelLibraryPick` */
 export function EcomModelLibraryPickerDialog({
   open,
   onOpenChange,

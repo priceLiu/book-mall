@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE = join(ROOT, "e-commerce-toolkit/docker-shared/global-asset-library");
-const TARGET_APPS = ["canvas-web", "book-mall"];
+const TARGET_APPS = ["canvas-web", "book-mall", "quick-replica-web"];
 
 const FILES = [
   "types.ts",
@@ -23,6 +23,9 @@ const FILES = [
   "global-asset-library-provider.tsx",
   "save-to-catalog-dialog.tsx",
   "platform-catalog-save-types.ts",
+  "unified-asset-library-types.ts",
+  "unified-asset-library-dialog.tsx",
+  "open-asset-library-utils.ts",
   "index.ts",
 ];
 

@@ -279,6 +279,13 @@ export function QrWorkspacePanel({
                 sceneImageUrls: draft.sceneImageUrls.filter((_, i) => i !== index),
               });
             }}
+            onAddReferenceUrls={(urls) => {
+              const maxRefs = getTextToVideoModelDef(draft.modelKey).maxRefImages;
+              onDraftChange({
+                ...draft,
+                sceneImageUrls: [...draft.sceneImageUrls, ...urls].slice(0, maxRefs),
+              });
+            }}
           />
         ) : isCreateImage ? (
           <QrCreateImageForm

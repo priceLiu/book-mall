@@ -13,6 +13,7 @@ import { useMemo, useRef, useState } from "react";
 
 import { QrHappyHorsePromptTextarea } from "@/components/quick-replica/qr-happyhorse-prompt-textarea";
 import { QrImageUploadZone } from "@/components/quick-replica/qr-image-upload-zone";
+import { QrPickFromAssetLibraryButton } from "@/components/quick-replica/qr-pick-from-asset-library-button";
 import { QrRefImageThumb } from "@/components/quick-replica/qr-ref-image-thumb";
 import { QrModelPickerTrigger } from "@/components/quick-replica/qr-model-picker";
 import { QrTextToVideoModelPicker } from "@/components/quick-replica/qr-text-to-video-model-picker";
@@ -55,6 +56,7 @@ type Props = {
   busy?: boolean;
   uploadingImage?: boolean;
   onUploadReferenceImages?: (files: File[]) => Promise<void>;
+  onAddReferenceUrls?: (urls: string[]) => void | Promise<void>;
   onRemoveReferenceImage?: (index: number) => void;
 };
 
@@ -237,6 +239,7 @@ export function QrTextToVideoForm({
   busy,
   uploadingImage,
   onUploadReferenceImages,
+  onAddReferenceUrls,
   onRemoveReferenceImage,
 }: Props) {
   const multiImageInputRef = useRef<HTMLInputElement>(null);
@@ -412,7 +415,16 @@ export function QrTextToVideoForm({
             await onUploadReferenceImages(files);
           }}
         >
-          <h3 className="text-sm font-semibold text-[var(--qr-text-primary)]">引用图片</h3>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-[var(--qr-text-primary)]">引用图片</h3>
+            {onAddReferenceUrls ? (
+              <QrPickFromAssetLibraryButton
+                disabled={busy || uploadingImage || refImages.length >= maxRefImages}
+                maxSelect={Math.max(1, maxRefImages - refImages.length)}
+                onPickUrls={(urls) => void onAddReferenceUrls(urls)}
+              />
+            ) : null}
+          </div>
           <p className="mt-1 text-xs text-[var(--qr-text-muted)]">
             {usesImageTokens
               ? "上传引用图片（HappyHorse 必填），在提示词中用 @ 引用"

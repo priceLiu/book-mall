@@ -6,7 +6,8 @@ import { createPortal } from "react-dom";
 
 import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
-import { EcomModelLibraryPickerDialog } from "@/components/model-shot/ecom-model-library-picker-dialog";
+import { useAssetLibrary } from "@/docker-shared/global-asset-library";
+import { openEcomModelLibraryPick } from "@/lib/ecom-asset-library-pick";
 import {
   StoryboardRefGenerateDialog,
   type StoryboardRefGenRole,
@@ -86,8 +87,6 @@ function StoryboardRefOverlays({
   pickerRole,
   setPickerRole,
   onAttachAssets,
-  modelPickerOpen,
-  setModelPickerOpen,
   onAttachModelFromLibrary,
   genRole,
   closeGenFlow,
@@ -103,8 +102,6 @@ function StoryboardRefOverlays({
   pickerRole: StoryboardReference["role"] | null;
   setPickerRole: (role: StoryboardReference["role"] | null) => void;
   onAttachAssets?: (assetIds: string[], role: StoryboardReference["role"]) => Promise<void>;
-  modelPickerOpen: boolean;
-  setModelPickerOpen: (open: boolean) => void;
   onAttachModelFromLibrary?: (entry: {
     id: string;
     name: string;
@@ -144,17 +141,6 @@ function StoryboardRefOverlays({
                 role,
               );
             }
-          }}
-        />
-      ) : null}
-
-      {onAttachModelFromLibrary ? (
-        <EcomModelLibraryPickerDialog
-          open={modelPickerOpen}
-          onOpenChange={setModelPickerOpen}
-          onPick={async (entry) => {
-            await onAttachModelFromLibrary(entry);
-            setModelPickerOpen(false);
           }}
         />
       ) : null}
@@ -209,7 +195,7 @@ export function StoryboardRefUploader({
     scene: null,
   });
   const [pickerRole, setPickerRole] = useState<StoryboardReference["role"] | null>(null);
-  const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const { openAssetLibrary } = useAssetLibrary();
   const [genRole, setGenRole] = useState<StoryboardRefGenRole | null>(null);
   const [genModelKey, setGenModelKey] = useState(imageModelKey);
 
@@ -233,6 +219,19 @@ export function StoryboardRefUploader({
 
   function closeGenFlow() {
     setGenRole(null);
+  }
+
+  function openModelLibraryPick() {
+    if (!onAttachModelFromLibrary) return;
+    openEcomModelLibraryPick(openAssetLibrary, {
+      onPick: async (entry) => {
+        await onAttachModelFromLibrary({
+          id: entry.id,
+          name: entry.name,
+          ossUrl: entry.ossUrl,
+        });
+      },
+    });
   }
 
   const uploadFile = useCallback(
@@ -266,7 +265,7 @@ export function StoryboardRefUploader({
     dropZoneProps: sectionPasteProps,
     focusZone: focusSectionPaste,
   } = useImageDropPaste({
-    enabled: !busy && !genBusyRole && !genRole && !modelPickerOpen && !imageGenPickerOpen,
+    enabled: !busy && !genBusyRole && !genRole && !imageGenPickerOpen,
     multiple: false,
     listenPaste: true,
     onFiles: (files) => void handleFiles(files, activeRefRoleRef.current),
@@ -361,7 +360,7 @@ export function StoryboardRefUploader({
                       className="h-7 px-2 text-[10px]"
                       onClick={() => {
                         onActiveRoleChange?.(role);
-                        setModelPickerOpen(true);
+                        openModelLibraryPick();
                       }}
                     >
                       <UserRound className="h-3 w-3 shrink-0" />
@@ -394,8 +393,6 @@ export function StoryboardRefUploader({
         pickerRole={pickerRole}
         setPickerRole={setPickerRole}
         onAttachAssets={onAttachAssets}
-        modelPickerOpen={modelPickerOpen}
-        setModelPickerOpen={setModelPickerOpen}
         onAttachModelFromLibrary={onAttachModelFromLibrary}
         genRole={genRole}
         closeGenFlow={closeGenFlow}
