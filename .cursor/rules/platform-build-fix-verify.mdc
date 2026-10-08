@@ -1,0 +1,55 @@
+---
+description: 平台/CloudBase 构建失败修复后必须本地完整构建验证再回复用户
+alwaysApply: true
+---
+
+# 平台构建错误 · 修复与本地完整验证（强制）
+
+用户贴出 **CloudBase / 腾讯云 / Docker 生产构建** 失败日志时，适用本规范。目标：避免「修一条 → 推送 → 云端再报下一条」的循环。
+
+## 根因习惯（先做）
+
+1. **识别失败子应用**（日志里的服务名 / Dockerfile 上下文，如 `book-mall`、`e-commerce-toolkit`、`quick-replica-web`、`canvas-web`）。
+2. **禁止只修日志里第一条错误就收工**。`next build` 类型检查常在 **首个** TS 错误处停止；云端日志不等于错误全集。
+3. 在该子应用目录先跑 **全量类型检查**，一次列出全部错误再批量修：
+
+```bash
+cd <app> && pnpm exec tsc --noEmit -p tsconfig.json
+# 或: ./node_modules/.bin/tsc --noEmit -p tsconfig.json
+```
+
+4. 测试目录若被 `tsconfig` `include` 扫进生产检查、且与运行时无关：优先 `exclude`（如 `"test"`），勿逐个「修测试凑过 `next build`」除非测试本身坏了。
+
+## 修完后的强制步骤（缺一不可）
+
+在声称「已修好 / 可以重新构建」之前，必须在 **同一子应用目录** 完成本地完整构建，且 **exit code 0**：
+
+| 子应用 | 推荐命令（对齐 Docker / CloudBase，勿误跑会连库 migrate 的脚本） |
+|---|---|
+| `book-mall` | `pnpm build:docker`（`prisma generate && next build`）；**不要**用会 `migrate deploy` 的 `pnpm build` 当云端等价验证 |
+| `e-commerce-toolkit` / `quick-replica-web` / `canvas-web` / `story-web` / `tool-web` 等 | `pnpm exec next build` 或 `pnpm build`（以该包 `package.json` 为准，须实际执行 `next build`） |
+
+- 构建失败 → **继续修**，再跑，直到通过。
+- 仅 `tsc` 通过 **不够**：最终必须以 **`next build`（或该应用 Docker 同款 build 脚本）成功** 为准。
+- 涉及 `docker-shared` / `platform-compose-ui` 同步时：先同步再构建；构建通过后提醒用户 **commit + push**，否则云端仍拉旧代码。
+
+## 回复用户时的话术（强制）
+
+构建本地通过后，须 **明确告知**：
+
+1. 已在本地对该子应用执行完整生产构建（写明命令与目录）。
+2. **本地完整构建通过，没有问题**（或附 exit 0 / 无 Type error）。
+3. 若改动尚未提交：说明须 **commit 并 push** 后云端才会吃到修复；未 push 时不得暗示「再点构建就会过」。
+
+禁止：
+
+- 只改代码、未跑完整 `next build`，就回复「可以重新部署了」。
+- 用「理论上没问题」「应该可以了」代替本地构建结果。
+- 修完一条日志错误就结束，不跑全量 `tsc` / 完整 build。
+
+## Code Review / 自检
+
+- [ ] 已对失败子应用跑过全量 `tsc --noEmit`
+- [ ] 已对该子应用跑过与 CloudBase 等价的完整 build，且成功
+- [ ] 回复中写明「本地完整构建通过」
+- [ ] 未提交时已提醒 commit / push
