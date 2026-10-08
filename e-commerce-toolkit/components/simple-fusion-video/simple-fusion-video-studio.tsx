@@ -46,6 +46,7 @@ import {
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { EcomIconButton } from "@/components/ui/ecom-icon-button";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
+import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 import { fetchStoryboardModels } from "@/lib/ecom-storyboard-api";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
@@ -809,7 +810,15 @@ function SimpleFusionVideoStudioInner({
                 <EcomProjectListButton
                   disabled={busy}
                   currentProjectId={project.id}
-                  loadProjects={async () => listSimpleFusionProjects(moduleId)}
+                  loadProjects={async (): Promise<EcomProjectListItem[]> => {
+                    const items = await listSimpleFusionProjects(moduleId);
+                    return items.map((p) => ({
+                      id: p.id,
+                      title: p.title?.trim() || copy.title,
+                      updatedAt: p.updatedAt,
+                      subtitle: p.phase,
+                    }));
+                  }}
                   onSelectProject={(id) => void getSimpleFusionProject(id).then(applyProject)}
                   title={`${copy.title} · 项目列表`}
                   emptyHint={`还没有保存过的${copy.title}项目。`}

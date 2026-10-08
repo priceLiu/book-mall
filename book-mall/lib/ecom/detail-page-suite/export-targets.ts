@@ -70,13 +70,16 @@ export function imageSizeForExportTarget(target: DetailPageSuiteExportTarget): s
   return ecomRatioToImageSize(ratio);
 }
 
+const EXPORT_TARGET_RATIOS: EcomImageRatio[] = [
+  "1:1",
+  "3:4",
+  "4:5",
+  "9:16",
+  "16:9",
+];
+
 export function ratioForExportTarget(target: DetailPageSuiteExportTarget): EcomImageRatio {
-  if (
-    target.ratio === "1:1" ||
-    target.ratio === "3:4" ||
-    target.ratio === "4:5" ||
-    target.ratio === "16:9"
-  ) {
+  if (EXPORT_TARGET_RATIOS.includes(target.ratio)) {
     return target.ratio;
   }
   return getEcomPlatformSpec(target.platformCode).detailPage.ratio;

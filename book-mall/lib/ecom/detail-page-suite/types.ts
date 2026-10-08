@@ -1,5 +1,6 @@
 import type { DetailPageSuiteCopyOverlay } from "./slot-copy-overlay-types";
 import type { EcomSellpointFivePart } from "@/lib/ecom/ecom-sellpoint-five-part";
+import type { EcomImageRatio } from "@/lib/ecom/ecom-platform-spec";
 
 export const ECOM_DETAIL_PAGE_SUITE_TOOL_KEY = "ecom-toolkit__detail-page-suite";
 export const ECOM_DETAIL_PAGE_SUITE_REPLICA_TOOL_KEY =
@@ -157,7 +158,7 @@ export type DetailPageSuiteExportTarget = {
   id: string;
   platformCode: string;
   label: string;
-  ratio: "1:1" | "3:4" | "4:5" | "16:9";
+  ratio: EcomImageRatio;
   widthPx: number;
   customHeightPx?: number;
 };
