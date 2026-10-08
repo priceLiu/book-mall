@@ -4,11 +4,17 @@ export type GlobalAssetCatalogKind =
   | "garment"
   | "full-body"
   | "style"
-  | "scene";
+  | "scene"
+  | "character"
+  | "reference"
+  | "prop"
+  | "storyboard-image"
+  | "storyboard-video"
+  | "audio";
 
 export type GlobalAssetCatalogScope = "platform" | "user" | "team" | "project";
 
-/** 画布「保存到库」上下文（团队/项目范围仅画布） */
+/** 画布「保存平台资产库」上下文（团队/项目范围仅画布） */
 export type GlobalAssetSaveContext = {
   projectId?: string;
   tenantId?: string | null;

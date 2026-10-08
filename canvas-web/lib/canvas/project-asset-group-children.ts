@@ -1,7 +1,7 @@
 import { isPro2MediaChildNode } from "./pro2-media-group-meta";
 import type { CanvasFlowNode } from "./types";
 
-/** 组保存为资产：收拢 parentId / pro2GroupId / controller 关联的全部媒体子节点 */
+/** 组保存项目资产：收拢 parentId / pro2GroupId / controller 关联的全部媒体子节点 */
 export function collectGroupChildNodesForAssetExport(
   groupId: string,
   nodes: CanvasFlowNode[],

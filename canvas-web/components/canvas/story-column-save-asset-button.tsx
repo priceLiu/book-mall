@@ -7,7 +7,7 @@ import {
   PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS,
 } from "./pro2/pro2-image-node-toolbar";
 
-/** Story-Pro 1.0 列节点 · 「保存为资产」（与 LibTV 顶栏同壳层） */
+/** Story-Pro 1.0 列节点 · 「保存项目资产」（与 LibTV 顶栏同壳层） */
 export function StoryColumnSaveAssetButton({
   onClick,
   disabled,
@@ -37,7 +37,7 @@ export function StoryColumnSaveAssetButton({
         onClick={onClick}
       >
         <BookmarkPlus className="size-3.5" />
-        {compact ? null : <span>保存为资产</span>}
+        {compact ? null : <span>保存项目资产</span>}
       </button>
     </div>
   );

@@ -4,6 +4,11 @@ import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import {
+  catalogKindSupportsImageImport,
+  PLATFORM_CATALOG_SAVE_TYPE_OPTIONS,
+  platformCatalogSaveTypeLabel,
+} from "./platform-catalog-save-types";
 import { GALD_CLOSE_BTN_CLASS, globalAssetTheme } from "./theme";
 import type {
   GlobalAssetCatalogKind,
@@ -16,24 +21,16 @@ import type {
 
 const POSE_CATEGORIES = ["A", "B", "C", "D", "E", "H", "I", "J", "K", "L", "M"];
 
-const SAVE_CATALOG_OPTIONS: Array<{ id: GlobalAssetCatalogKind; label: string }> = [
-  { id: "pose", label: "姿势库" },
-  { id: "avatar", label: "模特头像库" },
-  { id: "garment", label: "服装库" },
-  { id: "full-body", label: "全身模特" },
-  { id: "style", label: "风格库" },
-  { id: "scene", label: "场景库" },
-];
-
 const MODEL_CATALOG_KINDS = new Set<GlobalAssetCatalogKind>([
   "pose",
   "avatar",
   "garment",
   "full-body",
+  "character",
 ]);
 
 function buildDefaultCatalogName(catalogKind: GlobalAssetCatalogKind): string {
-  const label = SAVE_CATALOG_OPTIONS.find((o) => o.id === catalogKind)?.label ?? "素材";
+  const label = platformCatalogSaveTypeLabel(catalogKind);
   const stamp = new Date().toISOString().slice(0, 10);
   return `${label}-${stamp}`;
 }
@@ -61,7 +58,9 @@ export function SaveToCatalogDialog({
 }: Props) {
   const theme = globalAssetTheme(variant);
   const [catalogKind, setCatalogKind] = useState<GlobalAssetCatalogKind>(defaultCatalog);
-  const [scope, setScope] = useState<GlobalAssetCatalogScope>("user");
+  const [scopeUser, setScopeUser] = useState(true);
+  const [scopeProject, setScopeProject] = useState(false);
+  const [scopePlatform, setScopePlatform] = useState(false);
   const [isAdminFromApi, setIsAdminFromApi] = useState(false);
   const isAdmin = saveContext?.isPlatformAdmin === true || isAdminFromApi;
   const [savePrompt, setSavePrompt] = useState(Boolean(sourceImage.prompt?.trim()));
@@ -80,7 +79,9 @@ export function SaveToCatalogDialog({
     savedRef.current = false;
     nameTouchedRef.current = false;
     setCatalogKind(defaultCatalog);
-    setScope("user");
+    setScopeUser(true);
+    setScopeProject(false);
+    setScopePlatform(false);
     setError(null);
     setDiscardOpen(false);
     setSavePrompt(Boolean(sourceImage.prompt?.trim()));
@@ -105,22 +106,30 @@ export function SaveToCatalogDialog({
     setDiscardOpen(true);
   }
 
-  function resolvedScope(): GlobalAssetCatalogScope {
-    if (isAdmin && scope === "platform") return "platform";
-    if (scope === "team" && saveContext?.allowTeamShare) return "team";
-    if (scope === "project" && saveContext?.allowProjectScope) return "project";
-    return "user";
+  function resolvedScopes(): GlobalAssetCatalogScope[] {
+    const scopes: GlobalAssetCatalogScope[] = [];
+    const canProject =
+      scopeProject && saveContext?.allowProjectScope && saveContext.projectId?.trim();
+    if (canProject) scopes.push("project");
+    else if (scopeUser) scopes.push("user");
+    if (scopePlatform && isAdmin) scopes.push("platform");
+    return [...new Set(scopes)];
   }
 
   async function submit() {
     setBusy(true);
     setError(null);
     try {
-      const finalScope = resolvedScope();
-      await api.importToCatalog({
+      if (!catalogKindSupportsImageImport(catalogKind)) {
+        throw new Error("当前入口仅支持图片类型");
+      }
+      const scopes = resolvedScopes();
+      if (!scopes.some((s) => s === "user" || s === "project")) {
+        throw new Error("请选择个人全账号或当前项目");
+      }
+      const payloadBase = {
         catalogKind,
         imageUrl: sourceImage.url,
-        scope: finalScope,
         name: name.trim() || buildDefaultCatalogName(catalogKind),
         gender: MODEL_CATALOG_KINDS.has(catalogKind) ? gender : undefined,
         savePrompt: catalogKind === "pose" ? savePrompt : undefined,
@@ -128,16 +137,20 @@ export function SaveToCatalogDialog({
         category: catalogKind === "pose" ? category : undefined,
         sourceModule: sourceImage.sourceModule,
         sourceAssetId: sourceImage.sourceAssetId,
-        tenantId:
-          finalScope === "team" ? saveContext?.tenantId ?? undefined : undefined,
-        sourceProjectId:
-          finalScope === "project" ? saveContext?.projectId ?? undefined : undefined,
         projectId: saveContext?.projectId,
         modelKey:
           catalogKind === "style" || catalogKind === "scene"
             ? saveContext?.visionModelKey
             : undefined,
-      });
+      };
+      for (const finalScope of scopes) {
+        await api.importToCatalog({
+          ...payloadBase,
+          scope: finalScope,
+          sourceProjectId:
+            finalScope === "project" ? saveContext?.projectId ?? undefined : undefined,
+        });
+      }
       savedRef.current = true;
       onSaved?.();
       onClose();
@@ -180,48 +193,59 @@ export function SaveToCatalogDialog({
             <X className="h-4 w-4" />
           </button>
 
-          <h4 className={`mb-3 pr-8 text-sm font-semibold ${theme.textPrimary}`}>保存到库</h4>
+          <h4 className={`mb-3 pr-8 text-sm font-semibold ${theme.textPrimary}`}>保存平台资产库</h4>
 
-        <div className={`mb-3 space-y-2 text-xs ${theme.textPrimary}`}>
-          <span className="font-medium">目标库</span>
-          <div className="grid grid-cols-2 gap-2">
-            {SAVE_CATALOG_OPTIONS.map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                className={`rounded-lg px-3 py-2 text-left text-xs transition-colors ${
-                  catalogKind === opt.id ? theme.navActive : theme.navIdle
-                }`}
-                onClick={() => setCatalogKind(opt.id)}
-              >
+        <label className={`mb-3 block space-y-1 text-xs ${theme.textPrimary}`}>
+          <span className="font-medium">类型</span>
+          <select
+            className={`mt-1 w-full rounded-lg border px-2 py-1.5 text-sm ${theme.border} bg-transparent`}
+            value={catalogKind}
+            onChange={(e) => setCatalogKind(e.target.value as GlobalAssetCatalogKind)}
+          >
+            {PLATFORM_CATALOG_SAVE_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.id} value={opt.id}>
                 {opt.label}
-              </button>
+              </option>
             ))}
-          </div>
-        </div>
+          </select>
+        </label>
 
         <fieldset className={`mb-3 space-y-2 text-xs ${theme.textPrimary}`}>
           <legend className={`mb-1 font-medium ${theme.textSecondary}`}>可见范围</legend>
           <label className="flex items-center gap-2">
-            <input type="radio" checked={scope === "user"} onChange={() => setScope("user")} />
+            <input
+              type="checkbox"
+              checked={scopeUser}
+              onChange={(e) => {
+                const on = e.target.checked;
+                setScopeUser(on);
+                if (on) setScopeProject(false);
+              }}
+            />
             个人 · 全账号可用
           </label>
           {saveContext?.allowProjectScope ? (
             <label className="flex items-center gap-2">
-              <input type="radio" checked={scope === "project"} onChange={() => setScope("project")} />
+              <input
+                type="checkbox"
+                checked={scopeProject}
+                onChange={(e) => {
+                  const on = e.target.checked;
+                  setScopeProject(on);
+                  if (on) setScopeUser(false);
+                }}
+              />
               仅当前画布项目
-            </label>
-          ) : null}
-          {saveContext?.allowTeamShare ? (
-            <label className="flex items-center gap-2">
-              <input type="radio" checked={scope === "team"} onChange={() => setScope("team")} />
-              团队共享（画布内成员可见）
             </label>
           ) : null}
           {isAdmin ? (
             <label className="flex items-center gap-2">
-              <input type="radio" checked={scope === "platform"} onChange={() => setScope("platform")} />
-              全平台 · 平台库
+              <input
+                type="checkbox"
+                checked={scopePlatform}
+                onChange={(e) => setScopePlatform(e.target.checked)}
+              />
+              全平台 · 所有用户可用
             </label>
           ) : null}
         </fieldset>

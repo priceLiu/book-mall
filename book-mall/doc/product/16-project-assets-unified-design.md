@@ -7,11 +7,21 @@
 > - 租户/团队 `doc/product/14-tenant-team-design.md`  
 > - 现有 Story-Pro 资产 rollout `doc/plans/2026-story-pro-assets-and-script-assistant.md`  
 > - LibTV 顶栏规范 `canvas-web/docs/libtv-unified-node-catalog.md` §1.2  
-> - 平台联邦 `doc/product/12-platform-app-federation.md`
+> - 平台联邦 `doc/product/12-platform-app-federation.md`  
+> - **平台资产库 vs 项目资产（产品语义）**：`docs/项目产资产.md` §库与资产
 
 ---
 
 ## 1. 目标与结论
+
+### 1.0 与平台资产库（catalog）的分工
+
+| 入口 | 存储 | 范围 |
+| --- | --- | --- |
+| **保存项目资产** | `ProjectAsset` | 以 **当前画布项目** 为主（工作流快照） |
+| **保存平台资产库** | `Ecom*` catalog + `scope` | **参考目录**：系统平台库（admin · 全员只读）与 **我的** 跨项目库（`user` / `team`） |
+
+二者 **不** 共用表；跨项目复用参考图走 catalog，恢复节点/组走项目资产。详见 `docs/项目产资产.md`。
 
 ### 1.1 产品目标
 
@@ -20,8 +30,8 @@
 | 1 | 11 类资产：角色、场景、道具、大纲、分镜脚本、音频、分镜图、分镜视频、数字人、风格、提示词 | 统一 `ProjectAssetKind` 枚举 + 单一 `ProjectAsset` 表（payload 分 kind） |
 | 2 | 个人私有 / 团队共享 | 复用 `tenantId` + `ownerUserId` + `AssetVisibility`（PRIVATE / TEAM_PUBLIC） |
 | 3 | 同时仅一人可编辑 | 资产级 **编辑租约** `editLease`（与现有「锁定生产」`locked` 分离） |
-| 4 | 节点顶栏「保存为资产」 | 扩展 `Pro2ImageNodeToolbar` / 组顶栏 / 薄卡工具条，不新建壳层 |
-| 5 | 组可保存为资产 | `GROUP_BUNDLE` 复合资产，含子项快照 + 可选 relayout 元数据 |
+| 4 | 节点顶栏「保存项目资产」 | 扩展 `Pro2ImageNodeToolbar` / 组顶栏 / 薄卡工具条，不新建壳层 |
+| 5 | 组可保存项目资产 | `GROUP_BUNDLE` 复合资产，含子项快照 + 可选 relayout 元数据 |
 | 6 | 三种画布共用一套 | **一套 Platform API + 一套 `/assets` UI**；画布 edition 只影响「从哪类节点导出」映射 |
 | 7 | 顶栏样式 | 一律 `PRO2_IMAGE_NODE_TOOLBAR_*` |
 
@@ -30,7 +40,7 @@
 三种画布（Story-Pro 1.0 列式、影视 2.0 Pro2、分镜视频 1.0 sbv1）在**存储、权限、UI、API** 上共用 **同一套项目资产系统**。  
 画布 `edition` 仅决定：
 
-- 哪些节点类型可「保存为资产」
+- 哪些节点类型可「保存项目资产」
 - 导出时 `payload` 的默认字段映射
 
 **不**按画布拆表、拆 Tab 组件、拆权限模型。
@@ -206,7 +216,7 @@ model ProjectAssetRef {
 
 ---
 
-## 5. 画布 · 保存为资产
+## 5. 画布 · 保存项目资产
 
 ### 5.1 顶栏入口（统一壳层）
 
@@ -216,7 +226,7 @@ model ProjectAssetRef {
 // 文案 + 图标建议：BookmarkPlus 或 FolderInput
 <button className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS} …>
   <BookmarkPlus className="size-3.5" />
-  <span>保存为资产</span>
+  <span>保存项目资产</span>
 </button>
 ```
 
@@ -251,9 +261,9 @@ Story-Pro 1.0 列节点：列引擎条 / 槽位面板增加同文案按钮，API
 
 确认 → `POST /api/platform/assets`（Platform API，book-mall 单写）。
 
-### 5.3 组保存为资产
+### 5.3 组保存项目资产
 
-选中 Pro2/sbv1 媒体组 → 组顶栏「保存为资产」：
+选中 Pro2/sbv1 媒体组 → 组顶栏「保存项目资产」：
 
 1. 遍历组内节点，收集媒体 URL + 相对 position + 边关系。
 2. 写入 `GROUP_BUNDLE` payload；thumbnail 取第一张图或组标题色块。

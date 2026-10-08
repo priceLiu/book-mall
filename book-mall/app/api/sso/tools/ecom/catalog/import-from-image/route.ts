@@ -14,15 +14,22 @@ import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 export const dynamic = "force-dynamic";
 
 function readCatalogKind(raw: unknown): GlobalAssetCatalogKind | null {
-  if (
-    raw === "pose" ||
-    raw === "avatar" ||
-    raw === "garment" ||
-    raw === "full-body" ||
-    raw === "style" ||
-    raw === "scene"
-  ) {
-    return raw;
+  const kinds: GlobalAssetCatalogKind[] = [
+    "pose",
+    "avatar",
+    "garment",
+    "full-body",
+    "style",
+    "scene",
+    "character",
+    "reference",
+    "prop",
+    "storyboard-image",
+    "storyboard-video",
+    "audio",
+  ];
+  if (typeof raw === "string" && (kinds as string[]).includes(raw)) {
+    return raw as GlobalAssetCatalogKind;
   }
   return null;
 }

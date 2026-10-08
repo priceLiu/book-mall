@@ -292,7 +292,7 @@ export function UnifiedProjectAssetsView({
           <p className="text-xs text-white/45">
             {tab === "PRIVATE_PORTRAIT"
               ? "暂无私域人像。在图片节点工具栏点击「私域人像入库」，成功后会自动出现在此。"
-              : "暂无资产。在画布节点顶栏点击「保存为资产」入库。"}
+              : "暂无资产。在画布节点顶栏点击「保存项目资产」入库。"}
           </p>
         ) : (
           <>

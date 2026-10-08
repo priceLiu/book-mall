@@ -9,6 +9,10 @@ import { findCatalogDuplicateByImageUrl } from "@/lib/ecom/ecom-catalog-import-d
 import { createFullBodyModelFromImport } from "@/lib/ecom/ecom-full-body-model-library-service";
 import { createGarmentFromImport } from "@/lib/ecom/ecom-garment-library-service";
 import type { GlobalAssetCatalogKind } from "@/lib/ecom/ecom-global-asset-catalog";
+import {
+  catalogKindToGarmentKind,
+  isGarmentBackedCatalogKind,
+} from "@/lib/ecom/ecom-catalog-kind-meta";
 import { generateAndUploadCatalogThumb } from "@/lib/ecom/ecom-catalog-thumb-upload";
 import { buildPoseSourceImageKeyFromBuffer } from "@/lib/ecom/ecom-pose-library-import-helpers";
 import { importPoseFromImage } from "@/lib/ecom/ecom-pose-library-import";
@@ -104,7 +108,17 @@ export async function importCatalogFromImage(input: CatalogImportFromImageInput)
   const scope = resolveScope(input);
   const gender = input.gender === "male" ? "male" : "female";
 
-  const duplicateByUrl = await findCatalogDuplicateByImageUrl(input.imageUrl);
+  if (input.catalogKind === "audio") {
+    throw new Error("音频请从音频节点或媒体 URL 入库（当前入口仅支持图片）");
+  }
+  if (input.catalogKind === "storyboard-video") {
+    throw new Error("分镜视频请从视频节点入库（当前入口仅支持图片）");
+  }
+
+  const duplicateByUrl = await findCatalogDuplicateByImageUrl(input.imageUrl, {
+    catalogKind: input.catalogKind,
+    scope,
+  });
   if (duplicateByUrl) {
     return {
       ok: false as const,
@@ -145,6 +159,37 @@ export async function importCatalogFromImage(input: CatalogImportFromImageInput)
   const hashKey = buildPoseSourceImageKeyFromBuffer(buf);
   const defaultName = input.name?.trim() || `入库-${new Date().toISOString().slice(0, 10)}`;
 
+  if (input.catalogKind === "character") {
+    const id =
+      scope === "platform"
+        ? `character-${gender}-${randomUUID().slice(0, 8)}`
+        : `user-character-${randomUUID()}`;
+    const ossUrl = await uploadEcomModelLibraryPreview({ id, buf, contentType, ext });
+    const thumbUrl = await generateAndUploadCatalogThumb({
+      catalogKind: "avatar",
+      id,
+      sourceBuf: buf,
+    });
+    await upsertModelLibraryEntry({
+      id,
+      name: defaultName,
+      gender: gender === "male" ? "male" : "female",
+      age: "adult",
+      ossUrl,
+      sortOrder: Date.now() % 100000,
+    });
+    await prisma.ecomModelLibraryEntry.update({
+      where: { id },
+      data: {
+        thumbUrl,
+        ...scopeFields(input, scope),
+        enabled: true,
+      },
+    });
+    const entry = await prisma.ecomModelLibraryEntry.findFirst({ where: { id } });
+    return { ok: true as const, catalogKind: "character" as const, entry };
+  }
+
   if (input.catalogKind === "avatar") {
     const id =
       scope === "platform"
@@ -176,11 +221,22 @@ export async function importCatalogFromImage(input: CatalogImportFromImageInput)
     return { ok: true as const, catalogKind: "avatar" as const, entry };
   }
 
-  if (input.catalogKind === "garment") {
+  if (isGarmentBackedCatalogKind(input.catalogKind)) {
+    const garmentKind = catalogKindToGarmentKind(input.catalogKind)!;
+    const idSlug =
+      input.catalogKind === "garment"
+        ? "garment"
+        : input.catalogKind === "reference"
+          ? "ref"
+          : input.catalogKind === "prop"
+            ? "prop"
+            : input.catalogKind === "storyboard-image"
+              ? "sb-img"
+              : "garment";
     const id =
       scope === "platform"
-        ? `garment-${gender}-${randomUUID().slice(0, 8)}`
-        : `user-garment-${randomUUID()}`;
+        ? `${idSlug}-${gender}-${randomUUID().slice(0, 8)}`
+        : `user-${idSlug}-${randomUUID()}`;
     const ossUrl = await uploadEcomPoseLibraryPreview({ id, buf, contentType, ext });
     const thumbUrl = await generateAndUploadCatalogThumb({
       catalogKind: "garment",
@@ -188,6 +244,7 @@ export async function importCatalogFromImage(input: CatalogImportFromImageInput)
       sourceBuf: buf,
     });
     const entry = await createGarmentFromImport({
+      id,
       name: defaultName,
       gender,
       ossUrl,
@@ -197,8 +254,14 @@ export async function importCatalogFromImage(input: CatalogImportFromImageInput)
       userId: input.actorUserId,
       tenantId: input.tenantId,
       sourceProjectId: input.sourceProjectId,
+      garmentKind,
+      idSlug,
     });
-    return { ok: true as const, catalogKind: "garment" as const, entry };
+    return {
+      ok: true as const,
+      catalogKind: input.catalogKind,
+      entry,
+    };
   }
 
   if (input.catalogKind === "full-body") {

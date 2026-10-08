@@ -20,7 +20,10 @@ import {
 } from "@/lib/canvas/project-asset-provenance";
 import { isProjectAssetVideoUrl } from "@/lib/canvas/project-asset-preview";
 import { notifyProjectAssetsChanged } from "@/lib/canvas/use-project-assets";
+import { globalAssetTheme } from "@/docker-shared/global-asset-library/theme";
 import { ProjectAssetMediaPreviewGrid } from "./project-asset-grid-card";
+
+const SAVE_PROJECT_ASSET_THEME = globalAssetTheme("dark");
 
 const VISIBILITY_KEY = "canvas.projectAsset.visibility";
 const SCOPE_KEY = "canvas.projectAsset.scope";
@@ -243,8 +246,7 @@ export function SaveProjectAssetDialog({
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-5">
-        <h2 className="text-base font-semibold text-white">保存为资产</h2>
-        <p className="mt-1 text-xs text-white/50">写入统一项目资产库，三版画布共用。</p>
+        <h2 className="text-base font-semibold text-white">保存项目资产</h2>
 
         <label className="mt-4 block text-xs text-white/60">
           名称
@@ -344,7 +346,7 @@ export function SaveProjectAssetDialog({
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
-            className="rounded-lg px-4 py-2 text-sm text-white/70 hover:bg-white/5"
+            className={`rounded-lg px-3 py-1.5 text-sm ${SAVE_PROJECT_ASSET_THEME.btnSecondary}`}
             onClick={onClose}
             disabled={busy}
           >
@@ -352,7 +354,7 @@ export function SaveProjectAssetDialog({
           </button>
           <button
             type="button"
-            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-50"
+            className={`rounded-lg px-3 py-1.5 text-sm disabled:opacity-50 ${SAVE_PROJECT_ASSET_THEME.btnPrimary}`}
             onClick={() => void onSubmit()}
             disabled={busy || !name.trim()}
           >

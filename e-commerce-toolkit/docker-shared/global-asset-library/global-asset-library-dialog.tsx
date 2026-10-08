@@ -294,7 +294,7 @@ export function GlobalAssetLibraryDialog({
                     className={`rounded-lg px-2.5 py-1 text-xs ${theme.btnSecondary}`}
                     onClick={() => setSaveOpen(true)}
                   >
-                    保存到库
+                    保存平台资产库
                   </button>
                 ) : null}
                 <button

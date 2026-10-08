@@ -179,7 +179,7 @@ export function Pro2ImageNodeToolbar({
       {onSaveAsAsset ? (
         <Pro2ToolbarDropdownItem
           icon={BookmarkPlus}
-          label="保存为资产"
+          label="保存项目资产"
           onClick={() => {
             dropdowns.close();
             onSaveAsAsset();
@@ -189,7 +189,7 @@ export function Pro2ImageNodeToolbar({
       {onSaveToCatalog ? (
         <Pro2ToolbarDropdownItem
           icon={Archive}
-          label="保存到库"
+          label="保存平台资产库"
           disabled={!previewUrl}
           onClick={() => {
             dropdowns.close();

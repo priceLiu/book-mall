@@ -48,7 +48,7 @@ export function useSaveNodeAsAsset() {
       if (!projectId) {
         void alert({
           title: "无法保存",
-          message: "请先进入已保存的画布项目后再保存为资产。",
+          message: "请先进入已保存的画布项目后再保存项目资产。",
           variant: "warning",
         });
         return;
@@ -95,7 +95,7 @@ export function useSaveGroupAsAsset() {
       if (!projectId) {
         void alert({
           title: "无法保存",
-          message: "请先进入已保存的画布项目后再保存为资产。",
+          message: "请先进入已保存的画布项目后再保存项目资产。",
           variant: "warning",
         });
         return;

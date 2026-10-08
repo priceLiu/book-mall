@@ -114,18 +114,23 @@ export async function createGarmentFromImport(args: {
   userId: string;
   tenantId?: string | null;
   sourceProjectId?: string | null;
+  garmentKind?: string;
+  idSlug?: string;
+  id?: string;
 }): Promise<EcomGarmentLibraryEntry> {
+  const slug = args.idSlug?.trim() || "garment";
   const id =
-    args.scope === "platform"
-      ? `garment-${args.gender}-${randomUUID().slice(0, 8)}`
-      : `user-garment-${randomUUID()}`;
+    args.id?.trim() ||
+    (args.scope === "platform"
+      ? `${slug}-${args.gender}-${randomUUID().slice(0, 8)}`
+      : `user-${slug}-${randomUUID()}`);
   return upsertGarmentLibraryEntry({
     id,
     name: args.name,
     gender: args.gender,
     ossUrl: args.ossUrl,
     thumbUrl: args.thumbUrl ?? args.ossUrl,
-    garmentKind: "flat",
+    garmentKind: args.garmentKind?.trim() || "flat",
     scope: args.scope,
     userId: args.scope === "platform" ? null : args.userId,
     tenantId: args.scope === "team" ? args.tenantId ?? null : null,

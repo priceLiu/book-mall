@@ -687,7 +687,7 @@ export function Pro2MediaGroupToolbarPanel({
         <button
           type="button"
           className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
-          title="保存为资产"
+          title="保存项目资产"
           onClick={() =>
             saveGroupAsAsset(
               groupId,
@@ -696,7 +696,7 @@ export function Pro2MediaGroupToolbarPanel({
           }
         >
           <BookmarkPlus className="size-3.5" />
-          保存为资产
+          保存项目资产
         </button>
         <button
           type="button"

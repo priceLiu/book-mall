@@ -11,7 +11,7 @@ import {
   PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS,
 } from "./pro2-image-node-toolbar";
 
-/** LibTV 薄卡 · 选中时浮动工具条（复制 · 保存为资产） */
+/** LibTV 薄卡 · 选中时浮动工具条（复制 · 保存项目资产） */
 export function Pro2ThinNodeToolbar({
   onSaveAsAsset,
   onDuplicateNode,
@@ -58,7 +58,7 @@ export function Pro2ThinNodeToolbar({
           onClick={onSaveAsAsset}
         >
           <BookmarkPlus className="size-3.5" />
-          <span>保存为资产</span>
+          <span>保存项目资产</span>
         </button>
       ) : null}
       {onDuplicateNode ? (

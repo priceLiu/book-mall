@@ -24,7 +24,13 @@ export type GlobalAssetCatalogKind =
   | "garment"
   | "full-body"
   | "style"
-  | "scene";
+  | "scene"
+  | "character"
+  | "reference"
+  | "prop"
+  | "storyboard-image"
+  | "storyboard-video"
+  | "audio";
 
 export type GlobalAssetCatalogItem = {
   id: string;
@@ -98,12 +104,16 @@ export function globalAssetCatalogItemScopeLabel(item: GlobalAssetCatalogItem): 
 }
 
 const ALL_KINDS: GlobalAssetCatalogKind[] = [
-  "full-body",
-  "avatar",
-  "garment",
-  "pose",
-  "style",
+  "character",
+  "prop",
   "scene",
+  "style",
+  "reference",
+  "storyboard-image",
+  "pose",
+  "avatar",
+  "full-body",
+  "garment",
 ];
 
 function matchesGender(item: GlobalAssetCatalogItem, gender: string): boolean {
@@ -135,6 +145,10 @@ async function loadPoseItems(userId: string): Promise<GlobalAssetCatalogItem[]> 
   return items;
 }
 
+function isCharacterModelId(id: string): boolean {
+  return id.startsWith("character-") || id.startsWith("user-character-");
+}
+
 async function loadAvatarItems(
   query: GlobalAssetCatalogQuery,
 ): Promise<GlobalAssetCatalogItem[]> {
@@ -144,7 +158,9 @@ async function loadAvatarItems(
     gender: query.gender,
   });
   return sortAvatarCatalogItems(
-    models.map((m) => ({
+    models
+      .filter((m) => !isCharacterModelId(m.id))
+      .map((m) => ({
         id: m.id,
         catalogKind: "avatar" as const,
         title: m.name,
@@ -157,6 +173,37 @@ async function loadAvatarItems(
   );
 }
 
+async function loadCharacterItems(
+  query: GlobalAssetCatalogQuery,
+): Promise<GlobalAssetCatalogItem[]> {
+  const models = await listAvatarLibraryEntriesForViewer({
+    userId: query.userId,
+    tenantId: query.tenantId,
+    gender: query.gender,
+  });
+  return models
+    .filter((m) => isCharacterModelId(m.id))
+    .map((m) => ({
+      id: m.id,
+      catalogKind: "character" as const,
+      title: m.name,
+      ossUrl: m.ossUrl,
+      thumbUrl: m.thumbUrl ?? m.ossUrl,
+      scope: (m.scope ?? "platform") as EcomCatalogScope,
+      gender: m.gender,
+      subtitle: m.age,
+    }));
+}
+
+function garmentKindToCatalogKind(garmentKind: string | undefined): GlobalAssetCatalogKind {
+  const k = garmentKind?.trim() || "flat";
+  if (k === "reference") return "reference";
+  if (k === "prop") return "prop";
+  if (k === "storyboard-image") return "storyboard-image";
+  if (k === "storyboard-video") return "storyboard-video";
+  return "garment";
+}
+
 async function loadGarmentItems(
   query: GlobalAssetCatalogQuery,
   limit: number,
@@ -167,16 +214,44 @@ async function loadGarmentItems(
     projectId: query.projectId,
     limit,
   });
-  return garments.map((g) => ({
-    id: g.id,
-    catalogKind: "garment" as const,
-    title: g.name,
-    ossUrl: g.ossUrl,
-    thumbUrl: g.thumbUrl ?? g.ossUrl,
-    scope: (g.scope ?? "platform") as EcomCatalogScope,
-    gender: g.gender,
-    subtitle: g.garmentKind,
-  }));
+  return garments
+    .filter((g) => garmentKindToCatalogKind(g.garmentKind) === "garment")
+    .map((g) => ({
+      id: g.id,
+      catalogKind: "garment" as const,
+      title: g.name,
+      ossUrl: g.ossUrl,
+      thumbUrl: g.thumbUrl ?? g.ossUrl,
+      scope: (g.scope ?? "platform") as EcomCatalogScope,
+      gender: g.gender,
+      subtitle: g.garmentKind,
+    }));
+}
+
+async function loadGarmentBackedCatalogItems(
+  query: GlobalAssetCatalogQuery,
+  limit: number,
+  targetCatalogKind: GlobalAssetCatalogKind,
+  garmentKind: string,
+): Promise<GlobalAssetCatalogItem[]> {
+  const garments = await listGarmentLibraryEntriesForViewer({
+    userId: query.userId,
+    tenantId: query.tenantId,
+    projectId: query.projectId,
+    limit,
+  });
+  return garments
+    .filter((g) => (g.garmentKind?.trim() || "flat") === garmentKind)
+    .map((g) => ({
+      id: g.id,
+      catalogKind: targetCatalogKind,
+      title: g.name,
+      ossUrl: g.ossUrl,
+      thumbUrl: g.thumbUrl ?? g.ossUrl,
+      scope: (g.scope ?? "platform") as EcomCatalogScope,
+      gender: g.gender,
+      subtitle: g.garmentKind,
+    }));
 }
 
 async function loadFullBodyItems(
@@ -359,20 +434,42 @@ export async function listGlobalAssetCatalog(
   const requestedKind =
     query.kind && query.kind !== "all" ? query.kind : null;
 
-  const [poseRaw, avatarRaw, garmentRaw, fullBodyRaw, styleRaw, sceneRaw] =
-    await Promise.all([
-      loadPoseItems(query.userId),
-      loadAvatarItems(query),
-      loadGarmentItems(query, limit),
-      loadFullBodyItems(query, limit),
-      loadStyleItems(query, limit),
-      loadSceneItems(query, limit),
-    ]);
+  const [
+    poseRaw,
+    avatarRaw,
+    characterRaw,
+    garmentRaw,
+    referenceRaw,
+    propRaw,
+    storyboardImageRaw,
+    storyboardVideoRaw,
+    fullBodyRaw,
+    styleRaw,
+    sceneRaw,
+  ] = await Promise.all([
+    loadPoseItems(query.userId),
+    loadAvatarItems(query),
+    loadCharacterItems(query),
+    loadGarmentItems(query, limit),
+    loadGarmentBackedCatalogItems(query, limit, "reference", "reference"),
+    loadGarmentBackedCatalogItems(query, limit, "prop", "prop"),
+    loadGarmentBackedCatalogItems(query, limit, "storyboard-image", "storyboard-image"),
+    loadGarmentBackedCatalogItems(query, limit, "storyboard-video", "storyboard-video"),
+    loadFullBodyItems(query, limit),
+    loadStyleItems(query, limit),
+    loadSceneItems(query, limit),
+  ]);
 
   const byKind: Record<GlobalAssetCatalogKind, GlobalAssetCatalogItem[]> = {
     pose: applyCatalogFilters(poseRaw, query),
     avatar: applyCatalogFilters(avatarRaw, query),
+    character: applyCatalogFilters(characterRaw, query),
     garment: applyCatalogFilters(garmentRaw, query),
+    reference: applyCatalogFilters(referenceRaw, query),
+    prop: applyCatalogFilters(propRaw, query),
+    "storyboard-image": applyCatalogFilters(storyboardImageRaw, query),
+    "storyboard-video": applyCatalogFilters(storyboardVideoRaw, query),
+    audio: [],
     "full-body": applyCatalogFilters(fullBodyRaw, query),
     style: applyCatalogFilters(styleRaw, query),
     scene: applyCatalogFilters(sceneRaw, query),
@@ -381,7 +478,13 @@ export async function listGlobalAssetCatalog(
   const counts: Record<string, number> = {
     pose: byKind.pose.length,
     avatar: byKind.avatar.length,
+    character: byKind.character.length,
     garment: byKind.garment.length,
+    reference: byKind.reference.length,
+    prop: byKind.prop.length,
+    "storyboard-image": byKind["storyboard-image"].length,
+    "storyboard-video": byKind["storyboard-video"].length,
+    audio: 0,
     "full-body": byKind["full-body"].length,
     style: byKind.style.length,
     scene: byKind.scene.length,

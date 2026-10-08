@@ -408,7 +408,7 @@ export function LibtvVideoNodeToolbar({
         >
           <Pro2ToolbarDropdownItem
             icon={BookmarkPlus}
-            label="保存为资产"
+            label="保存项目资产"
             disabled={!previewUrl}
             onClick={() => {
               saveMenu.setOpen(false);

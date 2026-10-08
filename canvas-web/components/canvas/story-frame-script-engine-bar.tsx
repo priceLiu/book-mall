@@ -16,7 +16,7 @@ export function StoryFrameScriptEngineBar({
   styleRow: ReactNode;
   hintRow: ReactNode;
   imagePicker: ReactNode;
-  /** 列顶栏 · 保存为资产等 */
+  /** 列顶栏 · 保存项目资产等 */
   actions?: ReactNode;
   className?: string;
 }) {

@@ -22,6 +22,7 @@ const FILES = [
   "global-asset-tile.tsx",
   "global-asset-library-provider.tsx",
   "save-to-catalog-dialog.tsx",
+  "platform-catalog-save-types.ts",
   "index.ts",
 ];
 

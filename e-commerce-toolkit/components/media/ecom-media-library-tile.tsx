@@ -248,8 +248,8 @@ export function EcomMediaLibraryTile({
           <button
             type="button"
             className={ECOM_MEDIA_TILE_ACTION_BTN_CLASS}
-            aria-label="保存到库"
-            title="保存到库"
+            aria-label="保存平台资产库"
+            title="保存平台资产库"
             onClick={onSaveToCatalog}
           >
             <Archive className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />

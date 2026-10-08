@@ -66,7 +66,11 @@ export async function importPoseFromImage(
   const imageUrl = input.imageUrl?.trim();
   if (!imageUrl) throw new Error("imageUrl 必填");
 
-  const catalogDup = await findCatalogDuplicateByImageUrl(imageUrl);
+  const importScope = input.scope ?? (input.adminUserId ? "platform" : "user");
+  const catalogDup = await findCatalogDuplicateByImageUrl(imageUrl, {
+    catalogKind: "pose",
+    scope: importScope,
+  });
   if (catalogDup) {
     return {
       ok: false,
@@ -101,7 +105,7 @@ export async function importPoseFromImage(
   const category = (input.category?.trim() || "A").toUpperCase();
   const genders = normalizePoseGenders(input.genders ?? ["unisex"]);
   const sceneTags = normalizePoseSceneTags(input.sceneTags ?? ["电商"]);
-  const scope = input.scope ?? (input.adminUserId ? "platform" : "user");
+  const scope = importScope;
   const id =
     scope === "platform"
       ? nextPlatformPoseId(category)

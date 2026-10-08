@@ -26,10 +26,14 @@ export function buildCatalogThumbOssKey(catalogKind: CatalogThumbKind, id: strin
       return buildEcomGarmentLibraryThumbOssKey(id);
     case "full-body":
       return buildEcomFullBodyLibraryThumbOssKey(id);
-    default: {
-      const _exhaustive: never = catalogKind;
-      throw new Error(`不支持的 catalogKind: ${_exhaustive}`);
-    }
+    case "character":
+      return buildEcomModelLibraryThumbOssKey(id);
+    case "reference":
+    case "prop":
+    case "storyboard-image":
+    case "storyboard-video":
+    case "audio":
+      return buildEcomGarmentLibraryThumbOssKey(id);
   }
 }
 

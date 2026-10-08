@@ -21,7 +21,7 @@ export function CanvasSaveToPoseLibraryButton({
   sourceAssetId,
   onCatalogSaved,
   className,
-  label = "保存到库",
+  label = "保存平台资产库",
 }: Props) {
   const saveToCatalog = useSaveToCatalog();
 

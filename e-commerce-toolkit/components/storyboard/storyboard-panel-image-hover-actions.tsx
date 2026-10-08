@@ -109,8 +109,8 @@ export function StoryboardPanelImageHoverActions({
         {onSaveToCatalog ? (
           <button
             type="button"
-            title="保存到库"
-            aria-label="保存到库"
+            title="保存平台资产库"
+            aria-label="保存平台资产库"
             className={cn(actionBtnClass, "pointer-events-auto")}
             disabled={disabled}
             onClick={(e) => {

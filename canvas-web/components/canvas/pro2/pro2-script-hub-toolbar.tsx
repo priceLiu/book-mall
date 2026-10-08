@@ -440,7 +440,7 @@ export function Pro2ScriptHubToolbar({
         <button
           type="button"
           className={TOOL_BTN}
-          title="保存为资产"
+          title="保存项目资产"
           onClick={() =>
             saveAsAsset(
               hubId,
@@ -451,7 +451,7 @@ export function Pro2ScriptHubToolbar({
           }
         >
           <BookmarkPlus className="size-3.5" />
-          <span>保存为资产</span>
+          <span>保存项目资产</span>
         </button>
         <button
           type="button"

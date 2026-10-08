@@ -156,6 +156,10 @@ import {
   runLibtvMediaReversePromptFromNode,
 } from "@/lib/canvas/libtv-media-reverse-prompt";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
+import {
+  isMediaSrcLoaded,
+  markMediaSrcLoaded,
+} from "@/lib/canvas/loaded-media-src-cache";
 
 export type LibtvImageNodeEdition = "pro2" | "sbv1";
 
@@ -370,8 +374,34 @@ export function LibtvImageNode({
     : (!boundTerminalTask && Boolean(inflightTask)) ||
       (isLibtvMediaGenerating(d) && !boundTerminalTask) ||
       isInpaintGenerating;
+
+  /** 任务已终态但成图尚未 decode 时继续扫光，避免闪「品牌 loading」空档 */
+  const awaitingResultRevealRef = useRef(false);
+  const [resultPreviewReady, setResultPreviewReady] = useState(() =>
+    isMediaSrcLoaded(previewUrl),
+  );
+  useEffect(() => {
+    const cached = isMediaSrcLoaded(previewUrl);
+    setResultPreviewReady(cached);
+    if (cached) awaitingResultRevealRef.current = false;
+  }, [previewUrl]);
+  useEffect(() => {
+    if (isGenerating) awaitingResultRevealRef.current = true;
+  }, [isGenerating]);
+  const onResultPreviewLoad = useCallback(() => {
+    if (previewUrl?.trim()) markMediaSrcLoaded(previewUrl);
+    setResultPreviewReady(true);
+    awaitingResultRevealRef.current = false;
+  }, [previewUrl]);
+  const holdGeneratingForReveal =
+    awaitingResultRevealRef.current &&
+    Boolean(previewUrl?.trim()) &&
+    !resultPreviewReady &&
+    !previewLoadBroken;
+  const showGeneratingStage = isGenerating || holdGeneratingForReveal;
+
   const hasRuntimeError = d.runtime?.status === "error";
-  const hasUploadError = Boolean(d.uploadError?.trim()) && !isGenerating;
+  const hasUploadError = Boolean(d.uploadError?.trim()) && !showGeneratingStage;
   const hasError = hasRuntimeError || hasUploadError;
   const errorMessage = hasRuntimeError
     ? d.runtime?.failMessage?.trim() || "生成失败"
@@ -441,13 +471,13 @@ export function LibtvImageNode({
     selectionEditActive || cropActive || expandActive;
   const showSidePlus = Boolean(
     (hovered || selected || connectingFromNodeId) &&
-      !isGenerating &&
+      !showGeneratingStage &&
       !magicEditActive,
   );
   const soleSelected = useLibtvIsNodeSoleSelected(id, Boolean(selected));
   const showTryMenu =
-    !isCharacterThreeView && !hasImage && !isGenerating && !hasError;
-  const showFloatingToolbar = Boolean(soleSelected && !isGenerating);
+    !isCharacterThreeView && !hasImage && !showGeneratingStage && !hasError;
+  const showFloatingToolbar = Boolean(soleSelected && !showGeneratingStage);
   const gridSplit = d.gridSplit;
   const gridSplitActive = Boolean(gridSplit && edition === "pro2");
   const showImageTools = Boolean(
@@ -463,12 +493,12 @@ export function LibtvImageNode({
   const inpaintSelectionMode =
     inpaintModelKey.trim().toLowerCase() === "wan2.7-image-pro" ? "bbox" : "mask";
   const showNormalToolbar = showImageTools && !magicEditActive;
-  const showInpaintToolbar = Boolean(inpaintActive && !isGenerating);
-  const showEraseToolbar = Boolean(eraseActive && !isGenerating);
-  const showCropFrameDock = Boolean(cropActive && !isGenerating);
-  const showExpandFrameDock = Boolean(expandActive && !isGenerating);
+  const showInpaintToolbar = Boolean(inpaintActive && !showGeneratingStage);
+  const showEraseToolbar = Boolean(eraseActive && !showGeneratingStage);
+  const showCropFrameDock = Boolean(cropActive && !showGeneratingStage);
+  const showExpandFrameDock = Boolean(expandActive && !showGeneratingStage);
   const showGridSplitToolbar = Boolean(
-    soleSelected && gridSplitActive && !isGenerating,
+    soleSelected && gridSplitActive && !showGeneratingStage,
   );
   const { providers } = useUserProviders();
   const inpaintCanvasRef = useRef<ImageLocalEditCanvasHandle | null>(null);
@@ -720,7 +750,7 @@ export function LibtvImageNode({
       skipNaturalSizeAutoFit ||
       useAspectPresetBox ||
       Boolean(d.uploading) ||
-      (isGenerating && !d.uploading),
+      (showGeneratingStage && !d.uploading),
   });
 
   /** 侧 + 拉出邻居后 graph 变更 · 若外框仍停在默认横条则按 natural 重算 */
@@ -1057,13 +1087,26 @@ export function LibtvImageNode({
 
   const renderStage = () => {
     if (isCharacterThreeView) {
-      if (isGenerating) {
+      if (showGeneratingStage) {
         return (
-          <LibtvMediaGeneratingState
-            variant={chrome.generating}
-            cancelNodeId={id}
-            passNodeDrag
-          />
+          <>
+            {previewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previewUrl}
+                alt=""
+                className="pointer-events-none absolute inset-0 size-full object-contain opacity-0"
+                draggable={false}
+                onLoad={onResultPreviewLoad}
+                onError={onPreviewLoadError}
+              />
+            ) : null}
+            <LibtvMediaGeneratingState
+              variant={chrome.generating}
+              cancelNodeId={id}
+              passNodeDrag
+            />
+          </>
         );
       }
       if (hasImage) {
@@ -1097,7 +1140,7 @@ export function LibtvImageNode({
       );
     }
 
-    if (isGenerating) {
+    if (showGeneratingStage) {
       const cropPreview =
         gridSplitCropCss && previewUrl ? (
           <LibtvGridSplitCropSprite
@@ -1110,8 +1153,12 @@ export function LibtvImageNode({
           <img
             src={previewUrl}
             alt=""
-            className="absolute inset-0 size-full object-contain opacity-40"
+            className={cn(
+              "absolute inset-0 size-full object-contain",
+              isGenerating ? "opacity-40" : "opacity-0",
+            )}
             draggable={false}
+            onLoad={onResultPreviewLoad}
             onError={onPreviewLoadError}
           />
         ) : null;
@@ -1251,7 +1298,7 @@ export function LibtvImageNode({
           className="absolute inset-0 flex flex-col items-center justify-center px-3 py-4"
           onDoubleClick={(e) => {
             e.stopPropagation();
-            if (selected && !isGenerating) onPick();
+            if (selected && !showGeneratingStage) onPick();
           }}
         >
           <Pro2MediaNodeEmptyState
@@ -1511,18 +1558,18 @@ export function LibtvImageNode({
                   className={cn(
                     "nodrag flex shrink-0 items-center rounded-md transition",
                     !hasImage &&
-                      !isGenerating &&
+                      !showGeneratingStage &&
                       !isCharacterThreeView &&
                       "cursor-pointer hover:bg-white/[0.06]",
                   )}
                   title={
-                    !hasImage && !isGenerating && !isCharacterThreeView
+                    !hasImage && !showGeneratingStage && !isCharacterThreeView
                       ? "双击上传图片"
                       : undefined
                   }
                   onDoubleClick={(e) => {
                     e.stopPropagation();
-                    if (!hasImage && !isGenerating && !isCharacterThreeView) {
+                    if (!hasImage && !showGeneratingStage && !isCharacterThreeView) {
                       onPick();
                     }
                   }}
@@ -1540,7 +1587,7 @@ export function LibtvImageNode({
                 <Pro2CrewTaskStatusBadge nodeId={id} />
               ) : null}
               <div className="relative z-[1] flex shrink-0 items-center gap-2">
-                {!isGenerating && d.ossUrl?.trim() ? (
+                {!showGeneratingStage && d.ossUrl?.trim() ? (
                   <CanvasSaveToPoseLibraryButton
                     imageUrl={d.ossUrl.trim()}
                     prompt={d.dockInput}
@@ -1549,7 +1596,7 @@ export function LibtvImageNode({
                     onCatalogSaved={markGlobalCatalog}
                   />
                 ) : null}
-                {!isGenerating ? (
+                {!showGeneratingStage ? (
                   <LibtvNodeHeaderActions
                     portraitActive={portraitActive}
                     portraitImporting={portraitImporting}
