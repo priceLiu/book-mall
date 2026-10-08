@@ -181,11 +181,13 @@ export async function generateModulePrompts(opts: {
 
   let brief = ensureBriefSizeChartDefaults(project.brief ?? {});
   brief = ensureBriefSpecChartDefaults(brief);
-  const { llm: llmLabels } = isDetailPageSuiteSpecChartModuleId(mod.module_id)
-    ? partitionSpecModuleSelected(selected)
-    : isDetailPageSuiteSizeChartModuleId(mod.module_id)
-      ? partitionSizeModuleSelected(selected)
-      : { programmatic: [], llm: selected };
+  const partitioned: { programmatic: string[]; llm: string[] } =
+    isDetailPageSuiteSpecChartModuleId(mod.module_id)
+      ? partitionSpecModuleSelected(selected)
+      : isDetailPageSuiteSizeChartModuleId(mod.module_id)
+        ? partitionSizeModuleSelected(selected)
+        : { programmatic: [], llm: selected };
+  const { llm: llmLabels } = partitioned;
 
   const finishWithSlots = async (slots: DetailPageSuiteSlot[]) => {
     const modules = project.suite.modules.map((m) =>

@@ -32,15 +32,10 @@ export {
   updateComposeClip,
 };
 
-export type ComposeWorkbenchClip = Omit<PlatformClip, "source"> & {
-  source: "look" | "import";
-};
+export type ComposeWorkbenchClip = PlatformClip;
 
-export type ComposeWorkbenchState = Omit<PlatformState, "clips" | "profile"> & {
-  clips: ComposeWorkbenchClip[];
+export type ComposeWorkbenchState = Omit<PlatformState, "profile"> & {
   profile?: EcomMediaRenderProfileInput;
-  orderedAudioClipIds?: PlatformState["orderedAudioClipIds"];
-  audioClips?: PlatformState["audioClips"];
 };
 
 export const DEFAULT_COMPOSE_PROFILE: EcomMediaRenderProfileInput =
