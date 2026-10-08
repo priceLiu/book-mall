@@ -1,5 +1,7 @@
 import type { IpWorkflowPlanSlot } from "@/lib/ecom/ecom-ip-workflow-slot-merge";
 
+export type IpWorkflowStepBatchStatus = "pending" | "generating" | "ready";
+
 /** 批次结束只改 step.status，slots 以库内 merge 结果为准，禁止用本批次内存快照整表覆盖 */
 export async function finalizeIpWorkflowStepAfterBatch(opts: {
   slotsSnapshot: IpWorkflowPlanSlot[];
@@ -7,10 +9,7 @@ export async function finalizeIpWorkflowStepAfterBatch(opts: {
   generated: number;
   failures: Array<{ index: number; message: string }>;
   readStepSlots: () => Promise<IpWorkflowPlanSlot[]>;
-  patchStep: (patch: {
-    status: string;
-    slots?: IpWorkflowPlanSlot[];
-  }) => Promise<void>;
+  patchStep: (patch: { status: IpWorkflowStepBatchStatus }) => Promise<void>;
 }): Promise<void> {
   const dbSlots = await opts.readStepSlots();
   const attempted = new Set<number>();

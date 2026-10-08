@@ -11,6 +11,7 @@ import {
   DEFAULT_COMPOSE_PROFILE,
   moveComposeClip,
   orderedComposeClips,
+  type ComposeDialogsApi,
 } from "@private/platform-compose-ui/editor";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -603,12 +604,27 @@ function SimpleFusionComposeWorkbenchInner({
 
 export function SimpleFusionComposeWorkbench(props: Props) {
   const dialogs = useDialogs();
-  const dialogApi = useMemo(
+  const dialogApi = useMemo<ComposeDialogsApi>(
     () => ({
-      alert: dialogs.alert,
-      toast: dialogs.toast,
-      confirm: dialogs.confirm,
-      prompt: dialogs.prompt,
+      alert: (opts) =>
+        dialogs.alert({
+          title: opts.title,
+          message: opts.message,
+          variant: opts.variant === "error" ? "error" : "default",
+        }),
+      toast: (opts) =>
+        dialogs.toast({
+          title: opts.title,
+          variant:
+            opts.variant === "success" || opts.variant === "error"
+              ? opts.variant
+              : undefined,
+        }),
+      confirm: (opts) =>
+        dialogs.confirm({
+          title: opts.title,
+          message: opts.message,
+        }),
     }),
     [dialogs],
   );
