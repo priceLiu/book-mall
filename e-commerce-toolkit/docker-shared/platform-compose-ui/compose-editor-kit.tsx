@@ -2720,9 +2720,13 @@ export function ComposeMiniTimelinePanel({
         ? resolveProgramAudioAtSec(workbench, programPlayheadSec, durationHints)
         : resolveClipAtProgramSec(ordered, programPlayheadSec, durationHints);
     const a = audioRef.current;
-    const audioUrl = hit?.clip.audioUrl?.trim();
-    if (!a || !audioUrl) {
+    if (!a || !hit) {
       a?.pause();
+      return;
+    }
+    const audioUrl = hit.clip.audioUrl?.trim();
+    if (!audioUrl) {
+      a.pause();
       return;
     }
     if (!audioElementMatchesUrl(a, audioUrl)) {
@@ -2730,7 +2734,7 @@ export function ComposeMiniTimelinePanel({
       a.load();
     }
     const fileDur = audioDurationByUrl[audioUrl];
-    let target = hit ? Math.max(0, hit.sourceSec) : 0;
+    let target = Math.max(0, hit.sourceSec);
     if (fileDur != null && fileDur > 0) {
       target = Math.min(target, Math.max(0, fileDur - 0.02));
     }
@@ -3398,9 +3402,13 @@ export function ComposeEditorFullscreen({
         ? resolveProgramAudioAtSec(workbench, programPlayheadSec, durationHints)
         : resolveClipAtProgramSec(ordered, programPlayheadSec, durationHints);
     const a = audioRef.current;
-    const audioUrl = hit?.clip.audioUrl?.trim();
-    if (!a || !audioUrl) {
+    if (!a || !hit) {
       a?.pause();
+      return;
+    }
+    const audioUrl = hit.clip.audioUrl?.trim();
+    if (!audioUrl) {
+      a.pause();
       return;
     }
     if (!audioElementMatchesUrl(a, audioUrl)) {
@@ -3408,7 +3416,7 @@ export function ComposeEditorFullscreen({
       a.load();
     }
     const fileDur = audioDurationByUrl[audioUrl];
-    let target = hit ? Math.max(0, hit.sourceSec) : 0;
+    let target = Math.max(0, hit.sourceSec);
     if (fileDur != null && fileDur > 0) {
       target = Math.min(target, Math.max(0, fileDur - 0.02));
     }
