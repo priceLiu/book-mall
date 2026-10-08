@@ -28,8 +28,12 @@ export function defaultCatalogToSection(
   return "shared";
 }
 
+export const ASSET_LIBRARY_SECTION_LABELS: Record<AssetLibrarySection, string> = {
+  platform: "平台资产",
+  project: "本项目",
+  shared: "我的共用",
+};
+
 export function sectionLabel(section: AssetLibrarySection): string {
-  if (section === "platform") return "平台资产";
-  if (section === "project") return "本项目";
-  return "我的共用";
+  return ASSET_LIBRARY_SECTION_LABELS[section];
 }
