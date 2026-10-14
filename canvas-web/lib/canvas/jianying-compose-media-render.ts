@@ -23,6 +23,7 @@ import {
 import { syncMediaRenderFrameAudios } from "@/lib/canvas/media-render-sync-audio";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { dispatchPlatformCreditsBalanceRefresh } from "@/lib/canvas/canvas-credits-balance-events";
+import { refreshCanvasToolsSessionClient } from "@/lib/canvas-tools-session-client";
 
 function workbenchToMediaRenderProfile(
   workbench: ComposeWorkbenchState,
@@ -126,9 +127,17 @@ export function useJianyingComposeMediaRender(args: {
       }
 
       setComposeBusy(true);
+      const sessionOk = await refreshCanvasToolsSessionClient({
+        silent: true,
+        retries: 4,
+      });
+      if (!sessionOk) {
+        setComposeBusy(false);
+        throw new Error(
+          "401 UNAUTHORIZED · 工具站登录已失效，请刷新页面或从主站重新进入画布后再合成",
+        );
+      }
       updateNodeData(nodeId, {
-        videoUrl: undefined,
-        posterUrl: undefined,
         mediaRenderResult: null,
         mediaRenderResumeJobId: null,
       });
@@ -168,7 +177,37 @@ export function useJianyingComposeMediaRender(args: {
             base,
             projectId,
             frames,
+            onProgress: ({ label, progressPct }) => {
+              updateNodeData(
+                nodeId,
+                {
+                  mediaRenderInFlight: {
+                    jobId: "pending",
+                    status: "PENDING",
+                    progress: progressPct,
+                    progressLabel: label,
+                    ...composeInFlightTransition(workbench),
+                    scaleMode: workbench.profile?.video?.scaleMode ?? "fit1080p",
+                    mixDialogue: mixTts,
+                    burnInSubtitles: profile.subtitle?.burnIn ?? false,
+                    subtitleMode:
+                      profile.subtitle?.mode === "asr" ? "asr" : "script",
+                  },
+                },
+                { sessionOnly: true },
+              );
+            },
           });
+        }
+
+        const sessionStillOk = await refreshCanvasToolsSessionClient({
+          silent: true,
+          retries: 3,
+        });
+        if (!sessionStillOk) {
+          throw new Error(
+            "401 UNAUTHORIZED · 配音同步后登录已失效，请刷新页面或从主站重新进入画布后再合成",
+          );
         }
 
         const job = await submitMediaRender(base, projectId, {

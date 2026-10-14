@@ -1,8 +1,13 @@
-import { prisma } from "@/lib/prisma";
+import { AdminUserBindPhoneButton } from "@/components/admin/admin-user-bind-phone-button";
+import { AdminUserResetPasswordButton } from "@/components/admin/admin-user-reset-password-button";
+import { AdminUsersSearchForm } from "@/components/admin/admin-users-search-form";
+import {
+  adminUsersListTake,
+  buildAdminUsersListWhere,
+} from "@/lib/admin/admin-users-query";
 import { maskPhone } from "@/lib/auth/phone";
 import { formatAdminDateTime } from "@/lib/finance/billing-datetime";
-import { AdminUserResetPasswordButton } from "@/components/admin/admin-user-reset-password-button";
-import { AdminUserBindPhoneButton } from "@/components/admin/admin-user-bind-phone-button";
+import { prisma } from "@/lib/prisma";
 
 function accountScopeLabel(inTeam: boolean): string {
   return inTeam ? "团队" : "个人";
@@ -12,10 +17,21 @@ function billingPersonaLabel(persona: "PLATFORM_CREDIT" | "BYOK"): string {
   return persona === "BYOK" ? "自带 key 会员" : "平台代付";
 }
 
-export default async function AdminUsersPage() {
+type PageProps = {
+  searchParams: Promise<{ phone?: string; name?: string }>;
+};
+
+export default async function AdminUsersPage({ searchParams }: PageProps) {
+  const sp = await searchParams;
+  const phoneQ = sp.phone?.trim() ?? "";
+  const nameQ = sp.name?.trim() ?? "";
+  const where = buildAdminUsersListWhere({ phone: phoneQ, name: nameQ });
+  const hasFilter = Boolean(where);
+
   const users = await prisma.user.findMany({
+    where,
     orderBy: { createdAt: "desc" },
-    take: 200,
+    take: adminUsersListTake(hasFilter),
     select: {
       id: true,
       email: true,
@@ -47,9 +63,13 @@ export default async function AdminUsersPage() {
       <div>
         <h1 className="text-2xl font-bold">用户</h1>
         <p className="text-sm text-muted-foreground">
-          最近 200 条注册记录 · 老邮箱用户可在「补录手机」绑定手机号后用手机号登录
+          {hasFilter
+            ? `搜索命中最多 ${adminUsersListTake(true)} 条 · 支持手机号（完整或片段）与昵称模糊匹配`
+            : "最近 200 条注册记录 · 老邮箱用户可在「补录手机」绑定手机号后用手机号登录"}
         </p>
       </div>
+
+      <AdminUsersSearchForm initialPhone={phoneQ} initialName={nameQ} />
 
       <div className="overflow-x-auto rounded-lg border border-secondary">
         <table className="w-full min-w-[1080px] text-left text-sm">
@@ -66,6 +86,16 @@ export default async function AdminUsersPage() {
             </tr>
           </thead>
           <tbody>
+            {users.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={8}
+                  className="p-8 text-center text-sm text-muted-foreground"
+                >
+                  {hasFilter ? "未找到匹配用户，请调整手机号或昵称后重试" : "暂无用户"}
+                </td>
+              </tr>
+            ) : null}
             {users.map((u) => (
               <tr key={u.id} className="border-b border-secondary/80 last:border-0">
                 <td className="p-3 tabular-nums text-muted-foreground">

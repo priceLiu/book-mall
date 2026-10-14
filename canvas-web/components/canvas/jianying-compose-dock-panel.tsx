@@ -181,12 +181,6 @@ function JianyingComposeDockPanelInner({
     <>
       {miniOpen && !fullscreenOpen ? (
         <ModalPortal>
-          <button
-            type="button"
-            aria-label="关闭简易剪辑"
-            className="fixed inset-0 z-[3190] cursor-default bg-black/35"
-            onClick={() => setMiniOpen(false)}
-          />
           <ComposeMiniTimelinePanel
             key={miniPanelSession}
             projectId={projectId ?? "canvas-compose"}

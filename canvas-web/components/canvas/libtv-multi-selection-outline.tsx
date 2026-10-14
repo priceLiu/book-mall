@@ -4,15 +4,17 @@ import { useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useReactFlow, useStore } from "@xyflow/react";
 
+import { libtvSelectionFlowBoxToScreenBox } from "@/lib/canvas/batch-connect-preview-anchors";
 import {
   applySelectionDragDelta,
   libtvSelectionFlowBox,
 } from "@/lib/canvas/libtv-marquee-hit";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 import { cn } from "@/lib/utils";
 
-/** LibTV / Pro2 · 多选虚线框（画在 RF viewport 里，与节点同一套 flow 坐标，避免拖影） */
+/** LibTV / Pro2 · 多选虚线框（屏幕坐标定位 · 缩小画布仍可见） */
 export function LibtvMultiSelectionOutline({
   rfNodes,
   setRfNodes,
@@ -28,18 +30,11 @@ export function LibtvMultiSelectionOutline({
   onDragStart: () => void;
   onDragStop: () => void;
 }) {
-  /** 只在「正在拖空白框选」时藏框；整组拖动中必须保持挂载，否则 pointer capture 会丢。 */
   const userSelectionActive = useStore((s) => s.userSelectionActive);
   const canvasMarqueeSelecting = useCanvasStore((s) => s.canvasMarqueeSelecting);
   const hideForLiveMarquee = userSelectionActive || canvasMarqueeSelecting;
-  const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
-  const rfDom = useStore((s) => s.domNode);
-  const zoom = useStore((s) => s.transform[2]) || 1;
-  const viewportEl =
-    rfDom?.querySelector<HTMLElement>(".react-flow__viewport") ?? null;
-  const { screenToFlowPosition } = useReactFlow();
-  /** 画在 viewport 内会随缩放变细，按屏幕 3px 反算 */
-  const strokePx = 3 / zoom;
+  const viewport = useViewportTransformActive(true);
+  const { screenToFlowPosition, flowToScreenPosition } = useReactFlow();
 
   const dragRef = useRef<{
     last: { x: number; y: number };
@@ -58,6 +53,12 @@ export function LibtvMultiSelectionOutline({
     if (selectedIds.length < 2) return null;
     return libtvSelectionFlowBox(rfNodes, selectedIds);
   }, [rfNodes, selectedIds]);
+
+  const screenBox = useMemo(() => {
+    void viewport;
+    if (!flowBox) return null;
+    return libtvSelectionFlowBoxToScreenBox(flowBox, flowToScreenPosition);
+  }, [flowBox, flowToScreenPosition, viewport]);
 
   const flushPending = useCallback(() => {
     const drag = dragRef.current;
@@ -130,11 +131,12 @@ export function LibtvMultiSelectionOutline({
   );
 
   if (
-    !viewportEl ||
     hideForLiveMarquee ||
-    viewportMoving ||
     selectedIds.length < 2 ||
-    !flowBox
+    !flowBox ||
+    !screenBox ||
+    screenBox.width < 2 ||
+    screenBox.height < 2
   ) {
     return null;
   }
@@ -142,24 +144,23 @@ export function LibtvMultiSelectionOutline({
   return createPortal(
     <div
       className={cn(
-        "nopan nodrag nowheel pointer-events-auto absolute z-[1001] cursor-grab rounded-sm border-dotted active:cursor-grabbing",
+        "nopan nodrag nowheel pointer-events-auto fixed z-[1001] cursor-grab rounded-sm border-dotted active:cursor-grabbing",
       )}
       style={{
-        left: 0,
-        top: 0,
-        transform: `translate(${flowBox.x}px, ${flowBox.y}px)`,
-        width: flowBox.w,
-        height: flowBox.h,
-        borderWidth: strokePx,
+        left: screenBox.left,
+        top: screenBox.top,
+        width: Math.max(1, screenBox.width),
+        height: Math.max(1, screenBox.height),
+        borderWidth: 2,
         borderColor: "rgba(96, 165, 250, 0.95)",
         backgroundColor: "rgba(59, 130, 246, 0.12)",
-        boxShadow: `0 0 0 ${1.25 / zoom}px rgba(0, 0, 0, 0.45)`,
+        boxShadow: "0 0 0 1px rgba(0, 0, 0, 0.45)",
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
     />,
-    viewportEl,
+    document.body,
   );
 }

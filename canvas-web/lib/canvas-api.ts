@@ -2164,6 +2164,9 @@ function parseMediaRenderApiError(
   if (data?.error === "book_mall_url_missing") {
     return "未配置主站地址，无法提交剪辑任务";
   }
+  if (status === 401 || data?.error === "UNAUTHORIZED") {
+    return "401 UNAUTHORIZED · 工具站登录已失效";
+  }
   return `剪辑请求失败 HTTP ${status}`;
 }
 
@@ -2188,15 +2191,26 @@ async function fetchMediaRenderApi(
       }
       if (
         response.status === 401 &&
-        !sessionRefreshAttempted &&
         typeof window !== "undefined"
       ) {
-        sessionRefreshAttempted = true;
-        const refreshed = await refreshCanvasToolsSessionClient({ silent: true });
-        if (refreshed) {
-          attempt -= 1;
-          continue;
+        if (!sessionRefreshAttempted) {
+          sessionRefreshAttempted = true;
+          const refreshed = await refreshCanvasToolsSessionClient({
+            silent: true,
+            retries: 4,
+          });
+          if (refreshed) {
+            attempt -= 1;
+            continue;
+          }
         }
+        const errBody = (await response
+          .clone()
+          .json()
+          .catch(() => ({}))) as { message?: string; error?: string };
+        throw new Error(
+          parseMediaRenderApiError(errBody, response.status),
+        );
       }
       if (
         response.status >= 502 &&

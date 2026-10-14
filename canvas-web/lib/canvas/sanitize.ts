@@ -8,6 +8,7 @@
  * - keepPersistableMedia=true：保留 OSS / runtime.ossUrl / poster（社区分享预览与 fork）
  */
 
+import { normalizeJianyingAutoRenderNodeDataForPersist } from "./jianying-auto-render-playback-url";
 import type { CanvasFlowNode, CanvasGraph } from "./types";
 
 const TRANSIENT_KEYS = [
@@ -137,6 +138,9 @@ function stripNodeRuntime(
   );
   if (!keepPersistableMedia) {
     data = stripPersistableMedia(data);
+  }
+  if (keepPersistableMedia && n.type === "jianying-auto-render-pro2") {
+    data = normalizeJianyingAutoRenderNodeDataForPersist(data);
   }
   return { ...n, data };
 }

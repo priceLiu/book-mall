@@ -151,6 +151,7 @@ export default defineConfig({
       "test/unit/libtv-minimax-voice-catalog.test.ts",
       "test/unit/libtv-tts-voice-controls-schema.test.ts",
       "test/unit/media-render-session-url.test.ts",
+      "test/unit/jianying-auto-render-playback-url.test.ts",
       "test/unit/sbv1-media-group-layout.test.ts",
       "test/unit/pro2-media-group-layout.test.ts",
       "test/unit/sbv1-video-dock-params-schema.test.ts",

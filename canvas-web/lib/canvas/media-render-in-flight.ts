@@ -57,7 +57,7 @@ export function clearMediaRenderPollDismiss(nodeId: string) {
 }
 
 export function friendlyMediaRenderError(message: string): string {
-  if (/401|UNAUTHORIZED|工具站登录|无效或过期的工具令牌|重新连接主站/i.test(message)) {
+  if (/401|UNAUTHORIZED|工具站登录|无效或过期的工具令牌|重新连接主站|登录已失效|SESSION_REVOKED|别处登录/i.test(message)) {
     return "登录连接已断开，请稍候重试；若仍失败请刷新页面或重新连接主站账号。";
   }
   if (/aborted|abort/i.test(message)) {

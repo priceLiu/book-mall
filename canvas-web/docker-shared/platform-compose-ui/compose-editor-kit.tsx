@@ -114,6 +114,27 @@ const COMPOSE_FS_TIMELINE_WORKSPACE_CLASS =
   "flex h-[220px] max-h-[240px] min-h-[200px] shrink-0 flex-col overflow-hidden";
 const COMPOSE_FS_SCROLL_HIDE =
   "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden overflow-y-hidden";
+/** 时间线缩略图：并行拉取 + 略降帧数，减轻 FFmpeg/OSS 压力 */
+const COMPOSE_FILMSTRIP_FRAME_COUNT = 12;
+const COMPOSE_FILMSTRIP_CONCURRENCY = 3;
+
+async function mapUrlsWithConcurrency(
+  urls: string[],
+  limit: number,
+  fn: (url: string, index: number) => Promise<void>,
+): Promise<void> {
+  if (urls.length === 0) return;
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, limit), urls.length);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < urls.length) {
+        const i = nextIndex++;
+        await fn(urls[i]!, i);
+      }
+    }),
+  );
+}
 
 function cloneWorkbenchState(s: ComposeWorkbenchState): ComposeWorkbenchState {
   return structuredClone(s);
@@ -125,7 +146,8 @@ export function useComposeFilmstripLoader(
   active: boolean,
 ) {
   const fetchFilmstrip = useFetchVideoFilmstrip();
-  const [loading, setLoading] = useState(false);
+  /** 缩略图后台生成；`loading` 仅表示进度态，不阻塞剪辑 */
+  const [filmstripPrefetching, setFilmstripPrefetching] = useState(false);
   const [loadingLabel, setLoadingLabel] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
@@ -133,32 +155,35 @@ export function useComposeFilmstripLoader(
     if (!active) return;
     const urls = [...new Set(clips.map((c) => c.videoUrl.trim()).filter(Boolean))];
     if (urls.length === 0) {
-      setLoading(false);
+      setFilmstripPrefetching(false);
       setLoadingLabel(null);
       return;
     }
     let cancelled = false;
-    setLoading(true);
-    setLoadingLabel("准备时间线…");
+    setFilmstripPrefetching(true);
+    setLoadingLabel(`生成缩略图 0/${urls.length}…`);
     void (async () => {
       const total = urls.length;
-      for (let i = 0; i < total; i++) {
+      let done = 0;
+      await mapUrlsWithConcurrency(urls, COMPOSE_FILMSTRIP_CONCURRENCY, async (url) => {
         if (cancelled) return;
-        setLoadingLabel(`生成缩略图 ${i + 1}/${total}…`);
-        await loadComposeFilmstripCached(
-          fetchFilmstrip,
-          projectId,
-          urls[i]!,
-        ).catch(() => undefined);
-      }
-      if (!cancelled) {
-        setLoading(false);
-        setLoadingLabel(null);
+        await loadComposeFilmstripCached(fetchFilmstrip, projectId, url).catch(
+          () => undefined,
+        );
+        if (cancelled) return;
+        done += 1;
+        setLoadingLabel(`生成缩略图 ${done}/${total}…`);
         setTick((n) => n + 1);
+      });
+      if (!cancelled) {
+        setFilmstripPrefetching(false);
+        setLoadingLabel(null);
       }
     })();
     return () => {
       cancelled = true;
+      setFilmstripPrefetching(false);
+      setLoadingLabel(null);
     };
   // fetchFilmstrip 来自 Provider，引用稳定
   // eslint-disable-next-line react-hooks/exhaustive-deps -- projectId + clip urls 变化才重载
@@ -180,7 +205,9 @@ export function useComposeFilmstripLoader(
   }, [clips, projectId, tick]);
 
   return {
-    loading,
+    /** @deprecated 用 `filmstripPrefetching`；不再用于禁用时间线 */
+    loading: filmstripPrefetching,
+    filmstripPrefetching,
     loadingLabel,
     filmstripByUrl,
     fullDurationByUrl,
@@ -206,7 +233,7 @@ async function loadComposeFilmstripCached(
   const r = await fetchFilmstrip({
     sourceVideoUrl: videoUrl,
     projectId,
-    frameCount: 24,
+    frameCount: COMPOSE_FILMSTRIP_FRAME_COUNT,
   });
   const entry: FilmstripCacheEntry = {
     durationSec: Math.max(0.5, r.durationSec),
@@ -765,10 +792,43 @@ function composeAudioWaveformLoading(
   return !peaks.some((p) => p > 0.001);
 }
 
+function normalizeMediaUrlForCompare(url: string): string {
+  const raw = url.trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw, typeof window !== "undefined" ? window.location.href : "https://local");
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return raw.split("?")[0]?.split("#")[0] ?? raw;
+  }
+}
+
 function videoElementMatchesUrl(video: HTMLVideoElement, url: string): boolean {
+  const target = normalizeMediaUrlForCompare(url);
+  if (!target) return false;
+  const current = normalizeMediaUrlForCompare(video.currentSrc || video.src);
+  return current.length > 0 && current === target;
+}
+
+/** 换镜时显式切 src（仅改 React `src` 属性可能晚于 playhead 进下一段） */
+function applyProgramVideoClipSource(
+  video: HTMLVideoElement,
+  url: string,
+  onReady?: () => void,
+): void {
   const u = url.trim();
-  if (!u) return false;
-  return video.currentSrc === u || video.src === u || video.src.includes(u);
+  if (!u) return;
+  if (videoElementMatchesUrl(video, u)) {
+    onReady?.();
+    return;
+  }
+  const ready = () => {
+    video.removeEventListener("loadeddata", ready);
+    onReady?.();
+  };
+  if (onReady) video.addEventListener("loadeddata", ready);
+  video.src = u;
+  video.load();
 }
 
 function audioElementMatchesUrl(audio: HTMLAudioElement, url: string): boolean {
@@ -930,6 +990,19 @@ function useComposeProgramVideoPlayback({
   const lastSyncedAudioClipIdRef = useRef<string | null>(null);
   const playheadUiSyncMsRef = useRef(0);
   const orderedKey = ordered.map((c) => c.id).join("|");
+  /** 播放中 React `src` 须与 DOM 一致，避免滞后 state 把 `<video>` 拉回上一镜 */
+  const [livePlaybackVideoUrl, setLivePlaybackVideoUrl] = useState("");
+
+  const commitLivePlaybackVideoUrl = useCallback((url: string) => {
+    const u = url.trim();
+    if (u) setLivePlaybackVideoUrl(u);
+  }, []);
+
+  useEffect(() => {
+    if (playing) return;
+    const u = playbackVideoUrl.trim();
+    if (u) setLivePlaybackVideoUrl(u);
+  }, [playing, playbackVideoUrl]);
 
   const seekProgramVideoToPlayhead = useCallback(
     (opts?: { forcePlay?: boolean }) => {
@@ -975,10 +1048,16 @@ function useComposeProgramVideoPlayback({
       return;
     }
 
-    lastSyncedClipIdRef.current = clipId;
     if (!videoElementMatchesUrl(v, url)) {
+      commitLivePlaybackVideoUrl(url);
+      lastSyncedClipIdRef.current = null;
+      applyProgramVideoClipSource(v, url, () => {
+        lastSyncedClipIdRef.current = clipId;
+        seekProgramVideoToPlayhead({ forcePlay: true });
+      });
       return;
     }
+    lastSyncedClipIdRef.current = clipId;
     seekProgramVideoToPlayhead({ forcePlay: true });
   }, [
     playing,
@@ -989,6 +1068,27 @@ function useComposeProgramVideoPlayback({
     durationHints,
     videoRef,
     seekProgramVideoToPlayhead,
+    commitLivePlaybackVideoUrl,
+  ]);
+
+  useEffect(() => {
+    if (!playing) return;
+    const v = videoRef.current;
+    const url = (livePlaybackVideoUrl || playbackVideoUrl).trim();
+    if (!v || !url) return;
+    if (videoElementMatchesUrl(v, url)) return;
+    lastSyncedClipIdRef.current = null;
+    commitLivePlaybackVideoUrl(url);
+    applyProgramVideoClipSource(v, url, () => {
+      seekProgramVideoToPlayhead({ forcePlay: true });
+    });
+  }, [
+    playing,
+    playbackVideoUrl,
+    livePlaybackVideoUrl,
+    videoRef,
+    seekProgramVideoToPlayhead,
+    commitLivePlaybackVideoUrl,
   ]);
 
   useEffect(() => {
@@ -1155,18 +1255,28 @@ function useComposeProgramVideoPlayback({
         playheadUiSyncMsRef.current = 0;
         setProgramPlayheadSec(nextProgram);
         if (nextHit) {
-          syncProgramVideoElementToHit(v, nextHit, durationHints, {
-            force: true,
-          });
-          lastSyncedClipIdRef.current = nextHit.clip.id;
-          lastSyncedAudioClipIdRef.current = null;
-          const resume = () => {
-            void v.play().catch(() => undefined);
+          const nextUrl = nextHit.clip.videoUrl.trim();
+          commitLivePlaybackVideoUrl(nextUrl);
+          const resumeAfterSeek = () => {
+            syncProgramVideoElementToHit(v, nextHit, durationHints, {
+              force: true,
+            });
+            lastSyncedClipIdRef.current = nextHit.clip.id;
+            lastSyncedAudioClipIdRef.current = null;
+            const resume = () => {
+              void v.play().catch(() => undefined);
+            };
+            if (v.seeking) {
+              v.addEventListener("seeked", resume, { once: true });
+            } else {
+              resume();
+            }
           };
-          if (v.seeking) {
-            v.addEventListener("seeked", resume, { once: true });
+          if (!videoElementMatchesUrl(v, nextUrl)) {
+            lastSyncedClipIdRef.current = null;
+            applyProgramVideoClipSource(v, nextUrl, resumeAfterSeek);
           } else {
-            resume();
+            resumeAfterSeek();
           }
         }
         return true;
@@ -1184,6 +1294,7 @@ function useComposeProgramVideoPlayback({
       setPlaying,
       setProgramPlayheadSec,
       audioRef,
+      commitLivePlaybackVideoUrl,
     ],
   );
 
@@ -1207,6 +1318,7 @@ function useComposeProgramVideoPlayback({
       const clipChanged = lastSyncedClipIdRef.current !== hit.clip.id;
 
       if (clipChanged) {
+        commitLivePlaybackVideoUrl(hit.clip.videoUrl.trim());
         syncProgramVideoElementToHit(v, hit, durationHints, { force: true });
         lastSyncedClipIdRef.current = hit.clip.id;
         lastSyncedAudioClipIdRef.current = null;
@@ -1258,7 +1370,23 @@ function useComposeProgramVideoPlayback({
       setProgramPlayheadSec,
       durationHints,
       advanceProgramVideoPastClipEnd,
+      commitLivePlaybackVideoUrl,
     ],
+  );
+
+  const onProgramVideoEnded = useCallback(
+    (e: SyntheticEvent<HTMLVideoElement>) => {
+      if (!playing) return;
+      const v = e.currentTarget;
+      const hit = resolveClipAtProgramSec(
+        ordered,
+        programPlayheadSecRef.current,
+        durationHints,
+      );
+      if (!hit) return;
+      advanceProgramVideoPastClipEnd(v, hit);
+    },
+    [playing, ordered, durationHints, advanceProgramVideoPastClipEnd],
   );
 
   useEffect(() => {
@@ -1366,13 +1494,31 @@ function useComposeProgramVideoPlayback({
     }
     programPlayheadSecRef.current = programPlayheadSec;
     playheadUiSyncMsRef.current = 0;
+    const hit = resolveClipAtProgramSec(
+      ordered,
+      programPlayheadSec,
+      durationHints,
+    );
+    const startUrl = hit?.clip.videoUrl?.trim() ?? "";
+    if (startUrl) setLivePlaybackVideoUrl(startUrl);
     setPlaying(true);
-  }, [playing, setPlaying, setProgramPlayheadSec, programPlayheadSec, videoRef, audioRef]);
+  }, [
+    playing,
+    setPlaying,
+    setProgramPlayheadSec,
+    programPlayheadSec,
+    videoRef,
+    audioRef,
+    ordered,
+    durationHints,
+  ]);
 
   return {
     playbackVideoUrl,
+    livePlaybackVideoUrl,
     onProgramVideoTimeUpdate,
     onProgramVideoLoadedData,
+    onProgramVideoEnded,
     onProgramAudioTimeUpdate,
     toggleProgramPlay,
   };
@@ -2020,7 +2166,7 @@ export function ComposeSequenceTrack({
 
           <div className={cn("relative", clipLaneClassName)}>
             {videoLaneLoading ? (
-              <div className="absolute inset-0 z-[55] overflow-hidden">
+              <div className="pointer-events-none absolute inset-0 z-[55] overflow-hidden">
                 <ComposeMiniLoadingBreath
                   label={videoLaneLoadingLabel?.trim() || "正在生成时间线…"}
                   labelClassName={
@@ -2645,8 +2791,10 @@ export function ComposeMiniTimelinePanel({
 
   const {
     playbackVideoUrl,
+    livePlaybackVideoUrl,
     onProgramVideoTimeUpdate,
     onProgramVideoLoadedData,
+    onProgramVideoEnded,
     onProgramAudioTimeUpdate,
     toggleProgramPlay,
   } = useComposeProgramVideoPlayback({
@@ -2703,7 +2851,7 @@ export function ComposeMiniTimelinePanel({
   const pausedPreviewVideoUrl =
     playbackVideoUrl || selected?.videoUrl?.trim() || "";
   const programVideoSrc = playing
-    ? playbackVideoUrl || undefined
+    ? livePlaybackVideoUrl || playbackVideoUrl || undefined
     : pausedPreviewVideoUrl || undefined;
 
   useComposePausedProgramPreviewSeek({
@@ -2815,8 +2963,9 @@ export function ComposeMiniTimelinePanel({
     [durationSec, onApplyWorkbench, selectedId],
   );
 
-  /** 缩略图失败时仍允许剪辑（仅 loading 期间遮罩） */
-  const ready = !loading;
+  const filmstripProgress = loadingLabel?.trim() ?? "";
+  /** 缩略图后台生成，时间线始终可操作 */
+  const ready = true;
 
   const panelRef = useRef<HTMLDivElement>(null);
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
@@ -2923,9 +3072,12 @@ export function ComposeMiniTimelinePanel({
           <span className="hidden text-[10px] text-white/35 sm:inline">
             拖动标题栏移动
           </span>
-          {!ready ? (
-            <span className="max-w-[10rem] truncate text-[10px] text-yellow-300/85">
-              · {loadingLabel?.trim() || "加载中…"}
+          {filmstripProgress ? (
+            <span
+              className="max-w-[min(12rem,38vw)] truncate text-[10px] tabular-nums text-yellow-300/90"
+              aria-live="polite"
+            >
+              · {filmstripProgress}
             </span>
           ) : null}
           {exportBusy && composeStatusLine?.trim() ? (
@@ -3014,6 +3166,7 @@ export function ComposeMiniTimelinePanel({
         playsInline
         onTimeUpdate={onProgramVideoTimeUpdate}
         onLoadedData={onProgramVideoLoadedData}
+        onEnded={onProgramVideoEnded}
       />
       <audio
         ref={audioRef}
@@ -3024,8 +3177,8 @@ export function ComposeMiniTimelinePanel({
       />
       <div
         className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-0"
-        aria-busy={!ready}
-        aria-live={!ready ? "polite" : undefined}
+        aria-busy={Boolean(filmstripProgress)}
+        aria-live={filmstripProgress ? "polite" : undefined}
       >
         <ComposeSequenceTrack
           clips={ordered}
@@ -3039,7 +3192,7 @@ export function ComposeMiniTimelinePanel({
               setComposeAudioProgramStart(prev, clipId, start),
             )
           }
-          disabled={!canEdit || !ready}
+          disabled={!canEdit}
           trimStart={trimStart}
           trimEnd={trimEnd}
           filmstripByUrl={filmstripByUrl}
@@ -3061,8 +3214,6 @@ export function ComposeMiniTimelinePanel({
           zoomable
           clipLaneClassName="h-24"
           portraitFilmstrip
-          videoLaneLoading={!ready}
-          videoLaneLoadingLabel={loadingLabel}
           splitDisabled={!canEdit || !playheadInSelected}
           deleteDisabled={!canEdit || !selectedId || ordered.length <= 1}
           scrollContainerClassName="bg-transparent"
@@ -3251,7 +3402,8 @@ export function ComposeEditorFullscreen({
   }, [selected?.videoUrl, playing]);
 
   const selectedVideoUrl = selected?.videoUrl?.trim() ?? "";
-  const timelineReady = !loading;
+  const filmstripProgress = loadingLabel?.trim() ?? "";
+  const timelineReady = true;
 
   const pushUndoSnapshot = useCallback(() => {
     undoStackRef.current.push(cloneWorkbenchState(workbench));
@@ -3294,8 +3446,10 @@ export function ComposeEditorFullscreen({
 
   const {
     playbackVideoUrl,
+    livePlaybackVideoUrl,
     onProgramVideoTimeUpdate,
     onProgramVideoLoadedData,
+    onProgramVideoEnded,
     onProgramAudioTimeUpdate,
     toggleProgramPlay,
   } = useComposeProgramVideoPlayback({
@@ -3352,7 +3506,7 @@ export function ComposeEditorFullscreen({
   const pausedPreviewVideoUrl =
     playbackVideoUrl || selected?.videoUrl?.trim() || "";
   const programVideoSrc = playing
-    ? playbackVideoUrl || undefined
+    ? livePlaybackVideoUrl || playbackVideoUrl || undefined
     : pausedPreviewVideoUrl || undefined;
 
   useComposePausedProgramPreviewSeek({
@@ -3652,19 +3806,6 @@ export function ComposeEditorFullscreen({
       aria-label="卡点成片剪辑"
       onPointerDown={(e) => e.stopPropagation()}
     >
-      {!timelineReady ? (
-        <div className="absolute inset-0 z-[2100] flex flex-col items-center justify-end gap-3 bg-[#0d0d0d]/92 pb-16">
-          <Loader2 className="size-8 animate-spin text-white/75" />
-          <p
-            className={cn(
-              "text-sm tabular-nums",
-              brightChrome ? "text-white" : "text-yellow-300/90",
-            )}
-          >
-            {loadingLabel?.trim() || "正在加载时间线与缩略图…"}
-          </p>
-        </div>
-      ) : null}
       <header className="flex shrink-0 flex-col border-b border-white/10">
         <div className="flex items-center justify-between gap-3 px-4 py-2">
           <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -3678,6 +3819,17 @@ export function ComposeEditorFullscreen({
               {ordered.length} 段 ·{" "}
               {brightChrome ? "按时间线生成剪辑" : "云端 FFmpeg 合成"}
             </span>
+            {filmstripProgress ? (
+              <span
+                className={cn(
+                  "truncate text-[11px] tabular-nums",
+                  brightChrome ? "text-yellow-200" : "text-yellow-300/90",
+                )}
+                aria-live="polite"
+              >
+                · {filmstripProgress}
+              </span>
+            ) : null}
           </div>
           <div className="flex min-w-0 shrink-0 items-center gap-2">
             <button
@@ -3865,6 +4017,7 @@ export function ComposeEditorFullscreen({
                     controls={false}
                     onTimeUpdate={onProgramVideoTimeUpdate}
                     onLoadedData={onProgramVideoLoadedData}
+                    onEnded={onProgramVideoEnded}
                   />
                   <audio
                     ref={audioRef}
