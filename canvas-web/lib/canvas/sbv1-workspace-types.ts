@@ -61,6 +61,8 @@ export type Sbv1ImageNodeData = {
   imageQuality?: Sbv1ImageQuality;
   resolution?: Sbv1ImageResolution;
   outputCount?: number;
+  /** 多版本生图 · 当前选中的成功 taskId */
+  activeImageTaskId?: string;
 };
 
 export const SBV1_DEFAULT_IMAGE_NODE_DATA: Sbv1ImageNodeData = {

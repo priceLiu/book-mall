@@ -8,7 +8,9 @@ import {
   isUserCancelledCanvasTask,
 } from "./canvas-generation-cancel-messages";
 import { formatCanvasTaskError } from "./friendly-task-error";
-import { isCanvasManagedOssUrl } from "./canvas-managed-oss-url";
+import {
+  imageMediaPatchFromSucceededTask,
+} from "./libtv-image-generation-stack";
 import { pickTaskImagePreviewUrl, pickTaskResultMediaUrl } from "./task-media-url";
 
 function posterUrlFromTask(task: CanvasTaskRecord): string | undefined {
@@ -30,29 +32,11 @@ export function sbv1ImagePatchFromTask(
   task: CanvasTaskRecord,
 ): Record<string, unknown> | null {
   if (task.status === "SUCCEEDED") {
-    const previewUrl = pickTaskImagePreviewUrl(task);
-    if (!previewUrl) return null;
-    const hadImage = Boolean(prev.ossUrl?.trim() || prev.blobUrl?.trim());
-    const taskOss = task.ossUrl?.trim();
-    const managedOss = isCanvasManagedOssUrl(taskOss) ? taskOss : undefined;
+    const mediaPatch = imageMediaPatchFromSucceededTask(prev, task);
+    if (!mediaPatch) return null;
     return {
-      ...(managedOss
-        ? {
-            ossUrl: managedOss,
-            blobUrl: undefined,
-            imageMode: hadImage ? "img2img" : "txt2img",
-          }
-        : {}),
-      uploading: false,
-      uploadError: undefined,
-      runtime: {
-        status: "done",
-        taskId: task.id,
-        ossUrl: managedOss ?? previewUrl,
-        ephemeralUrl: task.ephemeralUrl ?? undefined,
-        failCode: undefined,
-        failMessage: undefined,
-      } satisfies CanvasNodeRuntime,
+      ...mediaPatch,
+      activeImageTaskId: task.id,
     };
   }
 

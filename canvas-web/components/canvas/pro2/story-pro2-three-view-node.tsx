@@ -61,6 +61,7 @@ import {
   Pro2ThreeViewNodeEmbeddedDock,
   pro2ThreeViewNodeUsesEmbeddedDock,
 } from "./pro2-three-view-node-embedded-dock";
+import { LibtvImageGenerationStack } from "../libtv-image-generation-stack-ui";
 
 /** 2.0 角色三视图 · 壳层与图片节点一致（LibTV） */
 export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
@@ -74,6 +75,8 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
   const setEdges = useCanvasStore((s) => s.setEdges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const inputRef = useRef<HTMLInputElement>(null);
+  const stageContainerRef = useRef<HTMLDivElement>(null);
+  const [genStackOpen, setGenStackOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
@@ -156,6 +159,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
       }
       const blobUrl = URL.createObjectURL(file);
       updateNodeData(id, {
+        activeImageTaskId: undefined,
         blobUrl,
         ossUrl: undefined,
         uploading: true,
@@ -292,6 +296,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
           className={cn(
             LIBTV_MEDIA_CARD_SHELL_CLASS,
             LIBTV_CARD_DRAG_CLASS,
+            genStackOpen && "!overflow-visible",
             "min-h-0 flex-1",
           )}
           style={libtvNodeBorderStyle({
@@ -300,43 +305,59 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
             edition: "pro2",
           })}
         >
-          <div className={cn(LIBTV_MEDIA_STAGE_CLASS, "relative")}>
-            {isGenerating ? (
-              <LibtvMediaGeneratingState
-                variant="violet"
-                cancelNodeId={id}
-                passNodeDrag
-              />
-            ) : hasImage ? (
-              <MediaHoverBox
-                src={previewUrl}
-                variant="generated"
-                alt={label}
-                fit="cover"
-                previewChrome="ecom"
-                className="absolute inset-0"
-              />
-            ) : hasError ? (
-              <Pro2MediaNodeErrorState
-                icon={AlertTriangle}
-                title="生成失败"
-                message={errorMessage}
-              />
-            ) : showEmbeddedDock ? (
-              <Pro2ThreeViewNodeEmbeddedDock nodeId={id} />
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center px-3 py-4">
-                <Pro2MediaNodeEmptyState
-                  icon={ImageIcon}
-                  label="等待生成三视图"
-                  className="min-h-0 pb-0"
+          <div
+            ref={stageContainerRef}
+            className={cn(
+              LIBTV_MEDIA_STAGE_CLASS,
+              "relative",
+              genStackOpen && "!overflow-visible",
+            )}
+          >
+            <div className="absolute inset-0 min-h-0 overflow-hidden">
+              {isGenerating ? (
+                <LibtvMediaGeneratingState
+                  variant="violet"
+                  cancelNodeId={id}
                   passNodeDrag
                 />
-                <p className="mt-3 text-[10px] text-white/35">
-                  选中节点以编辑提示词
-                </p>
-              </div>
-            )}
+              ) : hasImage ? (
+                <MediaHoverBox
+                  src={previewUrl}
+                  variant="generated"
+                  alt={label}
+                  fit="cover"
+                  previewChrome="ecom"
+                  className="absolute inset-0"
+                />
+              ) : hasError ? (
+                <Pro2MediaNodeErrorState
+                  icon={AlertTriangle}
+                  title="生成失败"
+                  message={errorMessage}
+                />
+              ) : showEmbeddedDock ? (
+                <Pro2ThreeViewNodeEmbeddedDock nodeId={id} />
+              ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center px-3 py-4">
+                  <Pro2MediaNodeEmptyState
+                    icon={ImageIcon}
+                    label="等待生成三视图"
+                    className="min-h-0 pb-0"
+                    passNodeDrag
+                  />
+                  <p className="mt-3 text-[10px] text-white/35">
+                    选中节点以编辑提示词
+                  </p>
+                </div>
+              )}
+            </div>
+            <LibtvImageGenerationStack
+              nodeId={id}
+              edition="pro2"
+              stageContainerRef={stageContainerRef}
+              onOpenChange={setGenStackOpen}
+              hidden={isGenerating || !hasImage}
+            />
             {hasImage && !isGenerating && d.globalCatalogMarked ? (
               <GlobalAssetCatalogBadge />
             ) : null}

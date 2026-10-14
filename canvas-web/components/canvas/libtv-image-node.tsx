@@ -84,6 +84,7 @@ import {
   LibtvMediaGeneratingState,
   isLibtvMediaGenerating,
 } from "./libtv-media-generating-state";
+import { LibtvImageGenerationStack } from "./libtv-image-generation-stack-ui";
 import { LibtvNodeErrorBanner } from "./libtv-node-error-banner";
 import { useLibtvRuntimeErrorBanner } from "@/lib/canvas/use-libtv-runtime-error-banner";
 import {
@@ -187,6 +188,7 @@ export type LibtvImageNodeData = CanvasPortraitNodeFields & {
   libtvEraseSession?: LibtvEraseSession;
   libtvCropSession?: LibtvCropSession;
   libtvExpandSession?: LibtvExpandSession;
+  activeImageTaskId?: string;
 };
 
 export type LibtvImageNodeProps = NodeProps & {
@@ -247,6 +249,8 @@ export function LibtvImageNode({
   const setEdges = useCanvasStore((s) => s.setEdges);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
   const inputRef = useRef<HTMLInputElement>(null);
+  const stageContainerRef = useRef<HTMLDivElement>(null);
+  const [genStackOpen, setGenStackOpen] = useState(false);
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const [reversePromptBusy, setReversePromptBusy] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -860,6 +864,7 @@ export function LibtvImageNode({
         label: file.name.replace(/\.[^.]+$/, "") || "图片",
         mediaAspectPreset: "",
         imageMode: "upload" as const,
+        activeImageTaskId: undefined,
       });
       scheduleCanvasImageUpload({
         nodeId: id,
@@ -1540,7 +1545,7 @@ export function LibtvImageNode({
         <div
           className={cn(
             LIBTV_MEDIA_CARD_SHELL_CLASS,
-            magicEditActive && "!overflow-visible",
+            (magicEditActive || genStackOpen) && "!overflow-visible",
             !magicEditActive && LIBTV_CARD_DRAG_CLASS,
             "min-h-0 flex-1",
           )}
@@ -1609,14 +1614,29 @@ export function LibtvImageNode({
           ) : null}
 
           <div
+            ref={stageContainerRef}
             className={cn(
               LIBTV_MEDIA_STAGE_CLASS,
-              magicEditActive && "!overflow-visible",
+              (magicEditActive || genStackOpen) && "!overflow-visible",
               "relative flex min-h-0 flex-col",
               magicEditActive && "nodrag nopan nowheel cursor-crosshair",
             )}
           >
-            {renderStage()}
+            <div
+              className={cn(
+                "absolute inset-0 min-h-0 overflow-hidden",
+                magicEditActive && "!overflow-visible",
+              )}
+            >
+              {renderStage()}
+            </div>
+            <LibtvImageGenerationStack
+              nodeId={id}
+              edition={edition}
+              stageContainerRef={stageContainerRef}
+              onOpenChange={setGenStackOpen}
+              hidden={showGeneratingStage || !hasImage}
+            />
             {hasImage && d.globalCatalogMarked ? <GlobalAssetCatalogBadge /> : null}
             <LibtvNodeErrorBanner
               message={errorBanner.message}

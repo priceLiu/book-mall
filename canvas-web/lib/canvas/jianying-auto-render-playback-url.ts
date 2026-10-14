@@ -81,10 +81,11 @@ export function normalizeJianyingAutoRenderNodeDataForPersist(
   const video = trimUrl(typeof data.videoUrl === "string" ? data.videoUrl : "");
   if (!video || !isMediaRenderSessionLocalUrl(video)) return data;
 
-  const next = { ...data, videoUrl: oss };
-  if (!trimUrl(typeof data.posterUrl === "string" ? data.posterUrl : "")) {
-    const poster = trimUrl(result.posterUrl);
-    if (poster) next.posterUrl = poster;
-  }
-  return next;
+  const hasPoster = trimUrl(typeof data.posterUrl === "string" ? data.posterUrl : "");
+  const posterFromResult = trimUrl(result.posterUrl);
+  return {
+    ...data,
+    videoUrl: oss,
+    ...(!hasPoster && posterFromResult ? { posterUrl: posterFromResult } : {}),
+  };
 }
