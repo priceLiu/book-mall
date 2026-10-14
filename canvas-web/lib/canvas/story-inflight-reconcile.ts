@@ -48,6 +48,7 @@ import {
   sbv1ImagePatchFromTask,
   sbv1VideoPatchFromTask,
 } from "./sbv1-image-task-apply";
+import { shouldSkipLibtvImageTaskPollApply } from "./libtv-image-generation-stack";
 import { pickTaskResultMediaUrl } from "./task-media-url";
 import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 import {
@@ -725,13 +726,17 @@ export function reconcileStaleInflightRuntimes(
           nodes,
         );
       } else if (isLibtvFreestandingImageNode(node) || node.type === "sbv1-video-engine") {
+        const nodeData = node.data as unknown as Sbv1ImageNodeData;
+        if (
+          isLibtvFreestandingImageNode(node) &&
+          shouldSkipLibtvImageTaskPollApply(nodeData, pick)
+        ) {
+          continue;
+        }
         const imagePatch =
           node.type === "sbv1-video-engine"
             ? sbv1VideoPatchFromTask(pick)
-            : sbv1ImagePatchFromTask(
-                node.data as unknown as Sbv1ImageNodeData,
-                pick,
-              );
+            : sbv1ImagePatchFromTask(nodeData, pick);
         const patch = imagePatch ?? runtimePatchFromCanvasTask(pick);
         if (imagePatch && !isSameSbv1MediaDataPatch(node.data as Record<string, unknown>, imagePatch)) {
           clearCanvasNodeRunSession(node.id);

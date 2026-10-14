@@ -11,6 +11,10 @@ import { formatCanvasTaskError } from "./friendly-task-error";
 import {
   imageMediaPatchFromSucceededTask,
 } from "./libtv-image-generation-stack";
+import {
+  type LibtvUsedImageTaskFields,
+  usedImageTaskIdsAfterMagicApply,
+} from "./libtv-image-generation-used";
 import { pickTaskImagePreviewUrl, pickTaskResultMediaUrl } from "./task-media-url";
 
 function posterUrlFromTask(task: CanvasTaskRecord): string | undefined {
@@ -34,9 +38,19 @@ export function sbv1ImagePatchFromTask(
   if (task.status === "SUCCEEDED") {
     const mediaPatch = imageMediaPatchFromSucceededTask(prev, task);
     if (!mediaPatch) return null;
+    const sameTask = prev.runtime?.taskId?.trim() === task.id;
+    const prevGenCount =
+      (prev as { generationSuccessCount?: number }).generationSuccessCount ?? 0;
+    const generationSuccessCount = sameTask
+      ? prevGenCount
+      : prevGenCount + 1;
     return {
       ...mediaPatch,
       activeImageTaskId: task.id,
+      generationSuccessCount,
+      usedImageTaskIds: usedImageTaskIdsAfterMagicApply(
+        prev as LibtvUsedImageTaskFields & Record<string, unknown>,
+      ),
     };
   }
 

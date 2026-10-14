@@ -153,15 +153,26 @@ export function libtvNodeBorderStyle(options: {
   selected?: boolean;
   hovered?: boolean;
   edition?: LibtvNodeBorderEdition;
+  /** 生图历史条展开时用内描边，避免外扩选中环在圆角外形成「四角白弧」 */
+  insetSelectionRing?: boolean;
 }): CSSProperties {
-  const { selected, edition = "pro2" } = options;
+  const { selected, edition = "pro2", insetSelectionRing } = options;
   if (selected) {
     const ringColor = libtvNodeSelectedRingColor(edition);
+    const ringPx = LIBTV_NODE_BORDER_SELECTED_RING_OUTSET;
+    if (insetSelectionRing) {
+      return {
+        borderWidth: LIBTV_NODE_BORDER_DEFAULT_WIDTH,
+        borderColor: LIBTV_NODE_BORDER_DEFAULT_COLOR,
+        borderStyle: "solid",
+        boxShadow: `inset 0 0 0 ${ringPx}px ${ringColor}, var(--libtv-node-elevation-shadow)`,
+      };
+    }
     return {
       borderWidth: LIBTV_NODE_BORDER_DEFAULT_WIDTH,
       borderColor: ringColor,
       borderStyle: "solid",
-      boxShadow: `0 0 0 ${LIBTV_NODE_BORDER_SELECTED_RING_OUTSET}px ${ringColor}, var(--libtv-node-elevation-shadow)`,
+      boxShadow: `0 0 0 ${ringPx}px ${ringColor}, var(--libtv-node-elevation-shadow)`,
     };
   }
   return {

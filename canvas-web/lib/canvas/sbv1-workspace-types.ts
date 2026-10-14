@@ -63,6 +63,10 @@ export type Sbv1ImageNodeData = {
   outputCount?: number;
   /** 多版本生图 · 当前选中的成功 taskId */
   activeImageTaskId?: string;
+  /** 累计成功生图次数（角标稳定展示 · autosave） */
+  generationSuccessCount?: number;
+  /** 已被下游/应用消费过的成功 taskId（「已用过」圆点） */
+  usedImageTaskIds?: string[];
 };
 
 export const SBV1_DEFAULT_IMAGE_NODE_DATA: Sbv1ImageNodeData = {

@@ -118,6 +118,8 @@ import {
   libtvMediaRunPendingRuntimePartial,
   resolveLibtvImageEngineFromNodeData,
 } from "./libtv-image-node-run";
+import { shouldSkipLibtvImageTaskPollApply } from "./libtv-image-generation-stack";
+import { markLibtvUpstreamImagesUsedWhenConsumerSucceeded } from "./libtv-image-generation-used";
 import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 import { resolveStoryProRunStylePayload } from "./story-pro-run-style-context";
 import { commitStoryVideoRowRun } from "./story-video-run";
@@ -698,6 +700,24 @@ function propagateAiOutputToDownstreamText(
   setNodeRuntime: (id: string, runtime: Partial<{ textOutput: string }>) => void,
 ) {
   propagateTextOutputToDownstream(nodeId, textOutput, setNodeRuntime);
+}
+
+function maybeMarkLibtvUpstreamImageUsedOnTaskSuccess(
+  consumerNodeId: string,
+  task: CanvasTaskRecord,
+  allTasks: CanvasTaskRecord[] | undefined,
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): void {
+  if (task.status !== "SUCCEEDED") return;
+  const { nodes, edges } = useCanvasStore.getState();
+  markLibtvUpstreamImagesUsedWhenConsumerSucceeded(
+    consumerNodeId,
+    task,
+    nodes,
+    edges,
+    allTasks ?? [],
+    updateNodeData,
+  );
 }
 
 function applyLibtvAudioTaskResult(
@@ -3008,7 +3028,15 @@ export function useCanvasRunner(
         ) {
           releaseInflightKey(runKey(ctx));
           releaseInflightKey(nodeId);
-          if (t.status === "SUCCEEDED") maybeNotifyCanvasCreditsSettled(t);
+          if (t.status === "SUCCEEDED") {
+            maybeNotifyCanvasCreditsSettled(t);
+            maybeMarkLibtvUpstreamImageUsedOnTaskSuccess(
+              nodeId,
+              t,
+              allTasks,
+              updateNodeData,
+            );
+          }
           emitTaskPanelSync(t, { flushAutosave: t.status === "SUCCEEDED" });
         }
         return;
@@ -3051,10 +3079,11 @@ export function useCanvasRunner(
 
       const patch = runtimePatchFromCanvasTask(t);
       if (node && isLibtvFreestandingImageNode(node)) {
-        const sbv1Patch = sbv1ImagePatchFromTask(
-          node.data as unknown as Sbv1ImageNodeData,
-          t,
-        );
+        const nodeData = node.data as unknown as Sbv1ImageNodeData;
+        if (shouldSkipLibtvImageTaskPollApply(nodeData, t)) {
+          return;
+        }
+        const sbv1Patch = sbv1ImagePatchFromTask(nodeData, t);
         if (sbv1Patch) {
           const rtPatch = sbv1Patch.runtime as Partial<CanvasNodeRuntime> | undefined;
           if (shouldSkipStoryRowTaskApply(localRt, t, nodeId)) return;
@@ -3089,7 +3118,17 @@ export function useCanvasRunner(
               taskByNodeRef.current.delete(runKey(job));
             }
             taskByNodeRef.current.delete(nodeId);
-            if (st === "done") maybeNotifyCanvasCreditsSettled(t);
+            if (st === "done") {
+              maybeNotifyCanvasCreditsSettled(t);
+              if (t.status === "SUCCEEDED") {
+                maybeMarkLibtvUpstreamImageUsedOnTaskSuccess(
+                  nodeId,
+                  t,
+                  allTasks,
+                  updateNodeData,
+                );
+              }
+            }
             emitTaskPanelSync(t, { flushAutosave: st === "done" });
           }
         } else if (
@@ -3120,7 +3159,17 @@ export function useCanvasRunner(
               taskByNodeRef.current.delete(runKey(job));
             }
             taskByNodeRef.current.delete(nodeId);
-            if (patch.status === "done") maybeNotifyCanvasCreditsSettled(t);
+            if (patch.status === "done") {
+              maybeNotifyCanvasCreditsSettled(t);
+              if (t.status === "SUCCEEDED") {
+                maybeMarkLibtvUpstreamImageUsedOnTaskSuccess(
+                  nodeId,
+                  t,
+                  allTasks,
+                  updateNodeData,
+                );
+              }
+            }
             emitTaskPanelSync(t, { flushAutosave: patch.status === "done" });
           }
         }
@@ -3149,7 +3198,17 @@ export function useCanvasRunner(
           if (st === "done" || st === "error") {
             const job = jobByTaskRef.current.get(t.id);
             if (job) releaseInflightKey(runKey(job));
-            if (st === "done") maybeNotifyCanvasCreditsSettled(t);
+            if (st === "done") {
+              maybeNotifyCanvasCreditsSettled(t);
+              if (t.status === "SUCCEEDED") {
+                maybeMarkLibtvUpstreamImageUsedOnTaskSuccess(
+                  nodeId,
+                  t,
+                  allTasks,
+                  updateNodeData,
+                );
+              }
+            }
             emitTaskPanelSync(t, { flushAutosave: st === "done" });
           }
         }
@@ -3177,7 +3236,17 @@ export function useCanvasRunner(
               if (key.startsWith(`${nodeId}:`)) releaseInflightKey(key);
             }
           }
-          if (patch.status === "done") maybeNotifyCanvasCreditsSettled(t);
+          if (patch.status === "done") {
+            maybeNotifyCanvasCreditsSettled(t);
+            if (t.status === "SUCCEEDED") {
+              maybeMarkLibtvUpstreamImageUsedOnTaskSuccess(
+                nodeId,
+                t,
+                allTasks,
+                updateNodeData,
+              );
+            }
+          }
           emitTaskPanelSync(t, { flushAutosave: patch.status === "done" });
         }
       }

@@ -374,7 +374,12 @@ export function storyRunContextFromScope(
  */
 export function pickPreferredCanvasTask(
   tasks: CanvasTaskRecord[],
-  opts?: { localRuntime?: CanvasNodeRuntime | null; nodeId?: string },
+  opts?: {
+    localRuntime?: CanvasNodeRuntime | null;
+    nodeId?: string;
+    /** 多版本生图 · 用户选中的成功 task（done 态勿被最新 SUCCEEDED 覆盖） */
+    activeImageTaskId?: string | null;
+  },
 ): CanvasTaskRecord | undefined {
   if (!tasks.length) return undefined;
 
@@ -442,6 +447,16 @@ export function pickPreferredCanvasTask(
       !isAbandonedCanvasInflightTask(t),
   );
   if (inflight.length) return newestTaskByUpdatedAt(inflight);
+
+  const pinnedId =
+    opts?.activeImageTaskId?.trim() ||
+    (opts?.localRuntime?.status === "done" ? localTaskId : undefined);
+  if (pinnedId && opts?.localRuntime?.status === "done") {
+    const pinned = tasks.find((t) => t.id === pinnedId);
+    if (pinned?.status === "SUCCEEDED" && taskHasDisplayableResult(pinned)) {
+      return pinned;
+    }
+  }
 
   const succeeded = tasks.filter(
     (t) => t.status === "SUCCEEDED" && taskHasDisplayableResult(t),
@@ -588,9 +603,13 @@ export function preferredTasksByNode(
         ? hubNodeLocalRuntimeForTaskPick(node)
         : (node.data as { runtime?: CanvasNodeRuntime }).runtime
       : undefined;
+    const activeImageTaskId = (
+      node?.data as { activeImageTaskId?: string } | undefined
+    )?.activeImageTaskId;
     const pick = pickPreferredCanvasTask(list, {
       localRuntime: localRt,
       nodeId,
+      activeImageTaskId,
     });
     if (pick) out.set(nodeId, pick);
   }

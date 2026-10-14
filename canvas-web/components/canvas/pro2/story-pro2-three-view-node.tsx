@@ -62,6 +62,15 @@ import {
   pro2ThreeViewNodeUsesEmbeddedDock,
 } from "./pro2-three-view-node-embedded-dock";
 import { LibtvImageGenerationStack } from "../libtv-image-generation-stack-ui";
+import {
+  libtvPinnedImageTaskId,
+  type LibtvActiveImageTaskFields,
+} from "@/lib/canvas/libtv-image-generation-stack";
+import {
+  markLibtvImageNodeTaskUsed,
+  usedImageTaskIdsPatch,
+  type LibtvUsedImageTaskFields,
+} from "@/lib/canvas/libtv-image-generation-used";
 
 /** 2.0 角色三视图 · 壳层与图片节点一致（LibTV） */
 export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
@@ -85,8 +94,15 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
   const saveAsAsset = useSaveNodeAsAsset();
   const saveToCatalog = useSaveToCatalog();
   const markGlobalCatalog = useCallback(() => {
-    updateNodeData(id, { globalCatalogMarked: true });
-  }, [id, updateNodeData]);
+    const usedPatch = usedImageTaskIdsPatch(
+      d as LibtvUsedImageTaskFields,
+      libtvPinnedImageTaskId(d as LibtvActiveImageTaskFields),
+    );
+    updateNodeData(id, {
+      globalCatalogMarked: true,
+      ...(usedPatch ?? {}),
+    });
+  }, [d, id, updateNodeData]);
   const previewUrl = d.ossUrl ?? d.blobUrl ?? "";
   const catalogImageUrl = (d.ossUrl?.trim() || previewUrl?.trim() || "").trim();
   const canSaveToCatalog =
@@ -255,14 +271,20 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
               passNodeDrag
               previewUrl={previewUrl}
               onExpandPreview={() => setPreviewOpen(true)}
-              onSaveAsAsset={() =>
+              onSaveAsAsset={() => {
                 saveAsAsset(
                   id,
                   "story-pro2-three-view",
                   d as unknown as Record<string, unknown>,
                   "CHARACTER",
-                )
-              }
+                );
+                markLibtvImageNodeTaskUsed(
+                  id,
+                  libtvPinnedImageTaskId(d as LibtvActiveImageTaskFields),
+                  updateNodeData,
+                  d as LibtvUsedImageTaskFields,
+                );
+              }}
               onSaveToCatalog={
                 canSaveToCatalog
                   ? () =>
@@ -292,26 +314,23 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
           <Pro2CrewTaskStatusBadge nodeId={id} />
         </div>
 
+        <div className="relative min-h-0 flex-1 overflow-visible">
         <div
           className={cn(
             LIBTV_MEDIA_CARD_SHELL_CLASS,
             LIBTV_CARD_DRAG_CLASS,
-            genStackOpen && "!overflow-visible",
-            "min-h-0 flex-1",
+            "isolate min-h-0 flex-1 overflow-hidden",
           )}
           style={libtvNodeBorderStyle({
             selected: !!selected,
             hovered: hovered && !selected,
             edition: "pro2",
+            insetSelectionRing: genStackOpen,
           })}
         >
           <div
             ref={stageContainerRef}
-            className={cn(
-              LIBTV_MEDIA_STAGE_CLASS,
-              "relative",
-              genStackOpen && "!overflow-visible",
-            )}
+            className={cn(LIBTV_MEDIA_STAGE_CLASS, "relative overflow-hidden")}
           >
             <div className="absolute inset-0 min-h-0 overflow-hidden">
               {isGenerating ? (
@@ -355,6 +374,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
               nodeId={id}
               edition="pro2"
               stageContainerRef={stageContainerRef}
+              stageImageFit="cover"
               onOpenChange={setGenStackOpen}
               hidden={isGenerating || !hasImage}
             />
@@ -362,6 +382,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
               <GlobalAssetCatalogBadge />
             ) : null}
           </div>
+        </div>
         </div>
       </div>
 

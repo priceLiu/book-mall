@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import {
+  dedupeSucceededImageGenerationsByMedia,
   listSucceededImageGenerations,
   resolveActiveImageTaskId,
 } from "@/lib/canvas/libtv-image-generation-stack";
@@ -49,6 +50,30 @@ describe("libtv-image-generation-stack", () => {
         succeeded,
       ),
     ).toBe("t1");
+  });
+
+  it("dedupes succeeded tasks with the same preview URL", () => {
+    const list = dedupeSucceededImageGenerationsByMedia([
+      task({
+        id: "t1",
+        status: "SUCCEEDED",
+        ossUrl: "https://cdn.example.com/same.png",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }),
+      task({
+        id: "t2",
+        status: "SUCCEEDED",
+        ossUrl: "https://cdn.example.com/same.png",
+        createdAt: "2026-01-02T00:00:00.000Z",
+      }),
+      task({
+        id: "t3",
+        status: "SUCCEEDED",
+        ossUrl: "https://cdn.example.com/other.png",
+        createdAt: "2026-01-03T00:00:00.000Z",
+      }),
+    ]);
+    expect(list.map((t) => t.id)).toEqual(["t2", "t3"]);
   });
 
   it("falls back to latest succeeded task", () => {

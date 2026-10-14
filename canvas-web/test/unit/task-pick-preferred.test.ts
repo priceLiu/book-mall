@@ -32,6 +32,30 @@ function task(
 }
 
 describe("pickPreferredCanvasTask", () => {
+  it("keeps pinned activeImageTaskId when local runtime is done", () => {
+    const pick = pickPreferredCanvasTask(
+      [
+        task({
+          id: "older",
+          status: "SUCCEEDED",
+          updatedAt: minsAgo(20),
+          ossUrl: "https://cdn.example/older.png",
+        }),
+        task({
+          id: "newer",
+          status: "SUCCEEDED",
+          updatedAt: minsAgo(2),
+          ossUrl: "https://cdn.example/newer.png",
+        }),
+      ],
+      {
+        localRuntime: { status: "done", taskId: "older" },
+        activeImageTaskId: "older",
+      },
+    );
+    expect(pick?.id).toBe("older");
+  });
+
   it("prefers succeeded video over newer failed retry", () => {
     const pick = pickPreferredCanvasTask([
       task({

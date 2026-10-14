@@ -138,6 +138,8 @@ export default defineConfig({
       "test/unit/libtv-video-compose-workbench.test.ts",
       "test/unit/libtv-image-node-title.test.ts",
       "test/unit/libtv-image-generation-stack.test.ts",
+      "test/unit/libtv-image-generation-used.test.ts",
+      "test/unit/libtv-image-generation-stack-poll.test.ts",
       "test/unit/sbv1-video-model-reference.test.ts",
       "test/unit/resolve-sbv1-video-engine-inputs.test.ts",
       "test/unit/jianying-from-workspace.test.ts",

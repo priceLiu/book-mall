@@ -1,8 +1,8 @@
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
+import type { CanvasNodeRuntime } from "./types";
 import type { LibtvInpaintSession } from "./libtv-inpaint-session";
 import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 import type { CanvasFlowNode } from "./types";
-import type { CanvasNodeRuntime } from "./types";
 import { isCanvasManagedOssUrl } from "./canvas-managed-oss-url";
 import { pickTaskImagePreviewUrl, taskHasDisplayableResult } from "./task-media-url";
 
@@ -18,6 +18,33 @@ export type LibtvActiveImageTaskFields = {
   activeImageTaskId?: string;
 };
 
+export function libtvPinnedImageTaskId(
+  data: LibtvActiveImageTaskFields & {
+    runtime?: Pick<CanvasNodeRuntime, "taskId" | "status">;
+  },
+): string | undefined {
+  const explicit = data.activeImageTaskId?.trim();
+  if (explicit) return explicit;
+  if (data.runtime?.status === "done") {
+    return data.runtime.taskId?.trim() || undefined;
+  }
+  return undefined;
+}
+
+/** 任务轮询写回：done 且用户已选历史版本时，忽略其它 SUCCEEDED 任务 */
+export function shouldSkipLibtvImageTaskPollApply(
+  nodeData: LibtvActiveImageTaskFields & {
+    runtime?: Pick<CanvasNodeRuntime, "taskId" | "status">;
+  },
+  task: CanvasTaskRecord,
+): boolean {
+  if (task.status !== "SUCCEEDED") return false;
+  if (nodeData.runtime?.status !== "done") return false;
+  const pinned = libtvPinnedImageTaskId(nodeData);
+  if (!pinned) return false;
+  return task.id !== pinned;
+}
+
 export function listSucceededImageGenerations(
   tasks: CanvasTaskRecord[],
 ): CanvasTaskRecord[] {
@@ -27,6 +54,23 @@ export function listSucceededImageGenerations(
       (a, b) =>
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
+}
+
+/** 同一预览 URL 只保留最后一次成功任务（轮询/重试不产生虚高版本数） */
+export function dedupeSucceededImageGenerationsByMedia(
+  tasks: CanvasTaskRecord[],
+): CanvasTaskRecord[] {
+  const sorted = listSucceededImageGenerations(tasks);
+  const byKey = new Map<string, CanvasTaskRecord>();
+  for (const t of sorted) {
+    const url = pickTaskImagePreviewUrl(t)?.trim();
+    const key = url || t.id;
+    byKey.set(key, t);
+  }
+  return [...byKey.values()].sort(
+    (a, b) =>
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
 }
 
 export function resolveActiveImageTaskId(

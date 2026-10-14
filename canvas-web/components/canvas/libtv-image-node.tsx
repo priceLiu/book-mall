@@ -85,6 +85,15 @@ import {
   isLibtvMediaGenerating,
 } from "./libtv-media-generating-state";
 import { LibtvImageGenerationStack } from "./libtv-image-generation-stack-ui";
+import {
+  libtvPinnedImageTaskId,
+  type LibtvActiveImageTaskFields,
+} from "@/lib/canvas/libtv-image-generation-stack";
+import {
+  markLibtvImageNodeTaskUsed,
+  usedImageTaskIdsPatch,
+  type LibtvUsedImageTaskFields,
+} from "@/lib/canvas/libtv-image-generation-used";
 import { LibtvNodeErrorBanner } from "./libtv-node-error-banner";
 import { useLibtvRuntimeErrorBanner } from "@/lib/canvas/use-libtv-runtime-error-banner";
 import {
@@ -335,8 +344,15 @@ export function LibtvImageNode({
   const saveAsAsset = useSaveNodeAsAsset();
   const saveToCatalog = useSaveToCatalog();
   const markGlobalCatalog = useCallback(() => {
-    updateNodeData(id, { globalCatalogMarked: true });
-  }, [id, updateNodeData]);
+    const usedPatch = usedImageTaskIdsPatch(
+      d as LibtvUsedImageTaskFields,
+      libtvPinnedImageTaskId(d as LibtvActiveImageTaskFields),
+    );
+    updateNodeData(id, {
+      globalCatalogMarked: true,
+      ...(usedPatch ?? {}),
+    });
+  }, [d, id, updateNodeData]);
   const catalogImageUrl = (d.ossUrl?.trim() || previewUrl?.trim() || "").trim();
   const canSaveToCatalog =
     Boolean(catalogImageUrl) &&
@@ -1384,9 +1400,19 @@ export function LibtvImageNode({
                 pro2ImageToolbarExtras ? onGridSplitPick : undefined
               }
               onExpandPreview={() => setPreviewOpen(true)}
-              onSaveAsAsset={() =>
-                saveAsAsset(id, saveAsAssetKind, d as unknown as Record<string, unknown>)
-              }
+              onSaveAsAsset={() => {
+                saveAsAsset(
+                  id,
+                  saveAsAssetKind,
+                  d as unknown as Record<string, unknown>,
+                );
+                markLibtvImageNodeTaskUsed(
+                  id,
+                  libtvPinnedImageTaskId(d as LibtvActiveImageTaskFields),
+                  updateNodeData,
+                  d as LibtvUsedImageTaskFields,
+                );
+              }}
               onSaveToCatalog={
                 canSaveToCatalog
                   ? () =>
@@ -1542,17 +1568,19 @@ export function LibtvImageNode({
           </div>
         ) : null}
 
+        <div className="relative min-h-0 flex-1 overflow-visible">
         <div
           className={cn(
             LIBTV_MEDIA_CARD_SHELL_CLASS,
-            (magicEditActive || genStackOpen) && "!overflow-visible",
+            magicEditActive && "!overflow-visible",
             !magicEditActive && LIBTV_CARD_DRAG_CLASS,
-            "min-h-0 flex-1",
+            "isolate min-h-0 flex-1 overflow-hidden",
           )}
           style={libtvNodeBorderStyle({
             selected: !!selected,
             hovered: hovered && !selected,
             edition,
+            insetSelectionRing: genStackOpen,
           })}
         >
           {edition === "sbv1" ? (
@@ -1617,8 +1645,8 @@ export function LibtvImageNode({
             ref={stageContainerRef}
             className={cn(
               LIBTV_MEDIA_STAGE_CLASS,
-              (magicEditActive || genStackOpen) && "!overflow-visible",
-              "relative flex min-h-0 flex-col",
+              magicEditActive && "!overflow-visible",
+              "relative flex min-h-0 flex-col overflow-hidden",
               magicEditActive && "nodrag nopan nowheel cursor-crosshair",
             )}
           >
@@ -1634,6 +1662,7 @@ export function LibtvImageNode({
               nodeId={id}
               edition={edition}
               stageContainerRef={stageContainerRef}
+              stageImageFit={stageImageFit}
               onOpenChange={setGenStackOpen}
               hidden={showGeneratingStage || !hasImage}
             />
@@ -1644,6 +1673,7 @@ export function LibtvImageNode({
               onDismiss={errorBanner.dismiss}
             />
           </div>
+        </div>
         </div>
       </div>
 
