@@ -7,6 +7,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { IpMasterContentPanel } from "@/components/ip-master/ip-master-content-panel";
 import { IpMasterProgressRail } from "@/components/ip-master/ip-master-progress-rail";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
+import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { ProductCreationStudioSkeleton } from "@/components/product-design/product-creation-studio-skeleton";
 import { EcomButtonPrimary } from "@/components/ui/ecom-button";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
@@ -504,7 +505,13 @@ export function IpMasterStudio() {
   if (empty) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6">
-        <h1 className="text-xl font-semibold text-[#1d1d1f]">IP 母版</h1>
+        <EcomWorkspaceTitleHeading
+          heading="h1"
+          guideModuleId="ip"
+          titleClassName="text-xl font-semibold text-[#1d1d1f]"
+          className="text-center"
+          title="IP 母版"
+        />
         <p className="max-w-md text-center text-sm text-[#6e6e73]">
           傻瓜式输入 → 大模型生成结构化模板 → 保存基准图与模板进母版库，供手办 / 品牌 VI 导入。
         </p>

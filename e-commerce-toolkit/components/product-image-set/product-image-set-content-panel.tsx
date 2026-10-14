@@ -11,6 +11,7 @@ import { ProductImageSetSlotWorkspace } from "@/components/product-image-set/pro
 import { ProductDesignSaveDialog } from "@/components/product-design/product-design-save-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { EcomIconButton, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import {
   downloadProductImageSetExportZip,
@@ -166,16 +167,16 @@ export function ProductImageSetContentPanel({
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
       <header className="shrink-0 border-b border-[#e8e8ed] bg-white px-4 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-sm font-semibold text-[#1d1d1f]">
-              {project.title?.trim() || "AI 商品套图"}
-            </h2>
+          <EcomWorkspaceTitleHeading
+            guideModuleId="product-image-set"
+            title={project.title?.trim() || "AI 商品套图"}
+          >
             <p className="text-[11px] text-[#6e6e73]">
               结构 {structureTotal} 张
               {hasSlots ? ` · 占位 ${project.output.slots.length} · 已出 ${readyCount}` : ""}
               {project.references.length > 0 ? ` · 原图 ${project.references.length}` : ""}
             </p>
-          </div>
+          </EcomWorkspaceTitleHeading>
           <EcomIconToolbar>
             <EcomIconToolbarGroup label="项目">
               {onNewProject ? (

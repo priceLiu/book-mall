@@ -18,6 +18,7 @@ import { SeedVideoRefUploader } from "@/components/seed-video/seed-video-ref-upl
 import { SeedVideoShotTable } from "@/components/seed-video/seed-video-shot-table";
 import { SeedVideoStoryboardDraftEditor } from "@/components/seed-video/seed-video-storyboard-draft-editor";
 import { EcomIconButton, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -1434,12 +1435,12 @@ export function SeedVideoContentPanel({
       <div className="ecom-scrollbar-overlay h-full min-h-0 w-full overflow-x-hidden overflow-y-auto overscroll-y-contain [overflow-anchor:none]">
         <header className="sticky top-0 z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold text-[#1d1d1f]">
-                {project.title ?? "服装种草视频"}
-              </h2>
+            <EcomWorkspaceTitleHeading
+              guideModuleId="seed-video"
+              title={project.title ?? "服装种草视频"}
+            >
               <p className="text-[11px] text-[#6e6e73]">{displaySkillLabel} · 素材策划与成片</p>
-            </div>
+            </EcomWorkspaceTitleHeading>
             <EcomIconToolbar>
               <EcomIconToolbarGroup label="项目">
                 {onNewProject ? (

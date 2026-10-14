@@ -13,6 +13,7 @@ import {
 } from "@/components/media/ecom-media-library-tile";
 import { EcomMediaSkeletonGrid } from "@/components/media/ecom-media-skeleton";
 import { EcomIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import {
   deleteWorkflowDraft,
@@ -159,15 +160,16 @@ export default function WorkflowDraftsPage() {
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <header className="shrink-0 border-b border-[#e8e8ed] bg-white px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-wide text-[#86868b]">
-                我的工作流
-              </p>
-              <h1 className="text-lg font-semibold text-[#1d1d1f]">暂存</h1>
+            <EcomWorkspaceTitleHeading
+              heading="h1"
+              eyebrow="我的工作流"
+              titleClassName="text-lg font-semibold text-[#1d1d1f]"
+              title="暂存"
+            >
               <p className="mt-1 text-xs text-[#6e6e73]">
                 各功能进行中的项目自动出现在此，可随时继续编辑或新建。
               </p>
-            </div>
+            </EcomWorkspaceTitleHeading>
             <div className="relative">
               <EcomIconToolbar>
                 <EcomIconToolbarGroup label="新建">

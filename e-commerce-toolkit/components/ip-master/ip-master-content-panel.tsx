@@ -14,6 +14,7 @@ import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { EcomButtonPrimary } from "@/components/ui/ecom-button";
 import { EcomIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import {
   IpMasterHelpHover,
@@ -196,15 +197,12 @@ export function IpMasterContentPanel({
     <div className="flex h-full min-h-0 flex-col">
       <header className="shrink-0 border-b border-[#e8e8ed] px-5 py-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-[#1d1d1f]">
-              {project.title?.trim() || "IP 母版"}
-            </h2>
+          <EcomWorkspaceTitleHeading guideModuleId="ip" title={project.title?.trim() || "IP 母版"}>
             <p className="text-[11px] text-[#6e6e73]">
               母版库 = 基准图 + 结构化模板 · 手办 / 品牌 VI 可选导入
               {activeVersion ? ` · 当前 ${activeVersion}` : ""}
             </p>
-          </div>
+          </EcomWorkspaceTitleHeading>
           <EcomIconToolbar>
             <EcomIconToolbarGroup label="项目">
               <EcomIconButton label="新建项目" icon={Plus} onClick={onNewProject} />

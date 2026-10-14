@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { EcomIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 import type { ImageLayerCanvasToolMode } from "@/lib/image-layer-tool-mode";
@@ -103,14 +104,17 @@ export function ImageLayerToolbar({
   return (
     <header className="z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <h2 className="truncate text-sm font-semibold text-[#1d1d1f]">
-            {projectTitle?.trim() || "图片处理"}
-          </h2>
+        <EcomWorkspaceTitleHeading
+          guideModuleId="image-layer"
+          className="min-w-0 flex-1"
+          title={
+            <span className="truncate">{projectTitle?.trim() || "图片处理"}</span>
+          }
+        >
           <p className="text-[11px] text-[#6e6e73]">
             背景与主体 / 擦除 / 重绘 / 拆层
           </p>
-        </div>
+        </EcomWorkspaceTitleHeading>
         <EcomIconToolbar className={cn(anyBusy && "pointer-events-none opacity-70")}>
           <EcomIconToolbarGroup label="新建">
             {onNewProject ? (

@@ -20,6 +20,7 @@ import {
   useEcomTemplateImport,
 } from "@/components/template-gallery/ecom-template-import-provider";
 import { EcomIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { cn } from "@/lib/utils";
 import { useEcomScrollPagination } from "@/lib/use-ecom-scroll-pagination";
@@ -369,12 +370,15 @@ function TemplateGalleryPageInner() {
           <div className="shrink-0 border-b border-[#e8e8ed] px-4 py-4 sm:px-6">
             <div className="space-y-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h1 className="text-lg font-semibold text-[#1d1d1f]">模板区</h1>
+                <EcomWorkspaceTitleHeading
+                  heading="h1"
+                  titleClassName="text-lg font-semibold text-[#1d1d1f]"
+                  title="模板区"
+                >
                   <p className="mt-1 text-xs text-[#6e6e73]">
                     案例库模板参考，按品类浏览；更多品类数据持续补充中。
                   </p>
-                </div>
+                </EcomWorkspaceTitleHeading>
                 {canImport ? (
                   <EcomIconToolbar>
                     <EcomIconToolbarGroup label="管理">

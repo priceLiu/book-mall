@@ -18,6 +18,7 @@ import { SeedVideoRenderProgressPanel } from "@/components/seed-video/seed-video
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { EcomIconButton } from "@/components/ui/ecom-icon-button";
 import { EcomGlobalAssetLibraryToolbarButton } from "@/components/global-asset-library/ecom-global-asset-library-toolbar-button";
+import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
@@ -321,12 +322,11 @@ export function OutfitVideoWorkspace({
   const workspaceHeader = (
     <header className="z-20 shrink-0 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-semibold text-[#1d1d1f]">穿搭动作迁移</h2>
+        <EcomWorkspaceTitleHeading title="穿搭动作迁移">
           <p className="text-[11px] text-[#6e6e73]">
             上传参考视频，拆镜后锁定穿搭参考，逐镜动作迁移并合成竖屏成片。
           </p>
-        </div>
+        </EcomWorkspaceTitleHeading>
         <EcomIconToolbar>
           <EcomIconToolbarGroup label="项目">
             <EcomIconButton

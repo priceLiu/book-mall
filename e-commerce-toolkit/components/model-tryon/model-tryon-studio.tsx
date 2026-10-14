@@ -7,6 +7,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { EcomIconButton } from "@/components/ui/ecom-icon-button";
 import { EcomGlobalAssetLibraryToolbarButton } from "@/components/global-asset-library/ecom-global-asset-library-toolbar-button";
+import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import type { VtonBatchTryonMode } from "@/components/vton/vton-results-grid";
@@ -706,14 +707,17 @@ export function ModelTryonStudio() {
     <EcomWorkspaceLayout fullWidth contentClassName="overflow-y-auto">
       <div className="flex min-h-full w-full flex-col gap-4 p-4 md:p-5 lg:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-lg font-semibold text-[#1d1d1f]">模特试衣</h1>
+          <EcomWorkspaceTitleHeading
+            heading="h1"
+            titleClassName="text-lg font-semibold text-[#1d1d1f]"
+            title="模特试衣"
+          >
             <p className="text-xs text-[#6e6e73]">
               {isTextToTryon
                 ? "文生试衣：参考图 + Prompt 引用，图片编辑模型生成时尚试衣大片。"
                 : "服装池 + 最多 9 套搭配批量试衣，锁定后可保存到资产库。"}
             </p>
-          </div>
+          </EcomWorkspaceTitleHeading>
           <EcomIconToolbar>
             <EcomIconToolbarGroup label="项目">
               <EcomIconButton

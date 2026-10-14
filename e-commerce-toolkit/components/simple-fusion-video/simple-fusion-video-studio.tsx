@@ -11,6 +11,7 @@ import { BackgroundGenerationProvider } from "@/components/generation";
 import { EcomGlobalAssetLibraryToolbarButton } from "@/components/global-asset-library/ecom-global-asset-library-toolbar-button";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
+import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { ProductDesignPromptMentionTextarea } from "@/components/product-design/product-design-prompt-mention-textarea";
 import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
 
@@ -800,11 +801,13 @@ function SimpleFusionVideoStudioInner({
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
         <header className="z-20 shrink-0 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold text-[#1d1d1f]">{copy.title}</h2>
+            <EcomWorkspaceTitleHeading
+              guideModuleId={moduleId}
+              title={copy.title}
+            >
               <p className="text-[11px] text-[#6e6e73]">{copy.subtitle}</p>
-            </div>
-            <EcomIconToolbar guideModuleId={moduleId}>
+            </EcomWorkspaceTitleHeading>
+            <EcomIconToolbar>
               <EcomIconToolbarGroup label="项目">
                 <EcomIconButton label="新建项目" icon={Plus} disabled={busy} onClick={() => void handleNewProject()} />
                 <EcomProjectListButton

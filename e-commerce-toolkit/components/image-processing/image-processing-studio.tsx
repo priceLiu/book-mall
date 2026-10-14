@@ -39,6 +39,7 @@ import {
 } from "@/components/image-processing/image-mask-canvas";
 import { EcomWorkspaceResultFrame } from "@/components/media/ecom-workspace-result-frame";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
+import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import {
   ECOM_WORKSPACE_RESULT_GRID_CLASS,
   ecomWorkspaceResultShellClass,
@@ -787,9 +788,14 @@ export function ImageProcessingStudio() {
             </div>
           ) : null}
 
-          <h1 className="mt-6 text-2xl font-bold tracking-tight text-[#1d1d1f] sm:mt-8 sm:text-3xl">
-            {imageProcessingPageTitle(activeTag)}
-          </h1>
+          <div className="mt-6 sm:mt-8">
+            <EcomWorkspaceTitleHeading
+              heading="h1"
+              guideModuleId="image-layer"
+              title={imageProcessingPageTitle(activeTag)}
+              titleClassName="text-2xl font-bold tracking-tight sm:text-3xl"
+            />
+          </div>
 
           {panel === "placeholder" ? (
             <div className="mt-6 rounded-2xl border border-dashed border-[#d2d2d7] bg-white p-8 text-center sm:mt-8 sm:p-12">

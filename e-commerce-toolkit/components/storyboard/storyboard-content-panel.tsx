@@ -23,6 +23,7 @@ import {
 } from "@/components/media";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { EcomIconButton, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { StoryboardDeliverableReviewDialog } from "@/components/storyboard/storyboard-deliverable-review-dialog";
 import { StoryboardDeliverableSection } from "@/components/storyboard/storyboard-deliverable-section";
@@ -2790,10 +2791,10 @@ export function StoryboardContentPanel({
       <div className="ecom-scrollbar-overlay h-full min-h-0 w-full overflow-x-hidden overflow-y-auto overscroll-y-contain [overflow-anchor:none]">
         <header className="sticky top-0 z-30 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold text-[#1d1d1f]">
-                {resolveStoryboardPageTitle(project)}
-              </h2>
+            <EcomWorkspaceTitleHeading
+              guideModuleId="storyboard-micro-drama"
+              title={resolveStoryboardPageTitle(project)}
+            >
               <p className="text-[11px] text-[#6e6e73]">
                 带货短视频分镜 · {durationSec}秒 · {aspectRatio}
                 {project.sheet?.panels.length
@@ -2801,7 +2802,7 @@ export function StoryboardContentPanel({
                   : ""}
                 {" · 成图自动入库「我的资产 · 电商口播故事版」"}
               </p>
-            </div>
+            </EcomWorkspaceTitleHeading>
             <EcomIconToolbar>
               <EcomIconToolbarGroup label="项目">
                 {onNewProject ? (

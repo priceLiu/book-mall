@@ -23,6 +23,7 @@ import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { useEcomIpWorkflowStepImageGen } from "@/lib/use-ecom-ip-workflow-step-image-gen";
 import { EcomIconButton, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import {
   downloadBrandViExportZip,
@@ -351,16 +352,16 @@ export function BrandViContentPanel({
       >
         <header className="sticky top-0 z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold text-[#1d1d1f]">
-                {project.title?.trim() || "品牌VI表情包SOP"}
-              </h2>
+            <EcomWorkspaceTitleHeading
+              guideModuleId="vi"
+              title={project.title?.trim() || "品牌VI表情包SOP"}
+            >
               <p className="text-[11px] text-[#6e6e73]">
                 参考图转潮玩盲盒 IP 全案 · 8 步 · 已出 {progress}/{totalSlots} 张
                 {project.meta?.workflow?.heroLockedUrl ? " · 主形象已定稿" : ""}
                 {" · 成图自动入库「我的资产 · 品牌VI表情包SOP」"}
               </p>
-            </div>
+            </EcomWorkspaceTitleHeading>
             <EcomIconToolbar>
               <EcomIconToolbarGroup label="项目">
                 {onNewProject ? (

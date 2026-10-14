@@ -23,6 +23,7 @@ import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-st
 import { useEcomIpWorkflowStepImageGen } from "@/lib/use-ecom-ip-workflow-step-image-gen";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import {
   downloadHandCraftExportZip,
@@ -339,16 +340,16 @@ export function HandCraftContentPanel({
       >
         <header className="sticky top-0 z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold text-[#1d1d1f]">
-                {project.title?.trim() || "手办盲盒 SOP"}
-              </h2>
+            <EcomWorkspaceTitleHeading
+              guideModuleId="hand-craft"
+              title={project.title?.trim() || "手办盲盒 SOP"}
+            >
               <p className="text-[11px] text-[#6e6e73]">
                 线稿转潮玩盲盒 IP 全案 · 10 步 · 已出 {progress}/{totalSlots} 张
                 {project.meta?.workflow?.heroLockedUrl ? " · 主形象已定稿" : ""}
                 {" · 成图自动入库「我的资产 · 手办盲盒 SOP」"}
               </p>
-            </div>
+            </EcomWorkspaceTitleHeading>
             <EcomIconToolbar>
               <EcomIconToolbarGroup label="项目">
                 {onNewProject ? (

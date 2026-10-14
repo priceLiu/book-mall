@@ -35,7 +35,7 @@ export function EcomFeishuGuideToolbarChip({ moduleId, className }: GuideChipPro
   );
 }
 
-/** @deprecated 全局单独一行顶栏已移除；请用 EcomIconToolbar 或 EcomFeishuGuideToolbarChip */
+/** @deprecated 全局单独一行顶栏已移除；请用 EcomWorkspaceTitleHeading */
 export function EcomWorkspaceGuideBar() {
   return null;
 }

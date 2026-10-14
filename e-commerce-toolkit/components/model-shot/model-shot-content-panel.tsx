@@ -27,6 +27,7 @@ import {
 } from "@/components/media";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { EcomIconButton, EcomIconButtonLink, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { EcomDialogCloseButton } from "@/components/ui/dialog";
 import {
@@ -785,12 +786,9 @@ export function ModelShotContentPanel({
       >
         <header className="sticky top-0 z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold text-[#1d1d1f]">
-                {project.title?.trim() || "服装模特图"}
-              </h2>
+            <EcomWorkspaceTitleHeading title={project.title?.trim() || "服装模特图"}>
               <p className="text-[11px] text-[#6e6e73]">阶段：{phase}</p>
-            </div>
+            </EcomWorkspaceTitleHeading>
             <EcomIconToolbar>
               <EcomIconToolbarGroup label="项目">
                 {onNewProject ? (

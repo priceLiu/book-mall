@@ -20,6 +20,7 @@ import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-mark
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { EcomIconButton, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -250,12 +251,11 @@ export function MediaDecomposeWorkspace({
     <>
       <header className="sticky top-0 z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-semibold text-[#1d1d1f]">拆图拆视频</h2>
+        <EcomWorkspaceTitleHeading guideModuleId="media-decompose" title="拆图拆视频">
           <p className="text-[11px] text-[#6e6e73]">
             上传图片或视频，反推分镜拆解或静态画面要素与生图 Prompt。
           </p>
-        </div>
+        </EcomWorkspaceTitleHeading>
         <EcomIconToolbar>
           <EcomIconToolbarGroup label="项目">
             {onNewProject ? (

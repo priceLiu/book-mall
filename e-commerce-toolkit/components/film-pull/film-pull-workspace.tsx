@@ -19,6 +19,7 @@ import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { EcomIconButton, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
 import { EcomGlobalAssetLibraryToolbarButton } from "@/components/global-asset-library/ecom-global-asset-library-toolbar-button";
+import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import {
@@ -313,10 +314,9 @@ export function FilmPullWorkspace({
     <>
       <header className="sticky top-0 z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-sm font-semibold text-[#1d1d1f]">专业拉片</h2>
+          <EcomWorkspaceTitleHeading guideModuleId="film-pull" title="专业拉片">
             <p className="text-[11px] text-[#6e6e73]">上传视频 → 拉片 → 一键复刻 → 制作成片</p>
-          </div>
+          </EcomWorkspaceTitleHeading>
           <EcomIconToolbar>
             <EcomIconToolbarGroup label="项目">
               {onNewProject ? (

@@ -20,6 +20,7 @@ import { EcomProjectListButton } from "@/components/layout/ecom-project-list-but
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomIconButton, EcomIconButtonLink } from "@/components/ui/ecom-icon-button";
+import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { formatDetailPageSuiteSellpointDraft } from "@/lib/ecom-sellpoint-five-part";
 import {
@@ -210,20 +211,30 @@ export function DetailPageSuiteWorkbenchChrome({
     });
   }, [isAplus, isHit, isReplica, isWorkbench, project.id, project.title]);
 
+  const guideModuleId = isHit
+    ? "detail-page-suite-hit"
+    : isAplus
+      ? "ai-detail-page"
+      : isReplica
+        ? "detail-page-suite-replica"
+        : "detail-page-suite";
+
   return (
     <header className="shrink-0 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-semibold text-[#1d1d1f]">
-            {project.title?.trim() ||
-              (isHit
-                ? "学竞品结构 · 原创详情"
-                : isAplus
-                  ? "A+ 详情模块出图"
-                  : isReplica
-                    ? "参考详情 → 标准套图"
-                    : "服装详情套图（模板）")}
-          </h2>
+        <EcomWorkspaceTitleHeading
+          guideModuleId={guideModuleId}
+          title={
+            project.title?.trim() ||
+            (isHit
+              ? "学竞品结构 · 原创详情"
+              : isAplus
+                ? "A+ 详情模块出图"
+                : isReplica
+                  ? "参考详情 → 标准套图"
+                  : "服装详情套图（模板）")
+          }
+        >
           <p className="text-[11px] text-[#6e6e73]">
             阶段：{isWorkbench ? "出图" : phaseLabel}
             {!isWorkbench && project.brief?.platform ? ` · ${project.brief.platform}` : ""}
@@ -248,7 +259,7 @@ export function DetailPageSuiteWorkbenchChrome({
             )}
             {imageModelLabel ? ` · 出图模型 ${imageModelLabel}` : ""}
           </p>
-        </div>
+        </EcomWorkspaceTitleHeading>
         <EcomIconToolbar>
           <EcomIconToolbarGroup label="项目">
             {onNewProject ? (
