@@ -71,8 +71,8 @@ describe("team-seat-margins — 团队每席 ppc", () => {
   const anchorCharge = 750;
 
   const TEAM_SEAT_SKUS = [
-    { tier: "标准版", priceYuan: 199, credits: 2490 },
-    { tier: "进阶版", priceYuan: 689, credits: 9570 },
+    { tier: "标准版", priceYuan: 289, credits: 3610 },
+    { tier: "进阶版", priceYuan: 769, credits: 10680 },
     { tier: "高级版", priceYuan: 1199, credits: 20670 },
     { tier: "至尊版", priceYuan: 1999, credits: 50000 },
   ];

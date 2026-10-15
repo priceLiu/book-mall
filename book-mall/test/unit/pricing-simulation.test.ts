@@ -18,8 +18,8 @@ const VIDEO_MODEL: ModelCostBasis = {
 };
 
 const TIERS: TierPricing[] = [
-  { tier: "标准版", priceYuan: 69, monthlyCredits: 860 },
-  { tier: "进阶版", priceYuan: 269, monthlyCredits: 3730 },
+  { tier: "标准版", priceYuan: 99, monthlyCredits: 1230 },
+  { tier: "进阶版", priceYuan: 299, monthlyCredits: 4150 },
   { tier: "高级版", priceYuan: 699, monthlyCredits: 12050 },
   { tier: "至尊版", priceYuan: 1199, monthlyCredits: 30000 },
 ];
@@ -33,7 +33,7 @@ describe("simulatePlanChange — 六维测算（M=1.0 贵视频）", () => {
 
   it("各档扣分（贴成本）", () => {
     const byTier = new Map(report.rows.map((r) => [r.tier, r.creditsPerGen]));
-    expect(byTier.get("标准版")).toBe(151.43);
+    expect(byTier.get("标准版")).toBe(150.95);
     expect(byTier.get("高级版")).toBe(209.45);
     expect(byTier.get("至尊版")).toBe(304);
   });
@@ -100,7 +100,7 @@ describe("reverseBreakEven — 模式 B（保本线核验）", () => {
   it("扣分过低 → 触发亏本（unsafe）", () => {
     const r = reverseBreakEven({
       model: VIDEO_MODEL,
-      tiers: [{ tier: "标准版", priceYuan: 69, monthlyCredits: 1000 }],
+      tiers: [{ tier: "标准版", priceYuan: 99, monthlyCredits: 1000 }],
       currentCreditsByTier: [{ tier: "标准版", creditsPerGen: 100 }],
     });
     expect(r.passed).toBe(false);

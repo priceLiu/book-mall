@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { getUserBillingPersona } from "@/lib/billing/billing-persona";
 import { prisma } from "@/lib/prisma";
 import { loadPricingConfig } from "@/lib/pricing/credit-pricing-engine";
+import { listPricingPageModels } from "@/lib/pricing/list-pricing-page-models";
 import { getWelcomeGiftConfig } from "@/lib/billing/welcome-gift";
 import { listUserTenantMemberships } from "@/lib/tenant/context";
 import { PricingPageClient } from "@/components/pricing/pricing-page-client";
@@ -22,7 +23,7 @@ export default async function PricingPage() {
   const session = await getServerSession(authOptions);
   const userId = session?.user?.id;
 
-  const [config, plansRaw, pricesRaw, teamTenants, welcomeGift, billingPersona] =
+  const [config, plansRaw, models, teamTenants, welcomeGift, billingPersona] =
     await Promise.all([
       loadPricingConfig(),
       prisma.membershipPlan.findMany({
@@ -30,10 +31,7 @@ export default async function PricingPage() {
         orderBy: [{ family: "asc" }, { interval: "asc" }, { sortOrder: "asc" }],
         include: { seatTiers: { orderBy: { sortOrder: "asc" } } },
       }),
-      prisma.modelCreditPrice.findMany({
-        where: { active: true },
-        orderBy: { creditsPerUnit: "asc" },
-      }),
+      listPricingPageModels(),
       userId
         ? listUserTenantMemberships(userId).then((ms) =>
             ms
@@ -69,12 +67,7 @@ export default async function PricingPage() {
             perSeatCredits: Number(t.perSeatCredits),
           })),
         }))}
-        models={pricesRaw.map((m) => ({
-          canonicalModelKey: m.canonicalModelKey,
-          displayName: m.displayName,
-          unit: m.unit,
-          creditsPerUnit: Number(m.creditsPerUnit),
-        }))}
+        models={models}
         teamTenants={teamTenants}
         welcomeGift={welcomeGift}
       />

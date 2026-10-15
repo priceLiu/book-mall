@@ -42,8 +42,8 @@ export function MarginProjectionView({ data }: { data: MarginProjectionPayload }
           ))}
         </ol>
         <p className="mt-3 text-sm text-[#656d76]">
-          举例：个人标准档实收 ¥69、860 积分，只打 Wan 3.0（15 秒）。一条挂牌成本 ¥9、扣 450 分，能打{" "}
-          <strong>1 条</strong>，厂商成本 ¥9，整月毛利 <strong>¥60</strong>（69 − 9）。
+          举例：个人标准档实收 ¥99、1230 积分，只打 Wan 3.0（15 秒）。一条挂牌成本 ¥9、扣 450 分，能打{" "}
+          <strong>2 条</strong>，厂商成本 ¥18，整月毛利 <strong>¥81</strong>（99 − 18）。
         </p>
       </section>
 

@@ -142,8 +142,8 @@ export interface CreditAcquisitionSku {
 
 /** App 个人月付订阅（现网 seed 月费；积分量可随调价变更） */
 export const SUBSCRIPTION_MONTH_SKUS: CreditAcquisitionSku[] = [
-  { id: "personal-标准", label: "标准版月付", channel: "SUBSCRIPTION", priceYuan: 69, credits: 860, tier: "标准版" },
-  { id: "personal-进阶", label: "进阶版月付", channel: "SUBSCRIPTION", priceYuan: 269, credits: 3730, tier: "进阶版" },
+  { id: "personal-标准", label: "标准版月付", channel: "SUBSCRIPTION", priceYuan: 99, credits: 1230, tier: "标准版" },
+  { id: "personal-进阶", label: "进阶版月付", channel: "SUBSCRIPTION", priceYuan: 299, credits: 4150, tier: "进阶版" },
   { id: "personal-高级", label: "高级版月付", channel: "SUBSCRIPTION", priceYuan: 699, credits: 12050, tier: "高级版" },
   { id: "personal-至尊", label: "至尊版月付", channel: "SUBSCRIPTION", priceYuan: 1199, credits: 30000, tier: "至尊版" },
 ];

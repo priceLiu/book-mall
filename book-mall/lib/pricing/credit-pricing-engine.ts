@@ -14,6 +14,7 @@ import {
   normalizeModelCreditTierRaw,
   pickActiveCostProfile,
 } from "./model-credit-price-store";
+import { composeModelCreditDisplayName } from "./model-credit-display-name";
 import {
   computeCreditPrice,
   computeNetCost,
@@ -116,6 +117,7 @@ export async function publishModelCreditPrice(input: {
     canonicalModelKey: input.canonicalModelKey,
     tierRaw,
   });
+  const displayName = composeModelCreditDisplayName(input.displayName, tierRaw);
 
   const netCostYuan = computeNetCost(toNum(chosen.listCostYuan), toNum(chosen.discountRate));
   const marginM =
@@ -154,7 +156,7 @@ export async function publishModelCreditPrice(input: {
       create: {
         canonicalModelKey: priceKey.canonicalModelKey,
         tierRaw: priceKey.tierRaw,
-        displayName: input.displayName,
+        displayName,
         vendor: chosen.vendor,
         unit: chosen.unit,
         netCostYuan: split.netCostYuan,
@@ -171,7 +173,7 @@ export async function publishModelCreditPrice(input: {
         publishedBy: input.publishedBy,
       },
       update: {
-        displayName: input.displayName,
+        displayName,
         vendor: chosen.vendor,
         unit: chosen.unit,
         tierRaw: priceKey.tierRaw,
@@ -217,7 +219,7 @@ export async function publishModelCreditPrice(input: {
     create: {
       canonicalModelKey: priceKey.canonicalModelKey,
       tierRaw: priceKey.tierRaw,
-      displayName: input.displayName,
+      displayName,
       vendor: chosen.vendor,
       unit: chosen.unit,
       netCostYuan: comp.netCostYuan,
@@ -230,7 +232,7 @@ export async function publishModelCreditPrice(input: {
       publishedBy: input.publishedBy,
     },
     update: {
-      displayName: input.displayName,
+      displayName,
       vendor: chosen.vendor,
       unit: chosen.unit,
       tierRaw: priceKey.tierRaw,

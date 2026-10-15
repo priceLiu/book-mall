@@ -93,34 +93,34 @@ describe("margin-projection — 折扣为 0 的种子口径", () => {
     expect(hh.clipCostYuan).toBeCloseTo(13.5, 6);
   });
 
-  it("个人标准档：68 张 / 1 条 Wan / 1 条 HH，毛利均有数", () => {
+  it("个人标准档：98 张 / 2 条 Wan / 1 条 HH，毛利均有数", () => {
     const row = personal.rows.find((r) => r.tier === "标准版")!;
     const img = row.cells[modelIndex["gpt-image-2"]!]!;
     const wan = row.cells[modelIndex["wan3.0-video"]!]!;
     const hh = row.cells[modelIndex["happyhorse-1.1"]!]!;
-    expect(row.creditsPool).toBe(860);
-    expect(personal.rows.find((r) => r.tier === "进阶版")!.creditsPool).toBe(3730);
-    expect(personal.rows.find((r) => r.tier === "进阶版")!.priceYuan).toBe(269);
+    expect(row.creditsPool).toBe(1230);
+    expect(personal.rows.find((r) => r.tier === "进阶版")!.creditsPool).toBe(4150);
+    expect(personal.rows.find((r) => r.tier === "进阶版")!.priceYuan).toBe(299);
     expect(personal.rows.find((r) => r.tier === "高级版")!.creditsPool).toBe(12050);
     expect(personal.rows.find((r) => r.tier === "高级版")!.priceYuan).toBe(699);
-    expect(img.generations).toBe(68);
-    expect(img.vendorCostYuan).toBeCloseTo(17, 2);
-    expect(img.monthProfitYuan).toBeCloseTo(52, 2);
-    expect(wan.generations).toBe(1);
-    expect(wan.vendorCostYuan).toBeCloseTo(9, 2);
-    expect(wan.monthProfitYuan).toBeCloseTo(60, 2);
+    expect(img.generations).toBe(98);
+    expect(img.vendorCostYuan).toBeCloseTo(24.5, 2);
+    expect(img.monthProfitYuan).toBeCloseTo(74.5, 2);
+    expect(wan.generations).toBe(2);
+    expect(wan.vendorCostYuan).toBeCloseTo(18, 2);
+    expect(wan.monthProfitYuan).toBeCloseTo(81, 2);
     expect(hh.generations).toBe(1);
     expect(hh.vendorCostYuan).toBeCloseTo(13.5, 2);
-    expect(hh.monthProfitYuan).toBeCloseTo(55.5, 2);
+    expect(hh.monthProfitYuan).toBeCloseTo(85.5, 2);
   });
 
-  it("团队 3 席标准档：597 张 / 16 条 Wan / 11 条 HH", () => {
+  it("团队 3 席标准档：866 张 / 24 条 Wan / 16 条 HH", () => {
     expect(team.seats).toBe(3);
     const row = team.rows.find((r) => r.tier === "标准版")!;
-    expect(row.creditsPool).toBe(7470);
-    expect(row.cells[modelIndex["gpt-image-2"]!]!.generations).toBe(597);
-    expect(row.cells[modelIndex["wan3.0-video"]!]!.generations).toBe(16);
-    expect(row.cells[modelIndex["happyhorse-1.1"]!]!.generations).toBe(11);
+    expect(row.creditsPool).toBe(10830);
+    expect(row.cells[modelIndex["gpt-image-2"]!]!.generations).toBe(866);
+    expect(row.cells[modelIndex["wan3.0-video"]!]!.generations).toBe(24);
+    expect(row.cells[modelIndex["happyhorse-1.1"]!]!.generations).toBe(16);
   });
 
   it("包含读表说明、月/年与积分包维度", () => {
@@ -131,7 +131,7 @@ describe("margin-projection — 折扣为 0 的种子口径", () => {
     expect(team.rows).toHaveLength(4);
     const year = projection.dimensions.find((d) => d.id === "personal-year")!;
     expect(year.rows).toHaveLength(4);
-    expect(year.rows.find((r) => r.tier === "进阶版")!.creditsPool).toBe(44760);
+    expect(year.rows.find((r) => r.tier === "进阶版")!.creditsPool).toBe(49800);
     const packs = projection.dimensions.find((d) => d.id === "credit-topup")!;
     expect(packs.rows.map((r) => r.creditsPool)).toEqual([1000, 2500, 6000]);
     expect(packs.rows[0]!.priceYuan).toBe(80);
