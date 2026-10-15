@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download } from "lucide-react";
+import { Copy, Download, Eye, Play } from "lucide-react";
 
 import type { QrCategory, QrTemplate } from "@/lib/qr-template-types";
 import { QR_CATEGORIES, getKindDef } from "@/lib/qr-template-types";
@@ -13,6 +13,8 @@ import {
   isAudioMediaUrl,
   isImageMediaUrl,
   isVideoMediaUrl,
+  resolveQrTemplateFullOutputImageUrl,
+  resolveQrTemplateFullOutputVideoUrl,
   resolveQrTemplatePreviewMedia,
 } from "@/lib/qr-template-preview-media";
 import { useIntersectionVisible } from "@/lib/use-intersection-visible";
@@ -22,6 +24,9 @@ import {
 } from "@/components/quick-replica/qr-panel-skeletons";
 import { HorizontalOscilloscopeWaveform } from "@/components/quick-replica/qr-audio-generate-preview";
 import { downloadQrTemplateOutput } from "@/lib/qr-download-output";
+import { QrFrostIconButton } from "@/components/quick-replica/qr-frost-icon-button";
+import { QrFullscreenImagePreview } from "@/components/quick-replica/qr-fullscreen-image-preview";
+import { QrFullscreenVideoPreview } from "@/components/quick-replica/qr-fullscreen-video-preview";
 
 export function useMasonryColumnCount(): number {
   const [count, setCount] = useState(2);
@@ -60,14 +65,12 @@ function resolveGalleryThumbnailUrl(thumbnailUrl: string | undefined): string | 
 }
 
 function resolveGalleryPreviewVideoUrl(template: QrTemplate): string | null {
-  const media = resolveQrTemplatePreviewMedia({
+  return resolveQrTemplateFullOutputVideoUrl({
+    id: template.id,
+    output: template.output,
     thumbnailUrl: template.thumbnailUrl,
-    mediaType: template.output?.mediaType,
-    outputUrl: template.output?.url,
-    referenceVideoUrl: template.reference?.slots?.referenceVideo?.url,
-    preferVideo: true,
+    reference: template.reference,
   });
-  return media?.kind === "video" ? media.url : null;
 }
 
 /** 封面优先 thumbnail；若为过期临时 mp4 / 空，回退参考图槽位 */
@@ -156,38 +159,43 @@ function TemplateDownloadButton({
   if (!url) return null;
 
   return (
-    <button
-      type="button"
+    <QrFrostIconButton
+      size="sm"
       aria-label="下载"
-      className={`flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 bg-[#0a0f18]/90 text-white/85 shadow-md transition hover:bg-[#121826] hover:text-white ${className}`}
+      className={className}
       onClick={(e) => {
         e.stopPropagation();
         e.preventDefault();
         void downloadQrTemplateOutput(template);
       }}
     >
-      <Download className="h-4 w-4" />
-    </button>
+      <Download strokeWidth={1.75} />
+    </QrFrostIconButton>
   );
 }
 
 export function MasonryTemplateCard({
   template,
   onSelect,
+  onRecreate,
   allowDownload = false,
   hideRecreateOnHover = false,
   naturalAspect = false,
 }: {
   template: QrTemplate;
   onSelect: () => void;
+  /** 悬停「复现」：载入工作区 */
+  onRecreate?: () => void;
   allowDownload?: boolean;
-  /** 场景墙：点击整卡进入全屏预览，不显示悬停「重现」 */
+  /** 场景墙：点击整卡进入全屏预览，不显示悬停操作 */
   hideRecreateOnHover?: boolean;
   /** 保留原图宽高比（瀑布流），不裁切为统一 4:3 */
   naturalAspect?: boolean;
 }) {
   const { ref: visibilityRef, visible } = useIntersectionVisible<HTMLDivElement>();
   const [hovering, setHovering] = useState(false);
+  const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
+  const [videoPreviewOpen, setVideoPreviewOpen] = useState(false);
   const showTitle = template.title && !/^图像灵感 \d+$/.test(template.title);
   const previewVideoUrl = resolveGalleryPreviewVideoUrl(template);
   const imageThumbUrl = resolveTemplatePosterImageUrl(template);
@@ -268,6 +276,9 @@ export function MasonryTemplateCard({
   const showSkeleton = visible && !ready;
   const showThumbImg = Boolean(imageThumbUrl && posterMode === "thumbnail" && visible);
   const hideThumbForVideo = Boolean(previewVideoUrl && hovering);
+  const fullImagePreviewUrl = resolveQrTemplateFullOutputImageUrl(template);
+  const showHoverActions = !hideRecreateOnHover && Boolean(onRecreate);
+  const isVideoCard = Boolean(previewVideoUrl);
 
   return (
     <div className="group relative w-full">
@@ -365,20 +376,47 @@ export function MasonryTemplateCard({
           />
         ) : null}
 
-        {!hideRecreateOnHover ? (
+        {showHoverActions ? (
           <>
             <div
               className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-              style={{
-                background:
-                  "linear-gradient(to top, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0) 34%), rgba(0, 0, 0, 0.42)",
-              }}
+              style={{ background: "rgba(0, 0, 0, 0.42)" }}
             />
 
-            <div className="pointer-events-none absolute inset-0 z-[2] flex items-end justify-center px-[6px] py-3">
-              <span className="qr-masonry-recreate pointer-events-auto min-w-[72px] rounded-[8px] bg-[var(--qr-brand)] px-4 py-2 text-[12px] font-medium leading-4 tracking-[0.05px] text-white opacity-0 translate-y-1 transition-all duration-150 group-hover:opacity-100 group-hover:translate-y-0">
-                重现
-              </span>
+            <div className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center gap-3 px-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 sm:gap-3.5">
+              {isVideoCard && previewVideoUrl ? (
+                <QrFrostIconButton
+                  aria-label="播放"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setVideoPreviewOpen(true);
+                  }}
+                >
+                  <Play className="ml-0.5" strokeWidth={1.75} />
+                </QrFrostIconButton>
+              ) : fullImagePreviewUrl ? (
+                <QrFrostIconButton
+                  aria-label="预览"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setImagePreviewOpen(true);
+                  }}
+                >
+                  <Eye strokeWidth={1.75} />
+                </QrFrostIconButton>
+              ) : null}
+              <QrFrostIconButton
+                aria-label="复现"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onRecreate?.();
+                }}
+              >
+                <Copy strokeWidth={1.75} />
+              </QrFrostIconButton>
             </div>
           </>
         ) : null}
@@ -413,6 +451,21 @@ export function MasonryTemplateCard({
     </div>
     {allowDownload ? (
       <TemplateDownloadButton template={template} className="absolute bottom-2 right-2 z-20" />
+    ) : null}
+    {imagePreviewOpen && fullImagePreviewUrl ? (
+      <QrFullscreenImagePreview
+        src={fullImagePreviewUrl}
+        title={template.title}
+        onClose={() => setImagePreviewOpen(false)}
+      />
+    ) : null}
+    {videoPreviewOpen && previewVideoUrl ? (
+      <QrFullscreenVideoPreview
+        src={previewVideoUrl}
+        poster={imageThumbUrl}
+        title={template.title}
+        onClose={() => setVideoPreviewOpen(false)}
+      />
     ) : null}
   </div>
   );
@@ -584,6 +637,7 @@ type Props = {
   templates: QrTemplate[];
   loading: boolean;
   onSelectTemplate: (template: QrTemplate) => void;
+  onRecreateTemplate?: (template: QrTemplate) => void;
   allowDownload?: boolean;
 };
 
@@ -593,6 +647,7 @@ export function QrTemplateGallery({
   templates,
   loading,
   onSelectTemplate,
+  onRecreateTemplate,
   allowDownload = false,
 }: Props) {
   const columnCount = useMasonryColumnCount();
@@ -652,6 +707,11 @@ export function QrTemplateGallery({
                         <MasonryTemplateCard
                           template={t}
                           onSelect={() => onSelectTemplate(t)}
+                          onRecreate={
+                            onRecreateTemplate && category !== "world"
+                              ? () => onRecreateTemplate(t)
+                              : undefined
+                          }
                           allowDownload={allowDownload}
                           naturalAspect={category === "world"}
                           hideRecreateOnHover={category === "world"}

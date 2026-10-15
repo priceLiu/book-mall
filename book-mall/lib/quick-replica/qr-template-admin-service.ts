@@ -12,6 +12,7 @@ import {
   buildAdminReference,
   type AdminTemplateFormInput,
 } from "@/lib/quick-replica/qr-admin-template-form";
+import { mergeBuiltinWithOverride } from "@/lib/quick-replica/qr-builtin-catalog-merge";
 import type { QrCategory, QrTemplateJson } from "@/lib/quick-replica/qr-types";
 import { rowToJson } from "@/lib/quick-replica/qr-template-service";
 
@@ -43,18 +44,6 @@ function inferMediaType(
   const thumb = t.thumbnailUrl.toLowerCase();
   if (/\.(mp4|webm|mov)(\?|$)/.test(thumb)) return "video";
   return "image";
-}
-
-function mergeBuiltinWithOverride(
-  builtin: QrTemplateJson,
-  override: QrTemplateJson,
-): QrTemplateJson {
-  return {
-    ...override,
-    id: builtin.id,
-    source: "builtin",
-    visibility: "public",
-  };
 }
 
 export async function loadCatalogOverrideMap(): Promise<Map<string, QrTemplateJson>> {

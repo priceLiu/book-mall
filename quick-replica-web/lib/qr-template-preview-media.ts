@@ -10,6 +10,18 @@ export function isAudioMediaUrl(url: string): boolean {
   return /\.(mp3|wav|m4a|aac|ogg|flac)(\?|$)/i.test(url.trim());
 }
 
+const QR_BUILTIN_OSS_BASE =
+  "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin";
+
+/** 内置视频库 id → 成片 mp4（output 被覆盖或快照缺失时回退） */
+export function resolveQrBuiltinVideoGalleryUrlFromId(id: string | undefined): string | null {
+  const trimmed = id?.trim() ?? "";
+  const match = /^qr-video-gallery-(\d+)$/i.exec(trimmed);
+  if (!match) return null;
+  const pad = match[1].padStart(2, "0");
+  return `${QR_BUILTIN_OSS_BASE}/qr-video-gallery-${pad}-video.mp4`;
+}
+
 export type QrPreviewMedia = {
   url: string;
   kind: "image" | "video" | "audio";
@@ -59,6 +71,57 @@ export function resolveQrTemplatePreviewMedia(input: {
       kind: input.mediaType === "video" && isVideoMediaUrl(thumb) ? "video" : "image",
     };
   }
+  return null;
+}
+
+/** 模板卡片 / 全屏预览：优先成片 output，避免只用缩略图封面 */
+export function resolveQrTemplateFullOutputImageUrl(input: {
+  output?: { mediaType?: "image" | "video" | "audio"; url?: string };
+  thumbnailUrl?: string;
+  reference?: {
+    slots?: {
+      sceneImages?: Array<{ url?: string }>;
+      targetImage?: { url?: string };
+      characterRefs?: Array<{ url?: string }>;
+    };
+  };
+}): string | undefined {
+  const outputUrl = input.output?.url?.trim() ?? "";
+  if (input.output?.mediaType === "image" && outputUrl) return outputUrl;
+  if (outputUrl && isImageMediaUrl(outputUrl)) return outputUrl;
+
+  const thumb = input.thumbnailUrl?.trim() ?? "";
+  if (thumb && isImageMediaUrl(thumb)) return thumb;
+
+  const slots = input.reference?.slots;
+  const scene = slots?.sceneImages?.find((s) => s.url?.trim() && isImageMediaUrl(s.url));
+  if (scene?.url?.trim()) return scene.url.trim();
+  const target = slots?.targetImage?.url?.trim();
+  if (target && isImageMediaUrl(target)) return target;
+  const character = slots?.characterRefs?.find((s) => s.url?.trim() && isImageMediaUrl(s.url));
+  if (character?.url?.trim()) return character.url.trim();
+  return undefined;
+}
+
+/** 全屏视频播放：优先 output 成片 */
+export function resolveQrTemplateFullOutputVideoUrl(input: {
+  id?: string;
+  output?: { mediaType?: "image" | "video" | "audio"; url?: string };
+  thumbnailUrl?: string;
+  reference?: { slots?: { referenceVideo?: { url?: string } } };
+}): string | null {
+  const outputUrl = input.output?.url?.trim() ?? "";
+  if (input.output?.mediaType === "video" && outputUrl) return outputUrl;
+  if (outputUrl && isVideoMediaUrl(outputUrl)) return outputUrl;
+
+  const refVideo = input.reference?.slots?.referenceVideo?.url?.trim() ?? "";
+  if (refVideo && isVideoMediaUrl(refVideo)) return refVideo;
+
+  const fromId = resolveQrBuiltinVideoGalleryUrlFromId(input.id);
+  if (fromId) return fromId;
+
+  const thumb = input.thumbnailUrl?.trim() ?? "";
+  if (thumb && isVideoMediaUrl(thumb)) return thumb;
   return null;
 }
 

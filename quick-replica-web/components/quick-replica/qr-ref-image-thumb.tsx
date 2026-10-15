@@ -3,6 +3,7 @@
 import { Download, Eye, X } from "lucide-react";
 import { useCallback, useState } from "react";
 
+import { QrFrostIconButton } from "@/components/quick-replica/qr-frost-icon-button";
 import { QrFullscreenImagePreview } from "@/components/quick-replica/qr-fullscreen-image-preview";
 import { downloadImageUrl } from "@/lib/qr-image-upload-paste";
 
@@ -66,26 +67,24 @@ export function QrRefImageThumb({
           </button>
         ) : null}
 
-        <div className="absolute inset-0 z-[2] flex items-center justify-center gap-2.5 overflow-hidden rounded-lg bg-black/55 opacity-0 transition-opacity group-hover:opacity-100">
-          <button
-            type="button"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white transition hover:bg-black/70"
+        <div className="absolute inset-0 z-[2] flex items-center justify-center gap-2 overflow-hidden rounded-lg bg-black/45 opacity-0 backdrop-blur-[2px] transition-opacity group-hover:opacity-100 sm:gap-2.5">
+          <QrFrostIconButton
+            size="sm"
             aria-label="预览放大"
             onClick={(event) => {
               event.stopPropagation();
               setLightboxOpen(true);
             }}
           >
-            <Eye className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white transition hover:bg-black/70"
+            <Eye strokeWidth={1.75} />
+          </QrFrostIconButton>
+          <QrFrostIconButton
+            size="sm"
             aria-label="下载图片"
             onClick={(event) => void handleDownload(event)}
           >
-            <Download className="h-4 w-4" />
-          </button>
+            <Download strokeWidth={1.75} />
+          </QrFrostIconButton>
         </div>
       </div>
 

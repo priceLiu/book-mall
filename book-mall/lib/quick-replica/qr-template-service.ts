@@ -8,21 +8,10 @@ import {
   listBuiltinQrTemplates,
 } from "@/lib/quick-replica/builtin-templates";
 import { ADMIN_TEMPLATE_PAGE_SIZE } from "@/lib/admin/admin-template-page";
+import { mergeBuiltinWithOverride } from "@/lib/quick-replica/qr-builtin-catalog-merge";
 import { filterTemplatesForGallery } from "@/lib/quick-replica/qr-template-catalog";
 import type { QrCategory, QrHomeFeedCategory, QrTemplateJson, QrTemplateListFilters } from "@/lib/quick-replica/qr-types";
 import { QR_HOME_FEED_CATEGORIES } from "@/lib/quick-replica/qr-types";
-
-function mergeBuiltinWithOverride(
-  builtin: QrTemplateJson,
-  override: QrTemplateJson,
-): QrTemplateJson {
-  return {
-    ...override,
-    id: builtin.id,
-    source: "builtin",
-    visibility: "public",
-  };
-}
 
 async function loadCatalogOverrideMap(): Promise<Map<string, QrTemplateJson>> {
   const rows = await prisma.qrTemplate.findMany({

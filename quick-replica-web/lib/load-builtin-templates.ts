@@ -9,16 +9,47 @@ import {
 
 let cached: QrTemplate[] | null = null;
 
+function readJsonTemplates(path: string): QrTemplate[] {
+  try {
+    const raw = readFileSync(path, "utf8");
+    const parsed = JSON.parse(raw) as QrTemplate | QrTemplate[];
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    return [];
+  }
+}
+
+function loadMonorepoGalleryTemplates(): QrTemplate[] {
+  const galleryDir = join(process.cwd(), "..", "book-mall", "content", "quick-replica");
+  const galleryFiles = [
+    "builtin-video-gallery.json",
+    "builtin-image-gallery.json",
+    "builtin-character-gallery.json",
+    "builtin-world-gallery.json",
+    "builtin-motion-sync-gallery.json",
+  ];
+  return galleryFiles.flatMap((file) => readJsonTemplates(join(galleryDir, file)));
+}
+
 function loadFromJsonFiles(): QrTemplate[] {
   const dir = join(process.cwd(), "content", "templates");
   try {
     const files = readdirSync(dir).filter((f) => f.endsWith(".json"));
-    if (files.length === 0) return BUILTIN_TEMPLATES;
-    return files.flatMap((file) => {
-      const raw = readFileSync(join(dir, file), "utf8");
-      const parsed = JSON.parse(raw) as QrTemplate | QrTemplate[];
-      return Array.isArray(parsed) ? parsed : [parsed];
-    });
+    const fromLocal =
+      files.length === 0
+        ? BUILTIN_TEMPLATES
+        : files.flatMap((file) => readJsonTemplates(join(dir, file)));
+    const fromGallery = loadMonorepoGalleryTemplates();
+    if (fromGallery.length === 0) return fromLocal;
+    const seen = new Set(fromLocal.map((t) => t.id));
+    const merged = [...fromLocal];
+    for (const t of fromGallery) {
+      if (!seen.has(t.id)) {
+        seen.add(t.id);
+        merged.push(t);
+      }
+    }
+    return merged;
   } catch {
     return BUILTIN_TEMPLATES;
   }

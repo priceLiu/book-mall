@@ -53,7 +53,7 @@ export default function QrWorkflowSharePage({
 
   return (
     <main className="mx-auto max-w-lg px-4 py-16">
-      <h1 className="text-xl font-semibold">工作流分享 · 快速复刻</h1>
+      <h1 className="text-xl font-semibold">工作流分享 · 一键复刻</h1>
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
       <p className="mt-2 text-sm text-gray-600">{title ?? "加载中…"}</p>
       {enabled ? (

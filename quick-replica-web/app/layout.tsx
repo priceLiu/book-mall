@@ -7,10 +7,10 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: {
-    default: "快速复刻",
+    default: "一键复刻",
     template: "%s · QuickReplica",
   },
-  description: "按示例快速复刻生成视频、图像与场景",
+  description: "按示例一键复刻生成视频、图像与场景",
 };
 
 /**

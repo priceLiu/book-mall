@@ -1,7 +1,8 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
+import { QrBrandMark } from "@/components/qr-brand-mark";
 import { PortalNav } from "@/components/portal-nav";
+import { QR_PRODUCT_NAME_ZH } from "@/lib/qr-product-name";
 import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 import { qrLoginHref, qrRegisterHref } from "@/lib/portal-auth-links";
 import { getMainSiteOrigin } from "@/lib/site-origin";
@@ -21,13 +22,10 @@ export function QrPortalTopBar({ authed = false }: Props) {
       style={{ background: "var(--qr-bg-page)" }}
     >
       <div className="flex h-12 items-center gap-2 px-3 md:h-14 md:gap-3 md:px-5">
-        <div className="flex w-[7.5rem] shrink-0 items-center gap-1.5 sm:w-40">
-          <Sparkles
-            className="h-4 w-4 shrink-0 sm:h-5 sm:w-5"
-            style={{ color: "var(--qr-brand)" }}
-          />
+        <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-2.5">
+          <QrBrandMark />
           <span className="truncate text-sm font-semibold text-[var(--qr-text-primary)]">
-            <span className="sm:hidden">快速复刻</span>
+            <span className="sm:hidden">{QR_PRODUCT_NAME_ZH}</span>
             <span className="hidden sm:inline">QuickReplica</span>
           </span>
         </div>

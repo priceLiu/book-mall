@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
 import { canShareQrTemplate } from "@/lib/qr-workflow-share-eligibility";
-import { Menu, Sparkles, Video, ImageIcon, Smile, Globe, Volume2, Home } from "lucide-react";
+import { Menu, Video, ImageIcon, Smile, Globe, Volume2, Home } from "lucide-react";
 
 import {
   QrGenerateDock,
@@ -57,7 +57,9 @@ import {
   type QrCreditsSettlementDetail,
 } from "@/lib/qr-credits-settlement-watch";
 import { fetchQrAudioCatalog } from "@/lib/qr-audio-catalog-client";
+import { QrBrandMark } from "@/components/qr-brand-mark";
 import { PortalNav } from "@/components/portal-nav";
+import { QR_PRODUCT_NAME_ZH } from "@/lib/qr-product-name";
 import { UnifiedAssetLibraryRoot } from "@/components/unified-asset-library-root";
 import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 import { getBookAccountUrl, getMainSiteOrigin } from "@/lib/site-origin";
@@ -72,7 +74,11 @@ import {
   pickKindsFromGallerySnapshot,
   pickTemplatesFromGallerySnapshot,
 } from "@/lib/qr-gallery-snapshot-client";
-import { isQrHomeCardCategory } from "@/components/qr-landing-home";
+import {
+  mergeQrAppRouteState,
+  type QrAppRouteState,
+  writeQrAppRouteToLocation,
+} from "@/lib/qr-app-url-state";
 
 type SessionInfo = {
   name?: string | null;
@@ -84,9 +90,30 @@ type MiddleMode = "browse" | "workspace" | "welcome";
 
 type Props = {
   session: SessionInfo | null;
+  initialRoute?: QrAppRouteState;
   canManageFeatured?: boolean;
   bookMallAdminUrl?: string | null;
 };
+
+function workspaceDraftFromRoute(boot: QrAppRouteState): QrWorkspaceDraft {
+  if (boot.navMode === "pinned-tool" && boot.pinnedToolKey && boot.selectedKind) {
+    return defaultWorkspaceDraft({
+      category: boot.category,
+      kind: boot.selectedKind,
+      toolKey: boot.pinnedToolKey,
+    });
+  }
+  if (boot.navMode === "category" && boot.category === "audio") {
+    return defaultWorkspaceDraft({
+      category: "audio",
+      kind: boot.selectedKind ?? "create-voiceover",
+    });
+  }
+  if (boot.navMode === "category" && boot.category === "world") {
+    return defaultWorkspaceDraft({ category: "world", kind: "create-world" });
+  }
+  return defaultWorkspaceDraft({ category: "video", kind: "text-to-video" });
+}
 
 const CATEGORY_ICONS: Record<QrCategory, typeof Video> = {
   video: Video,
@@ -98,14 +125,19 @@ const CATEGORY_ICONS: Record<QrCategory, typeof Video> = {
 
 export function QrAppClient({
   session,
+  initialRoute: initialRouteProp,
   canManageFeatured = false,
   bookMallAdminUrl = null,
 }: Props) {
-  const [navMode, setNavMode] = useState<QrNavMode>("home");
-  const [middleMode, setMiddleMode] = useState<MiddleMode>("welcome");
-  const [category, setCategory] = useState<QrCategory>("video");
-  const [selectedKind, setSelectedKind] = useState<string | null>(null);
-  const [pinnedToolKey, setPinnedToolKey] = useState<string | null>(null);
+  const initialRoute = useMemo(
+    () => mergeQrAppRouteState(initialRouteProp ?? null),
+    [initialRouteProp],
+  );
+  const [navMode, setNavMode] = useState<QrNavMode>(initialRoute.navMode);
+  const [middleMode, setMiddleMode] = useState<MiddleMode>(initialRoute.middleMode);
+  const [category, setCategory] = useState<QrCategory>(initialRoute.category);
+  const [selectedKind, setSelectedKind] = useState<string | null>(initialRoute.selectedKind);
+  const [pinnedToolKey, setPinnedToolKey] = useState<string | null>(initialRoute.pinnedToolKey);
   const [templates, setTemplates] = useState<QrTemplate[]>([]);
   const [kindItems, setKindItems] = useState<QrKindBrowseItem[]>([]);
   const [previewTemplate, setPreviewTemplate] = useState<QrTemplate | null>(null);
@@ -123,13 +155,13 @@ export function QrAppClient({
   const templatesCacheRef = useRef<Map<string, QrTemplate[]>>(new Map());
   const templatesCacheTsRef = useRef<Map<string, number>>(new Map());
   const kindsCacheTsRef = useRef<Map<QrCategory, number>>(new Map());
-  const [draft, setDraft] = useState<QrWorkspaceDraft>(
-    defaultWorkspaceDraft({ category: "video", kind: "text-to-video" }),
+  const [draft, setDraft] = useState<QrWorkspaceDraft>(() =>
+    workspaceDraftFromRoute(initialRoute),
   );
   const [audioRightTab, setAudioRightTab] = useState<QrAudioRightTab>("templates");
   const [worldOmniboxExpanded, setWorldOmniboxExpanded] = useState(false);
   const [voiceGalleryFocus, setVoiceGalleryFocus] = useState(false);
-  const [myWorksCategory, setMyWorksCategory] = useState<QrCategory>("audio");
+  const [myWorksCategory, setMyWorksCategory] = useState<QrCategory>(initialRoute.myWorksCategory);
   const [myWorksPreview, setMyWorksPreview] = useState<QrTemplate | null>(null);
   const [shareTemplate, setShareTemplate] = useState<QrTemplate | null>(null);
   const audioRightPanelRef = useRef<HTMLElement>(null);
@@ -599,23 +631,15 @@ export function QrAppClient({
   };
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("templateId")?.trim()) return;
-    const categoryParam = params.get("category")?.trim();
-    if (!categoryParam || !isQrHomeCardCategory(categoryParam)) return;
-
-    onCategory(categoryParam);
-    params.delete("category");
-    const qs = params.toString();
-    window.history.replaceState(
-      {},
-      "",
-      `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`,
-    );
-    // 仅处理 SSO 回跳 deep-link
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    writeQrAppRouteToLocation({
+      navMode,
+      middleMode,
+      category,
+      selectedKind,
+      pinnedToolKey,
+      myWorksCategory,
+    });
+  }, [navMode, middleMode, category, selectedKind, pinnedToolKey, myWorksCategory]);
 
   const onMyWorks = () => {
     setNavMode("my-works");
@@ -923,7 +947,7 @@ export function QrAppClient({
     if (middleMode === "welcome") {
       return (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center">
-          <Sparkles className="mb-3 h-8 w-8" style={{ color: "var(--qr-brand)" }} />
+          <QrBrandMark variant="hero" className="mb-3" />
           <p className="text-sm text-[var(--qr-text-secondary)]">
             选择左侧分类浏览模板，或点击置顶工具进入工作区
           </p>
@@ -1034,9 +1058,9 @@ export function QrAppClient({
             </button>
           ) : null}
           <div className="flex min-w-0 items-center gap-2">
-            <Sparkles className="h-5 w-5 shrink-0" style={{ color: "var(--qr-brand)" }} />
+            <QrBrandMark />
             <span className="truncate font-semibold">QuickReplica</span>
-            <span className="hidden text-xs qr-panel-muted sm:inline">快速复刻</span>
+            <span className="hidden text-xs qr-panel-muted sm:inline">{QR_PRODUCT_NAME_ZH}</span>
           </div>
         </div>
 
@@ -1171,6 +1195,7 @@ export function QrAppClient({
                   }
                   openPreviewTemplate(t);
                 }}
+                onRecreateTemplate={onCopyTemplate}
                 allowDownload={navMode === "my-works"}
               />
             )}

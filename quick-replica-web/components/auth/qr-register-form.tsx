@@ -1,7 +1,8 @@
 "use client";
 
 import { type FormEvent, useCallback, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { QrBrandMark } from "@/components/qr-brand-mark";
+import { QR_PRODUCT_NAME_ZH } from "@/lib/qr-product-name";
 
 function buildPortalSigninHref(
   bookOrigin: string,
@@ -115,14 +116,14 @@ export function QrRegisterForm({
 
   return (
     <div className="mx-auto flex w-full max-w-sm flex-col gap-5">
-      <div className="flex items-center gap-2">
-        <Sparkles className="h-6 w-6" style={{ color: "var(--qr-brand)" }} />
+      <div className="flex items-center gap-2.5">
+        <QrBrandMark />
         <span className="text-xl font-semibold">QuickReplica</span>
       </div>
       <div>
         <h1 className="text-2xl font-bold">创建账号</h1>
         <p className="mt-1 text-sm text-[var(--qr-text-secondary)]">
-          注册即可开始体验快速复刻
+          {`注册即可开始体验${QR_PRODUCT_NAME_ZH}`}
         </p>
       </div>
 

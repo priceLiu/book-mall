@@ -112,6 +112,105 @@ body {
     background: rgba(255, 255, 255, 0.12);
   }
 
+  /** 磨砂圆钮 · 图标随视口自适应（模板预览 / 参考图等） */
+  .qr-frost-icon-btn {
+    pointer-events: auto;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1 / 1;
+    width: clamp(2.875rem, 11vmin, 4rem);
+    height: clamp(2.875rem, 11vmin, 4rem);
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(10, 14, 22, 0.52);
+    color: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    transition:
+      transform 0.15s ease,
+      background-color 0.15s ease;
+  }
+
+  .qr-frost-icon-btn:hover:not(:disabled) {
+    background: rgba(10, 14, 22, 0.72);
+    transform: scale(1.04);
+  }
+
+  .qr-frost-icon-btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  .qr-frost-icon-btn--sm {
+    width: clamp(2.25rem, 9vmin, 2.875rem);
+    height: clamp(2.25rem, 9vmin, 2.875rem);
+  }
+
+  .qr-frost-icon-btn--lg {
+    width: clamp(3.375rem, 14vmin, 5.25rem);
+    height: clamp(3.375rem, 14vmin, 5.25rem);
+  }
+
+  .qr-frost-icon-btn__icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: clamp(1.125rem, 4.8vmin, 1.625rem);
+    height: clamp(1.125rem, 4.8vmin, 1.625rem);
+  }
+
+  .qr-frost-icon-btn--sm .qr-frost-icon-btn__icon {
+    width: clamp(0.9375rem, 4vmin, 1.25rem);
+    height: clamp(0.9375rem, 4vmin, 1.25rem);
+  }
+
+  .qr-frost-icon-btn--lg .qr-frost-icon-btn__icon {
+    width: clamp(1.375rem, 5.5vmin, 2rem);
+    height: clamp(1.375rem, 5.5vmin, 2rem);
+  }
+
+  .qr-frost-icon-btn__icon > svg {
+    width: 100%;
+    height: 100%;
+    flex-shrink: 0;
+  }
+
+  /** 品牌 Sparkles · 保持正圆、不拉伸 */
+  .qr-brand-mark {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1 / 1;
+    width: clamp(1.75rem, 5.5vmin, 2.375rem);
+    height: clamp(1.75rem, 5.5vmin, 2.375rem);
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(10, 14, 22, 0.48);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .qr-brand-mark__icon {
+    width: clamp(1rem, 3.6vmin, 1.35rem);
+    height: clamp(1rem, 3.6vmin, 1.35rem);
+    flex-shrink: 0;
+  }
+
+  .qr-brand-mark--hero {
+    width: clamp(2.375rem, 8vmin, 3.25rem);
+    height: clamp(2.375rem, 8vmin, 3.25rem);
+  }
+
+  .qr-brand-mark--hero .qr-brand-mark__icon {
+    width: clamp(1.25rem, 4.8vmin, 1.75rem);
+    height: clamp(1.25rem, 4.8vmin, 1.75rem);
+  }
+
   .qr-btn-pill {
     border-radius: var(--qr-radius-pill);
     padding: 6px 16px;

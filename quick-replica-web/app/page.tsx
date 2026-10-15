@@ -5,6 +5,11 @@ import { QrLanding } from "@/components/qr-landing";
 import { QrInactiveSessionRecover } from "@/components/qr-inactive-session-recover";
 import { fetchToolsSession } from "@/lib/tools-introspect";
 import { getMainSiteOrigin } from "@/lib/site-origin";
+import {
+  mergeQrAppRouteState,
+  parseQrAppRouteFromSearchParams,
+  readSearchParamsFromRecord,
+} from "@/lib/qr-app-url-state";
 
 export const dynamic = "force-dynamic";
 
@@ -24,9 +29,16 @@ async function fetchCanManageFeatured(token: string | undefined): Promise<boolea
   }
 }
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const token = cookies().get("tools_token")?.value?.trim() ?? "";
   const session = await fetchToolsSession(token || undefined);
+  const initialRoute = mergeQrAppRouteState(
+    parseQrAppRouteFromSearchParams(readSearchParamsFromRecord(searchParams)),
+  );
   if (session.active) {
     const intro = session.introspect;
     const canManageFeatured = await fetchCanManageFeatured(token);
@@ -37,6 +49,7 @@ export default async function HomePage() {
 
     return (
       <QrAppClient
+        initialRoute={initialRoute}
         canManageFeatured={canManageFeatured}
         bookMallAdminUrl={bookMallAdminUrl}
         session={

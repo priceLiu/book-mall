@@ -12,7 +12,7 @@ import type { QrTemplate } from "@/lib/qr-template-types";
 import { QrHomeHeroPanel } from "@/components/quick-replica/qr-home-hero-panel";
 
 function homeCategoryRedirectPath(category: QrHomeCardCategory): string {
-  return `/?category=${encodeURIComponent(category)}`;
+  return `/?view=category&category=${encodeURIComponent(category)}`;
 }
 
 type Props = {

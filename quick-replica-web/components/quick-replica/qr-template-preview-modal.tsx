@@ -7,7 +7,13 @@ import { QrModal } from "@/components/quick-replica/qr-modal";
 import { QrRefImageThumb } from "@/components/quick-replica/qr-ref-image-thumb";
 import { QrToast } from "@/components/quick-replica/qr-toast";
 import { getKindDef, templateToWorkspaceDraft, type QrTemplate } from "@/lib/qr-template-types";
-import { isAudioMediaUrl, isVideoMediaUrl, resolveTemplateSceneImageUrls } from "@/lib/qr-template-preview-media";
+import {
+  isAudioMediaUrl,
+  isVideoMediaUrl,
+  resolveQrTemplateFullOutputImageUrl,
+  resolveQrTemplateFullOutputVideoUrl,
+  resolveTemplateSceneImageUrls,
+} from "@/lib/qr-template-preview-media";
 import { QrAudioGenerateSuccess } from "@/components/quick-replica/qr-audio-generate-preview";
 
 type Props = {
@@ -46,11 +52,19 @@ function resolvePreviewMedia(template: QrTemplate): {
     !isAudio &&
     (template.output?.mediaType === "video" ||
       template.reference.model.role === "VIDEO");
-  const url =
-    outputUrl ||
-    (isVideo ? template.reference.slots.referenceVideo?.url : undefined) ||
-    template.thumbnailUrl;
-  return { url: url ?? "", isVideo: Boolean(isVideo && outputUrl) || isVideo, isAudio };
+  const imageUrl = resolveQrTemplateFullOutputImageUrl(template);
+  const videoUrl = resolveQrTemplateFullOutputVideoUrl({
+    id: template.id,
+    output: template.output,
+    thumbnailUrl: template.thumbnailUrl,
+    reference: template.reference,
+  });
+  const url = isAudio
+    ? outputUrl
+    : isVideo
+      ? videoUrl ?? outputUrl
+      : imageUrl ?? outputUrl ?? template.thumbnailUrl;
+  return { url: url ?? "", isVideo: Boolean(isVideo && (videoUrl || outputUrl)) || isVideo, isAudio };
 }
 
 export function QrTemplatePreviewModal({
