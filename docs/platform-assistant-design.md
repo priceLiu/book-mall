@@ -103,34 +103,16 @@ ALTER TABLE "PlatformDocChunk" ADD COLUMN IF NOT EXISTS "embedding" vector(1024)
 
 ---
 
-## 5. 知识白名单（草稿，供审阅增删）
+## 5. 知识白名单
 
-`book-mall/lib/platform-assistant/knowledge-allowlist.ts` 显式列出可对外文件 + 分类。
+**代码 SSOT**：`book-mall/lib/platform-assistant/knowledge-allowlist.ts`  
+**维护说明**：`book-mall/doc/product/platform-assistant-knowledge-sources.md`
 
-**纳入（intro / functional / operational）**
+2026-10-15 起按现行 **使用指南**（`docs/全站功能概述-20261004.md`、`docs/*-使用指南-20261004.md`、`docs/ecom/user-guides/*`）全面重组：强化 intro/operational/functional 分层，移除内部规划稿与重复旧画布 doc；权威应用清单仍为 `docs/platform-apps-catalog.md`。
 
-| 文件 | 分类 |
-|------|------|
-| `docs/platform-apps-catalog.md`（**权威应用清单**，回答「有哪些应用/某应用做什么」以此为准） | intro |
-| `book-mall/doc/product/00-overview.md` | intro |
-| `book-mall/doc/product/e-commerce-toolkit.md` | functional |
-| `book-mall/doc/product/quick-replica-platform.md` | functional |
-| `book-mall/doc/product/prompt-optimizer-platform.md` | functional |
-| `book-mall/doc/product/08-independent-tools-sso.md` | operational |
-| `book-mall/doc/product/04-user-center.md` | operational |
-| `book-mall/doc/product/06-flows.md` | operational |
-| `book-mall/doc/product/16-project-assets-unified-design.md` | functional |
-| `docs/canvas.md` / `docs/新画布.md` / `canvas-web/docs/canvas-portal-product-requirements.md` | functional |
-| `canvas-web/docs/story-editions-overview.md` / `canvas-web/docs/storyboard-video-1.0-requirements.md` | functional |
-| `docs/ecom.md` | functional |
-| `docs/director.md` | functional |
-| `docs/quick-replica.md` | functional |
-| `docs/一键发布平台.md` | functional |
-| `docs/自动剪辑.md` | functional |
+入库后脚本会 **删除不在白名单内的旧 `PlatformDocChunk.source`**，避免历史文档残留。
 
-> **知识覆盖**：初版只纳入少数文档且切块过少（如 `docs/canvas.md` 仅 1 块），叠加 ivfflat 近似召回，导致「AI 画布是做什么的」「平台有哪些应用」答不出。已新增 `docs/platform-apps-catalog.md`（对外可讲、只讲功能不含价格）作为强锚点，并补入画布/漫剧/发布/剪辑等功能文档，重建后共约 200+ 块。新增/修改文档后需 `pnpm --dir book-mall assistant:index` 重建。
-
-**严格排除（不入库）**：`book-mall/doc/plans/**`、`book-mall/doc/finance/**`、`02-users-billing-and-balance.md`、`03-metering-llm-and-tools.md`、`0516-finance-major-refactor.md`、`09-finance-refactor-and-tool-federation.md`、`11-ai-tryon-cost-template-v1.0.md`、`13-tool-service-fee-and-wallet.md`、`18-vip-package.md`、`19-credit-expiry.md`、`points-wallet-topup-spec.md`、`gen-hotcold-policy.md`、`百炼模型与kie壳的问题.md`、`docs/price/**`、`docs/全站架构图与配置表.md`（含端口/内部配置）、`docs/100人团队扩展方案.md`、`book-mall/doc/model-api.md`。
+**严格排除（不入库）**：`book-mall/doc/plans/**`、`book-mall/doc/finance/**`、定价/积分/成本细则、`docs/price/**`、`docs/全站架构图与配置表.md`（端口与内部配置）、`docs/dev.md`、未脱敏运维与 Prompt dump 等（完整列表见 `platform-assistant-knowledge-sources.md`）。
 
 ---
 

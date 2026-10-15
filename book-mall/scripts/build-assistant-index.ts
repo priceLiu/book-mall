@@ -13,6 +13,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   KNOWLEDGE_ALLOWLIST,
+  KNOWLEDGE_ALLOWLIST_PATHS,
   type KnowledgeSource,
 } from "@/lib/platform-assistant/knowledge-allowlist";
 import { platformEmbedTextsInProcess } from "@/lib/platform-assistant/platform-gateway";
@@ -202,6 +203,11 @@ async function main() {
     ok++;
   }
   console.log(`[assistant:index] 写入完成，${ok} 行。`);
+
+  const purged = await prisma.$executeRaw(
+    Prisma.sql`DELETE FROM "PlatformDocChunk" WHERE NOT ("source" = ANY(${KNOWLEDGE_ALLOWLIST_PATHS}::text[]))`,
+  );
+  console.log(`[assistant:index] 已清理非白名单来源的旧块（影响行数 ${String(purged)}）。`);
 }
 
 main()
