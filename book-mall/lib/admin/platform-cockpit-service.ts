@@ -32,7 +32,11 @@ import {
   listAssistantEmbedCandidates,
   listAssistantLlmCandidates,
 } from "@/lib/platform-assistant/platform-assistant-model-config-service";
-import { getTodayTrafficTotals } from "@/lib/site-traffic/queries";
+import {
+  getTodayRegisteredUserTraffic,
+  getTodayTrafficTotals,
+  type TodayRegisteredUserTrafficSnapshot,
+} from "@/lib/site-traffic/queries";
 import {
   buildCockpitFinanceKpis,
   type CockpitFinanceKpis,
@@ -132,6 +136,7 @@ export type PlatformCockpitSnapshot = {
     todayPageViews: number;
     todayProbeViews: number;
     todayUniqueIps: number;
+    todayRegistered: TodayRegisteredUserTrafficSnapshot;
   };
 };
 
@@ -170,8 +175,7 @@ async function fetchCockpitCountMetrics(now: Date) {
   const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const todayCreatedAt = { gte: dayStart, lt: dayEnd };
 
-  // 并行 count/aggregate，避免 $transaction 长时间占连接（PgBouncer 下更易 P2028）。
-  return Promise.all([
+  const batch1 = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { billingPersona: "PLATFORM_CREDIT" } }),
     prisma.user.count({ where: { billingPersona: "BYOK" } }),
@@ -187,6 +191,8 @@ async function fetchCockpitCountMetrics(now: Date) {
       _sum: { balanceCredits: true },
     }),
     prisma.creditAccount.count({ where: { monthlyGrantCredits: { gt: 0 } } }),
+  ] as const);
+  const batch2 = await Promise.all([
     prisma.creditLedger.aggregate({
       where: { type: { in: ["CONSUME", "SETTLE"] } },
       _sum: { credits: true },
@@ -209,6 +215,8 @@ async function fetchCockpitCountMetrics(now: Date) {
     prisma.gatewayRequestLog.count({
       where: { status: "SUCCEEDED", submittedAt: { gte: monthStart, lt: monthEnd } },
     }),
+  ] as const);
+  const batch3 = await Promise.all([
     prisma.canvasGenerationTask.count({
       where: {
         status: { in: ["QUEUED", "DISPATCHING", "PENDING", "SUBMITTED"] },
@@ -227,13 +235,19 @@ async function fetchCockpitCountMetrics(now: Date) {
     prisma.platformErrorLog.count({ where: { resolvedAt: null } }),
     prisma.platformErrorLog.count({ where: { createdAt: { gte: last24h } } }),
   ] as const);
+  return [...batch1, ...batch2, ...batch3] as const;
 }
 
 function buildMetricsSectionFromCounts(
   now: Date,
   counts: Awaited<ReturnType<typeof fetchCockpitCountMetrics>>,
   creditTrendLedgers: Array<{ createdAt: Date; credits: number }>,
-  trafficToday: { pageViews: number; probeViews: number; uniqueIps: number },
+  trafficToday: {
+    pageViews: number;
+    probeViews: number;
+    uniqueIps: number;
+    todayRegistered: TodayRegisteredUserTrafficSnapshot;
+  },
   commerce: CockpitCommerceMonthKpis,
   modelUsage: CockpitModelUsageSnapshot,
 ): PlatformCockpitMetricsSection {
@@ -335,6 +349,7 @@ function buildMetricsSectionFromCounts(
       todayPageViews: trafficToday.pageViews,
       todayProbeViews: trafficToday.probeViews,
       todayUniqueIps: trafficToday.uniqueIps,
+      todayRegistered: trafficToday.todayRegistered,
     },
   };
 }
@@ -383,24 +398,27 @@ export async function fetchPlatformCockpitMetricsSection(
   now: Date = new Date(),
 ): Promise<PlatformCockpitMetricsSection> {
   const trendSince = new Date(now.getTime() - CREDIT_TREND_DAYS * 24 * 60 * 60 * 1000);
-  const [counts, creditTrendLedgers, trafficToday, commerce, modelUsage] = await Promise.all([
-    fetchCockpitCountMetrics(now),
-    prisma.creditLedger.findMany({
+  const counts = await fetchCockpitCountMetrics(now);
+  const creditTrendLedgers = await prisma.creditLedger
+    .findMany({
       where: {
         type: { in: ["CONSUME", "SETTLE"] },
         createdAt: { gte: trendSince },
       },
       select: { createdAt: true, credits: true },
-    }).then((rows) => rows.map((r) => ({ createdAt: r.createdAt, credits: Number(r.credits) }))),
+    })
+    .then((rows) => rows.map((r) => ({ createdAt: r.createdAt, credits: Number(r.credits) })));
+  const [trafficTotals, todayRegistered] = await Promise.all([
     getTodayTrafficTotals(now),
-    buildCockpitCommerceMonthKpis({ now }),
-    buildCockpitModelUsageSnapshot({ now }),
+    getTodayRegisteredUserTraffic(now),
   ]);
+  const commerce = await buildCockpitCommerceMonthKpis({ now });
+  const modelUsage = await buildCockpitModelUsageSnapshot({ now });
   return buildMetricsSectionFromCounts(
     now,
     counts,
     creditTrendLedgers,
-    trafficToday,
+    { ...trafficTotals, todayRegistered },
     commerce,
     modelUsage,
   );

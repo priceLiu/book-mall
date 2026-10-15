@@ -2,7 +2,7 @@
 
 export { resolveBookMallOrigin } from "./book-mall-origin";
 export { fireTrafficHit, fireTrafficHitFromRequest } from "./fire-traffic-hit";
-export { shouldRecordTrafficHit } from "./should-record-traffic-hit";
+export { isTrafficPrefetchRequest, shouldRecordTrafficHit } from "./should-record-traffic-hit";
 export { isProbeTrafficPath, trafficHitKind } from "./classify-traffic-path";
 export type { TrafficHitKind } from "./classify-traffic-path";
 export { resolveToolsTokenUserId } from "./decode-tools-token-sub";

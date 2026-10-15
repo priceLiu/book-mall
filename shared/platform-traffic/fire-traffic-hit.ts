@@ -6,7 +6,7 @@
 import { resolveBookMallOrigin } from "./book-mall-origin";
 import { resolveToolsTokenUserId } from "./decode-tools-token-sub";
 import { pickTrafficIngestSecret } from "./traffic-ingest-secret";
-import { shouldRecordTrafficHit } from "./should-record-traffic-hit";
+import { isTrafficPrefetchRequest, shouldRecordTrafficHit } from "./should-record-traffic-hit";
 
 export type FireTrafficHitInput = {
   appKey: string;
@@ -81,6 +81,8 @@ export function fireTrafficHitFromRequest(
   },
   opts?: FireTrafficHitFromRequestOptions,
 ): void {
+  if (isTrafficPrefetchRequest(request.headers)) return;
+
   const xf = request.headers.get("x-forwarded-for");
   const real = request.headers.get("x-real-ip");
   const cookieJar = opts?.cookies ?? request.cookies;

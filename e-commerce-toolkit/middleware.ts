@@ -28,8 +28,6 @@ function getCanonicalOrigin(): string | null {
 }
 
 export function middleware(request: NextRequest) {
-  fireTrafficHitFromRequest("e-commerce", request);
-
   if (process.env.NODE_ENV === "production") {
     const canonicalOrigin = getCanonicalOrigin();
     if (canonicalOrigin) {
@@ -56,6 +54,7 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  fireTrafficHitFromRequest("e-commerce", request);
   return NextResponse.next();
 }
 

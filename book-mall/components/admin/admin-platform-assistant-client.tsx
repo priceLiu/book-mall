@@ -7,6 +7,8 @@ import type { AdminAssistantModelConfigPayload } from "@/app/api/admin/platform-
 import { AdminAssistantAiNewsPanel } from "@/components/admin/admin-assistant-ai-news-panel";
 import { AdminAssistantFeedbackPanel } from "@/components/admin/admin-assistant-feedback-panel";
 import { AdminAssistantModelConfigPanel } from "@/components/admin/admin-assistant-model-config-panel";
+import { AdminAssistantRunHistoryPanel } from "@/components/admin/admin-assistant-run-history-panel";
+import type { PlatformAssistantRunHistoryItem } from "@/lib/platform-assistant/run-history-service";
 import type { AssistantFeedbackListItem } from "@/lib/platform-assistant/feedback-service";
 import type { PlatformAssistantQaEntryView } from "@/lib/platform-assistant/qa-service";
 
@@ -19,7 +21,7 @@ const MATCH_MODE_LABEL = {
   KEYWORDS: "关键词匹配",
 } as const;
 
-type TabId = "qa" | "feedback" | "settings";
+type TabId = "qa" | "feedback" | "runs" | "settings";
 
 type QaDraft = {
   question: string;
@@ -398,6 +400,9 @@ export function AdminPlatformAssistantClient({
   feedbackSummary,
   modelConfig,
   aiNewsRows,
+  runHistoryItems,
+  runHistoryNextCursorId,
+  runHistorySummary,
 }: {
   qaItems: PlatformAssistantQaEntryView[];
   qaSummary: { total: number; enabled: number };
@@ -410,6 +415,13 @@ export function AdminPlatformAssistantClient({
   };
   modelConfig: AdminAssistantModelConfigPayload;
   aiNewsRows: Awaited<ReturnType<typeof import("@/lib/platform-assistant/ai-news-service").listRecentAiNewsDaily>>;
+  runHistoryItems: PlatformAssistantRunHistoryItem[];
+  runHistoryNextCursorId: string | null;
+  runHistorySummary: {
+    last24hTotal: number;
+    last24hSucceeded: number;
+    last24hFailed: number;
+  };
 }) {
   const [tab, setTab] = useState<TabId>("qa");
   const [promoteDraft, setPromoteDraft] = useState<Pick<
@@ -420,6 +432,7 @@ export function AdminPlatformAssistantClient({
   const tabs: { id: TabId; label: string }[] = [
     { id: "qa", label: "问答库" },
     { id: "feedback", label: "用户反馈" },
+    { id: "runs", label: "运行历史" },
     { id: "settings", label: "模型与热闻" },
   ];
 
@@ -462,6 +475,14 @@ export function AdminPlatformAssistantClient({
             });
             setTab("qa");
           }}
+        />
+      ) : null}
+
+      {tab === "runs" ? (
+        <AdminAssistantRunHistoryPanel
+          initialItems={runHistoryItems}
+          initialNextCursorId={runHistoryNextCursorId}
+          summary={runHistorySummary}
         />
       ) : null}
 

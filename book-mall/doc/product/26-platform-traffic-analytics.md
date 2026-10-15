@@ -20,7 +20,7 @@
 - Gateway `GatewayUser` LOCAL 注册/登录并入 Book 统一入口（见 §10 Phase 2）。
 - 注册/登录来源归因事件表（`SiteAuthEvent`）。
 - 第三方分析（Google Analytics 等）。
-- 全路径 raw 日志、GeoIP、设备画像。
+- 全路径 raw 日志、设备画像（管理后台 IP Top 50 使用离线 ip2region 展示归属地，不入库）。
 
 ---
 
@@ -71,6 +71,8 @@
 - `/_next/static`、`/_next/image`
 - 静态扩展名：`.ico`、`.png`、`.jpg`、`.jpeg`、`.gif`、`.svg`、`.webp`、`.woff`、`.woff2`
 - 带 `?_rsc=` 的 RSC 请求（避免 SPA 导航重复计数）
+- Next.js / 浏览器 **prefetch**（`Next-Router-Prefetch`、`Purpose: prefetch` 等）
+- **仅返回 30x 跳转** 的中间请求（canonical / HTTPS / SSO 重定向前不计；最终 `200` 的文档请求才计）
 - book 侧 `/admin/*`（管理后台不计入 C 端 PV）
 
 ### 写入方式

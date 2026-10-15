@@ -43,44 +43,47 @@ function enforceProductionHttpsRedirect(request: NextRequest): NextResponse | nu
   return NextResponse.redirect(dest, status);
 }
 
-export function middleware(request: NextRequest) {
+function finishToolTraffic(request: NextRequest) {
   fireTrafficHitFromRequest("tool", request);
+  return NextResponse.next();
+}
 
+export function middleware(request: NextRequest) {
   const httpsRedirect = enforceProductionHttpsRedirect(request);
   if (httpsRedirect) return httpsRedirect;
 
   if (process.env.NODE_ENV !== "production") {
-    return NextResponse.next();
+    return finishToolTraffic(request);
   }
 
   const canonicalOrigin = getToolsSitePublicOrigin();
   if (!canonicalOrigin) {
-    return NextResponse.next();
+    return finishToolTraffic(request);
   }
 
   let canonicalHost: string;
   try {
     canonicalHost = new URL(canonicalOrigin).host;
   } catch {
-    return NextResponse.next();
+    return finishToolTraffic(request);
   }
 
   const requestHost = incomingHost(request);
   if (!requestHost || requestHost === canonicalHost) {
-    return NextResponse.next();
+    return finishToolTraffic(request);
   }
 
   if (!isTencentCloudRunDefaultHost(requestHost)) {
-    return NextResponse.next();
+    return finishToolTraffic(request);
   }
 
   if (request.method !== "GET" && request.method !== "HEAD") {
-    return NextResponse.next();
+    return finishToolTraffic(request);
   }
 
   const path = request.nextUrl.pathname;
   if (path.startsWith("/api/")) {
-    return NextResponse.next();
+    return finishToolTraffic(request);
   }
 
   const dest = new URL(path + request.nextUrl.search, canonicalOrigin);

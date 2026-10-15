@@ -106,14 +106,6 @@ export default async function middleware(request: NextRequest) {
     });
   }
 
-  if (recordTraffic) {
-    fireTrafficHitFromRequest("book", request, {
-      excludeAdmin: true,
-      userId: sessionToken?.sub ?? null,
-      cookies: request.cookies,
-    });
-  }
-
   const httpsRedirect = enforceProductionHttpsRedirect(request);
   if (httpsRedirect) {
     return withProductionSecurityHeaders(httpsRedirect, request);
@@ -122,7 +114,17 @@ export default async function middleware(request: NextRequest) {
   const early = canonicalBookHostRedirect(request);
   if (early) return withProductionSecurityHeaders(early, request);
 
+  const recordBookTrafficHit = () => {
+    if (!recordTraffic) return;
+    fireTrafficHitFromRequest("book", request, {
+      excludeAdmin: true,
+      userId: sessionToken?.sub ?? null,
+      cookies: request.cookies,
+    });
+  };
+
   if (path.startsWith("/invite/")) {
+    recordBookTrafficHit();
     const res = NextResponse.next();
     res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
     res.headers.set("Pragma", "no-cache");
@@ -154,6 +156,7 @@ export default async function middleware(request: NextRequest) {
     }
   }
 
+  recordBookTrafficHit();
   return withProductionSecurityHeaders(NextResponse.next(), request);
 }
 

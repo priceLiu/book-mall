@@ -176,14 +176,15 @@ export function AdminTrafficPanel({
           <CardTitle className="text-base">IP Top 50</CardTitle>
           <CardDescription>
             {selectedApp === "all" ? "全站" : PLATFORM_TRAFFIC_APP_LABELS[selectedApp]} ·{" "}
-            {data.selectedDateCst}
+            {data.selectedDateCst} · PV 按「CST 日 + 应用 + IP」累加（文档 GET/HEAD，含刷新；不含
+            RSC 软导航与 Link 预取；302/308 跳转请求不计）
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto pt-0">
           {data.topIps.length === 0 ? (
             <p className="text-sm text-muted-foreground">暂无数据</p>
           ) : (
-            <table className="w-full min-w-[640px] text-sm">
+            <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b text-left text-[#656d76]">
                   {selectedApp === "all" ? (
@@ -191,10 +192,11 @@ export function AdminTrafficPanel({
                   ) : null}
                   <th className="pb-2 pr-4 font-medium">IP</th>
                   <th className="pb-2 pr-4 font-medium">类型</th>
-                  <th className="pb-2 pr-4 font-medium tabular-nums">次数</th>
+                  <th className="pb-2 pr-4 font-medium tabular-nums">PV</th>
                   <th className="pb-2 pr-4 font-medium tabular-nums">扫描</th>
                   <th className="pb-2 pr-4 font-medium">首次</th>
                   <th className="pb-2 pr-4 font-medium">末次</th>
+                  <th className="pb-2 pr-4 font-medium">用户手机</th>
                   <th className="pb-2 font-medium">用户 ID</th>
                 </tr>
               </thead>
@@ -204,7 +206,10 @@ export function AdminTrafficPanel({
                     {selectedApp === "all" ? (
                       <td className="py-2 pr-4 text-xs">{PLATFORM_TRAFFIC_APP_LABELS[row.appKey as PlatformTrafficAppKey] ?? row.appKey}</td>
                     ) : null}
-                    <td className="py-2 pr-4 font-mono text-xs">{row.ip}</td>
+                    <td className="py-2 pr-4 text-xs">
+                      <span className="font-mono">{row.ip}</span>
+                      <span className="mt-0.5 block text-[11px] text-[#656d76]">{row.ipLocation}</span>
+                    </td>
                     <td className="py-2 pr-4">
                       {row.kind === "probe" ? (
                         <span className="rounded bg-[#fff1e5] px-1.5 py-0.5 text-[11px] font-medium text-[#bc4c00]">
@@ -227,6 +232,9 @@ export function AdminTrafficPanel({
                     </td>
                     <td className="py-2 pr-4 whitespace-nowrap text-xs text-[#656d76]">
                       {new Date(row.lastSeenAt).toLocaleString("zh-CN")}
+                    </td>
+                    <td className="py-2 pr-4 whitespace-nowrap text-xs text-[#656d76]">
+                      {row.userPhone ?? "—"}
                     </td>
                     <td className="py-2 max-w-[9rem] truncate font-mono text-xs text-[#656d76]" title={row.userId ?? undefined}>
                       {row.userId ?? "—"}

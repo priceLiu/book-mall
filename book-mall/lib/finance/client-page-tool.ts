@@ -24,6 +24,7 @@ export function clientPageToToolLabel(clientPage: string | null | undefined): st
       chat: "对话",
       "ai-news-generate": "每日资讯生成",
       embed: "向量入库",
+      "index-embed": "知识索引向量",
       retrieve: "检索向量",
       completion: "非流式对话",
     };

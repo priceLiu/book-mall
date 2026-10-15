@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { DbBusyPanel } from "@/components/errors/db-busy-panel";
 
 function isDbBusyClientError(error: Error): boolean {
-  return /SYSTEM_BUSY|DbUnavailableError|connection pool|pool timeout|pool saturated/i.test(
+  return /SYSTEM_BUSY|DbUnavailableError|connection pool|pool timeout|pool saturated|Server has closed the connection|Can't reach database|Timed out fetching a new connection/i.test(
     error.message,
   );
 }

@@ -236,7 +236,62 @@ export function AdminPlatformCockpitMetrics({ data }: { data: PlatformCockpitMet
             href="/admin/traffic"
             hrefLabel="按应用查看 →"
           />
+          <KpiCard
+            label="今日注册 · 已访问"
+            value={`${fmt(data.traffic.todayRegistered.registeredCount)} / ${fmt(data.traffic.todayRegistered.visitedCount)}`}
+            hint="CST 当日注册用户数 / 当日有 PV 或扫描记录的用户数"
+          />
         </div>
+
+        <Card className="border-[#d1d9e0]/80 bg-white/90 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base">当日注册用户访问</CardTitle>
+            <CardDescription>
+              {data.businessDateCst} · 按 userId 汇总当日各 IP 访问次数（最多 200 人）
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="overflow-x-auto pt-0">
+            {data.traffic.todayRegistered.rows.length === 0 ? (
+              <p className="text-sm text-muted-foreground">今日暂无新注册用户</p>
+            ) : (
+              <table className="w-full min-w-[640px] text-sm">
+                <thead>
+                  <tr className="border-b text-left text-[#656d76]">
+                    <th className="pb-2 pr-4 font-medium">手机</th>
+                    <th className="pb-2 pr-4 font-medium tabular-nums">PV</th>
+                    <th className="pb-2 pr-4 font-medium tabular-nums">扫描</th>
+                    <th className="pb-2 pr-4 font-medium">注册时间</th>
+                    <th className="pb-2 pr-4 font-medium">末次访问</th>
+                    <th className="pb-2 font-medium">用户 ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.traffic.todayRegistered.rows.map((row) => (
+                    <tr key={row.userId} className="border-b border-[#d1d9e0]/60">
+                      <td className="py-2 pr-4 whitespace-nowrap text-xs">{row.phone ?? "—"}</td>
+                      <td className="py-2 pr-4 tabular-nums">{fmt(row.hitCount)}</td>
+                      <td className="py-2 pr-4 tabular-nums text-[#656d76]">
+                        {row.probeHitCount > 0 ? fmt(row.probeHitCount) : "—"}
+                      </td>
+                      <td className="py-2 pr-4 whitespace-nowrap text-xs text-[#656d76]">
+                        {new Date(row.registeredAt).toLocaleString("zh-CN")}
+                      </td>
+                      <td className="py-2 pr-4 whitespace-nowrap text-xs text-[#656d76]">
+                        {row.lastSeenAt ? new Date(row.lastSeenAt).toLocaleString("zh-CN") : "—"}
+                      </td>
+                      <td
+                        className="py-2 max-w-[9rem] truncate font-mono text-xs text-[#656d76]"
+                        title={row.userId}
+                      >
+                        {row.userId}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </CardContent>
+        </Card>
       </Section>
 
       <Section title="Gateway 与生成">

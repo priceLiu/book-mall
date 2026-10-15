@@ -70,8 +70,6 @@ function buildAuthRedirectUrl(request: NextRequest): URL {
 }
 
 export function middleware(request: NextRequest) {
-  fireTrafficHitFromRequest("quick-replica", request);
-
   if (process.env.NODE_ENV === "production") {
     const canonicalOrigin = getCanonicalOrigin();
     if (canonicalOrigin) {
@@ -99,11 +97,15 @@ export function middleware(request: NextRequest) {
   }
 
   if (isPublicPath(request.nextUrl.pathname)) {
+    fireTrafficHitFromRequest("quick-replica", request);
     return NextResponse.next();
   }
 
   const token = request.cookies.get("tools_token")?.value?.trim();
-  if (token) return NextResponse.next();
+  if (token) {
+    fireTrafficHitFromRequest("quick-replica", request);
+    return NextResponse.next();
+  }
 
   return NextResponse.redirect(buildAuthRedirectUrl(request));
 }

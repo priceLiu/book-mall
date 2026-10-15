@@ -17,6 +17,10 @@ import {
   listAssistantEmbedCandidates,
   listAssistantLlmCandidates,
 } from "@/lib/platform-assistant/platform-assistant-model-config-service";
+import {
+  getPlatformAssistantRunHistorySummary,
+  listPlatformAssistantRunHistory,
+} from "@/lib/platform-assistant/run-history-service";
 
 export const dynamic = "force-dynamic";
 
@@ -30,15 +34,25 @@ export default async function AdminPlatformAssistantPage() {
   if (!session?.user?.id) redirect("/login");
   if (role !== "ADMIN" && role !== "SUPER_ADMIN") redirect("/admin");
 
-  const [qaItems, qaSummary, feedbackSummary, feedbackItems, aiNewsRows, config] =
-    await Promise.all([
-      listAssistantQaEntries(),
-      getAssistantQaSummary(),
-      getAssistantFeedbackSummary(),
-      listOpenAssistantFeedback(50),
-      listRecentAiNewsDaily(3),
-      getPlatformAssistantModelConfigView(),
-    ]);
+  const [
+    qaItems,
+    qaSummary,
+    feedbackSummary,
+    feedbackItems,
+    aiNewsRows,
+    config,
+    runHistory,
+    runHistorySummary,
+  ] = await Promise.all([
+    listAssistantQaEntries(),
+    getAssistantQaSummary(),
+    getAssistantFeedbackSummary(),
+    listOpenAssistantFeedback(50),
+    listRecentAiNewsDaily(3),
+    getPlatformAssistantModelConfigView(),
+    listPlatformAssistantRunHistory({ limit: 50 }),
+    getPlatformAssistantRunHistorySummary(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -65,6 +79,9 @@ export default async function AdminPlatformAssistantPage() {
           embedCandidates: listAssistantEmbedCandidates(),
         }}
         aiNewsRows={aiNewsRows}
+        runHistoryItems={runHistory.items}
+        runHistoryNextCursorId={runHistory.nextCursorId}
+        runHistorySummary={runHistorySummary}
       />
     </div>
   );

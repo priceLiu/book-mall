@@ -53,8 +53,6 @@ function buildReEnterUrl(request: NextRequest): string | null {
 }
 
 export function middleware(request: NextRequest) {
-  fireTrafficHitFromRequest("prompt-optimizer", request);
-
   if (process.env.NODE_ENV === "production") {
     const canonicalOrigin = getCanonicalOrigin();
     if (canonicalOrigin) {
@@ -82,11 +80,15 @@ export function middleware(request: NextRequest) {
   }
 
   if (isPublicPath(request.nextUrl.pathname)) {
+    fireTrafficHitFromRequest("prompt-optimizer", request);
     return NextResponse.next();
   }
 
   const token = request.cookies.get("tools_token")?.value?.trim();
-  if (token) return NextResponse.next();
+  if (token) {
+    fireTrafficHitFromRequest("prompt-optimizer", request);
+    return NextResponse.next();
+  }
 
   const reEnter = buildReEnterUrl(request);
   if (reEnter) {

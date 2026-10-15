@@ -33,8 +33,6 @@ function getCanonicalOrigin(): string | null {
 }
 
 export function middleware(request: NextRequest) {
-  fireTrafficHitFromRequest("finance", request);
-
   const pathname = request.nextUrl.pathname;
   const isDocumentRequest =
     request.method === "GET" || request.method === "HEAD";
@@ -84,6 +82,7 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  fireTrafficHitFromRequest("finance", request);
   return NextResponse.next();
 }
 

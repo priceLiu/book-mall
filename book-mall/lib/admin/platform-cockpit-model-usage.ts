@@ -61,6 +61,12 @@ function cstDatesInPeriodThroughToday(periodKey: string, now: Date): string[] {
   return keys;
 }
 
+type GatewayUsageDailyAggRow = {
+  date_cst: string;
+  requestKind: string;
+  cnt: bigint;
+};
+
 export async function buildCockpitModelUsageSnapshot(input?: {
   periodKey?: string;
   now?: Date;
@@ -69,13 +75,27 @@ export async function buildCockpitModelUsageSnapshot(input?: {
   const periodKey = input?.periodKey ?? currentPeriodKey(now);
   const { from, to } = periodBounds(periodKey);
 
-  const logs = await prisma.gatewayRequestLog.findMany({
-    where: {
-      status: "SUCCEEDED",
-      submittedAt: { gte: from, lt: to },
-    },
-    select: { requestKind: true, submittedAt: true },
-  });
+  const [monthGroups, dailyRows] = await Promise.all([
+    prisma.gatewayRequestLog.groupBy({
+      by: ["requestKind"],
+      where: {
+        status: "SUCCEEDED",
+        submittedAt: { gte: from, lt: to },
+      },
+      _count: { _all: true },
+    }),
+    prisma.$queryRaw<GatewayUsageDailyAggRow[]>`
+      SELECT
+        to_char(("submittedAt" AT TIME ZONE 'UTC' + interval '8 hours'), 'YYYY-MM-DD') AS date_cst,
+        "requestKind"::text AS "requestKind",
+        COUNT(*)::bigint AS cnt
+      FROM "GatewayRequestLog"
+      WHERE status = 'SUCCEEDED'::"GatewayRequestStatus"
+        AND "submittedAt" >= ${from}
+        AND "submittedAt" < ${to}
+      GROUP BY 1, 2
+    `,
+  ]);
 
   const trendKeys = cstDatesInPeriodThroughToday(periodKey, now);
   const trendBuckets = new Map<string, CockpitModelUsageMonthTotals>(
@@ -83,16 +103,20 @@ export async function buildCockpitModelUsageSnapshot(input?: {
   );
   const monthTotals = emptyTotals();
 
-  for (const log of logs) {
-    const cat = classifyGatewayRequestKind(log.requestKind);
-    monthTotals[cat] += 1;
-    monthTotals.total += 1;
+  for (const row of monthGroups) {
+    const cat = classifyGatewayRequestKind(row.requestKind);
+    const n = row._count._all;
+    monthTotals[cat] += n;
+    monthTotals.total += n;
+  }
 
-    const key = cstDateKeyFromUtc(log.submittedAt);
-    const bucket = trendBuckets.get(key);
+  for (const row of dailyRows) {
+    const bucket = trendBuckets.get(row.date_cst);
     if (!bucket) continue;
-    bucket[cat] += 1;
-    bucket.total += 1;
+    const n = Number(row.cnt);
+    const cat = classifyGatewayRequestKind(row.requestKind);
+    bucket[cat] += n;
+    bucket.total += n;
   }
 
   return {

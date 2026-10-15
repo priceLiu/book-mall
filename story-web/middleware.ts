@@ -32,8 +32,6 @@ function getCanonicalOrigin(): string | null {
  * 仅在生产做规范域名（canonical host）重定向，避免默认云托管域名暴露。
  */
 export function middleware(request: NextRequest) {
-  fireTrafficHitFromRequest("story", request);
-
   if (process.env.NODE_ENV === "production") {
     const canonicalOrigin = getCanonicalOrigin();
     if (canonicalOrigin) {
@@ -60,6 +58,7 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  fireTrafficHitFromRequest("story", request);
   return NextResponse.next();
 }
 

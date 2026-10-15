@@ -27,8 +27,6 @@ function getCanonicalOrigin(): string | null {
 }
 
 export function middleware(request: NextRequest) {
-  fireTrafficHitFromRequest("gateway", request);
-
   if (process.env.NODE_ENV === "production") {
     const canonicalOrigin = getCanonicalOrigin();
     if (canonicalOrigin) {
@@ -55,6 +53,7 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  fireTrafficHitFromRequest("gateway", request);
   return NextResponse.next();
 }
 

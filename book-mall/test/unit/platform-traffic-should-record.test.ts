@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { shouldRecordTrafficHit } from "../../../shared/platform-traffic/should-record-traffic-hit";
+import {
+  isTrafficPrefetchRequest,
+  shouldRecordTrafficHit,
+} from "../../../shared/platform-traffic/should-record-traffic-hit";
 
 describe("shouldRecordTrafficHit", () => {
   it("records GET page requests", () => {
@@ -49,6 +52,16 @@ describe("shouldRecordTrafficHit", () => {
     expect(
       shouldRecordTrafficHit({ method: "POST", pathname: "/", search: "", excludeAdmin: false }),
     ).toBe(false);
+  });
+
+  it("detects prefetch headers", () => {
+    expect(
+      isTrafficPrefetchRequest(new Headers({ "next-router-prefetch": "1" })),
+    ).toBe(true);
+    expect(
+      isTrafficPrefetchRequest(new Headers({ purpose: "prefetch" })),
+    ).toBe(true);
+    expect(isTrafficPrefetchRequest(new Headers())).toBe(false);
   });
 
   it("still records scanner page paths so they can be labeled", () => {

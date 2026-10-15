@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { cstBusinessDate, cstDayStartUtc } from "@/lib/billing/credit-ops-service";
 import {
   PLATFORM_TRAFFIC_APP_KEYS,
   PLATFORM_TRAFFIC_APP_LABELS,
@@ -6,6 +7,25 @@ import {
 } from "@/lib/site-traffic/app-keys";
 import { cstDateKey, lastNCstDateKeys } from "@/lib/site-traffic/cst-date";
 import { trafficHitKind, type TrafficHitKind } from "@/lib/platform-traffic/classify-traffic-path";
+import { mapIpLocations } from "@/lib/site-traffic/ip-location";
+
+const TODAY_REGISTERED_TRAFFIC_LIMIT = 200;
+
+async function mapUserPhonesById(userIds: Array<string | null | undefined>): Promise<Map<string, string | null>> {
+  const unique = [...new Set(userIds.filter((id): id is string => Boolean(id)))];
+  if (!unique.length) return new Map();
+  const users = await prisma.user.findMany({
+    where: { id: { in: unique } },
+    select: { id: true, phone: true },
+  });
+  return new Map(users.map((u) => [u.id, u.phone]));
+}
+
+function cstDayBounds(now: Date): { start: Date; end: Date } {
+  const businessDate = cstBusinessDate(now);
+  const start = cstDayStartUtc(businessDate);
+  return { start, end: new Date(start.getTime() + 24 * 60 * 60 * 1000) };
+}
 
 export type TrafficTrendDatum = { date: string; pv: number; uv: number };
 
@@ -28,6 +48,23 @@ export type TrafficIpRow = {
   firstSeenAt: string;
   lastSeenAt: string;
   userId: string | null;
+  userPhone: string | null;
+  ipLocation: string;
+};
+
+export type TodayRegisteredUserTrafficRow = {
+  userId: string;
+  phone: string | null;
+  registeredAt: string;
+  hitCount: number;
+  probeHitCount: number;
+  lastSeenAt: string | null;
+};
+
+export type TodayRegisteredUserTrafficSnapshot = {
+  registeredCount: number;
+  visitedCount: number;
+  rows: TodayRegisteredUserTrafficRow[];
 };
 
 export type TrafficDashboardSnapshot = {
@@ -196,6 +233,9 @@ export async function getTrafficDashboardSnapshot(opts: {
     },
   });
 
+  const phoneByUserId = await mapUserPhonesById(topIpRows.map((r) => r.userId));
+  const locationByIp = mapIpLocations(topIpRows.map((r) => r.ip));
+
   return {
     generatedAt: now.toISOString(),
     selectedDateCst,
@@ -219,8 +259,59 @@ export async function getTrafficDashboardSnapshot(opts: {
       firstSeenAt: r.firstSeenAt.toISOString(),
       lastSeenAt: r.lastSeenAt.toISOString(),
       userId: r.userId,
+      userPhone: r.userId ? (phoneByUserId.get(r.userId) ?? null) : null,
+      ipLocation: locationByIp.get(r.ip) ?? "—",
     })),
   };
+}
+
+/** 当日（CST）注册用户在本业务日的访问汇总（按 userId 聚合各 IP 行） */
+export async function getTodayRegisteredUserTraffic(
+  now: Date = new Date(),
+): Promise<TodayRegisteredUserTrafficSnapshot> {
+  const { start, end } = cstDayBounds(now);
+  const dateCst = cstDateKey(now);
+
+  const newUsers = await prisma.user.findMany({
+    where: { createdAt: { gte: start, lt: end } },
+    select: { id: true, phone: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+    take: TODAY_REGISTERED_TRAFFIC_LIMIT,
+  });
+
+  if (newUsers.length === 0) {
+    return { registeredCount: 0, visitedCount: 0, rows: [] };
+  }
+
+  const ids = newUsers.map((u) => u.id);
+  const trafficGroups = await prisma.siteTrafficIpDaily.groupBy({
+    by: ["userId"],
+    where: { dateCst, userId: { in: ids } },
+    _sum: { hitCount: true, probeHitCount: true },
+    _max: { lastSeenAt: true },
+  });
+
+  const trafficByUserId = new Map(
+    trafficGroups
+      .filter((g): g is typeof g & { userId: string } => g.userId != null)
+      .map((g) => [g.userId, g]),
+  );
+
+  const rows: TodayRegisteredUserTrafficRow[] = newUsers.map((u) => {
+    const t = trafficByUserId.get(u.id);
+    return {
+      userId: u.id,
+      phone: u.phone,
+      registeredAt: u.createdAt.toISOString(),
+      hitCount: t?._sum.hitCount ?? 0,
+      probeHitCount: t?._sum.probeHitCount ?? 0,
+      lastSeenAt: t?._max.lastSeenAt?.toISOString() ?? null,
+    };
+  });
+
+  const visitedCount = rows.filter((r) => r.hitCount > 0 || r.probeHitCount > 0).length;
+
+  return { registeredCount: newUsers.length, visitedCount, rows };
 }
 
 export async function getTodayTrafficTotals(now: Date = new Date()): Promise<{

@@ -32,19 +32,22 @@ function getCanonicalOrigin(): string | null {
  * 登录仅经 `/auth/sso/callback` 可选换票；此处仅在生产做规范域名跳转。
  */
 export function middleware(request: NextRequest) {
-  fireTrafficHitFromRequest("director", request);
-
   if (process.env.NODE_ENV !== "production") {
+    fireTrafficHitFromRequest("director", request);
     return NextResponse.next();
   }
 
   const canonicalOrigin = getCanonicalOrigin();
-  if (!canonicalOrigin) return NextResponse.next();
+  if (!canonicalOrigin) {
+    fireTrafficHitFromRequest("director", request);
+    return NextResponse.next();
+  }
 
   let canonicalHost: string;
   try {
     canonicalHost = new URL(canonicalOrigin).host;
   } catch {
+    fireTrafficHitFromRequest("director", request);
     return NextResponse.next();
   }
 
@@ -63,6 +66,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(dest, 308);
   }
 
+  fireTrafficHitFromRequest("director", request);
   return NextResponse.next();
 }
 

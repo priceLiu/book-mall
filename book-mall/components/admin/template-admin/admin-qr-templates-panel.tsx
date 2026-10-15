@@ -854,218 +854,263 @@ export function AdminQrTemplatesPanel() {
       ) : null}
 
       {formOpen ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
-          <div className="w-full max-w-2xl space-y-3 rounded-xl bg-white p-5 shadow-lg">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">
-                {form.source === "new" ? "新建模板" : "编辑模板"}
-              </h3>
-              <button type="button" className="text-xs text-[#656d76]" onClick={() => setFormOpen(false)}>
+        <div className="fixed inset-0 z-50 flex">
+          <button
+            type="button"
+            className="min-w-0 flex-1 bg-black/40"
+            aria-label="关闭编辑"
+            onClick={() => setFormOpen(false)}
+          />
+          <div className="flex h-full w-full max-w-[min(920px,100vw)] shrink-0 flex-col border-l border-[#d0d7de] bg-white shadow-2xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-[#d0d7de] px-5 py-3">
+              <div>
+                <h3 className="text-sm font-semibold text-[#1f2328]">
+                  {form.source === "new" ? "新建模板" : "编辑模板"}
+                </h3>
+                <p className="mt-0.5 text-[11px] text-[#656d76]">
+                  左侧文案与模型参数 · 右侧封面与媒体（支持粘贴上传）
+                </p>
+              </div>
+              <button
+                type="button"
+                className="rounded-md border border-[#d0d7de] px-2.5 py-1 text-xs text-[#656d76] hover:bg-[#f6f8fa]"
+                onClick={() => setFormOpen(false)}
+              >
                 关闭
               </button>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block text-xs">
-                分类
-                <select
-                  className="mt-1 w-full rounded border border-[#d0d7de] px-2 py-1.5"
-                  value={form.category}
-                  disabled={form.source === "builtin"}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, category: e.target.value as QrCategory }))
-                  }
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block text-xs">
-                子类
-                <select
-                  className="mt-1 w-full rounded border border-[#d0d7de] px-2 py-1.5"
-                  value={form.kind}
-                  disabled={form.source === "builtin"}
-                  onChange={(e) => {
-                    const kind = e.target.value;
-                    const def = kinds.find((k) => k.id === kind);
-                    setForm((p) => ({
-                      ...p,
-                      kind,
-                      toolKey: def?.toolKey ?? (kind === "motion-sync" ? "motion-sync" : p.toolKey),
-                    }));
-                  }}
-                >
-                  {(QR_KINDS_BY_CATEGORY[form.category] ?? []).map((k) => (
-                    <option key={k.id} value={k.id}>
-                      {k.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block text-xs sm:col-span-2">
-                标题
-                <input
-                  className="mt-1 w-full rounded border border-[#d0d7de] px-2 py-1.5"
-                  value={form.title}
-                  onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
-                />
-              </label>
-              <label className="block text-xs sm:col-span-2">
-                提示词
-                <textarea
-                  className="mt-1 w-full rounded border border-[#d0d7de] px-2 py-1.5"
-                  rows={4}
-                  value={form.promptText}
-                  onChange={(e) => setForm((p) => ({ ...p, promptText: e.target.value }))}
-                />
-              </label>
-              {!characterEdit ? (
-                <>
+
+            <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2 lg:divide-x lg:divide-[#d0d7de]">
+              <div className="min-h-0 space-y-3 overflow-y-auto p-5">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-[#656d76]">
+                  基本信息
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block text-xs">
+                    分类
+                    <select
+                      className="mt-1 w-full rounded border border-[#d0d7de] px-2 py-1.5"
+                      value={form.category}
+                      disabled={form.source === "builtin"}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, category: e.target.value as QrCategory }))
+                      }
+                    >
+                      {CATEGORIES.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block text-xs">
+                    子类
+                    <select
+                      className="mt-1 w-full rounded border border-[#d0d7de] px-2 py-1.5"
+                      value={form.kind}
+                      disabled={form.source === "builtin"}
+                      onChange={(e) => {
+                        const kind = e.target.value;
+                        const def = kinds.find((k) => k.id === kind);
+                        setForm((p) => ({
+                          ...p,
+                          kind,
+                          toolKey:
+                            def?.toolKey ?? (kind === "motion-sync" ? "motion-sync" : p.toolKey),
+                        }));
+                      }}
+                    >
+                      {(QR_KINDS_BY_CATEGORY[form.category] ?? []).map((k) => (
+                        <option key={k.id} value={k.id}>
+                          {k.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <label className="block text-xs">
+                  标题
+                  <input
+                    className="mt-1 w-full rounded border border-[#d0d7de] px-2 py-1.5"
+                    value={form.title}
+                    onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+                  />
+                </label>
+                <label className="block text-xs">
+                  提示词
+                  <textarea
+                    className="mt-1 min-h-[10rem] w-full resize-y rounded border border-[#d0d7de] px-2 py-1.5 font-mono text-[11px] leading-relaxed"
+                    rows={8}
+                    value={form.promptText}
+                    onChange={(e) => setForm((p) => ({ ...p, promptText: e.target.value }))}
+                  />
+                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block text-xs">
+                    模型 key
+                    <input
+                      className="mt-1 w-full rounded border border-[#d0d7de] px-2 py-1.5 font-mono text-[11px]"
+                      value={form.modelKey}
+                      onChange={(e) => setForm((p) => ({ ...p, modelKey: e.target.value }))}
+                    />
+                  </label>
+                  <label className="block text-xs">
+                    排序
+                    <input
+                      type="number"
+                      className="mt-1 w-full rounded border border-[#d0d7de] px-2 py-1.5"
+                      value={form.sortOrder}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, sortOrder: Number(e.target.value) || 0 }))
+                      }
+                    />
+                  </label>
+                </div>
+                {form.category === "audio" ? (
+                  <div className="space-y-3 rounded-lg border border-[#d0d7de] bg-[#f6f8fa] p-3">
+                    <p className="text-[11px] font-medium text-[#656d76]">音频参数</p>
+                    <label className="block text-xs">
+                      voiceId
+                      <input
+                        className="mt-1 w-full rounded border border-[#d0d7de] bg-white px-2 py-1.5"
+                        value={form.voiceId}
+                        onChange={(e) => setForm((p) => ({ ...p, voiceId: e.target.value }))}
+                      />
+                    </label>
+                    <label className="block text-xs">
+                      风格标签
+                      <input
+                        className="mt-1 w-full rounded border border-[#d0d7de] bg-white px-2 py-1.5"
+                        value={form.audioStyleTag}
+                        onChange={(e) =>
+                          setForm((p) => ({ ...p, audioStyleTag: e.target.value }))
+                        }
+                      />
+                    </label>
+                    <label className="block text-xs">
+                      语速 {form.voiceSpeed}
+                      <input
+                        type="range"
+                        className="mt-1 w-full"
+                        min={0.5}
+                        max={2}
+                        step={0.05}
+                        value={form.voiceSpeed}
+                        onChange={(e) =>
+                          setForm((p) => ({ ...p, voiceSpeed: Number(e.target.value) }))
+                        }
+                      />
+                    </label>
+                    <label className="block text-xs">
+                      稳定度 {form.voiceStability}
+                      <input
+                        type="range"
+                        className="mt-1 w-full"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={form.voiceStability}
+                        onChange={(e) =>
+                          setForm((p) => ({ ...p, voiceStability: Number(e.target.value) }))
+                        }
+                      />
+                    </label>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="min-h-0 space-y-4 overflow-y-auto bg-[#f6f8fa] p-5">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-[#656d76]">
+                  媒体与引用
+                </p>
+                {!characterEdit ? (
+                  <div className="space-y-4">
+                    <AdminMediaField
+                      hoverChrome="canvas"
+                      label="封面"
+                      url={form.thumbnailUrl}
+                      accept="image"
+                      disabled={uploading}
+                      onUrlChange={(thumbnailUrl) => setForm((p) => ({ ...p, thumbnailUrl }))}
+                      onFiles={(files) => {
+                        const f = files[0];
+                        if (f) void uploadMedia(f, "thumbnail");
+                      }}
+                    />
+                    <AdminMediaField
+                      hoverChrome="canvas"
+                      label="主媒体"
+                      url={form.mediaUrl}
+                      accept="media"
+                      disabled={uploading}
+                      onUrlChange={(mediaUrl) => setForm((p) => ({ ...p, mediaUrl }))}
+                      onFiles={(files) => {
+                        const f = files[0];
+                        if (f) void uploadMedia(f, "media");
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <p className="rounded-md border border-dashed border-[#d0d7de] bg-white px-3 py-4 text-xs text-[#656d76]">
+                    角色库条目：封面与主媒体由角色资源统一管理，此处仅编辑提示词与模型参数。
+                  </p>
+                )}
+                {motion ? (
+                  <div className="space-y-4">
+                    <AdminMediaField
+                      hoverChrome="canvas"
+                      label="目标人物图"
+                      url={form.targetImageUrl}
+                      accept="image"
+                      disabled={uploading}
+                      onUrlChange={(targetImageUrl) => setForm((p) => ({ ...p, targetImageUrl }))}
+                      onFiles={(files) => {
+                        const f = files[0];
+                        if (f) void uploadMedia(f, "targetImage");
+                      }}
+                    />
+                    <AdminMediaField
+                      hoverChrome="canvas"
+                      label="参考视频"
+                      url={form.referenceVideoUrl}
+                      accept="video"
+                      disabled={uploading}
+                      onUrlChange={(referenceVideoUrl) =>
+                        setForm((p) => ({ ...p, referenceVideoUrl }))
+                      }
+                      onFiles={(files) => {
+                        const f = files[0];
+                        if (f) void uploadMedia(f, "referenceVideo");
+                      }}
+                    />
+                  </div>
+                ) : null}
+                {sceneEnabled ? (
                   <AdminMediaField
                     hoverChrome="canvas"
-                    label="封面"
-                    url={form.thumbnailUrl}
+                    label={`参考图 ${form.sceneImageUrls.length}/${ADMIN_SCENE_IMAGE_MAX}`}
+                    urls={form.sceneImageUrls}
                     accept="image"
-                    disabled={uploading}
-                    onUrlChange={(thumbnailUrl) => setForm((p) => ({ ...p, thumbnailUrl }))}
+                    multiple
+                    disabled={uploading || form.sceneImageUrls.length >= ADMIN_SCENE_IMAGE_MAX}
                     onFiles={(files) => {
-                      const f = files[0];
-                      if (f) void uploadMedia(f, "thumbnail");
+                      for (const f of files) void uploadMedia(f, "referenceImage");
                     }}
-                  />
-                  <AdminMediaField
-                    hoverChrome="canvas"
-                    label="主媒体"
-                    url={form.mediaUrl}
-                    accept="media"
-                    disabled={uploading}
-                    onUrlChange={(mediaUrl) => setForm((p) => ({ ...p, mediaUrl }))}
-                    onFiles={(files) => {
-                      const f = files[0];
-                      if (f) void uploadMedia(f, "media");
-                    }}
-                  />
-                </>
-              ) : null}
-              {motion ? (
-                <>
-                  <AdminMediaField
-                    hoverChrome="canvas"
-                    label="目标人物图"
-                    url={form.targetImageUrl}
-                    accept="image"
-                    disabled={uploading}
-                    onUrlChange={(targetImageUrl) => setForm((p) => ({ ...p, targetImageUrl }))}
-                    onFiles={(files) => {
-                      const f = files[0];
-                      if (f) void uploadMedia(f, "targetImage");
-                    }}
-                  />
-                  <AdminMediaField
-                    hoverChrome="canvas"
-                    label="参考视频"
-                    url={form.referenceVideoUrl}
-                    accept="video"
-                    disabled={uploading}
-                    onUrlChange={(referenceVideoUrl) =>
-                      setForm((p) => ({ ...p, referenceVideoUrl }))
+                    onRemoveAt={(index) =>
+                      setForm((p) => ({
+                        ...p,
+                        sceneImageUrls: p.sceneImageUrls.filter((_, i) => i !== index),
+                      }))
                     }
-                    onFiles={(files) => {
-                      const f = files[0];
-                      if (f) void uploadMedia(f, "referenceVideo");
-                    }}
                   />
-                </>
-              ) : null}
-              {sceneEnabled ? (
-                <AdminMediaField
-                  hoverChrome="canvas"
-                  label={`参考图 ${form.sceneImageUrls.length}/${ADMIN_SCENE_IMAGE_MAX}`}
-                  urls={form.sceneImageUrls}
-                  accept="image"
-                  multiple
-                  disabled={uploading || form.sceneImageUrls.length >= ADMIN_SCENE_IMAGE_MAX}
-                  onFiles={(files) => {
-                    for (const f of files) void uploadMedia(f, "referenceImage");
-                  }}
-                  onRemoveAt={(index) =>
-                    setForm((p) => ({
-                      ...p,
-                      sceneImageUrls: p.sceneImageUrls.filter((_, i) => i !== index),
-                    }))
-                  }
-                />
-              ) : null}
-              <label className="block text-xs">
-                模型 key
-                <input
-                  className="mt-1 w-full rounded border border-[#d0d7de] px-2 py-1.5"
-                  value={form.modelKey}
-                  onChange={(e) => setForm((p) => ({ ...p, modelKey: e.target.value }))}
-                />
-              </label>
-              <label className="block text-xs">
-                排序
-                <input
-                  type="number"
-                  className="mt-1 w-full rounded border border-[#d0d7de] px-2 py-1.5"
-                  value={form.sortOrder}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, sortOrder: Number(e.target.value) || 0 }))
-                  }
-                />
-              </label>
-              {form.category === "audio" ? (
-                <>
-                  <label className="block text-xs">
-                    voiceId
-                    <input
-                      className="mt-1 w-full rounded border border-[#d0d7de] px-2 py-1.5"
-                      value={form.voiceId}
-                      onChange={(e) => setForm((p) => ({ ...p, voiceId: e.target.value }))}
-                    />
-                  </label>
-                  <label className="block text-xs">
-                    风格标签
-                    <input
-                      className="mt-1 w-full rounded border border-[#d0d7de] px-2 py-1.5"
-                      value={form.audioStyleTag}
-                      onChange={(e) => setForm((p) => ({ ...p, audioStyleTag: e.target.value }))}
-                    />
-                  </label>
-                  <label className="block text-xs">
-                    语速 {form.voiceSpeed}
-                    <input
-                      type="range"
-                      min={0.5}
-                      max={2}
-                      step={0.05}
-                      value={form.voiceSpeed}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, voiceSpeed: Number(e.target.value) }))
-                      }
-                    />
-                  </label>
-                  <label className="block text-xs">
-                    稳定度 {form.voiceStability}
-                    <input
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      value={form.voiceStability}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, voiceStability: Number(e.target.value) }))
-                      }
-                    />
-                  </label>
-                </>
-              ) : null}
+                ) : null}
+                {uploading ? (
+                  <p className="text-xs text-[#0969da]">媒体上传中…</p>
+                ) : null}
+              </div>
             </div>
-            <div className="flex justify-end gap-2">
+
+            <div className="flex shrink-0 justify-end gap-2 border-t border-[#d0d7de] bg-white px-5 py-3">
               <button
                 type="button"
                 className="rounded-md border border-[#d0d7de] px-3 py-1.5 text-xs"
