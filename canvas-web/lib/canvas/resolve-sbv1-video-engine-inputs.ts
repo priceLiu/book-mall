@@ -30,6 +30,7 @@ import type { Sbv1ReferenceMode } from "./sbv1-workspace-types";
 import { directPredecessors } from "./topo";
 import type { Sbv1VideoEngineNodeData } from "./sbv1-workspace-types";
 import { resolvePro2VideoBoardCellDefaultPrompt } from "./pro2-video-board-dock-links";
+import { resolveSbv1UpstreamTextLinks } from "./sbv1-upstream-text-links";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 
 export type ResolveSbv1VideoEngineInputsResult =
@@ -191,6 +192,11 @@ export function resolveSbv1VideoEngineEffectivePrompt(
   const d = node.data as Sbv1VideoEngineNodeData;
   const direct = String(d.prompt ?? "").trim() || String(d.dockInput ?? "").trim();
   if (direct) return direct;
+  const fromUpstream = resolveSbv1UpstreamTextLinks(nodeId, nodes, edges)
+    .map((l) => l.fullText.trim())
+    .filter(Boolean)
+    .join("\n\n");
+  if (fromUpstream) return fromUpstream;
   return resolvePro2VideoBoardCellDefaultPrompt(nodeId, nodes, edges);
 }
 

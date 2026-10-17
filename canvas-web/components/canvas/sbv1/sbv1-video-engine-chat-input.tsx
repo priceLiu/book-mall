@@ -284,7 +284,8 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   );
 
   const hasRefs = dockRefLinks.some((l) => l.previewUrl?.trim());
-  const hasPrompt = Boolean(livePrompt.trim());
+  const hasUpstreamText = upstreamTextLinks.some((l) => l.fullText.trim());
+  const hasPrompt = Boolean(livePrompt.trim()) || hasUpstreamText;
   const activeRefIds = useMemo(
     () => dockActiveRefIdsFromPrompt(livePrompt),
     [livePrompt],

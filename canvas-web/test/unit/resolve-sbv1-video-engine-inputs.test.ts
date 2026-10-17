@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { resolveSbv1VideoEngineInputs } from "@/lib/canvas/resolve-sbv1-video-engine-inputs";
+import {
+  resolveSbv1VideoEngineEffectivePrompt,
+  resolveSbv1VideoEngineInputs,
+} from "@/lib/canvas/resolve-sbv1-video-engine-inputs";
 import type { CanvasFlowEdge, CanvasFlowNode } from "@/lib/canvas/types";
 
 const SEEDANCE_MODEL = "doubao-seedance-2.0";
@@ -183,5 +186,39 @@ describe("resolveSbv1VideoEngineInputs", () => {
       error:
         "请确认上游图片已生成完成并上传 OSS 后再生成视频（非 Seedance 模型直接使用 OSS 参考图，无需入库）。",
     });
+  });
+});
+
+describe("resolveSbv1VideoEngineEffectivePrompt", () => {
+  it("uses upstream text when dock prompt is empty (文生视频 + 文本节点)", () => {
+    const nodes: CanvasFlowNode[] = [
+      {
+        id: "txt1",
+        type: "story-pro2-starter",
+        position: { x: 0, y: 0 },
+        data: { dockInput: "A woman walks toward a pink supercar." },
+      },
+      {
+        id: "vid1",
+        type: "sbv1-video-engine",
+        position: { x: 400, y: 0 },
+        data: {
+          engine: { providerId: "gateway:bailian", modelKey: "wan3.0-video" },
+          dockInputMode: "t2v",
+        },
+      },
+    ];
+    const edges: CanvasFlowEdge[] = [
+      {
+        id: "e-txt",
+        source: "txt1",
+        target: "vid1",
+        sourceHandle: "text",
+        targetHandle: "in_text",
+      },
+    ];
+    expect(resolveSbv1VideoEngineEffectivePrompt("vid1", nodes, edges)).toBe(
+      "A woman walks toward a pink supercar.",
+    );
   });
 });
