@@ -98,6 +98,7 @@ export default defineConfig({
       "test/unit/pro2-storyboard-shot-budget.test.ts",
       "test/unit/spawn-pro2-script-category.test.ts",
       "test/unit/pro2-multi-group-spawn.test.ts",
+      "test/unit/pro2-shortcut-preset-placement.test.ts",
       "test/unit/pro2-character-board-column-placeholder.test.ts",
       "test/unit/pro2-character-script-fields.test.ts",
       "test/unit/pro2-project-format.test.ts",

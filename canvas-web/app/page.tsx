@@ -2,6 +2,7 @@ import { PortalCanvasChromeReset } from "@/components/home/portal-canvas-chrome-
 import { PortalDiscoverySection } from "@/components/home/portal-discovery-section";
 import { PortalFilmCasesSection } from "@/components/home/portal-film-cases-section";
 import { PortalHeroSection } from "@/components/home/portal-hero-section";
+import { PortalPostLoginCreateRunner } from "@/components/home/portal-post-login-create-runner";
 import { PortalHomeProvider } from "@/components/home/portal-home-context";
 import { RecentProjectsSection } from "@/components/home/recent-projects-section";
 import { fetchCanvasHomeSnapshotServer } from "@/lib/canvas-home-snapshot.server";
@@ -23,6 +24,7 @@ export default async function HomePage() {
       snapshotMeta={snapshotMeta}
     >
       <div className="bg-[var(--canvas-bg)]">
+        <PortalPostLoginCreateRunner />
         <PortalCanvasChromeReset />
         <PortalHeroSection />
         <RecentProjectsSection />

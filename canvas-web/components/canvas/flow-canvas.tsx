@@ -565,7 +565,13 @@ function FlowCanvasInner({
       void runLibtvCanvasEmptyShortcut(
         id,
         sbv1Canvas ? "sbv1" : "pro2",
-        { addNode, setNodes, setEdges, createGroupContaining },
+        {
+          addNode,
+          setNodes,
+          setEdges,
+          createGroupContaining,
+          getNodes: () => useCanvasStore.getState().nodes,
+        },
         { alert, confirm },
       );
     },

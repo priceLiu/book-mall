@@ -20,7 +20,10 @@ type NetworkInformationLike = {
 };
 
 const throughputSamples: number[] = [];
+const rttSamples: number[] = [];
 const MAX_SAMPLES = 8;
+const MAX_RTT_SAMPLES = 5;
+const APP_RTT_POLL_MS = 30_000;
 
 /** canvas-api call() 上报传输量，用于顶栏网速估算 */
 export function recordCanvasApiTransfer(bytes: number, durationMs: number): void {
@@ -62,6 +65,45 @@ function averageThroughputKbps(): number | null {
   return sum / throughputSamples.length;
 }
 
+function averageMeasuredRttMs(): number | null {
+  if (rttSamples.length === 0) return null;
+  const sum = rttSamples.reduce((a, b) => a + b, 0);
+  return Math.round(sum / rttSamples.length);
+}
+
+function resolveEffectiveRttMs(connRttMs: number | null): number | null {
+  if (connRttMs != null && connRttMs > 0) return connRttMs;
+  return averageMeasuredRttMs();
+}
+
+/** Safari 等无 Network Information API 时，用同域 lite session 估算 RTT */
+export async function measureCanvasAppRttMs(): Promise<number | null> {
+  if (typeof performance === "undefined" || typeof fetch === "undefined") {
+    return null;
+  }
+  const t0 = performance.now();
+  try {
+    const res = await fetch("/api/tools-session?lite=1", {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    await res.json().catch(() => null);
+    if (!res.ok) return null;
+    const ms = performance.now() - t0;
+    return ms > 0 && Number.isFinite(ms) ? Math.round(ms) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function recordCanvasAppRttSample(ms: number): void {
+  if (!Number.isFinite(ms) || ms <= 0) return;
+  rttSamples.push(ms);
+  if (rttSamples.length > MAX_RTT_SAMPLES) rttSamples.shift();
+  window.dispatchEvent(new CustomEvent("canvas:network-rtt"));
+}
+
 export function formatCanvasNetworkStatusLabel(status: CanvasNetworkStatus): string {
   if (!status.online) return "离线";
   const parts: string[] = [];
@@ -74,7 +116,7 @@ export function formatCanvasNetworkStatusLabel(status: CanvasNetworkStatus): str
   } else if (status.throughputKbps != null && status.throughputKbps > 0) {
     parts.push(`${status.throughputKbps.toFixed(0)} KB/s`);
   }
-  return parts.join(" · ") || "—";
+  return parts.join(" · ") || "在线";
 }
 
 /** 顶栏网络 · 连接类型 / RTT（不含网速） */
@@ -87,7 +129,7 @@ export function formatCanvasNetworkConnectionLabel(
   if (status.rttMs != null && status.rttMs > 0) {
     parts.push(`RTT ${Math.round(status.rttMs)}ms`);
   }
-  return parts.join(" · ") || "—";
+  return parts.join(" · ") || "在线";
 }
 
 /** 顶栏网络 · 网速（右侧展示） */
@@ -104,32 +146,52 @@ export function formatCanvasNetworkSpeedLabel(
   return null;
 }
 
-export function useCanvasNetworkStatus(): CanvasNetworkStatus {
-  const [status, setStatus] = useState<CanvasNetworkStatus>(() => ({
+function buildNetworkStatus(): CanvasNetworkStatus {
+  const conn = readConnection();
+  return {
     online: typeof navigator !== "undefined" ? navigator.onLine : true,
-    ...readConnection(),
+    effectiveType: conn.effectiveType,
+    downlinkMbps: conn.downlinkMbps,
+    rttMs: resolveEffectiveRttMs(conn.rttMs),
     throughputKbps: averageThroughputKbps(),
-  }));
+  };
+}
+
+export function useCanvasNetworkStatus(): CanvasNetworkStatus {
+  const [status, setStatus] = useState<CanvasNetworkStatus>(() =>
+    buildNetworkStatus(),
+  );
 
   useEffect(() => {
     const sync = () => {
-      setStatus({
-        online: navigator.onLine,
-        ...readConnection(),
-        throughputKbps: averageThroughputKbps(),
-      });
+      setStatus(buildNetworkStatus());
     };
     sync();
     window.addEventListener("online", sync);
     window.addEventListener("offline", sync);
     window.addEventListener("canvas:network-transfer", sync);
+    window.addEventListener("canvas:network-rtt", sync);
     const conn = (navigator as Navigator & { connection?: NetworkInformationLike })
       .connection;
     conn?.addEventListener?.("change", sync);
+
+    let cancelled = false;
+    const ping = async () => {
+      if (cancelled || document.visibilityState !== "visible") return;
+      const ms = await measureCanvasAppRttMs();
+      if (cancelled || ms == null) return;
+      recordCanvasAppRttSample(ms);
+    };
+    void ping();
+    const pingId = window.setInterval(() => void ping(), APP_RTT_POLL_MS);
+
     return () => {
+      cancelled = true;
+      window.clearInterval(pingId);
       window.removeEventListener("online", sync);
       window.removeEventListener("offline", sync);
       window.removeEventListener("canvas:network-transfer", sync);
+      window.removeEventListener("canvas:network-rtt", sync);
       conn?.removeEventListener?.("change", sync);
     };
   }, []);

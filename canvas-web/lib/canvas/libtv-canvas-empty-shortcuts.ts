@@ -22,6 +22,7 @@ type ShortcutStore = {
   ) => string;
   setNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void;
   setEdges: (fn: (edges: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
+  getNodes?: () => CanvasFlowNode[];
   createGroupContaining: (
     childIds: string[],
     args: {
@@ -45,6 +46,7 @@ export async function runLibtvCanvasEmptyShortcut(
       store.addNode(type as CanvasNodeType, position, data),
     setEdges: store.setEdges,
     setNodes: store.setNodes,
+    getNodes: store.getNodes,
     createGroupContaining: (
       childIds: string[],
       opts?: {

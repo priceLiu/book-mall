@@ -45,4 +45,25 @@ describe("formatCanvasNetworkConnectionLabel / SpeedLabel", () => {
     expect(formatCanvasNetworkConnectionLabel(status)).toBe("4G · RTT 80ms");
     expect(formatCanvasNetworkSpeedLabel(status)).toBe("10.5 Mbps");
   });
+
+  it("shows 在线 when browser hides Network Information API", () => {
+    expect(
+      formatCanvasNetworkConnectionLabel({
+        online: true,
+        effectiveType: null,
+        downlinkMbps: null,
+        rttMs: null,
+        throughputKbps: 2,
+      }),
+    ).toBe("在线");
+    expect(
+      formatCanvasNetworkSpeedLabel({
+        online: true,
+        effectiveType: null,
+        downlinkMbps: null,
+        rttMs: null,
+        throughputKbps: 2,
+      }),
+    ).toBe("2 KB/s");
+  });
 });

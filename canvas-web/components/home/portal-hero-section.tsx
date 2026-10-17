@@ -9,9 +9,21 @@ import { usePortalHome } from "@/components/home/portal-home-context";
 import { createPro2BlankCanvasProject } from "@/lib/canvas/create-pro2-blank-project";
 import { assignCanvasProjectLocation } from "@/lib/canvas/canvas-project-navigation";
 import {
+  ensureCanvasPortalSessionOrLogin,
+  isUnauthorizedCanvasPortalError,
+} from "@/lib/canvas/ensure-canvas-portal-session";
+import {
+  CANVAS_PORTAL_ACTION_CREATE_PRO2,
+  CANVAS_PORTAL_ACTION_DUPLICATE_FEATURED,
+  canvasPortalHomeActionHref,
+  markCanvasPortalCreatePro2Intent,
+  markCanvasPortalDuplicateFeaturedIntent,
+} from "@/lib/canvas/portal-post-login-intent";
+import {
   duplicatePortalFeaturedProject,
   type PortalFeaturedProjectSummary,
 } from "@/lib/canvas-api";
+import { canvasLoginHref } from "@/lib/portal-auth-links";
 import { pickRandomItems } from "@/lib/pick-random";
 import { isProjectThumbnailVideoUrl } from "@/lib/canvas/project-thumbnail";
 
@@ -211,12 +223,25 @@ export function PortalHeroSection() {
       setError("未配置主站地址");
       return;
     }
-    setStarting(true);
     setError(null);
+    const loginRedirect = canvasPortalHomeActionHref(CANVAS_PORTAL_ACTION_CREATE_PRO2);
+    if (
+      !(await ensureCanvasPortalSessionOrLogin(base, loginRedirect, {
+        beforeLoginRedirect: markCanvasPortalCreatePro2Intent,
+      }))
+    ) {
+      return;
+    }
+    setStarting(true);
     try {
       const { id } = await createPro2BlankCanvasProject(base);
       assignCanvasProjectLocation(id);
     } catch (e) {
+      if (isUnauthorizedCanvasPortalError(e)) {
+        markCanvasPortalCreatePro2Intent();
+        window.location.href = canvasLoginHref(loginRedirect, base);
+        return;
+      }
       setError(e instanceof Error ? e.message : "创建失败");
       setStarting(false);
     }
@@ -228,12 +253,27 @@ export function PortalHeroSection() {
         setError("未配置主站地址");
         return;
       }
-      setCopyingId(item.id);
       setError(null);
+      const loginRedirect = canvasPortalHomeActionHref(
+        CANVAS_PORTAL_ACTION_DUPLICATE_FEATURED,
+      );
+      if (
+        !(await ensureCanvasPortalSessionOrLogin(base, loginRedirect, {
+          beforeLoginRedirect: () => markCanvasPortalDuplicateFeaturedIntent(item.id),
+        }))
+      ) {
+        return;
+      }
+      setCopyingId(item.id);
       try {
         const created = await duplicatePortalFeaturedProject(base, item.id);
         assignCanvasProjectLocation(created.id);
       } catch (e) {
+        if (isUnauthorizedCanvasPortalError(e)) {
+          markCanvasPortalDuplicateFeaturedIntent(item.id);
+          window.location.href = canvasLoginHref(loginRedirect, base);
+          return;
+        }
         setError(e instanceof Error ? e.message : "复制失败");
         setCopyingId(null);
       }

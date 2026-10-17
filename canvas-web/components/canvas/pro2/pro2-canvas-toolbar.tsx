@@ -119,6 +119,7 @@ export function Pro2CanvasToolbar({
           addNode(type as CanvasNodeType, position, data),
         setEdges,
         setNodes,
+        getNodes: () => useCanvasStore.getState().nodes,
         createGroupContaining: (childIds, opts) =>
           createGroupContaining(childIds, {
             label: opts?.label ?? "",

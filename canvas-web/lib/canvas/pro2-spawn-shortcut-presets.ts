@@ -36,7 +36,10 @@ import {
   GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
 } from "./system-providers";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
-import { flowPositionAtViewportCenter } from "./viewport-placement";
+import {
+  flowCenterForImageToVideoPresetSpawn,
+  flowCenterForShortcutPresetSpawn,
+} from "./pro2-shortcut-preset-placement";
 
 export type Pro2ShortcutPresetId =
   | "image-to-prompt"
@@ -108,14 +111,8 @@ type SpawnStore = {
       pro2ShortcutPreset?: boolean;
     },
   ) => string | null;
+  getNodes?: () => CanvasFlowNode[];
 };
-
-function presetOrigin(anchor?: { x: number; y: number }) {
-  return (
-    anchor ??
-    flowPositionAtViewportCenter("story-pro2-starter") ?? { x: 420, y: 280 }
-  );
-}
 
 const SHORTCUT_GROUP_PAD = 28;
 const SHORTCUT_GROUP_HEADER = 32;
@@ -189,7 +186,13 @@ export function spawnPro2ShortcutPreset(
   anchor?: { x: number; y: number },
 ): { groupId: string | null; focusNodeId: string } {
   const gap = 56;
-  const center = presetOrigin(anchor);
+  const nodes = store.getNodes?.() ?? [];
+  const center = flowCenterForShortcutPresetSpawn(
+    preset,
+    nodes,
+    gap,
+    anchor,
+  );
   const textW = PRO2_TEXT_NODE_WIDTH;
   const imageW = LIBTV_SQUARE_IMAGE_NODE_WIDTH;
   const videoW = SBV1_VIDEO_ENGINE_WIDTH;
@@ -444,7 +447,13 @@ export function spawnLibtvImageToVideoPreset(
 ): { groupId: string | null; focusNodeId: string } {
   const preset: Pro2VideoShortcutPresetId = "image-ref-to-video";
   const gap = 56;
-  const center = presetOrigin(anchor);
+  const nodes = store.getNodes?.() ?? [];
+  const center = flowCenterForImageToVideoPresetSpawn(
+    nodes,
+    gap,
+    edition,
+    anchor,
+  );
   const imageW =
     edition === "sbv1" ? SBV1_IMAGE_NODE_WIDTH : LIBTV_SQUARE_IMAGE_NODE_WIDTH;
   const imageH =
