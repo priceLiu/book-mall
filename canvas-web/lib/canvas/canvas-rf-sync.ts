@@ -2,17 +2,19 @@ import type { CanvasFlowNode } from "./types";
 import { ensureNodeDragHandles } from "./normalize-graph-nodes";
 import { pickStoreToRfPosition } from "./canvas-rf-sync-position";
 import { alignRfNodesMeasuredToBox } from "./canvas-node-changes";
+import { isPro2StyledGroup } from "./pro2-media-group-meta";
 import {
-  isPro2StyledGroup,
-  syncPro2MediaGroupZIndex,
-} from "./pro2-media-group-meta";
+  applyLibtvManipulationLayerToNodes,
+  type LibtvManipulationLayerOptions,
+} from "./libtv-manipulation-layer";
 import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
 
-/** RF 节点列表 · 媒体组 zIndex 与选中态对齐（须写回 useNodesState，勿仅 useMemo 派生） */
+/** RF 节点列表 · 操纵 bundle zIndex（须写回 useNodesState，勿仅 useMemo 派生） */
 export function applyRfNodesMediaGroupZIndex(
   nodes: CanvasFlowNode[],
+  options?: LibtvManipulationLayerOptions,
 ): CanvasFlowNode[] {
-  return syncPro2MediaGroupZIndex(nodes);
+  return applyLibtvManipulationLayerToNodes(nodes, options);
 }
 
 function isStyledMediaGroupNode(

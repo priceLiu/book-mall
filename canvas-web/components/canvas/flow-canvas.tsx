@@ -101,7 +101,10 @@ import {
   insertProjectAssetViaCanvasBridge,
   parseProjectAssetDragPayload,
 } from "@/lib/canvas/spawn-project-asset-on-canvas";
-import { ensureNodeDragHandles } from "@/lib/canvas/normalize-graph-nodes";
+import {
+  bumpLibtvGroupRenderOrderToFront,
+  ensureNodeDragHandles,
+} from "@/lib/canvas/normalize-graph-nodes";
 import {
   CANVAS_RF_FOCUS_NODE_SET_EVENT,
   CANVAS_RF_SELECT_NODE_EVENT,
@@ -114,6 +117,10 @@ import { useLibtvCanvasOverlayClickThrough } from "@/lib/canvas/use-libtv-canvas
 import { scheduleUpdateNodeInternals } from "@/lib/canvas/use-schedule-update-node-internals";
 import { collectNodeInternalsRefreshIds } from "@/lib/canvas/canvas-node-internals-refresh";
 import { filterSpuriousRfEdgeRemoves } from "@/lib/canvas/canvas-edge-change-guard";
+import {
+  sortLibtvNodesWithDraggingLast,
+  type LibtvManipulationLayerOptions,
+} from "@/lib/canvas/libtv-manipulation-layer";
 import {
   applyLibtvEdgesLayerZ,
   CANVAS_EDGE_STROKE_WIDTH,
@@ -350,15 +357,43 @@ function FlowCanvasInner({
     }, 300);
   }, []);
 
+  const libtvManipulationLayerOptions =
+    useCallback((): LibtvManipulationLayerOptions | undefined => {
+      const s = useCanvasStore.getState();
+      const dragId = s.canvasDraggingNodeId;
+      const hoverId = s.dragHoverGroupId;
+      const dragNode = dragId
+        ? s.nodes.find((n) => n.id === dragId)
+        : undefined;
+      const hoverForReparent =
+        hoverId && dragNode?.type !== "group" ? hoverId : null;
+      if (!dragId && !hoverForReparent) return undefined;
+      return {
+        ...(dragId ? { draggingNodeIds: [dragId] } : {}),
+        ...(hoverForReparent ? { hoverGroupIds: [hoverForReparent] } : {}),
+      };
+    }, []);
+
   const resolveRfEdgesFromStore = useCallback(
-    (edges: CanvasFlowEdge[], nodes: CanvasFlowNode[]) => {
+    (
+      edges: CanvasFlowEdge[],
+      nodes: CanvasFlowNode[],
+      rfNodesForLayer?: CanvasFlowNode[],
+    ) => {
       const isLibtv =
         pro2FloatingInspector ||
         sbv1Canvas ||
         hasLibtvMediaCanvasNodes(nodes);
-      return isLibtv ? applyLibtvEdgesLayerZ(edges, nodes) : edges;
+      const layerNodes = rfNodesForLayer ?? nodes;
+      return isLibtv
+        ? applyLibtvEdgesLayerZ(
+            edges,
+            layerNodes,
+            libtvManipulationLayerOptions(),
+          )
+        : edges;
     },
-    [pro2FloatingInspector, sbv1Canvas],
+    [pro2FloatingInspector, sbv1Canvas, libtvManipulationLayerOptions],
   );
 
   const clearDragSnapGuides = useCallback(() => {
@@ -412,6 +447,7 @@ function FlowCanvasInner({
   const setCanvasDraggingNodeId = useCanvasStore(
     (s) => s.setCanvasDraggingNodeId,
   );
+  const canvasDraggingNodeId = useCanvasStore((s) => s.canvasDraggingNodeId);
   const setCanvasViewportMoving = useCanvasStore(
     (s) => s.setCanvasViewportMoving,
   );
@@ -757,7 +793,14 @@ function FlowCanvasInner({
           preserveRfSelection: true,
           preserveRfPositions: useCanvasStore.getState().canvasGeometryDragging,
         });
-        setRfNodes(mergedRf);
+        setRfNodes(
+          libtvCanvas
+            ? applyRfNodesMediaGroupZIndex(
+                mergedRf,
+                libtvManipulationLayerOptions(),
+              )
+            : mergedRf,
+        );
         const internalsIds = collectNodeInternalsRefreshIds(
           prevRf,
           mergedRf,
@@ -781,7 +824,13 @@ function FlowCanvasInner({
           deferStoreGraphSyncRef.current = false;
         }
         armStoreToRfSyncGuard();
-        setRfEdges(resolveRfEdgesFromStore(state.edges, state.nodes));
+        setRfEdges(
+          resolveRfEdgesFromStore(
+            state.edges,
+            state.nodes,
+            getNodes() as CanvasFlowNode[],
+          ),
+        );
       }
     });
     return unsub;
@@ -789,9 +838,37 @@ function FlowCanvasInner({
     armStoreToRfSyncGuard,
     getNodes,
     refreshRfInternalsAfterGeometry,
+    libtvManipulationLayerOptions,
+    libtvCanvas,
     resolveRfEdgesFromStore,
     setRfNodes,
     setRfEdges,
+  ]);
+
+  /** 拖动 / 拖入悬停组 · 整组 + 连线抬层（悬停变化时不一定有 position 帧） */
+  useEffect(() => {
+    if (!libtvCanvas) return;
+    const opts = libtvManipulationLayerOptions();
+    setRfNodes((prev) => applyRfNodesMediaGroupZIndex(prev, opts));
+    setRfEdges(() => {
+      const layerNodes = applyRfNodesMediaGroupZIndex(
+        getNodes() as CanvasFlowNode[],
+        opts,
+      );
+      return applyLibtvEdgesLayerZ(
+        useCanvasStore.getState().edges,
+        layerNodes,
+        opts,
+      );
+    });
+  }, [
+    canvasDraggingNodeId,
+    dragHoverGroupId,
+    getNodes,
+    libtvCanvas,
+    libtvManipulationLayerOptions,
+    setRfEdges,
+    setRfNodes,
   ]);
 
   /** 撤销/重做后强制 RF 与 store 对齐（拖动中 defer 同步时 undo 可能不生效） */
@@ -1237,15 +1314,24 @@ function FlowCanvasInner({
         }
         const next = applyNodeChanges(batch, base) as CanvasFlowNode[];
         const aligned = libtvCanvas ? alignRfNodesMeasuredToBox(next) : next;
+        const manipulationOpts = libtvManipulationLayerOptions();
         // LibTV：直接 setRfNodes，勿在 onNodesChange 内再调 onRfNodesChange（嵌套 Maximum update depth）
         if (libtvCanvas && batch.every((c) => c.type === "select")) {
-          const withZ = applyRfNodesMediaGroupZIndex(aligned);
+          const withZ = applyRfNodesMediaGroupZIndex(aligned, manipulationOpts);
           setRfNodes(withZ);
+          setRfEdges(
+            applyLibtvEdgesLayerZ(
+              useCanvasStore.getState().edges,
+              withZ,
+              manipulationOpts,
+            ),
+          );
           return withZ;
         }
         if (libtvCanvas) {
-          setRfNodes(aligned);
-          return aligned;
+          const withZ = applyRfNodesMediaGroupZIndex(aligned, manipulationOpts);
+          setRfNodes(withZ);
+          return withZ;
         }
         onRfNodesChange(batch);
         return next;
@@ -1484,12 +1570,14 @@ function FlowCanvasInner({
       setCanvasGeometryDragging,
       setCanvasDraggingNodeId,
       libtvCanvas,
+      libtvManipulationLayerOptions,
       getNodes,
       flushAutosaveAfterDrag,
       performGroupResizeCommit,
       clearGroupResizeSession,
       rfStore,
       setRfNodes,
+      setRfEdges,
     ],
   );
 
@@ -1948,6 +2036,23 @@ function FlowCanvasInner({
           }
         }
         commitFlowPositionsFromRf();
+        if (libtvCanvas) {
+          const order = bumpLibtvGroupRenderOrderToFront(
+            getNodes() as CanvasFlowNode[],
+            node.id,
+          ).map((n) => n.id);
+          setNodes((prev) => {
+            const byId = new Map(prev.map((n) => [n.id, n]));
+            return order
+              .map((id) => byId.get(id))
+              .filter((n): n is CanvasFlowNode => Boolean(n));
+          });
+          setRfNodes((prev) =>
+            applyRfNodesMediaGroupZIndex(
+              bumpLibtvGroupRenderOrderToFront(prev, node.id),
+            ),
+          );
+        }
         const groupRf = getNodes() as CanvasFlowNode[];
         refreshRfInternalsAfterGeometry(
           groupRf
@@ -1994,6 +2099,20 @@ function FlowCanvasInner({
         restoreLiftedGroupChildrenExtent();
       }
       setDragHoverGroup(null);
+      if (libtvCanvas) {
+        const opts = libtvManipulationLayerOptions();
+        setRfNodes((prev) => applyRfNodesMediaGroupZIndex(prev, opts));
+        setRfEdges(
+          applyLibtvEdgesLayerZ(
+            useCanvasStore.getState().edges,
+            applyRfNodesMediaGroupZIndex(
+              getNodes() as CanvasFlowNode[],
+              opts,
+            ),
+            opts,
+          ),
+        );
+      }
       if (libtvCanvas && node.type && node.type !== "group") {
         if (libtvMultiNodeDragRef.current) {
           // 框选后拖整组松手：保留多选，交给 Pro2SelectionToolbar；勿收成单节点 Dock
@@ -2020,12 +2139,15 @@ function FlowCanvasInner({
       getNodes,
       getZoom,
       libtvCanvas,
+      libtvManipulationLayerOptions,
       reparentNode,
       refreshRfInternalsAfterGeometry,
       restoreLiftedGroupChildrenExtent,
       setDragHoverGroup,
+      setRfEdges,
       setRfNodes,
       setCanvasGeometryDragging,
+      setNodes,
     ],
   );
 
@@ -2200,18 +2322,24 @@ function FlowCanvasInner({
     [setConnectingFrom, screenToFlowPosition, getNodes, onConnect, clearCanvasPaneSelection],
   );
 
-  // 分组拖入高亮：仅 patch 目标 group，避免每帧克隆全图 nodes
+  // 分组拖入高亮 + 拖动节点置后绘制（避免 roots 段落在 children 之下穿插）
   const decoratedNodes = useMemo(() => {
-    if (!dragHoverGroupId) return rfNodes;
-    return rfNodes.map((n) =>
-      n.id === dragHoverGroupId
-        ? {
-            ...n,
-            className: `${n.className ?? ""} is-drop-target`.trim(),
-          }
-        : n,
-    );
-  }, [rfNodes, dragHoverGroupId]);
+    let nodes = rfNodes;
+    if (dragHoverGroupId) {
+      nodes = rfNodes.map((n) => {
+        if (n.id !== dragHoverGroupId) return n;
+        const base = (n.className ?? "")
+          .replace(/\bis-drop-target\b/g, "")
+          .trim();
+        return {
+          ...n,
+          className: `${base} is-drop-target`.trim(),
+        };
+      });
+    }
+    if (!libtvCanvas || !canvasDraggingNodeId) return nodes;
+    return sortLibtvNodesWithDraggingLast(nodes, [canvasDraggingNodeId]);
+  }, [rfNodes, dragHoverGroupId, canvasDraggingNodeId, libtvCanvas]);
 
   const EDGE_FOCUS_MAX = libtvCanvas ? 256 : 48;
 

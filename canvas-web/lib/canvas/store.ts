@@ -46,6 +46,7 @@ import {
   sortNodesForReactFlow,
   stripPersistedNodeSelection,
 } from "./normalize-graph-nodes";
+import { reflowOverlappingCanvasGroups } from "./pro2-shortcut-preset-placement";
 import {
   maybeApplyLibtvMediaAspectPresetForNewNode,
   maybeApplyLibtvMediaAspectPresetFromPatch,
@@ -186,6 +187,7 @@ function finalizeHydratedGraph(
   nextNodes = applyStoryColumnHeights(finalized.nodes, finalized.edges);
   nextEdges = finalized.edges;
   nextNodes = relayoutStaleSbv1MediaGroups(nextNodes, nextEdges);
+  nextNodes = reflowOverlappingCanvasGroups(nextNodes);
   return {
     nodes: ensureNodeDragHandles(nextNodes),
     edges: nextEdges,
@@ -1476,24 +1478,26 @@ export const useCanvasStore = create<CanvasState>()(
         }
         set((state) =>
           withGraphRevision(state, {
-            nodes: state.nodes.map((n) =>
-              n.id === id
-                ? {
-                    ...n,
-                    width: size.width,
-                    height: size.height,
-                    style: {
-                      ...(typeof n.style === "object" && n.style ? n.style : {}),
+            nodes: reflowOverlappingCanvasGroups(
+              state.nodes.map((n) =>
+                n.id === id
+                  ? {
+                      ...n,
                       width: size.width,
                       height: size.height,
-                    },
-                    data: {
-                      ...n.data,
-                      ...fitMeta,
-                      manualSize: false,
-                    },
-                  }
-                : n,
+                      style: {
+                        ...(typeof n.style === "object" && n.style ? n.style : {}),
+                        width: size.width,
+                        height: size.height,
+                      },
+                      data: {
+                        ...n.data,
+                        ...fitMeta,
+                        manualSize: false,
+                      },
+                    }
+                  : n,
+              ),
             ),
           }),
         );
@@ -1819,10 +1823,16 @@ export const useCanvasStore = create<CanvasState>()(
           !pro2ShortcutPreset &&
             (pro2Kind || sbv1Styled || (pro2Styled && mediaGridChildrenOnly)),
         );
-        const PADDING =
-          usePro2MediaGrid || pro2Styled || sbv1Styled
+        const SHORTCUT_PRESET_GROUP_PAD = 28;
+        const SHORTCUT_PRESET_GROUP_HEADER = 32;
+        const PADDING = pro2ShortcutPreset
+          ? SHORTCUT_PRESET_GROUP_PAD
+          : usePro2MediaGrid || pro2Styled || sbv1Styled
             ? PRO2_MEDIA_GROUP_PAD
             : 84;
+        const shortcutPresetHeader = pro2ShortcutPreset
+          ? SHORTCUT_PRESET_GROUP_HEADER
+          : 0;
         const boxes = children.map((c) => {
           const m = measuredSizes?.[c.id];
           const cell = usePro2MediaGrid
@@ -1854,9 +1864,9 @@ export const useCanvasStore = create<CanvasState>()(
 
         const groupId = `g_${nanoid(8)}`;
         const groupX = minX - PADDING;
-        const groupY = minY - PADDING;
+        const groupY = minY - PADDING - shortcutPresetHeader;
         const groupW = maxX - minX + PADDING * 2;
-        const groupH = maxY - minY + PADDING * 2;
+        const groupH = maxY - minY + PADDING * 2 + shortcutPresetHeader;
 
         const groupData: Record<string, unknown> = {
           __t: "group",

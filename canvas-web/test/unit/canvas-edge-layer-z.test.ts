@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { CANVAS_EDGE_Z_MANIPULATION } from "@/lib/canvas/libtv-manipulation-layer";
 import {
   CANVAS_EDGE_Z_BEHIND_GROUP,
   CANVAS_EDGE_Z_DEFAULT,
@@ -82,6 +83,15 @@ describe("canvas-edge-layer-z", () => {
     expect(
       isEdgeCrossingGroupBoundary({ source: "out1", target: "vid1" }, nodes),
     ).toBe(true);
+  });
+
+  it("elevates edges when an endpoint is in the manipulation bundle", () => {
+    const selectedImg = { ...img, selected: true };
+    const activeNodes = [group, selectedImg, vid, outside];
+    const edge = { id: "e-manip", source: "img1", target: "vid1" };
+    expect(resolveLibtvCanvasEdgeZIndex(edge, activeNodes, null)).toBe(
+      CANVAS_EDGE_Z_MANIPULATION,
+    );
   });
 
   it("keeps fully outside edges at default layer", () => {

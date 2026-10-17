@@ -21,24 +21,208 @@ import {
   SBV1_IMAGE_NODE_HEIGHT,
   SBV1_IMAGE_NODE_WIDTH,
 } from "./sbv1-node-chrome";
-import { flowPositionAtViewportCenter } from "./viewport-placement";
+import { flowViewportCenterFlow } from "./viewport-placement";
 
 export const SHORTCUT_PRESET_SPAWN_GAP = 64;
 const MAX_SHIFT_ITER = 24;
 
-const SHORTCUT_GROUP_PAD = 28;
-const SHORTCUT_GROUP_HEADER = 32;
+export const SHORTCUT_GROUP_PAD = 28;
+export const SHORTCUT_GROUP_HEADER = 32;
 
 type Rect = { x: number; y: number; w: number; h: number };
 
-function nodeRect(n: CanvasFlowNode): Rect {
+function parseNodeDim(v: unknown, fallback: number): number {
+  if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
+  if (typeof v === "string") {
+    const n = Number.parseFloat(v);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return fallback;
+}
+
+function nodeStyleDims(n: CanvasFlowNode): { w: number; h: number } {
   const style =
     typeof n.style === "object" && n.style
-      ? (n.style as { width?: number; height?: number })
+      ? (n.style as { width?: unknown; height?: unknown })
       : {};
-  const w = Number(n.width ?? style.width ?? n.measured?.width ?? 240);
-  const h = Number(n.height ?? style.height ?? n.measured?.height ?? 200);
-  return { x: n.position.x, y: n.position.y, w, h };
+  return {
+    w: parseNodeDim(
+      n.width ?? style.width ?? n.measured?.width,
+      240,
+    ),
+    h: parseNodeDim(
+      n.height ?? style.height ?? n.measured?.height,
+      200,
+    ),
+  };
+}
+
+function isShortcutPresetGroup(n: CanvasFlowNode): boolean {
+  if (n.type !== "group") return false;
+  const d = n.data as { pro2ShortcutPreset?: boolean; label?: string };
+  if (d.pro2ShortcutPreset) return true;
+  const label = String(d.label ?? "");
+  return label.startsWith("预设 -");
+}
+
+function groupOrigin(group: CanvasFlowNode, nodes: CanvasFlowNode[]): {
+  x: number;
+  y: number;
+} {
+  let x = group.position.x;
+  let y = group.position.y;
+  let cur = group.parentId;
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const seen = new Set<string>();
+  while (cur && !seen.has(cur)) {
+    seen.add(cur);
+    const p = byId.get(cur);
+    if (!p) break;
+    x += p.position.x;
+    y += p.position.y;
+    cur = p.parentId;
+  }
+  return { x, y };
+}
+
+/** 组框与子节点绝对范围的并集（子节点撑出组框时也算占用） */
+export function shortcutPresetGroupObstacleRect(
+  group: CanvasFlowNode,
+  nodes: CanvasFlowNode[],
+): Rect {
+  const origin = groupOrigin(group, nodes);
+  const box = nodeStyleDims(group);
+  let minX = origin.x;
+  let minY = origin.y;
+  let maxX = origin.x + box.w;
+  let maxY = origin.y + box.h;
+
+  for (const c of nodes) {
+    if (c.parentId !== group.id || c.type === "group") continue;
+    const { w, h } = nodeStyleDims(c);
+    const ax = origin.x + c.position.x;
+    const ay = origin.y + c.position.y;
+    minX = Math.min(minX, ax - SHORTCUT_GROUP_PAD);
+    minY = Math.min(minY, ay - SHORTCUT_GROUP_PAD - SHORTCUT_GROUP_HEADER);
+    maxX = Math.max(maxX, ax + w + SHORTCUT_GROUP_PAD);
+    maxY = Math.max(maxY, ay + h + SHORTCUT_GROUP_PAD);
+  }
+
+  return { x: minX, y: minY, w: Math.max(1, maxX - minX), h: Math.max(1, maxY - minY) };
+}
+
+function shouldSeparateCanvasGroup(n: CanvasFlowNode): boolean {
+  if (n.type !== "group" || n.parentId) return false;
+  if (n.id.startsWith("sc-group-")) return false;
+  const d = n.data as {
+    pro2ShortcutPreset?: boolean;
+    pro2Styled?: boolean;
+    sbv1Styled?: boolean;
+    pro2Kind?: string;
+    label?: string;
+  };
+  if (d.pro2ShortcutPreset || d.pro2Styled || d.sbv1Styled || d.pro2Kind) {
+    return true;
+  }
+  return String(d.label ?? "").startsWith("预设");
+}
+
+function growGroupBoxToChildren(
+  nodes: CanvasFlowNode[],
+  group: CanvasFlowNode,
+): CanvasFlowNode[] {
+  const origin = groupOrigin(group, nodes);
+  let maxX = origin.x;
+  let maxY = origin.y;
+  let hasChild = false;
+  for (const c of nodes) {
+    if (c.parentId !== group.id || c.type === "group") continue;
+    hasChild = true;
+    const { w, h } = nodeStyleDims(c);
+    maxX = Math.max(maxX, origin.x + c.position.x + w + SHORTCUT_GROUP_PAD);
+    maxY = Math.max(maxY, origin.y + c.position.y + h + SHORTCUT_GROUP_PAD);
+  }
+  if (!hasChild) return nodes;
+  const needW = Math.ceil(maxX - origin.x);
+  const needH = Math.ceil(maxY - origin.y);
+  const cur = nodeStyleDims(group);
+  if (cur.w + 0.5 >= needW && cur.h + 0.5 >= needH) return nodes;
+  const width = Math.max(cur.w, needW);
+  const height = Math.max(cur.h, needH);
+  return nodes.map((n) =>
+    n.id === group.id
+      ? ({
+          ...n,
+          width,
+          height,
+          style: {
+            ...(typeof n.style === "object" && n.style ? n.style : {}),
+            width,
+            height,
+          },
+        } as CanvasFlowNode)
+      : n,
+  );
+}
+
+/**
+ * 快捷预设 / 媒体组：组框包住子节点，重叠的组按从左到右的顺序向右推开。
+ * 视频生成后节点变宽、或复制组时组宽偏小，都会走到这里。
+ */
+export function reflowOverlappingCanvasGroups(
+  nodes: CanvasFlowNode[],
+  gap = SHORTCUT_PRESET_SPAWN_GAP,
+): CanvasFlowNode[] {
+  const targets = nodes.filter(shouldSeparateCanvasGroup);
+  if (targets.length === 0) return nodes;
+
+  let next = nodes;
+  for (const g of targets) {
+    next = growGroupBoxToChildren(next, g);
+  }
+
+  const ordered = next
+    .filter(shouldSeparateCanvasGroup)
+    .sort(
+      (a, b) =>
+        a.position.x - b.position.x ||
+        a.position.y - b.position.y ||
+        a.id.localeCompare(b.id),
+    );
+
+  const placed: Rect[] = [];
+  const shifts = new Map<string, number>();
+  for (const g of ordered) {
+    const rect = shortcutPresetGroupObstacleRect(g, next);
+    let dx = 0;
+    for (let i = 0; i < MAX_SHIFT_ITER; i++) {
+      const shifted: Rect = { ...rect, x: rect.x + dx };
+      const hit = placed.find((o) => blocksHorizontal(shifted, o, gap));
+      if (!hit) break;
+      dx = hit.x + hit.w + gap - rect.x;
+    }
+    if (dx !== 0) shifts.set(g.id, dx);
+    placed.push({ ...rect, x: rect.x + dx });
+  }
+
+  if (shifts.size === 0 && next === nodes) return nodes;
+  if (shifts.size === 0) return next;
+
+  return next.map((n) => {
+    const dx = shifts.get(n.id);
+    if (!dx) return n;
+    return {
+      ...n,
+      position: { x: n.position.x + dx, y: n.position.y },
+    };
+  });
+}
+
+/** 垂直范围相交，且水平间距小于 gap */
+function blocksHorizontal(a: Rect, b: Rect, gap: number): boolean {
+  const yOverlap = !(a.y + a.h <= b.y || b.y + b.h <= a.y);
+  if (!yOverlap) return false;
+  return !(a.x + a.w + gap <= b.x || b.x + b.w + gap <= a.x);
 }
 
 function rectsOverlap(a: Rect, b: Rect, margin: number): boolean {
@@ -47,13 +231,6 @@ function rectsOverlap(a: Rect, b: Rect, margin: number): boolean {
     b.x + b.w + margin <= a.x ||
     a.y + a.h + margin <= b.y ||
     b.y + b.h + margin <= a.y
-  );
-}
-
-function isShortcutPresetGroup(n: CanvasFlowNode): boolean {
-  return (
-    n.type === "group" &&
-    Boolean((n.data as { pro2ShortcutPreset?: boolean }).pro2ShortcutPreset)
   );
 }
 
@@ -115,10 +292,14 @@ export function resolveShortcutPresetSpawnCenter(
   footprintH: number,
   gap = SHORTCUT_PRESET_SPAWN_GAP,
 ): { x: number; y: number } {
-  const obstacles = nodes.filter(isShortcutPresetGroup).map(nodeRect);
+  const presetGroups = nodes.filter(isShortcutPresetGroup);
+  const obstacles = presetGroups.map((g) =>
+    shortcutPresetGroupObstacleRect(g, nodes),
+  );
   if (obstacles.length === 0) return baseCenter;
 
-  let cx = baseCenter.x;
+  const rightmost = Math.max(...obstacles.map((o) => o.x + o.w));
+  let cx = rightmost + gap + footprintW / 2;
   const cy = baseCenter.y;
 
   for (let i = 0; i < MAX_SHIFT_ITER; i++) {
@@ -135,6 +316,41 @@ export function resolveShortcutPresetSpawnCenter(
   return { x: cx, y: cy };
 }
 
+/** relayout 后若与其它快捷组重叠，整组向右平移 */
+export function nudgeShortcutPresetGroupClearOfPeers(
+  nodes: CanvasFlowNode[],
+  groupId: string,
+  gap = SHORTCUT_PRESET_SPAWN_GAP,
+): CanvasFlowNode[] {
+  const group = nodes.find((n) => n.id === groupId);
+  if (!group || !isShortcutPresetGroup(group)) return nodes;
+
+  let selfRect = shortcutPresetGroupObstacleRect(group, nodes);
+  const others = nodes
+    .filter((n) => isShortcutPresetGroup(n) && n.id !== groupId)
+    .map((n) => shortcutPresetGroupObstacleRect(n, nodes));
+
+  if (others.length === 0) return nodes;
+
+  let dx = 0;
+  for (let i = 0; i < MAX_SHIFT_ITER; i++) {
+    const shifted: Rect = { ...selfRect, x: selfRect.x + dx };
+    const hit = others.find((o) => rectsOverlap(shifted, o, gap));
+    if (!hit) break;
+    dx = hit.x + hit.w + gap - selfRect.x;
+  }
+  if (dx === 0) return nodes;
+
+  return nodes.map((n) =>
+    n.id === groupId
+      ? {
+          ...n,
+          position: { x: n.position.x + dx, y: n.position.y },
+        }
+      : n,
+  );
+}
+
 export function flowCenterForShortcutPresetSpawn(
   preset: Pro2ShortcutPresetId,
   nodes: CanvasFlowNode[],
@@ -143,9 +359,7 @@ export function flowCenterForShortcutPresetSpawn(
 ): { x: number; y: number } {
   const content = shortcutPresetContentSize(preset, gap);
   const fp = shortcutPresetGroupFootprint(content.w, content.h);
-  const base =
-    anchor ??
-    flowPositionAtViewportCenter("story-pro2-starter") ?? { x: 420, y: 280 };
+  const base = anchor ?? flowViewportCenterFlow();
   return resolveShortcutPresetSpawnCenter(nodes, base, fp.w, fp.h);
 }
 
@@ -164,8 +378,6 @@ export function flowCenterForImageToVideoPresetSpawn(
   const contentW = imageW + gap + videoW;
   const contentH = Math.max(imageH, SBV1_VIDEO_ENGINE_HEIGHT);
   const fp = shortcutPresetGroupFootprint(contentW, contentH);
-  const base =
-    anchor ??
-    flowPositionAtViewportCenter("story-pro2-starter") ?? { x: 420, y: 280 };
+  const base = anchor ?? flowViewportCenterFlow();
   return resolveShortcutPresetSpawnCenter(nodes, base, fp.w, fp.h);
 }

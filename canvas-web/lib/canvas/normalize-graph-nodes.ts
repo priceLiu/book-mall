@@ -20,6 +20,7 @@ import {
   isLibtvMediaNodeBoxStale,
   reconcileLibtvMediaNodeBoxSizes,
 } from "./libtv-media-node-size";
+import { reflowOverlappingCanvasGroups } from "./pro2-shortcut-preset-placement";
 
 const GROUP_PADDING = 84;
 const GROUP_HEADER = 40;
@@ -287,6 +288,34 @@ export function sortNodesForReactFlow(
       !isGroupNode(n.type) && n.parentId && groupIds.has(n.parentId),
   );
   return [...groups, ...roots, ...children];
+}
+
+/**
+ * 将指定媒体组及其直接子节点移到 RF 绘制顺序末尾（同 z 时后绘制在上）。
+ * 组拖到另一组上方松手后，避免「数组靠后的组」永远压住先创建的组。
+ */
+export function bumpLibtvGroupRenderOrderToFront(
+  nodes: CanvasFlowNode[],
+  groupId: string,
+): CanvasFlowNode[] {
+  const group = nodes.find((n) => n.id === groupId && isGroupNode(n.type));
+  if (!group) return nodes;
+  const bundleIds = new Set([
+    groupId,
+    ...nodes.filter((n) => n.parentId === groupId).map((n) => n.id),
+  ]);
+  const rest = nodes.filter((n) => !bundleIds.has(n.id));
+  const bundleChildren = nodes.filter(
+    (n) => n.parentId === groupId && n.id !== groupId,
+  );
+  const next = sortNodesForReactFlow([...rest, group, ...bundleChildren]);
+  if (
+    next.length === nodes.length &&
+    next.every((n, i) => n.id === nodes[i]?.id)
+  ) {
+    return nodes;
+  }
+  return next;
 }
 
 /** 不应出现在分组内的漫剧顶层节点 */
@@ -1006,11 +1035,11 @@ export function normalizeCanvasNodes(
       edges ?? [],
     ),
   );
-  const withPro2Groups = sized.some((n) =>
-    String(n.type ?? "").startsWith("story-pro2-"),
-  )
-    ? collapsePro2VideoColumnAnchors(reconcilePro2MediaGroupMetadata(sized))
-    : sized;
+  const withPro2Groups = reflowOverlappingCanvasGroups(
+    sized.some((n) => String(n.type ?? "").startsWith("story-pro2-"))
+      ? collapsePro2VideoColumnAnchors(reconcilePro2MediaGroupMetadata(sized))
+      : sized,
+  );
 
   if (!hasStoryTemplateGroups(withPro2Groups)) {
     const sorted = sortNodesForReactFlow(repairOrphanParentIds(withPro2Groups));

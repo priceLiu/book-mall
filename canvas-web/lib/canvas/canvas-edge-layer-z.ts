@@ -1,3 +1,8 @@
+import {
+  CANVAS_EDGE_Z_MANIPULATION,
+  edgeInManipulationBundle,
+  type LibtvManipulationLayerOptions,
+} from "./libtv-manipulation-layer";
 import { isPro2StyledGroup } from "./pro2-media-group-meta";
 import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
@@ -85,6 +90,9 @@ export function isEdgeTouchingGroupedNode(
 }
 
 export function canvasEdgeLayerClassName(zIndex: number): string | undefined {
+  if (zIndex === CANVAS_EDGE_Z_MANIPULATION) {
+    return "canvas-edge-manipulation-active";
+  }
   if (zIndex === CANVAS_EDGE_Z_NODE_GAP) {
     return "canvas-edge-node-gap";
   }
@@ -102,13 +110,17 @@ export function canvasEdgeLayerClassName(zIndex: number): string | undefined {
 export function applyLibtvEdgesLayerZ(
   edges: CanvasFlowEdge[],
   nodes: CanvasFlowNode[],
+  options?: LibtvManipulationLayerOptions,
 ): CanvasFlowEdge[] {
   let changed = false;
   const next = edges.map((e) => {
-    const z = resolveLibtvCanvasEdgeZIndex(e, nodes, null);
+    const z = resolveLibtvCanvasEdgeZIndex(e, nodes, options);
     const layerClass = canvasEdgeLayerClassName(z);
     const baseClass = (e.className ?? "")
-      .replace(/\bcanvas-edge-(?:node-gap|behind-group)\b/g, "")
+      .replace(
+        /\bcanvas-edge-(?:node-gap|behind-group|manipulation-active)\b/g,
+        "",
+      )
       .trim();
     const className = layerClass
       ? `${baseClass} ${layerClass}`.trim()
@@ -129,11 +141,19 @@ export function applyLibtvEdgesLayerZ(
 export function resolveLibtvCanvasEdgeZIndex(
   edge: CanvasFlowEdge,
   nodes: CanvasFlowNode[],
-  focusNodeIds?: Set<string> | null,
+  options?: LibtvManipulationLayerOptions | Set<string> | null,
 ): number {
+  const layerOptions: LibtvManipulationLayerOptions | undefined =
+    options instanceof Set
+      ? { draggingNodeIds: [...options] }
+      : options ?? undefined;
+  if (edgeInManipulationBundle(edge, nodes, layerOptions)) {
+    return CANVAS_EDGE_Z_MANIPULATION;
+  }
   if (
-    focusNodeIds?.size &&
-    (focusNodeIds.has(edge.source) || focusNodeIds.has(edge.target))
+    options instanceof Set &&
+    options.size &&
+    (options.has(edge.source) || options.has(edge.target))
   ) {
     return CANVAS_EDGE_Z_NODE_GAP;
   }

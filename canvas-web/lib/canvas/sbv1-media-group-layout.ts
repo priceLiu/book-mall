@@ -328,6 +328,9 @@ export function applySbv1MediaGroupRelayout(
 ): CanvasFlowNode[] {
   const group = nodes.find((n) => n.id === groupId && n.type === "group");
   if (!group) return nodes;
+  if ((group.data as { pro2ShortcutPreset?: boolean }).pro2ShortcutPreset) {
+    return nodes;
+  }
   const force = opts?.force === true;
   const mode = opts?.mode ?? "auto";
   if (

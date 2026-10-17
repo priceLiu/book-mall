@@ -36,6 +36,8 @@ export function isSbv1MediaGroup(
 ): boolean {
   if (node.type !== "group") return false;
   const d = node.data as GroupNodeData;
+  // 快捷预设（文生视频等）是横向成组，不能走 sbv1 宫格，否则会把邻组挤叠在一起
+  if (d.pro2ShortcutPreset) return false;
   // Pro2 媒体组（含分镜视频组内 sbv1-video-engine）走 Pro2MediaGroupToolbar，避免双顶栏
   if (d.pro2Kind) return false;
   if (d.sbv1Styled) return true;

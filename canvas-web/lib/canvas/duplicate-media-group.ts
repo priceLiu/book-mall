@@ -7,6 +7,7 @@ import {
   ensurePro2HubToMediaGroupChildEdges,
 } from "./pro2-hub-media-group-edge";
 import { PRO2_MEDIA_GROUP_EXTRA, PRO2_MEDIA_GROUP_PAD } from "./pro2-media-group-layout";
+import { reflowOverlappingCanvasGroups } from "./pro2-shortcut-preset-placement";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 
 const COPY_GAP = 80;
@@ -146,5 +147,9 @@ export function duplicateMediaGroupInGraph(
 
   nextEdges = [...nextEdges, ...duplicatedInternalEdges];
 
-  return { nodes: nextNodes, edges: nextEdges, newGroupId };
+  return {
+    nodes: reflowOverlappingCanvasGroups(nextNodes),
+    edges: nextEdges,
+    newGroupId,
+  };
 }

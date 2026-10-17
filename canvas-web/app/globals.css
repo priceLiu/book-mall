@@ -362,20 +362,33 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
   box-shadow: none !important;
 }
 
-/* 拖动时用 GPU 合成层，减轻拖影/滞后感 */
+/* 拖动时用 GPU 合成层，减轻拖影/滞后感（操纵 bundle 见 .libtv-manipulation-active） */
 .react-flow__node.dragging {
   will-change: transform;
   z-index: 1000 !important;
 }
 
-/* 媒体组容器始终位于普通节点之下，避免拖动时遮挡子节点 */
+/* 默认：组壳在子节点之下；操纵中的整组由 .libtv-manipulation-active 抬升 */
 .canvas-flow-wrap .react-flow__node-group {
   z-index: 5 !important;
 }
 
-/* 分组拖动时不能抬到子节点上层，否则会出现“只见组底色、子节点消失” */
 .react-flow__node-group.dragging {
   z-index: 5 !important;
+}
+
+.canvas-flow-wrap .react-flow__node-group.libtv-manipulation-active,
+.canvas-flow-wrap .react-flow__node-group.libtv-manipulation-active.dragging {
+  z-index: 1200 !important;
+}
+
+.canvas-flow-wrap
+  .react-flow__node.libtv-manipulation-active:not(.react-flow__node-group),
+.canvas-flow-wrap
+  .react-flow__node.libtv-manipulation-active.dragging:not(
+    .react-flow__node-group
+  ) {
+  z-index: 1201 !important;
 }
 
 .react-flow__node.dragging .canvas-node-shell {
@@ -408,7 +421,7 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
 
 /*
  * 连线 / 节点容器均勿建 stacking context，否则边的 svg zIndex 无法与节点交错：
- * 组框 z=5 · 连线 z=12 · 媒体子节点 z=22 · 选中子节点 z=1201
+ * 组框 z=5 · 连线 z=12 · 媒体子节点 z=22 · 操纵 bundle 组 1200 / 子 1201 / 边 1199
  * 连线在节点间隙与组底色上可见，但不压住卡片本体
  */
 .canvas-flow-wrap .react-flow__edges,
@@ -420,6 +433,11 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
 }
 .canvas-flow-wrap .react-flow__edges svg:has(.canvas-edge-node-gap) {
   z-index: 12 !important;
+}
+.canvas-flow-wrap
+  .react-flow__edges
+  svg:has(.canvas-edge-manipulation-active) {
+  z-index: 1199 !important;
 }
 /* 非 group 节点默认在连线之上；选中再抬一层（勿写回 node.zIndex，否则 store↔RF 死循环） */
 .canvas-flow-wrap .react-flow__node:not(.react-flow__node-group) {
@@ -744,15 +762,22 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
   outline: 3px solid var(--canvas-accent) !important;
   outline-offset: -2px;
   box-shadow: 0 0 0 6px var(--canvas-accent-glow) !important;
-  background: rgba(167, 139, 250, 0.06) !important;
 }
 
-/* Pro2 媒体组（图 1）：拖入高亮保持细灰边，不用彩色虚线 */
+/* Pro2 媒体组（图 1）：拖入高亮仅描边 · 勿改 background（会盖掉 color-mix 组底色） */
 .react-flow__node-group.is-drop-target .canvas-group-node.pro2-media-group-node {
   outline: 1px solid rgba(255, 255, 255, 0.28) !important;
   outline-offset: -1px;
   box-shadow: none !important;
-  background-color: #16161e !important;
+}
+
+.canvas-flow-wrap
+  .react-flow__node.libtv-manipulation-drag-top:not(.react-flow__node-group),
+.canvas-flow-wrap
+  .react-flow__node.libtv-manipulation-drag-top.dragging:not(
+    .react-flow__node-group
+  ) {
+  z-index: 1202 !important;
 }
 
 /* 生成中节点：边框呼吸光晕 */

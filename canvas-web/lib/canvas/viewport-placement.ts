@@ -60,6 +60,17 @@ export function flowPositionAtViewportCenter(
   };
 }
 
+/** 视口中心 · flow 坐标（用于成组 spawn 的中心点，非节点左上角） */
+export function flowViewportCenterFlow(): { x: number; y: number } {
+  const container = placementCtx?.getContainer() ?? null;
+  if (!container || !placementCtx) return { x: 420, y: 280 };
+  const rect = container.getBoundingClientRect();
+  return placementCtx.screenToFlowPosition({
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2,
+  });
+}
+
 /** 屏幕坐标 → 新节点左上角（空白处双击菜单落点等）。 */
 export function flowPositionAtScreenPoint(
   type: CanvasNodeType,

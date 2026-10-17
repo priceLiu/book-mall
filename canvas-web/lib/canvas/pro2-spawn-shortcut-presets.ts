@@ -39,6 +39,9 @@ import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import {
   flowCenterForImageToVideoPresetSpawn,
   flowCenterForShortcutPresetSpawn,
+  nudgeShortcutPresetGroupClearOfPeers,
+  SHORTCUT_GROUP_HEADER,
+  SHORTCUT_GROUP_PAD,
 } from "./pro2-shortcut-preset-placement";
 
 export type Pro2ShortcutPresetId =
@@ -114,9 +117,6 @@ type SpawnStore = {
   getNodes?: () => CanvasFlowNode[];
 };
 
-const SHORTCUT_GROUP_PAD = 28;
-const SHORTCUT_GROUP_HEADER = 32;
-
 /** 快捷预设组 · 创建组后立即水平重排子节点 */
 function relayoutShortcutPresetGroup(
   setNodes: SpawnStore["setNodes"],
@@ -145,10 +145,27 @@ function relayoutShortcutPresetGroup(
   setNodes((prev) => {
     const group = prev.find((n) => n.id === groupId);
     if (!group) return prev;
-    return prev.map((n) => {
+
+    const anchorId = children[0]?.id;
+    const anchorBefore = anchorId
+      ? prev.find((n) => n.id === anchorId)
+      : undefined;
+    const anchorPos = anchorId ? childPositions.get(anchorId) : undefined;
+    let groupPosition = group.position;
+    if (anchorBefore && anchorPos) {
+      const absX = group.position.x + anchorBefore.position.x;
+      const absY = group.position.y + anchorBefore.position.y;
+      groupPosition = {
+        x: absX - anchorPos.x,
+        y: absY - anchorPos.y,
+      };
+    }
+
+    let next = prev.map((n) => {
       if (n.id === groupId) {
         return {
           ...n,
+          position: groupPosition,
           width: groupW,
           height: groupH,
           style: {
@@ -172,6 +189,8 @@ function relayoutShortcutPresetGroup(
         style: { width: spec.width, height: spec.height },
       } as CanvasFlowNode;
     });
+    next = nudgeShortcutPresetGroupClearOfPeers(next, groupId);
+    return next;
   });
 }
 
