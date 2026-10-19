@@ -4,11 +4,13 @@ import {
   AdminPlatformCockpitCreditOps,
   AdminPlatformCockpitMetrics,
 } from "@/components/admin/admin-platform-cockpit";
+import { AdminTodayDashboard } from "@/components/admin/admin-today-dashboard";
 import { AdminPlatformCockpitFinancePanel } from "@/components/admin/admin-platform-cockpit-finance-panel";
 import { AdminGatewayHealthPanel } from "@/components/admin/admin-gateway-health-panel";
 import {
   fetchPlatformCockpitAssistantSection,
   fetchPlatformCockpitCreditOpsSection,
+  fetchPlatformCockpitDailySection,
   fetchPlatformCockpitFinanceSection,
   fetchPlatformCockpitMetricsSection,
 } from "@/lib/admin/platform-cockpit-service";
@@ -29,6 +31,17 @@ export async function AdminCockpitGatewayHealthSection() {
 export async function AdminCockpitCreditOpsSection() {
   const section = await fetchPlatformCockpitCreditOpsSection();
   return <AdminPlatformCockpitCreditOps {...section} />;
+}
+
+export async function AdminCockpitDailySection(options?: { embedInCockpit?: boolean }) {
+  const { daily } = await fetchPlatformCockpitDailySection();
+  return (
+    <AdminTodayDashboard
+      initialDaily={daily}
+      gatewayOrigin={getGatewayPublicOrigin()}
+      embedInCockpit={options?.embedInCockpit}
+    />
+  );
 }
 
 export async function AdminCockpitFinanceSection() {

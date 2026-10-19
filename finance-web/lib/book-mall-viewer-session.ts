@@ -1,4 +1,8 @@
 import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
+import {
+  BOOK_MALL_VIEWER_FETCH_MS,
+  fetchWithOptionalTimeout,
+} from "@/lib/book-mall-fetch-timeout";
 
 export type BookMallViewerUser = {
   id: string;
@@ -19,7 +23,7 @@ export async function fetchBookMallViewerUser(
     const { url, init } = resolveBookMallBrowserRequest(base, "/api/finance/viewer-session", {
       signal,
     });
-    const res = await fetch(url, init);
+    const res = await fetchWithOptionalTimeout(url, init, BOOK_MALL_VIEWER_FETCH_MS);
     if (!res.ok) return null;
     const j = (await res.json()) as { user: BookMallViewerUser | null };
     return j.user ?? null;

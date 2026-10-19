@@ -16,3 +16,22 @@ export function cstDayEndUtc(businessDate: string): Date {
   const start = cstDayStartUtc(businessDate);
   return new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
 }
+
+const CST_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** 校验 `YYYY-MM-DD` 业务日参数；非法时返回 null */
+export function parseCstBusinessDateParam(raw: string | null | undefined): string | null {
+  const s = raw?.trim();
+  if (!s || !CST_DATE_RE.test(s)) return null;
+  const [y, m, d] = s.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const probe = new Date(Date.UTC(y, m - 1, d));
+  if (
+    probe.getUTCFullYear() !== y ||
+    probe.getUTCMonth() !== m - 1 ||
+    probe.getUTCDate() !== d
+  ) {
+    return null;
+  }
+  return s;
+}

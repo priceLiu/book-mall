@@ -25,7 +25,7 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { bookMallLoginHint } from "@/lib/book-mall-login-hint";
-import { fetchFinanceViewer, type FinanceViewerPayload } from "@/lib/finance-viewer";
+import { fetchFinanceViewerDetailed, type FinanceViewerPayload } from "@/lib/finance-viewer";
 import { canViewFinanceCost, canCreateProposal, roleLabel } from "@/lib/permissions";
 
 type NavItem = {
@@ -247,9 +247,21 @@ export function AdminSidebar() {
     let cancelled = false;
     setViewerErr(null);
     setViewer(undefined);
-    fetchFinanceViewer(base)
-      .then((v) => {
-        if (!cancelled) setViewer(v);
+    fetchFinanceViewerDetailed(base)
+      .then((r) => {
+        if (cancelled) return;
+        if (r.status === "ok") {
+          setViewer(r.viewer);
+          setViewerErr(null);
+          return;
+        }
+        if (r.status === "unreachable") {
+          setViewer(null);
+          setViewerErr("无法连接 Book 主站（请确认 :3000 已启动）");
+          return;
+        }
+        setViewer(null);
+        setViewerErr(null);
       })
       .catch(() => {
         if (!cancelled) {
@@ -306,6 +318,16 @@ export function AdminSidebar() {
           </>
         )}
       </div>
+      {base ? (
+        <div className="shrink-0 border-b border-white/10 px-2 py-2">
+          <a
+            href={`${base.replace(/\/$/, "")}/admin/today`}
+            className="flex items-center justify-center rounded bg-[#1890ff] px-2 py-2 text-sm font-medium text-white hover:bg-[#096dd9]"
+          >
+            主站 · 今日看板
+          </a>
+        </div>
+      ) : null}
       <nav className="finance-sidebar-scroll flex-1 space-y-3 overflow-y-auto p-2">
         {NAV_GROUPS.map((group) => {
           const items = viewer

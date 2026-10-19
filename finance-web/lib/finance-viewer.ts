@@ -1,4 +1,8 @@
 import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
+import {
+  BOOK_MALL_VIEWER_FETCH_MS,
+  fetchWithOptionalTimeout,
+} from "@/lib/book-mall-fetch-timeout";
 import type { FinancePermissions } from "./permissions";
 
 export type FinanceViewerUser = {
@@ -23,33 +27,56 @@ export type FinanceViewerPayload = {
   hasTeam: boolean;
 };
 
+export type FinanceViewerFetchResult =
+  | { status: "ok"; viewer: FinanceViewerPayload }
+  | { status: "guest" }
+  | { status: "unreachable"; reason: "timeout" | "network" | "upstream" };
+
+export async function fetchFinanceViewerDetailed(
+  base: string,
+  signal?: AbortSignal,
+): Promise<FinanceViewerFetchResult> {
+  if (!base) return { status: "guest" };
+  try {
+    const { url, init } = resolveBookMallBrowserRequest(base, "/api/finance/viewer-session", {
+      signal,
+    });
+    const res = await fetchWithOptionalTimeout(url, init, BOOK_MALL_VIEWER_FETCH_MS);
+    if (res.status === 503 || res.status === 502) return { status: "unreachable", reason: "upstream" };
+    if (!res.ok) return { status: "guest" };
+    const j = (await res.json()) as { user: FinanceViewerUser | null } & Partial<FinanceViewerPayload>;
+    if (!j.user) return { status: "guest" };
+    return {
+      status: "ok",
+      viewer: {
+        user: j.user,
+        permissions: j.permissions ?? {
+          isPlatformStaff: false,
+          canViewFinanceCost: false,
+          canManagePricing: false,
+          canCreateProposal: false,
+          canFinanceReview: false,
+          canFinalApprove: false,
+        },
+        teams: j.teams ?? [],
+        hasTeam: j.hasTeam ?? false,
+      },
+    };
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      return { status: "unreachable", reason: "timeout" };
+    }
+    return { status: "unreachable", reason: "network" };
+  }
+}
+
 export async function fetchFinanceViewer(
   base: string,
   signal?: AbortSignal,
 ): Promise<FinanceViewerPayload | null> {
-  if (!base) return null;
-  try {
-    const { url, init } = resolveBookMallBrowserRequest(base, "/api/finance/viewer-session", { signal });
-    const res = await fetch(url, init);
-    if (!res.ok) return null;
-    const j = (await res.json()) as { user: FinanceViewerUser | null } & Partial<FinanceViewerPayload>;
-    if (!j.user) return null;
-    return {
-      user: j.user,
-      permissions: j.permissions ?? {
-        isPlatformStaff: false,
-        canViewFinanceCost: false,
-        canManagePricing: false,
-        canCreateProposal: false,
-        canFinanceReview: false,
-        canFinalApprove: false,
-      },
-      teams: j.teams ?? [],
-      hasTeam: j.hasTeam ?? false,
-    };
-  } catch {
-    return null;
-  }
+  const r = await fetchFinanceViewerDetailed(base, signal);
+  if (r.status === "ok") return r.viewer;
+  return null;
 }
 
 /** 经 finance-web BFF 代理调用 book-mall API（生产跨域）。 */

@@ -1861,6 +1861,50 @@ const SEED_ITEMS: {
     listKind: "PENDING",
     completed: true,
   },
+  {
+    title: "CVL-100 画布组重叠穿插 · 文档与台账",
+    description:
+      "docs/画布组节点重叠穿插的问题.md；Admin 从 docs 导入 + CVL seed。",
+    docPath: "docs/画布组节点重叠穿插的问题.md",
+    sortOrder: 940,
+    listKind: "PENDING",
+  },
+  {
+    title: "CVL-101 方案 A/B 评审对齐",
+    description: "LibTV 组/节点穿插：激活置顶 vs 持久 stackRank；决策暂缓实现。",
+    docPath: "docs/画布组节点重叠穿插的问题.md",
+    sortOrder: 941,
+    listKind: "PENDING",
+  },
+  {
+    title: "CVL-102 方案 A · 统一 manipulation 层（暂缓）",
+    description:
+      "选中/框选/拖动/边 bundle；单一入口；非激活≤22、激活≥1200。暂缓编码。",
+    docPath: "docs/画布组节点重叠穿插的问题.md",
+    sortOrder: 942,
+    listKind: "PENDING",
+  },
+  {
+    title: "CVL-103 备选 · 方案 B stackRank 设计",
+    description: "持久 rank、迁移、spawn/复制；仅 spike，未选为默认路径。",
+    docPath: "docs/画布组节点重叠穿插的问题.md",
+    sortOrder: 943,
+    listKind: "PENDING",
+  },
+  {
+    title: "CVL-104 回归 · 三组重叠与拖入组",
+    description: "3 组拖组、图片拖入组、框选、组内连线可见性验收清单。",
+    docPath: "docs/画布组节点重叠穿插的问题.md",
+    sortOrder: 944,
+    listKind: "PENDING",
+  },
+  {
+    title: "CVL-105 补丁收拢评估",
+    description: "bumpLibtvGroupRenderOrderToFront / CSS is-drop-target / 多处 z 同步是否并入方案 A。",
+    docPath: "docs/画布组节点重叠穿插的问题.md",
+    sortOrder: 945,
+    listKind: "PENDING",
+  },
 ];
 
 async function main() {

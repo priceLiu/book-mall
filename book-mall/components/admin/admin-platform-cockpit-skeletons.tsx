@@ -39,6 +39,21 @@ export function AdminCockpitCreditOpsSkeleton() {
   return <PulseBlock className="h-48 w-full rounded-xl" />;
 }
 
+export function AdminCockpitDailySkeleton() {
+  return (
+    <section className="space-y-4" aria-hidden>
+      <PulseBlock className="h-10 w-full max-w-xl" />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {Array.from({ length: 5 }, (_, i) => (
+          <PulseBlock key={i} className="h-24" />
+        ))}
+      </div>
+      <PulseBlock className="h-10 w-64" />
+      <PulseBlock className="h-72 w-full rounded-xl" />
+    </section>
+  );
+}
+
 export function AdminCockpitAssistantSkeleton() {
   return (
     <div className="space-y-4" aria-hidden>
@@ -61,7 +76,7 @@ export function AdminCockpitMetricsSkeleton() {
 
 export function AdminDashboardLoading() {
   return (
-    <div className="space-y-8" role="status" aria-live="polite" aria-label="管理后台加载中">
+    <div className="space-y-10 pb-12" role="status" aria-live="polite" aria-label="管理后台加载中">
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-[#d1d9e0] pb-6">
         <div className="space-y-2">
           <PulseBlock className="h-3 w-24" />
@@ -73,11 +88,14 @@ export function AdminDashboardLoading() {
           <PulseBlock className="h-9 w-24" />
         </div>
       </header>
+      <AdminCockpitDailySkeleton />
+      <PulseBlock className="h-32 w-full rounded-xl" />
+      <AdminCockpitCreditOpsSkeleton />
       <AdminCockpitCreditOpsSkeleton />
       <AdminCockpitFinanceSkeleton />
       <AdminCockpitAssistantSkeleton />
       <AdminCockpitMetricsSkeleton />
-      <p className="text-sm text-[#656d76]">正在加载驾驶舱数据…</p>
+      <p className="text-sm text-[#656d76]">正在加载驾驶舱…</p>
     </div>
   );
 }

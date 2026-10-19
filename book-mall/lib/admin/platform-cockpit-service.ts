@@ -11,6 +11,10 @@ import {
   cstDayStartUtc,
 } from "@/lib/billing/credit-ops-service";
 import {
+  buildCockpitDailyDashboard,
+  type CockpitDailyDashboardSnapshot,
+} from "@/lib/admin/platform-cockpit-daily-dashboard";
+import {
   buildCockpitCommerceMonthKpis,
   type CockpitCommerceMonthKpis,
 } from "@/lib/admin/platform-cockpit-commerce-kpis";
@@ -352,6 +356,19 @@ function buildMetricsSectionFromCounts(
       todayRegistered: trafficToday.todayRegistered,
     },
   };
+}
+
+/** 当日（CST）运营看板：积分 / 生图视频 / Gateway / 日成本 */
+export async function fetchPlatformCockpitDailySection(input?: {
+  now?: Date;
+  businessDateCst?: string;
+}): Promise<{ daily: CockpitDailyDashboardSnapshot }> {
+  const now = input?.now ?? new Date();
+  const daily = await buildCockpitDailyDashboard({
+    now,
+    businessDateCst: input?.businessDateCst,
+  });
+  return { daily };
 }
 
 /** 本月经营三角：应付厂商 / 用户实收 / 毛利 */
