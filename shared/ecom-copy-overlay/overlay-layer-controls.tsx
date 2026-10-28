@@ -19,7 +19,7 @@ function clamp(n: number, min: number, max: number): number {
 }
 
 const inputClass =
-  "w-full rounded-lg border border-[#d2d2d7] bg-white px-2.5 py-1.5 text-sm text-[#1d1d1f] outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3]/20";
+  "w-full rounded-md border border-white/15 bg-black/40 px-2.5 py-1.5 text-sm text-white outline-none focus:border-[#0a84ff]";
 
 function Segmented<T extends string>({
   value,
@@ -31,7 +31,7 @@ function Segmented<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="flex rounded-lg border border-[#d2d2d7] bg-[#fafafa] p-0.5">
+    <div className="flex rounded-lg border border-white/15 bg-black/40 p-0.5">
       {options.map((opt) => {
         const active = opt.value === value;
         return (
@@ -40,8 +40,8 @@ function Segmented<T extends string>({
             type="button"
             className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
               active
-                ? "bg-white text-[#1d1d1f] shadow-sm"
-                : "text-[#6e6e73] hover:text-[#1d1d1f]"
+                ? "bg-white/15 text-white"
+                : "text-white/50 hover:text-white/80"
             }`}
             onClick={() => onChange(opt.value)}
           >
@@ -61,7 +61,7 @@ function StudioControls({
 }: Omit<Props, "variant">) {
   if (!selectedLayer) {
     return (
-      <p className={`text-xs text-[#86868b] ${className}`}>请在上方选中一个文案块</p>
+      <p className={`text-xs text-white/45 ${className}`}>请在上方选中一个文案块</p>
     );
   }
 
@@ -84,7 +84,7 @@ function StudioControls({
     <div className={`space-y-4 ${className}`}>
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
-          <span className="text-xs font-medium text-[#6e6e73]">字号 px</span>
+          <span className="text-xs font-medium text-white/55">字号 px</span>
           <input
             type="number"
             min={12}
@@ -95,7 +95,7 @@ function StudioControls({
           />
         </label>
         <label className="block">
-          <span className="text-xs font-medium text-[#6e6e73]">文本框宽度 %</span>
+          <span className="text-xs font-medium text-white/55">文本框宽度 %</span>
           <input
             type="number"
             min={12}
@@ -112,7 +112,7 @@ function StudioControls({
       </div>
 
       <div>
-        <span className="mb-1.5 block text-xs font-medium text-[#6e6e73]">字体</span>
+        <span className="mb-1.5 block text-xs font-medium text-white/55">字体</span>
         <select
           className={inputClass}
           value={normalizeCopyFontPresetId(selectedLayer.fontFamily)}
@@ -129,22 +129,22 @@ function StudioControls({
       </div>
 
       <div>
-        <span className="text-xs font-medium text-[#6e6e73]">文字颜色</span>
+        <span className="text-xs font-medium text-white/55">文字颜色</span>
         <div className="mt-1.5 flex items-center gap-2">
           <input
             type="color"
-            className="size-10 shrink-0 cursor-pointer rounded-lg border border-[#d2d2d7] bg-white p-0.5"
+            className="size-10 shrink-0 cursor-pointer rounded-lg border border-white/15 bg-black/40 p-0.5"
             value={selectedLayer.color ?? "#ffffff"}
             onChange={(e) => patchLayer({ color: e.target.value })}
           />
-          <span className="text-xs tabular-nums text-[#86868b]">
+          <span className="text-xs tabular-nums text-white/45">
             {(selectedLayer.color ?? "#ffffff").toUpperCase()}
           </span>
         </div>
       </div>
 
       <div>
-        <span className="mb-1.5 block text-xs font-medium text-[#6e6e73]">对齐</span>
+        <span className="mb-1.5 block text-xs font-medium text-white/55">对齐</span>
         <Segmented
           value={selectedLayer.textAlign ?? "center"}
           options={[
@@ -157,7 +157,7 @@ function StudioControls({
       </div>
 
       <div>
-        <span className="mb-1.5 block text-xs font-medium text-[#6e6e73]">方向 · 字重</span>
+        <span className="mb-1.5 block text-xs font-medium text-white/55">方向 · 字重</span>
         <div className="grid grid-cols-2 gap-2">
           <Segmented
             value={selectedLayer.writingMode === "vertical" ? "vertical" : "horizontal"}
@@ -169,11 +169,11 @@ function StudioControls({
               patchLayer({ writingMode: v === "vertical" ? "vertical" : "horizontal" })
             }
           />
-          <div className="flex rounded-lg border border-[#d2d2d7] bg-[#fafafa] p-0.5">
+          <div className="flex rounded-lg border border-white/15 bg-black/40 p-0.5">
             <button
               type="button"
               className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition-colors ${
-                isBold ? "bg-white text-[#1d1d1f] shadow-sm" : "text-[#6e6e73]"
+                isBold ? "bg-white/15 text-white" : "text-white/50"
               }`}
               onClick={() => patchLayer({ fontWeight: "bold" })}
             >
@@ -182,7 +182,7 @@ function StudioControls({
             <button
               type="button"
               className={`flex-1 rounded-md py-1.5 text-xs font-normal transition-colors ${
-                !isBold ? "bg-white text-[#1d1d1f] shadow-sm" : "text-[#6e6e73]"
+                !isBold ? "bg-white/15 text-white" : "text-white/50"
               }`}
               onClick={() => patchLayer({ fontWeight: "normal" })}
             >
@@ -192,9 +192,10 @@ function StudioControls({
         </div>
       </div>
 
-      <div className="space-y-3 rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-3">
-        <p className="text-xs font-semibold text-[#1d1d1f]">文字特效</p>
+      <div className="space-y-2 rounded-xl border border-white/10 bg-black/30 p-3">
+        <p className="text-xs font-semibold text-white">文字特效</p>
 
+        <div className="grid grid-cols-2 gap-2">
         <EffectRow
           label="投影"
           checked={shadowOn}
@@ -207,7 +208,7 @@ function StudioControls({
           }
         >
           <div className="grid grid-cols-2 gap-2">
-            <label className="block text-xs text-[#6e6e73]">
+            <label className="block text-xs text-white/55">
               模糊
               <input
                 type="number"
@@ -220,7 +221,7 @@ function StudioControls({
                 }
               />
             </label>
-            <label className="block text-xs text-[#6e6e73]">
+            <label className="block text-xs text-white/55">
               偏移 X
               <input
                 type="number"
@@ -233,7 +234,7 @@ function StudioControls({
                 }
               />
             </label>
-            <label className="block text-xs text-[#6e6e73]">
+            <label className="block text-xs text-white/55">
               偏移 Y
               <input
                 type="number"
@@ -246,11 +247,11 @@ function StudioControls({
                 }
               />
             </label>
-            <label className="col-span-2 block text-xs text-[#6e6e73]">
+            <label className="col-span-2 block text-xs text-white/55">
               投影色
               <input
                 type="color"
-                className="mt-1 h-9 w-full cursor-pointer rounded-lg border border-[#d2d2d7]"
+                className="mt-1 h-9 w-full cursor-pointer rounded-lg border border-white/15 bg-black/40"
                 value={selectedLayer.shadowColor?.trim() || "#000000"}
                 onChange={(e) => patchLayer({ shadowColor: e.target.value })}
               />
@@ -264,7 +265,7 @@ function StudioControls({
           onToggle={(on) => patchLayer(on ? { glowBlur: 12, glowOpacity: 0.85 } : { glowBlur: 0 })}
         >
           <div className="grid grid-cols-2 gap-2">
-            <label className="block text-xs text-[#6e6e73]">
+            <label className="block text-xs text-white/55">
               强度
               <input
                 type="number"
@@ -277,11 +278,11 @@ function StudioControls({
                 }
               />
             </label>
-            <label className="block text-xs text-[#6e6e73]">
+            <label className="block text-xs text-white/55">
               发光色
               <input
                 type="color"
-                className="mt-1 h-9 w-full cursor-pointer rounded-lg border border-[#d2d2d7]"
+                className="mt-1 h-9 w-full cursor-pointer rounded-lg border border-white/15 bg-black/40"
                 value={selectedLayer.glowColor?.trim() || "#ffffff"}
                 onChange={(e) => patchLayer({ glowColor: e.target.value })}
               />
@@ -297,7 +298,7 @@ function StudioControls({
           }
         >
           <div className="grid grid-cols-2 gap-2">
-            <label className="block text-xs text-[#6e6e73]">
+            <label className="block text-xs text-white/55">
               粗细 px
               <input
                 type="number"
@@ -310,11 +311,11 @@ function StudioControls({
                 }
               />
             </label>
-            <label className="block text-xs text-[#6e6e73]">
+            <label className="block text-xs text-white/55">
               描边色
               <input
                 type="color"
-                className="mt-1 h-9 w-full cursor-pointer rounded-lg border border-[#d2d2d7]"
+                className="mt-1 h-9 w-full cursor-pointer rounded-lg border border-white/15 bg-black/40"
                 value={selectedLayer.strokeColor?.trim() || "#000000"}
                 onChange={(e) => patchLayer({ strokeColor: e.target.value })}
               />
@@ -339,7 +340,7 @@ function StudioControls({
           }
         >
           <div className="grid grid-cols-2 gap-2">
-            <label className="block text-xs text-[#6e6e73]">
+            <label className="block text-xs text-white/55">
               内边距
               <input
                 type="number"
@@ -354,7 +355,7 @@ function StudioControls({
                 }
               />
             </label>
-            <label className="block text-xs text-[#6e6e73]">
+            <label className="block text-xs text-white/55">
               不透明度
               <input
                 type="number"
@@ -370,17 +371,18 @@ function StudioControls({
                 }
               />
             </label>
-            <label className="col-span-2 block text-xs text-[#6e6e73]">
+            <label className="col-span-2 block text-xs text-white/55">
               底色
               <input
                 type="color"
-                className="mt-1 h-9 w-full cursor-pointer rounded-lg border border-[#d2d2d7]"
+                className="mt-1 h-9 w-full cursor-pointer rounded-lg border border-white/15 bg-black/40"
                 value={selectedLayer.textBgColor?.trim() || "#000000"}
                 onChange={(e) => patchLayer({ textBgColor: e.target.value })}
               />
             </label>
           </div>
         </EffectRow>
+        </div>
       </div>
     </div>
   );
@@ -398,17 +400,19 @@ function EffectRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-[#e8e8ed] bg-white p-2.5">
+    <div
+      className={`rounded-lg border border-white/10 bg-black/25 p-2 ${checked ? "col-span-2" : ""}`}
+    >
       <label className="flex cursor-pointer items-center justify-between gap-2">
-        <span className="text-xs font-medium text-[#424245]">{label}</span>
+        <span className="text-xs font-medium text-white/80">{label}</span>
         <input
           type="checkbox"
-          className="size-4 rounded border-[#d2d2d7] accent-[#0071e3]"
+          className="size-4 rounded border-white/30 accent-[#0a84ff]"
           checked={checked}
           onChange={(e) => onToggle(e.target.checked)}
         />
       </label>
-      {checked ? <div className="mt-2 border-t border-[#f0f0f2] pt-2">{children}</div> : null}
+      {checked ? <div className="mt-2 border-t border-white/10 pt-2">{children}</div> : null}
     </div>
   );
 }

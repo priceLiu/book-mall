@@ -91,7 +91,7 @@ export async function buildDetailPageSuiteExportZip(
     (project.module === ECOM_DETAIL_PAGE_SUITE_HIT_MODULE
       ? "学竞品结构 · 原创详情"
       : project.module === ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE
-        ? "参考详情 → 标准套图"
+        ? "产品详情页套图复刻"
         : "服装详情套图（模板）");
   const root = sanitizeZipSegment(labelSource);
   const exportFailures: string[] = [];

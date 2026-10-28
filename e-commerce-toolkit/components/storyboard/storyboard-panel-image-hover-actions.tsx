@@ -25,7 +25,7 @@ function stopClick(e: React.MouseEvent) {
 }
 
 /**
- * 分镜图悬停操作：预览 / 重新生成 / 提示词预览（仅图标，无文字）。
+ * 分镜图悬停操作：预览 / 重新生成 / 编辑（仅图标，无文字）。
  */
 export function StoryboardPanelImageHoverActions({
   onPreview,
@@ -94,8 +94,8 @@ export function StoryboardPanelImageHoverActions({
         {onPreviewPrompt ? (
           <button
             type="button"
-            title="提示词编辑"
-            aria-label="提示词编辑"
+            title="编辑"
+            aria-label="编辑"
             className={cn(actionBtnClass, "pointer-events-auto")}
             disabled={disabled}
             onClick={(e) => {

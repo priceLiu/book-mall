@@ -42,7 +42,7 @@ export function EcomCopyOverlayLayersEditor({
   const listBtn = (active: boolean) =>
     isDark
       ? active
-        ? "border-violet-500 bg-violet-500/20 text-white"
+        ? "border-[#0a84ff] bg-[#0a84ff]/20 text-white"
         : "border-white/15 bg-black/30 text-white/80 hover:bg-white/10"
       : active
         ? "border-[#0071e3] bg-[#f0f6ff] text-[#1d1d1f]"
@@ -55,7 +55,7 @@ export function EcomCopyOverlayLayersEditor({
   const layerChip = (active: boolean) =>
     isDark
       ? active
-        ? "border-violet-400 bg-violet-500/25 text-white"
+        ? "border-[#0a84ff] bg-[#0a84ff]/25 text-white"
         : "border-white/15 bg-black/20 text-white/75 hover:bg-white/10"
       : active
         ? "border-[#0071e3] bg-[#f0f6ff] text-[#0071e3]"

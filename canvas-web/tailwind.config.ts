@@ -9,6 +9,8 @@ const config: Config = {
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
     "../shared/federated-portal-nav/**/*.{js,ts,jsx,tsx}",
     "./docker-shared/federated-portal-nav/**/*.{js,ts,jsx,tsx}",
+    "../shared/ecom-copy-overlay/**/*.{js,ts,jsx,tsx}",
+    "./docker-shared/ecom-copy-overlay/**/*.{js,ts,jsx,tsx}",
     "./docker-shared/global-asset-library/**/*.{js,ts,jsx,tsx}",
     "../book-mall/platform-compose-ui/**/*.{js,ts,jsx,tsx}",
     "./docker-shared/platform-compose-ui/**/*.{js,ts,jsx,tsx}",

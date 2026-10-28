@@ -21,6 +21,13 @@ import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-st
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomIconButton, EcomIconButtonLink } from "@/components/ui/ecom-icon-button";
 import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
+import {
+  resolveSuiteAplusWorkspaceTitle,
+  resolveSuiteHitWorkspaceTitle,
+  resolveSuiteReplicaWorkspaceTitle,
+  SUITE_APLUS_MENU_TITLE,
+  SUITE_REPLICA_MENU_TITLE,
+} from "@/lib/modules/registry";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import { formatDetailPageSuiteSellpointDraft } from "@/lib/ecom-sellpoint-five-part";
 import {
@@ -225,14 +232,13 @@ export function DetailPageSuiteWorkbenchChrome({
         <EcomWorkspaceTitleHeading
           guideModuleId={guideModuleId}
           title={
-            project.title?.trim() ||
-            (isHit
-              ? "学竞品结构 · 原创详情"
-              : isAplus
-                ? "A+ 详情模块出图"
-                : isReplica
-                  ? "参考详情 → 标准套图"
-                  : "服装详情套图（模板）")
+            isHit
+              ? resolveSuiteHitWorkspaceTitle(project.title)
+              : isReplica
+                ? resolveSuiteReplicaWorkspaceTitle(project.title)
+                : isAplus
+                  ? resolveSuiteAplusWorkspaceTitle(project.title)
+                  : project.title?.trim() || "服装详情套图（模板）"
           }
         >
           <p className="text-[11px] text-[#6e6e73]">
@@ -279,18 +285,18 @@ export function DetailPageSuiteWorkbenchChrome({
                   isHit
                     ? "学竞品结构 · 原创详情 · 项目列表"
                     : isAplus
-                      ? "A+ 详情模块出图 · 项目列表"
+                      ? `${SUITE_APLUS_MENU_TITLE} · 项目列表`
                       : isReplica
-                        ? "参考详情 → 标准套图 · 项目列表"
+                        ? `${SUITE_REPLICA_MENU_TITLE} · 项目列表`
                         : "服装详情套图（模板） · 项目列表"
                 }
                 emptyHint={
                   isHit
                     ? "还没有保存过的「学竞品结构 · 原创详情」项目。"
                     : isAplus
-                      ? "还没有保存过的「A+ 详情模块出图」项目。"
+                      ? `还没有保存过的「${SUITE_APLUS_MENU_TITLE}」项目。`
                       : isReplica
-                        ? "还没有保存过的「参考详情 → 标准套图」项目。"
+                        ? `还没有保存过的「${SUITE_REPLICA_MENU_TITLE}」项目。`
                         : "还没有保存过的「服装详情套图（模板）」项目。"
                 }
                 disabled={llmBusy}

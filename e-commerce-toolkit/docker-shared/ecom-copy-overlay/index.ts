@@ -75,3 +75,7 @@ export {
   useEcomCopyOverlayEditorState,
   type UseEcomCopyOverlayEditorStateOpts,
 } from "./use-overlay-editor-state";
+export {
+  FullscreenImageEditorShell,
+  FULLSCREEN_IMAGE_EDITOR_SURFACE,
+} from "./fullscreen-image-editor-shell";

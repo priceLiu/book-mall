@@ -13,6 +13,7 @@ import {
 import { DetailPageSuiteSizeChartEditDialog } from "@/components/detail-page-suite/detail-page-suite-size-chart-edit-dialog";
 import { DetailPageSuiteExportTargetsBar } from "@/components/detail-page-suite/detail-page-suite-export-targets-bar";
 import { DetailPageSuiteSlotPromptEditDialog } from "@/components/detail-page-suite/detail-page-suite-slot-prompt-edit-dialog";
+import { resolveSuiteHitWorkspaceTitle } from "@/lib/modules/registry";
 import {
   BackgroundGenerationProvider,
   useBackgroundGeneration,
@@ -95,6 +96,7 @@ import {
   resolveDetailPageSuiteActiveImageIndex,
   resolveDetailPageSuiteSlotHistory,
 } from "@/lib/detail-page-suite-slot-images";
+import { composeSuiteSlotKey } from "@/lib/detail-page-suite-slot-selection";
 import {
   DETAIL_PAGE_SUITE_HIT_DECOMPOSE_EXPECTED_MS,
   detailPageSuiteHitDecomposeTaskId,
@@ -1155,7 +1157,7 @@ function DetailPageSuiteHitStudioInner() {
       const items = await listDetailPageSuiteHitSummaries();
       return items.map((it) => ({
         id: it.id,
-        title: it.title?.trim() || "学竞品结构 · 原创详情",
+        title: resolveSuiteHitWorkspaceTitle(it.title),
         updatedAt: it.updatedAt,
         thumbnailUrl: it.thumbnailUrl,
       }));
@@ -1579,7 +1581,13 @@ function DetailPageSuiteHitStudioInner() {
 
       <DetailPageSuiteSlotPromptEditDialog
         open={Boolean(promptEdit)}
-        title={promptEdit?.label ?? "编辑提示词"}
+        title={promptEdit?.label ?? "编辑"}
+        referenceImages={(project?.references ?? [])
+          .filter((r) => (r.role === "product" || r.role === "model") && r.ossUrl?.trim())
+          .map((r) => ({
+            url: r.ossUrl.trim(),
+            label: r.label?.trim() || (r.role === "product" ? "商品" : "模特"),
+          }))}
         prompt={promptEdit?.prompt ?? ""}
         slotCopy={promptEdit?.slotCopy ?? ""}
         slotCopyAi={promptEdit?.slotCopyAi ?? ""}
@@ -1731,6 +1739,84 @@ function DetailPageSuiteHitStudioInner() {
             });
           } finally {
             setSlotComposeBusy(false);
+          }
+        }}
+        onRegenerateImage={async (prompt) => {
+          if (!promptEdit || !project) return;
+          const effectiveModelKey = imageModelKey.trim();
+          if (!effectiveModelKey) {
+            await alert({
+              title: "请选择出图模型",
+              message: "点击工具栏「选择生图模型与参数」后再出图。",
+              variant: "error",
+            });
+            return;
+          }
+          if (refsByRole.product.length === 0) {
+            await alert({
+              title: "请先上传新品产品图",
+              message: "出图只使用自有新品与模特素材，不会调用竞品截图。",
+              variant: "error",
+            });
+            return;
+          }
+          const modules = project.suite.modules.map((m) => {
+            if (m.module_id !== promptEdit.moduleId) return m;
+            return {
+              ...m,
+              slots: m.slots.map((s) =>
+                s.item_key === promptEdit.slotKey
+                  ? { ...s, positive_prompt: prompt, promptEdited: true }
+                  : s,
+              ),
+            };
+          });
+          const saved = await updateDetailPageSuiteHitProject(project.id, {
+            suite: { ...project.suite, modules },
+          });
+          setProject(saved);
+          const key = composeSuiteSlotKey(promptEdit.moduleId, promptEdit.slotKey);
+          setActiveGenSlotKeys((prev) => new Set([...prev, key]));
+          try {
+            const result = await generateDetailPageSuiteHitImages(saved.id, {
+              moduleId: promptEdit.moduleId,
+              slotKeys: [key],
+              modelKey: effectiveModelKey,
+              activeExportTargetIds: resolveActiveExportTargetIds(
+                saved.settings,
+                saved.brief?.platformCode,
+              ),
+            });
+            setProject(result.project);
+            syncActiveGenFromProject(result.project);
+            const mod = result.project.suite.modules.find(
+              (m) => m.module_id === promptEdit.moduleId,
+            );
+            const slot = mod?.slots.find((s) => s.item_key === promptEdit.slotKey);
+            const history = slot ? resolveDetailPageSuiteSlotHistory(slot) : [];
+            const activeIdx = slot ? resolveDetailPageSuiteActiveImageIndex(slot) : 0;
+            const url = history[activeIdx]?.url?.trim();
+            if (url) {
+              setPromptEdit((prev) => (prev ? { ...prev, baseImageUrl: url } : prev));
+            }
+            if (result.failures.length > 0) {
+              await alert({
+                title: "重新生图失败",
+                message: result.failures.slice(0, 5).join("\n"),
+                variant: "error",
+              });
+            } else {
+              toast({ variant: "success", title: "已按最新提示词重新生图" });
+            }
+          } catch (e) {
+            syncActiveGenFromProject(saved);
+            await alert({
+              title: "重新生图失败",
+              message: formatEcomImageGenUserMessage(
+                e instanceof Error ? e.message : "出图失败",
+              ),
+              variant: "error",
+            });
           }
         }}
         onSave={async (prompt, extras) => {

@@ -110,8 +110,8 @@ const SOURCE_MODULE_LABELS: Record<string, string> = {
   "image-layer": "图片处理",
   "detail-page-suite": "服装详情套图（模板）",
   "detail-page-suite-hit": "学竞品结构 · 原创详情",
-  "detail-page-suite-replica": "参考详情 → 标准套图",
-  "ai-detail-page": "A+ 详情模块出图",
+  "detail-page-suite-replica": "产品详情页套图复刻",
+  "ai-detail-page": "产品详情页模块出图",
 };
 
 export function generationRecordSourceLabel(meta: EcomGenerationRecordMeta | null): string {

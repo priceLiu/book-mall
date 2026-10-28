@@ -47,7 +47,7 @@ export const ECOM_MODULES: EcomModuleDef[] = [
   },
   {
     id: "ai-detail-page",
-    title: "A+ 详情模块出图",
+    title: "产品详情页模块出图",
     tagline: "无参考图 · 16 模块 · 9 品类 · 自动子维度",
     href: "/ecom/ai-detail-page",
     kind: "image",
@@ -77,7 +77,7 @@ export const ECOM_MODULES: EcomModuleDef[] = [
   },
   {
     id: "detail-page-suite-replica",
-    title: "参考详情 → 标准套图",
+    title: "产品详情页套图复刻",
     tagline: "上传参考长图 · 拆入固定 12 模块 · 自家卖点出图",
     href: "/ecom/detail-page-suite-replica",
     kind: "image",
@@ -239,4 +239,46 @@ export const ECOM_MODULES: EcomModuleDef[] = [
 
 export function findModuleByHref(href: string): EcomModuleDef | undefined {
   return ECOM_MODULES.find((m) => m.href === href);
+}
+
+const SUITE_HIT_MENU_TITLE = "学竞品结构 · 原创详情";
+const LEGACY_SUITE_HIT_TITLES = new Set(["爆款详情页套图", "学竞品结构·原创详情"]);
+
+/** 工作区顶栏 / 项目列表与左侧菜单对齐；旧项目名「爆款详情页套图」视为同一页。 */
+export function resolveSuiteHitWorkspaceTitle(projectTitle: string | null | undefined): string {
+  const raw = projectTitle?.trim() ?? "";
+  if (!raw || LEGACY_SUITE_HIT_TITLES.has(raw)) return SUITE_HIT_MENU_TITLE;
+  return raw;
+}
+
+export const SUITE_APLUS_MENU_TITLE = "产品详情页模块出图";
+const LEGACY_SUITE_APLUS_TITLES = new Set([
+  "AI 详情页",
+  "A+ 详情模块出图",
+  "A+详情模块出图",
+]);
+
+/** 工作区顶栏 / 项目列表与左侧菜单对齐；旧默认项目名视为同一页。 */
+export function resolveSuiteAplusWorkspaceTitle(
+  projectTitle: string | null | undefined,
+): string {
+  const raw = projectTitle?.trim() ?? "";
+  if (!raw || LEGACY_SUITE_APLUS_TITLES.has(raw)) return SUITE_APLUS_MENU_TITLE;
+  return raw;
+}
+
+export const SUITE_REPLICA_MENU_TITLE = "产品详情页套图复刻";
+const LEGACY_SUITE_REPLICA_TITLES = new Set([
+  "详情页套图复刻",
+  "参考详情 → 标准套图",
+  "参考详情→标准套图",
+]);
+
+/** 工作区顶栏 / 项目列表与左侧菜单对齐；旧默认项目名视为同一页。 */
+export function resolveSuiteReplicaWorkspaceTitle(
+  projectTitle: string | null | undefined,
+): string {
+  const raw = projectTitle?.trim() ?? "";
+  if (!raw || LEGACY_SUITE_REPLICA_TITLES.has(raw)) return SUITE_REPLICA_MENU_TITLE;
+  return raw;
 }

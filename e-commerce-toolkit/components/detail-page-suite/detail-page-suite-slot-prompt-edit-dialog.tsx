@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import {
   EcomCopyLayoutStudioDialog,
+  type EcomCopyLayoutReferenceImage,
   type EcomCopyLayoutStudioPreviewResult,
   type EcomCopyLayoutStudioSaveExtras,
 } from "@/components/copy-layout/ecom-copy-layout-studio-dialog";
@@ -49,8 +50,10 @@ type Props = {
     ctx: { previewUrl: string },
   ) => void | Promise<void>;
   onRewrite?: () => void;
+  onRegenerateImage?: (prompt: string) => void | Promise<void>;
   rewriteBusy?: boolean;
   promptRefUrls?: string[];
+  referenceImages?: EcomCopyLayoutReferenceImage[];
   promptRefUploadBusy?: boolean;
   onUploadPromptRef?: (file: File) => void;
   slotCopy?: string;
@@ -80,8 +83,10 @@ export function DetailPageSuiteSlotPromptEditDialog({
   onPreview,
   onConfirmCompose,
   onRewrite,
+  onRegenerateImage,
   rewriteBusy = false,
   promptRefUrls = [],
+  referenceImages = [],
   promptRefUploadBusy = false,
   onUploadPromptRef,
   slotCopy = "",
@@ -103,32 +108,28 @@ export function DetailPageSuiteSlotPromptEditDialog({
   const busy = saving || composing;
 
   if (layoutMode) {
-    const rightColumnExtras = (
+    const seen = new Set(referenceImages.map((item) => item.url));
+    const mergedRefs: EcomCopyLayoutReferenceImage[] = [
+      ...referenceImages,
+      ...promptRefUrls
+        .map((url) => url.trim())
+        .filter((url) => url && !seen.has(url))
+        .map((url, index) => ({ url, label: `本格参考 ${index + 1}` })),
+    ];
+    const leftColumnExtras = (
       <>
         {shootingRequirement?.trim() ? (
-          <div className="rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] px-3 py-2 text-sm leading-relaxed text-[#1d1d1f]">
-            <span className="font-medium text-[#6e6e73]">拍摄要求：</span>
+          <div className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm leading-relaxed text-white/85">
+            <span className="font-medium text-white/55">拍摄要求：</span>
             {shootingRequirement.trim()}
           </div>
         ) : null}
         {onUploadPromptRef ? (
-          <div className="space-y-2 rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-3 py-2">
-            <p className="text-xs font-medium text-[#6e6e73]">本格参考 / 场景图</p>
-            <p className="text-[10px] leading-relaxed text-[#86868b]">
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-white/55">补充本格参考图</p>
+            <p className="text-[10px] leading-relaxed text-white/35">
               上传后可用于 AI 重写本条 Prompt（最多 3 张）。
             </p>
-            {promptRefUrls.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {promptRefUrls.map((url) => (
-                  <img
-                    key={url}
-                    src={url}
-                    alt=""
-                    className="h-14 w-14 rounded-md border border-[#e8e8ed] object-cover"
-                  />
-                ))}
-              </div>
-            ) : null}
             <label className="inline-flex cursor-pointer items-center">
               <input
                 type="file"
@@ -141,7 +142,7 @@ export function DetailPageSuiteSlotPromptEditDialog({
                   if (file) onUploadPromptRef(file);
                 }}
               />
-              <span className="inline-flex h-8 items-center rounded-lg border border-[#d2d2d7] bg-white px-3 text-xs">
+              <span className="inline-flex h-8 items-center rounded-lg border border-white/15 bg-white/10 px-3 text-xs text-white">
                 {promptRefUploadBusy ? "上传中…" : "上传参考图"}
               </span>
             </label>
@@ -166,10 +167,12 @@ export function DetailPageSuiteSlotPromptEditDialog({
         composing={composing}
         rewriteBusy={rewriteBusy}
         onRewrite={onRewrite}
+        onRegenerateImage={onRegenerateImage}
         rewriteButtonLabel={
           onUploadPromptRef ? "AI 重写本条 Prompt" : "AI 重写本条（文案+提示词）"
         }
-        rightColumnExtras={rightColumnExtras}
+        referenceImages={mergedRefs}
+        leftColumnExtras={leftColumnExtras}
         onSave={(imagePrompt, extras) => void onSave(imagePrompt, extras)}
         onPreview={
           onPreview

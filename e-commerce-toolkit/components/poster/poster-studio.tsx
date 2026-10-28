@@ -882,6 +882,12 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
           copyOverlay={layoutArtifact.layout}
           exportWidthPx={layoutArtifact.render.exportWidthPx}
           aspectClassName={aspectClass(project.plan.aspectRatio)}
+          referenceImages={project.references
+            .filter((r) => r.ossUrl?.trim())
+            .map((r) => ({
+              url: r.ossUrl.trim(),
+              label: r.label?.trim() || undefined,
+            }))}
           composing={busy}
           onSave={async (prompt, extras) => {
             const artifacts = [...project.plan.artifacts];

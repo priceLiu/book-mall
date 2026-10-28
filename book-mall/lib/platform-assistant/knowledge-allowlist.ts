@@ -107,7 +107,7 @@ export const KNOWLEDGE_ALLOWLIST: KnowledgeSource[] = [
   {
     path: "docs/ecom/user-guides/使用指南-A+详情模块出图.md",
     category: "functional",
-    label: "A+ 详情模块出图",
+    label: "产品详情页模块出图",
   },
   {
     path: "docs/ecom/user-guides/使用指南-服装详情套图（模板）.md",

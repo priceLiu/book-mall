@@ -74,6 +74,10 @@ import {
   uploadAiDetailPageSlotPromptRef,
 } from "@/lib/ecom-ai-detail-page-api";
 import { formatEcomTransportError } from "@/lib/ecom-book-fetch";
+import {
+  resolveSuiteAplusWorkspaceTitle,
+  SUITE_APLUS_MENU_TITLE,
+} from "@/lib/modules/registry";
 import { resumeOrCreateEcomProject, writeEcomLastProjectId } from "@/lib/ecom-last-project";
 import { ensureEcomSessionFresh } from "@/lib/ecom-silent-sso";
 import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
@@ -468,7 +472,7 @@ export function AiDetailPageStudio() {
               const items = await listAiDetailPageSummaries();
               return items.map((it) => ({
                 id: it.id,
-                title: it.title?.trim() || "A+ 详情模块出图",
+                title: resolveSuiteAplusWorkspaceTitle(it.title),
                 updatedAt: it.updatedAt,
                 thumbnailUrl: it.thumbnailUrl,
               }));
@@ -482,7 +486,7 @@ export function AiDetailPageStudio() {
               if (
                 !(await confirm({
                   title: "删除本项目？",
-                  message: "将删除工作台中的 A+ 详情模块出图项目记录。",
+                  message: `将删除工作台中的 ${SUITE_APLUS_MENU_TITLE}项目记录。`,
                 }))
               ) {
                 return;
