@@ -13,17 +13,20 @@ const SIZE_CLASS: Record<QrFrostIconButtonSize, string> = {
 /** 磨砂圆钮 · 图标随视口缩放（全站统一） */
 export function QrFrostIconButton({
   size = "md",
+  cardAdaptive = false,
   className = "",
   children,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   size?: QrFrostIconButtonSize;
+  /** 在 `[container-name:qr-masonry-item]` 内按卡片宽度缩放 */
+  cardAdaptive?: boolean;
   children: ReactNode;
 }) {
   return (
     <button
       type="button"
-      className={`${SIZE_CLASS[size]} ${className}`.trim()}
+      className={`${SIZE_CLASS[size]}${cardAdaptive ? " qr-frost-icon-btn--card-adaptive" : ""} ${className}`.trim()}
       {...props}
     >
       <span className="qr-frost-icon-btn__icon">{children}</span>

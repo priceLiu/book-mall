@@ -1,15 +1,13 @@
 import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
-import { buildDecomposePrompt } from "@/lib/ecom/ecom-image-layer-prompt";
+import { startImageLayerDecomposeJob } from "@/lib/ecom/ecom-image-layer-decompose-job";
+import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
+import { validateDecomposeBboxes } from "@/lib/ecom/ecom-image-layer-prompt";
 import {
   decomposeImageLayer,
   ECOM_IMAGE_LAYER_MAX_BBOXES,
 } from "@/lib/ecom/ecom-image-layer-service";
-import {
-  appendEcomImageLayerGeneration,
-  saveEcomImageLayerWorkspace,
-  workspaceFromStack,
-} from "@/lib/ecom/ecom-image-layer-project-service";
+import { GatewayRequiredError } from "@/lib/gateway/book-gateway-link";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
@@ -57,6 +55,44 @@ export async function POST(req: Request) {
       ? body.projectId.trim()
       : undefined;
 
+  if (bboxes?.length) {
+    try {
+      validateDecomposeBboxes(bboxes);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "拆分框无效";
+      return ecomJson({ error: msg }, { status: 400 });
+    }
+  }
+
+  try {
+    await assertEcomToolkitGatewayAccess(auth.userId);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "图层拆分失败";
+    const status = e instanceof GatewayRequiredError ? e.httpStatus : 502;
+    return ecomJson({ error: msg }, { status });
+  }
+
+  // 有项目时立刻返回，分离在进程内后台完成。公网云托管约 60s 会把长请求打成 504。
+  if (projectId) {
+    try {
+      const job = await startImageLayerDecomposeJob({
+        userId: auth.userId,
+        projectId,
+        sourceImageUrl,
+        bboxes,
+        size,
+      });
+      return ecomJson(
+        { accepted: true, jobId: job.jobId, status: job.status },
+        { status: 202 },
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "图层拆分失败";
+      const status = msg === "项目不存在" ? 404 : 502;
+      return ecomJson({ error: msg }, { status });
+    }
+  }
+
   try {
     const stack = await decomposeImageLayer({
       userId: auth.userId,
@@ -64,27 +100,6 @@ export async function POST(req: Request) {
       bboxes,
       size,
     });
-    if (projectId) {
-      await saveEcomImageLayerWorkspace(
-        auth.userId,
-        projectId,
-        workspaceFromStack(stack, {
-          sourceImageUrl: stack.sourceImageUrl ?? sourceImageUrl,
-          originalImageUrl: sourceImageUrl,
-          pendingBboxes: [],
-          pendingBbox: null,
-        }),
-      );
-      const previewUrl = stack.background.url;
-      await appendEcomImageLayerGeneration(auth.userId, projectId, {
-        kind: "decompose",
-        title: "AI 图层分离",
-        prompt: buildDecomposePrompt(bboxes ?? []),
-        ossUrl: previewUrl,
-        logId: stack.logId ?? null,
-        compareFromUrl: sourceImageUrl,
-      });
-    }
     return ecomJson({ stack });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "图层拆分失败";

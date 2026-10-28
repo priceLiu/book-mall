@@ -67,6 +67,7 @@ function resolveGalleryThumbnailUrl(thumbnailUrl: string | undefined): string | 
 function resolveGalleryPreviewVideoUrl(template: QrTemplate): string | null {
   return resolveQrTemplateFullOutputVideoUrl({
     id: template.id,
+    category: template.category,
     output: template.output,
     thumbnailUrl: template.thumbnailUrl,
     reference: template.reference,
@@ -161,6 +162,7 @@ function TemplateDownloadButton({
   return (
     <QrFrostIconButton
       size="sm"
+      cardAdaptive
       aria-label="下载"
       className={className}
       onClick={(e) => {
@@ -281,7 +283,7 @@ export function MasonryTemplateCard({
   const isVideoCard = Boolean(previewVideoUrl);
 
   return (
-    <div className="group relative w-full">
+    <div className="group relative w-full [container-type:inline-size] [container-name:qr-masonry-item]">
     <div
       role="button"
       tabIndex={0}
@@ -383,9 +385,10 @@ export function MasonryTemplateCard({
               style={{ background: "rgba(0, 0, 0, 0.42)" }}
             />
 
-            <div className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center gap-3 px-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 sm:gap-3.5">
+            <div className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center gap-[clamp(0.375rem,3cqw,0.875rem)] px-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
               {isVideoCard && previewVideoUrl ? (
                 <QrFrostIconButton
+                  cardAdaptive
                   aria-label="播放"
                   onClick={(e) => {
                     e.preventDefault();
@@ -397,6 +400,7 @@ export function MasonryTemplateCard({
                 </QrFrostIconButton>
               ) : fullImagePreviewUrl ? (
                 <QrFrostIconButton
+                  cardAdaptive
                   aria-label="预览"
                   onClick={(e) => {
                     e.preventDefault();
@@ -408,6 +412,7 @@ export function MasonryTemplateCard({
                 </QrFrostIconButton>
               ) : null}
               <QrFrostIconButton
+                cardAdaptive
                 aria-label="复现"
                 onClick={(e) => {
                   e.preventDefault();

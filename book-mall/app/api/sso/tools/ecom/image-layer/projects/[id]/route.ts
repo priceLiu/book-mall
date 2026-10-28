@@ -1,9 +1,9 @@
 import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
 
+import { expireStaleImageLayerDecomposeJob } from "@/lib/ecom/ecom-image-layer-decompose-job";
 import type { ImageLayerWorkspace } from "@/lib/ecom/ecom-image-layer-project-types";
 import {
   deleteEcomImageLayerProject,
-  getEcomImageLayerProject,
   saveEcomImageLayerWorkspace,
   updateEcomImageLayerProject,
 } from "@/lib/ecom/ecom-image-layer-project-service";
@@ -18,7 +18,7 @@ export async function GET(_req: Request, ctx: Ctx) {
   if (!auth.ok) return auth.res;
   const { id } = await ctx.params;
   try {
-    const project = await getEcomImageLayerProject(auth.userId, id);
+    const project = await expireStaleImageLayerDecomposeJob(auth.userId, id);
     if (!project) return ecomJson({ error: "项目不存在" }, { status: 404 });
     return ecomJson({ project });
   } catch (e) {

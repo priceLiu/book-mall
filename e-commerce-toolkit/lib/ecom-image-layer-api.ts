@@ -9,6 +9,63 @@ import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 
 const BASE = "api/sso/tools/ecom/image-layer";
 
+const DECOMPOSE_WAIT_MS = 8 * 60 * 1000;
+
+export type ImageLayerDecomposeJobView = {
+  id: string;
+  status: "running" | "succeeded" | "failed";
+  error?: string;
+};
+
+export function readImageLayerDecomposeJob(
+  meta: Record<string, unknown> | null | undefined,
+): ImageLayerDecomposeJobView | null {
+  const raw = meta?.decomposeJob;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const job = raw as Record<string, unknown>;
+  const id = typeof job.id === "string" ? job.id.trim() : "";
+  const status = job.status;
+  if (!id) return null;
+  if (status !== "running" && status !== "succeeded" && status !== "failed") return null;
+  const error = typeof job.error === "string" ? job.error : undefined;
+  return { id, status, ...(error ? { error } : {}) };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+/** 轮询后台图层分离。云托管公网约 60s 会把同步长请求打成 504，所以接口先返回 jobId。 */
+export async function waitForImageLayerDecomposeJob(
+  projectId: string,
+  jobId: string,
+): Promise<ImageLayerStack> {
+  const deadline = Date.now() + DECOMPOSE_WAIT_MS;
+  let delayMs = 1200;
+  while (Date.now() < deadline) {
+    await sleep(delayMs);
+    delayMs = 2000;
+    const project = await getImageLayerProject(projectId);
+    const job = readImageLayerDecomposeJob(project.meta);
+    if (job?.id === jobId && job.status === "failed") {
+      throw new Error(job.error || "图层拆分失败");
+    }
+    if (job?.id === jobId && job.status === "succeeded") {
+      const stack = project.workspace?.stack;
+      if (!stack?.background?.url) throw new Error("图层拆分未返回有效结果");
+      return stack;
+    }
+    if (!job || job.id !== jobId) {
+      const stack = project.workspace?.stack;
+      if (stack?.background?.url) return stack;
+      throw new Error("图层分离已中断，请重新点击「AI 图层分离」");
+    }
+  }
+  throw new Error("图层分离仍在处理，请稍后刷新页面查看结果");
+}
+
 export async function uploadImageLayerSource(
   file: File,
   opts?: { projectId?: string; firstOrigin?: string },
@@ -43,8 +100,13 @@ export async function decomposeImageLayers(opts: {
     body: JSON.stringify(opts),
   });
   const stack = data.stack as ImageLayerStack | undefined;
-  if (!stack?.background?.url) throw new Error("图层拆分未返回有效结果");
-  return stack;
+  if (stack?.background?.url) return stack;
+  const jobId = typeof data.jobId === "string" ? data.jobId.trim() : "";
+  const projectId = opts.projectId?.trim() ?? "";
+  if (jobId && projectId) {
+    return waitForImageLayerDecomposeJob(projectId, jobId);
+  }
+  throw new Error("图层拆分未返回有效结果");
 }
 
 export type ImageLayerEditInput = {

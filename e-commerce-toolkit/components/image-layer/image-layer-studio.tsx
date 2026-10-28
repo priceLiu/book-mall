@@ -36,9 +36,11 @@ import {
   eraseImageLayerRegion,
   getImageLayerProject,
   listImageLayerProjectSummaries,
+  readImageLayerDecomposeJob,
   saveImageLayerResult,
   saveImageLayerWorkspace,
   uploadImageLayerSource,
+  waitForImageLayerDecomposeJob,
 } from "@/lib/ecom-image-layer-api";
 import { listAssets } from "@/lib/ecom-api";
 import { replaceEcomBackground } from "@/lib/ecom-background-replace-api";
@@ -153,6 +155,7 @@ function ImageLayerStudioInner() {
   const { alert, confirm, doubleConfirm, toast } = useDialogs();
   const backgroundGen = useBackgroundGeneration();
   const skipAutoSaveRef = useRef(true);
+  const decomposeResumeRunRef = useRef(0);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const exportBlobRef = useRef<Blob | null>(null);
   const canvasRef = useRef<ImageLayerCanvasHandle>(null);
@@ -770,6 +773,7 @@ function ImageLayerStudioInner() {
 
     const taskId = DECOMPOSE_TASK_ID;
     const prevStack = stack;
+    skipAutoSaveRef.current = true;
 
     try {
       await promoteAsDecomposeSource(decomposeUrl, { clearStack: true });
@@ -810,6 +814,7 @@ function ImageLayerStudioInner() {
       });
       return null;
     } finally {
+      skipAutoSaveRef.current = false;
       setDecomposeBusy(false);
       setBusyLabel(null);
     }
@@ -823,6 +828,90 @@ function ImageLayerStudioInner() {
     sourceUrl,
     stack,
   ]);
+
+  const runningDecomposeJobId = useMemo(() => {
+    const job = readImageLayerDecomposeJob(project?.meta ?? null);
+    return job?.status === "running" ? job.id : null;
+  }, [project?.meta]);
+
+  const decomposeResumeHandlersRef = useRef({
+    applyStack,
+    alert,
+    toast,
+    backgroundGen,
+  });
+  decomposeResumeHandlersRef.current = {
+    applyStack,
+    alert,
+    toast,
+    backgroundGen,
+  };
+
+  useEffect(() => {
+    if (!project?.id || !runningDecomposeJobId) return;
+    const projectId = project.id;
+    const jobId = runningDecomposeJobId;
+    const run = ++decomposeResumeRunRef.current;
+    let cancelled = false;
+    skipAutoSaveRef.current = true;
+    const holdSkip = window.setTimeout(() => {
+      if (decomposeResumeRunRef.current === run) skipAutoSaveRef.current = true;
+    }, 0);
+    setDecomposeBusy(true);
+    setBusyLabel("AI 图层分离中…");
+    const handlers = decomposeResumeHandlersRef.current;
+    handlers.backgroundGen.registerTask({
+      id: DECOMPOSE_TASK_ID,
+      label: "AI 图层分离",
+      hint: "Seedream 5.0 Pro · 可能需 1～2 分钟",
+      startedAt: new Date().toISOString(),
+      expectedDurationMs: 120_000,
+      poll: async () => ({ status: "running" as const }),
+    });
+    void (async () => {
+      try {
+        const result = await waitForImageLayerDecomposeJob(projectId, jobId);
+        if (cancelled || decomposeResumeRunRef.current !== run) return;
+        const live = decomposeResumeHandlersRef.current;
+        live.applyStack(result);
+        const updated = await getImageLayerProject(projectId);
+        if (cancelled || decomposeResumeRunRef.current !== run) return;
+        setProject(updated);
+        live.backgroundGen.dismissTask(DECOMPOSE_TASK_ID);
+        await live.toast({
+          variant: "success",
+          title: "图层分离完成",
+          message: "左侧为本次拆层原图，右侧为图层结果。",
+        });
+      } catch (e) {
+        if (cancelled || decomposeResumeRunRef.current !== run) return;
+        const live = decomposeResumeHandlersRef.current;
+        live.backgroundGen.failTask(
+          DECOMPOSE_TASK_ID,
+          e instanceof Error ? e.message : "图层分离失败",
+        );
+        if (isEcomUnauthorizedError(e)) {
+          setNeedLogin(true);
+          return;
+        }
+        await live.alert({
+          title: "图层分离失败",
+          message: e instanceof Error ? e.message : "请稍后重试",
+          variant: "error",
+        });
+      } finally {
+        window.clearTimeout(holdSkip);
+        if (decomposeResumeRunRef.current !== run) return;
+        skipAutoSaveRef.current = false;
+        setDecomposeBusy(false);
+        setBusyLabel(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(holdSkip);
+    };
+  }, [project?.id, runningDecomposeJobId]);
 
   const runDecompose = useCallback(async () => {
     if (!(await ensureSessionForAi())) return;

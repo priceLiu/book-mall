@@ -22,6 +22,11 @@ const UPSTREAM_CREATE_TASK_TIMEOUT_MS = readUpstreamTimeoutMs(
   "UPSTREAM_CREATE_TASK_TIMEOUT_MS",
   120_000,
 );
+/** Seedream 图层分离同步 /images/generations，常需 1～3 分钟 */
+const UPSTREAM_IMAGE_GENERATIONS_TIMEOUT_MS = readUpstreamTimeoutMs(
+  "UPSTREAM_IMAGE_GENERATIONS_TIMEOUT_MS",
+  300_000,
+);
 /** chat/completions body.max_tokens 达到此值时使用 STORY 超时 */
 export const UPSTREAM_STORY_CHAT_MAX_TOKENS_THRESHOLD = 8_000;
 
@@ -60,6 +65,9 @@ export function resolveUpstreamChatTimeoutMs(
 ): number {
   if (init.method?.toUpperCase() === "POST" && /\/createTask$/i.test(url)) {
     return UPSTREAM_CREATE_TASK_TIMEOUT_MS;
+  }
+  if (/\/images\/generations(?:\?|$)/i.test(url)) {
+    return UPSTREAM_IMAGE_GENERATIONS_TIMEOUT_MS;
   }
   if (/\/multimodal-generation\//i.test(url)) {
     return UPSTREAM_STORY_CHAT_TIMEOUT_MS;

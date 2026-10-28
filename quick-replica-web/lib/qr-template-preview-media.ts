@@ -63,7 +63,7 @@ export function resolveQrTemplatePreviewMedia(input: {
     return { url: outputUrl, kind: "audio" };
   }
   if (outputUrl && isVideoMediaUrl(outputUrl)) {
-    return { url: outputUrl, kind: "image" };
+    return { url: outputUrl, kind: "video", poster: thumb || undefined };
   }
   if (thumb) {
     return {
@@ -103,18 +103,54 @@ export function resolveQrTemplateFullOutputImageUrl(input: {
   return undefined;
 }
 
-/** 全屏视频播放：优先 output 成片 */
+function templateExpectsVideoOutput(input: {
+  category?: string;
+  output?: { mediaType?: "image" | "video" | "audio"; gatewayRequestLogId?: string };
+  reference?: { model?: { role?: string } };
+}): boolean {
+  if (input.output?.mediaType === "video") return true;
+  if (input.category === "video") return true;
+  if (input.reference?.model?.role === "VIDEO") return true;
+  if (input.output?.gatewayRequestLogId?.trim()) return true;
+  return false;
+}
+
+/** 全屏 / 卡片悬停：优先 output 成片，禁止误回退 referenceVideo */
 export function resolveQrTemplateFullOutputVideoUrl(input: {
   id?: string;
-  output?: { mediaType?: "image" | "video" | "audio"; url?: string };
+  category?: string;
+  output?: {
+    mediaType?: "image" | "video" | "audio";
+    url?: string;
+    gatewayRequestLogId?: string;
+  };
   thumbnailUrl?: string;
-  reference?: { slots?: { referenceVideo?: { url?: string } } };
+  reference?: {
+    slots?: { referenceVideo?: { url?: string } };
+    model?: { role?: string };
+  };
 }): string | null {
   const outputUrl = input.output?.url?.trim() ?? "";
-  if (input.output?.mediaType === "video" && outputUrl) return outputUrl;
-  if (outputUrl && isVideoMediaUrl(outputUrl)) return outputUrl;
-
   const refVideo = input.reference?.slots?.referenceVideo?.url?.trim() ?? "";
+
+  if (outputUrl) {
+    const mediaType = input.output?.mediaType;
+    if (mediaType === "video" || isVideoMediaUrl(outputUrl)) return outputUrl;
+    if (mediaType !== "audio" && !isAudioMediaUrl(outputUrl) && !isImageMediaUrl(outputUrl)) {
+      if (templateExpectsVideoOutput(input) && (!refVideo || outputUrl !== refVideo)) {
+        return outputUrl;
+      }
+    }
+    if (
+      mediaType === "image" &&
+      !isImageMediaUrl(outputUrl) &&
+      templateExpectsVideoOutput(input) &&
+      (!refVideo || outputUrl !== refVideo)
+    ) {
+      return outputUrl;
+    }
+  }
+
   if (refVideo && isVideoMediaUrl(refVideo)) return refVideo;
 
   const fromId = resolveQrBuiltinVideoGalleryUrlFromId(input.id);

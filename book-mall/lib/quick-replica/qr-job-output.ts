@@ -37,12 +37,16 @@ export function extractQrJobOutputUrl(resultSummary: unknown): {
   }
   if (typeof root.url === "string" && root.url.trim()) {
     const url = root.url.trim();
-    const mediaType = /\.(mp3|wav|m4a|aac|ogg)(\?|$)/i.test(url)
-      ? "audio"
-      : url.includes(".mp4") || url.includes(".webm") || url.includes("video")
-        ? "video"
-        : "image";
-    return { url, mediaType };
+    if (/\.(mp3|wav|m4a|aac|ogg|flac)(\?|$)/i.test(url)) {
+      return { url, mediaType: "audio" };
+    }
+    if (/\.(mp4|webm|mov|m4v)(\?|$)/i.test(url) || /\/video\b|video\//i.test(url)) {
+      return { url, mediaType: "video" };
+    }
+    if (/\.(webp|jpe?g|png|gif|avif|bmp|svg)(\?|$)/i.test(url)) {
+      return { url, mediaType: "image" };
+    }
+    return { url, mediaType: "video" };
   }
 
   const kieUrl = extractKieResultUrl(root as KieRecordResponse);

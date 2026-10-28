@@ -46,4 +46,15 @@ describe("extractQrJobOutputUrl", () => {
       }),
     ).toEqual({ url: "https://cdn.example.com/demo.mp3", mediaType: "audio" });
   });
+
+  it("treats extensionless OSS url as video (not image)", () => {
+    expect(
+      extractQrJobOutputUrl({
+        url: "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/canvas/user/u1/out-abc123",
+      }),
+    ).toEqual({
+      url: "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/canvas/user/u1/out-abc123",
+      mediaType: "video",
+    });
+  });
 });

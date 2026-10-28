@@ -178,6 +178,29 @@ body {
     flex-shrink: 0;
   }
 
+  /** 模板瀑布流卡片 · 悬停图标随卡片宽度缩放（非整页 vmin） */
+  @container qr-masonry-item (min-width: 0px) {
+    .qr-frost-icon-btn--card-adaptive {
+      width: clamp(1.625rem, 20cqw, 3.25rem);
+      height: clamp(1.625rem, 20cqw, 3.25rem);
+    }
+
+    .qr-frost-icon-btn--card-adaptive .qr-frost-icon-btn__icon {
+      width: clamp(0.875rem, 10cqw, 1.375rem);
+      height: clamp(0.875rem, 10cqw, 1.375rem);
+    }
+
+    .qr-frost-icon-btn--card-adaptive.qr-frost-icon-btn--sm {
+      width: clamp(1.375rem, 16cqw, 2.625rem);
+      height: clamp(1.375rem, 16cqw, 2.625rem);
+    }
+
+    .qr-frost-icon-btn--card-adaptive.qr-frost-icon-btn--sm .qr-frost-icon-btn__icon {
+      width: clamp(0.75rem, 8cqw, 1.125rem);
+      height: clamp(0.75rem, 8cqw, 1.125rem);
+    }
+  }
+
   /** 品牌 Sparkles · 保持正圆、不拉伸 */
   .qr-brand-mark {
     display: inline-flex;

@@ -2,6 +2,7 @@
  * 火山方舟 · Seedream 图像生成/编辑（OpenAI 兼容 /images/generations）
  */
 
+import { gatewayFetch } from "@/lib/gateway/format-fetch-error";
 import { resolveVolcengineArkApiRoot } from "@/lib/gateway/model-router";
 import { resolveVolcengineModelKey } from "@/lib/gateway/volcengine-chat-models";
 
@@ -309,14 +310,18 @@ export async function volcengineImageGenerations(
   const body = buildVolcengineImageGenerationsBody(req);
 
   const apiKey = extractApiKey(req.apiKey);
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+  const response = await gatewayFetch(
+    url,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
     },
-    body: JSON.stringify(body),
-  });
+    { hop: "upstream", providerKind: "VOLCENGINE" },
+  );
 
   const text = await response.text();
   let data: Record<string, unknown> = {};

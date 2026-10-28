@@ -90,6 +90,14 @@ describe("resolveUpstreamChatTimeoutMs", () => {
   it("exports story threshold at 8000", () => {
     expect(UPSTREAM_STORY_CHAT_MAX_TOKENS_THRESHOLD).toBe(8_000);
   });
+
+  it("uses a long timeout for seedream images/generations", () => {
+    const ms = resolveUpstreamChatTimeoutMs(
+      "https://ark.cn-beijing.volces.com/api/v3/images/generations",
+      { method: "POST", body: JSON.stringify({ model: "doubao-seedream-5-0-pro" }) },
+    );
+    expect(ms).toBeGreaterThanOrEqual(300_000);
+  });
 });
 
 describe("isTransientUpstreamConnectError", () => {

@@ -6,6 +6,7 @@ import {
   ECOM_IMAGE_LAYER_MODEL,
   ECOM_IMAGE_LAYER_TOOL_KEY,
 } from "@/lib/ecom/ecom-image-layer-service";
+import { mergeImageLayerWorkspaceDuringDecompose } from "@/lib/ecom/ecom-image-layer-decompose-job-state";
 import {
   ECOM_IMAGE_LAYER_MODULE,
   sanitizeImageLayerGenerations,
@@ -99,7 +100,11 @@ export async function updateEcomImageLayerProject(
 
   const prevWorkspace = sanitizeImageLayerWorkspace(existing.workspace);
   const nextWorkspace = patch.workspace
-    ? { ...prevWorkspace, ...patch.workspace }
+    ? mergeImageLayerWorkspaceDuringDecompose(
+        prevWorkspace,
+        patch.workspace,
+        existing.meta,
+      )
     : prevWorkspace;
 
   let nextMeta: Prisma.InputJsonValue | undefined;

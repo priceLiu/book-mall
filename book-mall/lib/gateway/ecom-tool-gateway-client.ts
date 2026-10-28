@@ -23,8 +23,11 @@ import {
   gatewayV1ImageOutPainting,
   gatewayV1ImageParsing,
   gatewayV1QwenImageEdit,
-  gatewayV1VolcengineImageGenerations,
 } from "@/lib/gateway/gateway-v1-http-client";
+import {
+  GatewayV1VolcengineImageError,
+  runGatewayV1VolcengineImageGenerations,
+} from "@/lib/gateway/gateway-v1-volcengine-image-service";
 import {
   GatewayV1AsrError,
   runGatewayV1AsrTranscribe,
@@ -38,6 +41,7 @@ import {
   type PreparedGatewayV1EcomAsyncJob,
 } from "@/lib/gateway/gateway-v1-ecom-async-job-service";
 import type { QwenImageEditParams } from "@/lib/gateway/qwen-image-edit-proxy";
+import type { VolcengineImageGenerationsParams } from "@/lib/gateway/volcengine-image-generations-proxy";
 import {
   AITRYON_PARSING_MODEL,
   dashscopeExtractTaskImageUrl,
@@ -626,19 +630,28 @@ export async function ecomGwVolcengineImageEdit(
   if (!pickCredentialForKind(auth.credentials, "VOLCENGINE")) {
     throw new GatewayRequiredError("Gateway Key 未绑定火山方舟凭证");
   }
-  return captureEcomLog(await gatewayV1VolcengineImageGenerations({
-    apiKeyId: auth.id,
-    body: {
-      model,
-      prompt: opts.prompt,
-      image: opts.image,
-      parameters: opts.parameters,
-    },
-    meta: gatewayV1ClientMeta("E_COMMERCE", {
-      clientPage: opts.clientPage,
-      bookUserId,
-    }),
-  }));
+  try {
+    return captureEcomLog(
+      await runGatewayV1VolcengineImageGenerations({
+        auth,
+        body: {
+          model,
+          prompt: opts.prompt,
+          image: opts.image,
+          parameters: opts.parameters as VolcengineImageGenerationsParams | undefined,
+        },
+        logMeta: gatewayV1ClientMeta("E_COMMERCE", {
+          clientPage: opts.clientPage,
+          bookUserId,
+        }),
+      }),
+    );
+  } catch (e) {
+    if (e instanceof GatewayV1VolcengineImageError) {
+      throw new Error(e.message);
+    }
+    throw e;
+  }
 }
 
 export async function ecomGwImageOutPainting(

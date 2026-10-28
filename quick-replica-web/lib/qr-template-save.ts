@@ -10,6 +10,8 @@ export function cloneTemplateForUserSave(t: QrTemplate) {
     title,
     thumbnailUrl: t.thumbnailUrl,
     reference: t.reference,
+    output: t.output,
+    gatewayRequestLogId: t.output?.gatewayRequestLogId,
   };
 }
 
