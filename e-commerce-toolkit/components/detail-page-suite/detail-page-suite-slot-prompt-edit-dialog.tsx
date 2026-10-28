@@ -177,7 +177,7 @@ export function DetailPageSuiteSlotPromptEditDialog({
         onPreview={
           onPreview
             ? (imagePrompt, extras) =>
-                void onPreview(imagePrompt, extras as DetailPageSuiteSlotPromptSaveExtras)
+                onPreview(imagePrompt, extras as DetailPageSuiteSlotPromptSaveExtras)
             : undefined
         }
         onConfirmCompose={

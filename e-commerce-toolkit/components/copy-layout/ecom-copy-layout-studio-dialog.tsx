@@ -16,15 +16,14 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
-const promptTextareaClass =
-  "mt-1.5 w-full min-h-[5.5rem] max-h-[min(12rem,22vh)] resize-y rounded-md border border-white/15 bg-black/40 px-3 py-2 text-sm leading-relaxed text-white outline-none placeholder:text-white/30 focus:border-[#0a84ff]";
-
 /** 与右栏 360px 底栏两列按钮同宽同高：(360 - 24 - 8) / 2 */
 const editorActionSize = "h-8 w-[164px]";
 const editorGhostBtn =
   `inline-flex ${editorActionSize} items-center justify-center rounded-lg border border-white/10 bg-[#2A2A2A] px-3 text-[13px] font-medium text-white hover:bg-[#333] disabled:opacity-40`;
 const editorPrimaryBtn =
   `inline-flex ${editorActionSize} items-center justify-center rounded-lg border border-white/15 bg-white/10 px-3 text-[13px] font-medium text-white hover:bg-white/15 disabled:opacity-40`;
+const editorWideBtn =
+  "inline-flex h-8 w-full items-center justify-center whitespace-nowrap rounded-lg border border-white/10 bg-[#2A2A2A] px-3 text-[13px] font-medium text-white hover:bg-[#333] disabled:opacity-40";
 
 function EditorBrandMark() {
   return (
@@ -87,7 +86,6 @@ type Props = {
   /** 用当前提示词重出中间这张底图；不关闭编辑器 */
   onRegenerateImage?: (prompt: string) => void | Promise<void>;
   rewriteButtonLabel?: string;
-  composeHint?: string;
   /** 打开时冻结的原提示词；缺省用 imagePrompt */
   sourcePrompt?: string;
   referenceImages?: EcomCopyLayoutReferenceImage[];
@@ -183,7 +181,6 @@ export function EcomCopyLayoutStudioDialog({
   onRewrite,
   onRegenerateImage,
   rewriteButtonLabel = "AI 重写本条（文案+提示词）",
-  composeHint,
   sourcePrompt,
   referenceImages = [],
   leftColumnExtras,
@@ -213,11 +210,6 @@ export function EcomCopyLayoutStudioDialog({
   const twoStepCompose = Boolean(onPreview);
   const previewBusy = previewing || localPreviewBusy;
   const busy = saving || composing || previewBusy || regenBusy;
-  const hint =
-    composeHint ??
-    (twoStepCompose
-      ? "生成预览核对成图，满意后保存并关闭。"
-      : "拖拽定位文案，保存后外层自动刷新。");
 
   const wasOpenRef = useRef(false);
   const incomingPromptRef = useRef(imagePrompt);
@@ -331,7 +323,7 @@ export function EcomCopyLayoutStudioDialog({
   return (
     <FullscreenImageEditorShell
       open={open}
-      zClassName={zClassName}
+      zClassName={zClassName ?? "z-[280]"}
       title={title}
       onClose={() => onOpenChange(false)}
       headerLeading={<EditorBrandMark />}
@@ -378,20 +370,15 @@ export function EcomCopyLayoutStudioDialog({
       }
       leftFooter={
         onRewrite ? (
-          <div className="space-y-2">
-            <p className="text-[11px] leading-relaxed text-white/40">{hint}</p>
-            <button
-              type="button"
-              className={`${editorGhostBtn} w-full`}
-              disabled={busy || rewriteBusy}
-              onClick={onRewrite}
-            >
-              {rewriteBusy ? "AI 生成中…" : rewriteButtonLabel}
-            </button>
-          </div>
-        ) : (
-          <p className="text-[11px] leading-relaxed text-white/40">{hint}</p>
-        )
+          <button
+            type="button"
+            className={editorWideBtn}
+            disabled={busy || rewriteBusy}
+            onClick={onRewrite}
+          >
+            {rewriteBusy ? "AI 生成中…" : rewriteButtonLabel}
+          </button>
+        ) : null
       }
       center={
         <>
@@ -464,21 +451,6 @@ export function EcomCopyLayoutStudioDialog({
           {rightColumnExtras ? (
             <InspectorSection title="更多">{rightColumnExtras}</InspectorSection>
           ) : null}
-
-          <InspectorSection
-            title="无字底图提示词"
-            description="仅重出摄影底图时使用，改字不触发重新生图"
-          >
-            <textarea
-              className={promptTextareaClass}
-              value={promptDraft}
-              onChange={(e) => {
-                markPreviewStale();
-                setPromptDraft(e.target.value);
-              }}
-              placeholder="中文生图描述…"
-            />
-          </InspectorSection>
         </>
       }
       rightFooter={
