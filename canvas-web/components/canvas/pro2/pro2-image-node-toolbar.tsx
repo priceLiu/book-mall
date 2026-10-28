@@ -422,6 +422,7 @@ export function Pro2ImageNodeToolbar({
             setOpen={(v) => (v ? dropdowns.toggle("magic") : dropdowns.close())}
             rect={dropdowns.isOpen("magic") ? dropdowns.rect : null}
             minWidth={180}
+            estimatedHeight={220}
           >
             {LIBTV_IMAGE_MAGIC_MENU.map((item) => (
               <Pro2ToolbarDropdownItem
@@ -441,6 +442,7 @@ export function Pro2ImageNodeToolbar({
             setOpen={(v) => (v ? dropdowns.toggle("grid") : dropdowns.close())}
             rect={dropdowns.isOpen("grid") ? dropdowns.rect : null}
             minWidth={220}
+            estimatedHeight={420}
           >
             {LIBTV_GRID_SPLIT_PRESETS.map((preset) => (
               <Pro2ToolbarDropdownItem

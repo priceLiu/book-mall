@@ -55,6 +55,7 @@ function resolvePreviewMedia(template: QrTemplate): {
   const imageUrl = resolveQrTemplateFullOutputImageUrl(template);
   const videoUrl = resolveQrTemplateFullOutputVideoUrl({
     id: template.id,
+    source: template.source,
     category: template.category,
     output: template.output,
     thumbnailUrl: template.thumbnailUrl,

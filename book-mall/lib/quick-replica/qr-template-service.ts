@@ -10,6 +10,10 @@ import {
 import { ADMIN_TEMPLATE_PAGE_SIZE } from "@/lib/admin/admin-template-page";
 import { mergeBuiltinWithOverride } from "@/lib/quick-replica/qr-builtin-catalog-merge";
 import { filterTemplatesForGallery } from "@/lib/quick-replica/qr-template-catalog";
+import {
+  enrichQrTemplateVideoOutput,
+  enrichQrTemplatesVideoOutput,
+} from "@/lib/quick-replica/qr-template-output-enrich";
 import type { QrCategory, QrHomeFeedCategory, QrTemplateJson, QrTemplateListFilters } from "@/lib/quick-replica/qr-types";
 import { QR_HOME_FEED_CATEGORIES } from "@/lib/quick-replica/qr-types";
 
@@ -150,11 +154,13 @@ export async function listQrTemplates(
       where,
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     });
-    return userRows.map(rowToJson);
+    return enrichQrTemplatesVideoOutput(userRows.map(rowToJson));
   }
 
   const overrideMap = await loadCatalogOverrideMap();
-  return listQrTemplatesGallery(userId, filters, overrideMap);
+  return enrichQrTemplatesVideoOutput(
+    await listQrTemplatesGallery(userId, filters, overrideMap),
+  );
 }
 
 /** @deprecated 从 `@/lib/quick-replica/qr-types` 导入 */
@@ -293,7 +299,7 @@ export async function listUserOwnGalleryTemplates(
     where,
     orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
   });
-  return rows.map(rowToJson);
+  return enrichQrTemplatesVideoOutput(rows.map(rowToJson));
 }
 
 /** 工作流分享：按 resourceId 解析模板（DB / 内置 / 运营 override），不校验归属 */
@@ -388,14 +394,16 @@ export async function getQrTemplateById(
       OR: [{ ownerUserId: userId }, { visibility: "public" }],
     },
   });
-  return row ? rowToJson(row) : null;
+  const json = row ? rowToJson(row) : null;
+  return enrichQrTemplateVideoOutput(json);
 }
 
 export async function findQrTemplateByLogId(logId: string): Promise<QrTemplateJson | null> {
   const row = await prisma.qrTemplate.findFirst({
     where: { gatewayRequestLogId: logId, deletedAt: null },
   });
-  return row ? rowToJson(row) : null;
+  const json = row ? rowToJson(row) : null;
+  return enrichQrTemplateVideoOutput(json);
 }
 
 function draftToTemplateReference(

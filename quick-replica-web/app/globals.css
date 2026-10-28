@@ -178,26 +178,26 @@ body {
     flex-shrink: 0;
   }
 
-  /** 模板瀑布流卡片 · 悬停图标随卡片宽度缩放（非整页 vmin） */
+  /** 模板瀑布流卡片 · 窄屏随卡片(cqw)缩小，大屏随视口(vmin)放大 */
   @container qr-masonry-item (min-width: 0px) {
     .qr-frost-icon-btn--card-adaptive {
-      width: clamp(1.625rem, 20cqw, 3.25rem);
-      height: clamp(1.625rem, 20cqw, 3.25rem);
+      width: clamp(1.625rem, max(18cqw, 5vmin), 4.5rem);
+      height: clamp(1.625rem, max(18cqw, 5vmin), 4.5rem);
     }
 
     .qr-frost-icon-btn--card-adaptive .qr-frost-icon-btn__icon {
-      width: clamp(0.875rem, 10cqw, 1.375rem);
-      height: clamp(0.875rem, 10cqw, 1.375rem);
+      width: clamp(0.875rem, max(9cqw, 2.5vmin), 2.125rem);
+      height: clamp(0.875rem, max(9cqw, 2.5vmin), 2.125rem);
     }
 
     .qr-frost-icon-btn--card-adaptive.qr-frost-icon-btn--sm {
-      width: clamp(1.375rem, 16cqw, 2.625rem);
-      height: clamp(1.375rem, 16cqw, 2.625rem);
+      width: clamp(1.375rem, max(14cqw, 4vmin), 3.5rem);
+      height: clamp(1.375rem, max(14cqw, 4vmin), 3.5rem);
     }
 
     .qr-frost-icon-btn--card-adaptive.qr-frost-icon-btn--sm .qr-frost-icon-btn__icon {
-      width: clamp(0.75rem, 8cqw, 1.125rem);
-      height: clamp(0.75rem, 8cqw, 1.125rem);
+      width: clamp(0.75rem, max(7cqw, 2vmin), 1.625rem);
+      height: clamp(0.75rem, max(7cqw, 2vmin), 1.625rem);
     }
   }
 

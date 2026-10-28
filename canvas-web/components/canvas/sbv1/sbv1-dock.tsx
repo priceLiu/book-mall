@@ -132,8 +132,10 @@ function Sbv1DockIcon({
   );
 }
 
-export const Sbv1Dock = forwardRef<HTMLDivElement, { items: Sbv1DockItem[] }>(
-  function Sbv1Dock({ items }, ref) {
+export const Sbv1Dock = forwardRef<
+  HTMLDivElement,
+  { items: Sbv1DockItem[]; /** 由 LibtvCanvasDockBarSlot 提供外壳时设为 false */ embedInShell?: boolean }
+>(function Sbv1Dock({ items, embedInShell = true }, ref) {
   const mouseX = useMotionValue(Infinity);
 
   return (
@@ -141,15 +143,23 @@ export const Sbv1Dock = forwardRef<HTMLDivElement, { items: Sbv1DockItem[] }>(
       ref={ref}
       onMouseMove={(e) => mouseX.set(e.clientX)}
       onMouseLeave={() => mouseX.set(Infinity)}
-      className={LIBTV_CANVAS_DOCK_BAR_CLASS}
-      initial={{ y: 32, opacity: 0 }}
+      className={
+        embedInShell
+          ? LIBTV_CANVAS_DOCK_BAR_CLASS
+          : "flex min-w-0 flex-1 items-end gap-2 self-stretch pb-1.5 pt-1"
+      }
+      initial={embedInShell ? { y: 32, opacity: 0 } : false}
       animate={{ y: 0, opacity: 1 }}
-      transition={{
-        type: "spring",
-        stiffness: 260,
-        damping: 20,
-        delay: 0.08,
-      }}
+      transition={
+        embedInShell
+          ? {
+              type: "spring",
+              stiffness: 260,
+              damping: 20,
+              delay: 0.08,
+            }
+          : { duration: 0 }
+      }
     >
       {items.map((item) => (
         <Sbv1DockIcon key={item.id} item={item} mouseX={mouseX} />

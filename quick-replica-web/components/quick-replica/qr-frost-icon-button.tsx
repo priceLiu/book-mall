@@ -19,7 +19,7 @@ export function QrFrostIconButton({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   size?: QrFrostIconButtonSize;
-  /** 在 `[container-name:qr-masonry-item]` 内按卡片宽度缩放 */
+  /** 在 `[container-name:qr-masonry-item]` 内：窄屏随卡片(cqw)，大屏随视口(vmin) */
   cardAdaptive?: boolean;
   children: ReactNode;
 }) {

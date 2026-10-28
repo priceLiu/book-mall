@@ -84,6 +84,24 @@ export function usePro2ToolbarExclusiveDropdowns<K extends string>(
   };
 }
 
+export type Pro2ToolbarDropdownPlacement = "auto" | "above" | "below";
+
+function resolvePro2ToolbarDropdownSide(
+  rect: DOMRect,
+  placement: Pro2ToolbarDropdownPlacement,
+  estimatedHeight: number,
+): "above" | "below" {
+  if (placement === "above") return "above";
+  if (placement === "below") return "below";
+  const gap = 6;
+  const spaceAbove = rect.top - gap;
+  const spaceBelow = window.innerHeight - rect.bottom - gap;
+  // 节点顶栏默认向上展开；仅当上方被视口裁切时改向下
+  if (spaceAbove >= estimatedHeight) return "above";
+  if (spaceBelow >= estimatedHeight) return "below";
+  return spaceBelow >= spaceAbove ? "below" : "above";
+}
+
 /** 顶栏下拉 · 深色菜单（编辑 / 宫格切分） */
 export function Pro2ToolbarDropdownMenu({
   open,
@@ -92,6 +110,8 @@ export function Pro2ToolbarDropdownMenu({
   children,
   className,
   minWidth = 220,
+  placement = "auto",
+  estimatedHeight = 280,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
@@ -99,8 +119,20 @@ export function Pro2ToolbarDropdownMenu({
   children: ReactNode;
   className?: string;
   minWidth?: number;
+  /** auto：上方空间不足时改向下展开（与 Dock `Sbv1ToolbarDropdown` 一致） */
+  placement?: Pro2ToolbarDropdownPlacement;
+  estimatedHeight?: number;
 }) {
   if (!open || !rect || typeof document === "undefined") return null;
+
+  const gap = 6;
+  const spaceAbove = rect.top - gap;
+  const spaceBelow = window.innerHeight - rect.bottom - gap;
+  const side = resolvePro2ToolbarDropdownSide(rect, placement, estimatedHeight);
+  const available = side === "above" ? spaceAbove : spaceBelow;
+  const panelMaxHeight = Math.max(120, Math.min(estimatedHeight, available));
+  const top = side === "above" ? rect.top - gap : rect.bottom + gap;
+  const transform = side === "above" ? "translateY(-100%)" : undefined;
 
   return createPortal(
     <>
@@ -112,16 +144,18 @@ export function Pro2ToolbarDropdownMenu({
       />
       <div
         className={cn(
-          "nodrag overflow-hidden rounded-xl border border-white/10 bg-[#262626] py-1 shadow-[0_8px_32px_rgba(0,0,0,0.55)]",
+          "nodrag overflow-x-hidden rounded-xl border border-white/10 bg-[#262626] py-1 shadow-[0_8px_32px_rgba(0,0,0,0.55)]",
           className,
         )}
         style={{
           position: "fixed",
           left: rect.left,
-          top: rect.top - 6,
-          transform: "translateY(-100%)",
+          top,
+          transform,
           zIndex: 201,
           minWidth,
+          maxHeight: panelMaxHeight,
+          overflowY: "auto",
         }}
       >
         {children}

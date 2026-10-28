@@ -67,6 +67,7 @@ function resolveGalleryThumbnailUrl(thumbnailUrl: string | undefined): string | 
 function resolveGalleryPreviewVideoUrl(template: QrTemplate): string | null {
   return resolveQrTemplateFullOutputVideoUrl({
     id: template.id,
+    source: template.source,
     category: template.category,
     output: template.output,
     thumbnailUrl: template.thumbnailUrl,
@@ -385,7 +386,7 @@ export function MasonryTemplateCard({
               style={{ background: "rgba(0, 0, 0, 0.42)" }}
             />
 
-            <div className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center gap-[clamp(0.375rem,3cqw,0.875rem)] px-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+            <div className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center gap-[clamp(0.375rem,max(3cqw,1.2vmin),1.25rem)] px-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
               {isVideoCard && previewVideoUrl ? (
                 <QrFrostIconButton
                   cardAdaptive

@@ -36,4 +36,24 @@ describe("resolveQrTemplateFullOutputVideoUrl", () => {
       }),
     ).toBe(generated);
   });
+
+  it("user saved work with log id never falls back to reference video", () => {
+    const reference = "https://cdn.example.com/ref.mp4";
+    expect(
+      resolveQrTemplateFullOutputVideoUrl({
+        source: "user",
+        category: "video",
+        output: {
+          mediaType: "image",
+          url: "https://example.com/thumb.jpg",
+          gatewayRequestLogId: "log-1",
+          createdAt: "",
+        },
+        reference: {
+          slots: { referenceVideo: { url: reference } },
+          model: { role: "VIDEO", modelKey: "kling", params: {} },
+        },
+      }),
+    ).toBeNull();
+  });
 });

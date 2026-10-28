@@ -4,12 +4,21 @@ import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
 const STORAGE_PREFIX = "libtv-canvas-dock-offset:";
 
+/** 收起态 Dock 贴左下时的 left / bottom 内边距（与画布 `bottom-4` 对齐） */
+export const CANVAS_DOCK_CORNER_INSET_PX = 16;
+
 export type CanvasDockBarPosition = {
   offsetX: number;
   offsetY: number;
+  /** 仅保留左侧把手 */
+  collapsed: boolean;
 };
 
-const DEFAULT_POSITION: CanvasDockBarPosition = { offsetX: 0, offsetY: 0 };
+const DEFAULT_POSITION: CanvasDockBarPosition = {
+  offsetX: 0,
+  offsetY: 0,
+  collapsed: false,
+};
 
 function parseStoredPosition(raw: string): CanvasDockBarPosition {
   if (raw.trim().startsWith("{")) {
@@ -23,12 +32,14 @@ function parseStoredPosition(raw: string): CanvasDockBarPosition {
         typeof parsed.offsetY === "number" && Number.isFinite(parsed.offsetY)
           ? parsed.offsetY
           : 0,
+      collapsed: parsed.collapsed === true,
     };
   }
   const legacyX = Number(raw);
   return {
     offsetX: Number.isFinite(legacyX) ? legacyX : 0,
     offsetY: 0,
+    collapsed: false,
   };
 }
 
@@ -101,7 +112,23 @@ export function clampCanvasDockBarPosition(
   return {
     offsetX: clampCanvasDockBarOffset(dockWidth, pos.offsetX),
     offsetY: clampCanvasDockBarOffsetY(dockHeight, pos.offsetY),
+    collapsed: pos.collapsed,
   };
+}
+
+/** 展开态：相对视口水平居中 + offsetX；收起态：固定左下角 */
+export function canvasDockBarLeftPx(opts: {
+  collapsed: boolean;
+  offsetX: number;
+  dockWidth: number;
+  viewportWidth: number;
+}): number {
+  const { collapsed, offsetX, dockWidth, viewportWidth } = opts;
+  if (collapsed) return CANVAS_DOCK_CORNER_INSET_PX;
+  if (viewportWidth <= 0 || dockWidth <= 0) {
+    return Math.max(0, viewportWidth / 2);
+  }
+  return viewportWidth / 2 + offsetX - dockWidth / 2;
 }
 
 type UseCanvasDockBarPositionOptions = {

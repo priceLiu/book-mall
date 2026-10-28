@@ -118,6 +118,7 @@ function templateExpectsVideoOutput(input: {
 /** 全屏 / 卡片悬停：优先 output 成片，禁止误回退 referenceVideo */
 export function resolveQrTemplateFullOutputVideoUrl(input: {
   id?: string;
+  source?: "builtin" | "user" | "catalog";
   category?: string;
   output?: {
     mediaType?: "image" | "video" | "audio";
@@ -132,10 +133,17 @@ export function resolveQrTemplateFullOutputVideoUrl(input: {
 }): string | null {
   const outputUrl = input.output?.url?.trim() ?? "";
   const refVideo = input.reference?.slots?.referenceVideo?.url?.trim() ?? "";
+  const savedGeneratedWork =
+    input.source === "user" && Boolean(input.output?.gatewayRequestLogId?.trim());
 
   if (outputUrl) {
     const mediaType = input.output?.mediaType;
-    if (mediaType === "video" || isVideoMediaUrl(outputUrl)) return outputUrl;
+    if (mediaType === "video" || isVideoMediaUrl(outputUrl)) {
+      if (savedGeneratedWork && refVideo && outputUrl === refVideo) {
+        return null;
+      }
+      return outputUrl;
+    }
     if (mediaType !== "audio" && !isAudioMediaUrl(outputUrl) && !isImageMediaUrl(outputUrl)) {
       if (templateExpectsVideoOutput(input) && (!refVideo || outputUrl !== refVideo)) {
         return outputUrl;
@@ -149,6 +157,10 @@ export function resolveQrTemplateFullOutputVideoUrl(input: {
     ) {
       return outputUrl;
     }
+  }
+
+  if (savedGeneratedWork) {
+    return null;
   }
 
   if (refVideo && isVideoMediaUrl(refVideo)) return refVideo;
