@@ -13,6 +13,8 @@ export const WANX_TEXT2IMAGE_PLUS_MODEL = "wanx2.1-t2i-plus";
 export const WAN27_IMAGE_MODEL = "wan2.7-image";
 /** 万相 2.6 图像编辑 / 多图参考（非 t2i） */
 export const WAN26_IMAGE_MODEL = "wan2.6-image";
+/** 万相 2.6 纯文生图（无参考图）。图像编辑 wan2.6-image 在 enable_interleave=false 时必须带 1～4 张图。 */
+export const WAN26_T2I_MODEL = "wan2.6-t2i";
 /** 可灵 3.0 Omni · 多图参考生分镜（百炼 DashScope） */
 export const KLING_V3_OMNI_IMAGE_MODEL = "kling/kling-v3-omni-image-generation";
 
@@ -590,6 +592,38 @@ export async function dashscopeCreateWanxTask(opts: {
 
 export type Wan27ImageContentItem = { text: string } | { image: string };
 
+/**
+ * wan2.6-t2i 的 size 必须是宽*高，总像素约在 1280²～1440²。
+ * 「1K / 2K」是图像编辑档位，不能原样传给文生图。
+ */
+export function resolveWan26T2iSize(size?: string): string {
+  const s = size?.trim() ?? "";
+  const presets = new Set([
+    "1280*1280",
+    "1104*1472",
+    "1472*1104",
+    "960*1696",
+    "1696*960",
+    "1344*576",
+  ]);
+  if (presets.has(s)) return s;
+  if (/^\d+\*\d+$/.test(s)) {
+    const [w, h] = s.split("*").map(Number);
+    if (w > 0 && h > 0) {
+      const pixels = w * h;
+      const min = 1280 * 1280;
+      const max = 1440 * 1440;
+      if (pixels >= min && pixels <= max) return `${w}*${h}`;
+      const r = w / h;
+      if (Math.abs(r - 16 / 9) < 0.12) return "1696*960";
+      if (Math.abs(r - 9 / 16) < 0.12) return "960*1696";
+      if (Math.abs(r - 4 / 3) < 0.1 || Math.abs(r - 3 / 2) < 0.1) return "1472*1104";
+      if (Math.abs(r - 3 / 4) < 0.1 || Math.abs(r - 2 / 3) < 0.1) return "1104*1472";
+    }
+  }
+  return "1280*1280";
+}
+
 function orderWanImageContent(
   items: Wan27ImageContentItem[],
   order: "text-first" | "images-first",
@@ -621,34 +655,57 @@ export async function dashscopeCreateWan27ImageTask(opts: {
   const hasText = items.some((c) => "text" in c);
   if (!hasText) return { ok: false, error: "缺少 text 提示词" };
 
-  const model = opts.model?.trim() || WAN27_IMAGE_MODEL;
-  const isWan26Image = model.toLowerCase().includes("wan2.6-image");
+  let model = opts.model?.trim() || WAN27_IMAGE_MODEL;
+  const modelLower = model.toLowerCase();
+  const isWan26Edit = modelLower.includes("wan2.6-image");
+  const isWan26T2iRequested = modelLower === WAN26_T2I_MODEL || modelLower.includes("wan2.6-t2i");
   const hasImage = items.some((c) => "image" in c);
-  // 多图参考须 text+image；纯文生图（仅 text）wan2.7 / wan2.7-pro 亦支持
+  // 无参考图时 wan2.6-image 的 enable_interleave=false 会被厂商拒绝（必须 1～4 张图）。
+  // 纯文生图改走 wan2.6-t2i，同一 image-generation 端点，不传 enable_interleave。
+  const useWan26T2i = isWan26T2iRequested || (isWan26Edit && !hasImage);
+  if (useWan26T2i && hasImage) {
+    return {
+      ok: false,
+      error: "万相 2.6 文生图不支持参考图，请改用万相 2.6 图像编辑或去掉参考图",
+    };
+  }
+  if (useWan26T2i) model = WAN26_T2I_MODEL;
+  const isWan26Image = isWan26Edit && !useWan26T2i;
+  // 多图参考须 text+image；纯文生图（仅 text）wan2.7 / wan2.7-pro / wan2.6-t2i 亦支持
   if (hasImage && items.length < 2) {
     return { ok: false, error: "缺少有效输入" };
   }
 
   const contentOrder =
-    opts.contentOrder ?? (isWan26Image ? "text-first" : "images-first");
+    opts.contentOrder ?? (isWan26Image || useWan26T2i ? "text-first" : "images-first");
   const ordered = orderWanImageContent(items, contentOrder);
-  const n = Math.min(isWan26Image ? 9 : 4, Math.max(1, Math.floor(opts.n ?? 1)));
+  const n = Math.min(
+    useWan26T2i ? 4 : isWan26Image ? 9 : 4,
+    Math.max(1, Math.floor(opts.n ?? 1)),
+  );
 
-  const parameters: Record<string, unknown> = isWan26Image
+  const parameters: Record<string, unknown> = useWan26T2i
     ? {
         prompt_extend: true,
         watermark: false,
         n,
-        enable_interleave: false,
-        size: opts.size?.trim() || "2K",
+        size: resolveWan26T2iSize(opts.size),
       }
-    : {
-        size: opts.size?.trim() || "2K",
-        n,
-        watermark: false,
-      };
+    : isWan26Image
+      ? {
+          prompt_extend: true,
+          watermark: false,
+          n,
+          enable_interleave: false,
+          size: opts.size?.trim() || "2K",
+        }
+      : {
+          size: opts.size?.trim() || "2K",
+          n,
+          watermark: false,
+        };
 
-  if (opts.bboxList?.length && !isWan26Image) {
+  if (opts.bboxList?.length && !isWan26Image && !useWan26T2i) {
     parameters.bbox_list = opts.bboxList;
   }
 

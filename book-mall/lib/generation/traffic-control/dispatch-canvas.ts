@@ -31,6 +31,8 @@ import {
 } from "@/lib/db-tx-retry";
 
 import {
+  getActorDispatchJitterMs,
+  getActorDispatchMinMs,
   getDispatchBatch,
   getDispatchSubmitTimeoutMs,
   getQueueTimeoutMin,
@@ -315,7 +317,12 @@ async function dispatchOneCanvasQueuedTask(
         const fresh = await tx.canvasGenerationTask.findUnique({ where: { id: task.id } });
         if (!fresh || fresh.status !== "QUEUED") return { action: "skipped" as const };
 
-        const acquired = await acquireTrafficSlotInTx(tx, scope, maxConcurrency);
+        const acquired = await acquireTrafficSlotInTx(
+          tx,
+          scope,
+          maxConcurrency,
+          isImage ? { ignorePipelinePacing: true } : undefined,
+        );
         if (!acquired.ok) {
           const retryAfter =
             acquired.retryAfter ?? nextDispatchAfterFromSpacing(new Date());
@@ -645,6 +652,26 @@ export async function dispatchQueuedCanvasTasks(opts?: {
         e instanceof Error ? e.message : String(e),
       );
     }
+  }
+
+  const batch = getDispatchBatch();
+  if (
+    result.skipped > 0 ||
+    result.dispatched > 0 ||
+    queued.length === batch
+  ) {
+    const { scheduleCanvasDispatchFollowUp } = await import(
+      "./fire-canvas-dispatch"
+    );
+    const delayMs =
+      result.skipped > 0
+        ? getActorDispatchMinMs() + getActorDispatchJitterMs() + 250
+        : 200;
+    scheduleCanvasDispatchFollowUp(
+      opts?.projectId,
+      delayMs,
+      "dispatch-follow-up",
+    );
   }
 
   return result;

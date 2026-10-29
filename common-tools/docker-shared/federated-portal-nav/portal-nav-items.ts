@@ -180,7 +180,7 @@ export function buildPortalNavItems(bookOrigin: string | null): PortalNavItem[] 
     },
     {
       key: "quick-replica",
-      label: "快速复刻",
+      label: "一键复刻",
       href: portalHref(bookOrigin, "quick-replica", qrOrigin),
     },
     {

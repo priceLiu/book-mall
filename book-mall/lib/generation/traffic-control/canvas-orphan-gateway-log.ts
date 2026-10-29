@@ -78,6 +78,83 @@ export async function findPromotableCanvasGatewayLog(
   return { logId: log.id, externalTaskId: ext };
 }
 
+const CANVAS_INFLIGHT_FOR_LOG_SYNC = [
+  "QUEUED",
+  "DISPATCHING",
+  "PENDING",
+  "SUBMITTED",
+] as const;
+
+/** logs 必须按 createdAt 降序。每个任务只看最新一条：最新已失败才算失败。 */
+export function taskIdsWhoseLatestGatewayLogFailed(
+  logs: Array<{ storyTaskId: string | null; status: string }>,
+): string[] {
+  const seen = new Set<string>();
+  const failed: string[] = [];
+  for (const log of logs) {
+    const id = log.storyTaskId?.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    if (log.status === "FAILED") failed.push(id);
+  }
+  return failed;
+}
+
+/**
+ * Gateway 最新日志已是失败，但画布任务还停在排队/提交中。
+ * 向导轮询只看画布任务，不把这里写成 FAILED，界面会一直「生成中」。
+ */
+export async function failInflightCanvasTasksFromFailedGatewayLogs(
+  taskIds: string[],
+): Promise<number> {
+  const ids = [...new Set(taskIds.map((id) => id.trim()).filter(Boolean))];
+  if (!ids.length) return 0;
+  const logs = await prisma.gatewayRequestLog.findMany({
+    where: { storyTaskId: { in: ids } },
+    orderBy: { createdAt: "desc" },
+    select: {
+      storyTaskId: true,
+      status: true,
+      failCode: true,
+      failMessage: true,
+    },
+    take: Math.min(500, ids.length * 4),
+  });
+  const failedIds = taskIdsWhoseLatestGatewayLogFailed(logs);
+  if (!failedIds.length) return 0;
+  const latest = new Map<string, (typeof logs)[number]>();
+  for (const log of logs) {
+    const id = log.storyTaskId?.trim();
+    if (!id || latest.has(id)) continue;
+    latest.set(id, log);
+  }
+  let n = 0;
+  for (const taskId of failedIds) {
+    const log = latest.get(taskId);
+    const updated = await prisma.canvasGenerationTask.updateMany({
+      where: {
+        id: taskId,
+        status: { in: [...CANVAS_INFLIGHT_FOR_LOG_SYNC] },
+      },
+      data: {
+        status: "FAILED",
+        failCode: log?.failCode ?? "GATEWAY_TASK_FAILED",
+        failMessage:
+          log?.failMessage?.slice(0, 500) ?? "Gateway 任务失败，请重新生成",
+        completedAt: new Date(),
+      },
+    });
+    n += updated.count;
+  }
+  return n;
+}
+
+export async function failInflightCanvasTaskIfLatestGatewayLogFailed(
+  taskId: string,
+): Promise<boolean> {
+  return (await failInflightCanvasTasksFromFailedGatewayLogs([taskId])) > 0;
+}
+
 /**
  * dispatch 提交前：已有 Gateway 日志则 promote 或判定「首次提交仍在途」，绝不重复 createTask。
  */

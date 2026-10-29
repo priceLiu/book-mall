@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildWizardAssetImageRunPayload,
+  pickWizardAssetPollTask,
   pickWizardAssetTaskPreviewUrl,
 } from "@/lib/canvas/pro2-wizard-asset-image-run";
 import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
@@ -149,5 +150,99 @@ describe("buildWizardAssetImageRunPayload", () => {
       updatedAt: "",
     } satisfies CanvasTaskRecord);
     expect(url).toContain("aliyuncs.com");
+  });
+});
+
+describe("pickWizardAssetPollTask", () => {
+  const nodeId = "pro2-wiz-gen-hub-character-c1";
+
+  it("ignores an older failure on the same node while the current task is still running", () => {
+    const pick = pickWizardAssetPollTask(
+      [
+        {
+          id: "old-fail",
+          nodeId,
+          kind: "IMAGE",
+          status: "FAILED",
+          model: "wan2.6-image",
+          ossUrl: null,
+          ephemeralUrl: null,
+          textOutput: null,
+          failCode: "DASHSCOPE_IMAGE_FAILED",
+          failMessage:
+            "When 'enable_interleave' is False, the last message must contain 1 to 4 images. Got 0 images.",
+          submittedAt: null,
+          completedAt: "2026-10-29T08:07:00.000Z",
+          kieTaskId: null,
+          createdAt: "2026-10-29T08:07:00.000Z",
+          updatedAt: "2026-10-29T08:07:10.000Z",
+        },
+        {
+          id: "current",
+          nodeId,
+          kind: "IMAGE",
+          status: "SUBMITTED",
+          model: "wan2.7-image",
+          ossUrl: null,
+          ephemeralUrl: null,
+          textOutput: null,
+          failCode: null,
+          failMessage: null,
+          submittedAt: "2026-10-29T08:20:00.000Z",
+          completedAt: null,
+          kieTaskId: null,
+          createdAt: "2026-10-29T08:20:00.000Z",
+          updatedAt: "2026-10-29T08:20:05.000Z",
+        },
+      ],
+      "current",
+      nodeId,
+    );
+    expect(pick).toBeUndefined();
+  });
+
+  it("returns the current task once it succeeds with an image", () => {
+    const pick = pickWizardAssetPollTask(
+      [
+        {
+          id: "old-fail",
+          nodeId,
+          kind: "IMAGE",
+          status: "FAILED",
+          model: "wan2.6-image",
+          ossUrl: null,
+          ephemeralUrl: null,
+          textOutput: null,
+          failCode: "DASHSCOPE_IMAGE_FAILED",
+          failMessage: "Got 0 images",
+          submittedAt: null,
+          completedAt: "2026-10-29T08:07:00.000Z",
+          kieTaskId: null,
+          createdAt: "2026-10-29T08:07:00.000Z",
+          updatedAt: "2026-10-29T08:07:10.000Z",
+        },
+        {
+          id: "current",
+          nodeId,
+          kind: "IMAGE",
+          status: "SUCCEEDED",
+          model: "wan2.7-image",
+          ossUrl: "https://cdn.example/new.png",
+          ephemeralUrl: null,
+          textOutput: null,
+          failCode: null,
+          failMessage: null,
+          submittedAt: null,
+          completedAt: "2026-10-29T08:21:00.000Z",
+          kieTaskId: null,
+          createdAt: "2026-10-29T08:20:00.000Z",
+          updatedAt: "2026-10-29T08:21:00.000Z",
+        },
+      ],
+      "current",
+      nodeId,
+    );
+    expect(pick?.id).toBe("current");
+    expect(pick?.ossUrl).toBe("https://cdn.example/new.png");
   });
 });

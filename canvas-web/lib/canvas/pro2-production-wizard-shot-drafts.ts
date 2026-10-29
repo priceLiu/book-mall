@@ -108,3 +108,27 @@ export const WIZARD_SHOT_PLACEHOLDER: Record<Pro2WizardShotMediaKind, string> = 
   frame: "点击 ✨ 编辑提示词并生成分镜图",
   video: "需先有分镜图 · 点击 ✨ 生成分镜视频",
 };
+
+function httpPreviewUrl(raw: string | undefined): string {
+  const url = raw?.trim() ?? "";
+  return /^https?:\/\//i.test(url) ? url : "";
+}
+
+/**
+ * 分镜视频格只认成片地址。首帧 `frameImageUrl` 是分镜图，不能当成视频，
+ * 否则未点「生成分镜视频」也会出现播放按钮。
+ */
+export function wizardVideoPreviewUrls(input: {
+  videoUrl?: string;
+  draftPreviewUrl?: string;
+  frameStillUrl?: string;
+}): string[] {
+  const frameStill = httpPreviewUrl(input.frameStillUrl);
+  const out: string[] = [];
+  for (const raw of [input.videoUrl, input.draftPreviewUrl]) {
+    const url = httpPreviewUrl(raw);
+    if (!url || (frameStill && url === frameStill)) continue;
+    if (!out.includes(url)) out.push(url);
+  }
+  return out;
+}

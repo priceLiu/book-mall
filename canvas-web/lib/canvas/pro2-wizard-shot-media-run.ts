@@ -26,12 +26,10 @@ import {
 import { coerceSbv1ImageAspectForModel } from "@/lib/canvas/sbv1-image-models";
 import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import type { StoryRefImage } from "@/lib/canvas/story-ref-image";
-import { pickPreferredCanvasTask } from "@/lib/canvas/task-pick";
 import {
   pickTaskResultMediaUrl,
   taskHasDisplayableResult,
 } from "@/lib/canvas/task-media-url";
-import type { CanvasNodeRuntime } from "@/lib/canvas/types";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { readProductionWizardAssetDraftsFromHub } from "@/lib/canvas/pro2-wizard-mention-ref-urls";
@@ -297,30 +295,15 @@ export function buildWizardShotVideoRunPayload(args: {
 export function pickWizardShotPollTask(
   tasks: WizardShotTaskRecord[],
   taskId: string,
-  nodeId: string,
+  _nodeId: string,
 ): WizardShotTaskRecord | undefined {
-  const localRuntime: CanvasNodeRuntime = {
-    status: "running",
-    taskId,
-  };
-  const preferred = pickPreferredCanvasTask(tasks, {
-    nodeId,
-    localRuntime,
-  }) as WizardShotTaskRecord | undefined;
-
   const bound = tasks.find((t) => t.id === taskId);
-  if (bound?.status === "FAILED" || bound?.status === "CANCELLED") {
+  // 同节点上一轮失败不能提前结束本轮轮询，否则失败弹窗和后续成片会同时出现。
+  if (!bound) return undefined;
+  if (bound.status === "FAILED" || bound.status === "CANCELLED") {
     return bound;
   }
-  if (bound && isWizardShotTaskSettled(bound)) {
-    return bound;
-  }
-  if (preferred?.status === "FAILED" || preferred?.status === "CANCELLED") {
-    return preferred;
-  }
-  if (preferred && isWizardShotTaskSettled(preferred)) {
-    return preferred;
-  }
+  if (isWizardShotTaskSettled(bound)) return bound;
   return undefined;
 }
 

@@ -5,6 +5,7 @@ import {
   isWizardShotTaskStaleInflight,
   parseWizardShotRunnerNodeId,
   pickWizardShotInflightTask,
+  pickWizardShotPollTask,
   pickWizardShotTaskPreviewUrl,
   resolveWizardShotVideoModelKey,
   wizardShotRunnerNodeId,
@@ -268,5 +269,31 @@ describe("resolveWizardShotVideoModelKey", () => {
         },
       }),
     ).toBe("happyhorse-1.1-r2v");
+  });
+});
+
+describe("pickWizardShotPollTask", () => {
+  it("does not treat a previous failure as the in-flight shot task", () => {
+    const nodeId = "pro2-wiz-shot-hub-frame-1";
+    const pick = pickWizardShotPollTask(
+      [
+        inflightTask({
+          id: "old-fail",
+          nodeId,
+          status: "FAILED",
+          failMessage: "Got 0 images",
+        }),
+        inflightTask({
+          id: "current",
+          nodeId,
+          status: "SUBMITTED",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }),
+      ],
+      "current",
+      nodeId,
+    );
+    expect(pick).toBeUndefined();
   });
 });

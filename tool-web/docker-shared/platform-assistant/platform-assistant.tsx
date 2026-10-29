@@ -193,7 +193,7 @@ function AssistantRichText({ text }: { text: string }) {
 
 const STYLE_ID = "platform-assistant-styles";
 const POSITION_KEY = "platform-assistant-ball-pos";
-const BALL_SIZE = 44;
+const BALL_SIZE = 30;
 const EDGE_GAP = 12;
 /** 判定为「拖拽」而非「点击」的最小位移（px） */
 const DRAG_THRESHOLD = 4;
@@ -299,6 +299,9 @@ function useInjectStyles(accent: string) {
   border: none;
   cursor: grab;
   padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
   touch-action: none;
   user-select: none;
@@ -1049,7 +1052,7 @@ export function PlatformAssistant({
             />
           ) : (
             <SparklesIcon
-              style={{ width: 26, height: 26, color: "#fff", pointerEvents: "none" }}
+              style={{ width: 19, height: 19, color: "#fff", pointerEvents: "none" }}
             />
           )}
         </button>

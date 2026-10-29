@@ -114,9 +114,31 @@ async function promoteDispatchingWithGatewayLog(
 ): Promise<boolean> {
   const log = await prisma.gatewayRequestLog.findUnique({
     where: { id: gatewayLogId },
-    select: { id: true, status: true, externalTaskId: true },
+    select: {
+      id: true,
+      status: true,
+      externalTaskId: true,
+      failCode: true,
+      failMessage: true,
+    },
   });
-  if (!log || log.status === "FAILED") return false;
+  if (!log) return false;
+  if (log.status === "FAILED") {
+    const updated = await prisma.canvasGenerationTask.updateMany({
+      where: { id: task.id, status: "DISPATCHING" },
+      data: {
+        status: "FAILED",
+        failCode: log.failCode ?? "GATEWAY_TASK_FAILED",
+        failMessage:
+          log.failMessage?.slice(0, 500) ?? "Gateway 任务失败，请重新生成",
+        completedAt: new Date(),
+      },
+    });
+    if (updated.count > 0) {
+      await releaseTrafficSlot(scopeKey);
+    }
+    return updated.count > 0;
+  }
 
   const vendorTaskId = log.externalTaskId?.trim();
   if (!vendorTaskId) return false;

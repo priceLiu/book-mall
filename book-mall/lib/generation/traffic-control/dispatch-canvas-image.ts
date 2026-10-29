@@ -341,7 +341,7 @@ async function submitCanvasImageToGateway(
         ? "9:16"
         : "16:9";
     const wan27Size =
-      !wan26 && imageUrls.length === 0
+      imageUrls.length === 0
         ? resolveWan27ImageSize({
             aspectRatio: wanAspect,
             imageSize:
@@ -685,10 +685,11 @@ export async function dispatchCanvasImageQueuedTask(
       });
     }
 
+    await deps.releaseTrafficSlot(scopeKey);
     await deps.releaseGatewayVideoTrafficSlotIfOccupying({
       logId: job.logId,
       scopeKey,
-      fireDispatch: true,
+      fireDispatch: false,
     }).catch(() => undefined);
 
     return "dispatched";
@@ -697,6 +698,12 @@ export async function dispatchCanvasImageQueuedTask(
     await deps.releaseTrafficSlot(scopeKey);
 
     if (!vendorJob && isTransientSystemBusyError(e)) {
+      const { failInflightCanvasTaskIfLatestGatewayLogFailed } = await import(
+        "@/lib/generation/traffic-control/canvas-orphan-gateway-log"
+      );
+      if (await failInflightCanvasTaskIfLatestGatewayLogFailed(task.id)) {
+        return "failed";
+      }
       const isSubmitTimeout = /dispatch submit timeout/i.test(msg);
       const { payload: retryPayload } = nextDispatchStaleRetryPayload(
         taskInputPayload(claimedTask ?? task),

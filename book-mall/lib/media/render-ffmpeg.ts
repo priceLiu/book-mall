@@ -14,7 +14,6 @@ import {
   buildAsrSubtitleSrtFromGlobalSegments,
   buildMediaRenderAsrCacheKey,
   transcribeMediaTimelineViaGateway,
-  type AsrSegment,
 } from "@/lib/media/asr-subtitle";
 import { QWEN3_ASR_FLASH_FILETRANS_MODEL } from "@/lib/gateway/dashscope-client";
 import { uploadMediaRenderAsrScratchFromPath } from "@/lib/media/media-render-oss";
@@ -1189,46 +1188,34 @@ export async function runFfmpegMediaRender(args: {
         transitionSec,
       });
 
-      let asrFileUrl: string;
-      if (timeline.clips.length === 1) {
-        asrFileUrl = timeline.clips[0]!.videoUrl;
-        args.onProgress?.(66, "识别台词…");
-      } else {
+      let audioSource = normPaths[0]!;
+      if (timeline.clips.length > 1) {
         args.onProgress?.(64, "合并预览用于语音识别…");
-        const mergedAsrPath = join(tmp, "merged-asr-preview.mp4");
+        audioSource = join(tmp, "merged-asr-preview.mp4");
         await renderXfade(
           normPaths,
           mergeDurations,
           profile,
-          mergedAsrPath,
+          audioSource,
           undefined,
         );
-        args.onProgress?.(65, "准备识别音频…");
-        const audioPath = join(tmp, "merged-asr-audio.mp3");
-        await extractAudioTrackForAsr(mergedAsrPath, audioPath);
-        asrFileUrl = await uploadMediaRenderAsrScratchFromPath({
-          userId: args.userId,
-          jobId: args.jobId,
-          filePath: audioPath,
-        });
-        args.onProgress?.(66, "识别台词…");
       }
+      args.onProgress?.(65, "准备识别音频…");
+      const audioPath = join(tmp, "merged-asr-audio.mp3");
+      await extractAudioTrackForAsr(audioSource, audioPath);
+      const asrFileUrl = await uploadMediaRenderAsrScratchFromPath({
+        userId: args.userId,
+        jobId: args.jobId,
+        filePath: audioPath,
+      });
+      args.onProgress?.(66, "识别台词…");
 
-      let segments: AsrSegment[] = [];
-      try {
-        segments = await transcribeMediaTimelineViaGateway({
-          userId: args.userId,
-          fileUrl: asrFileUrl,
-          modelKey: asrModelKey,
-          cacheKey: asrCacheKey,
-        });
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (/Gateway API Key|未关联 Gateway/i.test(msg)) {
-          throw e;
-        }
-        segments = [];
-      }
+      const segments = await transcribeMediaTimelineViaGateway({
+        userId: args.userId,
+        fileUrl: asrFileUrl,
+        modelKey: asrModelKey,
+        cacheKey: asrCacheKey,
+      });
 
       const timing = {
         transitionType: profile.transition.type,
@@ -1242,6 +1229,11 @@ export async function runFfmpegMediaRender(args: {
         });
       } else {
         srtContent = buildAsrSubtitleSrtFromGlobalSegments(segments);
+      }
+      if (!srtContent?.trim()) {
+        throw new Error(
+          "没有从视频里识别到字幕。请确认成片带有清晰人声后再合成；若改用分镜对白，请先填写对白。",
+        );
       }
     }
     let srtPath: string | undefined;

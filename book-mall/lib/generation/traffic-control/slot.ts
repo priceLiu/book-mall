@@ -17,12 +17,21 @@ export type AcquireSlotResult =
   | { ok: true }
   | { ok: false; reason: "concurrency" | "tokens" | "spacing"; retryAfter?: Date };
 
+export type AcquireTrafficSlotOpts = {
+  /**
+   * 生图批次不走视频车间距 / token 滴灌。
+   * 仍受 maxConcurrency 限制；提交到 Gateway 后由调用方立刻释放槽，厂商侧才能并行。
+   */
+  ignorePipelinePacing?: boolean;
+};
+
 /** 事务内：token bucket + spacing + 信号灯占槽 */
 export async function acquireTrafficSlotInTx(
   tx: Prisma.TransactionClient,
   scope: TrafficScope,
   /** 事务外预解析，避免 tx 内再开 prisma 查询拖过 5s 默认超时 */
   maxConcurrencyOverride?: number,
+  opts?: AcquireTrafficSlotOpts,
 ): Promise<AcquireSlotResult> {
   const maxConcurrency =
     maxConcurrencyOverride ?? (await resolveMaxConcurrencyForScope(scope));
@@ -52,7 +61,8 @@ export async function acquireTrafficSlotInTx(
     });
   }
 
-  if (spacingBlocked(state.lastDispatchAt, now.getTime())) {
+  const ignorePacing = opts?.ignorePipelinePacing === true;
+  if (!ignorePacing && spacingBlocked(state.lastDispatchAt, now.getTime())) {
     return {
       ok: false,
       reason: "spacing",
@@ -61,7 +71,7 @@ export async function acquireTrafficSlotInTx(
   }
 
   const tokens = refillTokenBucket(state, now.getTime());
-  if (tokens < 1) {
+  if (!ignorePacing && tokens < 1) {
     return { ok: false, reason: "tokens" };
   }
 
@@ -79,7 +89,7 @@ export async function acquireTrafficSlotInTx(
     },
     data: {
       runningVideoCount: { increment: 1 },
-      dispatchTokens: tokens - 1,
+      dispatchTokens: ignorePacing ? tokens : tokens - 1,
       lastTokenRefillAt: now,
       lastDispatchAt: now,
     },

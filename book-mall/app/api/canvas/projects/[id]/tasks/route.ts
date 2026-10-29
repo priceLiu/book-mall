@@ -152,7 +152,33 @@ export async function GET(request: NextRequest, ctx: Ctx) {
       );
       scheduleRecoverStaleDispatching(projectId, "canvas-tasks-read");
     }
+    if (tasks.some((t) => t.status === "QUEUED")) {
+      const { scheduleCanvasDispatchFollowUp } = await import(
+        "@/lib/generation/traffic-control/fire-canvas-dispatch"
+      );
+      scheduleCanvasDispatchFollowUp(projectId, 300, "canvas-tasks-read-queued");
+    }
     if (hasInflight) scheduleOpportunisticCanvasPoll(projectId);
+
+    const inflightIds = tasks
+      .filter((t) => CANVAS_INFLIGHT_STATUS.has(t.status))
+      .map((t) => t.id);
+    if (inflightIds.length > 0) {
+      const { failInflightCanvasTasksFromFailedGatewayLogs } = await import(
+        "@/lib/generation/traffic-control/canvas-orphan-gateway-log"
+      );
+      const failed = await failInflightCanvasTasksFromFailedGatewayLogs(
+        inflightIds,
+      );
+      if (failed > 0) {
+        tasks = await listProjectTasks({
+          userId: guard.user.id,
+          projectId,
+          nodeIds,
+          lightweight: !recovery,
+        });
+      }
+    }
 
     return NextResponse.json({ tasks }, { headers: jsonHeaders(request) });
   } catch (err) {

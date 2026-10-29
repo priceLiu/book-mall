@@ -860,7 +860,7 @@ export async function runImageEngineNode(
             ? "9:16"
             : "16:9";
         const wan27Size =
-          !wan26 && imageUrls.length === 0
+          imageUrls.length === 0
             ? resolveWan27ImageSize({
                 aspectRatio: wanAspect,
                 imageSize:

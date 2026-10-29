@@ -45,8 +45,9 @@ export function isWan26ImageModel(modelKey: string): boolean {
 
 export function resolveStoryboardDashscopeModel(modelKey?: string): string {
   const k = modelKey?.trim() ?? "";
-  // wan2.6-t2i 为纯文生图，不支持垫图；旧选项统一落到 wan2.6-image
-  if (k === "wan2.6-t2i" || k === "wan2.6-image") return WAN26_IMAGE_MODEL;
+  // wan2.6-t2i 为纯文生图；wan2.6-image 为图像编辑（须 1～4 张参考图）
+  if (k === "wan2.6-t2i") return "wan2.6-t2i";
+  if (k === "wan2.6-image") return WAN26_IMAGE_MODEL;
   if ((STORYBOARD_DASHSCOPE_IMAGE_MODELS as readonly string[]).includes(k)) {
     return k;
   }

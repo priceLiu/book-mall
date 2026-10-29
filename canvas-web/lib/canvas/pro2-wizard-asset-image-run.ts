@@ -23,12 +23,10 @@ import {
 import { coerceSbv1ImageAspectForModel } from "@/lib/canvas/sbv1-image-models";
 import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import type { StoryRefImage } from "@/lib/canvas/story-ref-image";
-import { pickPreferredCanvasTask } from "@/lib/canvas/task-pick";
 import {
   pickTaskResultMediaUrl,
   taskHasDisplayableResult,
 } from "@/lib/canvas/task-media-url";
-import type { CanvasNodeRuntime } from "@/lib/canvas/types";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
 
@@ -117,30 +115,16 @@ export function buildWizardAssetImageRunPayload(
 export function pickWizardAssetPollTask(
   tasks: WizardAssetTaskRecord[],
   taskId: string,
-  nodeId: string,
+  _nodeId: string,
 ): WizardAssetTaskRecord | undefined {
-  const localRuntime: CanvasNodeRuntime = {
-    status: "running",
-    taskId,
-  };
-  const preferred = pickPreferredCanvasTask(tasks, {
-    nodeId,
-    localRuntime,
-  }) as WizardAssetTaskRecord | undefined;
-
   const bound = tasks.find((t) => t.id === taskId);
-  if (bound?.status === "FAILED" || bound?.status === "CANCELLED") {
+  // 同一向导节点会留下上一轮 FAILED。列表还没出现本轮 task 时，不能把旧失败当成这次结果，
+  // 否则弹「生成失败」的同时，本轮任务仍会在后台出图。
+  if (!bound) return undefined;
+  if (bound.status === "FAILED" || bound.status === "CANCELLED") {
     return bound;
   }
-  if (bound && isWizardAssetTaskSettled(bound)) {
-    return bound;
-  }
-  if (preferred?.status === "FAILED" || preferred?.status === "CANCELLED") {
-    return preferred;
-  }
-  if (preferred && isWizardAssetTaskSettled(preferred)) {
-    return preferred;
-  }
+  if (isWizardAssetTaskSettled(bound)) return bound;
   return undefined;
 }
 

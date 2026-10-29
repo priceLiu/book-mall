@@ -74,10 +74,12 @@ export type SubtitleBurnInFieldsProps = {
   burnInLabel?: string;
   /** 自动成片 Dock 等窄高面板：单行/紧凑排版，避免滚动条 */
   density?: "default" | "compact";
-  /** 合成弹层等：字体/字号旁展示竖屏样板 */
+  /** 字体/字号旁展示成片比例样板 */
   showPreview?: boolean;
   /** 样板预览示例字（默认「智选AI」） */
   previewSampleText?: string;
+  /** 当前画面宽高，预览框与烧录字号按此比例 */
+  previewAspect?: { width: number; height: number };
   /** 始终烧录、隐藏开关（种草视频合成） */
   burnInLocked?: boolean;
   className?: string;
@@ -97,6 +99,7 @@ export function SubtitleBurnInFields({
   density = "default",
   showPreview = false,
   previewSampleText,
+  previewAspect,
   burnInLocked = false,
   className = "",
 }: SubtitleBurnInFieldsProps) {
@@ -181,7 +184,7 @@ export function SubtitleBurnInFields({
         <div
           className={
             showPreview
-              ? "flex flex-wrap items-start gap-4 pl-6"
+              ? "flex flex-col items-stretch gap-3 pl-6"
               : styleRowClass
           }
         >
@@ -219,7 +222,13 @@ export function SubtitleBurnInFields({
             </label>
           </div>
           {showPreview ? (
-            <SubtitleBurnInPreview style={style} sampleText={previewSampleText} />
+            <SubtitleBurnInPreview
+              style={style}
+              sampleText={previewSampleText}
+              fillWidth
+              aspectWidth={previewAspect?.width}
+              aspectHeight={previewAspect?.height}
+            />
           ) : null}
         </div>
       ) : null}

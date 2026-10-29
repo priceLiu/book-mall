@@ -11,6 +11,7 @@ import { enqueueWizardAssetGenerate } from "@/lib/canvas/pro2-wizard-asset-gener
 import { patchProductionWizardAssetDraft } from "@/lib/canvas/pro2-wizard-asset-draft-patch";
 import { useWizardJobProgressStatus } from "@/lib/canvas/pro2-wizard-asset-progress";
 import { markTaskMediaUrlBroken } from "@/lib/canvas/task-media-url";
+import { usePreviewRevealHold } from "@/lib/canvas/use-preview-reveal-hold";
 import type { Pro2ProductionWizardAssetDraft } from "@/lib/canvas/pro2-production-wizard-assets";
 import {
   resolveWizardAssetMentionPreviewCandidates,
@@ -176,6 +177,12 @@ export const Pro2ProductionWizardAssetCard = memo(function Pro2ProductionWizardA
   const generateStatus = draft?.generateStatus ?? "idle";
   const isGenerating =
     generateStatus === "running" || progressStatus === "running";
+  const reveal = usePreviewRevealHold(
+    isGenerating,
+    previewUrl,
+    generateStatus === "failed",
+  );
+  const showGenerating = isGenerating || reveal.holdGenerating;
 
   const defaultEngine = useMemo(() => {
     const pick =
@@ -275,7 +282,7 @@ export const Pro2ProductionWizardAssetCard = memo(function Pro2ProductionWizardA
         )}
       >
         <div className="relative aspect-video w-full bg-black/40">
-          {previewUrl && !isGenerating ? (
+          {previewUrl ? (
             <MediaHoverBox
               src={previewUrl}
               alt={name}
@@ -289,9 +296,11 @@ export const Pro2ProductionWizardAssetCard = memo(function Pro2ProductionWizardA
                   ? WIZARD_PREVIEW_RETRY_DELAYS_MS
                   : undefined
               }
+              onNaturalSize={() => reveal.onPreviewPaint()}
               onImageError={() => {
                 if (previewIndex + 1 >= previewCandidates.length) {
                   for (const u of previewCandidates) markTaskMediaUrlBroken(u);
+                  reveal.abandonPreviewHold();
                   return;
                 }
                 setPreviewIndex((idx) =>
@@ -299,23 +308,19 @@ export const Pro2ProductionWizardAssetCard = memo(function Pro2ProductionWizardA
                 );
               }}
             />
-          ) : (
+          ) : !showGenerating ? (
             <div className="flex size-full flex-col items-center justify-center gap-2 px-3 text-center text-white/25">
-              {!isGenerating ? (
-                <>
-                  <ImageIcon className="size-9" strokeWidth={1.25} />
-                  <span className="text-[11px] leading-snug">
-                    {WIZARD_ASSET_PLACEHOLDER[kind]}
-                  </span>
-                </>
-              ) : null}
+              <ImageIcon className="size-9" strokeWidth={1.25} />
+              <span className="text-[11px] leading-snug">
+                {WIZARD_ASSET_PLACEHOLDER[kind]}
+              </span>
             </div>
-          )}
+          ) : null}
 
-          {isGenerating ? (
+          {showGenerating ? (
             <LibtvMediaGeneratingState
               variant="violet"
-              className="absolute inset-0 rounded-none [&>div]:!border-0 [&>div]:![box-shadow:none]"
+              className="absolute inset-0 z-[2] rounded-none [&>div]:!border-0 [&>div]:![box-shadow:none]"
             />
           ) : null}
 
@@ -326,7 +331,7 @@ export const Pro2ProductionWizardAssetCard = memo(function Pro2ProductionWizardA
             className={cn(
               "absolute bottom-2 right-2 z-[3] grid size-8 place-items-center rounded-lg border border-white/15 bg-black/70 text-zinc-100",
               "backdrop-blur-sm transition hover:border-white/30 hover:bg-white/10 hover:text-white",
-              isGenerating && "opacity-80",
+              showGenerating && "opacity-80",
             )}
             onClick={() => setStudioOpen(true)}
           >
@@ -339,7 +344,7 @@ export const Pro2ProductionWizardAssetCard = memo(function Pro2ProductionWizardA
           {subtitle ? (
             <p className="line-clamp-2 text-xs text-zinc-500">{subtitle}</p>
           ) : null}
-          {isGenerating ? (
+          {showGenerating ? (
             <p className="truncate text-[10px] text-zinc-500">生成中…</p>
           ) : generateStatus === "failed" && draft?.failMessage ? (
             <p className="line-clamp-2 text-[10px] text-amber-300/90">

@@ -1,6 +1,30 @@
 import { dispatchQueuedCanvasTasks } from "./dispatch-canvas";
 import { dispatchQueuedStoryTasks } from "./dispatch-story";
 
+const followUpTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+/** 本轮没派完（被 pacing 跳过，或 batch 已满可能还有排队）时再拉一次出队。 */
+export function scheduleCanvasDispatchFollowUp(
+  projectId: string | undefined,
+  delayMs: number,
+  source: string,
+): void {
+  const key = projectId ?? "__global__";
+  if (followUpTimers.has(key)) return;
+  const timer = setTimeout(() => {
+    followUpTimers.delete(key);
+    if (projectId) {
+      fireCanvasDispatchForProject(projectId, source, { fastPath: true });
+      return;
+    }
+    fireVideoTrafficDispatchBacklog(source, {
+      fastPath: true,
+      bypassDebounce: true,
+    });
+  }, Math.max(0, delayMs));
+  followUpTimers.set(key, timer);
+}
+
 let globalDispatchInFlight = false;
 let lastGlobalDispatchAt = 0;
 /** 读路径 / 槽位释放触发的全局出队：防抖，避免 canvas-queue 轮询打满 DB */
@@ -20,12 +44,13 @@ function runDispatch(source: string, opts?: DispatchRunOpts): void {
   const projectId = opts?.projectId;
   if (projectId) {
     if (projectDispatchInFlight.has(projectId)) {
-      // 同项目已有 dispatch 在跑（createTask 可能 30–45s）：仍触发全局 backlog，
-      // 避免第二条 QUEUED 只能等整轮结束才出队。
-      fireVideoTrafficDispatchBacklog(`${source}-while-project-busy`, {
-        fastPath,
-        bypassDebounce: opts?.bypassDebounce,
-      });
+      // 同项目已有 dispatch 在跑（createTask 可能要几十秒）。不能丢掉这次触发，
+      // 否则后创建的 QUEUED 生图任务不会再出队，界面一直生成中且 Gateway 没有日志。
+      scheduleCanvasDispatchFollowUp(
+        projectId,
+        400,
+        `${source}-while-project-busy`,
+      );
       return;
     }
     projectDispatchInFlight.add(projectId);

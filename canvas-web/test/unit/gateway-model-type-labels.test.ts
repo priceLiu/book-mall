@@ -80,5 +80,10 @@ describe("SBV1_IMAGE_MODEL_KEYS", () => {
     expect(SBV1_IMAGE_MODEL_KEYS).toContain("wan2.7-image-pro");
     expect(SBV1_IMAGE_MODEL_KEYS).toContain("wan2.6-image");
     expect(SBV1_IMAGE_MODEL_KEYS).toContain("google/nano-banana-edit");
+    expect(SBV1_IMAGE_MODEL_KEYS).toContain("flux-2-pro");
+    expect(SBV1_IMAGE_MODEL_KEYS).toContain("gpt-image-1");
+    expect(SBV1_IMAGE_MODEL_KEYS).toContain("grok-imagine/text-to-image");
+    expect(SBV1_IMAGE_MODEL_KEYS).toContain("qwen-text-to-image");
+    expect(SBV1_IMAGE_MODEL_KEYS).toContain("hunyuan-3d-pro");
   });
 });

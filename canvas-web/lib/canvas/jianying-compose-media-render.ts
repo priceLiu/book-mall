@@ -46,7 +46,7 @@ function workbenchToMediaRenderProfile(
     },
     subtitle: {
       mode: subtitleMode,
-      burnIn: p.subtitle?.burnIn ?? false,
+      burnIn: subtitleMode === "asr" ? true : Boolean(p.subtitle?.burnIn),
       ...(p.subtitle?.style ? { style: p.subtitle.style } : {}),
     },
     video: { scaleMode: p.video?.scaleMode ?? "fit1080p" },

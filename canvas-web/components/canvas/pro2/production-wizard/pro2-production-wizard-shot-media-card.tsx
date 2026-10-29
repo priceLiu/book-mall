@@ -15,11 +15,13 @@ import { wizardAssetDraftsShallowEqual } from "@/lib/canvas/pro2-wizard-asset-dr
 import { enqueueWizardShotGenerate } from "@/lib/canvas/pro2-wizard-shot-generate-queue";
 import { patchProductionWizardShotDraft } from "@/lib/canvas/pro2-wizard-shot-draft-patch";
 import { isUnstableTaskMediaUrl } from "@/lib/canvas/task-media-url";
+import { usePreviewRevealHold } from "@/lib/canvas/use-preview-reveal-hold";
 import type { Pro2ProductionWizardShotDraft } from "@/lib/canvas/pro2-production-wizard-shot-drafts";
 import {
   defaultWizardShotPrompt,
   WIZARD_SHOT_PLACEHOLDER,
   wizardShotDraftKey,
+  wizardVideoPreviewUrls,
   type Pro2WizardShotMediaKind,
 } from "@/lib/canvas/pro2-production-wizard-shot-drafts";
 import type { Pro2ProductionScript } from "@/lib/canvas/data/pro2-production-script-schema";
@@ -67,17 +69,6 @@ function pickRuntimePreviewUrl(
   const ephemeral = runtime?.ephemeralUrl?.trim();
   if (ephemeral && /^https?:\/\//i.test(ephemeral)) return ephemeral;
   return undefined;
-}
-
-function pickBestPreviewUrl(
-  ...urls: Array<string | undefined>
-): string | undefined {
-  const candidates = urls
-    .map((x) => x?.trim())
-    .filter((x): x is string => Boolean(x && /^https?:\/\//i.test(x)));
-  if (!candidates.length) return undefined;
-  const stable = candidates.find((x) => !isUnstableTaskMediaUrl(x));
-  return stable ?? candidates[0];
 }
 
 function buildPreviewCandidates(
@@ -152,10 +143,15 @@ export const Pro2ProductionWizardShotMediaCard = memo(
           draft?.previewUrl,
         );
       }
+      const frameStill =
+        videoRow?.frameImageUrl?.trim() ||
+        pickRuntimePreviewUrl(frameRow?.runtime);
       return buildPreviewCandidates(
-        pickRuntimePreviewUrl(videoRow?.videoRuntime),
-        videoRow?.frameImageUrl,
-        draft?.previewUrl,
+        ...wizardVideoPreviewUrls({
+          videoUrl: pickRuntimePreviewUrl(videoRow?.videoRuntime),
+          draftPreviewUrl: draft?.previewUrl,
+          frameStillUrl: frameStill,
+        }),
       );
     }, [
       draft?.previewUrl,
@@ -169,9 +165,7 @@ export const Pro2ProductionWizardShotMediaCard = memo(
     useEffect(() => {
       setPreviewIndex(0);
     }, [previewCandidatesKey]);
-    const previewUrl =
-      previewCandidates[previewIndex] ??
-      pickBestPreviewUrl(draft?.previewUrl);
+    const previewUrl = previewCandidates[previewIndex];
     const jobId = wizardShotDraftKey(mediaKind, shotIndex);
     const progressStatus = useWizardJobProgressStatus(jobId);
     const liveGenerateStatus = useCanvasStore((s) => {
@@ -184,6 +178,12 @@ export const Pro2ProductionWizardShotMediaCard = memo(
     const generateStatus = liveGenerateStatus;
     const isGenerating =
       progressStatus === "running" || generateStatus === "running";
+    const reveal = usePreviewRevealHold(
+      mediaKind === "frame" && isGenerating,
+      mediaKind === "frame" ? previewUrl : undefined,
+      generateStatus === "failed",
+    );
+    const showGenerating = isGenerating || reveal.holdGenerating;
     const framePreviewUrl = frameDraft?.previewUrl?.trim();
 
     const defaultFrameEngine = useMemo(
@@ -293,6 +293,7 @@ export const Pro2ProductionWizardShotMediaCard = memo(
             mediaKind === "video" &&
               !framePreviewUrl &&
               !previewUrl &&
+              !showGenerating &&
               "opacity-75",
           )}
         >
@@ -307,19 +308,30 @@ export const Pro2ProductionWizardShotMediaCard = memo(
                 previewChrome="ecom"
                 prompt={prompt}
                 promptMentionables={mentionables}
-                className={cn("size-full", isGenerating && "opacity-50")}
+                className="size-full"
                 errorRetryDelaysMs={
                   previewIndex + 1 >= previewCandidates.length
                     ? WIZARD_PREVIEW_RETRY_DELAYS_MS
                     : undefined
                 }
+                onNaturalSize={
+                  mediaKind === "frame"
+                    ? () => reveal.onPreviewPaint()
+                    : undefined
+                }
                 onImageError={() => {
+                  if (
+                    mediaKind === "frame" &&
+                    previewIndex + 1 >= previewCandidates.length
+                  ) {
+                    reveal.abandonPreviewHold();
+                  }
                   setPreviewIndex((idx) =>
                     idx + 1 < previewCandidates.length ? idx + 1 : idx,
                   );
                 }}
               />
-            ) : !isGenerating ? (
+            ) : !showGenerating ? (
               <div className="flex size-full flex-col items-center justify-center gap-2 px-3 text-center text-white/25">
                 <MediaIcon className="size-8" strokeWidth={1.25} />
                 <span className="text-[10px] leading-snug">
@@ -328,7 +340,7 @@ export const Pro2ProductionWizardShotMediaCard = memo(
               </div>
             ) : null}
 
-            {isGenerating ? (
+            {showGenerating ? (
               <LibtvMediaGeneratingState
                 variant="violet"
                 className="absolute inset-0 z-[2] rounded-none [&>div]:!border-0 [&>div]:![box-shadow:none]"
@@ -342,7 +354,7 @@ export const Pro2ProductionWizardShotMediaCard = memo(
               className={cn(
                 "absolute bottom-2 right-2 z-[3] grid size-8 place-items-center rounded-lg border border-white/15 bg-black/70 text-zinc-100",
                 "backdrop-blur-sm transition hover:border-white/30 hover:bg-white/10 hover:text-white",
-                isGenerating && "opacity-80",
+                showGenerating && "opacity-80",
               )}
               onClick={(e) => {
                 e.stopPropagation();
@@ -357,7 +369,7 @@ export const Pro2ProductionWizardShotMediaCard = memo(
             <h3 className="truncate text-xs font-medium text-zinc-200">
               {mediaLabel}
             </h3>
-            {isGenerating ? (
+            {showGenerating ? (
               <p className="truncate text-[10px] text-zinc-500">生成中…</p>
             ) : generateStatus === "failed" && draft?.failMessage ? (
               <p className="line-clamp-2 text-[10px] text-amber-300/90">

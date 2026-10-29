@@ -3322,6 +3322,10 @@ export function ComposeEditorFullscreen({
   const [undoDepth, setUndoDepth] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [frameAspect, setFrameAspect] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
   const undoStackRef = useRef<ComposeWorkbenchState[]>([]);
 
   const orderedAudio = useMemo(
@@ -4016,6 +4020,13 @@ export function ComposeEditorFullscreen({
                     playsInline
                     controls={false}
                     onTimeUpdate={onProgramVideoTimeUpdate}
+                    onLoadedMetadata={(e) => {
+                      const width = e.currentTarget.videoWidth;
+                      const height = e.currentTarget.videoHeight;
+                      if (width > 0 && height > 0) {
+                        setFrameAspect({ width, height });
+                      }
+                    }}
                     onLoadedData={onProgramVideoLoadedData}
                     onEnded={onProgramVideoEnded}
                   />
@@ -4083,6 +4094,7 @@ export function ComposeEditorFullscreen({
               profile={profile}
               disabled={!timelineReady}
               brightChrome={brightChrome}
+              previewAspect={frameAspect ?? undefined}
               showBgmPresets
               bgmPresets={bgmPresets}
               onChange={(next) => setProfile(next)}

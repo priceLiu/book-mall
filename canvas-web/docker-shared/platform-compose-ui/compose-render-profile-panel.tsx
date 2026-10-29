@@ -62,6 +62,8 @@ type Props = {
   clipSubtitle?: ComposeClipSubtitleEditor | null;
   /** 画布全屏剪辑：Tab / 提示用纯白 */
   brightChrome?: boolean;
+  /** 当前成片画面像素，字幕预览按这个比例和字号 */
+  previewAspect?: { width: number; height: number };
 };
 
 export function ComposeRenderProfilePanel({
@@ -74,6 +76,7 @@ export function ComposeRenderProfilePanel({
   layout = "flat",
   clipSubtitle = null,
   brightChrome = false,
+  previewAspect,
 }: Props) {
   const [tab, setTab] = useState<ComposeRenderProfileTab>("video");
 
@@ -84,10 +87,11 @@ export function ComposeRenderProfilePanel({
       : p.subtitle?.mode === "none"
         ? "none"
         : "script";
-  const burnIn = p.subtitle?.burnIn ?? false;
+  const burnIn = subtitleMode === "asr" ? true : Boolean(p.subtitle?.burnIn);
   const style: SubtitleBurnInStyle = p.subtitle?.style ?? DEFAULT_SUBTITLE_STYLE;
   const vocalVolume = p.audio?.dialogueVolume ?? 0.95;
   const bgmFitTimeline = p.audio?.bgmFitTimeline !== false;
+  const previewSampleText = clipSubtitle?.value.trim() || "字幕";
 
   const patch = (partial: Partial<ComposeRenderProfile>) => {
     onChange({
@@ -299,7 +303,8 @@ export function ComposeRenderProfilePanel({
       variant="canvas-dark"
       density="compact"
       showPreview
-      previewSampleText="卡点成片"
+      previewSampleText={previewSampleText}
+      previewAspect={previewAspect}
       disabled={disabled}
       burnIn={burnIn}
       onBurnInChange={(value) =>
@@ -307,7 +312,11 @@ export function ComposeRenderProfilePanel({
           subtitle: {
             ...p.subtitle,
             burnIn: value,
-            mode: value && subtitleMode === "none" ? "script" : p.subtitle?.mode,
+            mode: value
+              ? subtitleMode === "none"
+                ? "script"
+                : p.subtitle?.mode
+              : "none",
           },
         })
       }
@@ -318,7 +327,7 @@ export function ComposeRenderProfilePanel({
           subtitle: {
             ...p.subtitle,
             mode,
-            burnIn,
+            burnIn: mode !== "none",
           },
         })
       }
@@ -388,10 +397,11 @@ export function ComposeRenderProfilePanel({
                 subtitle: {
                   ...p.subtitle,
                   burnIn: on,
-                  mode:
-                    on && (subtitleMode === "none" || !p.subtitle?.mode)
+                  mode: on
+                    ? p.subtitle.mode === "none"
                       ? "script"
-                      : p.subtitle?.mode ?? "script",
+                      : p.subtitle.mode
+                    : "none",
                 },
               });
             }}
@@ -399,7 +409,7 @@ export function ComposeRenderProfilePanel({
           <span className="leading-snug">
             烧录字幕到成片
             <span className="mt-0.5 block text-[10px] font-normal text-white/45">
-              默认不勾选；需要时在成片上显示字幕请勾选，下方字体与来源可先调好。
+              选择「从视频音频识别」或「分镜对白」后会写入成片。取消勾选则不烧字幕。
             </span>
           </span>
         </label>
@@ -407,7 +417,8 @@ export function ComposeRenderProfilePanel({
           variant="canvas-dark"
           density="compact"
           showPreview
-          previewSampleText="卡点成片"
+          previewSampleText={previewSampleText}
+          previewAspect={previewAspect}
           disabled={disabled}
           burnIn
           burnInLocked
@@ -419,6 +430,7 @@ export function ComposeRenderProfilePanel({
               subtitle: {
                 ...p.subtitle,
                 mode,
+                burnIn: mode !== "none",
               },
             })
           }

@@ -78,7 +78,7 @@ export function resolveStoryboardWan27JobSize(opts: {
   /** 有参考图时仍传竖向像素 size（如头像扩全身，避免 API 默认 2K 裁成半身） */
   keepPixelSizeWithRefs?: boolean;
 }): string | undefined {
-  if (opts.wan26) return resolveWan26ImageSize();
+  if (opts.wan26 && opts.refCount > 0) return resolveWan26ImageSize();
   if (opts.refCount > 0 && !opts.keepPixelSizeWithRefs) return undefined;
   return opts.wan27Size;
 }

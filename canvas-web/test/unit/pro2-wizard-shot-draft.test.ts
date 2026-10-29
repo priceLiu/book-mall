@@ -4,6 +4,7 @@ import {
   parseWizardShotDraftKey,
   shotRowKey,
   wizardShotDraftKey,
+  wizardVideoPreviewUrls,
 } from "@/lib/canvas/pro2-production-wizard-shot-drafts";
 import { buildWizardShotMountHubPatch } from "@/lib/canvas/pro2-wizard-shot-mount";
 import {
@@ -131,5 +132,26 @@ describe("buildWizardShotMountHubPatch", () => {
     expect(patch?.scriptStudioVideoRows?.[0]?.frameImageUrl).toBe(
       "https://cdn/frame.png",
     );
+  });
+});
+
+describe("wizardVideoPreviewUrls", () => {
+  it("does not treat the storyboard still as a generated video", () => {
+    expect(
+      wizardVideoPreviewUrls({
+        frameStillUrl: "https://cdn/frame.png",
+        draftPreviewUrl: "https://cdn/frame.png",
+      }),
+    ).toEqual([]);
+  });
+
+  it("keeps a real video url beside the still", () => {
+    expect(
+      wizardVideoPreviewUrls({
+        videoUrl: "https://cdn/node-video/shot.mp4",
+        draftPreviewUrl: "https://cdn/frame.png",
+        frameStillUrl: "https://cdn/frame.png",
+      }),
+    ).toEqual(["https://cdn/node-video/shot.mp4"]);
   });
 });

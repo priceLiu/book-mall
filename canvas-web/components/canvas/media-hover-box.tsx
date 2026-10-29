@@ -34,6 +34,7 @@ import {
   isMediaSrcLoaded,
   markMediaSrcLoaded,
 } from "@/lib/canvas/loaded-media-src-cache";
+import { heldMediaPreviewSrc } from "@/lib/canvas/media-preview-hold";
 import { useLazyMediaActive } from "@/lib/canvas/use-lazy-media-active";
 import {
   ImageZoomControls,
@@ -142,7 +143,8 @@ export function MediaHoverBox({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [failedRasterSrc, setFailedRasterSrc] = useState("");
-  const [imageLoaded, setImageLoaded] = useState(false);
+  /** 最近一次真正显示出来的地址。换 src 时留住它，直到新图 onLoad。 */
+  const [settledSrc, setSettledSrc] = useState("");
   const [stageShortSide, setStageShortSide] = useState(160);
   const rasterSrcRef = useRef("");
   const overlayBtnClass =
@@ -167,7 +169,6 @@ export function MediaHoverBox({
   const imgSrc = withRetryParam(rasterDisplaySrc, retryAttempt);
 
   useEffect(() => {
-    setImageLoaded(isMediaSrcLoaded(rasterDisplaySrc));
     setRetryAttempt(0);
     return () => {
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
@@ -199,8 +200,9 @@ export function MediaHoverBox({
 
   const markLoaded = useCallback(
     (e?: SyntheticEvent<HTMLImageElement>) => {
-      markMediaSrcLoaded(rasterDisplaySrc || src);
-      setImageLoaded(true);
+      const loadedSrc = rasterDisplaySrc || src || "";
+      markMediaSrcLoaded(loadedSrc);
+      if (loadedSrc) setSettledSrc(loadedSrc);
       const el = e?.currentTarget;
       if (el && onNaturalSize) {
         const w = el.naturalWidth || 0;
@@ -243,10 +245,20 @@ export function MediaHoverBox({
 
   const usesRasterImage =
     kind === "image" || (kind === "video" && Boolean(posterUrl?.trim()));
+  const imageReady =
+    Boolean(rasterDisplaySrc) &&
+    (isMediaSrcLoaded(rasterDisplaySrc) || settledSrc === rasterDisplaySrc);
+  const heldSrc = heldMediaPreviewSrc(
+    rasterDisplaySrc,
+    settledSrc,
+    imageReady,
+    imageLoadFailed,
+  );
   const showRasterLoading =
     usesRasterImage &&
     Boolean(src) &&
-    (!mediaReady || (mediaReady && !imageLoaded && !imageLoadFailed));
+    !heldSrc &&
+    (!mediaReady || (mediaReady && !imageReady && !imageLoadFailed));
   const showRasterFailed =
     usesRasterImage && Boolean(src) && mediaReady && imageLoadFailed;
   const mountRasterImage =
@@ -290,6 +302,14 @@ export function MediaHoverBox({
     [onUpload],
   );
 
+  if (
+    rasterDisplaySrc &&
+    isMediaSrcLoaded(rasterDisplaySrc) &&
+    settledSrc !== rasterDisplaySrc
+  ) {
+    setSettledSrc(rasterDisplaySrc);
+  }
+
   return (
     <>
       <div
@@ -317,17 +337,30 @@ export function MediaHoverBox({
           </div>
         ) : null}
 
+        {heldSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={heldSrc}
+            alt={alt}
+            className={cn(rasterFitClass, "absolute inset-0 z-[2]")}
+            draggable={false}
+          />
+        ) : null}
+
         {mountRasterImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             key={retryAttempt}
             src={imgSrc}
-            alt={alt}
+            alt={heldSrc ? "" : alt}
             loading={eagerMedia ? "eager" : "lazy"}
             decoding="async"
             onLoad={markLoaded}
             onError={onRasterError}
-            className={cn(rasterFitClass, !imageLoaded && "opacity-0")}
+            className={cn(
+              rasterFitClass,
+              !imageReady && "pointer-events-none absolute inset-0 opacity-0",
+            )}
             draggable={false}
           />
         ) : null}

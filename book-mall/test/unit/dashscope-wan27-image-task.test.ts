@@ -46,6 +46,69 @@ describe("dashscopeCreateWan27ImageTask", () => {
     expect(result).toEqual({ ok: false, error: "缺少 text 提示词" });
   });
 
+  it("routes text-only wan2.6-image to wan2.6-t2i without enable_interleave", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as {
+          model: string;
+          input: { messages: Array<{ content: unknown[] }> };
+          parameters: Record<string, unknown>;
+        };
+        expect(body.model).toBe("wan2.6-t2i");
+        expect(body.parameters.enable_interleave).toBeUndefined();
+        expect(body.parameters.size).toBe("1696*960");
+        expect(body.input.messages[0]?.content).toEqual([
+          { text: "角色三视图，白底" },
+        ]);
+        return new Response(
+          JSON.stringify({ output: { task_id: "task-wan26-t2i" } }),
+          { status: 200 },
+        );
+      }),
+    );
+
+    const result = await dashscopeCreateWan27ImageTask({
+      apiKey: "sk-test",
+      model: "wan2.6-image",
+      content: [{ text: "角色三视图，白底" }],
+      size: "1696*960",
+      contentOrder: "text-first",
+    });
+
+    expect(result).toEqual({ ok: true, taskId: "task-wan26-t2i" });
+  });
+
+  it("keeps wan2.6-image edit mode when a reference image is present", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as {
+          model: string;
+          parameters: { enable_interleave?: boolean; size?: string };
+        };
+        expect(body.model).toBe("wan2.6-image");
+        expect(body.parameters.enable_interleave).toBe(false);
+        expect(body.parameters.size).toBe("2K");
+        return new Response(
+          JSON.stringify({ output: { task_id: "task-wan26-edit" } }),
+          { status: 200 },
+        );
+      }),
+    );
+
+    const result = await dashscopeCreateWan27ImageTask({
+      apiKey: "sk-test",
+      model: "wan2.6-image",
+      content: [
+        { text: "保持脸部" },
+        { image: "https://example.com/ref.png" },
+      ],
+    });
+
+    expect(result).toEqual({ ok: true, taskId: "task-wan26-edit" });
+  });
+
   it("passes bbox_list for wan2.7 local edit", async () => {
     vi.stubGlobal(
       "fetch",
