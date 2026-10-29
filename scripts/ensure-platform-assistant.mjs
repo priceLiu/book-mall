@@ -15,6 +15,7 @@ const REQUIRED = [
   "platform-apps.ts",
   "ai-news-prefetch.ts",
   "greeting.ts",
+  "ai-news-format.ts",
   "index.ts",
   "platform-assistant.tsx",
   "package.json",
@@ -82,7 +83,14 @@ for (const app of APP_DIRS) {
   for (const targetDir of findPlatformAssistantDirs(app)) {
     if (!needsRefresh(targetDir)) continue;
     for (const name of REQUIRED) {
-      cpSync(join(srcDir, name), join(targetDir, name));
+      const src = join(srcDir, name);
+      const dest = join(targetDir, name);
+      if (existsSync(dest)) {
+        const srcStat = statSync(src);
+        const destStat = statSync(dest);
+        if (srcStat.dev === destStat.dev && srcStat.ino === destStat.ino) continue;
+      }
+      cpSync(src, dest);
     }
     patched += 1;
     console.info(

@@ -52,24 +52,21 @@ export function useOptionalCanvasShellSessionContext(): CanvasShellSessionContex
 }
 
 export function CanvasShellSessionProvider({ children }: { children: ReactNode }) {
-  const bootCached = getCachedToolsSession();
   const [payload, setPayload] = useState<CanvasToolsSessionClientPayload | null>(
-    bootCached,
+    null,
   );
-  const [loading, setLoading] = useState(
-    !(bootCached?.active || readToolsSessionOkHint()),
-  );
+  const [hintActive, setHintActive] = useState(false);
+  /** 首屏必须与服务端一致。sessionStorage / 内存缓存只在挂载后读，避免水合时顶栏 span 对不上。 */
+  const [loading, setLoading] = useState(true);
 
   const session = useMemo(
     () =>
       payload?.active
         ? mapFetchToolsSessionResultToShell(payload)
-        : bootCached?.active
-          ? mapFetchToolsSessionResultToShell(bootCached)
-          : readToolsSessionOkHint()
-            ? { ...GUEST_TOOL_SHELL_SESSION, active: true }
-            : GUEST_TOOL_SHELL_SESSION,
-    [bootCached, payload],
+        : hintActive
+          ? { ...GUEST_TOOL_SHELL_SESSION, active: true }
+          : GUEST_TOOL_SHELL_SESSION,
+    [hintActive, payload],
   );
 
   const refreshFull = useCallback(async () => {
@@ -108,18 +105,16 @@ export function CanvasShellSessionProvider({ children }: { children: ReactNode }
   }, []);
 
   useEffect(() => {
-    if (bootCached?.active) {
+    const cached = getCachedToolsSession();
+    if (cached?.active) {
+      setPayload(cached);
       setLoading(false);
-      void refreshFull();
-      return;
-    }
-    if (readToolsSessionOkHint()) {
+    } else if (readToolsSessionOkHint()) {
+      setHintActive(true);
       setLoading(false);
-      void refreshFull();
-      return;
     }
     void refreshFull();
-  }, [bootCached?.active, refreshFull]);
+  }, [refreshFull]);
 
   useEffect(() => {
     /** POST 续签成功后轻量拉取即可；避免拖动/心跳时 full introspect 失败弹红屏 */

@@ -19,6 +19,11 @@ import {
   prefetchAiNews,
   type PrefetchedAiNews,
 } from "./ai-news-prefetch";
+import {
+  countAiNewsItems,
+  organizeAiNewsMarkdown,
+  previewAiNewsMarkdown,
+} from "./ai-news-format";
 
 export type PlatformAssistantProps = {
   /** 对话端点。子站默认经 BFF 代理到主站。 */
@@ -112,36 +117,20 @@ function lineStartsWithEmoji(s: string): boolean {
 /** 默认展示的热闻条数；其余由用户点击展开。 */
 const AI_NEWS_PREVIEW_COUNT = 3;
 
-function countAiNewsItems(text: string): number {
-  return text.split("\n").filter((line) => /^\s*\d+\.\s/.test(line)).length;
-}
-
 function formatAiNewsDateKey(dateKey?: string): string {
   const m = String(dateKey ?? "").trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return dateKey?.trim() || "最近一期";
   return `${Number(m[1])}年${Number(m[2])}月${Number(m[3])}日`;
 }
 
-function truncateAiNewsMarkdown(text: string, maxItems: number): string {
-  const lines = text.split("\n");
-  const itemStarts: number[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (/^\s*\d+\.\s/.test(lines[i])) itemStarts.push(i);
-  }
-  if (itemStarts.length <= maxItems) return text;
-  const preview = lines.slice(0, itemStarts[maxItems]);
-  while (preview.length > 0 && !preview[preview.length - 1]?.trim()) {
-    preview.pop();
-  }
-  return preview.join("\n");
-}
-
 function AssistantAiNewsBlock({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false);
-  const totalItems = countAiNewsItems(text);
-  const hasMore = totalItems > AI_NEWS_PREVIEW_COUNT;
-  const displayText =
-    expanded || !hasMore ? text : truncateAiNewsMarkdown(text, AI_NEWS_PREVIEW_COUNT);
+  const organized = organizeAiNewsMarkdown(text);
+  const totalItems = countAiNewsItems(organized);
+  const preview = previewAiNewsMarkdown(organized, AI_NEWS_PREVIEW_COUNT);
+  const shownItems = countAiNewsItems(preview);
+  const hasMore = shownItems < totalItems;
+  const displayText = expanded || !hasMore ? organized : preview;
 
   return (
     <>
@@ -171,11 +160,12 @@ function AssistantRichText({ text }: { text: string }) {
             (lineStartsWithEmoji(trimmed) && !/^\d+\./.test(trimmed)));
         const isNumbered = /^\d+\.\s/.test(trimmed);
         const isSubField =
-          /^(核心事实|热度依据|简要点评)[：:]/.test(trimmed) ||
+          /^(核心事实|热度依据|简要点评|出处|发表时间)[：:]/.test(trimmed) ||
           trimmed.startsWith("🔥今日头条");
         const isDisclaimer = trimmed.startsWith("*") && trimmed.endsWith("*");
         let cls = "pa-rich-line";
-        if (isCategory) cls = "pa-rich-category";
+        if (isCategory && trimmed.includes("模型发布")) cls = "pa-rich-category pa-rich-category-model";
+        else if (isCategory) cls = "pa-rich-category";
         else if (isNumbered) cls = "pa-rich-item";
         else if (isSubField) cls = "pa-rich-sub";
         else if (isDisclaimer) cls = "pa-rich-disclaimer";
@@ -571,6 +561,9 @@ function useInjectStyles(accent: string) {
   font-size: 13px;
   font-weight: 700;
   color: #e4e4e7;
+}
+.pa-rich-category-model {
+  color: #c4b5fd;
 }
 .pa-rich-item {
   margin: 0 0 6px;

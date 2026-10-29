@@ -132,24 +132,23 @@ export function PortalDiscoverySection() {
       };
     });
 
-    const caseItems: DiscoveryItem[] = cases
-      .filter((c) => !projectIds.has(c.id))
-      .map((c) => {
-        projectIds.add(c.id);
-        return {
-          id: `case-${c.id}`,
-          kind: "case",
-          name: c.name,
-          description: (c.portalCaseBlurb || c.description?.trim()) ?? "",
-          thumbnailUrl: c.thumbnailUrl,
-          ownerLabel: ownerLabel(c.owner),
-          ownerId: c.owner?.id,
-          updatedAt: c.updatedAt,
-          caseProject: c,
-        };
-      });
+    const featuredProjectIds = new Set(projectIds);
+    const caseItems: DiscoveryItem[] = cases.map((c) => {
+      if (!featuredProjectIds.has(c.id)) projectIds.add(c.id);
+      return {
+        id: `case-${c.id}`,
+        kind: "case" as const,
+        name: c.name,
+        description: (c.portalCaseBlurb || c.description?.trim()) ?? "",
+        thumbnailUrl: c.thumbnailUrl,
+        ownerLabel: ownerLabel(c.owner),
+        ownerId: c.owner?.id,
+        updatedAt: c.updatedAt,
+        caseProject: c,
+      };
+    });
 
-    // 若项目同时是精选又是案例，精选优先；案例列表已过滤重复 id
+    // 「全部」里精选和案例不重复出卡；「案例」页签仍要看到已设为案例的精选项目。
     const templateItems = publicTemplates.map(templateItem);
 
     return [...featuredItems, ...templateItems, ...caseItems].sort(
@@ -157,9 +156,22 @@ export function PortalDiscoverySection() {
     );
   }, [featuredProjects, publicTemplates, cases]);
 
+  const featuredProjectIdSet = useMemo(
+    () => new Set(featuredProjects.map((f) => f.id)),
+    [featuredProjects],
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return items.filter((item) => {
+      if (
+        activeTab === TAB_ALL &&
+        item.kind === "case" &&
+        item.caseProject &&
+        featuredProjectIdSet.has(item.caseProject.id)
+      ) {
+        return false;
+      }
       if (activeTab === TAB_FEATURED && item.kind !== "featured") return false;
       if (activeTab === TAB_TEMPLATE && item.kind !== "template") return false;
       if (activeTab === TAB_CASE && item.kind !== "case") return false;
@@ -170,7 +182,7 @@ export function PortalDiscoverySection() {
         item.ownerLabel.toLowerCase().includes(q)
       );
     });
-  }, [items, activeTab, search]);
+  }, [items, activeTab, search, featuredProjectIdSet]);
 
   const onForkTemplate = useCallback(
     async (tpl: CanvasTemplateRecord) => {

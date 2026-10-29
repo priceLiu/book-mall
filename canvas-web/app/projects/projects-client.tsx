@@ -316,8 +316,11 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
     [router, base],
   );
 
+  const portalMetaGen = useRef(0);
   const refreshPortalAdminMeta = useCallback(async () => {
+    const gen = ++portalMetaGen.current;
     if (!base?.trim() || !isAdmin) {
+      if (gen !== portalMetaGen.current) return;
       setPortalFeaturedIds(new Set());
       setPortalCaseIds(new Set());
       setPortalFilmCaseIds(new Set());
@@ -325,13 +328,12 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
     }
     try {
       const meta = await fetchPortalAdminMeta(base);
+      if (gen !== portalMetaGen.current) return;
       setPortalFeaturedIds(new Set(meta.featuredIds));
       setPortalCaseIds(new Set(meta.pro2CaseIds));
       setPortalFilmCaseIds(new Set(meta.sbv1CaseIds));
     } catch {
-      setPortalFeaturedIds(new Set());
-      setPortalCaseIds(new Set());
-      setPortalFilmCaseIds(new Set());
+      // 失败时保留当前高亮。清掉会把刚点上的案例按钮打回灰色。
     }
   }, [base, isAdmin]);
 
@@ -344,12 +346,25 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
   }, [isAdmin, loading, base, refreshPortalAdminMeta]);
 
   const onTogglePortalCase = useCallback(
-    async (id: string, caseFlag: boolean) => {
+    async (id: string, caseFlag: boolean, edition: CanvasProjectEdition) => {
       if (!base?.trim()) return;
+      const apply = (on: boolean) => {
+        const update = (prev: Set<string>) => {
+          const next = new Set(prev);
+          if (on) next.add(id);
+          else next.delete(id);
+          return next;
+        };
+        if (edition === "sbv1") setPortalFilmCaseIds(update);
+        else setPortalCaseIds(update);
+      };
+      portalMetaGen.current += 1;
+      apply(caseFlag);
       try {
         await patchPortalCaseProject(base, id, { case: caseFlag });
         await refreshPortalAdminMeta();
       } catch (e) {
+        apply(!caseFlag);
         await dialogs.alert({
           title: caseFlag ? "设为案例失败" : "取消案例失败",
           message: e instanceof Error ? e.message : "请稍后重试",
@@ -749,14 +764,6 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
               <Plus className="mr-2 inline size-4" />
               新建分镜视频 1.0
             </button>
-            <button
-              type="button"
-              onClick={() => onOpenPicker("pro")}
-              className="rounded-lg border border-fuchsia-400/40 bg-fuchsia-500/15 px-3 py-2 text-sm font-medium text-fuchsia-100 hover:bg-fuchsia-500/25"
-            >
-              <Plus className="mr-2 inline size-4" />
-              新建影视专业版
-            </button>
           </div>
         </div>
       </header>
@@ -778,32 +785,10 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
         <CanvasListSkeleton sections={3} cardsPerSection={5} />
       ) : projects.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-12 text-center text-sm text-[var(--canvas-muted)]">
-          还没有画布。请使用上方按钮创建影视专业版或分镜视频画布。
+          还没有画布。请使用上方按钮创建影视专业版 2.0 或分镜视频画布。
         </div>
       ) : (
         <div className="space-y-10">
-          <ProjectsSection
-            title="分镜视频 1.0"
-            edition="sbv1"
-            projects={sbv1Projects}
-            mayLoadMore={hasMore}
-            onDelete={onDelete}
-            onDuplicate={onDuplicate}
-            duplicatingId={duplicatingId}
-            onPrefetchProject={prefetchProject}
-            onRename={onRename}
-            onCreate={() => onOpenPicker("sbv1")}
-            isAdmin={isAdmin}
-            portalFeaturedIds={portalFeaturedIds}
-            portalCaseIds={portalFilmCaseIds}
-            onTogglePortalFeatured={onTogglePortalFeatured}
-            onTogglePortalCase={onTogglePortalCase}
-            onOpenSubmit={(id, name) =>
-              setSubmitTarget({ id, name, edition: "sbv1" })
-            }
-            openingProjectId={openingProjectId}
-            onOpeningProject={setOpeningProjectId}
-          />
           <ProjectsSection
             title="影视专业版 2.0"
             edition="pro2"
@@ -836,7 +821,6 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
             duplicatingId={duplicatingId}
             onPrefetchProject={prefetchProject}
             onRename={onRename}
-            onCreate={() => onOpenPicker("pro")}
             isAdmin={isAdmin}
             portalFeaturedIds={portalFeaturedIds}
             portalCaseIds={portalCaseIds}
@@ -848,21 +832,45 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
             openingProjectId={openingProjectId}
             onOpeningProject={setOpeningProjectId}
           />
+          <ProjectsSection
+            title="分镜视频 1.0"
+            edition="sbv1"
+            projects={sbv1Projects}
+            mayLoadMore={hasMore}
+            onDelete={onDelete}
+            onDuplicate={onDuplicate}
+            duplicatingId={duplicatingId}
+            onPrefetchProject={prefetchProject}
+            onRename={onRename}
+            onCreate={() => onOpenPicker("sbv1")}
+            isAdmin={isAdmin}
+            portalFeaturedIds={portalFeaturedIds}
+            portalCaseIds={portalFilmCaseIds}
+            onTogglePortalFeatured={onTogglePortalFeatured}
+            onTogglePortalCase={onTogglePortalCase}
+            onOpenSubmit={(id, name) =>
+              setSubmitTarget({ id, name, edition: "sbv1" })
+            }
+            openingProjectId={openingProjectId}
+            onOpeningProject={setOpeningProjectId}
+          />
         </div>
       )}
 
-      {!loading && hasMore ? (
+      {!loading && projects.length > 0 ? (
         <div
-          ref={loadMoreSentinelRef}
+          ref={hasMore ? loadMoreSentinelRef : undefined}
           className="flex items-center justify-center py-8 text-sm text-[var(--canvas-muted)]"
         >
-          {loadingMore ? (
+          {hasMore && loadingMore ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" />
               加载更多…
             </>
           ) : (
-            <span className="text-white/30">向下滚动加载更多画布</span>
+            <span className="text-white/30">
+              {hasMore ? "滚动获取更多作品" : "到底了"}
+            </span>
           )}
         </div>
       ) : null}
@@ -1128,7 +1136,11 @@ function ProjectCardActionButton({
     <button
       type="button"
       disabled={disabled}
-      onClick={onClick}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClick?.();
+      }}
       title={title}
       aria-label={title}
       className={cn(
@@ -1171,12 +1183,16 @@ function ProjectsSection({
   duplicatingId: string | null;
   onPrefetchProject: (id: string) => void;
   onRename: (id: string, nextName: string) => void | Promise<void>;
-  onCreate: () => void;
+  onCreate?: () => void;
   isAdmin?: boolean;
   portalFeaturedIds?: Set<string>;
   portalCaseIds?: Set<string>;
   onTogglePortalFeatured?: (id: string, featured: boolean) => void | Promise<void>;
-  onTogglePortalCase?: (id: string, caseFlag: boolean) => void | Promise<void>;
+  onTogglePortalCase?: (
+    id: string,
+    caseFlag: boolean,
+    edition: CanvasProjectEdition,
+  ) => void | Promise<void>;
   onOpenSubmit?: (id: string, name: string) => void;
   openingProjectId: string | null;
   onOpeningProject: (id: string | null) => void;
@@ -1233,21 +1249,21 @@ function ProjectsSection({
             </button>
           ) : null}
         </label>
-        <button
-          type="button"
-          onClick={onCreate}
-          className="shrink-0 self-end rounded-full border border-white/15 px-3 py-1.5 text-xs text-white hover:border-white/30 sm:self-center"
-        >
-          <Plus className="mr-1 inline size-3" />
-          新建
-        </button>
+        {onCreate ? (
+          <button
+            type="button"
+            onClick={onCreate}
+            className="shrink-0 self-end rounded-full border border-white/15 px-3 py-1.5 text-xs text-white hover:border-white/30 sm:self-center"
+          >
+            <Plus className="mr-1 inline size-3" />
+            新建
+          </button>
+        ) : null}
       </div>
 
       {projects.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--canvas-border)] bg-[var(--canvas-surface)]/60 px-6 py-10 text-center text-sm text-[var(--canvas-muted)]">
-          {mayLoadMore
-            ? "此分区项目可能在下方，继续向下滚动加载更多。"
-            : "此分区暂无画布。"}
+          {mayLoadMore ? "滚动获取更多作品" : "到底了"}
         </div>
       ) : filteredProjects.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--canvas-border)] bg-[var(--canvas-surface)]/60 px-6 py-10 text-center text-sm text-[var(--canvas-muted)]">
@@ -1291,7 +1307,7 @@ function ProjectsSection({
                   更新于 {formatProjectUpdatedAt(p.updatedAt)}
                 </p>
               </CanvasProjectOpenLink>
-              <div className="mt-3 flex flex-wrap items-center justify-end gap-1.5 @[22rem]:gap-2">
+              <div className="relative z-10 mt-3 flex flex-wrap items-center justify-end gap-1.5 @[22rem]:gap-2">
                 {isAdmin && onTogglePortalCase ? (
                   <ProjectCardActionButton
                     label={edition === "sbv1" ? "视频作品" : "案例"}
@@ -1305,19 +1321,24 @@ function ProjectsSection({
                           : "设为首页案例"
                     }
                     onClick={() =>
-                      void onTogglePortalCase(p.id, !portalCaseIds?.has(p.id))
+                      void onTogglePortalCase(
+                        p.id,
+                        !portalCaseIds?.has(p.id),
+                        edition,
+                      )
                     }
                     className={
                       portalCaseIds?.has(p.id)
-                        ? edition === "sbv1"
-                          ? "border-cyan-400/40 text-cyan-200 hover:border-cyan-400/60"
-                          : "border-violet-400/40 text-violet-200 hover:border-violet-400/60"
-                        : edition === "sbv1"
-                          ? "border-white/10 text-[var(--canvas-muted)] hover:border-cyan-400/35 hover:text-cyan-200/90"
-                          : "border-white/10 text-[var(--canvas-muted)] hover:border-violet-400/35 hover:text-violet-200/90"
+                        ? "border-amber-400/40 text-amber-200 hover:border-amber-400/60"
+                        : "border-white/10 text-[var(--canvas-muted)] hover:border-amber-400/35 hover:text-amber-200/90"
                     }
                   >
-                    <Clapperboard className="size-3.5 shrink-0 @[22rem]:size-3" />
+                    <Clapperboard
+                      className={cn(
+                        "size-3.5 shrink-0 @[22rem]:size-3",
+                        portalCaseIds?.has(p.id) && "fill-current",
+                      )}
+                    />
                   </ProjectCardActionButton>
                 ) : null}
                 {isAdmin && onTogglePortalFeatured ? (

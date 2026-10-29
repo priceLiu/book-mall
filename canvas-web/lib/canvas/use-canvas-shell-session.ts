@@ -44,19 +44,6 @@ export function useCanvasShellSession(): ShellSessionState {
     if (shared) {
       return { loading: shared.loading, session: shared.session };
     }
-    const cached = getCachedToolsSession();
-    if (cached?.active) {
-      return {
-        loading: false,
-        session: mapFetchToolsSessionResultToShell(cached),
-      };
-    }
-    if (readToolsSessionOkHint()) {
-      return {
-        loading: false,
-        session: { ...GUEST_TOOL_SHELL_SESSION, active: true },
-      };
-    }
     return SSR_SHELL_SESSION_STATE;
   });
 

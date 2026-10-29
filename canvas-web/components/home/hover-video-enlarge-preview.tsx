@@ -20,11 +20,54 @@ const HIDE_DELAY_MS = 420;
 
 type VideoPreviewOrientation = "landscape" | "portrait" | "unknown";
 
-function readVideoOrientation(
-  el: HTMLVideoElement | null | undefined,
-): VideoPreviewOrientation {
-  if (!el?.videoWidth || !el?.videoHeight) return "unknown";
-  return el.videoWidth > el.videoHeight ? "landscape" : "portrait";
+function readVideoFrame(el: HTMLVideoElement | null | undefined): {
+  orientation: VideoPreviewOrientation;
+  /** 宽 / 高。用来按视口铺满，而不是停在视频原始像素。 */
+  aspect: number | null;
+} {
+  if (!el?.videoWidth || !el?.videoHeight) {
+    return { orientation: "unknown", aspect: null };
+  }
+  return {
+    orientation: el.videoWidth > el.videoHeight ? "landscape" : "portrait",
+    aspect: el.videoWidth / el.videoHeight,
+  };
+}
+
+/** 横屏、竖屏都铺满 92vw × 85vh，宽高比跟视频走。 */
+function previewFillStyle(
+  orientation: VideoPreviewOrientation,
+  aspect: number | null,
+):
+  | {
+      width: string;
+      height: string;
+      maxWidth: string;
+      maxHeight: string;
+      aspectRatio: string;
+    }
+  | undefined {
+  if (!aspect || !Number.isFinite(aspect) || aspect <= 0) return undefined;
+  const aspectRatio = String(aspect);
+  if (orientation === "landscape") {
+    return {
+      width: `min(92vw, calc(85vh * ${aspect}))`,
+      height: "auto",
+      maxWidth: "92vw",
+      maxHeight: "85vh",
+      aspectRatio,
+    };
+  }
+  if (orientation === "portrait") {
+    return {
+      width: "auto",
+      height: `min(85vh, calc(92vw / ${aspect}))`,
+      maxWidth: "92vw",
+      maxHeight: "85vh",
+      aspectRatio,
+    };
+  }
+  return undefined;
 }
 
 export type HoverVideoEnlargePayload = {
@@ -59,6 +102,7 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
   const [videoLoading, setVideoLoading] = useState(false);
   const [orientation, setOrientation] =
     useState<VideoPreviewOrientation>("unknown");
+  const [aspect, setAspect] = useState<number | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sourceVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -88,6 +132,7 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
     resumeTimeRef.current = 0;
     setVideoLoading(false);
     setOrientation("unknown");
+    setAspect(null);
     setOpen(null);
     setTouchMode(false);
     setInteractive(false);
@@ -117,7 +162,9 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
       setTouchMode(false);
       setInteractive(true);
       setVideoLoading(true);
-      setOrientation(readVideoOrientation(sourceVideo));
+      const frame = readVideoFrame(sourceVideo);
+      setOrientation(frame.orientation);
+      setAspect(frame.aspect);
       setOpen(payload);
     },
     [clearHideTimer, closeNow, interactive, open?.url],
@@ -166,10 +213,11 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
     };
 
     const onMetadata = () => {
-      setOrientation((prev) => {
-        const next = readVideoOrientation(el);
-        return next === "unknown" ? prev : next;
-      });
+      const frame = readVideoFrame(el);
+      if (frame.orientation !== "unknown") {
+        setOrientation(frame.orientation);
+        setAspect(frame.aspect);
+      }
       markReady();
     };
 
@@ -207,7 +255,6 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
   useEffect(() => () => closeNow(), [closeNow]);
 
   const dismissible = touchMode || interactive;
-  const isLandscape = orientation === "landscape";
 
   const portal =
     open && mounted
@@ -229,29 +276,23 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
             />
             <div
               className={cn(
-                "relative inline-block transition duration-200",
-                isLandscape
-                  ? "max-w-[min(92vw,1280px)]"
-                  : "max-w-[min(90vw,640px)]",
+                "relative inline-block w-max max-w-[92vw] transition duration-200",
                 dismissible ? "pointer-events-auto" : "pointer-events-none",
                 open ? "scale-100 opacity-100" : "scale-[0.97] opacity-0",
               )}
               onClick={dismissible ? (event) => event.stopPropagation() : undefined}
             >
               <div
-                className="pointer-events-none absolute -inset-5 rounded-2xl bg-white/[0.06] backdrop-blur-2xl"
+                className="pointer-events-none absolute -inset-2 rounded-2xl bg-white/[0.06] backdrop-blur-2xl"
                 aria-hidden
               />
               <div
-                className="pointer-events-none absolute -inset-3 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.5),0_28px_72px_rgba(0,0,0,0.42),0_48px_120px_rgba(0,0,0,0.28)]"
+                className="pointer-events-none absolute -inset-1.5 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.5),0_28px_72px_rgba(0,0,0,0.42),0_48px_120px_rgba(0,0,0,0.28)]"
                 aria-hidden
               />
               <div
                 className={cn(
-                  "relative flex items-center justify-center overflow-hidden rounded-xl bg-black",
-                  isLandscape
-                    ? "min-h-[min(50vh,480px)] min-w-0"
-                    : "min-h-[min(40vh,320px)] min-w-[min(90vw,640px)]",
+                  "relative flex w-max max-h-[85vh] max-w-[92vw] items-center justify-center overflow-hidden rounded-xl bg-black",
                 )}
               >
                 {open.posterUrl && videoLoading ? (
@@ -268,11 +309,9 @@ export function HoverVideoEnlargeProvider({ children }: { children: ReactNode })
                   key={open.url}
                   src={open.url}
                   poster={open.posterUrl || undefined}
+                  style={previewFillStyle(orientation, aspect)}
                   className={cn(
-                    "relative object-contain transition-opacity duration-150",
-                    isLandscape
-                      ? "max-h-[85vh] max-w-[min(92vw,1280px)]"
-                      : "max-h-[80vh] max-w-[min(90vw,640px)]",
+                    "relative h-auto max-h-[85vh] w-auto max-w-[92vw] object-contain transition-opacity duration-150",
                     videoLoading ? "opacity-0" : "opacity-100",
                   )}
                   muted
