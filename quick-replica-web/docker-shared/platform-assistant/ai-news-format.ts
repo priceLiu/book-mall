@@ -119,7 +119,10 @@ export function organizeAiNewsMarkdown(text: string): string {
   }
 
   const parts: string[] = [];
-  const headText = head.join("\n").replace(/^\n+|\n+$/g, "");
+  const headText = head
+    .filter((line) => !/模拟推演|重要提示|非真实|请勿作为投资|实际时间早于/.test(line))
+    .join("\n")
+    .replace(/^\n+|\n+$/g, "");
   if (headText) parts.push(headText);
 
   let next = 0;

@@ -10,6 +10,7 @@
     "greeting.ts",
     "platform-apps.ts",
     "ai-news-prefetch.ts",
+    "ai-news-format.ts",
     "package.json"
   ],
   "exports": {
@@ -17,7 +18,8 @@
     "./platform-assistant": "./platform-assistant.tsx",
     "./greeting": "./greeting.ts",
     "./platform-apps": "./platform-apps.ts",
-    "./ai-news-prefetch": "./ai-news-prefetch.ts"
+    "./ai-news-prefetch": "./ai-news-prefetch.ts",
+    "./ai-news-format": "./ai-news-format.ts"
   },
   "peerDependencies": {
     "react": "^18",
