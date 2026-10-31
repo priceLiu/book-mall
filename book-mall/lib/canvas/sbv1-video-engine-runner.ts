@@ -21,6 +21,7 @@ import {
   isDashscopeSbv1TextToVideoModel,
   isDashscopeWan30VideoModel,
 } from "./dashscope-sbv1-t2v";
+import { resolveCanvasVideoAspectRatio } from "./video-aspect-resolve";
 import { isTopazCanvasVideoModelKey } from "./providers/topaz";
 import { isMinimaxCanvasVideoModelKey } from "./providers/minimax-video";
 import { runCanvasS2vVideoNode } from "./canvas-s2v-runner";
@@ -57,9 +58,13 @@ export async function runSbv1VideoEngineNode(
     }),
   );
 
-  const aspectRatio = resolveVolcengineVideoRatio(
-    String(data.aspectRatio ?? params.aspect_ratio ?? "16:9"),
+  const userAspect = resolveCanvasVideoAspectRatio(
+    params,
+    data.aspectRatio != null ? String(data.aspectRatio) : undefined,
   );
+  const aspectRatio = isVolcengineStoryVideoModelKey(modelKey)
+    ? resolveVolcengineVideoRatio(userAspect)
+    : userAspect;
   const durationSec = Number(data.durationSec ?? params.duration ?? 15);
   const resolution = String(
     data.resolution ?? params.resolution ?? "1080p",

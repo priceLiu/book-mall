@@ -113,6 +113,7 @@ import { normalizeKieVideoRefImageUrls } from "./canvas-video-ref-image-normaliz
 import {
   buildCanvasVideoVolcengineInput,
   isVolcengineStoryVideoModelKey,
+  resolveVolcengineVideoRatio,
   VOLCENGINE_VIDEO_MULTI_REF_MODEL,
 } from "./canvas-video-volcengine";
 import { buildCanvasVideoMinimaxInput } from "@/lib/gateway/minimax-video-body";
@@ -130,6 +131,7 @@ import {
   isDashscopeWan30VideoModel,
   resolveDashscopeT2vRefMismatchMessage,
 } from "./dashscope-sbv1-t2v";
+import { resolveCanvasVideoAspectRatio } from "./video-aspect-resolve";
 import {
   ensureWan30ReferenceImageUrls,
   normalizeWan30MediaImageUrls,
@@ -2337,7 +2339,12 @@ export async function runVideoEngineNode(
         generateAudio: params.generate_audio === true || params.generateAudio === true,
         watermark: params.watermark === true,
       },
-      aspectRatio: String(params.aspect_ratio ?? "16:9"),
+      aspectRatio: resolveVolcengineVideoRatio(
+        resolveCanvasVideoAspectRatio(
+          params,
+          data.aspectRatio != null ? String(data.aspectRatio) : undefined,
+        ),
+      ),
     });
     model = built.model;
     input = built.body as Record<string, unknown>;
@@ -2363,7 +2370,10 @@ export async function runVideoEngineNode(
       options: {
         resolution: String(params.resolution ?? "2K"),
         duration: Number(params.duration ?? 5),
-        ratio: String(params.ratio ?? params.aspect_ratio ?? "16:9"),
+        ratio: resolveCanvasVideoAspectRatio(
+          params,
+          data.aspectRatio != null ? String(data.aspectRatio) : undefined,
+        ),
         aigc_watermark: params.aigc_watermark === true,
         generateAudio:
           params.generate_audio !== false && params.generateAudio !== false,
@@ -2374,8 +2384,9 @@ export async function runVideoEngineNode(
     videoProviderKind = "MINIMAX";
   } else if (isDashscopeT2v) {
     try {
-      const aspectRatio = String(
-        params.ratio ?? params.aspect_ratio ?? data.aspectRatio ?? "16:9",
+      const aspectRatio = resolveCanvasVideoAspectRatio(
+        params,
+        data.aspectRatio != null ? String(data.aspectRatio) : undefined,
       );
       const resolution = String(
         params.resolution ?? data.resolution ?? "720p",
@@ -2397,9 +2408,11 @@ export async function runVideoEngineNode(
           ? "omni"
           : dockMode === "first_last" || Boolean(kieLastFrame)
             ? "first_last"
-            : dockMode === "i2v" && wan30AllRefs.length <= 1
+            : dockMode === "i2v"
               ? "i2v"
-              : "omni";
+              : wan30AllRefs.length > 0
+                ? "omni"
+                : "first_last";
       let wan30Media = isDashscopeWan30VideoModel(effectiveModelKey)
         ? buildDashscopeWan30Media({
             dockMode: wan30DockMode,
@@ -2456,8 +2469,9 @@ export async function runVideoEngineNode(
     }
   } else if (isDashscopeHappyhorseI2v) {
     try {
-      const aspectRatio = String(
-        params.ratio ?? params.aspect_ratio ?? data.aspectRatio ?? "16:9",
+      const aspectRatio = resolveCanvasVideoAspectRatio(
+        params,
+        data.aspectRatio != null ? String(data.aspectRatio) : undefined,
       );
       const resolution = String(
         params.resolution ?? data.resolution ?? "720p",
@@ -2482,8 +2496,9 @@ export async function runVideoEngineNode(
     }
   } else if (isDashscopeKlingV3VideoGatewayModel(effectiveModelKey)) {
     try {
-      const aspectRaw = String(
-        params.ratio ?? params.aspect_ratio ?? data.aspectRatio ?? "16:9",
+      const aspectRaw = resolveCanvasVideoAspectRatio(
+        params,
+        data.aspectRatio != null ? String(data.aspectRatio) : undefined,
       );
       const aspectRatio =
         aspectRaw === "9:16"
@@ -3133,7 +3148,10 @@ export async function runRefVideoEngineNode(
     const resolution = /^720p$/i.test(String(params.resolution ?? ""))
       ? "720P"
       : "1080P";
-    const ratio = String(params.ratio ?? params.aspect_ratio ?? "16:9");
+    const ratio = resolveCanvasVideoAspectRatio(
+      params,
+      data.aspectRatio != null ? String(data.aspectRatio) : undefined,
+    );
     const duration = Number(params.duration ?? 5);
     const seedStr = String(params.seed ?? "");
     const parameterExtras: Record<string, unknown> = {};

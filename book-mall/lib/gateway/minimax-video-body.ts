@@ -203,10 +203,8 @@ export function buildMinimaxVideoSubmitBody(opts: {
   const duration = Number(opts.input.duration ?? 5);
   let ratio = String(opts.input.ratio ?? "16:9").trim();
 
-  if (mode === "t2v") {
-    if (!ratio || ratio === "adaptive") ratio = "16:9";
-  } else if (mode === "i2v" || mode === "fl2v") {
-    ratio = "adaptive";
+  if (mode === "t2v" && (!ratio || ratio === "adaptive")) {
+    ratio = "16:9";
   }
 
   const body: Record<string, unknown> = {

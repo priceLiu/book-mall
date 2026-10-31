@@ -598,7 +598,10 @@ export function isSbv1DockModeIncompatibleWithRefCount(
     return n > 0;
   }
 
-  if (mode === "i2v" && n > 1) return true;
+  if (mode === "i2v" && n > 1) {
+    if (_modelKey && isSbv1Wan30VideoModel(_modelKey)) return false;
+    return true;
+  }
 
   if (mode === "first_last" && n > 2) return true;
 

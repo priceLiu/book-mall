@@ -23,6 +23,7 @@ import {
   resolveSbv1DockInputMode,
   sbv1VideoModelUsesPortraitLibrary,
 } from "@/lib/canvas/sbv1-video-model-reference";
+import { resolveSbv1VideoDockDisplayFields } from "@/lib/canvas/sbv1-video-ui-sync";
 import {
   resolvePortraitAssetRefsFromUpstream,
 } from "./resolve-portrait-asset-refs";
@@ -1545,6 +1546,27 @@ export function useCanvasRunner(
           const vdRun = runData as import("./sbv1-workspace-types").Sbv1VideoEngineNodeData;
           const mk = vdRun.engine?.modelKey?.trim() ?? "";
           if (mk) {
+            const { aspectRatio: dockAspect } =
+              resolveSbv1VideoDockDisplayFields(vdRun);
+            const engForAspect =
+              (runData.engine as Record<string, unknown> | undefined) ?? {};
+            const prevParamsForAspect =
+              (engForAspect.params as Record<string, unknown> | undefined) ??
+              {};
+            const aspectSyncedParams = {
+              ...prevParamsForAspect,
+              ratio: dockAspect,
+              aspect_ratio: dockAspect,
+            };
+            runData = {
+              ...runData,
+              aspectRatio: dockAspect,
+              engine: {
+                ...engForAspect,
+                params: aspectSyncedParams,
+              },
+              params: aspectSyncedParams,
+            };
             const imageRefCount = Math.max(
               resolveSbv1UpstreamRefLinks(nodeId, latestNodes, latestEdges).length,
               imageInputs.length,

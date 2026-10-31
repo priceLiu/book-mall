@@ -8,6 +8,7 @@ import {
   buildGatewayInputSummary,
 } from "@/lib/gateway/log-input-summary";
 import { isBailianR2vGatewayModel } from "@/lib/gateway/model-router";
+import { resolveCanvasVideoAspectRatio } from "@/lib/canvas/video-aspect-resolve";
 
 function readPayload(inputPayload: unknown): Record<string, unknown> {
   if (!inputPayload || typeof inputPayload !== "object" || Array.isArray(inputPayload)) {
@@ -54,7 +55,10 @@ export function buildCanvasPendingInputSummary(
       prompt,
       referenceImageUrls,
       resolution,
-      ratio: String(params.ratio ?? params.aspect_ratio ?? "16:9"),
+      ratio: resolveCanvasVideoAspectRatio(
+        params,
+        typeof payload.aspectRatio === "string" ? payload.aspectRatio : undefined,
+      ),
       duration: Number(params.duration ?? 5),
       seedStr: typeof params.seed === "string" ? params.seed : undefined,
       parameterExtras:

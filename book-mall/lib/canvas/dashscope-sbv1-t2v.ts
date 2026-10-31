@@ -187,6 +187,19 @@ export function buildDashscopeWan30Media(opts: {
     if (media.length > 0) return media;
   }
 
+  // 图生视频：仅首帧，不混 reference_image（多参考时取首图）
+  if (dockMode === "i2v") {
+    const primary =
+      firstImage ||
+      dedupeMediaUrls(opts.referenceImageUrls).find((u) =>
+        isLikelyReferenceImageUrl(u),
+      ) ||
+      "";
+    if (primary) {
+      return [{ type: "first_frame", url: primary }];
+    }
+  }
+
   // 万相 3.0 API：first_frame 仅可与 last_frame 同用，不可与 reference_image 混传。
   if (refs.length > 0) {
     const seen = new Set<string>();
@@ -212,12 +225,17 @@ function parseWan30Ratio(
   aspectRatio: string,
   media: DashscopeWan30MediaItem[],
 ): string {
-  const hasVideo = media.some((m) => m.type === "reference_video");
-  if (hasVideo) return "adaptive";
   const t = aspectRatio.trim();
   const allowed = ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"] as const;
-  if ((allowed as readonly string[]).includes(t)) return t;
-  return "16:9";
+  const normalized = (allowed as readonly string[]).includes(t) ? t : "16:9";
+  const hasVideo = media.some((m) => m.type === "reference_video");
+  /** 固定比例：始终按用户选择提交（不因 reference_* 改写） */
+  if (normalized !== "adaptive" && normalized !== "auto") {
+    return normalized;
+  }
+  /** 仅用户显式选 adaptive/auto 时走自适应；有参考视频时厂商按参考比例出片 */
+  if (hasVideo && normalized === "adaptive") return "adaptive";
+  return normalized;
 }
 
 export function buildDashscopeWan30VideoBody(opts: {

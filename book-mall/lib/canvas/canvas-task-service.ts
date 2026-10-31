@@ -157,6 +157,7 @@ import {
 import { extractHunyuan3DResultUrls } from "./providers/hunyuan-3d";
 import { buildKieImageCreateArgs } from "./providers/kie";
 import { type BailianR2vTaskOutput, extractBailianR2vVideoUrlFromGatewaySummary } from "./canvas-video-bailian-r2v";
+import { resolveCanvasVideoAspectRatio } from "./video-aspect-resolve";
 import {
   dashscopeExtractTaskImageUrl,
   dashscopeExtractTaskVideoUrl,
@@ -2146,7 +2147,12 @@ export async function runCanvasPollWorker(opts?: {
             prompt: String(payload.prompt ?? ""),
             referenceImageUrls: refs,
             resolution,
-            ratio: String(params.ratio ?? params.aspect_ratio ?? "16:9"),
+            ratio: resolveCanvasVideoAspectRatio(
+              params,
+              typeof payload.aspectRatio === "string"
+                ? payload.aspectRatio
+                : undefined,
+            ),
             duration: Number(params.duration ?? 5),
             seedStr: String(params.seed ?? ""),
             parameterExtras:

@@ -40,10 +40,10 @@ describe("wan3.0-video", () => {
     expect(body.input.media).toBeUndefined();
   });
 
-  it("builds wan3 omni body with prompt_extend, audio and adaptive ratio", () => {
+  it("builds wan3 omni body with prompt_extend, audio and adaptive ratio when aspect is adaptive", () => {
     const body = buildDashscopeSbv1T2vVideoBody({
       prompt: "图1参考",
-      aspectRatio: "16:9",
+      aspectRatio: "adaptive",
       resolution: "720P",
       durationSec: 5,
       promptExtend: false,
@@ -57,6 +57,49 @@ describe("wan3.0-video", () => {
     expect(body.parameters.prompt_extend).toBe(false);
     expect(body.parameters.audio).toBe(false);
     expect(body.parameters.ratio).toBe("adaptive");
+  });
+
+  it("honors fixed 16:9 ratio for wan3 omni with reference images only", () => {
+    const body = buildDashscopeSbv1T2vVideoBody({
+      prompt: "图1参考",
+      aspectRatio: "16:9",
+      resolution: "720P",
+      durationSec: 5,
+      modelKey: "wan3.0-video",
+      media: [
+        { type: "reference_image", url: "https://oss.example/a.jpg" },
+        { type: "reference_image", url: "https://oss.example/b.jpg" },
+      ],
+    });
+    expect(body.parameters.ratio).toBe("16:9");
+  });
+
+  it("honors fixed 16:9 even when reference_video is present", () => {
+    const body = buildDashscopeSbv1T2vVideoBody({
+      prompt: "图1参考",
+      aspectRatio: "16:9",
+      resolution: "720P",
+      durationSec: 5,
+      modelKey: "wan3.0-video",
+      media: [
+        { type: "reference_video", url: "https://oss.example/ref.mp4" },
+        { type: "reference_image", url: "https://oss.example/a.jpg" },
+      ],
+    });
+    expect(body.parameters.ratio).toBe("16:9");
+  });
+
+  it("i2v mode uses first_frame with multiple referenceImageUrls", () => {
+    const media = buildDashscopeWan30Media({
+      dockMode: "i2v",
+      referenceImageUrls: [
+        "https://oss.example/first.png",
+        "https://oss.example/second.png",
+      ],
+    });
+    expect(media).toEqual([
+      { type: "first_frame", url: "https://oss.example/first.png" },
+    ]);
   });
 
   it("allows reference images (All-in-One, no R2V mismatch)", () => {

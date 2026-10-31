@@ -57,6 +57,7 @@ import {
   buildSbv1DockModeRefSyncPatch,
   dockInputModeToPatch,
   getSbv1VideoDockModeChips,
+  isSbv1Wan30VideoModel,
   resolveSbv1DockInputMode,
   sbv1DockRefCornerLabelForModel,
 } from "@/lib/canvas/sbv1-video-model-reference";
@@ -509,9 +510,11 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
             disabled={isGenerating}
             disabledModeIds={
               imageRefCount > 0
-                ? imageRefCount > 1
-                  ? (["t2v", "i2v"] as const)
-                  : (["t2v"] as const)
+                ? isSbv1Wan30VideoModel(modelKey)
+                  ? (["t2v"] as const)
+                  : imageRefCount > 1
+                    ? (["t2v", "i2v"] as const)
+                    : (["t2v"] as const)
                 : undefined
             }
             chipFontPx={modeChipFontPx}
