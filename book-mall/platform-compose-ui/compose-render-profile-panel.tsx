@@ -327,7 +327,7 @@ export function ComposeRenderProfilePanel({
           subtitle: {
             ...p.subtitle,
             mode,
-            burnIn: mode !== "none",
+            burnIn: true,
           },
         })
       }
@@ -398,9 +398,9 @@ export function ComposeRenderProfilePanel({
                   ...p.subtitle,
                   burnIn: on,
                   mode: on
-                    ? p.subtitle.mode === "none"
+                    ? p.subtitle?.mode === "none"
                       ? "script"
-                      : p.subtitle.mode
+                      : p.subtitle?.mode
                     : "none",
                 },
               });
@@ -430,7 +430,7 @@ export function ComposeRenderProfilePanel({
               subtitle: {
                 ...p.subtitle,
                 mode,
-                burnIn: mode !== "none",
+                burnIn: true,
               },
             })
           }
