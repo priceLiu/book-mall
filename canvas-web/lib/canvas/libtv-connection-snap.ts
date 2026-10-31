@@ -13,6 +13,7 @@ import {
   isBatchConnectSnapTarget,
   type BatchConnectMode,
 } from "./pro2-batch-connect";
+import { isLibtvSidePlusInHandle } from "./libtv-side-plus-in-handle";
 
 /** 拖线松手时 · 节点 type → 默认 target / source handle */
 export const DEFAULT_HANDLE_BY_TYPE: Record<
@@ -211,6 +212,44 @@ export function findBatchConnectSnapTarget(
   if (nearest) return nearest.node;
 
   return findTopmostNodeAtFlowPoint(nodes, flowPoint, excludeIds[0]);
+}
+
+export function inferLibtvConnectHandleType(
+  handleId: string | null | undefined,
+): "source" | "target" | null {
+  if (!handleId) return null;
+  if (isLibtvSidePlusInHandle(handleId) || handleId.startsWith("in_")) {
+    return "target";
+  }
+  return "source";
+}
+
+/** 侧栏 + 拖线过程中 · 指针下可 snap 的目标节点（与松手 snap 规则一致） */
+export function findConnectDragHoverNodeId(
+  nodes: CanvasFlowNode[],
+  flowPoint: { x: number; y: number },
+  fromNodeId: string,
+  fromHandleId: string | null,
+): string | null {
+  const fromHandleType = inferLibtvConnectHandleType(fromHandleId);
+  if (!fromHandleType) return null;
+  const snapped = resolveSnapConnectionOnNodeHit(
+    {
+      isValid: false,
+      fromNodeId,
+      fromHandleId,
+      fromHandleType,
+      toNodeId: null,
+      toHandleId: null,
+    },
+    nodes,
+    flowPoint,
+  );
+  if (snapped) {
+    return snapped.source === fromNodeId ? snapped.target : snapped.source;
+  }
+  const hit = findTopmostNodeAtFlowPoint(nodes, flowPoint, fromNodeId);
+  return hit?.id ?? null;
 }
 
 /** 拖线未命中 Handle 但落在节点上时，补全连线 */

@@ -127,7 +127,11 @@ import {
   CANVAS_EDGE_STROKE_WIDTH_CONNECTING,
 } from "@/lib/canvas/canvas-edge-layer-z";
 import { CANVAS_GRAPH_UNDO_REDO_EVENT } from "@/lib/canvas/canvas-graph-undo-redo";
-import { resolveSnapConnectionOnNodeHit, findNearestSidePlusHandle } from "@/lib/canvas/libtv-connection-snap";
+import {
+  findConnectDragHoverNodeId,
+  findNearestSidePlusHandle,
+  resolveSnapConnectionOnNodeHit,
+} from "@/lib/canvas/libtv-connection-snap";
 import {
   isLibtvSidePlusConnectHandle,
   resolveLibtvSideConnectMenu,
@@ -431,10 +435,17 @@ function FlowCanvasInner({
     (s) => s.openPro2ScriptTableEditor,
   );
   const setConnectingFrom = useCanvasStore((s) => s.setConnectingFrom);
+  const setConnectionHoverNodeId = useCanvasStore(
+    (s) => s.setConnectionHoverNodeId,
+  );
   const dragHoverGroupId = useCanvasStore((s) => s.dragHoverGroupId);
   const setDragHoverGroup = useCanvasStore((s) => s.setDragHoverGroup);
   const reparentNode = useCanvasStore((s) => s.reparentNode);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
+  const connectingFromHandleId = useCanvasStore(
+    (s) => s.connectingFromHandleId,
+  );
+  const connectionHoverNodeId = useCanvasStore((s) => s.connectionHoverNodeId);
   const fitViewNonce = useCanvasStore((s) => s.fitViewNonce);
   const canvasFocusNodeId = useCanvasStore((s) => s.canvasFocusNodeId);
   const canvasFocusNonce = useCanvasStore((s) => s.canvasFocusNonce);
@@ -2156,10 +2167,45 @@ function FlowCanvasInner({
       _evt: unknown,
       params: { nodeId?: string | null; handleId?: string | null },
     ) => {
+      setConnectionHoverNodeId(null);
       setConnectingFrom(params.nodeId ?? null, params.handleId ?? null);
     },
-    [setConnectingFrom],
+    [setConnectingFrom, setConnectionHoverNodeId],
   );
+
+  useEffect(() => {
+    if (!connectingFromNodeId) return;
+
+    const onPointerMove = (event: PointerEvent) => {
+      const flowPoint = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      const nodes = getNodes() as CanvasFlowNode[];
+      const hoverId = findConnectDragHoverNodeId(
+        nodes,
+        flowPoint,
+        connectingFromNodeId,
+        connectingFromHandleId,
+      );
+      const cur = useCanvasStore.getState().connectionHoverNodeId;
+      if (hoverId !== cur) {
+        setConnectionHoverNodeId(hoverId);
+      }
+    };
+
+    window.addEventListener("pointermove", onPointerMove, { capture: true });
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove, { capture: true });
+      setConnectionHoverNodeId(null);
+    };
+  }, [
+    connectingFromNodeId,
+    connectingFromHandleId,
+    getNodes,
+    screenToFlowPosition,
+    setConnectionHoverNodeId,
+  ]);
 
   /** ≥2 非 group 节点被选中时改由选区批量 + 承接连线，各节点侧栏 + 收起 */
   const onSelectionChange = useCallback(
@@ -2322,24 +2368,34 @@ function FlowCanvasInner({
     [setConnectingFrom, screenToFlowPosition, getNodes, onConnect, clearCanvasPaneSelection],
   );
 
-  // 分组拖入高亮 + 拖动节点置后绘制（避免 roots 段落在 children 之下穿插）
+  // 分组拖入高亮 · 拖线 snap 目标高亮 · 拖动节点置后绘制
   const decoratedNodes = useMemo(() => {
     let nodes = rfNodes;
-    if (dragHoverGroupId) {
+    if (dragHoverGroupId || connectionHoverNodeId) {
       nodes = rfNodes.map((n) => {
-        if (n.id !== dragHoverGroupId) return n;
-        const base = (n.className ?? "")
+        let className = (n.className ?? "")
           .replace(/\bis-drop-target\b/g, "")
+          .replace(/\bis-connect-target\b/g, "")
           .trim();
-        return {
-          ...n,
-          className: `${base} is-drop-target`.trim(),
-        };
+        if (dragHoverGroupId && n.id === dragHoverGroupId) {
+          className = `${className} is-drop-target`.trim();
+        }
+        if (connectionHoverNodeId && n.id === connectionHoverNodeId) {
+          className = `${className} is-connect-target`.trim();
+        }
+        if (className === (n.className ?? "").trim()) return n;
+        return { ...n, className };
       });
     }
     if (!libtvCanvas || !canvasDraggingNodeId) return nodes;
     return sortLibtvNodesWithDraggingLast(nodes, [canvasDraggingNodeId]);
-  }, [rfNodes, dragHoverGroupId, canvasDraggingNodeId, libtvCanvas]);
+  }, [
+    rfNodes,
+    dragHoverGroupId,
+    connectionHoverNodeId,
+    canvasDraggingNodeId,
+    libtvCanvas,
+  ]);
 
   const EDGE_FOCUS_MAX = libtvCanvas ? 256 : 48;
 

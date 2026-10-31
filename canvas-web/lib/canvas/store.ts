@@ -296,10 +296,12 @@ type CanvasState = {
    * 瞬时态（不进 undo 栈、不进图保存）：
    * - `connectingFromNodeId`：用户按住源 handle 拖线时该 handle 所属节点
    * - `dragHoverGroupId`：拖动节点过程中，鼠标当前悬停在哪个 group 容器内
+   * - `connectionHoverNodeId`：侧栏 + 拖线时指针下可 snap 的目标节点
    */
   connectingFromNodeId: string | null;
   /** 正在拖线的源 handle id · 拖线中仅该侧 + 保持可见 */
   connectingFromHandleId: string | null;
+  connectionHoverNodeId: string | null;
   /** 侧栏 + 拖线松手空白处 · 待选菜单（与 connectingFrom 并存） */
   pendingSideConnect: PendingSideConnect | null;
   dragHoverGroupId: string | null;
@@ -328,6 +330,7 @@ type CanvasState = {
   /** 鼠标悬停的 LibTV 媒体组（未选中时也可显示顶栏） */
   hoveredMediaGroupId: string | null;
   setConnectingFrom: (id: string | null, handleId?: string | null) => void;
+  setConnectionHoverNodeId: (id: string | null) => void;
   setPendingSideConnect: (pending: PendingSideConnect | null) => void;
   clearPendingSideConnect: () => void;
   setDragHoverGroup: (id: string | null) => void;
@@ -571,6 +574,7 @@ export const useCanvasStore = create<CanvasState>()(
       graphRevision: 0,
       connectingFromNodeId: null,
       connectingFromHandleId: null,
+      connectionHoverNodeId: null,
       pendingSideConnect: null,
       dragHoverGroupId: null,
       hoveredMediaGroupId: null,
@@ -590,13 +594,16 @@ export const useCanvasStore = create<CanvasState>()(
         set({
           connectingFromNodeId: id,
           connectingFromHandleId: id ? handleId : null,
+          connectionHoverNodeId: id ? get().connectionHoverNodeId : null,
         }),
+      setConnectionHoverNodeId: (id) => set({ connectionHoverNodeId: id }),
       setPendingSideConnect: (pending) => set({ pendingSideConnect: pending }),
       clearPendingSideConnect: () =>
         set({
           pendingSideConnect: null,
           connectingFromNodeId: null,
           connectingFromHandleId: null,
+          connectionHoverNodeId: null,
         }),
       setDragHoverGroup: (id) => set({ dragHoverGroupId: id }),
       setHoveredMediaGroupId: (id) => set({ hoveredMediaGroupId: id }),
@@ -614,6 +621,7 @@ export const useCanvasStore = create<CanvasState>()(
           canvasSelectionDragging: false,
           connectingFromNodeId: null,
           connectingFromHandleId: null,
+          connectionHoverNodeId: null,
           pendingSideConnect: null,
         }),
       setCanvasGeometryDragging: (dragging) =>

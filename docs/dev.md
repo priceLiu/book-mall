@@ -8,7 +8,10 @@ pnpm --dir e-commerce-toolkit install   # 首次：电商工具箱依赖（dev:a
 pnpm --dir book-mall install            # 主站与其它子站按需在各自目录 install
 pnpm dev:all                        # book-mall 先就绪，再并行启其余子站
 pnpm dev:all:stagger                # mall 先就绪，其余子站间隔 3s 错峰启动
+pnpm dev:all:clean                  # 杀占用端口 + 清各子站 .next + 再 dev:all
 ```
+
+若 mall 出现 `Cannot find module './NNNNN.js'` 或 `useContext` 为 null：多为 **dev 运行中执行了 `next build`** 或 HMR 损坏缓存。用 `pnpm dev:reset-next-caches`（或 `dev:all:clean`）后重启；**勿与 dev:all 共用同一 `.next`**。
 
 `dev:all` 进程表见仓库根 `scripts/dev-all.mjs`；终端里电商工具箱日志前缀为 `[ecom]`。
 

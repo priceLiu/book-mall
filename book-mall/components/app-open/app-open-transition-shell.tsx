@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 const OPEN_GRADIENT =
   "bg-[radial-gradient(ellipse_80%_55%_at_50%_38%,rgba(208,215,222,0.45),transparent_72%)]";
@@ -21,8 +21,12 @@ export function AppOpenTransitionShell({
   hint?: string;
   gradientClassName?: string;
 }) {
+  const [showManualLink, setShowManualLink] = useState(false);
+
   useEffect(() => {
     window.location.replace(targetUrl);
+    const t = window.setTimeout(() => setShowManualLink(true), 4000);
+    return () => window.clearTimeout(t);
   }, [targetUrl]);
 
   return (
@@ -43,6 +47,14 @@ export function AppOpenTransitionShell({
           <p className="max-w-sm text-[0.7rem] leading-relaxed text-[#656d76]/90">
             {hint}
           </p>
+        ) : null}
+        {showManualLink ? (
+          <a
+            href={targetUrl}
+            className="mt-2 text-xs font-medium text-[#0969da] underline underline-offset-2"
+          >
+            若长时间未跳转，请点击此处继续
+          </a>
         ) : null}
       </div>
     </div>

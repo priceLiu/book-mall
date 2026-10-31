@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, ShieldCheck, X } from "lucide-react";
 
+import { AiSpaceOverlay } from "@/components/ai-space/ai-space-overlay";
 import { SmsCodeField } from "@/components/auth/sms-code-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,13 +80,16 @@ export function AdminTopupVerifyDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="admin-topup-verify-title"
+    <AiSpaceOverlay
+      onClose={onClose}
+      label="购买前验证"
+      backdropClassName="bg-black/50"
     >
-      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+      <div
+        className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl"
+        role="document"
+        aria-labelledby="admin-topup-verify-title"
+      >
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 id="admin-topup-verify-title" className="flex items-center gap-2 text-lg font-semibold">
@@ -166,6 +170,6 @@ export function AdminTopupVerifyDialog({
           ) : null}
         </div>
       </div>
-    </div>
+    </AiSpaceOverlay>
   );
 }

@@ -749,7 +749,27 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
 }
 .canvas-connecting
   .react-flow__node:not(.react-flow__node-group):not(.dragging):hover
-  .canvas-node-shell {
+  .canvas-node-shell,
+.canvas-connecting
+  .react-flow__node:not(.react-flow__node-group):not(.dragging):hover
+  .libtv-control-node-bg,
+.canvas-connecting
+  .react-flow__node:not(.react-flow__node-group):not(.dragging):hover
+  .libtv-media-node-bg {
+  outline: 2px solid var(--canvas-accent) !important;
+  box-shadow: 0 0 0 4px var(--canvas-accent-glow) !important;
+}
+
+/* 侧栏 + 拖线 · 指针下可 snap 的目标节点（FlowCanvas · connectionHoverNodeId） */
+.canvas-connecting
+  .react-flow__node.is-connect-target:not(.react-flow__node-group):not(.dragging)
+  .canvas-node-shell,
+.canvas-connecting
+  .react-flow__node.is-connect-target:not(.react-flow__node-group):not(.dragging)
+  .libtv-control-node-bg,
+.canvas-connecting
+  .react-flow__node.is-connect-target:not(.react-flow__node-group):not(.dragging)
+  .libtv-media-node-bg {
   outline: 2px solid var(--canvas-accent) !important;
   box-shadow: 0 0 0 4px var(--canvas-accent-glow) !important;
 }
