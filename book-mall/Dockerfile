@@ -23,8 +23,10 @@ FROM with-shared AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # postinstall 会跑 prisma generate；schema 须先于 install 拷入
 COPY prisma ./prisma
+COPY scripts/docker-sync-platform-assistant.mjs scripts/docker-sync-platform-assistant.mjs
 RUN corepack enable && corepack prepare pnpm@11.1.3 --activate \
   && CI=true pnpm install --frozen-lockfile --ignore-scripts \
+  && node scripts/docker-sync-platform-assistant.mjs \
   && pnpm exec prisma generate
 
 # 扁平化 Prisma CLI（pnpm symlink → 实体目录），供 runner 拷贝。

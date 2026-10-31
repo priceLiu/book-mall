@@ -17,8 +17,10 @@ COPY docker-shared/platform-compose-ui /book-mall/platform-compose-ui
 FROM with-shared AS deps
 # pnpm-workspace.yaml 含 allowBuilds: unrs-resolver；不拷会触发 ERR_PNPM_IGNORED_BUILDS
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY scripts/docker-sync-platform-assistant.mjs scripts/docker-sync-platform-assistant.mjs
 RUN corepack enable && corepack prepare pnpm@11.1.3 --activate \
-  && CI=true pnpm install --frozen-lockfile --ignore-scripts
+  && CI=true pnpm install --frozen-lockfile --ignore-scripts \
+  && node scripts/docker-sync-platform-assistant.mjs
 
 FROM with-shared AS builder
 COPY --from=deps /app/node_modules ./node_modules
