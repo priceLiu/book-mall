@@ -16,6 +16,16 @@ const nextConfig = {
     "@private/platform-assistant",
     "@private/ecom-copy-overlay",
   ],
+  async redirects() {
+    return [
+      /** 静态资源在 /site-home-v2/*.jpg；误访问 /site-home-v2 会 404，引导到正确首页路由 */
+      {
+        source: "/site-home-v2",
+        destination: "/home-v2",
+        permanent: false,
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {

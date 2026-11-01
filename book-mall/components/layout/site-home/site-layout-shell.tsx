@@ -3,6 +3,10 @@
 import { usePathname } from "next/navigation";
 import { SiteHomeNav } from "@/components/layout/site-home/site-home-nav";
 
+function isHomeV2Shell(pathname: string): boolean {
+  return pathname === "/home-v2" || pathname.startsWith("/home-v2/");
+}
+
 function isPricingShell(pathname: string): boolean {
   return pathname === "/pricing" || pathname.startsWith("/pricing/");
 }
@@ -29,6 +33,10 @@ export function SiteLayoutShell({
   const pathname = usePathname();
   const useFullDarkShell = isMarketingDarkShell(pathname);
   const usePricingShell = isPricingShell(pathname);
+
+  if (isHomeV2Shell(pathname)) {
+    return <>{children}</>;
+  }
 
   if (usePricingShell) {
     return (

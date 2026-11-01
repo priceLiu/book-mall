@@ -14,8 +14,20 @@ export function NavbarSignOutButton({
   appearance = "default",
 }: {
   className?: string;
-  appearance?: "default" | "site-home";
+  appearance?: "default" | "site-home" | "site-home-v2";
 }) {
+  if (appearance === "site-home-v2") {
+    return (
+      <button
+        type="button"
+        className={cn("apple-nav-link home-v2-auth-hide-mobile", className)}
+        onClick={() => navigateBookMallFullSignOut("/home-v2")}
+      >
+        退出
+      </button>
+    );
+  }
+
   if (appearance === "site-home") {
     return (
       <button
