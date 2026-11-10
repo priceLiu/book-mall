@@ -1,6 +1,6 @@
-import { SiteHomeNav } from "@/components/layout/site-home/site-home-nav";
+import { SiteHomeV2Chrome } from "@/components/site-home-v2/site-home-v2-chrome";
 
-/** 个人中心浅色顶栏：保留门户导航，不用营销首页深色 fixed 顶栏 */
+/** 个人中心：V2 Apple 顶栏 + 浅色 app shell 内容区 */
 export function AccountAppShell({
   children,
   navAuth,
@@ -9,13 +9,10 @@ export function AccountAppShell({
   navAuth: React.ReactNode;
 }) {
   return (
-    <div data-site-home className="min-h-screen overflow-x-clip">
-      <div className="site-app-shell site-home-page-bg min-h-screen overflow-x-clip">
-        <SiteHomeNav variant="account" isLoggedIn>
-          {navAuth}
-        </SiteHomeNav>
+    <SiteHomeV2Chrome isLoggedIn authSlot={navAuth} siteHomeBody>
+      <div className="site-app-shell min-h-[calc(100vh-var(--header-h))] overflow-x-clip">
         {children}
       </div>
-    </div>
+    </SiteHomeV2Chrome>
   );
 }

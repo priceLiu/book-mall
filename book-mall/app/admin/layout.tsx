@@ -1,13 +1,14 @@
-import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import { NavbarAuth } from "@/components/layout/navbar-auth";
 import { authOptions } from "@/lib/auth";
 import { canViewFinanceCost } from "@/lib/auth/permissions";
-import { getToolsSsoSetupDiagnostics } from "@/lib/sso-tools-env";
 import { getFinanceWebPublicOrigin } from "@/lib/finance-web-public-url";
 
+import { AdminAppShell } from "@/components/admin/admin-app-shell";
 import { AdminNav } from "@/components/admin/admin-nav";
 import "../site-home.css";
+import "../site-home-v2.css";
 
 /** 构建阶段 CI 往往无 DATABASE_URL；避免对 Prisma 做静态预渲染 */
 export const dynamic = "force-dynamic";
@@ -25,39 +26,28 @@ export default async function AdminLayout({
   if (!session?.user?.id) redirect("/login");
   if (!canViewFinanceCost(session.user.role)) redirect("/account");
 
-  const toolsSsoDiag = getToolsSsoSetupDiagnostics();
   const financeWebOrigin = getFinanceWebPublicOrigin();
 
   return (
-    <div data-site-home className="min-h-screen overflow-x-clip">
-      <div className="site-app-shell site-home-page-bg min-h-screen">
-        <header className="site-app-subheader sticky top-0 z-40">
-          <div className="flex min-h-14 max-w-none items-center gap-2 px-4 py-2 sm:px-6">
-            <Link
-              href="/admin"
-              className="shrink-0 text-sm font-semibold text-[#1f2328] hover:text-[#0969da]"
-            >
-              管理后台
-            </Link>
-            <div className="min-w-0 flex-1">
-              <AdminNav
-                user={{
-                  id: session.user.id,
-                  email: session.user.email ?? null,
-                  name: session.user.name ?? null,
-                  image: session.user.image ?? null,
-                }}
-                toolsSsoReady={toolsSsoDiag.ready}
-                toolsSsoIssues={toolsSsoDiag.issues}
-                financeWebOrigin={financeWebOrigin}
-              />
-            </div>
+    <AdminAppShell navAuth={<NavbarAuth appearance="site-home-v2" />}>
+      <header className="admin-subnav-bar sticky top-[var(--header-h)] z-30 border-b border-[#d1d9e0] bg-white/95 backdrop-blur-md">
+        <div className="flex min-h-11 max-w-none items-center gap-2 px-4 py-1.5 sm:px-6 lg:px-8">
+          <div className="min-w-0 flex-1">
+            <AdminNav
+              user={{
+                id: session.user.id,
+                email: session.user.email ?? null,
+                name: session.user.name ?? null,
+                image: session.user.image ?? null,
+              }}
+              financeWebOrigin={financeWebOrigin}
+            />
           </div>
-        </header>
-        <div className="site-app-main mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">
-          {children}
         </div>
+      </header>
+      <div className="site-app-main mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">
+        {children}
       </div>
-    </div>
+    </AdminAppShell>
   );
 }

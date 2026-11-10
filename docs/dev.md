@@ -11,7 +11,7 @@ pnpm dev:all:stagger                # mall 先就绪，其余子站间隔 3s 错
 pnpm dev:all:clean                  # 杀占用端口 + 清各子站 .next + 再 dev:all
 ```
 
-若 mall 出现 `Cannot find module './NNNNN.js'` 或 `useContext` 为 null：多为 **dev 运行中执行了 `next build`** 或 HMR 损坏缓存。用 `pnpm dev:reset-next-caches`（或 `dev:all:clean`）后重启；**勿与 dev:all 共用同一 `.next`**。
+若 mall / gateway 出现 `Cannot find module './NNNNN.js'`、`react-dom.preload is not a function`、`Invalid hook call` 或 `useContext` 为 null：多为 **dev 运行中执行了 `next build`** 或 HMR 损坏缓存；**禁止**在 `next.config` 里 webpack alias `react` / `react-dom`（会破坏 Next 14 SSR）。**先停 dev**，再 `pnpm dev:reset-next-caches`（或 `dev:all:clean`）后重启；**勿与 dev:all 共用同一 `.next`**。mall 未就绪时其它子站上报 `POST /api/internal/platform-traffic/hit` 可能短暂 404，mall 编译完成后即恢复。
 
 `dev:all` 进程表见仓库根 `scripts/dev-all.mjs`；终端里电商工具箱日志前缀为 `[ecom]`。
 

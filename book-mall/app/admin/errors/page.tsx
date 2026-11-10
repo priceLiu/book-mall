@@ -17,8 +17,9 @@ export default async function AdminPlatformErrorsPage() {
       <div>
         <h1 className="text-2xl font-bold">平台错误日志</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Canvas / Gateway 等运行时失败会自动写入；5 分钟内相同指纹合并计数。Gateway
-          详细请求仍见 Gateway 控制台 Logs。
+          Canvas / Gateway 等运行时失败会自动写入；5 分钟内相同指纹合并计数。先用「类别」区分
+          系统运维、积分对账与模型 Gateway；业务侧再用「应用」筛选。Gateway 详细请求仍见
+          Gateway 控制台 Logs。
         </p>
       </div>
       <PlatformErrorsAdminClient />

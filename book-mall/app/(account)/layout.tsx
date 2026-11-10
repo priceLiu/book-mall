@@ -14,6 +14,7 @@ import { AccountShellLoader } from "@/components/account/account-shell-loader";
 import { NavbarAuth } from "@/components/layout/navbar-auth";
 import { runDbQuery } from "@/lib/db-query";
 import "../site-home.css";
+import "../site-home-v2.css";
 
 /** Layout 内查询 Prisma；构建阶段 CI 往往无 DATABASE_URL */
 export const dynamic = "force-dynamic";
@@ -82,7 +83,7 @@ export default async function AccountGroupLayout({
   const billingPersona = userRecord.billingPersona ?? null;
 
   return (
-    <AccountAppShell navAuth={<NavbarAuth appearance="default" />}>
+    <AccountAppShell navAuth={<NavbarAuth appearance="site-home-v2" />}>
       <AccountShellLoader
         profile={{
           image: userRecord.image ?? session.user.image ?? null,

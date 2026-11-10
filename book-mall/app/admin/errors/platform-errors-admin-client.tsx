@@ -1,8 +1,15 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 import { PLATFORM_ERROR_APP_FILTER_OPTIONS } from "@/lib/admin/platform-error-app-filter";
+import {
+  PLATFORM_ERROR_CATEGORY_FILTER_OPTIONS,
+  type PlatformErrorCategoryKey,
+} from "@/lib/admin/platform-error-category-filter";
+
+const PAGE_SIZE = 30;
 
 type PlatformErrorRow = {
   id: string;
@@ -16,6 +23,12 @@ type PlatformErrorRow = {
   occurrenceCount: number;
   resolvedAt: string | null;
   resolvedNote: string | null;
+};
+
+type ListResponse = {
+  items?: PlatformErrorRow[];
+  nextCursor?: string | null;
+  error?: string;
 };
 
 function formatTime(iso: string): string {
@@ -37,40 +50,119 @@ function contextSummary(ctx: Record<string, unknown> | null): string {
   return parts.length ? parts.join(" · ") : "—";
 }
 
+function FilterPill({
+  active,
+  disabled,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  disabled?: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      className={`rounded-full border px-3 py-1 text-sm transition-colors disabled:opacity-50 ${
+        active
+          ? "border-primary bg-primary/10 text-primary"
+          : "border-secondary hover:bg-muted/50"
+      }`}
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  );
+}
+
 export function PlatformErrorsAdminClient() {
   const [items, setItems] = useState<PlatformErrorRow[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<PlatformErrorCategoryKey>("");
   const [appFilter, setAppFilter] = useState("");
   const [unresolvedOnly, setUnresolvedOnly] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setBusy(true);
-    setError(null);
-    try {
+  const busy = loading || refreshing || loadingMore;
+
+  const buildQuery = useCallback(
+    (cursor?: string) => {
       const q = new URLSearchParams();
+      if (categoryFilter) q.set("category", categoryFilter);
       if (appFilter) q.set("appKey", appFilter);
       if (unresolvedOnly) q.set("unresolved", "1");
-      q.set("take", "80");
-      const r = await fetch(`/api/admin/platform-errors?${q.toString()}`);
-      const j = (await r.json()) as { items?: PlatformErrorRow[]; error?: string };
+      q.set("take", String(PAGE_SIZE));
+      if (cursor) q.set("cursor", cursor);
+      return q;
+    },
+    [appFilter, categoryFilter, unresolvedOnly],
+  );
+
+  const fetchPage = useCallback(
+    async (cursor?: string): Promise<ListResponse> => {
+      const r = await fetch(`/api/admin/platform-errors?${buildQuery(cursor).toString()}`);
+      const j = (await r.json()) as ListResponse;
       if (!r.ok) throw new Error(j.error ?? `HTTP ${r.status}`);
-      setItems(j.items ?? []);
+      return j;
+    },
+    [buildQuery],
+  );
+
+  const loadFirstPage = useCallback(
+    async (mode: "full" | "soft" = "full") => {
+      if (mode === "full") setLoading(true);
+      else setRefreshing(true);
+      setError(null);
+      try {
+        const j = await fetchPage();
+        setItems(j.items ?? []);
+        setNextCursor(j.nextCursor ?? null);
+        setExpandedId(null);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [fetchPage],
+  );
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const j = await fetchPage(nextCursor);
+      const batch = j.items ?? [];
+      setItems((prev) => {
+        const seen = new Set(prev.map((r) => r.id));
+        const merged = [...prev];
+        for (const row of batch) {
+          if (!seen.has(row.id)) merged.push(row);
+        }
+        return merged;
+      });
+      setNextCursor(j.nextCursor ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setBusy(false);
+      setLoadingMore(false);
     }
-  }, [appFilter, unresolvedOnly]);
+  }, [fetchPage, loadingMore, nextCursor]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void loadFirstPage("full");
+  }, [loadFirstPage]);
 
   const toggleResolved = async (row: PlatformErrorRow) => {
     const resolved = !row.resolvedAt;
-    setBusy(true);
     try {
       const r = await fetch("/api/admin/platform-errors", {
         method: "PATCH",
@@ -78,36 +170,56 @@ export function PlatformErrorsAdminClient() {
         body: JSON.stringify({ id: row.id, resolved }),
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      await load();
+      const patch = (await r.json()) as { item?: PlatformErrorRow };
+      const updated = patch.item;
+      if (updated) {
+        setItems((prev) => prev.map((it) => (it.id === row.id ? { ...it, ...updated } : it)));
+        if (unresolvedOnly && resolved) {
+          setItems((prev) => prev.filter((it) => it.id !== row.id));
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
     }
   };
+
+  const appFiltersDisabled = categoryFilter === "system" || categoryFilter === "credits";
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-muted-foreground">应用</span>
-        {PLATFORM_ERROR_APP_FILTER_OPTIONS.map((opt) => {
-          const active = appFilter === opt.value;
-          return (
-            <button
-              key={opt.value || "all"}
-              type="button"
+        <span className="shrink-0 text-sm text-muted-foreground">类别</span>
+        {PLATFORM_ERROR_CATEGORY_FILTER_OPTIONS.map((opt) => (
+          <FilterPill
+            key={opt.value || "category-all"}
+            active={categoryFilter === opt.value}
+            disabled={busy}
+            label={opt.label}
+            onClick={() => {
+              setCategoryFilter(opt.value);
+              if (opt.value === "system" || opt.value === "credits") {
+                setAppFilter("");
+              }
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="shrink-0 text-sm text-muted-foreground">应用</span>
+        {appFiltersDisabled ? (
+          <span className="text-sm text-muted-foreground">当前类别下不按应用拆分</span>
+        ) : (
+          PLATFORM_ERROR_APP_FILTER_OPTIONS.map((opt) => (
+            <FilterPill
+              key={opt.value || "app-all"}
+              active={appFilter === opt.value}
               disabled={busy}
-              className={`rounded-full border px-3 py-1 text-sm transition-colors disabled:opacity-50 ${
-                active
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-secondary hover:bg-muted/50"
-              }`}
+              label={opt.label}
               onClick={() => setAppFilter(opt.value)}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
+            />
+          ))
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -123,10 +235,16 @@ export function PlatformErrorsAdminClient() {
           type="button"
           disabled={busy}
           className="rounded-md border border-secondary px-3 py-2 text-sm hover:bg-muted/50 disabled:opacity-50"
-          onClick={() => void load()}
+          onClick={() => void loadFirstPage("soft")}
         >
           刷新
         </button>
+        {!loading && items.length > 0 ? (
+          <span className="text-xs text-muted-foreground">
+            已加载 {items.length} 条
+            {nextCursor ? "（还有更多）" : ""}
+          </span>
+        ) : null}
       </div>
 
       {error ? (
@@ -150,68 +268,80 @@ export function PlatformErrorsAdminClient() {
             </tr>
           </thead>
           <tbody>
-            {items.map((row) => (
-              <Fragment key={row.id}>
-                <tr className="border-b border-secondary/60 hover:bg-muted/30">
-                  <td className="whitespace-nowrap p-3 text-muted-foreground">
-                    {formatTime(row.createdAt)}
-                  </td>
-                  <td className="p-3">{row.source}</td>
-                  <td className="p-3 font-mono text-xs">{row.code ?? "—"}</td>
-                  <td className="max-w-md p-3">
-                    <button
-                      type="button"
-                      className="text-left hover:underline"
-                      onClick={() =>
-                        setExpandedId((id) => (id === row.id ? null : row.id))
-                      }
-                    >
-                      {row.message.length > 120
-                        ? `${row.message.slice(0, 117)}…`
-                        : row.message}
-                    </button>
-                  </td>
-                  <td className="p-3 text-xs text-muted-foreground">
-                    {contextSummary(row.context)}
-                  </td>
-                  <td className="p-3 tabular-nums">{row.occurrenceCount}</td>
-                  <td className="p-3">
-                    {row.resolvedAt ? (
-                      <span className="text-emerald-600">已处理</span>
-                    ) : (
-                      <span className="text-amber-600">待处理</span>
-                    )}
-                  </td>
-                  <td className="p-3">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      className="rounded border border-secondary px-2 py-1 text-xs hover:bg-muted/50 disabled:opacity-50"
-                      onClick={() => void toggleResolved(row)}
-                    >
-                      {row.resolvedAt ? "重新打开" : "标记已处理"}
-                    </button>
-                  </td>
-                </tr>
-                {expandedId === row.id ? (
-                  <tr key={`${row.id}-detail`} className="bg-muted/20">
-                    <td colSpan={8} className="p-4 text-xs">
-                      {row.detail ? (
-                        <pre className="mb-3 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-background p-3">
-                          {row.detail}
-                        </pre>
-                      ) : null}
-                      {row.context ? (
-                        <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded bg-background p-3">
-                          {JSON.stringify(row.context, null, 2)}
-                        </pre>
-                      ) : null}
-                    </td>
-                  </tr>
-                ) : null}
-              </Fragment>
-            ))}
-            {!items.length && !busy ? (
+            {loading ? (
+              <tr>
+                <td colSpan={8} className="p-10 text-center text-muted-foreground">
+                  <span className="inline-flex items-center justify-center gap-2 text-sm">
+                    <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+                    正在加载错误日志…
+                  </span>
+                </td>
+              </tr>
+            ) : null}
+            {!loading
+              ? items.map((row) => (
+                  <Fragment key={row.id}>
+                    <tr className="border-b border-secondary/60 hover:bg-muted/30">
+                      <td className="whitespace-nowrap p-3 text-muted-foreground">
+                        {formatTime(row.createdAt)}
+                      </td>
+                      <td className="p-3">{row.source}</td>
+                      <td className="p-3 font-mono text-xs">{row.code ?? "—"}</td>
+                      <td className="max-w-md p-3">
+                        <button
+                          type="button"
+                          className="text-left hover:underline"
+                          onClick={() =>
+                            setExpandedId((id) => (id === row.id ? null : row.id))
+                          }
+                        >
+                          {row.message.length > 120
+                            ? `${row.message.slice(0, 117)}…`
+                            : row.message}
+                        </button>
+                      </td>
+                      <td className="p-3 text-xs text-muted-foreground">
+                        {contextSummary(row.context)}
+                      </td>
+                      <td className="p-3 tabular-nums">{row.occurrenceCount}</td>
+                      <td className="p-3">
+                        {row.resolvedAt ? (
+                          <span className="text-emerald-600">已处理</span>
+                        ) : (
+                          <span className="text-amber-600">待处理</span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          className="rounded border border-secondary px-2 py-1 text-xs hover:bg-muted/50 disabled:opacity-50"
+                          onClick={() => void toggleResolved(row)}
+                        >
+                          {row.resolvedAt ? "重新打开" : "标记已处理"}
+                        </button>
+                      </td>
+                    </tr>
+                    {expandedId === row.id ? (
+                      <tr key={`${row.id}-detail`} className="bg-muted/20">
+                        <td colSpan={8} className="p-4 text-xs">
+                          {row.detail ? (
+                            <pre className="mb-3 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-background p-3">
+                              {row.detail}
+                            </pre>
+                          ) : null}
+                          {row.context ? (
+                            <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded bg-background p-3">
+                              {JSON.stringify(row.context, null, 2)}
+                            </pre>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                ))
+              : null}
+            {!loading && !items.length ? (
               <tr>
                 <td colSpan={8} className="p-8 text-center text-muted-foreground">
                   暂无错误记录
@@ -221,6 +351,26 @@ export function PlatformErrorsAdminClient() {
           </tbody>
         </table>
       </div>
+
+      {!loading && nextCursor ? (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            disabled={loadingMore}
+            className="inline-flex items-center gap-2 rounded-md border border-secondary px-4 py-2 text-sm hover:bg-muted/50 disabled:opacity-50"
+            onClick={() => void loadMore()}
+          >
+            {loadingMore ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                加载中…
+              </>
+            ) : (
+              `加载更多（每批 ${PAGE_SIZE} 条）`
+            )}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

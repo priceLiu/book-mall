@@ -20,7 +20,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { AdminToolsStationEntry } from "@/components/admin/admin-tools-station-entry";
 import {
   ADMIN_TOP_LEVEL_LINKS,
   ADMIN_TRAILING_TOP_LEVEL_LINKS,
@@ -30,7 +29,6 @@ import {
   type AdminNavLink,
 } from "@/lib/admin/admin-nav-config";
 import { cn } from "@/lib/utils";
-import { navigateBookMallFullSignOut } from "@/lib/session-kicked-marker";
 
 const ADMIN_NAV_GHOST =
   "site-app-nav-link h-9 border-0 bg-transparent px-3 shadow-none hover:shadow-none";
@@ -44,10 +42,6 @@ export type AdminNavUserProps = {
   name: string | null;
   image: string | null;
 };
-
-function navigateToFullSignOut() {
-  navigateBookMallFullSignOut("/");
-}
 
 function avatarLooksAbsolute(url: string) {
   return /^https?:\/\//i.test(url.trim());
@@ -255,13 +249,9 @@ function AdminNavSheet({
 
 export function AdminNav({
   user,
-  toolsSsoReady,
-  toolsSsoIssues,
   financeWebOrigin,
 }: {
   user: AdminNavUserProps;
-  toolsSsoReady: boolean;
-  toolsSsoIssues: string[];
   financeWebOrigin: string | null;
 }) {
   const pathname = usePathname();
@@ -301,30 +291,6 @@ export function AdminNav({
 
       <div className="ml-auto flex flex-wrap items-center gap-2">
         <AdminHeaderUser user={user} />
-
-        <span className="mx-0.5 hidden h-4 w-px shrink-0 bg-[#d1d9e0] sm:inline-block" aria-hidden />
-
-        <AdminToolsStationEntry toolsSsoReady={toolsSsoReady} toolsSsoIssues={toolsSsoIssues} />
-
-        <span className="mx-1 hidden h-4 w-px shrink-0 bg-[#d1d9e0] sm:inline-block" aria-hidden />
-
-        <Button variant="ghost" size="sm" className={`${ADMIN_NAV_GHOST} hidden sm:inline-flex`} asChild>
-          <Link href="/account" prefetch={true}>个人中心</Link>
-        </Button>
-
-        <Button variant="ghost" size="sm" className={`${ADMIN_NAV_GHOST} hidden sm:inline-flex`} asChild>
-          <Link href="/">回前台</Link>
-        </Button>
-
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className={`${ADMIN_NAV_GHOST} hidden sm:inline-flex`}
-          onClick={navigateToFullSignOut}
-        >
-          退出
-        </Button>
       </div>
     </nav>
   );

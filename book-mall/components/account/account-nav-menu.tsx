@@ -397,7 +397,7 @@ export function AccountNavMenu({
         <div
           className={cn(
             "site-app-profile-card flex min-w-0 items-center gap-2 px-3 py-2.5 transition-[padding,background-color] duration-200",
-            compact && "account-sidebar-profile-compact justify-center px-2",
+            compact && "account-sidebar-profile-compact justify-center px-0",
           )}
         >
           <Avatar className="h-9 w-9 shrink-0 border border-[#d1d9e0]">

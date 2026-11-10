@@ -21,6 +21,20 @@ html:has([data-site-home-v2]) body {
   -ms-overflow-style: none;
 }
 
+/* 全屏营销 Home V2（非 chrome 白壳子页）：html/body 与首屏 band-dark 同色，避免视口露白边 */
+html.site-home-v2-page:not(:has(.home-v2-chrome-shell)),
+html:has([data-site-home-v2]:not(.home-v2-chrome-shell)) {
+  background: var(--chapter-dark, #000000);
+}
+html.site-home-v2-page:not(:has(.home-v2-chrome-shell)) body,
+html:has([data-site-home-v2]:not(.home-v2-chrome-shell)) body {
+  background: var(--chapter-dark, #000000);
+}
+/* V2 chrome 子页（登录/课程等）露边时仍应为白底 */
+html:has(.home-v2-chrome-shell) body {
+  background: #ffffff;
+}
+
 [data-site-home-v2] {
   --bg: #ffffff;
   --surface: #f5f5f7;
@@ -88,7 +102,7 @@ html:has([data-site-home-v2]) body {
   min-height: 100vh;
   overflow-x: clip;
   max-width: 100%;
-  background: var(--surface);
+  background: var(--chapter-dark);
   color: var(--fg);
   font-family: var(--font-body);
   font-size: var(--text-base);
@@ -97,14 +111,95 @@ html:has([data-site-home-v2]) body {
   -webkit-font-smoothing: antialiased;
 }
 
-[data-site-home-v2] a {
+/* 营销长页正文链接色（不含个人中心 / 管理后台 / 顶栏） */
+[data-site-home-v2] :is(.home-v2-chapter, .home-v2-hero, .home-v2-rail) a {
   color: var(--accent-active);
   text-decoration: none;
 }
-[data-site-home-v2] a:hover {
+[data-site-home-v2] :is(.home-v2-chapter, .home-v2-hero, .home-v2-rail) a:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* 个人中心 / 管理后台 · 蓝底 / 主按钮：白字（避免被旧全局 a 色覆盖） */
+[data-site-home-v2] :is(.account-shell-root, .admin-shell-root) :is(a, button):where(
+    .text-white,
+    .text-primary-foreground,
+    .bg-primary,
+    [class*="bg-[#0969da]"],
+    [class*="bg-\\[#0969da\\]"]
+  ) {
+  color: #ffffff !important;
+}
+[data-site-home-v2] :is(.account-shell-root, .admin-shell-root) :is(a, button).bg-primary:hover,
+[data-site-home-v2] :is(.account-shell-root, .admin-shell-root) :is(a, button)[class*="bg-[#0969da]"]:hover {
+  color: #ffffff !important;
+  text-decoration: none;
+}
+[data-site-home-v2] .admin-shell-root a.site-app-nav-link {
+  color: #656d76;
+  text-decoration: none;
+}
+[data-site-home-v2] .admin-shell-root a.site-app-nav-link:hover,
+[data-site-home-v2] .admin-shell-root a.site-app-nav-link.site-app-nav-link-active {
+  color: #1f2328;
+  text-decoration: none;
+}
+
+/* 管理后台 · 页面/区块标题统一下调 2 档（text-3xl→xl、2xl→lg、lg→sm）；KPI 数字保留原字号 */
+[data-site-home-v2] .admin-shell-root .site-app-main :is(h1) {
+  font-size: 1.125rem !important;
+  line-height: 1.75rem !important;
+}
+@media (min-width: 640px) {
+  [data-site-home-v2] .admin-shell-root .site-app-main :is(h1) {
+    font-size: 1.25rem !important;
+    line-height: 1.75rem !important;
+  }
+}
+[data-site-home-v2] .admin-shell-root .site-app-main :is(h2, h3):not(.tabular-nums) {
+  font-size: 0.875rem !important;
+  line-height: 1.25rem !important;
+}
+@media (min-width: 640px) {
+  [data-site-home-v2] .admin-shell-root .site-app-main :is(h2, h3):not(.tabular-nums) {
+    font-size: 1rem !important;
+    line-height: 1.5rem !important;
+  }
+}
+
+/* 个人中心 · 页面/区块标题统一下调 2 档（与管理后台同尺度） */
+[data-site-home-v2] .account-shell-root .site-app-section-title {
+  font-size: 1rem !important;
+  line-height: 1.5rem !important;
+}
+@media (min-width: 768px) {
+  [data-site-home-v2] .account-shell-root .site-app-section-title {
+    font-size: 1.125rem !important;
+    line-height: 1.75rem !important;
+  }
+}
+[data-site-home-v2] .account-shell-root .site-app-main :is(h1):not(.site-app-section-title) {
+  font-size: 1.125rem !important;
+  line-height: 1.75rem !important;
+}
+@media (min-width: 640px) {
+  [data-site-home-v2] .account-shell-root .site-app-main :is(h1):not(.site-app-section-title) {
+    font-size: 1.25rem !important;
+    line-height: 1.75rem !important;
+  }
+}
+[data-site-home-v2] .account-shell-root .site-app-main :is(h2, h3):not(.tabular-nums) {
+  font-size: 0.875rem !important;
+  line-height: 1.25rem !important;
+}
+@media (min-width: 640px) {
+  [data-site-home-v2] .account-shell-root .site-app-main :is(h2, h3):not(.tabular-nums) {
+    font-size: 1rem !important;
+    line-height: 1.5rem !important;
+  }
+}
+
 [data-site-home-v2] a.btn-pill:not(.btn-pill-secondary),
 [data-site-home-v2] a.btn-pill:not(.btn-pill-secondary):hover,
 [data-site-home-v2] a.btn-pill-secondary:hover,
@@ -262,6 +357,22 @@ html:has([data-site-home-v2]) body {
   line-height: 1;
   flex: none;
 }
+[data-site-home-v2] .home-v2-nav-surface-label {
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 1px solid color-mix(in oklab, var(--apple-nav-link), transparent 55%);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--apple-nav-link-hover);
+  letter-spacing: -0.01em;
+}
+[data-site-home-v2] .site-header--apple-app-shell .apple-nav-cluster {
+  justify-content: space-between;
+}
+[data-site-home-v2] .site-header--apple-app-shell .nav-group--account {
+  margin-left: auto;
+}
+
 [data-site-home-v2] .nav-brand-name {
   font-size: 12px;
   font-weight: 600;
@@ -1330,12 +1441,19 @@ html:has([data-site-home-v2]) body {
   [data-site-home-v2] .home-v2-nav-auth .home-v2-auth-hide-mobile { display: none; }
 }
 
-/* 订阅 / API 价格 · V2 顶栏 + 白底内容区 */
+/* 营销子页 · V2 顶栏 + 白底内容区 */
+[data-site-home-v2].home-v2-chrome-shell,
 [data-site-home-v2].home-v2-pricing-shell {
   background: #ffffff;
   color: var(--fg);
 }
+[data-site-home-v2] .home-v2-chrome-body,
 [data-site-home-v2] .home-v2-pricing-body {
   background: #ffffff;
-  padding-top: var(--header-h);
+  /* 顶栏为 sticky 已在文档流占位，勿再叠 padding-top（否则后台二级导航与顶栏间会空出整块 header 高度） */
+  padding-top: 0;
+}
+[data-site-home-v2] .home-v2-chrome-body[data-site-home] {
+  background: var(--bg);
+  color: var(--fg);
 }

@@ -21,6 +21,16 @@ function incomingHost(request: NextRequest): string {
   return request.headers.get("host") ?? "";
 }
 
+/** 供 (site)/layout 服务端选择营销壳，避免 client usePathname 触发 SSR 异常 */
+function continueSiteLayout(request: NextRequest): NextResponse {
+  const reqHeaders = new Headers(request.headers);
+  reqHeaders.set("x-book-pathname", request.nextUrl.pathname);
+  return withProductionSecurityHeaders(
+    NextResponse.next({ request: { headers: reqHeaders } }),
+    request,
+  );
+}
+
 function withProductionSecurityHeaders(
   response: NextResponse,
   request: NextRequest,
@@ -125,7 +135,9 @@ export default async function middleware(request: NextRequest) {
 
   if (path.startsWith("/invite/")) {
     recordBookTrafficHit();
-    const res = NextResponse.next();
+    const reqHeaders = new Headers(request.headers);
+    reqHeaders.set("x-book-pathname", path);
+    const res = NextResponse.next({ request: { headers: reqHeaders } });
     res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
     res.headers.set("Pragma", "no-cache");
     return withProductionSecurityHeaders(res, request);
@@ -157,7 +169,7 @@ export default async function middleware(request: NextRequest) {
   }
 
   recordBookTrafficHit();
-  return withProductionSecurityHeaders(NextResponse.next(), request);
+  return continueSiteLayout(request);
 }
 
 export const config = {

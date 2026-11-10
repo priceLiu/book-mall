@@ -8,6 +8,10 @@ import {
   buildPlatformErrorAppWhere,
   parsePlatformErrorAppKey,
 } from "@/lib/admin/platform-error-app-filter";
+import {
+  buildPlatformErrorCategoryWhere,
+  parsePlatformErrorCategoryKey,
+} from "@/lib/admin/platform-error-category-filter";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -36,16 +40,19 @@ export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams;
   const source = parseSource(q.get("source"));
   const appKey = parsePlatformErrorAppKey(q.get("appKey"));
+  const category = parsePlatformErrorCategoryKey(q.get("category"));
   const unresolvedOnly = q.get("unresolved") === "1";
   const code = q.get("code")?.trim() || undefined;
-  const take = Math.min(200, Math.max(1, Number(q.get("take") ?? 80) || 80));
+  const take = Math.min(100, Math.max(1, Number(q.get("take") ?? 30) || 30));
   const cursor = q.get("cursor")?.trim() || undefined;
 
   const appWhere = appKey ? buildPlatformErrorAppWhere(appKey) : {};
+  const categoryWhere = category ? buildPlatformErrorCategoryWhere(category) : {};
 
   const rows = await prisma.platformErrorLog.findMany({
     where: {
       ...(source ? { source } : {}),
+      ...(Object.keys(categoryWhere).length > 0 ? categoryWhere : {}),
       ...(Object.keys(appWhere).length > 0 ? appWhere : {}),
       ...(unresolvedOnly ? { resolvedAt: null } : {}),
       ...(code ? { code } : {}),

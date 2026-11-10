@@ -1,78 +1,49 @@
-"use client";
-
-import { usePathname } from "next/navigation";
+import { CookieConsentBanner } from "@/components/layout/cookie-consent-banner";
 import { SiteHomeNav } from "@/components/layout/site-home/site-home-nav";
-
-function isHomeV2Shell(pathname: string): boolean {
-  return pathname === "/home-v2" || pathname.startsWith("/home-v2/");
-}
-
-function isPricingShell(pathname: string): boolean {
-  return pathname === "/pricing" || pathname.startsWith("/pricing/");
-}
-
-/** 定价路由自带 V2 顶栏 layout，勿再套旧 SiteHomeNav */
-function isPricingV2Shell(pathname: string): boolean {
-  return isPricingShell(pathname);
-}
-
-function isMarketingDarkShell(pathname: string): boolean {
-  if (pathname === "/") return true;
-  if (isPricingShell(pathname)) return false;
-  if (pathname.startsWith("/products")) return true;
-  if (pathname.startsWith("/courses")) return true;
-  return false;
-}
+import { SiteHomeV2Chrome } from "@/components/site-home-v2/site-home-v2-chrome";
+import {
+  isHomeV2Route,
+  isLegacyHome,
+  isPricingRoute,
+  prefersSiteHomeBody,
+} from "@/lib/site-layout/shell-route";
 
 export function SiteLayoutShell({
+  pathname,
   navAuth,
-  pricingNavAuth,
+  v2NavAuth,
   isLoggedIn,
   children,
 }: {
+  pathname: string;
   navAuth: React.ReactNode;
-  pricingNavAuth?: React.ReactNode;
+  v2NavAuth: React.ReactNode;
   isLoggedIn: boolean;
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-  const useFullDarkShell = isMarketingDarkShell(pathname);
-  const usePricingShell = isPricingShell(pathname);
-
-  if (isHomeV2Shell(pathname) || isPricingV2Shell(pathname)) {
+  if (isHomeV2Route(pathname) || isPricingRoute(pathname)) {
     return <>{children}</>;
   }
 
-  if (usePricingShell) {
-    return (
-      <div data-site-home className="min-h-screen overflow-x-clip">
-        <div className="site-app-shell site-home-page-bg min-h-screen overflow-x-clip">
-          <SiteHomeNav variant="account" isLoggedIn={isLoggedIn}>
-            {pricingNavAuth ?? navAuth}
-          </SiteHomeNav>
-          {children}
-        </div>
-      </div>
-    );
-  }
-
-  if (useFullDarkShell) {
+  if (isLegacyHome(pathname)) {
     return (
       <div data-site-home className="min-h-screen overflow-x-clip">
         <div className="site-home-page-bg min-h-screen overflow-x-clip">
           <SiteHomeNav isLoggedIn={isLoggedIn}>{navAuth}</SiteHomeNav>
           {children}
+          <CookieConsentBanner />
         </div>
       </div>
     );
   }
 
   return (
-    <>
-      <div data-site-home-header>
-        <SiteHomeNav isLoggedIn={isLoggedIn}>{navAuth}</SiteHomeNav>
-      </div>
+    <SiteHomeV2Chrome
+      isLoggedIn={isLoggedIn}
+      authSlot={v2NavAuth}
+      siteHomeBody={prefersSiteHomeBody(pathname)}
+    >
       {children}
-    </>
+    </SiteHomeV2Chrome>
   );
 }

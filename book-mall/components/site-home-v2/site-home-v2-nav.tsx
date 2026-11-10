@@ -15,6 +15,7 @@ import {
   type HomeV2NavSectionId,
   useHomeV2NavHighlight,
 } from "./use-home-v2-nav-highlight";
+import { cn } from "@/lib/utils";
 
 function NavChevron() {
   return (
@@ -57,15 +58,20 @@ function sectionIdFromHash(hash: string): HomeV2NavSectionId | null {
   return null;
 }
 
+export type SiteHomeV2NavSurface = "marketing" | "admin";
+
 export function SiteHomeV2Nav({
   isLoggedIn,
   authSlot,
+  surface = "marketing",
 }: {
   isLoggedIn: boolean;
   authSlot: React.ReactNode;
+  surface?: SiteHomeV2NavSurface;
 }) {
   const pathname = usePathname();
   const onHomeV2 = pathname === "/home-v2";
+  const isAdminShell = surface === "admin";
   const menuId = useId();
   const mobileId = useId();
   const dropdownRef = useRef<HTMLLIElement>(null);
@@ -106,25 +112,46 @@ export function SiteHomeV2Nav({
 
   const navLinkClass = (active: boolean) => (active ? "is-active" : undefined);
 
-  const homeHref = onHomeV2 ? anchorHref(HOME_V2_ANCHORS.top) : "/home-v2";
+  const homeHref = isAdminShell
+    ? "/admin"
+    : onHomeV2
+      ? anchorHref(HOME_V2_ANCHORS.top)
+      : "/home-v2";
+
+  const surfaceLabel = isAdminShell ? "管理后台" : null;
 
   const brandLink = (
-    <Link className="nav-brand" href={homeHref} aria-label="智选首页">
+    <Link
+      className="nav-brand"
+      href={homeHref}
+      aria-label={surfaceLabel ? `智选 ${surfaceLabel}` : "智选首页"}
+    >
       <span className="nav-brand-mark" aria-hidden>
         智
       </span>
       <span className="nav-brand-name">智选</span>
+      {surfaceLabel ? (
+        <span className="home-v2-nav-surface-label" aria-hidden>
+          {surfaceLabel}
+        </span>
+      ) : null}
     </Link>
   );
 
   return (
-    <header className="site-header site-header--apple">
+    <header
+      className={cn(
+        "site-header site-header--apple",
+        isAdminShell && "site-header--apple-app-shell",
+      )}
+    >
       <div className="apple-nav-inner">
         <div className="nav-brand-mobile">{brandLink}</div>
 
         <div className="apple-nav-cluster">
           <div className="nav-group nav-group--brand">{brandLink}</div>
 
+          {isAdminShell ? null : (
           <ul className="nav-links nav-group--menu" aria-label="主导航">
           <li className="has-dropdown" ref={dropdownRef}>
             <button
@@ -182,16 +209,19 @@ export function SiteHomeV2Nav({
             );
           })}
           </ul>
+          )}
 
           <div className="nav-group nav-group--account">
             {authSlot}
-            <a
-              className="apple-nav-link apple-nav-link--cta home-v2-auth-hide-mobile"
-              href={homeV2CanvasHref()}
-              {...BOOK_PORTAL_EXTERNAL_LINK_PROPS}
-            >
-              开始创作
-            </a>
+            {isAdminShell ? null : (
+              <a
+                className="apple-nav-link apple-nav-link--cta home-v2-auth-hide-mobile"
+                href={homeV2CanvasHref()}
+                {...BOOK_PORTAL_EXTERNAL_LINK_PROPS}
+              >
+                开始创作
+              </a>
+            )}
           </div>
         </div>
 
@@ -214,44 +244,60 @@ export function SiteHomeV2Nav({
       {mobileOpen ? (
         <div className="mobile-nav mobile-nav--apple" id={mobileId}>
           <nav aria-label="移动导航">
-            <p className="mobile-nav-label">产品应用</p>
-            {portalItems.map((item) => (
-              <a
-                key={item.key}
-                href={item.href}
-                {...BOOK_PORTAL_EXTERNAL_LINK_PROPS}
-                onClick={() => setMobileOpen(false)}
-              >
-                {item.label}
-              </a>
-            ))}
-            <hr className="my-2 border-[var(--border-soft)]" />
-            {SECTION_LINKS.map((link) => {
-              if ("isRoute" in link && link.isRoute) {
-                return (
-                  <Link key={link.href} href={link.href} onClick={() => setMobileOpen(false)}>
-                    {link.label}
-                  </Link>
-                );
-              }
-              return (
-                <Link
-                  key={link.href}
-                  href={anchorHref(link.href)}
+            {isAdminShell ? (
+              <>
+                <Link href="/home-v2" onClick={() => setMobileOpen(false)}>
+                  营销首页
+                </Link>
+                <Link href="/account" onClick={() => setMobileOpen(false)}>
+                  个人中心
+                </Link>
+                <Link href="/admin" onClick={() => setMobileOpen(false)}>
+                  管理首页
+                </Link>
+              </>
+            ) : (
+              <>
+                <p className="mobile-nav-label">产品应用</p>
+                {portalItems.map((item) => (
+                  <a
+                    key={item.key}
+                    href={item.href}
+                    {...BOOK_PORTAL_EXTERNAL_LINK_PROPS}
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    {item.label}
+                  </a>
+                ))}
+                <hr className="my-2 border-[var(--border-soft)]" />
+                {SECTION_LINKS.map((link) => {
+                  if ("isRoute" in link && link.isRoute) {
+                    return (
+                      <Link key={link.href} href={link.href} onClick={() => setMobileOpen(false)}>
+                        {link.label}
+                      </Link>
+                    );
+                  }
+                  return (
+                    <Link
+                      key={link.href}
+                      href={anchorHref(link.href)}
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      {link.label}
+                    </Link>
+                  );
+                })}
+                <a
+                  className="apple-nav-link apple-nav-link--cta"
+                  href={homeV2CanvasHref()}
+                  {...BOOK_PORTAL_EXTERNAL_LINK_PROPS}
                   onClick={() => setMobileOpen(false)}
                 >
-                  {link.label}
-                </Link>
-              );
-            })}
-            <a
-              className="apple-nav-link apple-nav-link--cta"
-              href={homeV2CanvasHref()}
-              {...BOOK_PORTAL_EXTERNAL_LINK_PROPS}
-              onClick={() => setMobileOpen(false)}
-            >
-              开始创作
-            </a>
+                  开始创作
+                </a>
+              </>
+            )}
           </nav>
         </div>
       ) : null}

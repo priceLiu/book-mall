@@ -12,16 +12,12 @@ import {
 } from "@/lib/gateway/gateway-log-app-filter";
 import { PLATFORM_ASSISTANT_CLIENT_PAGE_PREFIX } from "@/lib/platform-assistant/platform-assistant-constants";
 
-export type PlatformErrorAppKey = GatewayLogAppKey | "system";
+export type PlatformErrorAppKey = GatewayLogAppKey;
 
-export const PLATFORM_ERROR_APP_KEYS = [
-  ...GATEWAY_LOG_APP_KEYS,
-  "system",
-] as const;
+export const PLATFORM_ERROR_APP_KEYS = [...GATEWAY_LOG_APP_KEYS] as const;
 
 export const PLATFORM_ERROR_APP_LABELS: Record<PlatformErrorAppKey, string> = {
   ...GATEWAY_LOG_APP_LABELS,
-  system: "系统",
 };
 
 export const PLATFORM_ERROR_APP_FILTER_OPTIONS: {
@@ -40,7 +36,6 @@ export function parsePlatformErrorAppKey(
 ): PlatformErrorAppKey | undefined {
   const v = raw?.trim();
   if (!v) return undefined;
-  if (v.toLowerCase() === "system") return "system";
   return parseGatewayLogAppKey(v);
 }
 
@@ -65,10 +60,6 @@ function clientPageEquals(value: string): Prisma.PlatformErrorLogWhereInput {
 export function buildPlatformErrorAppWhere(
   appKey: PlatformErrorAppKey,
 ): Prisma.PlatformErrorLogWhereInput {
-  if (appKey === "system") {
-    return { source: "SYSTEM" };
-  }
-
   if (!isGatewayLogAppKey(appKey)) {
     return {};
   }
