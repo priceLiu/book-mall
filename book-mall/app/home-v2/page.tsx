@@ -13,13 +13,10 @@ export const metadata = {
 };
 
 export default async function HomeV2Page() {
-  const showcaseTemplates = await loadHomeV2ShowcaseTemplates();
-  let session: Awaited<ReturnType<typeof getServerSession>> = null;
-  try {
-    session = await getServerSession(authOptions);
-  } catch {
-    session = null;
-  }
+  const [session, showcaseTemplates] = await Promise.all([
+    getServerSession(authOptions),
+    loadHomeV2ShowcaseTemplates(),
+  ]);
 
   return (
     <SiteHomeV2Content
