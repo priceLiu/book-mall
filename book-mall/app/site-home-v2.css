@@ -75,10 +75,10 @@ html:has([data-site-home-v2]) body {
   --container-gutter-phone: 16px;
   --tile-gap: 12px;
   --header-h: 44px;
-  /* 标签区下移 + 标题加大相对原型多占高度；舞台负 margin 收回，按钮位置不变 */
+  /* 标签区下移；主屏舞台上移量：大图顶边对齐按钮垂直中线（按钮高 46px → 23px） */
   --hero-value-row-push: clamp(28px, 6vh, 56px);
-  --hero-title-size-delta: 13px;
-  --hero-stage-lift: calc(var(--hero-value-row-push) + var(--hero-title-size-delta));
+  --hero-btn-height: 46px;
+  --hero-stage-overlap: calc(var(--hero-btn-height) / 2);
   --ink-on-dark: #f5f5f7;
   --muted-on-dark: #a1a1a6;
   --chapter-dark: #000000;
@@ -492,6 +492,10 @@ html:has([data-site-home-v2]) body {
 [data-site-home-v2] .home-v2-hero .home-v2-copy-narrow {
   position: relative;
   z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(100%, var(--rail-max-wide));
 }
 /* 对齐 Downloads/home/index.html · .hero-copy */
 [data-site-home-v2] .home-v2-hero .hero-copy {
@@ -499,46 +503,52 @@ html:has([data-site-home-v2]) body {
   display: grid;
   gap: var(--space-5);
   justify-items: center;
-  margin-bottom: var(--space-12);
+  align-items: center;
+  width: 100%;
+  margin-inline: auto;
+  margin-bottom: 0;
 }
 [data-site-home-v2] .home-v2-hero .hero-copy .value-row {
   margin-top: var(--hero-value-row-push);
 }
 [data-site-home-v2] #hero-title {
   display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
   align-items: flex-end;
   justify-content: center;
-  flex-wrap: nowrap;
-  max-width: none;
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
   margin-inline: auto;
-  text-wrap: nowrap;
+  text-align: center;
   white-space: nowrap;
-  font-size: clamp(28px, 3vw + 0.5rem, 52px);
+  font-size: clamp(28px, 2.85vw + 0.5rem, 52px);
   line-height: 1.15;
   color: var(--ink-on-dark);
+  letter-spacing: -0.02em;
 }
 [data-site-home-v2] #hero-title .hero-title-brand {
   font-size: calc(1em + 6px);
   line-height: 1;
   white-space: nowrap;
-}
-[data-site-home-v2] #hero-title .hero-title-rest {
-  white-space: nowrap;
+  flex-shrink: 0;
 }
 [data-site-home-v2] #hero-title .hero-title-divider {
   display: block;
   width: 1px;
   height: 0.82em;
-  margin-inline: clamp(24px, 2.8vw, 36px);
+  margin-inline: clamp(14px, 1.8vw, 28px);
   margin-bottom: 0.08em;
   background: color-mix(in oklab, var(--muted-on-dark), transparent 15%);
   transform: scaleX(0.75);
   flex-shrink: 0;
   align-self: flex-end;
 }
-[data-site-home-v2] #hero-title .hero-title-break {
-  display: none;
+[data-site-home-v2] #hero-title .hero-title-rest {
+  white-space: nowrap;
+  font-size: 1em;
+  flex-shrink: 1;
+  min-width: 0;
 }
 [data-site-home-v2] .value-row {
   display: flex;
@@ -595,12 +605,12 @@ html:has([data-site-home-v2]) body {
   position: relative;
   z-index: 1;
   width: 100%;
-  margin-top: calc(-1 * var(--hero-stage-lift));
+  margin-top: calc(-1 * var(--hero-stage-overlap));
   padding-bottom: var(--space-8);
 }
 [data-site-home-v2] .home-v2-hero .hero-actions {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 [data-site-home-v2] .hero-visual {
   position: relative;
@@ -1209,19 +1219,6 @@ html:has([data-site-home-v2]) body {
   [data-site-home-v2] .home-v2-rail { padding-inline: var(--rail-gutter-tablet); }
   [data-site-home-v2] .home-v2-copy-narrow { padding-inline: var(--container-gutter-tablet); }
   [data-site-home-v2] .home-v2-hero { padding-block: calc(var(--section-y-tablet) - 12px) 0; }
-  [data-site-home-v2] #hero-title {
-    text-wrap: balance;
-    white-space: normal;
-  }
-  [data-site-home-v2] #hero-title .hero-title-break {
-    display: block;
-  }
-  [data-site-home-v2] #hero-title .hero-title-brand {
-    display: block;
-  }
-  [data-site-home-v2] #hero-title .hero-title-divider {
-    display: none;
-  }
   [data-site-home-v2] {
     --hero-value-row-push: var(--space-8);
   }
@@ -1278,8 +1275,24 @@ html:has([data-site-home-v2]) body {
   }
   [data-site-home-v2] .home-v2-rail { padding-inline: var(--rail-gutter-phone); }
   [data-site-home-v2] .home-v2-copy-narrow { padding-inline: var(--container-gutter-phone); }
+  [data-site-home-v2] #hero-title {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-wrap: wrap;
+    white-space: normal;
+    font-size: clamp(22px, 6.2vw, 32px);
+    gap: 0.35em;
+  }
+  [data-site-home-v2] #hero-title .hero-title-divider {
+    display: none;
+  }
   [data-site-home-v2] #hero-title .hero-title-rest {
     white-space: normal;
+    text-align: center;
+    text-wrap: balance;
+    max-width: 18em;
+    flex-shrink: 1;
   }
   [data-site-home-v2] .home-v2-hero .hero-actions .btn-pill {
     width: auto;
@@ -1315,4 +1328,14 @@ html:has([data-site-home-v2]) body {
   [data-site-home-v2] .pricing-anchors { grid-template-columns: 1fr; }
   [data-site-home-v2] .footer-grid { grid-template-columns: 1fr; }
   [data-site-home-v2] .home-v2-nav-auth .home-v2-auth-hide-mobile { display: none; }
+}
+
+/* 订阅 / API 价格 · V2 顶栏 + 白底内容区 */
+[data-site-home-v2].home-v2-pricing-shell {
+  background: #ffffff;
+  color: var(--fg);
+}
+[data-site-home-v2] .home-v2-pricing-body {
+  background: #ffffff;
+  padding-top: var(--header-h);
 }

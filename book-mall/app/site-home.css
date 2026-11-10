@@ -1683,6 +1683,65 @@
   margin-top: 0;
 }
 
+[data-site-home] .site-pricing-share-promo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 0.75rem;
+  width: min(48rem, 100%);
+  margin-inline: auto;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(221 214 254 / 0.85);
+  background: linear-gradient(135deg, rgb(245 243 255 / 0.9), rgb(255 255 255 / 0.95));
+  text-align: left;
+}
+
+[data-site-home] .site-pricing-share-promo-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex: none;
+  color: rgb(124 58 237);
+}
+
+[data-site-home] .site-pricing-share-promo-text {
+  flex: 1 1 12rem;
+  margin: 0;
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: hsl(var(--muted-foreground));
+}
+
+[data-site-home] .site-pricing-share-promo-text strong {
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+[data-site-home] .site-pricing-share-promo-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+}
+
+[data-site-home] .site-pricing-share-promo-link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 0.6875rem;
+  color: rgb(109 40 217);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+[data-site-home] .site-pricing-share-promo-link:hover {
+  color: rgb(91 33 182);
+}
+
 [data-site-home] .site-pricing-toggle-group {
   display: inline-flex;
   align-items: center;

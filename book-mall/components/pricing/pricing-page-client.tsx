@@ -14,7 +14,6 @@ import {
   Film,
   ImageIcon,
   Info,
-  Gift,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -244,16 +243,10 @@ export function PricingPageClient({
           </div>
         </div>
 
-        {welcomeGift && welcomeGift.generalCredits > 0 ? (
-          <div className="flex w-full max-w-2xl flex-wrap items-center justify-center gap-2 rounded-full border border-[#8957e5]/30 bg-[#8957e5]/10 px-4 py-2 text-sm text-[#5a32a3]">
-            <Gift className="h-4 w-4 shrink-0" />
-            <span>
-              新用户注册即送 {welcomeGift.generalCredits.toLocaleString()} 积分，30 天内有效
-            </span>
-          </div>
-        ) : null}
-
-        <ShareRewardsPromo isLoggedIn={isLoggedIn} />
+        <ShareRewardsPromo
+          isLoggedIn={isLoggedIn}
+          welcomeGiftCredits={welcomeGift?.generalCredits}
+        />
 
         {checkoutErrorMessage ? (
           <div

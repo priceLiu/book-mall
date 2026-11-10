@@ -106,8 +106,10 @@ export function SiteHomeV2Nav({
 
   const navLinkClass = (active: boolean) => (active ? "is-active" : undefined);
 
+  const homeHref = onHomeV2 ? anchorHref(HOME_V2_ANCHORS.top) : "/home-v2";
+
   const brandLink = (
-    <Link className="nav-brand" href={anchorHref(HOME_V2_ANCHORS.top)} aria-label="智选首页">
+    <Link className="nav-brand" href={homeHref} aria-label="智选首页">
       <span className="nav-brand-mark" aria-hidden>
         智
       </span>

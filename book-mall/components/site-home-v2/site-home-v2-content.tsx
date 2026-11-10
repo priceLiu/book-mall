@@ -140,7 +140,6 @@ export function SiteHomeV2Content({
               <h1 id="hero-title">
                 <span className="hero-title-brand">智选</span>
                 <span className="hero-title-divider" aria-hidden />
-                <br className="hero-title-break" aria-hidden />
                 <span className="hero-title-rest">办公・图像・视频・音乐全链路 AI 创作台</span>
               </h1>
               <ul className="value-row" aria-label="平台价值">

@@ -11,6 +11,11 @@ function isPricingShell(pathname: string): boolean {
   return pathname === "/pricing" || pathname.startsWith("/pricing/");
 }
 
+/** 定价路由自带 V2 顶栏 layout，勿再套旧 SiteHomeNav */
+function isPricingV2Shell(pathname: string): boolean {
+  return isPricingShell(pathname);
+}
+
 function isMarketingDarkShell(pathname: string): boolean {
   if (pathname === "/") return true;
   if (isPricingShell(pathname)) return false;
@@ -34,7 +39,7 @@ export function SiteLayoutShell({
   const useFullDarkShell = isMarketingDarkShell(pathname);
   const usePricingShell = isPricingShell(pathname);
 
-  if (isHomeV2Shell(pathname)) {
+  if (isHomeV2Shell(pathname) || isPricingV2Shell(pathname)) {
     return <>{children}</>;
   }
 
