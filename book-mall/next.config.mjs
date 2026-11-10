@@ -9,6 +9,14 @@ const nextConfig = {
     },
     /** archiver@8 的 package exports 与 webpack 不兼容，服务端 API 外置加载 */
     serverComponentsExternalPackages: ["archiver"],
+    /** standalone 镜像：显式打入首页 V2 组件与静态资源目录，避免漏追踪导致运行期 404 */
+    outputFileTracingIncludes: {
+      "/home-v2": [
+        "./components/site-home-v2/**/*",
+        "./lib/site-home-v2/**/*",
+        "./public/site-home-v2/**/*",
+      ],
+    },
   },
   transpilePackages: [
     "@private/federated-portal-nav",
@@ -21,6 +29,11 @@ const nextConfig = {
       /** 静态资源在 /site-home-v2/*.jpg；误访问 /site-home-v2 会 404，引导到正确首页路由 */
       {
         source: "/site-home-v2",
+        destination: "/home-v2",
+        permanent: false,
+      },
+      {
+        source: "/site-home-v2/",
         destination: "/home-v2",
         permanent: false,
       },

@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { loadHomeV2ShowcaseTemplates } from "@/lib/site-home-v2/load-showcase";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export const metadata = {
   title: "智选｜办公・图像・视频・音乐全链路 AI 创作台",
@@ -12,10 +13,13 @@ export const metadata = {
 };
 
 export default async function HomeV2Page() {
-  const [session, showcaseTemplates] = await Promise.all([
-    getServerSession(authOptions),
-    loadHomeV2ShowcaseTemplates(),
-  ]);
+  const showcaseTemplates = await loadHomeV2ShowcaseTemplates();
+  let session: Awaited<ReturnType<typeof getServerSession>> = null;
+  try {
+    session = await getServerSession(authOptions);
+  } catch {
+    session = null;
+  }
 
   return (
     <SiteHomeV2Content
