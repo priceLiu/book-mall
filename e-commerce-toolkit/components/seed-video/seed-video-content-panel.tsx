@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Download, Images, Plus, Save } from "lucide-react";
 
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
+import { EcomDeliverableVideoPreview } from "@/components/media/ecom-deliverable-video-preview";
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
 import { ECOM_WORKSPACE_RESULT_GRID_CLASS } from "@/lib/ecom-workspace-result-grid";
 import { ProductDesignPromptMentionTextarea } from "@/components/product-design/product-design-prompt-mention-textarea";
@@ -1603,13 +1604,11 @@ export function SeedVideoContentPanel({
       ) : null}
 
       {finalUrl && !showDirectProduction && !showFineProduction ? (
-        <section className="mb-6">
+        <section className="mb-6 mx-auto w-full max-w-md">
           <h2 className="mb-2 text-sm font-semibold text-[#1d1d1f]">成片预览</h2>
-          <EcomVideoSlot
-            src={finalUrl}
-            layout="gallery"
+          <EcomDeliverableVideoPreview
+            videoSrc={finalUrl}
             onPreview={() => onPreviewVideo(finalUrl, project.title ?? "种草视频")}
-            playSize="lg"
           />
         </section>
       ) : null}
@@ -1860,11 +1859,9 @@ export function SeedVideoContentPanel({
               <p className="text-[11px] text-[#6e6e73]">
                 逐镜合成已完成，可预览或保存到「我的资产」。
               </p>
-              <EcomVideoSlot
-                src={finalUrl}
-                layout="gallery-workspace"
+              <EcomDeliverableVideoPreview
+                videoSrc={finalUrl}
                 onPreview={() => onPreviewVideo(finalUrl, project.title ?? "种草视频")}
-                playSize="lg"
               />
             </div>
           ) : null}

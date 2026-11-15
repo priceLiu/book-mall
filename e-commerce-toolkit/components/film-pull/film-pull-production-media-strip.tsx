@@ -3,7 +3,7 @@
 import { Film, Loader2, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
+import { EcomDeliverableVideoPreview } from "@/components/media/ecom-deliverable-video-preview";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { StoryboardPanelCard } from "@/components/storyboard/storyboard-panel-card";
 import { StoryboardPanelVideoCard } from "@/components/storyboard/storyboard-panel-video-card";
@@ -311,15 +311,14 @@ export function FilmPullProductionMediaStrip({
             合成成片
           </EcomButtonPrimary>
         </div>
-        <div className="mx-auto w-full max-w-sm">
-          <EcomVideoSlot
-            src={finalUrl}
+        <div className="mx-auto w-full max-w-md">
+          <EcomDeliverableVideoPreview
             aspectRatio={aspectRatio}
-            generating={composeBusy}
-            emptyLabel={composeBusy ? "合成中…" : "待合成"}
-            playSize="md"
-            layout="gallery-workspace"
-            className="!bg-black"
+            videoSrc={finalUrl}
+            busy={composeBusy}
+            generatingLabel="合成中…"
+            emptyHint={composeBusy ? undefined : "待合成"}
+            matchPreviewFrame
             onPreview={
               finalUrl && !composeBusy ? () => onPreviewVideo(finalUrl, "制作成片") : undefined
             }

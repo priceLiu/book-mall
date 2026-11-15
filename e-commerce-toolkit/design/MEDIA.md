@@ -43,6 +43,31 @@
 
 ---
 
+## 展示 Tier 与冻结清单（SSOT）
+
+权威常量：`lib/media/ecom-media-display-spec.ts`
+
+| Tier | 用途 | 实现 |
+|------|------|------|
+| **T1 library** | 资产库缩略 | `EcomMediaLibraryTile` + `ECOM_LIBRARY_MEDIA_GRID_CLASS` |
+| **T2 workspace-result** | 工作区批量出图/出视频网格 | `ECOM_WORKSPACE_RESULT_GRID_CLASS` + `EcomWorkspaceResultFrame` + `EcomVideoSlot layout="workspace"` |
+| **T2v deliverable-video** | **单条最终成片**（合成/导出预览） | `EcomDeliverableVideoPreview`（标杆：电商口播故事版） |
+| **T2logo adaptive-brand-mark** | Logo / 方标类出图 | `EcomAdaptiveBrandMarkFrame` · `object-contain` · 禁止固定 px 主预览宽 |
+| **T3 gallery-strip** | 模板条、横向预览条 | `EcomVideoSlot layout="gallery"` / `gallery-workspace` |
+| **T4 table-cell** | 分镜表/镜表逐格 | `EcomVideoSlot compact` / `StoryboardPanelVideoCard` |
+
+**冻结（本轮不重构 UI）**：模特试衣 `components/vton/`、`components/hand-craft/`、`components/brand-vi/`、`app/ecom/model-tryon/`。
+
+- 工作区 **多条** 竖屏成片 → T2 `layout="workspace"`。
+- **一条** 最终成片 → T2v；**禁止** 用 `layout="gallery"` 展示主成片 mp4。
+
+### Logo / 方标（强制）
+
+- 主预览须 `object-contain`，容器 `w-full` + `max-width` 自适应（见 `ECOM_ADAPTIVE_BRAND_MARK_MAX_PX`）。
+- 多枚方标用 `ECOM_ADAPTIVE_BRAND_MARK_GRID_CLASS` 或 `ECOM_LIBRARY_MEDIA_GRID_CLASS` 宫格排列、居中列内对齐。
+
+---
+
 ## 资产库列表布局
 
 ### 分类层级（面包屑）

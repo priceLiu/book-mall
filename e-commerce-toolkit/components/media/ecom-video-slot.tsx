@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * T2 工作区网格内竖屏成片 → `layout="workspace"`。
+ * T4 分镜/镜表逐格 → `compact` / `default`（固定宽）；勿用于主成片。
+ * 单条最终成片 → `EcomDeliverableVideoPreview`（T2v），禁止 `layout="gallery"` 作主 mp4 预览。
+ * @see design/MEDIA.md §展示 Tier
+ */
+
 import { Play, X } from "lucide-react";
 
 import {

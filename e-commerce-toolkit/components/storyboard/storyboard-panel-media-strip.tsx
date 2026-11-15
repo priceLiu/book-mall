@@ -3,7 +3,7 @@
 import { Loader2 } from "lucide-react";
 import { useMemo } from "react";
 
-import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
+import { EcomDeliverableVideoPreview } from "@/components/media/ecom-deliverable-video-preview";
 import { StoryboardPanelCard } from "@/components/storyboard/storyboard-panel-card";
 import { StoryboardPanelVideoCard } from "@/components/storyboard/storyboard-panel-video-card";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
@@ -305,15 +305,14 @@ export function StoryboardPanelMediaStrip({
             <span className="text-[10px] font-medium text-[#34c759]">已生成</span>
           ) : null}
         </div>
-        <div className="mx-auto w-full max-w-sm">
-          <EcomVideoSlot
-            src={mergedVideoUrl}
+        <div className="mx-auto w-full max-w-md">
+          <EcomDeliverableVideoPreview
             aspectRatio={aspectRatio}
-            generating={mergeBusy}
-            emptyLabel={mergeBusy ? "合并中…" : "待合并"}
-            playSize="md"
-            layout="gallery-workspace"
-            className="!bg-black"
+            videoSrc={mergedVideoUrl}
+            busy={mergeBusy}
+            generatingLabel="合并中…"
+            emptyHint={mergeBusy ? undefined : "待合并"}
+            matchPreviewFrame
             onPreview={
               hasMergedVideo && !mergeBusy && onPreviewMergedVideo
                 ? onPreviewMergedVideo

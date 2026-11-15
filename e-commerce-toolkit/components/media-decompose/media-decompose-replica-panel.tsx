@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Clapperboard, Loader2 } from "lucide-react";
 
-import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
+import { EcomDeliverableVideoPreview } from "@/components/media/ecom-deliverable-video-preview";
 import {
   EcomImagePreviewHost,
   useEcomImagePreview,
@@ -1227,11 +1227,9 @@ export function MediaDecomposeReplicaPanel({
             <p className="text-[11px] text-[#6e6e73]">
               逐镜合成已完成，可预览或保存到「我的资产」。
             </p>
-            <EcomVideoSlot
-              src={finalUrl}
-              layout="gallery-workspace"
+            <EcomDeliverableVideoPreview
+              videoSrc={finalUrl}
               onPreview={() => onPreviewVideo(finalUrl, "精细成片")}
-              playSize="lg"
             />
           </div>
         ) : null}

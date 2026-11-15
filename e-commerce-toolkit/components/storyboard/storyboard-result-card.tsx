@@ -2,11 +2,8 @@
 
 import { Clapperboard, Film, Loader2 } from "lucide-react";
 
-import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
-import { EcomVideoStagePreview } from "@/components/media/ecom-video-stage-preview";
-import { STORYBOARD_PREVIEW_MIN_H, storyboardPreviewAspectClass } from "@/lib/storyboard-aspect";
+import { EcomDeliverableVideoPreview } from "@/components/media/ecom-deliverable-video-preview";
 import { isStoryboardVideoUrl } from "@/lib/storyboard-media";
-import { cn } from "@/lib/utils";
 
 type Props = {
   label: string;
@@ -46,63 +43,50 @@ export function StoryboardResultCard({
   matchSheetPreview = false,
 }: Props) {
   const hasVideo = isStoryboardVideoUrl(videoSrc);
-  const usePreviewFrame = hasVideo || busy || matchSheetPreview;
+
+  const emptyActions = (
+    <>
+      {primaryActionLabel && onPrimaryAction ? (
+        <button
+          type="button"
+          disabled={disabled || busy}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[#d2d2d7] bg-white px-3 py-1.5 text-xs font-medium text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
+          onClick={onPrimaryAction}
+        >
+          <Film className="h-3.5 w-3.5" />
+          {primaryActionLabel}
+        </button>
+      ) : null}
+      {secondaryActionLabel && onSecondaryAction ? (
+        <button
+          type="button"
+          disabled={disabled || mergeBusy || !canMerge}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[#d2d2d7] bg-white px-3 py-1.5 text-xs font-medium text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
+          onClick={onSecondaryAction}
+        >
+          {mergeBusy ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Clapperboard className="h-3.5 w-3.5" />
+          )}
+          {secondaryActionLabel}
+        </button>
+      ) : null}
+    </>
+  );
 
   return (
     <div className="isolate flex h-full min-w-0 flex-col">
       <p className="mb-2 text-sm font-bold text-[#1d1d1f]">{label}</p>
-      <div
-        className={cn(
-          "relative isolate w-full overflow-hidden rounded-xl border border-[#e8e8ed]",
-          STORYBOARD_PREVIEW_MIN_H,
-          usePreviewFrame
-            ? cn(
-                storyboardPreviewAspectClass(aspectRatio),
-                hasVideo || busy ? "bg-black" : "bg-[#f5f5f7]",
-              )
-            : "bg-[#f5f5f7]",
-        )}
-      >
-        {busy ? (
-          <EcomMediaGeneratingBusy background="black" label="成片生成中…" />
-        ) : hasVideo && onPreviewVideo ? (
-          <EcomVideoStagePreview
-            src={videoSrc!}
-            onPreview={onPreviewVideo}
-            className="absolute inset-0"
-          />
-        ) : (
-          <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-2 px-3 text-center">
-            <p className="text-xs text-[#86868b]">{emptyHint}</p>
-            {primaryActionLabel && onPrimaryAction ? (
-              <button
-                type="button"
-                disabled={disabled || busy}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#d2d2d7] bg-white px-3 py-1.5 text-xs font-medium text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
-                onClick={onPrimaryAction}
-              >
-                <Film className="h-3.5 w-3.5" />
-                {primaryActionLabel}
-              </button>
-            ) : null}
-            {secondaryActionLabel && onSecondaryAction ? (
-              <button
-                type="button"
-                disabled={disabled || mergeBusy || !canMerge}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#d2d2d7] bg-white px-3 py-1.5 text-xs font-medium text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
-                onClick={onSecondaryAction}
-              >
-                {mergeBusy ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Clapperboard className="h-3.5 w-3.5" />
-                )}
-                {secondaryActionLabel}
-              </button>
-            ) : null}
-          </div>
-        )}
-      </div>
+      <EcomDeliverableVideoPreview
+        aspectRatio={aspectRatio}
+        videoSrc={videoSrc}
+        busy={busy}
+        matchPreviewFrame={matchSheetPreview}
+        emptyHint={!hasVideo && !busy ? emptyHint : undefined}
+        emptyActions={!hasVideo && !busy ? emptyActions : undefined}
+        onPreview={hasVideo && onPreviewVideo ? onPreviewVideo : undefined}
+      />
       {onMergePanels && canMerge ? (
         <button
           type="button"

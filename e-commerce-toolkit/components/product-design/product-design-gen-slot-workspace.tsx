@@ -15,7 +15,11 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
-import { ECOM_WORKSPACE_RESULT_GRID_CLASS } from "@/lib/ecom-workspace-result-grid";
+import {
+  ECOM_WORKSPACE_RESULT_GRID_CLASS,
+  ecomWorkspaceResultShellClass,
+} from "@/lib/ecom-workspace-result-grid";
+import { isProductDesignBrandMarkSlot } from "@/lib/media/ecom-media-display-spec";
 import {
   ECOM_MEDIA_TILE_ACTION_ICON_CLASS,
   ECOM_SLOT_HOVER_ACTION_BTN_CLASS,
@@ -39,7 +43,7 @@ import type {
 import { getImageGenPlan } from "@/lib/product-design-workflow";
 import {
   productDesignCssAspectRatio,
-  productDesignRatioFrameClass,
+  productDesignRatioClass,
 } from "@/lib/product-design-ratio-display";
 import { cn } from "@/lib/utils";
 
@@ -458,6 +462,8 @@ export function ProductDesignGenSlotWorkspace({
               <GenSlotPreview
                 ratio={ratio}
                 label={label}
+                slotTitle={row.title}
+                slotPurpose={row.purpose}
                 index={row.index}
                 imageUrl={row.imageUrl}
                 generating={generating}
@@ -539,6 +545,8 @@ export function ProductDesignGenSlotWorkspace({
 function GenSlotPreview({
   ratio,
   label,
+  slotTitle,
+  slotPurpose,
   index,
   imageUrl,
   generating,
@@ -552,6 +560,8 @@ function GenSlotPreview({
 }: {
   ratio: string;
   label: string;
+  slotTitle?: string;
+  slotPurpose?: string;
   index: number;
   imageUrl?: string;
   generating?: boolean;
@@ -563,15 +573,17 @@ function GenSlotPreview({
   onDownload?: () => void;
   onGoToVideo?: () => void;
 }) {
-  const frameClass = productDesignRatioFrameClass(ratio);
+  const isBrandMark = isProductDesignBrandMarkSlot(ratio, label, slotTitle, slotPurpose);
+  const imageFitClass = isBrandMark ? "object-contain object-center" : "object-cover";
   const aspectStyle = { aspectRatio: productDesignCssAspectRatio(ratio) };
   const actionDisabled = Boolean(disabled) || Boolean(generating);
 
   return (
     <div
       className={cn(
-        "group/image relative w-full shrink-0 overflow-hidden bg-[#f5f5f7]",
-        frameClass,
+        "group/image relative w-full shrink-0 overflow-hidden bg-[#fafafa]",
+        ecomWorkspaceResultShellClass({ running: generating }),
+        productDesignRatioClass(ratio),
       )}
       style={aspectStyle}
     >
@@ -586,7 +598,7 @@ function GenSlotPreview({
               src={imageUrl}
               alt={`${label} ${index}`}
               fill
-              className="object-cover"
+              className={imageFitClass}
               sizes="(max-width: 1024px) 33vw, 280px"
               unoptimized
             />
@@ -599,7 +611,7 @@ function GenSlotPreview({
             src={imageUrl}
             alt={`${label} ${index}`}
             fill
-            className="object-cover"
+            className={imageFitClass}
             sizes="(max-width: 1024px) 33vw, 280px"
             unoptimized
           />

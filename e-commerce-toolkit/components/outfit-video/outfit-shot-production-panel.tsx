@@ -8,6 +8,7 @@ import {
   useEcomImagePreview,
 } from "@/components/media/ecom-image-preview-host";
 import { EcomPromptMentionRefBar } from "@/components/media/ecom-prompt-mention-ref-bar";
+import { EcomDeliverableVideoPreview } from "@/components/media/ecom-deliverable-video-preview";
 import { EcomVideoSlot } from "@/components/media/ecom-video-slot";
 import { OutfitEditableMentionCell } from "@/components/outfit-video/outfit-editable-mention-cell";
 import { OutfitShotSceneSetupDialog } from "@/components/outfit-video/outfit-shot-scene-setup-dialog";
@@ -595,13 +596,10 @@ export function OutfitShotProductionPanel({
         <div className="space-y-2 border-t border-[#e8e8ed] pt-4">
           <h3 className="text-sm font-semibold text-[#1d1d1f]">成片视频</h3>
           <p className="text-[11px] text-[#6e6e73]">逐镜合成已完成，可预览或保存到「我的资产」。</p>
-          <div className="max-w-[min(100%,20rem)]">
-            <EcomVideoSlot
-              src={finalVideoUrl}
-              layout="workspace"
-              aspectRatio="9:16"
+          <div className="mx-auto w-full max-w-md">
+            <EcomDeliverableVideoPreview
+              videoSrc={finalVideoUrl}
               onPreview={() => onPreviewVideo?.(finalVideoUrl, "穿搭成片")}
-              playSize="lg"
             />
           </div>
         </div>

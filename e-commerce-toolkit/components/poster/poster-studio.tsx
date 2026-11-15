@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EcomCopyLayoutStudioDialog } from "@/components/copy-layout/ecom-copy-layout-studio-dialog";
 import { PosterStepSection } from "@/components/poster/poster-step-section";
 import { PosterTemplatePicker } from "@/components/poster/poster-template-picker";
+import { EcomAdaptiveBrandMarkFrame } from "@/components/media/ecom-adaptive-brand-mark-frame";
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useBackgroundGenerationOptional } from "@/components/generation";
@@ -813,11 +814,20 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
                       className="overflow-hidden rounded-xl border border-[#e8e8ed] bg-[#fafafa] shadow-sm"
                     >
                       {preview ? (
-                        <img
-                          src={preview}
-                          alt=""
-                          className={cn("w-full object-cover", aspectClass(project.plan.aspectRatio))}
-                        />
+                        project.plan.aspectRatio === "1:1" ? (
+                          <EcomAdaptiveBrandMarkFrame
+                            src={preview}
+                            layout="fill"
+                            aspect="1:1"
+                            className="border-0"
+                          />
+                        ) : (
+                          <img
+                            src={preview}
+                            alt=""
+                            className={cn("w-full object-cover", aspectClass(project.plan.aspectRatio))}
+                          />
+                        )
                       ) : (
                         <div className={cn("bg-[#f5f5f7]", aspectClass(project.plan.aspectRatio))} />
                       )}

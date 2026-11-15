@@ -1,4 +1,6 @@
 /** 电商工具箱 · 媒体预览公共出口（其他模块优先从此 import） */
+export { EcomAdaptiveBrandMarkFrame } from "@/components/media/ecom-adaptive-brand-mark-frame";
+export { EcomDeliverableVideoPreview } from "@/components/media/ecom-deliverable-video-preview";
 export { EcomImagePreviewDialog } from "@/components/media/ecom-image-preview-dialog";
 export {
   EcomImagePreviewHost,
