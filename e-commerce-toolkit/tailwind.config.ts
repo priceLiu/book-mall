@@ -7,8 +7,9 @@ const config: Config = {
     "./lib/**/*.{js,ts,jsx,tsx,mdx}",
     "../shared/federated-portal-nav/**/*.{js,ts,jsx,tsx}",
     "./docker-shared/federated-portal-nav/**/*.{js,ts,jsx,tsx}",
-    "../shared/ecom-copy-overlay/**/*.{js,ts,jsx,tsx}",
-    "./docker-shared/ecom-copy-overlay/**/*.{js,ts,jsx,tsx}",
+    // 包根目录自带 node_modules。用 ** 会扫进依赖，Tailwind 提取会把 dev 卡死。
+    "../shared/ecom-copy-overlay/*.{js,ts,jsx,tsx}",
+    "./docker-shared/ecom-copy-overlay/*.{js,ts,jsx,tsx}",
     "./docker-shared/global-asset-library/**/*.{js,ts,jsx,tsx}",
     "../book-mall/platform-compose-ui/**/*.{js,ts,jsx,tsx}",
     "./docker-shared/platform-compose-ui/**/*.{js,ts,jsx,tsx}",

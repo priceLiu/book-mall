@@ -451,6 +451,8 @@ export function EcomProfileSidebar({
     >
       {/* 左侧图标轨 */}
       <div className="flex w-16 shrink-0 flex-col items-center gap-2 overflow-visible border-r border-[var(--ecom-chrome-border-subtle)] py-3">
+        {railQuickTop.map(renderRailQuickLink)}
+
         <RailTooltip label="电商工具箱首页">
           <Link
             href="/"
@@ -461,8 +463,6 @@ export function EcomProfileSidebar({
             商
           </Link>
         </RailTooltip>
-
-        {railQuickTop.map(renderRailQuickLink)}
 
         <div className="ecom-scrollbar-thin flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto px-2">
           {railSectionEntries.map((entry) => {
