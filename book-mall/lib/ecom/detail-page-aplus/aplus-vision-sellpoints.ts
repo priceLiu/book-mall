@@ -33,6 +33,7 @@ export async function visionAplusSellpointsFromProductImages(opts: {
     clientPageSuffix: `${ECOM_AI_DETAIL_PAGE_TOOL_KEY}__vision`,
     productUrls: urls,
     productDesc: project.brief?.productDesc,
+    brief: project.brief,
     modelKey,
     settingsVisionModelKey: project.settings.visionModelKey,
   });

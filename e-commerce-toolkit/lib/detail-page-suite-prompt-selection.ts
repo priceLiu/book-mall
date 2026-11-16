@@ -2,10 +2,13 @@ import {
   materializeModuleSlots,
   resolveModuleDisplaySlots,
 } from "@/lib/detail-page-suite-module-slots";
+import { readDetailPageSuiteImageGenFailures } from "@/lib/detail-page-suite-image-failures";
 import { detailPageSuiteSlotHasImage } from "@/lib/detail-page-suite-slot-images";
 import { listDetailPageSuitePendingImageKeys } from "@/lib/detail-page-suite-pending";
+import { isDetailPageSuiteTableDataModuleId } from "@/lib/detail-page-suite-spec-table";
 import {
   composeSuiteSlotKey,
+  isSuiteSlotSelectable,
   parseSuiteSlotKey,
 } from "@/lib/detail-page-suite-slot-selection";
 import type {
@@ -150,9 +153,9 @@ export function countModuleSlotSelection(
   for (const slot of resolveModuleDisplaySlots(mod)) {
     const key = composeSuiteSlotKey(mod.module_id, slot.item_key);
     if (!selected.has(key) || exclude?.has(key)) continue;
-    const hasPrompt = Boolean(slot.positive_prompt?.trim());
-    if (opts?.requirePrompt && !hasPrompt) continue;
-    if (opts?.requireNoPrompt && hasPrompt) continue;
+    const promptReady = isSuiteSlotSelectable(slot);
+    if (opts?.requirePrompt && !promptReady) continue;
+    if (opts?.requireNoPrompt && promptReady) continue;
     n++;
   }
   return n;
@@ -176,13 +179,32 @@ export function detailPageSuiteProjectSlotHasImage(
   return slot ? detailPageSuiteSlotHasImage(slot) : false;
 }
 
-/** 出图提交后取消勾选，避免下次「生图」重复提交已完成点位（对齐详情页套图工作台） */
+/** @deprecated 请勿在请求发出前调用；用 {@link detailPageSuiteDeselectSlotsAfterImageGen} */
 export function detailPageSuitePromptSelectionAfterImageGenSubmit(
   selected: ReadonlySet<string>,
   submittedKeys: readonly string[],
 ): Set<string> {
   const next = new Set(selected);
   for (const k of submittedKeys) next.delete(k);
+  return next;
+}
+
+/** 出图写回成功后：仅有成图的点位取消勾选；失败点位保留勾选便于重试 */
+export function detailPageSuiteDeselectSlotsAfterImageGen(
+  selected: ReadonlySet<string>,
+  submittedKeys: readonly string[],
+  project: Pick<DetailPageSuiteProject, "suite" | "meta">,
+): Set<string> {
+  const failures = readDetailPageSuiteImageGenFailures(project.meta);
+  const next = new Set(selected);
+  for (const k of submittedKeys) {
+    const failed = Boolean(failures[k]);
+    const hasImg = detailPageSuiteProjectSlotHasImage(project, k);
+    if (hasImg) next.delete(k);
+    else if (failed) {
+      /* 保留勾选 */
+    }
+  }
   return next;
 }
 
@@ -198,6 +220,63 @@ export function resolveDetailPageSuiteBusyImageGenExcludeKeys(
   return busy;
 }
 
+/**
+ * 用户点击「生图」时的防重入：只认本机 activeGen。
+ * 勿把 meta.pending 算进排除集，否则陈旧挂起会导致「已勾选但第一次点生图无效」。
+ */
+export function resolveDetailPageSuiteImageGenSubmitExcludeKeys(
+  activeGenSlotKeys: ReadonlySet<string>,
+): Set<string> {
+  return new Set(activeGenSlotKeys);
+}
+
+export function resolveDetailPageSuiteImageGenSlotKeysForSubmit(
+  project: Pick<DetailPageSuiteProject, "suite">,
+  selected: ReadonlySet<string>,
+  activeGenSlotKeys: ReadonlySet<string>,
+  opts?: { moduleId?: string; slotKeys?: string[] },
+): string[] {
+  const explicit = opts?.slotKeys?.map((k) => k.trim()).filter(Boolean);
+  if (explicit?.length) return explicit;
+  return resolveDetailPageSuiteImageGenSlotKeys(project, selected, {
+    moduleId: opts?.moduleId,
+    excludeKeys: resolveDetailPageSuiteImageGenSubmitExcludeKeys(activeGenSlotKeys),
+  });
+}
+
+/**
+ * 尺码/参数表：已就绪点位可直接点「生图」，未勾选时默认包含本模块全部可出图格子。
+ * 其它模块仍须先勾选。
+ */
+export function listModuleImageGenSlotKeys(
+  mod: DetailPageSuiteModuleState,
+  selected: ReadonlySet<string>,
+  opts?: { excludeKeys?: ReadonlySet<string> },
+): string[] {
+  const fromSelection = listModuleSelectedSlotKeys(mod, selected, {
+    requirePrompt: true,
+    excludeKeys: opts?.excludeKeys,
+  });
+  if (fromSelection.length > 0) return fromSelection;
+  if (!isDetailPageSuiteTableDataModuleId(mod.module_id)) return [];
+  const keys: string[] = [];
+  for (const slot of resolveModuleDisplaySlots(mod)) {
+    if (!isSuiteSlotSelectable(slot)) continue;
+    const key = composeSuiteSlotKey(mod.module_id, slot.item_key);
+    if (opts?.excludeKeys?.has(key)) continue;
+    keys.push(key);
+  }
+  return keys;
+}
+
+export function countModuleImageGenActionable(
+  mod: DetailPageSuiteModuleState,
+  selected: ReadonlySet<string>,
+  opts?: { excludeKeys?: ReadonlySet<string> },
+): number {
+  return listModuleImageGenSlotKeys(mod, selected, opts).length;
+}
+
 /** 本次出图 API / 出图中 UI 仅应包含的 composite slotKeys（与「生图(N)」计数一致） */
 export function resolveDetailPageSuiteImageGenSlotKeys(
   project: Pick<DetailPageSuiteProject, "suite">,
@@ -210,8 +289,7 @@ export function resolveDetailPageSuiteImageGenSlotKeys(
   const seen = new Set<string>();
   const keys: string[] = [];
   for (const mod of modules) {
-    for (const k of listModuleSelectedSlotKeys(mod, selected, {
-      requirePrompt: true,
+    for (const k of listModuleImageGenSlotKeys(mod, selected, {
       excludeKeys: opts?.excludeKeys,
     })) {
       if (seen.has(k)) continue;
@@ -236,9 +314,9 @@ export function listModuleSelectedSlotKeys(
   for (const slot of resolveModuleDisplaySlots(mod)) {
     const key = composeSuiteSlotKey(mod.module_id, slot.item_key);
     if (!selected.has(key) || exclude?.has(key)) continue;
-    const hasPrompt = Boolean(slot.positive_prompt?.trim());
-    if (opts?.requirePrompt && !hasPrompt) continue;
-    if (opts?.requireNoPrompt && hasPrompt) continue;
+    const promptReady = isSuiteSlotSelectable(slot);
+    if (opts?.requirePrompt && !promptReady) continue;
+    if (opts?.requireNoPrompt && promptReady) continue;
     keys.push(key);
   }
   return keys;

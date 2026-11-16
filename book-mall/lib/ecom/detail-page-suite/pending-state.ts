@@ -1,4 +1,5 @@
 import type { DetailPageSuiteMeta, DetailPageSuiteProject, DetailPageSuiteState } from "./types";
+import { readDetailPageSuiteImageGenFailures } from "./image-gen-failures";
 import { resolveModuleDisplaySlots } from "./module-slots";
 
 export type DetailPageSuitePendingImageEntry = {
@@ -17,6 +18,8 @@ export type DetailPageSuitePendingPromptModulesMap = Record<
 >;
 
 const STALE_IMAGE_MS = 45 * 60 * 1000;
+/** 与 ai-detail-page / 套图 `images/generate` maxDuration 300s 对齐 */
+export const DETAIL_PAGE_SUITE_IMAGE_GEN_PENDING_MAX_MS = 7 * 60 * 1000;
 const STALE_PROMPT_MS = 15 * 60 * 1000;
 
 function readRecord(raw: unknown): Record<string, unknown> {
@@ -78,6 +81,7 @@ export function reconcileDetailPageSuitePendingMeta(
   const base = meta ?? {};
   const pendingImages = { ...readDetailPageSuitePendingImages(base) };
   const pendingPromptModules = { ...readDetailPageSuitePendingPromptModules(base) };
+  const imageGenFailures = readDetailPageSuiteImageGenFailures(base);
 
   for (const [key, entry] of Object.entries(pendingImages)) {
     const idx = key.indexOf("::");
@@ -91,7 +95,20 @@ export function reconcileDetailPageSuitePendingMeta(
     const started = Date.parse(entry.startedAt);
     const stale =
       !Number.isFinite(started) || now - started > STALE_IMAGE_MS;
-    if (!mod || stale || slotHasImageAfter(mod, slotKey, entry.startedAt)) {
+    const exceededGenWindow =
+      Number.isFinite(started) &&
+      now - started > DETAIL_PAGE_SUITE_IMAGE_GEN_PENDING_MAX_MS;
+    const failure = imageGenFailures[key];
+    const failedAfterStart =
+      Boolean(failure?.failedAt) &&
+      (!Number.isFinite(started) || Date.parse(failure.failedAt) >= started - 1000);
+    if (
+      !mod ||
+      stale ||
+      exceededGenWindow ||
+      failedAfterStart ||
+      slotHasImageAfter(mod, slotKey, entry.startedAt)
+    ) {
       delete pendingImages[key];
     }
   }

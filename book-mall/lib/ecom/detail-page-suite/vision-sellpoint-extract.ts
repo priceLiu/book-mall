@@ -12,10 +12,13 @@ import {
   sellpointFivePartToDetailPageSellpoints,
   type EcomSellpointFivePart,
 } from "@/lib/ecom/ecom-sellpoint-five-part";
+import { extractFirstJsonObjectFromLlmText } from "@/lib/ecom/llm-json-extract";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
 import { ECOM_DEFAULT_VISION_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
 
-import type { DetailPageSuiteSellpoint } from "./types";
+import { buildAplusProductCategoryContextLines } from "@/lib/ecom/detail-page-aplus/aplus-product-category";
+
+import type { DetailPageSuiteBrief, DetailPageSuiteSellpoint } from "./types";
 
 const VISION_SYSTEM = `你是电商商品卖点策划专家。用户会提供多张自有新品产品实拍图。
 ${ECOM_SELLPOINT_FIVE_PART_LLM_RULES}
@@ -27,13 +30,6 @@ export type SellpointVisionExtractResult = {
   sellPoints: DetailPageSuiteSellpoint[];
 };
 
-function parseJsonFromLlmText(text: string): unknown {
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start < 0 || end <= start) throw new Error("识图未返回有效 JSON");
-  return JSON.parse(text.slice(start, end + 1));
-}
-
 export async function extractSellpointsFromProductImages(opts: {
   userId: string;
   projectId: string;
@@ -41,6 +37,7 @@ export async function extractSellpointsFromProductImages(opts: {
   clientPageSuffix: string;
   productUrls: string[];
   productDesc?: string | null;
+  brief?: DetailPageSuiteBrief | null;
   modelKey?: string;
   settingsVisionModelKey?: string | null;
 }): Promise<SellpointVisionExtractResult> {
@@ -53,11 +50,23 @@ export async function extractSellpointsFromProductImages(opts: {
   const max = getVisionMaxInputImages(modelKey);
   const urls = productUrls.slice(0, max);
 
+  const categoryBlock =
+    opts.brief && opts.brief.productVertical
+      ? buildAplusProductCategoryContextLines(opts.brief).join("\n")
+      : "";
+  const userText = [
+    `商品简述：${opts.productDesc?.trim() || "见产品图"}`,
+    categoryBlock,
+    "请结合产品图与上述品类信息，按五段式 JSON 输出卖点资料。",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
   const parts: CanvasChatContentPart[] = [
     ...urls.map((url) => ({ type: "image_url" as const, image_url: { url } })),
     {
       type: "text" as const,
-      text: `商品简述：${opts.productDesc?.trim() || "见产品图"}。请按五段式 JSON 输出卖点资料。`,
+      text: userText,
     },
   ];
 
@@ -70,7 +79,9 @@ export async function extractSellpointsFromProductImages(opts: {
     clientPage: ecomClientPage(opts.userId, opts.projectId, opts.clientPageSuffix),
   });
 
-  const parsed = parseEcomSellpointFivePartJson(parseJsonFromLlmText(text));
+  const parsed = parseEcomSellpointFivePartJson(
+    extractFirstJsonObjectFromLlmText(text, "识图未返回有效 JSON"),
+  );
   if (!parsed || parsed.coreSellingPoints.length === 0) {
     throw new Error("未能从图中识别出卖点");
   }
@@ -113,7 +124,9 @@ export async function polishSellpointFivePartFromBrief(opts: {
     ] as CanvasChatMessage[],
     clientPage: ecomClientPage(opts.userId, opts.projectId, opts.clientPageSuffix),
   });
-  const polished = parseEcomSellpointFivePartJson(parseJsonFromLlmText(text));
+  const polished = parseEcomSellpointFivePartJson(
+    extractFirstJsonObjectFromLlmText(text, "润色未返回有效 JSON"),
+  );
   if (!polished) throw new Error("润色未返回有效 JSON");
   return polished;
 }

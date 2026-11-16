@@ -56,6 +56,8 @@ export type AplusProductVertical =
 export type DetailPageSuiteBrief = {
   genderCategory?: string;
   styleCategory?: string;
+  productCategory?: string;
+  productSubCategory?: string;
   styleAttribute?: string;
   tier?: string;
   customScene?: string;

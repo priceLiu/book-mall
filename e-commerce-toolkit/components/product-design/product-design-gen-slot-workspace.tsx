@@ -73,6 +73,8 @@ type Props = {
   onPreview?: (index: number) => void;
   onDownload?: (index: number) => void;
   onGoToVideo?: (index: number) => void;
+  /** 打开/关闭 Prompt 弹层时通知父级（用于关闭大图预览等底层浮层） */
+  onPromptEditorOpenChange?: (open: boolean) => void;
 };
 
 function mergeGenSlots(project: ProductDesignProject, target: "main" | "detail"): GenSlotRow[] {
@@ -149,6 +151,7 @@ export function ProductDesignGenSlotWorkspace({
   onPreview,
   onDownload,
   onGoToVideo,
+  onPromptEditorOpenChange,
 }: Props) {
   const { alert, doubleConfirm } = useDialogs();
   const [busy, setBusy] = useState<string | null>(null);
@@ -469,7 +472,10 @@ export function ProductDesignGenSlotWorkspace({
                 generating={generating}
                 disabled={rowLocked}
                 showVideo={target === "main" && Boolean(row.assetId && onGoToVideo)}
-                onEditPrompt={() => setPromptDialogIndex(row.index)}
+                onEditPrompt={() => {
+                  setPromptDialogIndex(row.index);
+                  onPromptEditorOpenChange?.(true);
+                }}
                 onGenerate={() => void handleGenerateOne(row.index)}
                 onPreview={onPreview ? () => onPreview(row.index) : undefined}
                 onDownload={onDownload ? () => onDownload(row.index) : undefined}
@@ -524,8 +530,11 @@ export function ProductDesignGenSlotWorkspace({
       {promptDialogRow ? (
         <ProductDesignPromptDialog
           open={promptDialogIndex != null}
+          nativeOverlay
+          pickerZIndex={6100}
           onOpenChange={(open) => {
             if (!open) setPromptDialogIndex(null);
+            onPromptEditorOpenChange?.(open);
           }}
           value={promptDialogRow.prompt}
           onCommit={(prompt) => commitPrompt(promptDialogRow.index, prompt)}

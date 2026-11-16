@@ -23,8 +23,16 @@ describe("gateway-submit-error-policy", () => {
   it("classifies 429 as TRANSIENT retryable", () => {
     const e = new VolcengineUpstreamError("rate limit", { status: 429 });
     const c = classifyGatewaySubmitError(e);
-    expect(c.failCode).toBe("UPSTREAM_TRANSIENT");
+    expect(c.failCode).toBe("UPSTREAM_RATE_LIMIT");
     expect(c.retryable).toBe(true);
+  });
+
+  it("classifies DashScope rate limit text without http status", () => {
+    const c = classifyGatewaySubmitError(
+      new Error("Requests rate limit exceeded, please try again later."),
+    );
+    expect(c.failCode).toBe("UPSTREAM_RATE_LIMIT");
+    expect(c.userHintZh).toContain("限流");
   });
 
   it("classifies 404 as MODEL_NOT_FOUND", () => {

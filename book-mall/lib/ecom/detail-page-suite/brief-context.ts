@@ -1,3 +1,8 @@
+import {
+  buildAplusProductCategoryContextLines,
+  getAplusProductCategorySteps,
+} from "@/lib/ecom/detail-page-aplus/aplus-product-category";
+import { APLUS_PRODUCT_VERTICALS } from "@/lib/ecom/detail-page-aplus/aplus-subdim-match";
 import { BLANK_PLATE_MODULE_IDS, type DetailPageSuiteBrief } from "./types";
 import { buildSellpointContextForLlm } from "@/lib/ecom/ecom-sellpoint-five-part";
 
@@ -19,22 +24,39 @@ function line(label: string, value: string | undefined): string | null {
 }
 
 /** 七维 + 商品描述 + 卖点，供写提示词 LLM user 消息复用 */
+function briefUsesAplusProductVertical(
+  productVertical: DetailPageSuiteBrief["productVertical"],
+): boolean {
+  const pv = productVertical?.trim();
+  if (!pv || pv === "apparel" || pv === "general") return false;
+  return (APLUS_PRODUCT_VERTICALS as readonly string[]).includes(pv);
+}
+
 export function buildDetailPageSuiteBriefContextLines(
   brief: DetailPageSuiteBrief | null | undefined,
 ): string[] {
   const b = brief ?? {};
   const sellpointText = buildSellpointContextForLlm(b);
+  const aplusMode = briefUsesAplusProductVertical(b.productVertical);
+  const aplusCategory = aplusMode ? buildAplusProductCategoryContextLines(b) : [];
+  const categoryStepKeys = new Set(
+    aplusMode ? getAplusProductCategorySteps(b.productVertical).map((s) => s.key) : [],
+  );
+
   return [
     line("商品描述", b.productDesc),
+    ...aplusCategory,
     line("商品卖点", sellpointText || undefined),
-    line("性别品类", b.genderCategory),
-    line("款式品类", b.styleCategory),
+    line("性别品类", !categoryStepKeys.has("genderCategory") ? b.genderCategory : undefined),
+    line("款式品类", !categoryStepKeys.has("styleCategory") ? b.styleCategory : undefined),
+    line("产品大类", !categoryStepKeys.has("productCategory") ? b.productCategory : undefined),
+    line("产品细项", !categoryStepKeys.has("productSubCategory") ? b.productSubCategory : undefined),
     line("风格属性", b.styleAttribute),
     line("档次定位", b.tier),
     line("自定义场景", b.customScene),
     line("发布平台", b.platform ?? b.platformCode),
     line("输出语言", b.outputLanguage ?? "中文"),
-    line("产品品类", b.productVertical),
+    ...(!aplusCategory.length ? [line("产品品类", b.productVertical)] : []),
   ].filter((x): x is string => Boolean(x));
 }
 

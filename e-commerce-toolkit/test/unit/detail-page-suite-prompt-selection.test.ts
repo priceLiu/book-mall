@@ -5,15 +5,20 @@ import {
   countModuleSlotSelection,
   detailPageSuitePromptSelectionState,
   listDetailPageSuitePromptGenTargets,
+  countModuleImageGenActionable,
+  listModuleImageGenSlotKeys,
   listModuleSelectedSlotKeys,
   moduleHasGeneratedImage,
   modulePromptSelectionState,
   pruneDetailPageSuitePromptSelection,
   resolveDetailPageSuiteBusyPromptKeys,
   resolveDetailPageSuiteBusySlotKeys,
+  detailPageSuiteDeselectSlotsAfterImageGen,
   resolveDetailPageSuiteImageGenSlotKeys,
+  resolveDetailPageSuiteImageGenSlotKeysForSubmit,
 } from "@/lib/detail-page-suite-prompt-selection";
 import { resolveModuleDisplaySlots } from "@/lib/detail-page-suite-module-slots";
+import { DETAIL_PAGE_SUITE_SIZE_CHART_PROMPT_MARKER } from "@/lib/detail-page-suite-size-chart";
 import type { DetailPageSuiteProject } from "@/lib/detail-page-suite-types";
 
 const baseProject = (): DetailPageSuiteProject => ({
@@ -207,5 +212,111 @@ describe("detail-page-suite-prompt-selection", () => {
     expect(resolveDetailPageSuiteImageGenSlotKeys(project, selected, { moduleId: "m2" })).toEqual([
       k2,
     ]);
+  });
+
+  it("deselects only slots with image after gen; keeps failed slots selected", () => {
+    const key = "m1::item_a";
+    const project = {
+      suite: {
+        modules: [
+          {
+            module_id: "m1",
+            enable: true,
+            generate_count: 1,
+            slots: [
+              {
+                item_key: "item_a",
+                item_label: "A",
+                positive_prompt: "p",
+                imageUrl: "https://cdn.example/a.png",
+              },
+              {
+                item_key: "item_b",
+                item_label: "B",
+                positive_prompt: "p",
+              },
+            ],
+          },
+        ],
+      },
+      meta: {
+        imageGenFailures: {
+          "m1::item_b": { message: "err", failedAt: "2026-01-01T00:00:00.000Z" },
+        },
+      },
+    } as DetailPageSuiteProject;
+    const next = detailPageSuiteDeselectSlotsAfterImageGen(
+      new Set([key, "m1::item_b"]),
+      [key, "m1::item_b"],
+      project,
+    );
+    expect([...next]).toEqual(["m1::item_b"]);
+  });
+
+  it("submit resolver ignores stale meta.pending when slot is selected", () => {
+    const mod = {
+      module_id: "m1",
+      module_name: "细节",
+      enable: true,
+      generate_count: 1,
+      max_num: 6,
+      select_mode: "manual" as const,
+      candidate_pool: [],
+      selected_item_list: ["放大材质"],
+      slots: [
+        {
+          item_key: "item_1",
+          item_label: "放大材质",
+          positive_prompt: "macro texture",
+        },
+      ],
+    };
+    const key = "m1::item_1";
+    const project = {
+      suite: { modules: [mod] },
+      meta: {
+        pendingImages: {
+          [key]: { startedAt: new Date().toISOString() },
+        },
+      },
+    } as DetailPageSuiteProject;
+    expect(
+      resolveDetailPageSuiteImageGenSlotKeysForSubmit(
+        project,
+        new Set([key]),
+        new Set(),
+        { moduleId: "m1" },
+      ),
+    ).toEqual([key]);
+  });
+
+  it("table-data module image gen includes ready slots when none checked", () => {
+    const mod = {
+      module_id: "aplus_size_capacity",
+      module_name: "尺码",
+      enable: true,
+      generate_count: 1,
+      max_num: 6,
+      select_mode: "manual" as const,
+      candidate_pool: [],
+      selected_item_list: ["尺码数据总表图"],
+      slots: [
+        {
+          item_key: "item_1",
+          item_label: "尺码数据总表图",
+          positive_prompt: DETAIL_PAGE_SUITE_SIZE_CHART_PROMPT_MARKER,
+        },
+      ],
+    };
+    const key = "aplus_size_capacity::item_1";
+    expect(listModuleImageGenSlotKeys(mod, new Set())).toEqual([key]);
+    expect(countModuleImageGenActionable(mod, new Set())).toBe(1);
+    expect(
+      resolveDetailPageSuiteImageGenSlotKeys(
+        { suite: { modules: [mod] } } as DetailPageSuiteProject,
+        new Set(),
+        { moduleId: "aplus_size_capacity" },
+      ),
+    ).toEqual([key]);
   });
 });

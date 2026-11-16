@@ -52,9 +52,8 @@ import {
   listDetailPageSuitePromptGenTargets,
   pruneDetailPageSuitePromptSelection,
   detailPageSuiteProjectSlotHasImage,
-  detailPageSuitePromptSelectionAfterImageGenSubmit,
-  resolveDetailPageSuiteBusyImageGenExcludeKeys,
-  resolveDetailPageSuiteImageGenSlotKeys,
+  detailPageSuiteDeselectSlotsAfterImageGen,
+  resolveDetailPageSuiteImageGenSlotKeysForSubmit,
 } from "@/lib/detail-page-suite-prompt-selection";
 import { listDetailPageSuitePendingImageKeys } from "@/lib/detail-page-suite-pending";
 import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
@@ -182,6 +181,8 @@ function DetailPageSuiteHitStudioInner() {
   const [imageModelKey, setImageModelKey] = useState("");
   const [activeGenSlotKeys, setActiveGenSlotKeys] = useState<Set<string>>(() => new Set());
   const [promptSelectionKeys, setPromptSelectionKeys] = useState<Set<string>>(() => new Set());
+  const promptSelectionKeysRef = useRef(promptSelectionKeys);
+  promptSelectionKeysRef.current = promptSelectionKeys;
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const [imagePickerModuleId, setImagePickerModuleId] = useState<string | undefined>();
   const [imagePickerIntent, setImagePickerIntent] = useState<"settings" | "generate">(
@@ -1047,16 +1048,12 @@ function DetailPageSuiteHitStudioInner() {
       });
       return;
     }
-    const excludeKeys = resolveDetailPageSuiteBusyImageGenExcludeKeys(
+    const keys = resolveDetailPageSuiteImageGenSlotKeysForSubmit(
       project,
+      promptSelectionKeysRef.current,
       activeGenSlotKeys,
+      { moduleId, slotKeys },
     );
-    const keys =
-      slotKeys ??
-      resolveDetailPageSuiteImageGenSlotKeys(project, promptSelectionKeys, {
-        moduleId,
-        excludeKeys,
-      });
     if (keys.length === 0) {
       await alert({
         title: "请先勾选要出图的点位",
@@ -1067,13 +1064,10 @@ function DetailPageSuiteHitStudioInner() {
       });
       return;
     }
-    setPromptSelectionKeys((prev) =>
-      detailPageSuitePromptSelectionAfterImageGenSubmit(prev, keys),
-    );
-    setActiveGenSlotKeys((prev) => new Set([...prev, ...keys]));
     setImageModelKey(effectiveModelKey);
     try {
-      await persistImageModelSettings(effectiveModelKey);
+      await persistImageModelSettings(effectiveModelKey).catch(() => {});
+      setActiveGenSlotKeys((prev) => new Set([...prev, ...keys]));
       const activeExportTargetIds = resolveActiveExportTargetIds(
         project.settings,
         project.brief?.platformCode,
@@ -1085,6 +1079,9 @@ function DetailPageSuiteHitStudioInner() {
         activeExportTargetIds,
       });
       setProject(result.project);
+      setPromptSelectionKeys((prev) =>
+        detailPageSuiteDeselectSlotsAfterImageGen(prev, keys, result.project),
+      );
       syncActiveGenFromProject(result.project);
       if (result.failures.length > 0) {
         await alert({

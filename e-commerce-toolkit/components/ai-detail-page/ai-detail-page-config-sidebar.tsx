@@ -24,11 +24,13 @@ import {
 } from "@/lib/ecom-generation-settings/detail-template";
 import {
   patchAiDetailPagePromptPlanner,
+  planAiDetailPageSlots,
   updateAiDetailPageProject,
   uploadAiDetailPagePromptPlannerFile,
   visionAiDetailPageSellpoints,
 } from "@/lib/ecom-ai-detail-page-api";
-import type { AplusProductVertical } from "@/lib/detail-page-suite-types";
+import { AiDetailPageProductCategoryPicker } from "@/components/ai-detail-page/ai-detail-page-product-category-picker";
+import type { DetailPageSuiteBrief } from "@/lib/detail-page-suite-types";
 import {
   ECOM_SELLPOINT_FIVE_PART_PLACEHOLDER,
   briefPatchFromSellpointDraft,
@@ -55,18 +57,6 @@ type Props = {
   onRequestPlanAndPrompts: () => void;
   onRequestPrompts?: () => void;
 };
-
-const VERTICAL_OPTIONS: { value: AplusProductVertical; label: string }[] = [
-  { value: "fashion_apparel", label: "服装" },
-  { value: "bags", label: "包包" },
-  { value: "digital_3c", label: "3C 数码" },
-  { value: "footwear", label: "鞋子" },
-  { value: "jewelry", label: "珠宝" },
-  { value: "outdoor_gear", label: "户外用品" },
-  { value: "loungewear", label: "家居服" },
-  { value: "kitchenware", label: "厨房用品" },
-  { value: "baby_maternal", label: "母婴用品" },
-];
 
 const APLUS_JSON_CONTRACT_SUMMARY =
   "平台强制：仅输出 detail-page-suite 围栏内 JSON；items 条数 = N；item_label 与 selected_item_list 原文一致；尺码/参数数据总表由系统出图，勿写入 items。";
@@ -158,8 +148,14 @@ export function AiDetailPageConfigSidebar({
     [onProjectChange, project.id],
   );
 
+  const replanSlotsAfterModuleChange = useCallback(async () => {
+    const updated = await planAiDetailPageSlots(project.id);
+    await onProjectChange();
+    return updated;
+  }, [onProjectChange, project.id]);
+
   const patchModule = useCallback(
-    (moduleId: string, patch: Partial<DetailPageSuiteModuleState>) => {
+    (moduleId: string, patch: Partial<DetailPageSuiteModuleState>, opts?: { replan?: boolean }) => {
       const modules = syncSuiteModulesSlots(
         project.suite.modules.map((m) => {
           if (m.module_id !== moduleId) return m;
@@ -175,9 +171,13 @@ export function AiDetailPageConfigSidebar({
           return next;
         }),
       );
-      void persist({ suite: { ...project.suite, modules } });
+      void persist({ suite: { ...project.suite, modules } }).then(async () => {
+        if (opts?.replan) {
+          await replanSlotsAfterModuleChange();
+        }
+      });
     },
-    [persist, project.suite],
+    [persist, project.suite, replanSlotsAfterModuleChange],
   );
 
   const modelLabel =
@@ -243,37 +243,15 @@ export function AiDetailPageConfigSidebar({
           <section className="mb-3 rounded-xl border border-[#e8e8ed] bg-white px-3 py-3">
             <p className="mb-2 text-xs font-semibold">产品品类</p>
             <p className="mb-2 text-[10px] leading-relaxed text-[#86868b]">
-              用于自动匹配各模块子维度（生成 Prompt 时生效，无需手选子项）。
+              左侧一级品类；右侧二、三级与口播专业版一致。用于子维度自动匹配，并参与生成 Prompt 与 AI 识图卖点。
             </p>
-            <select
-              className="w-full rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[11px]"
+            <AiDetailPageProductCategoryPicker
+              brief={project.brief ?? undefined}
               disabled={disabled || Boolean(busy)}
-              value={(() => {
-                const raw = project.brief?.productVertical as
-                  | AplusProductVertical
-                  | "apparel"
-                  | "general"
-                  | undefined;
-                if (raw === "apparel" || raw === "general") {
-                  return "fashion_apparel";
-                }
-                return raw ?? "fashion_apparel";
-              })()}
-              onChange={(e) => {
-                void persist({
-                  brief: {
-                    ...(project.brief ?? {}),
-                    productVertical: e.target.value as AplusProductVertical,
-                  },
-                });
+              onBriefChange={(next: DetailPageSuiteBrief) => {
+                void persist({ brief: next });
               }}
-            >
-              {VERTICAL_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+            />
           </section>
 
           <section
@@ -351,11 +329,14 @@ export function AiDetailPageConfigSidebar({
                         onChange={(e) => {
                           const on = e.target.checked;
                           const count = on ? Math.max(1, mod.generate_count || 1) : 0;
-                          patchModule(mod.module_id, {
-                            enable: on,
-                            generate_count: count,
-                            selected_item_list: [],
-                          });
+                          patchModule(
+                            mod.module_id,
+                            {
+                              enable: on,
+                              generate_count: count,
+                            },
+                            { replan: on },
+                          );
                         }}
                       />
                       <span className="min-w-0">
@@ -374,10 +355,7 @@ export function AiDetailPageConfigSidebar({
                           max={mod.max_num}
                           disabled={disabled || Boolean(busy)}
                           onChange={(n) => {
-                            patchModule(mod.module_id, {
-                              generate_count: n,
-                              selected_item_list: [],
-                            });
+                            patchModule(mod.module_id, { generate_count: n }, { replan: true });
                           }}
                         />
                       </div>

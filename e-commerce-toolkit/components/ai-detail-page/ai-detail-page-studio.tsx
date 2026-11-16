@@ -33,6 +33,7 @@ import {
   appendDefaultSizeChartTableToBrief,
   ensureSizeChartBriefTableCount,
   isDetailPageSuiteSizeChartDataLabel,
+  partitionDetailPageSuiteImageGenKeys,
   resolveSizeChartTableForSlot,
   resolveSizeChartTableIndexForLabel,
   upsertSizeChartTableInBrief,
@@ -47,11 +48,10 @@ import {
   upsertSpecChartTableInBrief,
 } from "@/lib/detail-page-suite-spec-table";
 import {
-  detailPageSuitePromptSelectionAfterImageGenSubmit,
+  detailPageSuiteDeselectSlotsAfterImageGen,
   detailPageSuiteProjectSlotHasImage,
   listDetailPageSuitePromptGenTargets,
-  resolveDetailPageSuiteBusyImageGenExcludeKeys,
-  resolveDetailPageSuiteImageGenSlotKeys,
+  resolveDetailPageSuiteImageGenSlotKeysForSubmit,
 } from "@/lib/detail-page-suite-prompt-selection";
 import {
   detailPageSuiteHasPendingWork,
@@ -108,11 +108,16 @@ export function AiDetailPageStudio() {
   const [project, setProject] = useState<DetailPageSuiteProject | null>(null);
   const [loading, setLoading] = useState(true);
   const [needLogin, setNeedLogin] = useState(false);
-  const [uploadBusy, setUploadBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadProgressLabel, setUploadProgressLabel] = useState<string | undefined>();
   const [planning, setPlanning] = useState(false);
   const [prompting, setPrompting] = useState(false);
+  const [activePromptModuleIds, setActivePromptModuleIds] = useState<Set<string>>(new Set());
   const [activeGenSlotKeys, setActiveGenSlotKeys] = useState<Set<string>>(new Set());
   const [promptSelectionKeys, setPromptSelectionKeys] = useState<Set<string>>(new Set());
+  const promptSelectionKeysRef = useRef(promptSelectionKeys);
+  promptSelectionKeysRef.current = promptSelectionKeys;
   const [imageModels, setImageModels] = useState<StoryboardGatewayModel[]>([]);
   const [chatModels, setChatModels] = useState<StoryboardGatewayModel[]>([]);
   const [imageModelKey, setImageModelKey] = useState(DEFAULT_IMAGE_MODEL);
@@ -142,6 +147,7 @@ export function AiDetailPageStudio() {
   const imageModelsRef = useRef<StoryboardGatewayModel[]>([]);
   const chatModelsRef = useRef<StoryboardGatewayModel[]>([]);
   const imageGenInFlightRef = useRef(false);
+  const promptGenInFlightRef = useRef(false);
 
   const displayRatio = useMemo(
     () =>
@@ -173,7 +179,7 @@ export function AiDetailPageStudio() {
       if (!detailPageSuiteProjectSlotHasImage(p, key)) next.add(key);
     }
     setActiveGenSlotKeys(next);
-    setPrompting(listDetailPageSuitePendingPromptModuleIds(p.meta).length > 0);
+    setActivePromptModuleIds(new Set(listDetailPageSuitePendingPromptModuleIds(p.meta)));
   }, []);
 
   const applyLoadedProject = useCallback(
@@ -258,12 +264,14 @@ export function AiDetailPageStudio() {
     };
   }, [alert, applyLoadedProject, loadGeneration]);
 
+  const activeGenCount = activeGenSlotKeys.size;
   useEffect(() => {
     if (!project?.id) return;
-    if (!detailPageSuiteHasPendingWork(project.meta)) return;
+    const hasMetaPending = detailPageSuiteHasPendingWork(project.meta);
+    if (!hasMetaPending && activeGenCount === 0) return;
     let cancelled = false;
     const refresh = async () => {
-      if (cancelled || imageGenInFlightRef.current) return;
+      if (cancelled || promptGenInFlightRef.current) return;
       try {
         const fresh = await getAiDetailPageProject(project.id);
         if (!cancelled) applyLoadedProject(fresh);
@@ -278,6 +286,7 @@ export function AiDetailPageStudio() {
       window.clearInterval(id);
     };
   }, [
+    activeGenCount,
     applyLoadedProject,
     project?.id,
     project?.meta?.pendingImages,
@@ -303,9 +312,65 @@ export function AiDetailPageStudio() {
     await persistWorkspaceModelSettings({ chatModelKey: modelKey });
   }
 
+  const runProductRefUpload = useCallback(
+    async (task: () => Promise<DetailPageSuiteProject>, label: string) => {
+      setUploading(true);
+      setUploadProgressLabel(label);
+      setUploadProgress(10);
+      const tick = window.setInterval(() => {
+        setUploadProgress((p) => (p != null && p < 88 ? p + 7 : p));
+      }, 180);
+      try {
+        const latest = await task();
+        applyLoadedProject(latest);
+        setUploadProgress(100);
+      } catch (e) {
+        await alert({
+          title: "上传失败",
+          message: e instanceof Error ? e.message : "上传失败",
+          variant: "error",
+        });
+      } finally {
+        window.clearInterval(tick);
+        setUploading(false);
+        window.setTimeout(() => {
+          setUploadProgress(null);
+          setUploadProgressLabel(undefined);
+        }, 450);
+      }
+    },
+    [alert, applyLoadedProject],
+  );
+
+  const handleProductRefUpload = useCallback(
+    async (files: File[]) => {
+      if (!project || files.length === 0) return;
+      let latest = project;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]!;
+        const label =
+          files.length > 1
+            ? `正在上传 ${i + 1}/${files.length}：${file.name}`
+            : `正在上传：${file.name}`;
+        await runProductRefUpload(async () => {
+          latest = await uploadAiDetailPageRef(latest.id, file);
+          return latest;
+        }, label);
+      }
+    },
+    [project, runProductRefUpload],
+  );
+
   async function runImageGen(opts?: { moduleId?: string; slotKeys?: string[] }) {
     if (!project) return;
-    if (project.references.length === 0) {
+    const keys = resolveDetailPageSuiteImageGenSlotKeysForSubmit(
+      project,
+      promptSelectionKeysRef.current,
+      activeGenSlotKeys,
+      { moduleId: opts?.moduleId, slotKeys: opts?.slotKeys },
+    );
+    const { modelKeys } = partitionDetailPageSuiteImageGenKeys(project, keys);
+    if (modelKeys.length > 0 && project.references.length === 0) {
       await alert({
         title: "请先上传产品图",
         message: "上传至少一张产品参考图后再出图。",
@@ -313,16 +378,6 @@ export function AiDetailPageStudio() {
       });
       return;
     }
-    const excludeKeys = resolveDetailPageSuiteBusyImageGenExcludeKeys(
-      project,
-      activeGenSlotKeys,
-    );
-    const keys =
-      opts?.slotKeys ??
-      resolveDetailPageSuiteImageGenSlotKeys(project, promptSelectionKeys, {
-        moduleId: opts?.moduleId,
-        excludeKeys,
-      });
     if (keys.length === 0) {
       await alert({
         title: "请先勾选要出图的点位",
@@ -331,13 +386,13 @@ export function AiDetailPageStudio() {
       });
       return;
     }
-    setPromptSelectionKeys((prev) =>
-      detailPageSuitePromptSelectionAfterImageGenSubmit(prev, keys),
-    );
-    setActiveGenSlotKeys((prev) => new Set([...prev, ...keys]));
     imageGenInFlightRef.current = true;
+    let syncedFromResponse = false;
     try {
-      await persistImageModelSettings(imageModelKey);
+      await persistImageModelSettings(imageModelKey).catch(() => {
+        /* 出图不阻断于模型偏好保存失败 */
+      });
+      setActiveGenSlotKeys((prev) => new Set([...prev, ...keys]));
       const result = await generateAiDetailPageImages(project.id, {
         moduleId: opts?.moduleId,
         slotKeys: keys,
@@ -346,6 +401,10 @@ export function AiDetailPageStudio() {
         imageSize: project.settings.imageSize,
       });
       applyLoadedProject(result.project);
+      setPromptSelectionKeys((prev) =>
+        detailPageSuiteDeselectSlotsAfterImageGen(prev, keys, result.project),
+      );
+      syncedFromResponse = true;
       if (result.failures.length > 0) {
         await alert({
           title: "部分出图失败",
@@ -356,7 +415,6 @@ export function AiDetailPageStudio() {
         toast({ title: `已生成 ${result.generated} 张` });
       }
     } catch (e) {
-      syncActiveGenFromProject(project);
       await alert({
         title: "出图失败",
         message: formatEcomImageGenUserMessage(e instanceof Error ? e.message : "出图失败"),
@@ -364,6 +422,18 @@ export function AiDetailPageStudio() {
       });
     } finally {
       imageGenInFlightRef.current = false;
+      if (!syncedFromResponse) {
+        try {
+          const fresh = await getAiDetailPageProject(project.id);
+          applyLoadedProject(fresh);
+        } catch {
+          setActiveGenSlotKeys((prev) => {
+            const next = new Set(prev);
+            for (const k of keys) next.delete(k);
+            return next;
+          });
+        }
+      }
     }
   }
 
@@ -383,7 +453,7 @@ export function AiDetailPageStudio() {
         assistant={
           <AiDetailPageConfigSidebar
             project={project}
-            disabled={uploadBusy || planning || prompting}
+            disabled={uploading || planning || prompting}
             planning={planning}
             prompting={prompting}
             imageModels={imageModels}
@@ -394,6 +464,7 @@ export function AiDetailPageStudio() {
               void (async () => {
                 setPlanning(true);
                 setPrompting(true);
+                promptGenInFlightRef.current = true;
                 try {
                   await persistChatModelSettings(chatModelKey);
                   const updated = await planAndPromptsAiDetailPage(project.id, {
@@ -411,6 +482,7 @@ export function AiDetailPageStudio() {
                     variant: "error",
                   });
                 } finally {
+                  promptGenInFlightRef.current = false;
                   setPlanning(false);
                   setPrompting(false);
                 }
@@ -419,6 +491,7 @@ export function AiDetailPageStudio() {
             onRequestPrompts={() => {
               void (async () => {
                 setPrompting(true);
+                promptGenInFlightRef.current = true;
                 try {
                   await persistChatModelSettings(chatModelKey);
                   const updated = await generateAiDetailPagePrompts(project.id, {
@@ -433,6 +506,7 @@ export function AiDetailPageStudio() {
                     variant: "error",
                   });
                 } finally {
+                  promptGenInFlightRef.current = false;
                   setPrompting(false);
                 }
               })();
@@ -444,7 +518,7 @@ export function AiDetailPageStudio() {
           <DetailPageSuiteWorkbenchChrome
             project={project}
             variant="aplus"
-            llmBusy={uploadBusy || planning || prompting}
+            llmBusy={uploading || planning || prompting}
             displayRatio={displayRatio}
             imageModelLabel={imageModelLabel}
             onPickImageModel={() => setModelPickerOpen(true)}
@@ -519,27 +593,11 @@ export function AiDetailPageStudio() {
                   kind: "image" as const,
                 }))}
               emptyHint="上传产品图 · 用于识图卖点与出图参考"
-              busy={uploadBusy}
-              onUploadFiles={(files) => {
-                void (async () => {
-                  setUploadBusy(true);
-                  try {
-                    let latest = project;
-                    for (const file of files) {
-                      latest = await uploadAiDetailPageRef(project.id, file);
-                    }
-                    setProject(latest);
-                  } catch (e) {
-                    await alert({
-                      title: "上传失败",
-                      message: e instanceof Error ? e.message : "上传失败",
-                      variant: "error",
-                    });
-                  } finally {
-                    setUploadBusy(false);
-                  }
-                })();
-              }}
+              busy={uploading || planning || prompting}
+              showUploadProgress={uploading}
+              uploadProgress={uploadProgress}
+              uploadProgressLabel={uploadProgressLabel}
+              onUploadFiles={(files) => void handleProductRefUpload(files)}
               onRemove={(id) => {
                 void (async () => {
                   const refs = project.references.filter((r) => r.id !== id);
@@ -557,8 +615,12 @@ export function AiDetailPageStudio() {
             variant="aplus"
             hideHeader
             project={project}
-            llmBusy={uploadBusy || planning || prompting}
+            llmBusy={uploading || planning || prompting}
+            uploading={uploading}
+            uploadProgress={uploadProgress}
+            uploadProgressLabel={uploadProgressLabel}
             activeGenSlotKeys={activeGenSlotKeys}
+            activePromptModuleIds={activePromptModuleIds}
             promptSelectionKeys={promptSelectionKeys}
             onTogglePromptSelection={(key) => {
               setPromptSelectionKeys((prev) => {
@@ -575,6 +637,7 @@ export function AiDetailPageStudio() {
             onGenerateModulePrompts={(moduleId) => {
               void (async () => {
                 setPrompting(true);
+                promptGenInFlightRef.current = true;
                 try {
                   await persistChatModelSettings(chatModelKey);
                   const updated = await generateAiDetailPagePrompts(project.id, {
@@ -589,6 +652,7 @@ export function AiDetailPageStudio() {
                     variant: "error",
                   });
                 } finally {
+                  promptGenInFlightRef.current = false;
                   setPrompting(false);
                 }
               })();

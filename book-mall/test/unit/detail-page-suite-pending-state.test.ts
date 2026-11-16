@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { mergeModuleSlotsPreservingContent } from "@/lib/ecom/detail-page-suite/module-slots";
-import { reconcileDetailPageSuitePendingMeta } from "@/lib/ecom/detail-page-suite/pending-state";
+import {
+  DETAIL_PAGE_SUITE_IMAGE_GEN_PENDING_MAX_MS,
+  reconcileDetailPageSuitePendingMeta,
+} from "@/lib/ecom/detail-page-suite/pending-state";
 import type { DetailPageSuiteModuleState } from "@/lib/ecom/detail-page-suite/types";
 
 describe("detail-page-suite pending + slot merge", () => {
@@ -61,6 +64,35 @@ describe("detail-page-suite pending + slot merge", () => {
       meta,
       Date.parse("2026-09-13T10:00:01.000Z"),
     );
+    expect(reconciled?.pendingImages).toBeUndefined();
+  });
+
+  it("reconcile clears image pending older than gen max window", () => {
+    const startedAt = new Date(Date.now() - DETAIL_PAGE_SUITE_IMAGE_GEN_PENDING_MAX_MS - 30_000).toISOString();
+    const mod: DetailPageSuiteModuleState = {
+      module_id: "mod2",
+      module_name: "m",
+      enable: true,
+      generate_count: 1,
+      max_num: 2,
+      select_mode: "manual",
+      candidate_pool: ["A"],
+      selected_item_list: ["A"],
+      slots: [
+        {
+          item_key: "item_a",
+          item_label: "A",
+          source: "template",
+          positive_prompt: "prompt",
+        },
+      ],
+    };
+    const meta = {
+      pendingImages: {
+        "mod2::item_a": { startedAt },
+      },
+    };
+    const reconciled = reconcileDetailPageSuitePendingMeta({ modules: [mod] }, meta);
     expect(reconciled?.pendingImages).toBeUndefined();
   });
 });

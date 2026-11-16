@@ -82,6 +82,24 @@ export const TRANSIENT_SUBMIT_MARKERS = [
   "currently overloaded",
 ] as const;
 
+export const RATE_LIMIT_SUBMIT_MARKERS = [
+  "rate limit",
+  "rate_limit",
+  "ratelimit",
+  "too many requests",
+  "throttl",
+  "request rate limit",
+] as const;
+
+export const UPSTREAM_RATE_LIMIT_USER_ZH =
+  "百炼/阿里云对该 API Key 的生图配额触发限流（通常为每分钟可提交次数 RPM 或短时 QPS 上限，与是否异步任务无关）。请约 1～2 分钟后重试失败点位；若经常 429，请在百炼控制台查看该模型的限流说明并升配额，或换用火山等其它已绑定生图模型。批量勾选较多时也可分批出图以降低撞限概率。";
+
+export function isRateLimitSubmitMessage(message?: string | null): boolean {
+  const blob = normalizeBlob(message ?? "");
+  if (!blob) return false;
+  return RATE_LIMIT_SUBMIT_MARKERS.some((m) => blob.includes(m));
+}
+
 /** 瞬态 submit 重试：仅 TRANSIENT，指数退避，不阻塞 90s */
 export const GATEWAY_SUBMIT_RETRY_DELAYS_MS = [2_000, 5_000, 10_000] as const;
 export const GATEWAY_SUBMIT_MAX_TRANSIENT_ATTEMPTS = 3;
@@ -159,9 +177,26 @@ function isModelNotFoundMessage(message: string, httpStatus?: number): boolean {
 
 function isTransientSubmitMessage(message: string, httpStatus?: number): boolean {
   if (httpStatus === 429) return true;
+  if (isRateLimitSubmitMessage(message)) return true;
   if (httpStatus != null && httpStatus >= 500) return true;
   const blob = normalizeBlob(message);
   return TRANSIENT_SUBMIT_MARKERS.some((m) => blob.includes(m));
+}
+
+function rateLimitClassification(
+  message: string,
+  extra?: { httpStatus?: number; vendorRequestId?: string; vendorTaskId?: string },
+): ClassifiedGatewaySubmitError {
+  return {
+    class: "TRANSIENT",
+    failCode: "UPSTREAM_RATE_LIMIT",
+    message,
+    httpStatus: extra?.httpStatus ?? 429,
+    vendorRequestId: extra?.vendorRequestId,
+    vendorTaskId: extra?.vendorTaskId,
+    retryable: true,
+    userHintZh: UPSTREAM_RATE_LIMIT_USER_ZH,
+  };
 }
 
 function extractVendorRequestId(message: string): string | undefined {
@@ -273,6 +308,9 @@ export function classifyGatewaySubmitError(error: unknown): ClassifiedGatewaySub
         userHintZh: "火山凭证无效或无权限，请检查 Gateway 凭证与 baseUrl。",
       };
     }
+    if (isRateLimitSubmitMessage(message) || httpStatus === 429) {
+      return rateLimitClassification(message, { httpStatus, vendorRequestId, vendorTaskId });
+    }
     if (isTransientSubmitMessage(message, httpStatus)) {
       return {
         class: "TRANSIENT",
@@ -330,6 +368,9 @@ export function classifyGatewaySubmitError(error: unknown): ClassifiedGatewaySub
       retryable: false,
       userHintZh: "Gateway 凭证不可用或未绑定。",
     };
+  }
+  if (isRateLimitSubmitMessage(message)) {
+    return rateLimitClassification(message, { vendorRequestId });
   }
   if (isTransientSubmitMessage(message)) {
     return {

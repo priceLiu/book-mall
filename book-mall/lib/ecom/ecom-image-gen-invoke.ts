@@ -27,6 +27,7 @@ import {
 import { getImageGenMaxRefs } from "@/lib/ecom/ecom-product-design-ref-rules";
 import { ensureStoryboardRefImagesForWan27 } from "@/lib/ecom/ecom-storyboard-ref-image";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
+import { runGatewaySubmitWithRetry } from "@/lib/gateway/gateway-submit-error-policy";
 import {
   ecomGwCreateDashscopeJob,
   ecomGwCreateKieJob,
@@ -126,6 +127,17 @@ async function pollMultimodalSyncImage(
   return pollDashscopeImage(userId, taskId, logId);
 }
 
+const DASHSCOPE_IMAGE_SUBMIT_RETRY_DELAYS_MS = [3_000, 8_000, 15_000] as const;
+
+async function createDashscopeImageJobWithRetry(
+  userId: string,
+  body: Parameters<typeof ecomGwCreateDashscopeJob>[1],
+) {
+  return runGatewaySubmitWithRetry(() => ecomGwCreateDashscopeJob(userId, body), {
+    delaysMs: DASHSCOPE_IMAGE_SUBMIT_RETRY_DELAYS_MS,
+  });
+}
+
 async function generateMultimodalSyncImage(opts: {
   userId: string;
   modelKey: string;
@@ -161,7 +173,7 @@ async function generateMultimodalSyncImage(opts: {
   const defaultPromptExtend = isQwenImageEditModel(opts.modelKey)
     ? true
     : !isZImageTurboModel(opts.modelKey);
-  const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
+  const { taskId, logId } = await createDashscopeImageJobWithRetry(opts.userId, {
     kind: "multimodal-image-sync",
     model: opts.modelKey,
     content,
@@ -290,7 +302,7 @@ export async function generateEcomImage(opts: {
       userId: opts.userId,
       urls: opts.refImageUrls.slice(0, 10),
     });
-    const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
+    const { taskId, logId } = await createDashscopeImageJobWithRetry(opts.userId, {
       kind: "kling-v3-image",
       model: resolveStoryboardKlingModel(opts.modelKey),
       content: [...refs.map((url) => ({ image: url })), { text: prompt }],
@@ -313,7 +325,7 @@ export async function generateEcomImage(opts: {
   if (opts.refImageUrls.length === 0) {
     if (isStoryboardDashscopeImageModel(opts.modelKey)) {
       const wan26 = isWan26ImageModel(apiModel) || isWan26ImageModel(opts.modelKey);
-      const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
+      const { taskId, logId } = await createDashscopeImageJobWithRetry(opts.userId, {
         kind: "wan27-image",
         model: apiModel,
         content: [{ text: prompt }],
@@ -329,7 +341,7 @@ export async function generateEcomImage(opts: {
       const vendorUrl = await pollDashscopeImage(opts.userId, taskId, logId);
       return downloadAndUpload(opts.userId, vendorUrl);
     }
-    const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
+    const { taskId, logId } = await createDashscopeImageJobWithRetry(opts.userId, {
       kind: "wanx",
       model: apiModel,
       prompt,
@@ -350,7 +362,7 @@ export async function generateEcomImage(opts: {
     ? [{ text: prompt }, ...refs.map((url) => ({ image: url }))]
     : [...refs.map((url) => ({ image: url })), { text: prompt }];
 
-  const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
+  const { taskId, logId } = await createDashscopeImageJobWithRetry(opts.userId, {
     kind: "wan27-image",
     model: apiModel,
     content,

@@ -41,7 +41,9 @@ import {
   resolveReplicaModuleDisplaySlots,
 } from "@/lib/detail-page-suite-module-slots";
 import {
+  countModuleImageGenActionable,
   countModuleSlotSelection,
+  resolveDetailPageSuiteImageGenSubmitExcludeKeys,
   detailPageSuitePromptSelectionState,
   listDetailPageSuitePromptGenTargets,
   modulePromptSelectionState,
@@ -718,22 +720,29 @@ function ModuleBlock({
     return resolveModuleDisplaySlots(modForGrid);
   }, [mod, replicaMode, isHit]);
   const showReplicaSlotGrid = replicaMode;
+  const isSizeChartModule = isDetailPageSuiteTableDataModuleId(mod.module_id);
+  const isSpecChartModule = isDetailPageSuiteSpecChartModuleId(mod.module_id);
   const modulePickState = modulePromptSelectionState(mod, promptSelection, {
     excludeKeys: busySlotKeys,
   });
-  const selectedSlotCount = countModuleSlotSelection(mod, promptSelection, {
-    excludeKeys: busySlotKeys,
-  });
-  const selectedImageGenCount = countModuleSlotSelection(mod, promptSelection, {
-    excludeKeys: busySlotKeys,
-    requirePrompt: true,
-  });
-  const promptReadyCount = gridSlots.filter((s) => s.positive_prompt?.trim()).length;
+  const imageGenSubmitExclude = useMemo(
+    () => resolveDetailPageSuiteImageGenSubmitExcludeKeys(activeGen),
+    [activeGen],
+  );
+  const selectedSlotCount = countModuleSlotSelection(mod, promptSelection);
+  const selectedImageGenCount = isSizeChartModule
+    ? countModuleImageGenActionable(mod, promptSelection, { excludeKeys: imageGenSubmitExclude })
+    : countModuleSlotSelection(mod, promptSelection, {
+        excludeKeys: imageGenSubmitExclude,
+        requirePrompt: true,
+      });
+  const promptReadyCount = gridSlots.filter((s) => isSuiteSlotSelectable(s)).length;
+  const promptMissingCount = Math.max(0, gridSlots.length - promptReadyCount);
+  const promptGenTargetCount =
+    promptMissingCount > 0 ? promptMissingCount : selectedSlotCount;
   const modulePromptBusy = activePromptModules.has(mod.module_id);
   const addSlotCheck = canAddCustomSuiteSlot(suite, mod.module_id);
   const canAddSlot = addSlotCheck.ok;
-  const isSizeChartModule = isDetailPageSuiteTableDataModuleId(mod.module_id);
-  const isSpecChartModule = isDetailPageSuiteSpecChartModuleId(mod.module_id);
 
   return (
     <div className="rounded-xl border border-[#e8e8ed] p-4">
@@ -785,10 +794,10 @@ function ModuleBlock({
         {promptWorkspacePhase && onGenerateModulePrompts && !isSizeChartModule && !replicaMode ? (
           <EcomButtonSecondary
             size="sm"
-            disabled={!mod.enable || selectedSlotCount === 0}
+            disabled={!mod.enable || promptGenTargetCount === 0}
             onClick={() => onGenerateModulePrompts(mod.module_id)}
           >
-            {`生成提示词（${selectedSlotCount}）`}
+            {`生成提示词（${promptGenTargetCount}）`}
           </EcomButtonSecondary>
         ) : null}
         {promptWorkspacePhase && onGenerateModuleImages ? (
@@ -807,8 +816,8 @@ function ModuleBlock({
           已选 {selectedSlotCount}/{gridSlots.length} 个点位
           {isSizeChartModule ? (
             isSpecChartModule
-              ? " · 参数表编辑后勾选生图；包装/合规图需先有提示词"
-              : " · 尺码表编辑后勾选生图；线稿/对比图需先有提示词"
+              ? " · 已就绪的参数总表可直接点「生图」；包装/合规图需先有提示词"
+              : " · 已就绪的尺码总表可直接点「生图」；线稿/对比图需先有提示词"
           ) : (
             <>
               {" "}
@@ -854,7 +863,7 @@ function ModuleBlock({
                 displayRatio={displayRatio}
                 selectable={promptWorkspacePhase && !slotBusy}
                 selected={
-                  promptSelection.has(slotComposite) && !busySlotKeys.has(slotComposite)
+                  promptSelection.has(slotComposite) || activeGen.has(slotComposite)
                 }
                 onToggleSelect={
                   promptWorkspacePhase && onTogglePromptSelection && !slotBusy

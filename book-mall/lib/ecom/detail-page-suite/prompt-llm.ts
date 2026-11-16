@@ -15,13 +15,17 @@ import {
   markDetailPageSuitePromptModulePending,
   reconcileDetailPageSuitePendingMeta,
 } from "./pending-state";
+import { generateAplusModulePromptsBatch } from "@/lib/ecom/detail-page-aplus/aplus-prompt-batch";
+import { materializeAplusModuleSlots } from "@/lib/ecom/detail-page-aplus/aplus-plan-materialize";
 import {
   buildAplusModuleCatalogContextForLlm,
   buildAplusPromptPlannerSystem,
 } from "@/lib/ecom/detail-page-aplus/aplus-prompt-planner-compose";
+import { applyAutoMatchToSuite } from "@/lib/ecom/detail-page-aplus/aplus-subdim-match";
 import { isAplusBlankPlateModule } from "@/lib/ecom/detail-page-aplus/aplus-prompt-system";
 import { loadDetailPageSuiteForOps } from "./project-access";
 import {
+  buildDetailPageSuiteBlankPlateBody,
   buildDetailPageSuiteBriefContextBlock,
   buildDetailPageSuiteGenderModelRule,
   composeDetailPageSuiteVisiblePrompt,
@@ -167,6 +171,17 @@ export async function generateModulePrompts(opts: {
   if (!mod || !mod.enable || mod.generate_count < 1) {
     throw new Error("该模块未开启");
   }
+
+  if (isAplus) {
+    return generateAplusModulePromptsBatch({
+      userId: opts.userId,
+      projectId: opts.projectId,
+      modelKey: opts.modelKey,
+      projectModule: opts.projectModule,
+      moduleIds: [opts.moduleId],
+      project,
+    });
+  }
   let selected = mod.selected_item_list.slice(0, mod.generate_count);
   if (selected.length < mod.generate_count) {
     const extra = mod.candidate_pool.filter((x) => !selected.includes(x));
@@ -175,9 +190,6 @@ export async function generateModulePrompts(opts: {
   if (selected.length !== mod.generate_count) {
     throw new Error(`${mod.module_name} 请先选满 ${mod.generate_count} 个子维度`);
   }
-
-  let metaWithPending = markDetailPageSuitePromptModulePending(project.meta, mod.module_id);
-  await updateDetailPageSuiteProject(opts.userId, opts.projectId, { meta: metaWithPending });
 
   let brief = ensureBriefSizeChartDefaults(project.brief ?? {});
   brief = ensureBriefSpecChartDefaults(brief);
@@ -189,7 +201,12 @@ export async function generateModulePrompts(opts: {
         : { programmatic: [], llm: selected };
   const { llm: llmLabels } = partitioned;
 
-  const finishWithSlots = async (slots: DetailPageSuiteSlot[]) => {
+  let metaWithPending: DetailPageSuiteProject["meta"] = project.meta;
+
+  const finishWithSlots = async (
+    slots: DetailPageSuiteSlot[],
+    metaSeed: DetailPageSuiteProject["meta"] = metaWithPending,
+  ) => {
     const modules = project.suite.modules.map((m) =>
       m.module_id === mod.module_id
         ? {
@@ -199,11 +216,11 @@ export async function generateModulePrompts(opts: {
           }
         : m,
     );
-    const suite = normalizeDetailPageSuiteState({ ...project.suite, modules }, metaWithPending);
-    metaWithPending =
-      clearDetailPageSuitePromptModulePending(metaWithPending, mod.module_id) ?? { phase: "prompts" };
+    const suite = normalizeDetailPageSuiteState({ ...project.suite, modules }, metaSeed);
+    const metaAfterClear =
+      clearDetailPageSuitePromptModulePending(metaSeed, mod.module_id) ?? { phase: "prompts" };
     const metaWithSnapshots = upsertPromptSnapshotsFromSuite(
-      reconcileDetailPageSuitePendingMeta(suite, { ...metaWithPending, phase: "prompts" }),
+      reconcileDetailPageSuitePendingMeta(suite, { ...metaAfterClear, phase: "prompts" }),
       suite,
     );
     const updated = await updateDetailPageSuiteProject(opts.userId, opts.projectId, {
@@ -214,6 +231,23 @@ export async function generateModulePrompts(opts: {
     if (!updated) throw new Error("保存失败");
     return updated;
   };
+
+  /** A+ 留白模块：程序填入固定摄影正文，不经 LLM（与尺码程序化条一致） */
+  if (isAplus && isAplusBlankPlateModule(mod.module_id) && llmLabels.length > 0) {
+    const syntheticLlmMap = new Map(
+      llmLabels.map((label) => [
+        label,
+        { positive_prompt: buildDetailPageSuiteBlankPlateBody(label) },
+      ]),
+    );
+    const slots = isDetailPageSuiteSpecChartModuleId(mod.module_id)
+      ? buildSpecModuleSlotsForSelected(mod, selected, brief, syntheticLlmMap)
+      : buildModuleSlotsForSelected(mod, selected, brief, syntheticLlmMap);
+    return finishWithSlots(slots, project.meta);
+  }
+
+  metaWithPending = markDetailPageSuitePromptModulePending(project.meta, mod.module_id);
+  await updateDetailPageSuiteProject(opts.userId, opts.projectId, { meta: metaWithPending });
 
   if (llmLabels.length === 0) {
     const slots = isDetailPageSuiteSpecChartModuleId(mod.module_id)
@@ -510,7 +544,31 @@ export async function generateAllEnabledPrompts(opts: {
     opts.projectModule,
   );
   if (!access) throw new Error("项目不存在");
+  const updateDetailPageSuiteProject = access.update;
   let latest = access.project;
+  if (access.isAplus) {
+    const countErr = assertSuiteCounts(latest.suite);
+    if (countErr) throw new Error(countErr);
+    const matched = applyAutoMatchToSuite(latest.suite, latest.brief);
+    const modules = matched.modules.map((m) => materializeAplusModuleSlots(m));
+    const suite = normalizeDetailPageSuiteState(
+      { ...matched, modules },
+      latest.meta ?? undefined,
+    );
+    const synced = await updateDetailPageSuiteProject(opts.userId, opts.projectId, {
+      suite,
+      brief: latest.brief,
+    });
+    const prepared = synced ?? { ...latest, suite };
+    latest = prepared;
+    return generateAplusModulePromptsBatch({
+      userId: opts.userId,
+      projectId: opts.projectId,
+      modelKey: opts.modelKey,
+      projectModule: opts.projectModule,
+      project: prepared,
+    });
+  }
   for (const m of latest.suite.modules.filter((x) => x.enable && x.generate_count > 0)) {
     latest = await generateModulePrompts({
       userId: opts.userId,

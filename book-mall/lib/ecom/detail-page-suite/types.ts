@@ -92,6 +92,9 @@ export type DetailPageSuiteSpecChartState = {
 export type DetailPageSuiteBrief = {
   genderCategory?: string;
   styleCategory?: string;
+  /** 3C 等 Pro 品类 · 产品大类 / 细项 */
+  productCategory?: string;
+  productSubCategory?: string;
   styleAttribute?: string;
   tier?: string;
   customScene?: string;

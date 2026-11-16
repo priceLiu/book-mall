@@ -26,7 +26,7 @@ import {
   ECOM_DETAIL_PAGE_ACTION,
 } from "@/lib/ecom/ecom-product-design-types";
 import { ECOM_DEFAULT_VISION_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
-import { ecomGwChatStream } from "@/lib/gateway/ecom-tool-gateway-client";
+import { ecomGwChatComplete } from "@/lib/gateway/ecom-tool-gateway-client";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 
 export type ProductDesignVisionTarget = "main" | "detail";
@@ -68,6 +68,7 @@ function buildCopyContext(target: ProductDesignVisionTarget, design: ProductDesi
   return `详情文案：\n${lines.join("\n")}`;
 }
 
+/** 汇总完整助手正文（JSON/润色等短输出；多模态走非流式，避免 VL 长推理 SSE 读超时） */
 export async function drainEcomGwChat(
   userId: string,
   opts: {
@@ -77,38 +78,8 @@ export async function drainEcomGwChat(
     params?: Record<string, unknown>;
   },
 ): Promise<string> {
-  const gw = await ecomGwChatStream(userId, opts);
-  const reader = gw.body.getReader();
-  const decoder = new TextDecoder();
-  let sseBuffer = "";
-  let fullText = "";
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      sseBuffer += decoder.decode(value, { stream: true });
-      const lines = sseBuffer.split("\n");
-      sseBuffer = lines.pop() ?? "";
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith("data:")) continue;
-        const payload = trimmed.slice(5).trim();
-        if (!payload || payload === "[DONE]") continue;
-        try {
-          const chunk = JSON.parse(payload) as {
-            choices?: { delta?: { content?: string | null } }[];
-          };
-          const piece = chunk.choices?.[0]?.delta?.content ?? "";
-          if (piece) fullText += piece;
-        } catch {
-          /* ignore */
-        }
-      }
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  return fullText;
+  const result = await ecomGwChatComplete(userId, opts);
+  return result.text;
 }
 
 function parseVisionJson(text: string): Omit<ProductDesignVisualBriefEntry, "modelKey" | "analyzedAt" | "refFingerprint"> {

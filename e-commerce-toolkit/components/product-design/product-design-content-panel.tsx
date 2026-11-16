@@ -1673,6 +1673,9 @@ export function ProductDesignContentPanel({
             onRequestAnalyze={() => void requestMainPlanAnalyze()}
             onGenerate={(indexes) => void requestMainGenerate(indexes)}
             cardGeneratingFor={(index) => cardGeneratingFor("main", index)}
+            onPromptEditorOpenChange={(open) => {
+              if (open) setGalleryPreview(null);
+            }}
             onPreview={openMainSlotPreview}
             onDownload={(index) => {
               const item = project.design?.mainImages.find((m) => m.index === index);
@@ -1757,6 +1760,9 @@ export function ProductDesignContentPanel({
             onRequestAnalyze={() => void requestDetailPlanAnalyze()}
             onGenerate={(indexes) => void requestDetailGenerate(indexes)}
             cardGeneratingFor={(index) => cardGeneratingFor("detail", index)}
+            onPromptEditorOpenChange={(open) => {
+              if (open) setGalleryPreview(null);
+            }}
             onPreview={openDetailSlotPreview}
             onDownload={(index) => {
               const item = project.design?.detailPages.find((d) => d.index === index);
@@ -2066,6 +2072,9 @@ export function ProductDesignContentPanel({
                 onProjectChange={onProjectChange}
                 onGenerate={(indexes) => void requestMainGenerate(indexes)}
                 cardGeneratingFor={(index) => cardGeneratingFor("main", index)}
+                onPromptEditorOpenChange={(open) => {
+                  if (open) setGalleryPreview(null);
+                }}
                 onPreview={openMainSlotPreview}
                 onDownload={(index) => {
                   const item = design.mainImages.find((m) => m.index === index);
@@ -2135,6 +2144,9 @@ export function ProductDesignContentPanel({
                 onProjectChange={onProjectChange}
                 onGenerate={(indexes) => void requestDetailGenerate(indexes)}
                 cardGeneratingFor={(index) => cardGeneratingFor("detail", index)}
+                onPromptEditorOpenChange={(open) => {
+                  if (open) setGalleryPreview(null);
+                }}
                 onPreview={openDetailSlotPreview}
                 onDownload={(index) => {
                   const item = design.detailPages.find((d) => d.index === index);
@@ -2322,6 +2334,7 @@ export function ProductDesignContentPanel({
         items={galleryPreview?.items ?? []}
         initialIndex={galleryPreview?.initialIndex ?? 0}
         open={Boolean(galleryPreview?.items.length)}
+        nativeOverlay
         onOpenChange={(open) => {
           if (!open) setGalleryPreview(null);
         }}

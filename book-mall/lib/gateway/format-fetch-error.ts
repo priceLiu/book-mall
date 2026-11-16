@@ -18,6 +18,11 @@ const UPSTREAM_STORY_CHAT_TIMEOUT_MS = readUpstreamTimeoutMs(
   "UPSTREAM_STORY_CHAT_TIMEOUT_MS",
   600_000,
 );
+/** 多图 Vision Chat（DashScope VL 首 token 常 >3min） */
+const UPSTREAM_VISION_CHAT_TIMEOUT_MS = readUpstreamTimeoutMs(
+  "UPSTREAM_VISION_CHAT_TIMEOUT_MS",
+  900_000,
+);
 const UPSTREAM_CREATE_TASK_TIMEOUT_MS = readUpstreamTimeoutMs(
   "UPSTREAM_CREATE_TASK_TIMEOUT_MS",
   120_000,
@@ -76,14 +81,14 @@ export function resolveUpstreamChatTimeoutMs(
   if (init.method?.toUpperCase() === "POST" && /\/codex\/v1\/responses/i.test(url)) {
     return UPSTREAM_STORY_CHAT_TIMEOUT_MS;
   }
+  if (chatBodyHasVisionMedia(init.body)) {
+    return UPSTREAM_VISION_CHAT_TIMEOUT_MS;
+  }
   const maxTokens = readChatMaxTokensFromBody(init.body);
   if (
     typeof maxTokens === "number" &&
     maxTokens >= UPSTREAM_STORY_CHAT_MAX_TOKENS_THRESHOLD
   ) {
-    return UPSTREAM_STORY_CHAT_TIMEOUT_MS;
-  }
-  if (chatBodyHasVisionMedia(init.body)) {
     return UPSTREAM_STORY_CHAT_TIMEOUT_MS;
   }
   return UPSTREAM_CHAT_TIMEOUT_MS;
@@ -233,6 +238,7 @@ export function isTransientUpstreamConnectError(err: unknown): boolean {
     /timeout|timed out|connect timeout|ssl connection timeout|socket timeout/i.test(
       blob,
     ) ||
+    /ETIMEDOUT|ESOCKETTIMEDOUT/i.test(blob) ||
     /socket disconnected|secure TLS connection|ECONNRESET|EPIPE|UND_ERR_SOCKET|UND_ERR_CONNECT_TIMEOUT|UND_ERR_HEADERS_TIMEOUT|UND_ERR_BODY_TIMEOUT/i.test(
       blob,
     )

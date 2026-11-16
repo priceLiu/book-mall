@@ -74,6 +74,8 @@ import {
 } from "@/lib/detail-page-suite-module-slots";
 import {
   listDetailPageSuitePromptGenTargets,
+  detailPageSuiteDeselectSlotsAfterImageGen,
+  listModuleImageGenSlotKeys,
   listModuleSelectedSlotKeys,
   pruneDetailPageSuitePromptSelection,
   resolveDetailPageSuiteBusyPromptKeys,
@@ -453,14 +455,12 @@ function DetailPageSuiteStudioInner() {
 
   useEffect(() => {
     if (!project?.id) return;
-    if (!detailPageSuiteHasPendingWork(project.meta)) return;
+    const hasMetaPending = detailPageSuiteHasPendingWork(project.meta);
+    if (!hasMetaPending && activeGenSlotKeys.size === 0) return;
     let cancelled = false;
     const refresh = async () => {
       if (cancelled) return;
-      if (
-        imageGenInFlightRef.current.size > 0 ||
-        promptSlotInFlightRef.current.size > 0
-      ) {
+      if (promptSlotInFlightRef.current.size > 0) {
         return;
       }
       try {
@@ -476,6 +476,7 @@ function DetailPageSuiteStudioInner() {
       window.clearInterval(id);
     };
   }, [
+    activeGenSlotKeys.size,
     loadProjectById,
     project?.id,
     project?.meta?.pendingImages,
@@ -623,11 +624,6 @@ function DetailPageSuiteStudioInner() {
         });
         return;
       }
-      setPromptSelectionKeys((prev) => {
-        const next = new Set(prev);
-        for (const k of keys) next.delete(k);
-        return next;
-      });
       for (const k of keys) imageGenInFlightRef.current.add(k);
       const useDock = keys.length >= 3;
       const taskId = `dps-img-${Date.now()}`;
@@ -653,6 +649,9 @@ function DetailPageSuiteStudioInner() {
         });
         applyProject(result.project);
         latestProject = result.project;
+        setPromptSelectionKeys((prev) =>
+          detailPageSuiteDeselectSlotsAfterImageGen(prev, keys, result.project),
+        );
         if (useDock) backgroundGen.dismissTask(taskId);
 
         const stillMissingAfterWrite = keys.filter(
@@ -952,26 +951,25 @@ function DetailPageSuiteStudioInner() {
       const selectedKeys = listModuleSelectedSlotKeys(mod, promptSelectionKeys, {
         excludeKeys: busyKeys,
       });
-      if (selectedKeys.length === 0) {
-        toast({
-          title: "请先勾选点位",
-          variant: "error",
-        });
-        return;
-      }
-      const keys = listModuleSelectedSlotKeys(mod, promptSelectionKeys, {
+      const keys = listModuleImageGenSlotKeys(mod, promptSelectionKeys, {
         excludeKeys: busyKeys,
-        requirePrompt: true,
       });
       if (keys.length === 0) {
-        toast({
-          title: "尚无提示词",
-          message: "所选点位还没有提示词，请先生成提示词再出图。",
-          variant: "error",
-        });
+        if (selectedKeys.length === 0) {
+          toast({
+            title: "请先勾选点位",
+            variant: "error",
+          });
+        } else {
+          toast({
+            title: "尚无提示词",
+            message: "所选点位还没有提示词，请先生成提示词再出图。",
+            variant: "error",
+          });
+        }
         return;
       }
-      if (keys.length < selectedKeys.length) {
+      if (selectedKeys.length > 0 && keys.length < selectedKeys.length) {
         toast({
           title: `将出图 ${keys.length} 张`,
           message: `已跳过 ${selectedKeys.length - keys.length} 个无提示词的勾选点位。`,

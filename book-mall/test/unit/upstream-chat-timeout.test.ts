@@ -64,10 +64,10 @@ describe("resolveUpstreamChatTimeoutMs", () => {
         ],
       }),
     });
-    expect(ms).toBeGreaterThanOrEqual(600_000);
+    expect(ms).toBeGreaterThanOrEqual(900_000);
   });
 
-  it("uses story timeout when body contains image_url multimodal chat (replica script)", () => {
+  it("uses vision timeout when body contains image_url multimodal chat (replica script)", () => {
     const ms = resolveUpstreamChatTimeoutMs("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", {
       method: "POST",
       body: JSON.stringify({
@@ -84,7 +84,7 @@ describe("resolveUpstreamChatTimeoutMs", () => {
         ],
       }),
     });
-    expect(ms).toBeGreaterThanOrEqual(600_000);
+    expect(ms).toBeGreaterThanOrEqual(900_000);
   });
 
   it("exports story threshold at 8000", () => {
@@ -115,6 +115,13 @@ describe("isTransientUpstreamConnectError", () => {
       cause: Object.assign(new Error("Connect Timeout Error"), {
         code: "UND_ERR_CONNECT_TIMEOUT",
       }),
+    });
+    expect(isTransientUpstreamConnectError(err)).toBe(true);
+  });
+
+  it("treats read ETIMEDOUT as retryable", () => {
+    const err = new Error("fetch failed", {
+      cause: Object.assign(new Error("read ETIMEDOUT"), { code: "ETIMEDOUT" }),
     });
     expect(isTransientUpstreamConnectError(err)).toBe(true);
   });

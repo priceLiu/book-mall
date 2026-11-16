@@ -28,6 +28,12 @@ export function formatEcomTransportError(e: unknown): string {
   if (/terminated|ECONNRESET|aborted|socket hang up|UND_ERR|fetch failed|upstream_fetch_failed|failed to fetch/i.test(raw)) {
     return "与服务器连接中断，请确认 book-mall / Gateway 已启动后重试";
   }
+  if (
+    /ETIMEDOUT|timed out|连接超时|流式输出长时间无数据|流式输出超过墙钟上限/i.test(raw) ||
+    /(?:DASHSCOPE|BAILIAN|百炼|DashScope).*API.*(?:超时|请求失败)/i.test(raw)
+  ) {
+    return "视觉模型响应超时，百炼/DashScope 仍在处理或网络不稳定。请稍后重试；可改用小图、减少参考图张数，或在 Gateway 换用 qwen3-vl-flash。";
+  }
   return raw || "请稍后重试";
 }
 
@@ -67,7 +73,7 @@ export async function ecomBookFetch(path: string, init?: RequestInit) {
     if (res.status === 502 && data.error === "upstream_fetch_failed") {
       throw new Error(formatEcomTransportError(new Error(combined)));
     }
-    throw new Error(combined);
+    throw new Error(formatEcomTransportError(new Error(combined)));
   }
   return data;
 }

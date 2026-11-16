@@ -2,9 +2,11 @@ import { GatewayRequiredError } from "@/lib/gateway/book-gateway-link";
 import {
   classifyGatewaySubmitError,
   isContentPolicySubmitMessage,
+  isRateLimitSubmitMessage,
   isUpstreamBalanceMessage,
   isUpstreamFreeQuotaMessage,
   UPSTREAM_FREE_QUOTA_USER_ZH,
+  UPSTREAM_RATE_LIMIT_USER_ZH,
 } from "@/lib/gateway/gateway-submit-error-policy";
 
 const CONTENT_POLICY_USER_ZH =
@@ -30,6 +32,10 @@ export function formatEcomImageProcessingUserError(error: unknown): {
   const raw = error instanceof Error ? error.message.trim() : String(error).trim();
   if (raw.includes("积分不足")) {
     return { message: raw, status: 402 };
+  }
+
+  if (isRateLimitSubmitMessage(raw)) {
+    return { message: UPSTREAM_RATE_LIMIT_USER_ZH, status: 429 };
   }
 
   if (isContentPolicySubmitMessage(raw)) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DETAIL_PAGE_SUITE_IMAGE_GEN_PENDING_MAX_MS,
   listDetailPageSuitePendingImageKeys,
   reconcileDetailPageSuitePendingMeta,
 } from "@/lib/detail-page-suite-pending";
@@ -40,6 +41,51 @@ describe("detail-page-suite-pending (client)", () => {
               ],
             },
           ],
+        },
+      ],
+    };
+    const reconciled = reconcileDetailPageSuitePendingMeta(suite as never, meta);
+    expect(reconciled?.pendingImages).toBeUndefined();
+  });
+
+  it("reconcile drops pending when imageGenFailures recorded for slot", () => {
+    const startedAt = "2026-09-13T10:00:00.000Z";
+    const meta = {
+      pendingImages: {
+        "mod1::item_a": { startedAt },
+      },
+      imageGenFailures: {
+        "mod1::item_a": { message: "rate limit", failedAt: "2026-09-13T10:00:02.000Z" },
+      },
+    };
+    const suite = {
+      modules: [
+        {
+          module_id: "mod1",
+          enable: true,
+          generate_count: 1,
+          slots: [{ item_key: "item_a", item_label: "A", positive_prompt: "p" }],
+        },
+      ],
+    };
+    const reconciled = reconcileDetailPageSuitePendingMeta(suite as never, meta);
+    expect(reconciled?.pendingImages).toBeUndefined();
+  });
+
+  it("reconcile drops image pending past single-request max window", () => {
+    const startedAt = new Date(Date.now() - DETAIL_PAGE_SUITE_IMAGE_GEN_PENDING_MAX_MS - 60_000).toISOString();
+    const meta = {
+      pendingImages: {
+        "mod1::item_a": { startedAt },
+      },
+    };
+    const suite = {
+      modules: [
+        {
+          module_id: "mod1",
+          enable: true,
+          generate_count: 1,
+          slots: [{ item_key: "item_a", item_label: "A", positive_prompt: "p" }],
         },
       ],
     };

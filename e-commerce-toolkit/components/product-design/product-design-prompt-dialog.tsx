@@ -18,6 +18,9 @@ import type { EcomPromptImageRef } from "@/lib/ecom-prompt-mention";
 import { PRODUCT_DESIGN_PROMPT_MENTION_FIELD_PROPS } from "@/lib/product-design-prompt-mention-ui";
 import { cn } from "@/lib/utils";
 
+/** 高于工作台侧栏/画布；低于 @ 引用浮层 pickerZIndex（默认 6000） */
+const PRODUCT_DESIGN_PROMPT_DIALOG_Z = 2200;
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -121,7 +124,8 @@ export function ProductDesignPromptDialog({
     if (!open || typeof document === "undefined") return null;
     return createPortal(
       <div
-        className="fixed inset-0 z-[300] flex items-center justify-center bg-black/45 p-4"
+        className="fixed inset-0 flex items-center justify-center bg-black/50 p-4"
+        style={{ zIndex: PRODUCT_DESIGN_PROMPT_DIALOG_Z }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="product-design-prompt-title"
@@ -129,7 +133,7 @@ export function ProductDesignPromptDialog({
       >
         <div
           className={cn(
-            "relative flex max-h-[85vh] w-full max-w-3xl flex-col gap-3 overflow-hidden rounded-2xl bg-white p-6 shadow-2xl",
+            "relative isolate z-[1] flex max-h-[85vh] w-full max-w-3xl flex-col gap-3 overflow-hidden rounded-2xl bg-white p-6 shadow-2xl",
           )}
           onClick={(e) => e.stopPropagation()}
         >
